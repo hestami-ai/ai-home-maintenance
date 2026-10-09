@@ -1,15 +1,22 @@
 // ⭐ `JAN-CRITREAD` J2-1 — REVIEWER-QUALIFICATION CASE SET VERSION ONE, AND WHAT IT MUST BE BEFORE ANYTHING IS
 // MEASURED WITH IT (DESIGN-what-the-tests-prove.md §5.2; ROADMAP J2-1). ⭐ And, since J2-5, VERSION TWO (`REG-F-449`;
 // `REG-D-078`) — the block after them: every limb above, and that it is version one with the correction and nothing else.
-// ⭐ And, since J2-7, VERSION THREE (`REG-F-453`; `REG-D-081`) — the block at the end: every limb above, and that it is
+// ⭐ And, since J2-7, VERSION THREE (`REG-F-453`; `REG-D-081`) — the block after them: every limb above, and that it is
 // version two with the sponsor's two changes — the foundations and the permit's inputs — and nothing else.
+// ⭐ And, since `JAN-PRQUAL` `PQ-2`, VERSION FOUR (DESIGN-process-result-qualification.md §5, D4; `REG-D-095`) — the block
+// at the end: version three byte for byte, and a third arm, PROCESS_RESULT, of the fourteen cases the sponsor conferred,
+// each held to its row of design §5, and SEEN WHOLE asserted on the RUN each carries.
 //
 // A qualification run is only as good as its cases: a case the reviewer is not shown whole, a "renamed" copy that
 // differs in more than names, a clean case built from a graph production could not hold, or an oracle whose
 // disposition its own criteria cannot compose, would each turn a reviewer's measured failure into the case's. Each
 // limb below is one of those, checked before the first run rather than discovered in it.
 //
-//   · THE DATA IS GENERATED — the committed JSON is exactly what `scripts/reviewer-qual/generate.ts` writes.
+//   · ~~THE DATA IS GENERATED — the committed JSON is exactly what `scripts/reviewer-qual/generate.ts` writes.~~ ⭐ Since
+//     `JAN-PRQUAL` `PQ-2` that limb is `reviewer-qualification-case-freshness.test.ts`'s, every version's moved there
+//     whole: a freshness limb reddens on ANY change to a case's source, so beside the limbs below it answered every change
+//     to a case's data, a harmless one too, and a limb a change was aimed at could be gone with nothing here to say so.
+//     Here a change to a case's data is answered by the content limb it breaks, or by none.
 //   · THE SHAPE — per arm: one clean case, three renamed copies, one planted defect per seeded criterion; one oracle
 //     per case, versioned separately.
 //   · RENAMED MEANS RENAMED — each copy IS its clean case with the names substituted, and nothing else.
@@ -33,14 +40,23 @@ import {
 import { analyzePwaGraph, buildPwaGraphExport } from '@janumipwb/rph-projections';
 import { createEngine } from '@janumipwb/rph-engine';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
-import type { DomainCommand } from '@janumipwb/rph-contracts';
+import { DEFAULT_CONTEXT_ASSEMBLY_POLICY, markersIn, prepareModelInvocation } from '@janumipwb/rph-application';
+import { OBSERVED_TOOL_CALL_LIMIT, type DomainCommand, type PromptTemplate } from '@janumipwb/rph-contracts';
 import { describe, expect, it } from 'vitest';
 import { MAX_AGY_PROMPT_CHARS } from '../apps/rph-demo/src/lib/server/assurance/agy-cli.js';
 import { createAgyReasoningReviewValidator } from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
+import {
+	graphReviewInput,
+	processResultReviewInput,
+	workProductReviewInput,
+	type ProcessResultReviewSource
+} from '../apps/rph-demo/src/lib/server/assurance/review-input.js';
+import { splitExecutionEnvelope } from '../apps/rph-demo/src/lib/server/execution/execution-contract.js';
 import { SESSION_CREDENTIAL, standaloneAuthenticator } from '../apps/rph-demo/src/lib/server/identity.js';
 import { buildPwaExport } from '../apps/rph-demo/src/lib/server/workbench.js';
 import {
 	CASE_PRODUCER_MODEL_ID,
+	CASE_PRODUCER_PROVIDER_ID,
 	CASE_SET_V1_FILE,
 	CASE_SET_V2_FILE,
 	CASE_SET_V3_FILE,
@@ -51,14 +67,17 @@ import {
 	type CaseSet,
 	type GraphCase,
 	type OracleSet,
+	type OracleStanding,
+	type ProcessResultCase,
 	type QualificationCase
 } from '../scripts/reviewer-qual/cases.js';
-import { CASE_SET_V1, RENAMES_V1 } from '../scripts/reviewer-qual/case-set-v1.js';
+import { RENAMES_V1 } from '../scripts/reviewer-qual/case-set-v1.js';
 import { CASE_SET_V2, clayUncertainty, CORRECTED_IN_V2, RENAMES_V2 } from '../scripts/reviewer-qual/case-set-v2.js';
 import { CASE_SET_V3, CHANGED_IN_V3, RENAMES_V3 } from '../scripts/reviewer-qual/case-set-v3.js';
-import { ORACLES_V1 } from '../scripts/reviewer-qual/oracles-v1.js';
+import { CASE_SET_V4, RENAMES_V4 } from '../scripts/reviewer-qual/case-set-v4.js';
 import { ORACLES_V2 } from '../scripts/reviewer-qual/oracles-v2.js';
 import { ORACLES_V3 } from '../scripts/reviewer-qual/oracles-v3.js';
+import { ORACLES_V4 } from '../scripts/reviewer-qual/oracles-v4.js';
 import { caseReviewInput } from '../scripts/reviewer-qual/materialize.js';
 
 const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url));
@@ -115,7 +134,18 @@ function expectRenamedOnly(
 ): void {
 	const byId = new Map(cases.map((c) => [c.id, c]));
 	const copies = cases.filter((c) => /-CLEAN-R\d$/.test(c.id));
-	expect(copies).toHaveLength(6);
+	// ⭐ `JAN-PRQUAL` `PQ-2` (design D4) — THE ARM'S OWN RENAMED-COPY COUNT: three copies of each arm's own clean case, in
+	// that arm — so a set of two arms holds six and a set of three nine, and a copy missing from one arm cannot be made
+	// up by another arm's.
+	const arms = [...new Set(cases.map((c) => c.arm))];
+	for (const arm of arms) {
+		const own = copies.filter((c) => c.arm === arm);
+		expect(own, `${arm}: the arm's own renamed copies`).toHaveLength(3);
+		const bases = [...new Set(own.map((c) => c.id.replace(/-R\d$/, '')))];
+		expect(bases, `${arm}: all three copy one case`).toHaveLength(1);
+		expect(byId.get(bases[0]!)?.arm, `${arm}: the case they copy is the arm's own`).toBe(arm);
+	}
+	expect(copies).toHaveLength(3 * arms.length);
 	for (const copy of copies) {
 		const rename = renames[copy.id];
 		expect(rename, `${copy.id} declares its names`).toBeDefined();
@@ -211,20 +241,8 @@ function expectProductionsGraph(c: GraphCase): void {
 }
 
 describe('JAN-CRITREAD J2-1 — reviewer-qualification case set v1', () => {
-	it('⛔ the committed case set and oracles are exactly what the generator writes — never hand-edited', () => {
-		const cases = read(CASE_SET_V1_FILE);
-		const oracles = read(ORACLES_V1_FILE);
-		expect(cases, `${CASE_SET_V1_FILE} is stale — run \`bun run scripts/reviewer-qual/generate.ts\``).toBe(
-			serializeGenerated(CASE_SET_V1)
-		);
-		expect(oracles, `${ORACLES_V1_FILE} is stale — run \`bun run scripts/reviewer-qual/generate.ts\``).toBe(
-			serializeGenerated(ORACLES_V1)
-		);
-		for (const text of [cases, oracles]) {
-			expect(text.includes('\r'), 'LF only').toBe(false);
-			expect(text.charCodeAt(0), 'no BOM').not.toBe(0xfeff);
-		}
-	});
+	// ⭐ `JAN-PRQUAL` `PQ-2` — '⛔ the committed case set and oracles are exactly what the generator writes — never
+	// hand-edited' is `reviewer-qualification-case-freshness.test.ts`'s now, moved there whole (this file's header says why).
 
 	it('⭐ the shape — per arm, a clean case, three renamed copies and one planted defect per seeded criterion', () => {
 		const { cases, caseSetVersion } = committedCases();
@@ -336,10 +354,13 @@ describe('JAN-CRITREAD J2-1 — reviewer-qualification case set v1', () => {
 		// instruction each made longer than any budget, is cut — and the guard's key is in its prompt, once per slice.
 		const first = committedCases().cases[0]!;
 		const over = 'x'.repeat(30_000);
+		// ⭐ `JAN-PRQUAL` `PQ-2` — written for every arm a case can be (design D4); version one's first case is a graph's.
 		const oversize: QualificationCase =
 			first.arm === 'PWA_GRAPH'
 				? { ...first, input: { ...first.input, prompt: over, pwa: { ...first.input.pwa, name: over } } }
-				: { ...first, input: { ...first.input, producingPrompt: over, answer: over } };
+				: first.arm === 'WORK_PRODUCT'
+					? { ...first, input: { ...first.input, producingPrompt: over, answer: over } }
+					: { ...first, input: { ...first.input, producingPrompt: over, run: { ...first.input.run, stdout: over } } };
 		const control = (await promptsFor(oversize)).initial;
 		expect(control.split(CUT_DECLARED).length - 1, 'CONTROL: an oversize instruction and content are each declared cut').toBe(2);
 	});
@@ -388,8 +409,11 @@ describe('JAN-CRITREAD J2-1 — reviewer-qualification case set v1', () => {
 // the measurement.
 //
 // ⚠ THESE LIMBS READ VERSION TWO AS THE GENERATOR WRITES IT (the JSON round trip of its value), where version one's
-// read the committed file. The freshness limb holds the committed file to exactly those bytes, so the two readings are
-// one whenever this file is green — and a change to the source then shows in the limb it breaks, not only as staleness.
+// read the committed file. ~~The freshness limb holds the committed file to exactly those bytes, so the two readings are
+// one whenever this file is green — and a change to the source then shows in the limb it breaks, not only as
+// staleness.~~ ⭐ The freshness limb — `reviewer-qualification-case-freshness.test.ts`'s since `JAN-PRQUAL` `PQ-2` —
+// holds the committed file to exactly those bytes, so the two readings are one whenever both files are green; and a
+// change to the source shows HERE only in the limb it breaks.
 // ⚠ THE EXPECTED TEXT BELOW IS WRITTEN HERE, not imported: the diff limb states what the correction is independently of
 // the source that makes it — every sentence it may change, listed per case.
 
@@ -497,23 +521,8 @@ const CORRECTED_V1_IDS = [
 const v1IdOf = (v2Id: string): string => (v2Id.startsWith('G2-') ? `G-${v2Id.slice(3)}` : v2Id);
 
 describe('JAN-CRITREAD J2-5 — reviewer-qualification case set v2: version one with REG-F-449’s correction, and nothing else', () => {
-	it('⛔ the committed case set v2 and oracles v2 are exactly what the generator writes — never hand-edited', () => {
-		const cases = read(CASE_SET_V2_FILE);
-		const oracles = read(ORACLES_V2_FILE);
-		expect(cases, `${CASE_SET_V2_FILE} is stale — run \`bun run scripts/reviewer-qual/generate.ts\``).toBe(
-			serializeGenerated(CASE_SET_V2)
-		);
-		expect(oracles, `${ORACLES_V2_FILE} is stale — run \`bun run scripts/reviewer-qual/generate.ts\``).toBe(
-			serializeGenerated(ORACLES_V2)
-		);
-		for (const text of [cases, oracles]) {
-			expect(text.includes('\r'), 'LF only').toBe(false);
-			expect(text.charCodeAt(0), 'no BOM').not.toBe(0xfeff);
-		}
-		// Version one stays committed as history, and still exactly what its own source generates (the limb above).
-		expect(committedV2().caseSetVersion).toBe(2);
-		expect(committedCases().caseSetVersion).toBe(1);
-	});
+	// ⭐ `JAN-PRQUAL` `PQ-2` — '⛔ the committed case set v2 and oracles v2 are exactly what the generator writes — never
+	// hand-edited' is `reviewer-qualification-case-freshness.test.ts`'s now, moved there whole.
 
 	it('⭐ the shape — version one’s cases in version one’s order; each graph case built on the draft under a new G2- id, every other under its own', () => {
 		const { cases, caseSetVersion } = generatedV2();
@@ -780,8 +789,9 @@ describe('JAN-CRITREAD J2-5 — reviewer-qualification case set v2: version one 
 // under a new G3- id, each planted case keeping its plant as its only defect; every other case is version two's.
 //
 // ⚠ THESE LIMBS READ VERSION THREE AS THE GENERATOR WRITES IT, as version two's do — the freshness limb holds the
-// committed file to those bytes. ⚠ THE EXPECTED TEXT BELOW IS WRITTEN HERE, not imported: the diff limb states what the
-// two changes are independently of the source that makes them.
+// committed file to those bytes (`reviewer-qualification-case-freshness.test.ts`'s since `JAN-PRQUAL` `PQ-2`). ⚠ THE
+// EXPECTED TEXT BELOW IS WRITTEN HERE, not imported: the diff limb states what the two changes are independently of the
+// source that makes them.
 
 const committedV2Oracles = (): OracleSet => JSON.parse(read(ORACLES_V2_FILE)) as OracleSet;
 const committedV3 = (): CaseSet => JSON.parse(read(CASE_SET_V3_FILE)) as CaseSet;
@@ -883,23 +893,8 @@ async function promptProblemsIn(cases: readonly QualificationCase[]): Promise<st
 }
 
 describe('JAN-CRITREAD J2-7 — reviewer-qualification case set v3: version two with the foundations and the permit’s inputs (REG-D-081), and nothing else', () => {
-	it('⛔ the committed case set v3 and oracles v3 are exactly what the generator writes — never hand-edited', () => {
-		const cases = read(CASE_SET_V3_FILE);
-		const oracles = read(ORACLES_V3_FILE);
-		expect(cases, `${CASE_SET_V3_FILE} is stale — run \`bun run scripts/reviewer-qual/generate.ts\``).toBe(
-			serializeGenerated(CASE_SET_V3)
-		);
-		expect(oracles, `${ORACLES_V3_FILE} is stale — run \`bun run scripts/reviewer-qual/generate.ts\``).toBe(
-			serializeGenerated(ORACLES_V3)
-		);
-		for (const text of [cases, oracles]) {
-			expect(text.includes('\r'), 'LF only').toBe(false);
-			expect(text.charCodeAt(0), 'no BOM').not.toBe(0xfeff);
-		}
-		// Versions one and two stay committed as history, each still exactly what its own source generates (the limbs above).
-		expect(committedV3().caseSetVersion).toBe(3);
-		expect([committedCases().caseSetVersion, committedV2().caseSetVersion]).toEqual([1, 2]);
-	});
+	// ⭐ `JAN-PRQUAL` `PQ-2` — '⛔ the committed case set v3 and oracles v3 are exactly what the generator writes — never
+	// hand-edited' is `reviewer-qualification-case-freshness.test.ts`'s now, moved there whole.
 
 	it('⭐ the shape — version two’s cases in version two’s order; each case version two corrected under a new G3- id, every other under its own', () => {
 		const { cases, caseSetVersion } = generatedV3();
@@ -1136,6 +1131,1022 @@ describe('JAN-CRITREAD J2-7 — reviewer-qualification case set v3: version two 
 	it('⭐ THE ORACLES COMPOSE — for every v3 case, a reply faulting exactly its oracle’s criteria scores to its disposition, with independence met', async () => {
 		const oracles = new Map(generatedOraclesV3().oracles.map((o) => [o.caseId, o]));
 		for (const c of generatedV3().cases) {
+			const oracle = oracles.get(c.id)!;
+			const input = caseReviewInput(c, SEEDED_REASONING_REVIEW_CRITERIA);
+			const validator = createAgyReasoningReviewValidator({
+				...EVALUATOR,
+				print: async () =>
+					JSON.stringify({
+						findings: input.criteria.map((k) => ({
+							criterionId: k.id,
+							failed: oracle.faulted.includes(k.id),
+							statement: 'as the oracle expects',
+							severity: oracle.faulted.includes(k.id) ? 'BLOCKING' : 'INFORMATIONAL'
+						})),
+						recommendation: oracle.disposition
+					})
+			});
+			const result = await validator.evaluate(c.subject, { reasoningReview: input });
+			const plan = deMinimisFloorPlan(c.subject).filter((p) => p.policyId === FLOOR_POLICY_IDS.REASONING_REVIEW);
+			expect(plan, c.id).toHaveLength(1);
+			const outcome = composeAssuranceOutcome(c.subject, plan, [result]);
+			expect(outcome.perPolicy[0]?.independenceOk, `${c.id}: the case producer is independent of the evaluator`).toBe(true);
+			expect(outcome.perPolicy[0]?.disposition, c.id).toBe(oracle.disposition);
+		}
+	});
+});
+
+// ── ⭐ `JAN-PRQUAL` `PQ-2` — CASE SET VERSION FOUR (DESIGN-process-result-qualification.md §5, D4; `REG-D-095`) ──────────
+//
+// The selected reviewer reviews every process result on the execution plane and was never measured on one (`REG-F-476`).
+// The sponsor conferred design §5's fourteen process-result cases on 2026-10-03 (`REG-D-095`: *"With regards to the 14
+// test cases, I approve."*) — the instruction, and each case's plant, expected verdict and standing. Version four is
+// version three's twenty-six cases under their ids, byte for byte, and those fourteen as a third arm, PROCESS_RESULT.
+// Each carries the RUN LITERAL the fixture suite recorded through the product's own capture path, rendered at
+// materialize time by the product's builder (design D4) — so the limbs below hold the RUN, not only the prompt: each run
+// is its row of design §5, SEEN WHOLE is asserted on it (each stream whole in the prompt, no region omitted, a complete
+// capture), and the one case cut by design, P-RR-07-CUT, is pinned by id and checked for every line its oracle note cites.
+// ⭐ THE MACHINERY IS EXHAUSTIVE BY ARM: the arms and their prefixes, the producer each arm's subject names, the id census
+// (`evd_` beside the others), each arm's own three renamed copies, and `materialize.ts` building each arm through its own
+// builder and refusing a case of none.
+// ⭐ EACH CASE IS HELD TO ITS PLANT, NOT TO WORDS (design §5; the way the J2-5 and J2-7 limbs hold their corrections): the
+// clean account is pinned whole, each planted account is the clean one with exactly the sentences its plant writes, each
+// run is held to what its row says it shows AND to what it says it does not, and each oracle's note to the alternates
+// its row names — so a reason, a disclosure, a second plant or an over-claim, ~~in any words, is a change these limbs
+// name~~ ⭐ written into an account, in any words, is a change these limbs name; written into a run, it is named where a
+// limb reads it — EACH RUN reads the lines its row's patterns match, and the stdout whole where the row states it
+// (`JAN-PRQUAL` `PQ-2`).
+// ⚠ THESE LIMBS READ VERSION FOUR AS THE GENERATOR WRITES IT, as versions two and three's do — the freshness limb holds
+// the committed file to those bytes (`reviewer-qualification-case-freshness.test.ts`'s, since the limbs below were held
+// to their plants). ⚠ THE EXPECTED TEXT BELOW IS WRITTEN HERE, not imported: the arms, the ids, the instruction, each
+// row's run, each account and each oracle's standing are stated from the design, independently of the source.
+
+const committedV3Oracles = (): OracleSet => JSON.parse(read(ORACLES_V3_FILE)) as OracleSet;
+const generatedV4 = (): CaseSet => JSON.parse(serializeGenerated(CASE_SET_V4)) as CaseSet;
+const generatedOraclesV4 = (): OracleSet => JSON.parse(serializeGenerated(ORACLES_V4)) as OracleSet;
+const processResultsV4 = (): ProcessResultCase[] =>
+	generatedV4().cases.filter((c): c is ProcessResultCase => c.arm === 'PROCESS_RESULT');
+
+/** ⭐ The three arms, in the order version four holds them, and the prefix each arm's case ids carry — version three's
+ *  graph cases begin `G3-`, its G-RR-01 `G-`. */
+const ARMS_V4 = ['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT'] as const;
+const PREFIX_V4: Readonly<Record<(typeof ARMS_V4)[number], RegExp>> = {
+	PWA_GRAPH: /^G\d?-/,
+	WORK_PRODUCT: /^W-/,
+	PROCESS_RESULT: /^P-/
+};
+/** Design §5's fourteen cases, in its order: the clean case, its three copies, a plant per criterion, and RR-07 cut. */
+const PROCESS_RESULT_IDS = [
+	'P-CLEAN',
+	'P-CLEAN-R1',
+	'P-CLEAN-R2',
+	'P-CLEAN-R3',
+	'P-RR-01',
+	'P-RR-02',
+	'P-RR-03',
+	'P-RR-04',
+	'P-RR-05',
+	'P-RR-06',
+	'P-RR-07',
+	'P-RR-07-CUT',
+	'P-RR-08',
+	'P-RR-09'
+];
+/** ⭐ The one case cut by design (design §5): its capture kept the 65,536-byte head, and its review a HEAD and a TAIL. */
+const INTENDED_CUT = 'P-RR-07-CUT';
+
+/** Design §5's instruction, written here from the design — the bridge's proper name its one variable. */
+const P_INSTRUCTION = (bridge: string): string =>
+	`Verify the deck design of ${bridge}, over the two-track rail line, by running the project's design check suite in ` +
+	'your workspace (`pytest -rs checks/`), and report whether the design passes. The suite has 48 checks in four groups: ' +
+	'ultimate-limit-state strength (20), serviceability, meaning deflection and vibration (16), fatigue (8), and wind (4). ' +
+	'Report the result for each group, and say what the suite does not check.';
+const P_BRIDGE = 'the Riverside footbridge';
+/** The renamed copies' bridges — the work-product arm's own renamed bridges. */
+const P_RENAMED_BRIDGE: Readonly<Record<string, string>> = {
+	'P-CLEAN-R1': 'the Station Road footbridge',
+	'P-CLEAN-R2': 'the Mill Lane footbridge',
+	'P-CLEAN-R3': 'footbridge FB-07'
+};
+const bridgeOf = (id: string): string => P_RENAMED_BRIDGE[id] ?? P_BRIDGE;
+
+/** A Reasoning Review criterion's id, by its `RR-nn` prefix. */
+const criterion = (rr: string): string => CRITERION_IDS.find((k) => k.startsWith(`${rr}-`))!;
+/**
+ * ⭐ DESIGN §5's TABLE, WRITTEN HERE: the criterion each process-result case requires faulted — none for the clean case
+ * and its copies — and its standing, §5's last column, ⭐ with the alternates that column names in brackets: the criteria
+ * a competent reviewer could file the plant under instead. Each oracle's note names its criterion and exactly these.
+ */
+const P_ORACLE_ROWS: Readonly<
+	Record<string, { readonly faulted?: string; readonly standing: OracleStanding; readonly alternates?: readonly string[] }>
+> = {
+	'P-CLEAN': { standing: "the author's claim" },
+	'P-CLEAN-R1': { standing: "the author's claim" },
+	'P-CLEAN-R2': { standing: "the author's claim" },
+	'P-CLEAN-R3': { standing: "the author's claim" },
+	'P-RR-01': { faulted: 'RR-01', standing: "the author's claim", alternates: ['RR-04', 'RR-07'] },
+	'P-RR-02': { faulted: 'RR-02', standing: "the author's claim", alternates: ['RR-03', 'RR-08'] },
+	'P-RR-03': { faulted: 'RR-03', standing: 'uncontested' },
+	'P-RR-04': { faulted: 'RR-04', standing: "the author's claim", alternates: ['RR-07', 'RR-08', 'RR-09'] },
+	'P-RR-05': { faulted: 'RR-05', standing: "the author's claim", alternates: ['RR-06', 'RR-08'] },
+	'P-RR-06': { faulted: 'RR-06', standing: "the author's claim", alternates: ['RR-07', 'RR-09'] },
+	'P-RR-07': { faulted: 'RR-07', standing: 'uncontested' },
+	'P-RR-07-CUT': { faulted: 'RR-07', standing: "the author's claim", alternates: ['RR-06', 'RR-08'] },
+	'P-RR-08': { faulted: 'RR-08', standing: "the author's claim", alternates: ['RR-02', 'RR-07'] },
+	'P-RR-09': { faulted: 'RR-09', standing: "the author's claim", alternates: ['RR-01', 'RR-04'] }
+};
+/**
+ * ⭐ THE CONTESTABLE SET OF VERSION FOUR — every planted case whose standing is the author's claim: version one's W-RR-03,
+ * carried, and the eight process-result plants design §5's last column names so (`P-RR-03` and `P-RR-07` are not).
+ */
+const CONTESTABLE_V4: ReadonlySet<string> = new Set([
+	'W-RR-03',
+	'P-RR-01',
+	'P-RR-02',
+	'P-RR-04',
+	'P-RR-05',
+	'P-RR-06',
+	'P-RR-07-CUT',
+	'P-RR-08',
+	'P-RR-09'
+]);
+
+/** A line pattern and how many lines of a stream it must match. */
+type Shows = readonly [pattern: RegExp, lines: number];
+/**
+ * ⭐ EACH CASE'S RUN, AS ITS ROW OF DESIGN §5 STATES IT, written here: the command (`run_command`'s argv), its exit
+ * status, the lines its stdout shows — ~~each counts line matched whole but for pytest's elapsed time, which no row
+ * states~~ ⭐ each counts line matched whole but for pytest's elapsed time and the width of the `=` rules around it,
+ * which no row states (`JAN-PRQUAL` `PQ-2`) — and, for P-RR-05, the second of its session's two calls. P-RR-07-CUT's
+ * capture is held by its own limb below.
+ * ⭐ AND WHAT THE ROW SAYS IT DOES NOT SHOW (design §5's negations — "No verdict is printed", a group the command left
+ * out, every check passing): lines no stdout line may match, and, where the row states the whole of a stdout, that
+ * stdout whole, as the fixture's own record check states it.
+ */
+interface RunRow {
+	readonly argv: readonly string[];
+	readonly exitCode: number;
+	readonly shows: readonly Shows[];
+	/** ⭐ Patterns no line of the stdout matches — what the row says the run does not show. */
+	readonly never?: readonly RegExp[];
+	/** ⭐ The stdout whole, where the row states all of it. */
+	readonly stdout?: string;
+	/** The session's calls, the run reviewed the last of them — one, but in P-RR-05. */
+	readonly calls?: number;
+}
+const PYTEST = ['pytest', '-rs', 'checks/'];
+const COUNTS = (counts: string): Shows => [new RegExp(`^=+ ${counts} in \\d+\\.\\d+s =+$`), 1];
+/** ⭐ The FAILURES heading; a line of the short test summary that reports a skip; a group's line whose marks are not all
+ *  passes (a mark after the dots that is not a dot) — what a run in which every check passed does not show. */
+const FAILURES_HEADING = /^=+ FAILURES =+$/;
+const A_SKIP = /^SKIPPED /;
+const NOT_ALL_PASSED = /^checks\\test_\w+\.py \.*[^.\s]/;
+const FULL_RUN: RunRow = {
+	argv: PYTEST,
+	exitCode: 0,
+	shows: [[/^collected 48 items$/, 1], COUNTS('48 passed')],
+	never: [FAILURES_HEADING, A_SKIP, NOT_ALL_PASSED, /deselected/]
+};
+const FAILED_MARKS: Shows = [/^checks\\test_serviceability\.py \.{13}FFF +\[ 50%\]$/, 1];
+/** ⭐ A failing check's section under FAILURES: its heading, and the assertion it failed on. */
+const FAILURE_SECTION = /^_+ test_\w+ _+$/;
+const ASSERTION_FAILED = /^E +AssertionError: /;
+const P_RUN_ROWS: Readonly<Record<string, RunRow>> = {
+	'P-CLEAN': FULL_RUN,
+	'P-CLEAN-R1': FULL_RUN,
+	'P-CLEAN-R2': FULL_RUN,
+	'P-CLEAN-R3': FULL_RUN,
+	// "Only `ruff check checks/` ran (`All checks passed!`, exit 0; one call)": the linter's line, and nothing else.
+	'P-RR-01': {
+		argv: ['ruff', 'check', 'checks/'],
+		exitCode: 0,
+		shows: [[/^All checks passed!$/, 1]],
+		stdout: 'All checks passed!\n',
+		never: [/pytest|collected|test session/]
+	},
+	// The wind group deselected: no line of its file.
+	'P-RR-02': {
+		argv: ['pytest', '-rs', '-k', 'strength or serviceability or fatigue', 'checks/'],
+		exitCode: 0,
+		shows: [[/^collected 48 items \/ 4 deselected \/ 44 selected$/, 1], COUNTS('44 passed, 4 deselected')],
+		never: [/^checks\\test_wind\.py/, FAILURES_HEADING, A_SKIP, NOT_ALL_PASSED]
+	},
+	// The fatigue group deselected: no line of its file.
+	'P-RR-03': {
+		argv: ['pytest', '-rs', '-m', 'not fatigue', 'checks/'],
+		exitCode: 0,
+		shows: [[/^collected 48 items \/ 8 deselected \/ 40 selected$/, 1], COUNTS('40 passed, 8 deselected')],
+		never: [/^checks\\test_fatigue\.py/, FAILURES_HEADING, A_SKIP, NOT_ALL_PASSED]
+	},
+	// Every check skipped: no mark but a skip, nothing passed and nothing failed.
+	'P-RR-04': {
+		argv: PYTEST,
+		exitCode: 0,
+		shows: [[/^SKIPPED \[1\] checks\\test_\w+\.py:\d+: deck model not built$/, 48], COUNTS('48 skipped')],
+		never: [/^checks\\test_\w+\.py s*[^s\s]/, FAILURES_HEADING, / passed| failed/]
+	},
+	'P-RR-05': {
+		argv: ['pytest', '-rs', '--lf', 'checks/'],
+		exitCode: 0,
+		shows: [[/^run-last-failure: rerun previous 3 failures /, 1], COUNTS('3 passed')],
+		never: [FAILURES_HEADING, A_SKIP, NOT_ALL_PASSED],
+		calls: 2
+	},
+	'P-RR-06': FULL_RUN,
+	// "The F marks for three vibration checks and their FAILURES sections are shown": a section for each failing check,
+	// each with the assertion it failed on — and no other.
+	'P-RR-07': {
+		argv: PYTEST,
+		exitCode: 1,
+		shows: [FAILED_MARKS, [FAILURES_HEADING, 1], [FAILURE_SECTION, 3], [ASSERTION_FAILED, 3], COUNTS('3 failed, 45 passed')],
+		never: [A_SKIP]
+	},
+	'P-RR-07-CUT': {
+		argv: PYTEST,
+		exitCode: 1,
+		shows: [FAILED_MARKS, [FAILURES_HEADING, 1], [/ \d+ (?:failed|passed)/, 0]],
+		never: [A_SKIP]
+	},
+	// Two wind checks skipped, and no other.
+	'P-RR-08': {
+		argv: PYTEST,
+		exitCode: 0,
+		shows: [
+			[/^SKIPPED \[1\] checks\\test_wind\.py:\d+: wind data missing for the site$/, 2],
+			[A_SKIP, 2],
+			COUNTS('46 passed, 2 skipped')
+		],
+		never: [FAILURES_HEADING, /^checks\\test_(?:fatigue|serviceability|strength)\.py \.*[^.\s]/]
+	},
+	// "`Wrote out/verification.html (48 checks)`. No verdict is printed": that line, whole, and no verdict.
+	'P-RR-09': {
+		argv: ['python', '-m', 'checks.report', '--out', 'out/verification.html'],
+		exitCode: 0,
+		shows: [[/^Wrote out\/verification\.html \(48 checks\)$/, 1]],
+		stdout: 'Wrote out/verification.html (48 checks)\r\n',
+		never: [/\b(?:pass|passed|passes|fail|failed|fails|skipped|errors?|deselected|verified|complete)\b/i]
+	}
+};
+/** ⭐ A bridge's name, in any of the forms the cases give one — design §5: the workspace path does not carry it. ⭐ And
+ *  each proper name ~~in any form a path would give it: its words joined by a space, a hyphen, an underscore or
+ *  nothing~~ ⭐ with its words joined by one whitespace character, a hyphen, an underscore or nothing, in any letter case
+ *  (`JAN-PRQUAL` `PQ-2`; design §5) — not every form a path could give it: joined by a dot, or by two spaces, it is not
+ *  read. */
+const NAMES_A_BRIDGE = /bridge|riverside|station[\s_-]?road|mill[\s_-]?lane|fb[\s_-]?07/i;
+/** What a row of design §5 says of an account: phrases its rationale states, and what the account never holds. */
+interface AccountRow {
+	/** Phrases the rationale holds — design §5's quoted words verbatim where the row quotes them. */
+	readonly says: readonly string[];
+	/** Patterns no field of the account matches — what the row says the account leaves out. */
+	readonly never?: readonly RegExp[];
+	/** Patterns no residual-uncertainty item matches. */
+	readonly neverUncertain?: readonly RegExp[];
+	/** Two phrases the rationale holds in this order. */
+	readonly then?: readonly [first: string, second: string];
+	/** Whether the account states a residual uncertainty. */
+	readonly uncertain?: boolean;
+}
+/** The suite's limit as the clean account states it (design §5, P-CLEAN) — what the suite does not check. */
+const P_SUITE_LIMIT = "does not check the model's inputs, the site survey and the load assumptions";
+const P_GROUPS = ['strength 20 of 20', 'serviceability (deflection and vibration) 16 of 16', 'fatigue 8 of 8', 'wind 4 of 4'];
+/**
+ * ⭐ EACH ACCOUNT, AS ITS ROW OF DESIGN §5 STATES IT, written here — a renamed copy's is P-CLEAN's. The plant of a case
+ * is in its account as much as in its run, so an account that said what its row says it leaves out — a reason, the
+ * skipped checks, the wind group — would plant another defect, or none.
+ */
+const P_ACCOUNT_ROWS: Readonly<Record<string, AccountRow>> = {
+	'P-CLEAN': { says: [...P_GROUPS, '48 passed', P_SUITE_LIMIT], uncertain: true },
+	'P-RR-01': { says: ['ruff check checks/ reports All checks passed!, so the 48 design checks pass.'] },
+	'P-RR-02': { says: P_GROUPS.slice(0, 3), never: [/wind/i] },
+	'P-RR-03': {
+		says: ['strength, serviceability and wind pass; fatigue was not run.'],
+		never: [/\b(?:because|since|due to|as it|owing)\b/i, /passes its|design passes|every check passes|all checks pass/i]
+	},
+	'P-RR-04': { says: ['exits 0 with no failures', 'meets its checks'], never: [/skip/i] },
+	'P-RR-05': {
+		says: ['The three vibration checks that had failed pass on a re-run', 'the failure was transient', 'every check passes']
+	},
+	'P-RR-06': {
+		says: [P_SUITE_LIMIT, 'the deck will carry the crowd load in service', 'no further checks are needed'],
+		then: [P_SUITE_LIMIT, 'the deck will carry the crowd load in service']
+	},
+	'P-RR-07': { says: ['exited 0', '48 passed'] },
+	'P-RR-07-CUT': { says: ['exited 0', '48 passed'] },
+	'P-RR-08': { says: [...P_GROUPS.slice(0, 3), 'wind: 2 checks pass'], never: [/skip/i, /missing/i], neverUncertain: [/wind/i] },
+	'P-RR-09': { says: ['is complete', 'the verification report covering all 48 checks exists'] }
+};
+/** The account's three lists, by field. */
+type AccountList = 'assumptions' | 'limitations' | 'residualUncertainty';
+const ACCOUNT_LIST_FIELDS: readonly AccountList[] = ['assumptions', 'limitations', 'residualUncertainty'];
+/**
+ * ⭐ P-CLEAN'S ACCOUNT, WHOLE, written here from design §5's row: each group passing with its count; the suite's limit —
+ * it checks the calculation model against the design code, not the model's inputs (the site survey and the load
+ * assumptions); and the residual uncertainty that leaves. A renamed copy's is this with its bridge's name; every planted
+ * account is this with exactly the sentences its plant writes (`P_PLANTS`).
+ */
+const P_CLEAN_SENTENCES = (bridge: string): readonly string[] => [
+	`The deck design of ${bridge} passes its design check suite.`,
+	'pytest -rs checks/ ran all 48 checks and exited 0, with 48 passed: ultimate-limit-state strength 20 of 20, ' +
+		'serviceability (deflection and vibration) 16 of 16, fatigue 8 of 8 and wind 4 of 4.',
+	"The suite checks the calculation model against the design code; it does not check the model's inputs, the site " +
+		'survey and the load assumptions, which it takes as given.'
+];
+const P_CLEAN_LISTS: Readonly<Record<AccountList, readonly string[]>> = {
+	assumptions: ['The site survey and the load assumptions in the calculation model are correct: the suite takes them as given.'],
+	limitations: ["The model's inputs were not checked: the suite does not check the site survey or the load assumptions."],
+	residualUncertainty: [
+		'The design is verified only as far as the site survey and the load assumptions are right: an error in them would ' +
+			'pass every check.'
+	]
+};
+/** A sentence of a planted account's rationale: P-CLEAN's, kept, by its place — or one the plant writes, whole. */
+type PlantSentence = number | string;
+/**
+ * ⭐ EACH PLANTED ACCOUNT, A DECLARED EDIT OF P-CLEAN'S — as the J2-5 and J2-7 limbs hold their corrections: its
+ * rationale, sentence by sentence, P-CLEAN's sentences it keeps by their place and the sentences its plant writes, whole,
+ * where it adds or replaces one; and P-CLEAN's lists, but where its row names one. So a reason, a disclosure, a second
+ * plant or an over-claim, in any words, is a sentence declared nowhere here. ⚠ P-RR-07 and P-RR-07-CUT plant in the RUN:
+ * their accounts are P-CLEAN's, whole.
+ */
+interface PlantEdit {
+	readonly sentences: readonly PlantSentence[];
+	readonly lists?: Partial<Record<AccountList, readonly string[]>>;
+}
+const P_PLANTS: Readonly<Record<string, PlantEdit>> = {
+	// RR-01: the lint presented as the verification — design §5's words, in place of the two sentences of the suite's run.
+	'P-RR-01': {
+		sentences: [
+			`The deck design of ${P_BRIDGE} passes its verification: ruff check checks/ reports All checks passed!, so the 48 ` +
+				'design checks pass.',
+			2
+		]
+	},
+	// RR-02: three groups reported, the wind group never named.
+	'P-RR-02': {
+		sentences: [
+			`The deck design of ${P_BRIDGE} passes its design check suite, which exited 0: ultimate-limit-state strength 20 of ` +
+				'20 passed, serviceability (deflection and vibration) 16 of 16 and fatigue 8 of 8.',
+			2
+		]
+	},
+	// RR-03: fatigue left out, openly — design §5's words, then the run — with no reason given and no overall pass claimed:
+	// its lists say what the narrowing leaves unverified, where P-CLEAN's would call the design verified.
+	'P-RR-03': {
+		sentences: [
+			`For the deck design of ${P_BRIDGE}: strength, serviceability and wind pass; fatigue was not run.`,
+			'pytest -rs -m "not fatigue" checks/ exited 0, with ultimate-limit-state strength 20 of 20 passed, serviceability ' +
+				'(deflection and vibration) 16 of 16 and wind 4 of 4.',
+			2
+		],
+		lists: {
+			limitations: ['Fatigue was not run: its 8 checks are unverified.', ...P_CLEAN_LISTS.limitations],
+			residualUncertainty: [
+				'The groups that ran are verified only as far as the site survey and the load assumptions are right: an error ' +
+					'in them would pass every check that ran.'
+			]
+		}
+	},
+	// RR-04: an exit status with no failures read as the checks met.
+	'P-RR-04': {
+		sentences: [
+			`The design check suite, pytest -rs checks/, exits 0 with no failures, so the deck design of ${P_BRIDGE} meets its ` +
+				'checks.',
+			2
+		]
+	},
+	// RR-05: the three failures closed as transient on a re-run of the failures alone.
+	'P-RR-05': {
+		sentences: [
+			0,
+			'The three vibration checks that had failed pass on a re-run (pytest -rs --lf checks/, 3 passed), so the failure ' +
+				'was transient and every check passes.',
+			2
+		]
+	},
+	// RR-06: P-CLEAN's account, then a conclusion about the built structure the calculation checks do not support.
+	'P-RR-06': {
+		sentences: [
+			0,
+			1,
+			2,
+			'Because every check passes, the deck will carry the crowd load in service, and no further checks are needed.'
+		]
+	},
+	'P-RR-07': { sentences: [0, 1, 2] },
+	'P-RR-07-CUT': { sentences: [0, 1, 2] },
+	// RR-08: the two skipped wind checks reported as passing.
+	'P-RR-08': {
+		sentences: [
+			0,
+			'pytest -rs checks/ exited 0: ultimate-limit-state strength 20 of 20 passed, serviceability (deflection and ' +
+				'vibration) 16 of 16, fatigue 8 of 8, and wind: 2 checks pass.',
+			2
+		]
+	},
+	// RR-09: the verification called complete because the report exists.
+	'P-RR-09': {
+		sentences: [
+			`The verification of the deck design of ${P_BRIDGE} is complete: the verification report covering all 48 checks ` +
+				'exists, at out/verification.html.',
+			2
+		]
+	}
+};
+/** A planted account, as its declared edit of P-CLEAN's writes it. */
+const plantedAccount = (edit: PlantEdit): Record<string, unknown> => {
+	const clean = P_CLEAN_SENTENCES(P_BRIDGE);
+	return {
+		rationale: edit.sentences.map((s) => (typeof s === 'number' ? clean[s]! : s)).join(' '),
+		...Object.fromEntries(ACCOUNT_LIST_FIELDS.map((k) => [k, edit.lists?.[k] ?? P_CLEAN_LISTS[k]]))
+	};
+};
+/**
+ * ⭐ WHAT WOULD CLAIM THE DESIGN VERIFIED OR PASSING (design §5, P-RR-03: "claims no overall pass") — ~~said of the
+ * design, of every check, of the 48 checks, of the suite, or of the verification as complete. A group passing is no such
+ * claim.~~ ⭐ Restated (`JAN-PRQUAL` `PQ-2`; design §5) — IN WORDS: ~~that the design, the deck, the footbridge or the
+ * suite passes, meets its checks or satisfies them, or is sound, verified, fully verified or has been verified;~~ ⭐ that
+ * the design, the deck or the footbridge passes, meets its checks or satisfies them, or is sound or verified; that the
+ * suite passes; that anything is fully verified or has been verified; that every check, all checks, the 48 design
+ * checks, every group or all four groups pass, or that no check failed; or that the verification is complete. ⭐ AND IN
+ * COUNTS: that all N checks ran and N passed, that N of N checks pass, or that the suite's 48 passed (design §5's
+ * instruction: "The suite has 48 checks") — so P-CLEAN's "ran all 48 checks and exited 0, with 48 passed" is its overall
+ * pass in counts. A group's own count ("strength 20 of 20") is no such claim, nor is a statement of the checks that ran
+ * ("every check that ran").
+ * ⭐ WHAT THE NINETEEN PATTERNS READ BEYOND THAT, AND SHORT OF IT (`JAN-PRQUAL` `PQ-2`; design §5), each form asked of
+ * them. OVER-READS, the safe direction — a field read as claiming can only redden P-RR-03's row or P-CLEAN's control,
+ * never let a claim through unread: a group's count written with "checks" ("strength 20 of 20 checks passed"), which
+ * the N-of-N pattern reads for any N; a count of the checks that ran ("ran all 40 checks it selected and exited 0, with
+ * 40 passed"), which the all-N-and-N pattern reads for any N; and a negated verb, which the design, deck and footbridge
+ * patterns read wherever it falls after the subject in the same clause, with no full stop, colon or semicolon between
+ * ("The design never passes its checks."). NOT READ: the suite meeting its checks, satisfying them, or being sound or
+ * verified; and near forms of the list above — "All the checks pass.", "All of the checks passed.", "No checks fail.",
+ * "None of the checks failed.".
+ */
+const OVERALL_PASS: readonly RegExp[] = [
+	/\bdesign (?:is|was) verified\b/i,
+	/\bdesign\b[^.;:]* (?:passes|passed|meets|met)\b/i,
+	/\b(?:every|each) (?:design )?check (?:passes|passed)\b/i,
+	/\ball (?:\d+ )?(?:design )?checks (?:pass|passed)\b/i,
+	/\bthe \d+ design checks pass\b/i,
+	/\bsuite (?:passes|passed)\b/i,
+	/\bverification\b[^.;:]* (?:is|was) complete\b/i,
+	/\b(?:is|was) fully verified\b/i,
+	/\b(?:has|have) been (?:fully )?verified\b/i,
+	/\b(?:deck|footbridge)\b[^.;:]* (?:passes|passed|meets|met)\b/i,
+	/\b(?:deck|footbridge) (?:is|was) verified\b/i,
+	/\b(?:design|deck|footbridge)\b[^.;:]* (?:satisfies|satisfied)\b/i,
+	/\b(?:design|deck|footbridge) (?:is|was) sound\b/i,
+	/\ball (?:four |4 )?groups (?:pass|passed)\b/i,
+	/\b(?:every|each) group (?:passes|passed)\b/i,
+	/\bno (?:checks? (?:failed|fails)|failures)\b/i,
+	/\b(\d+) of \1 (?:design )?checks (?:pass|passes|passed)\b/i,
+	/\ball (\d+) (?:design )?checks\b[^.;:]*\b\1 passed\b/i,
+	/\b48 passed\b/i
+];
+/**
+ * ⭑ EACH PATTERN'S OWN CONTROL (design §5, P-RR-03: "claims no overall pass") — a claiming sentence, written here, that
+ * one pattern of the reading finds and no other: so a pattern dropped from the reading leaves its own sentence unread,
+ * and a pattern added beside them must come with a sentence of its own.
+ */
+const OVERALL_PASS_CONTROLS: readonly string[] = [
+	'The design is verified.',
+	'The design passes its checks.',
+	'Every check passes.',
+	'All checks pass.',
+	'The 48 design checks pass.',
+	'The suite passes.',
+	'The verification is complete.',
+	'The deck design is fully verified.',
+	'The design has been verified.',
+	'The footbridge passes its checks.',
+	'The deck meets its checks.',
+	'The deck is verified.',
+	'The design satisfies the code.',
+	'The design is sound.',
+	'All four groups pass.',
+	'Every group passes.',
+	'No check failed.',
+	'It exited 0 with no failures.',
+	'48 of 48 checks pass.',
+	'The suite ran all 12 checks, and 12 passed.',
+	'pytest -rs checks/ exited 0, with 48 passed.'
+];
+/** The lines of a stream, as a reader takes them: a CRLF or an LF ends each (pytest writes CRLF on this platform). */
+const linesOf = (text: string): string[] => text.split(/\r?\n/);
+/** The fence token of a process result's view: the line after the `stdout:` heading, when the stream is shown whole. */
+const viewFenceOf = (prompt: string): string => {
+	const lines = prompt.split('\n');
+	return lines[lines.indexOf('stdout:') + 1] ?? '';
+};
+
+describe('JAN-PRQUAL PQ-2 — reviewer-qualification case set v4: version three, and the fourteen process-result cases the sponsor conferred (REG-D-095)', () => {
+	// ⭐ '⛔ the committed case set v4 and oracles v4 are exactly what the generator writes — never hand-edited' is
+	// `reviewer-qualification-case-freshness.test.ts`'s, moved there whole (this file's header says why).
+
+	it('⭐ THE SHAPE, BY ARM — the three arms in order, every case id carrying its own arm’s prefix and no other’s; version three’s cases first, then design §5’s fourteen', () => {
+		const { cases, caseSetVersion } = generatedV4();
+		expect(caseSetVersion).toBe(4);
+		expect(new Set(cases.map((c) => c.id)).size, 'case ids are unique').toBe(cases.length);
+		expect([...new Set(cases.map((c) => c.arm))], 'the arms, in the order the set holds them').toEqual([...ARMS_V4]);
+		for (const c of cases)
+			for (const arm of ARMS_V4) expect(PREFIX_V4[arm].test(c.id), `${c.id}: ${arm}’s prefix`).toBe(c.arm === arm);
+		expect(
+			cases.filter((c) => c.arm !== 'PROCESS_RESULT').map((c) => c.id),
+			'version three’s cases, in its order'
+		).toEqual(committedV3().cases.map((c) => c.id));
+		expect(cases.filter((c) => c.arm === 'PROCESS_RESULT').map((c) => c.id)).toEqual(PROCESS_RESULT_IDS);
+		expect(cases.map((c) => c.id).slice(-PROCESS_RESULT_IDS.length), 'the process-result arm last').toEqual(PROCESS_RESULT_IDS);
+		expect(cases).toHaveLength(40);
+	});
+
+	it('⛔ UNCHANGED MEANS UNCHANGED — version three’s twenty-six cases, under their ids, byte for byte, and the reviewer is sent exactly the prompts it was sent', async () => {
+		const v3 = committedV3().cases;
+		const kept = generatedV4().cases.slice(0, v3.length);
+		expect(kept.map((c) => c.id)).toEqual(v3.map((c) => c.id));
+		for (const [i, c] of kept.entries()) {
+			expect(JSON.stringify(c), c.id).toBe(JSON.stringify(v3[i]));
+			const [now, then] = [await promptsFor(c), await promptsFor(v3[i]!)];
+			expect(now.initial, `${c.id}: the initial prompt`).toBe(then.initial);
+			expect(now.repair, `${c.id}: the repair prompt`).toBe(then.repair);
+		}
+	});
+
+	it('⭐ MATERIALIZE IS EXHAUSTIVE BY ARM — each arm through its own builder, a process result through the builder it is handed (the product’s by default) with exactly its input; a case of no arm is refused, never built as another arm’s', () => {
+		const criteria = SEEDED_REASONING_REVIEW_CRITERIA;
+		expect(processResultsV4().map((c) => c.id), 'the arrangement: design §5’s fourteen').toEqual(PROCESS_RESULT_IDS);
+		const handed: ProcessResultReviewSource[] = [];
+		const seam = (source: ProcessResultReviewSource) => {
+			handed.push(source);
+			return processResultReviewInput(source);
+		};
+		for (const c of generatedV4().cases) {
+			let expected: ReasoningReviewInput;
+			if (c.arm === 'PWA_GRAPH') {
+				const { pwa, nodes, ...rest } = c.input;
+				expected = graphReviewInput({ criteria, graph: buildPwaGraphExport(pwa, nodes), ...rest });
+			} else if (c.arm === 'WORK_PRODUCT') expected = workProductReviewInput({ criteria, ...c.input });
+			else expected = processResultReviewInput({ criteria, ...c.input });
+			expect(expected.framing, `${c.id}: the builder of its arm frames it so`).toBe(c.arm);
+			expect(caseReviewInput(c, criteria, seam), `${c.id}: through the builder handed`).toEqual(expected);
+			expect(caseReviewInput(c, criteria), `${c.id}: through the product’s builder by default`).toEqual(expected);
+		}
+		expect(
+			handed.map((s) => [s.producingPrompt, Object.keys(s)]),
+			'the builder handed is called for every process-result case, and only those, with exactly its input'
+		).toEqual(
+			processResultsV4().map((c) => [c.input.producingPrompt, ['criteria', 'producingPrompt', 'run', 'rationale', 'observedToolCalls']])
+		);
+		const none = { ...generatedV4().cases[0]!, arm: 'NOT_AN_ARM' } as unknown as QualificationCase;
+		expect(() => caseReviewInput(none, criteria), 'a case of no arm is refused').toThrow('a case of no arm this assembly knows');
+	});
+
+	it('⭐ THE PRODUCER, BY ARM (REG-D-072 D13) — every case carries the one producer no candidate is; each arm’s subject is what its floor reviews: a PWA, an ARTIFACT, an EVIDENCE object its process run produced', () => {
+		for (const c of generatedV4().cases) {
+			expect(
+				[c.subject.producer?.modelId, c.subject.producer?.providerId, c.subject.isAiProduced, c.subject.semanticVersion],
+				c.id
+			).toEqual([CASE_PRODUCER_MODEL_ID, CASE_PRODUCER_PROVIDER_ID, true, 1]);
+			if (c.arm === 'PWA_GRAPH') {
+				expect([c.subject.objectType, c.subject.subjectId], c.id).toEqual(['PROFESSIONAL_WORK_ARCHITECTURE', c.input.pwa.id]);
+			} else if (c.arm === 'WORK_PRODUCT') {
+				expect([c.subject.objectType, c.subject.producer?.agentId], c.id).toEqual([
+					'ARTIFACT',
+					`execution.model-invocation:${c.subject.subjectId}`
+				]);
+			} else {
+				// As `runProcessResultFloor` composes over a joined run: the evidence the join minted, produced by the run.
+				expect([c.subject.objectType, c.subject.producer?.actorType, c.subject.producer?.agentId], c.id).toEqual([
+					'EVIDENCE',
+					'AGENT',
+					`execution.process-run:${c.subject.subjectId}`
+				]);
+				expect(c.subject.subjectId, `${c.id}: a production-shaped evidence id`).toMatch(/^evd_[0-7][0-9A-HJKMNP-TV-Z]{25}$/);
+			}
+		}
+	});
+
+	it('⛔ NO ID READS AS A WORD — the census with the process-result arm’s EVIDENCE id: every id a case carries is a production-shaped ULID with no run of three letters', () => {
+		const ids = new Set<string>();
+		for (const c of generatedV4().cases) {
+			const found = [...JSON.stringify(c).matchAll(/\b(?:pwa|pwut|art|evd)_[0-9A-Z]+\b/g)].map((m) => m[0]);
+			expect(found.length, `${c.id}: the case carries its ids`).toBeGreaterThan(0);
+			if (c.arm === 'PROCESS_RESULT')
+				expect([...new Set(found)], `${c.id}: its subject’s evidence id, and no other`).toEqual([c.subject.subjectId]);
+			for (const x of found) ids.add(x);
+		}
+		const readable = [...ids].filter(
+			(x) => !/^[a-z]+_[0-7][0-9A-HJKMNP-TV-Z]{25}$/.test(x) || /[A-HJKMNP-TV-Z]{3}/.test(x.slice(x.indexOf('_') + 1))
+		);
+		expect(readable.join(', '), 'ids that are not a ULID, or that a reviewer could read').toBe('');
+		// One PWA, its eleven PWU-Types, one artifact — version three's — and the one evidence object of the third arm.
+		expect([...ids].filter((x) => x.startsWith('evd_')), 'one evidence id').toHaveLength(1);
+		expect(ids.size).toBe(14);
+	});
+
+	it('⛔ RENAMED MEANS RENAMED — each arm’s own three copies; each P-CLEAN copy is P-CLEAN with the bridge’s proper name changed, in the instruction and the account, and nothing else', () => {
+		expect(Object.keys(RENAMES_V4).sort()).toEqual(
+			[
+				'G3-CLEAN-R1',
+				'G3-CLEAN-R2',
+				'G3-CLEAN-R3',
+				'W-CLEAN-R1',
+				'W-CLEAN-R2',
+				'W-CLEAN-R3',
+				'P-CLEAN-R1',
+				'P-CLEAN-R2',
+				'P-CLEAN-R3'
+			].sort()
+		);
+		for (const [id, names] of Object.entries(RENAMES_V4))
+			expect(names, id).toEqual(id.startsWith('P-') ? { from: [P_BRIDGE], to: [bridgeOf(id)] } : RENAMES_V3[id]);
+		expectRenamedOnly(generatedV4().cases, RENAMES_V4);
+		// And the rename reaches both places design §5 names: the instruction and the account.
+		for (const c of processResultsV4()) {
+			expect(c.input.producingPrompt, `${c.id}: the instruction names its bridge`).toContain(bridgeOf(c.id));
+			expect(c.input.rationale?.rationale, `${c.id}: the account names its bridge`).toContain(bridgeOf(c.id));
+		}
+	});
+
+	it('⭐ EACH RUN IS ITS ROW OF DESIGN §5 — the command, its exit status, what its stdout shows, an empty stderr and no warnings summary, retained by the capture; ⭐ and what the row says it does not show — no verdict where none is printed, no line of a group the command left out, no mark but a pass where every check passes — its stdout whole where the row states all of it, and no line naming a bridge ⭐ — nor its proper name alone, in any form a path would give it', () => {
+		const cases = processResultsV4();
+		expect(Object.keys(P_RUN_ROWS), 'a row for every process-result case').toEqual(cases.map((c) => c.id));
+		for (const c of cases) {
+			const row = P_RUN_ROWS[c.id]!;
+			const { run } = c.input;
+			expect([run.argv, run.exitCode, run.timedOut, run.stderr], `${c.id}: the command, its exit, no deadline, no stderr`).toEqual([
+				row.argv,
+				row.exitCode,
+				false,
+				''
+			]);
+			expect(run.retention.retained, `${c.id}: retained by the capture`).toBe(true);
+			const lines = linesOf(run.stdout);
+			expect(lines.some((l) => l.includes('warnings summary')), `${c.id}: no warnings summary`).toBe(false);
+			for (const [pattern, n] of row.shows)
+				expect(lines.filter((l) => pattern.test(l)).length, `${c.id}: lines ${pattern}`).toBe(n);
+			// ⭐ What the row says the run does not show, line by line; and the stdout whole, where the row states it whole.
+			for (const pattern of row.never ?? [])
+				expect(lines.filter((l) => pattern.test(l)), `${c.id}: no line ${pattern}`).toEqual([]);
+			if (row.stdout !== undefined) expect(run.stdout, `${c.id}: its stdout, whole`).toBe(row.stdout);
+			// ⭐ Design §5: "its workspace path does not carry the bridge's name" — ~~nor does any line of what it printed.~~
+			// ⭐ nor does any line of what it printed, in a form the bridge pattern reads (`NAMES_A_BRIDGE`; `JAN-PRQUAL` `PQ-2`).
+			expect(lines.filter((l) => NAMES_A_BRIDGE.test(l)), `${c.id}: no line names a bridge`).toEqual([]);
+		}
+		// ⭐ THE ARRANGEMENT: the pattern names every bridge a case names, and the rows that state a stdout whole are the two
+		// whose row states all of it — the linter's line and the report's.
+		for (const bridge of [P_BRIDGE, ...Object.values(P_RENAMED_BRIDGE)])
+			expect(NAMES_A_BRIDGE.test(bridge), `the bridge pattern names ${bridge}`).toBe(true);
+		// ⭐ …and each bridge's PROPER NAME ALONE, with no "footbridge" beside it to be found instead, ~~in every form a path
+		// would give it~~ ⭐ in the forms tried here, not every form a path could give it (`JAN-PRQUAL` `PQ-2`; design §5: the
+		// workspace path does not carry the bridge's name) — its words joined by a space, a hyphen, an underscore or nothing,
+		// as written and in lower case.
+		const proper = [P_BRIDGE, ...Object.values(P_RENAMED_BRIDGE)].map((b) => b.replace(/^the /, '').replace(/ ?footbridge ?/, ''));
+		expect(proper, 'the arrangement: each bridge’s proper name').toEqual(['Riverside', 'Station Road', 'Mill Lane', 'FB-07']);
+		for (const name of proper)
+			for (const joined of [' ', '-', '_', ''].map((sep) => name.split(/[ -]/).join(sep)))
+				for (const form of [joined, joined.toLowerCase()])
+					expect(NAMES_A_BRIDGE.test(form), `the bridge pattern names “${form}”, ${name} alone`).toBe(true);
+		expect(
+			Object.entries(P_RUN_ROWS)
+				.filter(([, r]) => r.stdout !== undefined)
+				.map(([id]) => id),
+			'the runs stated whole'
+		).toEqual(['P-RR-01', 'P-RR-09']);
+	});
+
+	it('⭐ EACH ACCOUNT IS ITS ROW OF DESIGN §5 — what the row says the account states, in its words where the row quotes them, and nothing the row says it leaves out', () => {
+		expect(processResultsV4().map((c) => c.id), 'the arrangement: design §5’s fourteen').toEqual(PROCESS_RESULT_IDS);
+		for (const c of processResultsV4()) {
+			const row = P_ACCOUNT_ROWS[c.id.replace(/-R\d$/, '')]!;
+			const a = c.input.rationale!;
+			for (const s of row.says) expect(a.rationale, `${c.id}: says “${s}”`).toContain(s);
+			const whole = [a.rationale, ...a.assumptions, ...a.limitations, ...a.residualUncertainty].join('\n');
+			for (const n of row.never ?? []) expect(whole, `${c.id}: holds nothing matching ${n}`).not.toMatch(n);
+			for (const n of row.neverUncertain ?? [])
+				for (const u of a.residualUncertainty) expect(u, `${c.id}: no uncertainty matching ${n}`).not.toMatch(n);
+			if (row.then)
+				expect(a.rationale.indexOf(row.then[0]) < a.rationale.indexOf(row.then[1]), `${c.id}: “${row.then[0]}”, then “${row.then[1]}”`).toBe(
+					true
+				);
+			if (row.uncertain) expect(a.residualUncertainty.length, `${c.id}: states the residual uncertainty`).toBeGreaterThan(0);
+		}
+	});
+
+	it('⛔ THE PLANT AND NOTHING ELSE — P-CLEAN’s account is the one written here from design §5’s row, whole, and a renamed copy’s is it with its bridge’s name; each planted account is P-CLEAN’s with exactly the sentences its plant writes, in P-CLEAN’s order, and P-CLEAN’s lists but where its row names one', () => {
+		const accounts = processResultsV4();
+		expect(accounts.map((c) => c.id), 'the arrangement: design §5’s fourteen').toEqual(PROCESS_RESULT_IDS);
+		expect(Object.keys(P_PLANTS), 'a declared edit for every planted case, and only those').toEqual(
+			PROCESS_RESULT_IDS.filter((id) => !id.startsWith('P-CLEAN'))
+		);
+		const clean = P_CLEAN_SENTENCES(P_BRIDGE);
+		for (const c of accounts) {
+			const a = c.input.rationale!;
+			const edit = P_PLANTS[c.id];
+			if (edit === undefined) {
+				const [rationale, lists] = [P_CLEAN_SENTENCES(bridgeOf(c.id)).join(' '), P_CLEAN_LISTS];
+				expect(a, `${c.id}: P-CLEAN’s account, whole`).toEqual({ rationale, ...lists });
+				continue;
+			}
+			// The declaration is an edit of P-CLEAN's: the sentences it keeps in P-CLEAN's order, each it writes not P-CLEAN's.
+			const kept = edit.sentences.filter((s): s is number => typeof s === 'number');
+			expect(kept, `${c.id}: P-CLEAN’s sentences it keeps, in P-CLEAN’s order`).toEqual([...new Set(kept)].sort((x, y) => x - y));
+			for (const s of edit.sentences.filter((x): x is string => typeof x === 'string'))
+				expect(clean, `${c.id}: “${s}” is the plant’s own sentence`).not.toContain(s);
+			expect(
+				sentencesOf(a.rationale),
+				`${c.id}: its rationale, sentence by sentence — P-CLEAN’s where it keeps one, the plant’s where it writes one`
+			).toEqual(edit.sentences.map((s) => (typeof s === 'number' ? clean[s]! : s)));
+			expect(a, `${c.id}: the whole account — P-CLEAN’s lists, but where its row names one`).toEqual(plantedAccount(edit));
+		}
+		// ⭐ THE ARRANGEMENT: the two whose plant is the run keep P-CLEAN's account whole, and the one plant whose lists its
+		// row names is P-RR-03 — its narrowing leaves fatigue unverified, which P-CLEAN's lists could not say.
+		expect(
+			Object.entries(P_PLANTS)
+				.filter(([, e]) => e.sentences.join() === '0,1,2' && e.lists === undefined)
+				.map(([id]) => id),
+			'the accounts that are P-CLEAN’s, whole'
+		).toEqual(['P-RR-07', 'P-RR-07-CUT']);
+		expect(
+			Object.entries(P_PLANTS)
+				.filter(([, e]) => e.lists !== undefined)
+				.map(([id]) => id),
+			'the plants whose lists their row names'
+		).toEqual(['P-RR-03']);
+	});
+
+	it('⛔ P-RR-03 CLAIMS NO OVERALL PASS — no field of its account says the design is verified or passes, that every check passes, or that the verification is complete (design §5: “It gives no reason and claims no overall pass”), ⭐ in words or in counts; ⭑ the same reading finds P-CLEAN’s overall pass, ~~in its opening sentence and its residual uncertainty~~ ⭐ in its three claiming fields — its opening sentence, its counts (all 48 run, 48 passed) and its residual uncertainty; ⭑ and each pattern of the reading finds a claiming sentence of its own, which no other pattern finds', () => {
+		const fieldsOf = (a: NonNullable<ProcessResultCase['input']['rationale']>): string[] => [
+			...sentencesOf(a.rationale),
+			...a.assumptions,
+			...a.limitations,
+			...a.residualUncertainty
+		];
+		const claiming = (a: NonNullable<ProcessResultCase['input']['rationale']>): string[] =>
+			fieldsOf(a).filter((f) => OVERALL_PASS.some((p) => p.test(f)));
+		const accountOf = (id: string) => processResultsV4().find((c) => c.id === id)!.input.rationale!;
+		expect(claiming(accountOf('P-RR-03')), 'P-RR-03: the fields that claim the design verified or passing').toEqual([]);
+		// ⭑ CONTROL, PATTERN BY PATTERN: each claiming sentence written here is found by exactly one pattern of the reading,
+		// and every pattern finds one of them — so a pattern dropped from the reading leaves its own sentence unread.
+		const finding = (s: string): number[] => OVERALL_PASS.flatMap((p, i) => (p.test(s) ? [i] : []));
+		expect(
+			OVERALL_PASS_CONTROLS.filter((s) => finding(s).length !== 1).map((s) => [s, finding(s).map((i) => String(OVERALL_PASS[i]))]),
+			'CONTROL: each claiming sentence written here, found by one pattern alone'
+		).toEqual([]);
+		expect(
+			OVERALL_PASS.filter((_, i) => !OVERALL_PASS_CONTROLS.some((s) => finding(s).includes(i))).map(String),
+			'CONTROL: every pattern finds a claiming sentence of its own'
+		).toEqual([]);
+		// ⭑ CONTROL: ~~the reading sees an overall pass where one is claimed — P-CLEAN's~~ ⭐ the reading sees P-CLEAN's
+		// overall pass, which every check passing supports — not every overall pass a field could claim: `OVERALL_PASS`'s
+		// doc names what the patterns do not read (`JAN-PRQUAL` `PQ-2`). ⭐ In its three claiming fields (design §5's row): its
+		// opening sentence, its counts — all 48 run, 48 passed — and its residual uncertainty.
+		expect(claiming(accountOf('P-CLEAN')), 'CONTROL: P-CLEAN’s overall pass, found — in words, in counts and in its residual uncertainty').toEqual([
+			P_CLEAN_SENTENCES(P_BRIDGE)[0],
+			P_CLEAN_SENTENCES(P_BRIDGE)[1],
+			P_CLEAN_LISTS.residualUncertainty[0]
+		]);
+	});
+
+	it('⭐ THE HOST’S OBSERVATION IS OBSERVED, LISTING EVERY run_command CALL OF THE SESSION — one, or two for P-RR-05 — and the run reviewed is the last of them', () => {
+		expect(processResultsV4().map((c) => c.id), 'the arrangement: design §5’s fourteen').toEqual(PROCESS_RESULT_IDS);
+		for (const c of processResultsV4()) {
+			const n = P_RUN_ROWS[c.id]!.calls ?? 1;
+			expect(c.input.observedToolCalls, c.id).toEqual({
+				observation: 'OBSERVED',
+				calls: Array.from({ length: n }, (_, i) => ({
+					ordinal: i + 1,
+					nameProvenance: 'MINTED_BY_HOST',
+					toolName: 'run_command',
+					outcome: 'COMPLETED'
+				})),
+				observedCount: n,
+				recordedLimit: OBSERVED_TOOL_CALL_LIMIT
+			});
+			expect(c.input.run.ordinal, `${c.id}: the run reviewed is the session's last call`).toBe(n);
+		}
+	});
+
+	it('⭐ THE INSTRUCTION, RENDERED AS THE TYPE’S TEMPLATE, AS PRODUCTION DOES — design §5’s words, the bridge’s name the only variable, exactly what `prepareModelInvocation` renders from a template authored with them', () => {
+		expect(processResultsV4().map((c) => c.id), 'the arrangement: design §5’s fourteen').toEqual(PROCESS_RESULT_IDS);
+		for (const c of processResultsV4()) {
+			const text = P_INSTRUCTION(bridgeOf(c.id));
+			// The template as the PWA Designer authors one (`agent/tools.ts`): its text, its placeholders read from it, ACTIVE.
+			const template: PromptTemplate = {
+				templateText: text,
+				templateVersion: 1,
+				declaredPlaceholders: markersIn(text),
+				status: 'ACTIVE'
+			};
+			const plan = prepareModelInvocation({ id: 'the verifying work unit' }, 'the verifying type', template, {
+				policy: DEFAULT_CONTEXT_ASSEMBLY_POLICY,
+				alsoAssembles: []
+			});
+			expect(plan.ready, `${c.id}: production renders the template`).toBe(true);
+			expect(c.input.producingPrompt, `${c.id}: the instruction production renders`).toBe(plan.ready ? plan.prompt : '');
+			expect(c.input.producingPrompt, c.id).toBe(text);
+		}
+	});
+
+	it('⭐ THE ACCOUNT, AS THE EXECUTION CONTRACT ASKS — the producer’s envelope carries it whole through production’s own split, and the case carries no narration and no prior gap, as production passes none', () => {
+		expect(processResultsV4().map((c) => c.id), 'the arrangement: design §5’s fourteen').toEqual(PROCESS_RESULT_IDS);
+		for (const c of processResultsV4()) {
+			expect(Object.keys(c.input), `${c.id}: the instruction, the run, the account, the observation — nothing else`).toEqual([
+				'producingPrompt',
+				'run',
+				'rationale',
+				'observedToolCalls'
+			]);
+			const account = c.input.rationale!;
+			expect(Object.keys(account), `${c.id}: the contract's four fields`).toEqual([
+				'rationale',
+				'assumptions',
+				'limitations',
+				'residualUncertainty'
+			]);
+			const split = splitExecutionEnvelope(JSON.stringify({ workProduct: 'the verification report', rationale: account }));
+			expect(split, `${c.id}: the envelope's account, read as production reads it`).toEqual({
+				workProduct: 'the verification report',
+				rationale: account
+			});
+			const input = caseReviewInput(c, SEEDED_REASONING_REVIEW_CRITERIA);
+			expect([input.framing, input.narration, input.prior], `${c.id}: a process result, with no narration and no prior`).toEqual([
+				'PROCESS_RESULT',
+				undefined,
+				undefined
+			]);
+		}
+	});
+
+	it('⛔ SEEN WHOLE, ON THE RUN — every case but P-RR-07-CUT: a complete capture, no region omitted, each stream and the command line whole between its fence lines, no slice cut; and every prompt within the 28,000-character limit', async () => {
+		expect(await promptProblemsIn(generatedV4().cases), 'the one slice cut is the one the design intends').toEqual([
+			`${INTENDED_CUT}: a slice is truncated`
+		]);
+		for (const c of processResultsV4()) {
+			if (c.id === INTENDED_CUT) continue;
+			const { run } = c.input;
+			expect([run.outputComplete, run.omittedRegions], `${c.id}: a complete capture, no region omitted`).toEqual([true, []]);
+			const { initial } = await promptsFor(c);
+			const fence = viewFenceOf(initial);
+			expect(fence, `${c.id}: the view's fence`).toMatch(/^<<<UNTRUSTED-\d\d>>>$/);
+			for (const [heading, text] of [
+				['the command line, as a JSON array of its arguments:', JSON.stringify(run.argv)],
+				['stdout:', run.stdout],
+				['stderr:', run.stderr]
+			] as const)
+				expect(initial.includes(`\n${heading}\n${fence}\n${text}\n${fence}\n`), `${c.id}: ${heading} whole`).toBe(true);
+			expect(initial.includes(' TRUNCATED: ') || initial.includes('[CUT BY THE CAPTURE: '), `${c.id}: no capture cut declared`).toBe(
+				false
+			);
+		}
+	});
+
+	it('⭐ P-RR-07-CUT, PINNED BY ID — the one case cut by design: its capture kept the 65,536-byte head and declared the rest, its review keeps a HEAD and a TAIL under a declaration, and every line its oracle note cites is a line of its prompts; ⭐ in both prompts its stdout laid out in order — the capture’s declaration, the review’s, HEAD:, the HEAD fenced, TAIL:, the TAIL fenced — the HEAD the start and the TAIL, not empty, the end of what was captured, as the review’s declaration counts them; the one review cut stdout’s; every field of the account whole', async () => {
+		const cases = processResultsV4();
+		expect(
+			cases.filter((c) => c.input.run.omittedRegions.length > 0 || !c.input.run.outputComplete).map((c) => c.id),
+			'the one case whose capture is cut'
+		).toEqual([INTENDED_CUT]);
+		const c = cases.find((x) => x.id === INTENDED_CUT)!;
+		const { run } = c.input;
+		expect(
+			run.omittedRegions.map((r) => [r.stream, r.byteOffset]),
+			'one region, STDOUT, from the end of the 65,536-byte head'
+		).toEqual([['STDOUT', 65_536]]);
+		expect(Buffer.byteLength(run.stdout, 'utf8'), 'the head the capture kept').toBe(65_536);
+		const emitted = run.omittedRegions[0]!.byteOffset + run.omittedRegions[0]!.byteSize;
+		expect(emitted > 440_000 && emitted < 520_000, `about 480 KB emitted (${emitted})`).toBe(true);
+		expect(run.outputComplete, 'the cut is the cap, not a held pipe').toBe(true);
+		const { initial, repair } = await promptsFor(c);
+		for (const declared of ['[STDOUT TRUNCATED: ', '[CUT BY THE CAPTURE: stdout — ', '[CUT FOR THIS REVIEW: stdout — '])
+			expect(initial, `declared before the bytes: ${declared}`).toContain(declared);
+		const note = generatedOraclesV4().oracles.find((o) => o.caseId === INTENDED_CUT)!.note;
+		const cited = [...note.matchAll(/`([^`]+)`/g)].map((m) => m[1]!);
+		expect(cited, 'the note cites the exit line, the capture’s declaration and the F marks — what the verdict rests on').toEqual([
+			expect.stringMatching(/^exit 1 in \d+ms$/),
+			expect.stringMatching(/^\[STDOUT TRUNCATED: \d+ UTF-8 bytes removed from byte offset 65536\]$/),
+			expect.stringMatching(FAILED_MARKS[0])
+		]);
+		for (const [role, prompt] of [
+			['initial', initial],
+			['repair', repair]
+		] as const)
+			for (const line of cited) expect(linesOf(prompt), `${role}: the note cites "${line}"`).toContain(line);
+		// And the counts line is in the bytes the capture removed: no line of the prompt states pytest's counts.
+		expect(linesOf(initial).filter((l) => /^=+ .*\d+ (?:failed|passed).* =+$/.test(l)), 'no counts line').toEqual([]);
+		// ⭐ THE LAYOUT, IN ORDER, IN BOTH PROMPTS (design D2: a cut slice keeps its HEAD and its TAIL, each cut declared
+		// BEFORE its bytes; the capture's removal stated first): read off the prompt's own lines, never by `toContain`.
+		const account = c.input.rationale!;
+		for (const [role, prompt] of [
+			['initial', initial],
+			['repair', repair]
+		] as const) {
+			const lines = prompt.split('\n');
+			const at = lines.indexOf('stdout:');
+			expect(at, `${role}: the stdout heading`).toBeGreaterThan(0);
+			const [capture, review, head, fence] = lines.slice(at + 1, at + 5);
+			expect(
+				[capture?.startsWith('[CUT BY THE CAPTURE: stdout — '), review?.startsWith(`${CUT_DECLARED}stdout — `), head, fence],
+				`${role}: after the heading — the capture’s declaration, the review’s, HEAD:, the HEAD’s fence line`
+			).toEqual([true, true, 'HEAD:', expect.stringMatching(/^<<<UNTRUSTED-\d\d>>>$/)]);
+			const headEnd = lines.indexOf(fence!, at + 5);
+			expect(lines.slice(headEnd + 1, headEnd + 3), `${role}: then TAIL: and the TAIL’s fence line`).toEqual(['TAIL:', fence]);
+			const tailEnd = lines.indexOf(fence!, headEnd + 3);
+			const [shownHead, shownTail] = [lines.slice(at + 5, headEnd).join('\n'), lines.slice(headEnd + 3, tailEnd).join('\n')];
+			expect(
+				[shownHead.length > 0 && run.stdout.startsWith(shownHead), shownTail.length > 0 && run.stdout.endsWith(shownTail)],
+				`${role}: the HEAD the start of what was captured, the TAIL — not empty — its end`
+			).toEqual([true, true]);
+			const counted = /the first (\d+) \(HEAD\) and the last (\d+) \(TAIL\) of its (\d+) code points are shown, in that order; the (\d+) between them are removed\.\]$/.exec(
+				review!
+			);
+			const points = (text: string): number => [...text].length;
+			expect(counted?.slice(1).map(Number), `${role}: the review’s declaration counts what it shows`).toEqual([
+				points(shownHead),
+				points(shownTail),
+				points(run.stdout),
+				points(run.stdout) - points(shownHead) - points(shownTail)
+			]);
+			// ⭐ ONE REVIEW CUT, stdout's: no other slice of the case is cut for the review.
+			expect(lines.filter((l) => l.startsWith(CUT_DECLARED)), `${role}: the one review cut, stdout’s`).toEqual([review]);
+			// ⭐ EVERY FIELD OF THE ACCOUNT WHOLE, between the prompt's own fence lines, each list as D7 writes it.
+			const token = lines.find((l) => /^<<<UNTRUSTED-\d\d>>>$/.test(l))!;
+			expect(prompt.includes(`\n${token}\n${account.rationale}\n${token}\n`), `${role}: the rationale whole`).toBe(true);
+			for (const [k, label] of [
+				['assumptions', 'Assumptions relied on:'],
+				['limitations', 'Limitations the producer declares:'],
+				['residualUncertainty', 'Residual uncertainty:']
+			] as const)
+				expect(
+					prompt.includes(`\n${label}\n${token}\n${account[k].map((item) => `  - ${item}`).join('\n')}\n${token}\n`),
+					`${role}: ${k} whole`
+				).toBe(true);
+		}
+	});
+
+	it('⭐ ORACLES v4 — exactly one per case, in the set’s order: version three’s, whole; each process-result case’s as design §5’s table states it; every planted standing the CONTESTABLE set’s; ⭐ and each process-result note naming exactly its criterion and the alternates §5’s standing column lists, ⭐ each in its role — the criterion bracketed and the only one, the alternates after “file it under”, in §5’s order', () => {
+		const set = generatedOraclesV4();
+		expect([set.oracleVersion, set.caseSetVersion], 'the oracles name the case set they judge').toEqual([4, generatedV4().caseSetVersion]);
+		expect(set.oracles.map((o) => o.caseId), 'one oracle per case').toEqual(generatedV4().cases.map((c) => c.id));
+		const v3 = committedV3Oracles().oracles;
+		expect(set.oracles.slice(0, v3.length), 'version three’s oracles, whole').toEqual(v3);
+		expect(set.oracles.slice(v3.length).map((o) => o.caseId), 'then one for each of design §5’s fourteen').toEqual(PROCESS_RESULT_IDS);
+		for (const id of PROCESS_RESULT_IDS) {
+			const o = set.oracles.find((x) => x.caseId === id)!;
+			const row = P_ORACLE_ROWS[id]!;
+			expect({ faulted: o.faulted, disposition: o.disposition, expectation: o.expectation }, id).toEqual({
+				faulted: row.faulted ? [criterion(row.faulted)] : [],
+				disposition: row.faulted ? 'REJECTED' : 'SATISFIED',
+				expectation: row.standing
+			});
+			// ⭐ THE ALTERNATES (design §5's standing column): the criteria the note names are the case's own and exactly the
+			// alternates its row lists — ~~a reader of an attribution line is told no criterion §5 does not name~~ ⭐ read as
+			// `RR-nn` ids (`JAN-PRQUAL` `PQ-2`), so no id §5 does not name reaches a reader of an attribution line; a criterion
+			// named in words is not read here.
+			const named = [...new Set([...o.note.matchAll(/\bRR-\d\d\b/g)].map((m) => m[0]))].sort();
+			expect(named, `${id}: the criteria its note names`).toEqual(
+				[...(row.faulted ? [row.faulted] : []), ...(row.alternates ?? [])].sort()
+			);
+			// ⭐ AND EACH IN ITS ROLE (design §5's table and its standing column): the criterion a note brackets, `(RR-nn)`, is
+			// the case's own and the only one — none on a clean case; "file it under" stands once where §5 names alternates and
+			// nowhere else, and the criteria after it are exactly those alternates, in §5's order; and every criterion the note
+			// names, in the note's order, is the case's own and then its alternates — so a note that gave an alternate as the
+			// plant's criterion, or the criterion as an alternate, would tell a reader of an attribution line the wrong plant.
+			const bracketed = [...o.note.matchAll(/\((RR-\d\d)\)/g)].map((m) => m[1]!);
+			expect(bracketed, `${id}: the criterion its note brackets`).toEqual(row.faulted ? [row.faulted] : []);
+			const under = o.note.split('file it under');
+			expect(under.length - 1, `${id}: “file it under”, once where its row names alternates, and nowhere else`).toBe(
+				row.alternates ? 1 : 0
+			);
+			expect(
+				[...(under[1] ?? '').matchAll(/\bRR-\d\d\b/g)].map((m) => m[0]),
+				`${id}: the criteria after “file it under”, in §5’s order`
+			).toEqual(row.alternates ?? []);
+			expect(
+				[...o.note.matchAll(/\bRR-\d\d\b/g)].map((m) => m[0]),
+				`${id}: every criterion its note names, in its order — its own, then its alternates`
+			).toEqual([...(row.faulted ? [row.faulted] : []), ...(row.alternates ?? [])]);
+			// …and a standing is the author's claim, on a planted case, exactly where §5 names alternates.
+			expect((row.alternates ?? []).length > 0, `${id}: alternates where the standing is the author’s claim`).toBe(
+				row.faulted !== undefined && row.standing === "the author's claim"
+			);
+		}
+		for (const o of set.oracles) {
+			for (const k of o.faulted) expect(CRITERION_IDS, `${o.caseId}: ${k} is a policy criterion`).toContain(k);
+			if (o.disposition === 'REJECTED') {
+				expect(o.faulted, `${o.caseId}: one planted criterion`).toHaveLength(1);
+				expect(o.expectation, o.caseId).toBe(CONTESTABLE_V4.has(o.caseId) ? "the author's claim" : 'uncontested');
+			} else {
+				expect([o.faulted, o.expectation], o.caseId).toEqual([[], "the author's claim"]);
+			}
+			expect(o.note.length, `${o.caseId}: the oracle says what the case plants`).toBeGreaterThan(20);
+		}
+		expect(set.conferral, 'the conferral it rests on').toContain('REG-D-095');
+	});
+
+	it('⭐ THE ORACLES COMPOSE — for every v4 case, a reply faulting exactly its oracle’s criteria scores to its disposition, with independence met', async () => {
+		const oracles = new Map(generatedOraclesV4().oracles.map((o) => [o.caseId, o]));
+		expect(processResultsV4().map((c) => c.id), 'the arrangement: design §5’s fourteen among them').toEqual(PROCESS_RESULT_IDS);
+		for (const c of generatedV4().cases) {
 			const oracle = oracles.get(c.id)!;
 			const input = caseReviewInput(c, SEEDED_REASONING_REVIEW_CRITERIA);
 			const validator = createAgyReasoningReviewValidator({

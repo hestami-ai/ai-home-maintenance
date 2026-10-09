@@ -1195,12 +1195,14 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 		).toBe(2);
 	});
 
-	it('⭐ the RUN line records the CURRENT case set’s and oracles’ versions — 3 and 3 since J2-7 (2 and 2 from J2-5) — the ones the CLI read and ran', async () => {
+	it('⭐ the RUN line records the CURRENT case set’s and oracles’ versions — 4 and 4 since JAN-PRQUAL PQ-2 (3 and 3 from J2-7, 2 and 2 from J2-5) — the ones the CLI read and ran', async () => {
 		// ⚠ `JAN-CRITREAD` J2-5: a runner that read the current set but another version's oracles (or recorded another
 		// version) would stamp a run of version two as version one's — and the record would say its calls were judged by
 		// oracles that hold no entry for a G2- case. Nothing else reads these two fields back from a real run.
-		// ⭐ `JAN-CRITREAD` J2-7: the current set is version three, so a run of it records 3 and 3 — and a runner left on
+		// ⭐ `JAN-CRITREAD` J2-7: the current set was version three, so a run of it recorded 3 and 3 — and a runner left on
 		// version two would stamp a G3- case as judged by oracles that hold no entry for it.
+		// ⭐ `JAN-PRQUAL` `PQ-2` (DESIGN-process-result-qualification.md D4): the current set is version four, so a run of it
+		// records 4 and 4 — and a runner left on version three would stamp a P- case as judged by oracles that hold none.
 		cleanEnv();
 		const out = join(tmp(), 'run.ndjson');
 		const spawned: Spawned[] = [];
@@ -1215,13 +1217,13 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 		expect(
 			{ caseSetVersion: run.caseSetVersion, oracleVersion: run.oracleVersion },
 			'the versions the RUN line records'
-		).toEqual({ caseSetVersion: 3, oracleVersion: 3 });
+		).toEqual({ caseSetVersion: 4, oracleVersion: 4 });
 		// …which are the versions of the files `cases.ts` names current — the ones the check holds coverage to.
 		expect([
 			CURRENT_SET.caseSetVersion,
 			CURRENT_ORACLE_SET.oracleVersion,
 			CURRENT_ORACLE_SET.caseSetVersion
-		]).toEqual([3, 3, 3]);
+		]).toEqual([4, 4, 4]);
 		expect(spawned, 'one call, captured').toHaveLength(1);
 	});
 });

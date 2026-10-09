@@ -28,7 +28,8 @@
 //     and behaviourally for every limit a probe can reach.
 //   · ⭐⭐ `JAN-PRQUAL` `PQ-1` (design D3; `REG-F-476`, `REG-D-094`) — THE FINGERPRINT REACHES THE PROCESS-RESULT RENDERER.
 //     Its P- probes are run literals built through the `processResult` seam, whose default IS the product's builder:
-//     a renderer change moves `probes` and no case prompt, and so does a change confined to ONE branch of the
+//     a renderer change moves `probes` and ~~no case prompt~~ — since `PQ-2` (design D4) — the process-result cases'
+//     prompts alone, and so does a change confined to ONE branch of the
 //     renderer — each branch the per-branch rows name (`BRANCH_CHANGES`), held to the probes that take it (design §2
 //     G2: hashed over one clean run, the renderer's other branches were unseen). ⭐ And so does a change to what either
 //     FENCE CHOOSER reads (`REG-F-481`) — a row per slice the view's chooser reads and one per slice the VALIDATOR's
@@ -57,7 +58,14 @@
 //     The pins that leaned on the validator's old ` …(truncated)` marker and the `"""` fence are re-expressed against
 //     the declared cut (`[CUT FOR THIS REVIEW: …]`, its numbers checked against the bytes) and the fence lines. ⭐ And
 //     "no case prompt moves" is MEASURED: the case prompts are materialized through the validator seam
-//     (`casePromptsOf`), and a CONTROL row shows that limb sees one move.
+//     (`casePromptsOf`), and a CONTROL row shows that limb sees one move. ⭐ `JAN-PRQUAL` `PQ-2` (design D4): and every
+//     row's claim about the case prompts is asked of the CURRENT set too (`movedNow`) — case set v1 holds no process
+//     result, so a claim asked of it alone could not fail where case set v4's fourteen are built; asked of v4, the
+//     validator chooser that stops reading a process result's view was found to move all fourteen, and says so.
+//     ⚠ Where no seam a row changes reaches `casePromptsOf` — the SCORING, MALFORMATION and INDEPENDENCE rows — that
+//     ask holds by construction and could not fail, and the row says so: it is no measured claim.
+//   · ⭐ `PQ-2` — EVERY WITNESS OF THE READER CORPUS HOLDS THE CODE POINTS ITS LABEL NAMES, with its own control: a
+//     witness kept by its label with its code point taken out is named.
 //   · ⭐ `JAN-SELREV` SR-2 (D6) — THE FINGERPRINT MEASURES THE VALIDATOR WITHOUT `requireReportedModel`. What it hashes
 //     is the runner's SCORING seam: the corpus replies that report another model are scored there, never refused, and on
 //     a copy the option set in the runner moves the scoring digest — which is why only the product's devin branch sets
@@ -153,8 +161,26 @@ const REPO = fileURLToPath(new URL('../', import.meta.url))
 	.replace(/\/$/, '');
 /** ⚠ `JAN-CRITREAD` J2-5 — case set version one, a fixed fixture: no reviewer component depends on the cases. */
 const CASES = (JSON.parse(readFileSync(`${REPO}/${CASE_SET_V1_FILE}`, 'utf8')) as CaseSet).cases;
-/** ⭐ `PQ-1` — the CURRENT case set (case set v3: no process-result case), whose case prompts no renderer change may move. */
+/** ⭐ `PQ-1` — the CURRENT case set ~~(case set v3: no process-result case), whose case prompts no renderer change may move~~ —
+ *  since `JAN-PRQUAL` `PQ-2` case set v4, whose fourteen process-result cases a renderer change DOES reach (design D4). */
 const CURRENT_CASES = committedCaseSet(new URL('../', import.meta.url)).cases;
+/** ⭐ `PQ-2` — the current set's process-result cases: the case prompts a change to what a process result's reviewer reads
+ *  may move, and the only ones. */
+const CURRENT_PROCESS_RESULTS = CURRENT_CASES.filter((c) => c.arm === 'PROCESS_RESULT').map((c) => c.id);
+/** ⭐ `PQ-2` — the cases of `base` whose prompts moved in `fp`, the initial or the repair. */
+const movedCasePrompts = (fp: ReviewerFingerprint, base: ReviewerFingerprint): string[] =>
+	[...base.casePrompts].filter(([id, p]) => {
+		const now = fp.casePrompts.get(id);
+		return now?.initial !== p.initial || now.repair !== p.repair;
+	}).map(([id]) => id);
+/**
+ * ⭐ `PQ-2` (design D4) — the CURRENT set's case prompts a change at `seams` moves. ⛔ A row that asked only whether a
+ * change moved a case prompt of case set v1 asked it of a set that holds no process result, so its "no case prompt"
+ * could not fail where case set v4's fourteen are built (a validator chooser that stops reading a process result's view
+ * moves all fourteen, measured): every row's claim about the case prompts is asked of the current set too.
+ */
+const movedNow = async (seams: FingerprintSeams): Promise<string[]> =>
+	movedCasePrompts(await reviewerFingerprint(CURRENT_CASES, seams), BASE_NOW);
 const REPAIR_INSTRUCTION = 'IMPORTANT: reply with ONLY the minified JSON object.';
 // ~~const TRUNCATED = ' …(truncated)';~~ — the validator's marker, appended AFTER the bytes and naming nothing; gone with
 // `JAN-PRQUAL` `PQ-1` (design D2, the sponsor's answer (a) of 2026-10-03: every cut in every framing is declared BEFORE its
@@ -167,7 +193,7 @@ const FENCE_LINE = /^<<<UNTRUSTED-\d\d>>>$/;
 // (`cutSlices`, below), which a count of declarations could not tell apart.
 
 let BASE: ReviewerFingerprint;
-/** ⭐ `PQ-1` — today's fingerprint over the CURRENT case set: the same reviewer, v3's case prompts. */
+/** ⭐ `PQ-1` — today's fingerprint over the CURRENT case set: the same reviewer, ~~v3's~~ v4's case prompts (`PQ-2`). */
 let BASE_NOW: ReviewerFingerprint;
 beforeAll(async () => {
 	// ⛔ No program can be found from this process: the validator's default print is `agyPrint`.
@@ -189,7 +215,7 @@ function onlyMoved(fp: ReviewerFingerprint, moved: readonly (keyof ReviewerFinge
 }
 
 describe('JAN-CRITREAD J2-3 — the reviewer fingerprint MOVES on each component', () => {
-	it('⭐ a PROMPT BRANCH — the process-result framing, which no case exercises: the probes move, no case prompt does', async () => {
+	it('⭐ a PROMPT BRANCH — the process-result framing: the probes move, and of the case prompts exactly the process-result cases’ — none of v1’s, and the current set’s fourteen (PQ-2)', async () => {
 		const seams: FingerprintSeams = {
 			...PRODUCT_SEAMS,
 			validator: (print) =>
@@ -202,11 +228,16 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint MOVES on each component
 		// ⭐ `PQ-1` — MEASURED: the case prompts are materialized through this same validator seam (`casePromptsOf`), so
 		// this half says the change reached no case prompt — not, as it did when they were read off the runner's own
 		// validator, that it could not have (the CONTROL below is the change that does reach them).
-		expect(fp.casePrompts, 'no case is a process result').toEqual(BASE.casePrompts);
-		// ⭐ `PQ-1` — and still true of the CURRENT set (case set v3): no case of it is a process result either.
-		expect((await reviewerFingerprint(CURRENT_CASES, seams)).casePrompts, 'no case of the current set is a process result').toEqual(
-			BASE_NOW.casePrompts
-		);
+		expect(fp.casePrompts, 'no case of v1 is a process result').toEqual(BASE.casePrompts);
+		// ~~⭐ `PQ-1` — and still true of the CURRENT set (case set v3): no case of it is a process result either.~~
+		// ⭐ `JAN-PRQUAL` `PQ-2` (design D4) — the CURRENT set, case set v4, holds fourteen: exactly their prompts move, each
+		// its initial and its repair, and no other case's does.
+		expect(CURRENT_PROCESS_RESULTS, 'the arrangement: the current set holds the fourteen').toHaveLength(14);
+		const now = await reviewerFingerprint(CURRENT_CASES, seams);
+		expect(movedCasePrompts(now, BASE_NOW), 'the case prompts of the current set that move').toEqual(CURRENT_PROCESS_RESULTS);
+		for (const id of CURRENT_PROCESS_RESULTS)
+			for (const role of ['initial', 'repair'] as const)
+				expect(now.casePrompts.get(id)![role], `${id}: its ${role} prompt moves`).not.toBe(BASE_NOW.casePrompts.get(id)![role]);
 	});
 
 	it('⭐ CONTROL — the "no case prompt moves" limb MEASURES: a validator change EVERY prompt carries moves every case prompt, of both sets', async () => {
@@ -247,8 +278,10 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint MOVES on each component
 		const fp = await reviewerFingerprint(CASES, seams);
 		onlyMoved(fp, ['probes']);
 		expect(fp.casePrompts, 'every case is seen whole, so no case prompt carries a cut').toEqual(BASE.casePrompts);
-		expect((await reviewerFingerprint(CURRENT_CASES, seams)).casePrompts, 'nor any of the current set').toEqual(
-			BASE_NOW.casePrompts
+		// ⭐ `JAN-PRQUAL` `PQ-2` (design D4) — nor any of the current set but P-RR-07-CUT, the one case cut by design: its review
+		// keeps a HEAD and a TAIL under a declaration (`reviewer-qualification-cases.test.ts` pins it by id).
+		expect(movedCasePrompts(await reviewerFingerprint(CURRENT_CASES, seams), BASE_NOW), 'nor any of the current set but the one cut by design').toEqual(
+			['P-RR-07-CUT']
 		);
 		// ⭐ `PQ-1` — AND THE NAME IS HELD TO THE BYTES BOTH WAYS: the probes a cut declaration reaches are exactly the ones
 		// named OVERSIZE — the validator's cuts and the process-result builder's alike — so a probe that carries a cut
@@ -281,8 +314,8 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint MOVES on each component
 		}
 	});
 
-	it('⭐ a SCORING RULE — a fault now scored PARTIALLY_MET: the scoring digest moves, no prompt does', async () => {
-		const fp = await reviewerFingerprint(CASES, {
+	it('⭐ a SCORING RULE — a fault now scored PARTIALLY_MET: the scoring digest moves, no prompt does — of v1, nor of the current set (PQ-2)', async () => {
+		const seams: FingerprintSeams = {
 			...PRODUCT_SEAMS,
 			evaluate: async (a) => {
 				const e = await evaluateCase(a);
@@ -294,10 +327,16 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint MOVES on each component
 					}
 				};
 			}
-		});
+		};
+		const fp = await reviewerFingerprint(CASES, seams);
 		onlyMoved(fp, ['scoring']);
 		expect(fp.casePrompts).toEqual(BASE.casePrompts);
-	});
+		// ⚠ BY CONSTRUCTION, NOT MEASURED (`JAN-PRQUAL` `PQ-2`, design D4): this row changes the `evaluate` seam alone, and
+		// no seam it changes reaches `casePromptsOf`, which builds each case prompt through the `validator`, `criteria` and
+		// `processResult` seams and never `evaluate` (`fingerprint.ts`) — so this half, as the v1 half above it, holds
+		// whatever a case holds and could not fail. It is kept, and it is no measured claim about the current set.
+		expect(await movedNow(seams), 'nor any case prompt of the current set').toEqual([]);
+	}, 60_000);
 
 	it('⭐ the REPAIR PROMPT — the instruction a failed first parse draws: the scoring digest moves', async () => {
 		const fp = await reviewerFingerprint(CASES, {
@@ -315,9 +354,9 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint MOVES on each component
 		// The rule lives in the package the runner scores through (`floor.ts` `deMinimisFloorPlan`), not behind a seam:
 		// so the package itself is replaced for a FRESH load of the fingerprint, and the fresh load is first shown to
 		// measure exactly what the tree measures — the CONTROL — so the move is the rule's and not the reload's.
-		const fresh = async () => {
+		const fresh = async (cases: readonly QualificationCase[] = CASES) => {
 			vi.resetModules();
-			return (await import('../scripts/reviewer-qual/fingerprint.js')).reviewerFingerprint(CASES);
+			return (await import('../scripts/reviewer-qual/fingerprint.js')).reviewerFingerprint(cases);
 		};
 		try {
 			expect((await fresh()).reviewer, 'CONTROL: a fresh load measures the tree').toBe(BASE.reviewer);
@@ -334,6 +373,12 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint MOVES on each component
 			const fp = await fresh();
 			onlyMoved(fp, ['scoring']);
 			expect(fp.casePrompts, 'independence reaches no prompt').toEqual(BASE.casePrompts);
+			// ⭐ `PQ-2` (design D4) — nor any prompt of the current set's cases. ⚠ BY CONSTRUCTION, NOT MEASURED: the rule
+			// replaced is the plan's (`deMinimisFloorPlan`), which the runner's scoring reads and no case-prompt path does —
+			// `casePromptsOf` builds each case prompt through the `validator`, `criteria` and `processResult` seams, none of
+			// which reads the plan — so this half, as the v1 half above it, holds whatever a case holds and could not fail.
+			// It is kept, and it is no measured claim about the current set.
+			expect(movedCasePrompts(await fresh(CURRENT_CASES), BASE_NOW), 'nor any case prompt of the current set').toEqual([]);
 		} finally {
 			vi.doUnmock('@janumipwb/rph-assurance');
 			vi.resetModules();
@@ -346,17 +391,23 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint MOVES on each component
 		expect(PRODUCT_SEAMS.independence, 'the product’s own is the seeded Reasoning Review policy’s').toBe('DIFFERENT_MODEL');
 	});
 
-	it('⭐ a MALFORMATION RULE — a class the harness no longer detects (the review’s E6): the scoring digest moves', async () => {
-		const fp = await reviewerFingerprint(CASES, {
+	it('⭐ a MALFORMATION RULE — a class the harness no longer detects (the review’s E6): the scoring digest moves, and no case prompt of v1 or of the current set (PQ-2)', async () => {
+		const seams: FingerprintSeams = {
 			...PRODUCT_SEAMS,
 			evaluate: async (a) => {
 				const e = await evaluateCase(a);
 				return { ...e, calls: e.calls.map((c) => ({ ...c, malformations: c.malformations.filter((k) => k !== 'DUPLICATE_KEY') })) };
 			}
-		});
+		};
+		const fp = await reviewerFingerprint(CASES, seams);
 		onlyMoved(fp, ['scoring']);
 		expect(fp.casePrompts).toEqual(BASE.casePrompts);
-	});
+		// ⚠ BY CONSTRUCTION, NOT MEASURED (`JAN-PRQUAL` `PQ-2`, design D4): this row changes the `evaluate` seam alone, and
+		// no seam it changes reaches `casePromptsOf`, which builds each case prompt through the `validator`, `criteria` and
+		// `processResult` seams and never `evaluate` (`fingerprint.ts`) — so this half, as the v1 half above it, holds
+		// whatever a case holds and could not fail. It is kept, and it is no measured claim about the current set.
+		expect(await movedNow(seams), 'nor any case prompt of the current set').toEqual([]);
+	}, 60_000);
 });
 
 describe('JAN-CRITREAD J2-3 — the reviewer fingerprint does NOT move on what decides no verdict', () => {
@@ -365,12 +416,15 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint does NOT move on what d
 		for (const d of dirs) rmSync(d, { recursive: true, force: true });
 	});
 
-	it('⭐ it is a function of the tree: computed twice, identical in every part', async () => {
+	it('⭐ it is a function of the tree: computed twice, identical in every part — over v1, and over the current set (PQ-2)', async () => {
 		const again = await reviewerFingerprint(CASES);
 		expect(again).toEqual(BASE);
 		expect(BASE.reviewer).toMatch(/^[0-9a-f]{64}$/);
 		expect(BASE.casePrompts.size, 'one entry per case').toBe(CASES.length);
-	});
+		// ⭐ `PQ-2` (design D4) — and over case set v4, its process results' run literals rendered at materialize time.
+		expect(await reviewerFingerprint(CURRENT_CASES), 'the current set, computed again').toEqual(BASE_NOW);
+		expect(BASE_NOW.casePrompts.size, 'one entry per case of the current set').toBe(CURRENT_CASES.length);
+	}, 60_000);
 
 	/** A disposable copy of what the fingerprint loads, with the packages reached through real re-export directories. */
 	function disposableTree(): string {
@@ -1485,6 +1539,12 @@ interface ValidatorChooserRule {
 	readonly moves: readonly string[];
 	readonly kept: (slice: string, framing: ReasoningReviewInput['framing'], cut: boolean) => boolean;
 	readonly framings: readonly string[];
+	/**
+	 * ⭐ `PQ-2` (design D4) — the case prompts of the CURRENT set the rule moves, as `BRANCH_CHANGES` names the ones a
+	 * renderer branch moves: none, but where what the rule stops reading decides the token of a current case's prompt —
+	 * the view of a process result, fenced by a token of its own, which the prompt's token avoids in each of the fourteen.
+	 */
+	readonly casesNow?: readonly string[];
 }
 /** The account's four fields, as the prompt's regions name them. */
 const ACCOUNT_SLICES: readonly string[] = [
@@ -1609,7 +1669,10 @@ const VALIDATOR_CHOOSER_RULES: Readonly<Record<string, ValidatorChooserRule>> = 
 	'the view of a process result, read whole': {
 		moves: P_PROBES().filter((id) => id !== 'P-NO-FENCE'),
 		kept: (s) => s !== 'the view',
-		framings: ['P']
+		framings: ['P'],
+		// ⭐ `PQ-2` — each process-result case's view is fenced by `<<<UNTRUSTED-00>>>`, and those fence lines are the view's:
+		// read whole, they make the prompt take the next token, so a chooser that stops reading the view moves all fourteen.
+		casesNow: CURRENT_PROCESS_RESULTS
 	}
 };
 /**
@@ -1879,15 +1942,19 @@ const jsonLineLeaving =
 		);
 /** The fence module, as the fingerprint's modules import it — mocked whole for a fresh load. */
 const FENCE_MODULE_ID = '../apps/rph-demo/src/lib/server/assurance/review-fence.js';
-/** The fingerprint, loaded afresh over the fence module with `override` laid over its exports. */
-async function freshOverFence(override: (real: typeof import('../apps/rph-demo/src/lib/server/assurance/review-fence.js')) => Record<string, unknown>) {
+/** The fingerprint, loaded afresh over the fence module with `override` laid over its exports — over `cases`, case set v1
+ *  unless a row asks for the current set (`PQ-2`). */
+async function freshOverFence(
+	override: (real: typeof import('../apps/rph-demo/src/lib/server/assurance/review-fence.js')) => Record<string, unknown>,
+	cases: readonly QualificationCase[] = CASES
+) {
 	vi.resetModules();
 	vi.doMock(FENCE_MODULE_ID, async (importOriginal) => {
 		const real = await importOriginal<typeof import('../apps/rph-demo/src/lib/server/assurance/review-fence.js')>();
 		return { ...real, ...override(real) };
 	});
 	try {
-		return await (await import('../scripts/reviewer-qual/fingerprint.js')).reviewerFingerprint(CASES);
+		return await (await import('../scripts/reviewer-qual/fingerprint.js')).reviewerFingerprint(cases);
 	} finally {
 		vi.doUnmock(FENCE_MODULE_ID);
 		vi.resetModules();
@@ -1906,7 +1973,7 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 		expect(PRODUCT_SEAMS.processResult).toBe(processResultReviewInput);
 	});
 
-	it('⭐ a RENDERER change moves `probes` and NO case prompt — every P- probe with it, no other probe: each is built through the seam', async () => {
+	it('⭐ a RENDERER change moves `probes` — every P- probe with it, no other probe: each is built through the seam — and, of the case prompts, exactly the process-result cases’ (none of v1’s; the current set’s fourteen, PQ-2)', async () => {
 		const seams: FingerprintSeams = {
 			...PRODUCT_SEAMS,
 			processResult: (source) => {
@@ -1917,12 +1984,16 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 		const fp = await reviewerFingerprint(CASES, seams);
 		onlyMoved(fp, ['probes']);
 		expect(movedProbes(fp), 'every process-result probe moves, and only those').toEqual(P_PROBES());
-		// ⚠ TRUE BY CONSTRUCTION TODAY, AND SAID SO: no case of v1 or v3 is a process result, and the case prompts are built
+		// ~~⚠ TRUE BY CONSTRUCTION TODAY, AND SAID SO: no case of v1 or v3 is a process result, and the case prompts are built
 		// through `materialize.ts`, which no process-result builder reaches. `PQ-2` (design D4) must hand it the seams'
-		// `processResult` (`casePromptsOf` says so) — from then on these halves measure what its cases' prompts do.
-		expect(fp.casePrompts, 'no case prompt moves').toEqual(BASE.casePrompts);
-		expect((await reviewerFingerprint(CURRENT_CASES, seams)).casePrompts, 'no case prompt of the current set (v3 has no process-result case)').toEqual(
-			BASE_NOW.casePrompts
+		// `processResult` (`casePromptsOf` says so) — from then on these halves measure what its cases' prompts do.~~
+		// ⭐ `JAN-PRQUAL` `PQ-2` (design D4) — HANDED: `casePromptsOf` builds a process-result case through the seams'
+		// `processResult`, so these halves MEASURE what a renderer change does to a case prompt — none of v1's moves, and of
+		// the current set, case set v4, exactly its fourteen process-result cases' do.
+		expect(fp.casePrompts, 'no case of v1 is a process result: none moves').toEqual(BASE.casePrompts);
+		expect(CURRENT_PROCESS_RESULTS, 'the arrangement: the current set holds the fourteen').toHaveLength(14);
+		expect(movedCasePrompts(await reviewerFingerprint(CURRENT_CASES, seams), BASE_NOW), 'the current set’s process-result cases, and only those').toEqual(
+			CURRENT_PROCESS_RESULTS
 		);
 	});
 
@@ -2169,7 +2240,7 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 	});
 
 	it.each(Object.keys(BRANCH_CHANGES))(
-		'⭐ a change confined to ONE branch of the renderer — %s — moves `probes` through the probes that take it, and no case prompt',
+		'⭐ a change confined to ONE branch of the renderer — %s — moves `probes` through the probes that take it, and no case prompt of v1; of the current set, exactly the process-result cases that take it (PQ-2)',
 		async (branch) => {
 			const b = BRANCH_CHANGES[branch]!;
 			const fp = await reviewerFingerprint(CASES, { ...PRODUCT_SEAMS, processResult: changedIn(b) });
@@ -2179,7 +2250,18 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 			// of it, is a different set (`branchDiscrepancies`; its CONTROL is the row below).
 			expect(branchDiscrepancies(moved, b), `the probes that moved: ${moved.join(', ')}`).toEqual([]);
 			expect(moved.every((id) => id.startsWith('P-')), 'only process-result probes move').toBe(true);
-			expect(fp.casePrompts, 'no case prompt moves').toEqual(BASE.casePrompts);
+			expect(fp.casePrompts, 'no case prompt of v1 moves').toEqual(BASE.casePrompts);
+			// ⭐ `JAN-PRQUAL` `PQ-2` (design D4) — AND OF THE CURRENT SET, EXACTLY THE PROCESS-RESULT CASES WHOSE RUN TAKES THE
+			// BRANCH: their run literals are rendered through the same seam (`casePromptsOf`), so the branch's own `takes`,
+			// asked of each case's run and of the view the product renders for it, names the case prompts that must move —
+			// P-RR-07-CUT for the cuts it carries, every other process-result case for the clean branch, none for the rest.
+			const takers = CURRENT_CASES.filter(
+				(c) => c.arm === 'PROCESS_RESULT' && b.takes(c.input.run, caseReviewInput(c, PRODUCT_SEAMS.criteria).content)
+			).map((c) => c.id);
+			expect(
+				movedCasePrompts(await reviewerFingerprint(CURRENT_CASES, { ...PRODUCT_SEAMS, processResult: changedIn(b) }), BASE_NOW),
+				'the current set’s case prompts that move: exactly the process-result cases that take the branch'
+			).toEqual(takers);
 		},
 		60_000
 	);
@@ -2273,15 +2355,19 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 	});
 
 	it.each(Object.keys(CHOOSER_RULES))(
-		'⭐ a view chooser that stops reading %s moves `probes` through exactly the probes that plant a candidate there, and no case prompt',
+		'⭐ a view chooser that stops reading %s moves `probes` through exactly the probes that plant a candidate there, and no case prompt — of v1, nor of the current set, whose process results a view chooser builds (PQ-2)',
 		async (rule) => {
 			const r = CHOOSER_RULES[rule]!;
-			const fp = await reviewerFingerprint(CASES, { ...PRODUCT_SEAMS, processResult: r.builder });
+			const seams: FingerprintSeams = { ...PRODUCT_SEAMS, processResult: r.builder };
+			const fp = await reviewerFingerprint(CASES, seams);
 			onlyMoved(fp, ['probes']);
 			expect(movedProbes(fp), 'the probes whose token that slice decides').toEqual(r.moves);
 			expect(fp.casePrompts, 'no case prompt moves').toEqual(BASE.casePrompts);
+			// ⭐ `PQ-2` (design D4) — and of the current set, measured: no process-result case holds a candidate a chooser
+			// that skips this slice would then take.
+			expect(await movedNow(seams), 'no case prompt of the current set moves').toEqual([]);
 		},
-		60_000
+		120_000
 	);
 
 	it('⭐ THE ARRANGEMENT — in every framing, a probe whose account has every field, and one whose account has an empty list', () => {
@@ -2417,26 +2503,31 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 	}, 60_000);
 
 	it.each(Object.keys(VALIDATOR_CHOOSER_RULES))(
-		'⭐ a validator chooser that stops reading %s moves `probes` through exactly the probes that plant a candidate there, and no case prompt',
+		'⭐ a validator chooser that stops reading %s moves `probes` through exactly the probes that plant a candidate there, ~~and no case prompt~~ and, of the case prompts, none of v1’s and of the current set exactly those the rule names — the fourteen process results’ where it stops reading their view (PQ-2)',
 		async (rule) => {
 			const r = VALIDATOR_CHOOSER_RULES[rule]!;
-			const fp = await reviewerFingerprint(CASES, {
+			const seams: FingerprintSeams = {
 				...PRODUCT_SEAMS,
 				validator: validatorPrinting((p, input) => revalidated(p, input, (s, cut) => r.kept(s, input.framing, cut)))
-			});
+			};
+			const fp = await reviewerFingerprint(CASES, seams);
 			onlyMoved(fp, ['probes']);
 			expect(movedProbes(fp), 'the probes whose token that slice decides').toEqual(r.moves);
 			expect([...new Set(r.moves.map((id) => id[0]))], 'in every framing that carries the slice').toEqual(r.framings);
 			expect(fp.casePrompts, 'no case prompt moves').toEqual(BASE.casePrompts);
+			// ⭐ `PQ-2` (design D4) — AND OF THE CURRENT SET, EXACTLY THE CASE PROMPTS THE RULE NAMES: measured over case set
+			// v4, where "no case prompt" was false of the view's rule (all fourteen process results move).
+			expect(await movedNow(seams), 'the case prompts of the current set the rule moves').toEqual(r.casesNow ?? []);
 		},
-		60_000
+		120_000
 	);
 
 	it.each(Object.keys(LIST_SERIALIZATION_CHANGES))(
-		'⭐ design §9.3 D7 — %s moves `probes` through exactly the probes whose prompt shows a list whole, in every framing — and exactly the case prompts whose case carries a list',
+		'⭐ design §9.3 D7 — %s moves `probes` through exactly the probes whose prompt shows a list whole, in every framing — and exactly the case prompts whose case carries a list, of v1 and of the current set (PQ-2)',
 		async (change) => {
 			const as = LIST_SERIALIZATION_CHANGES[change]!;
-			const fp = await reviewerFingerprint(CASES, { ...PRODUCT_SEAMS, validator: validatorPrinting((p) => listsReserialized(p, as)) });
+			const seams: FingerprintSeams = { ...PRODUCT_SEAMS, validator: validatorPrinting((p) => listsReserialized(p, as)) };
+			const fp = await reviewerFingerprint(CASES, seams);
 			onlyMoved(fp, ['probes']);
 			const showing = showingAListWhole();
 			expect(movedProbes(fp), 'the probes whose prompt shows a list whole').toEqual(showing);
@@ -2452,15 +2543,28 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 				CASES.filter((c) => fp.casePrompts.get(c.id)?.initial !== BASE.casePrompts.get(c.id)?.initial).map((c) => c.id),
 				'the case prompts that move: exactly those whose case carries a list'
 			).toEqual(carrying);
+			// ⭐ `PQ-2` (design D4) — and of the current set: exactly its cases whose account carries a list, the process
+			// results among them (each shows its lists whole, the cut case's too).
+			const carryingNow = CURRENT_CASES.filter((c) => {
+				const account = caseReviewInput(c, PRODUCT_SEAMS.criteria).rationale;
+				return account !== undefined && ACCOUNT_LISTS.some((k) => account[k].length > 0);
+			}).map((c) => c.id);
+			expect(carryingNow.filter((id) => CURRENT_PROCESS_RESULTS.includes(id)), 'the arrangement: every process result carries a list').toEqual(
+				CURRENT_PROCESS_RESULTS
+			);
+			expect(await movedNow(seams), 'the case prompts of the current set that move: exactly those whose case carries a list').toEqual(
+				carryingNow
+			);
 		},
-		60_000
+		120_000
 	);
 
 	it.each(Object.keys(D7_LAYOUT_CHANGES))(
-		'⭐ design §9.3 D7 — %s moves `probes` through exactly the probes whose account it touches, in every framing — and exactly the case prompts whose case carries it',
+		'⭐ design §9.3 D7 — %s moves `probes` through exactly the probes whose account it touches, in every framing — and exactly the case prompts whose case carries it, of v1 and of the current set (PQ-2)',
 		async (name) => {
 			const layout = D7_LAYOUT_CHANGES[name]!;
-			const fp = await reviewerFingerprint(CASES, { ...PRODUCT_SEAMS, validator: (print) => PRODUCT_SEAMS.validator((p) => print(layout.change(p))) });
+			const seams: FingerprintSeams = { ...PRODUCT_SEAMS, validator: (print) => PRODUCT_SEAMS.validator((p) => print(layout.change(p))) };
+			const fp = await reviewerFingerprint(CASES, seams);
 			onlyMoved(fp, ['probes']);
 			const carrying = FINGERPRINT_PROBES.filter((x) => layout.carries(x.input(PRODUCT_SEAMS.criteria, PRODUCT_SEAMS.processResult)))
 				.map((x) => x.id)
@@ -2473,19 +2577,24 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 				CASES.filter((k) => fp.casePrompts.get(k.id)?.initial !== BASE.casePrompts.get(k.id)?.initial).map((k) => k.id),
 				'the case prompts that move: exactly those whose case carries it'
 			).toEqual(cases);
+			// ⭐ `PQ-2` (design D4) — and of the current set: exactly its cases that carry it.
+			expect(await movedNow(seams), 'the case prompts of the current set that move: exactly those whose case carries it').toEqual(
+				CURRENT_CASES.filter((k) => layout.carries(caseReviewInput(k, PRODUCT_SEAMS.criteria))).map((k) => k.id)
+			);
 		},
-		60_000
+		120_000
 	);
 
 	it.each(AssuranceSeveritySchema.options)(
-		'⭐ design §9.3 D8 — the stakes %s written otherwise beside its criterion moves `probes` through exactly the probes whose prompt shows it, in every framing — and every case prompt exactly when the floor policy declares it',
+		'⭐ design §9.3 D8 — the stakes %s written otherwise beside its criterion moves `probes` through exactly the probes whose prompt shows it, in every framing — and every case prompt exactly when the floor policy declares it, of v1 and of the current set (PQ-2)',
 		async (stakes) => {
 			const showing = showingStakes(stakes);
 			expect([...new Set(showing.map((id) => id[0]))], 'the arrangement: it is shown in every framing').toEqual(['G', 'W', 'P']);
-			const fp = await reviewerFingerprint(CASES, {
+			const seams: FingerprintSeams = {
 				...PRODUCT_SEAMS,
 				validator: (print) => PRODUCT_SEAMS.validator((p) => print(p.split(stakesMark(stakes)).join(stakesMark(stakes.toLowerCase()))))
-			});
+			};
+			const fp = await reviewerFingerprint(CASES, seams);
 			onlyMoved(fp, ['probes']);
 			expect(movedProbes(fp), 'the probes whose prompt shows it').toEqual(showing);
 			const declared = PRODUCT_SEAMS.criteria.some((c) => c.severityIfNotMet === stakes);
@@ -2493,8 +2602,15 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 				expect(fp.casePrompts.get(c.id)!.initial !== BASE.casePrompts.get(c.id)!.initial, `${c.id}: moves exactly when the floor policy declares ${stakes}`).toBe(
 					declared
 				);
+			// ⭐ `PQ-2` (design D4) — and every case prompt of the current set, exactly when the policy declares it. ⚠ The
+			// substitution models the change over the WHOLE prompt, quoted slices included, so a case whose own text held a
+			// stakes mark would move here too where the policy declares no such stakes — a false red, never a false green, in
+			// this half as in the v1 half above it; no case of either set holds a stakes mark today.
+			expect(await movedNow(seams), `the case prompts of the current set that move: every one exactly when the floor policy declares ${stakes}`).toEqual(
+				declared ? CURRENT_CASES.map((c) => c.id) : []
+			);
 		},
-		60_000
+		120_000
 	);
 
 	it('⭐ design §9.3 D8 — a rubric that writes EVERY stakes as BLOCKING, the policy’s unread, moves `probes` through G-STAKES, W-STAKES and P-STAKES alone, and no case prompt: every floor criterion declares BLOCKING', async () => {
@@ -2502,30 +2618,46 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 		// policy's criteria, every one BLOCKING, so a rubric that ignored the policy and wrote BLOCKING beside each moved no
 		// probe and no case prompt (driven on a disposable copy). The three stakes probes are the only place it shows.
 		expect(PRODUCT_SEAMS.criteria.every((c) => c.severityIfNotMet === 'BLOCKING'), 'the arrangement: every floor criterion declares BLOCKING').toBe(true);
-		const fp = await reviewerFingerprint(CASES, {
+		const seams: FingerprintSeams = {
 			...PRODUCT_SEAMS,
 			validator: (print) =>
 				PRODUCT_SEAMS.validator((p) => print(AssuranceSeveritySchema.options.reduce((q, s) => q.split(stakesMark(s)).join(stakesMark('BLOCKING')), p)))
-		});
+		};
+		const fp = await reviewerFingerprint(CASES, seams);
 		onlyMoved(fp, ['probes']);
 		expect(movedProbes(fp), 'the probes handed every stakes').toEqual(['G-STAKES', 'W-STAKES', 'P-STAKES']);
 		expect(fp.casePrompts, 'no case prompt moves').toEqual(BASE.casePrompts);
-	}, 60_000);
+		// ~~⭐ `PQ-2` (design D4) — nor any of the current set: its cases are handed the floor policy's criteria too.~~
+		// ⭐ Restated (`PQ-2`, design D4; design §9.3 D8) — nor any of the current set, whose cases are handed the floor
+		// policy's criteria too, every one BLOCKING, so no line of the rubric changes for them. ⚠ But a current case CAN
+		// redden this half: the row models the rubric change as a substitution over the WHOLE prompt, quoted slices
+		// included, so a case whose own text holds a stakes mark other than BLOCKING (`[if unmet: ADVISORY]` in an account,
+		// say; a BLOCKING mark is rewritten to itself) moves under it, though a real rubric change, which rewrites only the
+		// rubric's own lines, would not move it — a false red, never a false green. No case of the current set holds a stakes
+		// mark today.
+		expect(await movedNow(seams), 'no case prompt of the current set moves').toEqual([]);
+	}, 120_000);
 
 	it.each(Object.keys(D8_PHRASES))(
-		'⭐ design §9.3 D8 — %s, changed, moves `probes` through every probe the validator sends a prompt for, and every case prompt',
+		'⭐ design §9.3 D8 — %s, changed, moves `probes` through every probe the validator sends a prompt for, and every case prompt — of v1, and of the current set (PQ-2)',
 		async (name) => {
 			const [from, to] = D8_PHRASES[name]!;
 			for (const id of sendingAPrompt())
 				expect(BASE.probePrompts.get(id)!.split(from).length - 1, `${id}: the arrangement — the phrase, once`).toBe(1);
-			const fp = await reviewerFingerprint(CASES, { ...PRODUCT_SEAMS, validator: (print) => PRODUCT_SEAMS.validator((p) => print(p.replace(from, () => to))) });
+			const seams: FingerprintSeams = { ...PRODUCT_SEAMS, validator: (print) => PRODUCT_SEAMS.validator((p) => print(p.replace(from, () => to))) };
+			const fp = await reviewerFingerprint(CASES, seams);
 			onlyMoved(fp, ['probes']);
 			expect(movedProbes(fp), 'every probe the validator sends a prompt for').toEqual(sendingAPrompt());
 			for (const c of CASES)
 				for (const role of ['initial', 'repair'] as const)
 					expect(fp.casePrompts.get(c.id)![role], `${c.id}: its ${role} prompt moves`).not.toBe(BASE.casePrompts.get(c.id)![role]);
+			// ⭐ `PQ-2` (design D4) — and every case prompt of the current set, each its initial and its repair.
+			const now = await reviewerFingerprint(CURRENT_CASES, seams);
+			for (const c of CURRENT_CASES)
+				for (const role of ['initial', 'repair'] as const)
+					expect(now.casePrompts.get(c.id)![role], `the current set’s ${c.id}: its ${role} prompt moves`).not.toBe(BASE_NOW.casePrompts.get(c.id)![role]);
 		},
-		60_000
+		120_000
 	);
 
 	it('⭑ CONTROL — the list re-serializer read back: D7’s own serialization, re-applied, is the product’s prompt byte for byte, and a list holding a line break is read as ONE item', () => {
@@ -2659,41 +2791,50 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 	});
 
 	it.each(FIELD_READING_ROWS)(
-		'⭐ design §9.3 D7 — a validator chooser that reads %s %s moves `probes` through exactly the account-breaks probes, in every framing, and no case prompt',
+		'⭐ design §9.3 D7 — a validator chooser that reads %s %s moves `probes` through exactly the account-breaks probes, in every framing, and no case prompt — of v1, nor of the current set (PQ-2)',
 		async (field, reading) => {
 			const read = FIELD_READINGS[reading]!.read;
-			const fp = await reviewerFingerprint(CASES, { ...PRODUCT_SEAMS, validator: validatorPrinting((p, input) => reread(p, input, field, read)) });
+			const seams: FingerprintSeams = { ...PRODUCT_SEAMS, validator: validatorPrinting((p, input) => reread(p, input, field, read)) };
+			const fp = await reviewerFingerprint(CASES, seams);
 			onlyMoved(fp, ['probes']);
 			expect(movedProbes(fp), 'the probes that plant in that field both ways').toEqual(ACCOUNT_BREAKS_PROBES);
 			expect(fp.casePrompts, 'no case prompt moves').toEqual(BASE.casePrompts);
+			// ⭐ `PQ-2` (design D4) — nor any of the current set, measured: no case's account holds a plant read only otherwise.
+			expect(await movedNow(seams), 'no case prompt of the current set moves').toEqual([]);
 		},
-		60_000
+		120_000
 	);
 
 	it.each(FIELD_READING_ROWS)(
-		'⭐ design §9.3 D7 — a view chooser that reads %s %s moves `probes` through exactly P-ACCOUNT-BREAKS, and no case prompt',
+		'⭐ design §9.3 D7 — a view chooser that reads %s %s moves `probes` through exactly P-ACCOUNT-BREAKS, and no case prompt — of v1, nor of the current set, whose process results a view chooser builds (PQ-2)',
 		async (field, reading) => {
-			const fp = await reviewerFingerprint(CASES, {
+			const seams: FingerprintSeams = {
 				...PRODUCT_SEAMS,
 				processResult: choosing(() => true, otherRead(field, FIELD_READINGS[reading]!.read))
-			});
+			};
+			const fp = await reviewerFingerprint(CASES, seams);
 			onlyMoved(fp, ['probes']);
 			expect(movedProbes(fp), 'the process-result probe that plants in that field both ways').toEqual(['P-ACCOUNT-BREAKS']);
 			expect(fp.casePrompts, 'no case prompt moves').toEqual(BASE.casePrompts);
+			// ⭐ `PQ-2` (design D4) — nor any of the current set, measured.
+			expect(await movedNow(seams), 'no case prompt of the current set moves').toEqual([]);
 		},
-		60_000
+		120_000
 	);
 
-	it('⭑ CONTROL — the field re-reader read back: each field read as the prompt carries it, every prompt re-chosen over, is the product’s byte for byte; and the view’s chooser handed each field so renders the product’s view', async () => {
+	it('⭑ CONTROL — the field re-reader read back: each field read as the prompt carries it, every prompt re-chosen over, is the product’s byte for byte; and the view’s chooser handed each field so renders the product’s view — over v1, and over the current set (PQ-2)', async () => {
 		const same = (t: string): string => t;
-		const fp = await reviewerFingerprint(CASES, {
+		const seams: FingerprintSeams = {
 			...PRODUCT_SEAMS,
 			validator: validatorPrinting((p, input) => reread(p, input, "the account's assumptions", same)),
 			processResult: choosing(() => true, otherRead("the account's assumptions", same))
-		});
+		};
+		const fp = await reviewerFingerprint(CASES, seams);
 		expect(fp.components, 'nothing moves').toEqual(BASE.components);
 		expect(fp.casePrompts, 'no case prompt moves').toEqual(BASE.casePrompts);
-	}, 60_000);
+		// ⭐ `PQ-2` (design D4) — nor any of the current set's, its fourteen process results built through the view's chooser.
+		expect(await movedNow(seams), 'no case prompt of the current set moves').toEqual([]);
+	}, 120_000);
 
 	it('⭐ design §9.3 D7 — a list item holding a line feed, its later lines written otherwise (indented under the item, as a reader of bullets might expect), moves `probes` through exactly the probes whose prompt shows such an item whole, in every framing — and exactly the case prompts whose case holds one', async () => {
 		// ⛔ WHY (design §9.3 D7; `REG-F-481`): D7 states the ambiguity of bullets — an item holding a newline and the prefix
@@ -2716,7 +2857,8 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 				: [];
 		});
 		expect(showing, 'the arrangement: the probes that show such an item whole').toEqual(ACCOUNT_BREAKS_PROBES);
-		const fp = await reviewerFingerprint(CASES, { ...PRODUCT_SEAMS, validator: validatorPrinting((p) => listsReserialized(p, indented)) });
+		const seams: FingerprintSeams = { ...PRODUCT_SEAMS, validator: validatorPrinting((p) => listsReserialized(p, indented)) };
+		const fp = await reviewerFingerprint(CASES, seams);
 		onlyMoved(fp, ['probes']);
 		expect(movedProbes(fp), 'the probes whose prompt shows such an item whole').toEqual(showing);
 		const cases = CASES.filter((c) => holdsOne(caseReviewInput(c, PRODUCT_SEAMS.criteria).rationale)).map((c) => c.id);
@@ -2724,18 +2866,25 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 			CASES.filter((c) => fp.casePrompts.get(c.id)?.initial !== BASE.casePrompts.get(c.id)?.initial).map((c) => c.id),
 			'the case prompts that move: exactly those whose case holds such an item'
 		).toEqual(cases);
-	}, 60_000);
+		// ⭐ `PQ-2` (design D4) — and of the current set: exactly its cases that hold one.
+		expect(await movedNow(seams), 'the case prompts of the current set that move: exactly those whose case holds such an item').toEqual(
+			CURRENT_CASES.filter((c) => holdsOne(caseReviewInput(c, PRODUCT_SEAMS.criteria).rationale)).map((c) => c.id)
+		);
+	}, 120_000);
 
 	it.each(Object.keys(ENCODER_CALL_SITES))(
-		'⭐ %s encoded by `JSON.stringify`, not `jsonLine`, moves `probes` through the probe that plants a break there, and no case prompt',
+		'⭐ %s encoded by `JSON.stringify`, not `jsonLine`, moves `probes` through the probe that plants a break there, and no case prompt — of v1, nor of the current set (PQ-2)',
 		async (site) => {
 			const e = ENCODER_CALL_SITES[site]!;
-			const fp = await reviewerFingerprint(CASES, { ...PRODUCT_SEAMS, validator: validatorPrinting((p, input) => encodedRaw(p, input, e.which)) });
+			const seams: FingerprintSeams = { ...PRODUCT_SEAMS, validator: validatorPrinting((p, input) => encodedRaw(p, input, e.which)) };
+			const fp = await reviewerFingerprint(CASES, seams);
 			onlyMoved(fp, ['probes']);
 			expect(movedProbes(fp), 'the probe whose break that call site encodes').toEqual(e.moves);
 			expect(fp.casePrompts, 'no case prompt moves').toEqual(BASE.casePrompts);
+			// ⭐ `PQ-2` (design D4) — nor any of the current set, measured: no case holds a break at that call site.
+			expect(await movedNow(seams), 'no case prompt of the current set moves').toEqual([]);
 		},
-		60_000
+		120_000
 	);
 
 	// ~~U+0085 and U+2029 alone, through G-OVERSIZE-FENCES alone~~ — `PQ-1` (`REG-F-481`): every break is planted at every
@@ -2745,15 +2894,18 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 		['U+2028', 0x2028],
 		['U+2029', 0x2029]
 	] as const)(
-		'⭐ `jsonLine` leaving %s raw — at every call site at once, the fence module loaded afresh — moves `probes` through the two probes that plant it, G-OVERSIZE-FENCES and P-OVERSIZE-FENCES',
+		'⭐ `jsonLine` leaving %s raw — at every call site at once, the fence module loaded afresh — moves `probes` through the two probes that plant it, G-OVERSIZE-FENCES and P-OVERSIZE-FENCES, and no case prompt of v1 or of the current set (PQ-2)',
 		async (_name, left) => {
 			expect(jsonLineLeaving(0)({ a: 'x' }), 'CONTROL: leaving none raw, it is `jsonLine`').toBe(jsonLine({ a: 'x' }));
 			const fp = await freshOverFence(() => ({ jsonLine: jsonLineLeaving(left) }));
 			onlyMoved(fp, ['probes']);
 			expect(movedProbes(fp), 'the probes that plant that break').toEqual(['G-OVERSIZE-FENCES', 'P-OVERSIZE-FENCES']);
 			expect(fp.casePrompts, 'no case prompt moves').toEqual(BASE.casePrompts);
+			// ⭐ `PQ-2` (design D4) — nor any of the current set, measured: no case's command line or content holds the break.
+			const now = await freshOverFence(() => ({ jsonLine: jsonLineLeaving(left) }), CURRENT_CASES);
+			expect(movedCasePrompts(now, BASE_NOW), 'no case prompt of the current set moves').toEqual([]);
 		},
-		120_000
+		240_000
 	);
 
 	it('⭐ WHAT NO CHOOSER MAY READ IS PLANTED, AND WOULD DECIDE — each chooser’s token in the bytes a cut removes (every cut a probe takes but those standing on a cut’s own arithmetic; for both choosers of a process result, in each tied list and in each slice P-OVERSIZE-ALL’s prompt cuts), astride two slices (W-FENCES, G-OVERSIZE-FENCES, P-OVERSIZE-FENCES) and astride a cut’s two parts (P-OVERSIZE-FENCES’s stdout), split by a line feed, and written backwards and with its runs reversed on a line with no bidi control: in no slice as the prompt carries it, and a chooser that read it would choose another token', () => {
@@ -3095,16 +3247,19 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 		).toEqual(['G-NO-FENCE', 'W-NO-FENCE', 'P-NO-FENCE']);
 	});
 
-	it('⭐ a chooser that NEVER FAILS CLOSED — every candidate occurring, it fences with the last anyway — moves `probes` through the three refused probes, one in each framing, each refusal now a prompt', async () => {
-		const fp = await freshOverFence((real) => ({
+	it('⭐ a chooser that NEVER FAILS CLOSED — every candidate occurring, it fences with the last anyway — moves `probes` through the three refused probes, one in each framing, each refusal now a prompt, and no case prompt of v1 or of the current set (PQ-2)', async () => {
+		const neverClosed = (real: typeof import('../apps/rph-demo/src/lib/server/assurance/review-fence.js')) => ({
 			chooseFence: (slices: readonly string[]) => real.chooseFence(slices) ?? real.fenceCandidate(99)
-		}));
+		});
+		const fp = await freshOverFence(neverClosed);
 		onlyMoved(fp, ['probes']);
 		expect(movedProbes(fp), 'the probes the validator refuses').toEqual(['G-NO-FENCE', 'W-NO-FENCE', 'P-NO-FENCE']);
 		for (const id of ['G-NO-FENCE', 'W-NO-FENCE', 'P-NO-FENCE'])
 			expect(fp.probePrompts.get(id)!.startsWith(`${REFUSED}\n`), `${id}: sent, where it was refused`).toBe(false);
 		expect(fp.casePrompts, 'no case prompt moves').toEqual(BASE.casePrompts);
-	}, 120_000);
+		// ⭐ `PQ-2` (design D4) — nor any of the current set's: no case prints every candidate.
+		expect(movedCasePrompts(await freshOverFence(neverClosed, CURRENT_CASES), BASE_NOW), 'no case prompt of the current set moves').toEqual([]);
+	}, 240_000);
 
 	it('⭐ THE ARRANGEMENT — P-OVERSIZE-AT-ITS-BUDGET’s view fills its budget EXACTLY, on the edge of the validator’s refusal of a view over it: its three slices cut alike, each declaration as wide as the widest the layout reserves; and it is sent, whole', () => {
 		// ⛔ WHY (`PQ-1`; `REG-F-480`, `REG-F-476`): every probe's view fell short of its budget by the digits a declaration
@@ -3214,14 +3369,15 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481) — the fingerprint reaches the ske
 		Object.fromEntries(SOURCES.map((s) => [s.key, readExtract(s, EXTRACTS[s.key])])) as Record<InputKey, string[]>
 	);
 	const TABLE_MODULE_ID = '../apps/rph-demo/src/lib/server/assurance/fence-skeleton-table.js';
-	/** The fingerprint, loaded afresh over `table` in place of the committed one, and the fences probe's view token. */
-	const freshOver = async (table: FenceSkeletonTable) => {
+	/** The fingerprint, loaded afresh over `table` in place of the committed one, and the fences probe's view token — over
+	 *  `cases`, case set v1 unless a row asks for the current set (`PQ-2`). */
+	const freshOver = async (table: FenceSkeletonTable, cases: readonly QualificationCase[] = CASES) => {
 		vi.resetModules();
 		vi.doMock(TABLE_MODULE_ID, () => ({ FENCE_SKELETON_UNICODE_VERSION: UNICODE_VERSION, DELETED: table.deleted, MAPPED: table.mapped }));
 		try {
 			const fingerprint = await import('../scripts/reviewer-qual/fingerprint.js');
 			const probes = await import('../scripts/reviewer-qual/probes.js');
-			const fp = await fingerprint.reviewerFingerprint(CASES);
+			const fp = await fingerprint.reviewerFingerprint(cases);
 			const fences = probes.FINGERPRINT_PROBES.find((x) => x.id === 'P-OVERSIZE-FENCES')!.input(
 				fingerprint.PRODUCT_SEAMS.criteria,
 				fingerprint.PRODUCT_SEAMS.processResult
@@ -3233,9 +3389,10 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481) — the fingerprint reaches the ske
 		}
 	};
 	/** The fingerprint, loaded afresh over the fence module with `override` laid over its exports, and the fences probe's
-	 *  view token — as `freshOver`, for a rule of the reader rather than a family of the table. */
+	 *  view token — as `freshOver`, for a rule of the reader rather than a family of the table; over `cases`, as it is. */
 	const freshOverReader = async (
-		override: (real: typeof import('../apps/rph-demo/src/lib/server/assurance/review-fence.js')) => Record<string, unknown>
+		override: (real: typeof import('../apps/rph-demo/src/lib/server/assurance/review-fence.js')) => Record<string, unknown>,
+		cases: readonly QualificationCase[] = CASES
 	) => {
 		vi.resetModules();
 		vi.doMock(FENCE_MODULE_ID, async (importOriginal) => {
@@ -3245,7 +3402,7 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481) — the fingerprint reaches the ske
 		try {
 			const fingerprint = await import('../scripts/reviewer-qual/fingerprint.js');
 			const probes = await import('../scripts/reviewer-qual/probes.js');
-			const fp = await fingerprint.reviewerFingerprint(CASES);
+			const fp = await fingerprint.reviewerFingerprint(cases);
 			const fences = probes.FINGERPRINT_PROBES.find((x) => x.id === 'P-OVERSIZE-FENCES')!.input(
 				fingerprint.PRODUCT_SEAMS.criteria,
 				fingerprint.PRODUCT_SEAMS.processResult
@@ -3413,76 +3570,76 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481) — the fingerprint reaches the ske
 	 * unit — or, for the reading set, a table that keeps each code point's first reading alone. ⭐ AND ITS SEVEN OF HOW A
 	 * SLICE IS READ, each dropped from the reader re-stated above (`statedReader`).
 	 */
-	const READER_RULES: readonly (readonly [name: string, load: () => ReturnType<typeof freshOver>, token: string])[] = [
+	const READER_RULES: readonly (readonly [name: string, load: (cases?: readonly QualificationCase[]) => ReturnType<typeof freshOver>, token: string])[] = [
 		[
 			'a line terminator a reader may not break at, read as nothing too — each read as a break alone (the view’s own 08, split by a raw U+2028 in stderr)',
-			() =>
+			(cases) =>
 				freshOverReader((real) => ({
 					chooseFence: (slices: readonly string[]) =>
 						real.chooseFence(
 							slices.map((s) => [...s].map((c) => (real.UNBROKEN_TERMINATORS.includes(c.codePointAt(0)!) ? '\n' : c)).join(''))
 						)
-				})),
+				}), cases),
 			'<<<UNTRUSTED-08>>>'
 		],
 		[
 			'every reading of a code point — the first alone (the tall te of 10, in stderr, which TR39 reads as 7 and its capital as T)',
-			() => freshOver({ deleted: DELETED, mapped: MAPPED.filter(([cp], i) => i === 0 || MAPPED[i - 1]![0] !== cp) }),
+			(cases) => freshOver({ deleted: DELETED, mapped: MAPPED.filter(([cp], i) => i === 0 || MAPPED[i - 1]![0] !== cp) }, cases),
 			'<<<UNTRUSTED-10>>>'
 		],
 		[
 			'a line holding a bidi control, read laid out reversed — no line reversed (11, written backwards after a RIGHT-TO-LEFT OVERRIDE, in stderr)',
-			() =>
+			(cases) =>
 				freshOverReader((real) => ({
 					chooseFence: (slices: readonly string[]) =>
 						real.chooseFence(slices.map((s) => [...s].filter((c) => !real.reordersLine(c.codePointAt(0)!)).join('')))
-				})),
+				}), cases),
 			'<<<UNTRUSTED-11>>>'
 		],
 		[
 			// ⭐ A code point outside the Basic Multilingual Plane is two UTF-16 units: a reader that looked it up by its first
 			// unit alone reads a lone surrogate, never the lookalike (driven on a disposable copy: no probe moved).
 			'a code point outside the Basic Multilingual Plane, read whole — its first UTF-16 unit alone (the MATHEMATICAL BOLD DIGIT ZERO of 02, in argv)',
-			() =>
+			(cases) =>
 				freshOverReader((real) => ({
 					chooseFence: (slices: readonly string[]) =>
 						real.chooseFence(slices.map((s) => [...s].map((c) => (c.length === 2 ? c[0]! : c)).join('')))
-				})),
+				}), cases),
 			'<<<UNTRUSTED-02>>>'
 		],
 		[
 			'an isolate or an embedding lays a line out, as the override does — the override alone (12, written backwards between a RIGHT-TO-LEFT ISOLATE and its pop, in the instruction)',
-			() => freshOverReader((real) => ({ chooseFence: statedReader(real, 'an isolate or an embedding') })),
+			(cases) => freshOverReader((real) => ({ chooseFence: statedReader(real, 'an isolate or an embedding') }), cases),
 			'<<<UNTRUSTED-12>>>'
 		],
 		[
 			'every line of a slice that holds a control is laid out — the first alone (13, after an override on the second line of stderr that holds one)',
-			() => freshOverReader((real) => ({ chooseFence: statedReader(real, 'every line') })),
+			(cases) => freshOverReader((real) => ({ chooseFence: statedReader(real, 'every line') }), cases),
 			'<<<UNTRUSTED-13>>>'
 		],
 		[
 			'a control anywhere in a line lays it out — only a control that begins it (14, after an override mid-line, in stderr)',
-			() => freshOverReader((real) => ({ chooseFence: statedReader(real, 'anywhere in a line') })),
+			(cases) => freshOverReader((real) => ({ chooseFence: statedReader(real, 'anywhere in a line') }), cases),
 			'<<<UNTRUSTED-14>>>'
 		],
 		[
 			'a line laid out runs across the terminators a reader may not break at — broken at each (15, after an override, split by a U+2028, in stderr)',
-			() => freshOverReader((real) => ({ chooseFence: statedReader(real, 'across a terminator') })),
+			(cases) => freshOverReader((real) => ({ chooseFence: statedReader(real, 'across a terminator') }), cases),
 			'<<<UNTRUSTED-15>>>'
 		],
 		[
 			'a candidate may begin while another is open — only where none is (16, after a fourth bracket, in stderr)',
-			() => freshOverReader((real) => ({ chooseFence: statedReader(real, 'while another is open') })),
+			(cases) => freshOverReader((real) => ({ chooseFence: statedReader(real, 'while another is open') }), cases),
 			'<<<UNTRUSTED-16>>>'
 		],
 		[
 			'a candidate may begin inside a reading — only where a reading begins (17, its first two brackets U+226A, which reads as <<, in stderr)',
-			() => freshOverReader((real) => ({ chooseFence: statedReader(real, 'inside a reading') })),
+			(cases) => freshOverReader((real) => ({ chooseFence: statedReader(real, 'inside a reading') }), cases),
 			'<<<UNTRUSTED-17>>>'
 		],
 		[
 			'a line is laid out with its runs reversed too — code point by code point alone (18, its digits before its name inside a RIGHT-TO-LEFT EMBEDDING, in stderr)',
-			() => freshOverReader((real) => ({ chooseFence: statedReader(real, 'runs reversed') })),
+			(cases) => freshOverReader((real) => ({ chooseFence: statedReader(real, 'runs reversed') }), cases),
 			'<<<UNTRUSTED-18>>>'
 		]
 	];
@@ -3521,15 +3678,18 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481) — the fingerprint reaches the ske
 		['a reading that holds a bracket breaks a run, however many characters it has — only one that IS a bracket (U+226B)', 'a reading of several brackets']
 	];
 	it.each(CORPUS_ONLY_RULES)(
-		'⭐ the reader’s rule: %s — dropped, it moves `probes` through the reader corpus alone, and no probe’s prompt',
+		'⭐ the reader’s rule: %s — dropped, it moves `probes` through the reader corpus alone, and no probe’s prompt, nor any case prompt of v1 or of the current set (PQ-2)',
 		async (_name, rule) => {
 			const { fp, viewToken } = await freshOverReader((real) => ({ chooseFence: statedReader(real, rule) }));
 			onlyMoved(fp, ['probes']);
 			expect(movedProbes(fp), 'no probe’s prompt moves: the reader corpus alone').toEqual([]);
 			expect(viewToken).toBe('<<<UNTRUSTED-19>>>');
 			expect(fp.casePrompts, 'no case prompt moves').toEqual(BASE.casePrompts);
+			// ⭐ `PQ-2` (design D4) — nor any of the current set's.
+			const now = (await freshOverReader((real) => ({ chooseFence: statedReader(real, rule) }), CURRENT_CASES)).fp;
+			expect(movedCasePrompts(now, BASE_NOW), 'no case prompt of the current set moves').toEqual([]);
 		},
-		120_000
+		240_000
 	);
 
 	/** A rule a witness of the reader corpus stands on: a rule of how a slice is read, or one of how a code point is. */
@@ -3666,7 +3826,33 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481) — the fingerprint reaches the ske
 		expect(CORPUS.filter(([, rule]) => rule !== undefined).length, 'the arrangement: the witnesses that stand on a rule').toBe(47);
 	}, 60_000);
 
-	it('⭐ the reader changed where NO probe plants — U+200F RIGHT-TO-LEFT MARK read as a control it names — moves `probes` through the reader corpus, and no probe’s prompt', async () => {
+	/** Each code point a witness's label names, `U+` and its hex digits, in the label's order. */
+	const namedIn = (label: string): number[] => [...label.matchAll(/U\+([0-9A-F]{4,6})\b/g)].map((m) => parseInt(m[1]!, 16));
+	/** The code points a witness's label names that none of its slices holds — one line each. */
+	const unheld = (corpus: readonly (typeof READER_CORPUS)[number][]): string[] =>
+		corpus.flatMap((w) =>
+			namedIn(w.rule)
+				.filter((cp) => !w.slices.some((s) => [...s].some((c) => c.codePointAt(0) === cp)))
+				.map((cp) => `${w.rule}: U+${cp.toString(16).toUpperCase().padStart(4, '0')} is in none of its slices`)
+		);
+	it('⛔ EVERY WITNESS HOLDS THE CODE POINTS ITS LABEL NAMES — each U+XXXX a witness’s rule names occurs in its slices, so a witness kept by its label with its code point taken out is named; ⭑ CONTROL: the right-to-left mark’s witness, its slice the mark’s alone taken out, is found', () => {
+		// ⛔ WHY (`PQ-1`; `REG-F-481`): the composition row holds each witness by its label and its slice as not empty, and the
+		// reader row that reads U+200F as a control is carried by the corpus's SECOND U+200F witness — so the first, its
+		// slice replaced by one with no U+200F, kept every test green (driven at `PQ-1`'s landing): its label went on naming
+		// a witness the corpus no longer held.
+		expect(unheld(READER_CORPUS), 'the code points each label names, held by its slices').toEqual([]);
+		// The arrangement: the labels that name a code point, and every one of them is read.
+		expect(READER_CORPUS.filter((w) => namedIn(w.rule).length > 0).length, 'the arrangement: witnesses that name a code point').toBeGreaterThan(40);
+		expect(namedIn('U+1D7CE and U+0023, not U+12'), 'the arrangement: four to six hex digits, astral ones too').toEqual([0x1d7ce, 0x23]);
+		// ⭑ CONTROL — the witness of U+200F RIGHT-TO-LEFT MARK as no control the reader names, its slice replaced by one with
+		// no mark: the row names exactly it.
+		const label = 'NOT READ — LAYOUT, NOT MODELLED: U+200F RIGHT-TO-LEFT MARK is no control the reader names';
+		expect(READER_CORPUS.filter((w) => w.rule === label), 'the arrangement: one such witness').toHaveLength(1);
+		const stripped = READER_CORPUS.map((w) => (w.rule === label ? { ...w, slices: ['<<<UNTRUSTED-0x>>>'] } : w));
+		expect(unheld(stripped), 'CONTROL: the witness whose slice lost its mark, named').toEqual([`${label}: U+200F is in none of its slices`]);
+	});
+
+	it('⭐ the reader changed where NO probe plants — U+200F RIGHT-TO-LEFT MARK read as a control it names — moves `probes` through the reader corpus, and no probe’s prompt, nor any case prompt of v1 or of the current set (PQ-2)', async () => {
 		// ⛔ WHY (`PQ-1`; `REG-F-481`, `REG-F-476`): a reader changed where no plant stood moved no fingerprint (driven on a
 		// disposable copy), and plants will always lag the reader. The reader corpus is hashed beside the probes for it, as
 		// the skeleton's digest is for a table changed where no plant stands (the row above).
@@ -3675,21 +3861,26 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481) — the fingerprint reaches the ske
 			FINGERPRINT_PROBES.filter((p) => BASE.probePrompts.get(p.id)!.includes(RLM)).map((p) => p.id),
 			'the arrangement: no probe’s prompt holds it'
 		).toEqual([]);
-		const { fp, viewToken } = await freshOverReader((real) => ({
+		const rlmAsAControl = (real: typeof import('../apps/rph-demo/src/lib/server/assurance/review-fence.js')) => ({
 			chooseFence: (slices: readonly string[]) => real.chooseFence(slices.map((s) => s.split(RLM).join(String.fromCodePoint(0x202e))))
-		}));
+		});
+		const { fp, viewToken } = await freshOverReader(rlmAsAControl);
 		onlyMoved(fp, ['probes']);
 		expect(movedProbes(fp), 'no probe’s prompt moves: the reader corpus alone').toEqual([]);
 		expect(viewToken).toBe('<<<UNTRUSTED-19>>>');
 		expect(fp.casePrompts, 'no case prompt moves').toEqual(BASE.casePrompts);
-	}, 120_000);
+		// ⭐ `PQ-2` (design D4) — nor any case prompt of the current set: no case holds the mark.
+		expect(movedCasePrompts((await freshOverReader(rlmAsAControl, CURRENT_CASES)).fp, BASE_NOW), 'no case prompt of the current set moves').toEqual(
+			[]
+		);
+	}, 240_000);
 
 	it('⭑ THE ARRANGEMENT — the ASCII fold ALONE is no family: rule 2 reads a prototype’s characters in either case besides, so the table is the same without it (which is why its row drops the case mappings with it)', () => {
 		const t = fenceSkeletonTable(DATA, (c) => c);
 		expect([t.deleted, t.mapped], 'the generator without the fold').toEqual([DELETED, MAPPED]);
 	}, 120_000);
 
-	it('⭐ the table changed where NO probe plants — one entry read otherwise, its code point in no probe’s prompt — moves `probes` through the skeleton’s digest, and no probe’s prompt', async () => {
+	it('⭐ the table changed where NO probe plants — one entry read otherwise, its code point in no probe’s prompt — moves `probes` through the skeleton’s digest, and no probe’s prompt, nor any case prompt of v1 or of the current set (PQ-2)', async () => {
 		// ⛔ WHY (`PQ-1`; `REG-F-481`, `REG-F-476`): the plants reach six families and the reader's rules, and the table holds
 		// thousands of entries;
 		// a change to one no plant holds — a lookalike read no more, a reading changed — decided the fence for an input that
@@ -3702,12 +3893,15 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481) — the fingerprint reaches the ske
 			FINGERPRINT_PROBES.filter((p) => [...BASE.probePrompts.get(p.id)!].some((c) => c.codePointAt(0) === cp)).map((p) => p.id),
 			'the arrangement: no probe’s prompt holds it'
 		).toEqual([]);
-		const { fp, viewToken } = await freshOver({ deleted: DELETED, mapped: MAPPED.map(([c, r]) => [c, c === cp ? '(2)' : r] as const) });
+		const table: FenceSkeletonTable = { deleted: DELETED, mapped: MAPPED.map(([c, r]) => [c, c === cp ? '(2)' : r] as const) };
+		const { fp, viewToken } = await freshOver(table);
 		onlyMoved(fp, ['probes']);
 		expect(movedProbes(fp), 'no probe’s prompt moves: the digest alone').toEqual([]);
 		expect(viewToken).toBe('<<<UNTRUSTED-19>>>');
 		expect(fp.casePrompts, 'no case prompt moves').toEqual(BASE.casePrompts);
-	}, 120_000);
+		// ⭐ `PQ-2` (design D4) — nor any case prompt of the current set: no case holds the code point.
+		expect(movedCasePrompts((await freshOver(table, CURRENT_CASES)).fp, BASE_NOW), 'no case prompt of the current set moves').toEqual([]);
+	}, 240_000);
 
 	it.each(FAMILIES)(
 		'⭐ %s — dropped, it moves `probes` through P-OVERSIZE-FENCES alone, its view’s token falling to the plant it no longer reads',
@@ -3750,8 +3944,10 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481) — the fingerprint reaches the ske
 			expect(movedProbes(fp), 'the probes that plant by that rule of the reader').toEqual(movedByRule(name));
 			expect(viewToken, 'the view’s token: the first plant the reader no longer reads').toBe(token);
 			expect(fp.casePrompts, 'no case prompt moves').toEqual(BASE.casePrompts);
+			// ⭐ `PQ-2` (design D4) — nor any case prompt of the current set, measured: no case holds a plant by that rule.
+			expect(movedCasePrompts((await load(CURRENT_CASES)).fp, BASE_NOW), 'no case prompt of the current set moves').toEqual([]);
 		},
-		120_000
+		240_000
 	);
 });
 
@@ -3972,6 +4168,49 @@ describe('JAN-CRITREAD J2-3 — the fingerprint and the runner agree', () => {
 		expect(calls).toHaveLength(4);
 		for (const call of calls)
 			expect(call.promptSha256, `${call.caseId} ${call.role}`).toBe(BASE.casePrompts.get(call.caseId)![call.role]);
+	});
+
+	it('⭐ …and on the process-result arm (PQ-2, design D4): a process-result case’s prompts are the hashes a run records — its run literal rendered by the one builder on both sides', async () => {
+		const two: QualificationCase[] = CURRENT_CASES.filter((c) => c.id === 'P-CLEAN' || c.id === 'P-RR-07-CUT');
+		expect(two.map((c) => c.arm), 'the arrangement: two process results, one of them cut by design').toEqual([
+			'PROCESS_RESULT',
+			'PROCESS_RESULT'
+		]);
+		let n = 0;
+		const lines = await runQualification({
+			runId: 'qr-agree-2',
+			date: '2026-10-09T12:00:00.000Z',
+			commit: 'e5f9358b'.repeat(5),
+			fingerprint: { reviewer: BASE_NOW.reviewer, scoring: BASE_NOW.scoring, caseSet: BASE_NOW.caseSet },
+			cases: two,
+			caseSetVersion: 4,
+			oracleVersion: 4,
+			criteria: SEEDED_REASONING_REVIEW_CRITERIA,
+			transport: {
+				name: 'stub',
+				identify: async () => FIXTURE,
+				call: async () => ({
+					returned:
+						(n += 1) % 2 === 1
+							? 'not a judgement'
+							: JSON.stringify({
+									findings: SEEDED_REASONING_REVIEW_CRITERIA.map((k) => ({
+										criterionId: k.id,
+										failed: false,
+										statement: 'absent'
+									})),
+									recommendation: 'SATISFIED'
+								}),
+					served: null
+				})
+			},
+			repetitions: 1,
+			env: {}
+		});
+		const calls = lines.filter((l): l is CallLine => l.kind === 'CALL');
+		expect(calls).toHaveLength(4);
+		for (const call of calls)
+			expect(call.promptSha256, `${call.caseId} ${call.role}`).toBe(BASE_NOW.casePrompts.get(call.caseId)![call.role]);
 	});
 
 	it('⭐ the case-set digest is over the cases’ inputs: an input edit moves it and moves no reviewer component', async () => {

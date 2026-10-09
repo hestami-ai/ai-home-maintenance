@@ -8,7 +8,9 @@
 // ⚠ TYPES, PATHS AND THE SERIALIZER ONLY — NO RUNTIME IMPORT. The generator (`generate.ts`) runs under bare `bun`,
 // where `@janumipwb/*` would resolve to built `dist` (`REG-D-072` D11); nothing here needs a package at runtime.
 import type { AssuranceSubject, ProfessionalRationaleSummary } from '@janumipwb/rph-assurance';
+import type { ObservedToolCallReport } from '@janumipwb/rph-contracts';
 import type { PwaGraphNode, PwaMeta } from '@janumipwb/rph-projections';
+import type { ObservedProcessRun } from '../../apps/rph-demo/src/lib/server/tools/process-run-observer.js';
 
 /**
  * ⭐ THE PRODUCER EVERY CASE CARRIES (`REG-D-072` D13). The reasoning-review policy requires `DIFFERENT_MODEL`
@@ -39,6 +41,20 @@ export interface WorkProductCaseInput {
 	readonly priorGaps?: readonly string[];
 }
 
+/**
+ * ⭐ `JAN-PRQUAL` `PQ-2` (DESIGN-process-result-qualification.md D4, §5) — what the process-result arm hands
+ * `processResultReviewInput`, less the criteria: the RUN LITERAL as the host observed it, which the product's builder
+ * renders at materialize time (`materialize.ts`), so a change to what the reviewer of a process result reads reaches the
+ * case's prompt; the instruction the producer was given; its account; the host's observation of its calls.
+ * ⛔ NO NARRATION AND NO PRIOR GAPS, BY TYPE: `runProcessResultFloor` passes neither, so a case cannot carry either.
+ */
+export interface ProcessResultCaseInput {
+	readonly producingPrompt: string;
+	readonly run: ObservedProcessRun;
+	readonly rationale?: ProfessionalRationaleSummary;
+	readonly observedToolCalls?: ObservedToolCallReport;
+}
+
 interface CaseCommon {
 	/** Stable across versions of the set: a case that changes gets a new id (version two's `G2-…`, `case-set-v2.ts`;
 	 *  version three's `G3-…`, `case-set-v3.ts`). */
@@ -54,7 +70,12 @@ export interface WorkProductCase extends CaseCommon {
 	readonly arm: 'WORK_PRODUCT';
 	readonly input: WorkProductCaseInput;
 }
-export type QualificationCase = GraphCase | WorkProductCase;
+/** ⭐ `PQ-2` (design D4) — the third arm: one completed command run, reviewed against the account (`R15`). */
+export interface ProcessResultCase extends CaseCommon {
+	readonly arm: 'PROCESS_RESULT';
+	readonly input: ProcessResultCaseInput;
+}
+export type QualificationCase = GraphCase | WorkProductCase | ProcessResultCase;
 
 export interface CaseSet {
 	readonly note: string;
@@ -96,17 +117,22 @@ export const ORACLES_V2_FILE = 'docs/tracking/reviewer-qualification/oracles/ora
 /** ⭐ `JAN-CRITREAD` J2-7 — version three (`REG-F-453`; `REG-D-081`), beside versions one and two, which stay as history. */
 export const CASE_SET_V3_FILE = 'docs/tracking/reviewer-qualification/cases/case-set-v3.json';
 export const ORACLES_V3_FILE = 'docs/tracking/reviewer-qualification/oracles/oracles-v3.json';
+/** ⭐ `JAN-PRQUAL` `PQ-2` — version four (design D4, §5; `REG-D-095`), beside versions one to three, which stay as history. */
+export const CASE_SET_V4_FILE = 'docs/tracking/reviewer-qualification/cases/case-set-v4.json';
+export const ORACLES_V4_FILE = 'docs/tracking/reviewer-qualification/oracles/oracles-v4.json';
 
 /**
  * ⭐ `JAN-CRITREAD` J2-5 — THE CURRENT CASE SET AND ITS ORACLES: what `reviewer:qual:check` holds coverage and
  * escalation to, what a run runs (`run.ts`), and what the fingerprint's case-set digest is taken over. The one place
  * the current version is named, so the check, the runner and the stamp cannot sit on different versions.
  * Version two from J2-5: version one's graph cases built on the draft, with `REG-F-449`'s correction, under new ids.
- * ⭐ Version three since J2-7: version two's twelve changed cases with the sponsor's two changes — the design type's
+ * ⭐ Version three from J2-7: version two's twelve changed cases with the sponsor's two changes — the design type's
  * scope takes in the foundations, and the permit receives the report and the calculations (`REG-D-081`) — under new ids.
+ * ⭐ Version four since `JAN-PRQUAL` `PQ-2`: version three's twenty-six cases under their ids, byte for byte, and the
+ * fourteen process-result cases the sponsor conferred (DESIGN-process-result-qualification.md §5; `REG-D-095`).
  */
-export const CURRENT_CASE_SET_FILE = CASE_SET_V3_FILE;
-export const CURRENT_ORACLES_FILE = ORACLES_V3_FILE;
+export const CURRENT_CASE_SET_FILE = CASE_SET_V4_FILE;
+export const CURRENT_ORACLES_FILE = ORACLES_V4_FILE;
 
 /** The one serialization of a generated file: tab-indented JSON, LF, a final newline. */
 export function serializeGenerated(value: CaseSet | OracleSet): string {

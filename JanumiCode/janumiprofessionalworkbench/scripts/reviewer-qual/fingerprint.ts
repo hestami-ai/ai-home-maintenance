@@ -72,8 +72,10 @@
 // for (the safe direction: a cut that removes no plant among them), a field read otherwise where no plant of it stands
 // (above; design §9.3 D7), and a change to the reader that changes no
 // witness's token and no plant's. Driven red before
-// `PQ-1`'s probes: a real edit to each branch, on a disposable copy, moved no probe. ⚠ It moves no CASE prompt while no
-// case is a process result (case set v3); the cases that carry run literals are `PQ-2`'s (design D4).
+// `PQ-1`'s probes: a real edit to each branch, on a disposable copy, moved no probe. ~~⚠ It moves no CASE prompt while no
+// case is a process result (case set v3); the cases that carry run literals are `PQ-2`'s (design D4).~~ ⭐ `JAN-PRQUAL`
+// `PQ-2` (design D4): case set v4's process-result cases carry run literals, built through the SAME seam
+// (`casePromptsOf`), so a renderer change moves their case prompts too — and the case-set digest and coverage owe a RUN.
 import { readFileSync } from 'node:fs';
 import {
 	FLOOR_POLICY_DEFINITIONS,
@@ -144,7 +146,8 @@ export interface FingerprintSeams {
 	 * ⭐ `JAN-PRQUAL` `PQ-1` (design D3) — the builder every process-result probe is built through: the product's
 	 * `processResultReviewInput`, which renders the run's REVIEW view within the content budget the validator computes.
 	 * A test swaps it to show a renderer change moves `probes` — and that a change confined to one branch of the renderer
-	 * moves the probes that take it — and no case prompt (v3 has no process-result case; see `casePromptsOf`).
+	 * moves the probes that take it — ~~and no case prompt (v3 has no process-result case; see `casePromptsOf`)~~ and, since
+	 * `PQ-2` (design D4), the prompts of the process-result cases, built through this seam too (`casePromptsOf`).
 	 */
 	readonly processResult: ProcessResultBuilder;
 }
@@ -280,9 +283,10 @@ const readerTokens = (): string => JSON.stringify(READER_CORPUS.map((w) => [w.sl
  * its own — so a row that swapped the validator seam and said "no case prompt moves" asked a question that could only
  * be answered yes: a seam change every prompt carries left every case prompt where it was. Now such a change moves
  * them, and the fingerprint test holds that as the limb's control.
- * ⚠ `PQ-2` (design D4) MUST CARRY THIS FORWARD: a process-result case is built through the BUILDER, so `materialize.ts`
+ * ~~⚠ `PQ-2` (design D4) MUST CARRY THIS FORWARD: a process-result case is built through the BUILDER, so `materialize.ts`
  * must then take the seams' `processResult` — else a renderer change that does reach a case prompt is measured as one
- * that does not.
+ * that does not.~~ ⭐ CARRIED FORWARD by `PQ-2` (design D4): a process-result case is built through the seams'
+ * `processResult` (`materialize.ts` takes it), so a renderer change that reaches a case prompt is measured as one that does.
  */
 async function casePromptsOf(
 	seams: FingerprintSeams,
@@ -295,7 +299,7 @@ async function casePromptsOf(
 			sent.push(p);
 			return sent.length === 1 ? UNUSABLE : cleanJudgement(seams.criteria);
 		});
-		await validator.evaluate(c.subject, { reasoningReview: caseReviewInput(c, seams.criteria) });
+		await validator.evaluate(c.subject, { reasoningReview: caseReviewInput(c, seams.criteria, seams.processResult) });
 		const [initial, repair] = sent;
 		if (sent.length !== 2 || initial === undefined || repair === undefined)
 			throw new Error(`${c.id}: the capture drew ${sent.length} prompt(s), not an initial and a repair`);

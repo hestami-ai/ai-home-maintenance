@@ -70,7 +70,14 @@ const REPO = fileURLToPath(new URL('../', import.meta.url))
 	.join('/');
 /** The run `REG-D-084` selected on, and the RESCORED record `REG-D-093` re-stamped: case set v3, every case twice. */
 const SELECTED_RUN = 'qr-2026-09-25-devin-glm-5-3-flash-max-v3';
-const CASES: readonly QualificationCase[] = committedCaseSet(new URL('../', import.meta.url)).cases;
+/**
+ * ⭐ `JAN-PRQUAL` `PQ-2` — THE CASES THE SELECTED RUN MEASURED: the current set's graph and work-product arms, which case
+ * set v4 carries from v3 byte for byte (`reviewer-qualification-cases.test.ts`). Its process-result arm is v4's own, and
+ * owes its own run (DESIGN-process-result-qualification.md D4): no recorded prompt of the selected run is of one.
+ */
+const CASES: readonly QualificationCase[] = committedCaseSet(new URL('../', import.meta.url)).cases.filter(
+	(c) => c.arm !== 'PROCESS_RESULT'
+);
 /** The committed record — append-only, so the lines read here are the ones the selected run wrote. */
 const RECORD: readonly RecordLine[] = readFileSync(`${REPO}/${RECORD_DIR}/runs.ndjson`, 'utf8')
 	.split('\n')
@@ -284,7 +291,7 @@ const callsOf = (runId: string): CallLine[] =>
 	RECORD.filter((l): l is CallLine => l.kind === 'CALL' && l.runId === runId);
 
 describe('⭐⭐ JAN-PRQUAL PQ-1 — design §4.1 against the RECORD: every case the selected candidate was measured on moved only by the fence and the declared cuts, the account’s regions and the host lines (§4.1 steps 1 to 4), and design §9.3 D7 and D8 (steps 2a and 2c)', () => {
-	it('⭐ the arrangement — the selected run measured every current case, twice, under case set v3; the prompts captured here are the ones the fingerprint hashes, and none carries a cut', async () => {
+	it('⭐ the arrangement — the selected run measured every current case of the graph and work-product arms, twice, under case set v3; the prompts captured here are the ones the fingerprint hashes, and none carries a cut', async () => {
 		expect(runLine(SELECTED_RUN).caseSetVersion, 'case set v3').toBe(3);
 		const initial = callsOf(SELECTED_RUN).filter((c) => c.role === 'initial');
 		expect(initial).toHaveLength(2 * CASES.length);

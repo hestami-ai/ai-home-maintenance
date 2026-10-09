@@ -15,12 +15,13 @@
 // calls it before verdict attribution and blocks on the result. That half was proved by driving it: a deliberately
 // hung victim under the real runner, which reported INCONCLUSIVE instead of KILLED. Recorded in REG-F-116, not
 // claimed here.
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
-import { DECLARED_MUTANTS, isHistory } from '../scripts/mutants/ledger.js';
+import { applyMutant } from '../scripts/mutants/apply.js';
+import { DECLARED_MUTANTS, isHistory, type DeclaredMutant } from '../scripts/mutants/ledger.js';
 import { timeoutEvidence } from '../scripts/mutants/measured.js';
 import { compileProjectOf, ROOT_CONFIGS_PROJECT, tscArgv } from '../scripts/mutants/verdict.js';
 
@@ -344,26 +345,101 @@ function programsOnDisk(): string[] {
 	return found.sort((a, b) => a.localeCompare(b));
 }
 
-/** Everything the runner type-checks with `tsc`: not history (never compiled; its file may be gone), not `.svelte`
- *  (`compileVerdict` sends those to `svelte-check`, which reads the app's `.svelte` files — REG-F-175). */
-function measuredByTsc(): typeof DECLARED_MUTANTS {
-	return DECLARED_MUTANTS.filter((m) => !isHistory(m) && !m.file.endsWith('.svelte'));
+/**
+ * ⭐ A DATA FILE: a `.json` (`JAN-PRQUAL` `PQ-2`; DESIGN-process-result-qualification.md D4, the run literals the
+ * process-result cases carry; ROADMAP-process-result-qualification.md `PQ-2`). The runner's compile leg runs `tsc` for a
+ * mutant of one — on the program `compileProjectOf` names — but no program here holds a `.json` as a root file, and the
+ * run literals, `case-set-v4-runs.json`, are read at run time (`case-set-v4.ts` reads them with `node:fs`), so no
+ * program loads that file at all: ~~the leg compiles green whatever the mutation did, and NO_COMPILE cannot fire —~~
+ * ⭐ where that program can be read, the leg compiles green whatever the mutation did, and NO_COMPILE cannot fire —
+ * `compileVerdict`'s `.svelte` lesson (REG-F-175), with no compiler that reads the file to send it to. ⭐ Where it
+ * cannot — `docs/` has no `tsconfig.json`, nor has `packages/typescript-config/` — the leg FAILS whatever the
+ * mutation did, `tsc` reporting TS5058 for the missing path and the runner grading it NO_COMPILE: SR-1's defect above.
+ * ~~So a data file is left out of the `tsc` census below, as a `.svelte` file is, and the DATA-FILE LIMB further down
+ * holds it instead.~~ ⭐ So a data file is exempt from the `tsc` census's ROOT-FILE arm below, and from that arm
+ * alone: its program must still exist and parse, so a data file whose program cannot be read is named by that
+ * program's error, and its program enters the walk of the programs on disk. The DATA-FILE LIMB further down holds what
+ * the root-file arm cannot: that the mutant leaves the file valid JSON.
+ *
+ * ⭐ "No program loads that file" is said of the run literals, not of every `.json`: `tsc` reads a `tsconfig*.json`
+ * as a program's configuration, though it type-checks it as none of the program's files, and a config that carries
+ * comments (`scripts/tsconfig.json`, `verif/tsconfig.json`, `tsconfig.root-configs.json`) is not valid JSON even
+ * unmutated — which the limb names as that, never as a mutant's defect.
+ */
+const isDataFile = (file: string): boolean => file.endsWith('.json');
+
+/** Everything the runner ~~type-checks with `tsc`~~ ⭐ runs `tsc` for: not history (never compiled; its file may be
+ *  gone), not `.svelte` (`compileVerdict` sends those to `svelte-check`, which reads the app's `.svelte` files —
+ *  REG-F-175), ~~⭐ and not a data file, which nothing type-checks (above)~~ ⭐ and a data file with the rest: nothing
+ *  type-checks it, but the runner still runs `tsc -p` on the program `compileProjectOf` names for it, so that program
+ *  must exist and parse (`isDataFile`, above). ⭐ Over a population, the ledger's by default, so the census's CONTROL
+ *  can plant entries that are never in the ledger. */
+function measuredByTsc(population: readonly DeclaredMutant[] = DECLARED_MUTANTS): DeclaredMutant[] {
+	return population.filter((m) => !isHistory(m) && !m.file.endsWith('.svelte'));
 }
+
+/** ⭐ The census itself, over a population: ~~each entry whose file is not a ROOT FILE of the program the runner
+ *  compiles for it, by id — or whose program cannot be parsed~~ ⭐ by id, each entry whose program cannot be parsed,
+ *  a data file's among them, and each whose file is not a ROOT FILE of the program the runner compiles for it, but a
+ *  data file, which is exempt from this ROOT-FILE arm and from nothing else (`isDataFile`). */
+function outsideItsProgram(population: readonly DeclaredMutant[]): string[] {
+	return population.flatMap((m) => {
+		const { tsconfig } = compileProjectOf(m.file);
+		const program = rootFilesOf(tsconfig);
+		if ('error' in program) return [`${m.id}: ${tsconfig} — ${program.error}`];
+		if (program.files.has(m.file) || isDataFile(m.file)) return [];
+		return [`${m.id}: ${m.file} is not in ${tsconfig}'s files`];
+	});
+}
+
+/** An entry for a CONTROL to plant — never in the ledger. */
+const planted = (id: string, file: string, find: string, replace: string): DeclaredMutant => ({
+	id,
+	file,
+	find,
+	replace,
+	expectRed: ['verif/mutant-verdict.test.ts'],
+	why: 'planted by a CONTROL of this file, never in the ledger',
+	source: 'verif/mutant-verdict.test.ts'
+});
 
 describe('SR-1 — every mutant compiles under a program that contains its file', () => {
 	// ⚠ SELECTED BY WHAT THE RUNNER COMPILES, NOT BY THE MAPPING UNDER TEST, so a mapping that sends an entry to the
 	// wrong program reddens here rather than shrinking the census. ROOT files, not every file the program loads: a
-	// file reached only by import is checked only while that import survives (REG-F-097's shape).
-	it('every measurable ledger mutant compiled by `tsc` is a ROOT FILE of the program the runner compiles for it', () => {
+	// file reached only by import is checked only while that import survives (REG-F-097's shape). ~~⭐ Narrowed by one
+	// kind of file, with its reason (`JAN-PRQUAL` `PQ-2`): a data file, which no program type-checks (`isDataFile`).~~
+	// ⭐ One ARM is narrowed, by one kind of file, with its reason (`JAN-PRQUAL` `PQ-2`): a data file need not be a ROOT
+	// FILE of its program, which type-checks no data file; but its program must exist and parse like any other, because
+	// the runner still runs `tsc -p` on it, so a data file under a directory with no program (`docs/`) is named here by
+	// that program's error, and its program enters the walk below (`isDataFile`).
+	it('every measurable ledger mutant compiled by `tsc` ~~is a ROOT FILE of the program the runner compiles for it~~ ⭐ is compiled under a program that exists and parses, and is a ROOT FILE of it unless it is a data file', () => {
 		const measured = measuredByTsc();
 		expect(measured.length, 'a census over no entries proves nothing').toBeGreaterThan(0);
-		const outside = measured.flatMap((m) => {
-			const { tsconfig } = compileProjectOf(m.file);
-			const program = rootFilesOf(tsconfig);
-			if ('error' in program) return [`${m.id}: ${tsconfig} — ${program.error}`];
-			return program.files.has(m.file) ? [] : [`${m.id}: ${m.file} is not in ${tsconfig}'s files`];
-		});
+		const outside = outsideItsProgram(measured);
 		expect(outside).toEqual([]);
+	});
+
+	// ⭐ CONTROL — THE CENSUS ~~LEAVES OUT A DATA FILE~~ ⭐ EXEMPTS A DATA FILE FROM ITS ROOT-FILE ARM ALONE, AND ONLY A
+	// DATA FILE (`JAN-PRQUAL` `PQ-2`). Planted, never in the ledger, for the reason REG-F-122 gives: while the ledger is
+	// healthy its entries cannot enter the arm this proves. Beside the planted `.json`, in its directory, a `.ts` and a
+	// `.txt` that no program holds: the census still names both, so the exemption is no wider than a data file — not the
+	// data file's directory, and not every file `tsc` cannot read, which would leave a `.txt` mutant ~~in neither this
+	// census nor the DATA-FILE LIMB~~ ⭐ held by neither this census's root-file arm nor the DATA-FILE LIMB. ⭐ And a
+	// planted `.json` under `docs/`, where this programme's case sets and oracles are and no program is: the census names
+	// it by its program's error, so the exemption is no wider than the root-file arm — the runner still runs `tsc -p` on
+	// `docs/tsconfig.json` for it and grades the missing path NO_COMPILE, the path error this census exists to refuse.
+	it('⭐ CONTROL — the census ~~leaves out a `.json` data file~~ ⭐ exempts a `.json` data file from its ROOT-FILE arm alone, and only a data file: a `.ts` and a `.txt` beside it, which no program holds, are still named, ⭐ and so is a data file whose program cannot be read, by that program’s error', () => {
+		const population = [
+			planted('PLANTED-data', 'scripts/reviewer-qual/planted.json', '{', '{ '),
+			planted('PLANTED-code', 'scripts/reviewer-qual/planted.ts', 'a', 'b'),
+			planted('PLANTED-text', 'scripts/reviewer-qual/planted.txt', 'a', 'b'),
+			planted('PLANTED-data-no-program', 'docs/tracking/reviewer-qualification/planted.json', '{', '{ ')
+		];
+		expect(outsideItsProgram(measuredByTsc(population))).toEqual([
+			"PLANTED-code: scripts/reviewer-qual/planted.ts is not in scripts/tsconfig.json's files",
+			"PLANTED-text: scripts/reviewer-qual/planted.txt is not in scripts/tsconfig.json's files",
+			`PLANTED-data-no-program: docs/tsconfig.json — Cannot read file '${REPO_ROOT}docs/tsconfig.json'.`
+		]);
 	});
 
 	// THE ARGV THE RUNNER SPAWNS, PINNED LITERALLY. `run.ts` is imported by nothing, so while it built this array
@@ -397,7 +473,9 @@ describe('SR-1 — every mutant compiles under a program that contains its file'
 	// THE MAPPING HELD TO THE PROGRAMS' OWN FILE LISTS, for files no ledger entry targets yet. `compileProjectOf` names
 	// its secondary programs by path (see why in `verdict.ts`); this is what keeps that table from drifting away from
 	// the tsconfigs it mirrors — a file some program type-checks, routed to one that does not hold it, is the next
-	// J13-M15 waiting for its mutant.
+	// J13-M15 waiting for its mutant. ⭐ Its first check reads the programs the runner compiles for the ledger's entries,
+	// a data file's among them (`measuredByTsc` keeps data files, `JAN-PRQUAL` `PQ-2`), so a data file's program that is
+	// not on disk is named here as well as by the census above.
 	it('every file ANY program type-checks is routed to a program that holds it', () => {
 		const programs = programsOnDisk();
 		const named = [...new Set(measuredByTsc().map((m) => compileProjectOf(m.file).tsconfig))];
@@ -418,5 +496,83 @@ describe('SR-1 — every mutant compiles under a program that contains its file'
 			});
 		});
 		expect(misrouted).toEqual([]);
+	});
+});
+
+// ── ⭐ THE DATA-FILE LIMB — `JAN-PRQUAL` `PQ-2` ──────────────────────────────────────────────────────────────────────
+//
+// DESIGN-process-result-qualification.md D4 (the run literals the process-result cases carry);
+// ROADMAP-process-result-qualification.md `PQ-2`. ~~In the `tsc` census's place for a data file (`isDataFile`).~~
+// ⭐ In the place of the `tsc` census's ROOT-FILE arm for a data file (`isDataFile`); the census still holds a data
+// file's program to existing and parsing.
+//
+// With no compile leg to tell "the mutation broke the file" from "the guard caught it", a mutant that left a data file
+// unparsable would be KILLED by a load error that says nothing of the guard: a module that parses the file at import
+// throws (`case-set-v4.ts` parses `case-set-v4-runs.json` at module scope), so a victim that imports it fails to load
+// and no row of it runs. So each measurable ledger mutant of a data file is applied here, in memory, exactly as the
+// runner applies it (`applyMutant`: the first occurrence of its `find`, replaced LITERALLY), and the text it leaves must
+// parse — a mutant that breaks the JSON cannot enter the ledger. It reads the working tree, as the anchor census in
+// `verif/mutant-ledger.test.ts` does. ⭐ It parses STRICTLY, with `JSON.parse`, as `case-set-v4.ts` does: a JSONC
+// reader (TypeScript's config reader) lets a trailing comma, a comment and a byte-order mark through, and that module
+// fails to load on each. ⭐ A data file that is not valid JSON before any mutant — a config that carries comments —
+// is named as that, "…is not valid JSON even unmutated", never as the mutant's defect.
+//
+// ⭐ WHAT THIS HOLDS IS VALID JSON, NOT A MODULE THAT LOADS. A mutant that leaves the file valid JSON can still fail
+// the load of the module that reads it: `case-set-v4.ts` reads keys of the run literals at import (`recorded()` throws
+// for a run or an observation the file does not record, and the capture's `environment` is read at module scope), so
+// a mutant that renames or drops such a key leaves the file parseable and its victim unable to load, with no row run
+// — which the runner grades KILLED. Nothing here refuses that mutant.
+
+/** Each measurable data-file mutant of `population` whose file, once the mutant is applied, is not valid JSON — by id;
+ *  ⭐ one whose file is not valid JSON before it is named as that. */
+function unparsableOnceApplied(population: readonly DeclaredMutant[]): string[] {
+	return population
+		.filter((m) => !isHistory(m) && isDataFile(m.file))
+		.flatMap((m) => {
+			const original = readFileSync(`${REPO_ROOT}${m.file}`, 'utf8');
+			try {
+				JSON.parse(original);
+			} catch (error) {
+				return [`${m.id}: ${m.file} is not valid JSON even unmutated — ${String(error)}`];
+			}
+			const mutated = applyMutant(original, m.find, m.replace);
+			try {
+				JSON.parse(mutated);
+				return [];
+			} catch (error) {
+				return [`${m.id}: ${m.file} is not valid JSON once the mutant is applied — ${String(error)}`];
+			}
+		});
+}
+
+describe('⭐ JAN-PRQUAL PQ-2 — the DATA-FILE LIMB: a data file’s mutant leaves the file ~~loadable~~ ⭐ valid JSON', () => {
+	it('⭐ every measurable ledger mutant of a `.json` data file, applied as the runner applies it, leaves valid JSON', () => {
+		expect(unparsableOnceApplied(DECLARED_MUTANTS)).toEqual([]);
+	});
+
+	// ⭐ CONTROL — planted, never in the ledger, for the reason REG-F-122 gives (the census's CONTROL above says it). ~~Two
+	// mutants of `package.json` at its first `{`~~ ⭐ Mutants of `package.json` at its first `{`: one leaves `{,`, which
+	// `JSON.parse` refuses, and one `{ `, which it accepts. The first must be named, by id, and the second must not — so a
+	// limb that parses the file unmutated, or only the replacement, or takes no data file at all, reddens HERE.
+	// ⭐ One leaves `{"a": [1,],`, a trailing comma that only a STRICT reader refuses — TypeScript's JSONC reader
+	// accepts it — so it must be named, and a limb that reads JSONC reddens here. ⭐ One leaves `{"b": "$'",`: valid JSON
+	// when its replacement goes in LITERALLY, as `applyMutant` puts it, but a pattern to `String.prototype.replace`, where
+	// `$'` stands for the text after the match, so the rest of the file lands inside the string — it must NOT be named,
+	// and a limb that applies a mutant as a pattern (the defect `applyMutant` exists for) reddens here. ⭐ And a mutant
+	// of `scripts/tsconfig.json`, a config whose comments `JSON.parse` refuses before any mutant: it must be named as not
+	// valid JSON even unmutated, never as the mutant's defect.
+	it('⭐ CONTROL — a planted data-file mutant that breaks its JSON is named, by id, and one that leaves it valid is not — ⭐ read strictly and applied literally, and a file that is not JSON before its mutant is named as that', () => {
+		const offenders = unparsableOnceApplied([
+			planted('PLANTED-broken', 'package.json', '{', '{,'),
+			planted('PLANTED-valid', 'package.json', '{', '{ '),
+			planted('PLANTED-jsonc', 'package.json', '{', '{"a": [1,],'),
+			planted('PLANTED-dollar', 'package.json', '{', '{"b": "' + "$'" + '",'),
+			planted('PLANTED-config', 'scripts/tsconfig.json', '{', '{ ')
+		]);
+		expect(offenders.map((s) => s.split(' — ')[0])).toEqual([
+			'PLANTED-broken: package.json is not valid JSON once the mutant is applied',
+			'PLANTED-jsonc: package.json is not valid JSON once the mutant is applied',
+			'PLANTED-config: scripts/tsconfig.json is not valid JSON even unmutated'
+		]);
 	});
 });

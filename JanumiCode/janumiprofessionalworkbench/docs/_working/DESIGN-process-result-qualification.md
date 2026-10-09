@@ -5,7 +5,7 @@
 - The agent read the go-ahead as covering the paid re-measurement the fix owes.
 - `REG-D-091` sends any new process-result cases to the sponsor for conferral first.
 
-**Date:** 2026-10-02; revisions 4 and 5 on 2026-10-05. **Revision:** 5. Revisions 1, 2 and 4 were each attacked by three adversarial critics; §8 lists what revisions 1 and 2's findings became, and §9.2 records what revision 4's corrected. The sponsor answered §7 on 2026-10-03 (option (a); the cases conferred; the rule adopted). §9 records paid run 1, the sponsor's answers to it, and D7 to D9. **Status:** §1-§8 RULED (`REG-D-095`); §9 RULED (*"Proceed as you recommend"*, 2026-10-05), its delegated calls flagged for confirmation. ⭑ 2026-10-08: the rulings of 2026-10-05 are `REG-D-096`, the delegated calls `REG-D-097`, paid run 1's result `REG-F-488` and the re-run's `REG-F-489`; §9.4 records the outcome, and `PQ-1` lands with it.
+**Date:** 2026-10-02; revisions 4 and 5 on 2026-10-05. **Revision:** 5. Revisions 1, 2 and 4 were each attacked by three adversarial critics; §8 lists what revisions 1 and 2's findings became, and §9.2 records what revision 4's corrected. The sponsor answered §7 on 2026-10-03 (option (a); the cases conferred; the rule adopted). §9 records paid run 1, the sponsor's answers to it, and D7 to D9. **Status:** §1-§8 RULED (`REG-D-095`); §9 RULED (*"Proceed as you recommend"*, 2026-10-05), its delegated calls flagged for confirmation. ⭑ 2026-10-08: the rulings of 2026-10-05 are `REG-D-096`, the delegated calls `REG-D-097`, paid run 1's result `REG-F-488` and the re-run's `REG-F-489`; §9.4 records the outcome, and `PQ-1` lands with it. ⭑ 2026-10-09: `PQ-2` lands, its delegated calls `REG-D-098` and paid run 2's result `REG-F-499`, which §10 records; under §7.3 nothing reopens, and `JAN-PRQUAL` is complete.
 
 **Delegation.**
 - Decisions the ruling does not settle are delegated best judgement under `REG-D-071`. They are recorded as `REG-D-094`, for sponsor confirmation.
@@ -357,3 +357,24 @@ Paid run 1 (`qr-2026-10-04-devin-glm-5-3-flash-max-v3`) is the selected candidat
   - The re-scorer's control, with the tolerance off, reproduces 414 of 414 answered evaluations in the record; 2 transport failures are not re-scorable.
   - Reported, not a threshold: 5 of the 52 replies are malformed. 3 hold a row only for each criterion they fault (MISSING_CRITERION), a shape that on a clean case would read INCONCLUSIVE, and 2 carry prose outside their answer (`REG-F-489`).
   - The confounds stand: the run cannot say which of D7 and D8 did it.
+
+## 10. `PQ-2`: the cases as built, and paid run 2 (2026-10-09)
+
+### 10.1 The cases as built (`REG-D-098`)
+
+- **Case set v4 and oracles v4** are generated: v3's 26 cases under their ids, unchanged, then §5's fourteen as the `PROCESS_RESULT` arm, each with its oracle from §5's table. No plant, expected verdict, faulted list or standing changed.
+- **The run literals** are the fixture suite's capture record, byte for byte (`scripts/reviewer-qual/case-set-v4-runs.json`): pytest 9.1.0 under Python 3.14.0 on `win32 (Windows-11-10.0.26300-SP0)`, captured through the product's own `run_command` path. D1's builder renders each at materialize time (`scripts/reviewer-qual/materialize.ts:36-49`, the switch by arm that replaces G5's binary branch).
+- **Two wording calls changed bytes after the build**, each recorded and not re-conferred (Delegation; `REG-D-095`):
+  - `P-RR-03`'s lists say what the narrowing leaves unverified, and no longer call the design verified, restoring §5's *"It gives no reason and claims no overall pass."*
+  - Each planted oracle note names its own criterion before §5's alternates.
+- **What moved** (§4 item 2): the case-set digest and the 28 new case prompts. No fingerprint component moved; the reviewer fingerprint is `PQ-1`'s.
+
+### 10.2 Paid run 2, under §7.3 (`REG-F-499`)
+
+- **The run**, `qr-2026-10-08-devin-glm-5-3-flash-max-v4`: the selected candidate over the fourteen cases, two repetitions, 28 calls, each case's initial prompt twice, no repair.
+- **Clean:** 8 of 8 SATISFIED; no clean evaluation has a failed row.
+- **Planted:** 19 of 20 REJECTED. The twentieth, `P-RR-08` #1, failed at the transport, a REFUSAL after 97675 ms elapsed (its recorded reason, *"devin failed after 97674 ms"*), short of the 240000 ms bound; re-run once as §7.3 provides (`qr-2026-10-08-devin-glm-5-3-flash-max-v4-retry`), it is REJECTED.
+- **So 28 of 28 are right.** §7.3, read: no planted case missed in both repetitions and no clean case failed in both; 0 of 20 planted and 0 of 8 clean evaluations wrong. Nothing reopens the selection.
+- **Reported, not a threshold:** the planted criterion is named in 19 of 19 answered planted evaluations, and in the retry. 2 of the 28 replies are MISSING_CRITERION (`P-RR-03` #2, `P-RR-07-CUT` #2), each REJECTED, the shape `REG-F-489` records.
+- **Escalated** (D5): the one material failure, `P-RR-08`'s BOUNDEDNESS, to `REG-F-499` (the ESCALATION line `runs.ndjson:579`), an open watch item on devin's transport failures short of the bound (`REG-F-488`'s two, and this one) and on MISSING_CRITERION replies.
+- **The confounds stand:** the served model is not pinned, and the eight clean evaluations are of one account under four names, so correlated.

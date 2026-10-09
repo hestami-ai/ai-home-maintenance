@@ -23,7 +23,8 @@
 // Anything else in a region — a label, "(none declared)", a heading, the subject hash — is host text quoted. The values
 // are taken from the INPUTS (and, for a process result, the run its builder rendered), never from the product's
 // rendering, and read by a parser written here. ⭐ Held in every framing over literal inputs reaching every slice whole
-// and cut, over the 26 cases of case set v3 (initial and repair prompts), and over every fingerprint probe.
+// and cut, over the cases of the current set (initial and repair prompts) — case set v4's 40 since `JAN-PRQUAL` `PQ-2`, its
+// process results read against their runs — and over every fingerprint probe.
 // ⛔ NO MODEL IS REACHABLE: every prompt is captured at the validator's print seam, and PATH names an empty directory.
 import { SEEDED_REASONING_REVIEW_CRITERIA, type ProfessionalRationaleSummary, type ReasoningReviewInput } from '@janumipwb/rph-assurance';
 import type { ObservedToolCallReport } from '@janumipwb/rph-contracts';
@@ -299,12 +300,16 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481) — no host text inside quoted mate
 			expect(all.includes(needle), needle).toBe(true);
 	});
 
-	it('⭐ the 26 cases of case set v3 — initial and repair prompt', async () => {
+	// ⭐ `JAN-PRQUAL` `PQ-2` (DESIGN-process-result-qualification.md D4) — and the 14 process-result cases of case set v4, each
+	// read against the run its builder rendered, as every process-result probe is (below).
+	it('⭐ the 40 cases of case set v4 — initial and repair prompt, each process result read against its run', async () => {
 		const cases = committedCaseSet(new URL('../', import.meta.url)).cases;
-		expect(cases).toHaveLength(26);
+		expect(cases).toHaveLength(40);
+		expect(cases.filter((c) => c.arm === 'PROCESS_RESULT'), 'the 14 process-result cases').toHaveLength(14);
 		for (const c of cases) {
 			const input = caseReviewInput(c, SEEDED_REASONING_REVIEW_CRITERIA);
-			for (const p of await promptsOf(input)) expectNoHostTextQuoted(p, input, c.id);
+			const run = c.arm === 'PROCESS_RESULT' ? c.input.run : undefined;
+			for (const p of await promptsOf(input)) expectNoHostTextQuoted(p, input, c.id, run);
 		}
 	}, 120_000);
 
