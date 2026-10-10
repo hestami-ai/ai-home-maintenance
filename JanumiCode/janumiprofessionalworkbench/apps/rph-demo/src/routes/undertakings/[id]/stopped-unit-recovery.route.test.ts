@@ -48,7 +48,9 @@ const seam = vi.hoisted(() => ({
 				readonly recordedLimit: number;
 		  },
 	/** Set, the producing prompt re-renders under this fingerprint: the type's template is not the one that produced it. */
-	templateMovedTo: undefined as string | undefined
+	templateMovedTo: undefined as string | undefined,
+	/** ⭐ `P76F-A` A4 — the model devin's export says answered: the configured one unless a case arranges a substitute. */
+	reportedModel: 'fixture-assurance-model'
 }));
 
 // ⭑ THE REAL `prepareModelInvocation`, its fingerprint moved only when a case says the template moved (RD7's check): the
@@ -114,7 +116,7 @@ vi.mock('../../../lib/server/tools/devin-reviewer.js', async (importOriginal) =>
 				if (exportPath !== undefined)
 					await writeFile(
 						exportPath,
-						JSON.stringify({ steps: [{ extra: { generation_model: 'fixture-assurance-model' } }] }),
+						JSON.stringify({ steps: [{ extra: { generation_model: seam.reportedModel } }] }),
 						'utf8'
 					);
 				return { stdout: step ?? seam.answer };
@@ -135,7 +137,7 @@ import {
 	modelWorkUnit
 } from '../../../lib/server/execution/begin-execute.testing.js';
 import { assurancePreflight } from '../../../lib/server/assurance/preflight.js';
-import { RATIONALE_REQUIRED } from '../../../lib/server/execution/stopped-unit-recovery.js';
+import { RATIONALE_REQUIRED, stoppedUnitOf } from '../../../lib/server/execution/stopped-unit-recovery.js';
 import {
 	ABANDON_FROM_WAITING_CITATION,
 	RERUN_REVIEW_CITATION,
@@ -145,7 +147,7 @@ import {
 	createProcessRunObserver,
 	type ObservedProcessRun
 } from '../../../lib/server/tools/process-run-observer.js';
-import { getArtifactStore, getEngine, resetEngine } from '../../../lib/server/workbench.js';
+import { getArtifactStore, getEngine, resetEngine, uiSession } from '../../../lib/server/workbench.js';
 import { actions, load } from './+page.server.js';
 
 const LIVE_BACKEND_VARIABLES = [
@@ -252,6 +254,7 @@ async function recoveryShown(pwuId: string) {
 				{
 					readonly kind: string;
 					readonly offers: Record<string, boolean>;
+					readonly rerunsWithheld: string | null;
 					readonly findings: number;
 					readonly reruns: number;
 					readonly stepId: string;
@@ -332,6 +335,7 @@ beforeEach(() => {
 	seam.sessions = 0;
 	seam.observed = undefined;
 	seam.templateMovedTo = undefined;
+	seam.reportedModel = 'fixture-assurance-model';
 	vi.stubEnv('PATH', noProgramsDirectory());
 	for (const v of LIVE_BACKEND_VARIABLES) vi.stubEnv(v, undefined);
 	vi.stubEnv('JPWB_ASSURANCE_TOOL', 'devin');
@@ -703,6 +707,100 @@ describe('⭐⭐ P76F-A A3 — each choice’s Decision is the person’s words,
 	});
 });
 
+// ── ⭐⭐ `P76F-A` A4 (RD3; `REG-D-105` (3); `JAN-SELREV` D6, `JAN-SELRES` D7; ASR-13) — A REFUSAL ONLY A DIFFERENT OR
+// RE-QUALIFIED REVIEWER CAN FIX OFFERS NEITHER RE-RUN ─────────────────────────────────────────────────────────────────────
+//
+// ⛔ A review refused because devin reported a SUBSTITUTED model (`REQUALIFY_OR_RESELECT_REVIEWER`), or because it was not
+// independent of the producer (`CHANGE_REVIEWER`), was sorted as one that "did not conclude" — so a re-review was offered,
+// and the paid lane's rule pressed it: another billed call to the reviewer just refused. The classifier's own guidance for
+// the first: *"Retrying or reconfiguring the same selection does not fix this: another call is billed and may be served
+// the same way."* A re-run of the WORK is reviewed by that same reviewer too, so neither re-run is offered, and the SERVER
+// refuses both: the unit waits for the reviewer to change, or is abandoned.
+
+/** The finding codes recorded on observations about `subjectId`. */
+const observationCodesOf = (subjectId: string): string[] =>
+	listByType(getEngine(), 'ASSURANCE_OBSERVATION')
+		.filter((o) => (o.state.subjectObjectIds as readonly string[] | undefined)?.includes(subjectId))
+		.map((o) => String(o.state.findingCode));
+
+/** What the floor's classifier answers each refused subject of the waiting unit with — read as the server reads it. */
+const refusalActionsOf = (pwuId: string): string[] => {
+	const stopped = stoppedUnitOf(uiSession(), pwuId);
+	return stopped.ok ? stopped.unit.refusals.map((r) => r.action) : [];
+};
+
+describe('⭐⭐ P76F-A A4 — a refusal only a different or re-qualified reviewer can fix: Abandon alone is offered, and the server refuses both re-runs', () => {
+	const CLASSES = [
+		[
+			'the reviewing tool reported a SUBSTITUTED model',
+			{
+				action: 'REQUALIFY_OR_RESELECT_REVIEWER',
+				code: 'VALIDATOR_MODEL_SUBSTITUTED',
+				arrange: () => {
+					seam.reportedModel = 'substituted-model';
+				}
+			}
+		],
+		[
+			'the review was NOT INDEPENDENT of the producer',
+			{
+				action: 'CHANGE_REVIEWER',
+				code: 'INDEPENDENCE_VIOLATION',
+				// The stand-in producer's model is recorded `unresolved` (`executorIdentity`): a reviewer configured — and
+				// reported — as that same model is the same model, which DIFFERENT_MODEL refuses.
+				arrange: () => {
+					vi.stubEnv('JPWB_ASSURANCE_MODEL', 'unresolved');
+					seam.reportedModel = 'unresolved';
+				}
+			}
+		]
+	] as const;
+
+	it.each(CLASSES)('⛔ %s — the PAGE offers Abandon alone, and says why neither re-run is', async (_label, c) => {
+		c.arrange();
+		const k = await aWaitingUnit([]);
+		expect(observationCodesOf(k.art), 'arrangement: the refusal is not this class’s').toContain(c.code);
+		// ⚠ THE CODE ALONE DOES NOT PIN THE CLASS: a validator that failed records INDEPENDENCE_VIOLATION beside its execution
+		// failure too (measured: the substitution's own record carries one). The classifier's ACTION is the class.
+		expect(refusalActionsOf(k.pwuId), 'arrangement: the classifier does not answer this class’s action').toEqual([c.action]);
+		const { view, awaiting } = await recoveryShown(k.pwuId);
+		expect(view).toMatchObject({
+			kind: 'REVIEWER_MUST_CHANGE',
+			offers: { rerunReview: false, rerunWork: false, abandon: true }
+		});
+		expect(view?.rerunsWithheld, 'the page does not say why').toContain(`(${c.action})`);
+		expect(awaiting, 'the waiting step’s own controls are offered').toEqual([k.stepA]);
+	});
+
+	it.each(CLASSES)(
+		'⛔ %s — the SERVER refuses a re-review AND a re-run of the work, naming why: no reviewer called, no session opened, nothing recorded, the unit still waiting; Abandon still closes it',
+		async (_label, c) => {
+			c.arrange();
+			const k = await aWaitingUnit([]);
+			const events = getEngine().readAllEvents().length;
+			const calls = seam.devin.length;
+			const sessions = seam.sessions;
+			const why = (act: string) =>
+				new RegExp(
+					`^Re-running the ${act} refused: the reviewer must change before anything is re-run \\(.*\\(${c.action}\\)\\)\\. .*re-qualified or re-selected.*abandoned\\.$`
+				);
+			expect((await act('rerunReview', { pwuId: k.pwuId, rationale: RATIONALE })).data?.error ?? '').toMatch(
+				why('review')
+			);
+			expect((await act('rerunWork', { pwuId: k.pwuId, rationale: 'Try the work again.' })).data?.error ?? '').toMatch(
+				why('work')
+			);
+			expect(getEngine().readAllEvents().length, 'a refused re-run recorded something').toBe(events);
+			expect(seam.devin, 'a refused re-run called the reviewer').toHaveLength(calls);
+			expect(seam.sessions, 'a refused re-run opened a producer session').toBe(sessions);
+			expect(axesOf(k.pwuId)).toEqual(['EXECUTING', 'WAITING']);
+			expect(
+				await act('abandonPwu', { pwuId: k.pwuId, reason: 'The reviewer must be re-selected first.' })
+			).toEqual({ advanced: 'abandoned' });
+		}
+	);
+});
+
 describe('⭐ R-1d (RD3) — what the page offers, by what the refusal was', () => {
 	it.each([
 		[
@@ -748,6 +846,8 @@ describe('⭐ R-1d (RD3) — what the page offers, by what the refusal was', () 
 		);
 		// RD3's first row: a re-run of the work after a review that gave no findings says so.
 		expect(MARKUP).toContain('{#if r.findings === 0}');
+		// ⭐ `P76F-A` A4: a refusal only a different reviewer can fix says why NEITHER re-run is offered.
+		expect(MARKUP).toMatch(/\{#if r\.rerunsWithheld\}\s*<span[^>]*data-testid="recovery-reruns-withheld"/);
 		// R-1c: abandoning a waiting unit asks for the person's rationale.
 		expect(MARKUP).toMatch(
 			/\{#if data\.recoveryByPwu\[p\.id\]\}\s*<input\s+name="reason"[^>]*required/

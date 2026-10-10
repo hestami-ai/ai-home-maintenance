@@ -100,6 +100,7 @@ import {
 	RERUN_REVIEW,
 	RERUN_WORK,
 	rerunReviewRefusal,
+	rerunWorkRefusal,
 	stoppedUnitOf,
 	waitingStepOf,
 	waitReasonFor,
@@ -2573,6 +2574,8 @@ export const actions: Actions = {
 	// ⛔ REFUSED AFTER A REVIEW THAT CONCLUDED — against the work, or escalated — BY THE SERVER, not only by the page
 	// (`REG-D-105` (3); `rerunReviewRefusal`): the latest assessment wins, so a re-review run until one said SATISFIED would
 	// clear a reasoned refusal.
+	// ⛔ `P76F-A` A4 — AND AFTER A REFUSAL ONLY A DIFFERENT OR RE-QUALIFIED REVIEWER CAN FIX (a substituted model, a reviewer
+	// not independent of the producer): the same reviewer would be billed again, and refused the same way.
 	// ⛔ AND REFUSED, WITH NOTHING DISPATCHED AND THE UNIT STILL WAITING, WHEN ANY PART THE FLOOR NEEDS CANNOT BE REBUILT FROM
 	// THE RECORD (RD7): the producing prompt, the rationale, the producer's identity, each command's run. It never reviews a
 	// partial reconstruction.
@@ -2741,6 +2744,11 @@ export const actions: Actions = {
 		const stopped = stoppedUnitOf(uiSession(), pwuId);
 		if (!stopped.ok) return fail(400, { error: `Re-running the work refused: ${stopped.refusedBecause}` });
 		const s = stopped.unit;
+		// ⛔ `P76F-A` A4 — REFUSED BY THE SERVER, not only withheld by the page, after a refusal only a different or re-qualified
+		// reviewer can fix (`rerunWorkRefusal`): the new work would be reviewed by the reviewer just refused — another billed
+		// call, refused the same way. Nothing is dispatched, and the unit keeps waiting.
+		const workNotOffered = rerunWorkRefusal(s);
+		if (workNotOffered) return fail(400, { error: `Re-running the work refused: ${workNotOffered}` });
 		const { pwu, pwuType, pwuTypeId, typeFacts } = unitTypeOf(pwuId);
 		if (pwuType?.workDischarge !== 'MODEL')
 			return fail(400, {

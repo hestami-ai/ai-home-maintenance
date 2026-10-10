@@ -233,7 +233,9 @@
 										{:else if p.workLifecycleState === 'EXECUTING' && data.recoveryByPwu[p.id]}
 											<!-- ⭐ JAN-EXEC P7-6R R-1d (RD2, RD3; REG-D-104 (1); REG-D-105 (3)) — A UNIT WAITING FOR A PERSON.
 											     Its review refused it, and the record says so; what is offered follows what the refusal was:
-											     re-run the review only after a review that did NOT conclude, re-run the work and abandon always.
+											     re-run the review only after a review that did NOT conclude, re-run the work after any refusal save
+											     one only a different reviewer can fix (P76F-A A4: a substituted model, a reviewer not independent
+											     of the producer — then neither re-run, and the row says why), and abandon always.
 											     The sign-off acts are not offered here — each is refused while the unit is not SUCCEEDED — and
 											     neither is anything that runs nothing (REG-F-466). Each choice is the person's Decision, so it
 											     asks for their rationale. -->
@@ -243,6 +245,11 @@
 													>Waiting for your choice — the review refused this unit's work: {r.refusal}. Re-runs so
 													far: {r.reruns}.</span
 												>
+												{#if r.rerunsWithheld}
+													<span class="hint" data-testid="recovery-reruns-withheld"
+														>Neither re-run is offered: {r.rerunsWithheld}</span
+													>
+												{/if}
 												{#if r.offers.rerunReview}
 													<form method="POST" action="?/rerunReview" use:enhance class="findingform">
 														<input type="hidden" name="pwuId" value={p.id} />
