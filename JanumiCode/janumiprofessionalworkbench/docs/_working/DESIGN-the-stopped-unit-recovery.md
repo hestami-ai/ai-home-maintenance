@@ -148,7 +148,15 @@ The route reader found that a re-review needs four things the floor took from me
 ### RD10. What R-1 carries and does not fix
 
 - **`REG-F-232`.** There is no `ReviseExecutionPlan`, and `planVersion` stays 1. The chain is read from `supersedingExecutionPlanId`.
-- **`REG-F-433`.** A reader that returns the older of two assessments on a tie. A re-review is later in time, so it does not tie. A test pins that.
+- ~~**`REG-F-433`.** A reader that returns the older of two assessments on a tie. A re-review is later in time, so it does not tie. A test pins that.~~
+  - ⭑ **Corrected 2026-10-10, before any build: that line was wrong.** `loadReviewerAnswer` sorts by `attemptOrdinal` alone, and the sort is stable (`reviewer-answer.ts:50-53`). A re-review's first try is ordinal 1, like the original's, so the two tie, and the older answer is returned. Time does not enter.
+  - **It bites twice in Phase 7.**
+    - The run report pairs a review with its answers by subject, and refuses any subject with more than one floor run (`REG-F-433`'s pointer of 2026-10-10). Every re-reviewed work product would be reported as not pairable, and P7-4f could not adjudicate it.
+    - The run plan's own rule for P7-6 says: *"a fix that reviews something again first builds `REG-F-433`'s join key (the `REG-D-070` Q2 order), or mints a new subject"* (`DESIGN-the-live-end-to-end-run.md` §6, P7-6).
+  - **So R-1 builds the join key, as package B7.** It is also first in the sponsor's ruled order (`REG-D-070` Q2: this key, then dropping G4, then `REG-F-431`).
+    - **What it does:** one floor-run token per floor run, used for the assessments' correlation and for the exchanges' `runToken`, on both planes (`REG-F-433`'s first remedy).
+    - **What reads it:** the reader and the run report pair by that token, not by subject.
+    - **The red that must come first:** two floor runs on one subject with distinct answers; the reader must return the second run's (the entry's own predicted red).
 - **`REG-F-512` and the shared workspace.** There is no snapshot per attempt. A workspace hash per attempt is owed for the port.
 - **`REG-F-544`.** Recovery never routes through a hand completion.
 
@@ -200,6 +208,7 @@ The route reader found that a re-review needs four things the floor took from me
 4. **R-1d: what the page offers.** By RD3's table, re-run the review is shown only for a review that did not conclude. A test asserts its absence after a REJECTED review (pending §9 Q3).
 5. **R-1e: the five-unit e2e spec.** Its `onlyStepOf` helper asserts one plan per unit (`phase7-five-unit.e2e.ts:176-182`), so it turns red on a second plan and is rewritten to read the active plan's step.
 6. **R-1f: the live lane's rule** (pending §9 Q4).
+6a. **B7: `REG-F-433`'s join key** (RD10, corrected). It lands before any re-review is paid for. Its red is the entry's own: two floor runs on one subject, and the reader must return the second run's answer.
 7. **The gate and the mutation measurement as usual, then commit.**
 
 ## 8. How it fits with P7-6

@@ -293,6 +293,7 @@ This design's own steps for the roadmap's Phase 7.
   - **Its tree:** a clean worktree at a named commit, with no edits during the run.
   - **After a phase stops,** the later phases still run, in order, each recorded as "its upstream phase was not assured". The limit is checked before each phase.
   - **Forbidden during the run,** and confirmed from the event log afterwards: `completeStep`, `skipStep`, `retryStep`, waivers, Mark Satisfied without Record Assurance, and Abandon followed by re-proposing.
+    - ⭑ 2026-10-10: the recovery acts of P7-6's rule are allowed, by that rule only (`REG-D-105` (4); P7-6 below).
 - **P7-4, our checks.** Each is written and committed before P7-3, with its predicted result.
   - **a. The acceptance suite** of §3.1, kept outside the workspace and run on each phase's archived copy.
   - **b. Seeded faults:** a fixed list of hand-made faults in `src/` (a wrong N, case folding off, a wrong exit code, a broken entry point). Each must make the model's own suite fail. The report says how many each suite catches.
@@ -318,6 +319,19 @@ This design's own steps for the roadmap's Phase 7.
   - **The controls:** the P7-4 controls are frozen and re-run after every fix. A fix that lets a control pass is a regression to register, not progress.
   - **Re-reviewing:** a fix that reviews something again first builds `REG-F-433`'s join key (the `REG-D-070` Q2 order), or mints a new subject.
   - **Paid re-runs:** each one comes back to the sponsor.
+  - ⭑ **2026-10-10 — what P7-6 became** (`REG-D-103`, `REG-D-104`, `REG-D-105`):
+    - **The reviewer fix:** `DESIGN-the-reviewer-isolated.md`, I1 to I6.
+    - **The recovery of a stopped unit, P7-6R:** `DESIGN-the-stopped-unit-recovery.md`.
+    - **The build order:** the roadmap's §9, B1 to B8. Then the re-qualification (P1), then this run again (P2).
+    - **The limit is 200 reviewer calls** (`REG-D-105` (1)), checked as before: between phases, and now also before each recovery re-run.
+  - ⭑ **The paid run's recovery rule** (`REG-D-105` (4): *"Rule in run plan (Recommended)"*). When a phase's Begin & Execute is refused, the lane acts as the operator, once, by this rule:
+    1. A review that did not conclude is re-run once (the re-run-the-review act).
+    2. A review that concluded against the work has the work re-run once, with its findings (the re-run-the-work act).
+    3. If that re-run is refused again, the unit is abandoned.
+    - Each act posts the page's own form, with a rationale naming this rule. So each choice is recorded as the operator's Decision, never the engine's.
+    - The run report lists each re-run beside the Decision that made it.
+    - **Allowed during the run,** beside the list below: these three acts, by this rule only. Abandon followed by re-proposing stays forbidden.
+  - ⭑ **D13 after I1.** I1 runs the reviewer in its own folder with the trust check off, so the reviewer no longer needs a trusted checkout. D13 stays as written until the next paid run shows the worktree works.
 - **P7-7, half B.**
   - **The request:** *"Create a PWA for realizing a small command-line product through requirements, design, implementation with unit tests, and end-to-end verification, with the assurance policies each phase needs."*
   - **Then:** the candidate is accepted under the real reviewer, published, and executed as in P7-3.

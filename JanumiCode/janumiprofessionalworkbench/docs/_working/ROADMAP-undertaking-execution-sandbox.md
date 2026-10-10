@@ -1939,6 +1939,8 @@ assurance policies gate it.** ⛔ Report what breaks; do not smooth it.
 | B4 | R-1a: the plan-revision chain driven in the engine | a store test from K1's state through to a SUCCEEDED unit (predicted to be admitted) |
 | B5 | R-1b to R-1d: the wait at a refusal, the three acts, and what the page offers | the K1 route test (step WAITING, not RUNNING); three new route tests |
 | B6 | R-1e and R-1f: the five-unit spec reads the active plan's step; the paid lane's rule, as the operator | `onlyStepOf` on a unit with two plans |
+| B7 | `REG-F-433`'s join key: one floor-run token for a run's assessments and its exchanges, on both planes; the reader and the run report pair by it (first in `REG-D-070` Q2's ruled order; the run plan's P7-6 rule for any re-review) | two floor runs on one subject with distinct answers: the reader must return the second run's |
+| B8 | the run report and its audit know the recovery: a recovery act's completion is not a hand completion; each re-run is listed beside the Decision that made it; the limit check runs before each re-run | the report's audit on a run with a re-run of the review (today: flagged as a hand completion) |
 | P1 | the re-qualification on case set v4 (paid, about 80 calls) | reported to the sponsor before P2 |
 | P2 | a dry run, then the measured run again with P7-4 (paid, about 62 calls with recovery) | reported to the sponsor |
 
