@@ -137,6 +137,61 @@ function executorLaneFaults(env: Readonly<Record<string, string | undefined>>): 
 	];
 }
 
+/**
+ * ⭐ `JAN-EXEC` Phase 7 `P7-2` (D3) — TWO VARIABLES THE SERVER READS AT CALL TIME, each with why. The config passes the
+ * operator's whole shell to the server, and each of these changes a run with nothing recording it (`REG-F-531`), so the
+ * lane boots with neither: refused here, before the server starts, by a rule of THIS LANE — the product reads both.
+ */
+const READ_AT_CALL_TIME = {
+	JPWB_REVIEW_SEES_PRIOR:
+		'the server reads it at every review it runs (`reviewSeesPriorFindings`, src/lib/server/execution/loop-detection.ts), ' +
+		"and '1' or 'true' hands the reviewer its own earlier findings",
+	JPWB_AGENT:
+		'the server reads it whenever the authoring agent is asked for a turn (`agentMode`, src/lib/server/workbench.ts), ' +
+		"and 'pi' or 'mock' chooses that agent over the mode's default"
+} as const;
+
+/**
+ * ⭐ `P7-2` (D3) — one line for each of `READ_AT_CALL_TIME` that `env` sets. ⚠ SET MEANS A VALUE, after trimming: the
+ * server reads `''` and `'   '` as unset too, so refusing them would refuse a shell that changes nothing. Any other value
+ * is refused, not only the ones the server acts on — the run is measured with both unset (design §6 P7-2 D3).
+ */
+function readAtCallTimeFaults(env: Readonly<Record<string, string | undefined>>): string[] {
+	return Object.entries(READ_AT_CALL_TIME).flatMap(([name, why]) =>
+		env[name]?.trim()
+			? [
+					`  · ${name}=${JSON.stringify(env[name])} is refused by a rule of THIS LANE, not of the product: ${why}, ` +
+						'which changes the run with nothing recording it (REG-F-531). The run is measured with it unset ' +
+						'(design §6 P7-2 D3). Unset it.'
+				]
+			: []
+	);
+}
+
+/**
+ * ⭐ `P7-2` (D1) — A REQUEST FOR THE PHASE 7 RUN WITH NO RUN FOLDER, one line for each Phase 7 variable `env` sets while
+ * `JPWB_LIVE_RUN_DIR` is unset. The config then collects the one-unit spec, `execution.live.ts`, which calls its models
+ * whatever these say — so a run folder that never reached the process (misspelt, or set where the runner did not inherit
+ * it) would turn a request for Phase 7 into a paid run nobody asked for, its calls in no count of the limit (D8). ⚠ UNSET
+ * AS THE CONFIG READS IT: an empty run folder collects `phase7.live.ts`, which the run-folder check then refuses
+ * (`run-folder.ts`, `liveExecTestMatch`). A rule of THIS LANE, labelled as such.
+ */
+function phase7RequestFaults(env: Readonly<Record<string, string | undefined>>): string[] {
+	if (env[LIVE_RUN_DIR_VARIABLE] !== undefined) return [];
+	return [PHASE7_PAID_VARIABLE, PHASE7_PRIOR_CALLS_VARIABLE].flatMap((variable) =>
+		env[variable]?.trim()
+			? [
+					`  · ${variable}=${JSON.stringify(env[variable])} is refused by a rule of THIS LANE, not of the product: it ` +
+						`asks for the Phase 7 run, but ${LIVE_RUN_DIR_VARIABLE} is unset, so the config would collect the ` +
+						'one-unit spec (e2e-live-exec/execution.live.ts), which calls its models whatever this says: a paid run ' +
+						'nobody asked for, its record under the temporary folder (REG-F-526) and its reviewer calls in no count ' +
+						`of the limit (D8). Set ${LIVE_RUN_DIR_VARIABLE} to the run folder (design §6 P7-2 D1, D2), or unset ` +
+						`${variable} to run the one-unit lane.`
+				]
+			: []
+	);
+}
+
 /** What every run needs, whichever tool reviews: the producing tool and model, and the reviewing tool. */
 const ALWAYS_REQUIRED = ['JPWB_EXECUTOR', 'JPWB_EXECUTOR_MODEL', 'JPWB_ASSURANCE_TOOL'] as const;
 
@@ -158,7 +213,9 @@ export function requiredLaneKeys(tool: string | undefined): readonly string[] {
  * product's selector refuses it, and a set program override for the selected tool because the product refuses that
  * outside test mode, where this lane runs. ⭐ `JAN-SELRES` RS-1 (D5) — the same holds for the EXECUTOR, with ONE
  * exception, which is the lane's own and is labelled as such where it is refused: no agy executor
- * (`executorLaneFaults`).
+ * (`executorLaneFaults`). ⭐ `JAN-EXEC` Phase 7 `P7-2` (D3) — and two more of the lane's own, labelled the same way: a set
+ * `JPWB_REVIEW_SEES_PRIOR` or `JPWB_AGENT` (`readAtCallTimeFaults`). ⭐ (D1) — and a Phase 7 variable set with no run
+ * folder (`phase7RequestFaults`).
  */
 export function laneKeysRefusal(
 	env: Readonly<Record<string, string | undefined>>
@@ -174,11 +231,17 @@ export function laneKeysRefusal(
 	const overridden = program !== undefined && env[program] !== undefined ? program : undefined;
 	// ⭐ `JAN-SELRES` RS-1 (D5) — THE EXECUTOR LIMB: the product's executor rules restated, and the lane's own.
 	const executorFaults = executorLaneFaults(env);
+	// ⭐ `JAN-EXEC` Phase 7 `P7-2` (D3) — THE VARIABLES THE SERVER READS AT CALL TIME: the lane's own rule.
+	const callTimeFaults = readAtCallTimeFaults(env);
+	// ⭐ `P7-2` (D1) — A PHASE 7 REQUEST THE CONFIG WOULD RUN AS THE ONE-UNIT SPEC: the lane's own rule.
+	const requestFaults = phase7RequestFaults(env);
 	if (
 		missing.length === 0 &&
 		unwired === undefined &&
 		overridden === undefined &&
-		executorFaults.length === 0
+		executorFaults.length === 0 &&
+		callTimeFaults.length === 0 &&
+		requestFaults.length === 0
 	)
 		return undefined;
 	return [
@@ -202,6 +265,8 @@ export function laneKeysRefusal(
 				]
 			: []),
 		...executorFaults,
+		...callTimeFaults,
+		...requestFaults,
 		'The keys:',
 		'  JPWB_EXECUTOR / JPWB_EXECUTOR_MODEL — the tool and model that PRODUCE the work product: pi, with a model Pi ' +
 			'resolves (this lane refuses agy; devin has no executor adapter), and no program override for it',
@@ -235,6 +300,7 @@ export function laneKeysRefusal(
  *   · `setupMs` — authoring, publishing and instantiating before the POST: the 120 s the lane already allowed.
  * ⚠ NOT COVERED: a review of each command the executor ran (`evidence-join.ts`, `runProcessResultFloor`). The prompt
  * the spec sends asks for a JSON answer only, and how many commands a model runs anyway is not bounded here.
+ * ⭐ `JAN-EXEC` Phase 7 `P7-2` (D4) — the Phase 7 lane's allowance covers them, derived from this budget (below).
  */
 export const LANE_BUDGET = Object.freeze({
 	tries: 3,
@@ -254,3 +320,74 @@ export const EXECUTE_TIMEOUT_MS =
 
 /** The lane's per-test timeout: the POST's wait plus the setup before it — ~~2,280 s (38 minutes)~~ ⭐ 3,720 s (62 minutes). */
 export const TEST_TIMEOUT_MS = EXECUTE_TIMEOUT_MS + LANE_BUDGET.setupMs;
+
+// ── ⭐ `JAN-EXEC` Phase 7 `P7-2` (D4, D8) — THE PHASE 7 LANE'S WAIT AND LIMIT ──────────────────────────────────────────
+// `phase7.live.ts` runs five units in ONE test: the root, which runs no model, then the four model phases, each started
+// only after the one before has answered (`REG-F-535`). A phase's Begin & Execute runs what the one-unit lane's does and
+// then the review of each command it ran, which that lane leaves out (`LANE_BUDGET`'s NOT COVERED): so a phase is given
+// the one-unit wait, a review of up to `reviewerCallsPerTry` calls for each command reviewed, and each such command's
+// own deadline (design §6 P7-2 D4; `docs/_working/DESIGN-the-live-end-to-end-run.md`).
+// ⚠ AN ALLOWANCE, NOT A WORST CASE (the design's struck wording): the executor's turn has no bound (`executorCallMs`
+// above), and the commands past the 32nd still run, each up to its deadline, counted nowhere (`REG-F-521`, `REG-F-517`).
+// ⛔ DERIVED BY REFERENCE, NEVER RESTATED: a copy of the budget's figures here would part from the one-unit lane's the day
+// either moved, and would give each of their ledger anchors a second home.
+
+/**
+ * How many of a phase's commands become evidence and are reviewed: the product's `OBSERVED_PROCESS_RUN_LIMIT`
+ * (`src/lib/server/tools/process-run-observer.ts`), restated because this module imports nothing, and held to it by
+ * `verif/live-exec-lane-config.test.ts`.
+ */
+export const PHASE7_REVIEWED_COMMANDS = 32;
+
+/**
+ * The deadline the product hands the runner for each command a model chooses: `EXECUTION_COMMAND_TIMEOUT_MS`
+ * (`src/lib/server/tools/execution-tool-surface.ts`), private there, so held through the mirror
+ * `scripts/phase7/runner-environment.ts` keeps of it.
+ */
+export const PHASE7_COMMAND_MS = 120_000;
+
+/**
+ * ⭐ ONE PHASE'S ALLOWANCE: the Begin & Execute wait, 32 command reviews of up to four calls of 240 s, and 32 commands of
+ * 120 s — 3,600 s + 30,720 s + 3,840 s = 38,160 s (10.6 hours). D4 rules that a phase which outlasts it ends the run
+ * there, so the next is never started beside it (`REG-F-535`, `REG-F-527`).
+ */
+export const PHASE7_UNIT_ALLOWANCE_MS =
+	EXECUTE_TIMEOUT_MS +
+	PHASE7_REVIEWED_COMMANDS * (LANE_BUDGET.reviewerCallsPerTry * LANE_BUDGET.reviewerCallMs) +
+	PHASE7_REVIEWED_COMMANDS * PHASE7_COMMAND_MS;
+
+/** The phases a model runs: §3.2's four (`scripts/phase7/pwa-content.ts`, `PHASE7_PHASES`). The root runs none. */
+export const PHASE7_MODEL_UNITS = 4;
+
+/** Typing and publishing the PWA, creating the Undertaking, the root's run, five sign-offs and every archive: an allowance. */
+export const PHASE7_SETUP_MS = 1_800_000;
+
+/**
+ * The spec's own timeout, set with `test.setTimeout` (the config's stays the one-unit lane's): the setup and four phases'
+ * allowance — 1,800 s + 4 × 38,160 s = 154,440 s (42.9 hours). ⚠ It must stay under Node's timer ceiling,
+ * 2,147,483,647 ms, past which a timer fires at once.
+ */
+export const PHASE7_TEST_TIMEOUT_MS =
+	PHASE7_SETUP_MS + PHASE7_MODEL_UNITS * PHASE7_UNIT_ALLOWANCE_MS;
+
+/** ⭐ D8 — the sponsor's limit, in reviewer calls (`REG-D-102` (4)), checked before each phase. */
+export const PHASE7_PAID_LIMIT = 150;
+
+/** ⭐ D8 — the reviewer calls held back for the negative control (P7-4e): its own cap (`negative-control.ts`). */
+export const PHASE7_NEGATIVE_CONTROL_RESERVE = 4;
+
+/**
+ * ⭐ D1, D2 — the run folder. Set, the server keeps the run in it and the config collects `phase7.live.ts` alone; unset,
+ * the one-unit lane as before (`e2e-live-exec/run-folder.ts`). Set before Playwright starts: the config is loaded again
+ * in its worker.
+ */
+export const LIVE_RUN_DIR_VARIABLE = 'JPWB_LIVE_RUN_DIR';
+
+/**
+ * ⭐ D1 — the spec calls a model only when this is `1`; otherwise it is dry. ⚠ Set with no run folder, it and the next are
+ * refused at boot (`phase7RequestFaults`): the config would run the one-unit spec, which is paid whatever they say.
+ */
+export const PHASE7_PAID_VARIABLE = 'JPWB_PHASE7_PAID';
+
+/** ⭐ D8 — the reviewer calls spent before this run (P7-3a's), given by the operator. */
+export const PHASE7_PRIOR_CALLS_VARIABLE = 'JPWB_PHASE7_PRIOR_REVIEWER_CALLS';

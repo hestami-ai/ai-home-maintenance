@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { introspect, gotoHydrated, declareRisk } from '../e2e/support/harness';
 import {
 	EXECUTE_TIMEOUT_MS,
+	PHASE7_PRIOR_CALLS_VARIABLE,
 	REVIEWER_IDENTITY_EVIDENCE,
 	REVIEWER_MODEL_VARIABLE,
 	wiredReviewer
@@ -190,7 +191,13 @@ test.describe('LIVE — a work unit is executed by a real model and reviewed by 
 		expect(assurance.length, 'no model reviewed the work product').toBeGreaterThanOrEqual(1);
 
 		const producer = execution[0]!.resolvedModel as Identity;
-		const reviewer = assurance[0]!.resolvedModel as Identity;
+		// ⭐ `JAN-EXEC` Phase 7 `P7-2` (D10) — THE REVIEWER IS READ FROM THE FIRST CALL THAT ANSWERED, NOT THE FIRST RECORD.
+		// Since `P7-2b` a reviewer call that throws short of its tool's bound is recorded `NO_RESPONSE` and run once more,
+		// and that record carries the model the host configured, ungraded (`reasoning-review-validator.ts`, `attempt`): read
+		// from it, the grade asserted below would fail a run whose review then stood.
+		const answered = assurance.filter((e) => e.disposition !== 'NO_RESPONSE');
+		expect(answered.length, 'no reviewer call answered').toBeGreaterThanOrEqual(1);
+		const reviewer = answered[0]!.resolvedModel as Identity;
 
 		// ⭑ THE PRODUCER IS THE EXECUTING MODEL. Before `JAN-TOOLSUITE` this field carried the JUDGE's model —
 		// the producing side labelled with the reviewing side's identity, which is both a fiction and a
@@ -271,6 +278,15 @@ test.describe('LIVE — a work unit is executed by a real model and reviewed by 
 		console.log(`tries    : ${execution.length}  (execution-plane exchanges)`);
 		console.log(`producer : ${producer.value}  (${producer.evidence})`);
 		console.log(`reviewer : ${reviewer.value}  (${reviewer.evidence})`);
+		// ⭐ `JAN-EXEC` Phase 7 `P7-2` (D8) — THE REVIEWER CALLS THIS RUN SPENT. P7-3a is this lane's paid run, and the Phase 7
+		// run counts them against the sponsor's limit only as the operator gives them: this run's store sits under the
+		// temporary folder, where the lane's earlier records are gone (`REG-F-526`). Every ASSURANCE exchange counts, a call
+		// that threw (`NO_RESPONSE`) included, as the Phase 7 lane counts them (`scripts/phase7/run-archive.ts`,
+		// `reviewerCalls`) — and the count is a lower bound, as there.
+		console.log(
+			`reviewer calls: ${assurance.length}  (every ASSURANCE exchange, NO_RESPONSE included: add it to ` +
+				`${PHASE7_PRIOR_CALLS_VARIABLE} for the Phase 7 run)`
+		);
 		for (const a of assessments)
 			console.log(`assessment ${policyOf(a)} -> ${String(a.assessmentState ?? '?')}`);
 		for (const o of observations)
@@ -283,5 +299,6 @@ test.describe('LIVE — a work unit is executed by a real model and reviewed by 
 			type: 'live-review',
 			description: assessments.map((a) => `${policyOf(a)}=${String(a.assessmentState)}`).join(' ')
 		});
+		test.info().annotations.push({ type: 'reviewer-calls', description: String(assurance.length) });
 	});
 });

@@ -11,6 +11,12 @@
 // ⭐ `JAN-EXEC` Phase 7 `P7-2b` (`REG-D-102` (2)) — AND NOW 3 tries × 4 calls × 240 s: a reviewer call that throws short of
 // its tool's bound is run once more (`reasoning-review-validator.ts`, `timed`), so each of a review's two calls may be
 // two. Measured below through the product's devin branch, with a program that throws before each answer.
+// ⭐ `JAN-EXEC` Phase 7 `P7-2` (D3, D4, D10) — AND THE PHASE 7 LANE'S OWN: the two variables the server reads at call time,
+// refused at boot by a rule of the lane and held to the product's readers of them; the Phase 7 allowance, held to the
+// product's command limit and deadline and derived from the budget by reference; and the one-unit spec's reviewer, read
+// from the first call that answered. ⭐ (D1, D8) — and a Phase 7 variable set with no run folder, refused at boot where
+// the config would collect the paid one-unit spec instead; and the reviewer calls that spec spent, printed and annotated,
+// which the Phase 7 run is given as the calls spent before it.
 // Both now live in one PURE module, `e2e-live-exec/lane-config.ts`, which the config and the spec import and which
 // this file holds — to the PRODUCT's own answers wherever the product can be asked: the reviewer selector for which
 // variable each tool reads and which program override it refuses, the repair bound for the tries, the two reviewer
@@ -36,12 +42,20 @@ import {
 	type AssuranceSubject,
 	type ValidatorContext
 } from '@janumipwb/rph-assurance';
+import { ModelExchangeSchema } from '@janumipwb/rph-contracts';
 import ts from 'typescript';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	EXECUTE_TIMEOUT_MS,
 	EXECUTOR_PROGRAM_VARIABLE,
 	LANE_BUDGET,
+	PHASE7_COMMAND_MS,
+	PHASE7_MODEL_UNITS,
+	PHASE7_NEGATIVE_CONTROL_RESERVE,
+	PHASE7_PAID_LIMIT,
+	PHASE7_REVIEWED_COMMANDS,
+	PHASE7_TEST_TIMEOUT_MS,
+	PHASE7_UNIT_ALLOWANCE_MS,
 	REVIEWER_IDENTITY_EVIDENCE,
 	REVIEWER_MODEL_VARIABLE,
 	REVIEWER_PROGRAM_VARIABLE,
@@ -59,13 +73,26 @@ import { selectExecutor } from '../apps/rph-demo/src/lib/server/execution/execut
 import { noProgramsDirectory } from '../apps/rph-demo/src/lib/server/assurance/no-programs.testing.js';
 import { createAgyReasoningReviewValidator } from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
 import { selectReviewer } from '../apps/rph-demo/src/lib/server/assurance/reviewer-selection.js';
-import { DEFAULT_REPAIR_BOUND } from '../apps/rph-demo/src/lib/server/execution/loop-detection.js';
+import {
+	DEFAULT_REPAIR_BOUND,
+	reviewSeesPriorFindings
+} from '../apps/rph-demo/src/lib/server/execution/loop-detection.js';
 import { devinPrint } from '../apps/rph-demo/src/lib/server/tools/devin-reviewer.js';
 import { isToolInvocationResult } from '../apps/rph-demo/src/lib/server/tools/backing-tool.js';
+import { OBSERVED_PROCESS_RUN_LIMIT } from '../apps/rph-demo/src/lib/server/tools/process-run-observer.js';
+import { agentMode } from '../apps/rph-demo/src/lib/server/workbench.js';
+import { liveExecTestMatch, ONE_UNIT_SPEC } from '../apps/rph-demo/e2e-live-exec/run-folder.js';
+import { MAX_REVIEWER_CALLS } from '../scripts/phase7/negative-control.js';
+import { PHASE7_PHASES, PHASE7_ROOT } from '../scripts/phase7/pwa-content.js';
+import { EXECUTION_COMMAND_TIMEOUT_MS } from '../scripts/phase7/runner-environment.js';
 
 const APP = fileURLToPath(new URL('../apps/rph-demo/', import.meta.url));
 const CONFIG = 'playwright.live-exec.config.ts';
 const SPEC = 'e2e-live-exec/execution.live.ts';
+const LANE = 'e2e-live-exec/lane-config.ts';
+const REGISTER = fileURLToPath(
+	new URL('../docs/canon/JPWB-REG-005 Decision and Divergence Register.md', import.meta.url)
+);
 const MODEL_VARIABLES = ['JPWB_JUDGE_MODEL', 'JPWB_ASSURANCE_MODEL'] as const;
 const NO_OVERRIDES = { agy: undefined, devin: undefined } as const;
 
@@ -398,6 +425,160 @@ describe('⭐ the lane refuses the executor the product refuses — and one more
 	});
 });
 
+// ⭐ `JAN-EXEC` Phase 7 `P7-2` (D3) — TWO VARIABLES THE SERVER READS AT CALL TIME, REFUSED BEFORE IT STARTS. The config
+// passes the operator's whole shell to the server (`REG-F-531`), so the refusal is the config's, at load, and asserted by
+// its words: each variable named, with its value and why. ⭑ HELD TO THE PRODUCT'S OWN READERS: every value the server
+// acts on is refused, and a blank one, which the server reads as unset, is not.
+describe('⭐ P7-2 D3 — the lane boots with neither JPWB_REVIEW_SEES_PRIOR nor JPWB_AGENT set — a rule of its own, labelled', () => {
+	/** The lane's whole environment, admitted, with `name` set to `value`. */
+	const refusalWith = (name: string, value: string | undefined) =>
+		laneKeysRefusal({ ...COMPLETE, JPWB_ASSURANCE_TOOL: 'devin', [name]: value });
+
+	it('⛔ a set JPWB_REVIEW_SEES_PRIOR is refused, named with its value, and why: the server hands the reviewer its own earlier findings', () => {
+		for (const value of ['1', 'true', '0', ' yes ']) {
+			const refusal = refusalWith('JPWB_REVIEW_SEES_PRIOR', value) ?? 'NO REFUSAL';
+			expect(refusal, JSON.stringify(value)).toContain(
+				`JPWB_REVIEW_SEES_PRIOR=${JSON.stringify(value)} is refused by a rule of THIS LANE, not of the product`
+			);
+			expect(refusal).toContain(
+				'the server reads it at every review it runs (`reviewSeesPriorFindings`'
+			);
+			expect(refusal).toContain("'1' or 'true' hands the reviewer its own earlier findings");
+			expect(refusal).toContain('REG-F-531');
+			expect(refusal).toContain('design §6 P7-2 D3');
+		}
+	});
+
+	it('⛔ a set JPWB_AGENT is refused, named with its value, and why: the server chooses its authoring agent by it', () => {
+		for (const value of ['pi', 'mock', 'Mock', ' x ']) {
+			const refusal = refusalWith('JPWB_AGENT', value) ?? 'NO REFUSAL';
+			expect(refusal, JSON.stringify(value)).toContain(
+				`JPWB_AGENT=${JSON.stringify(value)} is refused by a rule of THIS LANE, not of the product`
+			);
+			expect(refusal).toContain(
+				'the server reads it whenever the authoring agent is asked for a turn (`agentMode`'
+			);
+			expect(refusal).toContain("'pi' or 'mock' chooses that agent over the mode's default");
+			expect(refusal).toContain('REG-F-531');
+		}
+	});
+
+	it('⭑ blank is unset: an empty or spaced value refuses nothing, for either', () => {
+		for (const name of ['JPWB_REVIEW_SEES_PRIOR', 'JPWB_AGENT'])
+			for (const value of [undefined, '', '   ', '\t'])
+				expect(refusalWith(name, value), `${name}=${JSON.stringify(value)}`).toBeUndefined();
+	});
+
+	it('⭑ held to the product: every value its readers ACT on is refused, and each reads a blank value as unset', () => {
+		const acted: string[] = [];
+		// `reviewSeesPriorFindings` takes the value; `agentMode` reads the environment when it is called.
+		for (const value of ['1', 'true', 'TRUE', ' 1 ', ' True ', '0', 'false', 'yes', '', '   ']) {
+			if (reviewSeesPriorFindings(value)) {
+				acted.push(`JPWB_REVIEW_SEES_PRIOR=${JSON.stringify(value)}`);
+				expect(refusalWith('JPWB_REVIEW_SEES_PRIOR', value), JSON.stringify(value)).toBeDefined();
+			}
+			if (!value.trim()) expect(reviewSeesPriorFindings(value), 'blank, read as unset').toBe(false);
+		}
+		try {
+			vi.stubEnv('JPWB_AGENT', undefined);
+			const byDefault = agentMode();
+			for (const value of ['pi', 'mock', 'Mock', ' mock ', 'x', '', '   ']) {
+				vi.stubEnv('JPWB_AGENT', value);
+				if (agentMode() !== byDefault) {
+					acted.push(`JPWB_AGENT=${JSON.stringify(value)}`);
+					expect(refusalWith('JPWB_AGENT', value), JSON.stringify(value)).toBeDefined();
+				}
+				if (!value.trim()) expect(agentMode(), 'blank, read as unset').toBe(byDefault);
+			}
+		} finally {
+			vi.unstubAllEnvs();
+		}
+		// ⛔ NOT VACUOUS: some value moved each reader, or the agreement above held of nothing.
+		expect(acted.some((a) => a.startsWith('JPWB_REVIEW_SEES_PRIOR='))).toBe(true);
+		expect(acted.some((a) => a.startsWith('JPWB_AGENT='))).toBe(true);
+	});
+
+	it('⛔ both set, beside a missing key: ONE refusal names all three', () => {
+		const refusal =
+			laneKeysRefusal({
+				...COMPLETE,
+				JPWB_ASSURANCE_TOOL: 'devin',
+				JPWB_EXECUTOR_MODEL: undefined,
+				JPWB_REVIEW_SEES_PRIOR: 'true',
+				JPWB_AGENT: 'mock'
+			}) ?? 'NO REFUSAL';
+		expect(refusal).toMatch(/missing[^\n]*JPWB_EXECUTOR_MODEL/);
+		expect(refusal).toContain('JPWB_REVIEW_SEES_PRIOR="true" is refused by a rule of THIS LANE');
+		expect(refusal).toContain('JPWB_AGENT="mock" is refused by a rule of THIS LANE');
+	});
+});
+
+// ⭐ `JAN-EXEC` Phase 7 `P7-2` (D1) — A REQUEST FOR THE PHASE 7 RUN THE CONFIG WOULD RUN AS THE ONE-UNIT SPEC. With
+// `JPWB_LIVE_RUN_DIR` unset the config collects `execution.live.ts`, which calls its models whatever the Phase 7 variables
+// say — so a run folder that never reached the process turned a request for Phase 7 into a paid run. ⭑ The variables are
+// written here as the design and the operator spell them, never through the module's constants: a misspelt constant
+// would otherwise be asked about by its own misspelling.
+describe('⭐ P7-2 D1 — a Phase 7 variable set with no run folder is refused at boot: the config would run the paid one-unit spec', () => {
+	const ADMITTED = { ...COMPLETE, JPWB_ASSURANCE_TOOL: 'devin' } as const;
+	const RUN_ASKED_FOR = 'asks for the Phase 7 run, but JPWB_LIVE_RUN_DIR is unset';
+
+	it('⛔ JPWB_PHASE7_PAID or JPWB_PHASE7_PRIOR_REVIEWER_CALLS, set with no JPWB_LIVE_RUN_DIR, is refused — named, with its value, the spec that would run instead, and whose rule it is', () => {
+		for (const [name, value] of [
+			['JPWB_PHASE7_PAID', '1'],
+			['JPWB_PHASE7_PAID', '0'],
+			['JPWB_PHASE7_PRIOR_REVIEWER_CALLS', '12'],
+			['JPWB_PHASE7_PRIOR_REVIEWER_CALLS', ' 3 ']
+		] as const) {
+			const refusal = laneKeysRefusal({ ...ADMITTED, [name]: value }) ?? 'NO REFUSAL';
+			expect(refusal, `${name}=${JSON.stringify(value)}`).toContain(
+				`${name}=${JSON.stringify(value)} is refused by a rule of THIS LANE, not of the product: it ${RUN_ASKED_FOR}`
+			);
+			expect(refusal).toContain('the one-unit spec (e2e-live-exec/execution.live.ts)');
+			expect(refusal).toContain('(design §6 P7-2 D1, D2)');
+		}
+	});
+
+	it('⭑ with a run folder named — even empty, which the run-folder check refuses — neither refuses; and a blank one asks for nothing', () => {
+		const PHASE7 = { JPWB_PHASE7_PAID: '1', JPWB_PHASE7_PRIOR_REVIEWER_CALLS: '12' };
+		for (const runFolder of ['E:/runs/phase7-paid', '', '   '])
+			expect(
+				laneKeysRefusal({ ...ADMITTED, ...PHASE7, JPWB_LIVE_RUN_DIR: runFolder }),
+				JSON.stringify(runFolder)
+			).toBeUndefined();
+		for (const blank of ['', '   '])
+			expect(
+				laneKeysRefusal({
+					...ADMITTED,
+					JPWB_PHASE7_PAID: blank,
+					JPWB_PHASE7_PRIOR_REVIEWER_CALLS: blank
+				}),
+				JSON.stringify(blank)
+			).toBeUndefined();
+	});
+
+	it('⭐ held to the config’s own rule: the lane refuses a Phase 7 variable exactly where the config would collect the one-unit spec', () => {
+		let refused = 0;
+		for (const runFolder of [undefined, '', 'E:/runs/phase7-paid'])
+			for (const paid of [undefined, '', '1'])
+				for (const prior of [undefined, '7']) {
+					const env = {
+						...ADMITTED,
+						JPWB_LIVE_RUN_DIR: runFolder,
+						JPWB_PHASE7_PAID: paid,
+						JPWB_PHASE7_PRIOR_REVIEWER_CALLS: prior
+					};
+					const asked = Boolean(paid?.trim() || prior?.trim());
+					const refuses = (laneKeysRefusal(env) ?? '').includes(RUN_ASKED_FOR);
+					if (refuses) refused += 1;
+					expect(refuses, JSON.stringify(env)).toBe(
+						asked && liveExecTestMatch(env) === ONE_UNIT_SPEC
+					);
+				}
+		// ⛔ NOT VACUOUS: four rows ask with no run folder — the agreement holds of refusals, not of nothing.
+		expect(refused).toBe(4);
+	});
+});
+
 /** A subject and a review input for the validator — enough to reach its prompt, its call and its repair. */
 const REVIEW_SUBJECT: AssuranceSubject = {
 	subjectId: 'lane-budget-fixture',
@@ -522,6 +703,73 @@ describe('⭐ the lane waits for the reviewer’s bounded worst case — the rev
 		// (`assurance/exchange-recorder.ts`, `identityFacts`).
 		expect(typeof agy).toBe('string');
 		expect(REVIEWER_IDENTITY_EVIDENCE.agy).toBe('HOST_CONFIGURED');
+	});
+});
+
+// ⭐ `JAN-EXEC` Phase 7 `P7-2` (D4, D8) — THE PHASE 7 LANE'S ALLOWANCE AND LIMIT. Each figure the module restates is held to
+// the product's own (the command limit, imported; the command deadline, through `scripts/phase7/runner-environment.ts`'s
+// held mirror, since the product keeps it private), the derived ones to the budget above BY REFERENCE, read from the AST,
+// and the limit and its reserve to the sponsor's ruling and the negative control's cap.
+describe('⭐ P7-2 D4 — the Phase 7 lane waits an ALLOWANCE derived from the budget by reference, under its limit', () => {
+	it('the reviewed commands are the product’s OBSERVED_PROCESS_RUN_LIMIT — the runs past it are no evidence (REG-F-517)', () => {
+		expect(PHASE7_REVIEWED_COMMANDS).toBe(OBSERVED_PROCESS_RUN_LIMIT);
+	});
+
+	it('each command’s deadline is the one the product hands the runner, through the mirror held to its source', () => {
+		expect(PHASE7_COMMAND_MS).toBe(EXECUTION_COMMAND_TIMEOUT_MS);
+	});
+
+	it('one phase’s allowance: the Begin & Execute wait, 32 reviews of four 240 s calls, 32 commands of 120 s — 38,160 s', () => {
+		// 3,600 s + 32 × 4 × 240 s + 32 × 120 s = 3,600 s + 30,720 s + 3,840 s.
+		expect(PHASE7_UNIT_ALLOWANCE_MS).toBe(38_160_000);
+	});
+
+	it('⛔ BY REFERENCE: the allowance and the test timeout read the budget’s own figures, and state no number', () => {
+		const sf = parsed(LANE);
+		expect(madeOf(sf, 'PHASE7_UNIT_ALLOWANCE_MS')).toEqual({
+			reads: [
+				'EXECUTE_TIMEOUT_MS',
+				'PHASE7_REVIEWED_COMMANDS',
+				'LANE_BUDGET.reviewerCallsPerTry',
+				'LANE_BUDGET.reviewerCallMs',
+				'PHASE7_REVIEWED_COMMANDS',
+				'PHASE7_COMMAND_MS'
+			],
+			numbers: []
+		});
+		expect(madeOf(sf, 'PHASE7_TEST_TIMEOUT_MS')).toEqual({
+			reads: ['PHASE7_SETUP_MS', 'PHASE7_MODEL_UNITS', 'PHASE7_UNIT_ALLOWANCE_MS'],
+			numbers: []
+		});
+	});
+
+	it('the model phases are §3.2’s four — each run by a model, the root by none', () => {
+		expect(PHASE7_MODEL_UNITS).toBe(PHASE7_PHASES.length);
+		expect(PHASE7_PHASES.map((t) => t.workDischarge)).toEqual(PHASE7_PHASES.map(() => 'MODEL'));
+		expect(PHASE7_ROOT.workDischarge).toBe('HUMAN');
+	});
+
+	it('⛔ the spec’s test timeout — the setup and four phases’ allowance, 154,440 s — stays under Node’s timer ceiling', () => {
+		// ⚠ FIRST, so a figure pushed past the ceiling reddens here by this message, not by the arithmetic below it.
+		expect(
+			PHASE7_TEST_TIMEOUT_MS,
+			'past 2,147,483,647 ms a Node timer fires at once, and Playwright would time the test out at its start'
+		).toBeLessThanOrEqual(2_147_483_647);
+		// 1,800 s + 4 × 38,160 s.
+		expect(PHASE7_TEST_TIMEOUT_MS).toBe(154_440_000);
+	});
+
+	it('⭐ D8 — the paid limit is the sponsor’s, read from REG-D-102 (4) itself', () => {
+		const register = readFileSync(REGISTER, 'utf8');
+		const at = register.indexOf('### REG-D-102 ');
+		const ruling = register.slice(at, register.indexOf('\n### ', at + 1));
+		const limit = /\*\*The paid limit is (\d+) reviewer calls,\*\*/.exec(ruling)?.[1];
+		expect(limit, 'REG-D-102 states its limit').toBeDefined();
+		expect(PHASE7_PAID_LIMIT).toBe(Number(limit));
+	});
+
+	it('⭐ D8 — the reserve is the negative control’s own cap on reviewer calls (P7-4e)', () => {
+		expect(PHASE7_NEGATIVE_CONTROL_RESERVE).toBe(MAX_REVIEWER_CALLS);
 	});
 });
 
@@ -671,6 +919,33 @@ function assertionsOn(sf: ts.SourceFile, subject: string): string[] {
 	return out;
 }
 
+/**
+ * What the initializer of the variable `name` in `sf` is made of: each name and property path it reads, in order, and
+ * each number it states. ⭐ `P7-2` (D4) — so "derived by reference" is read from the source, not inferred from a value.
+ */
+function madeOf(sf: ts.SourceFile, name: string): { reads: string[]; numbers: string[] } {
+	const reads: string[] = [];
+	const numbers: string[] = [];
+	const read = (n: ts.Node): void => {
+		if (ts.isNumericLiteral(n)) numbers.push(n.getText(sf));
+		else if (ts.isPropertyAccessExpression(n)) reads.push(n.getText(sf));
+		else if (ts.isIdentifier(n)) reads.push(n.text);
+		else ts.forEachChild(n, read);
+	};
+	const find = (n: ts.Node): void => {
+		if (
+			ts.isVariableDeclaration(n) &&
+			ts.isIdentifier(n.name) &&
+			n.name.text === name &&
+			n.initializer
+		)
+			read(n.initializer);
+		else ts.forEachChild(n, find);
+	};
+	find(sf);
+	return { reads, numbers };
+}
+
 /** The names `sf` imports from the helper, by the specifier it must use. */
 function importsFrom(sf: ts.SourceFile, specifier: string): string[] {
 	return sf.statements.flatMap((st) =>
@@ -710,6 +985,7 @@ describe('⛔ the config and the spec take every one of these from the helper', 
 		expect(importsFrom(sf, './lane-config').sort()).toEqual(
 			[
 				'EXECUTE_TIMEOUT_MS',
+				'PHASE7_PRIOR_CALLS_VARIABLE',
 				'REVIEWER_IDENTITY_EVIDENCE',
 				'REVIEWER_MODEL_VARIABLE',
 				'wiredReviewer'
@@ -753,4 +1029,66 @@ describe('⛔ the config and the spec take every one of these from the helper', 
 			assertionsOn(sf, "assessments.map(policyOf).filter((id) => !id.startsWith('floor.'))")
 		).toEqual(['toEqual([])']);
 	});
+
+	// ⭐ `JAN-EXEC` Phase 7 `P7-2` (D10). Since `P7-2b` a reviewer call that throws is recorded `NO_RESPONSE`, carrying the
+	// configured model ungraded, before the call that answers — so the spec's grade assertion read from the FIRST record
+	// would fail a run whose review stood.
+	it('⭐ P7-2 D10 — the spec reads its reviewer’s identity from the first ASSURANCE call that ANSWERED, never a NO_RESPONSE record', () => {
+		const sf = parsed(SPEC);
+		expect(initializersOf(sf, 'reviewer')).toEqual(['answered[0]!.resolvedModel as Identity']);
+		expect(initializersOf(sf, 'answered')).toEqual([
+			"assurance.filter((e) => e.disposition !== 'NO_RESPONSE')"
+		]);
+		expect(assertionsOn(sf, 'answered.length')).toEqual(['toBeGreaterThanOrEqual(1)']);
+		// ⭑ The field and the member it names are the contract's (`rph-contracts` `ModelExchange`), so neither can rot apart.
+		expect(ModelExchangeSchema.shape.disposition.options).toContain('NO_RESPONSE');
+	});
+
+	// ⭐ `JAN-EXEC` Phase 7 `P7-2` (D8). P7-3a is this spec's paid run, and the Phase 7 run counts its calls only as the
+	// operator gives them — its store sits under the temporary folder (`REG-F-526`), so the spec must say the count itself.
+	it('⭐ P7-2 D8 — the spec prints and annotates the reviewer calls it spent: EVERY ASSURANCE exchange, a call that threw included', () => {
+		const sf = parsed(SPEC);
+		expect(initializersOf(sf, 'assurance')).toEqual([
+			"exchanges.filter((e) => e.plane === 'ASSURANCE')"
+		]);
+		expect(annotationsOf(sf)['reviewer-calls'], 'the annotation the JSON report keeps').toBe(
+			'String(assurance.length)'
+		);
+		expect(templatesStarting(sf, 'reviewer calls: '), 'the line the operator reads').toEqual([
+			'assurance.length'
+		]);
+	});
 });
+
+/** Each annotation `sf` pushes — `{ type: '<literal>', description: … }` — its description as source text, by type. */
+function annotationsOf(sf: ts.SourceFile): Record<string, string> {
+	const out: Record<string, string> = {};
+	const visit = (n: ts.Node): void => {
+		if (ts.isObjectLiteralExpression(n)) {
+			const prop = (name: string) =>
+				n.properties.find(
+					(p): p is ts.PropertyAssignment =>
+						ts.isPropertyAssignment(p) && p.name.getText(sf) === name
+				)?.initializer;
+			const type = prop('type');
+			const description = prop('description');
+			if (type !== undefined && ts.isStringLiteral(type) && description !== undefined)
+				out[type.text] = description.getText(sf).replace(/\s+/g, ' ');
+		}
+		ts.forEachChild(n, visit);
+	};
+	visit(sf);
+	return out;
+}
+
+/** The first expression of every template in `sf` whose text begins with `head`, as source text. */
+function templatesStarting(sf: ts.SourceFile, head: string): string[] {
+	const out: string[] = [];
+	const visit = (n: ts.Node): void => {
+		if (ts.isTemplateExpression(n) && n.head.text.startsWith(head))
+			out.push(n.templateSpans[0]!.expression.getText(sf));
+		ts.forEachChild(n, visit);
+	};
+	visit(sf);
+	return out;
+}

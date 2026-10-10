@@ -64,9 +64,9 @@ For each stage: what the roadmap intends, what HEAD can do, and the gap.
 | 5b | Declared policies | *"the declared assurance policies gate it"* | a built-in step signs off 14 policy verdicts, checking no criterion; nothing declared gates completion (`R20`) | **vacuous by construction** (`REG-F-523`, `REG-F-406`) |
 | 6 | The product | it does what the brief asks, and its own tests would catch it failing | nothing in the product checks this | our checks in P7-4 |
 | 7 | Completion | the Undertaking completes | the Undertaking has no completion state (`ACTIVE`, `MIGRATING`, `ARCHIVED`: `packages/rph-contracts/src/objects.ts:874-885`) | measured instead as: every work unit, the root included, SATISFIED in lifecycle and assurance, and every unit's plan step SUCCEEDED (`REG-F-533`) |
-| 8 | The record | a person can read what each model was asked and answered, and what each reviewer said | the bytes are readable only from the content database (`REG-F-528`); every declared verdict names the operator as producer, under a credential typed HUMAN that a script operates (`REG-F-514`) | the report states both |
+| 8 | The record | a person can read what each model was asked and answered, and what each reviewer said | the bytes are readable only from the ~~content database~~ ⭑ stores: the content store holds them, and the record store says whose they are (`REG-F-528`); every declared verdict names the operator as producer, under a credential typed HUMAN that a script operates (`REG-F-514`) | the report states both |
 
-**Stage 8's pairing rule.** An exchange whose `subjectObjectId` is the assessment's subject, with the highest `attemptOrdinal`, is the answer that concluded it. This holds only while each subject has exactly one floor run (`REG-F-433`). The report checks that condition, and lists any assessment with no exchange as "no answer recorded" (`REG-F-525`).
+**Stage 8's pairing rule.** An exchange whose `subjectObjectId` is the assessment's subject, with the highest `attemptOrdinal`, is the answer that concluded it. This holds only while each subject has exactly one floor run (`REG-F-433`). The report checks that condition, and lists any assessment with no exchange as "no answer recorded" (`REG-F-525`). ⭑ Scoped by D9 (2026-10-09): the rule covers reasoning-review assessments only, the only ones with exchanges. Since P7-2b the concluding record may also be a `NO_RESPONSE` (both calls threw) or a refusal, and the report names each.
 
 ## 3. The scenario
 
@@ -153,7 +153,7 @@ These are read from code at `a2d88db6`. Most are not yet driven. Every one has a
 | | Predicted break | How it stops a phase | Register |
 |---|---|---|---|
 | K1 | A phase that stops can never be run again, only abandoned. It stops on any of: a refused or escalated review, a provider error, a timed-out command. Begin & Execute is offered only on a PROPOSED unit; Retry only re-queues the step (`apps/rph-demo/src/routes/undertakings/[id]/+page.svelte:228-232`; `+page.server.ts:1723-1729`). | always | `REG-F-511`; corrects `REG-F-474` and `REG-D-090`, the premise of `REG-D-091` |
-| K2r | **Blocks by rule:** a timed-out command, a reviewer call that throws, an INCONCLUSIVE or MISSING_CRITERION reply, an ESCALATED recommendation. | by rule | `REG-F-499`, `REG-F-489`, `REG-F-474`, `REG-F-520`, `REG-F-525` |
+| K2r | **Blocks by rule:** a timed-out command, a reviewer call that throws ⭑ twice, or at its tool's bound (P7-2b), an INCONCLUSIVE or MISSING_CRITERION reply, an ESCALATED recommendation. | by rule | `REG-F-499`, `REG-F-489`, `REG-F-474`, `REG-F-520`, `REG-F-525` |
 | K2j | **Blocks only if GLM faults it (inferred):** a fail-then-fix test loop judged against the final account; a command that only reads a file. | by GLM's judgement | `REG-F-485`, `REG-F-486` |
 | K3 | Phases are neither ordered nor connected. Files in the shared workspace carry the hand-off, and reading them is a reviewed command (K2j). | indirectly | `REG-F-358` (corrected) |
 | K4 | Files one phase writes (`AGENTS.md`, `CLAUDE.md`, `.pi/`) become part of later phases' system prompt or code. | unseen | `REG-F-512` |
@@ -188,7 +188,7 @@ This design's own steps for the roadmap's Phase 7.
 - **P7-2, the run's lane.**
   - **Invocation:** a new spec, `apps/rph-demo/e2e-live-exec/phase7.live.ts`, run alone with `bun run e2e:live-exec -- e2e-live-exec/phase7.live.ts`.
   - **Its run folder** comes from `JPWB_LIVE_RUN_DIR`, set before Playwright starts, because the config is loaded again in its worker. The spec asserts that `<dir>/demo.sqlite` exists.
-  - **Its wait per unit** is stated in `lane-config.ts` as a `PHASE7` budget: ~~3 × (240 + 2 × 240) s, plus 32 × 2 × 240 s of command reviews, plus 32 × 120 s of commands. That is about 6 h, the worst case.~~ With P7-2b's retries a review is up to 4 calls (2026-10-09): 3 × (240 + 4 × 240) s, plus 32 × 4 × 240 s of command reviews, plus 32 × 120 s of commands, about 10.6 h, the worst case. The verif test that pins `lane-config.ts` is extended to it.
+  - **Its wait per unit** is stated in `lane-config.ts` as a `PHASE7` budget: ~~3 × (240 + 2 × 240) s, plus 32 × 2 × 240 s of command reviews, plus 32 × 120 s of commands. That is about 6 h, the worst case.~~ With P7-2b's retries a review is up to 4 calls (2026-10-09): 3 × (240 + 4 × 240) s, plus 32 × 4 × 240 s of command reviews, plus 32 × 120 s of commands, about 10.6 h, ~~the worst case~~ ⭑ an allowance, not a worst case: the executor's turn has no bound, and the commands past the 32nd still run, uncounted (`REG-F-521`; round 2's code map, 2026-10-09). The verif test that pins `lane-config.ts` is extended to it.
   - **At boot** it records the `JPWB_*` and `RPH_*` environment, asserts that `JPWB_REVIEW_SEES_PRIOR` and `JPWB_AGENT` are unset, and runs a reviewer readiness check that calls no model.
   - **Each Begin & Execute's** JSON response is saved.
   - **After each unit, it archives:**
@@ -196,15 +196,82 @@ This design's own steps for the roadmap's Phase 7.
     - the workspace and its `.process-output` sibling;
     - the introspect dump.
   - **After each unit, it checks:**
-    - capture folders against evidence objects (K5);
-    - a workspace scan for `AGENTS.md`, `CLAUDE.md` and `.pi/` (K4);
+    - capture folders against evidence objects (K5); ⭑ a folder with no evidence has other causes too, which D7 names;
+    - a ~~workspace~~ scan for `AGENTS.md`, `CLAUDE.md` and `.pi/` (K4) ⭑ where Pi loads them: its agent folder, and the workspace's ancestors and root (D7; `REG-F-512`);
     - each EXECUTION exchange's parse outcome (K9);
     - the SHA-256 of `src/`, `test/` and `docs/`;
     - the reviewer calls used so far;
     - before any summary is committed, a scan of the archive for the account name and absolute paths (`REG-F-536`).
   - **After teardown**, a final copy of the whole run folder is taken.
   - **A run-report builder** reads both stores, read-only. It is a deliverable with its own red.
-  - **The spec's deterministic part** is proven first, stopping before the first Begin & Execute, with no model call.
+  - **The spec's deterministic part** is proven first, stopping before the first ~~Begin & Execute~~ ⭑ model-run Begin & Execute, with no model call. The root's Begin & Execute runs no model, so the dry run also proves one press, its saved response and one archive-and-check cycle, at no cost (D5 below).
+- **P7-2's build decisions** (2026-10-09, under `REG-D-101`'s delegation). They come from a read-only map of the code on round 1's tree, by five mappers and a critic.
+  - **D1, paid only on request.** The spec is dry unless `JPWB_PHASE7_PAID=1`. The config collects `phase7.live.ts` only when `JPWB_LIVE_RUN_DIR` is set, and `execution.live.ts` only when it is not. So the two specs never share a server or a store: an unfiltered run collected both, and each counts the PWA picker.
+  - **D2, the run folder.** `JPWB_LIVE_RUN_DIR` must be absolute and must exist. It must lie outside the repository and the temporary folder (`REG-F-526`), hold no store yet, and have no `AGENTS.md`, `CLAUDE.md`, `.pi/` or `.agents/` in it or in any ancestor.
+    - The config refuses otherwise, in the runner's load only: the worker loads the config again, after the server has made the store.
+    - A dry run and the paid run never share a folder: a store is seeded only when empty, and command ids restart at each boot.
+  - **D3, at boot.**
+    - `laneKeysRefusal` also refuses a set `JPWB_REVIEW_SEES_PRIOR` or `JPWB_AGENT`, before the server starts.
+    - The spec records the inherited `JPWB_*`, `RPH_*` and `PI_*` variables and the config's overlay.
+    - The readiness check runs `devin --version` and `devin models list`, and requires the configured model in the list. No model is called. Nothing checks Pi before its first turn.
+  - **D4, the wait.**
+    - `lane-config.ts` derives the per-unit allowance (38,160 s) from `LANE_BUDGET` by reference.
+    - It also gives the spec's own test timeout: four units' allowance plus 30 minutes for typing, publishing, sign-offs and archives.
+    - A unit that outlasts its allowance ends the run there. The next unit is never started beside it (`REG-F-535`, `REG-F-527`).
+  - **D5, the order.**
+    - One test: Begin & Execute on the root, then on each phase in order; then sign-off of each phase that completed, and of the root last.
+    - A stopped phase is left as found, and the later phases still run. The run's own record notes that each later phase's upstream was not assured; the store has no such field.
+    - The spec reads engine state after every act (`REG-F-540`), and saves each action's status and raw body.
+    - It logs every POST it makes, because the stores keep accepted acts only.
+  - **D6, the archive.**
+    - After each unit, it keeps:
+      - both stores, through SQLite's backup, each copy converted to a rollback journal so that a read-only open writes nothing beside it;
+      - the workspace and `.process-output`, copied byte for byte. Neither exists until the first model unit, and `.process-output` is one per Undertaking;
+      - the introspect dump.
+    - After Playwright exits, the operator copies the whole run folder, `-wal` and `-shm` files included.
+  - **D7, the checks.**
+    - K4 is checked as Pi loads: its agent folder, every ancestor of the workspace and the workspace root. Each executor input is also searched for the context markers Pi writes.
+    - K5 lists the capture folders a unit added against its evidence, and names the other causes of a folder with no evidence.
+    - K9 reads each execution exchange's parse outcome, with its detail.
+    - Hashes are kept per file and per folder for `src/`, `test/` and `docs/`, and for the whole workspace, as the manifest uses.
+  - **D8, the limit.**
+    - Before each phase, three counts must total under 150: the reviewer calls already spent (P7-3a's, given by the operator), those recorded in this run, and 4 held for P7-4e.
+    - A phase started under the limit can overshoot it by its own worst case, 140 calls. The sponsor's check is between phases (`REG-D-102` (4)).
+    - The recorded count is a lower bound.
+  - **D9, the report.** `scripts/phase7/run-report.ts` reads the archived stores read-only. It writes:
+    - the stage matrix, the pairing check, the adjudication table's rows and the forbidden-act audit;
+    - the manifest for the per-command re-runs.
+    - **The pairing (stage 8)** covers reasoning-review assessments only. An assessment's answer is its subject's highest-ordinal exchange, reported as one of:
+      - answered;
+      - no response (both calls threw);
+      - refused (a substitute, or a failed repair);
+      - no answer recorded.
+      A subject with more than one floor run is reported as not pairable (`REG-F-433`).
+    - **The audit:** a hand completion is any step success that is not one of Begin & Execute's two shapes.
+    - **The manifest** holds the commands that were recorded. Runs past the 32nd are counted, not listed (`REG-F-517`).
+    - The report's own output is scanned for the account name and absolute paths before it is written (`REG-F-536`).
+  - **D10, the one-unit lane.** `execution.live.ts` reads its reviewer's identity from the first call that answered, not from the first record. Since P7-2b, a recovered throw leaves a `NO_RESPONSE` record first.
+  - **D11, the dry run signs off the root** (2026-10-10, under the same delegation). After the root's Begin & Execute and its archive, the dry run signs off the root and takes the final archive, then stops. Signing off calls no model, and otherwise the sign-off path and the final archive would first run in the paid run.
+- **P7-2 as built (round 2, 2026-10-10).** Three builders, two adversarial verifiers each and a fixer each. Where the build departs from D1 to D10, or adds to them:
+  - **The run folder (D2)** is refused inside any git working tree, the main checkout and every worktree included. The repository's own tree alone is not enough, because P7-3 runs from a worktree.
+  - **D1 is closed both ways.** `JPWB_PHASE7_PAID` or `JPWB_PHASE7_PRIOR_REVIEWER_CALLS` without a run folder is refused, rather than running the paid one-unit spec.
+  - **The one-unit lane prints its reviewer calls,** so P7-3a's count can be given to D8.
+  - **The worker reuses the runner's store** rather than minting a second folder (`REG-F-526`'s pairs).
+  - **The run's order lives in the operator** (`runTheLane`), so verif drives it on stand-in hands. Two ends are added: `request-failed`, for a POST that fails in transit, and `lane-error`, for a throw.
+  - **K4 also reads** the agent folder's `APPEND_SYSTEM.md` and `extensions/`, which Pi loads under the executor's override.
+  - **Readiness refuses any reviewer but devin,** as a rule of this lane.
+  - **A per-unit archive that throws still ends the run.** This is kept, and is a known risk.
+  - **D11 is built.** The dry run signs off the root through the paid run's own steps and takes `06-final`. Its verdict requires both acts accepted, and the root SATISFIED in lifecycle and assurance.
+  - **The account name the report's scan looks for (D9) is taken from every source:**
+    - the user record's name, and the last segment of its home folder;
+    - `USERPROFILE` and `USERNAME`.
+    - The scan never looks for `unknown`. Bun 1.3.14 on Windows gives that as the user record's name when `USERNAME` is unset, and turbo's default env mode unsets it for the gate's tests.
+    - When no name can be found, the report refuses to write, rather than scanning for nothing (`REG-F-545`).
+  - **The first dry run passed (2026-10-10, 26 s, no model called).**
+    - The readiness check found devin 3000.11.3, with `glm-5-3-flash-max` in its model list.
+    - The root's press and sign-off were accepted, and both archives were taken. K4 checked 4 ancestors and found nothing.
+    - The final copy and the report ran on the folder.
+  - **The report** leaves two kinds of cell open, owed to a person: stage 6 (to P7-4a to c), and stage 4 where a reviewer concluded against the work (to P7-4f). A break with no register id is marked unregistered, owed to P7-5. An argument naming the account or an absolute path is replaced, and its command is listed apart from the manifest.
 - **P7-2b, only if chosen in §9.2.**
   - **The rule:** a devin call that throws before its 240 s bound, with no reply, is run once more (the qualification's own rule, `JAN-PRQUAL` design §7.3); a second throw counts.
   - **Where it sits:** in the validator's `timed`, once, before its rethrow (`apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts:955-962`).
@@ -299,7 +366,7 @@ This design's own steps for the roadmap's Phase 7.
 - `REG-F-486`: the executor has no read tool, so every look at a file is a reviewed command.
 - `REG-F-403`: *"not green"* is permanent on this surface for a root that declares `pol_intent_fidelity`.
 - `REG-F-406`: Phase 7 is designed; its three items are answered by §9.5, stage 5b with §9.6, and P7-4e.
-- `REG-F-328`, `REG-F-333`: a reviewer call that throws is captured nowhere (`REG-F-525`).
+- `REG-F-328`, `REG-F-333`: a reviewer call that throws is captured nowhere (`REG-F-525`). ⭑ Since P7-2b it is recorded `NO_RESPONSE`, and `REG-F-525` is closed (round 1).
 - `REG-F-439`, `REG-D-088`, `REG-F-445`: the live-run records they cite are gone from this host (`REG-F-526`).
 - `REG-F-457`: the live lanes still pass the whole shell to the server (`REG-F-531`).
 - `REG-F-209`: its *"until the review is redone"* holds only while the PWA is DRAFT; after that, the publication wedge (`REG-F-502`).
@@ -395,7 +462,7 @@ The stage maps predicted 78 breaks, B01 to B78 (labels local to this design). Ea
 | B69 | DEGRADES | Incidental and repaired-unit runs are reviewed refusably; each file look costs a review | registered: `REG-F-486`, `REG-F-485` | `REG-F-486`'s pointer covers the read-tool cost. |
 | B70 | DEGRADES | The run's record in %TEMP% is lost; a naive copy misses the WAL | new `REG-F-526` | Exact subject of `REG-F-526`. |
 | B71 | DEGRADES | The run cannot be watched, and its content cannot be read through the product | new `REG-F-528` | Exact subject of `REG-F-528`; the idle-reset risk is REG-F-501. |
-| B72 | DEGRADES | The paid budget can be counted, not priced; failed reviewer calls undercounted | new `REG-F-529`, `REG-F-525` | `REG-F-529`: no usage field; `REG-F-525`: a thrown reviewer call leaves no exchange. |
+| B72 | DEGRADES | The paid budget can be counted, not priced; failed reviewer calls undercounted | new `REG-F-529`, `REG-F-525` | `REG-F-529`: no usage field; `REG-F-525`: a thrown reviewer call leaves no exchange ⭑ (closed by P7-2b: it is recorded `NO_RESPONSE`). |
 | B73 | BLOCKS | The authoring spec and harness fixture are unusable inside the durable process | this design: K7 | Reset refused by R24; lane-control test-only; not named in draft K7. |
 | B74 | DEGRADES | Commands past the 32nd are never evidence or reviewed; the step still completes | new `REG-F-517` | Same defect as B58. |
 | B75 | DEGRADES | Stray shell variables silently change the run | new `REG-F-531` | Exact subject of `REG-F-531`. |
@@ -417,7 +484,7 @@ The stage maps predicted 78 breaks, B01 to B78 (labels local to this design). Ea
 **Transport failures.**
 - **The measured rate:** the reviewer program failed without answering in 3 of its last 133 calls, cause unrecorded (`REG-F-499`); over all the selected candidate's runs, 3 in 237.
 - **What that means for this run:** at those rates, 20 reviewer calls carry roughly a 22–37% chance of at least one such failure, and 40 calls 40–60%. These figures are extrapolated from the qualification's call path.
-- **The consequence today:** each such failure stops its phase for good (K1, K2r).
+- **The consequence today:** each such failure stops its phase for good (K1, K2r). ⭑ Since P7-2b, only a second failure in a row does.
 
 **What "paid" means:** Pi on `openai-codex/gpt-5.6-sol`, and devin with `glm-5-3-flash-max`. The record counts calls, not tokens or money (`REG-F-529`).
 

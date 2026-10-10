@@ -29240,6 +29240,7 @@ clean baseline**), wired into `reasoning-review-validator.ts`.
 
 - **Merge target:** `ICP-02` d2b. **Owed:** the `RecordArtifact` dispatch and a durable §31 adapter.
 - ⭑ **2026-10-09** — *"every bounded try"* holds for the parse paths this entry covers. A try whose backing tool throws (a transport failure, or the 240 s kill) is captured nowhere: `reasoning-review-validator.ts:955-963` rethrows with no capture (`REG-F-525`).
+- ⭑ **2026-10-10 — superseded by P7-2b.** The pointer above says a try whose backing tool throws is captured nowhere. Since `JAN-EXEC` Phase 7 round 1 (P7-2b), such a call is recorded `NO_RESPONSE` with its sanitised cause, and run once more short of its tool's bound; `REG-F-525` is closed.
 
 ### REG-F-329 — `REG-D-049` convicted W10 of abandoning work it had correctly DEFERRED: the deferral splits across the JPWB / Janumi Platform boundary, and only the JPWB limbs were lost
 
@@ -37091,6 +37092,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - **WHAT IT BREAKS.** PER-9: *"Every bounded model or agent try — each retry, reformat, and repair request included — is its own durable exchange record"*. `REG-D-055`: *"A failed try becomes durable even when the human DISCARDS the turn"*. And bytes already captured to the content plane are left with no record referencing them — `REG-F-336` C-2's orphan.
 - **THE GENERAL FORM.** Any throw from the recording step skips the drain, not only a discard. The execution-plane floor has the same order: `execution/floor-over-subject.ts:157` records, `:167` drains.
 - ⚠ **WHY IT IS NOT FIXED HERE.** The natural fix — drain first, or in a `finally` — makes a late drain a FOREIGN event to a successor turn on the same PWA, and W3 (`authoring-turn-reviewed.test.ts`) pins exactly that consequence. A design is owed, with this probe's observation as its first red.
+- ⭑ **2026-10-10 — anchors moved.** `floor-over-subject.ts:157` (records) and `:167` (drains) are now `:207` and `:217`; the order this entry describes is unchanged.
 
 ---
 
@@ -37121,6 +37123,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - **PREDECESSORS, NEITHER OF WHICH FILES IT.** `REG-F-327` filed that the assessment→exchange forward reference had no carrier and pointed to a reverse join, before `MODEL_EXCHANGE` existed. `REG-D-055` records why the structural join was given up and that an exchange cannot name its assessment when captured. Neither records that nothing replaced the lost join.
 - ⚠ **A PROPERTY CHECK CANNOT SEE THIS, AND ONE SAID SO.** W-3b `limb:PER-9:3` (`docs/tracking/w3b/invariant-verdicts.ndjson:240`, `PARTIAL`) scored correlation by the PRESENCE of `correlationId` and says *"Nothing else is owed on this limb."* This entry supersedes that sentence; the row carries a pointer in a new `owed_superseded` field (the journal's own precedent, `limb:OBJ-3:2`), its `owed` unrewritten.
 - **REMEDY CANDIDATES, UNTESTED.** Mint ONE floor-run token and use it for the assessments' correlation and the exchanges' `runToken` and correlation; or set `causationId`. Recording exchange ids ON the assessment would need a contract change and a reordering — the drain runs after the recording (`REG-F-431`). Predicted red first: two floor runs on one PWA with distinct answers, and the reader must return the second run's.
+- ⭑ **2026-10-10 — Phase 7's report pairs, and refuses to pair where this entry's gap bites.** Round 2's run report (`scripts/phase7/run-report-core.ts`) pairs only reasoning-review assessments, the only ones with exchanges. A subject with more than one floor run is reported as not pairable, never paired (design §6 D9); this entry stays open, since the join key is P7-6's. Its anchors have moved since filing: `floor-over-subject.ts:159`, `:178` and `:184` are now `:209`, `:228` and `:234`; `floor.ts:409-412`, `:440` and `:446` are now `:759-762`, `:791` and `:797`; the positive control's `messages.ts:894` and `:2063` are now `:896` and `:2066` (still 2 hits).
 
 ---
 
@@ -38928,6 +38931,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
     - on `REG-F-406`: Phase 7 is designed; its "live lane is broken" paragraph is superseded by `REG-F-405`'s fix and `REG-D-088`'s run.
   - **The roadmap's §9** records the steps P7-0 to P7-7.
 - ⭑ **2026-10-09 — round 1 built** (P7-1a, P7-1b, P7-2b and P7-4's tools; `REG-D-102`). Calls made in building it, for confirmation with the run's report: the brief and the four phase prompts live in one module, `scripts/phase7/pwa-content.ts`, pinned to `product-brief.md` byte for byte; each prompt's answer shape is its type's output contract; the implementation and end-to-end asks name `bin/wordfreq.js`; P7-4b's unit arm uses generic operators on the model's code, because no fixed list of faults can be written before the code exists; the re-runner refuses an absolute argument and requires each unit's tree digest; and its default per-test deadline is the runner's 120 s.
+- ⭑ **2026-10-10 — used again, for P7-2's build.** The design's §6 records eleven build decisions made under this delegation, D1 to D11 (2026-10-09 and 10): the dry run as the default, the run folder, the boot checks, the wait, the order, the archive, the checks, the limit, the report, the one-unit lane's identity read and the dry run's sign-off. Each is reported to the sponsor with the run.
 
 ### REG-F-502 — a PWA that Validate or Publish refuses can never be fixed or published: the lifecycle has no way back to DRAFT, the graph is first refused after the PWA has left DRAFT, and a floor that a later type edit has made stale reads SATISFIED on the page until Publish refuses it
 
@@ -39092,6 +39096,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   3. Run the evidence join on each return path after a turn, so that no stop drops commands that ran. Untested.
   - Predicted red: the design's no-model rehearsal (P7-1), with a stub reviewer that fails once, leaves a unit that no page action can complete. At HEAD it does.
 - ⭑ **2026-10-09 — driven at one of its six stops** (`JAN-EXEC` Phase 7 round 1): the floor's refusal of a completion whose review is INCONCLUSIVE, by the route test (`apps/rph-demo/src/routes/undertakings/[id]/phase7-route.characterization.test.ts`) and the five-unit gate spec (`apps/rph-demo/e2e/phase7-five-unit.e2e.ts`). There, Begin & Execute is offered only on a PROPOSED row and is refused at `BeginPwuShaping` if posted anyway; Retry and Start run no model and no floor; Record Assurance is refused; a hand completion with no output is admitted and frees nothing; and Abandon is the way out. The other five stops, Record Blocking Finding, the replacement-unit route and the dropped-commands limb remain read from code, not driven.
+- ⭑ **2026-10-10 — the run goes on after a stop, and a hand completion naming one output frees nothing either.** This entry's status reads *"The measured run ends at the first unit that stops"*. The design's P7-3 and `REG-D-101` item 8 say the opposite, and round 2's lane does as they say: a stopped phase is left as found, and the later phases still run (design §6 D5). Round 2's store test also drove a hand `completeStep` that names the unit's one work product, after Begin & Execute was refused for a command's evidence: it is admitted, and the unit is still not SATISFIED, as prediction (c) found for a completion naming none (`REG-F-544`).
 
 ### REG-F-512 — The executor's Pi loads `AGENTS.md`, `CLAUDE.md` and `.pi/` files from the Undertaking's shared workspace, so a file one unit writes becomes part of a later unit's system prompt, or code the server process runs, and no reviewer sees it
 
@@ -39114,6 +39119,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - **REMEDY CANDIDATES, UNTESTED.**
   1. Build the executor's loader closed: `noContextFiles: true`, `noExtensions: true`, an `appendSystemPromptOverride` that returns nothing, settings with `projectTrusted: false`, and `PI_OFFLINE=1` for the server. Untested. Predicted red: a session opened over a workspace holding `AGENTS.md` and `.pi/APPEND_SYSTEM.md` carries neither text in its recorded composite; at HEAD it carries both.
   2. Record what the loader loaded (context files, extensions, packages) on the EXECUTION exchange, and show it to the reviewer. Untested.
+- ⭑ **2026-10-10 — Phase 7 checks what Pi loads, and refuses a run folder under a context file.** Round 2's K4 check reads Pi's agent folder (`AGENTS.md`, `CLAUDE.md`, `APPEND_SYSTEM.md`, which Pi appends even under the executor's override, and `extensions/`), every ancestor of the workspace and its root, and searches each executor input for the context markers Pi writes (design §6 D7). The lane refuses at boot a run folder with such a file in it or above it (D2). On this host the account's home folder holds `.pi`, so no run folder under it is admitted.
 
 ### REG-F-513 — The Undertaking page shows no review of a unit whose completion the floor refused, nor of any unit's superseded tries, and shows the refusal itself only once, as a form error: its scope admits a work product or command evidence only through a successful completion
 
@@ -39205,6 +39211,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   2. The drop is recorded where a reader of the step looks: a limitation on the completion, or an evidence object of its own.
   3. The cap is per try, as the record-plane call cap it was made equal to is (`process-run-observer.ts:101-104`). This changes which runs are dropped, not whether.
 - ⭑ **2026-10-09 — driven** (`JAN-EXEC` Phase 7's route test). Given 33 completed runs, the real observer yields 32 evidence objects; the 33rd appears in no event and in no evidence's stored bytes, and the step completes.
+- ⭑ **2026-10-10 — what the record keeps of the runs it drops.** A run past the 32nd keeps a capture folder and its stdout and stderr; its argv, exit code and order are recorded nowhere but the executor's own turn input. So round 2's re-run manifest lists the recorded commands and counts the others (design §6 D9). The cap is the first 32 runs to COMPLETE in a session, and one session serves all of a unit's tries. Round 1's route test matches evidence to a unit by substring (`phase7-route.characterization.test.ts:496`); the run uses equality, since test-mode ids can prefix each other.
 
 ### REG-F-518 — Pi asks the executing model for parallel tool calls and runs one message's calls concurrently, and JPWB's two tools do not ask to run in sequence, so a command can start before a file written in the same message exists
 
@@ -39222,6 +39229,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - **REMEDY CANDIDATES, UNTESTED.**
   1. `toPiExecutionTools` declares `executionMode: 'sequential'` on both minted tools, so Pi runs any message that calls them one call at a time (`agent-loop.js:289-290`). Predicted red: a test drives one message's `write_file` and `run_command` through Pi's loop, with a stub workspace whose write resolves late and a stub runner that records whether the file exists when it is called. At `a2d88db6` the runner sees the file absent.
   2. The observer assigns a run's ordinal when the run starts, as its comment says.
+- ⭑ **2026-10-10 — the ordinal has its first reader.** Round 2's re-run manifest carries each command's order as the order its run COMPLETED, and names it so, since the start order this entry describes is recorded nowhere.
 
 ### REG-F-519 — the executor's answer is all the text the model emits in a tool-using turn, parsed whole as one JSON object, so any text outside the final JSON leaves its account NOT DECLARED for the work product's review and for every command's review
 
@@ -39314,6 +39322,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   2. Until a reviewer is wired, record the scripted sign-off INCONCLUSIVE, not SATISFIED, for a policy whose BLOCKING criteria nobody answered (`RPH-ASR-005`'s rule). Untested; it stops every unit with such a policy from turning green, Phase 7's included, so it is the sponsor's call.
   3. Disclosure only: label these verdicts as demonstration sign-offs wherever a green is shown and in Phase 7's run report, and report stage 5 as not measured. Untested.
 - ⭑ **2026-10-09 — driven** (`JAN-EXEC` Phase 7's five-unit gate spec, its prediction (b)). A root whose TRANSFORMATION produced nothing, recorded as the operator's, is signed off green.
+- ⭑ **2026-10-10 — the report's label.** This entry asks the run report to count these verdicts as not measured. `REG-D-102` (6), later, has the report mark all 14 vacuous, and the design's §1 keeps "vacuous by construction" as its own value. Round 2's report does that (design §6 D9). The design sentence this entry quotes as stage 5, *"Its declared policies are signed off"*, is not in the design: searched with grep, and with `git log -S` over the design's history (0 each; positive control: "declared policies", 2 lines in the design).
 
 ### REG-F-524 — A work unit whose declared assurance policies all fail to govern it can never be assured: the kernel folds the empty set to UNASSESSED and refuses Record Assurance with a reason that names no policy, the page lists each excluded policy as "REQUIRED — UNASSESSED", and no step before the sign-off warns
 
@@ -39375,6 +39384,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   1. The lane takes its run root from a variable naming a folder outside the repository and outside the temp directory, and refuses to boot without one.
   2. The spec archives the run at its end, pass or fail: both `.sqlite` files with their `-wal` and `-shm` files, the workspaces, the results file and an introspect dump, into a dated folder; only summaries are committed while redaction has no producer (W-3).
   3. Set `TEMP` and `TMP` for the Playwright process to a kept folder (Node's `os.tmpdir()` follows them on Windows, INFERRED). No code changes, but devin's and the commands' temp files move with it.
+- ⭑ **2026-10-10 — the Phase 7 lane keeps its record.** Round 2's lane takes its run folder from `JPWB_LIVE_RUN_DIR`, refused at boot when it is relative, under the temporary folder, inside any git working tree, already holds a store, or has a context file Pi would load in it or above it (design §6 D1, D2). The worker reuses the runner's store instead of minting a second folder. Each unit's stores are kept through SQLite's backup, converted so a read-only open writes nothing beside them (D6). The one-unit lane, with no run folder named, still mints under the temporary folder.
 
 ### REG-F-527 — when a live-exec run outlasts its wait, Playwright force-kills the server in the middle of the work unit: the try in flight leaves no record, the unit stays EXECUTING with its step RUNNING, and nothing can run it again
 
@@ -39395,6 +39405,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   1. For Phase 7: run the server outside Playwright's `webServer`, started with the lane's environment and a kept run root, so a spec's timeout ends the spec and not the server; and size each unit's wait from a bound that includes its command reviews, as the design's P7-2 plans.
   2. In the product: record a try as begun, durably, before its call, so a killed try leaves a "started, never answered" record. This reorders `captureTry` and touches the exchange contract.
   3. `RPH-PER-012`'s reconciliation of an interrupted step; that row records why it is not a small fix.
+- ⭑ **2026-10-10 — the Phase 7 lane stops where this begins.** A unit that outlasts its allowance ends the run there, archived, and the next unit is never started beside it (design §6 D4). Playwright still kills the server mid-unit at teardown, so this entry stays open; the post-run copy (`scripts/phase7/finalize-run.ts`) keeps what the store holds then.
 
 ### REG-F-528 — nothing in the product shows what an executed work unit was asked, what it answered, what its reviewer answered or what its commands printed: those bytes can be read only from the stores themselves, and a unit gives no progress signal while it runs
 
@@ -39415,6 +39426,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   1. An Undertaking view of a unit's exchanges and evidence that shows each verified answer span and command result through `verifyExchangeContent` and `readAnswerSpan` (`packages/rph-application/src/exchange-resolution.ts:177`, `:206`), never volunteered reasoning. Unless fixed with it, it inherits `REG-F-433`'s missing join and `REG-F-464`'s omissions.
   2. For Phase 7: a read-only script over the archived content database that lists per unit each try's prompt and answer, each review's answer and each command's result.
   3. A progress line per try, review and command on the log plane, naming acts and ids only, since the log plane has no redaction (`REG-F-319`).
+- ⭑ **2026-10-10 — two corrections.** The one-unit lane's wait is now 60 minutes, not 36 (P7-2b's four calls per review; `lane-config.ts`, `EXECUTE_TIMEOUT_MS`). And the floor's drain-failure signal is `console.warn`, which goes to stderr, which Playwright passes through; only the server's stdout is dropped. Round 2's report reads the bytes from both stores, which is what this entry says they need.
 
 ### REG-F-529 — a paid run's spend can be neither priced nor fully counted from its record: `MODEL_EXCHANGE` has no usage or cost field though Pi's SDK carries both on every assistant message, and a Pi turn's provider requests are not counted
 
@@ -39569,6 +39581,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   1. Refuse Begin & Execute on an Undertaking with a unit already executing, as a stated refusal.
   2. A per-Undertaking lock in the workspace host, held for a unit's whole execution.
   3. If units may run in parallel by design, give each its own workspace and make the hand-off explicit, then revisit the junction race the roadmap accepted.
+- ⭑ **2026-10-10 — the Phase 7 lane keeps to one.** It starts each unit only after the one before has answered, and a unit that outlasts its allowance ends the run (design §6 D4). Edge re-sends a POST whose connection dies; a re-sent Begin & Execute arrives for a unit no longer PROPOSED and is refused at `BeginPwuShaping`. Read from code and a browser probe, not driven against the server.
 
 ### REG-F-536 — every executor prompt carries the host's absolute workspace path, which names the operator's account: Pi appends "Current working directory" even when JPWB overrides the system prompt
 
@@ -39589,6 +39602,8 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   1. Run each workspace under a neutral root that names no account (for example a fixed `/work/<undertaking>` mount), so the path discloses nothing.
   2. Ask Pi for an option that leaves the working directory out of a custom prompt, or wrap its prompt builder.
   3. Record the path as a declared host fact, redacted in what reaches the provider.
+- ⭑ **2026-10-10 — what Phase 7 does about it.** The lane's own files hold the account name and absolute paths by construction: the inherited variables, K4's agent-folder path, refusal texts. They stay outside the repository. The run report scans its own output and refuses to write on a hit; an argument naming the account or an absolute path is replaced, and its command is listed apart from the manifest (design §6 D9). One more carrier, found in round 2: an assertion message that quotes a temporary path names the account, and the ledger's OBSERVED texts quote assertion messages. Round 2's entries replace such paths with `%TEMP%`.
+- ⭑ **2026-10-10 — the account's name is already committed, 27 times.** Run over the committed tree (`git grep` for the name, word-bounded, at `7d0f837c`), the scan's rule finds it on 27 lines of 12 files: comments, test fixtures, design and roadmap text, mutation-ledger `why` texts quoting assertion messages, and `W-3`'s measurements. Among them is `packages/rph-ports/src/ports/process-runner.ts`'s own example of a host path fragment. None comes from Phase 7's rounds; round 2 adds none and scrubbed the three its own ledger entries held. A sweep is owed: each test fixture's name replaced and its mutants driven again. It is unscheduled.
 
 ### REG-F-537 — the independence check compares the model ids the tools report by exact string, so another spelling of the same model passes as independent; the limit is disclosed only in an operator message
 
@@ -39697,6 +39712,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - **REMEDY CANDIDATES, UNTESTED.**
   1. Invalidate the page's data after every action, refused or not (a custom `enhance` callback that calls `update()` with `invalidateAll`).
   2. Show a refused unit's state and reason in its row, from the engine, not from the form result.
+- ⭑ **2026-10-10 — the Phase 7 lane reads the store, as this entry's status says it must.** After every act, sign-offs included, the lane reads the unit from the store, and it loads the page afresh before each unit's sign-off (design §6 D5; round 2's fix pass).
 
 ### REG-F-541 — the five-unit rehearsal raises each test's limit to 60 s only inside the test, so its setup runs under the suite's 30 s; under round 1's parallel measurement lanes, `PQ7-M99`'s run timed out at 30 s and was INCONCLUSIVE, and its official re-run alone was KILLED
 
@@ -39721,3 +39737,60 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - `30000ms`: 1 line, in `REG-F-182` (the positive control). `Test timeout of`: 2 lines, in `REG-F-168` and `REG-F-182`.
   - `setTimeout(60` and `describe.configure`: 0 lines each.
   - `phase7-five-unit`: 2 lines, in `REG-F-511`'s pointer and in `REG-F-540`.
+
+### REG-F-542 — the one-unit live lane read its reviewer's identity from the first reviewer record, and since P7-2b that can be a call that threw: P7-3a would have failed on a transport failure P7-2b recovered from
+
+**Filed 2026-10-10** (`JAN-EXEC` Phase 7 round 2's code map; read from code, not driven; fixed in the same round). **Status:** ✅ **CLOSED 2026-10-10 by round 2 (design §6 D10).** `PQ7-M120-the-reviewer-is-read-from-the-first-record` and `PQ7-M120b-the-one-unit-lane-counts-only-the-calls-that-answered` hold the fix.
+
+- **WHAT IT WAS.**
+  - `apps/rph-demo/e2e-live-exec/execution.live.ts` took the first ASSURANCE exchange as the reviewer, and required its model to be the configured one, graded `PROVIDER_REPORTED` for devin.
+  - Round 1's P7-2b records a call that throws short of its tool's bound as `NO_RESPONSE`, under the configured identity with no reported model, then runs it once more (`reasoning-review-validator.ts`, `attempt()`).
+  - So after a recovered transport failure, the first record was the failed call, and the lane would have failed its grade check although the review concluded.
+- **WHY IT MATTERS.** P7-3a is a paid check (`REG-D-102` (4)). A failure that P7-2b exists to absorb would have spent it.
+- **THE GENERAL FORM.** A reader that takes the first record of a kind changes meaning when a change adds records of that kind before the one it means. Round 2's report reads each call and names a `NO_RESPONSE` as such (design §6 D9).
+- **FIXED.** The lane drops `NO_RESPONSE` records before reading the reviewer, and requires at least one call that answered. It also prints every ASSURANCE exchange as its reviewer-call count, which D8 needs from P7-3a.
+- **SEARCHED BEFORE FILING.** The register for `assurance[0]`: 0 lines. For `NO_RESPONSE`: 10 lines, in `REG-D-064`, `REG-F-410`, `REG-F-413`, `REG-F-499` and `REG-F-525` (the positive control), none about this lane's reading.
+
+### REG-F-543 — in server mode a page command's idempotency key is its command number and the milliseconds since the server started, and both restart at every boot, so a durable store kept across boots can refuse a new command as the replay of an old one
+
+**Filed 2026-10-10** (`JAN-EXEC` Phase 7 round 2's code map; read from code, not driven). **Status:** ⚠ **OPEN — unscheduled; latent.** Each Phase 7 run boots once, on a store of its own, so it cannot meet it.
+
+- **WHAT THE CODE DOES.**
+  - `uiCommand` (`apps/rph-demo/src/lib/server/workbench.ts`) mints `ui-idem-${cmdSeq}` in test mode and `ui-idem-${cmdSeq}-${Math.floor(performance.now())}` in server mode. `cmdSeq` is a module counter that starts at 0 (`:114`), and `performance.now()` counts from the process's start.
+  - A receipt's `idempotency_key` is the table's primary key (`packages/rph-persistence/src/schema.ts:119`). A key reused for a different command is refused `RPH_IDEMPOTENCY_CONFLICT` (`packages/rph-application/src/command-bus.ts:599-603`, after `REG-F-012`); a key reused for the same command is answered from the earlier receipt.
+  - So two boots that reach the same command number at the same millisecond after start mint the same key, and the later command is refused, or answered from a receipt it did not earn.
+- **WHY IT MATTERS.** Server mode is the durable deployment. The collision needs the same counter and the same millisecond, so it is rare, and its refusal names the key, not the cause.
+- **REMEDY CANDIDATE, UNTESTED.** Mint the key from something unique across boots, as object ids already are (`mintUiId`, `workbench.ts:646`).
+- **SEARCHED BEFORE FILING.** The register for `ui-idem`: 1 line, in `REG-F-012` (the positive control), about keys within the test suite. For `cmdSeq` and `performance.now`: 0 lines each.
+
+### REG-F-544 — an operator can complete a model step by hand, naming only its work product, after Begin & Execute was refused for that step's command evidence: the floor gate judges only the results a completion names
+
+**Filed 2026-10-10** (`JAN-EXEC` Phase 7 round 2; driven by the run report's store test, `apps/rph-demo/src/lib/server/execution/phase7-run-report.store.test.ts:488-508`). **Status:** ⚠ **OPEN — unscheduled.** P7-3 forbids hand completion, and its report flags any it finds.
+
+- **WHAT HAPPENS, DRIVEN.**
+  - A model unit's Begin & Execute is refused: its work product's floor is SATISFIED, but one command's evidence did not pass its own floor.
+  - The operator then completes the step by hand (`completeStep`), naming only the work product. The act is accepted: *"{ type: 'success' }"*.
+  - The floor gate judges each result a completion names (`packages/rph-application/src/handlers/floor-gate.ts`, `stepResultSubjects`). Begin & Execute's own completion names the command evidence; a hand completion may leave it out.
+  - The unit is still not SATISFIED afterwards: the run report reads its stage 7 broke, as prediction (c) found for a hand completion naming nothing (`REG-F-511`).
+- **WHY IT MATTERS.** The step's record says SUCCEEDED while evidence the step produced was refused, and nothing on the completion says it was left out. The floor gate's own header discloses a narrower residual, inline content beside one floor-satisfied artifact; this one is whole evidence objects.
+- **REMEDY CANDIDATES, UNTESTED.**
+  1. A completion of a model step must name every evidence object the step's executions produced, or be refused.
+  2. Or the gate judges every evidence object a step's executions produced, whatever the completion names.
+- **SEARCHED BEFORE FILING.** The register for `ONE floor-satisfied`, `one floor-satisfied`, `naming one output`, `Complete form` and `command evidence did not pass`: 0 lines each. For `completeStep`: 1 line, in `REG-F-061`, about another matter. Positive control: `floor-gate`, 44 lines.
+
+### REG-F-545 — the report's account-name scan read its name from Bun's `os.userInfo()`, which answers `unknown` on Windows when `USERNAME` is unset: under turbo's default env mode it looked for `unknown` beside the real name and refused its own report, and without `USERPROFILE` too it would have looked for `unknown` alone
+
+**Filed 2026-10-10** (`JAN-EXEC` Phase 7 round 2's landing gate; root-caused by driving Bun and Node in stripped environments; fixed in the same round). **Status:** ✅ **CLOSED 2026-10-10 by round 2** (design §6, "P7-2 as built"). `PQ7-M313` to `PQ7-M324` hold the fix, and `PQ7-M144` is re-anchored on it.
+
+- **WHAT HAPPENED.**
+  - `gate:fast` on round 2's tree failed 7 of the 10 tests in `apps/rph-demo/src/lib/server/execution/phase7-run-report.store.test.ts`. Each read *"refused, and nothing was written: the report's own output names the account or an absolute path (REG-F-536)"*, at two places in `report.md`.
+  - The same file passed when vitest ran it directly: alone, four times beside five mutation lanes, and from the app's folder. Through `turbo run test`, as the gate runs it, it failed every time.
+- **WHY.**
+  - Turbo 2's default env mode passes a task a filtered environment. Driven with a probe test through `turbo run test`: it carries `USERPROFILE`, `HOME`, `HOMEPATH`, `TEMP` and `APPDATA`, and not `USERNAME` or `LOCALAPPDATA`. The store test spawns the report's command line with its own environment.
+  - The scan took its names from `os.userInfo().username` and the last segment of `USERPROFILE` (`scripts/phase7/archive-scan.ts`, `accountNames`).
+  - Bun 1.3.14 on Windows answers `os.userInfo().username` with the literal `unknown` when `USERNAME` is unset, though its `homedir` is right. Node answers the account's name either way. Driven both ways, in a stripped environment and with `USERNAME` restored.
+  - So the scan looked for `unknown` as well as the account's name. It found the report's own `unknown` cells (a unit's unrecorded runs; an audit row's POSTs) and refused.
+- **WHY IT MATTERS.** Every report built in the gate's environment would be refused, so the guard could not pass in the place it is checked. And in an environment without `USERPROFILE` as well, driven with `env -i`, the scan looked for `unknown` alone: `REG-F-536`'s guard would have passed the real name.
+- **THE GENERAL FORM.** A guard that reads its target from the environment is only as good as the environment it is run in. Check it in the runner's environment, not only in the shell's.
+- **FIXED.** The scan takes its names from the user record's name, the last segment of its home folder, `USERPROFILE` and `USERNAME`, and never takes `unknown`. With no name found, the report's command line and the scan's own refuse to write. The end-to-end test runs the report's command line through a bun driver that deletes `USERNAME` and `USERPROFILE` from its own environment first: on Windows a child spawned with an environment that lacks them gets them back from its parent, so the fixer's first test, which passed a stripped environment to `spawnSync` alone, passed on the broken code (driven). `turbo run test` for the demo app now passes: 98 files, 3590 tests and 1 skipped.
+- **SEARCHED BEFORE FILING.** The register for `userInfo` and `envMode`: 0 lines each. For `USERNAME`: 4 lines, in `REG-F-521` and `REG-F-536`, about the child's environment and a search, none about the scan's name. For `turbo`: 67 lines (the positive control).

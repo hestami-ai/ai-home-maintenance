@@ -1,8 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { laneKeysRefusal, requiredLaneKeys, TEST_TIMEOUT_MS } from './e2e-live-exec/lane-config';
+import { liveExecStore, liveExecTestMatch } from './e2e-live-exec/run-folder';
 
 // JAN-LIVEEXEC — the LIVE EXECUTION lane: a work unit runs on a REAL model and is reviewed by a REAL, DIFFERENT
 // one. Sibling of playwright.live.config.ts, which runs the real Pi AUTHORING agent; this one exercises the
@@ -25,6 +23,11 @@ import { laneKeysRefusal, requiredLaneKeys, TEST_TIMEOUT_MS } from './e2e-live-e
 // as before: a Pi model Pi cannot resolve (only Pi's SDK can say), a refused sandbox and a refused context policy are
 // found when the executor opens, and recorded as a started-then-failed step. `e2e-live-exec/lane-config.ts` restates the
 // executor rules and refuses them at boot, with one rule of the lane's own: no agy executor.
+//
+// ⭐ `JAN-EXEC` Phase 7 `P7-2` (D1, D2) — TWO SPECS, ONE PER RUN. With `JPWB_LIVE_RUN_DIR` set, this runs Phase 7's
+// five-unit spec, `e2e-live-exec/phase7.live.ts`, with its server keeping the run in that folder; unset, the one-unit
+// spec, `execution.live.ts`, as before. `e2e-live-exec/run-folder.ts` says which, and checks the folder before the server
+// starts: `bun run e2e:live-exec -- e2e-live-exec/phase7.live.ts`, from `apps/rph-demo`, with the variable set.
 const PORT = 4322;
 
 // ⛔ NO MODEL LABEL IS PINNED HERE (REG-D-052: the model is configured, never pinned; REG-F-331 measured what
@@ -66,7 +69,10 @@ const passthrough = Object.fromEntries(
 
 export default defineConfig({
 	testDir: './e2e-live-exec',
-	testMatch: '**/*.live.ts',
+	// ⭐ `P7-2` (D1) — ONE SPEC, CHOSEN BY THE RUN FOLDER: `phase7.live.ts` alone when `JPWB_LIVE_RUN_DIR` is set,
+	// `execution.live.ts` alone when not. This collected `**/*.live.ts`, so an unfiltered run would have run both specs on
+	// one server and one store, each counting the PWA picker's options.
+	testMatch: liveExecTestMatch(process.env),
 	fullyParallel: false,
 	forbidOnly: !!process.env.CI,
 	retries: 0,
@@ -121,7 +127,13 @@ export default defineConfig({
 			// and `R24`'s reset guard refuses a durable store outright — so a lane that reused one path would be
 			// unable to reset AND would accumulate another run's workspaces. A fresh directory per run is what
 			// makes “durable” and “disposable” both true.
-			JPWB_DEMO_DB: join(mkdtempSync(join(tmpdir(), 'jpwb-live-exec-')), 'demo.sqlite'),
+			// ⭐ `P7-2` (D2) — AND A RUN THAT MUST BE KEPT NAMES ITS OWN FOLDER. With `JPWB_LIVE_RUN_DIR` set, the store is
+			// `<dir>/demo.sqlite`, the folder checked in the runner's load only — absolute, existing, outside every git working
+			// tree (the repository's main checkout and each of its worktrees) and the temporary folder, holding no store, and
+			// with nothing on its path that Pi reads — because the record under the temporary folder was lost (`REG-F-526`).
+			// Unset, a folder is minted under it as before, now once per run: the worker's load of this config names the
+			// runner's folder instead of minting a second (`run-folder.ts`).
+			JPWB_DEMO_DB: liveExecStore(process.env),
 			...passthrough
 		}
 	}
