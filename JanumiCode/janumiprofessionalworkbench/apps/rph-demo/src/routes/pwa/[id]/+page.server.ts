@@ -329,9 +329,17 @@ export const load: PageServerLoad = async ({ params }) => {
 		// ⛔ THE ANSWER ONLY. Volunteered reasoning is `PER-12` material behind `REG-Q-077`, and this view has
 		// no field that could carry it: reads are authority-checked nowhere in this system, so the decision
 		// cannot be left to a template.
+		// ⭐⭐ `JAN-EXEC` P7-6 fix round C, C2 (`REG-F-433`; `REG-F-552`) — AND IT IS THE ANSWER OF THE REVIEW SHOWN ABOVE: joined
+		// to `floor`'s own reasoning review by its floor-run token (`reasoningReviewRunToken`), and within that run the reply
+		// the review CONCLUDED from (`loadReviewerAnswer`). ⛔ It was the subject's most recent run, so a DISCARDED turn's
+		// answer stood beside canonical's floor (the turn's exchanges stay canonical; its assessments died with the fork).
+		// ⛔ READ FROM CANONICAL, NOT `engine`: a turn's floor runs on the fork but drains its exchanges to canonical, and the
+		// fork is a point-in-time snapshot holding none of them — so beside a staged candidate the page showed the run
+		// BEFORE the turn (`pwa-reviewer-answer-join.test.ts` holds all three).
 		reviewerAnswer: await loadReviewerAnswer(
 			params.id,
-			engine.as(SESSION_CREDENTIAL),
+			floor?.reasoningReviewRunToken,
+			canonicalEngine.as(SESSION_CREDENTIAL),
 			getArtifactStore()
 		),
 		// A pending fork is a PREVIEW. The graph/transcript/floor above read it, while this flag makes the authority

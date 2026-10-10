@@ -2582,10 +2582,12 @@ export const actions: Actions = {
 	// assessments: it reads the latest per policy by `updatedAt` (`latestAssessmentByPolicy`), and they are recorded
 	// later than the refused ones.
 	// ⚠ `P76F-A` A6 — THAT HOLDS FOR THE GATE ALONE. ~~"later in time … and so the ones it reads (RD10,
-	// `REG-F-433`)"~~: RD10 struck its line that a re-review "is later in time, so it does not tie". `REG-F-433`'s reader
+	// `REG-F-433`)"~~: RD10 struck its line that a re-review "is later in time, so it does not tie". ~~`REG-F-433`'s reader
 	// (`loadReviewerAnswer`) sorts by `attemptOrdinal` alone, a re-review's first try is ordinal 1 like the original's,
-	// so the two TIE and the OLDER answer is returned; and the run report pairs a review with its answers by subject.
-	// Both are B7's, `REG-F-433`'s join key.
+	// so the two TIE and the OLDER answer is returned; and the run report pairs a review with its answers by subject.~~
+	// Both were B7's, `REG-F-433`'s join key — ⭐ landed (P7-6 B7, merged with `P76F-C`): the run report pairs each review
+	// with the calls of its own floor run, by the token its assessment carries; the reader reads the run whose token the
+	// review it is shown beside carries (C2).
 	// ⛔ REFUSED AFTER A REVIEW THAT CONCLUDED — against the work, or escalated — BY THE SERVER, not only by the page
 	// (`REG-D-105` (3); `rerunReviewRefusal`): the latest assessment wins, so a re-review run until one said SATISFIED would
 	// clear a reasoned refusal.

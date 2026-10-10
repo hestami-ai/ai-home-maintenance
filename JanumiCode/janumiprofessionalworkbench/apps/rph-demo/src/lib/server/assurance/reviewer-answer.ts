@@ -20,6 +20,9 @@ import {
 } from '@janumipwb/rph-application';
 import type { ArtifactStore } from '@janumipwb/rph-ports';
 import type { AuthedEngineHandle } from '@janumipwb/rph-engine';
+// ⭐ `P76F-C` C2 — the validator's own I5 marker, imported (this module runs in the app, where the validator is loaded
+// anyway); the run report RESTATES it instead (`REG-D-072` D12), held equal by verif.
+import { NO_CRITERION_ANSWERED } from './reasoning-review-validator.js';
 
 export interface ReviewerAnswerView {
 	readonly exchangeId: string;
@@ -33,44 +36,89 @@ export interface ReviewerAnswerView {
 	readonly verdicts: readonly { readonly field: string; readonly verdict: string }[];
 }
 
+/** The fields of a stored try this reader decides by. */
+export type Try = { readonly id: string; readonly state: unknown };
+const tryState = (r: Try) =>
+	r.state as {
+		readonly runToken?: string;
+		readonly subjectObjectId?: string;
+		readonly attemptOrdinal?: number;
+		readonly disposition?: string;
+		readonly parseOutcome?: { readonly outcome?: string; readonly detail?: string };
+	};
+const ordinalOf = (r: Try): number => Number(tryState(r).attemptOrdinal ?? 0);
+
 /**
- * The reviewer's retained answer for the most recent exchange on a subject, verified before it is shown.
+ * ⭐⭐ `JAN-EXEC` P7-6 fix round C, C2 (`DESIGN-the-reviewer-isolated.md` §4d I5; `REG-F-552`) — THE TRY ONE FLOOR RUN'S
+ * REVIEW CONCLUDED FROM, its tries sorted by ordinal: the HIGHEST ordinal (the answered try, or the repair or retry whose
+ * reply the review read last) — save a P7-6 I5 chain, a reply that PARSED and answered no criterion, told by the I5 pair on
+ * its record (`SCHEMA_COERCION_FAILED` and the validator's marker `NO_CRITERION_ANSWERED` opening the detail — never the
+ * outcome alone, which a JSON repair's first reply carries too). I5's one repair may only ADD a conclusion: answering, it
+ * concluded the review; answering none, not parsing or getting no reply, the review kept the FIRST reply's judgement —
+ * while the record ENDS on the repair. ⛔ Read by its highest ordinal, the page showed that repair's reply (prose, or none)
+ * under an assessment that concluded from the first. ⚠ A repair refused for WHO answered it (a substitute, recorded
+ * `NOT_ATTEMPTED`) failed the review: the general rule stands, as in the Phase 7 run report (`criterionRepairConclusion`,
+ * `scripts/phase7/run-report-core.ts`), which reads the same rule from the same records.
+ * ⭑ Exported for `reviewer-answer.test.ts`, which holds each conjunct on its own arrangement — including the two the
+ * product's validator never writes (the marker beside another outcome; the outcome without the marker).
+ */
+export function concludedTry(sorted: readonly Try[]): Try | undefined {
+	const last = sorted.at(-1);
+	// The first try that got a reply: the call's, or its retry's after a throw.
+	const asked = sorted.find((r) => tryState(r).disposition !== 'NO_RESPONSE');
+	if (asked === undefined) return last;
+	const outcome = tryState(asked).parseOutcome;
+	const i5 =
+		tryState(asked).disposition === 'REPAIR_REQUESTED' &&
+		outcome?.outcome === 'SCHEMA_COERCION_FAILED' &&
+		(outcome.detail ?? '').startsWith(NO_CRITERION_ANSWERED);
+	if (!i5) return last;
+	const after = sorted.filter((r) => ordinalOf(r) > ordinalOf(asked));
+	const answered = after.find((r) => tryState(r).disposition === 'ACCEPTED');
+	if (answered !== undefined) return answered;
+	// ⚠ A substitute is REFUSED unread (`REJECTED`, `NOT_ATTEMPTED`); a repair that got no reply is `NO_RESPONSE`, whose
+	// outcome is `NOT_ATTEMPTED` too — so the disposition tells them apart, never the outcome alone.
+	const ended = tryState(after.at(-1) ?? asked);
+	const substituted = ended.disposition === 'REJECTED' && ended.parseOutcome?.outcome === 'NOT_ATTEMPTED';
+	return substituted ? last : asked;
+}
+
+/**
+ * The reviewer's retained answer from the floor run `floorRunToken` names, verified before it is shown.
  *
- * ⚠ MOST RECENT BY `attemptOrdinal`, NOT BY INSERTION ORDER. A run makes up to four bounded tries and the
- * repair is the one whose answer the assessment used; reading "the first row back" would show the try that
- * FAILED while labelling it the reviewer's answer.
+ * ⚠ MOST RECENT BY `attemptOrdinal`, NOT BY INSERTION ORDER. A run makes up to four bounded tries; reading "the first row
+ * back" would show the try that FAILED while labelling it the reviewer's answer. ~~and the repair is the one whose answer
+ * the assessment used~~ ⛔ `P76F-C` C2: not of every chain — a P7-6 I5 repair that added nothing is NOT the one the
+ * assessment used; the first reply is (`concludedTry`).
  * ⭐⭐ `JAN-EXEC` P7-6 B7 (`REG-F-433`; `DESIGN-the-stopped-unit-recovery.md` RD10, as corrected) — BUT BY ORDINAL ONLY
  * WITHIN ONE FLOOR RUN. ⛔ The sort above ran across ALL the subject's runs, and every run's first try is ordinal 1: two runs
- * of one try each TIED, and the stable sort returned the OLDER run's answer (the entry's probe, and the test that now holds
- * this: `floor-recording.test.ts`). A re-review is exactly that arrangement. So the subject's calls are first grouped by
- * their run's token (`runToken`, which a floor run now shares with its assessments' correlation — `floor.ts`,
- * `floor-over-subject.ts`), the MOST RECENT RUN is taken BY THE RECORD'S OWN ORDER — `listByType` lists aggregates in the
- * order their first events were recorded, and a run's calls are drained after it ran, so the run whose calls were recorded
- * last is the latest — and only then its highest ordinal.
- * ⚠ "Most recent" is the record's, not the page's: a call from an authoring turn that was later discarded stays recorded
- * (its exchanges are canonical; its assessments died with the fork), and is still the most recent run here.
+ * of one try each TIED, and the stable sort returned the OLDER run's answer (the entry's probe, and the test that holds
+ * this: `floor-recording.test.ts`). A re-review is exactly that arrangement. So a run's calls are grouped by its token
+ * (`runToken`, which a floor run shares with its assessments' correlation — `floor.ts`, `floor-over-subject.ts`).
+ * ⭐⭐ `P76F-C` C2 — AND THE RUN IS THE ONE WHOSE REVIEW THE PAGE SHOWS, named by the caller (`floorRunToken`, the shown
+ * assessment's own correlation: `loadPwaFloor`'s `reasoningReviewRunToken`). ~~the MOST RECENT RUN is taken BY THE RECORD'S
+ * OWN ORDER~~ ⛔ B7 took the latest run on the subject, and said so: *"a call from an authoring turn that was later
+ * discarded stays recorded (its exchanges are canonical; its assessments died with the fork), and is still the most recent
+ * run here"* — so the page showed a discarded turn's answer beside a floor that never concluded from it.
+ * ⚠ `engine` IS WHERE THE EXCHANGES ARE: CANONICAL, always — a floor run on an authoring turn drains its tries to canonical
+ * through the turn's witness (`runPwaFloor`), while its assessments go to the fork, whose point-in-time snapshot holds
+ * none of them. ⚠ A token that names no call — a floor recorded before the key (B7), whose assessments' correlation no
+ * call carries — gives `undefined`: no answer is shown rather than another run's.
  */
 export async function loadReviewerAnswer(
 	subjectId: string,
+	floorRunToken: string | undefined,
 	engine: AuthedEngineHandle,
 	store: ArtifactStore
 ): Promise<ReviewerAnswerView | undefined> {
-	const tokenOf = (r: { state: unknown }) => (r.state as { runToken?: string }).runToken;
-	const mine = listByType(engine, 'MODEL_EXCHANGE').filter(
-		(r) => (r.state as { subjectObjectId?: string }).subjectObjectId === subjectId
-	);
-	// ⭐ B7 — the latest run, by the record's order: the run of the call recorded last.
-	const latestRun = mine.length === 0 ? undefined : tokenOf(mine[mine.length - 1]!);
-	const rows = mine
-		.filter((r) => tokenOf(r) === latestRun)
-		.sort(
-			(a, b) =>
-				Number((b.state as { attemptOrdinal?: number }).attemptOrdinal ?? 0) -
-				Number((a.state as { attemptOrdinal?: number }).attemptOrdinal ?? 0)
-		);
-	if (rows.length === 0) return undefined;
+	if (floorRunToken === undefined) return undefined;
+	const rows = listByType(engine, 'MODEL_EXCHANGE')
+		.filter((r) => tryState(r).subjectObjectId === subjectId && tryState(r).runToken === floorRunToken)
+		.sort((a, b) => ordinalOf(a) - ordinalOf(b));
+	const shown = concludedTry(rows);
+	if (shown === undefined) return undefined;
 
-	const state = rows[0]!.state as unknown as ResolvableExchange;
+	const state = shown.state as unknown as ResolvableExchange;
 	const report = await verifyExchangeContent(state, store);
 	const verdicts = report.refs.map((r) => ({ field: r.field, verdict: r.verdict }));
 	const read = await readAnswerSpan(state, store);
@@ -91,8 +139,8 @@ export async function loadReviewerAnswer(
 		// ⚠ THE ENGINE ALREADY RETURNED THE ANSWER. `listByType` yields rows keyed by aggregate id, and a
 		// `MODEL_EXCHANGE` aggregate IS its exchange — so the id is a fact this function already holds, was
 		// already sorting on, and threw away in favour of an assertion.
-		exchangeId: rows[0]!.id,
-		attemptOrdinal: Number((rows[0]!.state as { attemptOrdinal?: number }).attemptOrdinal ?? 0),
+		exchangeId: shown.id,
+		attemptOrdinal: ordinalOf(shown),
 		...(read.available ? { answer: read.bytes } : {}),
 		disclosure: read.available
 			? `Retained and verified: the stored bytes were re-hashed and match what this record claims.`

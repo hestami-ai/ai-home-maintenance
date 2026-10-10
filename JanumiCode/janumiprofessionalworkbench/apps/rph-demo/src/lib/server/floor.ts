@@ -201,6 +201,15 @@ export interface FloorView {
 	 *  (`escalationRecommendationNote`), and the observation stays on `policies` above, as the informational record it
 	 *  is. */
 	readonly reasoningGaps: string[];
+	/**
+	 * ⭐⭐ `JAN-EXEC` P7-6 fix round C, C2 (`REG-F-433`; `DESIGN-the-stopped-unit-recovery.md` RD10, as corrected) — THE
+	 * FLOOR-RUN TOKEN OF THE REASONING REVIEW THIS VIEW SHOWS: its assessment's correlation, which its run's reviewer calls
+	 * carry as their `runToken` (one token per floor run, P7-6 B7). The page hands it to `loadReviewerAnswer`, so the answer
+	 * shown under this floor is the one ITS review concluded from — never another run's on the subject.
+	 * ⚠ Set by `loadPwaFloor` (the page's read); absent when no reasoning review is recorded, and on `runPwaFloor`'s return,
+	 * which no page renders an answer under.
+	 */
+	readonly reasoningReviewRunToken?: string;
 }
 
 /** The authoring-plane response to an unsatisfied floor. Only a valid Reasoning Review finding about the reviewed
@@ -988,6 +997,7 @@ export function loadPwaFloor(
 	}
 	const satisfied = order.every((p) => latest.get(p)?.state.assessmentState === 'SATISFIED');
 	const rr = latest.get(FLOOR_POLICY_IDS.REASONING_REVIEW);
+	const runToken = rr === undefined ? undefined : floorRunTokenOf(engine, rr.id);
 	return {
 		subjectId: pwaId,
 		aggregate: floorAggregate(order, policies),
@@ -999,6 +1009,18 @@ export function loadPwaFloor(
 			? (obsByAssessment.get(rr.id) ?? [])
 					.filter((o) => !isReviewerRecommendation(o))
 					.map((o) => o.statement)
-			: []
+			: [],
+		// ⭐ C2 — the shown review's own floor run, read from ITS record: the answer under this floor is joined to it.
+		...(runToken === undefined ? {} : { reasoningReviewRunToken: runToken })
 	};
+}
+
+/**
+ * ⭐ C2 (`REG-F-433`) — the floor-run token an assessment carries: the correlation its recording plan was dispatched under
+ * (`runPwaFloor` — one token for the run's assessments and its reviewer calls, P7-6 B7), read off the assessment's FIRST
+ * event, its request. ⛔ Never from the assessment's state, which carries no correlation; and never the subject's latest
+ * run's — that is the join this replaces. `undefined` when the record holds no event of it.
+ */
+function floorRunTokenOf(engine: AuthedEngineHandle, assessmentId: string): string | undefined {
+	return engine.readAllEvents().find((e) => e.aggregateId === assessmentId)?.correlationId;
 }

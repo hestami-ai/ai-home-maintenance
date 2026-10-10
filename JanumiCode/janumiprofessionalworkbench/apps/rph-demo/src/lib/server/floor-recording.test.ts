@@ -29,7 +29,7 @@ import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AGENT_CREDENTIAL, SESSION_CREDENTIAL, standaloneAuthenticator } from './identity.js';
-import { reasoningReviewCriteria, runPwaFloor, type FloorProducer } from './floor.js';
+import { loadPwaFloor, reasoningReviewCriteria, runPwaFloor, type FloorProducer } from './floor.js';
 import { loadReviewerAnswer } from './assurance/reviewer-answer.js';
 import { clearingJudgement } from './assurance/clearing-reviewer.testing.js';
 import { getArtifactStore } from './workbench.js';
@@ -209,7 +209,8 @@ describe('runPwaFloor records the floor through the AUTHENTICATED session (REG-F
 				session
 			);
 
-			const view = await loadReviewerAnswer(PWA, session, getArtifactStore());
+			// ⭐ `P76F-C` C2 — joined to the floor shown: the token of ITS reasoning review (`reasoningReviewRunToken`).
+			const view = await loadReviewerAnswer(PWA, loadPwaFloor(PWA, session)?.reasoningReviewRunToken, session, getArtifactStore());
 			expect(view, 'no exchange was found for the subject').toBeDefined();
 			expect(view!.answer, 'the reviewer answer did not survive the round trip').toBe(JUDGEMENT);
 			expect(view!.disclosure, 'a verified read must say it was verified').toMatch(/re-hashed/i);
@@ -277,7 +278,8 @@ describe('runPwaFloor records the floor through the AUTHENTICATED session (REG-F
 				listByType(session, 'MODEL_EXCHANGE').map((r) => (r.state as Record<string, unknown>).attemptOrdinal),
 				'arrangement: one try per run, both at ordinal 1 — the tie REG-F-433 drove'
 			).toEqual([1, 1]);
-			const view = await loadReviewerAnswer(PWA, session, getArtifactStore());
+			// ⭐ `P76F-C` C2 — by the token of the review the floor SHOWS, the later one (`latestFloorAssessments`).
+			const view = await loadReviewerAnswer(PWA, loadPwaFloor(PWA, session)?.reasoningReviewRunToken, session, getArtifactStore());
 			expect(view?.answer, 'the reader returned the OLDER run’s answer (REG-F-433)').toBe(second);
 		});
 
@@ -314,7 +316,14 @@ describe('runPwaFloor records the floor through the AUTHENTICATED session (REG-F
 			// Without this, "the answer came back" could not be told apart from a function that returns a view
 			// for anything — and an empty view rendered next to a real assessment reads as "the reviewer said
 			// nothing", which is a claim nobody made.
-			expect(await loadReviewerAnswer('pwa_does_not_exist', session, getArtifactStore())).toBeUndefined();
+			expect(await loadReviewerAnswer('pwa_does_not_exist', undefined, session, getArtifactStore())).toBeUndefined();
+			// ⭐ `P76F-C` C2 — and a token no call carries (a floor recorded before the key) shows nothing, never another run's.
+			await runPwaFloor(
+				PWA,
+				{ prompt: 'assess it', producer: PRODUCER, print: async () => answering('a run'), canonical: session },
+				session
+			);
+			expect(await loadReviewerAnswer(PWA, 'authoring-floor', session, getArtifactStore())).toBeUndefined();
 		});
 
 		it('⭑ E-2 is RETAINED end to end, split at retention — REG-D-056', async () => {
