@@ -469,6 +469,21 @@ export const CRITERION_REPAIR_INSTRUCTION =
 	'IMPORTANT: your reply gave no row for any criterion. Reply with ONLY the minified JSON object, with one row in findings for each criterion, failed=false where it is met.';
 
 /**
+ * ⭐⭐ `JAN-EXEC` P7-6 B2 (the fix round) — THE SENTENCE THAT NAMES AN I5 CHAIN ON THE RECORD: the close of E-5's detail on
+ * every reply that parsed and answered no criterion (`noCriterionAnswered`) — the first reply's, and a criterion repair's
+ * that answered none either, whose detail restates the cause. ⛔ A reader cannot tell this chain by its outcome:
+ * `classifyParse` gives `SCHEMA_COERCION_FAILED` to a reply that parsed and could not be coerced, which draws the JSON
+ * repair. Read by its last call, an I5 chain whose repair answered none, did not parse or got no reply was reported a failed
+ * repair or a no response — though the review concluded on the FIRST reply (the Phase 7 run report, `pairReview`, which
+ * restates this, and `verif/phase7-run-report.test.ts` holds the two equal).
+ * ⚠ EXPORTED, NOT REWORDED: the detail is byte for byte as before. ⚠ A repair that did NOT parse does not carry it (its
+ * detail is `classifyParse`'s), and that absence is how a reader tells the two refusals apart.
+ */
+export const NO_CRITERION_ANSWERED_NOTE =
+	'One repair was requested; if it answers none either, does not parse or gets no reply, this reply’s judgement ' +
+	'is the one the review keeps, its recommendation recorded (REG-D-090).';
+
+/**
  * ⭐ P7-6 I5 — WHY A PARSED REPLY ANSWERS NO CRITERION, in the words E-5's detail records, or `undefined` when it answers at
  * least one. `coerceJudgement` keeps a finding only under an id the policy declares, so `judgement.findings` empty is
  * exactly "no finding names one of the policy's criteria" — and a reply answering SOME is never this (`REG-F-489`: the
@@ -490,8 +505,7 @@ function noCriterionAnswered(
 				: `each of its ${rows.length} finding(s) names an id the policy does not declare`;
 	return (
 		`None of the policy's ${input.criteria.length} criteria was answered: the reply parsed, but ${cause} (REG-F-552). ` +
-		'One repair was requested; if it answers none either, does not parse or gets no reply, this reply’s judgement ' +
-		'is the one the review keeps, its recommendation recorded (REG-D-090).'
+		NO_CRITERION_ANSWERED_NOTE
 	);
 }
 

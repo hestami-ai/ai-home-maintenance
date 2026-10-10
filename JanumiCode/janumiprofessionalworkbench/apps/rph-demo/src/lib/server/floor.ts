@@ -754,12 +754,21 @@ export async function runPwaFloor(
 		// engine whose Gate E will judge the completion, so the two cannot disagree. Never `isTestMode()`.
 		{ admitStipulatedAnswers: engine.admitStipulatedAnswers }
 	);
+	// ⭐⭐ `JAN-EXEC` P7-6 B7 — `REG-F-433`'s JOIN KEY: ONE TOKEN FOR THIS FLOOR RUN, minted once (RD10, as corrected; the
+	// execution plane's twin is `floor-over-subject.ts`, `floorRunToken`). ⛔ The assessments were correlated
+	// `authoring-floor:<candidate hash>` — the same for every run over one candidate, and bare `authoring-floor` with none —
+	// and the exchanges `model-exchange:<pwaId>` with a SECOND `mintUiId('floorrun')` for their `runToken`: nothing joined a
+	// run's assessments to its own reviewer calls, and `loadReviewerAnswer` returned the older run's answer on a tie. Now
+	// the assessments' correlation, the exchanges' `runToken` and their correlation are this one token. ⭑ Lossless: it is
+	// the old correlation — the plane and the candidate's hash — followed by the run's own id, the recording's `idPrefix`.
+	// ⚠ ON A TURN the assessments go to the fork and the exchanges to canonical (`REG-F-433`'s "DIFFERENT STORES"): the
+	// token is a string both carry, so the join survives the turn's commit, which replays the fork's commands unchanged.
+	const floorRunId = mintUiId('floorrun');
+	const floorRunToken = `${opts.candidateSubjectHash ? `authoring-floor:${opts.candidateSubjectHash}` : 'authoring-floor'}:${floorRunId}`;
 	recordAssuranceRecordingPlan(engine, plan, {
 		issuedAt: hostNow(),
-		correlationId: opts.candidateSubjectHash
-			? `authoring-floor:${opts.candidateSubjectHash}`
-			: 'authoring-floor',
-		idPrefix: mintUiId('floorrun'),
+		correlationId: floorRunToken,
+		idPrefix: floorRunId,
 		newId: (prefix) => mintUiId(prefix)
 	});
 	// ⭑ THE DRAIN — PER-9's durable exchange record, one per bounded try.
@@ -788,13 +797,15 @@ export async function runPwaFloor(
 					targetAggregateType: 'MODEL_EXCHANGE',
 					targetAggregateId: aggregateId,
 					issuedAt: hostNow(),
-					correlationId: `model-exchange:${pwaId}`,
+					// ⭐ B7 — the run's token, as its assessments carry it: never the subject's constant.
+					correlationId: floorRunToken,
 					idempotencyKey: `mex:${aggregateId}`,
 					payload
 				}),
 			drained,
 			{
-				runToken: mintUiId('floorrun'),
+				// ⭐ B7 — THE SAME TOKEN, never a second mint: the field `loadReviewerAnswer` groups a run's calls by.
+				runToken: floorRunToken,
 				plane: 'ASSURANCE',
 				invokerId: 'agy.reasoning-review',
 				assurancePolicyId: FLOOR_POLICY_IDS.REASONING_REVIEW,

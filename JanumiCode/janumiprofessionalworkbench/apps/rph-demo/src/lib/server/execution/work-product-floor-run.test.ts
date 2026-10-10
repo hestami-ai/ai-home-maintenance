@@ -91,6 +91,74 @@ describe('JAN-WPREVIEW — the floor over a work product', () => {
 		expect(out.satisfied, `not satisfied: ${JSON.stringify(out.observations)}`).toBe(true);
 	});
 
+	// ⭐⭐ `JAN-EXEC` P7-6 B7 — `REG-F-433`'s JOIN KEY ON THE EXECUTION PLANE (`DESIGN-the-stopped-unit-recovery.md` RD10, as
+	// corrected). ⛔ THE GAP THE ENTRY RECORDS HERE TOO: the assessments were correlated by `runLabel:subjectId` — the same for
+	// every run on the subject — and the exchanges took a separately minted `runToken` and `model-exchange:<subject>`. So a
+	// re-review (P7-6R's `rerunReview`, which runs this floor again over the same work product) could not be told from the
+	// review it re-ran: the run report reported every re-reviewed subject not pairable. ONE token per run now does all three.
+	it('⛔ REG-F-433 — ONE token per floor run: two runs over one work product, each run’s assessments correlated by the runToken its own reviewer calls carry', async () => {
+		const { session, artifacts, newId } = harness();
+		const ref = await artifacts.put({
+			tenantPrefix: 'tnt-t',
+			bytes: ANSWER,
+			mediaType: 'text/plain',
+			purgeability: 'RETAINED_BY_PARTICIPATION'
+		});
+		const stored = {
+			status: 'STORED' as const,
+			storageKey: ref.storageKey,
+			contentHash: ref.contentHash,
+			byteSize: ref.byteSize,
+			purgeability: 'RETAINED_BY_PARTICIPATION' as const,
+			contentDurability: artifacts.durability
+		};
+		const artifactId = 'art_01ARZ3NDEKTSV4RRFFQ69G5A03';
+		for (let run = 0; run < 2; run += 1)
+			await withLiveReviewerSeam(async () =>
+				runWorkProductFloor(
+					{
+						artifactId,
+						artifact: { semanticVersion: 1, provenance: {}, producingPwuId: 'pwu_1' },
+						exchange: {
+							exchangeId: 'mex_3',
+							materializedInputRef: stored,
+							rawOutputBeforeCoercionRef: stored,
+							answerSpanRef: stored,
+							volunteeredReasoningRef: { status: 'PENDING_CONTENT_PLANE', reason: 'none' }
+						} as never,
+						answer: ANSWER,
+						producingPrompt: 'Assess the northern delivery route.',
+						producerProviderId: 'test-provider',
+						producerModelId: 'test-model'
+					},
+					session,
+					{
+						artifacts,
+						now: () => TS,
+						newId,
+						criteria: reasoningReviewCriteria(session),
+						print: clearingReviewerFor('The WORK PRODUCT to review', reasoningReviewCriteria(session))
+					}
+				)
+			);
+		const events = session.readAllEvents();
+		const correlationsOf = (type: string) => [
+			...new Set(events.filter((e) => e.aggregateType === type).map((e) => e.correlationId))
+		];
+		const tokens = [
+			...new Set(
+				events
+					.filter((e) => e.aggregateType === 'MODEL_EXCHANGE')
+					.map((e) => (e.payload as { runToken?: unknown }).runToken)
+			)
+		];
+		expect(tokens, 'arrangement: two floor runs, each with its reviewer’s calls').toHaveLength(2);
+		expect(correlationsOf('ASSURANCE_ASSESSMENT'), 'the assessments are not correlated by their run’s token').toEqual(tokens);
+		expect(correlationsOf('MODEL_EXCHANGE'), 'the exchanges are not correlated by their run’s token').toEqual(tokens);
+		// ⭑ LOSSLESS: the token keeps what the correlation said before it — the run's label and its subject.
+		for (const t of tokens) expect(String(t)).toMatch(new RegExp(`^work-product-floor:${artifactId}:`));
+	});
+
 	it('⛔ and an EMPTY work product does NOT satisfy it — the refusal path, driven', async () => {
 		// ⭑ THE COUNTERPART TO THE CASE ABOVE, and it is what keeps "satisfied" meaningful. Without a driven
 		// refusal, the passing case cannot be told apart from a floor that satisfies anything — the rubber

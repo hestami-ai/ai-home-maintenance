@@ -138,6 +138,8 @@ export function readStores(archive: string): StoreRows {
 				aggregateType: String(e.aggregateType ?? ''),
 				aggregateId: String(e.aggregateId ?? ''),
 				commandId: typeof e.commandId === 'string' ? e.commandId : null,
+				// ⭐ P7-6 B7 — a floor run's token, on its assessments' events: the pairing's key (`REG-F-433`).
+				correlationId: typeof e.correlationId === 'string' ? e.correlationId : null,
 				payload: (e.payload ?? {}) as Record<string, unknown>
 			};
 		});

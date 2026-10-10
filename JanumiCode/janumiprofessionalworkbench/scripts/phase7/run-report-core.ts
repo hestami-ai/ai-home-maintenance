@@ -12,7 +12,10 @@
 //   · THE PAIRING (§2 stage 8; `REG-F-433`) — every Reasoning Review of an execution-plane subject, paired with the
 //     ASSURANCE-plane call that concluded it: answered, no response, refused (a substitute, or a failed repair), no
 //     answer recorded, or not pairable when its subject had more than one floor run. A deterministic floor policy and a
-//     sign-off are listed as making no model call BY DESIGN — never as "no answer recorded".
+//     sign-off are listed as making no model call BY DESIGN — never as "no answer recorded". ⭐ P7-6 B7: each review is
+//     joined to ITS OWN floor run's calls by the run's token, so a re-reviewed subject is paired review by review; only a
+//     record with no token falls back to the subject, and keeps its refusal. ⭐ P7-6 B2: an I5 chain whose criterion repair
+//     added nothing concluded on its FIRST reply, `REG-F-552`'s case — never a failed repair nor a no response.
 //   · THE AUDIT (P7-3) — each hand act the log can show, the forbidden six first. ⛔ A hand completion is ANY step
 //     success that is not one of Begin & Execute's two shapes (the critic's corrected rule: an operator completion that
 //     names ONE output carries neither of the markers the maps first listed).
@@ -76,6 +79,17 @@ export const OPERATOR_FAILURE_REASON = 'Operator marked the step failed.';
 export const MODEL_EXECUTOR_NAME = 'Execution model';
 /** Every evidence object of a unit carries this scope, and nothing else ties it to the unit (`+page.server.ts`). */
 export const EVIDENCE_SCOPE_PREFIX = 'commands run by the executing model for work unit ';
+/**
+ * ⭐ P7-6 B2 — the sentence E-5's detail closes with on every reply that PARSED and answered no criterion: the first reply
+ * of a P7-6 I5 chain, and a criterion repair that answered none either (`reasoning-review-validator.ts`
+ * `NO_CRITERION_ANSWERED_NOTE`, held equal to this by `verif/phase7-run-report.test.ts`). ⛔ RESTATED, NOT IMPORTED: the
+ * validator's module loads the reviewer's whole chain, which reads tool variables at load (`REG-D-072` D12), and this
+ * report reads an archive with no reviewer anywhere. ⚠ The note, never the outcome: `classifyParse` gives a JSON repair's
+ * first reply `SCHEMA_COERCION_FAILED` too.
+ */
+export const NO_CRITERION_ANSWERED_NOTE =
+	'One repair was requested; if it answers none either, does not parse or gets no reply, this reply’s judgement ' +
+	'is the one the review keeps, its recommendation recorded (REG-D-090).';
 // ⛔ THE LANE'S OWN FIGURES, DERIVED BY REFERENCE, NEVER RESTATED: the limit the report states is the one the lane checked
 // before each phase, so the two can never part (`e2e-live-exec/lane-config.ts`, which imports nothing).
 /** The runs one unit's observer keeps (`tools/process-run-observer.ts` `OBSERVED_PROCESS_RUN_LIMIT`; `REG-F-517`). */
@@ -147,6 +161,12 @@ export interface StoredEvent {
 	readonly aggregateType: string;
 	readonly aggregateId: string;
 	readonly commandId: string | null;
+	/**
+	 * ⭐ P7-6 B7 (`REG-F-433`) — the envelope's `correlationId`. A floor run's assessments carry their run's token here, the
+	 * token its reviewer calls carry as `runToken` (`floor-over-subject.ts`, `floorRunToken`): the key the pairing joins
+	 * by. Optional: a row read without it is a record whose review names no run.
+	 */
+	readonly correlationId?: string | null;
 	readonly payload: Readonly<Record<string, unknown>>;
 }
 
@@ -247,9 +267,21 @@ export interface MatrixCell {
 	readonly unregistered?: true;
 }
 
-export type PairingLabel = 'answered' | 'no-response' | 'refused' | 'no-answer-recorded' | 'not-pairable';
+/**
+ * How a review's pairing reads. ⭐ P7-6 B2 — `no-criterion-answered`: the review concluded on a reply that PARSED and
+ * answered no criterion, after its one criterion repair (P7-6 I5) answered none, did not parse or got no reply —
+ * `REG-F-552`'s case, never a failed repair nor a no response, which the record's last call would otherwise say.
+ */
+export type PairingLabel =
+	| 'answered'
+	| 'no-criterion-answered'
+	| 'no-response'
+	| 'refused'
+	| 'no-answer-recorded'
+	| 'not-pairable';
 export const PAIRING_LABELS: readonly PairingLabel[] = [
 	'answered',
+	'no-criterion-answered',
 	'no-response',
 	'refused',
 	'no-answer-recorded',
@@ -266,7 +298,15 @@ export interface PairingRow {
 	/** Set on a `refused` row: which refusal it was. */
 	readonly refusal?: 'substitute' | 'failed-repair';
 	readonly detail: string;
-	/** How many floor runs the subject had — the condition `REG-F-433`'s rule holds under is exactly one. */
+	/**
+	 * ⭐ P7-6 B7 — what joined the review to its calls: its floor run's token, which its assessment and its calls both carry
+	 * (`REG-F-433`'s key), or — for a record that carries none, a run's before the key — its subject alone.
+	 */
+	readonly joinedBy: 'run token' | 'subject';
+	/**
+	 * How many floor runs the pairing had to tell apart: 1 for a review joined by its run's token; for one joined by its
+	 * subject, the subject's runs no token names — the condition the subject rule holds under is exactly one.
+	 */
 	readonly floorRuns: number;
 	/** The exchange that concluded it, or null. */
 	readonly concludedBy: string | null;
@@ -570,6 +610,8 @@ interface Index {
 	readonly events: readonly StoredEvent[];
 	readonly eventsOfType: (type: string) => readonly StoredEvent[];
 	readonly completionOf: ReadonlyMap<string, StoredEvent>;
+	/** ⭐ P7-6 B7 — each aggregate's correlation: its first event's that carries one (a floor run's token, for a review). */
+	readonly correlationOf: ReadonlyMap<string, string>;
 	readonly criteriaOf: ReadonlyMap<string, readonly { criterionId: string; result: string }[]>;
 	readonly observationsOf: ReadonlyMap<string, readonly { code: string; severity: string }[]>;
 	readonly content: ReadonlyMap<string, StoredContent> | null;
@@ -589,10 +631,12 @@ function indexOf(store: StoreRows): Index {
 	const events = [...store.events].sort((a, b) => a.sequence - b.sequence);
 	const byEventType = new Map<string, StoredEvent[]>();
 	const completionOf = new Map<string, StoredEvent>();
+	const correlationOf = new Map<string, string>();
 	const criteriaOf = new Map<string, { criterionId: string; result: string }[]>();
 	const observationsOf = new Map<string, { code: string; severity: string }[]>();
 	for (const e of events) {
 		append(byEventType, e.eventType, e);
+		if (str(e.correlationId) !== '' && !correlationOf.has(e.aggregateId)) correlationOf.set(e.aggregateId, str(e.correlationId));
 		const assessmentId = str(e.payload.assessmentId);
 		if (e.eventType === 'AssuranceAssessmentCompleted') completionOf.set(assessmentId || e.aggregateId, e);
 		else if (e.eventType === 'AssuranceCriterionEvaluated')
@@ -606,6 +650,7 @@ function indexOf(store: StoreRows): Index {
 		events,
 		eventsOfType: (type) => byEventType.get(type) ?? [],
 		completionOf,
+		correlationOf,
 		criteriaOf,
 		observationsOf,
 		content: store.content === null ? null : new Map(store.content.map((c) => [c.storageKey, c]))
@@ -700,8 +745,20 @@ function unitOf(ix: Index, spec: UnitSpec, undertakingId: string | null, lane: r
 		problems.push(`lane/run.json's ${spec.slug} unit is not the store's "${spec.type.name}" unit`);
 	const id = object?.id;
 	const plans = ix.ofType('EXECUTION_PLAN').filter((p) => id !== undefined && str(p.state.workUnitId) === id);
-	if (plans.length > 1)
-		problems.push(`the ${spec.slug} unit has ${plans.length} execution plans: it was begun more than once`);
+	// ⭐⭐ `JAN-EXEC` P7-6 B5 (the roadmap's B8) — A PERSON'S RE-RUN IS A PLAN REVISION, NOT A SECOND BEGIN (RD5): it proposes
+	// plan B and supersedes the refused plan A citing it. ⛔ Counted as plans, every recovered unit read "begun more than
+	// once". So the plans a supersession NAMES as successor are the re-runs' own, and only the rest were begun. ⭑ Read from
+	// `ExecutionPlanSuperseded.supersedingExecutionPlanId` (RD10: no `ReviseExecutionPlan` exists, and the plan's own state
+	// does not keep the successor) — never from plan count or order.
+	const successors = new Set(
+		ix
+			.eventsOfType('ExecutionPlanSuperseded')
+			.filter((e) => plans.some((p) => p.id === e.aggregateId))
+			.map((e) => str(e.payload.supersedingExecutionPlanId))
+	);
+	const begun = plans.filter((p) => !successors.has(p.id));
+	if (begun.length > 1)
+		problems.push(`the ${spec.slug} unit has ${begun.length} execution plans: it was begun more than once`);
 	const unit: Unit = {
 		...spec,
 		object,
@@ -768,18 +825,23 @@ function floorOf(ix: Index, subjectId: string): { policyId: string; state: strin
 // ── THE PAIRING (§2 stage 8; `REG-F-433`) ────────────────────────────────────────────────────────────────────────────
 
 export const PAIRING_RULE =
-	'A Reasoning Review of an execution-plane subject is paired with the ASSURANCE-plane, floor.reasoning-review exchange ' +
-	'of the same subject with the highest attemptOrdinal — the answer that concluded it — and only while that subject had ' +
-	'exactly one floor run (REG-F-433): its exchanges then share one runToken, and their ordinals restart at 1 in each run. ' +
-	'A deterministic floor policy and every sign-off make no model call, by design.';
+	'A Reasoning Review of an execution-plane subject is paired with the ASSURANCE-plane, floor.reasoning-review exchanges ' +
+	'its own floor run made, joined by that run’s token: the review’s assessment carries it as its correlation, and each ' +
+	'call as its runToken (REG-F-433). The call with the highest attemptOrdinal among them concluded the review — save a ' +
+	'P7-6 I5 chain, a reply that parsed and answered no criterion, whose one criterion repair answered none, did not parse ' +
+	'or got no reply: that first reply concluded it (REG-F-552). A record that carries no token, a run’s before the key, ' +
+	'is paired by its subject, and only while that subject had exactly one floor run no token names: its ordinals restart ' +
+	'at 1 in each run. A deterministic floor policy and every sign-off make no model call, by design.';
 
 const callOf = (x: StoredObject): string => `${str(x.state.exchangeRole)}:${str(x.state.disposition)}`;
 const ordinalOf = (x: StoredObject): number => int(x.state.attemptOrdinal) ?? 0;
+const runOf = (x: StoredObject): string => str(x.state.runToken);
 
-type Pairing = Pick<PairingRow, 'label' | 'refusal' | 'detail' | 'floorRuns' | 'concludedBy' | 'calls'>;
+type Pairing = Pick<PairingRow, 'label' | 'refusal' | 'detail' | 'joinedBy' | 'floorRuns' | 'concludedBy' | 'calls'>;
+type Conclusion = Pick<Pairing, 'label' | 'refusal' | 'detail' | 'concludedBy'>;
 
 /** What the call that concluded a review says of it, by its disposition. */
-function concludedBy(top: StoredObject): Pick<Pairing, 'label' | 'refusal' | 'detail' | 'concludedBy'> {
+function concludedBy(top: StoredObject): Conclusion {
 	const role = str(top.state.exchangeRole);
 	const disposition = str(top.state.disposition);
 	if (disposition === 'ACCEPTED') return { label: 'answered', detail: `concluded by its ${role} call`, concludedBy: top.id };
@@ -811,7 +873,65 @@ function concludedBy(top: StoredObject): Pick<Pairing, 'label' | 'refusal' | 'de
 	};
 }
 
-/** ⭐ One Reasoning Review of `subjectId`, paired with the call that concluded it (see `PAIRING_RULE`). */
+/**
+ * ⭐⭐ `JAN-EXEC` P7-6 B2 (the fix round) — A P7-6 I5 CHAIN, READ AS IT CONCLUDED (`DESIGN-the-reviewer-isolated.md` §4d;
+ * `REG-F-552`), or undefined for any other chain. I5 repairs a reply that PARSED and answered no criterion, once, and the
+ * repair may only ADD a conclusion: answering, it concludes the review; answering none, not parsing, or getting no reply,
+ * the review keeps the FIRST reply's judgement — while the record ENDS on the repair.
+ * ⛔ READ BY "THE HIGHEST ORDINAL CONCLUDED IT", such a chain was a FAILED REPAIR (`REG-F-489`/`428`/`479`) or a NO RESPONSE
+ * (`REG-F-499`) concluded by the repair — a review the record shows concluded on its first reply.
+ * ⭑ TOLD BY THE VALIDATOR'S OWN NOTE (`NO_CRITERION_ANSWERED_NOTE`) on the first reply that got one (the call's, or its
+ * retry's after a throw) — never by `SCHEMA_COERCION_FAILED`, which a JSON repair's first reply can carry too. The same note
+ * on the repair says it answered none either; a refusal without it did not parse.
+ * ⚠ Undefined — the general reading stands — when the repair is not in the record (nothing concluded it there), or was
+ * refused for WHO answered it: a substitute fails the review wherever it answers.
+ */
+function criterionRepairConclusion(sorted: readonly StoredObject[]): Conclusion | undefined {
+	const noted = (x: StoredObject | undefined): boolean =>
+		str(rec(x?.state.parseOutcome).detail).includes(NO_CRITERION_ANSWERED_NOTE);
+	const asked = sorted.find((x) => str(x.state.disposition) !== 'NO_RESPONSE');
+	if (asked === undefined || str(asked.state.disposition) !== 'REPAIR_REQUESTED' || !noted(asked)) return undefined;
+	const after = sorted.filter((x) => ordinalOf(x) > ordinalOf(asked));
+	const answered = after.find((x) => str(x.state.disposition) === 'ACCEPTED');
+	if (answered !== undefined)
+		return {
+			label: 'answered',
+			detail: `concluded by its ${str(answered.state.exchangeRole)} call, the criterion repair of a reply that answered no criterion (REG-F-552)`,
+			concludedBy: answered.id
+		};
+	const last = after.at(-1);
+	const repairEnded = str(last?.state.disposition);
+	let how: string;
+	if (repairEnded === 'NO_RESPONSE') how = 'got no reply';
+	else if (repairEnded === 'REJECTED' && str(rec(last?.state.parseOutcome).outcome) !== 'NOT_ATTEMPTED')
+		how = noted(last) ? 'answered none either' : 'did not parse';
+	else return undefined;
+	return {
+		label: 'no-criterion-answered',
+		detail:
+			`its ${str(asked.state.exchangeRole)} reply answered no criterion, and its criterion repair ${how} (REG-F-552): ` +
+			"the review kept that reply's judgement, its recommendation recorded (REG-D-090)",
+		concludedBy: asked.id
+	};
+}
+
+/** ⭐ The pairing of calls already known to be ONE run's: the call that concluded the review (see `PAIRING_RULE`). */
+function concludedFrom(
+	sorted: readonly StoredObject[],
+	o: { readonly joinedBy: Pairing['joinedBy']; readonly floorRuns: number; readonly calls: readonly string[] }
+): Pairing {
+	const unpaired = (label: PairingLabel, detail: string): Pairing => ({ label, detail, ...o, concludedBy: null });
+	const top = sorted.at(-1);
+	if (top === undefined) return unpaired('no-answer-recorded', 'no ASSURANCE-plane exchange names the subject (REG-F-525)');
+	if (sorted.filter((x) => ordinalOf(x) === ordinalOf(top)).length > 1)
+		return unpaired('not-pairable', `two of the subject's calls share its highest ordinal, ${ordinalOf(top)}`);
+	return { ...(criterionRepairConclusion(sorted) ?? concludedBy(top)), ...o };
+}
+
+/**
+ * ⭐ One Reasoning Review of `subjectId` whose record carries NO run token — a run's before `REG-F-433`'s key — paired by
+ * its subject: only while the subject had exactly one floor run (see `PAIRING_RULE`).
+ */
 export function pairReview(subjectId: string, reviewsOfSubject: number, exchanges: readonly StoredObject[]): Pairing {
 	const sorted = [...exchanges].sort((a, b) => ordinalOf(a) - ordinalOf(b));
 	const calls = sorted.map(callOf);
@@ -819,20 +939,68 @@ export function pairReview(subjectId: string, reviewsOfSubject: number, exchange
 	// among its calls, or a second call at ordinal 1 — the validator's counter restarts with every floor run.
 	const floorRuns = Math.max(
 		reviewsOfSubject,
-		new Set(exchanges.map((x) => str(x.state.runToken))).size,
+		new Set(exchanges.map(runOf)).size,
 		exchanges.filter((x) => ordinalOf(x) === 1).length
 	);
-	const unpaired = (label: PairingLabel, detail: string): Pairing => ({ label, detail, floorRuns, concludedBy: null, calls });
 	if (floorRuns > 1)
-		return unpaired(
-			'not-pairable',
-			`the subject ${subjectId} had ${floorRuns} floor runs, and no recorded key joins a review to its own run's calls (REG-F-433)`
-		);
-	const top = sorted.at(-1);
-	if (top === undefined) return unpaired('no-answer-recorded', 'no ASSURANCE-plane exchange names the subject (REG-F-525)');
-	if (sorted.filter((x) => ordinalOf(x) === ordinalOf(top)).length > 1)
-		return unpaired('not-pairable', `two of the subject's calls share its highest ordinal, ${ordinalOf(top)}`);
-	return { ...concludedBy(top), floorRuns, calls };
+		return {
+			label: 'not-pairable',
+			detail: `the subject ${subjectId} had ${floorRuns} floor runs, and no recorded key joins a review to its own run's calls (REG-F-433)`,
+			joinedBy: 'subject',
+			floorRuns,
+			concludedBy: null,
+			calls
+		};
+	return concludedFrom(sorted, { joinedBy: 'subject', floorRuns, calls });
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` P7-6 B7 — ONE REVIEW, JOINED TO THE CALLS ITS OWN FLOOR RUN MADE, by the token the run's assessment carries
+ * as its correlation and its calls as their `runToken` (`REG-F-433`'s key; `floor-over-subject.ts`, `floor.ts`). ⛔ Its
+ * subject may have had other runs — a re-review is one — and none of their calls is this review's.
+ * ⚠ Two calls at ordinal 1 under one token would be two runs sharing it, which the floor never mints: not pairable, said so.
+ */
+export function pairRun(token: string, exchanges: readonly StoredObject[]): Pairing {
+	const sorted = [...exchanges].sort((a, b) => ordinalOf(a) - ordinalOf(b));
+	const calls = sorted.map(callOf);
+	const firsts = sorted.filter((x) => ordinalOf(x) === 1).length;
+	if (firsts > 1)
+		return {
+			label: 'not-pairable',
+			detail: `${firsts} calls at ordinal 1 carry the one floor-run token ${token}: two runs share it`,
+			joinedBy: 'run token',
+			floorRuns: firsts,
+			concludedBy: null,
+			calls
+		};
+	return concludedFrom(sorted, { joinedBy: 'run token', floorRuns: 1, calls });
+}
+
+/**
+ * ⭐⭐ P7-6 B7 — ONE REVIEW'S PAIRING, AMONG ITS SUBJECT'S REVIEWS AND CALLS (`PAIRING_RULE`):
+ *   · its token names calls → those calls, and no other run's (`pairRun`);
+ *   · its token names none, and every call of the subject is another review's by token → its run recorded no call;
+ *   · ⛔ otherwise the SUBJECT RULE, over the reviews whose token names no call and the calls no review's token names — a
+ *     record from before the key keeps exactly the refusal it had (`pairReview`): honest, never paired on a guess.
+ */
+function pairingOf(ix: Index, review: StoredObject, reviewsOfSubject: readonly StoredObject[], calls: readonly StoredObject[]): Pairing {
+	const subjectId = strs(review.state.subjectObjectIds)[0] ?? '';
+	const tokenOf = (a: StoredObject): string => ix.correlationOf.get(a.id) ?? '';
+	const token = tokenOf(review);
+	const own = token === '' ? [] : calls.filter((x) => runOf(x) === token);
+	if (own.length > 0) return pairRun(token, own);
+	const named = new Set(reviewsOfSubject.map(tokenOf).filter((t) => t !== '' && calls.some((x) => runOf(x) === t)));
+	const loose = calls.filter((x) => !named.has(runOf(x)));
+	if (token !== '' && loose.length === 0)
+		return {
+			label: 'no-answer-recorded',
+			detail: `no call is recorded under its floor run's token, and every call of its subject is another review's (REG-F-525)`,
+			joinedBy: 'run token',
+			floorRuns: 1,
+			concludedBy: null,
+			calls: []
+		};
+	return pairReview(subjectId, reviewsOfSubject.filter((r) => !named.has(tokenOf(r))).length, loose);
 }
 
 /** Why an assessment other than a Reasoning Review asked no model: what made it. */
@@ -848,7 +1016,7 @@ function reviewRow(
 	ix: Index,
 	units: readonly Unit[],
 	a: StoredObject,
-	reviewsOf: ReadonlyMap<string, number>,
+	reviewsOf: ReadonlyMap<string, readonly StoredObject[]>,
 	exchangesOf: ReadonlyMap<string, readonly StoredObject[]>
 ): PairingRow | undefined {
 	const subjects = strs(a.state.subjectObjectIds);
@@ -857,8 +1025,15 @@ function reviewRow(
 	if (subjectType !== 'ARTIFACT' && subjectType !== 'EVIDENCE') return undefined;
 	const pairing: Pairing =
 		subjects.length === 1
-			? pairReview(subjectId, reviewsOf.get(subjectId) ?? 0, exchangesOf.get(subjectId) ?? [])
-			: { label: 'not-pairable', detail: `the review names ${subjects.length} subjects`, floorRuns: 0, concludedBy: null, calls: [] };
+			? pairingOf(ix, a, reviewsOf.get(subjectId) ?? [], exchangesOf.get(subjectId) ?? [])
+			: {
+					label: 'not-pairable',
+					detail: `the review names ${subjects.length} subjects`,
+					joinedBy: 'subject',
+					floorRuns: 0,
+					concludedBy: null,
+					calls: []
+				};
 	return {
 		assessmentId: a.id,
 		subjectId,
@@ -876,11 +1051,8 @@ function buildPairing(ix: Index, units: readonly Unit[]): PairingReport {
 	for (const x of ix.ofType('MODEL_EXCHANGE'))
 		if (str(x.state.plane) === 'ASSURANCE' && str(x.state.assurancePolicyId) === REASONING_REVIEW)
 			append(exchangesOf, str(x.state.subjectObjectId), x);
-	const reviewsOf = new Map<string, number>();
-	for (const r of reviews) {
-		const s = strs(r.state.subjectObjectIds)[0] ?? '';
-		reviewsOf.set(s, (reviewsOf.get(s) ?? 0) + 1);
-	}
+	const reviewsOf = new Map<string, StoredObject[]>();
+	for (const r of reviews) append(reviewsOf, strs(r.state.subjectObjectIds)[0] ?? '', r);
 	const rows: PairingRow[] = [];
 	const outside: string[] = [];
 	for (const a of reviews) {
@@ -1179,12 +1351,27 @@ function handEventsOf(v: AuditView, type: string): StoredEvent[] {
 /**
  * ⭐ P7-6R R-1c — THE PERSON'S RE-RUNS, each an EFFECTIVE `REPLAN` Decision whose selected option names it (RD4). Listed
  * because each changes what the run measures, and none is forbidden: the paid run's rule makes them (`REG-D-105` (4)).
+ * ⭐⭐ `JAN-EXEC` P7-6 B5 (the roadmap's B8) — AND EACH IS LISTED BESIDE THE DECISION THAT MADE IT: the finding is the
+ * Decision, and its line names the re-run itself — the plan B the Decision's batch made, read from the supersession of the
+ * refused plan it names (RD4: its subjects are the unit, then the refused plan; RD5: A superseded citing B, after the
+ * Decision). ⛔ Listed as the Decision alone, a reader had the choice and not what it made. A Decision no revision follows
+ * — the batch refused after it, which the route rolls back whole — is still listed, and says so.
  */
 function reruns(v: AuditView, option: string, what: string): AuditFinding[] {
 	return v.ix
 		.eventsOfType('DecisionEffective')
 		.filter((e) => str(e.payload.decisionType) === 'REPLAN' && str(e.payload.selectedOption) === option)
-		.map((e) => findingOf(e, v.unitOfObject(strs(e.payload.subjectObjectIds)[0] ?? ''), what));
+		.map((e) => {
+			const [unitId, refusedPlan] = strs(e.payload.subjectObjectIds);
+			const revision = v.ix
+				.eventsOfType('ExecutionPlanSuperseded')
+				.find((s) => s.sequence > e.sequence && s.aggregateId === refusedPlan);
+			const made =
+				revision === undefined
+					? 'no plan revision follows it in the record'
+					: `plan ${str(revision.payload.supersedingExecutionPlanId)}, superseding plan ${refusedPlan}`;
+			return findingOf(e, v.unitOfObject(unitId ?? ''), `${what}: ${made}`);
+		});
 }
 
 /** The hand acts each of whose events has the page's action as its only emitter — save the route's own R-1 acts. */
@@ -1687,6 +1874,8 @@ function stageThree(v: UnitView, ix: Index): MatrixCell {
 /** The register ids a review that did not conclude with an answer bears on, by why it did not. */
 function idsOfUnconcluded(r: PairingRow): string[] {
 	const ids: string[] = [];
+	// ⭐ P7-6 B2 — a review that concluded on a reply answering no criterion is `REG-F-552`'s, whatever its repair came to.
+	if (r.label === 'no-criterion-answered') ids.push('REG-F-552');
 	if (r.label === 'no-response') ids.push('REG-F-499');
 	if (r.refusal === 'failed-repair') ids.push('REG-F-489', 'REG-F-428', 'REG-F-479');
 	if (r.label === 'no-answer-recorded') ids.push('REG-F-525');
@@ -2231,12 +2420,13 @@ function pairingLines(r: RunReport): string[] {
 		`- ${counts}.`,
 		`- No model answer by design: ${byDesign}.`,
 		'',
-		'| Assessment | Unit | Subject | State | Pairing | Calls |',
-		'|---|---|---|---|---|---|',
+		// ⭐ P7-6 B7 — and what joined each review to its calls: its run's token, or its subject alone.
+		'| Assessment | Unit | Subject | State | Pairing | Joined by | Calls |',
+		'|---|---|---|---|---|---|---|',
 		...r.pairing.rows.map(
 			(p) =>
 				`| ${p.assessmentId} | ${p.unit ?? '—'} | ${p.subjectKind} ${p.subjectId ?? ''} | ${p.assessmentState} | ` +
-				`${p.label}${inParens(p.refusal)} | ${p.calls.join(', ')} |`
+				`${p.label}${inParens(p.refusal)} | ${p.joinedBy} | ${p.calls.join(', ')} |`
 		)
 	];
 }

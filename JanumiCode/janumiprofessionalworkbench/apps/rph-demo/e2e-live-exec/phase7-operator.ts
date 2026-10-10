@@ -53,7 +53,7 @@ import {
 } from './lane-config.js';
 
 // ── THE BOUNDS THE LANE'S OWN ACTS WAIT ──────────────────────────────────────────────────────────────────────────────
-// ⛔ THIS LANE SETS NO ACTION TIMEOUT, so every wait without one runs to the test's: 43 hours (`lane-config.ts`). Each
+// ⛔ THIS LANE SETS NO ACTION TIMEOUT, so every wait without one runs to the test's: ~~43~~ 85 hours (`lane-config.ts`). Each
 // act below that calls no model is bounded here, as an allowance, and Begin & Execute by `PHASE7_UNIT_ALLOWANCE_MS`.
 
 /** A click, a fill, a navigation — no model behind any. The spec makes it the page's default, so no act waits unbounded. */
@@ -437,14 +437,35 @@ export interface RecoveryRecord {
 	readonly rationale: string;
 	/** ⭐ D8 — checked before each re-run, as between phases; null for an abandonment, which calls no model. */
 	readonly limitCheck: LimitCheck | null;
-	/** null when the act was not pressed — the limit stopped it. */
+	/** null when the act was not pressed — the limit stopped it, or the row did not offer it (`notPressed`). */
 	readonly status: number | null;
 	readonly envelopeType: EnvelopeType | null;
 	readonly timedOutAfterMs: number | null;
 	readonly requestFailure: string | null;
 	/** null when the act was not pressed. */
 	readonly after: UnitState | null;
+	/**
+	 * ⭐ P7-6 B3 — what the STORE says a re-run came to, read after it (`rerunReading`); null for an abandonment, for a re-run
+	 * not pressed, and for one with no answer (the run ends there).
+	 */
+	readonly reading: RerunReading | null;
+	/** ⭐ P7-6 B3 — the server's refusal, in its own words, of an act it answered with anything but success; else null. */
+	readonly refusal: string | null;
+	/** ⭐ P7-6 B3 — why the act was not pressed: the limit (D8), or a row that did not offer it; null when it was. */
+	readonly notPressed: string | null;
 }
+
+/**
+ * ⭐⭐ P7-6 B3 (the fix round) — WHAT A RE-RUN CAME TO, READ FROM THE STORE, never from its envelope (`REG-F-540`):
+ *   · `recovered` — a new plan B, its step and the unit SUCCEEDED;
+ *   · `refused-again` — a new plan B whose step WAITS, the unit WAITING: the review refused the re-run as it refused the
+ *     first (RD5), and only this is "a re-run that is refused again" (`REG-D-105` (4)) — the one reading the rule abandons;
+ *   · `not-made` — NO new plan: the server refused the press before dispatching anything (a missing rationale, RD7 unable
+ *     to rebuild, the reviewer's preflight), so no re-run was made, and the unit waits as it did;
+ *   · `stopped-otherwise` — a new plan B, the unit not waiting: R-2's stops (an executor try that did not run, a refused
+ *     evidence join, a floor that threw), for which the page offers no choice, abandonment's field included.
+ */
+export type RerunReading = 'recovered' | 'refused-again' | 'not-made' | 'stopped-otherwise';
 
 /** ⭑ `request-failed` — a Begin & Execute whose request failed in transit (round 2's fix pass; `pressFormAction`). */
 export type EndReason =
@@ -557,13 +578,23 @@ export function unitsOf(snap: EngineSnapshot, undertakingName: string): Map<stri
 	);
 }
 
+/** A unit's LAST plan in the store, or undefined. ⚠ A loop, not `findLast`, which verif's ES2022 program does not have. */
+function lastPlanOf(snap: EngineSnapshot, unitId: string): ObjectRow | undefined {
+	let plan: ObjectRow | undefined;
+	for (const p of snap.executionPlans) if (p.state.workUnitId === unitId) plan = p;
+	return plan;
+}
+
+/** ⭐ P7-6 B3 — the id of a unit's last plan in the store, or null: what a re-run's new plan B is told apart from. */
+export const planIdOf = (snap: EngineSnapshot, unitId: string): string | null =>
+	lastPlanOf(snap, unitId)?.id ?? null;
+
 /** A unit's axes and its plan step, from the store; null where it holds none. */
 export function unitStateOf(snap: EngineSnapshot, unitId: string): UnitState {
 	const unit = snap.pwus.find((p) => p.id === unitId);
-	// Its LAST plan, and that plan's last step: each Begin & Execute mints one plan of one step. ⚠ A loop, not `findLast`,
-	// which verif's ES2022 program does not have.
-	let plan: ObjectRow | undefined;
-	for (const p of snap.executionPlans) if (p.state.workUnitId === unitId) plan = p;
+	// Its LAST plan, and that plan's last step: each Begin & Execute mints one plan of one step, and each re-run one more
+	// (P7-6R RD5), the plan it superseded left with its step cancelled.
+	const plan = lastPlanOf(snap, unitId);
 	const steps = (plan?.state.steps as { stepState?: unknown }[] | undefined) ?? [];
 	const at = (v: unknown) => str(v) || null;
 	return {
@@ -572,6 +603,19 @@ export function unitStateOf(snap: EngineSnapshot, unitId: string): UnitState {
 		assuranceState: at(unit?.state.assuranceState),
 		planStepState: at(steps.at(-1)?.stepState)
 	};
+}
+
+/**
+ * ⭐ P7-6 B3 — what a re-run came to (`RerunReading`), from the store read after it and the unit's last plan before it.
+ * ⛔ The plan decides first: with no new plan, nothing was dispatched, whatever state the unit reads.
+ */
+export function rerunReading(planBefore: string | null, snap: EngineSnapshot, unitId: string): RerunReading {
+	const plan = planIdOf(snap, unitId);
+	if (plan === null || plan === planBefore) return 'not-made';
+	const s = unitStateOf(snap, unitId);
+	if (s.executionState === 'SUCCEEDED' && s.planStepState === 'SUCCEEDED') return 'recovered';
+	if (s.executionState === 'WAITING' && s.planStepState === 'WAITING') return 'refused-again';
+	return 'stopped-otherwise';
 }
 
 /** ⭐ D8 — the reviewer calls this run's store records: every ASSURANCE exchange, a lower bound (`run-archive.ts`). */
@@ -751,8 +795,9 @@ export async function pressFormAction(
 	page.on('requestfailed', onFailed);
 	try {
 		// ⛔ THE CLICK IS NOT THE WAIT: a click that times out — its button never came — is thrown, never read as a
-		// press that outlasted its allowance.
-		await button.click();
+		// press that outlasted its allowance. ⭐ P7-6 B3 — and its bound is its own, `PHASE7_UI_MS`, never the page's default
+		// alone, which the spec sets where nothing here can see it.
+		await button.click({ timeout: PHASE7_UI_MS });
 		const first = await Promise.race([
 			answered.then((response) => ({ response })),
 			lost.then((failure) => ({ failure }))
@@ -872,6 +917,9 @@ export async function recoveryOffers(row: Locator): Promise<RecoveryOffers> {
  * ⭐ P7-6R R-1f — one recovery act on the unit in `row`, the run plan's rationale typed into the act's own field. ⚠ A re-run
  * is waited for up to ONE PHASE'S ALLOWANCE (D4): a re-run of the work runs the phase again, and a re-review runs its
  * floors. An abandonment calls no model, and is bounded as a sign-off act is.
+ * ⭐ P7-6 B3 — EACH FILL AND CLICK IS BOUNDED BY `PHASE7_UI_MS`, its own: a field the row does not carry (the abandonment's
+ * is rendered for a WAITING unit only) fails there, thrown, never waited on for as long as the page's default says.
+ * ⛔ The rule asks the row before it presses (`recoverByRule`); this bound is what holds if the row changed between.
  */
 export async function recover(
 	page: Page,
@@ -880,7 +928,7 @@ export async function recover(
 	decode: Decode
 ): Promise<ActionOutcome> {
 	if (act === 'abandonPwu') {
-		await row.getByTestId('abandon-rationale').fill(RULE_RATIONALE[act]);
+		await row.getByTestId('abandon-rationale').fill(RULE_RATIONALE[act], { timeout: PHASE7_UI_MS });
 		return pressFormAction(
 			page,
 			act,
@@ -890,7 +938,7 @@ export async function recover(
 		);
 	}
 	const testId = act === 'rerunReview' ? 'rerun-review' : 'rerun-work';
-	await row.getByTestId(`${testId}-rationale`).fill(RULE_RATIONALE[act]);
+	await row.getByTestId(`${testId}-rationale`).fill(RULE_RATIONALE[act], { timeout: PHASE7_UI_MS });
 	return pressFormAction(page, act, row.getByTestId(testId), PHASE7_UNIT_ALLOWANCE_MS, decode);
 }
 
@@ -1016,7 +1064,8 @@ export interface LaneHands {
  *   3b. ⭐ P7-6R R-1f — A PHASE THAT STOPPED AT ITS REVIEW IS RECOVERED BY THE RUN PLAN'S RULE, AS THE OPERATOR, before the
  *      next starts (`REG-D-105` (4); `recoverByRule`): re-run the review if the row offers it, else re-run the work, the
  *      LIMIT checked first as between phases (D8); and a re-run refused again is abandoned. ⛔ A re-run with no answer
- *      ends the run as a Begin & Execute with none does (D4);
+ *      ends the run as a Begin & Execute with none does (D4); ⭐ P7-6 B3 — "refused again" is the STORE's reading (a new
+ *      plan whose step waits), and a re-run never made, or one that left the unit RUNNING or FAILED, is left as found;
  *   4. SIGN-OFF: each phase that completed, then the root LAST, the page loaded afresh for each, the store read after
  *      every act, every refusal recorded and none asserted; then the final archive, `06-final`. ⭐ DRY TOO, BY THE SAME
  *      ACTS (design §6 P7-2 D11): no phase completed, so the root is signed off alone. Signing off calls no model, and
@@ -1101,7 +1150,9 @@ export async function runTheLane(r: {
 		const recoveryAct = async (
 			unit: RunUnit,
 			act: RecoveryAct,
-			check: LimitCheck | null
+			check: LimitCheck | null,
+			/** ⭐ P7-6 B3 — the unit's last plan before a re-run, which its new plan B is told apart from; null for an abandonment. */
+			planBefore: string | null
 		): Promise<RunEnd | null> => {
 			const outcome = await hands.recover(unit, act);
 			writeOnce(actionFile(lane, unit, act), actionRecordOf(unit, act, outcome));
@@ -1109,7 +1160,9 @@ export async function runTheLane(r: {
 			// ⚠ As a press: an `error` envelope or a redirect leaves the row gone, so the page is loaded afresh first.
 			const rowGone = !['success', 'failure'].includes(outcome.envelopeType ?? '');
 			if (reached.end === null && rowGone) await hands.showOverview();
-			const after = unitStateOf((await hands.read()).snapshot, unit.unitId!);
+			const { snapshot } = await hands.read();
+			const after = unitStateOf(snapshot, unit.unitId!);
+			const answered = reached.end === null;
 			unit.recovery.push({
 				act,
 				rationale: RULE_RATIONALE[act],
@@ -1118,19 +1171,48 @@ export async function runTheLane(r: {
 				envelopeType: outcome.envelopeType,
 				timedOutAfterMs: outcome.timedOutAfterMs,
 				requestFailure: outcome.requestFailure,
-				after
+				after,
+				// ⭐ P7-6 B3 — READ FROM THE STORE: what the re-run came to, which is what the rule decides by.
+				reading: act !== 'abandonPwu' && answered ? rerunReading(planBefore, snapshot, unit.unitId!) : null,
+				refusal: answered && outcome.envelopeType !== 'success' ? refusalOf(outcome) : null,
+				notPressed: null
 			});
 			unit.after = after;
 			unit.stopped = stoppedAfter(outcome.envelopeType, after);
 			writeRunRecord(lane, record);
 			return reached.end;
 		};
+		/** An act the rule did not press, and why — the limit (D8), or a row that did not offer it (P7-6 B3). */
+		const notPressed = (unit: RunUnit, act: RecoveryAct, check: LimitCheck | null, why: string): void => {
+			unit.recovery.push({
+				act,
+				rationale: RULE_RATIONALE[act],
+				limitCheck: check,
+				status: null,
+				envelopeType: null,
+				timedOutAfterMs: null,
+				requestFailure: null,
+				after: null,
+				reading: null,
+				refusal: null,
+				notPressed: why
+			});
+			writeRunRecord(lane, record);
+		};
 		/**
 		 * ⭐⭐ P7-6R R-1f — THE RUN PLAN'S RULE ON ONE STOPPED PHASE (`REG-D-105` (4)): the row read afresh; re-run the review
 		 * if the row offers it — a review that did not conclude — else re-run the work, with the findings; the LIMIT checked
 		 * before the re-run, as between phases (D8); and a re-run refused again is abandoned. Returns the end a press with no
 		 * answer reached, `'paid-limit'` when the limit stopped the re-run, or null.
-		 * ⚠ A STOP THE ROW OFFERS NO RE-RUN FOR — a step that failed, which is R-2's — is left as found, as before R-1.
+		 * ⚠ A STOP THE ROW OFFERS NO RE-RUN FOR — a step that failed, which is R-2's; a substituted reviewer — is left as found,
+		 * as before R-1, and never abandoned by the rule.
+		 * ⭐⭐ P7-6 B3 (the fix round) — "REFUSED AGAIN" IS READ FROM THE STORE (`rerunReading`), never from "it stopped". ⛔ The
+		 * rule abandoned on any stop after the re-run, and two are no such refusal: a press the server refused before
+		 * dispatching anything (`not-made`: no plan B, the unit waiting as before — abandoned under a false rationale, the row's
+		 * other re-run skipped), and a re-run that left the unit RUNNING or FAILED (`stopped-otherwise`, R-2's — whose row
+		 * renders no abandonment's field, so the fill threw and ended the run `lane-error`, the final archive never taken).
+		 * Each of those is left as found, recorded with the server's words. ⛔ And the abandonment is pressed only when the
+		 * row, read again, OFFERS it: never a control the row does not offer.
 		 */
 		const recoverByRule = async (unit: RunUnit): Promise<RunEnd | 'paid-limit' | null> => {
 			await hands.showOverview();
@@ -1140,24 +1222,19 @@ export async function runTheLane(r: {
 			const { snapshot } = await hands.read();
 			const check = limitCheck(boot.prior as number, recordedReviewerCalls(snapshot));
 			if (!check.allowed) {
-				unit.recovery.push({
-					act: rerun,
-					rationale: RULE_RATIONALE[rerun],
-					limitCheck: check,
-					status: null,
-					envelopeType: null,
-					timedOutAfterMs: null,
-					requestFailure: null,
-					after: null
-				});
-				writeRunRecord(lane, record);
+				notPressed(unit, rerun, check, `the limit: ${check.total} of ${check.limit} reviewer calls (D8)`);
 				return 'paid-limit';
 			}
-			const rerunEnd = await recoveryAct(unit, rerun, check);
-			if (rerunEnd !== null || unit.stopped !== true) return rerunEnd;
+			const rerunEnd = await recoveryAct(unit, rerun, check, planIdOf(snapshot, unit.unitId!));
+			// ⭐ B3 — only a re-run the store reads as REFUSED AGAIN goes on to the abandonment; any other is left as found.
+			if (rerunEnd !== null || unit.recovery.at(-1)?.reading !== 'refused-again') return rerunEnd;
 			// ⚠ LOADED AFRESH: a refusal leaves the page stale, and the row it shows may predate the re-run's own wait.
 			await hands.showOverview();
-			return recoveryAct(unit, 'abandonPwu', null);
+			if (!(await hands.recoveryOffers(unit)).abandon) {
+				notPressed(unit, 'abandonPwu', null, 'the row, read again after the re-run, offers no abandonment');
+				return null;
+			}
+			return recoveryAct(unit, 'abandonPwu', null, null);
 		};
 
 		/** Begin & Execute on `unit`, then its state and its archive; the end it reached, if it reached one. */

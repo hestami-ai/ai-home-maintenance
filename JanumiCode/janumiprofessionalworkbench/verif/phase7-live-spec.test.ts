@@ -298,7 +298,7 @@ describe('⛔ the spec, from source: Playwright’s own `test`, its own timeout,
 	it('⭐ the page is loaded afresh on the Undertaking the setup created, and its overview shown', () => {
 		expect(callsTo(sf, 'gotoHydrated')).toEqual([['page', 'undertakingPath']]);
 		expect(propertiesNamed(sf, 'showOverview')).toEqual([
-			"async () => { await gotoHydrated(page, undertakingPath); await page.getByRole('button', { name: 'overview', exact: true }).click(); }"
+			"async () => { await gotoHydrated(page, undertakingPath); await page.getByRole('button', { name: 'overview', exact: true }).click({ timeout: PHASE7_UI_MS }); }"
 		]);
 	});
 
@@ -364,6 +364,22 @@ describe('⛔ D4 — the operator bounds every Begin & Execute by one phase’s 
 			['recover', 'act', 'PHASE7_SIGN_OFF_MS'],
 			['recover', 'act', 'PHASE7_UNIT_ALLOWANCE_MS']
 		]);
+	});
+
+	// ⭐⭐ P7-6 B3 (the fix round) — EVERY FILL AND EVERY CLICK THE LANE MAKES CARRIES ITS OWN BOUND, in the operator and in the
+	// spec's hands (whose `showOverview` the rule calls). ⛔ The page's default (`setDefaultTimeout`) is set in the spec, where
+	// no test here drives it: a hand that leaned on it was bounded only so long as that one line stood.
+	it('⛔ B3 — every fill and every click in the operator and the spec passes an explicit timeout', () => {
+		for (const file of [OPERATOR, SPEC]) {
+			const sf = parsed(file);
+			for (const method of ['fill', 'click'])
+				for (const c of anyMethodCalls(sf, method))
+					expect(
+						c.arguments.map((a) => flat(sf, a)).join(', '),
+						`${file}: ${flat(sf, c)}`
+					).toMatch(/\btimeout\b/);
+		}
+		expect(anyMethodCalls(op, 'fill'), 'arrangement: the operator fills the rule’s rationale').not.toEqual([]);
 	});
 
 	it('⛔ takes nothing from the harness but its types, and nothing from phase7-pwa, whose imports verif’s program refuses', () => {
@@ -637,7 +653,13 @@ describe('⭐ D5 — the sign-off acts on the page: the row waited for, Mark Sat
 
 /**
  * ⭐ P7-6R R-1f — a waiting unit's row as the page draws it (R-1d): the test ids it carries (`offered`), and a log of what
- * the operator did to it — filled which field with what, clicked which button — with every response it waited on.
+ * the operator did to it — filled which field with what, clicked which button, each with the bound it was given — with
+ * every response it waited on.
+ * ⭐⭐ P7-6 B3 (the fix round) — ⛔ AND A FIELD OR BUTTON THE ROW DOES NOT CARRY CANNOT BE FILLED OR CLICKED: either waits
+ * out its bound and throws, as Playwright's does. Until this, `fill` succeeded on any name, so a press on a field the page
+ * never renders — the abandonment's rationale on a unit no longer WAITING (`+page.svelte`) — passed every test, and in the
+ * paid lane waited out its bound and threw, ending the run `lane-error` with its final archive never taken. A field's
+ * button stands with it: `rerun-review` with `rerun-review-rationale`, and `Abandon`'s field is `abandon-rationale`.
  */
 function recoveryRow(offered: readonly string[]) {
 	const log: string[] = [];
@@ -660,10 +682,22 @@ function recoveryRow(offered: readonly string[]) {
 			});
 		}
 	};
+	/** Whether the row carries `name`: an offered test id, a field of one, or the Abandon button beside its field. */
+	const carried = (name: string): boolean =>
+		offered.some((o) => name === o || name === `${o}-rationale`) ||
+		(name === 'Abandon' && offered.includes('abandon-rationale'));
+	const absent = (act: string, name: string, o?: { timeout?: number }) =>
+		new errors.TimeoutError(`locator.${act}: Timeout ${o?.timeout}ms exceeded waiting for ${name}.`);
 	const element = (name: string) => ({
 		count: async () => (shown && offered.includes(name) ? 1 : 0),
-		click: async () => void log.push(`click ${name}`),
-		fill: async (text: string) => void log.push(`fill ${name}: ${text}`)
+		click: async (o?: { timeout?: number }) => {
+			if (!carried(name)) throw absent('click', name, o);
+			log.push(`click ${name} (${o?.timeout})`);
+		},
+		fill: async (text: string, o?: { timeout?: number }) => {
+			if (!carried(name)) throw absent('fill', name, o);
+			log.push(`fill ${name}: ${text} (${o?.timeout})`);
+		}
 	});
 	const row = {
 		waitFor: async (o: { state: string; timeout: number }) => {
@@ -695,22 +729,34 @@ describe('⭐ P7-6R R-1f — the run plan’s rule’s acts on the page: what th
 
 	it('⛔ each act types the run plan’s rationale into ITS OWN field, presses ITS OWN button, and waits on ITS OWN action — a re-run for a phase’s allowance, an abandonment for a sign-off act’s', async () => {
 		const pressed = async (act: 'rerunReview' | 'rerunWork' | 'abandonPwu') => {
-			const r = recoveryRow([]);
+			const r = recoveryRow(['rerun-review', 'rerun-work', 'abandon-rationale']);
 			expect((await recover(r.page, r.row, act, decode)).envelopeType).toBe('success');
 			return [r.log, r.asked];
 		};
+		// ⭐ P7-6 B3 — each fill and each click with a bound of its own, never the page's default alone.
 		expect(await pressed('rerunReview')).toEqual([
-			[`fill rerun-review-rationale: ${RULE_RATIONALE.rerunReview}`, 'click rerun-review'],
+			[`fill rerun-review-rationale: ${RULE_RATIONALE.rerunReview} (${PHASE7_UI_MS})`, `click rerun-review (${PHASE7_UI_MS})`],
 			[{ action: 'rerunReview', timeout: PHASE7_UNIT_ALLOWANCE_MS }]
 		]);
 		expect(await pressed('rerunWork')).toEqual([
-			[`fill rerun-work-rationale: ${RULE_RATIONALE.rerunWork}`, 'click rerun-work'],
+			[`fill rerun-work-rationale: ${RULE_RATIONALE.rerunWork} (${PHASE7_UI_MS})`, `click rerun-work (${PHASE7_UI_MS})`],
 			[{ action: 'rerunWork', timeout: PHASE7_UNIT_ALLOWANCE_MS }]
 		]);
 		expect(await pressed('abandonPwu')).toEqual([
-			[`fill abandon-rationale: ${RULE_RATIONALE.abandonPwu}`, 'click Abandon'],
+			[`fill abandon-rationale: ${RULE_RATIONALE.abandonPwu} (${PHASE7_UI_MS})`, `click Abandon (${PHASE7_UI_MS})`],
 			[{ action: 'abandonPwu', timeout: PHASE7_SIGN_OFF_MS }]
 		]);
+	});
+
+	// ⭐⭐ P7-6 B3 (the fix round) — ⛔ THE ABANDONMENT'S FIELD IS RENDERED FOR A WAITING UNIT ONLY (`+page.svelte`: `abandon-
+	// rationale` inside `recoveryByPwu`), so a press on a row that does not carry it must FAIL — at the act's own bound —
+	// never type into nothing and click. Its bound is explicit, so it cannot wait on whatever the page's default became.
+	it('⛔ B3 — an abandonment on a row that does NOT carry its field fails, at its own bound, and presses nothing', async () => {
+		const r = recoveryRow(['rerun-work']);
+		await expect(recover(r.page, r.row, 'abandonPwu', decode)).rejects.toThrow(
+			`locator.fill: Timeout ${PHASE7_UI_MS}ms exceeded waiting for abandon-rationale.`
+		);
+		expect([r.log, r.asked], 'something was pressed on a row that offers no abandonment').toEqual([[], []]);
 	});
 });
 
@@ -1195,8 +1241,21 @@ interface Script {
 			string,
 			{
 				readonly offers: RecoveryOffers;
+				/**
+				 * ⭐ P7-6 B3 — what the row offers when it is read again, after a re-run; the first offers, unless said. A unit
+				 * no longer WAITING offers no abandonment's field (`+page.svelte`).
+				 */
+				readonly offersAfter?: RecoveryOffers;
+				/**
+				 * ⭐ P7-6 B3 — `newPlan`: whether the act's server answer DISPATCHED a plan revision, so the store holds a new
+				 * plan B (RD5). A re-run does, unless the server refused it before dispatching anything (`false`); an
+				 * abandonment never does.
+				 */
 				readonly acts?: Partial<
-					Record<RecoveryAct, { outcome: ActionOutcome; after: UnitState; calls?: number }>
+					Record<
+						RecoveryAct,
+						{ outcome: ActionOutcome; after: UnitState; calls?: number; newPlan?: boolean }
+					>
 				>;
 			}
 		>
@@ -1209,6 +1268,9 @@ function laneOf(script: Script) {
 	const calls: string[] = [];
 	const archives: ArchiveCall[] = [];
 	const store = new Map<string, UnitState>();
+	/** ⭐ P7-6 B3 — each unit's plans: a re-run supersedes the last, whose step it cancels, and adds plan B (RD5). */
+	const plans = new Map<string, number>();
+	const recoveryReads = new Map<string, number>();
 	const idOf = (slug: string) => `pwu_${slug}`;
 	let reviewerCallCount = 0;
 	let reads = 0;
@@ -1231,12 +1293,14 @@ function laneOf(script: Script) {
 			executionPlans: [...store].flatMap(([id, s]) =>
 				s.planStepState === null
 					? []
-					: [
-							{
-								id: `pln_${id}`,
-								state: { workUnitId: id, steps: [{ stepState: s.planStepState }] }
+					: Array.from({ length: plans.get(id) ?? 1 }, (_, i) => ({
+							id: i === 0 ? `pln_${id}` : `pln_${id}_${i + 1}`,
+							// A superseded plan's step was cancelled with it; the last plan's is the unit's.
+							state: {
+								workUnitId: id,
+								steps: [{ stepState: i === (plans.get(id) ?? 1) - 1 ? s.planStepState : 'CANCELLED' }]
 							}
-						]
+						}))
 			),
 			modelExchanges: [
 				...Array.from({ length: reviewerCallCount }, (_, i) => ({
@@ -1278,8 +1342,12 @@ function laneOf(script: Script) {
 		showOverview: async () => void calls.push('showOverview'),
 		recoveryOffers: async (unit) => {
 			calls.push(`recoveryOffers ${unit.slug}`);
+			const read = (recoveryReads.get(unit.slug) ?? 0) + 1;
+			recoveryReads.set(unit.slug, read);
+			const recovery = script.recoveries?.[unit.slug];
 			return (
-				script.recoveries?.[unit.slug]?.offers ?? {
+				(read > 1 ? recovery?.offersAfter : undefined) ??
+				recovery?.offers ?? {
 					rerunReview: false,
 					rerunWork: false,
 					abandon: false
@@ -1290,6 +1358,9 @@ function laneOf(script: Script) {
 			calls.push(`recover ${unit.slug} ${act}`);
 			const r = script.recoveries?.[unit.slug]?.acts?.[act];
 			if (r === undefined) throw new Error(`the script recovers no ${unit.slug} by ${act}`);
+			// ⭐ P7-6 B3 — a re-run the server dispatched leaves a new plan B in the store; one refused before it, none.
+			if (act !== 'abandonPwu' && (r.newPlan ?? true))
+				plans.set(unit.unitId!, (plans.get(unit.unitId!) ?? 1) + 1);
 			store.set(unit.unitId!, r.after);
 			reviewerCallCount += r.calls ?? 0;
 			return r.outcome;
@@ -1727,6 +1798,8 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			'beginExecute design',
 			'recoveryOffers design',
 			'recover design rerunWork',
+			// ⭐ P7-6 B3 — the row asked again, on the page loaded afresh, before the abandonment it offers is pressed.
+			'recoveryOffers design',
 			'recover design abandonPwu',
 			'beginExecute implementation',
 			'beginExecute end-to-end'
@@ -1737,9 +1810,9 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		expect(
 			l.calls
 				.slice(reworked, l.calls.indexOf('recover design abandonPwu'))
-				.filter((c) => c === 'showOverview'),
-			'the abandonment was pressed on the page the refused re-run left'
-		).toEqual(['showOverview']);
+				.filter((c) => c === 'showOverview' || c === 'recoveryOffers design'),
+			'the abandonment was pressed on the page the refused re-run left, or on a row not asked again'
+		).toEqual(['showOverview', 'recoveryOffers design']);
 		const [, requirements, design, implementation] = record.units as [
 			RunUnit,
 			RunUnit,
@@ -1767,6 +1840,13 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		).toEqual([
 			['rerunWork', RULE_RATIONALE.rerunWork, 5, 'failure'],
 			['abandonPwu', RULE_RATIONALE.abandonPwu, null, 'success']
+		]);
+		// ⭐ P7-6 B3 — what the STORE read each act to: the re-run of the review recovered, the re-run of the work was refused
+		// again (a new plan whose step waits), and only that one was abandoned.
+		expect([...requirements.recovery, ...design.recovery].map((r) => [r.act, r.reading])).toEqual([
+			['rerunReview', 'recovered'],
+			['rerunWork', 'refused-again'],
+			['abandonPwu', null]
 		]);
 		for (const rationale of Object.values(RULE_RATIONALE))
 			expect(rationale).toMatch(/^The run plan’s rule, REG-D-105 \(4\): /);
@@ -1831,7 +1911,10 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 				envelopeType: null,
 				timedOutAfterMs: null,
 				requestFailure: null,
-				after: null
+				after: null,
+				reading: null,
+				refusal: null,
+				notPressed: `the limit: ${PHASE7_PAID_LIMIT} of ${PHASE7_PAID_LIMIT} reviewer calls (D8)`
 			}
 		]);
 		expect(record.end?.reason).toBe('paid-limit');
@@ -1882,6 +1965,133 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		expect(l.only('recoveryOffers', 'recover')).toEqual(['recoveryOffers requirements']);
 		expect(record.units[1]!.recovery).toEqual([]);
 		expect(record.end?.reason).toBe('complete');
+	});
+
+	// ── ⭐⭐ P7-6 B3 (the fix round) — THE RULE DECIDES FROM THE STORE, AFTER A RE-RUN, WHAT THE RE-RUN CAME TO ────────────────
+	// ⛔ It abandoned on ANY stop after a re-run (`stoppedAfter`), and two kinds of stop are not "a re-run refused again":
+	//   · a press the server refused BEFORE dispatching anything — a missing rationale, RD7 unable to rebuild, the reviewer's
+	//     preflight — leaves the unit WAITING with NO NEW PLAN: no re-run was made, and the rule abandoned it with a false
+	//     rationale, skipping the re-run the row still offered;
+	//   · a re-run that leaves the unit RUNNING or FAILED (an executor try that did not run, a refused evidence join, a floor
+	//     that threw: R-2's stops) — and the abandonment's field is rendered for a WAITING unit only, so its fill waited out
+	//     its bound and threw: the run ended `lane-error`, its final archive never taken.
+	// Now: a new plan whose step WAITS is refused again — abandoned, if the row offers it; no new plan, the re-run was not
+	// made — the server's words kept, the unit left as found; a new plan not waiting — left as found, and recorded.
+	const refusedWith = (error: string): ActionOutcome => ({ ...answered('failure'), decoded: { error } });
+	const FAILED = unitState('EXECUTING', 'FAILED', 'UNASSESSED', 'FAILED');
+	const OTHERS_COMPLETE = {
+		root: ALL_COMPLETE.root!,
+		design: ALL_COMPLETE.design!,
+		implementation: ALL_COMPLETE.implementation!,
+		'end-to-end': ALL_COMPLETE['end-to-end']!
+	};
+	const OTHERS_GREEN = { root: GREEN, design: GREEN, implementation: GREEN, 'end-to-end': GREEN };
+	const EVERY_OFFER: RecoveryOffers = { rerunReview: true, rerunWork: true, abandon: true };
+	const NO_OFFER: RecoveryOffers = { rerunReview: false, rerunWork: false, abandon: false };
+
+	it('⛔ B3 — a re-run the server refused BEFORE DISPATCHING ANYTHING (no new plan in the store) is NOT abandoned: the re-run was not made, the server’s words kept, the unit left as found', async () => {
+		const REFUSAL = 'The review cannot be re-run, and the unit keeps waiting: the producing prompt cannot be rebuilt.';
+		const l = laneOf({
+			paid: true,
+			prior: 0,
+			presses: { ...OTHERS_COMPLETE, requirements: { outcome: answered('failure'), after: WAITING, calls: 1 } },
+			recoveries: {
+				requirements: {
+					offers: EVERY_OFFER,
+					acts: {
+						rerunReview: { outcome: refusedWith(REFUSAL), after: WAITING, newPlan: false },
+						abandonPwu: { outcome: answered('success'), after: ABANDONED }
+					}
+				}
+			},
+			signOffs: OTHERS_GREEN
+		});
+		const record = await l.run();
+		expect(l.only('recover '), 'a re-run that was never made was abandoned as one refused again').toEqual([
+			'recover requirements rerunReview'
+		]);
+		const requirements = record.units[1]!;
+		expect(requirements.recovery.map((r) => [r.act, r.reading, r.refusal])).toEqual([
+			['rerunReview', 'not-made', REFUSAL]
+		]);
+		expect([requirements.stopped, requirements.after]).toEqual([true, WAITING]);
+		expect(record.end?.reason).toBe('complete');
+	});
+
+	it('⛔ B3 — a re-run that leaves the unit NOT WAITING — RUNNING or FAILED, an R-2 stop — is left as found and recorded: no abandonment is pressed', async () => {
+		for (const after of [STOPPED, FAILED]) {
+			const l = laneOf({
+				paid: true,
+				prior: 0,
+				presses: { ...OTHERS_COMPLETE, requirements: { outcome: answered('failure'), after: WAITING } },
+				recoveries: {
+					requirements: {
+						offers: { rerunReview: false, rerunWork: true, abandon: true },
+						// A unit no longer WAITING: its row renders no abandonment's field, and no re-run.
+						offersAfter: NO_OFFER,
+						acts: {
+							rerunWork: { outcome: refusedWith('Execution failed: the executor try did not run.'), after },
+							abandonPwu: { outcome: answered('success'), after: ABANDONED }
+						}
+					}
+				},
+				signOffs: OTHERS_GREEN
+			});
+			const record = await l.run();
+			expect(l.only('recover '), `${after.executionState}: an abandonment was pressed`).toEqual([
+				'recover requirements rerunWork'
+			]);
+			expect(record.units[1]!.recovery.map((r) => [r.act, r.reading, r.after])).toEqual([
+				['rerunWork', 'stopped-otherwise', after]
+			]);
+			expect(record.end?.reason, after.executionState ?? '').toBe('complete');
+		}
+	});
+
+	it('⛔ B3 — refused again, and the row read afresh offers NO abandonment: none is pressed — never a control the row does not offer — and that is recorded', async () => {
+		const l = laneOf({
+			paid: true,
+			prior: 0,
+			presses: { ...OTHERS_COMPLETE, requirements: { outcome: answered('failure'), after: WAITING } },
+			recoveries: {
+				requirements: {
+					offers: EVERY_OFFER,
+					offersAfter: NO_OFFER,
+					acts: {
+						rerunReview: { outcome: answered('failure'), after: WAITING },
+						abandonPwu: { outcome: answered('success'), after: ABANDONED }
+					}
+				}
+			},
+			signOffs: OTHERS_GREEN
+		});
+		const record = await l.run();
+		expect(l.only('recover ')).toEqual(['recover requirements rerunReview']);
+		expect(
+			record.units[1]!.recovery.map((r) => [r.act, r.reading, r.status, r.notPressed])
+		).toEqual([
+			['rerunReview', 'refused-again', 200, null],
+			['abandonPwu', null, null, 'the row, read again after the re-run, offers no abandonment']
+		]);
+		expect(record.end?.reason).toBe('complete');
+	});
+
+	it('⭑ CONTROL — a WAITING unit whose row offers NO re-run at all is left as found, and never abandoned by the rule', async () => {
+		const l = laneOf({
+			paid: true,
+			prior: 0,
+			presses: { ...OTHERS_COMPLETE, requirements: { outcome: answered('failure'), after: WAITING } },
+			recoveries: {
+				requirements: {
+					offers: { rerunReview: false, rerunWork: false, abandon: true },
+					acts: { abandonPwu: { outcome: answered('success'), after: ABANDONED } }
+				}
+			},
+			signOffs: OTHERS_GREEN
+		});
+		const record = await l.run();
+		expect(l.only('recoveryOffers', 'recover')).toEqual(['recoveryOffers requirements']);
+		expect([record.units[1]!.recovery, record.units[1]!.after]).toEqual([[], WAITING]);
 	});
 
 	it('⛔ D4 — a phase PAST ITS ALLOWANCE ends the run there: it is archived, and the next is never pressed beside it, nothing signed off (REG-F-535)', async () => {

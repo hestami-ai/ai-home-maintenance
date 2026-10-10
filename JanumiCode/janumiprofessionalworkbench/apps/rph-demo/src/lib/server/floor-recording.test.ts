@@ -29,8 +29,9 @@ import type { ActorReference, DomainCommand } from '@janumipwb/rph-contracts';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AGENT_CREDENTIAL, SESSION_CREDENTIAL, standaloneAuthenticator } from './identity.js';
-import { runPwaFloor, type FloorProducer } from './floor.js';
+import { reasoningReviewCriteria, runPwaFloor, type FloorProducer } from './floor.js';
 import { loadReviewerAnswer } from './assurance/reviewer-answer.js';
+import { clearingJudgement } from './assurance/clearing-reviewer.testing.js';
 import { getArtifactStore } from './workbench.js';
 
 const TS = '2026-08-05T09:00:00Z';
@@ -246,6 +247,67 @@ describe('runPwaFloor records the floor through the AUTHENTICATED session (REG-F
 				view!.verdicts.map((v) => v.field),
 				'every content element is accounted for, bytes disclosed for none but the answer'
 			).toContain('volunteeredReasoningRef');
+		});
+
+		// ── ⭐⭐ `JAN-EXEC` P7-6 B7 — `REG-F-433`'s JOIN KEY (`DESIGN-the-stopped-unit-recovery.md` RD10, as corrected; first of
+		// `REG-D-070` Q2's three) ─────────────────────────────────────────────────────────────────────────────────────────
+		//
+		// ⛔ THE ENTRY'S OWN PREDICTED RED: two floor runs on one subject, distinct answers, ONE TRY EACH. Both tries are
+		// ordinal 1, so a reader that sorts by `attemptOrdinal` alone ties them, and its stable sort returns the OLDER run's
+		// answer — the probe `REG-F-433` records: *"reader returned the FIRST (older) run's answer"*. A re-review is exactly
+		// this arrangement (its first try is ordinal 1, as the original's was), so every re-reviewed subject would show the
+		// answer the displayed review did not conclude from.
+		// ⭑ Each reply answers EVERY criterion (`clearingJudgement`): a reply answering none draws P7-6 I5's repair, a second
+		// try, and the tie would not be the one the entry drove. The arrangement says so before the assertion does.
+		const answering = (run: string): string =>
+			clearingJudgement(reasoningReviewCriteria(session)).replaceAll(
+				'evaluated; the failure class is absent',
+				`evaluated in ${run}; the failure class is absent`
+			);
+
+		it('⛔ REG-F-433 — two floor runs on one subject, distinct answers, one try each: the reader returns the SECOND run’s', async () => {
+			const [first, second] = [answering('the first run'), answering('the second run')];
+			for (const reply of [first, second])
+				await runPwaFloor(
+					PWA,
+					{ prompt: 'assess it', producer: PRODUCER, print: async () => reply, canonical: session },
+					session
+				);
+			expect(
+				listByType(session, 'MODEL_EXCHANGE').map((r) => (r.state as Record<string, unknown>).attemptOrdinal),
+				'arrangement: one try per run, both at ordinal 1 — the tie REG-F-433 drove'
+			).toEqual([1, 1]);
+			const view = await loadReviewerAnswer(PWA, session, getArtifactStore());
+			expect(view?.answer, 'the reader returned the OLDER run’s answer (REG-F-433)').toBe(second);
+		});
+
+		it('⛔ REG-F-433 — ONE token per floor run: its assessments’ correlation IS its exchanges’ runToken and their correlation; two runs, two tokens', async () => {
+			for (const run of ['the first run', 'the second run'])
+				await runPwaFloor(
+					PWA,
+					{
+						prompt: 'assess it',
+						producer: PRODUCER,
+						print: async () => answering(run),
+						canonical: session,
+						candidateSubjectHash: 'sha256:candidate'
+					},
+					session
+				);
+			const events = session.readAllEvents();
+			const correlationsOf = (type: string) => [
+				...new Set(events.filter((e) => e.aggregateType === type).map((e) => e.correlationId))
+			];
+			// The runs' tokens, in the record's order: one per run, each run's tries carrying its own.
+			const tokens = [
+				...new Set(listByType(session, 'MODEL_EXCHANGE').map((r) => (r.state as Record<string, unknown>).runToken))
+			];
+			expect(tokens, 'two floor runs are two runs: one token each').toHaveLength(2);
+			expect(correlationsOf('ASSURANCE_ASSESSMENT'), 'the assessments are not correlated by their run’s token').toEqual(tokens);
+			expect(correlationsOf('ASSURANCE_OBSERVATION'), 'the observations are not correlated by their run’s token').toEqual(tokens);
+			expect(correlationsOf('MODEL_EXCHANGE'), 'the exchanges are not correlated by their run’s token').toEqual(tokens);
+			// ⭑ LOSSLESS: the token keeps what the assessments' correlation said before it — the plane and the candidate's hash.
+			for (const t of tokens) expect(String(t)).toMatch(/^authoring-floor:sha256:candidate:/);
 		});
 
 		it('CONTROL — a subject with no exchange returns undefined rather than an empty answer', async () => {

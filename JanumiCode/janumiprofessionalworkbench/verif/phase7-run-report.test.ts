@@ -56,6 +56,8 @@ import { createSqliteDriver, SCHEMA_SQL } from '@janumipwb/rph-persistence';
 import { afterAll, describe, expect, it } from 'vitest';
 import { main as finalize, RESULTS_NAME } from '../scripts/phase7/finalize-run.js';
 import { manifestProblems } from '../scripts/phase7/rerun-commands.js';
+// ⭐ P7-6 I5 — the note the validator writes on every reply that answered no criterion, which the report restates.
+import { NO_CRITERION_ANSWERED_NOTE as VALIDATOR_I5_NOTE } from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
 import {
 	buildRunReport,
 	CELL_VALUES,
@@ -70,6 +72,7 @@ import {
 	K5_OWED,
 	manifestArgv,
 	MODEL_EXECUTOR_NAME,
+	NO_CRITERION_ANSWERED_NOTE,
 	OPERATOR_COMPLETION_DETAIL,
 	OPERATOR_FAILURE_REASON,
 	OUTSIDE,
@@ -118,6 +121,8 @@ interface Call {
 	readonly ordinal: number;
 	readonly runToken?: string;
 	readonly parse?: string;
+	/** E-5's detail, as the validator wrote it — what tells a P7-6 I5 chain (`NO_CRITERION_ANSWERED_NOTE`). */
+	readonly detail?: string;
 }
 interface PhaseKnobs {
 	/** Begin & Execute was pressed. Default true. */
@@ -146,6 +151,13 @@ interface PhaseKnobs {
 	readonly timedOutAfterMs?: number;
 	/** What the executor's tries retained: bytes that do not hash to their record, or nothing at all. */
 	readonly content?: 'mismatch' | 'unretained';
+	/**
+	 * ⭐ P7-6 B7 (`REG-F-433`) — the floor-run token the work product's review was recorded under (its events'
+	 * `correlationId`). Unset, the review's record carries none, as a run's before the join key did.
+	 */
+	readonly reviewToken?: string;
+	/** ⭐ P7-6 B7 — later floor runs' reviews of the same work product (a re-review), each its state and its token. */
+	readonly reReviews?: readonly { readonly state: string; readonly token?: string }[];
 }
 type Slug = 'requirements' | 'design' | 'implementation' | 'end-to-end';
 const SATISFIED: Floor = ['SATISFIED', 'SATISFIED', 'SATISFIED'];
@@ -172,8 +184,22 @@ function aRun(
 	const content: StoredContent[] = [];
 	const put = (objectType: string, id: string, state: Record<string, unknown>) =>
 		objects.push({ id, objectType, state, firstSequence: ++seq });
-	const emit = (eventType: string, aggregateId: string, payload: Record<string, unknown>, commandId: string | null = null) =>
-		events.push({ sequence: ++seq, eventType, aggregateType: '', aggregateId, commandId, payload });
+	const emit = (
+		eventType: string,
+		aggregateId: string,
+		payload: Record<string, unknown>,
+		commandId: string | null = null,
+		correlationId?: string
+	) =>
+		events.push({
+			sequence: ++seq,
+			eventType,
+			aggregateType: '',
+			aggregateId,
+			commandId,
+			payload,
+			...(correlationId === undefined ? {} : { correlationId })
+		});
 	/** A ref the content store holds, and its row — the bytes `text`, hashed as the reader hashes them; ⛔ or not. */
 	const stored = (key: string, text: string, fault?: 'mismatch') => {
 		const contentHash = `sha256:${sha(text)}`;
@@ -215,7 +241,7 @@ function aRun(
 				attemptOrdinal: c.ordinal,
 				exchangeRole: c.role,
 				disposition: c.disposition,
-				parseOutcome: { outcome: c.parse ?? 'PARSED', detail: '' },
+				parseOutcome: { outcome: c.parse ?? 'PARSED', detail: c.detail ?? '' },
 				...refs(`mex_${subject}_${i}`, c.disposition)
 			})
 		);
@@ -310,6 +336,13 @@ function aRun(
 		if (k.workProducts !== 0) {
 			put('ARTIFACT', art, { producingPwuId: id, storageKey: `k_${art}`, contentHash: `sha256:${sha(art)}` });
 			floor(art, k.workProductFloor ?? SATISFIED);
+			// ⭐ P7-6 B7 — each review's recording carried its floor run's token, as the floor now records it.
+			if (k.reviewToken !== undefined) emit('AssuranceAssessmentRequested', `asmt_${art}_2`, {}, null, k.reviewToken);
+			for (const [i, again] of (k.reReviews ?? []).entries()) {
+				const id = `asmt_${art}_again${i + 1}`;
+				put('ASSURANCE_ASSESSMENT', id, { assurancePolicyId: 'floor.reasoning-review', subjectObjectIds: [art], assessmentState: again.state });
+				if (again.token !== undefined) emit('AssuranceAssessmentRequested', id, {}, null, again.token);
+			}
 			reviewCalls(art, k.review ?? [{ role: 'INITIAL', disposition: 'ACCEPTED', ordinal: 1 }]);
 			for (let i = 1; i <= (k.commands ?? 0); i++) {
 				const evd = `evd_${spec.slug}_${i}`;
@@ -400,14 +433,19 @@ const exchange =(state: Record<string, unknown>, id = 'mex_x'): StoredObject => 
 	state,
 	firstSequence: 1
 });
-const call = (role: string, disposition: string, ordinal: number, o: { runToken?: string; parse?: string } = {}) =>
+const call = (
+	role: string,
+	disposition: string,
+	ordinal: number,
+	o: { runToken?: string; parse?: string; detail?: string } = {}
+) =>
 	exchange(
 		{
 			exchangeRole: role,
 			disposition,
 			attemptOrdinal: ordinal,
 			runToken: o.runToken ?? 'run_1',
-			parseOutcome: { outcome: o.parse ?? 'PARSED', detail: '' }
+			parseOutcome: { outcome: o.parse ?? 'PARSED', detail: o.detail ?? '' }
 		},
 		`mex_${role}_${ordinal}_${o.runToken ?? 'run_1'}`
 	);
@@ -538,6 +576,175 @@ describe('JAN-EXEC P7-2 D9 — the pairing of a review with the call that conclu
 
 	it('⛔ two calls at one subject’s highest ordinal in one run are not pairable', () => {
 		expect(pairReview('art_1', 1, [call('INITIAL', 'ACCEPTED', 2), call('RETRY', 'ACCEPTED', 2)]).label).toBe('not-pairable');
+	});
+
+	// ── ⭐⭐ `JAN-EXEC` P7-6 B7 — `REG-F-433`'s JOIN KEY: EACH REVIEW PAIRED WITH ITS OWN RUN'S CALLS, BY THE RUN'S TOKEN ──────────
+	// (`DESIGN-the-stopped-unit-recovery.md` RD10, as corrected.) A floor run's assessments now carry, as their correlation,
+	// the token its reviewer calls carry as `runToken` (`floor-over-subject.ts`, `floor.ts`). ⛔ Without it a re-reviewed
+	// work product — P7-6R's re-run of the review — was a subject with two floor runs, reported NOT PAIRABLE: P7-4f could not
+	// adjudicate one review of it.
+	it('⭐ B7 — a RE-REVIEWED work product: each review is paired with ITS OWN run’s calls, by the run’s token — never "not pairable"', () => {
+		const r = reportOf(
+			aRun({
+				design: {
+					workProductFloor: ['SATISFIED', 'SATISFIED', 'INCONCLUSIVE'],
+					reviewToken: 'work-product-floor:art_design:wpfloor_a',
+					reReviews: [{ state: 'SATISFIED', token: 'work-product-floor:art_design:wpfloor_b' }],
+					review: [
+						{ role: 'INITIAL', disposition: 'REPAIR_REQUESTED', ordinal: 1, parse: 'JSON_PARSE_FAILED', runToken: 'work-product-floor:art_design:wpfloor_a' },
+						{ role: 'REPAIR', disposition: 'REJECTED', ordinal: 2, parse: 'JSON_PARSE_FAILED', runToken: 'work-product-floor:art_design:wpfloor_a' },
+						{ role: 'INITIAL', disposition: 'ACCEPTED', ordinal: 1, runToken: 'work-product-floor:art_design:wpfloor_b' }
+					]
+				}
+			})
+		).report;
+		expect(
+			r.pairing.rows.filter((p) => p.unit === 'design').map((p) => [p.assessmentState, p.label, p.refusal ?? null, p.concludedBy, p.calls]),
+			'a re-reviewed subject was not paired review by review (REG-F-433)'
+		).toEqual([
+			['INCONCLUSIVE', 'refused', 'failed-repair', 'mex_art_design_1', ['INITIAL:REPAIR_REQUESTED', 'REPAIR:REJECTED']],
+			['SATISFIED', 'answered', null, 'mex_art_design_2', ['INITIAL:ACCEPTED']]
+		]);
+		expect(r.pairing.counts['not-pairable']).toBe(0);
+	});
+
+	it('⛔ B7 — a record with NO token (a run before the join key) keeps the refusal: two floor runs on its subject are NOT PAIRABLE, honestly', () => {
+		const r = reportOf(
+			aRun({
+				design: {
+					reReviews: [{ state: 'SATISFIED' }],
+					review: [
+						{ role: 'INITIAL', disposition: 'ACCEPTED', ordinal: 1, runToken: 'wpfloorrun_a' },
+						{ role: 'INITIAL', disposition: 'ACCEPTED', ordinal: 1, runToken: 'wpfloorrun_b' }
+					]
+				}
+			})
+		).report;
+		expect(r.pairing.rows.filter((p) => p.unit === 'design').map((p) => [p.label, p.floorRuns])).toEqual([
+			['not-pairable', 2],
+			['not-pairable', 2]
+		]);
+	});
+
+	it('⛔ B7 — a run whose token names NO call recorded nothing: NO ANSWER RECORDED — never paired with another run’s calls, never "not pairable"', () => {
+		// Two runs that recorded no call, beside one that did: each says so on its own, and none is pooled with the others.
+		const r = reportOf(
+			aRun({
+				design: {
+					reviewToken: 'work-product-floor:art_design:wpfloor_a',
+					reReviews: [
+						{ state: 'SATISFIED', token: 'work-product-floor:art_design:wpfloor_b' },
+						{ state: 'INCONCLUSIVE', token: 'work-product-floor:art_design:wpfloor_c' }
+					],
+					review: [{ role: 'INITIAL', disposition: 'ACCEPTED', ordinal: 1, runToken: 'work-product-floor:art_design:wpfloor_b' }]
+				}
+			})
+		).report;
+		expect(r.pairing.rows.filter((p) => p.unit === 'design').map((p) => [p.label, p.joinedBy, p.concludedBy])).toEqual([
+			['no-answer-recorded', 'run token', null],
+			['answered', 'run token', 'mex_art_design_0'],
+			['no-answer-recorded', 'run token', null]
+		]);
+	});
+
+	it('⛔ B7 — a record from before the key beside one after it: the old review is paired by its subject over the calls NO token names — never with the new run’s', () => {
+		const r = reportOf(
+			aRun({
+				design: {
+					reReviews: [{ state: 'SATISFIED', token: 'work-product-floor:art_design:wpfloor_b' }],
+					review: [
+						{ role: 'INITIAL', disposition: 'NO_RESPONSE', ordinal: 1, runToken: 'wpfloorrun_a', parse: 'NOT_ATTEMPTED' },
+						{ role: 'INITIAL', disposition: 'ACCEPTED', ordinal: 1, runToken: 'work-product-floor:art_design:wpfloor_b' }
+					]
+				}
+			})
+		).report;
+		expect(r.pairing.rows.filter((p) => p.unit === 'design').map((p) => [p.label, p.joinedBy, p.floorRuns, p.calls])).toEqual([
+			['no-response', 'subject', 1, ['INITIAL:NO_RESPONSE']],
+			['answered', 'run token', 1, ['INITIAL:ACCEPTED']]
+		]);
+	});
+
+	// ── ⭐⭐ `JAN-EXEC` P7-6 I5 READ TRUTHFULLY (`DESIGN-the-reviewer-isolated.md` §4d; `REG-F-552`) ─────────────────────────────
+	// I5 repairs a reply that PARSED and answered no criterion, once, and the repair may only ADD a conclusion: when it answers
+	// none, does not parse, or gets no reply, the review keeps the FIRST reply's judgement — yet the record ENDS on the repair.
+	// ⛔ Read by "the highest ordinal concluded it", such a chain was reported a FAILED REPAIR (`REG-F-489`/`428`/`479`), or a
+	// NO RESPONSE (`REG-F-499`), concluded by the repair — a review the record shows concluded on its first reply.
+	/** The first reply's E-5 detail, as `noCriterionAnswered` writes it (the validator), over the seeded nine criteria. */
+	const I5_FIRST =
+		"None of the policy's 9 criteria was answered: the reply parsed, but its findings list is empty (REG-F-552). " +
+		'One repair was requested; if it answers none either, does not parse or gets no reply, this reply’s judgement is the one the review keeps, its recommendation recorded (REG-D-090).';
+	const STANDS = ' The first reply’s judgement stands (REG-F-552; REG-D-090).';
+	const i5First = (role = 'INITIAL', ordinal = 1) =>
+		call(role, 'REPAIR_REQUESTED', ordinal, { parse: 'SCHEMA_COERCION_FAILED', detail: I5_FIRST });
+
+	it('⭐ I5 — a criterion repair that ANSWERS concludes the review: answered, by the repair', () => {
+		const p = pairReview('art_1', 1, [i5First(), call('REPAIR', 'ACCEPTED', 2)]);
+		expect([p.label, p.concludedBy]).toEqual(['answered', 'mex_REPAIR_2_run_1']);
+	});
+
+	it('⛔ I5 — a criterion repair that answers NONE either: concluded by the FIRST reply, REG-F-552’s case — never a failed repair', () => {
+		const p = pairReview('art_1', 1, [
+			i5First(),
+			call('REPAIR', 'REJECTED', 2, { parse: 'SCHEMA_COERCION_FAILED', detail: `The repair answered no criterion either. ${I5_FIRST}${STANDS}` })
+		]);
+		expect([p.label, p.refusal ?? null, p.concludedBy]).toEqual(['no-criterion-answered', null, 'mex_INITIAL_1_run_1']);
+		expect(p.detail).toMatch(/answered no criterion, and its criterion repair answered none either \(REG-F-552\)/);
+	});
+
+	it('⛔ I5 — a criterion repair that does NOT PARSE: concluded by the FIRST reply, REG-F-552’s case — never a failed repair', () => {
+		const p = pairReview('art_1', 1, [
+			i5First(),
+			call('REPAIR', 'REJECTED', 2, { parse: 'JSON_EXTRACTION_FAILED', detail: `No JSON object could be located in the reply.${STANDS}` })
+		]);
+		expect([p.label, p.refusal ?? null, p.concludedBy]).toEqual(['no-criterion-answered', null, 'mex_INITIAL_1_run_1']);
+		expect(p.detail).toMatch(/answered no criterion, and its criterion repair did not parse \(REG-F-552\)/);
+	});
+
+	it('⛔ I5 — a criterion repair that gets NO REPLY: concluded by the FIRST reply, REG-F-552’s case — never a no response', () => {
+		const p = pairReview('art_1', 1, [i5First(), call('REPAIR', 'NO_RESPONSE', 2, { parse: 'NOT_ATTEMPTED' }), call('RETRY', 'NO_RESPONSE', 3, { parse: 'NOT_ATTEMPTED' })]);
+		expect([p.label, p.concludedBy]).toEqual(['no-criterion-answered', 'mex_INITIAL_1_run_1']);
+		expect(p.detail).toMatch(/answered no criterion, and its criterion repair got no reply \(REG-F-552\)/);
+		// ⭐ After a throw, the first reply is its RETRY: that reply concluded it.
+		const retried = pairReview('art_1', 1, [call('INITIAL', 'NO_RESPONSE', 1, { parse: 'NOT_ATTEMPTED' }), i5First('RETRY', 2), call('REPAIR', 'NO_RESPONSE', 3, { parse: 'NOT_ATTEMPTED' })]);
+		expect([retried.label, retried.concludedBy]).toEqual(['no-criterion-answered', 'mex_RETRY_2_run_1']);
+	});
+
+	it('⭑ CONTROL — the I5 chain is told by the validator’s NOTE, never by SCHEMA_COERCION_FAILED, which a JSON repair’s first reply can carry too', () => {
+		const json = pairReview('art_1', 1, [
+			call('INITIAL', 'REPAIR_REQUESTED', 1, { parse: 'SCHEMA_COERCION_FAILED', detail: 'The reply parsed and could not be coerced.' }),
+			call('REPAIR', 'REJECTED', 2, { parse: 'JSON_PARSE_FAILED' })
+		]);
+		expect([json.label, json.refusal]).toEqual(['refused', 'failed-repair']);
+		// ⛔ And a criterion repair refused for WHO answered it is a substitute, as anywhere: the review failed on it.
+		const substitute = pairReview('art_1', 1, [i5First(), call('REPAIR', 'REJECTED', 2, { parse: 'NOT_ATTEMPTED' })]);
+		expect([substitute.label, substitute.refusal, substitute.concludedBy]).toEqual(['refused', 'substitute', 'mex_REPAIR_2_run_1']);
+	});
+
+	it('⛔ I5 — the stage-4 cell names REG-F-552 for a review that concluded on a reply answering no criterion, and none of a failed repair’s or a no response’s ids', () => {
+		const r = reportOf(
+			aRun({
+				design: {
+					workProductFloor: ['SATISFIED', 'SATISFIED', 'INCONCLUSIVE'],
+					stepState: 'WAITING',
+					unit: { lifecycle: 'EXECUTING', execution: 'WAITING', assurance: 'UNASSESSED' },
+					review: [
+						{ role: 'INITIAL', disposition: 'REPAIR_REQUESTED', ordinal: 1, parse: 'SCHEMA_COERCION_FAILED', detail: I5_FIRST },
+						{ role: 'REPAIR', disposition: 'NO_RESPONSE', ordinal: 2, parse: 'NOT_ATTEMPTED' }
+					]
+				}
+			})
+		).report;
+		const four = cellOf(r, '4', 'design');
+		expect(four.value).toBe('broke');
+		expect(four.registerIds).toContain('REG-F-552');
+		for (const id of ['REG-F-489', 'REG-F-428', 'REG-F-479', 'REG-F-499']) expect(four.registerIds, id).not.toContain(id);
+	});
+
+	it('⭐ the NOTE the report tells an I5 chain by is the validator’s own export, and the first reply’s detail carries it', () => {
+		expect(typeof VALIDATOR_I5_NOTE, 'the validator exports no I5 note').toBe('string');
+		expect(NO_CRITERION_ANSWERED_NOTE).toBe(VALIDATOR_I5_NOTE);
+		expect(I5_FIRST.endsWith(NO_CRITERION_ANSWERED_NOTE)).toBe(true);
 	});
 
 	it('⭐ only Reasoning Reviews are paired: a deterministic floor policy and every sign-off ask no model, BY DESIGN', () => {
@@ -772,6 +979,102 @@ describe('JAN-EXEC P7-2 D9 — the audit of hand acts (P7-3)', () => {
 		expect(found('cancelStep'), 'a recovery’s own cancellation was read as a hand Cancel').toEqual([['plan_requirements', 'requirements']]);
 		expect(found('rerunReview')).toEqual([['dec_rerun', 'design']]);
 		expect(actOf(r, 'rerunWork').verdict).toBe('none');
+	});
+});
+
+// ── ⭐⭐ `JAN-EXEC` P7-6 B5 — THE ROADMAP'S B8: THE RUN REPORT AND ITS AUDIT KNOW THE RECOVERY ──────────────────────────────
+// (`ROADMAP-undertaking-execution-sandbox.md` §9, B8; `DESIGN-the-stopped-unit-recovery.md` RD5, RD10.) A recovery act's
+// completion is not a hand completion; each re-run is listed beside the Decision that made it; the limit is checked before
+// each re-run (the lane's: `verif/phase7-live-spec.test.ts`). Its red: the audit over a run with a re-run of the review.
+describe('JAN-EXEC P7-6 B5 (the roadmap’s B8) — the report and its audit know the recovery', () => {
+	const ev = (eventType: string, aggregateId: string, commandId: string, payload: Record<string, unknown> = {}) => ({
+		eventType,
+		aggregateType: 'X',
+		aggregateId,
+		commandId,
+		payload
+	});
+	const byModel = {
+		actorId: 'model:fixture-executor',
+		actorType: 'AGENT',
+		displayName: MODEL_EXECUTOR_NAME
+	};
+	/**
+	 * A run whose DESIGN phase was refused at its review, WAITED, and was recovered by a person's re-run of the review, its
+	 * rows as the route writes them (RD2, RD4, RD5): the wait; the Decision; plan B proposed; plan A superseded by B and its
+	 * waiting step cancelled; B approved and activated; the unit WAITING→RUNNING citing B; B started — then B completed naming
+	 * A's work product, with the unit's hop to SUCCEEDED citing B, in one batch.
+	 */
+	function aRecoveredRun() {
+		const run = aRun(
+			{ design: { completion: 'none' } },
+			{
+				extraEvents: [
+					ev('ExecutionStepWaiting', 'plan_design', 'ui-900', { stepId: 'step_design', stepState: 'WAITING' }),
+					ev('PwuStateChanged', 'pwu_design', 'ui-901', { previousState: 'EXECUTING', newState: 'EXECUTING', executionState: 'WAITING', supportingObjectIds: ['plan_design'] }),
+					ev('DecisionEffective', 'dec_rerun', 'ui-911', { decisionType: 'REPLAN', selectedOption: 'RERUN_REVIEW', subjectObjectIds: ['pwu_design', 'plan_design', 'art_design'] }),
+					ev('ExecutionPlanProposed', 'plan_design_b', 'ui-912', { executionPlanId: 'plan_design_b', workUnitId: 'pwu_design' }),
+					ev('ExecutionPlanSuperseded', 'plan_design', 'ui-913', { supersedingExecutionPlanId: 'plan_design_b', status: 'SUPERSEDED' }),
+					ev('ExecutionStepCancelled', 'plan_design', 'ui-914', { stepId: 'step_design', stepState: 'CANCELLED' }),
+					ev('ExecutionPlanApproved', 'plan_design_b', 'ui-915'),
+					ev('ExecutionPlanActivated', 'plan_design_b', 'ui-916'),
+					ev('PwuStateChanged', 'pwu_design', 'ui-917', { previousState: 'EXECUTING', newState: 'EXECUTING', executionState: 'RUNNING', supportingObjectIds: ['plan_design_b'] }),
+					ev('ExecutionStepStarted', 'plan_design_b', 'ui-918', { stepId: 'step_design_b' }),
+					ev('ExecutionStepSucceeded', 'plan_design_b', 'ui-930', {
+						outputArtifactIds: ['art_design'],
+						proposedEvidenceIds: [],
+						executionProvenance: { originType: 'MODEL_GENERATION', producingExecutionAttemptId: 'step_design#1', executedBy: byModel }
+					}),
+					ev('PwuStateChanged', 'pwu_design', 'ui-931', { previousState: 'EXECUTING', newState: 'EXECUTING', executionState: 'SUCCEEDED', supportingObjectIds: ['plan_design_b'] })
+				]
+			}
+		);
+		const planB: StoredObject = {
+			id: 'plan_design_b',
+			objectType: 'EXECUTION_PLAN',
+			state: { workUnitId: 'pwu_design', status: 'ACTIVE', steps: [{ id: 'step_design_b', stepState: 'SUCCEEDED' }] },
+			firstSequence: Number.MAX_SAFE_INTEGER - 1
+		};
+		const objects = run.store.objects.map((o) =>
+			o.id === 'plan_design'
+				? { ...o, state: { workUnitId: 'pwu_design', status: 'SUPERSEDED', steps: [{ id: 'step_design', stepState: 'CANCELLED' }] } }
+				: o
+		);
+		return { store: { ...run.store, objects: [...objects, planB] }, lane: run.lane };
+	}
+
+	it('⛔ B8 — a recovered unit is NOT "begun more than once": its plan B is the revision its re-run made, read from the supersession chain (RD10)', () => {
+		const r = reportOf(aRecoveredRun()).report;
+		expect(r.problems, 'a person’s re-run was read as a second Begin & Execute').toEqual([]);
+		expect(r.units.find((u) => u.slug === 'design')?.step).toEqual({ planId: 'plan_design_b', stepState: 'SUCCEEDED', planStatus: 'ACTIVE' });
+	});
+
+	it('⭑ CONTROL — two plans of one unit that NO supersession joins are still a unit begun more than once', () => {
+		const run = aRecoveredRun();
+		const unjoined = { ...run.store, events: run.store.events.filter((e) => e.eventType !== 'ExecutionPlanSuperseded') };
+		expect(reportOf({ store: unjoined, lane: run.lane }).report.problems).toEqual([
+			'the design unit has 2 execution plans: it was begun more than once'
+		]);
+	});
+
+	it('⛔ B8 — a recovery act’s completion, its start, its cancellation and its wait are none of them hand acts', () => {
+		const r = reportOf(aRecoveredRun()).report;
+		for (const act of ['completeStep', 'startStep', 'cancelStep', 'enterWaitStep'])
+			expect([act, actOf(r, act).verdict, actOf(r, act).found.map((f) => f.why)]).toEqual([act, 'none', []]);
+		expect(r.audit.forbiddenFound).toBe(0);
+	});
+
+	it('⛔ B8 — each re-run is listed BESIDE the Decision that made it: the Decision, and the plan it made, superseding the refused one', () => {
+		const r = reportOf(aRecoveredRun()).report;
+		expect(actOf(r, 'rerunReview').found.map((f) => [f.aggregateId, f.unit, f.why])).toEqual([
+			['dec_rerun', 'design', 'a person’s re-run of the review: plan plan_design_b, superseding plan plan_design']
+		]);
+		// A Decision no plan revision follows is listed all the same, and says so.
+		const run = aRecoveredRun();
+		const decidedOnly = { ...run.store, events: run.store.events.filter((e) => e.eventType !== 'ExecutionPlanSuperseded') };
+		expect(actOf(reportOf({ store: decidedOnly, lane: run.lane }).report, 'rerunReview').found.map((f) => f.why)).toEqual([
+			'a person’s re-run of the review: no plan revision follows it in the record'
+		]);
 	});
 });
 
