@@ -192,6 +192,12 @@ const PINNED: Readonly<Record<string, readonly string[]>> = {
 		// rejection was unreachable. It is an ASSURANCE act, deliberately separate from the governance act below.
 		'recordBlockingFinding',
 		'markSatisfied',
+		// ⭐ `JAN-EXEC` P7-6R R-1c (`REG-D-104` (1)): the person's two re-runs of a unit WAITING after its review refused
+		// it. Each records the person's Decision and revises the plan. Each is a governed act that the server refuses
+		// unless the unit waits and the act is offered (RD3). Abandon, the third choice, is the act below. This census
+		// reddened when they arrived (gate:fast, after B6), which is its job.
+		'rerunReview',
+		'rerunWork',
 		// S-1a (REG-F-104): abandonment is one of the three acts DOC-001 §5.2 reserves to Governance, and it
 		// had no caller from any surface. This census reddened on arrival, which is its job.
 		'abandonPwu',

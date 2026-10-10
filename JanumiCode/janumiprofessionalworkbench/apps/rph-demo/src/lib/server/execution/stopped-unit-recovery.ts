@@ -52,7 +52,7 @@ import {
 } from '@janumipwb/rph-engine';
 import type { ArtifactStore } from '@janumipwb/rph-ports';
 import { FLOOR_POLICY_IDS } from '@janumipwb/rph-assurance';
-import { commandLine, renderProcessResultEvidence } from '../assurance/process-result-render.js';
+import { processRunFromEvidence } from '../assurance/process-result-render.js';
 import {
 	classifyFloorRemediation,
 	isOperationalRemediation,
@@ -644,15 +644,6 @@ export function producerOf(
 	};
 }
 
-/** `[STDOUT TRUNCATED: 139264 UTF-8 bytes removed from byte offset 65536]` — the evidence view's capture-cut line. */
-const CUT_LINE =
-	/^\[(STDOUT|STDERR) TRUNCATED: (\d+) UTF-8 bytes removed from byte offset (\d+)\]$/;
-/** The evidence view's incomplete-capture line (`process-result-render.ts` `captureFacts`), whole. */
-const INCOMPLETE_LINE =
-	'[OUTPUT INCOMPLETE: a descendant still held the streams when the child exited, so more may have been coming]';
-const STDOUT_HEADING = '--- stdout ---';
-const STDERR_SEPARATOR = '\n--- stderr ---\n';
-
 /**
  * ⭐ RD7 — ONE COMMAND'S RUN, REBUILT FROM ITS EVIDENCE: the command, exit code, deadline and duration from the EVIDENCE's
  * `contentReference`; the streams, the capture's cuts and its completeness from the stored bytes the join minted
@@ -661,6 +652,8 @@ const STDERR_SEPARATOR = '\n--- stderr ---\n';
  * ⛔ SELF-VERIFYING: the rebuilt run is RE-RENDERED and must reproduce the stored bytes EXACTLY, so a parse that read the
  * rendering wrongly refuses rather than reviewing something else. ⛔ AND AN AMBIGUOUS SPLIT REFUSES: a stdout that itself
  * holds the stderr heading's line could split two ways that render identically, and which one ran cannot be told.
+ * ⭑ Both are `processRunFromEvidence`'s, in the renderer's own module, since that read binds the error stream (`REG-Q-066`;
+ * moved there after the gate's `verif/agy-stderr-unbound.test.ts` named this file's two bindings).
  * ⚠ TWO FIELDS ARE NOT IN THE EVIDENCE, AND NO FLOOR READS EITHER (grep, 2026-10-10: neither `process-result-render.ts`,
  * `review-input.ts` nor `process-result-floor.ts` reads `ordinal` or an omission's `reason`): `ordinal` is the run's place
  * among the attempt's evidence, and each cut's `reason` says it is not in the evidence rather than inventing one.
@@ -705,53 +698,20 @@ export async function rebuildProcessRun(
 		return refuse(
 			`its bytes at '${storageKey}' do not hash to the ${str(ref.mint.contentHash)} it names.`
 		);
-	const lines = bytes.split('\n');
-	if (lines[0] !== `command: ${commandLine(argv)}`)
-		return refuse('its bytes do not open with the command its record names.');
-	const stdoutAt = lines.indexOf(STDOUT_HEADING);
-	if (stdoutAt < 2) return refuse('its bytes hold no stdout heading.');
-	let outputComplete = true;
-	const omittedRegions: {
-		stream: 'STDOUT' | 'STDERR';
-		reason: string;
-		byteSize: number;
-		byteOffset: number;
-	}[] = [];
-	for (const line of lines.slice(2, stdoutAt)) {
-		if (line === INCOMPLETE_LINE) {
-			outputComplete = false;
-			continue;
-		}
-		const cut = CUT_LINE.exec(line);
-		if (!cut)
-			return refuse(`its bytes hold a capture line it cannot read: ${JSON.stringify(line)}.`);
-		omittedRegions.push({
-			stream: cut[1] as 'STDOUT' | 'STDERR',
-			reason: 'not in the evidence: the minted bytes record the cut, not its reason (R-1 RD7)',
-			byteSize: Number(cut[2]),
-			byteOffset: Number(cut[3])
-		});
-	}
-	// The streams: stdout from the byte after its heading's line, up to the one separator before the stderr heading.
-	const streams = lines.slice(stdoutAt + 1).join('\n');
-	const separatorAt = streams.indexOf(STDERR_SEPARATOR);
-	if (separatorAt < 0) return refuse('its bytes hold no stderr heading.');
-	if (streams.indexOf(STDERR_SEPARATOR, separatorAt + 1) >= 0)
-		return refuse(
-			'its streams hold the stderr heading’s line a second time, so where stdout ends cannot be told.'
-		);
-	const stdout = streams.slice(0, separatorAt);
-	const stderr = streams.slice(separatorAt + STDERR_SEPARATOR.length);
+	// ⛔ READ BACK BY THE RENDERER'S OWN MODULE, NEVER HERE: the read binds the run's error stream, and only a site with
+	// a retention disposition may bind it (`REG-Q-066`; `verif/agy-stderr-unbound.test.ts`). The record supplies what
+	// the bytes do not carry.
 	const capture = ref.capture;
-	const run: ObservedProcessRun = {
-		ordinal,
-		argv,
-		exitCode: ref.exitCode,
-		timedOut: ref.timedOut,
-		durationMs: ref.durationMs,
-		outputComplete,
-		omittedRegions,
-		retention:
+	const read = processRunFromEvidence(
+		bytes,
+		{
+			ordinal,
+			argv,
+			exitCode: ref.exitCode,
+			timedOut: ref.timedOut,
+			durationMs: ref.durationMs
+		},
+		(omittedRegions) =>
 			capture.retained === true
 				? {
 						retained: true,
@@ -762,13 +722,7 @@ export async function rebuildProcessRun(
 						omittedRegions,
 						omissionsPath: str(capture.omissionsPath)
 					}
-				: { retained: false, notRetainedBecause: str(capture.notRetainedBecause) },
-		stdout,
-		stderr
-	};
-	if (renderProcessResultEvidence(run) !== bytes)
-		return refuse(
-			'the run rebuilt from its bytes does not render back to them, so the rebuild is not the run.'
-		);
-	return { ok: true, value: run };
+				: { retained: false, notRetainedBecause: str(capture.notRetainedBecause) }
+	);
+	return 'run' in read ? { ok: true, value: read.run } : refuse(read.refusedBecause);
 }
