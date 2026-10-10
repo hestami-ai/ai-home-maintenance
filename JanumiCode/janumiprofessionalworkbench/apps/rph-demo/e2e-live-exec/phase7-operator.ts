@@ -422,7 +422,28 @@ export interface RunUnit extends ArchiveUnit {
 	/** ⭐ D5 — an earlier phase stopped, so this one ran on an upstream nothing assured; the store has no such field. */
 	upstreamNotAssured: boolean | null;
 	limitCheck: LimitCheck | null;
+	/**
+	 * ⭐ `JAN-EXEC` P7-6R R-1f — what the run plan's rule did as the operator after this phase stopped (`REG-D-105` (4)), in
+	 * order: empty for a phase that did not stop, and for one whose row offered no re-run.
+	 */
+	recovery: RecoveryRecord[];
 	signOff: SignOffRecord | null;
+}
+
+/** ⭐ P7-6R R-1f — one act the run plan's rule made on a stopped phase, and the unit as the STORE read it after. */
+export interface RecoveryRecord {
+	readonly act: RecoveryAct;
+	/** The rationale typed, the run plan's rule's own (`RULE_RATIONALE`). */
+	readonly rationale: string;
+	/** ⭐ D8 — checked before each re-run, as between phases; null for an abandonment, which calls no model. */
+	readonly limitCheck: LimitCheck | null;
+	/** null when the act was not pressed — the limit stopped it. */
+	readonly status: number | null;
+	readonly envelopeType: EnvelopeType | null;
+	readonly timedOutAfterMs: number | null;
+	readonly requestFailure: string | null;
+	/** null when the act was not pressed. */
+	readonly after: UnitState | null;
 }
 
 /** ⭑ `request-failed` — a Begin & Execute whose request failed in transit (round 2's fix pass; `pressFormAction`). */
@@ -457,6 +478,7 @@ export function unpressed(units: readonly ArchiveUnit[]): RunUnit[] {
 		stopped: null,
 		upstreamNotAssured: null,
 		limitCheck: null,
+		recovery: [],
 		signOff: null
 	}));
 }
@@ -804,6 +826,74 @@ export async function markSatisfied(
 	);
 }
 
+// ── ⭐⭐ `JAN-EXEC` P7-6R R-1f — THE RUN PLAN'S RULE, ACTED AS THE OPERATOR (`REG-D-105` (4)) ────────────────────────────
+//
+// The paid run is unattended, so the person's choice at a stop (`REG-D-104` (1)) is made by a rule the sponsor approved
+// in the run plan (`DESIGN-the-stopped-unit-recovery.md` §5): a review that did not conclude is re-run once; a review that
+// concluded against the work has its work re-run once, with the findings; a re-run refused again is abandoned.
+// ⛔ THE LANE IS THE OPERATOR, NEVER THE ENGINE: each act posts the page's own form, with the rule's rationale typed, so
+// each choice is recorded as the operator's Decision. ⭑ Which re-run is the rule's is read off the ROW — Re-run the review
+// is offered only after a review that did not conclude (RD3) — so the lane asks the page the question the server answers.
+
+/** ⭐ P7-6R R-1f — what a waiting unit's row offers (R-1d): read off the row, once it is drawn. */
+export interface RecoveryOffers {
+	readonly rerunReview: boolean;
+	readonly rerunWork: boolean;
+	readonly abandon: boolean;
+}
+
+/** The page's three acts on a waiting unit, by their form actions. */
+export type RecoveryAct = 'rerunReview' | 'rerunWork' | 'abandonPwu';
+
+/**
+ * ⭐ THE RATIONALE EACH ACT TYPES: the run plan's rule, naming itself, so a reader of the Decision learns that the operator
+ * followed a rule the sponsor approved and which limb of it this was (`REG-D-105` (4)).
+ */
+export const RULE_RATIONALE: Readonly<Record<RecoveryAct, string>> = {
+	rerunReview: 'The run plan’s rule, REG-D-105 (4): a review that did not conclude is re-run once.',
+	rerunWork:
+		'The run plan’s rule, REG-D-105 (4): a review that concluded against the work has its work re-run once, with the findings.',
+	abandonPwu: 'The run plan’s rule, REG-D-105 (4): a re-run that is refused again is abandoned.'
+};
+
+/** ⭐ P7-6R R-1f — the choices the row offers, once it is drawn. ⚠ Waited for first, as `recordAssurance` waits. */
+export async function recoveryOffers(row: Locator): Promise<RecoveryOffers> {
+	await row.waitFor({ timeout: PHASE7_UI_MS, state: 'visible' });
+	const offered = async (testId: string): Promise<boolean> =>
+		(await row.getByTestId(testId).count()) > 0;
+	return {
+		rerunReview: await offered('rerun-review'),
+		rerunWork: await offered('rerun-work'),
+		abandon: await offered('abandon-rationale')
+	};
+}
+
+/**
+ * ⭐ P7-6R R-1f — one recovery act on the unit in `row`, the run plan's rationale typed into the act's own field. ⚠ A re-run
+ * is waited for up to ONE PHASE'S ALLOWANCE (D4): a re-run of the work runs the phase again, and a re-review runs its
+ * floors. An abandonment calls no model, and is bounded as a sign-off act is.
+ */
+export async function recover(
+	page: Page,
+	row: Locator,
+	act: RecoveryAct,
+	decode: Decode
+): Promise<ActionOutcome> {
+	if (act === 'abandonPwu') {
+		await row.getByTestId('abandon-rationale').fill(RULE_RATIONALE[act]);
+		return pressFormAction(
+			page,
+			act,
+			row.getByRole('button', { name: 'Abandon', exact: true }),
+			PHASE7_SIGN_OFF_MS,
+			decode
+		);
+	}
+	const testId = act === 'rerunReview' ? 'rerun-review' : 'rerun-work';
+	await row.getByTestId(`${testId}-rationale`).fill(RULE_RATIONALE[act]);
+	return pressFormAction(page, act, row.getByTestId(testId), PHASE7_UNIT_ALLOWANCE_MS, decode);
+}
+
 /** What the run record keeps of one sign-off act: its status and envelope, and the unit as the STORE read it after. */
 export interface SignOffAct {
 	readonly status: number | null;
@@ -849,17 +939,21 @@ export interface RunEnd {
  * request failed in transit. Either way the server may still be running the unit, so the next is never started beside
  * it (`REG-F-535`, `REG-F-527`). Null for a press that was answered, whatever it said.
  */
-export function unansweredEnd(title: string, o: ActionOutcome): RunEnd | null {
+export function unansweredEnd(
+	title: string,
+	o: ActionOutcome,
+	act = 'Begin & Execute'
+): RunEnd | null {
 	if (o.timedOutAfterMs !== null)
 		return {
 			reason: 'allowance-exceeded',
-			detail: `${title}'s Begin & Execute outlasted its allowance of ${o.timedOutAfterMs} ms`
+			detail: `${title}'s ${act} outlasted its allowance of ${o.timedOutAfterMs} ms`
 		};
 	if (o.requestFailure !== null)
 		return {
 			reason: 'request-failed',
 			detail:
-				`${title}'s Begin & Execute failed in transit (${o.requestFailure}): the server may have stopped, or ` +
+				`${title}'s ${act} failed in transit (${o.requestFailure}): the server may have stopped, or ` +
 				'may still be running it'
 		};
 	return null;
@@ -896,6 +990,10 @@ export interface LaneHands {
 	readonly recordAssurance: (unit: RunUnit) => Promise<ActionOutcome | null>;
 	/** Mark Satisfied on the unit's row, once Record Assurance has left it (`markSatisfied`). */
 	readonly markSatisfied: (unit: RunUnit) => Promise<ActionOutcome>;
+	/** ⭐ P7-6R R-1f — what the unit's row offers after a stop (`recoveryOffers`). */
+	readonly recoveryOffers: (unit: RunUnit) => Promise<RecoveryOffers>;
+	/** ⭐ P7-6R R-1f — one recovery act on the unit's row, the run plan's rationale typed (`recover`). */
+	readonly recover: (unit: RunUnit, act: RecoveryAct) => Promise<ActionOutcome>;
 	/** The server's dump, through a fresh request context (`freshIntrospect`). */
 	readonly read: () => Promise<Dump>;
 	/** Archive the run as it stands and check it (`archiveUnit`): the capture folders the archive holds. */
@@ -915,6 +1013,10 @@ export interface LaneHands {
  *      phase, the LIMIT (D8), or the run ends `paid-limit`. A phase that stops is left as found, and the later ones
  *      still run, each recorded as having an upstream nothing assured (D5). ⛔ DRY, NO PHASE IS PRESSED (D1): each is a
  *      unit a model runs, so the run goes from the root's archive straight to 4;
+ *   3b. ⭐ P7-6R R-1f — A PHASE THAT STOPPED AT ITS REVIEW IS RECOVERED BY THE RUN PLAN'S RULE, AS THE OPERATOR, before the
+ *      next starts (`REG-D-105` (4); `recoverByRule`): re-run the review if the row offers it, else re-run the work, the
+ *      LIMIT checked first as between phases (D8); and a re-run refused again is abandoned. ⛔ A re-run with no answer
+ *      ends the run as a Begin & Execute with none does (D4);
  *   4. SIGN-OFF: each phase that completed, then the root LAST, the page loaded afresh for each, the store read after
  *      every act, every refusal recorded and none asserted; then the final archive, `06-final`. ⭐ DRY TOO, BY THE SAME
  *      ACTS (design §6 P7-2 D11): no phase completed, so the root is signed off alone. Signing off calls no model, and
@@ -990,6 +1092,74 @@ export async function runTheLane(r: {
 				capturesBefore
 			});
 		};
+		/**
+		 * ⭐ P7-6R R-1f — ONE RECOVERY ACT on a stopped phase: pressed with the run plan's rationale, its answer kept, the unit
+		 * read from the STORE after it (`REG-F-540`), and the run record written. The end a press with no answer reached, or
+		 * null. ⚠ No archive of its own: the unit's archive was taken after its Begin & Execute, and the final archive holds
+		 * what the recovery added.
+		 */
+		const recoveryAct = async (
+			unit: RunUnit,
+			act: RecoveryAct,
+			check: LimitCheck | null
+		): Promise<RunEnd | null> => {
+			const outcome = await hands.recover(unit, act);
+			writeOnce(actionFile(lane, unit, act), actionRecordOf(unit, act, outcome));
+			reached.end = unansweredEnd(unit.title, outcome, act);
+			// ⚠ As a press: an `error` envelope or a redirect leaves the row gone, so the page is loaded afresh first.
+			const rowGone = !['success', 'failure'].includes(outcome.envelopeType ?? '');
+			if (reached.end === null && rowGone) await hands.showOverview();
+			const after = unitStateOf((await hands.read()).snapshot, unit.unitId!);
+			unit.recovery.push({
+				act,
+				rationale: RULE_RATIONALE[act],
+				limitCheck: check,
+				status: outcome.status,
+				envelopeType: outcome.envelopeType,
+				timedOutAfterMs: outcome.timedOutAfterMs,
+				requestFailure: outcome.requestFailure,
+				after
+			});
+			unit.after = after;
+			unit.stopped = stoppedAfter(outcome.envelopeType, after);
+			writeRunRecord(lane, record);
+			return reached.end;
+		};
+		/**
+		 * ⭐⭐ P7-6R R-1f — THE RUN PLAN'S RULE ON ONE STOPPED PHASE (`REG-D-105` (4)): the row read afresh; re-run the review
+		 * if the row offers it — a review that did not conclude — else re-run the work, with the findings; the LIMIT checked
+		 * before the re-run, as between phases (D8); and a re-run refused again is abandoned. Returns the end a press with no
+		 * answer reached, `'paid-limit'` when the limit stopped the re-run, or null.
+		 * ⚠ A STOP THE ROW OFFERS NO RE-RUN FOR — a step that failed, which is R-2's — is left as found, as before R-1.
+		 */
+		const recoverByRule = async (unit: RunUnit): Promise<RunEnd | 'paid-limit' | null> => {
+			await hands.showOverview();
+			const offers = await hands.recoveryOffers(unit);
+			if (!offers.rerunReview && !offers.rerunWork) return null;
+			const rerun: RecoveryAct = offers.rerunReview ? 'rerunReview' : 'rerunWork';
+			const { snapshot } = await hands.read();
+			const check = limitCheck(boot.prior as number, recordedReviewerCalls(snapshot));
+			if (!check.allowed) {
+				unit.recovery.push({
+					act: rerun,
+					rationale: RULE_RATIONALE[rerun],
+					limitCheck: check,
+					status: null,
+					envelopeType: null,
+					timedOutAfterMs: null,
+					requestFailure: null,
+					after: null
+				});
+				writeRunRecord(lane, record);
+				return 'paid-limit';
+			}
+			const rerunEnd = await recoveryAct(unit, rerun, check);
+			if (rerunEnd !== null || unit.stopped !== true) return rerunEnd;
+			// ⚠ LOADED AFRESH: a refusal leaves the page stale, and the row it shows may predate the re-run's own wait.
+			await hands.showOverview();
+			return recoveryAct(unit, 'abandonPwu', null);
+		};
+
 		/** Begin & Execute on `unit`, then its state and its archive; the end it reached, if it reached one. */
 		const run = async (unit: RunUnit): Promise<RunEnd | null> => {
 			const outcome = await hands.beginExecute(unit);
@@ -1048,6 +1218,15 @@ export async function runTheLane(r: {
 			// ⛔ THE SERVER MAY STILL BE RUNNING IT, so nothing is started beside it (D4; `REG-F-535`). When the test ends,
 			// Playwright kills the server mid-unit (`REG-F-527`): its record is the archive just taken.
 			if (ended !== null) return end(ended.reason, ended.detail);
+			// ⭐ P7-6R R-1f — a phase that stopped is recovered by the run plan's rule before the next starts.
+			if (unit.stopped === true) {
+				const recovered = await recoverByRule(unit);
+				if (recovered === 'paid-limit') {
+					reason = 'paid-limit';
+					break;
+				}
+				if (recovered !== null) return end(recovered.reason, recovered.detail);
+			}
 		}
 
 		// ── 4. SIGN-OFF: each phase that completed, then the root, LAST — every refusal recorded ─────────────────────

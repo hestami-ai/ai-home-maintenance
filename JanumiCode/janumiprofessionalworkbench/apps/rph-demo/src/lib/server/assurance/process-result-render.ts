@@ -72,7 +72,9 @@ function exitLine(run: ObservedProcessRun): string {
  * lines has still seen that a stream is a prefix. A declaration below the content it qualifies is one the reader
  * reaches only if the content did not already convince them.
  */
-function captureFacts(run: ObservedProcessRun): string[] {
+function captureFacts(
+	run: Pick<ObservedProcessRun, 'outputComplete' | 'omittedRegions'>
+): string[] {
 	return [
 		...(run.outputComplete
 			? []
@@ -110,6 +112,91 @@ export function renderProcessResultEvidence(run: ObservedProcessRun): string {
 		`--- stdout ---\n${run.stdout}`,
 		`--- stderr ---\n${run.stderr}`
 	].join('\n');
+}
+
+/** One declared cut of a run's capture, as the run carries it. */
+type ProcessRunCut = ObservedProcessRun['omittedRegions'][number];
+
+/** `[STDOUT TRUNCATED: 139264 UTF-8 bytes removed from byte offset 65536]`: the evidence view's capture-cut line (`captureFacts`). */
+const EVIDENCE_CUT_LINE =
+	/^\[(STDOUT|STDERR) TRUNCATED: (\d+) UTF-8 bytes removed from byte offset (\d+)\]$/;
+/** The evidence view's incomplete-capture line, whole: `captureFacts`'s own, so the read cannot drift from the write. */
+const EVIDENCE_INCOMPLETE_LINE = captureFacts({ outputComplete: false, omittedRegions: [] })[0];
+const EVIDENCE_STDOUT_HEADING = '--- stdout ---';
+const EVIDENCE_STDERR_SEPARATOR = '\n--- stderr ---\n';
+
+/**
+ * ⭐ `JAN-EXEC` P7-6R RD7: THE EVIDENCE VIEW READ BACK. This rebuilds a command's run from the bytes the join minted, for
+ * a re-review (`stopped-unit-recovery.ts` `rebuildProcessRun`). The re-review hands the run to the floors in memory and
+ * writes nothing.
+ * ⛔ IT LIVES HERE, BESIDE THE RENDERER, BECAUSE IT BINDS `stderr` (`REG-Q-066`), and this file's disposition (above)
+ * covers it:
+ *   · the streams it reads are the evidence view's own bytes, which are already the participating copy on the content
+ *     plane;
+ *   · the run it returns renders back to exactly those bytes, as checked below;
+ *   · so it creates no byte that the evidence view did not already create.
+ * A second binding site would need its own disposition, and REG-Q-066 answered again (`verif/agy-stderr-unbound.test.ts`).
+ * ⛔ SELF-VERIFYING: the rebuilt run is re-rendered and must reproduce the bytes EXACTLY. A parse that misread the
+ * rendering therefore refuses, rather than reviewing something else.
+ * ⛔ AN AMBIGUOUS SPLIT REFUSES: if stdout itself holds the stderr heading's line, the bytes split two ways that render
+ * identically, and which one ran cannot be told.
+ * ⚠ The evidence view does not carry the run's ordinal, its exit, its deadline, its duration or its retention. The caller
+ * supplies these from the EVIDENCE's record (`facts`, `retentionOf`). Each cut's `reason` is not in the bytes either,
+ * and the rebuilt cut says so instead of inventing one.
+ */
+export function processRunFromEvidence(
+	bytes: string,
+	facts: Pick<ObservedProcessRun, 'ordinal' | 'argv' | 'exitCode' | 'timedOut' | 'durationMs'>,
+	retentionOf: (omittedRegions: readonly ProcessRunCut[]) => ObservedProcessRun['retention']
+): { readonly run: ObservedProcessRun } | { readonly refusedBecause: string } {
+	const lines = bytes.split('\n');
+	if (lines[0] !== `command: ${commandLine(facts.argv)}`)
+		return { refusedBecause: 'its bytes do not open with the command its record names.' };
+	const stdoutAt = lines.indexOf(EVIDENCE_STDOUT_HEADING);
+	if (stdoutAt < 2) return { refusedBecause: 'its bytes hold no stdout heading.' };
+	let outputComplete = true;
+	const omittedRegions: ProcessRunCut[] = [];
+	for (const line of lines.slice(2, stdoutAt)) {
+		if (line === EVIDENCE_INCOMPLETE_LINE) {
+			outputComplete = false;
+			continue;
+		}
+		const cut = EVIDENCE_CUT_LINE.exec(line);
+		if (!cut)
+			return {
+				refusedBecause: `its bytes hold a capture line it cannot read: ${JSON.stringify(line)}.`
+			};
+		omittedRegions.push({
+			stream: cut[1] as 'STDOUT' | 'STDERR',
+			reason: 'not in the evidence: the minted bytes record the cut, not its reason (R-1 RD7)',
+			byteSize: Number(cut[2]),
+			byteOffset: Number(cut[3])
+		});
+	}
+	// The streams: stdout starts at the byte after its heading's line and runs to the one separator before the stderr
+	// heading.
+	const streams = lines.slice(stdoutAt + 1).join('\n');
+	const separatorAt = streams.indexOf(EVIDENCE_STDERR_SEPARATOR);
+	if (separatorAt < 0) return { refusedBecause: 'its bytes hold no stderr heading.' };
+	if (streams.includes(EVIDENCE_STDERR_SEPARATOR, separatorAt + 1))
+		return {
+			refusedBecause:
+				'its streams hold the stderr heading’s line a second time, so where stdout ends cannot be told.'
+		};
+	const run: ObservedProcessRun = {
+		...facts,
+		outputComplete,
+		omittedRegions,
+		retention: retentionOf(omittedRegions),
+		stdout: streams.slice(0, separatorAt),
+		stderr: streams.slice(separatorAt + EVIDENCE_STDERR_SEPARATOR.length)
+	};
+	if (renderProcessResultEvidence(run) !== bytes)
+		return {
+			refusedBecause:
+				'the run rebuilt from its bytes does not render back to them, so the rebuild is not the run.'
+		};
+	return { run };
 }
 
 /**

@@ -9,10 +9,14 @@
 // goes RED — that is the case doing its job — and is restated, in the commit that lands the remedy, to pin the new
 // behaviour; each case names the register id it pins so that commit can find it.
 //
-//   · K1  (`REG-F-511`; `REG-F-520`'s last bullet) — a review that ends INCONCLUSIVE leaves a unit that no page action
+//   · K1  (`REG-F-511`; `REG-F-520`'s last bullet) — ~~a review that ends INCONCLUSIVE leaves a unit that no page action
 //         completes: Begin & Execute is not offered again and refuses if posted, Retry re-queues the step and runs no
 //         model and no floor, the assurance acts are refused, a hand-completed step leaves the unit as unassurable as
-//         before, and the one way out is Abandon.
+//         before, and the one way out is Abandon.~~ ⭐ RESTATED WITH P7-6R R-1b (`REG-D-104` (1);
+//         `DESIGN-the-stopped-unit-recovery.md` RD2): the refusal now leaves the unit and its step WAITING for a person,
+//         no step act is admitted on the waiting step, the sign-off acts are refused, and the page offers the person's
+//         three choices; Abandon asks for their rationale and cancels the waiting step. The re-runs themselves are held by
+//         `stopped-unit-recovery.route.test.ts`.
 //   · K2r (`REG-F-520`; `REG-F-489`) — a timed-out command gives a BLOCKING finding and the completion is refused; a
 //         reply that stays malformed after its repair is INCONCLUSIVE.
 //   · K5  (`REG-F-517`) — 33 completed command runs yield 32 evidence objects, the 33rd is in no record, and the step
@@ -291,8 +295,8 @@ afterEach(() => {
 	vi.unstubAllEnvs();
 });
 
-describe('⛔ K1 (REG-F-511) — a model-run unit that stops can never be run again, only abandoned', () => {
-	it('⛔ a review that ends INCONCLUSIVE leaves a unit no page action completes: Begin & Execute is not offered again, Retry re-queues the step and runs no model and no floor, and the one way out is Abandon', async () => {
+describe('⭐ K1 (REG-F-511; R-1, REG-D-104 (1)) — a model-run unit whose review is refused WAITS for a person', () => {
+	it('⭐ a review that ends INCONCLUSIVE leaves the unit and its step WAITING: Begin & Execute is not offered again, no step act runs anything, the sign-off acts are refused, and the page offers the person’s choices — Abandon among them, now with their rationale', async () => {
 		// The review ends INCONCLUSIVE: devin fails at the transport on its call AND on that call's one retry (`P7-2b`).
 		seam.script.push(transportFailure(), transportFailure());
 		const pwuId = await modelWorkUnit();
@@ -316,18 +320,17 @@ describe('⛔ K1 (REG-F-511) — a model-run unit that stops can never be run ag
 			'arrangement: the call, its retry, and one executor turn'
 		).toEqual([2, 1]);
 
-		// ── WHAT THE PAGE SHOWS: a unit EXECUTING, its step RUNNING ─────────────────────────────────────────────────
+		// ── ⭐ WHAT THE PAGE SHOWS: the unit EXECUTING and WAITING, its step WAITING (R-1b, RD2) ─────────────────────────
+		// ⛔ RESTATED WITH R-1b: until then the refusal wrote no event, and this case pinned the unit RUNNING with its step
+		// RUNNING, offering Complete and Fail. Its first run against R-1b went red there, as predicted.
 		const shown = await page(pwuId);
 		expect(shown.row).toMatchObject({
 			workLifecycleState: 'EXECUTING',
-			executionState: 'RUNNING',
+			executionState: 'WAITING',
 			assuranceState: 'UNASSESSED'
 		});
 		expect(shown.plan.status).toBe('ACTIVE');
-		expect(shown.step).toMatchObject({
-			stepState: 'RUNNING',
-			advanceCommands: ['complete', 'fail']
-		});
+		expect(shown.step).toMatchObject({ stepState: 'WAITING', advanceCommands: [] });
 		// ⛔ Begin & Execute is offered on a PROPOSED row alone (`+page.svelte`), so it is not offered on this one again.
 		expect(branchOf('beginExecute')).toBe("{#if p.workLifecycleState === 'PROPOSED'}");
 		const { id: planId } = shown.plan;
@@ -339,13 +342,14 @@ describe('⛔ K1 (REG-F-511) — a model-run unit that stops can never be run ag
 			/^Execution failed: BeginPwuShaping: BeginPwuShaping does not declare EXECUTING as a source state — it claims \[PROPOSED\] for SHAPING\./
 		);
 
-		// ── NEITHER ASSURANCE ACT CAN BE RECORDED, AND NO GREEN ──────────────────────────────────────────────────────
-		const noPlanCited = `ChangePwuState: ChangePwuState would set PWU ${pwuId} executionState=SUCCEEDED with no execution plan evidencing it.`;
+		// ── NEITHER ASSURANCE ACT CAN BE RECORDED, AND NO GREEN: a waiting unit's execution cannot hop to SUCCEEDED ───────
+		const noHop =
+			'ChangePwuState: Illegal transition on PWU.executionState: WAITING -> SUCCEEDED (ILLEGAL_UNDEFINED: transition WAITING -> SUCCEEDED is not in the PWU.executionState matrix)';
 		const assured = await actions.recordAssurance(
 			actionEvent('recordAssurance', { pwuId }) as never
 		);
-		expect((assured as { data?: { error?: string } }).data?.error ?? '').toMatch(
-			new RegExp(`^Assurance failed: ${noPlanCited.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`)
+		expect((assured as { data?: { error?: string } }).data?.error).toBe(
+			`Assurance failed: ${noHop}`
 		);
 		const faulted = await actions.recordBlockingFinding(
 			actionEvent('recordBlockingFinding', {
@@ -353,68 +357,73 @@ describe('⛔ K1 (REG-F-511) — a model-run unit that stops can never be run ag
 				statement: 'The review never concluded.'
 			}) as never
 		);
-		expect((faulted as { data?: { error?: string } }).data?.error ?? '').toMatch(
-			new RegExp(
-				`^Recording the finding failed: ${noPlanCited.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`
-			)
+		expect((faulted as { data?: { error?: string } }).data?.error).toBe(
+			`Recording the finding failed: ${noHop}`
 		);
 		const green = await actions.markSatisfied(actionEvent('markSatisfied', { pwuId }) as never);
 		expect((green as { data?: { error?: string } }).data?.error).toBe(
 			'No green without assurance: ChangePwuState: ChangePwuState previousState UNDER_ASSURANCE does not match current EXECUTING (stale)'
 		);
 
-		// ── FAIL, THEN RETRY, THEN START: EACH DISPATCHES ITS ONE COMMAND, AND NOTHING RUNS ───────────────────────────
+		// ── ⛔ NO STEP ACT RUNS ANYTHING, AND NONE IS ADMITTED ON A WAITING STEP (`REG-F-466`) ─────────────────────────────
+		// Fail needs RUNNING, Retry FAILED, Start QUEUED, Complete RUNNING: each is refused at the step's state, and the
+		// record, the executor and the reviewer are as the stop left them.
 		const exchanges = countOf('MODEL_EXCHANGE');
 		const assessments = countOf('ASSURANCE_ASSESSMENT');
-		let from = getEngine().readAllEvents().length;
-		expect(await actions.failStep(actionEvent('failStep', { planId, stepId }) as never)).toEqual({
-			advanced: 'FailExecutionStep'
-		});
-		expect(appendedSince(from)).toEqual(['ExecutionStepFailed']);
-		from = getEngine().readAllEvents().length;
-		// ⛔ RETRY: `RetryExecutionStep` alone — FAILED to QUEUED — and no subscriber acts on it.
-		expect(await actions.retryStep(actionEvent('retryStep', { planId, stepId }) as never)).toEqual({
-			advanced: 'RetryExecutionStep'
-		});
-		expect(appendedSince(from), 'Retry dispatched more than the step retry').toEqual([
-			'ExecutionStepRetried'
-		]);
-		from = getEngine().readAllEvents().length;
-		expect(await actions.startStep(actionEvent('startStep', { planId, stepId }) as never)).toEqual({
-			advanced: 'StartExecutionStep'
-		});
-		expect(appendedSince(from)).toEqual(['ExecutionStepStarted']);
+		const from = getEngine().readAllEvents().length;
+		const refusedAt = (command: string, needs: string) =>
+			`${command} rejected — RPH_ILLEGAL_STATE_TRANSITION: ${command} requires step ${stepId} to be ${needs}, but it is WAITING. The stepState machine may permit that arrow for a DIFFERENT command; this command declares drivesFrom ${needs}.`;
+		for (const [action, command, needs] of [
+			['failStep', 'FailExecutionStep', 'RUNNING'],
+			['retryStep', 'RetryExecutionStep', 'FAILED'],
+			['startStep', 'StartExecutionStep', 'QUEUED'],
+			['completeStep', 'CompleteExecutionStep', 'RUNNING']
+		] as const) {
+			const answered = (await actions[action](
+				actionEvent(action, { planId, stepId }) as never
+			)) as {
+				data?: { error?: string };
+			};
+			expect(answered.data?.error, `${action} on a WAITING step`).toBe(refusedAt(command, needs));
+		}
+		expect(appendedSince(from), 'a step act recorded something').toEqual([]);
 		expect(seam.devin, 'a step action ran the reviewer').toHaveLength(reviewerCalls);
 		expect(seam.turns, 'a step action ran the executor').toHaveLength(turns);
 		expect(countOf('MODEL_EXCHANGE'), 'a step action recorded a model call').toBe(exchanges);
 		expect(countOf('ASSURANCE_ASSESSMENT'), 'a step action ran a floor').toBe(assessments);
 
-		// ── COMPLETED BY HAND, WITH NO OUTPUT, THE STEP SUCCEEDS — AND THE UNIT IS STILL NOT ASSURABLE ───────────────
-		from = getEngine().readAllEvents().length;
-		expect(
-			await actions.completeStep(actionEvent('completeStep', { planId, stepId }) as never)
-		).toEqual({
-			advanced: 'CompleteExecutionStep'
-		});
-		expect(appendedSince(from)).toEqual(['ExecutionStepSucceeded']);
-		const stillRefused = await actions.recordAssurance(
-			actionEvent('recordAssurance', { pwuId }) as never
-		);
-		expect((stillRefused as { data?: { error?: string } }).data?.error ?? '').toMatch(
-			new RegExp(`^Assurance failed: ${noPlanCited.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`)
-		);
-		expect((await page(pwuId)).row).toMatchObject({
-			workLifecycleState: 'EXECUTING',
-			executionState: 'RUNNING'
+		// ── ⭐ THE PERSON'S CHOICES (R-1d, RD3): after a review that did not conclude, all three ─────────────────────────
+		const data = (await load({
+			params: { id: String(getObject(getEngine(), pwuId)?.undertakingId) }
+		} as never)) as unknown as {
+			readonly recoveryByPwu: Readonly<
+				Record<string, { readonly offers: Record<string, boolean> }>
+			>;
+		};
+		expect(data.recoveryByPwu[pwuId]?.offers).toEqual({
+			rerunReview: true,
+			rerunWork: true,
+			abandon: true
 		});
 
-		// ── THE ONE WAY OUT ──────────────────────────────────────────────────────────────────────────────────────────
-		expect(await actions.abandonPwu(actionEvent('abandonPwu', { pwuId }) as never)).toEqual({
-			advanced: 'abandoned'
-		});
+		// ── ABANDON, NOW THE PERSON'S DECISION WITH THEIR RATIONALE — and it cancels the waiting step (R-1c) ─────────────
+		const unexplained = (await actions.abandonPwu(
+			actionEvent('abandonPwu', { pwuId }) as never
+		)) as {
+			data?: { error?: string };
+		};
+		expect(unexplained.data?.error, 'a waiting unit was abandoned with no rationale typed').toMatch(
+			/^Abandonment refused: This unit waits for a person’s choice/
+		);
+		expect(
+			await actions.abandonPwu(
+				actionEvent('abandonPwu', { pwuId, reason: 'The reviewer is down; stop here.' }) as never
+			)
+		).toEqual({ advanced: 'abandoned' });
 		expect((await page(pwuId)).row.workLifecycleState).toBe('ABANDONED');
+		expect((await page(pwuId)).step.stepState).toBe('CANCELLED');
 		expect(seam.devin, 'nothing after the stop ran the reviewer').toHaveLength(reviewerCalls);
-	});
+	}, 60_000);
 });
 
 describe('⛔ K2r (REG-F-520, REG-F-489) — what refuses a completion by rule', () => {
@@ -447,7 +456,8 @@ describe('⛔ K2r (REG-F-520, REG-F-489) — what refuses a completion by rule',
 			`${evidenceId} (["node","--test","run-1"]): SCHEMA_INVALID: Subject failed strict output-contract/schema validation. | PROCESS_VERDICT_UNOBSERVED: Deterministic invariant violated: PROCESS_VERDICT_UNOBSERVED CompleteExecutionStep: CompleteExecutionStep blocked: the de minimis assurance floor is not SATISFIED for result ${evidenceId} at v1`
 		);
 		expect(message).toContain('(floor.schema-invariant=REJECTED)');
-		expect((await page(pwuId)).step.stepState, 'the completion was not refused').toBe('RUNNING');
+		// ⭐ P7-6R R-1b (RD2): the refused completion leaves its step WAITING for a person, not RUNNING.
+		expect((await page(pwuId)).step.stepState, 'the completion was not refused').toBe('WAITING');
 		// ⭑ The command was reviewed too: the BLOCKING finding is the deterministic floor's, beside a review that ran.
 		expect(seam.devin).toHaveLength(2);
 	});
@@ -474,7 +484,8 @@ describe('⛔ K2r (REG-F-520, REG-F-489) — what refuses a completion by rule',
 			.filter((m) => m.state.plane === 'ASSURANCE')
 			.map((m) => `${String(m.state.exchangeRole)}:${String(m.state.disposition)}`);
 		expect(review).toEqual(['INITIAL:REPAIR_REQUESTED', 'REPAIR:REJECTED']);
-		expect((await page(pwuId)).step.stepState).toBe('RUNNING');
+		// ⭐ P7-6R R-1b (RD2): the refused completion leaves its step WAITING for a person, not RUNNING.
+		expect((await page(pwuId)).step.stepState).toBe('WAITING');
 	});
 });
 

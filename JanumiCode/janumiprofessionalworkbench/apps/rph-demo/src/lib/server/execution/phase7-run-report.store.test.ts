@@ -372,7 +372,7 @@ const ran = {
 
 /** One page action, posted as the lane posts it: logged in `posts.jsonl`, its answer saved in `lane/actions/`. */
 async function press(
-	action: 'beginExecute' | 'completeStep' | 'recordAssurance' | 'markSatisfied',
+	action: 'beginExecute' | 'resolveWaitStep' | 'completeStep' | 'recordAssurance' | 'markSatisfied',
 	unit: (typeof UNITS)[number],
 	fields: Readonly<Record<string, string>>
 ): Promise<Envelope> {
@@ -497,6 +497,15 @@ beforeAll(async () => {
 			.filter((a) => a.state.producingPwuId === unitId(implementation))
 			.at(-1)!;
 		const steps = plan.state.steps as { id: string }[];
+		// ⭐ `JAN-EXEC` P7-6R R-1b (RD2): the refusal now leaves the step WAITING for a person's choice, and Complete needs a
+		// RUNNING step — so the forbidden act takes two posts the page offers neither of: Resume, then Complete.
+		const resumed = await press('resolveWaitStep', implementation, {
+			planId: plan.id,
+			stepId: steps[0]!.id
+		});
+		expect(resumed.type, `arrangement: the waiting step was not resumed: ${resumed.error}`).toBe(
+			'success'
+		);
 		const byHand = await press('completeStep', implementation, {
 			planId: plan.id,
 			stepId: steps[0]!.id,
@@ -591,7 +600,7 @@ beforeAll(async () => {
 				limitCheck:
 					u.order === 1
 						? null
-						: { prior: 6, recorded: 0, reserve: 4, total: 10, limit: 150, allowed: true },
+						: { prior: 6, recorded: 0, reserve: 4, total: 10, limit: 200, allowed: true },
 				signOff: ran.envelopes.has(`${u.slug}:recordAssurance`)
 					? { recordAssurance: 'success' }
 					: null
@@ -714,7 +723,13 @@ describe('JAN-EXEC P7-2 D9 — the run report over stores the product wrote, rea
 			]
 		]);
 		expect(complete.posted).toBe(1);
-		expect(acts.filter((a) => a.verdict === 'FOUND').map((a) => a.act)).toEqual(['completeStep']);
+		// ⭐ P7-6R R-1b: the forbidden completion now needs the waiting step Resumed first, a hand act of its own; the two
+		// waits Begin & Execute recorded at its refusals (design, implementation) are the route's, and are not found.
+		expect(acts.filter((a) => a.verdict === 'FOUND').map((a) => a.act)).toEqual([
+			'completeStep',
+			'resolveWaitStep'
+		]);
+		expect(acts.find((a) => a.act === 'enterWaitStep')?.verdict).toBe('none');
 		expect(report().audit.forbiddenFound).toBe(1);
 		expect(report().audit.expected.map((e) => [e.act, e.count])).toEqual([
 			['CreateAssurancePolicy', 1],

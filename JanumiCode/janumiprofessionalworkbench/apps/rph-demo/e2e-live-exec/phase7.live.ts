@@ -28,6 +28,8 @@ import {
 	markSatisfied,
 	openLane,
 	recordAssurance,
+	recover,
+	recoveryOffers,
 	runTheLane,
 	screenshot,
 	typesAsTyped,
@@ -64,13 +66,19 @@ import { STORE_FILE } from './run-folder';
 //   2. The PWA, typed and read back from the store, then published; the Undertaking created; its five units read.
 //   3. Begin & Execute on the ROOT, then on each PHASE in order, each started only after the one before has answered
 //      (`REG-F-535`). Before each phase, the LIMIT (D8): the calls spent before, those this store records, and four held
-//      for the negative control must total under 150, or the run ends `paid-limit`. Each press waits on its own
+//      for the negative control must total under the sponsor's limit — ~~150~~ ⭐ 200 (`REG-D-105` (1)) — or the run ends
+//      `paid-limit`. Each press waits on its own
 //      response for up to one phase's allowance (D4); one with NO ANSWER — it outlasted that allowance, or its request
 //      failed in transit — ends the run there, `allowance-exceeded` or `request-failed`, the root's included, and
 //      nothing is started beside it. Each answer is kept raw (`lane/actions/`), and the unit's state READ FROM THE STORE
 //      (`REG-F-540`), then the run archived and checked (`scripts/phase7/run-archive.ts`, D6 and D7).
-//   4. A phase that stops is left as found, and the later phases still run, each recorded as having an upstream nothing
-//      assured — a field the store does not have (D5).
+//   4. ~~A phase that stops is left as found~~ ⭐ P7-6R R-1f — A PHASE THAT STOPS AT ITS REVIEW IS RECOVERED BY THE RUN
+//      PLAN'S RULE, AS THE OPERATOR (`REG-D-105` (4); `recoverByRule`): its row read afresh; re-run the review if the row
+//      offers it (a review that did not conclude), else re-run the work, with the findings; the LIMIT checked before the
+//      re-run, as before a phase; and a re-run refused again is abandoned. Each act posts the page's own form with the
+//      rule's rationale typed, so each choice is the operator's Decision, never the engine's. A stop the row offers no
+//      re-run for is left as found. The later phases still run, each recorded as having an upstream nothing assured — a
+//      field the store does not have (D5).
 //   5. SIGN-OFF: Record Assurance, then Mark Satisfied, on each phase that completed, and the root's attempted LAST, the
 //      page loaded afresh for each and the store read after every act, each refusal recorded, never asserted; then the
 //      final archive, `06-final`. Dry, no phase was pressed, so the root's alone, by these same acts (D11).
@@ -82,7 +90,7 @@ import { STORE_FILE } from './run-folder';
 // each command did — is recorded, never asserted: the report reads it (`scripts/phase7/run-report.ts`, D9), because a
 // lane that stopped at a product's first refusal would measure nothing after it. ⛔ The forbidden acts (P7-3) are never
 // pressed here: no step is completed, skipped or retried by hand, no waiver is asked, Mark Satisfied follows an accepted
-// Record Assurance only, nothing is abandoned or proposed again. ⚠ It never resets the engine and stipulates nothing:
+// Record Assurance only, nothing is proposed again — ⭐ and nothing is abandoned but by the run plan's rule (step 4). ⚠ It never resets the engine and stipulates nothing:
 // the store is durable, and the reviewer is real.
 
 test.describe('LIVE — JAN-EXEC Phase 7: §3.2’s PWA, published, run as an Undertaking on the real executor and reviewer', () => {
@@ -145,6 +153,9 @@ test.describe('LIVE — JAN-EXEC Phase 7: §3.2’s PWA, published, run as an Un
 				},
 				recordAssurance: (unit) => recordAssurance(page, unitRow(page, unit.title), actionFields),
 				markSatisfied: (unit) => markSatisfied(page, unitRow(page, unit.title), actionFields),
+				// ⭐ P7-6R R-1f — the run plan's rule's two hands: the row's offers, and one act on the row (`REG-D-105` (4)).
+				recoveryOffers: (unit) => recoveryOffers(unitRow(page, unit.title)),
+				recover: (unit, act) => recover(page, unitRow(page, unit.title), act, actionFields),
 				read: () => freshIntrospect(base),
 				archive: async (call) =>
 					(
