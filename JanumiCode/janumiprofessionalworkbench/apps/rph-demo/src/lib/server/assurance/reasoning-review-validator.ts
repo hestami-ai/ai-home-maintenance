@@ -442,6 +442,60 @@ function subjectHashLine(hash: string | undefined): string {
 }
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7 P7-6 I6 (`DESIGN-the-reviewer-isolated.md` §4d; `REG-F-552` remedy 2; `REG-D-105` (2)) — THE
+ * PROMPT ASKS FOR ONE ROW PER CRITERION, MET OR NOT, in every framing, on a line of its own after D8's lines.
+ *
+ * ⛔ THE CAUSE, FOUND IN DESIGNING IT: D8's *"For each failure give a one-sentence statement … and a severity"* can be read
+ * as "list only the failures" — the shape of `REG-F-552` (no rows: `{"findings":[],"recommendation":"SATISFIED",…}`, 2 of
+ * the 25 live replies that parsed) and of `REG-F-489` (rows only for the criteria faulted). An unanswered criterion is
+ * invalid output (ASR-2), so either reads INCONCLUSIVE on clean work.
+ * ⭐ THE SPONSOR'S CONDITION (`REG-D-105` (2)): the prompt must not push the reviewer to find a failure that is not there.
+ * So it asks for a row for EVERY criterion, says a met criterion is recorded as met, and asks for no failure. ⚠ D8's
+ * lines are the sponsor's answers of 2026-10-05, byte for byte, so they are not edited: this follows them.
+ * ⭑ IT NAMES NO DISPOSITION VALUE, so the statement `REG-D-090` records about the prompt's naming of ESCALATED stays
+ * true (`reasoning-review-validator.test.ts` counts every mention, in every framing). The re-qualification measures the
+ * condition: its clean cases must stay SATISFIED (design §4d).
+ * ⚠ It moves every probe and every case prompt, so the reviewer fingerprint, and a paid re-qualification with it.
+ */
+export const ONE_ROW_PER_CRITERION =
+	'Give exactly one row in findings for each criterion listed above: failed=false where the criterion is met, failed=true where it is not. A criterion that is met is recorded as met; do not look for a failure that is not there. An empty findings list leaves every criterion unassessed.';
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7 P7-6 I5 (design §4d; `REG-F-552` remedy 1) — THE LINE A REPAIR CARRIES WHEN A REPLY PARSED AND
+ * ANSWERED NO CRITERION. A repair names what was wrong, never a generic try-again (DOC-001:227) — so not the JSON repair's
+ * line, which names a fault this reply did not have. Byte for byte as the design writes it.
+ */
+export const CRITERION_REPAIR_INSTRUCTION =
+	'IMPORTANT: your reply gave no row for any criterion. Reply with ONLY the minified JSON object, with one row in findings for each criterion, failed=false where it is met.';
+
+/**
+ * ⭐ P7-6 I5 — WHY A PARSED REPLY ANSWERS NO CRITERION, in the words E-5's detail records, or `undefined` when it answers at
+ * least one. `coerceJudgement` keeps a finding only under an id the policy declares, so `judgement.findings` empty is
+ * exactly "no finding names one of the policy's criteria" — and a reply answering SOME is never this (`REG-F-489`: the
+ * floor's reading of an unanswered criterion holds). The cause is read off the reply as parsed: no findings list, an
+ * empty one, or findings under ids the policy does not declare.
+ */
+function noCriterionAnswered(
+	parsed: unknown,
+	judgement: ReasoningReviewJudgement,
+	input: ReasoningReviewInput
+): string | undefined {
+	if (judgement.findings.length > 0) return undefined;
+	const rows = (parsed as { findings?: unknown } | null)?.findings;
+	let cause = 'it carries no findings list';
+	if (Array.isArray(rows))
+		cause =
+			rows.length === 0
+				? 'its findings list is empty'
+				: `each of its ${rows.length} finding(s) names an id the policy does not declare`;
+	return (
+		`None of the policy's ${input.criteria.length} criteria was answered: the reply parsed, but ${cause} (REG-F-552). ` +
+		'One repair was requested; if it answers none either, does not parse or gets no reply, this reply’s judgement ' +
+		'is the one the review keeps, its recommendation recorded (REG-D-090).'
+	);
+}
+
+/**
  * ⭐⭐ `JAN-PRQUAL` `PQ-1` (design D2; the sponsor's answer (a) of 2026-10-03) — THE PROMPT'S PLAN: every slice measured
  * and cut, the one assembler, and the content budget that assembler leaves. ONE function, which `judgePrompt` renders
  * and `processResultContentBudget` reads — so the budget a process result's builder fits its view to IS the budget this
@@ -555,6 +609,10 @@ function promptPlan(input: ReasoningReviewInput) {
 			// fingerprint (a paid re-measurement). ⭑ No name of that value here: `REG-D-090`'s search still finds two.
 			// ⭑ `PQ-1`: the fence sentence in the preamble names and defines no disposition value either (`FENCE_MEANING`).
 			// ⭑ D8 glossed the other three again and left this one bare, last and named once, so the statement stays true.
+			// ⭐ P7-6 I6 — one row per criterion, met or not, AFTER D8's lines and on a line of its own, an empty line before
+			// it (this list drops a '', so it is written into the line, as D8's own is). It names and defines no disposition
+			// value either (`ONE_ROW_PER_CRITERION`).
+			`\n${ONE_ROW_PER_CRITERION}`,
 			'',
 			'Return ONLY a single-line minified JSON object (no markdown, no prose) shaped EXACTLY as:',
 			// The example id comes from the POLICY too. It was hardcoded to 'RR-01-no-problem-substitution' — a
@@ -1027,6 +1085,10 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 			// ⭐ P7-6 I2 — the LATEST call's session export, set afresh by every call (`attempt`) and so never an earlier
 			// call's (`TryReport.sessionExport`).
 			let toolSessionExport: string | undefined;
+			// ⭐ P7-6 I5 — every error `attempt` made of a call that got NO REPLY (the sanitised form `timed` rethrows). The I5
+			// repair reads it to tell "the repair got no reply" — after which the first judgement stands — from a refusal of
+			// who answered or a retention fault, which propagate as everywhere in this validator.
+			const noReply = new WeakSet<Error>();
 			const prompt = judgePrompt(input);
 			// ICP-02 d2b — PER-9-a: "each retry, reformat, and repair request included" is its OWN record.
 			// `firstRaw` is a CONST on purpose: the previous `raw = await print(...)` destroyed the first try's
@@ -1194,6 +1256,7 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 					// ⭐ `P7-2b` — and the sanitised error is the one form of the failure anything here keeps: the record's E-5
 					// carries its message, and it is what `timed` rethrows if the call is not run again or fails again.
 					const failure = sanitiseToolFailure(e, p, 'reasoning-review backing tool');
+					noReply.add(failure);
 					const times = { requestedAt, respondedAt: clock() };
 					const elapsedMs = Date.parse(times.respondedAt) - Date.parse(times.requestedAt);
 					const disposal = thrownCallDisposal(role, elapsedMs, callBound);
@@ -1280,6 +1343,52 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 				return { text, times, role, predecessor };
 			};
 
+			/**
+			 * ⭐⭐ P7-6 I5 — THE ONE REPAIR OF A REPLY THAT PARSED AND ANSWERED NO CRITERION: the repair's judgement when it answers
+			 * at least one criterion, else `undefined` — and the caller keeps the first. Every try is its own record (PER-9):
+			 * an answering repair `accepted`; one that answers none, or does not parse, `rejected`, its E-5 saying the first
+			 * judgement stands; one that gets no reply recorded `no-response` by `attempt` (and run once more where its bound
+			 * says so, `P7-2b`). ⛔ Only a call that got NO REPLY is absorbed here (`noReply`); a substituted model's refusal
+			 * and a retention fault propagate, as everywhere in this validator.
+			 */
+			const criterionRepair = async (first: ExchangeRecord): Promise<ReasoningReviewJudgement | undefined> => {
+				const repairPrompt = `${prompt}\n\n${CRITERION_REPAIR_INSTRUCTION}`;
+				let repaired: Awaited<ReturnType<typeof timed>>;
+				try {
+					repaired = await timed(repairPrompt, 'repair', first);
+				} catch (e) {
+					if (e instanceof Error && noReply.has(e)) return undefined;
+					throw e;
+				}
+				let judged: ReasoningReviewJudgement | undefined;
+				let value: unknown;
+				let error: unknown;
+				try {
+					value = JSON.parse(extractJson(repaired.text));
+					judged = coerceJudgement(value, input);
+				} catch (e) {
+					error = e;
+				}
+				const stillNone = judged ? noCriterionAnswered(value, judged, input) : undefined;
+				if (judged && stillNone === undefined) {
+					await capture(repaired.role, repairPrompt, repaired.text, 'accepted', repaired.times, PARSED, repaired.predecessor);
+					return judged;
+				}
+				const failed = judged
+					? { outcome: 'SCHEMA_COERCION_FAILED' as const, detail: `The repair answered no criterion either. ${stillNone}` }
+					: classifyParse(repaired.text, error);
+				await capture(
+					repaired.role,
+					repairPrompt,
+					repaired.text,
+					'rejected',
+					repaired.times,
+					{ ...failed, detail: `${failed.detail} The first reply’s judgement stands (REG-F-552; REG-D-090).` },
+					repaired.predecessor
+				);
+				return undefined;
+			};
+
 			const firstTry = await timed(prompt, 'initial');
 			const firstRaw = firstTry.text;
 			let judgement: ReasoningReviewJudgement;
@@ -1309,15 +1418,44 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 			// observed, so the behaviour is left as `REG-F-338` chose it and the ground is corrected instead.
 			let firstParsed: ReasoningReviewJudgement | undefined;
 			let firstError: unknown;
+			// ⭐ P7-6 I5 — the reply as parsed, before coercion: what `noCriterionAnswered` reads the cause off.
+			let firstValue: unknown;
 			try {
-				firstParsed = coerceJudgement(JSON.parse(extractJson(firstRaw)), input);
+				firstValue = JSON.parse(extractJson(firstRaw));
+				firstParsed = coerceJudgement(firstValue, input);
 			} catch (e) {
 				firstParsed = undefined;
 				firstError = e;
 			}
+			// ⭐ P7-6 I5 — `undefined` when the parsed reply answers at least one criterion (or did not parse at all).
+			const unanswered = firstParsed ? noCriterionAnswered(firstValue, firstParsed, input) : undefined;
 			// ⭐ `JAN-EXEC` `P7-2b` — EACH ANSWERED TRY IS RECORDED UNDER THE ROLE AND PREDECESSOR `timed` RETURNS: the call
 			// asked for, or its `retry` after a call that threw, so the chain reads as the calls were made.
-			if (firstParsed) {
+			if (firstParsed && unanswered !== undefined) {
+				// ⭐⭐ P7-6 I5 (`DESIGN-the-reviewer-isolated.md` §4d; `REG-F-552` remedy 1; `REG-D-105` (2)) — A REPLY THAT
+				// PARSED AND ANSWERED NO CRITERION IS REPAIRED ONCE. ⛔ It used to be taken as it stood — no repair follows a
+				// reply that parses — and the floor recorded it INCONCLUSIVE (ASR-2; `REG-D-090`), so its phase stopped: the
+				// measured run's own shape, `{"findings":[],"recommendation":"SATISFIED",…}`.
+				//   · the try is recorded `repair-requested`, its E-5 `SCHEMA_COERCION_FAILED` naming the cause (PER-9);
+				//   · the repair is the prompt plus a line naming that cause (`CRITERION_REPAIR_INSTRUCTION`);
+				//   · ⛔ THE REPAIR MAY ONLY ADD A CONCLUSION. Answering at least one criterion, its judgement is used; answering
+				//     none again, not parsing, or getting no reply, the FIRST judgement stands, exactly as before — never a
+				//     throw, which would turn a VALID INCONCLUSIVE with its recommendation kept into an execution failure;
+				//   · ONCE, and never after the JSON repair below: a reply that did not parse draws that one instead, and its
+				//     answer is taken as it stands, so a review makes at most one repair;
+				//   · ⚠ DISCLOSED: a repair answered by a SUBSTITUTED model is still refused (`requireReportedModel`, D6), as a
+				//     substitute is wherever it answers — a refusal of who answered, never "no answer", so it propagates.
+				const first = await capture(
+					firstTry.role,
+					prompt,
+					firstRaw,
+					'repair-requested',
+					firstTry.times,
+					{ outcome: 'SCHEMA_COERCION_FAILED', detail: unanswered },
+					firstTry.predecessor
+				);
+				judgement = (await criterionRepair(first)) ?? firstParsed;
+			} else if (firstParsed) {
 				judgement = firstParsed;
 				await capture(
 					firstTry.role,

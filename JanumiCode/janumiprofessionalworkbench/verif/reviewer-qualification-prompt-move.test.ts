@@ -30,6 +30,9 @@
 //   2c. ⭐ design §9.3 D8: the rubric and recommendation lines go back to HEAD's — D8's five instruction lines to HEAD's
 //      three, each rubric line without the ` [if unmet: <stakes>]` D8 put beside it (every line carries one), and D8's
 //      empty line and four-line sentence to HEAD's two lines;
+//   2d. ⭐ `JAN-EXEC` Phase 7 P7-6 I6 (`DESIGN-the-reviewer-isolated.md` §4d; `REG-D-105` (2)): the line asking for one row
+//      per criterion, met or not, and the empty line before it, after D8's sentence, are deleted
+//      (`\n\n${ONE_ROW_PER_CRITERION}\n` → `\n`);
 //   3. F is the first line of the form `<<<UNTRUSTED-nn>>>`; split on `\n${F}\n`: the parts alternate HOST, UNTRUSTED, …;
 //   4. rejoin each untrusted part X by the host part before it — after the subject heading as `\n${X}\n` (HEAD did not
 //      fence the content); after `A PREVIOUS review flagged:` as ` ${X}. ` (HEAD put the prior findings inline); every
@@ -39,7 +42,8 @@
 // ⚠ A PIN OF ONE MOVE: a later deliberate change to what the reviewer reads makes it false by design. Retire it then, by
 // striking it in place with a pointer to the change, as a ledger entry is retired — never by editing the recorded hashes.
 // ⭐ Design §9.3 D7 and D8 were such changes, and both are INVERTIBLE, so the pin is kept and extended (steps 2a and 2c)
-// rather than retired: today's prompt still maps back, byte for byte, to the one the selected run measured.
+// rather than retired: today's prompt still maps back, byte for byte, to the one the selected run measured. ⭐ And so is
+// P7-6 I6 (step 2d): one line, added whole, so the pin is extended again rather than retired.
 // ⛔ NO MODEL IS REACHABLE: the prompts are captured at the validator's print seam, and PATH names an empty directory.
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -52,6 +56,7 @@ import {
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { renderRationale } from '../apps/rph-demo/src/lib/server/agent/rationale.js';
 import { FENCE_MEANING } from '../apps/rph-demo/src/lib/server/assurance/review-fence.js';
+import { ONE_ROW_PER_CRITERION } from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
 import type { QualificationCase } from '../scripts/reviewer-qual/cases.js';
 import { committedCaseSet, PRODUCT_SEAMS, reviewerFingerprint } from '../scripts/reviewer-qual/fingerprint.js';
 import { caseReviewInput } from '../scripts/reviewer-qual/materialize.js';
@@ -184,9 +189,15 @@ function hashAsHead(prompt: string): string {
 	const contentEnd = without.lastIndexOf('}', without.indexOf("\nThe producing agent's PROFESSIONAL"));
 	return `${without.slice(0, contentEnd)},"candidateSubjectHash":${JSON.stringify(hash)}${without.slice(contentEnd)}`;
 }
+/** ⭐ Step 2d: P7-6 I6's line, and the empty line before it, deleted. */
+function oneRowPerCriterionAsHead(prompt: string): string {
+	const line = `\n\n${ONE_ROW_PER_CRITERION}\n`;
+	expect(prompt.split(line), 'step 2d: I6’s line, once, after its empty line').toHaveLength(2);
+	return prompt.replace(line, '\n');
+}
 /** ⭐ The inverse transform above, step by step. */
 function headPromptOf(prompt: string): string {
-	let p = prompt.replace(`${FENCE_MEANING}\n`, '');
+	let p = oneRowPerCriterionAsHead(prompt).replace(`${FENCE_MEANING}\n`, '');
 	p = p.replace(`:\n${NOT_DECLARED}\n`, `:\n"""${NOT_DECLARED}"""\n`);
 	p = p.replace(
 		'chain-of-thought):\n(none recorded)\n',

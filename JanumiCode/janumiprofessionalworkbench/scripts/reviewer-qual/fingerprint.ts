@@ -110,10 +110,16 @@ import type { CandidateIdentity } from './record.js';
 import { evaluateCase } from './runner.js';
 import { CORPUS_CASE, scoringCorpus } from './scoring-corpus.js';
 
-/** A case's two prompts, as sha256 — the hashes its CALL lines carry for the initial call and the repair. */
+/** A case's ~~two~~ prompts, as sha256 — the hashes its CALL lines carry for the initial call and ~~the repair~~ each repair. */
 export interface CasePrompts {
 	readonly initial: string;
 	readonly repair: string;
+	/**
+	 * ⭐ P7-6 I5 (`DESIGN-the-reviewer-isolated.md` §4d; `REG-F-552`) — the repair of a reply that PARSED and answered no
+	 * criterion, which the validator sends with a prompt of its own (`CRITERION_REPAIR_INSTRUCTION`), and a run records
+	 * as `criterion-repair` (`runner.ts` `callRole`; `record.ts` `CALL_ROLES`).
+	 */
+	readonly 'criterion-repair': string;
 }
 export interface ReviewerFingerprint {
 	/** The reviewer fingerprint — a RUN line's `reviewerFingerprint`. */
@@ -225,6 +231,9 @@ const cleanJudgement = (criteria: readonly AssessmentCriterion[]): string =>
 	});
 /** A first reply no parse accepts, so the validator sends its repair prompt too. */
 const UNUSABLE = 'not a judgement';
+/** ⭐ P7-6 I5 — a first reply that PARSES and answers no criterion (`REG-F-552`'s shape), so the validator sends its
+ *  criterion repair. */
+const ANSWERS_NO_CRITERION = '{"findings":[],"recommendation":"SATISFIED","residualUncertainty":["x"]}';
 
 /** How a refusal is hashed: this line, the statement the validator refused with, then the content it was handed. */
 const REFUSED = 'REFUSED — the validator sent no prompt:';
@@ -333,17 +342,27 @@ async function casePromptsOf(
 	cases: readonly QualificationCase[]
 ): Promise<Map<string, CasePrompts>> {
 	const out = new Map<string, CasePrompts>();
-	for (const c of cases) {
+	/** The prompts the seams' validator sends for `c` when its first reply is `first` and its second answers clean. */
+	const capture = async (c: QualificationCase, first: string): Promise<string[]> => {
 		const sent: string[] = [];
 		const validator = seams.validator(async (p) => {
 			sent.push(p);
-			return sent.length === 1 ? UNUSABLE : cleanJudgement(seams.criteria);
+			return sent.length === 1 ? first : cleanJudgement(seams.criteria);
 		});
 		await validator.evaluate(c.subject, { reasoningReview: caseReviewInput(c, seams.criteria, seams.processResult) });
+		return sent;
+	};
+	for (const c of cases) {
+		const sent = await capture(c, UNUSABLE);
 		const [initial, repair] = sent;
 		if (sent.length !== 2 || initial === undefined || repair === undefined)
 			throw new Error(`${c.id}: the capture drew ${sent.length} prompt(s), not an initial and a repair`);
-		out.set(c.id, { initial: sha256(initial), repair: sha256(repair) });
+		// ⭐ P7-6 I5 — and the criterion repair, drawn by a first reply that parses and answers no criterion.
+		const criterion = await capture(c, ANSWERS_NO_CRITERION);
+		const criterionRepair = criterion[1];
+		if (criterion.length !== 2 || criterionRepair === undefined)
+			throw new Error(`${c.id}: the capture drew ${criterion.length} prompt(s), not an initial and a criterion repair`);
+		out.set(c.id, { initial: sha256(initial), repair: sha256(repair), 'criterion-repair': sha256(criterionRepair) });
 	}
 	return out;
 }

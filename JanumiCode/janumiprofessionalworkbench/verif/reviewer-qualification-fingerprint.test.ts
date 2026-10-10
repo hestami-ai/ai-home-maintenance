@@ -168,12 +168,16 @@ const CURRENT_CASES = committedCaseSet(new URL('../', import.meta.url)).cases;
 /** ⭐ `PQ-2` — the current set's process-result cases: the case prompts a change to what a process result's reviewer reads
  *  may move, and the only ones. */
 const CURRENT_PROCESS_RESULTS = CURRENT_CASES.filter((c) => c.arm === 'PROCESS_RESULT').map((c) => c.id);
-/** ⭐ `PQ-2` — the cases of `base` whose prompts moved in `fp`, the initial or the repair. */
+/** ⭐ `PQ-2` — the cases of `base` whose prompts moved in `fp`, the initial or ~~the repair~~ either repair (⭐ P7-6 I5: the
+ *  criterion repair's too). */
 const movedCasePrompts = (fp: ReviewerFingerprint, base: ReviewerFingerprint): string[] =>
 	[...base.casePrompts].filter(([id, p]) => {
 		const now = fp.casePrompts.get(id);
-		return now?.initial !== p.initial || now.repair !== p.repair;
+		return now?.initial !== p.initial || now.repair !== p.repair || now['criterion-repair'] !== p['criterion-repair'];
 	}).map(([id]) => id);
+/** ⭐ P7-6 I5 — the line the validator's criterion repair carries (`CRITERION_REPAIR_INSTRUCTION`), as design §4d writes it. */
+const CRITERION_REPAIR_LINE =
+	'IMPORTANT: your reply gave no row for any criterion. Reply with ONLY the minified JSON object, with one row in findings for each criterion, failed=false where it is met.';
 /**
  * ⭐ `PQ-2` (design D4) — the CURRENT set's case prompts a change at `seams` moves. ⛔ A row that asked only whether a
  * change moved a case prompt of case set v1 asked it of a set that holds no process result, so its "no case prompt"
@@ -362,6 +366,20 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint MOVES on each component
 				evaluateCase({
 					...a,
 					call: (p) => a.call(p.replace(REPAIR_INSTRUCTION, `${REPAIR_INSTRUCTION} Nothing else.`))
+				})
+		});
+		onlyMoved(fp, ['scoring']);
+	});
+
+	it('⭐⭐ P7-6 I5 — the CRITERION REPAIR’s line, the instruction a reply that answers no criterion draws: the scoring digest moves', async () => {
+		// ⭐ The corpus holds replies that answer no criterion (`scoring-corpus.ts`: `no-rows-repaired`, `no-findings-array`,
+		// `bare-scalar`), so the line their repair carries is hashed as the JSON repair's is — appended to its first prompt.
+		const fp = await reviewerFingerprint(CASES, {
+			...PRODUCT_SEAMS,
+			evaluate: (a) =>
+				evaluateCase({
+					...a,
+					call: (p) => a.call(p.replace(CRITERION_REPAIR_LINE, `${CRITERION_REPAIR_LINE} Nothing else.`))
 				})
 		});
 		onlyMoved(fp, ['scoring']);
@@ -4117,6 +4135,30 @@ describe('JAN-CRITREAD J2-3 — the scoring corpus', () => {
 	});
 });
 
+describe('⭐⭐ P7-6 I5 — the scoring corpus holds the measured run’s reply, repaired, PINNED BY ID', () => {
+	it('⭐ `no-rows-repaired` — SATISFIED with no findings at all draws the criterion repair, whose clean answer is the judgement scored', async () => {
+		// ⛔ PER ENTRY (as the ER-2 pins above): a set pin is kept green by any entry. This holds the one entry whose repair
+		// ANSWERS — so the digest moves if the repair is dropped, or if the first judgement is kept after a repair that answered.
+		const entry = scoringCorpus(SEEDED_REASONING_REVIEW_CRITERIA).find((e) => e.id === 'no-rows-repaired');
+		expect(entry, 'a corpus entry').toBeDefined();
+		const sent: string[] = [];
+		let n = 0;
+		const e = await evaluateCase({
+			case: CORPUS_CASE,
+			criteria: SEEDED_REASONING_REVIEW_CRITERIA,
+			candidate: FIXTURE,
+			scoringDigest: '0'.repeat(64),
+			call: async (p) => {
+				sent.push(p);
+				return { returned: entry!.replies[Math.min(n++, entry!.replies.length - 1)]!, served: null };
+			}
+		});
+		expect(e.calls.map((c) => c.role), 'two calls: the initial, then the criterion repair').toEqual(['initial', 'criterion-repair']);
+		expect(sent[1], 'the repair carries the line naming the cause').toBe(`${sent[0]}\n\n${CRITERION_REPAIR_LINE}`);
+		expect([e.scored.disposition, e.scored.resultClass], 'the repair’s answer is the one scored').toEqual(['SATISFIED', 'VALID']);
+	});
+});
+
 describe('JAN-SELREV SR-2 (D6) — the fingerprint measures the validator WITHOUT `requireReportedModel`', () => {
 	it('⛔ a corpus reply reporting ANOTHER model is scored, never refused — by both of the fingerprint’s validators', async () => {
 		// ⚠ THE TWO SEAMS ARE NOT GUARDED ALIKE. The fingerprint hashes the SCORING seam's outcomes, so the option set there
@@ -4257,6 +4299,48 @@ describe('JAN-CRITREAD J2-3 — the fingerprint and the runner agree', () => {
 		expect(calls).toHaveLength(4);
 		for (const call of calls)
 			expect(call.promptSha256, `${call.caseId} ${call.role}`).toBe(BASE_NOW.casePrompts.get(call.caseId)![call.role]);
+	});
+
+	it('⭐⭐ P7-6 I5 — a repair after a reply that PARSED and answered no criterion is recorded `criterion-repair`, and its hash is the case prompt the fingerprint derives for it', async () => {
+		// ⭐ `DESIGN-the-reviewer-isolated.md` §4d (`REG-F-552`): the validator repairs such a reply with a prompt of its own
+		// (`CRITERION_REPAIR_INSTRUCTION`). ⛔ Recorded as a plain `repair`, its hash would be compared with the JSON repair's:
+		// a run under today's fingerprint would read as a prompt that changed though the fingerprint did not (limb 2), and
+		// its case as unmeasured (limb 1) — the paid re-qualification refused for the reviewer's own repair.
+		const one: QualificationCase[] = CURRENT_CASES.filter((c) => c.id === 'W-CLEAN');
+		let n = 0;
+		const lines = await runQualification({
+			runId: 'qr-agree-3',
+			date: '2026-10-10T12:00:00.000Z',
+			commit: 'e5f9358b'.repeat(5),
+			fingerprint: { reviewer: BASE_NOW.reviewer, scoring: BASE_NOW.scoring, caseSet: BASE_NOW.caseSet },
+			cases: one,
+			caseSetVersion: 4,
+			oracleVersion: 4,
+			criteria: SEEDED_REASONING_REVIEW_CRITERIA,
+			transport: {
+				name: 'stub',
+				identify: async () => FIXTURE,
+				call: async () => ({
+					returned:
+						(n += 1) === 1
+							? '{"findings":[],"recommendation":"SATISFIED","residualUncertainty":["x"]}'
+							: JSON.stringify({
+									findings: SEEDED_REASONING_REVIEW_CRITERIA.map((k) => ({ criterionId: k.id, failed: false, statement: 'absent' })),
+									recommendation: 'SATISFIED'
+								}),
+					served: null
+				})
+			},
+			repetitions: 1,
+			env: {}
+		});
+		const calls = lines.filter((l): l is CallLine => l.kind === 'CALL');
+		expect(calls.map((c) => c.role)).toEqual(['initial', 'criterion-repair']);
+		for (const call of calls)
+			expect(call.promptSha256, `${call.caseId} ${call.role}`).toBe(BASE_NOW.casePrompts.get(call.caseId)![call.role]);
+		// ⭐ And the two repairs are two prompts: the record can tell them apart only because their hashes differ.
+		const prompts = BASE_NOW.casePrompts.get('W-CLEAN')!;
+		expect(prompts['criterion-repair']).not.toBe(prompts.repair);
 	});
 
 	it('⭐ the case-set digest is over the cases’ inputs: an input edit moves it and moves no reviewer component', async () => {

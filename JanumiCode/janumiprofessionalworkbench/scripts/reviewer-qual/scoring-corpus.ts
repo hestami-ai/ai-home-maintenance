@@ -150,8 +150,27 @@ export function scoringCorpus(criteria: readonly AssessmentCriterion[]): readonl
 			covers: 'one criterion never answered',
 			replies: [reply(ids.slice(1).map((id) => row(id)))]
 		},
-		{ id: 'no-findings-array', covers: 'findings is not an array', replies: [JSON.stringify({ findings: 'none', recommendation: 'SATISFIED' })] },
-		{ id: 'bare-scalar', covers: 'a bare JSON scalar, which parses as a judgement with no findings', replies: ['null'] },
+		// ⭐ P7-6 I5 — each of these two answers no criterion, so each now draws the criterion repair, which (its one reply
+		// repeating) answers none again: the first judgement stands, as before the repair existed.
+		{
+			id: 'no-findings-array',
+			covers: 'findings is not an array — and (P7-6 I5) the criterion repair answers none again, so the first judgement stands',
+			replies: [JSON.stringify({ findings: 'none', recommendation: 'SATISFIED' })]
+		},
+		{
+			id: 'bare-scalar',
+			covers: 'a bare JSON scalar, which parses as a judgement with no findings — and (P7-6 I5) the criterion repair answers none again',
+			replies: ['null']
+		},
+		// ⭐ `JAN-EXEC` Phase 7 P7-6 I5 (`DESIGN-the-reviewer-isolated.md` §4d; `REG-F-552`) — the measured run's own reply,
+		// SATISFIED with not one row, now repaired once: here the criterion repair answers every criterion, and its judgement
+		// is the one scored. So dropping the repair, or keeping the first judgement after a repair that answered, moves the
+		// digest (the calls it drew, and its outcome); and the repair's line is hashed as the JSON repair's is (`fingerprint.ts`).
+		{
+			id: 'no-rows-repaired',
+			covers: 'REG-F-552: SATISFIED with no findings at all; the criterion repair (P7-6 I5) answers every criterion clean, and its judgement is used',
+			replies: ['{"findings":[],"recommendation":"SATISFIED","residualUncertainty":["x"]}', clean]
+		},
 		{
 			id: 'reported-as-producer',
 			covers: 'the tool reports the producer as the model that answered — independence fails',

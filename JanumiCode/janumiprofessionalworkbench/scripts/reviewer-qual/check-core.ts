@@ -49,6 +49,7 @@ import {
 	serverDayOf,
 	type AcknowledgedLine,
 	type CallLine,
+	type CasePromptHashes,
 	type EscalationLine,
 	type HeldOutLine,
 	type MaterialFailureClass,
@@ -67,7 +68,9 @@ export interface CurrentReviewer {
 	readonly scoring: string;
 	readonly caseSet: string;
 	readonly components: FingerprintComponents;
-	readonly casePrompts: ReadonlyMap<string, { readonly initial: string; readonly repair: string }>;
+	// ⭐ P7-6 I5 — each call role's hash, the criterion repair's among them (`record.ts` `CALL_ROLES`), so a recorded call is
+	// held to the prompt today's reviewer sends for the repair it was.
+	readonly casePrompts: CasePromptHashes;
 }
 export interface CheckInputs {
 	/** The record's top-level `*.ndjson` files git tracks, by name, as they stand. */

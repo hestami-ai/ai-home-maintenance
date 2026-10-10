@@ -577,6 +577,21 @@ describe('JAN-CRITREAD J2-2 — the reviewer-qualification record', () => {
 		).toContain('line 2: CALL G-CLEAN#1 initial is scored under a digest that is not its run’s');
 	});
 
+	it('⭐ P7-6 I5 — a `criterion-repair` is the second call of an evaluation, as a `repair` is: lawful after an initial, never first, never beside another repair', () => {
+		// ⭐ `DESIGN-the-reviewer-isolated.md` §4d (`REG-F-552`): the validator now repairs a reply that PARSED and answered no
+		// criterion, with a prompt of its own. The record names which repair a call was, so its prompt hash is compared with
+		// the one today's reviewer sends for THAT repair (`fingerprint.ts` `CasePrompts`).
+		const at = (lines: readonly unknown[]) => recordProblems(text(lines), { tracked: true }).join('\n');
+		const initial = { ...CALL_ANSWERED, scored: null };
+		const criterionRepair = { ...CALL_ANSWERED, role: 'criterion-repair', promptSha256: HEX('f') };
+		// ⛔ AT HEAD: refused as a role the record does not know.
+		expect(at([RUN, initial, criterionRepair]), 'an initial, then its criterion repair, scored on the last').toBe('');
+		expect(at([RUN, criterionRepair])).toContain('line 2: CALL G-CLEAN#1 criterion-repair does not follow an initial call');
+		expect(at([RUN, initial, { ...CALL_ANSWERED, role: 'repair', scored: null }, criterionRepair])).toContain(
+			'line 4: CALL G-CLEAN#1 criterion-repair: the evaluation already has initial and repair'
+		);
+	});
+
 	it('⛔ `JAN-SELREV` SR-4 — A SELECTION names a candidate the product can DEPLOY and the sponsor ruling it rests on; a malformed one is refused like any other line (REG-D-086)', () => {
 		const selection = EVERY_KIND.find((l): l is SelectionLine => l.kind === 'SELECTION')!;
 		const at = (line: unknown) => lineProblems(line).join('\n');
