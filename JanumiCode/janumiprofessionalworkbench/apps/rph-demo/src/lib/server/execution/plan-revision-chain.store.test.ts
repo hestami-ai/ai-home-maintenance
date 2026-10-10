@@ -541,7 +541,12 @@ describe('⭐ R-1a (REG-D-104 (1), REG-F-511) — the plan-revision chain, from 
 
 		// ── THE RE-REVIEW: the floors recorded again over A's work product, and this time the review concludes ─────────
 		expect(await recordFloor(k.art, true), 'the re-review did not conclude').toBe(true);
-		// ⭑ RD10 (`REG-F-433`): the re-review is LATER than the refused review, so the latest-per-policy read does not tie.
+		// ⭑ THE FLOOR GATE reads the latest assessment per policy BY `updatedAt` (`latestAssessmentByPolicy`), so a re-review
+		// recorded later is the one it reads — that, and only that, is what this pins.
+		// ⚠ `P76F-A` A6: ~~RD10 (`REG-F-433`): the re-review is LATER than the refused review, so the latest-per-policy read
+		// does not tie.~~ RD10 struck that line: `REG-F-433`'s reader (`loadReviewerAnswer`) sorts by `attemptOrdinal` alone,
+		// and a re-review's first try ties the original's at 1, so it returns the OLDER answer. That reader, and the run
+		// report's pairing by subject, are B7's (`REG-F-433`'s join key).
 		const [refused, rerun] = reviewsOf(k.art);
 		expect(
 			[refused?.state.assessmentState, rerun?.state.assessmentState],
@@ -549,7 +554,7 @@ describe('⭐ R-1a (REG-D-104 (1), REG-F-511) — the plan-revision chain, from 
 		).toEqual(['INCONCLUSIVE', 'SATISFIED']);
 		expect(
 			String(rerun!.state.updatedAt) > String(refused!.state.updatedAt),
-			'the re-review ties the refused review in time'
+			'the re-review is not later by updatedAt, which is what the floor gate reads'
 		).toBe(true);
 
 		expect(

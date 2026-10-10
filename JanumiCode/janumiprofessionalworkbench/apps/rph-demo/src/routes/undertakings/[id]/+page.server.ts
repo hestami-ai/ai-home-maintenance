@@ -2578,8 +2578,14 @@ export const actions: Actions = {
 	//
 	// A person's choice on a unit waiting after a review that DID NOT CONCLUDE: the floors run again over the refused
 	// attempt's recorded work product and evidence, and NO PRODUCER RUNS. The new attempt is plan B's one step, an
-	// `ASSURANCE_INVOCATION`, whose input is that work product; B completes NAMING it, and the gate judges the new
-	// assessments, which are later in time than the refused ones and so the ones it reads (RD10, `REG-F-433`).
+	// `ASSURANCE_INVOCATION`, whose input is that work product; B completes NAMING it, and the FLOOR GATE judges the new
+	// assessments: it reads the latest per policy by `updatedAt` (`latestAssessmentByPolicy`), and they are recorded
+	// later than the refused ones.
+	// ⚠ `P76F-A` A6 — THAT HOLDS FOR THE GATE ALONE. ~~"later in time … and so the ones it reads (RD10,
+	// `REG-F-433`)"~~: RD10 struck its line that a re-review "is later in time, so it does not tie". `REG-F-433`'s reader
+	// (`loadReviewerAnswer`) sorts by `attemptOrdinal` alone, a re-review's first try is ordinal 1 like the original's,
+	// so the two TIE and the OLDER answer is returned; and the run report pairs a review with its answers by subject.
+	// Both are B7's, `REG-F-433`'s join key.
 	// ⛔ REFUSED AFTER A REVIEW THAT CONCLUDED — against the work, or escalated — BY THE SERVER, not only by the page
 	// (`REG-D-105` (3); `rerunReviewRefusal`): the latest assessment wins, so a re-review run until one said SATISFIED would
 	// clear a reasoned refusal.
