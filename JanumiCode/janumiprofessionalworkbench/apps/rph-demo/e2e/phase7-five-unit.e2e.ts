@@ -40,7 +40,7 @@ import {
 import {
 	ABANDON_FROM_WAITING_CITATION,
 	RERUN_REVIEW_CITATION,
-	RERUN_WORK_CITATION
+	RERUN_WORK_AFTER_NOT_CONCLUDED_CITATION
 } from '../src/lib/server/execution/recovery-authority';
 
 // ⭐⭐ `JAN-EXEC` Phase 7, P7-1b — THE FIVE-UNIT REHEARSAL, IN THE DETERMINISTIC GATE LANE
@@ -955,7 +955,8 @@ test.describe('JAN-EXEC Phase 7 P7-1b — the five-unit rehearsal, in the gate l
 				selectedOption: option,
 				status: 'EFFECTIVE',
 				// ⭐ `P76F-A` A3 — the person's words, verbatim, then the ruling that authorises the act (RD4).
-				rationale: `${rationale}\n\n${option === 'RERUN_REVIEW' ? RERUN_REVIEW_CITATION : RERUN_WORK_CITATION}`,
+				// ⭐ `P76F-C` C5 — the design phase's review did NOT conclude, so its re-run of the work cites `REG-D-104` (1) alone.
+				rationale: `${rationale}\n\n${option === 'RERUN_REVIEW' ? RERUN_REVIEW_CITATION : RERUN_WORK_AFTER_NOT_CONCLUDED_CITATION}`,
 				authority: { actorId: OPERATOR, actorType: 'HUMAN' }
 			});
 		}

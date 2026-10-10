@@ -141,7 +141,8 @@ import { RATIONALE_REQUIRED, stoppedUnitOf } from '../../../lib/server/execution
 import {
 	ABANDON_FROM_WAITING_CITATION,
 	RERUN_REVIEW_CITATION,
-	RERUN_WORK_CITATION
+	RERUN_WORK_AFTER_CONCLUDED_CITATION,
+	RERUN_WORK_AFTER_NOT_CONCLUDED_CITATION
 } from '../../../lib/server/execution/recovery-authority.js';
 import {
 	createProcessRunObserver,
@@ -389,6 +390,75 @@ describe('⭐ R-1b (RD2, RD6) — the refusal records the wait, and each work pr
 		).toEqual([]);
 		// RD6 — the work product names the attempt that made it: the step's first Start.
 		expect(getObject(getEngine(), art)?.producingExecutionAttemptId).toBe(`${stepA}#1`);
+	});
+});
+
+// ── ⭐⭐ `P76F-C` C3 (RD2, RD3; `REG-D-104` (1); `REG-D-105` (3); PER-9) — THE WAIT'S REASON NAMES ONLY THE CHOICES OFFERED ──
+// ⛔ THE DEFECT: `waitReasonFor` wrote *"The unit waits for a person to choose: re-run the review, re-run the work with the
+// findings, or abandon it"* for EVERY refusal — on the permanent record of a review that concluded against the work, where
+// `REG-D-105` (3) withholds the re-review, and of a reviewer that must change, where `P76F-A` A4 withholds both re-runs. A
+// false statement of what the person may do, written where the refusal happens and kept.
+// ⭐ Each case reads the RECORDED reason, and holds it to what the page then offers the same unit (`recoveryShown`): the
+// reason is written at the refusal, from the floors just recorded; the offers are read later, from the record — two
+// readings that must agree.
+describe('⭐⭐ P76F-C C3 — the recorded wait reason names only the choices offered for that refusal’s kind', () => {
+	/** The acts the reason names, in the order it names them. */
+	const actsIn = (reason: string): string[] =>
+		['re-run the review', 're-run the work with the findings', 'abandon it'].filter((a) => reason.includes(a));
+	/** The acts the page offers, in the same words. */
+	const actsOffered = (offers: Record<string, boolean>): string[] => [
+		...(offers.rerunReview ? ['re-run the review'] : []),
+		...(offers.rerunWork ? ['re-run the work with the findings'] : []),
+		...(offers.abandon ? ['abandon it'] : [])
+	];
+
+	it.each([
+		[
+			'a review that did NOT CONCLUDE — all three',
+			[transportFailure(), transportFailure()],
+			CLEAN,
+			'NOT_CONCLUDED',
+			(art: string) =>
+				`The assurance floor refused the completion — ${art}: floor.reasoning-review=INCONCLUSIVE. The unit waits for a person to choose: re-run the review, re-run the work with the findings, or abandon it (REG-D-104 (1)).`
+		],
+		[
+			'a review that CONCLUDED against the work — re-run the work, or abandon',
+			[],
+			REJECTED,
+			'CONCLUDED',
+			(art: string) =>
+				`The assurance floor refused the completion — ${art}: floor.reasoning-review=REJECTED. The unit waits for a person to choose: re-run the work with the findings, or abandon it (REG-D-104 (1)). The review concluded, so it is not re-run (REG-D-105 (3)).`
+		],
+		[
+			'a review that ESCALATED — re-run the work, or abandon',
+			[],
+			ESCALATED,
+			'ESCALATED',
+			(art: string) =>
+				`The assurance floor refused the completion — ${art}: floor.reasoning-review=ESCALATED. The unit waits for a person to choose: re-run the work with the findings, or abandon it (REG-D-104 (1)). The review escalated to a person, so it is not re-run (REG-D-105 (3), REG-F-474).`
+		]
+	] as const)('⛔ %s', async (_label, script, answer, kind, expected) => {
+		const k = await aWaitingUnit([...script], answer);
+		const [reason] = payloads('ExecutionStepWaiting', k.planA).map((p) => String(p.waitReason));
+		expect(reason, 'the recorded wait reason').toBe(expected(k.art));
+		const { view } = await recoveryShown(k.pwuId);
+		expect(view?.kind, 'arrangement: the refusal is not this kind').toBe(kind);
+		expect(actsIn(reason!), 'the reason names a choice the page does not offer').toEqual(actsOffered(view!.offers));
+	});
+
+	it('⛔ a reviewer that MUST CHANGE — abandon alone, and why neither re-run is offered', async () => {
+		seam.reportedModel = 'substituted-model';
+		const k = await aWaitingUnit([]);
+		const [reason] = payloads('ExecutionStepWaiting', k.planA).map((p) => String(p.waitReason));
+		const { view } = await recoveryShown(k.pwuId);
+		expect(view?.kind, 'arrangement: the refusal is not a reviewer that must change').toBe('REVIEWER_MUST_CHANGE');
+		expect(reason).toMatch(
+			new RegExp(
+				`^The assurance floor refused the completion — ${k.art}: floor\\.reasoning-review=INCONCLUSIVE\\. The unit waits for a person to abandon it — ` +
+					'neither re-run is offered: the reviewer must change before anything is re-run \\(.*\\(REQUALIFY_OR_RESELECT_REVIEWER\\)\\)\\.'
+			)
+		);
+		expect(actsIn(reason!), 'the reason names a choice the page does not offer').toEqual(actsOffered(view!.offers));
 	});
 });
 
@@ -662,6 +732,9 @@ describe('⭐ R-1c — re-run the work (RD5, RD8): a fresh session whose first t
 		const first = seam.turns.find((t) => t.session === sessions + 1)!.text;
 		expect(first).toBe(instruction);
 		expect(first).not.toContain('REVIEWER_RECOMMENDED_ESCALATION');
+		// ⭐ `P76F-C` C5 — an escalation CONCLUDED the review (`REG-D-105` (3)'s question named "REJECTED or ESCALATED"), so the
+		// re-run of the work cites (3)'s clause, as after a review that concluded against the work.
+		expect(String(decisionsOf(k.pwuId)[0]?.state.rationale)).toBe(`Re-run it.\n\n${RERUN_WORK_AFTER_CONCLUDED_CITATION}`);
 	});
 
 	it('⛔ RD4 — with no rationale typed, the re-run of the work is refused, opens no session and records nothing', async () => {
@@ -711,7 +784,9 @@ describe('⭐⭐ P76F-A A3 — each choice’s Decision is the person’s words,
 	it('⭐ each act’s citation names its ruling, and says no policy object authorises the person’s choice', () => {
 		for (const [act, citation, rulings] of [
 			['re-run the review', RERUN_REVIEW_CITATION, ['REG-D-104 (1)', 'REG-D-105 (3)']],
-			['re-run the work', RERUN_WORK_CITATION, ['REG-D-104 (1)', 'REG-D-105 (3)']],
+			['re-run the work after a review that concluded', RERUN_WORK_AFTER_CONCLUDED_CITATION, ['REG-D-104 (1)', 'REG-D-105 (3)']],
+			// ⭐ `P76F-C` C5 — (3) is named only to say it rules what follows a CONCLUDED review: here (1) alone authorises.
+			['re-run the work after a review that did not conclude', RERUN_WORK_AFTER_NOT_CONCLUDED_CITATION, ['REG-D-104 (1)']],
 			['abandon from waiting', ABANDON_FROM_WAITING_CITATION, ['REG-D-104 (1)']]
 		] as const) {
 			for (const ruling of rulings) expect(citation, `${act} does not cite ${ruling}`).toContain(ruling);
@@ -719,7 +794,14 @@ describe('⭐⭐ P76F-A A3 — each choice’s Decision is the person’s words,
 			expect(citation, `${act} does not point at RD4`).toContain('RD4');
 		}
 		// ⛔ One citation per act: a re-run of the work is not authorised by the re-review's reading of `REG-D-105` (3).
-		expect(new Set([RERUN_REVIEW_CITATION, RERUN_WORK_CITATION, ABANDON_FROM_WAITING_CITATION]).size).toBe(3);
+		expect(
+			new Set([
+				RERUN_REVIEW_CITATION,
+				RERUN_WORK_AFTER_CONCLUDED_CITATION,
+				RERUN_WORK_AFTER_NOT_CONCLUDED_CITATION,
+				ABANDON_FROM_WAITING_CITATION
+			]).size
+		).toBe(4);
 	});
 
 	it('⛔ the typed text survives VERBATIM — its inner spacing, a tab, quotes and markup-like characters — and the re-run of the work cites ITS ruling', async () => {
@@ -730,7 +812,28 @@ describe('⭐⭐ P76F-A A3 — each choice’s Decision is the person’s words,
 		seam.answer = CLEAN;
 		expect(await act('rerunWork', { pwuId: k.pwuId, rationale: typed })).toEqual({ advanced: 'work-rerun' });
 		const [decision] = decisionsOf(k.pwuId);
-		expect(decision?.state.rationale).toBe(`${typed}\n\n${RERUN_WORK_CITATION}`);
+		// ⭐ `P76F-C` C5 — after a review that CONCLUDED against the work: `REG-D-105` (3)'s clause applies.
+		expect(decision?.state.rationale).toBe(`${typed}\n\n${RERUN_WORK_AFTER_CONCLUDED_CITATION}`);
+	});
+
+	// ⛔⛔ `P76F-C` C5 — THE WORK RE-RUN CITES THE CLAUSE THAT APPLIES. It cited `REG-D-105` (3) — *"keeps a re-run of the work …
+	// after a review that concluded against the work"* — on EVERY re-run of the work, also after a review that did NOT
+	// conclude, where `REG-D-104` (1) alone authorises it: a false citation on the Decision's permanent record.
+	it('⛔ after a review that did NOT conclude, the re-run of the work cites REG-D-104 (1) alone — never REG-D-105 (3)’s clause for a concluded review', async () => {
+		const k = await aWaitingUnit([transportFailure(), transportFailure()]);
+		seam.answer = CLEAN;
+		const typed = 'The reviewer never answered; attempt the work again.';
+		expect(await act('rerunWork', { pwuId: k.pwuId, rationale: typed })).toEqual({ advanced: 'work-rerun' });
+		const rationale = String(decisionsOf(k.pwuId)[0]?.state.rationale);
+		expect(rationale.startsWith(`${typed}\n\n`), 'the typed text is not first, verbatim').toBe(true);
+		expect(rationale, 'a review that did not conclude cited as one that concluded').not.toContain(
+			'after a review that concluded against the work'
+		);
+		expect(rationale).toContain('REG-D-104 (1)');
+		expect(rationale).toMatch(/No policy object authorises/);
+		expect(rationale, 'the citation is not the one for a review that did not conclude').toBe(
+			`${typed}\n\n${RERUN_WORK_AFTER_NOT_CONCLUDED_CITATION}`
+		);
 	});
 
 	it('⭑ CONTROL — abandoning a unit that is NOT waiting is the S-1 path as before: its rationale cites nothing it was not given', async () => {
@@ -749,7 +852,8 @@ describe('⭐⭐ P76F-A A3 — each choice’s Decision is the person’s words,
 // and the paid lane's rule pressed it: another billed call to the reviewer just refused. The classifier's own guidance for
 // the first: *"Retrying or reconfiguring the same selection does not fix this: another call is billed and may be served
 // the same way."* A re-run of the WORK is reviewed by that same reviewer too, so neither re-run is offered, and the SERVER
-// refuses both: the unit waits for the reviewer to change, or is abandoned.
+// refuses both: ~~the unit waits for the reviewer to change, or is abandoned~~ ⛔ `P76F-C` C4: the reviewer must change, a
+// changed one re-opens no re-run of this unit (not built), and today the unit can be abandoned.
 
 /** The finding codes recorded on observations about `subjectId`. */
 const observationCodesOf = (subjectId: string): string[] =>
@@ -804,6 +908,13 @@ describe('⭐⭐ P76F-A A4 — a refusal only a different or re-qualified review
 		});
 		expect(view?.rerunsWithheld, 'the page does not say why').toContain(`(${c.action})`);
 		expect(awaiting, 'the waiting step’s own controls are offered').toEqual([k.stepA]);
+		// ⛔ `P76F-C` C4 — A PROMISE NOTHING KEEPS: the text said the unit "waits until the reviewer is re-qualified or
+		// re-selected … or it is abandoned", but the offers are read from the RECORDED refusal, which still names the reviewer
+		// refused — a changed reviewer re-opens nothing. It now says so, and that today the unit can be abandoned.
+		expect(view?.rerunsWithheld, 'the page promises a re-run once the reviewer changes').not.toMatch(/waits until/);
+		expect(view?.rerunsWithheld).toMatch(
+			/a changed reviewer does not re-open this unit’s re-runs \(not built\), so today the unit can be abandoned/
+		);
 	});
 
 	it.each(CLASSES)(
@@ -816,7 +927,8 @@ describe('⭐⭐ P76F-A A4 — a refusal only a different or re-qualified review
 			const sessions = seam.sessions;
 			const why = (act: string) =>
 				new RegExp(
-					`^Re-running the ${act} refused: the reviewer must change before anything is re-run \\(.*\\(${c.action}\\)\\)\\. .*re-qualified or re-selected.*abandoned\\.$`
+					// ⛔ `P76F-C` C4: the reviewer must change; a changed one re-opens nothing (not built); today, abandon.
+					`^Re-running the ${act} refused: the reviewer must change before anything is re-run \\(.*\\(${c.action}\\)\\)\\. .*re-qualifying or re-selecting.*a changed reviewer does not re-open this unit’s re-runs \\(not built\\), so today the unit can be abandoned\\.$`
 				);
 			expect((await act('rerunReview', { pwuId: k.pwuId, rationale: RATIONALE })).data?.error ?? '').toMatch(
 				why('review')

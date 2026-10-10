@@ -102,6 +102,7 @@ import {
 	rerunReviewRefusal,
 	rerunWorkRefusal,
 	stepActOnAwaitedChoice,
+	stopAtRefusal,
 	stoppedUnitOf,
 	waitingStepOf,
 	waitReasonFor,
@@ -114,7 +115,7 @@ import {
 	ABANDON_FROM_WAITING_CITATION,
 	decisionRationale,
 	RERUN_REVIEW_CITATION,
-	RERUN_WORK_CITATION
+	rerunWorkCitation
 } from '$lib/server/execution/recovery-authority';
 import { runProcessResultFloor } from '$lib/server/execution/process-result-floor';
 import type { ObservedProcessRun } from '$lib/server/tools/process-run-observer';
@@ -995,12 +996,19 @@ function waitForAPerson(
 	const steps =
 		(getObject(getEngine(), planId)?.steps as { id?: string; stepState?: string }[] | undefined) ?? [];
 	if (!steps.some((s) => s.id === stepId && s.stepState === 'RUNNING')) return null;
+	// ⭐⭐ `P76F-C` C3 — THE REASON NAMES ONLY THE CHOICES THIS STOP OFFERS: read from the floors just recorded over the refused
+	// subjects (`stopAtRefusal`), by the rule the page and the server read the stop back by (`offersOf`). ⛔ It named all
+	// three for every refusal, on the permanent record.
+	const stop = stopAtRefusal(
+		uiSession(),
+		refusals.map((r) => r.subjectId)
+	);
 	return runSteps([
 		[
 			'EnterExecutionStepWait',
 			'EXECUTION_PLAN',
 			planId,
-			{ stepId, waitReason: waitReasonFor(refusals, engineRefusal) }
+			{ stepId, waitReason: waitReasonFor(refusals, engineRefusal, stop) }
 		],
 		chg(pwuId, 'EXECUTING', 'EXECUTING', 'WAITING', 'UNASSESSED', 'PRESERVED', [planId])
 	]);
@@ -2793,8 +2801,10 @@ export const actions: Actions = {
 				RERUN_WORK,
 				decisionSubjects(s),
 				s.consideredObservationIds,
-				// ⭐ `P76F-A` A3 (RD4) — the person's words, then the ruling that authorises a re-run of the work.
-				decisionRationale(rationale, RERUN_WORK_CITATION)
+				// ⭐ `P76F-A` A3 (RD4) — the person's words, then the ruling that authorises a re-run of the work. ⭐ `P76F-C` C5 —
+				// the clause that APPLIES: after a review that concluded (against the work, or escalated) `REG-D-105` (3)'s; after
+				// one that did not, `REG-D-104` (1) alone. ⛔ It cited (3)'s clause for a concluded review on every re-run.
+				decisionRationale(rationale, rerunWorkCitation(s.kind === 'CONCLUDED' || s.kind === 'ESCALATED'))
 			),
 			...planRevision(s, decisionId, planB, {
 				id: stepB,

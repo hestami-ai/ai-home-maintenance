@@ -13,9 +13,11 @@
 //   · the review DID NOT CONCLUDE (an operational action other than an escalation: a validator or transport failure, an
 //     INCONCLUSIVE review, a reply answering no criterion — `REG-F-552`) → re-run the review, re-run the work, abandon;
 //   · ⭐ `P76F-A` A4 — the review was refused for WHO reviewed: a substituted model, or a reviewer not independent of the
-//     producer (`REVIEWER_MUST_CHANGE`) → abandon ALONE. Each re-run is reviewed by that same reviewer, so the unit waits
-//     for the reviewer to change, or is abandoned. ⚠ A departure from RD3's table, which files both under "did not
-//     conclude": the classifier's own guidance says a retry "does not fix this".
+//     producer (`REVIEWER_MUST_CHANGE`) → abandon ALONE. Each re-run is reviewed by that same reviewer. ~~so the unit waits
+//     for the reviewer to change, or is abandoned~~ ⛔ `P76F-C` C4: nothing waits for the reviewer to change — the offers
+//     are read from the RECORDED refusal, so a changed reviewer re-opens no re-run (not built); today the unit can be
+//     abandoned. ⚠ A departure from RD3's table, which files both under "did not conclude": the classifier's own guidance
+//     says a retry "does not fix this".
 //   · the review CONCLUDED AGAINST THE WORK (`REFINE_SUBJECT`, or a deterministic floor finding beside a review that
 //     passed, `RESOLVE_OTHER_FLOOR_FINDINGS`) → re-run the work with the findings, abandon;
 //   · the review ESCALATED → re-run the work with the subject findings, abandon. ⛔ The escalation itself is never fed
@@ -110,11 +112,13 @@ export type RefusalKind = 'NOT_CONCLUDED' | 'CONCLUDED' | 'ESCALATED' | 'REVIEWE
  *     policy independence rule"*.
  * ⛔ EACH WAS SORTED "DID NOT CONCLUDE" — both are operational (`isOperationalRemediation`) — so a re-review was offered and
  * the paid lane's rule pressed it (`REG-D-105` (4)): another billed call to the reviewer the refusal had just refused.
- * Neither re-run is offered for them now: a re-run of the WORK is reviewed by that same reviewer too. The unit waits for
- * the reviewer to change, or is abandoned.
+ * Neither re-run is offered for them now: a re-run of the WORK is reviewed by that same reviewer too. ~~The unit waits for
+ * the reviewer to change, or is abandoned.~~ ⛔ `P76F-C` C4: the unit can be abandoned; it does not wait for the reviewer.
  * ⚠ READ FROM THE RECORD, LIKE EVERY OFFER HERE: a reviewer re-selected after the refusal does not re-open the offer — the
  * recorded refusal still names the one refused, and nothing recorded says which reviewer would run now. Disclosed (the
- * builder's report); RD3 has no row for it.
+ * builder's report); RD3 has no row for it. ⭐ `P76F-C` C4 — AND THE TEXT THE PERSON READS NOW SAYS SO
+ * (`reviewerMustChangeText`): it promised the unit "waits until the reviewer is re-qualified or re-selected", a re-open
+ * nothing keeps. Whether a changed reviewer should re-open a unit's re-runs is a design question (the lead files it).
  */
 const REVIEWER_MUST_CHANGE: Readonly<Partial<Record<FloorRemediationAction, string>>> = {
 	REQUALIFY_OR_RESELECT_REVIEWER:
@@ -226,22 +230,76 @@ function latestFloorAssessmentIds(engine: EngineHandle, subjectId: string): Map<
 	);
 }
 
+/**
+ * A subject's floor as recorded. ⭑ `loadPwaFloor` IS SUBJECT-AGNOSTIC — it keys on `subjectObjectIds` alone; its name is the
+ * authoring plane's, its first caller's. A subject with no floor recorded at all reads as a review that did not run.
+ */
+function recordedFloorOf(engine: AuthedEngineHandle, subjectId: string): FloorView {
+	return (
+		loadPwaFloor(subjectId, engine) ?? {
+			subjectId,
+			aggregate: 'UNASSESSED',
+			satisfied: false,
+			waived: false,
+			policies: [],
+			reasoningGaps: []
+		}
+	);
+}
+
+/** The offers of a stop of `kind` over `refused` refused subjects (RD3). ⭑ ONE RULE, read by every reader of a stop. */
+export interface StopOffers {
+	readonly rerunReview: boolean;
+	readonly rerunWork: boolean;
+	readonly abandon: boolean;
+}
+
+/**
+ * ⭐ RD3 — WHAT A STOP OFFERS, from its kind and how many subjects were refused. ⭐ `P76F-C` C3: ONE function, read where
+ * the stop is RECORDED (the wait's reason, `stopAtRefusal`) and where it is READ BACK (`stoppedUnitOf`, so the page and the
+ * server), so the reason on the record can name no choice the page then withholds.
+ */
+export function offersOf(kind: RefusalKind, refused: number): StopOffers {
+	return {
+		// ⛔ `REG-D-105` (3): only a review that did not conclude may be re-run — and only when one was refused.
+		rerunReview: kind === 'NOT_CONCLUDED' && refused > 0,
+		// ⛔ `P76F-A` A4: and the work, after any refusal SAVE one only a different reviewer can fix — the new work would be
+		// reviewed by the reviewer just refused.
+		rerunWork: kind !== 'REVIEWER_MUST_CHANGE',
+		abandon: true
+	};
+}
+
+/**
+ * ⭐⭐ `P76F-C` C3 (RD2, RD3) — THE STOP THE ROUTE IS ABOUT TO RECORD, read from the floors it has just recorded over the
+ * refused subjects, exactly as `stoppedUnitOf` will read them once the unit waits: each subject's classifier action
+ * (`classifyFloorRemediation`), the strictest kind, its offers (`offersOf`), and — where only a different reviewer can fix
+ * it — why neither re-run is offered (`reviewerMustChangeText`). ⭑ So the wait's reason (`waitReasonFor`) names only what
+ * will be offered. A subject whose recorded floor is SATISFIED is no refusal, as in `recordedRefusalOf`.
+ */
+export function stopAtRefusal(
+	engine: AuthedEngineHandle,
+	subjectIds: readonly string[]
+): { readonly kind: RefusalKind; readonly offers: StopOffers; readonly rerunsWithheld: string | null } {
+	const refused = subjectIds.flatMap((subjectId) => {
+		const view = recordedFloorOf(engine, subjectId);
+		return view.satisfied ? [] : [{ subjectId, action: classifyFloorRemediation(view).action }];
+	});
+	const kind = strictestKind(refused.map((r) => refusalKindOf(r.action)));
+	return {
+		kind,
+		offers: offersOf(kind, refused.length),
+		rerunsWithheld: kind === 'REVIEWER_MUST_CHANGE' ? reviewerMustChangeText(refused) : null
+	};
+}
+
 /** A subject's recorded refusal, or undefined when its floor is SATISFIED. */
 function recordedRefusalOf(
 	engine: AuthedEngineHandle,
 	subjectId: string,
 	objectType: 'ARTIFACT' | 'EVIDENCE'
 ): RecordedRefusal | undefined {
-	// ⭑ `loadPwaFloor` IS SUBJECT-AGNOSTIC — it keys on `subjectObjectIds` alone; its name is the authoring plane's, its
-	// first caller's. A subject with no floor recorded at all reads as a review that did not run.
-	const view: FloorView = loadPwaFloor(subjectId, engine) ?? {
-		subjectId,
-		aggregate: 'UNASSESSED',
-		satisfied: false,
-		waived: false,
-		policies: [],
-		reasoningGaps: []
-	};
+	const view = recordedFloorOf(engine, subjectId);
 	if (view.satisfied) return undefined;
 	const remediation = classifyFloorRemediation(view);
 	const refusing = latestFloorAssessmentIds(engine, subjectId);
@@ -344,14 +402,8 @@ export function stoppedUnitOf(
 			evidenceIds,
 			refusals,
 			kind,
-			offers: {
-				// ⛔ `REG-D-105` (3): only a review that did not conclude may be re-run — and only when one was refused.
-				rerunReview: kind === 'NOT_CONCLUDED' && refusals.length > 0,
-				// ⛔ `P76F-A` A4: and the work, after any refusal SAVE one only a different reviewer can fix — the new work would be
-				// reviewed by the reviewer just refused.
-				rerunWork: kind !== 'REVIEWER_MUST_CHANGE',
-				abandon: true
-			},
+			// ⭐ `P76F-C` C3 — the one rule the wait's reason was written by, too (`offersOf`).
+			offers: offersOf(kind, refusals.length),
 			findings,
 			consideredObservationIds: refusals.flatMap((r) => r.observationIds),
 			reruns
@@ -374,42 +426,81 @@ export function describeRefusals(
 		.join('; ');
 }
 
+/** The acts offered, as the wait's reason names them, joined as a list: "a, b, or c". */
+function offeredActs(offers: StopOffers): string {
+	const acts = [
+		...(offers.rerunReview ? ['re-run the review'] : []),
+		...(offers.rerunWork ? ['re-run the work with the findings'] : []),
+		...(offers.abandon ? ['abandon it'] : [])
+	];
+	return acts.length < 2 ? acts.join('') : `${acts.slice(0, -1).join(', ')}, or ${acts.at(-1)!}`;
+}
+
+/** ⭐ `P76F-C` C3 — why the re-review is not among them, by the stop's kind; empty when it is, or when neither re-run is. */
+const NO_RERUN_REVIEW: Readonly<Record<RefusalKind, string>> = {
+	NOT_CONCLUDED: ' No review of the attempt is refused on the record, so none is re-run.',
+	CONCLUDED: ' The review concluded, so it is not re-run (REG-D-105 (3)).',
+	ESCALATED: ' The review escalated to a person, so it is not re-run (REG-D-105 (3), REG-F-474).',
+	REVIEWER_MUST_CHANGE: ''
+};
+
 /**
  * ⭐ RD2 — THE WAIT'S REASON, written where the refusal happens: each refusing subject with each policy and its disposition,
  * and what the unit now waits for. ⭑ From the floor runs the route just made, never re-read — the same facts the record
  * now holds, in the engine's own `policyId=disposition` form.
+ * ⭐⭐ `P76F-C` C3 (PER-9) — AND ONLY THE CHOICES THAT STOP OFFERS (`stop`, `stopAtRefusal`, by the rule `stoppedUnitOf` then
+ * reads them back by, `offersOf`): after a review that did not conclude, all three; after one that concluded against the
+ * work or escalated, re-run the work or abandon (`REG-D-105` (3)); after a refusal only a different reviewer can fix,
+ * abandon alone, and why (`reviewerMustChangeText`). ⛔ It named all three for EVERY refusal — on the permanent record, a
+ * re-review `REG-D-105` (3) withholds, and re-runs `P76F-A` A4 withholds.
  */
 export function waitReasonFor(
 	refusals: readonly {
 		readonly subjectId: string;
 		readonly unsatisfied: readonly { readonly policyId: string; readonly disposition: string }[];
 	}[],
-	engineRefusal: string
+	engineRefusal: string,
+	stop: { readonly kind: RefusalKind; readonly offers: StopOffers; readonly rerunsWithheld: string | null }
 ): string {
 	const named = describeRefusals(refusals);
+	const head = `The assurance floor refused the completion — ${named || engineRefusal}.`;
+	if (!stop.offers.rerunReview && !stop.offers.rerunWork)
+		return `${head} The unit waits for a person to abandon it — neither re-run is offered: ${stop.rerunsWithheld ?? 'none is offered for this stop.'}`;
 	return (
-		`The assurance floor refused the completion — ${named || engineRefusal}. The unit waits for a person to choose: ` +
-		're-run the review, re-run the work with the findings, or abandon it (REG-D-104 (1)).'
+		`${head} The unit waits for a person to choose: ${offeredActs(stop.offers)} (REG-D-104 (1)).` +
+		(stop.offers.rerunReview ? '' : NO_RERUN_REVIEW[stop.kind])
 	);
 }
 
 /**
  * ⭐⭐ `P76F-A` A4 — WHY NEITHER RE-RUN IS OFFERED, for a stop only a different or re-qualified reviewer can fix: each such
- * refused subject with the classifier's reason, then the remedy, which is the reviewer's, never a re-run's. Null for any
- * other stop. ⭑ ONE TEXT, read by the page (`RecoveryView.rerunsWithheld`) and by the server's refusal of each re-run.
+ * refused subject with the classifier's reason, then the remedy, which is the reviewer's, never a re-run's.
+ * ⛔ `P76F-C` C4 — A PROMISE NOTHING KEEPS, STRUCK: it ended *"The unit waits until the reviewer is re-qualified or
+ * re-selected (REG-D-084, REG-D-086), or one independent of the producer is selected — or it is abandoned."* But every offer
+ * here is read from the RECORDED refusal, which still names the reviewer refused: a changed reviewer re-opens no re-run of
+ * this unit (that is not built — the lead files it as a design question). So it says what is true: the reviewer must
+ * change; a changed one does not re-open this unit's re-runs; today the unit can be abandoned.
+ * ⭑ ONE TEXT, read by the page (`RecoveryView.rerunsWithheld`), by the server's refusal of each re-run, and — `P76F-C` C3 —
+ * by the wait's recorded reason (`stopAtRefusal`).
  */
-export function reviewerMustChange(unit: StoppedUnit): string | null {
-	if (unit.kind !== 'REVIEWER_MUST_CHANGE') return null;
-	const why = unit.refusals.flatMap((r) => {
+function reviewerMustChangeText(
+	refusals: readonly { readonly subjectId: string; readonly action: FloorRemediationAction }[]
+): string {
+	const why = refusals.flatMap((r) => {
 		const reason = REVIEWER_MUST_CHANGE[r.action];
 		return reason === undefined ? [] : [`${r.subjectId}: ${reason}`];
 	});
 	return (
 		`the reviewer must change before anything is re-run (${why.join('; ')}). A re-run of the review, or of the work, is ` +
-		'reviewed by that same reviewer: another billed call, refused the same way, so re-running does not fix this. The unit ' +
-		'waits until the reviewer is re-qualified or re-selected (REG-D-084, REG-D-086), or one independent of the producer is ' +
-		'selected — or it is abandoned.'
+		'reviewed by that same reviewer: another billed call, refused the same way, so re-running does not fix this. The ' +
+		'reviewer is changed by re-qualifying or re-selecting it (REG-D-084, REG-D-086), or by selecting one independent of the ' +
+		'producer — but a changed reviewer does not re-open this unit’s re-runs (not built), so today the unit can be abandoned.'
 	);
+}
+
+/** ⭐ `P76F-A` A4 — `reviewerMustChangeText` for a stopped unit: the text, or null for any stop a re-run may follow. */
+export function reviewerMustChange(unit: StoppedUnit): string | null {
+	return unit.kind === 'REVIEWER_MUST_CHANGE' ? reviewerMustChangeText(unit.refusals) : null;
 }
 
 /** ⛔ `REG-D-105` (3) — why a re-review is refused for this stop, or null when it is offered. */
