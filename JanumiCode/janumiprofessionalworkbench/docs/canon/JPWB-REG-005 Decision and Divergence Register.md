@@ -30558,6 +30558,7 @@ field was drafted, defended as 'retained whole', and withdrawn. Do not write the
   split write) and `packages/rph-application/src/handlers/model-exchange.ts` (the narrowed guard), with the
   conformance limb moving alongside per item 23's conjunction. **Owed:** `REG-Q-066` marked ADJUDICATED;
   `ASR-11` limb 3 re-dispositioned a second time once the split is driven. Status: CLOSED.
+- ⭑ **2026-10-10 — narrowed for the reviewer's plane** (`REG-D-106`). A reviewer reply in which no answer span can be located is now kept whole, `PURGEABLE_AT_EXPIRY`, where this entry's table row *"Not separable → PENDING, block"* kept nothing. The execution plane is unchanged.
 
 ### REG-F-345 — the §9.7 split preserves BYTES and not ORDER: two different replies produce one identical record
 
@@ -39989,3 +39990,47 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
      - **The re-qualification measures the condition.** Its clean cases must still be SATISFIED, so a reviewer pushed into inventing failures would fail them.
   3. **After a review that concluded against the work, the choices are re-run the work, or abandon.** Re-running the review stays for a review that did not conclude. Because the floor reads the latest assessment, a second review of the same work product could otherwise clear a reasoned refusal (`REG-F-474`).
   4. **In the paid run, the run plan states the choice rule, and the lane acts on it as the operator.** A review that did not conclude is re-run once; refused work is re-run once, with the findings; then the unit is abandoned. Each choice is recorded as the operator's Decision, never the engine's.
+
+### REG-D-106 — DELEGATED (`REG-D-103` (2)): a reviewer reply with no locatable answer is kept whole, purgeable at expiry, narrowing `REG-D-056`'s "not separable stays blocked" to the execution plane
+
+**Decided 2026-10-10** (P7-6's builder, under the sponsor's approval of I2, *"keep its unparsed replies"* (`REG-D-103` (2); `DESIGN-the-reviewer-isolated.md` §2 I2); built in `bd4af566`). **Type:** DECISION — delegated, flagged for sponsor confirmation. **Status:** ⚠ **OPEN — in force on the reviewer's plane; sponsor confirmation owed.**
+
+- **WHAT IS DECIDED.** A reviewer reply in which no answer span can be located — prose, an empty reply, or a reply cut off — is stored whole, under the retention class `PURGEABLE_AT_EXPIRY`. The exchange's `rawOutputBeforeCoercionRef` points at it.
+- **WHAT IT NARROWS.** `REG-D-056`'s table keeps nothing of a non-separable reply (*"Not separable → PENDING, block"*, on Guide §9.7). That row now holds for the execution plane only.
+- **WHY THIS CLASS.**
+  - Any reasoning in the reply stays purgeable (PER-12).
+  - No judgement rests on its bytes. A reply with no locatable object always coerces to the same empty judgement.
+  - Diagnosis is what it is kept for, which is ASR-11 limb 3, PER-12's one permitted use.
+- **WHAT IS NOT KEPT, AND WHY.**
+  - A mixed reply, an answer with prose around it, keeps `rawOutputBeforeCoercionRef` PENDING. It can be reassembled from its two stored spans. The record plane refuses a stored whole reply beside a stored reasoning span (`REG-D-056`).
+  - A call that threw keeps nothing, because no reply came back.
+- **DEVIN'S EXPORT.** The session export, which shows any tool devin called, is stored the same way. `MODEL_EXCHANGE` has no field for it, and adding one is a ratified contract change. So its storage key, hash and size are written into the record's tool-call observation, whose reason already says the adapter could not watch the session. A typed field is the open question.
+
+### REG-F-553 — The reviewer fingerprint moves when the reviewer's preamble changes, but no recorded case prompt does: a preamble-only change lets reviewer:qual:check be satisfied by re-stamping old runs, where a paid run is owed
+
+**Filed 2026-10-10** (P7-6's build, B1; driven by its builder, confirmed by its reviewer). **Status:** ⚠ **OPEN — latent: P7-6 does not hit it, because I6 moves every case prompt in the same landing.**
+
+- **WHAT HAPPENS.** I4's preamble is added by the devin transport, after the validator has built the prompt. The fingerprint hashes the preamble (`scripts/reviewer-qual/fingerprint.ts`), so a change to it moves the fingerprint. But a qualification run records the validator's prompt, before the transport adds the preamble, so no recorded case prompt changes. The check then treats the move as one that needs no model call, and offers RESCORED re-stamps of the old runs.
+- **WHY IT MATTERS.** A change to what the reviewer reads would pass the gate with no measurement of the reviewer reading it. The design asked that the check stay red until the reviewer is re-qualified (`DESIGN-the-reviewer-isolated.md` §4b).
+- **REMEDY CANDIDATES, UNTESTED.**
+  1. Record per-transport case-prompt hashes: a CALL line's `promptSha256` is what the transport sent.
+  2. Or make the check owe a run, not a re-stamp, whenever the transport component of the fingerprint moved.
+  - **Predicted red:** a preamble-only change on a disposable copy, after which the check must refuse RESCORED lines. At HEAD it accepts them (the builder's pin of today's limit).
+- **SEARCHED BEFORE FILING.**
+  - The register for *`preamble`*: 19 lines in 14 entries. Twelve concern other prompts' preambles; the other two are P7-6's own, `REG-D-104` and `REG-F-549`.
+  - For *`RESCORED`*: 22 lines in 12 entries, each about re-stamping after a scoring-only move, and each lawful there (`REG-F-463`: *"A RESCORED record suffices, at no charge"*). None concerns something a transport adds after the case prompt is recorded.
+  - Positive control: `REG-F-476`, a fingerprint that did not reach the renderer, the same class on another component.
+
+### REG-F-554 — devin's session export is lost when devin exits non-zero; a denied tool call exits 0, so the case I2 most needs is kept
+
+**Filed 2026-10-10** (P7-6's build, B2; read from code by its builder and its reviewer; the exit code of a denied tool call read from both probes' records). **Status:** ⚠ **OPEN — unscheduled; low: it bites only a call that fails.**
+
+- **WHAT HAPPENS.** `devinPrint` reads devin's export only on its normal path. When devin exits non-zero, `execFile` rejects, the adapter throws, and its `finally` deletes the folder holding the export. An export that names no model is also dropped, because the bare-string return has no field for it.
+- **WHY IT MATTERS, AND HOW MUCH.** The export is the only record of which tools devin called.
+  - **The case I2 most needs is kept.** Both probes exited 0 after a denied tool call: probe 1 printed *"exit 0"* with stdout *"I'll perform the three tasks now."*, and probe 2 printed *"exit 0"* with an empty stdout (`REG-F-549`). So a reviewer that reaches for a tool takes the normal path, and its export is kept.
+  - **What is lost** is the export of a call that genuinely fails, such as a transport failure (`REG-F-499`).
+- **REMEDY CANDIDATES, UNTESTED.** Read the export in the `catch`, before the `finally` deletes it. Then carry it on the thrown error, or record it as the failed call's diagnostic, scanned as the diagnostic already is (PER-12).
+- **SEARCHED BEFORE FILING.**
+  - The register for lines holding both *`export`* and *`devin`*: 17 lines in 11 entries. None concerns an exit code.
+  - The nearest are `REG-F-359`, where `devinPrint` deleted the export before its own helper could read it (the same lifetime class, on the normal path, closed), and `REG-F-529`, whose remedy reads usage from the export *"before the export is deleted"*.
+  - Positive control: `REG-F-499`, devin's transport failures, which records thrown calls and not their exports.
