@@ -646,6 +646,11 @@ describe('JAN-EXEC P7-2 D9 — the audit of hand acts (P7-3)', () => {
 		expect([act('retryStep').verdict, act('retryStep').found[0]?.unit]).toEqual(['FOUND', 'design']);
 		expect([act('skipStep').verdict, act('skipStep').found[0]?.unit]).toEqual(['FOUND', 'design']);
 		expect(r.audit.forbiddenFound).toBe(3);
+		// ⭐ `P76F-A` A5 — AND STAGE 7 STILL READS THAT UNIT AS STOPPED: its step completed by hand, its own execution still
+		// RUNNING (`completion`; REG-F-511). ⚠ Held HERE now: the store test's operator can no longer complete a refused unit's
+		// step by hand — the server refuses the Resume before it — so no hand completion reaches that store any more, and
+		// PQ7-M168 survived it (re-measured 2026-10-10).
+		expect(shown(cellOf(r, '7', 'implementation'))).toEqual(['broke', ['REG-F-511']]);
 	});
 
 	it('⛔ a waiver of any kind is FOUND — its request, grant or denial in the log, or its POST refused before any', () => {
