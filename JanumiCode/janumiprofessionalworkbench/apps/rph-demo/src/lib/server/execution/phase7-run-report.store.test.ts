@@ -600,7 +600,7 @@ beforeAll(async () => {
 				limitCheck:
 					u.order === 1
 						? null
-						: { prior: 6, recorded: 0, reserve: 4, total: 10, limit: 150, allowed: true },
+						: { prior: 6, recorded: 0, reserve: 4, total: 10, limit: 200, allowed: true },
 				signOff: ran.envelopes.has(`${u.slug}:recordAssurance`)
 					? { recordAssurance: 'success' }
 					: null

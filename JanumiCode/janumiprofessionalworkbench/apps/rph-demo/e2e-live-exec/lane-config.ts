@@ -370,8 +370,12 @@ export const PHASE7_SETUP_MS = 1_800_000;
 export const PHASE7_TEST_TIMEOUT_MS =
 	PHASE7_SETUP_MS + PHASE7_MODEL_UNITS * PHASE7_UNIT_ALLOWANCE_MS;
 
-/** ⭐ D8 — the sponsor's limit, in reviewer calls (`REG-D-102` (4)), checked before each phase. */
-export const PHASE7_PAID_LIMIT = 150;
+/**
+ * ⭐ D8 — the sponsor's limit, in reviewer calls, checked before each phase ⭐ and before each re-run the run plan's rule
+ * makes (`REG-D-105` (4)). ~~150 (`REG-D-102` (4))~~ ⭐ 200: *"Raise limit to 200"* (`REG-D-105` (1), which amends
+ * `REG-D-102` (4)); it covers the re-qualification, the re-run and a few recovery re-runs.
+ */
+export const PHASE7_PAID_LIMIT = 200;
 
 /** ⭐ D8 — the reviewer calls held back for the negative control (P7-4e): its own cap (`negative-control.ts`). */
 export const PHASE7_NEGATIVE_CONTROL_RESERVE = 4;

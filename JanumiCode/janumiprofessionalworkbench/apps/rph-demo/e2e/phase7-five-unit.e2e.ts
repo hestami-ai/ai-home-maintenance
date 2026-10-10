@@ -73,9 +73,15 @@ import {
 //   a refusal included — is recorded, and only then is it held to the prediction. (c) was already recorded this way.
 //
 // ── ⚠ K1, DRIVEN (`REG-F-511`; the design's §5) ──────────────────────────────────────────────────────────────────────
-// A model unit whose completion the floor refused stays EXECUTING with its execution RUNNING, and nothing on the page
+// ~~A model unit whose completion the floor refused stays EXECUTING with its execution RUNNING, and nothing on the page
 // runs it again: Begin & Execute is offered only on a PROPOSED unit, Retry only re-queues the step, and Record
-// Assurance is refused while the unit is RUNNING. The second test drives each limb, and then (c), the one lever left.
+// Assurance is refused while the unit is RUNNING. The second test drives each limb, and then (c), the one lever left.~~
+// ⭐ RESTATED BY P7-6R R-1 (`REG-D-104` (1); `DESIGN-the-stopped-unit-recovery.md` RD2-RD5): a unit whose completion the
+// floor refused now WAITS for a person, its step WAITING, and its row offers the person's three choices — re-run the
+// review (only after a review that did not conclude), re-run the work, abandon — each the person's Decision. The second
+// test drives the wait, the offers, the withheld controls and abandonment; the third, R-1e, recovers two phases of the
+// five, one by each re-run, and signs all five off. ⚠ Prediction (c) has no arrangement left: Complete is not offered on
+// a waiting step, and the engine refuses it there.
 // ⚠ AND ONE THING NO ENTRY SAYS, FOUND BY THIS SPEC'S FIRST RUN: right after the refusal the page is STALE — the row
 // still reads PROPOSED and still offers Begin & Execute, because SvelteKit's `enhance` reloads a page's data only on a
 // success. Pressing that stale offer is refused at `BeginPwuShaping`; the second test pins both, then loads the page.
@@ -135,6 +141,12 @@ const STUCK_UNDERTAKING = {
 	objective: UNDERTAKING.objective,
 	product: UNDERTAKING.product
 };
+/** ⭐ P7-6R R-1e's Undertaking: §3.2's PWA, two of whose phases stop and are recovered by a person. */
+const RECOVERY_UNDERTAKING = {
+	name: 'wordfreq realization, recovered',
+	objective: UNDERTAKING.objective,
+	product: UNDERTAKING.product
+};
 
 // ── READERS OVER THE ENGINE'S GROUND TRUTH ─────────────────────────────────────────────────────────────────────────
 
@@ -166,19 +178,31 @@ interface PlanStep {
 	readonly stepState: string;
 }
 
-/** The unit's execution plans, each with its steps. */
-function plansOf(snap: EngineSnapshot, unitId: string): { id: string; steps: PlanStep[] }[] {
+/** The unit's execution plans, in the order proposed, each with its status and its steps. */
+function plansOf(
+	snap: EngineSnapshot,
+	unitId: string
+): { id: string; status: string; steps: PlanStep[] }[] {
 	return snap.executionPlans
 		.filter((p) => p.state.workUnitId === unitId)
-		.map((p) => ({ id: p.id, steps: (p.state.steps as PlanStep[] | undefined) ?? [] }));
+		.map((p) => ({
+			id: p.id,
+			status: str(p.state.status),
+			steps: (p.state.steps as PlanStep[] | undefined) ?? []
+		}));
 }
 
-/** The unit's ONE plan and its ONE step — asserted, because every unit here is begun exactly once. */
-function onlyStepOf(snap: EngineSnapshot, unitId: string): { planId: string; step: PlanStep } {
-	const plans = plansOf(snap, unitId);
-	expect(plans, `unit ${unitId} was not begun exactly once`).toHaveLength(1);
-	expect(plans[0]!.steps, `unit ${unitId}'s plan has more than one step`).toHaveLength(1);
-	return { planId: plans[0]!.id, step: plans[0]!.steps[0]! };
+/**
+ * The unit's ACTIVE plan and its ONE step. ⭐ P7-6R R-1e: ~~its ONE plan — asserted, because every unit here is begun
+ * exactly once~~ — a unit a person re-ran has more than one plan: each re-run is a plan revision that supersedes the one
+ * before (RD5), so the plan that ran last is the one ACTIVE plan, and that is the plan whose step the unit stands on.
+ * ⛔ Still asserted ONE: a unit with two ACTIVE plans is RPH-EXE-001's defect, and this would read either.
+ */
+function activeStepOf(snap: EngineSnapshot, unitId: string): { planId: string; step: PlanStep } {
+	const active = plansOf(snap, unitId).filter((p) => p.status === 'ACTIVE');
+	expect(active, `unit ${unitId} has not exactly one ACTIVE plan`).toHaveLength(1);
+	expect(active[0]!.steps, `unit ${unitId}'s active plan has more than one step`).toHaveLength(1);
+	return { planId: active[0]!.id, step: active[0]!.steps[0]! };
 }
 
 /** Every completion the step recorded — its `ExecutionStepSucceeded` payloads, in log order. */
@@ -459,7 +483,7 @@ test.describe('JAN-EXEC Phase 7 P7-1b — the five-unit rehearsal, in the gate l
 		// ⭐ PREDICTION (b)'S ARRANGEMENT, READ BEFORE THE ROOT IS SIGNED OFF: its run was a TRANSFORMATION that produced
 		// nothing — no output, no evidence, no work product, no exchange — and is recorded as the operator's.
 		const executed = await introspect(request);
-		const { planId: rootPlan, step: rootStep } = onlyStepOf(executed, rootId);
+		const { planId: rootPlan, step: rootStep } = activeStepOf(executed, rootId);
 		const rootCompletions = completionsOf(executed, rootPlan, rootStep.id);
 		expect(rootCompletions, 'the root’s step did not complete exactly once').toHaveLength(1);
 		const done = rootCompletions[0]!;
@@ -508,7 +532,7 @@ test.describe('JAN-EXEC Phase 7 P7-1b — the five-unit rehearsal, in the gate l
 			'every unit, the root included, SATISFIED in lifecycle and in assurance, its execution SUCCEEDED'
 		).toEqual(PHASE7_PWA.types.map((t) => [t.name, 'SATISFIED', 'SATISFIED', 'SUCCEEDED']).sort());
 		for (const [title, u] of units) {
-			const { step } = onlyStepOf(snap, u.id);
+			const { step } = activeStepOf(snap, u.id);
 			expect(step.stepState, `${title}'s plan step did not SUCCEED`).toBe('SUCCEEDED');
 			expect(step.stepType, `${title} ran the wrong kind of step`).toBe(
 				title === PHASE7_ROOT.name ? 'TRANSFORMATION' : 'MODEL_INVOCATION'
@@ -613,7 +637,7 @@ test.describe('JAN-EXEC Phase 7 P7-1b — the five-unit rehearsal, in the gate l
 			'REG-F-514: every declared verdict records the operator as the producer'
 		).toEqual([OPERATOR]);
 		for (const t of PHASE7_PHASES) {
-			const { planId, step } = onlyStepOf(snap, units.get(t.name)!.id);
+			const { planId, step } = activeStepOf(snap, units.get(t.name)!.id);
 			const executor = completionsOf(snap, planId, step.id)[0]?.executionProvenance as
 				{ executedBy?: { actorType?: string } } | undefined;
 			expect(executor?.executedBy?.actorType, `${t.name}'s step does not name the model`).toBe(
@@ -622,7 +646,7 @@ test.describe('JAN-EXEC Phase 7 P7-1b — the five-unit rehearsal, in the gate l
 		}
 	});
 
-	test('⛔ K1 — a phase whose review is INCONCLUSIVE can never complete (REG-F-511): the root signs off beside it (prediction a), Retry runs nothing, and Complete with no output closes its step and frees nothing (prediction c)', async ({
+	test('⭐ K1, RESTATED BY P7-6R R-1 — a phase whose review is INCONCLUSIVE WAITS for a person (REG-D-104 (1)): the root signs off beside it (prediction a), no step act runs anything, the page offers the person’s three choices, and Abandon takes their rationale and cancels the waiting step', async ({
 		page,
 		request
 	}) => {
@@ -638,7 +662,7 @@ test.describe('JAN-EXEC Phase 7 P7-1b — the five-unit rehearsal, in the gate l
 		await publishThroughDesigner(page, request, pwaId);
 		await createUndertakingThroughForm(page, STUCK_UNDERTAKING);
 
-		// ── 2. THE PHASE RUNS, AND ITS REVIEW STOPS IT ──────────────────────────────────────────────────────────────
+		// ── 2. THE PHASE RUNS, ITS REVIEW STOPS IT, AND IT WAITS (R-1b, RD2) ─────────────────────────────────────────
 		const ran = await beginExecute(page, PHASE);
 		// ⛔ THE CONTROL, DRIVEN: register the stipulation for this PWA after all — the phase completes, and this reddens.
 		expect(ran.type, 'arrangement: the unstipulated phase completed').toBe('failure');
@@ -647,13 +671,14 @@ test.describe('JAN-EXEC Phase 7 P7-1b — the five-unit rehearsal, in the gate l
 		);
 		const stopped = await introspect(request);
 		const phase = unitsOf(stopped, STUCK_UNDERTAKING.name).get(PHASE)!;
-		expect(axes(phase), 'arrangement: the phase is not left EXECUTING and RUNNING').toEqual([
+		// ⭐ RESTATED WITH R-1b: until then the refusal wrote no event, and the phase was left EXECUTING and RUNNING.
+		expect(axes(phase), 'R-1b: the phase does not wait after its refusal').toEqual([
 			'EXECUTING',
 			'UNASSESSED',
-			'RUNNING'
+			'WAITING'
 		]);
-		const { planId, step } = onlyStepOf(stopped, phase.id);
-		expect(step.stepState, 'arrangement: the phase’s step is not left RUNNING').toBe('RUNNING');
+		const { planId, step } = activeStepOf(stopped, phase.id);
+		expect(step.stepState, 'R-1b: the phase’s step does not wait').toBe('WAITING');
 		const product = stopped.artifacts.find((a) => a.state.producingPwuId === phase.id);
 		expect(product, 'arrangement: the try recorded no work product').toBeTruthy();
 		expect(
@@ -670,65 +695,52 @@ test.describe('JAN-EXEC Phase 7 P7-1b — the five-unit rehearsal, in the gate l
 		await expect(page.getByRole('alert')).toContainText('the assurance floor is NOT satisfied');
 		await shot(page, 'the phase stopped by an INCONCLUSIVE review');
 
-		// ── 3. ⚠ THE PAGE DOES NOT RELOAD AFTER A REFUSED ACTION — DRIVEN BY THIS SPEC'S FIRST RUN, AND IN NO REGISTER
-		//    ENTRY YET (reported with P7-1b for filing) ────────────────────────────────────────────────────────────────
+		// ── 3. ⚠ THE PAGE DOES NOT RELOAD AFTER A REFUSED ACTION — DRIVEN BY THIS SPEC'S FIRST RUN ───────────────────
 		// SvelteKit's `enhance` reloads a page's data only when the action succeeds; on a refusal it sets the form's error
 		// and nothing else. So the row still reads PROPOSED and still offers Begin & Execute, over a unit the store holds
-		// EXECUTING with its step RUNNING. `REG-F-513`'s *"The professional sees a unit EXECUTING, RUNNING and UNASSESSED"*
-		// holds only once the page is loaded again.
+		// EXECUTING and WAITING.
 		const phaseRow = unitRow(page, PHASE);
 		// ⛔ THE MUTANT, DRIVEN: reload the page's data after a refused Begin & Execute — this reddens.
 		await expect(
 			phaseRow.getByRole('cell', { name: 'PROPOSED', exact: true }),
 			'the page reloaded after the refused Begin & Execute — this pin is then obsolete'
 		).toBeVisible();
-		// ⛔ AND THE STALE OFFER CANNOT RUN THE UNIT AGAIN (`REG-F-511`): its batch opens with `BeginPwuShaping`, which
-		// admits only a PROPOSED unit, so the press is refused before anything is tried or reviewed.
+		// ⛔ AND THE STALE OFFER CANNOT RUN THE UNIT AGAIN: its batch opens with `BeginPwuShaping`, which admits only a
+		// PROPOSED unit, so the press is refused before anything is tried or reviewed.
 		const again = await beginExecute(page, PHASE);
-		expect(again.type, 'REG-F-511: a second Begin & Execute was accepted on a stopped unit').toBe(
-			'failure'
+		expect(again.type, 'a second Begin & Execute was accepted on a stopped unit').toBe('failure');
+		expect(refusalOf(again), 'the second press is not refused at BeginPwuShaping').toContain(
+			'Execution failed: BeginPwuShaping'
 		);
-		expect(
-			refusalOf(again),
-			'REG-F-511: the second press is not refused at BeginPwuShaping'
-		).toContain('Execution failed: BeginPwuShaping');
 		expect(recordCounts(await introspect(request)), 'the second press tried something').toEqual(
 			atStop
 		);
 
-		// ── 4. ⛔ K1 ON THE PAGE AS THE OPERATOR NEXT LOADS IT (`REG-F-511`): Begin & Execute is not offered again, and
-		//    Record Assurance is refused ─────────────────────────────────────────────────────────────────────────────────
+		// ── 4. ⭐ THE PAGE, AS THE OPERATOR NEXT LOADS IT (R-1d, RD3): the unit waits, and its row offers the person's three
+		//    choices — and none of the sign-off acts, each refused while the unit has not SUCCEEDED ────────────────────
 		await gotoHydrated(page, new URL(page.url()).pathname);
 		await page.getByRole('button', { name: 'overview', exact: true }).click();
-		await expect(phaseRow.getByRole('cell')).toHaveText([
-			PHASE,
-			'EXECUTING',
-			'RUNNING',
-			'UNASSESSED',
-			`${PHASE} ↗`,
-			/Record Assurance/
-		]);
+		await expect(phaseRow.getByRole('cell').nth(2)).toHaveText('WAITING');
+		await expect(phaseRow.getByTestId('recovery-refusal')).toContainText(
+			'floor.reasoning-review=INCONCLUSIVE'
+		);
 		// ⛔ THE MUTANT, DRIVEN: offer Begin & Execute on an EXECUTING row too — this reddens; the five-unit test stays green.
 		await expect(
 			phaseRow.getByRole('button', { name: 'Begin & Execute', exact: true }),
-			'REG-F-511: Begin & Execute is offered only on a PROPOSED unit'
+			'Begin & Execute is offered only on a PROPOSED unit'
 		).toHaveCount(0);
-		const refused = await recordAssurance(page, PHASE);
-		expect(refused.type, 'REG-F-511: Record Assurance was accepted on a RUNNING unit').toBe(
-			'failure'
-		);
-		// ⛔ THE MUTANT, DRIVEN: conclude every declared verdict INCONCLUSIVE — the refusal then names the sign-off, not the
-		// hop, and this reddens. The reason is held, not only the refusal.
-		expect(
-			refusalOf(refused),
-			'REG-F-511: the refusal is not the hop to SUCCEEDED that cites no plan'
-		).toContain('with no execution plan evidencing it');
-		expect(
-			recordCounts(await introspect(request)),
-			'a refused sign-off left records behind'
-		).toEqual(atStop);
+		await expect(
+			phaseRow.getByRole('button', { name: 'Record Assurance', exact: true }),
+			'R-1d: a waiting unit is offered a sign-off act'
+		).toHaveCount(0);
+		// RD3's first row: a review that did not conclude — re-run the review, re-run the work (which carries no finding),
+		// and abandon.
+		await expect(phaseRow.getByTestId('rerun-review')).toBeVisible();
+		await expect(phaseRow.getByTestId('rerun-work')).toBeVisible();
+		await expect(phaseRow.getByTestId('rerun-work-no-findings')).toBeVisible();
+		await expect(phaseRow.getByTestId('abandon-rationale')).toBeVisible();
 
-		// ── 5. ⭐ PREDICTION (a): THE ROOT IS SIGNED OFF WHILE ITS CHILD IS STUCK ─────────────────────────────────────
+		// ── 5. ⭐ PREDICTION (a): THE ROOT IS SIGNED OFF WHILE ITS CHILD WAITS ───────────────────────────────────────────
 		const rootRan = await beginExecute(page, ROOT);
 		expect(rootRan.type, `Begin & Execute on the root was refused: ${refusalOf(rootRan)}`).toBe(
 			'success'
@@ -739,8 +751,7 @@ test.describe('JAN-EXEC Phase 7 P7-1b — the five-unit rehearsal, in the gate l
 		// ⭐ OBSERVED BEFORE ANYTHING IS ASSERTED, as (b) is: the root's sign-off asserts neither act, and its observation —
 		// a refusal included — is recorded before it is held to the prediction.
 		// ⛔ THE MUTANT, DRIVEN: refuse a unit's sign-off while a child of it is unsatisfied — this prediction reddens, its
-		// annotation the refusal, and the five-unit test, which signs its root off last, stays green. Refusing the sign-off
-		// of a unit whose type a model does not run reddens it here too, and the five-unit test with it.
+		// annotation the refusal, and the five-unit test, which signs its root off last, stays green.
 		const rootSignOff = await attemptSignOff(page, ROOT);
 		const signed = unitsOf(await introspect(request), STUCK_UNDERTAKING.name);
 		recordPrediction(
@@ -755,111 +766,190 @@ test.describe('JAN-EXEC Phase 7 P7-1b — the five-unit rehearsal, in the gate l
 			'nothing gates a parent’s sign-off on its children — recomposition is undispatched in production (REG-F-041) — so a SATISFIED root is not a finished Undertaking (REG-F-533)'
 		);
 		await expect(unitRow(page, ROOT).getByText('✓ satisfied')).toBeVisible();
-		expect(axes(signed.get(PHASE)!), 'arrangement: the child is no longer stuck').toEqual([
+		expect(axes(signed.get(PHASE)!), 'arrangement: the child no longer waits').toEqual([
 			'EXECUTING',
 			'UNASSESSED',
-			'RUNNING'
+			'WAITING'
 		]);
 
-		// ── 6. ⛔ K1: RETRY RUNS NOTHING (`REG-F-511`; `REG-F-520`) ──────────────────────────────────────────────────
-		// The stopped step is RUNNING, where the page offers Complete and Fail and no Retry. The operator fails it so
-		// Retry is offered; Retry re-queues it and Start runs it again — and neither executes nor reviews anything.
-		// ⚠ MEASURED FROM HERE, NOT FROM THE STOP: the root's sign-off above added its own three assessments.
-		const beforeRetry = recordCounts(await introspect(request));
+		// ── 6. ⛔ THE WAITING STEP OFFERS NONE OF ITS OWN CONTROLS (R-1d; `REG-F-466`) ───────────────────────────────────
+		// ⭐ RESTATED WITH R-1: the stopped step was RUNNING, offering Complete and Fail, and after Fail a Retry that ran
+		// nothing (`REG-F-511`). Now it WAITS, and Retry, Start, Complete, Fail, Resume and Cancel are all withheld: each
+		// runs nothing, and the person's choice is made on the unit's row. ⚠ So prediction (c) — a hand completion with no
+		// output closes the step — has no arrangement left: Complete is not offered on a waiting step, and the engine
+		// refuses it there (`phase7-route.characterization.test.ts`, K1). It was observed ADMITTED on 2026-10-09.
+		const beforeAbandon = recordCounts(await introspect(request));
 		await page.getByRole('button', { name: 'execution', exact: true }).click();
 		const group = page
 			.getByTestId('exec-pwu-group')
 			.filter({ has: page.getByRole('heading', { name: new RegExp(`^${escapeRegExp(PHASE)} `) }) });
 		const stepRow = group.getByTestId('exec-step');
-		const stepState = stepRow.getByTestId('step-state');
-		await expect(stepState).toHaveText('RUNNING');
-		await expect(stepRow.getByTestId('step-action-complete')).toBeVisible();
-		// ⭐ `REG-F-466`'s STEP RETRY, ANSWERED FOR THIS REFUSAL. It says *"whether it is offered beside a substitution's
-		// refusal was not driven"*: beside a refusal that leaves the step RUNNING, Retry is not offered — driven here for
-		// an INCONCLUSIVE review. A substitution's refusal leaves the step RUNNING through the same return, the
-		// `fail(400)` after a refused `CompleteExecutionStep` (`[id]/+page.server.ts`): read from code, not driven.
-		await expect(
-			stepRow.getByTestId('step-action-retry'),
-			'REG-F-466: Retry is offered beside a refused completion, on a RUNNING step'
-		).toHaveCount(0);
-		for (const [action, testId, after] of [
-			['failStep', 'step-action-fail', 'FAILED'],
-			['retryStep', 'step-action-retry', 'QUEUED'],
-			['startStep', 'step-action-start', 'RUNNING']
-		] as const) {
-			const moved = await pressAction(page, action, stepRow.getByTestId(testId));
-			expect(moved.type, `${action} was refused: ${refusalOf(moved)}`).toBe('success');
-			await expect(stepState).toHaveText(after);
-		}
-		const afterRetry = await introspect(request);
-		expect(
-			recordCounts(afterRetry),
-			'REG-F-511: Retry or Start executed or reviewed something — no try, no work product, no review was added'
-		).toEqual(beforeRetry);
-		expect(
-			completionsOf(afterRetry, planId, step.id),
-			'nothing completed the re-queued step'
-		).toEqual([]);
-		await page.getByRole('button', { name: 'overview', exact: true }).click();
-		await expect(
-			phaseRow.getByRole('button', { name: 'Begin & Execute', exact: true }),
-			'REG-F-511: a retried unit is offered Begin & Execute again'
-		).toHaveCount(0);
-		const stillRefused = await recordAssurance(page, PHASE);
-		expect(stillRefused.type, 'REG-F-511: after Retry, Record Assurance was accepted').toBe(
-			'failure'
-		);
+		await expect(stepRow.getByTestId('step-state')).toHaveText('WAITING');
+		await expect(stepRow.getByTestId('step-awaits-choice')).toBeVisible();
+		for (const control of ['retry', 'start', 'complete', 'fail', 'resolve', 'cancel'])
+			await expect(
+				stepRow.getByTestId(`step-action-${control}`),
+				`REG-F-466: a waiting step offers ${control}`
+			).toHaveCount(0);
 
-		// ── 7. ⭐ PREDICTION (c): COMPLETE WITH NO OUTPUT CLOSES THE STEP — AND FREES NOTHING ─────────────────────────
-		await page.getByRole('button', { name: 'execution', exact: true }).click();
-		await expect(stepRow.getByTestId('complete-output')).toHaveValue('');
-		await expect(stepRow.getByTestId('complete-ai')).not.toBeChecked();
-		// ⛔ THE MUTANT, DRIVEN: refuse a completion that names no output — this prediction reddens, its observation the
-		// refusal.
-		const completed = await pressAction(
-			page,
-			'completeStep',
-			stepRow.getByTestId('step-action-complete')
-		);
-		const closed = await introspect(request);
-		const completions = completionsOf(closed, planId, step.id);
-		recordPrediction(
-			'c',
-			completed.type === 'success' && completions.length === 1
-				? 'ADMITTED'
-				: `${completed.type}: ${refusalOf(completed)}`,
-			'the zero-subject rule admits a no-output completion of a model step whose structured result is empty (REG-F-520)'
-		);
-		await expect(stepState).toHaveText('SUCCEEDED');
-		await shot(page, 'the stuck phase’s step closed by hand, with no output');
-		const closing = completions[0]!;
-		// ⚠ THE LEVER DISCARDS RATHER THAN REPAIRS (`REG-F-520`): the completion names neither the work product the
-		// try recorded nor any evidence, and records the operator as the executor of a model's step.
-		expect(
-			[ids(closing.outputArtifactIds), ids(closing.proposedEvidenceIds)],
-			'REG-F-520: the hand completion names an output or evidence'
-		).toEqual([[], []]);
-		expect(
-			(closing.executionProvenance as { executedBy?: { actorId?: string; actorType?: string } })
-				.executedBy,
-			'REG-F-520: the hand completion does not record the operator as the executor'
-		).toMatchObject({ actorId: OPERATOR, actorType: 'HUMAN' });
-		// ⛔ AND THE UNIT IS STILL STUCK (`REG-F-511`): no page action moves its execution state, so the sign-off's hop
-		// to SUCCEEDED still cites no plan, and only Abandon remains.
-		expect(
-			axes(unitsOf(closed, STUCK_UNDERTAKING.name).get(PHASE)!),
-			'REG-F-511: a hand completion moved the unit'
-		).toEqual(['EXECUTING', 'UNASSESSED', 'RUNNING']);
+		// ── 7. ⭐ ABANDON, NOW THE PERSON'S DECISION WITH THEIR RATIONALE — and the waiting step CANCELLED (R-1c) ─────────
 		await page.getByRole('button', { name: 'overview', exact: true }).click();
-		const neverAssured = await recordAssurance(page, PHASE);
+		await phaseRow.getByTestId('abandon-rationale').fill('The review never concluded; stop here.');
+		const abandoned = await pressAction(
+			page,
+			'abandonPwu',
+			phaseRow.getByRole('button', { name: 'Abandon', exact: true })
+		);
+		expect(abandoned.type, `Abandon was refused: ${refusalOf(abandoned)}`).toBe('success');
+		const closed = await introspect(request);
+		expect(axes(unitsOf(closed, STUCK_UNDERTAKING.name).get(PHASE)!)[0]).toBe('ABANDONED');
 		expect(
-			neverAssured.type,
-			'REG-F-511: after a hand completion, Record Assurance was accepted'
-		).toBe('failure');
-		expect(refusalOf(neverAssured)).toContain('with no execution plan evidencing it');
-		await expect(
-			phaseRow.getByRole('button', { name: 'Abandon', exact: true }),
-			'REG-F-511: the way out is Abandon'
-		).toBeVisible();
+			plansOf(closed, phase.id).map((p) => p.steps.map((s) => s.stepState)),
+			'R-1c: abandoning a waiting unit left its step waiting'
+		).toEqual([['CANCELLED']]);
+		const decision = closed.decisions.find(
+			(d) => d.state.decisionType === 'ABANDON' && ids(d.state.subjectObjectIds).includes(phase.id)
+		);
+		expect(decision?.state, 'the abandonment is not the person’s Decision').toMatchObject({
+			status: 'EFFECTIVE',
+			rationale: 'The review never concluded; stop here.',
+			authority: { actorId: OPERATOR, actorType: 'HUMAN' }
+		});
+		expect(ids(decision!.state.subjectObjectIds)).toEqual([phase.id, planId, product!.id]);
+		expect(recordCounts(closed), 'abandoning ran something').toEqual(beforeAbandon);
+		expect(step.id).toBeTruthy();
+	});
+
+	// ── ⭐⭐ `JAN-EXEC` P7-6R R-1e (`DESIGN-the-stopped-unit-recovery.md` §7 item 5; RD3-RD5; `REG-D-104` (1)) ──────────────────
+	// THE FIVE UNITS, TWO PHASES STOPPED AND RECOVERED BY A PERSON, at no cost: the stand-in reviewer leaves each review
+	// INCONCLUSIVE until the test registers its stipulation, so the first two phases stop and WAIT; then the person re-runs
+	// the requirements phase's REVIEW — no executor turn, the floors over the recorded work product — and the design
+	// phase's WORK, in a fresh session; the other two run as before, and all five are signed off.
+	// ⚠ THE STIPULATION ARRIVES BETWEEN THE STOP AND THE RE-RUN, and that is the arrangement, not a claim: it stands for a
+	// reviewer that answers the second time it is asked (`REG-D-071`), which is what a re-run of a review that did not
+	// conclude is for.
+	// ⚠ NOT REHEARSED HERE: "a REJECTED review, then re-run the work with its findings". This lane cannot reach it honestly —
+	// a stipulation is CLEAN by design (`stipulations.ts`: a scripted fault would be indistinguishable from a reviewer's
+	// finding), and a fixture work product the checker rejects is repaired by Begin & Execute's own loop before it stops.
+	// It is driven, with a scripted reviewer, by `routes/undertakings/[id]/stopped-unit-recovery.route.test.ts`.
+	test('⭐ P7-6R R-1e — the five units, two phases stopped by a review that did not conclude and recovered by a person: one by re-running its review with no executor turn, one by re-running its work in a fresh session; then all five SATISFIED', async ({
+		page,
+		request
+	}) => {
+		test.setTimeout(90_000);
+		const [REQUIREMENTS, DESIGN] = [PHASE7_PHASES[0]!, PHASE7_PHASES[1]!];
+
+		// ── 1. THE §3.2 PWA AND ITS UNDERTAKING — ⛔ NOTHING REGISTERED YET ────────────────────────────────────────────
+		const pwaId = await createDraftPwa(page, request, PHASE7_PWA);
+		await typePwuTypes(page, request, PHASE7_PWA.types);
+		expectTheTypesTyped(await introspect(request), pwaId, PHASE7_PWA.types);
+		await publishThroughDesigner(page, request, pwaId);
+		await createUndertakingThroughForm(page, RECOVERY_UNDERTAKING);
+
+		// ── 2. THE ROOT RUNS; THE FIRST TWO PHASES STOP, AND WAIT ───────────────────────────────────────────────────
+		const rootRan = await beginExecute(page, PHASE7_ROOT.name);
+		expect(rootRan.type, `Begin & Execute on the root was refused: ${refusalOf(rootRan)}`).toBe(
+			'success'
+		);
+		for (const t of [REQUIREMENTS, DESIGN]) {
+			// ⚠ The page reloads only after a success, so after the first refusal the row is stale: load it afresh.
+			await gotoHydrated(page, new URL(page.url()).pathname);
+			await page.getByRole('button', { name: 'overview', exact: true }).click();
+			const ran = await beginExecute(page, t.name);
+			expect(ran.type, `arrangement: ${t.name} completed with nothing registered`).toBe('failure');
+		}
+		const stopped = unitsOf(await introspect(request), RECOVERY_UNDERTAKING.name);
+		for (const t of [REQUIREMENTS, DESIGN])
+			expect(axes(stopped.get(t.name)!), `${t.name} does not wait`).toEqual([
+				'EXECUTING',
+				'UNASSESSED',
+				'WAITING'
+			]);
+		const exchangesOf = (snap: EngineSnapshot, unitId: string) =>
+			snap.modelExchanges.filter(
+				(x) => x.state.plane === 'EXECUTION' && x.state.subjectObjectId === unitId
+			).length;
+		const before = await introspect(request);
+
+		// ── 3. THE REVIEWER WILL ANSWER NOW (the test's stipulation); THE PERSON RE-RUNS ─────────────────────────────
+		await registerStipulation(request, pwaId, 'WORK_PRODUCT');
+		await gotoHydrated(page, new URL(page.url()).pathname);
+		await page.getByRole('button', { name: 'overview', exact: true }).click();
+		// ⭐ The requirements phase: RE-RUN THE REVIEW — offered, since its review did not conclude (RD3).
+		const reqRow = unitRow(page, REQUIREMENTS.name);
+		await reqRow
+			.getByTestId('rerun-review-rationale')
+			.fill('The review never concluded; review the same work product again.');
+		const reviewed = await pressAction(page, 'rerunReview', reqRow.getByTestId('rerun-review'));
+		expect(reviewed.type, `the re-review was refused: ${refusalOf(reviewed)}`).toBe('success');
+		// ⭐ The design phase: RE-RUN THE WORK, which carries no finding from a review that did not conclude.
+		const designRow = unitRow(page, DESIGN.name);
+		await expect(designRow.getByTestId('rerun-work-no-findings')).toBeVisible();
+		await designRow.getByTestId('rerun-work-rationale').fill('Attempt the design again.');
+		const reworked = await pressAction(page, 'rerunWork', designRow.getByTestId('rerun-work'));
+		expect(reworked.type, `the re-run of the work was refused: ${refusalOf(reworked)}`).toBe(
+			'success'
+		);
+		const after = await introspect(request);
+		const reqId = stopped.get(REQUIREMENTS.name)!.id;
+		const designId = stopped.get(DESIGN.name)!.id;
+		expect(
+			[
+				exchangesOf(after, reqId) - exchangesOf(before, reqId),
+				exchangesOf(after, designId) - exchangesOf(before, designId)
+			],
+			'RD5: a re-review ran the executor, or a re-run of the work did not'
+		).toEqual([0, 1]);
+
+		// ── 4. THE REST RUN AS BEFORE, AND ALL FIVE ARE SIGNED OFF, THE ROOT LAST ───────────────────────────────────
+		for (const t of PHASE7_PHASES.slice(2)) {
+			const ran = await beginExecute(page, t.name);
+			expect(ran.type, `Begin & Execute on ${t.name} was refused: ${refusalOf(ran)}`).toBe(
+				'success'
+			);
+		}
+		for (const t of PHASE7_PHASES) await signOff(page, t.name);
+		await signOff(page, PHASE7_ROOT.name);
+		await shot(page, 'five units SATISFIED, two of them recovered by a person');
+
+		// ── 5. ⭐ THE END STATE, AND THE CHAIN EACH RECOVERY LEFT (RD4, RD5) ──────────────────────────────────────────
+		const snap = await introspect(request);
+		const units = unitsOf(snap, RECOVERY_UNDERTAKING.name);
+		expect(
+			[...units.entries()].map(([title, u]) => [title, ...axes(u)]).sort(),
+			'every unit SATISFIED, its execution SUCCEEDED'
+		).toEqual(PHASE7_PWA.types.map((t) => [t.name, 'SATISFIED', 'SATISFIED', 'SUCCEEDED']).sort());
+		for (const [title, u] of units)
+			expect(
+				activeStepOf(snap, u.id).step.stepState,
+				`${title}'s active step did not SUCCEED`
+			).toBe('SUCCEEDED');
+		for (const [unitId, option, stepType, rationale] of [
+			[
+				reqId,
+				'RERUN_REVIEW',
+				'ASSURANCE_INVOCATION',
+				'The review never concluded; review the same work product again.'
+			],
+			[designId, 'RERUN_WORK', 'MODEL_INVOCATION', 'Attempt the design again.']
+		] as const) {
+			const plans = plansOf(snap, unitId);
+			expect(
+				plans.map((p) => [p.status, p.steps.map((s) => `${s.stepType}:${s.stepState}`)]),
+				'RD5: the refused plan superseded with its step cancelled, and the re-run’s plan active with its step succeeded'
+			).toEqual([
+				['SUPERSEDED', ['MODEL_INVOCATION:CANCELLED']],
+				['ACTIVE', [`${stepType}:SUCCEEDED`]]
+			]);
+			const decision = snap.decisions.find(
+				(d) => d.state.decisionType === 'REPLAN' && ids(d.state.subjectObjectIds).includes(unitId)
+			);
+			expect(decision?.state, 'RD4: the re-run is not the person’s Decision').toMatchObject({
+				selectedOption: option,
+				status: 'EFFECTIVE',
+				rationale,
+				authority: { actorId: OPERATOR, actorType: 'HUMAN' }
+			});
+		}
 	});
 });
