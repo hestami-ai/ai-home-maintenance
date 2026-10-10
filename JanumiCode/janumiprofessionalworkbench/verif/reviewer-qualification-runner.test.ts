@@ -543,27 +543,33 @@ describe('JAN-CRITREAD J2-2 — the runner, over a stub transport', () => {
 		expect(repair.promptSha256).not.toBe(initial.promptSha256);
 		expect(recordProblems(repaired.map(serializeLine).join(''), { tracked: false })).toEqual([]);
 
-		// `null` parses, so the validator takes it as a judgement with no findings and never repairs — every criterion
-		// unjudged. Nothing of the reply is retained, and the replay reproduces the outcome from `parses` alone.
+		// ~~`null` parses, so the validator takes it as a judgement with no findings and never repairs — every criterion
+		// unjudged.~~ ⭐ `JAN-EXEC` Phase 7 P7-6 I5 (`DESIGN-the-reviewer-isolated.md` §4d; `REG-F-552`): `null` parses, so the
+		// validator takes it as a judgement with no findings — which answers no criterion, so it now sends ONE criterion
+		// repair, recorded `criterion-repair`. Its reply (the stub's `null` again) answers none either, so the FIRST judgement
+		// stands, every criterion unjudged, as before the repair existed. Nothing of either reply is retained, and the replay
+		// reproduces the outcome from `parses` alone.
 		const scalar = await runQualification(
 			inputs({ transport: stubTransport(() => answer('null')), cases: [caseById('G-CLEAN')] })
 		);
-		const only = scalar[1] as CallLine;
-		expect(scalar).toHaveLength(2);
-		expect(only.reply).toEqual({ status: 'NO_ANSWER_SPAN', parses: true });
-		expect(only.scored?.disposition).toBe('INCONCLUSIVE');
-		expect(new Set(only.scored?.criteria.map(([, o]) => o))).toEqual(
+		const [, first, criterionRepair] = scalar as [RunLine, CallLine, CallLine];
+		expect(scalar).toHaveLength(3);
+		expect(first).toMatchObject({ role: 'initial', reply: { status: 'NO_ANSWER_SPAN', parses: true }, scored: null });
+		expect(criterionRepair).toMatchObject({ role: 'criterion-repair', reply: { status: 'NO_ANSWER_SPAN', parses: true } });
+		expect(criterionRepair.scored?.disposition).toBe('INCONCLUSIVE');
+		expect(new Set(criterionRepair.scored?.criteria.map(([, o]) => o))).toEqual(
 			new Set(['UNABLE_TO_DETERMINE'])
 		);
+		expect(recordProblems(scalar.map(serializeLine).join(''), { tracked: false })).toEqual([]);
 		const replayed = await evaluateCase({
 			case: caseById('G-CLEAN'),
 			criteria: CRITERIA,
 			candidate: STUB,
-			call: replayReplies([only]),
+			call: replayReplies([first, criterionRepair]),
 			scoringDigest: FINGERPRINT.scoring,
 			now: ticking()
 		});
-		expect(replayed.scored).toEqual(only.scored);
+		expect(replayed.scored).toEqual(criterionRepair.scored);
 	});
 
 	it('⛔ A TRANSPORT THROW is a transport-failure class, not re-scorable, scored as the product’s floor runner scores a throwing validator', async () => {

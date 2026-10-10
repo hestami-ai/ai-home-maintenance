@@ -290,6 +290,19 @@ export interface ToolInvocationResult {
 	 * single most-recorded defect"*, and the union below costs one discriminator to avoid it.
 	 */
 	readonly observedToolCalls: AdapterToolObservation;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7 P7-6 I2 (`DESIGN-the-reviewer-isolated.md` §2; `REG-F-351`) — THE TOOL'S OWN RECORD OF THE
+	 * SESSION, AS THE TOOL WROTE IT, when it writes one: devin's ATIF export, every step and any tool devin called.
+	 *
+	 * ⭑ WHY IT TRAVELS WITH THE ANSWER: the adapter cannot watch the session (`observedToolCalls` says so), so the
+	 * tool's export is the only evidence of what ran inside it — and the measured run's reviewer ended its sessions
+	 * reaching for tools (`REG-F-549`), which nothing it kept could show. The adapter deletes its folder on return, so
+	 * the bytes are read there and handed on; the caller retains them (`captureTry`'s `toolSessionExport`).
+	 * ⚠ CONTENT, NEVER A RECORD FIELD: model-chosen text, the prompt and this host's own devin setup among it (`REG-F-548`'s
+	 * pointer), so it is stored PURGEABLE_AT_EXPIRY on the content plane and only pointed at from the record.
+	 * ⭑ `undefined` means the tool wrote none, or none could be read — an absence of the record, never "no tool ran".
+	 */
+	readonly sessionExport?: string;
 }
 
 /**

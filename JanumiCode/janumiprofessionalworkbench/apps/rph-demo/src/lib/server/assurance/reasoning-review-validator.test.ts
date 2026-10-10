@@ -45,7 +45,8 @@ import { readFileSync } from 'node:fs';
 import { createExchangeSink } from './exchange-capture.js';
 import { renderRationale } from '../agent/rationale.js';
 import { processResultReviewInput } from './review-input.js';
-import type { ArtifactStore } from '@janumipwb/rph-ports';
+import { createInMemoryArtifactStore, type ArtifactStore } from '@janumipwb/rph-ports';
+import type { ToolInvocationResult } from '../tools/backing-tool.js';
 
 /**
  * ⭐ R11 — the adapter observation every `ToolInvocationResult` now owes.
@@ -220,6 +221,158 @@ describe('Reasoning Review Validator — a CONTENT STORE failure is not a malfor
 		expect(result.executionFailed).toBe(false);
 		expect(prompts).toHaveLength(2);
 		expect(exchanges.drain().some((e) => e.disposition === 'repair-requested')).toBe(true);
+	});
+});
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7 P7-6 I2 (`DESIGN-the-reviewer-isolated.md` §2; `REG-F-351`, `REG-D-103` (2)) ──────────────
+//
+// In the measured run, 10 reviewer replies did not parse (3 empty, 7 prose) and NONE was kept: every one was recorded
+// `PENDING_CONTENT_PLANE`, so a person could not read what the reviewer said, nor why its review failed (`REG-F-351`'s
+// pointer; `REG-F-549`). The sponsor approved keeping them (`REG-D-103` (2)). These hold that on the reviewer's plane,
+// through the real validator with only its print seam stood in for, and a real in-memory content store.
+
+/** What a stand-in reviewer says, call by call (the last repeats), each a reply or a tool report. */
+function replying(...replies: (string | ToolInvocationResult)[]) {
+	const prompts: string[] = [];
+	const print: AgyPrint = async (p) => {
+		prompts.push(p);
+		return replies[Math.min(prompts.length - 1, replies.length - 1)]!;
+	};
+	return { prompts, print };
+}
+
+/** A tool report answering `text` as devin does, with the session export devin writes (`devinPrint`). */
+const devinReport = (text: string, sessionExport?: string): ToolInvocationResult => ({
+	answer: { arrived: true, text },
+	rawOutput: text,
+	producer: { agentId: 'devin', modelId: JUDGE, providerId: 'devin' },
+	identityEvidence: 'PROVIDER_REPORTED',
+	observedToolCalls: {
+		canObserve: false,
+		reason: 'Fixture: the devin adapter runs devin to completion and watches no session.'
+	},
+	...(sessionExport === undefined ? {} : { sessionExport })
+});
+
+/** The prose the measured run's reviewer left as its answer (`REG-F-549`): an agent setting out to look for itself. */
+const PROSE = "I'll verify the files the work product describes before I answer.";
+
+describe('⭐⭐ P7-6 I2 — every reviewer reply is KEPT as content, parsed or not, and the record points at it (REG-F-351)', () => {
+	it('⭐ a reply with NO JSON in it — prose — is stored whole and pointed at by rawOutputBeforeCoercionRef, PURGEABLE_AT_EXPIRY', async () => {
+		const { print } = replying(PROSE, CLEAN);
+		const store = createInMemoryArtifactStore();
+		const exchanges = createExchangeSink();
+		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE, artifacts: store, exchanges }).evaluate(
+			SUBJECT,
+			ctx()
+		);
+		expect(result.executionFailed, 'arrangement: the repair answered, so the review stands').toBe(false);
+		const [first] = exchanges.drain();
+		expect(first!.parseOutcome.outcome, 'arrangement: no JSON object could be located').toBe('JSON_EXTRACTION_FAILED');
+		const raw = first!.rawOutputBeforeCoercionRef;
+		// ⛔ THE DEFECT, AT HEAD: `PENDING_CONTENT_PLANE` — the bytes the reviewer answered were obtainable and not kept.
+		expect(raw.status, 'the unparsed reply is retained').toBe('STORED');
+		expect(await store.get(raw.storageKey!), 'and its bytes are the reply, exactly').toBe(PROSE);
+		// ⭐ PURGEABLE: no judgement rests on a reply no answer span could be located in (`exchange-capture.ts`), and
+		// whatever reasoning it holds stays purgeable (PER-12) — kept for diagnosis (ASR-11 limb 3).
+		expect(raw.purgeability).toBe('PURGEABLE_AT_EXPIRY');
+		// ⭐ Its two spans still say why they hold nothing — and where the reply is.
+		for (const span of [first!.answerSpanRef, first!.volunteeredReasoningRef]) {
+			expect(span.status).toBe('PENDING_CONTENT_PLANE');
+			expect(span.reason).toMatch(/rawOutputBeforeCoercionRef/);
+		}
+	});
+
+	it('⭐ when the repair is prose TOO and the review fails, BOTH replies are kept, each under its own record', async () => {
+		const SECOND = 'Still checking the workspace.';
+		const { print } = replying(PROSE, SECOND);
+		const store = createInMemoryArtifactStore();
+		const exchanges = createExchangeSink();
+		await expect(
+			createAgyReasoningReviewValidator({ print, modelId: JUDGE, artifacts: store, exchanges }).evaluate(SUBJECT, ctx())
+		).rejects.toThrow();
+		const kept = await Promise.all(
+			exchanges.drain().map(async (e) => [e.disposition, await store.get(e.rawOutputBeforeCoercionRef.storageKey ?? '')])
+		);
+		expect(kept).toEqual([
+			['repair-requested', PROSE],
+			['rejected', SECOND]
+		]);
+	});
+
+	it('⭐ an EMPTY reply is kept as what it is — zero bytes, stored — so the record measures the silence', async () => {
+		const { print } = replying('', CLEAN);
+		const store = createInMemoryArtifactStore();
+		const exchanges = createExchangeSink();
+		await createAgyReasoningReviewValidator({ print, modelId: JUDGE, artifacts: store, exchanges }).evaluate(SUBJECT, ctx());
+		const [first] = exchanges.drain();
+		expect(first!.parseOutcome.outcome).toBe('EMPTY_RESPONSE');
+		expect(first!.rawOutputBeforeCoercionRef.status).toBe('STORED');
+		expect(first!.rawOutputBeforeCoercionRef.byteSize).toBe(0);
+		expect(await store.get(first!.rawOutputBeforeCoercionRef.storageKey!)).toBe('');
+	});
+
+	it('⛔ a call that THREW has no reply to keep: its record stays PENDING, never a stored empty reply', async () => {
+		// ⛔ THE MUTANT: retain on every try. A thrown call's `rawOutput` is '' because NOTHING came back — storing it
+		// would record an empty reply that never arrived, the `no-response` / `rejected` conflation `JAN-NOANS` closed.
+		let n = 0;
+		const print: AgyPrint = async () => {
+			n += 1;
+			if (n === 1) throw new Error('devin invocation failed: connection reset');
+			return CLEAN;
+		};
+		const store = createInMemoryArtifactStore();
+		const exchanges = createExchangeSink();
+		await createAgyReasoningReviewValidator({ print, modelId: JUDGE, artifacts: store, exchanges, callBoundMs: 240_000 }).evaluate(
+			SUBJECT,
+			ctx()
+		);
+		const [thrown, retry] = exchanges.drain();
+		expect(thrown!.disposition, 'arrangement: the first call threw and was run once more').toBe('no-response');
+		expect(retry!.exchangeRole).toBe('retry');
+		expect(thrown!.rawOutputBeforeCoercionRef.status, 'no reply, so nothing is stored as one').toBe('PENDING_CONTENT_PLANE');
+	});
+
+	it('⭑ CONTROL — a MIXED reply is still separated at retention, never stored whole (REG-D-056; the handler refuses a blob beside a stored reasoning span)', async () => {
+		const { print } = replying(`Let me think first.\n${CLEAN}\nThat is all.`);
+		const store = createInMemoryArtifactStore();
+		const exchanges = createExchangeSink();
+		await createAgyReasoningReviewValidator({ print, modelId: JUDGE, artifacts: store, exchanges }).evaluate(SUBJECT, ctx());
+		const [only] = exchanges.drain();
+		expect(only!.answerSpanRef.status).toBe('STORED');
+		expect(only!.volunteeredReasoningRef.status).toBe('STORED');
+		expect(only!.rawOutputBeforeCoercionRef.status, 'the mixed blob is not stored whole').toBe('PENDING_CONTENT_PLANE');
+	});
+
+	it('⭐ devin’s EXPORT of the session is kept too, and the record says where: the tool-call observation names its storage key', async () => {
+		// ⭐ design §2 I2: *"So is devin's export of the session, which shows any tool it called. The exchange record points
+		// at both."* The record's only typed home for "what tools ran" is its tool-call observation, whose reason says
+		// devin's adapter could not watch the session — so the pointer goes there (`exchange-capture.ts`).
+		const EXPORT = JSON.stringify({ schema_version: 'ATIF-v1.7', steps: [{ step_id: 1, source: 'agent', tool_calls: [] }] });
+		const { print } = replying(devinReport(CLEAN, EXPORT));
+		const store = createInMemoryArtifactStore();
+		const exchanges = createExchangeSink();
+		await createAgyReasoningReviewValidator({ print, modelId: JUDGE, artifacts: store, exchanges }).evaluate(SUBJECT, ctx());
+		const [only] = exchanges.drain();
+		const report = only!.observedToolCalls;
+		expect(report.observation).toBe('NOT_OBSERVABLE');
+		const key = /storage key (\S+?),/.exec(report.reason ?? '')?.[1];
+		expect(key, 'the observation names where the export is kept').toBeDefined();
+		expect(await store.get(key!), 'and it holds devin’s export, exactly').toBe(EXPORT);
+		expect((await store.stat(key!))?.purgeability, 'purgeable: a session trace, never Evidence (PER-12)').toBe('PURGEABLE_AT_EXPIRY');
+	});
+
+	it('⛔ a later call’s record never carries an EARLIER call’s export: each export is its own call’s', async () => {
+		// ⛔ THE MUTANT: the export kept across calls, as the reported identity is (`reportedSoFar`). The repair below
+		// answered as a bare string — no export — so a pointer on its record would name a session it was not.
+		const EXPORT = JSON.stringify({ steps: [{ step_id: 1, source: 'agent' }] });
+		const { print } = replying(devinReport(PROSE, EXPORT), CLEAN);
+		const store = createInMemoryArtifactStore();
+		const exchanges = createExchangeSink();
+		await createAgyReasoningReviewValidator({ print, modelId: JUDGE, artifacts: store, exchanges }).evaluate(SUBJECT, ctx());
+		const [first, repair] = exchanges.drain();
+		expect(first!.observedToolCalls.reason, 'arrangement: the first call’s export is pointed at').toMatch(/storage key /);
+		expect(repair!.observedToolCalls.reason ?? '', 'the repair’s record names no export').not.toMatch(/storage key /);
 	});
 });
 
@@ -1281,6 +1434,177 @@ describe('⭐⭐ design §9.3 D8 — the prompt agrees with the policy: D8’s l
 		const rubric = SEEDED_REASONING_REVIEW_CRITERIA.map((c) => `- ${c.id}: ${c.description} [if unmet: ${c.severityIfNotMet}]`).join('\n');
 		expect(prompts[0]).toContain(`\n${rubric}\n\n${D8_RECOMMENDATION_LINES[0]}\n`);
 		expect(rubric.length, 'the floor rubric within RUBRIC_MAX').toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.RUBRIC_MAX);
+	});
+});
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7 P7-6 I6 (`DESIGN-the-reviewer-isolated.md` §4d; `REG-F-552` remedy 2; `REG-D-105` (2)) ──────
+//
+// D8's line *"For each failure give a one-sentence statement … and a severity"* can be read as "list only the failures",
+// the shape of both `REG-F-552` (no rows at all) and `REG-F-489` (rows only for faulted criteria). The sponsor chose to
+// ask for one row per criterion, met or not, ON A CONDITION: the prompt must not push the reviewer to find a failure that
+// is not there. So the sentence says a met criterion is recorded as met, and asks for no failure; D8's lines stay byte
+// for byte (the sponsor's answers of 2026-10-05), and the sentence is added AFTER them.
+
+/** ⭐ THE SENTENCE, BYTE FOR BYTE AS DESIGN §4d WRITES IT — one line of the prompt. */
+const ONE_ROW_PER_CRITERION_SENTENCE =
+	'Give exactly one row in findings for each criterion listed above: failed=false where the criterion is met, failed=true where it is not. A criterion that is met is recorded as met; do not look for a failure that is not there. An empty findings list leaves every criterion unassessed.';
+
+describe('⭐⭐ P7-6 I6 — the prompt asks for ONE ROW PER CRITERION, met or not, in every framing, after D8’s lines and naming no disposition', () => {
+	it.each(['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT'] as const)(
+		'⭐ %s — the sentence is one line of the prompt, once, after D8’s recommendation sentence and before the output format',
+		async (framing) => {
+			const { prompts, print } = capturing();
+			await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(SUBJECT, ctx({ framing }));
+			const lines = prompts[0]!.split('\n');
+			// ⛔ THE MUTANT: the sentence dropped, in every framing or in one — the reviewer is again free to read D8's
+			// "For each failure" as "list only the failures" (`REG-F-552`, `REG-F-489`).
+			expect(lines.filter((l) => l === ONE_ROW_PER_CRITERION_SENTENCE), 'the sentence, once, on a line of its own').toHaveLength(1);
+			const at = lines.indexOf(ONE_ROW_PER_CRITERION_SENTENCE);
+			const recommendation = lines.indexOf(D8_RECOMMENDATION_LINES[0]);
+			// ⭐ AFTER D8's lines, never inside them: D8's four recommendation lines stand whole and together before it.
+			expect(lines.slice(recommendation, recommendation + D8_RECOMMENDATION_LINES.length), 'D8’s sentence, whole').toEqual([
+				...D8_RECOMMENDATION_LINES
+			]);
+			expect(at, 'after D8’s recommendation sentence').toBeGreaterThan(recommendation + D8_RECOMMENDATION_LINES.length - 1);
+			expect(at, 'and before the output format').toBeLessThan(
+				lines.indexOf('Return ONLY a single-line minified JSON object (no markdown, no prose) shaped EXACTLY as:')
+			);
+		}
+	);
+
+	it('⭐ the sponsor’s condition, as text: it names no disposition value, asks for no failure, and says a met criterion is recorded as met', () => {
+		// ⭑ `REG-D-090`'s recorded statement is about the prompt's naming of ESCALATED: a sentence that named a disposition
+		// value could make it false (`⚠ A RECORDED STATEMENT IS ABOUT THE FOUR LINES ABOVE`), and the ESCALATED pins above
+		// count every mention in every framing. This holds the sentence's own words.
+		for (const d of ['SATISFIED', 'CONDITIONALLY_SATISFIED', 'REJECTED', 'INCONCLUSIVE', 'ESCALATED'])
+			expect(ONE_ROW_PER_CRITERION_SENTENCE.toUpperCase(), `names no ${d}`).not.toContain(d);
+		expect(ONE_ROW_PER_CRITERION_SENTENCE).toContain('A criterion that is met is recorded as met');
+		expect(ONE_ROW_PER_CRITERION_SENTENCE).toContain('do not look for a failure that is not there');
+	});
+});
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7 P7-6 I5 (`DESIGN-the-reviewer-isolated.md` §4d; `REG-F-552` remedy 1; `REG-D-105` (2)) ──────
+//
+// A reply that PARSES but answers NO criterion — `{"findings":[],"recommendation":"SATISFIED",…}`, the measured run's own
+// shape, 2 of the 25 live replies that parsed and none of 234 in qualification — was taken as it stood: no repair is
+// sent after a reply that parses, and the floor records it INCONCLUSIVE (ASR-2; `REG-D-090`), so its phase stops.
+// Now ONE repair is sent, naming the cause. ⛔ THE REPAIR MAY ONLY ADD A CONCLUSION: a repair that answers no criterion
+// again, does not parse, or gets no reply leaves the FIRST reply's judgement standing, exactly as today.
+
+/** ⭐ THE REPAIR LINE, BYTE FOR BYTE AS DESIGN §4d WRITES IT. */
+const CRITERION_REPAIR_LINE =
+	'IMPORTANT: your reply gave no row for any criterion. Reply with ONLY the minified JSON object, with one row in findings for each criterion, failed=false where it is met.';
+/** ⭐ THE MEASURED RUN'S EXACT REPLY SHAPE (`REG-F-552`): SATISFIED, residual uncertainty, and not one row. */
+const NO_ROWS = '{"findings":[],"recommendation":"SATISFIED","residualUncertainty":["x"]}';
+
+describe('⭐⭐ P7-6 I5 — a reply that answers NO criterion is repaired ONCE, and the repair can only add a conclusion (REG-F-552)', () => {
+	/** Today's result for `reply`: the first judgement taken as it stood, which is what a failed repair must leave. */
+	const asToday = { recommendation: 'SATISFIED', outcome: 'UNABLE_TO_DETERMINE' } as const;
+
+	it('⭐ the measured run’s exact reply draws a SECOND call, the prompt plus the line naming the cause', async () => {
+		const { prompts, print } = replying(NO_ROWS, CLEAN);
+		const exchanges = createExchangeSink();
+		await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+		// ⛔ AT HEAD: ONE call — no repair follows a reply that parses.
+		expect(prompts, 'a repair is sent').toHaveLength(2);
+		expect(prompts[1], 'the prompt, then the line naming what was wrong').toBe(`${prompts[0]}\n\n${CRITERION_REPAIR_LINE}`);
+		const [first, repair] = exchanges.drain();
+		// ⭐ RECORDED AS ITS OWN TRY (PER-9): requested a repair, the cause named — none of the policy's criteria answered.
+		expect(first!.disposition).toBe('repair-requested');
+		expect(first!.parseOutcome.outcome).toBe('SCHEMA_COERCION_FAILED');
+		expect(first!.parseOutcome.detail).toMatch(new RegExp(`none of the policy's ${SEEDED_REASONING_REVIEW_CRITERIA.length} criteria`, 'i'));
+		expect(first!.parseOutcome.detail).toContain('REG-F-552');
+		expect(repair!.exchangeRole).toBe('repair');
+		expect(repair!.predecessorExchangeId).toBe(first!.exchangeId);
+	});
+
+	it('⭐ the repair ANSWERS: its judgement is used — the review concludes', async () => {
+		const { print } = replying(NO_ROWS, CLEAN);
+		const exchanges = createExchangeSink();
+		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+		expect(result.criteria.map((c) => c.outcome), 'every criterion answered, by the repair').toEqual(
+			SEEDED_REASONING_REVIEW_CRITERIA.map(() => 'MET')
+		);
+		expect(exchanges.drain().map((e) => e.disposition)).toEqual(['repair-requested', 'accepted']);
+	});
+
+	it('⛔ the repair answers NONE again: the FIRST judgement stands, as today — the recommendation kept, every criterion unassessed', async () => {
+		const { prompts, print } = replying(NO_ROWS, '{"findings":[],"recommendation":"REJECTED","residualUncertainty":[]}');
+		const exchanges = createExchangeSink();
+		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+		expect(prompts, 'once, never twice').toHaveLength(2);
+		expect(result.executionFailed).toBe(false);
+		// ⛔ THE FIRST reply's recommendation, not the repair's: a repair that answered nothing changes nothing.
+		expect(result.dispositionRecommendation).toBe(asToday.recommendation);
+		expect(new Set(result.criteria.map((c) => c.outcome))).toEqual(new Set([asToday.outcome]));
+		const [, repair] = exchanges.drain();
+		expect(repair!.disposition, 'the repair is recorded, refused').toBe('rejected');
+		expect(repair!.parseOutcome.outcome).toBe('SCHEMA_COERCION_FAILED');
+	});
+
+	it('⛔ the repair does NOT PARSE: the FIRST judgement stands — never a throw, which would be worse than today', async () => {
+		const { print } = replying(NO_ROWS, "I'll check the files first.");
+		const exchanges = createExchangeSink();
+		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+		expect(result.executionFailed, 'today the review completes, so it still does').toBe(false);
+		expect(result.dispositionRecommendation).toBe(asToday.recommendation);
+		const [, repair] = exchanges.drain();
+		expect(repair!.disposition).toBe('rejected');
+		expect(repair!.parseOutcome.outcome).toBe('JSON_EXTRACTION_FAILED');
+	});
+
+	it('⛔ the repair gets NO REPLY (its call throws): the FIRST judgement stands, and the call is recorded no-response', async () => {
+		let n = 0;
+		const print: AgyPrint = async () => {
+			n += 1;
+			if (n === 2) throw new Error('devin invocation failed: connection reset');
+			return NO_ROWS;
+		};
+		const exchanges = createExchangeSink();
+		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+		expect(result.executionFailed, 'a repair that got no reply makes nothing worse than today').toBe(false);
+		expect(result.dispositionRecommendation).toBe(asToday.recommendation);
+		expect(exchanges.drain().map((e) => e.disposition)).toEqual(['repair-requested', 'no-response']);
+	});
+
+	it('⭐ every finding under an id the policy does not declare answers no criterion either: repaired', async () => {
+		const unknown = JSON.stringify({
+			findings: [{ criterionId: 'RR-99-no-such-class', failed: false, statement: 'met' }],
+			recommendation: 'SATISFIED'
+		});
+		const { prompts, print } = replying(unknown, CLEAN);
+		const exchanges = createExchangeSink();
+		await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+		expect(prompts).toHaveLength(2);
+		expect(exchanges.drain()[0]!.parseOutcome.detail).toMatch(/does not declare/);
+	});
+
+	it('⭑ CONTROL — a reply answering SOME criteria but not all is NOT repaired (REG-F-489): one call, the floor reads the rest', async () => {
+		const some = JSON.stringify({
+			findings: [{ criterionId: SEEDED_REASONING_REVIEW_CRITERIA[0]!.id, failed: true, statement: 'not met', severity: 'BLOCKING' }],
+			recommendation: 'REJECTED'
+		});
+		const { prompts, print } = replying(some, CLEAN);
+		const exchanges = createExchangeSink();
+		await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+		expect(prompts, 'a partial reply is taken as it stands').toHaveLength(1);
+		expect(exchanges.drain().map((e) => e.disposition)).toEqual(['accepted']);
+	});
+
+	it('⭑ CONTROL — a fully answered reply is not repaired, and a reply that does not parse still draws the JSON repair, not this one', async () => {
+		const answered = replying(CLEAN);
+		await createAgyReasoningReviewValidator({ print: answered.print, modelId: JUDGE }).evaluate(SUBJECT, ctx());
+		expect(answered.prompts).toHaveLength(1);
+		const prose = replying(PROSE, CLEAN);
+		await createAgyReasoningReviewValidator({ print: prose.print, modelId: JUDGE }).evaluate(SUBJECT, ctx());
+		expect(prose.prompts[1]).toBe(`${prose.prompts[0]}\n\nIMPORTANT: reply with ONLY the minified JSON object.`);
+	});
+
+	it('⛔ a repair after a reply that did not parse is never followed by this one: at most one repair, ever', async () => {
+		// The JSON repair answers no criterion: it is used as it stands (today's rule), and no third call is made.
+		const { prompts, print } = replying(PROSE, NO_ROWS, CLEAN);
+		await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(SUBJECT, ctx());
+		expect(prompts, 'two calls, never three').toHaveLength(2);
 	});
 });
 

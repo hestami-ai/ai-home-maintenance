@@ -98,6 +98,7 @@ import {
 import {
 	createAgyReasoningReviewValidator,
 	OBSERVATION_HEADING,
+	ONE_ROW_PER_CRITERION,
 	processResultContentBudget,
 	REASONING_REVIEW_BUDGET
 } from './reasoning-review-validator.js';
@@ -1086,6 +1087,10 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 — a 64 KiB process result, read whole by noth
 //   2c. ⭐ design §9.3 D8: the rubric and recommendation lines go back to HEAD's — D8's five instruction lines to HEAD's
 //      three, each rubric line without the ` [if unmet: <stakes>]` D8 put beside it (every line carries one), and D8's
 //      empty line and four-line sentence to HEAD's two lines;
+//   2d. ⭐ `JAN-EXEC` Phase 7 P7-6 I6 (`DESIGN-the-reviewer-isolated.md` §4d; `REG-D-105` (2)): the line asking for one row
+//      per criterion, met or not, and the empty line before it, after D8's sentence, are deleted
+//      (`\n\n${ONE_ROW_PER_CRITERION}\n` → `\n`) — a decided change, named here so the pin still says the prompt moved
+//      by exactly what was decided;
 //   3. F is the first line of the form `<<<UNTRUSTED-nn>>>`; split the prompt on `\n${F}\n`, so its parts alternate HOST,
 //      UNTRUSTED, HOST, … (no untrusted part contains F, by the chooser);
 //   4. rejoin each untrusted part X by the host part before it: after the subject heading (ending `to review:` or
@@ -1171,8 +1176,14 @@ function hashAsHead(prompt: string): string {
 	const contentEnd = without.lastIndexOf('}', without.indexOf("\nThe producing agent's PROFESSIONAL"));
 	return `${without.slice(0, contentEnd)},"candidateSubjectHash":${JSON.stringify(m[1])}${without.slice(contentEnd)}`;
 }
+/** Step 2d: P7-6 I6's line, and the empty line before it, deleted. */
+function oneRowPerCriterionAsHead(prompt: string): string {
+	const line = `\n\n${ONE_ROW_PER_CRITERION}\n`;
+	expect(prompt.split(line), 'step 2d: I6’s line, once, after its empty line').toHaveLength(2);
+	return prompt.replace(line, '\n');
+}
 function headPromptOf(prompt: string): string {
-	let p = prompt.replace(`${FENCE_MEANING}\n`, '');
+	let p = oneRowPerCriterionAsHead(prompt).replace(`${FENCE_MEANING}\n`, '');
 	p = p.replace(`:\n${NOT_DECLARED}\n`, `:\n"""${NOT_DECLARED}"""\n`);
 	p = p.replace('chain-of-thought):\n(none recorded)\n', 'chain-of-thought):\n"""(none recorded)"""\n');
 	p = hashAsHead(accountAsHead(rubricAsHead(p)));

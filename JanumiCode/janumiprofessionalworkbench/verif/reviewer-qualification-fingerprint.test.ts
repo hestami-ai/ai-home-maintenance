@@ -139,6 +139,7 @@ import {
 import { sha256 } from '../scripts/reviewer-qual/digest.js';
 import { detectMalformations } from '../scripts/reviewer-qual/malformations.js';
 import type { ToolInvocationResult } from '../apps/rph-demo/src/lib/server/tools/backing-tool.js';
+import { DEVIN_REVIEWER_PREAMBLE } from '../apps/rph-demo/src/lib/server/tools/devin-reviewer.js';
 import { FINGERPRINT_PROBES, PROBE_SUBJECT, READER_CORPUS } from '../scripts/reviewer-qual/probes.js';
 import type { CallLine, CandidateIdentity } from '../scripts/reviewer-qual/record.js';
 import { evaluateCase, runQualification } from '../scripts/reviewer-qual/runner.js';
@@ -167,12 +168,16 @@ const CURRENT_CASES = committedCaseSet(new URL('../', import.meta.url)).cases;
 /** ⭐ `PQ-2` — the current set's process-result cases: the case prompts a change to what a process result's reviewer reads
  *  may move, and the only ones. */
 const CURRENT_PROCESS_RESULTS = CURRENT_CASES.filter((c) => c.arm === 'PROCESS_RESULT').map((c) => c.id);
-/** ⭐ `PQ-2` — the cases of `base` whose prompts moved in `fp`, the initial or the repair. */
+/** ⭐ `PQ-2` — the cases of `base` whose prompts moved in `fp`, the initial or ~~the repair~~ either repair (⭐ P7-6 I5: the
+ *  criterion repair's too). */
 const movedCasePrompts = (fp: ReviewerFingerprint, base: ReviewerFingerprint): string[] =>
 	[...base.casePrompts].filter(([id, p]) => {
 		const now = fp.casePrompts.get(id);
-		return now?.initial !== p.initial || now.repair !== p.repair;
+		return now?.initial !== p.initial || now.repair !== p.repair || now['criterion-repair'] !== p['criterion-repair'];
 	}).map(([id]) => id);
+/** ⭐ P7-6 I5 — the line the validator's criterion repair carries (`CRITERION_REPAIR_INSTRUCTION`), as design §4d writes it. */
+const CRITERION_REPAIR_LINE =
+	'IMPORTANT: your reply gave no row for any criterion. Reply with ONLY the minified JSON object, with one row in findings for each criterion, failed=false where it is met.';
 /**
  * ⭐ `PQ-2` (design D4) — the CURRENT set's case prompts a change at `seams` moves. ⛔ A row that asked only whether a
  * change moved a case prompt of case set v1 asked it of a set that holds no process result, so its "no case prompt"
@@ -290,6 +295,22 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint MOVES on each component
 		expect(moved).toEqual(FINGERPRINT_PROBES.map((p) => p.id).filter((id) => id.includes('OVERSIZE')));
 	});
 
+	it('⭐⭐ P7-6 I4 — the DEVIN PREAMBLE, one character of it: `probes` moves, no probe prompt does, and — the limit, measured — no case prompt either', async () => {
+		// ⭐ `DESIGN-the-reviewer-isolated.md` §4b (`REG-D-104` (2)): devin's transport writes a no-tools preamble before every
+		// prompt, and the fingerprint hashes its text beside the probes (`fingerprint.ts` `TRANSPORT_PREAMBLE`).
+		const seams: FingerprintSeams = { ...PRODUCT_SEAMS, devinPreamble: PRODUCT_SEAMS.devinPreamble.replace('NO TOOLS.', 'NO TOOLS!') };
+		expect(seams.devinPreamble, 'the arrangement changed one character').not.toBe(PRODUCT_SEAMS.devinPreamble);
+		const fp = await reviewerFingerprint(CASES, seams);
+		onlyMoved(fp, ['probes']);
+		// ⭐ BESIDE the probes, not in them: every probe's prompt is the validator's, which the preamble never reaches.
+		expect(fp.probePrompts, 'no probe prompt moves').toEqual(BASE.probePrompts);
+		// ⚠ THE LIMIT `TRANSPORT_PREAMBLE` STATES, MEASURED HERE SO IT CANNOT CHANGE UNSEEN: a run records the validator's
+		// prompt, before `devinPrint` prepends, so a preamble-only change moves no case prompt — of v1, nor of the current
+		// set. The day case prompts are hashed per transport, this row reddens, and says so.
+		expect(fp.casePrompts, 'no case prompt of v1 moves').toEqual(BASE.casePrompts);
+		expect(await movedNow(seams), 'nor any case prompt of the current set').toEqual([]);
+	});
+
 	it('⭐ a BUDGET CONSTANT — hashed as itself, so CONTENT_MAX moves the fingerprint though no probe can reach it', async () => {
 		const fp = await reviewerFingerprint(CASES, {
 			...PRODUCT_SEAMS,
@@ -345,6 +366,20 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint MOVES on each component
 				evaluateCase({
 					...a,
 					call: (p) => a.call(p.replace(REPAIR_INSTRUCTION, `${REPAIR_INSTRUCTION} Nothing else.`))
+				})
+		});
+		onlyMoved(fp, ['scoring']);
+	});
+
+	it('⭐⭐ P7-6 I5 — the CRITERION REPAIR’s line, the instruction a reply that answers no criterion draws: the scoring digest moves', async () => {
+		// ⭐ The corpus holds replies that answer no criterion (`scoring-corpus.ts`: `no-rows-repaired`, `no-findings-array`,
+		// `bare-scalar`), so the line their repair carries is hashed as the JSON repair's is — appended to its first prompt.
+		const fp = await reviewerFingerprint(CASES, {
+			...PRODUCT_SEAMS,
+			evaluate: (a) =>
+				evaluateCase({
+					...a,
+					call: (p) => a.call(p.replace(CRITERION_REPAIR_LINE, `${CRITERION_REPAIR_LINE} Nothing else.`))
 				})
 		});
 		onlyMoved(fp, ['scoring']);
@@ -539,6 +574,25 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint does NOT move on what d
 		const gated = fingerprintIn(copy);
 		expect(gated.components.scoring, 'the scoring digest moves').not.toBe(BASE.components.scoring);
 		for (const k of ['probes', 'budget', 'criteria'] as const) expect(gated.components[k], k).toBe(BASE.components[k]);
+	}, 120_000);
+
+	it('⭐⭐ P7-6 I4 (REG-D-104) — the no-tools PREAMBLE devin’s transport writes before every prompt MOVES it: one character of it changed, on a copy, moves `probes` and no other component', () => {
+		// ⛔ WHY (`DESIGN-the-reviewer-isolated.md` §4b): qualification calls the product's own `devinPrint`
+		// (`transports.ts`), so a re-qualification measures the preamble — but the fingerprint hashed the VALIDATOR's
+		// prompts, never what a transport adds to them. Left there, `reviewer:qual:check` stayed green on the qualification
+		// made WITHOUT the preamble. The edit is made where the product reads it — `devin-reviewer.ts`, in the copy — so the
+		// row holds the hash to the product's own constant, not to a value a seam was handed.
+		const copy = disposableTree();
+		const file = `${copy}/apps/rph-demo/src/lib/server/tools/devin-reviewer.ts`;
+		const original = readFileSync(file, 'utf8');
+		const find = "'You are answering as a reviewer that has NO TOOLS.";
+		expect(original.split(find).length - 1, 'the edit anchors once, on the preamble').toBe(1);
+		writeFileSync(file, original.replace(find, () => "'You are answering as a reviewer that has NO TOOLS!"));
+		const moved = fingerprintIn(copy);
+		expect(moved.reviewer, 'one character of the preamble moves the reviewer fingerprint').not.toBe(BASE.reviewer);
+		expect(moved.components.probes, 'through the probes component, where it is hashed').not.toBe(BASE.components.probes);
+		// THE CONTROL: the copy measured the tree in everything else, so the move is the preamble's.
+		for (const k of ['budget', 'criteria', 'scoring'] as const) expect(moved.components[k], k).toBe(BASE.components[k]);
 	}, 120_000);
 });
 
@@ -3304,7 +3358,7 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 });
 
 describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481) — the skeleton’s table is hashed WHOLE, as it reads, and the reader as it reads a slice', () => {
-	it('⭐ `probes` is every probe’s entry, in the probe set’s order, then the skeleton’s digest — the LITERAL its determinism test pins — then the reader corpus’s tokens AS EACH WITNESS STATES THEM, each under an id no probe has', () => {
+	it('⭐ `probes` is every probe’s entry, in the probe set’s order, then the skeleton’s digest — the LITERAL its determinism test pins — then the reader corpus’s tokens AS EACH WITNESS STATES THEM, then (P7-6 I4) the preamble devinPrint WRITES, each under an id no probe has', () => {
 		// ⭐ THE LITERAL, NOT THE FUNCTION: held to `verif/fence-skeleton-determinism.test.ts`'s `SKELETON_DIGEST`, the value
 		// both runtimes must agree with, so a fingerprint can never hash a skeleton that test does not pin.
 		const literal = /const SKELETON_DIGEST = '([0-9a-f]{64})';/.exec(
@@ -3315,12 +3369,22 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481) — the skeleton’s table is hashe
 		// ⭐ `PQ-1` (`REG-F-481`) — AND THE READER CORPUS, AS STATED: each witness's slices with the token it says the chooser
 		// takes, so a fingerprint can never hash a reader whose tokens part from what the corpus states.
 		const stated = JSON.stringify(READER_CORPUS.map((w) => [w.slices, w.token]));
+		// ⭐ P7-6 I4 (`REG-D-104` (2)) — AND THE PREAMBLE AS THE PRODUCT WRITES IT: `DEVIN_REVIEWER_PREAMBLE`, the constant
+		// `devinPrint` puts before every prompt (and `devin-reviewer.test.ts` pins to the bytes the paid replay measured), so
+		// the fingerprint can never hash a preamble other than the one the reviewer reads.
 		expect(BASE.components.probes).toBe(
-			sha256(JSON.stringify([...pairs, ['FENCE-SKELETON', sha256(literal!)], ['FENCE-READER', sha256(stated)]]))
+			sha256(
+				JSON.stringify([
+					...pairs,
+					['FENCE-SKELETON', sha256(literal!)],
+					['FENCE-READER', sha256(stated)],
+					['DEVIN-PREAMBLE', sha256(DEVIN_REVIEWER_PREAMBLE)]
+				])
+			)
 		);
 		expect(
-			FINGERPRINT_PROBES.filter((p) => ['FENCE-SKELETON', 'FENCE-READER'].includes(p.id)).map((p) => p.id),
-			'no probe is named for the skeleton or the reader'
+			FINGERPRINT_PROBES.filter((p) => ['FENCE-SKELETON', 'FENCE-READER', 'DEVIN-PREAMBLE'].includes(p.id)).map((p) => p.id),
+			'no probe is named for the skeleton, the reader or the preamble'
 		).toEqual([]);
 		expect(BASE.probePrompts.size, 'and the probes’ prompts are the probes’ alone').toBe(FINGERPRINT_PROBES.length);
 	}, 60_000);
@@ -4071,6 +4135,30 @@ describe('JAN-CRITREAD J2-3 — the scoring corpus', () => {
 	});
 });
 
+describe('⭐⭐ P7-6 I5 — the scoring corpus holds the measured run’s reply, repaired, PINNED BY ID', () => {
+	it('⭐ `no-rows-repaired` — SATISFIED with no findings at all draws the criterion repair, whose clean answer is the judgement scored', async () => {
+		// ⛔ PER ENTRY (as the ER-2 pins above): a set pin is kept green by any entry. This holds the one entry whose repair
+		// ANSWERS — so the digest moves if the repair is dropped, or if the first judgement is kept after a repair that answered.
+		const entry = scoringCorpus(SEEDED_REASONING_REVIEW_CRITERIA).find((e) => e.id === 'no-rows-repaired');
+		expect(entry, 'a corpus entry').toBeDefined();
+		const sent: string[] = [];
+		let n = 0;
+		const e = await evaluateCase({
+			case: CORPUS_CASE,
+			criteria: SEEDED_REASONING_REVIEW_CRITERIA,
+			candidate: FIXTURE,
+			scoringDigest: '0'.repeat(64),
+			call: async (p) => {
+				sent.push(p);
+				return { returned: entry!.replies[Math.min(n++, entry!.replies.length - 1)]!, served: null };
+			}
+		});
+		expect(e.calls.map((c) => c.role), 'two calls: the initial, then the criterion repair').toEqual(['initial', 'criterion-repair']);
+		expect(sent[1], 'the repair carries the line naming the cause').toBe(`${sent[0]}\n\n${CRITERION_REPAIR_LINE}`);
+		expect([e.scored.disposition, e.scored.resultClass], 'the repair’s answer is the one scored').toEqual(['SATISFIED', 'VALID']);
+	});
+});
+
 describe('JAN-SELREV SR-2 (D6) — the fingerprint measures the validator WITHOUT `requireReportedModel`', () => {
 	it('⛔ a corpus reply reporting ANOTHER model is scored, never refused — by both of the fingerprint’s validators', async () => {
 		// ⚠ THE TWO SEAMS ARE NOT GUARDED ALIKE. The fingerprint hashes the SCORING seam's outcomes, so the option set there
@@ -4211,6 +4299,48 @@ describe('JAN-CRITREAD J2-3 — the fingerprint and the runner agree', () => {
 		expect(calls).toHaveLength(4);
 		for (const call of calls)
 			expect(call.promptSha256, `${call.caseId} ${call.role}`).toBe(BASE_NOW.casePrompts.get(call.caseId)![call.role]);
+	});
+
+	it('⭐⭐ P7-6 I5 — a repair after a reply that PARSED and answered no criterion is recorded `criterion-repair`, and its hash is the case prompt the fingerprint derives for it', async () => {
+		// ⭐ `DESIGN-the-reviewer-isolated.md` §4d (`REG-F-552`): the validator repairs such a reply with a prompt of its own
+		// (`CRITERION_REPAIR_INSTRUCTION`). ⛔ Recorded as a plain `repair`, its hash would be compared with the JSON repair's:
+		// a run under today's fingerprint would read as a prompt that changed though the fingerprint did not (limb 2), and
+		// its case as unmeasured (limb 1) — the paid re-qualification refused for the reviewer's own repair.
+		const one: QualificationCase[] = CURRENT_CASES.filter((c) => c.id === 'W-CLEAN');
+		let n = 0;
+		const lines = await runQualification({
+			runId: 'qr-agree-3',
+			date: '2026-10-10T12:00:00.000Z',
+			commit: 'e5f9358b'.repeat(5),
+			fingerprint: { reviewer: BASE_NOW.reviewer, scoring: BASE_NOW.scoring, caseSet: BASE_NOW.caseSet },
+			cases: one,
+			caseSetVersion: 4,
+			oracleVersion: 4,
+			criteria: SEEDED_REASONING_REVIEW_CRITERIA,
+			transport: {
+				name: 'stub',
+				identify: async () => FIXTURE,
+				call: async () => ({
+					returned:
+						(n += 1) === 1
+							? '{"findings":[],"recommendation":"SATISFIED","residualUncertainty":["x"]}'
+							: JSON.stringify({
+									findings: SEEDED_REASONING_REVIEW_CRITERIA.map((k) => ({ criterionId: k.id, failed: false, statement: 'absent' })),
+									recommendation: 'SATISFIED'
+								}),
+					served: null
+				})
+			},
+			repetitions: 1,
+			env: {}
+		});
+		const calls = lines.filter((l): l is CallLine => l.kind === 'CALL');
+		expect(calls.map((c) => c.role)).toEqual(['initial', 'criterion-repair']);
+		for (const call of calls)
+			expect(call.promptSha256, `${call.caseId} ${call.role}`).toBe(BASE_NOW.casePrompts.get(call.caseId)![call.role]);
+		// ⭐ And the two repairs are two prompts: the record can tell them apart only because their hashes differ.
+		const prompts = BASE_NOW.casePrompts.get('W-CLEAN')!;
+		expect(prompts['criterion-repair']).not.toBe(prompts.repair);
 	});
 
 	it('⭐ the case-set digest is over the cases’ inputs: an input edit moves it and moves no reviewer component', async () => {

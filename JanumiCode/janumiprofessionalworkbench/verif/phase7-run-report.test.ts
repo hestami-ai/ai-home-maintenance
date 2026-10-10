@@ -1132,6 +1132,27 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 		expect(exchangeReading(exchange({ disposition: 'NO_RESPONSE', materializedInputRef: ref('in'), answerSpanRef: pending }), content)).toBe('readable');
 	});
 
+	it('⭐ P7-6 I2 (REG-F-351) — a reply KEPT WHOLE because no answer span could be located in it is what was answered: readable', () => {
+		// ⭐ `DESIGN-the-reviewer-isolated.md` §2 I2: *"A reply that does not parse is then readable, and stage 8 can be read
+		// in full."* The reviewer's plane keeps such a reply under `rawOutputBeforeCoercionRef`, its answer span PENDING
+		// (no span could be located), so a reader that asks only for the span reads it as never retained.
+		const row = (key: string): StoredContent => ({ storageKey: key, contentHash: 'sha256:aa', byteSize: 3, purged: false, actualHash: 'sha256:aa', actualSize: 3 });
+		const content = new Map([['in', row('in')], ['raw', row('raw')]]);
+		const ref = (key: string) => ({ status: 'STORED', storageKey: key, contentHash: 'sha256:aa', byteSize: 3 });
+		const pending = { status: 'PENDING_CONTENT_PLANE' };
+		const kept = { materializedInputRef: ref('in'), answerSpanRef: pending, rawOutputBeforeCoercionRef: ref('raw') };
+		// ⛔ THE MUTANT: the answer read off `answerSpanRef` alone — the kept reply reads `not retained`, as at HEAD.
+		expect(exchangeReading(exchange({ disposition: 'REPAIR_REQUESTED', ...kept }), content)).toBe('readable');
+		// ⭑ CONTROL — and a kept reply whose bytes are gone still does not hold what it claims.
+		expect(exchangeReading(exchange({ disposition: 'REPAIR_REQUESTED', ...kept, rawOutputBeforeCoercionRef: ref('gone') }), content)).toBe(
+			'does not hold what it claims'
+		);
+		// ⭑ CONTROL — and with neither the span nor the whole reply kept, nothing of what was answered can be read.
+		expect(exchangeReading(exchange({ disposition: 'REPAIR_REQUESTED', ...kept, rawOutputBeforeCoercionRef: pending }), content)).toBe(
+			'not retained'
+		);
+	});
+
 	it('⛔ the ids a review that did not conclude bears on: a command’s (REG-F-520), a failed repair’s (REG-F-489, REG-F-428, REG-F-479)', () => {
 		const transport = [
 			{ role: 'INITIAL', disposition: 'NO_RESPONSE', ordinal: 1 },

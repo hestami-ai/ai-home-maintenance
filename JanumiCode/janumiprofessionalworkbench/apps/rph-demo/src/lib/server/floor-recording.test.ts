@@ -318,18 +318,29 @@ describe('runPwaFloor records the floor through the AUTHENTICATED session (REG-F
 			expect(reasoning.storageKey).not.toBe(answer.storageKey);
 		});
 
-		it('⛔ and a NON-SEPARABLE answer is still BLOCKED — §9.7, which the ruling did not lift', async () => {
-			// Prose with no locatable JSON object: the answer and any reasoning cannot be separated losslessly,
-			// so §9.7's own instruction is to block. The sponsor authorised retention; it did not authorise
-			// retaining a blob whose halves cannot be told apart, which is wrong in one direction or the other.
-			//
+		// ~~it('⛔ and a NON-SEPARABLE answer is still BLOCKED — §9.7, which the ruling did not lift', …)~~
+		// ⭐ STRUCK BY `JAN-EXEC` Phase 7 P7-6 I2 (`DESIGN-the-reviewer-isolated.md` §2; `REG-F-351`; `REG-D-103` (2)) — ON
+		// THE REVIEWER'S PLANE, A REPLY NO ANSWER SPAN CAN BE LOCATED IN IS NOW KEPT, WHOLE, PURGEABLE. The old row said:
+		// *"the answer and any reasoning cannot be separated losslessly, so §9.7's own instruction is to block. The sponsor
+		// authorised retention; it did not authorise retaining a blob whose halves cannot be told apart, which is wrong in
+		// one direction or the other."* Two things moved under it:
+		//   · the sponsor authorised exactly that, for the reviewer: P7-6 as offered — *"keep its unparsed replies"* — was
+		//     approved (`REG-D-103` (2)), after the measured run kept none of its 10 unparsed reviewer replies, and so no one
+		//     could read why its reviews failed (`REG-F-351`'s pointer; `REG-F-549`);
+		//   · and "wrong in one direction or the other" does not hold of such a reply. Kept PURGEABLE_AT_EXPIRY, its
+		//     reasoning stays purgeable (PER-12); and no judgement rests on its bytes — a reply with no locatable object
+		//     coerces to the same empty judgement whatever it says — so purging them severs no trace (PER-8's why).
+		// ⛔ STILL BLOCKED ON THE EXECUTION PLANE, where an unlocatable answer may be the work product (`REG-F-351`): that
+		// plane never asks (`run-model-step.test.ts`, "an UNDELIMITED prose answer is NOT retained").
+		it('⭐ P7-6 I2 — a NON-SEPARABLE reviewer reply is KEPT whole, PURGEABLE_AT_EXPIRY, and the durable record points at it', async () => {
 			// Both tries fail here, so the run itself throws — the record is what this asserts, not the verdict.
+			const PROSE = 'I had a look and it seems broadly fine to me.';
 			await runPwaFloor(
 				PWA,
 				{
 					prompt: 'assess it',
 					producer: PRODUCER,
-					print: async () => 'I had a look and it seems broadly fine to me.',
+					print: async () => PROSE,
 					canonical: session
 				},
 				session
@@ -338,12 +349,16 @@ describe('runPwaFloor records the floor through the AUTHENTICATED session (REG-F
 			const records = listByType(session, 'MODEL_EXCHANGE');
 			expect(records.length, 'the failed tries were not recorded at all').toBeGreaterThan(0);
 			const state = records[0]!.state as Record<string, unknown>;
-			for (const f of ['rawOutputBeforeCoercionRef', 'answerSpanRef', 'volunteeredReasoningRef']) {
+			// ⭐ THROUGH THE HANDLER: the durable record accepts a stored blob beside two PENDING spans — the one combination
+			// it refuses is a stored blob beside a STORED reasoning span (`model-exchange.ts`, `REG-D-056`).
+			const whole = state.rawOutputBeforeCoercionRef as Record<string, unknown>;
+			expect(whole.status, 'the unparsed reply is retained, on the durable record').toBe('STORED');
+			expect(whole.purgeability).toBe('PURGEABLE_AT_EXPIRY');
+			expect(await getArtifactStore().get(whole.storageKey as string), 'and the key holds the reply').toBe(PROSE);
+			for (const f of ['answerSpanRef', 'volunteeredReasoningRef']) {
 				const ref = state[f] as Record<string, unknown>;
-				expect(ref.status, `${f} must stay blocked when the spans cannot be separated`).toBe(
-					'PENDING_CONTENT_PLANE'
-				);
-				expect(ref.reason, `${f} must cite the rule that blocks it`).toMatch(/separated losslessly|§9.7/i);
+				expect(ref.status, `${f} holds nothing: no span could be located`).toBe('PENDING_CONTENT_PLANE');
+				expect(ref.reason, `${f} says where the reply is`).toMatch(/rawOutputBeforeCoercionRef/);
 			}
 		});
 

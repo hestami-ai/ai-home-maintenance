@@ -6,7 +6,8 @@
 //   · `probes`   — the prompts the product's validator materializes for the probe set (`probes.ts`), which reaches the
 //                  branches of assembly it names, the process-result arm and every oversize-together cap included — a
 //                  probe the validator refuses hashed as its refusal — and, beside them, the fence skeleton's digest
-//                  and the token the product's chooser takes over each witness of the reader corpus;
+//                  and the token the product's chooser takes over each witness of the reader corpus, and (⭐ P7-6 I4)
+//                  the no-tools preamble devin's transport writes before every prompt (`TRANSPORT_PREAMBLE`);
 //   · `budget`   — the excerpt budget constants themselves (`REASONING_REVIEW_BUDGET`), since `CONTENT_MAX` is a cap no
 //                  probe can reach;
 //   · `criteria` — the seed criteria as whole objects, every field, the ones no prompt or score reads included — and,
@@ -23,7 +24,9 @@
 // ⛔ NOTHING HERE READS A SOURCE FILE. A comment moves no fingerprint, and a whole-file hash would move it on every
 // comment — `verif/reviewer-qualification-fingerprint.test.ts` measures that on a disposable copy of the tree.
 // ⚠ OUT OF SCOPE, AS §5.5 STATES: the model (a change of model moves nothing), the transports' bounds and argv (in each
-// RUN's candidate identity instead), and a durable deployment seeded before a criteria change.
+// RUN's candidate identity instead), and a durable deployment seeded before a criteria change. ⭐ But not what a
+// transport WRITES INTO the prompt (P7-6 I4; `REG-D-104` (2)): devin's no-tools preamble is text the reviewer reads, so it
+// is hashed (`TRANSPORT_PREAMBLE`, which says what that does and does not reach).
 // ~~⚠ AND `renderProcessResult` (`REG-D-072` D17): the process-result arm's content is literal in its probes, so a change
 // to how a production process result is rendered into `content` moves no fingerprint.~~
 // ⭐⭐ `JAN-PRQUAL` `PQ-1` (design D3; `REG-F-476`, `REG-D-094`) — STRUCK: THE FINGERPRINT REACHES THE RENDERER. The P- probes
@@ -94,6 +97,10 @@ import {
 } from '../../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
 import { chooseFence } from '../../apps/rph-demo/src/lib/server/assurance/review-fence.js';
 import { processResultReviewInput } from '../../apps/rph-demo/src/lib/server/assurance/review-input.js';
+// ⭐ P7-6 I4 — the preamble devin's transport writes before every prompt. ⚠ This loads `devin-reviewer.ts`, which reads
+// `JPWB_DEVIN_BIN` at module load (`REG-D-072` D12), as the validator's chain already loads `agy-cli.ts`, which reads
+// `JPWB_AGY_BIN` so: the runner computes the fingerprint only past its D12 refusal (`run.ts`), so the order holds for both.
+import { DEVIN_REVIEWER_PREAMBLE } from '../../apps/rph-demo/src/lib/server/tools/devin-reviewer.js';
 import { fenceSkeletonDigest } from '../fence-skeleton/digest.js';
 import { CURRENT_CASE_SET_FILE, type CaseSet, type QualificationCase } from './cases.js';
 import { canonicalJson, reviewerFingerprintOf, sha256, type FingerprintComponents } from './digest.js';
@@ -103,10 +110,16 @@ import type { CandidateIdentity } from './record.js';
 import { evaluateCase } from './runner.js';
 import { CORPUS_CASE, scoringCorpus } from './scoring-corpus.js';
 
-/** A case's two prompts, as sha256 — the hashes its CALL lines carry for the initial call and the repair. */
+/** A case's ~~two~~ prompts, as sha256 — the hashes its CALL lines carry for the initial call and ~~the repair~~ each repair. */
 export interface CasePrompts {
 	readonly initial: string;
 	readonly repair: string;
+	/**
+	 * ⭐ P7-6 I5 (`DESIGN-the-reviewer-isolated.md` §4d; `REG-F-552`) — the repair of a reply that PARSED and answered no
+	 * criterion, which the validator sends with a prompt of its own (`CRITERION_REPAIR_INSTRUCTION`), and a run records
+	 * as `criterion-repair` (`runner.ts` `callRole`; `record.ts` `CALL_ROLES`).
+	 */
+	readonly 'criterion-repair': string;
 }
 export interface ReviewerFingerprint {
 	/** The reviewer fingerprint — a RUN line's `reviewerFingerprint`. */
@@ -150,6 +163,12 @@ export interface FingerprintSeams {
 	 * `PQ-2` (design D4), the prompts of the process-result cases, built through this seam too (`casePromptsOf`).
 	 */
 	readonly processResult: ProcessResultBuilder;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7 P7-6 I4 (`DESIGN-the-reviewer-isolated.md` §4b; `REG-D-104` (2)) — the no-tools preamble the
+	 * product's `devinPrint` writes before every prompt it sends (`DEVIN_REVIEWER_PREAMBLE`). Hashed beside the probes
+	 * (`TRANSPORT_PREAMBLE`, below). A test swaps it to show one character of it moves `probes`.
+	 */
+	readonly devinPreamble: string;
 }
 
 /** Who the fingerprint's validator says it is: an identity no producer carries, so independence never decides a probe. */
@@ -193,6 +212,8 @@ export const PRODUCT_SEAMS: FingerprintSeams = {
 	budget: REASONING_REVIEW_BUDGET,
 	criteria: SEEDED_REASONING_REVIEW_CRITERIA,
 	independence: SEEDED_INDEPENDENCE,
+	// ⭐ P7-6 I4 — THE PRODUCT'S OWN CONSTANT, the one `devinPrint` writes: never a copy of its text.
+	devinPreamble: DEVIN_REVIEWER_PREAMBLE,
 	// ⛔ THE PRODUCT'S BUILDER ITSELF — the same function `runProcessResultFloor` builds through, never a copy or a wrapper
 	// of it (`verif/reviewer-qualification-fingerprint.test.ts` holds the identity). That is why the production fingerprint
 	// cannot hash a process result other than as the product sends it: the floor's input IS this function's output for
@@ -210,6 +231,9 @@ const cleanJudgement = (criteria: readonly AssessmentCriterion[]): string =>
 	});
 /** A first reply no parse accepts, so the validator sends its repair prompt too. */
 const UNUSABLE = 'not a judgement';
+/** ⭐ P7-6 I5 — a first reply that PARSES and answers no criterion (`REG-F-552`'s shape), so the validator sends its
+ *  criterion repair. */
+const ANSWERS_NO_CRITERION = '{"findings":[],"recommendation":"SATISFIED","residualUncertainty":["x"]}';
 
 /** How a refusal is hashed: this line, the statement the validator refused with, then the content it was handed. */
 const REFUSED = 'REFUSED — the validator sent no prompt:';
@@ -274,6 +298,31 @@ const FENCE_READER = 'FENCE-READER';
 const readerTokens = (): string => JSON.stringify(READER_CORPUS.map((w) => [w.slices, chooseFence(w.slices) ?? null]));
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7 P7-6 I4 (`DESIGN-the-reviewer-isolated.md` §4b; `REG-D-104` (2)) — WHAT A TRANSPORT ADDS TO THE
+ * PROMPT, HASHED AS THE PROBES ARE. The product's `devinPrint` writes a no-tools preamble before every prompt it sends
+ * (`DEVIN_REVIEWER_PREAMBLE`), and qualification calls that same `devinPrint` (`transports.ts`), so a re-qualification
+ * measures it. ⛔ But everything above hashes the VALIDATOR's prompts, which the preamble never reaches: left out, a
+ * change to what the selected reviewer reads moved nothing, and `reviewer:qual:check` stayed GREEN on the qualification
+ * made without it (driven 2026-10-10: GREEN at fingerprint `ed39d6cc…`, the preamble already in `devinPrint`). So its
+ * text is hashed beside the probes, under this id, as the skeleton's digest and the reader's tokens are — in `probes`,
+ * so `FingerprintComponents` and the RUN line keep their shape; one character of it moves `probes`
+ * (`verif/reviewer-qualification-fingerprint.test.ts`, on a disposable copy and at the seam).
+ * ⚠ FOR EVERY CANDIDATE, AND THAT IS STATED RATHER THAN HIDDEN. The fingerprint is the TREE's — the check computes one and
+ * holds every RUN line to it, whichever transport the run used (`check-core.ts`) — so the preamble moves agy's and
+ * ollama's fingerprints too, though neither transport sends it: their prompts are the validator's alone, unchanged by
+ * it. That over-reach is the safe direction — it can only ask for a measurement a candidate did not need, never accept
+ * one that is stale — and it asks for none today: the SELECTION in force names devin (`REG-D-084`), and the any-candidate
+ * coverage limb is answered by the selected candidate's runs.
+ * ⛔ WHAT IT DOES NOT REACH: the CASE prompts. A run records the hash of the prompt the validator hands its transport
+ * (`runner.ts`), BEFORE `devinPrint` prepends — so a change to the preamble ALONE moves no case prompt, and the check
+ * would read it as a move "outside every case prompt": owing an ACKNOWLEDGED line, and admitting RESCORED re-stamps of
+ * devin's runs where a paid run is what such a change owes. Not closed here: closing it is per-transport case-prompt
+ * hashes, a change to what a CALL line's `promptSha256` means. ⭑ In P7-6 it does not bite: I6's sentence moves every
+ * case prompt in the same landing, so a RUN of the selected candidate is owed regardless.
+ */
+const TRANSPORT_PREAMBLE = 'DEVIN-PREAMBLE';
+
+/**
  * Each case's initial and repair prompt hashes, exactly as the runner records them (`CallLine.promptSha256`) — the
  * fingerprint test holds the two equal over a run ('the case prompts are the hashes a run records').
  *
@@ -293,17 +342,27 @@ async function casePromptsOf(
 	cases: readonly QualificationCase[]
 ): Promise<Map<string, CasePrompts>> {
 	const out = new Map<string, CasePrompts>();
-	for (const c of cases) {
+	/** The prompts the seams' validator sends for `c` when its first reply is `first` and its second answers clean. */
+	const capture = async (c: QualificationCase, first: string): Promise<string[]> => {
 		const sent: string[] = [];
 		const validator = seams.validator(async (p) => {
 			sent.push(p);
-			return sent.length === 1 ? UNUSABLE : cleanJudgement(seams.criteria);
+			return sent.length === 1 ? first : cleanJudgement(seams.criteria);
 		});
 		await validator.evaluate(c.subject, { reasoningReview: caseReviewInput(c, seams.criteria, seams.processResult) });
+		return sent;
+	};
+	for (const c of cases) {
+		const sent = await capture(c, UNUSABLE);
 		const [initial, repair] = sent;
 		if (sent.length !== 2 || initial === undefined || repair === undefined)
 			throw new Error(`${c.id}: the capture drew ${sent.length} prompt(s), not an initial and a repair`);
-		out.set(c.id, { initial: sha256(initial), repair: sha256(repair) });
+		// ⭐ P7-6 I5 — and the criterion repair, drawn by a first reply that parses and answers no criterion.
+		const criterion = await capture(c, ANSWERS_NO_CRITERION);
+		const criterionRepair = criterion[1];
+		if (criterion.length !== 2 || criterionRepair === undefined)
+			throw new Error(`${c.id}: the capture drew ${criterion.length} prompt(s), not an initial and a criterion repair`);
+		out.set(c.id, { initial: sha256(initial), repair: sha256(repair), 'criterion-repair': sha256(criterionRepair) });
 	}
 	return out;
 }
@@ -364,10 +423,13 @@ export async function reviewerFingerprint(
 		prompts.set(probe.id, await probePrompt(seams, PROBE_SUBJECT, probe.input(seams.criteria, seams.processResult)));
 	if (prompts.has(FENCE_SKELETON)) throw new Error(`a probe is named ${FENCE_SKELETON}, which is the skeleton's entry`);
 	if (prompts.has(FENCE_READER)) throw new Error(`a probe is named ${FENCE_READER}, which is the reader corpus's entry`);
-	/** What `probes` hashes, in order: each probe's prompt (or refusal), and then — as two more entries — the skeleton's
-	 *  digest and the reader corpus's tokens. */
+	if (prompts.has(TRANSPORT_PREAMBLE))
+		throw new Error(`a probe is named ${TRANSPORT_PREAMBLE}, which is the devin preamble's entry`);
+	/** What `probes` hashes, in order: each probe's prompt (or refusal), and then — as ~~two~~ three more entries — the
+	 *  skeleton's digest, the reader corpus's tokens and (⭐ P7-6 I4) the preamble devin's transport writes. */
 	const probePrompts = new Map([...prompts, [FENCE_SKELETON, (skeletonDigest ??= fenceSkeletonDigest())]]);
 	probePrompts.set(FENCE_READER, readerTokens());
+	probePrompts.set(TRANSPORT_PREAMBLE, seams.devinPreamble);
 	const components: FingerprintComponents = {
 		probes: sha256(JSON.stringify([...probePrompts].map(([id, p]) => [id, sha256(p)]))),
 		budget: sha256(canonicalJson(seams.budget)),

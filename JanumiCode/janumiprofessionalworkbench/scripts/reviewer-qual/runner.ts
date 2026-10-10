@@ -32,7 +32,10 @@ import {
 	extractJson,
 	splitAnswerSpan
 } from '../../apps/rph-demo/src/lib/server/assurance/agy-cli.js';
-import { createAgyReasoningReviewValidator } from '../../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
+import {
+	createAgyReasoningReviewValidator,
+	CRITERION_REPAIR_INSTRUCTION
+} from '../../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
 import {
 	isToolInvocationResult,
 	type ToolInvocationResult
@@ -49,6 +52,7 @@ import {
 	serverDayOf,
 	type CallEvaluator,
 	type CallLine,
+	type CallRole,
 	type CallReply,
 	type CandidateIdentity,
 	type CriterionOutcomeName,
@@ -68,7 +72,7 @@ export interface RunFingerprint {
 
 /** One model call, as a line will carry it. */
 export interface EvaluationCall {
-	readonly role: 'initial' | 'repair';
+	readonly role: CallRole;
 	readonly promptSha256: string;
 	readonly elapsedMs: number;
 	readonly reply: CallReply;
@@ -82,6 +86,18 @@ export interface Evaluation {
 }
 
 const sha256 = (s: string): string => createHash('sha256').update(s, 'utf8').digest('hex');
+
+/**
+ * ⭐ P7-6 I5 (`DESIGN-the-reviewer-isolated.md` §4d; `REG-F-552`) — WHICH CALL THIS IS, as the record names it: the first is
+ * `initial`; a later one is the validator's one repair — `criterion-repair` when its prompt ends with the line the
+ * validator writes after a reply that PARSED and answered no criterion (`CRITERION_REPAIR_INSTRUCTION`, the product's own
+ * constant), else `repair`, the repair of a reply that did not parse. ⛔ A plain `repair` for both would hold the
+ * criterion repair's hash to the JSON repair's, and the check would read today's own repair as a prompt that changed.
+ */
+const callRole = (made: number, prompt: string): CallRole => {
+	if (made === 0) return 'initial';
+	return prompt.endsWith(`\n\n${CRITERION_REPAIR_INSTRUCTION}`) ? 'criterion-repair' : 'repair';
+};
 /** The validator's exchange clock. Its stamps reach no line, so a fixed value keeps a re-scoring identical. */
 const EXCHANGE_CLOCK = () => '1970-01-01T00:00:00.000Z';
 
@@ -150,7 +166,7 @@ export async function evaluateCase(args: {
 		providerId: args.candidate.provider,
 		clock: EXCHANGE_CLOCK,
 		print: async (prompt) => {
-			const role = calls.length === 0 ? 'initial' : 'repair';
+			const role = callRole(calls.length, prompt);
 			const started = now();
 			const elapsed = () => Math.round(now() - started);
 			try {

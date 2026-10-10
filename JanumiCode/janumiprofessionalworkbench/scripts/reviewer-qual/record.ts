@@ -81,7 +81,15 @@ export const MALFORMATION_CLASSES = [
 ] as const;
 export type MalformationClass = (typeof MALFORMATION_CLASSES)[number];
 
-export const CALL_ROLES = ['initial', 'repair'] as const;
+/**
+ * The call roles a CALL line records. ⭐ `JAN-EXEC` Phase 7 P7-6 I5 (`DESIGN-the-reviewer-isolated.md` §4d; `REG-F-552`) —
+ * and `criterion-repair`: the validator's one repair of a reply that PARSED and answered no criterion, a prompt of its own
+ * (`CRITERION_REPAIR_INSTRUCTION`). It is the second call of an evaluation, as `repair` is, and never beside it — the
+ * validator makes at most one repair. ⛔ Recorded as a plain `repair`, its hash would be held to the JSON repair's
+ * (`promptsAreToday`), and the paid re-qualification refused for the reviewer's own repair. ⭑ Added within record
+ * version 1, as malformation classes have been: no line written before it holds it, so every one of them still reads.
+ */
+export const CALL_ROLES = ['initial', 'repair', 'criterion-repair'] as const;
 export type CallRole = (typeof CALL_ROLES)[number];
 /** `CriterionOutcome` (`rph-assurance`), restated as data so a line can be checked without loading the package. */
 export const CRITERION_OUTCOMES = [
@@ -914,7 +922,8 @@ function callProblems(
 	evaluations.set(key, e);
 	if (e.roles.length === 0) {
 		if (line.role !== 'initial') problems.push(`${at} does not follow an initial call`);
-	} else if (e.roles.length === 1 && line.role === 'repair') {
+		// ⭐ P7-6 I5 — either repair is a lawful second call (`CALL_ROLES`); an initial there is the evaluation's second initial.
+	} else if (e.roles.length === 1 && line.role !== 'initial') {
 		if (e.scoredAt.length > 0)
 			problems.push(
 				`line ${e.scoredAt[0]}: CALL ${label} initial is scored, but a later call follows it`

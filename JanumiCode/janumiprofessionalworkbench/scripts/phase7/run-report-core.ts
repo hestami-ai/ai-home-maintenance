@@ -1269,13 +1269,20 @@ export type ExchangeReading = 'readable' | 'not retained' | 'does not hold what 
  *     cannot read it, so it is NOT RETAINED, never "holds what it claims". ⚠ Save the answer of a call that got none
  *     (`NO_RESPONSE`): there is nothing to read;
  *   · every other ref the record claims must hold what it claims.
+ *   · ⭐ `JAN-EXEC` Phase 7 P7-6 I2 (`DESIGN-the-reviewer-isolated.md` §2; `REG-F-351`) — what it answered is its answer
+ *     span, OR, where no span could be located in the reply and the reviewer's plane kept the reply whole, the whole
+ *     reply (`rawOutputBeforeCoercionRef`, its span PENDING): *"A reply that does not parse is then readable, and stage 8
+ *     can be read in full."* ⛔ Asked of the span alone, every kept unparsed reply read `not retained`, as at HEAD.
  */
 export function exchangeReading(x: StoredObject, content: ReadonlyMap<string, StoredContent> | null): ExchangeReading {
 	const verdicts = CONTENT_REFS.map((f) => [f, contentVerdict(x.state[f], content)] as const);
 	if (verdicts.some(([, v]) => v === 'UNRESOLVABLE' || v === 'PURGED' || v === 'HASH_MISMATCH'))
 		return 'does not hold what it claims';
+	const verified = (f: string): boolean => verdicts.some(([g, v]) => g === f && v === 'VERIFIED');
+	// ⭐ P7-6 I2 — the ref that holds what it answered: the span, unless only the whole reply was kept.
+	const answered = !verified('answerSpanRef') && verified('rawOutputBeforeCoercionRef') ? 'rawOutputBeforeCoercionRef' : 'answerSpanRef';
 	const needed: readonly string[] =
-		str(x.state.disposition) === 'NO_RESPONSE' ? ['materializedInputRef'] : ['materializedInputRef', 'answerSpanRef'];
+		str(x.state.disposition) === 'NO_RESPONSE' ? ['materializedInputRef'] : ['materializedInputRef', answered];
 	return verdicts.every(([f, v]) => v === 'VERIFIED' || !needed.includes(f)) ? 'readable' : 'not retained';
 }
 

@@ -412,3 +412,128 @@ describe('the record discloses the DURABILITY of the content it names - H-2', ()
 		expect(rec.materializedInputRef.contentDurability).toBeUndefined();
 	});
 });
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7 P7-6 I2 (`DESIGN-the-reviewer-isolated.md` §2; `REG-F-351`, `REG-D-103` (2)) ──────────────
+describe('⭐⭐ P7-6 I2 — a reply no answer span can be located in, KEPT for diagnosis where the caller asks; and a tool’s export of the session, pointed at', () => {
+	const PROSE = "I'll verify the files the work product describes first.";
+
+	it('⭐ RETAINED_FOR_DIAGNOSIS — the whole reply stored PURGEABLE_AT_EXPIRY; its spans PENDING, each saying where the reply is', async () => {
+		const { store, sink } = harness();
+		const rec = await captureTry({
+			store,
+			sink,
+			tenantPrefix: TENANT,
+			exchangeId: 'exch-prose',
+			role: 'initial',
+			model: MODEL,
+			...CAPTURE_FACTS,
+			prompt: 'P',
+			rawOutput: PROSE,
+			disposition: 'repair-requested',
+			unseparatedRawOutput: 'RETAINED_FOR_DIAGNOSIS'
+		});
+		expect(rec.rawOutputBeforeCoercionRef.status).toBe('STORED');
+		expect(await store.get(rec.rawOutputBeforeCoercionRef.storageKey!)).toBe(PROSE);
+		// ⛔ THE MUTANT: RETAINED_BY_PARTICIPATION. No judgement can rest on these bytes — a reply with no locatable object
+		// coerces to the same empty judgement whatever it says — and any reasoning in them must stay purgeable (PER-12).
+		expect(rec.rawOutputBeforeCoercionRef.purgeability).toBe('PURGEABLE_AT_EXPIRY');
+		expect((await store.stat(rec.rawOutputBeforeCoercionRef.storageKey!))?.purgeability).toBe('PURGEABLE_AT_EXPIRY');
+		for (const span of [rec.answerSpanRef, rec.volunteeredReasoningRef]) {
+			expect(span.status).toBe('PENDING_CONTENT_PLANE');
+			expect(span.reason).toMatch(/rawOutputBeforeCoercionRef/);
+		}
+		expect(rec.omittedRegions, 'nothing was cut out of anything, so nothing is declared').toEqual([]);
+	});
+
+	it('⭑ CONTROL — absent, the §9.7 block is UNCHANGED: the execution plane, which never asks, keeps nothing of such a reply', async () => {
+		const { store, sink } = harness();
+		const rec = await captureTry({
+			store,
+			sink,
+			tenantPrefix: TENANT,
+			exchangeId: 'exch-prose-blocked',
+			role: 'initial',
+			model: MODEL,
+			...CAPTURE_FACTS,
+			prompt: 'P',
+			rawOutput: PROSE,
+			disposition: 'accepted'
+		});
+		for (const ref of [rec.rawOutputBeforeCoercionRef, rec.answerSpanRef, rec.volunteeredReasoningRef]) {
+			expect(ref.status).toBe('PENDING_CONTENT_PLANE');
+			expect(ref.reason).toMatch(/separated losslessly/);
+		}
+	});
+
+	it('⭐ a tool’s EXPORT of the session is stored PURGEABLE_AT_EXPIRY, and the tool-call observation’s reason names where', async () => {
+		const { store, sink } = harness();
+		const EXPORT = '{"schema_version":"ATIF-v1.7","steps":[]}';
+		const rec = await captureTry({
+			store,
+			sink,
+			tenantPrefix: TENANT,
+			exchangeId: 'exch-export',
+			role: 'initial',
+			model: MODEL,
+			...CAPTURE_FACTS,
+			prompt: 'P',
+			rawOutput: '{}',
+			disposition: 'accepted',
+			toolSessionExport: EXPORT
+		});
+		const reason = rec.observedToolCalls.reason ?? '';
+		// ⭐ The adapter's own words stay first, whole; the pointer follows them.
+		expect(reason.startsWith(CAPTURE_FACTS.observedToolCalls.reason)).toBe(true);
+		const key = /storage key (\S+?),/.exec(reason)?.[1];
+		// ⛔ THE MUTANT: the export stored and the pointer dropped — bytes on the content plane that no record points at,
+		// the orphan `REG-F-336` C-2 forbids.
+		expect(key, 'the reason names the export’s storage key').toBeDefined();
+		expect(await store.get(key!)).toBe(EXPORT);
+		expect((await store.stat(key!))?.purgeability).toBe('PURGEABLE_AT_EXPIRY');
+		expect(rec.observedToolCalls.observation, 'the observation itself is unchanged').toBe('NOT_OBSERVABLE');
+	});
+
+	it('⛔ beside an OBSERVED report the export is NOT stored: that arm may carry no reason, so nothing could point at it', async () => {
+		const { store, sink } = harness();
+		const puts: string[] = [];
+		const counting = { ...store, put: async (i: Parameters<typeof store.put>[0]) => (puts.push(i.bytes), store.put(i)) };
+		const rec = await captureTry({
+			store: counting,
+			sink,
+			tenantPrefix: TENANT,
+			exchangeId: 'exch-observed',
+			role: 'initial',
+			model: MODEL,
+			...CAPTURE_FACTS,
+			observedToolCalls: {
+				observation: 'OBSERVED',
+				calls: [{ ordinal: 1, nameProvenance: 'NOT_MINTED', outcome: 'COMPLETED' }],
+				observedCount: 1,
+				recordedLimit: 32
+			},
+			prompt: 'P',
+			rawOutput: '{}',
+			disposition: 'accepted',
+			toolSessionExport: '{"steps":[]}'
+		});
+		expect(puts, 'the export is never written').not.toContain('{"steps":[]}');
+		expect(rec.observedToolCalls.reason, 'and the OBSERVED report gains no reason').toBeUndefined();
+	});
+
+	it('⭑ CONTROL — with NO store nothing is retained, and the observation is the adapter’s own, untouched', async () => {
+		const rec = await captureTry({
+			tenantPrefix: TENANT,
+			exchangeId: 'exch-nostore',
+			role: 'initial',
+			model: MODEL,
+			...CAPTURE_FACTS,
+			prompt: 'P',
+			rawOutput: PROSE,
+			disposition: 'accepted',
+			unseparatedRawOutput: 'RETAINED_FOR_DIAGNOSIS',
+			toolSessionExport: '{"steps":[]}'
+		});
+		expect(rec.rawOutputBeforeCoercionRef.status).toBe('PENDING_CONTENT_PLANE');
+		expect(rec.observedToolCalls).toEqual(CAPTURE_FACTS.observedToolCalls);
+	});
+});

@@ -7,7 +7,7 @@
 //
 // ⚠ EVERY FLAG BELOW WAS MEASURED BY DRIVING `devin 3000.6.14`, not read from documentation.
 import { execFile } from 'node:child_process';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -51,16 +51,56 @@ export function assuranceModel(): string {
 }
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7 P7-6 I4 (`DESIGN-the-reviewer-isolated.md` §4b; `REG-D-104` (2)) — THE REVIEWER IS TOLD IT HAS
+ * NO TOOLS, before every prompt `devinPrint` writes.
+ *
+ * ⛔ WHY (`REG-F-549`, probe 2 of design §4a): given a work product, GLM under devin set out to verify it with tools, and in
+ * print mode a tool call that is not approved ENDS the session — the reply is whatever was written before it (*"I'll
+ * verif…"*), or nothing. Isolation alone (I1) cannot make it answer. The sponsor chose "Prompt + isolate, test first";
+ * the test replayed the measured run's four work-product reviews behind THESE BYTES (design §4c, 4 paid calls): no try
+ * called a tool, and three of the four concluded.
+ * ⚠ SO THE BYTES ARE THE MEASURED ONES, LINE BREAKS INCLUDED, AND `devin-reviewer.test.ts` PINS THEM to the JSON literal
+ * the design records. A change to them is a change to what was tested, and to what the reviewer reads: it MOVES THE
+ * REVIEWER FINGERPRINT (`scripts/reviewer-qual/fingerprint.ts` hashes it, its `devinPreamble` seam), so
+ * `reviewer:qual:check` then refuses until the selected reviewer is re-qualified behind the new text.
+ * ⭑ devin's ONLY: the agy transport is not changed (design §4b), and nothing here reaches agy's prompt.
+ */
+export const DEVIN_REVIEWER_PREAMBLE =
+	'You are answering as a reviewer that has NO TOOLS. You cannot read files, list folders, run commands or fetch anything,\n' +
+	'and you must not try: any tool call ends this session without an answer. Everything you may judge is in the text below.\n' +
+	'Judge only that text, and reply with the single JSON object the instructions below ask for, and nothing else.\n' +
+	'\n' +
+	'---\n' +
+	'\n';
+
+/**
+ * ⭐⭐ P7-6 I1 (design §2; `REG-F-548`) — THE PROJECT CONFIG THE REVIEWER'S OWN FOLDER HOLDS, `.devin/config.json`: every
+ * tool denied by name — `read`, `edit`, `grep`, `glob`, `exec`, then `Fetch(*)` and `mcp__*`. devin's permission rules
+ * check deny first, and a deny always wins.
+ * ⭐ DRIVEN, NOT READ: devin's documentation does not say whether deny rules hold in `--print` mode, so design §4a's probe 1
+ * (one paid call, 2026-10-10, devin 3000.11.3) asked the isolated reviewer to list its folder and read two planted files.
+ * It called `exec` and `read`; devin answered *"Permission denied for this tool by a deny rule in the project settings"*,
+ * and neither file's token reached the session (`REG-F-548`'s pointer). ⚠ The rules hold; they do not make the reviewer
+ * ANSWER — a denied call still ends the session (`REG-F-549`), which is what the preamble above is for.
+ * ⚠ Written minified, byte for byte as the design names it, and pinned so by `devin-reviewer.test.ts`.
+ */
+const DENY_ALL_TOOLS_CONFIG =
+	'{"permissions":{"deny":["read","edit","grep","glob","exec","Fetch(*)","mcp__*"]}}';
+
+/**
  * The exec seam — `AgyExec`'s shape (`assurance/agy-cli.ts`), for the same reason: without it the devin branch could be
  * exercised only by driving a real devin, so no test had ever reached it (`JAN-SELREV` SR-1). A stand-in script cannot
  * take its place either: node refuses a batch target with `shell: false` (EINVAL, measured in
  * `execution/child-process-runner.test.ts`). ⚠ A seam standing in for devin also writes the export file devin writes,
  * at the path its argv names after `--export`.
+ * ⭐ P7-6 I1 — `cwd` IS devin's working folder: the adapter's own fresh temporary folder, never the server's. A seam that
+ * ignores it is a stand-in that runs anywhere; `devin-reviewer.test.ts` reads it, and the folder's contents, as devin
+ * would start in it.
  */
 export type DevinExec = (
 	file: string,
 	args: readonly string[],
-	options: { timeout: number; maxBuffer: number; windowsHide: boolean }
+	options: { cwd: string; timeout: number; maxBuffer: number; windowsHide: boolean }
 ) => Promise<{ stdout: string }>;
 
 /**
@@ -76,9 +116,26 @@ export type DevinExec = (
  * rather than trusting the `PROMPT_FREE` declaration. A declaration that is wrong then fails safe, which is the
  * difference between a claim and a control.
  *
- * ⚠ NO `--respect-workspace-trust false`. Print mode fails in an untrusted directory and that flag is a trust
+ * ~~⚠ NO `--respect-workspace-trust false`. Print mode fails in an untrusted directory and that flag is a trust
  * BYPASS. It proved unnecessary — the probe succeeded without it — so an untrusted-directory failure surfaces
- * as a refusal to be fixed by trusting the directory, never by disabling the check.
+ * as a refusal to be fixed by trusting the directory, never by disabling the check.~~
+ * ⭐ STRUCK BY `JAN-EXEC` Phase 7 P7-6 I1 (`DESIGN-the-reviewer-isolated.md` §2; `REG-F-548`, `REG-F-547`): the flag IS
+ * passed now, and the ground under that paragraph moved twice.
+ *   · ⛔ "It proved unnecessary" held only while devin ran in the SERVER's folder, which this host's devin trusted —
+ *     and that folder was the defect: print mode auto-approves read-only tools, so the reviewer could read this
+ *     repository's app, and in the measured run one verdict reported what it found there as the product's workspace
+ *     (`REG-F-548`). In any other tree the same call was refused outright (`REG-F-547`: P7-3a's second attempt, every
+ *     review refused in a quarter of a second).
+ *   · ⭐ devin now runs in the adapter's OWN fresh temporary folder, holding only the prompt and a project config that
+ *     denies every tool by name (`DENY_ALL_TOOLS_CONFIG`). A fresh folder is untrusted BY CONSTRUCTION — no person can
+ *     have started devin in it to trust it — so the trust check could only ever refuse here, and the flag devin's help
+ *     gives for print mode turns it off. ⚠ So the control is no longer trust: it is ISOLATION — an empty folder, every
+ *     tool denied — and the 2026-10-10 probes drove the deny rules to hold in print mode under devin 3000.11.3
+ *     (`REG-F-548`'s pointer; design §4a). Trusting the folder instead is not available: it would have to be done by
+ *     hand, per folder, for a folder that exists for one call.
+ *   · ⚠ WHAT ISOLATION DOES NOT REACH (`REG-F-548`'s pointer, probe 2): the reviewer's system context still carries this
+ *     host's own devin setup — the account's global rules file, its installed skills and subagent profiles — so a
+ *     review's context still depends on the machine it runs on. Not closed here.
  */
 export async function devinPrint(
 	prompt: string,
@@ -93,20 +150,44 @@ export async function devinPrint(
 	const promptPath = join(dir, 'prompt.txt');
 	const exportPath = join(dir, 'export.json');
 	try {
-		await writeFile(promptPath, prompt, 'utf8');
+		// ⭐ P7-6 I4 — the no-tools preamble FIRST, then the prompt, in the one file devin reads (`DEVIN_REVIEWER_PREAMBLE`).
+		// ⚠ The diagnostic check below still measures against `prompt`, the caller's: the preamble is this file's own
+		// fixed text, and a diagnostic that echoed only it would leak nothing of the review.
+		await writeFile(promptPath, `${DEVIN_REVIEWER_PREAMBLE}${prompt}`, 'utf8');
+		// ⭐ P7-6 I1 — the deny-all project config, in the folder devin runs in; nothing else is put there.
+		await mkdir(join(dir, '.devin'));
+		await writeFile(join(dir, '.devin', 'config.json'), DENY_ALL_TOOLS_CONFIG, 'utf8');
 		const { stdout } = await exec(
 			DEVIN_BIN,
-			['--print', '--model', configured, '--prompt-file', promptPath, '--export', exportPath],
-			{ timeout: 240_000, maxBuffer: 16 * 1024 * 1024, windowsHide: true }
+			[
+				'--print',
+				'--model',
+				configured,
+				'--prompt-file',
+				promptPath,
+				'--export',
+				exportPath,
+				// ⭐ I1 — a fresh folder is untrusted by construction; isolation is the control (the struck paragraph above).
+				'--respect-workspace-trust',
+				'false'
+			],
+			// ⭐ I1 — `cwd`: devin's working folder is this one, never the server's (`REG-F-548`).
+			{ cwd: dir, timeout: 240_000, maxBuffer: 16 * 1024 * 1024, windowsHide: true }
 		);
 		// ⭑⭑ THE READ HAPPENS HERE, AND THE PLACEMENT IS THE WHOLE FIX. `readReportedModel` was written with
 		// `devinPrint` and could never be called by anyone: the `finally` below deletes `dir` before this
 		// function returns, so the export it reads is gone by the time any caller holds the answer. It was not
 		// an unused export — it was a function whose only possible caller was its own enclosing function.
 		const reported = await readReportedModel(exportPath);
+		// ⭐ P7-6 I2 (design §2; `REG-F-351`) — AND THE EXPORT ITSELF, read here for the reason `reported` is: the `finally`
+		// below removes it. It is the only record of what devin did inside its session — any tool it called — and the
+		// measured run's reviewer ended its sessions reaching for tools (`REG-F-549`) with nothing kept to show it.
+		const sessionExport = await readFile(exportPath, 'utf8').catch(() => undefined);
 		// ⛔ NO REPORT MEANS THE WEAKER GRADE, NOT THE CONFIGURED VALUE DRESSED UP. An unreadable export is an
 		// absence of evidence about the model; returning the bare string lets the caller record what the HOST
 		// configured, graded `HOST_CONFIGURED`, which is the honest fact.
+		// ⚠ DISCLOSED (P7-6 I2): an export that names no model is not carried either — the bare string has no field for
+		// it — and nor is the export of a call that FAILED (the throw below), whose cause is all the caller is handed.
 		if (!reported) return stdout;
 		return {
 			// ⭐ `JAN-NOANS` — `execFile` RESOLVES ON EXIT 0, AND EXIT 0 WITH EMPTY STDOUT IS NOT AN ANSWER.
@@ -138,7 +219,9 @@ export async function devinPrint(
 					'mints no tool surface and watches no session, so it is not in a position to observe tool ' +
 					'calls at all — neither its own (it has none) nor any the tool made internally. A reader must ' +
 					'not read this record as evidence that no command ran.'
-			}
+			},
+			// ⭐ P7-6 I2 — devin's own record of the session, for the caller to retain (`ToolInvocationResult.sessionExport`).
+			...(sessionExport === undefined ? {} : { sessionExport })
 		};
 	} catch (e) {
 		const raw = e instanceof Error ? e.message : String(e);
