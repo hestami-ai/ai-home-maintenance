@@ -39863,6 +39863,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   1. Run devin in the adapter's own temporary folder, which holds only the prompt and the export, with `--respect-workspace-trust false` there (devin's help gives that flag for print mode; it also closes `REG-F-547`).
   2. Re-measure the selected reviewer on the qualification cases under that arrangement before relying on it again.
 - **SEARCHED BEFORE FILING.** The register for `permission-mode`, `permission mode`, `read-only tools`, `auto-approves` and `devin --print`: 0 lines each. Positive control: `devin`, many lines, in the entries on the selected reviewer.
+- ⭑ **2026-10-10 — two probes, 2 paid calls (P7-6, `DESIGN-the-reviewer-isolated.md` §4a).** 1. A project config in the reviewer's own empty folder, denying `read`, `edit`, `grep`, `glob`, `exec`, `Fetch(*)` and `mcp__*`, holds in print mode: devin answered *"Permission denied for this tool by a deny rule in the project settings"*, and neither planted file's token reached the session. 2. The reviewer's system context also carries this host's own devin setup: the account's global rules file, the installed skills and the subagent profiles. So a review's context depends on the machine it runs on.
 
 ### REG-F-549 — in the measured run the reviewer never answered the review of a phase's work product: 4 of 4 phases, once with empty replies and three times in prose, each repair request the same, so every phase ended INCONCLUSIVE at its floor
 
@@ -39877,6 +39878,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - the reviewer's tools (`REG-F-548`): *"I'll verif…"* reads as an agent setting out to check for itself.
 - **WHY IT MATTERS.** No phase of a real run can complete while its work product's review cannot conclude, whatever the work is worth. Here the work was good: the product passed every acceptance case (P7-4a).
 - **SEARCHED BEFORE FILING.** The register for `JSON_EXTRACTION_FAILED`: 3 lines, in `REG-D-057` and `REG-F-346`. For `EMPTY_RESPONSE`: 7 lines, in `REG-D-064`, `REG-F-346`, `REG-F-410` and `REG-F-413`. All are about the parse vocabulary, none about live work products.
+- ⭑ **2026-10-10 — the mechanism, driven (P7-6's probe 2).** The design phase's own work-product review prompt (22,092 characters, from the run's content store) was replayed through the isolated reviewer. Its only move was a tool call, `exec ls -la && ls -la docs …`, to inspect the files the work product describes. Denied, the session ended with an empty stdout. So in print mode a tool call that is not approved ends devin's session, and the reply is whatever was written before it. In the measured run the read-only calls were auto-approved and an `exec` ended the session, leaving *"I'll verif…"*. Isolation alone cannot make the reviewer answer, so P7-6's re-run is held and the choice of fix goes to the sponsor (`REG-D-103`).
 
 ### REG-F-550 — three command reviews in the measured run ran into the reviewing model's output limit, which devin reports by failing, so each was recorded as a call that threw and run once more: one answered, two failed again
 
@@ -39901,3 +39903,15 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - **WHY IT MATTERS.** Both verdicts cannot be right under one account. A reviewer that judges each run against the phase's final words, alone and without the runs beside it, reads an ordinary fix-and-retest loop as it happens to.
 - **THE GENERAL FORM** is `REG-F-486`'s: a review must be joined to the state its subject describes.
 - **SEARCHED BEFORE FILING.** The register for `41 tests` and `same closing account`: 0 lines each. Positive control: `REG-F-486`, which names the join.
+
+### REG-D-103 — SPONSOR RULING: P7-6 approved, "fix then re-run"; and REG-D-091 answered with a question, how a stopped unit's recovery works under DBOS or similar tooling
+
+**Ruled 2026-10-10** (sponsor, in session, answering the two questions sent with P7-3's report). **Type:** SPONSOR RULING. **Status:** ⚠ **OPEN — P7-6's first iteration is held at its own gate (`REG-F-549`), and the sponsor's DBOS question is answered with the reviewer's fix options; both go back to the sponsor.**
+
+- **THE SPONSOR'S WORDS, verbatim:**
+  1. Asked *"On an Undertaking, a phase that stops can only be abandoned; Retry runs nothing (REG-D-091's premise failed live, all four phases). How should a stopped work unit be recovered?"*, the sponsor answered: *"How will this work in the context of DBOS or similar technology as the underlying tooling for undertakings?"*
+  2. Asked *"Approve P7-6: fix the reviewer, then re-run the measured run once (about 40 reviewer calls of the 109 left in your limit)?"*, the sponsor chose *"Yes, fix then re-run (Recommended)"*.
+- **WHAT (1) MEANS.** No option was chosen. The sponsor asked how recovery would work with a durable-execution runtime underneath. `REG-D-091`'s choice stays open, to be answered in those terms.
+- **WHAT (2) MEANS.** P7-6's first iteration was approved as offered: isolate the reviewer, keep its unparsed replies, re-check it on live-size work products, then one paid re-run.
+  - The offer called the re-check free work. It is not: it calls the reviewer. The design budgets it at 8 calls and discloses it.
+  - Two probe calls were spent. Their result held the re-run at the design's own gate (`REG-F-549`). Spend: 43 of the 150 reviewer calls.
