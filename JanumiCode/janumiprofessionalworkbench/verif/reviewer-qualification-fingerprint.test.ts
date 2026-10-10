@@ -139,6 +139,7 @@ import {
 import { sha256 } from '../scripts/reviewer-qual/digest.js';
 import { detectMalformations } from '../scripts/reviewer-qual/malformations.js';
 import type { ToolInvocationResult } from '../apps/rph-demo/src/lib/server/tools/backing-tool.js';
+import { DEVIN_REVIEWER_PREAMBLE } from '../apps/rph-demo/src/lib/server/tools/devin-reviewer.js';
 import { FINGERPRINT_PROBES, PROBE_SUBJECT, READER_CORPUS } from '../scripts/reviewer-qual/probes.js';
 import type { CallLine, CandidateIdentity } from '../scripts/reviewer-qual/record.js';
 import { evaluateCase, runQualification } from '../scripts/reviewer-qual/runner.js';
@@ -288,6 +289,22 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint MOVES on each component
 		// cannot hide among the probes an oversize change is said not to reach, nor an OVERSIZE probe carry none.
 		const moved = FINGERPRINT_PROBES.map((p) => p.id).filter((id) => fp.probePrompts.get(id) !== BASE.probePrompts.get(id));
 		expect(moved).toEqual(FINGERPRINT_PROBES.map((p) => p.id).filter((id) => id.includes('OVERSIZE')));
+	});
+
+	it('⭐⭐ P7-6 I4 — the DEVIN PREAMBLE, one character of it: `probes` moves, no probe prompt does, and — the limit, measured — no case prompt either', async () => {
+		// ⭐ `DESIGN-the-reviewer-isolated.md` §4b (`REG-D-104` (2)): devin's transport writes a no-tools preamble before every
+		// prompt, and the fingerprint hashes its text beside the probes (`fingerprint.ts` `TRANSPORT_PREAMBLE`).
+		const seams: FingerprintSeams = { ...PRODUCT_SEAMS, devinPreamble: PRODUCT_SEAMS.devinPreamble.replace('NO TOOLS.', 'NO TOOLS!') };
+		expect(seams.devinPreamble, 'the arrangement changed one character').not.toBe(PRODUCT_SEAMS.devinPreamble);
+		const fp = await reviewerFingerprint(CASES, seams);
+		onlyMoved(fp, ['probes']);
+		// ⭐ BESIDE the probes, not in them: every probe's prompt is the validator's, which the preamble never reaches.
+		expect(fp.probePrompts, 'no probe prompt moves').toEqual(BASE.probePrompts);
+		// ⚠ THE LIMIT `TRANSPORT_PREAMBLE` STATES, MEASURED HERE SO IT CANNOT CHANGE UNSEEN: a run records the validator's
+		// prompt, before `devinPrint` prepends, so a preamble-only change moves no case prompt — of v1, nor of the current
+		// set. The day case prompts are hashed per transport, this row reddens, and says so.
+		expect(fp.casePrompts, 'no case prompt of v1 moves').toEqual(BASE.casePrompts);
+		expect(await movedNow(seams), 'nor any case prompt of the current set').toEqual([]);
 	});
 
 	it('⭐ a BUDGET CONSTANT — hashed as itself, so CONTENT_MAX moves the fingerprint though no probe can reach it', async () => {
@@ -539,6 +556,25 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint does NOT move on what d
 		const gated = fingerprintIn(copy);
 		expect(gated.components.scoring, 'the scoring digest moves').not.toBe(BASE.components.scoring);
 		for (const k of ['probes', 'budget', 'criteria'] as const) expect(gated.components[k], k).toBe(BASE.components[k]);
+	}, 120_000);
+
+	it('⭐⭐ P7-6 I4 (REG-D-104) — the no-tools PREAMBLE devin’s transport writes before every prompt MOVES it: one character of it changed, on a copy, moves `probes` and no other component', () => {
+		// ⛔ WHY (`DESIGN-the-reviewer-isolated.md` §4b): qualification calls the product's own `devinPrint`
+		// (`transports.ts`), so a re-qualification measures the preamble — but the fingerprint hashed the VALIDATOR's
+		// prompts, never what a transport adds to them. Left there, `reviewer:qual:check` stayed green on the qualification
+		// made WITHOUT the preamble. The edit is made where the product reads it — `devin-reviewer.ts`, in the copy — so the
+		// row holds the hash to the product's own constant, not to a value a seam was handed.
+		const copy = disposableTree();
+		const file = `${copy}/apps/rph-demo/src/lib/server/tools/devin-reviewer.ts`;
+		const original = readFileSync(file, 'utf8');
+		const find = "'You are answering as a reviewer that has NO TOOLS.";
+		expect(original.split(find).length - 1, 'the edit anchors once, on the preamble').toBe(1);
+		writeFileSync(file, original.replace(find, () => "'You are answering as a reviewer that has NO TOOLS!"));
+		const moved = fingerprintIn(copy);
+		expect(moved.reviewer, 'one character of the preamble moves the reviewer fingerprint').not.toBe(BASE.reviewer);
+		expect(moved.components.probes, 'through the probes component, where it is hashed').not.toBe(BASE.components.probes);
+		// THE CONTROL: the copy measured the tree in everything else, so the move is the preamble's.
+		for (const k of ['budget', 'criteria', 'scoring'] as const) expect(moved.components[k], k).toBe(BASE.components[k]);
 	}, 120_000);
 });
 
@@ -3304,7 +3340,7 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 });
 
 describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481) — the skeleton’s table is hashed WHOLE, as it reads, and the reader as it reads a slice', () => {
-	it('⭐ `probes` is every probe’s entry, in the probe set’s order, then the skeleton’s digest — the LITERAL its determinism test pins — then the reader corpus’s tokens AS EACH WITNESS STATES THEM, each under an id no probe has', () => {
+	it('⭐ `probes` is every probe’s entry, in the probe set’s order, then the skeleton’s digest — the LITERAL its determinism test pins — then the reader corpus’s tokens AS EACH WITNESS STATES THEM, then (P7-6 I4) the preamble devinPrint WRITES, each under an id no probe has', () => {
 		// ⭐ THE LITERAL, NOT THE FUNCTION: held to `verif/fence-skeleton-determinism.test.ts`'s `SKELETON_DIGEST`, the value
 		// both runtimes must agree with, so a fingerprint can never hash a skeleton that test does not pin.
 		const literal = /const SKELETON_DIGEST = '([0-9a-f]{64})';/.exec(
@@ -3315,12 +3351,22 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481) — the skeleton’s table is hashe
 		// ⭐ `PQ-1` (`REG-F-481`) — AND THE READER CORPUS, AS STATED: each witness's slices with the token it says the chooser
 		// takes, so a fingerprint can never hash a reader whose tokens part from what the corpus states.
 		const stated = JSON.stringify(READER_CORPUS.map((w) => [w.slices, w.token]));
+		// ⭐ P7-6 I4 (`REG-D-104` (2)) — AND THE PREAMBLE AS THE PRODUCT WRITES IT: `DEVIN_REVIEWER_PREAMBLE`, the constant
+		// `devinPrint` puts before every prompt (and `devin-reviewer.test.ts` pins to the bytes the paid replay measured), so
+		// the fingerprint can never hash a preamble other than the one the reviewer reads.
 		expect(BASE.components.probes).toBe(
-			sha256(JSON.stringify([...pairs, ['FENCE-SKELETON', sha256(literal!)], ['FENCE-READER', sha256(stated)]]))
+			sha256(
+				JSON.stringify([
+					...pairs,
+					['FENCE-SKELETON', sha256(literal!)],
+					['FENCE-READER', sha256(stated)],
+					['DEVIN-PREAMBLE', sha256(DEVIN_REVIEWER_PREAMBLE)]
+				])
+			)
 		);
 		expect(
-			FINGERPRINT_PROBES.filter((p) => ['FENCE-SKELETON', 'FENCE-READER'].includes(p.id)).map((p) => p.id),
-			'no probe is named for the skeleton or the reader'
+			FINGERPRINT_PROBES.filter((p) => ['FENCE-SKELETON', 'FENCE-READER', 'DEVIN-PREAMBLE'].includes(p.id)).map((p) => p.id),
+			'no probe is named for the skeleton, the reader or the preamble'
 		).toEqual([]);
 		expect(BASE.probePrompts.size, 'and the probes’ prompts are the probes’ alone').toBe(FINGERPRINT_PROBES.length);
 	}, 60_000);
