@@ -1923,9 +1923,9 @@ assurance policies gate it.** ⛔ Report what breaks; do not smooth it.
 | P7-1a / P7-1b | free rehearsals: a route test that reaches the command-evidence join, and a five-unit gate spec | ✅ built, round 1 |
 | P7-2 | the run's live spec, archive, checks and run report | built, round 2 (2026-10-10), to the design's §6 D1 to D11; its dry run is owed |
 | P7-2b | a reviewer call that throws, run once more and recorded | ✅ built, round 1 (`REG-D-102`) |
-| P7-3a / P7-3 | a one-unit live check, then the measured run of the execution half | owed; paid, within the approved limit of 150 reviewer calls (`REG-D-102`) |
-| P7-4 | our checks against a false "Yes" | tools ✅ built, round 1; run after P7-3 |
-| P7-5 / P7-6 | report and register; fix and run again | owed |
+| P7-3a / P7-3 | a one-unit live check, then the measured run of the execution half | ✅ run 2026-10-10: P7-3a passed on its third attempt (`REG-F-546`, `REG-F-547`); P7-3 ran all five units, and every phase stopped at its review; 39 of the 150 reviewer calls |
+| P7-4 | our checks against a false "Yes" | ✅ run 2026-10-10: the product passed every acceptance case; the negative control was refused as predicted (2 calls) |
+| P7-5 / P7-6 | report and register; fix and run again | P7-5 ✅ `REPORT-the-live-end-to-end-run.md` (2026-10-10); P7-6 proposed, awaiting the sponsor |
 | P7-7 | the authoring half: the live agent builds the PWA from a request | owed |
 
 ⚠ *"The results become `TEST_RESULT` evidence"* above ~~is put to the sponsor as the design's §9.5~~ ⭑ is read as `R18`'s OBSERVATION evidence, judged by the reviewer (the sponsor, `REG-D-102` (5)). *"The declared assurance policies gate it"* holds in form only today (the design's stage 5b; §9.6) ⭑ and runs as is, all 14 verdicts reported vacuous (`REG-D-102` (6)). §11's *"It works live"* was measured on 2026-09-14 and has not been driven since; today's live authoring specs cannot pass (`REG-F-506`).

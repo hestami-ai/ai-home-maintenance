@@ -1,7 +1,7 @@
 # DESIGN — JAN-EXEC Phase 7: the live end-to-end run
 
 **Programme:** `JAN-EXEC` Phase 7 (`ROADMAP-undertaking-execution-sandbox.md` §9, where Phase 7 is one paragraph).
-**Status:** DESIGN rev 2. ~~Awaiting the sponsor's answers to §9.~~ The sponsor answered §9 on 2026-10-09, all six as recommended (`REG-D-102`).
+**Status:** DESIGN rev 2. ~~Awaiting the sponsor's answers to §9.~~ The sponsor answered §9 on 2026-10-09, all six as recommended (`REG-D-102`). ⭑ Half A ran on 2026-10-10. Its report is `REPORT-the-live-end-to-end-run.md`: the execution works, and the review does not (`REG-F-548` to `REG-F-551`).
 **Date:** 2026-10-09.
 **Records:** the go-ahead is `REG-D-100`; the delegated calls are `REG-D-101`; the findings are `REG-F-502` to `REG-F-537`. All are filed with this design.
 **Evidence:**
@@ -251,6 +251,11 @@ This design's own steps for the roadmap's Phase 7.
     - **The manifest** holds the commands that were recorded. Runs past the 32nd are counted, not listed (`REG-F-517`).
     - The report's own output is scanned for the account name and absolute paths before it is written (`REG-F-536`).
   - **D10, the one-unit lane.** `execution.live.ts` reads its reviewer's identity from the first call that answered, not from the first record. Since P7-2b, a recovered throw leaves a `NO_RESPONSE` record first.
+  - **D13, the paid runs run from the main checkout** (2026-10-10, under the same delegation, after P7-3a's second attempt).
+    - devin refuses to review in a folder it has not been told to trust, and on this host it trusts the main checkout only. So in the paid runs' worktree every reviewer call was refused locally (`REG-F-547`).
+    - The main checkout is used at the named commit, with no code edited while a run is going; its only other files are another agent's design drafts.
+    - P7-3a, run there, passed: one executor try, one reviewer call, the floor SATISFIED.
+  - **D12, the run tree is warmed first** (2026-10-10, under the same delegation, after P7-3a's first attempt). A free dry run runs once in the paid runs' tree before each paid run. On a fresh tree, Vite optimises the dependencies a route first imports and then reloads the page. P7-3a's first attempt lost its click to the new PWA that way, then waited out its 62-minute timeout; no model was called (`REG-F-546`).
   - **D11, the dry run signs off the root** (2026-10-10, under the same delegation). After the root's Begin & Execute and its archive, the dry run signs off the root and takes the final archive, then stops. Signing off calls no model, and otherwise the sign-off path and the final archive would first run in the paid run.
 - **P7-2 as built (round 2, 2026-10-10).** Three builders, two adversarial verifiers each and a fixer each. Where the build departs from D1 to D10, or adds to them:
   - **The run folder (D2)** is refused inside any git working tree, the main checkout and every worktree included. The repository's own tree alone is not enough, because P7-3 runs from a worktree.
@@ -303,7 +308,7 @@ This design's own steps for the roadmap's Phase 7.
     - GLM's verdict and rows;
     - a classification: reviewer right; reviewer wrong; join defect (`REG-F-485`, `REG-F-486`); transport failure (`REG-F-499`); malformed reply (`REG-F-489`, `REG-F-428`, `REG-F-479`).
   - **g.** The 14 declared verdicts, each marked "vacuous by construction".
-- **P7-5, the report.**
+- **P7-5, the report.** ⭑ Written 2026-10-10: `REPORT-the-live-end-to-end-run.md`.
   - The stage matrix of §1.
   - Every break registered, with its evidence.
   - The fixes proposed, in the order the run hit them.
