@@ -1920,11 +1920,11 @@ assurance policies gate it.** ⛔ Report what breaks; do not smooth it.
 | Step | What | Status |
 |---|---|---|
 | P7-0 | register what the preparation found | ✅ with the design |
-| P7-1a / P7-1b | free rehearsals: a route test that reaches the command-evidence join, and a five-unit gate spec | owed |
+| P7-1a / P7-1b | free rehearsals: a route test that reaches the command-evidence join, and a five-unit gate spec | ✅ built, round 1 |
 | P7-2 | the run's live spec, archive, checks and run report | owed |
-| P7-2b | a reviewer call that throws, run once more and recorded | owed; chosen (`REG-D-102`) |
+| P7-2b | a reviewer call that throws, run once more and recorded | ✅ built, round 1 (`REG-D-102`) |
 | P7-3a / P7-3 | a one-unit live check, then the measured run of the execution half | owed; paid, within the approved limit of 150 reviewer calls (`REG-D-102`) |
-| P7-4 | our checks against a false "Yes" | owed; written before P7-3 |
+| P7-4 | our checks against a false "Yes" | tools ✅ built, round 1; run after P7-3 |
 | P7-5 / P7-6 | report and register; fix and run again | owed |
 | P7-7 | the authoring half: the live agent builds the PWA from a request | owed |
 

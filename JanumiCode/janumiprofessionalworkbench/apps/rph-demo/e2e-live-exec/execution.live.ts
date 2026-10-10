@@ -163,10 +163,11 @@ test.describe('LIVE — a work unit is executed by a real model and reviewed by 
 		// refusal surfaces as an alert to read rather than as a timeout that hides it.
 		// ⭐ `JAN-SELREV` SR-3 — THE WAIT IS A BOUNDED ALLOWANCE, NOT A BOUND ON EVERYTHING THIS POST DOES. It was 480 s,
 		// which is two reviewer calls of 240 s and nothing else, while this one POST runs up to 3 tries of an executor
-		// call plus a review of up to 2 calls: 2,160 s, with the arithmetic in `lane-config.ts`. The reviewer's half is
-		// its bounded worst case; each executor call gets a 240 s allowance, because the Pi executor bounds only the
-		// commands it runs, not its model turn. ⚠ NOT COVERED: the review of each command the executor ran, which runs
-		// in this same POST after the loop (`evidence-join.ts`).
+		// call plus a review of up to ~~2 calls: 2,160 s~~ ⭐ 4 calls: 3,600 s (`JAN-EXEC` Phase 7 `P7-2b`, 2026-10-09: each
+		// of a review's two calls is run once more when it throws short of its tool's bound), with the arithmetic in
+		// `lane-config.ts`. The reviewer's half is its bounded worst case; each executor call gets a 240 s allowance,
+		// because the Pi executor bounds only the commands it runs, not its model turn. ⚠ NOT COVERED: the review of each
+		// command the executor ran, which runs in this same POST after the loop (`evidence-join.ts`).
 		const executed = page.waitForResponse((r) => r.request().method() === 'POST', {
 			timeout: EXECUTE_TIMEOUT_MS
 		});

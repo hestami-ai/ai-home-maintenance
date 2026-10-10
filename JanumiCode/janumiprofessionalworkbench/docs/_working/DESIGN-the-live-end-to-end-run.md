@@ -188,7 +188,7 @@ This design's own steps for the roadmap's Phase 7.
 - **P7-2, the run's lane.**
   - **Invocation:** a new spec, `apps/rph-demo/e2e-live-exec/phase7.live.ts`, run alone with `bun run e2e:live-exec -- e2e-live-exec/phase7.live.ts`.
   - **Its run folder** comes from `JPWB_LIVE_RUN_DIR`, set before Playwright starts, because the config is loaded again in its worker. The spec asserts that `<dir>/demo.sqlite` exists.
-  - **Its wait per unit** is stated in `lane-config.ts` as a `PHASE7` budget: 3 × (240 + 2 × 240) s, plus 32 × 2 × 240 s of command reviews, plus 32 × 120 s of commands. That is about 6 h, the worst case. The verif test that pins `lane-config.ts` is extended to it.
+  - **Its wait per unit** is stated in `lane-config.ts` as a `PHASE7` budget: ~~3 × (240 + 2 × 240) s, plus 32 × 2 × 240 s of command reviews, plus 32 × 120 s of commands. That is about 6 h, the worst case.~~ With P7-2b's retries a review is up to 4 calls (2026-10-09): 3 × (240 + 4 × 240) s, plus 32 × 4 × 240 s of command reviews, plus 32 × 120 s of commands, about 10.6 h, the worst case. The verif test that pins `lane-config.ts` is extended to it.
   - **At boot** it records the `JPWB_*` and `RPH_*` environment, asserts that `JPWB_REVIEW_SEES_PRIOR` and `JPWB_AGENT` are unset, and runs a reviewer readiness check that calls no model.
   - **Each Begin & Execute's** JSON response is saved.
   - **After each unit, it archives:**
@@ -408,7 +408,7 @@ The stage maps predicted 78 breaks, B01 to B78 (labels local to this design). Ea
 **Per phase:**
 - **Executor:** at most 3 tries. The model requests inside a try are not counted (`REG-F-529`), so nothing bounds the executor's spend.
 - **Reviewer:** one call per try reviewed, plus one per command reviewed (32 at most), and up to twice that when a reply needs repair. Each call is bounded at 240 s. With P7-2b, a thrown call may run once more.
-- **The worst case:** 70 reviewer calls (140 with P7-2b) and about 6 hours.
+- **The worst case:** 70 reviewer calls (140 with P7-2b) and about 6 hours (10.6 with P7-2b).
 
 **Half A, four model phases:**
 - **Typical estimate:** 6 to 9 executor tries and 15 to 50 reviewer calls; 1 to 3 hours.

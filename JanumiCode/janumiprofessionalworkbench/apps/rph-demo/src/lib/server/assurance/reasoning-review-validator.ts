@@ -40,7 +40,7 @@ import {
 	splitAnswerSpan
 } from './agy-cli.js';
 import type { ArtifactStore } from '@janumipwb/rph-ports';
-import type { ExchangeRecord } from '../agent/exchange-record.js';
+import type { ExchangeRecord, ModelInput } from '../agent/exchange-record.js';
 import { captureTry, type ExchangeSink } from './exchange-capture.js';
 import { sanitiseToolFailure } from '../tools/diagnostic-safety.js';
 import {
@@ -764,6 +764,136 @@ function substitutedModelStatement(
 	);
 }
 
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7 `P7-2b` (`REG-D-102` (2); `docs/_working/DESIGN-the-live-end-to-end-run.md` §6) — EACH REVIEWING
+ * TOOL'S OWN BOUND, which decides whether a call that threw is run once more.
+ *   · `devin` — `devinPrint`'s execFile kill (`tools/devin-reviewer.ts`).
+ *   · `agy` — its own `--print-timeout 3m`, the EARLIER of its two bounds (`agy-cli.ts`, `agyCall`: that argv, and the
+ *     execFile kill at 240 s). agy stops itself at three minutes and exits non-zero, so a throw at or past 180 s is its
+ *     timeout — the reading the qualification already makes (`scripts/reviewer-qual/transports.ts`, `classifyAgyFailure`).
+ * ⚠ RESTATED, NOT IMPORTED: each adapter writes its bound as a literal in the call it makes and exports none, so
+ * `thrown-reviewer-call.test.ts` drives both through their exec seams and holds these to what each hands its program.
+ */
+export const REVIEWER_CALL_BOUND_MS = Object.freeze({
+	devin: 240_000,
+	agy: 180_000
+});
+
+/** The roles this validator records a try under. ⭐ `P7-2b` — `retry` is a thrown call's one further call. */
+type TryRole = 'initial' | 'repair' | 'retry';
+
+/**
+ * ⭐ `P7-2b` — WHAT A CALL THAT THREW REPORTED OF TOOL CALLS: nothing, said in its own words.
+ *
+ * ⛔ NOT THE DEFAULT ARM'S SENTENCE. That one says the tool *"returned only an answer string"*, and a call that threw
+ * returned nothing at all: its record would state a fact about a reply that never arrived (`R11`).
+ */
+const THROWN_CALL_OBSERVATION: AdapterToolObservation = {
+	canObserve: false,
+	reason:
+		'The backing tool’s call failed with no reply, so it reported nothing about tool calls. This record ' +
+		'therefore says nothing about whether any ran — it is not evidence that none did.'
+};
+
+/**
+ * ⭐ `P7-2b` — WHAT A TRY'S TOOL REPORTED OF IT: who answered, graded (E-3), and what it could see of tool calls (`R11`).
+ * The two facts only the tool can give, so a record takes them TOGETHER: a call that threw gave neither, and its record
+ * must borrow neither from a call that answered. ⚠ The landing first carried only the observation this way, and the
+ * thrown call's record took its identity — an earlier call's report, graded `PROVIDER_REPORTED` — from the answered path.
+ */
+interface TryReport {
+	readonly model: ModelInput;
+	readonly observation: AdapterToolObservation;
+}
+
+/**
+ * ⭐ `P7-2b` — what one call of the backing tool came to: its answer, timed; or a call whose `print` threw, with the
+ * record already made of it and whether it is run once more.
+ */
+type Attempt =
+	| {
+			readonly answered: true;
+			readonly text: string;
+			readonly times: { requestedAt: string; respondedAt: string };
+	  }
+	| {
+			readonly answered: false;
+			readonly failure: Error;
+			readonly failed: ExchangeRecord;
+			readonly runOnceMore: boolean;
+	  };
+
+/**
+ * ⭐⭐ `P7-2b` — WHETHER A CALL THAT THREW IS RUN ONCE MORE, and the clause its record says so in. Pure, so the rule is
+ * written once, in this order:
+ *   · a call that was itself the retry STANDS — a thrown call is given one further call, never two (`REG-D-102`: *"a
+ *     second throw counts"*);
+ *   · a tool whose bound this validator does not know is not run again (`AgyValidatorOptions.callBoundMs`);
+ *   · a time the clock cannot place — unreadable, or a response before its request — is not shown to be short of the
+ *     bound, so it is not run again;
+ *   · at or past the bound is a TIMEOUT, and a timeout is not run again;
+ *   · short of it — a failure with no reply, before the tool's own limit — the call is run once more.
+ * ⛔ THE BOUND ITSELF IS A TIMEOUT: the kill fires AT it, so a throw measured at exactly the bound is the kill's.
+ */
+function thrownCallDisposal(
+	role: TryRole,
+	elapsedMs: number,
+	bound: number | undefined
+): { readonly runOnceMore: boolean; readonly clause: string } {
+	if (role === 'retry')
+		return {
+			runOnceMore: false,
+			clause:
+				'it was itself the one further call a thrown call is given (REG-D-102), so this failure stands'
+		};
+	if (bound === undefined)
+		return {
+			runOnceMore: false,
+			clause: 'this reviewer declares no bound, so a call that throws is not run again'
+		};
+	if (!Number.isFinite(elapsedMs) || elapsedMs < 0)
+		return {
+			runOnceMore: false,
+			clause: `its time cannot be read off the clock, so it is not shown to be short of the tool’s ${bound} ms bound and is not run again`
+		};
+	if (elapsedMs >= bound)
+		return {
+			runOnceMore: false,
+			clause: `at or past the tool’s ${bound} ms bound — a timeout, which is not run again`
+		};
+	return {
+		runOnceMore: true,
+		clause: `short of the tool’s ${bound} ms bound, so it is run once more (REG-D-102)`
+	};
+}
+
+/**
+ * ⭐ `P7-2b` — E-5's detail for a call that threw (`REG-F-499`'s first remedy): when it failed, what became of it, and
+ * the cause the tool printed — the SANITISED form only (`sanitiseToolFailure`), never the raw rejection, which may carry
+ * the prompt (finding #60).
+ */
+function thrownCallDetail(failure: Error, elapsedMs: number, clause: string): string {
+	const when = Number.isFinite(elapsedMs) && elapsedMs >= 0 ? ` after ${elapsedMs} ms` : '';
+	return (
+		`The reviewing tool’s call failed${when} with no reply, ${clause}. ` +
+		`What the tool reported, sanitised: ${failure.message}`
+	);
+}
+
+/**
+ * ⭐ `P7-2b` — the bound this validator holds a thrown call to, or `undefined` when it knows none. See
+ * `AgyValidatorOptions.callBoundMs` for why each arm is the one it is.
+ */
+function callBoundOf(opts: AgyValidatorOptions): number | undefined {
+	if (opts.callBoundMs !== undefined) return opts.callBoundMs;
+	// The validator's own default program, whose bound it knows.
+	if (opts.print === undefined) return REVIEWER_CALL_BOUND_MS.agy;
+	// ⚠ The product's devin branch, known by the one option only that branch sets (`requireReportedModel`'s doc).
+	return opts.requireReportedModel && opts.agentId === 'devin'
+		? REVIEWER_CALL_BOUND_MS.devin
+		: undefined;
+}
+
 export interface AgyValidatorOptions {
 	print?: AgyPrint;
 	/**
@@ -789,8 +919,35 @@ export interface AgyValidatorOptions {
 	 * ⛔ SET ONLY BY THE PRODUCT'S DEVIN BRANCH (`assurance/index.ts`), NEVER BY THE FINGERPRINT OR THE QUALIFICATION
 	 * RUNNER. Their scoring corpus holds replies reporting OTHER models (`scripts/reviewer-qual/scoring-corpus.ts`), and
 	 * those outcomes are hashed into the reviewer fingerprint: an ungated check would refuse them, and move it.
+	 * ⭐ `P7-2b` — AND SO IT IS ALSO HOW THIS VALIDATOR KNOWS IT RUNS DEVIN'S PROGRAM, whose bound a thrown call is held to
+	 * (`callBoundMs`, below). ⚠ A coupling, disclosed there.
 	 */
 	requireReportedModel?: boolean;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7 `P7-2b` (`REG-D-102` (2)) — THE BOUND OF THE TOOL BEHIND `print`, where the caller knows it.
+	 * A call whose `print` throws short of it, with no reply, is run ONCE more, and both calls are recorded: the failed
+	 * one `no-response` under its own role, its successor `retry`. A throw at or past it is a timeout, and stands; so does
+	 * a second throw.
+	 *
+	 * ⭑ ABSENT, THE VALIDATOR KNOWS THE BOUND ONLY OF THE TWO PROGRAMS THE PRODUCT RUNS THROUGH IT (`callBoundOf`): agy, its
+	 * own default `print` (`REVIEWER_CALL_BOUND_MS.agy`), and devin through the product's devin branch, the one caller
+	 * that sets `requireReportedModel` (`REVIEWER_CALL_BOUND_MS.devin`). Any other injected `print` has no known bound, and
+	 * its throw stands, as every throw did before.
+	 * ⛔ SO THE FINGERPRINT AND THE QUALIFICATION RUNNER ARE UNCHANGED BY THE RULE: each injects its own `print` and sets
+	 * neither option. The runner applies the qualification's own rule (`JAN-PRQUAL` design §7.3: *"A transport failure is
+	 * re-run once, then counts"*) to a WHOLE evaluation, and records each call under the two roles its record knows
+	 * (`scripts/reviewer-qual/record.ts`, `CALL_ROLES`); a retry inside the validator would apply the rule twice and file
+	 * its second call as a repair.
+	 * ⭑ HELD, EACH HALF ITS OWN WAY: the runner by `verif/reviewer-qualification-runner.test.ts`, whose failing transport
+	 * a validator that held every injected `print` to a bound would run again (the ledger asks it, by mutant); the
+	 * fingerprint by construction — no reply of its scoring corpus and no probe's `print` throws, so the rule never fires
+	 * there.
+	 * ⚠ THE COUPLING, DISCLOSED: devin's arm reads `requireReportedModel` because `assurance/index.ts`, which builds the
+	 * devin branch, is not this landing's to change. The direct form is for that branch to pass this option beside it.
+	 * `thrown-reviewer-call.test.ts` drives the branch through `createFloorRegistry`, so the day the marker moves, its
+	 * retry case reddens.
+	 */
+	callBoundMs?: number;
 	/** ICP-02 d2b — where the per-try exchange records go. Optional: the Validator is constructed fresh on every
 	 *  floor run with an empty options object, so a hard dependency would break the assurance path rather than
 	 *  degrade to today's behaviour. */
@@ -805,6 +962,8 @@ export interface AgyValidatorOptions {
 export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}): Validator {
 	const print = opts.print ?? agyPrint;
 	const clock = opts.clock ?? (() => new Date().toISOString());
+	// ⭐ `P7-2b` — read once: the tool behind `print` does not change within a validator.
+	const callBound = callBoundOf(opts);
 	// Per-instance, so ids restart with each floor run and are stable within it.
 	let tryCounter = 0;
 	return {
@@ -836,6 +995,14 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 			};
 			// ⭐ SR-2 (D6) — what the host ASKED FOR, held apart from `evaluator`, which a tool's report overwrites below.
 			const configuredModelId = evaluator.modelId ?? '';
+			// ⭐ `JAN-EXEC` `P7-2b` — AND THE WHOLE IDENTITY THE HOST CONFIGURED, UNGRADED: what a call that THREW is recorded
+			// under (`attempt`, below), since it reported nothing. ⛔ Never `evaluator` by then, which an EARLIER call's report
+			// may have overwritten and graded `PROVIDER_REPORTED`: the record would say the provider confirmed the model for a
+			// call that returned nothing. The execution plane's thrown arm records the same (`run-model-step.ts`).
+			const configured: ModelInput = {
+				modelId: configuredModelId,
+				providerId: evaluator.providerId ?? ''
+			};
 			// ⭑ `undefined` UNTIL A TOOL REPORTS ONE, and `identityFacts` then defaults to `HOST_CONFIGURED`.
 			// Seeding it with a grade here would assert confirmation before any tool had spoken.
 			let identityEvidence: ToolIdentityEvidence | undefined;
@@ -857,14 +1024,37 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 			// ⭑ THE TIMES BRACKET THE MODEL CALL AND CANNOT BE RECOVERED LATER. The event's own stamps are taken
 			// at the DRAIN, up to two round-trips after the act, so without these latency is unrecoverable and a
 			// timeout is permanently indistinguishable from a slow but successful answer (PER-11).
+			// ⭐ `JAN-EXEC` Phase 7 `P7-2b` — AND A CALL THAT THREW IS A TRY TOO: `retry` and `no-response` are the two members
+			// this capture could not say before (the contract has carried both all along, `rph-contracts` `ModelExchange`),
+			// and `reported` is what the try's tool reported of it (`TryReport`): for a call that threw, nothing — no identity
+			// it confirmed and no observation — said in its own words.
+			// ⭑ READ AT CALL TIME, NOT CLOSED OVER AT CONSTRUCTION. ~~`capture` runs after `timed`, so by here the tool has
+			// spoken~~ — and the grade travels with the id, because a stronger value with no grade to justify it is the
+			// fabricated-measurement defect this arm exists to stop.
+			// ⭐ CORRECTED (`P7-2b`): *"by here the tool has spoken"* held while every capture followed a call that RETURNED. A
+			// call that THREW is captured too now, and has not spoken: this read would find an EARLIER call's report — devin's
+			// model, graded `PROVIDER_REPORTED` — and record a confirmation for a call that returned nothing. So the read is
+			// `capture`'s default, and a thrown call passes what it reported instead (`attempt`, below).
+			// ⚠ DISCLOSED, AND NOT FIXED HERE: a call that ANSWERED with a bare string reported nothing either — `devinPrint`
+			// returns one when devin's export names no model — and this read gives its record an earlier call's report and
+			// grade all the same.
+			const reportedSoFar = (): TryReport => ({
+				model: {
+					modelId: evaluator.modelId ?? '',
+					providerId: evaluator.providerId ?? '',
+					...(identityEvidence ? { evidence: identityEvidence } : {})
+				},
+				observation: toolObservation
+			});
 			const capture = (
-				role: 'initial' | 'repair',
+				role: TryRole,
 				text: string,
 				rawOutput: string,
-				disposition: 'accepted' | 'rejected' | 'repair-requested',
+				disposition: 'accepted' | 'rejected' | 'repair-requested' | 'no-response',
 				times: { requestedAt: string; respondedAt: string },
 				parseOutcome: ExchangeParseOutcome,
-				predecessor?: ExchangeRecord
+				predecessor?: ExchangeRecord,
+				reported: TryReport = reportedSoFar()
 			) => {
 				tryCounter += 1;
 				return captureTry({
@@ -874,14 +1064,7 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 					exchangeId: `exch-${tryCounter}`,
 					role,
 					...(predecessor ? { predecessor } : {}),
-					// ⭑ READ AT CALL TIME, NOT CLOSED OVER AT CONSTRUCTION. `capture` runs after `timed`, so by
-					// here the tool has spoken — and the grade travels with the id, because a stronger value
-					// with no grade to justify it is the fabricated-measurement defect this arm exists to stop.
-					model: {
-						modelId: evaluator.modelId ?? '',
-						providerId: evaluator.providerId ?? '',
-						...(identityEvidence ? { evidence: identityEvidence } : {})
-					},
+					model: reported.model,
 					prompt: text,
 					rawOutput,
 					disposition,
@@ -901,13 +1084,36 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 							'nothing is missing; the assessment this call produced is recorded as an ' +
 							'ASSURANCE_ASSESSMENT, not as an ARTIFACT.'
 					},
-					observedToolCalls: governedToolCallReport(toolObservation)
+					observedToolCalls: governedToolCallReport(reported.observation)
 				});
 			};
 
-			/** Run one bounded try, timing it. The clock is injectable so the gate is not wall-clock dependent.
-			 *  ⭐ SR-2 — `role` and `predecessor` are what a try REFUSED here is recorded with (D6, below). */
-			const timed = async (p: string, role: 'initial' | 'repair', predecessor?: ExchangeRecord) => {
+			/**
+			 * ⭐⭐ `JAN-EXEC` Phase 7 `P7-2b` (`REG-D-102` (2)) — ONE CALL OF THE BACKING TOOL, TIMED: its answer, or — when its
+			 * `print` threw — the record of a call that got no reply, and whether it is run once more.
+			 *
+			 * ⛔ A FAILED CALL IS STILL A TRY THAT HAPPENED (`REG-F-525`; `PER-9`). This catch used to rethrow and record
+			 * nothing, so the call that broke a review was the one call with no record — its prompt, its times and its cause
+			 * in none — where the execution plane records the same failure (`run-model-step.ts`: *"A FAILED CALL IS STILL A
+			 * TRY THAT HAPPENED"*). It is recorded `no-response`, the sponsor's word for a thrown call (`JAN-NOANS`) — never
+			 * `rejected`, which says an answer arrived and was refused — and E-5 says no parse was attempted, carrying the
+			 * time against the tool's bound and the SANITISED cause (`REG-F-499`'s first remedy).
+			 * ⭐ ITS IDENTITY IS THE ONE THE HOST CONFIGURED, UNGRADED (`configured`): the call reported none, so an identity an
+			 * earlier call reported, graded `PROVIDER_REPORTED`, would be a confirmation nobody gave (`TryReport`).
+			 * ⚠ A RETENTION FAULT IN THAT CAPTURE PROPAGATES, in place of the call's own error, as one does from every capture
+			 * in this validator (`REG-F-338`'s rule, below). `REG-F-525`'s remedy proposed the reverse, untested; a record
+			 * dropped without a word is the omission `PER-9` forbids.
+			 * ⭐ AND THE CALL IS THEN NOT RUN AGAIN: the fault leaves `attempt` before any `Attempt` exists, and a retry would
+			 * have to name the failed call's record as its predecessor (PER-9-a), and there is no such record — so a review
+			 * cannot stand on a chain with the call that broke it missing. ⚠ This is a DIVERGENCE from `REG-F-525`'s remedy 1 (*"A
+			 * failure inside that capture must not replace the call's own error"*), kept for `REG-F-338`'s reason, and pinned —
+			 * which error reaches the floor, and that no retry happens — by `thrown-reviewer-call.test.ts` (viii).
+			 */
+			const attempt = async (
+				p: string,
+				role: TryRole,
+				predecessor?: ExchangeRecord
+			): Promise<Attempt> => {
 				const requestedAt = clock();
 				let text: string;
 				try {
@@ -959,11 +1165,52 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 					// rejection reached the floor runner and was written verbatim into a projected
 					// `VALIDATOR_EXECUTION_FAILED` observation — finding #60 reachable through a different door.
 					// ⭑ An adapter that sanitises is a DISCIPLINE; a seam that sanitises is a PROPERTY.
-					throw sanitiseToolFailure(e, p, 'reasoning-review backing tool');
+					// ⭐ `P7-2b` — and the sanitised error is the one form of the failure anything here keeps: the record's E-5
+					// carries its message, and it is what `timed` rethrows if the call is not run again or fails again.
+					const failure = sanitiseToolFailure(e, p, 'reasoning-review backing tool');
+					const times = { requestedAt, respondedAt: clock() };
+					const elapsedMs = Date.parse(times.respondedAt) - Date.parse(times.requestedAt);
+					const disposal = thrownCallDisposal(role, elapsedMs, callBound);
+					const failed = await capture(
+						role,
+						p,
+						'',
+						'no-response',
+						times,
+						{
+							outcome: 'NOT_ATTEMPTED',
+							detail: thrownCallDetail(failure, elapsedMs, disposal.clause)
+						},
+						predecessor,
+						// ⭐ WHAT IT REPORTED: nothing — the identity the host configured, ungraded, and an observation claiming none.
+						{ model: configured, observation: THROWN_CALL_OBSERVATION }
+					);
+					return { answered: false, failure, failed, runOnceMore: disposal.runOnceMore };
 				}
-				const times = { requestedAt, respondedAt: clock() };
+				return { answered: true, text, times: { requestedAt, respondedAt: clock() } };
+			};
+
+			/** Run one bounded try, timing it. The clock is injectable so the gate is not wall-clock dependent.
+			 *  ⭐ SR-2 — `role` and `predecessor` are what a try REFUSED here is recorded with (D6, below).
+			 *  ⭐ `P7-2b` — and what the try that ANSWERED is recorded with, returned beside its answer: the call asked for, or
+			 *  — when that call threw short of its tool's bound — its one further call, `retry`, naming the failed call's
+			 *  record as its predecessor. ⛔ ONCE, AND STRUCTURALLY: one further call and never a loop, so a tool that keeps
+			 *  failing costs two calls and no more, and the second failure is the one rethrown. */
+			const timed = async (p: string, asked: 'initial' | 'repair', after?: ExchangeRecord) => {
+				let role: TryRole = asked;
+				let predecessor = after;
+				let call = await attempt(p, role, predecessor);
+				if (!call.answered && call.runOnceMore) {
+					role = 'retry';
+					predecessor = call.failed;
+					call = await attempt(p, role, predecessor);
+				}
+				// ⛔ RETHROWN EXACTLY AS BEFORE: the seam's sanitised error, of the call that broke the review, which the floor
+				// runner records as `VALIDATOR_EXECUTION_FAILED` — so the review reads INCONCLUSIVE, as a single throw did.
+				if (!call.answered) throw call.failure;
+				const { text, times } = call;
 				// ⭐⭐ `JAN-SELREV` SR-2 (D6) — THE MODEL THAT ANSWERED MUST BE THE MODEL CONFIGURED, when the caller requires
-				// it. Right after the override above: `evaluator.modelId` is now the model the tool REPORTED, the value the
+				// it. Right after the call (`attempt`, above): `evaluator.modelId` is now the model the tool REPORTED, the value the
 				// record carries (devin's is its export's last `generation_model`, `devin-reviewer.ts` `readReportedModel`).
 				//   · A tool that reported NOTHING left the configured id in place, graded `HOST_CONFIGURED` — an absence of
 				//     evidence, not evidence of a substitute — so it is never refused here.
@@ -971,9 +1218,11 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 				//     must not be the one try with no record (PER-9). It is `rejected` — an answer arrived and was refused
 				//     for who gave it — under the reported id and its grade, and E-5 says no parse was attempted.
 				//   · ⛔ NO REPAIR: a second call would go to the same substitute, and be billed.
-				//   · ⚠ OUTSIDE the `try` above on purpose: thrown inside it, the refusal would be dressed as a failed
+				//   · ⚠ OUTSIDE `attempt`'s `try` on purpose: thrown inside it, the refusal would be dressed as a failed
 				//     invocation of the backing tool, which it is not — ⭐ and `sanitiseToolFailure` REBUILDS every error it
 				//     catches (`tools/diagnostic-safety.ts`), so the code the throw carries (below) would be lost with it.
+				//   · ⭐ `JAN-EXEC` `P7-2b` — AND SO IT IS NEVER RUN AGAIN: only a throw from `print` is, and this refusal is no such
+				//     throw. A retry answered by a substitute is refused here the same way, recorded as the `retry` it was.
 				//   · ⭐ `JAN-SELRES` RS-2 (D6; `REG-F-460`) — THE THROW CARRIES `VALIDATOR_MODEL_SUBSTITUTED`, so the floor can
 				//     tell a refused substitute from a reviewer that failed to run: the runner records it beside
 				//     `VALIDATOR_EXECUTION_FAILED` (whose statement is this message, unchanged), and the classifier answers it
@@ -1002,7 +1251,7 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 						)
 					});
 				}
-				return { text, times };
+				return { text, times, role, predecessor };
 			};
 
 			const firstTry = await timed(prompt, 'initial');
@@ -1040,9 +1289,19 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 				firstParsed = undefined;
 				firstError = e;
 			}
+			// ⭐ `JAN-EXEC` `P7-2b` — EACH ANSWERED TRY IS RECORDED UNDER THE ROLE AND PREDECESSOR `timed` RETURNS: the call
+			// asked for, or its `retry` after a call that threw, so the chain reads as the calls were made.
 			if (firstParsed) {
 				judgement = firstParsed;
-				await capture('initial', prompt, firstRaw, 'accepted', firstTry.times, PARSED);
+				await capture(
+					firstTry.role,
+					prompt,
+					firstRaw,
+					'accepted',
+					firstTry.times,
+					PARSED,
+					firstTry.predecessor
+				);
 			} else {
 				// E-5 recorded for the FAILING try before the repair is attempted — finding #62 is precisely that
 				// this outcome was swallowed by a bare catch and recorded nowhere.
@@ -1050,12 +1309,13 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 				// outcome"; a bare `repair-requested` cannot say whether the model returned nothing, returned
 				// prose, or returned well-formed JSON of the wrong shape — three faults with three remedies.
 				const first = await capture(
-					'initial',
+					firstTry.role,
 					prompt,
 					firstRaw,
 					'repair-requested',
 					firstTry.times,
-					classifyParse(firstRaw, firstError)
+					classifyParse(firstRaw, firstError),
+					firstTry.predecessor
 				);
 				const repairPrompt = `${prompt}\n\nIMPORTANT: reply with ONLY the minified JSON object.`;
 				const repairTry = await timed(repairPrompt, 'repair', first);
@@ -1066,24 +1326,24 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 					// The repair failed too. Record it as REJECTED before rethrowing — otherwise the try that
 					// finally broke the run would be the one try with no record, which is the defect inverted.
 					await capture(
-						'repair',
+						repairTry.role,
 						repairPrompt,
 						repairRaw,
 						'rejected',
 						repairTry.times,
 						classifyParse(repairRaw, e),
-						first
+						repairTry.predecessor
 					);
 					throw e;
 				}
 				await capture(
-					'repair',
+					repairTry.role,
 					repairPrompt,
 					repairRaw,
 					'accepted',
 					repairTry.times,
 					PARSED,
-					first
+					repairTry.predecessor
 				);
 			}
 			// The policy's criteria score the result, exactly as they rendered the rubric. Passing the same

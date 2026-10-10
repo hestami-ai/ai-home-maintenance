@@ -219,11 +219,16 @@ export function laneKeysRefusal(
 
 /**
  * ⭐ THE WAIT, FROM THE REVIEWER'S BOUND. The spec's one "Begin & Execute" POST runs the whole repair loop before it
- * answers: each try is one executor call and one work-product review, and each review is at most two reviewer calls.
+ * answers: each try is one executor call and one work-product review, and each review is at most ~~two~~ ⭐ four reviewer
+ * calls.
  *   · `tries` — the loop's repair bound (`DEFAULT_REPAIR_BOUND`, `src/lib/server/execution/loop-detection.ts`).
  *   · `reviewerCallMs` — the `timeout` both reviewer adapters hand their program (`agyPrint`, `devinPrint`).
- *   · `reviewerCallsPerTry` — the initial call and one repair (`reasoning-review-validator.ts`, `evaluate`), which the
- *     verif test measures by driving the validator with a reviewer that never answers in JSON.
+ *   · `reviewerCallsPerTry` — the initial call and one repair (`reasoning-review-validator.ts`, `evaluate`), ~~which the
+ *     verif test measures by driving the validator with a reviewer that never answers in JSON~~ ⭐ each of them run once
+ *     more when it throws short of its tool's bound (`JAN-EXEC` Phase 7 `P7-2b`, `REG-D-102` (2); the validator's
+ *     `timed`): 2 × 2 = 4. The verif test measures it by driving the product's devin branch with a program that throws
+ *     before each answer and never answers in JSON. ⚠ A call run again after a throw can take its whole bound once more,
+ *     so four bounds, not two, are what a review may cost.
  *   · `executorCallMs` — ⚠ AN ALLOWANCE, NOT A BOUND. The Pi executor adapter (`src/lib/server/tools/pi-executor.ts`)
  *     sets no time limit on its model turn — only each command it runs is bounded, at 120 s
  *     (`execution-tool-surface.ts`) — so each try's executor call is given the 240 s agy's adapter bounds itself to.
@@ -234,15 +239,18 @@ export function laneKeysRefusal(
 export const LANE_BUDGET = Object.freeze({
 	tries: 3,
 	reviewerCallMs: 240_000,
-	reviewerCallsPerTry: 2,
+	reviewerCallsPerTry: 4,
 	executorCallMs: 240_000,
 	setupMs: 120_000
 });
 
-/** How long the spec waits for "Begin & Execute" to answer: 3 × (240 s + 2 × 240 s) = 2,160 s (36 minutes). */
+/**
+ * How long the spec waits for "Begin & Execute" to answer: ~~3 × (240 s + 2 × 240 s) = 2,160 s (36 minutes)~~ ⭐ `P7-2b`:
+ * 3 × (240 s + 4 × 240 s) = 3,600 s (60 minutes).
+ */
 export const EXECUTE_TIMEOUT_MS =
 	LANE_BUDGET.tries *
 	(LANE_BUDGET.executorCallMs + LANE_BUDGET.reviewerCallsPerTry * LANE_BUDGET.reviewerCallMs);
 
-/** The lane's per-test timeout: the POST's wait plus the setup before it — 2,280 s (38 minutes). */
+/** The lane's per-test timeout: the POST's wait plus the setup before it — ~~2,280 s (38 minutes)~~ ⭐ 3,720 s (62 minutes). */
 export const TEST_TIMEOUT_MS = EXECUTE_TIMEOUT_MS + LANE_BUDGET.setupMs;

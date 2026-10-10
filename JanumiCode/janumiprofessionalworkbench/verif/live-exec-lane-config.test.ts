@@ -8,6 +8,9 @@
 //     (`docs/_working/DESIGN-the-selected-reviewer.md` §2 G9; `REG-F-461`);
 //   · it waited 480 s for the one request that runs every try's executor call AND every try's review, when the
 //     reviewer alone may take 3 tries × 2 calls × 240 s.
+// ⭐ `JAN-EXEC` Phase 7 `P7-2b` (`REG-D-102` (2)) — AND NOW 3 tries × 4 calls × 240 s: a reviewer call that throws short of
+// its tool's bound is run once more (`reasoning-review-validator.ts`, `timed`), so each of a review's two calls may be
+// two. Measured below through the product's devin branch, with a program that throws before each answer.
 // Both now live in one PURE module, `e2e-live-exec/lane-config.ts`, which the config and the spec import and which
 // this file holds — to the PRODUCT's own answers wherever the product can be asked: the reviewer selector for which
 // variable each tool reads and which program override it refuses, the repair bound for the tries, the two reviewer
@@ -27,6 +30,8 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
+	FLOOR_POLICY_IDS,
+	runFloorAndPlanRecording,
 	SEEDED_REASONING_REVIEW_CRITERIA,
 	type AssuranceSubject,
 	type ValidatorContext
@@ -49,6 +54,7 @@ import {
 	wiredReviewer
 } from '../apps/rph-demo/e2e-live-exec/lane-config.js';
 import { agyPrint } from '../apps/rph-demo/src/lib/server/assurance/agy-cli.js';
+import { createFloorRegistry } from '../apps/rph-demo/src/lib/server/assurance/index.js';
 import { selectExecutor } from '../apps/rph-demo/src/lib/server/execution/executor-selection.js';
 import { noProgramsDirectory } from '../apps/rph-demo/src/lib/server/assurance/no-programs.testing.js';
 import { createAgyReasoningReviewValidator } from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
@@ -443,7 +449,7 @@ describe('⭐ the lane waits for the reviewer’s bounded worst case — the rev
 		expect(bounds).toEqual([LANE_BUDGET.reviewerCallMs, LANE_BUDGET.reviewerCallMs]);
 	});
 
-	it('a review is at most two calls — the initial one and one repair — measured by driving the product’s validator with a reviewer that never answers in JSON', async () => {
+	it('~~a review is at most two calls~~ ⭐ a reviewer that answers but never in JSON makes two calls — the initial one and one repair — measured by driving the product’s validator with a reviewer that never answers in JSON', async () => {
 		const prompts: string[] = [];
 		const validator = createAgyReasoningReviewValidator({
 			print: async (p) => {
@@ -452,18 +458,47 @@ describe('⭐ the lane waits for the reviewer’s bounded worst case — the rev
 			},
 			modelId: 'fixture-reviewer'
 		});
-		// The worst case: the initial answer fails to parse, so a repair is asked for, and it fails too.
+		// The initial answer fails to parse, so a repair is asked for, and it fails too. ⭐ `P7-2b` — no call threw, so none
+		// is run again: this arm is two calls, and the budget's four are the throwing arm's, measured below.
 		await expect(validator.evaluate(REVIEW_SUBJECT, REVIEW_CONTEXT)).rejects.toThrow();
-		expect(prompts, 'the calls one review made').toHaveLength(LANE_BUDGET.reviewerCallsPerTry);
-		expect(LANE_BUDGET.reviewerCallsPerTry).toBe(2);
+		expect(prompts, 'the calls one review made').toHaveLength(2);
+		expect(prompts.length).toBeLessThanOrEqual(LANE_BUDGET.reviewerCallsPerTry);
 	});
 
-	it('the Begin & Execute wait covers every try’s executor allowance and both of its reviewer calls; the test adds its setup', () => {
+	it('⭐ P7-2b — a review is at most FOUR calls: each of its two calls, thrown short of devin’s bound, is run once more — measured by driving the product’s devin branch with a program that fails, answers in no JSON, fails, and answers in no JSON again', async () => {
+		// ⭑ THE PRODUCT'S OWN BRANCH (`createFloorRegistry`), NOT A VALIDATOR BUILT HERE: whether a thrown call is run again
+		// depends on the bound the validator knows for its tool, and the devin branch is where the product gives it one.
+		vi.stubEnv('JPWB_ASSURANCE_TOOL', 'devin');
+		vi.stubEnv('JPWB_ASSURANCE_MODEL', 'fixture-assurance');
+		const calls: number[] = [];
+		const devin = async (_file: string, args: readonly string[]) => {
+			calls.push(calls.length + 1);
+			// Odd calls fail with no reply, short of the bound; even calls answer, never in JSON.
+			if (calls.length % 2 === 1) throw new Error('devin exited with code 1: connection reset');
+			const exportPath = args[args.indexOf('--export') + 1]!;
+			writeFileSync(
+				exportPath,
+				JSON.stringify({ steps: [{ extra: { generation_model: 'fixture-assurance' } }] })
+			);
+			return { stdout: 'not JSON, and never will be' };
+		};
+		const registry = createFloorRegistry({ testMode: false, devinExec: devin });
+		const plan = await runFloorAndPlanRecording(REVIEW_SUBJECT, REVIEW_CONTEXT, registry);
+		const review = plan.assessments.find((a) => a.policyId === FLOOR_POLICY_IDS.REASONING_REVIEW);
+		expect(review?.disposition, 'a reply malformed after its repair still fails the review').toBe(
+			'INCONCLUSIVE'
+		);
+		expect(calls, 'the calls one review made').toHaveLength(LANE_BUDGET.reviewerCallsPerTry);
+		expect(LANE_BUDGET.reviewerCallsPerTry).toBe(4);
+	});
+
+	it('the Begin & Execute wait covers every try’s executor allowance and ~~both of its reviewer calls~~ ⭐ all four of its reviewer calls; the test adds its setup', () => {
 		const { tries, executorCallMs, reviewerCallsPerTry, reviewerCallMs, setupMs } = LANE_BUDGET;
 		expect(EXECUTE_TIMEOUT_MS).toBe(
 			tries * (executorCallMs + reviewerCallsPerTry * reviewerCallMs)
 		);
-		expect(EXECUTE_TIMEOUT_MS).toBe(2_160_000);
+		// ⭐ `P7-2b` — 3 × (240 s + 4 × 240 s) = 3,600 s. It was 3 × (240 s + 2 × 240 s) = 2,160 s.
+		expect(EXECUTE_TIMEOUT_MS).toBe(3_600_000);
 		expect(TEST_TIMEOUT_MS).toBe(EXECUTE_TIMEOUT_MS + setupMs);
 	});
 

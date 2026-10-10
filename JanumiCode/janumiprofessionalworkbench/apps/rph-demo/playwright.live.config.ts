@@ -21,12 +21,15 @@ export default defineConfig({
 	// ⚠ `JAN-SELREV` SR-3 — CHECKED AGAINST A REAL REVIEWER'S WORST CASE: IT DOES NOT COVER IT, AND IS LEFT, SAID SO.
 	// This lane boots in test mode, so with no `JPWB_ASSURANCE_TOOL` in the shell its reviewer is the declared
 	// stand-in, which calls no model, and 360 s is the Pi agent's allowance. But its server inherits the shell: with a
-	// tool exported, a real reviewer judges the turn — up to 2 calls of 240 s per review (the initial one and one
-	// repair), and up to 2 reviews per turn (the first, and one after the auto-refinement pass). That is 4 × 240 s =
-	// 960 s of reviewer time alone, plus a second agent run, and the agent's run has no time limit to add up
-	// (`src/routes/pwa/[id]/agent/+server.ts`). ⛔ Raising this number would change nothing: each spec sets its own
-	// `test.setTimeout(360_000)` and polls 340 s for the turn to finish. So run this lane without
-	// `JPWB_ASSURANCE_TOOL`; with it exported, a turn that a real reviewer judges can outlast both waits.
+	// tool exported, a real reviewer judges the turn — up to ~~2 calls~~ ⭐ 4 calls of 240 s per review (the initial one
+	// and one repair, ⭐ each run once more when it throws short of its tool's bound: `JAN-EXEC` Phase 7 `P7-2b`,
+	// 2026-10-09, which reaches this lane because the authoring floor builds its reviewer through `createFloorRegistry`
+	// too, `runPwaFloor` in `src/lib/server/floor.ts`), and up to 2 reviews per turn (the first, and one after the
+	// auto-refinement pass). That is ~~4 × 240 s = 960 s~~ ⭐ 8 × 240 s = 1,920 s of reviewer time alone, plus a second
+	// agent run, and the agent's run has no time limit to add up (`src/routes/pwa/[id]/agent/+server.ts`). ⛔ Raising
+	// this number would change nothing: each spec sets its own `test.setTimeout(360_000)` and polls 340 s for the turn
+	// to finish. So run this lane without `JPWB_ASSURANCE_TOOL`; with it exported, a turn that a real reviewer judges
+	// can outlast both waits.
 	timeout: 360_000,
 	expect: { timeout: 15_000 },
 	use: {

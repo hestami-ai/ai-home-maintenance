@@ -1210,6 +1210,7 @@ Recorded at founding as session-known ground truth; the canon must not contradic
   The sweep's one genuine yield was this line — found only because an investigator followed the merge target's
   citation instead of trusting it. The entry's single live **Status** line is unchanged and stands above.
 - **⚠ CITATION CORRECTED (same day).** This entry cited the judged-act rule as ~~*"DOC-003 §6 DEC-6"*~~; **DEC-6 is JPWB-DOC-003 §7** (*Decomposition and recomposition*). §6 contains the string `DEC-6` because **STA-4 CITES it** — so a grep for the rule's name lands in a section that does not contain the rule, which is the same trap as REG-F-030's heading and is why §N is never inferred from a hit. The substance is unaffected; **what the correct section then yielded is not** — see **REG-F-042**, which reads DEC-6 limb by limb and finds this entry understated the gap.
+- ⭑ **2026-10-09 — observed** (`JAN-EXEC` Phase 7's five-unit gate spec, its prediction (a)). The root of an Undertaking is signed off green while one of its children is stuck and cannot complete: its sign-off did not wait on its children.
 
 ### REG-F-042 — DEC-6 names NINE checks for recomposition and the engine derives ONE, and that one admits a disposition two ratified rules exclude by name
 
@@ -37928,6 +37929,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - ⭑ **2026-10-02 — NARROWED, NOT CLOSED (`JAN-ESCREC` `ER-1`, `REG-D-092`).**
   - **The resume hint** is composed by `resumeHintText` (`apps/rph-demo/src/lib/server/authoring-turn.ts`) and wraps. For an `ESCALATE_REVIEW` block it names the escalation and says that refining re-runs the same automated reviewer; every other block reads as before.
   - **The waiver form** is offered only where the recorded floor has a waiver target, chosen by the function the action uses. It is still offered beside an operational block that records a finding (a review that did not execute), and while a draft is open (DD-4), where the action refuses.
+- ⭑ **2026-10-09 — the step-retry limb, driven for an INCONCLUSIVE refusal** (`JAN-EXEC` Phase 7's five-unit gate spec). Beside the floor's refused completion the step is RUNNING, and the page offers Complete and Fail but no Retry. Retry appears only after Fail, and then runs nothing (`REG-F-511`).
 
 ### REG-D-087 — DELEGATED (`REG-D-071`): `JAN-SELRES` — the executor is selected, run and recorded as the reviewer is; a substituted reviewer model is answered with its own code and action; three post-confirmation deviations recorded
 
@@ -38206,6 +38208,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - **WHAT (2) MEANS.** `REG-D-072` is confirmed: its seventeen departures stand as built. `REG-F-476` (D17) is to be fixed when opportune: after `JAN-ESCREC`, by its own design, roadmap and build. The agent reads the go-ahead as covering the one paid re-measurement of the selected reviewer that the fix owes. If the fix needs new process-result qualification cases, they go to the sponsor for conferral first, as case sets did under `REG-D-073` and `REG-D-083`.
 - **WHAT (3) MEANS.** `REG-D-090` is confirmed with its items 1 to 4; item 5 is (1) above.
 - **MADE WITH THIS ENTRY** (in `JAN-ESCREC` `ER-1`'s landing). The statuses of `REG-D-072` and `REG-D-090` are struck and restated CONFIRMED; those of `REG-D-088`, `REG-D-089`, `REG-F-473`, `REG-F-474` and `REG-F-476` are restated; the pointers on `REG-D-074`, `REG-D-075` and `REG-D-082` lose "pending sponsor confirmation".
+- ⭑ **2026-10-09 — its premise, driven** (`JAN-EXEC` Phase 7 round 1; `REG-F-511`). On undertakings no page act re-runs a stopped unit: beside an INCONCLUSIVE refusal, Retry and Start run nothing and the unit can only be abandoned, as the route test and the five-unit gate spec drive. An ESCALATED work product stops its step through the same refusal (read from code). Option (a)'s *"a re-run re-runs the same automated reviewer, which can clear it"* holds on the authoring plane, not on undertakings, so this choice goes back to the sponsor.
 
 ### REG-D-092 — DELEGATED (`REG-D-071`): `JAN-ESCREC` `ER-1` as built — what the build decided beyond `REG-D-090`, and two trade-offs
 
@@ -38777,6 +38780,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - **CONFOUNDS, STATED.** devin's served model is not pinned: `servedModelDigest` is null on both RUN lines. The eight clean evaluations are of one account under four names, so correlated.
 - **SEARCHED BEFORE FILING.** The register for `qr-2026-10-08`, `P-RR-08`, `P-RR-03` and `P-RR-07-CUT`: 0 each. For `devin failed after`: 1 line, in `REG-F-488`. For `paid run 2`: 3 lines, all in `REG-D-095`. For `MISSING_CRITERION`: 5 lines, in `REG-D-074` and `REG-F-489`. Positive control: `transport failure`, 12 lines in 10 entries. The nearest entries are `REG-F-488` (paid run 1's two transport failures), `REG-F-489` (the MISSING_CRITERION shape) and `REG-F-496` (a closed finding that discharges a new escalation).
 - **REMEDY CANDIDATES, UNTESTED.** For the transport failures: record what `devinPrint` threw, sanitised, beside the elapsed time, so a failure short of the bound says why. For MISSING_CRITERION: `REG-F-489`'s candidate, a prompt sentence that asks for a row for every criterion, which moves every case prompt and owes a paid run (`REG-D-086`).
+- ⭑ **2026-10-09 — remedy 1 built in the product, with one retry** (`JAN-EXEC` Phase 7 P7-2b, `REG-D-102`). In the reasoning-review validator, a devin or agy call that throws before its tool's bound (devin 240 s; agy 180 s, its print timeout) is run once more. The failed call is recorded as `NO_RESPONSE` with the sanitised cause the tool gave, and the second as `RETRY` (`apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts`, `attempt` and `thrownCallDisposal`). A second throw, or a throw at the bound, still ends the review INCONCLUSIVE. The qualification's own transport (`scripts/reviewer-qual/transports.ts`) is unchanged, and this watch item stays open.
 
 ### REG-F-500 — a ledger mutant of a data file still runs the runner's `tsc` leg, which reads no data file, and one that leaves the run literals valid JSON but breaks the module that loads them is graded KILLED by the load error, with no row run
 
@@ -38793,6 +38797,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   1. The runner gives a data file no `tsc` leg, or parses it in that leg's place and grades a file it cannot parse NO_COMPILE, pinned in `verif/mutant-verdict.test.ts` beside the `.svelte` branch's pin; the census's root-file exemption and `compileVerdict`'s comment are restated with it.
   2. `case-set-v4.ts` exports a pure loader that its import uses, and the DATA-FILE LIMB runs that loader over each mutated text, so a mutant that leaves the run literals unloadable is named at the gate rather than KILLED at the run.
   3. The general form: the runner reads a named victim that ran no row as no measurement (INCONCLUSIVE, as it reads a victim red before the mutant). That would read `J25-M9`'s kill so too, unless a row of the cases test held the case set's own refusal.
+- ⭑ **2026-10-09 — the same limit for `.mjs` instruments** (`JAN-EXEC` Phase 7 round 1). Five driven, KILLED mutants of `scripts/phase7`'s `.mjs` files (`node-test-reporter.mjs` and `acceptance/wordfreq.test.mjs`) are outside the ledger, because no `tsc` program holds a `.mjs` file and the runner's compile leg runs `tsc -p scripts/tsconfig.json`. The general form: a file no compiler reads cannot be mutation-measured by this runner.
 
 ### REG-D-099 — SPONSOR RULING: `REG-D-097` and `REG-D-098` confirmed; the measurement lanes' leftover folders reported deleted; the recurring e2e flake filed (`REG-F-501`); what comes next asked
 
@@ -38841,6 +38846,12 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   2. The fixture's after-test check retries once on a connection reset. The server keeps what any check finds, and the run's final check reads everything kept, so a resend can change only an attribution.
   - Predicted first: with a remedy, the test's first attempt passes in full runs whose check goes out at about 6 s idle, as a trace shows; without one, it failed in each of the three runs whose attempt took about that long. A pass in a slower run, as in the fourth, tests nothing.
 - **SEARCHED BEFORE FILING.** The register at `a22fa102` for `ECONNRESET`, `pwa-designer-gallery`, `keepAliveTimeout`, `keep-alive` and `apiRequestContext`: 0 lines each. For `lane-control`: 1 line, in `REG-D-077`. For `lane control`: 5 lines in 3 entries, `REG-D-072` and `REG-D-077` (the lane control's design and its route) and `REG-Q-038`, where the words are part of *"two-plane control"*. For `harness.ts`: 13 lines in 9 entries, none naming a connection error. For `flake`: 17 lines in 8 entries, and for `flaky`: 9 lines in 7. Positive control: `retries: 1`, 4 lines in 4 entries. The nearest entries are `REG-F-182` (two e2e flakes in August, unexplained, their trace lost; its rule to capture a trace first), `REG-F-452` (a test arrangement a loaded host breaks, filed as a flake), and `REG-D-072` and `REG-D-077` (the lane control).
+- ⭑ **2026-10-09 — the mechanism on a second test.** In `60f81a20`'s gate, `pwa-walkthrough.e2e.ts:32` failed its first attempt with *"apiRequestContext.get: read ECONNRESET"* on `GET /test-api/introspect` (`e2e/support/harness.ts:139`). Its trace: the GET went out 5918 ms after the request context's last response and was reset 88 ms later. With this entry's own failure (sent at 6004 ms, reset 15 ms later), both resets arrived about 6.0 s after the last response (6006 and 6019 ms), at the server's measured close (6001 to 6015 ms in the probe), whether the request left just before the close or just after. The same gate passed this entry's test on its first attempt, in 6.3 s.
+- ⭑ **2026-10-09 — the mechanism on three more tests, in `JAN-EXEC` Phase 7 round 1's gates.** Round 1's tree was gated twice before its commit, and its three full e2e runs each passed by a retry. Each first failure was this reset:
+  - `pwu-lifecycle.e2e.ts:111`, with four mutation lanes and an e2e lane running beside the gate: *"apiRequestContext.post: read ECONNRESET"* on the after-test `POST /test-api/lane-control` (`e2e/support/harness.ts:28`). Its trace: sent 5794 ms after the request context's last response, and reset 278 ms later, 6072 ms after that response. That is later than the probe's close (6001 to 6015 ms), as a loaded host would make it.
+  - `undertaking-scope.e2e.ts:87`: the same after-test request, reset. Its trace was cleared by the next e2e run before it was copied out, as `REG-F-182` warns.
+  - `phase7-five-unit.e2e.ts:383`, round 1's own rehearsal: *"apiRequestContext.get: read ECONNRESET"* on `GET /test-api/introspect` (`harness.ts:139`, called from the spec's `:412`). Its trace: sent 5912 ms after the last response, and reset 93 ms later, 6004 ms after it.
+  - So five tests have now met it, and one did in every full e2e run of round 1. The remedy this entry owes is paid for at every landing until it is made.
 
 ### REG-D-100 — SPONSOR RULING: `JAN-EXEC` Phase 7, the live end-to-end, is the next programme; every issue it or its preparation surfaces is registered, because assurance is the methodology's critical value proposition
 
@@ -38916,6 +38927,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
     - on `REG-F-403`: "not green" is permanent on this surface;
     - on `REG-F-406`: Phase 7 is designed; its "live lane is broken" paragraph is superseded by `REG-F-405`'s fix and `REG-D-088`'s run.
   - **The roadmap's §9** records the steps P7-0 to P7-7.
+- ⭑ **2026-10-09 — round 1 built** (P7-1a, P7-1b, P7-2b and P7-4's tools; `REG-D-102`). Calls made in building it, for confirmation with the run's report: the brief and the four phase prompts live in one module, `scripts/phase7/pwa-content.ts`, pinned to `product-brief.md` byte for byte; each prompt's answer shape is its type's output contract; the implementation and end-to-end asks name `bin/wordfreq.js`; P7-4b's unit arm uses generic operators on the model's code, because no fixed list of faults can be written before the code exists; the re-runner refuses an absolute argument and requires each unit's tree digest; and its default per-test deadline is the runner's 120 s.
 
 ### REG-F-502 — a PWA that Validate or Publish refuses can never be fixed or published: the lifecycle has no way back to DRAFT, the graph is first refused after the PWA has left DRAFT, and a floor that a later type edit has made stale reads SATISFIED on the page until Publish refuses it
 
@@ -39079,6 +39091,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   2. A re-review act that re-runs the floors over the recorded work product and evidence without executing again: for a transport failure, and for an escalation once a human path exists. Untested.
   3. Run the evidence join on each return path after a turn, so that no stop drops commands that ran. Untested.
   - Predicted red: the design's no-model rehearsal (P7-1), with a stub reviewer that fails once, leaves a unit that no page action can complete. At HEAD it does.
+- ⭑ **2026-10-09 — driven at one of its six stops** (`JAN-EXEC` Phase 7 round 1): the floor's refusal of a completion whose review is INCONCLUSIVE, by the route test (`apps/rph-demo/src/routes/undertakings/[id]/phase7-route.characterization.test.ts`) and the five-unit gate spec (`apps/rph-demo/e2e/phase7-five-unit.e2e.ts`). There, Begin & Execute is offered only on a PROPOSED row and is refused at `BeginPwuShaping` if posted anyway; Retry and Start run no model and no floor; Record Assurance is refused; a hand completion with no output is admitted and frees nothing; and Abandon is the way out. The other five stops, Record Blocking Finding, the replacement-unit route and the dropped-commands limb remain read from code, not driven.
 
 ### REG-F-512 — The executor's Pi loads `AGENTS.md`, `CLAUDE.md` and `.pi/` files from the Undertaking's shared workspace, so a file one unit writes becomes part of a later unit's system prompt, or code the server process runs, and no reviewer sees it
 
@@ -39191,6 +39204,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   1. The route refuses the completion when `observedCount` exceeds the runs joined, and names the count, as `R17` blocks a run whose output was not retained. Predicted red: a route test whose seam reports 33 runs observed and 32 kept, asserting the completion is refused, fails at `a2d88db6`.
   2. The drop is recorded where a reader of the step looks: a limitation on the completion, or an evidence object of its own.
   3. The cap is per try, as the record-plane call cap it was made equal to is (`process-run-observer.ts:101-104`). This changes which runs are dropped, not whether.
+- ⭑ **2026-10-09 — driven** (`JAN-EXEC` Phase 7's route test). Given 33 completed runs, the real observer yields 32 evidence objects; the 33rd appears in no event and in no evidence's stored bytes, and the step completes.
 
 ### REG-F-518 — Pi asks the executing model for parallel tool calls and runs one message's calls concurrently, and JPWB's two tools do not ask to run in sequence, so a command can start before a file written in the same message exists
 
@@ -39299,6 +39313,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   1. Ask the qualified reviewer each declared policy's own criteria over the unit's work product and command evidence, record each answer through `RecordCriterionResult` as the floor does, and carry its report as the verdict (`R25`'s three obligations). Untested; it adds paid reviewer calls per policy per unit.
   2. Until a reviewer is wired, record the scripted sign-off INCONCLUSIVE, not SATISFIED, for a policy whose BLOCKING criteria nobody answered (`RPH-ASR-005`'s rule). Untested; it stops every unit with such a policy from turning green, Phase 7's included, so it is the sponsor's call.
   3. Disclosure only: label these verdicts as demonstration sign-offs wherever a green is shown and in Phase 7's run report, and report stage 5 as not measured. Untested.
+- ⭑ **2026-10-09 — driven** (`JAN-EXEC` Phase 7's five-unit gate spec, its prediction (b)). A root whose TRANSFORMATION produced nothing, recorded as the operator's, is signed off green.
 
 ### REG-F-524 — A work unit whose declared assurance policies all fail to govern it can never be assured: the kernel folds the empty set to UNASSESSED and refuses Record Assurance with a reason that names no policy, the page lists each excluded policy as "REQUIRED — UNASSESSED", and no step before the sign-off warns
 
@@ -39323,7 +39338,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-F-525 — a reviewer call that throws (a devin or agy transport failure, or the tool's 240 s kill) leaves no `MODEL_EXCHANGE` on either plane, while an executor call that throws is recorded `no-response`
 
-**Filed 2026-10-09** (`JAN-EXEC` Phase 7's mapping, with `REG-D-101`; read from code at `a2d88db6`, not driven). **Status:** ⚠ **OPEN — unscheduled.** In Phase 7 a devin transport failure (3 of the selected reviewer's last 133 calls, `REG-F-499`) stops its unit with no record of the call that failed, so the run's `ASSURANCE` exchanges undercount its reviewer calls and cannot time the failure.
+**Filed 2026-10-09** (`JAN-EXEC` Phase 7's mapping, with `REG-D-101`; read from code at `a2d88db6`, not driven). **Status:** ~~⚠ **OPEN — unscheduled.** In Phase 7 a devin transport failure (3 of the selected reviewer's last 133 calls, `REG-F-499`) stops its unit with no record of the call that failed, so the run's `ASSURANCE` exchanges undercount its reviewer calls and cannot time the failure.~~ ✅ **CLOSED 2026-10-09 by `JAN-EXEC` Phase 7 P7-2b (`REG-D-102`).** A reviewer call that throws is now recorded wherever the reasoning-review validator runs, on the authoring floor and on the execution plane alike: the failed call as `NO_RESPONSE`, under the host's configured identity with no grade, with the sanitised cause the tool gave; and a retry, if one is run, as `RETRY`, with the failed call as its predecessor. A throw at the tool's bound is a timeout: recorded and not retried. ⚠ One divergence from remedy 1, kept deliberately: when the thrown call's own record cannot be kept (a retention fault), that fault reaches the floor in place of the call's error and the call is not run again, as `REG-F-338`'s rule requires, since a retry would need the lost record as its predecessor. Round 1's thrown-call test pins it (case (viii), `apps/rph-demo/src/lib/server/assurance/thrown-reviewer-call.test.ts`).
 
 - **WHAT HAPPENS.**
   - The Reasoning Review validator runs each try through `timed` (`apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts:910`). When the backing tool's `print` throws (`:914`), the catch rethrows a sanitised error and captures nothing (`:955-963`). Every `capture` in the validator runs after a call returned: the refused substitute (`:987`), the parsed initial try (`:1045`), the unparsed initial try before its repair (`:1052`), and the repair (`:1068`, `:1079`). A repair whose call throws (`:1061`) leaves the initial try's `repair-requested` record and none of its own.
@@ -39622,3 +39637,87 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   5. **"The results become TEST_RESULT evidence" is read as `R18`:** each completed command is one OBSERVATION record, judged by the reviewer against the phase's closing summary. No evidence type is added.
   6. **The declared policies run as is.** Their sign-off checks no criterion (`REG-F-523`), so `R25`'s first obligation is unmet for this run. The report marks all 14 verdicts vacuous, and a "Yes" cannot count them.
 - **MADE WITH THIS ENTRY.** The statuses of `REG-D-100` and `REG-D-101` are restated. The design's status line, its §9 heading and the roadmap's Phase 7 table record the answers.
+
+### REG-F-538 — a reviewer call that answers with a bare string after an earlier call that reported its model is recorded with that earlier call's model, grade and tool observation, so the record says the provider confirmed a model for a call that confirmed nothing
+
+**Filed 2026-10-09** (`JAN-EXEC` Phase 7 round 1, P7-2b's verification; read from code at the round's tree, not driven). **Status:** ⚠ **OPEN — unscheduled; disclosed in the validator, not fixed.** P7-2b fixed the thrown-call arm of this shape; the answered-call arm remains.
+
+- **WHAT HAPPENS.**
+  - Every reviewer call's record takes its identity and tool observation from `reportedSoFar()`: the evaluator identity and grade the validator holds at that moment (`apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts:1036-1047`). That is whatever the LAST call that reported a model set.
+  - `devinPrint` returns a bare string, with no reported model, when devin's export names none (`apps/rph-demo/src/lib/server/tools/devin-reviewer.ts:108-110`).
+  - So when the initial call reported its model and a later call (a repair, or since P7-2b a retry) answers with a bare string, the later call's record carries the earlier call's model graded `PROVIDER_REPORTED`, and the earlier call's tool observation.
+  - The validator's own comment discloses this: *"a call that ANSWERED with a bare string reported nothing either … and this read gives its record an earlier call's report and grade all the same"* (`:1038-1040`).
+- **WHY IT MATTERS.** The grade `PROVIDER_REPORTED` says the provider confirmed the model for that call (`JAN-ASRIDENT`). For an answered call that reported nothing, the confirmation belongs to another call, so the identity record overstates what was observed. Independence and the SR-2 substitution check read this identity.
+- **SEARCHED BEFORE FILING.**
+  - **`reportedSoFar`:** 0 lines.
+  - **`bare string`:** 7 lines in 6 entries.
+    - `REG-F-208`, `REG-F-224` and `REG-F-228` are about schema fields.
+    - `REG-F-357` and `REG-F-359`, both closed, made the reviewer seam return a structured result when a model is reported and a bare string when it is not. This finding is what that design leaves for an answered call.
+    - `REG-F-458`, closed, is about agy's executor record.
+  - **`PROVIDER_REPORTED`:** 15 lines in 10 entries.
+  - **Positive control:** `REG-F-406`, 1 line.
+  - **The nearest:** `REG-F-359`, `REG-F-465` (a producer's `PROVIDER_REPORTED` grade that is the host's own resolution) and `REG-F-525` (the thrown-call arm, recorded with the configured identity since P7-2b).
+- **REMEDY CANDIDATES, UNTESTED.**
+  1. Pass each call's own report to its capture, as P7-2b now does for a thrown call. A call that reported nothing is recorded under the configured identity with no grade.
+  2. Make `devinPrint` return a structured result with an explicit "no model reported" for the bare-string arm, so the validator cannot confuse it with a reported one.
+
+### REG-F-539 — until a page load, the PWA designer draws nodes on top of each other: each newly typed type takes its computed position, but every node already drawn keeps the position where it first landed
+
+**Filed 2026-10-09** (`JAN-EXEC` Phase 7 round 1, found by P7-1b's spec; measured by a log-only probe three times, not committed). **Status:** ⚠ **OPEN — unscheduled.** Cosmetic for the run: the spec types §3.2's PWA and does not depend on the layout.
+
+- **WHAT HAPPENS.**
+  - Each time a type is defined, the designer's layout effect re-runs ELK over the whole graph. It then keeps every node already drawn where it first landed, and gives only the new node its computed position (`apps/rph-demo/src/routes/pwa/[id]/+page.svelte:371-382`: *"only a genuinely new node takes ELK's computed position"*).
+  - So a new node can land on a kept one. With §3.2's five types typed child-first, the probe measured 4 overlapping pairs before a reload, and 0 after: the root over Requirements, Design and Implementation and unit tests, and Design on Implementation and unit tests at one box (x560 y537, 360×240).
+- **WHY IT MATTERS.** A professional building a PWA type by type sees nodes stacked on one another until they reload, and may read the graph's shape wrongly.
+- **SEARCHED BEFORE FILING.**
+  - **No hits:** `lands over`, `first landed`, `layout effect`, `child-first`, `genuinely new node`, `on top of each other`, `computed position` and `svelte-flow`: 0 lines each.
+  - **About other things:** `overlap`, 20 lines in 18 entries; `ELK`, 3 lines, all in `REG-Q-074`; `canvas`, 13 lines in 4 entries (`REG-F-209`, `REG-Q-073`, `REG-Q-074`, `REG-F-375`).
+  - **Positive control:** `REG-F-406`, 1 line.
+  - **The nearest:** `REG-Q-074` and `REG-F-375`.
+- **REMEDY CANDIDATES, UNTESTED.**
+  1. Re-run the layout and move every node to its computed position when the graph's shape changes, keeping only positions the professional dragged.
+  2. Place a new node only in free space, and lay the rest out unchanged.
+
+### REG-F-540 — after a refused action, the Undertaking page is stale: the row still reads PROPOSED and still offers Begin & Execute, because the page reloads its data only when an action succeeds
+
+**Filed 2026-10-09** (`JAN-EXEC` Phase 7 round 1, found and pinned by P7-1b's spec, `apps/rph-demo/e2e/phase7-five-unit.e2e.ts`, its second test). **Status:** ⚠ **OPEN — unscheduled.** P7-3's spec reads the engine's state, not the page, after every action.
+
+- **WHAT HAPPENS.**
+  - Each row's actions are forms submitted with SvelteKit's default `use:enhance` (`apps/rph-demo/src/routes/undertakings/[id]/+page.svelte:228-232`). By default this re-runs the page's load only after a successful action.
+  - When Begin & Execute is refused (for example by the floor, `+page.server.ts:1634-1635`, `fail(400)`), the page keeps its old data. The row still reads PROPOSED and still offers Begin & Execute, although the unit is EXECUTING with its step RUNNING.
+  - A second Begin & Execute on the stale row is refused at `BeginPwuShaping` and records nothing (driven by P7-1b).
+- **WHY IT MATTERS.** After a refusal, the professional sees a unit as not begun, and is offered an act the engine will refuse. Meanwhile the refusal's reason shows once, as a form error (`REG-F-513`).
+- **SEARCHED BEFORE FILING.**
+  - **`reads PROPOSED`:** 0 lines.
+  - **`enhance`:** 1 line, in `REG-F-535`, about two units starting at once.
+  - **`stale page` and `stale offer`:** 0 lines each.
+  - **`stale row`:** 4 lines in 4 entries (`REG-F-072`, `REG-F-140`, `REG-F-184`, `REG-F-200`), none about this page.
+  - **Positive control:** `REG-F-406`, 1 line.
+  - **The nearest:** `REG-F-513` (a refused unit's reviews missing from the page) and `REG-F-511` (a stopped unit can only be abandoned).
+- **REMEDY CANDIDATES, UNTESTED.**
+  1. Invalidate the page's data after every action, refused or not (a custom `enhance` callback that calls `update()` with `invalidateAll`).
+  2. Show a refused unit's state and reason in its row, from the engine, not from the form result.
+
+### REG-F-541 — the five-unit rehearsal raises each test's limit to 60 s only inside the test, so its setup runs under the suite's 30 s; under round 1's parallel measurement lanes, `PQ7-M99`'s run timed out at 30 s and was INCONCLUSIVE, and its official re-run alone was KILLED
+
+**Filed 2026-10-09** (`JAN-EXEC` Phase 7 round 1's mutation measurement, on round 1's tree before its commit; read from the runner's verdict, the spec and a hand drive). **Status:** ⚠ **OPEN — unscheduled. The verdict stands KILLED, from the official re-run; the spec's timeout arrangement is owed.**
+
+- **WHAT HAPPENED.**
+  - The measurement ran the official runner in six worktrees at once: four vitest lanes, an e2e lane and the full gate.
+  - In the e2e lane, 11 of the 12 mutants whose victim is `apps/rph-demo/e2e/phase7-five-unit.e2e.ts` were KILLED. `PQ7-M99-a-first-try-s-turn-carries-a-line-before-the-instruction` read *"INCONCLUSIVE … the run TIMED OUT (Test timeout of 30000ms exceeded) no report was written, so the timed-out suite cannot be named here"*.
+  - Driven by hand in the same worktree, with the runner's own Playwright command and the other lanes still running, it was caught: test 1 red at `:563` on both attempts, test 2 passed, 1.4 min, no timeout.
+  - Re-run alone through the official runner: *"KILLED      1"*, *"INCONCLUSIVE 0"*.
+- **WHY THE LIMIT WAS 30 s.**
+  - Both tests open with `test.setTimeout(60_000)` (`:387`, `:629`). The suite's default is 30 s (`apps/rph-demo/playwright.config.ts:48`).
+  - Playwright counts a test's setup against its limit, and a limit set inside the body applies from that line on. The setup here is Playwright's browser context and page, the lane control's announce (`e2e/support/harness.ts:24-26`) and the spec's `empty` reset (`:379-381`).
+  - A message naming 30000 ms therefore means the limit fired before a test's first line ran. **INFERRED** from the message and the code: the runner keeps no report for a named victim.
+- **WHY IT MATTERS.** A mutant whose kill is real is reported as unmeasured, and the measurement blocks until it is re-driven alone. Each P7-6 re-run drives these frozen controls again, and a re-run under load can lose one the same way.
+- **THE GENERAL FORM** is `REG-F-182`'s: under contention, an e2e victim's run can time out before it measures. Its rule, re-drive an unmeasured verdict in isolation before touching what it points at, settled this one.
+- **REMEDY CANDIDATES, UNTESTED.**
+  1. Set the 60 s where it covers the setup: `test.describe.configure({ timeout: 60_000 })` in the spec's `describe`.
+  2. Or raise the running test's limit on the first line of the `beforeEach`, before the reset.
+  - Either edit changes the spec's bytes, so its 12 e2e mutants are driven again with it. Predicted first: neither changes a verdict on a quiet host.
+- **SEARCHED BEFORE FILING.** The register with round 1's entries:
+  - `30000ms`: 1 line, in `REG-F-182` (the positive control). `Test timeout of`: 2 lines, in `REG-F-168` and `REG-F-182`.
+  - `setTimeout(60` and `describe.configure`: 0 lines each.
+  - `phase7-five-unit`: 2 lines, in `REG-F-511`'s pointer and in `REG-F-540`.

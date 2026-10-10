@@ -77,8 +77,10 @@ export default defineConfig({
 	globalTeardown: './e2e/global-teardown.ts',
 	// ⭐ `JAN-SELREV` SR-3 — FROM THE REVIEWER'S BOUND, NOT FROM "TWO CALLS". This said *"Two real model calls per run
 	// (produce, then review)"* and allowed 600 s. The one Begin & Execute POST runs up to 3 tries, each an executor call
-	// and a review of at most 2 reviewer calls of 240 s: the reviewer alone may take 3 × 2 × 240 = 1,440 s. The wait and
-	// its arithmetic live in `e2e-live-exec/lane-config.ts` (2,160 s for the POST, 2,280 s for the test).
+	// and a review of at most ~~2~~ ⭐ 4 reviewer calls of 240 s: the reviewer alone may take ~~3 × 2 × 240 = 1,440 s~~
+	// ⭐ 3 × 4 × 240 = 2,880 s (`JAN-EXEC` Phase 7 `P7-2b`, 2026-10-09: a call that throws short of its tool's bound is
+	// run once more). The wait and its arithmetic live in `e2e-live-exec/lane-config.ts` (~~2,160 s for the POST,
+	// 2,280 s for the test~~ ⭐ 3,600 s for the POST, 3,720 s for the test).
 	timeout: TEST_TIMEOUT_MS,
 	expect: { timeout: 20_000 },
 	use: {

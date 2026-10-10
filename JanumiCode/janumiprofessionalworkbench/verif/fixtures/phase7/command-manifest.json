@@ -1,0 +1,50 @@
+{
+	"manifestVersion": 1,
+	"run": "verif fixture: commands recorded against the reference workspace, one of each kind the re-runner reports",
+	"units": [
+		{ "unit": "IMPLEMENTATION", "treeSha256": "b23e26cfbccac0f105ee2b2cecb6c6104ddb7f8e25474b77790582ca53c6a02f" },
+		{ "unit": "END_TO_END", "treeSha256": "b23e26cfbccac0f105ee2b2cecb6c6104ddb7f8e25474b77790582ca53c6a02f" }
+	],
+	"commands": [
+		{
+			"unit": "IMPLEMENTATION",
+			"ordinal": 1,
+			"argv": ["node", "--test", "test/unit/*.test.js"],
+			"cwd": ".",
+			"exitCode": 1,
+			"timedOut": false,
+			"evidenceId": "evd_01M9P7X4K8W2N6Q3R5T7V9Y1Z1",
+			"evidenceVerdict": "REJECTED"
+		},
+		{
+			"unit": "IMPLEMENTATION",
+			"ordinal": 2,
+			"argv": ["node", "bin/wordfreq.js", "--help"],
+			"cwd": ".",
+			"exitCode": 0,
+			"timedOut": false,
+			"evidenceId": "evd_01M9P7X4K8W2N6Q3R5T7V9Y1Z2",
+			"evidenceVerdict": "SATISFIED"
+		},
+		{
+			"unit": "IMPLEMENTATION",
+			"ordinal": 3,
+			"argv": ["node", "--test", "test/unit/*.test.js"],
+			"cwd": ".",
+			"exitCode": 0,
+			"timedOut": false,
+			"evidenceId": "evd_01M9P7X4K8W2N6Q3R5T7V9Y1Z3",
+			"evidenceVerdict": "SATISFIED"
+		},
+		{
+			"unit": "END_TO_END",
+			"ordinal": 1,
+			"argv": ["node", "--test", "test/unit/*.test.js", "test/e2e/*.test.js"],
+			"cwd": ".",
+			"exitCode": 0,
+			"timedOut": false,
+			"evidenceId": null,
+			"evidenceVerdict": "NOT_EVIDENCE"
+		}
+	]
+}
