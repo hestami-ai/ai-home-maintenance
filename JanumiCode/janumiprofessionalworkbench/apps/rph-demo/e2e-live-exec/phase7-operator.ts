@@ -45,25 +45,27 @@ import {
 import {
 	laneKeysRefusal,
 	PHASE7_NEGATIVE_CONTROL_RESERVE,
+	PHASE7_INTROSPECT_MS,
 	PHASE7_PAID_LIMIT,
 	PHASE7_PRIOR_CALLS_VARIABLE,
+	PHASE7_SIGN_OFF_MS,
+	PHASE7_UI_MS,
 	PHASE7_UNIT_ALLOWANCE_MS,
 	REVIEWER_MODEL_VARIABLE,
 	wiredReviewer
 } from './lane-config.js';
 
 // ── THE BOUNDS THE LANE'S OWN ACTS WAIT ──────────────────────────────────────────────────────────────────────────────
-// ⛔ THIS LANE SETS NO ACTION TIMEOUT, so every wait without one runs to the test's: ~~43~~ 85 hours (`lane-config.ts`). Each
+// ⛔ THIS LANE SETS NO ACTION TIMEOUT, so every wait without one runs to the test's: ~~43~~ ~~85~~ 103 hours (`lane-config.ts`). Each
 // act below that calls no model is bounded here, as an allowance, and Begin & Execute by `PHASE7_UNIT_ALLOWANCE_MS`.
 
-/** A click, a fill, a navigation — no model behind any. The spec makes it the page's default, so no act waits unbounded. */
-export const PHASE7_UI_MS = 120_000;
-/** A sign-off act's POST: it calls no model, and the page then loads the whole event log again. */
-export const PHASE7_SIGN_OFF_MS = 300_000;
+// ⭐ `P76F-C` C8 — the UI's bound and a sign-off act's are DEFINED in `lane-config.ts` now, so the spec's timeout counts every
+// act by the bound it waits (`PHASE7_TEST_TIMEOUT_MS`); re-exported here, where each act names it.
+export { PHASE7_SIGN_OFF_MS, PHASE7_UI_MS };
 /** One readiness call (`devin --version`, `devin models list`). */
 export const READINESS_CALL_MS = 120_000;
-/** One read of the server's dump, which carries the whole event log. */
-export const INTROSPECT_MS = 300_000;
+/** One read of the server's dump, which carries the whole event log — ⭐ `P76F-C` C8: `lane-config.ts`'s, by reference. */
+export const INTROSPECT_MS = PHASE7_INTROSPECT_MS;
 
 /** The Undertaking of §3.2's PWA, as the gate's rehearsal creates it. Its objective reaches no prompt (`REG-F-510`). */
 export const PHASE7_UNDERTAKING = {

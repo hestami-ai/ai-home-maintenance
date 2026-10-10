@@ -359,7 +359,11 @@ export const PHASE7_UNIT_ALLOWANCE_MS =
 /** The phases a model runs: §3.2's four (`scripts/phase7/pwa-content.ts`, `PHASE7_PHASES`). The root runs none. */
 export const PHASE7_MODEL_UNITS = 4;
 
-/** Typing and publishing the PWA, creating the Undertaking, the root's run, five sign-offs and every archive: an allowance. */
+/**
+ * The boot's readiness calls, typing and publishing the PWA, creating the Undertaking, and every archive's copying: an
+ * allowance — acts this module cannot count one by one. ⭐ `P76F-C` C8: ~~the root's run, five sign-offs~~ — those are each
+ * bounded by a figure of their own, and are counted below by it (`PHASE7_TEST_TIMEOUT_MS`).
+ */
 export const PHASE7_SETUP_MS = 1_800_000;
 
 /**
@@ -370,18 +374,98 @@ export const PHASE7_SETUP_MS = 1_800_000;
  */
 export const PHASE7_RERUNS_PER_PHASE = 1;
 
+// ── ⭐⭐ `P76F-C` C8 — THE BOUNDS OF THE LANE'S OWN ACTS, HERE SO THE SPEC'S TIMEOUT READS EACH BY REFERENCE ────────────────
+// ⛔ They lived in `phase7-operator.ts`, which imports this module, so the timeout below could not count them: the five
+// sign-offs' own bounds alone (5 × 2 × 300 s = 3,000 s) exceeded the 1,800 s setup allowance they were said to fit in,
+// and the four abandonments (4 × 300 s) and the rule's fills, clicks and page loads were counted nowhere. The operator
+// re-exports each, so every act still names the bound it waits.
+
+/** A click, a fill, a navigation — no model behind any. The spec makes it the page's default, so no act waits unbounded. */
+export const PHASE7_UI_MS = 120_000;
+/** A sign-off act's POST — ⭐ and an abandonment's: it calls no model, and the page then loads the whole event log again. */
+export const PHASE7_SIGN_OFF_MS = 300_000;
+/** One read of the server's dump, which carries the whole event log (`freshIntrospect`). */
+export const PHASE7_INTROSPECT_MS = 300_000;
+
 /**
- * The spec's own timeout, set with `test.setTimeout` (the config's stays the one-unit lane's): the setup, four phases'
- * allowance, ⭐ and one re-run's allowance for each phase (P7-6 B4) — 1,800 s + 4 × 38,160 s + 4 × 1 × 38,160 s =
- * 307,080 s (85.3 hours). ~~1,800 s + 4 × 38,160 s = 154,440 s (42.9 hours)~~ ⛔ counted each phase's Begin & Execute
- * only, so a run whose phases each took the rule's re-run could reach the test's timeout with a phase still inside its
- * allowance, and Playwright would kill the server mid-unit there (`REG-F-527`). ⚠ It must stay under Node's timer
- * ceiling, 2,147,483,647 ms, past which a timer fires at once.
+ * ⭐ `P76F-C` C8 — THE OVERVIEW SHOWN AFRESH (the spec's `showOverview`): the page's navigation and its hydration wait, each
+ * bounded by the page's default, and the tab's click by its own — 3 × 120 s = 360 s.
+ */
+export const PHASE7_SHOW_OVERVIEW_MS = 3 * PHASE7_UI_MS;
+
+/**
+ * ⭐ `P76F-C` C8 — ONE BEGIN & EXECUTE AND WHAT THE LANE DOES AFTER IT (`runTheLane`, `run`): the press, waited for up to one
+ * phase's allowance; the overview shown afresh after an envelope that leaves the page; the store read; the screenshot —
+ * 38,160 s + 360 s + 300 s + 120 s = 38,940 s. ⚠ The archive's copying is the setup allowance's.
+ */
+export const PHASE7_UNIT_RUN_MS =
+	PHASE7_UNIT_ALLOWANCE_MS + PHASE7_SHOW_OVERVIEW_MS + PHASE7_INTROSPECT_MS + PHASE7_UI_MS;
+
+/**
+ * ⭐ `P76F-C` C8 — THE RUN PLAN'S RULE ON ONE STOPPED PHASE, EVERY ACT AT ITS BOUND (`recoverByRule`, `recoveryAct`):
+ *   · the re-run: the overview shown, the row's offers waited for, the store read for the limit, the rationale filled,
+ *     the press waited for up to one phase's allowance (⭐ the RE-RUN's allowance, `REG-D-105` (4)), the overview shown
+ *     again after an envelope that leaves the page, the store read — 360 + 120 + 300 + 120 + 38,160 + 360 + 300 =
+ *     39,720 s;
+ *   · the abandonment of a re-run refused again: the overview shown, the row's offers, the rationale filled, the press
+ *     (a sign-off act's bound), the overview again, the store read — 360 + 120 + 120 + 300 + 360 + 300 = 1,560 s;
+ * together 41,280 s.
+ */
+export const PHASE7_RECOVERY_MS =
+	PHASE7_SHOW_OVERVIEW_MS +
+	PHASE7_UI_MS +
+	PHASE7_INTROSPECT_MS +
+	PHASE7_UI_MS +
+	PHASE7_UNIT_ALLOWANCE_MS +
+	PHASE7_SHOW_OVERVIEW_MS +
+	PHASE7_INTROSPECT_MS +
+	(PHASE7_SHOW_OVERVIEW_MS +
+		PHASE7_UI_MS +
+		PHASE7_UI_MS +
+		PHASE7_SIGN_OFF_MS +
+		PHASE7_SHOW_OVERVIEW_MS +
+		PHASE7_INTROSPECT_MS);
+
+/** ⭐ `P76F-C` C8 — the units the lane presses Begin & Execute on, and signs off: the root, and the four phases. */
+export const PHASE7_PRESSED_UNITS = PHASE7_MODEL_UNITS + 1;
+
+/** A sign-off's two acts: Record Assurance, then Mark Satisfied (`signOff`). */
+export const PHASE7_SIGN_OFF_ACTS = 2;
+
+/**
+ * ⭐ `P76F-C` C8 — ONE UNIT'S SIGN-OFF, EVERY ACT AT ITS BOUND (`signOff`): the overview shown; then each of its two acts —
+ * the row's wait (its row visible, or Record Assurance detached), the press, the store read after — 360 s + 2 × (120 s +
+ * 300 s + 300 s) = 1,800 s.
+ */
+export const PHASE7_SIGN_OFF_UNIT_MS =
+	PHASE7_SHOW_OVERVIEW_MS + PHASE7_SIGN_OFF_ACTS * (PHASE7_UI_MS + PHASE7_SIGN_OFF_MS + PHASE7_INTROSPECT_MS);
+
+/**
+ * The spec's own timeout, set with `test.setTimeout` (the config's stays the one-unit lane's) — ⭐⭐ `P76F-C` C8: THE WORST
+ * CASE OF THE LANE'S OWN BOUNDS, every act waited for up to its bound and counted by it:
+ *   · the setup allowance (boot, the PWA, the Undertaking, every archive's copying) — 1,800 s;
+ *   · the root's Begin & Execute and each phase's, each with what follows it (`PHASE7_UNIT_RUN_MS`) — 5 × 38,940 s =
+ *     194,700 s, ⭐ the root's included: its press is bounded by a phase's allowance too (`beginExecute`);
+ *   · the store read for the limit before each phase — 4 × 300 s = 1,200 s;
+ *   · one re-run for each phase, and the abandonment that may follow it, with the rule's every UI act
+ *     (`PHASE7_RECOVERY_MS`) — 4 × 1 × 41,280 s = 165,120 s;
+ *   · five sign-offs, each two acts (`PHASE7_SIGN_OFF_UNIT_MS`) — 5 × 1,800 s = 9,000 s, ⚠ counted for every unit
+ *     though a phase that is abandoned is never signed off: an upper bound;
+ *   · the final screenshot and the final archive's read — 120 s + 300 s = 420 s;
+ * = 372,240 s (103.4 hours). ~~1,800 s + 4 × 38,160 s + 4 × 1 × 38,160 s = 307,080 s (85.3 hours)~~ ⛔ counted the five
+ * sign-offs (3,000 s at their bounds), the four abandonments (1,200 s) and the rule's UI acts inside the 1,800 s setup
+ * allowance, and the root's Begin & Execute (up to 38,160 s) nowhere: a run whose every act stayed within its bound could
+ * reach the test's timeout with a unit still inside its allowance, and Playwright would kill the server mid-unit there
+ * (`REG-F-527`). ⚠ It must stay under Node's timer ceiling, 2,147,483,647 ms, past which a timer fires at once.
  */
 export const PHASE7_TEST_TIMEOUT_MS =
 	PHASE7_SETUP_MS +
-	PHASE7_MODEL_UNITS * PHASE7_UNIT_ALLOWANCE_MS +
-	PHASE7_MODEL_UNITS * PHASE7_RERUNS_PER_PHASE * PHASE7_UNIT_ALLOWANCE_MS;
+	PHASE7_PRESSED_UNITS * PHASE7_UNIT_RUN_MS +
+	PHASE7_MODEL_UNITS * PHASE7_INTROSPECT_MS +
+	PHASE7_MODEL_UNITS * PHASE7_RERUNS_PER_PHASE * PHASE7_RECOVERY_MS +
+	PHASE7_PRESSED_UNITS * PHASE7_SIGN_OFF_UNIT_MS +
+	PHASE7_UI_MS +
+	PHASE7_INTROSPECT_MS;
 
 /**
  * ⭐ D8 — the sponsor's limit, in reviewer calls, checked before each phase ⭐ and before each re-run the run plan's rule

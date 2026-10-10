@@ -100,7 +100,7 @@ test.describe('LIVE — JAN-EXEC Phase 7: §3.2’s PWA, published, run as an Un
 	}) => {
 		test.setTimeout(PHASE7_TEST_TIMEOUT_MS);
 		// ⛔ NO ACT WAITS UNBOUNDED: this lane sets no action timeout, so a click on a button that never came would wait out
-		// the ~~43-hour~~ ⭐ 85-hour test (P7-6 B4). Begin & Execute and the sign-off acts pass bounds of their own ⭐ — and,
+		// the ~~43-hour~~ ~~85-hour~~ ⭐ 103-hour test (P7-6 B4; `P76F-C` C8). Begin & Execute and the sign-off acts pass bounds of their own ⭐ — and,
 		// since P7-6 B3, every fill and click the lane makes.
 		page.setDefaultTimeout(PHASE7_UI_MS);
 		const paid = process.env[PHASE7_PAID_VARIABLE] === '1';

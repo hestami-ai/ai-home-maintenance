@@ -490,12 +490,20 @@ export const NO_CRITERION_ANSWERED = 'The reply answered no criterion (REG-F-552
  * false cause on the permanent record (PER-9), and the two have different remedies — rows with no id ignored the row
  * format; rows under unknown ids invented criteria. ⭑ Exported, beside `NO_CRITERION_ANSWERED`, for any reader that holds
  * the parsed reply.
- * ⚠ Meaningful only for a reply none of whose rows was kept: a row under a declared id is never counted here.
+ * ~~⚠ Meaningful only for a reply none of whose rows was kept: a row under a declared id is never counted here.~~
+ * ⛔⛔ `P76F-C` C7 — ITS PRECONDITION, CHECKED, NOT ASSUMED: no row names a declared id. Exported for any reader holding a
+ * parsed reply, it answered every reply — and one whose row names a declared id got *"each of its 1 row(s) names no
+ * criterion id"*, a false cause, since the reply answered a criterion. Unmet, it returns `undefined`: no cause, never a
+ * false one. ⭑ The validator's own caller (`unansweredCause`) reaches it only when no row was kept, so its I5 records
+ * are as before.
  */
-export function noCriterionCause(parsed: unknown, declared: ReadonlySet<string>): string {
+export function noCriterionCause(parsed: unknown, declared: ReadonlySet<string>): string | undefined {
 	const rows = (parsed as { findings?: unknown } | null)?.findings;
 	if (!Array.isArray(rows)) return 'it carries no findings list';
 	if (rows.length === 0) return 'its findings list is empty';
+	const idOf = (r: unknown): unknown => (r as { criterionId?: unknown } | null)?.criterionId;
+	// ⛔ C7 — a row under a declared id answers a criterion: the reply is not one this states a cause for.
+	if (rows.some((r) => typeof idOf(r) === 'string' && declared.has(idOf(r) as string))) return undefined;
 	const unnamed = rows.filter((r) => typeof (r as { criterionId?: unknown } | null)?.criterionId !== 'string').length;
 	const undeclared = rows.filter((r) => {
 		const id = (r as { criterionId?: unknown } | null)?.criterionId;

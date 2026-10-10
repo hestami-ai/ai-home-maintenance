@@ -50,13 +50,22 @@ import {
 	EXECUTOR_PROGRAM_VARIABLE,
 	LANE_BUDGET,
 	PHASE7_COMMAND_MS,
+	PHASE7_INTROSPECT_MS,
 	PHASE7_MODEL_UNITS,
 	PHASE7_NEGATIVE_CONTROL_RESERVE,
 	PHASE7_PAID_LIMIT,
+	PHASE7_PRESSED_UNITS,
+	PHASE7_RECOVERY_MS,
 	PHASE7_REVIEWED_COMMANDS,
 	PHASE7_RERUNS_PER_PHASE,
+	PHASE7_SETUP_MS,
+	PHASE7_SHOW_OVERVIEW_MS,
+	PHASE7_SIGN_OFF_MS,
+	PHASE7_SIGN_OFF_UNIT_MS,
 	PHASE7_TEST_TIMEOUT_MS,
+	PHASE7_UI_MS,
 	PHASE7_UNIT_ALLOWANCE_MS,
+	PHASE7_UNIT_RUN_MS,
 	REVIEWER_IDENTITY_EVIDENCE,
 	REVIEWER_MODEL_VARIABLE,
 	REVIEWER_PROGRAM_VARIABLE,
@@ -68,6 +77,11 @@ import {
 	wiredExecutor,
 	wiredReviewer
 } from '../apps/rph-demo/e2e-live-exec/lane-config.js';
+import {
+	INTROSPECT_MS as OPERATOR_INTROSPECT_MS,
+	PHASE7_SIGN_OFF_MS as OPERATOR_SIGN_OFF_MS,
+	PHASE7_UI_MS as OPERATOR_UI_MS
+} from '../apps/rph-demo/e2e-live-exec/phase7-operator.js';
 import { agyPrint } from '../apps/rph-demo/src/lib/server/assurance/agy-cli.js';
 import { createFloorRegistry } from '../apps/rph-demo/src/lib/server/assurance/index.js';
 import { selectExecutor } from '../apps/rph-demo/src/lib/server/execution/executor-selection.js';
@@ -738,15 +752,23 @@ describe('⭐ P7-2 D4 — the Phase 7 lane waits an ALLOWANCE derived from the b
 			],
 			numbers: []
 		});
-		// ⭐ P7-6 B4 — and the run plan's rule's re-runs, each a phase's allowance again.
+		// ⭐ P7-6 B4 — and the run plan's rule's re-runs, each a phase's allowance again. ⭐⭐ `P76F-C` C8 — and every other act
+		// the lane waits on, each by its own bound: the root's run and each phase's with what follows it, the limit's reads, the
+		// rule's acts, the sign-offs, the final screenshot and read.
 		expect(madeOf(sf, 'PHASE7_TEST_TIMEOUT_MS')).toEqual({
 			reads: [
 				'PHASE7_SETUP_MS',
+				'PHASE7_PRESSED_UNITS',
+				'PHASE7_UNIT_RUN_MS',
 				'PHASE7_MODEL_UNITS',
-				'PHASE7_UNIT_ALLOWANCE_MS',
+				'PHASE7_INTROSPECT_MS',
 				'PHASE7_MODEL_UNITS',
 				'PHASE7_RERUNS_PER_PHASE',
-				'PHASE7_UNIT_ALLOWANCE_MS'
+				'PHASE7_RECOVERY_MS',
+				'PHASE7_PRESSED_UNITS',
+				'PHASE7_SIGN_OFF_UNIT_MS',
+				'PHASE7_UI_MS',
+				'PHASE7_INTROSPECT_MS'
 			],
 			numbers: []
 		});
@@ -773,17 +795,48 @@ describe('⭐ P7-2 D4 — the Phase 7 lane waits an ALLOWANCE derived from the b
 
 	// ⭐ P7-6 B4 — WAS *"the setup and four phases’ allowance, 154,440 s"* (1,800 s + 4 × 38,160 s); each phase may now take a
 	// re-run of its own (`REG-D-105` (4)), so the timeout covers four phases' Begin & Execute AND four re-runs.
-	it('⛔ the spec’s test timeout — the setup, four phases’ allowance and one re-run’s allowance for each, 307,080 s — stays under Node’s timer ceiling', () => {
+	// ⛔⛔ `P76F-C` C8 — AND WAS *"307,080 s"* (1,800 s + 4 × 38,160 s + 4 × 1 × 38,160 s), which counted the five sign-offs (at
+	// their bounds, 5 × 2 × 300 s = 3,000 s), the four abandonments (4 × 300 s) and the rule's fills, clicks and page loads
+	// inside a 1,800 s setup allowance they alone exceed, and the root's Begin & Execute — bounded by a phase's allowance —
+	// nowhere. The timeout is now the worst case of the lane's own bounds, each act counted by the bound it waits.
+	it('⛔ the spec’s test timeout — the worst case of the lane’s own bounds, every act counted by its bound, 372,240 s — stays under Node’s timer ceiling', () => {
 		// ⚠ FIRST, so a figure pushed past the ceiling reddens here by this message, not by the arithmetic below it.
 		expect(
 			PHASE7_TEST_TIMEOUT_MS,
 			'past 2,147,483,647 ms a Node timer fires at once, and Playwright would time the test out at its start'
 		).toBeLessThanOrEqual(2_147_483_647);
-		// 1,800 s + 4 × 38,160 s + 4 × 1 × 38,160 s = 1,800 s + 152,640 s + 152,640 s (85.3 hours).
+		// 1,800 s + 5 × 38,940 s + 4 × 300 s + 4 × 1 × 41,280 s + 5 × 1,800 s + 120 s + 300 s
+		// = 1,800 s + 194,700 s + 1,200 s + 165,120 s + 9,000 s + 420 s = 372,240 s (103.4 hours).
 		expect(
 			PHASE7_TEST_TIMEOUT_MS,
-			'the timeout does not cover a re-run for each phase: 1,800 s + 4 × 38,160 s + 4 × 1 × 38,160 s'
-		).toBe(307_080_000);
+			'the timeout is not the worst case of the lane’s own bounds: 1,800 s setup + 5 × 38,940 s (the root’s run and each ' +
+				'phase’s) + 4 × 300 s (the limit’s reads) + 4 × 1 × 41,280 s (a re-run, an abandonment and the rule’s UI acts for ' +
+				'each phase) + 5 × 1,800 s (the sign-offs) + 120 s + 300 s (the final screenshot and read)'
+		).toBe(372_240_000);
+	});
+
+	// ⭐⭐ `P76F-C` C8 — EACH TERM, AT ITS BOUNDS: the arithmetic the timeout's comment states, held term by term, so a bound
+	// that moves reddens the term it moved, not only the total.
+	it('⭐ C8 — each term of the worst case, every act at its bound', () => {
+		// The overview shown afresh: the navigation, the hydration wait, the tab's click.
+		expect(PHASE7_SHOW_OVERVIEW_MS).toBe(3 * PHASE7_UI_MS);
+		// One Begin & Execute and what follows it: the press, the overview again, the store read, the screenshot.
+		expect(PHASE7_UNIT_RUN_MS).toBe(PHASE7_UNIT_ALLOWANCE_MS + 360_000 + 300_000 + 120_000);
+		expect(PHASE7_UNIT_RUN_MS).toBe(38_940_000);
+		// The rule on one stopped phase: the re-run (39,720 s) and the abandonment that may follow it (1,560 s).
+		expect(PHASE7_RECOVERY_MS).toBe(39_720_000 + 1_560_000);
+		// One unit's sign-off: the overview, then two acts, each its row's wait, its press and the store read after.
+		expect(PHASE7_SIGN_OFF_UNIT_MS).toBe(360_000 + 2 * (120_000 + 300_000 + 300_000));
+		// The units pressed and signed off: the root, and §3.2's four phases.
+		expect(PHASE7_PRESSED_UNITS).toBe(PHASE7_PHASES.length + 1);
+		// ⛔ The bounds the acts wait are these very figures: the operator names lane-config's, never a copy of its own.
+		expect([PHASE7_UI_MS, PHASE7_SIGN_OFF_MS, PHASE7_INTROSPECT_MS]).toEqual([
+			OPERATOR_UI_MS,
+			OPERATOR_SIGN_OFF_MS,
+			OPERATOR_INTROSPECT_MS
+		]);
+		// ⭑ The sign-offs' own bounds alone pass the setup allowance they were said to fit inside: the finding, restated.
+		expect(PHASE7_PRESSED_UNITS * 2 * PHASE7_SIGN_OFF_MS).toBeGreaterThan(PHASE7_SETUP_MS);
 	});
 
 	// ⭐ `JAN-EXEC` P7-6R — THE LIMIT IS NOW `REG-D-105` (1)'s, which amends `REG-D-102` (4): *"Raise limit to 200"*. The test

@@ -1673,6 +1673,19 @@ describe('⭐⭐ P76F-A A2 — the cause an I5 record states is TRUE for each ki
 		expect(noCriterionCause(JSON.parse(reply), declared)).toBe(cause);
 	});
 
+	// ⛔⛔ `P76F-C` C7 — A HELPER THAT COULD STATE A FALSE CAUSE. `noCriterionCause` is exported for any reader holding a parsed
+	// reply, and it answered every reply: one whose row names a DECLARED id — a reply that answered a criterion — got
+	// "each of its 1 row(s) names no criterion id", false on its face. Its precondition is that no row names a declared id;
+	// unmet, it now states no cause at all.
+	it('⛔ C7 — its precondition unmet (a row names a declared id), it states NO cause — never a false one', () => {
+		const id = SEEDED_REASONING_REVIEW_CRITERIA[0]!.id;
+		expect(noCriterionCause(JSON.parse(rowsReply({ criterionId: id, failed: false })), declared), 'one declared row').toBeUndefined();
+		expect(
+			noCriterionCause(JSON.parse(rowsReply({ criterionId: 'RR-99-no-such-class' }, { failed: false }, { criterionId: id, failed: true })), declared),
+			'a declared row among rows of both other kinds'
+		).toBeUndefined();
+	});
+
 	it.each(KINDS)(
 		'⛔ the RECORD names that cause, after the marker — %s — and never another kind’s',
 		async (_kind, reply, cause) => {
