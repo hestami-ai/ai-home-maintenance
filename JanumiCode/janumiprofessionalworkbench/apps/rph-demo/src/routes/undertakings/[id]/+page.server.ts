@@ -107,6 +107,13 @@ import {
 	type RecoveryView,
 	type StoppedUnit
 } from '$lib/server/execution/stopped-unit-recovery';
+// ⭐ `P76F-A` A3 (RD4) — what authorises each of the person's choices, cited after their own words in its Decision.
+import {
+	ABANDON_FROM_WAITING_CITATION,
+	decisionRationale,
+	RERUN_REVIEW_CITATION,
+	RERUN_WORK_CITATION
+} from '$lib/server/execution/recovery-authority';
 import { runProcessResultFloor } from '$lib/server/execution/process-result-floor';
 import type { ObservedProcessRun } from '$lib/server/tools/process-run-observer';
 // ⭐ `JAN-NOANS`: the `resolveJudgeModel` import is GONE from this route, and its absence is the check. It was
@@ -999,10 +1006,14 @@ function waitForAPerson(
 
 /**
  * ⭐ P7-6R RD4 — THE PERSON'S CHOICE, AS A DECISION, proposed and approved in the batch it authorises: `authority` the
- * session's own HUMAN actor (`proposeDecision` refuses any other, `REG-F-014`); the rationale they typed; the subjects the
- * refused unit, plan, work product and evidence; the observations considered, the refusing assessments'. ⭑ That is canon's
- * control-action record (RPH-DOC-002:2242-2249), each field a field. ⚠ No policy object authorises a person's re-run, and
- * none is invented: the authority cited is the sponsor's ruling, in the selected option's reading (`REG-D-104` (1)).
+ * session's own HUMAN actor (`proposeDecision` refuses any other, `REG-F-014`); the rationale the caller composes — the
+ * person's typed text, verbatim, then the act's citation (`decisionRationale`); the subjects the refused unit, plan, work
+ * product and evidence; the observations considered, the refusing assessments'. ⭑ That is canon's control-action record
+ * (RPH-DOC-002:2242-2249), each field a field.
+ * ⚠ No policy object authorises a person's re-run, and none is invented: the authority is the sponsor's ruling.
+ * ⛔ `P76F-A` A3: the first build said here that the ruling was "cited … in the selected option's reading" — and the
+ * Decision cited nothing: its rationale was the typed text alone. RD4 puts the ruling in the rationale's template, and
+ * the record says no policy object exists; each call below now passes its act's citation (`recovery-authority.ts`).
  */
 function personsDecision(
 	decisionId: string,
@@ -2605,7 +2616,8 @@ export const actions: Actions = {
 				RERUN_REVIEW,
 				decisionSubjects(s),
 				s.consideredObservationIds,
-				rationale
+				// ⭐ `P76F-A` A3 (RD4) — the person's words, then the ruling that authorises a re-run of the review.
+				decisionRationale(rationale, RERUN_REVIEW_CITATION)
 			),
 			...planRevision(s, decisionId, planB, {
 				id: stepB,
@@ -2756,7 +2768,8 @@ export const actions: Actions = {
 				RERUN_WORK,
 				decisionSubjects(s),
 				s.consideredObservationIds,
-				rationale
+				// ⭐ `P76F-A` A3 (RD4) — the person's words, then the ruling that authorises a re-run of the work.
+				decisionRationale(rationale, RERUN_WORK_CITATION)
 			),
 			...planRevision(s, decisionId, planB, {
 				id: stepB,
@@ -2820,7 +2833,11 @@ export const actions: Actions = {
 				: undefined;
 		const typed = str(form, 'reason');
 		if (waiting && !typed) return fail(400, { error: `Abandonment refused: ${RATIONALE_REQUIRED}` });
-		const reason = typed || 'The work is no longer required.';
+		// ⭐ `P76F-A` A3 (RD4) — abandoning a WAITING unit is the person's recovery choice: their words, verbatim, then the ruling
+		// that authorises it. ⭑ Any other unit abandons as before (S-1): its rationale is what was given, or the default.
+		const reason = waiting
+			? decisionRationale(typed, ABANDON_FROM_WAITING_CITATION)
+			: typed || 'The work is no longer required.';
 		const stopped = waiting ? stoppedUnitOf(uiSession(), pwuId) : undefined;
 		const subjects = stopped?.ok
 			? decisionSubjects(stopped.unit)

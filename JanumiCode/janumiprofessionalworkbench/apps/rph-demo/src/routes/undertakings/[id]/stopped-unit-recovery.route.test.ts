@@ -137,6 +137,11 @@ import {
 import { assurancePreflight } from '../../../lib/server/assurance/preflight.js';
 import { RATIONALE_REQUIRED } from '../../../lib/server/execution/stopped-unit-recovery.js';
 import {
+	ABANDON_FROM_WAITING_CITATION,
+	RERUN_REVIEW_CITATION,
+	RERUN_WORK_CITATION
+} from '../../../lib/server/execution/recovery-authority.js';
+import {
 	createProcessRunObserver,
 	type ObservedProcessRun
 } from '../../../lib/server/tools/process-run-observer.js';
@@ -369,13 +374,16 @@ describe('⭐ R-1c — re-run the review (RD4, RD5, RD7): no producer runs, the 
 		expect(seam.turns, 'a re-review sent the producer a turn').toHaveLength(turns);
 		expect(seam.devin, 'the re-review did not call the reviewer once').toHaveLength(calls + 1);
 		expect(reviewsOf(k.art)).toEqual(['INCONCLUSIVE', 'SATISFIED']);
-		// RD4 — the person's Decision.
+		// RD4 — the person's Decision: ⭐ `P76F-A` A3 — its rationale the person's typed text, verbatim, THEN the ruling that
+		// authorises the act, since no policy object does (RD4: "cited in the rationale's template … and the record says so").
 		const [decision] = decisionsOf(k.pwuId);
 		expect(decision?.state).toMatchObject({
 			decisionType: 'REPLAN',
 			selectedOption: 'RERUN_REVIEW',
 			status: 'EFFECTIVE',
-			rationale: RATIONALE,
+			rationale: `${RATIONALE}
+
+${RERUN_REVIEW_CITATION}`,
 			authority: { actorId: 'local-professional', actorType: 'HUMAN' },
 			subjectObjectIds: [k.pwuId, k.planA, k.art]
 		});
@@ -645,11 +653,53 @@ describe('⭐ R-1c — abandon from waiting: the existing path, and the waiting 
 		expect(decision?.state).toMatchObject({
 			decisionType: 'ABANDON',
 			status: 'EFFECTIVE',
-			rationale: 'Not worth another call.',
+			// ⭐ `P76F-A` A3 — the person's words, then the ruling that authorises abandoning a WAITING unit (RD4).
+			rationale: `Not worth another call.
+
+${ABANDON_FROM_WAITING_CITATION}`,
 			authority: { actorType: 'HUMAN' },
 			subjectObjectIds: [k.pwuId, k.planA, k.art]
 		});
 		expect(payloads('ExecutionStepCancelled', k.planA)[0]?.reason).toContain(decision!.id);
+	});
+});
+
+// ── ⭐⭐ `P76F-A` A3 (RD4; `REG-D-104` (1); `REG-D-105` (3)) — THE DECISION CITES ITS AUTHORITY, AFTER THE PERSON'S OWN WORDS ──
+//
+// RD4: *"The authorising policy is the ruling itself, cited in the rationale's template. No policy object exists for a
+// person's re-run, and the record says so."* ⛔ The first build recorded the typed text alone, so a Decision of the
+// person's re-run named no authority at all, and nothing on the record said none was a policy object.
+describe('⭐⭐ P76F-A A3 — each choice’s Decision is the person’s words, verbatim, then the ruling that authorises it (RD4)', () => {
+	it('⭐ each act’s citation names its ruling, and says no policy object authorises the person’s choice', () => {
+		for (const [act, citation, rulings] of [
+			['re-run the review', RERUN_REVIEW_CITATION, ['REG-D-104 (1)', 'REG-D-105 (3)']],
+			['re-run the work', RERUN_WORK_CITATION, ['REG-D-104 (1)', 'REG-D-105 (3)']],
+			['abandon from waiting', ABANDON_FROM_WAITING_CITATION, ['REG-D-104 (1)']]
+		] as const) {
+			for (const ruling of rulings) expect(citation, `${act} does not cite ${ruling}`).toContain(ruling);
+			expect(citation, `${act} does not say no policy object authorises it`).toMatch(/No policy object authorises/);
+			expect(citation, `${act} does not point at RD4`).toContain('RD4');
+		}
+		// ⛔ One citation per act: a re-run of the work is not authorised by the re-review's reading of `REG-D-105` (3).
+		expect(new Set([RERUN_REVIEW_CITATION, RERUN_WORK_CITATION, ABANDON_FROM_WAITING_CITATION]).size).toBe(3);
+	});
+
+	it('⛔ the typed text survives VERBATIM — its inner spacing, a tab, quotes and markup-like characters — and the re-run of the work cites ITS ruling', async () => {
+		const k = await aWaitingUnit([], REJECTED);
+		// ⚠ NO LINE BREAK, and that is the form's, not the server's: the page's field is a single-line input, and a posted
+		// form's encoding turns a line break into CR LF before the server reads it (measured: this case first carried one).
+		const typed = 'Address the finding — “the easier problem”.  Then: <b>keep</b>\t100% of the tests & the CLI.';
+		seam.answer = CLEAN;
+		expect(await act('rerunWork', { pwuId: k.pwuId, rationale: typed })).toEqual({ advanced: 'work-rerun' });
+		const [decision] = decisionsOf(k.pwuId);
+		expect(decision?.state.rationale).toBe(`${typed}\n\n${RERUN_WORK_CITATION}`);
+	});
+
+	it('⭑ CONTROL — abandoning a unit that is NOT waiting is the S-1 path as before: its rationale cites nothing it was not given', async () => {
+		const pwuId = await modelWorkUnit();
+		expect(await act('abandonPwu', { pwuId, reason: 'Not needed after all.' })).toEqual({ advanced: 'abandoned' });
+		const [decision] = decisionsOf(pwuId);
+		expect(decision?.state.rationale).toBe('Not needed after all.');
 	});
 });
 
