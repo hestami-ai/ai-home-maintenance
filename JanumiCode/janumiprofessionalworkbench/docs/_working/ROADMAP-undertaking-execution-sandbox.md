@@ -1926,7 +1926,21 @@ assurance policies gate it.** ⛔ Report what breaks; do not smooth it.
 | P7-3a / P7-3 | a one-unit live check, then the measured run of the execution half | ✅ run 2026-10-10: P7-3a passed on its third attempt (`REG-F-546`, `REG-F-547`); P7-3 ran all five units, and every phase stopped at its review; 39 of the 150 reviewer calls |
 | P7-4 | our checks against a false "Yes" | ✅ run 2026-10-10: the product passed every acceptance case; the negative control was refused as predicted (2 calls) |
 | P7-5 / P7-6 | report and register; fix and run again | P7-5 ✅ `REPORT-the-live-end-to-end-run.md` (2026-10-10); P7-6 approved (`REG-D-103`), designed (`DESIGN-the-reviewer-isolated.md`), and held at its own gate: two probes found the reviewer's agent harness, not its access, is the cause (`REG-F-549`); the sponsor chose *"Prompt + isolate, test first"* (`REG-D-104`), and its test passed 3 of 4 with no tool call, 4 calls (§4c; the fourth is `REG-F-552`) |
+| P7-6R | a stopped unit waits for a person, who re-runs its review, re-runs its work with the findings, or abandons it (`REG-D-104` (1); `REG-F-511`) | designed 2026-10-10 (`DESIGN-the-stopped-unit-recovery.md`): R-1, the review-refused stop, is built before the re-run; R-2 covers the other five stops |
 | P7-7 | the authoring half: the live agent builds the PWA from a request | owed |
+
+⭐ **THE BUILD ORDER FOR P7-6 AND P7-6R** (2026-10-10; `DESIGN-the-reviewer-isolated.md` §2, §4b, §4d; `DESIGN-the-stopped-unit-recovery.md` §7; `REG-D-104`, `REG-D-105`). Each package names the test that must turn red first. The gate and the mutation measurement run before each commit.
+
+| Package | What | Must turn red first |
+|---|---|---|
+| B1 | I1 and I4: the reviewer runs in its own folder, every tool denied, the trust check off, and a no-tools preamble before every prompt; the preamble is part of the reviewer fingerprint | an adapter test of devin's folder, its config and its argv; `reviewer:qual:check` against the recorded v4 runs |
+| B2 | I2: every reviewer reply is kept as content, parsed or not, with devin's export | a reply that does not parse is retained and pointed at |
+| B3 | I5 and I6: one repair for a reply that answers no criterion, and the prompt's sentence asking for one row per criterion, met or not | the measured run's exact empty-findings reply gets a second call; the sentence is in every framing |
+| B4 | R-1a: the plan-revision chain driven in the engine | a store test from K1's state through to a SUCCEEDED unit (predicted to be admitted) |
+| B5 | R-1b to R-1d: the wait at a refusal, the three acts, and what the page offers | the K1 route test (step WAITING, not RUNNING); three new route tests |
+| B6 | R-1e and R-1f: the five-unit spec reads the active plan's step; the paid lane's rule, as the operator | `onlyStepOf` on a unit with two plans |
+| P1 | the re-qualification on case set v4 (paid, about 80 calls) | reported to the sponsor before P2 |
+| P2 | a dry run, then the measured run again with P7-4 (paid, about 62 calls with recovery) | reported to the sponsor |
 
 ⚠ *"The results become `TEST_RESULT` evidence"* above ~~is put to the sponsor as the design's §9.5~~ ⭑ is read as `R18`'s OBSERVATION evidence, judged by the reviewer (the sponsor, `REG-D-102` (5)). *"The declared assurance policies gate it"* holds in form only today (the design's stage 5b; §9.6) ⭑ and runs as is, all 14 verdicts reported vacuous (`REG-D-102` (6)). §11's *"It works live"* was measured on 2026-09-14 and has not been driven since; today's live authoring specs cannot pass (`REG-F-506`).
 

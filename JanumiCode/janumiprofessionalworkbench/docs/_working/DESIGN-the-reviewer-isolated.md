@@ -1,7 +1,7 @@
 # DESIGN — JAN-EXEC Phase 7, P7-6 (first iteration): the reviewer isolated, its replies kept, then the run again
 
 **Programme:** `JAN-EXEC` Phase 7, step P7-6 (`DESIGN-the-live-end-to-end-run.md` §6; `REPORT-the-live-end-to-end-run.md` §7, fixes 1 to 3).
-**Status:** DESIGN. The sponsor approved P7-6 on 2026-10-10, *"Yes, fix then re-run"* (`REG-D-103`). After the probes (§4a), the sponsor chose the fix, *"Prompt + isolate, test first"* (`REG-D-104`): §4b.
+**Status:** DESIGN. The sponsor approved P7-6 on 2026-10-10, *"Yes, fix then re-run"* (`REG-D-103`). After the probes (§4a), the sponsor chose the fix, *"Prompt + isolate, test first"* (`REG-D-104`): §4b. Its test passed (§4c), and the sponsor's next four answers (`REG-D-105`) add I5 and I6: §4d.
 **Scope:** the three fixes the approval named, then one paid re-run. The report's other fixes (4 to 7) are not in this iteration; fix 6 waits on the sponsor's `REG-D-091` question.
 
 ## 1. Why
@@ -101,6 +101,30 @@ The sponsor chose *"Prompt + isolate, test first"*: keep devin and GLM, run the 
   3. The re-qualification on case set v4, about 80 calls.
   4. The re-run, about 40 calls, plus P7-4e, 2.
   - **The arithmetic:** 47 + 80 + 42 = 169, about 19 over the 150.
+
+## 4d. The sponsor's choices after the test (`REG-D-105`), and what they add
+
+- **The limit is 200 reviewer calls.**
+  - **Spent and planned:** 47 spent; the re-qualification, about 80, plus repairs; the re-run, about 42; and the recovery re-runs that P7-6R's rule allows, at most one per stopped unit, about 20. That is about 190.
+  - The lane still checks the limit between phases.
+- **I5, a reply that answers no criterion is repaired once** (`REG-F-552`, remedy 1).
+  - **Where.** In the validator, after the first reply parses: no finding names one of the policy's criteria, whether the list is empty or every id is unknown.
+  - **How the try is recorded.** As `repair-requested`, with the outcome `SCHEMA_COERCION_FAILED` and a detail naming the cause: none of the policy's criteria answered.
+  - **The repair** is the prompt, plus a line naming that cause: *"IMPORTANT: your reply gave no row for any criterion. Reply with ONLY the minified JSON object, with one row in findings for each criterion, failed=false where it is met."* A repair names what was wrong, not a generic try-again (DOC-001:227).
+  - **If the repair answers at least one criterion,** its judgement is used.
+  - **If it answers none again, or does not parse,** the first reply's judgement stands, recorded as today. The floor then records INCONCLUSIVE, with the recommendation kept (`REG-D-090`). So the repair can only add a conclusion. It never makes an outcome worse than today's.
+  - **Not repaired:** a reply that answers some criteria but not all (`REG-F-489`). The floor's reading of an unanswered criterion holds.
+  - **Cost:** at most one more call per such reply.
+  - **Predicted red:** a validator test fed the measured run's exact reply, `{"findings":[],"recommendation":"SATISFIED",…}`, asserting a second call carrying the repair line. At HEAD there is one call.
+- **I6, the prompt asks for one row per criterion, met or not** (`REG-F-552`, remedy 2, with the sponsor's condition).
+  - **The cause, found while designing this.** D8's lines say *"For each failure give a one-sentence statement … and a severity"*. A reviewer can read that as "list only the failures", and that is the shape of both `REG-F-552` (no rows) and `REG-F-489` (rows only for faulted criteria).
+  - **The added sentence.** D8's lines are the sponsor's answers of 2026-10-05, byte for byte, so they are not edited. The sentence is added after them:
+    > Give exactly one row in findings for each criterion listed above: failed=false where the criterion is met, failed=true where it is not. A criterion that is met is recorded as met; do not look for a failure that is not there. An empty findings list leaves every criterion unassessed.
+  - **The sponsor's condition** is that the prompt must not push the reviewer to find a failure. The sentence says a met criterion is recorded as met, and it asks for no failure.
+  - **It names no disposition value,** so the statement `REG-D-090` records about the prompt stays true.
+  - **The re-qualification measures the condition:** its clean cases must stay SATISFIED.
+  - **Predicted red:** a test asserting the sentence in every framing the prompt is built in. The existing pins on D8's lines must stay green.
+- **Order.** I1, I2, I4, I5 and I6 land together. Then one re-qualification measures them all, and its result goes to the sponsor before the re-run.
 
 ## 5. What this does not do
 
