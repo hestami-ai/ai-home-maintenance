@@ -80,16 +80,18 @@ export const MODEL_EXECUTOR_NAME = 'Execution model';
 /** Every evidence object of a unit carries this scope, and nothing else ties it to the unit (`+page.server.ts`). */
 export const EVIDENCE_SCOPE_PREFIX = 'commands run by the executing model for work unit ';
 /**
- * ⭐ P7-6 B2 — the sentence E-5's detail closes with on every reply that PARSED and answered no criterion: the first reply
- * of a P7-6 I5 chain, and a criterion repair that answered none either (`reasoning-review-validator.ts`
- * `NO_CRITERION_ANSWERED_NOTE`, held equal to this by `verif/phase7-run-report.test.ts`). ⛔ RESTATED, NOT IMPORTED: the
- * validator's module loads the reviewer's whole chain, which reads tool variables at load (`REG-D-072` D12), and this
- * report reads an archive with no reviewer anywhere. ⚠ The note, never the outcome: `classifyParse` gives a JSON repair's
- * first reply `SCHEMA_COERCION_FAILED` too.
+ * ⭐ P7-6 I5 (`p76-fix-c` C1) — THE MARKER E-5's detail OPENS WITH on every reply that PARSED and answered no criterion: the
+ * try that requested the criterion repair, and a criterion repair that answered none either (`reasoning-review-validator.ts`
+ * `NO_CRITERION_ANSWERED`, `P76F-A` A2; held equal to this by `verif/phase7-run-report.test.ts`). ⛔ RESTATED, NOT IMPORTED:
+ * the validator's module loads the reviewer's whole chain, which reads tool variables at load (`REG-D-072` D12), and this
+ * report reads an archive with no reviewer anywhere. ⚠ The marker beside the outcome, never the outcome alone:
+ * `classifyParse` gives a JSON repair's first reply `SCHEMA_COERCION_FAILED` too.
+ * ⛔ IT REPLACES B2's `NO_CRITERION_ANSWERED_NOTE`, the request's CLOSING sentence, which A2 removed from a refused repair's
+ * record on purpose (it said of the repair that its own judgement was kept) — so, keyed on it, a repair that parsed and
+ * answered none read "did not parse", a false cause. ⚠ No fallback for the older wording: I5 has never run against a
+ * model, so no stored record carries it.
  */
-export const NO_CRITERION_ANSWERED_NOTE =
-	'One repair was requested; if it answers none either, does not parse or gets no reply, this reply’s judgement ' +
-	'is the one the review keeps, its recommendation recorded (REG-D-090).';
+export const NO_CRITERION_ANSWERED = 'The reply answered no criterion (REG-F-552).';
 // ⛔ THE LANE'S OWN FIGURES, DERIVED BY REFERENCE, NEVER RESTATED: the limit the report states is the one the lane checked
 // before each phase, so the two can never part (`e2e-live-exec/lane-config.ts`, which imports nothing).
 /** The runs one unit's observer keeps (`tools/process-run-observer.ts` `OBSERVED_PROCESS_RUN_LIMIT`; `REG-F-517`). */
@@ -880,17 +882,23 @@ function concludedBy(top: StoredObject): Conclusion {
  * the review keeps the FIRST reply's judgement — while the record ENDS on the repair.
  * ⛔ READ BY "THE HIGHEST ORDINAL CONCLUDED IT", such a chain was a FAILED REPAIR (`REG-F-489`/`428`/`479`) or a NO RESPONSE
  * (`REG-F-499`) concluded by the repair — a review the record shows concluded on its first reply.
- * ⭑ TOLD BY THE VALIDATOR'S OWN NOTE (`NO_CRITERION_ANSWERED_NOTE`) on the first reply that got one (the call's, or its
- * retry's after a throw) — never by `SCHEMA_COERCION_FAILED`, which a JSON repair's first reply can carry too. The same note
- * on the repair says it answered none either; a refusal without it did not parse.
+ * ⭑ TOLD BY THE VALIDATOR'S OWN MARKER (`NO_CRITERION_ANSWERED`, `p76-fix-c` C1), which OPENS E-5's detail beside the
+ * outcome `SCHEMA_COERCION_FAILED` (`i5Marked`): on the first reply that got one (the call's, or its retry's after a throw),
+ * recorded `REPAIR_REQUESTED`, it is the I5 repair-request — never the outcome alone, which a JSON repair's first reply can
+ * carry too. On the repair, recorded `REJECTED`, the same pair says it answered none either; a repair refused with any
+ * other outcome (or without the marker) did not parse; one recorded `NO_RESPONSE` got no reply.
+ * ⛔ B2 told the last two apart by whether the repair's detail held the request's CLOSING sentence, which `P76F-A` A2
+ * removed from a refused repair's record on purpose — so a repair that parsed and answered none read "did not parse".
  * ⚠ Undefined — the general reading stands — when the repair is not in the record (nothing concluded it there), or was
  * refused for WHO answered it: a substitute fails the review wherever it answers.
  */
 function criterionRepairConclusion(sorted: readonly StoredObject[]): Conclusion | undefined {
-	const noted = (x: StoredObject | undefined): boolean =>
-		str(rec(x?.state.parseOutcome).detail).includes(NO_CRITERION_ANSWERED_NOTE);
+	// ⭐ C1 — the I5 pair, both halves: the outcome AND the marker opening the detail (the validator writes both, together).
+	const i5Marked = (x: StoredObject | undefined): boolean =>
+		str(rec(x?.state.parseOutcome).outcome) === 'SCHEMA_COERCION_FAILED' &&
+		str(rec(x?.state.parseOutcome).detail).startsWith(NO_CRITERION_ANSWERED);
 	const asked = sorted.find((x) => str(x.state.disposition) !== 'NO_RESPONSE');
-	if (asked === undefined || str(asked.state.disposition) !== 'REPAIR_REQUESTED' || !noted(asked)) return undefined;
+	if (asked === undefined || str(asked.state.disposition) !== 'REPAIR_REQUESTED' || !i5Marked(asked)) return undefined;
 	const after = sorted.filter((x) => ordinalOf(x) > ordinalOf(asked));
 	const answered = after.find((x) => str(x.state.disposition) === 'ACCEPTED');
 	if (answered !== undefined)
@@ -904,7 +912,7 @@ function criterionRepairConclusion(sorted: readonly StoredObject[]): Conclusion 
 	let how: string;
 	if (repairEnded === 'NO_RESPONSE') how = 'got no reply';
 	else if (repairEnded === 'REJECTED' && str(rec(last?.state.parseOutcome).outcome) !== 'NOT_ATTEMPTED')
-		how = noted(last) ? 'answered none either' : 'did not parse';
+		how = i5Marked(last) ? 'answered none either' : 'did not parse';
 	else return undefined;
 	return {
 		label: 'no-criterion-answered',

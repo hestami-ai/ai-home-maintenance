@@ -51,13 +51,20 @@ import {
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { deMinimisFloorPlan, FLOOR_POLICY_IDS } from '@janumipwb/rph-assurance';
+import { deMinimisFloorPlan, FLOOR_POLICY_IDS, SEEDED_REASONING_REVIEW_CRITERIA } from '@janumipwb/rph-assurance';
 import { createSqliteDriver, SCHEMA_SQL } from '@janumipwb/rph-persistence';
 import { afterAll, describe, expect, it } from 'vitest';
 import { main as finalize, RESULTS_NAME } from '../scripts/phase7/finalize-run.js';
 import { manifestProblems } from '../scripts/phase7/rerun-commands.js';
-// ⭐ P7-6 I5 — the note the validator writes on every reply that answered no criterion, which the report restates.
-import { NO_CRITERION_ANSWERED_NOTE as VALIDATOR_I5_NOTE } from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
+// ⭐ P7-6 I5 (`p76-fix-c` C1) — the marker the validator OPENS every I5 record's detail with, which the report restates;
+// and the validator, its sink and the floor's recorder, which write the I5 records these cases read (`i5Chain`).
+import {
+	createAgyReasoningReviewValidator,
+	NO_CRITERION_ANSWERED as VALIDATOR_I5_MARKER,
+	type AgyPrint
+} from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
+import { createExchangeSink } from '../apps/rph-demo/src/lib/server/assurance/exchange-capture.js';
+import { mintIdsFor, toRecordModelExchange } from '../apps/rph-demo/src/lib/server/assurance/exchange-recorder.js';
 import {
 	buildRunReport,
 	CELL_VALUES,
@@ -72,11 +79,12 @@ import {
 	K5_OWED,
 	manifestArgv,
 	MODEL_EXECUTOR_NAME,
-	NO_CRITERION_ANSWERED_NOTE,
+	NO_CRITERION_ANSWERED,
 	OPERATOR_COMPLETION_DETAIL,
 	OPERATOR_FAILURE_REASON,
 	OUTSIDE,
 	pairReview,
+	pairRun,
 	parseClass,
 	PHASE7_UNITS,
 	RECORDED_RUN_LIMIT,
@@ -121,7 +129,7 @@ interface Call {
 	readonly ordinal: number;
 	readonly runToken?: string;
 	readonly parse?: string;
-	/** E-5's detail, as the validator wrote it — what tells a P7-6 I5 chain (`NO_CRITERION_ANSWERED_NOTE`). */
+	/** E-5's detail, as the validator wrote it — what tells a P7-6 I5 chain (`NO_CRITERION_ANSWERED`, the marker opening it). */
 	readonly detail?: string;
 }
 interface PhaseKnobs {
@@ -665,63 +673,176 @@ describe('JAN-EXEC P7-2 D9 — the pairing of a review with the call that conclu
 		]);
 	});
 
+	// ⛔ `p76-fix-c` C9 (b) — `pairRun`'s own refusal had no case: deleted, two runs sharing a token were paired as one, the
+	// later run's last call taken as the review's conclusion. A third call above ordinal 1 is arranged on purpose: with only
+	// the two firsts, `concludedFrom`'s "two calls share its highest ordinal" refuses too, so the case would not tell.
+	it('⛔ B7 — two calls at ordinal 1 under ONE token are two runs sharing it: NOT PAIRABLE, said so — never concluded by the last call', () => {
+		const token = 'work-product-floor:art_design:wpfloor_a';
+		const shared = [
+			call('INITIAL', 'REPAIR_REQUESTED', 1, { runToken: token, parse: 'JSON_EXTRACTION_FAILED' }),
+			call('INITIAL', 'ACCEPTED', 1, { runToken: token }),
+			call('REPAIR', 'ACCEPTED', 2, { runToken: token })
+		];
+		const p = pairRun(token, shared);
+		expect([p.label, p.joinedBy, p.floorRuns, p.concludedBy, p.detail]).toEqual([
+			'not-pairable',
+			'run token',
+			2,
+			null,
+			`2 calls at ordinal 1 carry the one floor-run token ${token}: two runs share it`
+		]);
+		const r = reportOf(aRun({ design: { reviewToken: token, review: shared.map((x) => ({ role: String(x.state.exchangeRole), disposition: String(x.state.disposition), ordinal: Number(x.state.attemptOrdinal), runToken: token })) } })).report;
+		expect(r.pairing.rows.filter((row) => row.unit === 'design').map((row) => [row.label, row.joinedBy, row.concludedBy])).toEqual([
+			['not-pairable', 'run token', null]
+		]);
+	});
+
 	// ── ⭐⭐ `JAN-EXEC` P7-6 I5 READ TRUTHFULLY (`DESIGN-the-reviewer-isolated.md` §4d; `REG-F-552`) ─────────────────────────────
 	// I5 repairs a reply that PARSED and answered no criterion, once, and the repair may only ADD a conclusion: when it answers
 	// none, does not parse, or gets no reply, the review keeps the FIRST reply's judgement — yet the record ENDS on the repair.
 	// ⛔ Read by "the highest ordinal concluded it", such a chain was reported a FAILED REPAIR (`REG-F-489`/`428`/`479`), or a
 	// NO RESPONSE (`REG-F-499`), concluded by the repair — a review the record shows concluded on its first reply.
-	/** The first reply's E-5 detail, as `noCriterionAnswered` writes it (the validator), over the seeded nine criteria. */
-	const I5_FIRST =
-		"None of the policy's 9 criteria was answered: the reply parsed, but its findings list is empty (REG-F-552). " +
-		'One repair was requested; if it answers none either, does not parse or gets no reply, this reply’s judgement is the one the review keeps, its recommendation recorded (REG-D-090).';
-	const STANDS = ' The first reply’s judgement stands (REG-F-552; REG-D-090).';
-	const i5First = (role = 'INITIAL', ordinal = 1) =>
-		call(role, 'REPAIR_REQUESTED', ordinal, { parse: 'SCHEMA_COERCION_FAILED', detail: I5_FIRST });
+	// ⛔⛔ `p76-fix-c` C1 — AND TOLD BY THE MARKER THE VALIDATOR WRITES, ON RECORDS THE VALIDATOR WROTE. B2 told "the repair
+	// answered none either" from "it did not parse" by whether the repair's detail held the FIRST reply's closing sentence —
+	// which `P76F-A` A2 removed from a refused repair's record on purpose (it said of the repair that its own judgement was
+	// kept). So, merged, a repair that parsed and answered none was reported "did not parse": a false cause. And these cases
+	// passed throughout, because their details were HAND-TYPED in B's wording, which no validator writes any more.
+	// ⭐ So every I5 record below is the product's own: a review run through the REAL validator, its model stubbed to reply as
+	// each case scripts, each try projected to its stored shape by the floor's own recorder (`i5Chain`). A rewording of the
+	// validator's details now reddens these cases instead of leaving them asserting on prose nobody writes.
+	/** A reply that parses and answers no criterion — the measured run's own shape (`REG-F-552`). */
+	const NO_ROWS = '{"findings":[],"recommendation":"SATISFIED","residualUncertainty":["x"]}';
+	/** A reply answering every seeded criterion, met. */
+	const ANSWERS = JSON.stringify({
+		findings: SEEDED_REASONING_REVIEW_CRITERIA.map((c) => ({ criterionId: c.id, failed: false, statement: 'met' })),
+		recommendation: 'SATISFIED'
+	});
+	/** A reply that parses and answers none AGAIN — its one row names no criterion id (a cause of its own, A2). */
+	const NONE_AGAIN = '{"findings":[{"failed":false,"statement":"met"}],"recommendation":"SATISFIED"}';
+	/** A reply no JSON can be read from. */
+	const PROSE = "I'll check the files the work product names first.";
+	/**
+	 * ⭐ `p76-fix-c` C1 — ONE REVIEW'S TRIES AS THE VALIDATOR RECORDS THEM: the real `createAgyReasoningReviewValidator`, its
+	 * model stubbed (`AgyPrint`) to give each of `replies` in turn — an `Error` is a call that got no reply — and each record
+	 * the sink drained projected by `toRecordModelExchange`, as the floor stores it, then read as the report reads a stored
+	 * MODEL_EXCHANGE. Ids are `mex_<ROLE>_<ordinal>_run_1`, as `call` names them.
+	 */
+	const i5Chain = async (...replies: (string | Error)[]): Promise<StoredObject[]> => {
+		let n = 0;
+		const print: AgyPrint = async () => {
+			const r = replies[n++] ?? '';
+			if (r instanceof Error) throw r;
+			return r;
+		};
+		const exchanges = createExchangeSink();
+		await createAgyReasoningReviewValidator({ print, modelId: 'fixture-judge', exchanges }).evaluate(
+			{
+				subjectId: 'art_1',
+				objectType: 'ARTIFACT',
+				semanticVersion: 1,
+				isAiProduced: true,
+				producer: { actorType: 'AGENT', agentId: 'executor', modelId: 'executor-model', providerId: 'executor-provider' }
+			},
+			{
+				reasoningReview: {
+					criteria: SEEDED_REASONING_REVIEW_CRITERIA,
+					framing: 'WORK_PRODUCT',
+					prompt: 'Write the design',
+					content: '# Design',
+					narration: ''
+				}
+			}
+		);
+		const records = exchanges.drain();
+		let minted = 0;
+		const ids = mintIdsFor(records, () => `mex_${++minted}`);
+		return records.map((rec) => {
+			const p = toRecordModelExchange(
+				rec,
+				{
+					runToken: 'run_1',
+					plane: 'ASSURANCE',
+					invokerId: 'floor.reasoning-review',
+					assurancePolicyId: 'floor.reasoning-review',
+					subjectObjectId: 'art_1',
+					subjectObjectType: 'ARTIFACT',
+					subjectSemanticVersion: 1,
+					// The run's own mint, which the projection does not call: the ids are minted above, for the whole drain.
+					newId: (prefix) => `${prefix}_unused`
+				},
+				ids
+			);
+			const state = { exchangeRole: p.exchangeRole, disposition: p.disposition, attemptOrdinal: p.attemptOrdinal, runToken: p.runToken, parseOutcome: p.parseOutcome };
+			return exchange(state, `mex_${p.exchangeRole}_${p.attemptOrdinal}_run_1`);
+		});
+	};
+	/** E-5's detail on a stored try. */
+	const detailOf = (x: StoredObject | undefined): string => String((x?.state.parseOutcome as { detail?: unknown } | undefined)?.detail);
 
-	it('⭐ I5 — a criterion repair that ANSWERS concludes the review: answered, by the repair', () => {
-		const p = pairReview('art_1', 1, [i5First(), call('REPAIR', 'ACCEPTED', 2)]);
+	it('⭐ I5 — a criterion repair that ANSWERS concludes the review: answered, by the repair — and SAID so, by the I5 reading alone', async () => {
+		const chain = await i5Chain(NO_ROWS, ANSWERS);
+		expect(chain.map((x) => `${x.state.exchangeRole}:${x.state.disposition}`), 'arrangement: an I5 chain').toEqual(['INITIAL:REPAIR_REQUESTED', 'REPAIR:ACCEPTED']);
+		const p = pairReview('art_1', 1, chain);
 		expect([p.label, p.concludedBy]).toEqual(['answered', 'mex_REPAIR_2_run_1']);
+		// ⛔ `p76-fix-c` C9 (a): the general reading gives the same label and concluder (the repair is the last call), so only
+		// the detail tells that the I5 reading made this row — without it, the row is "concluded by its REPAIR call".
+		expect(p.detail).toBe('concluded by its REPAIR call, the criterion repair of a reply that answered no criterion (REG-F-552)');
 	});
 
-	it('⛔ I5 — a criterion repair that answers NONE either: concluded by the FIRST reply, REG-F-552’s case — never a failed repair', () => {
-		const p = pairReview('art_1', 1, [
-			i5First(),
-			call('REPAIR', 'REJECTED', 2, { parse: 'SCHEMA_COERCION_FAILED', detail: `The repair answered no criterion either. ${I5_FIRST}${STANDS}` })
-		]);
+	it('⛔ I5 — a criterion repair that answers NONE either: concluded by the FIRST reply, REG-F-552’s case — never a failed repair, and never "did not parse"', async () => {
+		const chain = await i5Chain(NO_ROWS, NONE_AGAIN);
+		expect(chain.map((x) => `${x.state.exchangeRole}:${x.state.disposition}`), 'arrangement: an I5 chain').toEqual(['INITIAL:REPAIR_REQUESTED', 'REPAIR:REJECTED']);
+		const p = pairReview('art_1', 1, chain);
 		expect([p.label, p.refusal ?? null, p.concludedBy]).toEqual(['no-criterion-answered', null, 'mex_INITIAL_1_run_1']);
 		expect(p.detail).toMatch(/answered no criterion, and its criterion repair answered none either \(REG-F-552\)/);
 	});
 
-	it('⛔ I5 — a criterion repair that does NOT PARSE: concluded by the FIRST reply, REG-F-552’s case — never a failed repair', () => {
-		const p = pairReview('art_1', 1, [
-			i5First(),
-			call('REPAIR', 'REJECTED', 2, { parse: 'JSON_EXTRACTION_FAILED', detail: `No JSON object could be located in the reply.${STANDS}` })
-		]);
+	it('⛔ I5 — a criterion repair that does NOT PARSE: concluded by the FIRST reply, REG-F-552’s case — never a failed repair', async () => {
+		const chain = await i5Chain(NO_ROWS, PROSE);
+		expect(chain.map((x) => `${x.state.exchangeRole}:${x.state.disposition}`), 'arrangement: an I5 chain').toEqual(['INITIAL:REPAIR_REQUESTED', 'REPAIR:REJECTED']);
+		const p = pairReview('art_1', 1, chain);
 		expect([p.label, p.refusal ?? null, p.concludedBy]).toEqual(['no-criterion-answered', null, 'mex_INITIAL_1_run_1']);
 		expect(p.detail).toMatch(/answered no criterion, and its criterion repair did not parse \(REG-F-552\)/);
 	});
 
-	it('⛔ I5 — a criterion repair that gets NO REPLY: concluded by the FIRST reply, REG-F-552’s case — never a no response', () => {
-		const p = pairReview('art_1', 1, [i5First(), call('REPAIR', 'NO_RESPONSE', 2, { parse: 'NOT_ATTEMPTED' }), call('RETRY', 'NO_RESPONSE', 3, { parse: 'NOT_ATTEMPTED' })]);
+	it('⛔ I5 — a criterion repair that gets NO REPLY: concluded by the FIRST reply, REG-F-552’s case — never a no response', async () => {
+		const chain = await i5Chain(NO_ROWS, new Error('devin invocation failed: connection reset'));
+		expect(chain.map((x) => `${x.state.exchangeRole}:${x.state.disposition}`), 'arrangement: an I5 chain').toEqual(['INITIAL:REPAIR_REQUESTED', 'REPAIR:NO_RESPONSE']);
+		const p = pairReview('art_1', 1, chain);
 		expect([p.label, p.concludedBy]).toEqual(['no-criterion-answered', 'mex_INITIAL_1_run_1']);
 		expect(p.detail).toMatch(/answered no criterion, and its criterion repair got no reply \(REG-F-552\)/);
-		// ⭐ After a throw, the first reply is its RETRY: that reply concluded it.
-		const retried = pairReview('art_1', 1, [call('INITIAL', 'NO_RESPONSE', 1, { parse: 'NOT_ATTEMPTED' }), i5First('RETRY', 2), call('REPAIR', 'NO_RESPONSE', 3, { parse: 'NOT_ATTEMPTED' })]);
+		// ⭐ After a throw, the first reply is its RETRY: that reply concluded it. ⚠ Arranged by renumbering the validator's own
+		// two records behind a call that threw — the stub validator runs no retry, since it declares no bound (`P7-2b`).
+		const [first, repair] = chain;
+		const at = (x: StoredObject, role: string, ordinal: number) =>
+			exchange({ ...x.state, exchangeRole: role, attemptOrdinal: ordinal }, `mex_${role}_${ordinal}_run_1`);
+		const retried = pairReview('art_1', 1, [call('INITIAL', 'NO_RESPONSE', 1, { parse: 'NOT_ATTEMPTED' }), at(first!, 'RETRY', 2), at(repair!, 'REPAIR', 3)]);
 		expect([retried.label, retried.concludedBy]).toEqual(['no-criterion-answered', 'mex_RETRY_2_run_1']);
 	});
 
-	it('⭑ CONTROL — the I5 chain is told by the validator’s NOTE, never by SCHEMA_COERCION_FAILED, which a JSON repair’s first reply can carry too', () => {
+	it('⭑ CONTROL — the I5 chain is told by the validator’s MARKER, never by SCHEMA_COERCION_FAILED, which a JSON repair’s first reply can carry too', async () => {
 		const json = pairReview('art_1', 1, [
 			call('INITIAL', 'REPAIR_REQUESTED', 1, { parse: 'SCHEMA_COERCION_FAILED', detail: 'The reply parsed and could not be coerced.' }),
 			call('REPAIR', 'REJECTED', 2, { parse: 'JSON_PARSE_FAILED' })
 		]);
 		expect([json.label, json.refusal]).toEqual(['refused', 'failed-repair']);
+		// ⛔ C1 — and the marker beside ANOTHER outcome is not the pair either: the key is both, each asked on its own (the
+		// validator writes the marker only under SCHEMA_COERCION_FAILED, so this arrangement edits its record's outcome alone).
+		const [asked, noneAgain] = await i5Chain(NO_ROWS, NONE_AGAIN);
+		const otherOutcome = exchange(
+			{ ...asked!.state, parseOutcome: { outcome: 'JSON_PARSE_FAILED', detail: detailOf(asked) } },
+			asked!.id
+		);
+		const marker = pairReview('art_1', 1, [otherOutcome, noneAgain!]);
+		expect([marker.label, marker.refusal, marker.concludedBy]).toEqual(['refused', 'failed-repair', 'mex_REPAIR_2_run_1']);
 		// ⛔ And a criterion repair refused for WHO answered it is a substitute, as anywhere: the review failed on it.
-		const substitute = pairReview('art_1', 1, [i5First(), call('REPAIR', 'REJECTED', 2, { parse: 'NOT_ATTEMPTED' })]);
+		const [first] = await i5Chain(NO_ROWS, ANSWERS);
+		const substitute = pairReview('art_1', 1, [first!, call('REPAIR', 'REJECTED', 2, { parse: 'NOT_ATTEMPTED' })]);
 		expect([substitute.label, substitute.refusal, substitute.concludedBy]).toEqual(['refused', 'substitute', 'mex_REPAIR_2_run_1']);
 	});
 
-	it('⛔ I5 — the stage-4 cell names REG-F-552 for a review that concluded on a reply answering no criterion, and none of a failed repair’s or a no response’s ids', () => {
+	it('⛔ I5 — the stage-4 cell names REG-F-552 for a review that concluded on a reply answering no criterion, and none of a failed repair’s or a no response’s ids', async () => {
+		const [first] = await i5Chain(NO_ROWS, new Error('devin invocation failed: connection reset'));
 		const r = reportOf(
 			aRun({
 				design: {
@@ -729,7 +850,7 @@ describe('JAN-EXEC P7-2 D9 — the pairing of a review with the call that conclu
 					stepState: 'WAITING',
 					unit: { lifecycle: 'EXECUTING', execution: 'WAITING', assurance: 'UNASSESSED' },
 					review: [
-						{ role: 'INITIAL', disposition: 'REPAIR_REQUESTED', ordinal: 1, parse: 'SCHEMA_COERCION_FAILED', detail: I5_FIRST },
+						{ role: 'INITIAL', disposition: 'REPAIR_REQUESTED', ordinal: 1, parse: 'SCHEMA_COERCION_FAILED', detail: detailOf(first) },
 						{ role: 'REPAIR', disposition: 'NO_RESPONSE', ordinal: 2, parse: 'NOT_ATTEMPTED' }
 					]
 				}
@@ -741,10 +862,14 @@ describe('JAN-EXEC P7-2 D9 — the pairing of a review with the call that conclu
 		for (const id of ['REG-F-489', 'REG-F-428', 'REG-F-479', 'REG-F-499']) expect(four.registerIds, id).not.toContain(id);
 	});
 
-	it('⭐ the NOTE the report tells an I5 chain by is the validator’s own export, and the first reply’s detail carries it', () => {
-		expect(typeof VALIDATOR_I5_NOTE, 'the validator exports no I5 note').toBe('string');
-		expect(NO_CRITERION_ANSWERED_NOTE).toBe(VALIDATOR_I5_NOTE);
-		expect(I5_FIRST.endsWith(NO_CRITERION_ANSWERED_NOTE)).toBe(true);
+	it('⭐ the MARKER the report tells an I5 chain by is the validator’s own export, and opens the request’s record and a repair’s that answered none — and no other', async () => {
+		expect(typeof VALIDATOR_I5_MARKER, 'the validator exports no I5 marker').toBe('string');
+		expect(NO_CRITERION_ANSWERED).toBe(VALIDATOR_I5_MARKER);
+		const [asked, noneAgain] = await i5Chain(NO_ROWS, NONE_AGAIN);
+		expect(detailOf(asked).startsWith(NO_CRITERION_ANSWERED), 'the request’s record').toBe(true);
+		expect(detailOf(noneAgain).startsWith(NO_CRITERION_ANSWERED), 'a repair that answered none').toBe(true);
+		const [, unparsed] = await i5Chain(NO_ROWS, PROSE);
+		expect(detailOf(unparsed), 'a repair that did not parse').not.toContain(NO_CRITERION_ANSWERED);
 	});
 
 	it('⭐ only Reasoning Reviews are paired: a deterministic floor policy and every sign-off ask no model, BY DESIGN', () => {
