@@ -1,7 +1,7 @@
 # DESIGN — JAN-EXEC Phase 7, P7-6 (first iteration): the reviewer isolated, its replies kept, then the run again
 
 **Programme:** `JAN-EXEC` Phase 7, step P7-6 (`DESIGN-the-live-end-to-end-run.md` §6; `REPORT-the-live-end-to-end-run.md` §7, fixes 1 to 3).
-**Status:** DESIGN. The sponsor approved P7-6 on 2026-10-10, *"Yes, fix then re-run"* (`REG-D-103`).
+**Status:** DESIGN. The sponsor approved P7-6 on 2026-10-10, *"Yes, fix then re-run"* (`REG-D-103`). After the probes (§4a), the sponsor chose the fix, *"Prompt + isolate, test first"* (`REG-D-104`): §4b.
 **Scope:** the three fixes the approval named, then one paid re-run. The report's other fixes (4 to 7) are not in this iteration; fix 6 waits on the sponsor's `REG-D-091` question.
 
 ## 1. Why
@@ -61,7 +61,48 @@ In the measured run, the reviewer never answered the review of a phase's work pr
   - or a different transport to the model, a plain completion call. That re-opens `REG-D-084`'s selection.
 - **I1 stays right on its own ground** (`REG-F-548`): a reviewer must not read what it was not shown.
 
+## 4b. The fix chosen, and its test (`REG-D-104`)
+
+The sponsor chose *"Prompt + isolate, test first"*: keep devin and GLM, run the reviewer isolated, and tell it in its prompt that it has no tools. Test it on the four failed reviews, at most 8 calls, and report. If it answers, re-qualify it on the full case set before the re-run.
+
+- **I4, the reviewer is told it has no tools.**
+  - `devinPrint` puts this text before every prompt it sends. The agy transport is not changed.
+    > You are answering as a reviewer that has NO TOOLS. You cannot read files, list folders, run commands or fetch anything, and you must not try: any tool call ends this session without an answer. Everything you may judge is in the text below. Judge only that text, and reply with the single JSON object the instructions below ask for, and nothing else.
+  - **It must move the reviewer fingerprint.** Qualification calls the product's own `devinPrint` (`scripts/reviewer-qual/transports.ts`), so a re-qualification measures the preamble. But the fingerprint hashes the validator's prompts, not what a transport adds to them. Left there, `reviewer:qual:check` would stay green on the qualification made without the preamble.
+    - So the preamble is part of what the fingerprint hashes for a devin candidate.
+    - The test that must turn red first: `reviewer:qual:check` against the recorded v4 RUN lines, once the preamble is in the code. It stays red until the re-qualification is recorded.
+- **I1 and I2 are unchanged.** I1 isolates the reviewer; I2 keeps every reply.
+- **I3, restated as the test the sponsor asked for.**
+  - **What is replayed.** The four work-product reviews' stored prompts, from the measured run's content store, each behind the preamble, each in its own folder that holds only the prompt and the deny-all config. Try 1 is the stored INITIAL prompt. A reply that does not parse gets try 2, the stored REPAIR prompt, as the product would. That is at most 8 calls.
+  - **How a reply is judged.** As the product judges it: its own `extractJson`, then `JSON.parse`, then `coerceJudgement`'s rules. A review **concludes** when it is SATISFIED, CONDITIONALLY_SATISFIED, or REJECTED with a failed finding, and it answers every criterion its prompt names. That last rule is the floor's: a review that answers no criterion is recorded INCONCLUSIVE (ASR-2).
+  - **The judge is checked first, at no cost.**
+    - On the 21 answers the measured run kept, it gives the recommendation the run recorded, all 21.
+    - It marks the run's one SATISFIED that answered no criterion as incomplete. The floor recorded that review INCONCLUSIVE.
+    - On four made-up replies it gives: an empty reply EMPTY_RESPONSE, prose UNPARSED, a REJECTED with no findings DOES NOT CONCLUDE, and findings under an unknown criterion are dropped.
+  - **The gate** is §2's: at least 3 of the 4 reviews conclude. Each try's tool calls are read from devin's export and reported beside it.
+  - **What the test cannot show.** That the reviewer's answers are right. It shows only that the reviewer answers. Whether it still judges well with the preamble is the re-qualification's question.
+- **After the test, the sponsor decides; nothing more is spent before that.**
+  - If the gate passes, the next step is re-qualification on case set v4 in full. That is 40 cases: v3's 26 took 52 calls, and v4's 14 took 28, so about 80 calls.
+  - Then the re-run, about 40 calls, and P7-4e, 2.
+  - **The arithmetic:** 43 spent, plus 8, 80 and 42, is about 173 of the 150. That is about 23 over the limit, and more if repairs are needed. So re-qualification and the re-run need the sponsor's limit raised, or a smaller re-qualification the sponsor accepts.
+
+## 4c. The test's result (2026-10-10, 4 paid calls)
+
+- **4 calls, not 8.** Every try parsed, so no repair was sent. Spend: 47 of the 150.
+- **No tool calls, in all four.** Each devin export shows one model step and no tool call. On these four prompts, the preamble removes `REG-F-549`'s mechanism.
+- **Three of the four conclude.** Requirements, design and end-to-end were each SATISFIED, with all 9 criteria answered, and gave 5, 5 and 7 residual uncertainties.
+- **The fourth does not.** The implementation review answered SATISFIED with an empty findings list. The floor records that INCONCLUSIVE, so the phase would still stop.
+  - The measured run had one such reply too. Qualification had none in 234 (`REG-F-552`).
+- **The gate passes, at its threshold:** 3 of 4.
+- **What it does not show:** whether SATISFIED is right. P7-4 found the product sound: all 7 acceptance cases passed, and its tests caught all 7 seeded deviations. That is consistent with these verdicts, but it does not measure the reviewer.
+- **What follows, in order, and nothing is spent before the sponsor answers:**
+  1. I1, I2 and I4 in code, with the fingerprint move (§4b). This costs no calls.
+  2. `REG-F-552`'s remedy, if chosen. It must land before re-qualification, so that one re-qualification measures both.
+  3. The re-qualification on case set v4, about 80 calls.
+  4. The re-run, about 40 calls, plus P7-4e, 2.
+  - **The arithmetic:** 47 + 80 + 42 = 169, about 19 over the 150.
+
 ## 5. What this does not do
 
-- It does not change the reviewer's model, its prompt or its criteria.
+- ~~It does not change the reviewer's model, its prompt or its criteria.~~ It does not change the reviewer's model or its criteria. Its prompt gains I4's preamble (§4b, `REG-D-104`).
 - It does not change how commands are joined to accounts (`REG-F-486`, `REG-F-551`), the order of a message's commands (`REG-F-518`), or the executor's envelope (`REG-F-519`). So the re-run may still stop a phase on those, and if it does, it says so.

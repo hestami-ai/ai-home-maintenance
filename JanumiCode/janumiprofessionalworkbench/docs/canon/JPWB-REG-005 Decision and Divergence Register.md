@@ -38215,6 +38215,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - **MADE WITH THIS ENTRY** (in `JAN-ESCREC` `ER-1`'s landing). The statuses of `REG-D-072` and `REG-D-090` are struck and restated CONFIRMED; those of `REG-D-088`, `REG-D-089`, `REG-F-473`, `REG-F-474` and `REG-F-476` are restated; the pointers on `REG-D-074`, `REG-D-075` and `REG-D-082` lose "pending sponsor confirmation".
 - ⭑ **2026-10-09 — its premise, driven** (`JAN-EXEC` Phase 7 round 1; `REG-F-511`). On undertakings no page act re-runs a stopped unit: beside an INCONCLUSIVE refusal, Retry and Start run nothing and the unit can only be abandoned, as the route test and the five-unit gate spec drive. An ESCALATED work product stops its step through the same refusal (read from code). Option (a)'s *"a re-run re-runs the same automated reviewer, which can clear it"* holds on the authoring plane, not on undertakings, so this choice goes back to the sponsor.
 - ⭑ **2026-10-10 — sent back to the sponsor** with P7-3's report (`docs/_working/REPORT-the-live-end-to-end-run.md`, *"Two things need you"*). Its premise failed live on all four phases of the measured run (`REG-F-511`).
+- ⭑ **2026-10-10 — how a stopped unit is recovered is now chosen (`REG-D-104` (1)).** Phase 7 found that a stopped unit could only be abandoned (`REG-F-511`). The sponsor chose: the unit waits for a person, who re-runs its review, re-runs its work with the findings, or abandons it.
 
 ### REG-D-092 — DELEGATED (`REG-D-071`): `JAN-ESCREC` `ER-1` as built — what the build decided beyond `REG-D-090`, and two trade-offs
 
@@ -39879,6 +39880,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - **WHY IT MATTERS.** No phase of a real run can complete while its work product's review cannot conclude, whatever the work is worth. Here the work was good: the product passed every acceptance case (P7-4a).
 - **SEARCHED BEFORE FILING.** The register for `JSON_EXTRACTION_FAILED`: 3 lines, in `REG-D-057` and `REG-F-346`. For `EMPTY_RESPONSE`: 7 lines, in `REG-D-064`, `REG-F-346`, `REG-F-410` and `REG-F-413`. All are about the parse vocabulary, none about live work products.
 - ⭑ **2026-10-10 — the mechanism, driven (P7-6's probe 2).** The design phase's own work-product review prompt (22,092 characters, from the run's content store) was replayed through the isolated reviewer. Its only move was a tool call, `exec ls -la && ls -la docs …`, to inspect the files the work product describes. Denied, the session ended with an empty stdout. So in print mode a tool call that is not approved ends devin's session, and the reply is whatever was written before it. In the measured run the read-only calls were auto-approved and an `exec` ended the session, leaving *"I'll verif…"*. Isolation alone cannot make the reviewer answer, so P7-6's re-run is held and the choice of fix goes to the sponsor (`REG-D-103`).
+- ⭑ **2026-10-10 — the fix the sponsor chose, tested (`REG-D-104` (2); `DESIGN-the-reviewer-isolated.md` §4c; 4 paid calls).** The four work-product review prompts were replayed through the isolated reviewer, with a preamble telling it that it has no tools. No try called a tool: each devin export shows one model step and no tool call. Three of the four concluded, SATISFIED with all 9 criteria answered. The fourth, the implementation review, answered SATISFIED with no findings, which the floor records INCONCLUSIVE (`REG-F-552`).
 
 ### REG-F-550 — three command reviews in the measured run ran into the reviewing model's output limit, which devin reports by failing, so each was recorded as a call that threw and run once more: one answered, two failed again
 
@@ -39906,7 +39908,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-D-103 — SPONSOR RULING: P7-6 approved, "fix then re-run"; and REG-D-091 answered with a question, how a stopped unit's recovery works under DBOS or similar tooling
 
-**Ruled 2026-10-10** (sponsor, in session, answering the two questions sent with P7-3's report). **Type:** SPONSOR RULING. **Status:** ⚠ **OPEN — P7-6's first iteration is held at its own gate (`REG-F-549`), and the sponsor's DBOS question is answered with the reviewer's fix options; both go back to the sponsor.**
+**Ruled 2026-10-10** (sponsor, in session, answering the two questions sent with P7-3's report). **Type:** SPONSOR RULING. **Status:** ~~⚠ **OPEN — P7-6's first iteration is held at its own gate (`REG-F-549`), and the sponsor's DBOS question is answered with the reviewer's fix options; both go back to the sponsor.**~~ ✅ **ANSWERED 2026-10-10 — both went back to the sponsor, who chose in each (`REG-D-104`).**
 
 - **THE SPONSOR'S WORDS, verbatim:**
   1. Asked *"On an Undertaking, a phase that stops can only be abandoned; Retry runs nothing (REG-D-091's premise failed live, all four phases). How should a stopped work unit be recovered?"*, the sponsor answered: *"How will this work in the context of DBOS or similar technology as the underlying tooling for undertakings?"*
@@ -39915,3 +39917,49 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - **WHAT (2) MEANS.** P7-6's first iteration was approved as offered: isolate the reviewer, keep its unparsed replies, re-check it on live-size work products, then one paid re-run.
   - The offer called the re-check free work. It is not: it calls the reviewer. The design budgets it at 8 calls and discloses it.
   - Two probe calls were spent. Their result held the re-run at the design's own gate (`REG-F-549`). Spend: 43 of the 150 reviewer calls.
+
+### REG-D-104 — SPONSOR RULING: a refused work unit waits for a person, who re-runs its review, re-runs its work with the findings, or abandons it; and P7-6's reviewer fix is "prompt + isolate, test first"
+
+**Ruled 2026-10-10** (sponsor, in session, answering the two questions sent with P7-6's probe results, `REG-D-103`). **Type:** SPONSOR RULING. **Status:** ⚠ **OPEN — (1) is to be designed, then built; (2)'s test is owed, at most 8 calls, and its result goes back to the sponsor before anything more is spent.**
+
+- **THE SPONSOR'S WORDS, verbatim, each with the question and the option chosen:**
+  1. Asked *"With DBOS in view, how should a refused (stopped) work unit be recovered? Each choice is built now on today's engine and maps onto DBOS fork/recv at the port."*, the sponsor chose *"Wait, then re-run or abandon (Recommended)"*. That option read: *"The refused unit waits for a person, who chooses: re-run the review, re-run the work with the findings, or abandon. Each re-run is a new recorded attempt reusing what came before (a plan revision now; DBOS fork + recv later)."*
+     - The options not chosen were *"Automatic re-run first"* and *"Abandon and re-propose"*.
+  2. Asked *"The reviewer (GLM via devin) acts as an agent and ends its own session reaching for tools. How should P7-6 fix it before the re-run?"*, the sponsor chose *"Prompt + isolate, test first (Recommended)"*. That option read: *"Keep devin+GLM; run it isolated and tell it in its prompt it has no tools. Test on the 4 failed reviews (≤8 calls) and report; if it answers, re-qualify on the full case set before the re-run (may need ~50 more calls than the 107 left)."*
+     - The options not chosen were *"Plain model call"* and *"Pause P7-6"*.
+- **WHAT (1) MEANS.** It answers how a stopped unit is recovered (`REG-D-103` (1); `REG-F-511`).
+  - A unit whose review refuses it does not end. It waits, and the choice of what happens next is a person's.
+  - There are three choices: re-run the review, re-run the work with the review's findings, or abandon the unit.
+  - A re-run is a new attempt on the record. The refused attempt stays.
+  - **On today's engine** a re-run is a plan revision: canon's STA-8 supersedes and keeps the attempt history. **Under DBOS** the same re-run is a fork of the recorded workflow from the step to repeat, and the wait is a durable receive. DBOS is not adopted (`REG-Q-016`).
+  - It is to be designed, then put on a roadmap, before it is built.
+- **WHAT (2) MEANS.** P7-6 keeps devin and GLM, and adds a no-tools preamble to the reviewer's prompt, to I1's isolation and I2's kept replies (`DESIGN-the-reviewer-isolated.md` §4b).
+  - The test replays the measured run's four work-product reviews, at most 8 calls. The gate is at least 3 of 4 concluding.
+  - The preamble changes what the qualified reviewer reads, so it must move the reviewer fingerprint. Then `reviewer:qual:check` refuses until the reviewer is re-qualified.
+  - **The option's arithmetic is corrected here.** It said *"may need ~50 more calls than the 107 left"*. Counted from the qualification record, a full v4 re-qualification is about 80 calls. With the test and the re-run, that is about 173 of the 150, so about 23 over the limit, not 50.
+- ⭑ **2026-10-10 — (2)'s test ran: 4 calls, not 8, because every try parsed and no repair was sent.** No try called a tool. Three of the four reviews concluded, so the gate of at least 3 of 4 passes, at its threshold. The fourth answered with no findings (`REG-F-552`). Spend: 47 of the 150 reviewer calls. The result goes to the sponsor before the re-qualification is spent (`DESIGN-the-reviewer-isolated.md` §4c).
+
+### REG-F-552 — The selected reviewer sometimes answers SATISFIED with an empty findings list: 2 of the 25 replies parsed on live work products, and none of its 234 in qualification; the floor records each such review INCONCLUSIVE, so its phase stops
+
+**Filed 2026-10-10** (`JAN-EXEC` Phase 7 P7-6, from I3's replay and the measured run's records). **Status:** ⚠ **OPEN — a remedy is owed before the reviewer is re-qualified, so the re-qualification measures it.**
+
+- **WHAT HAPPENED.** Two replies had this shape: *`{"findings":[],"recommendation":"SATISFIED","residualUncertainty":[…]}`*.
+  1. In the measured run, one end-to-end command review gave four residual uncertainties and no findings. The floor recorded that reasoning review INCONCLUSIVE.
+  2. In I3's replay (`REG-D-104` (2)), the implementation phase's work-product review gave five residual uncertainties and no findings.
+- **WHAT THE PRODUCT DOES WITH IT.** It fails closed, but the phase still stops:
+  - Its parse takes the reply (`coerceJudgement`). It sends no repair, because a repair follows only a reply that does not parse.
+  - The floor then records the review INCONCLUSIVE: an unanswered criterion is invalid output (ASR-2; `REG-D-090`).
+  - So the review gives no verdict, and the phase stops (`REG-F-511`).
+- **WHY IT MATTERS.**
+  - **Qualification never met it.** Counted from `docs/tracking/reviewer-qualification/runs.ndjson`, none of the 234 replies GLM-5.3 Flash Max gave in qualification had empty findings (3 more calls gave no answer). On live work products it is 2 of the 25 replies that parsed: the 21 the measured run kept, and I3's 4.
+  - **A possible cause, untested.** The live review prompts run to about 17,000 to 19,000 input tokens, and the qualification cases may be smaller. If so, the case set does not cover the size of a live review.
+  - **What it costs.** One review in four in I3. Until a stopped unit can be recovered (`REG-D-104` (1)), each one costs its phase.
+- **REMEDY CANDIDATES, UNTESTED.**
+  1. Treat a reply that parses but answers no criterion as needing repair, and send the product's repair prompt once. That is at most one more call per such reply.
+  2. Ask, in the prompt, for one finding per criterion, naming the count.
+  3. Add live-size work-product cases to the qualification case set, such as the measured run's four.
+  - Any of these changes the reviewer path. So it lands before the re-qualification, which then measures it once.
+  - **Predicted red, for candidate 1:** a validator test that feeds this exact reply, and asserts a repair is sent. At HEAD none is sent.
+- **SEARCHED BEFORE FILING.**
+  - The register for *`findings":[]`*, *`empty findings`*, *`answers no criterion`* and *`answered no criterion`*: 0 lines each.
+  - For *`findings array`*: 1 line, `REG-D-090`'s *"a reply with no findings array … INCONCLUSIVE today"*. It is the positive control, and the nearest entry: the same outcome, for a reply with no `findings` key at all.
