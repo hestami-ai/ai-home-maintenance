@@ -819,9 +819,7 @@ test.describe('JAN-EXEC Phase 7 P7-1b — the five-unit rehearsal, in the gate l
 		);
 		expect(decision?.state, 'the abandonment is not the person’s Decision').toMatchObject({
 			status: 'EFFECTIVE',
-			rationale: `The review never concluded; stop here.
-
-${ABANDON_FROM_WAITING_CITATION}`,
+			rationale: `The review never concluded; stop here.\n\n${ABANDON_FROM_WAITING_CITATION}`,
 			authority: { actorId: OPERATOR, actorType: 'HUMAN' }
 		});
 		expect(ids(decision!.state.subjectObjectIds)).toEqual([phase.id, planId, product!.id]);
@@ -957,9 +955,7 @@ ${ABANDON_FROM_WAITING_CITATION}`,
 				selectedOption: option,
 				status: 'EFFECTIVE',
 				// ⭐ `P76F-A` A3 — the person's words, verbatim, then the ruling that authorises the act (RD4).
-				rationale: `${rationale}
-
-${option === 'RERUN_REVIEW' ? RERUN_REVIEW_CITATION : RERUN_WORK_CITATION}`,
+				rationale: `${rationale}\n\n${option === 'RERUN_REVIEW' ? RERUN_REVIEW_CITATION : RERUN_WORK_CITATION}`,
 				authority: { actorId: OPERATOR, actorType: 'HUMAN' }
 			});
 		}

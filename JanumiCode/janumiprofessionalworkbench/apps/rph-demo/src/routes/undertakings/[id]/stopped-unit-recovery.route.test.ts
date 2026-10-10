@@ -385,9 +385,7 @@ describe('⭐ R-1c — re-run the review (RD4, RD5, RD7): no producer runs, the 
 			decisionType: 'REPLAN',
 			selectedOption: 'RERUN_REVIEW',
 			status: 'EFFECTIVE',
-			rationale: `${RATIONALE}
-
-${RERUN_REVIEW_CITATION}`,
+			rationale: `${RATIONALE}\n\n${RERUN_REVIEW_CITATION}`,
 			authority: { actorId: 'local-professional', actorType: 'HUMAN' },
 			subjectObjectIds: [k.pwuId, k.planA, k.art]
 		});
@@ -658,9 +656,7 @@ describe('⭐ R-1c — abandon from waiting: the existing path, and the waiting 
 			decisionType: 'ABANDON',
 			status: 'EFFECTIVE',
 			// ⭐ `P76F-A` A3 — the person's words, then the ruling that authorises abandoning a WAITING unit (RD4).
-			rationale: `Not worth another call.
-
-${ABANDON_FROM_WAITING_CITATION}`,
+			rationale: `Not worth another call.\n\n${ABANDON_FROM_WAITING_CITATION}`,
 			authority: { actorType: 'HUMAN' },
 			subjectObjectIds: [k.pwuId, k.planA, k.art]
 		});

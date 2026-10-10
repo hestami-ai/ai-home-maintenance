@@ -101,6 +101,7 @@ import {
 	RERUN_WORK,
 	rerunReviewRefusal,
 	rerunWorkRefusal,
+	stepActOnAwaitedChoice,
 	stoppedUnitOf,
 	waitingStepOf,
 	waitReasonFor,
@@ -2115,6 +2116,10 @@ export const actions: Actions = {
 	},
 	cancelStep: async ({ request }) => {
 		const f = await request.formData();
+		// ⛔ `P76F-A` A5 — NOT on a step awaiting a person's choice (`stepActOnAwaitedChoice`): cancelled, it would leave the unit
+		// WAITING with no step to choose on. Abandoning the unit cancels it, in the person's Decision's batch.
+		const awaited = stepActOnAwaitedChoice(uiSession(), str(f, 'planId'), str(f, 'stepId'), 'cancel');
+		if (awaited) return fail(400, { error: awaited });
 		return dispatchResult('CancelExecutionStep', str(f, 'planId'), {
 			stepId: str(f, 'stepId'),
 			reason: str(f, 'reason') || 'Operator cancelled the step.'
@@ -2138,6 +2143,10 @@ export const actions: Actions = {
 	},
 	resolveWaitStep: async ({ request }) => {
 		const f = await request.formData();
+		// ⛔ `P76F-A` A5 — NOT on a step awaiting a person's choice (`stepActOnAwaitedChoice`): resumed, it would run with nothing
+		// to run it, the unit still WAITING. A re-run is the way on, and it is the person's Decision.
+		const awaited = stepActOnAwaitedChoice(uiSession(), str(f, 'planId'), str(f, 'stepId'), 'resume');
+		if (awaited) return fail(400, { error: awaited });
 		return dispatchResult('ResolveExecutionStepWait', str(f, 'planId'), {
 			stepId: str(f, 'stepId'),
 			resolution: str(f, 'reason') || 'Operator resolved the wait.'

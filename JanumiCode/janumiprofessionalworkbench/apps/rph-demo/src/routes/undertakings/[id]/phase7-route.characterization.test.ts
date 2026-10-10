@@ -14,9 +14,11 @@
 //         model and no floor, the assurance acts are refused, a hand-completed step leaves the unit as unassurable as
 //         before, and the one way out is Abandon.~~ ⭐ RESTATED WITH P7-6R R-1b (`REG-D-104` (1);
 //         `DESIGN-the-stopped-unit-recovery.md` RD2): the refusal now leaves the unit and its step WAITING for a person,
-//         no step act is admitted on the waiting step, the sign-off acts are refused, and the page offers the person's
-//         three choices; Abandon asks for their rationale and cancels the waiting step. The re-runs themselves are held by
-//         `stopped-unit-recovery.route.test.ts`.
+//         no step act is admitted on the waiting step — Fail, Retry, Start and Complete refused by the engine at the step's
+//         state, and ⭐ Resume and Cancel, which the engine WOULD admit from WAITING, refused by the server on a step awaiting
+//         the person's choice (`P76F-A` A5: until then both were admitted, while this line said none was) — the
+//         sign-off acts are refused, and the page offers the person's three choices; Abandon asks for their rationale and
+//         cancels the waiting step. The re-runs themselves are held by `stopped-unit-recovery.route.test.ts`.
 //   · K2r (`REG-F-520`; `REG-F-489`) — a timed-out command gives a BLOCKING finding and the completion is refused; a
 //         reply that stays malformed after its repair is INCONCLUSIVE.
 //   · K5  (`REG-F-517`) — 33 completed command runs yield 32 evidence objects, the 33rd is in no record, and the step
@@ -385,6 +387,26 @@ describe('⭐ K1 (REG-F-511; R-1, REG-D-104 (1)) — a model-run unit whose revi
 				data?: { error?: string };
 			};
 			expect(answered.data?.error, `${action} on a WAITING step`).toBe(refusedAt(command, needs));
+		}
+		// ⭐ `P76F-A` A5 — AND THE TWO ACTS THE ENGINE WOULD ADMIT FROM WAITING are refused by the SERVER, not only withheld by
+		// the page: Resume would set the step running with nothing to run it, and Cancel would leave the unit waiting with no
+		// step to choose on — either way the unit stays WAITING and its row offers no re-run (`REG-F-466`). ⛔ Until this fix
+		// both were admitted (`phase7-run-report.store.test.ts` resumed one, to complete it by hand). Each refusal names the
+		// person's three choices.
+		for (const [action, verb] of [
+			['resolveWaitStep', 'Resuming'],
+			['cancelStep', 'Cancelling']
+		] as const) {
+			const answered = (await actions[action](
+				actionEvent(action, { planId, stepId }) as never
+			)) as {
+				data?: { error?: string };
+			};
+			expect(answered.data?.error ?? '', `${action} on a step waiting for a person’s choice`).toMatch(
+				new RegExp(
+					`^${verb} the step refused: step ${stepId} waits for a person’s choice .*re-run the review, re-run the work with the findings, or abandon the unit`
+				)
+			);
 		}
 		expect(appendedSince(from), 'a step act recorded something').toEqual([]);
 		expect(seam.devin, 'a step action ran the reviewer').toHaveLength(reviewerCalls);

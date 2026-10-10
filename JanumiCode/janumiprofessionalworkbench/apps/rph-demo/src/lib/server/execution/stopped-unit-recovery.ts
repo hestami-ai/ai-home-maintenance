@@ -451,15 +451,62 @@ export interface RecoveryView {
 	readonly stepId: string;
 }
 
+/**
+ * ⭐⭐ `P76F-A` A5 (RD2; `REG-F-466`) — THE STEP THAT WAITS FOR A PERSON'S CHOICE: the unit's ACTIVE plan's WAITING step, when
+ * the unit's own execution axis is WAITING — or undefined.
+ * ⭑ STRUCTURAL, NEVER THE REASON'S TEXT: the route records the step's wait and the unit's RUNNING→WAITING in ONE batch, at a
+ * floor refusal (`waitForAPerson`), and nothing else moves the unit's axis to WAITING; a hand Wait (`enterWaitStep`) moves
+ * the step alone. So the pair identifies the wait the route recorded — the run report tells the two apart the same way,
+ * by the batch (`run-report-core.ts`, `routesOwnStepAct`) — and no reader keys on `waitReasonFor`'s prose.
+ * ⭑ ONE READING, TWO READERS: the page withholds the step's own controls on it (`recoveryViewOf`, `awaitingChoiceStepIds`),
+ * and the server refuses Resume and Cancel on it (`stepActOnAwaitedChoice`).
+ */
+export function awaitingChoiceStepOf(
+	engine: EngineHandle,
+	pwuId: string
+): ReturnType<typeof waitingStepOf> {
+	// ⭑ The unit's own axis first: the page asks this of every unit, and only a waiting one is worth a scan of the plans.
+	if (getObjectOfType(engine, 'PROFESSIONAL_WORK_UNIT', pwuId)?.executionState !== 'WAITING') return undefined;
+	return waitingStepOf(engine, pwuId);
+}
+
+/**
+ * ⭐⭐ `P76F-A` A5 — WHY RESUME OR CANCEL IS REFUSED ON `stepId` OF `planId`, or null when the step does not await a person's
+ * choice (any other step: a hand Wait's included, which these two acts exist for).
+ * ⛔ BOTH WERE ADMITTED: the engine's machine lets a WAITING step resume or be cancelled, and the page only WITHHELD the two
+ * controls. Resumed, the step runs with nothing to run it; cancelled, the unit stays WAITING with no waiting step — and in
+ * either case `recoveryViewOf` finds no step awaiting a choice, so the row offers no re-run and the unit is stranded
+ * (`phase7-run-report.store.test.ts` resumed one, to complete it by hand).
+ */
+export function stepActOnAwaitedChoice(
+	engine: EngineHandle,
+	planId: string,
+	stepId: string,
+	act: 'resume' | 'cancel'
+): string | null {
+	const pwuId = str(getObject(engine, planId)?.workUnitId);
+	const waiting = pwuId ? awaitingChoiceStepOf(engine, pwuId) : undefined;
+	if (waiting?.planId !== planId || waiting.stepId !== stepId) return null;
+	const outcome =
+		act === 'resume'
+			? 'Resumed, it would run with nothing to run it'
+			: 'Cancelled, it would leave the unit waiting with no step to choose on';
+	return (
+		`${act === 'resume' ? 'Resuming' : 'Cancelling'} the step refused: step ${stepId} waits for a person’s choice after ` +
+		`the review refused work unit ${pwuId}’s work — the wait recorded with the unit’s own (RD2). ${outcome}, and the unit ` +
+		'would stay WAITING with no re-run offered (REG-F-466). Choose on the unit’s row: re-run the review, re-run the work ' +
+		'with the findings, or abandon the unit, as the row offers (REG-D-104 (1)).'
+	);
+}
+
 /** The page's view of a waiting unit — or, when the record cannot say what refused it, Abandon alone, saying why. */
 export function recoveryViewOf(
 	engine: AuthedEngineHandle,
 	pwuId: string
 ): RecoveryView | undefined {
-	// ⭑ The unit's own axis first: the page asks this of every unit, and only a waiting one is worth a scan of the plans.
-	const pwu = getObjectOfType(engine, 'PROFESSIONAL_WORK_UNIT', pwuId);
-	if (pwu?.executionState !== 'WAITING') return undefined;
-	const waiting = waitingStepOf(engine, pwuId);
+	// ⭐ `P76F-A` A5 — the step awaiting the person's choice, read as the server reads it to refuse Resume and Cancel on it
+	// (`awaitingChoiceStepOf`), so the page withholds exactly what the server refuses.
+	const waiting = awaitingChoiceStepOf(engine, pwuId);
 	if (!waiting) return undefined;
 	const stopped = stoppedUnitOf(engine, pwuId);
 	if (!stopped.ok)
