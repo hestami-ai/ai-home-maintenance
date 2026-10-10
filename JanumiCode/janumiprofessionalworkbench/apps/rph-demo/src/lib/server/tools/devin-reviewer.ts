@@ -59,10 +59,14 @@ export function assuranceModel(): string {
  * verif…"*), or nothing. Isolation alone (I1) cannot make it answer. The sponsor chose "Prompt + isolate, test first";
  * the test replayed the measured run's four work-product reviews behind THESE BYTES (design §4c, 4 paid calls): no try
  * called a tool, and three of the four concluded.
- * ⚠ SO THE BYTES ARE THE MEASURED ONES, LINE BREAKS INCLUDED, AND `devin-reviewer.test.ts` PINS THEM to the JSON literal
- * the design records. A change to them is a change to what was tested, and to what the reviewer reads: it MOVES THE
- * REVIEWER FINGERPRINT (`scripts/reviewer-qual/fingerprint.ts` hashes it, its `devinPreamble` seam), so
- * `reviewer:qual:check` then refuses until the selected reviewer is re-qualified behind the new text.
+ * ⚠ SO THE BYTES ARE THE MEASURED ONES, LINE BREAKS INCLUDED, AND `devin-reviewer.test.ts` PINS THEM to the replay's own
+ * prompt files, read back: 355 bytes — the three lines joined by `\n`, then `\n\n---\n`, and the prompt begins on the very
+ * next line. A change to them is a change to what was tested, and to what the reviewer reads: it MOVES THE REVIEWER
+ * FINGERPRINT (`scripts/reviewer-qual/fingerprint.ts` hashes it, its `devinPreamble` seam), so `reviewer:qual:check` then
+ * refuses until the selected reviewer is re-qualified behind the new text.
+ * ⛔ CORRECTED (`P76F-A`, 2026-10-10): the first build ended this `\n\n---\n\n` — one line break more than the replay sent —
+ * from a build note, and its test pinned the note's bytes, so "the measured ones" was false here until this fix. Read
+ * against the replay's eight prompt files, the 355 bytes are identical in all eight.
  * ⭑ devin's ONLY: the agy transport is not changed (design §4b), and nothing here reaches agy's prompt.
  */
 export const DEVIN_REVIEWER_PREAMBLE =
@@ -70,8 +74,7 @@ export const DEVIN_REVIEWER_PREAMBLE =
 	'and you must not try: any tool call ends this session without an answer. Everything you may judge is in the text below.\n' +
 	'Judge only that text, and reply with the single JSON object the instructions below ask for, and nothing else.\n' +
 	'\n' +
-	'---\n' +
-	'\n';
+	'---\n';
 
 /**
  * ⭐⭐ P7-6 I1 (design §2; `REG-F-548`) — THE PROJECT CONFIG THE REVIEWER'S OWN FOLDER HOLDS, `.devin/config.json`: every
@@ -82,10 +85,17 @@ export const DEVIN_REVIEWER_PREAMBLE =
  * It called `exec` and `read`; devin answered *"Permission denied for this tool by a deny rule in the project settings"*,
  * and neither file's token reached the session (`REG-F-548`'s pointer). ⚠ The rules hold; they do not make the reviewer
  * ANSWER — a denied call still ends the session (`REG-F-549`), which is what the preamble above is for.
- * ⚠ Written minified, byte for byte as the design names it, and pinned so by `devin-reviewer.test.ts`.
+ * ⭐ WRITTEN AS THE PAID REPLAY WROTE IT (design §4c; `P76F-A`): `JSON.stringify` of the object, two-space indented, and a
+ * closing line break — 150 bytes, identical in all four of the replay's folders, and pinned so by `devin-reviewer.test.ts`.
+ * ⛔ IT WAS WRITTEN MINIFIED, and that file is not the one devin read when the replay passed the sponsor's gate. The same
+ * JSON to a parser, and very likely to devin's — but "very likely" is a reading nobody drove, so what ships is what was
+ * measured.
  */
-const DENY_ALL_TOOLS_CONFIG =
-	'{"permissions":{"deny":["read","edit","grep","glob","exec","Fetch(*)","mcp__*"]}}';
+const DENY_ALL_TOOLS_CONFIG = `${JSON.stringify(
+	{ permissions: { deny: ['read', 'edit', 'grep', 'glob', 'exec', 'Fetch(*)', 'mcp__*'] } },
+	null,
+	2
+)}\n`;
 
 /**
  * The exec seam — `AgyExec`'s shape (`assurance/agy-cli.ts`), for the same reason: without it the devin branch could be

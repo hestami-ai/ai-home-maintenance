@@ -28,6 +28,8 @@ import type { ObservedToolCallReport } from '@janumipwb/rph-contracts';
 import { MAX_AGY_PROMPT_CHARS } from './agy-cli.js';
 import {
 	createAgyReasoningReviewValidator,
+	NO_CRITERION_ANSWERED,
+	noCriterionCause,
 	OBSERVATION_HEADING,
 	processResultContentBudget,
 	processResultUntrustedSlices,
@@ -1605,6 +1607,103 @@ describe('⭐⭐ P7-6 I5 — a reply that answers NO criterion is repaired ONCE,
 		const { prompts, print } = replying(PROSE, NO_ROWS, CLEAN);
 		await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(SUBJECT, ctx());
 		expect(prompts, 'two calls, never three').toHaveLength(2);
+	});
+});
+
+// ── ⭐⭐ `P76F-A` A2 (`REG-F-552`; PER-9) — THE CAUSE AN I5 RECORD STATES IS THE TRUE ONE, FOR EACH KIND OF REPLY ──────────────
+//
+// ⛔ THE DEFECT: the detail said *"each of its N finding(s) names an id the policy does not declare"* for EVERY reply whose
+// rows answered nothing — also for rows that named no id at all. That is a false cause on the permanent record (E-5 is
+// kept, PER-9), and the two have different remedies: rows with no id are a reply that ignored the row format; rows under
+// unknown ids are a reviewer that invented criteria. Now each kind is named as itself — no list, an empty list, rows naming
+// no id, rows naming undeclared ids, or a mix — and every I5 detail begins with one exported marker, so a reader (the run
+// report) can key on it rather than on prose.
+// ⛔ And the repair's own record said, of ITSELF, *"this reply's judgement is the one the review keeps"* — beside *"the first
+// reply's judgement stands"*. The repair's record now says only the second, which is what the validator does.
+
+/** A parsed reply carrying `findings` as its rows, recommending SATISFIED. */
+const rowsReply = (...findings: unknown[]): string => JSON.stringify({ findings, recommendation: 'SATISFIED' });
+
+describe('⭐⭐ P76F-A A2 — the cause an I5 record states is TRUE for each kind of reply that answers no criterion (REG-F-552, PER-9)', () => {
+	const declared = new Set(SEEDED_REASONING_REVIEW_CRITERIA.map((c) => c.id));
+	const KINDS = [
+		['no findings list', '{"recommendation":"SATISFIED"}', 'it carries no findings list'],
+		['an empty findings list', NO_ROWS, 'its findings list is empty'],
+		[
+			'rows that name no criterion id — no field, a number, a bare string',
+			rowsReply({ failed: false, statement: 'met' }, { criterionId: 5, failed: false }, 'met'),
+			'each of its 3 row(s) names no criterion id'
+		],
+		[
+			'rows that name ids the policy does not declare',
+			rowsReply({ criterionId: 'RR-99-no-such-class', failed: false }),
+			'each of its 1 row(s) names an id the policy does not declare'
+		],
+		[
+			'a mix of the two',
+			rowsReply({ criterionId: 'RR-99-no-such-class' }, { failed: false }, null),
+			'of its 3 rows, 2 name no criterion id and 1 names an id the policy does not declare'
+		]
+	] as const;
+
+	it.each(KINDS)('⭐ the cause, read off the reply as parsed — %s', (_kind, reply, cause) => {
+		expect(noCriterionCause(JSON.parse(reply), declared)).toBe(cause);
+	});
+
+	it.each(KINDS)(
+		'⛔ the RECORD names that cause, after the marker — %s — and never another kind’s',
+		async (_kind, reply, cause) => {
+			const { print } = replying(reply, CLEAN);
+			const exchanges = createExchangeSink();
+			await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+			const [first] = exchanges.drain();
+			expect(first!.disposition, 'arrangement: the reply drew no criterion repair').toBe('repair-requested');
+			const detail = first!.parseOutcome.detail;
+			expect(detail.startsWith(`${NO_CRITERION_ANSWERED} `), `the marker does not open the detail: ${detail}`).toBe(true);
+			expect(detail).toContain(`: ${cause}.`);
+			// ⛔ THE DEFECT, BY NAME: rows that name no id were recorded as naming undeclared ones.
+			if (!cause.includes('does not declare')) expect(detail).not.toMatch(/does not declare/);
+			for (const [, , other] of KINDS)
+				if (other !== cause && !cause.includes(other)) expect(detail, `another kind’s cause: ${other}`).not.toContain(other);
+		}
+	);
+
+	it('⭐ the measured run’s own shape, recorded in full: the marker, the count, the cause, and what follows the one repair', async () => {
+		const { print } = replying(NO_ROWS, CLEAN);
+		const exchanges = createExchangeSink();
+		await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+		expect(exchanges.drain()[0]!.parseOutcome.detail).toBe(
+			`${NO_CRITERION_ANSWERED} It parsed, but none of the policy's ${SEEDED_REASONING_REVIEW_CRITERIA.length} criteria has a row: its findings list is empty. ` +
+				'One repair was requested; if it answers none either, does not parse or gets no reply, this reply’s judgement is the one the review keeps, its recommendation recorded (REG-D-090).'
+		);
+	});
+
+	it('⛔ a repair that answers none again: its record opens with the marker, names ITS OWN cause, and says the FIRST reply’s judgement stands — never that its own is kept', async () => {
+		const { print } = replying(NO_ROWS, rowsReply({ failed: false, statement: 'met' }));
+		const exchanges = createExchangeSink();
+		await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+		const [, repair] = exchanges.drain();
+		expect(repair!.disposition, 'arrangement: the repair was not refused').toBe('rejected');
+		const detail = repair!.parseOutcome.detail;
+		expect(detail.startsWith(`${NO_CRITERION_ANSWERED} `), `the marker does not open the detail: ${detail}`).toBe(true);
+		expect(detail).toContain('The repair parsed, but');
+		expect(detail).toContain(': each of its 1 row(s) names no criterion id.');
+		expect(detail).toContain('The first reply’s judgement stands');
+		// ⛔ THE SECOND DEFECT: the repair's record said its OWN judgement was the one kept.
+		expect(detail).not.toContain('this reply’s judgement is the one the review keeps');
+		expect(detail).not.toContain('One repair was requested');
+	});
+
+	it('⭑ CONTROL — the marker is the I5 records’ alone: a reply that did not parse, its repair request and an accepted reply carry none', async () => {
+		const prose = replying(PROSE, CLEAN);
+		const exchanges = createExchangeSink();
+		await createAgyReasoningReviewValidator({ print: prose.print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+		const details = exchanges.drain().map((e) => [e.disposition, e.parseOutcome.detail.startsWith(NO_CRITERION_ANSWERED)]);
+		expect(details).toEqual([
+			['repair-requested', false],
+			['accepted', false]
+		]);
+		expect(NO_CRITERION_ANSWERED, 'the marker is a sentence a reader can find').toMatch(/^\S.*REG-F-552/);
 	});
 });
 

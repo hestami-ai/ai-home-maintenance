@@ -35,6 +35,13 @@ import {
 	type Phase7PwaDeclaration,
 	type Phase7TypeDeclaration
 } from '../../../scripts/phase7/pwa-content';
+// ⭐ `P76F-A` A3 (RD4) — the citation each choice's Decision carries after the person's words: the server's own constants,
+// from the one module with no imports, so the spec pins the exact rationale written.
+import {
+	ABANDON_FROM_WAITING_CITATION,
+	RERUN_REVIEW_CITATION,
+	RERUN_WORK_CITATION
+} from '../src/lib/server/execution/recovery-authority';
 
 // ⭐⭐ `JAN-EXEC` Phase 7, P7-1b — THE FIVE-UNIT REHEARSAL, IN THE DETERMINISTIC GATE LANE
 // (`docs/_working/DESIGN-the-live-end-to-end-run.md` §6; approved with the plan, `REG-D-102`).
@@ -812,7 +819,7 @@ test.describe('JAN-EXEC Phase 7 P7-1b — the five-unit rehearsal, in the gate l
 		);
 		expect(decision?.state, 'the abandonment is not the person’s Decision').toMatchObject({
 			status: 'EFFECTIVE',
-			rationale: 'The review never concluded; stop here.',
+			rationale: `The review never concluded; stop here.\n\n${ABANDON_FROM_WAITING_CITATION}`,
 			authority: { actorId: OPERATOR, actorType: 'HUMAN' }
 		});
 		expect(ids(decision!.state.subjectObjectIds)).toEqual([phase.id, planId, product!.id]);
@@ -947,7 +954,8 @@ test.describe('JAN-EXEC Phase 7 P7-1b — the five-unit rehearsal, in the gate l
 			expect(decision?.state, 'RD4: the re-run is not the person’s Decision').toMatchObject({
 				selectedOption: option,
 				status: 'EFFECTIVE',
-				rationale,
+				// ⭐ `P76F-A` A3 — the person's words, verbatim, then the ruling that authorises the act (RD4).
+				rationale: `${rationale}\n\n${option === 'RERUN_REVIEW' ? RERUN_REVIEW_CITATION : RERUN_WORK_CITATION}`,
 				authority: { actorId: OPERATOR, actorType: 'HUMAN' }
 			});
 		}

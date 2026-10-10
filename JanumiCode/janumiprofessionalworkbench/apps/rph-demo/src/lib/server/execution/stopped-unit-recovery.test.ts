@@ -21,7 +21,9 @@ import {
 } from './stopped-unit-recovery.js';
 
 describe('⭐ RD3 — a refusal is sorted by the floor’s own classification', () => {
-	it('⛔ each of the classifier’s actions, sorted: an operational one did not conclude, save the escalation; a subject finding concluded', () => {
+	// ⭐ `P76F-A` A4: and save the two only a different or re-qualified reviewer can fix — a substituted model, a reviewer not
+	// independent of the producer — which offer NEITHER re-run: each re-run is reviewed by that same reviewer.
+	it('⛔ each of the classifier’s actions, sorted: an operational one did not conclude, save the escalation and the two the reviewer must change for; a subject finding concluded', () => {
 		const actions: readonly FloorRemediationAction[] = [
 			'RETRY_OR_CONFIGURE_REVIEWER',
 			'REQUALIFY_OR_RESELECT_REVIEWER',
@@ -32,8 +34,8 @@ describe('⭐ RD3 — a refusal is sorted by the floor’s own classification', 
 		];
 		expect(actions.map((a) => [a, refusalKindOf(a)])).toEqual([
 			['RETRY_OR_CONFIGURE_REVIEWER', 'NOT_CONCLUDED'],
-			['REQUALIFY_OR_RESELECT_REVIEWER', 'NOT_CONCLUDED'],
-			['CHANGE_REVIEWER', 'NOT_CONCLUDED'],
+			['REQUALIFY_OR_RESELECT_REVIEWER', 'REVIEWER_MUST_CHANGE'],
+			['CHANGE_REVIEWER', 'REVIEWER_MUST_CHANGE'],
 			['ESCALATE_REVIEW', 'ESCALATED'],
 			['REFINE_SUBJECT', 'CONCLUDED'],
 			['RESOLVE_OTHER_FLOOR_FINDINGS', 'CONCLUDED']
@@ -46,6 +48,10 @@ describe('⭐ RD3 — a refusal is sorted by the floor’s own classification', 
 		expect(strictestKind(['ESCALATED', 'CONCLUDED'])).toBe('CONCLUDED');
 		expect(strictestKind(['NOT_CONCLUDED', 'ESCALATED'])).toBe('ESCALATED');
 		expect(strictestKind(['NOT_CONCLUDED', 'NOT_CONCLUDED'])).toBe('NOT_CONCLUDED');
+		// ⭐ `P76F-A` A4 — and a reviewer that must change outranks them all: any re-run would be reviewed by it again.
+		expect(strictestKind(['CONCLUDED', 'REVIEWER_MUST_CHANGE'])).toBe('REVIEWER_MUST_CHANGE');
+		expect(strictestKind(['REVIEWER_MUST_CHANGE', 'ESCALATED'])).toBe('REVIEWER_MUST_CHANGE');
+		expect(strictestKind(['NOT_CONCLUDED', 'REVIEWER_MUST_CHANGE'])).toBe('REVIEWER_MUST_CHANGE');
 		expect(strictestKind([])).toBe('NOT_CONCLUDED');
 	});
 

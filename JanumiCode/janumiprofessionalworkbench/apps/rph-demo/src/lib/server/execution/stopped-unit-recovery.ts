@@ -12,6 +12,10 @@
 // `../floor.ts`), and this module reuses that sort rather than restating it:
 //   · the review DID NOT CONCLUDE (an operational action other than an escalation: a validator or transport failure, an
 //     INCONCLUSIVE review, a reply answering no criterion — `REG-F-552`) → re-run the review, re-run the work, abandon;
+//   · ⭐ `P76F-A` A4 — the review was refused for WHO reviewed: a substituted model, or a reviewer not independent of the
+//     producer (`REVIEWER_MUST_CHANGE`) → abandon ALONE. Each re-run is reviewed by that same reviewer, so the unit waits
+//     for the reviewer to change, or is abandoned. ⚠ A departure from RD3's table, which files both under "did not
+//     conclude": the classifier's own guidance says a retry "does not fix this".
 //   · the review CONCLUDED AGAINST THE WORK (`REFINE_SUBJECT`, or a deterministic floor finding beside a review that
 //     passed, `RESOLVE_OTHER_FLOOR_FINDINGS`) → re-run the work with the findings, abandon;
 //   · the review ESCALATED → re-run the work with the subject findings, abandon. ⛔ The escalation itself is never fed
@@ -89,20 +93,53 @@ export function attemptStepOf(attemptKey: string): string {
 	return attemptKey.slice(0, attemptKey.lastIndexOf('#'));
 }
 
-/** How one refusal reads to RD3: the review did not conclude, concluded against the work, or escalated. */
-export type RefusalKind = 'NOT_CONCLUDED' | 'CONCLUDED' | 'ESCALATED';
+/**
+ * How one refusal reads to RD3: the review did not conclude, concluded against the work, or escalated — ⭐ `P76F-A` A4: or
+ * was refused for WHO reviewed, which only a different or re-qualified reviewer can fix (`REVIEWER_MUST_CHANGE`).
+ */
+export type RefusalKind = 'NOT_CONCLUDED' | 'CONCLUDED' | 'ESCALATED' | 'REVIEWER_MUST_CHANGE';
+
+/**
+ * ⭐⭐ `P76F-A` A4 — THE TWO REFUSALS ONLY A DIFFERENT OR RE-QUALIFIED REVIEWER CAN FIX, each with why, in the classifier's own
+ * terms (`../floor.ts`, `classifyFloorRemediation`):
+ *   · `REQUALIFY_OR_RESELECT_REVIEWER` — the reviewing tool reported that a model other than the configured and selected one
+ *     answered (`JAN-SELREV` D6). Its guidance: *"Retrying or reconfiguring the same selection does not fix this: another
+ *     call is billed and may be served the same way."*
+ *   · `CHANGE_REVIEWER` — the review was not independent of the producer (ASR-13). The same reviewer against the same
+ *     producer is refused the same way; its guidance: *"Select a permitted reviewer/model/provider that satisfies the
+ *     policy independence rule"*.
+ * ⛔ EACH WAS SORTED "DID NOT CONCLUDE" — both are operational (`isOperationalRemediation`) — so a re-review was offered and
+ * the paid lane's rule pressed it (`REG-D-105` (4)): another billed call to the reviewer the refusal had just refused.
+ * Neither re-run is offered for them now: a re-run of the WORK is reviewed by that same reviewer too. The unit waits for
+ * the reviewer to change, or is abandoned.
+ * ⚠ READ FROM THE RECORD, LIKE EVERY OFFER HERE: a reviewer re-selected after the refusal does not re-open the offer — the
+ * recorded refusal still names the one refused, and nothing recorded says which reviewer would run now. Disclosed (the
+ * builder's report); RD3 has no row for it.
+ */
+const REVIEWER_MUST_CHANGE: Readonly<Partial<Record<FloorRemediationAction, string>>> = {
+	REQUALIFY_OR_RESELECT_REVIEWER:
+		'the reviewing tool reported that a model other than the configured and selected one answered, so the review was refused (REQUALIFY_OR_RESELECT_REVIEWER)',
+	CHANGE_REVIEWER: 'the review was not independent of the producer (CHANGE_REVIEWER)'
+};
 
 /**
  * ⭐ RD3, FOR ONE REFUSED SUBJECT — the floor's own sort (`isOperationalRemediation`), with the escalation taken out of the
- * operational side: it is a review that CONCLUDED (it named a human), and re-reviewing it is `REG-F-474`'s defect.
+ * operational side: it is a review that CONCLUDED (it named a human), and re-reviewing it is `REG-F-474`'s defect. ⭐ And,
+ * `P76F-A` A4, the two refusals of WHO reviewed taken out too (`REVIEWER_MUST_CHANGE`): no re-run fixes them.
  */
 export function refusalKindOf(action: FloorRemediationAction): RefusalKind {
 	if (action === 'ESCALATE_REVIEW') return 'ESCALATED';
+	if (REVIEWER_MUST_CHANGE[action] !== undefined) return 'REVIEWER_MUST_CHANGE';
 	return isOperationalRemediation(action) ? 'NOT_CONCLUDED' : 'CONCLUDED';
 }
 
-/** ⭐ RD3, ACROSS SUBJECTS — the strictest: one concluded refusal makes the stop concluded, then one escalation. */
+/**
+ * ⭐ RD3, ACROSS SUBJECTS — the strictest: a reviewer that must change first (`P76F-A` A4: any re-run is reviewed by it
+ * again, so one such subject withholds both re-runs), then one concluded refusal makes the stop concluded, then one
+ * escalation.
+ */
 export function strictestKind(kinds: readonly RefusalKind[]): RefusalKind {
+	if (kinds.includes('REVIEWER_MUST_CHANGE')) return 'REVIEWER_MUST_CHANGE';
 	if (kinds.includes('CONCLUDED')) return 'CONCLUDED';
 	if (kinds.includes('ESCALATED')) return 'ESCALATED';
 	return 'NOT_CONCLUDED';
@@ -310,7 +347,9 @@ export function stoppedUnitOf(
 			offers: {
 				// ⛔ `REG-D-105` (3): only a review that did not conclude may be re-run — and only when one was refused.
 				rerunReview: kind === 'NOT_CONCLUDED' && refusals.length > 0,
-				rerunWork: true,
+				// ⛔ `P76F-A` A4: and the work, after any refusal SAVE one only a different reviewer can fix — the new work would be
+				// reviewed by the reviewer just refused.
+				rerunWork: kind !== 'REVIEWER_MUST_CHANGE',
 				abandon: true
 			},
 			findings,
@@ -354,9 +393,31 @@ export function waitReasonFor(
 	);
 }
 
+/**
+ * ⭐⭐ `P76F-A` A4 — WHY NEITHER RE-RUN IS OFFERED, for a stop only a different or re-qualified reviewer can fix: each such
+ * refused subject with the classifier's reason, then the remedy, which is the reviewer's, never a re-run's. Null for any
+ * other stop. ⭑ ONE TEXT, read by the page (`RecoveryView.rerunsWithheld`) and by the server's refusal of each re-run.
+ */
+export function reviewerMustChange(unit: StoppedUnit): string | null {
+	if (unit.kind !== 'REVIEWER_MUST_CHANGE') return null;
+	const why = unit.refusals.flatMap((r) => {
+		const reason = REVIEWER_MUST_CHANGE[r.action];
+		return reason === undefined ? [] : [`${r.subjectId}: ${reason}`];
+	});
+	return (
+		`the reviewer must change before anything is re-run (${why.join('; ')}). A re-run of the review, or of the work, is ` +
+		'reviewed by that same reviewer: another billed call, refused the same way, so re-running does not fix this. The unit ' +
+		'waits until the reviewer is re-qualified or re-selected (REG-D-084, REG-D-086), or one independent of the producer is ' +
+		'selected — or it is abandoned.'
+	);
+}
+
 /** ⛔ `REG-D-105` (3) — why a re-review is refused for this stop, or null when it is offered. */
 export function rerunReviewRefusal(unit: StoppedUnit): string | null {
 	if (unit.offers.rerunReview) return null;
+	// ⭐ `P76F-A` A4 — first: a reviewer that must change refuses the re-review whatever else was refused.
+	const mustChange = reviewerMustChange(unit);
+	if (mustChange) return mustChange;
 	if (unit.refusals.length === 0)
 		return 'no review of the refused attempt is refused on the record, so there is nothing to re-review.';
 	return unit.kind === 'ESCALATED'
@@ -364,10 +425,21 @@ export function rerunReviewRefusal(unit: StoppedUnit): string | null {
 		: `the review concluded against the work (${describeRefusals(unit.refusals)}); the floor reads the latest assessment, so a second review of the same work product could clear a reasoned refusal. Re-run the work with the findings, or abandon the unit (REG-D-105 (3)).`;
 }
 
+/**
+ * ⭐ `P76F-A` A4 — why a re-run of the work is refused for this stop, or null when it is offered: only a stop the reviewer
+ * must change for withholds it (`reviewerMustChange`).
+ */
+export function rerunWorkRefusal(unit: StoppedUnit): string | null {
+	if (unit.offers.rerunWork) return null;
+	return reviewerMustChange(unit) ?? 'a re-run of the work is not offered for this stop.';
+}
+
 /** What the Undertaking page shows of a waiting unit, and offers (R-1d). Serializable. */
 export interface RecoveryView {
 	readonly kind: RefusalKind | 'UNREADABLE';
 	readonly refusal: string;
+	/** ⭐ `P76F-A` A4 — why NEITHER re-run is offered, when only a different reviewer can fix the refusal; else null. */
+	readonly rerunsWithheld: string | null;
 	readonly offers: {
 		readonly rerunReview: boolean;
 		readonly rerunWork: boolean;
@@ -379,21 +451,69 @@ export interface RecoveryView {
 	readonly stepId: string;
 }
 
+/**
+ * ⭐⭐ `P76F-A` A5 (RD2; `REG-F-466`) — THE STEP THAT WAITS FOR A PERSON'S CHOICE: the unit's ACTIVE plan's WAITING step, when
+ * the unit's own execution axis is WAITING — or undefined.
+ * ⭑ STRUCTURAL, NEVER THE REASON'S TEXT: the route records the step's wait and the unit's RUNNING→WAITING in ONE batch, at a
+ * floor refusal (`waitForAPerson`), and nothing else moves the unit's axis to WAITING; a hand Wait (`enterWaitStep`) moves
+ * the step alone. So the pair identifies the wait the route recorded — the run report tells the two apart the same way,
+ * by the batch (`run-report-core.ts`, `routesOwnStepAct`) — and no reader keys on `waitReasonFor`'s prose.
+ * ⭑ ONE READING, TWO READERS: the page withholds the step's own controls on it (`recoveryViewOf`, `awaitingChoiceStepIds`),
+ * and the server refuses Resume and Cancel on it (`stepActOnAwaitedChoice`).
+ */
+export function awaitingChoiceStepOf(
+	engine: EngineHandle,
+	pwuId: string
+): ReturnType<typeof waitingStepOf> {
+	// ⭑ The unit's own axis first: the page asks this of every unit, and only a waiting one is worth a scan of the plans.
+	if (getObjectOfType(engine, 'PROFESSIONAL_WORK_UNIT', pwuId)?.executionState !== 'WAITING') return undefined;
+	return waitingStepOf(engine, pwuId);
+}
+
+/**
+ * ⭐⭐ `P76F-A` A5 — WHY RESUME OR CANCEL IS REFUSED ON `stepId` OF `planId`, or null when the step does not await a person's
+ * choice (any other step: a hand Wait's included, which these two acts exist for).
+ * ⛔ BOTH WERE ADMITTED: the engine's machine lets a WAITING step resume or be cancelled, and the page only WITHHELD the two
+ * controls. Resumed, the step runs with nothing to run it; cancelled, the unit stays WAITING with no waiting step — and in
+ * either case `recoveryViewOf` finds no step awaiting a choice, so the row offers no re-run and the unit is stranded
+ * (`phase7-run-report.store.test.ts` resumed one, to complete it by hand).
+ */
+export function stepActOnAwaitedChoice(
+	engine: EngineHandle,
+	planId: string,
+	stepId: string,
+	act: 'resume' | 'cancel'
+): string | null {
+	const pwuId = str(getObject(engine, planId)?.workUnitId);
+	const waiting = pwuId ? awaitingChoiceStepOf(engine, pwuId) : undefined;
+	if (waiting?.planId !== planId || waiting.stepId !== stepId) return null;
+	const outcome =
+		act === 'resume'
+			? 'Resumed, it would run with nothing to run it'
+			: 'Cancelled, it would leave the unit waiting with no step to choose on';
+	return (
+		`${act === 'resume' ? 'Resuming' : 'Cancelling'} the step refused: step ${stepId} waits for a person’s choice after ` +
+		`the review refused work unit ${pwuId}’s work — the wait recorded with the unit’s own (RD2). ${outcome}, and the unit ` +
+		'would stay WAITING with no re-run offered (REG-F-466). Choose on the unit’s row: re-run the review, re-run the work ' +
+		'with the findings, or abandon the unit, as the row offers (REG-D-104 (1)).'
+	);
+}
+
 /** The page's view of a waiting unit — or, when the record cannot say what refused it, Abandon alone, saying why. */
 export function recoveryViewOf(
 	engine: AuthedEngineHandle,
 	pwuId: string
 ): RecoveryView | undefined {
-	// ⭑ The unit's own axis first: the page asks this of every unit, and only a waiting one is worth a scan of the plans.
-	const pwu = getObjectOfType(engine, 'PROFESSIONAL_WORK_UNIT', pwuId);
-	if (pwu?.executionState !== 'WAITING') return undefined;
-	const waiting = waitingStepOf(engine, pwuId);
+	// ⭐ `P76F-A` A5 — the step awaiting the person's choice, read as the server reads it to refuse Resume and Cancel on it
+	// (`awaitingChoiceStepOf`), so the page withholds exactly what the server refuses.
+	const waiting = awaitingChoiceStepOf(engine, pwuId);
 	if (!waiting) return undefined;
 	const stopped = stoppedUnitOf(engine, pwuId);
 	if (!stopped.ok)
 		return {
 			kind: 'UNREADABLE',
 			refusal: stopped.refusedBecause,
+			rerunsWithheld: null,
 			offers: { rerunReview: false, rerunWork: false, abandon: true },
 			findings: 0,
 			reruns: 0,
@@ -403,6 +523,7 @@ export function recoveryViewOf(
 	return {
 		kind: u.kind,
 		refusal: describeRefusals(u.refusals),
+		rerunsWithheld: reviewerMustChange(u),
 		offers: u.offers,
 		findings: u.findings.length,
 		reruns: u.reruns,

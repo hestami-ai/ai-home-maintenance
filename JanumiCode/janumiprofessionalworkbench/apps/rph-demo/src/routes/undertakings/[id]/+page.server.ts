@@ -100,6 +100,8 @@ import {
 	RERUN_REVIEW,
 	RERUN_WORK,
 	rerunReviewRefusal,
+	rerunWorkRefusal,
+	stepActOnAwaitedChoice,
 	stoppedUnitOf,
 	waitingStepOf,
 	waitReasonFor,
@@ -107,6 +109,13 @@ import {
 	type RecoveryView,
 	type StoppedUnit
 } from '$lib/server/execution/stopped-unit-recovery';
+// ⭐ `P76F-A` A3 (RD4) — what authorises each of the person's choices, cited after their own words in its Decision.
+import {
+	ABANDON_FROM_WAITING_CITATION,
+	decisionRationale,
+	RERUN_REVIEW_CITATION,
+	RERUN_WORK_CITATION
+} from '$lib/server/execution/recovery-authority';
 import { runProcessResultFloor } from '$lib/server/execution/process-result-floor';
 import type { ObservedProcessRun } from '$lib/server/tools/process-run-observer';
 // ⭐ `JAN-NOANS`: the `resolveJudgeModel` import is GONE from this route, and its absence is the check. It was
@@ -999,10 +1008,14 @@ function waitForAPerson(
 
 /**
  * ⭐ P7-6R RD4 — THE PERSON'S CHOICE, AS A DECISION, proposed and approved in the batch it authorises: `authority` the
- * session's own HUMAN actor (`proposeDecision` refuses any other, `REG-F-014`); the rationale they typed; the subjects the
- * refused unit, plan, work product and evidence; the observations considered, the refusing assessments'. ⭑ That is canon's
- * control-action record (RPH-DOC-002:2242-2249), each field a field. ⚠ No policy object authorises a person's re-run, and
- * none is invented: the authority cited is the sponsor's ruling, in the selected option's reading (`REG-D-104` (1)).
+ * session's own HUMAN actor (`proposeDecision` refuses any other, `REG-F-014`); the rationale the caller composes — the
+ * person's typed text, verbatim, then the act's citation (`decisionRationale`); the subjects the refused unit, plan, work
+ * product and evidence; the observations considered, the refusing assessments'. ⭑ That is canon's control-action record
+ * (RPH-DOC-002:2242-2249), each field a field.
+ * ⚠ No policy object authorises a person's re-run, and none is invented: the authority is the sponsor's ruling.
+ * ⛔ `P76F-A` A3: the first build said here that the ruling was "cited … in the selected option's reading" — and the
+ * Decision cited nothing: its rationale was the typed text alone. RD4 puts the ruling in the rationale's template, and
+ * the record says no policy object exists; each call below now passes its act's citation (`recovery-authority.ts`).
  */
 function personsDecision(
 	decisionId: string,
@@ -2103,6 +2116,10 @@ export const actions: Actions = {
 	},
 	cancelStep: async ({ request }) => {
 		const f = await request.formData();
+		// ⛔ `P76F-A` A5 — NOT on a step awaiting a person's choice (`stepActOnAwaitedChoice`): cancelled, it would leave the unit
+		// WAITING with no step to choose on. Abandoning the unit cancels it, in the person's Decision's batch.
+		const awaited = stepActOnAwaitedChoice(uiSession(), str(f, 'planId'), str(f, 'stepId'), 'cancel');
+		if (awaited) return fail(400, { error: awaited });
 		return dispatchResult('CancelExecutionStep', str(f, 'planId'), {
 			stepId: str(f, 'stepId'),
 			reason: str(f, 'reason') || 'Operator cancelled the step.'
@@ -2126,6 +2143,10 @@ export const actions: Actions = {
 	},
 	resolveWaitStep: async ({ request }) => {
 		const f = await request.formData();
+		// ⛔ `P76F-A` A5 — NOT on a step awaiting a person's choice (`stepActOnAwaitedChoice`): resumed, it would run with nothing
+		// to run it, the unit still WAITING. A re-run is the way on, and it is the person's Decision.
+		const awaited = stepActOnAwaitedChoice(uiSession(), str(f, 'planId'), str(f, 'stepId'), 'resume');
+		if (awaited) return fail(400, { error: awaited });
 		return dispatchResult('ResolveExecutionStepWait', str(f, 'planId'), {
 			stepId: str(f, 'stepId'),
 			resolution: str(f, 'reason') || 'Operator resolved the wait.'
@@ -2557,11 +2578,19 @@ export const actions: Actions = {
 	//
 	// A person's choice on a unit waiting after a review that DID NOT CONCLUDE: the floors run again over the refused
 	// attempt's recorded work product and evidence, and NO PRODUCER RUNS. The new attempt is plan B's one step, an
-	// `ASSURANCE_INVOCATION`, whose input is that work product; B completes NAMING it, and the gate judges the new
-	// assessments, which are later in time than the refused ones and so the ones it reads (RD10, `REG-F-433`).
+	// `ASSURANCE_INVOCATION`, whose input is that work product; B completes NAMING it, and the FLOOR GATE judges the new
+	// assessments: it reads the latest per policy by `updatedAt` (`latestAssessmentByPolicy`), and they are recorded
+	// later than the refused ones.
+	// ⚠ `P76F-A` A6 — THAT HOLDS FOR THE GATE ALONE. ~~"later in time … and so the ones it reads (RD10,
+	// `REG-F-433`)"~~: RD10 struck its line that a re-review "is later in time, so it does not tie". `REG-F-433`'s reader
+	// (`loadReviewerAnswer`) sorts by `attemptOrdinal` alone, a re-review's first try is ordinal 1 like the original's,
+	// so the two TIE and the OLDER answer is returned; and the run report pairs a review with its answers by subject.
+	// Both are B7's, `REG-F-433`'s join key.
 	// ⛔ REFUSED AFTER A REVIEW THAT CONCLUDED — against the work, or escalated — BY THE SERVER, not only by the page
 	// (`REG-D-105` (3); `rerunReviewRefusal`): the latest assessment wins, so a re-review run until one said SATISFIED would
 	// clear a reasoned refusal.
+	// ⛔ `P76F-A` A4 — AND AFTER A REFUSAL ONLY A DIFFERENT OR RE-QUALIFIED REVIEWER CAN FIX (a substituted model, a reviewer
+	// not independent of the producer): the same reviewer would be billed again, and refused the same way.
 	// ⛔ AND REFUSED, WITH NOTHING DISPATCHED AND THE UNIT STILL WAITING, WHEN ANY PART THE FLOOR NEEDS CANNOT BE REBUILT FROM
 	// THE RECORD (RD7): the producing prompt, the rationale, the producer's identity, each command's run. It never reviews a
 	// partial reconstruction.
@@ -2605,7 +2634,8 @@ export const actions: Actions = {
 				RERUN_REVIEW,
 				decisionSubjects(s),
 				s.consideredObservationIds,
-				rationale
+				// ⭐ `P76F-A` A3 (RD4) — the person's words, then the ruling that authorises a re-run of the review.
+				decisionRationale(rationale, RERUN_REVIEW_CITATION)
 			),
 			...planRevision(s, decisionId, planB, {
 				id: stepB,
@@ -2729,6 +2759,11 @@ export const actions: Actions = {
 		const stopped = stoppedUnitOf(uiSession(), pwuId);
 		if (!stopped.ok) return fail(400, { error: `Re-running the work refused: ${stopped.refusedBecause}` });
 		const s = stopped.unit;
+		// ⛔ `P76F-A` A4 — REFUSED BY THE SERVER, not only withheld by the page, after a refusal only a different or re-qualified
+		// reviewer can fix (`rerunWorkRefusal`): the new work would be reviewed by the reviewer just refused — another billed
+		// call, refused the same way. Nothing is dispatched, and the unit keeps waiting.
+		const workNotOffered = rerunWorkRefusal(s);
+		if (workNotOffered) return fail(400, { error: `Re-running the work refused: ${workNotOffered}` });
 		const { pwu, pwuType, pwuTypeId, typeFacts } = unitTypeOf(pwuId);
 		if (pwuType?.workDischarge !== 'MODEL')
 			return fail(400, {
@@ -2756,7 +2791,8 @@ export const actions: Actions = {
 				RERUN_WORK,
 				decisionSubjects(s),
 				s.consideredObservationIds,
-				rationale
+				// ⭐ `P76F-A` A3 (RD4) — the person's words, then the ruling that authorises a re-run of the work.
+				decisionRationale(rationale, RERUN_WORK_CITATION)
 			),
 			...planRevision(s, decisionId, planB, {
 				id: stepB,
@@ -2820,7 +2856,11 @@ export const actions: Actions = {
 				: undefined;
 		const typed = str(form, 'reason');
 		if (waiting && !typed) return fail(400, { error: `Abandonment refused: ${RATIONALE_REQUIRED}` });
-		const reason = typed || 'The work is no longer required.';
+		// ⭐ `P76F-A` A3 (RD4) — abandoning a WAITING unit is the person's recovery choice: their words, verbatim, then the ruling
+		// that authorises it. ⭑ Any other unit abandons as before (S-1): its rationale is what was given, or the default.
+		const reason = waiting
+			? decisionRationale(typed, ABANDON_FROM_WAITING_CITATION)
+			: typed || 'The work is no longer required.';
 		const stopped = waiting ? stoppedUnitOf(uiSession(), pwuId) : undefined;
 		const subjects = stopped?.ok
 			? decisionSubjects(stopped.unit)

@@ -489,7 +489,7 @@ beforeAll(async () => {
 		expect(refused.error, 'arrangement: the command review did not refuse the completion').toMatch(
 			/the command evidence did not pass its own floor/
 		);
-		// … and the operator completes its step by hand, naming its one work product: the act P7-3 forbids.
+		// … and the operator tries to complete its step by hand, naming its one work product: the act P7-3 forbids.
 		const plan = listByType(getEngine(), 'EXECUTION_PLAN').find(
 			(p) => p.state.workUnitId === unitId(implementation)
 		)!;
@@ -499,22 +499,26 @@ beforeAll(async () => {
 		const steps = plan.state.steps as { id: string }[];
 		// ⭐ `JAN-EXEC` P7-6R R-1b (RD2): the refusal now leaves the step WAITING for a person's choice, and Complete needs a
 		// RUNNING step — so the forbidden act takes two posts the page offers neither of: Resume, then Complete.
+		// ⛔ `P76F-A` A5: AND THE SERVER REFUSES THE FIRST — a step awaiting a person's choice is not resumed by hand
+		// (`stepActOnAwaitedChoice`) — so the completion that needed it is refused by the engine at the step's state. Both POSTs
+		// stay in the lane's log, which is how the audit finds a refused act; the hand completion naming one output is no longer
+		// in the store, because no page act can now make one on a refused unit (its shape stays held synthetically,
+		// `verif/phase7-run-report.test.ts`).
 		const resumed = await press('resolveWaitStep', implementation, {
 			planId: plan.id,
 			stepId: steps[0]!.id
 		});
-		expect(resumed.type, `arrangement: the waiting step was not resumed: ${resumed.error}`).toBe(
-			'success'
+		expect(resumed.type, 'arrangement: the server resumed a step awaiting a person’s choice').toBe('failure');
+		expect(resumed.error).toMatch(
+			/^Resuming the step refused: step \S+ waits for a person’s choice .*re-run the review, re-run the work with the findings, or abandon the unit/
 		);
 		const byHand = await press('completeStep', implementation, {
 			planId: plan.id,
 			stepId: steps[0]!.id,
 			outputArtifactId: product.id
 		});
-		expect(byHand, 'arrangement: the hand completion naming one output was refused').toEqual({
-			type: 'success',
-			error: ''
-		});
+		expect(byHand.type, 'arrangement: the hand completion was admitted on a step still WAITING').toBe('failure');
+		expect(byHand.error).toMatch(/^CompleteExecutionStep rejected — RPH_ILLEGAL_STATE_TRANSITION: .* but it is WAITING\./);
 		leaveWhatThePhaseLeft(
 			{ 'src/wordfreq.js': 'export {};\n', 'test/unit/wordfreq.test.js': '// unit tests\n' },
 			['impl-1', 'impl-2']
@@ -711,19 +715,17 @@ describe('JAN-EXEC P7-2 D9 — the run report over stores the product wrote, rea
 		expect(seam.devin).toHaveLength(report().reviewerCalls.recorded);
 	});
 
-	it('⛔ the audit names the hand completion that names ONE output — and none of Begin & Execute’s own three', () => {
+	// ⛔ RESTATED BY `P76F-A` A5: this case pinned the hand completion that named ONE output, made after a hand Resume of the
+	// waiting step. The server now refuses that Resume, so the completion is refused too and no hand completion is in the
+	// store: the audit finds both acts from the lane's own log, each POSTed once and refused (its synthetic twin pins the
+	// completion's shape, `verif/phase7-run-report.test.ts`).
+	it('⛔ the audit names the refused hand acts from the lane’s log — the Resume the server refused, the completion that could not follow — and none of Begin & Execute’s own three', () => {
 		const acts = report().audit.acts;
 		const complete = acts.find((a) => a.act === 'completeStep')!;
-		expect(complete.found.map((f) => [f.unit, f.why])).toEqual([
-			[
-				'implementation',
-				expect.stringMatching(
-					/^executed by a HUMAN actor, naming 1 output\(s\), without the same-batch execution hop/
-				)
-			]
-		]);
+		expect(complete.found, 'a hand completion reached the store').toEqual([]);
 		expect(complete.posted).toBe(1);
-		// ⭐ P7-6R R-1b: the forbidden completion now needs the waiting step Resumed first, a hand act of its own; the two
+		expect(acts.find((a) => a.act === 'resolveWaitStep')).toMatchObject({ found: [], posted: 1, verdict: 'FOUND' });
+		// ⭐ P7-6R R-1b: the forbidden completion needs the waiting step Resumed first, a hand act of its own; the two
 		// waits Begin & Execute recorded at its refusals (design, implementation) are the route's, and are not found.
 		expect(acts.filter((a) => a.verdict === 'FOUND').map((a) => a.act)).toEqual([
 			'completeStep',
@@ -737,7 +739,9 @@ describe('JAN-EXEC P7-2 D9 — the run report over stores the product wrote, rea
 		]);
 	});
 
-	it('⭐ the matrix reads the run as it went: the stops broke, the 33rd run broke stage 4, the hand completion broke the floor', () => {
+	// ⛔ RESTATED BY `P76F-A` A5: it read the implementation phase's floor as BROKEN by the hand completion. That completion is
+	// now refused (the Resume before it is), so the phase stays where its floor refused it, which stage 5a reads as intended.
+	it('⭐ the matrix reads the run as it went: the stops broke, the 33rd run broke stage 4, and the refused implementation phase’s floor held — no hand completion got past it', () => {
 		expect(at('1', 'whole run')?.value).toBe('not measured in this half');
 		expect(at('2', 'whole run')?.value).toBe('as intended');
 		expect([at('7', 'whole run')?.value, at('7', 'whole run')?.registerIds]).toEqual([
@@ -762,7 +766,10 @@ describe('JAN-EXEC P7-2 D9 — the run report over stores the product wrote, rea
 			null,
 			'P7-4f, the adjudication table'
 		]);
-		expect(at('5a', 'implementation')?.value).toBe('broke');
+		expect([at('5a', 'implementation')?.value, at('5a', 'implementation')?.basis[0]]).toEqual([
+			'as intended',
+			'the step did not complete, and the floor refused it'
+		]);
 		expect(PHASES.map((p) => at('5b', p)?.value)).toEqual([
 			'vacuous by construction',
 			'not reached',

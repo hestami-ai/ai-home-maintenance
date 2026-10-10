@@ -118,17 +118,26 @@ describe('JAN-TOOLSUITE — the reviewing model is configured, never pinned', ()
 // exec seam, where a real devin is never started: what folder devin is given, what that folder holds, the argv, and
 // the bytes of the prompt file.
 
-/** The deny-all project config, byte for byte as design §2 I1 names it. */
-const DENY_ALL = '{"permissions":{"deny":["read","edit","grep","glob","exec","Fetch(*)","mcp__*"]}}';
+/**
+ * ⭐ THE DENY-ALL PROJECT CONFIG, AS THE PAID REPLAY WROTE IT (design §2 I1, §4c) — read back byte for byte from the
+ * replay's own `.devin/config.json`, identical in all four of its folders: the seven names, two-space indented, one per
+ * line, and a closing line break (150 bytes). ⛔ NOT the minified line the first build pinned (`P76F-A`): that was the
+ * design's list written out by hand, never the file devin read when the deny rules were driven to hold.
+ */
+const DENY_ALL =
+	'{\n  "permissions": {\n    "deny": [\n      "read",\n      "edit",\n      "grep",\n      "glob",\n      "exec",\n      "Fetch(*)",\n      "mcp__*"\n    ]\n  }\n}\n';
 
 /**
- * ⭐ THE PREAMBLE'S BYTES, AS THE PAID REPLAY MEASURED THEM (`REG-D-104` (2); design §4c) — the design's JSON string
- * literal, written here as ONE string literal with the same escapes (each `\n` a line break), so a change of one
- * character, a line break included, is a change to what was tested. ⚠ Not `JSON.parse` of the literal: its doubled
- * backslashes read as a network path to this repository's own archive scan (`REG-F-536`).
+ * ⭐ THE PREAMBLE'S BYTES, AS THE PAID REPLAY MEASURED THEM (`REG-D-104` (2); design §4c) — read back from the replay's
+ * own prompt files, the first 355 bytes of every one of its eight: the three lines joined by `\n`, then `\n\n---\n`, and
+ * the prompt starts on the very next line. Written here as ONE string literal (each `\n` a line break), so a change of
+ * one character, a line break included, is a change to what was tested.
+ * ⛔ CORRECTED (`P76F-A`): the first build ended it `\n\n---\n\n`, from a build note, and pinned this literal to the same
+ * wrong bytes — a pin of the note, not of the measurement. ⚠ Not `JSON.parse` of a literal: doubled backslashes read as a
+ * network path to this repository's own archive scan (`REG-F-536`).
  */
 const MEASURED_PREAMBLE =
-	'You are answering as a reviewer that has NO TOOLS. You cannot read files, list folders, run commands or fetch anything,\nand you must not try: any tool call ends this session without an answer. Everything you may judge is in the text below.\nJudge only that text, and reply with the single JSON object the instructions below ask for, and nothing else.\n\n---\n\n';
+	'You are answering as a reviewer that has NO TOOLS. You cannot read files, list folders, run commands or fetch anything,\nand you must not try: any tool call ends this session without an answer. Everything you may judge is in the text below.\nJudge only that text, and reply with the single JSON object the instructions below ask for, and nothing else.\n\n---\n';
 
 /** Every file under `dir`, as a path relative to it with forward slashes, sorted. */
 function filesUnder(dir: string): string[] {
@@ -223,7 +232,12 @@ describe('⭐⭐ P7-6 I1 — the reviewer runs isolated: its own fresh folder, e
 		// ⛔ THE MUTANT: a name dropped from the list. devin's permission rules check deny first and a deny always wins,
 		// so the one tool not named is the one devin may still auto-approve (design §2 I1). Probe 1 (§4a) drove these
 		// seven names to hold in print mode under devin 3000.11.3.
+		// ⭐ AND THE FILE IS THE REPLAY'S, BYTE FOR BYTE (`P76F-A`): what ships is the file the measurement put in front of
+		// devin, so no reading of "the same JSON, laid out differently" is left to a parser nobody has driven.
 		expect(seen[0]!.config, 'the bytes of .devin/config.json').toBe(DENY_ALL);
+		expect(JSON.parse(DENY_ALL), 'arrangement: the pinned bytes are the seven names').toEqual({
+			permissions: { deny: ['read', 'edit', 'grep', 'glob', 'exec', 'Fetch(*)', 'mcp__*'] }
+		});
 	});
 
 	it('⭐ the argv: print mode, the model, the prompt file, the export — and the workspace-trust check OFF', async () => {
@@ -285,6 +299,7 @@ describe('⭐⭐ P7-6 I4 — the reviewer is told it has NO TOOLS: the preamble 
 	it('⭐ the preamble is the bytes the paid replay measured, byte for byte, its line breaks included', () => {
 		// ⛔ THE MUTANT: one character of it changed. The replay that passed the sponsor's gate (3 of 4 concluded, no tool
 		// call in any of the four, design §4c) measured THESE bytes; another text is an untested one.
+		expect(Buffer.byteLength(MEASURED_PREAMBLE, 'utf8'), 'arrangement: the replay’s preamble is 355 bytes').toBe(355);
 		expect(DEVIN_REVIEWER_PREAMBLE).toBe(MEASURED_PREAMBLE);
 	});
 
