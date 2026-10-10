@@ -469,31 +469,68 @@ export const CRITERION_REPAIR_INSTRUCTION =
 	'IMPORTANT: your reply gave no row for any criterion. Reply with ONLY the minified JSON object, with one row in findings for each criterion, failed=false where it is met.';
 
 /**
- * ⭐ P7-6 I5 — WHY A PARSED REPLY ANSWERS NO CRITERION, in the words E-5's detail records, or `undefined` when it answers at
- * least one. `coerceJudgement` keeps a finding only under an id the policy declares, so `judgement.findings` empty is
- * exactly "no finding names one of the policy's criteria" — and a reply answering SOME is never this (`REG-F-489`: the
- * floor's reading of an unanswered criterion holds). The cause is read off the reply as parsed: no findings list, an
- * empty one, or findings under ids the policy does not declare.
+ * ⭐⭐ `P76F-A` A2 (`REG-F-552`; PER-9) — THE MARKER EVERY I5 RECORD'S DETAIL BEGINS WITH: the `SCHEMA_COERCION_FAILED` E-5 of
+ * a reply that PARSED and answered no criterion — the try that requested the criterion repair (`repair-requested`), and a
+ * repair that answered none again (`rejected`). ⭑ EXPORTED SO A READER KEYS ON IT, NOT ON PROSE: the run report tells an I5
+ * repair-request from a reply of the wrong SHAPE, which records the same outcome code (`classifyParse`), by
+ * `parseOutcome.detail.startsWith(NO_CRITERION_ANSWERED)` beside the disposition. ⛔ A STABLE STRING: a change to it is a
+ * change to what every reader of past records keys on — records written before it carry the older wording
+ * (*"None of the policy's N criteria was answered: …"*), and only the cause sentence after it may grow.
  */
-function noCriterionAnswered(
+export const NO_CRITERION_ANSWERED = 'The reply answered no criterion (REG-F-552).';
+
+/**
+ * ⭐⭐ `P76F-A` A2 — WHY A PARSED REPLY'S ROWS ANSWER NO CRITERION, read off the reply as parsed: the TRUE cause, of five kinds.
+ * `coerceJudgement` keeps a row only when its `criterionId` is a string the policy declares, so a reply that answers none
+ * has no list, an empty one, or rows each of which names NO id (no field, a number, not an object at all) or names an id the
+ * policy does not declare — or a mix of those two. ⛔ IT SAID "names an id the policy does not declare" FOR ALL OF THEM: a
+ * false cause on the permanent record (PER-9), and the two have different remedies — rows with no id ignored the row
+ * format; rows under unknown ids invented criteria. ⭑ Exported, beside `NO_CRITERION_ANSWERED`, for any reader that holds
+ * the parsed reply.
+ * ⚠ Meaningful only for a reply none of whose rows was kept: a row under a declared id is never counted here.
+ */
+export function noCriterionCause(parsed: unknown, declared: ReadonlySet<string>): string {
+	const rows = (parsed as { findings?: unknown } | null)?.findings;
+	if (!Array.isArray(rows)) return 'it carries no findings list';
+	if (rows.length === 0) return 'its findings list is empty';
+	const unnamed = rows.filter((r) => typeof (r as { criterionId?: unknown } | null)?.criterionId !== 'string').length;
+	const undeclared = rows.filter((r) => {
+		const id = (r as { criterionId?: unknown } | null)?.criterionId;
+		return typeof id === 'string' && !declared.has(id);
+	}).length;
+	if (undeclared === 0) return `each of its ${rows.length} row(s) names no criterion id`;
+	if (unnamed === 0) return `each of its ${rows.length} row(s) names an id the policy does not declare`;
+	const count = (n: number) => `${n} ${n === 1 ? 'names' : 'name'}`;
+	return `of its ${rows.length} rows, ${count(unnamed)} no criterion id and ${count(undeclared)} an id the policy does not declare`;
+}
+
+/**
+ * ⭐ P7-6 I5 — the cause, when a parsed reply answers NO criterion, or `undefined` when it answers at least one: a reply
+ * answering SOME is never this (`REG-F-489`: the floor's reading of an unanswered criterion holds).
+ */
+function unansweredCause(
 	parsed: unknown,
 	judgement: ReasoningReviewJudgement,
 	input: ReasoningReviewInput
 ): string | undefined {
 	if (judgement.findings.length > 0) return undefined;
-	const rows = (parsed as { findings?: unknown } | null)?.findings;
-	let cause = 'it carries no findings list';
-	if (Array.isArray(rows))
-		cause =
-			rows.length === 0
-				? 'its findings list is empty'
-				: `each of its ${rows.length} finding(s) names an id the policy does not declare`;
-	return (
-		`None of the policy's ${input.criteria.length} criteria was answered: the reply parsed, but ${cause} (REG-F-552). ` +
-		'One repair was requested; if it answers none either, does not parse or gets no reply, this reply’s judgement ' +
-		'is the one the review keeps, its recommendation recorded (REG-D-090).'
-	);
+	return noCriterionCause(parsed, criterionIds(input));
 }
+
+/** ⭐ P7-6 I5 (`P76F-A` A2) — the E-5 detail of the try that REQUESTS the one criterion repair: the marker, then the cause. */
+const criterionRepairRequested = (cause: string, input: ReasoningReviewInput): string =>
+	`${NO_CRITERION_ANSWERED} It parsed, but none of the policy's ${input.criteria.length} criteria has a row: ${cause}. ` +
+	'One repair was requested; if it answers none either, does not parse or gets no reply, this reply’s judgement ' +
+	'is the one the review keeps, its recommendation recorded (REG-D-090).';
+
+/**
+ * ⭐ P7-6 I5 (`P76F-A` A2) — the E-5 detail of a REPAIR that answered none again: the marker, ITS OWN cause, and what the
+ * validator then does. ⛔ It used to append the request's detail, which says of the reply it describes that "this reply’s
+ * judgement is the one the review keeps" — false of the repair, whose judgement is discarded: the FIRST stands.
+ */
+const criterionRepairRefused = (cause: string, input: ReasoningReviewInput): string =>
+	`${NO_CRITERION_ANSWERED} The repair parsed, but none of the policy's ${input.criteria.length} criteria has a row in it ` +
+	`either: ${cause}. The first reply’s judgement stands, its recommendation recorded (REG-D-090).`;
 
 /**
  * ⭐⭐ `JAN-PRQUAL` `PQ-1` (design D2; the sponsor's answer (a) of 2026-10-03) — THE PROMPT'S PLAN: every slice measured
@@ -1369,23 +1406,18 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 				} catch (e) {
 					error = e;
 				}
-				const stillNone = judged ? noCriterionAnswered(value, judged, input) : undefined;
+				const stillNone = judged ? unansweredCause(value, judged, input) : undefined;
 				if (judged && stillNone === undefined) {
 					await capture(repaired.role, repairPrompt, repaired.text, 'accepted', repaired.times, PARSED, repaired.predecessor);
 					return judged;
 				}
-				const failed = judged
-					? { outcome: 'SCHEMA_COERCION_FAILED' as const, detail: `The repair answered no criterion either. ${stillNone}` }
-					: classifyParse(repaired.text, error);
-				await capture(
-					repaired.role,
-					repairPrompt,
-					repaired.text,
-					'rejected',
-					repaired.times,
-					{ ...failed, detail: `${failed.detail} The first reply’s judgement stands (REG-F-552; REG-D-090).` },
-					repaired.predecessor
-				);
+				// ⭐ `P76F-A` A2 — a repair that answered none again records the marker and ITS OWN cause (`criterionRepairRefused`);
+				// one that did not parse, its parse's own outcome. Each says the first judgement stands — which is what is done.
+				const unparsed = stillNone === undefined ? classifyParse(repaired.text, error) : undefined;
+				const failed: ExchangeParseOutcome = unparsed
+					? { ...unparsed, detail: `${unparsed.detail} The first reply’s judgement stands (REG-F-552; REG-D-090).` }
+					: { outcome: 'SCHEMA_COERCION_FAILED', detail: criterionRepairRefused(stillNone!, input) };
+				await capture(repaired.role, repairPrompt, repaired.text, 'rejected', repaired.times, failed, repaired.predecessor);
 				return undefined;
 			};
 
@@ -1418,7 +1450,7 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 			// observed, so the behaviour is left as `REG-F-338` chose it and the ground is corrected instead.
 			let firstParsed: ReasoningReviewJudgement | undefined;
 			let firstError: unknown;
-			// ⭐ P7-6 I5 — the reply as parsed, before coercion: what `noCriterionAnswered` reads the cause off.
+			// ⭐ P7-6 I5 — the reply as parsed, before coercion: what `noCriterionCause` reads the cause off (`P76F-A` A2).
 			let firstValue: unknown;
 			try {
 				firstValue = JSON.parse(extractJson(firstRaw));
@@ -1428,7 +1460,7 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 				firstError = e;
 			}
 			// ⭐ P7-6 I5 — `undefined` when the parsed reply answers at least one criterion (or did not parse at all).
-			const unanswered = firstParsed ? noCriterionAnswered(firstValue, firstParsed, input) : undefined;
+			const unanswered = firstParsed ? unansweredCause(firstValue, firstParsed, input) : undefined;
 			// ⭐ `JAN-EXEC` `P7-2b` — EACH ANSWERED TRY IS RECORDED UNDER THE ROLE AND PREDECESSOR `timed` RETURNS: the call
 			// asked for, or its `retry` after a call that threw, so the chain reads as the calls were made.
 			if (firstParsed && unanswered !== undefined) {
@@ -1451,7 +1483,8 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 					firstRaw,
 					'repair-requested',
 					firstTry.times,
-					{ outcome: 'SCHEMA_COERCION_FAILED', detail: unanswered },
+					// ⭐ `P76F-A` A2 — the marker, then the TRUE cause (`criterionRepairRequested`): a reader keys on the first.
+					{ outcome: 'SCHEMA_COERCION_FAILED', detail: criterionRepairRequested(unanswered, input) },
 					firstTry.predecessor
 				);
 				judgement = (await criterionRepair(first)) ?? firstParsed;
