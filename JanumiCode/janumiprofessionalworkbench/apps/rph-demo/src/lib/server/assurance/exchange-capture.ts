@@ -103,6 +103,36 @@ export interface CaptureTryInput {
 	 */
 	readonly workProductDerivation: WorkProductDerivation;
 	readonly observedToolCalls: ObservedToolCallReport;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7 P7-6 I2 (`DESIGN-the-reviewer-isolated.md` §2; `REG-F-351`; `REG-D-103` (2)) — WHAT BECOMES OF A
+	 * REPLY IN WHICH NO ANSWER SPAN CAN BE LOCATED, which only the caller can say.
+	 *   · absent, or `BLOCKED` — Guide §9.7's own instruction, on every plane as before: nothing of it is stored. ⛔ THE
+	 *     EXECUTION PLANE NEVER ASKS OTHERWISE (the design leaves it unchanged): there an unlocatable answer may be the work
+	 *     product itself (`REG-F-351`), and retaining it whole would be the whole-blob write `REG-D-056` refused.
+	 *   · `RETAINED_FOR_DIAGNOSIS` — the reviewer's plane: the whole reply is stored PURGEABLE_AT_EXPIRY and pointed at by
+	 *     `rawOutputBeforeCoercionRef`; its two spans stay PENDING, saying where it is. ⭑ Why that class, and why it is
+	 *     wrong in NEITHER direction §9.7 fears: whatever reasoning the reply holds stays purgeable (PER-12); and no
+	 *     judgement rests on its bytes — a reply with no locatable object coerces to the same empty judgement whatever it
+	 *     says (`coerceJudgement`) — so purging it severs no trace (PER-8's why). It is kept for diagnosis, ASR-11 limb 3
+	 *     (*"raw output is retained for diagnostics"*) and PER-12's one permitted use. The sponsor approved keeping the
+	 *     reviewer's unparsed replies (`REG-D-103` (2)), after the measured run kept none of its 10 (`REG-F-351`'s pointer).
+	 * ⚠ ASKED ONLY FOR A TRY THAT GOT A REPLY. A call that threw has `rawOutput` '' because nothing came back; stored, it
+	 * would read as an empty reply that never arrived (`JAN-NOANS`). The validator does not ask for one.
+	 */
+	readonly unseparatedRawOutput?: 'BLOCKED' | 'RETAINED_FOR_DIAGNOSIS';
+	/**
+	 * ⭐⭐ P7-6 I2 — THE BACKING TOOL'S OWN RECORD OF THE SESSION (`ToolInvocationResult.sessionExport`: devin's export, which
+	 * lists every step and any tool devin called). Stored PURGEABLE_AT_EXPIRY — a session trace, never Evidence (PER-12) —
+	 * and pointed at from the record: the record's tool-call observation, whose reason already says this adapter could
+	 * not watch the session, gains where the tool's own account of it is kept.
+	 * ⛔ THE POINTER IS WHAT MAKES IT LAWFUL: stored with nothing pointing at it, it would be the orphan `REG-F-336` C-2
+	 * forbids. So beside an OBSERVED report — an arm that may carry no reason (`model-exchange.ts`) — it is NOT stored. No
+	 * adapter that observes calls writes an export today.
+	 * ⚠ NOT A TYPED FIELD, AND SAID SO: `MODEL_EXCHANGE` has no ref for a session export, and adding one is a ratified
+	 * contract change (the design §10 route, `R11`'s act). Until then the pointer is prose, bounded with the reason it
+	 * joins (`RecordPlaneProseSchema`, 4,096 characters; devin's reason and the pointer are under 1,000).
+	 */
+	readonly toolSessionExport?: string;
 }
 
 /** A disclosed absence, which PER-9 permits — as distinct from the silent one it forbids. */
@@ -224,18 +254,16 @@ export async function captureTry(input: CaptureTryInput): Promise<ExchangeRecord
 	let omittedRegions: OmittedRegion[] = [];
 
 	if (!span.located) {
-		// ⛔ §9.7's OWN INSTRUCTION, and the only branch that still refuses. `located` is a MEASUREMENT
+		// ⛔ §9.7's OWN INSTRUCTION, and the only branch that still refuses — ⭐ unless the caller asks to keep the whole
+		// reply for diagnosis (P7-6 I2, the reviewer's plane; `unlocatedRefs`). `located` is a MEASUREMENT
 		// (REG-F-339), so this is entered on evidence about THIS blob rather than on a class of blob assumed
 		// unsplittable — the over-broad claim REG-F-340 corrected.
-		const blocked = pendingRef(
-			'No answer span could be located, so the answer and any volunteered reasoning cannot be separated ' +
-				'losslessly. Guide §9.7: block the capability and resolve Section 16 item 23. Retaining the blob ' +
-				'whole would classify reasoning as participating (PER-8, permanent) or the answer as purgeable ' +
-				'(PER-12) — wrong in one direction or the other.'
-		);
-		answerSpanRef = blocked;
-		volunteeredReasoningRef = blocked;
-		rawOutputRef = blocked;
+		({ answerSpanRef, volunteeredReasoningRef, rawOutputRef } = await unlocatedRefs(
+			input.rawOutput,
+			input.unseparatedRawOutput,
+			input.store.durability,
+			put
+		));
 	} else {
 		answerSpanRef = storedRef(
 			await put(span.answer, 'RETAINED_BY_PARTICIPATION'),
@@ -291,8 +319,81 @@ export async function captureTry(input: CaptureTryInput): Promise<ExchangeRecord
 		volunteeredReasoningRef,
 		omittedRegions,
 		disposition: input.disposition,
-		parseOutcome: input.parseOutcome
+		parseOutcome: input.parseOutcome,
+		// ⭐ P7-6 I2 — the observation as the adapter reported it, and, where the tool wrote one, where its export is kept.
+		observedToolCalls: await withSessionExport(
+			input.store,
+			input.tenantPrefix,
+			input.observedToolCalls,
+			input.toolSessionExport
+		)
 	};
 	input.sink?.record(recorded);
 	return recorded;
+}
+
+/** The three E-2 refs of a reply. */
+interface ReplyRefs {
+	readonly answerSpanRef: ContentRef;
+	readonly volunteeredReasoningRef: ContentRef;
+	readonly rawOutputRef: ContentRef;
+}
+
+/**
+ * The E-2 refs of a reply in which NO answer span could be located: blocked, as Guide §9.7 instructs — or, where the
+ * caller asks (`unseparatedRawOutput`, the reviewer's plane, P7-6 I2), the whole reply kept PURGEABLE_AT_EXPIRY for
+ * diagnosis, its two spans saying they hold nothing and where the reply is. ⭑ Nothing was cut out of anything in either
+ * arm, so neither declares a region.
+ */
+async function unlocatedRefs(
+	rawOutput: string,
+	asked: CaptureTryInput['unseparatedRawOutput'],
+	durability: ContentDurability,
+	put: (bytes: string, purgeability: Purgeability) => Promise<StoredArtifactRef>
+): Promise<ReplyRefs> {
+	if (asked === 'RETAINED_FOR_DIAGNOSIS') {
+		const kept = pendingRef(
+			'No answer span could be located in this reply, so nothing in it can be told apart as an answer or as ' +
+				'volunteered reasoning (Guide §9.7). The whole reply is kept instead, under rawOutputBeforeCoercionRef, ' +
+				'PURGEABLE_AT_EXPIRY, for diagnosis (ASR-11 limb 3): no judgement rests on its bytes. JAN-EXEC Phase 7 ' +
+				'P7-6 I2; REG-D-103 (2).'
+		);
+		return {
+			answerSpanRef: kept,
+			volunteeredReasoningRef: kept,
+			rawOutputRef: storedRef(await put(rawOutput, 'PURGEABLE_AT_EXPIRY'), durability, 'PURGEABLE_AT_EXPIRY')
+		};
+	}
+	const blocked = pendingRef(
+		'No answer span could be located, so the answer and any volunteered reasoning cannot be separated ' +
+			'losslessly. Guide §9.7: block the capability and resolve Section 16 item 23. Retaining the blob ' +
+			'whole would classify reasoning as participating (PER-8, permanent) or the answer as purgeable ' +
+			'(PER-12) — wrong in one direction or the other.'
+	);
+	return { answerSpanRef: blocked, volunteeredReasoningRef: blocked, rawOutputRef: blocked };
+}
+
+/**
+ * ⭐⭐ P7-6 I2 — STORE A TOOL'S EXPORT OF THE SESSION, AND SAY ON THE RECORD WHERE IT IS (`CaptureTryInput.toolSessionExport`).
+ *
+ * The pointer joins the observation's own reason, after the adapter's words, which stay whole: that reason already says
+ * this adapter could not watch the session, so where the tool's own account of the session is kept is the next thing a
+ * reader of it needs. ⛔ An OBSERVED report may carry no reason (`model-exchange.ts`), so beside one the export is not
+ * stored at all — stored there, nothing could point at it (`REG-F-336` C-2).
+ */
+async function withSessionExport(
+	store: ArtifactStore,
+	tenantPrefix: string,
+	report: ObservedToolCallReport,
+	bytes: string | undefined
+): Promise<ObservedToolCallReport> {
+	if (bytes === undefined || report.observation === 'OBSERVED') return report;
+	const ref = await store.put({ tenantPrefix, bytes, mediaType: 'application/json', purgeability: 'PURGEABLE_AT_EXPIRY' });
+	return {
+		...report,
+		reason:
+			`${report.reason ?? ''} ⭑ The backing tool's own export of this session, which lists every step and any tool ` +
+			`it called, is kept on the content plane, PURGEABLE_AT_EXPIRY: storage key ${ref.storageKey}, ` +
+			`${ref.contentHash}, ${ref.byteSize} bytes (JAN-EXEC Phase 7 P7-6 I2).`
+	};
 }

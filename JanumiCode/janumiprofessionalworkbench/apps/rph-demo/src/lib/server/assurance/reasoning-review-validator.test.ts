@@ -45,7 +45,8 @@ import { readFileSync } from 'node:fs';
 import { createExchangeSink } from './exchange-capture.js';
 import { renderRationale } from '../agent/rationale.js';
 import { processResultReviewInput } from './review-input.js';
-import type { ArtifactStore } from '@janumipwb/rph-ports';
+import { createInMemoryArtifactStore, type ArtifactStore } from '@janumipwb/rph-ports';
+import type { ToolInvocationResult } from '../tools/backing-tool.js';
 
 /**
  * ⭐ R11 — the adapter observation every `ToolInvocationResult` now owes.
@@ -220,6 +221,158 @@ describe('Reasoning Review Validator — a CONTENT STORE failure is not a malfor
 		expect(result.executionFailed).toBe(false);
 		expect(prompts).toHaveLength(2);
 		expect(exchanges.drain().some((e) => e.disposition === 'repair-requested')).toBe(true);
+	});
+});
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7 P7-6 I2 (`DESIGN-the-reviewer-isolated.md` §2; `REG-F-351`, `REG-D-103` (2)) ──────────────
+//
+// In the measured run, 10 reviewer replies did not parse (3 empty, 7 prose) and NONE was kept: every one was recorded
+// `PENDING_CONTENT_PLANE`, so a person could not read what the reviewer said, nor why its review failed (`REG-F-351`'s
+// pointer; `REG-F-549`). The sponsor approved keeping them (`REG-D-103` (2)). These hold that on the reviewer's plane,
+// through the real validator with only its print seam stood in for, and a real in-memory content store.
+
+/** What a stand-in reviewer says, call by call (the last repeats), each a reply or a tool report. */
+function replying(...replies: (string | ToolInvocationResult)[]) {
+	const prompts: string[] = [];
+	const print: AgyPrint = async (p) => {
+		prompts.push(p);
+		return replies[Math.min(prompts.length - 1, replies.length - 1)]!;
+	};
+	return { prompts, print };
+}
+
+/** A tool report answering `text` as devin does, with the session export devin writes (`devinPrint`). */
+const devinReport = (text: string, sessionExport?: string): ToolInvocationResult => ({
+	answer: { arrived: true, text },
+	rawOutput: text,
+	producer: { agentId: 'devin', modelId: JUDGE, providerId: 'devin' },
+	identityEvidence: 'PROVIDER_REPORTED',
+	observedToolCalls: {
+		canObserve: false,
+		reason: 'Fixture: the devin adapter runs devin to completion and watches no session.'
+	},
+	...(sessionExport === undefined ? {} : { sessionExport })
+});
+
+/** The prose the measured run's reviewer left as its answer (`REG-F-549`): an agent setting out to look for itself. */
+const PROSE = "I'll verify the files the work product describes before I answer.";
+
+describe('⭐⭐ P7-6 I2 — every reviewer reply is KEPT as content, parsed or not, and the record points at it (REG-F-351)', () => {
+	it('⭐ a reply with NO JSON in it — prose — is stored whole and pointed at by rawOutputBeforeCoercionRef, PURGEABLE_AT_EXPIRY', async () => {
+		const { print } = replying(PROSE, CLEAN);
+		const store = createInMemoryArtifactStore();
+		const exchanges = createExchangeSink();
+		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE, artifacts: store, exchanges }).evaluate(
+			SUBJECT,
+			ctx()
+		);
+		expect(result.executionFailed, 'arrangement: the repair answered, so the review stands').toBe(false);
+		const [first] = exchanges.drain();
+		expect(first!.parseOutcome.outcome, 'arrangement: no JSON object could be located').toBe('JSON_EXTRACTION_FAILED');
+		const raw = first!.rawOutputBeforeCoercionRef;
+		// ⛔ THE DEFECT, AT HEAD: `PENDING_CONTENT_PLANE` — the bytes the reviewer answered were obtainable and not kept.
+		expect(raw.status, 'the unparsed reply is retained').toBe('STORED');
+		expect(await store.get(raw.storageKey!), 'and its bytes are the reply, exactly').toBe(PROSE);
+		// ⭐ PURGEABLE: no judgement rests on a reply no answer span could be located in (`exchange-capture.ts`), and
+		// whatever reasoning it holds stays purgeable (PER-12) — kept for diagnosis (ASR-11 limb 3).
+		expect(raw.purgeability).toBe('PURGEABLE_AT_EXPIRY');
+		// ⭐ Its two spans still say why they hold nothing — and where the reply is.
+		for (const span of [first!.answerSpanRef, first!.volunteeredReasoningRef]) {
+			expect(span.status).toBe('PENDING_CONTENT_PLANE');
+			expect(span.reason).toMatch(/rawOutputBeforeCoercionRef/);
+		}
+	});
+
+	it('⭐ when the repair is prose TOO and the review fails, BOTH replies are kept, each under its own record', async () => {
+		const SECOND = 'Still checking the workspace.';
+		const { print } = replying(PROSE, SECOND);
+		const store = createInMemoryArtifactStore();
+		const exchanges = createExchangeSink();
+		await expect(
+			createAgyReasoningReviewValidator({ print, modelId: JUDGE, artifacts: store, exchanges }).evaluate(SUBJECT, ctx())
+		).rejects.toThrow();
+		const kept = await Promise.all(
+			exchanges.drain().map(async (e) => [e.disposition, await store.get(e.rawOutputBeforeCoercionRef.storageKey ?? '')])
+		);
+		expect(kept).toEqual([
+			['repair-requested', PROSE],
+			['rejected', SECOND]
+		]);
+	});
+
+	it('⭐ an EMPTY reply is kept as what it is — zero bytes, stored — so the record measures the silence', async () => {
+		const { print } = replying('', CLEAN);
+		const store = createInMemoryArtifactStore();
+		const exchanges = createExchangeSink();
+		await createAgyReasoningReviewValidator({ print, modelId: JUDGE, artifacts: store, exchanges }).evaluate(SUBJECT, ctx());
+		const [first] = exchanges.drain();
+		expect(first!.parseOutcome.outcome).toBe('EMPTY_RESPONSE');
+		expect(first!.rawOutputBeforeCoercionRef.status).toBe('STORED');
+		expect(first!.rawOutputBeforeCoercionRef.byteSize).toBe(0);
+		expect(await store.get(first!.rawOutputBeforeCoercionRef.storageKey!)).toBe('');
+	});
+
+	it('⛔ a call that THREW has no reply to keep: its record stays PENDING, never a stored empty reply', async () => {
+		// ⛔ THE MUTANT: retain on every try. A thrown call's `rawOutput` is '' because NOTHING came back — storing it
+		// would record an empty reply that never arrived, the `no-response` / `rejected` conflation `JAN-NOANS` closed.
+		let n = 0;
+		const print: AgyPrint = async () => {
+			n += 1;
+			if (n === 1) throw new Error('devin invocation failed: connection reset');
+			return CLEAN;
+		};
+		const store = createInMemoryArtifactStore();
+		const exchanges = createExchangeSink();
+		await createAgyReasoningReviewValidator({ print, modelId: JUDGE, artifacts: store, exchanges, callBoundMs: 240_000 }).evaluate(
+			SUBJECT,
+			ctx()
+		);
+		const [thrown, retry] = exchanges.drain();
+		expect(thrown!.disposition, 'arrangement: the first call threw and was run once more').toBe('no-response');
+		expect(retry!.exchangeRole).toBe('retry');
+		expect(thrown!.rawOutputBeforeCoercionRef.status, 'no reply, so nothing is stored as one').toBe('PENDING_CONTENT_PLANE');
+	});
+
+	it('⭑ CONTROL — a MIXED reply is still separated at retention, never stored whole (REG-D-056; the handler refuses a blob beside a stored reasoning span)', async () => {
+		const { print } = replying(`Let me think first.\n${CLEAN}\nThat is all.`);
+		const store = createInMemoryArtifactStore();
+		const exchanges = createExchangeSink();
+		await createAgyReasoningReviewValidator({ print, modelId: JUDGE, artifacts: store, exchanges }).evaluate(SUBJECT, ctx());
+		const [only] = exchanges.drain();
+		expect(only!.answerSpanRef.status).toBe('STORED');
+		expect(only!.volunteeredReasoningRef.status).toBe('STORED');
+		expect(only!.rawOutputBeforeCoercionRef.status, 'the mixed blob is not stored whole').toBe('PENDING_CONTENT_PLANE');
+	});
+
+	it('⭐ devin’s EXPORT of the session is kept too, and the record says where: the tool-call observation names its storage key', async () => {
+		// ⭐ design §2 I2: *"So is devin's export of the session, which shows any tool it called. The exchange record points
+		// at both."* The record's only typed home for "what tools ran" is its tool-call observation, whose reason says
+		// devin's adapter could not watch the session — so the pointer goes there (`exchange-capture.ts`).
+		const EXPORT = JSON.stringify({ schema_version: 'ATIF-v1.7', steps: [{ step_id: 1, source: 'agent', tool_calls: [] }] });
+		const { print } = replying(devinReport(CLEAN, EXPORT));
+		const store = createInMemoryArtifactStore();
+		const exchanges = createExchangeSink();
+		await createAgyReasoningReviewValidator({ print, modelId: JUDGE, artifacts: store, exchanges }).evaluate(SUBJECT, ctx());
+		const [only] = exchanges.drain();
+		const report = only!.observedToolCalls;
+		expect(report.observation).toBe('NOT_OBSERVABLE');
+		const key = /storage key (\S+?),/.exec(report.reason ?? '')?.[1];
+		expect(key, 'the observation names where the export is kept').toBeDefined();
+		expect(await store.get(key!), 'and it holds devin’s export, exactly').toBe(EXPORT);
+		expect((await store.stat(key!))?.purgeability, 'purgeable: a session trace, never Evidence (PER-12)').toBe('PURGEABLE_AT_EXPIRY');
+	});
+
+	it('⛔ a later call’s record never carries an EARLIER call’s export: each export is its own call’s', async () => {
+		// ⛔ THE MUTANT: the export kept across calls, as the reported identity is (`reportedSoFar`). The repair below
+		// answered as a bare string — no export — so a pointer on its record would name a session it was not.
+		const EXPORT = JSON.stringify({ steps: [{ step_id: 1, source: 'agent' }] });
+		const { print } = replying(devinReport(PROSE, EXPORT), CLEAN);
+		const store = createInMemoryArtifactStore();
+		const exchanges = createExchangeSink();
+		await createAgyReasoningReviewValidator({ print, modelId: JUDGE, artifacts: store, exchanges }).evaluate(SUBJECT, ctx());
+		const [first, repair] = exchanges.drain();
+		expect(first!.observedToolCalls.reason, 'arrangement: the first call’s export is pointed at').toMatch(/storage key /);
+		expect(repair!.observedToolCalls.reason ?? '', 'the repair’s record names no export').not.toMatch(/storage key /);
 	});
 });
 

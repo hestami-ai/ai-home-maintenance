@@ -804,6 +804,14 @@ const THROWN_CALL_OBSERVATION: AdapterToolObservation = {
 interface TryReport {
 	readonly model: ModelInput;
 	readonly observation: AdapterToolObservation;
+	/**
+	 * ⭐ P7-6 I2 (`DESIGN-the-reviewer-isolated.md` §2; `REG-F-351`) — the tool's own record of THIS call's session (devin's
+	 * export), when it wrote one: retained as content and pointed at from the record (`captureTry`'s `toolSessionExport`).
+	 * ⛔ ONE CALL'S, NEVER CARRIED: unlike the identity, which `reportedSoFar` keeps from an earlier call, an export is
+	 * read afresh for each call — a later call's record naming an earlier call's session would point at a session it was
+	 * not. A call that threw reported none.
+	 */
+	readonly sessionExport?: string;
 }
 
 /**
@@ -1016,6 +1024,9 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 					'The backing tool returned only an answer string, so it reported nothing about tool calls. This ' +
 					'record therefore says nothing about whether any ran — it is not evidence that none did.'
 			};
+			// ⭐ P7-6 I2 — the LATEST call's session export, set afresh by every call (`attempt`) and so never an earlier
+			// call's (`TryReport.sessionExport`).
+			let toolSessionExport: string | undefined;
 			const prompt = judgePrompt(input);
 			// ICP-02 d2b — PER-9-a: "each retry, reformat, and repair request included" is its OWN record.
 			// `firstRaw` is a CONST on purpose: the previous `raw = await print(...)` destroyed the first try's
@@ -1044,7 +1055,8 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 					providerId: evaluator.providerId ?? '',
 					...(identityEvidence ? { evidence: identityEvidence } : {})
 				},
-				observation: toolObservation
+				observation: toolObservation,
+				...(toolSessionExport === undefined ? {} : { sessionExport: toolSessionExport })
 			});
 			const capture = (
 				role: TryRole,
@@ -1084,7 +1096,17 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 							'nothing is missing; the assessment this call produced is recorded as an ' +
 							'ASSURANCE_ASSESSMENT, not as an ARTIFACT.'
 					},
-					observedToolCalls: governedToolCallReport(reported.observation)
+					observedToolCalls: governedToolCallReport(reported.observation),
+					// ⭐⭐ P7-6 I2 (`DESIGN-the-reviewer-isolated.md` §2; `REG-F-351`; `REG-D-103` (2)) — EVERY REPLY THIS REVIEWER
+					// GAVE IS KEPT, PARSED OR NOT: one no answer span can be located in is stored whole, PURGEABLE_AT_EXPIRY, for
+					// diagnosis (`captureTry`'s `unseparatedRawOutput` says why that class is wrong in neither direction). The
+					// measured run kept none of its 10 unparsed reviewer replies, so no one could read why its reviews failed.
+					// ⛔ NOT for a call that THREW (`no-response`): its '' is no reply, and stored it would read as an empty one.
+					// ⚠ A MIXED reply is still separated, never stored whole: the record plane refuses a stored blob beside a
+					// stored reasoning span (`REG-D-056`), and its two halves reassemble it (`REG-D-057`).
+					...(disposition === 'no-response' ? {} : { unseparatedRawOutput: 'RETAINED_FOR_DIAGNOSIS' as const }),
+					// ⭐ P7-6 I2 — and the tool's own export of THIS call's session, retained and pointed at.
+					...(reported.sessionExport === undefined ? {} : { toolSessionExport: reported.sessionExport })
 				});
 			};
 
@@ -1116,9 +1138,13 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 			): Promise<Attempt> => {
 				const requestedAt = clock();
 				let text: string;
+				// ⭐ P7-6 I2 — this call's export, or none: cleared before the call, so no earlier call's export survives into
+				// this call's record — a bare string, or a call that throws, reports none (`TryReport.sessionExport`).
+				toolSessionExport = undefined;
 				try {
 					const returned = await print(p);
 					if (isToolInvocationResult(returned)) {
+						toolSessionExport = returned.sessionExport;
 						// ⚠ `JAN-NOANS` — NARROWED HERE, AND THIS PLANE'S BEHAVIOUR IS DELIBERATELY UNCHANGED.
 						// `classifyParse` below already asks *"did the model return no bytes?"* FIRST and reports
 						// `EMPTY_RESPONSE` — the assurance plane has been right about this all along, and

@@ -252,6 +252,31 @@ describe('⭐⭐ P7-6 I1 — the reviewer runs isolated: its own fresh folder, e
 	});
 });
 
+describe('⭐⭐ P7-6 I2 — devin’s EXPORT of the session is read before its folder is removed, and returned with the answer (REG-F-351)', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs();
+	});
+
+	it('⭐ the result carries the export’s bytes, exactly as devin wrote them — the record of every step and any tool it called', async () => {
+		vi.stubEnv('JPWB_ASSURANCE_MODEL', 'glm-test');
+		const EXPORT = JSON.stringify({
+			schema_version: 'ATIF-v1.7',
+			steps: [{ step_id: 1, source: 'agent', extra: { generation_model: 'glm-test' }, tool_calls: [] }]
+		});
+		let folder = '';
+		const exec: DevinExec = async (_file, args, options) => {
+			folder = options.cwd;
+			await writeFile(args[args.indexOf('--export') + 1]!, EXPORT, 'utf8');
+			return { stdout: '{"findings":[],"recommendation":"SATISFIED"}' };
+		};
+		const result = await devinPrint('Judge the work product.', exec);
+		// ⛔ THE MUTANT: the export not returned. The `finally` removes the folder, so the bytes are gone by the time any
+		// caller holds the answer — `readReportedModel`'s lesson, a second time: read it HERE, or never.
+		expect(typeof result === 'string' ? undefined : result.sessionExport).toBe(EXPORT);
+		expect(existsSync(folder), 'arrangement: the folder, export and all, is removed').toBe(false);
+	});
+});
+
 describe('⭐⭐ P7-6 I4 — the reviewer is told it has NO TOOLS: the preamble before every prompt devinPrint writes (REG-D-104 (2))', () => {
 	afterEach(() => {
 		vi.unstubAllEnvs();

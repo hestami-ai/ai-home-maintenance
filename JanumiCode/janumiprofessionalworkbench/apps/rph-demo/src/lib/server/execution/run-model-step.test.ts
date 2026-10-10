@@ -146,6 +146,12 @@ describe('JAN-EXECRUN — a work unit actually runs', () => {
 			'PENDING_CONTENT_PLANE'
 		);
 		expect(answerRef.reason, 'and the record must say why').toMatch(/separated losslessly|§9.7/i);
+		// ⭐ `JAN-EXEC` Phase 7 P7-6 I2 — AND THE WHOLE REPLY IS NOT KEPT EITHER, ON THIS PLANE. The reviewer's plane now keeps
+		// an unlocatable reply whole, purgeable, for diagnosis (`REG-D-103` (2); `captureTry`'s `unseparatedRawOutput`), and
+		// the design leaves the executor's plane unchanged (`DESIGN-the-reviewer-isolated.md` §2 I2): here such an answer may
+		// be the work product (`REG-F-351`). ⛔ THE MUTANT: the option's default flipped to retain.
+		const wholeRef = dispatched[0]!.rawOutputBeforeCoercionRef as { status?: string };
+		expect(wholeRef.status, 'the execution plane keeps no unlocatable answer whole').toBe('PENDING_CONTENT_PLANE');
 	});
 
 	it('⭑ a DELIMITED answer IS retained, and the ARTIFACT names the SAME bytes the exchange does', async () => {

@@ -179,9 +179,15 @@ export async function devinPrint(
 		// function returns, so the export it reads is gone by the time any caller holds the answer. It was not
 		// an unused export — it was a function whose only possible caller was its own enclosing function.
 		const reported = await readReportedModel(exportPath);
+		// ⭐ P7-6 I2 (design §2; `REG-F-351`) — AND THE EXPORT ITSELF, read here for the reason `reported` is: the `finally`
+		// below removes it. It is the only record of what devin did inside its session — any tool it called — and the
+		// measured run's reviewer ended its sessions reaching for tools (`REG-F-549`) with nothing kept to show it.
+		const sessionExport = await readFile(exportPath, 'utf8').catch(() => undefined);
 		// ⛔ NO REPORT MEANS THE WEAKER GRADE, NOT THE CONFIGURED VALUE DRESSED UP. An unreadable export is an
 		// absence of evidence about the model; returning the bare string lets the caller record what the HOST
 		// configured, graded `HOST_CONFIGURED`, which is the honest fact.
+		// ⚠ DISCLOSED (P7-6 I2): an export that names no model is not carried either — the bare string has no field for
+		// it — and nor is the export of a call that FAILED (the throw below), whose cause is all the caller is handed.
 		if (!reported) return stdout;
 		return {
 			// ⭐ `JAN-NOANS` — `execFile` RESOLVES ON EXIT 0, AND EXIT 0 WITH EMPTY STDOUT IS NOT AN ANSWER.
@@ -213,7 +219,9 @@ export async function devinPrint(
 					'mints no tool surface and watches no session, so it is not in a position to observe tool ' +
 					'calls at all — neither its own (it has none) nor any the tool made internally. A reader must ' +
 					'not read this record as evidence that no command ran.'
-			}
+			},
+			// ⭐ P7-6 I2 — devin's own record of the session, for the caller to retain (`ToolInvocationResult.sessionExport`).
+			...(sessionExport === undefined ? {} : { sessionExport })
 		};
 	} catch (e) {
 		const raw = e instanceof Error ? e.message : String(e);
