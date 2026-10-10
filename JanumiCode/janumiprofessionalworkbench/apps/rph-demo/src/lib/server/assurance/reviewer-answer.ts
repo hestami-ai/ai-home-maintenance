@@ -39,14 +39,30 @@ export interface ReviewerAnswerView {
  * ⚠ MOST RECENT BY `attemptOrdinal`, NOT BY INSERTION ORDER. A run makes up to four bounded tries and the
  * repair is the one whose answer the assessment used; reading "the first row back" would show the try that
  * FAILED while labelling it the reviewer's answer.
+ * ⭐⭐ `JAN-EXEC` P7-6 B7 (`REG-F-433`; `DESIGN-the-stopped-unit-recovery.md` RD10, as corrected) — BUT BY ORDINAL ONLY
+ * WITHIN ONE FLOOR RUN. ⛔ The sort above ran across ALL the subject's runs, and every run's first try is ordinal 1: two runs
+ * of one try each TIED, and the stable sort returned the OLDER run's answer (the entry's probe, and the test that now holds
+ * this: `floor-recording.test.ts`). A re-review is exactly that arrangement. So the subject's calls are first grouped by
+ * their run's token (`runToken`, which a floor run now shares with its assessments' correlation — `floor.ts`,
+ * `floor-over-subject.ts`), the MOST RECENT RUN is taken BY THE RECORD'S OWN ORDER — `listByType` lists aggregates in the
+ * order their first events were recorded, and a run's calls are drained after it ran, so the run whose calls were recorded
+ * last is the latest — and only then its highest ordinal.
+ * ⚠ "Most recent" is the record's, not the page's: a call from an authoring turn that was later discarded stays recorded
+ * (its exchanges are canonical; its assessments died with the fork), and is still the most recent run here.
  */
 export async function loadReviewerAnswer(
 	subjectId: string,
 	engine: AuthedEngineHandle,
 	store: ArtifactStore
 ): Promise<ReviewerAnswerView | undefined> {
-	const rows = listByType(engine, 'MODEL_EXCHANGE')
-		.filter((r) => (r.state as { subjectObjectId?: string }).subjectObjectId === subjectId)
+	const tokenOf = (r: { state: unknown }) => (r.state as { runToken?: string }).runToken;
+	const mine = listByType(engine, 'MODEL_EXCHANGE').filter(
+		(r) => (r.state as { subjectObjectId?: string }).subjectObjectId === subjectId
+	);
+	// ⭐ B7 — the latest run, by the record's order: the run of the call recorded last.
+	const latestRun = mine.length === 0 ? undefined : tokenOf(mine[mine.length - 1]!);
+	const rows = mine
+		.filter((r) => tokenOf(r) === latestRun)
 		.sort(
 			(a, b) =>
 				Number((b.state as { attemptOrdinal?: number }).attemptOrdinal ?? 0) -

@@ -54,6 +54,7 @@ import {
 	PHASE7_NEGATIVE_CONTROL_RESERVE,
 	PHASE7_PAID_LIMIT,
 	PHASE7_REVIEWED_COMMANDS,
+	PHASE7_RERUNS_PER_PHASE,
 	PHASE7_TEST_TIMEOUT_MS,
 	PHASE7_UNIT_ALLOWANCE_MS,
 	REVIEWER_IDENTITY_EVIDENCE,
@@ -737,10 +738,31 @@ describe('⭐ P7-2 D4 — the Phase 7 lane waits an ALLOWANCE derived from the b
 			],
 			numbers: []
 		});
+		// ⭐ P7-6 B4 — and the run plan's rule's re-runs, each a phase's allowance again.
 		expect(madeOf(sf, 'PHASE7_TEST_TIMEOUT_MS')).toEqual({
-			reads: ['PHASE7_SETUP_MS', 'PHASE7_MODEL_UNITS', 'PHASE7_UNIT_ALLOWANCE_MS'],
+			reads: [
+				'PHASE7_SETUP_MS',
+				'PHASE7_MODEL_UNITS',
+				'PHASE7_UNIT_ALLOWANCE_MS',
+				'PHASE7_MODEL_UNITS',
+				'PHASE7_RERUNS_PER_PHASE',
+				'PHASE7_UNIT_ALLOWANCE_MS'
+			],
 			numbers: []
 		});
+	});
+
+	// ⭐⭐ `JAN-EXEC` P7-6 B4 (the fix round) — THE RUN PLAN'S RULE RE-RUNS A STOPPED PHASE AT MOST ONCE (`REG-D-105` (4): *"A
+	// review that did not conclude is re-run once; refused work is re-run once"*), and each re-run is waited for up to one
+	// phase's allowance (`phase7-operator.ts` `recover`). ⛔ The timeout counted each phase's Begin & Execute only, so a run
+	// whose phases each took a re-run could reach the test's timeout with a phase still inside its allowance — and Playwright
+	// kills the server mid-unit there (`REG-F-527`).
+	it('⭐ B4 — the rule re-runs a stopped phase at most ONCE, as REG-D-105 (4) words it', () => {
+		const register = readFileSync(REGISTER, 'utf8');
+		const at = register.indexOf('### REG-D-105 ');
+		const ruling = register.slice(at, register.indexOf('\n### ', at + 1));
+		expect(ruling).toContain('A review that did not conclude is re-run once; refused work is re-run once');
+		expect(PHASE7_RERUNS_PER_PHASE).toBe(1);
 	});
 
 	it('the model phases are §3.2’s four — each run by a model, the root by none', () => {
@@ -749,14 +771,19 @@ describe('⭐ P7-2 D4 — the Phase 7 lane waits an ALLOWANCE derived from the b
 		expect(PHASE7_ROOT.workDischarge).toBe('HUMAN');
 	});
 
-	it('⛔ the spec’s test timeout — the setup and four phases’ allowance, 154,440 s — stays under Node’s timer ceiling', () => {
+	// ⭐ P7-6 B4 — WAS *"the setup and four phases’ allowance, 154,440 s"* (1,800 s + 4 × 38,160 s); each phase may now take a
+	// re-run of its own (`REG-D-105` (4)), so the timeout covers four phases' Begin & Execute AND four re-runs.
+	it('⛔ the spec’s test timeout — the setup, four phases’ allowance and one re-run’s allowance for each, 307,080 s — stays under Node’s timer ceiling', () => {
 		// ⚠ FIRST, so a figure pushed past the ceiling reddens here by this message, not by the arithmetic below it.
 		expect(
 			PHASE7_TEST_TIMEOUT_MS,
 			'past 2,147,483,647 ms a Node timer fires at once, and Playwright would time the test out at its start'
 		).toBeLessThanOrEqual(2_147_483_647);
-		// 1,800 s + 4 × 38,160 s.
-		expect(PHASE7_TEST_TIMEOUT_MS).toBe(154_440_000);
+		// 1,800 s + 4 × 38,160 s + 4 × 1 × 38,160 s = 1,800 s + 152,640 s + 152,640 s (85.3 hours).
+		expect(
+			PHASE7_TEST_TIMEOUT_MS,
+			'the timeout does not cover a re-run for each phase: 1,800 s + 4 × 38,160 s + 4 × 1 × 38,160 s'
+		).toBe(307_080_000);
 	});
 
 	// ⭐ `JAN-EXEC` P7-6R — THE LIMIT IS NOW `REG-D-105` (1)'s, which amends `REG-D-102` (4): *"Raise limit to 200"*. The test

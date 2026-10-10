@@ -363,12 +363,25 @@ export const PHASE7_MODEL_UNITS = 4;
 export const PHASE7_SETUP_MS = 1_800_000;
 
 /**
- * The spec's own timeout, set with `test.setTimeout` (the config's stays the one-unit lane's): the setup and four phases'
- * allowance — 1,800 s + 4 × 38,160 s = 154,440 s (42.9 hours). ⚠ It must stay under Node's timer ceiling,
- * 2,147,483,647 ms, past which a timer fires at once.
+ * ⭐ `JAN-EXEC` P7-6 B4 — THE RE-RUNS THE RUN PLAN'S RULE MAKES OF ONE STOPPED PHASE: at most ONE (`REG-D-105` (4): *"A
+ * review that did not conclude is re-run once; refused work is re-run once"*), each waited for up to one phase's allowance
+ * (`phase7-operator.ts` `recover`). ⚠ The abandonment that may follow calls no model, and is bounded as a sign-off act is,
+ * within the setup's allowance as the sign-offs are.
+ */
+export const PHASE7_RERUNS_PER_PHASE = 1;
+
+/**
+ * The spec's own timeout, set with `test.setTimeout` (the config's stays the one-unit lane's): the setup, four phases'
+ * allowance, ⭐ and one re-run's allowance for each phase (P7-6 B4) — 1,800 s + 4 × 38,160 s + 4 × 1 × 38,160 s =
+ * 307,080 s (85.3 hours). ~~1,800 s + 4 × 38,160 s = 154,440 s (42.9 hours)~~ ⛔ counted each phase's Begin & Execute
+ * only, so a run whose phases each took the rule's re-run could reach the test's timeout with a phase still inside its
+ * allowance, and Playwright would kill the server mid-unit there (`REG-F-527`). ⚠ It must stay under Node's timer
+ * ceiling, 2,147,483,647 ms, past which a timer fires at once.
  */
 export const PHASE7_TEST_TIMEOUT_MS =
-	PHASE7_SETUP_MS + PHASE7_MODEL_UNITS * PHASE7_UNIT_ALLOWANCE_MS;
+	PHASE7_SETUP_MS +
+	PHASE7_MODEL_UNITS * PHASE7_UNIT_ALLOWANCE_MS +
+	PHASE7_MODEL_UNITS * PHASE7_RERUNS_PER_PHASE * PHASE7_UNIT_ALLOWANCE_MS;
 
 /**
  * ⭐ D8 — the sponsor's limit, in reviewer calls, checked before each phase ⭐ and before each re-run the run plan's rule

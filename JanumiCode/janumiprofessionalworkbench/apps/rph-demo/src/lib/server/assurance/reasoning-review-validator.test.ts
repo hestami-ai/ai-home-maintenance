@@ -1569,6 +1569,29 @@ describe('⭐⭐ P7-6 I5 — a reply that answers NO criterion is repaired ONCE,
 		expect(exchanges.drain().map((e) => e.disposition)).toEqual(['repair-requested', 'no-response']);
 	});
 
+	// ⭐⭐ `JAN-EXEC` P7-6 B2 (the fix round) — THE RECORD NAMES AN I5 CHAIN BY ONE STABLE STRING. ⛔ A reader cannot tell this
+	// chain from the JSON repair's by its E-5 outcome: `classifyParse` gives `SCHEMA_COERCION_FAILED` too, to a reply that
+	// parsed and could not be coerced. The Phase 7 run report read every I5 chain by its LAST call — a failed repair, or a
+	// no response — though the review concluded on its first reply. So the validator's own string is exported, and this
+	// holds where it stands: on the first reply's record, and on a repair's that answered none — and NOT on a repair that
+	// did not parse, which is how the report tells those two apart.
+	// ⭑ MERGED WITH `P76F-A` A2 (`p76-fix-c` C0): B2 keyed on the CLOSING sentence of the first reply's detail, which A2
+	// removed from a refused repair's record on purpose (it said of the repair that its own judgement was kept). The one
+	// stable string both records carry is A2's MARKER, which OPENS every I5 detail — so the B2 test keys on that.
+	it('⭐ the I5 marker opens the first reply’s record and a repair’s that answered none — and not a repair that did not parse', async () => {
+		const none = replying(NO_ROWS, '{"findings":[],"recommendation":"REJECTED","residualUncertainty":[]}');
+		const noneSink = createExchangeSink();
+		await createAgyReasoningReviewValidator({ print: none.print, modelId: JUDGE, exchanges: noneSink }).evaluate(SUBJECT, ctx());
+		const [first, repairedNone] = noneSink.drain();
+		expect(NO_CRITERION_ANSWERED, 'the marker is a sentence, not an empty string every detail holds').toMatch(/REG-F-552/);
+		expect(first!.parseOutcome.detail.startsWith(NO_CRITERION_ANSWERED), 'the first reply’s record').toBe(true);
+		expect(repairedNone!.parseOutcome.detail.startsWith(NO_CRITERION_ANSWERED), 'a repair that answered none').toBe(true);
+		const prose = replying(NO_ROWS, "I'll check the files first.");
+		const proseSink = createExchangeSink();
+		await createAgyReasoningReviewValidator({ print: prose.print, modelId: JUDGE, exchanges: proseSink }).evaluate(SUBJECT, ctx());
+		expect(proseSink.drain()[1]!.parseOutcome.detail, 'a repair that did not parse').not.toContain(NO_CRITERION_ANSWERED);
+	});
+
 	it('⭐ every finding under an id the policy does not declare answers no criterion either: repaired', async () => {
 		const unknown = JSON.stringify({
 			findings: [{ criterionId: 'RR-99-no-such-class', failed: false, statement: 'met' }],

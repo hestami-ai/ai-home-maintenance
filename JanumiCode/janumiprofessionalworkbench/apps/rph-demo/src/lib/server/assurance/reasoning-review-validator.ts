@@ -480,6 +480,18 @@ export const CRITERION_REPAIR_INSTRUCTION =
 export const NO_CRITERION_ANSWERED = 'The reply answered no criterion (REG-F-552).';
 
 /**
+ * ⭐ `JAN-EXEC` P7-6 B2 (the fix round) — THE CLOSING SENTENCE OF THE I5 REPAIR-REQUEST'S DETAIL (`criterionRepairRequested`),
+ * exported because the Phase 7 run report's pairing restates it and `verif/phase7-run-report.test.ts` holds the two equal.
+ * ⚠ MERGED WITH `P76F-A` A2 (`p76-fix-c` C0): A2 removed this sentence from a REFUSED repair's record on purpose (it says
+ * of the reply it closes that its judgement is the one kept — false of a repair), so it is the REQUEST's alone, and a
+ * reader telling "the repair answered none" from "it did not parse" by it is told wrong; `NO_CRITERION_ANSWERED`, which
+ * opens both records, is the key (`p76-fix-c` C1).
+ */
+export const NO_CRITERION_ANSWERED_NOTE =
+	'One repair was requested; if it answers none either, does not parse or gets no reply, this reply’s judgement ' +
+	'is the one the review keeps, its recommendation recorded (REG-D-090).';
+
+/**
  * ⭐⭐ `P76F-A` A2 — WHY A PARSED REPLY'S ROWS ANSWER NO CRITERION, read off the reply as parsed: the TRUE cause, of five kinds.
  * `coerceJudgement` keeps a row only when its `criterionId` is a string the policy declares, so a reply that answers none
  * has no list, an empty one, or rows each of which names NO id (no field, a number, not an object at all) or names an id the
@@ -520,8 +532,7 @@ function unansweredCause(
 /** ⭐ P7-6 I5 (`P76F-A` A2) — the E-5 detail of the try that REQUESTS the one criterion repair: the marker, then the cause. */
 const criterionRepairRequested = (cause: string, input: ReasoningReviewInput): string =>
 	`${NO_CRITERION_ANSWERED} It parsed, but none of the policy's ${input.criteria.length} criteria has a row: ${cause}. ` +
-	'One repair was requested; if it answers none either, does not parse or gets no reply, this reply’s judgement ' +
-	'is the one the review keeps, its recommendation recorded (REG-D-090).';
+	NO_CRITERION_ANSWERED_NOTE;
 
 /**
  * ⭐ P7-6 I5 (`P76F-A` A2) — the E-5 detail of a REPAIR that answered none again: the marker, ITS OWN cause, and what the

@@ -689,11 +689,18 @@ describe('JAN-EXEC P7-2 D9 — the run report over stores the product wrote, rea
 		]);
 		expect(report().pairing.counts).toEqual({
 			answered: 37,
+			'no-criterion-answered': 0,
 			'no-response': 1,
 			refused: 0,
 			'no-answer-recorded': 0,
 			'not-pairable': 0
 		});
+		// ⭐ P7-6 B7 (`REG-F-433`) — EVERY review the product recorded is joined to its calls by its floor run's TOKEN, read
+		// from the archived envelopes by the command line itself: never by its subject, which a re-review would make ambiguous.
+		expect(
+			[...new Set(report().pairing.rows.map((r) => r.joinedBy))],
+			'a review the product recorded was not joined by its run’s token'
+		).toEqual(['run token']);
 		// ⛔ The deterministic policies and the sign-offs ask no model: listed so, never as "no answer recorded".
 		expect(
 			Object.fromEntries(

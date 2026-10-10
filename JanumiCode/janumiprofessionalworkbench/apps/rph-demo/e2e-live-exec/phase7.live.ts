@@ -100,7 +100,8 @@ test.describe('LIVE — JAN-EXEC Phase 7: §3.2’s PWA, published, run as an Un
 	}) => {
 		test.setTimeout(PHASE7_TEST_TIMEOUT_MS);
 		// ⛔ NO ACT WAITS UNBOUNDED: this lane sets no action timeout, so a click on a button that never came would wait out
-		// the 43-hour test. Begin & Execute and the sign-off acts pass bounds of their own.
+		// the ~~43-hour~~ ⭐ 85-hour test (P7-6 B4). Begin & Execute and the sign-off acts pass bounds of their own ⭐ — and,
+		// since P7-6 B3, every fill and click the lane makes.
 		page.setDefaultTimeout(PHASE7_UI_MS);
 		const paid = process.env[PHASE7_PAID_VARIABLE] === '1';
 		const runFolder = process.env[LIVE_RUN_DIR_VARIABLE]?.trim() ?? '';
@@ -147,9 +148,10 @@ test.describe('LIVE — JAN-EXEC Phase 7: §3.2’s PWA, published, run as an Un
 					return unitsOf((await freshIntrospect(base)).snapshot, PHASE7_UNDERTAKING.name);
 				},
 				beginExecute: (unit) => beginExecute(page, unitRow(page, unit.title), actionFields),
+				// ⭐ P7-6 B3 — its click bounded by its own timeout: the run plan's rule calls this hand too.
 				showOverview: async () => {
 					await gotoHydrated(page, undertakingPath);
-					await page.getByRole('button', { name: 'overview', exact: true }).click();
+					await page.getByRole('button', { name: 'overview', exact: true }).click({ timeout: PHASE7_UI_MS });
 				},
 				recordAssurance: (unit) => recordAssurance(page, unitRow(page, unit.title), actionFields),
 				markSatisfied: (unit) => markSatisfied(page, unitRow(page, unit.title), actionFields),

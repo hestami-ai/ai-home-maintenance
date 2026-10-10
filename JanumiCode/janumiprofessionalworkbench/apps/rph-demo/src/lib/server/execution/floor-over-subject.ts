@@ -84,7 +84,7 @@ export interface FloorSubjectDeclaration {
 		readonly modelId: string;
 		readonly providerId: string;
 	};
-	/** The prefix this run's correlation ids carry, e.g. `work-product-floor`. */
+	/** The prefix this run's floor-run token carries, e.g. `work-product-floor` (`floorRunToken`). */
 	readonly runLabel: string;
 	/** The prefix this run's minted assessment ids carry, e.g. `wpfloor`. */
 	readonly idPrefix: string;
@@ -141,6 +141,26 @@ export function escalatedReviewNote(action: FloorRemediationAction): string {
  * the literal — would make three constants disagree with one vocabulary instead of one.
  */
 const FLOOR_REVIEW_INVOKER_ID = 'reasoning-review';
+
+/**
+ * ⭐⭐ `JAN-EXEC` P7-6 B7 — `REG-F-433`'s JOIN KEY: ONE TOKEN PER FLOOR RUN (`DESIGN-the-stopped-unit-recovery.md` RD10, as
+ * corrected; first of `REG-D-070` Q2's three, and nothing past it — G4 and `REG-F-431`'s drain are untouched).
+ *
+ * ⛔ WHAT IT REPLACES: a floor's assessments were correlated `<runLabel>:<subjectId>` — the SAME for every run on the
+ * subject — and its exchanges took `model-exchange:<subjectId>` and a SECOND, separately minted `runToken`. Nothing a run
+ * recorded named the run, so two runs on one subject could not be told apart (`REG-F-433`'s "NO SHARED KEY"): the one
+ * reader that paired them returned the OLDER run's answer on a tie, and the Phase 7 run report refused every subject a
+ * re-review had touched. P7-6R's re-run of the review is exactly a second floor run over the same work product.
+ * ⭐ NOW ONE TOKEN carries all three: the assessments' (and their observations') `correlationId`, and the exchanges'
+ * `runToken` and `correlationId` — `REG-F-433`'s first remedy, with NO CONTRACT CHANGE (each is a string already).
+ * ⭑ LOSSLESS, AND MINTED ONCE: the token is what the assessments' correlation said before — the run's label and its subject
+ * — followed by the run's own minted id, the same id the recording's commands are prefixed by (`idPrefix`, *"unique per
+ * recording run"*). ⛔ It is compared WHOLE, for equality, and never parsed: the label and subject inside it are for a
+ * person reading the record, not a key anything splits.
+ */
+function floorRunToken(runLabel: string, subjectId: string, floorRunId: string): string {
+	return `${runLabel}:${subjectId}:${floorRunId}`;
+}
 
 /**
  * Run the three de minimis floor policies over any subject and record the assessments against it.
@@ -204,10 +224,13 @@ export async function runFloorOverSubject(
 		// engine whose Gate E judges the completion. One source, so the ladder and the gate cannot disagree.
 		{ admitStipulatedAnswers: engine.admitStipulatedAnswers }
 	);
+	// ⭐ B7 — THE RUN'S ONE TOKEN (`floorRunToken`), minted once, before anything of the run is recorded.
+	const floorRunId = opts.newId(declaration.idPrefix);
+	const token = floorRunToken(declaration.runLabel, declaration.subjectId, floorRunId);
 	recordAssuranceRecordingPlan(engine, plan, {
 		issuedAt: opts.now(),
-		correlationId: `${declaration.runLabel}:${declaration.subjectId}`,
-		idPrefix: opts.newId(declaration.idPrefix),
+		correlationId: token,
+		idPrefix: floorRunId,
 		newId: opts.newId
 	});
 
@@ -225,13 +248,16 @@ export async function runFloorOverSubject(
 					targetAggregateType: 'MODEL_EXCHANGE',
 					targetAggregateId: aggregateId,
 					issuedAt: opts.now(),
-					correlationId: `model-exchange:${declaration.subjectId}`,
+					// ⭐ B7 — the run's token, as its assessments carry it: never the subject's constant.
+					correlationId: token,
 					idempotencyKey: `mex:${aggregateId}`,
 					payload
 				}),
 			drained,
 			{
-				runToken: opts.newId(`${declaration.idPrefix}run`),
+				// ⭐ B7 — THE SAME TOKEN, never a second mint: this is the field a reader joins the run's calls to its
+				// assessments by (`reviewer-answer.ts`; `scripts/phase7/run-report-core.ts`, `buildPairing`).
+				runToken: token,
 				// ⚠ THE REVIEW IS AN ASSURANCE ACT EVEN THOUGH ITS SUBJECT CAME OFF THE EXECUTION PLANE. The
 				// plane names WHO IS ACTING, not where the subject came from — conflating them would file the
 				// reviewer's call as though the work unit had made it.

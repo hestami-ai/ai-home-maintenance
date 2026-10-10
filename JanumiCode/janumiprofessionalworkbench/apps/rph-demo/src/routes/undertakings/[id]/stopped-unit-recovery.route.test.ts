@@ -148,6 +148,7 @@ import {
 	type ObservedProcessRun
 } from '../../../lib/server/tools/process-run-observer.js';
 import { getArtifactStore, getEngine, resetEngine, uiSession } from '../../../lib/server/workbench.js';
+import { stepSuccessShape } from '../../../../../../scripts/phase7/run-report-core.js';
 import { actions, load } from './+page.server.js';
 
 const LIVE_BACKEND_VARIABLES = [
@@ -231,6 +232,32 @@ const payloads = (eventType: string, aggregateId: string): Record<string, unknow
 		.readAllEvents()
 		.filter((e) => e.eventType === eventType && e.aggregateId === aggregateId)
 		.map((e) => e.payload as Record<string, unknown>);
+
+/**
+ * ⭐⭐ `JAN-EXEC` P7-6 B5 (the roadmap's B8) — HOW THE RUN REPORT'S AUDIT READS THE COMPLETION OF `planId`'s step, on the
+ * events the route REALLY wrote: the success and the event after it, as the archived store holds them
+ * (`scripts/phase7/run-report-core.ts`, `stepSuccessShape`). ⛔ A recovery act's completion read as a hand completion would
+ * file every recovered phase of the paid run under P7-3's first forbidden act.
+ */
+function auditShapeOfCompletion(planId: string, pwuId: string) {
+	const events = getEngine().readAllEvents();
+	const at = events.findIndex((e) => e.eventType === 'ExecutionStepSucceeded' && e.aggregateId === planId);
+	expect(at, `arrangement: no completion of ${planId} was recorded`).toBeGreaterThan(-1);
+	const stored = (i: number) => {
+		const e = events[i];
+		return e === undefined
+			? undefined
+			: {
+					sequence: i + 1,
+					eventType: e.eventType,
+					aggregateType: e.aggregateType,
+					aggregateId: e.aggregateId,
+					commandId: e.commandId ?? null,
+					payload: e.payload as Record<string, unknown>
+				};
+	};
+	return stepSuccessShape(stored(at)!, stored(at + 1), pwuId);
+}
 
 /** The reasoning reviews over a subject, in the order recorded. */
 const reviewsOf = (subjectId: string): string[] =>
@@ -408,6 +435,12 @@ describe('⭐ R-1c — re-run the review (RD4, RD5, RD7): no producer runs, the 
 				.producingExecutionAttemptId
 		).toBe(`${k.stepA}#1`);
 		expect(axesOf(k.pwuId)).toEqual(['EXECUTING', 'SUCCEEDED']);
+		// ⭐ P7-6 B5 (B8) — the run report's audit reads the re-review's completion as Begin & Execute's model path, beside its
+		// same-batch hop: never a hand completion.
+		expect(auditShapeOfCompletion(b!.id, k.pwuId), 'a re-review’s completion reads as a hand completion').toEqual({
+			beginExecute: true,
+			why: 'the model path'
+		});
 		// ⭐ THE WAY OUT IS NOW THE ORDINARY ONE: the unit can be assured.
 		expect(
 			await actions.recordAssurance(actionEvent('recordAssurance', { pwuId: k.pwuId }) as never)
@@ -602,6 +635,11 @@ describe('⭐ R-1c — re-run the work (RD5, RD8): a fresh session whose first t
 			[artB.id]
 		]);
 		expect(axesOf(k.pwuId)).toEqual(['EXECUTING', 'SUCCEEDED']);
+		// ⭐ P7-6 B5 (B8) — and the re-run of the work's completion, too: Begin & Execute's model path, never a hand completion.
+		expect(auditShapeOfCompletion(b!.id, k.pwuId), 'a re-run of the work’s completion reads as a hand completion').toEqual({
+			beginExecute: true,
+			why: 'the model path'
+		});
 	});
 
 	it('⛔ REG-D-059 — after a review that did not conclude, a re-run of the work carries NOTHING: its first turn is the instruction exactly', async () => {
