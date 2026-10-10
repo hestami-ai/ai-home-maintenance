@@ -455,6 +455,98 @@ describe('assembledSources — the claim the policy is checked against', () => {
 	});
 });
 
+// ── ⭐⭐ `JAN-EXEC` P7-6R RD8 — A RE-RUN OF THE WORK CARRIES THE FINDINGS INTO A FRESH SESSION'S FIRST TURN ───────────
+//
+// `DESIGN-the-stopped-unit-recovery.md` RD8 (`REG-D-104` (1)): a person who re-runs refused work opens a FRESH session, and
+// the hazard the route reader found is that a findings turn omits the instruction, because the HELD session already had
+// it (`run-model-step.ts`'s findings turn, `JAN-EXECSESS`). Handed to a fresh session, that turn is findings with no task.
+// ⭐ So a carried finding rides the FIRST turn, after the instruction; and the turn declares `PRIOR_REVIEW_FINDING` only —
+// never `PRIOR_WORK_PRODUCT` or `PRIOR_RATIONALE`, which a fresh session does not hold, remembering or not.
+describe('⭐ P7-6R RD8 — a re-run’s first turn is the instruction AND the carried findings, in a fresh session', () => {
+	/** A FRESH session that remembers — so what its FIRST turn holds is the whole of what it was told. */
+	function freshSession() {
+		const turns: string[] = [];
+		return {
+			turns,
+			session: {
+				retainsHistory: true,
+				dispose: () => undefined,
+				processRuns: () => ({ runs: [], observedCount: 0, recordedLimit: 32 }),
+				lastTurnObservation: () => UNOBSERVED,
+				turn: async (text: string) => {
+					turns.push(text);
+					return ANSWER;
+				}
+			}
+		};
+	}
+	const CARRIED = [
+		{ code: 'RR-04-no-proxy-satisfaction', statement: 'The work product is a plausible stub.' }
+	];
+
+	it('⛔ the first turn holds the INSTRUCTION, then the carried findings — and the reviewer is still handed the instruction alone', async () => {
+		// THE MUTANT: send the findings turn the held session uses, which omits the instruction — or ignore what is carried.
+		const { turns, session } = freshSession();
+		const { input } = harness({ session, carriedFindings: CARRIED });
+		const out = await runModelInvocationStep(input);
+		expect(out.ran).toBe(true);
+		if (!out.ran) return;
+		expect(turns, 'one turn, the fresh session’s first').toHaveLength(1);
+		expect(turns[0]!.startsWith(out.prompt), 'the first turn does not open with the instruction').toBe(
+			true
+		);
+		expect(turns[0]).toContain('RR-04-no-proxy-satisfaction: The work product is a plausible stub.');
+		expect(turns[0], 'the producer is not told its earlier files may still be there').toContain(
+			'files it wrote may still be in the workspace'
+		);
+		// ⛔ The reviewer stays cold: it judges the work against the obligation, never against the carried findings.
+		expect(out.prompt).not.toContain('RR-04-no-proxy-satisfaction');
+	});
+
+	it('⛔ it declares PRIOR_REVIEW_FINDING: a policy permitting the instruction alone REFUSES the turn, naming it', async () => {
+		// THE MUTANT: carry the findings and declare nothing — the ceiling then approves material it was never told about.
+		const { session } = freshSession();
+		const { input } = harness({
+			session,
+			carriedFindings: CARRIED,
+			contextPolicy: {
+				policyId: 'ctx-instruction-only',
+				permittedSources: [{ source: 'RENDERED_INSTRUCTION', scope: 'THIS_TRY' }]
+			}
+		});
+		const out = await runModelInvocationStep(input);
+		expect(out.ran, 'carried findings were assembled under no declared authority').toBe(false);
+		expect(!out.ran && out.refusedBecause).toMatch(/PRIOR_REVIEW_FINDING at THIS_WORK_UNIT/);
+	});
+
+	it('⭑ CONTROL — and ONLY that: a policy permitting the findings but not the producer’s prior work runs it, on a session that remembers', async () => {
+		// ⛔ THE MUTANT: declare the held session's three sources — a fresh session holds no prior work product or rationale,
+		// and this policy would then refuse a turn that carries neither.
+		const { session } = freshSession();
+		const { input } = harness({
+			session,
+			carriedFindings: CARRIED,
+			contextPolicy: {
+				policyId: 'ctx-findings-only',
+				permittedSources: [
+					{ source: 'RENDERED_INSTRUCTION', scope: 'THIS_TRY' },
+					{ source: 'PRIOR_REVIEW_FINDING', scope: 'THIS_WORK_UNIT' }
+				]
+			}
+		});
+		expect((await runModelInvocationStep(input)).ran).toBe(true);
+	});
+
+	it('⭑ CONTROL — with nothing carried, the first turn is the instruction exactly, as Begin & Execute sends it', async () => {
+		const { turns, session } = freshSession();
+		const { input } = harness({ session, carriedFindings: [] });
+		const out = await runModelInvocationStep(input);
+		expect(out.ran).toBe(true);
+		if (!out.ran) return;
+		expect(turns).toEqual([out.prompt]);
+	});
+});
+
 // ── ⭑⭑ JAN-OUTCONTRACT OC-02 — THE CONTRACT REACHES THE REVIEWER, AND IT DOES SO INSIDE THE INSTRUCTION ────
 //
 // ⭑ THE ROADMAP PREDICTED A SECOND FIELD AND MEASUREMENT REFUTED IT. `OC-02` was drafted as

@@ -230,6 +230,53 @@
 												<input type="hidden" name="pwuId" value={p.id} />
 												<button class="mini" type="submit">Begin &amp; Execute</button>
 											</form>
+										{:else if p.workLifecycleState === 'EXECUTING' && data.recoveryByPwu[p.id]}
+											<!-- ⭐ JAN-EXEC P7-6R R-1d (RD2, RD3; REG-D-104 (1); REG-D-105 (3)) — A UNIT WAITING FOR A PERSON.
+											     Its review refused it, and the record says so; what is offered follows what the refusal was:
+											     re-run the review only after a review that did NOT conclude, re-run the work and abandon always.
+											     The sign-off acts are not offered here — each is refused while the unit is not SUCCEEDED — and
+											     neither is anything that runs nothing (REG-F-466). Each choice is the person's Decision, so it
+											     asks for their rationale. -->
+											{@const r = data.recoveryByPwu[p.id]}
+											<div class="recovery" data-testid="recovery">
+												<span class="hint" data-testid="recovery-refusal"
+													>Waiting for your choice — the review refused this unit's work: {r.refusal}. Re-runs so
+													far: {r.reruns}.</span
+												>
+												{#if r.offers.rerunReview}
+													<form method="POST" action="?/rerunReview" use:enhance class="findingform">
+														<input type="hidden" name="pwuId" value={p.id} />
+														<input
+															name="rationale"
+															placeholder="Why re-run the review?"
+															required
+															data-testid="rerun-review-rationale"
+														/>
+														<button class="mini" type="submit" data-testid="rerun-review"
+															>Re-run the review</button
+														>
+													</form>
+												{/if}
+												{#if r.offers.rerunWork}
+													<form method="POST" action="?/rerunWork" use:enhance class="findingform">
+														<input type="hidden" name="pwuId" value={p.id} />
+														<input
+															name="rationale"
+															placeholder="Why re-run the work?"
+															required
+															data-testid="rerun-work-rationale"
+														/>
+														<button class="mini" type="submit" data-testid="rerun-work"
+															>Re-run the work</button
+														>
+														{#if r.findings === 0}
+															<span class="hint" data-testid="rerun-work-no-findings"
+																>The review gave no findings to carry.</span
+															>
+														{/if}
+													</form>
+												{/if}
+											</div>
 										{:else if p.workLifecycleState === 'EXECUTING'}
 											<form method="POST" action="?/recordAssurance" use:enhance>
 												<input type="hidden" name="pwuId" value={p.id} />
@@ -293,6 +340,15 @@
 										{#if !['SATISFIED', 'ABANDONED', 'REJECTED', 'SUPERSEDED', 'INVALIDATED'].includes(p.workLifecycleState)}
 											<form method="POST" action="?/abandonPwu" use:enhance>
 												<input type="hidden" name="pwuId" value={p.id} />
+												<!-- ⭐ P7-6R R-1c — abandoning a WAITING unit is the person's Decision too, so it asks why. -->
+												{#if data.recoveryByPwu[p.id]}
+													<input
+														name="reason"
+														placeholder="Why abandon?"
+														required
+														data-testid="abandon-rationale"
+													/>
+												{/if}
 												<button class="mini" type="submit">Abandon</button>
 											</form>
 										{/if}
@@ -433,7 +489,15 @@
 													)}
 												</span>
 											{/if}
-											{#each s.controlCommands as ctl (ctl)}
+											<!-- ⭐ P7-6R R-1d (RD2; REG-F-466) — a step WAITING for a person's choice offers none of its own
+											     controls: Resume and Cancel run nothing, and the choice is made on the unit's row. -->
+											{#if data.awaitingChoiceStepIds.includes(s.id)}
+												<span class="mini muted" data-testid="step-awaits-choice"
+													>waits for a person's choice — re-run the review, re-run the work, or abandon, on the
+													unit's row</span
+												>
+											{/if}
+											{#each data.awaitingChoiceStepIds.includes(s.id) ? [] : s.controlCommands as ctl (ctl)}
 												<form method="POST" action="?/{STEP_CONTROL_ACTION[ctl]}" use:enhance class="inlineform">
 													<input type="hidden" name="planId" value={pl.id} />
 													<input type="hidden" name="stepId" value={s.id} />

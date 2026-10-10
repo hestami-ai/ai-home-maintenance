@@ -735,6 +735,44 @@ describe('JAN-EXEC P7-2 D9 — the audit of hand acts (P7-3)', () => {
 		for (const act of ['startStep', 'cancelStep', 'proposeEvidence', 'recordBlockingFinding'])
 			expect(clean.audit.acts.find((a) => a.act === act)?.verdict, act).toBe('none');
 	});
+
+	// ⭐⭐ `JAN-EXEC` P7-6R R-1 (`DESIGN-the-stopped-unit-recovery.md` RD2, RD5; `REG-D-104` (1)): from R-1 the page's Wait and
+	// Cancel are no longer the only emitters of their events. Begin & Execute records a WAIT where the floor refuses a
+	// completion, a re-run CANCELS the refused plan's waiting step, and abandoning a waiting unit cancels it too — each in
+	// its own batch. Read as hand acts, every refused phase of the paid run would read as one the operator suspended.
+	it('⛔ P7-6R R-1 — the route’s own wait and a recovery’s own cancellation are not hand acts; a lone Wait or Cancel still is; and each re-run is listed', () => {
+		const ev = (eventType: string, aggregateId: string, commandId: string, payload: Record<string, unknown> = {}) => ({
+			eventType,
+			aggregateType: 'X',
+			aggregateId,
+			commandId,
+			payload
+		});
+		const r = reportOf(
+			aRun({}, {
+				extraEvents: [
+					// RD2 — the floor's refusal recorded as a wait: the step, then the unit's hop, one batch.
+					ev('ExecutionStepWaiting', 'plan_design', 'ui-960', { stepId: 'step_design', stepState: 'WAITING' }),
+					ev('PwuStateChanged', 'pwu_design', 'ui-961', { previousState: 'EXECUTING', newState: 'EXECUTING', executionState: 'WAITING', supportingObjectIds: ['plan_design'] }),
+					// RD5 — a re-run: the person's Decision, then A superseded and its waiting step cancelled, one batch.
+					ev('DecisionEffective', 'dec_rerun', 'ui-969', { decisionType: 'REPLAN', selectedOption: 'RERUN_REVIEW', subjectObjectIds: ['pwu_design', 'plan_design'] }),
+					ev('ExecutionPlanSuperseded', 'plan_design', 'ui-970', { supersedingExecutionPlanId: 'plan_b', status: 'SUPERSEDED' }),
+					ev('ExecutionStepCancelled', 'plan_design', 'ui-971', { stepId: 'step_design', stepState: 'CANCELLED' }),
+					// R-1c — abandon from waiting: the waiting step cancelled, then the unit abandoned, one batch.
+					ev('ExecutionStepCancelled', 'plan_implementation', 'ui-980', { stepId: 'step_implementation', stepState: 'CANCELLED' }),
+					ev('PwuAbandoned', 'pwu_implementation', 'ui-981'),
+					// The operator's own Wait and Cancel, each a lone command.
+					ev('ExecutionStepWaiting', 'plan_requirements', 'ui-990', { stepId: 'step_requirements', stepState: 'WAITING' }),
+					ev('ExecutionStepCancelled', 'plan_requirements', 'ui-992', { stepId: 'step_requirements', stepState: 'CANCELLED' })
+				]
+			})
+		).report;
+		const found = (act: string) => actOf(r, act).found.map((f) => [f.aggregateId, f.unit]);
+		expect(found('enterWaitStep'), 'the route’s own wait was read as a hand Wait').toEqual([['plan_requirements', 'requirements']]);
+		expect(found('cancelStep'), 'a recovery’s own cancellation was read as a hand Cancel').toEqual([['plan_requirements', 'requirements']]);
+		expect(found('rerunReview')).toEqual([['dec_rerun', 'design']]);
+		expect(actOf(r, 'rerunWork').verdict).toBe('none');
+	});
 });
 
 describe('JAN-EXEC P7-2 D9 — the reviewer calls, a lower bound, and the paid limit (design D8)', () => {

@@ -1128,7 +1128,66 @@ function handEvidence(v: AuditView): AuditFinding[] {
 		.map((e) => findingOf(e, null, "evidence the evidence join did not propose: not the executing model's, or not a unit's commands"));
 }
 
-/** The hand acts each of whose events has the page's action as its only emitter. */
+/**
+ * ⭐⭐ `JAN-EXEC` P7-6R R-1 — WHETHER A STEP'S WAIT OR CANCELLATION IS THE ROUTE'S OWN, NOT THE PAGE'S HAND ACT
+ * (`DESIGN-the-stopped-unit-recovery.md` RD2, RD5; `REG-D-104` (1)). From R-1 the page's Wait and Cancel are no longer the
+ * only emitters of their events:
+ *   · the floor's refusal of a completion records a WAIT (RD2): `ExecutionStepWaiting`, then — the next command of the one
+ *     batch — the unit's execution hop to WAITING, citing the plan;
+ *   · a person's re-run supersedes the refused plan, then CANCELS its waiting step (RD5): `ExecutionPlanSuperseded` on the
+ *     same plan is the command before the cancellation;
+ *   · abandoning a waiting unit cancels its step, then abandons the unit: `PwuAbandoned` is the command after.
+ * ⛔ TOLD APART BY THE BATCH, NEVER BY THE REASON'S PROSE — as `stepSuccessShape` reads a completion. A Wait or a Cancel
+ * pressed by hand is a lone command, and is still found.
+ */
+function routesOwnStepAct(
+	e: StoredEvent,
+	prev: StoredEvent | undefined,
+	next: StoredEvent | undefined,
+	unitId: string | null
+): boolean {
+	const nextInBatch = (n: StoredEvent | undefined, type: string): boolean =>
+		n?.eventType === type && n.aggregateId === unitId && n.commandId !== null && n.commandId === nextUiCommand(e.commandId);
+	if (e.eventType === 'ExecutionStepWaiting')
+		return (
+			nextInBatch(next, 'PwuStateChanged') &&
+			str(next?.payload.executionState) === 'WAITING' &&
+			strs(next?.payload.supportingObjectIds).includes(e.aggregateId)
+		);
+	if (e.eventType === 'ExecutionStepCancelled')
+		return (
+			(prev?.eventType === 'ExecutionPlanSuperseded' &&
+				prev.aggregateId === e.aggregateId &&
+				e.commandId !== null &&
+				nextUiCommand(prev.commandId) === e.commandId) ||
+			nextInBatch(next, 'PwuAbandoned')
+		);
+	return false;
+}
+
+/** The events of `type` that are hand acts: every one, save the route's own (`routesOwnStepAct`). */
+function handEventsOf(v: AuditView, type: string): StoredEvent[] {
+	const found: StoredEvent[] = [];
+	v.ix.events.forEach((e, i) => {
+		if (e.eventType !== type) return;
+		const unitId = v.unitOfPlan(e.aggregateId)?.object?.id ?? null;
+		if (!routesOwnStepAct(e, v.ix.events[i - 1], v.ix.events[i + 1], unitId)) found.push(e);
+	});
+	return found;
+}
+
+/**
+ * ⭐ P7-6R R-1c — THE PERSON'S RE-RUNS, each an EFFECTIVE `REPLAN` Decision whose selected option names it (RD4). Listed
+ * because each changes what the run measures, and none is forbidden: the paid run's rule makes them (`REG-D-105` (4)).
+ */
+function reruns(v: AuditView, option: string, what: string): AuditFinding[] {
+	return v.ix
+		.eventsOfType('DecisionEffective')
+		.filter((e) => str(e.payload.decisionType) === 'REPLAN' && str(e.payload.selectedOption) === option)
+		.map((e) => findingOf(e, v.unitOfObject(strs(e.payload.subjectObjectIds)[0] ?? ''), what));
+}
+
+/** The hand acts each of whose events has the page's action as its only emitter — save the route's own R-1 acts. */
 const PAGE_ONLY_ACTS: readonly (readonly [string, string])[] = [
 	['cancelStep', 'ExecutionStepCancelled'],
 	['pruneStep', 'ExecutionStepPruned'],
@@ -1194,8 +1253,10 @@ function otherActs(v: AuditView, undertakingId: string | null, lane: LaneRows): 
 					"three paths, so only the operator's default reason is told apart"
 			}
 		),
+		act('rerunReview', false, reruns(v, 'RERUN_REVIEW', 'a person’s re-run of the review'), posted(lane, ['rerunReview'])),
+		act('rerunWork', false, reruns(v, 'RERUN_WORK', 'a person’s re-run of the work'), posted(lane, ['rerunWork'])),
 		...PAGE_ONLY_ACTS.map(([name, type]) =>
-			act(name, false, v.ix.eventsOfType(type).map((e) => findingOf(e, onPlan(e), type)), posted(lane, [name]))
+			act(name, false, handEventsOf(v, type).map((e) => findingOf(e, onPlan(e), type)), posted(lane, [name]))
 		),
 		act('proposeEvidence', false, handEvidence(v), posted(lane, ['proposeEvidence'])),
 		act(

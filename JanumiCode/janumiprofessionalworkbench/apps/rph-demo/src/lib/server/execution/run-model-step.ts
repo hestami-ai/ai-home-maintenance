@@ -76,6 +76,19 @@ export interface RunModelStepInput {
 	 */
 	readonly priorFindings?: readonly { readonly code: string; readonly statement: string }[];
 	/**
+	 * ⭐⭐ `JAN-EXEC` P7-6R RD8 — findings carried from a REFUSED ATTEMPT into a FRESH session, by a person's re-run of the
+	 * work (`DESIGN-the-stopped-unit-recovery.md` RD8; `REG-D-104` (1)).
+	 *
+	 * ⛔ NOT `priorFindings`, AND THE DIFFERENCE IS THE HAZARD RD8 NAMES. A repair turn on a HELD session omits the
+	 * instruction, because the session already had it; a fresh session given that turn would get findings with no task. So
+	 * a carried finding rides the FIRST turn, AFTER the instruction, and declares `PRIOR_REVIEW_FINDING` alone — the fresh
+	 * session holds no prior work product and no prior rationale, whatever `retainsHistory` says.
+	 * ⛔ Only SUBJECT findings, as the floor's classifier lists them: never an escalation recommendation, and nothing from a
+	 * review that did not conclude (`REG-D-090`, `REG-D-059`). The caller passes them on try 1 only; later tries are repairs
+	 * on the now-held session and use `priorFindings`.
+	 */
+	readonly carriedFindings?: readonly { readonly code: string; readonly statement: string }[];
+	/**
 	 * ⭑ CP-04 — the policy this deployment operates under, RESOLVED, not an id.
 	 *
 	 * ⛔ Required, so that *"resolve the policy and ignore it"* is not expressible here either. Resolution is
@@ -163,6 +176,42 @@ export function assembledSources(
 				] as const)
 			: [])
 	];
+}
+
+/**
+ * ⭐ P7-6R RD8 — what THIS turn assembles: a repair turn, what the held session holds (`assembledSources`); a fresh
+ * session's first turn carrying a refused attempt's findings, the finding ALONE — `retainsHistory: false`, because a fresh
+ * session holds no prior work product or rationale whatever it could hold; and with neither, nothing beyond the
+ * instruction. ⛔ Carried findings are ignored beside prior ones: a repair turn is on a session that already has a task.
+ */
+function turnAssembles(input: RunModelStepInput): readonly ContextSourceRule[] {
+	if (input.priorFindings?.length)
+		return assembledSources(input.priorFindings, input.session.retainsHistory);
+	return assembledSources(input.carriedFindings, false);
+}
+
+/**
+ * ⭐ P7-6R RD8 — a turn that is not a repair: the instruction, and — on a re-run of refused work — the refused review's
+ * findings AFTER it, since a fresh session has no task until it is given one. ⭑ It says what the session does NOT hold and
+ * what it may find, so the record (E-1 holds this turn) says so too: the earlier attempt's files stay in the shared
+ * workspace (`workspace-host.ts`). With nothing carried it is the instruction exactly, as Begin & Execute sends it.
+ */
+function firstTurn(
+	instruction: string,
+	carried: readonly { readonly code: string; readonly statement: string }[]
+): string {
+	if (carried.length === 0) return instruction;
+	return [
+		instruction,
+		'',
+		'An independent assurance review of an earlier attempt at this work found the following:',
+		...carried.map((f) => `- ${f.code}: ${f.statement}`),
+		'',
+		'This is a fresh session: you do not hold that attempt’s work product or rationale,',
+		'though files it wrote may still be in the workspace.',
+		'Produce the work product, addressing these findings. Do not argue with them and do not',
+		'restate them back; if you believe a finding is mistaken, say so in your rationale.'
+	].join('\n');
 }
 
 export type RunModelStepOutcome =
@@ -254,7 +303,7 @@ export async function runModelInvocationStep(
 
 	const plan = prepareModelInvocation(input.subject, input.pwuTypeId, input.template, {
 		policy: input.contextPolicy,
-		alsoAssembles: assembledSources(input.priorFindings, input.session.retainsHistory),
+		alsoAssembles: turnAssembles(input),
 		...(input.contextSpecification ? { specification: input.contextSpecification } : {})
 	});
 	if (!plan.ready) return { ran: false, refusedBecause: plan.reason };
@@ -276,7 +325,7 @@ export async function runModelInvocationStep(
 				'Produce the work product again, addressing these findings. Do not argue with them and do not',
 				'restate them back; if you believe a finding is mistaken, say so in your rationale.'
 			].join('\n')
-		: plan.prompt;
+		: firstTurn(plan.prompt, input.carriedFindings ?? []);
 
 	const sink = createExchangeSink();
 	const exchangeId = input.newId('exch');

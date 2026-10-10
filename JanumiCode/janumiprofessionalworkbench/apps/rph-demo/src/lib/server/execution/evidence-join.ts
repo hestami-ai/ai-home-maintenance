@@ -84,6 +84,13 @@ export interface EvidenceJoinInput {
 	/** What this evidence is ABOUT, in the producing work unit's terms. `SCOPE_STATED` is an admissibility limb. */
 	readonly scope: string;
 	readonly tenantPrefix: string;
+	/**
+	 * ⭐ `JAN-EXEC` P7-6R RD6 — the attempt whose model ran these commands, `<stepId>#<n>`, carried into each evidence's
+	 * content reference. ⚠ The design's RD6 names the ARTIFACT's field; EVIDENCE has none (`ProposeEvidence` is a strict
+	 * payload), and a re-review must find the refused attempt's command evidence as surely as its work product — so it rides
+	 * the content reference, whose schema is an open record (`ArtifactReferenceSchema`), beside the run's other facts.
+	 */
+	readonly producingExecutionAttemptId?: string;
 }
 
 /**
@@ -125,6 +132,8 @@ export interface ProcessEvidenceContentReference {
 	readonly exitCode: number | null;
 	readonly timedOut: boolean;
 	readonly durationMs: number;
+	/** ⭐ P7-6R RD6 — the attempt that ran the command (`EvidenceJoinInput.producingExecutionAttemptId`). */
+	readonly producingExecutionAttemptId?: string;
 }
 
 /**
@@ -212,7 +221,10 @@ export async function joinProcessEvidence(
 			command: run.argv,
 			exitCode: run.exitCode,
 			timedOut: run.timedOut,
-			durationMs: run.durationMs
+			durationMs: run.durationMs,
+			...(input.producingExecutionAttemptId
+				? { producingExecutionAttemptId: input.producingExecutionAttemptId }
+				: {})
 		};
 
 		// 2. THE GOVERNED OBJECT.

@@ -90,6 +90,25 @@ import {
 import { resolveContextPolicy } from '$lib/server/execution/context-policy';
 import { stepBindingFor } from '$lib/server/execution/step-binding';
 import { resolveUndertakingSandbox } from '$lib/server/execution/workspace-host';
+// ⭐ `JAN-EXEC` P7-6R R-1 — the stopped unit, read from the record: its wait, the person's three choices, and RD7's rebuild.
+import {
+	attemptKeyOf,
+	RATIONALE_REQUIRED,
+	rebuildProcessRun,
+	rebuildProducingTurn,
+	recoveryViewOf,
+	RERUN_REVIEW,
+	RERUN_WORK,
+	rerunReviewRefusal,
+	stoppedUnitOf,
+	waitingStepOf,
+	waitReasonFor,
+	type RebuiltProducingTurn,
+	type RecoveryView,
+	type StoppedUnit
+} from '$lib/server/execution/stopped-unit-recovery';
+import { runProcessResultFloor } from '$lib/server/execution/process-result-floor';
+import type { ObservedProcessRun } from '$lib/server/tools/process-run-observer';
 // ⭐ `JAN-NOANS`: the `resolveJudgeModel` import is GONE from this route, and its absence is the check. It was
 // the last live reference to the REVIEWER's model on the EXECUTION path — `REG-F-356`'s defect, whose final
 // residue survived in the host-configured fallback identity below. Lint is what reports a relapse.
@@ -559,6 +578,18 @@ export const load: PageServerLoad = ({ params }) => {
 	// the shaped plans — the events don't carry stepType) drives the AI-no-binding coherence advisory.
 	const attemptsByStepId = buildAttemptsByStepId(plans, engine.readAllEvents());
 
+	// ⭐ `JAN-EXEC` P7-6R R-1d (RD2, RD3, RD9) — each unit WAITING for a person after a refused review: what refused it, the
+	// choices RD3 offers for that refusal, and how many re-runs it has had. Read from the record (`recoveryViewOf`), so the
+	// page offers what the server will accept — the server refuses a re-review after a concluded refusal too.
+	// ⭑ And the waiting steps, whose own controls the execution tab withholds: Resume and Cancel run nothing, and the
+	// person's choice is made on the unit's row (`REG-F-466`).
+	const recoveryByPwu: Record<string, RecoveryView> = {};
+	for (const p of pwus) {
+		const view = recoveryViewOf(uiSession(), p.id);
+		if (view) recoveryByPwu[p.id] = view;
+	}
+	const awaitingChoiceStepIds = Object.values(recoveryByPwu).map((v) => v.stepId);
+
 	// Tier-2 execution SEQUENCE (JAN-EXECPLAN DWP-04, fork C): arrange the Undertaking's PWU INSTANCES by their TYPES'
 	// hand-off dependency (reuse buildPwaExport — version-scoped to the bound (pwaId, pwaVersion) — then layerHandoff),
 	// plus a SINGLE-AXIS coherence advisory (consumer began before any producer instance SUCCEEDED). The type→instance
@@ -601,6 +632,8 @@ export const load: PageServerLoad = ({ params }) => {
 		prunableStepByPlan,
 		transitionRowsByPlan,
 		attemptsByStepId,
+		recoveryByPwu,
+		awaitingChoiceStepIds,
 		sequence,
 		assessments,
 		disclosures,
@@ -930,6 +963,824 @@ function dispatchResult(commandType: string, aggId: string, payload: unknown) {
 	return { advanced: commandType };
 }
 
+/**
+ * ── ⭐⭐ `JAN-EXEC` P7-6R R-1b (RD2; `REG-D-104` (1); `REG-F-511`; `REG-F-513`) — THE WAIT, RECORDED WHERE THE REFUSAL HAPPENS
+ *
+ * ⛔ UNTIL R-1 THE REFUSAL WROTE NO EVENT: the step stayed RUNNING, the unit EXECUTING and RUNNING, and the reason lived only
+ * in the response's `form.error` (`REG-F-513`). Now the step WAITS, with a reason naming each refusing subject, policy and
+ * disposition (`waitReasonFor`), and the unit's execution axis says WAITING — so the unit reads as waiting for a person,
+ * durably, and the page offers the person's choices (RD3) instead of acts that run nothing (`REG-F-466`).
+ * ⭑ ITS OWN BATCH, AFTER THE REFUSED ONE ROLLED BACK: the refused completion stays refused whole (`SPEC-001-INV-14`,
+ * `REG-F-513`'s atomicity), and the wait is a separate fact about what follows it.
+ * ⚠ ONLY A STEP STILL RUNNING WAITS. A step something else already moved — failed by hand mid-review, say — is not waiting on
+ * this refusal, and `EnterExecutionStepWait` would refuse it; the refusal is then reported alone, as before R-1.
+ * Returns why the wait could not be recorded, or null.
+ */
+function waitForAPerson(
+	pwuId: string,
+	planId: string,
+	stepId: string,
+	refusals: Parameters<typeof waitReasonFor>[0],
+	engineRefusal: string
+): string | null {
+	const steps =
+		(getObject(getEngine(), planId)?.steps as { id?: string; stepState?: string }[] | undefined) ?? [];
+	if (!steps.some((s) => s.id === stepId && s.stepState === 'RUNNING')) return null;
+	return runSteps([
+		[
+			'EnterExecutionStepWait',
+			'EXECUTION_PLAN',
+			planId,
+			{ stepId, waitReason: waitReasonFor(refusals, engineRefusal) }
+		],
+		chg(pwuId, 'EXECUTING', 'EXECUTING', 'WAITING', 'UNASSESSED', 'PRESERVED', [planId])
+	]);
+}
+
+/**
+ * ⭐ P7-6R RD4 — THE PERSON'S CHOICE, AS A DECISION, proposed and approved in the batch it authorises: `authority` the
+ * session's own HUMAN actor (`proposeDecision` refuses any other, `REG-F-014`); the rationale they typed; the subjects the
+ * refused unit, plan, work product and evidence; the observations considered, the refusing assessments'. ⭑ That is canon's
+ * control-action record (RPH-DOC-002:2242-2249), each field a field. ⚠ No policy object authorises a person's re-run, and
+ * none is invented: the authority cited is the sponsor's ruling, in the selected option's reading (`REG-D-104` (1)).
+ */
+function personsDecision(
+	decisionId: string,
+	decisionType: 'REPLAN' | 'ABANDON',
+	selectedOption: string,
+	subjectObjectIds: readonly string[],
+	consideredObservationIds: readonly string[],
+	rationale: string
+): Step[] {
+	return [
+		[
+			'ProposeDecision',
+			'DECISION',
+			decisionId,
+			{
+				decisionType,
+				subjectObjectIds: [...subjectObjectIds],
+				selectedOption,
+				rationale,
+				authority: actingActor(uiSession()),
+				consideredObservationIds: [...consideredObservationIds]
+			}
+		],
+		[
+			'ApproveDecision',
+			'DECISION',
+			decisionId,
+			{
+				selectedOption,
+				rationale,
+				consideredEvidenceIds: [],
+				consideredObservationIds: [...consideredObservationIds],
+				subjectSemanticVersions: { [subjectObjectIds[0]!]: 1 }
+			}
+		]
+	];
+}
+
+/** The refused unit's subjects, in RD4's order: the unit, the refused plan, its work product, then its evidence. */
+const decisionSubjects = (s: StoppedUnit): string[] => [
+	s.pwuId,
+	s.planId,
+	s.workProductId,
+	...s.evidenceIds
+];
+
+/** The work unit, its type, and the type's parsed facts — read as Begin & Execute reads them (`R30`, `REG-F-411`). */
+function unitTypeOf(pwuId: string) {
+	const pwu = getObjectOfType(getEngine(), 'PROFESSIONAL_WORK_UNIT', pwuId);
+	const pwuTypeId = String((pwu?.pwuTypeId ?? '') as string);
+	const pwuType = pwuTypeId ? getObjectOfType(getEngine(), 'PWU_TYPE', pwuTypeId) : undefined;
+	const typeFacts = resolvePwuTypeFacts(
+		(id) => getObjectOfType(getEngine(), 'PWU_TYPE', id),
+		pwuTypeId || undefined
+	);
+	return { pwu, pwuType, pwuTypeId, typeFacts };
+}
+
+/**
+ * ⭐ P7-6R RD7 — EVERYTHING A RE-REVIEW'S FLOORS NEED, REBUILT FROM THE RECORD: the producing turn (prompt, rationale,
+ * producer, exchange — `rebuildProducingTurn`) and the run of each refused command (`rebuildProcessRun`). ⛔ The first
+ * part that cannot be rebuilt refuses the whole, so nothing is dispatched and the unit keeps waiting.
+ */
+async function rebuildForReview(
+	s: StoppedUnit
+): Promise<
+	| {
+			readonly ok: true;
+			readonly turn: RebuiltProducingTurn;
+			readonly runs: ReadonlyMap<string, ObservedProcessRun>;
+	  }
+	| { readonly ok: false; readonly refusedBecause: string }
+> {
+	const { pwuType, pwuTypeId, typeFacts } = unitTypeOf(s.pwuId);
+	const turn = await rebuildProducingTurn(uiSession(), getArtifactStore(), {
+		pwuId: s.pwuId,
+		workProductId: s.workProductId,
+		attemptKey: s.attemptKey,
+		pwuTypeId,
+		template: typeFacts.promptTemplate,
+		...(typeFacts.purpose ? { purpose: typeFacts.purpose } : {}),
+		...(pwuType?.contextSpecification
+			? { contextSpecification: pwuType.contextSpecification as ContextSpecification }
+			: {})
+	});
+	if (!turn.ok) return turn;
+	const runs = new Map<string, ObservedProcessRun>();
+	for (const [i, evidenceId] of s.evidenceIds.entries()) {
+		if (!s.refusals.some((r) => r.subjectId === evidenceId)) continue;
+		const run = await rebuildProcessRun(
+			getObject(getEngine(), evidenceId) ?? {},
+			getArtifactStore(),
+			i + 1
+		);
+		if (!run.ok) return run;
+		runs.set(evidenceId, run.value);
+	}
+	return { ok: true, turn: turn.value, runs };
+}
+
+/**
+ * ⭐ P7-6R RD5 — A RE-RUN IS A PLAN REVISION, IN ONE BATCH: plan B proposed with its one step; A superseded citing B; A's
+ * waiting step cancelled, its reason citing the Decision; B's binding requested and authorized, when its step has one; B
+ * approved and activated; the unit's execution axis WAITING→RUNNING; B's step started — the new attempt on the record.
+ * ⭑ DRIVEN IN THE ENGINE FIRST (`plan-revision-chain.store.test.ts`, R-1a): admitted, as predicted, in this order.
+ * ⚠ CARRIED, NOT FIXED (RD10, `REG-F-232`): no `ReviseExecutionPlan` act exists and `planVersion` stays 1; the chain is read
+ * from `ExecutionPlanSuperseded.supersedingExecutionPlanId`, and A's step is closed explicitly because supersession does not
+ * touch it.
+ */
+function planRevision(
+	s: StoppedUnit,
+	decisionId: string,
+	planB: string,
+	step: {
+		readonly id: string;
+		readonly stepType: 'ASSURANCE_INVOCATION' | 'MODEL_INVOCATION';
+		readonly purpose: string;
+		readonly inputBindings: readonly { artifactId: string; required: boolean }[];
+		readonly binding?: NonNullable<ReturnType<typeof stepBindingFor>>;
+	}
+): Step[] {
+	const bindingId = step.binding?.request.runtimeBindingId;
+	// ⭑ Each act named, so the batch below reads as RD5's list, in RD5's order.
+	const supersedeA: Step = [
+		'SupersedeExecutionPlan',
+		'EXECUTION_PLAN',
+		s.planId,
+		{ supersedingExecutionPlanId: planB }
+	];
+	// ⛔ SUPERSESSION DOES NOT TOUCH A's STEPS (`REG-F-232`), so the waiting step is closed here, citing the Decision.
+	const cancelA: Step = [
+		'CancelExecutionStep',
+		'EXECUTION_PLAN',
+		s.planId,
+		{
+			stepId: s.stepId,
+			reason: `Superseded by plan ${planB} under the person’s Decision ${decisionId} (REG-D-104 (1)).`
+		}
+	];
+	const bindB: Step[] =
+		step.binding && bindingId
+			? [
+					['RequestRuntimeBinding', 'RUNTIME_BINDING', bindingId, step.binding.request],
+					[
+						'AuthorizeRuntimeBinding',
+						'RUNTIME_BINDING',
+						bindingId,
+						{ grantedCapabilities: [...step.binding.request.requestedCapabilities] }
+					]
+				]
+			: [];
+	const proposeB: Step = [
+		'ProposeExecutionPlan',
+		'EXECUTION_PLAN',
+		planB,
+		{
+			executionPlanId: planB,
+			workUnitId: s.pwuId,
+			steps: [
+				{
+					id: step.id,
+					executionPlanId: planB,
+					stepType: step.stepType,
+					...(bindingId ? { runtimeBindingId: bindingId } : {}),
+					purpose: step.purpose,
+					inputBindings: [...step.inputBindings],
+					outputBindings: [],
+					preconditions: [],
+					postconditions: [],
+					stepState: 'QUEUED'
+				}
+			],
+			transitions: [],
+			retryPolicy: {},
+			tacticalChangePolicy: {},
+			escalationPolicy: {},
+			terminationPolicy: {}
+		}
+	];
+	const activateB: Step[] = [
+		['ApproveExecutionPlan', 'EXECUTION_PLAN', planB, {}],
+		[
+			'ActivateExecutionPlan',
+			'EXECUTION_PLAN',
+			planB,
+			{ authorizedRuntimeBindingIds: bindingId ? [bindingId] : [] }
+		]
+	];
+	const resumeUnit = chg(s.pwuId, 'EXECUTING', 'EXECUTING', 'RUNNING', 'UNASSESSED', 'PRESERVED', [
+		planB
+	]);
+	const startB: Step = ['StartExecutionStep', 'EXECUTION_PLAN', planB, { stepId: step.id }];
+	return [proposeB, supersedeA, cancelA, ...bindB, ...activateB, resumeUnit, startB];
+}
+
+/**
+ * ⛔ THE MODEL IS THE EXECUTOR of a model step's result — Begin & Execute's completion, a re-run's, and a re-review's,
+ * which names the work product the model made in the refused attempt. ⭑ ONE LITERAL, because the run report reads a
+ * completion's shape by it (`scripts/phase7/run-report-core.ts`, `MODEL_EXECUTOR_NAME`), and its control holds the page
+ * to saying it exactly once.
+ */
+function modelExecutedBy(modelId: string) {
+	return { actorId: `model:${modelId}`, actorType: 'AGENT' as const, displayName: 'Execution model' };
+}
+
+/** What one model unit's run needs: the started plan and step, its binding, its executor, and its type's facts. */
+interface ModelUnitRun {
+	readonly pwuId: string;
+	readonly planId: string;
+	readonly stepId: string;
+	/** The id the step's completion records as `executionAttemptId`. */
+	readonly attemptId: string;
+	readonly binding: ReturnType<typeof stepBindingFor>;
+	readonly bindingId: string;
+	readonly executor: RunnableExecutorSelection;
+	readonly pwu: Record<string, unknown> | undefined;
+	readonly pwuType: Record<string, unknown> | undefined;
+	readonly pwuTypeId: string;
+	readonly typeFacts: ReturnType<typeof resolvePwuTypeFacts>;
+	/**
+	 * ⭐ P7-6R RD8 — a refused attempt's SUBJECT findings, carried by a person's re-run of the work into this run's FRESH
+	 * session, on its first turn only. Absent for Begin & Execute.
+	 */
+	readonly carriedFindings?: readonly { readonly code: string; readonly statement: string }[];
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` P7-6R — A MODEL UNIT'S RUN, AFTER ITS PLAN'S STEP HAS STARTED: the producer loop, the work-product floor,
+ * the evidence join, the completion — and, when the floor refuses the completion, the WAIT (RD2). Extracted from
+ * Begin & Execute, unchanged but for RD6's attempt key, RD8's carried findings and RD2's wait, because a person's re-run
+ * of the work (`rerunWork`, RD5) runs exactly this on its plan B: a second copy of the loop is how two descriptions of one
+ * run come to disagree (`REG-F-353`).
+ */
+async function runModelUnit(u: ModelUnitRun) {
+	const { pwuId, planId, stepId, attemptId, binding, bindingId, executor } = u;
+	const { pwu, pwuType, pwuTypeId, typeFacts } = u;
+	const template = typeFacts.promptTemplate;
+	// ⭐ P7-6R RD6 — THE ATTEMPT THIS RUN IS, `<stepId>#<n>`: the step has just started, so its count of Starts names it.
+	// Every work product and every command evidence this run records carries it, so a re-review knows which attempt made
+	// what it re-reviews — the reference a DBOS step output would carry (the design's §6).
+	const attemptKey = attemptKeyOf(getEngine(), planId, stepId);
+	// ── ⭑ THE MODEL CALL HAPPENS HERE, OUTSIDE THE BATCH, AND THAT IS NOT A COMPROMISE ─────────────────
+	//
+	// `runSteps` dispatches atomically. An external call cannot join that batch, and it should not: a step
+	// whose model call failed has genuinely STARTED and genuinely FAILED, and `FailExecutionStep` is the
+	// command that says so. Rolling the start back would erase a try that happened, cost money, and is
+	// exactly what `PER-9` keeps records for.
+	// ── ⭑⭑ JAN-EXECLOOP — THE LOOP `REG-D-059` LICENSED AND LEFT OPEN ─────────────────────────────
+	//
+	// The sponsor: *"the automated reviews / policies … are fed back into the executing agent of the PWU
+	// so that it may attempt to address the identified findings. However, that could go in loops so
+	// there is expected to be a loop detection capability … At some point — say two loops or three —
+	// there would be an escalation."* `REG-D-059` measured the ground and named the gap exactly: three
+	// of the four parts existed; **what was missing is the LOOP** — a bound greater than one, and the
+	// classification that decides when to stop.
+	//
+	// ⚠ EVERY TRY IS ITS OWN ARTIFACT AND ITS OWN EXCHANGE RECORD. `PER-9` requires *"each retry,
+	// reformat, and repair request"* be recorded, and CSAA-007 that *"repair never rewrites predecessor
+	// raw output"* — so a superseded try is SUPERSEDED, never overwritten. Reusing one artifact id
+	// across tries would destroy the evidence the loop exists to produce.
+	let outcome!: Extract<Awaited<ReturnType<typeof runModelInvocationStep>>, { ran: true }>;
+	let review!: Awaited<ReturnType<typeof runWorkProductFloor>>;
+	let artifactId = '';
+	let priorFindings: readonly { code: string; statement: string }[] = [];
+	const openPerTry: number[] = [];
+	let loopEnded = '';
+
+	// ⭑⭑ ONE SESSION FOR THE WHOLE WORK UNIT (`JAN-EXECSESS`). The sponsor's v2 mechanism: *"the CLI
+	// session wasn't closed or released until the phase or sub-phase completed … This approach allowed
+	// the assurance policies feedback to be fed back to the implementing agent before that phase or
+	// sub-phase was determined complete."* Opened before the loop and released in `finally`, so a
+	// repair turn reaches a producer that remembers what it produced.
+	// ── ⭑⭑ CP-04d — THE POLICY IS RESOLVED FROM THE STORE, BEFORE A SINGLE TURN IS SENT ────────────
+	//
+	// `ICP-04`'s exit test is *"point a binding at a policy that does not exist. This MUST refuse"*, and
+	// until this line it stood only in a unit test with a hand-built finder. ⚠ The refusal FAILS THE
+	// STEP rather than throwing past it: the step has already STARTED (the batch above ran
+	// `StartExecutionStep`), so a try that cannot proceed is a failure with a reason, not an absence.
+	let governing: ReturnType<typeof resolveContextPolicy>;
+	try {
+		governing = resolveContextPolicy(getEngine(), stepId);
+	} catch (e) {
+		const why = e instanceof Error ? e.message : String(e);
+		runSteps([['FailExecutionStep', 'EXECUTION_PLAN', planId, { stepId, failureReason: why }]]);
+		return fail(400, { error: `The model invocation did not run: ${why}` });
+	}
+
+	/**
+	 * What the binding CURRENTLY says, from the store — never the request. Both halves, together.
+	 *
+	 * ⛔⛔ `W-1` — THE PROJECTION IS THE KERNEL'S, NOT A FOURTH SPELLING OF IT. This used to be
+	 * `.map((c) => String(c.capability ?? ''))`, which is a FOURTH projection of `grantedCapabilities`
+	 * and the only one that does not use `capabilityIdentities` — whose own docblock says *"ONE COPY,
+	 * because there are now three readers, and a projection duplicated per reader is how two of them come
+	 * to disagree."* ⚠ AND THEY DID DISAGREE: the kernel's DROPS a non-string element (fail-closed, an
+	 * unreadable grant grants nothing), while `String(c.capability ?? '')` COERCED one into the empty
+	 * string and kept it — an entry no authorizer wrote, in the list a tool surface is minted from.
+	 *
+	 * ⛔⛔ `B-1` — AND THE STATUS COMES BACK WITH IT, because a capability list is NOT an authorization.
+	 * `RevokeRuntimeCapability` advances `authorizationStatus` to REVOKED and DELIBERATELY leaves
+	 * `grantedCapabilities` intact (its handler says so: the revocation event is derived from the set the
+	 * binding held). So every reader that took only the list saw the same answer before and after a
+	 * revocation, and §22.1's *"Revoked bindings cannot be used for new attempts"* — RATIFIED — was
+	 * enforced on the START arrow and nowhere per try. Returning the pair from ONE read is what stops a
+	 * caller holding a grant without the fact that says whether it still stands.
+	 */
+	const currentBinding = (id: string): { status: string; capabilities: string[] } => {
+		const state = listByType(getEngine(), 'RUNTIME_BINDING')
+			.map((b) => b.state as Record<string, unknown>)
+			.find((b) => b.id === id);
+		return {
+			status: typeof state?.authorizationStatus === 'string' ? state.authorizationStatus : '',
+			capabilities: capabilityIdentities(state?.grantedCapabilities)
+		};
+	};
+
+	// ── ⭐⭐ JAN-EXEC PHASE 2 — THE PRODUCER IS OPENED IN THE UNDERTAKING'S WORKSPACE ────────
+	//
+	// ⛔ UNTIL THIS LINE IT WAS OPENED IN THE SERVER'S. `openPiExecutionSession` hardcoded `process.cwd()`
+	// twice because the opener was zero-argument and had nowhere else to get a directory — so an executing
+	// model's notion of "here" was the SvelteKit server's own source tree, i.e. this repository.
+	//
+	// ⭑ THE OWNER IS THE **UNDERTAKING**, READ OFF THE PWU (`R8`). This action takes no `params`, and it
+	// does not need to: `undertakingId` is on the flattened PWU, which is also the field `listPwus` keys on —
+	// so the workspace belongs to the same object the work unit does, and a second step in a new session lands
+	// in the same directory as the first.
+	//
+	// ── ⭐⭐ JAN-EXEC PHASE 3 — AND THE STEP'S GRANT DECIDES WHAT THE MODEL CAN DO IN IT ──────────────
+	//
+	// `grantedCapabilities` is read from the STORE, not from the request, exactly as the per-try refusal
+	// below reads it: the tools minted for this session are the ones the RUNTIME_BINDING currently
+	// grants, and an ungranted tool is never minted, so the model is never told it exists.
+	//
+	// ── ⛔⛔ `B-1c` — THE DISCLOSURE THAT USED TO STAND HERE NAMED A REFUSAL THAT DID NOT EXIST ────────
+	//
+	// It read: *"a capability revoked between tries refuses the next try when the step REQUIRES it
+	// (`stepCapabilityRefusal`, below) — but a revoked capability the step merely USES leaves its tool
+	// minted for the rest of this held session."* **DRIVEN: IT DID NOT, FOR `REQUIRES` OR FOR `USES`.**
+	// And the sentence was wrong in a second way that is worse than the first: ⛔ **"a capability revoked
+	// between tries" IS NOT AN EXPRESSIBLE ACT.** `RevokeRuntimeCapability` takes NO capability list — it
+	// revokes the whole BINDING — and `grantIsMonotone` refuses an authorization that omits a capability
+	// already granted. There is no command in this engine that removes one capability from a live
+	// binding, so the disclosure described a mechanism, a refusal and a residual that all had no subject.
+	//
+	// ⭐ **WHAT IS TRUE NOW, AND IT IS THE `B-1` FIX RATHER THAN A REWORDING.** Revocation acts on the
+	// BINDING, and both readers now take its STATUS:
+	//   · BEFORE the session opens — `mintExecutionTools` mints NOTHING for a binding that cannot back a
+	//     new attempt, so a revoked binding gets a model with no hands at all;
+	//   · BETWEEN tries — `stepCapabilityRefusal` refuses the NEXT TRY outright, for `REQUIRES` and
+	//     `USES` alike, because the refusal is on the binding and not on one capability.
+	//
+	// ⚠ **AND THE BOUND THAT GENUINELY REMAINS, STATED WITHOUT THE PART THAT WAS FALSE.** The surface is
+	// minted ONCE, when the session opens, while the status and grant are re-read on EVERY try — so a
+	// binding revoked mid-unit leaves its already-minted tools ON THE HELD SESSION. What that costs is
+	// bounded by the refusal above: no further TURN is taken, so the model is never asked anything again
+	// and never gets to call them. The session is held on sponsor authority (`JAN-EXECSESS`), so "a
+	// session per try" is not available. ⭑ Pi exposes `AgentSession.setActiveToolsByName`, which can only
+	// NARROW a registry this host already built — that is the seam a later increment would use, and
+	// naming it keeps this a disclosed bound rather than an unknown one.
+	let producer: Awaited<ReturnType<ReturnType<typeof getExecutionSession>>>;
+	try {
+		const current = binding ? currentBinding(bindingId) : undefined;
+		producer = await getExecutionSession(executor)({
+			...resolveUndertakingSandbox(String((pwu?.undertakingId ?? '') as string)),
+			grantedCapabilities: current?.capabilities ?? [],
+			// ⚠ `''` FOR A STEP THAT NAMES NO BINDING, AND WHAT MAKES THAT SAFE IS THE **LIST**, NOT THIS
+			// FIELD — said because the plausible reading is the other way round. `canReuseBindingForNewAttempt`
+			// refuses REVOKED and DENIED and nothing else, so an empty status passes it; what mints nothing
+			// is the empty capability set beside it. ⛔ The same holds for a binding id that no longer
+			// resolves: both halves come back empty from ONE read, so the two cannot disagree about which
+			// case this is.
+			bindingAuthorizationStatus: current?.status ?? ''
+		});
+	} catch (e) {
+		// ⚠ A REFUSED SANDBOX FAILS THE STEP RATHER THAN ESCAPING AS A 500, mirroring the context-policy
+		// refusal directly above: the step has already STARTED, so a producer that cannot lawfully be opened
+		// is a failure with a reason, not an absence.
+		const why = e instanceof Error ? e.message : String(e);
+		runSteps([['FailExecutionStep', 'EXECUTION_PLAN', planId, { stepId, failureReason: why }]]);
+		return fail(400, { error: `The model invocation did not run: ${why}` });
+	}
+	// ⭐ `JAN-SELRES` RS-1 (D4) — the record's fallback identity, from the selection that just opened the producer.
+	const fallbackIdentity = executorRecordIdentity(executor);
+	try {
+		for (let attempt = 1; ; attempt++) {
+			// ⛔ ONE READ PER TRY, HELD IN ONE VALUE. Reading the status and the grant through two calls
+			// would reinstate, at the call site, the very split `currentBinding` exists to close.
+			const onThisTry = binding ? currentBinding(bindingId) : undefined;
+			const tryOutcome = await runModelInvocationStep({
+				// ⭐⭐ `JAN-ASSERTED` `R30` — ONE PARSE REPLACES FIVE HAND-WRITTEN ASSERTIONS.
+				//
+				// ⛔ THIS LITERAL USED TO READ `String((pwu?.title ?? '') as string)` and four more like
+				// it. Every field was ASSERTED into the shape this call wanted, so `check-types` had
+				// nothing to check and two of them contradicted the contract outright.
+				//
+				// ⭑ `resolveInvocationSubject` refuses on ABSENCE **and on SHAPE**, the way
+				// `resolveContextAssemblyPolicy` already does one object over. It closes the boundary by
+				// CONSTRUCTION rather than by enumeration: a twelfth field added later is checked for
+				// free, and a field the schema has never heard of becomes an error instead of `undefined`.
+				//
+				// ⚠ `purpose` COMES FROM THE **TYPE**, not the work unit, so it is supplied from the
+				// parsed type facts rather than folded into the subject resolver — two objects, two
+				// parses, neither one speaking for the other.
+				subject: {
+					...resolveInvocationSubject(
+						(id) => getObjectOfType(getEngine(), 'PROFESSIONAL_WORK_UNIT', id),
+						pwuId
+					),
+					...(typeFacts.purpose ? { purpose: typeFacts.purpose } : {})
+					// ⭐⭐ `JAN-ASSERTED` — TWO CASTS USED TO SIT HERE, AND THEY ARE `REG-F-411` IN FULL:
+					//
+					//     expectedOutputs:   (pwu?.expectedOutputs   as string[] | undefined) ?? [],
+					//     inputRequirements: (pwu?.inputRequirements as string[] | undefined) ?? []
+					//
+					// ⛔ THE CONTRACT SAYS OBJECTS. `objects.ts:556`/`:555` declare both as
+					// `z.array(z.record(z.string(), z.unknown()))`, so `.join(', ')` downstream rendered
+					// `[object Object]` into every executing model's instruction — and into every
+					// reviewer's, which judges `RR-07-no-contradiction` against it. `check-types` could
+					// not see it because **the cast existed precisely to stop it**.
+					//
+					// ⭑ AND `?? []` WAS THE SECOND DEFECT, QUIETER THAN THE FIRST. It turned ABSENT into
+					// PRESENT-BUT-EMPTY, which defeated `JAN-PROMPT`'s ratified default #2 (2026-09-04,
+					// `REG-D-058`) — *"A missing declared placeholder at render time is a REFUSAL, not a
+					// disclosed gap."* The guard is live in `prompt-render.ts` and pinned green by
+					// `execution-invocation.test.ts`; four characters here made it unreachable at the only
+					// production call site.
+					//
+					// ⭐ NOTHING REPLACES THEM, BY RULING (`R29`). No form anywhere lets a professional
+					// author `expectedOutputs`; every production site mints `{outputId: 'out_<ulid>',
+					// kind: 'DOCUMENT'}`, so the best possible rendering is an internal id and a constant
+					// the surface invented. The professional's own statement of the required output
+					// already reaches the instruction through `PromptTemplate.outputContract`.
+				},
+				subjectSemanticVersion: Number((pwu?.semanticVersion ?? 1) as number),
+				pwuTypeId,
+				template,
+				store: getArtifactStore(),
+				tenantPrefix: EXECUTION_TENANT_PREFIX,
+				dispatchExchange: (payload, aggregateId) =>
+					dispatch('RecordModelExchange', 'MODEL_EXCHANGE', aggregateId, payload),
+				newId: mintUiId,
+				now: hostNow,
+				// ⭐⭐ `JAN-NOANS` — THE EXECUTOR'S OWN CONFIGURATION, AND THIS LINE READ THE REVIEWER'S.
+				//
+				// ⛔ IT SAID `resolveJudgeModel() ?? 'unresolved'` WITH `providerId: 'agy'` — the ASSURANCE
+				// model and the ASSURANCE tool, handed to an EXECUTION step. That is `REG-F-356`'s defect,
+				// which `TS-04`/`LE-01` fixed on the paths two comments below (*"This read
+				// `resolveJudgeModel()` — it labelled the PRODUCING model with the REVIEWING model's id"*)
+				// — and this arm was left behind.
+				//
+				// ⚠ IT SURVIVED BECAUSE NOTHING REACHED IT. These values are the HOST_CONFIGURED FALLBACK,
+				// used only when the tool reports no identity of its own~~: the success path always overrides
+				// them with `produced.producer`. So the only readers were the `catch` arm and — now —
+				// `JAN-NOANS`'s no-answer arm~~ — ⭐ `JAN-SELRES` D4, CORRECTED: which for the agy executor, whose
+				// answer is a bare string, is EVERY call, the successful ones included; only Pi's success path
+				// overrides them with `produced.producer`. The defect became visible on the first live run that
+				// took the fallback: an EXECUTION exchange whose `resolvedModel` read `gemini-3.1-pro-high`.
+				//
+				// ⭑ MEASURED, NOT REASONED. `checkIndependence('DIFFERENT_MODEL', …)` reads this field, so a
+				// failed execution call was recorded as having been produced by the reviewer.
+				//
+				// ⭐ `JAN-SELRES` RS-1 (D4) — AND THEY COME FROM THE SELECTION THAT OPENED THE EXECUTOR, no longer
+				// from a second read of the environment per try (`resolveExecutorModel()`,
+				// `resolveExecutorToolId()`). With the agy executor running the JUDGE model, that read named a
+				// model that never ran (`REG-F-458`); now the model agy is asked to run IS the model recorded, and
+				// the stand-in records no configured model, because none produced its answer.
+				modelId: fallbackIdentity.modelId,
+				// ⭑ THE TOOL, GRADED HOST_CONFIGURED, WHICH IS WHAT IT HONESTLY IS. The provider proper is
+				// embedded in the model label (`openai-codex/gpt-6-astra`) and only the tool can resolve it —
+				// so when the tool told us nothing, the tool id is the strongest true thing available.
+				providerId: fallbackIdentity.providerId,
+				session: producer,
+				priorFindings,
+				// ⭐ P7-6R RD8 — a person's re-run of the work carries the refused review's subject findings on its FIRST turn,
+				// after the instruction, into this fresh session; later tries are repairs on the now-held session.
+				...(attempt === 1 && u.carriedFindings?.length ? { carriedFindings: u.carriedFindings } : {}),
+				// ⭑ THE RESOLVED POLICY, not an id — obeying it is the STEP's job because that is where the
+				// assembly happens; resolving it is the caller's because that is what needs the store.
+				contextPolicy: governing.policy,
+				// ⭑ `PWU_TYPE.contextSpecification` — ratified, and read by NOTHING until CP-04b.
+				...(pwuType?.contextSpecification
+					? { contextSpecification: pwuType.contextSpecification as ContextSpecification }
+					: {}),
+				// ⭑ EG-03 — the binding's CURRENT status AND grant, read from the store on EVERY try.
+				// ⛔ `B-1`: BOTH, from ONE read. Revocation between tries changes the STATUS and leaves the
+				// GRANT untouched — `RevokeRuntimeCapability` does not clear it — so a caller passing the
+				// grant alone passed a value that could not change and called it a check.
+				binding:
+					binding && onThisTry
+						? {
+								kind: 'BOUND',
+								binding,
+								granted: onThisTry.capabilities,
+								authorizationStatus: onThisTry.status
+							}
+						: { kind: 'NONE' }
+			});
+
+			if (!tryOutcome.ran) {
+				// ⛔ THE STEP FAILS, AND SAYS WHY. The work unit does not advance as though the work were done —
+				// which is the whole difference between a demo and a record.
+				runSteps([
+					[
+						'FailExecutionStep',
+						'EXECUTION_PLAN',
+						planId,
+						{ stepId, failureReason: tryOutcome.refusedBecause }
+					]
+				]);
+				return fail(400, {
+					error: `The model invocation did not run: ${tryOutcome.refusedBecause}`
+				});
+			}
+			outcome = tryOutcome;
+
+			// ⭑⭑ THE ARTIFACT IS RECORDED ON ITS OWN, AND THE EVIDENCE TAUGHT ME THAT. My first version put
+			// `RecordArtifact` and `CompleteExecutionStep` in ONE atomic batch. The floor refused the completion —
+			// correctly — and took the artifact down with it, so a model call that DID happen and DID produce a
+			// work product left no work product behind. ⚠ The model's output is a FACT about the world; whether
+			// the step may COMPLETE is a judgement about that fact. Rolling the fact back because the judgement
+			// went against it is the erasure `PER-9` exists to prevent.
+			artifactId = mintUiId('art');
+			const recorded = runSteps([
+				[
+					'RecordArtifact',
+					'ARTIFACT',
+					artifactId,
+					{
+						artifactId,
+						artifactType: 'work-product',
+						mediaType: 'text/plain',
+						storageProvider: 'jpwb:content-plane',
+						storageKey: tryOutcome.storageKey,
+						contentHash: tryOutcome.contentHash,
+						byteSize: tryOutcome.byteSize,
+						producingPwuId: pwuId,
+						// ⭐ P7-6R RD6 — the attempt that made it. `messages.ts` has carried the field since it was generated;
+						// nothing set it until a re-review needed to know which attempt produced what it re-reviews.
+						producingExecutionAttemptId: attemptKey,
+						// ⚠ NOT NARROWED. These four columns have no ratified vocabulary (`REG-Q-056`, OPEN) and
+						// `handlers/artifact.test.ts:123-136` is a green test that exists to catch anyone inventing
+						// one. Free strings here are the honest shape, not laziness.
+						securityClassification: 'unclassified',
+						retentionClass: 'retained-by-participation',
+						status: 'recorded'
+					}
+				]
+			]);
+			if (recorded)
+				return fail(400, { error: `Recording the work product failed: ${recorded}` });
+
+			// ── ⭑⭑ THE FLOOR RUNS OVER THE WORK PRODUCT, SO IT CAN BE SATISFIED AND NOT ONLY REFUSE ────────
+			//
+			// `REG-F-352` left this step able to run, produce a work product, and never complete: the floor
+			// refused it correctly and nothing could satisfy it. This is the run that can.
+			//
+			// ⭑ THE SUBJECT IS THE ARTIFACT, because that is what `floorGateBlock` looks for. And the criteria
+			// come from the SAME policy object the authoring review reads — restating the rubric here is how
+			// four descriptions of one criterion came to disagree.
+			review = await runWorkProductFloor(
+				{
+					artifactId,
+					artifact: (getObject(getEngine(), artifactId) ?? {}) as Record<string, unknown>,
+					// The exchange the call just recorded — resolved by the id the outcome now carries, rather
+					// than searched for. `verifyExchangeContent` re-hashes its refs to decide `traceComplete`.
+					exchange: (getObject(getEngine(), tryOutcome.exchangeId) ?? {}) as never,
+					answer: tryOutcome.answer,
+					producingPrompt: tryOutcome.prompt,
+					// ⭑⭑ THE PRODUCER IS THE MODEL THAT ANSWERED, NOT THE JUDGE. This read
+					// `resolveJudgeModel()` — it labelled the PRODUCING model with the REVIEWING model's id, so
+					// `checkIndependence('DIFFERENT_MODEL', …)` compared a string with itself and could only
+					// refuse. The outcome now carries who actually produced the work product.
+					producerModelId: tryOutcome.producer.modelId,
+					producerProviderId: tryOutcome.producer.providerId,
+					// ⭑ THE PRODUCER'S OWN ACCOUNT, forwarded to the reviewer. Undefined when the model did not
+					// declare one — a recorded shortfall, never a synthesized summary.
+					...(tryOutcome.rationale ? { rationale: tryOutcome.rationale } : {}),
+					// ⛔ OFF BY DEFAULT. The sponsor's model puts the loop's state on the PRODUCER — *"the
+					// component responsible for tracking or remembering how it responded to the various
+					// feedback"* — and the paper's deployed pipeline does the same: the judge's reason is
+					// appended to the GENERATOR's prompt and the judge re-scores each draft cold. Supplied
+					// here only when a deployment has explicitly chosen otherwise.
+					...(reviewSeesPriorFindings() && priorFindings.length
+						? { priorGaps: priorFindings.map((f) => `${f.code}: ${f.statement}`) }
+						: {})
+				},
+				uiSession(),
+				{
+					artifacts: getArtifactStore(),
+					now: hostNow,
+					newId: mintUiId,
+					criteria: reasoningReviewCriteria(uiSession())
+				}
+			);
+			if (review.satisfied) break;
+
+			// ⭑ THE OPEN-FINDING COUNT IS THE REMEDIATION'S OWN, not a severity cut I invented here. That set
+			// is already filtered to valid SUBJECT findings, never operational failures.
+			openPerTry.push(review.remediation.findings.length);
+			const trend = classifyTrend(openPerTry);
+			const gate = mayRetry(attempt, trend);
+
+			// ⛔ `autoRefine` IS THE GUARD THAT DECIDES WHETHER THERE IS ANYTHING TO SEND BACK AT ALL. An
+			// INCONCLUSIVE review — *the reviewer could not tell* — sets it false, because feeding that back
+			// as though it were a critique would MANUFACTURE WORK FROM SILENCE (`REG-D-059`, `ASR-11` limb 1).
+			if (!review.remediation.autoRefine || !gate.retry) {
+				loopEnded = review.remediation.autoRefine
+					? `${gate.reason} Trend after ${attempt} ${attempt === 1 ? 'try' : 'tries'}: ${trend}.`
+					: `The review did not produce findings that may be sent back to the producer (${review.remediation.action}).`;
+				break;
+			}
+			priorFindings = review.remediation.findings.map((f) => ({
+				code: f.code,
+				statement: f.statement
+			}));
+		}
+	} finally {
+		// ⚠ RELEASED WHEN THE UNIT STOPS BEING WORKED ON — satisfied, escalated, or out of tries — and in
+		// a `finally` so a refusal mid-loop cannot strand a live session.
+		producer.dispose();
+	}
+
+	// ── ⭐⭐ JAN-EXEC PHASE 5 — THE EVIDENCE JOIN: every command the host ran becomes a governed object ──
+	//
+	// ⛔ UNTIL THIS BLOCK, `proposedEvidenceIds` WAS THE LITERAL `[]` ON EVERY PATH IN THIS FILE, and the
+	// exit code of a model-run test suite existed NOWHERE after the turn ended — `ProcessRunOutcome.
+	// retention` had no production consumer and the tool-call observer drops everything but a name and an
+	// outcome. So a step could run a test suite and complete with no governed trace that it had.
+	//
+	// ⭐ `R18`: EVERY COMPLETED RUN, TYPED `OBSERVATION`. This host cannot tell `npm test` from `ls` —
+	// `run_command` is one tool name for every command and the argv was chosen by an untrusted party — so
+	// it records what it CAN say. ⛔ Including runs `R17` will BLOCK: minting only the ones that would
+	// pass would let a step complete as though a killed command never happened.
+	//
+	// ⚠ THE JOIN RUNS EVEN WHEN THE WORK-PRODUCT FLOOR REFUSED, and that is deliberate. A command that
+	// ran is a FACT about the world; whether the step may COMPLETE is a judgement about that fact. It is
+	// the same argument `PER-9` makes for not rolling the artifact back when the floor refuses it.
+	const observedRuns = producer.processRuns();
+	const join = await joinProcessEvidence(
+		{
+			runs: observedRuns.runs,
+			// ⭑ THE PRODUCING MODEL'S EXCHANGE (`R15`). A child process has no exchange; what
+			// `traceComplete` verifies is the record of the turn in which the model DECIDED to run this.
+			exchange: (getObject(getEngine(), outcome.exchangeId) ?? {}) as never,
+			producingPrompt: outcome.prompt,
+			producerModelId: outcome.producer.modelId,
+			producerProviderId: outcome.producer.providerId,
+			// ⭐ `R15`'s INDEPENDENT HALF — the adapter's own observation, not the model's word (§22.1).
+			observedToolCalls: governedToolCallReport(producer.lastTurnObservation()),
+			...(outcome.rationale ? { rationale: outcome.rationale } : {}),
+			scope: `commands run by the executing model for work unit ${pwuId}`,
+			tenantPrefix: EXECUTION_TENANT_PREFIX,
+			// ⭐ P7-6R RD6 — and each command's evidence names the same attempt, in its content reference.
+			producingExecutionAttemptId: attemptKey
+		},
+		uiSession(),
+		{
+			artifacts: getArtifactStore(),
+			now: hostNow,
+			newId: mintUiId,
+			criteria: reasoningReviewCriteria(uiSession()),
+			// ⚠ ONE COMMAND PER CALL, THROUGH THE SAME `runSteps` THE REST OF THIS ACTION USES, so a
+			// refusal anywhere rolls the whole action back (`SPEC-001-INV-14`). A module reaching for the
+			// engine directly would commit evidence this path's own failure arm could not undo.
+			propose: (evidenceId, payload) =>
+				runSteps([['ProposeEvidence', 'EVIDENCE', evidenceId, payload]]),
+			getObject: (id) => getObject(getEngine(), id) as Record<string, unknown> | undefined
+		}
+	);
+	if (join.refusedBecause)
+		return fail(400, {
+			error: `The model ran ${observedRuns.observedCount} command(s) and one could not be recorded as evidence: ${join.refusedBecause}`
+		});
+
+	// ── ⛔ AND NOW THE FLOOR DECIDES, WHICH IS THE WHOLE POINT ─────────────────────────────────────
+	//
+	// `floor-gate.ts:30` — `AI_STEP_TYPES = new Set(['MODEL_INVOCATION'])` — makes this step AI-produced
+	// BY CONSTRUCTION, and the recorded provenance names an AGENT, so signal 0 fires too. Completing it
+	// therefore requires the three floor policies SATISFIED against the produced artifact.
+	//
+	// ⭑ THIS GATE HAS NEVER FIRED IN THIS DEMO, because nothing was ever AI-executed: the existing
+	// lifecycle step is a TRANSFORMATION a human drove, and its own comment says so. The first genuine
+	// model-executed work unit is the first thing to meet it.
+	//
+	// ⛔ NOTHING HERE WEAKENS IT. A refusal is reported with its reason and the step stays RUNNING; the
+	// exchange and the work product are already recorded, so what happened is on the record and what is
+	// owed is legible. Making the demo pass by relaxing the gate would defeat the system's central claim.
+	const completed = runSteps([
+		[
+			'CompleteExecutionStep',
+			'EXECUTION_PLAN',
+			planId,
+			{
+				executionStepId: stepId,
+				executionAttemptId: attemptId,
+				resultStatus: 'SUCCEEDED',
+				// ⭑ AN ACTUAL OUTPUT, WHERE THE DEMO HAS ONLY EVER RECORDED `noOutputResult`.
+				outputArtifactIds: [artifactId],
+				// ⭐⭐ PHASE 5 — AND NOW EVERY COMMAND THE MODEL RAN, EACH WITH ITS OWN FLOOR ALREADY
+				// RECORDED. `completeExecutionStep` unions this with `outputArtifactIds` and loops the floor
+				// gate over EVERY member at its own store-derived version — so naming an id whose floor is
+				// missing does not weaken the gate, it REFUSES the completion. That is why the join runs first.
+				proposedEvidenceIds: join.joined.map((j) => j.evidenceId),
+				detectedAssumptionIds: [],
+				structuredResult: {},
+				// ⛔ THE MODEL IS THE EXECUTOR. The TRANSFORMATION path below records the human who
+				// clicked, correctly — a human drove it. Recording a human here would be a fiction, and
+				// the assurance floor is entitled to know which it was.
+				executionProvenance: {
+					// ⭑ THE MODEL THAT ACTUALLY ANSWERED. This read `resolveJudgeModel()` — the REVIEWER's
+					// model — so the execution provenance credited the judge with doing the work. The same
+					// fiction `JAN-TOOLSUITE` removed from the floor, surviving one layer over because
+					// nothing read this field back.
+					executedBy: modelExecutedBy(outcome.producer.modelId)
+				}
+			}
+		],
+		chg(pwuId, 'EXECUTING', 'EXECUTING', 'SUCCEEDED', 'UNASSESSED', 'PRESERVED', [planId])
+	]);
+	if (completed) {
+		// ⭐ P7-6R R-1b (RD2) — the refused completion leaves the step and the unit WAITING for a person (`waitForAPerson`).
+		const waited = waitForAPerson(
+			pwuId,
+			planId,
+			stepId,
+			[
+				...(review.satisfied
+					? []
+					: [
+							{
+								subjectId: artifactId,
+								unsatisfied: review.dispositions.filter((d) => d.disposition !== 'SATISFIED')
+							}
+						]),
+				...join.joined
+					.filter((j) => !j.satisfied)
+					.map((j) => ({ subjectId: j.evidenceId, unsatisfied: j.unsatisfiedPolicies }))
+			],
+			completed
+		);
+		return fail(400, {
+			error: (review.satisfied
+				? // ⭐ `JAN-ESCREC` D3 (`REG-D-090`) — AND WHEN THE WORK PRODUCT PASSED BUT A COMMAND'S RESULT DID NOT, THE COMMAND
+					// EVIDENCE'S OWN REFUSAL (`describeRefusedEvidence`), BEFORE THE ENGINE'S TEXT. The two reviews are independent
+					// calls, so the work product can pass while a command's result is escalated or rejected; this arm printed only
+					// the engine's text, whose fallback is `policyId=disposition` (design G5) — no observation, and beside an
+					// escalation no sentence saying what it asks (the ER-1 app verifier's MAJOR 1, its probe `ER1-VP1`). ⭑ The
+					// same hand-over as the arm below, so one reader splits both; with nothing refused this message is unchanged.
+					`The model ran, its work product is recorded, and the assurance floor is satisfied — but the step still did not complete${describeRefusedEvidence(join.joined) ? ` — and the command evidence did not pass its own floor: ${describeRefusedEvidence(join.joined)}` : '.'} ${completed}`
+				: // ⭑ THE REVIEW RAN AND DID NOT PASS. That is a JUDGEMENT about the work, not a missing
+					// check, and the two must not read the same. The findings are surfaced; feeding them back
+					// to the producing model is REG-D-059's ruling and needs the loop bound, which is the
+					// next increment — so this one stops at surfacing and says so.
+					// ⭑ AND IT SAYS WHY THE LOOP STOPPED, not merely that it did. `REG-D-059` bounds the
+					// repair loop and escalates at the bound; an operator reading this needs to know
+					// whether the producer ran out of tries, stalled, or made things worse.
+					// ⭐ `JAN-SELRES` RS-3 (`REG-F-469`) — THE TRIES THAT RAN, NO MORE. On this arm every try was unsatisfied,
+					// and each pushed its count onto `openPerTry` before the loop decided to stop, so its length IS the
+					// number of tries. This read `openPerTry.length + 1`: a single review said "2 tries", and a try is a
+					// billed call. `begin-execute-try-count.test.ts` holds it against the EXECUTION exchanges recorded.
+					// ⭐ `JAN-ESCREC` D3 (`REG-D-090`) — AND BESIDE AN ESCALATED REVIEW'S OBSERVATIONS, WHAT THE ESCALATION ASKS
+					// (`escalatedReviewNote`): routed to a human reviewer, whose review this workbench cannot record yet
+					// (`REG-F-474`). Keyed on the classifier's ACTION, never on prose; the command evidence's refusal carries
+					// its own (`describeRefusedEvidence`), on this arm and on the satisfied arm above.
+					// `begin-execute-escalated-review.test.ts` holds both arms, and the satisfied work product beside an
+					// escalated command result.
+					// ⭐ `JAN-ESCREC` D3 — AND OBSERVATIONS THAT HOLD NO FINDING SAY SO, NAMING WHAT REFUSED (`noFindingNote`, keyed
+					// on the codes): the recommendation alone was all this arm printed of a review left INCONCLUSIVE by an
+					// unanswered criterion, and INCONCLUSIVE was named nowhere (the second fix round's re-verifier's finding [0]).
+					// ⛔ Never an ESCALATED review's: the sentence after it explains that one, so the note is keyed on the action too.
+					`The model ran, its work product was reviewed over ${openPerTry.length} ${openPerTry.length === 1 ? 'try' : 'tries'}, and the assurance floor is NOT satisfied: ${review.observations.map((o) => `${o.code}: ${o.statement}`).join(' | ') || completed}${noFindingNote(review.observations, review.dispositions, review.remediation.action)}${escalatedReviewNote(review.remediation.action)}${loopEnded ? ` — ${loopEnded}` : ''}${describeRefusedEvidence(join.joined) ? ` — and the command evidence did not pass its own floor: ${describeRefusedEvidence(join.joined)}` : ''}`) +
+				// ⚠ A WAIT THAT COULD NOT BE RECORDED IS SAID, never swallowed: the unit is then left as K1 left it.
+				(waited ? ` — and the wait for a person’s choice could not be recorded: ${waited}` : '')
+		});
+	}
+	return { advanced: 'executed' };
+}
+
 export const actions: Actions = {
 	// Instantiate a PWU Instance in this Undertaking, realizing a selected PWU Type (CON-009 ownership binding).
 	proposePwu: async ({ request, params }) => {
@@ -1014,7 +1865,7 @@ export const actions: Actions = {
 			(id) => getObjectOfType(getEngine(), 'PWU_TYPE', id),
 			pwuTypeId || undefined
 		);
-		const template = typeFacts.promptTemplate;
+		// ⭐ P7-6R — the template is read where it is used, in `runModelUnit`, which a re-run of the work runs too.
 		// ⭑ JAN-DISCHARGE — DECLARED, NOT SNIFFED. This read `template?.status === 'ACTIVE'`, which inferred a
 		// decision from an artefact: a type became model-executed because someone happened to arm a prompt. The
 		// type now SAYS who does its work, and `checkDischargeCoherence` keeps the two from disagreeing — an
@@ -1156,516 +2007,22 @@ export const actions: Actions = {
 		]);
 		if (err) return fail(400, { error: `Execution failed: ${err}` });
 
-		// ── ⭑ THE MODEL CALL HAPPENS HERE, OUTSIDE THE BATCH, AND THAT IS NOT A COMPROMISE ─────────────────
-		//
-		// `runSteps` dispatches atomically. An external call cannot join that batch, and it should not: a step
-		// whose model call failed has genuinely STARTED and genuinely FAILED, and `FailExecutionStep` is the
-		// command that says so. Rolling the start back would erase a try that happened, cost money, and is
-		// exactly what `PER-9` keeps records for.
-		if (isModelStep) {
-			// ── ⭑⭑ JAN-EXECLOOP — THE LOOP `REG-D-059` LICENSED AND LEFT OPEN ─────────────────────────────
-			//
-			// The sponsor: *"the automated reviews / policies … are fed back into the executing agent of the PWU
-			// so that it may attempt to address the identified findings. However, that could go in loops so
-			// there is expected to be a loop detection capability … At some point — say two loops or three —
-			// there would be an escalation."* `REG-D-059` measured the ground and named the gap exactly: three
-			// of the four parts existed; **what was missing is the LOOP** — a bound greater than one, and the
-			// classification that decides when to stop.
-			//
-			// ⚠ EVERY TRY IS ITS OWN ARTIFACT AND ITS OWN EXCHANGE RECORD. `PER-9` requires *"each retry,
-			// reformat, and repair request"* be recorded, and CSAA-007 that *"repair never rewrites predecessor
-			// raw output"* — so a superseded try is SUPERSEDED, never overwritten. Reusing one artifact id
-			// across tries would destroy the evidence the loop exists to produce.
-			let outcome!: Extract<Awaited<ReturnType<typeof runModelInvocationStep>>, { ran: true }>;
-			let review!: Awaited<ReturnType<typeof runWorkProductFloor>>;
-			let artifactId = '';
-			let priorFindings: readonly { code: string; statement: string }[] = [];
-			const openPerTry: number[] = [];
-			let loopEnded = '';
-
-			// ⭑⭑ ONE SESSION FOR THE WHOLE WORK UNIT (`JAN-EXECSESS`). The sponsor's v2 mechanism: *"the CLI
-			// session wasn't closed or released until the phase or sub-phase completed … This approach allowed
-			// the assurance policies feedback to be fed back to the implementing agent before that phase or
-			// sub-phase was determined complete."* Opened before the loop and released in `finally`, so a
-			// repair turn reaches a producer that remembers what it produced.
-			// ── ⭑⭑ CP-04d — THE POLICY IS RESOLVED FROM THE STORE, BEFORE A SINGLE TURN IS SENT ────────────
-			//
-			// `ICP-04`'s exit test is *"point a binding at a policy that does not exist. This MUST refuse"*, and
-			// until this line it stood only in a unit test with a hand-built finder. ⚠ The refusal FAILS THE
-			// STEP rather than throwing past it: the step has already STARTED (the batch above ran
-			// `StartExecutionStep`), so a try that cannot proceed is a failure with a reason, not an absence.
-			let governing: ReturnType<typeof resolveContextPolicy>;
-			try {
-				governing = resolveContextPolicy(getEngine(), stepId);
-			} catch (e) {
-				const why = e instanceof Error ? e.message : String(e);
-				runSteps([['FailExecutionStep', 'EXECUTION_PLAN', planId, { stepId, failureReason: why }]]);
-				return fail(400, { error: `The model invocation did not run: ${why}` });
-			}
-
-			/**
-			 * What the binding CURRENTLY says, from the store — never the request. Both halves, together.
-			 *
-			 * ⛔⛔ `W-1` — THE PROJECTION IS THE KERNEL'S, NOT A FOURTH SPELLING OF IT. This used to be
-			 * `.map((c) => String(c.capability ?? ''))`, which is a FOURTH projection of `grantedCapabilities`
-			 * and the only one that does not use `capabilityIdentities` — whose own docblock says *"ONE COPY,
-			 * because there are now three readers, and a projection duplicated per reader is how two of them come
-			 * to disagree."* ⚠ AND THEY DID DISAGREE: the kernel's DROPS a non-string element (fail-closed, an
-			 * unreadable grant grants nothing), while `String(c.capability ?? '')` COERCED one into the empty
-			 * string and kept it — an entry no authorizer wrote, in the list a tool surface is minted from.
-			 *
-			 * ⛔⛔ `B-1` — AND THE STATUS COMES BACK WITH IT, because a capability list is NOT an authorization.
-			 * `RevokeRuntimeCapability` advances `authorizationStatus` to REVOKED and DELIBERATELY leaves
-			 * `grantedCapabilities` intact (its handler says so: the revocation event is derived from the set the
-			 * binding held). So every reader that took only the list saw the same answer before and after a
-			 * revocation, and §22.1's *"Revoked bindings cannot be used for new attempts"* — RATIFIED — was
-			 * enforced on the START arrow and nowhere per try. Returning the pair from ONE read is what stops a
-			 * caller holding a grant without the fact that says whether it still stands.
-			 */
-			const currentBinding = (id: string): { status: string; capabilities: string[] } => {
-				const state = listByType(getEngine(), 'RUNTIME_BINDING')
-					.map((b) => b.state as Record<string, unknown>)
-					.find((b) => b.id === id);
-				return {
-					status: typeof state?.authorizationStatus === 'string' ? state.authorizationStatus : '',
-					capabilities: capabilityIdentities(state?.grantedCapabilities)
-				};
-			};
-
-			// ── ⭐⭐ JAN-EXEC PHASE 2 — THE PRODUCER IS OPENED IN THE UNDERTAKING'S WORKSPACE ────────
-			//
-			// ⛔ UNTIL THIS LINE IT WAS OPENED IN THE SERVER'S. `openPiExecutionSession` hardcoded `process.cwd()`
-			// twice because the opener was zero-argument and had nowhere else to get a directory — so an executing
-			// model's notion of "here" was the SvelteKit server's own source tree, i.e. this repository.
-			//
-			// ⭑ THE OWNER IS THE **UNDERTAKING**, READ OFF THE PWU (`R8`). This action takes no `params`, and it
-			// does not need to: `undertakingId` is on the flattened PWU, which is also the field `listPwus` keys on —
-			// so the workspace belongs to the same object the work unit does, and a second step in a new session lands
-			// in the same directory as the first.
-			//
-			// ── ⭐⭐ JAN-EXEC PHASE 3 — AND THE STEP'S GRANT DECIDES WHAT THE MODEL CAN DO IN IT ──────────────
-			//
-			// `grantedCapabilities` is read from the STORE, not from the request, exactly as the per-try refusal
-			// below reads it: the tools minted for this session are the ones the RUNTIME_BINDING currently
-			// grants, and an ungranted tool is never minted, so the model is never told it exists.
-			//
-			// ── ⛔⛔ `B-1c` — THE DISCLOSURE THAT USED TO STAND HERE NAMED A REFUSAL THAT DID NOT EXIST ────────
-			//
-			// It read: *"a capability revoked between tries refuses the next try when the step REQUIRES it
-			// (`stepCapabilityRefusal`, below) — but a revoked capability the step merely USES leaves its tool
-			// minted for the rest of this held session."* **DRIVEN: IT DID NOT, FOR `REQUIRES` OR FOR `USES`.**
-			// And the sentence was wrong in a second way that is worse than the first: ⛔ **"a capability revoked
-			// between tries" IS NOT AN EXPRESSIBLE ACT.** `RevokeRuntimeCapability` takes NO capability list — it
-			// revokes the whole BINDING — and `grantIsMonotone` refuses an authorization that omits a capability
-			// already granted. There is no command in this engine that removes one capability from a live
-			// binding, so the disclosure described a mechanism, a refusal and a residual that all had no subject.
-			//
-			// ⭐ **WHAT IS TRUE NOW, AND IT IS THE `B-1` FIX RATHER THAN A REWORDING.** Revocation acts on the
-			// BINDING, and both readers now take its STATUS:
-			//   · BEFORE the session opens — `mintExecutionTools` mints NOTHING for a binding that cannot back a
-			//     new attempt, so a revoked binding gets a model with no hands at all;
-			//   · BETWEEN tries — `stepCapabilityRefusal` refuses the NEXT TRY outright, for `REQUIRES` and
-			//     `USES` alike, because the refusal is on the binding and not on one capability.
-			//
-			// ⚠ **AND THE BOUND THAT GENUINELY REMAINS, STATED WITHOUT THE PART THAT WAS FALSE.** The surface is
-			// minted ONCE, when the session opens, while the status and grant are re-read on EVERY try — so a
-			// binding revoked mid-unit leaves its already-minted tools ON THE HELD SESSION. What that costs is
-			// bounded by the refusal above: no further TURN is taken, so the model is never asked anything again
-			// and never gets to call them. The session is held on sponsor authority (`JAN-EXECSESS`), so "a
-			// session per try" is not available. ⭑ Pi exposes `AgentSession.setActiveToolsByName`, which can only
-			// NARROW a registry this host already built — that is the seam a later increment would use, and
-			// naming it keeps this a disclosed bound rather than an unknown one.
-			let producer: Awaited<ReturnType<ReturnType<typeof getExecutionSession>>>;
-			try {
-				const current = binding ? currentBinding(bindingId) : undefined;
-				producer = await getExecutionSession(executor)({
-					...resolveUndertakingSandbox(String((pwu?.undertakingId ?? '') as string)),
-					grantedCapabilities: current?.capabilities ?? [],
-					// ⚠ `''` FOR A STEP THAT NAMES NO BINDING, AND WHAT MAKES THAT SAFE IS THE **LIST**, NOT THIS
-					// FIELD — said because the plausible reading is the other way round. `canReuseBindingForNewAttempt`
-					// refuses REVOKED and DENIED and nothing else, so an empty status passes it; what mints nothing
-					// is the empty capability set beside it. ⛔ The same holds for a binding id that no longer
-					// resolves: both halves come back empty from ONE read, so the two cannot disagree about which
-					// case this is.
-					bindingAuthorizationStatus: current?.status ?? ''
-				});
-			} catch (e) {
-				// ⚠ A REFUSED SANDBOX FAILS THE STEP RATHER THAN ESCAPING AS A 500, mirroring the context-policy
-				// refusal directly above: the step has already STARTED, so a producer that cannot lawfully be opened
-				// is a failure with a reason, not an absence.
-				const why = e instanceof Error ? e.message : String(e);
-				runSteps([['FailExecutionStep', 'EXECUTION_PLAN', planId, { stepId, failureReason: why }]]);
-				return fail(400, { error: `The model invocation did not run: ${why}` });
-			}
-			// ⭐ `JAN-SELRES` RS-1 (D4) — the record's fallback identity, from the selection that just opened the producer.
-			const fallbackIdentity = executorRecordIdentity(executor);
-			try {
-				for (let attempt = 1; ; attempt++) {
-					// ⛔ ONE READ PER TRY, HELD IN ONE VALUE. Reading the status and the grant through two calls
-					// would reinstate, at the call site, the very split `currentBinding` exists to close.
-					const onThisTry = binding ? currentBinding(bindingId) : undefined;
-					const tryOutcome = await runModelInvocationStep({
-						// ⭐⭐ `JAN-ASSERTED` `R30` — ONE PARSE REPLACES FIVE HAND-WRITTEN ASSERTIONS.
-						//
-						// ⛔ THIS LITERAL USED TO READ `String((pwu?.title ?? '') as string)` and four more like
-						// it. Every field was ASSERTED into the shape this call wanted, so `check-types` had
-						// nothing to check and two of them contradicted the contract outright.
-						//
-						// ⭑ `resolveInvocationSubject` refuses on ABSENCE **and on SHAPE**, the way
-						// `resolveContextAssemblyPolicy` already does one object over. It closes the boundary by
-						// CONSTRUCTION rather than by enumeration: a twelfth field added later is checked for
-						// free, and a field the schema has never heard of becomes an error instead of `undefined`.
-						//
-						// ⚠ `purpose` COMES FROM THE **TYPE**, not the work unit, so it is supplied from the
-						// parsed type facts rather than folded into the subject resolver — two objects, two
-						// parses, neither one speaking for the other.
-						subject: {
-							...resolveInvocationSubject(
-								(id) => getObjectOfType(getEngine(), 'PROFESSIONAL_WORK_UNIT', id),
-								pwuId
-							),
-							...(typeFacts.purpose ? { purpose: typeFacts.purpose } : {})
-							// ⭐⭐ `JAN-ASSERTED` — TWO CASTS USED TO SIT HERE, AND THEY ARE `REG-F-411` IN FULL:
-							//
-							//     expectedOutputs:   (pwu?.expectedOutputs   as string[] | undefined) ?? [],
-							//     inputRequirements: (pwu?.inputRequirements as string[] | undefined) ?? []
-							//
-							// ⛔ THE CONTRACT SAYS OBJECTS. `objects.ts:556`/`:555` declare both as
-							// `z.array(z.record(z.string(), z.unknown()))`, so `.join(', ')` downstream rendered
-							// `[object Object]` into every executing model's instruction — and into every
-							// reviewer's, which judges `RR-07-no-contradiction` against it. `check-types` could
-							// not see it because **the cast existed precisely to stop it**.
-							//
-							// ⭑ AND `?? []` WAS THE SECOND DEFECT, QUIETER THAN THE FIRST. It turned ABSENT into
-							// PRESENT-BUT-EMPTY, which defeated `JAN-PROMPT`'s ratified default #2 (2026-09-04,
-							// `REG-D-058`) — *"A missing declared placeholder at render time is a REFUSAL, not a
-							// disclosed gap."* The guard is live in `prompt-render.ts` and pinned green by
-							// `execution-invocation.test.ts`; four characters here made it unreachable at the only
-							// production call site.
-							//
-							// ⭐ NOTHING REPLACES THEM, BY RULING (`R29`). No form anywhere lets a professional
-							// author `expectedOutputs`; every production site mints `{outputId: 'out_<ulid>',
-							// kind: 'DOCUMENT'}`, so the best possible rendering is an internal id and a constant
-							// the surface invented. The professional's own statement of the required output
-							// already reaches the instruction through `PromptTemplate.outputContract`.
-						},
-						subjectSemanticVersion: Number((pwu?.semanticVersion ?? 1) as number),
-						pwuTypeId,
-						template,
-						store: getArtifactStore(),
-						tenantPrefix: EXECUTION_TENANT_PREFIX,
-						dispatchExchange: (payload, aggregateId) =>
-							dispatch('RecordModelExchange', 'MODEL_EXCHANGE', aggregateId, payload),
-						newId: mintUiId,
-						now: hostNow,
-						// ⭐⭐ `JAN-NOANS` — THE EXECUTOR'S OWN CONFIGURATION, AND THIS LINE READ THE REVIEWER'S.
-						//
-						// ⛔ IT SAID `resolveJudgeModel() ?? 'unresolved'` WITH `providerId: 'agy'` — the ASSURANCE
-						// model and the ASSURANCE tool, handed to an EXECUTION step. That is `REG-F-356`'s defect,
-						// which `TS-04`/`LE-01` fixed on the paths two comments below (*"This read
-						// `resolveJudgeModel()` — it labelled the PRODUCING model with the REVIEWING model's id"*)
-						// — and this arm was left behind.
-						//
-						// ⚠ IT SURVIVED BECAUSE NOTHING REACHED IT. These values are the HOST_CONFIGURED FALLBACK,
-						// used only when the tool reports no identity of its own~~: the success path always overrides
-						// them with `produced.producer`. So the only readers were the `catch` arm and — now —
-						// `JAN-NOANS`'s no-answer arm~~ — ⭐ `JAN-SELRES` D4, CORRECTED: which for the agy executor, whose
-						// answer is a bare string, is EVERY call, the successful ones included; only Pi's success path
-						// overrides them with `produced.producer`. The defect became visible on the first live run that
-						// took the fallback: an EXECUTION exchange whose `resolvedModel` read `gemini-3.1-pro-high`.
-						//
-						// ⭑ MEASURED, NOT REASONED. `checkIndependence('DIFFERENT_MODEL', …)` reads this field, so a
-						// failed execution call was recorded as having been produced by the reviewer.
-						//
-						// ⭐ `JAN-SELRES` RS-1 (D4) — AND THEY COME FROM THE SELECTION THAT OPENED THE EXECUTOR, no longer
-						// from a second read of the environment per try (`resolveExecutorModel()`,
-						// `resolveExecutorToolId()`). With the agy executor running the JUDGE model, that read named a
-						// model that never ran (`REG-F-458`); now the model agy is asked to run IS the model recorded, and
-						// the stand-in records no configured model, because none produced its answer.
-						modelId: fallbackIdentity.modelId,
-						// ⭑ THE TOOL, GRADED HOST_CONFIGURED, WHICH IS WHAT IT HONESTLY IS. The provider proper is
-						// embedded in the model label (`openai-codex/gpt-6-astra`) and only the tool can resolve it —
-						// so when the tool told us nothing, the tool id is the strongest true thing available.
-						providerId: fallbackIdentity.providerId,
-						session: producer,
-						priorFindings,
-						// ⭑ THE RESOLVED POLICY, not an id — obeying it is the STEP's job because that is where the
-						// assembly happens; resolving it is the caller's because that is what needs the store.
-						contextPolicy: governing.policy,
-						// ⭑ `PWU_TYPE.contextSpecification` — ratified, and read by NOTHING until CP-04b.
-						...(pwuType?.contextSpecification
-							? { contextSpecification: pwuType.contextSpecification as ContextSpecification }
-							: {}),
-						// ⭑ EG-03 — the binding's CURRENT status AND grant, read from the store on EVERY try.
-						// ⛔ `B-1`: BOTH, from ONE read. Revocation between tries changes the STATUS and leaves the
-						// GRANT untouched — `RevokeRuntimeCapability` does not clear it — so a caller passing the
-						// grant alone passed a value that could not change and called it a check.
-						binding:
-							binding && onThisTry
-								? {
-										kind: 'BOUND',
-										binding,
-										granted: onThisTry.capabilities,
-										authorizationStatus: onThisTry.status
-									}
-								: { kind: 'NONE' }
-					});
-
-					if (!tryOutcome.ran) {
-						// ⛔ THE STEP FAILS, AND SAYS WHY. The work unit does not advance as though the work were done —
-						// which is the whole difference between a demo and a record.
-						runSteps([
-							[
-								'FailExecutionStep',
-								'EXECUTION_PLAN',
-								planId,
-								{ stepId, failureReason: tryOutcome.refusedBecause }
-							]
-						]);
-						return fail(400, {
-							error: `The model invocation did not run: ${tryOutcome.refusedBecause}`
-						});
-					}
-					outcome = tryOutcome;
-
-					// ⭑⭑ THE ARTIFACT IS RECORDED ON ITS OWN, AND THE EVIDENCE TAUGHT ME THAT. My first version put
-					// `RecordArtifact` and `CompleteExecutionStep` in ONE atomic batch. The floor refused the completion —
-					// correctly — and took the artifact down with it, so a model call that DID happen and DID produce a
-					// work product left no work product behind. ⚠ The model's output is a FACT about the world; whether
-					// the step may COMPLETE is a judgement about that fact. Rolling the fact back because the judgement
-					// went against it is the erasure `PER-9` exists to prevent.
-					artifactId = mintUiId('art');
-					const recorded = runSteps([
-						[
-							'RecordArtifact',
-							'ARTIFACT',
-							artifactId,
-							{
-								artifactId,
-								artifactType: 'work-product',
-								mediaType: 'text/plain',
-								storageProvider: 'jpwb:content-plane',
-								storageKey: tryOutcome.storageKey,
-								contentHash: tryOutcome.contentHash,
-								byteSize: tryOutcome.byteSize,
-								producingPwuId: pwuId,
-								// ⚠ NOT NARROWED. These four columns have no ratified vocabulary (`REG-Q-056`, OPEN) and
-								// `handlers/artifact.test.ts:123-136` is a green test that exists to catch anyone inventing
-								// one. Free strings here are the honest shape, not laziness.
-								securityClassification: 'unclassified',
-								retentionClass: 'retained-by-participation',
-								status: 'recorded'
-							}
-						]
-					]);
-					if (recorded)
-						return fail(400, { error: `Recording the work product failed: ${recorded}` });
-
-					// ── ⭑⭑ THE FLOOR RUNS OVER THE WORK PRODUCT, SO IT CAN BE SATISFIED AND NOT ONLY REFUSE ────────
-					//
-					// `REG-F-352` left this step able to run, produce a work product, and never complete: the floor
-					// refused it correctly and nothing could satisfy it. This is the run that can.
-					//
-					// ⭑ THE SUBJECT IS THE ARTIFACT, because that is what `floorGateBlock` looks for. And the criteria
-					// come from the SAME policy object the authoring review reads — restating the rubric here is how
-					// four descriptions of one criterion came to disagree.
-					review = await runWorkProductFloor(
-						{
-							artifactId,
-							artifact: (getObject(getEngine(), artifactId) ?? {}) as Record<string, unknown>,
-							// The exchange the call just recorded — resolved by the id the outcome now carries, rather
-							// than searched for. `verifyExchangeContent` re-hashes its refs to decide `traceComplete`.
-							exchange: (getObject(getEngine(), tryOutcome.exchangeId) ?? {}) as never,
-							answer: tryOutcome.answer,
-							producingPrompt: tryOutcome.prompt,
-							// ⭑⭑ THE PRODUCER IS THE MODEL THAT ANSWERED, NOT THE JUDGE. This read
-							// `resolveJudgeModel()` — it labelled the PRODUCING model with the REVIEWING model's id, so
-							// `checkIndependence('DIFFERENT_MODEL', …)` compared a string with itself and could only
-							// refuse. The outcome now carries who actually produced the work product.
-							producerModelId: tryOutcome.producer.modelId,
-							producerProviderId: tryOutcome.producer.providerId,
-							// ⭑ THE PRODUCER'S OWN ACCOUNT, forwarded to the reviewer. Undefined when the model did not
-							// declare one — a recorded shortfall, never a synthesized summary.
-							...(tryOutcome.rationale ? { rationale: tryOutcome.rationale } : {}),
-							// ⛔ OFF BY DEFAULT. The sponsor's model puts the loop's state on the PRODUCER — *"the
-							// component responsible for tracking or remembering how it responded to the various
-							// feedback"* — and the paper's deployed pipeline does the same: the judge's reason is
-							// appended to the GENERATOR's prompt and the judge re-scores each draft cold. Supplied
-							// here only when a deployment has explicitly chosen otherwise.
-							...(reviewSeesPriorFindings() && priorFindings.length
-								? { priorGaps: priorFindings.map((f) => `${f.code}: ${f.statement}`) }
-								: {})
-						},
-						uiSession(),
-						{
-							artifacts: getArtifactStore(),
-							now: hostNow,
-							newId: mintUiId,
-							criteria: reasoningReviewCriteria(uiSession())
-						}
-					);
-					if (review.satisfied) break;
-
-					// ⭑ THE OPEN-FINDING COUNT IS THE REMEDIATION'S OWN, not a severity cut I invented here. That set
-					// is already filtered to valid SUBJECT findings, never operational failures.
-					openPerTry.push(review.remediation.findings.length);
-					const trend = classifyTrend(openPerTry);
-					const gate = mayRetry(attempt, trend);
-
-					// ⛔ `autoRefine` IS THE GUARD THAT DECIDES WHETHER THERE IS ANYTHING TO SEND BACK AT ALL. An
-					// INCONCLUSIVE review — *the reviewer could not tell* — sets it false, because feeding that back
-					// as though it were a critique would MANUFACTURE WORK FROM SILENCE (`REG-D-059`, `ASR-11` limb 1).
-					if (!review.remediation.autoRefine || !gate.retry) {
-						loopEnded = review.remediation.autoRefine
-							? `${gate.reason} Trend after ${attempt} ${attempt === 1 ? 'try' : 'tries'}: ${trend}.`
-							: `The review did not produce findings that may be sent back to the producer (${review.remediation.action}).`;
-						break;
-					}
-					priorFindings = review.remediation.findings.map((f) => ({
-						code: f.code,
-						statement: f.statement
-					}));
-				}
-			} finally {
-				// ⚠ RELEASED WHEN THE UNIT STOPS BEING WORKED ON — satisfied, escalated, or out of tries — and in
-				// a `finally` so a refusal mid-loop cannot strand a live session.
-				producer.dispose();
-			}
-
-			// ── ⭐⭐ JAN-EXEC PHASE 5 — THE EVIDENCE JOIN: every command the host ran becomes a governed object ──
-			//
-			// ⛔ UNTIL THIS BLOCK, `proposedEvidenceIds` WAS THE LITERAL `[]` ON EVERY PATH IN THIS FILE, and the
-			// exit code of a model-run test suite existed NOWHERE after the turn ended — `ProcessRunOutcome.
-			// retention` had no production consumer and the tool-call observer drops everything but a name and an
-			// outcome. So a step could run a test suite and complete with no governed trace that it had.
-			//
-			// ⭐ `R18`: EVERY COMPLETED RUN, TYPED `OBSERVATION`. This host cannot tell `npm test` from `ls` —
-			// `run_command` is one tool name for every command and the argv was chosen by an untrusted party — so
-			// it records what it CAN say. ⛔ Including runs `R17` will BLOCK: minting only the ones that would
-			// pass would let a step complete as though a killed command never happened.
-			//
-			// ⚠ THE JOIN RUNS EVEN WHEN THE WORK-PRODUCT FLOOR REFUSED, and that is deliberate. A command that
-			// ran is a FACT about the world; whether the step may COMPLETE is a judgement about that fact. It is
-			// the same argument `PER-9` makes for not rolling the artifact back when the floor refuses it.
-			const observedRuns = producer.processRuns();
-			const join = await joinProcessEvidence(
-				{
-					runs: observedRuns.runs,
-					// ⭑ THE PRODUCING MODEL'S EXCHANGE (`R15`). A child process has no exchange; what
-					// `traceComplete` verifies is the record of the turn in which the model DECIDED to run this.
-					exchange: (getObject(getEngine(), outcome.exchangeId) ?? {}) as never,
-					producingPrompt: outcome.prompt,
-					producerModelId: outcome.producer.modelId,
-					producerProviderId: outcome.producer.providerId,
-					// ⭐ `R15`'s INDEPENDENT HALF — the adapter's own observation, not the model's word (§22.1).
-					observedToolCalls: governedToolCallReport(producer.lastTurnObservation()),
-					...(outcome.rationale ? { rationale: outcome.rationale } : {}),
-					scope: `commands run by the executing model for work unit ${pwuId}`,
-					tenantPrefix: EXECUTION_TENANT_PREFIX
-				},
-				uiSession(),
-				{
-					artifacts: getArtifactStore(),
-					now: hostNow,
-					newId: mintUiId,
-					criteria: reasoningReviewCriteria(uiSession()),
-					// ⚠ ONE COMMAND PER CALL, THROUGH THE SAME `runSteps` THE REST OF THIS ACTION USES, so a
-					// refusal anywhere rolls the whole action back (`SPEC-001-INV-14`). A module reaching for the
-					// engine directly would commit evidence this path's own failure arm could not undo.
-					propose: (evidenceId, payload) =>
-						runSteps([['ProposeEvidence', 'EVIDENCE', evidenceId, payload]]),
-					getObject: (id) => getObject(getEngine(), id) as Record<string, unknown> | undefined
-				}
-			);
-			if (join.refusedBecause)
-				return fail(400, {
-					error: `The model ran ${observedRuns.observedCount} command(s) and one could not be recorded as evidence: ${join.refusedBecause}`
-				});
-
-			// ── ⛔ AND NOW THE FLOOR DECIDES, WHICH IS THE WHOLE POINT ─────────────────────────────────────
-			//
-			// `floor-gate.ts:30` — `AI_STEP_TYPES = new Set(['MODEL_INVOCATION'])` — makes this step AI-produced
-			// BY CONSTRUCTION, and the recorded provenance names an AGENT, so signal 0 fires too. Completing it
-			// therefore requires the three floor policies SATISFIED against the produced artifact.
-			//
-			// ⭑ THIS GATE HAS NEVER FIRED IN THIS DEMO, because nothing was ever AI-executed: the existing
-			// lifecycle step is a TRANSFORMATION a human drove, and its own comment says so. The first genuine
-			// model-executed work unit is the first thing to meet it.
-			//
-			// ⛔ NOTHING HERE WEAKENS IT. A refusal is reported with its reason and the step stays RUNNING; the
-			// exchange and the work product are already recorded, so what happened is on the record and what is
-			// owed is legible. Making the demo pass by relaxing the gate would defeat the system's central claim.
-			const completed = runSteps([
-				[
-					'CompleteExecutionStep',
-					'EXECUTION_PLAN',
-					planId,
-					{
-						executionStepId: stepId,
-						executionAttemptId: attemptId,
-						resultStatus: 'SUCCEEDED',
-						// ⭑ AN ACTUAL OUTPUT, WHERE THE DEMO HAS ONLY EVER RECORDED `noOutputResult`.
-						outputArtifactIds: [artifactId],
-						// ⭐⭐ PHASE 5 — AND NOW EVERY COMMAND THE MODEL RAN, EACH WITH ITS OWN FLOOR ALREADY
-						// RECORDED. `completeExecutionStep` unions this with `outputArtifactIds` and loops the floor
-						// gate over EVERY member at its own store-derived version — so naming an id whose floor is
-						// missing does not weaken the gate, it REFUSES the completion. That is why the join runs first.
-						proposedEvidenceIds: join.joined.map((j) => j.evidenceId),
-						detectedAssumptionIds: [],
-						structuredResult: {},
-						// ⛔ THE MODEL IS THE EXECUTOR. The TRANSFORMATION path below records the human who
-						// clicked, correctly — a human drove it. Recording a human here would be a fiction, and
-						// the assurance floor is entitled to know which it was.
-						executionProvenance: {
-							executedBy: {
-								// ⭑ THE MODEL THAT ACTUALLY ANSWERED. This read `resolveJudgeModel()` — the REVIEWER's
-								// model — so the execution provenance credited the judge with doing the work. The same
-								// fiction `JAN-TOOLSUITE` removed from the floor, surviving one layer over because
-								// nothing read this field back.
-								actorId: `model:${outcome.producer.modelId}`,
-								actorType: 'AGENT',
-								displayName: 'Execution model'
-							}
-						}
-					}
-				],
-				chg(pwuId, 'EXECUTING', 'EXECUTING', 'SUCCEEDED', 'UNASSESSED', 'PRESERVED', [planId])
-			]);
-			if (completed)
-				return fail(400, {
-					error: review.satisfied
-						? // ⭐ `JAN-ESCREC` D3 (`REG-D-090`) — AND WHEN THE WORK PRODUCT PASSED BUT A COMMAND'S RESULT DID NOT, THE COMMAND
-							// EVIDENCE'S OWN REFUSAL (`describeRefusedEvidence`), BEFORE THE ENGINE'S TEXT. The two reviews are independent
-							// calls, so the work product can pass while a command's result is escalated or rejected; this arm printed only
-							// the engine's text, whose fallback is `policyId=disposition` (design G5) — no observation, and beside an
-							// escalation no sentence saying what it asks (the ER-1 app verifier's MAJOR 1, its probe `ER1-VP1`). ⭑ The
-							// same hand-over as the arm below, so one reader splits both; with nothing refused this message is unchanged.
-							`The model ran, its work product is recorded, and the assurance floor is satisfied — but the step still did not complete${describeRefusedEvidence(join.joined) ? ` — and the command evidence did not pass its own floor: ${describeRefusedEvidence(join.joined)}` : '.'} ${completed}`
-						: // ⭑ THE REVIEW RAN AND DID NOT PASS. That is a JUDGEMENT about the work, not a missing
-							// check, and the two must not read the same. The findings are surfaced; feeding them back
-							// to the producing model is REG-D-059's ruling and needs the loop bound, which is the
-							// next increment — so this one stops at surfacing and says so.
-							// ⭑ AND IT SAYS WHY THE LOOP STOPPED, not merely that it did. `REG-D-059` bounds the
-							// repair loop and escalates at the bound; an operator reading this needs to know
-							// whether the producer ran out of tries, stalled, or made things worse.
-							// ⭐ `JAN-SELRES` RS-3 (`REG-F-469`) — THE TRIES THAT RAN, NO MORE. On this arm every try was unsatisfied,
-							// and each pushed its count onto `openPerTry` before the loop decided to stop, so its length IS the
-							// number of tries. This read `openPerTry.length + 1`: a single review said "2 tries", and a try is a
-							// billed call. `begin-execute-try-count.test.ts` holds it against the EXECUTION exchanges recorded.
-							// ⭐ `JAN-ESCREC` D3 (`REG-D-090`) — AND BESIDE AN ESCALATED REVIEW'S OBSERVATIONS, WHAT THE ESCALATION ASKS
-							// (`escalatedReviewNote`): routed to a human reviewer, whose review this workbench cannot record yet
-							// (`REG-F-474`). Keyed on the classifier's ACTION, never on prose; the command evidence's refusal carries
-							// its own (`describeRefusedEvidence`), on this arm and on the satisfied arm above.
-							// `begin-execute-escalated-review.test.ts` holds both arms, and the satisfied work product beside an
-							// escalated command result.
-							// ⭐ `JAN-ESCREC` D3 — AND OBSERVATIONS THAT HOLD NO FINDING SAY SO, NAMING WHAT REFUSED (`noFindingNote`, keyed
-							// on the codes): the recommendation alone was all this arm printed of a review left INCONCLUSIVE by an
-							// unanswered criterion, and INCONCLUSIVE was named nowhere (the second fix round's re-verifier's finding [0]).
-							// ⛔ Never an ESCALATED review's: the sentence after it explains that one, so the note is keyed on the action too.
-							`The model ran, its work product was reviewed over ${openPerTry.length} ${openPerTry.length === 1 ? 'try' : 'tries'}, and the assurance floor is NOT satisfied: ${review.observations.map((o) => `${o.code}: ${o.statement}`).join(' | ') || completed}${noFindingNote(review.observations, review.dispositions, review.remediation.action)}${escalatedReviewNote(review.remediation.action)}${loopEnded ? ` — ${loopEnded}` : ''}${describeRefusedEvidence(join.joined) ? ` — and the command evidence did not pass its own floor: ${describeRefusedEvidence(join.joined)}` : ''}`
-				});
-			return { advanced: 'executed' };
-		}
+		// ⭐ `JAN-EXEC` P7-6R — THE MODEL'S PART RUNS IN `runModelUnit`, which a person's re-run of the work runs too (RD5,
+		// RD8): one loop, one floor, one join and one refusal-to-wait path for both, never a second copy of any of them.
+		if (isModelStep)
+			return runModelUnit({
+				pwuId,
+				planId,
+				stepId,
+				attemptId,
+				binding,
+				bindingId,
+				executor,
+				pwu,
+				pwuType,
+				pwuTypeId,
+				typeFacts
+			});
 
 		const legacy = runSteps([
 			// Explicit no-output completion (RPH-EXE-006 permits it) — the demo shows the lifecycle, not artifact
@@ -2195,6 +2552,238 @@ export const actions: Actions = {
 		return { advanced: 'satisfied' };
 	},
 
+	// ── ⭐⭐ `JAN-EXEC` P7-6R R-1c — RE-RUN THE REVIEW (`DESIGN-the-stopped-unit-recovery.md` RD3, RD4, RD5, RD7; `REG-D-104` (1);
+	// `REG-D-105` (3)) ───────────────────────────────────────────────────────────────────────────────────────────────────
+	//
+	// A person's choice on a unit waiting after a review that DID NOT CONCLUDE: the floors run again over the refused
+	// attempt's recorded work product and evidence, and NO PRODUCER RUNS. The new attempt is plan B's one step, an
+	// `ASSURANCE_INVOCATION`, whose input is that work product; B completes NAMING it, and the gate judges the new
+	// assessments, which are later in time than the refused ones and so the ones it reads (RD10, `REG-F-433`).
+	// ⛔ REFUSED AFTER A REVIEW THAT CONCLUDED — against the work, or escalated — BY THE SERVER, not only by the page
+	// (`REG-D-105` (3); `rerunReviewRefusal`): the latest assessment wins, so a re-review run until one said SATISFIED would
+	// clear a reasoned refusal.
+	// ⛔ AND REFUSED, WITH NOTHING DISPATCHED AND THE UNIT STILL WAITING, WHEN ANY PART THE FLOOR NEEDS CANNOT BE REBUILT FROM
+	// THE RECORD (RD7): the producing prompt, the rationale, the producer's identity, each command's run. It never reviews a
+	// partial reconstruction.
+	// ⚠ B's STEP REQUESTS NO RUNTIME BINDING, departing from RD5 item 5 on purpose: a binding grants an EXECUTOR's
+	// capabilities, minted as the producer's tools, and a review step opens no executor — a grant there would be a record
+	// nobody exercises. A step naming no binding is `OUT_OF_SCOPE` to the binding limb, as a TRANSFORMATION step is.
+	// ⚠ ONLY THE REFUSED REVIEWS RUN AGAIN. A subject whose floor was SATISFIED keeps it: re-running it can only spend a call.
+	rerunReview: async ({ request }) => {
+		const f = await request.formData();
+		const pwuId = str(f, 'pwuId');
+		if (!pwuId) return fail(400, { error: 'Missing PWU.' });
+		const rationale = str(f, 'rationale');
+		if (!rationale) return fail(400, { error: RATIONALE_REQUIRED });
+		const stopped = stoppedUnitOf(uiSession(), pwuId);
+		if (!stopped.ok)
+			return fail(400, { error: `Re-running the review refused: ${stopped.refusedBecause}` });
+		const s = stopped.unit;
+		const notOffered = rerunReviewRefusal(s);
+		if (notOffered) return fail(400, { error: `Re-running the review refused: ${notOffered}` });
+		// ⭐ THE REVIEWER IS ASKED BEFORE ANYTHING IS DISPATCHED, as Begin & Execute asks it (`JAN-SELREV` SR-1, D5): a re-review
+		// IS the reviewer's run, so one that cannot run refuses here, in its own words, and the unit keeps waiting.
+		const reviewReady = assurancePreflight({ testMode: isTestMode() });
+		if (!reviewReady.ready) return fail(400, { error: reviewReady.guidance });
+
+		// ── RD7 — EVERYTHING THE FLOOR NEEDS, REBUILT AND CHECKED BEFORE ANYTHING IS DISPATCHED ──────────────────────
+		const rebuilt = await rebuildForReview(s);
+		if (!rebuilt.ok)
+			return fail(400, {
+				error: `The review cannot be re-run, and the unit keeps waiting: ${rebuilt.refusedBecause}`
+			});
+		const { turn, runs } = rebuilt;
+
+		// ── RD4 + RD5 — THE PERSON'S DECISION AND THE PLAN REVISION, ONE BATCH ────────────────────────────────────────
+		const decisionId = mintUiId('dec');
+		const planB = mintUiId('plan');
+		const stepB = mintUiId('step');
+		const revised = runSteps([
+			...personsDecision(
+				decisionId,
+				'REPLAN',
+				RERUN_REVIEW,
+				decisionSubjects(s),
+				s.consideredObservationIds,
+				rationale
+			),
+			...planRevision(s, decisionId, planB, {
+				id: stepB,
+				stepType: 'ASSURANCE_INVOCATION',
+				purpose: `Re-run the review of work product ${s.workProductId}, which attempt ${s.attemptKey} produced; no producer runs`,
+				inputBindings: [{ artifactId: s.workProductId, required: true }]
+			})
+		]);
+		if (revised) return fail(400, { error: `Re-running the review refused: ${revised}` });
+
+		// ── THE FLOORS, AGAIN, OVER WHAT WAS REFUSED — each through the run Begin & Execute uses for its kind ─────────
+		const opts = {
+			artifacts: getArtifactStore(),
+			now: hostNow,
+			newId: mintUiId,
+			criteria: reasoningReviewCriteria(uiSession())
+		};
+		const outcomes: {
+			readonly subjectId: string;
+			readonly floor: Awaited<ReturnType<typeof runWorkProductFloor>>;
+		}[] = [];
+		for (const r of s.refusals) {
+			const producing = {
+				exchange: turn.exchange,
+				producingPrompt: turn.producingPrompt,
+				producerModelId: turn.producerModelId,
+				producerProviderId: turn.producerProviderId,
+				...(turn.rationale ? { rationale: turn.rationale } : {})
+			};
+			const floor =
+				r.objectType === 'ARTIFACT'
+					? await runWorkProductFloor(
+							{ artifactId: r.subjectId, artifact: turn.artifact, answer: turn.answer, ...producing },
+							uiSession(),
+							opts
+						)
+					: await runProcessResultFloor(
+							{
+								evidenceId: r.subjectId,
+								evidence: getObject(getEngine(), r.subjectId) ?? {},
+								run: runs.get(r.subjectId)!,
+								...(turn.observedToolCalls ? { observedToolCalls: turn.observedToolCalls } : {}),
+								...producing
+							},
+							uiSession(),
+							opts
+						);
+			outcomes.push({ subjectId: r.subjectId, floor });
+		}
+
+		// ── B COMPLETES NAMING A's WORK PRODUCT AND EVIDENCE, AND THE UNIT SUCCEEDS CITING B ───────────────────────────
+		// ⭑ The output was made by the model in attempt A (RD6), so the provenance says so: MODEL_GENERATION, the model, and
+		// the attempt — the reuse a DBOS fork would record (the design's §6).
+		const completed = runSteps([
+			[
+				'CompleteExecutionStep',
+				'EXECUTION_PLAN',
+				planB,
+				{
+					executionStepId: stepB,
+					executionAttemptId: mintUiId('attempt'),
+					resultStatus: 'SUCCEEDED',
+					outputArtifactIds: [s.workProductId],
+					proposedEvidenceIds: [...s.evidenceIds],
+					detectedAssumptionIds: [],
+					structuredResult: {},
+					executionProvenance: {
+						originType: 'MODEL_GENERATION',
+						producingExecutionAttemptId: s.attemptKey,
+						executedBy: modelExecutedBy(turn.producerModelId)
+					}
+				}
+			],
+			chg(pwuId, 'EXECUTING', 'EXECUTING', 'SUCCEEDED', 'UNASSESSED', 'PRESERVED', [planB])
+		]);
+		if (completed) {
+			// ⭐ REFUSED AGAIN: B's step waits as A's did (RD5), and the person chooses again.
+			const refused = outcomes.filter((o) => !o.floor.satisfied);
+			const waited = waitForAPerson(
+				pwuId,
+				planB,
+				stepB,
+				refused.map((o) => ({
+					subjectId: o.subjectId,
+					unsatisfied: o.floor.dispositions.filter((d) => d.disposition !== 'SATISFIED')
+				})),
+				completed
+			);
+			return fail(400, {
+				error:
+					`The review was re-run, and the assurance floor is NOT satisfied: ` +
+					(refused
+						.map(
+							(o) =>
+								`${o.subjectId}: ${o.floor.observations.map((ob) => `${ob.code}: ${ob.statement}`).join(' | ') || 'no observation recorded'}` +
+								noFindingNote(o.floor.observations, o.floor.dispositions, o.floor.remediation.action) +
+								escalatedReviewNote(o.floor.remediation.action)
+						)
+						.join(' — ') || completed) +
+					(waited ? ` — and the wait for a person’s choice could not be recorded: ${waited}` : '')
+			});
+		}
+		return { advanced: 'review-rerun' };
+	},
+
+	// ── ⭐⭐ `JAN-EXEC` P7-6R R-1c — RE-RUN THE WORK WITH THE FINDINGS (RD4, RD5, RD8; `REG-D-104` (1)) ──────────────────────
+	//
+	// A person's choice on any waiting unit: plan B's one step is a producer step, as Begin & Execute builds one, its binding
+	// requested and authorized, and it runs `runModelUnit` — the producer loop, the floor, the join, the completion and the
+	// wait — in a FRESH session whose first turn carries the instruction AND the refused review's SUBJECT findings (RD8).
+	// ⛔ Nothing from a review that did not conclude, and never the escalation itself (`REG-D-059`, `REG-D-090`): the
+	// findings are the floor classifier's, which lists neither.
+	// ⭑ The reviewer and the executor are asked BEFORE anything is dispatched, as Begin & Execute asks them (`JAN-SELREV`
+	// SR-1, `JAN-SELRES` RS-1): a refusal leaves the unit waiting, with nothing recorded.
+	rerunWork: async ({ request }) => {
+		const f = await request.formData();
+		const pwuId = str(f, 'pwuId');
+		if (!pwuId) return fail(400, { error: 'Missing PWU.' });
+		const rationale = str(f, 'rationale');
+		if (!rationale) return fail(400, { error: RATIONALE_REQUIRED });
+		const stopped = stoppedUnitOf(uiSession(), pwuId);
+		if (!stopped.ok) return fail(400, { error: `Re-running the work refused: ${stopped.refusedBecause}` });
+		const s = stopped.unit;
+		const { pwu, pwuType, pwuTypeId, typeFacts } = unitTypeOf(pwuId);
+		if (pwuType?.workDischarge !== 'MODEL')
+			return fail(400, {
+				error: `Re-running the work refused: work unit ${pwuId}’s type does not say a model does its work.`
+			});
+		const reviewerReady = assurancePreflight({ testMode: isTestMode() });
+		if (!reviewerReady.ready) return fail(400, { error: reviewerReady.guidance });
+		const chosen = selectExecutor({ testMode: isTestMode() });
+		if (chosen.kind === 'REFUSED') return fail(400, { error: executorRefusalMessage(chosen) });
+
+		const decisionId = mintUiId('dec');
+		const planB = mintUiId('plan');
+		const stepB = mintUiId('step');
+		const bindB = mintUiId('bind');
+		const binding = stepBindingFor(
+			'MODEL_INVOCATION',
+			pwuType.workDischarge as string,
+			bindB,
+			stepB
+		);
+		const revised = runSteps([
+			...personsDecision(
+				decisionId,
+				'REPLAN',
+				RERUN_WORK,
+				decisionSubjects(s),
+				s.consideredObservationIds,
+				rationale
+			),
+			...planRevision(s, decisionId, planB, {
+				id: stepB,
+				stepType: 'MODEL_INVOCATION',
+				purpose: `Re-attempt the work in a fresh session, after attempt ${s.attemptKey} was refused`,
+				inputBindings: [],
+				...(binding ? { binding } : {})
+			})
+		]);
+		if (revised) return fail(400, { error: `Re-running the work refused: ${revised}` });
+		const ran = await runModelUnit({
+			pwuId,
+			planId: planB,
+			stepId: stepB,
+			attemptId: mintUiId('attempt'),
+			binding,
+			bindingId: bindB,
+			executor: chosen,
+			pwu,
+			pwuType,
+			pwuTypeId,
+			typeFacts,
+			carriedFindings: s.findings
+		});
+		return 'advanced' in ran ? { advanced: 'work-rerun' } : ran;
+	},
+
 	// ── ABANDON — S-1 of ROADMAP-decision-subject-scope (REG-F-077) ──────────────────────────────────────────
 	//
 	// Abandonment is one of the three acts JPWB-DOC-001 §5.2 reserves to Governance BY NAME, and W-1 gave it a
@@ -2221,7 +2810,22 @@ export const actions: Actions = {
 		const form = await request.formData();
 		const pwuId = str(form, 'pwuId');
 		if (!pwuId) return fail(400, { error: 'Missing PWU.' });
-		const reason = str(form, 'reason') || 'The work is no longer required.';
+		// ── ⭐ `JAN-EXEC` P7-6R R-1c — ABANDON FROM WAITING: the same path, the person's own rationale, and the waiting
+		// step CANCELLED in the same batch, so the abandoned unit leaves no step waiting for a choice nobody will make.
+		// ⭑ The Decision names what was refused and considers its observations (RD4), as a re-run's does. ⚠ Only for a unit
+		// waiting after a refusal (its execution WAITING); any other unit abandons exactly as before.
+		const waiting =
+			getObject(getEngine(), pwuId)?.executionState === 'WAITING'
+				? waitingStepOf(uiSession(), pwuId)
+				: undefined;
+		const typed = str(form, 'reason');
+		if (waiting && !typed) return fail(400, { error: `Abandonment refused: ${RATIONALE_REQUIRED}` });
+		const reason = typed || 'The work is no longer required.';
+		const stopped = waiting ? stoppedUnitOf(uiSession(), pwuId) : undefined;
+		const subjects = stopped?.ok
+			? decisionSubjects(stopped.unit)
+			: [pwuId, ...(waiting ? [waiting.planId] : [])];
+		const considered = stopped?.ok ? stopped.unit.consideredObservationIds : [];
 		const decisionId = mintUiId('dec');
 		const err = runSteps([
 			[
@@ -2230,13 +2834,13 @@ export const actions: Actions = {
 				decisionId,
 				{
 					decisionType: 'ABANDON',
-					subjectObjectIds: [pwuId],
+					subjectObjectIds: subjects,
 					selectedOption: 'Abandon this work unit',
 					rationale: reason,
 					// The session's own identity — `proposeDecision` refuses a declared authority that is not the
 					// stamped issuer (REG-F-014), so this is the only value that can be correct.
 					authority: actingActor(uiSession()),
-					consideredObservationIds: []
+					consideredObservationIds: [...considered]
 				}
 			],
 			[
@@ -2247,13 +2851,26 @@ export const actions: Actions = {
 					selectedOption: 'Abandon this work unit',
 					rationale: reason,
 					consideredEvidenceIds: [],
-					consideredObservationIds: [],
+					consideredObservationIds: [...considered],
 					// STATED, NOT OMITTED. `{}` passes the pin-agreement predicate vacuously (it filters on
 					// `pinned[id] !== undefined`); the true value makes it live. Fail-closed either way, because
 					// this is CHECKED against the engine's own pin and can only cause a refusal — see S-0.
 					subjectSemanticVersions: { [pwuId]: 1 }
 				}
 			],
+			...(waiting
+				? ([
+						[
+							'CancelExecutionStep',
+							'EXECUTION_PLAN',
+							waiting.planId,
+							{
+								stepId: waiting.stepId,
+								reason: `Abandoned under the person’s Decision ${decisionId} (REG-D-104 (1)).`
+							}
+						]
+					] satisfies Step[])
+				: []),
 			[
 				'AbandonPwu',
 				PWU,
