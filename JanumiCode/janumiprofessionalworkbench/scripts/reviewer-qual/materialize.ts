@@ -51,6 +51,9 @@ export function caseReviewInput(
 			return declaredPolicyReviewInput({
 				policy: { policyId: policy.policyId, name: policy.name, purpose: policy.purpose },
 				criteria: policy.criteria,
+				// ⭐ `E12F` F4 — every declared case's instruction is its unit's rendered prompt (`case-set-v5.ts`: THE
+				// INSTRUCTION), the prompt its one producer was given: the phase's shape, never the root's.
+				instructionIs: 'PRODUCING_PROMPT',
 				...work
 			});
 		}

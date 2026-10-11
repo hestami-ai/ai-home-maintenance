@@ -123,6 +123,7 @@ describe('⭐⭐ E2 — case set v5: version four, then the fourteen declared-po
 			const expected = declaredPolicyReviewInput({
 				policy: { policyId: policy.policyId, name: policy.name, purpose: policy.purpose },
 				criteria: policy.criteria,
+				instructionIs: 'PRODUCING_PROMPT',
 				...work
 			});
 			expect(caseReviewInput(c, SEEDED_REASONING_REVIEW_CRITERIA), c.id).toEqual(expected);

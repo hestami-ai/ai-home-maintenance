@@ -27,6 +27,7 @@
 // rationale, the prior gaps — are the caller's to supply, and a qualification case supplies them as literals.
 import type { AssessmentCriterion, ObservedToolCallReport } from '@janumipwb/rph-contracts';
 import type {
+	DeclaredInstruction,
 	DeclaredPolicyFraming,
 	ProfessionalRationaleSummary,
 	ReasoningReviewInput
@@ -204,6 +205,12 @@ export interface DeclaredPolicyReviewSource {
 	readonly criteria: readonly AssessmentCriterion[];
 	/** The instruction the work answered: the unit's rendered prompt, or, for a unit with none, its own purpose. */
 	readonly instruction: string;
+	/**
+	 * ⭐ `E12F` F4 — WHAT `instruction` IS: the prompt the one producer of the work was given (`PRODUCING_PROMPT`), or the
+	 * unit's own purpose (`UNIT_PURPOSE`) — a unit composed of others, or one whose work no recorded prompt produced. The
+	 * reviewer is told which, and nothing else about it (`DeclaredInstruction`).
+	 */
+	readonly instructionIs: DeclaredInstruction;
 	/** The work products judged, each with the title of the unit that produced it — the unit's own, or its children's. */
 	readonly workProducts: readonly { readonly unit: string; readonly answer: string }[];
 	/** The commands those units ran, as the host recorded them. */
@@ -236,6 +243,8 @@ export function declaredPolicyReviewInput(source: DeclaredPolicyReviewSource): R
 		// ⭑ `R14` — DECLARED BY THE CALLER, and the policy it judges against with it (`declaredPolicy`).
 		framing: 'DECLARED_POLICY',
 		declaredPolicy: { policyId: source.policy.policyId, name: source.policy.name, purpose: source.policy.purpose },
+		// ⭐ `E12F` F4 — what the instruction IS, so the reviewer is told only what is true of it.
+		declaredInstruction: source.instructionIs,
 		prompt: source.instruction,
 		content: jsonLine({
 			workProducts: source.workProducts.map((w) => ({ workUnit: w.unit, workProduct: w.answer })),

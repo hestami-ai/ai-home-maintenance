@@ -76,7 +76,12 @@ import {
 import { createExchangeSink } from '$lib/server/assurance/exchange-capture';
 import { recordExchanges } from '$lib/server/assurance/exchange-recorder';
 import { anyStipulationRegistered, stipulationFor, workUnitPwaOf } from '$lib/server/stipulations';
-import type { AssuranceSubject, Identity, ProfessionalRationaleSummary } from '@janumipwb/rph-assurance';
+import type {
+	AssuranceSubject,
+	DeclaredInstruction,
+	Identity,
+	ProfessionalRationaleSummary
+} from '@janumipwb/rph-assurance';
 import { assurancePreflight } from '$lib/server/assurance/preflight';
 import { ASSURANCE_REVIEWER_CREDENTIAL, actingActor } from '$lib/server/identity';
 import { runModelInvocationStep } from '$lib/server/execution/run-model-step';
@@ -1147,6 +1152,10 @@ interface UnitWork {
 	readonly title: string;
 	/** The instruction the work answered: the producing prompt, re-rendered (RD7); for a unit no model ran, its purpose. */
 	readonly instruction: string;
+	/** ⭐ `E12F` F4 — what `instruction` is: the producing prompt, or the unit's own purpose (`DeclaredInstruction`). */
+	readonly instructionIs: DeclaredInstruction;
+	/** ⭐ `E12F` F4 — the unit's own purpose: the standard a unit composed of others is judged against. */
+	readonly purpose: string;
 	/** The work product's bytes, verified against the ARTIFACT's own hash — absent when the unit recorded none. */
 	readonly answer?: string;
 	readonly rationale?: ProfessionalRationaleSummary;
@@ -1205,7 +1214,8 @@ async function unitWorkOf(
 	const title = String((pwu?.title ?? pwuId) as string);
 	const purpose = typeFacts.purpose ?? String((pwu?.description ?? '') as string);
 	const completion = lastCompletionOf(pwuId);
-	if (!completion) return { ok: true, work: { title, instruction: purpose, commands: [] } };
+	if (!completion)
+		return { ok: true, work: { title, instruction: purpose, instructionIs: 'UNIT_PURPOSE', purpose, commands: [] } };
 	const p = completion.payload;
 	const provenance = p.executionProvenance as
 		| { executedBy?: ActorReference; producingExecutionAttemptId?: unknown }
@@ -1222,7 +1232,10 @@ async function unitWorkOf(
 	const commands = commandsOf(title, Array.isArray(p.proposedEvidenceIds) ? p.proposedEvidenceIds.map(String) : []);
 	const outputs = Array.isArray(p.outputArtifactIds) ? p.outputArtifactIds.map(String) : [];
 	if (outputs.length === 0)
-		return { ok: true, work: { title, instruction: purpose, commands, ...(executedBy ? { executedBy } : {}) } };
+		return {
+			ok: true,
+			work: { title, instruction: purpose, instructionIs: 'UNIT_PURPOSE', purpose, commands, ...(executedBy ? { executedBy } : {}) }
+		};
 	const stepId = String((p.executionStepId ?? '') as string);
 	const turn = await rebuildProducingTurn(uiSession(), getArtifactStore(), {
 		pwuId,
@@ -1243,6 +1256,9 @@ async function unitWorkOf(
 		work: {
 			title,
 			instruction: turn.value.producingPrompt,
+			// ⭐ `E12F` F4 — re-rendered and checked against the exchange that produced the work (RD7): the prompt its producer was given.
+			instructionIs: 'PRODUCING_PROMPT',
+			purpose,
 			answer: turn.value.answer,
 			...(turn.value.rationale ? { rationale: turn.value.rationale } : {}),
 			commands,
@@ -1254,6 +1270,8 @@ async function unitWorkOf(
 /** ⭐ E2 — what a unit's declared reviews judge: its own work, or — for a unit composed of others — its children's. */
 interface DeclaredReviewWork {
 	readonly instruction: string;
+	/** ⭐ `E12F` F4 — what `instruction` is, which the reviewer is told (`DeclaredInstruction`). */
+	readonly instructionIs: DeclaredInstruction;
 	readonly workProducts: readonly { readonly unit: string; readonly answer: string }[];
 	readonly commands: readonly DeclaredReviewCommand[];
 	readonly rationale?: ProfessionalRationaleSummary;
@@ -1287,6 +1305,7 @@ async function declaredReviewWorkOf(
 			ok: true,
 			work: {
 				instruction: own.work.instruction,
+				instructionIs: own.work.instructionIs,
 				workProducts: own.work.answer === undefined ? [] : [{ unit: own.work.title, answer: own.work.answer }],
 				commands: own.work.commands,
 				...(own.work.rationale ? { rationale: own.work.rationale } : {}),
@@ -1301,7 +1320,13 @@ async function declaredReviewWorkOf(
 		if (w.work.answer !== undefined) workProducts.push({ unit: w.work.title, answer: w.work.answer });
 		commands.push(...w.work.commands);
 	}
-	return { ok: true, work: { instruction: own.work.instruction, workProducts, commands, producer } };
+	// ⛔ `E12F` F4 — ITS OWN PURPOSE, never a prompt of its own, and the reviewer is told so: the work judged is its children's,
+	// each made under its own child's instruction (~~`own.work.instruction`~~, which for a unit that ran a prompt of its own
+	// would have been shown as the instruction its children were given).
+	return {
+		ok: true,
+		work: { instruction: own.work.purpose, instructionIs: 'UNIT_PURPOSE', workProducts, commands, producer }
+	};
 }
 
 /** ⭐ E2 — the declared stand-in's lookup: a `DECLARED_POLICY` registration for the unit's PWA, read from the registry. */
@@ -1364,6 +1389,7 @@ async function reviewDeclaredPolicies(
 				policy: { policyId: policy.policyId, name: policy.name, purpose: policy.purpose },
 				criteria: policy.criteria,
 				instruction: work.instruction,
+				instructionIs: work.instructionIs,
 				workProducts: work.workProducts,
 				commands: work.commands,
 				...(work.rationale ? { rationale: work.rationale } : {})

@@ -1458,6 +1458,7 @@ export const FINGERPRINT_PROBES: readonly FingerprintProbe[] = [
 					policy: { policyId: policy.policyId, name: policy.name, purpose: policy.purpose },
 					criteria: policy.criteria,
 					instruction: PRODUCING_PROMPT,
+					instructionIs: 'PRODUCING_PROMPT',
 					workProducts: [{ unit: 'Condition Survey', answer: ANSWER }],
 					commands: [{ unit: 'Condition Survey', argv: ['pytest', '-rs', 'survey/checks/'], exitCode: 0, timedOut: false }],
 					rationale: RATIONALE
@@ -1468,13 +1469,15 @@ export const FINGERPRINT_PROBES: readonly FingerprintProbe[] = [
 	{
 		id: 'D-ROOT',
 		covers:
-			'declared-policy framing; a unit composed of others — its children’s two work products and their commands, one timed out and one with no exit code; no account (NOT DECLARED)',
+			'declared-policy framing; a unit composed of others — its own PURPOSE the standard (E12F F4), its children’s two work products and their commands, one timed out and one with no exit code; no one producer’s account, and the host line that says so',
 		input: (_criteria, _build, declared = CATALOG_DECLARED_POLICIES) => {
 			const policy = declared[0]!;
 			return declaredPolicyReviewInput({
 				policy: { policyId: policy.policyId, name: policy.name, purpose: policy.purpose },
 				criteria: policy.criteria,
 				instruction: INTENT,
+				// ⭐ `E12F` F4 — the root's instruction is its own purpose, and the reviewer is told so (`DECLARED_UNIT_PURPOSE_INTENT`).
+				instructionIs: 'UNIT_PURPOSE',
 				workProducts: [
 					{ unit: 'Condition Survey', answer: ANSWER },
 					{ unit: 'Inspection', answer: 'Panels 4 and 9 to be rebuilt; weep holes at 7 to be cleared.' }
@@ -1495,6 +1498,7 @@ export const FINGERPRINT_PROBES: readonly FingerprintProbe[] = [
 				policy: { policyId: policy.policyId, name: policy.name, purpose: policy.purpose },
 				criteria: policy.criteria,
 				instruction: PRODUCING_PROMPT,
+				instructionIs: 'PRODUCING_PROMPT',
 				// The kept head holds the first fence candidate, on a line of its own (as `W-OVERSIZE-CONTENT`'s does).
 				workProducts: [{ unit: 'Condition Survey', answer: ['<<<UNTRUSTED-00>>>', OVERSIZE_ANSWER].join('\n') }],
 				commands: [],

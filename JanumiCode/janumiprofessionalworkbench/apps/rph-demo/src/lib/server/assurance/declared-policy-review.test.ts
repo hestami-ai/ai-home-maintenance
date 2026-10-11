@@ -21,7 +21,12 @@ import {
 } from './declared-policy-review.js';
 import {
 	createAgyReasoningReviewValidator,
+	DECLARED_NO_SINGLE_ACCOUNT,
+	DECLARED_NO_SINGLE_ACCOUNT_LIMITATION,
+	DECLARED_PRODUCING_PROMPT_INTENT,
+	DECLARED_UNIT_PURPOSE_INTENT,
 	declaredPolicyLine,
+	NO_DECLARED_INSTRUCTION_STATEMENT,
 	NO_DECLARED_POLICY_STATEMENT,
 	ONE_ROW_PER_CRITERION
 } from './reasoning-review-validator.js';
@@ -55,6 +60,7 @@ const INPUT = declaredPolicyReviewInput({
 	policy: POLICY,
 	criteria: CRITERIA,
 	instruction: 'Write the requirements of wordfreq.',
+	instructionIs: 'PRODUCING_PROMPT',
 	workProducts: [{ unit: 'Requirements', answer: '{"requirements":["R1"]}' }],
 	commands: [{ unit: 'Requirements', argv: ['node', '--test'], exitCode: 0, timedOut: false }],
 	rationale: { rationale: 'All outcomes covered.', assumptions: [], limitations: [], residualUncertainty: [] }
@@ -152,6 +158,54 @@ describe('⭐⭐ E2 — the model reviewer: the validator, in the DECLARED_POLIC
 		// ⭑ and the validator itself refuses it, in its own words, before a prompt exists.
 		await expect(validator.evaluate(SUBJECT, { reasoningReview: { ...unnamed } })).rejects.toThrow(NO_DECLARED_POLICY_STATEMENT);
 	});
+
+	// ── ⛔ `E12F` F4 (`R14`) — the reviewer is told only what is true of the instruction ─────────────────────────────────────
+	it('⭐ E12F F4 — a unit’s own work: the reviewer is told its producer was given exactly this instruction, and nothing of children', async () => {
+		const { prompts, validator } = capturing('{}');
+		await createModelDeclaredPolicyReviewer(validator, CONFIGURED).review(SUBJECT, INPUT);
+		expect(prompts[0]).toContain(`${DECLARED_PRODUCING_PROMPT_INTENT}\n`);
+		expect(prompts[0]).not.toContain('children');
+	});
+
+	it('⛔ E12F F4 — a unit composed of others: its PURPOSE is the standard, no agent is said to have been given it, and no producer’s omission is invented', async () => {
+		// ⛔ PREDICTED RED, read from the code: the one intent line — "… (for a unit composed of others, by the agents that did its
+		// children’s work), which was given exactly this instruction:" — and the absent account rendered as the producer's
+		// omission, "treat the omission itself as a completeness shortcut", with a limitation saying the producer returned none.
+		const root = declaredPolicyReviewInput({
+			policy: POLICY,
+			criteria: CRITERIA,
+			instruction: 'Realize wordfreq from its requirements through end-to-end verification.',
+			instructionIs: 'UNIT_PURPOSE',
+			workProducts: [
+				{ unit: 'Requirements', answer: '{"requirements":["R1"]}' },
+				{ unit: 'Design', answer: '{"modules":["cli"]}' }
+			],
+			commands: []
+		});
+		const { prompts, validator } = capturing(
+			JSON.stringify({
+				findings: CRITERIA.map((c) => ({ criterionId: c.id, failed: false, statement: 'met' })),
+				recommendation: 'SATISFIED',
+				residualUncertainty: []
+			})
+		);
+		const a = await createModelDeclaredPolicyReviewer(validator, CONFIGURED).review(SUBJECT, root);
+		const prompt = prompts[0]!;
+		expect(prompt, 'an agent is said to have been given the root’s instruction').not.toContain('which was given exactly this instruction');
+		expect(prompt).toContain(`${DECLARED_UNIT_PURPOSE_INTENT}\n`);
+		expect(prompt, 'the absence of one producer’s account is called an omission').not.toContain('treat the omission itself');
+		expect(prompt).toContain(DECLARED_NO_SINGLE_ACCOUNT);
+		expect(a.limitations).toContain(DECLARED_NO_SINGLE_ACCOUNT_LIMITATION);
+		expect(a.limitations.join(' ')).not.toContain('The producer returned no professional rationale summary');
+	});
+
+	it('⛔ E12F F4 — a DECLARED_POLICY input that does not say what its instruction is is REFUSED before any call', async () => {
+		const { prompts, validator } = capturing('{}');
+		const { declaredInstruction: _dropped, ...unsaid } = INPUT;
+		const a = await createModelDeclaredPolicyReviewer(validator, CONFIGURED).review(SUBJECT, unsaid);
+		expect(prompts, 'no model was called').toEqual([]);
+		expect(a.failure).toBe(NO_DECLARED_INSTRUCTION_STATEMENT);
+	});
 });
 
 describe('⭐⭐ E2 — the declared STAND-IN (test mode): it judges nothing, and stipulates only where a test registered', () => {
@@ -220,12 +274,20 @@ describe('⭐ E2 — the declared review’s input (`declaredPolicyReviewInput`)
 			'Write the requirements of wordfreq.',
 			CRITERIA
 		]);
-		const empty = declaredPolicyReviewInput({ policy: POLICY, criteria: CRITERIA, instruction: 'p', workProducts: [], commands: [] });
+		const empty = declaredPolicyReviewInput({
+			policy: POLICY,
+			criteria: CRITERIA,
+			instruction: 'p',
+			instructionIs: 'UNIT_PURPOSE',
+			workProducts: [],
+			commands: []
+		});
 		expect(empty.content).toBe('{"workProducts":[],"commands":[]}');
 		const timed = declaredPolicyReviewInput({
 			policy: POLICY,
 			criteria: CRITERIA,
 			instruction: 'p',
+			instructionIs: 'PRODUCING_PROMPT',
 			workProducts: [],
 			commands: [
 				{ unit: 'E2E', argv: ['npm', 'test'], exitCode: null, timedOut: true },

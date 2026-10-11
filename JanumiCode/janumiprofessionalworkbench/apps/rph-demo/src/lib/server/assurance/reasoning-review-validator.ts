@@ -183,6 +183,46 @@ export const NO_DECLARED_POLICY_STATEMENT =
 	'This review was not sent: a DECLARED_POLICY review names no declared policy (its id, name and purpose), so the reviewer could not be told what it judges against. No model was called.';
 
 /**
+ * ⭐ `E12F` F4 — THE STATEMENT A `DECLARED_POLICY` REVIEW FAILS WITH WHEN IT DOES NOT SAY WHAT ITS INSTRUCTION IS
+ * (`declaredInstruction`). ⛔ Never sent, as a review naming no policy is not: the host would have to tell the reviewer
+ * whether an agent was given that instruction, and it does not know.
+ */
+export const NO_DECLARED_INSTRUCTION_STATEMENT =
+	'This review was not sent: a DECLARED_POLICY review does not say what its instruction is (the producing prompt, or the unit’s own purpose), so the reviewer could not be told truly what the work answered. No model was called.';
+
+/**
+ * ⭐⭐ `E12F` F4 (`R14`) — THE INTENT LINE OF A DECLARED REVIEW WHOSE INSTRUCTION IS THE PROMPT ITS ONE PRODUCER WAS GIVEN
+ * (`PRODUCING_PROMPT`): true of a unit that did its own work, a phase. ⛔ It carried, for every declared review, *"(for a unit
+ * composed of others, by the agents that did its children's work), which was given exactly this instruction"* — false of the
+ * root, whose instruction is its purpose and whose children each had a prompt of their own.
+ */
+export const DECLARED_PRODUCING_PROMPT_INTENT =
+	'The WORK below was produced for a professional work unit by a DIFFERENT AI agent, which was given exactly this instruction:';
+
+/**
+ * ⭐⭐ `E12F` F4 — THE INTENT LINE OF A DECLARED REVIEW WHOSE INSTRUCTION IS THE UNIT'S OWN PURPOSE (`UNIT_PURPOSE`): a unit
+ * composed of others (the root), or one whose work no recorded prompt produced. It says only what is true: the purpose is
+ * the standard, and each work product and command was made for the unit it names, under that unit's own instruction, which
+ * the reviewer is not shown. ⭑ It claims nothing about whether an agent was given the purpose.
+ */
+export const DECLARED_UNIT_PURPOSE_INTENT =
+	'The WORK below was done for a professional work unit, and is judged against that unit’s own PURPOSE, quoted next. Each work product and each command in it was made for the work unit it names, under that unit’s own instruction, which is not shown here:';
+
+/**
+ * ⭐⭐ `E12F` F4 — WHAT STANDS IN PLACE OF THE ACCOUNT AND THE NARRATION IN A `UNIT_PURPOSE` REVIEW THAT CARRIES NEITHER.
+ * ⛔ The account's absence was rendered as the PRODUCER's omission — *"the producer returned no professional rationale
+ * summary … treat the omission itself as a completeness shortcut"* — and recorded as a limitation saying so: false of the
+ * root, which has no one producing agent, and whose host shows no single account for many children's work. A reviewer told
+ * to fault an omission nobody made is pushed toward a failure that is not there.
+ */
+export const DECLARED_NO_SINGLE_ACCOUNT =
+	'No producing agent’s account or narration is shown: this work is judged against the unit’s own purpose, not as one agent’s answer to an instruction, so the host shows none, and its absence is no omission by any producer.';
+
+/** ⭐ `E12F` F4 — the limitation such a review records in place of *"The producer returned no professional rationale summary"*. */
+export const DECLARED_NO_SINGLE_ACCOUNT_LIMITATION =
+	'No producing agent’s account was shown: the work was judged against the unit’s own purpose, and the review judged its work products and commands only.';
+
+/**
  * ⭐⭐ E2 (design B1) — THE HOST'S LINE NAMING THE DECLARED POLICY A REVIEW JUDGES AGAINST: its name, its id and its purpose,
  * the catalog's own words, and how the rubric's lines below are to be read. ⛔ D8's lines speak of "derivational-integrity
  * failure class[es]", and they are the sponsor's answers byte for byte (design §9.3 D8), so they are NOT edited for this
@@ -199,7 +239,7 @@ export function declaredPolicyLine(policy: DeclaredPolicyFraming): string {
 	);
 }
 
-function framingText(input: Pick<ReasoningReviewInput, 'framing' | 'declaredPolicy'>): Framed {
+function framingText(input: Pick<ReasoningReviewInput, 'framing' | 'declaredPolicy' | 'declaredInstruction'>): Framed {
 	const framing: ReviewFraming = input.framing;
 	switch (framing) {
 		case 'WORK_PRODUCT':
@@ -241,11 +281,15 @@ function framingText(input: Pick<ReasoningReviewInput, 'framing' | 'declaredPoli
 			// purpose, its criteria the rubric. ⛔ Refused, never sent, when the input names no policy.
 			const policy = input.declaredPolicy;
 			if (!policy) throw new Error(NO_DECLARED_POLICY_STATEMENT);
+			// ⛔ `E12F` F4 (`R14`) — ~~"produced … by a DIFFERENT AI agent (for a unit composed of others, by the agents that did
+			// its children's work), which was given exactly this instruction:"~~ — false of the root, whose instruction is its
+			// purpose. The intent line now says what the instruction IS, as the caller declares it, and refuses when it does not.
+			const instruction = input.declaredInstruction;
+			if (instruction === undefined) throw new Error(NO_DECLARED_INSTRUCTION_STATEMENT);
+			const ownPurpose = instruction === 'UNIT_PURPOSE';
 			return {
-				intent:
-					'The WORK below was produced for a professional work unit by a DIFFERENT AI agent (for a unit composed of ' +
-					'others, by the agents that did its children’s work), which was given exactly this instruction:',
-				intentSlice: 'the instruction',
+				intent: ownPurpose ? DECLARED_UNIT_PURPOSE_INTENT : DECLARED_PRODUCING_PROMPT_INTENT,
+				intentSlice: ownPurpose ? 'the purpose' : 'the instruction',
 				// ⭐ The work is ONE line of JSON (`declaredPolicyReviewInput`), and this host line states its serialization —
 				// and that the exit codes in it are the host's record, quoted beside the agent's arguments (`REG-F-481`).
 				subject:
@@ -626,6 +670,13 @@ const criterionRepairRefused = (cause: string, input: ReasoningReviewInput): str
  *     it then differs from the view's own, and occurs nowhere in it (the nesting, design D2) — and the view's own is
  *     chosen over this prompt's other untrusted slices (`processResultUntrustedSlices`), so it occurs in none of them.
  */
+/**
+ * ⭐ `E12F` F4 — A DECLARED REVIEW OF A UNIT'S OWN PURPOSE THAT CARRIES NO ACCOUNT AND NO NARRATION: one with no one producing
+ * agent, whose prompt and limitation say so (`DECLARED_NO_SINGLE_ACCOUNT`) rather than call an absence a producer's omission.
+ */
+const withNoSingleProducer = (input: ReasoningReviewInput): boolean =>
+	input.framing === 'DECLARED_POLICY' && input.declaredInstruction === 'UNIT_PURPOSE' && !input.rationale && !input.narration;
+
 function promptPlan(input: ReasoningReviewInput) {
 	const framed = framingText(input);
 	// THE RUBRIC IS THE POLICY'S OWN. This rendered from the REASONING_REVIEW_CRITERIA constant, which is what made
@@ -658,6 +709,8 @@ function promptPlan(input: ReasoningReviewInput) {
 	const narration = input.narration ? excerptHead('the narration', input.narration, NARRATION_MAX) : undefined;
 	const userIntent = excerptHead(framed.intentSlice, input.prompt, USER_INTENT_MAX);
 	const prefenced = input.framing === 'PROCESS_RESULT';
+	// ⭐ `E12F` F4 — a declared review of a unit's own PURPOSE with no account and no narration has no one producing agent.
+	const noSingleProducer = withNoSingleProducer(input);
 	const assemble = (fence: string, content: string): string =>
 		[
 			'You are an independent assurance reviewer performing a REASONING REVIEW of an AI-produced professional artifact.',
@@ -680,9 +733,15 @@ function promptPlan(input: ReasoningReviewInput) {
 			// host's heading and sentences, outside every fence (`REG-F-484`).
 			prefenced ? `\n${OBSERVATION_HEADING}\n${renderObservedCalls(input.observedToolCalls)}` : '',
 			// §8.4 puts the contracted account first: this is what the producer is accountable for having written.
-			`\nThe producing agent's PROFESSIONAL RATIONALE SUMMARY — its own contracted account of how the artifact discharges the obligation (Section 9.7). Judge whether it is candid and whether the artifact bears it out; an account that claims more than the artifact supports is itself a finding:\n${account ? renderAccount(fence, account) : renderRationale(undefined)}`,
+			// ⭐ `E12F` F4 — save in a `UNIT_PURPOSE` review that carries neither an account nor a narration: there is no one
+			// producing agent to have written either, so one host line says so, and nothing calls the absence an omission.
+			noSingleProducer
+				? `\n${DECLARED_NO_SINGLE_ACCOUNT}`
+				: `\nThe producing agent's PROFESSIONAL RATIONALE SUMMARY — its own contracted account of how the artifact discharges the obligation (Section 9.7). Judge whether it is candid and whether the artifact bears it out; an account that claims more than the artifact supports is itself a finding:\n${account ? renderAccount(fence, account) : renderRationale(undefined)}`,
 			// Then observable trace data. Never the producer's interior (Section 9.7).
-			`\nThe producing agent's observable narration during the turn (trace data, not its private chain-of-thought):\n${narration ? quoted(fence, narration) : '(none recorded)'}`,
+			noSingleProducer
+				? ''
+				: `\nThe producing agent's observable narration during the turn (trace data, not its private chain-of-thought):\n${narration ? quoted(fence, narration) : '(none recorded)'}`,
 			prior
 				? `\nA PREVIOUS review flagged:\n${quoted(fence, prior)}\nJudge whether those are genuinely resolved.`
 				: '',
@@ -1633,7 +1692,10 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 				...result,
 				limitations: [
 					...result.limitations,
-					'The producer returned no professional rationale summary (Section 9.7); the review judged the artifact and observable trace data only.'
+					// ⛔ `E12F` F4 — never said of a declared review of a unit's own purpose: no one producer owed an account.
+					withNoSingleProducer(input)
+						? DECLARED_NO_SINGLE_ACCOUNT_LIMITATION
+						: 'The producer returned no professional rationale summary (Section 9.7); the review judged the artifact and observable trace data only.'
 				]
 			};
 		}

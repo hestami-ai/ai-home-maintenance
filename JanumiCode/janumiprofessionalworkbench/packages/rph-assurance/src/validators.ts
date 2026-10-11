@@ -96,6 +96,21 @@ export interface DeclaredPolicyFraming {
 	readonly purpose: string;
 }
 
+/**
+ * ⭐⭐ `E12F` F4 (the E12 package review's fourth finding; `R14`: *"a review conducted on a false account of its own subject is
+ * worse than no review"*) — WHAT THE INSTRUCTION A `DECLARED_POLICY` REVIEW SHOWS IS, so the reviewer is told only what is
+ * true of it:
+ *   · `PRODUCING_PROMPT` — the prompt the agent that produced the ONE work product judged was given, re-rendered from the
+ *     record: the reviewer is told that agent was given exactly it;
+ *   · `UNIT_PURPOSE` — the unit's OWN purpose: for a unit composed of others (the root, judged over its children's work,
+ *     `REG-D-111` (2)), or one whose work no recorded prompt produced. It is the standard the work is judged against, and
+ *     each work product judged was made under its own unit's instruction, which is not shown.
+ * ⛔ The framing said of EVERY declared review that the work was produced "by the agents that did its children's work, which
+ * was given exactly this instruction" — false of the root, whose instruction is its purpose and whose children each had a
+ * prompt of their own.
+ */
+export type DeclaredInstruction = 'PRODUCING_PROMPT' | 'UNIT_PURPOSE';
+
 /** The inputs a Validator needs beyond the subject. Deterministic Validators read the fact bags; the Reasoning
  *  Review Validator reads the review input (the intent + the serialized subject content to review). */
 export interface ReasoningReviewInput {
@@ -145,6 +160,12 @@ export interface ReasoningReviewInput {
 	 * and every record and case built over them — are unchanged.
 	 */
 	readonly declaredPolicy?: DeclaredPolicyFraming;
+	/**
+	 * ⭐ `E12F` F4 — what a `DECLARED_POLICY` review's instruction (`prompt`) is (`DeclaredInstruction`). ⛔ REQUIRED BY THAT
+	 * FRAMING, AND READ BY NO OTHER, as `declaredPolicy` is: a reviewer refuses a declared review that does not say, rather
+	 * than tell the reviewer something about its instruction the host does not know to be true.
+	 */
+	readonly declaredInstruction?: DeclaredInstruction;
 	readonly prompt: string;
 	readonly content: string;
 	/**

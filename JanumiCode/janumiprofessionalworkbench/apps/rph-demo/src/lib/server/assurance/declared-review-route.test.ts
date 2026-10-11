@@ -89,6 +89,7 @@ import { actions as undertakings } from '../../../routes/undertakings/+page.serv
 import { actionEvent, beginExecute } from '../execution/begin-execute.testing.js';
 import { dispatch, getEngine, mintUiId, resetEngine } from '../workbench.js';
 import { noProgramsDirectory } from './no-programs.testing.js';
+import { DECLARED_PRODUCING_PROMPT_INTENT, DECLARED_UNIT_PURPOSE_INTENT } from './reasoning-review-validator.js';
 
 const POLICY = 'pol_requirement_coverage';
 const LIVE_BACKEND_VARIABLES = [
@@ -249,5 +250,120 @@ describe('⭐⭐ E2 — Record Assurance reviews each declared policy, and recor
 		expect(d.results).toHaveLength(6);
 		expect(d.findings).toEqual([]);
 		expect((getObject(getEngine(), pwuId) as { assuranceState?: string }).assuranceState).toBe('SATISFIED');
+	});
+});
+
+// ── ⛔ `E12F` F4 — WHAT THE REVIEWER IS TOLD ABOUT THE INSTRUCTION, FOR A UNIT COMPOSED OF OTHERS ───────────────────────────
+//
+// The root is judged over its CHILDREN's work (`REG-D-111` (2)), and its instruction is ITS OWN PURPOSE: no agent was given it,
+// and each child's work was produced under the child's own prompt. The framing said the work was produced "by the agents
+// that did its children's work, which was given exactly this instruction" — a false account of the subject, which `R14`
+// calls worse than no review.
+
+/** The root's purpose, as its type declares it: what the root's declared review shows as the standard. */
+const ROOT_PURPOSE = 'Realize the requirements of the product from the work of its phase.';
+
+/**
+ * A root type over ONE child type — the child a MODEL unit declaring `pol_requirement_coverage`, with its own prompt; the
+ * root a HUMAN unit (a TRANSFORMATION, no prompt) declaring `pol_intent_preservation` — published and instantiated.
+ */
+async function rootOverAChild(): Promise<{ readonly root: string; readonly child: string }> {
+	const pwaId = mintUiId('pwa');
+	const childType = mintUiId('pwut');
+	const rootType = mintUiId('pwut');
+	const steps: readonly [string, string, string, Record<string, unknown>][] = [
+		['CreatePwa', 'PROFESSIONAL_WORK_ARCHITECTURE', pwaId, { pwaId, name: 'Realization PWA', description: 'd', domain: 'software', version: '0.1.0' }],
+		[
+			'DefinePwuType',
+			'PWU_TYPE',
+			childType,
+			{
+				pwuTypeId: childType,
+				pwaId,
+				pwuKind: 'REQUIREMENT_DEFINITION',
+				name: 'Requirements',
+				purpose: 'Write the requirements',
+				isRoot: false,
+				permittedChildTypeIds: [],
+				requiredInputs: [],
+				requiredOutputs: [],
+				requiredAssurancePolicyIds: [POLICY],
+				workDischarge: 'MODEL',
+				promptTemplate: {
+					templateText: 'Write the requirements of {subject}.',
+					templateVersion: 1,
+					declaredPlaceholders: ['subject'],
+					status: 'ACTIVE'
+				}
+			}
+		],
+		[
+			'DefinePwuType',
+			'PWU_TYPE',
+			rootType,
+			{
+				pwuTypeId: rootType,
+				pwaId,
+				pwuKind: 'PRODUCT_REALIZATION',
+				name: 'Realization',
+				purpose: ROOT_PURPOSE,
+				isRoot: true,
+				permittedChildTypeIds: [childType],
+				permittedChildren: [{ typeId: childType, cardinality: 'M1' }],
+				requiredInputs: [],
+				requiredOutputs: [],
+				requiredAssurancePolicyIds: ['pol_intent_preservation'],
+				workDischarge: 'HUMAN'
+			}
+		],
+		['SubmitPwaForReview', 'PROFESSIONAL_WORK_ARCHITECTURE', pwaId, {}],
+		['ValidatePwa', 'PROFESSIONAL_WORK_ARCHITECTURE', pwaId, {}],
+		['PublishPwa', 'PROFESSIONAL_WORK_ARCHITECTURE', pwaId, { rootPwuTypeId: rootType }]
+	];
+	for (const [commandType, aggregateType, aggregateId, payload] of steps) {
+		const r = dispatch(commandType, aggregateType, aggregateId, payload);
+		expect(r.status, `arrangement: ${commandType} — ${r.error?.message ?? ''}`).toBe('ACCEPTED');
+	}
+	const created = (await undertakings.create(actionEvent('create', { name: 'Composed Demo', pwaId, ...RISK }) as never)) as {
+		created?: string;
+		data?: { error?: string };
+	};
+	expect(created.created, `arrangement: the Undertaking — ${created.data?.error ?? ''}`).toBeDefined();
+	const units = listPwus(getEngine(), created.created!);
+	return {
+		root: units.find((p) => p.state.pwuTypeId === rootType)!.id,
+		child: units.find((p) => p.state.pwuTypeId === childType)!.id
+	};
+}
+
+describe('⛔ E12F F4 — the root’s declared review is told only what is true of its subject', () => {
+	it('⛔ the root’s declared prompt does not say its children were given the root’s instruction: the root’s PURPOSE is the standard, and each child’s work was made under its own instruction', async () => {
+		// ⛔ PREDICTED RED, read from the code: the framing's one intent line — "produced … by a DIFFERENT AI agent (for a unit
+		// composed of others, by the agents that did its children's work), which was given exactly this instruction:" — above
+		// the ROOT's purpose, an instruction no agent was given.
+		const { root, child } = await rootOverAChild();
+		expect((await beginExecute(root)).data?.error, 'arrangement: the root’s Begin & Execute').toBeUndefined();
+		expect((await beginExecute(child)).data?.error, 'arrangement: the child’s Begin & Execute').toBeUndefined();
+		expect((await recordAssurance(child)).advanced, 'arrangement: the child signed off').toBe('assured');
+		seam.declared.length = 0;
+		await recordAssurance(root);
+		expect(seam.declared, 'one declared review of the root').toHaveLength(1);
+		const prompt = seam.declared[0]!;
+		// ⛔ No claim that anyone was given this instruction — it is the root's purpose.
+		expect(prompt, 'the root’s prompt says an agent was given its instruction').not.toContain('which was given exactly this instruction');
+		expect(prompt).not.toContain('by the agents that did its children');
+		// ⭐ What is true: the unit's own purpose is the standard, and each work product was made under its own unit's instruction.
+		expect(prompt).toContain(DECLARED_UNIT_PURPOSE_INTENT);
+		expect(prompt).toContain(ROOT_PURPOSE);
+		expect(prompt).toContain('"workUnit":"Requirements"');
+	});
+
+	it('⭐ CONTROL — a unit that did its own work is still told, truly, that its producer was given exactly this instruction', async () => {
+		const pwuId = await declaringModelUnit();
+		expect((await beginExecute(pwuId)).data?.error, 'arrangement: Begin & Execute').toBeUndefined();
+		await recordAssurance(pwuId);
+		expect(seam.declared).toHaveLength(1);
+		expect(seam.declared[0]).toContain(DECLARED_PRODUCING_PROMPT_INTENT);
+		expect(seam.declared[0]).not.toContain(DECLARED_UNIT_PURPOSE_INTENT);
 	});
 });
