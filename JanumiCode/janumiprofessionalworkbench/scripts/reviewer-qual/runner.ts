@@ -151,7 +151,16 @@ export async function evaluateCase(args: {
 	readonly now?: () => number;
 }): Promise<Evaluation> {
 	const now = args.now ?? (() => performance.now());
-	const criterionIds = new Set(args.criteria.map((k) => k.id));
+	// ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (design B5) — A DECLARED CASE IS ANSWERED AGAINST ITS OWN POLICY'S CRITERIA, never the
+	// floor's seeded rubric the run is handed (`materialize.ts` builds its prompt from them): so its reply's rows are read
+	// against them too. ⛔ Read against the floor's, every row of a well-formed declared reply is recorded as
+	// UNDECLARED_CRITERION_ID and every floor criterion as MISSING_CRITERION — malformations the reviewer never made.
+	// ⚠ ITS SCORE IS THE OTHER ARMS': for a VALID result the floor's composition computes `dispositionFromFindings` over the
+	// result's own rows and findings — the ladder the declared sign-off computes its verdict by (`declared-policy-signoff.ts`)
+	// — and its DIFFERENT_MODEL requirement is one every candidate meets against the case's fictional producer (measured on
+	// the fourteen cases: a scorer of their own, the ladder alone, scored each of them alike).
+	const caseCriteria = args.case.arm === 'DECLARED_POLICY' ? args.case.input.policy.criteria : args.criteria;
+	const criterionIds = new Set(caseCriteria.map((k) => k.id));
 	const input: ReasoningReviewInput = caseReviewInput(args.case, args.criteria);
 	const calls: EvaluationCall[] = [];
 	let harness: unknown;

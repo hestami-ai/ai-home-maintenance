@@ -14,6 +14,7 @@ import type { ReasoningReviewInput } from '@janumipwb/rph-assurance';
 import type { AssessmentCriterion } from '@janumipwb/rph-contracts';
 import { buildPwaGraphExport } from '@janumipwb/rph-projections';
 import {
+	declaredPolicyReviewInput,
 	graphReviewInput,
 	processResultReviewInput,
 	workProductReviewInput
@@ -42,6 +43,17 @@ export function caseReviewInput(
 			return workProductReviewInput({ criteria, ...c.input });
 		case 'PROCESS_RESULT':
 			return processResult({ criteria, ...c.input });
+		case 'DECLARED_POLICY': {
+			// ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (design B5) — THE DECLARED ARM, through the builder Record Assurance builds with
+			// (`declaredPolicyReviewInput`). ⛔ ITS CRITERIA ARE THE CASE'S OWN POLICY'S, never `criteria` — the floor's seeded
+			// rubric, which a declared review never sees.
+			const { policy, ...work } = c.input;
+			return declaredPolicyReviewInput({
+				policy: { policyId: policy.policyId, name: policy.name, purpose: policy.purpose },
+				criteria: policy.criteria,
+				...work
+			});
+		}
 		default: {
 			const none: never = c;
 			throw new Error(`a case of no arm this assembly knows: ${JSON.stringify((none as { arm?: unknown }).arm)}`);

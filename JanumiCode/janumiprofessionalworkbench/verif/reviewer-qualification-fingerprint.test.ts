@@ -90,6 +90,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { SEEDED_REASONING_REVIEW_CRITERIA } from '@janumipwb/rph-assurance';
+import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import ts from 'typescript';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
@@ -140,7 +141,13 @@ import { sha256 } from '../scripts/reviewer-qual/digest.js';
 import { detectMalformations } from '../scripts/reviewer-qual/malformations.js';
 import type { ToolInvocationResult } from '../apps/rph-demo/src/lib/server/tools/backing-tool.js';
 import { DEVIN_REVIEWER_PREAMBLE } from '../apps/rph-demo/src/lib/server/tools/devin-reviewer.js';
-import { FINGERPRINT_PROBES, PROBE_SUBJECT, READER_CORPUS } from '../scripts/reviewer-qual/probes.js';
+import {
+	CATALOG_DECLARED_POLICIES,
+	FINGERPRINT_PROBES,
+	PROBE_SUBJECT,
+	READER_CORPUS,
+	type DeclaredProbePolicy
+} from '../scripts/reviewer-qual/probes.js';
 import type { CallLine, CandidateIdentity } from '../scripts/reviewer-qual/record.js';
 import { evaluateCase, runQualification } from '../scripts/reviewer-qual/runner.js';
 import { caseReviewInput } from '../scripts/reviewer-qual/materialize.js';
@@ -426,6 +433,87 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint MOVES on each component
 		expect(PRODUCT_SEAMS.independence, 'the product’s own is the seeded Reasoning Review policy’s').toBe('DIFFERENT_MODEL');
 	});
 
+	// ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (`DESIGN-phase-7-completion.md` B4; `REG-F-553`'s class) — THE DECLARED-POLICY
+	// FRAMING, a fourth branch of what a reviewer reads (`REG-D-110` (3): the selected reviewer judges every declared policy).
+	// ⛔ Before E2's probes no probe reached it, and no component hashed the catalog's policies: a change to the framing's
+	// text, to a policy's purpose, to a criterion of it, or to the independence its sign-off checks moved NO fingerprint, so
+	// `reviewer:qual:check` stayed green over a rubric nobody re-measured (each row below observed red before them).
+	/** The catalog's declared policies as the product seeds them — built HERE from the catalog, never read off the seam. */
+	const catalogDeclared = (): DeclaredProbePolicy[] =>
+		ontology.seedPolicies.map((p) => ({
+			policyId: p.policyId,
+			name: p.name,
+			purpose: p.purpose,
+			criteria: p.criteria as unknown as readonly AssessmentCriterion[],
+			independenceRequirement: p.independenceRequirement
+		}));
+	const withDeclared = (declared: readonly DeclaredProbePolicy[]): FingerprintSeams => ({
+		...PRODUCT_SEAMS,
+		declaredPolicies: declared
+	});
+	/** The current set's declared cases — the case prompts a change to the declared framing's text may move, and the only ones. */
+	const CURRENT_DECLARED = CURRENT_CASES.filter((c) => c.arm === 'DECLARED_POLICY').map((c) => c.id);
+	const movedProbes = (fp: ReviewerFingerprint): string[] =>
+		[...fp.probePrompts].filter(([id, p]) => p !== BASE.probePrompts.get(id)).map(([id]) => id);
+
+	it('⭐⭐ E2 — the DECLARED FRAMING’S TEXT: the probes move, and of the case prompts exactly the current set’s fourteen declared cases’ — none of v1’s', async () => {
+		const seams: FingerprintSeams = {
+			...PRODUCT_SEAMS,
+			validator: (print) =>
+				PRODUCT_SEAMS.validator((p) =>
+					print(p.replace('The WORK to judge against that policy', 'The WORK to judge against this policy'))
+				)
+		};
+		const fp = await reviewerFingerprint(CASES, seams);
+		onlyMoved(fp, ['probes']);
+		expect(fp.casePrompts, 'no case of v1 is a declared review').toEqual(BASE.casePrompts);
+		expect(CURRENT_DECLARED, 'the arrangement: the current set holds the fourteen').toHaveLength(14);
+		expect(await movedNow(seams), 'the case prompts of the current set that move').toEqual(CURRENT_DECLARED);
+	});
+
+	it('⭐⭐ E2 — a DECLARED POLICY’S PURPOSE, one catalog policy’s: its own probe and the criteria component move — and no case prompt, each case carrying its policy as a literal', async () => {
+		const declared = catalogDeclared().map((p) =>
+			p.policyId === 'pol_test_adequacy' ? { ...p, purpose: `${p.purpose}!` } : p
+		);
+		const fp = await reviewerFingerprint(CASES, withDeclared(declared));
+		onlyMoved(fp, ['probes', 'criteria']);
+		expect(movedProbes(fp), 'the probe of that policy, and no other').toEqual(['D-pol_test_adequacy']);
+		expect(await movedNow(withDeclared(declared)), 'no case prompt of the current set').toEqual([]);
+	});
+
+	it('⭐⭐ E2 — a DECLARED POLICY’S INDEPENDENCE, which no prompt shows and its sign-off checks: the criteria component moves, alone', async () => {
+		const declared = catalogDeclared().map((p) =>
+			p.policyId === 'pol_assumption_disclosure'
+				? { ...p, independenceRequirement: `${p.independenceRequirement}-ALTERED` }
+				: p
+		);
+		onlyMoved(await reviewerFingerprint(CASES, withDeclared(declared)), ['criteria']);
+	});
+
+	it('⭐⭐ E2 — a DECLARED CRITERION’S FIELD, every field of it, whole: the criteria component moves', async () => {
+		const [policy, target] = [0, 3];
+		const criterion = catalogDeclared()[policy]!.criteria[target]!;
+		for (const field of Object.keys(criterion)) {
+			const declared = catalogDeclared().map((p, i) =>
+				i !== policy
+					? p
+					: {
+							...p,
+							criteria: p.criteria.map((c, j) => {
+								if (j !== target) return c;
+								const v = (c as unknown as Record<string, unknown>)[field];
+								const altered =
+									typeof v === 'boolean' ? !v : Array.isArray(v) ? [...v, 'EV-ALTERED'] : `${String(v)}-ALTERED`;
+								return { ...c, [field]: altered };
+							})
+						}
+			);
+			const fp = await reviewerFingerprint(CASES, withDeclared(declared));
+			expect(fp.reviewer, `${field}: the reviewer fingerprint moves`).not.toBe(BASE.reviewer);
+			expect(fp.components.criteria, `${field}: the criteria component moves`).not.toBe(BASE.components.criteria);
+		}
+	}, 120_000);
+
 	it('⭐ a MALFORMATION RULE — a class the harness no longer detects (the review’s E6): the scoring digest moves, and no case prompt of v1 or of the current set (PQ-2)', async () => {
 		const seams: FingerprintSeams = {
 			...PRODUCT_SEAMS,
@@ -594,6 +682,24 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint does NOT move on what d
 		// THE CONTROL: the copy measured the tree in everything else, so the move is the preamble's.
 		for (const k of ['budget', 'criteria', 'scoring'] as const) expect(moved.components[k], k).toBe(BASE.components[k]);
 	}, 120_000);
+
+	it('⭐⭐ `JAN-EXEC` Phase 7 completion E2 (design B4; REG-F-553’s class) — the DECLARED FRAMING’S TEXT, one character of it changed where the product writes it, on a copy: `probes` moves, and no other component', () => {
+		// ⛔ WHY: no probe reached the `DECLARED_POLICY` framing before E2, so this edit — one character of what every declared
+		// review's reviewer reads — moved no fingerprint (observed red before the declared probes). The edit is made where the
+		// product writes the text, `reasoning-review-validator.ts`, in the copy: the row holds the hash to the product's own
+		// sentence, not to a value a seam was handed.
+		const copy = disposableTree();
+		const file = `${copy}/${VALIDATOR}`;
+		const original = readFileSync(file, 'utf8');
+		const find = "'The WORK to judge against that policy, as one line of JSON";
+		expect(original.split(find).length - 1, 'the edit anchors once, on the declared framing').toBe(1);
+		writeFileSync(file, original.replace(find, () => "'The WORK to judge against that policy; as one line of JSON"));
+		const moved = fingerprintIn(copy);
+		expect(moved.reviewer, 'one character of the declared framing moves the reviewer fingerprint').not.toBe(BASE.reviewer);
+		expect(moved.components.probes, 'through the probes component, where it is hashed').not.toBe(BASE.components.probes);
+		// THE CONTROL: the copy measured the tree in everything else, so the move is the declared framing's.
+		for (const k of ['budget', 'criteria', 'scoring'] as const) expect(moved.components[k], k).toBe(BASE.components[k]);
+	}, 120_000);
 });
 
 describe('JAN-CRITREAD J2-3 — the probe set reaches every branch of prompt assembly', () => {
@@ -645,9 +751,18 @@ describe('JAN-CRITREAD J2-3 — the probe set reaches every branch of prompt ass
 			'[CUT BY THE CAPTURE: stdout — ',
 			'[CUT BY THE CAPTURE: stderr — ',
 			'so the TAIL below is the end of what was CAPTURED, not the end of the output.]',
-			'so the end shown below is the end of what was CAPTURED, not the end of the output.]'
+			'so the end shown below is the end of what was CAPTURED, not the end of the output.]',
+			// ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (design B4) — and the DECLARED-POLICY framing: its policy line, its subject
+			// line, and the work as one line of JSON, a timed-out command and one with no exit code among it.
+			'You are judging this work against ONE declared assurance policy, ',
+			'The WORK to judge against that policy, as one line of JSON',
+			'"timedOut":true',
+			'"exitCode":null'
 		])
 			expect(any(needle), needle).toBe(true);
+		// ⭐ E2 — one declared probe per catalog policy, each naming its own policy in its policy line.
+		for (const id of ['pol_requirement_coverage', 'pol_fitness_for_purpose'])
+			expect(prompt(`D-${id}`).includes(`(${id}). Its purpose: `), id).toBe(true);
 		expect(prompt('G-DECLARED').includes('(NOT DECLARED'), 'a declared account renders as itself').toBe(false);
 	});
 
@@ -1477,7 +1592,8 @@ const HOST_LINE_CHANGES: Readonly<Record<string, HostLineChange>> = {
 	// line above its region is the account's section heading, and that is the line a validator could put inside it.
 	'the account’s section heading, inside the rationale’s region': {
 		carries: (i) => i.rationale !== undefined,
-		framings: ['G', 'W', 'P'],
+		// ⭐ `JAN-EXEC` Phase 7 completion E2 — and the DECLARED framing (design B4): its probes carry the account too.
+		framings: ['G', 'W', 'P', 'D'],
 		change: (prompt) => {
 			const heading = headingOf(prompt);
 			const lines = prompt.split('\n');
@@ -1491,7 +1607,9 @@ const HOST_LINE_CHANGES: Readonly<Record<string, HostLineChange>> = {
 			`the label of ${k}, inside its region`,
 			{
 				carries: (i: ReasoningReviewInput) => (i.rationale?.[k].length ?? 0) > 0,
-				framings: ['G', 'W', 'P'],
+				// ⭐ E2 — and the DECLARED framing where its probes' account (`RATIONALE`) lists the field: its assumptions and
+				// its residual uncertainty, and no limitation.
+				framings: k === 'limitations' ? ['G', 'W', 'P'] : ['G', 'W', 'P', 'D'],
 				// ~~`${label}, as a JSON array of strings:`~~ — D7: HEAD's label.
 				change: labelInside(`${ACCOUNT_LIST_LABELS[k]}:`)
 			}
@@ -1499,7 +1617,8 @@ const HOST_LINE_CHANGES: Readonly<Record<string, HostLineChange>> = {
 	),
 	'an empty list’s "(none declared)" line, quoted': {
 		carries: (i) => ACCOUNT_LISTS.some((k) => i.rationale?.[k].length === 0),
-		framings: ['G', 'W', 'P'],
+		// ⭐ E2 — and the DECLARED framing: its probes' account declares no limitation.
+		framings: ['G', 'W', 'P', 'D'],
 		change: noneDeclaredQuoted
 	},
 	'the candidate’s subject hash, merged back into the content': {
@@ -1626,10 +1745,12 @@ const VALIDATOR_CHOOSER_RULES: Readonly<Record<string, ValidatorChooserRule>> = 
 	// ⭐ `PQ-1` (`REG-F-481`) — AND ONLY WHEN IT IS CUT: the content of a graph or a work product skipped when the budget cut
 	// it, read when whole. ⛔ No probe held a candidate in a cut content, so this rule moved no probe (driven on a disposable
 	// copy); `G-OVERSIZE-CONTENT` and `W-OVERSIZE-CONTENT` hold one in the kept HEAD now.
+	// ⭐ `JAN-EXEC` Phase 7 completion E2 — AND THE DECLARED WORK, CUT (design B4): `D-OVERSIZE-CONTENT` holds a candidate in
+	// the kept HEAD of its cut content, so the rule moves it too.
 	'the content of a graph or a work product, when it is cut': {
-		moves: ['G-OVERSIZE-CONTENT', 'W-OVERSIZE-CONTENT'],
+		moves: ['G-OVERSIZE-CONTENT', 'W-OVERSIZE-CONTENT', 'D-OVERSIZE-CONTENT'],
 		kept: (s, _f, cut) => !(s === 'the content' && cut),
-		framings: ['G', 'W']
+		framings: ['G', 'W', 'D']
 	},
 	// ⭐ `PQ-1` (`REG-F-481`) — EACH FIELD OF THE ACCOUNT, THE NARRATION AND THE PRIOR FINDINGS, IN EVERY FRAMING THAT CARRIES
 	// THEM. ⛔ They moved a graph's probe and a process result's, never a work product's, and no process-result probe
@@ -1923,6 +2044,17 @@ const holds = (text: string, n: number): boolean =>
 // declaring each of the five (`probes.ts` `withEveryStakes`).
 /** How the rubric writes a criterion's stakes beside it (`reasoning-review-validator.ts`; design §9.3 D8). */
 const stakesMark = (stakes: string): string => `[if unmet: ${stakes}]`;
+/** ⭐ E2 — every stakes a catalog policy declares, so the DECLARED probes show it (`probes.ts` `CATALOG_DECLARED_POLICIES`). */
+const CATALOG_STAKES: ReadonlySet<string> = new Set(
+	CATALOG_DECLARED_POLICIES.flatMap((p) => p.criteria.map((k) => k.severityIfNotMet))
+);
+/** ⭐ E2 — the declared probes whose prompt shows a stakes other than BLOCKING (their policy's own), in probe order. */
+const DECLARED_PROBES_BEYOND_BLOCKING = (): string[] =>
+	FINGERPRINT_PROBES.map((x) => x.id).filter(
+		(id) =>
+			id.startsWith('D-') &&
+			AssuranceSeveritySchema.options.some((s) => s !== 'BLOCKING' && BASE.probePrompts.get(id)!.includes(stakesMark(s)))
+	);
 /** The probes whose prompt shows `stakes` beside a criterion. */
 const showingStakes = (stakes: string): string[] =>
 	FINGERPRINT_PROBES.map((x) => x.id).filter((id) => BASE.probePrompts.get(id)!.includes(stakesMark(stakes)));
@@ -2585,7 +2717,8 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 			onlyMoved(fp, ['probes']);
 			const showing = showingAListWhole();
 			expect(movedProbes(fp), 'the probes whose prompt shows a list whole').toEqual(showing);
-			expect([...new Set(showing.map((id) => id[0]))], 'in every framing').toEqual(['G', 'W', 'P']);
+			// ⭐ E2 — ~~G, W, P~~: and the DECLARED framing, whose probes show their account's lists whole.
+			expect([...new Set(showing.map((id) => id[0]))], 'in every framing').toEqual(['G', 'W', 'P', 'D']);
 			// ⭐ A CASE PROMPT MOVES TOO, unlike a renderer change: every prompt with an account carries its lists so (D7 moved
 			// every case prompt). Exactly the cases whose account holds a list — every case is seen whole, so none is cut.
 			const carrying = CASES.filter((c) => {
@@ -2624,7 +2757,11 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 				.map((x) => x.id)
 				.filter((id) => sendingAPrompt().includes(id));
 			expect(movedProbes(fp), 'the probes whose account it touches').toEqual(carrying);
-			expect([...new Set(carrying.map((id) => id[0]))], 'in every framing').toEqual(['G', 'W', 'P']);
+			// ⭐ E2 — ~~G, W, P~~: and the DECLARED framing where its probes' account (`RATIONALE`) carries it — every field
+			// but the limitations, which it leaves empty.
+			expect([...new Set(carrying.map((id) => id[0]))], 'in every framing').toEqual(
+				name.includes('limitations') ? ['G', 'W', 'P'] : ['G', 'W', 'P', 'D']
+			);
 			const cases = CASES.filter((k) => layout.carries(caseReviewInput(k, PRODUCT_SEAMS.criteria))).map((k) => k.id);
 			expect(cases.length, 'the arrangement: a case carries it').toBeGreaterThan(0);
 			expect(
@@ -2643,7 +2780,15 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 		'⭐ design §9.3 D8 — the stakes %s written otherwise beside its criterion moves `probes` through exactly the probes whose prompt shows it, in every framing — and every case prompt exactly when the floor policy declares it, of v1 and of the current set (PQ-2)',
 		async (stakes) => {
 			const showing = showingStakes(stakes);
-			expect([...new Set(showing.map((id) => id[0]))], 'the arrangement: it is shown in every framing').toEqual(['G', 'W', 'P']);
+			// ⭐ `JAN-EXEC` Phase 7 completion E2 — and in the DECLARED framing, where a catalog policy declares the stakes: its
+			// probe's rubric is that policy's own criteria (design B4).
+			const inDeclared = CATALOG_STAKES.has(stakes) ? ['D'] : [];
+			expect([...new Set(showing.map((id) => id[0]))], 'the arrangement: it is shown in every framing').toEqual([
+				'G',
+				'W',
+				'P',
+				...inDeclared
+			]);
 			const seams: FingerprintSeams = {
 				...PRODUCT_SEAMS,
 				validator: (print) => PRODUCT_SEAMS.validator((p) => print(p.split(stakesMark(stakes)).join(stakesMark(stakes.toLowerCase()))))
@@ -2660,8 +2805,12 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 			// substitution models the change over the WHOLE prompt, quoted slices included, so a case whose own text held a
 			// stakes mark would move here too where the policy declares no such stakes — a false red, never a false green, in
 			// this half as in the v1 half above it; no case of either set holds a stakes mark today.
-			expect(await movedNow(seams), `the case prompts of the current set that move: every one exactly when the floor policy declares ${stakes}`).toEqual(
-				declared ? CURRENT_CASES.map((c) => c.id) : []
+			// ⭐ E2 — ~~every one exactly when the floor policy declares it~~: a DECLARED case's rubric is its own policy's, so it
+			// moves exactly when THAT policy declares the stakes (design B5).
+			expect(await movedNow(seams), `the case prompts of the current set that move: every one exactly when its policy declares ${stakes}`).toEqual(
+				CURRENT_CASES.filter((c) =>
+					c.arm === 'DECLARED_POLICY' ? c.input.policy.criteria.some((k) => k.severityIfNotMet === stakes) : declared
+				).map((c) => c.id)
 			);
 		},
 		120_000
@@ -2679,7 +2828,14 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 		};
 		const fp = await reviewerFingerprint(CASES, seams);
 		onlyMoved(fp, ['probes']);
-		expect(movedProbes(fp), 'the probes handed every stakes').toEqual(['G-STAKES', 'W-STAKES', 'P-STAKES']);
+		// ⭐ `JAN-EXEC` Phase 7 completion E2 — ~~G-STAKES, W-STAKES and P-STAKES alone~~: and each DECLARED probe whose catalog
+		// policy declares a stakes other than BLOCKING (design B4) — its rubric is that policy's own.
+		expect(movedProbes(fp), 'the probes handed every stakes').toEqual([
+			'G-STAKES',
+			'W-STAKES',
+			'P-STAKES',
+			...DECLARED_PROBES_BEYOND_BLOCKING()
+		]);
 		expect(fp.casePrompts, 'no case prompt moves').toEqual(BASE.casePrompts);
 		// ~~⭐ `PQ-2` (design D4) — nor any of the current set: its cases are handed the floor policy's criteria too.~~
 		// ⭐ Restated (`PQ-2`, design D4; design §9.3 D8) — nor any of the current set, whose cases are handed the floor
@@ -2689,7 +2845,13 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 		// say; a BLOCKING mark is rewritten to itself) moves under it, though a real rubric change, which rewrites only the
 		// rubric's own lines, would not move it — a false red, never a false green. No case of the current set holds a stakes
 		// mark today.
-		expect(await movedNow(seams), 'no case prompt of the current set moves').toEqual([]);
+		// ⭐ E2 — ~~no case prompt of the current set moves~~: none of the floor's cases, and exactly the DECLARED cases whose
+		// policy declares a stakes other than BLOCKING (design B5) — their rubric is their policy's own.
+		expect(await movedNow(seams), 'of the current set, exactly the declared cases whose policy declares a stakes other than BLOCKING').toEqual(
+			CURRENT_CASES.filter(
+				(c) => c.arm === 'DECLARED_POLICY' && c.input.policy.criteria.some((k) => k.severityIfNotMet !== 'BLOCKING')
+			).map((c) => c.id)
+		);
 	}, 120_000);
 
 	it.each(Object.keys(D8_PHRASES))(
