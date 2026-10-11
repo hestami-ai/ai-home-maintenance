@@ -39121,6 +39121,10 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - ⭑ **2026-10-10 — driven live, four times.** In P7-3, the measured run, every phase's Begin & Execute was refused at its floor, and each phase is left RUNNING with no page act that runs it again. So no phase completed and stage 7 broke (`docs/_working/REPORT-the-live-end-to-end-run.md` §1). `REG-D-091`'s choice goes back to the sponsor with that report.
 - ⭑ **2026-10-10 — the recovery is designed (`REG-D-104` (1); `DESIGN-the-stopped-unit-recovery.md`, step P7-6R).** A refused completion records a wait on the step and on the unit. A person's choice is recorded as a Decision. A re-run is a plan revision built from existing commands: supersede, cancel the waiting step, then a new plan whose step is the new attempt. R-1 covers this entry's floor-refusal stop. R-2 covers the other five, and remedy 3, the evidence join on every return path. The plan-revision chain has not been driven, so R-1's first act drives it in the engine.
 - ⭑ **2026-10-10 — R-1 built** (`DESIGN-the-stopped-unit-recovery.md` §8a; merged at `547a1cf8`). The floor-refusal stop now records a wait, and a person re-runs the review, re-runs the work, or abandons the unit; each re-run is a new plan and a new attempt. This entry's other five stops, and remedy 3, are R-2's and stay open.
+- ⭑ **2026-10-11 — the recovery driven live (P2, P7-6R R-1).** Three phases stopped at their floor.
+  - **What the rule did.** It re-ran each phase's work once, as the operator, under the run plan's rule. Each re-run was refused again, by the same false schema finding (`REG-F-557`), and the rule abandoned the unit.
+  - **What the record shows.** Each choice is the operator's Decision. The audit found 0 forbidden acts.
+  - **What completed.** The implementation phase completed: SATISFIED in lifecycle and assurance, its step SUCCEEDED. It is the first phase of the measured run ever to complete.
 
 ### REG-F-512 — The executor's Pi loads `AGENTS.md`, `CLAUDE.md` and `.pi/` files from the Undertaking's shared workspace, so a file one unit writes becomes part of a later unit's system prompt, or code the server process runs, and no reviewer sees it
 
@@ -39201,6 +39205,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   2. When a host fact (trace, identity) fails, re-run the floor once before stopping. Untested.
   - Predicted red: a stub executor whose first work product has no brace pair and whose second has one, beside a stub review that passes, completes in two tries. At HEAD it stops after one.
 - ⭑ **2026-10-10 — the recovery inherits this gap** (P7-6R, `DESIGN-the-stopped-unit-recovery.md` §8a). When the review passed and another floor policy refused the work, a person may now re-run the work, but the re-run carries no findings, because the classifier lists none for `RESOLVE_OTHER_FLOOR_FINDINGS`. The producer is not told what the policy refused, and the page says the review gave no findings to carry. Remedy 1 here would serve both paths.
+- ⭑ **2026-10-11 — P2: three phases stopped on this entry's stop, and the finding behind it was false** (`REG-F-557`). Requirements, design and end-to-end each passed their work-product review, and `floor.schema-invariant` refused each work product. But each work product parses whole as JSON. The schema fact read a markdown code block inside it as the answer.
 
 ### REG-F-516 — Instantiation offers its conditional children to no one and cannot add a second instance of an M+ child, and a refused instantiation leaves an empty Undertaking and an approved Intent behind
 
@@ -39899,6 +39904,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - **SEARCHED BEFORE FILING.** The register for `JSON_EXTRACTION_FAILED`: 3 lines, in `REG-D-057` and `REG-F-346`. For `EMPTY_RESPONSE`: 7 lines, in `REG-D-064`, `REG-F-346`, `REG-F-410` and `REG-F-413`. All are about the parse vocabulary, none about live work products.
 - ⭑ **2026-10-10 — the mechanism, driven (P7-6's probe 2).** The design phase's own work-product review prompt (22,092 characters, from the run's content store) was replayed through the isolated reviewer. Its only move was a tool call, `exec ls -la && ls -la docs …`, to inspect the files the work product describes. Denied, the session ended with an empty stdout. So in print mode a tool call that is not approved ends devin's session, and the reply is whatever was written before it. In the measured run the read-only calls were auto-approved and an `exec` ended the session, leaving *"I'll verif…"*. Isolation alone cannot make the reviewer answer, so P7-6's re-run is held and the choice of fix goes to the sponsor (`REG-D-103`).
 - ⭑ **2026-10-10 — the fix the sponsor chose, tested (`REG-D-104` (2); `DESIGN-the-reviewer-isolated.md` §4c; 4 paid calls).** The four work-product review prompts were replayed through the isolated reviewer, with a preamble telling it that it has no tools. No try called a tool: each devin export shows one model step and no tool call. Three of the four concluded, SATISFIED with all 9 criteria answered. The fourth, the implementation review, answered SATISFIED with no findings, which the floor records INCONCLUSIVE (`REG-F-552`).
+- ⭑ **2026-10-11 — P2: the fixed reviewer answers.** In the measured run again, 35 of its 37 reviews were answered. The other 2 calls got no response (`REG-F-499`). Each work-product review concluded.
 
 ### REG-F-550 — three command reviews in the measured run ran into the reviewing model's output limit, which devin reports by failing, so each was recorded as a call that threw and run once more: one answered, two failed again
 
@@ -39987,6 +39993,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - For *`findings array`*: 1 line, `REG-D-090`'s *"a reply with no findings array … INCONCLUSIVE today"*. It is the positive control, and the nearest entry: the same outcome, for a reply with no `findings` key at all.
 - ⭑ **2026-10-10 — the sponsor chose both remedies 1 and 2, with a condition on 2** (`REG-D-105` (2)). The prompt change must not push the reviewer to find a failure that is not there. So it asks for one row for each criterion, met or not, and says that a met criterion is recorded as met.
 - ⭑ **2026-10-10 — both remedies measured** (P1, `qr-2026-10-10-devin-glm-5-3-flash-max-v4`). In 76 answered calls, no reply was malformed and none needed a repair, of either kind. The earlier full re-run had 5 malformed replies in 52 (`REG-F-489`). The clean cases stayed SATISFIED, 24 of 24, as the sponsor's condition asked. But two planted defects were answered SATISFIED with the defect named only as residual uncertainty (`REG-F-555`); whether the new sentence caused that is untested.
+- ⭑ **2026-10-11 — P2: no reply answered no criterion, of 37 reviews** (the run report's pairing: 0 `no-criterion-answered`).
 
 ### REG-D-105 — SPONSOR RULING: the reviewer-call limit raised to 200; both of REG-F-552's remedies, provided the prompt does not push for a failure; no re-review after a review that concluded against the work; and the paid run's choices made by a rule in its plan
 
@@ -40085,6 +40092,10 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - The run plan's recovery rule acts at each stop (`REG-D-105` (4)). The limit is 200 reviewer calls, and 131 are spent.
   - P7-4's checks against a false "Yes" stand behind the reviewer.
 - **WHAT (2) MEANS.** `REG-D-106` is confirmed as built.
+- ⭑ **2026-10-11 — P2 ran** (`REPORT-the-live-end-to-end-run.md` §9).
+  - **What completed.** The implementation phase completed. Three phases stopped on a false schema finding (`REG-F-557`) and were abandoned by the run plan's rule.
+  - **The product.** It passed every acceptance case, and its own e2e tests caught all 7 seeded deviations. The negative control was REJECTED.
+  - **Spend:** 174 of the 200 reviewer calls. The result goes back to the sponsor.
 
 ### REG-F-556 — Under `gate:fast`'s parallel test step, tests on vitest's 5 s default time out though each passes in well under it alone: four files on 2026-10-10
 
@@ -40106,3 +40117,30 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - For *`5000 ms`*: 7 lines, in `REG-F-162`, `REG-F-169`, `REG-F-173` and `REG-F-501`. For *`5 s default`*: 0.
   - The nearest is `REG-F-169` (CLOSED): verif's filesystem censuses timed out on the same default under load. Its safe default applies here: *"treat 'failed under load, passes alone' as a diagnosis rather than a flake"*.
   - `REG-F-173` gave the mutation runner's vitest a retry. The root vitest config sets `testTimeout: 60_000` (`vitest.config.ts:122`). Neither reaches `rph-demo`'s own test step, which these files run in.
+
+### REG-F-557 — The answer-span reader takes the first markdown fence anywhere in the text: a valid JSON work product whose documents hold a code block is read as that block, so the schema floor refuses it, and passes a fragment when the block holds a brace pair
+
+**Filed 2026-10-11** (P2, the measured run again; driven on both measured runs' archives with the product's own `splitAnswerSpan` and `extractJson`). **Status:** ⚠ **OPEN — the blocking break of P2: it stopped three of the four phases.**
+
+- **WHAT HAPPENS.**
+  - `splitAnswerSpan` and `extractJson` (`apps/rph-demo/src/lib/server/assurance/agy-cli.ts`) look first for a fenced block anywhere in the text, and take what is inside it as the answer.
+  - The work-product floor's schema fact is `splitAnswerSpan(answer).located` (`apps/rph-demo/src/lib/server/execution/work-product-floor.ts:84`).
+  - So a work product that is one JSON object, whose document strings hold markdown code blocks, is read as the first code block's contents.
+- **DRIVEN, P2.**
+  - Six of the seven work products parse whole as JSON.
+  - In each of the six, the first fence holds `text\nnode bin/wordfreq.js [options] [file]\n` or `text\n$ node --version …`, with no brace pair. So `located` is false, the fact is `WORK_PRODUCT_NOT_PARSEABLE`, and `floor.schema-invariant` is REJECTED (`SCHEMA_INVALID`).
+  - The seventh, the implementation's, holds no fence, and was SATISFIED.
+- **DRIVEN, the first measured run.** Its design work product's first fence held a TypeScript type, `{ help: boolean, top: number, … }`: 126 characters, and not JSON. `located` was true, so the schema floor was SATISFIED on that fragment.
+- **AND THE RECORD.** When no span is located, the execution exchange keeps no answer bytes (`REG-D-056`, on the execution plane). So in P2 the work-product answers of the three refused phases are unreadable: 6 exchanges, and the run report's stage 8 broke.
+- **WHY IT MATTERS.**
+  - The schema floor neither checks the work product nor fails safe: it refused valid work, and passed a fragment.
+  - Every phase that writes markdown with a code block is refused. Here that was requirements, design and verification.
+  - The reviewer's replies pass through the same `extractJson`. A reply whose statements quote code in a fence would be read the same way. That was not seen in P1 or P2.
+- **REMEDY CANDIDATES, UNTESTED.**
+  1. The work-product floor asks its schema of the work product it was given: the envelope's `workProduct`, which `splitExecutionEnvelope` has already parsed. It uses no span heuristic.
+  2. `extractJson` and `splitAnswerSpan` try the whole text as JSON first. Only if that fails do they look for a fence, and only for one that encloses the whole answer.
+  - **Predicted red:** a fixture shaped like P2's requirements work product, a JSON object whose document holds a code block, must be SATISFIED by the schema floor. At HEAD it is REJECTED.
+- **SEARCHED BEFORE FILING.**
+  - The register for *`code fence`* and *`inside a JSON string`*: 0 lines each. For *`first fenced`*: 1 line, `REG-F-515`'s description of `located`. For *`splitAnswerSpan`*: 15 lines, about the retention boundary (`REG-F-339` and its neighbours). For *`SCHEMA_INVALID`*: 1 line, in `REG-F-519`.
+  - The nearest entries are `REG-F-515`, which classifies the stop, and `REG-F-519`, the envelope's whole-text parse.
+  - **`REG-F-519`'s pointer stands.** It says the first measured run's requirements answer failed the output contract, and it did: probed the same way, that work product is not JSON as a whole.

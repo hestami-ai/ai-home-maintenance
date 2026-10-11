@@ -144,3 +144,24 @@ Each goes design, roadmap, code, and names the test that must fail first. P7-4's
 - **Authoring (half B, P7-7).** The PWA was typed by the operator, so the authoring floor and the publish gate were not measured.
 - **The declared policies.** No phase completed, so 12 of the 14 declared verdicts were never issued. Those that are issued check no criterion (`REG-F-523`).
 - **The reviewer, once isolated.** Every reviewer result here comes from an agent that could read this repository. Whether that also touched JAN-PRQUAL's qualification, which ran the same way, is open (`REG-F-548`).
+
+## 9. P2: the run again after P7-6 and P7-6R (2026-10-11)
+
+**The answer moves:** the execution works, the review now works, and a phase completes. Three of the four phases still stopped, on one product defect, `REG-F-557`.
+
+- **The run.** From the main checkout at `d9e58656`, after a dry run: 47 minutes, five units, at no forbidden act. The run plan's recovery rule acted at each stop (`REG-D-105` (4)).
+- **What completed: the implementation phase.** It is SATISFIED in lifecycle and assurance, its step SUCCEEDED, and all 21 of its floor assessments are SATISFIED. It is the first phase of the measured run ever to complete.
+- **What stopped: requirements, design and end-to-end.**
+  - Each passed its work-product review. Then `floor.schema-invariant` refused its work product as `SCHEMA_INVALID`.
+  - Each work product is valid JSON. The answer-span reader took a markdown code block inside its documents as the answer (`REG-F-557`; driven with the product's own functions on the archive).
+  - The rule re-ran each phase's work once. The re-run was refused the same way, and the rule abandoned the unit.
+- **The reviewer** answered 35 of its 37 reviews, and 2 calls got no response (`REG-F-499`). No reply answered no criterion (`REG-F-552`). Two command reviews concluded against the work: one in requirements, one in end-to-end. Whether each was right is P7-4f's question, still open.
+- **The product** (P7-4).
+  - **Acceptance:** 7 of 7 on the implementation, end-to-end and final archives.
+  - **Seeded faults:** its own e2e tests caught 7 of 7 seeded deviations, and its unit tests caught 68 of 77 mutations (8 survived, 1 timed out).
+  - **The spawn check:** its e2e tests start the real tool. The one that does not is a static check of the repository.
+  - **Commands re-run:** the 5 that could be re-run agree with their verdicts.
+  - **The negative control:** REJECTED twice, under RR-03, RR-04, RR-06 and RR-09, for 2 calls.
+- **The record:** the pairing joins every review to its own calls (`REG-F-433`'s key): 0 not pairable. The refused phases' answers are unreadable, because no span was located (`REG-F-557`).
+- **Spend:** 41 reviewer calls in the run and 2 in the negative control. That is 174 of the 200.
+- **Next, the sponsor's.** Fix `REG-F-557` (design, roadmap, code), then run once more. With the reviews now concluding, that run would show whether all four phases complete. It needs about 45 calls, more than the 26 left.
