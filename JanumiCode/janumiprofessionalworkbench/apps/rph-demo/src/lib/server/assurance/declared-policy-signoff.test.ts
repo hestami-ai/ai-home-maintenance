@@ -38,10 +38,12 @@ import {
 } from '../identity.js';
 import {
 	evidenceRefusals,
+	foldAfterRerun,
 	governingDeclaredPolicies,
 	noCriterionDeclared,
 	planDeclaredSignoff,
-	unsatisfyingReviews
+	unsatisfyingReviews,
+	type DeclaredSignoff
 } from './declared-policy-signoff.js';
 import type { DeclaredPolicyAnswer } from './declared-policy-review.js';
 
@@ -734,5 +736,31 @@ describe('⭐ planDeclaredSignoff — one assessment per governing DECLARED poli
 			.map((e) => (e.payload as { residualUncertainty?: string[] }).residualUncertainty ?? []);
 		expect(recorded).toHaveLength(2);
 		expect(recorded[0]).toContain('The reviewer read the first 4,000 characters only.');
+	});
+});
+
+// ── ⭐ `E12F` F3 (`REG-D-112` (a)) — THE UNIT'S FOLD AFTER A RE-RUN OF ITS DECLARED REVIEWS THAT DID NOT CONCLUDE ────────────────
+describe('⭐ E12F F3 — the unit’s fold after a re-run reads every governing policy’s latest verdict, never the re-run’s alone', () => {
+	const rerun = (dispositions: DeclaredSignoff['dispositions']): DeclaredSignoff => ({
+		policyIds: dispositions.map((_, i) => `pol_rerun_${i}`),
+		assessmentIds: dispositions.map((_, i) => `asm_rerun_${i}`),
+		excluded: [],
+		dispositions,
+		steps: [],
+		humanSteps: [],
+		blockingObservationIds: [],
+		criterionResults: 0
+	});
+	const other = (state: string) => [{ policyId: 'pol_other', assessmentId: 'asm_other', state }];
+
+	it('⭐ a policy NOT re-run still folds in: its CONDITIONALLY_SATISFIED caps a re-run that SATISFIED', () => {
+		expect(foldAfterRerun(rerun(['SATISFIED']), other('CONDITIONALLY_SATISFIED'))).toBe('CONDITIONALLY_SATISFIED');
+		expect(foldAfterRerun(rerun(['SATISFIED']), other('SATISFIED'))).toBe('SATISFIED');
+		expect(foldAfterRerun(rerun(['INCONCLUSIVE']), other('SATISFIED')), 'a re-run that again did not conclude').toBe('INCONCLUSIVE');
+		expect(foldAfterRerun(rerun(['REJECTED']), other('SATISFIED'))).toBe('REJECTED');
+	});
+
+	it('⛔ an unconcluded latest verdict of another policy is no pass: it folds as INCONCLUSIVE', () => {
+		expect(foldAfterRerun(rerun(['SATISFIED']), other('ASSESSING'))).toBe('INCONCLUSIVE');
 	});
 });

@@ -65,7 +65,7 @@
 //     each criterion result citing the reviewer's answer — the reviewer's answers are its evidence (`REG-D-111` (3)); its
 //     commands are the operator's to issue (`humanSteps`).
 // ⚠ ON THE ASSURANCE PLANE ONLY (`REG-D-111` (4)): nothing here gates `CompleteExecutionStep` (`REG-F-406` item 2, `R20`).
-import { driveAssessmentToAssessing, selectGoverningPolicies } from '@janumipwb/rph-engine';
+import { driveAssessmentToAssessing, listAssessments, selectGoverningPolicies } from '@janumipwb/rph-engine';
 import type { EngineHandle } from '@janumipwb/rph-engine';
 import type { ActorReference, AssessmentCriterion } from '@janumipwb/rph-contracts';
 import {
@@ -413,10 +413,18 @@ export function planDeclaredSignoff(opts: {
 	/** Evidence this review considered. The same set on every verdict: one reviewer read it once. */
 	readonly evidenceConsideredIds?: readonly string[];
 	readonly mintId: (prefix: string) => string;
+	/**
+	 * ⭐ `E12F` F3 (`REG-D-112` (a)) — ONLY THESE governing policies are planned: a person's re-run of the declared reviews
+	 * that did not conclude (`declaredRerunOffer`), each a NEW assessment beside the one it re-runs. Absent: every one.
+	 */
+	readonly onlyPolicyIds?: ReadonlySet<string>;
 }): DeclaredSignoff {
 	const { engine, pwuId, subjectSemanticVersion, operator, producer, mintId } = opts;
 	const considered = [...(opts.evidenceConsideredIds ?? [])];
-	const { policies, excluded } = governingDeclaredPolicies(engine, pwuId);
+	const governing = governingDeclaredPolicies(engine, pwuId);
+	const only = opts.onlyPolicyIds;
+	const policies = only ? governing.policies.filter((p) => only.has(p.policyId)) : governing.policies;
+	const { excluded } = governing;
 	const selected = policies.map((p) => p.policyId);
 	const assessmentIds = selected.map(() => mintId('asm'));
 	const dispositions: AssessmentDisposition[] = [];
@@ -599,4 +607,127 @@ export function unsatisfyingReviews(
 	return plan.policyIds
 		.map((policyId, i) => ({ policyId, disposition: plan.dispositions[i]! }))
 		.filter((r) => !SATISFYING.has(r.disposition));
+}
+
+// ── ⭐⭐ `E12F` F3 — A DECLARED REVIEW THAT DID NOT CONCLUDE MAY BE RE-RUN, BY THE PERSON (`REG-D-112` (a)) ───────────────────
+//
+// ⛔ WHAT WAS WRONG: one INCONCLUSIVE declared verdict STRANDED its unit. The fold of its verdicts is no value of the unit's
+// assurance axis, so the unit stayed UNDER_ASSURANCE and ASSESSING — and Record Assurance is offered only while EXECUTING,
+// and P7-6R's re-run reaches a unit WAITING after a refused step (`stopped-unit-recovery.ts`), never one under assurance.
+// Nothing the page offered could move it but Abandon.
+// ⭐ `REG-D-112` (a): *a declared review that did not conclude may be re-run, by the person*, as P7-6R re-runs a review that
+// did not conclude (`REG-D-104` (1), `REG-D-105` (3)):
+//   · ONLY the declared reviews whose LATEST verdict is INCONCLUSIVE are re-run; one that concluded is never re-reviewed —
+//     a SATISFIED keeps its verdict, and a declared REJECTED goes canon's route (`REG-D-111` (1)), never re-reviewed
+//     (`REG-D-105` (3)'s rule: the latest assessment wins, so a re-review run until one said SATISFIED would clear a
+//     reasoned refusal). ⚠ ACROSS POLICIES, THE STRICTEST WINS, as for P7-6R: a unit carrying a REJECTED is offered none.
+//   · EACH A NEW ASSESSMENT, the old one kept: the latest per policy speaks (the floor gate's rule, `RPH-PWU-007`'s reading).
+//   · Recorded as the PERSON's Decision, its rationale theirs and its citation the ruling (`recovery-authority.ts`).
+
+/**
+ * ⭐ `E12F` F3 — the option a person's re-run of the declared reviews selects, on its Decision. ⭑ A free string, as P7-6R's
+ * `RERUN_REVIEW` is (`Decision.selectedOption` is `z.string()`).
+ */
+export const RERUN_DECLARED_REVIEWS = 'RERUN_DECLARED_REVIEWS';
+
+/** ⭐ `E12F` F3 — one governing declared policy's LATEST verdict over a unit: the assessment that speaks for it, and its state. */
+export interface LatestDeclaredVerdict {
+	readonly policyId: string;
+	readonly assessmentId: string;
+	readonly state: string;
+}
+
+/**
+ * ⭐ `E12F` F3 — THE LATEST ASSESSMENT PER GOVERNING DECLARED POLICY OVER `pwuId`: the floor gate's rule — by `updatedAt`, ties
+ * to the last seen (`latestAssessmentByPolicy`, `assessment-index.ts`), which `RPH-PWU-007`'s fold reads too — so the page,
+ * the re-run and the kernel's guard agree on which verdict speaks. A policy never assessed has no row.
+ */
+export function latestDeclaredVerdicts(
+	engine: EngineHandle,
+	pwuId: string,
+	policyIds: readonly string[]
+): ReadonlyMap<string, LatestDeclaredVerdict> {
+	const wanted = new Set(policyIds);
+	const latest = new Map<string, LatestDeclaredVerdict & { readonly at: string }>();
+	for (const a of listAssessments(engine, { kind: 'WORKSPACE' })) {
+		const s = a.state as { assurancePolicyId?: unknown; subjectObjectIds?: unknown; updatedAt?: unknown; assessmentState?: unknown };
+		const policyId = typeof s.assurancePolicyId === 'string' ? s.assurancePolicyId : '';
+		const subjects = Array.isArray(s.subjectObjectIds) ? s.subjectObjectIds : [];
+		if (!wanted.has(policyId) || !subjects.includes(pwuId)) continue;
+		const at = typeof s.updatedAt === 'string' ? s.updatedAt : '';
+		const prev = latest.get(policyId);
+		if (!prev || at >= prev.at)
+			latest.set(policyId, { policyId, assessmentId: a.id, state: String(s.assessmentState ?? ''), at });
+	}
+	return new Map([...latest].map(([k, { at: _at, ...v }]) => [k, v]));
+}
+
+/** ⭐ `E12F` F3 — what the person is offered on a unit stranded by a declared review that did not conclude. */
+export interface DeclaredRerunOffer {
+	/** The governing policies whose latest verdict is INCONCLUSIVE — the reviews re-run, in selection order. */
+	readonly policies: readonly GoverningDeclaredPolicy[];
+	/** Their INCONCLUSIVE assessments, kept: the Decision's subjects beside the unit. */
+	readonly inconclusive: readonly LatestDeclaredVerdict[];
+	/** Every OTHER governing policy's latest verdict: what the unit's assurance is folded with after the re-run. */
+	readonly others: readonly LatestDeclaredVerdict[];
+}
+
+/**
+ * ⭐⭐ `E12F` F3 (`REG-D-112` (a)) — WHETHER THE PERSON MAY RE-RUN `pwuId`'s DECLARED REVIEWS, AND WHICH: read from the record,
+ * so the page offers what the server will accept. ⛔ Refused, with why, unless the unit is UNDER_ASSURANCE and ASSESSING
+ * (the state an INCONCLUSIVE fold leaves it in), no governing policy's latest verdict is REJECTED (`REG-D-105` (3)), and at
+ * least one is INCONCLUSIVE.
+ */
+export function declaredRerunOffer(
+	engine: EngineHandle,
+	pwuId: string
+): DeclaredRerunOffer | { readonly refusedBecause: string } {
+	const { policies } = governingDeclaredPolicies(engine, pwuId);
+	const latest = latestDeclaredVerdicts(
+		engine,
+		pwuId,
+		policies.map((p) => p.policyId)
+	);
+	// ⭑ ASKED FIRST, so a unit whose declared review concluded against it is told the RULE, not only its state.
+	const rejected = [...latest.values()].filter((v) => v.state === 'REJECTED');
+	if (rejected.length > 0)
+		return {
+			refusedBecause:
+				`a declared review concluded against the work (${rejected.map((v) => `${v.policyId} REJECTED`).join('; ')}): a REJECTED ` +
+				'is not re-reviewed — the latest verdict wins, so a re-review could clear a reasoned refusal (REG-D-105 (3)); it goes ' +
+				"canon's route, a blocking finding (REG-D-111 (1))"
+		};
+	const unit = engine.loadObject(pwuId)?.state as { workLifecycleState?: unknown; assuranceState?: unknown } | undefined;
+	if (unit?.workLifecycleState !== 'UNDER_ASSURANCE' || unit.assuranceState !== 'ASSESSING')
+		return {
+			refusedBecause:
+				`the unit is ${String(unit?.workLifecycleState ?? 'unknown')} with its assurance ${String(unit?.assuranceState ?? 'unknown')}; ` +
+				'only a unit left under assessment by a declared review that did not conclude may have its declared reviews re-run (REG-D-112 (a))'
+		};
+	const inconclusive = policies.filter((p) => latest.get(p.policyId)?.state === 'INCONCLUSIVE');
+	if (inconclusive.length === 0)
+		return { refusedBecause: 'no declared review of this unit ended INCONCLUSIVE, so none is re-run (REG-D-112 (a))' };
+	return {
+		policies: inconclusive,
+		inconclusive: inconclusive.map((p) => latest.get(p.policyId)!),
+		others: policies.filter((p) => !inconclusive.includes(p)).flatMap((p) => latest.get(p.policyId) ?? [])
+	};
+}
+
+/**
+ * ⭐ `E12F` F3 — THE UNIT'S FOLD AFTER A RE-RUN: §28.2's strictest over the re-run policies' NEW verdicts and every other
+ * governing policy's latest — never the re-run's alone, or a policy not re-run would go unfolded. A policy never assessed
+ * (no latest) folds as INCONCLUSIVE: nothing concluded it.
+ */
+export function foldAfterRerun(
+	plan: DeclaredSignoff,
+	others: readonly LatestDeclaredVerdict[]
+): AssessmentDisposition {
+	const states = [
+		...plan.dispositions,
+		...others.map((v): AssessmentDisposition =>
+			(STRICTEST as readonly string[]).includes(v.state) ? (v.state as AssessmentDisposition) : 'INCONCLUSIVE'
+		)
+	];
+	return STRICTEST.find((d) => states.includes(d)) ?? 'INCONCLUSIVE';
 }

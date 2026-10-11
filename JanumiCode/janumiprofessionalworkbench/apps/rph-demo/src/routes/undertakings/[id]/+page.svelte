@@ -318,6 +318,27 @@
 												<input type="hidden" name="pwuId" value={p.id} />
 												<button class="mini primary" type="submit">Mark Satisfied</button>
 											</form>
+											<!-- ⭐⭐ E12F F3 (REG-D-112 (a)) — A UNIT LEFT UNDER ASSESSMENT BY A DECLARED REVIEW THAT DID NOT CONCLUDE.
+											     Offered ONLY the re-run of the declared reviews whose latest verdict is INCONCLUSIVE (the server's own
+											     reading, `declaredRerunOffer`): one that concluded is never re-reviewed, a REJECTED least of all
+											     (REG-D-105 (3)). The choice is the person's Decision, so it asks for their rationale. -->
+											{#if data.declaredRerunByPwu[p.id]}
+												<form method="POST" action="?/rerunDeclaredReviews" use:enhance class="findingform">
+													<span class="hint" data-testid="rerun-declared-policies"
+														>Declared reviews that did not conclude: {data.declaredRerunByPwu[p.id].policies.join(', ')}.</span
+													>
+													<input type="hidden" name="pwuId" value={p.id} />
+													<input
+														name="rationale"
+														placeholder="Why re-run them?"
+														required
+														data-testid="rerun-declared-rationale"
+													/>
+													<button class="mini" type="submit" data-testid="rerun-declared-reviews"
+														>Re-run the declared reviews</button
+													>
+												</form>
+											{/if}
 											<!-- REJECTION IS OFFERED ONLY WHERE A BLOCKING FINDING ACTUALLY STANDS (S-1b / B-3).
 											     The predicate is the SAME question the engine's `hasBlockingObservationFor` asks —
 											     a BLOCKING/CRITICAL observation whose subjectObjectIds include this PWU — so the

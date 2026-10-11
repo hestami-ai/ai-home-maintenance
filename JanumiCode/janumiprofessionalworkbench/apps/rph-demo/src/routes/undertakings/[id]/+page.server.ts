@@ -59,9 +59,12 @@ import {
 	uiSession
 } from '$lib/server/workbench';
 import {
+	declaredRerunOffer,
 	evidenceRefusals,
+	foldAfterRerun,
 	governingDeclaredPolicies,
 	planDeclaredSignoff,
+	RERUN_DECLARED_REVIEWS,
 	unsatisfyingReviews,
 	type DeclaredSignoff,
 	type GoverningDeclaredPolicy
@@ -135,7 +138,9 @@ import {
 	ABANDON_FROM_WAITING_CITATION,
 	decisionRationale,
 	RERUN_REVIEW_CITATION,
-	rerunWorkCitation
+	rerunWorkCitation,
+	RERUN_DECLARED_REVIEWS_CITATION,
+	DECLARED_RERUN_RATIONALE_REQUIRED
 } from '$lib/server/execution/recovery-authority';
 import { runProcessResultFloor } from '$lib/server/execution/process-result-floor';
 import type { ObservedProcessRun } from '$lib/server/tools/process-run-observer';
@@ -619,6 +624,14 @@ export const load: PageServerLoad = ({ params }) => {
 		if (view) recoveryByPwu[p.id] = view;
 	}
 	const awaitingChoiceStepIds = Object.values(recoveryByPwu).map((v) => v.stepId);
+	// ⭐⭐ `E12F` F3 (`REG-D-112` (a)) — each unit left UNDER ASSURANCE by a declared review that did not conclude: the declared
+	// reviews the person may re-run, ONLY those whose latest verdict is INCONCLUSIVE. Read from the record
+	// (`declaredRerunOffer`), so the page offers exactly what `rerunDeclaredReviews` accepts.
+	const declaredRerunByPwu: Record<string, { readonly policies: readonly string[] }> = {};
+	for (const p of pwus) {
+		const offer = declaredRerunOffer(engine, p.id);
+		if (!('refusedBecause' in offer)) declaredRerunByPwu[p.id] = { policies: offer.policies.map((x) => x.policyId) };
+	}
 
 	// Tier-2 execution SEQUENCE (JAN-EXECPLAN DWP-04, fork C): arrange the Undertaking's PWU INSTANCES by their TYPES'
 	// hand-off dependency (reuse buildPwaExport — version-scoped to the bound (pwaId, pwaVersion) — then layerHandoff),
@@ -664,6 +677,7 @@ export const load: PageServerLoad = ({ params }) => {
 		attemptsByStepId,
 		recoveryByPwu,
 		awaitingChoiceStepIds,
+		declaredRerunByPwu,
 		sequence,
 		assessments,
 		disclosures,
@@ -2872,6 +2886,82 @@ export const actions: Actions = {
 						: `a verdict that did not conclude leaves this PWU under assessment.`)
 			});
 		return { advanced: 'assured' };
+	},
+
+	// ── ⭐⭐ `E12F` F3 — RE-RUN THE DECLARED REVIEWS THAT DID NOT CONCLUDE (`REG-D-112` (a); `REG-D-104` (1); `REG-D-105` (3)) ────────
+	//
+	// ⛔ ONE INCONCLUSIVE DECLARED VERDICT STRANDED ITS UNIT: the fold is no value of the assurance axis, so the unit stayed
+	// UNDER_ASSURANCE and ASSESSING — Record Assurance is offered only while EXECUTING, and P7-6R's re-run reaches a unit
+	// WAITING after a refused step, never one under assurance. The person's choice, as P7-6R records one:
+	//   · ONLY THE DECLARED REVIEWS WHOSE LATEST VERDICT IS INCONCLUSIVE are re-run (`declaredRerunOffer`): one that concluded
+	//     keeps its verdict, and a declared REJECTED is never re-reviewed (`REG-D-105` (3)) — it goes canon's route.
+	//   · EACH A NEW ASSESSMENT, the old one kept (`planDeclaredSignoff`'s `onlyPolicyIds`), its reviewer asked BEFORE anything
+	//     is dispatched, as Record Assurance asks it, and its calls recorded whatever the batch then does (PER-9).
+	//   · THE PERSON'S DECISION, in the same batch: their rationale VERBATIM, then the ruling cited (`REG-D-112` (a)); its
+	//     subjects the unit and the INCONCLUSIVE assessments re-run, its observations theirs. ⚠ `REPLAN` is P7-6R's type for a
+	//     re-run of a review; nothing here revises a plan, and the decision types name no re-assessment (the lead's to rule).
+	//   · THE UNIT FOLDED AFTER IT over every governing policy's latest verdict (`foldAfterRerun`): a positive fold its
+	//     assurance hop, citing those verdicts; a REJECTED canon's first half, as Record Assurance takes it; INCONCLUSIVE no
+	//     hop — the unit stays under assessment, and the person may choose again.
+	rerunDeclaredReviews: async ({ request }) => {
+		const f = await request.formData();
+		const pwuId = str(f, 'pwuId');
+		if (!pwuId) return fail(400, { error: 'Missing PWU.' });
+		const rationale = str(f, 'rationale');
+		if (!rationale) return fail(400, { error: DECLARED_RERUN_RATIONALE_REQUIRED });
+		const engine = getEngine();
+		const offer = declaredRerunOffer(engine, pwuId);
+		if ('refusedBecause' in offer)
+			return fail(400, { error: `Re-running the declared reviews refused: ${offer.refusedBecause}` });
+		const ready = assurancePreflight({ testMode: isTestMode() });
+		if (!ready.ready) return fail(400, { error: ready.guidance });
+		const operator = actingActor(uiSession());
+		const work = await declaredReviewWorkOf(pwuId, operator);
+		if (!work.ok) return fail(400, { error: `The declared policies cannot be reviewed: ${work.refusedBecause}` });
+		const subjectSemanticVersion = engine.loadObject(pwuId)?.semanticVersion ?? 1;
+		const { answers, invocations } = await reviewDeclaredPolicies(pwuId, offer.policies, work.work, subjectSemanticVersion);
+		const rerun = planDeclaredSignoff({
+			engine,
+			pwuId,
+			subjectSemanticVersion,
+			operator,
+			producer: work.work.producer,
+			answers,
+			invocations,
+			admitStipulatedAnswers: engine.admitStipulatedAnswers,
+			mintId: mintUiId,
+			onlyPolicyIds: new Set(offer.policies.map((p) => p.policyId))
+		});
+		const folded = foldAfterRerun(rerun, offer.others);
+		const rerunIds = new Set(offer.inconclusive.map((v) => v.assessmentId));
+		const considered = listByType(engine, 'ASSURANCE_OBSERVATION')
+			.filter((o) => rerunIds.has(String((o.state.assessmentId ?? '') as string)))
+			.map((o) => o.id);
+		const refused = runMultiParty(rerun.steps, [
+			...personsDecision(
+				mintUiId('dec'),
+				'REPLAN',
+				RERUN_DECLARED_REVIEWS,
+				[pwuId, ...offer.inconclusive.map((v) => v.assessmentId)],
+				considered,
+				decisionRationale(rationale, RERUN_DECLARED_REVIEWS_CITATION)
+			),
+			...(rerun.humanSteps as Step[]),
+			...declaredHop(pwuId, folded, [...rerun.assessmentIds, ...offer.others.map((v) => v.assessmentId)], rerun)
+		]);
+		if (refused) return fail(400, { error: `Re-running the declared reviews failed: ${refused}` });
+		const against = unsatisfyingReviews(rerun);
+		if (against.length > 0)
+			return fail(400, {
+				error:
+					`The declared reviews were re-run, and did not conclude in this PWU's favour: ` +
+					against.map((u) => `${u.policyId} reached ${u.disposition}`).join('; ') +
+					`. Each is a new assessment, the old one kept (REG-D-112 (a)); ` +
+					(folded === 'REJECTED'
+						? `a REJECTED verdict is recorded with its blocking findings, and this PWU's assurance is REJECTED (REG-D-111 (1)); its work lifecycle stays under assurance.`
+						: `a verdict that did not conclude leaves this PWU under assessment, and its re-run is offered again.`)
+			});
+		return { advanced: 'declared-reviews-rerun' };
 	},
 
 	// ── THE ADVERSE ARM: RECORD A BLOCKING FINDING (S-1b / B-2) ────────────────────────────────────────────────

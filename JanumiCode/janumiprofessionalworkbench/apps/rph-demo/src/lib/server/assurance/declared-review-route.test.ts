@@ -26,7 +26,9 @@ vi.hoisted(() => {
 const seam = vi.hoisted(() => ({
 	declared: [] as string[],
 	floor: 0,
-	unmet: undefined as string | undefined
+	unmet: undefined as string | undefined,
+	/** ⭐ `E12F` F3 — the declared policies whose review's transport FAILS: the review answers nothing, and is INCONCLUSIVE. */
+	failing: new Set<string>()
 }));
 
 vi.mock('../execution/model.js', async (importOriginal) => {
@@ -63,6 +65,9 @@ vi.mock('../tools/devin-reviewer.js', async (importOriginal) => {
 				const declared = prompt.includes('declared assurance policy');
 				if (declared) seam.declared.push(prompt);
 				else seam.floor += 1;
+				// ⭐ `E12F` F3 — a declared review of a FAILING policy: devin's program fails, every try (`seam.failing`).
+				if (declared && [...seam.failing].some((id) => prompt.includes(`(${id})`)))
+					throw new Error('hermetic: the declared review’s transport is down');
 				const ids = declared
 					? [...prompt.matchAll(/^- ([A-Za-z0-9_-]+): .* \[if unmet: [A-Z]+\]$/gm)].map((m) => m[1]!)
 					: SEEDED_REASONING_REVIEW_CRITERIA.map((c) => c.id);
@@ -82,14 +87,20 @@ vi.mock('../tools/devin-reviewer.js', async (importOriginal) => {
 	};
 });
 
+import { readFileSync } from 'node:fs';
 import { getObject, listByType, listPwus } from '@janumipwb/rph-engine';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { actions } from '../../../routes/undertakings/[id]/+page.server.js';
+import { actions, load } from '../../../routes/undertakings/[id]/+page.server.js';
 import { actions as undertakings } from '../../../routes/undertakings/+page.server.js';
 import { actionEvent, beginExecute } from '../execution/begin-execute.testing.js';
 import { dispatch, getEngine, mintUiId, resetEngine } from '../workbench.js';
 import { noProgramsDirectory } from './no-programs.testing.js';
 import { DECLARED_PRODUCING_PROMPT_INTENT, DECLARED_UNIT_PURPOSE_INTENT } from './reasoning-review-validator.js';
+import { RERUN_DECLARED_REVIEWS } from './declared-policy-signoff.js';
+import {
+	DECLARED_RERUN_RATIONALE_REQUIRED,
+	RERUN_DECLARED_REVIEWS_CITATION
+} from '../execution/recovery-authority.js';
 
 const POLICY = 'pol_requirement_coverage';
 const LIVE_BACKEND_VARIABLES = [
@@ -110,8 +121,11 @@ const RISK = {
 	'risk.regulatoryExposure': 'NONE'
 };
 
-/** A MODEL work unit of a type that DECLARES `pol_requirement_coverage`, of a kind it governs — published, instantiated. */
-async function declaringModelUnit(): Promise<string> {
+/**
+ * A MODEL work unit of a type that DECLARES `pol_requirement_coverage`, of a kind it governs — published, instantiated.
+ * ⭐ `E12F` F3 — or the policies named: two, so one review can fail to conclude beside one that concludes.
+ */
+async function declaringModelUnit(policies: readonly string[] = [POLICY]): Promise<string> {
 	const pwaId = mintUiId('pwa');
 	const typeId = mintUiId('pwut');
 	const steps: readonly [string, string, string, Record<string, unknown>][] = [
@@ -130,7 +144,7 @@ async function declaringModelUnit(): Promise<string> {
 				permittedChildTypeIds: [],
 				requiredInputs: [],
 				requiredOutputs: [],
-				requiredAssurancePolicyIds: [POLICY],
+				requiredAssurancePolicyIds: [...policies],
 				workDischarge: 'MODEL',
 				promptTemplate: {
 					templateText: 'Write the requirements of {subject}.',
@@ -188,6 +202,7 @@ beforeEach(() => {
 	seam.declared.length = 0;
 	seam.floor = 0;
 	seam.unmet = undefined;
+	seam.failing.clear();
 	vi.stubEnv('PATH', noProgramsDirectory());
 	for (const v of LIVE_BACKEND_VARIABLES) vi.stubEnv(v, undefined);
 	vi.stubEnv('JPWB_ASSURANCE_TOOL', 'devin');
@@ -365,5 +380,132 @@ describe('⛔ E12F F4 — the root’s declared review is told only what is true
 		expect(seam.declared).toHaveLength(1);
 		expect(seam.declared[0]).toContain(DECLARED_PRODUCING_PROMPT_INTENT);
 		expect(seam.declared[0]).not.toContain(DECLARED_UNIT_PURPOSE_INTENT);
+	});
+});
+
+// ── ⭐⭐ `E12F` F3 — A DECLARED REVIEW THAT DID NOT CONCLUDE MAY BE RE-RUN, BY THE PERSON (`REG-D-112` (a)) ─────────────────────
+//
+// ⛔ One INCONCLUSIVE declared verdict STRANDED its unit: UNDER_ASSURANCE and ASSESSING, Record Assurance offered only while
+// EXECUTING, and P7-6R's re-run reaching only a unit WAITING after a refused step — nothing moved it but Abandon.
+
+const IP = 'pol_intent_preservation';
+const RATIONALE = 'The intent review’s call failed at the transport; I am re-running it.';
+
+/** What the page shows of the unit's declared re-run: the load's own view, or nothing. */
+async function declaredRerunShown(pwuId: string): Promise<{ readonly policies: readonly string[] } | undefined> {
+	const undertakingId = String((getObject(getEngine(), pwuId) as { undertakingId?: string }).undertakingId);
+	const data = (await load({ params: { id: undertakingId } } as never)) as unknown as {
+		readonly declaredRerunByPwu?: Readonly<Record<string, { readonly policies: readonly string[] }>>;
+	};
+	return data.declaredRerunByPwu?.[pwuId];
+}
+
+const rerunDeclared = async (pwuId: string, rationale = RATIONALE) =>
+	(await actions.rerunDeclaredReviews(actionEvent('rerunDeclaredReviews', { pwuId, rationale }) as never)) as {
+		advanced?: string;
+		data?: { error?: string };
+	};
+
+/** The unit's assessments under `policyId`, in the order they were made. */
+const assessmentsUnder = (pwuId: string, policyId: string) =>
+	listByType(getEngine(), 'ASSURANCE_ASSESSMENT')
+		.filter(
+			(a) =>
+				(a.state as { assurancePolicyId?: string }).assurancePolicyId === policyId &&
+				((a.state as { subjectObjectIds?: string[] }).subjectObjectIds ?? []).includes(pwuId)
+		)
+		.map((a) => ({ id: a.id, state: (a.state as { assessmentState?: string }).assessmentState }));
+
+const axesOf = (pwuId: string) => {
+	const u = getObject(getEngine(), pwuId) as { workLifecycleState?: string; assuranceState?: string };
+	return [u.workLifecycleState, u.assuranceState];
+};
+
+/** A unit declaring two policies, signed off with ONE declared review that did not conclude (its transport failed). */
+async function strandedUnit(): Promise<string> {
+	const pwuId = await declaringModelUnit([POLICY, IP]);
+	expect((await beginExecute(pwuId)).data?.error, 'arrangement: Begin & Execute').toBeUndefined();
+	seam.failing.add(IP);
+	const first = await recordAssurance(pwuId);
+	expect(first.data?.error, 'arrangement: the intent review did not conclude').toContain(`${IP} reached INCONCLUSIVE`);
+	expect(axesOf(pwuId), 'arrangement: the unit is left under assessment').toEqual(['UNDER_ASSURANCE', 'ASSESSING']);
+	return pwuId;
+}
+
+describe('⭐⭐ E12F F3 (REG-D-112 (a)) — a declared review that did not conclude is offered to the person, and re-run', () => {
+	it('⭐ the page offers re-running ONLY the review that did not conclude; the re-run is a NEW assessment beside the old one, the person’s Decision citing the ruling — and the unit is assured', async () => {
+		const pwuId = await strandedUnit();
+		// ⛔ PREDICTED RED, read from the code: no offer — `load` carried no declared re-run, and no action existed: the unit,
+		// UNDER_ASSURANCE and ASSESSING, could be moved by nothing the page offers but Abandon.
+		expect(await declaredRerunShown(pwuId), 'the stranded unit is offered no re-run').toEqual({ policies: [IP] });
+		seam.failing.clear();
+		seam.declared.length = 0;
+		const r = await rerunDeclared(pwuId);
+		expect([r.advanced, r.data?.error]).toEqual(['declared-reviews-rerun', undefined]);
+		// ⭐ ONLY THE REVIEW THAT DID NOT CONCLUDE is re-run: the requirement-coverage verdict that concluded is never asked again.
+		expect(seam.declared, 'one review re-run').toHaveLength(1);
+		expect(seam.declared[0]).toContain(`(${IP})`);
+		// ⭐ EACH A NEW ASSESSMENT, THE OLD ONE KEPT.
+		const ip = assessmentsUnder(pwuId, IP);
+		expect(ip.map((a) => a.state)).toEqual(['INCONCLUSIVE', 'SATISFIED']);
+		expect(assessmentsUnder(pwuId, POLICY).map((a) => a.state)).toEqual(['SATISFIED']);
+		// ⭐ THE PERSON'S DECISION, their words then the ruling, naming the unit and the review it re-runs.
+		const decision = listByType(getEngine(), 'DECISION')
+			.map((d) => d.state as { selectedOption?: string; rationale?: string; subjectObjectIds?: string[]; decisionType?: string })
+			.find((d) => d.selectedOption === RERUN_DECLARED_REVIEWS);
+		expect(decision?.rationale).toBe(`${RATIONALE}
+
+${RERUN_DECLARED_REVIEWS_CITATION}`);
+		expect(decision?.subjectObjectIds).toEqual([pwuId, ip[0]!.id]);
+		// ⭐ THE UNIT, folded over every policy's latest verdict: assured — and offered no re-run now.
+		expect(axesOf(pwuId)).toEqual(['UNDER_ASSURANCE', 'SATISFIED']);
+		expect(await declaredRerunShown(pwuId)).toBeUndefined();
+	});
+
+	it('⛔ a re-run that again does not conclude is recorded — a second INCONCLUSIVE assessment, the unit still under assessment — and the person may choose again', async () => {
+		const pwuId = await strandedUnit();
+		const r = await rerunDeclared(pwuId);
+		expect(r.advanced).toBeUndefined();
+		expect(r.data?.error).toContain(`${IP} reached INCONCLUSIVE`);
+		expect(assessmentsUnder(pwuId, IP).map((a) => a.state)).toEqual(['INCONCLUSIVE', 'INCONCLUSIVE']);
+		expect(axesOf(pwuId)).toEqual(['UNDER_ASSURANCE', 'ASSESSING']);
+		expect(await declaredRerunShown(pwuId)).toEqual({ policies: [IP] });
+	});
+
+	it('⛔ refused, with nothing dispatched: no rationale; a unit whose declared review CONCLUDED AGAINST the work (REG-D-105 (3)); and a unit with none that did not conclude', async () => {
+		const stranded = await strandedUnit();
+		const before = getEngine().readAllEvents().length;
+		const unsaid = await rerunDeclared(stranded, '');
+		expect(unsaid.data?.error).toBe(DECLARED_RERUN_RATIONALE_REQUIRED);
+		expect(getEngine().readAllEvents().length, 'a refusal dispatched something').toBe(before);
+
+		// A declared REJECTED is not re-reviewed: it goes canon's route (REG-D-111 (1)), the unit's assurance REJECTED.
+		const rejected = await declaringModelUnit();
+		expect((await beginExecute(rejected)).data?.error).toBeUndefined();
+		seam.unmet = 'RC-01';
+		await recordAssurance(rejected);
+		seam.unmet = undefined;
+		expect(await declaredRerunShown(rejected), 'a REJECTED unit is offered a re-review').toBeUndefined();
+		expect((await rerunDeclared(rejected)).data?.error).toContain(
+			`Re-running the declared reviews refused: a declared review concluded against the work (${POLICY} REJECTED): a REJECTED is not re-reviewed`
+		);
+
+		// An assured unit: nothing did not conclude.
+		const assured = await declaringModelUnit();
+		expect((await beginExecute(assured)).data?.error).toBeUndefined();
+		expect((await recordAssurance(assured)).advanced).toBe('assured');
+		expect(await declaredRerunShown(assured)).toBeUndefined();
+		expect((await rerunDeclared(assured)).data?.error).toContain(
+			'Re-running the declared reviews refused: the unit is UNDER_ASSURANCE with its assurance SATISFIED'
+		);
+	});
+
+	it('⭐ the markup: the re-run is offered on an UNDER_ASSURANCE row, only where the load offers it, and asks for the person’s rationale', () => {
+		const markup = readFileSync(new URL('../../../routes/undertakings/[id]/+page.svelte', import.meta.url), 'utf8');
+		const row = markup.indexOf("{:else if p.workLifecycleState === 'UNDER_ASSURANCE'}");
+		const gate = markup.indexOf('{#if data.declaredRerunByPwu[p.id]}');
+		const form = markup.indexOf('action="?/rerunDeclaredReviews"');
+		expect([row > -1, gate > row, form > gate], 'the re-run is offered outside the UNDER_ASSURANCE row’s gate').toEqual([true, true, true]);
+		expect(markup.slice(form, markup.indexOf('</form>', form))).toMatch(/name="rationale"[^>]*required/);
 	});
 });
