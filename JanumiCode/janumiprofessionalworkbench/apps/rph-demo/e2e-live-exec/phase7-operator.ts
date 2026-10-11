@@ -60,7 +60,8 @@ import {
 // act below that calls no model is bounded here, as an allowance, and Begin & Execute by `PHASE7_UNIT_ALLOWANCE_MS`.
 
 // ⭐ `P76F-C` C8 — the UI's bound and a sign-off act's are DEFINED in `lane-config.ts` now, so the spec's timeout counts every
-// act by the bound it waits (`PHASE7_TEST_TIMEOUT_MS`); re-exported here, where each act names it.
+// ~~act~~ ⛔ `P76F-D` D4: every PHASE AND RECOVERY act by the bound it waits (`PHASE7_TEST_TIMEOUT_MS`) — the setup's acts only
+// within an allowance their bounds pass (`PHASE7_SETUP_MS`); re-exported here, where each act names it.
 export { PHASE7_SIGN_OFF_MS, PHASE7_UI_MS };
 /** One readiness call (`devin --version`, `devin models list`). */
 export const READINESS_CALL_MS = 120_000;

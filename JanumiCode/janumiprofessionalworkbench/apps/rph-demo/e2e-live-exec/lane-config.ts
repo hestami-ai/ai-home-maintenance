@@ -363,6 +363,13 @@ export const PHASE7_MODEL_UNITS = 4;
  * The boot's readiness calls, typing and publishing the PWA, creating the Undertaking, and every archive's copying: an
  * allowance — acts this module cannot count one by one. ⭐ `P76F-C` C8: ~~the root's run, five sign-offs~~ — those are each
  * bounded by a figure of their own, and are counted below by it (`PHASE7_TEST_TIMEOUT_MS`).
+ * ⚠⚠ `P76F-D` D4 — AN ALLOWANCE, NOT A WORST CASE, AND SMALLER THAN ITS OWN ACTS' BOUNDS: two readiness calls at 120 s
+ * (`phase7-operator.ts`, `READINESS_CALL_MS`), two reads of the store at 300 s (`freshIntrospect`), a screenshot at 120 s,
+ * and every fill, click and navigation of the designer and the Undertaking form at the page's 120 s default — dozens,
+ * as many as §3.2's PWA makes `e2e/support/phase7-pwa.ts` type — pass 1,800 s at their bounds, and the archive's copying
+ * has no bound at all. ⛔ NOT COUNTED BY THEIR BOUNDS, AND IT CANNOT BE FROM HERE: the number of form acts is that support
+ * module's control flow over the PWA's content (a fill per field set, a check per child and per policy), which this
+ * module, importing nothing, could only restate as a guess; and a copy with no bound has no bound to count.
  */
 export const PHASE7_SETUP_MS = 1_800_000;
 
@@ -370,7 +377,8 @@ export const PHASE7_SETUP_MS = 1_800_000;
  * ⭐ `JAN-EXEC` P7-6 B4 — THE RE-RUNS THE RUN PLAN'S RULE MAKES OF ONE STOPPED PHASE: at most ONE (`REG-D-105` (4): *"A
  * review that did not conclude is re-run once; refused work is re-run once"*), each waited for up to one phase's allowance
  * (`phase7-operator.ts` `recover`). ⚠ The abandonment that may follow calls no model, and is bounded as a sign-off act is,
- * within the setup's allowance as the sign-offs are.
+ * ~~within the setup's allowance as the sign-offs are~~ ⛔ `P76F-D` D4: struck — since `P76F-C` C8 each is counted by its
+ * own acts' bounds, the abandonment in `PHASE7_RECOVERY_MS` and the sign-offs in `PHASE7_SIGN_OFF_UNIT_MS`.
  */
 export const PHASE7_RERUNS_PER_PHASE = 1;
 
@@ -441,9 +449,14 @@ export const PHASE7_SIGN_OFF_UNIT_MS =
 	PHASE7_SHOW_OVERVIEW_MS + PHASE7_SIGN_OFF_ACTS * (PHASE7_UI_MS + PHASE7_SIGN_OFF_MS + PHASE7_INTROSPECT_MS);
 
 /**
- * The spec's own timeout, set with `test.setTimeout` (the config's stays the one-unit lane's) — ⭐⭐ `P76F-C` C8: THE WORST
- * CASE OF THE LANE'S OWN BOUNDS, every act waited for up to its bound and counted by it:
- *   · the setup allowance (boot, the PWA, the Undertaking, every archive's copying) — 1,800 s;
+ * The spec's own timeout, set with `test.setTimeout` (the config's stays the one-unit lane's) — ⭐⭐ `P76F-C` C8: ~~THE WORST
+ * CASE OF THE LANE'S OWN BOUNDS, every act waited for up to its bound and counted by it~~ ⛔ `P76F-D` D4: overstated — the
+ * setup's acts are not counted by their bounds, and those bounds alone pass its allowance (`PHASE7_SETUP_MS`). What is
+ * true: EVERY PHASE AND RECOVERY ACT COUNTED BY ITS BOUND — each Begin & Execute and what follows it, the limit's reads,
+ * the run plan's rule, the sign-offs, the final screenshot and read — PLUS THE SETUP'S ALLOWANCE, which is not a worst
+ * case:
+ *   · the setup allowance (boot, the PWA, the Undertaking, every archive's copying) — 1,800 s, ⚠ an allowance: its own
+ *     acts at their bounds pass it, and the archive's copying has none;
  *   · the root's Begin & Execute and each phase's, each with what follows it (`PHASE7_UNIT_RUN_MS`) — 5 × 38,940 s =
  *     194,700 s, ⭐ the root's included: its press is bounded by a phase's allowance too (`beginExecute`);
  *   · the store read for the limit before each phase — 4 × 300 s = 1,200 s;
@@ -456,7 +469,10 @@ export const PHASE7_SIGN_OFF_UNIT_MS =
  * sign-offs (3,000 s at their bounds), the four abandonments (1,200 s) and the rule's UI acts inside the 1,800 s setup
  * allowance, and the root's Begin & Execute (up to 38,160 s) nowhere: a run whose every act stayed within its bound could
  * reach the test's timeout with a unit still inside its allowance, and Playwright would kill the server mid-unit there
- * (`REG-F-527`). ⚠ It must stay under Node's timer ceiling, 2,147,483,647 ms, past which a timer fires at once.
+ * (`REG-F-527`). ⚠ `P76F-D` D4 — AND IT STILL CAN, BY THE SETUP ALONE: a setup whose acts each stay inside their bounds can
+ * outlast its 1,800 s allowance, and every later term is then short by that much. Disclosed, not closed: counting the
+ * setup's acts needs their number, which this module cannot read (`PHASE7_SETUP_MS`). ⚠ It must stay under Node's timer
+ * ceiling, 2,147,483,647 ms, past which a timer fires at once.
  */
 export const PHASE7_TEST_TIMEOUT_MS =
 	PHASE7_SETUP_MS +

@@ -798,8 +798,11 @@ describe('⭐ P7-2 D4 — the Phase 7 lane waits an ALLOWANCE derived from the b
 	// ⛔⛔ `P76F-C` C8 — AND WAS *"307,080 s"* (1,800 s + 4 × 38,160 s + 4 × 1 × 38,160 s), which counted the five sign-offs (at
 	// their bounds, 5 × 2 × 300 s = 3,000 s), the four abandonments (4 × 300 s) and the rule's fills, clicks and page loads
 	// inside a 1,800 s setup allowance they alone exceed, and the root's Begin & Execute — bounded by a phase's allowance —
-	// nowhere. The timeout is now the worst case of the lane's own bounds, each act counted by the bound it waits.
-	it('⛔ the spec’s test timeout — the worst case of the lane’s own bounds, every act counted by its bound, 372,240 s — stays under Node’s timer ceiling', () => {
+	// nowhere. ~~The timeout is now the worst case of the lane's own bounds, each act counted by the bound it waits.~~ ⛔ `P76F-D`
+	// D4: overstated — the setup's acts are not counted by their bounds (their number is the PWA's, which `lane-config.ts`
+	// cannot read; the archive's copying has no bound), and those bounds alone pass its 1,800 s allowance. The timeout is
+	// every PHASE AND RECOVERY act at its bound, plus the setup's ALLOWANCE — which is not a worst case.
+	it('⛔ the spec’s test timeout — every phase and recovery act at its bound, plus the setup’s allowance, 372,240 s — stays under Node’s timer ceiling', () => {
 		// ⚠ FIRST, so a figure pushed past the ceiling reddens here by this message, not by the arithmetic below it.
 		expect(
 			PHASE7_TEST_TIMEOUT_MS,
@@ -809,15 +812,16 @@ describe('⭐ P7-2 D4 — the Phase 7 lane waits an ALLOWANCE derived from the b
 		// = 1,800 s + 194,700 s + 1,200 s + 165,120 s + 9,000 s + 420 s = 372,240 s (103.4 hours).
 		expect(
 			PHASE7_TEST_TIMEOUT_MS,
-			'the timeout is not the worst case of the lane’s own bounds: 1,800 s setup + 5 × 38,940 s (the root’s run and each ' +
-				'phase’s) + 4 × 300 s (the limit’s reads) + 4 × 1 × 41,280 s (a re-run, an abandonment and the rule’s UI acts for ' +
-				'each phase) + 5 × 1,800 s (the sign-offs) + 120 s + 300 s (the final screenshot and read)'
+			'the timeout is not every phase and recovery act at its bound plus the setup’s allowance: 1,800 s setup (an ' +
+				'allowance, its own acts NOT counted by their bounds) + 5 × 38,940 s (the root’s run and each phase’s) + 4 × 300 s ' +
+				'(the limit’s reads) + 4 × 1 × 41,280 s (a re-run, an abandonment and the rule’s UI acts for each phase) + ' +
+				'5 × 1,800 s (the sign-offs) + 120 s + 300 s (the final screenshot and read)'
 		).toBe(372_240_000);
 	});
 
 	// ⭐⭐ `P76F-C` C8 — EACH TERM, AT ITS BOUNDS: the arithmetic the timeout's comment states, held term by term, so a bound
 	// that moves reddens the term it moved, not only the total.
-	it('⭐ C8 — each term of the worst case, every act at its bound', () => {
+	it('⭐ C8 — each counted term, every phase and recovery act at its bound', () => {
 		// The overview shown afresh: the navigation, the hydration wait, the tab's click.
 		expect(PHASE7_SHOW_OVERVIEW_MS).toBe(3 * PHASE7_UI_MS);
 		// One Begin & Execute and what follows it: the press, the overview again, the store read, the screenshot.
