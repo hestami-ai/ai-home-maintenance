@@ -165,3 +165,37 @@ Each goes design, roadmap, code, and names the test that must fail first. P7-4's
 - **The record:** the pairing joins every review to its own calls (`REG-F-433`'s key): 0 not pairable. The refused phases' answers are unreadable, because no span was located (`REG-F-557`).
 - **Spend:** 41 reviewer calls in the run and 2 in the negative control. That is 174 of the 200.
 - **Next, the sponsor's.** Fix `REG-F-557` (design, roadmap, code), then run once more. With the reviews now concluding, that run would show whether all four phases complete. It needs about 45 calls, more than the 26 left.
+
+## 10. P3: the run once more after `REG-F-557` (2026-10-11) — every phase completes
+
+**The answer to the execution half is yes**, with the standing caveats: on a published PWA, an Undertaking ran its work units as intended, and every phase completed under its assurance.
+
+- **The run.** From the main checkout at `478a7b78`, after a dry run: 27 minutes, five units, 0 forbidden acts. No recovery act was needed.
+- **Every unit completed.** The root and all four phases are SATISFIED in lifecycle and assurance, each with its step SUCCEEDED, after one try each.
+- **The stage matrix: 22 cells as intended, 0 broke.** Of the rest:
+  - 4 are vacuous by construction: the declared policies (`REG-F-406`, `REG-F-523`);
+  - 4 are open to P7-4's product checks;
+  - 1 is not measured in this half: build and publish, which is half B.
+- **The reviewer** answered all 21 reviews, with one call retried once. None was malformed, none answered no criterion, and every review was paired with its own calls.
+- **The product** (P7-4).
+  - **Acceptance:** 7 of 7 on the implementation, end-to-end and final archives.
+  - **Seeded faults:** its own e2e tests caught 7 of 7 seeded deviations, and its unit tests caught 84 of 92 mutations (7 survived, 1 timed out).
+  - **The spawn check:** its e2e tests start the real tool. The one that does not is a static check of the repository.
+  - **Commands re-run:** the 5 that could be re-run agree with their verdicts.
+  - **The negative control:** REJECTED twice, under RR-03, RR-04, RR-06 and RR-09.
+- **Spend:** 22 reviewer calls in the run and 2 in the negative control. That is 198 of the 230.
+- **What a "Yes" still states, and what is not yet measured.**
+  - The PWA had to name its product (`REG-F-510`).
+  - The declared policies are signed off with no criterion checked (`REG-F-523`).
+  - The reviewer missed 2 of 56 planted defects in its last qualification (`REG-F-555`).
+  - The PWA was typed by the operator: authoring it live is half B (P7-7).
+  - Nothing replays the run yet (Phase 8).
+
+### The run's arc
+
+| | First run (P7-3) | P2 | P3 |
+|---|---|---|---|
+| Phases completed | 0 of 4 | 1 of 4 | 4 of 4 |
+| What stopped the others | the reviewer's agent harness ended its own session (`REG-F-549`); a stopped unit could not be run again (`REG-F-511`) | a code block inside valid JSON read as the answer (`REG-F-557`) | none |
+| Work-product reviews concluded | 0 of 4 | 4 of 4 | 4 of 4 |
+| Reviewer calls | 36 | 41 | 22 |

@@ -40174,6 +40174,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
     - the scoring corpus holds no reply on the new branch, so the fingerprint cannot see this fix. That is `REG-F-553`'s class;
     - the harness's copy of the fence expression is checked by a comment, not a test.
   - **The design's evidence, corrected.** *"none of the 522 recorded reviewer replies holds a fence pair"* is true, but counting the retained answers could not have shown it, because their backticks are escaped. The evidence is that the harness's FENCED class, read over the raw replies, holds on 0 of 531 CALL lines.
+- ⭑ **2026-10-11 — the fix measured live (P3).** All four work products passed `floor.schema-invariant`, and every phase completed. Its general form, an answer that is not exactly one JSON object, did not arise in this run.
 
 ### REG-D-108 — SPONSOR RULING: after P2, fix REG-F-557, then run the measured run once more (P3); the limit rises to about 230 reviewer calls
 
@@ -40186,3 +40187,8 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - The reviewer-call limit is about 230 (`REG-D-102` (4) amended again). 174 are spent.
   - P3's result goes back to the sponsor.
 - ⭑ **2026-10-11 — the number the lane enforces.** The sponsor's *"about 230"* is held as a number: **The limit is 230 reviewer calls** (`REG-D-102` (4) amended). The lane's `PHASE7_PAID_LIMIT` reads it from this entry.
+- ⭑ **2026-10-11 — P3 ran, and every phase completed** (`REPORT-the-live-end-to-end-run.md` §10).
+  - **What completed.** The root and all four phases are SATISFIED, each step SUCCEEDED after one try. The stage matrix reads 22 cells as intended and 0 broke.
+  - **The checks.** The product passed every acceptance case, and the negative control was REJECTED.
+  - **Spend:** 198 of the 230 reviewer calls.
+  - **The answer to the execution half of the sponsor's question** is yes, with the standing caveats: `REG-F-510`, `REG-F-523` and `REG-F-555`. The authoring half (P7-7) and the replay (Phase 8) are not yet measured.
