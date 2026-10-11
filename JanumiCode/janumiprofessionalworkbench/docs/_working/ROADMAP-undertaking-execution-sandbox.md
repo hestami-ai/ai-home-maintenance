@@ -1946,6 +1946,19 @@ assurance policies gate it.** ⛔ Report what breaks; do not smooth it.
 | B9 | `REG-F-557`: the answer is the whole JSON text when it is one, and the work-product floor's "parseable" means it parses (`DESIGN-the-answer-span.md`; `REG-D-108`) | a P2-shaped work product (a JSON object whose document holds a code block) must be SATISFIED by the schema floor |
 | P3 | a dry run, then the measured run once more with P7-4 (paid, about 45 calls, within the 230 of `REG-D-108`) | reported to the sponsor; ✅ run 2026-10-11: every phase completed, 22 cells as intended and 0 broke; 198 of 230 calls (`REPORT-the-live-end-to-end-run.md` §10) |
 
+⭐ **THE COMPLETION PROGRAMME** (2026-10-11; `REG-D-109`, `REG-D-110`, `REG-D-111`; `DESIGN-phase-7-completion.md`). Each package names the test that must turn red first, and the gate and the mutation measurement run before each commit. The order follows the design's §6: build everything, then one re-qualification, then the runs, then the recording.
+
+| Package | What | Must turn red first |
+|---|---|---|
+| E1 | Part A: the review prompt's symmetric clause (`REG-F-555`; `REG-D-110` (2)) | a pin that the source holds the new clause |
+| E2 | Part B: one declared review per policy; each criterion recorded; the verdict from the answers; a negative verdict recorded; the framing's own probes in the fingerprint; the declared cases; the report's stage 5b (`REG-F-523`; `REG-D-110` (3); `REG-D-111`) | a stand-in answering a criterion NOT_MET gives that policy REJECTED (today SATISFIED) |
+| E3 | Part C: the lane's half-B mode, its units read from the published PWA, an authoring allowance, a pinned author model, the candidate checks recorded and reported, stage 1 measured; the limit 450 (`REG-D-110` (1), (4)) | a run whose hands return other unit titles proceeds (today refused) |
+| E4 | Part D: the replay's recording format, its switch, and its executor, runner and reviewer arms, which fail closed on a stale prompt (`REG-D-111` (5)) | test mode with the switch set answers REPLAY (today STAND_IN) |
+| P4 | the declared cases' oracles conferred by the sponsor, then the re-qualification (paid) | reported to the sponsor |
+| P5 | half A again: the "Yes" without `REG-F-523` or `REG-F-555` (paid) | reported to the sponsor |
+| P6 | half B: the authoring agent builds the PWA, then it runs (paid) | reported to the sponsor |
+| P7 | the recording, from the last paid run, and the replay regression committed | the regression replays the recorded matrix at no call |
+
 ⚠ *"The results become `TEST_RESULT` evidence"* above ~~is put to the sponsor as the design's §9.5~~ ⭑ is read as `R18`'s OBSERVATION evidence, judged by the reviewer (the sponsor, `REG-D-102` (5)). *"The declared assurance policies gate it"* holds in form only today (the design's stage 5b; §9.6) ⭑ and runs as is, all 14 verdicts reported vacuous (`REG-D-102` (6)). §11's *"It works live"* was measured on 2026-09-14 and has not been driven since; today's live authoring specs cannot pass (`REG-F-506`).
 
 **PHASE 8 (`R2`, second half):** a fourth `ProducerSession` answering from a committed recording, selected by an

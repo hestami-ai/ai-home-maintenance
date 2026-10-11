@@ -39361,6 +39361,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - ⭑ **2026-10-09 — driven** (`JAN-EXEC` Phase 7's five-unit gate spec, its prediction (b)). A root whose TRANSFORMATION produced nothing, recorded as the operator's, is signed off green.
 - ⭑ **2026-10-10 — the report's label.** This entry asks the run report to count these verdicts as not measured. `REG-D-102` (6), later, has the report mark all 14 vacuous, and the design's §1 keeps "vacuous by construction" as its own value. Round 2's report does that (design §6 D9). The design sentence this entry quotes as stage 5, *"Its declared policies are signed off"*, is not in the design: searched with grep, and with `git log -S` over the design's history (0 each; positive control: "declared policies", 2 lines in the design).
 - ⭑ **2026-10-10 — in P7-3.** 2 of the 14 declared verdicts were issued, both the root's, each vacuous by construction. No phase completed, so the other 12 were never asked for.
+- ⭑ **2026-10-11 — to be resolved:** each declared policy judged by the reviewer, one review per policy, each criterion recorded and the verdict computed from them (`REG-D-110` (3); `DESIGN-phase-7-completion.md` Part B).
 
 ### REG-F-524 — A work unit whose declared assurance policies all fail to govern it can never be assured: the kernel folds the empty set to UNASSESSED and refuses Record Assurance with a reason that names no policy, the page lists each excluded policy as "REQUIRED — UNASSESSED", and no step before the sign-off warns
 
@@ -39693,6 +39694,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - ⭑ **2026-10-10 — spend.** The three approved paid steps used 41 reviewer calls of the 150: P7-3a 3 (two refused by devin before any model was called), P7-3 36, and P7-4e 2. They also used 6 executor calls. P7-3a took three attempts: the first two failed on the run tree (`REG-F-546`, `REG-F-547`), at a cost of one executor call and no model review.
 - ⭑ **2026-10-10 — the limit in (4) is raised from 150 to 200 reviewer calls** (`REG-D-105` (1)). The rule that each paid step is reported before the next still holds.
 - ⭑ **2026-10-11 — the limit in (4) is raised again, to about 230 reviewer calls** (`REG-D-108`), for P3.
+- ⭑ **2026-10-11 — the limit in (4) is raised again, to about 450 reviewer calls**, for the completion programme (`REG-D-110` (1)).
 
 ### REG-F-538 — a reviewer call that answers with a bare string after an earlier call that reported its model is recorded with that earlier call's model, grade and tool observation, so the record says the provider confirmed a model for a call that confirmed nothing
 
@@ -40085,6 +40087,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   2. Or say what makes a concern a failure: *"a concern that shows the criterion is not met is a failure, whatever you are unsure of"*. That needs the sponsor's view, since it pushes the other way.
   - Either moves the reviewer fingerprint and owes a paid re-qualification.
 - **SEARCHED BEFORE FILING.** The register for lines holding both *`residual uncertainty`* and *`planted`*: 0. For *`PLANTED_DEFECT_NOT_REJECTED`*: 1 line, the entry that defines the predicate (`REG-D-082`), and none about a miss by this reviewer. Positive control: `REG-F-552`, this reviewer's other P7-6-era finding.
+- ⭑ **2026-10-11 — the remedy chosen: the symmetric clause** (`REG-D-110` (2); `DESIGN-phase-7-completion.md` A1).
 
 ### REG-D-107 — SPONSOR RULING: P2 approved after P1 — run the measured end-to-end run again, with recovery, now; and REG-D-106 confirmed
 
@@ -40213,3 +40216,32 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
     4. Then half B (1).
     5. Last, the replay (3), of a run made on the final code. A replay of P3 made earlier would replay a state the other three change.
   - Each paid step comes back to the sponsor with its budget. 198 of the 230 reviewer calls are spent, so the plan needs a new limit.
+- ⭑ **2026-10-11 — the programme is designed** (`DESIGN-phase-7-completion.md`), and the sponsor answered its four questions (`REG-D-110`).
+
+### REG-D-110 — SPONSOR RULING: the completion programme's four questions — a limit of about 450 reviewer calls; the symmetric clause for REG-F-555; one declared review per policy; half B names wordfreq and measures its traps as they are
+
+**Ruled 2026-10-11** (sponsor, in session, answering `DESIGN-phase-7-completion.md` §8). **Type:** SPONSOR RULING. **Status:** ⚠ **OPEN — in force for the programme; its build is owed, then the declared cases' conferral, then P4 to P6.**
+
+- **THE SPONSOR'S WORDS, verbatim, each with the question:**
+  1. Asked *"The completion programme (DESIGN-phase-7-completion.md) needs about 140–245 more reviewer calls across all four parts (198 of 230 spent). How should the spend be approved?"*, the sponsor chose *"Raise to about 450 (Recommended)"*.
+  2. Asked *"REG-F-555 (2 planted defects filed as residual uncertainty): how should the review prompt's one-row-per-criterion sentence change?"*, the sponsor chose *"Symmetric clause (Recommended)"*.
+  3. Asked *"REG-F-523: declared policies will be judged by the reviewer, criterion by criterion. One review per unit covering all its policies, or one per policy?"*, the sponsor chose *"One per policy"*.
+  4. Asked *"Half B (the authoring agent builds the PWA): what should its request say, and what about the known traps that would strand a unit or fake a 'Yes'?"*, the sponsor chose *"Name wordfreq; measure traps"*.
+- **WHAT EACH MEANS.**
+  1. **The limit.** The reviewer-call limit is about 450 for the whole programme (`REG-D-102` (4) amended again). The lane holds it as 450, and each paid step still reports before the next.
+  2. **The sentence.** It keeps *"A criterion that is met is recorded as met"* and ends *"a concern that shows a criterion is not met is recorded failed=true, and never moved to residualUncertainty"*.
+  3. **One review per policy, not the recommended one per unit.** About 15 extra reviewer calls a run. Each (unit, policy) pair is judged on its own, its criteria recorded, its verdict computed from them.
+  4. **Half B's request and traps.**
+     - The request names the product, `wordfreq`, so P7-4's checks apply.
+     - The candidate checks (the design's C4) record and report what they find. They do not refuse before Submit, so a trap plays out live and the run reports it.
+- ⭑ **2026-10-11 — the number the lane enforces.** The sponsor's *"about 450"* is held as a number: **The limit is 450 reviewer calls** (`REG-D-102` (4) amended). The lane's `PHASE7_PAID_LIMIT` is to read it from this entry (package E3).
+
+### REG-D-111 — DELEGATED (`REG-D-109`): the completion programme's own decisions — a declared REJECTED goes the canon route and is reported, not recovered; the root judged over its children; the operator records fitness-for-purpose's human decision; declared verdicts stay on the assurance plane; the replay recorded from the last paid run
+
+**Decided 2026-10-11** (agent, under the sponsor's *"All of those options should be pursued and resolved"*; `DESIGN-phase-7-completion.md` §7). **Type:** DECISION — delegated, flagged for sponsor confirmation. **Status:** ⚠ **OPEN — in force for the programme; sponsor confirmation owed.**
+
+1. **A declared REJECTED goes canon's route.** That is a blocking finding, then `UNDER_ASSURANCE → REJECTED`, recovered only by a replacement unit (*"Replacement PWU created → SUPERSEDED"*). In the paid run it is reported, not recovered. P7-6R's re-run does not reach a unit already under assurance (`stopped-unit-recovery.ts:386`).
+2. **The root's declared policies are judged over its children's work products and the end-to-end evidence** (DEC-6).
+3. **`fitness_for_purpose` requires a HUMAN evaluator.** The reviewer's criterion answers are its evidence, and the operator records the human decision, citing them, as a HUMAN actor.
+4. **Declared verdicts judge on the assurance plane only.** They do not gate `CompleteExecutionStep`: R20 stays out of scope (`REG-F-406` item 2).
+5. **The replay is recorded from the programme's last paid run**, not from P3. P3's archive serves as an uncommitted development fixture. Parts A and B make it stale, and that staleness gives the replay's stale path its red.
