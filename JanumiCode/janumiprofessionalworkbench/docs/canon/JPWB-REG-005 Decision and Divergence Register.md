@@ -39687,6 +39687,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - **MADE WITH THIS ENTRY.** The statuses of `REG-D-100` and `REG-D-101` are restated. The design's status line, its §9 heading and the roadmap's Phase 7 table record the answers.
 - ⭑ **2026-10-10 — spend.** The three approved paid steps used 41 reviewer calls of the 150: P7-3a 3 (two refused by devin before any model was called), P7-3 36, and P7-4e 2. They also used 6 executor calls. P7-3a took three attempts: the first two failed on the run tree (`REG-F-546`, `REG-F-547`), at a cost of one executor call and no model review.
 - ⭑ **2026-10-10 — the limit in (4) is raised from 150 to 200 reviewer calls** (`REG-D-105` (1)). The rule that each paid step is reported before the next still holds.
+- ⭑ **2026-10-11 — the limit in (4) is raised again, to about 230 reviewer calls** (`REG-D-108`), for P3.
 
 ### REG-F-538 — a reviewer call that answers with a bare string after an earlier call that reported its model is recorded with that earlier call's model, grade and tool observation, so the record says the provider confirmed a model for a call that confirmed nothing
 
@@ -40144,3 +40145,15 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - The register for *`code fence`* and *`inside a JSON string`*: 0 lines each. For *`first fenced`*: 1 line, `REG-F-515`'s description of `located`. For *`splitAnswerSpan`*: 15 lines, about the retention boundary (`REG-F-339` and its neighbours). For *`SCHEMA_INVALID`*: 1 line, in `REG-F-519`.
   - The nearest entries are `REG-F-515`, which classifies the stop, and `REG-F-519`, the envelope's whole-text parse.
   - **`REG-F-519`'s pointer stands.** It says the first measured run's requirements answer failed the output contract, and it did: probed the same way, that work product is not JSON as a whole.
+- ⭑ **2026-10-11 — scheduled** (`REG-D-108`): the fix goes design, roadmap, then code, and then P3, the measured run once more.
+
+### REG-D-108 — SPONSOR RULING: after P2, fix REG-F-557, then run the measured run once more (P3); the limit rises to about 230 reviewer calls
+
+**Ruled 2026-10-11** (sponsor, in session, answering the question sent with P2's result). **Type:** SPONSOR RULING. **Status:** ⚠ **OPEN — `REG-F-557`'s fix is owed (design, roadmap, code), then P3.**
+
+- **THE SPONSOR'S WORDS, verbatim, with the question:** Asked *"P2: the implementation phase completed end to end; the reviewer and the recovery work. Three phases stopped on one product defect, REG-F-557 (the answer-span reader treats a code block inside a valid JSON work product as the answer). 174 of 200 calls spent. What next?"*, the sponsor chose *"Fix REG-F-557, then P3 (Recommended)"*. That option read: *"Design, roadmap, then code for the reader (no calls), then one more measured run, which would show whether all four phases complete. P3 needs about 45 reviewer calls, so the limit rises to about 230."*
+- **WHAT IT MEANS.**
+  - `REG-F-557`'s fix is designed, put on the roadmap and built, and costs no calls.
+  - Then P3 runs: the measured run once more, with P7-4's checks.
+  - The reviewer-call limit is about 230 (`REG-D-102` (4) amended again). 174 are spent.
+  - P3's result goes back to the sponsor.
