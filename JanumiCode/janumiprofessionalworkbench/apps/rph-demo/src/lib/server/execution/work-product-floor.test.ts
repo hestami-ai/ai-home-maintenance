@@ -4,6 +4,7 @@
 // is asserted rather than derived is a floor step that certifies itself — the defect `floor.ts` records
 // against its own history, where five literal `true`s made identity/provenance unfailable.
 import { describe, expect, it } from 'vitest';
+import { schemaInvariantValidator, type AssuranceSubject } from '@janumipwb/rph-assurance';
 import { createInMemoryArtifactStore, type ArtifactStore } from '@janumipwb/rph-ports';
 import { workProductFloorFacts, type WorkProductSubject } from './work-product-floor.js';
 
@@ -66,7 +67,8 @@ describe('JAN-EXECREVIEW — the work product’s floor facts are DERIVED', () =
 
 	it('⛔ an UNPARSEABLE work product fails schemaValid, and the code says PARSEABLE not CONFORMANT', async () => {
 		// ⚠ THE NAME OF THE VIOLATION IS THE POINT. `outputContract` is free text and NOT machine-checkable, so
-		// "conforms to its contract" cannot be decided. What is decided is that the answer is locatable.
+		// "conforms to its contract" cannot be decided. What is decided is that the answer is ~~locatable~~ located and
+		// that the located span parses (`REG-F-557` AS2; the describe block at the end of this file).
 		//
 		// THE MUTANT: report `WORK_PRODUCT_VIOLATES_OUTPUT_CONTRACT`. Identical behaviour, and the record now
 		// claims a measurement nobody made — the fabricated-measurement defect, wearing a more useful name.
@@ -126,5 +128,57 @@ describe('JAN-EXECREVIEW — the work product’s floor facts are DERIVED', () =
 			store
 		);
 		expect(facts.identityProvenance.hasProducer).toBe(false);
+	});
+});
+
+// ⭐ `REG-F-557` — THE SCHEMA FLOOR, DRIVEN THROUGH ITS OWN VALIDATOR (`DESIGN-the-answer-span.md` §3, predicted reds 1
+// and 3). P2: six of seven work products were ONE JSON object whose document held a code block, and `floor.schema-invariant`
+// refused each as `SCHEMA_INVALID`, stopping three of the four phases. The first measured run: a fenced TypeScript type
+// held a brace pair, and the floor passed that fragment. Each fixture is asked of the floor exactly as production asks
+// it: these facts, then the deterministic validator that judges them.
+describe('REG-F-557 — the schema floor asks whether the work product PARSES (AS1, AS2)', () => {
+	const SUBJECT: AssuranceSubject = {
+		subjectId: 'art_1',
+		objectType: 'ARTIFACT',
+		semanticVersion: 1,
+		isAiProduced: true,
+		producer: {
+			agentId: 'execution.model-invocation:art_1',
+			modelId: 'test-judge-model',
+			providerId: 'test-provider'
+		}
+	};
+	const schemaFloor = async (answer: string) => {
+		const store = createInMemoryArtifactStore();
+		const facts = await workProductFloorFacts(await subjectFor(store, { answer }), store);
+		return schemaInvariantValidator(SUBJECT, facts.schemaInvariant);
+	};
+
+	it('⭐ a P2-shaped work product — one JSON object whose document holds a fenced block — is SATISFIED', async () => {
+		// Built with JSON.stringify, as P2's were written: the fence is INSIDE a string. At HEAD the reader took that
+		// fence's contents as the answer, found no brace pair in them, and the floor refused valid work.
+		const P2_SHAPED = JSON.stringify({
+			documents: [
+				{ path: 'docs/requirements.md', text: '# Req\n\n```text\nnode bin/x.js [options]\n```\n' }
+			]
+		});
+		const r = await schemaFloor(P2_SHAPED);
+		expect(r.dispositionRecommendation, JSON.stringify(r.observations)).toBe('SATISFIED');
+	});
+
+	it('⛔ markdown prose holding a fenced brace pair is REJECTED: a locatable fragment is not a parse (AS2)', async () => {
+		// THE MUTANT: `schemaValid` is the span's `located` alone, as it was - the brace pair in a TypeScript type is
+		// "locatable", and the floor certifies a fragment that is not JSON.
+		const PROSE = '# Design\n\nThe CLI reads its flags into\n\n```ts\n{ help: boolean }\n```\n\nand prints usage.';
+		const r = await schemaFloor(PROSE);
+		expect(r.dispositionRecommendation).toBe('REJECTED');
+		expect(r.observations.map((o) => o.code)).toEqual(['SCHEMA_INVALID', 'WORK_PRODUCT_NOT_PARSEABLE']);
+	});
+
+	it('CONTROL — a work product wrapped in a ```json fence is still SATISFIED: it is the LOCATED span that parses', async () => {
+		// Without this the refusal above is satisfiable by parsing the WHOLE answer, which would refuse every fenced
+		// work product - the false refusal back, by another route. THE MUTANT: parse `subject.answer`, not the span.
+		const r = await schemaFloor('```json\n{"finding":"the route is viable"}\n```');
+		expect(r.dispositionRecommendation, JSON.stringify(r.observations)).toBe('SATISFIED');
 	});
 });

@@ -177,6 +177,35 @@ describe('JAN-EXECRUN — a work unit actually runs', () => {
 		);
 	});
 
+	it('⭐ REG-F-557 — an envelope whose work product holds a fenced block KEEPS its answer span (REG-D-056)', async () => {
+		// P2: the execution exchange keeps no answer bytes when no span is located (`REG-D-056`), and the reader took
+		// the first fence anywhere in the reply - here inside the work product's document string, with no brace pair
+		// in it - so three phases' answers were unreadable. The envelope is ONE JSON object, so it is the span, whole
+		// (`DESIGN-the-answer-span.md` AS1; §3's separable consequence). Built with JSON.stringify, as a model's is.
+		const WORK_PRODUCT = {
+			documents: [
+				{ path: 'docs/requirements.md', text: '# Req\n\n```text\nnode bin/x.js [options]\n```\n' }
+			]
+		};
+		const ENVELOPE = JSON.stringify({
+			workProduct: WORK_PRODUCT,
+			rationale: { rationale: 'The usage line is the contract the CLI is held to.' }
+		});
+		const { input, dispatched, store } = harness({
+			session: oneShotSession(async () => ENVELOPE)
+		});
+		const out = await runModelInvocationStep(input);
+		expect(out.ran).toBe(true);
+		if (!out.ran) return;
+
+		const answerRef = dispatched[0]!.answerSpanRef as { storageKey?: string; status?: string };
+		expect(answerRef.status, 'the envelope is one JSON object: its span is located and retained').toBe('STORED');
+		expect(await store.get(answerRef.storageKey!), 'the answer span is the whole envelope').toBe(ENVELOPE);
+		expect(await store.get(out.storageKey), 'the artifact is the work product, unwrapped').toBe(
+			JSON.stringify(WORK_PRODUCT)
+		);
+	});
+
 	it('⛔ REFUSES when the type has no ACTIVE template — and records nothing', async () => {
 		// A type with no prompt declares no agent behaviour. THE MUTANT: fall through to a default prompt. Every
 		// work unit would then appear executable, against an instruction nobody authored or reviewed.

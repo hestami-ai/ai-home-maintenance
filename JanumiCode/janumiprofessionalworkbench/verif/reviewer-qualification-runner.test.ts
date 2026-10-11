@@ -440,8 +440,9 @@ describe('JAN-CRITREAD J2-2 — the runner, over a stub transport', () => {
 			recommendation: 'CONDITIONALLY_SATISFIED',
 			residualUncertainty: ['kept', 5, { x: 'dropped' }, ['y']]
 		};
-		// ⚠ The raw text escapes its backticks, as a model's JSON may: with a literal fence in it, splitAnswerSpan would
-		// window into the fence and no span would be located at all.
+		// ⚠ The raw text escapes its backticks, as a model's JSON may: ~~with a literal fence in it, splitAnswerSpan would
+		// window into the fence and no span would be located at all.~~ ⭐ `REG-F-557` AS1 — STRUCK: a text that is one JSON
+		// object is now read whole, literal fence or not; the escape stays, as the shape a model's JSON may take.
 		const raw = JSON.stringify(rich).replaceAll('`', `${'\\'}u0060`).replace('424242', '1e400');
 		expect(splitAnswerSpan(raw)).toMatchObject({ located: true, answer: raw });
 		const kept = retainedAnswer(JSON.parse(raw) as Record<string, unknown>);
@@ -770,6 +771,24 @@ describe('JAN-CRITREAD J2-2 — REG-F-428’s classes, detected harness-side ove
 		];
 		for (const [name, raw, classes] of table)
 			expect(detectMalformations(raw, IDS), name).toEqual(classes);
+	});
+
+	it('⭐ REG-F-557 AS3 — a reply that IS one JSON object, a statement quoting fenced code, is well formed: not FENCED', () => {
+		// The product reads such a reply WHOLE (`DESIGN-the-answer-span.md` AS1), so it unwrapped no fence and the reply is
+		// clean. ⛔ THE MUTANT: FENCED read off the raw text alone, as it was - a fence inside a string, which the product
+		// no longer unwraps, is then counted as a malformation the reviewer did not commit (`MALFORMATION_GAINED`, §5.1).
+		const fence = '```';
+		const quoting = reply(
+			CRITERIA.map((k, i) =>
+				i === 0
+					? { ...row(k.id), statement: `It reads\n${fence}ts\nconst o = { help: boolean };\n${fence}\nonly.` }
+					: row(k.id)
+			)
+		);
+		expect(quoting, 'the fixture holds a fence pair').toMatch(/```[\s\S]*?```/);
+		expect(detectMalformations(quoting, IDS)).toEqual([]);
+		// The CONTROL is the table's 'fenced' and 'fenced and wrapped' rows above: a reply the product DOES unwrap from a
+		// fence is still FENCED.
 	});
 
 	it('⭐ "judged wrong" and "discarded" stay apart — the measured duplicate key scores RR-02 NOT_MET, and the line says why', async () => {

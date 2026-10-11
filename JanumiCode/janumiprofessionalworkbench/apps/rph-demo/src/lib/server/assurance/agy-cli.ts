@@ -226,7 +226,37 @@ export interface AnswerSpan {
 	readonly located: boolean;
 }
 
+/**
+ * ⭐ `REG-F-557` AS1 — IS THE WHOLE TEXT, TRIMMED, ONE JSON OBJECT? Not an array, not a string, not `null`: the answer
+ * both readers locate is an object, so only an object may be taken whole.
+ *
+ * ⛔ WHY THE WHOLE TEXT IS ASKED FIRST. Both readers looked for a fence ANYWHERE in the text and took what was inside
+ * it as the answer. A work product that is one JSON object, whose document strings hold markdown code blocks, was
+ * read as its first code block: in P2 that refused six valid work products as `SCHEMA_INVALID` and stopped three of
+ * the four phases; in the first measured run a fenced TypeScript type held a brace pair, and the floor passed that
+ * fragment. A text that parses as one object has no fence AROUND it — any fence in it is INSIDE one of its strings.
+ * ⭑ Exported so the qualification harness asks the product's own question (`malformations.ts`, AS3).
+ */
+export function isWholeJsonObject(raw: string): boolean {
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(raw.trim());
+	} catch {
+		return false;
+	}
+	return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed);
+}
+
 export function splitAnswerSpan(raw: string): AnswerSpan {
+	// ⭐ `REG-F-557` AS1 — THE WHOLE TEXT FIRST: when it is one JSON object, that object is the answer, and the
+	// whitespace around it is the prefix and suffix, so `prefix + answer + suffix === raw` still holds. The offset is
+	// measured against `raw`, never the trimmed text — the `REG-F-339` difficulty, unchanged.
+	if (isWholeJsonObject(raw)) {
+		const whole = raw.trim();
+		const start = raw.length - raw.trimStart().length;
+		return { prefix: raw.slice(0, start), answer: whole, suffix: raw.slice(start + whole.length), located: true };
+	}
+	// Only otherwise today's path: the first fence, then the outermost braces.
 	// The `d` flag yields match INDICES, so the fence body's position in `raw` is read off the match rather
 	// than recomputed by searching for the captured text — which would pick the wrong occurrence whenever the
 	// body also appears in the opening delimiter's vicinity.
@@ -247,13 +277,20 @@ export function splitAnswerSpan(raw: string): AnswerSpan {
 /**
  * Strip markdown fences and extract the outermost JSON object from a model reply.
  *
- * ⚠ BEHAVIOUR DELIBERATELY UNCHANGED. Every caller feeds this straight to `JSON.parse`, and its THROW is what
+ * ~~⚠ BEHAVIOUR DELIBERATELY UNCHANGED. Every caller feeds this straight to `JSON.parse`, and its THROW is what
  * drives the repair path — so this is left byte-identical and `splitAnswerSpan` is added beside it rather than
- * replacing it. The equivalence (`located` ⇒ `splitAnswerSpan(raw).answer === extractJson(raw)`) is pinned by
- * test, so the two cannot drift apart silently.
+ * replacing it.~~ ⭐ `REG-F-557` AS1 — STRUCK, BECAUSE IT CHANGED, AND ONLY WHERE THE OLD PATH COULD NOT BE RIGHT. Its
+ * behaviour changes only when the whole trimmed text is one JSON object: that object is returned. There the old path
+ * could only return the same object (no fence in it, so its outermost braces) or a fragment of it (what lay between
+ * its first two fences, which in valid JSON stand only inside its strings). ⚠ SO THE REPAIR PATH MOVES TOO, AND ONLY
+ * THERE: such a fragment either threw — a repair asked of a reply that had answered — or parsed as some other value.
+ * Every text that is not one JSON object takes the old path unchanged and throws exactly as it did. The equivalence
+ * (`located` ⇒ `splitAnswerSpan(raw).answer === extractJson(raw)`) is still pinned by test (`REG-F-339`), so the two
+ * cannot drift apart silently.
  */
 export function extractJson(raw: string): string {
 	let s = raw.trim();
+	if (isWholeJsonObject(s)) return s;
 	const fence = /```(?:json)?([\s\S]*?)```/i.exec(s);
 	// `!` only: the group always participates when the fence matches. It lets this module typecheck under the
 	// repository's base config (`noUncheckedIndexedAccess`), which the reviewer-qualification harness compiles it

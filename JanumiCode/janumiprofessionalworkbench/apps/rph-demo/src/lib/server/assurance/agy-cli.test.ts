@@ -83,11 +83,39 @@ const PADDED = '   \n{"a":1}\n  ';
 const NO_JSON = 'I could not comply.';
 const UNCLOSED = 'prose { "a": 1 with no closing brace';
 
+// ⭐ `REG-F-557` (P2, the measured run again) — ONE JSON OBJECT WHOSE STRINGS HOLD A MARKDOWN CODE BLOCK. Six of P2's
+// seven work products were this shape, and the reader took the first fence ANYWHERE in the text as the answer. Built
+// with JSON.stringify, as a model's JSON is written: the fence sits INSIDE a string, its line breaks escaped.
+// P2_SHAPED's fence holds no brace pair, so at HEAD no span was located (a false refusal); DESIGN_SHAPED's holds a
+// TypeScript type, so at HEAD the span was that type (a false pass, the first measured run); JUDGEMENT_QUOTING_CODE is
+// a reviewer's reply whose statement quotes code, which passes through the same `extractJson`.
+const P2_SHAPED = JSON.stringify({
+	documents: [{ path: 'docs/requirements.md', text: '# Req\n\n```text\nnode bin/x.js [options]\n```\n' }]
+});
+const DESIGN_SHAPED = JSON.stringify({
+	documents: [{ path: 'docs/design.md', text: '# Design\n\n```ts\ntype Options = { help: boolean };\n```\n' }]
+});
+const PADDED_DESIGN = `\n  ${DESIGN_SHAPED}\n\t`;
+const JUDGEMENT_QUOTING_CODE = JSON.stringify({
+	findings: [
+		{
+			criterionId: 'RR-01-no-problem-substitution',
+			failed: true,
+			statement: 'The parser reads\n```ts\nconst o = { help: boolean };\n```\nand drops every other flag.',
+			severity: 'MATERIAL'
+		}
+	],
+	recommendation: 'REJECTED'
+});
+
 const LOCATED: readonly (readonly [string, string])[] = [
 	['reason-then-answer', REASONED],
 	['fenced', FENCED],
 	['bare object', PLAIN],
-	['surrounded by whitespace', PADDED]
+	['surrounded by whitespace', PADDED],
+	['one JSON object whose document holds a fenced block (REG-F-557, P2)', P2_SHAPED],
+	['one JSON object whose document holds a fenced type, padded (REG-F-557)', PADDED_DESIGN],
+	['a judgement whose statement quotes fenced code (REG-F-557)', JUDGEMENT_QUOTING_CODE]
 ];
 
 describe('splitAnswerSpan - the complement is recoverable, and losslessly', () => {
@@ -113,8 +141,9 @@ describe('splitAnswerSpan - the complement is recoverable, and losslessly', () =
 	});
 
 	it.each(LOCATED)('agrees with extractJson wherever a span is located - %s', (_name, raw) => {
-		// THE PIN. extractJson is deliberately left byte-identical because its THROW drives the repair path.
-		// This is what stops the two drifting apart once callers start using the split.
+		// THE PIN. extractJson ~~is deliberately left byte-identical~~ changes only where the whole text is one JSON
+		// object (`REG-F-557` AS1), because its THROW drives the repair path. This is what stops the two drifting
+		// apart once callers start using the split - and it now holds on the REG-F-557 shapes too.
 		const s = splitAnswerSpan(raw);
 		expect(s.located).toBe(true);
 		expect(s.answer).toBe(extractJson(raw));
@@ -136,10 +165,66 @@ describe('splitAnswerSpan - the complement is recoverable, and losslessly', () =
 	it('CONTROL - extractJson still behaves exactly as it did, including on the unlocated shapes', () => {
 		// Without this the "deliberately unchanged" claim at the site is unenforced, and a future edit to
 		// extractJson would be invisible here.
+		// ⭐ `REG-F-557` AS1: the claim is now "unchanged unless the whole text is one JSON object" — and none of these
+		// is one but PADDED, whose old answer was already that whole object, trimmed. So every line here still holds.
 		expect(extractJson(REASONED)).toBe('{"recommendation":"SATISFIED"}');
 		expect(extractJson(FENCED)).toBe('{"a":1}');
 		expect(extractJson(PADDED)).toBe('{"a":1}');
 		expect(extractJson(NO_JSON)).toBe('I could not comply.');
 		expect(extractJson(UNCLOSED)).toBe('prose { "a": 1 with no closing brace');
+	});
+});
+
+// -- ⭐ REG-F-557 AS1: the whole text first ------------------------------------------------------------------
+// `DESIGN-the-answer-span.md` §2 AS1: when the whole trimmed text parses as one JSON object, that object IS the answer;
+// only otherwise the old path (the first fence, then the outermost braces). §3's predicted reds 2 and 4 are here; 1
+// and 3 are the schema floor's (`work-product-floor.test.ts`).
+
+describe('REG-F-557 AS1 - a reply that IS one JSON object is read whole, whatever its strings hold', () => {
+	it('⭐ a design-shaped work product is read WHOLE, not as the fenced type inside one of its strings', () => {
+		// THE DEFECT, as the first measured run drove it: the span was the 126-character TypeScript type inside the
+		// first fence, and the floor passed that fragment. THE MUTANT: drop the whole-text arm - the fragment is back.
+		const s = splitAnswerSpan(DESIGN_SHAPED);
+		expect(s.located).toBe(true);
+		expect(s.answer, 'the answer is the whole object, not the fragment inside a string').toBe(DESIGN_SHAPED);
+	});
+
+	it('⭐ and a padded one keeps its whitespace as the prefix and suffix, so the split stays lossless (REG-F-339)', () => {
+		// THE MUTANT: offsets of the TRIMMED text, as the legacy path computes them - the prefix is lost, PER-9's
+		// "record-plane omission is not legal" one layer down.
+		expect(splitAnswerSpan(PADDED_DESIGN)).toEqual({
+			prefix: '\n  ',
+			answer: DESIGN_SHAPED,
+			suffix: '\n\t',
+			located: true
+		});
+	});
+
+	it('⭐ a reviewer reply whose statement quotes fenced code is extracted whole by extractJson', () => {
+		// Not seen in P1 or P2 (`REG-F-557` "WHY IT MATTERS"), and the repair path's parse reads through this.
+		// THE MUTANT: drop extractJson's whole-text arm - it returns the `{ help: boolean }` inside the statement.
+		expect(extractJson(JUDGEMENT_QUOTING_CODE)).toBe(JUDGEMENT_QUOTING_CODE);
+		expect(JSON.parse(extractJson(JUDGEMENT_QUOTING_CODE))).toMatchObject({
+			recommendation: 'REJECTED'
+		});
+	});
+
+	// ⛔ "ONE JSON OBJECT" - NOT ANY JSON VALUE. A reply that parses as an array, a string or null is read as before. Each
+	// row is its own arrangement, so each conjunct of the test has a row only it reddens.
+	it.each([
+		[
+			'a JSON array',
+			'[{"a":1},{"b":2}]',
+			{ prefix: '[', answer: '{"a":1},{"b":2}', suffix: ']', located: true }
+		],
+		[
+			'a JSON string',
+			'"{\\"a\\":1}"',
+			{ prefix: '"', answer: '{\\"a\\":1}', suffix: '"', located: true }
+		],
+		['JSON null', 'null', { prefix: '', answer: 'null', suffix: '', located: false }]
+	] as const)('CONTROL - %s is not an object, so it reads as it did', (_name, raw, before) => {
+		expect(splitAnswerSpan(raw)).toEqual(before);
+		expect(extractJson(raw)).toBe(before.answer);
 	});
 });

@@ -58,15 +58,28 @@ export interface WorkProductSubject {
 	readonly priorGaps?: readonly string[];
 }
 
+/** Does this text parse as JSON? The located span runs from a `{` to a `}`, so a span that parses is one object. */
+function parsesAsJson(text: string): boolean {
+	try {
+		JSON.parse(text);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
 /**
  * The deterministic floor facts for a work product.
  *
  * ⚠ `schemaValid` MEANS PARSEABLE, NOT "CONFORMS TO ITS OUTPUT CONTRACT", and the distinction is load-bearing.
  * `PromptTemplate.outputContract` is FREE TEXT describing what a conforming answer looks like; it is not
- * machine-checkable, so contract conformance cannot be decided today. What CAN be decided is that the answer
- * is locatable — the same measurement the retention path makes (`REG-F-351`). ⛔ Reporting a parse as
+ * machine-checkable, so contract conformance cannot be decided today. ~~What CAN be decided is that the answer
+ * is locatable — the same measurement the retention path makes (`REG-F-351`).~~ ⭐ `REG-F-557` AS2 — STRUCK: "locatable"
+ * was all it asked, and a brace pair inside a fenced TypeScript type is locatable, so the first measured run's floor
+ * passed a fragment that is not JSON. What IS decided now is what the code always said: the answer span is located
+ * (the retention path's measurement, `REG-F-351`) AND the located span PARSES as JSON. ⛔ Reporting a parse as
  * conformance would be the fabricated-measurement defect this repository records repeatedly, so the violation
- * code says `NOT_PARSEABLE` and a machine-checkable contract is recorded as owed.
+ * code says `NOT_PARSEABLE` — which now means what it says — and a machine-checkable contract is recorded as owed.
  */
 export function workProductFloorFacts(
 	subject: WorkProductSubject,
@@ -81,7 +94,12 @@ export function workProductFloorFacts(
 		traceComplete: boolean;
 	};
 }> {
-	const parseable = splitAnswerSpan(subject.answer).located;
+	// ⭐ `REG-F-557` AS2 — LOCATED, AND THE LOCATED SPAN PARSES. Since AS1 a work product that is one JSON object is its
+	// own span, whole, so P2's valid work products pass; and prose whose fence holds a brace pair locates a span that
+	// does not parse, so it is refused. ⚠ It is the SPAN that is parsed, not the whole answer: a work product the
+	// model wrapped in a json fence is located inside the fence and still passes.
+	const span = splitAnswerSpan(subject.answer);
+	const parseable = span.located && parsesAsJson(span.answer);
 	// ⭑ THE TRACE CHECK IS THE READ PATH BUILT FOR DIAGNOSTICS. `verifyExchangeContent` re-hashes the retained
 	// bytes and reports whether the record's claim about them is true — which is exactly what "the trace is
 	// complete" has to mean if it is to be a measurement rather than an assertion.

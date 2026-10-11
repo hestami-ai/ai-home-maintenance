@@ -401,8 +401,10 @@ export function projectJudgement(parsed: Record<string, unknown>): Record<string
 	);
 }
 
-/** A backtick, escaped: `extractJson` windows into whatever lies between two ``` fences, so none may reach a retained
- *  answer that a replay feeds back through it. */
+/** A backtick, escaped: ~~`extractJson` windows into whatever lies between two ``` fences, so none may reach a retained
+ *  answer that a replay feeds back through it.~~ ⭐ `REG-F-557` AS1 — STRUCK: a retained form is one JSON object, which
+ *  `extractJson` now reads whole, fence or not. The escape is KEPT: it changes no parse, and the lines already written
+ *  carry it. */
 const BACKTICK = '\\u' + '0060';
 /** ⭐ THE RETAINED FORM of a parsed answer — its projection's JSON, backticks escaped: the one way a line keeps an answer. */
 export function retainedAnswer(parsed: Record<string, unknown>): string {

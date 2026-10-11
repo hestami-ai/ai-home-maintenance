@@ -9,7 +9,10 @@
 //
 // ⛔ ONLY THE NAMES ARE KEPT. The raw reply is seen here and nowhere else in the record; the bytes that showed a class
 // never enter a tracked line (§5.3 retention).
-import { splitAnswerSpan } from '../../apps/rph-demo/src/lib/server/assurance/agy-cli.js';
+import {
+	isWholeJsonObject,
+	splitAnswerSpan
+} from '../../apps/rph-demo/src/lib/server/assurance/agy-cli.js';
 import { MALFORMATION_CLASSES, projectJudgement, type MalformationClass } from './record.js';
 
 /** The recommendation values `coerceJudgement` accepts; anything else is read as INCONCLUSIVE. */
@@ -20,7 +23,14 @@ const RECOMMENDATIONS: ReadonlySet<unknown> = new Set([
 	'INCONCLUSIVE',
 	'ESCALATED'
 ]);
-/** The fence `splitAnswerSpan` windows into — the same expression, so "fenced" means what the product unwrapped. */
+/**
+ * The fence `splitAnswerSpan` windows into — the same expression, so "fenced" means what the product unwrapped.
+ * ⭐ `REG-F-557` AS3 — CHECKED AGAINST THE PRODUCT'S, 2026-10-11: `splitAnswerSpan`'s is this pattern with the `d` flag
+ * (match indices only, the same match) and `extractJson`'s is this pattern exactly. ⚠ BUT SINCE AS1 THE PRODUCT ASKS IT
+ * ONLY OF A REPLY THAT IS NOT ONE JSON OBJECT — a reply that is one is read whole, and any fence in it is inside a
+ * string the product never unwraps. So FENCED asks the product's own question first (`isWholeJsonObject`), and
+ * `MALFORMATION_GAINED` does not count against a reviewer a fence it quoted inside a statement.
+ */
 const FENCE = /```(?:json)?([\s\S]*?)```/i;
 const FENCE_DELIMITER = /```(?:json)?/gi;
 
@@ -32,7 +42,7 @@ export function detectMalformations(
 	const found = new Set<MalformationClass>();
 	const span = splitAnswerSpan(raw);
 	if (!span.located) return ['NO_ANSWER_SPAN'];
-	if (FENCE.test(raw)) found.add('FENCED');
+	if (!isWholeJsonObject(raw) && FENCE.test(raw)) found.add('FENCED');
 	// Anything outside the span but its fence's own delimiters is prose the prompt asked the reviewer not to write.
 	if ((span.prefix + span.suffix).replace(FENCE_DELIMITER, '').trim() !== '')
 		found.add('PROSE_WRAPPED');
