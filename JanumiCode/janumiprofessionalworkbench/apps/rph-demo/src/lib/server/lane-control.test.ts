@@ -39,7 +39,9 @@ const OBJECTS: Record<string, StoredObject> = {
 	}),
 	'pwa-1': obj('PROFESSIONAL_WORK_ARCHITECTURE', {}),
 	'art-1': obj('ARTIFACT', { producingPwuId: 'pwu-1' }),
-	'pwu-1': obj('PROFESSIONAL_WORK_UNIT', { undertakingId: 'und-1' }),
+	// ⭐ `E12F` F11 — its TYPE declares `pol_declared`, the usual place an author declares a policy (limb 4 reads it).
+	'pwu-1': obj('PROFESSIONAL_WORK_UNIT', { undertakingId: 'und-1', pwuTypeId: 'pwut-1' }),
+	'pwut-1': obj('PWU_TYPE', { requiredAssurancePolicyIds: ['pol_declared'] }),
 	'und-1': obj('UNDERTAKING', { pwaId: 'pwa-1' }),
 	'evd-1': obj('EVIDENCE', {})
 };
@@ -237,7 +239,47 @@ describe('⭐⭐ E2 — the check, limb 3: a declared stand-in pass rests on sti
 			...stipulatedDeclared('m', 'reviewer.declared-policy'),
 			completion('n', 'pwu-1', DECLARED_STANDIN, 'INCONCLUSIVE', DECLARED_POLICY_ID)
 		];
-		expect(laneFindings([src(events)], [])).toEqual([]);
+		// ⭐ `E12F` F11 — ~~nothing~~: the positive one under another validator is LIMB 4's (below), never limb 3's.
+		expect(laneFindings([src(events)], []).map((f) => f.limb), 'limb 3 judged a review it did not run').not.toContain(3);
+	});
+});
+
+// ── ⛔ `E12F` F11 — LIMB 4, LIMB 2's DECLARED COUNTERPART: nothing but the declared stand-in passes a declared policy here ──────
+//
+// On the gate lane the declared stand-in answers every declared review (`declared-policy-review.ts`). A POSITIVE verdict of a
+// policy its subject DECLARES, under any other validator — the model reviewer the lane never runs, the pre-E2 sign-off that
+// judged nothing — is an undisclosed pass, as a positive floor review under any validator but the floor's stand-in is
+// (limb 2). ⛔ Limb 3 asked only of the stand-in's completions, so such a pass went unseen.
+
+describe('⛔ E12F F11 — the check, limb 4: nothing but the declared stand-in passes a DECLARED policy on this lane', () => {
+	it('⛔ a SATISFIED — or CONDITIONALLY_SATISFIED — declared verdict under any other validator, registered or not', () => {
+		// ⛔ PREDICTED RED, read from the code: [] — `laneFindings` asked nothing of a declared completion but the stand-in's.
+		const events = [
+			completion('m', 'pwu-1', 'reviewer.declared-policy', 'SATISFIED', DECLARED_POLICY_ID),
+			completion('w', 'pwu-1', 'workbench.independent-review', 'CONDITIONALLY_SATISFIED', DECLARED_POLICY_ID)
+		];
+		for (const regs of [[], [DECLARED]] as const)
+			expect(
+				laneFindings([src(events, 'candidate of pwa-1')], regs).map((f) => [f.limb, f.where, f.assessmentId, f.validatorId]),
+				'a declared pass under another validator went unseen'
+			).toEqual([
+				[4, 'candidate of pwa-1', 'm', 'reviewer.declared-policy'],
+				[4, 'candidate of pwa-1', 'w', 'workbench.independent-review']
+			]);
+		expect(laneFindings([src(events)], [])[0]!.reason).toBe(
+			'a SATISFIED verdict of pol_declared, which its work unit declares, completed under reviewer.declared-policy — on this lane only the declared stand-in may pass a declared policy, and only on a stipulation'
+		);
+	});
+
+	it('⭐ CONTROL — a non-positive declared verdict, a positive one of a policy its subject does NOT declare (the demo sign-off), and the declared stand-in’s are not this limb’s', () => {
+		const events = [
+			completion('r', 'pwu-1', 'reviewer.declared-policy', 'REJECTED', DECLARED_POLICY_ID),
+			completion('i', 'pwu-1', 'reviewer.declared-policy', 'INCONCLUSIVE', DECLARED_POLICY_ID),
+			completion('d', 'pwu-1', 'workbench.demo-signoff', 'SATISFIED', 'pol_01ARZ3NDEKTSV4RRFFQ69GDEM0'),
+			completion('x', 'pwa-1', 'reviewer.declared-policy', 'SATISFIED', DECLARED_POLICY_ID),
+			...stipulatedDeclared('s')
+		];
+		expect(laneFindings([src(events)], [DECLARED])).toEqual([]);
 	});
 });
 

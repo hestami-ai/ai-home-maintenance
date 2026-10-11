@@ -15,6 +15,11 @@
 //   the declared stand-in rests on a `DECLARED_POLICY` registration for its unit's PWA, and every mandatory row it records
 //   is STIPULATED: that stand-in has no checker, so a row it recorded other than as a stipulation is a judgement nobody
 //   made. ⚠ It asks no EVALUATED row, as limb 1 does: nothing in this lane judges a declared policy, and the record says so.
+// · ⭐ LIMB 4 (`E12F` F11, the E12 package review's eleventh finding) — LIMB 2's DECLARED COUNTERPART: no other positive
+//   verdict of a DECLARED policy exists on the lane. A positive completion of a policy its subject work unit declares (the
+//   kernel's one reading of a declaration, `declaredAssurancePolicyIds`) under any validator but the declared stand-in's —
+//   the model reviewer, which this lane never runs, or the pre-E2 sign-off, which judged nothing — is an undisclosed pass.
+//   ⛔ Limb 3 asked only of the stand-in's completions, so such a pass went unseen.
 //
 // ── WHY THE SERVER COMPUTES IT (`REG-D-072` D8) ─────────────────────────────────────────────────────────────────
 // The design put this in a per-test fixture teardown. Three things refute that: `retries: 1` turns a violation that
@@ -32,6 +37,7 @@
 // ⛔ THE THREAT MODEL: an undisclosed pass arising from a regression in the product, the stand-in or the lane's
 // configuration. A spec author deliberately forging records is a code-review matter.
 import { BLOCKING_SEVERITIES, FLOOR_POLICY_IDS } from '@janumipwb/rph-assurance';
+import { declaredAssurancePolicyIds } from '@janumipwb/rph-domain';
 import type { DomainEvent } from '@janumipwb/rph-contracts';
 import type { StoredObject } from '@janumipwb/rph-ports';
 import { STANDIN_VALIDATOR_ID } from './assurance/standin-reasoning-review-validator.js';
@@ -58,7 +64,7 @@ export interface LaneSource {
 
 /** What the lane control found wrong with one positive reasoning-review completion. */
 export interface LaneFinding {
-	readonly limb: 1 | 2 | 3;
+	readonly limb: 1 | 2 | 3 | 4;
 	readonly where: string;
 	readonly assessmentId: string;
 	readonly validatorId: string;
@@ -186,7 +192,22 @@ function limbThreeReasons(
 }
 
 /**
- * ⭐ THE CHECK ITSELF — pure: ~~both~~ the three limbs over one segment's sources and the registrations in force.
+ * ⭐ `E12F` F11 — WHETHER A COMPLETION'S SUBJECT IS A WORK UNIT THAT DECLARES ITS POLICY: on itself or through its type — the
+ * kernel's one reading (`declaredAssurancePolicyIds`, the set `RPH-PWU-007` folds and Gate E reads). A subject that is not a
+ * work unit declares nothing.
+ */
+function subjectDeclares(source: LaneSource, subjectId: string, policyId: string | undefined): boolean {
+	const unit = source.loadObject(subjectId);
+	if (unit?.objectType !== 'PROFESSIONAL_WORK_UNIT' || policyId === undefined) return false;
+	const pwu = unit.state as { assurancePolicyIds?: string[]; pwuTypeId?: string };
+	const pwuType = pwu.pwuTypeId
+		? (source.loadObject(pwu.pwuTypeId)?.state as { requiredAssurancePolicyIds?: string[] } | undefined)
+		: undefined;
+	return declaredAssurancePolicyIds(pwu, pwuType).includes(policyId);
+}
+
+/**
+ * ⭐ THE CHECK ITSELF — pure: ~~both~~ ~~the three~~ the four limbs over one segment's sources and the registrations in force.
  */
 export function laneFindings(
 	sources: readonly LaneSource[],
@@ -210,6 +231,23 @@ export function laneFindings(
 						subjectId,
 						limb: 3,
 						reason: reasons.join('; ')
+					});
+				continue;
+			}
+			// ⭐ `E12F` F11 — LIMB 4, limb 2's declared counterpart: a positive verdict of a policy its subject DECLARES, under any
+			// validator but the declared stand-in (whose completions are limb 3's, above). ⚠ The floor's reasoning review is
+			// limbs 1 and 2's, whoever declares it.
+			if (c.assurancePolicyId !== FLOOR_POLICY_IDS.REASONING_REVIEW && POSITIVE.has(String(c.disposition))) {
+				const subjectId = c.subjectObjectIds?.[0] ?? '';
+				if (subjectDeclares(source, subjectId, c.assurancePolicyId))
+					found.push({
+						where: source.where,
+						assessmentId: c.assessmentId,
+						validatorId: String(c.validatorId),
+						disposition: String(c.disposition),
+						subjectId,
+						limb: 4,
+						reason: `a ${String(c.disposition)} verdict of ${String(c.assurancePolicyId)}, which its work unit declares, completed under ${String(c.validatorId)} — on this lane only the declared stand-in may pass a declared policy, and only on a stipulation`
 					});
 				continue;
 			}

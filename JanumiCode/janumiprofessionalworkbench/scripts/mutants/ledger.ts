@@ -27196,5 +27196,32 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/phase7-run-report.test.ts"],
 		why: "PROMISE (E12F F10): a run whose declared verdicts are partly judged and partly not states the REG-F-523 caveat COUNTED - 'N of M declared verdicts were signed off with no criterion checked' - never as if none were checked. WHO RELIES: the report's reader, for whom 'the declared policies were signed off with no criterion checked' over a run whose phases were judged is a false caveat. WHAT THE MUTATION DOES: one unchecked verdict states the whole line. OBSERVED (bun run mutants -- (the E12F F7 and F10b ids, with E12-M16 and E12-M17), 2026-10-11, in the fixer's worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M43-a-mixed-run-states-the-whole-caveat ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 7 completion E12 fix round (the package review's findings 7 and 10b): stage 5b is driven over a declared policy that declares required evidence - a cap below the answers is as intended, a verdict above them broke, and (the general form) a REJECTED is no evidence cap (EVIDENCE_CEILINGS, supportedDisposition's two answers short of SATISFIED); the REG-F-523 caveat is stated per run (uncheckedCaveat) - whole for a run whose declared verdicts carry no criterion result, counted for one that mixes them"
+	},
+	{
+		id: "E12-M44-limb-4-flags-nothing",
+		file: "apps/rph-demo/src/lib/server/lane-control.ts",
+		find: "if (subjectDeclares(source, subjectId, c.assurancePolicyId))",
+		replace: "if (subjectDeclares(source, subjectId, c.assurancePolicyId) && false) // MUTANT: a declared pass under another validator goes unseen",
+		expectRed: ["apps/rph-demo/src/lib/server/lane-control.test.ts"],
+		why: "PROMISE (E12F F11, the package review's eleventh finding - limb 2's declared counterpart): on the gate lane a POSITIVE verdict of a policy its subject work unit declares, under any validator but the declared stand-in, is a lane violation (limb 4) - the model reviewer the lane never runs, or the pre-E2 sign-off that judged nothing. WHO RELIES: the gate's green lane - a regression that ran a real reviewer, or reverted to the sign-off that checked no criterion, would otherwise pass the lane undisclosed. WHAT THE MUTATION DOES: limb 4 flags nothing, as before the fix. OBSERVED (bun run mutants -- (the E12F F11 ids, with E12-M13 and E12-M14), 2026-10-11, in the fixer's worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M44-limb-4-flags-nothing       ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion E12 fix round (the package review's finding 11): the lane control's limb 4, limb 2's declared counterpart - a positive verdict of a policy its subject work unit declares (declaredAssurancePolicyIds over the unit and its type, the kernel's one reading) completed under any validator but the declared stand-in is a lane violation"
+	},
+	{
+		id: "E12-M45-limb-4-reads-only-the-unit-s-own-declarations",
+		file: "apps/rph-demo/src/lib/server/lane-control.ts",
+		find: "return declaredAssurancePolicyIds(pwu, pwuType).includes(policyId);",
+		replace: "return declaredAssurancePolicyIds(pwu, pwuType && undefined).includes(policyId); // MUTANT: the type's declarations are not read",
+		expectRed: ["apps/rph-demo/src/lib/server/lane-control.test.ts"],
+		why: "PROMISE (E12F F11): limb 4 reads a declaration as the kernel does - the unit's own assurancePolicyIds and its TYPE's requiredAssurancePolicyIds (declaredAssurancePolicyIds). WHO RELIES: limb 4 on the gate lane, where an author declares a policy on the TYPE, the usual place (every Phase 7 policy is the type's). WHAT THE MUTATION DOES: only the unit's own list is read, so a type-declared policy's pass under another validator goes unseen. OBSERVED (bun run mutants -- (the E12F F11 ids, with E12-M13 and E12-M14), 2026-10-11, in the fixer's worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M45-limb-4-reads-only-the-unit-s-own-declarations ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion E12 fix round (the package review's finding 11): the lane control's limb 4, limb 2's declared counterpart - a positive verdict of a policy its subject work unit declares (declaredAssurancePolicyIds over the unit and its type, the kernel's one reading) completed under any validator but the declared stand-in is a lane violation"
+	},
+	{
+		id: "E12-M46-limb-4-reads-any-subject-as-declaring",
+		file: "apps/rph-demo/src/lib/server/lane-control.ts",
+		find: "if (unit?.objectType !== 'PROFESSIONAL_WORK_UNIT' || policyId === undefined) return false;",
+		replace: "if (unit?.objectType !== 'PROFESSIONAL_WORK_UNIT' || policyId === undefined) return true; // MUTANT: any subject declares any policy",
+		expectRed: ["apps/rph-demo/src/lib/server/lane-control.test.ts"],
+		why: "PROMISE (E12F F11): only a WORK UNIT declares a policy, so limb 4 never reads a completion over another subject - a graph's, an artifact's - as a declared verdict. WHO RELIES: the gate lane, whose staged floor verdicts over PWAs and work products are limbs 1 and 2's, never limb 4's. WHAT THE MUTATION DOES: a positive verdict over a subject that is not a work unit is flagged as a declared pass. OBSERVED (bun run mutants -- (the E12F F11 ids, with E12-M13 and E12-M14), 2026-10-11, in the fixer's worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M46-limb-4-reads-any-subject-as-declaring ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion E12 fix round (the package review's finding 11): the lane control's limb 4, limb 2's declared counterpart - a positive verdict of a policy its subject work unit declares (declaredAssurancePolicyIds over the unit and its type, the kernel's one reading) completed under any validator but the declared stand-in is a lane violation"
 	}
 ];
