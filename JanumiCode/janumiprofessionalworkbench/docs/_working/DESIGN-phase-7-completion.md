@@ -1,7 +1,7 @@
 # DESIGN — JAN-EXEC Phase 7, the completion programme: the reviewer's misses, declared policies that judge, live authoring, and the replay
 
 **Programme:** `JAN-EXEC` Phase 7, after P3. It answers `REG-D-109`, the sponsor's *"All of those options should be pursued and resolved."*
-**Status:** DESIGN, revision 2, 2026-10-11. The sponsor answered §8's four questions (`REG-D-110`). Two answers depart from the recommendation, and they are applied below: one review per policy (B1), and half B's traps measured, not refused (C4). §7's decisions are recorded as `REG-D-111`, delegated and flagged.
+**Status:** DESIGN, revision 3, 2026-10-11. The build's review raised four more decisions (`REG-D-112`), which are delegated and listed in §7. The sponsor answered §8's four questions (`REG-D-110`). Two answers depart from the recommendation, and they are applied below: one review per policy (B1), and half B's traps measured, not refused (C4). §7's decisions are recorded as `REG-D-111`, delegated and flagged.
 **Sources:**
 - A read-only research pass: one reader per part, and a critic that re-read their citations and corrected eight claims.
 - Each part's facts cite the line they were read from.
@@ -138,8 +138,13 @@
 - **B3:** a declared REJECTED goes the canon route, and is reported in the paid run, not recovered.
 - **B6:** the root is judged over its children and the end-to-end evidence. The operator records `fitness_for_purpose`'s human decision.
 - **B7:** declared verdicts stay on the assurance plane (R20 out of scope).
-- **C4:** the candidate checks refuse before Submit. `REG-F-503`, `REG-F-504` and `REG-F-516` are measured as they are, and disclosed.
+- ~~**C4:** the candidate checks refuse before Submit.~~ ⭑ Superseded by `REG-D-110` (4): the checks record and report, and refuse nothing. `REG-F-503`, `REG-F-504` and `REG-F-516` are measured as they are, and disclosed.
 - **D4:** the replay is recorded from the last paid run, not from P3.
+- **`REG-D-112`, after the build's review:**
+  - (a) a declared review that did not conclude may be re-run, and a declared REJECTED is not re-reviewed;
+  - (b) a dry run calls no model, and its sign-off stops before the first declared review;
+  - (c) the replay covers the execution half from the published PWA, not the authoring turn;
+  - (d) Pi runs a turn's tool calls one at a time (`REG-F-518`), before the recorded run.
 
 ## 8. For the sponsor
 

@@ -39266,6 +39266,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   2. The observer assigns a run's ordinal when the run starts, as its comment says.
 - ⭑ **2026-10-10 — the ordinal has its first reader.** Round 2's re-run manifest carries each command's order as the order its run COMPLETED, and names it so, since the start order this entry describes is recorded nowhere.
 - ⭑ **2026-10-10 — driven live.** In P7-3's requirements phase, the executor's existence check of `docs/requirements.md` printed `<missing>`, because it ran beside the `write_file` in the same message. The file exists. The command's review refused it as *"the delegated deliverable is absent"* (RR-01, RR-09).
+- ⭑ **2026-10-11 — to be fixed before the recorded run** (`REG-D-112` (d)). A turn's tool calls run one at a time, because a replay must reproduce them in order. This changes the executor's behaviour, and the change is stated where it is made.
 
 ### REG-F-519 — the executor's answer is all the text the model emits in a tool-using turn, parsed whole as one JSON object, so any text outside the final JSON leaves its account NOT DECLARED for the work product's review and for every command's review
 
@@ -39506,6 +39507,12 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   1. Restate Phase 8 as three replays — the executor's turns, the reviewer's answers bound to the subjects they judged, and the commands' results with their captures — and put the reviewer half to the sponsor under `REG-D-067` and `REG-D-071`.
   2. Or restate Phase 8's claim narrower: an executor replay that proves the wiring (`REG-D-071` Q1), reviewed by the stand-in, with commands not replayed, saying in its own words that it does not reproduce a run.
   3. Either way, Phase 7 archives in the form the chosen replay reads.
+- ⭑ **2026-10-11 — the replay's machinery is built** (package E4; `DESIGN-phase-7-completion.md` Part D).
+  - **What it replays.** The executor, the reviewer and the commands, each keyed by hash and failing closed when stale, never falling back to a live call or to answering by order.
+  - **What it covers.** The execution half from the published PWA. The authoring turn is not replayed, because its calls are not recorded (`REG-D-112` (c)).
+  - **Run over P3's archive, the recorder could not yet write a real recording.** The archive scan hit 199 times on JSON-escaped code, and a try whose commands raced (`REG-F-518`) is refused.
+  - **What it extracted from P3:** all 4 executor turns, all 17 commands and 16 of the 22 reviewer calls.
+  - The fix round makes the scan read decoded strings, and `REG-F-518` is fixed before the recorded run (`REG-D-112` (d)).
 
 ### REG-F-531 — the live lanes pass the operator's whole shell environment to the server, and the live-exec lane's boot check reads only the backend selections: a stray `JPWB_REVIEW_SEES_PRIOR` changes what the reviewer is given, and a stray `JPWB_AGENT` or `JPWB_AGENT_MODEL` changes the authoring agent, with nothing saying so
 
@@ -40245,3 +40252,22 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 3. **`fitness_for_purpose` requires a HUMAN evaluator.** The reviewer's criterion answers are its evidence, and the operator records the human decision, citing them, as a HUMAN actor.
 4. **Declared verdicts judge on the assurance plane only.** They do not gate `CompleteExecutionStep`: R20 stays out of scope (`REG-F-406` item 2).
 5. **The replay is recorded from the programme's last paid run**, not from P3. P3's archive serves as an uncommitted development fixture. Parts A and B make it stale, and that staleness gives the replay's stale path its red.
+- ⭑ **2026-10-11 — (1) as built departs in one respect** (the E2 build's review). A declared REJECTED moves the unit's assurance axis to REJECTED. Its lifecycle stays UNDER_ASSURANCE, and does not go `UNDER_ASSURANCE → REJECTED`. The report and the page read the assurance axis. Further decisions the build raised are `REG-D-112`.
+
+### REG-D-112 — DELEGATED (`REG-D-109`): what the completion programme's build review raised — a declared review that did not conclude may be re-run; a dry run calls no model; the replay covers the execution half from the published PWA; Pi runs a turn's tool calls one at a time
+
+**Decided 2026-10-11** (agent, under the sponsor's *"All of those options should be pursued and resolved"*; raised by the adversarial reviews of packages E1–E4). **Type:** DECISION — delegated, flagged for sponsor confirmation. **Status:** ⚠ **OPEN — in force for the programme's fix round; sponsor confirmation owed.**
+
+- **(a) A declared review that did not conclude may be re-run.**
+  - The trouble as built: one INCONCLUSIVE declared verdict left its unit UNDER_ASSURANCE with no page act that could finish it. P7-6R's re-run does not reach a unit under assurance.
+  - **The page offers re-running only the declared reviews whose latest verdict is INCONCLUSIVE.** Each re-run is the person's Decision and a new assessment, and the old one is kept.
+  - **A declared REJECTED is not re-reviewed.** That follows `REG-D-105` (3)'s rule; it goes canon's route (`REG-D-111` (1)).
+  - The paid lane's rule (`REG-D-105` (4)) re-runs an inconclusive declared review once, then leaves the unit as found.
+- **(b) A dry run calls no model.**
+  - The trouble as built: signing off the root now runs its declared reviews, so the dry run would have called devin.
+  - **The dry run rehearses its sign-off up to the first declared review, and records that stage as not reached in a dry run.**
+- **(c) The replay covers the execution half from the published PWA.**
+  - The authoring turn is not replayed, because its calls are not recorded.
+  - **The recording holds the published PWA's content, and the replay re-creates it.** The authoring floor's exchanges are left out.
+  - **A live backend selection beside the replay switch is refused**, the authoring agent's included.
+- **(d) Pi runs a turn's tool calls one at a time** (`REG-F-518`). This is fixed before the recorded run, because a replay must reproduce the calls in order. It changes the executor's behaviour.
