@@ -83,6 +83,7 @@ import {
 	OPERATOR_COMPLETION_DETAIL,
 	OPERATOR_FAILURE_REASON,
 	OUTSIDE,
+	PAID_LIMIT,
 	pairReview,
 	pairRun,
 	parseClass,
@@ -1218,13 +1219,15 @@ describe('JAN-EXEC P7-2 D9 — the reviewer calls, a lower bound, and the paid l
 	});
 
 	// ⭐ P7-6R — the limit is 200 since `REG-D-105` (1), which amends `REG-D-102` (4)'s 150.
-	it('⛔ the three counts must total UNDER the limit: 196 + 4 held for P7-4e is 200, which is not under it', () => {
+	// ⭑ `REG-D-108` — read against the lane's limit, not a copy of it: these cases pinned 200 and went red at 230.
+	it('⛔ the three counts must total UNDER the limit: the limit less the 4 held for P7-4e, plus those 4, is not under it', () => {
 		// The lane's own check names the prior spend; with none, the operator's variable as the lane inherited it.
 		const at = (prior: number) =>
 			reportOf(aRun({}, { lane: { boot: { inherited: { JPWB_PHASE7_PRIOR_REVIEWER_CALLS: String(prior) }, overlay: { JPWB_DEMO_DB: DEMO_DB } } } }))
 				.report.reviewerCalls.limit;
-		expect(at(191)).toEqual({ prior: 191, recorded: 4, reserve: 4, total: 199, limit: 200, under: true });
-		expect(at(192)).toEqual({ prior: 192, recorded: 4, reserve: 4, total: 200, limit: 200, under: false });
+		const L = PAID_LIMIT;
+		expect(at(L - 9)).toEqual({ prior: L - 9, recorded: 4, reserve: 4, total: L - 1, limit: L, under: true });
+		expect(at(L - 8)).toEqual({ prior: L - 8, recorded: 4, reserve: 4, total: L, limit: L, under: false });
 		const run = aRun();
 		const checked = { ...run.lane, run: { units: [{ slug: 'design', limitCheck: { prior: 7 } }] } };
 		expect(buildRunReport(run.store, checked, { accountNames: NAMES }).report.reviewerCalls.limit.prior).toBe(7);

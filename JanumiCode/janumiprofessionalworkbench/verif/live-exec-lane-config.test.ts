@@ -845,13 +845,13 @@ describe('⭐ P7-2 D4 — the Phase 7 lane waits an ALLOWANCE derived from the b
 
 	// ⭐ `JAN-EXEC` P7-6R — THE LIMIT IS NOW `REG-D-105` (1)'s, which amends `REG-D-102` (4): *"Raise limit to 200"*. The test
 	// reads the ruling in force; `REG-D-102`'s own sentence still states the limit it set, which the amendment replaced.
-	it('⭐ D8 — the paid limit is the sponsor’s, read from REG-D-105 (1) itself, which amends REG-D-102 (4)', () => {
+	it('⭐ D8 — the paid limit is the sponsor’s, read from the ruling in force, REG-D-108, which amends REG-D-102 (4) again', () => {
 		const register = readFileSync(REGISTER, 'utf8');
-		const at = register.indexOf('### REG-D-105 ');
+		const at = register.indexOf('### REG-D-108 ');
 		const ruling = register.slice(at, register.indexOf('\n### ', at + 1));
-		expect(ruling, 'REG-D-105 does not amend REG-D-102 (4)').toContain('(`REG-D-102` (4) amended)');
+		expect(ruling, 'REG-D-108 does not amend REG-D-102 (4)').toContain('(`REG-D-102` (4) amended)');
 		const limit = /\*\*The limit is (\d+) reviewer calls\*\*/.exec(ruling)?.[1];
-		expect(limit, 'REG-D-105 states its limit').toBeDefined();
+		expect(limit, 'REG-D-108 states its limit').toBeDefined();
 		expect(PHASE7_PAID_LIMIT).toBe(Number(limit));
 	});
 

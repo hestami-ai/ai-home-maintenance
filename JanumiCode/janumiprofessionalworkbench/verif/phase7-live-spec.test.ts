@@ -1113,18 +1113,22 @@ describe('⭐ the store, as the run reads it after every act (REG-F-540)', () =>
 
 describe('⭐ D8 — the limit, and D5 — what the run records of each unit', () => {
 	// ⭐ P7-6R — the limit is 200 since `REG-D-105` (1), which amends `REG-D-102` (4)'s 150.
-	it('⛔ prior + recorded + the reserve must total UNDER the sponsor’s limit: 199 starts a phase, 200 does not', () => {
-		expect([PHASE7_PAID_LIMIT, PHASE7_NEGATIVE_CONTROL_RESERVE]).toEqual([200, 4]);
-		expect(limitCheck(150, 45)).toEqual({
-			prior: 150,
+	// ⭑ `REG-D-108` — THE ARITHMETIC IS READ AGAINST THE LIMIT, NOT A COPY OF IT. These cases pinned 200 and went red when the
+	// sponsor raised the limit to 230; what they hold is the boundary (one under starts, the limit does not), which a
+	// typed number only restates. The limit's VALUE is pinned once, against the register (`live-exec-lane-config.test.ts`).
+	it('⛔ prior + recorded + the reserve must total UNDER the sponsor’s limit: one under it starts a phase, the limit does not', () => {
+		const L = PHASE7_PAID_LIMIT;
+		expect(PHASE7_NEGATIVE_CONTROL_RESERVE).toBe(4);
+		expect(limitCheck(L - 50, 45)).toEqual({
+			prior: L - 50,
 			recorded: 45,
 			reserve: 4,
-			total: 199,
-			limit: 200,
+			total: L - 1,
+			limit: L,
 			allowed: true
 		});
-		expect(limitCheck(150, 46).allowed).toBe(false);
-		expect(limitCheck(0, 196).allowed).toBe(false);
+		expect(limitCheck(L - 50, 46).allowed).toBe(false);
+		expect(limitCheck(0, L - 4).allowed).toBe(false);
 	});
 
 	const state = (executionState: string, planStepState: string): UnitState => ({
@@ -2164,9 +2168,10 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 	});
 
 	it('⛔ D8 — at the sponsor’s limit, counting what the store records, the run ends `paid-limit` before the phase, and what completed is still signed off, the root last', async () => {
+		// ⭑ `REG-D-108` — the prior spend is set against the limit, so the design phase is the one that reaches it.
 		const l = laneOf({
 			paid: true,
-			prior: 190,
+			prior: PHASE7_PAID_LIMIT - 10,
 			presses: {
 				root: ALL_COMPLETE.root!,
 				requirements: { outcome: answered('success'), after: COMPLETED, calls: 6 }
@@ -2181,11 +2186,11 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			'recordAssurance root'
 		]);
 		expect(record.units[2]!.limitCheck).toEqual({
-			prior: 190,
+			prior: PHASE7_PAID_LIMIT - 10,
 			recorded: 6,
 			reserve: 4,
-			total: 200,
-			limit: 200,
+			total: PHASE7_PAID_LIMIT,
+			limit: PHASE7_PAID_LIMIT,
 			allowed: false
 		});
 		expect(record.units[2]!.beginExecute).toBeNull();

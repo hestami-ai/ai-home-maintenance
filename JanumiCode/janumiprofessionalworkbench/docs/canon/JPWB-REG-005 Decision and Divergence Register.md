@@ -40123,6 +40123,9 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - For *`5000 ms`*: 7 lines, in `REG-F-162`, `REG-F-169`, `REG-F-173` and `REG-F-501`. For *`5 s default`*: 0.
   - The nearest is `REG-F-169` (CLOSED): verif's filesystem censuses timed out on the same default under load. Its safe default applies here: *"treat 'failed under load, passes alone' as a diagnosis rather than a flake"*.
   - `REG-F-173` gave the mutation runner's vitest a retry. The root vitest config sets `testTimeout: 60_000` (`vitest.config.ts:122`). Neither reaches `rph-demo`'s own test step, which these files run in.
+- ⭑ **2026-10-11 — its general form, and the remedy applied to it.** The next gate run went red on a fifth file, *`pwa-surface-object-type.test.ts`*, which also passes alone (5 of 5). So budgeting the test that last timed out cannot end it.
+  - **The general form.** `apps/rph-demo/vitest.config.ts`, which `gate:fast`'s `rph-demo` test step runs, carries none of the watchdogs both root configs carry: `hookTimeout` and `testTimeout` of 60 s, and `maxWorkers: 4` (`JAN-CSAADEC` CD-03, which recorded the same shape and copied them across; `REG-F-024`).
+  - **Applied.** The same three settings are copied into it, not chosen. The per-test and per-file budgets already added stay, and are redundant beside them.
 
 ### REG-F-557 — The answer-span reader takes the first markdown fence anywhere in the text: a valid JSON work product whose documents hold a code block is read as that block, so the schema floor refuses it, and passes a fragment when the block holds a brace pair
 
@@ -40182,3 +40185,4 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - Then P3 runs: the measured run once more, with P7-4's checks.
   - The reviewer-call limit is about 230 (`REG-D-102` (4) amended again). 174 are spent.
   - P3's result goes back to the sponsor.
+- ⭑ **2026-10-11 — the number the lane enforces.** The sponsor's *"about 230"* is held as a number: **The limit is 230 reviewer calls** (`REG-D-102` (4) amended). The lane's `PHASE7_PAID_LIMIT` reads it from this entry.

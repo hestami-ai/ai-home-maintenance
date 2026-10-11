@@ -485,10 +485,11 @@ export const PHASE7_TEST_TIMEOUT_MS =
 
 /**
  * ⭐ D8 — the sponsor's limit, in reviewer calls, checked before each phase ⭐ and before each re-run the run plan's rule
- * makes (`REG-D-105` (4)). ~~150 (`REG-D-102` (4))~~ ⭐ 200: *"Raise limit to 200"* (`REG-D-105` (1), which amends
- * `REG-D-102` (4)); it covers the re-qualification, the re-run and a few recovery re-runs.
+ * makes (`REG-D-105` (4)). ~~150 (`REG-D-102` (4))~~ ~~200: *"Raise limit to 200"* (`REG-D-105` (1), which amends
+ * `REG-D-102` (4)); it covers the re-qualification, the re-run and a few recovery re-runs.~~ ⭐ 230: *"the limit rises
+ * to about 230"* (`REG-D-108`, after P2), held as the number its pointer states, for P3.
  */
-export const PHASE7_PAID_LIMIT = 200;
+export const PHASE7_PAID_LIMIT = 230;
 
 /** ⭐ D8 — the reviewer calls held back for the negative control (P7-4e): its own cap (`negative-control.ts`). */
 export const PHASE7_NEGATIVE_CONTROL_RESERVE = 4;
