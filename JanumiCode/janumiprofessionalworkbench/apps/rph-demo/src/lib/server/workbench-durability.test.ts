@@ -22,8 +22,12 @@ import { existsSync, rmSync } from 'node:fs';
 import { SESSION_CREDENTIAL } from './identity.js';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { openWorkbench } from './workbench.js';
+
+// ⚠ `REG-F-556` — AN EXPLICIT BUDGET FOR THE WHOLE FILE, SIZED TO ITS WORK: every test here opens, writes or restarts a durable workbench over a store on disk. Under `gate:fast`'s parallel test step one of them timed out at vitest's 5 s default, and each passes
+// alone (`REG-F-169`'s safe default: a failure under load that passes alone is a diagnosis). The global default is not raised.
+vi.setConfig({ testTimeout: 60_000 });
 
 let fileSeq = 0;
 const created: string[] = [];

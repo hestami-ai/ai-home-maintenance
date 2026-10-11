@@ -37128,6 +37128,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - **REMEDY CANDIDATES, UNTESTED.** Mint ONE floor-run token and use it for the assessments' correlation and the exchanges' `runToken` and correlation; or set `causationId`. Recording exchange ids ON the assessment would need a contract change and a reordering — the drain runs after the recording (`REG-F-431`). Predicted red first: two floor runs on one PWA with distinct answers, and the reader must return the second run's.
 - ⭑ **2026-10-10 — Phase 7's report pairs, and refuses to pair where this entry's gap bites.** Round 2's run report (`scripts/phase7/run-report-core.ts`) pairs only reasoning-review assessments, the only ones with exchanges. A subject with more than one floor run is reported as not pairable, never paired (design §6 D9); this entry stays open, since the join key is P7-6's. Its anchors have moved since filing: `floor-over-subject.ts:159`, `:178` and `:184` are now `:209`, `:228` and `:234`; `floor.ts:409-412`, `:440` and `:446` are now `:759-762`, `:791` and `:797`; the positive control's `messages.ts:894` and `:2063` are now `:896` and `:2066` (still 2 hits).
 - ⭑ **2026-10-10 — scheduled as package B7 of P7-6 and P7-6R** (roadmap §9; `DESIGN-the-stopped-unit-recovery.md` RD10). P7-6R's recovery re-runs a review over the same work product. Its first try is ordinal 1, as the original's was, so this entry's tie returns the older answer, and the run report refuses to pair the subject. The run plan's rule for P7-6 requires this entry's join key before any re-review. It is also first in `REG-D-070` Q2's ruled order. The recovery design had first said a later re-review does not tie; that was wrong, and is struck there.
+- ⭑ **2026-10-10 — the join key is built** (B7; merged at `547a1cf8`). One floor-run token per floor run is the assessments' correlation and the exchanges' run token, on both planes. The run report pairs by it, and the PWA reader joins to the token of the assessment it displays. A floor recorded before the key shows no reviewer answer on the PWA page, rather than another run's. This is the first of `REG-D-070` Q2's three steps; dropping G4 and `REG-F-431`'s drain fix are not done.
 
 ---
 
@@ -37614,12 +37615,21 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-F-452 — `child-process-runner.test.ts`'s B2 arrangement assumes a node child exits inside its 500 ms deadline; under a loaded gate it did not, and the test reported a timeout it had correctly observed
 
-**Filed 2026-09-25** (`JAN-CRITREAD` `J1-3`, found by the J1-3 gate run; not a J1-3 change). **Status:** ⚠ **OPEN — a load-sensitive arrangement (a flake), not a product defect on this evidence; the remedy is owed.**
+**Filed 2026-09-25** (`JAN-CRITREAD` `J1-3`, found by the J1-3 gate run; not a J1-3 change). **Status:** ~~⚠ **OPEN — a load-sensitive arrangement (a flake), not a product defect on this evidence; the remedy is owed.**~~ ✅ **CLOSED 2026-10-10** — the remedy is built: B2's deadline is placed after an observed exit, and the file's reaper no longer kills its own worker (the pointer below).
 
 - **WHAT HAPPENED.** In `gate:fast`'s parallel `rph-demo` test step, *"⛔⛔ B2 — and it is NOT a timeout: a child that exited 0 in milliseconds did not time out"* failed in 1814 ms. It reported *"a deadline that passes over an EXITED child is not a timeout: expected true to be false"*. In the previous gate run the same test passed in 579 ms. Run alone after the failure, it passed 3 of 3. Nothing in the runner or the test changed in `J1-3`; the file was last changed by `7189c4b7`.
 - **WHY — most likely, not proven.** The arrangement gives the child a 500 ms deadline and relies on its own note: *"The child exits in about 70ms on this host"*. The product sets `timedOut` from whether the child was still running when the deadline passed. On a loaded host, starting a node child can take longer than 500 ms, and then `timedOut: true` is the TRUE observation, not a fabricated one. The test cannot tell which case it got, because it does not observe the child's exit time.
 - **REMEDY — owed, not taken here.** The arrangement must make the deadline fall AFTER an observed exit, for example by driving the deadline from the child's recorded exit rather than from wall time. Raising the timeout would only move the flake, and is refused. Until then a red here on a loaded run is re-run, and the re-run is recorded.
 - **SEARCHED BEFORE FILING.** The register for `child-process-runner` (0), `HOLDS_THE_PIPES` (0) and `NOT a timeout` (0).
+- ⭑ **2026-10-10 — it recurred, and the file's worker also crashed (P7-6 and P7-6R's gates).**
+  - **The same red.** B2 reported a timeout it had observed, after 1737 ms, in a gate run while another builder's gate ran beside it. Run alone, the file passed.
+  - **A second symptom, the same file.** Three times today `gate:fast`'s `rph-demo` test step ended *"Error: [vitest-pool]: Worker forks emitted error. … Caused by: Error: Worker exited unexpectedly"*, and the one file that did not run was `src/lib/server/execution/child-process-runner.test.ts`: twice in the recovery builder's gate runs under load, and once in the lead's gate with nothing else running. Each time it passed when run alone, or in the next gate run.
+  - **The cause, driven: the file's own cleanup killed its worker.** Its `reap` killed `Number(out.stdout)`, the grandchild pid the child prints. When the deadline kills the child first, which is this entry's own load case, the stdout is empty, and `Number('')` is 0. On this host `process.kill(0, 'SIGKILL')` ends the CALLING process, under node and under bun alike: each exited 1, and nothing printed after the kill ran. So the cleanup killed the vitest worker running the file.
+  - **Fixed in the same commit.** `reap` now kills only a positive integer. A test with `process.kill` replaced passes it seven texts that name no pid. It was observed red first: *"expected "kill" to not be called at all, but actually been called 7 times"*. It was green after the fix, and the whole file passes, 35 tests.
+  - **And this entry's own remedy, done in the same commit.** With the worker no longer killed, the next gate showed the first symptom alone: B2 red, *"expected null to be +0"*. The child had not exited by its 500ms deadline, so it truly timed out.
+    - **What changed.** B2 now steps its deadline up, 500ms at a time, from 500ms to 8000ms. The step is narrower than the runner's 1000ms drain, so no step can jump the window between the child's exit and the drain's end.
+    - **What it asserts on.** Only an attempt whose own outcome shows the arrangement held: exit 0, and settled at or after its deadline. If none holds, the test fails and lists every attempt.
+    - **Measured.** The file passes, 35 tests. P2B-x, the mutant that calls a deadline passing over an exited child a timeout, is KILLED; so are P2B-q and P2B-d.
 
 ### REG-D-078 — SPONSOR RULING: the flawed clean case is fixed; the pass-bar question waits on a second candidate, devin with GLM-5.3 Flash at Max effort; Ollama is set aside for the reviewer role; REG-D-075, REG-D-076 and REG-D-077 confirmed
 
@@ -38023,6 +38033,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - `RESOLVE_OTHER_FLOOR_FINDINGS`: 0.
   - `classifyFloorRemediation`: 3 hits (its test coverage, its reuse on the execution plane, the loop programme), none about a composite block or a non-review validator failure.
   - `composite`: 11 hits, none about the floor.
+- ⭑ **2026-10-10 — P7-6R reads this stop's action, and assumes the failure is deterministic.** A recovery after a `RESOLVE_OTHER_FLOOR_FINDINGS` stop offers no re-review. The recorded reason says *"a re-review would not change it"*. That is true of a policy that refused, and not of a validator that did not run, which this entry's limb answers with the same action. The classifier's owed rule would settle both.
 
 ### REG-F-473 — a reviewer's ESCALATED recommendation is never recorded as an escalation: `dispositionFromFindings` cannot return ESCALATED, so a review that recommends escalation with no failed criterion is recorded SATISFIED
 
@@ -38792,6 +38803,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - **REMEDY CANDIDATES, UNTESTED.** For the transport failures: record what `devinPrint` threw, sanitised, beside the elapsed time, so a failure short of the bound says why. For MISSING_CRITERION: `REG-F-489`'s candidate, a prompt sentence that asks for a row for every criterion, which moves every case prompt and owes a paid run (`REG-D-086`).
 - ⭑ **2026-10-09 — remedy 1 built in the product, with one retry** (`JAN-EXEC` Phase 7 P7-2b, `REG-D-102`). In the reasoning-review validator, a devin or agy call that throws before its tool's bound (devin 240 s; agy 180 s, its print timeout) is run once more. The failed call is recorded as `NO_RESPONSE` with the sanitised cause the tool gave, and the second as `RETRY` (`apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts`, `attempt` and `thrownCallDisposal`). A second throw, or a throw at the bound, still ends the review INCONCLUSIVE. The qualification's own transport (`scripts/reviewer-qual/transports.ts`) is unchanged, and this watch item stays open.
 - ⭑ **2026-10-10 — another cause recorded as no response.** Three of P7-3's command reviews ended with devin's *"Response truncated: model hit max output token limit"*: an answer the model ran out of room for, recorded as a thrown call (`REG-F-550`).
+- ⭑ **2026-10-10 — P1, the re-qualification after P7-6: 4 of its 80 calls failed this way** (`qr-2026-10-10-devin-glm-5-3-flash-max-v4`). Each was a REFUSAL short of the 240000 ms bound: G3-RR-04 #1 after 136036 ms, W-RR-08 #1 after 140154 ms, G3-RR-03 #2 after 115215 ms and P-RR-08 #2 after 105103 ms, each recorded *"devin failed after … ms"*. Re-run once under `qr-2026-10-10-devin-glm-5-3-flash-max-v4-retry`, as the qualification's §7.3 provides, all four were REJECTED, the right verdict. So the class recurs at about 5% of calls, under the isolated reviewer as before it.
 
 ### REG-F-500 — a ledger mutant of a data file still runs the runner's `tsc` leg, which reads no data file, and one that leaves the run literals valid JSON but breaks the module that loads them is graded KILLED by the load error, with no row run
 
@@ -39108,6 +39120,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - ⭑ **2026-10-10 — the run goes on after a stop, and a hand completion naming one output frees nothing either.** This entry's status reads *"The measured run ends at the first unit that stops"*. The design's P7-3 and `REG-D-101` item 8 say the opposite, and round 2's lane does as they say: a stopped phase is left as found, and the later phases still run (design §6 D5). Round 2's store test also drove a hand `completeStep` that names the unit's one work product, after Begin & Execute was refused for a command's evidence: it is admitted, and the unit is still not SATISFIED, as prediction (c) found for a completion naming none (`REG-F-544`).
 - ⭑ **2026-10-10 — driven live, four times.** In P7-3, the measured run, every phase's Begin & Execute was refused at its floor, and each phase is left RUNNING with no page act that runs it again. So no phase completed and stage 7 broke (`docs/_working/REPORT-the-live-end-to-end-run.md` §1). `REG-D-091`'s choice goes back to the sponsor with that report.
 - ⭑ **2026-10-10 — the recovery is designed (`REG-D-104` (1); `DESIGN-the-stopped-unit-recovery.md`, step P7-6R).** A refused completion records a wait on the step and on the unit. A person's choice is recorded as a Decision. A re-run is a plan revision built from existing commands: supersede, cancel the waiting step, then a new plan whose step is the new attempt. R-1 covers this entry's floor-refusal stop. R-2 covers the other five, and remedy 3, the evidence join on every return path. The plan-revision chain has not been driven, so R-1's first act drives it in the engine.
+- ⭑ **2026-10-10 — R-1 built** (`DESIGN-the-stopped-unit-recovery.md` §8a; merged at `547a1cf8`). The floor-refusal stop now records a wait, and a person re-runs the review, re-runs the work, or abandons the unit; each re-run is a new plan and a new attempt. This entry's other five stops, and remedy 3, are R-2's and stay open.
 
 ### REG-F-512 — The executor's Pi loads `AGENTS.md`, `CLAUDE.md` and `.pi/` files from the Undertaking's shared workspace, so a file one unit writes becomes part of a later unit's system prompt, or code the server process runs, and no reviewer sees it
 
@@ -39187,6 +39200,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   1. On the execution plane, answer a finding the producer can fix (`WORK_PRODUCT_NOT_PARSEABLE`) with a repair turn, decided together with `REG-F-472`'s owed rule. Untested.
   2. When a host fact (trace, identity) fails, re-run the floor once before stopping. Untested.
   - Predicted red: a stub executor whose first work product has no brace pair and whose second has one, beside a stub review that passes, completes in two tries. At HEAD it stops after one.
+- ⭑ **2026-10-10 — the recovery inherits this gap** (P7-6R, `DESIGN-the-stopped-unit-recovery.md` §8a). When the review passed and another floor policy refused the work, a person may now re-run the work, but the re-run carries no findings, because the classifier lists none for `RESOLVE_OTHER_FLOOR_FINDINGS`. The producer is not told what the policy refused, and the page says the review gave no findings to carry. Remedy 1 here would serve both paths.
 
 ### REG-F-516 — Instantiation offers its conditional children to no one and cannot add a second instance of an M+ child, and a refused instantiation leaves an empty Undertaking and an approved Intent behind
 
@@ -39972,6 +39986,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - The register for *`findings":[]`*, *`empty findings`*, *`answers no criterion`* and *`answered no criterion`*: 0 lines each.
   - For *`findings array`*: 1 line, `REG-D-090`'s *"a reply with no findings array … INCONCLUSIVE today"*. It is the positive control, and the nearest entry: the same outcome, for a reply with no `findings` key at all.
 - ⭑ **2026-10-10 — the sponsor chose both remedies 1 and 2, with a condition on 2** (`REG-D-105` (2)). The prompt change must not push the reviewer to find a failure that is not there. So it asks for one row for each criterion, met or not, and says that a met criterion is recorded as met.
+- ⭑ **2026-10-10 — both remedies measured** (P1, `qr-2026-10-10-devin-glm-5-3-flash-max-v4`). In 76 answered calls, no reply was malformed and none needed a repair, of either kind. The earlier full re-run had 5 malformed replies in 52 (`REG-F-489`). The clean cases stayed SATISFIED, 24 of 24, as the sponsor's condition asked. But two planted defects were answered SATISFIED with the defect named only as residual uncertainty (`REG-F-555`); whether the new sentence caused that is untested.
 
 ### REG-D-105 — SPONSOR RULING: the reviewer-call limit raised to 200; both of REG-F-552's remedies, provided the prompt does not push for a failure; no re-review after a review that concluded against the work; and the paid run's choices made by a rule in its plan
 
@@ -39993,7 +40008,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-D-106 — DELEGATED (`REG-D-103` (2)): a reviewer reply with no locatable answer is kept whole, purgeable at expiry, narrowing `REG-D-056`'s "not separable stays blocked" to the execution plane
 
-**Decided 2026-10-10** (P7-6's builder, under the sponsor's approval of I2, *"keep its unparsed replies"* (`REG-D-103` (2); `DESIGN-the-reviewer-isolated.md` §2 I2); built in `bd4af566`). **Type:** DECISION — delegated, flagged for sponsor confirmation. **Status:** ⚠ **OPEN — in force on the reviewer's plane; sponsor confirmation owed.**
+**Decided 2026-10-10** (P7-6's builder, under the sponsor's approval of I2, *"keep its unparsed replies"* (`REG-D-103` (2); `DESIGN-the-reviewer-isolated.md` §2 I2); built in `bd4af566`). **Type:** DECISION — delegated, flagged for sponsor confirmation. **Status:** ~~⚠ **OPEN — in force on the reviewer's plane; sponsor confirmation owed.**~~ ✅ **CONFIRMED 2026-10-10 by the sponsor** — *"Confirm (Recommended)"* (`REG-D-107` (2)).
 
 - **WHAT IS DECIDED.** A reviewer reply in which no answer span can be located — prose, an empty reply, or a reply cut off — is stored whole, under the retention class `PURGEABLE_AT_EXPIRY`. The exchange's `rawOutputBeforeCoercionRef` points at it.
 - **WHAT IT NARROWS.** `REG-D-056`'s table keeps nothing of a non-separable reply (*"Not separable → PENDING, block"*, on Guide §9.7). That row now holds for the execution plane only.
@@ -40034,3 +40049,60 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - The register for lines holding both *`export`* and *`devin`*: 17 lines in 11 entries. None concerns an exit code.
   - The nearest are `REG-F-359`, where `devinPrint` deleted the export before its own helper could read it (the same lifetime class, on the normal path, closed), and `REG-F-529`, whose remedy reads usage from the export *"before the export is deleted"*.
   - Positive control: `REG-F-499`, devin's transport failures, which records thrown calls and not their exports.
+
+### REG-F-555 — After P7-6, the selected reviewer twice named a planted defect as residual uncertainty and answered SATISFIED: 2 of 56 planted evaluations, where its 162 earlier ones had none
+
+**Filed 2026-10-10** (P1, the re-qualification after P7-6, `qr-2026-10-10-devin-glm-5-3-flash-max-v4`, with its retry run). **Status:** ⚠ **OPEN — a material failure of the qualification, escalated here; its cause is untested.**
+
+- **WHAT HAPPENED.** Two planted-defect evaluations were answered SATISFIED, with the defect not faulted:
+  - **W-RR-03 #1.** The reviewer wrote, as residual uncertainty: *"The 300 kN pedestrian-load total rests on a central-20 m loading extent that is not among the supplied model inputs and is not declared as an assumption in the artifact or rationale."* Repetition 2 faulted the same defect as BLOCKING, under RR-06.
+  - **G3-RR-09 #2.** The reviewer marked RR-09 met, and wrote as residual uncertainty: *"The rationale argues completeness from type existence and connectivity alone"*, and that the permit step's check certificate has no producing node. Repetition 1 faulted both, as BLOCKING, under RR-06 and RR-09.
+- **WHY IT IS NEW.** Counted from `docs/tracking/reviewer-qualification/runs.ndjson`:
+  - Every earlier run of this reviewer rejected every planted defect it answered: 162 of 162. That includes W-RR-03 8 of 8 and G3-RR-09 6 of 6.
+  - P1 rejected 54 of 56, its retries included.
+  - Its clean cases were all SATISFIED, 24 of 24, and no reply was malformed.
+- **A POSSIBLE CAUSE, UNTESTED.** Both misses have the same shape: the defect was seen, then filed as a concern that leaves the criterion met. P7-6 changed two things the reviewer reads:
+  - **I6's sentence** ends *"A criterion that is met is recorded as met; do not look for a failure that is not there."* It was added at the sponsor's condition that the prompt must not push for a failure (`REG-D-105` (2)), and it may push a borderline fault into residual uncertainty.
+  - **I4's preamble** says to *"Judge only that text"*.
+  - D8's existing line already says a concern that leaves the criterion met goes to the residual uncertainty.
+  - With two repetitions per case, P1 cannot tell these apart, or tell them from chance.
+- **WHY IT MATTERS.** A false SATISFIED is the failure assurance exists to prevent. In the live run, P7-4's own checks against a false "Yes" stand behind the reviewer.
+- **REMEDY CANDIDATES, UNTESTED.**
+  1. Drop the sentence's last clause, keeping *"Give exactly one row in findings for each criterion listed above: failed=false where the criterion is met, failed=true where it is not."* and the line about an empty list. Then re-measure the planted cases.
+  2. Or say what makes a concern a failure: *"a concern that shows the criterion is not met is a failure, whatever you are unsure of"*. That needs the sponsor's view, since it pushes the other way.
+  - Either moves the reviewer fingerprint and owes a paid re-qualification.
+- **SEARCHED BEFORE FILING.** The register for lines holding both *`residual uncertainty`* and *`planted`*: 0. For *`PLANTED_DEFECT_NOT_REJECTED`*: 1 line, the entry that defines the predicate (`REG-D-082`), and none about a miss by this reviewer. Positive control: `REG-F-552`, this reviewer's other P7-6-era finding.
+
+### REG-D-107 — SPONSOR RULING: P2 approved after P1 — run the measured end-to-end run again, with recovery, now; and REG-D-106 confirmed
+
+**Ruled 2026-10-10** (sponsor, in session, answering the two questions sent with P1's result). **Type:** SPONSOR RULING. **Status:** ⚠ **OPEN — P2 is owed: the last fixes merged, the gate, a dry run, then the paid run and P7-4's checks; its result goes back to the sponsor.**
+
+- **THE SPONSOR'S WORDS, verbatim, each with the question:**
+  1. Asked *"P1, the re-qualification after the reviewer fix, is done (84 calls; 131 of 200 now spent). Clean cases 24/24 SATISFIED; planted defects 54/56 REJECTED; 0 malformed replies (was 5 of 52); 4 transport failures, all REJECTED on their one retry. The 2 misses are new: the reviewer saw the planted defect but filed it as residual uncertainty and answered SATISFIED (REG-F-555, cause untested). Run P2, the measured end-to-end run again with recovery (about 45-70 calls)?"*, the sponsor chose *"Run P2 now (Recommended)"*.
+  2. Asked *"REG-D-106 (delegated, needs your confirmation): a reviewer reply with no readable answer in it (prose, empty, cut off) is now kept whole, deletable at expiry, so a failed review can be read afterwards. This narrows REG-D-056's 'keep nothing' to the execution plane. Confirm?"*, the sponsor chose *"Confirm (Recommended)"*.
+- **WHAT (1) MEANS.**
+  - P2 runs with the reviewer as P1 qualified it. `REG-F-555`'s remedy is designed later.
+  - The run plan's recovery rule acts at each stop (`REG-D-105` (4)). The limit is 200 reviewer calls, and 131 are spent.
+  - P7-4's checks against a false "Yes" stand behind the reviewer.
+- **WHAT (2) MEANS.** `REG-D-106` is confirmed as built.
+
+### REG-F-556 — Under `gate:fast`'s parallel test step, tests on vitest's 5 s default time out though each passes in well under it alone: four files on 2026-10-10
+
+**Filed 2026-10-10** (P7-6 and P7-6R's gate runs). **Status:** ⚠ **OPEN — a load-sensitive gate, not a product defect on this evidence. Remedy 1 is applied with this entry cited: a 60 s budget for the whole of `workbench-harness-declaration.test.ts` and `workbench-durability.test.ts`, whose every test boots a workbench (a second test of the first timed out after one alone was budgeted), and for the one heavy test in each of the other two files. A recurrence elsewhere is its own observation.**
+
+- **WHAT HAPPENED.** In the full gate's `rph-demo` test step, these failed with *"Error: Test timed out in 5000ms."*:
+  - `workbench-durability.test.ts`, *"authored state written before a restart is readable after it"*;
+  - `workbench-harness-declaration.test.ts`, *"⭐⭐ a SERVER that also declares the harness gets BOTH …"* (three runs), and its *"⭑ CONTROL — both endpoints still work for the in-memory harness the gate runs on"* (two runs);
+  - `review-input.test.ts`, the reference workbench graph's test;
+  - `phase7-run-report.store.test.ts`, *"⛔ the archive is byte-identical afterwards …"* (132 ms alone).
+  - Each file passed when run alone. Some of these runs had another builder's gate running beside them; the record does not say which.
+- **WHY IT MATTERS.** A gate that goes red on load costs a re-run and trains its readers to dismiss red. That is the opposite of what a gate is for.
+- **REMEDY CANDIDATES, UNTESTED.**
+  1. Give tests that open a store or spawn a server an explicit timeout sized to their work, as the recovery tests were given.
+  2. Or run the store-heavy files in a pool of their own.
+  - Raising the global default would hide a real slowdown, and is not proposed.
+- **SEARCHED BEFORE FILING.**
+  - The register for *`Test timed out in 5000ms`*: 3 lines, in `REG-F-116`, `REG-F-136` and `REG-F-169`.
+  - For *`5000 ms`*: 7 lines, in `REG-F-162`, `REG-F-169`, `REG-F-173` and `REG-F-501`. For *`5 s default`*: 0.
+  - The nearest is `REG-F-169` (CLOSED): verif's filesystem censuses timed out on the same default under load. Its safe default applies here: *"treat 'failed under load, passes alone' as a diagnosis rather than a flake"*.
+  - `REG-F-173` gave the mutation runner's vitest a retry. The root vitest config sets `testTimeout: 60_000` (`vitest.config.ts:122`). Neither reaches `rph-demo`'s own test step, which these files run in.

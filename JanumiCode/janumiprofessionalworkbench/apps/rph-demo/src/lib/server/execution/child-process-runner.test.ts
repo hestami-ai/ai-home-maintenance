@@ -23,7 +23,7 @@
 // `retained: true` with a `stdoutPath` out of a workspace whose `directoryPath` was `undefined` — bytes in a Map
 // reported as the durable copy a purge can reach. A suite that never used the real adapter could not have
 // noticed. Both workspaces below are real directories now, and the construction guard REFUSES the in-memory one.
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
@@ -590,14 +590,39 @@ describe('⛔⛔ B2 / B3 — the outcome comes from the CHILD, and `run` always 
 		'const g=spawn(process.execPath,["-e","setTimeout(()=>{},60000)"],{cwd:require("node:os").tmpdir(),stdio:["ignore","inherit","inherit"],detached:true});' +
 		'g.unref();process.stdout.write(String(g.pid));process.exit(0);';
 
-	/** Whatever the child reported as the grandchild's pid, killed so nothing outlives the spec. */
+	/**
+	 * Whatever the child reported as the grandchild's pid, killed so nothing outlives the spec.
+	 * ⛔ `REG-F-452` — ONLY A POSITIVE INTEGER IS KILLED. The child prints nothing when its deadline kills it first, and
+	 * `Number('')` is 0: on Windows `process.kill(0, …)` ends the CALLING process, so this cleanup killed the vitest worker
+	 * running the file (driven 2026-10-10, under node and bun). A pid the child never printed has no grandchild to reap.
+	 */
 	function reap(pid: string): void {
+		const n = Number(pid.trim());
+		if (!Number.isInteger(n) || n <= 0) return;
 		try {
-			process.kill(Number(pid), 'SIGKILL');
+			process.kill(n, 'SIGKILL');
 		} catch {
 			// Already gone, or never started: the spec's cleanup is not a place to fail.
 		}
 	}
+
+	it('⛔ REG-F-452 — the reaper kills only a pid the child printed: an empty stdout is Number("") = 0, which Windows reads as THIS process', () => {
+		// ⭐ DRIVEN 2026-10-10: `process.kill(0, 'SIGKILL')` ended the calling process itself, under node and under bun
+		// alike, on this host (exit 1, nothing printed after it). Under a loaded gate the B2 arrangement's deadline can
+		// kill the child before it prints its grandchild's pid (`REG-F-452`), the stdout is empty, and the reaper killed
+		// the vitest worker running this file: four gate runs ended *"Worker exited unexpectedly"* with this file unrun.
+		// ⚠ `process.kill` IS REPLACED for the arrangement, so a reaper that still kills by 0 reddens this test instead of
+		// ending the worker that runs it.
+		const kill = vi.spyOn(process, 'kill').mockImplementation(() => true);
+		try {
+			for (const text of ['', '  ', '\n', '0', '-1', 'abc', '12.5']) reap(text);
+			expect(kill, 'a text that names no positive pid is killed by nothing').not.toHaveBeenCalled();
+			reap(' 4242\n');
+			expect(kill).toHaveBeenCalledWith(4242, 'SIGKILL');
+		} finally {
+			kill.mockRestore();
+		}
+	});
 
 	it('⛔⛔ B3 — a DESCENDANT HOLDING THE PIPES no longer costs the caller its outcome', async () => {
 		// ⛔ `run()` PRODUCING NO FACT AT ALL IS THE WORST OUTCOME THIS PORT CAN HAVE — its entire premise is that
@@ -641,15 +666,36 @@ describe('⛔⛔ B2 / B3 — the outcome comes from the CHILD, and `run` always 
 		// the capture then drains for a second, so a 500ms deadline is one that genuinely PASSES OVER AN EXITED
 		// CHILD — the condition the old code could not tell from a real timeout. The window is an order of
 		// magnitude wider than the startup it has to clear.
-		const out = await runner().run({ argv: node(HOLDS_THE_PIPES), cwd, timeoutMs: 500 });
-		expect(out.ran).toBe(true);
-		if (!out.ran) return;
-		reap(out.stdout);
+		// ⛔ `REG-F-452` — ~~a 500ms deadline~~ THE DEADLINE IS PLACED AFTER AN OBSERVED EXIT, NOT AN ASSUMED ONE. Under a
+		// loaded gate a node child took longer than 500ms to start, so the deadline passed over a child still RUNNING:
+		// `timedOut: true` was then the true observation, and the test reported it as the defect (exit `null`, not 0).
+		// So the deadline steps up, 500ms at a time, which is narrower than the 1000ms drain (`STREAM_DRAIN_GRACE_MS`), so
+		// no step can jump the window between the child's exit and the drain's end. The assertion is made only on the
+		// attempt whose OWN OUTCOME shows the arrangement held: exit 0, and settled at or after its deadline. ⛔ An
+		// attempt where it did not hold asserts nothing, and if none holds, the test fails saying so, never passes.
+		let out: Awaited<ReturnType<ReturnType<typeof runner>['run']>> | undefined;
+		const missed: string[] = [];
+		for (let timeoutMs = 500; timeoutMs <= 8_000; timeoutMs += 500) {
+			const attempt = await runner().run({ argv: node(HOLDS_THE_PIPES), cwd, timeoutMs });
+			expect(attempt.ran).toBe(true);
+			if (!attempt.ran) return;
+			reap(attempt.stdout);
+			if (attempt.exitCode === 0 && attempt.durationMs >= timeoutMs) {
+				out = attempt;
+				break;
+			}
+			missed.push(`${timeoutMs}ms: exit ${attempt.exitCode}, settled at ${attempt.durationMs}ms`);
+		}
+		expect(
+			out,
+			`the arrangement was never established, a deadline passing over an EXITED child: ${missed.join('; ')}`
+		).toBeDefined();
+		if (!out?.ran) return;
 		expect(out.exitCode).toBe(0);
 		expect(out.timedOut, 'a deadline that passes over an EXITED child is not a timeout').toBe(
 			false
 		);
-	});
+	}, 120_000);
 
 	it('⛔ and a child that outlives its deadline AND the kill is a REFUSAL, never silence and never a fake code', async () => {
 		// ⭐ THE LAST THING BETWEEN `run` AND A PROMISE THAT NEVER SETTLES. `SIGKILL` cannot be survived on either

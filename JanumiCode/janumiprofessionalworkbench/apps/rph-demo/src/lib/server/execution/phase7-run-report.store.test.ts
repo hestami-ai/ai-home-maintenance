@@ -680,13 +680,16 @@ describe('JAN-EXEC P7-2 D9 — the run report over stores the product wrote, rea
 		expect(report().problems).toEqual([]);
 	});
 
+	// ⚠ `REG-F-556` — AN EXPLICIT BUDGET, SIZED TO ITS WORK: it hashes every file of the run's archive. Under `gate:fast`'s parallel test step it timed
+	// out at vitest's 5 s default, and it passes alone (`REG-F-169`'s safe default: a failure under load that passes
+	// alone is a diagnosis). The global default is not raised.
 	it('⛔ the archive is byte-identical afterwards: the read-only open wrote nothing beside either store', () => {
 		expect(
 			Object.keys(ran.before).filter((f) => /-(wal|shm|journal)$/.test(f)),
 			'arrangement: the archive held no journal'
 		).toEqual([]);
 		expect(digestOf(FINAL)).toEqual(ran.before);
-	});
+	}, 60_000);
 
 	it('⭐ the workspace the report makes paths relative to is the one the product made', () => {
 		expect(workspaceDirectoryFor(DB, ran.undertakingId).split('/').join('\\')).toBe(

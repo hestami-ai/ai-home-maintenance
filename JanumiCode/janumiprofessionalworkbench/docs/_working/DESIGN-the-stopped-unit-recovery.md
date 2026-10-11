@@ -76,6 +76,8 @@ The floor already sorts a refusal into a problem with the review or a problem wi
 | **The review did not conclude**: INCONCLUSIVE, a validator failure, a transport failure, an empty findings list (`REG-F-552`) | offered | offered; the page says the review gave no findings to carry | offered |
 | **The review concluded against the work**: REJECTED, with findings | **not offered** (`REG-D-105` (3)) | offered, with the findings | offered |
 | **The review escalated** | **not offered** (`REG-D-105` (3)) | offered, with the subject findings; the escalation itself is never fed back (`REG-D-090`) | offered |
+| ⭑ *As built:* **the reviewer itself must change**: a substituted model, or a reviewer not independent of the producer | **not offered** | **not offered**: a re-run of the work is reviewed by the same reviewer | offered |
+| ⭑ *As built:* **a floor policy other than the review refused the work**, the review having passed | **not offered**: a re-review cannot change that policy's finding | offered; the review gave no findings to carry (`REG-F-515`) | offered |
 
 - **Why re-review is not offered after a concluded refusal.** The floor reads the latest assessment for each policy (`floor-gate.ts:280`). So a second review of the same work product, run until one says SATISFIED, would clear a refusal the first review reasoned out.
   - That is reviewer shopping. It contradicts ASR-12 in substance.
@@ -210,6 +212,36 @@ The route reader found that a re-review needs four things the floor took from me
 6. **R-1f: the live lane's rule** (pending §9 Q4).
 6a. **B7: `REG-F-433`'s join key** (RD10, corrected). It lands before any re-review is paid for. Its red is the entry's own: two floor runs on one subject, and the reader must return the second run's answer.
 7. **The gate and the mutation measurement as usual, then commit.**
+
+## 8a. As built (2026-10-10; B4 to B8, then three fix rounds)
+
+Built by one builder and four fixers, each diff reviewed adversarially; merged into `jan-exec/phase7c`. Where the build departs from RD1 to RD10, or adds to them:
+
+- **The chain is admitted** (R-1a). The engine admits RD5's batch from K1's state, as predicted. A Start on the superseded plan's step is refused (STA-8).
+- **RD3 has two more rows** (the table above).
+  - When the reviewer itself must change, neither re-run is offered: each would be reviewed by the same reviewer. A changed reviewer does not re-open the unit's re-runs; that is not built, and the page says so.
+  - A floor policy other than the review can refuse the work, the review having passed. Then a re-review is not offered. A re-run of the work carries no findings, because the floor's classifier lists none for that stop (`REG-F-515`).
+- **The wait.**
+  - It is recorded with a reason that names only the choices its stop offers.
+  - The server refuses a hand Resume or Cancel on a step awaiting a person's choice, and names the three acts. A hand Wait's step is resumed and cancelled as before.
+- **RD4's citation** is a fixed text per act, in `recovery-authority.ts`, after the person's words verbatim. It names the ruling that applies to that act and that stop, and says no policy object authorises the choice.
+- **RD5 departures.**
+  - The review step requests no runtime binding.
+  - A command's evidence carries the attempt key in its content reference, because EVIDENCE has no field for it.
+  - Only the refused reviews are re-run.
+- **RD10, B7: `REG-F-433`'s join key is built.**
+  - One floor-run token per floor run, on both planes.
+  - The run report pairs by it.
+  - The PWA reader joins to the assessment it displays, reads the calls from canonical, and names the try the run report names, or none.
+- **The paid lane's rule** (`REG-D-105` (4)).
+  - **How it chooses.** It reads which re-run to make off the row's own offers, then decides from the store what happened:
+    - **a new plan whose step waits again** → refused again → abandon;
+    - **no new plan** → the press was refused before anything ran → left as found, with the server's words recorded;
+    - **the unit not waiting** → left as found.
+  - **What it never does.** It never presses a control the row does not offer. A stop that offers no re-run is left as found.
+  - The limit is checked before each re-run.
+- **The spec's timeout** counts every phase and recovery act at its bound, plus the setup's allowance. The allowance is not a worst case, and the code says so.
+- **Not built in R-1:** R-2's five other stops, and the evidence join on every return path (`REG-F-511`).
 
 ## 8. How it fits with P7-6
 

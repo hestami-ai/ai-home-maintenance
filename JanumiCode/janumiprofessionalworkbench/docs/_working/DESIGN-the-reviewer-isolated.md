@@ -126,6 +126,44 @@ The sponsor chose *"Prompt + isolate, test first"*: keep devin and GLM, run the 
   - **Predicted red:** a test asserting the sentence in every framing the prompt is built in. The existing pins on D8's lines must stay green.
 - **Order.** I1, I2, I4, I5 and I6 land together. Then one re-qualification measures them all, and its result goes to the sponsor before the re-run.
 
+## 4e. As built (2026-10-10; B1 to B3, then two fix rounds)
+
+Built by two builders and two fixers, each diff reviewed adversarially; merged into `jan-exec/phase7c`. Where the build departs from §2 to §4d, or adds to them:
+
+- **The preamble's bytes are the replay's, 355 of them** (I4).
+  - The three lines are joined by line breaks, then a blank line, `---`, and one line break. The prompt starts on the next line.
+  - The first build ended with one line break too many. That was the lead's build note, not the measurement. The adversarial review compared the replay's own prompt files, and the fix makes the product write what the replay sent.
+  - **The deny config is written as the replay wrote it:** two-space-indented JSON with a closing line break, 150 bytes.
+- **I1.** devin runs in the adapter's own fresh folder, with the trust check off. The folder holds only the prompt and the deny config.
+- **The fingerprint hashes the preamble, for every candidate.** The fingerprint belongs to the tree, so agy's and ollama's fingerprints move too, though neither sends the preamble.
+  - A preamble-only change moves no recorded case prompt, so the check would accept re-stamps where a paid run is owed (`REG-F-553`). P7-6 does not hit this, because I6 moves every case prompt.
+- **I2: what is kept, and where.**
+  - A reply in which no answer span can be located is stored whole, purgeable at expiry (`REG-D-106`, which narrows `REG-D-056` for the reviewer's plane).
+  - A mixed reply, an answer with prose around it, stays reassemblable from its two stored spans.
+  - devin's export is stored, and its key is written into the record's tool-call observation, since `MODEL_EXCHANGE` has no field for it.
+  - The export is read only on devin's normal path (`REG-F-554`). A denied tool call exits 0, so it is kept.
+- **I5: the repair, and how it is recorded.**
+  - **A stable marker** opens every I5 record's detail: *"The reply answered no criterion (REG-F-552)."* The detail then states the true cause: no rows, rows naming no id, or rows naming ids the policy does not declare.
+  - **A repair that answers none again, does not parse, or gets no reply** leaves the first reply's judgement standing. Its record says so, and never that its own judgement is kept.
+  - **A repair served by a substituted model** is still refused (`JAN-SELREV` D6).
+  - **Qualification records the repair under its own role, `criterion-repair`.** Otherwise its prompt would be held to the JSON repair's hash and read as a changed prompt.
+- **I6.** The sentence stands on its own line after D8's four recommendation lines, before the output format. Between the rubric and the recommendation it would break D8's own layout pins, which stay green.
+- **The run report reads a kept reply,** and pairs an I5 chain by the marker: an answering repair concludes the review; otherwise the first reply does (fix round C).
+
+## 4f. P1, the re-qualification (2026-10-10, 84 paid calls)
+
+- **The run.** `qr-2026-10-10-devin-glm-5-3-flash-max-v4`, from the main checkout at `3ab448e1`, under fingerprint `368e9199…`: case set v4 in full, 40 cases, 2 repetitions each, 80 calls in 66 minutes.
+  - 4 calls failed at the transport, each devin exiting short of the 240 s bound (`REG-F-499`). Re-run once, as the qualification's §7.3 provides, under `…-v4-retry`, all four were REJECTED, the right verdict.
+- **The clean cases: 24 of 24 SATISFIED.** The sponsor's condition on I6 holds: the prompt did not push the reviewer to invent a failure.
+- **No reply was malformed, and none needed a repair,** of either kind. The earlier full re-run had 5 malformed replies in 52 (`REG-F-489`), and the measured run's live reviews had 2 that answered no criterion (`REG-F-552`).
+- **The planted defects: 54 of 56 REJECTED.**
+  - The two misses, W-RR-03 #1 and G3-RR-09 #2, were answered SATISFIED with the defect named only as residual uncertainty. Each case's other repetition was REJECTED.
+  - This reviewer's 162 earlier planted evaluations were all REJECTED. So this is new (`REG-F-555`).
+  - The cause is untested: I6's last clause, I4's preamble, or chance.
+- **`reviewer:qual:check` is GREEN.** Every case is covered under today's fingerprint, the record reproduces, and the six material failures are escalated (`REG-F-499` for the four transport failures, `REG-F-555` for the two misses).
+- **The sponsor approved P2 on this result** (`REG-D-107`). `REG-F-555`'s remedy is designed later.
+- **Spend:** 131 of the 200 reviewer calls.
+
 ## 5. What this does not do
 
 - ~~It does not change the reviewer's model, its prompt or its criteria.~~ It does not change the reviewer's model or its criteria. Its prompt gains I4's preamble (§4b, `REG-D-104`).

@@ -26,6 +26,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+// ⚠ `REG-F-556` — AN EXPLICIT BUDGET FOR THE WHOLE FILE, SIZED TO ITS WORK: every test here boots the workbench, as a server, a harness or both. Under `gate:fast`'s parallel test step two of them timed out at vitest's 5 s default (the server-and-harness case, and the in-memory CONTROL), and each passes
+// alone (`REG-F-169`'s safe default: a failure under load that passes alone is a diagnosis). The global default is not raised.
+vi.setConfig({ testTimeout: 60_000 });
+
 let container = '';
 
 function dbPath(): string {

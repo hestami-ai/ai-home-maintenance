@@ -305,6 +305,9 @@ function realizeLiteralGraph(engine: AuthedEngineHandle): void {
 }
 
 describe('JAN-CRITREAD J2-1 — the graph arm: graphReviewInput is what runPwaFloor builds', () => {
+	// ⚠ `REG-F-556` — AN EXPLICIT BUDGET, SIZED TO ITS WORK: it builds the reference graph and its prompt under every option set. Under `gate:fast`'s parallel test step it timed
+	// out at vitest's 5 s default, and it passes alone (`REG-F-169`'s safe default: a failure under load that passes
+	// alone is a diagnosis). The global default is not raised.
 	it('⭐ the REFERENCE workbench graph — the call site and the module agree, input and prompt, under every option set', async () => {
 		resetEngine('reference');
 		const session = getEngine().as(SESSION_CREDENTIAL);
@@ -321,7 +324,7 @@ describe('JAN-CRITREAD J2-1 — the graph arm: graphReviewInput is what runPwaFl
 			expectSameInput(module, production.input, `the call site — ${label}`);
 			expect(await materialize(module), `the materialized prompt — ${label}`).toBe(production.prompt);
 		}
-	});
+	}, 60_000);
 
 	it('⭐ a LITERAL graph put in an engine — the call site, the module and the pins agree', async () => {
 		resetEngine('empty');
