@@ -68,6 +68,7 @@ import {
 import { createExchangeSink } from '../apps/rph-demo/src/lib/server/assurance/exchange-capture.js';
 import { mintIdsFor, toRecordModelExchange } from '../apps/rph-demo/src/lib/server/assurance/exchange-recorder.js';
 import {
+	ALWAYS_STATED,
 	buildRunReport,
 	CELL_VALUES,
 	contentVerdict,
@@ -177,6 +178,12 @@ interface PhaseKnobs {
 	 * criterion left unanswered (`unanswered`); or with a verdict the answers do not give (`off-verdict`).
 	 */
 	readonly declared?: DeclaredKnob;
+	/**
+	 * ⭐ `E12F` F7 — ONE of the unit's declared policies DECLARES REQUIRED EVIDENCE, so its own evidence can CAP a verdict
+	 * below its answers (`supportedDisposition`): the policy, the verdict recorded, and whether its first criterion was
+	 * answered NOT_MET. ⚠ Name a policy no earlier unit declares: a policy object is put once, by the first unit to sign it off.
+	 */
+	readonly evidenced?: { readonly policyId: string; readonly recorded: string; readonly unmet?: boolean };
 }
 type DeclaredKnob = 'judged' | 'legacy' | 'unanswered' | 'off-verdict';
 /** ⭐ E2 — each catalog policy's criteria, as the product seeds them (`seedAdditivePolicies`). */
@@ -284,14 +291,28 @@ function aRun(
 	 * (`AssuranceCriterionEvaluated`), the verdict computed from them, completed under the declared reviewer, its evaluator's
 	 * invocation the review's token — or, `legacy`, as the pre-E2 sign-off recorded it: no criterion, its own validator.
 	 */
-	const declaredVerdict = (asm: string, policyId: string, unitId: string, how: DeclaredKnob) => {
+	const declaredVerdict = (
+		asm: string,
+		policyId: string,
+		unitId: string,
+		how: DeclaredKnob,
+		evidenced?: PhaseKnobs['evidenced']
+	) => {
 		if (how === 'legacy') return assess(asm, policyId, unitId, 'SATISFIED', DECLARED_SIGNOFF_VALIDATOR);
 		const criteria = POLICY_CRITERIA.get(policyId) ?? [];
-		if (!policiesPut.has(policyId)) put('ASSURANCE_POLICY', policyId, { criteria: criteria.map((c) => ({ id: c.id, severityIfNotMet: c.severityIfNotMet })) });
+		// ⭐ `E12F` F7 — the one policy the knob names declares required evidence, gating SATISFIED alone (its ceiling then
+		// CONDITIONALLY_SATISFIED), as four of the catalog's kinds' policies do.
+		const ev = evidenced?.policyId === policyId ? evidenced : undefined;
+		if (!policiesPut.has(policyId))
+			put('ASSURANCE_POLICY', policyId, {
+				criteria: criteria.map((c) => ({ id: c.id, severityIfNotMet: c.severityIfNotMet })),
+				...(ev ? { requiredEvidence: [{ requirementId: 'RE-1', requiredForDispositions: 'SATISFIED_ONLY', cardinality: 'ONE_OR_MORE' }] } : {})
+			});
 		policiesPut.add(policyId);
 		let state = 'SATISFIED';
 		if (how === 'unanswered') state = 'INCONCLUSIVE';
 		if (how === 'off-verdict') state = 'REJECTED';
+		if (ev) state = ev.recorded;
 		put('ASSURANCE_ASSESSMENT', asm, {
 			assurancePolicyId: policyId,
 			subjectObjectIds: [unitId],
@@ -303,13 +324,18 @@ function aRun(
 			emit('AssuranceCriterionEvaluated', asm, {
 				assessmentId: asm,
 				criterionId: c.id,
-				result: how === 'unanswered' && j === 0 ? 'UNABLE_TO_DETERMINE' : 'MET'
+				result: (how === 'unanswered' || ev?.unmet === true) && j === 0 ? (ev?.unmet ? 'NOT_MET' : 'UNABLE_TO_DETERMINE') : 'MET'
 			})
 		);
 		emit('AssuranceAssessmentCompleted', asm, { assessmentId: asm, validatorId: DECLARED_REVIEW_VALIDATORS[0] });
 	};
-	const signOff = (unitId: string, policyIds: readonly string[], how: DeclaredKnob = 'judged') => {
-		policyIds.forEach((p, i) => declaredVerdict(`asm_${unitId}_${i}`, p, unitId, how));
+	const signOff = (
+		unitId: string,
+		policyIds: readonly string[],
+		how: DeclaredKnob = 'judged',
+		evidenced?: PhaseKnobs['evidenced']
+	) => {
+		policyIds.forEach((p, i) => declaredVerdict(`asm_${unitId}_${i}`, p, unitId, how, evidenced));
 		assess(`asm_${unitId}_demo`, DEMO_POLICY_ID, unitId, 'SATISFIED', 'workbench.demo-signoff');
 		emit('PwuStateChanged', unitId, {
 			previousState: 'UNDER_ASSURANCE',
@@ -445,7 +471,7 @@ function aRun(
 				},
 				`ui-${++ui}`
 			);
-		if (k.signedOff ?? (unit?.lifecycle === 'SATISFIED')) signOff(id, spec.type.policyIds, k.declared);
+		if (k.signedOff ?? (unit?.lifecycle === 'SATISFIED')) signOff(id, spec.type.policyIds, k.declared, k.evidenced);
 		for (let i = 1; i <= (k.captures ?? k.commands ?? 0); i++) captures.push(`${spec.slug}-${i}`);
 		archives.push({
 			name: `${String(spec.order).padStart(2, '0')}-${spec.slug}`,
@@ -970,6 +996,31 @@ describe('⭐⭐ JAN-EXEC Phase 7 completion E2 — stage 5b read from the recor
 		const c = cellOf(r, '5b', 'implementation');
 		expect([c.value, c.registerIds, c.unregistered]).toEqual(['broke', [], true]);
 		expect(c.basis.join(' ')).toMatch(/pol_assumption_disclosure: recorded REJECTED, and its answers give SATISFIED/);
+	});
+
+	// ── ⛔ `E12F` F7 — A POLICY THAT DECLARES REQUIRED EVIDENCE: its ceiling may cap a verdict BELOW its answers, never above,
+	// and never to a REJECTED (`supportedDisposition` answers SATISFIED, CONDITIONALLY_SATISFIED or INCONCLUSIVE). ⛔ No case
+	// put required evidence on a policy, so `const capped = evidenced;` — any recorded verdict of such a policy read as
+	// following from its answers — survived.
+	it('⭐ E12F F7 — CONTROL: an evidenced policy capped BELOW its answers (CONDITIONALLY_SATISFIED over all met) is as intended', () => {
+		const r = reportOf(aRun({ design: { evidenced: { policyId: 'pol_architecture_coverage', recorded: 'CONDITIONALLY_SATISFIED' } } })).report;
+		const row = r.declaredVerdicts.rows.find((d) => d.unit === 'design' && d.policyId === 'pol_architecture_coverage')!;
+		expect([row.state, row.followsFromAnswers, row.value]).toEqual(['CONDITIONALLY_SATISFIED', true, 'as intended']);
+	});
+
+	it('⛔ E12F F7 — an evidenced policy recorded ABOVE its answers (SATISFIED over a BLOCKING criterion NOT MET) broke 5b: a ceiling only lowers', () => {
+		// ⛔ PREDICTED RED under `const capped = evidenced;`: as intended — the evidence read as excusing any verdict at all.
+		const r = reportOf(aRun({ design: { evidenced: { policyId: 'pol_architecture_coverage', recorded: 'SATISFIED', unmet: true } } })).report;
+		const row = r.declaredVerdicts.rows.find((d) => d.unit === 'design' && d.policyId === 'pol_architecture_coverage')!;
+		expect([row.state, row.followsFromAnswers, row.value]).toEqual(['SATISFIED', false, 'broke']);
+		expect(cellOf(r, '5b', 'design').basis.join(' ')).toMatch(/pol_architecture_coverage: recorded SATISFIED, and its answers give REJECTED/);
+	});
+
+	it('⛔ E12F F7 — an evidenced policy recorded REJECTED over answers that give SATISFIED broke 5b: no evidence ceiling rejects', () => {
+		// ⛔ PREDICTED RED, read from the code: as intended — `capped` admitted any recorded verdict stricter than the answers'.
+		const r = reportOf(aRun({ design: { evidenced: { policyId: 'pol_architecture_coverage', recorded: 'REJECTED' } } })).report;
+		const row = r.declaredVerdicts.rows.find((d) => d.unit === 'design' && d.policyId === 'pol_architecture_coverage')!;
+		expect([row.state, row.followsFromAnswers, row.value], 'a REJECTED read as an evidence cap').toEqual(['REJECTED', false, 'broke']);
 	});
 
 	it('⭑ CONTROL — a verdict the pre-E2 sign-off recorded is still read as it was: vacuous by construction (REG-F-523)', () => {
@@ -1504,6 +1555,23 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 		expect(md).toContain('REG-F-510: the PWA had to name its product');
 		// ⭐ E2 (design B8) — THE OPENING CAVEAT LOSES ITS `REG-F-523` LINE: the declared policies judge now.
 		expect(md).not.toContain('REG-F-523: the declared policies were signed off with no criterion checked.');
+	});
+
+	it('⛔ E12F F10 — the REG-F-523 caveat is KEPT for a run whose declared verdicts carry no criterion result (a pre-E2 archive), and counted for one that mixes them', () => {
+		// ⛔ PREDICTED RED, read from the code: E2 dropped the line for EVERY run, so a report over a pre-E2 archive — its 14
+		// declared verdicts signed off from required evidence alone — opened without the gap it most needs to state.
+		const legacy = { declared: 'legacy' } as const;
+		const pre = reportOf(
+			aRun({ requirements: legacy, design: legacy, implementation: legacy, 'end-to-end': legacy }, { rootDeclared: 'legacy' })
+		).report;
+		expect(pre.answer.alwaysStated).toEqual([...ALWAYS_STATED, 'REG-F-523: the declared policies were signed off with no criterion checked.']);
+		const mixed = reportOf(aRun({ 'end-to-end': legacy })).report;
+		expect(mixed.answer.alwaysStated).toEqual([
+			...ALWAYS_STATED,
+			'REG-F-523: 3 of 14 declared verdicts were signed off with no criterion checked.'
+		]);
+		// ⭑ CONTROL — every verdict judged, criterion by criterion: the line stays dropped.
+		expect(reportOf(aRun()).report.answer.alwaysStated).toEqual([...ALWAYS_STATED]);
 	});
 
 	it('⛔ a press that outlasted the allowance (D4) is read as cut there — never from its mid-unit archive as if it ended', () => {

@@ -135,13 +135,29 @@ export type CellValue = (typeof CELL_VALUES)[number];
 
 /**
  * ~~The two gaps no Phase 7 run can close, which a "Yes" always states (§1).~~ ⭐⭐ E2 (`DESIGN-phase-7-completion.md` B8,
- * §1) — THE GAP NO PHASE 7 RUN CAN CLOSE, which a "Yes" always states. ⛔ The `REG-F-523` line is gone: the declared policies
- * are judged now, criterion by criterion (`REG-D-110` (3)), and stage 5b says, per run, whether they were.
+ * §1) — THE GAP NO PHASE 7 RUN CAN CLOSE, which a "Yes" always states. ⛔ The `REG-F-523` line is gone ⭐ `E12F` F10: FROM
+ * WHAT IS ALWAYS STATED, and stated per run instead (`uncheckedCaveat`) — the declared policies are judged now, criterion by
+ * criterion (`REG-D-110` (3)), and stage 5b says, per run, whether they were; a run whose verdicts carry no criterion result
+ * (a pre-E2 archive) still opens with it.
  * ~~'REG-F-523: the declared policies were signed off with no criterion checked.'~~
  */
 export const ALWAYS_STATED = [
 	'REG-F-510: the PWA had to name its product, because an Undertaking cannot tell its phases what to build (§3.3).'
 ] as const;
+
+/**
+ * ⛔⛔ `E12F` F10 — ~~THE `REG-F-523` LINE IS GONE~~ FOR EVERY RUN: true of a run whose declared verdicts were judged, and false
+ * of one whose verdicts carry no criterion result — a pre-E2 archive, signed off from required evidence alone, or a verdict
+ * of a policy that declares no criterion. So the caveat is STATED PER RUN, from its declared verdicts: the line whole when
+ * none of them carries a criterion result, counted when some do not, and absent when every one does (or none was recorded).
+ */
+export function uncheckedCaveat(declared: readonly { readonly criterionResults: number }[]): readonly string[] {
+	const unchecked = declared.filter((d) => d.criterionResults === 0).length;
+	if (unchecked === 0) return [];
+	if (unchecked === declared.length)
+		return ['REG-F-523: the declared policies were signed off with no criterion checked.'];
+	return [`REG-F-523: ${unchecked} of ${declared.length} declared verdicts were signed off with no criterion checked.`];
+}
 
 /** The classifications a person gives each adjudication row (P7-4f). This report leaves the field blank. */
 export const ADJUDICATION_CLASSES = [
@@ -2193,6 +2209,11 @@ function stageSevenWhole(views: readonly UnitView[]): MatrixCell {
 const ANSWERED = new Set(['MET', 'NOT_MET', 'PARTIALLY_MET', 'NOT_APPLICABLE']);
 /** §28.2's ladder, strictest first — how two verdicts are compared. */
 const STRICTEST_FIRST = ['REJECTED', 'INCONCLUSIVE', 'CONDITIONALLY_SATISFIED', 'SATISFIED'];
+/**
+ * ⭐ `E12F` F7 — the verdicts a policy's own evidence can CAP a verdict to (`supportedDisposition`'s two answers short of
+ * SATISFIED, `declared-policy-signoff.ts`): never REJECTED, which only answers can reach.
+ */
+const EVIDENCE_CEILINGS: ReadonlySet<string> = new Set(['CONDITIONALLY_SATISFIED', 'INCONCLUSIVE']);
 
 /**
  * ⭐⭐ E2 (design B8) — WHETHER A DECLARED VERDICT IS THE ONE ITS ANSWERS GIVE, and why: the kernel's ladder
@@ -2235,9 +2256,12 @@ function judgedVerdict(ix: Index, a: StoredObject): Omit<DeclaredVerdict, 'asses
 		}))
 	});
 	const evidenced = Array.isArray(policyState.requiredEvidence) && policyState.requiredEvidence.length > 0;
+	// ⛔ `E12F` F7 — A CAP IS A CEILING'S VALUE: `supportedDisposition` answers SATISFIED, CONDITIONALLY_SATISFIED or
+	// INCONCLUSIVE, so a verdict below its answers follows from them only as one of the two a ceiling can impose. ⛔ Any
+	// stricter verdict was read as capped, a REJECTED over answers that give SATISFIED among them — and no ceiling rejects.
 	const capped =
 		evidenced &&
-		STRICTEST_FIRST.indexOf(state) >= 0 &&
+		EVIDENCE_CEILINGS.has(state) &&
 		STRICTEST_FIRST.indexOf(state) < STRICTEST_FIRST.indexOf(given);
 	const followsFromAnswers = declared.length > 0 && (state === given || capped);
 	const unanswered = declared.filter((c) => !ANSWERED.has(latest.get(c.id)?.result ?? ''));
@@ -2482,7 +2506,8 @@ export function buildRunReport(
 			contentRows: store.content === null ? null : store.content.length
 		},
 		answer: {
-			alwaysStated: ALWAYS_STATED,
+			// ⭐ `E12F` F10 — and the `REG-F-523` line where this run's declared verdicts carry no criterion result.
+			alwaysStated: [...ALWAYS_STATED, ...uncheckedCaveat(declared)],
 			counts: cellCounts,
 			open: matrix.filter((c) => c.value === null).length,
 			measured: cellCounts['as intended'] + cellCounts.broke,
