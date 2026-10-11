@@ -1151,7 +1151,7 @@ interface UnitWork {
 	readonly answer?: string;
 	readonly rationale?: ProfessionalRationaleSummary;
 	readonly commands: readonly DeclaredReviewCommand[];
-	/** ⭐ `REG-F-514` — WHO DID THE WORK, as its completion records it, its attempt as its invocation. */
+	/** ⭐ `REG-F-514` — WHO DID THIS UNIT'S OWN WORK, as its completion records it, its attempt as its invocation. */
 	readonly executedBy?: ActorReference;
 }
 
@@ -1257,7 +1257,12 @@ interface DeclaredReviewWork {
 	readonly workProducts: readonly { readonly unit: string; readonly answer: string }[];
 	readonly commands: readonly DeclaredReviewCommand[];
 	readonly rationale?: ProfessionalRationaleSummary;
-	/** ⭐ `REG-F-514` — the producer the verdicts check independence against: the unit's executor, else the operator. */
+	/**
+	 * ⭐ `REG-F-514` — the producer the verdicts check independence against: the unit's OWN executor, else the operator.
+	 * ⛔ `E12F` F9 — WHO DID THE JUDGED WORK FOR A PHASE ONLY: a unit composed of others is judged over its children's work,
+	 * and its producer is still its own — the operator who ran its TRANSFORMATION — so its verdicts check independence
+	 * against the operator, never against the agents whose work they judged.
+	 */
 	readonly producer: ActorReference;
 }
 
@@ -1265,7 +1270,9 @@ interface DeclaredReviewWork {
  * ⭐⭐ E2 — THE WORK A UNIT'S DECLARED POLICIES ARE JUDGED OVER (`R18`; design B1, B6). A unit with children is judged over
  * ITS CHILDREN's work products and commands, the end-to-end phase's evidence among them (`REG-D-111` (2), DEC-6): its own
  * TRANSFORMATION produces nothing. ⚠ A child with no work product contributes its commands only; the root's instruction is
- * its own purpose, and no single account is shown for many children's work.
+ * its own purpose, and no single account is shown for many children's work. ⛔ `E12F` F9 — AND ITS PRODUCER IS ITS OWN
+ * executor (the operator, for the root), not its children's: independence is checked against who did the judged work for
+ * a phase only.
  */
 async function declaredReviewWorkOf(
 	pwuId: string,
@@ -2695,7 +2702,9 @@ export const actions: Actions = {
 		// identity off the SAME authenticated session… `producer` is the operator~~ each governing declared policy is
 		// REVIEWED, one review per policy, by the reviewer the floor's own selector selects, over the unit's work product and
 		// commands (its children's, for a unit composed of others); each criterion is recorded, and the verdict is computed
-		// from the answers. The evaluator recorded is WHO JUDGED; the producer is WHO DID THE WORK (`REG-F-514`).
+		// from the answers. The evaluator recorded is WHO JUDGED; the producer is ~~WHO DID THE WORK~~ the unit's OWN executor
+		// (`REG-F-514`) — ⛔ `E12F` F9: who did the judged work for a phase only; for the root it is the operator, while the
+		// work judged is its children's (`declaredReviewWorkOf`).
 		const engine = getEngine();
 		// READ, not assumed. `REG-F-109` says a PWU's semanticVersion cannot move, which makes the literal `1`
 		// this surface uses elsewhere correct today — but the guard that reads it (`declaredPolicyVerdicts`)
@@ -2810,11 +2819,14 @@ export const actions: Actions = {
 			// verdict is refused by `RPH-PWU-007` — correctly — and would have left the operator unable to
 			// record the state their assurance genuinely reached.
 			// ⭐ E2 — THE FOLD CAN NOW BE AGAINST THE WORK, and each arm says what it is:
-			//   · REJECTED (`REG-D-111` (1)) — canon's route: the blocking findings are recorded above, and the unit's assurance
-			//     axis is REJECTED, citing the REJECTED verdicts and those findings. ⚠ Its lifecycle stays UNDER_ASSURANCE:
-			//     `UNDER_ASSURANCE → REJECTED` on the work axis is a governance act (an EFFECTIVE REJECTION Decision,
-			//     `resolveRejectAuthorization`), and its recovery — *"Replacement PWU created → SUPERSEDED"* — is NOT BUILT
-			//     (reported: in the paid run a declared refusal is reported, not recovered).
+			//   · REJECTED (`REG-D-111` (1)) — ~~canon's route~~ ⛔ `E12F` F8: THE FIRST HALF OF CANON'S ROUTE, AND A DEPARTURE FROM
+			//     ITS SECOND. The blocking findings are recorded above, and the unit's ASSURANCE axis is REJECTED, citing the
+			//     REJECTED verdicts and those findings; canon's route goes on `UNDER_ASSURANCE → REJECTED` on the work LIFECYCLE,
+			//     and this does not: the unit's lifecycle STAYS `UNDER_ASSURANCE`. Kept on purpose, because that hop is a
+			//     governance act (an EFFECTIVE REJECTION Decision, `resolveRejectAuthorization`) a reviewer's verdict does not
+			//     make, and its recovery — *"Replacement PWU created → SUPERSEDED"* — is NOT BUILT (reported: in the paid run a
+			//     declared refusal is reported, not recovered). The person may still reject the unit, citing the blocking
+			//     finding (the row's Reject). ⚠ The departure is the lead's to record in the register.
 			//   · INCONCLUSIVE — no hop: it is not a value of the unit's assurance axis (`pwu.ts`), so the unit stays ASSESSING
 			//     with the verdicts recorded; nothing here recovers it (reported).
 			...declaredHop(pwuId, folded, [assessmentId, ...review.assessmentIds], review)
@@ -2830,7 +2842,7 @@ export const actions: Actions = {
 					against.map((u) => `${u.policyId} reached ${u.disposition}`).join('; ') +
 					`. The verdicts are computed from the reviewer's criterion answers (REG-D-110 (3)); ` +
 					(folded === 'REJECTED'
-						? `a REJECTED verdict is recorded with its blocking findings, and this PWU's assurance is REJECTED (REG-D-111 (1)).`
+						? `a REJECTED verdict is recorded with its blocking findings, and this PWU's assurance is REJECTED (REG-D-111 (1)); its work lifecycle stays under assurance.`
 						: `a verdict that did not conclude leaves this PWU under assessment.`)
 			});
 		return { advanced: 'assured' };

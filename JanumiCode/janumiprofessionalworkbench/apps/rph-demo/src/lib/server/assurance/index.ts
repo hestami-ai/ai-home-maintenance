@@ -134,9 +134,11 @@ export function createFloorRegistry(opts: {
  *   · STAND_IN (test mode, no tool named) — the declared stand-in, answering only where a test registered a
  *     `DECLARED_POLICY` stipulation for the unit's PWA (`declared-policy-review.ts`).
  *   · REFUSED — a reviewer that runs nothing and answers every review with the refusal: recorded, never thrown.
- *   · DEVIN / AGY — the product's own reasoning-review validator: THE INSTANCE `createFloorRegistry` builds (the same
- *     transport, the same capture, the same `requireReportedModel` on the devin branch, so its retry bound is devin's),
- *     run in the `DECLARED_POLICY` framing. ⭑ One review per (unit, policy) pair is one evaluation of this validator.
+ *   · DEVIN / AGY — the product's own reasoning-review validator, ~~THE INSTANCE `createFloorRegistry` builds~~ ⛔ `E12F`
+ *     F10: AN INSTANCE BUILT BY `createFloorRegistry`, the floor's own construction, called afresh here with this review's
+ *     options — never the floor's instance, which this function does not see (the same transport, the same capture wiring,
+ *     the same `requireReportedModel` on the devin branch, so its retry bound is devin's), run in the `DECLARED_POLICY`
+ *     framing. ⭑ One review per (unit, policy) pair is one evaluation of this validator.
  * ⚠ THE SAME OPTIONS AS `createFloorRegistry`'s, AND ITS RULE FOR THEM: an injected `print` wins over the configured tool
  * (the seam the gate exercises the wiring through), and never over a refused configuration.
  */
@@ -149,9 +151,12 @@ export function createDeclaredPolicyReviewer(opts: {
 	clock?: () => string;
 	stipulations?: DeclaredStipulationLookup;
 }): DeclaredPolicyReviewer {
-	// ⭐ THE FLOOR'S OWN REVIEWER INSTANCE, NOT A SECOND CONSTRUCTION OF IT: the registry builds it — its transport, its
-	// capture, devin's `requireReportedModel` and so its retry bound — and the declared review runs that very validator in
-	// the `DECLARED_POLICY` framing. ⛔ A second copy of the construction would be a second thing to keep in step.
+	// ⭐ ~~THE FLOOR'S OWN REVIEWER INSTANCE~~ ⛔ `E12F` F10: THE FLOOR'S OWN CONSTRUCTION, NOT A SECOND COPY OF IT. This builds
+	// a registry of its own (`createFloorRegistry`, with this review's options and its own exchange sink) and takes its
+	// reasoning-review validator — a NEW instance, built exactly as the floor's is: its transport, its capture, devin's
+	// `requireReportedModel` and so its retry bound — and runs it in the `DECLARED_POLICY` framing. It is not the instance
+	// a floor run evaluates with: nothing is shared between them but the code that builds both. ⛔ A second copy of the
+	// construction would be a second thing to keep in step.
 	const { stipulations, ...registryOpts } = opts;
 	const validator = createFloorRegistry(registryOpts).get(FLOOR_POLICY_IDS.REASONING_REVIEW)!;
 	if (validator.validatorId === STANDIN_VALIDATOR_ID)

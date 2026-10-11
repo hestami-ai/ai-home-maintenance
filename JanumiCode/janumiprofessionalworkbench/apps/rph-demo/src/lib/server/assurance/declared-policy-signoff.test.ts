@@ -39,6 +39,7 @@ import {
 import {
 	evidenceRefusals,
 	governingDeclaredPolicies,
+	noCriterionDeclared,
 	planDeclaredSignoff,
 	unsatisfyingReviews
 } from './declared-policy-signoff.js';
@@ -466,6 +467,27 @@ describe('⭐ planDeclaredSignoff — one assessment per governing DECLARED poli
 	it('⛔ E2 — a governing policy NOBODY reviewed is INCONCLUSIVE, never a pass', () => {
 		const p = plan(PWU, { answers: new Map([[POL_INVOC, answered(POL_INVOC)]]) });
 		expect(p.dispositions).toEqual(['INCONCLUSIVE', 'SATISFIED']);
+	});
+
+	it('⛔ E12F F6 — a governing policy that declares NO criterion is INCONCLUSIVE, and the record says why: nothing was checked, whatever the reviewer recommended', () => {
+		// ⛔ PREDICTED RED, read from the code: SATISFIED — `dispositionFromFindings` over no row and no finding passes, so a
+		// policy with an empty rubric was signed off with nothing checked, `REG-F-523`'s shape one policy down.
+		const POL_EMPTY = 'pol_01ARZ3NDEKTSV4RRFFQ69GS190';
+		const TYPE_EMPTY = 'pwt_01ARZ3NDEKTSV4RRFFQ69GS1A0';
+		const PWU_EMPTY = 'pwu_01ARZ3NDEKTSV4RRFFQ69GS1B0';
+		policy(POL_EMPTY, 'No criteria', 'DIFFERENT_AGENT', [], true, []);
+		definePwuType(TYPE_EMPTY, [POL_EMPTY]);
+		proposePwu(PWU_EMPTY, TYPE_EMPTY);
+		const p = plan(PWU_EMPTY, { answers: new Map([[POL_EMPTY, answered(POL_EMPTY, {}, {}, [])]]) });
+		expect(p.dispositions, 'a policy with no criterion checks nothing').toEqual(['INCONCLUSIVE']);
+		expect(p.criterionResults).toBe(0);
+		const complete = p.steps.find(([t]) => t === 'CompleteAssuranceAssessment')!;
+		expect((complete[3] as { validatorResult: { residualUncertainty: string[] } }).validatorResult.residualUncertainty).toContain(
+			noCriterionDeclared(POL_EMPTY)
+		);
+		expect(runReview(p.steps as readonly [string, string, string, unknown][]).ok).toBe(true);
+		expect(stateOf(p.assessmentIds[0]!)?.assessmentState).toBe('INCONCLUSIVE');
+		expect(unsatisfyingReviews(p)).toEqual([{ policyId: POL_EMPTY, disposition: 'INCONCLUSIVE' }]);
 	});
 
 	it('⭐ E2 — a stipulated row counts as met in an engine built to admit it, and only there (REG-D-071 Q5 (a))', () => {

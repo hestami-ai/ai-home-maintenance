@@ -11,7 +11,9 @@
 //     computed from the policy's required evidence alone (`supportedDisposition`; `REG-F-523`).
 //   · ⭐ NOW: one review per declared policy, its calls recorded on the ASSURANCE plane under the policy; one criterion
 //     result per criterion; the verdict computed from the answers — REJECTED, recorded with its blocking finding, the
-//     unit's assurance REJECTED (canon's route, `REG-D-111` (1)) — and the operator told, the action a failure.
+//     unit's ASSURANCE axis REJECTED (~~canon's route~~ the first half of canon's route, `REG-D-111` (1); ⚠ `E12F` F8: its
+//     lifecycle stays UNDER_ASSURANCE, a departure from canon's `UNDER_ASSURANCE → REJECTED`) — and the operator told, the
+//     action a failure.
 //
 // ⛔ HERMETIC. devin's exec seam starts nothing; PATH finds no program.
 import { vi } from 'vitest';
@@ -221,7 +223,8 @@ describe('⭐⭐ E2 — Record Assurance reviews each declared policy, and recor
 			['RC-06', 'MET']
 		]);
 		expect(d.findings.map((f) => [f.findingCode, f.severity])).toEqual([['RC-01', 'BLOCKING']]);
-		// ⭐ `REG-D-111` (1) — CANON'S ROUTE: the unit's assurance is REJECTED; its lifecycle stays under assurance.
+		// ⭐ `REG-D-111` (1) — ~~CANON'S ROUTE~~ ITS FIRST HALF: the unit's assurance is REJECTED; ⚠ `E12F` F8: its lifecycle
+		// stays under assurance — a departure from canon's `UNDER_ASSURANCE → REJECTED`, kept (the route says why).
 		const unit = getObject(getEngine(), pwuId) as { workLifecycleState?: string; assuranceState?: string };
 		expect([unit.workLifecycleState, unit.assuranceState]).toEqual(['UNDER_ASSURANCE', 'REJECTED']);
 		// ⭐ WHO JUDGED, and the call it made: devin, its model, the review's invocation the token its call was recorded under.
@@ -231,7 +234,8 @@ describe('⭐⭐ E2 — Record Assurance reviews each declared policy, and recor
 			.map((x) => x.state as { plane?: string; assurancePolicyId?: string; runToken?: string })
 			.filter((x) => x.assurancePolicyId === POLICY);
 		expect(calls.map((x) => [x.plane, x.runToken])).toEqual([['ASSURANCE', evaluator.executionInstanceId]]);
-		// ⭐ `REG-F-514` — the producer is the model that did the work, never the operator.
+		// ⭐ `REG-F-514` — the producer is the model that did the work, never the operator (a unit that did its own work;
+		// ⚠ `E12F` F9: a unit composed of others records its own executor, the operator).
 		expect((d.assessments[0]!.producer as { actorId?: string }).actorId).toMatch(/^model:/);
 	});
 

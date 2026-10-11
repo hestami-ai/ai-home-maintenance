@@ -48,12 +48,19 @@
 //     `UNABLE_TO_DETERMINE` where it gave none, a test's stipulation beside it where the stand-in stipulated (design B2).
 //     ⭑ Every criterion is recorded, so the record never stands on a criterion nobody recorded (`RPH-CON-005`'s question).
 //   · EACH FAILED CRITERION AN OPEN FINDING, at the POLICY's declared severity (`R25`) — a BLOCKING one is canon's
-//     *"blocking finding"* (`REG-D-111` (1)).
+//     *"blocking finding"* (`REG-D-111` (1)). ⚠ `E12F` F8 — THAT IS THE FIRST HALF OF CANON'S ROUTE, AND ONLY IT: canon's route
+//     goes on `UNDER_ASSURANCE → REJECTED` on the work LIFECYCLE, and this sign-off does not take that hop. A REJECTED
+//     verdict moves the unit's ASSURANCE axis to REJECTED, and its lifecycle STAYS `UNDER_ASSURANCE` — a departure from
+//     `REG-D-111` (1) as the design wrote it (B3), kept on purpose (the route says why) and the lead's to record.
 //   · ⭐ THE VERDICT FROM THE ANSWERS: `dispositionFromFindings` over those rows and findings (design B2), never the
 //     reviewer's recommendation — so REJECTED and CONDITIONALLY_SATISFIED are reachable — and never past what the policy's
 //     own evidence supports (`supportedDisposition`, kept as the CEILING it always was).
 //   · ⭐ THE EVALUATOR IS WHO JUDGED: the reviewer's actual identity, the review's invocation beside it; ⭐ AND THE PRODUCER
-//     IS WHO DID THE WORK — the unit's executor where the record holds it (`REG-F-514`), handed in by the route.
+//     IS THE UNIT'S OWN EXECUTOR where the record holds it (`REG-F-514`), handed in by the route. ⛔ `E12F` F9 — ~~IS WHO DID
+//     THE WORK~~: that holds for a unit that did its own work (a phase) and for no other. A unit composed of others (the
+//     root) is judged over its CHILDREN's work (`REG-D-111` (2)), yet its producer is ITS OWN executor — the operator, who
+//     ran its TRANSFORMATION — so its independence is checked against the operator, never against the agents whose work
+//     the review judged. Each child's own verdicts checked those; the root's do not.
 //   · ⭐ A POLICY DEMANDING A HUMAN (`pol_fitness_for_purpose`) is recorded as the OPERATOR's decision, as a HUMAN actor,
 //     each criterion result citing the reviewer's answer — the reviewer's answers are its evidence (`REG-D-111` (3)); its
 //     commands are the operator's to issue (`humanSteps`).
@@ -74,8 +81,10 @@ import type { DeclaredPolicyAnswer } from './declared-policy-review.js';
  * act by a different route — a reviewer that could reject here would collapse the two.~~
  * ⭐ E2 (design B2, B3; `REG-D-111` (1)) — AND REJECTED: a verdict computed from criterion answers can be against the work,
  * and a paid review's verdict is RECORDED (PER-9), never refused before dispatch. ⛔ `recordBlockingFinding` stays the
- * OPERATOR's adverse act; this is the reviewer's, reached through the same canon route — a blocking finding, then the
- * unit's assurance REJECTED.
+ * OPERATOR's adverse act; this is the reviewer's, ~~reached through the same canon route~~ — a blocking finding, then the
+ * unit's ASSURANCE axis REJECTED. ⚠ `E12F` F8 — NOT CANON'S WHOLE ROUTE: canon's ends `UNDER_ASSURANCE → REJECTED` on the
+ * work lifecycle, and the unit's lifecycle here stays `UNDER_ASSURANCE` (a departure from `REG-D-111` (1); the header says
+ * why it is kept).
  */
 export type AssessmentDisposition = 'SATISFIED' | 'CONDITIONALLY_SATISFIED' | 'INCONCLUSIVE' | 'REJECTED';
 
@@ -295,6 +304,10 @@ function rowsOf(policy: GoverningDeclaredPolicy, answer: DeclaredPolicyAnswer): 
  * ⭐⭐ E2 (design B2) — THE VERDICT, COMPUTED FROM THE ANSWERS: `dispositionFromFindings` over the recorded rows and the open
  * findings, never the reviewer's recommendation, and never past the policy's own evidence (its ceiling).
  *   · ⛔ A review that produced no answer is INCONCLUSIVE — nothing was judged.
+ *   · ⛔ `E12F` F6 — AND SO IS A POLICY THAT DECLARES NO CRITERION, its list empty or absent (`governingDeclaredPolicies`
+ *     reads an absent list as empty): `dispositionFromFindings` over no row and no finding answers SATISFIED, so such a
+ *     policy was signed off with nothing checked — `REG-F-523`'s shape, one policy down. The record says why
+ *     (`noCriterionDeclared`, beside the verdict).
  *   · ⭑ IN AN ENGINE BUILT TO ADMIT THEM — never durable, by the `Engine`'s own refusal — a row recorded
  *     `UNABLE_TO_DETERMINE` with `stipulated: 'MET'` beside it counts as met, as the floor's ladder counts one
  *     (`REG-D-071` Q5 (a)); the engine's Gate E reads the same rows the same way, so the verdict and the gate agree.
@@ -306,6 +319,7 @@ function verdictOf(
 	admitStipulatedAnswers: boolean
 ): AssessmentDisposition {
 	if (answer.failure !== undefined) return 'INCONCLUSIVE';
+	if (policy.criteria.length === 0) return 'INCONCLUSIVE';
 	const counted = rows.map((c) =>
 		admitStipulatedAnswers && c.outcome === 'UNABLE_TO_DETERMINE' && c.stipulated === 'MET'
 			? { ...c, outcome: 'MET' as const }
@@ -345,6 +359,13 @@ function citedRationale(reviewer: ActorReference, row: FloorCriterion): string {
 	return `The reviewer ${reviewer.displayName ?? reviewer.actorId} answered ${row.outcome}${said}`;
 }
 
+/**
+ * ⛔ `E12F` F6 — WHAT THE RECORD SAYS BESIDE THE VERDICT OF A POLICY THAT DECLARES NO CRITERION: nothing was checked, so the
+ * verdict is INCONCLUSIVE whatever the reviewer recommended (`verdictOf`).
+ */
+export const noCriterionDeclared = (policyId: string): string =>
+	`${policyId} declares no criterion, so nothing was checked: its verdict is INCONCLUSIVE, never SATISFIED.`;
+
 /** ⭐ E2 — what a governing policy that was never reviewed is answered with: nothing, and why. ⛔ Never a pass. */
 const unreviewed = (policyId: string): DeclaredPolicyAnswer => ({
 	policyId,
@@ -377,8 +398,10 @@ export function planDeclaredSignoff(opts: {
 	readonly operator: ActorReference;
 	/**
 	 * The party that produced the work. Supplied so independence is CHECKED, not skipped. ⭐ E2 (`REG-F-514`): the unit's
-	 * EXECUTOR where the record holds one — the model, its attempt as its invocation — and the operator only where the
-	 * operator did the work; the route reads it from the record.
+	 * EXECUTOR where the record holds one — the model, its attempt as its invocation — ~~and the operator only where the
+	 * operator did the work~~ and the operator otherwise; the route reads it from the record. ⛔ `E12F` F9 — the unit's OWN
+	 * executor, which is who did the judged work for a phase only: for a unit composed of others (the root) it is the
+	 * operator who ran its TRANSFORMATION, while the work judged is its children's (header).
 	 */
 	readonly producer: ActorReference;
 	/** ⭐ E2 — each governing policy's review, as its reviewer answered it: one per policy (`REG-D-110` (3)). */
@@ -478,6 +501,8 @@ export function planDeclaredSignoff(opts: {
 		const noted = [
 			...answer.residualUncertainty,
 			...answer.limitations,
+			// ⛔ `E12F` F6 — a policy with no criterion: why its verdict is INCONCLUSIVE.
+			...(policy.criteria.length === 0 ? [noCriterionDeclared(policyId)] : []),
 			...(answer.recommendation === disposition
 				? []
 				: [
@@ -527,7 +552,8 @@ export function planDeclaredSignoff(opts: {
 				// ⛔ THE PARTY THAT DID THE WORK, NOT THE REVIEWER, AND THIS FIELD IS THE WHOLE POINT OF THE PHASE. Supplying it
 				// is what makes the §39 invariant-8 check RUN: `completeAssuranceAssessment` skips independence
 				// when either operand is absent, so omitting the producer would buy a green by removing the
-				// question rather than answering it.
+				// question rather than answering it. ⚠ `E12F` F9 — for a unit composed of others, the party that ran ITS
+				// transformation (the operator), not the agents whose work the review judged (the header).
 				producer
 			}
 		]);

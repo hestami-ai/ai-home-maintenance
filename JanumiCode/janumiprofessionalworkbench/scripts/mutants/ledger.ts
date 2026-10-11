@@ -27088,5 +27088,14 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["packages/rph-application/src/handlers/stipulated-answer-gate.test.ts"],
 		why: "PROMISE (E2): only a WORK UNIT declares a policy; a subject that is not one declares nothing, so Gate E's widened admission never reaches it. WHO RELIES: every engine built to admit stipulations, whose assessments over other objects keep REG-D-071 Q5 (a)'s refusal. WHAT THE MUTATION DOES: an assessment over any object that is not a work unit is admitted on answers nobody gave. OBSERVED (bun run mutants -- (the E2 Gate E ids), 2026-10-11, in the builder's worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M31-gate-e-admits-any-subject  ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 7 completion E2 - the gate's coverage floor (FLOOR_REGRESSED on assurance.ts): Gate E's declared-policy reading (subjectDeclares) loses its unreachable arms and its two reachable ones are driven - a policy the unit's TYPE requires, and a subject that is not a work unit (REG-F-523; REG-D-110 (3))"
+	},
+	{
+		id: "E12-M32-a-policy-with-no-criterion-passes",
+		file: "apps/rph-demo/src/lib/server/assurance/declared-policy-signoff.ts",
+		find: "if (policy.criteria.length === 0) return 'INCONCLUSIVE';",
+		replace: "if (policy.criteria.length === 0) return stricter('SATISFIED', policy.evidenceCeiling); // MUTANT: a policy with no criterion passes on nothing checked",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/declared-policy-signoff.test.ts"],
+		why: "PROMISE (E12F F6, the package review's sixth finding): a governing declared policy whose criteria list is empty or absent is INCONCLUSIVE, the record saying why (noCriterionDeclared) - nothing was checked, so no verdict in favour of the work can stand. WHO RELIES: every declared sign-off - dispositionFromFindings over no row and no finding answers SATISFIED, so such a policy was signed off with nothing checked, REG-F-523's shape one policy down. WHAT THE MUTATION DOES: such a policy passes under its evidence ceiling, as before the fix. OBSERVED (bun run mutants -- E12-M32-a-policy-with-no-criterion-passes, 2026-10-11, in the fixer's worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M32-a-policy-with-no-criterion-passes ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion E12 fix round (the package review's findings 6, 8, 9 and 10a): a declared policy with no criterion is INCONCLUSIVE, stated; the comments say plainly that a REJECTED verdict takes only the first half of canon's route (the lifecycle stays UNDER_ASSURANCE, a departure from REG-D-111 (1)), that the producer is the unit's own executor (who did the judged work for a phase only), and that the declared reviewer is built by the floor's construction, not the floor's instance"
 	}
 ];
