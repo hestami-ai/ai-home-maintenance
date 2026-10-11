@@ -50,11 +50,14 @@ import {
 	EXECUTOR_PROGRAM_VARIABLE,
 	LANE_BUDGET,
 	PHASE7_COMMAND_MS,
+	PHASE7_DECLARED_POLICIES_PER_UNIT,
+	PHASE7_DECLARED_REVIEWS_MS,
 	PHASE7_INTROSPECT_MS,
 	PHASE7_MODEL_UNITS,
 	PHASE7_NEGATIVE_CONTROL_RESERVE,
 	PHASE7_PAID_LIMIT,
 	PHASE7_PRESSED_UNITS,
+	PHASE7_RECORD_ASSURANCE_MS,
 	PHASE7_RECOVERY_MS,
 	PHASE7_REVIEWED_COMMANDS,
 	PHASE7_RERUNS_PER_PHASE,
@@ -802,21 +805,26 @@ describe('⭐ P7-2 D4 — the Phase 7 lane waits an ALLOWANCE derived from the b
 	// D4: overstated — the setup's acts are not counted by their bounds (their number is the PWA's, which `lane-config.ts`
 	// cannot read; the archive's copying has no bound), and those bounds alone pass its 1,800 s allowance. The timeout is
 	// every PHASE AND RECOVERY act at its bound, plus the setup's ALLOWANCE — which is not a worst case.
-	it('⛔ the spec’s test timeout — every phase and recovery act at its bound, plus the setup’s allowance, 372,240 s — stays under Node’s timer ceiling', () => {
+	// ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (design B8) — AND WAS *"372,240 s"*: Record Assurance runs a declared review of each
+	// of the unit's declared policies now (`REG-D-110` (3)), so each of the five sign-offs grows by the reviews of the most
+	// policies one unit declares (`PHASE7_DECLARED_REVIEWS_MS`, 3,840 s): 372,240 s + 5 × 3,840 s = 391,440 s.
+	it('⛔ the spec’s test timeout — every phase and recovery act at its bound, plus the setup’s allowance, 391,440 s — stays under Node’s timer ceiling', () => {
 		// ⚠ FIRST, so a figure pushed past the ceiling reddens here by this message, not by the arithmetic below it.
 		expect(
 			PHASE7_TEST_TIMEOUT_MS,
 			'past 2,147,483,647 ms a Node timer fires at once, and Playwright would time the test out at its start'
 		).toBeLessThanOrEqual(2_147_483_647);
-		// 1,800 s + 5 × 38,940 s + 4 × 300 s + 4 × 1 × 41,280 s + 5 × 1,800 s + 120 s + 300 s
-		// = 1,800 s + 194,700 s + 1,200 s + 165,120 s + 9,000 s + 420 s = 372,240 s (103.4 hours).
+		// 1,800 s + 5 × 38,940 s + 4 × 300 s + 4 × 1 × 41,280 s + 5 × 5,640 s + 120 s + 300 s
+		// = 1,800 s + 194,700 s + 1,200 s + 165,120 s + 28,200 s + 420 s = 391,440 s (108.7 hours).
+		// ~~5 × 1,800 s … = 372,240 s (103.4 hours)~~ — E2: each sign-off's Record Assurance now runs its unit's declared reviews.
 		expect(
 			PHASE7_TEST_TIMEOUT_MS,
 			'the timeout is not every phase and recovery act at its bound plus the setup’s allowance: 1,800 s setup (an ' +
 				'allowance, its own acts NOT counted by their bounds) + 5 × 38,940 s (the root’s run and each phase’s) + 4 × 300 s ' +
 				'(the limit’s reads) + 4 × 1 × 41,280 s (a re-run, an abandonment and the rule’s UI acts for each phase) + ' +
-				'5 × 1,800 s (the sign-offs) + 120 s + 300 s (the final screenshot and read)'
-		).toBe(372_240_000);
+				'5 × 5,640 s (the sign-offs, each Record Assurance its unit’s declared reviews) + 120 s + 300 s (the final ' +
+				'screenshot and read)'
+		).toBe(391_440_000);
 	});
 
 	// ⭐⭐ `P76F-C` C8 — EACH TERM, AT ITS BOUNDS: the arithmetic the timeout's comment states, held term by term, so a bound
@@ -829,8 +837,10 @@ describe('⭐ P7-2 D4 — the Phase 7 lane waits an ALLOWANCE derived from the b
 		expect(PHASE7_UNIT_RUN_MS).toBe(38_940_000);
 		// The rule on one stopped phase: the re-run (39,720 s) and the abandonment that may follow it (1,560 s).
 		expect(PHASE7_RECOVERY_MS).toBe(39_720_000 + 1_560_000);
-		// One unit's sign-off: the overview, then two acts, each its row's wait, its press and the store read after.
-		expect(PHASE7_SIGN_OFF_UNIT_MS).toBe(360_000 + 2 * (120_000 + 300_000 + 300_000));
+		// One unit's sign-off: the overview, then two acts, each its row's wait, its press and the store read after —
+		// ⭐ E2 (design B8): and Record Assurance's declared reviews, four policies' of four 240 s calls each.
+		expect(PHASE7_SIGN_OFF_UNIT_MS).toBe(360_000 + 2 * (120_000 + 300_000 + 300_000) + 4 * 4 * 240_000);
+		expect(PHASE7_SIGN_OFF_UNIT_MS).toBe(5_640_000);
 		// The units pressed and signed off: the root, and §3.2's four phases.
 		expect(PHASE7_PRESSED_UNITS).toBe(PHASE7_PHASES.length + 1);
 		// ⛔ The bounds the acts wait are these very figures: the operator names lane-config's, never a copy of its own.
@@ -841,6 +851,39 @@ describe('⭐ P7-2 D4 — the Phase 7 lane waits an ALLOWANCE derived from the b
 		]);
 		// ⭑ The sign-offs' own bounds alone pass the setup allowance they were said to fit inside: the finding, restated.
 		expect(PHASE7_PRESSED_UNITS * 2 * PHASE7_SIGN_OFF_MS).toBeGreaterThan(PHASE7_SETUP_MS);
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (`DESIGN-phase-7-completion.md` B8: *"The sign-off's time bound grows to cover the
+	// reviews"*; B1, `REG-D-110` (3): one review per declared policy). ⛔ Record Assurance called no model before E2, and its
+	// press was bounded as a sign-off act (300 s); it now runs a declared review of each of the unit's policies, one after
+	// another, each up to `reviewerCallsPerTry` calls of `reviewerCallMs`, so a sign-off whose reviews each stayed inside
+	// their bound would have been abandoned at 300 s — the paid run's first unit's sign-off ending as unanswered.
+	it('⭐⭐ E2 — Record Assurance is waited for up to its own act and a declared review of each of the most policies one §3.2 unit declares: 300 s + 4 × 4 × 240 s = 4,140 s', () => {
+		// The most declared policies one unit carries, restated (this module imports nothing) and held to §3.2's PWA.
+		expect(PHASE7_DECLARED_POLICIES_PER_UNIT).toBe(
+			Math.max(...[...PHASE7_PHASES, PHASE7_ROOT].map((t) => t.policyIds.length))
+		);
+		expect(PHASE7_DECLARED_POLICIES_PER_UNIT, 'the design’s four (§3.2)').toBe(4);
+		expect(PHASE7_DECLARED_REVIEWS_MS).toBe(4 * 4 * 240_000);
+		expect(PHASE7_RECORD_ASSURANCE_MS).toBe(PHASE7_SIGN_OFF_MS + PHASE7_DECLARED_REVIEWS_MS);
+		expect(PHASE7_RECORD_ASSURANCE_MS).toBe(4_140_000);
+		// ⛔ BY REFERENCE: the reviews read the budget's own figures, and the sign-off counts them; no number is stated.
+		const sf = parsed(LANE);
+		expect(madeOf(sf, 'PHASE7_DECLARED_REVIEWS_MS')).toEqual({
+			reads: [
+				'PHASE7_DECLARED_POLICIES_PER_UNIT',
+				'LANE_BUDGET.reviewerCallsPerTry',
+				'LANE_BUDGET.reviewerCallMs'
+			],
+			numbers: []
+		});
+		expect(madeOf(sf, 'PHASE7_RECORD_ASSURANCE_MS')).toEqual({
+			reads: ['PHASE7_SIGN_OFF_MS', 'PHASE7_DECLARED_REVIEWS_MS'],
+			numbers: []
+		});
+		expect(madeOf(sf, 'PHASE7_SIGN_OFF_UNIT_MS').reads, 'the sign-off counts its declared reviews').toContain(
+			'PHASE7_DECLARED_REVIEWS_MS'
+		);
 	});
 
 	// ⭐ `JAN-EXEC` P7-6R — THE LIMIT IS NOW `REG-D-105` (1)'s, which amends `REG-D-102` (4): *"Raise limit to 200"*. The test

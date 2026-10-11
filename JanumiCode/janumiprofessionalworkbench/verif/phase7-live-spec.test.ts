@@ -33,6 +33,7 @@ import {
 	PHASE7_PAID_LIMIT,
 	PHASE7_PAID_VARIABLE,
 	PHASE7_PRIOR_CALLS_VARIABLE,
+	PHASE7_RECORD_ASSURANCE_MS,
 	PHASE7_UNIT_ALLOWANCE_MS,
 	REVIEWER_MODEL_VARIABLE
 } from '../apps/rph-demo/e2e-live-exec/lane-config.js';
@@ -357,7 +358,9 @@ describe('⛔ D4 — the operator bounds every Begin & Execute by one phase’s 
 			])
 		).toEqual([
 			['beginExecute', "'beginExecute'", 'PHASE7_UNIT_ALLOWANCE_MS'],
-			['recordAssurance', "'recordAssurance'", 'PHASE7_SIGN_OFF_MS'],
+			// ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (design B8) — ~~'PHASE7_SIGN_OFF_MS'~~: Record Assurance runs the unit's
+			// declared reviews now, so it is waited for up to its act and those reviews (`PHASE7_RECORD_ASSURANCE_MS`).
+			['recordAssurance', "'recordAssurance'", 'PHASE7_RECORD_ASSURANCE_MS'],
 			['markSatisfied', "'markSatisfied'", 'PHASE7_SIGN_OFF_MS'],
 			// ⭐ P7-6R R-1f — the rule's acts: an abandonment, bounded as a sign-off act; a re-run, as a phase (a re-run of the
 			// work runs the phase again).
@@ -621,7 +624,7 @@ function signOffRow(offered: number) {
 }
 
 describe('⭐ D5 — the sign-off acts on the page: the row waited for, Mark Satisfied only once Record Assurance has left it', () => {
-	it('⛔ Record Assurance waits for the row BEFORE judging it — a row offering it is pressed with the sign-off bound, one offering none is not pressed', async () => {
+	it('⛔ Record Assurance waits for the row BEFORE judging it — a row offering it is pressed with its own bound, its declared reviews counted (E2), one offering none is not pressed', async () => {
 		const offering = signOffRow(1);
 		const pressed = await recordAssurance(offering.page, offering.row, decode);
 		expect(pressed?.envelopeType, 'a row that offers Record Assurance read as offering none').toBe(
@@ -631,7 +634,7 @@ describe('⭐ D5 — the sign-off acts on the page: the row waited for, Mark Sat
 			`wait for the row visible ${PHASE7_UI_MS}`,
 			'click Record Assurance'
 		]);
-		expect(offering.asked).toEqual([{ action: 'recordAssurance', timeout: PHASE7_SIGN_OFF_MS }]);
+		expect(offering.asked).toEqual([{ action: 'recordAssurance', timeout: PHASE7_RECORD_ASSURANCE_MS }]);
 		const bare = signOffRow(0);
 		expect(await recordAssurance(bare.page, bare.row, decode)).toBeNull();
 		expect(bare.log, 'a row that offers no Record Assurance was pressed').toEqual([

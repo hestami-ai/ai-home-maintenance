@@ -396,6 +396,30 @@ export const PHASE7_SIGN_OFF_MS = 300_000;
 export const PHASE7_INTROSPECT_MS = 300_000;
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (`DESIGN-phase-7-completion.md` B1, B8; `REG-D-110` (3): one review per declared
+ * policy) — THE MOST DECLARED POLICIES ONE UNIT OF §3.2 CARRIES: the design phase's four (`scripts/phase7/pwa-content.ts`,
+ * `PHASE7_DESIGN`). Restated, because this module imports nothing, and held to §3.2's PWA by
+ * `verif/live-exec-lane-config.test.ts`. ⚠ A unit carrying fewer is bounded as one carrying four: an upper bound.
+ */
+export const PHASE7_DECLARED_POLICIES_PER_UNIT = 4;
+
+/**
+ * ⭐⭐ E2 — A UNIT'S DECLARED REVIEWS, AT THEIR BOUND: Record Assurance runs one review per declared policy, one after
+ * another, each the reasoning-review validator's own call, retry and repair — up to `reviewerCallsPerTry` calls of
+ * `reviewerCallMs` (`LANE_BUDGET`, by reference) — 4 × 4 × 240 s = 3,840 s.
+ */
+export const PHASE7_DECLARED_REVIEWS_MS =
+	PHASE7_DECLARED_POLICIES_PER_UNIT * LANE_BUDGET.reviewerCallsPerTry * LANE_BUDGET.reviewerCallMs;
+
+/**
+ * ⭐⭐ E2 (design B8: *"The sign-off's time bound grows to cover the reviews"*) — RECORD ASSURANCE'S OWN BOUND: the act's
+ * (`PHASE7_SIGN_OFF_MS`) and its declared reviews — 300 s + 3,840 s = 4,140 s. ⛔ Before E2 it called no model and was
+ * bounded as a sign-off act, so a sign-off whose reviews each stayed inside their bound would have been abandoned at 300 s.
+ * Mark Satisfied and an abandonment call no model, and keep `PHASE7_SIGN_OFF_MS`.
+ */
+export const PHASE7_RECORD_ASSURANCE_MS = PHASE7_SIGN_OFF_MS + PHASE7_DECLARED_REVIEWS_MS;
+
+/**
  * ⭐ `P76F-C` C8 — THE OVERVIEW SHOWN AFRESH (the spec's `showOverview`): the page's navigation and its hydration wait, each
  * bounded by the page's default, and the tab's click by its own — 3 × 120 s = 360 s.
  */
@@ -443,10 +467,13 @@ export const PHASE7_SIGN_OFF_ACTS = 2;
 /**
  * ⭐ `P76F-C` C8 — ONE UNIT'S SIGN-OFF, EVERY ACT AT ITS BOUND (`signOff`): the overview shown; then each of its two acts —
  * the row's wait (its row visible, or Record Assurance detached), the press, the store read after — 360 s + 2 × (120 s +
- * 300 s + 300 s) = 1,800 s.
+ * 300 s + 300 s) = 1,800 s; ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (design B8) — and Record Assurance's declared reviews
+ * (`PHASE7_DECLARED_REVIEWS_MS`, 3,840 s), which its press now waits for: 5,640 s. ~~= 1,800 s~~
  */
 export const PHASE7_SIGN_OFF_UNIT_MS =
-	PHASE7_SHOW_OVERVIEW_MS + PHASE7_SIGN_OFF_ACTS * (PHASE7_UI_MS + PHASE7_SIGN_OFF_MS + PHASE7_INTROSPECT_MS);
+	PHASE7_SHOW_OVERVIEW_MS +
+	PHASE7_SIGN_OFF_ACTS * (PHASE7_UI_MS + PHASE7_SIGN_OFF_MS + PHASE7_INTROSPECT_MS) +
+	PHASE7_DECLARED_REVIEWS_MS;
 
 /**
  * The spec's own timeout, set with `test.setTimeout` (the config's stays the one-unit lane's) — ⭐⭐ `P76F-C` C8: ~~THE WORST
@@ -462,10 +489,12 @@ export const PHASE7_SIGN_OFF_UNIT_MS =
  *   · the store read for the limit before each phase — 4 × 300 s = 1,200 s;
  *   · one re-run for each phase, and the abandonment that may follow it, with the rule's every UI act
  *     (`PHASE7_RECOVERY_MS`) — 4 × 1 × 41,280 s = 165,120 s;
- *   · five sign-offs, each two acts (`PHASE7_SIGN_OFF_UNIT_MS`) — 5 × 1,800 s = 9,000 s, ⚠ counted for every unit
- *     though a phase that is abandoned is never signed off: an upper bound;
+ *   · five sign-offs, each two acts (`PHASE7_SIGN_OFF_UNIT_MS`) — ~~5 × 1,800 s = 9,000 s~~ ⭐ E2: and each Record
+ *     Assurance's declared reviews, 5 × 5,640 s = 28,200 s, ⚠ counted for every unit though a phase that is abandoned is
+ *     never signed off, and as four policies' though the root declares two: an upper bound;
  *   · the final screenshot and the final archive's read — 120 s + 300 s = 420 s;
- * = 372,240 s (103.4 hours). ~~1,800 s + 4 × 38,160 s + 4 × 1 × 38,160 s = 307,080 s (85.3 hours)~~ ⛔ counted the five
+ * = 391,440 s (108.7 hours). ~~= 372,240 s (103.4 hours)~~ before E2's declared reviews. ~~1,800 s + 4 × 38,160 s +
+ * 4 × 1 × 38,160 s = 307,080 s (85.3 hours)~~ ⛔ counted the five
  * sign-offs (3,000 s at their bounds), the four abandonments (1,200 s) and the rule's UI acts inside the 1,800 s setup
  * allowance, and the root's Begin & Execute (up to 38,160 s) nowhere: a run whose every act stayed within its bound could
  * reach the test's timeout with a unit still inside its allowance, and Playwright would kill the server mid-unit there

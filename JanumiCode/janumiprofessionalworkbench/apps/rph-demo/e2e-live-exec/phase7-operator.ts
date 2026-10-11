@@ -48,6 +48,7 @@ import {
 	PHASE7_INTROSPECT_MS,
 	PHASE7_PAID_LIMIT,
 	PHASE7_PRIOR_CALLS_VARIABLE,
+	PHASE7_RECORD_ASSURANCE_MS,
 	PHASE7_SIGN_OFF_MS,
 	PHASE7_UI_MS,
 	PHASE7_UNIT_ALLOWANCE_MS,
@@ -56,7 +57,7 @@ import {
 } from './lane-config.js';
 
 // ── THE BOUNDS THE LANE'S OWN ACTS WAIT ──────────────────────────────────────────────────────────────────────────────
-// ⛔ THIS LANE SETS NO ACTION TIMEOUT, so every wait without one runs to the test's: ~~43~~ ~~85~~ 103 hours (`lane-config.ts`). Each
+// ⛔ THIS LANE SETS NO ACTION TIMEOUT, so every wait without one runs to the test's: ~~43~~ ~~85~~ ~~103~~ 108.7 hours (`lane-config.ts`). Each
 // act below that calls no model is bounded here, as an allowance, and Begin & Execute by `PHASE7_UNIT_ALLOWANCE_MS`.
 
 // ⭐ `P76F-C` C8 — the UI's bound and a sign-off act's are DEFINED in `lane-config.ts` now, so the spec's timeout counts every
@@ -848,7 +849,9 @@ export async function recordAssurance(
 	await row.waitFor({ state: 'visible', timeout: PHASE7_UI_MS });
 	const assure = row.getByRole('button', { name: 'Record Assurance', exact: true });
 	if ((await assure.count()) === 0) return null;
-	return pressFormAction(page, 'recordAssurance', assure, PHASE7_SIGN_OFF_MS, decode);
+	// ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (design B8) — ~~`PHASE7_SIGN_OFF_MS`~~: the press runs a declared review of each of the
+	// unit's policies now (`REG-D-110` (3)), so it is waited for up to its act AND those reviews (`PHASE7_RECORD_ASSURANCE_MS`).
+	return pressFormAction(page, 'recordAssurance', assure, PHASE7_RECORD_ASSURANCE_MS, decode);
 }
 
 /**
