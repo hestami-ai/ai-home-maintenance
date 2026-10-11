@@ -362,7 +362,11 @@ describe('⛔ D4 — the operator bounds every Begin & Execute by one phase’s 
 			// ⭐ P7-6R R-1f — the rule's acts: an abandonment, bounded as a sign-off act; a re-run, as a phase (a re-run of the
 			// work runs the phase again).
 			['recover', 'act', 'PHASE7_SIGN_OFF_MS'],
-			['recover', 'act', 'PHASE7_UNIT_ALLOWANCE_MS']
+			['recover', 'act', 'PHASE7_UNIT_ALLOWANCE_MS'],
+			// ⭐ E3 (C1) — half B's designer acts: "Accept exact candidate", then Submit for Review, Validate and Publish, each
+			// bounded as a sign-off act is — none calls a model (`acceptCandidate`, `designerAct`).
+			['acceptCandidate', "'acceptAgentCandidate'", 'PHASE7_SIGN_OFF_MS'],
+			['designerAct', 'act', 'PHASE7_SIGN_OFF_MS']
 		]);
 	});
 

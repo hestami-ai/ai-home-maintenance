@@ -1,0 +1,1315 @@
+// ⭐⭐ `JAN-EXEC` Phase 7 completion programme, package E3 — HALF B, THE AUTHORING HALF, HELD WHERE THE GATE CAN SEE IT
+// (`docs/_working/DESIGN-phase-7-completion.md` §4 C1 to C6; `REG-D-109`, `REG-D-110` (1) and (4); the run plan's P7-7,
+// `docs/_working/DESIGN-the-live-end-to-end-run.md` §6).
+//
+// Half B is paid and never runs in the gate: the live authoring agent builds the PWA from a request, a person's acceptance
+// of the exact candidate is pressed, and the PWA is published and run as in P3. So this file DRIVES what the lane does in
+// half B on hands made here — no browser, no server and no model — and holds each rule the design gives it:
+//   · C1 — the order: the draft created, the request sent, the candidate's status waited on through the store, "Accept
+//     exact candidate" pressed, then Submit, Validate and Publish, then the Undertaking; and what the lane records — the
+//     candidate's hash, the floor's dispositions, the author's model;
+//   · C2 — the units READ FROM THE PUBLISHED PWA, root first and then the tree's order, never §3.2's hand-typed five;
+//   · C3 — an authoring allowance, folded into the timeout, and the author's model REQUIRED and recorded;
+//   · C4 — the candidate checks, which RECORD AND REPORT and refuse nothing (`REG-D-110` (4): *"Name wordfreq; measure
+//     traps"*);
+//   · C5 — the run report: stage 1 measured, a per-unit check that a model ran, the checks' findings beside the units;
+//   · C6 — the dry rehearsal stops before Send: authoring is a model call.
+// ⛔ NO PROGRAM IS RUN HERE, and nothing stipulates: the gate's own rehearsal of the turn, with the mock agent, is
+// `apps/rph-demo/e2e/phase7-half-b.e2e.ts` (`REG-F-477`: stipulations live under `e2e/`, never `e2e-live/`).
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { policyApplicability } from '@janumipwb/rph-domain';
+import ts from 'typescript';
+import { afterAll, describe, expect, it } from 'vitest';
+import type { EngineSnapshot, ObjectRow } from '../apps/rph-demo/e2e/support/harness.js';
+import {
+	EXECUTE_TIMEOUT_MS,
+	LANE_BUDGET,
+	laneKeysRefusal,
+	NODE_TIMER_CEILING_MS,
+	phase7Half,
+	phase7HalfBTestTimeoutMs,
+	PHASE7_AUTHORING_ALLOWANCE_MS,
+	PHASE7_AUTHORING_FLOOR_RUNS,
+	PHASE7_AUTHORING_MS,
+	PHASE7_CANDIDATE_POLL_MS,
+	PHASE7_DESIGNER_ACTS,
+	PHASE7_INTROSPECT_MS,
+	PHASE7_MODEL_UNITS,
+	PHASE7_PER_PHASE_MS,
+	PHASE7_SETUP_MS,
+	PHASE7_SIGN_OFF_MS,
+	PHASE7_TEST_TIMEOUT_MS,
+	PHASE7_UI_MS,
+	PHASE7_UNIT_RUN_MS
+} from '../apps/rph-demo/e2e-live-exec/lane-config.js';
+import {
+	acceptedHashOf,
+	bootOf,
+	candidateOf,
+	DESIGNER_ACTS,
+	laneVerdict,
+	openLane,
+	overlayOf,
+	producerOfStream,
+	runTheLane,
+	TURN_SETTLED,
+	type ActionOutcome,
+	type Boot,
+	type LaneHands,
+	type RunRecord
+} from '../apps/rph-demo/e2e-live-exec/phase7-operator.js';
+import {
+	candidateChecks,
+	CHECK_REGISTER_IDS,
+	governanceOf
+} from '../scripts/phase7/candidate-checks.js';
+import {
+	AUTHORING_FLOOR_POLICIES,
+	floorDispositions,
+	identityOf,
+	mandatoryTypes,
+	PHASE7_HALF_B_DRAFT,
+	PHASE7_HALF_B_REQUEST,
+	PHASE7_RUN_PLAN_REQUEST,
+	slugOf,
+	unitsInTreeOrder
+} from '../scripts/phase7/half-b.js';
+import { PHASE7_INSTRUCTION_BUDGET, PHASE7_PWA, PRODUCT_BRIEF } from '../scripts/phase7/pwa-content.js';
+import {
+	buildRunReport,
+	FLOOR_POLICIES,
+	HALF_B_CAVEATS,
+	renderMarkdown,
+	type LaneRows,
+	type MatrixCell,
+	type RunReport,
+	type StoredEvent,
+	type StoredObject,
+	type StoreRows
+} from '../scripts/phase7/run-report-core.js';
+
+const REPO = fileURLToPath(new URL('../', import.meta.url));
+
+const ROOT = mkdtempSync(join(tmpdir(), 'jpwb-p7-half-b-'));
+afterAll(() => rmSync(ROOT, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }));
+
+let seq = 0;
+/** A fresh folder of this file's own. */
+const folder = (label: string): string => {
+	const dir = join(ROOT, `${label}-${++seq}`);
+	mkdirSync(dir, { recursive: true });
+	return dir;
+};
+
+// ── THE AGENT'S PWA, AS A STORE WOULD HOLD IT ONCE ACCEPTED ─────────────────────────────────────────────────────────
+// ⭑ NOT §3.2's five: other names, other kinds, a different order of definition, and three of the traps the candidate
+// checks measure (C4) — a leaf whose discharge is UNDECLARED (`REG-F-505`), a prompt that uses `{criteria}`, which no work
+// unit supplies (`REG-F-508`), and a policy scoped to another kind (`REG-F-524`).
+
+const PWA_ID = 'pwa_agent';
+const AGENT_POLICIES: ObjectRow[] = [
+	{
+		id: 'pol_intent_preservation',
+		state: { name: 'Intent preservation', status: 'ACTIVE', applicability: { objectTypeConditions: ['PROFESSIONAL_WORK_UNIT'] } }
+	},
+	{
+		id: 'pol_requirement_coverage',
+		state: {
+			name: 'Requirement coverage',
+			status: 'ACTIVE',
+			applicability: { objectTypeConditions: ['PROFESSIONAL_WORK_UNIT'], pwuKindConditions: ['REQUIREMENT_DEFINITION'] }
+		}
+	}
+];
+const prompt = (templateText: string, status = 'ACTIVE') => ({
+	templateText,
+	status,
+	declaredPlaceholders: [...templateText.matchAll(/\{([A-Za-z]\w*)\}/g)].map((m) => m[1]),
+	outputContract: 'A JSON object whose workProduct holds every file written, in full.'
+});
+/** The agent's types, IN THE ORDER IT DEFINED THEM — the children before the root, and not in the tree's order. */
+const AGENT_TYPES: ObjectRow[] = [
+	{
+		id: 'pwutype_verify',
+		state: {
+			pwaId: PWA_ID,
+			name: 'Verify wordfreq end to end',
+			pwuKind: 'INTEGRATED_PRODUCT_VALIDATION',
+			purpose: 'Run the real tool against its acceptance scenarios.',
+			workDischarge: 'UNDECLARED',
+			isRoot: false,
+			permittedChildTypeIds: [],
+			requiredAssurancePolicyIds: ['pol_intent_preservation'],
+			status: 'ACTIVE'
+		}
+	},
+	{
+		id: 'pwutype_specify',
+		state: {
+			pwaId: PWA_ID,
+			name: 'Specify wordfreq',
+			pwuKind: 'REQUIREMENT_DEFINITION',
+			purpose: 'Write the numbered requirements of wordfreq.',
+			workDischarge: 'MODEL',
+			isRoot: false,
+			permittedChildTypeIds: [],
+			promptTemplate: prompt('Write {subject} for wordfreq: {purpose}'),
+			requiredAssurancePolicyIds: ['pol_requirement_coverage', 'pol_intent_preservation'],
+			status: 'ACTIVE'
+		}
+	},
+	{
+		id: 'pwutype_build',
+		state: {
+			pwaId: PWA_ID,
+			name: 'Build wordfreq',
+			pwuKind: 'PRODUCT_IMPLEMENTATION',
+			purpose: 'Implement wordfreq and its unit tests.',
+			workDischarge: 'MODEL',
+			isRoot: false,
+			permittedChildTypeIds: [],
+			promptTemplate: prompt('Implement {subject} against {criteria}.'),
+			requiredAssurancePolicyIds: ['pol_requirement_coverage'],
+			status: 'ACTIVE'
+		}
+	},
+	{
+		id: 'pwutype_root',
+		state: {
+			pwaId: PWA_ID,
+			name: 'wordfreq Realization',
+			pwuKind: 'PRODUCT_REALIZATION',
+			purpose: 'Realize wordfreq from its requirements to its verification.',
+			workDischarge: 'HUMAN',
+			isRoot: true,
+			// ⭑ THE TREE'S ORDER: specify, build, verify — not the order the types were defined in.
+			permittedChildTypeIds: ['pwutype_specify', 'pwutype_build', 'pwutype_verify'],
+			permittedChildren: [
+				{ typeId: 'pwutype_specify', cardinality: 'M1' },
+				{ typeId: 'pwutype_build', cardinality: 'M1' },
+				{ typeId: 'pwutype_verify', cardinality: 'M1' }
+			],
+			requiredAssurancePolicyIds: ['pol_intent_preservation'],
+			status: 'ACTIVE'
+		}
+	}
+];
+/** The units instantiation built, AS THE STORE LISTS THEM — scrambled here, so only the tree can order them. */
+const AGENT_UNITS: readonly { id: string; typeId: string; title: string; parent: string | null }[] = [
+	{ id: 'pwu_v', typeId: 'pwutype_verify', title: 'Verify wordfreq end to end', parent: 'pwu_r' },
+	{ id: 'pwu_r', typeId: 'pwutype_root', title: 'wordfreq Realization', parent: null },
+	{ id: 'pwu_b', typeId: 'pwutype_build', title: 'Build wordfreq', parent: 'pwu_r' },
+	{ id: 'pwu_s', typeId: 'pwutype_specify', title: 'Specify wordfreq', parent: 'pwu_r' }
+];
+/** The order a correct lane presses them in: the root, then the tree's order. */
+const TREE_ORDER = ['root', 'specify-wordfreq', 'build-wordfreq', 'verify-wordfreq-end-to-end'];
+const CANDIDATE_HASH = `sha256:${'ab'.repeat(32)}`;
+const AUTHOR = { providerId: 'openai-codex', modelId: 'gpt-5.6-sol' };
+const REVIEWER = { providerId: 'devin', modelId: 'glm-5-3-flash-max' };
+/** The authoring floor's three assessments of the candidate, as the turn's fork holds them. */
+const FLOOR_OF_THE_CANDIDATE: ObjectRow[] = [
+	'floor.schema-invariant',
+	'floor.identity-provenance',
+	'floor.reasoning-review'
+].map((policyId, i) => ({
+	id: `asm_floor_${i}`,
+	state: {
+		assurancePolicyId: policyId,
+		subjectObjectIds: [PWA_ID],
+		assessmentState: 'SATISFIED',
+		...(policyId === 'floor.reasoning-review'
+			? { evaluator: { actorId: 'reviewer', actorType: 'AGENT', displayName: 'devin', ...REVIEWER } }
+			: {})
+	}
+}));
+
+const answered = (envelopeType: string, data = '[{}]'): ActionOutcome => ({
+	status: 200,
+	envelopeType: envelopeType as ActionOutcome['envelopeType'],
+	rawBody: JSON.stringify({ type: envelopeType, status: 200, data }),
+	decoded: {},
+	timedOutAfterMs: null,
+	requestFailure: null
+});
+/** The acceptance as SvelteKit answers it: `{ acceptedCandidate }`, devalue-flattened, and decoded by `actionFields`. */
+const ACCEPTED: ActionOutcome = {
+	...answered('success', `[{"acceptedCandidate":1},"${CANDIDATE_HASH}"]`),
+	decoded: { acceptedCandidate: CANDIDATE_HASH }
+};
+const COMPLETED = { lifecycleState: 'EXECUTING', executionState: 'SUCCEEDED', assuranceState: 'UNASSESSED', planStepState: 'SUCCEEDED' };
+
+interface HalfBScript {
+	readonly paid: boolean;
+	/** The candidate's status at each read after Send, the last repeated; READY_TO_COMMIT unless said. */
+	readonly statuses?: readonly string[];
+	/** What "Accept exact candidate" came to; accepted, naming the hash, unless said. */
+	readonly accept?: ActionOutcome;
+	/** What each designer act came to, by its form action; accepted unless said. */
+	readonly lifecycle?: Readonly<Record<string, ActionOutcome>>;
+	/** No candidate is ever staged: the server refused the turn before it began. */
+	readonly noCandidate?: boolean;
+	/** Why the turn stopped, in the floor's words, on a candidate that is not READY_TO_COMMIT. */
+	readonly detail?: string;
+	/** What the store reads the PWA after an accepted Publish; PUBLISHED unless said. */
+	readonly published?: string;
+}
+
+/** A run folder of its own, a store made here, and the half-B hands, each call logged in order. */
+function halfBLane(script: HalfBScript) {
+	const lane = openLane(folder('lane'));
+	const calls: string[] = [];
+	const timeouts: number[] = [];
+	let clock = 0;
+	let readsAfterSend = 0;
+	let sent = false;
+	let accepted = false;
+	let status = 'DRAFT';
+	let undertaking = false;
+	const pressed = new Map<string, typeof COMPLETED>();
+	const statusAt = (n: number) => {
+		const list = script.statuses ?? ['COLLECTING', 'ASSURING', 'READY_TO_COMMIT'];
+		return list[Math.min(n, list.length) - 1] ?? 'READY_TO_COMMIT';
+	};
+	const snapshot = (): EngineSnapshot => {
+		const candidateStatus = sent && !accepted && script.noCandidate !== true ? statusAt(readsAfterSend) : null;
+		return {
+			pwas: [{ id: PWA_ID, state: { name: 'CLI Product Realization', publicationStatus: status } }],
+			pwuTypes: accepted ? AGENT_TYPES : [],
+			assurancePolicies: AGENT_POLICIES,
+			assessments: accepted ? FLOOR_OF_THE_CANDIDATE : [],
+			undertakings: undertaking ? [{ id: 'und_1', state: { name: 'wordfreq realization' } }] : [],
+			pwus: undertaking
+				? AGENT_UNITS.map((u) => {
+						const s = pressed.get(u.id);
+						return {
+							id: u.id,
+							state: {
+								title: u.title,
+								undertakingId: 'und_1',
+								pwuTypeId: u.typeId,
+								...(u.parent === null ? {} : { parentWorkUnitId: u.parent }),
+								workLifecycleState: s?.lifecycleState ?? 'PROPOSED',
+								executionState: s?.executionState ?? 'NOT_STARTED',
+								assuranceState: s?.assuranceState ?? 'UNASSESSED'
+							}
+						};
+					})
+				: [],
+			executionPlans: [...pressed.keys()].map((id) => ({
+				id: `pln_${id}`,
+				state: { workUnitId: id, steps: [{ stepState: 'SUCCEEDED' }] }
+			})),
+			modelExchanges: [],
+			evidence: [],
+			artifacts: [],
+			authoringCandidates:
+				candidateStatus === null
+					? []
+					: [
+							{
+								pwaId: PWA_ID,
+								summary: {
+									status: candidateStatus,
+									...(candidateStatus === 'READY_TO_COMMIT' ? { candidateHash: CANDIDATE_HASH } : {}),
+									...(script.detail === undefined ? {} : { detail: script.detail }),
+									commandCount: 9
+								},
+								pwuTypes: AGENT_TYPES,
+								assessments: FLOOR_OF_THE_CANDIDATE,
+								conversations: [],
+								criterionEvents: [],
+								completionEvents: []
+							}
+						]
+		} as unknown as EngineSnapshot;
+	};
+	const hands: LaneHands = {
+		// ⛔ HALF A's SETUP — the hand-typed PWA. Half B never calls it; today's lane did, and read the agent's units as
+		// §3.2's: the store's units are returned, so a lane that calls it meets them exactly as it would after typing.
+		setUp: async () => {
+			calls.push('setUp');
+			undertaking = true;
+			return new Map(AGENT_UNITS.map((u) => [u.title, { id: u.id, state: { undertakingId: 'und_1' } }]));
+		},
+		beginExecute: async (unit) => {
+			calls.push(`beginExecute ${unit.slug}`);
+			pressed.set(unit.unitId!, COMPLETED);
+			return answered('success');
+		},
+		showOverview: async () => void calls.push('showOverview'),
+		recordAssurance: async (unit) => {
+			calls.push(`recordAssurance ${unit.slug}`);
+			return null;
+		},
+		markSatisfied: async (unit) => {
+			calls.push(`markSatisfied ${unit.slug}`);
+			return answered('success');
+		},
+		recoveryOffers: async () => ({ rerunReview: false, rerunWork: false, abandon: false }),
+		recover: async () => {
+			throw new Error('nothing stops here');
+		},
+		read: async () => {
+			calls.push('read');
+			if (sent) readsAfterSend += 1;
+			const snap = snapshot();
+			return { text: JSON.stringify(snap), snapshot: snap };
+		},
+		archive: async (call) => {
+			calls.push(`archive ${call.name}`);
+			return [];
+		},
+		screenshot: async () => null,
+		author: {
+			createDraft: async () => {
+				calls.push('author.createDraft');
+				return PWA_ID;
+			},
+			send: async (request) => {
+				calls.push('author.send');
+				expect(request, 'the lane sent no request').not.toBe('');
+				sent = true;
+			},
+			// ⭐ C3 — the producer the page's turn named: the store records none.
+			producerLine: async () => {
+				calls.push('author.producerLine');
+				return `${AUTHOR.providerId}/${AUTHOR.modelId}`;
+			},
+			turnRunning: async () => {
+				calls.push('author.turnRunning');
+				return script.noCandidate === true ? false : !TERMINAL.has(statusAt(readsAfterSend));
+			},
+			accept: async () => {
+				calls.push('author.accept');
+				const outcome = script.accept ?? ACCEPTED;
+				if (outcome.envelopeType === 'success') accepted = true;
+				return outcome;
+			},
+			lifecycle: async (act) => {
+				calls.push(`author.${act}`);
+				const outcome = script.lifecycle?.[act] ?? answered('success');
+				if (outcome.envelopeType === 'success')
+					status = { submitForReview: 'UNDER_REVIEW', validate: 'VALIDATED', publish: script.published ?? 'PUBLISHED' }[act];
+				return outcome;
+			},
+			createUndertaking: async () => {
+				calls.push('author.createUndertaking');
+				undertaking = true;
+			},
+			pause: async (ms) => {
+				calls.push(`author.pause ${ms}`);
+				clock += ms;
+			},
+			now: () => clock
+		},
+		extendTimeout: (ms) => void timeouts.push(ms)
+	} as LaneHands;
+	const boot: Boot = {
+		record: {
+			startedAt: '2026-10-11T00:00:00.000Z',
+			mode: script.paid ? 'paid' : 'dry',
+			half: 'B',
+			authorModel: `${AUTHOR.providerId}/${AUTHOR.modelId}`,
+			node: process.version,
+			inherited: {},
+			overlay: overlayOf(undefined),
+			readiness: null,
+			priorReviewerCalls: 0,
+			refusals: []
+		},
+		refusals: [],
+		prior: 0
+	} as Boot;
+	return {
+		run: () => runTheLane({ boot, lane, hands, flushPosts: () => void calls.push('flushPosts') }),
+		calls,
+		timeouts,
+		/** The calls of these kinds, in order. */
+		only: (...kinds: string[]) => calls.filter((c) => kinds.some((k) => c.startsWith(k))),
+		lane,
+		written: (): RunRecord => JSON.parse(readFileSync(lane.run, 'utf8')) as RunRecord,
+		action: (name: string) => existsSync(join(lane.actions, `${name}.json`))
+	};
+}
+const TERMINAL = new Set(['READY_TO_COMMIT', 'REVISION_REQUIRED', 'BLOCKED_EXTERNAL']);
+
+describe('⭐⭐ C1, C2 — HALF B, IN ITS ORDER: `runTheLane` on hands made here (DESIGN-phase-7-completion.md §4)', () => {
+	// ⭐ THE ROADMAP'S PREDICTED RED for E3 (`ROADMAP-undertaking-execution-sandbox.md` §9, *"a run whose hands return other
+	// unit titles proceeds (today refused)"*): the lane held a run to §3.2's five hand-typed titles
+	// (`phase7-operator.ts`, *"instantiation did not build one unit per type"*), so an agent-authored PWA — whose types
+	// are the agent's — could never be pressed.
+	it('⭐ C2 — a half-B run whose units are the AGENT’s, not §3.2’s five, proceeds: each pressed, the root first, then the tree’s order', async () => {
+		const l = halfBLane({ paid: true });
+		const record = await l.run();
+		expect(l.only('beginExecute')).toEqual(TREE_ORDER.map((s) => `beginExecute ${s}`));
+		expect(record.units.map((u) => [u.order, u.slug, u.title, u.unitId])).toEqual([
+			[1, 'root', 'wordfreq Realization', 'pwu_r'],
+			[2, 'specify-wordfreq', 'Specify wordfreq', 'pwu_s'],
+			[3, 'build-wordfreq', 'Build wordfreq', 'pwu_b'],
+			[4, 'verify-wordfreq-end-to-end', 'Verify wordfreq end to end', 'pwu_v']
+		]);
+		expect(record.end?.reason).toBe('complete');
+	});
+
+	// ⭐ THE ORDER C1 GIVES THE LANE: send, wait on the candidate's status, accept, submit, validate, publish — then the
+	// Undertaking. ⛔ Half A's setup — the hand-typed PWA — is never called.
+	it('⭐ C1 — the order: draft, Send, the candidate’s status waited on through the store, Accept, Submit, Validate, Publish, the Undertaking', async () => {
+		const l = halfBLane({ paid: true });
+		await l.run().catch(() => undefined);
+		expect(
+			l.only('setUp', 'author.', 'read', 'beginExecute root').slice(0, 18),
+			'the half-B order (DESIGN-phase-7-completion.md §4 C1)'
+		).toEqual([
+			'author.createDraft',
+			'author.send',
+			'read',
+			'author.pause 5000',
+			'read',
+			'author.pause 5000',
+			'read',
+			// ⭐ C3 — the author, read off the page once the turn has settled: the store records none.
+			'author.producerLine',
+			'author.accept',
+			'read',
+			'author.submitForReview',
+			'author.validate',
+			'author.publish',
+			'read',
+			'author.createUndertaking',
+			'read',
+			'beginExecute root',
+			'read'
+		]);
+	});
+});
+
+// ── THE RUN REPORT OF A HALF-B RUN ──────────────────────────────────────────────────────────────────────────────────
+
+/** The archived store of a half-B run, cut down to what stage 1 reads: the PWA, its floor, its types and units. */
+function halfBStore(
+	o: {
+		publication?: string;
+		floor?: readonly string[];
+		/** Each unit's run, by its id: `model`, an execution try answered and its step SUCCEEDED; `press`, its step
+		 *  SUCCEEDED with no try — a TRANSFORMATION the press completed; absent, never begun. Each one run is signed off. */
+		ran?: Readonly<Record<string, 'model' | 'press'>>;
+		/** Units the Undertaking does not hold, by id: instantiation built none of them. */
+		dropped?: readonly string[];
+	} = {}
+): StoreRows {
+	let n = 0;
+	const object = (objectType: string, id: string, state: Record<string, unknown>): StoredObject => ({
+		id,
+		objectType,
+		state,
+		firstSequence: ++n
+	});
+	const floor = o.floor ?? ['SATISFIED', 'SATISFIED', 'SATISFIED'];
+	const objects: StoredObject[] = [
+		object('PROFESSIONAL_WORK_ARCHITECTURE', PWA_ID, {
+			name: 'CLI Product Realization',
+			publicationStatus: o.publication ?? 'PUBLISHED'
+		}),
+		...FLOOR_OF_THE_CANDIDATE.map((a, i) =>
+			object('ASSURANCE_ASSESSMENT', a.id, { ...a.state, assessmentState: floor[i] })
+		),
+		...AGENT_TYPES.map((t) => object('PWU_TYPE', t.id, t.state)),
+		object('UNDERTAKING', 'und_1', { name: 'wordfreq realization', status: 'ACTIVE' }),
+		...AGENT_UNITS.filter((u) => !(o.dropped ?? []).includes(u.id)).flatMap((u) => {
+			const ran = o.ran?.[u.id];
+			const declared = AGENT_TYPES.find((t) => t.id === u.typeId)!.state.requiredAssurancePolicyIds;
+			return [
+				object('PROFESSIONAL_WORK_UNIT', u.id, {
+					title: u.title,
+					undertakingId: 'und_1',
+					pwuTypeId: u.typeId,
+					assurancePolicyIds: declared,
+					...(u.parent === null ? {} : { parentWorkUnitId: u.parent }),
+					workLifecycleState: ran === undefined ? 'PROPOSED' : 'SATISFIED',
+					executionState: ran === undefined ? 'NOT_STARTED' : 'SUCCEEDED',
+					assuranceState: ran === undefined ? 'UNASSESSED' : 'SATISFIED'
+				}),
+				...(ran === undefined
+					? []
+					: [object('EXECUTION_PLAN', `plan_${u.id}`, { workUnitId: u.id, steps: [{ id: `step_${u.id}`, stepState: 'SUCCEEDED' }] })]),
+				...(ran === 'model'
+					? [
+							object('MODEL_EXCHANGE', `mex_${u.id}`, {
+								plane: 'EXECUTION',
+								subjectObjectId: u.id,
+								disposition: 'ACCEPTED',
+								parseOutcome: { outcome: 'PARSED', detail: '' }
+							})
+						]
+					: [])
+			];
+		})
+	];
+	const events: StoredEvent[] = [];
+	return { objects, events, content: [] };
+}
+
+/** The lane's own files of a half-B run: its record names the half, the PWA, and the hash the person accepted. */
+function halfBLaneRows(o: { acceptedHash?: string | null; findings?: readonly unknown[] } = {}): LaneRows {
+	return {
+		run: {
+			mode: 'paid',
+			half: 'B',
+			units: AGENT_UNITS.map((u) => ({ unitId: u.id, title: u.title })),
+			end: { reason: 'complete' },
+			authoring: {
+				pwaId: PWA_ID,
+				candidate: { status: 'READY_TO_COMMIT', candidateHash: CANDIDATE_HASH },
+				accept: { envelopeType: 'success', acceptedHash: o.acceptedHash === undefined ? CANDIDATE_HASH : o.acceptedHash },
+				authorModel: { configured: `${AUTHOR.providerId}/${AUTHOR.modelId}`, resolved: `${AUTHOR.providerId}/${AUTHOR.modelId}` },
+				checks: {
+					findings: o.findings ?? candidateChecks(AGENT_TYPES, AGENT_POLICIES).findings,
+					refused: false
+				}
+			}
+		},
+		boot: { startedAt: '2026-10-11T00:00:00.000Z', mode: 'paid', half: 'B', overlay: { JPWB_DEMO_DB: 'runs/p7b/demo.sqlite' } },
+		posts: [],
+		actions: [],
+		archives: [],
+		archiveRead: '06-final',
+		problems: []
+	};
+}
+
+const NAMES = ['jdoe'];
+const cellOf = (r: RunReport, stage: string, row: string): MatrixCell => {
+	const c = r.matrix.find((m) => m.stage === stage && m.row === row);
+	expect(c, `no cell ${stage} × ${row}`).toBeDefined();
+	return c!;
+};
+
+describe('⭐ C5 — the run report of a half-B run: stage 1 measured', () => {
+	// ⭐ THE ROADMAP'S SECOND PREDICTED RED: stage 1 read *"not measured in this half"* whatever the run, because half A
+	// authors no candidate (`run-report-core.ts`, `stageOne`). Half B authors one, and the report must measure it: the
+	// floor, the reviewer's identity, the accepted hash and PUBLISHED.
+	it('⭐ stage 1 of a half-B run is MEASURED: the floor SATISFIED, the reviewer named, the accepted hash, PUBLISHED — as intended', () => {
+		const r = buildRunReport(halfBStore(), halfBLaneRows(), { accountNames: NAMES }).report;
+		const one = cellOf(r, '1', 'whole run');
+		expect(one.value).toBe('as intended');
+	});
+});
+
+describe('⭐ C5 — stage 1 of a half-B run reads what failed, and states its caveats', () => {
+	const stageOne = (store: StoreRows, lane: LaneRows): MatrixCell =>
+		cellOf(buildRunReport(store, lane, { accountNames: NAMES }).report, '1', 'whole run');
+
+	it('⭐ AS INTENDED it names the floor, the reviewer, the author and the hash accepted — and carries REG-F-503 and REG-F-504 beside it', () => {
+		const one = stageOne(halfBStore(), halfBLaneRows());
+		expect([one.value, one.registerIds, one.unregistered]).toEqual(['as intended', [], undefined]);
+		expect(one.basis).toEqual([
+			'the PWA "CLI Product Realization" is PUBLISHED, authored by the agent from the request (design §4 C1)',
+			'the authoring floor: floor.schema-invariant SATISFIED, floor.identity-provenance SATISFIED, floor.reasoning-review SATISFIED',
+			"the reviewer: devin/glm-5-3-flash-max; the author, as the page's turn named it: openai-codex/gpt-5.6-sol (configured: openai-codex/gpt-5.6-sol)",
+			`the accepted hash: ${CANDIDATE_HASH}; the candidate as the lane last read it: READY_TO_COMMIT`,
+			`caveat ${HALF_B_CAVEATS[0]}`,
+			`caveat ${HALF_B_CAVEATS[1]}`
+		]);
+	});
+
+	it('⛔ BROKE — a floor policy not SATISFIED, a reviewer not named, no hash accepted, or a PWA not PUBLISHED: each said, the break unregistered', () => {
+		const inconclusive = stageOne(halfBStore({ floor: ['SATISFIED', 'SATISFIED', 'INCONCLUSIVE'] }), halfBLaneRows());
+		expect([inconclusive.value, inconclusive.unregistered]).toEqual(['broke', true]);
+		expect(inconclusive.basis).toContain("the authoring floor's floor.reasoning-review reads INCONCLUSIVE");
+		const unaccepted = stageOne(halfBStore(), halfBLaneRows({ acceptedHash: null }));
+		expect([unaccepted.value, unaccepted.basis]).toEqual([
+			'broke',
+			expect.arrayContaining(['the lane recorded no accepted hash: no one accepted a candidate'])
+		]);
+		const another = stageOne(halfBStore(), halfBLaneRows({ acceptedHash: `sha256:${'cd'.repeat(32)}` }));
+		expect(another.basis).toContain(
+			`the hash accepted, sha256:${'cd'.repeat(32)}, is not the staged candidate's, ${CANDIDATE_HASH}`
+		);
+		const draft = stageOne(halfBStore({ publication: 'DRAFT' }), halfBLaneRows());
+		expect([draft.value, draft.basis]).toEqual(['broke', expect.arrayContaining(['the PWA is DRAFT'])]);
+		const unnamed = halfBStore();
+		const review = unnamed.objects.find((x) => x.state.assurancePolicyId === 'floor.reasoning-review')!;
+		(review.state as Record<string, unknown>).evaluator = undefined;
+		expect(stageOne(unnamed, halfBLaneRows()).basis).toContain('the floor’s reasoning review names no reviewer');
+	});
+
+	it('⛔ NOT REACHED when the store holds no PWA the lane authored into; ⭑ and half A still reads stage 1 as not measured', () => {
+		const store = halfBStore();
+		const none = stageOne({ ...store, objects: store.objects.filter((x) => x.id !== PWA_ID) }, halfBLaneRows());
+		expect([none.value, none.basis]).toEqual([
+			'not reached',
+			[`no PWA the lane authored into is in the store (lane/run.json names ${PWA_ID})`]
+		]);
+		const lane = halfBLaneRows();
+		const halfA = { ...lane, run: { ...(lane.run as object), half: undefined }, boot: { ...(lane.boot as object), half: undefined } };
+		expect(stageOne(store, halfA).value).toBe('not measured in this half');
+	});
+});
+
+describe('⭐ C5 — a per-unit check that a model ran: REG-F-505’s false “Yes” is a break', () => {
+	const ALL_RAN = { pwu_r: 'press', pwu_s: 'model', pwu_b: 'model', pwu_v: 'model' } as const;
+	const reportOf = (ran: Readonly<Record<string, 'model' | 'press'>>) =>
+		buildRunReport(halfBStore({ ran }), halfBLaneRows(), { accountNames: NAMES }).report;
+
+	it('⭐ a phase that SUCCEEDED with no model run is BROKE at stages 3 and 7, and so is the whole run’s 7 — never “as intended”', () => {
+		const r = reportOf({ ...ALL_RAN, pwu_v: 'press' });
+		const three = cellOf(r, '3', 'verify-wordfreq-end-to-end');
+		const seven = cellOf(r, '7', 'verify-wordfreq-end-to-end');
+		expect([three.value, three.registerIds, seven.value, seven.registerIds]).toEqual([
+			'broke',
+			['REG-F-505'],
+			'broke',
+			['REG-F-505']
+		]);
+		expect(cellOf(r, '7', 'whole run').value).toBe('broke');
+		expect(r.units.map((u) => [u.slug, u.modelRan])).toEqual([
+			['root', false],
+			['specify-wordfreq', true],
+			['build-wordfreq', true],
+			['verify-wordfreq-end-to-end', false]
+		]);
+	});
+
+	it('⭐ CONTROL — every phase a model ran, and the root the press’s alone: stage 7 reads as intended for each, and for the whole run', () => {
+		const r = reportOf(ALL_RAN);
+		expect(TREE_ORDER.map((slug) => cellOf(r, '7', slug === 'root' ? 'whole run' : slug).value)).toEqual([
+			'as intended',
+			'as intended',
+			'as intended',
+			'as intended'
+		]);
+	});
+});
+
+describe('⭐ C5 — the candidate checks’ findings stand beside what each unit did; C2 — the report’s units are the PWA’s', () => {
+	it('⭐ each unit carries its type’s findings, and the markdown shows them in its units table and in the authoring section', () => {
+		const r = buildRunReport(halfBStore({ ran: { pwu_r: 'press', pwu_s: 'model', pwu_b: 'model', pwu_v: 'press' } }), halfBLaneRows(), {
+			accountNames: NAMES
+		}).report;
+		expect(r.units.map((u) => [u.slug, u.candidateFindings])).toEqual([
+			['root', []],
+			['specify-wordfreq', []],
+			['build-wordfreq', ['supplied-markers (REG-F-508)', 'policy-governs (REG-F-524)']],
+			['verify-wordfreq-end-to-end', ['model-leaf (REG-F-505, REG-F-507)']]
+		]);
+		const md = renderMarkdown(r);
+		expect(md).toContain('| Stage | specify-wordfreq | build-wordfreq | verify-wordfreq-end-to-end |');
+		expect(md).toContain(
+			'| 4 | verify-wordfreq-end-to-end | Verify wordfreq end to end | SATISFIED | SATISFIED | SUCCEEDED | SUCCEEDED | 0 | no | model-leaf (REG-F-505, REG-F-507) |'
+		);
+		expect(md).toContain('## Half B — the authoring (design §4 C1 to C5)');
+		expect(md).toContain('- **The candidate checks (C4), recorded before Submit, refusing nothing (REG-D-110 (4)):** 3 findings.');
+		for (const c of HALF_B_CAVEATS) expect(md).toContain(`  - ${c}`);
+		expect(r.authoring?.author).toEqual({ configured: 'openai-codex/gpt-5.6-sol', resolved: 'openai-codex/gpt-5.6-sol' });
+		expect([r.run.half, r.authoring?.acceptedHash, r.authoring?.reviewer]).toEqual(['B', CANDIDATE_HASH, 'devin/glm-5-3-flash-max']);
+	});
+
+	it('⭐ stage 2 holds the units to the PWA’s MANDATORY tree: as intended when each has one, broke naming the type that has none', () => {
+		const whole = buildRunReport(halfBStore(), halfBLaneRows(), { accountNames: NAMES }).report;
+		expect([cellOf(whole, '2', 'whole run').value, cellOf(whole, '2', 'whole run').basis]).toEqual([
+			'as intended',
+			[
+				'4 work units, one per mandatory type of the published PWA, each under the root',
+				'the PWA declares no conditional child, so none went unoffered (REG-F-516)'
+			]
+		]);
+		const short = buildRunReport(halfBStore({ dropped: ['pwu_b'] }), halfBLaneRows(), { accountNames: NAMES }).report;
+		expect([cellOf(short, '2', 'whole run').value, cellOf(short, '2', 'whole run').basis]).toEqual([
+			'broke',
+			['no work unit for Build wordfreq']
+		]);
+		// ⭑ The declared verdicts a complete half-B run signs off are the agent's: each unit's own policies, 1 + 2 + 1 + 1.
+		expect(whole.declaredVerdicts.expected).toBe(5);
+	});
+});
+
+describe('⭐ C1, C3 — the lane’s half, and half B’s author, at boot', () => {
+	const ADMITTED = {
+		JPWB_EXECUTOR: 'pi',
+		JPWB_EXECUTOR_MODEL: 'openai-codex/gpt-5.6-sol',
+		JPWB_ASSURANCE_TOOL: 'devin',
+		JPWB_ASSURANCE_MODEL: 'glm-5-3-flash-max',
+		JPWB_LIVE_RUN_DIR: 'runs/phase7-b'
+	} as const;
+
+	it('⭐ unset or blank is half A — the default, unchanged; `A` and `B` are themselves, trimmed; anything else names no half', () => {
+		for (const [value, half] of [
+			[undefined, 'A'],
+			['', 'A'],
+			['  ', 'A'],
+			['A', 'A'],
+			[' B ', 'B'],
+			['b', undefined],
+			['C', undefined]
+		] as const)
+			expect(phase7Half({ JPWB_PHASE7_HALF: value }), JSON.stringify(value)).toBe(half);
+	});
+
+	it('⛔ a half the lane does not know is refused at boot, naming the two it knows; half B with no JPWB_AGENT_MODEL is refused as missing', () => {
+		expect(laneKeysRefusal({ ...ADMITTED, JPWB_PHASE7_HALF: 'b' })).toContain(
+			"JPWB_PHASE7_HALF=\"b\" is refused by a rule of THIS LANE: it names no half of the Phase 7 run — 'A'"
+		);
+		for (const model of [undefined, '', '   '])
+			expect(laneKeysRefusal({ ...ADMITTED, JPWB_PHASE7_HALF: 'B', JPWB_AGENT_MODEL: model }), JSON.stringify(model)).toContain(
+				"JPWB_PHASE7_HALF='B' runs the live authoring agent, and it is missing JPWB_AGENT_MODEL"
+			);
+		expect(laneKeysRefusal({ ...ADMITTED, JPWB_PHASE7_HALF: 'B', JPWB_AGENT_MODEL: 'openai-codex/gpt-5.6-sol' })).toBeUndefined();
+		// ⭑ HALF A IS UNCHANGED: it authors nothing, so it asks for no author's model.
+		expect(laneKeysRefusal({ ...ADMITTED })).toBeUndefined();
+		expect(laneKeysRefusal({ ...ADMITTED, JPWB_PHASE7_HALF: 'A' })).toBeUndefined();
+	});
+
+	it('⛔ JPWB_PHASE7_HALF set with no run folder asks for the Phase 7 run, and is refused as the paid variable is (D1)', () => {
+		const { JPWB_LIVE_RUN_DIR: _folder, ...noFolder } = ADMITTED;
+		expect(laneKeysRefusal({ ...noFolder, JPWB_PHASE7_HALF: 'B', JPWB_AGENT_MODEL: 'm' })).toContain(
+			'JPWB_PHASE7_HALF="B" is refused by a rule of THIS LANE, not of the product: it asks for the Phase 7 run, but JPWB_LIVE_RUN_DIR is unset'
+		);
+	});
+
+	it('⭐ C3 — the boot records the half and the author’s model as configured, and refuses half B without one', async () => {
+		const store = join(folder('boot-b'), 'demo.sqlite');
+		writeFileSync(store, '');
+		const ready = async (_program: string, args: readonly string[]) => ({
+			exitCode: 0,
+			stdout: args[0] === 'models' ? 'glm-5-3-flash-max\n' : 'devin 3000\n',
+			stderr: '',
+			failure: null
+		});
+		const boot = (env: Record<string, string>) =>
+			bootOf({ paid: true, env: { ...ADMITTED, JPWB_PHASE7_PRIOR_REVIEWER_CALLS: '0', ...env }, serverEnv: { JPWB_DEMO_DB: store }, store, run: ready });
+		const b = await boot({ JPWB_PHASE7_HALF: 'B', JPWB_AGENT_MODEL: ' openai-codex/gpt-5.6-sol ' });
+		expect([b.refusals, b.record.half, b.record.authorModel]).toEqual([[], 'B', 'openai-codex/gpt-5.6-sol']);
+		const refused = await boot({ JPWB_PHASE7_HALF: 'B' });
+		expect([refused.record.half, refused.record.authorModel]).toEqual(['B', null]);
+		expect(refused.refusals.join('\n')).toContain('it is missing JPWB_AGENT_MODEL');
+		const a = await boot({});
+		expect([a.refusals, a.record.half]).toEqual([[], 'A']);
+	});
+});
+
+describe('⭐ C3 — the authoring allowance, folded into the timeout', () => {
+	it('⭐ two floor runs — the floor, and the one auto-refinement pass the agent route makes — each one try of the one-unit lane: 2,400 s', () => {
+		const route = readFileSync(join(REPO, 'apps/rph-demo/src/routes/pwa/[id]/agent/+server.ts'), 'utf8');
+		expect(route).toContain('auto-refine at most once');
+		expect(route.split('await runPwaFloor(').length - 1, 'the route runs the floor once, and once more to refine').toBe(
+			PHASE7_AUTHORING_FLOOR_RUNS
+		);
+		expect(PHASE7_AUTHORING_ALLOWANCE_MS).toBe(
+			PHASE7_AUTHORING_FLOOR_RUNS * (LANE_BUDGET.executorCallMs + LANE_BUDGET.reviewerCallsPerTry * LANE_BUDGET.reviewerCallMs)
+		);
+		expect([PHASE7_AUTHORING_ALLOWANCE_MS, EXECUTE_TIMEOUT_MS / LANE_BUDGET.tries]).toEqual([2_400_000, 1_200_000]);
+	});
+
+	it('⭐ the authoring’s share: the allowance, one overrunning poll, and four designer acts each at its bound — 5,585 s', () => {
+		expect([PHASE7_CANDIDATE_POLL_MS, PHASE7_DESIGNER_ACTS, DESIGNER_ACTS.length + 1]).toEqual([5_000, 4, 4]);
+		expect(PHASE7_AUTHORING_MS).toBe(
+			PHASE7_AUTHORING_ALLOWANCE_MS +
+				PHASE7_CANDIDATE_POLL_MS +
+				PHASE7_INTROSPECT_MS +
+				4 * (PHASE7_UI_MS + PHASE7_SIGN_OFF_MS + PHASE7_INTROSPECT_MS)
+		);
+		expect(PHASE7_AUTHORING_MS).toBe(5_585_000);
+	});
+
+	it('⭐ half B’s timeout: half A’s re-counted for the agent’s phases, plus the authoring; capped at Node’s timer ceiling', () => {
+		// ⭑ ONE PHASE'S SHARE is exactly what half A's arithmetic counts once per phase: the timeout less its setup, the
+		// root's run, the final screenshot and read, and the root's sign-off, over its four phases.
+		expect(PHASE7_PER_PHASE_MS).toBe(82_320_000);
+		expect(
+			PHASE7_TEST_TIMEOUT_MS - PHASE7_SETUP_MS - PHASE7_UNIT_RUN_MS - PHASE7_UI_MS - PHASE7_INTROSPECT_MS - 1_800_000
+		).toBe(PHASE7_MODEL_UNITS * PHASE7_PER_PHASE_MS);
+		expect(phase7HalfBTestTimeoutMs(4)).toBe(PHASE7_TEST_TIMEOUT_MS + PHASE7_AUTHORING_MS);
+		expect(phase7HalfBTestTimeoutMs(4)).toBe(377_825_000);
+		expect(phase7HalfBTestTimeoutMs(7) - phase7HalfBTestTimeoutMs(6)).toBe(PHASE7_PER_PHASE_MS);
+		expect(phase7HalfBTestTimeoutMs(1)).toBe(PHASE7_TEST_TIMEOUT_MS - 3 * PHASE7_PER_PHASE_MS + PHASE7_AUTHORING_MS);
+		expect(phase7HalfBTestTimeoutMs(40)).toBe(NODE_TIMER_CEILING_MS);
+		expect(NODE_TIMER_CEILING_MS).toBe(2_147_483_647);
+	});
+
+	it('⭐ the lane extends the test’s timeout ONCE, when the units are read, by the agent’s phase count', async () => {
+		const l = halfBLane({ paid: true });
+		await l.run();
+		expect(l.timeouts).toEqual([phase7HalfBTestTimeoutMs(3)]);
+	});
+});
+
+describe('⭐ C1, C4, C6 — what the lane does, and records, in half B', () => {
+	it('⭐ C1 — the record: the candidate, the floor’s dispositions, the author’s model, the reviewer, the hash accepted, the acts — written to lane/run.json', async () => {
+		const l = halfBLane({ paid: true });
+		await l.run();
+		const a = l.written().authoring!;
+		expect(a.request).toBe(PHASE7_HALF_B_REQUEST);
+		expect([a.pwaId, a.sent, a.polls, a.candidate?.status, a.candidate?.candidateHash]).toEqual([
+			PWA_ID,
+			true,
+			3,
+			'READY_TO_COMMIT',
+			CANDIDATE_HASH
+		]);
+		expect(a.floor).toEqual(
+			AUTHORING_FLOOR_POLICIES.map((policyId) => ({
+				policyId,
+				state: 'SATISFIED',
+				evaluator: policyId === 'floor.reasoning-review' ? 'devin/glm-5-3-flash-max' : null,
+				producer: null
+			}))
+		);
+		expect([a.authorModel, a.reviewer, a.accept?.acceptedHash, a.accept?.envelopeType]).toEqual([
+			{ configured: 'openai-codex/gpt-5.6-sol', resolved: 'openai-codex/gpt-5.6-sol' },
+			'devin/glm-5-3-flash-max',
+			CANDIDATE_HASH,
+			'success'
+		]);
+		expect(a.lifecycle.map((x) => [x.act, x.envelopeType, x.refusal])).toEqual(
+			DESIGNER_ACTS.map((act) => [act, 'success', null])
+		);
+		expect([a.published, a.typesAsAccepted?.length, a.unitProblems]).toEqual([true, 4, []]);
+		expect(['acceptAgentCandidate', ...DESIGNER_ACTS].map((act) => l.action(`00-authoring-${act}`))).toEqual([
+			true,
+			true,
+			true,
+			true
+		]);
+	});
+
+	// ⭐⭐ `REG-D-110` (4): *"They do not refuse before Submit, so a trap plays out live and the run reports it."*
+	it('⭐ C4 — the checks run on the ACCEPTED candidate before Submit, find this PWA’s three traps, and refuse NOTHING: Submit, Validate and Publish follow', async () => {
+		const l = halfBLane({ paid: true });
+		const record = await l.run();
+		const checks = record.authoring!.checks!;
+		expect(checks.refused).toBe(false);
+		expect(checks.findings.map((f) => [f.check, f.typeName])).toEqual([
+			['model-leaf', 'Verify wordfreq end to end'],
+			['supplied-markers', 'Build wordfreq'],
+			['policy-governs', 'Build wordfreq']
+		]);
+		const order = l.only('author.accept', 'author.submitForReview', 'author.validate', 'author.publish');
+		expect(order).toEqual(['author.accept', 'author.submitForReview', 'author.validate', 'author.publish']);
+		expect(record.end?.reason).toBe('complete');
+	});
+
+	it('⛔ C6 — DRY, the rehearsal makes the draft and stops BEFORE SEND: authoring is a model call; the verdict holds it to that', async () => {
+		const l = halfBLane({ paid: false });
+		const record = await l.run();
+		expect(l.only('author.', 'setUp', 'beginExecute')).toEqual(['author.createDraft']);
+		expect([record.end?.reason, record.authoring?.sent, record.authoring?.pwaId, record.dryRun, record.units]).toEqual([
+			'dry-run-stop',
+			false,
+			PWA_ID,
+			{ modelExchanges: 0 },
+			[]
+		]);
+		expect(laneVerdict(record)).toEqual([]);
+	});
+
+	it('⛔ C6 — a half-B dry run that sent its request, made no draft, or recorded a model exchange fails its verdict, each said', () => {
+		const dry = (authoring: object, modelExchanges: number | null): RunRecord =>
+			({
+				mode: 'dry',
+				half: 'B',
+				units: [],
+				authoring,
+				dryRun: modelExchanges === null ? null : { modelExchanges },
+				end: { reason: 'dry-run-stop', at: '' },
+				problems: []
+			}) as unknown as RunRecord;
+		expect(laneVerdict(dry({ pwaId: PWA_ID, sent: true }, 0))).toEqual([
+			'the dry run sent the request: authoring is a model call, and a dry run calls none (design §4 C6)'
+		]);
+		expect(laneVerdict(dry({ pwaId: null, sent: false }, 2))).toEqual([
+			'the dry run made no draft for the agent to author into',
+			'the dry run recorded 2 model exchange(s)'
+		]);
+		expect(laneVerdict(dry({ pwaId: PWA_ID, sent: false }, null))).toEqual([
+			'the dry run recorded an unread number of model exchange(s)'
+		]);
+	});
+
+	it('⛔ a candidate the floor did not assure is accepted by no one: the run ends authoring-stopped, in the floor’s words, and the verdict says so', async () => {
+		const l = halfBLane({
+			paid: true,
+			statuses: ['ASSURING', 'BLOCKED_EXTERNAL'],
+			detail: 'The review did not produce a usable verdict.'
+		});
+		const record = await l.run();
+		expect(l.only('author.accept', 'author.submitForReview', 'beginExecute')).toEqual([]);
+		expect(record.end).toMatchObject({
+			reason: 'authoring-stopped',
+			detail: 'the candidate is BLOCKED_EXTERNAL, so no one can accept it: The review did not produce a usable verdict.'
+		});
+		expect(record.authoring?.floor.map((f) => f.state)).toEqual(['SATISFIED', 'SATISFIED', 'SATISFIED']);
+		expect(laneVerdict(record)).toEqual([
+			"the run ended 'authoring-stopped', not 'complete': the candidate is BLOCKED_EXTERNAL, so no one can accept it: The review did not produce a usable verdict."
+		]);
+	});
+
+	it('⛔ a refused acceptance, or a refused designer act, ends the run there: nothing after it is pressed, the refusal in the server’s words', async () => {
+		const refusal = (error: string): ActionOutcome => ({
+			...answered('failure', `[{"error":1},"${error}"]`),
+			decoded: { error }
+		});
+		const unaccepted = halfBLane({ paid: true, accept: refusal('The candidate changed.') });
+		const r1 = await unaccepted.run();
+		expect(unaccepted.only('author.submitForReview', 'beginExecute')).toEqual([]);
+		expect(r1.end).toMatchObject({
+			reason: 'authoring-stopped',
+			detail: "the PWA's Accept exact candidate was refused: The candidate changed."
+		});
+		expect([r1.authoring?.accept?.refusal, r1.authoring?.checks]).toEqual(['The candidate changed.', null]);
+		const invalid = halfBLane({ paid: true, lifecycle: { validate: refusal('The graph is not well formed.') } });
+		const r2 = await invalid.run();
+		expect(invalid.only('author.publish', 'author.createUndertaking', 'beginExecute')).toEqual([]);
+		expect(r2.end).toMatchObject({
+			reason: 'authoring-stopped',
+			detail: "the PWA's validate was refused: The graph is not well formed."
+		});
+	});
+
+	it('⛔ a Publish answered while the store reads the PWA otherwise ends the run: published is the store’s word, not the envelope’s', async () => {
+		const l = halfBLane({ paid: true, published: 'VALIDATED' });
+		const record = await l.run();
+		expect(l.only('author.createUndertaking', 'beginExecute')).toEqual([]);
+		expect([record.end?.reason, record.end?.detail, record.authoring?.published]).toEqual([
+			'authoring-stopped',
+			'Publish was answered, and the store reads the PWA VALIDATED',
+			false
+		]);
+	});
+
+	it('⛔ C3 — a turn that outlasts its allowance ends the run there, allowance-exceeded: the page still holds it, and nothing is pressed', async () => {
+		const l = halfBLane({ paid: true, statuses: ['ASSURING'] });
+		const record = await l.run();
+		const polls = PHASE7_AUTHORING_ALLOWANCE_MS / PHASE7_CANDIDATE_POLL_MS;
+		expect(l.only('author.pause')).toHaveLength(polls);
+		expect(l.only('author.accept', 'beginExecute')).toEqual([]);
+		expect([record.end?.reason, record.authoring?.polls]).toEqual(['allowance-exceeded', polls + 1]);
+		expect(record.end?.detail).toContain(`the authoring turn outlasted its allowance of ${PHASE7_AUTHORING_ALLOWANCE_MS} ms, its candidate read ASSURING`);
+	});
+
+	it('⛔ a turn the server refused before it began stages no candidate: once the page’s turn is over, the run ends, never waiting out the allowance', async () => {
+		const l = halfBLane({ paid: true, noCandidate: true });
+		const record = await l.run();
+		expect(l.only('read', 'author.pause', 'author.turnRunning')).toEqual([
+			'read',
+			'author.pause 5000',
+			'read',
+			'author.turnRunning'
+		]);
+		expect(record.end).toMatchObject({ reason: 'authoring-stopped' });
+		expect(record.end?.detail).toContain('the page’s turn ended and no candidate was staged');
+	});
+
+	it('⭐ the candidate as the store reads it, and the hash an acceptance names — its own field first, else the one its body carries', () => {
+		const snap = {
+			authoringCandidates: [
+				{ pwaId: 'other', summary: { status: 'COLLECTING', commandCount: 1 } },
+				{ pwaId: PWA_ID, summary: { status: 'REVISION_REQUIRED', detail: 'two roots', remediationAction: 'REVISE', commandCount: 3 } }
+			]
+		} as unknown as EngineSnapshot;
+		expect(candidateOf(snap, PWA_ID)).toEqual({
+			status: 'REVISION_REQUIRED',
+			candidateHash: null,
+			detail: 'two roots',
+			remediationAction: 'REVISE',
+			commandCount: 3
+		});
+		expect(candidateOf(snap, 'pwa_none')).toBeNull();
+		expect([...TURN_SETTLED].sort()).toEqual(
+			['BLOCKED_EXTERNAL', 'COMMITTED', 'COMMIT_FAILED', 'CONFLICTED', 'DISCARDED', 'READY_TO_COMMIT', 'REVISION_REQUIRED'].sort()
+		);
+		expect(acceptedHashOf(ACCEPTED)).toBe(CANDIDATE_HASH);
+		expect(acceptedHashOf({ ...ACCEPTED, decoded: {} })).toBe(CANDIDATE_HASH);
+		expect(acceptedHashOf(answered('success'))).toBeNull();
+	});
+});
+
+describe('⭐ C3 — the author as the turn’s own stream names it: the one place it is said', () => {
+	it('⭐ the first `producer` event of the stream, as provider/model; none, null; a line that is no event, passed over', () => {
+		const event = (e: object) => `data: ${JSON.stringify(e)}`;
+		const stream = [
+			event({ kind: 'status', text: 'pi agent · openai-codex/gpt-5.6-sol' }),
+			'',
+			'data: {not json',
+			event({ kind: 'producer', producer: { agentId: 'authoring-agent', modelId: 'gpt-5.6-sol', providerId: 'openai-codex' } }),
+			'',
+			event({ kind: 'producer', producer: { agentId: 'authoring-agent', modelId: 'later', providerId: 'other' } }),
+			event({ kind: 'done' })
+		].join('\n');
+		expect(producerOfStream(stream)).toBe('openai-codex/gpt-5.6-sol');
+		expect(producerOfStream(event({ kind: 'producer', producer: { modelId: 'mock-structural' } }))).toBe('mock-structural');
+		expect(producerOfStream([event({ kind: 'status', text: 'mock agent' }), event({ kind: 'done' })].join('\n'))).toBeNull();
+		expect(producerOfStream('')).toBeNull();
+	});
+});
+
+describe('⭐ C1 — half B’s request: the run plan’s, naming wordfreq (REG-D-110 (4)), and nothing of the PWA’s shape', () => {
+	it('⭐ the run plan’s request, verbatim from the design, with the product named where it names a product, and the brief after it', () => {
+		const design = readFileSync(join(REPO, 'docs/_working/DESIGN-the-live-end-to-end-run.md'), 'utf8');
+		expect(design).toContain(`**The request:** *"${PHASE7_RUN_PLAN_REQUEST}"*`);
+		expect(PHASE7_HALF_B_REQUEST).toBe(
+			'Create a PWA for realizing a small command-line product, wordfreq, through requirements, design, implementation ' +
+				'with unit tests, and end-to-end verification, with the assurance policies each phase needs.\n\nThe product, as ' +
+				`its brief states it:\n\n${PRODUCT_BRIEF}`
+		);
+	});
+
+	it('⛔ it dictates no type, kind, policy, discharge or marker — a request that did would measure transcription, not authoring', () => {
+		const kinds = [...new Set(PHASE7_PWA.types.map((t) => t.pwuKind))];
+		for (const word of [...kinds, ...PHASE7_PWA.types.map((t) => t.name), 'pol_', 'MODEL', 'HUMAN', 'UNDECLARED', 'workDischarge', 'promptActive', 'Ready to use', '{', '}'])
+			expect(PHASE7_HALF_B_REQUEST, word).not.toContain(word);
+	});
+
+	it('⭐ the agent’s draft is named as half A’s PWA is, so the two halves’ reports name one PWA alike', () => {
+		expect(PHASE7_HALF_B_DRAFT).toEqual({ name: PHASE7_PWA.name, domain: PHASE7_PWA.domain });
+	});
+});
+
+describe('⭐ C2 — the order rule: the root first, then the tree’s order', () => {
+	const unit = (id: string, typeId: string, parent: string | null, title = id) => ({
+		id,
+		state: { title, pwuTypeId: typeId, ...(parent === null ? {} : { parentWorkUnitId: parent }) }
+	});
+	const type = (id: string, children: readonly string[] = []) => ({ id, state: { permittedChildTypeIds: [...children] } });
+
+	it('⭐ depth first, each unit’s children in the order its TYPE permits them — never the store’s order', () => {
+		const types = [type('t_root', ['t_b', 't_a']), type('t_a', ['t_a2', 't_a1']), type('t_b'), type('t_a1'), type('t_a2')];
+		const units = [
+			unit('u_a1', 't_a1', 'u_a'),
+			unit('u_b', 't_b', 'u_root'),
+			unit('u_a', 't_a', 'u_root'),
+			unit('u_root', 't_root', null),
+			unit('u_a2', 't_a2', 'u_a')
+		];
+		const tree = unitsInTreeOrder(units, types);
+		expect(tree.units.map((u) => [u.order, u.unitId])).toEqual([
+			[1, 'u_root'],
+			[2, 'u_b'],
+			[3, 'u_a'],
+			[4, 'u_a2'],
+			[5, 'u_a1']
+		]);
+		expect(tree.problems).toEqual([]);
+	});
+
+	it('⚠ a child its parent’s type does not list keeps the store’s order after the listed; a unit the root does not reach is listed last, and said', () => {
+		const types = [type('t_root', ['t_x'])];
+		const units = [
+			unit('u_y', 't_y', 'u_root'),
+			unit('u_root', 't_root', null),
+			unit('u_lost', 't_x', 'u_gone', 'Lost'),
+			unit('u_x', 't_x', 'u_root')
+		];
+		const tree = unitsInTreeOrder(units, types);
+		expect(tree.units.map((u) => u.unitId)).toEqual(['u_root', 'u_x', 'u_y', 'u_lost']);
+		expect(tree.problems).toEqual(['the unit "Lost" is not under the root']);
+		expect(unitsInTreeOrder([unit('a', 't', null), unit('b', 't', null)], []).problems[0]).toBe(
+			'2 units have no parent unit, where a tree has one root'
+		);
+	});
+
+	it('⭐ slugs: the root’s is `root`; the others from their titles, each unique, `final` and `root` never taken', () => {
+		const units = [
+			unit('r', 't', null, 'Anything at all'),
+			unit('a', 't', 'r', 'Design & Build: wordfreq!'),
+			unit('b', 't', 'r', 'Design & Build: wordfreq?'),
+			unit('c', 't', 'r', 'Final'),
+			unit('d', 't', 'r', 'Root'),
+			unit('e', 't', 'r', '——')
+		];
+		expect(unitsInTreeOrder(units, []).units.map((u) => u.slug)).toEqual([
+			'root',
+			'design-build-wordfreq',
+			'design-build-wordfreq-2',
+			'final-unit',
+			'root-unit',
+			'unit'
+		]);
+		expect(slugOf('Café — Résumé of the product, 2nd pass')).toBe('cafe-resume-of-the-product-2nd-pass');
+		expect(slugOf('x'.repeat(39) + ' yz')).toBe('x'.repeat(39));
+	});
+
+	it('⭐ the mandatory tree: M1 and M+ walked, and a child with no rule (M1, as instantiation reads it); C1 and C+ named, never walked', () => {
+		const types = [
+			{
+				id: 'root',
+				state: {
+					name: 'Root',
+					isRoot: true,
+					permittedChildTypeIds: ['m1', 'mplus', 'c1', 'norule'],
+					permittedChildren: [
+						{ typeId: 'm1', cardinality: 'M1' },
+						{ typeId: 'mplus', cardinality: 'M+' },
+						{ typeId: 'c1', cardinality: 'C1' }
+					]
+				}
+			},
+			{ id: 'm1', state: { name: 'M1 child', permittedChildTypeIds: ['cplus'], permittedChildren: [{ typeId: 'cplus', cardinality: 'C+' }] } },
+			{ id: 'mplus', state: { name: 'M+ child' } },
+			{ id: 'c1', state: { name: 'C1 child' } },
+			{ id: 'norule', state: { name: 'No-rule child' } },
+			{ id: 'cplus', state: { name: 'C+ grandchild' } }
+		];
+		const { mandatory, conditional } = mandatoryTypes(types);
+		expect(mandatory.map((t) => t.id)).toEqual(['root', 'm1', 'mplus', 'norule']);
+		expect(conditional).toEqual(['C+ grandchild', 'C1 child']);
+	});
+});
+
+describe('⭐ C1 — the floor’s dispositions, as the record holds them', () => {
+	it('⭐ each policy’s LATEST assessment of the PWA, in the plan’s order; MISSING where there is none; the identities as provider/model', () => {
+		const a = (id: string, policyId: string, state: string, subject = PWA_ID, evaluator?: object) => ({
+			id,
+			state: { assurancePolicyId: policyId, subjectObjectIds: [subject], assessmentState: state, ...(evaluator ? { evaluator } : {}) }
+		});
+		const rows = [
+			a('1', 'floor.reasoning-review', 'INCONCLUSIVE'),
+			a('2', 'floor.schema-invariant', 'SATISFIED'),
+			a('3', 'floor.reasoning-review', 'SATISFIED', PWA_ID, { modelId: 'glm', providerId: 'devin' }),
+			a('4', 'floor.identity-provenance', 'REJECTED', 'pwa_other')
+		];
+		expect(floorDispositions(rows, PWA_ID)).toEqual([
+			{ policyId: 'floor.schema-invariant', state: 'SATISFIED', evaluator: null, producer: null },
+			{ policyId: 'floor.identity-provenance', state: 'MISSING', evaluator: null, producer: null },
+			{ policyId: 'floor.reasoning-review', state: 'SATISFIED', evaluator: 'devin/glm', producer: null }
+		]);
+		expect([identityOf({ modelId: 'm' }), identityOf({ displayName: 'd' }), identityOf(undefined)]).toEqual(['m', 'd', null]);
+		expect(AUTHORING_FLOOR_POLICIES).toEqual(FLOOR_POLICIES);
+	});
+});
+
+describe('⭐⭐ C4 — the candidate checks: each trap found, and nothing refused (REG-D-110 (4))', () => {
+	it('⭐ on the agent’s PWA: the UNDECLARED leaf, the unsupplied marker, and the policy of another kind — each with its register ids; the clean type and the root none', () => {
+		const checks = candidateChecks(AGENT_TYPES, AGENT_POLICIES);
+		expect(checks.refused).toBe(false);
+		expect(checks.findings).toEqual([
+			{
+				check: 'model-leaf',
+				typeId: 'pwutype_verify',
+				typeName: 'Verify wordfreq end to end',
+				registerIds: ['REG-F-505', 'REG-F-507'],
+				detail:
+					'a leaf of the tree declares UNDECLARED with no prompt: a model runs it only when it declares MODEL with an ACTIVE prompt'
+			},
+			{
+				check: 'supplied-markers',
+				typeId: 'pwutype_build',
+				typeName: 'Build wordfreq',
+				registerIds: ['REG-F-508'],
+				detail:
+					'its prompt uses {criteria}, which no work unit supplies (it supplies {subject}, {title}, {description}, {purpose}): its step is refused at render'
+			},
+			{
+				check: 'policy-governs',
+				typeId: 'pwutype_build',
+				typeName: 'Build wordfreq',
+				registerIds: ['REG-F-524'],
+				detail:
+					'it declares pol_requirement_coverage, which does not govern its kind, PRODUCT_IMPLEMENTATION: and none of its declared policies governs it, so its unit can never be assured'
+			}
+		]);
+		expect(checks.types.map((t) => [t.name, t.leaf, t.namesProduct])).toEqual([
+			['Verify wordfreq end to end', true, false],
+			['Specify wordfreq', true, true],
+			['Build wordfreq', true, false],
+			['wordfreq Realization', false, false]
+		]);
+		expect(CHECK_REGISTER_IDS['prompt-length']).toEqual([]);
+	});
+
+	it('⛔ a MODEL leaf whose prompt is DRAFT, and a prompt past the 4,000 characters the reviewer is shown, are each found', () => {
+		const draft = { id: 't_d', state: { ...AGENT_TYPES[1]!.state, promptTemplate: prompt('Write {subject}.', 'DRAFT') } };
+		const long = { id: 't_l', state: { ...AGENT_TYPES[1]!.state, promptTemplate: prompt(`Write {subject}. ${'x'.repeat(PHASE7_INSTRUCTION_BUDGET)}`) } };
+		const found = candidateChecks([draft, long], AGENT_POLICIES).findings.map((f) => [f.typeId, f.check]);
+		expect(found).toEqual([
+			['t_d', 'model-leaf'],
+			['t_l', 'prompt-length']
+		]);
+	});
+
+	it('⭐ a policy governs a kind as the KERNEL decides: absent or not ACTIVE governs nothing; another kind does not; a rule for a person is undecidable', () => {
+		const scoped = AGENT_POLICIES[1]!;
+		expect(governanceOf(scoped, 'REQUIREMENT_DEFINITION')).toBe('GOVERNS');
+		expect(governanceOf(scoped, 'PRODUCT_IMPLEMENTATION')).toBe('DOES_NOT_GOVERN');
+		expect(governanceOf(AGENT_POLICIES[0]!, 'ANY_KIND')).toBe('GOVERNS');
+		expect(governanceOf(undefined, 'REQUIREMENT_DEFINITION')).toBe('NOT_AVAILABLE');
+		expect(governanceOf({ ...scoped, state: { ...scoped.state, status: 'SUSPENDED' } }, 'REQUIREMENT_DEFINITION')).toBe('NOT_AVAILABLE');
+		const expression = { id: 'p_e', state: { status: 'ACTIVE', applicability: { expression: { op: 'RISK_AT_LEAST' } } } };
+		expect(governanceOf(expression, 'X')).toBe('UNDECIDABLE');
+		// ⭑ HELD TO THE KERNEL ITSELF, case by case: the same rule, the same subject, the same answer.
+		expect(policyApplicability(scoped.state.applicability as never, { objectType: 'PROFESSIONAL_WORK_UNIT', pwuKind: 'PRODUCT_IMPLEMENTATION' })).toBe(
+			'NOT_APPLICABLE'
+		);
+		// ⭑ REG-F-524's own case: only when EVERY declared policy fails to govern is the unit unassurable, and the finding says so.
+		const mixed = { id: 't_m', state: { ...AGENT_TYPES[2]!.state, requiredAssurancePolicyIds: ['pol_requirement_coverage', 'pol_intent_preservation'] } };
+		expect(candidateChecks([mixed], AGENT_POLICIES).findings.find((f) => f.check === 'policy-governs')?.detail).toBe(
+			'it declares pol_requirement_coverage, which does not govern its kind, PRODUCT_IMPLEMENTATION'
+		);
+	});
+});
+
+// ── THE SPEC, FROM SOURCE: half B's hands are the operator's acts, on the page ────────────────────────────────────────
+
+describe('⛔ the spec, from source: half B’s hands are the operator’s own acts, and its timeout is extended once', () => {
+	const sf = ts.createSourceFile(
+		'phase7.live.ts',
+		readFileSync(join(REPO, 'apps/rph-demo/e2e-live-exec/phase7.live.ts'), 'utf8'),
+		ts.ScriptTarget.Latest,
+		true
+	);
+	const flat = (n: ts.Node) => n.getText(sf).replace(/\s+/g, ' ');
+	const properties = (name: string): string[] => {
+		const out: string[] = [];
+		const visit = (n: ts.Node): void => {
+			if (ts.isPropertyAssignment(n) && n.name.getText(sf) === name) out.push(flat(n.initializer));
+			ts.forEachChild(n, visit);
+		};
+		visit(sf);
+		return out;
+	};
+
+	it('⭐ each authoring hand is the operator’s act on the page, the draft half B’s, the timeout set on the running test', () => {
+		expect(properties('createDraft')).toEqual([
+			'() => withFreshRequest(base, (request) => createDraftPwa(page, request, PHASE7_HALF_B_DRAFT))'
+		]);
+		expect(properties('send')).toEqual(['(request) => turn.send(request)']);
+		expect(properties('turnRunning')).toEqual(['() => turnRunning(page)']);
+		expect(properties('producerLine')).toEqual(['() => turn.producer()']);
+		expect(properties('accept')).toEqual(['() => acceptCandidate(page, actionFields)']);
+		expect(properties('lifecycle')).toEqual(['(act) => designerAct(page, act, actionFields)']);
+		expect(properties('extendTimeout')).toEqual(['(ms) => test.info().setTimeout(ms)']);
+	});
+});
+
+describe('⛔ C5 — a half-B run that stopped short of its units has completed nothing', () => {
+	// ⭑ Found reviewing E3's own report: the whole run's stage 7 asked every unit, and a half-B run that stopped before its
+	// Undertaking — a dry rehearsal, a candidate no one accepted — has none, which every-of-none read as intended.
+	it('⛔ no unit: the whole run’s stage 7 is NOT REACHED, never as intended; stage 1 says why the PWA never ran', () => {
+		const store = halfBStore({ publication: 'DRAFT' });
+		const stopped: StoreRows = {
+			...store,
+			objects: store.objects.filter((x) => x.objectType === 'PROFESSIONAL_WORK_ARCHITECTURE')
+		};
+		const lane = halfBLaneRows({ acceptedHash: null });
+		const r = buildRunReport(stopped, { ...lane, run: { ...(lane.run as object), units: [], end: { reason: 'authoring-stopped' } } }, {
+			accountNames: NAMES
+		}).report;
+		expect([cellOf(r, '7', 'whole run').value, cellOf(r, '7', 'whole run').basis]).toEqual([
+			'not reached',
+			['the run holds no work unit: no Undertaking of the run was instantiated']
+		]);
+		expect(cellOf(r, '1', 'whole run').value).toBe('broke');
+		expect(r.units).toEqual([]);
+	});
+
+	it('⭐ a half-B phase’s stage 3 says the prompt is the agent’s, and where the record of its naming the product is', () => {
+		const r = buildRunReport(halfBStore({ ran: { pwu_r: 'press', pwu_s: 'model', pwu_b: 'model', pwu_v: 'model' } }), halfBLaneRows(), {
+			accountNames: NAMES
+		}).report;
+		expect(cellOf(r, '3', 'specify-wordfreq').basis).toContain(
+			"the prompt is the agent's: whether it names the product is the candidate checks' record (namesProduct; REG-F-510)"
+		);
+	});
+});

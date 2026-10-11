@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { test, expect } from '@playwright/test';
 import { gotoHydrated } from '../e2e/support/harness';
 import {
@@ -10,6 +11,7 @@ import {
 	unitRow
 } from '../e2e/support/phase7-pwa';
 import { PHASE7_PWA } from '../../../scripts/phase7/pwa-content';
+import { PHASE7_HALF_B_DRAFT } from '../../../scripts/phase7/half-b';
 import { archiveUnit } from '../../../scripts/phase7/run-archive';
 import {
 	LIVE_RUN_DIR_VARIABLE,
@@ -20,7 +22,9 @@ import {
 import {
 	PHASE7_UI_MS,
 	PHASE7_UNDERTAKING,
+	acceptCandidate,
 	beginExecute,
+	designerAct,
 	bootOf,
 	freshIntrospect,
 	laneVerdict,
@@ -32,6 +36,8 @@ import {
 	recoveryOffers,
 	runTheLane,
 	screenshot,
+	agentTurnOn,
+	turnRunning,
 	typesAsTyped,
 	unitsOf,
 	withFreshRequest
@@ -66,8 +72,8 @@ import { STORE_FILE } from './run-folder';
 //   2. The PWA, typed and read back from the store, then published; the Undertaking created; its five units read.
 //   3. Begin & Execute on the ROOT, then on each PHASE in order, each started only after the one before has answered
 //      (`REG-F-535`). Before each phase, the LIMIT (D8): the calls spent before, those this store records, and four held
-//      for the negative control must total under the sponsor's limit — ~~150~~ ⭐ 200 (`REG-D-105` (1)) — or the run ends
-//      `paid-limit`. Each press waits on its own
+//      for the negative control must total under the sponsor's limit — ~~150~~ ~~200 (`REG-D-105` (1))~~ ⭐ 450
+//      (`REG-D-110` (1)), `lane-config.ts`'s `PHASE7_PAID_LIMIT` — or the run ends `paid-limit`. Each press waits on its own
 //      response for up to one phase's allowance (D4); one with NO ANSWER — it outlasted that allowance, or its request
 //      failed in transit — ends the run there, `allowance-exceeded` or `request-failed`, the root's included, and
 //      nothing is started beside it. Each answer is kept raw (`lane/actions/`), and the unit's state READ FROM THE STORE
@@ -82,6 +88,16 @@ import { STORE_FILE } from './run-folder';
 //   5. SIGN-OFF: Record Assurance, then Mark Satisfied, on each phase that completed, and the root's attempted LAST, the
 //      page loaded afresh for each and the store read after every act, each refusal recorded, never asserted; then the
 //      final archive, `06-final`. Dry, no phase was pressed, so the root's alone, by these same acts (D11).
+//
+// ── ⭐⭐ `JAN-EXEC` Phase 7 completion programme, E3 — HALF B, `JPWB_PHASE7_HALF=B` (`DESIGN-phase-7-completion.md` §4) ─────
+// The same lane, the PWA AUTHORED BY THE LIVE AGENT instead of typed (C1): the draft created through the page; the
+// request — the run plan's, naming `wordfreq` (`REG-D-110` (4)) — sent from the designer's chat, and the page HELD THERE
+// while the turn runs, for a turn whose page leaves is discarded; the candidate's status waited on through the store;
+// "Accept exact candidate" pressed; Submit, Validate and Publish; then the Undertaking, whose units are READ FROM THE
+// PUBLISHED PWA, root first, then the tree's order (C2), and run as in steps 3 to 5. The candidate checks run before
+// Submit and refuse nothing (C4). `JPWB_AGENT_MODEL` is required, and recorded (C3); the timeout is extended once the
+// units are read (`phase7HalfBTestTimeoutMs`). Dry, half B stops before Send: authoring is a model call (C6). The order
+// is the operator's (`authorThePwa`), on the `author` hands below. ⚠ Unset or blank, the half is A: everything above.
 //
 // ── ⚠ WHAT THIS SPEC ASSERTS, AND WHAT IT ONLY RECORDS ────────────────────────────────────────────────────────────────
 // It asserts its OWN machinery (`laneVerdict`): the boot, the PWA as typed, one unit per type, the dry run's proof of the
@@ -121,6 +137,8 @@ test.describe('LIVE — JAN-EXEC Phase 7: §3.2’s PWA, published, run as an Un
 			store
 		});
 		let undertakingPath = '';
+		// ⭐ E3 (C1, C3) — half B's turn on the page: Send, and the turn's own stream kept for the producer it names.
+		const turn = agentTurnOn(page);
 
 		// ── THE HANDS: the page and the server, as `runTheLane` uses them ──────────────────────────────────────────────
 		const record = await runTheLane({
@@ -173,7 +191,26 @@ test.describe('LIVE — JAN-EXEC Phase 7: §3.2’s PWA, published, run as an Un
 							env: process.env
 						})
 					).captures,
-				screenshot: (name) => screenshot(page, join(lane.screenshots, `${name}.png`))
+				screenshot: (name) => screenshot(page, join(lane.screenshots, `${name}.png`)),
+				// ⭐⭐ E3 (C1) — HALF B's HANDS: the designer page, held where the turn is, and the clock. Every read of the store
+				// while the turn runs is a fresh request context (`read`), never the page: a turn is discarded when its page leaves.
+				author: {
+					createDraft: () =>
+						withFreshRequest(base, (request) => createDraftPwa(page, request, PHASE7_HALF_B_DRAFT)),
+					send: (request) => turn.send(request),
+					turnRunning: () => turnRunning(page),
+					producerLine: () => turn.producer(),
+					accept: () => acceptCandidate(page, actionFields),
+					lifecycle: (act) => designerAct(page, act, actionFields),
+					createUndertaking: async () => {
+						await createUndertakingThroughForm(page, PHASE7_UNDERTAKING);
+						undertakingPath = new URL(page.url()).pathname;
+					},
+					pause: (ms) => sleep(ms),
+					now: () => Date.now()
+				},
+				// ⭐ E3 (C3) — half B's timeout, once its units are read: set afresh on the running test, from its start.
+				extendTimeout: (ms) => test.info().setTimeout(ms)
 			}
 		});
 		expect(
