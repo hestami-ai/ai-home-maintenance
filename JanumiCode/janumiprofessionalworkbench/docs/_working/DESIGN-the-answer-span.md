@@ -23,7 +23,7 @@
   - A machine-checkable output contract is still owed, as the comment records.
 - **AS3. The qualification harness follows.**
   - `scripts/reviewer-qual/malformations.ts` reads replies through `splitAnswerSpan`, so it follows AS1 by construction. Its own copy of the fence expression is checked against the product's.
-  - **What re-scoring would change: nothing recorded.** None of the 522 recorded reviewer replies holds a fence pair (counted from `runs.ndjson`), so no recorded extraction changes.
+  - **What re-scoring would change: nothing recorded.** ~~None of the 522 recorded reviewer replies holds a fence pair (counted from `runs.ndjson`), so no recorded extraction changes.~~ ⭑ *Corrected after the build's review:* the claim is true, but that count could not have shown it, because the retained answers escape their backticks. The evidence is that the harness's FENCED class, read over the raw replies, holds on 0 of 531 CALL lines. The review's fuzz of old against new readers agrees.
   - `reviewer:qual:check` must stay GREEN. If the scoring digest moves, that is a scoring-only move, which RESCORED lines discharge with no model call.
 
 ## 3. What must turn red first
@@ -44,3 +44,9 @@
 - **The run.** The measured run once more, and P7-4's checks with it.
 - **The budget.** About 45 reviewer calls, within the sponsor's 230 (`REG-D-108`); 174 are spent.
 - **What it should show.** Whether all four phases complete. Two command reviews in P2 concluded against the work, one in requirements and one in end-to-end, so those two phases may still stop on their reviews. If they do, the run plan's rule handles them, and P7-4f judges whether each review was right.
+
+## 5. As built (2026-10-11, B9, `33e73925`)
+
+- AS1 and AS2 are as designed. AS3 departs from the design, and the builder reported it: the harness's FENCED class now first asks the product's own `isWholeJsonObject`. Otherwise a clean one-object reply that quotes a fence would be counted FENCED.
+- **One "control" was red at HEAD:** the execution exchange of a P2-shaped answer kept no answer span. It now does, and it is tested by driving the real execution step.
+- **The general form remains** (`REG-F-557`'s pointer). An answer that is not exactly one JSON object, and whose document holds a code block, is still read fence-first and refused.

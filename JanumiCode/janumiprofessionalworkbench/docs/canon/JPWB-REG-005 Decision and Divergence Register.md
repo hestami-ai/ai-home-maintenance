@@ -37615,7 +37615,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-F-452 — `child-process-runner.test.ts`'s B2 arrangement assumes a node child exits inside its 500 ms deadline; under a loaded gate it did not, and the test reported a timeout it had correctly observed
 
-**Filed 2026-09-25** (`JAN-CRITREAD` `J1-3`, found by the J1-3 gate run; not a J1-3 change). **Status:** ~~⚠ **OPEN — a load-sensitive arrangement (a flake), not a product defect on this evidence; the remedy is owed.**~~ ✅ **CLOSED 2026-10-10** — the remedy is built: B2's deadline is placed after an observed exit, and the file's reaper no longer kills its own worker (the pointer below).
+**Filed 2026-09-25** (`JAN-CRITREAD` `J1-3`, found by the J1-3 gate run; not a J1-3 change). **Status:** ~~⚠ **OPEN — a load-sensitive arrangement (a flake), not a product defect on this evidence; the remedy is owed.**~~ ~~✅ **CLOSED 2026-10-10** — the remedy is built: B2's deadline is placed after an observed exit, and the file's reaper no longer kills its own worker (the pointer below).~~ ⚠ **REOPENED 2026-10-11** — the reaper's fix holds; B2's new arrangement does not prove an exit before the deadline (the pointer below).
 
 - **WHAT HAPPENED.** In `gate:fast`'s parallel `rph-demo` test step, *"⛔⛔ B2 — and it is NOT a timeout: a child that exited 0 in milliseconds did not time out"* failed in 1814 ms. It reported *"a deadline that passes over an EXITED child is not a timeout: expected true to be false"*. In the previous gate run the same test passed in 579 ms. Run alone after the failure, it passed 3 of 3. Nothing in the runner or the test changed in `J1-3`; the file was last changed by `7189c4b7`.
 - **WHY — most likely, not proven.** The arrangement gives the child a 500 ms deadline and relies on its own note: *"The child exits in about 70ms on this host"*. The product sets `timedOut` from whether the child was still running when the deadline passed. On a loaded host, starting a node child can take longer than 500 ms, and then `timedOut: true` is the TRUE observation, not a fabricated one. The test cannot tell which case it got, because it does not observe the child's exit time.
@@ -37630,6 +37630,11 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
     - **What changed.** B2 now steps its deadline up, 500ms at a time, from 500ms to 8000ms. The step is narrower than the runner's 1000ms drain, so no step can jump the window between the child's exit and the drain's end.
     - **What it asserts on.** Only an attempt whose own outcome shows the arrangement held: exit 0, and settled at or after its deadline. If none holds, the test fails and lists every attempt.
     - **Measured.** The file passes, 35 tests. P2B-x, the mutant that calls a deadline passing over an exited child a timeout, is KILLED; so are P2B-q and P2B-d.
+- ⭑ **2026-10-11 — reopened: the arrangement closed yesterday asks a weaker question than its comment says.**
+  - **What happened.** In B9's first gate run, B2 went red again: *"a deadline that passes over an EXITED child is not a timeout: expected true to be false"*. That was on an attempt the new arrangement had accepted: exit 0, and settled at or after its deadline.
+  - **Why that does not prove it.** That pair does not show the child exited BEFORE the deadline. A child still running when the deadline fires, which exits 0 as the kill lands, gives the same pair, and `timedOut: true` is then the true observation.
+  - **What still holds.** The reaper's fix: no worker has died since.
+  - **The remedy, owed.** Drive the deadline from the child's RECORDED exit, as this entry first said. The child prints its own exit time, and the test asserts only on an attempt whose recorded exit came well before its deadline. Until then, a red here on a loaded run is re-run, and the re-run is recorded.
 
 ### REG-D-078 — SPONSOR RULING: the flawed clean case is fixed; the pass-bar question waits on a second candidate, devin with GLM-5.3 Flash at Max effort; Ollama is set aside for the reviewer role; REG-D-075, REG-D-076 and REG-D-077 confirmed
 
@@ -40146,6 +40151,26 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - The nearest entries are `REG-F-515`, which classifies the stop, and `REG-F-519`, the envelope's whole-text parse.
   - **`REG-F-519`'s pointer stands.** It says the first measured run's requirements answer failed the output contract, and it did: probed the same way, that work product is not JSON as a whole.
 - ⭑ **2026-10-11 — scheduled** (`REG-D-108`): the fix goes design, roadmap, then code, and then P3, the measured run once more.
+- ⭑ **2026-10-11 — built (B9, `33e73925`; `DESIGN-the-answer-span.md`), and its general form remains.**
+  - **What is built.**
+    - The reader takes the whole text when it is one JSON object.
+    - The work-product floor's "parseable" now means the located span parses.
+    - The design's four reds were each observed first, and its 10 mutants are KILLED.
+    - The reviewer fingerprint and the scoring digest did not move, and `reviewer:qual:check` is GREEN.
+    - An adversarial review fuzzed the old and new readers over 300,000 inputs. Only texts that are one JSON object holding a fence pair changed, and none of the recorded replies did.
+  - **What remains: the general form.** An answer that is not exactly one JSON object, and whose document holds a code block, is still read fence-first, and the floor now refuses it. That covers:
+    - an object wrapped in a json fence;
+    - an object after a prose preamble;
+    - an object followed by trailing prose;
+    - an array of documents.
+    - For two of these shapes HEAD's floor was a false pass, and AS2 makes each a false refusal.
+    - An executor answer reaches the floor in such a shape when its envelope did not parse whole (`REG-F-519`), so such a phase stops as P2's did. All of P2's work products were exactly one object.
+  - **Guard gaps the review found** (MINOR):
+    - nothing tests the floor's `located` conjunct alone, so a JSON `null` or array would pass under a mutant;
+    - the trim before the whole-text parse is unguarded against a leading byte-order mark;
+    - the scoring corpus holds no reply on the new branch, so the fingerprint cannot see this fix. That is `REG-F-553`'s class;
+    - the harness's copy of the fence expression is checked by a comment, not a test.
+  - **The design's evidence, corrected.** *"none of the 522 recorded reviewer replies holds a fence pair"* is true, but counting the retained answers could not have shown it, because their backticks are escaped. The evidence is that the harness's FENCED class, read over the raw replies, holds on 0 of 531 CALL lines.
 
 ### REG-D-108 — SPONSOR RULING: after P2, fix REG-F-557, then run the measured run once more (P3); the limit rises to about 230 reviewer calls
 
