@@ -15,6 +15,7 @@
 import { AGY_BIN_OVERRIDE, resolveJudgeModel } from './agy-cli.js';
 import { DEVIN_BIN_OVERRIDE, resolveAssuranceModel } from '../tools/devin-reviewer.js';
 import { selectBackingTool } from '../tools/backing-tool.js';
+import { REPLAY_VARIABLE, resolveReplayRecording } from '../replay/replay-switch.js';
 
 /** The environment the selector reads — `process.env` in the product, a plain record in a test. */
 export type ReviewerEnvironment = Readonly<Record<string, string | undefined>>;
@@ -39,10 +40,14 @@ export type ReviewerRefusalCode =
 	| 'REVIEWER_TOOL_UNKNOWN'
 	| 'REVIEWER_TOOL_UNWIRED'
 	| 'REVIEWER_MODEL_UNSET'
-	| 'REVIEWER_PROGRAM_OVERRIDDEN';
+	| 'REVIEWER_PROGRAM_OVERRIDDEN'
+	// ⭐ `JAN-EXEC` Phase 8 (D2; `REG-D-111` (5)) — the replay switch's two refusals (`replay/replay-switch.ts`).
+	| 'REVIEWER_REPLAY_OUTSIDE_TEST_MODE'
+	| 'REVIEWER_REPLAY_BESIDE_A_TOOL';
 
 /**
- * The selector's answer — exactly one of four.
+ * The selector's answer — exactly one of ~~four~~ ⭐ five: `JAN-EXEC` Phase 8 adds `REPLAY` (D2), the recording folder
+ * `JPWB_REPLAY` names, honoured in test mode only.
  *
  * ⭑ `REFUSED` CARRIES THE TOOL IT REFUSED, when one was named, so no caller has to re-read the environment to say
  * which configuration was wrong: a second read is a second answer, which is how the two preflights came to disagree.
@@ -51,6 +56,10 @@ export type ReviewerSelection =
 	| { readonly kind: 'STAND_IN' }
 	| { readonly kind: 'AGY'; readonly modelId: string }
 	| { readonly kind: 'DEVIN'; readonly modelId: string }
+	// ⭐ `JAN-EXEC` Phase 8 (D2) — the reviewer answers from a recording, each reply served only to the prompt whose hash it
+	// was recorded under, and FAILING CLOSED otherwise (`REPLAY_STALE`; `replay/replay-run.ts`). ⛔ Never the stand-in, never
+	// a live tool, never answers by order alone (`REG-D-067`).
+	| { readonly kind: 'REPLAY'; readonly recordingDir: string }
 	| {
 			readonly kind: 'REFUSED';
 			readonly code: ReviewerRefusalCode;
@@ -132,7 +141,41 @@ function selectedProgramOverridden(
 }
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 8 (`DESIGN-phase-7-completion.md` §5 D2; `REG-D-111` (5); `REG-F-530`) — THE REPLAY SWITCH'S ANSWER,
+ * or `undefined` when `JPWB_REPLAY` is unset: the executor selector's rule (`executor-selection.ts`, `replaySelection`),
+ * so the two replay together or neither does. Outside test mode REFUSED whatever tool is named; in test mode REFUSED
+ * beside a named tool, since a live reviewer winning silently is a paid call where a replay was asked for.
+ */
+function replaySelection(
+	env: ReviewerEnvironment,
+	testMode: boolean,
+	toolId: string | undefined
+): ReviewerSelection | undefined {
+	const recordingDir = resolveReplayRecording(env[REPLAY_VARIABLE]);
+	if (recordingDir === undefined) return undefined;
+	if (!testMode)
+		return refused(
+			'REVIEWER_REPLAY_OUTSIDE_TEST_MODE',
+			toolId,
+			`${REPLAY_VARIABLE} is set, and a replay is honoured in test mode only: outside it the mandatory Reasoning Review ` +
+				'would answer from a recording while the record named a reviewer that judged. Unset it, or run in test mode ' +
+				'(REG-D-111 (5)).'
+		);
+	if (toolId !== undefined)
+		return refused(
+			'REVIEWER_REPLAY_BESIDE_A_TOOL',
+			toolId,
+			`${REPLAY_VARIABLE} is set and so is JPWB_ASSURANCE_TOOL ('${toolId}'): a replay and a live reviewer cannot both ` +
+				'judge, and a live one winning silently would be a paid call where a replay was asked for. Unset one of them.'
+		);
+	return { kind: 'REPLAY', recordingDir };
+}
+
+/**
  * Which reviewer runs.
+ *
+ * ⭐ `JAN-EXEC` Phase 8 — ASKED FIRST: `JPWB_REPLAY` (`replaySelection`, above): REPLAY in test mode with no tool named,
+ * else `REVIEWER_REPLAY_OUTSIDE_TEST_MODE` or `REVIEWER_REPLAY_BESIDE_A_TOOL`. Unset, the table below is unchanged.
  *
  * ⭑ THE TABLE (D2, D7):
  *   · tool UNSET (absent, `''` or whitespace) — test mode: the declared STAND-IN; outside it: REFUSED.
@@ -157,6 +200,8 @@ export function selectReviewer(input: {
 }): ReviewerSelection {
 	const env = input.env ?? process.env;
 	const toolId = resolveReviewerToolId(env.JPWB_ASSURANCE_TOOL);
+	const replay = replaySelection(env, input.testMode, toolId);
+	if (replay) return replay;
 	if (toolId === undefined)
 		return input.testMode
 			? { kind: 'STAND_IN' }

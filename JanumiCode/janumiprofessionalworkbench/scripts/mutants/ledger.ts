@@ -7389,7 +7389,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		find: "\t\t\t\tinput.runner.kind === 'REAL'",
 		replace: "\t\t\t\tinput.argv.length >= 0 // MUTANT: both wirings get the WIRING ERROR message",
 		expectRed: ["packages/rph-ports/src/ports/process-runner.test.ts"],
-		why: "PROMISE, in the function's own docblock: \"IT REFUSES AN IN_MEMORY WORKSPACE FOR EITHER RUNNER KIND, AND THE MESSAGES DIFFER ON PURPOSE ... Collapsing the two into one message would make a misconfiguration read exactly like the default.\" WHO RELIES: whoever is debugging why nothing ran - the only reader this distinction exists for. WHAT THE MUTATION DOES TO THEM: the hermetic default now announces itself as a WIRING ERROR, so a host is sent to fix a correct configuration; and once that message is normal noise, the real misconfiguration is indistinguishable from it. `planned` is false either way, so this mutant is INVISIBLE to any assertion that stops at the refusal - the victim asserts that the default's message does NOT match /WIRING ERROR/, which is the only form that catches it.",
+		why: "PROMISE, in the function's own docblock: \"IT REFUSES AN IN_MEMORY WORKSPACE FOR EITHER RUNNER KIND, AND THE MESSAGES DIFFER ON PURPOSE ... Collapsing the two into one message would make a misconfiguration read exactly like the default.\" WHO RELIES: whoever is debugging why nothing ran - the only reader this distinction exists for. WHAT THE MUTATION DOES TO THEM: the hermetic default now announces itself as a WIRING ERROR, so a host is sent to fix a correct configuration; and once that message is normal noise, the real misconfiguration is indistinguishable from it. `planned` is false either way, so this mutant is INVISIBLE to any assertion that stops at the refusal - the victim asserts that the default's message does NOT match /WIRING ERROR/, which is the only form that catches it. 2026-10-11 (JAN-EXEC Phase 8 E4): the REPLAYED kind gave the non-REAL arm a helper of its own (`unplannableWithoutADirectory`), whose first, narrower parameter made this mutation NO_COMPILE (TS2345: '\"REAL\" | \"REFUSING\" | \"REPLAYED\"' not assignable) - the helper now takes the whole kind union, the anchor unchanged, and the mutant measured again: KILLED - 'KILLED         P1-h-both-wirings-get-the-same-refusal ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'.",
 		source: "JAN-EXEC Phase 1 - the message-discrimination limb of `planProcessRun`"
 	},
 	{
@@ -26808,5 +26808,347 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["apps/rph-demo/src/lib/server/execution/run-model-step.test.ts"],
 		why: "PROMISE (REG-F-557 AS1; REG-D-056): the execution exchange of an envelope that is one JSON object keeps its answer span - the design's separable consequence. WHO RELIES: the permanent record of every model-executed step, whose answer bytes are kept only when a span is located; P2's three refused phases left 6 exchanges with no answer bytes, and the run report's stage 8 broke. WHAT THE MUTATION DOES: the whole-object arm answers but reports no span, so `captureTry` takes REG-D-056's unlocated branch and the execution exchange keeps nothing of a P2-shaped envelope. OBSERVED (bun run mutants -- the ten P78 ids, 2026-10-11, in the builder's worktree after `bun run build`, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P78-M10-a-whole-object-span-is-reported-unlocated ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'.",
 		source: "JAN-EXEC Phase 7 P7-8 (B9, p78-answer-span) - REG-F-557's fix: AS1 the whole text first (extractJson and splitAnswerSpan read a reply that is one JSON object whole; only otherwise the first fence, then the outermost braces), AS2 the work-product floor's schema fact is located AND the located span parses, AS3 the qualification harness's FENCED asks the product's own question (docs/_working/DESIGN-the-answer-span.md AS1-AS3, §3; REG-F-557; REG-D-108; REG-F-339; REG-D-056)"
+	},
+	{
+		id: "E4-M1-test-mode-ignores-the-executor-switch",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "\treturn { kind: 'REPLAY', recordingDir };\n}",
+		replace: "\treturn undefined; // MUTANT: the switch is read and ignored, and the stand-in answers\n}",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replay-selection.test.ts"],
+		why: "PROMISE (D2; the design's predicted red): test mode with JPWB_REPLAY set answers REPLAY for the executor. WHO RELIES: the replay regression, whose executor turns must come from the recording, never the fixture. WHAT THE MUTATION DOES: the switch is ignored and the stand-in executor answers, as it did before Phase 8 (executor-selection.ts, the STAND_IN arm). OBSERVED (bun run mutants -- E4-M P1-h-both-wirings-get-the-same-refusal P2-c-both-wirings-get-the-same-refusal, 2026-10-11, in the builder's worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M1-test-mode-ignores-the-executor-switch ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯' Measured again after its victim's literals were rebuilt so that no line names an absolute path (REG-F-536; bun run mutants -- the twelve ids, 2026-10-11): the same verdict, KILLED.",
+		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
+	},
+	{
+		id: "E4-M2-the-executor-switch-is-honoured-outside-test-mode",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "\tif (!testMode)\n\t\treturn refused(\n\t\t\t'EXECUTOR_REPLAY_OUTSIDE_TEST_MODE',",
+		replace: "\tif (!testMode && false) // MUTANT: the switch is honoured outside test mode\n\t\treturn refused(\n\t\t\t'EXECUTOR_REPLAY_OUTSIDE_TEST_MODE',",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replay-selection.test.ts"],
+		why: "PROMISE (D2): outside test mode JPWB_REPLAY is REFUSED with its own code (EXECUTOR_REPLAY_OUTSIDE_TEST_MODE), before anything is dispatched. WHO RELIES: a deployed host, whose executor must be the configured one, never answers read from a file while the record names a model that ran. WHAT THE MUTATION DOES: the refusal is skipped, so a live tool named beside the switch runs (or, beside none, the replay itself answers) outside test mode. OBSERVED (bun run mutants -- E4-M P1-h-both-wirings-get-the-same-refusal P2-c-both-wirings-get-the-same-refusal, 2026-10-11, in the builder's worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M2-the-executor-switch-is-honoured-outside-test-mode ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯' Measured again after its victim's literals were rebuilt so that no line names an absolute path (REG-F-536; bun run mutants -- the twelve ids, 2026-10-11): the same verdict, KILLED.",
+		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
+	},
+	{
+		id: "E4-M3-test-mode-ignores-the-reviewer-switch",
+		file: "apps/rph-demo/src/lib/server/assurance/reviewer-selection.ts",
+		find: "\treturn { kind: 'REPLAY', recordingDir };\n}",
+		replace: "\treturn undefined; // MUTANT: the switch is read and ignored, and the stand-in reviews\n}",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replay-selection.test.ts"],
+		why: "PROMISE (D2; the design's predicted red): test mode with JPWB_REPLAY set answers REPLAY for the reviewer. WHO RELIES: the replay regression, whose reviews must be the recorded ones (REG-F-530: the stand-in leaves a clean review INCONCLUSIVE and stops a replayed unit). WHAT THE MUTATION DOES: the switch is ignored and the declared stand-in reviews. OBSERVED (bun run mutants -- E4-M P1-h-both-wirings-get-the-same-refusal P2-c-both-wirings-get-the-same-refusal, 2026-10-11, in the builder's worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M3-test-mode-ignores-the-reviewer-switch ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯' Measured again after its victim's literals were rebuilt so that no line names an absolute path (REG-F-536; bun run mutants -- the twelve ids, 2026-10-11): the same verdict, KILLED.",
+		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
+	},
+	{
+		id: "E4-M4-the-reviewer-switch-is-honoured-outside-test-mode",
+		file: "apps/rph-demo/src/lib/server/assurance/reviewer-selection.ts",
+		find: "\tif (!testMode)\n\t\treturn refused(\n\t\t\t'REVIEWER_REPLAY_OUTSIDE_TEST_MODE',",
+		replace: "\tif (!testMode && false) // MUTANT: the switch is honoured outside test mode\n\t\treturn refused(\n\t\t\t'REVIEWER_REPLAY_OUTSIDE_TEST_MODE',",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replay-selection.test.ts"],
+		why: "PROMISE (D2): outside test mode JPWB_REPLAY is REFUSED for the reviewer with REVIEWER_REPLAY_OUTSIDE_TEST_MODE, and the preflight every model step asks first carries it. WHO RELIES: the mandatory Reasoning Review of a deployed host (REG-D-052: a deterministic answerer only in test mode). WHAT THE MUTATION DOES: the refusal is skipped, so outside test mode the configured live reviewer runs where a replay was asked for, or the replay judges while the record names a reviewer that judged. OBSERVED (bun run mutants -- E4-M P1-h-both-wirings-get-the-same-refusal P2-c-both-wirings-get-the-same-refusal, 2026-10-11, in the builder's worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M4-the-reviewer-switch-is-honoured-outside-test-mode ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯' Measured again after its victim's literals were rebuilt so that no line names an absolute path (REG-F-536; bun run mutants -- the twelve ids, 2026-10-11): the same verdict, KILLED.",
+		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
+	},
+	{
+		id: "E4-M5-a-replay-beside-a-live-executor-is-not-refused",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "\tif (toolId !== undefined)\n\t\treturn refused(\n\t\t\t'EXECUTOR_REPLAY_BESIDE_A_TOOL',",
+		replace: "\tif (toolId !== undefined && false) // MUTANT: the replay silently outranks a named executor\n\t\treturn refused(\n\t\t\t'EXECUTOR_REPLAY_BESIDE_A_TOOL',",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replay-selection.test.ts"],
+		why: "PROMISE (D2): a replay with JPWB_EXECUTOR also set is refused (EXECUTOR_REPLAY_BESIDE_A_TOOL), naming the tool. WHO RELIES: an operator whose environment carries both, who must learn that one of them did nothing. WHAT THE MUTATION DOES: the replay silently wins over the named tool. OBSERVED (bun run mutants -- E4-M P1-h-both-wirings-get-the-same-refusal P2-c-both-wirings-get-the-same-refusal, 2026-10-11, in the builder's worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M5-a-replay-beside-a-live-executor-is-not-refused ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯' Measured again after its victim's literals were rebuilt so that no line names an absolute path (REG-F-536; bun run mutants -- the twelve ids, 2026-10-11): the same verdict, KILLED.",
+		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
+	},
+	{
+		id: "E4-M6-a-replay-beside-a-live-reviewer-is-not-refused",
+		file: "apps/rph-demo/src/lib/server/assurance/reviewer-selection.ts",
+		find: "\tif (toolId !== undefined)\n\t\treturn refused(\n\t\t\t'REVIEWER_REPLAY_BESIDE_A_TOOL',",
+		replace: "\tif (toolId !== undefined && false) // MUTANT: the replay silently outranks a named reviewer\n\t\treturn refused(\n\t\t\t'REVIEWER_REPLAY_BESIDE_A_TOOL',",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replay-selection.test.ts"],
+		why: "PROMISE (D2; REG-D-067): a replay with JPWB_ASSURANCE_TOOL also set is refused (REVIEWER_REPLAY_BESIDE_A_TOOL): neither may silently win, and the live one winning is a paid call where a replay was asked for. WHAT THE MUTATION DOES: the replay silently outranks the named reviewer. OBSERVED (bun run mutants -- E4-M P1-h-both-wirings-get-the-same-refusal P2-c-both-wirings-get-the-same-refusal, 2026-10-11, in the builder's worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M6-a-replay-beside-a-live-reviewer-is-not-refused ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯' Measured again after its victim's literals were rebuilt so that no line names an absolute path (REG-F-536; bun run mutants -- the twelve ids, 2026-10-11): the same verdict, KILLED.",
+		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
+	},
+	{
+		id: "E4-M7-CONTROL-replies-are-served-by-order-alone",
+		file: "apps/rph-demo/src/lib/server/replay/replay-run.ts",
+		find: "\t\t\tif (actual !== call.promptSha256)\n",
+		replace: "\t\t\tif (actual !== call.promptSha256 && false) // MUTANT: replies served by order alone, the prompt never asked\n",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replay-reviewer.test.ts"],
+		why: "PROMISE (D2; REG-D-067; REG-D-068 'bound to the subject it was made about'; the design's control mutant): a recorded reply is served only to the prompt whose scrubbed hash it was recorded under; a mismatch is REPLAY_STALE naming the call and both hashes. WHO RELIES: every replayed review, whose judgement is worth nothing about another subject. WHAT THE MUTATION DOES: replies are served by order alone, the qualification runner's replayReplies precedent - a stale prompt is answered SATISFIED (driven red-first: 'expected ... to contain REPLAY_STALE', the disposition SATISFIED). OBSERVED (bun run mutants -- E4-M P1-h-both-wirings-get-the-same-refusal P2-c-both-wirings-get-the-same-refusal, 2026-10-11, in the builder's worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M7-CONTROL-replies-are-served-by-order-alone ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
+	},
+	{
+		id: "E4-M8-a-recorded-throw-is-not-thrown-again",
+		file: "apps/rph-demo/src/lib/server/replay/replay-run.ts",
+		find: "\t\t\tif (call.reply.status === 'THROWN') throw new Error(expand(call.reply.message));\n",
+		replace: "\t\t\t// MUTANT: a recorded throw is served as a reply with no text\n",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replay-reviewer.test.ts"],
+		why: "PROMISE (D2; the design's predicted red): a recorded THROWN reply is thrown again with the tool's own message, so the validator records it no-response and runs it once more exactly as the run did (P7-2b; REG-D-102 (2)). WHO RELIES: a replay of P3, whose design phase holds a thrown command review and its retry. WHAT THE MUTATION DOES: the throw is served as an empty reply - another disposition, a repair where the run retried. OBSERVED (bun run mutants -- E4-M P1-h-both-wirings-get-the-same-refusal P2-c-both-wirings-get-the-same-refusal, 2026-10-11, in the builder's worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M8-a-recorded-throw-is-not-thrown-again ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
+	},
+	{
+		id: "E4-M9-the-recorded-elapsed-time-is-not-honoured",
+		file: "apps/rph-demo/src/lib/server/replay/replay-run.ts",
+		find: "\t\t\tvirtualMs += call.elapsedMs;\n",
+		replace: "\t\t\t// MUTANT: the clock does not advance by the recorded elapsed time\n",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replay-reviewer.test.ts"],
+		why: "PROMISE (D2): the replay's clock advances by each call's RECORDED elapsed time, so the validator's thrownCallDisposal measures what the run measured and a retry happens exactly where it happened. WHO RELIES: a replayed throw at or past the tool's bound (a timeout: no retry) and one short of it (one retry). WHAT THE MUTATION DOES: every call takes 0 ms, so a recorded timeout is retried and the records' times are not the recorded ones. OBSERVED (bun run mutants -- E4-M P1-h-both-wirings-get-the-same-refusal P2-c-both-wirings-get-the-same-refusal, 2026-10-11, in the builder's worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M9-the-recorded-elapsed-time-is-not-honoured ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
+	},
+	{
+		id: "E4-M10-a-stale-call-does-not-poison-the-replay",
+		file: "apps/rph-demo/src/lib/server/replay/replay-run.ts",
+		find: "\t\tpoisoned ??= refusal;\n",
+		replace: "\t\t// MUTANT: the first refusal poisons nothing\n",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replay-reviewer.test.ts"],
+		why: "PROMISE (D2): the first REPLAY_STALE or REPLAY_EXHAUSTED poisons the replay, so every later call of any arm refuses - the validator's one retry of a stale throw included - and the regression sees the refusal. WHO RELIES: the regression's verdict (poisonedBy), and a stale command, after which the recorded argv must not be served. WHAT THE MUTATION DOES: the replay carries on after diverging and nothing records that it refused. OBSERVED (bun run mutants -- E4-M P1-h-both-wirings-get-the-same-refusal P2-c-both-wirings-get-the-same-refusal, 2026-10-11, in the builder's worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M10-a-stale-call-does-not-poison-the-replay ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
+	},
+	{
+		id: "E4-M11-the-turn-text-is-not-checked",
+		file: "apps/rph-demo/src/lib/server/replay/replay-run.ts",
+		find: "\t\t\tif (actual !== recorded.turnSha256)\n",
+		replace: "\t\t\tif (actual !== recorded.turnSha256 && false) // MUTANT: the turn is never checked\n",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replay-executor.test.ts"],
+		why: "PROMISE (D2): an executor try is served only to a turn whose scrubbed text hashes to the recorded turnSha256; else REPLAY_STALE naming the try and both hashes, and no tool runs. WHO RELIES: the replay regression, whose recorded work product answers the recorded instruction only. WHAT THE MUTATION DOES: any turn takes the next recorded try, its tool calls run and its answer is returned. OBSERVED (bun run mutants -- E4-M P1-h-both-wirings-get-the-same-refusal P2-c-both-wirings-get-the-same-refusal, 2026-10-11, in the builder's worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M11-the-turn-text-is-not-checked ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
+	},
+	{
+		id: "E4-M12-the-command-argv-is-not-checked",
+		file: "apps/rph-demo/src/lib/server/replay/replay-run.ts",
+		find: "\t\t\tif (JSON.stringify(actual) !== JSON.stringify(recorded.argv))\n",
+		replace: "\t\t\tif (JSON.stringify(actual) !== JSON.stringify(recorded.argv) && false) // MUTANT: the argv is never checked\n",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replayed-runner.test.ts"],
+		why: "PROMISE (D2): the REPLAYED runner serves a recorded command only to the argv it was recorded for; another argv runs nothing, writes nothing, and is REPLAY_STALE. WHO RELIES: every replayed command review, whose prompt carries the argv and the recorded output. WHAT THE MUTATION DOES: any argv receives the next recorded outcome and capture. OBSERVED (bun run mutants -- E4-M P1-h-both-wirings-get-the-same-refusal P2-c-both-wirings-get-the-same-refusal, 2026-10-11, in the builder's worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M12-the-command-argv-is-not-checked ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯' Measured again after its victim's literals were rebuilt so that no line names an absolute path (REG-F-536; bun run mutants -- the twelve ids, 2026-10-11): the same verdict, KILLED.",
+		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
+	},
+	{
+		id: "E4-M13-a-replayed-review-is-graded-provider-reported",
+		file: "apps/rph-demo/src/lib/server/replay/replay-run.ts",
+		find: "\t\t\t\tidentityEvidence: 'HOST_CONFIGURED',\n\t\t\t\tobservedToolCalls: REPLAYED_REVIEW_OBSERVATION",
+		replace: "\t\t\t\tidentityEvidence: 'PROVIDER_REPORTED', // MUTANT: the recorded grade is re-reported\n\t\t\t\tobservedToolCalls: REPLAYED_REVIEW_OBSERVATION",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replay-reviewer.test.ts"],
+		why: "PROMISE (D2; D3; REG-F-530 'Identity'): a replayed reviewer reply is graded HOST_CONFIGURED - no provider reported a call that did not happen. WHO RELIES: the exchange record of every replayed review, and the regression's assertion that no exchange is PROVIDER_REPORTED. WHAT THE MUTATION DOES: the record says the provider confirmed the model for a replayed call. OBSERVED (bun run mutants -- E4-M P1-h-both-wirings-get-the-same-refusal P2-c-both-wirings-get-the-same-refusal, 2026-10-11, in the builder's worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M13-a-replayed-review-is-graded-provider-reported ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
+	},
+	{
+		id: "E4-M14-a-replayed-turn-is-graded-provider-reported",
+		file: "apps/rph-demo/src/lib/server/replay/replay-executor.ts",
+		find: "\t\t\t\t\tidentityEvidence: 'HOST_CONFIGURED',\n",
+		replace: "\t\t\t\t\tidentityEvidence: 'PROVIDER_REPORTED', // MUTANT: the recorded grade is re-reported\n",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replay-executor.test.ts"],
+		why: "PROMISE (D2; REG-F-530 'Identity'): a replayed executor turn reports the recorded producer graded HOST_CONFIGURED. WHO RELIES: the EXECUTION-plane exchange of every replayed try. WHAT THE MUTATION DOES: it re-reports PROVIDER_REPORTED, the run's grade, for a turn no provider served. OBSERVED (bun run mutants -- E4-M P1-h-both-wirings-get-the-same-refusal P2-c-both-wirings-get-the-same-refusal, 2026-10-11, in the builder's worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M14-a-replayed-turn-is-graded-provider-reported ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
+	},
+	{
+		id: "E4-M15-a-diverged-tool-outcome-is-not-refused",
+		file: "apps/rph-demo/src/lib/server/replay/replay-executor.ts",
+		find: "\t\t\t\t\tif (observed !== call.outcome)\n",
+		replace: "\t\t\t\t\tif (observed !== call.outcome && false) // MUTANT: the replayed outcome is never held to the recorded one\n",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replay-executor.test.ts"],
+		why: "PROMISE (D2): each replayed tool call's outcome, as the host observes it through the real minted tools, must be the recorded one; else the turn fails REPLAY_STALE. WHO RELIES: a replay whose write the workspace now refuses, or whose command the runner now refuses, which is a run that has diverged. WHAT THE MUTATION DOES: the divergence passes silently and the recorded answer is returned over a workspace it does not describe. OBSERVED (bun run mutants -- E4-M P1-h-both-wirings-get-the-same-refusal P2-c-both-wirings-get-the-same-refusal, 2026-10-11, in the builder's worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M15-a-diverged-tool-outcome-is-not-refused ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
+	},
+	{
+		id: "E4-M16-a-replay-opens-over-a-real-runner",
+		file: "apps/rph-demo/src/lib/server/replay/replay-executor.ts",
+		find: "\tif (context.runner.kind !== 'REPLAYED')\n",
+		replace: "\tif (context.runner.kind !== 'REPLAYED' && false) // MUTANT: a replay opens over any runner\n",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replay-executor.test.ts"],
+		why: "PROMISE (D2; D3 'never REAL'): the replay session opens only over the REPLAYED runner; a REAL one would re-run commands the recording says the result of. WHO RELIES: the regression's 'no program spawned'. WHAT THE MUTATION DOES: the replay session opens over a REAL runner and its run_command calls would start programs. OBSERVED (bun run mutants -- E4-M P1-h-both-wirings-get-the-same-refusal P2-c-both-wirings-get-the-same-refusal, 2026-10-11, in the builder's worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M16-a-replay-opens-over-a-real-runner ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
+	},
+	{
+		id: "E4-M17-the-replayed-runner-takes-any-cwd",
+		file: "apps/rph-demo/src/lib/server/replay/replayed-runner.ts",
+		find: "\t\t\tif (resolvePath(request.cwd) !== deliverableRoot)\n",
+		replace: "\t\t\tif (resolvePath(request.cwd) !== deliverableRoot && false) // MUTANT: any cwd is replayed\n",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replayed-runner.test.ts"],
+		why: "PROMISE (D2): the REPLAYED runner refuses a cwd that is not the deliverable workspace before the recording is read, as the real runner refuses it (B8). WHO RELIES: the recording's cursor, which a mis-built request must not advance. WHAT THE MUTATION DOES: a request for another directory takes a recorded command. OBSERVED (bun run mutants -- E4-M P1-h-both-wirings-get-the-same-refusal P2-c-both-wirings-get-the-same-refusal, 2026-10-11, in the builder's worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M17-the-replayed-runner-takes-any-cwd ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯' Measured again after its victim's literals were rebuilt so that no line names an absolute path (REG-F-536; bun run mutants -- the twelve ids, 2026-10-11): the same verdict, KILLED.",
+		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
+	},
+	{
+		id: "E4-M18-the-replayed-runner-declares-itself-real",
+		file: "apps/rph-demo/src/lib/server/replay/replayed-runner.ts",
+		find: "\t\tkind: 'REPLAYED',\n",
+		replace: "\t\tkind: 'REAL', // MUTANT: the replay is declared a real runner\n",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replayed-runner.test.ts"],
+		why: "PROMISE (D2; the port's kind union): a runner that starts nothing declares REPLAYED, never REAL. WHO RELIES: every reader of ProcessRunner.kind - planProcessRun, producerWorkingDirectory, the replay session's own REAL refusal. WHAT THE MUTATION DOES: a replayed outcome is declared the outcome of a run that happened. OBSERVED (bun run mutants -- E4-M P1-h-both-wirings-get-the-same-refusal P2-c-both-wirings-get-the-same-refusal, 2026-10-11, in the builder's worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M18-the-replayed-runner-declares-itself-real ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯' Measured again after its victim's literals were rebuilt so that no line names an absolute path (REG-F-536; bun run mutants -- the twelve ids, 2026-10-11): the same verdict, KILLED.",
+		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
+	},
+	{
+		id: "E4-M19-the-floor-registry-has-no-replay-arm",
+		file: "apps/rph-demo/src/lib/server/assurance/index.ts",
+		find: "\telse if (selection.kind === 'REPLAY') registry.register(replayReviewer(selection, opts));\n",
+		replace: "\telse if (selection.kind === 'REPLAY' && opts.testMode === false) registry.register(replayReviewer(selection, opts)); // MUTANT: in test mode REPLAY falls to the agy branch\n",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replay-reviewer.test.ts"],
+		why: "PROMISE (D2; REG-D-067): a REPLAY selection registers the replay reviewer - the product's validator on the replay's print and clock - and an injected print does not outrank it. WHO RELIES: every floor of a replayed run. WHAT THE MUTATION DOES: REPLAY falls to the real-tool branch: the injected print (or agy) reviews, a fallback the replay must never take. OBSERVED (bun run mutants -- E4-M P1-h-both-wirings-get-the-same-refusal P2-c-both-wirings-get-the-same-refusal, 2026-10-11, in the builder's worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M19-the-floor-registry-has-no-replay-arm ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
+	},
+	{
+		id: "E4-M20-the-replay-reviewer-runs-on-the-wall-clock",
+		file: "apps/rph-demo/src/lib/server/assurance/index.ts",
+		find: "\t\tclock: run.clock,\n",
+		replace: "\t\t// MUTANT: the replay's clock is not handed to the validator\n",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replay-reviewer.test.ts"],
+		why: "PROMISE (D2): the floor registry hands the validator the replay's clock, so a thrown call's retry is decided by its recorded elapsed time. WHO RELIES: the replay of a run with a thrown reviewer call (P3's design phase). WHAT THE MUTATION DOES: the validator reads the wall clock, and the records' times are this replay's, not the recording's. OBSERVED (bun run mutants -- E4-M P1-h-both-wirings-get-the-same-refusal P2-c-both-wirings-get-the-same-refusal, 2026-10-11, in the builder's worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M20-the-replay-reviewer-runs-on-the-wall-clock ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
+	},
+	{
+		id: "E4-M21-the-replay-reviewer-has-no-recorded-bound",
+		file: "apps/rph-demo/src/lib/server/assurance/index.ts",
+		find: "\t\t...(reviewer.callBoundMs === null ? {} : { callBoundMs: reviewer.callBoundMs })\n",
+		replace: "\t\t// MUTANT: the recorded bound is not handed to the validator\n",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replay-reviewer.test.ts"],
+		why: "PROMISE (D2): the replay reviewer is held to the recorded tool's bound, so a recorded throw short of it is run once more as it was. WHO RELIES: the replay of P3's thrown command review. WHAT THE MUTATION DOES: an injected print declares no bound, so the recorded throw stands and the review fails where the run's retried and passed. OBSERVED (bun run mutants -- E4-M P1-h-both-wirings-get-the-same-refusal P2-c-both-wirings-get-the-same-refusal, 2026-10-11, in the builder's worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M21-the-replay-reviewer-has-no-recorded-bound ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
+	},
+	{
+		id: "E4-M22-the-replay-gets-no-filesystem-sandbox",
+		file: "apps/rph-demo/src/lib/server/execution/workspace-host.ts",
+		find: "\tif (replay !== undefined) return replaySandbox(undertakingId, segment, replay);",
+		replace: "\tif (replay !== undefined && replay.recording.executor.length < 0) return replaySandbox(undertakingId, segment, replay); // MUTANT: never taken at run time, so test mode's in-memory arm answers",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replay-sandbox.test.ts"],
+		why: "PROMISE (D3; the design's predicted red; REG-F-530 'the test-mode rule ... gives a replay no filesystem workspace'): in test mode with the switch, an Undertaking gets FILESYSTEM workspaces under the replay's disposable root and the REPLAYED runner. WHO RELIES: replayed write_file calls and the R17 capture bytes. WHAT THE MUTATION DOES: the replay gets IN_MEMORY workspaces and the refusing runner, as before Phase 8. OBSERVED (bun run mutants -- P1-h-both-wirings-get-the-same-refusal E4-M22 E4-M27, 2026-10-11, in the builder's worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M22-the-replay-gets-no-filesystem-sandbox ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯' The first run reported this mutant NO_COMPILE (the refusal's condition was mutated, `&& false`, and the arm's narrowing went with it - the ledger header's V-2c lesson); it was reformulated to keep the condition's type and falsify it at run time, and measured again.",
+		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
+	},
+	{
+		id: "E4-M23-the-replay-sandbox-is-taken-outside-test-mode",
+		file: "apps/rph-demo/src/lib/server/execution/workspace-host.ts",
+		find: "\tif (env.RPH_DEMO_MODE !== 'test') return undefined;",
+		replace: "\tif (env.RPH_DEMO_MODE === 'never') return undefined; // MUTANT: the replay arm in any mode",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replay-sandbox.test.ts"],
+		why: "PROMISE (D3): the replay sandbox is taken in test mode only; outside it the switch buys nothing here. WHO RELIES: a server-mode host, whose sandbox must not become a replay's. WHAT THE MUTATION DOES: a server process with JPWB_REPLAY set gets the replay's disposable workspaces and REPLAYED runner. OBSERVED (bun run mutants -- E4-M P1-h-both-wirings-get-the-same-refusal P2-c-both-wirings-get-the-same-refusal, 2026-10-11, in the builder's worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M23-the-replay-sandbox-is-taken-outside-test-mode ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
+	},
+	{
+		id: "E4-M24-the-replay-session-opens-another-recording",
+		file: "apps/rph-demo/src/lib/server/execution/model.ts",
+		find: "openReplayExecutionSession(context, replayRunFor(selection.recordingDir))",
+		replace: "openReplayExecutionSession(context, replayRunFor(`${selection.recordingDir}-not-the-selected-one`)) /* MUTANT */",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replay-executor.test.ts"],
+		why: "PROMISE (D2): getExecutionSession opens the replay session over the recording the REPLAY selection names. WHO RELIES: the route's Begin & Execute in replay mode. WHAT THE MUTATION DOES: another folder is opened, which is refused as no recording, and every replayed step fails. OBSERVED (bun run mutants -- E4-M P1-h-both-wirings-get-the-same-refusal P2-c-both-wirings-get-the-same-refusal, 2026-10-11, in the builder's worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M24-the-replay-session-opens-another-recording ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
+	},
+	{
+		id: "E4-M25-a-replayed-runner-reads-as-the-hermetic-default",
+		file: "packages/rph-ports/src/ports/process-runner.ts",
+		find: "\tif (kind === 'REPLAYED')\n",
+		replace: "\tif (kind === 'REPLAYED' && false) // MUTANT: REPLAYED gets the REFUSING default's sentence\n",
+		expectRed: ["packages/rph-ports/src/ports/process-runner.test.ts"],
+		why: "PROMISE (D2, D3; P1-h's rule that each wiring gets its own true sentence): a REPLAYED runner over an IN_MEMORY workspace is refused as a wiring error of its own - neither the REAL runner's (a command executing elsewhere, false of a runner that starts nothing) nor the hermetic default's. WHO RELIES: whoever debugs why a replay replayed nothing. WHAT THE MUTATION DOES: the REPLAYED misconfiguration reads exactly like the library's default. OBSERVED (bun run mutants -- E4-M P1-h-both-wirings-get-the-same-refusal P2-c-both-wirings-get-the-same-refusal, 2026-10-11, in the builder's worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M25-a-replayed-runner-reads-as-the-hermetic-default ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
+	},
+	{
+		id: "E4-M26-a-replayed-session-reads-as-the-hosts-default",
+		file: "apps/rph-demo/src/lib/server/execution/producer-session.ts",
+		find: "\t\t\t\t\t\tcontext.runner.kind === 'REPLAYED'\n",
+		replace: "\t\t\t\t\t\tcontext.runner.kind === 'REPLAYED' && false // MUTANT: REPLAYED gets the default's sentence\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/producer-session.test.ts"],
+		why: "PROMISE (D2, D3; P2-c's rule): producerWorkingDirectory refuses a REPLAYED runner over an IN_MEMORY workspace as its own wiring error, never with the default's 'configure JPWB_DEMO_DB', advice that cannot help a replay. WHAT THE MUTATION DOES: the replay misconfiguration gets the default's sentence. OBSERVED (bun run mutants -- E4-M P1-h-both-wirings-get-the-same-refusal P2-c-both-wirings-get-the-same-refusal, 2026-10-11, in the builder's worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M26-a-replayed-session-reads-as-the-hosts-default ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
+	},
+	{
+		id: "E4-M27-a-recording-of-another-format-is-read",
+		file: "apps/rph-demo/src/lib/server/replay/recording.ts",
+		find: "\tif (v.format !== RECORDING_FORMAT)\n",
+		replace: "\tif (v.format !== RECORDING_FORMAT && String(v.format) === '') // MUTANT: any named format is read\n",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/recording.test.ts"],
+		why: "PROMISE (D1): readRecording refuses a recording.json of another format - a recording of another shape replays another run. WHO RELIES: every replay arm, which reads its fields as this format defines them. WHAT THE MUTATION DOES: another format is read as this one. OBSERVED (bun run mutants -- P1-h-both-wirings-get-the-same-refusal E4-M22 E4-M27, 2026-10-11, in the builder's worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M27-a-recording-of-another-format-is-read ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯' The first run reported this mutant NO_COMPILE (the refusal's condition was mutated, `&& false`, and the arm's narrowing went with it - the ledger header's V-2c lesson); it was reformulated to keep the condition's type and falsify it at run time, and measured again. Measured again after its victim's literals were rebuilt so that no line names an absolute path (REG-F-536; bun run mutants -- the twelve ids, 2026-10-11): the same verdict, KILLED.",
+		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
+	},
+	{
+		id: "E4-M28-the-scrub-is-not-longest-first",
+		file: "apps/rph-demo/src/lib/server/replay/recording.ts",
+		find: "\treturn pairs.sort((a, b) => b.literal.length - a.literal.length);",
+		replace: "\treturn pairs; // MUTANT: the pairs in place order, not longest first",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/recording.test.ts"],
+		why: "PROMISE (D1; REG-F-536): the scrub replaces the longer literal first, so the workspace is never replaced inside its own .process-output sibling or the home folder inside the workspace. WHO RELIES: every hash the recording holds and the replay recomputes. WHAT THE MUTATION DOES: the process-output path is scrubbed as the workspace token plus a suffix, and the two spellings no longer round-trip. OBSERVED (bun run mutants -- E4-M P1-h-both-wirings-get-the-same-refusal P2-c-both-wirings-get-the-same-refusal, 2026-10-11, in the builder's worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M28-the-scrub-is-not-longest-first ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯' Measured again after its victim's literals were rebuilt so that no line names an absolute path (REG-F-536; bun run mutants -- the twelve ids, 2026-10-11): the same verdict, KILLED.",
+		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
+	},
+	{
+		id: "E4-M29-a-filesystem-root-is-a-scrub-place",
+		file: "apps/rph-demo/src/lib/server/replay/recording.ts",
+		find: "\t\tif (native === '' || dirname(native) === native) continue;",
+		replace: "\t\tif (native === '') continue; // MUTANT: a root is scrubbed too",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/recording.test.ts"],
+		why: "PROMISE (D1): a place that is a filesystem root is left out of the scrub: '/' as a home would replace every separator in the text. WHO RELIES: a replay on a host whose home is a root (a container). WHAT THE MUTATION DOES: every separator in every hashed text becomes a token. OBSERVED (bun run mutants -- E4-M P1-h-both-wirings-get-the-same-refusal P2-c-both-wirings-get-the-same-refusal, 2026-10-11, in the builder's worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M29-a-filesystem-root-is-a-scrub-place ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯' Measured again after its victim's literals were rebuilt so that no line names an absolute path (REG-F-536; bun run mutants -- the twelve ids, 2026-10-11): the same verdict, KILLED.",
+		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
+	},
+	{
+		id: "E4-M30-a-token-closes-with-a-brace-again",
+		file: "apps/rph-demo/src/lib/server/replay/recording.ts",
+		find: "\t`JPWB_REPLAY_${place}_${spelling.toUpperCase()}`;",
+		replace: "\t`{{${place}:${spelling}}}`; // MUTANT: the brace-closed token shape",
+		expectRed: ["verif/phase7-record-replay.test.ts"],
+		why: "PROMISE (D1; REG-F-536): a scrub token ends in a word character, so the archive scan never reads a path relative to it as the start of a UNC path. WHO RELIES: the recorder, which refuses on any scan hit, and the commit rule that a committed recording scans clean. WHAT THE MUTATION DOES: the token shape the first landing had - driven red: the recorder's own fixture was refused, 'reviewer.jsonl:1:341 unc-path', for {{HOME}}\\\\AppData\\\\... in a JSON line. OBSERVED (bun run mutants -- E4-M P1-h-both-wirings-get-the-same-refusal P2-c-both-wirings-get-the-same-refusal, 2026-10-11, in the builder's worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M30-a-token-closes-with-a-brace-again ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
+	},
+	{
+		id: "E4-M31-the-recorder-writes-without-scanning",
+		file: "scripts/phase7/record-replay.ts",
+		find: "\tif (hits.length > 0) {\n",
+		replace: "\tif (hits.length > 0 && false) { // MUTANT: the recording is written whatever the scan found\n",
+		expectRed: ["verif/phase7-record-replay.test.ts"],
+		why: "PROMISE (D1; REG-F-536): the recorder writes nothing when any file of the recording names the account or an absolute path, and names each hit's place and kind, never its text. WHO RELIES: the committed recording P7 will hold. WHAT THE MUTATION DOES: a recording naming the account is written. OBSERVED (bun run mutants -- E4-M P1-h-both-wirings-get-the-same-refusal P2-c-both-wirings-get-the-same-refusal, 2026-10-11, in the builder's worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M31-the-recorder-writes-without-scanning ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
+	},
+	{
+		id: "E4-M32-the-recorder-writes-without-the-writes-rebuilding-the-workspace",
+		file: "scripts/phase7/record-replay.ts",
+		find: "\tif (checks.some((c) => c.match === false)) {\n",
+		replace: "\tif (checks.some((c) => c.match === false) && false) { // MUTANT: a mismatched workspace is written anyway\n",
+		expectRed: ["verif/phase7-record-replay.test.ts"],
+		why: "PROMISE (D1; REG-F-530 'whether the next request's payload carries it is INFERRED'): the recorder writes nothing unless the recorded write_file calls, replayed, rebuild every unit archive's workspace tree. WHO RELIES: a replay that must rebuild the deliverable through the product's own write_file. WHAT THE MUTATION DOES: a recording whose writes do not rebuild the workspace (a file a command made) is written. OBSERVED (bun run mutants -- E4-M P1-h-both-wirings-get-the-same-refusal P2-c-both-wirings-get-the-same-refusal, 2026-10-11, in the builder's worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M32-the-recorder-writes-without-the-writes-rebuilding-the-workspace ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
+	},
+	{
+		id: "E4-M33-a-try-run-out-of-call-order-is-recorded",
+		file: "scripts/phase7/record-replay-core.ts",
+		find: "\tif (!completedInCallOrder(paired.map((p) => p.completedAt))) {\n",
+		replace: "\tif (!completedInCallOrder(paired.map((p) => p.completedAt)) && false) { // MUTANT: completion order is not asked\n",
+		expectRed: ["verif/phase7-record-replay.test.ts"],
+		why: "PROMISE (D1, D4; REG-F-518): a try whose commands completed out of the order they were called is refused at recording - Pi ran them together, their reviews were dispatched in completion order, and a sequential replay goes stale there. Driven on P3's archive: 16 of 22 reviewer calls replayed, then REPLAY_STALE at the end-to-end phase's second command review. WHAT THE MUTATION DOES: such a recording is written and goes stale at its first raced command. OBSERVED (bun run mutants -- E4-M P1-h-both-wirings-get-the-same-refusal P2-c-both-wirings-get-the-same-refusal, 2026-10-11, in the builder's worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M33-a-try-run-out-of-call-order-is-recorded ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
+	},
+	{
+		id: "E4-M34-a-reply-in-two-halves-is-not-reassembled",
+		file: "scripts/phase7/record-replay-core.ts",
+		find: "\tconst region = regions.find((r) => r.role === 'MODEL_ANSWER');",
+		replace: "\tconst region = regions.find((r) => r.role === 'NO_SUCH_ROLE'); // MUTANT: the answer's region is never found",
+		expectRed: ["verif/phase7-record-replay.test.ts"],
+		why: "PROMISE (D1; REG-D-057): a reviewer reply kept in two halves - the answer span and the rest, the answer's place a MODEL_ANSWER region - is reassembled byte for byte. Measured on P3's archive: every answered reviewer call was kept so, the whole reply never. WHAT THE MUTATION DOES: the reply cannot be read, and the recorder refuses every run whose reviews answered. OBSERVED (bun run mutants -- E4-M P1-h-both-wirings-get-the-same-refusal P2-c-both-wirings-get-the-same-refusal, 2026-10-11, in the builder's worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M34-a-reply-in-two-halves-is-not-reassembled ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
+	},
+	{
+		id: "E4-M35-the-regression-ignores-a-provider-reported-exchange",
+		file: "scripts/phase7/replay-regression.ts",
+		find: "\t\tif (x.modelEvidence === 'PROVIDER_REPORTED' || x.providerEvidence === 'PROVIDER_REPORTED')\n",
+		replace: "\t\tif ((x.modelEvidence === 'PROVIDER_REPORTED' || x.providerEvidence === 'PROVIDER_REPORTED') && false) // MUTANT\n",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replay-regression.test.ts"],
+		why: "PROMISE (D3): the regression names every exchange graded PROVIDER_REPORTED. WHO RELIES: P7's committed regression. WHAT THE MUTATION DOES: a replay that re-reported the provider's grade passes; the regression test's own control (the paid run's double grades its replies so) reddens. OBSERVED (bun run mutants -- E4-M P1-h-both-wirings-get-the-same-refusal P2-c-both-wirings-get-the-same-refusal, 2026-10-11, in the builder's worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M35-the-regression-ignores-a-provider-reported-exchange ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
+	},
+	{
+		id: "E4-M36-the-regression-ignores-an-unserved-recording",
+		file: "scripts/phase7/replay-regression.ts",
+		find: "\t\tif (o.consumed[part] !== recorded[part])\n",
+		replace: "\t\tif (o.consumed[part] !== recorded[part] && false) // MUTANT\n",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replay-regression.test.ts"],
+		why: "PROMISE (D3): the regression requires the whole recording served - every executor try, command and reviewer call. WHO RELIES: a replay that diverged before its end, whatever its matrix says. WHAT THE MUTATION DOES: a replay that served 0 of 2 reviewer calls passes this limb. OBSERVED (bun run mutants -- E4-M P1-h-both-wirings-get-the-same-refusal P2-c-both-wirings-get-the-same-refusal, 2026-10-11, in the builder's worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M36-the-regression-ignores-an-unserved-recording ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
+	},
+	{
+		id: "E4-M37-the-regression-ignores-a-moved-cell",
+		file: "scripts/phase7/replay-regression.ts",
+		find: "\t\telse if (observed.get(key) !== value)\n",
+		replace: "\t\telse if (observed.get(key) !== value && false) // MUTANT\n",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replay-regression.test.ts"],
+		why: "PROMISE (D3): the regression asserts the recorded matrix, cell by cell. WHO RELIES: P7's 'the regression replays the recorded matrix at no call'. WHAT THE MUTATION DOES: a replay whose cells moved (a stale review breaking stage 4) passes this limb. OBSERVED (bun run mutants -- E4-M P1-h-both-wirings-get-the-same-refusal P2-c-both-wirings-get-the-same-refusal, 2026-10-11, in the builder's worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M37-the-regression-ignores-a-moved-cell ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
+	},
+	{
+		id: "E4-M38-the-regression-ignores-a-spawned-program",
+		file: "scripts/phase7/replay-regression.ts",
+		find: "\tif (o.spawned > 0) problems.push",
+		replace: "\tif (o.spawned > 0 && false) problems.push",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replay-regression.test.ts"],
+		why: "PROMISE (D3): the regression names any program started while the replay ran - commands are replayed, never re-run. WHAT THE MUTATION DOES: a replay that started a program passes this limb. OBSERVED (bun run mutants -- E4-M P1-h-both-wirings-get-the-same-refusal P2-c-both-wirings-get-the-same-refusal, 2026-10-11, in the builder's worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M38-the-regression-ignores-a-spawned-program ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
 	}
 ];

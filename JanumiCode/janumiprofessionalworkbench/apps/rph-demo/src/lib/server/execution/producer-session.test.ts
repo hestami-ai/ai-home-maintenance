@@ -58,6 +58,22 @@ describe('⛔ an IN_MEMORY workspace is REFUSED — and the two wirings get DIFF
 		expect(out.resolved === false && out.refusedBecause).toMatch(/IN_MEMORY/);
 	});
 
+	it('⭐ `JAN-EXEC` Phase 8 (D2, D3) — with a REPLAYED runner it is a WIRING ERROR of its own: the replay writes nowhere', () => {
+		// ⭑ THE REPLAY HOST PAIRS THE REPLAYED RUNNER WITH A FILESYSTEM WORKSPACE AND NOTHING ELSE (`workspace-host.ts`): its
+		// tool calls replay into that directory. The REAL arm's sentence (a model operating somewhere nobody chose) is false
+		// of a session that runs nothing live, and the default's (configure JPWB_DEMO_DB) is advice that cannot help.
+		const out = producerWorkingDirectory({
+			workspace: workspace({ materialization: 'IN_MEMORY', directoryPath: undefined }),
+			runner: { kind: 'REPLAYED' }
+		});
+		expect(out.resolved).toBe(false);
+		const said = out.resolved === false ? out.refusedBecause : '';
+		expect(said).toMatch(/HOST WIRING ERROR/);
+		expect(said).toMatch(/REPLAYED/);
+		expect(said).not.toMatch(/server's own source tree/);
+		expect(said).not.toMatch(/JPWB_DEMO_DB/);
+	});
+
 	it('with a REAL runner it is a HOST WIRING ERROR, named as one', () => {
 		const out = producerWorkingDirectory({
 			workspace: workspace({ materialization: 'IN_MEMORY', directoryPath: undefined }),

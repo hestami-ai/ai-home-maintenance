@@ -332,8 +332,14 @@ export interface ProcessRunner {
 	 * ⭑ DECLARED, MIRRORING `ArtifactStore.durability` and `Workspace.materialization`. A caller assembling a
 	 * step's evidence is entitled to know it was talking to the refusing default BEFORE it writes "the command
 	 * ran" anywhere.
+	 *
+	 * ⭐ `JAN-EXEC` Phase 8 (`DESIGN-phase-7-completion.md` §5 D2, D3; `REG-F-530`) — `REPLAYED`: a runner that STARTS NOTHING
+	 * and answers each request from a recording — the argv checked against the recorded one, the recorded capture bytes
+	 * written where a real run leaves them, the recorded outcome returned. ⛔ Its own member, never `REAL`: a replayed
+	 * outcome read as a run that happened would be the fabrication this union exists to prevent, and a replay a reader
+	 * could not tell from a live run is that fabrication in a record.
 	 */
-	readonly kind: 'REAL' | 'REFUSING';
+	readonly kind: 'REAL' | 'REFUSING' | 'REPLAYED';
 	run(request: ProcessRunRequest): Promise<ProcessRunOutcome>;
 }
 
@@ -357,6 +363,24 @@ export interface ProcessRunPlanInput {
 	>;
 	readonly argv: readonly string[];
 	readonly timeoutMs: number;
+}
+
+/**
+ * ⭐ `JAN-EXEC` Phase 8 — the refusal of a workspace with no directory, for a runner that is not REAL: each kind its own
+ * true sentence. ⭑ REFUSING is the hermetic default (unchanged); REPLAYED is a wiring error of its own, since the replay
+ * host pairs it with a FILESYSTEM workspace only — it starts nothing, so the REAL arm's consequence would be false of it.
+ */
+function unplannableWithoutADirectory(
+	// ⚠ THE WHOLE UNION, THOUGH `REAL` NEVER ARRIVES (the caller answers it first): `P1-h` sends every kind here, and
+	// a narrower parameter made that mutation stop compiling — a guard measured as NO_COMPILE proves nothing.
+	kind: ProcessRunner['kind'],
+	named: string,
+	program: string,
+	materialization: string
+): string {
+	if (kind === 'REPLAYED')
+		return `The workspace of ${named} is ${materialization} and has no directory on disk, but the wired ProcessRunner is REPLAYED. This is a HOST WIRING ERROR: a replay is wired against a FILESYSTEM workspace only, where its recorded tool calls write and its recorded captures land, and here they have nowhere to go — so '${program}' was not replayed. A replayed runner starts nothing, so no command ran anywhere.`;
+	return `The workspace of ${named} is ${materialization} and has no directory on disk, and the wired ProcessRunner is REFUSING. This is the library's hermetic default rather than a misconfiguration: nothing is executable here, so '${program}' was not run. Supply a FILESYSTEM workspace and a REAL runner to execute commands.`;
 }
 
 /**
@@ -408,7 +432,12 @@ export function planProcessRun(input: ProcessRunPlanInput): ProcessRunPlan {
 			refusedBecause:
 				input.runner.kind === 'REAL'
 					? `The workspace of ${named} is ${input.workspace.materialization} and has no directory on disk, but the wired ProcessRunner is REAL. This is a HOST WIRING ERROR and it is refused before anything starts: a real runner needs a real cwd, and the alternative to refusing is that '${programFileName(program)}' executes in some other directory — the server's own source tree — while the record says it ran in the workspace.`
-					: `The workspace of ${named} is ${input.workspace.materialization} and has no directory on disk, and the wired ProcessRunner is REFUSING. This is the library's hermetic default rather than a misconfiguration: nothing is executable here, so '${programFileName(program)}' was not run. Supply a FILESYSTEM workspace and a REAL runner to execute commands.`
+					: unplannableWithoutADirectory(
+							input.runner.kind,
+							named,
+							programFileName(program),
+							input.workspace.materialization
+						)
 		};
 	// A FILESYSTEM workspace with no directory contradicts its own declaration. Trusting the enum and reading
 	// `directoryPath!` would hand `undefined` to `spawn`, which resolves to the parent process's cwd — the

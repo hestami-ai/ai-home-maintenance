@@ -20,7 +20,8 @@ import {
 	type StipulationLookup
 } from './standin-reasoning-review-validator.js';
 import { assuranceModel, devinPrint, type DevinExec } from '../tools/devin-reviewer.js';
-import { refusalMessage, selectReviewer } from './reviewer-selection.js';
+import { refusalMessage, selectReviewer, type ReviewerSelection } from './reviewer-selection.js';
+import { replayRunFor } from '../replay/replay-run.js';
 
 export function createFloorRegistry(opts: {
 	testMode: boolean;
@@ -76,6 +77,7 @@ export function createFloorRegistry(opts: {
 			// where the test registered one — recorded as NOT JUDGED, and counted only by an admitting engine.
 			createStandinReasoningReviewValidator({ stipulationFor: opts.stipulations ?? (() => undefined) })
 		);
+	else if (selection.kind === 'REPLAY') registry.register(replayReviewer(selection, opts));
 	else if (selection.kind === 'REFUSED')
 		// ⛔ D4 — A MISCONFIGURATION IS RECORDED, NEVER THROWN, AND NEVER AS agy's WORK. The refusal's own validator
 		// id says what the record is; its `evaluate` throws the guidance, which the floor runner records as
@@ -115,6 +117,39 @@ export function createFloorRegistry(opts: {
 			})
 		);
 	return registry;
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 8 (`DESIGN-phase-7-completion.md` §5 D2; `REG-D-111` (5); `REG-F-530`) — THE REPLAY REVIEWER: the
+ * product's own validator — its call, retry, repair and capture — with the replay's `print` and the replay's clock
+ * (`replay/replay-run.ts`). Its configured identity is the recording's reviewer, and so is the bound a thrown call is held
+ * to, so with the recorded elapsed time a retry happens exactly where it happened.
+ * ⛔ AN INJECTED `print` DOES NOT OUTRANK IT. Elsewhere `print` stands in for the configured PROGRAM so a test can reach
+ * the wiring; here the recording IS the program, and a second answerer beside it is the fallback `REG-D-067` forbids.
+ * ⛔ A RECORDING THAT CANNOT BE READ IS A REFUSAL, RECORDED — `unconfiguredReviewer`, as a misconfigured reviewer is: the
+ * floor fails closed with the reason on its face, and nothing falls back to the stand-in or a live tool.
+ */
+function replayReviewer(
+	selection: Extract<ReviewerSelection, { kind: 'REPLAY' }>,
+	opts: { artifacts?: ArtifactStore; exchanges?: ExchangeSink }
+): Validator {
+	let run: ReturnType<typeof replayRunFor>;
+	try {
+		run = replayRunFor(selection.recordingDir);
+	} catch (e) {
+		return unconfiguredReviewer(e instanceof Error ? e.message : String(e));
+	}
+	const reviewer = run.recording.manifest.models.reviewer;
+	return createAgyReasoningReviewValidator({
+		...(opts.artifacts ? { artifacts: opts.artifacts } : {}),
+		...(opts.exchanges ? { exchanges: opts.exchanges } : {}),
+		print: run.reviewerPrint,
+		clock: run.clock,
+		agentId: reviewer.agentId,
+		modelId: reviewer.modelId,
+		providerId: reviewer.providerId,
+		...(reviewer.callBoundMs === null ? {} : { callBoundMs: reviewer.callBoundMs })
+	});
 }
 
 /** The validator a REFUSED selection registers: it runs nothing, and fails with the refusal. */

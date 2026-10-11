@@ -82,6 +82,9 @@ import {
 } from '@janumipwb/rph-ports';
 import { createChildProcessRunner } from './child-process-runner.js';
 import { createFilesystemWorkspace } from './filesystem-workspace.js';
+import { replayRunFor, type ReplayRun } from '../replay/replay-run.js';
+import { createReplayedProcessRunner } from '../replay/replayed-runner.js';
+import { REPLAY_VARIABLE, resolveReplayRecording } from '../replay/replay-switch.js';
 
 /**
  * The ports an Undertaking's execution runs against, resolved together.
@@ -143,6 +146,21 @@ function durableWorkspaceRoot(env: NodeJS.ProcessEnv): string | undefined {
 }
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 8 (`DESIGN-phase-7-completion.md` §5 D3; `REG-F-530`) — THE REPLAY THIS PROCESS RUNS, or `undefined`.
+ *
+ * ⛔ TEST MODE AND THE SWITCH, BOTH, READ AFFIRMATIVELY — `RPH_DEMO_MODE === 'test'`, the one declaration the stand-ins
+ * key on, and `JPWB_REPLAY` naming a recording. Outside test mode the switch buys nothing here: the selectors refuse it
+ * before anything is dispatched (`replay-switch.ts`), so no sandbox of a refused replay is ever asked for.
+ * ⛔ A RECORDING THAT CANNOT BE READ THROWS (`RecordingRefusal`): the step that asked for the sandbox records it as a
+ * failure, rather than falling back to the in-memory arm, where a replayed write would have nowhere to land.
+ */
+function replayOfThisProcess(env: NodeJS.ProcessEnv): ReplayRun | undefined {
+	if (env.RPH_DEMO_MODE !== 'test') return undefined;
+	const recordingDir = resolveReplayRecording(env[REPLAY_VARIABLE]);
+	return recordingDir === undefined ? undefined : replayRunFor(recordingDir);
+}
+
+/**
  * Does this root name the same directory NO MATTER what it is resolved against?
  *
  * ⛔ A COMPARISON RATHER THAN `isAbsolute`, AND THE WIN32 SPELLINGS ARE WHY — see bound 1 in the header. Two
@@ -170,6 +188,53 @@ function ownerFingerprint(undertakingId: string): string {
 }
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 8 (`DESIGN-phase-7-completion.md` §5 D3; `REG-F-530`) — A REPLAY'S SANDBOX: FILESYSTEM workspaces
+ * under the replay's DISPOSABLE root, paired with the REPLAYED runner.
+ *
+ * ⭑ WHY A DIRECTORY AT ALL: a replay rebuilds the deliverable through the product's own `write_file`, and the evidence
+ * join blocks a command result whose capture bytes were not kept (`R17`) — so both need a directory, which test mode's
+ * IN_MEMORY arm does not have (`REG-F-530`'s *"the test-mode rule it adopts gives a replay no filesystem workspace"*).
+ * ⛔ NEVER THE REAL RUNNER: test mode keeps "nothing executes" — the REPLAYED runner starts nothing and answers from the
+ * recording. ⛔ AND THE STORES STAY IN MEMORY: the root is a temporary folder of this replay's (`ReplayRun.root`), and
+ * `JPWB_DEMO_DB` buys nothing in test mode — a replay is as disposable as every other test-mode run.
+ * ⭑ The same derivation as the durable arm (one subdirectory per owner, fingerprinted; a `.process-output` sibling), and
+ * the replay is told the two directories, which are what its scrub replaces before it hashes.
+ */
+function replaySandbox(
+	undertakingId: string,
+	segment: string,
+	replay: ReplayRun
+): UndertakingSandbox {
+	const directoryName = `${segment}-${ownerFingerprint(undertakingId)}`;
+	const deliverableDirectory = resolvePath(join(replay.root(), directoryName));
+	const outputDirectory = `${deliverableDirectory}${PROCESS_OUTPUT_DIRECTORY_SUFFIX}`;
+	mkdirSync(deliverableDirectory, { recursive: true });
+	mkdirSync(outputDirectory, { recursive: true });
+	replay.useSandbox({ workspace: deliverableDirectory, processOutput: outputDirectory });
+	const deliverable = createFilesystemWorkspace({
+		ownerKind: 'UNDERTAKING',
+		ownerId: undertakingId,
+		purgeability: 'RETAINED_BY_PARTICIPATION',
+		directoryPath: deliverableDirectory
+	});
+	const output = createFilesystemWorkspace({
+		ownerKind: 'UNDERTAKING',
+		ownerId: undertakingId,
+		purgeability: 'PURGEABLE_AT_EXPIRY',
+		directoryPath: outputDirectory
+	});
+	return {
+		workspace: deliverable,
+		outputWorkspace: output,
+		runner: createReplayedProcessRunner({
+			deliverableWorkspace: deliverable,
+			outputWorkspace: output,
+			commands: replay
+		})
+	};
+}
+
+/**
  * Resolve the sandbox for ONE Undertaking — per request, never held.
  *
  * ⛔ THE OWNER ID IS CHECKED BEFORE IT BECOMES A DIRECTORY NAME. It arrives from a stored object rather than
@@ -184,13 +249,18 @@ function ownerFingerprint(undertakingId: string): string {
  */
 export function resolveUndertakingSandbox(
 	undertakingId: string,
-	root: string | undefined = durableWorkspaceRoot(process.env)
+	root: string | undefined = durableWorkspaceRoot(process.env),
+	/** ⭐ `JAN-EXEC` Phase 8 (D3) — the replay this process runs (`replayOfThisProcess`), unless a test hands in its own. */
+	replay: ReplayRun | undefined = replayOfThisProcess(process.env)
 ): UndertakingSandbox {
 	const segment = containedWorkspacePath(undertakingId);
 	if (segment === undefined || segment !== undertakingId || segment.includes('/'))
 		throw new Error(
 			`'${undertakingId}' cannot name an Undertaking workspace directory. The owner id becomes ONE path segment under the durable root: it may not be empty, may not contain a separator, and may not resolve above the root. Refusing rather than substituting a directory: a workspace nobody chose would hold a deliverable nobody could find.`
 		);
+
+	// ⭐ `JAN-EXEC` Phase 8 (D3) — A REPLAY'S OWN ARM, before the in-memory one it would otherwise take in test mode.
+	if (replay !== undefined) return replaySandbox(undertakingId, segment, replay);
 
 	if (root === undefined || root === '')
 		// ⚠ LAWFUL, AND DISCLOSED RATHER THAN SILENT — the same posture `getArtifactStore()` takes without a
