@@ -185,6 +185,62 @@ describe('⭐ the check — limb 2: nothing else passes a reasoning review on th
 	});
 });
 
+// ── ⭐⭐ `JAN-EXEC` Phase 7 completion E2 — LIMB 3: a declared stand-in pass rests on a DECLARED_POLICY registration ──────
+//
+// The declared policies are reviewed now, and in this lane the declared stand-in answers them — with NO checker, so each
+// criterion it answers is a stipulation (`declared-policy-review.ts`). So its pass rests on stipulated mandatory rows and
+// on a registration for its unit's PWA on the `DECLARED_POLICY` arm; and, judging nothing, it records no evaluated row.
+
+const DECLARED_STANDIN = 'standin.declared-policy-review';
+const DECLARED_POLICY_ID = 'pol_declared';
+OBJECTS[DECLARED_POLICY_ID] = obj('ASSURANCE_POLICY', {
+	criteria: [
+		{ id: 'D-1', severityIfNotMet: 'BLOCKING' },
+		{ id: 'D-2', severityIfNotMet: 'BLOCKING' }
+	]
+});
+const DECLARED = { pwaId: 'pwa-1', framing: 'DECLARED_POLICY', remaining: 'CLEAN' } as const;
+/** What a declared stand-in pass rests on: every criterion of the policy stipulated, over a WORK UNIT. */
+const stipulatedDeclared = (a: string, validatorId = DECLARED_STANDIN) => [
+	row(a, 'D-1', 'UNABLE_TO_DETERMINE', 'MET'),
+	row(a, 'D-2', 'UNABLE_TO_DETERMINE', 'MET'),
+	completion(a, 'pwu-1', validatorId, 'SATISFIED', DECLARED_POLICY_ID)
+];
+
+describe('⭐⭐ E2 — the check, limb 3: a declared stand-in pass rests on stipulated rows and a DECLARED_POLICY registration', () => {
+	it('⭐ CONTROL — a declared stand-in pass, every row stipulated, its unit’s PWA registered on DECLARED_POLICY, is clean', () => {
+		expect(laneFindings([src(stipulatedDeclared('d'))], [DECLARED])).toEqual([]);
+	});
+
+	it('⛔ a declared stand-in pass for a PWA nobody registered, or registered only on ANOTHER arm', () => {
+		// ⛔ PREDICTED RED BEFORE LIMB 3: [] — no declared completion was the lane's business, so a stand-in that stipulated
+		// for a PWA nobody registered passed the lane unseen.
+		for (const regs of [[], [WP], [GRAPH]] as const)
+			expect(laneFindings([src(stipulatedDeclared('d'))], regs).map((f) => [f.limb, f.assessmentId, f.reason])).toEqual([
+				[3, 'd', 'no test registered a stipulation for pwa-1 on DECLARED_POLICY']
+			]);
+	});
+
+	it('⛔ a declared stand-in pass with a mandatory row NOT stipulated — the stand-in judged something it cannot', () => {
+		const events = [
+			row('d', 'D-1', 'MET'),
+			row('d', 'D-2', 'UNABLE_TO_DETERMINE', 'MET'),
+			completion('d', 'pwu-1', DECLARED_STANDIN, 'SATISFIED', DECLARED_POLICY_ID)
+		];
+		expect(laneFindings([src(events)], [DECLARED]).map((f) => [f.limb, f.reason])).toEqual([
+			[3, 'it records a mandatory row NOT stipulated (D-1) — the declared stand-in judges nothing']
+		]);
+	});
+
+	it('⭐ CONTROL — a declared review under another validator, or a non-positive one, is not this limb’s business', () => {
+		const events = [
+			...stipulatedDeclared('m', 'reviewer.declared-policy'),
+			completion('n', 'pwu-1', DECLARED_STANDIN, 'INCONCLUSIVE', DECLARED_POLICY_ID)
+		];
+		expect(laneFindings([src(events)], [])).toEqual([]);
+	});
+});
+
 // ── THE SERVER: segments, marks, and what is kept ─────────────────────────────────────────────────────────────────
 
 afterEach(() => {

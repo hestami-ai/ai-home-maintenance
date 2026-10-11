@@ -14,9 +14,16 @@
 // which a validator must never do as a side effect.
 import type { EngineHandle } from '@janumipwb/rph-engine';
 
-/** The framings a test may stipulate for. A process result is never stipulated: no test needs it. */
-export type StipulableFraming = 'PWA_GRAPH' | 'WORK_PRODUCT';
-const FRAMINGS: readonly StipulableFraming[] = ['PWA_GRAPH', 'WORK_PRODUCT'];
+/**
+ * The framings a test may stipulate for. A process result is never stipulated: no test needs it.
+ * ⭐ `JAN-EXEC` Phase 7 completion E2 (`REG-F-523`; `DESIGN-phase-7-completion.md` B1) — AND `DECLARED_POLICY`: the arm the
+ * declared-policy stand-in answers (`declared-policy-review.ts`), each of a unit's declared policies judged against its own
+ * criteria. A registration for it stipulates every criterion of every declared policy of that PWA's units CLEAN, recorded
+ * `UNABLE_TO_DETERMINE` with `stipulated: 'MET'` beside it, exactly as the floor arm records its remainder: that stand-in
+ * has no checker, so nothing of a declared policy is judged in the gate lane, and the record says so.
+ */
+export type StipulableFraming = 'PWA_GRAPH' | 'WORK_PRODUCT' | 'DECLARED_POLICY';
+const FRAMINGS: readonly StipulableFraming[] = ['PWA_GRAPH', 'WORK_PRODUCT', 'DECLARED_POLICY'];
 
 export interface StipulationRegistration {
 	readonly pwaId: string;
@@ -94,6 +101,21 @@ export function workProductPwaOf(engine: Pick<EngineHandle, 'loadObject'>, artif
 	const pwuId = field(artifactId, 'ARTIFACT', 'producingPwuId');
 	const undertakingId = field(pwuId, 'PROFESSIONAL_WORK_UNIT', 'undertakingId');
 	return field(undertakingId, 'UNDERTAKING', 'pwaId');
+}
+
+/**
+ * ⭐ E2 — the PWA a WORK UNIT belongs to — `PROFESSIONAL_WORK_UNIT.undertakingId` → `UNDERTAKING.pwaId` — or `undefined` on
+ * any missing link, as `workProductPwaOf` reads its chain: the declared-policy stand-in's subject is the unit itself.
+ */
+export function workUnitPwaOf(engine: Pick<EngineHandle, 'loadObject'>, pwuId: string): string | undefined {
+	const field = (id: string | undefined, objectType: string, key: string): string | undefined => {
+		if (id === undefined) return undefined;
+		const object = engine.loadObject(id);
+		if (object?.objectType !== objectType) return undefined;
+		const value = (object.state as Record<string, unknown> | undefined)?.[key];
+		return typeof value === 'string' && value !== '' ? value : undefined;
+	};
+	return field(field(pwuId, 'PROFESSIONAL_WORK_UNIT', 'undertakingId'), 'UNDERTAKING', 'pwaId');
 }
 
 /** Discarded by `resetEngine`, in the same act that replaces the engine. */

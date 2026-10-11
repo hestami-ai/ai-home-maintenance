@@ -120,11 +120,21 @@ export async function resetEngine(
 export async function registerStipulation(
 	request: APIRequestContext,
 	pwaId: string,
-	framing: 'PWA_GRAPH' | 'WORK_PRODUCT'
+	// ⭐ `JAN-EXEC` Phase 7 completion E2 — and `DECLARED_POLICY`: each declared policy of the PWA's units, stipulated CLEAN
+	// by the declared stand-in, recorded NOT JUDGED (`declared-policy-review.ts`).
+	framing: 'PWA_GRAPH' | 'WORK_PRODUCT' | 'DECLARED_POLICY'
 ): Promise<void> {
 	const res = await request.post('/test-api/reviewer-script', { data: { pwaId, framing, remaining: 'CLEAN' } });
 	expect(res.ok(), `registerStipulation(${pwaId}, ${framing}): ${await res.text()}`).toBeTruthy();
 	expect(((await res.json()) as { registered: unknown }).registered).toEqual({ pwaId, framing, remaining: 'CLEAN' });
+}
+
+/**
+ * ⭐ E2 — stipulate the DECLARED policies CLEAN for every PWA the engine holds, for a spec over the reference seed whose
+ * sign-off must conclude (`registerStipulation`'s rule: after the reset, ids read from the store).
+ */
+export async function stipulateDeclaredPolicies(request: APIRequestContext): Promise<void> {
+	for (const pwa of (await introspect(request)).pwas) await registerStipulation(request, pwa.id, 'DECLARED_POLICY');
 }
 
 /** Navigate and wait for Svelte to hydrate (so toggle/enhance handlers are attached before we interact). One call

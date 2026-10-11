@@ -26,6 +26,7 @@ import {
 	type ReasoningReviewFinding,
 	type ReasoningReviewInput,
 	type ReasoningReviewJudgement,
+	type DeclaredPolicyFraming,
 	type ReviewFraming,
 	type Severity,
 	type Validator,
@@ -172,7 +173,34 @@ interface Framed {
 	readonly subjectSlice: string;
 }
 
-function framingText(framing: ReviewFraming): Framed {
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (`REG-F-523`; `REG-D-110` (3); `DESIGN-phase-7-completion.md` B1) — THE STATEMENT A
+ * `DECLARED_POLICY` REVIEW FAILS WITH WHEN IT NAMES NO POLICY. ⛔ It is never sent: a reviewer told it judges "against a
+ * policy" it cannot name would be misdescribed to (`R14`'s *"a review conducted on a false account of its own subject is
+ * worse than no review"*). Host-authored and fixed, since it becomes a recorded failure.
+ */
+export const NO_DECLARED_POLICY_STATEMENT =
+	'This review was not sent: a DECLARED_POLICY review names no declared policy (its id, name and purpose), so the reviewer could not be told what it judges against. No model was called.';
+
+/**
+ * ⭐⭐ E2 (design B1) — THE HOST'S LINE NAMING THE DECLARED POLICY A REVIEW JUDGES AGAINST: its name, its id and its purpose,
+ * the catalog's own words, and how the rubric's lines below are to be read. ⛔ D8's lines speak of "derivational-integrity
+ * failure class[es]", and they are the sponsor's answers byte for byte (design §9.3 D8), so they are NOT edited for this
+ * framing: this line says, before them, that each "failure class" there is one of this policy's criteria and that its
+ * failure is the work NOT MEETING it — which is what D8's own definition of present already says (*"present means the
+ * artifact does NOT MEET that criterion"*). ⭑ Host lines, outside every fence: the purpose is the catalog's, not the
+ * producer's.
+ */
+export function declaredPolicyLine(policy: DeclaredPolicyFraming): string {
+	return (
+		`You are judging this work against ONE declared assurance policy, ${policy.name} (${policy.policyId}). Its purpose: ` +
+		`${policy.purpose}\nEach "failure class" in the lines below is one of this policy's own criteria, and its failure ` +
+		'is that the work does not meet that criterion.'
+	);
+}
+
+function framingText(input: Pick<ReasoningReviewInput, 'framing' | 'declaredPolicy'>): Framed {
+	const framing: ReviewFraming = input.framing;
 	switch (framing) {
 		case 'WORK_PRODUCT':
 			return {
@@ -207,6 +235,27 @@ function framingText(framing: ReviewFraming): Framed {
 				subject: 'The artifact (a canonical graph export / serialized subject) to review:',
 				subjectSlice: 'the artifact'
 			};
+		case 'DECLARED_POLICY': {
+			// ⭐⭐ E2 (design B1; `R18`) — A WORK UNIT'S WORK, JUDGED AGAINST ONE OF ITS DECLARED POLICIES: its work product and
+			// the commands it ran (or, for a unit composed of others, its children's — `REG-D-111` (2)), against the policy's
+			// purpose, its criteria the rubric. ⛔ Refused, never sent, when the input names no policy.
+			const policy = input.declaredPolicy;
+			if (!policy) throw new Error(NO_DECLARED_POLICY_STATEMENT);
+			return {
+				intent:
+					'The WORK below was produced for a professional work unit by a DIFFERENT AI agent (for a unit composed of ' +
+					'others, by the agents that did its children’s work), which was given exactly this instruction:',
+				intentSlice: 'the instruction',
+				// ⭐ The work is ONE line of JSON (`declaredPolicyReviewInput`), and this host line states its serialization —
+				// and that the exit codes in it are the host's record, quoted beside the agent's arguments (`REG-F-481`).
+				subject:
+					`${declaredPolicyLine(policy)}\n` +
+					'The WORK to judge against that policy, as one line of JSON: "workProducts" holds each work product with the ' +
+					'title of the work unit that produced it, and "commands" each command the producing agents ran — its ' +
+					'arguments as the agent gave them, and the exit code and timeout the host recorded for it:',
+				subjectSlice: 'the work'
+			};
+		}
 		default: {
 			// ⛔ A NEW `ReviewFraming` MEMBER LANDS HERE AS A TYPE ERROR, which is why the union is closed.
 			const _never: never = framing;
@@ -578,7 +627,7 @@ const criterionRepairRefused = (cause: string, input: ReasoningReviewInput): str
  *     chosen over this prompt's other untrusted slices (`processResultUntrustedSlices`), so it occurs in none of them.
  */
 function promptPlan(input: ReasoningReviewInput) {
-	const framed = framingText(input.framing);
+	const framed = framingText(input);
 	// THE RUBRIC IS THE POLICY'S OWN. This rendered from the REASONING_REVIEW_CRITERIA constant, which is what made
 	// the seeded ASSURANCE_POLICY object a projection of this file — written at seed time and never read again.
 	// `description` is DOC-004 §7's field (the constant called it `label`). ⭑ HOST-AUTHORED: cut and declared, never fenced.

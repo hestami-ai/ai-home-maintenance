@@ -59,6 +59,20 @@ const WRITERS: Readonly<Record<string, { readonly why: string; readonly writes: 
 		why: 'THE declared stand-in (J1-2): stipulates the DERIVED remainder CLEAN, only where a test registered one',
 		writes: 1
 	},
+	// ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (`REG-F-523`; `REG-D-110` (3); `DESIGN-phase-7-completion.md` B1, B2) — THE DECLARED
+	// POLICIES' REVIEWS: a second stand-in, and the sign-off that records what a review answered.
+	'apps/rph-demo/src/lib/server/assurance/declared-policy-review.ts': {
+		why: 'THE declared stand-in (E2): stipulates EVERY criterion of a declared policy CLEAN, only where a test registered a DECLARED_POLICY stipulation for the unit’s PWA — it has no checker, so it judges none',
+		writes: 1
+	},
+	'apps/rph-demo/src/lib/server/assurance/declared-policy-signoff.ts': {
+		why: 'the declared sign-off sends each recorded row’s stipulation across the command boundary, as the floor’s recorder does (form D) — copied, never minted',
+		writes: 1
+	},
+	'apps/rph-demo/src/lib/server/assurance/declared-policy-signoff.test.ts': {
+		why: 'a validator double’s stipulated rows, and an ADMITTING engine to show Gate E and the verdict read them alike',
+		writes: 3
+	},
 	'apps/rph-demo/src/lib/server/assurance/standin-reasoning-review-validator.test.ts': {
 		why: 'the stand-in’s rules, composed as an ADMITTING engine would compose them',
 		writes: 1

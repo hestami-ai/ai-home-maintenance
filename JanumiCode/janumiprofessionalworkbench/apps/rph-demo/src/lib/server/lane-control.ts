@@ -11,6 +11,10 @@
 //   stand-in that stipulates for a PWA nobody registered each redden.
 // · LIMB 2 — no other positive `floor.reasoning-review` exists on the lane. The reference seed's hand-written one is
 //   excluded BY POSITION — a mark taken after every seed — never by a name a writer could copy.
+// · ⭐ LIMB 3 (`JAN-EXEC` Phase 7 completion E2; `REG-F-523`; `REG-D-110` (3)) — a POSITIVE declared-policy completion under
+//   the declared stand-in rests on a `DECLARED_POLICY` registration for its unit's PWA, and every mandatory row it records
+//   is STIPULATED: that stand-in has no checker, so a row it recorded other than as a stipulation is a judgement nobody
+//   made. ⚠ It asks no EVALUATED row, as limb 1 does: nothing in this lane judges a declared policy, and the record says so.
 //
 // ── WHY THE SERVER COMPUTES IT (`REG-D-072` D8) ─────────────────────────────────────────────────────────────────
 // The design put this in a per-test fixture teardown. Three things refute that: `retries: 1` turns a violation that
@@ -31,8 +35,10 @@ import { BLOCKING_SEVERITIES, FLOOR_POLICY_IDS } from '@janumipwb/rph-assurance'
 import type { DomainEvent } from '@janumipwb/rph-contracts';
 import type { StoredObject } from '@janumipwb/rph-ports';
 import { STANDIN_VALIDATOR_ID } from './assurance/standin-reasoning-review-validator.js';
+import { STANDIN_DECLARED_REVIEW_VALIDATOR_ID } from './assurance/declared-policy-review.js';
 import {
 	workProductPwaOf,
+	workUnitPwaOf,
 	type StipulableFraming,
 	type StipulationRegistration
 } from './stipulations.js';
@@ -52,7 +58,7 @@ export interface LaneSource {
 
 /** What the lane control found wrong with one positive reasoning-review completion. */
 export interface LaneFinding {
-	readonly limb: 1 | 2;
+	readonly limb: 1 | 2 | 3;
 	readonly where: string;
 	readonly assessmentId: string;
 	readonly validatorId: string;
@@ -149,7 +155,38 @@ function limbOneReasons(
 }
 
 /**
- * ⭐ THE CHECK ITSELF — pure: both limbs over one segment's sources and the registrations in force.
+ * ⭐ E2 — LIMB 3's questions of one declared stand-in completion: a registration for its unit's PWA on `DECLARED_POLICY`,
+ * and every mandatory row it recorded (the LATEST per criterion, as Gate E folds them) a stipulation. Empty: clean.
+ */
+function limbThreeReasons(
+	source: LaneSource,
+	c: Completion,
+	subjectId: string,
+	registrations: readonly StipulationRegistration[]
+): string[] {
+	const mandatory = mandatoryOf(source, String(c.assurancePolicyId));
+	const latest = new Map<string, { result?: unknown; claim?: unknown }>();
+	for (const e of source.events) {
+		if (e.eventType !== 'AssuranceCriterionEvaluated') continue;
+		const p = e.payload as { assessmentId?: unknown; criterionId?: unknown; result?: unknown; stipulated?: unknown };
+		if (p.assessmentId === c.assessmentId && typeof p.criterionId === 'string')
+			latest.set(p.criterionId, { result: p.result, claim: p.stipulated });
+	}
+	const judged = [...latest.entries()]
+		.filter(([id, r]) => mandatory.has(id) && !(r.result === 'UNABLE_TO_DETERMINE' && r.claim === 'MET'))
+		.map(([id]) => id);
+	const reasons: string[] = [];
+	if (judged.length > 0)
+		reasons.push(`it records a mandatory row NOT stipulated (${judged.join(', ')}) — the declared stand-in judges nothing`);
+	const pwaId = workUnitPwaOf(source, subjectId);
+	if (pwaId === undefined) reasons.push(`its subject ${subjectId} is not a work unit with a PWA`);
+	else if (!registrations.some((r) => r.pwaId === pwaId && r.framing === 'DECLARED_POLICY'))
+		reasons.push(`no test registered a stipulation for ${pwaId} on DECLARED_POLICY`);
+	return reasons;
+}
+
+/**
+ * ⭐ THE CHECK ITSELF — pure: ~~both~~ the three limbs over one segment's sources and the registrations in force.
  */
 export function laneFindings(
 	sources: readonly LaneSource[],
@@ -160,6 +197,22 @@ export function laneFindings(
 		for (const e of source.events) {
 			if (e.eventType !== 'AssuranceAssessmentCompleted') continue;
 			const c = e.payload as Completion;
+			// ⭐ E2 — LIMB 3: a positive declared-policy completion the declared stand-in answered.
+			if (c.validatorId === STANDIN_DECLARED_REVIEW_VALIDATOR_ID && POSITIVE.has(String(c.disposition))) {
+				const subjectId = c.subjectObjectIds?.[0] ?? '';
+				const reasons = limbThreeReasons(source, c, subjectId, registrations);
+				if (reasons.length > 0)
+					found.push({
+						where: source.where,
+						assessmentId: c.assessmentId,
+						validatorId: String(c.validatorId),
+						disposition: String(c.disposition),
+						subjectId,
+						limb: 3,
+						reason: reasons.join('; ')
+					});
+				continue;
+			}
 			if (
 				c.assurancePolicyId !== FLOOR_POLICY_IDS.REASONING_REVIEW ||
 				!POSITIVE.has(String(c.disposition))

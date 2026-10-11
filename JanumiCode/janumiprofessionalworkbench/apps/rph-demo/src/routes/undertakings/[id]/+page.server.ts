@@ -56,13 +56,27 @@ import {
 	hostNow,
 	isTestMode,
 	mintUiId,
-	reviewerSession,
 	uiSession
 } from '$lib/server/workbench';
 import {
+	evidenceRefusals,
+	governingDeclaredPolicies,
 	planDeclaredSignoff,
-	unsatisfyingReviews
+	unsatisfyingReviews,
+	type DeclaredSignoff,
+	type GoverningDeclaredPolicy
 } from '$lib/server/assurance/declared-policy-signoff';
+// ⭐ `JAN-EXEC` Phase 7 completion E2 — the declared policies' reviews: the seam, its input, and the capture of its calls.
+import { createDeclaredPolicyReviewer } from '$lib/server/assurance/index';
+import type { DeclaredPolicyAnswer } from '$lib/server/assurance/declared-policy-review';
+import {
+	declaredPolicyReviewInput,
+	type DeclaredReviewCommand
+} from '$lib/server/assurance/review-input';
+import { createExchangeSink } from '$lib/server/assurance/exchange-capture';
+import { recordExchanges } from '$lib/server/assurance/exchange-recorder';
+import { anyStipulationRegistered, stipulationFor, workUnitPwaOf } from '$lib/server/stipulations';
+import type { AssuranceSubject, Identity, ProfessionalRationaleSummary } from '@janumipwb/rph-assurance';
 import { assurancePreflight } from '$lib/server/assurance/preflight';
 import { ASSURANCE_REVIEWER_CREDENTIAL, actingActor } from '$lib/server/identity';
 import { runModelInvocationStep } from '$lib/server/execution/run-model-step';
@@ -1123,6 +1137,300 @@ async function rebuildForReview(
 		runs.set(evidenceId, run.value);
 	}
 	return { ok: true, turn: turn.value, runs };
+}
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7 completion E2 — THE DECLARED POLICIES' REVIEWS, FROM THE RECORD (`REG-F-523`; `REG-D-110` (3);
+// `REG-D-111` (2); `DESIGN-phase-7-completion.md` B1, B6) ────────────────────────────────────────────────────────────────
+
+/** ⭐ E2 — one unit's work, read from the record, as its declared reviews judge it (`R18`). */
+interface UnitWork {
+	readonly title: string;
+	/** The instruction the work answered: the producing prompt, re-rendered (RD7); for a unit no model ran, its purpose. */
+	readonly instruction: string;
+	/** The work product's bytes, verified against the ARTIFACT's own hash — absent when the unit recorded none. */
+	readonly answer?: string;
+	readonly rationale?: ProfessionalRationaleSummary;
+	readonly commands: readonly DeclaredReviewCommand[];
+	/** ⭐ `REG-F-514` — WHO DID THE WORK, as its completion records it, its attempt as its invocation. */
+	readonly executedBy?: ActorReference;
+}
+
+/** The unit's LAST step completion, in log order, with the plan it completed — or nothing, if no step of it succeeded. */
+function lastCompletionOf(
+	pwuId: string
+): { readonly planId: string; readonly payload: Record<string, unknown> } | undefined {
+	const engine = getEngine();
+	const plans = new Set(
+		listExecutionPlans(engine)
+			.filter((p) => String(p.state.workUnitId ?? '') === pwuId)
+			.map((p) => p.id)
+	);
+	const done = engine
+		.readAllEvents()
+		.filter((e) => e.eventType === 'ExecutionStepSucceeded' && plans.has(e.aggregateId));
+	const last = done.at(-1);
+	return last ? { planId: last.aggregateId, payload: (last.payload ?? {}) as Record<string, unknown> } : undefined;
+}
+
+/** ⭐ E2 — each command a completion's evidence records: the command, its exit, whether it timed out. Pointers, no bytes. */
+function commandsOf(title: string, evidenceIds: readonly string[]): DeclaredReviewCommand[] {
+	return evidenceIds.flatMap((id) => {
+		const ref = getObject(getEngine(), id)?.contentReference as
+			| { command?: unknown; exitCode?: unknown; timedOut?: unknown }
+			| undefined;
+		if (!ref || !Array.isArray(ref.command)) return [];
+		return [
+			{
+				unit: title,
+				argv: ref.command.map(String),
+				exitCode: typeof ref.exitCode === 'number' ? ref.exitCode : null,
+				timedOut: ref.timedOut === true
+			}
+		];
+	});
+}
+
+/**
+ * ⭐⭐ E2 — ONE UNIT'S WORK, AS THE RECORD HOLDS IT: its last completion's work product — REBUILT as a re-review rebuilds it
+ * (RD7, `rebuildProducingTurn`): its bytes re-hashed, its instruction re-rendered and checked against the exchange that
+ * produced it, its account split from that exchange — the commands its evidence records, and its executor.
+ * ⛔ A WORK PRODUCT THE RECORD CANNOT REBUILD REFUSES THE WHOLE (RD7's rule): no review of a partial reconstruction is asked
+ * for, and nothing is dispatched. ⚠ A unit with no completion, or one that named no output, is judged as it is: its
+ * purpose the instruction, no work product, its commands if any.
+ */
+async function unitWorkOf(
+	pwuId: string
+): Promise<{ readonly ok: true; readonly work: UnitWork } | { readonly ok: false; readonly refusedBecause: string }> {
+	const { pwu, pwuType, pwuTypeId, typeFacts } = unitTypeOf(pwuId);
+	const title = String((pwu?.title ?? pwuId) as string);
+	const purpose = typeFacts.purpose ?? String((pwu?.description ?? '') as string);
+	const completion = lastCompletionOf(pwuId);
+	if (!completion) return { ok: true, work: { title, instruction: purpose, commands: [] } };
+	const p = completion.payload;
+	const provenance = p.executionProvenance as
+		| { executedBy?: ActorReference; producingExecutionAttemptId?: unknown }
+		| undefined;
+	const reused = typeof provenance?.producingExecutionAttemptId === 'string' ? provenance.producingExecutionAttemptId : undefined;
+	const attemptId = reused ?? String((p.executionAttemptId ?? '') as string);
+	// ⭐ `REG-F-514` remedy 1 — the executor's own invocation is its attempt, so a `DIFFERENT_INVOCATION` demand is decided.
+	const executedBy = provenance?.executedBy
+		? {
+				...provenance.executedBy,
+				...(provenance.executedBy.executionInstanceId || !attemptId ? {} : { executionInstanceId: attemptId })
+			}
+		: undefined;
+	const commands = commandsOf(title, Array.isArray(p.proposedEvidenceIds) ? p.proposedEvidenceIds.map(String) : []);
+	const outputs = Array.isArray(p.outputArtifactIds) ? p.outputArtifactIds.map(String) : [];
+	if (outputs.length === 0)
+		return { ok: true, work: { title, instruction: purpose, commands, ...(executedBy ? { executedBy } : {}) } };
+	const stepId = String((p.executionStepId ?? '') as string);
+	const turn = await rebuildProducingTurn(uiSession(), getArtifactStore(), {
+		pwuId,
+		workProductId: outputs[0]!,
+		// ⭐ The PRODUCING attempt: a re-review's completion names the attempt that made the work it passed (RD6).
+		attemptKey: reused ?? attemptKeyOf(getEngine(), completion.planId, stepId),
+		pwuTypeId,
+		template: typeFacts.promptTemplate,
+		...(typeFacts.purpose ? { purpose: typeFacts.purpose } : {}),
+		...(pwuType?.contextSpecification
+			? { contextSpecification: pwuType.contextSpecification as ContextSpecification }
+			: {})
+	});
+	if (!turn.ok)
+		return { ok: false, refusedBecause: `the work of ${title} cannot be rebuilt from the record: ${turn.refusedBecause}` };
+	return {
+		ok: true,
+		work: {
+			title,
+			instruction: turn.value.producingPrompt,
+			answer: turn.value.answer,
+			...(turn.value.rationale ? { rationale: turn.value.rationale } : {}),
+			commands,
+			...(executedBy ? { executedBy } : {})
+		}
+	};
+}
+
+/** ⭐ E2 — what a unit's declared reviews judge: its own work, or — for a unit composed of others — its children's. */
+interface DeclaredReviewWork {
+	readonly instruction: string;
+	readonly workProducts: readonly { readonly unit: string; readonly answer: string }[];
+	readonly commands: readonly DeclaredReviewCommand[];
+	readonly rationale?: ProfessionalRationaleSummary;
+	/** ⭐ `REG-F-514` — the producer the verdicts check independence against: the unit's executor, else the operator. */
+	readonly producer: ActorReference;
+}
+
+/**
+ * ⭐⭐ E2 — THE WORK A UNIT'S DECLARED POLICIES ARE JUDGED OVER (`R18`; design B1, B6). A unit with children is judged over
+ * ITS CHILDREN's work products and commands, the end-to-end phase's evidence among them (`REG-D-111` (2), DEC-6): its own
+ * TRANSFORMATION produces nothing. ⚠ A child with no work product contributes its commands only; the root's instruction is
+ * its own purpose, and no single account is shown for many children's work.
+ */
+async function declaredReviewWorkOf(
+	pwuId: string,
+	operator: ActorReference
+): Promise<{ readonly ok: true; readonly work: DeclaredReviewWork } | { readonly ok: false; readonly refusedBecause: string }> {
+	const own = await unitWorkOf(pwuId);
+	if (!own.ok) return own;
+	const producer = own.work.executedBy ?? operator;
+	const children = listPwus(getEngine()).filter((u) => String(u.state.parentWorkUnitId ?? '') === pwuId);
+	if (children.length === 0)
+		return {
+			ok: true,
+			work: {
+				instruction: own.work.instruction,
+				workProducts: own.work.answer === undefined ? [] : [{ unit: own.work.title, answer: own.work.answer }],
+				commands: own.work.commands,
+				...(own.work.rationale ? { rationale: own.work.rationale } : {}),
+				producer
+			}
+		};
+	const workProducts: { unit: string; answer: string }[] = [];
+	const commands: DeclaredReviewCommand[] = [];
+	for (const child of children) {
+		const w = await unitWorkOf(child.id);
+		if (!w.ok) return w;
+		if (w.work.answer !== undefined) workProducts.push({ unit: w.work.title, answer: w.work.answer });
+		commands.push(...w.work.commands);
+	}
+	return { ok: true, work: { instruction: own.work.instruction, workProducts, commands, producer } };
+}
+
+/** ⭐ E2 — the declared stand-in's lookup: a `DECLARED_POLICY` registration for the unit's PWA, read from the registry. */
+function declaredStipulationFor(pwuId: string): 'CLEAN' | undefined {
+	if (!anyStipulationRegistered()) return undefined;
+	const pwaId = workUnitPwaOf(getEngine(), pwuId);
+	return pwaId === undefined ? undefined : stipulationFor(pwaId, 'DECLARED_POLICY');
+}
+
+/** The record's actor as the assurance island's identity — what the review's subject names as its producer. */
+function identityOf(actor: ActorReference): Identity {
+	return {
+		actorType: actor.actorType,
+		agentId: actor.actorId,
+		...(actor.modelId ? { modelId: actor.modelId } : {}),
+		...(actor.providerId ? { providerId: actor.providerId } : {}),
+		...(actor.executionInstanceId ? { invocationId: actor.executionInstanceId } : {})
+	};
+}
+
+/** ⭐ E2 — the invoker a declared review's calls are recorded under: never the floor's `reasoning-review`. */
+const DECLARED_REVIEW_INVOKER_ID = 'declared-policy-review';
+
+/**
+ * ⭐⭐ E2 — ONE REVIEW PER GOVERNING DECLARED POLICY (`REG-D-110` (3)), each through the selected reviewer (the floor's own,
+ * `createDeclaredPolicyReviewer`), each its own invocation: a token its calls are recorded under, which the verdict's
+ * evaluator carries as its invocation. ⭑ Every call is recorded (PER-9), on the ASSURANCE plane under the declared policy,
+ * BEFORE the sign-off is dispatched — a paid call is an act that happened, whatever the batch then does.
+ */
+async function reviewDeclaredPolicies(
+	pwuId: string,
+	policies: readonly GoverningDeclaredPolicy[],
+	work: DeclaredReviewWork,
+	semanticVersion: number
+): Promise<{
+	readonly answers: ReadonlyMap<string, DeclaredPolicyAnswer>;
+	readonly invocations: ReadonlyMap<string, string>;
+}> {
+	const answers = new Map<string, DeclaredPolicyAnswer>();
+	const invocations = new Map<string, string>();
+	const subject: AssuranceSubject = {
+		subjectId: pwuId,
+		objectType: 'PROFESSIONAL_WORK_UNIT',
+		semanticVersion,
+		isAiProduced: true,
+		producer: identityOf(work.producer)
+	};
+	for (const policy of policies) {
+		const token = `declared-review:${pwuId}:${policy.policyId}:${mintUiId('rvw')}`;
+		const exchanges = createExchangeSink();
+		const reviewer = createDeclaredPolicyReviewer({
+			testMode: isTestMode(),
+			artifacts: getArtifactStore(),
+			exchanges,
+			stipulations: (s) => declaredStipulationFor(s.subjectId)
+		});
+		const answer = await reviewer.review(
+			subject,
+			declaredPolicyReviewInput({
+				policy: { policyId: policy.policyId, name: policy.name, purpose: policy.purpose },
+				criteria: policy.criteria,
+				instruction: work.instruction,
+				workProducts: work.workProducts,
+				commands: work.commands,
+				...(work.rationale ? { rationale: work.rationale } : {})
+			})
+		);
+		answers.set(policy.policyId, answer);
+		invocations.set(policy.policyId, token);
+		const drained = exchanges.drain();
+		if (drained.length === 0) continue;
+		const outcome = recordExchanges(
+			(payload, aggregateId) =>
+				uiSession().dispatch({
+					commandId: mintUiId('cmd'),
+					commandType: 'RecordModelExchange',
+					commandSchemaVersion: 1,
+					targetAggregateType: 'MODEL_EXCHANGE',
+					targetAggregateId: aggregateId,
+					issuedAt: hostNow(),
+					correlationId: token,
+					idempotencyKey: `mex:${aggregateId}`,
+					payload
+				}),
+			drained,
+			{
+				runToken: token,
+				plane: 'ASSURANCE',
+				invokerId: DECLARED_REVIEW_INVOKER_ID,
+				assurancePolicyId: policy.policyId,
+				subjectObjectId: pwuId,
+				subjectObjectType: 'PROFESSIONAL_WORK_UNIT',
+				subjectSemanticVersion: semanticVersion,
+				newId: mintUiId
+			}
+		);
+		// A retention fault must not fail a review that reached its conclusion — but it must not vanish either.
+		if (outcome.failures.length > 0)
+			console.warn(
+				`[MXR] ${outcome.recorded}/${drained.length} declared-review exchange records written; ` +
+					`${outcome.failures.length} failed: ${outcome.failures.join('; ')}`
+			);
+	}
+	return { answers, invocations };
+}
+
+/**
+ * ⭐ E2 — THE UNIT'S LAST ASSURANCE HOP, BY THE FOLD OF ITS DECLARED VERDICTS (design B3; `REG-D-111` (1)): a positive fold
+ * (or none, when nothing governs) asserts it citing every assessment; REJECTED asserts it citing the REJECTED verdicts and
+ * their blocking findings; INCONCLUSIVE asserts nothing — it is no value of the unit's assurance axis (`pwu.ts`).
+ */
+function declaredHop(
+	pwuId: string,
+	folded: DeclaredSignoff['foldedAssuranceState'],
+	positiveCites: readonly string[],
+	review: DeclaredSignoff
+): Step[] {
+	if (folded === 'INCONCLUSIVE') return [];
+	if (folded === 'REJECTED')
+		return [
+			chg(pwuId, 'UNDER_ASSURANCE', 'UNDER_ASSURANCE', 'SUCCEEDED', 'REJECTED', 'PRESERVED', [
+				...review.assessmentIds.filter((_, i) => review.dispositions[i] === 'REJECTED'),
+				...review.blockingObservationIds
+			])
+		];
+	return [
+		chg(
+			pwuId,
+			'UNDER_ASSURANCE',
+			'UNDER_ASSURANCE',
+			'SUCCEEDED',
+			folded ?? 'SATISFIED',
+			'PRESERVED',
+			positiveCites
+		)
+	];
 }
 
 /**
@@ -2381,34 +2689,30 @@ export const actions: Actions = {
 		// FOUR IT DOES. `RPH-PWU-007`'s §28.2 fold now refuses that, correctly — the refusal naming each silent
 		// policy is what opened this phase.
 		//
-		// ⚠ AND IT IS ISSUED BY THE REVIEWER, NOT NAMED BY THE OPERATOR. `actingActor(reviewerSession())` reads the
-		// identity off the SAME authenticated session whose credential stamps these commands, so `issuedBy` and
-		// `evaluator` are the same party by construction rather than by agreement. `producer` is the operator, so
-		// §39 invariant 8 is ANSWERED rather than skipped — which is what the declared policies' `DIFFERENT_AGENT`
-		// and `DIFFERENT_INVOCATION` requirements have always demanded and never got.
-		const reviewer = actingActor(reviewerSession());
-		const review = planDeclaredSignoff({
-			engine: getEngine(),
-			pwuId,
-			// READ, not assumed. `REG-F-109` says a PWU's semanticVersion cannot move, which makes the literal `1`
-			// this surface uses elsewhere correct today — but the guard that reads it (`declaredPolicyVerdicts`)
-			// compares against the STORE, and an assessment pinned to the wrong version is silently STALE rather
-			// than loudly wrong. One read costs nothing and cannot rot.
-			subjectSemanticVersion: getEngine().loadObject(pwuId)?.semanticVersion ?? 1,
-			evaluator: reviewer,
-			producer: evaluator,
-			evidenceConsideredIds: considered,
-			mintId: mintUiId
-		});
+		// ⚠ AND IT IS ISSUED BY THE REVIEWER, NOT NAMED BY THE OPERATOR: the reviewer's commands go out under the reviewer's
+		// own credential (`runMultiParty`). ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (`REG-F-523`; `REG-D-110` (3); `REG-D-111`;
+		// `DESIGN-phase-7-completion.md` B1–B3, B6, B7) — AND NOW IT JUDGES: ~~`actingActor(reviewerSession())` reads the
+		// identity off the SAME authenticated session… `producer` is the operator~~ each governing declared policy is
+		// REVIEWED, one review per policy, by the reviewer the floor's own selector selects, over the unit's work product and
+		// commands (its children's, for a unit composed of others); each criterion is recorded, and the verdict is computed
+		// from the answers. The evaluator recorded is WHO JUDGED; the producer is WHO DID THE WORK (`REG-F-514`).
+		const engine = getEngine();
+		// READ, not assumed. `REG-F-109` says a PWU's semanticVersion cannot move, which makes the literal `1`
+		// this surface uses elsewhere correct today — but the guard that reads it (`declaredPolicyVerdicts`)
+		// compares against the STORE, and an assessment pinned to the wrong version is silently STALE rather
+		// than loudly wrong. One read costs nothing and cannot rot.
+		const subjectSemanticVersion = engine.loadObject(pwuId)?.semanticVersion ?? 1;
+		const governing = governingDeclaredPolicies(engine, pwuId);
 		{
-			// ⛔ REFUSED BEFORE ANYTHING IS DISPATCHED, which is what `SPEC-001-INV-14` deserves rather than a
-			// rollback after the fact. A policy whose §6.1 evidence gates EVERY positive disposition cannot be
-			// concluded in this PWU's favour at all, and that is knowable from the policy object alone.
+			// ⛔ REFUSED BEFORE ANYTHING IS DISPATCHED — ⭐ E2: AND BEFORE ANY REVIEW IS ASKED FOR — which is what
+			// `SPEC-001-INV-14` deserves rather than a rollback after the fact. A policy whose §6.1 evidence gates EVERY
+			// positive disposition cannot be concluded in this PWU's favour at all, and that is knowable from the policy
+			// object alone: a review of it would be a paid call whose verdict could never be recorded.
 			//
 			// ⚠ THE OPERATOR GETS THE REASON, NOT THE SYMPTOM. Left to the kernel, the refusal would arrive as
 			// `RPH-PWU-007`'s §28.2 fold — *"a policy this PWU itself declares has not been satisfied"* — which
 			// is true and names the silence rather than the evidence that is missing.
-			const unsatisfying = unsatisfyingReviews(review);
+			const unsatisfying = evidenceRefusals(governing.policies);
 			if (unsatisfying.length > 0)
 				return fail(400, {
 					error:
@@ -2418,6 +2722,40 @@ export const actions: Actions = {
 						`this PWU cannot be recorded SATISFIED until that evidence is supplied.`
 				});
 		}
+		// ⭐ E2 — THE REVIEWS, ASKED BEFORE ANYTHING IS DISPATCHED, as Begin & Execute asks its reviewer (`JAN-SELREV` SR-1, D5):
+		// a reviewer that cannot run refuses here, in its own words, with nothing recorded; and a unit whose work the record
+		// cannot rebuild refuses here too (RD7's rule: no review of a partial reconstruction).
+		let producer: ActorReference = evaluator;
+		let answers: ReadonlyMap<string, DeclaredPolicyAnswer> = new Map();
+		let invocations: ReadonlyMap<string, string> = new Map();
+		if (governing.policies.length > 0) {
+			const declaredReviewReady = assurancePreflight({ testMode: isTestMode() });
+			if (!declaredReviewReady.ready) return fail(400, { error: declaredReviewReady.guidance });
+			const work = await declaredReviewWorkOf(pwuId, evaluator);
+			if (!work.ok)
+				return fail(400, { error: `The declared policies cannot be reviewed: ${work.refusedBecause}` });
+			producer = work.work.producer;
+			({ answers, invocations } = await reviewDeclaredPolicies(
+				pwuId,
+				governing.policies,
+				work.work,
+				subjectSemanticVersion
+			));
+		}
+		const review = planDeclaredSignoff({
+			engine,
+			pwuId,
+			subjectSemanticVersion,
+			operator: evaluator,
+			producer,
+			answers,
+			invocations,
+			// ⭐ `REG-D-071` Q5 — the engine this records into decides whether a stipulated answer counts, as its Gate E does.
+			admitStipulatedAnswers: engine.admitStipulatedAnswers,
+			evidenceConsideredIds: considered,
+			mintId: mintUiId
+		});
+		const folded = review.foldedAssuranceState;
 
 		const err = runMultiParty(review.steps, [
 			// A pending assessment has already been REQUESTED, so re-running the prelude would attempt a second
@@ -2444,6 +2782,8 @@ export const actions: Actions = {
 					producer: evaluator
 				}
 			],
+			// ⭐ E2 (`REG-D-111` (3)) — a policy demanding a HUMAN evaluator: the OPERATOR's decision, issued by the operator.
+			...(review.humanSteps as Step[]),
 			chg(pwuId, 'EXECUTING', 'EVIDENCE_PENDING', 'SUCCEEDED', 'EVIDENCE_REQUIRED', 'PRESERVED'),
 			chg(
 				pwuId,
@@ -2469,17 +2809,30 @@ export const actions: Actions = {
 			// CONDITIONALLY_SATISFIED and the PWU's axis must say so. Asserting SATISFIED over a conditional
 			// verdict is refused by `RPH-PWU-007` — correctly — and would have left the operator unable to
 			// record the state their assurance genuinely reached.
-			chg(
-				pwuId,
-				'UNDER_ASSURANCE',
-				'UNDER_ASSURANCE',
-				'SUCCEEDED',
-				review.foldedAssuranceState ?? 'SATISFIED',
-				'PRESERVED',
-				[assessmentId, ...review.assessmentIds]
-			)
+			// ⭐ E2 — THE FOLD CAN NOW BE AGAINST THE WORK, and each arm says what it is:
+			//   · REJECTED (`REG-D-111` (1)) — canon's route: the blocking findings are recorded above, and the unit's assurance
+			//     axis is REJECTED, citing the REJECTED verdicts and those findings. ⚠ Its lifecycle stays UNDER_ASSURANCE:
+			//     `UNDER_ASSURANCE → REJECTED` on the work axis is a governance act (an EFFECTIVE REJECTION Decision,
+			//     `resolveRejectAuthorization`), and its recovery — *"Replacement PWU created → SUPERSEDED"* — is NOT BUILT
+			//     (reported: in the paid run a declared refusal is reported, not recovered).
+			//   · INCONCLUSIVE — no hop: it is not a value of the unit's assurance axis (`pwu.ts`), so the unit stays ASSESSING
+			//     with the verdicts recorded; nothing here recovers it (reported).
+			...declaredHop(pwuId, folded, [assessmentId, ...review.assessmentIds], review)
 		]);
 		if (err) return fail(400, { error: `Assurance failed: ${err}` });
+		// ⭐⭐ E2 (design B3) — A VERDICT AGAINST THE WORK IS RECORDED, THEN REPORTED: the batch committed it (a paid review's
+		// record is owed, PER-9), and the operator is told what the reviews concluded — never told the unit is assured.
+		const against = unsatisfyingReviews(review);
+		if (against.length > 0)
+			return fail(400, {
+				error:
+					`Assurance recorded, and the declared review did not conclude in this PWU's favour: ` +
+					against.map((u) => `${u.policyId} reached ${u.disposition}`).join('; ') +
+					`. The verdicts are computed from the reviewer's criterion answers (REG-D-110 (3)); ` +
+					(folded === 'REJECTED'
+						? `a REJECTED verdict is recorded with its blocking findings, and this PWU's assurance is REJECTED (REG-D-111 (1)).`
+						: `a verdict that did not conclude leaves this PWU under assessment.`)
+			});
 		return { advanced: 'assured' };
 	},
 

@@ -19,7 +19,9 @@
 //   · THE AUDIT (P7-3) — each hand act the log can show, the forbidden six first. ⛔ A hand completion is ANY step
 //     success that is not one of Begin & Execute's two shapes (the critic's corrected rule: an operator completion that
 //     names ONE output carries neither of the markers the maps first listed).
-//   · REVIEWER CALLS — a lower bound; the 14 DECLARED VERDICTS, each vacuous by construction (`REG-F-523`); the
+//   · REVIEWER CALLS — a lower bound; the 14 DECLARED VERDICTS, ~~each vacuous by construction (`REG-F-523`)~~ ⭐ E2: each read
+//     from its recorded criterion results — as intended when every criterion is answered and its verdict is the one they
+//     give (`REG-D-110` (3); design B8), a pre-E2 sign-off's still vacuous by construction; the
 //     ADJUDICATION TABLE's rows with the classification left for a person (P7-4f); and the per-command RE-RUN MANIFEST
 //     v1, exactly as `rerun-commands.ts` reads it (P7-4d).
 //
@@ -28,6 +30,9 @@
 // writes for the account name and absolute paths before writing a byte (`REG-F-536`).
 import { createHash } from 'node:crypto';
 import { posix } from 'node:path';
+// ⭐ E2 (design B8) — the kernel's own ladder, so "the verdict the answers give" is decided by the rule the sign-off computes
+// it with (`declared-policy-signoff.ts` `verdictOf`), never a restated copy of it. Pure, store-free.
+import { BLOCKING_SEVERITIES, dispositionFromFindings } from '@janumipwb/rph-assurance';
 import {
 	PHASE7_NEGATIVE_CONTROL_RESERVE,
 	PHASE7_PAID_LIMIT,
@@ -66,8 +71,21 @@ export const REASONING_REVIEW = 'floor.reasoning-review';
 export const DEMO_POLICY_ID = 'pol_01ARZ3NDEKTSV4RRFFQ69GDEM0';
 /** The finding code Record Blocking Finding records (`DEMO_FINDING_CODE`). */
 export const DEMO_FINDING_CODE = 'DEMO_UNFIT';
-/** The declared-policy sign-off's validator (`declared-policy-signoff.ts` `DEMO_REVIEW_VALIDATOR_ID`). */
+/** ~~The declared-policy sign-off's validator~~ ⭐ E2 — the PRE-E2 sign-off's validator (`declared-policy-signoff.ts`
+ *  `DEMO_REVIEW_VALIDATOR_ID`): a record made before the declared policies were judged carries it, and reads vacuous. */
 export const DECLARED_SIGNOFF_VALIDATOR = 'workbench.independent-review';
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (`REG-F-523`; `REG-D-110` (3)) — THE VALIDATORS A DECLARED VERDICT IS RECORDED UNDER
+ * NOW: the model reviewer, the gate lane's stand-in, a refused selection, and a policy nobody reviewed
+ * (`declared-policy-review.ts`, `declared-policy-signoff.ts`). ⛔ RESTATED, NOT IMPORTED: those modules load the reviewer's
+ * chain, which reads tool variables at load (`REG-D-072` D12); `verif/phase7-run-report.test.ts` holds each to its source.
+ */
+export const DECLARED_REVIEW_VALIDATORS = [
+	'reviewer.declared-policy',
+	'standin.declared-policy-review',
+	'declared-policy-review.unconfigured',
+	'declared-policy-review.missing'
+] as const;
 /** Begin & Execute's root completion (`undertakings/[id]/+page.server.ts`, the TRANSFORMATION path's detail). */
 export const ROOT_COMPLETION_DETAIL =
 	'Demo lifecycle step: it demonstrates the execution axis and authors no artifact.';
@@ -75,6 +93,9 @@ export const ROOT_COMPLETION_DETAIL =
 export const OPERATOR_COMPLETION_DETAIL = 'Operator completed the step without naming a produced output.';
 /** The page's hand failure, when the operator gives no reason (`failStep`'s default `failureReason`). */
 export const OPERATOR_FAILURE_REASON = 'Operator marked the step failed.';
+/** ⭐ E2 — the operator's actor id (`identity.ts`, the session principal): a declared verdict naming it as producer is
+ *  `REG-F-514`'s shape on a model unit. */
+export const OPERATOR_ACTOR_ID = 'local-professional';
 /** The model path's executor, as Begin & Execute names it (`executionProvenance.executedBy.displayName`). */
 export const MODEL_EXECUTOR_NAME = 'Execution model';
 /** Every evidence object of a unit carries this scope, and nothing else ties it to the unit (`+page.server.ts`). */
@@ -112,10 +133,14 @@ export const CELL_VALUES = [
 ] as const;
 export type CellValue = (typeof CELL_VALUES)[number];
 
-/** The two gaps no Phase 7 run can close, which a "Yes" always states (§1). */
+/**
+ * ~~The two gaps no Phase 7 run can close, which a "Yes" always states (§1).~~ ⭐⭐ E2 (`DESIGN-phase-7-completion.md` B8,
+ * §1) — THE GAP NO PHASE 7 RUN CAN CLOSE, which a "Yes" always states. ⛔ The `REG-F-523` line is gone: the declared policies
+ * are judged now, criterion by criterion (`REG-D-110` (3)), and stage 5b says, per run, whether they were.
+ * ~~'REG-F-523: the declared policies were signed off with no criterion checked.'~~
+ */
 export const ALWAYS_STATED = [
-	'REG-F-510: the PWA had to name its product, because an Undertaking cannot tell its phases what to build (§3.3).',
-	'REG-F-523: the declared policies were signed off with no criterion checked.'
+	'REG-F-510: the PWA had to name its product, because an Undertaking cannot tell its phases what to build (§3.3).'
 ] as const;
 
 /** The classifications a person gives each adjudication row (P7-4f). This report leaves the field blank. */
@@ -389,8 +414,31 @@ export interface DeclaredVerdict {
 	readonly policyId: string;
 	readonly state: string;
 	readonly criterionResults: number;
-	readonly value: 'vacuous by construction';
+	/**
+	 * ~~`'vacuous by construction'`~~ ⭐ E2 (design B8): `as intended` when every criterion of the policy is answered and the
+	 * recorded verdict is the one those answers give; `broke` otherwise; a pre-E2 sign-off's `vacuous by construction`.
+	 */
+	readonly value: 'as intended' | 'broke' | 'vacuous by construction';
 	readonly registerIds: readonly string[];
+	/** ⭐ E2 — who the verdict is recorded under: the declared reviewer, its stand-in, or the pre-E2 sign-off. */
+	readonly validatorId: string;
+	/**
+	 * ⭐ E2 — the policy's criteria (`declared`), the rows recorded against it (`recorded`, latest per criterion), and of
+	 * those, how many a reviewer answered, came back undetermined, and carried a test's stipulation.
+	 */
+	readonly criteria: {
+		readonly declared: number;
+		readonly recorded: number;
+		readonly answered: number;
+		readonly undetermined: number;
+		readonly stipulatedRows: number;
+	};
+	/** ⭐ E2 — whether the recorded verdict is the one the recorded answers give; `null` for a pre-E2 sign-off. */
+	readonly followsFromAnswers: boolean | null;
+	/** ⭐ E2 — the producer the verdict checked independence against (`REG-F-514`), as the assessment records it. */
+	readonly producer: string | null;
+	/** ⭐ E2 — why, in the record's own terms: what was unanswered, or what the answers give. */
+	readonly basis: readonly string[];
 }
 
 export interface ContentPointer {
@@ -803,6 +851,8 @@ function resolveUnits(
 /** The id of the unit a floor subject belongs to: a work product's producing unit, a command's by its scope. */
 function ownerOf(subject: StoredObject): string {
 	if (subject.objectType === 'ARTIFACT') return str(subject.state.producingPwuId);
+	// ⭐ E2 — a declared review's subject is the work unit itself: its calls are that unit's.
+	if (subject.objectType === 'PROFESSIONAL_WORK_UNIT') return subject.id;
 	const scope = str(subject.state.scope);
 	return scope.startsWith(EVIDENCE_SCOPE_PREFIX) ? scope.slice(EVIDENCE_SCOPE_PREFIX.length) : '';
 }
@@ -1074,9 +1124,14 @@ function buildPairing(ix: Index, units: readonly Unit[]): PairingReport {
 		'demo sign-off': [],
 		other: []
 	};
-	for (const a of assessments)
+	for (const a of assessments) {
+		const validatorId = str(ix.completionOf.get(a.id)?.payload.validatorId);
+		// ⭐ E2 — a declared review ASKED a reviewer: it is listed with the declared verdicts, its calls counted there, and
+		// never as an assessment that asked no model by design.
+		if ((DECLARED_REVIEW_VALIDATORS as readonly string[]).includes(validatorId)) continue;
 		if (str(a.state.assurancePolicyId) !== REASONING_REVIEW)
-			noModel[noModelKind(str(a.state.assurancePolicyId), str(ix.completionOf.get(a.id)?.payload.validatorId))].push(a.id);
+			noModel[noModelKind(str(a.state.assurancePolicyId), validatorId)].push(a.id);
+	}
 	const counts = Object.fromEntries(PAIRING_LABELS.map((l) => [l, rows.filter((r) => r.label === l).length]));
 	return {
 		rule: PAIRING_RULE,
@@ -1984,11 +2039,36 @@ function stageFiveA(v: UnitView, ix: Index): MatrixCell {
 	return cell('5a', row, 'as intended', [], [why, ...unsatisfied]);
 }
 
-/** Stage 5b — the declared policies, signed off with no criterion checked. */
+/**
+ * Stage 5b — ~~the declared policies, signed off with no criterion checked~~ ⭐⭐ E2 (`REG-F-523`; `REG-D-110` (3); design B8):
+ * the declared policies JUDGED, read from what each verdict recorded — AS INTENDED when every one of the unit's declared
+ * verdicts has every criterion of its policy answered and is the verdict those answers give (`DeclaredVerdict.value`).
+ *   · ⛔ a criterion left unanswered breaks it (`REG-F-489`'s shape: a review that did not answer every criterion);
+ *   · ⛔ a verdict the answers do not give breaks it, and no register entry names that;
+ *   · ⚠ a verdict the pre-E2 sign-off recorded is still vacuous by construction (`REG-F-523`, `REG-D-102` (6)).
+ * ⭑ A verdict against the work is AS INTENDED here when its answers give it: 5b asks whether the policies judged, and
+ * stage 7 whether the unit then completed.
+ */
 function stageFiveB(v: UnitView): MatrixCell {
 	if (v.declared.length === 0) return cell('5b', v.unit.slug, 'not reached', [], ['no declared verdict was signed off']);
-	return cell('5b', v.unit.slug, 'vacuous by construction', ['REG-F-523', 'REG-F-406'], [
-		`${plural(v.declared.length, 'declared verdict', 'declared verdicts')}, each computed from the policy's required evidence alone (REG-D-102 (6))`
+	const vacuous = v.declared.filter((d) => d.value === 'vacuous by construction');
+	if (vacuous.length > 0)
+		return cell('5b', v.unit.slug, 'vacuous by construction', ['REG-F-523', 'REG-F-406'], [
+			`${plural(vacuous.length, 'declared verdict', 'declared verdicts')} signed off before E2, each computed from the policy's required evidence alone (REG-D-102 (6))`
+		]);
+	const broke = v.declared.filter((d) => d.value === 'broke');
+	if (broke.length > 0)
+		return cell(
+			'5b',
+			v.unit.slug,
+			'broke',
+			broke.flatMap((d) => d.registerIds),
+			broke.flatMap((d) => d.basis),
+			{ unregistered: broke.some((d) => d.registerIds.length === 0) }
+		);
+	return cell('5b', v.unit.slug, 'as intended', [], [
+		`${plural(v.declared.length, 'declared verdict', 'declared verdicts')}, each with every criterion of its policy answered and its verdict the one its answers give (REG-D-110 (3))`,
+		`verdicts: ${v.declared.map((d) => `${d.policyId} ${d.state}`).join('; ')}`
 	]);
 }
 
@@ -2015,8 +2095,12 @@ function stageEight(v: UnitView): MatrixCell {
 	const basis = [
 		`${total - broken - unretained} of ${total} exchange(s) can be read: what each model was asked and what it answered, ` +
 			'each holding what its record claims',
-		'standing: the bytes are readable only from the content store (REG-F-528), and every declared verdict names the ' +
-			'operator as producer (REG-F-514)'
+		// ⭐ E2 (`REG-F-514`) — ~~"and every declared verdict names the operator as producer"~~: the sign-off records the
+		// unit's executor now, so the standing names REG-F-514 only for a verdict that still records the operator.
+		'standing: the bytes are readable only from the content store (REG-F-528)' +
+			(v.declared.some((d) => d.producer === OPERATOR_ACTOR_ID)
+				? ', and a declared verdict names the operator as producer (REG-F-514)'
+				: '')
 	];
 	if (broken > 0)
 		basis.push(
@@ -2105,19 +2189,115 @@ function stageSevenWhole(views: readonly UnitView[]): MatrixCell {
 
 // ── THE REPORT ───────────────────────────────────────────────────────────────────────────────────────────────────────
 
+/** The criterion outcomes a reviewer GAVE — every recorded result but the one that says nobody determined it. */
+const ANSWERED = new Set(['MET', 'NOT_MET', 'PARTIALLY_MET', 'NOT_APPLICABLE']);
+/** §28.2's ladder, strictest first — how two verdicts are compared. */
+const STRICTEST_FIRST = ['REJECTED', 'INCONCLUSIVE', 'CONDITIONALLY_SATISFIED', 'SATISFIED'];
+
+/**
+ * ⭐⭐ E2 (design B8) — WHETHER A DECLARED VERDICT IS THE ONE ITS ANSWERS GIVE, and why: the kernel's ladder
+ * (`dispositionFromFindings`) over the recorded rows — the LATEST per criterion, each mandatory by its POLICY's stakes, a
+ * criterion with no row undetermined — and the assessment's OPEN findings. ⚠ A policy that declares required evidence can
+ * cap a verdict below its answers (`supportedDisposition`'s ceiling); such a verdict is read as following when it is the
+ * stricter of the two. ⭑ An engine built for tests counts a stipulated row as met; no run this report reads is one.
+ */
+function judgedVerdict(ix: Index, a: StoredObject): Omit<DeclaredVerdict, 'assessmentId' | 'unit' | 'validatorId'> {
+	const policyId = str(a.state.assurancePolicyId);
+	const state = str(a.state.assessmentState);
+	const policyState = ix.byId.get(policyId)?.state ?? {};
+	const declared = (Array.isArray(policyState.criteria) ? policyState.criteria : []).map((c) => ({
+		id: str(rec(c).id),
+		mandatory: BLOCKING_SEVERITIES.has(str(rec(c).severityIfNotMet) as never)
+	}));
+	// ⚠ `claimed`, never `stipulated`: this report READS a row's stipulation, and the census of who writes one
+	// (`verif/stipulation-writers.test.ts`) counts every property named so.
+	const latest = new Map<string, { result: string; claimed: boolean }>();
+	for (const e of ix.eventsOfType('AssuranceCriterionEvaluated'))
+		if (str(e.payload.assessmentId) === a.id)
+			latest.set(str(e.payload.criterionId), { result: str(e.payload.result), claimed: str(e.payload.stipulated) === 'MET' });
+	const rows = [...latest.values()];
+	const criteria = {
+		declared: declared.length,
+		recorded: rows.length,
+		answered: rows.filter((r) => ANSWERED.has(r.result)).length,
+		undetermined: rows.filter((r) => r.result === 'UNABLE_TO_DETERMINE').length,
+		stipulatedRows: rows.filter((r) => r.claimed).length
+	};
+	const open = ix
+		.ofType('ASSURANCE_OBSERVATION')
+		.filter((o) => str(o.state.assessmentId) === a.id && str(o.state.disposition) === 'OPEN')
+		.map((o) => ({ severity: str(o.state.severity) as never, open: true }));
+	const given: string = dispositionFromFindings({
+		findings: open,
+		criteria: declared.map((c) => ({
+			mandatory: c.mandatory,
+			outcome: (latest.get(c.id)?.result ?? 'UNABLE_TO_DETERMINE') as never
+		}))
+	});
+	const evidenced = Array.isArray(policyState.requiredEvidence) && policyState.requiredEvidence.length > 0;
+	const capped =
+		evidenced &&
+		STRICTEST_FIRST.indexOf(state) >= 0 &&
+		STRICTEST_FIRST.indexOf(state) < STRICTEST_FIRST.indexOf(given);
+	const followsFromAnswers = declared.length > 0 && (state === given || capped);
+	const unanswered = declared.filter((c) => !ANSWERED.has(latest.get(c.id)?.result ?? ''));
+	const basis: string[] = [];
+	const registerIds: string[] = [];
+	if (unanswered.length > 0) {
+		registerIds.push('REG-F-489');
+		basis.push(
+			`${policyId}: ${unanswered.length} of ${declared.length} criteria not answered (${unanswered.map((c) => c.id).join(', ')})`
+		);
+	}
+	if (!followsFromAnswers)
+		basis.push(
+			declared.length === 0
+				? `${policyId}: the policy's criteria are not in the store, so the verdict cannot be read against them`
+				: `${policyId}: recorded ${state}, and its answers give ${given}`
+		);
+	return {
+		policyId,
+		state,
+		criterionResults: ix.criteriaOf.get(a.id)?.length ?? 0,
+		value: unanswered.length === 0 && followsFromAnswers ? 'as intended' : 'broke',
+		registerIds,
+		criteria,
+		followsFromAnswers,
+		producer: str(rec(a.state.producer).actorId) || null,
+		basis
+	};
+}
+
+/**
+ * ⭐ THE DECLARED VERDICTS (P7-4g), each read as design B8 reads it (`judgedVerdict`) — ⚠ or, signed off before E2 (the
+ * sign-off's own validator), vacuous by construction, as `REG-D-102` (6) had the report mark all 14.
+ */
 function declaredVerdicts(ix: Index, units: readonly Unit[]): DeclaredVerdict[] {
-	return ix
-		.ofType('ASSURANCE_ASSESSMENT')
-		.filter((a) => str(ix.completionOf.get(a.id)?.payload.validatorId) === DECLARED_SIGNOFF_VALIDATOR)
-		.map((a) => ({
-			assessmentId: a.id,
-			unit: units.find((u) => u.object !== null && u.object.id === strs(a.state.subjectObjectIds)[0])?.slug ?? null,
-			policyId: str(a.state.assurancePolicyId),
-			state: str(a.state.assessmentState),
-			criterionResults: ix.criteriaOf.get(a.id)?.length ?? 0,
-			value: 'vacuous by construction',
-			registerIds: ['REG-F-523', 'REG-F-406']
-		}));
+	const judged = DECLARED_REVIEW_VALIDATORS as readonly string[];
+	return ix.ofType('ASSURANCE_ASSESSMENT').flatMap((a): DeclaredVerdict[] => {
+		const validatorId = str(ix.completionOf.get(a.id)?.payload.validatorId);
+		const unit = units.find((u) => u.object !== null && u.object.id === strs(a.state.subjectObjectIds)[0])?.slug ?? null;
+		const results = ix.criteriaOf.get(a.id)?.length ?? 0;
+		if (validatorId === DECLARED_SIGNOFF_VALIDATOR)
+			return [
+				{
+					assessmentId: a.id,
+					unit,
+					policyId: str(a.state.assurancePolicyId),
+					state: str(a.state.assessmentState),
+					criterionResults: results,
+					value: 'vacuous by construction',
+					registerIds: ['REG-F-523', 'REG-F-406'],
+					validatorId,
+					criteria: { declared: 0, recorded: results, answered: 0, undetermined: 0, stipulatedRows: 0 },
+					followsFromAnswers: null,
+					producer: str(rec(a.state.producer).actorId) || null,
+					basis: ['signed off before E2, from the policy’s required evidence alone (REG-F-523)']
+				}
+			];
+		if (!judged.includes(validatorId)) return [];
+		return [{ assessmentId: a.id, unit, validatorId, ...judgedVerdict(ix, a) }];
+	});
 }
 
 function unitView(
@@ -2475,18 +2655,27 @@ function adjudicationLine(a: AdjudicationRow): string {
 	);
 }
 
+/** ⭐ E2 — one declared verdict's line: its answers counted, whether its verdict follows from them, and its value. */
+function declaredLine(d: DeclaredVerdict): string {
+	let follows = '—';
+	if (d.followsFromAnswers !== null) follows = d.followsFromAnswers ? 'yes' : 'no';
+	return (
+		`| ${d.assessmentId} | ${d.unit ?? '—'} | ${d.policyId} | ${d.state} | ${d.criteria.answered} of ${d.criteria.declared} | ` +
+		`${follows} | ${d.value} |`
+	);
+}
+
 function verdictLines(r: RunReport): string[] {
 	const unrecorded = Object.entries(r.manifest.unrecordedRuns)
 		.map(([u, n]) => `${u} ${n ?? 'unknown'}`)
 		.join('; ');
 	return [
-		`## The declared verdicts (P7-4g) — ${r.declaredVerdicts.rows.length} of ${r.declaredVerdicts.expected}, each vacuous by construction`,
+		// ⭐ E2 (design B8) — ~~"each vacuous by construction"~~: each read from its recorded criterion results.
+		`## The declared verdicts (P7-4g) — ${r.declaredVerdicts.rows.length} of ${r.declaredVerdicts.expected}, each read from its recorded criterion results`,
 		'',
-		'| Assessment | Unit | Policy | State | Criterion results |',
-		'|---|---|---|---|---|',
-		...r.declaredVerdicts.rows.map(
-			(d) => `| ${d.assessmentId} | ${d.unit ?? '—'} | ${d.policyId} | ${d.state} | ${d.criterionResults} |`
-		),
+		'| Assessment | Unit | Policy | State | Criteria answered | Follows from its answers | Value |',
+		'|---|---|---|---|---|---|---|',
+		...r.declaredVerdicts.rows.map(declaredLine),
 		'',
 		'## The adjudication table’s rows (P7-4f) — classification left for a person',
 		'',

@@ -26,7 +26,11 @@
 // ⚠ WHAT STAYS WITH THE CALLER: the route-level pieces — the narration, the candidate's subject hash, the agent's
 // rationale, the prior gaps — are the caller's to supply, and a qualification case supplies them as literals.
 import type { AssessmentCriterion, ObservedToolCallReport } from '@janumipwb/rph-contracts';
-import type { ProfessionalRationaleSummary, ReasoningReviewInput } from '@janumipwb/rph-assurance';
+import type {
+	DeclaredPolicyFraming,
+	ProfessionalRationaleSummary,
+	ReasoningReviewInput
+} from '@janumipwb/rph-assurance';
 import type { PwaGraphExport } from '@janumipwb/rph-projections';
 import type { ObservedProcessRun } from '../tools/process-run-observer.js';
 import { renderProcessResultReview } from './process-result-render.js';
@@ -180,5 +184,70 @@ export function processResultReviewInput(source: ProcessResultReviewSource): Rea
 		...shape,
 		content: renderProcessResultReview(source.run, budget, otherUntrusted),
 		...halves
+	};
+}
+
+/** ⭐ E2 — one command a unit ran, as the host recorded it on its evidence: the command, its exit, and whether it timed out. */
+export interface DeclaredReviewCommand {
+	/** The work unit that ran it — its title, so the root's review can say whose command it was. */
+	readonly unit: string;
+	readonly argv: readonly string[];
+	readonly exitCode: number | null;
+	readonly timedOut: boolean;
+}
+
+/** ⭐ E2 — what a declared-policy review knows about the work it judges. */
+export interface DeclaredPolicyReviewSource {
+	/** The declared policy: its id, name and purpose, read from the stored policy by the caller. */
+	readonly policy: DeclaredPolicyFraming;
+	/** That policy's OWN criteria, read from the store — the rubric (`ASR-4`: never a second one). */
+	readonly criteria: readonly AssessmentCriterion[];
+	/** The instruction the work answered: the unit's rendered prompt, or, for a unit with none, its own purpose. */
+	readonly instruction: string;
+	/** The work products judged, each with the title of the unit that produced it — the unit's own, or its children's. */
+	readonly workProducts: readonly { readonly unit: string; readonly answer: string }[];
+	/** The commands those units ran, as the host recorded them. */
+	readonly commands: readonly DeclaredReviewCommand[];
+	/** ⭑ §9.7 — the producer's CONTRACTED account, when one unit's work is judged and it returned one. */
+	readonly rationale?: ProfessionalRationaleSummary;
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (`REG-F-523`; `REG-D-110` (3); `DESIGN-phase-7-completion.md` B1, B6) — THE ONE
+ * BUILDER OF A DECLARED-POLICY REVIEW'S INPUT: what Record Assurance hands the reviewer for each of a unit's declared
+ * policies, and what the declared qualification cases replay (`scripts/reviewer-qual/materialize.ts`).
+ *
+ * ⭑ THE WORK IS THE UNIT'S WORK PRODUCT AND THE COMMANDS IT RAN (`R18`): the reviewer judges the declared policy over both.
+ * For a unit composed of others the work is its CHILDREN's work products and commands, the end-to-end phase's among them
+ * (`REG-D-111` (2), DEC-6): the root's own TRANSFORMATION produces nothing.
+ * ⭐ ONE UNTRUSTED VALUE, IN ITS STATED SERIALIZATION (`REG-F-481`): the work is ONE line of JSON (`jsonLine`, as the graph's
+ * content is) — `workProducts`, each work product with the title of the unit that produced it, and `commands`, each command
+ * with the exit code and timeout recorded for it — and the host line above it says so (the validator's `DECLARED_POLICY`
+ * framing). ⛔ No word of the host's is written into it: no label, no heading, no "(none)".
+ * ⚠ THE COMMANDS ARE NOT THE FLOOR'S REVIEW VIEW: each was already reviewed on its own (`runProcessResultFloor`), and what a
+ * policy's criteria need of them is which ran and how each ended. ⚠ So the exit codes the HOST recorded sit inside the quoted
+ * value, beside the agent's arguments — the conservative direction, disclosed on the host line: the host's record is
+ * understated as quoted, and no word of the agent's is ever shown as the host's.
+ * ⚠ A unit with no work product is judged as it is — an empty `workProducts` — and nothing is invented to fill it.
+ */
+export function declaredPolicyReviewInput(source: DeclaredPolicyReviewSource): ReasoningReviewInput {
+	return {
+		criteria: source.criteria,
+		// ⭑ `R14` — DECLARED BY THE CALLER, and the policy it judges against with it (`declaredPolicy`).
+		framing: 'DECLARED_POLICY',
+		declaredPolicy: { policyId: source.policy.policyId, name: source.policy.name, purpose: source.policy.purpose },
+		prompt: source.instruction,
+		content: jsonLine({
+			workProducts: source.workProducts.map((w) => ({ workUnit: w.unit, workProduct: w.answer })),
+			commands: source.commands.map((c) => ({
+				workUnit: c.unit,
+				command: c.argv,
+				exitCode: c.exitCode,
+				timedOut: c.timedOut
+			}))
+		}),
+		// ⚠ PASSED UNCONDITIONALLY, as the work-product floor passes it: §9.7 — presence or absence is never a signal.
+		rationale: source.rationale,
+		narration: undefined
 	};
 }

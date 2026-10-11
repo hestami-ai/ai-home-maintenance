@@ -124,8 +124,13 @@ const PREDICTED = {
 const OPERATOR = 'local-professional';
 /** The second principal the declared-policy sign-off issues under (`R22`), also HUMAN (`REG-F-523`). */
 const REVIEWER = 'assurance-reviewer-1';
-/** That sign-off's validator (`lib/server/assurance/declared-policy-signoff.ts`, `DEMO_REVIEW_VALIDATOR_ID`). */
-const SIGNOFF_VALIDATOR = 'workbench.independent-review';
+/** ~~That sign-off's validator (`DEMO_REVIEW_VALIDATOR_ID`)~~ ⭐ E2 — the declared policies' reviewer in this lane: the
+ *  declared stand-in (`lib/server/assurance/declared-policy-review.ts`, `STANDIN_DECLARED_REVIEW_VALIDATOR_ID`). */
+const DECLARED_VALIDATOR = 'standin.declared-policy-review';
+/** ⭐ E2 — the declared stand-in's identity, the evaluator of every declared verdict it answers (`STANDIN_DECLARED_EVALUATOR`). */
+const DECLARED_EVALUATOR = 'standin-declared-reviewer';
+/** ⭐ E2 (`REG-D-111` (3)) — the declared policy that demands a HUMAN evaluator: the operator's decision, by the operator. */
+const HUMAN_POLICY = 'pol_fitness_for_purpose';
 /** The declared stand-in reviewer of this lane (`standin-reasoning-review-validator.ts`, `STANDIN_VALIDATOR_ID`). */
 const STANDIN_VALIDATOR = 'standin.reasoning-review';
 const REASONING_REVIEW = 'floor.reasoning-review';
@@ -406,7 +411,43 @@ function expectTheTypesTyped(
 	expect(typed, 'the designer did not record the PWA as declared (§3.2)').toEqual(expected);
 }
 
+// ⚠⚠ `JAN-EXEC` Phase 7 completion E2 — THE SPEC'S OWN COSTS, KEPT OUT OF WHAT ITS TESTS MEASURE. Each Playwright run starts
+// a fresh Vite server (`reuseExistingServer: false`), so this spec's tests are the first of a run whenever the mutation
+// runner drives them, and every Record Assurance now runs a declared review of each of its unit's policies. Measured
+// 2026-10-11 in the builder's worktree, the machine at 100% CPU under the other builders' runs:
+//   · THE TRACE'S SNAPSHOTS were most of each test's time — with them, the three tests' warm runs took 41.7 s, 22.6 s and
+//     61.9 s; without them 29.1 s, 12.6 s and 27.6 s — and a failed test's teardown outran Playwright's after-failure slot
+//     (the config's 30 s, not the test's own timeout) with its trace not yet written: the R-1e test, failed by its
+//     assertion under the mutant PQ7-M106, then read "Test timeout of 30000ms exceeded", which the mutation runner grades
+//     INCONCLUSIVE whatever else failed. So this spec keeps a trace of its actions, network and console on failure, and no
+//     DOM snapshots or screencast: the gallery's shots and the failure screenshot still show the page.
+//   · THE COLD SERVER: the first test's first attempt ran past its 60 s (60.6 s, at the root's Mark Satisfied; 29.1 s
+//     warm, on its retry) — Vite compiling, on first request, every route's module graph the test drives. So the pages the
+//     tests drive are loaded once before them (`beforeAll`), under a bound of their own, and no test pays the compile.
+// ⛔ Neither raises a test's timeout: each removes a cost that is not what the test measures.
+test.use({ trace: { mode: 'retain-on-failure', snapshots: false, screenshots: false } });
+
+/** The warm-up's own bound: the cold compile of the pages the tests drive — about 30 s measured under load — with room. */
+const WARM_UP_MS = 180_000;
+
 test.describe('JAN-EXEC Phase 7 P7-1b — the five-unit rehearsal, in the gate lane', () => {
+	test.beforeAll(async ({ browser, request }) => {
+		test.setTimeout(WARM_UP_MS);
+		// The reference seed holds a PWA and an Undertaking, so each page the tests drive can be loaded — the board, the
+		// designer, the Undertaking form and an Undertaking's page — and with it the server modules its actions run.
+		await resetEngine(request, 'reference');
+		const seeded = await introspect(request);
+		const page = await browser.newPage();
+		for (const path of [
+			'/',
+			`/pwa/${seeded.pwas[0]!.id}`,
+			'/undertakings',
+			`/undertakings/${seeded.undertakings[0]!.id}`
+		])
+			await gotoHydrated(page, path);
+		await page.close();
+	});
+
 	test.beforeEach(async ({ request }) => {
 		await resetEngine(request, 'empty');
 	});
@@ -439,6 +480,10 @@ test.describe('JAN-EXEC Phase 7 P7-1b — the five-unit rehearsal, in the gate l
 		// body, after the reset, with the PWA's id READ FROM THE STORE. Each work product finds its PWA through artifact →
 		// unit → Undertaking, so this one registration answers all four phases.
 		await registerStipulation(request, pwaId, 'WORK_PRODUCT');
+		// ⭐ `JAN-EXEC` Phase 7 completion E2 (`REG-F-523`; `REG-D-110` (3)) — AND EACH UNIT'S DECLARED POLICIES: the declared
+		// stand-in answers each policy's criteria as stipulated CLEAN, recorded NOT JUDGED — it has no checker, so in this
+		// lane nothing of a declared policy is judged, and the record says so (`declared-policy-review.ts`).
+		await registerStipulation(request, pwaId, 'DECLARED_POLICY');
 		await typePwuTypes(page, request, PHASE7_PWA.types);
 		expectTheTypesTyped(await introspect(request), pwaId, PHASE7_PWA.types);
 		await publishThroughDesigner(page, request, pwaId);
@@ -526,7 +571,9 @@ test.describe('JAN-EXEC Phase 7 P7-1b — the five-unit rehearsal, in the gate l
 				['SATISFIED', 'SATISFIED'],
 				'GREEN'
 			),
-			'REG-F-523 — a root whose TRANSFORMATION produced nothing is signed off green on two declared verdicts that answered no criterion'
+			// ⭐ E2 — ~~"on two declared verdicts that answered no criterion"~~: its two declared policies are judged over its
+			// CHILDREN's work now (`REG-D-111` (2)), their criteria stipulated in this lane; its own step still produced nothing.
+			'REG-F-523 — a root whose TRANSFORMATION produced nothing is signed off green, its two declared policies judged over its children’s work (REG-D-111 (2)), each criterion stipulated in this lane'
 		);
 		await expect(unitRow(page, PHASE7_ROOT.name).getByText('✓ satisfied')).toBeVisible();
 		await shot(page, 'five units SATISFIED');
@@ -609,9 +656,13 @@ test.describe('JAN-EXEC Phase 7 P7-1b — the five-unit rehearsal, in the gate l
 			).toEqual([['SATISFIED', STANDIN_VALIDATOR]]);
 		}
 
-		// ── 7. ⛔ THE DECLARED POLICIES' SIGN-OFF JUDGED NOTHING (`REG-F-523`; `REG-D-102` (6)) ─────────────────────────
-		// The design's 14 verdicts: two on the root, two, four, three and three on the phases. Each SATISFIED, each issued
-		// by the second principal, and not one criterion answered — so a "Yes" can count none of them.
+		// ── 7. ~~⛔ THE DECLARED POLICIES' SIGN-OFF JUDGED NOTHING (`REG-F-523`; `REG-D-102` (6))~~ ⭐⭐ E2 — EACH DECLARED POLICY
+		// REVIEWED, ONE REVIEW PER POLICY, EACH CRITERION RECORDED (`REG-F-523`; `REG-D-110` (3); `DESIGN-phase-7-completion.md`
+		// B1, B2) ─────────────────────────────────────────────────────────────────────────────────────────────────────
+		// The design's 14 verdicts: two on the root, two, four, three and three on the phases. ~~Each SATISFIED, each issued by
+		// the second principal, and not one criterion answered — so a "Yes" can count none of them.~~ ⭐ Each SATISFIED, each
+		// answered by the declared stand-in — every criterion stipulated in this lane, so it is never evidence a reviewer
+		// judged them (that is the re-qualification's, P4) — and each criterion recorded: 100.
 		const declared = [...units.values()].flatMap((u) => declaredVerdictsOf(snap, u));
 		expect(declared, 'the design counts 14 declared verdicts (REG-D-102 (6))').toHaveLength(14);
 		expect(
@@ -620,29 +671,55 @@ test.describe('JAN-EXEC Phase 7 P7-1b — the five-unit rehearsal, in the gate l
 				.sort(),
 			'the root’s declared policies are §3.3’s two'
 		).toEqual([...PHASE7_ROOT.policyIds].sort());
+		// ⭐ E2 — WHO JUDGED, AND WHO ISSUED IT: the stand-in is each verdict's evaluator, issued by the reviewer's session
+		// (`R22`); ⭐ but a policy demanding a HUMAN is the OPERATOR's decision, recorded by the operator (`REG-D-111` (3)).
 		expect(
 			declared.map((a) => [
 				str(a.state.assessmentState),
 				validatorOf(snap, a.id),
-				str((a.state.evaluator as { actorId?: string } | undefined)?.actorId)
+				str((a.state.evaluator as { actorId?: string } | undefined)?.actorId),
+				str((a.state.updatedBy as { actorId?: string } | undefined)?.actorId)
 			]),
-			'REG-F-523: each declared verdict is the sign-off’s SATISFIED, issued by the second principal'
-		).toEqual(declared.map(() => ['SATISFIED', SIGNOFF_VALIDATOR, REVIEWER]));
-		// ⛔ THE MUTANT, DRIVEN (P7-1b's verifier's first): the sign-off records each declared policy's criteria MET — this
-		// count reddens.
+			'E2: each declared verdict is SATISFIED, answered by the declared stand-in'
+		).toEqual(
+			declared.map((a) =>
+				str(a.state.assurancePolicyId) === HUMAN_POLICY
+					? ['SATISFIED', DECLARED_VALIDATOR, OPERATOR, OPERATOR]
+					: ['SATISFIED', DECLARED_VALIDATOR, DECLARED_EVALUATOR, REVIEWER]
+			)
+		);
+		// ~~⛔ THE MUTANT, DRIVEN (P7-1b's verifier's first): the sign-off records each declared policy's criteria MET — this
+		// count reddens.~~ ⭐ E2 (design B2) — ONE CRITERION RESULT PER CRITERION: the design's 100 (~~0~~), each stipulated in
+		// this lane, never MET. ⛔ THE MUTANT, E12's: the sign-off records no criterion result — this count reddens.
+		const answers = snap.events.filter(
+			(e) =>
+				e.eventType === 'AssuranceCriterionEvaluated' &&
+				declared.some((a) => a.id === str(payloadOf(e).assessmentId))
+		);
 		expect(
 			criterionAnswersFor(
 				snap,
 				declared.map((a) => a.id)
 			),
-			'REG-F-523: the sign-off records no criterion result — it judges nothing'
-		).toBe(0);
-		// ⚠ AND IT NAMES THE OPERATOR AS EACH UNIT'S PRODUCER (`REG-F-514`), though a model did the phases' work: the
-		// phases' steps name the model as their executor, and the verdicts check independence against the operator.
+			'E2: one criterion result per criterion of each declared policy (design B2)'
+		).toBe(100);
 		expect(
-			[...new Set(declared.map((a) => str((a.state.producer as { actorId?: string })?.actorId)))],
-			'REG-F-514: every declared verdict records the operator as the producer'
-		).toEqual([OPERATOR]);
+			[...new Set(answers.map((e) => `${str(payloadOf(e).result)}:${str(payloadOf(e).stipulated)}`))],
+			'E2: in this lane every declared criterion is stipulated, never judged MET'
+		).toEqual(['UNABLE_TO_DETERMINE:MET']);
+		// ~~⚠ AND IT NAMES THE OPERATOR AS EACH UNIT'S PRODUCER (`REG-F-514`)~~ ⭐ E2 (`REG-F-514`) — EACH PHASE'S VERDICTS NAME
+		// THE MODEL THAT DID ITS WORK as producer, and the root's the operator, who ran its step.
+		expect(
+			[
+				...new Set(
+					declared.map((a) => {
+						const unit = [...units.entries()].find(([, u]) => ids(a.state.subjectObjectIds).includes(u.id))![0];
+						return `${unit === PHASE7_ROOT.name ? 'root' : 'phase'}:${str((a.state.producer as { actorType?: string })?.actorType)}`;
+					})
+				)
+			].sort(),
+			'REG-F-514: the producer is the unit’s executor'
+		).toEqual(['phase:AGENT', 'root:HUMAN']);
 		for (const t of PHASE7_PHASES) {
 			const { planId, step } = activeStepOf(snap, units.get(t.name)!.id);
 			const executor = completionsOf(snap, planId, step.id)[0]?.executionProvenance as
@@ -664,6 +741,9 @@ test.describe('JAN-EXEC Phase 7 P7-1b — the five-unit rehearsal, in the gate l
 		// ── 1. THE PWA AND ITS UNDERTAKING — ⛔ NOTHING REGISTERED, so the stand-in leaves the review INCONCLUSIVE
 		//    (`REG-D-071`), as a reviewer that answers no verdict would ────────────────────────────────────────────────
 		const pwaId = await createDraftPwa(page, request, STUCK_PWA);
+		// ⭐ E2 — the DECLARED policies' stipulation only, so the root's sign-off can conclude beside the stuck phase
+		// (prediction (a)); ⛔ the phase's WORK_PRODUCT review stays unstipulated, as the arm this test drives needs.
+		await registerStipulation(request, pwaId, 'DECLARED_POLICY');
 		await typePwuTypes(page, request, STUCK_PWA.types);
 		expectTheTypesTyped(await introspect(request), pwaId, STUCK_PWA.types);
 		await publishThroughDesigner(page, request, pwaId);
@@ -880,6 +960,8 @@ test.describe('JAN-EXEC Phase 7 P7-1b — the five-unit rehearsal, in the gate l
 
 		// ── 3. THE REVIEWER WILL ANSWER NOW (the test's stipulation); THE PERSON RE-RUNS ─────────────────────────────
 		await registerStipulation(request, pwaId, 'WORK_PRODUCT');
+		// ⭐ E2 — and each unit's declared policies, so its sign-off can conclude (`declared-policy-review.ts`).
+		await registerStipulation(request, pwaId, 'DECLARED_POLICY');
 		await gotoHydrated(page, new URL(page.url()).pathname);
 		await page.getByRole('button', { name: 'overview', exact: true }).click();
 		// ⭐ The requirements phase: RE-RUN THE REVIEW — offered, since its review did not conclude (RD3).

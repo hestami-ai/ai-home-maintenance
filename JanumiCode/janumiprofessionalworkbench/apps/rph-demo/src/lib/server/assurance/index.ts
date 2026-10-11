@@ -9,6 +9,7 @@ import {
 	FLOOR_POLICY_IDS,
 	identityProvenanceValidatorInstance,
 	schemaInvariantValidatorInstance,
+	type Identity,
 	type Validator,
 	type ValidatorRegistry
 } from '@janumipwb/rph-assurance';
@@ -17,8 +18,17 @@ import type { ExchangeSink } from './exchange-capture.js';
 import { createAgyReasoningReviewValidator, type AgyPrint } from './reasoning-review-validator.js';
 import {
 	createStandinReasoningReviewValidator,
+	STANDIN_VALIDATOR_ID,
 	type StipulationLookup
 } from './standin-reasoning-review-validator.js';
+import {
+	createModelDeclaredPolicyReviewer,
+	createStandinDeclaredPolicyReviewer,
+	createUnconfiguredDeclaredPolicyReviewer,
+	type DeclaredPolicyReviewer,
+	type DeclaredStipulationLookup
+} from './declared-policy-review.js';
+import { judgeModel } from './agy-cli.js';
 import { assuranceModel, devinPrint, type DevinExec } from '../tools/devin-reviewer.js';
 import { refusalMessage, selectReviewer } from './reviewer-selection.js';
 
@@ -115,6 +125,53 @@ export function createFloorRegistry(opts: {
 			})
 		);
 	return registry;
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (`REG-F-523`; `REG-D-110` (3); `DESIGN-phase-7-completion.md` B1) — THE DECLARED-POLICY
+ * REVIEWER, SELECTED AS THE FLOOR'S REVIEWER IS: the same selector (`selectReviewer`), so the floor and the declared reviews
+ * of one host can never be judged by two different reviewers, nor one of them refused while the other runs.
+ *   · STAND_IN (test mode, no tool named) — the declared stand-in, answering only where a test registered a
+ *     `DECLARED_POLICY` stipulation for the unit's PWA (`declared-policy-review.ts`).
+ *   · REFUSED — a reviewer that runs nothing and answers every review with the refusal: recorded, never thrown.
+ *   · DEVIN / AGY — the product's own reasoning-review validator: THE INSTANCE `createFloorRegistry` builds (the same
+ *     transport, the same capture, the same `requireReportedModel` on the devin branch, so its retry bound is devin's),
+ *     run in the `DECLARED_POLICY` framing. ⭑ One review per (unit, policy) pair is one evaluation of this validator.
+ * ⚠ THE SAME OPTIONS AS `createFloorRegistry`'s, AND ITS RULE FOR THEM: an injected `print` wins over the configured tool
+ * (the seam the gate exercises the wiring through), and never over a refused configuration.
+ */
+export function createDeclaredPolicyReviewer(opts: {
+	testMode: boolean;
+	artifacts?: ArtifactStore;
+	exchanges?: ExchangeSink;
+	print?: AgyPrint;
+	devinExec?: DevinExec;
+	clock?: () => string;
+	stipulations?: DeclaredStipulationLookup;
+}): DeclaredPolicyReviewer {
+	// ⭐ THE FLOOR'S OWN REVIEWER INSTANCE, NOT A SECOND CONSTRUCTION OF IT: the registry builds it — its transport, its
+	// capture, devin's `requireReportedModel` and so its retry bound — and the declared review runs that very validator in
+	// the `DECLARED_POLICY` framing. ⛔ A second copy of the construction would be a second thing to keep in step.
+	const { stipulations, ...registryOpts } = opts;
+	const validator = createFloorRegistry(registryOpts).get(FLOOR_POLICY_IDS.REASONING_REVIEW)!;
+	if (validator.validatorId === STANDIN_VALIDATOR_ID)
+		return createStandinDeclaredPolicyReviewer({ stipulationFor: stipulations ?? (() => undefined) });
+	// ⚠ WHO ANSWERS A CALL THAT THREW: the identity the host configured, ungraded — what the validator records it under too.
+	const tool = selectReviewer({ testMode: opts.testMode }).kind === 'DEVIN' && !opts.print ? 'devin' : 'agy';
+	const configured = (): Identity => {
+		try {
+			return tool === 'devin'
+				? { actorType: 'AGENT', agentId: 'devin', modelId: assuranceModel(), providerId: 'devin' }
+				: { actorType: 'AGENT', agentId: 'agy', modelId: judgeModel(), providerId: 'google' };
+		} catch {
+			// ⛔ A model no longer configured: the review's failure says so; the record names the tool alone.
+			return { actorType: 'AGENT', agentId: tool };
+		}
+	};
+	// ⛔ A REFUSED SELECTION's validator runs nothing and throws the refusal: answered as a failure, under its own id.
+	if (validator.validatorId === UNCONFIGURED_REVIEWER_ID)
+		return createUnconfiguredDeclaredPolicyReviewer(validator);
+	return createModelDeclaredPolicyReviewer(validator, configured);
 }
 
 /** The validator a REFUSED selection registers: it runs nothing, and fails with the refusal. */

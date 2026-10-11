@@ -72,7 +72,29 @@ export type ReviewFraming =
 	 * ADAPTER'S OBSERVED CALLS — `§22.1` makes the model's word untrusted, and the adapter's observation is the
 	 * only independent half available. `observedToolCalls` below is that half.
 	 */
-	| 'PROCESS_RESULT';
+	| 'PROCESS_RESULT'
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (`REG-F-523`; `REG-D-110` (3); `DESIGN-phase-7-completion.md` B1) — a work
+	 * unit's work, judged against ONE of its DECLARED assurance policies: the policy's purpose framing the review, and
+	 * that policy's own criteria the rubric (`declaredPolicy`, below). One review per (unit, policy) pair.
+	 *
+	 * ⛔ NOT A FLOOR REVIEW, AND IT IS NEVER RECORDED AS ONE. A review in this framing is run through the reviewer's own
+	 * machinery — its call, retry, repair and capture — but its answers are recorded under the DECLARED policy, by the
+	 * app's declared-policy sign-off, never as a `ValidatorResult` citing a `FloorPolicyId`. ⚠ So `ASR-4`'s bound above
+	 * holds here as for the other three: the rubric is the policy's own criteria, never a second rubric.
+	 */
+	| 'DECLARED_POLICY';
+
+/**
+ * ⭐⭐ E2 (`DESIGN-phase-7-completion.md` B1) — WHAT A `DECLARED_POLICY` REVIEW TELLS THE REVIEWER ABOUT THE POLICY IT
+ * JUDGES AGAINST: its id, its name and its PURPOSE, read from the stored policy by the caller. ⭑ Host-authored — it is the
+ * catalog's text, never the producer's — so a reviewer shows it on host lines, outside every fence.
+ */
+export interface DeclaredPolicyFraming {
+	readonly policyId: string;
+	readonly name: string;
+	readonly purpose: string;
+}
 
 /** The inputs a Validator needs beyond the subject. Deterministic Validators read the fact bags; the Reasoning
  *  Review Validator reads the review input (the intent + the serialized subject content to review). */
@@ -116,6 +138,13 @@ export interface ReasoningReviewInput {
 	 * citing a policy that did not supply it (`R14`).
 	 */
 	readonly framing: ReviewFraming;
+	/**
+	 * ⭐ E2 — the declared policy a `DECLARED_POLICY` review judges against (`DeclaredPolicyFraming`). ⛔ REQUIRED BY THAT
+	 * FRAMING, AND READ BY NO OTHER: a reviewer refuses a `DECLARED_POLICY` review that does not carry it, rather than
+	 * tell the reviewer it judges against a policy it cannot name. Optional in the type so the three floor framings —
+	 * and every record and case built over them — are unchanged.
+	 */
+	readonly declaredPolicy?: DeclaredPolicyFraming;
 	readonly prompt: string;
 	readonly content: string;
 	/**

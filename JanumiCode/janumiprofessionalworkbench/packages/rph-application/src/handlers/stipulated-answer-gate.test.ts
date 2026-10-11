@@ -45,8 +45,9 @@ const criterion = (id: string) => ({
 	mayBeNotApplicable: false
 });
 
-/** An ASSESSING assessment under `policyId`, in an engine that does or does not admit stipulations. */
-function arrange(policyId: string, admitStipulatedAnswers: boolean) {
+/** An ASSESSING assessment under `policyId`, in an engine that does or does not admit stipulations — ⭐ E2: its subject
+ *  work unit DECLARING the policy, or not. */
+function arrange(policyId: string, admitStipulatedAnswers: boolean, declared = false) {
 	const store = new SqliteStorageAdapter({ now: () => TS });
 	let seq = 0;
 	const engine: AuthedEngine = new Engine({
@@ -93,7 +94,7 @@ function arrange(policyId: string, admitStipulatedAnswers: boolean) {
 			constraintIds: [],
 			assumptionIds: [],
 			expectedOutputs: [],
-			assurancePolicyIds: [],
+			assurancePolicyIds: declared ? [policyId] : [],
 			riskProfile: {
 				consequence: 'LOW',
 				uncertainty: 'LOW',
@@ -175,6 +176,34 @@ describe('⭐ GATE E admits a stipulated remainder — in an admitting engine, u
 	it('⛔ an admitting engine still refuses a stipulated row under ANY OTHER policy', () => {
 		// THE MUTANT: drop the policy scope. The permission `REG-D-071` Q5 (a) grants is for the reasoning review.
 		const a = arrange(OTHER, true);
+		a.record('A', 'MET');
+		a.record('B', 'UNABLE_TO_DETERMINE', 'MET');
+		const r = a.completeSatisfied();
+		expect(r.status).toBe('REJECTED');
+		expect(r.error?.message).toContain(a.stipulatedId);
+	});
+
+	// ── ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (`REG-F-523`; `REG-D-110` (3); `DESIGN-phase-7-completion.md` B1) ──────────────
+	// THE DECLARED POLICIES ARE JUDGED NOW, AND IN THE GATE LANE A STAND-IN ANSWERS THEM, AS ONE ANSWERS THE FLOOR: every
+	// criterion stipulated CLEAN where the test registered it (`declared-policy-review.ts`). So Gate E admits a stipulated row
+	// under a policy the assessed WORK UNIT ITSELF DECLARES, as it admits one under the reasoning review — and only in an
+	// admitting engine. ⚠ A DEPARTURE FROM `REG-D-071` Q5 (a)'s scope (*"Gate E for floor.reasoning-review only"*), reported:
+	// the scope was the one arm a stand-in then answered. Any other policy — one the subject does not declare — is still
+	// refused, by the test above.
+	it('⭐ E2 — an admitting engine admits a stipulated row under a policy the assessed work unit DECLARES', () => {
+		// PREDICTED RED BEFORE E2: Gate E refuses — the scope was `floor.reasoning-review` alone.
+		const a = arrange(OTHER, true, true);
+		expect(a.record('A', 'MET').status).toBe('ACCEPTED');
+		expect(a.record('B', 'UNABLE_TO_DETERMINE', 'MET').status).toBe('ACCEPTED');
+		const r = a.completeSatisfied();
+		expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+		expect(a.state()).toBe('SATISFIED');
+	});
+
+	it('⛔ E2 — and an engine NOT built to admit them still refuses it under that declared policy', () => {
+		// THE MUTANT: admit a declared policy's stipulated row whatever the engine. Every production engine would then
+		// satisfy a declared policy on answers nobody gave.
+		const a = arrange(OTHER, false, true);
 		a.record('A', 'MET');
 		a.record('B', 'UNABLE_TO_DETERMINE', 'MET');
 		const r = a.completeSatisfied();

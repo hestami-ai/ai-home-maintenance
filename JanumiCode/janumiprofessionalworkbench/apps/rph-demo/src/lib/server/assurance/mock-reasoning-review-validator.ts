@@ -317,6 +317,18 @@ export function judgeStructurally(input: ReasoningReviewInput): ReasoningReviewJ
 			return judgeProcessResult(input.content, input.observedToolCalls);
 		case 'PWA_GRAPH':
 			return judge(input.content);
+		case 'DECLARED_POLICY':
+			// ⭐ `JAN-EXEC` Phase 7 completion E2 (`REG-F-523`; design B1) — THE CHECKER JUDGES NO DECLARED CRITERION. It knows
+			// two structural failure classes of the floor's rubric, and a declared policy's criteria are not among them, so it
+			// answers none: an empty judgement, which the floor's stand-in never completes (its rule 2) and which reads
+			// INCONCLUSIVE — fail-closed. ⚠ The declared stand-in (`declared-policy-review.ts`) does not run this checker.
+			return {
+				findings: [],
+				recommendation: 'INCONCLUSIVE',
+				limitations: [
+					'The structural checker judges no declared-policy criterion: it knows two failure classes of the floor’s rubric only.'
+				]
+			};
 		default: {
 			const _never: never = input.framing;
 			throw new Error(`Unknown review framing: ${String(_never)}`);

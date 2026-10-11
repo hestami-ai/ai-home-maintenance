@@ -52,6 +52,8 @@ import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { deMinimisFloorPlan, FLOOR_POLICY_IDS, SEEDED_REASONING_REVIEW_CRITERIA } from '@janumipwb/rph-assurance';
+// ⭐ `JAN-EXEC` Phase 7 completion E2 — each declared policy's criteria, from the ontology the product seeds.
+import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { createSqliteDriver, SCHEMA_SQL } from '@janumipwb/rph-persistence';
 import { afterAll, describe, expect, it } from 'vitest';
 import { main as finalize, RESULTS_NAME } from '../scripts/phase7/finalize-run.js';
@@ -69,6 +71,7 @@ import {
 	buildRunReport,
 	CELL_VALUES,
 	contentVerdict,
+	DECLARED_REVIEW_VALIDATORS,
 	DECLARED_SIGNOFF_VALIDATOR,
 	DEMO_FINDING_CODE,
 	DEMO_POLICY_ID,
@@ -80,6 +83,7 @@ import {
 	manifestArgv,
 	MODEL_EXECUTOR_NAME,
 	NO_CRITERION_ANSWERED,
+	OPERATOR_ACTOR_ID,
 	OPERATOR_COMPLETION_DETAIL,
 	OPERATOR_FAILURE_REASON,
 	OUTSIDE,
@@ -167,7 +171,18 @@ interface PhaseKnobs {
 	readonly reviewToken?: string;
 	/** ⭐ P7-6 B7 — later floor runs' reviews of the same work product (a re-review), each its state and its token. */
 	readonly reReviews?: readonly { readonly state: string; readonly token?: string }[];
+	/**
+	 * ⭐ E2 (`REG-F-523`; design B8) — how the unit's declared policies were signed off: JUDGED by a reviewer, one row per
+	 * criterion and the verdict computed from them (the default); by the pre-E2 sign-off (`legacy`); with one mandatory
+	 * criterion left unanswered (`unanswered`); or with a verdict the answers do not give (`off-verdict`).
+	 */
+	readonly declared?: DeclaredKnob;
 }
+type DeclaredKnob = 'judged' | 'legacy' | 'unanswered' | 'off-verdict';
+/** ⭐ E2 — each catalog policy's criteria, as the product seeds them (`seedAdditivePolicies`). */
+const POLICY_CRITERIA = new Map<string, readonly { readonly id: string; readonly severityIfNotMet: string }[]>(
+	ontology.seedPolicies.map((p) => [p.policyId, p.criteria])
+);
 type Slug = 'requirements' | 'design' | 'implementation' | 'end-to-end';
 const SATISFIED: Floor = ['SATISFIED', 'SATISFIED', 'SATISFIED'];
 const sha = (s: string) => createHash('sha256').update(s).digest('hex');
@@ -182,6 +197,8 @@ function aRun(
 		readonly run?: Record<string, unknown>;
 		/** The root signed off. Default true — the lane's dry run signs it off too (D11); false is a run cut short before its sign-offs. */
 		readonly rootSignedOff?: boolean;
+		/** ⭐ E2 — how the root's declared policies were signed off (`PhaseKnobs.declared`). Default `judged`. */
+		readonly rootDeclared?: DeclaredKnob;
 		/** The archive read holds the content store. Default true. */
 		readonly contentStore?: boolean;
 	} = {}
@@ -261,8 +278,38 @@ function aRun(
 			{ previousState: 'EXECUTING', newState: 'EXECUTING', executionState: 'SUCCEEDED', supportingObjectIds: [planId] },
 			`ui-${++ui}`
 		);
-	const signOff = (unitId: string, policyIds: readonly string[]) => {
-		policyIds.forEach((p, i) => assess(`asm_${unitId}_${i}`, p, unitId, 'SATISFIED', DECLARED_SIGNOFF_VALIDATOR));
+	const policiesPut = new Set<string>();
+	/**
+	 * ⭐ E2 — ONE DECLARED VERDICT AS THE SIGN-OFF RECORDS IT NOW: the policy's criteria each recorded
+	 * (`AssuranceCriterionEvaluated`), the verdict computed from them, completed under the declared reviewer, its evaluator's
+	 * invocation the review's token — or, `legacy`, as the pre-E2 sign-off recorded it: no criterion, its own validator.
+	 */
+	const declaredVerdict = (asm: string, policyId: string, unitId: string, how: DeclaredKnob) => {
+		if (how === 'legacy') return assess(asm, policyId, unitId, 'SATISFIED', DECLARED_SIGNOFF_VALIDATOR);
+		const criteria = POLICY_CRITERIA.get(policyId) ?? [];
+		if (!policiesPut.has(policyId)) put('ASSURANCE_POLICY', policyId, { criteria: criteria.map((c) => ({ id: c.id, severityIfNotMet: c.severityIfNotMet })) });
+		policiesPut.add(policyId);
+		let state = 'SATISFIED';
+		if (how === 'unanswered') state = 'INCONCLUSIVE';
+		if (how === 'off-verdict') state = 'REJECTED';
+		put('ASSURANCE_ASSESSMENT', asm, {
+			assurancePolicyId: policyId,
+			subjectObjectIds: [unitId],
+			assessmentState: state,
+			evaluator: { actorId: 'devin', actorType: 'AGENT', executionInstanceId: `declared-review:${asm}` },
+			producer: { actorId: 'model:fixture-executor-model', actorType: 'AGENT' }
+		});
+		criteria.forEach((c, j) =>
+			emit('AssuranceCriterionEvaluated', asm, {
+				assessmentId: asm,
+				criterionId: c.id,
+				result: how === 'unanswered' && j === 0 ? 'UNABLE_TO_DETERMINE' : 'MET'
+			})
+		);
+		emit('AssuranceAssessmentCompleted', asm, { assessmentId: asm, validatorId: DECLARED_REVIEW_VALIDATORS[0] });
+	};
+	const signOff = (unitId: string, policyIds: readonly string[], how: DeclaredKnob = 'judged') => {
+		policyIds.forEach((p, i) => declaredVerdict(`asm_${unitId}_${i}`, p, unitId, how));
 		assess(`asm_${unitId}_demo`, DEMO_POLICY_ID, unitId, 'SATISFIED', 'workbench.demo-signoff');
 		emit('PwuStateChanged', unitId, {
 			previousState: 'UNDER_ASSURANCE',
@@ -398,7 +445,7 @@ function aRun(
 				},
 				`ui-${++ui}`
 			);
-		if (k.signedOff ?? (unit?.lifecycle === 'SATISFIED')) signOff(id, spec.type.policyIds);
+		if (k.signedOff ?? (unit?.lifecycle === 'SATISFIED')) signOff(id, spec.type.policyIds, k.declared);
 		for (let i = 1; i <= (k.captures ?? k.commands ?? 0); i++) captures.push(`${spec.slug}-${i}`);
 		archives.push({
 			name: `${String(spec.order).padStart(2, '0')}-${spec.slug}`,
@@ -406,7 +453,7 @@ function aRun(
 			captures: [...captures]
 		});
 	}
-	if (rootSignedOff) signOff('pwu_root', PHASE7_UNITS[0]!.type.policyIds);
+	if (rootSignedOff) signOff('pwu_root', PHASE7_UNITS[0]!.type.policyIds, o.rootDeclared);
 	for (const e of o.extraEvents ?? []) events.push({ ...e, sequence: ++seq });
 	return {
 		store: { objects, events, content: o.contentStore === false ? null : content },
@@ -481,6 +528,14 @@ describe('JAN-EXEC P7-2 D9 — what the report restates of the product is the pr
 		expect(source('apps/rph-demo/src/lib/server/assurance/declared-policy-signoff.ts')).toContain(
 			`export const DEMO_REVIEW_VALIDATOR_ID = '${DECLARED_SIGNOFF_VALIDATOR}';`
 		);
+		// ⭐ E2 — the validators a declared verdict is recorded under now, each where the product declares it.
+		const [model, standin, unconfigured, missing] = DECLARED_REVIEW_VALIDATORS;
+		const review = source('apps/rph-demo/src/lib/server/assurance/declared-policy-review.ts');
+		expect(review).toContain(`export const DECLARED_REVIEW_VALIDATOR_ID = '${model}';`);
+		expect(review).toContain(`export const STANDIN_DECLARED_REVIEW_VALIDATOR_ID = '${standin}';`);
+		expect(review).toContain(`export const UNCONFIGURED_DECLARED_REVIEWER_ID = '${unconfigured}';`);
+		expect(source('apps/rph-demo/src/lib/server/assurance/declared-policy-signoff.ts')).toContain(`validatorId: '${missing}',`);
+		expect(source('apps/rph-demo/src/lib/server/identity.ts')).toContain(`actorId: '${OPERATOR_ACTOR_ID}',`);
 		expect(source('apps/rph-demo/src/lib/server/tools/process-run-observer.ts')).toContain(
 			`export const OBSERVED_PROCESS_RUN_LIMIT = ${RECORDED_RUN_LIMIT};`
 		);
@@ -884,8 +939,43 @@ describe('JAN-EXEC P7-2 D9 — the pairing of a review with the call that conclu
 		]);
 		expect(
 			Object.fromEntries(Object.entries(r.pairing.noModelAnswerByDesign).map(([k, ids]) => [k, ids.length]))
-		).toEqual({ 'deterministic floor policy': 10, 'declared-policy sign-off': 14, 'demo sign-off': 5, other: 0 });
+			// ⭐ E2 — the 14 declared verdicts each ASKED a reviewer now: listed with the declared verdicts, never as asking none.
+		).toEqual({ 'deterministic floor policy': 10, 'declared-policy sign-off': 0, 'demo sign-off': 5, other: 0 });
 		expect(r.pairing.counts['no-answer-recorded']).toBe(0);
+	});
+});
+
+describe('⭐⭐ JAN-EXEC Phase 7 completion E2 — stage 5b read from the recorded criterion results (REG-F-523; design B8)', () => {
+	it('⭐ a declared verdict is AS INTENDED when every criterion of its policy is answered and its verdict is the one they give', () => {
+		const r = reportOf(aRun()).report;
+		const row = r.declaredVerdicts.rows.find((d) => d.unit === 'design' && d.policyId === 'pol_architecture_coverage')!;
+		expect([row.value, row.validatorId, row.criteria, row.followsFromAnswers, row.producer]).toEqual([
+			'as intended',
+			DECLARED_REVIEW_VALIDATORS[0],
+			{ declared: 10, recorded: 10, answered: 10, undetermined: 0, stipulatedRows: 0 },
+			true,
+			'model:fixture-executor-model'
+		]);
+	});
+
+	it('⛔ a mandatory criterion left UNANSWERED broke 5b (REG-F-489): the verdict follows, but not every criterion was judged', () => {
+		const r = reportOf(aRun({ design: { declared: 'unanswered' } })).report;
+		expect(shown(cellOf(r, '5b', 'design'))).toEqual(['broke', ['REG-F-489']]);
+		expect(cellOf(r, '5b', 'design').basis.join(' ')).toMatch(/pol_assumption_disclosure: 1 of 6 criteria not answered/);
+		expect(cellOf(r, '5b', 'requirements').value).toBe('as intended');
+	});
+
+	it('⛔ a verdict the answers do NOT give broke 5b, and no register entry names it (unregistered)', () => {
+		const r = reportOf(aRun({ implementation: { declared: 'off-verdict' } })).report;
+		const c = cellOf(r, '5b', 'implementation');
+		expect([c.value, c.registerIds, c.unregistered]).toEqual(['broke', [], true]);
+		expect(c.basis.join(' ')).toMatch(/pol_assumption_disclosure: recorded REJECTED, and its answers give SATISFIED/);
+	});
+
+	it('⭑ CONTROL — a verdict the pre-E2 sign-off recorded is still read as it was: vacuous by construction (REG-F-523)', () => {
+		const r = reportOf(aRun({ 'end-to-end': { declared: 'legacy' } })).report;
+		expect(shown(cellOf(r, '5b', 'end-to-end'))).toEqual(['vacuous by construction', ['REG-F-406', 'REG-F-523']]);
+		expect(cellOf(r, '5b', 'design').value).toBe('as intended');
 	});
 });
 
@@ -1236,12 +1326,15 @@ describe('JAN-EXEC P7-2 D9 — the reviewer calls, a lower bound, and the paid l
 });
 
 describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
-	it('⭐ a complete run: every reached cell as intended, 5b vacuous by construction, 6 open and owed to P7-4', () => {
+	// ⭐⭐ E2 (`REG-F-523`; `REG-D-110` (3); design B8) — 5b MOVED: ~~vacuous by construction~~ AS INTENDED, every declared
+	// policy JUDGED — each criterion answered, each verdict the one its answers give. ⛔ PREDICTED RED, observed against HEAD's
+	// report: `["vacuous by construction", ["REG-F-406", "REG-F-523"]]` for every phase.
+	it('⭐ a complete run: every reached cell as intended, 5b as intended (E2), 6 open and owed to P7-4', () => {
 		const r = reportOf(aRun()).report;
 		for (const c of r.matrix) expect(c.value === null || (CELL_VALUES as readonly string[]).includes(c.value), `${c.stage} ${c.row}`).toBe(true);
 		for (const p of ['requirements', 'design', 'implementation', 'end-to-end']) {
 			for (const s of ['3', '4', '5a', '7', '8']) expect(cellOf(r, s, p).value, `${s} ${p}`).toBe('as intended');
-			expect(shown(cellOf(r, '5b', p))).toEqual(['vacuous by construction', ['REG-F-406', 'REG-F-523']]);
+			expect(shown(cellOf(r, '5b', p)), `5b ${p}`).toEqual(['as intended', []]);
 			expect([cellOf(r, '6', p).value, cellOf(r, '6', p).owedTo]).toEqual([null, 'P7-4a, P7-4b and P7-4c']);
 		}
 		expect([cellOf(r, '1', 'whole run').value, cellOf(r, '2', 'whole run').value, cellOf(r, '7', 'whole run').value]).toEqual([
@@ -1250,8 +1343,10 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 			'as intended'
 		]);
 		expect(r.declaredVerdicts.rows).toHaveLength(14);
-		// 4 phases × 5 reached stages, and the run's stages 2 and 7: 22 that could have failed; stage 1 is half B's.
-		expect(r.answer).toMatchObject({ open: 4, measured: 22 });
+		// ⭐ E2 — 4 phases × 6 reached stages (5b among them now), and the run's stages 2 and 7: 26 that could have failed;
+		// stage 1 is half B's. ~~4 phases × 5 reached stages … 22~~
+		expect(r.answer).toMatchObject({ open: 4, measured: 26 });
+		expect(r.declaredVerdicts.rows.map((d) => d.value)).toEqual(r.declaredVerdicts.rows.map(() => 'as intended'));
 	});
 
 	it('⭐ a dry run, the root alone begun: every phase not reached, and so the run’s completion', () => {
@@ -1407,7 +1502,8 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 		const md = renderMarkdown(reportOf(aRun({ design: { review: [] } })).report);
 		expect(md).toContain('| 8 The record | as intended | broke (REG-F-525) | as intended | as intended |');
 		expect(md).toContain('REG-F-510: the PWA had to name its product');
-		expect(md).toContain('REG-F-523: the declared policies were signed off with no criterion checked.');
+		// ⭐ E2 (design B8) — THE OPENING CAVEAT LOSES ITS `REG-F-523` LINE: the declared policies judge now.
+		expect(md).not.toContain('REG-F-523: the declared policies were signed off with no criterion checked.');
 	});
 
 	it('⛔ a press that outlasted the allowance (D4) is read as cut there — never from its mid-unit archive as if it ended', () => {
