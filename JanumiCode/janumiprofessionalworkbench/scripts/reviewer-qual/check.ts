@@ -153,6 +153,8 @@ export async function main(argv: readonly string[], deps: CheckCliDeps): Promise
 		current: today,
 		cases: caseSet.cases,
 		oracles: oracles.oracles,
+		// ⭐ `E12F` F5 — the current oracles' conferral, which the check refuses while it reads PROPOSED (`REG-D-073`).
+		conferral: oracles.conferral,
 		oracleSets,
 		findings,
 		struck,

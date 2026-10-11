@@ -166,6 +166,15 @@ export const ORACLES_V5_FILE = 'docs/tracking/reviewer-qualification/oracles/ora
 export const CURRENT_CASE_SET_FILE = CASE_SET_V5_FILE;
 export const CURRENT_ORACLES_FILE = ORACLES_V5_FILE;
 
+/**
+ * ⭐⭐ `E12F` F5 (the E12 package review's fifth finding; `REG-D-073`, oracle integrity) — THE WORDS AN ORACLE SET'S
+ * `conferral` CARRIES WHILE ANY OF ITS ORACLES AWAITS THE SPONSOR: written by the version that proposes them
+ * (`oracles-v5.ts`), and READ BY `reviewer:qual:check`, which refuses a current set carrying them (`ORACLES_NOT_CONFERRED`),
+ * so no run over oracles their author alone has judged can turn the check green. ⚠ A conferred version's statement does not
+ * carry them: conferral is recorded as the sponsor's, in the version that confers.
+ */
+export const ORACLES_PROPOSED = 'PROPOSED, AWAITING SPONSOR CONFERRAL';
+
 /** The one serialization of a generated file: tab-indented JSON, LF, a final newline. */
 export function serializeGenerated(value: CaseSet | OracleSet): string {
 	return `${JSON.stringify(value, null, '\t')}\n`;

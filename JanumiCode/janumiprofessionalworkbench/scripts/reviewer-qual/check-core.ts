@@ -25,6 +25,11 @@
 //      answered criterion now UNABLE_TO_DETERMINE) are informational: both REPORTED for every record this limb reads,
 //      and never escalated. An ESCALATION line already citing what is now reported stays valid history: nothing
 //      requires a line to cite a material failure, and the record is append-only.
+// ⭐⭐ `E12F` F5 (`REG-D-073`) — AND A LIMB BEFORE THE THREE, CONFERRAL: today's oracles must be CONFERRED. A current oracle
+// set whose `conferral` carries `ORACLES_PROPOSED` is a CONFERRAL problem, whatever the record holds — a run over oracles
+// their author alone has judged measures the reviewer against the author's word, and must not turn the check green.
+// ⛔ It was a comment's promise only (`oracles-v5.ts`: "read by the check"): nothing here read the conferral, so a run over
+// version five made before the sponsor conferred its fourteen declared oracles would have been green.
 // ⭐ `JAN-SELREV` SR-4 — THE GATE HOLDS THE SELECTED REVIEWER TO TODAY'S DEFINITION (`REG-D-086`; DESIGN-the-selected-
 // reviewer.md §5 Q1). The LAST SELECTION line in the record is in force. With one in force, limb 1 asks its own
 // question — covered, in exactly its sense (`coveredBy`) — again of the selected candidate's runs alone, and a case no
@@ -39,7 +44,7 @@
 // operation that needs the product — re-scoring — is a function handed in (`rescore.ts` in the CLI). It reads no file.
 // ⚠ "CONTENT UNCHANGED" IS THE CASE ID: a case that changes gets a new id (`cases.ts`), so a case id still in today's set
 // is the same case. A case edited in place under its id reads here as a non-reproduction — which it is.
-import type { Oracle, OracleSet, QualificationCase } from './cases.js';
+import { ORACLES_PROPOSED, type Oracle, type OracleSet, type QualificationCase } from './cases.js';
 import { canonicalJson, reviewerFingerprintOf, type FingerprintComponents } from './digest.js';
 import {
 	MATERIAL_FAILURE_CLASSES,
@@ -87,6 +92,11 @@ export interface CheckInputs {
 	/** Today's oracles — material failures are judged against the current oracle version (§5.1). */
 	readonly oracles: readonly Oracle[];
 	/**
+	 * ⭐ `E12F` F5 — today's oracle set's `conferral` statement, as its file carries it: a statement carrying
+	 * `ORACLES_PROPOSED` is refused (`ORACLES_NOT_CONFERRED`). Required, so a caller cannot leave the question unasked.
+	 */
+	readonly conferral: string;
+	/**
 	 * ⭐ `JAN-CRITREAD` J2-6 — EVERY oracle version on file, today's among them. Nothing is judged against them: they say
 	 * only which of a record's cases OUTSIDE today's set its own oracle version planted, so the attribution report
 	 * counts those evaluations out aloud instead of shrinking in silence (`REG-D-080`).
@@ -109,7 +119,16 @@ export interface CheckInputs {
 		scoringDigest: string
 	) => Promise<ScoredOutcome>;
 }
-export type CheckLimb = 'RECORD' | 'COVERAGE' | 'REPRODUCTION' | 'ESCALATION';
+export type CheckLimb = 'RECORD' | 'CONFERRAL' | 'COVERAGE' | 'REPRODUCTION' | 'ESCALATION';
+
+/**
+ * ⭐⭐ `E12F` F5 (`REG-D-073`) — THE CONFERRAL PROBLEM: today's oracles are proposed, not conferred, so no run over today's
+ * case set can qualify a reviewer against them. Named once, here, so the check and its test say the same words.
+ */
+export const ORACLES_NOT_CONFERRED =
+	`today’s oracles are ${ORACLES_PROPOSED}: their author proposed them and the sponsor has not conferred them, so no run ` +
+	'over today’s case set can qualify a reviewer against them — owed: the sponsor’s conferral (REG-D-073; ' +
+	'DESIGN-phase-7-completion.md §6 step 2)';
 export interface CheckProblem {
 	readonly limb: CheckLimb;
 	readonly message: string;
@@ -1185,7 +1204,7 @@ function escalation(ctx: Ctx, failures: ReadonlyMap<string, RecordFailures>, str
 	}
 }
 
-const LIMB_ORDER: readonly CheckLimb[] = ['RECORD', 'COVERAGE', 'REPRODUCTION', 'ESCALATION'];
+const LIMB_ORDER: readonly CheckLimb[] = ['RECORD', 'CONFERRAL', 'COVERAGE', 'REPRODUCTION', 'ESCALATION'];
 
 /** ⭐ THE CHECK: every problem in the record, by limb — empty when green. Each limb is its own phase above. */
 export async function checkQualification(i: CheckInputs): Promise<CheckReport> {
@@ -1194,6 +1213,8 @@ export async function checkQualification(i: CheckInputs): Promise<CheckReport> {
 	const caseById = new Map(i.cases.map((c) => [c.id, c]));
 	const rescores = references(p, i, problems);
 	const refuse: Refuse = (message) => problems.push({ limb: 'RECORD', message });
+	// ⭐ `E12F` F5 — CONFERRAL, asked whatever the record holds: oracles nobody conferred qualify no reviewer (`REG-D-073`).
+	if (i.conferral.includes(ORACLES_PROPOSED)) problems.push({ limb: 'CONFERRAL', message: ORACLES_NOT_CONFERRED });
 	const ctx: Ctx = {
 		i,
 		p,

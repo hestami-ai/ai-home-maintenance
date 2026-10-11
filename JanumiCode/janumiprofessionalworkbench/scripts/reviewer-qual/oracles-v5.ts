@@ -15,14 +15,18 @@
 // the generated record.
 // Correcting an oracle is a new oracle VERSION, never an edit, and moves no case digest.
 // Generated into `docs/tracking/reviewer-qualification/oracles/` by `generate.ts`; the JSON is never hand-edited.
-import type { Oracle, OracleSet, OracleStanding } from './cases.js';
+import { ORACLES_PROPOSED, type Oracle, type OracleSet, type OracleStanding } from './cases.js';
 import { DECLARED_CASE_POLICIES, PLANTED_CRITERION } from './case-set-v5.js';
 import { ORACLES_V4 } from './oracles-v4.js';
 
 const AUTHORS_CLAIM: OracleStanding = "the author's claim";
 
-/** ⛔ The conferral the declared oracles await — the generated record's own word, read by the check and the cases test. */
-export const DECLARED_ORACLES_PROPOSED = 'PROPOSED, AWAITING SPONSOR CONFERRAL';
+/**
+ * ⛔ The conferral the declared oracles await — the generated record's own word, read by the cases test and ⭐ `E12F` F5: by
+ * the check, which refuses a current set carrying it (`cases.ts` `ORACLES_PROPOSED`, this word's one home). ~~read by the
+ * check~~ — it was not, until F5: a run over version five before the sponsor conferred would have gone green.
+ */
+export const DECLARED_ORACLES_PROPOSED = ORACLES_PROPOSED;
 
 /** What each declared case plants, or why it is clean — for the reader of a failure, never read by a scorer. */
 const NOTES: Readonly<Record<string, { readonly clean: string; readonly planted: string }>> = {
