@@ -14,6 +14,7 @@ import { createExchangeSink } from './exchange-capture.js';
 import { mintIdsFor, toRecordModelExchange } from './exchange-recorder.js';
 import { createAgyReasoningReviewValidator, type AgyPrint } from './reasoning-review-validator.js';
 import { concludedTry, type Try } from './reviewer-answer.js';
+import { pairRun, type StoredObject } from '../../../../../../scripts/phase7/run-report-core.js';
 
 /** A reply that PARSES and answers no criterion — the measured run's own shape (`REG-F-552`). */
 const NO_ROWS = '{"findings":[],"recommendation":"SATISFIED","residualUncertainty":["x"]}';
@@ -157,5 +158,85 @@ describe('⭐⭐ P7-6 C2 — the try a floor run’s review concluded from (REG-
 
 	it('⭑ CONTROL — no try, nothing concluded: undefined, never a view of nothing', () => {
 		expect(concludedTry([])).toBeUndefined();
+	});
+
+	// ⛔⛔ `P76F-D` D3 — A REPAIR THAT IS NOT ON THE RECORD CONCLUDED NOTHING THE RECORD CAN SHOW. The reader returned the FIRST
+	// reply of an I5 chain whose repair the record does not hold — its capture threw, or its record was lost — while the run
+	// report (`criterionRepairConclusion`) names no call: the review did not conclude from that reply, which ASKED for a
+	// repair. So the page showed, as the answer a review concluded from, a reply it did not conclude from.
+	it('⛔ P76F-D D3 — an I5 repair-request whose repair is not on the record: no answer — the review did not conclude from it', async () => {
+		// The one edit: the repair's record dropped, as when its capture threw or its record was lost.
+		const [asked] = await tries(NO_ROWS, PROSE);
+		expect(calls([asked!]), 'arrangement').toEqual(['INITIAL:REPAIR_REQUESTED:SCHEMA_COERCION_FAILED']);
+		expect(concludedTry([asked!]), 'the reply that asked for a repair is shown as what the review concluded from').toBeUndefined();
+	});
+
+	// ⭐ `P76F-D` D3 — AND ITS GENERAL FORM: any chain whose last try is not one a review concludes on (a reply that asked for
+	// a JSON repair, the repair not on the record) shows no answer, as the report names none (`concludedBy`).
+	it('⛔ P76F-D D3 — a JSON repair-request whose repair is not on the record: no answer either', async () => {
+		const [first] = await tries(PROSE, PROSE);
+		expect(calls([first!]), 'arrangement').toEqual(['INITIAL:REPAIR_REQUESTED:JSON_EXTRACTION_FAILED']);
+		expect(concludedTry([first!]), 'a reply that asked for a repair is shown as what the review concluded from').toBeUndefined();
+	});
+});
+
+// ── ⭐⭐ `P76F-D` D3 — THE READER AND THE RUN REPORT NAME THE SAME TRY, ON EVERY CHAIN ─────────────────────────────────────
+// `concludedTry`'s header claims it reads the rule the Phase 7 run report reads (`criterionRepairConclusion`, `concludedBy`,
+// `scripts/phase7/run-report-core.ts`) from the same records. ⛔ It did not, on a chain whose repair is not on the record —
+// and nothing held the two together, so the claim was the reader's word. Now each chain this file builds is read by BOTH,
+// through the report's own entry (`pairRun`, one floor run's calls), and the try each names must be the same — or none.
+describe('⭐⭐ P76F-D D3 — the PWA reader and the run report name the same try, or none, on every chain', () => {
+	/** `t` as the run report reads a run's calls from the archived store. */
+	const stored = (t: readonly Try[]): StoredObject[] =>
+		t.map((x, i) => ({
+			id: x.id,
+			objectType: 'MODEL_EXCHANGE',
+			state: x.state as Readonly<Record<string, unknown>>,
+			firstSequence: i + 1
+		}));
+	/** `t` with its disposition replaced — the one field a case edits. */
+	const withDisposition = (t: Try, disposition: string): Try => ({
+		id: t.id,
+		state: { ...(t.state as object), disposition }
+	});
+	const pairOf = async (
+		build: () => Promise<readonly Try[]>
+	): Promise<{ readonly reader: string | null; readonly report: string | null }> => {
+		const t = await build();
+		return { reader: concludedTry(t)?.id ?? null, report: pairRun('run_1', stored(t)).concludedBy };
+	};
+	const CHAINS: readonly (readonly [string, () => Promise<readonly Try[]>])[] = [
+		['an answered first call', () => tries(ANSWERS)],
+		['a first call that threw, and nothing more', () => tries(new Error('devin invocation failed: connection reset'))],
+		['I5, its repair answering', () => tries(NO_ROWS, ANSWERS)],
+		['I5, its repair answering none again', () => tries(NO_ROWS, NONE_AGAIN)],
+		['I5, its repair not parsing', () => tries(NO_ROWS, PROSE)],
+		['I5, its repair getting no reply', () => tries(NO_ROWS, new Error('devin invocation failed: connection reset'))],
+		['I5, its repair refused as a substitute', async () => {
+			const [asked, repair] = await tries(NO_ROWS, PROSE);
+			return [asked!, withOutcome(repair!, 'NOT_ATTEMPTED')];
+		}],
+		['I5, its repair not on the record', async () => (await tries(NO_ROWS, PROSE)).slice(0, 1)],
+		['I5, its repair recorded as asking for a repair itself (never written by the validator)', async () => {
+			const [asked, repair] = await tries(NO_ROWS, PROSE);
+			return [asked!, withDisposition(repair!, 'REPAIR_REQUESTED')];
+		}],
+		['a JSON repair answering', () => tries(PROSE, ANSWERS)],
+		['a JSON repair failing', () => tries(PROSE, PROSE)],
+		['a JSON repair not on the record', async () => (await tries(PROSE, PROSE)).slice(0, 1)],
+		['the outcome without the marker', async () => {
+			const [first, repair] = await tries(PROSE, PROSE);
+			return [withOutcome(first!, 'SCHEMA_COERCION_FAILED'), repair!];
+		}],
+		['the marker beside another outcome', async () => {
+			const [asked, repair] = await tries(NO_ROWS, PROSE);
+			return [withOutcome(asked!, 'JSON_PARSE_FAILED'), repair!];
+		}],
+		['no try', async () => []]
+	];
+
+	it.each(CHAINS)('⭐ %s', async (_label, build) => {
+		const { reader, report } = await pairOf(build);
+		expect(reader, 'the PWA reader names a try the run report does not').toBe(report);
 	});
 });

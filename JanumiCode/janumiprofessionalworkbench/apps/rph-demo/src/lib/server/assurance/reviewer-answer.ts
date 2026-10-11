@@ -49,6 +49,13 @@ const tryState = (r: Try) =>
 const ordinalOf = (r: Try): number => Number(tryState(r).attemptOrdinal ?? 0);
 
 /**
+ * ⭐ `P76F-D` D3 — THE DISPOSITIONS A REVIEW CONCLUDES ON, as the run report names a concluding call (`concludedBy`,
+ * `scripts/phase7/run-report-core.ts`): an answer, a call that threw (the review then records it got none), a refusal.
+ * ⛔ Never `REPAIR_REQUESTED` — a reply that asked to be repaired concluded nothing — nor `QUARANTINED`.
+ */
+const CONCLUDES: ReadonlySet<string> = new Set(['ACCEPTED', 'NO_RESPONSE', 'REJECTED']);
+
+/**
  * ⭐⭐ `JAN-EXEC` P7-6 fix round C, C2 (`DESIGN-the-reviewer-isolated.md` §4d I5; `REG-F-552`) — THE TRY ONE FLOOR RUN'S
  * REVIEW CONCLUDED FROM, its tries sorted by ordinal: the HIGHEST ordinal (the answered try, or the repair or retry whose
  * reply the review read last) — save a P7-6 I5 chain, a reply that PARSED and answered no criterion, told by the I5 pair on
@@ -59,20 +66,33 @@ const ordinalOf = (r: Try): number => Number(tryState(r).attemptOrdinal ?? 0);
  * under an assessment that concluded from the first. ⚠ A repair refused for WHO answered it (a substitute, recorded
  * `NOT_ATTEMPTED`) failed the review: the general rule stands, as in the Phase 7 run report (`criterionRepairConclusion`,
  * `scripts/phase7/run-report-core.ts`), which reads the same rule from the same records.
+ * ⭐⭐ `P76F-D` D3 — ~~reads the same rule~~ ⛔ IT DID NOT, ON A REPAIR THE RECORD DOES NOT HOLD (its capture threw, or its
+ * record was lost): the reader returned the FIRST reply — the one that ASKED for a repair — while the report names no call
+ * (`concludedBy`: *"which concludes no review: the call that concluded it is not in the record"*). The report is right:
+ * a review does not conclude from a reply that asked to be repaired, and with no repair on the record nothing there
+ * concluded it. So the reader now reads the report's two rules as the report does: outside an I5 chain the general rule,
+ * which takes the highest ordinal only when its disposition concludes a review (`CONCLUDES`); inside one, an answering
+ * repair, else the first reply only where the record holds a repair that ENDED without concluding (no reply, or refused
+ * — `keptFirst` below; a substitute's refusal is the general rule's), else none. ⭑ And
+ * the claim is now CHECKED, not stated: `reviewer-answer.test.ts` reads every chain it builds through both, the report's
+ * own entry (`pairRun`) beside this, and holds them to the same try, or none.
  * ⭑ Exported for `reviewer-answer.test.ts`, which holds each conjunct on its own arrangement — including the two the
  * product's validator never writes (the marker beside another outcome; the outcome without the marker).
  */
 export function concludedTry(sorted: readonly Try[]): Try | undefined {
 	const last = sorted.at(-1);
+	// ⭐ `P76F-D` D3 — THE GENERAL RULE, as the run report's (`concludedBy`): the highest ordinal, when a review concludes on
+	// it; none when it is a reply that asked for a repair the record does not hold.
+	const general = last !== undefined && CONCLUDES.has(String(tryState(last).disposition)) ? last : undefined;
 	// The first try that got a reply: the call's, or its retry's after a throw.
 	const asked = sorted.find((r) => tryState(r).disposition !== 'NO_RESPONSE');
-	if (asked === undefined) return last;
+	if (asked === undefined) return general;
 	const outcome = tryState(asked).parseOutcome;
 	const i5 =
 		tryState(asked).disposition === 'REPAIR_REQUESTED' &&
 		outcome?.outcome === 'SCHEMA_COERCION_FAILED' &&
 		(outcome.detail ?? '').startsWith(NO_CRITERION_ANSWERED);
-	if (!i5) return last;
+	if (!i5) return general;
 	const after = sorted.filter((r) => ordinalOf(r) > ordinalOf(asked));
 	const answered = after.find((r) => tryState(r).disposition === 'ACCEPTED');
 	if (answered !== undefined) return answered;
@@ -80,6 +100,15 @@ export function concludedTry(sorted: readonly Try[]): Try | undefined {
 	// outcome is `NOT_ATTEMPTED` too — so the disposition tells them apart, never the outcome alone.
 	const ended = tryState(after.at(-1) ?? asked);
 	const substituted = ended.disposition === 'REJECTED' && ended.parseOutcome?.outcome === 'NOT_ATTEMPTED';
+	// ⭐⭐ `P76F-D` D3 — THE FIRST REPLY'S JUDGEMENT WAS KEPT ONLY BY A REPAIR THE RECORD HOLDS, ENDED WITHOUT CONCLUDING: no
+	// reply, or refused. With no repair on the record, `ended` is the request itself (`REPAIR_REQUESTED`) — and a repair
+	// recorded any other way, which the validator never writes, ended nothing — so nothing there concluded the review, and
+	// no answer is shown, as the report names none (`concludedBy` of a call that concludes no review). ⛔ It returned the
+	// request — the reply that asked to be repaired. ⭑ `undefined`, never `general`: the two agree on every such record
+	// (its last try concludes nothing), and `general` would answer an ANSWERING repair too, leaving the `answered` branch
+	// above with nothing to decide (measured: `P76F-C-M12` survived it).
+	const keptFirst = ended.disposition === 'NO_RESPONSE' || ended.disposition === 'REJECTED';
+	if (!keptFirst) return undefined;
 	return substituted ? last : asked;
 }
 
