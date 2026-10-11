@@ -456,9 +456,20 @@ function subjectHashLine(hash: string | undefined): string {
  * true (`reasoning-review-validator.test.ts` counts every mention, in every framing). The re-qualification measures the
  * condition: its clean cases must stay SATISFIED (design §4d).
  * ⚠ It moves every probe and every case prompt, so the reviewer fingerprint, and a paid re-qualification with it.
+ *
+ * ⭐⭐ `JAN-EXEC` Phase 7 completion E1 (`REG-F-555`; `REG-D-110` (2), the sponsor's *"Symmetric clause"*;
+ * `DESIGN-phase-7-completion.md` A1) — THE LAST CLAUSE IS THE SYMMETRIC ONE. ⛔ It was *"do not look for a failure that is
+ * not there"*, and P1's two misses had one shape: the reviewer saw the planted defect and filed it as residual uncertainty,
+ * restating the very criterion it marked met (W-RR-03 #1, G3-RR-09 #2). D8's lines name one destination for a concern —
+ * the residual uncertainty, for one that LEAVES the criterion met — and nothing said where one that shows it UNMET goes.
+ * Now the sentence says: a met criterion is recorded met; a concern that shows a criterion unmet is recorded failed=true,
+ * never moved to residualUncertainty. ⭑ It still asks the reviewer to find nothing (`REG-D-105` (2)): the failure clause is
+ * conditional on a concern that SHOWS the criterion unmet, and it names and defines no disposition value, so `REG-D-090`'s
+ * statement stays true. D8's lines are untouched; the line about an empty list stays.
+ * ⚠ It moves every probe and every case prompt again: all 40 cases are owed in the re-qualification (design §2, §6; P4).
  */
 export const ONE_ROW_PER_CRITERION =
-	'Give exactly one row in findings for each criterion listed above: failed=false where the criterion is met, failed=true where it is not. A criterion that is met is recorded as met; do not look for a failure that is not there. An empty findings list leaves every criterion unassessed.';
+	'Give exactly one row in findings for each criterion listed above: failed=false where the criterion is met, failed=true where it is not. A criterion that is met is recorded as met; a concern that shows a criterion is not met is recorded failed=true, and never moved to residualUncertainty. An empty findings list leaves every criterion unassessed.';
 
 /**
  * ⭐⭐ `JAN-EXEC` Phase 7 P7-6 I5 (design §4d; `REG-F-552` remedy 1) — THE LINE A REPAIR CARRIES WHEN A REPLY PARSED AND

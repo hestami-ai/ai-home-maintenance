@@ -31,6 +31,7 @@ import {
 	NO_CRITERION_ANSWERED,
 	noCriterionCause,
 	OBSERVATION_HEADING,
+	ONE_ROW_PER_CRITERION,
 	processResultContentBudget,
 	processResultUntrustedSlices,
 	REASONING_REVIEW_BUDGET,
@@ -1447,9 +1448,16 @@ describe('⭐⭐ design §9.3 D8 — the prompt agrees with the policy: D8’s l
 // is not there. So the sentence says a met criterion is recorded as met, and asks for no failure; D8's lines stay byte
 // for byte (the sponsor's answers of 2026-10-05), and the sentence is added AFTER them.
 
-/** ⭐ THE SENTENCE, BYTE FOR BYTE AS DESIGN §4d WRITES IT — one line of the prompt. */
+/** ~~⭐ THE SENTENCE, BYTE FOR BYTE AS DESIGN §4d WRITES IT — one line of the prompt.~~
+ *  ⭐⭐ `JAN-EXEC` Phase 7 completion E1 (`REG-F-555`; `REG-D-110` (2); `DESIGN-phase-7-completion.md` A1, A2) — THE SENTENCE
+ *  AS THE SPONSOR CHOSE IT: it keeps *"A criterion that is met is recorded as met"*, and its last clause is the symmetric
+ *  one. ⛔ It ended *"do not look for a failure that is not there"*, and both of P1's misses (W-RR-03 #1, G3-RR-09 #2) filed
+ *  a criterion's defect as residual uncertainty beside that criterion marked met. The line about an empty list stays. */
 const ONE_ROW_PER_CRITERION_SENTENCE =
-	'Give exactly one row in findings for each criterion listed above: failed=false where the criterion is met, failed=true where it is not. A criterion that is met is recorded as met; do not look for a failure that is not there. An empty findings list leaves every criterion unassessed.';
+	'Give exactly one row in findings for each criterion listed above: failed=false where the criterion is met, failed=true where it is not. A criterion that is met is recorded as met; a concern that shows a criterion is not met is recorded failed=true, and never moved to residualUncertainty. An empty findings list leaves every criterion unassessed.';
+/** ⭐ E1 — THE SYMMETRIC CLAUSE, the sponsor's words (`REG-D-110` (2)). */
+const SYMMETRIC_CLAUSE =
+	'a concern that shows a criterion is not met is recorded failed=true, and never moved to residualUncertainty';
 
 describe('⭐⭐ P7-6 I6 — the prompt asks for ONE ROW PER CRITERION, met or not, in every framing, after D8’s lines and naming no disposition', () => {
 	it.each(['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT'] as const)(
@@ -1481,7 +1489,27 @@ describe('⭐⭐ P7-6 I6 — the prompt asks for ONE ROW PER CRITERION, met or n
 		for (const d of ['SATISFIED', 'CONDITIONALLY_SATISFIED', 'REJECTED', 'INCONCLUSIVE', 'ESCALATED'])
 			expect(ONE_ROW_PER_CRITERION_SENTENCE.toUpperCase(), `names no ${d}`).not.toContain(d);
 		expect(ONE_ROW_PER_CRITERION_SENTENCE).toContain('A criterion that is met is recorded as met');
-		expect(ONE_ROW_PER_CRITERION_SENTENCE).toContain('do not look for a failure that is not there');
+		// ~~expect(ONE_ROW_PER_CRITERION_SENTENCE).toContain('do not look for a failure that is not there');~~
+		// ⭐ E1 (`REG-D-110` (2); `REG-D-105` (2)) — ADAPTED, NOT DROPPED: the clause that said it in words is gone, so the
+		// condition is held as what the sentence ASKS. ⛔ It asks the reviewer to find nothing: no imperative to look, search
+		// or hunt for a failure, nor to find one. ⭐ And its failure clause is CONDITIONAL — a failure is recorded where a
+		// concern SHOWS the criterion unmet — so it asks for a failure only where one is shown, never one that is not there.
+		expect(ONE_ROW_PER_CRITERION_SENTENCE, 'it speaks of looking for a failure at all').not.toMatch(
+			/\b(look|search|hunt)\b[^.;]*\bfor\b[^.;]*\bfailure/i
+		);
+		expect(ONE_ROW_PER_CRITERION_SENTENCE, 'it asks the reviewer to find a failure').not.toMatch(/\bfind\b/i);
+		expect(ONE_ROW_PER_CRITERION_SENTENCE).toContain(`a concern that shows a criterion is not met is recorded failed=true`);
+	});
+
+	// ⭐⭐ E1 — THE NEW PIN (`REG-F-555`; `REG-D-110` (2); `DESIGN-phase-7-completion.md` A2): THE SOURCE HOLDS THE SYMMETRIC CLAUSE.
+	// ⛔ RED AT HEAD: the source's sentence ended *"do not look for a failure that is not there"*, so a concern that showed a
+	// criterion unmet had one destination named for it — D8's residual uncertainty, written for a concern that leaves the
+	// criterion MET — and P1's two misses went there (`REG-F-555`). ⚠ It holds the EXPORT the prompt is built from; the pin
+	// above holds the prompt's line, in every framing.
+	it('⭐ REG-F-555 — the source’s sentence holds the symmetric clause, and keeps what a met criterion is recorded as', () => {
+		expect(ONE_ROW_PER_CRITERION, 'the source does not hold the symmetric clause (REG-D-110 (2))').toContain(SYMMETRIC_CLAUSE);
+		expect(ONE_ROW_PER_CRITERION).toContain('A criterion that is met is recorded as met');
+		expect(ONE_ROW_PER_CRITERION, 'the source’s sentence is not the sponsor’s').toBe(ONE_ROW_PER_CRITERION_SENTENCE);
 	});
 });
 
