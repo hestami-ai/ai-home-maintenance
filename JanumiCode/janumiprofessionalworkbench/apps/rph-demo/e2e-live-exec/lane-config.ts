@@ -592,6 +592,23 @@ export const PHASE7_AUTHORING_FLOOR_RUNS = 2;
 export const PHASE7_AUTHORING_ALLOWANCE_MS =
 	PHASE7_AUTHORING_FLOOR_RUNS * (EXECUTE_TIMEOUT_MS / LANE_BUDGET.tries);
 
+/**
+ * ⭐⭐ `REG-D-112` (E3's review, finding 2) — THE AUTHORING TURN'S WORST CASE IN REVIEWER CALLS: each of its floor runs one
+ * review of up to `reviewerCallsPerTry` calls — 2 × 4 = 8, the calls the allowance above counts in time. ⛔ Half B checks
+ * it against the limit BEFORE SEND (D8): the lane's first check had been before the first PHASE, so the authoring floor's
+ * reviews, and a model root's, were spent before the limit was ever asked.
+ */
+export const PHASE7_AUTHORING_REVIEWER_CALLS = PHASE7_AUTHORING_FLOOR_RUNS * LANE_BUDGET.reviewerCallsPerTry;
+
+/**
+ * ⭐⭐ `REG-D-112` (finding 2) — ONE MODEL UNIT'S WORST CASE IN REVIEWER CALLS, as its allowance counts its reviews
+ * (`PHASE7_UNIT_ALLOWANCE_MS`): each try's work-product review, and the review of each command reviewed, each of up to
+ * `reviewerCallsPerTry` calls — (3 + 32) × 4 = 140. ⛔ Half B checks it before the ROOT's press when the agent's root
+ * declares MODEL: §3.2's root runs no model, and the agent's may.
+ */
+export const PHASE7_UNIT_REVIEWER_CALLS =
+	(LANE_BUDGET.tries + PHASE7_REVIEWED_COMMANDS) * LANE_BUDGET.reviewerCallsPerTry;
+
 /** ⭐ C1 — how long the lane waits between two reads of the candidate's status: each read is the whole dump. */
 export const PHASE7_CANDIDATE_POLL_MS = 5_000;
 

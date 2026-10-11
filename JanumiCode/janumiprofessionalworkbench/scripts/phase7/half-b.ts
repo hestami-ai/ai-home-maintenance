@@ -13,9 +13,13 @@
 //     (`permittedChildTypeIds`), depth first — the order instantiation itself walks (`planComposition`,
 //     `packages/rph-projections/src/composition-plan.ts`), read back from the store rather than from the store's listing;
 //   · each unit's SLUG, from its title, so the archive and the report name the agent's units as they name §3.2's;
+//   · ⭐ `REG-D-112` — the units HELD TO THE PLAN INSTANTIATION MAKES of the PWA, per (parent, type) (`treeAgainstPlan`);
 //   · the authoring floor's dispositions, read from the assessments of the PWA.
-// ⭑ PURE, AND IT IMPORTS ONLY THE CONTENT MODULE: Playwright, bun and vitest load it alike, and the run report reads an
-// archive with nothing of the server in it.
+// ⭑ PURE: Playwright, bun and vitest load it alike, and the run report reads an archive with nothing of the server in
+// it. ~~It imports only the content module.~~ ⭐ `REG-D-112` (E3's review, finding 4): and the product's own planner,
+// `planComposition` — a pure function of the types, from the projections package (data only, never a write target) —
+// so stage 2 holds the units to what instantiation builds, never to a restatement of it.
+import { planComposition } from '@janumipwb/rph-projections';
 import { PRODUCT_BRIEF } from './pwa-content.js';
 
 // ── THE REQUEST (C1; `REG-D-110` (4)) ───────────────────────────────────────────────────────────────────────────────
@@ -160,35 +164,101 @@ export function unitsInTreeOrder(
 	};
 }
 
-/** A cardinality's mandatory minimum (`composition-plan.ts`, `mandatoryMinimum`): M1 and M+ one, C1 and C+ none. */
-const mandatory = (cardinality: unknown): boolean => cardinality === 'M1' || cardinality === 'M+';
+/** ⭐ `REG-D-112` — what holding an Undertaking's units to the plan instantiation makes of its PWA found (`treeAgainstPlan`). */
+export interface TreeAgainstPlan {
+	/** The units the plan makes: one for each mandatory child under each parent, and the root. */
+	readonly planned: number;
+	/** Each planned unit none was built for: `<type>`, or `<type> under <its parent's title>`. */
+	readonly missing: readonly string[];
+	/** Each (parent, type) built more than once: `<type> under <the parent's title>`, once each. */
+	readonly duplicated: readonly string[];
+	/** The ids of the units whose parent is no unit of the Undertaking. */
+	readonly orphaned: readonly string[];
+	/** The units the plan does not make under their parent: each id, and its parent's title. */
+	readonly unplanned: readonly { readonly unitId: string; readonly parentTitle: string }[];
+	/** The conditional children the plan OFFERS, which instantiation offers to no one (`REG-F-516`), by type name. */
+	readonly conditional: readonly string[];
+	/** Each permitted child the plan cannot resolve, `<parent type> → <child>`: instantiation refuses such a PWA. */
+	readonly unresolved: readonly string[];
+}
 
 /**
- * ⭐ C2 — the types an Undertaking of the PWA must have a unit of: the root, and each child its parent permits as
- * MANDATORY, depth first — a permitted child with no rule is M1, as `planComposition` reads it — beside the conditional
- * children, which instantiation offers to no one (`REG-F-516`). ⚠ A type already on the path is not walked again.
+ * ⭐⭐ `REG-D-112` (E3's review, finding 4) — THE UNDERTAKING'S UNITS, HELD TO THE PLAN INSTANTIATION MAKES OF ITS PWA,
+ * PER (PARENT, TYPE): the product's own planner (`planComposition`, as `routes/undertakings/+page.server.ts` asks it) plans
+ * one unit for each mandatory child under each parent, and each planned unit is matched to a unit of its type under the
+ * unit matched to its parent. ⛔ ~~The mandatory TYPES, walked once per permitting parent, each matched by type alone~~:
+ * a type two parents permit was listed twice, so its two units — one under each, as instantiation builds it — read as
+ * "more than one work unit", and one parent's missing unit was hidden by the other's. ⚠ What is left over is said: a
+ * second unit of a planned (parent, type) is a duplicate; one whose parent is no unit of the Undertaking, an orphan; one
+ * of a type the plan does not put under its parent, unplanned.
  */
-export function mandatoryTypes(types: readonly Row[]): {
-	readonly mandatory: readonly Row[];
-	readonly conditional: readonly string[];
-} {
-	const byId = new Map(types.map((t) => [t.id, t]));
-	const found: Row[] = [];
-	const conditional: string[] = [];
-	const walk = (t: Row, path: readonly string[]): void => {
-		found.push(t);
-		const rules = Array.isArray(t.state.permittedChildren) ? (t.state.permittedChildren as { typeId?: unknown; cardinality?: unknown }[]) : [];
-		for (const childId of strs(t.state.permittedChildTypeIds)) {
-			const child = byId.get(childId);
-			const rule = rules.find((r) => r.typeId === childId);
-			if (child === undefined || path.includes(childId)) continue;
-			if (rule === undefined || mandatory(rule.cardinality)) walk(child, [...path, childId]);
-			else conditional.push(str(child.state.name));
-		}
-	};
+export function treeAgainstPlan(units: readonly Row[], types: readonly Row[]): TreeAgainstPlan {
+	const nameOf = (typeId: string): string => str(types.find((t) => t.id === typeId)?.state.name) || typeId;
 	const root = types.find((t) => t.state.isRoot === true);
-	if (root !== undefined) walk(root, [root.id]);
-	return { mandatory: found, conditional };
+	const plan =
+		root === undefined
+			? { instances: [], offered: [], unresolved: [] }
+			: planComposition(
+					types.map((t) => ({
+						id: t.id,
+						isRoot: t.state.isRoot === true,
+						permittedChildTypeIds: strs(t.state.permittedChildTypeIds),
+						permittedChildren: Array.isArray(t.state.permittedChildren)
+							? (t.state.permittedChildren as Parameters<typeof planComposition>[0][number]['permittedChildren'])
+							: undefined
+					})),
+					root.id
+				);
+	const typeOfKey = new Map(plan.instances.map((i) => [i.key, i.typeId]));
+	/** Each planned key, and the unit matched to it. */
+	const built = new Map<string, Row>();
+	const matched = new Set<string>();
+	const missing: string[] = [];
+	for (const planned of plan.instances) {
+		const parentKey = planned.parentKey;
+		// null: the root, which has no parent; undefined: a parent the plan makes and no unit was built for.
+		const parent = parentKey === undefined ? null : built.get(parentKey);
+		const unit =
+			parent === undefined
+				? undefined
+				: units.find(
+						(u) => !matched.has(u.id) && str(u.state.pwuTypeId) === planned.typeId && parentOf(u) === (parent?.id ?? null)
+					);
+		if (unit === undefined) {
+			const under = parent ? str(parent.state.title) : nameOf(typeOfKey.get(parentKey ?? '') ?? '');
+			missing.push(`${nameOf(planned.typeId)}${parentKey === undefined ? '' : ` under ${under}`}`);
+			continue;
+		}
+		matched.add(unit.id);
+		built.set(planned.key, unit);
+	}
+	const ids = new Set(units.map((u) => u.id));
+	const titleOf = (id: string): string => str(units.find((u) => u.id === id)?.state.title) || id;
+	const plannedFor = (u: Row): boolean =>
+		plan.instances.some(
+			(i) =>
+				i.typeId === str(u.state.pwuTypeId) &&
+				(i.parentKey === undefined ? parentOf(u) === null : built.get(i.parentKey)?.id === parentOf(u))
+		);
+	const duplicated = new Set<string>();
+	const orphaned: string[] = [];
+	const unplanned: { unitId: string; parentTitle: string }[] = [];
+	for (const u of units.filter((x) => !matched.has(x.id))) {
+		const parent = parentOf(u);
+		if (plannedFor(u))
+			duplicated.add(`${nameOf(str(u.state.pwuTypeId))}${parent === null ? '' : ` under ${titleOf(parent)}`}`);
+		else if (parent === null || !ids.has(parent)) orphaned.push(u.id);
+		else unplanned.push({ unitId: u.id, parentTitle: titleOf(parent) });
+	}
+	return {
+		planned: plan.instances.length,
+		missing,
+		duplicated: [...duplicated],
+		orphaned,
+		unplanned,
+		conditional: plan.offered.map((o) => nameOf(o.typeId)),
+		unresolved: plan.unresolved.map((u) => `${nameOf(u.parentTypeId)} → ${nameOf(u.typeId)}`)
+	};
 }
 
 // ── THE AUTHORING FLOOR, AS THE RECORD HOLDS IT ─────────────────────────────────────────────────────────────────────

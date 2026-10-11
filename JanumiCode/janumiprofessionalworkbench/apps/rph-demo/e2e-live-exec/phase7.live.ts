@@ -8,11 +8,11 @@ import {
 	createUndertakingThroughForm,
 	publishThroughDesigner,
 	typePwuTypes,
-	unitRow
+	unitRowById
 } from '../e2e/support/phase7-pwa';
 import { PHASE7_PWA } from '../../../scripts/phase7/pwa-content';
 import { PHASE7_HALF_B_DRAFT } from '../../../scripts/phase7/half-b';
-import { archiveUnit } from '../../../scripts/phase7/run-archive';
+import { archiveAuthoring, archiveUnit, AUTHORING_ARCHIVE } from '../../../scripts/phase7/run-archive';
 import {
 	LIVE_RUN_DIR_VARIABLE,
 	PHASE7_PAID_VARIABLE,
@@ -98,6 +98,10 @@ import { STORE_FILE } from './run-folder';
 // Submit and refuse nothing (C4). `JPWB_AGENT_MODEL` is required, and recorded (C3); the timeout is extended once the
 // units are read (`phase7HalfBTestTimeoutMs`). Dry, half B stops before Send: authoring is a model call (C6). The order
 // is the operator's (`authorThePwa`), on the `author` hands below. ⚠ Unset or blank, the half is A: everything above.
+// ⭐⭐ `REG-D-112` (E3's review): the LIMIT is checked before Send, the authoring floor's worst case counted, and before the
+// root's press, a MODEL root's counted (finding 2); the store is ARCHIVED into `lane/archive/00-authoring` however the
+// authoring ends, so even a run that stopped there is reported (finding 1); and every unit's row is found BY ITS ID,
+// since a title may repeat (finding 5).
 //
 // ── ⚠ WHAT THIS SPEC ASSERTS, AND WHAT IT ONLY RECORDS ────────────────────────────────────────────────────────────────
 // It asserts its OWN machinery (`laneVerdict`): the boot, the PWA as typed, one unit per type, the dry run's proof of the
@@ -165,17 +169,19 @@ test.describe('LIVE — JAN-EXEC Phase 7: §3.2’s PWA, published, run as an Un
 					undertakingPath = new URL(page.url()).pathname;
 					return unitsOf((await freshIntrospect(base)).snapshot, PHASE7_UNDERTAKING.name);
 				},
-				beginExecute: (unit) => beginExecute(page, unitRow(page, unit.title), actionFields),
+				// ⭐ `REG-D-112` (E3's review, finding 5) — EVERY ACT ON A UNIT FINDS ITS ROW BY THE UNIT'S ID (`unitRowById`), never by
+				// its title: a type more than one parent permits gives its title to a unit under each.
+				beginExecute: (unit) => beginExecute(page, unitRowById(page, unit.unitId!), actionFields),
 				// ⭐ P7-6 B3 — its click bounded by its own timeout: the run plan's rule calls this hand too.
 				showOverview: async () => {
 					await gotoHydrated(page, undertakingPath);
 					await page.getByRole('button', { name: 'overview', exact: true }).click({ timeout: PHASE7_UI_MS });
 				},
-				recordAssurance: (unit) => recordAssurance(page, unitRow(page, unit.title), actionFields),
-				markSatisfied: (unit) => markSatisfied(page, unitRow(page, unit.title), actionFields),
+				recordAssurance: (unit) => recordAssurance(page, unitRowById(page, unit.unitId!), actionFields),
+				markSatisfied: (unit) => markSatisfied(page, unitRowById(page, unit.unitId!), actionFields),
 				// ⭐ P7-6R R-1f — the run plan's rule's two hands: the row's offers, and one act on the row (`REG-D-105` (4)).
-				recoveryOffers: (unit) => recoveryOffers(unitRow(page, unit.title)),
-				recover: (unit, act) => recover(page, unitRow(page, unit.title), act, actionFields),
+				recoveryOffers: (unit) => recoveryOffers(unitRowById(page, unit.unitId!)),
+				recover: (unit, act) => recover(page, unitRowById(page, unit.unitId!), act, actionFields),
 				read: () => freshIntrospect(base),
 				archive: async (call) =>
 					(
@@ -191,6 +197,10 @@ test.describe('LIVE — JAN-EXEC Phase 7: §3.2’s PWA, published, run as an Un
 							env: process.env
 						})
 					).captures,
+				// ⭐ `REG-D-112` (finding 1) — half B's authoring, archived however it ended, into `lane/archive/00-authoring`.
+				archiveAuthoring: async (dump) => {
+					await archiveAuthoring({ archiveDir: join(lane.archive, AUTHORING_ARCHIVE), storePath: store, introspect: dump });
+				},
 				screenshot: (name) => screenshot(page, join(lane.screenshots, `${name}.png`)),
 				// ⭐⭐ E3 (C1) — HALF B's HANDS: the designer page, held where the turn is, and the clock. Every read of the store
 				// while the turn runs is a fresh request context (`read`), never the page: a turn is discarded when its page leaves.

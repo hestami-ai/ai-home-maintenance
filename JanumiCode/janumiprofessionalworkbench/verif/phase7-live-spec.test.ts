@@ -279,16 +279,17 @@ describe('⛔ the spec, from source: Playwright’s own `test`, its own timeout,
 	});
 
 	it('⛔ D4, D5 — every act on a unit is the operator’s, on that unit’s own row; the spec waits on no response itself', () => {
+		// ⭐ `REG-D-112` (E3's review, finding 5) — the unit's own row BY ITS ID: a title may repeat in half B.
 		for (const act of ['beginExecute', 'recordAssurance', 'markSatisfied'])
 			expect(callsTo(sf, act), act).toEqual([
-				['page', 'unitRow(page, unit.title)', 'actionFields']
+				['page', 'unitRowById(page, unit.unitId!)', 'actionFields']
 			]);
 		// ⭐ P7-6R R-1f — and the run plan's rule's acts too: the row's offers read, and each act pressed, on the unit's own row.
 		expect(callsTo(sf, 'recoveryOffers'), 'recoveryOffers').toEqual([
-			['unitRow(page, unit.title)']
+			['unitRowById(page, unit.unitId!)']
 		]);
 		expect(callsTo(sf, 'recover'), 'recover').toEqual([
-			['page', 'unitRow(page, unit.title)', 'act', 'actionFields']
+			['page', 'unitRowById(page, unit.unitId!)', 'act', 'actionFields']
 		]);
 		expect(anyMethodCalls(sf, 'waitForResponse')).toEqual([]);
 		expect(callsTo(sf, 'pressAction')).toEqual([]);

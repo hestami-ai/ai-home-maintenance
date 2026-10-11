@@ -16,11 +16,13 @@
 //   · C6 — the dry rehearsal stops before Send: authoring is a model call.
 // ⛔ NO PROGRAM IS RUN HERE, and nothing stipulates: the gate's own rehearsal of the turn, with the mock agent, is
 // `apps/rph-demo/e2e/phase7-half-b.e2e.ts` (`REG-F-477`: stipulations live under `e2e/`, never `e2e-live/`).
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { policyApplicability } from '@janumipwb/rph-domain';
+import { createSqliteDriver, SCHEMA_SQL } from '@janumipwb/rph-persistence';
 import ts from 'typescript';
 import { afterAll, describe, expect, it } from 'vitest';
 import type { EngineSnapshot, ObjectRow } from '../apps/rph-demo/e2e/support/harness.js';
@@ -38,7 +40,10 @@ import {
 	PHASE7_DESIGNER_ACTS,
 	PHASE7_INTROSPECT_MS,
 	PHASE7_MODEL_UNITS,
+	PHASE7_NEGATIVE_CONTROL_RESERVE,
+	PHASE7_PAID_LIMIT,
 	PHASE7_PER_PHASE_MS,
+	PHASE7_REVIEWED_COMMANDS,
 	PHASE7_SETUP_MS,
 	PHASE7_SIGN_OFF_MS,
 	PHASE7_TEST_TIMEOUT_MS,
@@ -58,7 +63,9 @@ import {
 	TURN_SETTLED,
 	type ActionOutcome,
 	type Boot,
+	type Dump,
 	type LaneHands,
+	type LanePaths,
 	type RunRecord
 } from '../apps/rph-demo/e2e-live-exec/phase7-operator.js';
 import {
@@ -70,14 +77,15 @@ import {
 	AUTHORING_FLOOR_POLICIES,
 	floorDispositions,
 	identityOf,
-	mandatoryTypes,
 	PHASE7_HALF_B_DRAFT,
 	PHASE7_HALF_B_REQUEST,
 	PHASE7_RUN_PLAN_REQUEST,
 	slugOf,
+	treeAgainstPlan,
 	unitsInTreeOrder
 } from '../scripts/phase7/half-b.js';
 import { PHASE7_INSTRUCTION_BUDGET, PHASE7_PWA, PRODUCT_BRIEF } from '../scripts/phase7/pwa-content.js';
+import { archiveAuthoring, AUTHORING_ARCHIVE, journalHeaderOf } from '../scripts/phase7/run-archive.js';
 import {
 	buildRunReport,
 	FLOOR_POLICIES,
@@ -197,8 +205,15 @@ const AGENT_TYPES: ObjectRow[] = [
 		}
 	}
 ];
+/** One unit instantiation built: its id, its type, its title (its type's name) and its parent unit. */
+interface AgentUnit {
+	readonly id: string;
+	readonly typeId: string;
+	readonly title: string;
+	readonly parent: string | null;
+}
 /** The units instantiation built, AS THE STORE LISTS THEM — scrambled here, so only the tree can order them. */
-const AGENT_UNITS: readonly { id: string; typeId: string; title: string; parent: string | null }[] = [
+const AGENT_UNITS: readonly AgentUnit[] = [
 	{ id: 'pwu_v', typeId: 'pwutype_verify', title: 'Verify wordfreq end to end', parent: 'pwu_r' },
 	{ id: 'pwu_r', typeId: 'pwutype_root', title: 'wordfreq Realization', parent: null },
 	{ id: 'pwu_b', typeId: 'pwutype_build', title: 'Build wordfreq', parent: 'pwu_r' },
@@ -206,6 +221,88 @@ const AGENT_UNITS: readonly { id: string; typeId: string; title: string; parent:
 ];
 /** The order a correct lane presses them in: the root, then the tree's order. */
 const TREE_ORDER = ['root', 'specify-wordfreq', 'build-wordfreq', 'verify-wordfreq-end-to-end'];
+
+/**
+ * ⭐ `REG-D-112` (E3's review, findings 3 to 5) — A THREE-LEVEL TREE WHOSE LEAF TYPE TWO PARENTS SHARE: the root over
+ * "Design wordfreq" and "Build wordfreq", each a COMPOSITE that runs no model (HUMAN) and permits "Review wordfreq", a MODEL
+ * leaf with an ACTIVE prompt. Instantiation (`planComposition`) builds the leaf ONCE UNDER EACH PARENT, so the Undertaking
+ * holds two units of one type — and of one title, which instantiation copies from the type's name.
+ */
+const SHARED_TYPES: ObjectRow[] = [
+	{
+		id: 'pwutype_s_review',
+		state: {
+			pwaId: PWA_ID,
+			name: 'Review wordfreq',
+			pwuKind: 'DESIGN_REVIEW',
+			purpose: 'Review the work of the phase above it.',
+			workDischarge: 'MODEL',
+			isRoot: false,
+			permittedChildTypeIds: [],
+			promptTemplate: prompt('Review {subject} for wordfreq: {purpose}'),
+			requiredAssurancePolicyIds: ['pol_intent_preservation'],
+			status: 'ACTIVE'
+		}
+	},
+	...[
+		['pwutype_s_design', 'Design wordfreq', 'SOLUTION_DESIGN'],
+		['pwutype_s_build', 'Build wordfreq', 'PRODUCT_IMPLEMENTATION']
+	].map(([id, name, pwuKind]) => ({
+		id: id!,
+		state: {
+			pwaId: PWA_ID,
+			name,
+			pwuKind,
+			purpose: `${name}, through the review beneath it.`,
+			workDischarge: 'HUMAN',
+			isRoot: false,
+			permittedChildTypeIds: ['pwutype_s_review'],
+			permittedChildren: [{ typeId: 'pwutype_s_review', cardinality: 'M1' }],
+			requiredAssurancePolicyIds: ['pol_intent_preservation'],
+			status: 'ACTIVE'
+		}
+	})),
+	{
+		id: 'pwutype_s_root',
+		state: {
+			pwaId: PWA_ID,
+			name: 'wordfreq Realization',
+			pwuKind: 'PRODUCT_REALIZATION',
+			purpose: 'Realize wordfreq.',
+			workDischarge: 'HUMAN',
+			isRoot: true,
+			permittedChildTypeIds: ['pwutype_s_design', 'pwutype_s_build'],
+			permittedChildren: [
+				{ typeId: 'pwutype_s_design', cardinality: 'M1' },
+				{ typeId: 'pwutype_s_build', cardinality: 'M1' }
+			],
+			requiredAssurancePolicyIds: ['pol_intent_preservation'],
+			status: 'ACTIVE'
+		}
+	}
+];
+/** The shared tree's units, as the store lists them: the two reviews share a title, and are told apart only by id. */
+const SHARED_UNITS: readonly AgentUnit[] = [
+	{ id: 'pwu_rv_b', typeId: 'pwutype_s_review', title: 'Review wordfreq', parent: 'pwu_sb' },
+	{ id: 'pwu_sr', typeId: 'pwutype_s_root', title: 'wordfreq Realization', parent: null },
+	{ id: 'pwu_sd', typeId: 'pwutype_s_design', title: 'Design wordfreq', parent: 'pwu_sr' },
+	{ id: 'pwu_sb', typeId: 'pwutype_s_build', title: 'Build wordfreq', parent: 'pwu_sr' },
+	{ id: 'pwu_rv_d', typeId: 'pwutype_s_review', title: 'Review wordfreq', parent: 'pwu_sd' }
+];
+/** The shared tree's order — the root, then depth first — each slug with the unit it names. */
+const SHARED_ORDER: readonly (readonly [string, string])[] = [
+	['root', 'pwu_sr'],
+	['design-wordfreq', 'pwu_sd'],
+	['review-wordfreq', 'pwu_rv_d'],
+	['build-wordfreq', 'pwu_sb'],
+	['review-wordfreq-2', 'pwu_rv_b']
+];
+/** ⭐ `REG-D-112` (finding 2) — the agent's PWA with a root that declares MODEL, an ACTIVE prompt: its press runs a model. */
+const MODEL_ROOT_TYPES: ObjectRow[] = AGENT_TYPES.map((t) =>
+	t.state.isRoot === true
+		? { id: t.id, state: { ...t.state, workDischarge: 'MODEL', promptTemplate: prompt('Realize {subject}: {purpose}') } }
+		: t
+);
 const CANDIDATE_HASH = `sha256:${'ab'.repeat(32)}`;
 const AUTHOR = { providerId: 'openai-codex', modelId: 'gpt-5.6-sol' };
 const REVIEWER = { providerId: 'devin', modelId: 'glm-5-3-flash-max' };
@@ -255,11 +352,22 @@ interface HalfBScript {
 	readonly detail?: string;
 	/** What the store reads the PWA after an accepted Publish; PUBLISHED unless said. */
 	readonly published?: string;
+	/** ⭐ `REG-D-112` (finding 2) — the reviewer calls spent before the run (D8); none unless said. */
+	readonly prior?: number;
+	/** ⭐ `REG-D-112` — the agent's types, and the units instantiation built of them; `AGENT_TYPES`, `AGENT_UNITS` unless said. */
+	readonly types?: readonly ObjectRow[];
+	readonly units?: readonly AgentUnit[];
+	/** ⭐ `REG-D-112` (finding 1) — what the authoring archive does beyond being logged: nothing unless said. */
+	readonly archive?: (dump: Dump, lane: LanePaths) => Promise<void>;
+	/** ⭐ `REG-D-112` (finding 1) — "Accept exact candidate" throws, as a page that lost its button would. */
+	readonly acceptThrows?: boolean;
 }
 
 /** A run folder of its own, a store made here, and the half-B hands, each call logged in order. */
 function halfBLane(script: HalfBScript) {
 	const lane = openLane(folder('lane'));
+	const types = script.types ?? AGENT_TYPES;
+	const units = script.units ?? AGENT_UNITS;
 	const calls: string[] = [];
 	const timeouts: number[] = [];
 	let clock = 0;
@@ -277,12 +385,12 @@ function halfBLane(script: HalfBScript) {
 		const candidateStatus = sent && !accepted && script.noCandidate !== true ? statusAt(readsAfterSend) : null;
 		return {
 			pwas: [{ id: PWA_ID, state: { name: 'CLI Product Realization', publicationStatus: status } }],
-			pwuTypes: accepted ? AGENT_TYPES : [],
+			pwuTypes: accepted ? types : [],
 			assurancePolicies: AGENT_POLICIES,
 			assessments: accepted ? FLOOR_OF_THE_CANDIDATE : [],
 			undertakings: undertaking ? [{ id: 'und_1', state: { name: 'wordfreq realization' } }] : [],
 			pwus: undertaking
-				? AGENT_UNITS.map((u) => {
+				? units.map((u) => {
 						const s = pressed.get(u.id);
 						return {
 							id: u.id,
@@ -317,7 +425,7 @@ function halfBLane(script: HalfBScript) {
 									...(script.detail === undefined ? {} : { detail: script.detail }),
 									commandCount: 9
 								},
-								pwuTypes: AGENT_TYPES,
+								pwuTypes: types,
 								assessments: FLOOR_OF_THE_CANDIDATE,
 								conversations: [],
 								criterionEvents: [],
@@ -332,7 +440,7 @@ function halfBLane(script: HalfBScript) {
 		setUp: async () => {
 			calls.push('setUp');
 			undertaking = true;
-			return new Map(AGENT_UNITS.map((u) => [u.title, { id: u.id, state: { undertakingId: 'und_1' } }]));
+			return new Map(units.map((u) => [u.title, { id: u.id, state: { undertakingId: 'und_1' } }]));
 		},
 		beginExecute: async (unit) => {
 			calls.push(`beginExecute ${unit.slug}`);
@@ -362,6 +470,11 @@ function halfBLane(script: HalfBScript) {
 			calls.push(`archive ${call.name}`);
 			return [];
 		},
+		// ⭐ `REG-D-112` (finding 1) — the authoring's archive, logged, and taken as the script says.
+		archiveAuthoring: async (dump: Dump) => {
+			calls.push('archiveAuthoring');
+			await script.archive?.(dump, lane);
+		},
 		screenshot: async () => null,
 		author: {
 			createDraft: async () => {
@@ -384,6 +497,7 @@ function halfBLane(script: HalfBScript) {
 			},
 			accept: async () => {
 				calls.push('author.accept');
+				if (script.acceptThrows === true) throw new Error('locator.click: Timeout 120000ms exceeded.');
 				const outcome = script.accept ?? ACCEPTED;
 				if (outcome.envelopeType === 'success') accepted = true;
 				return outcome;
@@ -417,11 +531,11 @@ function halfBLane(script: HalfBScript) {
 			inherited: {},
 			overlay: overlayOf(undefined),
 			readiness: null,
-			priorReviewerCalls: 0,
+			priorReviewerCalls: script.prior ?? 0,
 			refusals: []
 		},
 		refusals: [],
-		prior: 0
+		prior: script.prior ?? 0
 	} as Boot;
 	return {
 		run: () => runTheLane({ boot, lane, hands, flushPosts: () => void calls.push('flushPosts') }),
@@ -460,10 +574,12 @@ describe('⭐⭐ C1, C2 — HALF B, IN ITS ORDER: `runTheLane` on hands made her
 		const l = halfBLane({ paid: true });
 		await l.run().catch(() => undefined);
 		expect(
-			l.only('setUp', 'author.', 'read', 'beginExecute root').slice(0, 18),
+			l.only('setUp', 'author.', 'read', 'beginExecute root').slice(0, 21),
 			'the half-B order (DESIGN-phase-7-completion.md §4 C1)'
 		).toEqual([
 			'author.createDraft',
+			// ⭐ `REG-D-112` (finding 2) — the store read for the LIMIT, before Send.
+			'read',
 			'author.send',
 			'read',
 			'author.pause 5000',
@@ -479,6 +595,9 @@ describe('⭐⭐ C1, C2 — HALF B, IN ITS ORDER: `runTheLane` on hands made her
 			'author.publish',
 			'read',
 			'author.createUndertaking',
+			'read',
+			// ⭐ `REG-D-112` — the store read for the authoring's ARCHIVE (finding 1), then for the LIMIT before the root (2).
+			'read',
 			'read',
 			'beginExecute root',
 			'read'
@@ -498,6 +617,9 @@ function halfBStore(
 		ran?: Readonly<Record<string, 'model' | 'press'>>;
 		/** Units the Undertaking does not hold, by id: instantiation built none of them. */
 		dropped?: readonly string[];
+		/** ⭐ `REG-D-112` — the agent's types and units; `AGENT_TYPES`, `AGENT_UNITS` unless said. */
+		types?: readonly ObjectRow[];
+		units?: readonly AgentUnit[];
 	} = {}
 ): StoreRows {
 	let n = 0;
@@ -516,11 +638,11 @@ function halfBStore(
 		...FLOOR_OF_THE_CANDIDATE.map((a, i) =>
 			object('ASSURANCE_ASSESSMENT', a.id, { ...a.state, assessmentState: floor[i] })
 		),
-		...AGENT_TYPES.map((t) => object('PWU_TYPE', t.id, t.state)),
+		...(o.types ?? AGENT_TYPES).map((t) => object('PWU_TYPE', t.id, t.state)),
 		object('UNDERTAKING', 'und_1', { name: 'wordfreq realization', status: 'ACTIVE' }),
-		...AGENT_UNITS.filter((u) => !(o.dropped ?? []).includes(u.id)).flatMap((u) => {
+		...(o.units ?? AGENT_UNITS).filter((u) => !(o.dropped ?? []).includes(u.id)).flatMap((u) => {
 			const ran = o.ran?.[u.id];
-			const declared = AGENT_TYPES.find((t) => t.id === u.typeId)!.state.requiredAssurancePolicyIds;
+			const declared = (o.types ?? AGENT_TYPES).find((t) => t.id === u.typeId)?.state.requiredAssurancePolicyIds ?? [];
 			return [
 				object('PROFESSIONAL_WORK_UNIT', u.id, {
 					title: u.title,
@@ -553,20 +675,33 @@ function halfBStore(
 }
 
 /** The lane's own files of a half-B run: its record names the half, the PWA, and the hash the person accepted. */
-function halfBLaneRows(o: { acceptedHash?: string | null; findings?: readonly unknown[] } = {}): LaneRows {
+function halfBLaneRows(
+	o: {
+		acceptedHash?: string | null;
+		findings?: readonly unknown[];
+		/** ⭐ `REG-D-112` — the agent's types and units; `AGENT_TYPES`, `AGENT_UNITS` unless said. */
+		types?: readonly ObjectRow[];
+		units?: readonly AgentUnit[];
+		/** ⭐ `REG-D-112` (finding 6) — the author as pinned and as the turn named it; the same model unless said. */
+		author?: { readonly configured: string | null; readonly resolved: string | null };
+	} = {}
+): LaneRows {
+	const model = `${AUTHOR.providerId}/${AUTHOR.modelId}`;
 	return {
 		run: {
 			mode: 'paid',
 			half: 'B',
-			units: AGENT_UNITS.map((u) => ({ unitId: u.id, title: u.title })),
+			units: (o.units ?? AGENT_UNITS).map((u) => ({ unitId: u.id, title: u.title })),
 			end: { reason: 'complete' },
 			authoring: {
 				pwaId: PWA_ID,
+				// ⭐ `REG-D-112` (finding 7) — a paid run SENT its request, as the lane records it.
+				sent: true,
 				candidate: { status: 'READY_TO_COMMIT', candidateHash: CANDIDATE_HASH },
 				accept: { envelopeType: 'success', acceptedHash: o.acceptedHash === undefined ? CANDIDATE_HASH : o.acceptedHash },
-				authorModel: { configured: `${AUTHOR.providerId}/${AUTHOR.modelId}`, resolved: `${AUTHOR.providerId}/${AUTHOR.modelId}` },
+				authorModel: o.author ?? { configured: model, resolved: model },
 				checks: {
-					findings: o.findings ?? candidateChecks(AGENT_TYPES, AGENT_POLICIES).findings,
+					findings: o.findings ?? candidateChecks(o.types ?? AGENT_TYPES, AGENT_POLICIES).findings,
 					refused: false
 				}
 			}
@@ -712,14 +847,16 @@ describe('⭐ C5 — the candidate checks’ findings stand beside what each uni
 		expect([cellOf(whole, '2', 'whole run').value, cellOf(whole, '2', 'whole run').basis]).toEqual([
 			'as intended',
 			[
-				'4 work units, one per mandatory type of the published PWA, each under the root',
+				// ⭐ `REG-D-112` (finding 4) — per (parent, type), as instantiation plans it, never one per mandatory type.
+				'4 work units, one for each mandatory child under each parent, as instantiation plans the published PWA (planComposition), the root over them all',
 				'the PWA declares no conditional child, so none went unoffered (REG-F-516)'
 			]
 		]);
 		const short = buildRunReport(halfBStore({ dropped: ['pwu_b'] }), halfBLaneRows(), { accountNames: NAMES }).report;
 		expect([cellOf(short, '2', 'whole run').value, cellOf(short, '2', 'whole run').basis]).toEqual([
 			'broke',
-			['no work unit for Build wordfreq']
+			// ⭐ `REG-D-112` (finding 4) — and the parent it is missing under.
+			['no work unit for Build wordfreq under wordfreq Realization']
 		]);
 		// ⭑ The declared verdicts a complete half-B run signs off are the agent's: each unit's own policies, 1 + 2 + 1 + 1.
 		expect(whole.declaredVerdicts.expected).toBe(5);
@@ -993,10 +1130,14 @@ describe('⭐ C1, C4, C6 — what the lane does, and records, in half B', () => 
 		const l = halfBLane({ paid: true, noCandidate: true });
 		const record = await l.run();
 		expect(l.only('read', 'author.pause', 'author.turnRunning')).toEqual([
+			// ⭐ `REG-D-112` — the limit's read before Send (finding 2) ...
+			'read',
 			'read',
 			'author.pause 5000',
 			'read',
-			'author.turnRunning'
+			'author.turnRunning',
+			// ⭐ ... and the authoring archive's, at the end (finding 1).
+			'read'
 		]);
 		expect(record.end).toMatchObject({ reason: 'authoring-stopped' });
 		expect(record.end?.detail).toContain('the page’s turn ended and no candidate was staged');
@@ -1152,9 +1293,22 @@ describe('⭐ C2 — the order rule: the root first, then the tree’s order', (
 			{ id: 'norule', state: { name: 'No-rule child' } },
 			{ id: 'cplus', state: { name: 'C+ grandchild' } }
 		];
-		const { mandatory, conditional } = mandatoryTypes(types);
-		expect(mandatory.map((t) => t.id)).toEqual(['root', 'm1', 'mplus', 'norule']);
-		expect(conditional).toEqual(['C+ grandchild', 'C1 child']);
+		// ⭐ `REG-D-112` (finding 4) — asked of the product's own planner (`treeAgainstPlan`, `planComposition`): with no unit
+		// built, every planned unit is missing — each under its parent — and the conditional children are named, never planned.
+		const plan = treeAgainstPlan([], types);
+		expect([plan.planned, plan.missing]).toEqual([4, ['Root', 'M1 child under Root', 'M+ child under Root', 'No-rule child under Root']]);
+		expect(plan.conditional).toEqual(['C+ grandchild', 'C1 child']);
+	});
+
+	it('⭐ REG-D-112 — the plan is the PRODUCT’s: a type two parents permit is planned once under EACH, and matched per (parent, type)', () => {
+		const plan = treeAgainstPlan(
+			SHARED_UNITS.map((u) => ({ id: u.id, state: { title: u.title, pwuTypeId: u.typeId, ...(u.parent === null ? {} : { parentWorkUnitId: u.parent }) } })),
+			SHARED_TYPES
+		);
+		expect(plan).toEqual({ planned: 5, missing: [], duplicated: [], orphaned: [], unplanned: [], conditional: [], unresolved: [] });
+		// ⭑ A permitted child that resolves to no type: instantiation refuses such a PWA, and the plan says why.
+		const broken = treeAgainstPlan([], [{ id: 'r', state: { name: 'R', isRoot: true, permittedChildTypeIds: ['ghost'] } }]);
+		expect(broken.unresolved).toEqual(['R → ghost']);
 	});
 });
 
@@ -1281,6 +1435,12 @@ describe('⛔ the spec, from source: half B’s hands are the operator’s own a
 		expect(properties('lifecycle')).toEqual(['(act) => designerAct(page, act, actionFields)']);
 		expect(properties('extendTimeout')).toEqual(['(ms) => test.info().setTimeout(ms)']);
 	});
+
+	it('⭐ REG-D-112 (finding 1) — the authoring archive is the run folder’s own: the store the server keeps, into lane/archive/00-authoring', () => {
+		expect(properties('archiveAuthoring')).toEqual([
+			'async (dump) => { await archiveAuthoring({ archiveDir: join(lane.archive, AUTHORING_ARCHIVE), storePath: store, introspect: dump }); }'
+		]);
+	});
 });
 
 describe('⛔ C5 — a half-B run that stopped short of its units has completed nothing', () => {
@@ -1311,5 +1471,398 @@ describe('⛔ C5 — a half-B run that stopped short of its units has completed 
 		expect(cellOf(r, '3', 'specify-wordfreq').basis).toContain(
 			"the prompt is the agent's: whether it names the product is the candidate checks' record (namesProduct; REG-F-510)"
 		);
+	});
+});
+
+// ── ⭐⭐ E3'S REVIEW, AND ITS FINDINGS FIXED (`REG-D-112`) ────────────────────────────────────────────────────────────
+// The review of package E3 found eight things in half B; each fix is held here by the test that was RED before it.
+
+/** `rows` written into a record store by the product's own driver — WAL, as the server keeps it. */
+function writeStore(file: string, rows: StoreRows): void {
+	const db = createSqliteDriver(file);
+	try {
+		db.exec(SCHEMA_SQL);
+		const now = '2026-10-11T12:00:00.000Z';
+		const put = db.prepare(
+			'INSERT INTO professional_work_objects(id, object_type, aggregate_type, revision, semantic_version, state, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)'
+		);
+		for (const o of rows.objects) put.run(o.id, o.objectType, o.objectType, 1, 1, JSON.stringify(o.state), now, now);
+	} finally {
+		db.close();
+	}
+}
+
+const RUN_REPORT = join(REPO, 'scripts', 'phase7', 'run-report.ts');
+/** The run report's command line over `run`, spawned under bun as an operator runs it. */
+function runReport(run: string): { code: number | null; out: string } {
+	const r = spawnSync('bun', [RUN_REPORT, run], { cwd: REPO, encoding: 'utf8', timeout: 120_000 });
+	return { code: r.status, out: `${r.stdout ?? ''}${r.stderr ?? ''}` };
+}
+
+/** A refusal of a designer act, in the server's words. */
+const refusedWith = (error: string): ActionOutcome => ({ ...answered('failure', `[{"error":1},"${error}"]`), decoded: { error } });
+
+describe('⛔ REG-D-112 (E3’s review, 1) — a run that stops during authoring is ARCHIVED, and the run report reads it', () => {
+	// ⭐ THE PREDICTED RED: no archive was taken before any authoring end, so a run that stopped there left no store, and the
+	// report refused it — `run-report.ts`: *"no archive under lane/archive holds a demo.sqlite"*.
+	it(
+		'⭐ a run stopped at a candidate the floor did not assure leaves lane/archive/00-authoring, and the run report READS it',
+		async () => {
+			const store = join(folder('authoring-store'), 'demo.sqlite');
+			const drafted = halfBStore({ publication: 'DRAFT' });
+			writeStore(store, { ...drafted, objects: drafted.objects.filter((x) => x.objectType === 'PROFESSIONAL_WORK_ARCHITECTURE') });
+			const l = halfBLane({
+				paid: true,
+				statuses: ['ASSURING', 'BLOCKED_EXTERNAL'],
+				detail: 'The review did not produce a usable verdict.',
+				archive: async (dump, lane) =>
+					void (await archiveAuthoring({ archiveDir: join(lane.archive, AUTHORING_ARCHIVE), storePath: store, introspect: dump }))
+			});
+			const record = await l.run();
+			expect(record.end?.reason).toBe('authoring-stopped');
+			const r = runReport(dirname(l.lane.lane));
+			expect(r.code, r.out).toBe(0);
+			expect(r.out).toContain(`read lane/archive/${AUTHORING_ARCHIVE};`);
+			const report = JSON.parse(readFileSync(join(l.lane.lane, 'report', 'report.json'), 'utf8')) as RunReport;
+			expect([report.run.half, report.run.endReason, report.run.archiveRead]).toEqual(['B', 'authoring-stopped', AUTHORING_ARCHIVE]);
+			expect([cellOf(report, '1', 'whole run').value, cellOf(report, '7', 'whole run').value]).toEqual(['broke', 'not reached']);
+		},
+		120_000
+	);
+
+	it('⛔ EVERY authoring end is archived, once, before the run ends: the candidate, the allowance, the dry stop, a refused act, no candidate, the limit', async () => {
+		const ends: Record<string, HalfBScript> = {
+			'a candidate not assured': { paid: true, statuses: ['BLOCKED_EXTERNAL'] },
+			'the allowance outlasted': { paid: true, statuses: ['ASSURING'] },
+			'the dry stop': { paid: false },
+			'a refused acceptance': { paid: true, accept: refusedWith('The candidate changed.') },
+			'a refused Validate': { paid: true, lifecycle: { validate: refusedWith('The graph is not well formed.') } },
+			'no candidate staged': { paid: true, noCandidate: true },
+			'the limit before Send': { paid: true, prior: PHASE7_PAID_LIMIT }
+		};
+		for (const [why, script] of Object.entries(ends)) {
+			const l = halfBLane(script);
+			const record = await l.run();
+			expect(record.units, why).toEqual([]);
+			expect(l.only('archiveAuthoring', 'flushPosts', 'beginExecute'), why).toEqual(['archiveAuthoring', 'flushPosts']);
+		}
+	});
+
+	it('⛔ a throw mid-authoring is archived too, and still ends the run lane-error, its own words kept', async () => {
+		const l = halfBLane({ paid: true, acceptThrows: true });
+		await expect(l.run()).rejects.toThrow('locator.click: Timeout 120000ms exceeded.');
+		expect(l.only('archiveAuthoring', 'flushPosts')).toEqual(['archiveAuthoring', 'flushPosts']);
+		expect(l.written().end).toMatchObject({ reason: 'lane-error', detail: 'locator.click: Timeout 120000ms exceeded.' });
+	});
+
+	it('⭐ an authoring that reached its units is archived once, before the root’s press: what the published PWA was, before anything ran', async () => {
+		const l = halfBLane({ paid: true });
+		await l.run();
+		expect(l.only('archiveAuthoring', 'author.createUndertaking', 'beginExecute root')).toEqual([
+			'author.createUndertaking',
+			'archiveAuthoring',
+			'beginExecute root'
+		]);
+	});
+
+	it('⭐ the authoring archive: the dump, both stores BACKED UP to a rollback journal, its checks — and written once', async () => {
+		const run = folder('authoring-archive');
+		const store = join(run, 'demo.sqlite');
+		writeStore(store, halfBStore());
+		const snapshot = { modelExchanges: [{ id: 'x1', state: { plane: 'ASSURANCE' } }], artifacts: [], evidence: [] };
+		const request = {
+			archiveDir: join(run, 'lane', 'archive', AUTHORING_ARCHIVE),
+			storePath: store,
+			introspect: { text: `${JSON.stringify(snapshot)}\n`, snapshot } as never
+		};
+		const checks = await archiveAuthoring(request);
+		expect(readdirSync(request.archiveDir).sort()).toEqual(['checks.json', 'demo.sqlite', 'introspect.json']);
+		expect(journalHeaderOf(join(request.archiveDir, 'demo.sqlite'))).toEqual([1, 1]);
+		expect([checks.archived.stores.map((s) => [s.name, s.present]), checks.archived.workspace, checks.archived.processOutput]).toEqual([
+			[
+				['demo.sqlite', true],
+				['demo.sqlite.content.sqlite', false]
+			],
+			{ present: false },
+			{ present: false }
+		]);
+		expect(checks.reviewerCalls.recorded.calls).toBe(1);
+		expect(JSON.parse(readFileSync(join(request.archiveDir, 'checks.json'), 'utf8'))).toEqual(JSON.parse(JSON.stringify(checks)));
+		await expect(archiveAuthoring(request)).rejects.toThrow(
+			`refused: the archive ${AUTHORING_ARCHIVE} already exists, and an archive is written once`
+		);
+	});
+
+	it('⭐ the report of a run whose AUTHORING outlasted its allowance names no unit that did: that end is the turn’s', () => {
+		const store = halfBStore({ publication: 'DRAFT' });
+		const lane = halfBLaneRows();
+		const r = buildRunReport(
+			{ ...store, objects: store.objects.filter((x) => x.objectType === 'PROFESSIONAL_WORK_ARCHITECTURE') },
+			{ ...lane, run: { ...(lane.run as object), units: [], end: { reason: 'allowance-exceeded' } } },
+			{ accountNames: NAMES }
+		).report;
+		expect(r.problems.filter((p) => p.includes('allowance'))).toEqual([]);
+	});
+});
+
+describe('⛔ REG-D-112 (E3’s review, 2) — the LIMIT is checked before Send and before the root’s press, each act’s worst case counted', () => {
+	/** The authoring floor's worst case: two floor runs, each one review of up to `reviewerCallsPerTry` calls — 8. */
+	const FLOOR_WORST = PHASE7_AUTHORING_FLOOR_RUNS * LANE_BUDGET.reviewerCallsPerTry;
+	/** A model unit's worst case, as its allowance counts it: each try's review, and each reviewed command's — 140. */
+	const UNIT_WORST = (LANE_BUDGET.tries + PHASE7_REVIEWED_COMMANDS) * LANE_BUDGET.reviewerCallsPerTry;
+
+	// ⭐ THE PREDICTED RED: half B pressed Send with no check — the first was before the first PHASE, after the authoring
+	// floor's reviews and a model root's had been spent.
+	it('⭐ the authoring floor’s worst case past the limit: half B refuses BEFORE SEND — nothing sent, the run ends paid-limit, the check kept', async () => {
+		const prior = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - FLOOR_WORST + 1;
+		const l = halfBLane({ paid: true, prior });
+		const record = await l.run();
+		expect(l.only('author.send', 'beginExecute')).toEqual([]);
+		expect([record.end?.reason, record.authoring?.sent]).toEqual(['paid-limit', false]);
+		expect(record.authoring?.limitCheck).toEqual({
+			prior,
+			recorded: 0,
+			reserve: PHASE7_NEGATIVE_CONTROL_RESERVE,
+			ahead: FLOOR_WORST,
+			total: PHASE7_PAID_LIMIT + 1,
+			limit: PHASE7_PAID_LIMIT,
+			allowed: false
+		});
+		expect(record.end?.detail).toContain(`before Send: ${PHASE7_PAID_LIMIT + 1} of ${PHASE7_PAID_LIMIT} reviewer calls`);
+	});
+
+	it('⭐ CONTROL — one call fewer spent, the worst case fits the limit exactly: Send is pressed, and the run goes on', async () => {
+		const prior = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - FLOOR_WORST;
+		const l = halfBLane({ paid: true, prior });
+		const record = await l.run();
+		expect(l.only('author.send')).toEqual(['author.send']);
+		expect(record.authoring?.limitCheck).toMatchObject({ total: PHASE7_PAID_LIMIT, allowed: true });
+	});
+
+	it('⭐ a MODEL root’s worst case is counted before its press: past the limit the root is never pressed; a root that runs no model is pressed at the same count', async () => {
+		const prior = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - UNIT_WORST + 1;
+		const model = halfBLane({ paid: true, prior, types: MODEL_ROOT_TYPES });
+		const refused = await model.run();
+		expect([model.only('author.send'), model.only('beginExecute')]).toEqual([['author.send'], []]);
+		expect([refused.end?.reason, refused.units[0]?.limitCheck]).toEqual([
+			'paid-limit',
+			{
+				prior,
+				recorded: 0,
+				reserve: PHASE7_NEGATIVE_CONTROL_RESERVE,
+				ahead: UNIT_WORST,
+				total: PHASE7_PAID_LIMIT + 1,
+				limit: PHASE7_PAID_LIMIT,
+				allowed: false
+			}
+		]);
+		expect(refused.end?.detail).toContain('before the root’s press');
+		const human = halfBLane({ paid: true, prior });
+		const pressed = await human.run();
+		expect(human.only('beginExecute root')).toEqual(['beginExecute root']);
+		expect(pressed.units[0]?.limitCheck).toMatchObject({ ahead: 0, allowed: true });
+	});
+});
+
+describe('⭐ REG-D-112 (E3’s review, 3) — REG-F-505’s check is scoped to model LEAVES, as C4’s is: a three-level tree can read as intended', () => {
+	const ALL_RAN = { pwu_sr: 'press', pwu_sd: 'press', pwu_sb: 'press', pwu_rv_d: 'model', pwu_rv_b: 'model' } as const;
+	const reportOf = (ran: Readonly<Record<string, 'model' | 'press'>>) =>
+		buildRunReport(halfBStore({ types: SHARED_TYPES, units: SHARED_UNITS, ran }), halfBLaneRows({ types: SHARED_TYPES, units: SHARED_UNITS }), {
+			accountNames: NAMES
+		}).report;
+
+	// ⭐ THE PREDICTED RED: a composite between the root and the leaves runs no model by design, and read as REG-F-505.
+	it('⭐ the COMPOSITES, which run no model by design, read as intended at stages 3 and 7 — and so does the whole run', () => {
+		const r = reportOf(ALL_RAN);
+		expect(
+			['design-wordfreq', 'build-wordfreq'].map((slug) => [cellOf(r, '3', slug).value, cellOf(r, '7', slug).value, cellOf(r, '7', slug).registerIds])
+		).toEqual([
+			['as intended', 'as intended', []],
+			['as intended', 'as intended', []]
+		]);
+		expect(cellOf(r, '3', 'design-wordfreq').basis[0]).toContain('a composite of the tree');
+		expect(cellOf(r, '7', 'whole run').value).toBe('as intended');
+	});
+
+	it('⛔ CONTROL — a model LEAF of that tree that SUCCEEDED with no model run is still broke, REG-F-505, and so is the whole run', () => {
+		const r = reportOf({ ...ALL_RAN, pwu_rv_b: 'press' });
+		expect([cellOf(r, '3', 'review-wordfreq-2').registerIds, cellOf(r, '7', 'review-wordfreq-2').registerIds]).toEqual([
+			['REG-F-505'],
+			['REG-F-505']
+		]);
+		expect(cellOf(r, '7', 'whole run').value).toBe('broke');
+	});
+});
+
+describe('⭐ REG-D-112 (E3’s review, 4) — stage 2 counts per (parent, type), as instantiation plans it: a shared child is no duplicate', () => {
+	const stageTwoOf = (types: readonly ObjectRow[], units: readonly AgentUnit[]): MatrixCell =>
+		cellOf(buildRunReport(halfBStore({ types, units }), halfBLaneRows({ types, units }), { accountNames: NAMES }).report, '2', 'whole run');
+
+	// ⭐ THE PREDICTED RED: a type two parents permit was counted once per permitting parent, so its two units read as
+	// "more than one work unit" — while instantiation (`planComposition`) builds it once under each.
+	it('⭐ a child type two parents share, built once under each: stage 2 as intended, never "more than one work unit"', () => {
+		const two = stageTwoOf(SHARED_TYPES, SHARED_UNITS);
+		expect([two.value, two.basis]).toEqual([
+			'as intended',
+			[
+				'5 work units, one for each mandatory child under each parent, as instantiation plans the published PWA (planComposition), the root over them all',
+				'the PWA declares no conditional child, so none went unoffered (REG-F-516)'
+			]
+		]);
+	});
+
+	it('⛔ DUPLICATED — two units of one type under ONE parent: broke, naming the type and the parent', () => {
+		const twice = stageTwoOf(SHARED_TYPES, [...SHARED_UNITS, { id: 'pwu_rv_d2', typeId: 'pwutype_s_review', title: 'Review wordfreq', parent: 'pwu_sd' }]);
+		expect([twice.value, twice.basis]).toEqual(['broke', ['more than one work unit for Review wordfreq under Design wordfreq']]);
+	});
+
+	it('⛔ ORPHANED — a unit whose parent is no unit of the Undertaking: broke, naming it, and the place it is missing from', () => {
+		const lost = stageTwoOf(
+			AGENT_TYPES,
+			AGENT_UNITS.map((u) => (u.id === 'pwu_b' ? { ...u, parent: 'pwu_gone' } : u))
+		);
+		expect([lost.value, lost.basis]).toEqual([
+			'broke',
+			['no work unit for Build wordfreq under wordfreq Realization', 'the build-wordfreq unit’s parent is no unit of the Undertaking']
+		]);
+	});
+
+	it('⛔ MISSING under one parent though built under the other: broke, naming the parent it is missing under; and a unit the plan does not make', () => {
+		const short = stageTwoOf(SHARED_TYPES, SHARED_UNITS.filter((u) => u.id !== 'pwu_rv_b'));
+		expect([short.value, short.basis]).toEqual(['broke', ['no work unit for Review wordfreq under Build wordfreq']]);
+		const stray = stageTwoOf(AGENT_TYPES, [...AGENT_UNITS, { id: 'pwu_x', typeId: 'pwutype_specify', title: 'Specify wordfreq', parent: 'pwu_b' }]);
+		expect([stray.value, stray.basis]).toEqual([
+			'broke',
+			['the specify-wordfreq-2 unit is not one the published PWA’s plan makes under its parent, Build wordfreq']
+		]);
+	});
+
+	// ⭐ THE GENERAL FORM (`REG-D-112`): counted by type alone, one parent's missing unit was HIDDEN by another's duplicate —
+	// two reviews under one parent and none under the other read as one type built twice, the missing one never named.
+	it('⛔ both units of a shared child under ONE parent: a duplicate there, and the other parent’s MISSING — never hidden by it', () => {
+		const lopsided = stageTwoOf(
+			SHARED_TYPES,
+			SHARED_UNITS.map((u) => (u.id === 'pwu_rv_b' ? { ...u, parent: 'pwu_sd' } : u))
+		);
+		expect([lopsided.value, lopsided.basis]).toEqual([
+			'broke',
+			['no work unit for Review wordfreq under Build wordfreq', 'more than one work unit for Review wordfreq under Design wordfreq']
+		]);
+	});
+
+	it('⛔ a tree whose permitted child resolves to no type: broke, saying instantiation refuses it', () => {
+		const types = AGENT_TYPES.map((t) =>
+			t.state.isRoot === true
+				? { id: t.id, state: { ...t.state, permittedChildTypeIds: [...(t.state.permittedChildTypeIds as string[]), 'pwutype_ghost'] } }
+				: t
+		);
+		const ghost = stageTwoOf(types, AGENT_UNITS);
+		expect([ghost.value, ghost.basis]).toEqual([
+			'broke',
+			['the published PWA’s tree does not resolve, wordfreq Realization → pwutype_ghost: instantiation refuses it']
+		]);
+	});
+
+	it('⭐ the CONDITIONAL children are named, never offered (REG-F-516) — and stage 2 still reads as intended', () => {
+		const extend: ObjectRow = {
+			id: 'pwutype_extend',
+			state: { pwaId: PWA_ID, name: 'Extend wordfreq', pwuKind: 'PRODUCT_IMPLEMENTATION', isRoot: false, permittedChildTypeIds: [], status: 'ACTIVE' }
+		};
+		const types = AGENT_TYPES.map((t) =>
+			t.state.isRoot === true
+				? {
+						id: t.id,
+						state: {
+							...t.state,
+							permittedChildTypeIds: [...(t.state.permittedChildTypeIds as string[]), extend.id],
+							permittedChildren: [...(t.state.permittedChildren as object[]), { typeId: extend.id, cardinality: 'C1' }]
+						}
+					}
+				: t
+		);
+		const offered = stageTwoOf([...types, extend], AGENT_UNITS);
+		expect([offered.value, offered.basis[1]]).toEqual(['as intended', '1 conditional child was never offered (REG-F-516): Extend wordfreq']);
+	});
+});
+
+describe('⭐ REG-D-112 (E3’s review, 5) — units are identified by ID: two of one title are both run, and the repeat is reported', () => {
+	// ⭐ THE PREDICTED RED: two units of one title were refused as a lane error once the PWA was published — a paid run
+	// ended `lane-error` after its authoring's spend.
+	it('⭐ a shared child’s two units of one title: the run COMPLETES, each pressed once, by its own id, and the repeat recorded', async () => {
+		const l = halfBLane({ paid: true, types: SHARED_TYPES, units: SHARED_UNITS });
+		const record = await l.run();
+		expect(record.end?.reason).toBe('complete');
+		expect(l.only('beginExecute')).toEqual(SHARED_ORDER.map(([slug]) => `beginExecute ${slug}`));
+		expect(record.units.map((u) => [u.slug, u.unitId])).toEqual(SHARED_ORDER);
+		expect(record.authoring?.unitProblems).toEqual([
+			'2 units are titled "Review wordfreq" — a type more than one parent permits is built once under each, and two types may share a name — so the lane tells them apart by id, never by the title their rows show (REG-D-112)'
+		]);
+	});
+
+	it('⭐ the report says so too — and never calls a shared child’s repeat a re-proposal', () => {
+		const r = buildRunReport(halfBStore({ types: SHARED_TYPES, units: SHARED_UNITS }), halfBLaneRows({ types: SHARED_TYPES, units: SHARED_UNITS }), {
+			accountNames: NAMES
+		}).report;
+		expect(r.problems.filter((p) => p.includes('Review wordfreq'))).toEqual([
+			'2 work units are titled "Review wordfreq", each read by its own id: a type more than one parent permits is built once under each (REG-D-112)'
+		]);
+	});
+});
+
+describe('⛔ REG-D-112 (E3’s review, 6) — the author’s model is pinned AND ENFORCED: another model, or none read, breaks stage 1', () => {
+	const stageOneOf = (author: { configured: string | null; resolved: string | null }): MatrixCell =>
+		cellOf(buildRunReport(halfBStore(), halfBLaneRows({ author }), { accountNames: NAMES }).report, '1', 'whole run');
+	const PINNED = `${AUTHOR.providerId}/${AUTHOR.modelId}`;
+
+	// ⭐ THE PREDICTED RED: a substituted author read as intended, with a warning beside it.
+	it('⭐ the turn named another model than the one pinned: stage 1 BROKE, REG-F-509, and said', () => {
+		const one = stageOneOf({ configured: PINNED, resolved: 'openai-codex/gpt-4.1' });
+		expect([one.value, one.registerIds]).toEqual(['broke', ['REG-F-509']]);
+		expect(one.basis).toContain(
+			`the author that ran, openai-codex/gpt-4.1, is not the model pinned, ${PINNED}: Pi substituted another, unannounced (REG-F-509)`
+		);
+	});
+
+	it('⭐ the turn named no model the lane could read: stage 1 BROKE — the pinned model is not shown to have authored the PWA', () => {
+		const one = stageOneOf({ configured: PINNED, resolved: null });
+		expect([one.value, one.registerIds]).toEqual(['broke', ['REG-F-509']]);
+		expect(one.basis).toContain(
+			`no producer was read from the turn’s stream, so nothing shows the pinned model, ${PINNED}, authored the PWA (REG-F-509)`
+		);
+	});
+
+	it('⭐ CONTROL — a bare id pinned, the turn naming it under its provider, is the model pinned: as intended', () => {
+		expect(stageOneOf({ configured: AUTHOR.modelId, resolved: PINNED }).value).toBe('as intended');
+	});
+});
+
+describe('⭐ REG-D-112 (E3’s review, 7) — a half-B run that never sent its request has NOT REACHED stage 1', () => {
+	const unsent = (end: string): LaneRows => {
+		const lane = halfBLaneRows();
+		return {
+			...lane,
+			run: {
+				...(lane.run as object),
+				mode: end === 'dry-run-stop' ? 'dry' : 'paid',
+				units: [],
+				end: { reason: end },
+				authoring: { pwaId: PWA_ID, sent: false, candidate: null, accept: null, authorModel: { configured: 'm', resolved: null }, checks: null }
+			}
+		};
+	};
+	const drafted = halfBStore({ publication: 'DRAFT' });
+	const store = { ...drafted, objects: drafted.objects.filter((x) => x.objectType === 'PROFESSIONAL_WORK_ARCHITECTURE') };
+
+	// ⭐ THE PREDICTED RED: the dry rehearsal's draft read as a broken authoring — a floor MISSING, no hash, a DRAFT.
+	it('⭐ the dry rehearsal stopped before Send: stage 1 NOT REACHED, saying why — never broke', () => {
+		const one = cellOf(buildRunReport(store, unsent('dry-run-stop'), { accountNames: NAMES }).report, '1', 'whole run');
+		expect([one.value, one.registerIds, one.unregistered]).toEqual(['not reached', [], undefined]);
+		expect(one.basis).toEqual([
+			'the request was never sent — the run ended dry-run-stop before Send — so no candidate was authored for the floor to judge'
+		]);
+	});
+
+	it('⭐ … and so did a paid run the limit stopped before Send', () => {
+		expect(cellOf(buildRunReport(store, unsent('paid-limit'), { accountNames: NAMES }).report, '1', 'whole run').value).toBe('not reached');
 	});
 });

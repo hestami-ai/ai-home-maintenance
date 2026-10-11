@@ -25775,19 +25775,19 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "P76R-M50-the-spec-presses-another-act-than-the-rule-s",
 		file: "apps/rph-demo/e2e-live-exec/phase7.live.ts",
-		find: "recover: (unit, act) => recover(page, unitRow(page, unit.title), act, actionFields),",
-		replace: "recover: (unit) => recover(page, unitRow(page, unit.title), 'abandonPwu', actionFields),",
+		find: "recover: (unit, act) => recover(page, unitRowById(page, unit.unitId!), act, actionFields),",
+		replace: "recover: (unit) => recover(page, unitRowById(page, unit.unitId!), 'abandonPwu', actionFields),",
 		expectRed: ["verif/phase7-live-spec.test.ts"],
-		why: "PROMISE: the spec's hand presses the act the rule chose, on the unit's own row (D5). WHO RELIES: the paid run, whose recovery is the operator's rule acted on the page. WHAT THE MUTATION DOES: every recovery act the rule asks for is pressed as Abandon. OBSERVED (bun run mutants -- P76R-M50-the-spec-presses-another-act-than-the-rule-s, 2026-10-10): KILLED         P76R-M50-the-spec-presses-another-act-than-the-rule-s ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯",
+		why: "PROMISE: the spec's hand presses the act the rule chose, on the unit's own row (D5). WHO RELIES: the paid run, whose recovery is the operator's rule acted on the page. WHAT THE MUTATION DOES: every recovery act the rule asks for is pressed as Abandon. OBSERVED (bun run mutants -- P76R-M50-the-spec-presses-another-act-than-the-rule-s, 2026-10-10): KILLED         P76R-M50-the-spec-presses-another-act-than-the-rule-s ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯ ⭐ RE-ANCHORED 2026-10-11 (JAN-EXEC Phase 7 completion programme, E3's fix round; ledger rule #5, in the commit that moved the line): the spec's hands find a unit's row by its ID (`unitRowById`), since a title may repeat in half B (REG-D-112, finding 5), so the anchor is the hand as it now reads. The promise and the mutation are unchanged: every recovery act the rule asks for is pressed as Abandon. RE-OBSERVED (bun run mutants -- the E3 fix-round ids, 2026-10-11, in the fixer's worktree, its changes staged): KILLED         P76R-M50-the-spec-presses-another-act-than-the-rule-s ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯",
 		source: "JAN-EXEC Phase 7 P7-6R R-1e and R-1f (package B6) - the five-unit rehearsal restated for the wait (K1 WAITING, the person's three choices offered, the step's own controls withheld, Abandon taking a rationale) and a five-unit recovery rehearsal (a review re-run with no executor turn, a work re-run in a fresh session, all five SATISFIED); and the paid lane's recovery by the run plan's rule, acted as the operator: re-run the review if the row offers it, else re-run the work, abandon a re-run refused again, the limit read before each re-run, each act typing the rule's rationale (docs/_working/DESIGN-the-stopped-unit-recovery.md §5, §7 items 5-6; ROADMAP-undertaking-execution-sandbox.md §9 'THE BUILD ORDER FOR P7-6 AND P7-6R'; REG-D-104 (1); REG-D-105 (1), (4))"
 	},
 	{
 		id: "P76R-M51-the-spec-reads-another-row-s-offers",
 		file: "apps/rph-demo/e2e-live-exec/phase7.live.ts",
-		find: "recoveryOffers: (unit) => recoveryOffers(unitRow(page, unit.title)),",
-		replace: "recoveryOffers: (unit) => recoveryOffers(unitRow(page, unit.slug)),",
+		find: "recoveryOffers: (unit) => recoveryOffers(unitRowById(page, unit.unitId!)),",
+		replace: "recoveryOffers: (unit) => recoveryOffers(unitRowById(page, unit.slug)),",
 		expectRed: ["verif/phase7-live-spec.test.ts"],
-		why: "PROMISE: the spec reads a stopped phase's offers off ITS OWN row, found by its title as every act's row is (D5). WHO RELIES: the rule's choice, which another row - or none - would answer. WHAT THE MUTATION DOES: the row is looked for by the unit's slug, which no row carries as its title. OBSERVED (bun run mutants -- P76R-M51-the-spec-reads-another-row-s-offers, 2026-10-10): KILLED         P76R-M51-the-spec-reads-another-row-s-offers ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯",
+		why: "PROMISE: the spec reads a stopped phase's offers off ITS OWN row, found by its title as every act's row is (D5). WHO RELIES: the rule's choice, which another row - or none - would answer. WHAT THE MUTATION DOES: the row is looked for by the unit's slug, which no row carries as its title. OBSERVED (bun run mutants -- P76R-M51-the-spec-reads-another-row-s-offers, 2026-10-10): KILLED         P76R-M51-the-spec-reads-another-row-s-offers ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯ ⭐ RE-ANCHORED 2026-10-11 (JAN-EXEC Phase 7 completion programme, E3's fix round; ledger rule #5, in the commit that moved the line): the row is found by the unit's ID now, never its title (`unitRowById`; REG-D-112, finding 5), so the anchor is the hand as it now reads. The promise is unchanged - the offers are read off the unit's own row - and the mutation the same: the row is looked for by the unit's slug, which no row carries. RE-OBSERVED (bun run mutants -- the E3 fix-round ids, 2026-10-11, in the fixer's worktree, its changes staged): KILLED         P76R-M51-the-spec-reads-another-row-s-offers ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯",
 		source: "JAN-EXEC Phase 7 P7-6R R-1e and R-1f (package B6) - the five-unit rehearsal restated for the wait (K1 WAITING, the person's three choices offered, the step's own controls withheld, Abandon taking a rationale) and a five-unit recovery rehearsal (a review re-run with no executor turn, a work re-run in a fresh session, all five SATISFIED); and the paid lane's recovery by the run plan's rule, acted as the operator: re-run the review if the row offers it, else re-run the work, abandon a re-run refused again, the limit read before each re-run, each act typing the rule's rationale (docs/_working/DESIGN-the-stopped-unit-recovery.md §5, §7 items 5-6; ROADMAP-undertaking-execution-sandbox.md §9 'THE BUILD ORDER FOR P7-6 AND P7-6R'; REG-D-104 (1); REG-D-105 (1), (4))"
 	},
 	{
@@ -26983,10 +26983,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "E3-M20-a-conditional-child-is-read-as-mandatory",
 		file: "scripts/phase7/half-b.ts",
-		find: "if (rule === undefined || mandatory(rule.cardinality)) walk(child, [...path, childId]);",
-		replace: "if (rule === undefined || rule.cardinality !== 'NEVER_A_CODE') walk(child, [...path, childId]);",
+		find: "permittedChildren: Array.isArray(t.state.permittedChildren)",
+		replace: "permittedChildren: false && Array.isArray(t.state.permittedChildren)",
 		expectRed: ["verif/phase7-half-b.test.ts"],
-		why: "PROMISE (C2; REG-F-516): the mandatory tree walks M1, M+ and rule-less children, and names the conditional ones, which instantiation offers to no one. WHO RELIES: stage 2, which holds the units to the mandatory tree and discloses the conditional children. WHAT THE MUTATION DOES: a C1 child is read as mandatory, and its missing unit as a break. OBSERVED (bun run mutants -- the E3 ids, 2026-10-11, in the builder's worktree after `bun run build`, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E3-M20-a-conditional-child-is-read-as-mandatory ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'. ⭑ First declared as the bare `walk(child, [...path, childId]);`, which left the `else` beside it dangling: the runner refused it NO_COMPILE (TS1128); the condition that always holds keeps the statement whole.",
+		why: "PROMISE (C2; REG-F-516): the mandatory tree walks M1, M+ and rule-less children, and names the conditional ones, which instantiation offers to no one. WHO RELIES: stage 2, which holds the units to the mandatory tree and discloses the conditional children. WHAT THE MUTATION DOES: a C1 child is read as mandatory, and its missing unit as a break. OBSERVED (bun run mutants -- the E3 ids, 2026-10-11, in the builder's worktree after `bun run build`, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E3-M20-a-conditional-child-is-read-as-mandatory ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'. ⭑ First declared as the bare `walk(child, [...path, childId]);`, which left the `else` beside it dangling: the runner refused it NO_COMPILE (TS1128); the condition that always holds keeps the statement whole. ⭐ RE-ANCHORED 2026-10-11 (JAN-EXEC Phase 7 completion programme, E3's fix round; ledger rule #5, in the commit that moved the line): `mandatoryTypes`' own walk is gone: stage 2 asks the product's planner (`treeAgainstPlan`, `planComposition`; REG-D-112, finding 4), so the anchor is the cardinality rules the planner is handed. The promise is unchanged; the mutation reaches it the planner's way: the rules are withheld, every permitted child reads as M1 (a child with no rule is M1), and a C1 child is planned as mandatory and named as no conditional child. RE-OBSERVED (bun run mutants -- the E3 fix-round ids, 2026-10-11, in the fixer's worktree, its changes staged): KILLED         E3-M20-a-conditional-child-is-read-as-mandatory ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯",
 		source: "JAN-EXEC Phase 7 completion programme, package E3 - half B, the authoring half: the lane's half-B mode, its units read from the published PWA, an authoring allowance and a pinned author model, the candidate checks recorded and reported, stage 1 measured; and the limit 450 (docs/_working/DESIGN-phase-7-completion.md §4 C1-C6; REG-D-109; REG-D-110 (1), (4); REG-F-503; REG-F-504; REG-F-505; REG-F-506; REG-F-507; REG-F-508; REG-F-509; REG-F-516; REG-F-524; REG-F-531)"
 	},
 	{
@@ -27073,10 +27073,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "E3-M30-a-phase-no-model-ran-reads-done",
 		file: "scripts/phase7/run-report-core.ts",
-		find: "\tv.unit.order > 1 && v.stepState === 'SUCCEEDED' && !modelRanFor(v.unit);",
-		replace: "\tv.unit.order > 99 && v.stepState === 'SUCCEEDED' && !modelRanFor(v.unit);",
+		find: "\tv.unit.order > 1 && v.leaf && v.stepState === 'SUCCEEDED' && !modelRanFor(v.unit);",
+		replace: "\tv.unit.order > 99 && v.leaf && v.stepState === 'SUCCEEDED' && !modelRanFor(v.unit);",
 		expectRed: ["verif/phase7-half-b.test.ts"],
-		why: "PROMISE (C5; REG-F-505): a phase whose step SUCCEEDED with no model run is broke at stages 3 and 7 - never the false 'Yes' a TRANSFORMATION signed off on vacuous verdicts reads as. WHO RELIES: the whole run's stage 7. WHAT THE MUTATION DOES: no phase is ever checked. OBSERVED (bun run mutants -- the E3 ids, 2026-10-11, in the builder's worktree after `bun run build`, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E3-M30-a-phase-no-model-ran-reads-done ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'.",
+		why: "PROMISE (C5; REG-F-505): a phase whose step SUCCEEDED with no model run is broke at stages 3 and 7 - never the false 'Yes' a TRANSFORMATION signed off on vacuous verdicts reads as. WHO RELIES: the whole run's stage 7. WHAT THE MUTATION DOES: no phase is ever checked. OBSERVED (bun run mutants -- the E3 ids, 2026-10-11, in the builder's worktree after `bun run build`, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E3-M30-a-phase-no-model-ran-reads-done ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'. ⭐ RE-ANCHORED 2026-10-11 (JAN-EXEC Phase 7 completion programme, E3's fix round; ledger rule #5, in the commit that moved the line): the check is scoped to model LEAVES (`v.leaf`; REG-D-112, finding 3), so the anchor is the line as it now reads. The promise and the mutation are unchanged: no phase is ever checked. RE-OBSERVED (bun run mutants -- the E3 fix-round ids, 2026-10-11, in the fixer's worktree, its changes staged): KILLED         E3-M30-a-phase-no-model-ran-reads-done ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯",
 		source: "JAN-EXEC Phase 7 completion programme, package E3 - half B, the authoring half: the lane's half-B mode, its units read from the published PWA, an authoring allowance and a pinned author model, the candidate checks recorded and reported, stage 1 measured; and the limit 450 (docs/_working/DESIGN-phase-7-completion.md §4 C1-C6; REG-D-109; REG-D-110 (1), (4); REG-F-503; REG-F-504; REG-F-505; REG-F-506; REG-F-507; REG-F-508; REG-F-509; REG-F-516; REG-F-524; REG-F-531)"
 	},
 	{
@@ -27100,10 +27100,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "E3-M33-a-mandatory-type-with-no-unit-is-no-break",
 		file: "scripts/phase7/run-report-core.ts",
-		find: "missing: mandatory.filter((t) => !typesBuilt.includes(t.id)).map((t) => str(t.state.name)),",
-		replace: "missing: mandatory.filter((t) => t.id === '').map((t) => str(t.state.name)),",
+		find: "\t\t\tmissing: plan.missing,",
+		replace: "\t\t\tmissing: plan.missing.filter(() => false),",
 		expectRed: ["verif/phase7-half-b.test.ts"],
-		why: "PROMISE (C2): stage 2 holds half B's units to the PWA's mandatory tree, naming a mandatory type with no unit. WHO RELIES: the report's stage 2. WHAT THE MUTATION DOES: a missing mandatory unit reads as intended. OBSERVED (bun run mutants -- the E3 ids, 2026-10-11, in the builder's worktree after `bun run build`, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E3-M33-a-mandatory-type-with-no-unit-is-no-break ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'.",
+		why: "PROMISE (C2): stage 2 holds half B's units to the PWA's mandatory tree, naming a mandatory type with no unit. WHO RELIES: the report's stage 2. WHAT THE MUTATION DOES: a missing mandatory unit reads as intended. OBSERVED (bun run mutants -- the E3 ids, 2026-10-11, in the builder's worktree after `bun run build`, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E3-M33-a-mandatory-type-with-no-unit-is-no-break ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'. ⭐ RE-ANCHORED 2026-10-11 (JAN-EXEC Phase 7 completion programme, E3's fix round; ledger rule #5, in the commit that moved the line): stage 2 holds the units to the plan instantiation makes, per (parent, type) (`treeAgainstPlan`; REG-D-112, finding 4), so the anchor is where the report takes the plan's missing units. The promise and the mutation are unchanged: a planned unit with none built reads as intended. RE-OBSERVED (bun run mutants -- the E3 fix-round ids, 2026-10-11, in the fixer's worktree, its changes staged): KILLED         E3-M33-a-mandatory-type-with-no-unit-is-no-break ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯",
 		source: "JAN-EXEC Phase 7 completion programme, package E3 - half B, the authoring half: the lane's half-B mode, its units read from the published PWA, an authoring allowance and a pinned author model, the candidate checks recorded and reported, stage 1 measured; and the limit 450 (docs/_working/DESIGN-phase-7-completion.md §4 C1-C6; REG-D-109; REG-D-110 (1), (4); REG-F-503; REG-F-504; REG-F-505; REG-F-506; REG-F-507; REG-F-508; REG-F-509; REG-F-516; REG-F-524; REG-F-531)"
 	},
 	{
@@ -27123,5 +27123,275 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/phase7-half-b.test.ts"],
 		why: "PROMISE (C5; REG-F-510): a half-B phase's stage 3 says its prompt is the agent's, and points at the candidate checks' record of whether it names the product - never half A's 'the prompt names the product, as §3.3 records'. WHO RELIES: the reader of the matrix's basis. WHAT THE MUTATION DOES: half B is told what only half A's hand-written prompts can claim. OBSERVED (bun run mutants -- the E3 ids, 2026-10-11, in the builder's worktree after `bun run build`, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E3-M35-half-b-s-prompts-read-as-section-3-2-s ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'.",
 		source: "JAN-EXEC Phase 7 completion programme, package E3 - half B, the authoring half: the lane's half-B mode, its units read from the published PWA, an authoring allowance and a pinned author model, the candidate checks recorded and reported, stage 1 measured; and the limit 450 (docs/_working/DESIGN-phase-7-completion.md §4 C1-C6; REG-D-109; REG-D-110 (1), (4); REG-F-503; REG-F-504; REG-F-505; REG-F-506; REG-F-507; REG-F-508; REG-F-509; REG-F-516; REG-F-524; REG-F-531)"
+	},
+	{
+		id: "E3-M36-the-authoring-is-never-archived",
+		file: "apps/rph-demo/e2e-live-exec/phase7-operator.ts",
+		find: "\t\tawait archiveAuthoring(dump);\n\t\treturn dump;",
+		replace: "\t\treturn dump; // MUTANT: the authoring's store is never archived",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (REG-D-112, finding 1): however half B's authoring ends, the store is archived into lane/archive/00-authoring before the run ends, so the run report has a store to read. WHO RELIES: the report of a run that stopped during authoring - the authoring half's own result, a candidate the floor did not assure or a refused act. WHAT THE MUTATION DOES: nothing is archived, so such a run leaves no store and the run report refuses it, 'no archive under lane/archive holds a demo.sqlite' - the predicted red. OBSERVED (bun run mutants -- the E3 fix-round ids, 2026-10-11, in the fixer's worktree, its changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E3-M36-the-authoring-is-never-archived ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯'.",
+		source: "JAN-EXEC Phase 7 completion programme, package E3's fix round - the review's eight findings on half B (REG-D-112): every authoring end archived, and the run report reading it; the limit before Send and before a model root's press; REG-F-505 held to model leaves; stage 2 per (parent, type), as instantiation plans it; units told apart by id; the author's pin enforced; a request never sent not reached; the author read from the turn's own stream (docs/_working/DESIGN-phase-7-completion.md §4 C1-C6; REG-D-110 (1), (4); REG-D-112; REG-F-505; REG-F-509; REG-F-516; REG-F-531)"
+	},
+	{
+		id: "E3-M37-a-throw-mid-authoring-is-not-archived",
+		file: "apps/rph-demo/e2e-live-exec/phase7-operator.ts",
+		find: "\t\tawait archived().catch((failed: unknown) =>",
+		replace: "\t\tawait Promise.resolve().catch((failed: unknown) =>",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (REG-D-112, finding 1): a throw mid-authoring is archived too, as far as it can be, and the run still ends lane-error in the throw's own words. WHO RELIES: the report of a run a lost page ended during authoring. WHAT THE MUTATION DOES: the throw's path archives nothing. OBSERVED (bun run mutants -- the E3 fix-round ids, 2026-10-11, in the fixer's worktree, its changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E3-M37-a-throw-mid-authoring-is-not-archived ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'.",
+		source: "JAN-EXEC Phase 7 completion programme, package E3's fix round - the review's eight findings on half B (REG-D-112): every authoring end archived, and the run report reading it; the limit before Send and before a model root's press; REG-F-505 held to model leaves; stage 2 per (parent, type), as instantiation plans it; units told apart by id; the author's pin enforced; a request never sent not reached; the author read from the turn's own stream (docs/_working/DESIGN-phase-7-completion.md §4 C1-C6; REG-D-110 (1), (4); REG-D-112; REG-F-505; REG-F-509; REG-F-516; REG-F-531)"
+	},
+	{
+		id: "E3-M38-an-authoring-allowance-is-reported-as-a-unit-s",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "endReason === 'allowance-exceeded' && views.length > 0 &&",
+		replace: "endReason === 'allowance-exceeded' && views.length >= 0 &&",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (REG-D-112, finding 1): the report of a half-B run whose AUTHORING turn outlasted its allowance does not say that the run names no unit whose Begin & Execute outlasted its own - that end is the turn's, and the run has no unit. WHO RELIES: the reader of the report read from 00-authoring. WHAT THE MUTATION DOES: the false problem line returns. OBSERVED (bun run mutants -- the E3 fix-round ids, 2026-10-11, in the fixer's worktree, its changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E3-M38-an-authoring-allowance-is-reported-as-a-unit-s ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'.",
+		source: "JAN-EXEC Phase 7 completion programme, package E3's fix round - the review's eight findings on half B (REG-D-112): every authoring end archived, and the run report reading it; the limit before Send and before a model root's press; REG-F-505 held to model leaves; stage 2 per (parent, type), as instantiation plans it; units told apart by id; the author's pin enforced; a request never sent not reached; the author read from the turn's own stream (docs/_working/DESIGN-phase-7-completion.md §4 C1-C6; REG-D-110 (1), (4); REG-D-112; REG-F-505; REG-F-509; REG-F-516; REG-F-531)"
+	},
+	{
+		id: "E3-M39-the-authoring-archive-keeps-no-record-store",
+		file: "scripts/phase7/run-archive.ts",
+		find: "\t\tawait archiveStore(RECORD_STORE, r.storePath, archiveDir),",
+		replace: "\t\tawait archiveStore(RECORD_STORE, `${r.storePath}.absent`, archiveDir),",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (REG-D-112, finding 1): the authoring archive holds the record store, backed up and converted to a rollback journal - the store the run report reads. WHO RELIES: the report of a run that stopped during authoring. WHAT THE MUTATION DOES: the record store is sought where none is and recorded absent, so the archive holds no store to read. OBSERVED (bun run mutants -- the E3 fix-round ids, 2026-10-11, in the fixer's worktree, its changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E3-M39-the-authoring-archive-keeps-no-record-store ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'.",
+		source: "JAN-EXEC Phase 7 completion programme, package E3's fix round - the review's eight findings on half B (REG-D-112): every authoring end archived, and the run report reading it; the limit before Send and before a model root's press; REG-F-505 held to model leaves; stage 2 per (parent, type), as instantiation plans it; units told apart by id; the author's pin enforced; a request never sent not reached; the author read from the turn's own stream (docs/_working/DESIGN-phase-7-completion.md §4 C1-C6; REG-D-110 (1), (4); REG-D-112; REG-F-505; REG-F-509; REG-F-516; REG-F-531)"
+	},
+	{
+		id: "E3-M40-half-b-sends-past-the-limit",
+		file: "apps/rph-demo/e2e-live-exec/phase7-operator.ts",
+		find: "\tif (!authoring.limitCheck.allowed)",
+		replace: "\tif (!authoring.limitCheck.allowed && authoring.polls < 0)",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (REG-D-112, finding 2): past the limit, the authoring floor's worst case counted, half B refuses BEFORE SEND - nothing sent, the run ends paid-limit. WHO RELIES: the sponsor's limit (REG-D-110 (1)), which the lane first asked before the first PHASE, after the authoring floor's reviews were spent. WHAT THE MUTATION DOES: the check is recorded and ignored, and Send is pressed - the predicted red. OBSERVED (bun run mutants -- the E3 fix-round ids, 2026-10-11, in the fixer's worktree, its changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E3-M40-half-b-sends-past-the-limit ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'.",
+		source: "JAN-EXEC Phase 7 completion programme, package E3's fix round - the review's eight findings on half B (REG-D-112): every authoring end archived, and the run report reading it; the limit before Send and before a model root's press; REG-F-505 held to model leaves; stage 2 per (parent, type), as instantiation plans it; units told apart by id; the author's pin enforced; a request never sent not reached; the author read from the turn's own stream (docs/_working/DESIGN-phase-7-completion.md §4 C1-C6; REG-D-110 (1), (4); REG-D-112; REG-F-505; REG-F-509; REG-F-516; REG-F-531)"
+	},
+	{
+		id: "E3-M41-the-limit-before-send-counts-no-authoring",
+		file: "apps/rph-demo/e2e-live-exec/phase7-operator.ts",
+		find: "recordedReviewerCalls(before), PHASE7_AUTHORING_REVIEWER_CALLS);",
+		replace: "recordedReviewerCalls(before), 0);",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (REG-D-112, finding 2): the check before Send counts the authoring floor's worst case, two floor runs' reviews. WHO RELIES: the limit. WHAT THE MUTATION DOES: none is counted, so a run with fewer calls left than the floor may spend sends its request. OBSERVED (bun run mutants -- the E3 fix-round ids, 2026-10-11, in the fixer's worktree, its changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E3-M41-the-limit-before-send-counts-no-authoring ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'.",
+		source: "JAN-EXEC Phase 7 completion programme, package E3's fix round - the review's eight findings on half B (REG-D-112): every authoring end archived, and the run report reading it; the limit before Send and before a model root's press; REG-F-505 held to model leaves; stage 2 per (parent, type), as instantiation plans it; units told apart by id; the author's pin enforced; a request never sent not reached; the author read from the turn's own stream (docs/_working/DESIGN-phase-7-completion.md §4 C1-C6; REG-D-110 (1), (4); REG-D-112; REG-F-505; REG-F-509; REG-F-516; REG-F-531)"
+	},
+	{
+		id: "E3-M42-a-worst-case-that-fits-exactly-is-refused",
+		file: "apps/rph-demo/e2e-live-exec/phase7-operator.ts",
+		find: "allowed: total <= spent.limit",
+		replace: "allowed: total < spent.limit",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (REG-D-112, finding 2): an act whose worst case fits the limit EXACTLY may spend all of it - the limit is a ceiling. WHO RELIES: a run near the limit, which the phase rule's '<' would refuse a call early. WHAT THE MUTATION DOES: the boundary moves by one, and the CONTROL - exactly the authoring's worst case left - is refused. OBSERVED (bun run mutants -- the E3 fix-round ids, 2026-10-11, in the fixer's worktree, its changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E3-M42-a-worst-case-that-fits-exactly-is-refused ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'.",
+		source: "JAN-EXEC Phase 7 completion programme, package E3's fix round - the review's eight findings on half B (REG-D-112): every authoring end archived, and the run report reading it; the limit before Send and before a model root's press; REG-F-505 held to model leaves; stage 2 per (parent, type), as instantiation plans it; units told apart by id; the author's pin enforced; a request never sent not reached; the author read from the turn's own stream (docs/_working/DESIGN-phase-7-completion.md §4 C1-C6; REG-D-110 (1), (4); REG-D-112; REG-F-505; REG-F-509; REG-F-516; REG-F-531)"
+	},
+	{
+		id: "E3-M43-a-worst-case-one-past-the-limit-is-allowed",
+		file: "apps/rph-demo/e2e-live-exec/phase7-operator.ts",
+		find: "allowed: total <= spent.limit",
+		replace: "allowed: total <= spent.limit + 1",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (REG-D-112, finding 2): a worst case one call past the limit is refused. WHO RELIES: the limit. WHAT THE MUTATION DOES: the boundary moves the other way, and the predicted red - one call past - sends its request. OBSERVED (bun run mutants -- the E3 fix-round ids, 2026-10-11, in the fixer's worktree, its changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E3-M43-a-worst-case-one-past-the-limit-is-allowed ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'.",
+		source: "JAN-EXEC Phase 7 completion programme, package E3's fix round - the review's eight findings on half B (REG-D-112): every authoring end archived, and the run report reading it; the limit before Send and before a model root's press; REG-F-505 held to model leaves; stage 2 per (parent, type), as instantiation plans it; units told apart by id; the author's pin enforced; a request never sent not reached; the author read from the turn's own stream (docs/_working/DESIGN-phase-7-completion.md §4 C1-C6; REG-D-110 (1), (4); REG-D-112; REG-F-505; REG-F-509; REG-F-516; REG-F-531)"
+	},
+	{
+		id: "E3-M44-a-model-root-s-worst-case-is-not-counted",
+		file: "apps/rph-demo/e2e-live-exec/phase7-operator.ts",
+		find: "dischargeOf(snap, rootId) === 'MODEL' ? PHASE7_UNIT_REVIEWER_CALLS : 0",
+		replace: "dischargeOf(snap, rootId) === 'MODEL' ? 0 : 0",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (REG-D-112, finding 2): before the agent's root is pressed, a MODEL root's worst case is counted - §3.2's root runs no model, the agent's may. WHO RELIES: the limit. WHAT THE MUTATION DOES: it is never counted, and a MODEL root is pressed with too few calls left. OBSERVED (bun run mutants -- the E3 fix-round ids, 2026-10-11, in the fixer's worktree, its changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E3-M44-a-model-root-s-worst-case-is-not-counted ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'.",
+		source: "JAN-EXEC Phase 7 completion programme, package E3's fix round - the review's eight findings on half B (REG-D-112): every authoring end archived, and the run report reading it; the limit before Send and before a model root's press; REG-F-505 held to model leaves; stage 2 per (parent, type), as instantiation plans it; units told apart by id; the author's pin enforced; a request never sent not reached; the author read from the turn's own stream (docs/_working/DESIGN-phase-7-completion.md §4 C1-C6; REG-D-110 (1), (4); REG-D-112; REG-F-505; REG-F-509; REG-F-516; REG-F-531)"
+	},
+	{
+		id: "E3-M45-the-root-is-pressed-past-the-limit",
+		file: "apps/rph-demo/e2e-live-exec/phase7-operator.ts",
+		find: "\t\t\tif (!rootCheck.allowed)",
+		replace: "\t\t\tif (!rootCheck.allowed && rootCheck.ahead < 0)",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (REG-D-112, finding 2): past the limit the agent's root is never pressed, and the run ends paid-limit. WHO RELIES: the limit. WHAT THE MUTATION DOES: the check is recorded and ignored, and the root is pressed. OBSERVED (bun run mutants -- the E3 fix-round ids, 2026-10-11, in the fixer's worktree, its changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E3-M45-the-root-is-pressed-past-the-limit ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'.",
+		source: "JAN-EXEC Phase 7 completion programme, package E3's fix round - the review's eight findings on half B (REG-D-112): every authoring end archived, and the run report reading it; the limit before Send and before a model root's press; REG-F-505 held to model leaves; stage 2 per (parent, type), as instantiation plans it; units told apart by id; the author's pin enforced; a request never sent not reached; the author read from the turn's own stream (docs/_working/DESIGN-phase-7-completion.md §4 C1-C6; REG-D-110 (1), (4); REG-D-112; REG-F-505; REG-F-509; REG-F-516; REG-F-531)"
+	},
+	{
+		id: "E3-M46-a-unit-s-worst-case-counts-no-command-review",
+		file: "apps/rph-demo/e2e-live-exec/lane-config.ts",
+		find: "\t(LANE_BUDGET.tries + PHASE7_REVIEWED_COMMANDS) * LANE_BUDGET.reviewerCallsPerTry;",
+		replace: "\tLANE_BUDGET.tries * LANE_BUDGET.reviewerCallsPerTry;",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (REG-D-112, finding 2): a model unit's worst case counts the review of each command reviewed, as its allowance counts them - (3 + 32) x 4 = 140. WHO RELIES: the check before a MODEL root's press. WHAT THE MUTATION DOES: the commands' reviews are counted nowhere - 12 - and the root is pressed with too few calls left. OBSERVED (bun run mutants -- the E3 fix-round ids, 2026-10-11, in the fixer's worktree, its changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E3-M46-a-unit-s-worst-case-counts-no-command-review ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'.",
+		source: "JAN-EXEC Phase 7 completion programme, package E3's fix round - the review's eight findings on half B (REG-D-112): every authoring end archived, and the run report reading it; the limit before Send and before a model root's press; REG-F-505 held to model leaves; stage 2 per (parent, type), as instantiation plans it; units told apart by id; the author's pin enforced; a request never sent not reached; the author read from the turn's own stream (docs/_working/DESIGN-phase-7-completion.md §4 C1-C6; REG-D-110 (1), (4); REG-D-112; REG-F-505; REG-F-509; REG-F-516; REG-F-531)"
+	},
+	{
+		id: "E3-M47-the-authoring-worst-case-counts-one-floor-run",
+		file: "apps/rph-demo/e2e-live-exec/lane-config.ts",
+		find: "export const PHASE7_AUTHORING_REVIEWER_CALLS = PHASE7_AUTHORING_FLOOR_RUNS * LANE_BUDGET.reviewerCallsPerTry;",
+		replace: "export const PHASE7_AUTHORING_REVIEWER_CALLS = LANE_BUDGET.reviewerCallsPerTry;",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (REG-D-112, finding 2): the authoring's worst case is both floor runs' reviews - the floor, and the one auto-refinement pass the agent route may make. WHO RELIES: the check before Send. WHAT THE MUTATION DOES: one floor run is counted. OBSERVED (bun run mutants -- the E3 fix-round ids, 2026-10-11, in the fixer's worktree, its changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E3-M47-the-authoring-worst-case-counts-one-floor-run ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'.",
+		source: "JAN-EXEC Phase 7 completion programme, package E3's fix round - the review's eight findings on half B (REG-D-112): every authoring end archived, and the run report reading it; the limit before Send and before a model root's press; REG-F-505 held to model leaves; stage 2 per (parent, type), as instantiation plans it; units told apart by id; the author's pin enforced; a request never sent not reached; the author read from the turn's own stream (docs/_working/DESIGN-phase-7-completion.md §4 C1-C6; REG-D-110 (1), (4); REG-D-112; REG-F-505; REG-F-509; REG-F-516; REG-F-531)"
+	},
+	{
+		id: "E3-M48-every-unit-reads-as-a-model-leaf",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "\treturn !strs(type.state.permittedChildTypeIds).some((id) => {",
+		replace: "\treturn !strs([]).some((id) => {",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (REG-D-112, finding 3): a composite of the tree - a type that permits children of its PWA - is no model leaf, as C4's model-leaf check reads it. WHO RELIES: stages 3 and 7 of a three-level tree. WHAT THE MUTATION DOES: every unit is a leaf, so the composites, which run no model by design, read as REG-F-505 - the predicted red. OBSERVED (bun run mutants -- the E3 fix-round ids, 2026-10-11, in the fixer's worktree, its changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E3-M48-every-unit-reads-as-a-model-leaf ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'.",
+		source: "JAN-EXEC Phase 7 completion programme, package E3's fix round - the review's eight findings on half B (REG-D-112): every authoring end archived, and the run report reading it; the limit before Send and before a model root's press; REG-F-505 held to model leaves; stage 2 per (parent, type), as instantiation plans it; units told apart by id; the author's pin enforced; a request never sent not reached; the author read from the turn's own stream (docs/_working/DESIGN-phase-7-completion.md §4 C1-C6; REG-D-110 (1), (4); REG-D-112; REG-F-505; REG-F-509; REG-F-516; REG-F-531)"
+	},
+	{
+		id: "E3-M49-a-composite-s-stage-3-reads-as-a-missing-try",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "\tif (compositeDone(v))\n\t\treturn cell('3', row, 'as intended', [], [",
+		replace: "\tif (compositeDone(v) && u.tries.length < 0)\n\t\treturn cell('3', row, 'as intended', [], [",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (REG-D-112, finding 3): a composite's stage 3 reads as intended - its work is its children's, and its press completed its step. WHO RELIES: a three-level tree's matrix. WHAT THE MUTATION DOES: the arm is never taken, and the composite's stage 3 falls to 'no try recorded' (REG-F-511). OBSERVED (bun run mutants -- the E3 fix-round ids, 2026-10-11, in the fixer's worktree, its changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E3-M49-a-composite-s-stage-3-reads-as-a-missing-try ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'.",
+		source: "JAN-EXEC Phase 7 completion programme, package E3's fix round - the review's eight findings on half B (REG-D-112): every authoring end archived, and the run report reading it; the limit before Send and before a model root's press; REG-F-505 held to model leaves; stage 2 per (parent, type), as instantiation plans it; units told apart by id; the author's pin enforced; a request never sent not reached; the author read from the turn's own stream (docs/_working/DESIGN-phase-7-completion.md §4 C1-C6; REG-D-110 (1), (4); REG-D-112; REG-F-505; REG-F-509; REG-F-516; REG-F-531)"
+	},
+	{
+		id: "E3-M50-a-shared-child-is-matched-by-type-alone",
+		file: "scripts/phase7/half-b.ts",
+		find: "&& parentOf(u) === (parent?.id ?? null)",
+		replace: "&& (parent === null || parent !== null)",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (REG-D-112, finding 4): each planned unit is matched to a unit of its type UNDER THE UNIT MATCHED TO ITS PARENT. WHO RELIES: stage 2 of a tree whose child type two parents share. WHAT THE MUTATION DOES: units are matched by type alone, so two reviews under one parent and none under the other read as complete - one parent's missing unit hidden by the other's duplicate, the general form of the finding. OBSERVED (bun run mutants -- the E3 fix-round ids, 2026-10-11, in the fixer's worktree, its changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E3-M50-a-shared-child-is-matched-by-type-alone ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'.",
+		source: "JAN-EXEC Phase 7 completion programme, package E3's fix round - the review's eight findings on half B (REG-D-112): every authoring end archived, and the run report reading it; the limit before Send and before a model root's press; REG-F-505 held to model leaves; stage 2 per (parent, type), as instantiation plans it; units told apart by id; the author's pin enforced; a request never sent not reached; the author read from the turn's own stream (docs/_working/DESIGN-phase-7-completion.md §4 C1-C6; REG-D-110 (1), (4); REG-D-112; REG-F-505; REG-F-509; REG-F-516; REG-F-531)"
+	},
+	{
+		id: "E3-M51-a-second-unit-under-one-parent-is-no-duplicate",
+		file: "scripts/phase7/half-b.ts",
+		find: "\t\tif (plannedFor(u))\n",
+		replace: "\t\tif (plannedFor(u) && u.id === '')\n",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (REG-D-112, finding 4): a second unit of a planned (parent, type) is a duplicate, named with its parent. WHO RELIES: stage 2. WHAT THE MUTATION DOES: it is never one, and reads as a unit out of the plan. OBSERVED (bun run mutants -- the E3 fix-round ids, 2026-10-11, in the fixer's worktree, its changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E3-M51-a-second-unit-under-one-parent-is-no-duplicate ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'.",
+		source: "JAN-EXEC Phase 7 completion programme, package E3's fix round - the review's eight findings on half B (REG-D-112): every authoring end archived, and the run report reading it; the limit before Send and before a model root's press; REG-F-505 held to model leaves; stage 2 per (parent, type), as instantiation plans it; units told apart by id; the author's pin enforced; a request never sent not reached; the author read from the turn's own stream (docs/_working/DESIGN-phase-7-completion.md §4 C1-C6; REG-D-110 (1), (4); REG-D-112; REG-F-505; REG-F-509; REG-F-516; REG-F-531)"
+	},
+	{
+		id: "E3-M52-an-orphan-is-read-as-a-unit-out-of-the-plan",
+		file: "scripts/phase7/half-b.ts",
+		find: "else if (parent === null || !ids.has(parent)) orphaned.push(u.id);",
+		replace: "else if (parent === null) orphaned.push(u.id);",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (REG-D-112, finding 4): a unit whose parent is no unit of the Undertaking is an orphan. WHO RELIES: stage 2. WHAT THE MUTATION DOES: it reads as a unit the plan does not make, under a parent that does not exist. OBSERVED (bun run mutants -- the E3 fix-round ids, 2026-10-11, in the fixer's worktree, its changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E3-M52-an-orphan-is-read-as-a-unit-out-of-the-plan ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'.",
+		source: "JAN-EXEC Phase 7 completion programme, package E3's fix round - the review's eight findings on half B (REG-D-112): every authoring end archived, and the run report reading it; the limit before Send and before a model root's press; REG-F-505 held to model leaves; stage 2 per (parent, type), as instantiation plans it; units told apart by id; the author's pin enforced; a request never sent not reached; the author read from the turn's own stream (docs/_working/DESIGN-phase-7-completion.md §4 C1-C6; REG-D-110 (1), (4); REG-D-112; REG-F-505; REG-F-509; REG-F-516; REG-F-531)"
+	},
+	{
+		id: "E3-M53-a-unit-the-plan-does-not-make-passes",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "\t\t...(halfB?.unplanned ?? []).map(",
+		replace: "\t\t...(halfB?.unplanned ?? []).filter(() => false).map(",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (REG-D-112, finding 4): a unit the plan does not put under its parent breaks stage 2, named. WHO RELIES: stage 2. WHAT THE MUTATION DOES: it is never said, and stage 2 reads as intended. OBSERVED (bun run mutants -- the E3 fix-round ids, 2026-10-11, in the fixer's worktree, its changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E3-M53-a-unit-the-plan-does-not-make-passes ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'.",
+		source: "JAN-EXEC Phase 7 completion programme, package E3's fix round - the review's eight findings on half B (REG-D-112): every authoring end archived, and the run report reading it; the limit before Send and before a model root's press; REG-F-505 held to model leaves; stage 2 per (parent, type), as instantiation plans it; units told apart by id; the author's pin enforced; a request never sent not reached; the author read from the turn's own stream (docs/_working/DESIGN-phase-7-completion.md §4 C1-C6; REG-D-110 (1), (4); REG-D-112; REG-F-505; REG-F-509; REG-F-516; REG-F-531)"
+	},
+	{
+		id: "E3-M54-an-unresolved-tree-passes",
+		file: "scripts/phase7/half-b.ts",
+		find: "unresolved: plan.unresolved.map((u) =>",
+		replace: "unresolved: plan.unresolved.filter(() => false).map((u) =>",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (REG-D-112, finding 4): a permitted child the plan cannot resolve is said - instantiation refuses such a PWA. WHO RELIES: stage 2. WHAT THE MUTATION DOES: it is never said. OBSERVED (bun run mutants -- the E3 fix-round ids, 2026-10-11, in the fixer's worktree, its changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E3-M54-an-unresolved-tree-passes   ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'.",
+		source: "JAN-EXEC Phase 7 completion programme, package E3's fix round - the review's eight findings on half B (REG-D-112): every authoring end archived, and the run report reading it; the limit before Send and before a model root's press; REG-F-505 held to model leaves; stage 2 per (parent, type), as instantiation plans it; units told apart by id; the author's pin enforced; a request never sent not reached; the author read from the turn's own stream (docs/_working/DESIGN-phase-7-completion.md §4 C1-C6; REG-D-110 (1), (4); REG-D-112; REG-F-505; REG-F-509; REG-F-516; REG-F-531)"
+	},
+	{
+		id: "E3-M55-a-repeated-title-is-not-reported",
+		file: "apps/rph-demo/e2e-live-exec/phase7-operator.ts",
+		find: "problems: [...tree.problems, ...repeated] };",
+		replace: "problems: [...tree.problems, ...repeated.slice(repeated.length)] };",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (REG-D-112, finding 5): each title more than one unit bears is reported, the lane telling the units apart by id. WHO RELIES: the reader of lane/run.json, whose overview rows read alike. WHAT THE MUTATION DOES: never reported. OBSERVED (bun run mutants -- the E3 fix-round ids, 2026-10-11, in the fixer's worktree, its changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E3-M55-a-repeated-title-is-not-reported ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'.",
+		source: "JAN-EXEC Phase 7 completion programme, package E3's fix round - the review's eight findings on half B (REG-D-112): every authoring end archived, and the run report reading it; the limit before Send and before a model root's press; REG-F-505 held to model leaves; stage 2 per (parent, type), as instantiation plans it; units told apart by id; the author's pin enforced; a request never sent not reached; the author read from the turn's own stream (docs/_working/DESIGN-phase-7-completion.md §4 C1-C6; REG-D-110 (1), (4); REG-D-112; REG-F-505; REG-F-509; REG-F-516; REG-F-531)"
+	},
+	{
+		id: "E3-M56-the-lane-reads-a-unit-by-its-title",
+		file: "apps/rph-demo/e2e-live-exec/phase7-operator.ts",
+		find: "\t\tunitId: units[i]!.unitId\n",
+		replace: "\t\tunitId: units.find((t) => t.title === u.title)!.unitId\n",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (REG-D-112, finding 5): each unit of the record is the store's unit BY ID from the moment it is read. WHO RELIES: every act on a unit. WHAT THE MUTATION DOES: units are looked up by title, so two of one title are both the first - one pressed twice, the other never. OBSERVED (bun run mutants -- the E3 fix-round ids, 2026-10-11, in the fixer's worktree, its changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E3-M56-the-lane-reads-a-unit-by-its-title ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'.",
+		source: "JAN-EXEC Phase 7 completion programme, package E3's fix round - the review's eight findings on half B (REG-D-112): every authoring end archived, and the run report reading it; the limit before Send and before a model root's press; REG-F-505 held to model leaves; stage 2 per (parent, type), as instantiation plans it; units told apart by id; the author's pin enforced; a request never sent not reached; the author read from the turn's own stream (docs/_working/DESIGN-phase-7-completion.md §4 C1-C6; REG-D-110 (1), (4); REG-D-112; REG-F-505; REG-F-509; REG-F-516; REG-F-531)"
+	},
+	{
+		id: "E3-M57-the-report-calls-a-shared-title-a-re-proposal",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "if (candidates.length > 1 && spec.unitId === undefined)",
+		replace: "if (candidates.length > 1)",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (REG-D-112, finding 5): a repeated title is a re-proposal only where units are found by title (half A); half B's are read by id. WHO RELIES: the report's problems. WHAT THE MUTATION DOES: a shared child's two units read as a re-proposal. OBSERVED (bun run mutants -- the E3 fix-round ids, 2026-10-11, in the fixer's worktree, its changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E3-M57-the-report-calls-a-shared-title-a-re-proposal ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'.",
+		source: "JAN-EXEC Phase 7 completion programme, package E3's fix round - the review's eight findings on half B (REG-D-112): every authoring end archived, and the run report reading it; the limit before Send and before a model root's press; REG-F-505 held to model leaves; stage 2 per (parent, type), as instantiation plans it; units told apart by id; the author's pin enforced; a request never sent not reached; the author read from the turn's own stream (docs/_working/DESIGN-phase-7-completion.md §4 C1-C6; REG-D-110 (1), (4); REG-D-112; REG-F-505; REG-F-509; REG-F-516; REG-F-531)"
+	},
+	{
+		id: "E3-M58-the-report-says-nothing-of-a-repeated-title",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "for (const title of new Set(titles.filter((t, i) => titles.indexOf(t) !== i)))",
+		replace: "for (const title of new Set(titles.filter((t, i) => titles.indexOf(t) !== i && i < 0)))",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (REG-D-112, finding 5): the report says which titles more than one unit bears, each unit read by its own id. WHO RELIES: the report's reader. WHAT THE MUTATION DOES: it says nothing. OBSERVED (bun run mutants -- the E3 fix-round ids, 2026-10-11, in the fixer's worktree, its changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E3-M58-the-report-says-nothing-of-a-repeated-title ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'.",
+		source: "JAN-EXEC Phase 7 completion programme, package E3's fix round - the review's eight findings on half B (REG-D-112): every authoring end archived, and the run report reading it; the limit before Send and before a model root's press; REG-F-505 held to model leaves; stage 2 per (parent, type), as instantiation plans it; units told apart by id; the author's pin enforced; a request never sent not reached; the author read from the turn's own stream (docs/_working/DESIGN-phase-7-completion.md §4 C1-C6; REG-D-110 (1), (4); REG-D-112; REG-F-505; REG-F-509; REG-F-516; REG-F-531)"
+	},
+	{
+		id: "E3-M59-the-spec-presses-a-row-by-its-title",
+		file: "apps/rph-demo/e2e-live-exec/phase7.live.ts",
+		find: "beginExecute: (unit) => beginExecute(page, unitRowById(page, unit.unitId!), actionFields),",
+		replace: "beginExecute: (unit) => beginExecute(page, unitRowById(page, unit.title), actionFields),",
+		expectRed: ["verif/phase7-live-spec.test.ts"],
+		why: "PROMISE (REG-D-112, finding 5): the spec presses Begin & Execute on the unit's row found BY ITS ID. WHO RELIES: a paid run whose PWA gives two units one title. WHAT THE MUTATION DOES: the row is sought by the title, which no row carries as its id. OBSERVED (bun run mutants -- the E3 fix-round ids, 2026-10-11, in the fixer's worktree, its changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E3-M59-the-spec-presses-a-row-by-its-title ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'.",
+		source: "JAN-EXEC Phase 7 completion programme, package E3's fix round - the review's eight findings on half B (REG-D-112): every authoring end archived, and the run report reading it; the limit before Send and before a model root's press; REG-F-505 held to model leaves; stage 2 per (parent, type), as instantiation plans it; units told apart by id; the author's pin enforced; a request never sent not reached; the author read from the turn's own stream (docs/_working/DESIGN-phase-7-completion.md §4 C1-C6; REG-D-110 (1), (4); REG-D-112; REG-F-505; REG-F-509; REG-F-516; REG-F-531)"
+	},
+	{
+		id: "E3-M60-the-overview-row-names-no-unit",
+		file: "apps/rph-demo/src/routes/undertakings/[id]/+page.svelte",
+		find: "<tr data-pwu-id={p.id}>",
+		replace: "<tr data-pwu-id={p.title}>",
+		expectRed: ["apps/rph-demo/e2e/phase7-half-b.e2e.ts"],
+		why: "PROMISE (REG-D-112, finding 5): the Undertaking overview's row carries its unit's ID, by which the lane finds it. WHO RELIES: every act the lane makes on a unit (`unitRowById`). WHAT THE MUTATION DOES: the row carries its title, so no row is found by any unit's id - the gate's rehearsal of half B, on the real page. OBSERVED (bun run mutants -- the E3 fix-round ids, 2026-10-11, in the fixer's worktree, its changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E3-M60-the-overview-row-names-no-unit'. ⭑ A Playwright victim's verdict line carries no failed-test count; the runner's timeout check (measured.ts) found none in its output - the run's summary read INCONCLUSIVE 0.",
+		source: "JAN-EXEC Phase 7 completion programme, package E3's fix round - the review's eight findings on half B (REG-D-112): every authoring end archived, and the run report reading it; the limit before Send and before a model root's press; REG-F-505 held to model leaves; stage 2 per (parent, type), as instantiation plans it; units told apart by id; the author's pin enforced; a request never sent not reached; the author read from the turn's own stream (docs/_working/DESIGN-phase-7-completion.md §4 C1-C6; REG-D-110 (1), (4); REG-D-112; REG-F-505; REG-F-509; REG-F-516; REG-F-531)"
+	},
+	{
+		id: "E3-M61-a-substituted-author-reads-as-intended",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "if (resolved !== null && (resolved === configured || resolved.endsWith(`/${configured}`)))",
+		replace: "if (resolved !== null)",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (REG-D-112, finding 6): the author's model is pinned AND enforced - a turn that named another model than JPWB_AGENT_MODEL pinned breaks stage 1 (REG-F-509). WHO RELIES: the answer that the agent authored the PWA as asked. WHAT THE MUTATION DOES: any model read passes - the predicted red, a substitution read as intended. OBSERVED (bun run mutants -- the E3 fix-round ids, 2026-10-11, in the fixer's worktree, its changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E3-M61-a-substituted-author-reads-as-intended ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'.",
+		source: "JAN-EXEC Phase 7 completion programme, package E3's fix round - the review's eight findings on half B (REG-D-112): every authoring end archived, and the run report reading it; the limit before Send and before a model root's press; REG-F-505 held to model leaves; stage 2 per (parent, type), as instantiation plans it; units told apart by id; the author's pin enforced; a request never sent not reached; the author read from the turn's own stream (docs/_working/DESIGN-phase-7-completion.md §4 C1-C6; REG-D-110 (1), (4); REG-D-112; REG-F-505; REG-F-509; REG-F-516; REG-F-531)"
+	},
+	{
+		id: "E3-M62-an-unread-author-reads-as-intended",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "if (resolved !== null && (resolved === configured || resolved.endsWith(`/${configured}`)))",
+		replace: "if (resolved === null || resolved === configured || resolved.endsWith(`/${configured}`))",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (REG-D-112, finding 6): a turn whose producer the lane could not read breaks stage 1 - nothing shows the pinned model authored the PWA. WHO RELIES: stage 1. WHAT THE MUTATION DOES: an unread author passes. OBSERVED (bun run mutants -- the E3 fix-round ids, 2026-10-11, in the fixer's worktree, its changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E3-M62-an-unread-author-reads-as-intended ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'.",
+		source: "JAN-EXEC Phase 7 completion programme, package E3's fix round - the review's eight findings on half B (REG-D-112): every authoring end archived, and the run report reading it; the limit before Send and before a model root's press; REG-F-505 held to model leaves; stage 2 per (parent, type), as instantiation plans it; units told apart by id; the author's pin enforced; a request never sent not reached; the author read from the turn's own stream (docs/_working/DESIGN-phase-7-completion.md §4 C1-C6; REG-D-110 (1), (4); REG-D-112; REG-F-505; REG-F-509; REG-F-516; REG-F-531)"
+	},
+	{
+		id: "E3-M63-an-author-s-fault-names-no-register-entry",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "\t\tregisterIds: ['REG-F-509']\n\t};\n}",
+		replace: "\t\tregisterIds: []\n\t};\n}",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (REG-D-112, finding 6): an author's fault is stated with the entry it is filed under, REG-F-509 - never an unregistered break. WHO RELIES: P7-5, which reports each break with its register id. WHAT THE MUTATION DOES: it names none. OBSERVED (bun run mutants -- the E3 fix-round ids, 2026-10-11, in the fixer's worktree, its changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E3-M63-an-author-s-fault-names-no-register-entry ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'.",
+		source: "JAN-EXEC Phase 7 completion programme, package E3's fix round - the review's eight findings on half B (REG-D-112): every authoring end archived, and the run report reading it; the limit before Send and before a model root's press; REG-F-505 held to model leaves; stage 2 per (parent, type), as instantiation plans it; units told apart by id; the author's pin enforced; a request never sent not reached; the author read from the turn's own stream (docs/_working/DESIGN-phase-7-completion.md §4 C1-C6; REG-D-110 (1), (4); REG-D-112; REG-F-505; REG-F-509; REG-F-516; REG-F-531)"
+	},
+	{
+		id: "E3-M64-a-request-never-sent-reads-as-a-broken-authoring",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "\tif (authoring.sent !== true)\n\t\treturn cell('1', WHOLE_RUN, 'not reached', [], [",
+		replace: "\tif (authoring.sent === 'never')\n\t\treturn cell('1', WHOLE_RUN, 'not reached', [], [",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (REG-D-112, finding 7): a half-B run that never sent its request - the dry rehearsal, or the limit before Send - has NOT REACHED stage 1. WHO RELIES: the dry run's report, now that it has one (finding 1). WHAT THE MUTATION DOES: its draft reads as a broken authoring - a floor MISSING, no hash, a DRAFT - the predicted red. OBSERVED (bun run mutants -- the E3 fix-round ids, 2026-10-11, in the fixer's worktree, its changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E3-M64-a-request-never-sent-reads-as-a-broken-authoring ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'.",
+		source: "JAN-EXEC Phase 7 completion programme, package E3's fix round - the review's eight findings on half B (REG-D-112): every authoring end archived, and the run report reading it; the limit before Send and before a model root's press; REG-F-505 held to model leaves; stage 2 per (parent, type), as instantiation plans it; units told apart by id; the author's pin enforced; a request never sent not reached; the author read from the turn's own stream (docs/_working/DESIGN-phase-7-completion.md §4 C1-C6; REG-D-110 (1), (4); REG-D-112; REG-F-505; REG-F-509; REG-F-516; REG-F-531)"
+	},
+	{
+		id: "E3-M65-the-spec-archives-the-authoring-outside-the-archive",
+		file: "apps/rph-demo/e2e-live-exec/phase7.live.ts",
+		find: "archiveDir: join(lane.archive, AUTHORING_ARCHIVE), storePath: store",
+		replace: "archiveDir: join(lane.lane, AUTHORING_ARCHIVE), storePath: store",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (REG-D-112, finding 1): the spec archives the authoring into lane/archive/00-authoring, where the run report looks. WHO RELIES: the report of a run that stopped during authoring. WHAT THE MUTATION DOES: the archive lands beside lane/archive, where no report reads it. OBSERVED (bun run mutants -- the E3 fix-round ids, 2026-10-11, in the fixer's worktree, its changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E3-M65-the-spec-archives-the-authoring-outside-the-archive ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'.",
+		source: "JAN-EXEC Phase 7 completion programme, package E3's fix round - the review's eight findings on half B (REG-D-112): every authoring end archived, and the run report reading it; the limit before Send and before a model root's press; REG-F-505 held to model leaves; stage 2 per (parent, type), as instantiation plans it; units told apart by id; the author's pin enforced; a request never sent not reached; the author read from the turn's own stream (docs/_working/DESIGN-phase-7-completion.md §4 C1-C6; REG-D-110 (1), (4); REG-D-112; REG-F-505; REG-F-509; REG-F-516; REG-F-531)"
 	}
 ];

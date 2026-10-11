@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
 import { test, resetEngine, introspect, registerStipulation } from './support/harness';
-import { actionFields, createDraftPwa, createUndertakingThroughForm, unitRow } from './support/phase7-pwa';
+import { actionFields, createDraftPwa, createUndertakingThroughForm, unitRowById } from './support/phase7-pwa';
 import {
 	acceptCandidate,
 	authoringRecordOf,
@@ -129,7 +129,9 @@ test.describe('Phase 7 half B — the turn, accepted, published and run, through
 			read,
 			lane,
 			dry: false,
-			undertakingName: PHASE7_UNDERTAKING.name
+			undertakingName: PHASE7_UNDERTAKING.name,
+			// ⭐ `REG-D-112` (finding 2) — the limit before Send counts the calls spent before: none, in the gate.
+			prior: 0
 		});
 		if ('end' in authored) throw new Error(`the half-B order did not reach the units: ${JSON.stringify(authored.end)}`);
 		const a = record.authoring!;
@@ -142,6 +144,8 @@ test.describe('Phase 7 half B — the turn, accepted, published and run, through
 			true
 		]);
 		expect(a.accept?.acceptedHash, 'the hash accepted is not the candidate’s').toBe(a.candidate?.candidateHash);
+		// ⭐ `REG-D-112` (finding 2) — the limit was checked before Send, the authoring floor's worst case counted.
+		expect(a.limitCheck, 'the limit before Send').toMatchObject({ prior: 0, ahead: 8, allowed: true });
 		expect(a.floor.map((f) => f.state), 'the authoring floor, as the turn’s fork held it').toEqual([
 			'SATISFIED',
 			'SATISFIED',
@@ -170,19 +174,27 @@ test.describe('Phase 7 half B — the turn, accepted, published and run, through
 			[2, 'specify-wordfreq', 'Specify wordfreq'],
 			[3, 'verify-wordfreq', 'Verify wordfreq']
 		]);
+		// ⭐ `REG-D-112` (finding 5) — the rows BY ID, and each unit's id in the record from the start.
 		const rows = authored.rows;
+		expect(record.units.map((u) => rows.get(u.unitId!)?.state.title)).toEqual(record.units.map((u) => u.title));
+		const idOf = (title: string): string => record.units.find((u) => u.title === title)!.unitId!;
+		// ⭐ `REG-D-112` (finding 5) — THE OVERVIEW'S ROW IS FOUND BY ITS UNIT'S ID, one row each: the attribute the lane's every
+		// act on a unit relies on (`unitRowById`), asked before anything is pressed.
+		for (const unit of record.units)
+			await expect(unitRowById(page, unit.unitId!), `the overview’s row for ${unit.title}, by its id`).toHaveCount(1);
 
-		// ── Each unit run in that order: Begin & Execute pressed by the operator's own act, the store read after ──────
+		// ── Each unit run in that order: Begin & Execute pressed by the operator's own act ON ITS ROW BY ID — the overview's
+		// row carries its unit's id (`data-pwu-id`) — the store read after ──────────────────────────────────────────────
 		for (const unit of record.units) {
-			const ran = await beginExecute(page, unitRow(page, unit.title), actionFields);
+			const ran = await beginExecute(page, unitRowById(page, unit.unitId!), actionFields);
 			expect(ran.envelopeType, `Begin & Execute on ${unit.title}: ${ran.rawBody ?? ''}`).toBe('success');
-			const after = unitStateOf(await introspect(request), rows.get(unit.title)!.id);
+			const after = unitStateOf(await introspect(request), unit.unitId!);
 			expect([after.executionState, after.planStepState], unit.title).toEqual(['SUCCEEDED', 'SUCCEEDED']);
 		}
 		// ⭐ THE TRAP PLAYED OUT LIVE (REG-D-110 (4)): the UNDECLARED leaf completed with NO model run — the false "Yes" the
 		// run report now reads as a break (C5) — while the MODEL leaf's try is recorded.
 		const exchanges = (await introspect(request)).modelExchanges.filter((x) => x.state.plane === 'EXECUTION');
-		const triesOf = (title: string) => exchanges.filter((x) => x.state.subjectObjectId === rows.get(title)!.id).length;
+		const triesOf = (title: string) => exchanges.filter((x) => x.state.subjectObjectId === idOf(title)).length;
 		expect([triesOf('Specify wordfreq') > 0, triesOf('Verify wordfreq')]).toEqual([true, 0]);
 	});
 });

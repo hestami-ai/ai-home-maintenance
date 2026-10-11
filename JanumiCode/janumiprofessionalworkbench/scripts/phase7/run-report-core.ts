@@ -45,7 +45,7 @@ import {
 	type Phase7TypeDeclaration
 } from './pwa-content.js';
 // ⭐ E3 (C2, C5) — half B's units, read from the published PWA in the tree's order, and its authoring floor.
-import { floorDispositions, mandatoryTypes, unitsInTreeOrder } from './half-b.js';
+import { floorDispositions, treeAgainstPlan, unitsInTreeOrder } from './half-b.js';
 import {
 	MANIFEST_VERSION,
 	manifestProblems,
@@ -501,7 +501,11 @@ export interface AuthoringSummary {
 	readonly candidate: { readonly status: string | null; readonly hash: string | null; readonly detail: string | null };
 	/** The authoring floor's dispositions of the PWA, as the STORE holds them once the commit replayed them. */
 	readonly floor: readonly { readonly policyId: string; readonly state: string }[];
-	/** ⭐ C3 — the author's model, as configured and as the floor recorded the producer it judged. */
+	/**
+	 * ⭐ C3 — the author's model, as configured, and ~~as the floor recorded the producer it judged~~ ⭐ `REG-D-112` (finding 8)
+	 * as THE TURN'S OWN STREAM named it, its `producer` event (`phase7-operator.ts`, `producerOfStream`): the floor's
+	 * assessments name no producer, so the store records no author for a turn.
+	 */
 	readonly author: { readonly configured: string | null; readonly resolved: string | null };
 	readonly reviewer: string | null;
 	/** The hash the acceptance named — the lane's record, the store keeping none (`REG-F-504`). */
@@ -771,7 +775,14 @@ interface UnitStructure {
 	 * ⭐ E3 (C2) — half B: the units, and the conditional children the published PWA declares, which instantiation offers to
 	 * no one (`REG-F-516`). Absent in half A, whose children are all M1 (§3.2).
 	 */
-	readonly halfB?: { readonly units: number; readonly conditional: readonly string[] };
+	readonly halfB?: {
+		readonly units: number;
+		readonly conditional: readonly string[];
+		/** ⭐ `REG-D-112` (finding 4) — units the plan does not make under their parent: each slug, and its parent's title. */
+		readonly unplanned: readonly { readonly slug: string; readonly parentTitle: string }[];
+		/** ⭐ `REG-D-112` (finding 4) — permitted children the plan cannot resolve: instantiation refuses such a PWA. */
+		readonly unresolved: readonly string[];
+	};
 }
 
 /** ⭐ E3 — the half a run was, by its own record: `B` when the lane says so, else `A`, as every run before E3 was. */
@@ -804,7 +815,9 @@ function unitOf(ix: Index, spec: UnitSpec, undertakingId: string | null, lane: r
 	const candidates = ix
 		.ofType('PROFESSIONAL_WORK_UNIT')
 		.filter((p) => str(p.state.undertakingId) === undertakingId && str(p.state.title) === spec.title);
-	if (candidates.length > 1)
+	// ⭐ `REG-D-112` (finding 5) — a repeated title is a re-proposal only where units are found BY title (half A): half B
+	// reads each unit by its id, and a type more than one parent permits gives its title to a unit under each.
+	if (candidates.length > 1 && spec.unitId === undefined)
 		problems.push(`${candidates.length} work units are titled "${spec.title}" in the Undertaking: a re-proposal`);
 	// ⭐ E3 (C2) — half B names the store's unit itself: the agent may give two units one title.
 	const own = spec.unitId ? candidates.find((p) => p.id === spec.unitId) : undefined;
@@ -873,9 +886,11 @@ function resolveUnits(
 /**
  * ⭐⭐ E3 (C2) — HALF B'S UNITS, READ FROM THE PUBLISHED PWA, never from §3.2's five: the Undertaking's units in the tree's
  * order, the root first (`half-b.ts`, `unitsInTreeOrder` — the order the lane pressed them in), each found by its own id.
- * Stage 2 then holds them to the PWA's MANDATORY tree (`mandatoryTypes`): a mandatory type with no unit is missing, two
- * units of one type a duplicate, a unit with no parent in the Undertaking an orphan; and the conditional children the PWA
- * declares are named, never offered (`REG-F-516`).
+ * Stage 2 then holds them to ~~the PWA's MANDATORY tree (`mandatoryTypes`)~~ ⭐ `REG-D-112` (E3's review, finding 4) THE
+ * PLAN INSTANTIATION MAKES OF IT, PER (PARENT, TYPE) (`treeAgainstPlan`, the product's `planComposition`): a planned unit
+ * none was built for is missing, a second under one parent a duplicate, a unit with no parent in the Undertaking an
+ * orphan, one the plan does not put under its parent unplanned; and the conditional children the PWA declares are named,
+ * never offered (`REG-F-516`). ⭐ A title more than one unit bears is said, each unit read by its id (finding 5).
  */
 function resolveHalfBUnits(
 	ix: Index,
@@ -896,22 +911,27 @@ function resolveHalfBUnits(
 		unitOf(ix, { order: t.order, slug: t.slug, title: t.title, typeId: t.typeId, unitId: t.unitId }, undertakingId, lane, problems)
 	);
 	const units = resolved.map((r) => r.unit);
-	const ids = new Set(stored.map((u) => u.id));
-	const { mandatory, conditional } = mandatoryTypes(types);
-	const typesBuilt = tree.units.map((t) => t.typeId);
+	const titles = tree.units.map((t) => t.title);
+	for (const title of new Set(titles.filter((t, i) => titles.indexOf(t) !== i)))
+		problems.push(
+			`${titles.filter((t) => t === title).length} work units are titled ${JSON.stringify(title)}, each read by its own id: ` +
+				'a type more than one parent permits is built once under each (REG-D-112)'
+		);
+	const plan = treeAgainstPlan(stored, types);
+	const slugOf = (unitId: string): string => tree.units.find((t) => t.unitId === unitId)?.slug ?? unitId;
 	return {
 		undertakingId,
 		units,
 		structure: {
-			missing: mandatory.filter((t) => !typesBuilt.includes(t.id)).map((t) => str(t.state.name)),
-			duplicated: mandatory
-				.filter((t) => typesBuilt.filter((id) => id === t.id).length > 1)
-				.map((t) => str(t.state.name)),
-			orphaned: tree.units
-				.slice(1)
-				.filter((t) => t.parentUnitId === null || !ids.has(t.parentUnitId))
-				.map((t) => t.slug),
-			halfB: { units: units.length, conditional }
+			missing: plan.missing,
+			duplicated: plan.duplicated,
+			orphaned: plan.orphaned.map(slugOf),
+			halfB: {
+				units: units.length,
+				conditional: plan.conditional,
+				unplanned: plan.unplanned.map((u) => ({ slug: slugOf(u.unitId), parentTitle: u.parentTitle })),
+				unresolved: plan.unresolved
+			}
 		}
 	};
 }
@@ -1917,6 +1937,11 @@ interface UnitView {
 	/** Its exchanges, both planes, by what a person can read of each (`exchangeReading`). */
 	readonly exchanges: { readonly total: number; readonly broken: number; readonly unretained: number };
 	readonly contentStore: boolean;
+	/**
+	 * ⭐ `REG-D-112` (E3's review, finding 3) — a LEAF of the tree, as C4's model-leaf check reads one (`candidate-checks.ts`):
+	 * its type permits no child type of its PWA (`leafOf`). Only a leaf's work is a model's to do (`REG-F-505`).
+	 */
+	readonly leaf: boolean;
 }
 
 /** Why a stage after 3 never concluded for a unit whose Begin & Execute outlasted the lane's allowance (D4). */
@@ -1965,10 +1990,34 @@ function completion(v: UnitView, row: string): MatrixCell {
 
 /**
  * ⭐ E3 (C5) — a PHASE whose step SUCCEEDED with no execution try ACCEPTED: no model ran for it (`REG-F-505`). ⚠ Never
- * the root, the first unit, whose run is the press's own by design (§3.2).
+ * the root, the first unit, whose run is the press's own by design (§3.2). ⭐⭐ `REG-D-112` (E3's review, finding 3) — AND
+ * ONLY A MODEL LEAF, as C4's check holds only leaves (`candidate-checks.ts`, `model-leaf`): a composite between the root
+ * and the leaves runs no model by design — its work is its children's — so a three-level tree read broke here, as
+ * `REG-F-505`, however it ran.
  */
 const noModelRan = (v: UnitView): boolean =>
-	v.unit.order > 1 && v.stepState === 'SUCCEEDED' && !modelRanFor(v.unit);
+	v.unit.order > 1 && v.leaf && v.stepState === 'SUCCEEDED' && !modelRanFor(v.unit);
+
+/** ⭐ `REG-D-112` (finding 3) — a composite of the tree whose press completed its step with no model run: by design. */
+const compositeDone = (v: UnitView): boolean => !v.leaf && v.stepState === 'SUCCEEDED' && !modelRanFor(v.unit);
+
+/**
+ * ⭐ `REG-D-112` (finding 3) — is the unit a LEAF of the tree, as C4 reads one: its type permits no live child type of its
+ * PWA. ⚠ A unit whose type the store does not hold is read as a leaf, so `REG-F-505`'s check is never dropped for want of
+ * its type — §3.2's phases are leaves either way.
+ */
+function leafOf(ix: Index, u: Unit): boolean {
+	const type = ix.byId.get(u.typeId ?? str(u.object?.state.pwuTypeId));
+	if (type?.objectType !== 'PWU_TYPE') return true;
+	return !strs(type.state.permittedChildTypeIds).some((id) => {
+		const child = ix.byId.get(id);
+		return (
+			child?.objectType === 'PWU_TYPE' &&
+			str(child.state.pwaId) === str(type.state.pwaId) &&
+			str(child.state.status) !== 'REMOVED'
+		);
+	});
+}
 
 /** ⭐ E3 (C5) — did a model run for the unit: an execution try of it answered (`ACCEPTED`). */
 const modelRanFor = (u: Unit): boolean => u.tries.some((t) => str(t.state.disposition) === 'ACCEPTED');
@@ -1996,6 +2045,14 @@ function stageThree(v: UnitView, ix: Index): MatrixCell {
 		return cell('3', row, 'broke', ['REG-F-505'], [
 			'its step SUCCEEDED and no model ran: no execution try is recorded for this unit, so its type ran as a ' +
 				'TRANSFORMATION, completed by the press with nothing produced (REG-F-505)'
+		]);
+	// ⭐ `REG-D-112` (finding 3) — A COMPOSITE OF THE TREE RUNS NO MODEL BY DESIGN: its work is its children's, as the
+	// root's is, and its press completed its step. Never `REG-F-505`'s, which holds model LEAVES only.
+	if (compositeDone(v))
+		return cell('3', row, 'as intended', [], [
+			'a composite of the tree: its type permits children of the PWA, so its work is theirs, and its press completed ' +
+				'its step with no model run, as the root’s does (REG-D-112)',
+			...(u.lane?.upstreamNotAssured === true ? ['its upstream phase was not assured (the lane’s record)'] : [])
 		]);
 	const tries = triesOf(u);
 	if (str(u.tries.at(-1)?.state.disposition) !== 'ACCEPTED')
@@ -2230,6 +2287,13 @@ function stageOneHalfB(ix: Index, lane: LaneRows): MatrixCell {
 		return cell('1', WHOLE_RUN, 'not reached', [], [
 			`no PWA the lane authored into is in the store (lane/run.json names ${pwaId === '' ? 'none' : pwaId})`
 		]);
+	// ⭐ `REG-D-112` (E3's review, finding 7) — A REQUEST NEVER SENT AUTHORED NOTHING: the dry rehearsal stops before Send
+	// (C6), and so does a paid run the limit refuses there. Its draft is no candidate the floor failed: NOT REACHED.
+	if (authoring.sent !== true)
+		return cell('1', WHOLE_RUN, 'not reached', [], [
+			`the request was never sent — the run ended ${str(rec(rec(lane.run).end).reason) || 'with no end recorded'} ` +
+				'before Send — so no candidate was authored for the floor to judge'
+		]);
 	const floor = floorDispositions(ix.ofType('ASSURANCE_ASSESSMENT'), pwaId);
 	const reviewer = floor.find((f) => f.policyId === REASONING_REVIEW)?.evaluator ?? null;
 	const accepted = str(rec(authoring.accept).acceptedHash) || null;
@@ -2248,19 +2312,56 @@ function stageOneHalfB(ix: Index, lane: LaneRows): MatrixCell {
 			: []),
 		...(status === 'PUBLISHED' ? [] : [`the PWA is ${status}`])
 	];
-	const value: CellValue = faults.length === 0 ? 'as intended' : 'broke';
-	return cell('1', WHOLE_RUN, value, [], [
-		`the PWA "${str(pwa.state.name)}" is ${status}, authored by the agent from the request (design §4 C1)`,
-		`the authoring floor: ${floor.map((f) => `${f.policyId} ${f.state}`).join(', ')}`,
-		`the reviewer: ${reviewer ?? 'none recorded'}; the author, as the page's turn named it: ${resolved ?? 'none recorded'} ` +
-			`(configured: ${configured ?? 'unset'})`,
-		...(resolved !== null && configured !== null && resolved !== configured && !resolved.endsWith(`/${configured}`)
-			? [`⚠ the author that ran is not the one configured: Pi substituted a model, unannounced (REG-F-509)`]
-			: []),
-		`the accepted hash: ${accepted ?? 'none'}; the candidate as the lane last read it: ${str(candidate.status) || 'none'}`,
-		...faults,
-		...HALF_B_CAVEATS.slice(0, 2).map((c) => `caveat ${c}`)
-	]);
+	const authorFaults = authorShortfalls(configured, resolved);
+	const value: CellValue = faults.length + authorFaults.faults.length === 0 ? 'as intended' : 'broke';
+	return cell(
+		'1',
+		WHOLE_RUN,
+		value,
+		authorFaults.registerIds,
+		[
+			`the PWA "${str(pwa.state.name)}" is ${status}, authored by the agent from the request (design §4 C1)`,
+			`the authoring floor: ${floor.map((f) => `${f.policyId} ${f.state}`).join(', ')}`,
+			`the reviewer: ${reviewer ?? 'none recorded'}; the author, as the page's turn named it: ${resolved ?? 'none recorded'} ` +
+				`(configured: ${configured ?? 'unset'})`,
+			`the accepted hash: ${accepted ?? 'none'}; the candidate as the lane last read it: ${str(candidate.status) || 'none'}`,
+			...faults,
+			...authorFaults.faults,
+			...HALF_B_CAVEATS.slice(0, 2).map((c) => `caveat ${c}`)
+		],
+		// ⚠ A floor, hash or publication fault is the run's to register (P7-5); an author's fault names its entry.
+		{ unregistered: faults.length > 0 }
+	);
+}
+
+/**
+ * ⭐⭐ `REG-D-112` (E3's review, finding 6) — THE AUTHOR'S MODEL IS PINNED, AND HELD TO THE PIN: stage 1 BREAKS when the
+ * model the turn's own stream named is not the one `JPWB_AGENT_MODEL` pinned — Pi substitutes another, unannounced
+ * (`REG-F-509`) — or when the lane read none, for then nothing shows the pinned model authored the PWA. ⛔ It read as
+ * intended, with a warning beside it: a pin that is recorded and not enforced. ⭑ A pin is met by the model named in full,
+ * or, pinned as a bare id, by that id under any provider — as `resolveModel` resolves one.
+ */
+function authorShortfalls(
+	configured: string | null,
+	resolved: string | null
+): { readonly faults: readonly string[]; readonly registerIds: readonly string[] } {
+	if (configured === null)
+		return {
+			faults: ['no author model was pinned: half B requires JPWB_AGENT_MODEL, and the record names none (design §4 C3)'],
+			registerIds: ['REG-F-531']
+		};
+	if (resolved !== null && (resolved === configured || resolved.endsWith(`/${configured}`)))
+		return { faults: [], registerIds: [] };
+	return {
+		faults: [
+			resolved === null
+				? `no producer was read from the turn’s stream, so nothing shows the pinned model, ${configured}, authored ` +
+					'the PWA (REG-F-509)'
+				: `the author that ran, ${resolved}, is not the model pinned, ${configured}: Pi substituted another, ` +
+					'unannounced (REG-F-509)'
+		],
+		registerIds: ['REG-F-509']
+	};
 }
 
 /** Stage 1 — the PWA is PUBLISHED; whether its authoring is assured is half B's (P7-7). ⭐ E3 (C5): and half B measures it. */
@@ -2280,16 +2381,25 @@ function stageOne(ix: Index, half: RunHalf = 'A', lane?: LaneRows): MatrixCell {
 /** Stage 2 — one work unit per mandatory type, the phases children of the root. */
 function stageTwo(undertakingId: string | null, structure: UnitStructure): MatrixCell {
 	if (undertakingId === null) return cell('2', WHOLE_RUN, 'not reached', [], ['no Undertaking of the run is in the store']);
+	const halfB = structure.halfB;
 	const faults = [
+		// ⭐ `REG-D-112` (finding 4) — half B's tree is held to the plan instantiation makes of it, per (parent, type).
+		...(halfB?.unresolved ?? []).map((s) => `the published PWA’s tree does not resolve, ${s}: instantiation refuses it`),
 		...structure.missing.map((s) => `no work unit for ${s}`),
 		...structure.duplicated.map((s) => `more than one work unit for ${s}`),
-		...structure.orphaned.map((s) => `the ${s} unit is not a child of the root`)
+		...structure.orphaned.map((s) =>
+			halfB === undefined ? `the ${s} unit is not a child of the root` : `the ${s} unit’s parent is no unit of the Undertaking`
+		),
+		...(halfB?.unplanned ?? []).map(
+			(u) => `the ${u.slug} unit is not one the published PWA’s plan makes under its parent, ${u.parentTitle}`
+		)
 	];
 	if (faults.length > 0) return cell('2', WHOLE_RUN, 'broke', [], faults);
 	// ⭐ E3 (C2) — HALF B'S TREE IS THE AGENT'S: its count, and the conditional children it declares, said as they are.
 	if (structure.halfB !== undefined)
 		return cell('2', WHOLE_RUN, 'as intended', [], [
-			`${plural(structure.halfB.units, 'work unit', 'work units')}, one per mandatory type of the published PWA, each under the root`,
+			`${plural(structure.halfB.units, 'work unit', 'work units')}, one for each mandatory child under each parent, as ` +
+				'instantiation plans the published PWA (planComposition), the root over them all',
 			structure.halfB.conditional.length === 0
 				? 'the PWA declares no conditional child, so none went unoffered (REG-F-516)'
 				: `${plural(structure.halfB.conditional.length, 'conditional child was', 'conditional children were')} never ` +
@@ -2388,7 +2498,8 @@ function unitView(
 			broken: readings.filter((r) => r === 'does not hold what it claims').length,
 			unretained: readings.filter((r) => r === 'not retained').length
 		},
-		contentStore: ix.content !== null
+		contentStore: ix.content !== null,
+		leaf: leafOf(ix, u)
 	};
 }
 
@@ -2557,7 +2668,9 @@ export function buildRunReport(
 	const workspace = demoDb === '' || undertakingId === null ? null : workspaceDirectoryFor(demoDb, undertakingId);
 	const views = units.map((u) => unitView(ix, u, units, lane, pairing, declared));
 	const endReason = str(rec(rec(lane.run).end).reason) || null;
-	if (endReason === 'allowance-exceeded' && views.every((v) => v.timedOut === null))
+	// ⭐ `REG-D-112` (E3's review, finding 1) — a half-B run whose AUTHORING outlasted its allowance has no unit to name: that
+	// end is the turn's (`authoring-stopped`'s sibling), read from its own archive, `00-authoring`.
+	if (endReason === 'allowance-exceeded' && views.length > 0 && views.every((v) => v.timedOut === null))
 		problems.push('lane/run.json ended allowance-exceeded, and names no unit whose Begin & Execute outlasted its allowance');
 	const matrix: MatrixCell[] = [
 		stageOne(ix, half, lane),
