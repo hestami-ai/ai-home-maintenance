@@ -11,9 +11,15 @@
 // ⭑ A MODULE OF ITS OWN, WITH NO IMPORTS, so the page's end-to-end specs can pin the exact citation the server writes
 // without loading the engine.
 
-/** ⭐ The ruling's three acts, as `REG-D-104` (1) names them — the clause every citation below opens with. */
+/**
+ * ⭐ The ruling's three acts, as `REG-D-104` (1) names them — the clause every citation below opens with.
+ * ⛔ `P76F-D` D1 — ~~"a work unit whose review refused it"~~: the ruling's subject is a REFUSED unit (its question: *"how
+ * should a refused (stopped) work unit be recovered?"*; the register's own heading: *"a refused work unit waits for a
+ * person …"*), and a unit a floor policy other than the review refused is one — its review passed it. Opening that
+ * unit's citation with "whose review refused it" put a false clause on its Decision's permanent record.
+ */
 const RULING =
-	'Authority: the sponsor’s ruling REG-D-104 (1) — a work unit whose review refused it waits for a person, who re-runs its review, re-runs its work with the findings, or abandons it';
+	'Authority: the sponsor’s ruling REG-D-104 (1) — a refused work unit waits for a person, who re-runs its review, re-runs its work with the findings, or abandons it';
 
 /** ⭐ RE-RUN THE REVIEW — `REG-D-104` (1), and `REG-D-105` (3), which offers it only after a review that did not conclude. */
 export const RERUN_REVIEW_CITATION =
@@ -38,12 +44,38 @@ export const RERUN_WORK_AFTER_NOT_CONCLUDED_CITATION =
 	'No policy object authorises a person’s re-run, and none is cited: the ruling is the authority (DESIGN-the-stopped-unit-recovery.md RD4).';
 
 /**
- * ⭐ `P76F-C` C5 — THE CITATION OF THE RE-RUN OF THE WORK BEING RECORDED: the clause that applies to its stop. ⭑ A boolean,
- * not the stop's kind, so this module keeps no import (the e2e specs load it bare): the caller answers whether the review
- * concluded — against the work, or escalated (`stopped-unit-recovery.ts`, `RefusalKind`).
+ * ⭐⭐ `P76F-D` D1 — RE-RUN THE WORK AFTER A REFUSAL BY A FLOOR POLICY OTHER THAN THE REVIEW: `REG-D-104` (1) ALONE.
+ * ⛔ Such a stop (`RESOLVE_OTHER_FLOOR_FINDINGS`: the Reasoning Review SATISFIED, a deterministic floor policy refusing the
+ * work) was filed as a review that CONCLUDED, so its re-run of the work cited (3)'s clause *"after a review that concluded
+ * against the work"* — on the Decision's permanent record, of a review that concluded FOR the work. (3) rules only what
+ * follows a review that concluded against the work; what follows another policy's refusal is (1)'s own.
  */
-export function rerunWorkCitation(reviewConcluded: boolean): string {
-	return reviewConcluded ? RERUN_WORK_AFTER_CONCLUDED_CITATION : RERUN_WORK_AFTER_NOT_CONCLUDED_CITATION;
+export const RERUN_WORK_AFTER_FLOOR_FINDING_CITATION =
+	`${RULING}. REG-D-105 (3) rules only what follows a review that concluded against the work; after a refusal by a floor policy other than the review, this ruling alone authorises re-running the work. ` +
+	'No policy object authorises a person’s re-run, and none is cited: the ruling is the authority (DESIGN-the-stopped-unit-recovery.md RD4).';
+
+/**
+ * ⭐⭐ `P76F-D` D1 — WHAT A RE-RUN OF THE WORK FOLLOWS, as far as its citation turns on it: a review that concluded (against
+ * the work, or escalated), a review that did not conclude, or a refusal by a floor policy other than the review.
+ * ~~⭑ A boolean, not the stop's kind~~ ⛔ A boolean held two answers, so the third — a floor finding — was cited as one of
+ * them. ⭑ A union DECLARED HERE, not the stop's kind imported (`stopped-unit-recovery.ts`, `RefusalKind`): this module
+ * keeps no import, since the e2e specs load it bare. The caller maps its stop's kind (`rerunWorkAfterOf`).
+ */
+export type RerunWorkAfter = 'CONCLUDED_REVIEW' | 'UNCONCLUDED_REVIEW' | 'FLOOR_FINDING';
+
+/** The citation of each, one per entry — the record a missing case would not compile without. */
+const RERUN_WORK_CITATIONS: Readonly<Record<RerunWorkAfter, string>> = {
+	CONCLUDED_REVIEW: RERUN_WORK_AFTER_CONCLUDED_CITATION,
+	UNCONCLUDED_REVIEW: RERUN_WORK_AFTER_NOT_CONCLUDED_CITATION,
+	FLOOR_FINDING: RERUN_WORK_AFTER_FLOOR_FINDING_CITATION
+};
+
+/**
+ * ⭐ `P76F-C` C5 — THE CITATION OF THE RE-RUN OF THE WORK BEING RECORDED: the clause that applies to its stop. ⭐ `P76F-D` D1 —
+ * of three, by what the re-run follows (`RerunWorkAfter`).
+ */
+export function rerunWorkCitation(after: RerunWorkAfter): string {
+	return RERUN_WORK_CITATIONS[after];
 }
 
 /**

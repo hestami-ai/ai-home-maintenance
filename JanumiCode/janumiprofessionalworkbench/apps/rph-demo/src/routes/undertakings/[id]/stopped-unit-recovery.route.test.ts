@@ -50,8 +50,37 @@ const seam = vi.hoisted(() => ({
 	/** Set, the producing prompt re-renders under this fingerprint: the type's template is not the one that produced it. */
 	templateMovedTo: undefined as string | undefined,
 	/** ⭐ `P76F-A` A4 — the model devin's export says answered: the configured one unless a case arranges a substitute. */
-	reportedModel: 'fixture-assurance-model'
+	reportedModel: 'fixture-assurance-model',
+	/**
+	 * ⭐ `P76F-D` D2 — set, the engine refuses the next batch that completes a step, with this reason, and the seam clears it.
+	 * Unset, every batch is the real engine's.
+	 */
+	refuseCompletion: undefined as string | undefined
 }));
+
+// ⭐⭐ `P76F-D` D2 — THE ENGINE'S BATCHES, the real `dispatchBatch`, save the one completion a case has the engine refuse
+// (`seam.refuseCompletion`). ⭑ WHY A SEAM: a stop where no refused subject is found is a completion the engine refused while
+// every floor the route recorded over its results is SATISFIED — and the route's own floors cannot be arranged to give one,
+// since the engine's gate reads the very assessments the route just recorded (`floorGateBlock`, `latestAssessmentByPolicy`)
+// and nothing re-versions a recorded work product (`RecordArtifact` alone mints one, at v1). So the refusal is arranged at
+// the engine's door, and everything after it — the wait, its reason, the stop read back — is the route's own.
+vi.mock('../../../lib/server/workbench.js', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('../../../lib/server/workbench.js')>();
+	return {
+		...actual,
+		dispatchBatch: vi.fn((commands: Parameters<typeof actual.dispatchBatch>[0]) => {
+			const reason = seam.refuseCompletion;
+			if (reason === undefined || !commands.some((c) => c.commandType === 'CompleteExecutionStep'))
+				return actual.dispatchBatch(commands);
+			seam.refuseCompletion = undefined;
+			return {
+				ok: false,
+				failedIndex: 0,
+				results: [{ status: 'REJECTED', error: { code: 'RPH_INVARIANT_VIOLATION', message: reason } }]
+			} as unknown as ReturnType<typeof actual.dispatchBatch>;
+		})
+	};
+});
 
 // ⭑ THE REAL `prepareModelInvocation`, its fingerprint moved only when a case says the template moved (RD7's check): the
 // types a published PWA declares cannot change, so a moved template is arranged at the one seam that renders it.
@@ -142,6 +171,7 @@ import {
 	ABANDON_FROM_WAITING_CITATION,
 	RERUN_REVIEW_CITATION,
 	RERUN_WORK_AFTER_CONCLUDED_CITATION,
+	RERUN_WORK_AFTER_FLOOR_FINDING_CITATION,
 	RERUN_WORK_AFTER_NOT_CONCLUDED_CITATION
 } from '../../../lib/server/execution/recovery-authority.js';
 import {
@@ -364,6 +394,7 @@ beforeEach(() => {
 	seam.observed = undefined;
 	seam.templateMovedTo = undefined;
 	seam.reportedModel = 'fixture-assurance-model';
+	seam.refuseCompletion = undefined;
 	vi.stubEnv('PATH', noProgramsDirectory());
 	for (const v of LIVE_BACKEND_VARIABLES) vi.stubEnv(v, undefined);
 	vi.stubEnv('JPWB_ASSURANCE_TOOL', 'devin');
@@ -1002,5 +1033,171 @@ describe('⭐ R-1d (RD3) — what the page offers, by what the refusal was', () 
 		expect(MARKUP).toContain(
 			'{#each data.awaitingChoiceStepIds.includes(s.id) ? [] : s.controlCommands as ctl (ctl)}'
 		);
+		// ⛔ `P76F-D` D1 — the row says what is true of EVERY stop: the completion was refused. It said "the review refused this
+		// unit's work" — false after a floor finding (the review passed it), after a review that did not conclude (it refused
+		// nothing), after a reviewer refused for who it was, and after the engine refused with every floor satisfied (D2).
+		expect(MARKUP.includes('the review refused this unit'), 'the row says the review refused the work, whatever refused it').toBe(
+			false
+		);
+		expect(MARKUP).toContain("Waiting for your choice — this unit's completion was refused: {r.refusal}.");
+	});
+});
+
+// ── ⭐⭐ `P76F-D` D1 (RD3, RD4; `REG-D-104` (1); `REG-D-105` (3)) — A FLOOR POLICY OTHER THAN THE REVIEW REFUSED THE WORK ──────
+// ⛔ THE DEFECT: `refusalKindOf` filed `RESOLVE_OTHER_FLOOR_FINDINGS` — the Reasoning Review SATISFIED, a deterministic floor
+// policy refusing the work — as `CONCLUDED`. So a re-run of the work recorded `REG-D-105` (3)'s clause, *"after a review that
+// concluded against the work"*, on the Decision's permanent record, and the wait's recorded reason said *"The review
+// concluded, so it is not re-run"*: the review concluded FOR the work.
+// ⭑ THE ARRANGEMENT is K2r's (`phase7-route.characterization.test.ts`): the work product's review passes; the one command the
+// host ran was killed at its deadline, so its evidence carries a BLOCKING deterministic finding beside a review that passed.
+describe('⭐⭐ P76F-D D1 — a floor finding beside a review that passed: re-run the work or abandon, with its own reason and its own citation', () => {
+	/** A unit waiting on ONE refusal, a timed-out command's floor finding — the work product's review and the command's passed. */
+	async function aFloorFindingStop() {
+		seam.observed = observedRuns([{ ...aRun(1), exitCode: null, timedOut: true, durationMs: 120_000 }]);
+		const k = await aWaitingUnit([]);
+		const [evd, ...more] = listByType(getEngine(), 'EVIDENCE')
+			.filter(
+				(e) =>
+					(e.state.contentReference as { producingExecutionAttemptId?: string }).producingExecutionAttemptId ===
+					`${k.stepA}#1`
+			)
+			.map((e) => e.id);
+		expect([evd, ...more], 'arrangement: the timed-out command was not joined as its one evidence').toHaveLength(1);
+		expect(reviewsOf(evd!), 'arrangement: the command’s review did not pass').toEqual(['SATISFIED']);
+		expect(reviewsOf(k.art), 'arrangement: the work product’s review did not pass').toEqual(['SATISFIED']);
+		expect(refusalActionsOf(k.pwuId), 'arrangement: the classifier does not answer a floor finding').toEqual([
+			'RESOLVE_OTHER_FLOOR_FINDINGS'
+		]);
+		// The re-runs below run no command, so the work re-run's own completion is not refused the same way.
+		seam.observed = undefined;
+		return { ...k, evd: evd! };
+	}
+
+	it('⛔ the PAGE reads it as its own kind and offers re-run the work and abandon — never a re-review, which runs that policy again over the same work', async () => {
+		const k = await aFloorFindingStop();
+		const { view, awaiting } = await recoveryShown(k.pwuId);
+		expect(view).toMatchObject({
+			kind: 'FLOOR_FINDING',
+			offers: { rerunReview: false, rerunWork: true, abandon: true },
+			rerunsWithheld: null,
+			findings: 0
+		});
+		expect(awaiting).toEqual([k.stepA]);
+	});
+
+	it('⛔ the RECORDED wait reason names the choices offered, and why the review is not re-run — never "the review concluded"', async () => {
+		const k = await aFloorFindingStop();
+		const [reason] = payloads('ExecutionStepWaiting', k.planA).map((p) => String(p.waitReason));
+		expect(reason, 'a floor finding recorded as a review that concluded').not.toContain('The review concluded');
+		expect(reason).toBe(
+			`The assurance floor refused the completion — ${k.evd}: floor.schema-invariant=REJECTED. The unit waits for a person to choose: re-run the work with the findings, or abandon it (REG-D-104 (1)). A floor policy other than the review refused the work, which a re-review would not change, so the review is not re-run.`
+		);
+	});
+
+	it('⛔ the SERVER refuses a re-review, naming the floor finding — not "the review concluded against the work" — runs no reviewer and records nothing', async () => {
+		const k = await aFloorFindingStop();
+		const events = getEngine().readAllEvents().length;
+		const calls = seam.devin.length;
+		const result = await act('rerunReview', { pwuId: k.pwuId, rationale: RATIONALE });
+		expect(result.data?.error ?? '').toBe(
+			`Re-running the review refused: a floor policy other than the review refused the work (${k.evd}: floor.schema-invariant=REJECTED), which a re-review would not change: it runs that policy again over the same work. Re-run the work, or abandon the unit (REG-D-104 (1)).`
+		);
+		expect(getEngine().readAllEvents()).toHaveLength(events);
+		expect(seam.devin).toHaveLength(calls);
+	});
+
+	it('⛔ the re-run of the work’s Decision cites REG-D-104 (1) alone — never REG-D-105 (3)’s clause for a review that concluded against the work', async () => {
+		const k = await aFloorFindingStop();
+		const typed = 'The command timed out; run the work again.';
+		expect(await act('rerunWork', { pwuId: k.pwuId, rationale: typed })).toEqual({ advanced: 'work-rerun' });
+		const rationale = String(decisionsOf(k.pwuId)[0]?.state.rationale);
+		expect(rationale, 'a floor finding cited as a review that concluded against the work').not.toBe(
+			`${typed}\n\n${RERUN_WORK_AFTER_CONCLUDED_CITATION}`
+		);
+		expect(rationale).toBe(`${typed}\n\n${RERUN_WORK_AFTER_FLOOR_FINDING_CITATION}`);
+	});
+
+	// ⭐ `strictestKind` — BESIDE A REVIEW THAT DID NOT CONCLUDE, ONE FLOOR FINDING STILL WITHHOLDS THE RE-REVIEW: the re-review
+	// would run that policy again over the same work, and the completion would be refused by it again.
+	it('⛔ beside a review that did NOT conclude, one floor finding withholds the re-review: the reason names both refusals, the server’s refusal the floor finding alone', async () => {
+		// The work product's review fails at the transport, and on its retry; the timed-out command's review passes.
+		seam.observed = observedRuns([{ ...aRun(1), exitCode: null, timedOut: true, durationMs: 120_000 }]);
+		const k = await aWaitingUnit([transportFailure(), transportFailure()]);
+		seam.observed = undefined;
+		expect(refusalActionsOf(k.pwuId), 'arrangement: not a review that did not conclude beside a floor finding').toEqual([
+			'RETRY_OR_CONFIGURE_REVIEWER',
+			'RESOLVE_OTHER_FLOOR_FINDINGS'
+		]);
+		const [evd] = listByType(getEngine(), 'EVIDENCE')
+			.filter(
+				(e) =>
+					(e.state.contentReference as { producingExecutionAttemptId?: string }).producingExecutionAttemptId ===
+					`${k.stepA}#1`
+			)
+			.map((e) => e.id);
+		const { view } = await recoveryShown(k.pwuId);
+		expect(view).toMatchObject({ kind: 'FLOOR_FINDING', offers: { rerunReview: false, rerunWork: true, abandon: true } });
+		const [reason] = payloads('ExecutionStepWaiting', k.planA).map((p) => String(p.waitReason));
+		expect(reason).toBe(
+			`The assurance floor refused the completion — ${k.art}: floor.reasoning-review=INCONCLUSIVE; ${evd}: floor.schema-invariant=REJECTED. The unit waits for a person to choose: re-run the work with the findings, or abandon it (REG-D-104 (1)). A floor policy other than the review refused the work, which a re-review would not change, so the review is not re-run.`
+		);
+		// ⛔ Only the floor finding: the review that did not conclude is no "floor policy other than the review".
+		expect((await act('rerunReview', { pwuId: k.pwuId, rationale: RATIONALE })).data?.error ?? '').toBe(
+			`Re-running the review refused: a floor policy other than the review refused the work (${evd}: floor.schema-invariant=REJECTED), which a re-review would not change: it runs that policy again over the same work. Re-run the work, or abandon the unit (REG-D-104 (1)).`
+		);
+	});
+
+	it('⭐ its citation says a floor policy other than the review refused the work, and that (3) does not rule it', () => {
+		expect(RERUN_WORK_AFTER_FLOOR_FINDING_CITATION).toContain('REG-D-104 (1)');
+		// ⛔ The ruling's own summary, which every citation opens with, must not say the REVIEW refused the unit: here it passed.
+		expect(
+			RERUN_WORK_AFTER_FLOOR_FINDING_CITATION.includes('whose review refused it'),
+			'the ruling is cited as if the review had refused the work'
+		).toBe(false);
+		expect(RERUN_WORK_AFTER_FLOOR_FINDING_CITATION).toContain(
+			'after a refusal by a floor policy other than the review, this ruling alone authorises re-running the work'
+		);
+		expect(RERUN_WORK_AFTER_FLOOR_FINDING_CITATION).toMatch(/No policy object authorises/);
+		expect(
+			new Set([
+				RERUN_REVIEW_CITATION,
+				RERUN_WORK_AFTER_CONCLUDED_CITATION,
+				RERUN_WORK_AFTER_NOT_CONCLUDED_CITATION,
+				RERUN_WORK_AFTER_FLOOR_FINDING_CITATION,
+				ABANDON_FROM_WAITING_CITATION
+			]).size
+		).toBe(5);
+	});
+});
+
+// ── ⭐⭐ `P76F-D` D2 (RD2, RD3; PER-9) — A STOP WHERE NO REFUSED SUBJECT IS FOUND ──────────────────────────────────────────
+// ⛔ THE GAP: `NO_RERUN_REVIEW.NOT_CONCLUDED` — *"No review of the attempt is refused on the record, so none is re-run."* — is
+// written on the permanent record whenever the engine refuses a completion whose results' floors are all SATISFIED, and no
+// test asserted it: emptying it passed every test. ⛔ AND THE HEAD OF THAT REASON SAID *"The assurance floor refused the
+// completion"* — false there: every floor the route recorded over the results is SATISFIED, so the engine refused for a
+// reason of its own, and the reason now says so, quoting it.
+describe('⭐⭐ P76F-D D2 — the engine refused the completion and no review of the attempt is refused on the record', () => {
+	/** What the arranged engine says. ⭑ No closing period: the reason closes the sentence it quotes. */
+	const ENGINE_SAYS = 'arranged by the test, the engine refuses this completion for a reason no recorded floor holds';
+
+	it('⛔ the RECORDED reason says the engine refused, offers re-run the work or abandon, and says why the review is not re-run — and the page offers exactly that', async () => {
+		seam.refuseCompletion = ENGINE_SAYS;
+		const pwuId = await modelWorkUnit();
+		const stopped = await beginExecute(pwuId);
+		expect(stopped.data?.error ?? '', 'arrangement: the completion was not refused by the engine alone').toMatch(
+			/^The model ran, its work product is recorded, and the assurance floor is satisfied — but the step still did not complete\./
+		);
+		const [planA] = plansOf(pwuId);
+		expect(planA?.steps[0]?.stepState, 'arrangement: the refused step does not wait').toBe('WAITING');
+		const [reason] = payloads('ExecutionStepWaiting', planA!.id).map((p) => String(p.waitReason));
+		expect(reason).toBe(
+			`The engine refused the completion — CompleteExecutionStep: ${ENGINE_SAYS}. The unit waits for a person to choose: re-run the work with the findings, or abandon it (REG-D-104 (1)). No review of the attempt is refused on the record, so none is re-run.`
+		);
+		const { view } = await recoveryShown(pwuId);
+		expect(view).toMatchObject({
+			kind: 'NOT_CONCLUDED',
+			offers: { rerunReview: false, rerunWork: true, abandon: true },
+			refusal: ''
+		});
 	});
 });

@@ -18,15 +18,22 @@
 //     are read from the RECORDED refusal, so a changed reviewer re-opens no re-run (not built); today the unit can be
 //     abandoned. ⚠ A departure from RD3's table, which files both under "did not conclude": the classifier's own guidance
 //     says a retry "does not fix this".
-//   · the review CONCLUDED AGAINST THE WORK (`REFINE_SUBJECT`, or a deterministic floor finding beside a review that
-//     passed, `RESOLVE_OTHER_FLOOR_FINDINGS`) → re-run the work with the findings, abandon;
+//   · the review CONCLUDED AGAINST THE WORK (`REFINE_SUBJECT`~~, or a deterministic floor finding beside a review that
+//     passed, `RESOLVE_OTHER_FLOOR_FINDINGS`~~) → re-run the work with the findings, abandon;
+//   · ⭐ `P76F-D` D1 — a FLOOR POLICY OTHER THAN THE REVIEW refused the work, beside a review that passed it
+//     (`RESOLVE_OTHER_FLOOR_FINDINGS`) → re-run the work, abandon. Never a re-review: it runs that deterministic policy again
+//     over the same work, and would not change its finding. ⛔ It was filed with the review that concluded against the work,
+//     so its re-run of the work cited `REG-D-105` (3)'s clause for one — and the review had concluded FOR it. ⚠ RD3's
+//     table has no row for it (the lead files one).
 //   · the review ESCALATED → re-run the work with the subject findings, abandon. ⛔ The escalation itself is never fed
 //     back (`REG-D-090`).
 // ⛔ RE-REVIEW AFTER A CONCLUDED REFUSAL IS NOT OFFERED, BY THE SPONSOR'S RULING (`REG-D-105` (3)): the floor reads the
 // latest assessment per policy, so a second review of the same work product, run until one said SATISFIED, would clear a
 // refusal the first review reasoned out — reviewer shopping, against ASR-12 in substance, and `REG-F-474`'s defect for an
 // escalation. ⚠ ACROSS SUBJECTS, THE STRICTEST WINS: one concluded refusal among several makes the whole stop CONCLUDED,
-// because a re-review re-runs every refused floor and would re-run that one too.
+// because a re-review re-runs every refused floor and would re-run that one too — ⭐ and, `P76F-D` D1, one floor finding
+// withholds a re-review beside a review that did not conclude, since the completion would be refused again by it
+// (`strictestKind`).
 //
 // ── ⭐ RD7 — WHAT A RE-REVIEW REBUILDS, AND ITS REFUSAL WHEN IT CANNOT ──────────────────────────────────────────────────
 // The floor took four things from memory when it first ran: the producing prompt, the producer's rationale, the producer's
@@ -69,6 +76,7 @@ import {
 import type { ObservedProcessRun } from '../tools/process-run-observer.js';
 import { resolveContextPolicy } from './context-policy.js';
 import { splitExecutionEnvelope } from './execution-contract.js';
+import type { RerunWorkAfter } from './recovery-authority.js';
 
 /** The two re-runs a REPLAN Decision may select (RD4). ⭑ Free strings: `Decision.selectedOption` is `z.string()`. */
 export const RERUN_REVIEW = 'RERUN_REVIEW';
@@ -97,9 +105,15 @@ export function attemptStepOf(attemptKey: string): string {
 
 /**
  * How one refusal reads to RD3: the review did not conclude, concluded against the work, or escalated — ⭐ `P76F-A` A4: or
- * was refused for WHO reviewed, which only a different or re-qualified reviewer can fix (`REVIEWER_MUST_CHANGE`).
+ * was refused for WHO reviewed, which only a different or re-qualified reviewer can fix (`REVIEWER_MUST_CHANGE`) — ⭐
+ * `P76F-D` D1: or passed the work, which a floor policy other than the review refused (`FLOOR_FINDING`).
  */
-export type RefusalKind = 'NOT_CONCLUDED' | 'CONCLUDED' | 'ESCALATED' | 'REVIEWER_MUST_CHANGE';
+export type RefusalKind =
+	| 'NOT_CONCLUDED'
+	| 'CONCLUDED'
+	| 'ESCALATED'
+	| 'REVIEWER_MUST_CHANGE'
+	| 'FLOOR_FINDING';
 
 /**
  * ⭐⭐ `P76F-A` A4 — THE TWO REFUSALS ONLY A DIFFERENT OR RE-QUALIFIED REVIEWER CAN FIX, each with why, in the classifier's own
@@ -130,10 +144,16 @@ const REVIEWER_MUST_CHANGE: Readonly<Partial<Record<FloorRemediationAction, stri
  * ⭐ RD3, FOR ONE REFUSED SUBJECT — the floor's own sort (`isOperationalRemediation`), with the escalation taken out of the
  * operational side: it is a review that CONCLUDED (it named a human), and re-reviewing it is `REG-F-474`'s defect. ⭐ And,
  * `P76F-A` A4, the two refusals of WHO reviewed taken out too (`REVIEWER_MUST_CHANGE`): no re-run fixes them.
+ * ⭐⭐ `P76F-D` D1 — AND A FLOOR FINDING TAKEN OUT OF THE CONCLUDED SIDE: the classifier answers `RESOLVE_OTHER_FLOOR_FINDINGS`
+ * only beside a Reasoning Review that is SATISFIED (`classifyFloorRemediation`'s last arm) — the review concluded FOR the
+ * work, and a deterministic floor policy refused it. ⛔ Sorted `CONCLUDED`, its re-run of the work cited `REG-D-105` (3)'s
+ * clause *"after a review that concluded against the work"* (`rerunWorkCitation`), and its wait's recorded reason said
+ * *"The review concluded"* — each false, on the permanent record.
  */
 export function refusalKindOf(action: FloorRemediationAction): RefusalKind {
 	if (action === 'ESCALATE_REVIEW') return 'ESCALATED';
 	if (REVIEWER_MUST_CHANGE[action] !== undefined) return 'REVIEWER_MUST_CHANGE';
+	if (action === 'RESOLVE_OTHER_FLOOR_FINDINGS') return 'FLOOR_FINDING';
 	return isOperationalRemediation(action) ? 'NOT_CONCLUDED' : 'CONCLUDED';
 }
 
@@ -141,12 +161,41 @@ export function refusalKindOf(action: FloorRemediationAction): RefusalKind {
  * ⭐ RD3, ACROSS SUBJECTS — the strictest: a reviewer that must change first (`P76F-A` A4: any re-run is reviewed by it
  * again, so one such subject withholds both re-runs), then one concluded refusal makes the stop concluded, then one
  * escalation.
+ * ⭐⭐ `P76F-D` D1 — THEN ONE FLOOR FINDING, AHEAD OF A REVIEW THAT DID NOT CONCLUDE AND BEHIND EVERY OTHER KIND:
+ *   · AHEAD of `NOT_CONCLUDED`: one floor finding WITHHOLDS a re-review. A re-review re-runs every refused floor, that
+ *     deterministic policy's among them, over the same work — the completion would be refused by it again, so the re-review
+ *     of a review that did not conclude beside it could spend a billed call and change nothing (`offersOf`).
+ *   · BEHIND `CONCLUDED` and `ESCALATED`: one REVIEW that concluded — against the work, or escalated — among several still
+ *     makes the stop that review's. `REG-D-105` (3) then rules what follows it, so the re-run of the work cites (3)'s clause
+ *     and the reason says that review concluded, both true of that stop; the floor finding's own words (`REG-D-104` (1)
+ *     alone) would be false beside it. Either way the re-review is withheld and the work re-run is offered.
+ *   · BEHIND `REVIEWER_MUST_CHANGE`, as every kind is: any re-run would be reviewed by the reviewer refused.
  */
 export function strictestKind(kinds: readonly RefusalKind[]): RefusalKind {
 	if (kinds.includes('REVIEWER_MUST_CHANGE')) return 'REVIEWER_MUST_CHANGE';
 	if (kinds.includes('CONCLUDED')) return 'CONCLUDED';
 	if (kinds.includes('ESCALATED')) return 'ESCALATED';
+	if (kinds.includes('FLOOR_FINDING')) return 'FLOOR_FINDING';
 	return 'NOT_CONCLUDED';
+}
+
+/**
+ * ⭐⭐ `P76F-D` D1 — WHAT A RE-RUN OF THE WORK FOLLOWS, BY ITS STOP'S KIND, for its citation (`rerunWorkCitation`): a review
+ * that concluded — against the work, or escalated (`REG-D-105` (3)'s question named both, *"REJECTED or ESCALATED"*) — a
+ * review that did not conclude, or a floor policy other than the review. ⚠ `REVIEWER_MUST_CHANGE` is never cited: the
+ * server refuses that stop's re-run of the work before any Decision (`rerunWorkRefusal`); its review did not conclude.
+ */
+const RERUN_WORK_AFTER: Readonly<Record<RefusalKind, RerunWorkAfter>> = {
+	NOT_CONCLUDED: 'UNCONCLUDED_REVIEW',
+	CONCLUDED: 'CONCLUDED_REVIEW',
+	ESCALATED: 'CONCLUDED_REVIEW',
+	FLOOR_FINDING: 'FLOOR_FINDING',
+	REVIEWER_MUST_CHANGE: 'UNCONCLUDED_REVIEW'
+};
+
+/** ⭐ `P76F-D` D1 — what the re-run of the work of a stop of `kind` follows (`RERUN_WORK_AFTER`). */
+export function rerunWorkAfterOf(kind: RefusalKind): RerunWorkAfter {
+	return RERUN_WORK_AFTER[kind];
 }
 
 /** One subject the refused attempt produced whose floor is NOT satisfied, as the record holds it. */
@@ -436,12 +485,21 @@ function offeredActs(offers: StopOffers): string {
 	return acts.length < 2 ? acts.join('') : `${acts.slice(0, -1).join(', ')}, or ${acts.at(-1)!}`;
 }
 
-/** ⭐ `P76F-C` C3 — why the re-review is not among them, by the stop's kind; empty when it is, or when neither re-run is. */
+/**
+ * ⭐ `P76F-C` C3 — why the re-review is not among them, by the stop's kind; empty when it is, or when neither re-run is.
+ * ⭐ `P76F-D` D2 — `NOT_CONCLUDED`'s is written only for a stop with no refused subject (with one, the re-review is offered):
+ * the engine refused a completion whose results' recorded floors are all SATISFIED. ⛔ It was asserted nowhere — emptying it
+ * passed every test; the route test now holds it, recorded (`stopped-unit-recovery.route.test.ts`, D2).
+ * ⭐ `P76F-D` D1 — `FLOOR_FINDING`'s: a floor policy other than the review refused the work — the review passed it, so it
+ * did not "conclude" against it — and a re-review would run that policy again over the same work.
+ */
 const NO_RERUN_REVIEW: Readonly<Record<RefusalKind, string>> = {
 	NOT_CONCLUDED: ' No review of the attempt is refused on the record, so none is re-run.',
 	CONCLUDED: ' The review concluded, so it is not re-run (REG-D-105 (3)).',
 	ESCALATED: ' The review escalated to a person, so it is not re-run (REG-D-105 (3), REG-F-474).',
-	REVIEWER_MUST_CHANGE: ''
+	REVIEWER_MUST_CHANGE: '',
+	FLOOR_FINDING:
+		' A floor policy other than the review refused the work, which a re-review would not change, so the review is not re-run.'
 };
 
 /**
@@ -452,7 +510,8 @@ const NO_RERUN_REVIEW: Readonly<Record<RefusalKind, string>> = {
  * reads them back by, `offersOf`): after a review that did not conclude, all three; after one that concluded against the
  * work or escalated, re-run the work or abandon (`REG-D-105` (3)); after a refusal only a different reviewer can fix,
  * abandon alone, and why (`reviewerMustChangeText`). ⛔ It named all three for EVERY refusal — on the permanent record, a
- * re-review `REG-D-105` (3) withholds, and re-runs `P76F-A` A4 withholds.
+ * re-review `REG-D-105` (3) withholds, and re-runs `P76F-A` A4 withholds. ⭐ `P76F-D` D1 — after a floor finding beside a
+ * review that passed, re-run the work or abandon, and why the review is not re-run (`NO_RERUN_REVIEW`).
  */
 export function waitReasonFor(
 	refusals: readonly {
@@ -463,7 +522,13 @@ export function waitReasonFor(
 	stop: { readonly kind: RefusalKind; readonly offers: StopOffers; readonly rerunsWithheld: string | null }
 ): string {
 	const named = describeRefusals(refusals);
-	const head = `The assurance floor refused the completion — ${named || engineRefusal}.`;
+	// ⭐⭐ `P76F-D` D2 — WHO REFUSED, AS THE RECORD SHOWS IT. With no refused subject named, every floor the route recorded over
+	// the completion's results is SATISFIED — the in-memory floor IS the gate's own reading (`gatePermitsTransition`), of the
+	// very assessments the engine reads, at the version it reads them — so the engine refused for a reason of its own, and
+	// the reason quotes it. ⛔ It said *"The assurance floor refused the completion"* there too: false, on the record.
+	const head = named
+		? `The assurance floor refused the completion — ${named}.`
+		: `The engine refused the completion — ${engineRefusal}.`;
 	if (!stop.offers.rerunReview && !stop.offers.rerunWork)
 		return `${head} The unit waits for a person to abandon it — neither re-run is offered: ${stop.rerunsWithheld ?? 'none is offered for this stop.'}`;
 	return (
@@ -511,6 +576,11 @@ export function rerunReviewRefusal(unit: StoppedUnit): string | null {
 	if (mustChange) return mustChange;
 	if (unit.refusals.length === 0)
 		return 'no review of the refused attempt is refused on the record, so there is nothing to re-review.';
+	// ⭐⭐ `P76F-D` D1 — a floor finding is not a review that concluded against the work: it names the policy's refusal, and why a
+	// re-review cannot clear it. ⛔ It fell to the concluded refusal's text below — *"the review concluded against the work"*,
+	// of a review that had passed it — and cited `REG-D-105` (3), which rules only what follows such a review.
+	if (unit.kind === 'FLOOR_FINDING')
+		return `a floor policy other than the review refused the work (${describeRefusals(unit.refusals.filter((r) => refusalKindOf(r.action) === 'FLOOR_FINDING'))}), which a re-review would not change: it runs that policy again over the same work. Re-run the work, or abandon the unit (REG-D-104 (1)).`;
 	return unit.kind === 'ESCALATED'
 		? `the review escalated (${describeRefusals(unit.refusals)}); a re-review would let an automated reviewer clear an escalation meant for a person (REG-F-474). Re-run the work, or abandon the unit (REG-D-105 (3)).`
 		: `the review concluded against the work (${describeRefusals(unit.refusals)}); the floor reads the latest assessment, so a second review of the same work product could clear a reasoned refusal. Re-run the work with the findings, or abandon the unit (REG-D-105 (3)).`;

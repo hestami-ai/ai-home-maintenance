@@ -100,6 +100,7 @@ import {
 	RERUN_REVIEW,
 	RERUN_WORK,
 	rerunReviewRefusal,
+	rerunWorkAfterOf,
 	rerunWorkRefusal,
 	stepActOnAwaitedChoice,
 	stopAtRefusal,
@@ -2804,7 +2805,10 @@ export const actions: Actions = {
 				// ⭐ `P76F-A` A3 (RD4) — the person's words, then the ruling that authorises a re-run of the work. ⭐ `P76F-C` C5 —
 				// the clause that APPLIES: after a review that concluded (against the work, or escalated) `REG-D-105` (3)'s; after
 				// one that did not, `REG-D-104` (1) alone. ⛔ It cited (3)'s clause for a concluded review on every re-run.
-				decisionRationale(rationale, rerunWorkCitation(s.kind === 'CONCLUDED' || s.kind === 'ESCALATED'))
+				// ⭐⭐ `P76F-D` D1 — and after a floor policy other than the review refused the work, `REG-D-104` (1) alone: the
+				// review passed that work. ⛔ The boolean (`s.kind === 'CONCLUDED' || …`) filed it as a review that concluded, so
+				// its Decision cited (3)'s clause *"after a review that concluded against the work"* (`rerunWorkAfterOf`).
+				decisionRationale(rationale, rerunWorkCitation(rerunWorkAfterOf(s.kind)))
 			),
 			...planRevision(s, decisionId, planB, {
 				id: stepB,

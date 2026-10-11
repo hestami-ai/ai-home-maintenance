@@ -38,7 +38,10 @@ describe('⭐ RD3 — a refusal is sorted by the floor’s own classification', 
 			['CHANGE_REVIEWER', 'REVIEWER_MUST_CHANGE'],
 			['ESCALATE_REVIEW', 'ESCALATED'],
 			['REFINE_SUBJECT', 'CONCLUDED'],
-			['RESOLVE_OTHER_FLOOR_FINDINGS', 'CONCLUDED']
+			// ⛔⛔ `P76F-D` D1 — NOT A REVIEW THAT CONCLUDED AGAINST THE WORK: the review was SATISFIED and a deterministic floor
+			// policy refused the work (`classifyFloorRemediation`'s last arm). Filed `CONCLUDED`, its re-run of the work cited
+			// *"after a review that concluded against the work"* on the Decision's permanent record — the review concluded FOR it.
+			['RESOLVE_OTHER_FLOOR_FINDINGS', 'FLOOR_FINDING']
 		]);
 	});
 
@@ -53,6 +56,21 @@ describe('⭐ RD3 — a refusal is sorted by the floor’s own classification', 
 		expect(strictestKind(['REVIEWER_MUST_CHANGE', 'ESCALATED'])).toBe('REVIEWER_MUST_CHANGE');
 		expect(strictestKind(['NOT_CONCLUDED', 'REVIEWER_MUST_CHANGE'])).toBe('REVIEWER_MUST_CHANGE');
 		expect(strictestKind([])).toBe('NOT_CONCLUDED');
+	});
+
+	// ⭐⭐ `P76F-D` D1 — A FLOOR FINDING'S PLACE AMONG THEM. ⭑ One floor finding WITHHOLDS a re-review: a re-review runs that
+	// deterministic policy again over the same work, and the completion would be refused again by it. ⭑ But a REVIEW that
+	// concluded — against the work, or escalated — beside it still decides the stop: `REG-D-105` (3) then rules the re-run of
+	// the work, so its citation, and its reason for withholding the re-review, are that review's.
+	it('⛔ P76F-D D1 — a floor finding outranks a review that did not conclude, and yields to one that concluded or escalated, and to a reviewer that must change', () => {
+		expect(strictestKind(['FLOOR_FINDING'])).toBe('FLOOR_FINDING');
+		// THE MUTANT: read the first subject alone — a re-review would then be offered beside a finding it cannot change.
+		expect(strictestKind(['NOT_CONCLUDED', 'FLOOR_FINDING'])).toBe('FLOOR_FINDING');
+		expect(strictestKind(['FLOOR_FINDING', 'CONCLUDED'])).toBe('CONCLUDED');
+		// THE MUTANT: a floor finding ahead of an escalation — the re-run of the work would then cite (1) alone beside a
+		// review that escalated, which (3) rules.
+		expect(strictestKind(['FLOOR_FINDING', 'ESCALATED'])).toBe('ESCALATED');
+		expect(strictestKind(['FLOOR_FINDING', 'REVIEWER_MUST_CHANGE'])).toBe('REVIEWER_MUST_CHANGE');
 	});
 
 	it('⭐ an attempt key names its step: everything before its last `#`', () => {

@@ -232,7 +232,9 @@
 											</form>
 										{:else if p.workLifecycleState === 'EXECUTING' && data.recoveryByPwu[p.id]}
 											<!-- ⭐ JAN-EXEC P7-6R R-1d (RD2, RD3; REG-D-104 (1); REG-D-105 (3)) — A UNIT WAITING FOR A PERSON.
-											     Its review refused it, and the record says so; what is offered follows what the refusal was:
+											     ~~Its review refused it~~ Its completion was refused (P76F-D D1: by its review, by a floor policy other
+											     than the review beside a review that passed it, or by the engine with every floor satisfied), and the
+											     record says so; what is offered follows what the refusal was:
 											     re-run the review only after a review that did NOT conclude, re-run the work after any refusal save
 											     one only a different reviewer can fix (P76F-A A4: a substituted model, a reviewer not independent
 											     of the producer — then neither re-run, and the row says why), and abandon always.
@@ -242,7 +244,7 @@
 											{@const r = data.recoveryByPwu[p.id]}
 											<div class="recovery" data-testid="recovery">
 												<span class="hint" data-testid="recovery-refusal"
-													>Waiting for your choice — the review refused this unit's work: {r.refusal}. Re-runs so
+													>Waiting for your choice — this unit's completion was refused: {r.refusal}. Re-runs so
 													far: {r.reruns}.</span
 												>
 												{#if r.rerunsWithheld}
