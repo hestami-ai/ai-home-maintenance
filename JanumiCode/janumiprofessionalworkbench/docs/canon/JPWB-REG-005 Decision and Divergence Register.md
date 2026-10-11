@@ -40192,3 +40192,24 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - **The checks.** The product passed every acceptance case, and the negative control was REJECTED.
   - **Spend:** 198 of the 230 reviewer calls.
   - **The answer to the execution half of the sponsor's question** is yes, with the standing caveats: `REG-F-510`, `REG-F-523` and `REG-F-555`. The authoring half (P7-7) and the replay (Phase 8) are not yet measured.
+- ⭑ **2026-10-11 — after P3, the sponsor chose what comes next: all four** (`REG-D-109`).
+
+### REG-D-109 — SPONSOR RULING: after P3, all four next steps are to be pursued and resolved — live authoring (half B), declared policies that check their criteria, the replay, and the reviewer's misses
+
+**Ruled 2026-10-11** (sponsor, in session, answering the question sent with P3's result). **Type:** SPONSOR RULING. **Status:** ⚠ **OPEN — a programme of four parts; each is designed, put on a roadmap and built; each paid step comes back to the sponsor with its budget.**
+
+- **THE SPONSOR'S WORDS, verbatim, with the question:** Asked *"The execution half is answered: every phase of the Undertaking completed (P3). What should Phase 7 take on next?"*, with four options, the sponsor answered: *"All of those options should be pursued and resolved."*
+- **THE FOUR OPTIONS, as offered:**
+  1. *"Half B: live authoring (Recommended)"*: *"P7-7: the authoring agent builds the PWA from a plain request, it is accepted and published, then run as in P3. This measures the 'PWA and its PWUs are built' half of your question. Design first; paid, so it comes back to you before any spend."*
+  2. *"Make declared policies real"*: *"REG-F-523: the declared assurance policies are signed off with no criterion checked, so 4 cells are 'vacuous by construction'. Make them judge their criteria, so a 'Yes' no longer carries that caveat."*
+  3. *"Phase 8: replay P3"*: *"Turn P3 into a committed, deterministic replay, so this result becomes a regression test that costs nothing to re-run."*
+  4. *"Reviewer misses first"*: *"REG-F-555: find why the reviewer filed 2 planted defects as residual uncertainty, and fix it with a re-qualification (paid)."*
+- **WHAT IT MEANS.**
+  - All four are in scope, and none is optional. The order is the agent's to propose and the sponsor's to see.
+  - **The proposed order is set by what each changes.**
+    1. The reviewer's misses (4) and the declared policies (2) are designed and built first. Building them costs no calls.
+    2. Then one re-qualification measures the reviewer as it then stands.
+    3. Then the execution half is run again, so its "Yes" carries neither caveat.
+    4. Then half B (1).
+    5. Last, the replay (3), of a run made on the final code. A replay of P3 made earlier would replay a state the other three change.
+  - Each paid step comes back to the sponsor with its budget. 198 of the 230 reviewer calls are spent, so the plan needs a new limit.
