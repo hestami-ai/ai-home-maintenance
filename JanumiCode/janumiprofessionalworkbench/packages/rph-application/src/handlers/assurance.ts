@@ -2174,17 +2174,21 @@ const undeterminedMandatoryCriteria = (
  * `RPH-PWU-007` folds). Read from the store, never from the command.
  */
 function subjectDeclares(ctx: HandlerContext, assessmentId: string, policyId: unknown): boolean {
-	if (typeof policyId !== 'string') return false;
-	const subjects =
-		(ctx.store.loadObject(assessmentId)?.state as { subjectObjectIds?: unknown } | undefined)?.subjectObjectIds;
-	return (Array.isArray(subjects) ? subjects : []).some((id) => {
-		const unit = ctx.store.loadObject(String(id));
+	// ⚠ NO `?.`, NO SHAPE TEST AND NO TYPE TEST HERE, AS AT `severityIfNotMet` ABOVE, AND FOR ITS REASON: Gate E runs while
+	// the assessment completes, so it is in the store, and `RequestAssuranceAssessment`'s schema makes `subjectObjectIds` a
+	// required array of ids — an arm for either's absence is a branch no arrangement can reach. A policy id that is not a
+	// string is declared by no unit: `includes` answers false.
+	const { subjectObjectIds } = ctx.store.loadObject(assessmentId)!.state as { subjectObjectIds: string[] };
+	return subjectObjectIds.some((id) => {
+		const unit = ctx.store.loadObject(id);
+		// A subject that is not a work unit declares nothing (driven: an assessment over the Intent).
 		if (unit?.objectType !== 'PROFESSIONAL_WORK_UNIT') return false;
 		const pwu = unit.state as { assurancePolicyIds?: string[]; pwuTypeId?: string };
+		// The union's TYPE half (driven: a policy the unit's type requires, the unit naming none).
 		const pwuType = pwu.pwuTypeId
 			? (ctx.store.loadObject(pwu.pwuTypeId)?.state as { requiredAssurancePolicyIds?: string[] } | undefined)
 			: undefined;
-		return declaredAssurancePolicyIds(pwu, pwuType).includes(policyId);
+		return declaredAssurancePolicyIds(pwu, pwuType).includes(policyId as string);
 	});
 }
 
