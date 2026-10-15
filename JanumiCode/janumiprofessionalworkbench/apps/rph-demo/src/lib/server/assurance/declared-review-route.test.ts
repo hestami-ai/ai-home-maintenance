@@ -545,6 +545,20 @@ ${RERUN_DECLARED_REVIEWS_CITATION}`);
 		const gate = markup.indexOf('{#if data.declaredRerunByPwu[p.id]}');
 		const form = markup.indexOf('action="?/rerunDeclaredReviews"');
 		expect([row > -1, gate > row, form > gate], 'the re-run is offered outside the UNDER_ASSURANCE row’s gate').toEqual([true, true, true]);
-		expect(markup.slice(form, markup.indexOf('</form>', form))).toMatch(/name="rationale"[^>]*required/);
+		const formMarkup = markup.slice(form, markup.indexOf('</form>', form));
+		expect(formMarkup).toMatch(/name="rationale"[^>]*required/);
+		// ⛔ E12's re-review F7 — INSIDE THAT BRANCH, not merely after its opening: the gate and the form lie before the next
+		// `{:else if`, which opens the SATISFIED row's. Order alone held with the form moved into any later branch.
+		const nextBranch = markup.indexOf('{:else if', row + 1);
+		expect([gate < nextBranch, form < nextBranch], 'the re-run is offered in a branch after the UNDER_ASSURANCE row’s').toEqual([
+			true,
+			true
+		]);
+		// ⛔ AND THE PAID LANE PRESSES WHAT THE PAGE DRAWS: its rule finds the form by its test ids (`phase7-operator.ts`,
+		// `declaredRerunOffered` and `rerunDeclared`), and nothing else ties them to this markup — each must be on this form.
+		const operator = readFileSync(new URL('../../../../e2e-live-exec/phase7-operator.ts', import.meta.url), 'utf8');
+		const laneIds = [...new Set([...operator.matchAll(/getByTestId\('(rerun-declared-[a-z-]+)'\)/g)].map((m) => m[1]!))];
+		expect(laneIds, 'arrangement: the lane presses the form by its field and its button').toHaveLength(2);
+		for (const id of laneIds) expect(formMarkup, `the lane presses ${id}, which the form does not carry`).toContain(`data-testid="${id}"`);
 	});
 });

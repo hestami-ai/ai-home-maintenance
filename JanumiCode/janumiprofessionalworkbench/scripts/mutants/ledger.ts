@@ -27732,5 +27732,32 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/phase7-run-report.test.ts"],
 		why: "PROMISE (E12's re-review F6): the audit's printed note for 'markSatisfied without recordAssurance' says what its POST count counts - a Mark Satisfied on a unit with no accepted Record Assurance AND no accepted re-run of its declared reviews (E12F F3; REG-D-112 (a)). It is report output, not a comment: the sponsor reads it beside the count. WHO RELIES: the sponsor reading a paid run's audit, where the rule recovered a unit - its row reads 0 POSTs, and the old note described that unit's Mark Satisfied, pressed after a refused Record Assurance, as one counted. WHAT THE MUTATION DOES: the note goes back to the wording from before the declared re-run was counted. OBSERVED (bun run mutants -- (the E12 re-review ids), 2026-10-15, in the fixer's worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M102-the-audit-note-describes-the-count-before-the-declared-re-run ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 7 completion E12, the re-review's finding 6 (MINOR): since E12F F3 the 'markSatisfied without recordAssurance' count also excludes a unit with an accepted rerunDeclaredReviews, so a Mark Satisfied after a REFUSED Record Assurance is no longer counted by itself, and the printed note that said 'a Mark Satisfied pressed on a unit with no accepted Record Assurance' was false; it now names the declared re-run too"
+	},
+	{
+		id: "E12-M103-the-declared-re-run-form-moves-out-of-the-under-assurance-branch",
+		file: "apps/rph-demo/src/routes/undertakings/[id]/+page.svelte",
+		find: "\t\t\t\t\t\t\t\t\t\t\t{#if data.declaredRerunByPwu[p.id]}",
+		replace: "\t\t\t\t\t\t\t\t\t\t{:else if p.workLifecycleState === 'SATISFIED'}\n\t\t\t\t\t\t\t\t\t\t\t{#if data.declaredRerunByPwu[p.id]}",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/declared-review-route.test.ts"],
+		why: "PROMISE (E12's re-review F7; REG-D-112 (a)): the declared re-run is offered on the UNDER_ASSURANCE row - its gate and its form INSIDE that branch, before the next '{:else if'. WHO RELIES: the person, and the paid lane's rule, which looks for the form on a unit under assessment and would find none. WHAT THE MUTATION DOES: a branch opens before the gate, so the form is drawn for a SATISFIED row instead - the shape the old test's indexOf order alone could not see (it stays green under this mutant at the commit before E12's re-review). OBSERVED (bun run mutants -- (the E12 re-review ids), 2026-10-15, in the fixer's worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M103-the-declared-re-run-form-moves-out-of-the-under-assurance-branch ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion E12, the re-review's finding 7 (MINOR): the markup test for the declared re-run asked a weaker question than its name - indexOf order alone (row < gate < form), so the form moved into any later branch, the SATISFIED one among them, stayed green - and nothing tied the paid lane's test ids ('rerun-declared-rationale', 'rerun-declared-reviews') to the markup; now the gate and the form must lie before the next '{:else if' after the UNDER_ASSURANCE branch, and each test id the operator presses must be on the form"
+	},
+	{
+		id: "E12-M104-the-form-s-button-id-is-not-the-lane-s",
+		file: "apps/rph-demo/src/routes/undertakings/[id]/+page.svelte",
+		find: "data-testid=\"rerun-declared-reviews\"",
+		replace: "data-testid=\"rerun-declared-review\"",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/declared-review-route.test.ts"],
+		why: "PROMISE (E12's re-review F7): the form carries each test id the paid lane presses it by - 'rerun-declared-reviews' for its button. WHO RELIES: the paid lane (phase7-operator.ts, declaredRerunOffered and rerunDeclared), which would read the form as not offered and leave the unit as found. WHAT THE MUTATION DOES: the button's id drifts from the lane's. OBSERVED (bun run mutants -- (the E12 re-review ids), 2026-10-15, in the fixer's worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M104-the-form-s-button-id-is-not-the-lane-s ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion E12, the re-review's finding 7 (MINOR): the markup test for the declared re-run asked a weaker question than its name - indexOf order alone (row < gate < form), so the form moved into any later branch, the SATISFIED one among them, stayed green - and nothing tied the paid lane's test ids ('rerun-declared-rationale', 'rerun-declared-reviews') to the markup; now the gate and the form must lie before the next '{:else if' after the UNDER_ASSURANCE branch, and each test id the operator presses must be on the form"
+	},
+	{
+		id: "E12-M105-the-lane-types-into-a-field-the-form-lacks",
+		file: "apps/rph-demo/e2e-live-exec/phase7-operator.ts",
+		find: "await row.getByTestId('rerun-declared-rationale').fill(",
+		replace: "await row.getByTestId('rerun-declared-reason').fill(",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/declared-review-route.test.ts"],
+		why: "PROMISE (E12's re-review F7): the tie runs both ways - the ids are read from the operator's own source, so an id the lane presses that the form does not carry reddens the page's test, not only the lane's. WHO RELIES: the paid lane, whose fill would wait out its bound and throw, ending the run lane-error. WHAT THE MUTATION DOES: the lane types its rationale into a field id the form lacks. OBSERVED (bun run mutants -- (the E12 re-review ids), 2026-10-15, in the fixer's worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M105-the-lane-types-into-a-field-the-form-lacks ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion E12, the re-review's finding 7 (MINOR): the markup test for the declared re-run asked a weaker question than its name - indexOf order alone (row < gate < form), so the form moved into any later branch, the SATISFIED one among them, stayed green - and nothing tied the paid lane's test ids ('rerun-declared-rationale', 'rerun-declared-reviews') to the markup; now the gate and the form must lie before the next '{:else if' after the UNDER_ASSURANCE branch, and each test id the operator presses must be on the form"
 	}
 ];
