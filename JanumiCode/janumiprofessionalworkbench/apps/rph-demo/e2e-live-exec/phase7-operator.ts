@@ -480,7 +480,13 @@ export interface RecoveryRecord {
  */
 export type RerunReading = 'recovered' | 'refused-again' | 'not-made' | 'stopped-otherwise';
 
-/** ⭑ `request-failed` — a Begin & Execute whose request failed in transit (round 2's fix pass; `pressFormAction`). */
+/**
+ * ⭑ `request-failed` — ~~a Begin & Execute whose request failed in transit (round 2's fix pass; `pressFormAction`)~~ ⭐ E12's
+ * polish (the confirm's EndReason finding) — ANY ACT THE LANE PRESSES whose request failed in transit, and ⭑
+ * `allowance-exceeded`, any that gave no answer within its bound: both are `unansweredEnd`'s, for a Begin & Execute (round 2's
+ * fix pass; `pressFormAction`), a recovery act the rule pressed (P7-6R R-1f), and a sign-off act — Record Assurance, the rule's
+ * re-run of the declared reviews, Mark Satisfied (E12's re-review F1) — and a throw after one keeps its reason.
+ */
 export type EndReason =
 	| 'complete'
 	| 'dry-run-stop'
