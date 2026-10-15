@@ -10,7 +10,12 @@
 //     outcome), and returns the recorded answer and producer — graded HOST_CONFIGURED, never PROVIDER_REPORTED;
 //   · ⛔ a turn whose text is not the recorded one is REPLAY_STALE, naming the try and both hashes, and runs no tool;
 //   · ⛔ a call whose outcome now differs from the recorded one fails the turn REPLAY_STALE;
-//   · ⛔ it refuses a REAL runner: a replay's commands go through the REPLAYED runner, never a real one.
+//   · ⛔ it refuses a REAL runner: a replay's commands go through the REPLAYED runner, never a real one;
+//   · ⭐ (the review of E4) ⛔ a try whose recorded INSTRUCTIONS or TOOL DEFINITIONS are not what this code gives the
+//     executor is REPLAY_STALE, naming the part (finding 1 — predicted red, observed: the turn replayed green); ⛔ no try
+//     is served before the published PWA was held to the recording (finding 4); a recorded CALL_FAILED replays with its
+//     recorded reporter (finding 9 — predicted red, observed: `reportedBy` "PROVIDER" where the recording said "TOOL");
+//     and ⛔ after any refusal the executor serves no try (finding 7 — its mutant: the poison check deleted).
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -30,6 +35,11 @@ import {
 import { createReplayRun, forgetReplayRuns, replayRunFor, type ReplayRun } from './replay-run.js';
 import { openReplayExecutionSession } from './replay-executor.js';
 import { createReplayedProcessRunner } from './replayed-runner.js';
+import {
+	FIXTURE_PWA_OBJECTS,
+	fixtureExecutorKey,
+	fixtureManifest
+} from './replay-fixture.testing.js';
 
 const TURN = 'Work unit: Requirements. Write docs/requirements.md, then check it exists.';
 const ANSWER = JSON.stringify({
@@ -51,6 +61,8 @@ const CHECK_ARGV = ['node', '-e', "console.log(require('fs').existsSync('docs/re
 const TRY: ExecutorTry = {
 	unit: 'requirements',
 	turnSha256: sha256Hex(TURN),
+	// ⭐ The key as this code gives the executor (finding 1): the contract and the two tools the grant below mints.
+	...fixtureExecutorKey(),
 	toolCalls: [
 		{
 			name: 'write_file',
@@ -85,7 +97,7 @@ const recordingOf = (
 		format: RECORDING_FORMAT,
 		commit: 'fixture-commit',
 		reviewerFingerprint: 'fixture-fingerprint',
-		pwaContentDigest: 'fixture-digest',
+		...fixtureManifest(),
 		models: {
 			executor: PRODUCER,
 			reviewer: { agentId: 'devin', modelId: 'r', providerId: 'devin', callBoundMs: 240_000 }
@@ -112,6 +124,12 @@ afterEach(() => {
 	forgetReplayRuns();
 	rmSync(root, { recursive: true, force: true });
 });
+
+/** ⭐ `run`, its published PWA held to the recording — what the replay's re-creation does before the Undertaking. */
+function checked(run: ReplayRun): ReplayRun {
+	run.checkPublishedPwa(FIXTURE_PWA_OBJECTS);
+	return run;
+}
 
 /** The replay's sandbox, as the replay host builds it: two FILESYSTEM workspaces and the REPLAYED runner. */
 function contextOn(run: ReplayRun) {
@@ -147,7 +165,7 @@ describe('⭐ the replay executor (D2) — recorded tool calls through the real 
 		for (const [file, text] of Object.entries(recordingFiles(recordingOf([TRY], [CHECK]))))
 			writeFileSync(join(dir, file), text);
 		// ⭑ The sandbox's runner draws on the same replay the session opens: one recording, one set of cursors.
-		const run = replayRunFor(dir);
+		const run = checked(replayRunFor(dir));
 		const session = await getExecutionSession({ kind: 'REPLAY', recordingDir: dir })(
 			contextOn(run)
 		);
@@ -158,7 +176,7 @@ describe('⭐ the replay executor (D2) — recorded tool calls through the real 
 	});
 
 	it('a matching turn writes and runs through the real tools, and returns the recorded answer, graded HOST_CONFIGURED', async () => {
-		const run = createReplayRun(recordingOf([TRY], [CHECK]), () => root);
+		const run = checked(createReplayRun(recordingOf([TRY], [CHECK]), () => root));
 		const session = await openReplayExecutionSession(contextOn(run), run);
 
 		const result = (await session.turn(TURN)) as ToolInvocationResult;
@@ -192,7 +210,7 @@ describe('⭐ the replay executor (D2) — recorded tool calls through the real 
 	});
 
 	it('⛔ a turn whose text is not the recorded one is REPLAY_STALE, naming the try and both hashes, and runs no tool', async () => {
-		const run = createReplayRun(recordingOf([TRY], [CHECK]), () => root);
+		const run = checked(createReplayRun(recordingOf([TRY], [CHECK]), () => root));
 		const session = await openReplayExecutionSession(contextOn(run), run);
 		const other = `${TURN} And one more thing.`;
 
@@ -215,7 +233,7 @@ describe('⭐ the replay executor (D2) — recorded tool calls through the real 
 				}
 			]
 		};
-		const run = createReplayRun(recordingOf([escaping], []), () => root);
+		const run = checked(createReplayRun(recordingOf([escaping], []), () => root));
 		const session = await openReplayExecutionSession(contextOn(run), run);
 
 		await expect(session.turn(TURN)).rejects.toThrow(
@@ -228,8 +246,85 @@ describe('⭐ the replay executor (D2) — recorded tool calls through the real 
 		});
 	});
 
-	it('⛔ refuses a REAL runner: a replay’s commands go through the REPLAYED runner, never a real one', async () => {
+	it('⛔ a recording whose executor INSTRUCTIONS differ is REPLAY_STALE, naming both hashes, and runs no tool', async () => {
+		const other: ExecutorTry = {
+			...TRY,
+			instructionsSha256: sha256Hex('another execution contract')
+		};
+		const run = checked(createReplayRun(recordingOf([other], [CHECK]), () => root));
+		const session = await openReplayExecutionSession(contextOn(run), run);
+
+		await expect(session.turn(TURN)).rejects.toThrow(
+			/^REPLAY_STALE: executor try 1 \(unit requirements\): the executor's instructions/
+		);
+		expect(run.consumed()).toEqual({ executor: 0, commands: 0, reviewer: 0 });
+		expect(() => readFileSync(join(workspaceDir, 'docs', 'requirements.md'))).toThrow();
+	});
+
+	it('⛔ a recording whose TOOL DEFINITIONS differ is REPLAY_STALE, naming both hashes, and runs no tool', async () => {
+		// ⭑ Recorded under a grant of file-system alone: one tool offered, where this step's grant mints two.
+		const other: ExecutorTry = {
+			...TRY,
+			toolsSha256: fixtureExecutorKey(['file-system']).toolsSha256
+		};
+		const run = checked(createReplayRun(recordingOf([other], [CHECK]), () => root));
+		const session = await openReplayExecutionSession(contextOn(run), run);
+
+		await expect(session.turn(TURN)).rejects.toThrow(
+			/^REPLAY_STALE: executor try 1 \(unit requirements\): the executor's tool definitions' SHA-256 is [0-9a-f]{64}, and the recording's is [0-9a-f]{64}/
+		);
+		expect(run.consumed()).toEqual({ executor: 0, commands: 0, reviewer: 0 });
+	});
+
+	it('⛔ no try is served before the published PWA was held to the recording (REG-D-112 (c); finding 4)', async () => {
 		const run = createReplayRun(recordingOf([TRY], [CHECK]), () => root);
+		const session = await openReplayExecutionSession(contextOn(run), run);
+
+		await expect(session.turn(TURN)).rejects.toThrow(
+			/^REPLAY_PWA_UNCHECKED: executor try 1 was asked for before the published PWA was held to the recording's digest/
+		);
+		expect(run.consumed()).toEqual({ executor: 0, commands: 0, reviewer: 0 });
+		expect(() => readFileSync(join(workspaceDir, 'docs', 'requirements.md'))).toThrow();
+	});
+
+	it('a recorded CALL_FAILED replays with the reporter the recording names — a TOOL is never re-reported as the PROVIDER', async () => {
+		const failed: ExecutorTry = {
+			...TRY,
+			toolCalls: [],
+			answer: {
+				arrived: false,
+				cause: 'CALL_FAILED',
+				reportedBy: 'TOOL',
+				message: 'the tool exited 1'
+			}
+		};
+		const run = checked(createReplayRun(recordingOf([failed], []), () => root));
+		const session = await openReplayExecutionSession(contextOn(run), run);
+
+		const result = (await session.turn(TURN)) as ToolInvocationResult;
+
+		expect(result.answer).toEqual({
+			arrived: false,
+			cause: 'CALL_FAILED',
+			reportedBy: 'TOOL',
+			message: 'the tool exited 1'
+		});
+	});
+
+	it('⛔ after the replay has refused anything, the executor serves no try — not even one whose turn matches', async () => {
+		const run = checked(createReplayRun(recordingOf([TRY], [CHECK]), () => root));
+		run.stale('a reviewer call went stale first');
+		const session = await openReplayExecutionSession(contextOn(run), run);
+
+		await expect(session.turn(TURN)).rejects.toThrow(
+			'REPLAY_STALE: executor try 1 was not replayed: the replay already refused (REPLAY_STALE: a reviewer call went stale first)'
+		);
+		expect(run.consumed()).toEqual({ executor: 0, commands: 0, reviewer: 0 });
+		expect(() => readFileSync(join(workspaceDir, 'docs', 'requirements.md'))).toThrow();
+	});
+
+	it('⛔ refuses a REAL runner: a replay’s commands go through the REPLAYED runner, never a real one', async () => {
+		const run = checked(createReplayRun(recordingOf([TRY], [CHECK]), () => root));
 		const context = {
 			...contextOn(run),
 			runner: {

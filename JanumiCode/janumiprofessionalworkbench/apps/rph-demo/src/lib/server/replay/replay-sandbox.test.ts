@@ -13,13 +13,14 @@ import { resolveUndertakingSandbox } from '../execution/workspace-host.js';
 import { getArtifactStore } from '../workbench.js';
 import { RECORDING_FORMAT, recordingFiles, SCRUB_TOKENS, type Recording } from './recording.js';
 import { forgetReplayRuns, replayRunFor } from './replay-run.js';
+import { fixtureManifest } from './replay-fixture.testing.js';
 
 const EMPTY: Recording = {
 	manifest: {
 		format: RECORDING_FORMAT,
 		commit: 'fixture-commit',
 		reviewerFingerprint: 'fixture-fingerprint',
-		pwaContentDigest: 'fixture-digest',
+		...fixtureManifest(),
 		models: {
 			executor: { agentId: 'execution.model-invocation', modelId: 'm', providerId: 'p' },
 			reviewer: { agentId: 'devin', modelId: 'r', providerId: 'devin', callBoundMs: 240_000 }

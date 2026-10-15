@@ -21,7 +21,7 @@ import {
 } from './standin-reasoning-review-validator.js';
 import { assuranceModel, devinPrint, type DevinExec } from '../tools/devin-reviewer.js';
 import { refusalMessage, selectReviewer, type ReviewerSelection } from './reviewer-selection.js';
-import { replayRunFor } from '../replay/replay-run.js';
+import { productCallBoundFor, replayRunFor } from '../replay/replay-run.js';
 
 export function createFloorRegistry(opts: {
 	testMode: boolean;
@@ -122,8 +122,19 @@ export function createFloorRegistry(opts: {
 /**
  * ⭐⭐ `JAN-EXEC` Phase 8 (`DESIGN-phase-7-completion.md` §5 D2; `REG-D-111` (5); `REG-F-530`) — THE REPLAY REVIEWER: the
  * product's own validator — its call, retry, repair and capture — with the replay's `print` and the replay's clock
- * (`replay/replay-run.ts`). Its configured identity is the recording's reviewer, and so is the bound a thrown call is held
- * to, so with the recorded elapsed time a retry happens exactly where it happened.
+ * (`replay/replay-run.ts`). Its configured identity is the recording's reviewer ~~, and so is the bound a thrown call is
+ * held to~~. ⭐ THE BOUND IS THE PRODUCT'S (the review of E4, finding 8): `productCallBoundFor` the recorded reviewing
+ * tool, as the product's own devin and agy branches hold it (`REVIEWER_CALL_BOUND_MS`) — the recording's own bound let a
+ * recording made under ANOTHER bound replay its retries as though this code had made them. A recording whose thrown
+ * calls the product's bound would dispose otherwise is refused when the replay opens (`replayRunFor`,
+ * `boundDisagreements`), so with the recorded elapsed time a retry still happens exactly where it happened.
+ * ⭐ AND IT IS RECORDED AS A REPLAY (finding 10): its validator id — on the registry AND on every result it returns, which
+ * the assessment's completion records — is `REPLAY_REVIEWER_ID`, never the live reviewer's `agy.reasoning-review` (the
+ * validator writes that id into its own result, so the result is rewritten here rather than the validator changed); its
+ * exchanges are graded HOST_CONFIGURED and say in their tool-call observation that the reply was replayed
+ * (`replay-run.ts`, `REPLAYED_REVIEW_OBSERVATION`). ⚠ An identity grade of its own — a `REPLAYED` beside
+ * `PROVIDER_REPORTED` and `HOST_CONFIGURED` — would need a ratified change to the exchange contract
+ * (`ResolvedModelIdentity.evidence`; `RecordModelExchange`): the sponsor's question, not built here.
  * ⛔ AN INJECTED `print` DOES NOT OUTRANK IT. Elsewhere `print` stands in for the configured PROGRAM so a test can reach
  * the wiring; here the recording IS the program, and a second answerer beside it is the fallback `REG-D-067` forbids.
  * ⛔ A RECORDING THAT CANNOT BE READ IS A REFUSAL, RECORDED — `unconfiguredReviewer`, as a misconfigured reviewer is: the
@@ -140,7 +151,8 @@ function replayReviewer(
 		return unconfiguredReviewer(e instanceof Error ? e.message : String(e));
 	}
 	const reviewer = run.recording.manifest.models.reviewer;
-	return createAgyReasoningReviewValidator({
+	const bound = productCallBoundFor(reviewer.agentId);
+	const validator = createAgyReasoningReviewValidator({
 		...(opts.artifacts ? { artifacts: opts.artifacts } : {}),
 		...(opts.exchanges ? { exchanges: opts.exchanges } : {}),
 		print: run.reviewerPrint,
@@ -148,9 +160,20 @@ function replayReviewer(
 		agentId: reviewer.agentId,
 		modelId: reviewer.modelId,
 		providerId: reviewer.providerId,
-		...(reviewer.callBoundMs === null ? {} : { callBoundMs: reviewer.callBoundMs })
+		...(bound === undefined ? {} : { callBoundMs: bound })
 	});
+	return {
+		policyId: validator.policyId,
+		validatorId: REPLAY_REVIEWER_ID,
+		evaluate: async (subject, ctx) => ({
+			...(await validator.evaluate(subject, ctx)),
+			validatorId: REPLAY_REVIEWER_ID
+		})
+	};
 }
+
+/** ⭐ Finding 10 — the id a REPLAYED review is recorded under: never `agy.reasoning-review`, since no reviewer ran. */
+export const REPLAY_REVIEWER_ID = 'replay.reasoning-review';
 
 /** The validator a REFUSED selection registers: it runs nothing, and fails with the refusal. */
 function unconfiguredReviewer(message: string): Validator {

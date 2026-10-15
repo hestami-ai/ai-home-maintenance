@@ -15,7 +15,12 @@
 import { AGY_BIN_OVERRIDE, resolveJudgeModel } from './agy-cli.js';
 import { DEVIN_BIN_OVERRIDE, resolveAssuranceModel } from '../tools/devin-reviewer.js';
 import { selectBackingTool } from '../tools/backing-tool.js';
-import { REPLAY_VARIABLE, resolveReplayRecording } from '../replay/replay-switch.js';
+import {
+	besideReplayReason,
+	liveSelectionsBesideReplay,
+	REPLAY_VARIABLE,
+	resolveReplayRecording
+} from '../replay/replay-switch.js';
 
 /** The environment the selector reads — `process.env` in the product, a plain record in a test. */
 export type ReviewerEnvironment = Readonly<Record<string, string | undefined>>;
@@ -43,7 +48,8 @@ export type ReviewerRefusalCode =
 	| 'REVIEWER_PROGRAM_OVERRIDDEN'
 	// ⭐ `JAN-EXEC` Phase 8 (D2; `REG-D-111` (5)) — the replay switch's two refusals (`replay/replay-switch.ts`).
 	| 'REVIEWER_REPLAY_OUTSIDE_TEST_MODE'
-	| 'REVIEWER_REPLAY_BESIDE_A_TOOL';
+	// ⭐ `REG-D-112` (c) — ~~`REVIEWER_REPLAY_BESIDE_A_TOOL`~~: beside ANY live-backend selection, its general form.
+	| 'REVIEWER_REPLAY_BESIDE_A_LIVE_SELECTION';
 
 /**
  * The selector's answer — exactly one of ~~four~~ ⭐ five: `JAN-EXEC` Phase 8 adds `REPLAY` (D2), the recording folder
@@ -144,12 +150,14 @@ function selectedProgramOverridden(
  * ⭐⭐ `JAN-EXEC` Phase 8 (`DESIGN-phase-7-completion.md` §5 D2; `REG-D-111` (5); `REG-F-530`) — THE REPLAY SWITCH'S ANSWER,
  * or `undefined` when `JPWB_REPLAY` is unset: the executor selector's rule (`executor-selection.ts`, `replaySelection`),
  * so the two replay together or neither does. Outside test mode REFUSED whatever tool is named; in test mode REFUSED
- * beside a named tool, since a live reviewer winning silently is a paid call where a replay was asked for.
+ * beside ~~a named tool~~ ⭐ any live-backend selection (`REG-D-112` (c); `liveSelectionsBesideReplay`), since a live
+ * backend winning silently is a paid call where a replay was asked for.
  */
 function replaySelection(
 	env: ReviewerEnvironment,
 	testMode: boolean,
-	toolId: string | undefined
+	toolId: string | undefined,
+	overrides: ReviewerProgramOverrides
 ): ReviewerSelection | undefined {
 	const recordingDir = resolveReplayRecording(env[REPLAY_VARIABLE]);
 	if (recordingDir === undefined) return undefined;
@@ -161,21 +169,18 @@ function replaySelection(
 				'would answer from a recording while the record named a reviewer that judged. Unset it, or run in test mode ' +
 				'(REG-D-111 (5)).'
 		);
-	if (toolId !== undefined)
-		return refused(
-			'REVIEWER_REPLAY_BESIDE_A_TOOL',
-			toolId,
-			`${REPLAY_VARIABLE} is set and so is JPWB_ASSURANCE_TOOL ('${toolId}'): a replay and a live reviewer cannot both ` +
-				'judge, and a live one winning silently would be a paid call where a replay was asked for. Unset one of them.'
-		);
+	const beside = liveSelectionsBesideReplay(env, overrides);
+	if (beside.length > 0)
+		return refused('REVIEWER_REPLAY_BESIDE_A_LIVE_SELECTION', toolId, besideReplayReason(beside));
 	return { kind: 'REPLAY', recordingDir };
 }
 
 /**
  * Which reviewer runs.
  *
- * ⭐ `JAN-EXEC` Phase 8 — ASKED FIRST: `JPWB_REPLAY` (`replaySelection`, above): REPLAY in test mode with no tool named,
- * else `REVIEWER_REPLAY_OUTSIDE_TEST_MODE` or `REVIEWER_REPLAY_BESIDE_A_TOOL`. Unset, the table below is unchanged.
+ * ⭐ `JAN-EXEC` Phase 8 — ASKED FIRST: `JPWB_REPLAY` (`replaySelection`, above): REPLAY in test mode with no live backend
+ * selected beside it, else `REVIEWER_REPLAY_OUTSIDE_TEST_MODE` or ⭐ `REVIEWER_REPLAY_BESIDE_A_LIVE_SELECTION`
+ * (`REG-D-112` (c)). Unset, the table below is unchanged.
  *
  * ⭑ THE TABLE (D2, D7):
  *   · tool UNSET (absent, `''` or whitespace) — test mode: the declared STAND-IN; outside it: REFUSED.
@@ -200,7 +205,8 @@ export function selectReviewer(input: {
 }): ReviewerSelection {
 	const env = input.env ?? process.env;
 	const toolId = resolveReviewerToolId(env.JPWB_ASSURANCE_TOOL);
-	const replay = replaySelection(env, input.testMode, toolId);
+	const overrides = input.overrides ?? { agy: AGY_BIN_OVERRIDE, devin: DEVIN_BIN_OVERRIDE };
+	const replay = replaySelection(env, input.testMode, toolId, overrides);
 	if (replay) return replay;
 	if (toolId === undefined)
 		return input.testMode
@@ -220,11 +226,7 @@ export function selectReviewer(input: {
 			`The reviewing tool '${toolId}' (JPWB_ASSURANCE_TOOL) is refused: ${e instanceof Error ? e.message : String(e)}`
 		);
 	}
-	const overridden = selectedProgramOverridden(
-		toolId,
-		input.testMode,
-		input.overrides ?? { agy: AGY_BIN_OVERRIDE, devin: DEVIN_BIN_OVERRIDE }
-	);
+	const overridden = selectedProgramOverridden(toolId, input.testMode, overrides);
 	if (overridden) return overridden;
 	// ⛔ `?? ''` MAKES THE ENVIRONMENT HANDED IN THE WHOLE INPUT. Both resolvers default their parameter to the PROCESS's
 	// variable when given `undefined`, so an explicit environment naming a tool and no model used to take its model from

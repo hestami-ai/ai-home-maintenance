@@ -1,6 +1,8 @@
 // ⭐⭐ `JAN-EXEC` Phase 8 (`DESIGN-phase-7-completion.md` §5 D2; `REG-D-111` (5); `REG-F-530`) — THE SWITCH, AT BOTH
 // SELECTORS: `JPWB_REPLAY` in test mode answers REPLAY for the executor and the reviewer alike; outside test mode it is
-// refused with its own code; beside a named tool it is refused; and unset, nothing changes.
+// refused with its own code; beside a named tool ⭐ — or any live-backend selection (`REG-D-112` (c)) — it is refused; and
+// unset, nothing changes.
+// ⭐ PREDICTED RED for `REG-D-112` (c), observed: `JPWB_AGENT=pi` beside the switch answered REPLAY, unrefused.
 //
 // ⭑ PREDICTED RED, WRITTEN BEFORE THE ARM EXISTED: test mode with `JPWB_REPLAY` set answers `STAND_IN` today
 // (`executor-selection.ts:202-204`; `reviewer-selection.ts:160-162`, at `03b3bf03`), because neither selector reads the switch.
@@ -73,9 +75,12 @@ describe('JPWB_REPLAY — the replay switch, read by both selectors (D2)', () =>
 		});
 		expect(executor).toMatchObject({
 			kind: 'REFUSED',
-			code: 'EXECUTOR_REPLAY_BESIDE_A_TOOL',
+			code: 'EXECUTOR_REPLAY_BESIDE_A_LIVE_SELECTION',
 			toolId: 'pi'
 		});
+		expect(executor.kind === 'REFUSED' ? executor.reason : '').toContain(
+			'JPWB_REPLAY is set and so is JPWB_EXECUTOR, JPWB_EXECUTOR_MODEL'
+		);
 		const reviewer = selectReviewer({
 			testMode: true,
 			env: {
@@ -87,9 +92,49 @@ describe('JPWB_REPLAY — the replay switch, read by both selectors (D2)', () =>
 		});
 		expect(reviewer).toMatchObject({
 			kind: 'REFUSED',
-			code: 'REVIEWER_REPLAY_BESIDE_A_TOOL',
+			code: 'REVIEWER_REPLAY_BESIDE_A_LIVE_SELECTION',
 			toolId: 'devin'
 		});
+	});
+
+	it('⛔ beside ANY live-backend selection the switch is refused — the authoring agent JPWB_AGENT included (REG-D-112)', () => {
+		const beside: readonly (readonly [string, string])[] = [
+			['JPWB_AGENT', 'pi'],
+			['JPWB_AGENT_MODEL', 'fixture-provider/fixture-agent'],
+			['JPWB_EXECUTOR_MODEL', 'fixture-executor'],
+			['JPWB_ASSURANCE_MODEL', 'fixture-assurance'],
+			['JPWB_JUDGE_MODEL', 'fixture-judge']
+		];
+		for (const [name, value] of beside) {
+			const env = { JPWB_REPLAY: DIR, [name]: value };
+			const executor = selectExecutor({ testMode: true, env, overrides: NO_OVERRIDES });
+			expect(executor, name).toMatchObject({
+				kind: 'REFUSED',
+				code: 'EXECUTOR_REPLAY_BESIDE_A_LIVE_SELECTION'
+			});
+			expect(executor.kind === 'REFUSED' ? executor.reason : '', name).toContain(name);
+			const reviewer = selectReviewer({ testMode: true, env, overrides: NO_OVERRIDES });
+			expect(reviewer, name).toMatchObject({
+				kind: 'REFUSED',
+				code: 'REVIEWER_REPLAY_BESIDE_A_LIVE_SELECTION'
+			});
+			expect(reviewer.kind === 'REFUSED' ? reviewer.reason : '', name).toContain(name);
+		}
+		// ⭑ And a program override the adapters captured is one too: beside a replay it would override nothing.
+		for (const overrides of [
+			{ agy: 'agy-elsewhere', devin: undefined },
+			{ agy: undefined, devin: 'devin-elsewhere' }
+		]) {
+			const env = { JPWB_REPLAY: DIR };
+			expect(selectExecutor({ testMode: true, env, overrides })).toMatchObject({
+				kind: 'REFUSED',
+				code: 'EXECUTOR_REPLAY_BESIDE_A_LIVE_SELECTION'
+			});
+			expect(selectReviewer({ testMode: true, env, overrides })).toMatchObject({
+				kind: 'REFUSED',
+				code: 'REVIEWER_REPLAY_BESIDE_A_LIVE_SELECTION'
+			});
+		}
 	});
 
 	it('the replay is a ready reviewer to the preflight, and the executor’s record falls back to no configured model', () => {

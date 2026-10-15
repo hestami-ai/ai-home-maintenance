@@ -23,13 +23,14 @@ import {
 	sha256Hex,
 	type Recording
 } from './recording.js';
+import { fixtureExecutorKey, fixtureManifest } from './replay-fixture.testing.js';
 
 const RECORDING: Recording = {
 	manifest: {
 		format: RECORDING_FORMAT,
 		commit: 'fixture-commit',
 		reviewerFingerprint: 'fixture-fingerprint',
-		pwaContentDigest: 'fixture-digest',
+		...fixtureManifest(),
 		models: {
 			executor: { agentId: 'execution.model-invocation', modelId: 'm', providerId: 'p' },
 			reviewer: { agentId: 'devin', modelId: 'r', providerId: 'devin', callBoundMs: null }
@@ -44,10 +45,16 @@ const RECORDING: Recording = {
 		{
 			unit: 'requirements',
 			turnSha256: sha256Hex('turn'),
+			...fixtureExecutorKey(),
 			toolCalls: [
 				{ name: 'write_file', arguments: { path: 'a.md', contents: 'x' }, outcome: 'COMPLETED' }
 			],
-			answer: { arrived: false, cause: 'CALL_FAILED', message: 'model not supported' },
+			answer: {
+				arrived: false,
+				cause: 'CALL_FAILED',
+				reportedBy: 'TOOL',
+				message: 'model not supported'
+			},
 			producer: { agentId: 'execution.model-invocation', modelId: 'm', providerId: 'p' }
 		}
 	],
@@ -105,7 +112,7 @@ describe('⭐ the recording’s format (D1)', () => {
 			)
 		};
 		expect(() => readRecording(written(otherFormat))).toThrow(
-			'REPLAY_RECORDING_REFUSED: the recording is refused: recording.json names the format "jpwb-replay-recording/0", not jpwb-replay-recording/1'
+			'REPLAY_RECORDING_REFUSED: the recording is refused: recording.json names the format "jpwb-replay-recording/0", not jpwb-replay-recording/2'
 		);
 		expect(() => readRecording('relative/recording')).toThrow(
 			/'relative\/recording' is not absolute/
@@ -130,6 +137,18 @@ describe('⭐ the recording’s format (D1)', () => {
 		};
 		expect(() => readRecording(written(badHash))).toThrow(
 			'executor.jsonl:1 has no SHA-256 `turnSha256`'
+		);
+	});
+
+	it('⛔ refuses a recording made on the other OS family, with a reason of its own — never REPLAY_STALE at its first path', () => {
+		const here = process.platform === 'win32' ? 'windows' : 'posix';
+		const there = here === 'windows' ? 'posix' : 'windows';
+		const files = recordingFiles({
+			...RECORDING,
+			manifest: { ...RECORDING.manifest, osFamily: there }
+		} as unknown as Recording);
+		expect(() => readRecording(written(files))).toThrow(
+			`REPLAY_RECORDING_REFUSED: the recording is refused: recording.json was made on the ${there} family, and this host is ${here}`
 		);
 	});
 

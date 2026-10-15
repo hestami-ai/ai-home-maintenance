@@ -3,7 +3,11 @@
 // share — a call that does not match its recording FAILS CLOSED, and so does every call after it.
 //
 // ── ⛔ WHAT EACH ARM CHECKS BEFORE IT ANSWERS ──────────────────────────────────────────────────────────────────────────
-//   · the EXECUTOR (`replay-executor.ts`): the turn's text, scrubbed, hashes to the recorded `turnSha256`;
+//   · ⭐ FIRST, ONCE (`REG-D-112` (c); the review of E4, finding 4): the published PWA, digested, is the recording's
+//     (`checkPublishedPwa`) — until it has been held so, no executor try is served (`REPLAY_PWA_UNCHECKED`);
+//   · the EXECUTOR (`replay-executor.ts`): the turn's text, scrubbed, hashes to the recorded `turnSha256` — ⭐ and the
+//     executor's instructions and its tool definitions, recomputed from the code under test, to the recorded
+//     `instructionsSha256` and `toolsSha256` (finding 1);
 //   · the RUNNER (`replayed-runner.ts`): the argv it is asked to run, scrubbed, is the recorded argv;
 //   · the REVIEWER (`reviewerPrint`, below): the prompt, scrubbed, hashes to the recorded `promptSha256`.
 // A mismatch is `REPLAY_STALE`, naming the call and both hashes; a call past the end is `REPLAY_EXHAUSTED`. ⛔ AND THE
@@ -23,25 +27,48 @@
 // Whether a call that threw is run once more depends on its elapsed time against the tool's bound. The replay hands the
 // validator `clock`, a virtual time that only `reviewerPrint` advances — by each call's RECORDED elapsed time — so the
 // validator measures exactly the time the run measured, and a retry happens exactly where it happened.
+// ⭐ AND THE BOUND IS THE PRODUCT's (the review of E4, finding 8): ~~the recording's~~ `REVIEWER_CALL_BOUND_MS` for the
+// recorded reviewing tool, as the product's own validator holds it (`productCallBoundFor`). A recording whose thrown
+// calls that bound would dispose otherwise than the run did — retried where it would stand, or standing where it would
+// be retried — was made under another bound, and is refused when the replay opens (`boundDisagreements`).
 import { mkdirSync, mkdtempSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { REVIEWER_CALL_BOUND_MS } from '../assurance/reasoning-review-validator.js';
 import { answerFromText, type ToolInvocationResult } from '../tools/backing-tool.js';
 import {
 	expandText,
+	instructionsSha256,
+	pwaContentDigest,
 	readRecording,
+	RecordingRefusal,
 	scrubPairs,
 	scrubText,
 	sha256Hex,
+	toolDefinitionsSha256,
 	type ExecutorTry,
+	type PwaObjectRow,
 	type RecordedCommand,
 	type Recording,
 	type ReviewerCall,
-	type ScrubPair
+	type ScrubPair,
+	type ToolDefinitionKey
 } from './recording.js';
 
-/** Why a replayed call was refused: the recording no longer matches, or it has no call left. */
-export type ReplayRefusalCode = 'REPLAY_STALE' | 'REPLAY_EXHAUSTED';
+/**
+ * Why a replayed call was refused: the recording no longer matches, or it has no call left — ⭐ or the published PWA was
+ * never held to the recording before a try was asked for (`REG-D-112` (c); finding 4).
+ */
+export type ReplayRefusalCode = 'REPLAY_STALE' | 'REPLAY_EXHAUSTED' | 'REPLAY_PWA_UNCHECKED';
+
+/**
+ * ⭐ WHAT THE EXECUTOR WAS GIVEN BESIDE ITS TURN (the review of E4, finding 1): its instructions and the tools it was
+ * offered, as the code under test would give them (`replay-executor.ts`, `executorKeyOf`).
+ */
+export interface ExecutorKey {
+	readonly instructions: string;
+	readonly tools: readonly ToolDefinitionKey[];
+}
 
 /** ⛔ A replay's refusal. Its message opens with its code, so a floor or a step that records it says which. */
 export class ReplayRefusal extends Error {
@@ -74,8 +101,17 @@ export interface ReplayRun extends ReplayCommandSource {
 	scrub(text: string): string;
 	/** Every string inside `value`, expanded — a recorded tool call's arguments, as this host's tools must receive them. */
 	expandArguments(value: Readonly<Record<string, unknown>>): Record<string, unknown>;
-	/** The next recorded executor try, if `turnText` hashes to it. ⛔ Throws `ReplayRefusal` otherwise. */
-	nextExecutorTry(turnText: string): ExecutorTry;
+	/**
+	 * ⭐ HOLD THE PUBLISHED PWA TO THE RECORDING (`REG-D-112` (c); finding 4): `objects` are the store's, and their
+	 * published PWA must digest to the recording's `pwaContentDigest`. ⛔ Throws `ReplayRefusal` (and poisons) otherwise;
+	 * until it has passed, no executor try is served.
+	 */
+	checkPublishedPwa(objects: readonly PwaObjectRow[]): void;
+	/**
+	 * The next recorded executor try, if `turnText` hashes to it — ⭐ and `key`, the executor's instructions and tools, to
+	 * the try's recorded key (finding 1). ⛔ Throws `ReplayRefusal` otherwise.
+	 */
+	nextExecutorTry(turnText: string, key: ExecutorKey): ExecutorTry;
 	/** ⭐ The reviewer's `print`: the next recorded reply, if the prompt hashes to it. ⛔ Rejects `ReplayRefusal` otherwise. */
 	readonly reviewerPrint: (prompt: string) => Promise<ToolInvocationResult>;
 	/** ⭐ The validator's clock: virtual time, advanced by each replayed call's recorded elapsed time. */
@@ -148,6 +184,8 @@ export function createReplayRun(
 	let virtualMs = REPLAY_EPOCH_MS;
 	const next = { executor: 0, commands: 0, reviewer: 0 };
 	let poisoned: ReplayRefusal | undefined;
+	/** ⭐ Whether the published PWA has been held to the recording's digest (`checkPublishedPwa`). */
+	let pwaChecked = false;
 
 	/** ⛔ THE FIRST REFUSAL POISONS THE REPLAY; every later call refuses as stale, naming it. */
 	const poison = (refusal: ReplayRefusal): ReplayRefusal => {
@@ -198,21 +236,83 @@ export function createReplayRun(
 		poisonedBy: () => poisoned,
 		clock: () => new Date(virtualMs).toISOString(),
 
-		nextExecutorTry(turnText) {
+		checkPublishedPwa(objects) {
+			const already = afterPoison('the published PWA');
+			if (already) throw already;
+			const actual = pwaContentDigest(objects);
+			if (typeof actual !== 'string')
+				throw poison(
+					new ReplayRefusal(
+						'REPLAY_STALE',
+						`the published PWA cannot be held to the recording: ${actual.join('; ')}.`
+					)
+				);
+			if (actual !== recording.manifest.pwaContentDigest)
+				throw poison(
+					new ReplayRefusal(
+						'REPLAY_STALE',
+						`the published PWA's content digest is ${actual}, and the recording's is ` +
+							`${recording.manifest.pwaContentDigest}: this run's PWA is not the one the recording was made on, ` +
+							'and no try is served to it.'
+					)
+				);
+			pwaChecked = true;
+		},
+
+		nextExecutorTry(turnText, key) {
 			const index = next.executor;
 			const what = `executor try ${index + 1}`;
 			const already = afterPoison(what);
 			if (already) throw already;
-			const recorded = recording.executor[index];
-			if (recorded === undefined) throw exhausted(what, recording.executor.length);
-			const actual = sha256Hex(scrub(turnText));
-			if (actual !== recorded.turnSha256)
+			// ⛔ `REG-D-112` (c); finding 4 — NO TRY BEFORE THE PWA WAS HELD TO THE RECORDING: a recorded answer answers the
+			// instruction the recorded PWA rendered, and a replay that skipped the check could serve it to another PWA's.
+			if (!pwaChecked)
 				throw poison(
 					new ReplayRefusal(
-						'REPLAY_STALE',
-						`${what} (unit ${recorded.unit}): the turn text's SHA-256 is ${actual}, and the recording's is ` +
-							`${recorded.turnSha256}. The executor was sent another turn than the one recorded.`
+						'REPLAY_PWA_UNCHECKED',
+						`${what} was asked for before the published PWA was held to the recording's digest ` +
+							'(checkPublishedPwa): a recorded try is served only to the PWA it was made on (REG-D-112 (c)).'
 					)
+				);
+			const recorded = recording.executor[index];
+			if (recorded === undefined) throw exhausted(what, recording.executor.length);
+			const stale = (
+				part: string,
+				actual: string,
+				recordedHash: string,
+				sentence: string
+			): ReplayRefusal =>
+				poison(
+					new ReplayRefusal(
+						'REPLAY_STALE',
+						`${what} (unit ${recorded.unit}): ${part} SHA-256 is ${actual}, and the recording's is ` +
+							`${recordedHash}. ${sentence}`
+					)
+				);
+			const turn = sha256Hex(scrub(turnText));
+			if (turn !== recorded.turnSha256)
+				throw stale(
+					"the turn text's",
+					turn,
+					recorded.turnSha256,
+					'The executor was sent another turn than the one recorded.'
+				);
+			// ⭐ FINDING 1 — THE REST OF WHAT THE MODEL WAS GIVEN: its system prompt and its tools, as this code gives them.
+			const instructions = instructionsSha256(key.instructions, scrub);
+			if (instructions !== recorded.instructionsSha256)
+				throw stale(
+					"the executor's instructions'",
+					instructions,
+					recorded.instructionsSha256,
+					'The executor would be given another system prompt than the one the recorded answer was made under.'
+				);
+			const tools = toolDefinitionsSha256(key.tools, scrub);
+			if (tools !== recorded.toolsSha256)
+				throw stale(
+					"the executor's tool definitions'",
+					tools,
+					recorded.toolsSha256,
+					'The executor would be offered other tools than the ones the recorded answer was made with.'
 				);
 			next.executor += 1;
 			return recorded;
@@ -277,6 +377,40 @@ export function createReplayRun(
 	};
 }
 
+/**
+ * ⭐ THE PRODUCT'S BOUND FOR A REVIEWING TOOL (finding 8): `REVIEWER_CALL_BOUND_MS`, the bound the product's own validator
+ * holds that tool's thrown calls to, or undefined for a tool the product declares none for (whose throws then stand).
+ */
+export function productCallBoundFor(agentId: string): number | undefined {
+	return agentId === 'devin' || agentId === 'agy' ? REVIEWER_CALL_BOUND_MS[agentId] : undefined;
+}
+
+/**
+ * ⭐⭐ FINDING 8 — WHERE THE PRODUCT'S BOUND WOULD DISPOSE A RECORDED THROW OTHERWISE THAN THE RUN DID, one sentence each.
+ * The validator runs a thrown call once more when it threw short of the bound, and lets it stand at or past it, or when
+ * it was itself the retry (`thrownCallDisposal`); the recording says what the run did by its NEXT call, a `retry` or not.
+ * A disagreement means the recording was made under another bound — the review's case among them, a throw that elapsed
+ * beyond the product's bound and was retried — and a replay of it would ask for a call the recording does not hold, or
+ * skip one it does. ⚠ A throw past the bound that the run let stand AGREES (a timeout, killed at the bound): it replays.
+ */
+export function boundDisagreements(recording: Recording, bound: number | undefined): string[] {
+	const out: string[] = [];
+	recording.reviewer.forEach((call, index) => {
+		if (call.reply.status !== 'THROWN' || call.role === 'retry') return;
+		const recordedRetry = recording.reviewer[index + 1]?.role === 'retry';
+		const productRetries = bound !== undefined && call.elapsedMs < bound;
+		if (recordedRetry === productRetries) return;
+		out.push(
+			`${describeCall(index, call)} threw after ${call.elapsedMs} ms and the recorded run ` +
+				`${recordedRetry ? 'ran it once more' : 'let it stand'}, where the product's bound for ` +
+				`'${recording.manifest.models.reviewer.agentId}' — ` +
+				`${bound === undefined ? 'none declared' : `${bound} ms`} — would ` +
+				`${productRetries ? 'run it once more' : 'let it stand'}`
+		);
+	});
+	return out;
+}
+
 /** The replays this process has opened, by recording folder: one replay per recording, from its first call. */
 const opened = new Map<string, ReplayRun>();
 
@@ -284,11 +418,23 @@ const opened = new Map<string, ReplayRun>();
  * ⭐ THE REPLAY OF THE RECORDING `JPWB_REPLAY` NAMES — opened on first use and held, so the executor, the runner and the
  * reviewer of one run draw on one set of cursors. ⛔ Throws `RecordingRefusal` when the folder is not a recording this
  * replay can read: every caller records the refusal on what it was opening, and nothing replays.
+ * ⭐ FINDING 8 — AND WHEN THE PRODUCT'S BOUND WOULD DISPOSE ONE OF ITS THROWS OTHERWISE (`boundDisagreements`): refused
+ * at open, by every arm alike, rather than diverging at the throw.
  */
 export function replayRunFor(dir: string): ReplayRun {
 	let run = opened.get(dir);
 	if (run === undefined) {
-		run = createReplayRun(readRecording(dir));
+		const recording = readRecording(dir);
+		const disagreements = boundDisagreements(
+			recording,
+			productCallBoundFor(recording.manifest.models.reviewer.agentId)
+		);
+		if (disagreements.length > 0)
+			throw new RecordingRefusal(
+				"the recording is refused: its thrown reviewer calls were disposed under another bound than the product's " +
+					`(finding 8): ${disagreements.join('; ')}`
+			);
+		run = createReplayRun(recording);
 		opened.set(dir, run);
 	}
 	return run;

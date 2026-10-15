@@ -55,6 +55,7 @@ import {
 	REPLAY_EPOCH_MS,
 	type ReplayRun
 } from './replay-run.js';
+import { fixtureManifest } from './replay-fixture.testing.js';
 
 const SUBJECT: AssuranceSubject = {
 	subjectId: 'art_replayed_review',
@@ -129,7 +130,7 @@ const recordingOf = (
 		format: RECORDING_FORMAT,
 		commit: 'fixture-commit',
 		reviewerFingerprint: 'fixture-fingerprint',
-		pwaContentDigest: 'fixture-digest',
+		...fixtureManifest(),
 		models: {
 			executor: {
 				agentId: 'execution.model-invocation',
@@ -376,5 +377,91 @@ describe('⭐ the floor registry’s REPLAY arm (D2)', () => {
 		const refused = await floorOver();
 		expect(refused.review?.disposition).toBe('INCONCLUSIVE');
 		expect(JSON.stringify(refused.review)).toContain('REPLAY_RECORDING_REFUSED');
+	});
+
+	it('(vii) ⛔ the replay holds the validator to the PRODUCT’s bound, and refuses a recording whose throws that bound would dispose otherwise', async () => {
+		const prompt = await promptOf();
+		delete process.env.JPWB_ASSURANCE_TOOL;
+		process.env.PATH = noProgramsDirectory();
+		// ⭑ Two recordings that say their bound was other than devin's 240 000 ms: one ran a 300 000 ms throw once more
+		// (a bound of 500 000), one let a 200 000 ms throw stand (a bound of 120 000). Under the product's bound the first
+		// is a timeout and the second is retried, so neither is the run this code would make.
+		const arrangements = [
+			{
+				bound: 500_000,
+				calls: [
+					call(prompt, { status: 'THROWN', message: TRANSPORT }, 300_000),
+					call(prompt, { status: 'ANSWERED', text: CLEAN }, 5, { role: 'retry' })
+				]
+			},
+			{
+				bound: 120_000,
+				calls: [
+					call(prompt, { status: 'THROWN', message: TRANSPORT }, 200_000),
+					call(prompt, { status: 'ANSWERED', text: CLEAN }, 5)
+				]
+			}
+		];
+		for (const { bound, calls } of arrangements) {
+			forgetReplayRuns();
+			if (dir !== '') rmSync(dir, { recursive: true, force: true });
+			dir = mkdtempSync(join(tmpdir(), 'jpwb-replay-bound-'));
+			for (const [file, text] of Object.entries(recordingFiles(recordingOf(calls, bound))))
+				writeFileSync(join(dir, file), text);
+			process.env.JPWB_REPLAY = dir;
+			const { review } = await floorOver();
+			expect(review?.disposition, `a recording made under a ${bound} ms bound replayed`).toBe(
+				'INCONCLUSIVE'
+			);
+			const said = JSON.stringify(review);
+			expect(said).toContain('REPLAY_RECORDING_REFUSED');
+			expect(said).toContain('reviewer call 1');
+			expect(said).toContain('240000 ms');
+		}
+	});
+
+	it('(viii) the replayed review is marked as one: its validator is the replay’s, never the live reviewer’s id', async () => {
+		const prompt = await promptOf();
+		dir = mkdtempSync(join(tmpdir(), 'jpwb-replay-id-'));
+		for (const [file, text] of Object.entries(
+			recordingFiles(recordingOf([call(prompt, { status: 'ANSWERED', text: CLEAN }, 5)]))
+		))
+			writeFileSync(join(dir, file), text);
+		delete process.env.JPWB_ASSURANCE_TOOL;
+		process.env.PATH = noProgramsDirectory();
+		process.env.JPWB_REPLAY = dir;
+		expect(
+			createFloorRegistry({ testMode: true }).get(FLOOR_POLICY_IDS.REASONING_REVIEW)?.validatorId
+		).toBe('replay.reasoning-review');
+		// ⭑ And the assessment the floor records names it too: the validator writes its own id into its result, which the
+		// replay arm rewrites — the registry's id alone would leave the record saying agy reviewed.
+		const { review } = await floorOver();
+		expect(review?.disposition).toBe('SATISFIED');
+		expect(review?.validatorId).toBe('replay.reasoning-review');
+	});
+
+	it('(ix) ⭐ the validator’s bound is the PRODUCT’s even where the recording names another, and the throws agree', async () => {
+		const prompt = await promptOf();
+		// ⭑ The recording says its reviewer declared NO bound, and holds a 1 000 ms throw the run retried — as the product's
+		// devin bound (240 000 ms) disposes it. Held to the recording's bound, the throw would stand and the review fail.
+		dir = mkdtempSync(join(tmpdir(), 'jpwb-replay-product-bound-'));
+		for (const [file, text] of Object.entries(
+			recordingFiles(
+				recordingOf(
+					[
+						call(prompt, { status: 'THROWN', message: TRANSPORT }, 1_000),
+						call(prompt, { status: 'ANSWERED', text: CLEAN }, 5, { role: 'retry' })
+					],
+					null
+				)
+			)
+		))
+			writeFileSync(join(dir, file), text);
+		delete process.env.JPWB_ASSURANCE_TOOL;
+		process.env.PATH = noProgramsDirectory();
+		process.env.JPWB_REPLAY = dir;
+		const { review, exchanges } = await floorOver();
+		expect(review?.disposition, 'the recording’s own bound decided the retry').toBe('SATISFIED');
+		expect(exchanges.drain().map((r) => r.exchangeRole)).toEqual(['initial', 'retry']);
 	});
 });

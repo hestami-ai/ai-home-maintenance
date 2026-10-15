@@ -9,7 +9,14 @@
 //     a THROWN reply carrying the tool's own message — and the report's matrix; no path of the run left in it;
 //   · ⛔ it refuses, writing nothing, when a file of the recording names the account (`REG-F-536`);
 //   · ⛔ it refuses when the recorded writes do not rebuild a unit archive's workspace (`REG-F-530`'s "inferred");
-//   · it refuses a run with no final archive; and the bound it records is the validator's own.
+//   · it refuses a run with no final archive; and the bound it records is the validator's own;
+//   · ⭐ (the review of E4) the try's KEY is read off the payload — its system prompt less Pi's trailer, its tools — and
+//     equals what the replay computes from this code (`executorKeyOf`; finding 1); the published PWA is recorded whole,
+//     with the OS family (findings 4, 6); ⛔ a half-B archive records the execution half only, the authoring floor's
+//     review left out (`REG-D-112` (c) — predicted red, observed 2026-10-15 with the recorder's rule removed: the
+//     recording's first reviewer call was it); and the scan reads DECODED values — JSON-escaped code passes, a decoded
+//     drive path is refused (finding 3 — predicted red, observed 2026-10-15 with the recorder scanning each file's
+//     text as before: `executor.jsonl:1:543 unc-path`).
 // ⛔ It drives the command line under bun, as an operator does: bun:sqlite does not exist under Node.
 // No model is called; nothing is read from any real run.
 import { spawnSync } from 'node:child_process';
@@ -22,7 +29,14 @@ import Database from 'better-sqlite3';
 import { createSqliteDriver, SCHEMA_SQL } from '@janumipwb/rph-persistence';
 import { afterAll, describe, expect, it } from 'vitest';
 import { REVIEWER_CALL_BOUND_MS } from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
-import { readRecording, sha256Hex } from '../apps/rph-demo/src/lib/server/replay/recording.js';
+import {
+	instructionsSha256,
+	osFamilyOf,
+	readRecording,
+	sha256Hex,
+	toolDefinitionsSha256
+} from '../apps/rph-demo/src/lib/server/replay/recording.js';
+import { fixtureKeyOf } from '../apps/rph-demo/src/lib/server/replay/replay-fixture.testing.js';
 import {
 	buildRecording,
 	RECORDED_CALL_BOUND_MS,
@@ -60,6 +74,21 @@ const ANSWER = JSON.stringify({
 });
 const REVIEW_PROMPT = 'Judge the requirements of wordfreq. The artifact: docs/requirements.md';
 const CLEAN = '{"findings":[],"recommendation":"SATISFIED","residualUncertainty":[]}';
+/** ⭐ What this code gives the executor (finding 1): the payload below carries it as Pi sends it. */
+const KEY = fixtureKeyOf();
+const same = (text: string): string => text;
+
+/**
+ * ⭐ A payload's head as Pi sends it (finding 1): the system prompt first — the contract, then Pi's date and working
+ * directory (`pi-coding-agent`, `buildSystemPrompt`) — and the tools as `pi-ai` lists them (`convertResponsesTools`).
+ */
+const payloadHead = (cwd: string) => ({
+	instructionsMessage: {
+		role: 'developer',
+		content: `${KEY.instructions}\nCurrent date: 2026-10-11\nCurrent working directory: ${cwd}`
+	},
+	tools: KEY.tools.map((t) => ({ type: 'function', ...t, strict: false }))
+});
 const TRANSPORT = 'devin exited with code 1: connection reset by peer';
 
 interface Arranged {
@@ -77,6 +106,12 @@ function arrange(
 		readonly stdoutTail?: string;
 		readonly archivedExtra?: boolean;
 		readonly final?: boolean;
+		/** ⭐ Half B's shape: the authoring floor reviewed the PWA before the Undertaking (`REG-D-112` (c)). */
+		readonly authoringFloor?: boolean;
+		/** A second file the executor wrote — code, whose JSON spelling doubles every backslash. */
+		readonly extraWrite?: { readonly path: string; readonly contents: string };
+		/** ⭐ What `lane/boot.json` names as `JPWB_DEMO_DB`, when not the run's own (finding 6). */
+		readonly bootDemoDb?: string;
 	} = {}
 ): Arranged {
 	const run = tempDir('run');
@@ -98,9 +133,12 @@ function arrange(
 	const pending = { status: 'PENDING_CONTENT_PLANE', reason: 'none' };
 	// ⭑ Pi's composite: the turn text with the cwd Pi appends (`REG-F-536`), then the calls and their outputs.
 	const turnText = `${TURN_HEAD}\nCurrent working directory: ${workspace.replaceAll('\\', '/')}`;
+	const head = payloadHead(workspace.replaceAll('\\', '/'));
 	const composite = {
 		model: 'fixture-executor-model',
+		tools: head.tools,
 		input: [
+			head.instructionsMessage,
 			{ role: 'user', content: [{ type: 'input_text', text: turnText }] },
 			{
 				type: 'function_call',
@@ -113,6 +151,17 @@ function arrange(
 				call_id: 'c1',
 				output: 'Wrote 44 UTF-8 bytes to docs/requirements.md.'
 			},
+			...(o.extraWrite
+				? [
+						{
+							type: 'function_call',
+							call_id: 'c0',
+							name: 'write_file',
+							arguments: JSON.stringify(o.extraWrite)
+						},
+						{ type: 'function_call_output', call_id: 'c0', output: 'Wrote the code.' }
+					]
+				: []),
 			{
 				type: 'function_call',
 				call_id: 'c2',
@@ -137,12 +186,25 @@ function arrange(
 		{
 			id: 'pwa_1',
 			objectType: 'PROFESSIONAL_WORK_ARCHITECTURE',
-			state: { publicationStatus: 'PUBLISHED' }
+			state: {
+				publicationStatus: 'PUBLISHED',
+				name: 'wordfreq',
+				description: 'The run’s PWA.',
+				domain: 'software',
+				version: '0.1.0',
+				rootPwuTypeId: 'pwut_1'
+			}
 		},
 		{
 			id: 'pwut_1',
 			objectType: 'PWU_TYPE',
-			state: { pwaId: 'pwa_1', name: 'Requirements', promptTemplate: { templateText: TURN_HEAD } }
+			state: {
+				pwaId: 'pwa_1',
+				name: 'Requirements',
+				pwuKind: 'REQUIREMENT_DEFINITION',
+				isRoot: true,
+				promptTemplate: { templateText: TURN_HEAD }
+			}
 		},
 		exchange('mex_try', {
 			plane: 'EXECUTION',
@@ -159,11 +221,32 @@ function arrange(
 				observation: 'OBSERVED',
 				calls: [
 					{ ordinal: 1, toolName: 'write_file', outcome: 'COMPLETED' },
-					{ ordinal: 2, toolName: 'run_command', outcome: 'COMPLETED' }
+					...(o.extraWrite ? [{ ordinal: 2, toolName: 'write_file', outcome: 'COMPLETED' }] : []),
+					{ ordinal: o.extraWrite ? 3 : 2, toolName: 'run_command', outcome: 'COMPLETED' }
 				],
-				observedCount: 2
+				observedCount: o.extraWrite ? 3 : 2
 			}
 		}),
+		// ⭐ HALF B's AUTHORING FLOOR (`REG-D-112` (c)): the Reasoning Review of the authored PWA, requested BEFORE the
+		// Undertaking's first try — what `floor.ts` (`runPwaFloor`) records, its subject the PWA itself.
+		...(o.authoringFloor
+			? [
+					exchange('mex_authoring_review', {
+						plane: 'ASSURANCE',
+						subjectObjectId: 'pwa_1',
+						subjectObjectType: 'PROFESSIONAL_WORK_ARCHITECTURE',
+						exchangeRole: 'INITIAL',
+						disposition: 'ACCEPTED',
+						requestedAt: '2026-10-11T07:59:00.000Z',
+						respondedAt: '2026-10-11T07:59:30.000Z',
+						resolvedModel: { value: 'fixture-reviewer-model' },
+						resolvedProvider: { value: 'devin' },
+						materializedInputRef: ref('Judge the authored graph of wordfreq.'),
+						rawOutputBeforeCoercionRef: ref(CLEAN),
+						parseOutcome: { outcome: 'PARSED' }
+					})
+				]
+			: []),
 		{
 			id: 'evd_1',
 			objectType: 'EVIDENCE',
@@ -233,6 +316,11 @@ function arrange(
 		const dir = join(archives, name);
 		mkdirSync(join(dir, 'workspace', 'docs'), { recursive: true });
 		writeFileSync(join(dir, 'workspace', 'docs', 'requirements.md'), DOC);
+		if (o.extraWrite) {
+			const at = join(dir, 'workspace', ...o.extraWrite.path.split('/'));
+			mkdirSync(join(at, '..'), { recursive: true });
+			writeFileSync(at, o.extraWrite.contents);
+		}
 		if (o.archivedExtra) writeFileSync(join(dir, 'workspace', 'made-by-a-command.txt'), 'x');
 	}
 	if (o.final !== false) {
@@ -294,7 +382,10 @@ function arrange(
 			units: [{ order: 2, slug: 'requirements', unitId: UNIT, archive: '02-requirements' }]
 		})
 	);
-	writeFileSync(join(lane, 'boot.json'), JSON.stringify({ overlay: { JPWB_DEMO_DB: demoDb } }));
+	writeFileSync(
+		join(lane, 'boot.json'),
+		JSON.stringify({ overlay: { JPWB_DEMO_DB: o.bootDemoDb ?? demoDb } })
+	);
 	mkdirSync(join(lane, 'report'), { recursive: true });
 	writeFileSync(
 		join(lane, 'report', 'report.json'),
@@ -341,7 +432,32 @@ describe('⭐ the recorder (D1) — a final archive into a replay recording, scr
 			},
 			expectedMatrix: [{ stage: '3', row: 'requirements', value: 'as intended' }]
 		});
+		// ⭐ The published PWA, whole (`REG-D-112` (c)), and the family it was made on (finding 6).
+		expect(recording.manifest.osFamily).toBe(osFamilyOf());
+		expect(recording.manifest.pwa).toEqual({
+			id: 'pwa_1',
+			name: 'wordfreq',
+			description: 'The run’s PWA.',
+			domain: 'software',
+			version: '0.1.0',
+			rootTypeId: 'pwut_1',
+			types: [
+				{
+					id: 'pwut_1',
+					declared: {
+						pwuKind: 'REQUIREMENT_DEFINITION',
+						name: 'Requirements',
+						isRoot: true,
+						promptTemplate: { templateText: TURN_HEAD }
+					}
+				}
+			],
+			policies: []
+		});
 		const [tried] = recording.executor;
+		// ⭐ FINDING 1 — the key read off the payload is the key the replay computes from this code.
+		expect(tried!.instructionsSha256).toBe(instructionsSha256(KEY.instructions, same));
+		expect(tried!.toolsSha256).toBe(toolDefinitionsSha256(KEY.tools, same));
 		// ⭐ Hashed over the SCRUBBED text: the cwd Pi printed is the workspace token, so a replay elsewhere compares equal.
 		expect(tried!.turnSha256).toBe(
 			sha256Hex(`${TURN_HEAD}\nCurrent working directory: JPWB_REPLAY_WORKSPACE_POSIX`)
@@ -392,7 +508,7 @@ describe('⭐ the recorder (D1) — a final archive into a replay recording, scr
 		expect(r.out).toMatch(
 			/refused, and nothing was written: the recording names the account or an absolute path \(REG-F-536\)/
 		);
-		expect(r.out).toMatch(/commands\.jsonl:1:\d+ account-name/);
+		expect(r.out).toMatch(/commands\.jsonl:1 \$\.stdout:\d+:\d+ account-name/);
 		expect(r.out, 'a refusal printed the name it refused').not.toContain(`owner: ${ACCOUNT}`);
 		expect(existsSync(out)).toBe(false);
 	});
@@ -407,6 +523,54 @@ describe('⭐ the recorder (D1) — a final archive into a replay recording, scr
 		);
 		expect(r.out).toContain(
 			'the recorded write_file calls do not rebuild the archived workspace (REG-F-530)'
+		);
+		expect(existsSync(out)).toBe(false);
+	});
+
+	it('⭐ REG-D-112 (c) — a half-B archive records the execution half only: the authoring floor’s review is left out', () => {
+		const a = arrange({ authoringFloor: true });
+		const out = join(tempDir('out'), 'recording');
+		const r = record(a, out);
+		expect(r.code, r.out).toBe(0);
+		const recording = readRecording(out);
+		expect(
+			recording.reviewer.map((c) => [c.unit, c.framing, c.role, c.reply.status]),
+			'the authoring floor’s review was recorded as a call the replay would be asked'
+		).toEqual([
+			['requirements', 'work-product', 'initial', 'THROWN'],
+			['requirements', 'work-product', 'retry', 'ANSWERED']
+		]);
+	});
+
+	it('⭐ the archive scan reads the recording’s DECODED values: JSON-escaped code passes, a decoded drive path is refused', () => {
+		// ⭑ Code the executor wrote: `/\r\n|\n/`, a regular expression of single backslashes. Serialised to JSON each
+		// is doubled, and the doubled pair reads as a UNC path to a scan of the serialised text — P3's 199 hits were this kind.
+		const code = {
+			path: 'src/lines.js',
+			contents: 'export const lines = (text) => text.split(/\\r\\n|\\n/);\n'
+		};
+		const escaped = record(arrange({ extraWrite: code }), join(tempDir('out'), 'recording'));
+		expect(escaped.code, escaped.out).toBe(0);
+		// ⛔ And a real drive path in a decoded value still hits — built here, never spelled (`REG-F-536`).
+		const drive = [`${String.fromCodePoint(81)}:`, 'elsewhere', 'notes.txt'].join('\\');
+		const out = join(tempDir('out'), 'recording');
+		const pathed = record(arrange({ stdoutTail: `see ${drive}\n` }), out);
+		expect(pathed.code).toBe(1);
+		expect(pathed.out).toMatch(/commands\.jsonl:1 \$\.stdout:\d+:\d+ drive-path/);
+		expect(existsSync(out)).toBe(false);
+	});
+
+	it('⛔ (finding 6) refuses a run whose store path is spelled by the OTHER OS family: a run is recorded on its own', () => {
+		// ⭑ Built, never spelled (`REG-F-536`): an absolute path of the family this host is not.
+		const otherFamily =
+			osFamilyOf() === 'windows'
+				? ['', 'srv', 'runs', 'demo.sqlite'].join('/')
+				: [`${String.fromCodePoint(81)}:`, 'runs', 'demo.sqlite'].join('\\');
+		const out = join(tempDir('out'), 'recording');
+		const r = record(arrange({ bootDemoDb: otherFamily }), out);
+		expect(r.code).toBe(1);
+		expect(r.out).toContain(
+			`lane/boot.json's JPWB_DEMO_DB is not an absolute path as this host's OS family (${osFamilyOf()}) spells one`
 		);
 		expect(existsSync(out)).toBe(false);
 	});
@@ -432,6 +596,8 @@ describe('⛔ REG-F-518 — a try whose commands completed out of the order they
 	// message's calls together (`REG-F-518`), the host minted each run's evidence as it COMPLETED, and the command reviews
 	// were dispatched in that order; a replay runs the calls one at a time, in call order, so its reviews come in call
 	// order. The recorder now says so, rather than writing a recording that goes stale where the run raced.
+	// ⭐ `REG-D-112` (d): Pi now runs a turn's tool calls one at a time (`pi-execution-tools.ts`), so a run made since
+	// completes its commands in the order they were called; the refusal stays, for any archive that did not.
 	const row = (
 		id: string,
 		objectType: string,
@@ -442,8 +608,11 @@ describe('⛔ REG-F-518 — a try whose commands completed out of the order they
 	const B = ['node', '--test', 'test/b.test.js'];
 	const ranOutput =
 		'exit 0 in 5ms\n--- stdout ---\nok\n\n--- stderr ---\n\n\nStructured result:\n{"exitCode":0,"timedOut":false,"durationMs":5,"outputComplete":true}';
+	const head = payloadHead('the-fixture-cwd');
 	const composite = {
+		tools: head.tools,
 		input: [
+			head.instructionsMessage,
 			{ role: 'user', content: [{ type: 'input_text', text: 'Run both suites.' }] },
 			{
 				type: 'function_call',
@@ -465,7 +634,12 @@ describe('⛔ REG-F-518 — a try whose commands completed out of the order they
 	const input = (evidenceOrder: readonly (readonly string[])[]): RecorderInput => ({
 		store: {
 			objects: [
-				row('pwa', 'PROFESSIONAL_WORK_ARCHITECTURE', { publicationStatus: 'PUBLISHED' }, 1),
+				row(
+					'pwa',
+					'PROFESSIONAL_WORK_ARCHITECTURE',
+					{ publicationStatus: 'PUBLISHED', rootPwuTypeId: 'pwut' },
+					1
+				),
 				row(
 					'mex',
 					'MODEL_EXCHANGE',

@@ -8,6 +8,9 @@
 //     input is the provider payload Pi sent last (`pi-executor.ts`: the composite, every message of the turn): its last
 //     user message is the TURN TEXT, and every `function_call` after it is a TOOL CALL, with its arguments, in the order
 //     the model made them. The host's own observation (`observedToolCalls`) gives each call's outcome, paired by position.
+//     ⭐ AND THE REST OF THE TRY'S KEY (the review of E4, finding 1): the payload's SYSTEM PROMPT (its `instructions`, or
+//     its developer/system message), less Pi's date and working-directory lines (`instructionsOfSentPrompt`), and its
+//     TOOLS list — each tool's name, description and parameter schema — hashed as the replay hashes what this code gives.
 //     ⚠ INFERRED, AS `REG-F-530` SAYS: the record names tool calls and their outcomes only, so `write_file`'s contents
 //     exist only in that payload — which is why `verifyWrites` replays every write and holds the result to each unit
 //     archive's workspace tree.
@@ -16,7 +19,10 @@
 //     `outputComplete` from the tool's structured result. A call the runner refused is recorded as that refusal.
 //   · REVIEWER CALLS — the ASSURANCE plane's `MODEL_EXCHANGE`s, in the order they were requested: the prompt (its
 //     materialized input), the reply (its retained raw output; a call that threw, its cause, as the tool printed it), the
-//     evaluator, and the ELAPSED time (`respondedAt` − `requestedAt`).
+//     evaluator, and the ELAPSED time (`respondedAt` − `requestedAt`). ⭐ LESS THE AUTHORING FLOOR'S (`REG-D-112` (c);
+//     `recordsAsReviewerCall`): the replay covers the execution half from the published PWA, and never authors.
+//   · ⭐ THE PUBLISHED PWA (`REG-D-112` (c)) — its declared content (`recordedPwaOf`), which the replay re-creates, and its
+//     digest (`pwaContentDigest`), which the replay holds the re-created one to before its first call.
 //   · THE MATRIX — the run report's own (`lane/report/report.json`): the recording expects the run it records.
 // ⛔ ANYTHING THAT CANNOT BE READ AS ABOVE IS A PROBLEM, AND A RECORDING WITH ONE IS NEVER WRITTEN: a replay of half a run
 // is another run.
@@ -25,12 +31,19 @@ import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'n
 import { dirname, join } from 'node:path';
 import {
 	expandText,
+	instructionsOfSentPrompt,
+	instructionsSha256,
+	osFamilyOf,
+	pwaContentDigest,
 	RECORDING_FORMAT,
+	recordedPwaOf,
 	SCRUB_TOKENS,
 	scrubPairs,
 	scrubText,
 	sha256Hex,
+	toolDefinitionsSha256,
 	type ExecutorTry,
+	type OsFamily,
 	type RecordedAnswer,
 	type RecordedCell,
 	type RecordedCommand,
@@ -40,7 +53,8 @@ import {
 	type RecordedToolOutcome,
 	type Recording,
 	type ReviewerCall,
-	type ScrubPair
+	type ScrubPair,
+	type ToolDefinitionKey
 } from '../../apps/rph-demo/src/lib/server/replay/recording.js';
 import { workspaceTreeSha256 } from './node-tests.js';
 import type { StoredObject, StoreRows } from './run-report-core.js';
@@ -84,12 +98,16 @@ export interface RecorderInput {
 	readonly expectedMatrix: readonly RecordedCell[];
 	readonly commit: string;
 	readonly reviewerFingerprint: string;
+	/** ⭐ The OS family the run ran on — this host's by default (finding 6; `record-replay.ts` holds the run to it). */
+	readonly osFamily?: OsFamily;
 }
 
 export interface RecorderOutput {
 	/** The recording, or null when a problem stopped it. */
 	readonly recording: Recording | null;
 	readonly problems: readonly string[];
+	/** ⭐ How many of the run's reviewer calls were the authoring floor's, left out (`REG-D-112` (c)). */
+	readonly authoringCallsLeftOut: number;
 	/** The run's own scrub, for `verifyWrites` (which writes with the run's paths, so a tree hash compares). */
 	readonly pairs: readonly ScrubPair[];
 }
@@ -135,10 +153,51 @@ interface PayloadCall {
 	readonly output: string;
 }
 
-/** The turn text and the turn's calls, from one EXECUTION exchange's composite payload — or why they cannot be read. */
-function turnOf(
-	payload: string | undefined
-): { readonly text: string; readonly calls: readonly PayloadCall[] } | string {
+/** What one EXECUTION exchange's composite payload gives a try: its turn, its calls, and the rest of its key. */
+interface PayloadTurn {
+	readonly text: string;
+	readonly calls: readonly PayloadCall[];
+	/** ⭐ Finding 1 — the executor's instructions as sent, less Pi's own trailer. */
+	readonly instructions: string;
+	/** ⭐ Finding 1 — the tools the executor was offered, in the order the payload lists them. */
+	readonly tools: readonly ToolDefinitionKey[];
+}
+
+/**
+ * ⭐ FINDING 1 — THE SYSTEM PROMPT A PAYLOAD CARRIES: the codex shape's `instructions`, or the responses shape's developer or
+ * system message (`pi-ai`, `openai-responses-shared.js`: the system prompt goes first, in the `developer` role for a
+ * reasoning model, else `system`).
+ */
+function sentSystemPrompt(
+	composite: Record<string, unknown>,
+	items: readonly Record<string, unknown>[]
+): string | undefined {
+	if (typeof composite.instructions === 'string') return composite.instructions;
+	const message = items.find((i) => i.role === 'developer' || i.role === 'system');
+	return message === undefined ? undefined : messageText(message);
+}
+
+/**
+ * ⭐ FINDING 1 — THE TOOLS A PAYLOAD OFFERED (`pi-ai`, `convertResponsesTools`: `{ type, name, description, parameters,
+ * strict }`), or why they cannot be read. ⭑ No `tools` at all is NO TOOL OFFERED — Pi sends the field only when the turn
+ * has tools — and keys as the empty list, as a grant that mints none does in the replay.
+ */
+function payloadTools(composite: Record<string, unknown>): ToolDefinitionKey[] | string {
+	if (composite.tools === undefined) return [];
+	if (!Array.isArray(composite.tools))
+		return "its payload's `tools` is not a list, so the tools it offered cannot be keyed";
+	const tools = composite.tools.map(rec).map((t) => ({
+		name: str(t.name),
+		description: str(t.description),
+		parameters: t.parameters
+	}));
+	return tools.some((t) => t.name === '')
+		? 'its payload offers a tool with no name, so the tools it offered cannot be keyed'
+		: tools;
+}
+
+/** The turn text, the turn's calls and the rest of its key, from one EXECUTION exchange's composite payload — or why not. */
+function turnOf(payload: string | undefined): PayloadTurn | string {
 	if (payload === undefined)
 		return 'its materialized input is not retained, so its turn and tool calls cannot be read';
 	let composite: Record<string, unknown>;
@@ -172,7 +231,18 @@ function turnOf(
 			output: outputs.get(str(item.call_id)) ?? ''
 		});
 	}
-	return { text: messageText(items[lastUser]!), calls };
+	const sent = sentSystemPrompt(composite, items);
+	if (sent === undefined)
+		return "its payload carries no system prompt, so the executor's instructions cannot be keyed (finding 1)";
+	const instructions = instructionsOfSentPrompt(sent);
+	if (instructions === undefined)
+		return (
+			"its payload's system prompt does not end with Pi's date and working-directory lines, so the execution " +
+			'contract cannot be told apart from what Pi added (finding 1)'
+		);
+	const tools = payloadTools(composite);
+	if (typeof tools === 'string') return tools;
+	return { text: messageText(items[lastUser]!), calls, instructions, tools };
 }
 
 /** The host's observed outcome of each call of a try, in start order (`observedToolCalls`), or why there is none. */
@@ -218,38 +288,10 @@ const FRAMING: Readonly<Record<string, string>> = {
 };
 
 /**
- * ⭐ THE PUBLISHED PWA'S DECLARED CONTENT, DIGESTED: each of its types' name, kind, purpose, root mark, discharge, policies
- * and prompt (its text and output contract), sorted by name, as canonical JSON. What the recorded run ran on — so a
- * replay of another PWA is told apart before its first call.
+ * ~~⭐ THE PUBLISHED PWA'S DECLARED CONTENT, DIGESTED~~ — ⭐ MOVED, unchanged, to the product's `recording.ts`
+ * (`pwaContentDigest`, beside `recordedPwaOf`), so the recorder that writes the digest and the replay that reads it before
+ * its first call compute it with one function (the review of E4, finding 4).
  */
-export function pwaContentDigest(objects: readonly StoredObject[]): string | string[] {
-	const published = objects.filter(
-		(o) =>
-			o.objectType === 'PROFESSIONAL_WORK_ARCHITECTURE' && o.state.publicationStatus === 'PUBLISHED'
-	);
-	if (published.length !== 1)
-		return [`the store holds ${published.length} published PWAs, and a recording is of one`];
-	const pwaId = published[0]!.id;
-	const types = objects
-		.filter((o) => o.objectType === 'PWU_TYPE' && o.state.pwaId === pwaId)
-		.map((t) => {
-			const prompt = rec(t.state.promptTemplate);
-			return {
-				name: str(t.state.name),
-				pwuKind: str(t.state.pwuKind),
-				purpose: str(t.state.purpose),
-				isRoot: t.state.isRoot === true,
-				workDischarge: str(t.state.workDischarge),
-				requiredAssurancePolicyIds: Array.isArray(t.state.requiredAssurancePolicyIds)
-					? [...(t.state.requiredAssurancePolicyIds as unknown[])].map(String).sort(byCodeUnit)
-					: [],
-				prompt: str(prompt.templateText),
-				outputContract: prompt.outputContract ?? null
-			};
-		})
-		.sort((a, b) => byCodeUnit(a.name, b.name));
-	return createHash('sha256').update(JSON.stringify(types), 'utf8').digest('hex');
-}
 
 /** What the extraction carries from one archive row to the next: the run's scrub, its units, and the evidence used. */
 interface Extraction {
@@ -381,6 +423,8 @@ function executorTryOf(
 		tried: {
 			unit: x.unitOf.get(str(row.state.subjectObjectId)) ?? str(row.state.subjectObjectId),
 			turnSha256: sha256Hex(x.scrub(turn.text)),
+			instructionsSha256: instructionsSha256(turn.instructions, x.scrub),
+			toolsSha256: toolDefinitionsSha256(turn.tools, x.scrub),
 			toolCalls: turn.calls.map((c, k) => ({
 				name: c.name,
 				arguments: scrubValue(c.arguments, x.pairs) as Record<string, unknown>,
@@ -506,6 +550,22 @@ function reviewerBound(rows: readonly StoredObject[], agent: string): number | n
 }
 
 /**
+ * ⭐⭐ `REG-D-112` (c) — WHETHER AN EXCHANGE ROW IS ONE OF THE RECORDING'S REVIEWER CALLS: an ASSURANCE-plane call, ⛔ NOT THE
+ * AUTHORING FLOOR's. The replay covers the execution half from the PUBLISHED PWA: it re-creates that PWA and never runs an
+ * authoring turn, so it never asks the review the authoring floor recorded — a Reasoning Review whose subject is the PWA
+ * itself (`floor.ts`, `runPwaFloor`: `subjectObjectType: 'PROFESSIONAL_WORK_ARCHITECTURE'`). Kept, that review was the
+ * recording's first reviewer call, and a replay of a half-B run went REPLAY_STALE at it (driven red: the replay regression,
+ * "reviewer call 1 (unit requirements, pwa, initial)"). What the authoring turn PRODUCED is kept instead — the published
+ * PWA (`recordedPwaOf`).
+ */
+export function recordsAsReviewerCall(row: StoredObject): boolean {
+	return row.state.plane === 'ASSURANCE' && row.state.subjectObjectType !== AUTHORING_FLOOR_SUBJECT;
+}
+
+/** The subject type of the authoring floor's review: the PWA itself (`floor.ts`, `runPwaFloor`). */
+export const AUTHORING_FLOOR_SUBJECT = 'PROFESSIONAL_WORK_ARCHITECTURE';
+
+/**
  * ⭐⭐ THE RECORDING, OR THE PROBLEMS THAT STOP IT. Every text is scrubbed of the run's directories (`scrubPairs`) and every
  * hash taken over the scrubbed bytes, so a replay that scrubs its own directories compares equal.
  */
@@ -530,7 +590,11 @@ export function buildRecording(i: RecorderInput): RecorderOutput {
 		.filter((o) => o.objectType === 'MODEL_EXCHANGE')
 		.sort(byRequest);
 	const executionRows = exchanges.filter((e) => e.state.plane === 'EXECUTION');
-	const assuranceRows = exchanges.filter((e) => e.state.plane === 'ASSURANCE');
+	const assuranceRows = exchanges.filter(recordsAsReviewerCall);
+	// ⭐ `REG-D-112` (c) — counted, so the recorder can say what it left out and why.
+	const authoringCallsLeftOut = exchanges.filter(
+		(e) => e.state.plane === 'ASSURANCE' && !recordsAsReviewerCall(e)
+	).length;
 
 	const tried = executionRows.map((row, n) => executorTryOf(row, n, x));
 	const executor = tried.flatMap((t) => (t ? [t.tried] : []));
@@ -558,11 +622,14 @@ export function buildRecording(i: RecorderInput): RecorderOutput {
 
 	const digest = pwaContentDigest(i.store.objects);
 	if (typeof digest !== 'string') x.problems.push(...digest);
+	// ⭐ `REG-D-112` (c) — the published PWA itself, enough to re-create it before the Undertaking.
+	const pwa = recordedPwaOf(i.store.objects);
+	if (Array.isArray(pwa) && typeof digest === 'string') x.problems.push(...pwa);
 	if (i.expectedMatrix.length === 0)
 		x.problems.push('the run report holds no matrix, and a recording expects the run it records');
 	if (executionRows.length === 0) x.problems.push('the archive holds no executor try');
-	if (x.problems.length > 0 || typeof digest !== 'string')
-		return { recording: null, problems: x.problems, pairs };
+	if (x.problems.length > 0 || typeof digest !== 'string' || Array.isArray(pwa))
+		return { recording: null, problems: x.problems, pairs, authoringCallsLeftOut };
 	const none: RecordedIdentity = { agentId: '', modelId: '', providerId: '' };
 	return {
 		recording: {
@@ -571,6 +638,8 @@ export function buildRecording(i: RecorderInput): RecorderOutput {
 				commit: i.commit,
 				reviewerFingerprint: i.reviewerFingerprint,
 				pwaContentDigest: digest,
+				osFamily: i.osFamily ?? osFamilyOf(),
+				pwa,
 				models: {
 					executor: executor[0]?.producer ?? none,
 					reviewer: {
@@ -586,7 +655,8 @@ export function buildRecording(i: RecorderInput): RecorderOutput {
 			reviewer
 		},
 		problems: [],
-		pairs
+		pairs,
+		authoringCallsLeftOut
 	};
 }
 

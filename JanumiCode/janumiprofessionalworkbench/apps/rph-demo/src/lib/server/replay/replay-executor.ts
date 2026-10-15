@@ -2,8 +2,11 @@
 // `ProducerSession`: the executor, answering from a committed recording (the roadmap's Phase 8, as `REG-F-530` restated it).
 //
 // ⭑ WHAT A TURN DOES, IN ORDER:
-//   1. the turn's text, scrubbed of this host's directories, must hash to the recorded `turnSha256` — else REPLAY_STALE,
-//      naming the try and both hashes, and no tool runs;
+//   1. the turn's text, scrubbed of this host's directories, must hash to the recorded `turnSha256` — ⭐ and the
+//      executor's INSTRUCTIONS and TOOL DEFINITIONS, as this code under test would give them (`executorKeyOf`: the
+//      `EXECUTION_CONTRACT_PROMPT` Pi is handed, and each minted tool's name, description and schema as Pi is handed it),
+//      to the recorded `instructionsSha256` and `toolsSha256` (the review of E4, finding 1) — else REPLAY_STALE, naming the
+//      try, the part and both hashes, and no tool runs;
 //   2. each recorded tool call runs, IN THE ORDER THE MODEL MADE THEM AND ONE AT A TIME, through the REAL tools this
 //      host minted for the step's grant (`mintExecutionTools`) — `write_file` into the Undertaking's FILESYSTEM workspace,
 //      `run_command` through the REPLAYED runner, so the deliverable is rebuilt by the product's own code and every run
@@ -23,8 +26,13 @@ import {
 	type ProducerSession,
 	type ProducerSessionContext
 } from '../execution/producer-session.js';
+import { EXECUTION_CONTRACT_PROMPT } from '../execution/execution-contract.js';
 import { toPiToolResult } from '../agent/pi-tool-result.js';
-import { mintExecutionTools } from '../tools/execution-tool-surface.js';
+import {
+	mintExecutionTools,
+	type ExecutionToolDescriptor
+} from '../tools/execution-tool-surface.js';
+import { toPiExecutionTools } from '../tools/pi-execution-tools.js';
 import type {
 	AdapterAnswer,
 	AdapterToolObservation,
@@ -33,7 +41,26 @@ import type {
 import { createProcessRunObserver } from '../tools/process-run-observer.js';
 import { createToolCallObserver } from '../tools/tool-call-observer.js';
 import type { RecordedAnswer } from './recording.js';
-import type { ReplayRun } from './replay-run.js';
+import type { ExecutorKey, ReplayRun } from './replay-run.js';
+
+/**
+ * ⭐⭐ THE EXECUTOR'S KEY AS THIS CODE WOULD GIVE IT (the review of E4, finding 1): the instructions `pi-executor.ts` hands
+ * Pi (`systemPromptOverride: () => EXECUTION_CONTRACT_PROMPT`) and the tools it offers — the very definitions
+ * `toPiExecutionTools` builds for `customTools`, each one's schema as the provider payload carries it (JSON: `pi-ai`'s
+ * `convertResponsesTools` passes the TypeBox schema, which JSON serialisation reduces to this), in the order minted.
+ * The recorder reads the same two off the payload a run sent (`record-replay-core.ts`), so a replay is served only where
+ * the code under test would give the model what the recorded run gave it.
+ */
+export function executorKeyOf(tools: readonly ExecutionToolDescriptor[]): ExecutorKey {
+	return {
+		instructions: EXECUTION_CONTRACT_PROMPT,
+		tools: toPiExecutionTools(tools).map((t) => ({
+			name: t.name,
+			description: t.description,
+			parameters: JSON.parse(JSON.stringify(t.parameters)) as unknown
+		}))
+	};
+}
 
 /** The recorded answer, its text expanded to this host's directories — `AdapterAnswer`'s shape, as the run's adapter gave it. */
 function answerOf(recorded: RecordedAnswer, expand: (s: string) => string): AdapterAnswer {
@@ -42,8 +69,9 @@ function answerOf(recorded: RecordedAnswer, expand: (s: string) => string): Adap
 		return {
 			arrived: false,
 			cause: 'CALL_FAILED',
-			reportedBy: 'PROVIDER',
-			message: recorded.message ?? ''
+			// ⭐ Finding 9 — ~~`reportedBy: 'PROVIDER'`~~ AS RECORDED: a TOOL's failure is never re-reported as the provider's.
+			reportedBy: recorded.reportedBy,
+			message: recorded.message
 		};
 	if (recorded.cause === 'CALL_ABORTED')
 		return {
@@ -80,6 +108,8 @@ export async function openReplayExecutionSession(
 		bindingAuthorizationStatus: context.bindingAuthorizationStatus
 	});
 	const mintedToolNames = tools.map((t) => t.name);
+	// ⭐ Finding 1 — the key beside the turn, from the tools just minted for the step's grant.
+	const key = executorKeyOf(tools);
 	const observer = createToolCallObserver();
 	let callIds = 0;
 	let lastTurn: AdapterToolObservation = {
@@ -98,7 +128,7 @@ export async function openReplayExecutionSession(
 		async turn(text: string): Promise<ToolInvocationResult> {
 			const callsBefore = observer.count();
 			try {
-				const recorded = run.nextExecutorTry(text);
+				const recorded = run.nextExecutorTry(text, key);
 				for (const [index, call] of recorded.toolCalls.entries()) {
 					callIds += 1;
 					const id = `replay-call-${callIds}`;

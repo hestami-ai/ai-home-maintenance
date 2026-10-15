@@ -28,25 +28,28 @@ vi.mock('node:child_process', async (importOriginal) => {
 
 import { createInMemoryWorkspace } from '@janumipwb/rph-ports';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createFilesystemWorkspace } from '../execution/filesystem-workspace.js';
 import {
 	RECORDING_FORMAT,
 	SCRUB_TOKENS,
+	scrubPairs,
+	scrubText,
 	type RecordedCommand,
 	type Recording
 } from './recording.js';
 import { createReplayRun } from './replay-run.js';
 import { createReplayedProcessRunner } from './replayed-runner.js';
+import { fixtureManifest } from './replay-fixture.testing.js';
 
 const recordingOf = (commands: readonly RecordedCommand[]): Recording => ({
 	manifest: {
 		format: RECORDING_FORMAT,
 		commit: 'fixture-commit',
 		reviewerFingerprint: 'fixture-fingerprint',
-		pwaContentDigest: 'fixture-digest',
+		...fixtureManifest(),
 		models: {
 			executor: { agentId: 'execution.model-invocation', modelId: 'm', providerId: 'p' },
 			reviewer: { agentId: 'devin', modelId: 'r', providerId: 'devin', callBoundMs: 240_000 }
@@ -59,16 +62,28 @@ const recordingOf = (commands: readonly RecordedCommand[]): Recording => ({
 	reviewer: []
 });
 
-const TEST_RUN: RecordedCommand = {
-	argv: ['node', '--test', 'JPWB_REPLAY_WORKSPACE_NATIVE/test'],
-	ran: true,
-	exitCode: 0,
-	timedOut: false,
-	durationMs: 160,
-	outputComplete: true,
-	omissions: [],
-	stdout: '# pass 3\nok JPWB_REPLAY_WORKSPACE_NATIVE/test/count.test.js\n',
-	stderr: ''
+/**
+ * The recorded command, its workspace spelled by THIS host's scrub, as a recording made here spells it. ⭐ The review of
+ * E4, finding 6: a recording replays on the OS family it was made on, and this one is made on the host that runs the
+ * test — on POSIX, where a path's spellings coincide, the scrub names another token than Windows does, and a token
+ * spelled out here for one family made this test go REPLAY_STALE on the other.
+ */
+const testRun = (): RecordedCommand => {
+	const workspace = scrubText(
+		workspaceDir,
+		scrubPairs({ WORKSPACE: workspaceDir, PROCESS_OUTPUT: outputDir, HOME: homedir() })
+	);
+	return {
+		argv: ['node', '--test', `${workspace}/test`],
+		ran: true,
+		exitCode: 0,
+		timedOut: false,
+		durationMs: 160,
+		outputComplete: true,
+		omissions: [],
+		stdout: `# pass 3\nok ${workspace}/test/count.test.js\n`,
+		stderr: ''
+	};
 };
 
 let root = '';
@@ -102,7 +117,7 @@ afterEach(() => rmSync(root, { recursive: true, force: true }));
 
 describe('⭐ the REPLAYED runner (D2) — commands replayed, never re-run', () => {
 	it('declares REPLAYED, returns the recorded outcome, and lays the recorded capture out as the real runner does', async () => {
-		const run = createReplayRun(recordingOf([TEST_RUN]), () => root);
+		const run = createReplayRun(recordingOf([testRun()]), () => root);
 		run.useSandbox({ workspace: workspaceDir, processOutput: outputDir });
 		const { deliverable, output } = sandbox();
 		const runner = createReplayedProcessRunner({
@@ -150,7 +165,7 @@ describe('⭐ the REPLAYED runner (D2) — commands replayed, never re-run', () 
 	});
 
 	it('⛔ an argv that is not the recorded one runs nothing, writes nothing, is REPLAY_STALE — and poisons the replay', async () => {
-		const run = createReplayRun(recordingOf([TEST_RUN, TEST_RUN]), () => root);
+		const run = createReplayRun(recordingOf([testRun(), testRun()]), () => root);
 		run.useSandbox({ workspace: workspaceDir, processOutput: outputDir });
 		const { deliverable, output } = sandbox();
 		const runner = createReplayedProcessRunner({

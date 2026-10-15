@@ -4,18 +4,35 @@
 //
 // ⭑ HOW THE RECORDING IS MADE, AND WHY THAT IS NOT CIRCULAR: the first pass stands in for the paid run. Its "models" are
 // a scripted double of the replay (`paidRun`, below) that answers by order, checks nothing, and records what the product
-// sent — the turn text and every reviewer prompt, scrubbed — and grades its replies `PROVIDER_REPORTED`, as a live tool
-// does. Its matrix is the run report's over the stores it left (`observedMatrix`). The recording is then made of what the
-// first pass SENT and SERVED, hashed, as the recorder makes one of a paid run's archive; and the second pass replays it
-// with the product's REAL replay (`replay-run.ts`), whose every call is checked.
+// sent — the turn text, the executor's key (finding 1) and every reviewer prompt, scrubbed — and grades its REVIEWER
+// replies `PROVIDER_REPORTED`, as a live tool does. ⭐ ~~and grades its replies `PROVIDER_REPORTED`~~ — THE EXECUTOR ARM
+// IS NOT THE DOUBLE'S (the review of E4, finding 12): the double stands behind `replayRunFor`, and the executor's session
+// is still the product's REPLAY session (`replay-executor.ts`), which grades every turn HOST_CONFIGURED, in the paid pass
+// as in the replay. So the first pass's PROVIDER_REPORTED exchanges are its reviews only, and the regression's limb is
+// shown to discriminate on the reviewer arm alone; the executor arm's grade is held by `replay-executor.test.ts` (its
+// HOST_CONFIGURED case, and the ledger's E4-M14). Its matrix is the run report's over the stores it left
+// (`observedMatrix`). The recording is then made of what the first pass SENT and SERVED, hashed, as the recorder makes
+// one of a paid run's archive — ⭐ with the published PWA and its digest read off the pass's store by the product's own
+// `recordedPwaOf` and `pwaContentDigest`, and its reviewer calls kept by the recorder's own rule
+// (`recordsAsReviewerCall`) — and the second pass replays it with the product's REAL replay (`replay-run.ts`), whose every
+// call is checked.
+// ⭐ THE REPLAY PASS RE-CREATES THE PUBLISHED PWA FROM THE RECORDING (`REG-D-112` (c); `replay-pwa.ts`), never types it:
+// the replay covers the execution half from the published PWA, and a half-B PWA was authored live, by no list a test holds.
 //
 // ⭑ WHAT MUST HOLD (D3):
 //   · the replay reproduces the recorded matrix — and the matrix is not vacuous: the phase ran, was reviewed, and its
 //     floor passed ("as intended" in stages 3, 4, 5a and 8), so two broken runs agreeing would not pass;
-//   · no exchange is graded PROVIDER_REPORTED — and the check discriminates: the first pass's are, and it names them;
+//   · no exchange is graded PROVIDER_REPORTED — and the check discriminates on the reviewer arm: the first pass's
+//     reviews are, and it names them;
 //   · no program is spawned — `child_process` is counted here, and PATH names an empty folder;
 //   · the whole recording is served;
-//   · ⛔ a stale recording fails it: REPLAY_STALE, and the matrix moves.
+//   · ⛔ a stale recording fails it: REPLAY_STALE, and the matrix moves;
+//   · ⭐ (`REG-D-112` (c)) a recording of a HALF-B run — its PWA reviewed by the authoring floor first — replays without
+//     reaching an authoring call (predicted red, observed 2026-10-15 with the recorder's rule removed and this test's
+//     own check of it skipped: REPLAY_STALE at "reviewer call 1 (unit requirements, pwa, initial)", the authoring floor's
+//     review kept as the first call);
+//   · ⭐ (finding 4) a recording of another published PWA is refused before the first call (predicted red, observed
+//     2026-10-15 with the digest's check removed: it replayed, the digest read by nothing).
 // ⛔ HERMETIC. No model is called and nothing runs: every program start throws and is counted.
 import { vi } from 'vitest';
 
@@ -56,6 +73,12 @@ vi.mock('./replay-run.js', async (importOriginal) => {
 	};
 });
 
+// ⭐ `REG-D-112` (c) — the AUTHORING FLOOR, watched: the half-B pass runs it, and a replay must never reach it.
+vi.mock('../floor.js', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('../floor.js')>();
+	return { ...actual, runPwaFloor: vi.fn(actual.runPwaFloor) };
+});
+
 import { listByType, listPwus } from '@janumipwb/rph-engine';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -74,6 +97,10 @@ import {
 	type ReplayObservation
 } from '../../../../../../scripts/phase7/replay-regression.js';
 import type { ArchiveFacts, LaneRows } from '../../../../../../scripts/phase7/run-report-core.js';
+import { recordsAsReviewerCall } from '../../../../../../scripts/phase7/record-replay-core.js';
+import { runPwaFloor } from '../floor.js';
+import { recreateRecordedPwa } from './replay-pwa.js';
+import type { ExecutorKey } from './replay-run.js';
 import { actions } from '../../../routes/undertakings/[id]/+page.server.js';
 import { actions as undertakings } from '../../../routes/undertakings/+page.server.js';
 import { noProgramsDirectory } from '../assurance/no-programs.testing.js';
@@ -82,12 +109,17 @@ import type { ToolInvocationResult } from '../tools/backing-tool.js';
 import { dispatch, getEngine, mintUiId, resetEngine } from '../workbench.js';
 import {
 	expandText,
+	instructionsSha256,
+	osFamilyOf,
+	pwaContentDigest,
 	RECORDING_FORMAT,
+	recordedPwaOf,
 	recordingFiles,
 	SCRUB_TOKENS,
 	scrubPairs,
 	scrubText,
 	sha256Hex,
+	toolDefinitionsSha256,
 	type ExecutorTry,
 	type RecordedCell,
 	type RecordedCommand,
@@ -132,8 +164,8 @@ const ANSWER = JSON.stringify({
 		residualUncertainty: []
 	}
 });
-/** The paid run's one executor try, before its turn's hash is known. */
-const TRY: Omit<ExecutorTry, 'turnSha256'> = {
+/** The paid run's one executor try, before its turn's hash and its key (finding 1) are known. */
+const TRY: Omit<ExecutorTry, 'turnSha256' | 'instructionsSha256' | 'toolsSha256'> = {
 	unit: 'requirements',
 	toolCalls: [
 		{
@@ -176,12 +208,15 @@ function cleanJudgementOf(prompt: string): string {
  * ⭑ THE PAID RUN'S DOUBLE: the replay's interface, answering by order, checking nothing, recording what it was sent —
  * scrubbed, as the recorder reads a paid run's archive — and grading its replies PROVIDER_REPORTED, as a live tool does.
  */
-function paidRun(
-	root: string
-): ReplayRun & { readonly turns: string[]; readonly calls: ReviewerCall[] } {
+function paidRun(root: string): ReplayRun & {
+	readonly turns: string[];
+	readonly keys: { readonly instructionsSha256: string; readonly toolsSha256: string }[];
+	readonly calls: ReviewerCall[];
+} {
 	let pairs: readonly ScrubPair[] = [];
 	let ms = Date.parse('2026-10-11T08:00:00.000Z');
 	const turns: string[] = [];
+	const keys: { readonly instructionsSha256: string; readonly toolsSha256: string }[] = [];
 	const calls: ReviewerCall[] = [];
 	let served = { executor: 0, commands: 0, reviewer: 0 };
 	const scrub = (t: string) => scrubText(t, pairs);
@@ -196,6 +231,7 @@ function paidRun(
 					: v;
 	const run = {
 		turns,
+		keys,
 		calls,
 		// ⭑ Only its manifest is read (the reviewer's identity and bound, `replayReviewer`): the double serves its own script.
 		recording: {
@@ -204,6 +240,17 @@ function paidRun(
 				commit: '',
 				reviewerFingerprint: '',
 				pwaContentDigest: '',
+				osFamily: osFamilyOf(),
+				pwa: {
+					id: '',
+					name: '',
+					description: '',
+					domain: '',
+					version: '',
+					rootTypeId: '',
+					types: [],
+					policies: []
+				},
 				models: { executor: EXECUTOR, reviewer: { ...REVIEWER, callBoundMs: 240_000 } },
 				scrub: { tokens: [...SCRUB_TOKENS] },
 				expectedMatrix: []
@@ -226,10 +273,18 @@ function paidRun(
 		consumed: () => served,
 		poisonedBy: () => undefined,
 		clock: () => new Date(ms).toISOString(),
-		nextExecutorTry(text: string) {
+		// ⭑ The paid run typed its PWA itself: it holds nothing to a recording.
+		checkPublishedPwa: () => undefined,
+		nextExecutorTry(text: string, key: ExecutorKey) {
 			turns.push(scrub(text));
+			// ⭐ Finding 1 — what the product gave the executor beside the turn, hashed as the recorder hashes a payload's.
+			const hashed = {
+				instructionsSha256: instructionsSha256(key.instructions, scrub),
+				toolsSha256: toolDefinitionsSha256(key.tools, scrub)
+			};
+			keys.push(hashed);
 			served = { ...served, executor: served.executor + 1 };
-			return { ...TRY, turnSha256: sha256Hex(scrub(text)) };
+			return { ...TRY, turnSha256: sha256Hex(scrub(text)), ...hashed };
 		},
 		nextCommand() {
 			served = { ...served, commands: served.commands + 1 };
@@ -258,11 +313,15 @@ function paidRun(
 			};
 		}
 	};
-	return run as unknown as ReplayRun & { readonly turns: string[]; readonly calls: ReviewerCall[] };
+	return run as unknown as ReplayRun & {
+		readonly turns: string[];
+		readonly keys: { readonly instructionsSha256: string; readonly toolsSha256: string }[];
+		readonly calls: ReviewerCall[];
+	};
 }
 
 /** §3.2's PWA, as the designer stores it, published — the arrangement `phase7-run-report.store.test.ts` makes. */
-function publishThePwa(): string {
+async function publishThePwa(o: { readonly authoringFloor?: boolean } = {}): Promise<string> {
 	const pwaId = mintUiId('pwa');
 	const typeIds = new Map<string, string>();
 	const steps: [string, string, string, Record<string, unknown>][] = [
@@ -315,6 +374,21 @@ function publishThePwa(): string {
 			}
 		]);
 	}
+	for (const [commandType, aggregateType, aggregateId, payload] of steps.splice(0)) {
+		const r = dispatch(commandType, aggregateType, aggregateId, payload);
+		expect(r.status, `arrangement: ${commandType} — ${r.error?.message ?? ''}`).toBe('ACCEPTED');
+	}
+	// ⭐ HALF B's SHAPE (`REG-D-112` (c)): the authoring floor reviews the DRAFT graph before it is submitted, as the
+	// authoring route runs it after a turn (`floor.ts`, `runPwaFloor`) — its review a reviewer call of the paid run.
+	if (o.authoringFloor)
+		await runPwaFloor(pwaId, {
+			prompt: 'Author the realization graph of wordfreq.',
+			producer: {
+				agentId: 'authoring.agent',
+				modelId: 'fixture-author-model',
+				providerId: 'fixture-provider'
+			}
+		});
 	steps.push(
 		['SubmitPwaForReview', 'PROFESSIONAL_WORK_ARCHITECTURE', pwaId, {}],
 		['ValidatePwa', 'PROFESSIONAL_WORK_ARCHITECTURE', pwaId, {}],
@@ -360,9 +434,21 @@ function archiveFacts(name: string, root: string): ArchiveFacts {
  * ⭐ THE LANE, IN REPLAY MODE, IN PROCESS: the PWA published, the Undertaking created, the root begun, then Requirements —
  * each press through the page's own action — and the lane's own record of it, as `phase7.live.ts` keeps one.
  */
-async function laneRun(root: string): Promise<LaneRows> {
+async function laneRun(
+	root: string,
+	o: { readonly authoringFloor?: boolean; readonly replay?: ReplayRun } = {}
+): Promise<LaneRows> {
 	resetEngine('empty');
-	const pwaId = publishThePwa();
+	// ⭐ `REG-D-112` (c) — A REPLAY RE-CREATES THE RECORDED PWA, and holds it to the recording before the first call; the
+	// paid pass types §3.2's PWA, as half A's lane does.
+	const pwaId =
+		o.replay === undefined
+			? await publishThePwa(o)
+			: recreateRecordedPwa(o.replay, {
+					dispatch: (commandType, aggregateType, aggregateId, payload) =>
+						dispatch(commandType, aggregateType, aggregateId, payload),
+					rowsOf: (objectType) => listByType(getEngine(), objectType)
+				});
 	const created = (await undertakings.create(
 		actionEvent('create', {
 			name: 'wordfreq realization',
@@ -444,11 +530,78 @@ const recordingDir = (recording: Recording): string => {
 	return dir;
 };
 
+/**
+ * ⭐ A paid pass's recording, its manifest's PWA and digest read off the pass's store by the product's own functions
+ * (`recordedPwaOf`, `pwaContentDigest`), as the recorder reads them off a final archive.
+ */
+async function recordingOfPass(
+	paid: ReturnType<typeof paidRun>,
+	matrix: readonly RecordedCell[],
+	reviewer: readonly ReviewerCall[]
+): Promise<Recording> {
+	const objects = (await inMemoryStoreRows()).objects;
+	const pwa = recordedPwaOf(objects);
+	const digest = pwaContentDigest(objects);
+	if (Array.isArray(pwa) || typeof digest !== 'string')
+		throw new Error(`arrangement: the paid pass published no one PWA — ${JSON.stringify(pwa)}`);
+	return {
+		manifest: {
+			format: RECORDING_FORMAT,
+			commit: 'fixture-commit',
+			reviewerFingerprint: 'fixture-fingerprint',
+			pwaContentDigest: digest,
+			osFamily: osFamilyOf(),
+			pwa,
+			models: { executor: EXECUTOR, reviewer: { ...REVIEWER, callBoundMs: 240_000 } },
+			scrub: { tokens: [...SCRUB_TOKENS] },
+			expectedMatrix: matrix
+		},
+		executor: [{ ...TRY, turnSha256: sha256Hex(paid.turns[0]!), ...paid.keys[0]! }],
+		commands: [RUN],
+		reviewer
+	};
+}
+
 /** The first pass — the paid run — and the recording made of it. */
 const recorded = {
 	recording: undefined as unknown as Recording,
-	observation: undefined as unknown as ReplayObservation
+	observation: undefined as unknown as ReplayObservation,
+	/** ⭐ A HALF-B-SHAPED paid run (`REG-D-112` (c)): the authoring floor reviewed the PWA before the Undertaking. */
+	halfB: undefined as unknown as Recording
 };
+
+/** What the recorder calls a reviewed subject's framing, by its object type (`record-replay-core.ts`, FRAMING). */
+const FRAMING: Readonly<Record<string, string>> = {
+	ARTIFACT: 'work-product',
+	EVIDENCE: 'command',
+	PROFESSIONAL_WORK_ARCHITECTURE: 'pwa'
+};
+
+/**
+ * ⭑ A paid pass's reviewer calls AS THE RECORDER KEEPS THEM: each call the double served, paired with the ASSURANCE
+ * exchange it was recorded as (in request order, as the recorder reads them), and kept or left out by the recorder's
+ * own rule (`recordsAsReviewerCall`).
+ */
+async function reviewerCallsAsRecorded(paid: {
+	readonly calls: ReviewerCall[];
+}): Promise<ReviewerCall[]> {
+	const rows = (await inMemoryStoreRows()).objects
+		.filter((o) => o.objectType === 'MODEL_EXCHANGE' && o.state.plane === 'ASSURANCE')
+		.sort(
+			(a, b) =>
+				Date.parse(String(a.state.requestedAt)) - Date.parse(String(b.state.requestedAt)) ||
+				a.firstSequence - b.firstSequence
+		);
+	expect(rows, 'arrangement: one ASSURANCE exchange per call the double served').toHaveLength(
+		paid.calls.length
+	);
+	return paid.calls
+		.map((c, k) => ({
+			...c,
+			framing: FRAMING[String(rows[k]!.state.subjectObjectType)] ?? c.framing
+		}))
+		.filter((_, k) => recordsAsReviewerCall(rows[k]!));
+}
 
 beforeAll(async () => {
 	process.env.PATH = noProgramsDirectory();
@@ -460,20 +613,27 @@ beforeAll(async () => {
 		const lane = await laneRun(root);
 		recorded.observation = await observe(lane, paid);
 		expect(paid.turns, 'arrangement: the paid run took one executor turn').toHaveLength(1);
-		recorded.recording = {
-			manifest: {
-				format: RECORDING_FORMAT,
-				commit: 'fixture-commit',
-				reviewerFingerprint: 'fixture-fingerprint',
-				pwaContentDigest: 'fixture-digest',
-				models: { executor: EXECUTOR, reviewer: { ...REVIEWER, callBoundMs: 240_000 } },
-				scrub: { tokens: [...SCRUB_TOKENS] },
-				expectedMatrix: recorded.observation.matrix
-			},
-			executor: [{ ...TRY, turnSha256: sha256Hex(paid.turns[0]!) }],
-			commands: [RUN],
-			reviewer: paid.calls
-		};
+		recorded.recording = await recordingOfPass(
+			paid,
+			recorded.observation.matrix,
+			await reviewerCallsAsRecorded(paid)
+		);
+		// ⭐ THE HALF-B PASS: the same run, its PWA reviewed by the authoring floor first.
+		const rootB = freshRoot();
+		const paidB = paidRun(rootB);
+		seam.paid = paidB;
+		const laneB = await laneRun(rootB, { authoringFloor: true });
+		const observedB = await observe(laneB, paidB);
+		expect(paidB.turns, 'arrangement: the half-B paid run took one executor turn').toHaveLength(1);
+		expect(
+			paidB.calls.map((c) => c.prompt.length > 0),
+			'arrangement: the half-B pass reviewed the PWA, its work product and its command'
+		).toHaveLength(3);
+		recorded.halfB = await recordingOfPass(
+			paidB,
+			observedB.matrix,
+			await reviewerCallsAsRecorded(paidB)
+		);
 	} finally {
 		seam.paid = undefined;
 	}
@@ -500,8 +660,22 @@ async function replayPass(recording: Recording): Promise<ReplayObservation> {
 	const run = replayRunFor(dir);
 	// ⭑ The replay's own disposable root, under a fresh temporary folder (`disposableRoot`).
 	made.push(join(run.root(), '..'));
-	const lane = await laneRun(run.root());
-	return observe(lane, run);
+	let lane: LaneRows | undefined;
+	try {
+		lane = await laneRun(run.root(), { replay: run });
+	} catch (refused) {
+		// ⭑ A refusal of the re-created PWA ends the pass before the Undertaking; the observation says so.
+		if (run.poisonedBy() === undefined) throw refused;
+	}
+	return lane === undefined
+		? {
+				matrix: [],
+				exchanges: [],
+				spawned: seam.spawned.length,
+				consumed: run.consumed(),
+				poisonedBy: run.poisonedBy()!.message
+			}
+		: observe(lane, run);
 }
 
 const cell = (cells: readonly RecordedCell[], stage: string, row: string) =>
@@ -520,7 +694,9 @@ describe('⭐ the replay regression (D3) — a recorded run, replayed in process
 			recorded.recording.reviewer.length,
 			'the work product and its one command were each reviewed'
 		).toBe(2);
-		// ⭑ THE CONTROL: the paid run's exchanges are PROVIDER_REPORTED, and the regression names every one of them.
+		// ⭑ THE CONTROL: the paid run's REVIEWER exchanges are PROVIDER_REPORTED — its executor's are not, the executor arm
+		// being the product's replay session in both passes (the review of E4, finding 12) — and the regression names every
+		// one of them.
 		const reported = recorded.observation.exchanges.filter(
 			(x) => x.modelEvidence === 'PROVIDER_REPORTED'
 		);
@@ -554,6 +730,67 @@ describe('⭐ the replay regression (D3) — a recorded run, replayed in process
 		expect(
 			replayRegressionProblems(recorded.recording, { ...clean, poisonedBy: 'REPLAY_STALE: x' })
 		).toEqual(['the replay refused: REPLAY_STALE: x']);
+	});
+
+	it('⭐ REG-D-112 (c) — a recording from a HALF-B run replays without reaching an authoring call', async () => {
+		// ⭑ The recorder's rule left the authoring floor's review out: two of the half-B pass's three calls are recorded.
+		expect(recorded.halfB.reviewer.map((c) => c.framing)).toEqual(['work-product', 'command']);
+		vi.mocked(runPwaFloor).mockClear();
+		const observation = await replayPass(recorded.halfB);
+		expect(replayRegressionProblems(recorded.halfB, observation)).toEqual([]);
+		expect(observation.consumed).toEqual({ executor: 1, commands: 1, reviewer: 2 });
+		expect(vi.mocked(runPwaFloor), 'the replay reached the authoring floor').not.toHaveBeenCalled();
+		expect(
+			listByType(getEngine(), 'MODEL_EXCHANGE').filter(
+				(x) => x.state.subjectObjectType === 'PROFESSIONAL_WORK_ARCHITECTURE'
+			),
+			'the replay recorded a review of the PWA'
+		).toEqual([]);
+	});
+
+	it('⛔ (finding 4) a recording of ANOTHER published PWA is refused before the first call — its content digest is read', async () => {
+		const another: Recording = {
+			...recorded.recording,
+			manifest: { ...recorded.recording.manifest, pwaContentDigest: sha256Hex('another PWA') }
+		};
+		const observation = await replayPass(another);
+		expect(observation.poisonedBy ?? '').toMatch(
+			/^REPLAY_STALE: the published PWA's content digest is [0-9a-f]{64}, and the recording's is [0-9a-f]{64}/
+		);
+		expect(
+			observation.consumed,
+			'a call was served before the PWA was held to the recording'
+		).toEqual({
+			executor: 0,
+			commands: 0,
+			reviewer: 0
+		});
+	});
+
+	it('⛔ (REG-D-112 (c)) a host whose policy is not the recorded one is refused BY NAME, before the PWA is re-created', async () => {
+		const pwa = recorded.recording.manifest.pwa;
+		expect(pwa.types, 'arrangement: §3.2’s five types are recorded').toHaveLength(5);
+		expect(pwa.policies.length, 'arrangement: the types name policies').toBeGreaterThan(0);
+		const [first, ...rest] = pwa.policies;
+		const another: Recording = {
+			...recorded.recording,
+			manifest: {
+				...recorded.recording.manifest,
+				pwa: {
+					...pwa,
+					policies: [{ ...first!, contentSha256: sha256Hex('another policy') }, ...rest]
+				}
+			}
+		};
+		const observation = await replayPass(another);
+		expect(observation.poisonedBy ?? '').toContain(
+			`REPLAY_STALE: the published PWA's policy ${first!.policyId} hashes to ${first!.contentSha256} on this host`
+		);
+		expect(observation.consumed).toEqual({ executor: 0, commands: 0, reviewer: 0 });
+		expect(
+			listByType(getEngine(), 'PROFESSIONAL_WORK_ARCHITECTURE'),
+			'a PWA was re-created under a policy the recording does not name'
+		).toEqual([]);
 	});
 
 	it('⛔ a stale recording fails the regression: REPLAY_STALE, and the matrix moves', async () => {

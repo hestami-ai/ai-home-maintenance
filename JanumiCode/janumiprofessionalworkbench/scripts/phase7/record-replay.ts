@@ -20,6 +20,13 @@
 //   3. ⛔ no file of the recording names the account or an absolute path (`REG-F-536`; `archive-scan.ts`), every text
 //      having been scrubbed of the run's own directories first. A hit refuses the whole recording, and names each hit's
 //      place and kind, never its text. And with no account name to scan for, nothing is written either (`REG-F-545`).
+//      ⭐ THE SCAN READS EACH FILE'S DECODED VALUES (`scanDecodedJson`; the review of E4, finding 3), not its JSON
+//      spelling: JSON doubles a backslash, and code a model wrote (`/\r\n/`) read as a UNC path — P3's recording was
+//      refused on 199 such hits. A real drive, share or home path, or the account name, in a value still hits.
+// ⭐ IT RECORDS THE EXECUTION HALF (`REG-D-112` (c)): the authoring floor's reviews are left out and counted
+// (`recordsAsReviewerCall`), and the published PWA is recorded for the replay to re-create.
+// ⭐ AND ONLY ON THE OS FAMILY THE RUN RAN ON (finding 6): `lane/boot.json`'s `JPWB_DEMO_DB` must be an absolute path as
+// this host spells one — the workspace the scrub replaces is derived from it here — and the recording names the family.
 // ⚠ RUNS UNDER BUN ONLY (bun:sqlite). Exit 0 written; 1 refused by a check; 2 refused before anything was read.
 import { Database } from 'bun:sqlite';
 import { createHash } from 'node:crypto';
@@ -36,10 +43,13 @@ import {
 import { homedir, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import {
+	osFamilyOf,
+	RECORDING_FILES,
 	recordingFiles,
+	type OsFamily,
 	type RecordedCell
 } from '../../apps/rph-demo/src/lib/server/replay/recording.js';
-import { accountNames, noAccountName, scanText, type ScanHit } from './archive-scan.js';
+import { accountNames, noAccountName, scanDecodedJson, type ScanHit } from './archive-scan.js';
 import {
 	buildRecording,
 	verifyWrites,
@@ -139,6 +149,13 @@ const USAGE =
 	'usage: bun scripts/phase7/record-replay.ts <RUN> <OUT> --commit <sha> --fingerprint <reviewer fingerprint>';
 
 /**
+ * ⭐ Finding 6 — whether `path` is absolute as `family` spells one: a drive letter, a colon and a separator, or a share,
+ * on Windows; a leading `/` on POSIX. Not `path.isAbsolute`, which on Windows also takes a rooted `/x` — a POSIX spelling.
+ */
+const absoluteOnFamily = (path: string, family: OsFamily): boolean =>
+	family === 'windows' ? /^(?:[A-Za-z]:[\\/]|\\\\)/.test(path) : path.startsWith('/');
+
+/**
  * Returns the exit code: 0 written; 1 refused by a check; 2 refused before anything was read. `names` are the account
  * names the recording is scanned for (`accountNames`), and `home` the folder scrubbed as `JPWB_REPLAY_HOME_NATIVE` — given so a test
  * can hand its own.
@@ -147,7 +164,8 @@ export function main(
 	argv: readonly string[],
 	write: (s: string) => void,
 	names: readonly string[] = accountNames(),
-	home: string = homedir()
+	home: string = homedir(),
+	family: OsFamily = osFamilyOf()
 ): number {
 	const say = (s: string) => write(`phase7/record-replay — ${s}\n`);
 	const parsed = parseArgs(argv);
@@ -217,6 +235,11 @@ export function main(
 		before.push(
 			'lane/report/report.json holds no matrix: the report is final before anything is recorded'
 		);
+	if (demoDb !== '' && !absoluteOnFamily(demoDb, family))
+		before.push(
+			`lane/boot.json's JPWB_DEMO_DB is not an absolute path as this host's OS family (${family}) spells one: a run ` +
+				'is recorded on the family it ran on, and its recording replays on that family alone (the format’s stated limit)'
+		);
 	if (before.length > 0) {
 		say(`refused, and nothing was written:\n  ${before.join('\n  ')}`);
 		return 1;
@@ -242,8 +265,14 @@ export function main(
 		captures: capturesOf(archive),
 		expectedMatrix,
 		commit,
-		reviewerFingerprint: fingerprint
+		reviewerFingerprint: fingerprint,
+		osFamily: family
 	});
+	if (built.authoringCallsLeftOut > 0)
+		say(
+			`left out ${built.authoringCallsLeftOut} reviewer call(s) of the authoring floor: the replay covers the ` +
+				'execution half from the published PWA, which the recording holds (REG-D-112 (c))'
+		);
 	if (built.recording === null) {
 		say(
 			`refused, and nothing was written — the run cannot be read whole into a recording:\n  ${built.problems.join('\n  ')}`
@@ -281,8 +310,9 @@ export function main(
 
 	// ── SCAN, THEN WRITE ─────────────────────────────────────────────────────────────────────────────────────────────────
 	const files = recordingFiles(built.recording);
+	// ⭐ Finding 3 — each file's DECODED values, never its JSON spelling (`scanDecodedJson`).
 	const hits: ScanHit[] = Object.entries(files).flatMap(([file, text]) =>
-		scanText(text, file, names)
+		scanDecodedJson(text, file, names, file !== RECORDING_FILES.manifest)
 	);
 	if (hits.length > 0) {
 		say(
