@@ -40241,6 +40241,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   4. **Half B's request and traps.**
      - The request names the product, `wordfreq`, so P7-4's checks apply.
      - The candidate checks (the design's C4) record and report what they find. They do not refuse before Submit, so a trap plays out live and the run reports it.
+- ⭑ **2026-10-15 — the declared cases are conferred** (`REG-D-113`). The 14 declared-policy oracles of case set v5 are the sponsor's; P4 runs against them once the programme's fix round is merged and gated.
 - ⭑ **2026-10-11 — the number the lane enforces.** The sponsor's *"about 450"* is held as a number: **The limit is 450 reviewer calls** (`REG-D-102` (4) amended). The lane's `PHASE7_PAID_LIMIT` is to read it from this entry (package E3).
 
 ### REG-D-111 — DELEGATED (`REG-D-109`): the completion programme's own decisions — a declared REJECTED goes the canon route and is reported, not recovered; the root judged over its children; the operator records fitness-for-purpose's human decision; declared verdicts stay on the assurance plane; the replay recorded from the last paid run
@@ -40271,3 +40272,21 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - **The recording holds the published PWA's content, and the replay re-creates it.** The authoring floor's exchanges are left out.
   - **A live backend selection beside the replay switch is refused**, the authoring agent's included.
 - **(d) Pi runs a turn's tool calls one at a time** (`REG-F-518`). This is fixed before the recorded run, because a replay must reproduce the calls in order. It changes the executor's behaviour.
+
+### REG-D-113 — SPONSOR RULING: the 14 declared-policy oracles of reviewer-qualification case set v5, conferred as proposed
+
+**Ruled 2026-10-15** (sponsor, in session). **Type:** SPONSOR RULING. **Status:** ✅ **CONFERRED 2026-10-15** — the generated oracle record is updated to cite this ruling with the completion programme's merge, and P4 runs against these oracles.
+
+- **THE SPONSOR'S WORDS, verbatim.** Asked *"Do you confer the 14 declared-policy answers as proposed: each clean case SATISFIED, each planted case REJECTED on the criterion named in the table?"*, the sponsor chose *"Confer all 14 (Recommended)"*.
+- **WHAT WAS SHOWN.** One table, one row per declared policy: the work judged, the defect planted in its second case, and the criterion that case fails. Its cells were drawn from `oracles-v5.json` and `case-set-v5.json` on branch `p7c-e12`, and each expected verdict and named criterion was checked against the oracle file.
+  - Requirement Coverage: the failure-path requirements are dropped while the account claims them covered; fails RC-04.
+  - Intent Preservation: an unrequested HTTP API and SQLite store are presented as part of the product; fails IP-02.
+  - Assumption Disclosure: the ASCII and space-splitting choices are stated as facts, and no assumption is declared; fails AD-01.
+  - Decomposition Coverage: the rank module is dropped, so nothing serves R2 or R4; fails DC-01.
+  - Architecture Coverage: the read module serves nothing, and R5 goes to no module; fails AC-01.
+  - Test Adequacy: only two rank tests, both for R1, ran while the account claims R1–R7 checked; fails TA-08.
+  - Fitness for Purpose: the tool printed letter counts, not word counts, and the verdict took a clean exit to mean the product works; fails FP-03.
+- **WHAT IT MEANS.**
+  - Each clean case (`D-RC-CLEAN`, `D-IP-CLEAN`, `D-AD-CLEAN`, `D-DC-CLEAN`, `D-AC-CLEAN`, `D-TA-CLEAN`, `D-FP-CLEAN`) expects SATISFIED with no criterion faulted.
+  - Each planted case (`D-RC-04`, `D-IP-02`, `D-AD-01`, `D-DC-01`, `D-AC-01`, `D-TA-08`, `D-FP-03`) expects REJECTED with its one named criterion faulted.
+  - Once the generated record cites this ruling, `reviewer:qual:check` no longer reports these oracles as unconferred (`REG-D-073`'s rule). Its coverage stays red until P4 runs.
