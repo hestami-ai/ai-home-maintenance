@@ -622,7 +622,7 @@ export function unsatisfyingReviews(
 //     (`REG-D-105` (3)'s rule: the latest assessment wins, so a re-review run until one said SATISFIED would clear a
 //     reasoned refusal). ⚠ ACROSS POLICIES, THE STRICTEST WINS, as for P7-6R: a unit carrying a REJECTED is offered none.
 //   · EACH A NEW ASSESSMENT, the old one kept: the latest per policy speaks (the floor gate's rule, `RPH-PWU-007`'s reading).
-//   · Recorded as the PERSON's Decision, its rationale theirs and its citation the ruling (`recovery-authority.ts`).
+//   · Recorded as the PERSON's Decision, its rationale theirs and its citation the decision (`recovery-authority.ts`).
 
 /**
  * ⭐ `E12F` F3 — the option a person's re-run of the declared reviews selects, on its Decision. ⭑ A free string, as P7-6R's

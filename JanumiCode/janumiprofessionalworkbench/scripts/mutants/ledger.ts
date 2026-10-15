@@ -27615,5 +27615,23 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/phase7-run-report.test.ts"],
 		why: "PROMISE (E12's re-review F1): the stage-7 cell of a sign-off act that outlasted its bound is marked unregistered - REG-F-527 names the kill, and no entry names why the act outlasted a bound counted from the reviewer's own - so P7-5 owes an entry before it reports it. WHO RELIES: the report's count of breaks no entry names. WHAT THE MUTATION DOES: the cell reads as wholly registered. OBSERVED (bun run mutants -- (the E12 re-review ids), 2026-10-15, in the fixer's worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M89-the-outlasted-sign-off-reads-registered ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 7 completion E12, the re-review's finding 1 (MATERIAL): a sign-off act that asks the reviewer and gets no answer - Record Assurance, or the rule's re-run of the declared reviews - ends the run there with unansweredEnd's reason, as a Begin & Execute with none does (D4, extended; REG-F-535): nothing is pressed beside it, the final archive is taken, and the run report reads the end and that unit's stage 7 from the act's bound; and D4's general form - a Mark Satisfied with no answer ends the run too, and the report's end check accepts a recovery act's bound as well"
+	},
+	{
+		id: "E12-M90-the-declared-re-run-cites-a-sponsor-s-ruling",
+		file: "apps/rph-demo/src/lib/server/execution/recovery-authority.ts",
+		find: "'Authority: REG-D-112 (a), a decision delegated under the sponsor’s REG-D-109 and flagged for the sponsor’s confirmation — ",
+		replace: "'Authority: the sponsor’s ruling REG-D-112 (a) — ",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/declared-review-route.test.ts"],
+		why: "PROMISE (E12's re-review F2): the citation written into each declared re-run's Decision names its authority as what it is - REG-D-112 (a), a decision delegated under the sponsor's REG-D-109 and flagged for the sponsor's confirmation - never 'the sponsor's ruling'. WHO RELIES: every later reader of the Decision, a permanent and append-only record, and the sponsor, whose confirmation of REG-D-112 is owed. WHAT THE MUTATION DOES: the citation opens 'Authority: the sponsor's ruling REG-D-112 (a)' again. OBSERVED (bun run mutants -- (the E12 re-review ids), 2026-10-15, in the fixer's worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M90-the-declared-re-run-cites-a-sponsor-s-ruling ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion E12, the re-review's finding 2 (MATERIAL): the citation each declared re-run's Decision records opened 'Authority: the sponsor's ruling REG-D-112 (a)', and REG-D-112 is a decision delegated under the sponsor's REG-D-109 and flagged for the sponsor's confirmation, not a sponsor's ruling - a false provenance claim on a permanent, append-only record (P76F-C C5's and P76F-D D1's class); it now cites REG-D-112 (a) as what it is"
+	},
+	{
+		id: "E12-M91-the-declared-re-run-calls-its-authority-the-ruling",
+		file: "apps/rph-demo/src/lib/server/execution/recovery-authority.ts",
+		find: "none is cited: REG-D-112 (a) is the authority (DESIGN-the-stopped-unit-recovery.md RD4).';",
+		replace: "none is cited: the ruling is the authority (DESIGN-the-stopped-unit-recovery.md RD4).';",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/declared-review-route.test.ts"],
+		why: "PROMISE (E12's re-review F2): the citation's closing sentence names the authority as REG-D-112 (a), not 'the ruling' - the same false provenance at the end of the record as at its start. WHO RELIES: the Decision's reader. WHAT THE MUTATION DOES: the sentence calls the authority 'the ruling' again. OBSERVED (bun run mutants -- (the E12 re-review ids), 2026-10-15, in the fixer's worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M91-the-declared-re-run-calls-its-authority-the-ruling ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion E12, the re-review's finding 2 (MATERIAL): the citation each declared re-run's Decision records opened 'Authority: the sponsor's ruling REG-D-112 (a)', and REG-D-112 is a decision delegated under the sponsor's REG-D-109 and flagged for the sponsor's confirmation, not a sponsor's ruling - a false provenance claim on a permanent, append-only record (P76F-C C5's and P76F-D D1's class); it now cites REG-D-112 (a) as what it is"
 	}
 ];

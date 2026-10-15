@@ -1072,7 +1072,7 @@ export const DRY_SIGN_OFF_NOT_REACHED =
 
 /**
  * ⭐ `E12F` F3 — THE RATIONALE THE RULE TYPES when it re-runs a unit's declared reviews that did not conclude: the run plan's
- * rule, naming itself and the ruling that extends it, so a reader of the Decision learns which limb this was.
+ * rule, naming itself and the decision that extends it, so a reader of the Decision learns which limb this was.
  */
 export const DECLARED_RERUN_RATIONALE =
 	'The run plan’s rule, REG-D-105 (4), as REG-D-112 (a) extends it to the declared reviews: a declared review that did not conclude is re-run once.';

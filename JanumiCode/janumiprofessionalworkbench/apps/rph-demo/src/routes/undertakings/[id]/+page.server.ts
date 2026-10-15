@@ -2897,7 +2897,7 @@ export const actions: Actions = {
 	//     keeps its verdict, and a declared REJECTED is never re-reviewed (`REG-D-105` (3)) — it goes canon's route.
 	//   · EACH A NEW ASSESSMENT, the old one kept (`planDeclaredSignoff`'s `onlyPolicyIds`), its reviewer asked BEFORE anything
 	//     is dispatched, as Record Assurance asks it, and its calls recorded whatever the batch then does (PER-9).
-	//   · THE PERSON'S DECISION, in the same batch: their rationale VERBATIM, then the ruling cited (`REG-D-112` (a)); its
+	//   · THE PERSON'S DECISION, in the same batch: their rationale VERBATIM, then the decision cited (`REG-D-112` (a)); its
 	//     subjects the unit and the INCONCLUSIVE assessments re-run, its observations theirs. ⚠ `REPLAN` is P7-6R's type for a
 	//     re-run of a review; nothing here revises a plan, and the decision types name no re-assessment (the lead's to rule).
 	//   · THE UNIT FOLDED AFTER IT over every governing policy's latest verdict (`foldAfterRerun`): a positive fold its

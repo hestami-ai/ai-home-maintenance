@@ -433,7 +433,7 @@ async function strandedUnit(): Promise<string> {
 }
 
 describe('⭐⭐ E12F F3 (REG-D-112 (a)) — a declared review that did not conclude is offered to the person, and re-run', () => {
-	it('⭐ the page offers re-running ONLY the review that did not conclude; the re-run is a NEW assessment beside the old one, the person’s Decision citing the ruling — and the unit is assured', async () => {
+	it('⭐ the page offers re-running ONLY the review that did not conclude; the re-run is a NEW assessment beside the old one, the person’s Decision citing REG-D-112 (a) — and the unit is assured', async () => {
 		const pwuId = await strandedUnit();
 		// ⛔ PREDICTED RED, read from the code: no offer — `load` carried no declared re-run, and no action existed: the unit,
 		// UNDER_ASSURANCE and ASSESSING, could be moved by nothing the page offers but Abandon.
@@ -449,13 +449,19 @@ describe('⭐⭐ E12F F3 (REG-D-112 (a)) — a declared review that did not conc
 		const ip = assessmentsUnder(pwuId, IP);
 		expect(ip.map((a) => a.state)).toEqual(['INCONCLUSIVE', 'SATISFIED']);
 		expect(assessmentsUnder(pwuId, POLICY).map((a) => a.state)).toEqual(['SATISFIED']);
-		// ⭐ THE PERSON'S DECISION, their words then the ruling, naming the unit and the review it re-runs.
+		// ⭐ THE PERSON'S DECISION, their words then the decision cited, naming the unit and the review it re-runs.
 		const decision = listByType(getEngine(), 'DECISION')
 			.map((d) => d.state as { selectedOption?: string; rationale?: string; subjectObjectIds?: string[]; decisionType?: string })
 			.find((d) => d.selectedOption === RERUN_DECLARED_REVIEWS);
 		expect(decision?.rationale).toBe(`${RATIONALE}
 
 ${RERUN_DECLARED_REVIEWS_CITATION}`);
+		// ⛔ E12's re-review F2 — THE RECORD SAYS WHAT REG-D-112 (a) IS: a decision delegated under the sponsor's REG-D-109 and
+		// flagged for the sponsor's confirmation, never a sponsor's ruling, on the Decision's permanent, append-only record.
+		expect(decision?.rationale, 'the Decision calls REG-D-112 a ruling').not.toMatch(/ruling REG-D-112|the ruling is the authority/);
+		expect(decision?.rationale).toContain(
+			'Authority: REG-D-112 (a), a decision delegated under the sponsor’s REG-D-109 and flagged for the sponsor’s confirmation'
+		);
 		expect(decision?.subjectObjectIds).toEqual([pwuId, ip[0]!.id]);
 		// ⭐ THE UNIT, folded over every policy's latest verdict: assured — and offered no re-run now.
 		expect(axesOf(pwuId)).toEqual(['UNDER_ASSURANCE', 'SATISFIED']);
