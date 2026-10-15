@@ -820,8 +820,9 @@ describe('⭐ the replay regression (D3) — a recorded run, replayed in process
 			manifest: { ...recorded.recording.manifest, pwaContentDigest: sha256Hex('another PWA') }
 		};
 		const observation = await replayPass(another);
+		// ⭐ (the confirm of E4's second fix round) The refusal says what the check catches — never "another PWA".
 		expect(observation.poisonedBy ?? '').toMatch(
-			/^REPLAY_STALE: the published PWA's content digest is [0-9a-f]{64}, and the recording's is [0-9a-f]{64}/
+			/^REPLAY_STALE: the published PWA's content digest is [0-9a-f]{64}, and the recording's is [0-9a-f]{64}: the PWA the replay re-created from the recording \(REG-D-112 \(c\)\) does not digest as the recording says — the recording's own `pwa` and its digest disagree, or the engine stored the re-created PWA otherwise than recorded, in the fields the digest covers\. No try is served to it\.$/
 		);
 		expect(
 			observation.consumed,

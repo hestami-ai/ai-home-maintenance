@@ -247,13 +247,18 @@ export function createReplayRun(
 						`the published PWA cannot be held to the recording: ${actual.join('; ')}.`
 					)
 				);
+			// ⭐ WHAT THE CHECK CATCHES, SAID (the confirm of E4's second fix round): ~~"this run's PWA is not the one the
+			// recording was made on"~~ — since `REG-D-112` (c) the replay re-creates the recording's OWN `pwa` before this
+			// (`replay-pwa.ts`), so a mismatch is the recording against itself, or the re-creation against what was recorded.
 			if (actual !== recording.manifest.pwaContentDigest)
 				throw poison(
 					new ReplayRefusal(
 						'REPLAY_STALE',
 						`the published PWA's content digest is ${actual}, and the recording's is ` +
-							`${recording.manifest.pwaContentDigest}: this run's PWA is not the one the recording was made on, ` +
-							'and no try is served to it.'
+							`${recording.manifest.pwaContentDigest}: the PWA the replay re-created from the recording ` +
+							"(REG-D-112 (c)) does not digest as the recording says — the recording's own `pwa` and its digest " +
+							'disagree, or the engine stored the re-created PWA otherwise than recorded, in the fields the digest ' +
+							'covers. No try is served to it.'
 					)
 				);
 			pwaChecked = true;
