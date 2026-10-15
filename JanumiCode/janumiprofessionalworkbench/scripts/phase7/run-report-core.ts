@@ -1549,7 +1549,11 @@ function forbiddenActs(v: AuditView, undertakingId: string | null, lane: LaneRow
 		act('retryStep', true, v.ix.eventsOfType('ExecutionStepRetried').map((e) => findingOf(e, onPlan(e), 'a failed step re-queued')), posted(lane, ['retryStep'])),
 		act('waiver', true, waivers, waiverPosts.includes(null) ? null : waiverPosts.reduce<number>((n, p) => n + (p ?? 0), 0)),
 		act('markSatisfied without recordAssurance', true, unassuredSatisfactions(v), unassuredPresses.length, {
-			note: 'POSTs counted from lane/actions: a Mark Satisfied pressed on a unit with no accepted Record Assurance'
+			// ⭐ E12's re-review F6 — the note says what is counted: since `E12F` F3, an accepted re-run of the declared reviews
+			// is the assurance a Mark Satisfied may follow too.
+			note:
+				'POSTs counted from lane/actions: a Mark Satisfied pressed on a unit with no accepted Record Assurance and no ' +
+				'accepted re-run of its declared reviews (REG-D-112 (a))'
 		}),
 		act(
 			'abandon followed by re-proposing',

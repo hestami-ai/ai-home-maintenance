@@ -1256,6 +1256,11 @@ describe('JAN-EXEC P7-2 D9 — the audit of hand acts (P7-3)', () => {
 		expect([accepted.verdict, accepted.posted], 'Mark Satisfied after an accepted declared re-run read as forbidden').toEqual(['none', 0]);
 		const refused = actOf(reportOf(aRun({}, { lane: { actions: acts('failure') } })).report, 'markSatisfied without recordAssurance');
 		expect(refused.posted).toBe(1);
+		// ⛔ E12’s re-review F6 — AND THE PRINTED NOTE SAYS WHAT IS COUNTED: since `E12F` F3 an accepted re-run of the declared
+		// reviews is assurance too, so a Mark Satisfied after a REFUSED Record Assurance is no longer counted by itself.
+		expect(accepted.note, 'the note describes a count it no longer makes').toBe(
+			'POSTs counted from lane/actions: a Mark Satisfied pressed on a unit with no accepted Record Assurance and no accepted re-run of its declared reviews (REG-D-112 (a))'
+		);
 	});
 
 	it('⭐ E12F F3 — a re-run of a unit’s declared reviews is LISTED among the other acts, by its Decision: the unit, and the assessments it re-ran', () => {
