@@ -394,6 +394,12 @@ export interface ReviewerCalls extends ReviewerCallCount {
 		readonly limit: number;
 		readonly under: boolean | null;
 	};
+	/**
+	 * ⭐ E12's polish (fix2's F8; the lead's delegated decision of 2026-10-15, to be registered) — THE LANE'S OWN READS OF THE
+	 * LIMIT, each before a paid act (D8; `E12F` F2): before each phase, each of the rule's re-runs, each sign-off and each re-run
+	 * of the declared reviews, unit by unit — and which held its act back. Read from `lane/run.json`.
+	 */
+	readonly laneLimitChecks: readonly LaneLimitCheck[];
 }
 
 export interface AuditFinding {
@@ -749,7 +755,55 @@ interface LaneUnit {
 	readonly signOffOutlasted: { readonly act: string; readonly ms: number } | null;
 	/** ⭐ E12's re-review F1 (D4) — a recovery act the rule pressed gave no answer within its bound: the run ended there. */
 	readonly recoveryOutlasted: boolean;
+	/**
+	 * ⭐ E12's polish (fix2's F8; the lead's delegated decision of 2026-10-15, to be registered) — WHAT THE LANE HELD BACK OF THE
+	 * SIGN-OFF: before which act, why in the lane's own words (`notPressed`), and the limit check it read first — before Record
+	 * Assurance (a dry run's rehearsal, `REG-D-112` (b), or the limit, D8), or before the rule's re-run of the declared reviews
+	 * (the limit). null when it held nothing back, and for a record written before E12F, which kept no such field.
+	 */
+	readonly signOffHeldBack: {
+		readonly before: string;
+		readonly reason: string;
+		readonly check: LaneLimitCheck | null;
+	} | null;
+	/** ⭐ E12's polish (the same decision) — every read of the limit the lane recorded for the unit, in the order it made them. */
+	readonly limitChecks: readonly LaneLimitCheck[];
 }
+
+/**
+ * ⭐ E12's polish (fix2's F8) — ONE READ OF THE LIMIT THE LANE RECORDED BEFORE A PAID ACT (D8; `E12F` F2): prior + recorded +
+ * reserve + the act's own worst case (`ahead`, 0 where it counted none), and whether that total stayed under the limit — the
+ * act pressed — or not, the act held back (`phase7-operator.ts` `limitCheck`).
+ */
+export interface LaneLimitCheck {
+	readonly unit: string;
+	/** What it was read before: the unit's Begin & Execute, a re-run of it, its sign-off, or a re-run of its declared reviews. */
+	readonly before: string;
+	readonly prior: number;
+	readonly recorded: number;
+	readonly reserve: number;
+	readonly ahead: number;
+	readonly total: number;
+	readonly limit: number;
+	readonly allowed: boolean;
+}
+
+/** A limit check the lane recorded, read loosely: null when it holds no total, limit or verdict to read. */
+function laneLimitCheck(unit: string, before: string, v: unknown): LaneLimitCheck | null {
+	const c = rec(v);
+	const [prior, recorded, reserve, total, limit, allowed] = [int(c.prior), int(c.recorded), int(c.reserve), int(c.total), int(c.limit), bool(c.allowed)];
+	if (prior === null || recorded === null || reserve === null || total === null || limit === null || allowed === null) return null;
+	return { unit, before, prior, recorded, reserve, ahead: int(c.ahead) ?? 0, total, limit, allowed };
+}
+
+/** The rule's re-run a recovery act's limit check was read before, by its act. */
+const RECOVERY_READ: Readonly<Record<string, string>> = {
+	rerunReview: 'the rule’s re-run of its review',
+	rerunWork: 'the rule’s re-run of its work'
+};
+/** ⭐ E12's polish — what a sign-off's hold, and its limit check, was read before. */
+const BEFORE_RECORD_ASSURANCE = 'Record Assurance';
+const BEFORE_DECLARED_RERUN = 'the rule’s re-run of its declared reviews';
 
 /** ⭐ E12's re-review F1 — the sign-off's acts, by the field the lane records each in and the button's name. */
 const SIGN_OFF_ACTS = [
@@ -795,9 +849,34 @@ function laneUnits(run: unknown): LaneUnit[] {
 			signOffOutlasted: signOffOutlasted(signOff),
 			recoveryOutlasted: (Array.isArray(r.recovery) ? (r.recovery as unknown[]) : []).some(
 				(x) => int(rec(x).timedOutAfterMs) !== null
-			)
+			),
+			signOffHeldBack: heldBackOf(str(r.slug), signOff),
+			limitChecks: limitChecksOf(str(r.slug), r, signOff)
 		};
 	});
+}
+
+/**
+ * ⭐ E12's polish (fix2's F8) — the sign-off's hold, from its record (`LaneUnit.signOffHeldBack`): with Record Assurance
+ * pressed, what the lane held back was the rule's re-run of the declared reviews, read before it; else the sign-off itself.
+ */
+function heldBackOf(slug: string, signOff: Record<string, unknown>): LaneUnit['signOffHeldBack'] {
+	const reason = str(signOff.notPressed);
+	if (reason === '') return null;
+	if ((signOff.recordAssurance ?? null) !== null)
+		return { before: BEFORE_DECLARED_RERUN, reason, check: laneLimitCheck(slug, BEFORE_DECLARED_RERUN, signOff.rerunLimitCheck) };
+	return { before: BEFORE_RECORD_ASSURANCE, reason, check: laneLimitCheck(slug, 'its sign-off', signOff.limitCheck) };
+}
+
+/** ⭐ E12's polish (fix2's F8) — every read of the limit the lane recorded for one unit, in its order (`LaneUnit.limitChecks`). */
+function limitChecksOf(slug: string, r: Record<string, unknown>, signOff: Record<string, unknown>): LaneLimitCheck[] {
+	const recovery = Array.isArray(r.recovery) ? (r.recovery as unknown[]) : [];
+	return [
+		laneLimitCheck(slug, 'its Begin & Execute', r.limitCheck),
+		...recovery.map((x) => laneLimitCheck(slug, RECOVERY_READ[str(rec(x).act)] ?? `the rule’s ${str(rec(x).act)}`, rec(x).limitCheck)),
+		laneLimitCheck(slug, 'its sign-off', signOff.limitCheck),
+		laneLimitCheck(slug, BEFORE_DECLARED_RERUN, signOff.rerunLimitCheck)
+	].filter((c): c is LaneLimitCheck => c !== null);
 }
 
 // ── THE UNITS ────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -1234,7 +1313,8 @@ function buildReviewerCalls(ix: Index, units: readonly Unit[], lane: LaneRows): 
 			total,
 			limit: PAID_LIMIT,
 			under: total === null ? null : total < PAID_LIMIT
-		}
+		},
+		laneLimitChecks: laneUnits(lane.run).flatMap((u) => u.limitChecks)
 	};
 }
 
@@ -1941,6 +2021,8 @@ interface UnitView {
 	readonly runs: UnitRuns;
 	readonly declared: readonly DeclaredVerdict[];
 	readonly signOffAttempted: boolean;
+	/** ⭐ E12's polish (fix2's F8) — what the lane held back of its sign-off, and why (`LaneUnit.signOffHeldBack`). */
+	readonly heldBack: LaneUnit['signOffHeldBack'];
 	/** Its exchanges, both planes, by what a person can read of each (`exchangeReading`). */
 	readonly exchanges: { readonly total: number; readonly broken: number; readonly unretained: number };
 	readonly contentStore: boolean;
@@ -1994,8 +2076,28 @@ function completion(v: UnitView, row: string): MatrixCell {
 			],
 			{ unregistered: true }
 		);
-	if (!v.signOffAttempted) return cell('7', row, 'not reached', [], [facts, 'its sign-off was never attempted']);
-	return cell('7', row, 'broke', [], [facts, 'its sign-off was attempted and the unit is not SATISFIED']);
+	if (!v.signOffAttempted) return cell('7', row, 'not reached', [], [facts, ...heldBackOr(v, 'its sign-off was never attempted')]);
+	return cell('7', row, 'broke', [], [facts, 'its sign-off was attempted and the unit is not SATISFIED', ...heldBackOr(v)]);
+}
+
+/** ⭐ E12's polish (fix2's F8) — the figures of one read of the limit, as the reviewer-calls section prints the record's own. */
+const limitFigures = (c: LaneLimitCheck): string =>
+	`${c.prior} + ${c.recorded} + ${c.reserve}${c.ahead > 0 ? ` + ${c.ahead} ahead` : ''} = ${c.total} of ${c.limit}, ` +
+	(c.allowed ? 'under it' : 'not under it');
+
+/**
+ * ⭐ E12's polish (fix2's F8; the lead's delegated decision of 2026-10-15, to be registered) — WHAT THE LANE HELD BACK OF A
+ * UNIT'S SIGN-OFF, as stage 7 says it: before which act, why in the lane's own words, and the limit it read; else `otherwise`.
+ * ⛔ A sign-off held back before Record Assurance read "its sign-off was never attempted", the words a run cut short reads, and
+ * a declared re-run held back beside a refused Record Assurance left the limit's part said nowhere.
+ */
+function heldBackOr(v: UnitView, ...otherwise: string[]): string[] {
+	const h = v.heldBack;
+	if (h === null) return otherwise;
+	return [
+		`its sign-off was held back before ${h.before}: ${h.reason}`,
+		...(h.check === null ? [] : [`the limit as the lane read it: ${limitFigures(h.check)}`])
+	];
 }
 
 const triesOf = (u: Unit): string[] => u.tries.map((t) => `${str(t.state.disposition)}:${parseClass(t.state.parseOutcome)}`);
@@ -2460,6 +2562,7 @@ function unitView(
 		signOffAttempted:
 			u.lane?.signOffAttempted === true ||
 			actions.some((a) => a.action === 'recordAssurance' || a.action === 'markSatisfied'),
+		heldBack: u.lane?.signOffHeldBack ?? null,
 		exchanges: {
 			total: exchanges.length,
 			broken: readings.filter((r) => r === 'does not hold what it claims').length,
@@ -2719,7 +2822,12 @@ function unitLines(r: RunReport): string[] {
 		`- **Recorded:** ${r.reviewerCalls.recorded} (${r.reviewerCalls.noResponse} with no response, ` +
 			`${r.reviewerCalls.retries} retries, ${r.reviewerCalls.repairs} repairs).`,
 		`- **The limit (design D8):** ${limit.prior ?? 'prior spend not given'} + ${limit.recorded} + ${limit.reserve} = ` +
-			`${limit.total ?? '?'} of ${limit.limit}${under}.`
+			`${limit.total ?? '?'} of ${limit.limit}${under}.`,
+		// ⭐ E12's polish (fix2's F8; the lead's delegated decision of 2026-10-15, to be registered) — and the lane's own reads.
+		`- **The lane's own reads of the limit, each before a paid act (design D8; E12F F2):** ${r.reviewerCalls.laneLimitChecks.length}.`,
+		...r.reviewerCalls.laneLimitChecks.map(
+			(c) => `  - ${c.unit}, before ${c.before}: ${limitFigures(c)}${c.allowed ? '' : ': held back'}.`
+		)
 	];
 }
 

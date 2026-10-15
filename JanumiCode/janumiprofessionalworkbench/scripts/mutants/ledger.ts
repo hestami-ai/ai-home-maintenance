@@ -27858,5 +27858,77 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/reviewer-qualification-declared-cases.test.ts"],
 		why: "PROMISE (E12's polish): a declared case's result class says whether the review answered (VALID) or failed (VALIDATOR_FAILED) - the one distinction the declared seam draws. WHO RELIES: a reader of a CALL line, who tells a reviewer that answered and was INCONCLUSIVE from a review that produced nothing. WHAT THE MUTATION DOES: a review that threw is classed VALID. OBSERVED (bun run mutants -- (the E12 polish ids), 2026-10-15, in the polish worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M116-a-declared-review-that-failed-is-classed-valid ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'; its red, the mutation applied by hand and the file restored byte for byte: 'AssertionError: expected [ 'INCONCLUSIVE', 'VALID' ] to deeply equal [ 'INCONCLUSIVE', 'VALIDATOR_FAILED' ]'",
 		source: "JAN-EXEC Phase 7 completion E12, polish (the confirm's runner.ts finding): the qualification scorer scored a declared case by the floor composition's ladder while its comment called that the ladder the declared sign-off computes its verdict by - found to differ on v5's own cases (BOUNDARY_REJECTED and REG-D-089's ESCALATED, where the sign-off records REJECTED and SATISFIED; VALIDATOR_FAILED, where it records INCONCLUSIVE) and past them (the sign-off's limbs, a policy's evidence ceiling); now a declared case is scored by the sign-off's own declaredVerdict over the product's own reading of the review, at the ceiling the policy's seeded evidence sets"
+	},
+	{
+		id: "E12-M117-a-sign-off-the-limit-held-back-reads-never-attempted",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "[facts, ...heldBackOr(v, 'its sign-off was never attempted')]",
+		replace: "[facts, 'its sign-off was never attempted']",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE (E12's polish, fix2's F8; the lead's delegated decision of 2026-10-15, to be registered): stage 7 reads a sign-off the lane held back before Record Assurance as held back - the lane's own reason and the limit it read - never as one never attempted, the words a run cut short before its sign-offs reads. WHO RELIES: P7-5, reading a run the limit stopped, and the sponsor, who set the limit (REG-D-110 (1)). WHAT THE MUTATION DOES: the hold is read away, and the unit reads 'its sign-off was never attempted' as before. OBSERVED (bun run mutants -- (the E12 polish ids), 2026-10-15, in the polish worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M117-a-sign-off-the-limit-held-back-reads-never-attempted ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'; its red, the mutation applied by hand and the file restored byte for byte: 'AssertionError: a sign-off the limit held back read as one never attempted: expected [ 'not reached', [ …(2) ] ] to deeply equal [ 'not reached', [ …(3) ] ]'",
+		source: "JAN-EXEC Phase 7 completion E12, polish (fix2's F8, decided by the lead on 2026-10-15): the run report discloses what the lane held back - stage 7 reads a sign-off the lane held back as held back, its reason and the limit it read, and the declared re-run the limit held back beside a refused Record Assurance; the reviewer-calls section lists the lane's own reads of the limit, each before a paid act, and which held its act back"
+	},
+	{
+		id: "E12-M118-a-declared-re-run-the-limit-held-back-is-said-nowhere",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "'its sign-off was attempted and the unit is not SATISFIED', ...heldBackOr(v)]",
+		replace: "'its sign-off was attempted and the unit is not SATISFIED']",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE (E12's polish, fix2's F8): a unit whose refused Record Assurance the rule would have answered with a re-run of its declared reviews, held back by the limit, says so at stage 7 beside the break. WHO RELIES: a reader telling a unit the reviewer left under assessment from one the limit left there. WHAT THE MUTATION DOES: the break reads as before, the limit's part said nowhere. OBSERVED (bun run mutants -- (the E12 polish ids), 2026-10-15, in the polish worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M118-a-declared-re-run-the-limit-held-back-is-said-nowhere ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'; its red, the mutation applied by hand and the file restored byte for byte: 'AssertionError: the hold of the declared re-run is said nowhere: expected [ Array(1) ] to deeply equal [ …(3) ]'",
+		source: "JAN-EXEC Phase 7 completion E12, polish (fix2's F8, decided by the lead on 2026-10-15): the run report discloses what the lane held back - stage 7 reads a sign-off the lane held back as held back, its reason and the limit it read, and the declared re-run the limit held back beside a refused Record Assurance; the reviewer-calls section lists the lane's own reads of the limit, each before a paid act, and which held its act back"
+	},
+	{
+		id: "E12-M119-the-declared-re-runs-hold-shows-the-sign-offs-read",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "check: laneLimitCheck(slug, BEFORE_DECLARED_RERUN, signOff.rerunLimitCheck) };",
+		replace: "check: laneLimitCheck(slug, BEFORE_DECLARED_RERUN, signOff.limitCheck) };",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE (E12's polish, fix2's F8): the hold of the rule's re-run of the declared reviews shows the read the lane made before THAT re-run (rerunLimitCheck), never the sign-off's earlier read, which let Record Assurance be pressed. WHO RELIES: the hold's figures, which must be the ones that held it back. WHAT THE MUTATION DOES: the re-run's hold shows the sign-off's read - under the limit - beside a reason that says it was not. OBSERVED (bun run mutants -- (the E12 polish ids), 2026-10-15, in the polish worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M119-the-declared-re-runs-hold-shows-the-sign-offs-read ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'; its red, the mutation applied by hand and the file restored byte for byte: 'AssertionError: the hold of the declared re-run is said nowhere: expected [ …(3) ] to deeply equal [ …(3) ]'",
+		source: "JAN-EXEC Phase 7 completion E12, polish (fix2's F8, decided by the lead on 2026-10-15): the run report discloses what the lane held back - stage 7 reads a sign-off the lane held back as held back, its reason and the limit it read, and the declared re-run the limit held back beside a refused Record Assurance; the reviewer-calls section lists the lane's own reads of the limit, each before a paid act, and which held its act back"
+	},
+	{
+		id: "E12-M120-the-reviewer-calls-list-no-read-of-the-lane",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "\t\tlaneLimitChecks: laneUnits(lane.run).flatMap((u) => u.limitChecks)",
+		replace: "\t\tlaneLimitChecks: []",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE (E12's polish, fix2's F8): the reviewer-calls section lists the lane's own reads of the limit, each before a paid act. WHO RELIES: a reader of a run the limit stopped, who sees where it acted and by how much (e.g. 234 of 230, the sign-off's own 16). WHAT THE MUTATION DOES: the section lists none. OBSERVED (bun run mutants -- (the E12 polish ids), 2026-10-15, in the polish worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M120-the-reviewer-calls-list-no-read-of-the-lane ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'; its red, the mutation applied by hand and the file restored byte for byte: 'AssertionError: the lane’s reads of the limit: expected [] to deeply equal [ [ 'requirements', …(3) ], …(5) ]'",
+		source: "JAN-EXEC Phase 7 completion E12, polish (fix2's F8, decided by the lead on 2026-10-15): the run report discloses what the lane held back - stage 7 reads a sign-off the lane held back as held back, its reason and the limit it read, and the declared re-run the limit held back beside a refused Record Assurance; the reviewer-calls section lists the lane's own reads of the limit, each before a paid act, and which held its act back"
+	},
+	{
+		id: "E12-M121-the-reviewer-calls-drop-the-sign-offs-reads",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "\t\tlaneLimitCheck(slug, 'its sign-off', signOff.limitCheck),\n",
+		replace: "",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE (E12's polish, fix2's F8): the list holds each sign-off's read of the limit (E12F F2), the one the decision names first. WHO RELIES: a reader of a run whose sign-off the limit held back. WHAT THE MUTATION DOES: the sign-offs' reads are dropped from the list. OBSERVED (bun run mutants -- (the E12 polish ids), 2026-10-15, in the polish worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M121-the-reviewer-calls-drop-the-sign-offs-reads ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'; its red, the mutation applied by hand and the file restored byte for byte: 'AssertionError: the lane’s reads of the limit: expected [ [ 'requirements', …(3) ], …(3) ] to deeply equal [ [ 'requirements', …(3) ], …(5) ]'",
+		source: "JAN-EXEC Phase 7 completion E12, polish (fix2's F8, decided by the lead on 2026-10-15): the run report discloses what the lane held back - stage 7 reads a sign-off the lane held back as held back, its reason and the limit it read, and the declared re-run the limit held back beside a refused Record Assurance; the reviewer-calls section lists the lane's own reads of the limit, each before a paid act, and which held its act back"
+	},
+	{
+		id: "E12-M122-the-reviewer-calls-drop-the-declared-re-runs-reads",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "\t\tlaneLimitCheck(slug, BEFORE_DECLARED_RERUN, signOff.rerunLimitCheck)\n",
+		replace: "",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE (E12's polish, fix2's F8): the list holds each read before the rule's re-run of the declared reviews (E12F F3). WHO RELIES: a reader of a unit the limit left under assessment. WHAT THE MUTATION DOES: those reads are dropped from the list. OBSERVED (bun run mutants -- (the E12 polish ids), 2026-10-15, in the polish worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M122-the-reviewer-calls-drop-the-declared-re-runs-reads ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'; its red, the mutation applied by hand and the file restored byte for byte: 'AssertionError: the lane’s reads of the limit: expected [ [ 'requirements', …(3) ], …(4) ] to deeply equal [ [ 'requirements', …(3) ], …(5) ]'",
+		source: "JAN-EXEC Phase 7 completion E12, polish (fix2's F8, decided by the lead on 2026-10-15): the run report discloses what the lane held back - stage 7 reads a sign-off the lane held back as held back, its reason and the limit it read, and the declared re-run the limit held back beside a refused Record Assurance; the reviewer-calls section lists the lane's own reads of the limit, each before a paid act, and which held its act back"
+	},
+	{
+		id: "E12-M123-the-reviewer-calls-drop-the-rules-re-run-reads",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "...recovery.map((x) => laneLimitCheck(",
+		replace: "...recovery.slice(0, 0).map((x) => laneLimitCheck(",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE (E12's polish, fix2's F8): the list holds each read before the run plan's rule re-ran a phase (P7-6R R-1f; D8). WHO RELIES: a reader of a run whose re-run the limit stopped. WHAT THE MUTATION DOES: the rule's re-run reads are dropped from the list. OBSERVED (bun run mutants -- (the E12 polish ids), 2026-10-15, in the polish worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M123-the-reviewer-calls-drop-the-rules-re-run-reads ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'; its red, the mutation applied by hand and the file restored byte for byte: 'AssertionError: the lane’s reads of the limit: expected [ [ 'requirements', …(3) ], …(4) ] to deeply equal [ [ 'requirements', …(3) ], …(5) ]'",
+		source: "JAN-EXEC Phase 7 completion E12, polish (fix2's F8, decided by the lead on 2026-10-15): the run report discloses what the lane held back - stage 7 reads a sign-off the lane held back as held back, its reason and the limit it read, and the declared re-run the limit held back beside a refused Record Assurance; the reviewer-calls section lists the lane's own reads of the limit, each before a paid act, and which held its act back"
+	},
+	{
+		id: "E12-M124-a-read-that-held-its-act-back-is-printed-as-one-that-did-not",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "${limitFigures(c)}${c.allowed ? '' : ': held back'}.`",
+		replace: "${limitFigures(c)}.`",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE (E12's polish, fix2's F8): the printed list says which read held its act back. WHO RELIES: a reader of report.md. WHAT THE MUTATION DOES: a read that held its act back prints like one that let it be pressed, save its figures. OBSERVED (bun run mutants -- (the E12 polish ids), 2026-10-15, in the polish worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M124-a-read-that-held-its-act-back-is-printed-as-one-that-did-not ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'; its red, the mutation applied by hand and the file restored byte for byte: 'AssertionError: expected '# Phase 7 run report\\n\\n- **Basis:** …' to contain '  - design, before its sign-off: 210 …''",
+		source: "JAN-EXEC Phase 7 completion E12, polish (fix2's F8, decided by the lead on 2026-10-15): the run report discloses what the lane held back - stage 7 reads a sign-off the lane held back as held back, its reason and the limit it read, and the declared re-run the limit held back beside a refused Record Assurance; the reviewer-calls section lists the lane's own reads of the limit, each before a paid act, and which held its act back"
 	}
 ];

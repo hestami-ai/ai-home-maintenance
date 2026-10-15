@@ -1864,6 +1864,105 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 		expect([c.value, c.basis[0]], 'a pressed Record Assurance read as a sign-off never attempted').toEqual(['broke', 'root: broke']);
 	});
 
+	// ── ⛔⛔ E12’s polish (fix2’s F8; the lead’s delegated decision of 2026-10-15, to be registered) — THE REPORT DISCLOSES WHAT THE
+	// LANE HELD BACK: nothing read the sign-off record's `notPressed`, `limitCheck` or `rerunLimitCheck`, so only the header's
+	// "ended: paid-limit" said the limit had acted at all.
+	/** What the lane read of the limit before an act, as `limitCheck` records it (`phase7-operator.ts`). */
+	const read = (prior: number, recorded: number, ahead: number, limit = 230) => {
+		const total = prior + recorded + 4 + ahead;
+		return { prior, recorded, reserve: 4, ...(ahead > 0 ? { ahead } : {}), total, limit, allowed: total < limit };
+	};
+	/** A run the lane stopped at design's sign-off: its phases completed, nothing signed off, design's record `signOff`. */
+	const heldAtDesign = (signOff: Record<string, unknown>, unit = { lifecycle: 'EXECUTING', execution: 'SUCCEEDED', assurance: 'UNASSESSED' }) => {
+		const completed = { lifecycle: 'EXECUTING', execution: 'SUCCEEDED', assurance: 'UNASSESSED' };
+		const run = aRun(
+			{ requirements: { unit: completed, signedOff: false }, design: { unit, signedOff: false }, implementation: { unit: completed, signedOff: false }, 'end-to-end': { unit: completed, signedOff: false } },
+			{ rootSignedOff: false, run: { end: { reason: 'paid-limit' } } }
+		);
+		const laneRun = run.lane.run as { units: Record<string, unknown>[] };
+		const lane: LaneRows = { ...run.lane, run: { ...laneRun, units: laneRun.units.map((u) => (u.slug === 'design' ? { ...u, signOff } : u)) } };
+		return buildRunReport(run.store, lane, { accountNames: NAMES }).report;
+	};
+	const unpressed = { recordAssurance: null, rerunDeclared: null, rerunLimitCheck: null, markSatisfied: null, refused: null };
+	const OVER = "the limit: 234 of 230 reviewer calls, the sign-off's own 16 counted (D8; E12F F2)";
+
+	it('⛔ E12’s polish (fix2’s F8) — stage 7: a sign-off the LIMIT held back reads as held back by the limit, its reason and its check — never as one never attempted', () => {
+		// ⛔ PREDICTED RED, read from the code: "its sign-off was never attempted", the words a run cut short before its sign-offs
+		// reads, and nothing of the 234 of 230 or the sign-off's own 16 calls.
+		const r = heldAtDesign({ offered: true, limitCheck: read(210, 4, 16), ...unpressed, notPressed: OVER });
+		const c = cellOf(r, '7', 'design');
+		expect([c.value, c.basis], 'a sign-off the limit held back read as one never attempted').toEqual([
+			'not reached',
+			[
+				'design: lifecycle EXECUTING, assurance UNASSESSED, step SUCCEEDED',
+				`its sign-off was held back before Record Assurance: ${OVER}`,
+				'the limit as the lane read it: 210 + 4 + 4 + 16 ahead = 234 of 230, not under it'
+			]
+		]);
+		// ⭑ CONTROL — a unit the lane never reached, the run stopped at design: never attempted, as before.
+		expect(cellOf(r, '7', 'implementation').basis.at(-1)).toBe('its sign-off was never attempted');
+	});
+
+	it('⛔ E12’s polish (fix2’s F8) — stage 7: the rule’s re-run of the declared reviews the limit held back is said beside the refused Record Assurance — broke, as before, the hold named', () => {
+		// ⛔ PREDICTED RED, read from the code: a plain "its sign-off was attempted and the unit is not SATISFIED" — the limit's
+		// part in leaving the unit under assessment said nowhere.
+		const rerunOver = "the limit: 238 of 230 reviewer calls, the sign-off's own 16 counted (D8; E12F F2)";
+		const r = heldAtDesign(
+			{
+				offered: true,
+				limitCheck: read(206, 0, 16),
+				...unpressed,
+				recordAssurance: { status: 200, envelopeType: 'failure', timedOutAfterMs: null, requestFailure: null, refusal: 'not concluded', after: null },
+				rerunLimitCheck: read(206, 12, 16),
+				refused: { act: 'Record Assurance', reason: 'not concluded' },
+				notPressed: rerunOver
+			},
+			{ lifecycle: 'UNDER_ASSURANCE', execution: 'SUCCEEDED', assurance: 'ASSESSING' }
+		);
+		expect(cellOf(r, '7', 'design').basis.slice(1), 'the hold of the declared re-run is said nowhere').toEqual([
+			'its sign-off was attempted and the unit is not SATISFIED',
+			`its sign-off was held back before the rule’s re-run of its declared reviews: ${rerunOver}`,
+			'the limit as the lane read it: 206 + 12 + 4 + 16 ahead = 238 of 230, not under it'
+		]);
+	});
+
+	it('⛔ E12’s polish (fix2’s F8) — the reviewer calls list the lane’s own reads of the limit — before each phase, each re-run, each sign-off and each re-run of the declared reviews — and which held its act back', () => {
+		// ⛔ PREDICTED RED, read from the code: the section printed the record's own count alone (prior + recorded + reserve);
+		// the reads the lane made before each paid act, the one that held design's sign-off back among them, were nowhere.
+		const run = aRun({}, { run: { end: { reason: 'paid-limit' } } });
+		const laneRun = run.lane.run as { units: Record<string, unknown>[] };
+		const at = (slug: string, fields: Record<string, unknown>) => (u: Record<string, unknown>) => (u.slug === slug ? { ...u, ...fields } : u);
+		const units = laneRun.units
+			.map(at('requirements', { limitCheck: read(200, 0, 0), recovery: [{ act: 'rerunReview', limitCheck: read(200, 2, 0) }, { act: 'abandonPwu', limitCheck: null }] }))
+			.map(at('design', { limitCheck: read(200, 4, 0), signOff: { offered: true, limitCheck: read(210, 4, 16), ...unpressed, notPressed: OVER } }))
+			.map(
+				at('implementation', {
+					signOff: {
+						offered: true,
+						limitCheck: read(205, 6, 12),
+						...unpressed,
+						recordAssurance: { status: 200, envelopeType: 'failure', after: null },
+						rerunLimitCheck: read(205, 18, 12),
+						notPressed: 'the limit: 239 of 230 …'
+					}
+				})
+			);
+		const r = buildRunReport(run.store, { ...run.lane, run: { ...laneRun, units } }, { accountNames: NAMES }).report;
+		expect(r.reviewerCalls, 'the section carries none of the lane’s reads of the limit').toHaveProperty('laneLimitChecks');
+		expect(r.reviewerCalls.laneLimitChecks.map((c) => [c.unit, c.before, c.total, c.allowed]), 'the lane’s reads of the limit').toEqual([
+			['requirements', 'its Begin & Execute', 204, true],
+			['requirements', 'the rule’s re-run of its review', 206, true],
+			['design', 'its Begin & Execute', 208, true],
+			['design', 'its sign-off', 234, false],
+			['implementation', 'its sign-off', 227, true],
+			['implementation', 'the rule’s re-run of its declared reviews', 239, false]
+		]);
+		const md = renderMarkdown(r);
+		expect(md).toContain("- **The lane's own reads of the limit, each before a paid act (design D8; E12F F2):** 6.");
+		expect(md).toContain('  - design, before its sign-off: 210 + 4 + 4 + 16 ahead = 234 of 230, not under it: held back.');
+		expect(md).toContain('  - requirements, before its Begin & Execute: 200 + 0 + 4 = 204 of 230, under it.');
+	});
+
 	it('⛔ stage 7’s sign-off: the lane’s dry run signs the root off (D11) — the root as intended, the run not reached; one never attempted, in a run cut short — not reached; one refused — broke', () => {
 		// ⚠ `E12F` F1 — A DRY RUN BEFORE `REG-D-112` (b): its root signed off by the paid run's own acts. Kept, for an archive made
 		// then; a dry run now rehearses the sign-off up to the reviewer call and presses nothing (the case above).
