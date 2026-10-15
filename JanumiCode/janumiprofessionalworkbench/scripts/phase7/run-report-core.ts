@@ -9,6 +9,8 @@
 //     P7-4's checks, a review that concluded against the work is the adjudication's (P7-4f), and runs the archive
 //     cannot count (K5) are a person's — rather than being given one of the five on a guess. ⛔ A unit whose Begin &
 //     Execute outlasted the lane's allowance (D4) is read as cut there, never from its mid-unit archive as if it ended.
+//     ⭐ In half B the phases are the agent's, and a root that declares MODEL is one of them, at stages 3 to 8 too (the
+//     lead's delegated decision of 2026-10-15, to be registered).
 //   · THE PAIRING (§2 stage 8; `REG-F-433`) — every Reasoning Review of an execution-plane subject, paired with the
 //     ASSURANCE-plane call that concluded it: answered, no response, refused (a substitute, or a failed repair), no
 //     answer recorded, or not pairable when its subject had more than one floor run. A deterministic floor policy and a
@@ -2024,6 +2026,16 @@ function childrenOf(ix: Index, u: Unit, units: readonly Unit[]): string[] {
 /** ⭐ E3 (C5) — did a model run for the unit: an execution try of it answered (`ACCEPTED`). */
 const modelRanFor = (u: Unit): boolean => u.tries.some((t) => str(t.state.disposition) === 'ACCEPTED');
 
+/**
+ * ⭐ The lead's delegated decision of 2026-10-15, to be registered — the discharge the unit's TYPE declares, read as the
+ * lane reads it before half B's root is pressed (`phase7-operator.ts`, `dischargeOf`): §3.2's declaration in half A, the
+ * agent's type in the store in half B, and `UNDECLARED` when neither names one.
+ */
+const dischargeOf = (ix: Index, u: Unit): string =>
+	u.type?.workDischarge ??
+	(str(ix.ofType('PWU_TYPE').find((t) => t.id === (u.typeId ?? str(u.object?.state.pwuTypeId)))?.state.workDischarge) ||
+		'UNDECLARED');
+
 const triesOf = (u: Unit): string[] => u.tries.map((t) => `${str(t.state.disposition)}:${parseClass(t.state.parseOutcome)}`);
 
 /** Stage 3 — the phase does the work, and a review's findings reach its next try. */
@@ -2329,7 +2341,7 @@ function stageOneHalfB(ix: Index, lane: LaneRows): MatrixCell {
 		value,
 		authorFaults.registerIds,
 		[
-			`the PWA "${str(pwa.state.name)}" is ${status}, authored by the agent from the request (design §4 C1)`,
+			authorshipLine(pwa, status, authoring, lane),
 			`the authoring floor: ${floor.map((f) => `${f.policyId} ${f.state}`).join(', ')}`,
 			`the reviewer: ${reviewer ?? 'none recorded'}; ${authorRead} (configured: ${configured ?? 'unset'})`,
 			`the accepted hash: ${accepted ?? 'none'}; the candidate as the lane last read it: ${str(candidate.status) || 'none'}`,
@@ -2340,6 +2352,28 @@ function stageOneHalfB(ix: Index, lane: LaneRows): MatrixCell {
 		// ⚠ A floor, hash or publication fault is the run's to register (P7-5); an author's fault names its entry — save a
 		// producer the lane could not read, which names none, and so is unregistered too (`cell`).
 		{ unregistered: faults.length > 0 }
+	);
+}
+
+/**
+ * ⭐ The lead's delegated decision of 2026-10-15, to be registered (E3's polish; the confirm of 60c8a828) — STAGE 1'S
+ * FIRST LINE: THE AGENT AUTHORED THE PWA ONLY WHEN A CANDIDATE OF ITS WAS ACCEPTED, the acceptance answered success and
+ * named its hash. ⛔ ~~Said whatever the authoring came to~~: a turn the server refused before it began read "authored
+ * by the agent", in the cell that says the turn never settled. Otherwise the PWA is still the lane's draft, and the line
+ * says what the authoring came to: its candidate as the lane last read it, and the run's end. ⚠ A hash alone is no
+ * acceptance: the lane keeps one beside a refusal whose words name it (`acceptedHashOf`).
+ */
+function authorshipLine(pwa: StoredObject, status: string, authoring: Record<string, unknown>, lane: LaneRows): string {
+	const named = `the PWA "${str(pwa.state.name)}" is ${status}`;
+	const accept = rec(authoring.accept);
+	if (str(accept.acceptedHash) !== '' && str(accept.envelopeType) === 'success')
+		return `${named}, authored by the agent from the request (design §4 C1)`;
+	const turn = str(rec(authoring.candidate).status);
+	const came = turn === '' ? 'no staged candidate' : `a candidate ${turn}`;
+	const end = str(rec(rec(lane.run).end).reason) || 'with no end recorded';
+	return (
+		`${named}, still the draft the lane created: no candidate of the agent’s was accepted into it — the authoring ` +
+		`came to ${came}, and the run ended ${end}`
 	);
 }
 
@@ -2691,11 +2725,18 @@ export function buildRunReport(
 	// end is the turn's (`authoring-stopped`'s sibling), read from its own archive, `00-authoring`.
 	if (endReason === 'allowance-exceeded' && views.length > 0 && views.every((v) => v.timedOut === null))
 		problems.push('lane/run.json ended allowance-exceeded, and names no unit whose Begin & Execute outlasted its allowance');
+	// ⭐ The lead's delegated decision of 2026-10-15, to be registered (E3's polish; the confirm of 60c8a828) — THE
+	// PHASES, whose cells stages 3 to 8 report: every unit after the root, which both halves put first; and THE ROOT
+	// ITSELF when its type declares MODEL, as half B's agent may (the lane counts its worst case before its press,
+	// `rootLimitCheck`): its press runs a model, so its tries, reviews and exchanges are measured like any phase's.
+	// ⛔ ~~Every root skipped by its place~~: a MODEL root that broke a stage read as intended. ⭑ §3.2's root declares
+	// HUMAN and keeps its reading, in the whole run's stage 7.
+	const phases = views.filter((v, i) => i > 0 || dischargeOf(ix, v.unit) === 'MODEL');
 	const matrix: MatrixCell[] = [
 		stageOne(ix, half, lane),
 		stageTwo(undertakingId, structure),
 		stageSevenWhole(views),
-		...views.slice(1).flatMap((v) => phaseCells(v, ix))
+		...phases.flatMap((v) => phaseCells(v, ix))
 	];
 	const counts = Object.fromEntries(CELL_VALUES.map((value) => [value, matrix.filter((c) => c.value === value).length]));
 	const mode = str(rec(lane.run).mode) || str(rec(lane.boot).mode) || null;
@@ -2751,7 +2792,7 @@ export function buildRunReport(
 			excluded: excluded.length,
 			ordinal:
 				'completion order: the order the host recorded each run as finished, which is not the order it started them (REG-F-518)',
-			unrecordedRuns: Object.fromEntries(views.slice(1).map((v) => [v.unit.slug, v.runs.unrecorded]))
+			unrecordedRuns: Object.fromEntries(phases.map((v) => [v.unit.slug, v.runs.unrecorded]))
 		},
 		problems
 	};
@@ -2799,8 +2840,10 @@ function headerLines(r: RunReport): string[] {
 }
 
 function matrixLines(r: RunReport): string[] {
-	// ⭐ E3 (C2) — the run's own phases: §3.2's four in half A, the agent's in half B.
-	const phases = r.units.slice(1).map((u) => u.slug);
+	// ⭐ E3 (C2) — the run's own phases: §3.2's four in half A, the agent's in half B. ⭐ The lead's delegated decision of
+	// 2026-10-15, to be registered — read off the matrix, the units it holds cells for: a root that declares MODEL is one
+	// (`buildRunReport`), never dropped by its place.
+	const phases = r.units.map((u) => u.slug).filter((slug) => r.matrix.some((c) => c.row === slug));
 	const at = (stage: StageId, row: string) => r.matrix.find((c) => c.stage === stage && c.row === row);
 	return [
 		'## The stage matrix (§1)',

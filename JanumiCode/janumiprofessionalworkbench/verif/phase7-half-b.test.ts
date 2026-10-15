@@ -95,6 +95,7 @@ import {
 	type LaneRows,
 	type MatrixCell,
 	type RunReport,
+	type StoredContent,
 	type StoredEvent,
 	type StoredObject,
 	type StoreRows
@@ -2139,5 +2140,160 @@ describe('⛔ REG-D-112 (E3’s re-review, 4) — the limit before the root coun
 		const record = await l.run();
 		expect(l.only('beginExecute root')).toEqual(['beginExecute root']);
 		expect(record.units[0]?.limitCheck).toMatchObject({ recorded: FLOOR_CALLS - 1, total: PHASE7_PAID_LIMIT, allowed: true });
+	});
+});
+
+// ── ⭐⭐ E3'S POLISH — THE CONFIRM OF 60c8a828, ITS TWO MINORS AS THE LEAD DECIDED THEM ──────────────────────────────
+// The lead's delegated decisions of 2026-10-15, to be registered: stage 1 says the agent authored the PWA only when a
+// candidate of its was accepted (2), and a root that declares MODEL has its cells reported like any phase's (3). Each is
+// held here by the test that was RED before it.
+
+describe('⛔ E3’s polish, 2 — stage 1 says the agent authored the PWA only when a candidate of its was ACCEPTED; else what the authoring came to', () => {
+	const drafted = halfBStore({ publication: 'DRAFT' });
+	const store = { ...drafted, objects: drafted.objects.filter((x) => x.objectType === 'PROFESSIONAL_WORK_ARCHITECTURE') };
+	/** A paid run whose authoring accepted nothing: Send pressed, then its candidate and its acceptance as the lane read them. */
+	const unaccepted = (candidate: object | null, accept: object | null, end: string): LaneRows => {
+		const lane = halfBLaneRows();
+		return {
+			...lane,
+			run: {
+				...(lane.run as object),
+				units: [],
+				end: { reason: end },
+				authoring: {
+					pwaId: PWA_ID,
+					sent: true,
+					candidate,
+					accept,
+					authorModel: { configured: `${AUTHOR.providerId}/${AUTHOR.modelId}`, resolved: null },
+					checks: null
+				}
+			}
+		};
+	};
+	const firstLine = (lane: LaneRows): string | undefined =>
+		cellOf(buildRunReport(store, lane, { accountNames: NAMES }).report, '1', 'whole run').basis[0];
+	const DRAFT_LINE =
+		'the PWA "CLI Product Realization" is DRAFT, still the draft the lane created: no candidate of the agent’s was accepted into it';
+
+	// ⭐ THE PREDICTED RED (the confirm's MINOR): the line said "authored by the agent from the request" whatever the authoring
+	// came to — in the same cell as "not asked — the turn never settled".
+	it('⭐ no candidate staged, or one the floor did not assure: still the lane’s draft, and the line says what the authoring came to', () => {
+		expect([
+			firstLine(unaccepted(null, null, 'authoring-stopped')),
+			firstLine(unaccepted({ status: 'BLOCKED_EXTERNAL', candidateHash: null }, null, 'authoring-stopped'))
+		]).toEqual([
+			`${DRAFT_LINE} — the authoring came to no staged candidate, and the run ended authoring-stopped`,
+			`${DRAFT_LINE} — the authoring came to a candidate BLOCKED_EXTERNAL, and the run ended authoring-stopped`
+		]);
+	});
+
+	// ⭐ A HASH IS NOT AN ACCEPTANCE: the lane keeps a hash beside a refused acceptance when the refusal's words name one
+	// (`acceptedHashOf` reads the action's body — "Acceptance hash does not match the exact candidate (…)").
+	it('⛔ an acceptance REFUSED, a hash recorded beside it: no candidate was accepted — never “authored by the agent”', () => {
+		const ready = { status: 'READY_TO_COMMIT', candidateHash: CANDIDATE_HASH };
+		const refused = { envelopeType: 'failure', acceptedHash: CANDIDATE_HASH };
+		expect(firstLine(unaccepted(ready, refused, 'authoring-stopped'))).toBe(
+			`${DRAFT_LINE} — the authoring came to a candidate READY_TO_COMMIT, and the run ended authoring-stopped`
+		);
+	});
+});
+
+describe('⛔ E3’s polish, 3 — a root that declares MODEL has its cells reported like any phase’s; §3.2’s HUMAN root keeps its reading', () => {
+	/** Every model exchange of `store` READABLE at stage 8: what it was asked and what it answered, each in the content store. */
+	const retained = (store: StoreRows): StoreRows => {
+		const content: StoredContent[] = [];
+		const objects = store.objects.map((o) => {
+			if (o.objectType !== 'MODEL_EXCHANGE') return o;
+			const refs = ['materializedInputRef', 'answerSpanRef'].map((field) => {
+				const storageKey = `${field}/${o.id}`;
+				const contentHash = `sha256:${o.id}.${field}`;
+				content.push({ storageKey, contentHash, byteSize: 1, purged: false, actualHash: contentHash, actualSize: 1 });
+				return [field, { status: 'STORED', storageKey, contentHash, byteSize: 1 }] as const;
+			});
+			return { ...o, state: { ...o.state, ...Object.fromEntries(refs) } };
+		});
+		return { ...store, objects, content };
+	};
+	/** The root's FIRST try: answered, and not a JSON object — its account reached its review as not declared (K9, REG-F-519). */
+	const firstTryUnparsed = (store: StoreRows): StoreRows => ({
+		...store,
+		objects: [
+			{
+				id: 'mex_pwu_r_first',
+				objectType: 'MODEL_EXCHANGE',
+				firstSequence: 0,
+				state: {
+					plane: 'EXECUTION',
+					subjectObjectId: 'pwu_r',
+					disposition: 'ACCEPTED',
+					parseOutcome: {
+						outcome: 'SCHEMA_COERCION_FAILED',
+						detail: 'The answer is not a JSON object, so the execution contract’s envelope could not be read.'
+					}
+				}
+			},
+			...store.objects
+		]
+	});
+	/** The agent's root declaring MODEL, its one permitted child C+: instantiation builds none, so it is the Undertaking's one unit. */
+	const MODEL_ROOT_ALONE: ObjectRow[] = [
+		{
+			id: 'pwutype_root',
+			state: {
+				...MODEL_ROOT_TYPES[3]!.state,
+				permittedChildTypeIds: ['pwutype_specify'],
+				permittedChildren: [{ typeId: 'pwutype_specify', cardinality: 'C+' }]
+			}
+		},
+		AGENT_TYPES[1]!
+	];
+	const ROOT_ALONE = AGENT_UNITS.filter((u) => u.id === 'pwu_r');
+	const ALL_MODEL = { pwu_r: 'model', pwu_s: 'model', pwu_b: 'model', pwu_v: 'model' } as const;
+	/** The run report of a half-B run whose model exchanges are all readable — and, asked, the root's first try not JSON. */
+	const reportOf = (
+		types: readonly ObjectRow[],
+		units: readonly AgentUnit[],
+		ran: Readonly<Record<string, 'model' | 'press'>>,
+		rootFirstTryUnparsed: boolean
+	): RunReport => {
+		const stored = halfBStore({ types, units, ran });
+		return buildRunReport(retained(rootFirstTryUnparsed ? firstTryUnparsed(stored) : stored), halfBLaneRows({ types, units }), {
+			accountNames: NAMES
+		}).report;
+	};
+	const broke = (r: RunReport) => r.matrix.filter((c) => c.value === 'broke').map((c) => [c.stage, c.row, c.registerIds]);
+
+	// ⭐ THE PREDICTED RED (the confirm's MINOR): the root's cells for stages 3 to 6 and 8 were skipped by its PLACE, so a MODEL
+	// root's own tries, reviews and exchanges were never measured — and a run whose root broke a stage read as intended.
+	it('⭐ a MODEL root that broke a stage — its first answer not JSON (K9) — reads BROKE there, over its phases and as the Undertaking’s one unit', () => {
+		expect([
+			broke(reportOf(MODEL_ROOT_TYPES, AGENT_UNITS, ALL_MODEL, true)),
+			broke(reportOf(MODEL_ROOT_ALONE, ROOT_ALONE, { pwu_r: 'model' }, true))
+		]).toEqual([[['4', 'root', ['REG-F-519']]], [['4', 'root', ['REG-F-519']]]]);
+	});
+
+	it('⭐ … and it is measured like any phase: its cells at stages 3 to 8, its column of the matrix, and a phase of the runs the manifest counts', () => {
+		const r = reportOf(MODEL_ROOT_TYPES, AGENT_UNITS, ALL_MODEL, false);
+		expect(r.matrix.filter((c) => c.row === 'root').map((c) => [c.stage, c.value])).toEqual([
+			['3', 'as intended'],
+			['4', null],
+			['5a', 'not reached'],
+			['5b', 'not reached'],
+			['6', null],
+			['7', 'as intended'],
+			['8', 'as intended']
+		]);
+		expect(renderMarkdown(r)).toContain('| Stage | root | specify-wordfreq | build-wordfreq | verify-wordfreq-end-to-end |');
+		expect(Object.keys(r.manifest.unrecordedRuns)).toEqual(['root', 'specify-wordfreq', 'build-wordfreq', 'verify-wordfreq-end-to-end']);
+	});
+
+	// ⭑ THE CONTROL: §3.2's root declares HUMAN, and so may the agent's — it runs no model, its work is its phases', and it
+	// keeps its reading: in the whole run's stage 7, never a column of its own.
+	it('⭑ CONTROL — a HUMAN root keeps its reading: no cell of its own, no column of the matrix, no phase of the manifest', () => {
+		const r = reportOf(AGENT_TYPES, AGENT_UNITS, { ...ALL_MODEL, pwu_r: 'press' }, false);
+		expect(r.matrix.filter((c) => c.row === 'root')).toEqual([]);
+		expect(renderMarkdown(r)).toContain('| Stage | specify-wordfreq | build-wordfreq | verify-wordfreq-end-to-end |');
+		expect(Object.keys(r.manifest.unrecordedRuns)).toEqual(['specify-wordfreq', 'build-wordfreq', 'verify-wordfreq-end-to-end']);
 	});
 });
