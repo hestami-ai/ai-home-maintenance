@@ -2188,14 +2188,33 @@ describe('⛔ E3’s polish, 2 — stage 1 says the agent authored the PWA only 
 		]);
 	});
 
-	// ⭐ A HASH IS NOT AN ACCEPTANCE: the lane keeps a hash beside a refused acceptance when the refusal's words name one
-	// (`acceptedHashOf` reads the action's body — "Acceptance hash does not match the exact candidate (…)").
-	it('⛔ an acceptance REFUSED, a hash recorded beside it: no candidate was accepted — never “authored by the agent”', () => {
+	// ⭐ A HASH IS NOT AN ACCEPTANCE: a record the lane wrote before the check of 241158f4 can hold a hash beside a refused
+	// acceptance, read out of the refusal's words — "Acceptance hash does not match the exact candidate (…)" (the server's,
+	// `authoring-turn.ts`). ⭐ THE PREDICTED RED (that check, finding 1): only the first line held to it. The fourth line, the
+	// faults and the authoring summary, report.json's and report.md's, read the refused hash as accepted, and no line named
+	// the refusal.
+	it('⛔ an acceptance REFUSED, a hash recorded beside it: no candidate was accepted — never “authored by the agent”, no accepted hash anywhere, and the refusal named', () => {
 		const ready = { status: 'READY_TO_COMMIT', candidateHash: CANDIDATE_HASH };
-		const refused = { envelopeType: 'failure', acceptedHash: CANDIDATE_HASH };
+		const refusal = `Acceptance hash does not match the exact candidate (${CANDIDATE_HASH} != sha256:${'cd'.repeat(32)}).`;
+		const refused = { envelopeType: 'failure', acceptedHash: CANDIDATE_HASH, refusal };
 		expect(firstLine(unaccepted(ready, refused, 'authoring-stopped'))).toBe(
 			`${DRAFT_LINE} — the authoring came to a candidate READY_TO_COMMIT, and the run ended authoring-stopped`
 		);
+		const r = buildRunReport(store, unaccepted(ready, refused, 'authoring-stopped'), { accountNames: NAMES }).report;
+		const one = cellOf(r, '1', 'whole run');
+		expect([one.basis[3], r.authoring?.acceptedHash]).toEqual([
+			'the accepted hash: none; the candidate as the lane last read it: READY_TO_COMMIT',
+			null
+		]);
+		expect(one.basis).toEqual(
+			expect.arrayContaining([
+				'the lane recorded no accepted hash: no one accepted a candidate',
+				`the acceptance was refused: ${refusal}`
+			])
+		);
+		const md = renderMarkdown(r);
+		expect(md).toContain('  - the accepted hash: none; the candidate as the lane last read it: READY_TO_COMMIT');
+		expect(md).toContain('- **The accepted hash:** none.');
 	});
 });
 
@@ -2295,5 +2314,26 @@ describe('⛔ E3’s polish, 3 — a root that declares MODEL has its cells repo
 		expect(r.matrix.filter((c) => c.row === 'root')).toEqual([]);
 		expect(renderMarkdown(r)).toContain('| Stage | specify-wordfreq | build-wordfreq | verify-wordfreq-end-to-end |');
 		expect(Object.keys(r.manifest.unrecordedRuns)).toEqual(['specify-wordfreq', 'build-wordfreq', 'verify-wordfreq-end-to-end']);
+	});
+});
+
+// ── ⭐⭐ THE CHECK OF 241158f4 — ITS TWO MINORS ─────────────────────────────────────────────────────────────────────
+// (1) A hash alone is no acceptance for EVERY reader of the lane's acceptance — stage 1's lines and faults, and the
+// authoring summary (E3's polish, 2, above) — and the lane records no accepted hash beside a refusal (below).
+
+describe('⛔ The check of 241158f4, 1 — only an acceptance answered SUCCESS names an accepted hash: the lane records none beside a refusal', () => {
+	// ⭐ THE PREDICTED RED: `acceptedHashOf` read the first hash out of ANY answer's body, and a refusal's words name two —
+	// "Acceptance hash does not match the exact candidate (<the hash pressed> != <the candidate's>)" — so the lane recorded
+	// the hash pressed as accepted.
+	it('⛔ a refused acceptance whose words name hashes: none accepted, in `acceptedHashOf` and in the run record, the refusal kept', async () => {
+		const refusal = `Acceptance hash does not match the exact candidate (${CANDIDATE_HASH} != sha256:${'cd'.repeat(32)}).`;
+		expect(acceptedHashOf(refusedWith(refusal))).toBeNull();
+		const l = halfBLane({ paid: true, accept: refusedWith(refusal) });
+		const record = await l.run();
+		expect([record.end?.reason, record.authoring?.accept?.acceptedHash, record.authoring?.accept?.refusal]).toEqual([
+			'authoring-stopped',
+			null,
+			refusal
+		]);
 	});
 });

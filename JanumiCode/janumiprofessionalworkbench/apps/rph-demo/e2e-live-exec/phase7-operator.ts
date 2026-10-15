@@ -1276,8 +1276,13 @@ export function candidateOf(snap: EngineSnapshot, pwaId: string): CandidateReadi
 	};
 }
 
-/** The hash the acceptance names: the action's own `acceptedCandidate`, else the one its raw body carries. */
+/**
+ * The hash the acceptance names: the action's own `acceptedCandidate`, else the one its raw body carries — and only an
+ * acceptance answered success names one. ⛔ ~~Any answer's body~~ (the check of 241158f4, finding 1): a refusal's words
+ * name hashes too — "Acceptance hash does not match the exact candidate (…)" — and the first was recorded as accepted.
+ */
 export function acceptedHashOf(o: ActionOutcome): string | null {
+	if (o.envelopeType !== 'success') return null;
 	const named = o.decoded?.acceptedCandidate;
 	if (typeof named === 'string' && named !== '') return named;
 	return /sha256:[0-9a-f]{64}/.exec(o.rawBody ?? '')?.[0] ?? null;

@@ -510,7 +510,10 @@ export interface AuthoringSummary {
 	 */
 	readonly author: { readonly configured: string | null; readonly resolved: string | null };
 	readonly reviewer: string | null;
-	/** The hash the acceptance named — the lane's record, the store keeping none (`REG-F-504`). */
+	/**
+	 * The hash of the candidate accepted — named by an acceptance that answered success (`acceptedHashIn`), else null — from
+	 * the lane's record, the store keeping none (`REG-F-504`).
+	 */
 	readonly acceptedHash: string | null;
 	/** ⭐ C4 — every finding of the candidate checks, recorded before Submit, none of which refused anything. */
 	readonly findings: readonly {
@@ -2311,7 +2314,10 @@ function stageOneHalfB(ix: Index, lane: LaneRows): MatrixCell {
 		]);
 	const floor = floorDispositions(ix.ofType('ASSURANCE_ASSESSMENT'), pwaId);
 	const reviewer = floor.find((f) => f.policyId === REASONING_REVIEW)?.evaluator ?? null;
-	const accepted = str(rec(authoring.accept).acceptedHash) || null;
+	// ⭐ The check of 241158f4, finding 1 — ONE READING OF THE ACCEPTANCE (`acceptedHashIn`) for every line and fault below;
+	// and a refused one is said in the server's own words, as the lane kept them (`DesignerActRecord.refusal`).
+	const accepted = acceptedHashIn(authoring);
+	const refusal = str(rec(authoring.accept).refusal);
 	const staged = str(candidate.candidateHash) || null;
 	const status = str(pwa.state.publicationStatus) || 'unpublished';
 	// ⭐ C3 — THE AUTHOR, AS THE LANE READ IT OFF THE PAGE: the store records none (the floor's assessments name no producer).
@@ -2328,6 +2334,7 @@ function stageOneHalfB(ix: Index, lane: LaneRows): MatrixCell {
 		...floor.filter((f) => f.state !== 'SATISFIED').map((f) => `the authoring floor's ${f.policyId} reads ${f.state}`),
 		...(reviewer === null ? ['the floor’s reasoning review names no reviewer'] : []),
 		...(accepted === null ? ['the lane recorded no accepted hash: no one accepted a candidate'] : []),
+		...(refusal === '' ? [] : [`the acceptance was refused: ${refusal}`]),
 		...(accepted !== null && staged !== null && accepted !== staged
 			? [`the hash accepted, ${accepted}, is not the staged candidate's, ${staged}`]
 			: []),
@@ -2341,7 +2348,7 @@ function stageOneHalfB(ix: Index, lane: LaneRows): MatrixCell {
 		value,
 		authorFaults.registerIds,
 		[
-			authorshipLine(pwa, status, authoring, lane),
+			authorshipLine(pwa, status, accepted, authoring, lane),
 			`the authoring floor: ${floor.map((f) => `${f.policyId} ${f.state}`).join(', ')}`,
 			`the reviewer: ${reviewer ?? 'none recorded'}; ${authorRead} (configured: ${configured ?? 'unset'})`,
 			`the accepted hash: ${accepted ?? 'none'}; the candidate as the lane last read it: ${str(candidate.status) || 'none'}`,
@@ -2356,18 +2363,36 @@ function stageOneHalfB(ix: Index, lane: LaneRows): MatrixCell {
 }
 
 /**
+ * ⭐ The lead's delegated decision of 2026-10-15, to be registered (E3's polish), HELD BY EVERY READER (the check of
+ * 241158f4, finding 1) — THE HASH OF THE CANDIDATE ACCEPTED: an acceptance that answered success and named its hash; else
+ * null. One reading for stage 1's lines and faults, and for the authoring summary that report.json and report.md print.
+ * ⛔ ~~Any hash recorded~~: a record the lane wrote before that check can hold a hash beside a refused acceptance, read
+ * out of the refusal's words (`acceptedHashOf`), and only stage 1's first line took it as no acceptance — its fourth line,
+ * its faults and the summary printed it as accepted.
+ */
+function acceptedHashIn(authoring: Record<string, unknown>): string | null {
+	const accept = rec(authoring.accept);
+	const hash = str(accept.acceptedHash);
+	return hash !== '' && str(accept.envelopeType) === 'success' ? hash : null;
+}
+
+/**
  * ⭐ The lead's delegated decision of 2026-10-15, to be registered (E3's polish; the confirm of 60c8a828) — STAGE 1'S
  * FIRST LINE: THE AGENT AUTHORED THE PWA ONLY WHEN A CANDIDATE OF ITS WAS ACCEPTED, the acceptance answered success and
  * named its hash. ⛔ ~~Said whatever the authoring came to~~: a turn the server refused before it began read "authored
  * by the agent", in the cell that says the turn never settled. Otherwise the PWA is still the lane's draft, and the line
  * says what the authoring came to: its candidate as the lane last read it, and the run's end. ⚠ A hash alone is no
- * acceptance: the lane keeps one beside a refusal whose words name it (`acceptedHashOf`).
+ * acceptance: `accepted` is stage 1's one reading of it (`acceptedHashIn`).
  */
-function authorshipLine(pwa: StoredObject, status: string, authoring: Record<string, unknown>, lane: LaneRows): string {
+function authorshipLine(
+	pwa: StoredObject,
+	status: string,
+	accepted: string | null,
+	authoring: Record<string, unknown>,
+	lane: LaneRows
+): string {
 	const named = `the PWA "${str(pwa.state.name)}" is ${status}`;
-	const accept = rec(authoring.accept);
-	if (str(accept.acceptedHash) !== '' && str(accept.envelopeType) === 'success')
-		return `${named}, authored by the agent from the request (design §4 C1)`;
+	if (accepted !== null) return `${named}, authored by the agent from the request (design §4 C1)`;
 	const turn = str(rec(authoring.candidate).status);
 	const came = turn === '' ? 'no staged candidate' : `a candidate ${turn}`;
 	const end = str(rec(rec(lane.run).end).reason) || 'with no end recorded';
@@ -2681,7 +2706,8 @@ function authoringSummary(ix: Index, lane: LaneRows, half: RunHalf): AuthoringSu
 			resolved: str(rec(a.authorModel).resolved) || floor.find((f) => f.producer !== null)?.producer || null
 		},
 		reviewer: floor.find((f) => f.policyId === REASONING_REVIEW)?.evaluator ?? (str(a.reviewer) || null),
-		acceptedHash: str(rec(a.accept).acceptedHash) || null,
+		// ⭐ The check of 241158f4, finding 1 — the hash ACCEPTED, as stage 1 reads it: never a refused acceptance's.
+		acceptedHash: acceptedHashIn(a),
 		findings: findingsOf(lane).map(({ typeId: _typeId, ...f }) => f),
 		caveats: HALF_B_CAVEATS
 	};
