@@ -15,7 +15,10 @@
 //   · ⛔ the command line prints each hit's kind and place and NEVER its text, which is the account name itself;
 //   · ⛔ `REG-F-545`: the account is looked for by every source that names it — the user record's name and home folder,
 //     USERPROFILE and USERNAME — and NEVER as `unknown`, which Bun gives as the user record's name when USERNAME is unset;
-//     with no name found the command line refuses, and run under bun as the gate runs it, it still finds the account.
+//     with no name found the command line refuses, and run under bun as the gate runs it, it still finds the account;
+//   · ⭐ (`JAN-EXEC` Phase 8; the review of E4, finding 3) a replay recording is scanned by its DECODED values
+//     (`scanDecodedJson`): code whose JSON spelling reads as a UNC path is no hit, and a real path or the account name
+//     in a value still is, at its place in the value — synthetic lines only.
 //
 // No model is called, and nothing outside a temporary folder is read but the scan's own script, run by bun.
 import { spawnSync } from 'node:child_process';
@@ -28,6 +31,7 @@ import {
 	accountNames,
 	escapesBlanked,
 	main,
+	scanDecodedJson,
 	scanTarget,
 	scanText,
 	textsOf,
@@ -303,5 +307,69 @@ describe('JAN-EXEC P7-2 — scanning a folder, and the command line', () => {
 		]);
 		const cells = scanStripped(join(d, 'cells.md'));
 		expect([cells.code, cells.out]).toEqual([0, 'phase7/archive-scan — no hit in 1 file(s): no account name and no absolute path\n']);
+	});
+});
+
+describe('⭐ JAN-EXEC Phase 8 — a replay recording is scanned by its DECODED values, never its JSON spelling (the review of E4, finding 3)', () => {
+	// ⭑ BUILT, NOT SPELLED: a drive and a home folder joined at run time, so no line of this file names one (`REG-F-536`).
+	const drive = `${String.fromCodePoint(81)}:`;
+	const decoded = (text: string, jsonl = true) =>
+		scanDecodedJson(text, 'executor.jsonl', NAMES, jsonl).map((h) => [h.file, h.line, h.column, h.kind]);
+
+	it('⛔ code a model wrote is no hit decoded — where its JSON spelling reads as a UNC path, as P3’s recording lines did', () => {
+		// ⭑ `/\r\n|\n/`, a regular expression of SINGLE backslashes, as a write_file call's contents. JSON doubles each one,
+		// and the doubled pair before a word reads as a share: the CONTROL shows that spelling hits, so the decoded scan's
+		// silence is the decoding's doing, not a line that holds nothing.
+		const code = `export const lines = (text) => text.split(/${B}r${B}n|${B}n/);\n`;
+		const line = JSON.stringify({
+			unit: 'requirements',
+			toolCalls: [{ name: 'write_file', arguments: { path: 'src/lines.js', contents: code } }]
+		});
+		expect(
+			scanText(line, 'executor.jsonl', NAMES).map((h) => h.kind),
+			'CONTROL: the JSON spelling is a hit'
+		).toContain('unc-path');
+		expect(decoded(line)).toEqual([]);
+	});
+
+	it('⭐ a real drive, share or home path — or the account name — in a decoded value still hits, at its place in the value', () => {
+		const home = ['', 'home', 'someone', 'run'].join('/');
+		const line = JSON.stringify({
+			argv: ['node', '--test', `${drive}${B}elsewhere${B}test`],
+			stdout: `ok\nwritten to ${B}${B}host${B}share${B}out by jdoe\n`,
+			stderr: `see ${home}`
+		});
+		expect(decoded(line)).toEqual([
+			['executor.jsonl:1 $.argv[2]', 1, 1, 'drive-path'],
+			['executor.jsonl:1 $.stdout', 2, 12, 'unc-path'],
+			['executor.jsonl:1 $.stdout', 2, 32, 'account-name'],
+			['executor.jsonl:1 $.stderr', 1, 5, 'home-path']
+		]);
+	});
+
+	it('⛔ a key that names the account is a hit, placed by its ordinal so no place prints it — and so is what lies under it', () => {
+		const hits = scanDecodedJson(
+			JSON.stringify({ unit: 'x', jdoe: { note: `${drive}${B}x` } }),
+			'reviewer.jsonl',
+			NAMES,
+			true
+		);
+		expect(hits.map((h) => [h.file, h.kind])).toEqual([
+			['reviewer.jsonl:1 ${key 2}', 'account-name'],
+			['reviewer.jsonl:1 ${key 2}.note', 'drive-path']
+		]);
+		expect(hits.some((h) => h.file.includes('jdoe')), 'a place printed the name it refused').toBe(false);
+	});
+
+	it('⛔ nothing is skipped for failing to parse: a line that is not JSON is scanned whole, as text — and a blank line still counts', () => {
+		const text = [JSON.stringify({ ok: true }), '', `not json: ${drive}${B}x`].join('\n');
+		expect(decoded(text)).toEqual([['executor.jsonl:3 (as text)', 1, 11, 'drive-path']]);
+	});
+
+	it('⭐ a manifest is ONE JSON value over many lines, read whole', () => {
+		const manifest = JSON.stringify({ models: { reviewer: { note: `ran in ${drive}/runs` } } }, null, 2);
+		expect(scanDecodedJson(manifest, 'recording.json', NAMES, false).map((h) => [h.file, h.kind])).toEqual([
+			['recording.json:1 $.models.reviewer.note', 'drive-path']
+		]);
 	});
 });

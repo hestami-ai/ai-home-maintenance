@@ -199,6 +199,60 @@ export function scanText(text: string, file: string, names: readonly string[]): 
 		.map((h) => ({ file, ...place(starts, h.index), kind: h.kind, match: h.match }));
 }
 
+/** A plain JSON key, shown as `.key` in a hit's place; any other is shown by its ordinal, never its text. */
+const PLAIN_KEY = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 8 (the review of E4, finding 3) — EVERY PLACE A JSON TEXT'S DECODED VALUES NAME THE ACCOUNT OR AN
+ * ABSOLUTE PATH: each string value, and each key, scanned AS IT DECODES (`scanText`), never as JSON spells it. `jsonl`
+ * reads one value per non-blank line. A hit's `file` is `<file>:<line> <path>` — `$.stdout`,
+ * `$.toolCalls[0].arguments.contents` — and its line and column are inside that value; a key that is not a plain identifier, or that itself hits, is shown by
+ * its ordinal (`{key 2}`), so a place never prints the text it refused.
+ * ⛔ WHY DECODED: JSON doubles every backslash, and two backslashes before a word read as the start of a UNC path — code a
+ * model wrote, a regular expression like `/\r\n/`, became `\\r\\n` in a recording line and refused it (P3's archive: 199
+ * unc-path hits, every one JSON-escaped code). Decoded, a backslash is the one the text holds: an escaped one is not a
+ * path, and a real drive, share or home path — or the account name — in a value still hits, as it would in the file the
+ * value came from. ⚠ A line that is not JSON is scanned as text, whole, so nothing is skipped for failing to parse.
+ */
+export function scanDecodedJson(
+	text: string,
+	file: string,
+	names: readonly string[],
+	jsonl: boolean
+): ScanHit[] {
+	const hits: ScanHit[] = [];
+	const walk = (value: unknown, at: string, path: string): void => {
+		if (typeof value === 'string') {
+			hits.push(...scanText(value, `${at} ${path}`, names));
+			return;
+		}
+		if (Array.isArray(value)) {
+			value.forEach((v, k) => walk(v, at, `${path}[${k}]`));
+			return;
+		}
+		if (typeof value !== 'object' || value === null) return;
+		Object.entries(value).forEach(([key, v], k) => {
+			const keyHits = scanText(key, `${at} ${path}{key ${k + 1}}`, names);
+			hits.push(...keyHits);
+			walk(v, at, PLAIN_KEY.test(key) && keyHits.length === 0 ? `${path}.${key}` : `${path}{key ${k + 1}}`);
+		});
+	};
+	const lines = jsonl ? text.split('\n') : [text];
+	lines.forEach((line, k) => {
+		if (line.trim() === '') return;
+		const at = `${file}:${jsonl ? k + 1 : 1}`;
+		let parsed: unknown;
+		try {
+			parsed = JSON.parse(line);
+		} catch {
+			hits.push(...scanText(line, `${at} (as text)`, names));
+			return;
+		}
+		walk(parsed, at, '$');
+	});
+	return hits;
+}
+
 /**
  * ⭐ A file's text in each encoding it can be in: UTF-16 after a UTF-16 byte-order mark; otherwise UTF-8 — and, when it
  * holds a NUL byte, UTF-16 too, from either byte (a BOM-less UTF-16 file, or text inside a binary one).
