@@ -41,10 +41,12 @@ import {
 	instructionsSha256,
 	osFamilyOf,
 	readRecording,
+	SCRUB_TOKENS,
 	sha256Hex,
 	toolDefinitionsSha256
 } from '../apps/rph-demo/src/lib/server/replay/recording.js';
 import { fixtureKeyOf } from '../apps/rph-demo/src/lib/server/replay/replay-fixture.testing.js';
+import { scanText } from '../scripts/phase7/archive-scan.js';
 import {
 	buildRecording,
 	RECORDED_CALL_BOUND_MS,
@@ -625,6 +627,28 @@ describe('⭐ the recorder (D1) — a final archive into a replay recording, scr
 
 	it('the bound it records for each reviewing tool is the validator’s own', () => {
 		expect(RECORDED_CALL_BOUND_MS).toEqual(REVIEWER_CALL_BOUND_MS);
+	});
+
+	it('⛔ a path relative to a scrub token is never the start of an absolute path to the archive scan: every token ends in a word character (REG-F-536)', () => {
+		// ⭑ THE PROPERTY `scrubToken` NAMES, ASKED OF EVERY TOKEN (the confirm of E4's second fix round: E4-M30 had died by
+		// this file's pinned token text alone). The scan reads a separator after a character that is no part of a word as
+		// a path's start — a folder of one letter after `/`, git's shell's drive; `/home/` and `/Users/` — so a token closed
+		// by a brace (`}`) would turn every path the run printed under its directory into a hit, and refuse the recording.
+		// Each continuation is a path RELATIVE to the token's directory, built here, never spelled (`REG-F-536`).
+		const B = '\\';
+		const relative: readonly (readonly [string, string])[] = [
+			['a one-letter folder, posix', ['', 'a', 'x.js'].join('/')],
+			['a folder named home, posix', ['', 'home', 'x'].join('/')],
+			['a folder named Users, posix', ['', 'Users', 'x'].join('/')],
+			['a one-letter folder, native', ['', 'a', 'x.js'].join(B)],
+			['a one-letter folder, JSON-escaped', ['', 'a', 'x.js'].join(B + B)]
+		];
+		for (const token of SCRUB_TOKENS)
+			for (const [what, rest] of relative)
+				expect(
+					scanText(`${token}${rest}`, 'f', [ACCOUNT]).map((h) => h.kind),
+					`${token}, then ${what}`
+				).toEqual([]);
 	});
 });
 
