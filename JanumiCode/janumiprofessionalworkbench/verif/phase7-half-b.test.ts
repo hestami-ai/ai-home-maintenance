@@ -2151,15 +2151,18 @@ describe('⛔ REG-D-112 (E3’s re-review, 4) — the limit before the root coun
 describe('⛔ E3’s polish, 2 — stage 1 says the agent authored the PWA only when a candidate of its was ACCEPTED; else what the authoring came to', () => {
 	const drafted = halfBStore({ publication: 'DRAFT' });
 	const store = { ...drafted, objects: drafted.objects.filter((x) => x.objectType === 'PROFESSIONAL_WORK_ARCHITECTURE') };
-	/** A paid run whose authoring accepted nothing: Send pressed, then its candidate and its acceptance as the lane read them. */
-	const unaccepted = (candidate: object | null, accept: object | null, end: string): LaneRows => {
+	/**
+	 * A paid run whose authoring accepted nothing: Send pressed, then its candidate and its acceptance as the lane read them,
+	 * and the run's end — null for a record that names none.
+	 */
+	const unaccepted = (candidate: object | null, accept: object | null, end: string | null): LaneRows => {
 		const lane = halfBLaneRows();
 		return {
 			...lane,
 			run: {
 				...(lane.run as object),
 				units: [],
-				end: { reason: end },
+				end: end === null ? undefined : { reason: end },
 				authoring: {
 					pwaId: PWA_ID,
 					sent: true,
@@ -2177,14 +2180,20 @@ describe('⛔ E3’s polish, 2 — stage 1 says the agent authored the PWA only 
 		'the PWA "CLI Product Realization" is DRAFT, still the draft the lane created: no candidate of the agent’s was accepted into it';
 
 	// ⭐ THE PREDICTED RED (the confirm's MINOR): the line said "authored by the agent from the request" whatever the authoring
-	// came to — in the same cell as "not asked — the turn never settled".
-	it('⭐ no candidate staged, or one the floor did not assure: still the lane’s draft, and the line says what the authoring came to', () => {
+	// came to — in the same cell as "not asked — the turn never settled". ⭐ AND HOW THE RUN ENDED (the check of 241158f4,
+	// finding 2): every case here ended authoring-stopped, so a line that always said so passed. A turn that outlasted its
+	// allowance ends otherwise, and a record can name no end.
+	it('⭐ no candidate staged, or one the floor did not assure: still the lane’s draft, and the line says what the authoring came to and how the run ended', () => {
 		expect([
 			firstLine(unaccepted(null, null, 'authoring-stopped')),
-			firstLine(unaccepted({ status: 'BLOCKED_EXTERNAL', candidateHash: null }, null, 'authoring-stopped'))
+			firstLine(unaccepted({ status: 'BLOCKED_EXTERNAL', candidateHash: null }, null, 'authoring-stopped')),
+			firstLine(unaccepted({ status: 'ASSURING', candidateHash: null }, null, 'allowance-exceeded')),
+			firstLine(unaccepted(null, null, null))
 		]).toEqual([
 			`${DRAFT_LINE} — the authoring came to no staged candidate, and the run ended authoring-stopped`,
-			`${DRAFT_LINE} — the authoring came to a candidate BLOCKED_EXTERNAL, and the run ended authoring-stopped`
+			`${DRAFT_LINE} — the authoring came to a candidate BLOCKED_EXTERNAL, and the run ended authoring-stopped`,
+			`${DRAFT_LINE} — the authoring came to a candidate ASSURING, and the run ended allowance-exceeded`,
+			`${DRAFT_LINE} — the authoring came to no staged candidate, and the run ended with no end recorded`
 		]);
 	});
 
@@ -2215,6 +2224,21 @@ describe('⛔ E3’s polish, 2 — stage 1 says the agent authored the PWA only 
 		const md = renderMarkdown(r);
 		expect(md).toContain('  - the accepted hash: none; the candidate as the lane last read it: READY_TO_COMMIT');
 		expect(md).toContain('- **The accepted hash:** none.');
+	});
+
+	// ⭐ "NAMED ITS HASH" (the lead's delegated decision of 2026-10-15): an acceptance answered success that named no hash is no
+	// acceptance either. ⭐ The check of 241158f4 (finding 2): the first line's own conjunct was held by no test.
+	it('⛔ an acceptance answered success that named NO hash: no candidate shown accepted — the first line, the fourth and the faults agree', () => {
+		const ready = { status: 'READY_TO_COMMIT', candidateHash: CANDIDATE_HASH };
+		const hashless = { envelopeType: 'success', acceptedHash: null, refusal: null };
+		const r = buildRunReport(store, unaccepted(ready, hashless, 'authoring-stopped'), { accountNames: NAMES }).report;
+		const one = cellOf(r, '1', 'whole run');
+		expect([one.basis[0], one.basis[3], r.authoring?.acceptedHash]).toEqual([
+			`${DRAFT_LINE} — the authoring came to a candidate READY_TO_COMMIT, and the run ended authoring-stopped`,
+			'the accepted hash: none; the candidate as the lane last read it: READY_TO_COMMIT',
+			null
+		]);
+		expect(one.basis).toContain('the lane recorded no accepted hash: no one accepted a candidate');
 	});
 });
 
@@ -2315,11 +2339,26 @@ describe('⛔ E3’s polish, 3 — a root that declares MODEL has its cells repo
 		expect(renderMarkdown(r)).toContain('| Stage | specify-wordfreq | build-wordfreq | verify-wordfreq-end-to-end |');
 		expect(Object.keys(r.manifest.unrecordedRuns)).toEqual(['specify-wordfreq', 'build-wordfreq', 'verify-wordfreq-end-to-end']);
 	});
+
+	// ⭑ AND A ROOT THAT DECLARES UNDECLARED (the check of 241158f4, finding 2): the control above held only HUMAN, and the
+	// decision makes a phase of a MODEL root alone. UNDECLARED is `REG-F-505`'s own trap, as the agent's verify leaf declares
+	// it here: a type that runs no model.
+	it('⭑ CONTROL — a root that declares UNDECLARED keeps its reading too: no cell of its own, no column of the matrix, no phase of the manifest', () => {
+		const undeclared = AGENT_TYPES.map((t) =>
+			t.state.isRoot === true ? { id: t.id, state: { ...t.state, workDischarge: 'UNDECLARED' } } : t
+		);
+		const r = reportOf(undeclared, AGENT_UNITS, { ...ALL_MODEL, pwu_r: 'press' }, false);
+		expect(r.matrix.filter((c) => c.row === 'root')).toEqual([]);
+		expect(renderMarkdown(r)).toContain('| Stage | specify-wordfreq | build-wordfreq | verify-wordfreq-end-to-end |');
+		expect(Object.keys(r.manifest.unrecordedRuns)).toEqual(['specify-wordfreq', 'build-wordfreq', 'verify-wordfreq-end-to-end']);
+	});
 });
 
 // ── ⭐⭐ THE CHECK OF 241158f4 — ITS TWO MINORS ─────────────────────────────────────────────────────────────────────
 // (1) A hash alone is no acceptance for EVERY reader of the lane's acceptance — stage 1's lines and faults, and the
 // authoring summary (E3's polish, 2, above) — and the lane records no accepted hash beside a refusal (below).
+// (2) What the polish built and no test held, each now held where it was built (E3's polish, 2 and 3, above): the run's
+// end in stage 1's first line, the conjunct "named its hash", and a root that declares UNDECLARED.
 
 describe('⛔ The check of 241158f4, 1 — only an acceptance answered SUCCESS names an accepted hash: the lane records none beside a refusal', () => {
 	// ⭐ THE PREDICTED RED: `acceptedHashOf` read the first hash out of ANY answer's body, and a refusal's words name two —
