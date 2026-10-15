@@ -27150,5 +27150,14 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["apps/rph-demo/src/lib/server/replay/replay-regression.test.ts"],
 		why: "PROMISE (D3): the regression names any program started while the replay ran - commands are replayed, never re-run. WHAT THE MUTATION DOES: a replay that started a program passes this limb. OBSERVED (bun run mutants -- E4-M P1-h-both-wirings-get-the-same-refusal P2-c-both-wirings-get-the-same-refusal, 2026-10-11, in the builder's worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M38-the-regression-ignores-a-spawned-program ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 8 E4 (p7c-e4) - the replay machinery: the recording format and its recorder (D1), the JPWB_REPLAY switch and the executor, runner and reviewer replay arms, which fail closed on a stale prompt (D2), the replay sandbox and the regression harness (D3) (DESIGN-phase-7-completion.md §5 D1-D4; REG-D-110; REG-D-111 (5); REG-F-530; REG-F-536; REG-F-518; REG-D-067)"
+	},
+	{
+		id: "E4-M40-pi-runs-a-turns-tool-calls-together-again",
+		file: "apps/rph-demo/src/lib/server/tools/pi-execution-tools.ts",
+		find: "\t\texecutionMode: EXECUTION_TOOL_MODE,\n",
+		replace: "\t\t// MUTANT: Pi's default, parallel, decides the order again\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/pi-execution-tools.test.ts"],
+		why: "PROMISE (REG-D-112 (d); REG-F-518): every minted execution tool declares executionMode 'sequential', so Pi's loop runs a turn's tool calls one at a time in the order the model made them. WHO RELIES: the recorded run, whose command reviews must follow call order for a replay to reproduce them, and every write a command reads. WHAT THE MUTATION DOES: Pi's default (parallel) returns - driven red first through pi-agent-core's own loop: the second call started and ended before the first ended. OBSERVED (bun run mutants -- E4-M, with SR1-M26, SR2-M23, RS1-M1, RS1-M5, P2B-x, P2B-q and P2B-d by their full ids, 2026-10-15, in the fixer's worktree, the round's changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M40-pi-runs-a-turns-tool-calls-together-again ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 8 E4 fix (p7c-e4) - the review of E4's findings: the executor's key (instructions and tools), the execution half from the published PWA (REG-D-112 (c)) and no live backend beside the switch (REG-D-112 (c)), the decoded archive scan, Pi's sequential tool calls (REG-D-112 (d); REG-F-518), the PWA digest read before the first call, the OS family, the product's bound, the recorded reporter, the replayed review's own id, and JPWB_REPLAY in the gate's scrub (DESIGN-phase-7-completion.md §5; REG-D-110; REG-D-111; REG-D-112)"
 	}
 ];

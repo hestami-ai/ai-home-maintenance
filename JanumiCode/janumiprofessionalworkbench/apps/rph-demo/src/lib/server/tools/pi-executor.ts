@@ -15,10 +15,13 @@
 //
 // ⚠ PI IS IMPORTED ONLY HERE, and only through a dynamic import at the call site, so the mock path and the whole
 // gate never load its heavy Node deps — the rule `agent/index.ts` already follows.
+// ⭐ `JAN-EXEC` Phase 8 (`REG-D-112` (d)) — STILL TRUE OF THIS MODULE AND OF THE CODING AGENT IT LOADS. The mapping of the
+// minted tools onto Pi's tool definitions moved to `pi-execution-tools.ts`, which imports only a TYPE from Pi, because it
+// decides the order a turn's calls run in (`REG-F-518`); its test drives that through Pi's CORE loop (`pi-agent-core`,
+// `pi-ai`'s faux provider), the one gate test that loads any part of Pi's SDK, and never this module.
 import {
 	AuthStorage,
 	createAgentSession,
-	defineTool,
 	DefaultResourceLoader,
 	getAgentDir,
 	ModelRegistry,
@@ -38,9 +41,8 @@ import {
 	createMaterializedInputRecorder,
 	type PayloadHookHost
 } from '../agent/materialized-input.js';
-import { toPiToolResult } from '../agent/pi-tool-result.js';
-import { toTypeBox } from '../agent/pi-typebox.js';
-import { mintExecutionTools, type ExecutionToolDescriptor } from './execution-tool-surface.js';
+import { mintExecutionTools } from './execution-tool-surface.js';
+import { toPiExecutionTools } from './pi-execution-tools.js';
 import { createToolCallObserver } from './tool-call-observer.js';
 import { createProcessRunObserver } from './process-run-observer.js';
 
@@ -74,26 +76,10 @@ function resolveExecutingModel(modelRegistry: ModelRegistry, configured: string)
 }
 
 /**
- * Wrap the minted execution tools as Pi custom tools.
- *
- * ⭑ THE SAME MAPPING THE AUTHORING AGENT USES, and deliberately so: one `ParamSpec` grammar, one TypeBox
- * translation (`toTypeBox`), one result shape (`toPiToolResult`). ⚠ IT TAKES WHAT `mintExecutionTools` RETURNED
- * AND FILTERS NOTHING — every decision about what the model may have was made at minting time, against the
- * grant. A second filter here would be a second authority over the same question, and the weaker of two
- * authorities is the one that eventually answers.
+ * ~~Wrap the minted execution tools as Pi custom tools.~~ ⭐ `JAN-EXEC` Phase 8 (`REG-D-112` (d)) — MOVED, with its reasons,
+ * to `pi-execution-tools.ts` (`toPiExecutionTools`): it decides the order a turn's tool calls run in (`REG-F-518`), and
+ * this module loads Pi's SDK at module scope, so nothing in the gate could drive it here.
  */
-function toPiExecutionTools(descriptors: readonly ExecutionToolDescriptor[]) {
-	return descriptors.map((d) =>
-		defineTool({
-			name: d.name,
-			label: d.name,
-			description: d.description,
-			parameters: toTypeBox(d.parameters),
-			execute: async (_toolCallId: string, params: Record<string, unknown>) =>
-				toPiToolResult(await d.run(params ?? {}))
-		})
-	);
-}
 
 /**
  * Run ONE bounded turn on Pi and return the work product plus who produced it.
