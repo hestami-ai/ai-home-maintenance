@@ -1026,11 +1026,20 @@ export interface SignOffAct {
 	 */
 	readonly timedOutAfterMs: number | null;
 	readonly requestFailure: string | null;
+	/**
+	 * ⭐ E12's re-review F4 — the server's refusal, in its own words, of an act it answered with anything but success; else
+	 * null. Kept on the act, so a Record Assurance refused before the rule's re-run keeps its reason whatever follows it.
+	 */
+	readonly refusal: string | null;
 	/** ⭐ D5 — read after the act (`REG-F-540`): an envelope is not the record. */
 	readonly after: UnitState;
 }
 
-/** What the run record keeps of a sign-off: each act, and the first refused, if one was. */
+/**
+ * What the run record keeps of a sign-off: each act, with its own refusal, and ~~the first refused, if one was~~ ⭐ E12's
+ * re-review F4 — the refusal that STANDS (`refused`), if one does: the rule's re-run follows a refused Record Assurance, so
+ * "the first" was never what the record kept.
+ */
 export interface SignOffRecord {
 	/** Whether the row offered Record Assurance at all: a unit that did not complete offers none. */
 	readonly offered: boolean;
@@ -1048,6 +1057,11 @@ export interface SignOffRecord {
 	readonly rerunDeclared: SignOffAct | null;
 	readonly rerunLimitCheck: LimitCheck | null;
 	readonly markSatisfied: SignOffAct | null;
+	/**
+	 * ⭐ E12's re-review F4 — THE REFUSAL THAT STANDS: the last act pressed, when it was refused or got no answer — what left
+	 * the sign-off unfinished. null when none does: nothing was pressed, or the sign-off was accepted, a Record Assurance the
+	 * rule's accepted re-run stood in for included (its own reason stays on its act, `SignOffAct.refusal`).
+	 */
 	readonly refused: {
 		readonly act: 'Record Assurance' | 'Re-run the declared reviews' | 'Mark Satisfied';
 		readonly reason: string;
@@ -1443,12 +1457,17 @@ export async function runTheLane(r: {
 		// ~~⭐ DRY TOO, BY THESE SAME ACTS (D11): no phase was pressed, so none completed, and the root is signed off alone.~~
 		// ⛔ `E12F` F1 (`REG-D-112` (b)) — DRY, THE ROOT'S SIGN-OFF IS REHEARSED UP TO THE REVIEWER CALL AND NO FURTHER: since E2
 		// Record Assurance asks the reviewer for one review per declared policy, and a dry run calls no model.
-		/** The act's status and envelope, or that no answer came, and the unit as the store reads it now (`REG-F-540`). */
+		/**
+		 * The act's status and envelope, or that no answer came, ⭐ its refusal in the server's words (E12's re-review F4), and
+		 * the unit as the store reads it now (`REG-F-540`).
+		 */
 		const actOf = async (unit: RunUnit, o: ActionOutcome): Promise<SignOffAct> => ({
 			status: o.status,
 			envelopeType: o.envelopeType,
 			timedOutAfterMs: o.timedOutAfterMs,
 			requestFailure: o.requestFailure,
+			refusal:
+				o.timedOutAfterMs === null && o.requestFailure === null && o.envelopeType !== 'success' ? refusalOf(o) : null,
 			after: unitStateOf((await hands.read()).snapshot, unit.unitId!)
 		});
 		const none = {

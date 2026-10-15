@@ -1236,12 +1236,16 @@ const answered = (envelopeType: EnvelopeType, status = 200): ActionOutcome => ({
 	timedOutAfterMs: null,
 	requestFailure: null
 });
-/** ⭐ E12's re-review F1 — what the run record keeps of a sign-off act that was answered (`answered`), and the store after it. */
+/**
+ * ⭐ E12's re-review F1 — what the run record keeps of a sign-off act that was answered (`answered`), and the store after it;
+ * ⭐ F4 — with its refusal, in the server's words, when it was not accepted.
+ */
 const actAnswered = (envelopeType: EnvelopeType, after: UnitState): SignOffAct => ({
 	status: 200,
 	envelopeType,
 	timedOutAfterMs: null,
 	requestFailure: null,
+	refusal: envelopeType === 'success' ? null : `{"type":"${envelopeType}"}`,
 	after
 });
 const OUTLASTED: ActionOutcome = {
@@ -2024,6 +2028,9 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 	// Now: a new plan whose step WAITS is refused again — abandoned, if the row offers it; no new plan, the re-run was not
 	// made — the server's words kept, the unit left as found; a new plan not waiting — left as found, and recorded.
 	const refusedWith = (error: string): ActionOutcome => ({ ...answered('failure'), decoded: { error } });
+	/** ⭐ E12's re-review F4 — a Record Assurance refused, in the server's own words: a declared review did not conclude. */
+	const DID_NOT_CONCLUDE =
+		"Assurance recorded, and the declared review did not conclude in this PWU's favour: pol_intent_preservation reached INCONCLUSIVE.";
 	const FAILED = unitState('EXECUTING', 'FAILED', 'UNASSESSED', 'FAILED');
 	const OTHERS_COMPLETE = {
 		root: ALL_COMPLETE.root!,
@@ -2326,7 +2333,7 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 				root: GREEN,
 				requirements: GREEN,
 				design: {
-					ra: answered('failure'),
+					ra: refusedWith(DID_NOT_CONCLUDE),
 					raAfter: ASSESSING,
 					calls: 4,
 					rerun: { offered: true, outcome: answered('success'), after: ASSURED, calls: 1 },
@@ -2353,6 +2360,13 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			SATISFIED,
 			null
 		]);
+		// ⭐ E12's re-review F4 — Record Assurance's refusal is KEPT, on its own act, though no refusal stands: the rule's accepted
+		// re-run stood in for it, and Mark Satisfied was accepted.
+		expect([design.recordAssurance?.refusal, design.rerunDeclared?.refusal, design.markSatisfied?.refusal]).toEqual([
+			DID_NOT_CONCLUDE,
+			null,
+			null
+		]);
 		expect(l.action('03-design-rerunDeclaredReviews'), 'the re-run’s answer was not kept').toBe(true);
 		expect([record.end?.reason, laneVerdict(record)]).toEqual(['complete', []]);
 	});
@@ -2363,7 +2377,7 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			presses: ALL_COMPLETE,
 			signOffs: {
 				root: GREEN,
-				design: { ra: answered('failure'), raAfter: ASSESSING, rerun: { offered: true, outcome: answered('failure'), after: ASSESSING } }
+				design: { ra: refusedWith(DID_NOT_CONCLUDE), raAfter: ASSESSING, rerun: { offered: true, outcome: answered('failure'), after: ASSESSING } }
 			}
 		}).run();
 		const twice = refusedTwice.units[2]!.signOff!;
@@ -2372,6 +2386,8 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			null,
 			{ act: 'Re-run the declared reviews', reason: '{"type":"failure"}' }
 		]);
+		// ⭐ E12's re-review F4 — the refusal that stands is the re-run's; Record Assurance's own is kept on its act.
+		expect([twice.recordAssurance?.refusal, twice.rerunDeclared?.refusal]).toEqual([DID_NOT_CONCLUDE, '{"type":"failure"}']);
 		const notOffered = laneOf({
 			paid: true,
 			presses: ALL_COMPLETE,
@@ -2465,7 +2481,7 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		]);
 		const design = record.units[2]!.signOff!;
 		expect([design.recordAssurance, design.refused]).toEqual([
-			{ status: null, envelopeType: null, timedOutAfterMs: PHASE7_RECORD_ASSURANCE_MS, requestFailure: null, after: ASSESSING },
+			{ status: null, envelopeType: null, timedOutAfterMs: PHASE7_RECORD_ASSURANCE_MS, requestFailure: null, refusal: null, after: ASSESSING },
 			{ act: 'Record Assurance', reason: `no answer within ${PHASE7_RECORD_ASSURANCE_MS} ms` }
 		]);
 		expect(
