@@ -7,7 +7,9 @@
 //     (`checkPublishedPwa`) — until it has been held so, no executor try is served (`REPLAY_PWA_UNCHECKED`);
 //   · the EXECUTOR (`replay-executor.ts`): the turn's text, scrubbed, hashes to the recorded `turnSha256` — ⭐ and the
 //     executor's instructions and its tool definitions, recomputed from the code under test, to the recorded
-//     `instructionsSha256` and `toolsSha256` (finding 1);
+//     `instructionsSha256` and `toolsSha256` (finding 1); ⭐ and, call by call, the result the model read, rendered again
+//     by the code under test, to the recorded `resultSha256` (`checkToolResult`; the lead's delegated decision of
+//     2026-10-15, to be registered);
 //   · the RUNNER (`replayed-runner.ts`): the argv it is asked to run, scrubbed, is the recorded argv;
 //   · the REVIEWER (`reviewerPrint`, below): the prompt, scrubbed, hashes to the recorded `promptSha256`.
 // A mismatch is `REPLAY_STALE`, naming the call and both hashes; a call past the end is `REPLAY_EXHAUSTED`. ⛔ AND THE
@@ -42,6 +44,7 @@ import {
 	pwaContentDigest,
 	readRecording,
 	RecordingRefusal,
+	SCRUB_TOKENS,
 	scrubPairs,
 	scrubText,
 	sha256Hex,
@@ -112,6 +115,13 @@ export interface ReplayRun extends ReplayCommandSource {
 	 * the try's recorded key (finding 1). ⛔ Throws `ReplayRefusal` otherwise.
 	 */
 	nextExecutorTry(turnText: string, key: ExecutorKey): ExecutorTry;
+	/**
+	 * ⭐⭐ WHAT THE MODEL READ OF A CALL, HELD TO THE RECORDING (the lead's delegated decision of 2026-10-15, to be
+	 * registered): `rendered` — call `index` of `tried`'s result as the code under test renders it, and as Pi would send it
+	 * (`toolResultAsSent`) — must hash, scrubbed, to the call's recorded `resultSha256`. ⛔ Throws `ReplayRefusal` (and
+	 * poisons) otherwise, naming the call and both hashes.
+	 */
+	checkToolResult(tried: ExecutorTry, index: number, rendered: string): void;
 	/** ⭐ The reviewer's `print`: the next recorded reply, if the prompt hashes to it. ⛔ Rejects `ReplayRefusal` otherwise. */
 	readonly reviewerPrint: (prompt: string) => Promise<ToolInvocationResult>;
 	/** ⭐ The validator's clock: virtual time, advanced by each replayed call's recorded elapsed time. */
@@ -321,6 +331,32 @@ export function createReplayRun(
 				);
 			next.executor += 1;
 			return recorded;
+		},
+
+		checkToolResult(tried, index, rendered) {
+			const call = tried.toolCalls[index];
+			const what = `executor try ${next.executor} (unit ${tried.unit}), tool call ${index + 1} (${call?.name ?? 'none'})`;
+			const already = afterPoison(`${what}'s result`);
+			if (already) throw already;
+			const actual = sha256Hex(scrub(rendered));
+			if (actual === call?.resultSha256) return;
+			// ⚠ THE KEY'S STATED LIMIT (`recording.ts`, the header's size of a scrubbed path), said where it bites: a call
+			// whose arguments name the run's own directories may report a size measured of them, which is this host's.
+			const named =
+				call !== undefined && SCRUB_TOKENS.some((token) => JSON.stringify(call.arguments).includes(token));
+			throw poison(
+				new ReplayRefusal(
+					'REPLAY_STALE',
+					`${what}: the result's SHA-256 as this code renders it is ${actual}, and the recording's is ` +
+						`${call?.resultSha256 ?? 'absent'}. The model read another result than this code renders, and the ` +
+						'recorded answer was made reading it.' +
+						(named
+							? " ⚠ Its arguments name the run's own directories (a scrub token), so a size the tool reports of " +
+								"them is this host's, and differs where this host's directories are not as long as the run's — " +
+								"the recording's stated limit."
+							: '')
+				)
+			);
 		},
 
 		nextCommand(argv) {

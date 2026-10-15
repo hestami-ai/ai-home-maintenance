@@ -50,7 +50,12 @@ const RECORDING: Recording = {
 			turnSha256: sha256Hex('turn'),
 			...fixtureExecutorKey(),
 			toolCalls: [
-				{ name: 'write_file', arguments: { path: 'a.md', contents: 'x' }, outcome: 'COMPLETED' }
+				{
+					name: 'write_file',
+					arguments: { path: 'a.md', contents: 'x' },
+					outcome: 'COMPLETED',
+					resultSha256: sha256Hex('Wrote 1 UTF-8 bytes to a.md.')
+				}
 			],
 			answer: {
 				arrived: false,
@@ -115,7 +120,19 @@ describe('⭐ the recording’s format (D1)', () => {
 			)
 		};
 		expect(() => readRecording(written(otherFormat))).toThrow(
-			'REPLAY_RECORDING_REFUSED: the recording is refused: recording.json names the format "jpwb-replay-recording/0", not jpwb-replay-recording/2'
+			'REPLAY_RECORDING_REFUSED: the recording is refused: recording.json names the format "jpwb-replay-recording/0", not jpwb-replay-recording/3'
+		);
+		// ⭐ (the lead's delegated decision of 2026-10-15, to be registered) A `/2` recording keys no tool result, and is
+		// refused as another shape rather than read with its key half missing.
+		const formatTwo = {
+			...files,
+			[RECORDING_FILES.manifest]: files[RECORDING_FILES.manifest]!.replace(
+				RECORDING_FORMAT,
+				'jpwb-replay-recording/2'
+			)
+		};
+		expect(() => readRecording(written(formatTwo))).toThrow(
+			'recording.json names the format "jpwb-replay-recording/2", not jpwb-replay-recording/3'
 		);
 		expect(() => readRecording('relative/recording')).toThrow(
 			/'relative\/recording' is not absolute/
@@ -140,6 +157,17 @@ describe('⭐ the recording’s format (D1)', () => {
 		};
 		expect(() => readRecording(written(badHash))).toThrow(
 			'executor.jsonl:1 has no SHA-256 `turnSha256`'
+		);
+		// ⭐ A call whose result the model read is not keyed is refused, naming the call.
+		const unkeyedResult = {
+			...files,
+			[RECORDING_FILES.executor]: files[RECORDING_FILES.executor]!.replace(
+				`,"resultSha256":"${sha256Hex('Wrote 1 UTF-8 bytes to a.md.')}"`,
+				''
+			)
+		};
+		expect(() => readRecording(written(unkeyedResult))).toThrow(
+			'executor.jsonl:1 toolCalls[0] has no SHA-256 `resultSha256`'
 		);
 	});
 

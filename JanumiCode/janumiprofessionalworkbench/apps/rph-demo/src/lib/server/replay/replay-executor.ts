@@ -12,7 +12,9 @@
 //      `run_command` through the REPLAYED runner, so the deliverable is rebuilt by the product's own code and every run
 //      reaches the host's own process-run observer, as a live one does;
 //   3. each call's outcome, as the host observes it, must be the recorded one — else REPLAY_STALE: a write the workspace
-//      now refuses, or a command the runner now refuses, is a run that has diverged from the recording;
+//      now refuses, or a command the runner now refuses, is a run that has diverged from the recording; ⭐ and the
+//      RESULT the model read of it, rendered by this code as Pi would send it (`toolResultAsSent`), must hash to the
+//      recorded `resultSha256` — else REPLAY_STALE, naming the call and both hashes (`ReplayRun.checkToolResult`);
 //   4. the recorded answer is returned, with the recorded producer — graded HOST_CONFIGURED.
 // ⛔ ONE AT A TIME ~~, NOT AS PI RAN THEM~~ (`REG-F-518`): ~~Pi starts one message's calls together, so a recorded run may
 // hold a command that started before a write landed~~ ⭐ as Pi runs them too since `REG-D-112` (d) (`pi-execution-tools.ts`,
@@ -23,17 +25,21 @@
 // provider reported a call that did not happen (`REG-F-530`, "Identity"); the host asserts the recorded producer.
 // ⚠ WHAT IT DOES NOT REPRODUCE: the composite payload Pi would have sent (`materializedInput`). The replay has none, and
 // says nothing: the exchange records the turn text, as a one-shot producer's does.
-// ⚠ AND WHAT IT DOES NOT KEY (the re-review of E4's fix round, stated, not built): the tool RESULTS the model read
+// ⚠ ~~AND WHAT IT DOES NOT KEY (the re-review of E4's fix round, stated, not built): the tool RESULTS the model read
 // mid-turn — `write_file`'s message, and `run_command`'s rendered exit, output and structured result (`toPiToolResult`).
 // The replay re-renders each and compares its OUTCOME CLASS alone (step 3), so a change to how a result is rendered after
-// the recording is not seen here, though the recorded answer was made reading the old rendering.
+// the recording is not seen here, though the recorded answer was made reading the old rendering.~~ ⭐ BUILT (the lead's
+// delegated decision of 2026-10-15, to be registered): the tool RESULTS the model read mid-turn — `write_file`'s message,
+// `run_command`'s rendered exit, output and structured result (`toPiToolResult`), and Pi's own answer to a call of a tool
+// the step has not minted (`unknownToolResult`) — are keyed call by call (step 3). ⚠ Its one stated limit: a size the
+// tool measures of a scrubbed path is the host's (`recording.ts`, the header's "a size measured of a scrubbed path").
 import {
 	producerWorkingDirectory,
 	type ProducerSession,
 	type ProducerSessionContext
 } from '../execution/producer-session.js';
 import { EXECUTION_CONTRACT_PROMPT } from '../execution/execution-contract.js';
-import { toPiToolResult } from '../agent/pi-tool-result.js';
+import { toolResultAsSent, toPiToolResult, unknownToolResult } from '../agent/pi-tool-result.js';
 import {
 	mintExecutionTools,
 	type ExecutionToolDescriptor
@@ -140,14 +146,13 @@ export async function openReplayExecutionSession(
 					const id = `replay-call-${callIds}`;
 					observer.started(id, call.name);
 					const tool = tools.find((t) => t.name === call.name);
-					// ⛔ ONE AT A TIME: each call awaited before the next starts (`REG-F-518`).
-					if (tool === undefined) observer.ended(id, undefined, true);
-					else
-						observer.ended(
-							id,
-							toPiToolResult(await tool.run(run.expandArguments(call.arguments))),
-							false
-						);
+					// ⛔ ONE AT A TIME: each call awaited before the next starts (`REG-F-518`). ⭐ A call to a tool not minted is
+					// answered as Pi answers one (`unknownToolResult`), an error, so its result is keyed as any other's.
+					const result =
+						tool === undefined
+							? unknownToolResult(call.name)
+							: toPiToolResult(await tool.run(run.expandArguments(call.arguments)));
+					observer.ended(id, result, tool === undefined);
 					const observed = observer.since(callsBefore).at(-1)?.outcome;
 					if (observed !== call.outcome)
 						throw run.stale(
@@ -155,6 +160,8 @@ export async function openReplayExecutionSession(
 								`recorded run observed ${call.outcome}, and this replay observed ${observed ?? 'nothing'}. The run has ` +
 								'diverged from the recording.'
 						);
+					// ⭐⭐ WHAT THE MODEL READ OF THE CALL (the lead's delegated decision of 2026-10-15, to be registered).
+					run.checkToolResult(recorded, index, toolResultAsSent(result));
 				}
 				const answer = answerOf(recorded.answer, run.expand);
 				return {

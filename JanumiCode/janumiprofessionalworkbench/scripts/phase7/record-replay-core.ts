@@ -7,7 +7,9 @@
 //   · EXECUTOR TRIES — the EXECUTION plane's `MODEL_EXCHANGE`s, in the order they were requested. A try's materialized
 //     input is the provider payload Pi sent last (`pi-executor.ts`: the composite, every message of the turn): its last
 //     user message is the TURN TEXT, and every `function_call` after it is a TOOL CALL, with its arguments, in the order
-//     the model made them. The host's own observation (`observedToolCalls`) gives each call's outcome, paired by position.
+//     the model made them — ⭐ and its `function_call_output`, the RESULT the model read of it, keyed over its scrubbed
+//     text (`resultSha256`; the lead's delegated decision of 2026-10-15, to be registered), a call with none refused.
+//     The host's own observation (`observedToolCalls`) gives each call's outcome, paired by position.
 //     ⭐ AND THE REST OF THE TRY'S KEY (the review of E4, finding 1): the payload's SYSTEM PROMPT (its `instructions`, or
 //     its developer/system message), less Pi's date and working-directory lines (`instructionsOfSentPrompt`), and its
 //     TOOLS list — each tool's name, description and parameter schema — hashed as the replay hashes what this code gives.
@@ -225,11 +227,13 @@ function turnOf(payload: string | undefined): PayloadTurn | string {
 		} catch {
 			return `its call to ${str(item.name)} carries arguments that are not JSON`;
 		}
-		calls.push({
-			name: str(item.name),
-			arguments: rec(args),
-			output: outputs.get(str(item.call_id)) ?? ''
-		});
+		// ⭐ WHAT THE MODEL READ OF THE CALL IS PART OF THE TRY'S KEY (`resultSha256`; the lead's delegated decision of
+		// 2026-10-15, to be registered), so a call the payload holds no output for is refused here, by name — keyed as
+		// nothing, it would go stale against every rendering, for a reason that is the recorder's.
+		const output = outputs.get(str(item.call_id));
+		if (output === undefined)
+			return `its call ${calls.length + 1} (${str(item.name)}) has no output in its payload, so the result the model read of it cannot be keyed`;
+		calls.push({ name: str(item.name), arguments: rec(args), output });
 	}
 	const sent = sentSystemPrompt(composite, items);
 	if (sent === undefined)
@@ -430,7 +434,9 @@ function executorTryOf(
 			toolCalls: turn.calls.map((c, k) => ({
 				name: c.name,
 				arguments: scrubValue(c.arguments, x.pairs) as Record<string, unknown>,
-				outcome: outcomes[k]!
+				outcome: outcomes[k]!,
+				// ⭐ What the model read of the call, keyed over its scrubbed text.
+				resultSha256: sha256Hex(x.scrub(c.output))
 			})),
 			answer: { arrived: true, text: x.scrub(raw) } satisfies RecordedAnswer,
 			producer: {

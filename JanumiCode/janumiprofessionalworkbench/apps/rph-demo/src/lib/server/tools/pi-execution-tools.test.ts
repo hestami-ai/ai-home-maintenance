@@ -21,12 +21,20 @@
 // ⛔ PREDICTED RED, observed 2026-10-15 with the declaration removed: under the default the log interleaves — *"a call
 // started before the one before it ended"*, the log `start write_file`, `start run_command`, `end run_command`,
 // `end write_file`.
+// ⭐ AND (the lead's delegated decision of 2026-10-15, to be registered; the replay's tool-result key) WHAT A RESULT REACHES
+// THE MODEL AS: the replay renders each recorded call's result as Pi would send it (`toolResultAsSent`) and Pi's own
+// answer to a call of a tool the session lacks (`unknownToolResult`) — restated from Pi, so each is held here to Pi
+// itself: a turn through `pi-agent-core`'s loop, its messages converted by `pi-ai`'s own Responses converter
+// (`convertResponsesMessages`), the payload shape the recorder reads.
 // ⚠ IT LOADS PI'S CORE LOOP (`pi-agent-core`, `pi-ai`) — about a second and a half under node, measured 2026-10-15 — and
 // never the coding agent, which is what `pi-executor.ts` imports. No model is called: the faux provider answers from its
 // script, in process.
 import { Agent, type AgentTool } from '@earendil-works/pi-agent-core';
-import { createFauxCore, fauxAssistantMessage, fauxToolCall } from '@earendil-works/pi-ai';
+import { createFauxCore, fauxAssistantMessage, fauxToolCall, type Message } from '@earendil-works/pi-ai';
+import { convertResponsesMessages } from '@earendil-works/pi-ai/api/openai-responses-shared';
 import { describe, expect, it } from 'vitest';
+import { toolResultAsSent, toPiToolResult, unknownToolResult } from '../agent/pi-tool-result.js';
+import type { ToolRunResult } from '../agent/types.js';
 import {
 	mintExecutionTools,
 	type ExecutionToolDescriptor,
@@ -100,5 +108,69 @@ describe('⭐ REG-D-112 (d) — a turn with two tool calls runs them one at a ti
 			['write_file', 'sequential'],
 			['run_command', 'sequential']
 		]);
+	});
+});
+
+describe('⭐ the replay’s tool-result key renders a result exactly as Pi sends it to the model (the lead’s delegated decision of 2026-10-15, to be registered)', () => {
+	/**
+	 * One turn through `pi-agent-core`'s own loop — the faux model calls `calls`, each answered by its tool or by Pi
+	 * itself, then ends — and each call's output in the payload `pi-ai`'s Responses converter makes of the turn's messages.
+	 */
+	async function sentThroughPi(
+		tools: readonly ExecutionToolDescriptor[],
+		calls: readonly string[]
+	): Promise<unknown[]> {
+		const faux = createFauxCore({ provider: 'faux-result-test' });
+		faux.setResponses([
+			fauxAssistantMessage(
+				calls.map((name, k) => fauxToolCall(name, {}, { id: `call-${k + 1}` })),
+				{ stopReason: 'toolUse' }
+			),
+			fauxAssistantMessage('every call answered')
+		]);
+		const model = faux.getModel();
+		const agent = new Agent({
+			initialState: {
+				model,
+				systemPrompt: 'the result test',
+				tools: toPiExecutionTools(tools) as unknown as AgentTool[]
+			},
+			streamFn: faux.streamSimple
+		});
+		await agent.prompt('Call the tools.');
+		expect(faux.getPendingResponseCount(), 'arrangement: the loop took every call').toBe(0);
+		// ⭑ The turn's messages a provider is sent: the loop's own user, assistant and tool-result messages.
+		const sent = agent.state.messages.filter(
+			(m): m is Message => m.role === 'user' || m.role === 'assistant' || m.role === 'toolResult'
+		);
+		return convertResponsesMessages(model, { messages: sent }, new Set([model.provider]), {
+			includeSystemPrompt: false
+		})
+			.filter((item) => (item as { type?: unknown }).type === 'function_call_output')
+			.map((item) => (item as { output?: unknown }).output);
+	}
+
+	it('a minted tool’s result — a summary with its structured result, an empty one, one holding an unpaired surrogate — is sent as toolResultAsSent renders it', async () => {
+		const results: readonly ToolRunResult[] = [
+			{ ok: true, summary: 'Wrote 3 UTF-8 bytes to a.md.', data: { path: 'a.md', byteSize: 3 } },
+			{ ok: true, summary: '' },
+			{ ok: false, summary: `Refused: a lone ${String.fromCodePoint(0xd800)} surrogate` }
+		];
+		const tools = results.map(
+			(result, k): ExecutionToolDescriptor => ({
+				name: `tool_${k}`,
+				description: `tool ${k}, for the result test`,
+				parameters: {},
+				capability: 'file-system',
+				run: async () => result
+			})
+		);
+		expect(await sentThroughPi(tools, tools.map((t) => t.name))).toEqual(
+			results.map((result) => toolResultAsSent(toPiToolResult(result)))
+		);
+	});
+
+	it('Pi’s own answer to a call of a tool the session lacks is sent as unknownToolResult renders it', async () => {
+		expect(await sentThroughPi([], ['read_file'])).toEqual([toolResultAsSent(unknownToolResult('read_file'))]);
 	});
 });

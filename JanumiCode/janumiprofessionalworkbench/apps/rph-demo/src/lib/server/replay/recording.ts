@@ -6,8 +6,9 @@
 //                    the expected stage matrix (the run report's cells: stage, row, value);
 //   executor.jsonl   one line per EXECUTOR TRY, in dispatch order: the unit, `turnSha256` (over the scrubbed turn text),
 //                    ⭐ `instructionsSha256` and `toolsSha256` (the executor's system prompt and tool definitions, below),
-//                    the tool calls in the order the model made them, with their arguments and what the host observed
-//                    of each, the answer (⭐ a failed call's REPORTER with it), and the producer;
+//                    the tool calls in the order the model made them, with their arguments, what the host observed of
+//                    each ⭐ and `resultSha256`, the hash of the result the model READ of it (below), the answer (⭐ a
+//                    failed call's REPORTER with it), and the producer;
 //   commands.jsonl   one line per command the REAL runner was asked to run, in the order it was asked: the argv and the
 //                    recorded outcome — exit, timedOut, durationMs, outputComplete, the declared omissions, and the
 //                    capture's bytes (stdout, stderr) — or the refusal it gave;
@@ -39,6 +40,17 @@
 // `toolsSha256` over each tool's name, description and parameter schema AS MINTED (`toolDefinitionsSha256`). The replay
 // recomputes both from the code under test (`replay-executor.ts`) and refuses `REPLAY_STALE` on a mismatch, naming the
 // part and both hashes — a changed `EXECUTION_CONTRACT_PROMPT` or tool surface can no longer replay green.
+// ⭐⭐ AND WHAT IT READ MID-TURN (the lead's delegated decision of 2026-10-15, to be registered; the second fix round's F7,
+// "stated, not built" there). The answer was also made reading each call's RESULT — `write_file`'s message,
+// `run_command`'s rendered exit, output and structured result (`toPiToolResult`) — so each recorded call carries
+// `resultSha256`, over the scrubbed text the run's payload sent the model as that call's output (`function_call_output`).
+// The replay renders the result again from the code under test, as Pi would send it (`toolResultAsSent`), and refuses
+// `REPLAY_STALE` where the hash differs, naming the call and both hashes: a change to how a result is rendered can no
+// longer replay green under an answer made reading the old rendering.
+// ⚠⚠ A SIZE MEASURED OF A SCRUBBED PATH IS THE HOST'S — A LIMIT OF THIS KEY, STATED. The scrub makes a path the same on
+// every host, but not a number measured of text that holds one: a `write_file` whose contents name the run's own
+// workspace is reported as so many bytes, and the replay host's workspace path is another length. Such a call goes
+// `REPLAY_STALE` where the two hosts' directories differ in length, and the refusal says so (`ReplayRun.checkToolResult`).
 //
 // ⛔ SCRUBBED BEFORE IT IS WRITTEN, AND HASHED OVER THE SCRUBBED BYTES (`REG-F-536`). Every executor prompt carries the
 // host's absolute workspace path, which names the operator's account, and a command's output can carry it too. The
@@ -84,8 +96,10 @@ import type { ProcessOutputOmission } from '@janumipwb/rph-ports';
  * ⭐ ~~`/1`~~ `/2` (the review of E4; `REG-D-112`): the executor's key (`instructionsSha256`, `toolsSha256`), the published
  * PWA (`pwa`), the OS family (`osFamily`) and a failed call's reporter (`reportedBy`). A `/1` recording holds none of them,
  * so it is refused as another shape rather than read with its key half missing. None was ever committed.
+ * ⭐ ~~`/2`~~ `/3` (the lead's delegated decision of 2026-10-15, to be registered): each tool call's `resultSha256`. A `/2`
+ * recording keys no result, and is refused the same way. None was committed either.
  */
-export const RECORDING_FORMAT = 'jpwb-replay-recording/2';
+export const RECORDING_FORMAT = 'jpwb-replay-recording/3';
 
 /** The OS family a recording was made on (finding 6, the header's "⚠⚠"). */
 export type OsFamily = 'windows' | 'posix';
@@ -525,6 +539,12 @@ export interface RecordedToolCall {
 	readonly arguments: Readonly<Record<string, unknown>>;
 	/** What the host observed happen to the call in the recorded run — the replay must observe the same. */
 	readonly outcome: RecordedToolOutcome;
+	/**
+	 * ⭐ SHA-256 of the call's RESULT as the model read it — the text the run's payload sent as the call's output
+	 * (`function_call_output`), scrubbed (the lead's delegated decision of 2026-10-15, to be registered). The replay
+	 * renders the result again from the code under test and holds it to this (`ReplayRun.checkToolResult`).
+	 */
+	readonly resultSha256: string;
 }
 
 /**
@@ -792,7 +812,8 @@ function executorTryOf(v: unknown, where: string): ExecutorTry {
 			return {
 				name: field(c, 'name', at, isString, 'string'),
 				arguments: field(c, 'arguments', at, isRecord, 'object'),
-				outcome: outcome as RecordedToolOutcome
+				outcome: outcome as RecordedToolOutcome,
+				resultSha256: field(c, 'resultSha256', at, isHex64, 'SHA-256')
 			};
 		}),
 		answer: answerOf(v.answer, where),

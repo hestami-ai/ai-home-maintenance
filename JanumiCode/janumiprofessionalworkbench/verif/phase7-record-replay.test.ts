@@ -100,6 +100,15 @@ const payloadHead = (cwd: string) => ({
 	tools: KEY.tools.map((t) => ({ type: 'function', ...t, strict: false }))
 });
 const TRANSPORT = 'devin exited with code 1: connection reset by peer';
+/**
+ * ⭐ What the model READ of each call — its `function_call_output` — which the recording keys (`resultSha256`; the
+ * lead's delegated decision of 2026-10-15, to be registered). ⭑ The write's names the workspace, so its key is taken
+ * over the SCRUBBED text, as every hash in a recording is.
+ */
+const wroteOutput = (workspace: string): string =>
+	`Wrote 44 UTF-8 bytes to ${workspace.replaceAll('\\', '/')}/docs/requirements.md.`;
+const ranOutput = (stdout: string): string =>
+	`exit 0 in 42ms\n--- stdout ---\n${stdout}\n--- stderr ---\n\n\nStructured result:\n{"exitCode":0,"timedOut":false,"durationMs":42,"outputComplete":true}`;
 
 interface Arranged {
 	readonly run: string;
@@ -126,6 +135,8 @@ function arrange(
 		readonly answer?: string;
 		/** The prompt both review calls were sent, when not `REVIEW_PROMPT`: one that embeds the work product. */
 		readonly reviewPrompt?: string;
+		/** ⭐ The payload holds no output for the command's call: what the model read of it is not there to key. */
+		readonly unanswered?: boolean;
 	} = {}
 ): Arranged {
 	const run = tempDir('run');
@@ -163,7 +174,7 @@ function arrange(
 			{
 				type: 'function_call_output',
 				call_id: 'c1',
-				output: 'Wrote 44 UTF-8 bytes to docs/requirements.md.'
+				output: wroteOutput(workspace)
 			},
 			...(o.extraWrite
 				? [
@@ -182,11 +193,9 @@ function arrange(
 				name: 'run_command',
 				arguments: JSON.stringify({ argv: ARGV })
 			},
-			{
-				type: 'function_call_output',
-				call_id: 'c2',
-				output: `exit 0 in 42ms\n--- stdout ---\n${stdout}\n--- stderr ---\n\n\nStructured result:\n{"exitCode":0,"timedOut":false,"durationMs":42,"outputComplete":true}`
-			}
+			...(o.unanswered
+				? []
+				: [{ type: 'function_call_output', call_id: 'c2', output: ranOutput(stdout) }])
 		]
 	};
 	const exchange = (id: string, state: Record<string, unknown>) => ({
@@ -476,13 +485,21 @@ describe('⭐ the recorder (D1) — a final archive into a replay recording, scr
 		expect(tried!.turnSha256).toBe(
 			sha256Hex(`${TURN_HEAD}\nCurrent working directory: JPWB_REPLAY_WORKSPACE_POSIX`)
 		);
+		// ⭐ And what the model READ of each call, keyed over the scrubbed text (the lead's delegated decision of 2026-10-15,
+		// to be registered): the write's output named the workspace, which its key holds as the token.
 		expect(tried!.toolCalls).toEqual([
 			{
 				name: 'write_file',
 				arguments: { path: 'docs/requirements.md', contents: DOC },
-				outcome: 'COMPLETED'
+				outcome: 'COMPLETED',
+				resultSha256: sha256Hex('Wrote 44 UTF-8 bytes to JPWB_REPLAY_WORKSPACE_POSIX/docs/requirements.md.')
 			},
-			{ name: 'run_command', arguments: { argv: ARGV }, outcome: 'COMPLETED' }
+			{
+				name: 'run_command',
+				arguments: { argv: ARGV },
+				outcome: 'COMPLETED',
+				resultSha256: sha256Hex(ranOutput(DOC))
+			}
 		]);
 		expect(tried!.answer).toEqual({ arrived: true, text: ANSWER });
 		expect(recording.commands).toEqual([
@@ -524,6 +541,18 @@ describe('⭐ the recorder (D1) — a final archive into a replay recording, scr
 		);
 		expect(r.out).toMatch(/commands\.jsonl:1 \$\.stdout:\d+:\d+ account-name/);
 		expect(r.out, 'a refusal printed the name it refused').not.toContain(`owner: ${ACCOUNT}`);
+		expect(existsSync(out)).toBe(false);
+	});
+
+	it('⛔ refuses a try whose call has no output in its payload: what the model read of it cannot be keyed', () => {
+		// ⭐ (the lead's delegated decision of 2026-10-15, to be registered) Keyed as nothing, the call would replay STALE
+		// against any rendering, for a reason that is the recorder's; refused here, by name, nothing is written.
+		const out = join(tempDir('out'), 'recording');
+		const r = record(arrange({ unanswered: true }), out);
+		expect(r.code).toBe(1);
+		expect(r.out).toContain(
+			'executor try 1 (mex_try): its call 2 (run_command) has no output in its payload, so the result the model read of it cannot be keyed'
+		);
 		expect(existsSync(out)).toBe(false);
 	});
 

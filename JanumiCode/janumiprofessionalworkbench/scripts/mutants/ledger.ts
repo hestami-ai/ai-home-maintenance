@@ -27483,5 +27483,86 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/phase7-archive-scan.test.ts"],
 		why: "PROMISE (the lead's delegated decision of 2026-10-15, to be registered: a UNC share in any spelling the old pattern caught; the confirm of E4's second fix round): CommonMark's source spelling of a share - a leading run of four and a separator of one, where a backslash escapes a backslash and is literal before a letter - is a hit at every depth, its runs four to one at each. WHO RELIES: a Markdown file the executor writes that names a share, carried in a write_file argument, the answer envelope and a review prompt. WHAT THE MUTATION DOES: only a leading run twice its separator is a share, as the second fix round's ratio rule had it (predicted red, observed 2026-10-15 at ae795e41's scan, before the rewrite: 'AssertionError: a share of runs 4 and 1, at depth 0: expected [] to deeply equal [ [ 'unc-path', 1, 1 ] ]'). Measured (bun run mutants -- the 27 entries anchored in archive-scan.ts or held by its test, PQ7-M147 the control aside, and E4-M63, by their full ids, 2026-10-15, in the polish round's worktree, its changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M75-commonmarks-share-spelling-is-no-hit ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 8 E4 polish round (p7c-e4) - the confirm of E4's second fix round and the lead's delegated decisions of 2026-10-15, to be registered: the archive scan reads an escape before a token at any depth of JSON escaping and a share in each spelling the old pattern caught (REG-F-536)"
+	},
+	{
+		id: "E4-M76-the-result-the-model-read-is-never-held-to-the-recording",
+		file: "apps/rph-demo/src/lib/server/replay/replay-executor.ts",
+		find: "\t\t\t\t\trun.checkToolResult(recorded, index, toolResultAsSent(result));\n",
+		replace: "\t\t\t\t\tvoid toolResultAsSent; // MUTANT: the result the model read is never held to the recording\n",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replay-executor.test.ts"],
+		why: "PROMISE (the lead's delegated decision of 2026-10-15, to be registered; the second fix round's F7): a recorded answer is replayed only where each call's RESULT, as the code under test renders it and Pi would send it, is the one the model read - so a change to toPiToolResult or a tool's summary after a recording cannot replay green (REG-D-067: a cached thing must be a function of its key). WHO RELIES: the CI replay of the programme's paid recording, and every claim that a replayed run reproduces the recorded one. WHAT THE MUTATION DOES: the replay session renders each result and never asks the recording about it (predicted red, observed 2026-10-15 with this line removed by hand: 'AssertionError: promise resolved \"{ …(5) }\" instead of rejecting', twice - the stale case and the size-limit case). Measured (bun run mutants -- E4-M, every E4 entry, 2026-10-15, in the polish round's worktree, the tool-result key's changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M76-the-result-the-model-read-is-never-held-to-the-recording ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 8 E4 polish round (p7c-e4) - the tool-result key: each recorded call keyed by the result the model read, the recording format /3, the replay holding the result this code renders to it (the lead's delegated decision of 2026-10-15, to be registered; the second fix round's F7; REG-D-067's key rule)"
+	},
+	{
+		id: "E4-M77-any-rendering-passes-the-result-key",
+		file: "apps/rph-demo/src/lib/server/replay/replay-run.ts",
+		find: "\t\t\tconst actual = sha256Hex(scrub(rendered));\n",
+		replace: "\t\t\tconst actual = call?.resultSha256 ?? sha256Hex(scrub(rendered)); // MUTANT: the recorded key is compared with itself\n",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replay-executor.test.ts"],
+		why: "PROMISE (the lead's delegated decision of 2026-10-15, to be registered): checkToolResult refuses REPLAY_STALE, naming the call and both hashes, where the rendering's scrubbed hash is not the recorded resultSha256, and poisons the replay. WHO RELIES: the replay executor, which calls it for every call (E4-M76 holds that wiring). WHAT THE MUTATION DOES: the hash compared is the recorded key itself, so any rendering of a recorded call passes. ⭑ REFORMULATED BEFORE ITS FIRST KILL (the ledger's V-2c lesson): its first form mutated the CONDITION - `|| call !== undefined` beside the comparison - and did not compile, the runner's own words: 'NO_COMPILE     E4-M77-any-rendering-passes-the-result-key apps/rph-demo/src/lib/server/replay/replay-run.ts(346,76): error TS2339: Property 'arguments' does not exist on type 'never'.', `call` narrowed to never below the early return; this form mutates the CONSEQUENCE. Measured (bun run mutants -- E4-M77-any-rendering-passes-the-result-key, 2026-10-15, in the polish round's worktree, its changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M77-any-rendering-passes-the-result-key ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 8 E4 polish round (p7c-e4) - the tool-result key: each recorded call keyed by the result the model read, the recording format /3, the replay holding the result this code renders to it (the lead's delegated decision of 2026-10-15, to be registered; the second fix round's F7; REG-D-067's key rule)"
+	},
+	{
+		id: "E4-M78-the-recorder-keys-a-result-as-nothing",
+		file: "scripts/phase7/record-replay-core.ts",
+		find: "\t\t\t\tresultSha256: sha256Hex(x.scrub(c.output))\n",
+		replace: "\t\t\t\tresultSha256: sha256Hex('') // MUTANT: what the model read is not keyed\n",
+		expectRed: ["verif/phase7-record-replay.test.ts"],
+		why: "PROMISE (the lead's delegated decision of 2026-10-15, to be registered): the recorder keys each call by its function_call_output - the result the model read - so the replay has something to hold its own rendering to. WHO RELIES: the paid run's recording, which the CI replay keys every call against. WHAT THE MUTATION DOES: every call is keyed as the empty string's hash (predicted red, observed 2026-10-15 before the recorder change, the reader already at /3: 'Error: REPLAY_RECORDING_REFUSED: the recording is refused: executor.jsonl:1 toolCalls[0] has no SHA-256 `resultSha256`'). Measured (bun run mutants -- E4-M, every E4 entry, 2026-10-15, in the polish round's worktree, the tool-result key's changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M78-the-recorder-keys-a-result-as-nothing ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 8 E4 polish round (p7c-e4) - the tool-result key: each recorded call keyed by the result the model read, the recording format /3, the replay holding the result this code renders to it (the lead's delegated decision of 2026-10-15, to be registered; the second fix round's F7; REG-D-067's key rule)"
+	},
+	{
+		id: "E4-M79-the-recorder-keys-a-result-unscrubbed",
+		file: "scripts/phase7/record-replay-core.ts",
+		find: "\t\t\t\tresultSha256: sha256Hex(x.scrub(c.output))\n",
+		replace: "\t\t\t\tresultSha256: sha256Hex(c.output) // MUTANT: the result is keyed as the run's host spelled it\n",
+		expectRed: ["verif/phase7-record-replay.test.ts"],
+		why: "PROMISE (the lead's delegated decision of 2026-10-15, to be registered; REG-F-536): a result is keyed over its SCRUBBED text, as every hash in a recording is, so a replay elsewhere - whose own directories it scrubs to the same tokens - compares equal. WHO RELIES: a replay on any host but the recorded one. WHAT THE MUTATION DOES: the result is keyed with the run's own paths in it. Measured (bun run mutants -- E4-M, every E4 entry, 2026-10-15, in the polish round's worktree, the tool-result key's changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M79-the-recorder-keys-a-result-unscrubbed ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 8 E4 polish round (p7c-e4) - the tool-result key: each recorded call keyed by the result the model read, the recording format /3, the replay holding the result this code renders to it (the lead's delegated decision of 2026-10-15, to be registered; the second fix round's F7; REG-D-067's key rule)"
+	},
+	{
+		id: "E4-M80-a-call-with-no-output-is-keyed-as-the-empty-string",
+		file: "scripts/phase7/record-replay-core.ts",
+		find: "if (output === undefined)\n\t\t\treturn `its call ${calls.length + 1} (${str(item.name)}) has no output in its payload, so the result the model read of it cannot be keyed`;\n\t\tcalls.push({ name: str(item.name), arguments: rec(args), output });",
+		replace: "calls.push({ name: str(item.name), arguments: rec(args), output: output ?? '' }); // MUTANT: a call with no output is keyed as the empty string",
+		expectRed: ["verif/phase7-record-replay.test.ts"],
+		why: "PROMISE (the lead's delegated decision of 2026-10-15, to be registered): a call whose payload holds no output is refused at recording, by name - keyed as nothing, it would go stale against every rendering, for a reason that is the recorder's. WHO RELIES: the operator recording a paid run, who learns where the payload is short. WHAT THE MUTATION DOES: the missing output is keyed as the empty string and the recording is written (predicted red, observed 2026-10-15 before the refusal: 'AssertionError: expected +0 to be 1 // Object.is equality'). Measured (bun run mutants -- E4-M, every E4 entry, 2026-10-15, in the polish round's worktree, the tool-result key's changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M80-a-call-with-no-output-is-keyed-as-the-empty-string ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 8 E4 polish round (p7c-e4) - the tool-result key: each recorded call keyed by the result the model read, the recording format /3, the replay holding the result this code renders to it (the lead's delegated decision of 2026-10-15, to be registered; the second fix round's F7; REG-D-067's key rule)"
+	},
+	{
+		id: "E4-M81-an-empty-result-is-sent-as-nothing",
+		file: "apps/rph-demo/src/lib/server/agent/pi-tool-result.ts",
+		find: "return (text.length > 0 ? text : '(no tool output)').replace(",
+		replace: "return text.replace( // MUTANT: an empty result is rendered as nothing, where Pi sends a placeholder",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/pi-execution-tools.test.ts"],
+		why: "PROMISE (the lead's delegated decision of 2026-10-15, to be registered): toolResultAsSent renders a result as pi-ai's Responses converter sends it - its text parts joined, `(no tool output)` when there are none, unpaired surrogates removed - which pi-execution-tools.test.ts holds to the converter itself, over a turn through pi-agent-core's loop. WHO RELIES: the replay's result key (E4-M76), which compares this rendering with what the run's payload carried. WHAT THE MUTATION DOES: an empty result is rendered as the empty string, so a recorded call that read Pi's placeholder would go stale. Measured (bun run mutants -- E4-M, every E4 entry, 2026-10-15, in the polish round's worktree, the tool-result key's changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M81-an-empty-result-is-sent-as-nothing ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 8 E4 polish round (p7c-e4) - the tool-result key: each recorded call keyed by the result the model read, the recording format /3, the replay holding the result this code renders to it (the lead's delegated decision of 2026-10-15, to be registered; the second fix round's F7; REG-D-067's key rule)"
+	},
+	{
+		id: "E4-M82-pis-answer-to-an-unknown-tool-is-restated-otherwise",
+		file: "apps/rph-demo/src/lib/server/agent/pi-tool-result.ts",
+		find: "return { content: [{ type: 'text', text: `Tool ${name} not found` }] };",
+		replace: "return { content: [{ type: 'text', text: `Tool ${name} is not available` }] }; // MUTANT: Pi's text restated otherwise",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/pi-execution-tools.test.ts"],
+		why: "PROMISE (the lead's delegated decision of 2026-10-15, to be registered): unknownToolResult is Pi's own result for a call of a tool its session lacks (pi-agent-core agent-loop.js, prepareToolCall), which pi-execution-tools.test.ts holds to the loop itself. WHO RELIES: the replay's result key, for a recorded call to a tool the step has not minted - a model that reaches for a built-in such as read. WHAT THE MUTATION DOES: the restatement drifts from Pi's text; the replay executor's own case keys with the same function and stays green, which is why the pin is against the loop. Measured (bun run mutants -- E4-M, every E4 entry, 2026-10-15, in the polish round's worktree, the tool-result key's changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M82-pis-answer-to-an-unknown-tool-is-restated-otherwise ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 8 E4 polish round (p7c-e4) - the tool-result key: each recorded call keyed by the result the model read, the recording format /3, the replay holding the result this code renders to it (the lead's delegated decision of 2026-10-15, to be registered; the second fix round's F7; REG-D-067's key rule)"
+	},
+	{
+		id: "E4-M83-a-recorded-call-with-no-result-key-is-read",
+		file: "apps/rph-demo/src/lib/server/replay/recording.ts",
+		find: "\t\t\t\tresultSha256: field(c, 'resultSha256', at, isHex64, 'SHA-256')\n",
+		replace: "\t\t\t\tresultSha256: typeof c.resultSha256 === 'string' ? c.resultSha256 : '' // MUTANT: a call with no result key is read\n",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/recording.test.ts"],
+		why: "PROMISE (the lead's delegated decision of 2026-10-15, to be registered): readRecording refuses a recorded call with no SHA-256 resultSha256, naming the file, the line and the call - a replay never starts on a key half missing. WHO RELIES: every replay arm, which reads only through readRecording. WHAT THE MUTATION DOES: a call with no key is read, keyed as nothing, and goes stale only at its turn, for a reason that points at the code (predicted red, observed 2026-10-15 before the reader change: 'AssertionError: expected { manifest: { …(9) }, …(3) } to deeply equal { manifest: { …(9) }, …(3) }'). Measured (bun run mutants -- E4-M, every E4 entry, 2026-10-15, in the polish round's worktree, the tool-result key's changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M83-a-recorded-call-with-no-result-key-is-read ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 8 E4 polish round (p7c-e4) - the tool-result key: each recorded call keyed by the result the model read, the recording format /3, the replay holding the result this code renders to it (the lead's delegated decision of 2026-10-15, to be registered; the second fix round's F7; REG-D-067's key rule)"
+	},
+	{
+		id: "E4-M84-the-size-limit-is-never-said",
+		file: "apps/rph-demo/src/lib/server/replay/replay-run.ts",
+		find: "SCRUB_TOKENS.some((token) => JSON.stringify(call.arguments).includes(token))",
+		replace: "SCRUB_TOKENS.some(() => false) // MUTANT: the size limit is never said",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replay-executor.test.ts"],
+		why: "PROMISE (the lead's delegated decision of 2026-10-15, to be registered; the recording's stated limit): where a call's arguments name the run's own directories, the result key's refusal says a size the tool reports of them is the host's - so a write whose contents name the workspace, replayed where the workspace path is another length, is read as the format's limit and not as a change in the code. WHO RELIES: the operator reading a stale replay of the paid recording. WHAT THE MUTATION DOES: the refusal never says it. Measured (bun run mutants -- E4-M, every E4 entry, 2026-10-15, in the polish round's worktree, the tool-result key's changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E4-M84-the-size-limit-is-never-said ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 8 E4 polish round (p7c-e4) - the tool-result key: each recorded call keyed by the result the model read, the recording format /3, the replay holding the result this code renders to it (the lead's delegated decision of 2026-10-15, to be registered; the second fix round's F7; REG-D-067's key rule)"
 	}
 ];

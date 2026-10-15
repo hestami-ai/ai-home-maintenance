@@ -4,7 +4,8 @@
 //
 // ⭑ HOW THE RECORDING IS MADE, AND WHY THAT IS NOT CIRCULAR: the first pass stands in for the paid run. Its "models" are
 // a scripted double of the replay (`paidRun`, below) that answers by order, checks nothing, and records what the product
-// sent — the turn text, the executor's key (finding 1) and every reviewer prompt, scrubbed — and grades its REVIEWER
+// sent — the turn text, the executor's key (finding 1), ⭐ the result it rendered of each tool call (the result key; the
+// lead's delegated decision of 2026-10-15, to be registered) and every reviewer prompt, scrubbed — and grades its REVIEWER
 // replies `PROVIDER_REPORTED`, as a live tool does. ⭐ ~~and grades its replies `PROVIDER_REPORTED`~~ — THE EXECUTOR ARM
 // IS NOT THE DOUBLE'S (the review of E4, finding 12): the double stands behind `replayRunFor`, and the executor's session
 // is still the product's REPLAY session (`replay-executor.ts`), which grades every turn HOST_CONFIGURED, in the paid pass
@@ -128,6 +129,7 @@ import {
 	type ExecutorTry,
 	type RecordedCell,
 	type RecordedCommand,
+	type RecordedToolCall,
 	type Recording,
 	type ReviewerCall,
 	type ScrubPair
@@ -169,8 +171,13 @@ const ANSWER = JSON.stringify({
 		residualUncertainty: []
 	}
 });
-/** The paid run's one executor try, before its turn's hash and its key (finding 1) are known. */
-const TRY: Omit<ExecutorTry, 'turnSha256' | 'instructionsSha256' | 'toolsSha256'> = {
+/**
+ * The paid run's one executor try, before its turn's hash and its key (finding 1) are known — ⭐ and what the product
+ * rendered of each call (`resultSha256`), which the paid pass records.
+ */
+const TRY: Omit<ExecutorTry, 'turnSha256' | 'instructionsSha256' | 'toolsSha256' | 'toolCalls'> & {
+	readonly toolCalls: readonly Omit<RecordedToolCall, 'resultSha256'>[];
+} = {
 	unit: 'requirements',
 	toolCalls: [
 		{
@@ -216,12 +223,15 @@ function cleanJudgementOf(prompt: string): string {
 function paidRun(root: string): ReplayRun & {
 	readonly turns: string[];
 	readonly keys: { readonly instructionsSha256: string; readonly toolsSha256: string }[];
+	readonly results: string[];
 	readonly calls: ReviewerCall[];
 } {
 	let pairs: readonly ScrubPair[] = [];
 	let ms = Date.parse('2026-10-11T08:00:00.000Z');
 	const turns: string[] = [];
 	const keys: { readonly instructionsSha256: string; readonly toolsSha256: string }[] = [];
+	/** ⭐ What the product rendered of each tool call, in call order, hashed as the recorder hashes a payload's output. */
+	const results: string[] = [];
 	const calls: ReviewerCall[] = [];
 	let served = { executor: 0, commands: 0, reviewer: 0 };
 	const scrub = (t: string) => scrubText(t, pairs);
@@ -237,6 +247,7 @@ function paidRun(root: string): ReplayRun & {
 	const run = {
 		turns,
 		keys,
+		results,
 		calls,
 		// ⭑ Only its manifest is read (the reviewer's identity and bound, `replayReviewer`): the double serves its own script.
 		recording: {
@@ -289,7 +300,17 @@ function paidRun(root: string): ReplayRun & {
 			};
 			keys.push(hashed);
 			served = { ...served, executor: served.executor + 1 };
-			return { ...TRY, turnSha256: sha256Hex(scrub(text)), ...hashed };
+			// ⭑ The double's own try keys no result: it records what the product renders instead (`checkToolResult`).
+			return {
+				...TRY,
+				toolCalls: TRY.toolCalls.map((c) => ({ ...c, resultSha256: '' })),
+				turnSha256: sha256Hex(scrub(text)),
+				...hashed
+			};
+		},
+		// ⭐ What the product rendered of a call, as the model would read it — recorded, as the recorder reads a payload's.
+		checkToolResult(_tried: ExecutorTry, _index: number, rendered: string) {
+			results.push(sha256Hex(scrub(rendered)));
 		},
 		nextCommand() {
 			served = { ...served, commands: served.commands + 1 };
@@ -321,6 +342,7 @@ function paidRun(root: string): ReplayRun & {
 	return run as unknown as ReplayRun & {
 		readonly turns: string[];
 		readonly keys: { readonly instructionsSha256: string; readonly toolsSha256: string }[];
+		readonly results: string[];
 		readonly calls: ReviewerCall[];
 	};
 }
@@ -578,6 +600,9 @@ async function recordingOfPass(
 	const digest = pwaContentDigest(objects);
 	if (Array.isArray(pwa) || typeof digest !== 'string')
 		throw new Error(`arrangement: the paid pass published no one PWA — ${JSON.stringify(pwa)}`);
+	expect(paid.results, 'arrangement: the paid pass rendered a result for each of its calls').toHaveLength(
+		TRY.toolCalls.length
+	);
 	return {
 		manifest: {
 			format: RECORDING_FORMAT,
@@ -590,7 +615,15 @@ async function recordingOfPass(
 			scrub: { tokens: [...SCRUB_TOKENS] },
 			expectedMatrix: matrix
 		},
-		executor: [{ ...TRY, turnSha256: sha256Hex(paid.turns[0]!), ...paid.keys[0]! }],
+		executor: [
+			{
+				...TRY,
+				// ⭐ Each call keyed by what the paid pass rendered of it — what its model read.
+				toolCalls: TRY.toolCalls.map((c, k) => ({ ...c, resultSha256: paid.results[k]! })),
+				turnSha256: sha256Hex(paid.turns[0]!),
+				...paid.keys[0]!
+			}
+		],
 		commands: [RUN],
 		reviewer
 	};
