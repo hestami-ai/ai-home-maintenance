@@ -72,6 +72,7 @@ import {
 	buildRunReport,
 	CELL_VALUES,
 	contentVerdict,
+	DECLARED_RERUN_OPTION,
 	DECLARED_REVIEW_VALIDATORS,
 	DECLARED_SIGNOFF_VALIDATOR,
 	DEMO_FINDING_CODE,
@@ -202,7 +203,11 @@ function aRun(
 		readonly lane?: Partial<LaneRows>;
 		/** Fields of `lane/run.json` beside its units — its mode and its end. */
 		readonly run?: Record<string, unknown>;
-		/** The root signed off. Default true — the lane's dry run signs it off too (D11); false is a run cut short before its sign-offs. */
+		/**
+		 * The root signed off. Default true — ~~the lane's dry run signs it off too (D11)~~ ⛔ `E12F` F1: a paid run's, and a
+		 * dry run's before `REG-D-112` (b); false is a run cut short before its sign-offs, or a dry run's since, its sign-off
+		 * rehearsed and never pressed.
+		 */
 		readonly rootSignedOff?: boolean;
 		/** ⭐ E2 — how the root's declared policies were signed off (`PhaseKnobs.declared`). Default `judged`. */
 		readonly rootDeclared?: DeclaredKnob;
@@ -561,6 +566,10 @@ describe('JAN-EXEC P7-2 D9 — what the report restates of the product is the pr
 		expect(review).toContain(`export const STANDIN_DECLARED_REVIEW_VALIDATOR_ID = '${standin}';`);
 		expect(review).toContain(`export const UNCONFIGURED_DECLARED_REVIEWER_ID = '${unconfigured}';`);
 		expect(source('apps/rph-demo/src/lib/server/assurance/declared-policy-signoff.ts')).toContain(`validatorId: '${missing}',`);
+		// ⭐ `E12F` F3 — the option a person's re-run of the declared reviews selects.
+		expect(source('apps/rph-demo/src/lib/server/assurance/declared-policy-signoff.ts')).toContain(
+			`export const RERUN_DECLARED_REVIEWS = '${DECLARED_RERUN_OPTION}';`
+		);
 		expect(source('apps/rph-demo/src/lib/server/identity.ts')).toContain(`actorId: '${OPERATOR_ACTOR_ID}',`);
 		expect(source('apps/rph-demo/src/lib/server/tools/process-run-observer.ts')).toContain(
 			`export const OBSERVED_PROCESS_RUN_LIMIT = ${RECORDED_RUN_LIMIT};`
@@ -1175,6 +1184,39 @@ describe('JAN-EXEC P7-2 D9 — the audit of hand acts (P7-3)', () => {
 		expect(reportOf(aRun()).report.audit.acts.find((a) => a.act === 'markSatisfied without recordAssurance')?.verdict).toBe('none');
 	});
 
+	it('⭐ E12F F3 — Mark Satisfied after the rule’s ACCEPTED re-run of the declared reviews is no forbidden act; after a refused one it is', () => {
+		// ⛔ PREDICTED RED, read from the code: FOUND — only an accepted Record Assurance counted as the assurance Mark Satisfied
+		// may follow, so the rule's sign-off (Record Assurance refused, its declared reviews re-run and accepted, REG-D-112 (a))
+		// read as the act P7-3 forbids.
+		const acts = (rerun: 'success' | 'failure') => [
+			{ file: '03-design-recordAssurance.json', action: 'recordAssurance', envelopeType: 'failure' },
+			{ file: '03-design-rerunDeclaredReviews.json', action: 'rerunDeclaredReviews', envelopeType: rerun },
+			{ file: '03-design-markSatisfied.json', action: 'markSatisfied', envelopeType: 'success' }
+		];
+		const accepted = actOf(reportOf(aRun({}, { lane: { actions: acts('success') } })).report, 'markSatisfied without recordAssurance');
+		expect([accepted.verdict, accepted.posted], 'Mark Satisfied after an accepted declared re-run read as forbidden').toEqual(['none', 0]);
+		const refused = actOf(reportOf(aRun({}, { lane: { actions: acts('failure') } })).report, 'markSatisfied without recordAssurance');
+		expect(refused.posted).toBe(1);
+	});
+
+	it('⭐ E12F F3 — a re-run of a unit’s declared reviews is LISTED among the other acts, by its Decision: the unit, and the assessments it re-ran', () => {
+		const decided = {
+			eventType: 'DecisionEffective',
+			aggregateType: 'DECISION',
+			aggregateId: 'dec_declared',
+			commandId: 'ui-990',
+			payload: { decisionType: 'REPLAN', selectedOption: DECLARED_RERUN_OPTION, subjectObjectIds: ['pwu_design', 'asm_pwu_design_1'] }
+		};
+		const listed = actOf(
+			reportOf(aRun({}, { extraEvents: [decided], lane: { posts: [{ seq: 1, url: 'http://h/undertakings/und_1?/rerunDeclaredReviews', status: 200 }] } })).report,
+			'rerunDeclaredReviews'
+		);
+		expect([listed.found.map((f) => [f.aggregateId, f.unit, f.why]), listed.posted]).toEqual([
+			[['dec_declared', 'design', 'a person’s re-run of the declared reviews that did not conclude: 1 assessment re-run']],
+			1
+		]);
+	});
+
 	it('⛔ an abandon followed by a re-proposal is the forbidden act; a re-proposal alone is listed on its own', () => {
 		const abandon = { eventType: 'PwuAbandoned', aggregateType: 'PROFESSIONAL_WORK_UNIT', aggregateId: 'pwu_design', commandId: 'ui-902', payload: {} };
 		const propose = { eventType: 'PwuProposed', aggregateType: 'PROFESSIONAL_WORK_UNIT', aggregateId: 'pwu_design', commandId: 'ui-903', payload: {} };
@@ -1649,7 +1691,62 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 		]);
 	});
 
+	it('⛔ E12F F1 (REG-D-112 (b)) — stage 7: a sign-off the lane held back BEFORE the reviewer call (a dry run’s, or the limit’s) is one never attempted — not reached, never broke', () => {
+		// ⛔ PREDICTED RED, read from the code: broke — the lane's record of a sign-off read as attempted whenever one was
+		// recorded, and a dry run's root, its sign-off rehearsed and not pressed, is not SATISFIED.
+		const unbegun = { begun: false };
+		const run = aRun(
+			{ requirements: unbegun, design: unbegun, implementation: unbegun, 'end-to-end': unbegun },
+			{ rootSignedOff: false, run: { mode: 'dry', end: { reason: 'dry-run-stop' }, dryRun: { modelExchanges: 0 } } }
+		);
+		const laneRun = run.lane.run as { units: Record<string, unknown>[] };
+		const held = (notPressed: string): LaneRows => ({
+			...run.lane,
+			run: {
+				...laneRun,
+				units: laneRun.units.map((u) =>
+					u.slug === 'root'
+						? { ...u, stopped: false, signOff: { offered: true, limitCheck: null, recordAssurance: null, rerunDeclared: null, rerunLimitCheck: null, markSatisfied: null, refused: null, notPressed } }
+						: u
+				)
+			}
+		});
+		for (const why of ['not reached in a dry run: Record Assurance asks the reviewer …', 'the limit: 234 of 230 reviewer calls …']) {
+			const c = cellOf(buildRunReport(run.store, held(why), { accountNames: NAMES }).report, '7', 'whole run');
+			expect(c.basis[0], why).toBe('root: not reached');
+		}
+	});
+
+	it('⛔ E12F F2, F3 — stage 7: a sign-off whose Record Assurance WAS pressed, and refused, the rule’s re-run then held back by the limit, was attempted — broke, never not reached', () => {
+		// ⛔ PREDICTED RED, read from the code: not reached — any `notPressed` read as a sign-off never attempted, though Record
+		// Assurance was pressed, and refused, before the limit held the declared re-run back.
+		const unbegun = { begun: false };
+		const run = aRun(
+			{ requirements: unbegun, design: unbegun, implementation: unbegun, 'end-to-end': unbegun },
+			{ rootSignedOff: false, run: { end: { reason: 'paid-limit' } } }
+		);
+		const laneRun = run.lane.run as { units: Record<string, unknown>[] };
+		const signOff = {
+			offered: true,
+			limitCheck: null,
+			recordAssurance: { status: 400, envelopeType: 'failure', after: null },
+			rerunDeclared: null,
+			rerunLimitCheck: null,
+			markSatisfied: null,
+			refused: { act: 'Record Assurance', reason: 'a verdict that did not conclude leaves this PWU under assessment.' },
+			notPressed: 'the limit: 232 of 230 reviewer calls …'
+		};
+		const lane: LaneRows = {
+			...run.lane,
+			run: { ...laneRun, units: laneRun.units.map((u) => (u.slug === 'root' ? { ...u, stopped: false, signOff } : u)) }
+		};
+		const c = cellOf(buildRunReport(run.store, lane, { accountNames: NAMES }).report, '7', 'whole run');
+		expect([c.value, c.basis[0]], 'a pressed Record Assurance read as a sign-off never attempted').toEqual(['broke', 'root: broke']);
+	});
+
 	it('⛔ stage 7’s sign-off: the lane’s dry run signs the root off (D11) — the root as intended, the run not reached; one never attempted, in a run cut short — not reached; one refused — broke', () => {
+		// ⚠ `E12F` F1 — A DRY RUN BEFORE `REG-D-112` (b): its root signed off by the paid run's own acts. Kept, for an archive made
+		// then; a dry run now rehearses the sign-off up to the reviewer call and presses nothing (the case above).
 		const unbegun = { begun: false };
 		// ⭐ THE LANE'S DRY RUN, AS D11 MAKES IT (design §6 P7-2): the root pressed, then signed off by the paid run's own
 		// acts — each kept in lane/actions — and SATISFIED; the final archive taken, and read; the four phases never pressed.

@@ -748,6 +748,7 @@ function laneUnits(run: unknown): LaneUnit[] {
 		const r = rec(u);
 		const pressed = r.beginExecute !== null && r.beginExecute !== undefined;
 		const be = rec(r.beginExecute);
+		const signOff = rec(r.signOff);
 		return {
 			slug: str(r.slug),
 			unitId: str(r.unitId) || null,
@@ -759,7 +760,13 @@ function laneUnits(run: unknown): LaneUnit[] {
 			stopped: bool(r.stopped),
 			upstreamNotAssured: bool(r.upstreamNotAssured),
 			limitPrior: int(rec(r.limitCheck).prior),
-			signOffAttempted: r.signOff !== null && r.signOff !== undefined
+			// ⛔ `E12F` F1, F2 — a sign-off the lane HELD BACK before Record Assurance (a dry run's, `REG-D-112` (b), or the
+			// limit's, D8) records why in `notPressed` and pressed nothing: never attempted. One whose Record Assurance was
+			// pressed was attempted, whatever was held back after it. ⚠ A record written before E12F carries no such field.
+			signOffAttempted:
+				r.signOff !== null &&
+				r.signOff !== undefined &&
+				(str(signOff.notPressed) === '' || (signOff.recordAssurance ?? null) !== null)
 		};
 	});
 }
@@ -1428,6 +1435,30 @@ function handEventsOf(v: AuditView, type: string): StoredEvent[] {
 }
 
 /**
+ * ⭐ `E12F` F3 — THE OPTION A PERSON'S RE-RUN OF A UNIT'S DECLARED REVIEWS SELECTS (`declared-policy-signoff.ts`
+ * `RERUN_DECLARED_REVIEWS`), restated — this report loads no product module — and held to its source by the restatement test.
+ */
+export const DECLARED_RERUN_OPTION = 'RERUN_DECLARED_REVIEWS';
+
+/**
+ * ⭐ `E12F` F3 (`REG-D-112` (a)) — EACH RE-RUN OF A UNIT'S DECLARED REVIEWS THAT DID NOT CONCLUDE, by its Decision: the unit, and
+ * the INCONCLUSIVE assessments it re-ran. ⚠ No plan is revised (`reruns` reads one): each re-run is a new assessment.
+ */
+function declaredReruns(v: AuditView): AuditFinding[] {
+	return v.ix
+		.eventsOfType('DecisionEffective')
+		.filter((e) => str(e.payload.decisionType) === 'REPLAN' && str(e.payload.selectedOption) === DECLARED_RERUN_OPTION)
+		.map((e) => {
+			const [unitId, ...rerun] = strs(e.payload.subjectObjectIds);
+			return findingOf(
+				e,
+				v.unitOfObject(unitId ?? ''),
+				`a person’s re-run of the declared reviews that did not conclude: ${plural(rerun.length, 'assessment', 'assessments')} re-run`
+			);
+		});
+}
+
+/**
  * ⭐ P7-6R R-1c — THE PERSON'S RE-RUNS, each an EFFECTIVE `REPLAN` Decision whose selected option names it (RD4). Listed
  * because each changes what the run measures, and none is forbidden: the paid run's rule makes them (`REG-D-105` (4)).
  * ⭐⭐ `JAN-EXEC` P7-6 B5 (the roadmap's B8) — AND EACH IS LISTED BESIDE THE DECISION THAT MADE IT: the finding is the
@@ -1474,8 +1505,12 @@ function forbiddenActs(v: AuditView, undertakingId: string | null, lane: LaneRow
 		v.ix.eventsOfType(t).map((e) => findingOf(e, null, 'a waiver act'))
 	);
 	const waiverPosts = [posted(lane, ['recordWaiver']), posted(lane, ['grant', 'deny'], '/decisions')];
+	// ⭐ `E12F` F3 — AND THE RULE'S ACCEPTED RE-RUN OF THE DECLARED REVIEWS THAT DID NOT CONCLUDE (`REG-D-112` (a)): the
+	// assurance a Mark Satisfied may follow when Record Assurance was refused and its reviews then concluded.
 	const assured = new Set(
-		lane.actions.filter((a) => a.action === 'recordAssurance' && a.envelopeType === 'success').map((a) => actionUnit(a.file))
+		lane.actions
+			.filter((a) => (a.action === 'recordAssurance' || a.action === 'rerunDeclaredReviews') && a.envelopeType === 'success')
+			.map((a) => actionUnit(a.file))
 	);
 	const unassuredPresses = lane.actions.filter((a) => a.action === 'markSatisfied' && !assured.has(actionUnit(a.file)));
 	const abandons = v.ix.eventsOfType('PwuAbandoned');
@@ -1521,6 +1556,8 @@ function otherActs(v: AuditView, undertakingId: string | null, lane: LaneRows): 
 		),
 		act('rerunReview', false, reruns(v, 'RERUN_REVIEW', 'a person’s re-run of the review'), posted(lane, ['rerunReview'])),
 		act('rerunWork', false, reruns(v, 'RERUN_WORK', 'a person’s re-run of the work'), posted(lane, ['rerunWork'])),
+		// ⭐ `E12F` F3 — the rule's re-run of a unit's declared reviews that did not conclude (`REG-D-112` (a)).
+		act('rerunDeclaredReviews', false, declaredReruns(v), posted(lane, ['rerunDeclaredReviews'])),
 		...PAGE_ONLY_ACTS.map(([name, type]) =>
 			act(name, false, handEventsOf(v, type).map((e) => findingOf(e, onPlan(e), type)), posted(lane, [name]))
 		),

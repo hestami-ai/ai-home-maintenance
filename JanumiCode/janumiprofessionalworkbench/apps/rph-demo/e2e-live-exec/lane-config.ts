@@ -390,7 +390,10 @@ export const PHASE7_RERUNS_PER_PHASE = 1;
 
 /** A click, a fill, a navigation — no model behind any. The spec makes it the page's default, so no act waits unbounded. */
 export const PHASE7_UI_MS = 120_000;
-/** A sign-off act's POST — ⭐ and an abandonment's: it calls no model, and the page then loads the whole event log again. */
+/**
+ * A sign-off act's POST — ⭐ and an abandonment's: it calls no model, and the page then loads the whole event log again.
+ * ⭐ `E12F` F1 — Mark Satisfied's: since E2 Record Assurance asks the reviewer, and waits `PHASE7_RECORD_ASSURANCE_MS`.
+ */
 export const PHASE7_SIGN_OFF_MS = 300_000;
 /** One read of the server's dump, which carries the whole event log (`freshIntrospect`). */
 export const PHASE7_INTROSPECT_MS = 300_000;
@@ -465,15 +468,34 @@ export const PHASE7_PRESSED_UNITS = PHASE7_MODEL_UNITS + 1;
 export const PHASE7_SIGN_OFF_ACTS = 2;
 
 /**
+ * ⭐⭐ `E12F` F3 (`REG-D-105` (4), applied by `REG-D-112` (a)) — THE RULE'S ONE RE-RUN OF A UNIT'S DECLARED REVIEWS THAT DID
+ * NOT CONCLUDE, EVERY ACT AT ITS BOUND (`signOff`): the overview shown afresh after the refused Record Assurance, the row's
+ * offer read, the store read for the limit, the rationale filled, the press — its act and a review of each declared policy,
+ * as Record Assurance's (`PHASE7_RECORD_ASSURANCE_MS`) — and the store read after: 360 + 120 + 300 + 120 + 4,140 + 300 =
+ * 5,340 s. ⛔ A paid act: counted, or the timeout could kill the server inside its bound (`REG-F-527`; E12-M27's class).
+ */
+export const PHASE7_DECLARED_RERUN_MS =
+	PHASE7_SHOW_OVERVIEW_MS +
+	PHASE7_UI_MS +
+	PHASE7_INTROSPECT_MS +
+	PHASE7_UI_MS +
+	PHASE7_RECORD_ASSURANCE_MS +
+	PHASE7_INTROSPECT_MS;
+
+/**
  * ⭐ `P76F-C` C8 — ONE UNIT'S SIGN-OFF, EVERY ACT AT ITS BOUND (`signOff`): the overview shown; then each of its two acts —
  * the row's wait (its row visible, or Record Assurance detached), the press, the store read after — 360 s + 2 × (120 s +
  * 300 s + 300 s) = 1,800 s; ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (design B8) — and Record Assurance's declared reviews
- * (`PHASE7_DECLARED_REVIEWS_MS`, 3,840 s), which its press now waits for: 5,640 s. ~~= 1,800 s~~
+ * (`PHASE7_DECLARED_REVIEWS_MS`, 3,840 s), which its press now waits for: 5,640 s. ~~= 1,800 s~~ ⭐⭐ `E12F` F2, F3 — and the
+ * store read for the limit before Record Assurance (300 s), and the rule's one re-run of the declared reviews that did not
+ * conclude (`PHASE7_DECLARED_RERUN_MS`, 5,340 s): 11,280 s. ~~= 5,640 s~~
  */
 export const PHASE7_SIGN_OFF_UNIT_MS =
 	PHASE7_SHOW_OVERVIEW_MS +
 	PHASE7_SIGN_OFF_ACTS * (PHASE7_UI_MS + PHASE7_SIGN_OFF_MS + PHASE7_INTROSPECT_MS) +
-	PHASE7_DECLARED_REVIEWS_MS;
+	PHASE7_DECLARED_REVIEWS_MS +
+	PHASE7_INTROSPECT_MS +
+	PHASE7_DECLARED_RERUN_MS;
 
 /**
  * The spec's own timeout, set with `test.setTimeout` (the config's stays the one-unit lane's) — ⭐⭐ `P76F-C` C8: ~~THE WORST
@@ -490,10 +512,12 @@ export const PHASE7_SIGN_OFF_UNIT_MS =
  *   · one re-run for each phase, and the abandonment that may follow it, with the rule's every UI act
  *     (`PHASE7_RECOVERY_MS`) — 4 × 1 × 41,280 s = 165,120 s;
  *   · five sign-offs, each two acts (`PHASE7_SIGN_OFF_UNIT_MS`) — ~~5 × 1,800 s = 9,000 s~~ ⭐ E2: and each Record
- *     Assurance's declared reviews, 5 × 5,640 s = 28,200 s, ⚠ counted for every unit though a phase that is abandoned is
- *     never signed off, and as four policies' though the root declares two: an upper bound;
+ *     Assurance's declared reviews, ~~5 × 5,640 s = 28,200 s~~ ⭐ `E12F` F2, F3: and the limit's read before each, and the
+ *     rule's one re-run of the declared reviews, 5 × 11,280 s = 56,400 s, ⚠ counted for every unit though a phase that is
+ *     abandoned is never signed off, and as four policies' though the root declares two: an upper bound;
  *   · the final screenshot and the final archive's read — 120 s + 300 s = 420 s;
- * = 391,440 s (108.7 hours). ~~= 372,240 s (103.4 hours)~~ before E2's declared reviews. ~~1,800 s + 4 × 38,160 s +
+ * = 419,640 s (116.6 hours). ~~= 391,440 s (108.7 hours)~~ before `E12F`'s limit read and re-run. ~~= 372,240 s (103.4
+ * hours)~~ before E2's declared reviews. ~~1,800 s + 4 × 38,160 s +
  * 4 × 1 × 38,160 s = 307,080 s (85.3 hours)~~ ⛔ counted the five
  * sign-offs (3,000 s at their bounds), the four abandonments (1,200 s) and the rule's UI acts inside the 1,800 s setup
  * allowance, and the root's Begin & Execute (up to 38,160 s) nowhere: a run whose every act stayed within its bound could
