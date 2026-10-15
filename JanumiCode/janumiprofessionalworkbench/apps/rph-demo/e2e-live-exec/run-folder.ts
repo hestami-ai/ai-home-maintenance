@@ -28,11 +28,14 @@
 //     resolved, and on Windows in any case, as its filesystem compares it.
 //   · HOLDING NO STORE, no `demo.sqlite*` — a store is seeded only when empty, and command ids restart at every boot, so
 //     a dry run and the paid run never share a folder.
-//   · NO `AGENTS.md`, `CLAUDE.md`, `.pi` OR `.agents` IN IT OR ABOVE IT, in any case — Pi folds `AGENTS.md` and
-//     `CLAUDE.md` from its working folder and every folder above into the executor's system prompt, and reads `.agents`
-//     skills from each of them and `.pi` settings and extensions from its working folder
-//     (`@earendil-works/pi-coding-agent` `dist/core/resource-loader.js`, `dist/core/package-manager.js`). The server makes
-//     every phase's working folder inside this one, so a file on this path would steer every phase unseen (`REG-F-512`).
+//   · NO `AGENTS.md`, `CLAUDE.md`, `.pi` OR `.agents` IN IT OR ABOVE IT, in any case — by default Pi folds `AGENTS.md` and
+//     `CLAUDE.md` from its working folder and every folder above into the system prompt, and reads `.agents` skills from
+//     each of them and `.pi` settings and extensions from its working folder (`@earendil-works/pi-coding-agent`
+//     `dist/core/resource-loader.js`, `dist/core/package-manager.js`). The server makes every phase's working folder
+//     inside this one, so under those defaults a file on this path would steer every phase unseen (`REG-F-512`). ⭐ Since
+//     the E4 polish round the executor's loader is told to take none of them but `.pi`'s settings, and the packages
+//     those list (`pi-executor-resources.ts`; the lead's delegated decision of 2026-10-15, to be registered), and this
+//     rule stands as the guard behind that.
 //
 // ⚠ NOTHING OF THE SERVER'S IS IMPORTED, for `lane-config.ts`'s reason: the runner loads this. What it reads of the host
 // comes through `RunFolderHost`, so `verif/phase7-run-folder.test.ts` drives every rule with no real folder in a refused
@@ -153,9 +156,10 @@ function runFolderRefusal(configured: string, problems: readonly string[]): stri
 		`Name, by its absolute path, an existing folder outside every git working tree (the repository's main checkout ` +
 			`and each of its worktrees among them) and the temporary folder that holds no store, with none of ` +
 			`${PI_CONTEXT_NAMES.join(', ')} in it or above it, and set it before Playwright starts (design §6 ` +
-			`P7-2 D2). Pi folds AGENTS.md and CLAUDE.md from its working folder and each folder above it into the executor's ` +
+			`P7-2 D2). By default Pi folds AGENTS.md and CLAUDE.md from its working folder and each folder above it into the ` +
 			`system prompt, reads .agents skills from each, and .pi from its working folder, which the server makes inside ` +
-			`the run folder. Pi keeps its own settings in a .pi folder in the home folder by default, so wherever that ` +
+			`the run folder; the executor's loader is told to leave them out but .pi's settings, and this rule is the guard ` +
+			`behind it. Pi keeps its own settings in a .pi folder in the home folder by default, so wherever that ` +
 			`folder exists, the run folder cannot be below the home folder. Unset ${LIVE_RUN_DIR_VARIABLE} to run the ` +
 			`one-unit lane instead.`
 	].join('\n');
@@ -244,7 +248,9 @@ function piContextOnThePath(start: string, host: RunFolderHost): string[] {
 			);
 		for (const name of names ?? [])
 			if (PI_CONTEXT_NAMES.some((pi) => pi.toLowerCase() === name.toLowerCase()))
-				found.push(`${join(folder, name)} is on the path Pi reads its context from (REG-F-512).`);
+				found.push(
+					`${join(folder, name)} is on the path Pi reads its context from by default (REG-F-512).`
+				);
 		const parent = dirname(folder);
 		if (parent === folder) return found;
 		folder = parent;

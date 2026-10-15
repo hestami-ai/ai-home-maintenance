@@ -242,7 +242,9 @@ const PI_PROMPT_TRAILER = /\nCurrent date: \d{4}-\d{2}-\d{2}\nCurrent working di
  * ⚠ ANYTHING ELSE PI ADDED STAYS IN, and so stays in the hash: an `APPEND_SYSTEM.md`, or the project context files Pi
  * gathers from the working directory's ancestors (`resource-loader.js`, `loadProjectContextFiles`). A run whose executor
  * was sent those was instructed by more than the code's contract, and its recording is stale against the code — the
- * replay names that, rather than replaying it as the contract's.
+ * replay names that, rather than replaying it as the contract's. ⭐ Since the E4 polish round the executor's loader
+ * adds neither (`tools/pi-executor-resources.ts`; the lead's delegated decision of 2026-10-15, to be registered); a
+ * run made before it could have.
  */
 export function instructionsOfSentPrompt(sent: string): string | undefined {
 	const trailer = PI_PROMPT_TRAILER.exec(sent);

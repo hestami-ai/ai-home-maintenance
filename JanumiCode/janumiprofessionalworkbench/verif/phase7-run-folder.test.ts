@@ -350,7 +350,7 @@ describe('⭐ P7-2 D2 — the run folder, checked in the runner’s load, every 
 		for (const where of [GOOD, at('runs'), ROOT]) {
 			const file = join(where, 'AGENTS.md');
 			expect(problemsOf(GOOD, fakeHost({ folders: [GOOD], files: [file] })), where).toContain(
-				`${file} is on the path Pi reads its context from (REG-F-512).`
+				`${file} is on the path Pi reads its context from by default (REG-F-512).`
 			);
 		}
 		expect(problemsOf(GOOD, fakeHost({ folders: [GOOD], unlistable: [at('runs')] }))).toContain(
@@ -388,7 +388,7 @@ describe('⭐ P7-2 D2 — the run folder, checked in the runner’s load, every 
 			links: { [folder]: target }
 		});
 		expect(problemsOf(folder, host)).toContain(
-			`${at('links', 'AGENTS.md')} is on the path Pi reads its context from (REG-F-512).`
+			`${at('links', 'AGENTS.md')} is on the path Pi reads its context from by default (REG-F-512).`
 		);
 	});
 

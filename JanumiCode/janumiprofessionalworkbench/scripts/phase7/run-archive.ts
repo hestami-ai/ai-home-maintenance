@@ -25,9 +25,13 @@
 // (`run-report.ts`, `archivedStoreProblem`), and `backupStore` proves each copy before the archive keeps it.
 //
 // ⚠ THE CHECKS SAY WHAT THE RECORD AND THE DISK SHOW, and name what they cannot tell apart (D7):
-//   · K4 (`REG-F-512`) as Pi loads its context: its agent folder — its context files, its appended prompt and its
-//     extensions — every folder above the workspace, the workspace root, its `.pi/`, and `.agents/skills` up to the git
-//     root — beside a search of each try's recorded executor input for the blocks Pi writes when it loaded a file;
+//   · K4 (`REG-F-512`) as Pi's loader takes context by default: its agent folder — its context files, its appended
+//     prompt and its extensions — every folder above the workspace, the workspace root, its `.pi/`, and
+//     `.agents/skills` up to the git root — beside a search of each try's recorded executor input for the blocks Pi
+//     writes when it loaded a file. ⭐ Since the E4 polish round the executor's loader is told to take none of them but
+//     the settings in `.pi/`, and the packages those list (`pi-executor-resources.ts`; the lead's delegated decision
+//     of 2026-10-15, to be registered): K4 reports them still, as the guard behind that, and its search shows whether
+//     any was taken;
 //   · K5 (`REG-F-517`) — the capture folders a unit added, against its evidence, and every cause of a folder with none;
 //   · K9 (`REG-F-519`) — each try's parse outcome, its shortfall named by the product's own text;
 //   · the hashes — per file and per folder for `src/`, `test/` and `docs/`, and the whole tree as the manifest takes it;
@@ -672,7 +676,8 @@ export function k5Check(input: K5Input): K5Check {
 // ── K4: WHAT PI LOADS FROM AROUND THE WORKSPACE (`REG-F-512`) ────────────────────────────────────────────────────────
 
 /**
- * The context files Pi folds into the executor's system prompt from each folder it reads: `AGENTS.md`, `AGENTS.MD`,
+ * The context files Pi folds into a system prompt by default from each folder it reads — ⭐ the executor's, since the E4
+ * polish round, reads none (`pi-executor-resources.ts`): `AGENTS.md`, `AGENTS.MD`,
  * `CLAUDE.md` or `CLAUDE.MD` (`@earendil-works/pi-coding-agent` `dist/core/resource-loader.js`,
  * `loadContextFileFromDir`). ⚠ Matched in ANY case: Pi asks for each by name with `existsSync`, which on Windows finds
  * `Agents.md` too.
@@ -681,13 +686,22 @@ const CONTEXT_FILE_NAMES = ['agents.md', 'claude.md'] as const;
 
 /**
  * ⭑ What Pi takes from its AGENT FOLDER beside the context files — round 2's verification found K4 read the folder for
- * context files alone: `APPEND_SYSTEM.md`, appended to every executor prompt EVEN UNDER the executor's override, with no
- * block to mark it (`dist/core/resource-loader.js`, `discoverAppendSystemPromptFile`; `system-prompt.js`,
- * `buildSystemPrompt`), and `extensions/`, code Pi loads into the SERVER's process for every executor session
- * (`dist/core/package-manager.js`, the user resources). The executor's loader turns off neither (`pi-executor.ts`).
+ * context files alone: `APPEND_SYSTEM.md`, appended to every prompt by default EVEN UNDER an override, with no block to
+ * mark it (`dist/core/resource-loader.js`, `discoverAppendSystemPromptFile`; `system-prompt.js`, `buildSystemPrompt`),
+ * and `extensions/`, code Pi loads into the SERVER's process for every session by default (`dist/core/package-manager.js`,
+ * the user resources). ~~The executor's loader turns off neither (`pi-executor.ts`).~~ ⭐ The executor's loader turns
+ * off both, and the context files, since the E4 polish round (`pi-executor-resources.ts`; the lead's delegated
+ * decision of 2026-10-15, to be registered): K4 reports them still — what a loader at Pi's defaults would take — and
+ * its search of the recorded inputs shows whether any was taken.
  * ⚠ Matched in any case, as `existsSync` finds them on Windows. `SYSTEM.md` is not here: the override replaces it.
  */
 const AGENT_APPEND_PROMPT = 'APPEND_SYSTEM.md';
+/**
+ * ⭐ What each finding below adds since the E4 polish round: the executor's loader no longer takes what it names
+ * (`pi-executor-resources.ts`; the lead's delegated decision of 2026-10-15, to be registered).
+ */
+const LEFT_OUT_BY_THE_EXECUTOR =
+	"; the executor's loader is told to leave this out (pi-executor-resources.ts)";
 const AGENT_EXTENSIONS = 'extensions';
 
 /**
@@ -800,7 +814,7 @@ export interface K4Check {
 		}[];
 	};
 	readonly workspaceRoot: { readonly exists: boolean; readonly contextFiles: readonly string[] };
-	/** The workspace's `.pi/`, which Pi reads settings, extensions and prompt files from — listed whole. */
+	/** The workspace's `.pi/`, where Pi reads settings and, by default, extensions and prompt files — listed whole. */
 	readonly pi: { readonly exists: boolean; readonly listing: readonly string[] };
 	/**
 	 * `.agents/skills` in each folder from the workspace up to its git root, else to the drive root
@@ -849,26 +863,29 @@ function instructionFiles(text: string): string[] {
 
 const occurrences = (text: string, needle: string): number => text.split(needle).length - 1;
 
-/** ⭐ K4 — as Pi loads: its agent folder, every folder above the workspace, the workspace root, `.pi/` and `.agents/skills`. */
+/**
+ * ⭐ K4 — as Pi's loader takes context by default: its agent folder, every folder above the workspace, the workspace
+ * root, `.pi/` and `.agents/skills`.
+ */
 export function k4Check(input: K4Input): K4Check {
 	const findings: string[] = [];
 	const agentDir = piAgentDirOf(input.env, input.home);
 	const agentFiles = contextFilesIn(agentDir);
 	for (const f of agentFiles)
 		findings.push(
-			`${join(agentDir, f)}: Pi's agent folder holds a context file it folds into every prompt`
+			`${join(agentDir, f)}: Pi's agent folder holds a context file, which Pi folds into every prompt by default${LEFT_OUT_BY_THE_EXECUTOR}`
 		);
 	const appendPrompt = entryIn(agentDir, AGENT_APPEND_PROMPT) ?? null;
 	if (appendPrompt !== null)
 		findings.push(
-			`${join(agentDir, appendPrompt)}: Pi appends it to every executor prompt, under the override, unmarked`
+			`${join(agentDir, appendPrompt)}: Pi appends it to every prompt by default, under an override, unmarked${LEFT_OUT_BY_THE_EXECUTOR}`
 		);
 	const extensionsEntry = entryIn(agentDir, AGENT_EXTENSIONS);
 	const extensions =
 		extensionsEntry === undefined ? [] : listingOf(join(agentDir, extensionsEntry));
 	if (extensionsEntry !== undefined && extensions.length > 0)
 		findings.push(
-			`${join(agentDir, extensionsEntry)}: Pi loads the extensions there into the server for every executor session`
+			`${join(agentDir, extensionsEntry)}: Pi loads the extensions there into the server for every session by default${LEFT_OUT_BY_THE_EXECUTOR}`
 		);
 	const above = upFrom(input.workspace).slice(1);
 	const withContext = above
@@ -877,12 +894,14 @@ export function k4Check(input: K4Input): K4Check {
 	for (const a of withContext)
 		for (const f of a.contextFiles)
 			findings.push(
-				`${join(a.path, f)}: above the workspace, on the path Pi reads its context from`
+				`${join(a.path, f)}: above the workspace, on the path Pi reads its context from by default${LEFT_OUT_BY_THE_EXECUTOR}`
 			);
 	const rootExists = existsSync(input.workspace);
 	const rootFiles = contextFilesIn(input.workspace);
 	for (const f of rootFiles)
-		findings.push(`${f}: at the workspace root, folded into the next unit's prompt`);
+		findings.push(
+			`${f}: at the workspace root, where Pi reads its context from by default${LEFT_OUT_BY_THE_EXECUTOR}`
+		);
 	const piEntry = entryIn(input.workspace, '.pi');
 	const pi =
 		piEntry === undefined
@@ -891,7 +910,7 @@ export function k4Check(input: K4Input): K4Check {
 	// ⚠ Said of the place, not of what is there: a `.pi` that is a FILE is named too, its listing saying it is no folder.
 	if (pi.exists)
 		findings.push(
-			`${piEntry}: at the workspace root, where Pi reads settings, extensions and prompt files`
+			`${piEntry}: at the workspace root, where Pi reads settings and resolves the packages they list — and, by default, extensions and prompt files, which the executor's loader is told to leave out (pi-executor-resources.ts)`
 		);
 	const chain = upFrom(input.workspace);
 	const gitAt = chain.findIndex((folder) => existsSync(join(folder, '.git')));
@@ -904,7 +923,10 @@ export function k4Check(input: K4Input): K4Check {
 		const path = join(folder, agents, skills);
 		return resolve(path) === resolve(userSkills) ? [] : [{ path, listing: listingOf(path) }];
 	});
-	for (const f of found) findings.push(`${f.path}: skills Pi collects for the workspace`);
+	for (const f of found)
+		findings.push(
+			`${f.path}: skills Pi collects for the workspace by default${LEFT_OUT_BY_THE_EXECUTOR}`
+		);
 	const inputs = input.tries.map((x) => {
 		const ref = rec(x.state.materializedInputRef);
 		const key = str(ref.storageKey);
