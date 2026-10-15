@@ -49,8 +49,10 @@
 // refuses the recording instead (`archive-scan.ts`), so what cannot be scrubbed is never written. ⭐ (The review of E4,
 // finding 5: the home folder IS scrubbed — it is one of the scrub's three places, `ScrubPlace`. What the scrub does not
 // know is any OTHER path: another account's folder, a drive or a share outside the run's three places.) The scan reads
-// the recording's DECODED values ~~, so a backslash JSON doubled is not read as a path~~ (`record-replay.ts`), and a
-// backslash JSON doubled is not read as a share at any depth of escaping (`archive-scan.ts`, `PATH_PATTERNS`).
+// the recording's DECODED values ~~, so a backslash JSON doubled is not read as a path~~ (`record-replay.ts`), and ~~a
+// backslash JSON doubled is not read as a share at any depth of escaping~~ ⭐ JSON doubling keeps a backslash run's
+// ratio, so code whose runs are equal is no share at any depth of escaping, and a share is one (`archive-scan.ts`,
+// `PATH_PATTERNS`).
 //
 // ⚠⚠ A RECORDING REPLAYS ON THE OS FAMILY IT WAS MADE ON — A LIMIT OF THIS FORMAT, STATED (finding 6). A run's text is
 // spelled as its host spells it — paths with `\` or `/`, line ends, the messages its programs print — and the scrub's

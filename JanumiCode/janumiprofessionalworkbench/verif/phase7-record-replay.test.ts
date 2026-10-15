@@ -21,7 +21,9 @@
 //     the write_file argument, the answer envelope's files, a review prompt embedding the work product — and passes at
 //     every depth by the share pattern's own rule (predicted red, observed 2026-10-15 with the old pattern restored:
 //     `executor.jsonl:1 $.answer.text:1:200 unc-path`, `reviewer.jsonl:1 $.prompt:2:185 unc-path`); and the account
-//     name after a newline inside the envelope is refused, which a scan of the file's text passes.
+//     name after a newline inside the envelope is refused ~~, which a scan of the file's text passes~~ (⭐ a scan of the
+//     file's text finds it too since an escape ends a token at any depth — the lead's delegated decision of 2026-10-15,
+//     to be registered — and the refusal names its place in the value).
 // ⛔ It drives the command line under bun, as an operator does: bun:sqlite does not exist under Node.
 // No model is called; nothing is read from any real run.
 import { spawnSync } from 'node:child_process';
@@ -587,8 +589,8 @@ describe('⭐ the recorder (D1) — a final archive into a replay recording, scr
 		expect(pathed.code).toBe(1);
 		expect(pathed.out).toMatch(/commands\.jsonl:1 \$\.stdout:\d+:\d+ drive-path/);
 		expect(existsSync(out)).toBe(false);
-		// ⛔ And the account name after a newline in the envelope's rationale — `\\n` in the line's own text, where no token
-		// ends, and `\n` decoded, where one does.
+		// ⛔ And the account name after a newline in the envelope's rationale — `\\n` in the line's own text ~~, where no
+		// token ends,~~ and `\n` decoded: an escape ends a token at any depth now, and the refusal is placed in the value.
 		const named = join(tempDir('out'), 'recording');
 		const r = record(arrange({ answer: answer(`ran as\n${ACCOUNT}`) }), named);
 		expect(r.code, r.out).toBe(1);

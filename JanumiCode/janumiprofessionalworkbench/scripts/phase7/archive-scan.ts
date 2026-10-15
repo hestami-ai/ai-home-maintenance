@@ -15,13 +15,18 @@
 //     record's name when USERNAME is unset (`REG-F-545`);
 //   · a DRIVE PATH — `C:\`, `C:/`, and the JSON-escaped `C:\\`: Pi prints the working directory with `/`, and the stores
 //     keep `\` escaped;
-//   · a UNC PATH — `\\host\share`, its JSON-escaped `\\\\host\\share`, and `//host/share` — ⭐ at EVERY depth of JSON
-//     escaping, and escaped code at none (`PATH_PATTERNS`);
+//   · a UNC PATH — `\\host\share`, its JSON-escaped `\\\\host\\share`, ⭐ CommonMark's source spelling of it (a leading run
+//     of four, a separator of one), and `//host/share` — ~~⭐ at EVERY depth of JSON escaping, and escaped code at none~~
+//     ⭐ a backslash share read by its runs' RATIO, which JSON escaping keeps at every depth (`PATH_PATTERNS`): so code
+//     whose runs are EQUAL, `/\r\n/` escaped to any depth, is no share, and code whose runs have a share's ratio is one,
+//     at every depth — it fails safe;
 //   · a HOME PATH — `/Users/…` or `/home/…`;
 //   · a drive in MSYS or WSL spelling — `/c/Users/…`, `/mnt/c/…` — which git's shell prints.
-// ⭑ EACH ALSO WHERE AN ESCAPE STANDS BEFORE IT: a JSON escape (`\n`, `\t`, `\u001b` …) or a terminal colour code ends
-// a token, though its last character is a letter — `"x:\nE:\\runs"`, `user:\njdoe`, `ESC[90mC:\…` — so a second view of
-// the text, each escape's letters blanked to spaces, is scanned beside it, at the same places (`escapesBlanked`).
+// ⭑ EACH ALSO WHERE AN ESCAPE STANDS BEFORE IT, ⭐ AT ANY DEPTH OF JSON ESCAPING: a JSON escape (`\n`, `\t`, `\u001b` …)
+// or a terminal colour code ends a token, though its last character is a letter — `"x:\nE:\\runs"`, `user:\njdoe`, and
+// `user:\\njdoe` two levels deep, `ESC[90mC:\…` — ~~so a second view of the text, each escape's letters blanked to
+// spaces, is scanned beside it, at the same places (`escapesBlanked`)~~ ⭐ so each pattern also takes a token's start
+// where an escape ends (`AFTER_AN_ESCAPE`).
 // ⭑ AND IN EITHER ENCODING WINDOWS WRITES: a file that opens with a UTF-16 byte-order mark (PowerShell 5's `>` and
 // `Out-File`) is read as UTF-16, and one that holds NUL bytes is read as UTF-16 as well as UTF-8.
 // ⚠ A RELATIVE PATH IS NOT A HIT, and nor is a URL: `https://x/y` has a scheme before its `//`, and `.\\src\\a.js` —
@@ -52,15 +57,52 @@ export interface ScanHit {
 	readonly match: string;
 }
 
+const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+
 /**
- * The absolute-path spellings, each a token START: what precedes it is not part of a longer word, so `https://` (a scheme
- * before `//`), `src/home/x` (a relative path through a `home` folder), `e2e/c/x` and `.\\test\\x` (a relative path,
- * JSON-escaped) are not hits.
+ * ⭐⭐ WHERE AN ESCAPE ENDS, AT ANY DEPTH OF JSON ESCAPING (`REG-F-536`; the lead's delegated decision of 2026-10-15, to be
+ * registered) — a lookbehind every pattern here takes beside its own (`token`): a JSON escape's last character (`\n`,
+ * `\t`, `\u0001` …) or a terminal colour code's, raw or escaped (`ESC[90m`, `\u001b[90m`), ends a token though it is a
+ * letter or a digit. ⭐ AT ANY DEPTH, because it asks only for the backslash right before the escape's letters, whatever
+ * run that backslash ends: a newline escaped twice, `\\n`, ends a token as `\n` does. It replaces a second view of the
+ * text, each escape's letters blanked, which read the escapes left to right, an escaped backslash consumed whole: there
+ * the account name after an escape two levels deep still stood after a letter, and was missed (the confirm of E4's second
+ * fix round).
+ * ⚠ IT READS BOTH WAYS AT ONCE, AND FAILS SAFE. One spelling is one thing at one depth and another a level up: a drive
+ * letter, a colon, a backslash and `new` is a drive in raw text, and the same letter and colon before a newline and `ew`,
+ * escaped once; `dir\\njdoe` is the folder `njdoe` escaped once, and the account name after a newline escaped twice. A token is found under either reading — its pattern's own lookbehind for
+ * the one, this for the other — so `a:` before an escaped newline reads as a drive, and a name that was only the tail of
+ * a longer word after an escape's letter reads as the name: refusals, read and judged, where a miss would be a leak.
+ * ⚠ ITS LETTERS TAKE THE CASE RULE OF THE PATTERN THAT USES IT: the account name is matched in any case, so before it a
+ * capital after a backslash (`\N`) ends an escape too, which only adds a hit.
+ * ⚠ Its ESC is computed from its code, as `scripts/mutants/run.ts` computes its ANSI stripper's: `no-control-regex`
+ * refuses an ESC in a regex literal however it is spelled.
+ */
+const AFTER_AN_ESCAPE = String.raw`(?<=${String.fromCodePoint(27)}\[[0-?]*[ -/]*[@-~]|\\(?:u001[bB]\[[0-?]*[ -/]*[@-~]|u[0-9A-Fa-f]{4}|[bfnrt"/]))`;
+
+/**
+ * `body` where a token STARTS: the character before it is none of `notAfter` — not part of a longer word or path — or an
+ * escape ends there (`AFTER_AN_ESCAPE`).
+ */
+const token = (notAfter: string, body: string, flags = 'g'): RegExp =>
+	new RegExp(`(?:(?<!${notAfter})|${AFTER_AN_ESCAPE})${body}`, flags);
+
+/**
+ * The absolute-path spellings, each a token START (`token`): what precedes it is not part of a longer word, so `https://`
+ * (a scheme before `//`), `src/home/x` (a relative path through a `home` folder), `e2e/c/x` and `.\\test\\x` (a relative
+ * path, JSON-escaped) are not hits — ⭐ or an escape ends there.
  * ⭐⭐ A UNC SHARE BY ITS RUNS' RATIO, AT EVERY DEPTH OF JSON ESCAPING (the re-review of E4's fix round: finding 3 was not
  * fixed). Each level of escaping doubles every backslash, so a share's leading run is TWICE its separator at every depth
- * — `\\host\share`, `\\\\host\\share`, `\\\\\\\\host\\\\share` — and escaped code's runs are EQUAL at every depth: `/\r\n/`
- * is a run of one before each letter, `\\r\\n` escaped once, `\\\\r\\\\n` twice, as is a source literal of escaped
- * backslashes (`"\\r\\n"`). So the pattern takes a run of 2n backslashes, a host, and a run of exactly n (`(\\+)\1 … \1`).
+ * — `\\host\share`, `\\\\host\\share`, `\\\\\\\\host\\\\share` — ⭐ or FOUR TIMES it, at every depth too, in CommonMark's
+ * source spelling, where a backslash escapes a backslash and is literal before a letter (the lead's delegated decision of
+ * 2026-10-15, to be registered: a share in each spelling the old pattern caught). And escaped code
+ * whose runs are EQUAL keeps them equal at every depth: `/\r\n/` is a run of one before each letter, `\\r\\n` escaped
+ * once, `\\\\r\\\\n` twice, as is a source literal of escaped backslashes (`"\\r\\n"`). So the pattern takes a run of 2n or
+ * 4n backslashes, a host, and a run of exactly n (`(\\+)\1(?:\1\1)? … \1`).
+ * ⚠ WHAT THE RATIO CANNOT TELL APART, STATED. Code whose own runs are two to one or four to one HAS a share's shape — a
+ * regular expression of a literal backslash, a `d` and an escaped dot, runs of two and one — and is a hit at every depth,
+ * which fails safe. And of the spellings the old pattern read as a share, one is read here as code: a leading run of two and a
+ * separator of two, `\\host\\share`, which is `\r\n`'s shape escaped once (P3's 199 false hits) — no hit.
  * It replaces two fixed spellings — the leading pair or its one escaping, then a separator of one or two — which read
  * `\\r\\n` as a share (P3's 199 hits) and a share escaped twice as nothing. Decoding one level (`scanDecodedJson`) did not
  * answer the first: a recording's values are themselves JSON — the executor's answer is the contract's envelope, whose
@@ -68,36 +110,12 @@ export interface ScanHit {
  * deep, and one level decoded still left `\\r\\n` there.
  */
 const PATH_PATTERNS: readonly (readonly [ScanHitKind, RegExp])[] = [
-	['drive-path', /(?<![A-Za-z0-9])[A-Za-z]:[\\/]/g],
-	['unc-path', /(?<![\w.:\\])(\\+)\1[\w.$-]+\1[\w.$-]/g],
-	['unc-path', /(?<![\w:/])\/\/[\w.$-]+\/[\w.$-]/g],
-	['home-path', /(?<![\w.])\/(?:Users|home)\/[\w.$-]/g],
-	['msys-path', /(?<![\w.:/])\/(?:mnt\/)?[A-Za-z]\/[\w.$-]/g]
+	['drive-path', token('[A-Za-z0-9]', String.raw`[A-Za-z]:[\\/]`)],
+	['unc-path', token(String.raw`[\w.:\\]`, String.raw`(\\+)\1(?:\1\1)?[\w.$-]+\1[\w.$-]`)],
+	['unc-path', token(String.raw`[\w:/]`, String.raw`\/\/[\w.$-]+\/[\w.$-]`)],
+	['home-path', token(String.raw`[\w.]`, String.raw`\/(?:Users|home)\/[\w.$-]`)],
+	['msys-path', token(String.raw`[\w.:/]`, String.raw`\/(?:mnt\/)?[A-Za-z]\/[\w.$-]`)]
 ];
-
-const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
-
-/**
- * A terminal colour code, raw or JSON-escaped (`ESC[90m`, `\u001b[90m`), and a JSON escape other than `\\` — read left to
- * right, so an escaped backslash is consumed whole and the letter after it stays a letter. ⚠ Its ESC is computed from its
- * code, as `scripts/mutants/run.ts` computes its ANSI stripper's: `no-control-regex` refuses an ESC in a regex literal
- * however it is spelled.
- */
-const ESCAPES = new RegExp(
-	String.raw`${String.fromCodePoint(27)}\[[0-?]*[ -/]*[@-~]|\\u001[bB]\[[0-?]*[ -/]*[@-~]|\\(?:\\|u[0-9A-Fa-f]{4}|[bfnrt"/])`,
-	'g'
-);
-
-/**
- * ⭐ `text` with each escape blanked to spaces — the same places, and no escape letter left to end a token. ⚠ A
- * backslash that opens an escape is KEPT: in raw text it is a path's own separator (`C:\runs`, whose `\r` reads as an
- * escape), and blanking it would hide the very drive the view is there to find.
- */
-export const escapesBlanked = (text: string): string =>
-	text.replace(ESCAPES, (m) => {
-		if (m === '\\\\') return m;
-		return m.startsWith('\\') ? `\\${' '.repeat(m.length - 1)}` : ' '.repeat(m.length);
-	});
 
 /** Strings in code-unit order: the same on every host and locale. */
 const byCodeUnit = (a: string, b: string): number => Number(a > b) - Number(a < b);
@@ -182,32 +200,21 @@ function place(starts: readonly number[], index: number): { line: number; column
 }
 
 /**
- * ⭐ Every place `text` names one of `names` (`accountNames`) or an absolute path, in order — in the text as it is, and in
- * its escapes-blanked view (`escapesBlanked`), whose places are the same. Pure.
+ * ⭐ Every place `text` names one of `names` (`accountNames`) or an absolute path, in order — ~~in the text as it is, and
+ * in its escapes-blanked view (`escapesBlanked`), whose places are the same~~ ⭐ each a token start, or where an escape
+ * ends at any depth (`token`). Pure.
  */
 export function scanText(text: string, file: string, names: readonly string[]): ScanHit[] {
 	const found: { index: number; kind: ScanHitKind; match: string }[] = [];
-	const blanked = escapesBlanked(text);
-	for (const view of blanked === text ? [text] : [text, blanked]) {
-		for (const [kind, pattern] of PATH_PATTERNS)
-			for (const m of view.matchAll(pattern))
-				found.push({ index: m.index, kind, match: text.slice(m.index, m.index + m[0].length) });
-		for (const name of names)
-			for (const m of view.matchAll(new RegExp(`(?<![A-Za-z0-9])${escapeRegExp(name)}(?![A-Za-z0-9])`, 'gi')))
-				found.push({ index: m.index, kind: 'account-name', match: text.slice(m.index, m.index + m[0].length) });
-	}
+	for (const [kind, pattern] of PATH_PATTERNS)
+		for (const m of text.matchAll(pattern)) found.push({ index: m.index, kind, match: m[0] });
+	for (const name of names)
+		for (const m of text.matchAll(token('[A-Za-z0-9]', `${escapeRegExp(name)}(?![A-Za-z0-9])`, 'gi')))
+			found.push({ index: m.index, kind: 'account-name', match: m[0] });
 	if (found.length === 0) return [];
 	const starts = lineStarts(text);
-	const seen = new Set<string>();
 	found.sort((a, b) => a.index - b.index);
-	return found
-		.filter((h) => {
-			const key = `${h.index}:${h.kind}`;
-			if (seen.has(key)) return false;
-			seen.add(key);
-			return true;
-		})
-		.map((h) => ({ file, ...place(starts, h.index), kind: h.kind, match: h.match }));
+	return found.map((h) => ({ file, ...place(starts, h.index), kind: h.kind, match: h.match }));
 }
 
 /** A plain JSON key, shown as `.key` in a hit's place; any other is shown by its ordinal, never its text. */
@@ -225,11 +232,13 @@ const PLAIN_KEY = /^[A-Za-z_][A-Za-z0-9_]*$/;
  * path, and~~ ⭐ (the re-review of E4's fix round: decoding undoes ONE level, and a recording's values are JSON themselves
  * — the executor's answer envelope, a review prompt embedding the work product — so code two levels deep stayed escaped,
  * and still read as a share; the share pattern now holds at every depth by its own rule, `PATH_PATTERNS`.) Decoded, a
- * hit is placed inside its value, and an escape inside a value that is itself JSON is one level nearer what it stands
+ * hit is placed inside its value ~~, and an escape inside a value that is itself JSON is one level nearer what it stands
  * for: a newline before the account name in the answer envelope is `\\n` in the line's text, an escaped backslash and a
- * letter, where no token ends, and `\n` decoded, where one does. A real drive, share or home path — or the account name —
- * in a value still hits, as it would in the file the value came from. ⚠ A line that is not JSON is scanned as text,
- * whole, so nothing is skipped for failing to parse.
+ * letter, where no token ends, and `\n` decoded, where one does~~ ⭐ — and no longer to reach a token after an escape: an
+ * escape ends a token at any depth (`AFTER_AN_ESCAPE`; the lead's delegated decision of 2026-10-15, to be registered), so
+ * the account name after `\\n` in the line's own text is a hit there too. A real drive, share or home path — or the
+ * account name — in a value still hits, as it would in the file the value came from. ⚠ A line that is not JSON is
+ * scanned as text, whole, so nothing is skipped for failing to parse.
  */
 export function scanDecodedJson(
 	text: string,
