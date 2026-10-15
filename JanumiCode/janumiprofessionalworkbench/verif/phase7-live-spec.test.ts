@@ -1299,6 +1299,11 @@ interface Script {
 	/** The read, counted from 1, that throws as a server gone would. */
 	readonly readThrowsAt?: number;
 	/**
+	 * ⭐ E12's polish (fix3's F1) — the unit, by slug, whose Mark Satisfied hand throws before it presses, as its wait for
+	 * Record Assurance to leave the row does at its bound (`markSatisfied`).
+	 */
+	readonly markSatisfiedThrowsOn?: string;
+	/**
 	 * ⭐ P7-6R R-1f — what each unit's row offers after a stop, by slug, and what each recovery act came to: the answer, the
 	 * store after it, and the reviewer calls it recorded. A unit not named offers no re-run.
 	 */
@@ -1341,6 +1346,7 @@ function laneOf(script: Script) {
 	let reviewerCallCount = 0;
 	let reads = 0;
 	let onDisk: RunRecord | null = null;
+	let onDiskAtMarkSatisfied: RunRecord | null = null;
 	const snapshot = (): EngineSnapshot =>
 		({
 			undertakings: [{ id: 'und_1', state: { name: PHASE7_UNDERTAKING.name } }],
@@ -1459,6 +1465,11 @@ function laneOf(script: Script) {
 		},
 		markSatisfied: async (unit) => {
 			calls.push(`markSatisfied ${unit.slug}`);
+			if (unit.slug === script.markSatisfiedThrowsOn) {
+				// ⭐ E12's polish (fix3's F1) — lane/run.json as it stood on disk when the hand threw: what a kill there would leave.
+				onDiskAtMarkSatisfied = existsSync(lane.run) ? (JSON.parse(readFileSync(lane.run, 'utf8')) as RunRecord) : null;
+				throw new errors.TimeoutError(`locator.waitFor: Timeout ${PHASE7_UI_MS}ms exceeded.`);
+			}
 			const s = signOffOf(unit);
 			if (s.msAfter) store.set(unit.unitId!, s.msAfter);
 			return s.ms ?? answered('success');
@@ -1508,6 +1519,8 @@ function laneOf(script: Script) {
 		written: (): RunRecord => JSON.parse(readFileSync(lane.run, 'utf8')) as RunRecord,
 		/** ⭐ E12's polish — lane/run.json as it stood on disk when the `readThrowsAt` read failed; null if none failed. */
 		onDiskAtTheFailedRead: (): RunRecord | null => onDisk,
+		/** ⭐ E12's polish (fix3's F1) — lane/run.json as it stood on disk when the `markSatisfiedThrowsOn` hand threw. */
+		onDiskWhenMarkSatisfiedThrew: (): RunRecord | null => onDiskAtMarkSatisfied,
 		action: (name: string) => existsSync(join(lane.actions, `${name}.json`))
 	};
 }
@@ -2636,6 +2649,102 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			recovered.onDiskAtTheFailedRead()?.units[1]?.recovery.map((r) => r.timedOutAfterMs),
 			'the recovery act was not on disk when the read began'
 		).toEqual([PHASE7_UNIT_ALLOWANCE_MS]);
+	});
+
+	it('⛔ E12’s polish (fix3’s F1) — the store read after an accepted Record Assurance completes the act on the unit’s record, written before Mark Satisfied: a throw in Mark Satisfied’s wait leaves lane/run.json the state read, not `after: null`', async () => {
+		// ⭑ Requirements' Record Assurance accepted, and the store read after it came back; then its Mark Satisfied hand
+		// throws before it presses, as its wait for Record Assurance to leave the row does at its bound. ⛔ PREDICTED RED,
+		// driven by the check: the read's state was returned and never written back, so lane/run.json kept the act as it
+		// stood before the read, `after` null.
+		const l = laneOf({
+			paid: true,
+			presses: ALL_COMPLETE,
+			signOffs: { root: GREEN, requirements: GREEN },
+			markSatisfiedThrowsOn: 'requirements'
+		});
+		await expect(l.run()).rejects.toThrow(`locator.waitFor: Timeout ${PHASE7_UI_MS}ms exceeded.`);
+		expect(l.calls.slice(l.calls.indexOf('recordAssurance requirements')), 'the throw came after the read').toEqual([
+			'recordAssurance requirements',
+			'read',
+			'markSatisfied requirements',
+			'flushPosts'
+		]);
+		expect(
+			[l.written().end?.reason, l.written().units[1]!.signOff?.recordAssurance],
+			'the state the read after Record Assurance came back with was lost'
+		).toEqual(['lane-error', actAnswered('success', ASSURED)]);
+		// ⭐ And on disk before Mark Satisfied: a run killed in its wait gets no catch to write the record.
+		expect(
+			l.onDiskWhenMarkSatisfiedThrew()?.units[1]?.signOff?.recordAssurance?.after,
+			'the state read was not on disk when Mark Satisfied began'
+		).toEqual(ASSURED);
+	});
+
+	it('⛔ E12’s polish (fix3’s F1, its general form) — and after a REFUSED Record Assurance: a throw before the rule’s re-run of the declared reviews leaves lane/run.json the state read', async () => {
+		// ⭑ Reads to requirements' limit (10); the store after its refused Record Assurance (11); and — the twelfth — the limit
+		// before the rule's re-run, which throws as a server gone would. The re-run is never pressed.
+		const l = laneOf({
+			paid: true,
+			presses: ALL_COMPLETE,
+			signOffs: { root: GREEN, requirements: { ra: answered('failure'), raAfter: ASSESSING, rerun: { offered: true } } },
+			readThrowsAt: 12
+		});
+		await expect(l.run()).rejects.toThrow('connect ECONNREFUSED 127.0.0.1:4322');
+		expect(l.calls.slice(l.calls.indexOf('recordAssurance requirements')), 'the throw came after the read').toEqual([
+			'recordAssurance requirements',
+			'read',
+			'showOverview',
+			'offersDeclaredRerun requirements',
+			'read',
+			'flushPosts'
+		]);
+		expect(
+			l.written().units[1]!.signOff?.recordAssurance,
+			'the state the read after Record Assurance came back with was lost'
+		).toEqual(actAnswered('failure', ASSESSING));
+		expect(
+			l.onDiskAtTheFailedRead()?.units[1]?.signOff?.recordAssurance?.after,
+			'the state read was not on disk when the re-run’s limit was read'
+		).toEqual(ASSESSING);
+	});
+
+	it('⛔ E12’s polish (fix3’s F1, its general form) — and after the rule’s ACCEPTED re-run of the declared reviews: a throw in Mark Satisfied’s wait leaves lane/run.json the state read after the re-run', async () => {
+		// ⭑ Requirements' Record Assurance refused, and the rule's re-run of its declared reviews accepted, the store read
+		// after each; then the Mark Satisfied hand throws before it presses.
+		const l = laneOf({
+			paid: true,
+			presses: ALL_COMPLETE,
+			signOffs: {
+				root: GREEN,
+				requirements: {
+					ra: answered('failure'),
+					raAfter: ASSESSING,
+					rerun: { offered: true, outcome: answered('success'), after: ASSURED }
+				}
+			},
+			markSatisfiedThrowsOn: 'requirements'
+		});
+		await expect(l.run()).rejects.toThrow(`locator.waitFor: Timeout ${PHASE7_UI_MS}ms exceeded.`);
+		expect(l.calls.slice(l.calls.indexOf('recordAssurance requirements')), 'the throw came after the reads').toEqual([
+			'recordAssurance requirements',
+			'read',
+			'showOverview',
+			'offersDeclaredRerun requirements',
+			'read',
+			'rerunDeclared requirements',
+			'read',
+			'markSatisfied requirements',
+			'flushPosts'
+		]);
+		const kept = l.written().units[1]!.signOff;
+		expect(
+			[kept?.recordAssurance, kept?.rerunDeclared],
+			'the state the read after the re-run came back with was lost'
+		).toEqual([actAnswered('failure', ASSESSING), actAnswered('success', ASSURED)]);
+		expect(
+			l.onDiskWhenMarkSatisfiedThrew()?.units[1]?.signOff?.rerunDeclared?.after,
+			'the state read was not on disk when Mark Satisfied began'
+		).toEqual(ASSURED);
 	});
 
 	it('⛔ an `error` envelope, and a redirect, reload the page before the store is read; a refusal does not', async () => {

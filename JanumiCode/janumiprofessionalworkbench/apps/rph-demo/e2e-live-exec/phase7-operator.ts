@@ -1043,7 +1043,8 @@ export interface SignOffAct {
 	/**
 	 * ⭐ D5 — read after the act (`REG-F-540`): an envelope is not the record. ⭐ E12's polish (the confirm's F1 residue) — null
 	 * while that read has not come back: the act is kept on the unit's record before it (`actOf`), so a read that throws — the
-	 * server gone — leaves the act here with its bound, and no state.
+	 * server gone — leaves the act here with its bound, and no state. ⭐ E12's polish (fix3's F1) — once it comes back, the act
+	 * on the record is completed with the state it read, and written.
 	 */
 	readonly after: UnitState | null;
 }
@@ -1500,7 +1501,10 @@ export async function runTheLane(r: {
 		 * KEPT ON THE UNIT'S RECORD FIRST (`kept`: the sign-off as it stands with this act), as `run` keeps a Begin & Execute's:
 		 * the record was assigned only when `signOff` returned, so a read that threw — the server gone beside reviews still
 		 * running — left lane/run.json no sign-off for the unit, and the report read the lane's own end as a problem with its
-		 * inputs and the unit's sign-off as never attempted.
+		 * inputs and the unit's sign-off as never attempted. ⛔ E12's polish (fix3's F1) — AND COMPLETED ON IT BY THE READ, and
+		 * written, as `recoveryAct` completes its kept act: the read's state was only returned, so a throw in a later step,
+		 * before the next act was kept — Mark Satisfied's wait, say — left lane/run.json the act with `after` null beside a
+		 * read that had come back.
 		 */
 		const actOf = async (
 			unit: RunUnit,
@@ -1510,7 +1514,10 @@ export async function runTheLane(r: {
 			const act = pressedAct(o);
 			unit.signOff = kept(act);
 			writeRunRecord(lane, record);
-			return { ...act, after: unitStateOf((await hands.read()).snapshot, unit.unitId!) };
+			const done: SignOffAct = { ...act, after: unitStateOf((await hands.read()).snapshot, unit.unitId!) };
+			unit.signOff = kept(done);
+			writeRunRecord(lane, record);
+			return done;
 		};
 		const none = {
 			limitCheck: null,
