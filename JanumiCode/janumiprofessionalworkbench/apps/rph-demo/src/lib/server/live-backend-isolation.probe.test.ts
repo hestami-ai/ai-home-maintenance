@@ -35,7 +35,10 @@ const LIVE_BACKEND_VARIABLES = [
 	'JPWB_EXECUTOR_MODEL',
 	'JPWB_AGENT',
 	'JPWB_DEVIN_BIN',
-	'JPWB_AGY_BIN'
+	'JPWB_AGY_BIN',
+	// ⭐ `JAN-EXEC` Phase 8 (the review of E4, finding 11) — the ninth: in test mode the replay switch selects the
+	// replay's arms over the stand-ins asked about below (`replay/replay-switch.ts`).
+	'JPWB_REPLAY'
 ] as const;
 
 describe('⭐ D8 — a gate process inherits no live-backend selection', () => {

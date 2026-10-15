@@ -36,6 +36,13 @@ const REPORTER = join(ROOT, 'verif', 'live-backend-isolation.reporter.ts');
 /**
  * The design's eight (D8), each with a value that would select a live backend if it reached the process — RESTATED
  * here, never imported from the module that removes them, so a name that module forgot is still exported.
+ * ⭐ `JAN-EXEC` Phase 8 (the review of E4, finding 11) — AND A NINTH, `JPWB_REPLAY`: in test mode it turns the declared
+ * stand-ins into the replay's arms (`replay/replay-switch.ts`), so a shell that exported it after recording turned the
+ * gate's stand-ins into a replay of whatever folder it named. Driven red 2026-10-15, exported here with the ninth left off
+ * the removed list: it reached all four children — each vitest child's probe *"a live-backend selection reached a gate
+ * process"*, its executor the replay where the stand-in was asked for (*"expected 'REPLAY' to be 'STAND_IN'"*), and the
+ * e2e server's environment (*"a live-backend selection would reach the e2e server: expected [ 'JPWB_REPLAY' ] to deeply
+ * equal []"*).
  */
 const EXPORTED: Readonly<Record<string, string>> = {
 	JPWB_ASSURANCE_TOOL: 'devin',
@@ -47,7 +54,10 @@ const EXPORTED: Readonly<Record<string, string>> = {
 	// ⛔ Paths INSIDE the empty directory, to files that do not exist: were an override to reach an adapter, it would
 	// name no program.
 	JPWB_DEVIN_BIN: join(NO_PROGRAMS, 'devin-exported-override'),
-	JPWB_AGY_BIN: join(NO_PROGRAMS, 'agy-exported-override')
+	JPWB_AGY_BIN: join(NO_PROGRAMS, 'agy-exported-override'),
+	// ⛔ A folder INSIDE the empty directory that holds no recording: were the switch to reach a selector, it would
+	// replay nothing.
+	JPWB_REPLAY: join(NO_PROGRAMS, 'replay-exported-recording')
 };
 
 /**
@@ -111,7 +121,8 @@ function expectProbePassed(r: { status: number | null; out: string }): void {
 describe('⭐ D8 — a gate entry point started with the eight live-backend variables EXPORTED still selects the stand-ins', () => {
 	it('⭑ CONTROL — the arrangement exports all eight, into a PATH that finds no program', () => {
 		const env = exportedEnvironment();
-		expect(Object.keys(EXPORTED)).toHaveLength(8);
+		// ⭐ The review of E4, finding 11 — ~~eight~~ nine: the replay switch is the ninth.
+		expect(Object.keys(EXPORTED)).toHaveLength(9);
 		for (const [k, v] of Object.entries(EXPORTED)) expect(env[k]).toBe(v);
 		expect(Object.keys(env).filter((k) => /^path$/i.test(k))).toEqual(['PATH']);
 		expect(env.PATH).toBe(NO_PROGRAMS);

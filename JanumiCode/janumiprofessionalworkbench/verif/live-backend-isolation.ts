@@ -25,7 +25,13 @@
 // ⛔ THE LIVE LANES ARE NOT ENTRY POINTS OF THE GATE. `playwright.live.config.ts` and `playwright.live-exec.config.ts`
 // exist to run the real backends, and neither imports the gate's config.
 
-/** The eight (D8). */
+/**
+ * The eight (D8) ~~.~~ ⭐ — and a ninth, `JPWB_REPLAY` (`JAN-EXEC` Phase 8; the review of E4, finding 11). It selects no
+ * paid backend, but it keys on its absence exactly as the eight do: in test mode it turns the declared stand-ins into the
+ * replay's arms (`apps/rph-demo/src/lib/server/replay/replay-switch.ts`), so an operator who exported it to replay a
+ * recording turned every gate test that expects a stand-in into a replay of that folder — or into a refused reviewer, for a
+ * folder that holds none (driven red on `live-backend-isolation.test.ts`, all four children).
+ */
 export const LIVE_BACKEND_VARIABLES = [
 	'JPWB_ASSURANCE_TOOL',
 	'JPWB_ASSURANCE_MODEL',
@@ -34,7 +40,8 @@ export const LIVE_BACKEND_VARIABLES = [
 	'JPWB_EXECUTOR_MODEL',
 	'JPWB_AGENT',
 	'JPWB_DEVIN_BIN',
-	'JPWB_AGY_BIN'
+	'JPWB_AGY_BIN',
+	'JPWB_REPLAY'
 ] as const;
 
 /** Remove every live-backend selection from `env` — the process's own, at a gate entry point. */
