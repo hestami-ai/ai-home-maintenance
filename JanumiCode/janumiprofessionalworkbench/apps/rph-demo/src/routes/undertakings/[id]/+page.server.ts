@@ -63,6 +63,7 @@ import {
 	evidenceRefusals,
 	foldAfterRerun,
 	governingDeclaredPolicies,
+	NEVER_ASSESSED,
 	planDeclaredSignoff,
 	RERUN_DECLARED_REVIEWS,
 	unsatisfyingReviews,
@@ -2900,9 +2901,10 @@ export const actions: Actions = {
 	//   · THE PERSON'S DECISION, in the same batch: their rationale VERBATIM, then the decision cited (`REG-D-112` (a)); its
 	//     subjects the unit and the INCONCLUSIVE assessments re-run, its observations theirs. ⚠ `REPLAN` is P7-6R's type for a
 	//     re-run of a review; nothing here revises a plan, and the decision types name no re-assessment (the lead's to rule).
-	//   · THE UNIT FOLDED AFTER IT over every governing policy's latest verdict (`foldAfterRerun`): a positive fold its
-	//     assurance hop, citing those verdicts; a REJECTED canon's first half, as Record Assurance takes it; INCONCLUSIVE no
-	//     hop — the unit stays under assessment, and the person may choose again.
+	//   · THE UNIT FOLDED AFTER IT over every governing policy's latest verdict (`foldAfterRerun`) — ⭐ E12's re-review F3: a
+	//     policy never assessed among them, folding as one that did not conclude: a positive fold its assurance hop, citing
+	//     those verdicts; a REJECTED canon's first half, as Record Assurance takes it; INCONCLUSIVE no hop — the unit stays
+	//     under assessment, and the person is told which policy holds it there.
 	rerunDeclaredReviews: async ({ request }) => {
 		const f = await request.formData();
 		const pwuId = str(f, 'pwuId');
@@ -2947,7 +2949,7 @@ export const actions: Actions = {
 				decisionRationale(rationale, RERUN_DECLARED_REVIEWS_CITATION)
 			),
 			...(rerun.humanSteps as Step[]),
-			...declaredHop(pwuId, folded, [...rerun.assessmentIds, ...offer.others.map((v) => v.assessmentId)], rerun)
+			...declaredHop(pwuId, folded, [...rerun.assessmentIds, ...offer.others.flatMap((v) => v.assessmentId ?? [])], rerun)
 		]);
 		if (refused) return fail(400, { error: `Re-running the declared reviews failed: ${refused}` });
 		const against = unsatisfyingReviews(rerun);
@@ -2960,6 +2962,23 @@ export const actions: Actions = {
 					(folded === 'REJECTED'
 						? `a REJECTED verdict is recorded with its blocking findings, and this PWU's assurance is REJECTED (REG-D-111 (1)); its work lifecycle stays under assurance.`
 						: `a verdict that did not conclude leaves this PWU under assessment, and its re-run is offered again.`)
+			});
+		// ⛔ E12's re-review F3 — A FOLD THE RE-RUN'S OWN VERDICTS DO NOT EXPLAIN: each concluded in the PWU's favour, and the
+		// unit did not hop, because a governing policy NOT re-run has no verdict that concluded — never assessed, or still in
+		// progress. The re-run is recorded; the person is told which policy holds the unit under assessment, never "re-run".
+		if (folded !== 'SATISFIED' && folded !== 'CONDITIONALLY_SATISFIED')
+			return fail(400, {
+				error:
+					`The declared reviews were re-run, and each concluded in this PWU's favour; but ` +
+					offer.others
+						.filter((v) => v.state !== 'SATISFIED' && v.state !== 'CONDITIONALLY_SATISFIED')
+						.map((v) =>
+							v.state === NEVER_ASSESSED
+								? `${v.policyId} was never assessed`
+								: `${v.policyId}'s latest verdict did not conclude (${v.state})`
+						)
+						.join('; ') +
+					`: this PWU's assurance folds every governing policy's latest verdict, so it stays under assessment (REG-D-112 (a)).`
 			});
 		return { advanced: 'declared-reviews-rerun' };
 	},

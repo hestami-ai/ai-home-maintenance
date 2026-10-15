@@ -40,6 +40,7 @@ import {
 	evidenceRefusals,
 	foldAfterRerun,
 	governingDeclaredPolicies,
+	NEVER_ASSESSED,
 	noCriterionDeclared,
 	planDeclaredSignoff,
 	unsatisfyingReviews,
@@ -762,5 +763,13 @@ describe('⭐ E12F F3 — the unit’s fold after a re-run reads every governing
 
 	it('⛔ an unconcluded latest verdict of another policy is no pass: it folds as INCONCLUSIVE', () => {
 		expect(foldAfterRerun(rerun(['SATISFIED']), other('ASSESSING'))).toBe('INCONCLUSIVE');
+	});
+
+	it('⛔ E12’s re-review F3 — a governing policy NEVER ASSESSED, as `declaredRerunOffer` carries it, is no pass either: it folds as INCONCLUSIVE', () => {
+		// ⭑ The offer's own construction of it — the policy carried, never dropped — is driven through the page's action
+		// (`declared-review-route.test.ts`): it needs a unit under assessment, which only the route makes.
+		const never = [{ policyId: 'pol_other', assessmentId: null, state: NEVER_ASSESSED } as const];
+		expect(foldAfterRerun(rerun(['SATISFIED']), never)).toBe('INCONCLUSIVE');
+		expect(foldAfterRerun(rerun(['REJECTED']), never), 'the strictest still wins').toBe('REJECTED');
 	});
 });

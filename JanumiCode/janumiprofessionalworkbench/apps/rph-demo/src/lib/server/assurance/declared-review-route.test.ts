@@ -96,7 +96,7 @@ import { actionEvent, beginExecute } from '../execution/begin-execute.testing.js
 import { dispatch, getEngine, mintUiId, resetEngine } from '../workbench.js';
 import { noProgramsDirectory } from './no-programs.testing.js';
 import { DECLARED_PRODUCING_PROMPT_INTENT, DECLARED_UNIT_PURPOSE_INTENT } from './reasoning-review-validator.js';
-import { RERUN_DECLARED_REVIEWS } from './declared-policy-signoff.js';
+import { declaredRerunOffer, NEVER_ASSESSED, RERUN_DECLARED_REVIEWS } from './declared-policy-signoff.js';
 import {
 	DECLARED_RERUN_RATIONALE_REQUIRED,
 	RERUN_DECLARED_REVIEWS_CITATION
@@ -476,6 +476,39 @@ ${RERUN_DECLARED_REVIEWS_CITATION}`);
 		expect(assessmentsUnder(pwuId, IP).map((a) => a.state)).toEqual(['INCONCLUSIVE', 'INCONCLUSIVE']);
 		expect(axesOf(pwuId)).toEqual(['UNDER_ASSURANCE', 'ASSESSING']);
 		expect(await declaredRerunShown(pwuId)).toEqual({ policies: [IP] });
+	});
+
+	it('⛔ E12’s re-review F3 — a governing policy NEVER ASSESSED folds beside the re-run as one that did not conclude: the re-run is recorded, the unit stays under assessment, and the person is told which policy', async () => {
+		// ⛔ PREDICTED RED, read from the code: `declaredRerunOffer` built `others` with flatMap(latest ?? []), so a governing
+		// policy with no assessment was dropped and never folded — the re-run's SATISFIED folded SATISFIED, only the kernel's
+		// NEVER_ASSESSED rung refused the hop, and the person got the kernel's message, the re-run's verdict unrecorded.
+		const pwuId = await declaringModelUnit([POLICY, IP]);
+		expect((await beginExecute(pwuId)).data?.error, 'arrangement: Begin & Execute').toBeUndefined();
+		// ⭑ A SUSPENDED policy governs nothing (`selectGoverningPolicies`), so Record Assurance assesses the intent review alone —
+		// which does not conclude — and the coverage policy, resumed, governs the unit with no assessment of it.
+		const policyAct = (commandType: string) => {
+			const r = dispatch(commandType, 'ASSURANCE_POLICY', POLICY, { policyId: POLICY });
+			expect(r.status, `arrangement: ${commandType} — ${r.error?.message ?? ''}`).toBe('ACCEPTED');
+		};
+		policyAct('SuspendAssurancePolicy');
+		seam.failing.add(IP);
+		expect((await recordAssurance(pwuId)).data?.error, 'arrangement').toContain(`${IP} reached INCONCLUSIVE`);
+		policyAct('ActivateAssurancePolicy');
+		seam.failing.clear();
+		expect(assessmentsUnder(pwuId, POLICY), 'arrangement: the coverage policy was assessed').toEqual([]);
+		const offer = declaredRerunOffer(getEngine(), pwuId);
+		expect('others' in offer ? offer.others : offer, 'a governing policy never assessed was dropped from the fold').toEqual([
+			{ policyId: POLICY, assessmentId: null, state: NEVER_ASSESSED }
+		]);
+		const r = await rerunDeclared(pwuId);
+		expect([r.advanced, r.data?.error]).toEqual([
+			undefined,
+			`The declared reviews were re-run, and each concluded in this PWU's favour; but ${POLICY} was never assessed: ` +
+				"this PWU's assurance folds every governing policy's latest verdict, so it stays under assessment (REG-D-112 (a))."
+		]);
+		// ⭐ THE RE-RUN IS RECORDED — a paid review's verdict (PER-9) — and the unit does not hop.
+		expect(assessmentsUnder(pwuId, IP).map((a) => a.state)).toEqual(['INCONCLUSIVE', 'SATISFIED']);
+		expect(axesOf(pwuId)).toEqual(['UNDER_ASSURANCE', 'ASSESSING']);
 	});
 
 	it('⛔ refused, with nothing dispatched: no rationale; a unit whose declared review CONCLUDED AGAINST the work (REG-D-105 (3)); and a unit with none that did not conclude', async () => {

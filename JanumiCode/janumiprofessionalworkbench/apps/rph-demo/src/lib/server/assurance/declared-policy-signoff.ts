@@ -662,14 +662,28 @@ export function latestDeclaredVerdicts(
 	return new Map([...latest].map(([k, { at: _at, ...v }]) => [k, v]));
 }
 
+/** ⭐ E12's re-review F3 — the state of a governing policy with no assessment over the unit: the kernel's own word for it. */
+export const NEVER_ASSESSED = 'NEVER_ASSESSED';
+
+/**
+ * ⭐ E12's re-review F3 — a governing policy NOT re-run, as the unit's fold reads it beside a re-run: its latest verdict, or —
+ * never assessed — no assessment and the state `NEVER_ASSESSED`, which folds as a verdict that did not conclude.
+ */
+export type OtherDeclaredVerdict =
+	| LatestDeclaredVerdict
+	| { readonly policyId: string; readonly assessmentId: null; readonly state: typeof NEVER_ASSESSED };
+
 /** ⭐ `E12F` F3 — what the person is offered on a unit stranded by a declared review that did not conclude. */
 export interface DeclaredRerunOffer {
 	/** The governing policies whose latest verdict is INCONCLUSIVE — the reviews re-run, in selection order. */
 	readonly policies: readonly GoverningDeclaredPolicy[];
 	/** Their INCONCLUSIVE assessments, kept: the Decision's subjects beside the unit. */
 	readonly inconclusive: readonly LatestDeclaredVerdict[];
-	/** Every OTHER governing policy's latest verdict: what the unit's assurance is folded with after the re-run. */
-	readonly others: readonly LatestDeclaredVerdict[];
+	/**
+	 * Every OTHER governing policy's latest verdict: what the unit's assurance is folded with after the re-run. ⭐ E12's
+	 * re-review F3 — a policy never assessed is carried too (`NEVER_ASSESSED`), never dropped.
+	 */
+	readonly others: readonly OtherDeclaredVerdict[];
 }
 
 /**
@@ -710,18 +724,25 @@ export function declaredRerunOffer(
 	return {
 		policies: inconclusive,
 		inconclusive: inconclusive.map((p) => latest.get(p.policyId)!),
-		others: policies.filter((p) => !inconclusive.includes(p)).flatMap((p) => latest.get(p.policyId) ?? [])
+		// ⛔ E12's re-review F3 — ~~`flatMap(latest ?? [])`~~: a governing policy with no assessment was DROPPED, so the fold
+		// passed over it and only the kernel's NEVER_ASSESSED rung stopped a SATISFIED hop. It is carried, and folds below.
+		others: policies
+			.filter((p) => !inconclusive.includes(p))
+			.map(
+				(p): OtherDeclaredVerdict =>
+					latest.get(p.policyId) ?? { policyId: p.policyId, assessmentId: null, state: NEVER_ASSESSED }
+			)
 	};
 }
 
 /**
  * ⭐ `E12F` F3 — THE UNIT'S FOLD AFTER A RE-RUN: §28.2's strictest over the re-run policies' NEW verdicts and every other
  * governing policy's latest — never the re-run's alone, or a policy not re-run would go unfolded. A policy never assessed
- * (no latest) folds as INCONCLUSIVE: nothing concluded it.
+ * (`NEVER_ASSESSED`) folds as INCONCLUSIVE: nothing concluded it.
  */
 export function foldAfterRerun(
 	plan: DeclaredSignoff,
-	others: readonly LatestDeclaredVerdict[]
+	others: readonly OtherDeclaredVerdict[]
 ): AssessmentDisposition {
 	const states = [
 		...plan.dispositions,
