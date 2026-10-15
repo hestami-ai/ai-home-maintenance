@@ -31,8 +31,13 @@
 //     reaching an authoring call (predicted red, observed 2026-10-15 with the recorder's rule removed and this test's
 //     own check of it skipped: REPLAY_STALE at "reviewer call 1 (unit requirements, pwa, initial)", the authoring floor's
 //     review kept as the first call);
-//   · ⭐ (finding 4) a recording of another published PWA is refused before the first call (predicted red, observed
-//     2026-10-15 with the digest's check removed: it replayed, the digest read by nothing).
+//   · ⭐ (finding 4) a recording ~~of another published PWA~~ ⭐ whose PWA and digest disagree is refused before the
+//     first call (predicted red, observed 2026-10-15 with the digest's check removed: it replayed, the digest read by
+//     nothing) — ⭑ the check's real scope (the re-review of E4's fix round): the replay re-creates the recording's own
+//     PWA, so the digest holds the recording to itself and the re-creation to what the engine stores;
+//   · ⭐ (the re-review of E4's fix round) a recording whose author REMOVED a type before publishing replays: the
+//     removed type is neither re-created — an orphan `ValidatePwa` refuses — nor digested (predicted red, observed
+//     2026-10-15 with the removed type kept: REPLAY_STALE at `ValidatePwa`, "1 orphan(s): Dropped draft").
 // ⛔ HERMETIC. No model is called and nothing runs: every program start throws and is counted.
 import { vi } from 'vitest';
 
@@ -321,7 +326,9 @@ function paidRun(root: string): ReplayRun & {
 }
 
 /** §3.2's PWA, as the designer stores it, published — the arrangement `phase7-run-report.store.test.ts` makes. */
-async function publishThePwa(o: { readonly authoringFloor?: boolean } = {}): Promise<string> {
+async function publishThePwa(
+	o: { readonly authoringFloor?: boolean; readonly removedType?: boolean } = {}
+): Promise<string> {
 	const pwaId = mintUiId('pwa');
 	const typeIds = new Map<string, string>();
 	const steps: [string, string, string, Record<string, unknown>][] = [
@@ -373,6 +380,29 @@ async function publishThePwa(o: { readonly authoringFloor?: boolean } = {}): Pro
 				workDischarge: t.workDischarge
 			}
 		]);
+	}
+	// ⭐ (the re-review of E4's fix round) A TYPE THE AUTHOR DEFINED AND THEN REMOVED before submitting, as a live authoring
+	// turn may: `RemovePwuType` tombstones it (`status: 'REMOVED'`), the engine's graph no longer counts it, and its row
+	// stays in the store the recorder reads.
+	if (o.removedType) {
+		const dropped = mintUiId('pwut');
+		steps.push(
+			[
+				'DefinePwuType',
+				'PWU_TYPE',
+				dropped,
+				{
+					pwuTypeId: dropped,
+					pwaId,
+					pwuKind: 'REQUIREMENT_DEFINITION',
+					name: 'Dropped draft',
+					purpose: 'A draft type the author removed before publishing.',
+					isRoot: false,
+					workDischarge: 'MODEL'
+				}
+			],
+			['RemovePwuType', 'PWU_TYPE', dropped, { pwuTypeId: dropped }]
+		);
 	}
 	for (const [commandType, aggregateType, aggregateId, payload] of steps.splice(0)) {
 		const r = dispatch(commandType, aggregateType, aggregateId, payload);
@@ -436,7 +466,11 @@ function archiveFacts(name: string, root: string): ArchiveFacts {
  */
 async function laneRun(
 	root: string,
-	o: { readonly authoringFloor?: boolean; readonly replay?: ReplayRun } = {}
+	o: {
+		readonly authoringFloor?: boolean;
+		readonly removedType?: boolean;
+		readonly replay?: ReplayRun;
+	} = {}
 ): Promise<LaneRows> {
 	resetEngine('empty');
 	// ⭐ `REG-D-112` (c) — A REPLAY RE-CREATES THE RECORDED PWA, and holds it to the recording before the first call; the
@@ -567,7 +601,9 @@ const recorded = {
 	recording: undefined as unknown as Recording,
 	observation: undefined as unknown as ReplayObservation,
 	/** ⭐ A HALF-B-SHAPED paid run (`REG-D-112` (c)): the authoring floor reviewed the PWA before the Undertaking. */
-	halfB: undefined as unknown as Recording
+	halfB: undefined as unknown as Recording,
+	/** ⭐ A paid run whose author REMOVED a type before publishing (the re-review of E4's fix round). */
+	removedType: undefined as unknown as Recording
 };
 
 /** What the recorder calls a reviewed subject's framing, by its object type (`record-replay-core.ts`, FRAMING). */
@@ -633,6 +669,22 @@ beforeAll(async () => {
 			paidB,
 			observedB.matrix,
 			await reviewerCallsAsRecorded(paidB)
+		);
+		// ⭐ THE PASS WHOSE AUTHOR REMOVED A TYPE (the re-review of E4's fix round): the same run, one type defined and removed.
+		const rootR = freshRoot();
+		const paidR = paidRun(rootR);
+		seam.paid = paidR;
+		const laneR = await laneRun(rootR, { removedType: true });
+		const observedR = await observe(laneR, paidR);
+		expect(paidR.turns, 'arrangement: the pass with a removed type took one executor turn').toHaveLength(1);
+		expect(
+			listByType(getEngine(), 'PWU_TYPE').filter((t) => t.state.status === 'REMOVED'),
+			'arrangement: the store the recording is made from holds the removed type'
+		).toHaveLength(1);
+		recorded.removedType = await recordingOfPass(
+			paidR,
+			observedR.matrix,
+			await reviewerCallsAsRecorded(paidR)
 		);
 	} finally {
 		seam.paid = undefined;
@@ -748,7 +800,21 @@ describe('⭐ the replay regression (D3) — a recorded run, replayed in process
 		).toEqual([]);
 	});
 
-	it('⛔ (finding 4) a recording of ANOTHER published PWA is refused before the first call — its content digest is read', async () => {
+	it('⭐ (the re-review of E4’s fix round) a recording whose author REMOVED a type before publishing replays: the removed type is neither re-created nor digested', async () => {
+		const observation = await replayPass(recorded.removedType);
+		expect(replayRegressionProblems(recorded.removedType, observation)).toEqual([]);
+		expect(observation.consumed).toEqual({ executor: 1, commands: 1, reviewer: 2 });
+		expect(
+			recorded.removedType.manifest.pwa.types.map((t) => t.declared.name),
+			'the recording holds the types the PWA has: the removed one is not among them'
+		).toEqual(PHASE7_PWA.types.map((t) => t.name));
+	});
+
+	it('⛔ (finding 4) a recording whose PWA and digest disagree is refused before the first call — the digest is read, and the re-created PWA held to it', async () => {
+		// ⭑ ITS REAL SCOPE (the re-review of E4's fix round): the replay re-creates the recording's own PWA (`REG-D-112`
+		// (c)), so the digest holds the recording to itself — its `pwa` and its digest — and the re-creation to what the
+		// engine stores. ~~A recording of another published PWA~~ A genuine recording of another PWA carries that PWA and its
+		// digest, and replays. This case changes the digest alone.
 		const another: Recording = {
 			...recorded.recording,
 			manifest: { ...recorded.recording.manifest, pwaContentDigest: sha256Hex('another PWA') }

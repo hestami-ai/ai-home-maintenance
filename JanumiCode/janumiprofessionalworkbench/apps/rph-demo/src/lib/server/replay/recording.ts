@@ -25,8 +25,12 @@
 // Reasoning Review whose subject is the PWA itself, `floor.ts`'s `runPwaFloor`) and records instead what the turn
 // PRODUCED — the published PWA's declared content (`RecordedPwa`: its types and prompts as `DefinePwuType` takes them,
 // and the policies they name, each by the hash of its content). The replay re-creates that PWA before the Undertaking
-// (`replay-pwa.ts`) and holds it to `pwaContentDigest` BEFORE THE FIRST CALL (`ReplayRun.checkPublishedPwa`): a recording
-// of another PWA is refused there, and serves no try.
+// (`replay-pwa.ts`) and holds it to `pwaContentDigest` BEFORE THE FIRST CALL (`ReplayRun.checkPublishedPwa`): ~~a recording
+// of another PWA is refused there, and serves no try.~~ ⭐ (the re-review of E4's fix round, on the check's real scope) a
+// re-created PWA that does not digest to the recording's is refused there, and serves no try: a recording whose `pwa`
+// and digest disagree, or a re-creation the engine stores otherwise than recorded, in the fields the digest covers. A
+// recording made on another PWA carries that PWA and its digest, and replays it — nothing in a replay types a PWA.
+// ⛔ A type its author REMOVED is neither recorded nor digested (`liveTypesOf`).
 //
 // ⭐⭐ THE EXECUTOR'S KEY IS ITS WHOLE INSTRUCTION, NOT ONLY ITS TURN (the review of E4, finding 1). What a model answered
 // is a function of the system prompt it was given and the tools it was offered as well as the turn's text, so a try is
@@ -45,7 +49,8 @@
 // refuses the recording instead (`archive-scan.ts`), so what cannot be scrubbed is never written. ⭐ (The review of E4,
 // finding 5: the home folder IS scrubbed — it is one of the scrub's three places, `ScrubPlace`. What the scrub does not
 // know is any OTHER path: another account's folder, a drive or a share outside the run's three places.) The scan reads
-// the recording's DECODED values, so a backslash JSON doubled is not read as a path (`record-replay.ts`).
+// the recording's DECODED values ~~, so a backslash JSON doubled is not read as a path~~ (`record-replay.ts`), and a
+// backslash JSON doubled is not read as a share at any depth of escaping (`archive-scan.ts`, `PATH_PATTERNS`).
 //
 // ⚠⚠ A RECORDING REPLAYS ON THE OS FAMILY IT WAS MADE ON — A LIMIT OF THIS FORMAT, STATED (finding 6). A run's text is
 // spelled as its host spells it — paths with `\` or `/`, line ends, the messages its programs print — and the scrub's
@@ -122,6 +127,9 @@ const SPELLINGS: readonly ScrubSpelling[] = ['json', 'native', 'posix'];
  * to it — `{{HOME}}\AppData\…` in a JSON line — read as a UNC path, and refused the recording it was there to make
  * committable (driven on this test's own fixture). After a word character the scan's lookbehinds hold, and a token
  * is never mistaken for the start of a path. Distinct final words keep `expandText`'s plain `replaceAll` exact.
+ * ⭐ (Since the re-review of E4's fix round the scan reads a share by its runs' ratio, so `\\AppData\\…` in a line — runs
+ * of two and two — is no share after a `}` either; the word-character ending stays, for the patterns that still read a
+ * separator after a non-word character as a path's start.)
  */
 export const scrubToken = (place: ScrubPlace, spelling: ScrubSpelling): string =>
 	`JPWB_REPLAY_${place}_${spelling.toUpperCase()}`;
@@ -289,8 +297,12 @@ export interface RecordedPwa {
 	readonly policies: readonly RecordedPolicy[];
 }
 
-/** `DefinePwuTypePayload`'s fields besides the two ids — what re-creates a type's declared state. */
-const DECLARED_TYPE_FIELDS = [
+/**
+ * `DefinePwuTypePayload`'s fields besides the two ids — what re-creates a type's declared state. ⭐ Pinned to the schema's
+ * own keys by `recording.test.ts` (the re-review of E4's fix round), so a field `DefinePwuType` gains is not dropped from
+ * the re-created PWA unnoticed.
+ */
+export const DECLARED_TYPE_FIELDS = [
 	'pwuKind',
 	'name',
 	'purpose',
@@ -340,6 +352,18 @@ const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 const recordOf = (v: unknown): Readonly<Record<string, unknown>> =>
 	typeof v === 'object' && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
 
+/**
+ * ⭐ THE PWA's LIVE TYPES (the re-review of E4's fix round): ⛔ never one its author removed — `RemovePwuType` tombstones a
+ * type (`status: 'REMOVED'`), its row staying in the store, and the engine's own graph skips it (`pwa-authoring.ts`,
+ * `pwuTypeNodesOf`). Re-created as a live type, it would be an orphan — nothing references a removed type — and
+ * `ValidatePwa` refuses the PWA. The digest and the recorded PWA both read the types through here, so they cannot
+ * disagree about which types the PWA has.
+ */
+const liveTypesOf = (objects: readonly PwaObjectRow[], pwaId: string): PwaObjectRow[] =>
+	objects.filter(
+		(o) => o.objectType === 'PWU_TYPE' && o.state.pwaId === pwaId && o.state.status !== 'REMOVED'
+	);
+
 /** The one published PWA among `objects`, or why there is not one. */
 function publishedPwaOf(objects: readonly PwaObjectRow[]): PwaObjectRow | string {
 	const published = objects.filter(
@@ -352,17 +376,19 @@ function publishedPwaOf(objects: readonly PwaObjectRow[]): PwaObjectRow | string
 }
 
 /**
- * ⭐ THE PUBLISHED PWA'S DECLARED CONTENT, DIGESTED: each of its types' name, kind, purpose, root mark, discharge, policies
- * and prompt (its text and output contract), sorted by name, as canonical JSON. What the recorded run ran on — so a
- * replay of another PWA is told apart before its first call (`ReplayRun.checkPublishedPwa`).
+ * ⭐ THE PUBLISHED PWA'S DECLARED CONTENT, DIGESTED: each of its ⭐ live types' (`liveTypesOf`) name, kind, purpose, root
+ * mark, discharge, policies and prompt (its text and output contract), sorted by name, as canonical JSON. ~~What the
+ * recorded run ran on — so a replay of another PWA is told apart before its first call~~ ⭐ The recorder digests the run's
+ * PWA, and the replay the PWA it re-created from the recording (`ReplayRun.checkPublishedPwa`): equal digests show that
+ * the recording's `pwa` and its digest agree, and that the engine stored the re-created types as recorded — in these
+ * fields, and no others.
  * ⭑ MOVED HERE from the recorder (`record-replay-core.ts`) and unchanged, so the recorder that writes the digest and the
  * replay that reads it compute it with one function.
  */
 export function pwaContentDigest(objects: readonly PwaObjectRow[]): string | string[] {
 	const pwa = publishedPwaOf(objects);
 	if (typeof pwa === 'string') return [pwa];
-	const types = objects
-		.filter((o) => o.objectType === 'PWU_TYPE' && o.state.pwaId === pwa.id)
+	const types = liveTypesOf(objects, pwa.id)
 		.map((t) => {
 			const prompt = recordOf(t.state.promptTemplate);
 			return {
@@ -383,8 +409,9 @@ export function pwaContentDigest(objects: readonly PwaObjectRow[]): string | str
 }
 
 /**
- * ⭐ THE PUBLISHED PWA, AS A RECORDING KEEPS IT (`RecordedPwa`) — or the problems that stop it. Its types in the order the
- * store defined them (`firstSequence`), which the engine accepted once; the policies they name in code-unit order.
+ * ⭐ THE PUBLISHED PWA, AS A RECORDING KEEPS IT (`RecordedPwa`) — or the problems that stop it. Its ⭐ live types
+ * (`liveTypesOf`) in the order the store defined them (`firstSequence`), which the engine accepted once; the policies
+ * they name in code-unit order.
  */
 export function recordedPwaOf(objects: readonly PwaObjectRow[]): RecordedPwa | string[] {
 	const pwa = publishedPwaOf(objects);
@@ -392,8 +419,7 @@ export function recordedPwaOf(objects: readonly PwaObjectRow[]): RecordedPwa | s
 	const problems: string[] = [];
 	const rootTypeId = str(pwa.state.rootPwuTypeId);
 	if (rootTypeId === '') problems.push(`the published PWA ${pwa.id} names no root type`);
-	const types = objects
-		.filter((o) => o.objectType === 'PWU_TYPE' && o.state.pwaId === pwa.id)
+	const types = liveTypesOf(objects, pwa.id)
 		.sort((a, b) => (a.firstSequence ?? 0) - (b.firstSequence ?? 0) || byCodeUnit(a.id, b.id))
 		.map((t) => ({
 			id: t.id,

@@ -631,6 +631,68 @@ describe('⛔⛔ B2 / B3 — the outcome comes from the CHILD, and `run` always 
 		}
 	}
 
+	/** `STREAM_DRAIN_GRACE_MS`, restated rather than imported, as `CAP_BYTES` is. */
+	const DRAIN_MS = 1_000;
+	/** How long before B2's deadline its child's recorded exit must come. */
+	const MARGIN_MS = 250;
+
+	/** What one B2 attempt recorded: each event's place in the order this process saw them, and the times it records. */
+	interface B2Attempt {
+		/** The run's exit code; undefined when it did not run. */
+		readonly exitCode: number | null | undefined;
+		/** When the child said it exited, by its own `Date.now()`; undefined when it said nothing whole. */
+		readonly toldExitAt: number | undefined;
+		readonly armedAt: number;
+		readonly timeoutMs: number;
+		readonly exitSeen: number | undefined;
+		readonly deadlineFired: number | undefined;
+		readonly settled: number | undefined;
+		/**
+		 * ⭐ Where the DRAIN SENTINEL fell: armed as the exit was read, by a listener added AHEAD of the runner's, with the
+		 * runner's drain delay — the same delay shares one list of timers, served in the order armed, so it fires no later
+		 * than the runner's drain. Undefined when it never fired.
+		 */
+		readonly drainFired: number | undefined;
+	}
+
+	/** ⭐ Whether a B2 attempt shows, by what it recorded, that its arrangement held: each clause B2's comment lists. */
+	const b2ArrangementHeld = (a: B2Attempt): boolean =>
+		a.exitCode === 0 &&
+		a.toldExitAt !== undefined &&
+		a.toldExitAt + MARGIN_MS <= a.armedAt + a.timeoutMs &&
+		a.exitSeen !== undefined &&
+		a.deadlineFired !== undefined &&
+		a.exitSeen < a.deadlineFired &&
+		a.settled !== undefined &&
+		a.settled > a.deadlineFired &&
+		(a.drainFired === undefined || a.settled < a.drainFired);
+
+	it('⛔ B2’s own instrument — an attempt that settled after its DRAIN SENTINEL fired asserts nothing: the drain, not the deadline, may have settled it', () => {
+		// ⭑ The re-review of E4's fix round: B2 took the order alone — settled after the sentinel — as the deadline having
+		// settled the run. Node serves a timer armed a millisecond after the sentinel in a later pass when its list is not
+		// yet due, so a drain due between the two settled the run there, and `timedOut` was false whatever the deadline's
+		// arm does — an attempt P2B-x could pass.
+		const held: B2Attempt = {
+			exitCode: 0,
+			toldExitAt: 1_100,
+			armedAt: 1_000,
+			timeoutMs: 725,
+			exitSeen: 1,
+			deadlineFired: 2,
+			settled: 3,
+			drainFired: undefined
+		};
+		expect(b2ArrangementHeld(held), 'CONTROL: settled by the deadline, the drain sentinel never fired').toBe(true);
+		expect(
+			b2ArrangementHeld({ ...held, drainFired: 4 }),
+			'CONTROL: settled by the deadline, the drain sentinel after it'
+		).toBe(true);
+		expect(
+			b2ArrangementHeld({ ...held, drainFired: 3, settled: 4 }),
+			'settled after the drain sentinel, in the order the deadline would have given'
+		).toBe(false);
+	});
+
 	it('⛔ REG-F-452 — the reaper kills only a pid the child printed: an empty stdout is Number("") = 0, which Windows reads as THIS process', () => {
 		// ⭐ DRIVEN 2026-10-10: `process.kill(0, 'SIGKILL')` ended the calling process itself, under node and under bun
 		// alike, on this host (exit 1, nothing printed after it). Under a loaded gate the B2 arrangement's deadline can
@@ -706,17 +768,22 @@ describe('⛔⛔ B2 / B3 — the outcome comes from the CHILD, and `run` always 
 		// held:
 		//   · the child exited on its own (exit 0), and its RECORDED exit came at least `MARGIN_MS` before the deadline;
 		//   · THIS process had read that exit before the deadline fired — the child's `exit` event, which the runner reads
-		//     too, came before a sentinel timer armed just ahead of the runner's own, with its delay: it fires in the same
-		//     pass, never after the runner's, so an exit read before it was the runner's fact when its deadline fired (a
+		//     too, came before a sentinel timer armed just ahead of the runner's own, with its delay: it fires ~~in the same
+		//     pass,~~ never after the runner's ⭐ (in the same pass, or a pass before it when the runner's was armed a
+		//     millisecond later), so an exit read before it was the runner's fact when its deadline fired (a
 		//     process too starved to read an exit before its own timer fires observes `timedOut: true` truly, as this entry
 		//     says of a child still running);
-		//   · and the DEADLINE settled the run — the runner handed its capture over after the sentinel fired, in that same
-		//     pass, so neither the drain nor the pipes' `close` did, which run in passes of their own.
+		//   · and the DEADLINE settled the run — the runner handed its capture over after the sentinel fired, ~~in that same
+		//     pass, so neither the drain nor the pipes' `close` did, which run in passes of their own~~ ⭐ and before a
+		//     DRAIN SENTINEL fired: armed as the exit was read, by a listener added ahead of the runner's, with the drain's
+		//     delay, it fires no later than the runner's drain, so a run settled before it was not settled by the drain (the
+		//     re-review of E4's fix round: the order alone did not show it — a runner's timer armed a millisecond after the
+		//     sentinel waits for a later pass, and a drain due between the two settled the run there). The pipes' `close`
+		//     cannot come first: the grandchild holds them until it is reaped, after the outcome. `b2ArrangementHeld` asks
+		//     each of these.
 		// ⭑ So it is driven through `observeChildRun`, the runner's own seam (`run` hands it the child it started, and
 		// returns its outcome), with a real child and the real kill — which is what lets the test arm beside its timer.
 		// ⛔ An attempt where any of these did not hold asserts nothing; if none holds, the test fails listing every one.
-		const DRAIN_MS = 1_000; // `STREAM_DRAIN_GRACE_MS`, restated rather than imported, as `CAP_BYTES` is.
-		const MARGIN_MS = 250;
 		const AIM_MS = (MARGIN_MS + DRAIN_MS) / 2;
 		const missed: string[] = [];
 		let timeoutMs = 500;
@@ -726,11 +793,20 @@ describe('⛔⛔ B2 / B3 — the outcome comes from the CHILD, and `run` always 
 			let deadlineFired: number | undefined;
 			let exitSeen: number | undefined;
 			let settled: number | undefined;
+			let drainFired: number | undefined;
+			let drainSentinel: ReturnType<typeof setTimeout> | undefined;
 			const child = spawn(process.execPath, ['-e', TELLS_ITS_EXIT], {
 				cwd,
 				shell: false,
 				stdio: ['ignore', 'pipe', 'pipe'],
 				windowsHide: true
+			});
+			// ⭐ Added BEFORE the runner's own `exit` listener, so it runs first in the emit: the drain sentinel is armed just
+			// ahead of the runner's drain, with its delay.
+			child.on('exit', () => {
+				drainSentinel ??= setTimeout(() => {
+					drainFired = ++order;
+				}, DRAIN_MS);
 			});
 			const armedAt = Date.now();
 			// ⭑ ARMED FIRST, WITH THE RUNNER'S DELAY: the same delay shares one list of timers, served in the order armed.
@@ -757,18 +833,21 @@ describe('⛔⛔ B2 / B3 — the outcome comes from the CHILD, and `run` always 
 			});
 			const out = await outcome;
 			clearTimeout(sentinel);
+			clearTimeout(drainSentinel);
 			const told = toldExit(out.ran ? out.stdout : '');
 			if (told !== undefined) reap(String(told.pid));
 			if (
 				out.ran &&
-				out.exitCode === 0 &&
-				told !== undefined &&
-				told.exitAt + MARGIN_MS <= armedAt + timeoutMs &&
-				exitSeen !== undefined &&
-				deadlineFired !== undefined &&
-				exitSeen < deadlineFired &&
-				settled !== undefined &&
-				settled > deadlineFired
+				b2ArrangementHeld({
+					exitCode: out.exitCode,
+					toldExitAt: told?.exitAt,
+					armedAt,
+					timeoutMs,
+					exitSeen,
+					deadlineFired,
+					settled,
+					drainFired
+				})
 			) {
 				expect(out.timedOut, 'a deadline that passes over an EXITED child is not a timeout').toBe(false);
 				return;
@@ -776,7 +855,8 @@ describe('⛔⛔ B2 / B3 — the outcome comes from the CHILD, and `run` always 
 			const recorded = told === undefined ? 'nothing' : `${told.exitAt - armedAt}ms`;
 			missed.push(
 				`deadline ${timeoutMs}ms: exit ${out.ran ? out.exitCode : 'none'}, its recorded exit ${recorded}, the ` +
-					`order exit/deadline/settled ${exitSeen ?? '-'}/${deadlineFired ?? '-'}/${settled ?? '-'}`
+					`order exit/deadline/settled/drain ${exitSeen ?? '-'}/${deadlineFired ?? '-'}/${settled ?? '-'}/` +
+					`${drainFired ?? '-'}`
 			);
 			timeoutMs =
 				told === undefined

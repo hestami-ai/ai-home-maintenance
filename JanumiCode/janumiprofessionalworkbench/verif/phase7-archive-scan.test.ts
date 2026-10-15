@@ -17,8 +17,13 @@
 //     USERPROFILE and USERNAME — and NEVER as `unknown`, which Bun gives as the user record's name when USERNAME is unset;
 //     with no name found the command line refuses, and run under bun as the gate runs it, it still finds the account;
 //   · ⭐ (`JAN-EXEC` Phase 8; the review of E4, finding 3) a replay recording is scanned by its DECODED values
-//     (`scanDecodedJson`): code whose JSON spelling reads as a UNC path is no hit, and a real path or the account name
-//     in a value still is, at its place in the value — synthetic lines only.
+//     (`scanDecodedJson`): ~~code whose JSON spelling reads as a UNC path is no hit, and~~ a real path or the account
+//     name in a value still is a hit, at its place in the value — ⭐ and the account name after an escape inside a value
+//     that is itself JSON, which the line's own text hides — synthetic lines only;
+//   · ⭐ (the re-review of E4's fix round: finding 3 was not fixed — decoding one level moved the false hits a level
+//     down) a UNC share is a hit at EVERY depth of JSON escaping, its leading run twice its separator, and escaped code
+//     is a hit at none — wherever a recording holds it: a write_file argument, the answer envelope's files, a review
+//     prompt that embeds the work product.
 //
 // No model is called, and nothing outside a temporary folder is read but the scan's own script, run by bun.
 import { spawnSync } from 'node:child_process';
@@ -27,6 +32,7 @@ import { tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
+import { splitExecutionEnvelope } from '../apps/rph-demo/src/lib/server/execution/execution-contract.js';
 import {
 	accountNames,
 	escapesBlanked,
@@ -124,7 +130,14 @@ describe('JAN-EXEC P7-2 — what the archive scan finds', () => {
 	});
 
 	it('⛔ a relative path with backslashes is no hit in either spelling — raw, or JSON-escaped as the report writes it', () => {
-		for (const path of [`.${B}test${B}unit${B}wordfreq.test.js`, `..${B}src${B}wordfreq.js`, `test${B}unit${B}x.js`]) {
+		// ⭐ (The re-review of E4's fix round) and one whose first separator is doubled: its runs are a share's ratio
+		// (`\\test\u…`), and the `.` before them is what makes it relative — escaping alone no longer tells it apart.
+		for (const path of [
+			`.${B}test${B}unit${B}wordfreq.test.js`,
+			`..${B}src${B}wordfreq.js`,
+			`test${B}unit${B}x.js`,
+			`.${B}${B}test${B}unit${B}x.js`
+		]) {
 			expect(kinds(path), path).toEqual([]);
 			expect(kinds(JSON.stringify({ argv: ['node', '--test', path] })), `${path} as JSON`).toEqual([]);
 		}
@@ -316,20 +329,60 @@ describe('⭐ JAN-EXEC Phase 8 — a replay recording is scanned by its DECODED 
 	const decoded = (text: string, jsonl = true) =>
 		scanDecodedJson(text, 'executor.jsonl', NAMES, jsonl).map((h) => [h.file, h.line, h.column, h.kind]);
 
-	it('⛔ code a model wrote is no hit decoded — where its JSON spelling reads as a UNC path, as P3’s recording lines did', () => {
-		// ⭑ `/\r\n|\n/`, a regular expression of SINGLE backslashes, as a write_file call's contents. JSON doubles each one,
-		// and the doubled pair before a word reads as a share: the CONTROL shows that spelling hits, so the decoded scan's
-		// silence is the decoding's doing, not a line that holds nothing.
+	it('⛔ code where a recording holds it is no hit — a write_file argument, the answer envelope’s files, a review prompt embedding the work product — and a share there still is', () => {
+		// ⭑ `/\r\n|\n/`, a regular expression of SINGLE backslashes, in each place a Phase 7 recording carries a file the
+		// executor wrote: the write_file call (one JSON level), the contract's envelope, whose work product holds each file's
+		// full text (two: the answer is JSON inside the line), and the work-product review's prompt, which embeds that work
+		// product re-serialised (`splitExecutionEnvelope`; two). The re-review drove the decoded scan red at the last two.
 		const code = `export const lines = (text) => text.split(/${B}r${B}n|${B}n/);\n`;
-		const line = JSON.stringify({
-			unit: 'requirements',
-			toolCalls: [{ name: 'write_file', arguments: { path: 'src/lines.js', contents: code } }]
-		});
+		const answer = (document: string): string =>
+			JSON.stringify({
+				workProduct: {
+					documents: [{ path: 'docs/notes.md', text: document }],
+					files: [{ path: 'src/lines.js', text: code }],
+					hashes: [],
+					commands: []
+				},
+				rationale: { rationale: 'written', assumptions: [], limitations: [], residualUncertainty: [] }
+			});
+		const recordingLines = (document: string): string =>
+			[
+				JSON.stringify({
+					unit: 'implementation',
+					toolCalls: [
+						{ name: 'write_file', arguments: { path: 'src/lines.js', contents: code }, outcome: 'COMPLETED' }
+					],
+					answer: { arrived: true, text: answer(document) }
+				}),
+				JSON.stringify({
+					unit: 'implementation',
+					prompt: `Judge this work product.\n${splitExecutionEnvelope(answer(document)).workProduct}\n`
+				})
+			].join('\n');
+		expect(decoded(recordingLines('no path here'))).toEqual([]);
+		// ⭑ CONTROL: the same places hold a share when one is there — in the work product's document, two levels deep.
 		expect(
-			scanText(line, 'executor.jsonl', NAMES).map((h) => h.kind),
-			'CONTROL: the JSON spelling is a hit'
-		).toContain('unc-path');
-		expect(decoded(line)).toEqual([]);
+			decoded(recordingLines(`copied to ${B}${B}host${B}share${B}out`)).map(([file, , , kind]) => [file, kind])
+		).toEqual([
+			['executor.jsonl:1 $.answer.text', 'unc-path'],
+			['executor.jsonl:2 $.prompt', 'unc-path']
+		]);
+	});
+
+	it('⭐ the account name after an escape inside a value that is itself JSON — the answer envelope — is a hit decoded, where the line’s own text hides it', () => {
+		const line = JSON.stringify({
+			unit: 'implementation',
+			answer: {
+				arrived: true,
+				text: JSON.stringify({ workProduct: {}, rationale: { rationale: 'ran as\njdoe' } })
+			}
+		});
+		// ⭑ CONTROL: in the line's own text that newline is `\\n` — an escaped backslash, then a letter — so no token ends
+		// before the name, and a scan of the text passes it.
+		expect(scanText(line, 'executor.jsonl', NAMES)).toEqual([]);
+		expect(decoded(line).map(([file, , , kind]) => [file, kind])).toEqual([
+			['executor.jsonl:1 $.answer.text', 'account-name']
+		]);
 	});
 
 	it('⭐ a real drive, share or home path — or the account name — in a decoded value still hits, at its place in the value', () => {
@@ -371,5 +424,28 @@ describe('⭐ JAN-EXEC Phase 8 — a replay recording is scanned by its DECODED 
 		expect(scanDecodedJson(manifest, 'recording.json', NAMES, false).map((h) => [h.file, h.kind])).toEqual([
 			['recording.json:1 $.models.reviewer.note', 'drive-path']
 		]);
+	});
+});
+
+describe('⭐ JAN-EXEC Phase 8 — a UNC share is a hit at EVERY depth of JSON escaping, and escaped code at none (the re-review of E4’s fix round: finding 3 was not fixed)', () => {
+	/** `text` as it reads inside a JSON string `depth` levels deep: each level doubles every backslash. */
+	const escaped = (text: string, depth: number): string =>
+		Array.from({ length: depth }).reduce<string>((t) => JSON.stringify(t).slice(1, -1), text);
+
+	it('⭐ a share is a hit at depths 0 to 3 — its leading run twice its separator at each, as each level doubles both', () => {
+		for (const share of [`${B}${B}host${B}share${B}x`, `${B}${B}wsl$${B}Ubuntu${B}x`])
+			for (let depth = 0; depth <= 3; depth += 1)
+				expect(kinds(escaped(share, depth)), `${share} at depth ${depth}`).toEqual([['unc-path', 1, 1]]);
+	});
+
+	it('⛔ escaped code is no share at any depth — each of its runs as long as the next: a line split, a word boundary, a unicode escape, a source literal of escaped backslashes', () => {
+		for (const code of [
+			`text.split(/${B}r${B}n|${B}n/)`,
+			`text.match(/${B}bthe${B}b/g)`,
+			`'${B}u00e9t${B}u00e9'`,
+			`text.split("${B}${B}r${B}${B}n")`
+		])
+			for (let depth = 0; depth <= 3; depth += 1)
+				expect(kinds(escaped(code, depth)), `${code} at depth ${depth}`).toEqual([]);
 	});
 });

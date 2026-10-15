@@ -21,8 +21,13 @@
 //      having been scrubbed of the run's own directories first. A hit refuses the whole recording, and names each hit's
 //      place and kind, never its text. And with no account name to scan for, nothing is written either (`REG-F-545`).
 //      ⭐ THE SCAN READS EACH FILE'S DECODED VALUES (`scanDecodedJson`; the review of E4, finding 3), not its JSON
-//      spelling: JSON doubles a backslash, and code a model wrote (`/\r\n/`) read as a UNC path — P3's recording was
-//      refused on 199 such hits. A real drive, share or home path, or the account name, in a value still hits.
+//      spelling: ~~JSON doubles a backslash, and code a model wrote (`/\r\n/`) read as a UNC path — P3's recording was
+//      refused on 199 such hits.~~ ⭐ each hit placed in its value, and the account name after an escape inside a value
+//      that is itself JSON (the answer envelope) found, which the file's text hides. Code a model wrote (`/\r\n/`), which
+//      read as a UNC path — P3's recording was refused on 199 such hits — is no hit at ANY depth of escaping by the share
+//      pattern's own rule (`archive-scan.ts`, `PATH_PATTERNS`; the re-review of the fix round: decoding one level left
+//      the code in the answer envelope and the review prompts escaped). A real drive, share or home path, or the account
+//      name, in a value still hits.
 // ⭐ IT RECORDS THE EXECUTION HALF (`REG-D-112` (c)): the authoring floor's reviews are left out and counted
 // (`recordsAsReviewerCall`), and the published PWA is recorded for the replay to re-create.
 // ⭐ AND ONLY ON THE OS FAMILY THE RUN RAN ON (finding 6): `lane/boot.json`'s `JPWB_DEMO_DB` must be an absolute path as
@@ -310,7 +315,8 @@ export function main(
 
 	// ── SCAN, THEN WRITE ─────────────────────────────────────────────────────────────────────────────────────────────────
 	const files = recordingFiles(built.recording);
-	// ⭐ Finding 3 — each file's DECODED values, never its JSON spelling (`scanDecodedJson`).
+	// ⭐ Finding 3 — each file's DECODED values, never its JSON spelling (`scanDecodedJson`); escaped code is no share at
+	// any depth by the pattern's own rule (`PATH_PATTERNS`).
 	const hits: ScanHit[] = Object.entries(files).flatMap(([file, text]) =>
 		scanDecodedJson(text, file, names, file !== RECORDING_FILES.manifest)
 	);

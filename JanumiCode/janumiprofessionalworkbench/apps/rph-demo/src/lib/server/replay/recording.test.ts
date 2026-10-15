@@ -6,12 +6,15 @@
 //   · ⛔ a folder of another format, a relative folder, a missing file and a malformed line are each REFUSED, the refusal
 //     naming the file and the line — a replay never starts on half a recording;
 //   · the scrub replaces each of a run's directories, in each spelling the run writes, by its own token — the longer
-//     path first, so the workspace is never replaced inside its own `.process-output` sibling — and expansion inverts it.
+//     path first, so the workspace is never replaced inside its own `.process-output` sibling — and expansion inverts it;
+//   · ⭐ (the re-review of E4's fix round) the fields that re-create a type are `DefinePwuType`'s own less its two ids.
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, parse } from 'node:path';
+import { DefinePwuTypePayloadSchema } from '@janumipwb/rph-contracts';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+	DECLARED_TYPE_FIELDS,
 	expandText,
 	RECORDING_FILES,
 	RECORDING_FORMAT,
@@ -186,5 +189,14 @@ describe('⭐ the recording’s format (D1)', () => {
 		// ⛔ A root is never a place: '/' as a home would replace every separator in the text.
 		expect(scrubPairs({ HOME: '/' })).toEqual([]);
 		expect(scrubPairs({ HOME: parse(tmpdir()).root })).toEqual([]);
+	});
+
+	it('⭐ the fields that re-create a type are DefinePwuType’s own less its two ids — pinned, so a field the schema gains is not dropped from the re-created PWA unnoticed', () => {
+		// ⭑ The re-review of E4's fix round: the list was restated by hand, and nothing tied it to the schema.
+		expect(new Set(DECLARED_TYPE_FIELDS)).toEqual(
+			new Set(
+				Object.keys(DefinePwuTypePayloadSchema.shape).filter((k) => k !== 'pwuTypeId' && k !== 'pwaId')
+			)
+		);
 	});
 });

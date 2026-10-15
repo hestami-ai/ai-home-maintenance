@@ -23,6 +23,7 @@ import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { LIVE_SELECTIONS_BESIDE_A_REPLAY } from '../apps/rph-demo/src/lib/server/replay/replay-switch.js';
 import { PROBE_MARK, type ServerEnvironmentReport } from './live-backend-isolation.reporter.js';
 import { NO_PROGRAMS } from './reviewer-qualification-hermetic.js';
 
@@ -43,6 +44,9 @@ const REPORTER = join(ROOT, 'verif', 'live-backend-isolation.reporter.ts');
  * process"*, its executor the replay where the stand-in was asked for (*"expected 'REPLAY' to be 'STAND_IN'"*), and the
  * e2e server's environment (*"a live-backend selection would reach the e2e server: expected [ 'JPWB_REPLAY' ] to deeply
  * equal []"*).
+ * ⭐ AND A TENTH, `JPWB_AGENT_MODEL` (the re-review of E4's fix round): the authoring agent's model, which the replay
+ * refuses beside its switch (`replay/replay-switch.ts`, `LIVE_SELECTIONS_BESIDE_A_REPLAY`) — so a shell that exported it
+ * for half B's authoring turned every gate replay test into that refusal.
  */
 const EXPORTED: Readonly<Record<string, string>> = {
 	JPWB_ASSURANCE_TOOL: 'devin',
@@ -51,6 +55,7 @@ const EXPORTED: Readonly<Record<string, string>> = {
 	JPWB_EXECUTOR: 'agy',
 	JPWB_EXECUTOR_MODEL: 'exported-executor-model',
 	JPWB_AGENT: 'pi',
+	JPWB_AGENT_MODEL: 'exported-agent-model',
 	// ⛔ Paths INSIDE the empty directory, to files that do not exist: were an override to reach an adapter, it would
 	// name no program.
 	JPWB_DEVIN_BIN: join(NO_PROGRAMS, 'devin-exported-override'),
@@ -110,7 +115,7 @@ const failures = (out: string): string =>
 function expectProbePassed(r: { status: number | null; out: string }): void {
 	expect(
 		r.status,
-		`the probe failed in a child started with the eight exported:\n${failures(r.out)}`
+		`the probe failed in a child started with the ten exported:\n${failures(r.out)}`
 	).toBe(0);
 	expect(
 		r.out,
@@ -118,16 +123,24 @@ function expectProbePassed(r: { status: number | null; out: string }): void {
 	).toMatch(/Tests\s+5 passed \(5\)/);
 }
 
-describe('⭐ D8 — a gate entry point started with the eight live-backend variables EXPORTED still selects the stand-ins', () => {
-	it('⭑ CONTROL — the arrangement exports all eight, into a PATH that finds no program', () => {
+describe('⭐ D8 — a gate entry point started with the ten live-backend variables EXPORTED still selects the stand-ins', () => {
+	it('⭑ CONTROL — the arrangement exports all ten, into a PATH that finds no program', () => {
 		const env = exportedEnvironment();
-		// ⭐ The review of E4, finding 11 — ~~eight~~ nine: the replay switch is the ninth.
-		expect(Object.keys(EXPORTED)).toHaveLength(9);
+		// ⭐ The review of E4, finding 11 — ~~eight~~ nine: the replay switch is the ninth. ⭐ The re-review of its fix
+		// round — ten: the authoring agent's model, which the replay refuses beside its switch.
+		expect(Object.keys(EXPORTED)).toHaveLength(10);
 		for (const [k, v] of Object.entries(EXPORTED)) expect(env[k]).toBe(v);
 		expect(Object.keys(env).filter((k) => /^path$/i.test(k))).toEqual(['PATH']);
 		expect(env.PATH).toBe(NO_PROGRAMS);
 		for (const [k, v] of Object.entries(RECEIPT)) expect(env[k]).toBe(v);
-		expect(Object.keys(EXPORTED), 'the canary must not be one of the eight').not.toContain(CANARY);
+		expect(Object.keys(EXPORTED), 'the canary must not be one of the ten').not.toContain(CANARY);
+	});
+
+	it('⭐ every live-backend selection the replay refuses beside its switch is one this instrument exports — so each gate entry point is held to removing it', () => {
+		// ⭑ The re-review of E4's fix round, its general form: the replay refused JPWB_AGENT_MODEL beside its switch, no gate
+		// entry point removed it, and nothing compared the two lists — so a shell that exported it turned the gate's replay
+		// tests into that refusal.
+		expect(LIVE_SELECTIONS_BESIDE_A_REPLAY.filter((name) => !(name in EXPORTED))).toEqual([]);
 	});
 
 	it('the root SOURCE config (`vitest.config.ts`)', () => {

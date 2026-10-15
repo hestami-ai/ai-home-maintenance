@@ -31,6 +31,10 @@
  * replay's arms (`apps/rph-demo/src/lib/server/replay/replay-switch.ts`), so an operator who exported it to replay a
  * recording turned every gate test that expects a stand-in into a replay of that folder — or into a refused reviewer, for a
  * folder that holds none (driven red on `live-backend-isolation.test.ts`, all four children).
+ * ⭐ AND A TENTH, `JPWB_AGENT_MODEL` (the re-review of E4's fix round): the authoring agent's model. The replay refuses it
+ * beside its switch (`LIVE_SELECTIONS_BESIDE_A_REPLAY`), so a shell that exported it for half B's authoring turned the
+ * gate's replay tests into that refusal (driven red: the replay's tests, 4 failed; and `live-backend-isolation.test.ts`,
+ * all four children, with it exported there and left off this list).
  */
 export const LIVE_BACKEND_VARIABLES = [
 	'JPWB_ASSURANCE_TOOL',
@@ -39,6 +43,7 @@ export const LIVE_BACKEND_VARIABLES = [
 	'JPWB_EXECUTOR',
 	'JPWB_EXECUTOR_MODEL',
 	'JPWB_AGENT',
+	'JPWB_AGENT_MODEL',
 	'JPWB_DEVIN_BIN',
 	'JPWB_AGY_BIN',
 	'JPWB_REPLAY'

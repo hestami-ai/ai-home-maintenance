@@ -15,7 +15,8 @@
 //     record's name when USERNAME is unset (`REG-F-545`);
 //   · a DRIVE PATH — `C:\`, `C:/`, and the JSON-escaped `C:\\`: Pi prints the working directory with `/`, and the stores
 //     keep `\` escaped;
-//   · a UNC PATH — `\\host\share`, its JSON-escaped `\\\\host\\share`, and `//host/share`;
+//   · a UNC PATH — `\\host\share`, its JSON-escaped `\\\\host\\share`, and `//host/share` — ⭐ at EVERY depth of JSON
+//     escaping, and escaped code at none (`PATH_PATTERNS`);
 //   · a HOME PATH — `/Users/…` or `/home/…`;
 //   · a drive in MSYS or WSL spelling — `/c/Users/…`, `/mnt/c/…` — which git's shell prints.
 // ⭑ EACH ALSO WHERE AN ESCAPE STANDS BEFORE IT: a JSON escape (`\n`, `\t`, `\u001b` …) or a terminal colour code ends
@@ -55,10 +56,20 @@ export interface ScanHit {
  * The absolute-path spellings, each a token START: what precedes it is not part of a longer word, so `https://` (a scheme
  * before `//`), `src/home/x` (a relative path through a `home` folder), `e2e/c/x` and `.\\test\\x` (a relative path,
  * JSON-escaped) are not hits.
+ * ⭐⭐ A UNC SHARE BY ITS RUNS' RATIO, AT EVERY DEPTH OF JSON ESCAPING (the re-review of E4's fix round: finding 3 was not
+ * fixed). Each level of escaping doubles every backslash, so a share's leading run is TWICE its separator at every depth
+ * — `\\host\share`, `\\\\host\\share`, `\\\\\\\\host\\\\share` — and escaped code's runs are EQUAL at every depth: `/\r\n/`
+ * is a run of one before each letter, `\\r\\n` escaped once, `\\\\r\\\\n` twice, as is a source literal of escaped
+ * backslashes (`"\\r\\n"`). So the pattern takes a run of 2n backslashes, a host, and a run of exactly n (`(\\+)\1 … \1`).
+ * It replaces two fixed spellings — the leading pair or its one escaping, then a separator of one or two — which read
+ * `\\r\\n` as a share (P3's 199 hits) and a share escaped twice as nothing. Decoding one level (`scanDecodedJson`) did not
+ * answer the first: a recording's values are themselves JSON — the executor's answer is the contract's envelope, whose
+ * work product carries each file's full text, and each review prompt embeds that work product — so code sits two levels
+ * deep, and one level decoded still left `\\r\\n` there.
  */
 const PATH_PATTERNS: readonly (readonly [ScanHitKind, RegExp])[] = [
 	['drive-path', /(?<![A-Za-z0-9])[A-Za-z]:[\\/]/g],
-	['unc-path', /(?<![\w.:\\])\\\\(?:\\\\)?[\w.$-]+\\{1,2}[\w.$-]/g],
+	['unc-path', /(?<![\w.:\\])(\\+)\1[\w.$-]+\1[\w.$-]/g],
 	['unc-path', /(?<![\w:/])\/\/[\w.$-]+\/[\w.$-]/g],
 	['home-path', /(?<![\w.])\/(?:Users|home)\/[\w.$-]/g],
 	['msys-path', /(?<![\w.:/])\/(?:mnt\/)?[A-Za-z]\/[\w.$-]/g]
@@ -208,11 +219,17 @@ const PLAIN_KEY = /^[A-Za-z_][A-Za-z0-9_]*$/;
  * reads one value per non-blank line. A hit's `file` is `<file>:<line> <path>` — `$.stdout`,
  * `$.toolCalls[0].arguments.contents` — and its line and column are inside that value; a key that is not a plain identifier, or that itself hits, is shown by
  * its ordinal (`{key 2}`), so a place never prints the text it refused.
- * ⛔ WHY DECODED: JSON doubles every backslash, and two backslashes before a word read as the start of a UNC path — code a
+ * ⛔ WHY DECODED: ~~JSON doubles every backslash, and two backslashes before a word read as the start of a UNC path — code a
  * model wrote, a regular expression like `/\r\n/`, became `\\r\\n` in a recording line and refused it (P3's archive: 199
  * unc-path hits, every one JSON-escaped code). Decoded, a backslash is the one the text holds: an escaped one is not a
- * path, and a real drive, share or home path — or the account name — in a value still hits, as it would in the file the
- * value came from. ⚠ A line that is not JSON is scanned as text, whole, so nothing is skipped for failing to parse.
+ * path, and~~ ⭐ (the re-review of E4's fix round: decoding undoes ONE level, and a recording's values are JSON themselves
+ * — the executor's answer envelope, a review prompt embedding the work product — so code two levels deep stayed escaped,
+ * and still read as a share; the share pattern now holds at every depth by its own rule, `PATH_PATTERNS`.) Decoded, a
+ * hit is placed inside its value, and an escape inside a value that is itself JSON is one level nearer what it stands
+ * for: a newline before the account name in the answer envelope is `\\n` in the line's text, an escaped backslash and a
+ * letter, where no token ends, and `\n` decoded, where one does. A real drive, share or home path — or the account name —
+ * in a value still hits, as it would in the file the value came from. ⚠ A line that is not JSON is scanned as text,
+ * whole, so nothing is skipped for failing to parse.
  */
 export function scanDecodedJson(
 	text: string,

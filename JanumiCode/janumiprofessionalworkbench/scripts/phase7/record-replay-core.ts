@@ -367,7 +367,9 @@ function commandOf(
 }
 
 /**
- * ⛔ `REG-F-518` — WHETHER A TRY'S RUNS COMPLETED IN THE ORDER THEY WERE CALLED. Pi starts one message's calls together, the
+ * ⛔ `REG-F-518` — WHETHER A TRY'S RUNS COMPLETED IN THE ORDER THEY WERE CALLED. ~~Pi starts one message's calls together~~
+ * ⭐ In a run made before `REG-D-112` (d), Pi started one message's calls together — since then it runs them one at a time
+ * (`pi-execution-tools.ts`, `EXECUTION_TOOL_MODE`) — and the
  * host mints each run's evidence as it COMPLETES, and the command reviews are dispatched in that order. A replay runs the
  * recorded calls one at a time, in call order, so its reviews come in call order: where the run's came otherwise, the
  * replay asks the recorded prompts in another order and goes stale there — driven on P3's archive (the end-to-end

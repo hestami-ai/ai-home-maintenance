@@ -16,7 +16,12 @@
 //     review left out (`REG-D-112` (c) — predicted red, observed 2026-10-15 with the recorder's rule removed: the
 //     recording's first reviewer call was it); and the scan reads DECODED values — JSON-escaped code passes, a decoded
 //     drive path is refused (finding 3 — predicted red, observed 2026-10-15 with the recorder scanning each file's
-//     text as before: `executor.jsonl:1:543 unc-path`).
+//     text as before: `executor.jsonl:1:543 unc-path`) ~~.~~ ⭐ — but decoding undoes one level, and the re-review of
+//     the fix round found code two levels deep still read as a share. Now the code sits where a recording holds it —
+//     the write_file argument, the answer envelope's files, a review prompt embedding the work product — and passes at
+//     every depth by the share pattern's own rule (predicted red, observed 2026-10-15 with the old pattern restored:
+//     `executor.jsonl:1 $.answer.text:1:200 unc-path`, `reviewer.jsonl:1 $.prompt:2:185 unc-path`); and the account
+//     name after a newline inside the envelope is refused, which a scan of the file's text passes.
 // ⛔ It drives the command line under bun, as an operator does: bun:sqlite does not exist under Node.
 // No model is called; nothing is read from any real run.
 import { spawnSync } from 'node:child_process';
@@ -29,6 +34,7 @@ import Database from 'better-sqlite3';
 import { createSqliteDriver, SCHEMA_SQL } from '@janumipwb/rph-persistence';
 import { afterAll, describe, expect, it } from 'vitest';
 import { REVIEWER_CALL_BOUND_MS } from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
+import { splitExecutionEnvelope } from '../apps/rph-demo/src/lib/server/execution/execution-contract.js';
 import {
 	instructionsSha256,
 	osFamilyOf,
@@ -112,6 +118,10 @@ function arrange(
 		readonly extraWrite?: { readonly path: string; readonly contents: string };
 		/** ⭐ What `lane/boot.json` names as `JPWB_DEMO_DB`, when not the run's own (finding 6). */
 		readonly bootDemoDb?: string;
+		/** The executor's answer, when not `ANSWER`: the contract's envelope, its work product carrying files' text. */
+		readonly answer?: string;
+		/** The prompt both review calls were sent, when not `REVIEW_PROMPT`: one that embeds the work product. */
+		readonly reviewPrompt?: string;
 	} = {}
 ): Arranged {
 	const run = tempDir('run');
@@ -215,7 +225,7 @@ function arrange(
 			resolvedModel: { value: 'fixture-executor-model', evidence: 'PROVIDER_REPORTED' },
 			resolvedProvider: { value: 'fixture-provider', evidence: 'PROVIDER_REPORTED' },
 			materializedInputRef: ref(JSON.stringify(composite)),
-			rawOutputBeforeCoercionRef: ref(ANSWER),
+			rawOutputBeforeCoercionRef: ref(o.answer ?? ANSWER),
 			volunteeredReasoningRef: pending,
 			observedToolCalls: {
 				observation: 'OBSERVED',
@@ -275,7 +285,7 @@ function arrange(
 			respondedAt: '2026-10-11T08:02:37.674Z',
 			resolvedModel: { value: 'fixture-reviewer-model' },
 			resolvedProvider: { value: 'devin' },
-			materializedInputRef: ref(REVIEW_PROMPT),
+			materializedInputRef: ref(o.reviewPrompt ?? REVIEW_PROMPT),
 			rawOutputBeforeCoercionRef: pending,
 			parseOutcome: {
 				outcome: 'NOT_ATTEMPTED',
@@ -293,7 +303,7 @@ function arrange(
 			respondedAt: '2026-10-11T08:03:04.274Z',
 			resolvedModel: { value: 'fixture-reviewer-model' },
 			resolvedProvider: { value: 'devin' },
-			materializedInputRef: ref(REVIEW_PROMPT),
+			materializedInputRef: ref(o.reviewPrompt ?? REVIEW_PROMPT),
 			rawOutputBeforeCoercionRef: pending,
 			answerSpanRef: ref(CLEAN),
 			volunteeredReasoningRef: ref('\n'),
@@ -542,14 +552,33 @@ describe('⭐ the recorder (D1) — a final archive into a replay recording, scr
 		]);
 	});
 
-	it('⭐ the archive scan reads the recording’s DECODED values: JSON-escaped code passes, a decoded drive path is refused', () => {
-		// ⭑ Code the executor wrote: `/\r\n|\n/`, a regular expression of single backslashes. Serialised to JSON each
-		// is doubled, and the doubled pair reads as a UNC path to a scan of the serialised text — P3's 199 hits were this kind.
+	it('⭐ the archive scan holds at every depth a recording carries: code in a write_file argument, the answer envelope’s files and a review prompt embedding the work product is written; a decoded drive path, and the account name inside the envelope, are refused', () => {
+		// ⭑ Code the executor wrote: `/\r\n|\n/`, a regular expression of single backslashes, where a Phase 7 recording
+		// carries it — the write_file call (P3's 199 hits were this kind), the contract's envelope, whose work product holds
+		// each file's full text as the phases' output contract asks, and the work-product review's prompt, which embeds that
+		// work product re-serialised (`splitExecutionEnvelope`). The last two sit two JSON levels deep in their lines.
 		const code = {
 			path: 'src/lines.js',
 			contents: 'export const lines = (text) => text.split(/\\r\\n|\\n/);\n'
 		};
-		const escaped = record(arrange({ extraWrite: code }), join(tempDir('out'), 'recording'));
+		const answer = (rationale: string): string =>
+			JSON.stringify({
+				workProduct: {
+					documents: [{ path: 'docs/requirements.md', text: DOC }],
+					files: [{ path: code.path, text: code.contents }],
+					hashes: [],
+					commands: []
+				},
+				rationale: { rationale, assumptions: [], limitations: [], residualUncertainty: [] }
+			});
+		const escaped = record(
+			arrange({
+				extraWrite: code,
+				answer: answer('written'),
+				reviewPrompt: `${REVIEW_PROMPT}\n${splitExecutionEnvelope(answer('written')).workProduct}\n`
+			}),
+			join(tempDir('out'), 'recording')
+		);
 		expect(escaped.code, escaped.out).toBe(0);
 		// ⛔ And a real drive path in a decoded value still hits — built here, never spelled (`REG-F-536`).
 		const drive = [`${String.fromCodePoint(81)}:`, 'elsewhere', 'notes.txt'].join('\\');
@@ -558,6 +587,14 @@ describe('⭐ the recorder (D1) — a final archive into a replay recording, scr
 		expect(pathed.code).toBe(1);
 		expect(pathed.out).toMatch(/commands\.jsonl:1 \$\.stdout:\d+:\d+ drive-path/);
 		expect(existsSync(out)).toBe(false);
+		// ⛔ And the account name after a newline in the envelope's rationale — `\\n` in the line's own text, where no token
+		// ends, and `\n` decoded, where one does.
+		const named = join(tempDir('out'), 'recording');
+		const r = record(arrange({ answer: answer(`ran as\n${ACCOUNT}`) }), named);
+		expect(r.code, r.out).toBe(1);
+		expect(r.out).toMatch(/executor\.jsonl:1 \$\.answer\.text:\d+:\d+ account-name/);
+		expect(r.out.includes(ACCOUNT), 'a refusal printed the name it refused').toBe(false);
+		expect(existsSync(named)).toBe(false);
 	});
 
 	it('⛔ (finding 6) refuses a run whose store path is spelled by the OTHER OS family: a run is recorded on its own', () => {

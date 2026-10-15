@@ -14,13 +14,19 @@
 //   3. each call's outcome, as the host observes it, must be the recorded one — else REPLAY_STALE: a write the workspace
 //      now refuses, or a command the runner now refuses, is a run that has diverged from the recording;
 //   4. the recorded answer is returned, with the recorded producer — graded HOST_CONFIGURED.
-// ⛔ ONE AT A TIME, NOT AS PI RAN THEM (`REG-F-518`): Pi starts one message's calls together, so a recorded run may hold a
+// ⛔ ONE AT A TIME ~~, NOT AS PI RAN THEM~~ (`REG-F-518`): ~~Pi starts one message's calls together, so a recorded run may
+// hold a command that started before a write landed~~ ⭐ as Pi runs them too since `REG-D-112` (d) (`pi-execution-tools.ts`,
+// `EXECUTION_TOOL_MODE`). A run made before that started one message's calls together, so its recording may hold a
 // command that started before a write landed. The replay runs the recorded order sequentially; the recording keeps that
 // order (`executor.jsonl`) and the recorded outcomes, so a race that mattered shows as an outcome that differs.
 // ⛔ NEVER PROVIDER_REPORTED. A replayed exchange that re-reported the recorded `PROVIDER_REPORTED` identity would say a
 // provider reported a call that did not happen (`REG-F-530`, "Identity"); the host asserts the recorded producer.
 // ⚠ WHAT IT DOES NOT REPRODUCE: the composite payload Pi would have sent (`materializedInput`). The replay has none, and
 // says nothing: the exchange records the turn text, as a one-shot producer's does.
+// ⚠ AND WHAT IT DOES NOT KEY (the re-review of E4's fix round, stated, not built): the tool RESULTS the model read
+// mid-turn — `write_file`'s message, and `run_command`'s rendered exit, output and structured result (`toPiToolResult`).
+// The replay re-renders each and compares its OUTCOME CLASS alone (step 3), so a change to how a result is rendered after
+// the recording is not seen here, though the recorded answer was made reading the old rendering.
 import {
 	producerWorkingDirectory,
 	type ProducerSession,

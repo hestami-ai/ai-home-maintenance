@@ -38,11 +38,14 @@ const LIVE_BACKEND_VARIABLES = [
 	'JPWB_AGY_BIN',
 	// ⭐ `JAN-EXEC` Phase 8 (the review of E4, finding 11) — the ninth: in test mode the replay switch selects the
 	// replay's arms over the stand-ins asked about below (`replay/replay-switch.ts`).
-	'JPWB_REPLAY'
+	'JPWB_REPLAY',
+	// ⭐ The re-review of E4's fix round — the tenth: the authoring agent's model, which the replay refuses beside its
+	// switch (`replay/replay-switch.ts`, `LIVE_SELECTIONS_BESIDE_A_REPLAY`).
+	'JPWB_AGENT_MODEL'
 ] as const;
 
 describe('⭐ D8 — a gate process inherits no live-backend selection', () => {
-	it('none of the eight reached this process', () => {
+	it('none of the ten reached this process', () => {
 		const reached = LIVE_BACKEND_VARIABLES.filter((v) => process.env[v] !== undefined).map(
 			(v) => `${v}=${JSON.stringify(process.env[v])}`
 		);
@@ -73,7 +76,7 @@ describe('⭐ D8 — a gate process inherits no live-backend selection', () => {
 	// requires five passes of five. A child started without the exported environment has no flag, skips this case and
 	// fails that count; an entry point that removed MORE than the eight loses the canary and fails here.
 	it.runIf(process.env.LIVE_BACKEND_PROBE === '1')(
-		'the environment the instrument exported reached this process — its canary, not one of the eight, survived',
+		'the environment the instrument exported reached this process — its canary, not one of the ten, survived',
 		() => {
 			expect(process.env.JPWB_LIVE_BACKEND_CANARY).toBe('exported');
 		}
