@@ -670,12 +670,26 @@ export function latestDeclaredVerdicts(
 export const NEVER_ASSESSED = 'NEVER_ASSESSED';
 
 /**
+ * ⭐ E12's polish (the confirm's F3 general form) — the state of a governing policy whose latest verdict binds ANOTHER semantic
+ * version of the unit, or names none: the kernel's own word for it (`declaredPolicyVerdicts`, `DeclaredPolicySilence`).
+ */
+export const STALE_VERSION = 'STALE_VERSION';
+
+/**
  * ⭐ E12's re-review F3 — a governing policy NOT re-run, as the unit's fold reads it beside a re-run: its latest verdict, or —
- * never assessed — no assessment and the state `NEVER_ASSESSED`, which folds as a verdict that did not conclude.
+ * never assessed — no assessment and the state `NEVER_ASSESSED`, which folds as a verdict that did not conclude. ⭐ E12's
+ * polish — or, its latest verdict bound to another version of the unit, that assessment and the state `STALE_VERSION`, which
+ * folds the same way.
  */
 export type OtherDeclaredVerdict =
 	| LatestDeclaredVerdict
-	| { readonly policyId: string; readonly assessmentId: null; readonly state: typeof NEVER_ASSESSED };
+	| { readonly policyId: string; readonly assessmentId: null; readonly state: typeof NEVER_ASSESSED }
+	| { readonly policyId: string; readonly assessmentId: string; readonly state: typeof STALE_VERSION };
+
+/** The semantic version of `pwuId` an assessment BOUND, or undefined where it names none (`assessment-index.ts`'s reading). */
+const boundVersionOf = (engine: EngineHandle, assessmentId: string, pwuId: string): unknown =>
+	(engine.loadObject(assessmentId)?.state as { subjectSemanticVersions?: Record<string, unknown> } | undefined)
+		?.subjectSemanticVersions?.[pwuId];
 
 /** ⭐ `E12F` F3 — what the person is offered on a unit stranded by a declared review that did not conclude. */
 export interface DeclaredRerunOffer {
@@ -685,7 +699,8 @@ export interface DeclaredRerunOffer {
 	readonly inconclusive: readonly LatestDeclaredVerdict[];
 	/**
 	 * Every OTHER governing policy's latest verdict: what the unit's assurance is folded with after the re-run. ⭐ E12's
-	 * re-review F3 — a policy never assessed is carried too (`NEVER_ASSESSED`), never dropped.
+	 * re-review F3 — a policy never assessed is carried too (`NEVER_ASSESSED`), never dropped; ⭐ E12's polish — and one whose
+	 * concluded verdict binds another version of the unit, as `STALE_VERSION`.
 	 */
 	readonly others: readonly OtherDeclaredVerdict[];
 }
@@ -725,6 +740,17 @@ export function declaredRerunOffer(
 	const inconclusive = policies.filter((p) => latest.get(p.policyId)?.state === 'INCONCLUSIVE');
 	if (inconclusive.length === 0)
 		return { refusedBecause: 'no declared review of this unit ended INCONCLUSIVE, so none is re-run (REG-D-112 (a))' };
+	// ⛔ E12's polish (the confirm's F3 general form) — THE KERNEL'S VERSION RUNG, which the fold beside a re-run lacked: a
+	// verdict bound to another semantic version of the unit, or naming none, is not this unit's verdict — the kernel's guard
+	// reads it `STALE_VERSION` (`declaredPolicyVerdicts`) — so it is carried so, and folds as one that did not conclude. ⛔ Read
+	// at face value, a SATISFIED bound to another version folded SATISFIED, the kernel refused the hop, and the re-run's paid
+	// verdicts went unrecorded. ⭑ Restated, not called: the kernel's fold is no export of the engine's seam. Asked, as the
+	// kernel asks it, of a verdict that concluded — one this fold reads as such; any other already folds as not concluded.
+	const version = engine.loadObject(pwuId)?.semanticVersion;
+	const standing = (v: LatestDeclaredVerdict): OtherDeclaredVerdict =>
+		(STRICTEST as readonly string[]).includes(v.state) && boundVersionOf(engine, v.assessmentId, pwuId) !== version
+			? { policyId: v.policyId, assessmentId: v.assessmentId, state: STALE_VERSION }
+			: v;
 	return {
 		policies: inconclusive,
 		inconclusive: inconclusive.map((p) => latest.get(p.policyId)!),
@@ -732,17 +758,18 @@ export function declaredRerunOffer(
 		// passed over it and only the kernel's NEVER_ASSESSED rung stopped a SATISFIED hop. It is carried, and folds below.
 		others: policies
 			.filter((p) => !inconclusive.includes(p))
-			.map(
-				(p): OtherDeclaredVerdict =>
-					latest.get(p.policyId) ?? { policyId: p.policyId, assessmentId: null, state: NEVER_ASSESSED }
-			)
+			.map((p): OtherDeclaredVerdict => {
+				const v = latest.get(p.policyId);
+				return v === undefined ? { policyId: p.policyId, assessmentId: null, state: NEVER_ASSESSED } : standing(v);
+			})
 	};
 }
 
 /**
  * ⭐ `E12F` F3 — THE UNIT'S FOLD AFTER A RE-RUN: §28.2's strictest over the re-run policies' NEW verdicts and every other
  * governing policy's latest — never the re-run's alone, or a policy not re-run would go unfolded. A policy never assessed
- * (`NEVER_ASSESSED`) folds as INCONCLUSIVE: nothing concluded it.
+ * (`NEVER_ASSESSED`) folds as INCONCLUSIVE: nothing concluded it; ⭐ E12's polish — and so does one whose verdict binds another
+ * version of the unit (`STALE_VERSION`): nothing concluded it for this one.
  */
 export function foldAfterRerun(
 	plan: DeclaredSignoff,

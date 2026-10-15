@@ -66,9 +66,11 @@ import {
 	NEVER_ASSESSED,
 	planDeclaredSignoff,
 	RERUN_DECLARED_REVIEWS,
+	STALE_VERSION,
 	unsatisfyingReviews,
 	type DeclaredSignoff,
-	type GoverningDeclaredPolicy
+	type GoverningDeclaredPolicy,
+	type OtherDeclaredVerdict
 } from '$lib/server/assurance/declared-policy-signoff';
 // ⭐ `JAN-EXEC` Phase 7 completion E2 — the declared policies' reviews: the seam, its input, and the capture of its calls.
 import { createDeclaredPolicyReviewer } from '$lib/server/assurance/index';
@@ -2159,6 +2161,18 @@ async function runModelUnit(u: ModelUnitRun) {
 	return { advanced: 'executed' };
 }
 
+/**
+ * ⭐ E12's re-review F3 — why a governing policy NOT re-run holds the unit under assessment beside a re-run of its declared
+ * reviews: never assessed, ⭐ E12's polish — a verdict bound to another version of the unit, or a latest verdict that did not
+ * conclude.
+ */
+function holdsTheUnit(v: OtherDeclaredVerdict): string {
+	if (v.state === NEVER_ASSESSED) return `${v.policyId} was never assessed`;
+	if (v.state === STALE_VERSION)
+		return `${v.policyId}'s latest verdict is bound to another semantic version of this PWU than its current one`;
+	return `${v.policyId}'s latest verdict did not conclude (${v.state})`;
+}
+
 export const actions: Actions = {
 	// Instantiate a PWU Instance in this Undertaking, realizing a selected PWU Type (CON-009 ownership binding).
 	proposePwu: async ({ request, params }) => {
@@ -2965,19 +2979,15 @@ export const actions: Actions = {
 			});
 		// ⛔ E12's re-review F3 — A FOLD THE RE-RUN'S OWN VERDICTS DO NOT EXPLAIN: each concluded in the PWU's favour, and the
 		// unit did not hop, because a governing policy NOT re-run has no verdict that concluded — never assessed, or still in
-		// progress. The re-run is recorded, and the person is told which policy holds the unit under assessment, never that the
-		// unit advanced.
+		// progress, ⭐ or (E12's polish) one bound to another version of the unit. The re-run is recorded, and the person is told
+		// which policy holds the unit under assessment (`holdsTheUnit`), never that the unit advanced.
 		if (folded !== 'SATISFIED' && folded !== 'CONDITIONALLY_SATISFIED')
 			return fail(400, {
 				error:
 					`The declared reviews were re-run, and each concluded in this PWU's favour; but ` +
 					offer.others
 						.filter((v) => v.state !== 'SATISFIED' && v.state !== 'CONDITIONALLY_SATISFIED')
-						.map((v) =>
-							v.state === NEVER_ASSESSED
-								? `${v.policyId} was never assessed`
-								: `${v.policyId}'s latest verdict did not conclude (${v.state})`
-						)
+						.map(holdsTheUnit)
 						.join('; ') +
 					`: this PWU's assurance folds every governing policy's latest verdict, so it stays under assessment (REG-D-112 (a)).`
 			});

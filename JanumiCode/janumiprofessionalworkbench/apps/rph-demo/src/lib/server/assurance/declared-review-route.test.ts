@@ -88,7 +88,7 @@ vi.mock('../tools/devin-reviewer.js', async (importOriginal) => {
 });
 
 import { readFileSync } from 'node:fs';
-import { getObject, listByType, listPwus } from '@janumipwb/rph-engine';
+import { driveAssessmentToAssessing, getObject, listByType, listPwus } from '@janumipwb/rph-engine';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { actions, load } from '../../../routes/undertakings/[id]/+page.server.js';
 import { actions as undertakings } from '../../../routes/undertakings/+page.server.js';
@@ -96,7 +96,7 @@ import { actionEvent, beginExecute } from '../execution/begin-execute.testing.js
 import { dispatch, getEngine, mintUiId, resetEngine } from '../workbench.js';
 import { noProgramsDirectory } from './no-programs.testing.js';
 import { DECLARED_PRODUCING_PROMPT_INTENT, DECLARED_UNIT_PURPOSE_INTENT } from './reasoning-review-validator.js';
-import { declaredRerunOffer, NEVER_ASSESSED, RERUN_DECLARED_REVIEWS } from './declared-policy-signoff.js';
+import { declaredRerunOffer, NEVER_ASSESSED, RERUN_DECLARED_REVIEWS, STALE_VERSION } from './declared-policy-signoff.js';
 import {
 	DECLARED_RERUN_RATIONALE_REQUIRED,
 	RERUN_DECLARED_REVIEWS_CITATION
@@ -505,6 +505,76 @@ ${RERUN_DECLARED_REVIEWS_CITATION}`);
 			undefined,
 			`The declared reviews were re-run, and each concluded in this PWU's favour; but ${POLICY} was never assessed: ` +
 				"this PWU's assurance folds every governing policy's latest verdict, so it stays under assessment (REG-D-112 (a))."
+		]);
+		// ⭐ THE RE-RUN IS RECORDED — a paid review's verdict (PER-9) — and the unit does not hop.
+		expect(assessmentsUnder(pwuId, IP).map((a) => a.state)).toEqual(['INCONCLUSIVE', 'SATISFIED']);
+		expect(axesOf(pwuId)).toEqual(['UNDER_ASSURANCE', 'ASSESSING']);
+	});
+
+	it('⛔ E12’s polish (the confirm’s F3 general form) — a verdict of a policy NOT re-run that is BOUND TO ANOTHER SEMANTIC VERSION of the unit is not this unit’s, as the kernel reads it (STALE_VERSION): it folds as one that did not conclude, the re-run is recorded, and the person is told which policy', async () => {
+		// ⛔ PREDICTED RED, read from the code: `declaredRerunOffer` carried the coverage policy's latest verdict at face value —
+		// SATISFIED, though it binds version 2 of a unit at version 1 — so the re-run's SATISFIED folded SATISFIED, the kernel's
+		// STALE_VERSION rung (`declaredPolicyVerdicts`) refused the hop, and the person got the kernel's message, the re-run's
+		// verdict unrecorded.
+		const pwuId = await strandedUnit();
+		// ⭑ The kernel admits a verdict bound to a version its subject is not at (`RPH-ASR-010`, unenforced), and test mode's
+		// `/test-api/dispatch` reaches it through this same command bus: a later SATISFIED of the coverage policy, binding 2.
+		const policy = getObject(getEngine(), POLICY) as { version?: string; criteria?: { id: string }[] };
+		const stale = mintUiId('asm');
+		const evaluator = { actorId: 'devin', actorType: 'AGENT' as const, displayName: 'devin (fixture-assurance-model)' };
+		const steps: [string, string, string, unknown][] = [];
+		driveAssessmentToAssessing((...step) => steps.push(step), {
+			assessmentId: stale,
+			assurancePolicyId: POLICY,
+			policyVersion: String(policy.version),
+			subjectObjectIds: [pwuId],
+			subjectSemanticVersions: { [pwuId]: 2 },
+			claimIds: [],
+			evaluator
+		});
+		for (const c of policy.criteria ?? []) steps.push(['RecordCriterionResult', 'ASSURANCE_ASSESSMENT', stale, { criterionId: c.id, result: 'MET' }]);
+		steps.push([
+			'CompleteAssuranceAssessment',
+			'ASSURANCE_ASSESSMENT',
+			stale,
+			{
+				validatorResult: {
+					validatorId: 'reviewer.declared-policy',
+					validatorVersion: '1',
+					policyId: POLICY,
+					policyVersion: String(policy.version),
+					assessmentId: stale,
+					subjectObjectIds: [pwuId],
+					subjectSemanticVersions: { [pwuId]: 2 },
+					claimResults: [],
+					evidenceConsideredIds: [],
+					evidenceRejected: [],
+					observations: [],
+					dispositionRecommendation: 'SATISFIED',
+					recommendedControlActions: [],
+					residualUncertainty: [],
+					limitations: [],
+					executionProvenance: { evaluator }
+				}
+			}
+		]);
+		for (const [ct, agg, id, payload] of steps) {
+			const r = dispatch(ct, agg, id, payload);
+			expect(r.status, `arrangement: ${ct} — ${r.error?.message ?? ''}`).toBe('ACCEPTED');
+		}
+		expect(assessmentsUnder(pwuId, POLICY).map((a) => a.state), 'arrangement').toEqual(['SATISFIED', 'SATISFIED']);
+		expect(getEngine().loadObject(pwuId)?.semanticVersion, 'arrangement: the unit is at version 1').toBe(1);
+		const offer = declaredRerunOffer(getEngine(), pwuId);
+		expect('others' in offer ? offer.others : offer, 'a verdict bound to another version was folded at face value').toEqual([
+			{ policyId: POLICY, assessmentId: stale, state: STALE_VERSION }
+		]);
+		seam.failing.clear();
+		const r = await rerunDeclared(pwuId);
+		expect([r.advanced, r.data?.error]).toEqual([
+			undefined,
+			`The declared reviews were re-run, and each concluded in this PWU's favour; but ${POLICY}'s latest verdict is bound to ` +
+				"another semantic version of this PWU than its current one: this PWU's assurance folds every governing policy's latest " +
+				'verdict, so it stays under assessment (REG-D-112 (a)).'
 		]);
 		// ⭐ THE RE-RUN IS RECORDED — a paid review's verdict (PER-9) — and the unit does not hop.
 		expect(assessmentsUnder(pwuId, IP).map((a) => a.state)).toEqual(['INCONCLUSIVE', 'SATISFIED']);

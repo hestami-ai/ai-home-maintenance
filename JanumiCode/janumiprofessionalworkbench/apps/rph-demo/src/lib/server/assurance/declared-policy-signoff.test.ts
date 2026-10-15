@@ -43,6 +43,7 @@ import {
 	NEVER_ASSESSED,
 	noCriterionDeclared,
 	planDeclaredSignoff,
+	STALE_VERSION,
 	unsatisfyingReviews,
 	type DeclaredSignoff
 } from './declared-policy-signoff.js';
@@ -796,5 +797,13 @@ describe('⭐ E12F F3 — the unit’s fold after a re-run reads every governing
 		const never = [{ policyId: 'pol_other', assessmentId: null, state: NEVER_ASSESSED } as const];
 		expect(foldAfterRerun(rerun(['SATISFIED']), never)).toBe('INCONCLUSIVE');
 		expect(foldAfterRerun(rerun(['REJECTED']), never), 'the strictest still wins').toBe('REJECTED');
+	});
+
+	it('⛔ E12’s polish — a verdict bound to ANOTHER VERSION of the unit, as `declaredRerunOffer` carries it (STALE_VERSION), is no pass either: it folds as INCONCLUSIVE', () => {
+		// ⭑ A characterization: the fold is unchanged — it reads any state outside §28.2's four as not concluded. The offer's own
+		// reading of a verdict's bound version is driven through the page's action (`declared-review-route.test.ts`).
+		const stale = [{ policyId: 'pol_other', assessmentId: 'asm_other', state: STALE_VERSION } as const];
+		expect(foldAfterRerun(rerun(['SATISFIED']), stale)).toBe('INCONCLUSIVE');
+		expect(foldAfterRerun(rerun(['REJECTED']), stale), 'the strictest still wins').toBe('REJECTED');
 	});
 });
