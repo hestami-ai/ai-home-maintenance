@@ -2965,7 +2965,8 @@ export const actions: Actions = {
 			});
 		// ⛔ E12's re-review F3 — A FOLD THE RE-RUN'S OWN VERDICTS DO NOT EXPLAIN: each concluded in the PWU's favour, and the
 		// unit did not hop, because a governing policy NOT re-run has no verdict that concluded — never assessed, or still in
-		// progress. The re-run is recorded; the person is told which policy holds the unit under assessment, never "re-run".
+		// progress. The re-run is recorded, and the person is told which policy holds the unit under assessment, never that the
+		// unit advanced.
 		if (folded !== 'SATISFIED' && folded !== 'CONDITIONALLY_SATISFIED')
 			return fail(400, {
 				error:

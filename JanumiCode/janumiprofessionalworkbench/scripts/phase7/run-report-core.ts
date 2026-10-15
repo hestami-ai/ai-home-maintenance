@@ -1978,8 +1978,8 @@ function completion(v: UnitView, row: string): MatrixCell {
 	if (s.assurance === 'CONDITIONALLY_SATISFIED')
 		return cell('7', row, 'broke', ['REG-F-403'], [facts, 'a CONDITIONALLY_SATISFIED unit can never be marked satisfied']);
 	// ⛔ E12's re-review F1 (D4) — A SIGN-OFF ACT THAT GAVE NO ANSWER WITHIN ITS BOUND: the run ended there, its final archive
-	// taken while the server may still have been running the act, which is killed unfinished (REG-F-527). Why it outlasted a
-	// bound counted from the reviewer's own, no register entry names.
+	// taken while the server may still have been running the act, which is killed unfinished (REG-F-527). Why it outlasted its
+	// bound, no register entry names.
 	const outlasted = v.signOffOutlasted;
 	if (outlasted !== null)
 		return cell(
