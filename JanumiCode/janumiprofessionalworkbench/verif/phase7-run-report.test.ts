@@ -1091,6 +1091,76 @@ describe('⭐⭐ JAN-EXEC Phase 7 completion E2 — stage 5b read from the recor
 		]);
 	});
 
+	// ── ⛔⛔ E12’s polish (fix2’s F9; the lead’s delegated decision of 2026-10-15, to be registered) — 5b READS THE LATEST DECLARED
+	// VERDICT PER (UNIT, POLICY), each superseded one listed as history beside it, as P7-6R's re-runs are listed.
+	/**
+	 * A complete run whose design unit's first declared policy was judged twice: a first review that answered nothing, made
+	 * before the fixture's own, which stands as its re-run (REG-D-112 (a)) — `first`'s fields laid over the first review.
+	 */
+	const rerunOfDesign = (first: Record<string, unknown> = {}) => {
+		const run = aRun();
+		const policyId = PHASE7_UNITS[2]!.type.policyIds[0]!;
+		let seq = 90_000;
+		const event = (eventType: string, payload: Record<string, unknown>): StoredEvent => ({
+			sequence: ++seq,
+			eventType,
+			aggregateType: '',
+			aggregateId: 'asm_design_first',
+			commandId: null,
+			payload: { assessmentId: 'asm_design_first', ...payload }
+		});
+		const store: StoreRows = {
+			...run.store,
+			objects: [
+				{
+					id: 'asm_design_first',
+					objectType: 'ASSURANCE_ASSESSMENT',
+					state: { assurancePolicyId: policyId, subjectObjectIds: ['pwu_design'], assessmentState: 'INCONCLUSIVE', ...first },
+					firstSequence: 0
+				},
+				...run.store.objects
+			],
+			events: [
+				...run.store.events,
+				...POLICY_CRITERIA.get(policyId)!.map((c) => event('AssuranceCriterionEvaluated', { criterionId: c.id, result: 'UNABLE_TO_DETERMINE' })),
+				event('AssuranceAssessmentCompleted', { validatorId: DECLARED_REVIEW_VALIDATORS[0] })
+			]
+		};
+		return { r: reportOf({ ...run, store }).report, policyId };
+	};
+
+	it('⛔ E12’s polish (fix2’s F9) — a unit the rule recovered by a re-run of its declared review reads as its LATEST verdict says: 5b as intended, the superseded review listed as history beside it, the heading 14 of 14', () => {
+		// ⛔ PREDICTED RED, read from the code: every declared verdict was read as speaking — 5b broke (REG-F-489) from the review the
+		// re-run replaced, and the heading read "15 of 14".
+		const { r, policyId } = rerunOfDesign();
+		const c = cellOf(r, '5b', 'design');
+		expect([c.value, c.registerIds], 'the review the re-run replaced still speaks').toEqual(['as intended', []]);
+		expect(c.basis.at(-1)).toBe(`listed as history: ${policyId} INCONCLUSIVE (asm_design_first, broke), superseded by asm_pwu_design_0`);
+		expect([r.declaredVerdicts.rows.length, r.declaredVerdicts.history.map((d) => [d.assessmentId, d.supersededBy])]).toEqual([
+			14,
+			[['asm_design_first', 'asm_pwu_design_0']]
+		]);
+		const md = renderMarkdown(r);
+		expect(md).toContain(
+			'## The declared verdicts (P7-4g) — 14 of 14, each read from its recorded criterion results; 1 verdict superseded, each listed as history beside the one that superseded it (REG-D-112 (a))'
+		);
+		// ⭑ Beside it: the history row directly under the verdict that superseded it.
+		const lines = md.split('\n');
+		expect(lines[lines.findIndex((l) => l.startsWith('| asm_pwu_design_0 |')) + 1]).toBe(
+			`| asm_design_first | design | ${policyId} | INCONCLUSIVE | 0 of 6 | yes | broke; history: superseded by asm_pwu_design_0 |`
+		);
+	});
+
+	it('⭑ CONTROL (fix2’s F9) — "latest" is the product’s own reading, by updatedAt, ties to the last made: a review updated after the re-run’s speaks, and 5b reads it', () => {
+		// ⭑ `latestDeclaredVerdicts` (`declared-policy-signoff.ts`) and the kernel's index read the same rule; a reading by the
+		// order made alone would let the re-run speak here.
+		const { r } = rerunOfDesign({ updatedAt: '2026-10-15T12:00:00.000Z' });
+		expect([cellOf(r, '5b', 'design').value, r.declaredVerdicts.history.map((d) => [d.assessmentId, d.supersededBy])]).toEqual([
+			'broke',
+			[['asm_pwu_design_0', 'asm_design_first']]
+		]);
+	});
+
 	it('⭑ CONTROL — a verdict the pre-E2 sign-off recorded is still read as it was: vacuous by construction (REG-F-523)', () => {
 		const r = reportOf(aRun({ 'end-to-end': { declared: 'legacy' } })).report;
 		expect(shown(cellOf(r, '5b', 'end-to-end'))).toEqual(['vacuous by construction', ['REG-F-406', 'REG-F-523']]);

@@ -27930,5 +27930,59 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/phase7-run-report.test.ts"],
 		why: "PROMISE (E12's polish, fix2's F8): the printed list says which read held its act back. WHO RELIES: a reader of report.md. WHAT THE MUTATION DOES: a read that held its act back prints like one that let it be pressed, save its figures. OBSERVED (bun run mutants -- (the E12 polish ids), 2026-10-15, in the polish worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M124-a-read-that-held-its-act-back-is-printed-as-one-that-did-not ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'; its red, the mutation applied by hand and the file restored byte for byte: 'AssertionError: expected '# Phase 7 run report\\n\\n- **Basis:** …' to contain '  - design, before its sign-off: 210 …''",
 		source: "JAN-EXEC Phase 7 completion E12, polish (fix2's F8, decided by the lead on 2026-10-15): the run report discloses what the lane held back - stage 7 reads a sign-off the lane held back as held back, its reason and the limit it read, and the declared re-run the limit held back beside a refused Record Assurance; the reviewer-calls section lists the lane's own reads of the limit, each before a paid act, and which held its act back"
+	},
+	{
+		id: "E12-M125-every-declared-verdict-speaks",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "\t\treturn id === d.assessmentId ? d : { ...d, supersededBy: id };",
+		replace: "\t\treturn id === d.assessmentId || id !== d.assessmentId ? d : { ...d, supersededBy: id };",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE (E12's polish, fix2's F9; the lead's delegated decision of 2026-10-15, to be registered): stage 5b reads the LATEST declared verdict per (unit, policy), each superseded one history - so a unit the rule recovered by a re-run of its declared review (REG-D-112 (a)) reads as its latest verdict says. WHO RELIES: P7-5, reading the paid run's 5b and the 'N of 14' heading. WHAT THE MUTATION DOES: no verdict is superseded, so the review the re-run replaced still speaks: 5b broke (REG-F-489) and the heading 15 of 14. OBSERVED (bun run mutants -- (the E12 polish ids), 2026-10-15, in the polish worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M125-every-declared-verdict-speaks ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'; its red, the mutation applied by hand and the file restored byte for byte: 'AssertionError: the review the re-run replaced still speaks: expected [ 'broke', [ 'REG-F-489' ] ] to deeply equal [ 'as intended', [] ]'",
+		source: "JAN-EXEC Phase 7 completion E12, polish (fix2's F9, decided by the lead on 2026-10-15): stage 5b reads the latest declared verdict per (unit, policy), as the product reads it - by updatedAt, ties to the last made; each superseded verdict is listed as history beside the one that superseded it, in 5b's basis and the declared verdicts table, and the heading and the REG-F-523 caveat count the verdicts that speak"
+	},
+	{
+		id: "E12-M126-the-latest-verdict-is-read-by-the-order-made-alone",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "if (prev === undefined || at >= prev.at) speaks.set(",
+		replace: "if (prev === undefined || at === at) speaks.set(",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE (E12's polish, fix2's F9): 'latest' is the product's own reading - by the assessment's updatedAt, ties to the last made (latestDeclaredVerdicts; the kernel's latestAssessmentByPolicy) - so the report and the product agree on which verdict speaks. WHO RELIES: 5b, against the page and the kernel's guard. WHAT THE MUTATION DOES: the last made always speaks, whatever its updatedAt. OBSERVED (bun run mutants -- (the E12 polish ids), 2026-10-15, in the polish worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M126-the-latest-verdict-is-read-by-the-order-made-alone ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'; its red, the mutation applied by hand and the file restored byte for byte: 'AssertionError: expected [ 'as intended', …(1) ] to deeply equal [ 'broke', …(1) ]'",
+		source: "JAN-EXEC Phase 7 completion E12, polish (fix2's F9, decided by the lead on 2026-10-15): stage 5b reads the latest declared verdict per (unit, policy), as the product reads it - by updatedAt, ties to the last made; each superseded verdict is listed as history beside the one that superseded it, in 5b's basis and the declared verdicts table, and the heading and the REG-F-523 caveat count the verdicts that speak"
+	},
+	{
+		id: "E12-M127-5b-lists-no-history",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "\t\t`verdicts: ${v.declared.map((d) => `${d.policyId} ${d.state}`).join('; ')}`,\n\t\t...historyOf(v)\n",
+		replace: "\t\t`verdicts: ${v.declared.map((d) => `${d.policyId} ${d.state}`).join('; ')}`\n",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE (E12's polish, fix2's F9): each superseded declared verdict is listed as history beside the ones that speak, in 5b's basis. WHO RELIES: a reader of a recovered unit's 5b, who sees the review the re-run replaced. WHAT THE MUTATION DOES: the as-intended cell lists no history. OBSERVED (bun run mutants -- (the E12 polish ids), 2026-10-15, in the polish worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M127-5b-lists-no-history       ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'; its red, the mutation applied by hand and the file restored byte for byte: 'AssertionError: expected 'verdicts: pol_assumption_disclosure S…' to be 'listed as history: pol_assumption_dis…' // Object.is equality'",
+		source: "JAN-EXEC Phase 7 completion E12, polish (fix2's F9, decided by the lead on 2026-10-15): stage 5b reads the latest declared verdict per (unit, policy), as the product reads it - by updatedAt, ties to the last made; each superseded verdict is listed as history beside the one that superseded it, in 5b's basis and the declared verdicts table, and the heading and the REG-F-523 caveat count the verdicts that speak"
+	},
+	{
+		id: "E12-M128-the-table-drops-the-history",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "\t\t\t...history.filter((h) => h.supersededBy === d.assessmentId).map(declaredLine)\n",
+		replace: "",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE (E12's polish, fix2's F9): the declared verdicts table lists each superseded verdict directly under the verdict that superseded it. WHO RELIES: a reader of report.md. WHAT THE MUTATION DOES: the history rows are dropped from the table. OBSERVED (bun run mutants -- (the E12 polish ids), 2026-10-15, in the polish worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M128-the-table-drops-the-history ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'; its red, the mutation applied by hand and the file restored byte for byte: 'AssertionError: expected '| asm_pwu_design_1 | design | pol_dec…' to be '| asm_design_first | design | pol_ass…' // Object.is equality'",
+		source: "JAN-EXEC Phase 7 completion E12, polish (fix2's F9, decided by the lead on 2026-10-15): stage 5b reads the latest declared verdict per (unit, policy), as the product reads it - by updatedAt, ties to the last made; each superseded verdict is listed as history beside the one that superseded it, in 5b's basis and the declared verdicts table, and the heading and the REG-F-523 caveat count the verdicts that speak"
+	},
+	{
+		id: "E12-M129-the-heading-counts-the-history",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "— ${r.declaredVerdicts.rows.length} of ${r.declaredVerdicts.expected}, each read",
+		replace: "— ${r.declaredVerdicts.rows.length + history.length} of ${r.declaredVerdicts.expected}, each read",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE (E12's polish, fix2's F9): the heading counts the verdicts that speak against the 14 a complete run signs off. WHO RELIES: a reader of report.md. WHAT THE MUTATION DOES: the heading counts the history too, 15 of 14. OBSERVED (bun run mutants -- (the E12 polish ids), 2026-10-15, in the polish worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M129-the-heading-counts-the-history ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'; its red, the mutation applied by hand and the file restored byte for byte: 'AssertionError: expected '# Phase 7 run report\\n\\n- **Basis:** …' to contain '## The declared verdicts (P7-4g) — 14…''",
+		source: "JAN-EXEC Phase 7 completion E12, polish (fix2's F9, decided by the lead on 2026-10-15): stage 5b reads the latest declared verdict per (unit, policy), as the product reads it - by updatedAt, ties to the last made; each superseded verdict is listed as history beside the one that superseded it, in 5b's basis and the declared verdicts table, and the heading and the REG-F-523 caveat count the verdicts that speak"
+	},
+	{
+		id: "E12-M130-the-report-reads-every-verdict-as-speaking",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "const declared = verdicts.filter((d) => d.supersededBy === null);",
+		replace: "const declared = verdicts;",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE (E12's polish, fix2's F9): what the report reads as the verdicts - 5b, the table's rows, the heading, the REG-F-523 caveat's count - is the verdicts that speak. WHO RELIES: every reader of the declared verdicts. WHAT THE MUTATION DOES: every verdict, superseded ones included, is read as speaking. OBSERVED (bun run mutants -- (the E12 polish ids), 2026-10-15, in the polish worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M130-the-report-reads-every-verdict-as-speaking ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'; its red, the mutation applied by hand and the file restored byte for byte: 'AssertionError: the review the re-run replaced still speaks: expected [ 'broke', [ 'REG-F-489' ] ] to deeply equal [ 'as intended', [] ]'",
+		source: "JAN-EXEC Phase 7 completion E12, polish (fix2's F9, decided by the lead on 2026-10-15): stage 5b reads the latest declared verdict per (unit, policy), as the product reads it - by updatedAt, ties to the last made; each superseded verdict is listed as history beside the one that superseded it, in 5b's basis and the declared verdicts table, and the heading and the REG-F-523 caveat count the verdicts that speak"
 	}
 ];

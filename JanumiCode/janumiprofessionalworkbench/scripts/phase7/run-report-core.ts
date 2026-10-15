@@ -463,6 +463,12 @@ export interface DeclaredVerdict {
 	readonly producer: string | null;
 	/** ⭐ E2 — why, in the record's own terms: what was unanswered, or what the answers give. */
 	readonly basis: readonly string[];
+	/**
+	 * ⭐ E12's polish (fix2's F9; the lead's delegated decision of 2026-10-15, to be registered) — the verdict that speaks for this
+	 * one's (unit, policy) when it is a later one — a re-run of its declared review (`REG-D-112` (a)) — or null when this one
+	 * speaks; read as the product reads it (`supersessions`).
+	 */
+	readonly supersededBy: string | null;
 }
 
 export interface ContentPointer {
@@ -589,7 +595,15 @@ export interface RunReport {
 	readonly pairing: PairingReport;
 	readonly reviewerCalls: ReviewerCalls;
 	readonly audit: AuditReport;
-	readonly declaredVerdicts: { readonly expected: number; readonly rows: readonly DeclaredVerdict[] };
+	/**
+	 * ⭐ E12's polish (fix2's F9) — `rows`, the verdict that speaks per (unit, policy), the latest; `history`, each one a later
+	 * one superseded, its `supersededBy` naming the verdict that speaks.
+	 */
+	readonly declaredVerdicts: {
+		readonly expected: number;
+		readonly rows: readonly DeclaredVerdict[];
+		readonly history: readonly DeclaredVerdict[];
+	};
 	readonly adjudication: { readonly classes: readonly string[]; readonly rows: readonly AdjudicationRow[] };
 	readonly manifest: {
 		readonly commands: number;
@@ -2019,7 +2033,10 @@ interface UnitView {
 	readonly signOffOutlasted: LaneUnit['signOffOutlasted'];
 	readonly reviews: readonly PairingRow[];
 	readonly runs: UnitRuns;
+	/** ⭐ E12's polish (fix2's F9) — its declared verdicts that speak, the latest per policy (`supersessions`). */
 	readonly declared: readonly DeclaredVerdict[];
+	/** ⭐ E12's polish (fix2's F9) — its declared verdicts a later one superseded, listed as history. */
+	readonly superseded: readonly DeclaredVerdict[];
 	readonly signOffAttempted: boolean;
 	/** ⭐ E12's polish (fix2's F8) — what the lane held back of its sign-off, and why (`LaneUnit.signOffHeldBack`). */
 	readonly heldBack: LaneUnit['signOffHeldBack'];
@@ -2261,7 +2278,8 @@ function stageFiveB(v: UnitView): MatrixCell {
 	const vacuous = v.declared.filter((d) => d.value === 'vacuous by construction');
 	if (vacuous.length > 0)
 		return cell('5b', v.unit.slug, 'vacuous by construction', ['REG-F-523', 'REG-F-406'], [
-			`${plural(vacuous.length, 'declared verdict', 'declared verdicts')} signed off before E2, each computed from the policy's required evidence alone (REG-D-102 (6))`
+			`${plural(vacuous.length, 'declared verdict', 'declared verdicts')} signed off before E2, each computed from the policy's required evidence alone (REG-D-102 (6))`,
+			...historyOf(v)
 		]);
 	const broke = v.declared.filter((d) => d.value === 'broke');
 	if (broke.length > 0)
@@ -2270,14 +2288,29 @@ function stageFiveB(v: UnitView): MatrixCell {
 			v.unit.slug,
 			'broke',
 			broke.flatMap((d) => d.registerIds),
-			broke.flatMap((d) => d.basis),
+			[...broke.flatMap((d) => d.basis), ...historyOf(v)],
 			{ unregistered: broke.some((d) => d.registerIds.length === 0) }
 		);
 	return cell('5b', v.unit.slug, 'as intended', [], [
 		`${plural(v.declared.length, 'declared verdict', 'declared verdicts')}, each with every criterion of its policy answered and its verdict the one its answers give (REG-D-110 (3))`,
-		`verdicts: ${v.declared.map((d) => `${d.policyId} ${d.state}`).join('; ')}`
+		`verdicts: ${v.declared.map((d) => `${d.policyId} ${d.state}`).join('; ')}`,
+		...historyOf(v)
 	]);
 }
+
+/**
+ * ⭐ E12's polish (fix2's F9; the lead's delegated decision of 2026-10-15, to be registered) — the unit's superseded declared
+ * verdicts, LISTED AS HISTORY beside the verdicts that speak, as P7-6R's re-runs are listed beside the Decision that made each:
+ * 5b reads the latest per (unit, policy) alone (`supersessions`).
+ */
+const historyOf = (v: UnitView): string[] =>
+	v.superseded.length === 0
+		? []
+		: [
+				`listed as history: ${v.superseded
+					.map((d) => `${d.policyId} ${d.state} (${d.assessmentId}, ${d.value}), superseded by ${String(d.supersededBy)}`)
+					.join('; ')}`
+			];
 
 /** Stage 6 — the product: our checks (P7-4), never this report. */
 function stageSix(v: UnitView): MatrixCell {
@@ -2414,7 +2447,10 @@ const EVIDENCE_CEILINGS: ReadonlySet<string> = new Set(['CONDITIONALLY_SATISFIED
  * stricter of the two. ⭑ An engine built for tests counts a stipulated row as met; no run this report reads is one.
  * ⭐ E12's re-review F5 — and a review that answered NO criterion gives INCONCLUSIVE, as `verdictOf` computes it.
  */
-function judgedVerdict(ix: Index, a: StoredObject): Omit<DeclaredVerdict, 'assessmentId' | 'unit' | 'validatorId'> {
+function judgedVerdict(
+	ix: Index,
+	a: StoredObject
+): Omit<DeclaredVerdict, 'assessmentId' | 'unit' | 'validatorId' | 'supersededBy'> {
 	const policyId = str(a.state.assurancePolicyId);
 	const state = str(a.state.assessmentState);
 	const policyState = ix.byId.get(policyId)?.state ?? {};
@@ -2496,7 +2532,7 @@ function judgedVerdict(ix: Index, a: StoredObject): Omit<DeclaredVerdict, 'asses
  */
 function declaredVerdicts(ix: Index, units: readonly Unit[]): DeclaredVerdict[] {
 	const judged = DECLARED_REVIEW_VALIDATORS as readonly string[];
-	return ix.ofType('ASSURANCE_ASSESSMENT').flatMap((a): DeclaredVerdict[] => {
+	const verdicts = ix.ofType('ASSURANCE_ASSESSMENT').flatMap((a): DeclaredVerdict[] => {
 		const validatorId = str(ix.completionOf.get(a.id)?.payload.validatorId);
 		const unit = units.find((u) => u.object !== null && u.object.id === strs(a.state.subjectObjectIds)[0])?.slug ?? null;
 		const results = ix.criteriaOf.get(a.id)?.length ?? 0;
@@ -2514,11 +2550,36 @@ function declaredVerdicts(ix: Index, units: readonly Unit[]): DeclaredVerdict[] 
 					criteria: { declared: 0, recorded: results, answered: 0, undetermined: 0, stipulatedRows: 0 },
 					followsFromAnswers: null,
 					producer: str(rec(a.state.producer).actorId) || null,
-					basis: ['signed off before E2, from the policy’s required evidence alone (REG-F-523)']
+					basis: ['signed off before E2, from the policy’s required evidence alone (REG-F-523)'],
+					supersededBy: null
 				}
 			];
 		if (!judged.includes(validatorId)) return [];
-		return [{ assessmentId: a.id, unit, validatorId, ...judgedVerdict(ix, a) }];
+		return [{ assessmentId: a.id, unit, validatorId, ...judgedVerdict(ix, a), supersededBy: null }];
+	});
+	return supersessions(ix, verdicts);
+}
+
+/**
+ * ⭐⭐ E12's polish (fix2's F9; the lead's delegated decision of 2026-10-15, to be registered) — WHICH DECLARED VERDICT SPEAKS
+ * for each (subject, policy): the latest, read as the product reads it — by the assessment's `updatedAt`, ties to the last made
+ * (`declared-policy-signoff.ts` `latestDeclaredVerdicts`, the kernel's `latestAssessmentByPolicy`) — and each earlier one names
+ * it (`supersededBy`). ⛔ Every verdict was read as speaking: `REG-D-112` (a) keeps the INCONCLUSIVE review beside its re-run,
+ * so a unit the rule recovered still read 5b broke from the review the re-run replaced, and the heading counted 15 of 14.
+ */
+function supersessions(ix: Index, verdicts: readonly DeclaredVerdict[]): DeclaredVerdict[] {
+	const keyOf = (d: DeclaredVerdict): string =>
+		`${strs(ix.byId.get(d.assessmentId)?.state.subjectObjectIds)[0] ?? ''} ${d.policyId}`;
+	const speaks = new Map<string, { readonly id: string; readonly at: string }>();
+	// ⚠ In the order made: `ofType` sorts by each assessment's first event, the order `listAssessments` reads them in.
+	for (const d of verdicts) {
+		const at = str(ix.byId.get(d.assessmentId)?.state.updatedAt);
+		const prev = speaks.get(keyOf(d));
+		if (prev === undefined || at >= prev.at) speaks.set(keyOf(d), { id: d.assessmentId, at });
+	}
+	return verdicts.map((d) => {
+		const id = speaks.get(keyOf(d))!.id;
+		return id === d.assessmentId ? d : { ...d, supersededBy: id };
 	});
 }
 
@@ -2528,7 +2589,8 @@ function unitView(
 	units: readonly Unit[],
 	lane: LaneRows,
 	pairing: PairingReport,
-	declared: readonly DeclaredVerdict[]
+	declared: readonly DeclaredVerdict[],
+	history: readonly DeclaredVerdict[]
 ): UnitView {
 	const state = u.object
 		? {
@@ -2559,6 +2621,7 @@ function unitView(
 		reviews: pairing.rows.filter((r) => r.unit === u.slug),
 		runs: unitRuns(u, units, lane),
 		declared: declared.filter((d) => d.unit === u.slug),
+		superseded: history.filter((d) => d.unit === u.slug),
 		signOffAttempted:
 			u.lane?.signOffAttempted === true ||
 			actions.some((a) => a.action === 'recordAssurance' || a.action === 'markSatisfied'),
@@ -2668,12 +2731,15 @@ export function buildRunReport(
 	if (lane.run === undefined) problems.push('lane/run.json is absent: the lane’s own record of each unit is not read');
 	const { undertakingId, units, structure } = resolveUnits(ix, laneUnits(lane.run), problems);
 	const pairing = buildPairing(ix, units);
-	const declared = declaredVerdicts(ix, units);
+	// ⭐ E12's polish (fix2's F9) — the verdicts that speak, the latest per (unit, policy), and the history beside them.
+	const verdicts = declaredVerdicts(ix, units);
+	const declared = verdicts.filter((d) => d.supersededBy === null);
+	const history = verdicts.filter((d) => d.supersededBy !== null);
 	const demoDb = str(rec(rec(lane.boot).overlay).JPWB_DEMO_DB);
 	if (demoDb === '')
 		problems.push('lane/boot.json names no JPWB_DEMO_DB: no recorded path can be made relative to the workspace');
 	const workspace = demoDb === '' || undertakingId === null ? null : workspaceDirectoryFor(demoDb, undertakingId);
-	const views = units.map((u) => unitView(ix, u, units, lane, pairing, declared));
+	const views = units.map((u) => unitView(ix, u, units, lane, pairing, declared, history));
 	const endReason = str(rec(rec(lane.run).end).reason) || null;
 	// ⛔ D4 — every act the lane presses ends the run when it outlasts its bound: a Begin & Execute, ⭐ E12's re-review F1 —
 	// a recovery act the rule pressed, and a sign-off act. So the end names one of them.
@@ -2724,7 +2790,7 @@ export function buildRunReport(
 		pairing,
 		reviewerCalls: buildReviewerCalls(ix, units, lane),
 		audit: buildAudit(ix, units, undertakingId, lane),
-		declaredVerdicts: { expected: DECLARED_VERDICTS_EXPECTED, rows: declared },
+		declaredVerdicts: { expected: DECLARED_VERDICTS_EXPECTED, rows: declared, history },
 		adjudication: {
 			classes: ADJUDICATION_CLASSES,
 			rows: pairing.rows.map((row) => adjudicationRow(ix, units, row, workspace, o.accountNames))
@@ -2895,9 +2961,11 @@ function adjudicationLine(a: AdjudicationRow): string {
 function declaredLine(d: DeclaredVerdict): string {
 	let follows = '—';
 	if (d.followsFromAnswers !== null) follows = d.followsFromAnswers ? 'yes' : 'no';
+	// ⭐ E12's polish (fix2's F9) — a superseded verdict is history: its value said, and the verdict that superseded it.
+	const value = d.supersededBy === null ? d.value : `${d.value}; history: superseded by ${d.supersededBy}`;
 	return (
 		`| ${d.assessmentId} | ${d.unit ?? '—'} | ${d.policyId} | ${d.state} | ${d.criteria.answered} of ${d.criteria.declared} | ` +
-		`${follows} | ${d.value} |`
+		`${follows} | ${value} |`
 	);
 }
 
@@ -2905,13 +2973,21 @@ function verdictLines(r: RunReport): string[] {
 	const unrecorded = Object.entries(r.manifest.unrecordedRuns)
 		.map(([u, n]) => `${u} ${n ?? 'unknown'}`)
 		.join('; ');
+	const history = r.declaredVerdicts.history;
 	return [
-		// ⭐ E2 (design B8) — ~~"each vacuous by construction"~~: each read from its recorded criterion results.
-		`## The declared verdicts (P7-4g) — ${r.declaredVerdicts.rows.length} of ${r.declaredVerdicts.expected}, each read from its recorded criterion results`,
+		// ⭐ E2 (design B8) — ~~"each vacuous by construction"~~: each read from its recorded criterion results. ⭐ E12's polish
+		// (fix2's F9) — the count is of the verdicts that speak; each one superseded is listed under the verdict that superseded it.
+		`## The declared verdicts (P7-4g) — ${r.declaredVerdicts.rows.length} of ${r.declaredVerdicts.expected}, each read from its recorded criterion results` +
+			(history.length === 0
+				? ''
+				: `; ${plural(history.length, 'verdict', 'verdicts')} superseded, each listed as history beside the one that superseded it (REG-D-112 (a))`),
 		'',
 		'| Assessment | Unit | Policy | State | Criteria answered | Follows from its answers | Value |',
 		'|---|---|---|---|---|---|---|',
-		...r.declaredVerdicts.rows.map(declaredLine),
+		...r.declaredVerdicts.rows.flatMap((d) => [
+			declaredLine(d),
+			...history.filter((h) => h.supersededBy === d.assessmentId).map(declaredLine)
+		]),
 		'',
 		'## The adjudication table’s rows (P7-4f) — classification left for a person',
 		'',
