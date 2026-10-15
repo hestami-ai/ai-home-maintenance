@@ -45,7 +45,7 @@ import {
 	type Phase7TypeDeclaration
 } from './pwa-content.js';
 // ⭐ E3 (C2, C5) — half B's units, read from the published PWA in the tree's order, and its authoring floor.
-import { floorDispositions, treeAgainstPlan, unitsInTreeOrder } from './half-b.js';
+import { floorDispositions, treeAgainstPlan, TURN_SETTLED, unitsInTreeOrder } from './half-b.js';
 import {
 	MANIFEST_VERSION,
 	manifestProblems,
@@ -1938,10 +1938,12 @@ interface UnitView {
 	readonly exchanges: { readonly total: number; readonly broken: number; readonly unretained: number };
 	readonly contentStore: boolean;
 	/**
-	 * ⭐ `REG-D-112` (E3's review, finding 3) — a LEAF of the tree, as C4's model-leaf check reads one (`candidate-checks.ts`):
-	 * its type permits no child type of its PWA (`leafOf`). Only a leaf's work is a model's to do (`REG-F-505`).
+	 * ⭐ `REG-D-112` (E3's re-review, finding 1) — the units the tree BUILT under it, by slug (`childrenOf`): none, and it is a
+	 * LEAF, whose work is a model's to do (`REG-F-505`). Instantiation builds the plan (`planComposition`), as C4 reads a type
+	 * the plan gives a child (`candidate-checks.ts`). ⛔ ~~Its type permits a child type of its PWA~~: a type whose permitted
+	 * children are all conditional permits them, and its unit has none (`REG-F-516`).
 	 */
-	readonly leaf: boolean;
+	readonly children: readonly string[];
 }
 
 /** Why a stage after 3 never concluded for a unit whose Begin & Execute outlasted the lane's allowance (D4). */
@@ -1965,14 +1967,14 @@ function completion(v: UnitView, row: string): MatrixCell {
 			`its Begin & Execute outlasted the lane's allowance of ${v.timedOut} ms (design D4): the run ended there, and the ` +
 				'server is killed with the unit still running (REG-F-527), which nothing can run again (REG-F-511)'
 		]);
-	// ⭐⭐ E3 (C5) — A PHASE NO MODEL RAN IS NOT DONE, WHATEVER ITS STATE READS: SATISFIED in lifecycle and assurance with its
+	// ⭐⭐ E3 (C5) — A LEAF NO MODEL RAN IS NOT DONE, WHATEVER ITS STATE READS: SATISFIED in lifecycle and assurance with its
 	// step SUCCEEDED is what a TRANSFORMATION the press completed, signed off on vacuous verdicts, reads too — `REG-F-505`'s
-	// false "Yes". ⚠ The root is not a phase: §3.2's runs no model by design, and its run is the press's (P7-1b (b)).
+	// false "Yes". ⚠ §3.2's root runs no model by design, its run the press's (P7-1b (b)): a composite, its work its phases'.
 	if (noModelRan(v))
 		return cell('7', row, 'broke', ['REG-F-505'], [
 			facts,
-			'no model ran for this phase: no execution try is recorded, so it completed as a TRANSFORMATION with nothing ' +
-				'produced, and is not counted done (REG-F-505)'
+			'no model ran for this unit: no execution try is recorded and the tree built nothing under it, so it completed as ' +
+				'a TRANSFORMATION with nothing produced, and is not counted done (REG-F-505)'
 		]);
 	if (s?.lifecycle === 'SATISFIED' && s.assurance === 'SATISFIED' && v.stepState === 'SUCCEEDED')
 		return cell('7', row, 'as intended', [], [facts]);
@@ -1989,34 +1991,34 @@ function completion(v: UnitView, row: string): MatrixCell {
 }
 
 /**
- * ⭐ E3 (C5) — a PHASE whose step SUCCEEDED with no execution try ACCEPTED: no model ran for it (`REG-F-505`). ⚠ Never
- * the root, the first unit, whose run is the press's own by design (§3.2). ⭐⭐ `REG-D-112` (E3's review, finding 3) — AND
- * ONLY A MODEL LEAF, as C4's check holds only leaves (`candidate-checks.ts`, `model-leaf`): a composite between the root
- * and the leaves runs no model by design — its work is its children's — so a three-level tree read broke here, as
- * `REG-F-505`, however it ran.
+ * ⭐ E3 (C5) — a unit whose step SUCCEEDED with no execution try ACCEPTED: no model ran for it (`REG-F-505`). ⭐⭐
+ * `REG-D-112` (E3's review, finding 3) — ONLY A LEAF, as C4's check holds only leaves (`candidate-checks.ts`,
+ * `model-leaf`): a composite runs no model by design — its work is its children's. ⭐⭐ `REG-D-112` (E3's re-review,
+ * finding 1) — A LEAF OF THE TREE INSTANTIATION BUILT (`childrenOf`): ~~one whose type permits no child type of its PWA~~
+ * — a type whose permitted children are all conditional is given none, and its unit read "its work is theirs" with no one
+ * to do it — ~~and never the root, by its place~~: the root too, for §3.2's runs no model because its work is its four
+ * phases', and a root the plan gives no child is the Undertaking's one unit.
  */
 const noModelRan = (v: UnitView): boolean =>
-	v.unit.order > 1 && v.leaf && v.stepState === 'SUCCEEDED' && !modelRanFor(v.unit);
+	v.children.length === 0 && v.stepState === 'SUCCEEDED' && !modelRanFor(v.unit);
 
 /** ⭐ `REG-D-112` (finding 3) — a composite of the tree whose press completed its step with no model run: by design. */
-const compositeDone = (v: UnitView): boolean => !v.leaf && v.stepState === 'SUCCEEDED' && !modelRanFor(v.unit);
+const compositeDone = (v: UnitView): boolean =>
+	v.children.length > 0 && v.stepState === 'SUCCEEDED' && !modelRanFor(v.unit);
 
 /**
- * ⭐ `REG-D-112` (finding 3) — is the unit a LEAF of the tree, as C4 reads one: its type permits no live child type of its
- * PWA. ⚠ A unit whose type the store does not hold is read as a leaf, so `REG-F-505`'s check is never dropped for want of
- * its type — §3.2's phases are leaves either way.
+ * ⭐ `REG-D-112` (E3's re-review, finding 1) — the units of the Undertaking that name `u` as their parent, the tree
+ * instantiation built: each by its slug, or its title when the report lists it under none. ⚠ A unit the store does not
+ * hold has none.
  */
-function leafOf(ix: Index, u: Unit): boolean {
-	const type = ix.byId.get(u.typeId ?? str(u.object?.state.pwuTypeId));
-	if (type?.objectType !== 'PWU_TYPE') return true;
-	return !strs(type.state.permittedChildTypeIds).some((id) => {
-		const child = ix.byId.get(id);
-		return (
-			child?.objectType === 'PWU_TYPE' &&
-			str(child.state.pwaId) === str(type.state.pwaId) &&
-			str(child.state.status) !== 'REMOVED'
-		);
-	});
+function childrenOf(ix: Index, u: Unit, units: readonly Unit[]): string[] {
+	const id = u.object?.id;
+	return id === undefined
+		? []
+		: ix
+				.ofType('PROFESSIONAL_WORK_UNIT')
+				.filter((p) => str(p.state.parentWorkUnitId) === id)
+				.map((p) => units.find((x) => x.object?.id === p.id)?.slug ?? str(p.state.title));
 }
 
 /** ⭐ E3 (C5) — did a model run for the unit: an execution try of it answered (`ACCEPTED`). */
@@ -2043,15 +2045,16 @@ function stageThree(v: UnitView, ix: Index): MatrixCell {
 	// completes with nothing produced — an agent following its system prompt declares no discharge (`REG-F-505`).
 	if (noModelRan(v))
 		return cell('3', row, 'broke', ['REG-F-505'], [
-			'its step SUCCEEDED and no model ran: no execution try is recorded for this unit, so its type ran as a ' +
-				'TRANSFORMATION, completed by the press with nothing produced (REG-F-505)'
+			'its step SUCCEEDED and no model ran: no execution try is recorded for this unit, and the tree built nothing under ' +
+				'it, so its type ran as a TRANSFORMATION, completed by the press with nothing produced (REG-F-505)'
 		]);
-	// ⭐ `REG-D-112` (finding 3) — A COMPOSITE OF THE TREE RUNS NO MODEL BY DESIGN: its work is its children's, as the
-	// root's is, and its press completed its step. Never `REG-F-505`'s, which holds model LEAVES only.
+	// ⭐ `REG-D-112` (finding 3) — A COMPOSITE OF THE TREE RUNS NO MODEL BY DESIGN: its work is its children's, and its press
+	// completed its step. Never `REG-F-505`'s, which holds LEAVES only. ⭐ (E3's re-review, finding 1) — and the children it
+	// HAS are named: the units the tree built under it (`childrenOf`), never the types its own type permits.
 	if (compositeDone(v))
 		return cell('3', row, 'as intended', [], [
-			'a composite of the tree: its type permits children of the PWA, so its work is theirs, and its press completed ' +
-				'its step with no model run, as the root’s does (REG-D-112)',
+			`a composite of the tree, the parent of ${v.children.join(', ')}: its work is theirs, and its press completed its ` +
+				'step with no model run (REG-D-112)',
 			...(u.lane?.upstreamNotAssured === true ? ['its upstream phase was not assured (the lane’s record)'] : [])
 		]);
 	const tries = triesOf(u);
@@ -2303,6 +2306,12 @@ function stageOneHalfB(ix: Index, lane: LaneRows): MatrixCell {
 	const author = rec(authoring.authorModel);
 	const resolved = str(author.resolved) || null;
 	const configured = str(author.configured) || null;
+	// ⭐ `REG-D-112` (E3's re-review, finding 2) — THE LANE ASKS THE TURN'S STREAM ONLY ONCE ITS CANDIDATE HAS SETTLED
+	// (`recordTheFloor`): a turn that never settled — no candidate staged, or the allowance outlasted — was never asked.
+	const settled = TURN_SETTLED.has(str(candidate.status));
+	const authorRead = settled
+		? `the author, as the page's turn named it: ${resolved ?? 'none recorded'}`
+		: 'the author: not asked — the turn never settled, so the lane never read its stream';
 	const faults = [
 		...floor.filter((f) => f.state !== 'SATISFIED').map((f) => `the authoring floor's ${f.policyId} reads ${f.state}`),
 		...(reviewer === null ? ['the floor’s reasoning review names no reviewer'] : []),
@@ -2312,7 +2321,7 @@ function stageOneHalfB(ix: Index, lane: LaneRows): MatrixCell {
 			: []),
 		...(status === 'PUBLISHED' ? [] : [`the PWA is ${status}`])
 	];
-	const authorFaults = authorShortfalls(configured, resolved);
+	const authorFaults = authorShortfalls(configured, resolved, settled);
 	const value: CellValue = faults.length + authorFaults.faults.length === 0 ? 'as intended' : 'broke';
 	return cell(
 		'1',
@@ -2322,14 +2331,14 @@ function stageOneHalfB(ix: Index, lane: LaneRows): MatrixCell {
 		[
 			`the PWA "${str(pwa.state.name)}" is ${status}, authored by the agent from the request (design §4 C1)`,
 			`the authoring floor: ${floor.map((f) => `${f.policyId} ${f.state}`).join(', ')}`,
-			`the reviewer: ${reviewer ?? 'none recorded'}; the author, as the page's turn named it: ${resolved ?? 'none recorded'} ` +
-				`(configured: ${configured ?? 'unset'})`,
+			`the reviewer: ${reviewer ?? 'none recorded'}; ${authorRead} (configured: ${configured ?? 'unset'})`,
 			`the accepted hash: ${accepted ?? 'none'}; the candidate as the lane last read it: ${str(candidate.status) || 'none'}`,
 			...faults,
 			...authorFaults.faults,
 			...HALF_B_CAVEATS.slice(0, 2).map((c) => `caveat ${c}`)
 		],
-		// ⚠ A floor, hash or publication fault is the run's to register (P7-5); an author's fault names its entry.
+		// ⚠ A floor, hash or publication fault is the run's to register (P7-5); an author's fault names its entry — save a
+		// producer the lane could not read, which names none, and so is unregistered too (`cell`).
 		{ unregistered: faults.length > 0 }
 	);
 }
@@ -2337,28 +2346,38 @@ function stageOneHalfB(ix: Index, lane: LaneRows): MatrixCell {
 /**
  * ⭐⭐ `REG-D-112` (E3's review, finding 6) — THE AUTHOR'S MODEL IS PINNED, AND HELD TO THE PIN: stage 1 BREAKS when the
  * model the turn's own stream named is not the one `JPWB_AGENT_MODEL` pinned — Pi substitutes another, unannounced
- * (`REG-F-509`) — or when the lane read none, for then nothing shows the pinned model authored the PWA. ⛔ It read as
- * intended, with a warning beside it: a pin that is recorded and not enforced. ⭑ A pin is met by the model named in full,
- * or, pinned as a bare id, by that id under any provider — as `resolveModel` resolves one.
+ * (`REG-F-509`). ⛔ It read as intended, with a warning beside it: a pin that is recorded and not enforced. ⭑ A pin is met
+ * by the model named in full, or, pinned as a bare id, by that id under any provider — as `resolveModel` resolves one.
+ * ⭐⭐ `REG-D-112` (E3's re-review, finding 2) — `REG-F-509` ONLY FOR A PRODUCER READ AND NOT THE PIN. ~~Or when the lane
+ * read none~~: a producer the lane could not read is no substitution Pi made — the stream did not come within the lane's
+ * bound, could not be read, or named none — so the LANE'S READ is the unknown, and the break names no entry: it reaches
+ * P7-5 unregistered, never counted as a known product entry. ⚠ AND NO CHECK BEFORE THE TURN SETTLED (`settled`): the lane
+ * asks the stream only then (`recordTheFloor`). ⭑ No pin at all is `REG-F-531`'s, whatever the stream named.
  */
 function authorShortfalls(
 	configured: string | null,
-	resolved: string | null
+	resolved: string | null,
+	settled: boolean
 ): { readonly faults: readonly string[]; readonly registerIds: readonly string[] } {
 	if (configured === null)
 		return {
 			faults: ['no author model was pinned: half B requires JPWB_AGENT_MODEL, and the record names none (design §4 C3)'],
 			registerIds: ['REG-F-531']
 		};
-	if (resolved !== null && (resolved === configured || resolved.endsWith(`/${configured}`)))
-		return { faults: [], registerIds: [] };
+	if (!settled) return { faults: [], registerIds: [] };
+	if (resolved === null)
+		return {
+			faults: [
+				'the lane read no producer from the turn’s stream — it did not come within the lane’s bound, could not be read, ' +
+					`or named none — so which model authored the PWA is unknown, and the pin, ${configured}, is not shown met`
+			],
+			registerIds: []
+		};
+	if (resolved === configured || resolved.endsWith(`/${configured}`)) return { faults: [], registerIds: [] };
 	return {
 		faults: [
-			resolved === null
-				? `no producer was read from the turn’s stream, so nothing shows the pinned model, ${configured}, authored ` +
-					'the PWA (REG-F-509)'
-				: `the author that ran, ${resolved}, is not the model pinned, ${configured}: Pi substituted another, ` +
-					'unannounced (REG-F-509)'
+			`the author that ran, ${resolved}, is not the model pinned, ${configured}: Pi substituted another, ` +
+				'unannounced (REG-F-509)'
 		],
 		registerIds: ['REG-F-509']
 	};
@@ -2499,7 +2518,7 @@ function unitView(
 			unretained: readings.filter((r) => r === 'not retained').length
 		},
 		contentStore: ix.content !== null,
-		leaf: leafOf(ix, u)
+		children: childrenOf(ix, u, units)
 	};
 }
 

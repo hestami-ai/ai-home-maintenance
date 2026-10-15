@@ -34,7 +34,7 @@ import {
 	promptMarkers,
 	renderedPrompt
 } from './pwa-content.js';
-import type { Row } from './half-b.js';
+import { typesGivenChildren, type Row } from './half-b.js';
 
 /** The four checks, by name. */
 export type CandidateCheck = 'model-leaf' | 'supplied-markers' | 'prompt-length' | 'policy-governs';
@@ -66,7 +66,11 @@ export interface CandidateTypeFacts {
 	readonly pwuKind: string;
 	readonly workDischarge: string;
 	readonly isRoot: boolean;
-	/** No permitted child type in the PWA: work the tree gives no one else to do. */
+	/**
+	 * The plan gives it no child (`typesGivenChildren`): its unit is a leaf of the tree instantiation builds, its work no
+	 * one else's. ⭐ `REG-D-112` (E3's re-review, finding 1) — ~~no permitted child type in the PWA~~: a type whose permitted
+	 * children are all conditional permits them, and is given none (`REG-F-516`).
+	 */
 	readonly leaf: boolean;
 	/** The prompt's status, or null when the type has none. */
 	readonly promptStatus: string | null;
@@ -120,8 +124,8 @@ function declarationOf(t: Row) {
 	};
 }
 
-/** What the checks read of one type. */
-function factsOf(t: Row, typeIds: ReadonlySet<string>, policies: ReadonlyMap<string, Row>): CandidateTypeFacts {
+/** What the checks read of one type; `composites`, the types the plan gives a child. */
+function factsOf(t: Row, composites: ReadonlySet<string>, policies: ReadonlyMap<string, Row>): CandidateTypeFacts {
 	const prompt = t.state.promptTemplate === undefined ? null : rec(t.state.promptTemplate);
 	const declared = declarationOf(t);
 	const rendered = prompt === null ? '' : renderedPrompt({ ...declared, pwuKind: '', workDischarge: 'MODEL', policyIds: [] });
@@ -132,7 +136,7 @@ function factsOf(t: Row, typeIds: ReadonlySet<string>, policies: ReadonlyMap<str
 		pwuKind,
 		workDischarge: str(t.state.workDischarge) || 'UNDECLARED',
 		isRoot: t.state.isRoot === true,
-		leaf: !strs(t.state.permittedChildTypeIds).some((id) => typeIds.has(id)),
+		leaf: !composites.has(t.id),
 		promptStatus: prompt === null ? null : str(prompt.status) || null,
 		markers: [...new Set([...promptMarkers(declared.prompt), ...strs(prompt?.declaredPlaceholders)])].sort(byCodeUnit),
 		renderedLength: rendered.length,
@@ -198,8 +202,8 @@ function findingsOf(f: CandidateTypeFacts): CandidateFinding[] {
  * writes this down and goes on.
  */
 export function candidateChecks(types: readonly Row[], policies: readonly Row[]): CandidateChecks {
-	const typeIds = new Set(types.map((t) => t.id));
+	const composites = typesGivenChildren(types);
 	const byId = new Map(policies.map((p) => [p.id, p]));
-	const facts = types.map((t) => factsOf(t, typeIds, byId));
+	const facts = types.map((t) => factsOf(t, composites, byId));
 	return { types: facts, findings: facts.flatMap(findingsOf), refused: false };
 }

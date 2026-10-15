@@ -182,6 +182,30 @@ export interface TreeAgainstPlan {
 	readonly unresolved: readonly string[];
 }
 
+/** Each type as the product's planner reads one (`CompositionNode`), as `routes/undertakings/+page.server.ts` hands it. */
+function compositionNodesOf(types: readonly Row[]): Parameters<typeof planComposition>[0] {
+	return types.map((t) => ({
+		id: t.id,
+		isRoot: t.state.isRoot === true,
+		permittedChildTypeIds: strs(t.state.permittedChildTypeIds),
+		permittedChildren: Array.isArray(t.state.permittedChildren)
+			? (t.state.permittedChildren as Parameters<typeof planComposition>[0][number]['permittedChildren'])
+			: undefined
+	}));
+}
+
+/**
+ * ⭐⭐ `REG-D-112` (E3's re-review, finding 1) — THE TYPES THE PLAN GIVES A CHILD: each type planned by the product's own
+ * planner (`planComposition`) from itself, and kept when the plan instantiates anything under it — an M1, M+ or rule-less
+ * permitted child that resolves. ⛔ ~~A type that permits a live child type~~: one whose permitted children are all
+ * conditional permits them and is given none — instantiation offers C1 and C+ to no one (`REG-F-516`) — so its unit is a
+ * LEAF of the tree instantiation builds, and its work a model's to do or no one's.
+ */
+export function typesGivenChildren(types: readonly Row[]): ReadonlySet<string> {
+	const nodes = compositionNodesOf(types);
+	return new Set(types.filter((t) => planComposition(nodes, t.id).instances.length > 1).map((t) => t.id));
+}
+
 /**
  * ⭐⭐ `REG-D-112` (E3's review, finding 4) — THE UNDERTAKING'S UNITS, HELD TO THE PLAN INSTANTIATION MAKES OF ITS PWA,
  * PER (PARENT, TYPE): the product's own planner (`planComposition`, as `routes/undertakings/+page.server.ts` asks it) plans
@@ -198,17 +222,7 @@ export function treeAgainstPlan(units: readonly Row[], types: readonly Row[]): T
 	const plan =
 		root === undefined
 			? { instances: [], offered: [], unresolved: [] }
-			: planComposition(
-					types.map((t) => ({
-						id: t.id,
-						isRoot: t.state.isRoot === true,
-						permittedChildTypeIds: strs(t.state.permittedChildTypeIds),
-						permittedChildren: Array.isArray(t.state.permittedChildren)
-							? (t.state.permittedChildren as Parameters<typeof planComposition>[0][number]['permittedChildren'])
-							: undefined
-					})),
-					root.id
-				);
+			: planComposition(compositionNodesOf(types), root.id);
 	const typeOfKey = new Map(plan.instances.map((i) => [i.key, i.typeId]));
 	/** Each planned key, and the unit matched to it. */
 	const built = new Map<string, Row>();
@@ -262,6 +276,22 @@ export function treeAgainstPlan(units: readonly Row[], types: readonly Row[]): T
 }
 
 // ── THE AUTHORING FLOOR, AS THE RECORD HOLDS IT ─────────────────────────────────────────────────────────────────────
+
+/**
+ * ⭐ C1 — THE TURN STATES THE LANE STOPS WAITING AT: the turn has settled, assured or not (`authoring-turn-machine.ts`).
+ * ⚠ COLLECTING, VALIDATING, ASSURING and COMMITTING are not among them: the agent or the floor is still at work.
+ * ⭐ `REG-D-112` (E3's re-review, finding 2) — HERE, so the lane and the run report read one set: the lane asks the turn's
+ * stream for its author only once its candidate has settled (`recordTheFloor`), and the report checks the author only then.
+ */
+export const TURN_SETTLED: ReadonlySet<string> = new Set([
+	'READY_TO_COMMIT',
+	'REVISION_REQUIRED',
+	'BLOCKED_EXTERNAL',
+	'CONFLICTED',
+	'COMMIT_FAILED',
+	'COMMITTED',
+	'DISCARDED'
+]);
 
 /**
  * The authoring floor's three policies, in its plan's order (`rph-assurance` `deMinimisFloorPlan`). ⚠ RESTATED: the run

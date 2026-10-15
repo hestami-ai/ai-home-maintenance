@@ -42,6 +42,7 @@ import { candidateChecks, type CandidateChecks } from '../../../scripts/phase7/c
 import {
 	floorDispositions,
 	PHASE7_HALF_B_REQUEST,
+	TURN_SETTLED,
 	unitsInTreeOrder,
 	type FloorDisposition,
 	type TreeUnit
@@ -1183,20 +1184,6 @@ export interface CandidateReading {
 	readonly commandCount: number;
 }
 
-/**
- * ⭐ C1 — THE TURN STATES THE LANE STOPS WAITING AT: the turn has settled, assured or not (`authoring-turn-machine.ts`).
- * ⚠ COLLECTING, VALIDATING, ASSURING and COMMITTING are not among them: the agent or the floor is still at work.
- */
-export const TURN_SETTLED: ReadonlySet<string> = new Set([
-	'READY_TO_COMMIT',
-	'REVISION_REQUIRED',
-	'BLOCKED_EXTERNAL',
-	'CONFLICTED',
-	'COMMIT_FAILED',
-	'COMMITTED',
-	'DISCARDED'
-]);
-
 /** One of the designer's acts in half B, as the run record keeps it. */
 export interface DesignerActRecord {
 	readonly act: 'acceptAgentCandidate' | DesignerAct;
@@ -1248,6 +1235,11 @@ export interface AuthoringRecord {
 	 * `REG-D-112` (finding 5), each title more than one unit bears, which the lane tells apart by id (`runUnitsOf`).
 	 */
 	unitProblems: string[];
+	/**
+	 * ⭐ `REG-D-112` (E3's re-review, finding 3) — why the authoring's archive, taken at an END of the authoring, failed, in its
+	 * own words; null when it did not (`authorThenArchive`). The end is kept as itself, and the dry verdict refuses on this.
+	 */
+	archiveFailure: string | null;
 }
 
 /** ⭐ C1 — an empty authoring record, before anything is done. */
@@ -1266,7 +1258,8 @@ export const authoringRecordOf = (request: string, configured: string | null): A
 	checks: null,
 	lifecycle: [],
 	published: null,
-	unitProblems: []
+	unitProblems: [],
+	archiveFailure: null
 });
 
 /** The staged candidate of `pwaId`, read off the dump — or null when none is staged. */
@@ -1463,7 +1456,9 @@ function designerEnd(o: ActionOutcome, act: string): RunEnd | null {
  *   7. the Undertaking, and its units READ FROM THE PUBLISHED PWA (C2), root first, then the tree's order — ⭐ each by its
  *      ID (`REG-D-112`, finding 5), the rows returned by id.
  * ⛔ An act with no answer, or one refused, ends the run there, recorded; nothing after it is pressed. ⭐ Whichever way it
- * ends, the lane then archives the store (`authorThenArchive`): no end of the authoring is left unreported.
+ * ends, the lane then archives the store (`authorThenArchive`): ~~no end of the authoring is left unreported~~ ⭐
+ * `REG-D-112` (E3's re-review, finding 3) — and the end is recorded as itself: an archive that fails there is recorded
+ * beside it (`archiveFailure`), never thrown over it.
  */
 export async function authorThePwa(r: {
 	readonly record: RunRecord;
@@ -1573,9 +1568,14 @@ export async function authorThePwa(r: {
  * candidate not assured, its allowance outlasted, the dry stop, a refused act, the limit before Send, a throw; and once
  * the units are read, before the root's press. ⛔ Before, no archive was taken until the root's, so a run that stopped
  * during authoring left no store, and the run report refused it (`run-report.ts`: *"no archive under lane/archive holds
- * a demo.sqlite"*). Returns the rows by id, or the authoring's end with the dump the archive took.
+ * a demo.sqlite"*). Returns the rows by id, or the authoring's end with the dump the archive took — or, when that archive
+ * failed, the store read again, or null if it cannot be.
  * ⚠ A THROW IS ARCHIVED TOO, as far as it can be: an archive that fails then is noted, never thrown over the throw it
- * follows, which ends the run `lane-error` in its own words.
+ * follows, which ends the run `lane-error` in its own words. ⭐⭐ `REG-D-112` (E3's re-review, finding 3) — AND SO IS AN
+ * END: an archive that fails at one is recorded (`archiveFailure`) and noted, never thrown over the end. ⛔ It was thrown,
+ * and the run ended `lane-error` in the archive's words: the limit before Send, the floor's own words, the allowance or
+ * the dry stop lost from `record.end`. ⚠ Once the units are read, a failed archive still throws: the run ends there,
+ * `lane-error`, before the root's press.
  */
 async function authorThenArchive(r: {
 	readonly record: RunRecord;
@@ -1584,7 +1584,7 @@ async function authorThenArchive(r: {
 	readonly lane: LanePaths;
 	readonly boot: Boot;
 	readonly note: (problem: string | null) => void;
-}): Promise<{ readonly rows: ReadonlyMap<string, ObjectRow> } | (AuthoringEnd & { readonly dump: Dump })> {
+}): Promise<{ readonly rows: ReadonlyMap<string, ObjectRow> } | (AuthoringEnd & { readonly dump: Dump | null })> {
 	const { author, archiveAuthoring, read } = r.hands;
 	if (author === undefined || archiveAuthoring === undefined)
 		throw new Error(
@@ -1613,8 +1613,18 @@ async function authorThenArchive(r: {
 		);
 		throw e;
 	}
-	const dump = await archived();
-	return 'end' in authored ? { ...authored, dump } : authored;
+	if (!('end' in authored)) {
+		await archived();
+		return authored;
+	}
+	const { end } = authored;
+	const dump = await archived().catch(async (failed: unknown) => {
+		r.authoring.archiveFailure = failed instanceof Error ? failed.message : String(failed);
+		r.note(`the authoring archive, at the authoring’s end (${end.reason}): ${r.authoring.archiveFailure}`);
+		// ⚠ The store read again, for the dry stop's count: an archive opens it read-only, and leaves it as it was.
+		return read().catch(() => null);
+	});
+	return { end, dump };
 }
 
 /** ⭐ `REG-D-112` (finding 2) — the discharge a unit's TYPE declares, as the runner reads it: `UNDECLARED` when none. */
@@ -1811,8 +1821,8 @@ export async function runTheLane(r: {
 			const authored = await authorThenArchive({ record, authoring: record.authoring, hands, lane, boot, note });
 			if ('end' in authored) {
 				// ⛔ DRY (C6), THE MODEL EXCHANGES ARE COUNTED AT THE STOP — on the dump the archive took there: the rehearsal sent
-				// nothing, and the store must say so.
-				if (authored.end.reason === 'dry-run-stop')
+				// nothing, and the store must say so. With no dump, none is counted, and the verdict says the count is unread.
+				if (authored.end.reason === 'dry-run-stop' && authored.dump !== null)
 					record.dryRun = { modelExchanges: authored.dump.snapshot.modelExchanges.length };
 				return end(authored.end.reason, authored.end.detail);
 			}
@@ -2131,11 +2141,15 @@ function rootSignOffShortfalls(root: RunUnit): string[] {
 
 /**
  * ⭐ E3 (C6) — why half B's dry rehearsal is not the one it was meant to be, one line each: it made the agent's draft,
- * pressed no Send — authoring is a model call — and the store, read at the stop, holds no model exchange.
+ * pressed no Send — authoring is a model call — and the store, read at the stop, holds no model exchange. ⭐ `REG-D-112`
+ * (E3's re-review, finding 3) — AND ITS ARCHIVE WAS TAKEN: one that fails at the stop is recorded beside it
+ * (`archiveFailure`), no longer the `lane-error` this verdict refused, and the authoring archive is the one
+ * archive-and-check cycle half B's rehearsal reaches.
  */
 function halfBDryShortfalls(record: RunRecord): string[] {
 	const a = record.authoring;
 	const exchanges = record.dryRun?.modelExchanges ?? null;
+	const archiveFailure = a?.archiveFailure ?? null;
 	return [
 		...(a?.pwaId ? [] : ['the dry run made no draft for the agent to author into']),
 		...(a?.sent === false
@@ -2143,7 +2157,10 @@ function halfBDryShortfalls(record: RunRecord): string[] {
 			: ['the dry run sent the request: authoring is a model call, and a dry run calls none (design §4 C6)']),
 		...(exchanges === 0
 			? []
-			: [`the dry run recorded ${exchanges ?? 'an unread number of'} model exchange(s)`])
+			: [`the dry run recorded ${exchanges ?? 'an unread number of'} model exchange(s)`]),
+		...(archiveFailure === null
+			? []
+			: [`the dry run’s authoring archive failed, so the archive it rehearses is not proved: ${archiveFailure}`])
 	];
 }
 

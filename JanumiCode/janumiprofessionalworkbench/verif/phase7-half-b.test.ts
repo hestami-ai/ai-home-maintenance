@@ -20,6 +20,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import { policyApplicability } from '@janumipwb/rph-domain';
 import { createSqliteDriver, SCHEMA_SQL } from '@janumipwb/rph-persistence';
@@ -60,7 +61,6 @@ import {
 	overlayOf,
 	producerOfStream,
 	runTheLane,
-	TURN_SETTLED,
 	type ActionOutcome,
 	type Boot,
 	type Dump,
@@ -82,10 +82,11 @@ import {
 	PHASE7_RUN_PLAN_REQUEST,
 	slugOf,
 	treeAgainstPlan,
+	TURN_SETTLED,
 	unitsInTreeOrder
 } from '../scripts/phase7/half-b.js';
 import { PHASE7_INSTRUCTION_BUDGET, PHASE7_PWA, PRODUCT_BRIEF } from '../scripts/phase7/pwa-content.js';
-import { archiveAuthoring, AUTHORING_ARCHIVE, journalHeaderOf } from '../scripts/phase7/run-archive.js';
+import { archiveAuthoring, AUTHORING_ARCHIVE, CONTENT_STORE_SUFFIX, journalHeaderOf } from '../scripts/phase7/run-archive.js';
 import {
 	buildRunReport,
 	FLOOR_POLICIES,
@@ -361,6 +362,8 @@ interface HalfBScript {
 	readonly archive?: (dump: Dump, lane: LanePaths) => Promise<void>;
 	/** ⭐ `REG-D-112` (finding 1) — "Accept exact candidate" throws, as a page that lost its button would. */
 	readonly acceptThrows?: boolean;
+	/** ⭐ `REG-D-112` (E3's re-review, finding 4) — the ASSURANCE exchanges the authoring floor records once Send is pressed. */
+	readonly floorCalls?: number;
 }
 
 /** A run folder of its own, a store made here, and the half-B hands, each call logged in order. */
@@ -410,7 +413,13 @@ function halfBLane(script: HalfBScript) {
 				id: `pln_${id}`,
 				state: { workUnitId: id, steps: [{ stepState: 'SUCCEEDED' }] }
 			})),
-			modelExchanges: [],
+			// ⭐ `REG-D-112` (E3's re-review, finding 4) — the authoring floor's calls, recorded once Send is pressed.
+			modelExchanges: sent
+				? Array.from({ length: script.floorCalls ?? 0 }, (_, i) => ({
+						id: `mex_floor_${i}`,
+						state: { plane: 'ASSURANCE', subjectObjectId: PWA_ID }
+					}))
+				: [],
 			evidence: [],
 			artifacts: [],
 			authoringCandidates:
@@ -1569,6 +1578,17 @@ describe('⛔ REG-D-112 (E3’s review, 1) — a run that stops during authoring
 		const run = folder('authoring-archive');
 		const store = join(run, 'demo.sqlite');
 		writeStore(store, halfBStore());
+		// ⭐ `REG-D-112` (E3's re-review, finding 5) — AND A CONTENT STORE BESIDE IT, in WAL as the server keeps it, one row in
+		// it. ⛔ The fixture had none, so the content store was only ever recorded ABSENT, and an archive that sought it
+		// elsewhere passed this test.
+		const content = createSqliteDriver(`${store}${CONTENT_STORE_SUFFIX}`);
+		try {
+			content.exec('CREATE TABLE artifact_content (storage_key TEXT PRIMARY KEY, bytes TEXT)');
+			content.prepare('INSERT INTO artifact_content (storage_key, bytes) VALUES (?, ?)').run('key-1', '{}');
+		} finally {
+			content.close();
+		}
+		expect(journalHeaderOf(`${store}${CONTENT_STORE_SUFFIX}`), 'the content store, as the server keeps it').toEqual([2, 2]);
 		const snapshot = { modelExchanges: [{ id: 'x1', state: { plane: 'ASSURANCE' } }], artifacts: [], evidence: [] };
 		const request = {
 			archiveDir: join(run, 'lane', 'archive', AUTHORING_ARCHIVE),
@@ -1576,12 +1596,19 @@ describe('⛔ REG-D-112 (E3’s review, 1) — a run that stops during authoring
 			introspect: { text: `${JSON.stringify(snapshot)}\n`, snapshot } as never
 		};
 		const checks = await archiveAuthoring(request);
-		expect(readdirSync(request.archiveDir).sort()).toEqual(['checks.json', 'demo.sqlite', 'introspect.json']);
-		expect(journalHeaderOf(join(request.archiveDir, 'demo.sqlite'))).toEqual([1, 1]);
+		expect(readdirSync(request.archiveDir).sort()).toEqual(['checks.json', 'demo.sqlite', 'demo.sqlite.content.sqlite', 'introspect.json']);
+		for (const name of ['demo.sqlite', 'demo.sqlite.content.sqlite'])
+			expect(journalHeaderOf(join(request.archiveDir, name)), name).toEqual([1, 1]);
+		const archived = new DatabaseSync(join(request.archiveDir, 'demo.sqlite.content.sqlite'), { readOnly: true });
+		try {
+			expect(archived.prepare('SELECT storage_key AS key FROM artifact_content').all()).toEqual([{ key: 'key-1' }]);
+		} finally {
+			archived.close();
+		}
 		expect([checks.archived.stores.map((s) => [s.name, s.present]), checks.archived.workspace, checks.archived.processOutput]).toEqual([
 			[
 				['demo.sqlite', true],
-				['demo.sqlite.content.sqlite', false]
+				['demo.sqlite.content.sqlite', true]
 			],
 			{ present: false },
 			{ present: false }
@@ -1823,12 +1850,17 @@ describe('⛔ REG-D-112 (E3’s review, 6) — the author’s model is pinned AN
 		);
 	});
 
-	it('⭐ the turn named no model the lane could read: stage 1 BROKE — the pinned model is not shown to have authored the PWA', () => {
+	// ⭐ `REG-D-112` (E3's re-review, finding 2) — ~~BROKE, REG-F-509~~: a producer the lane could not read is no substitution
+	// Pi made. The lane's READ is the unknown — the stream did not come within its bound, could not be read, or named none —
+	// so the break is UNREGISTERED, P7-5's to name, and never counted as a known product entry.
+	it('⭐ the turn named no model the lane could read: stage 1 BROKE, UNREGISTERED — the lane’s read named as the unknown, never REG-F-509', () => {
 		const one = stageOneOf({ configured: PINNED, resolved: null });
-		expect([one.value, one.registerIds]).toEqual(['broke', ['REG-F-509']]);
+		expect([one.value, one.registerIds, one.unregistered]).toEqual(['broke', [], true]);
 		expect(one.basis).toContain(
-			`no producer was read from the turn’s stream, so nothing shows the pinned model, ${PINNED}, authored the PWA (REG-F-509)`
+			'the lane read no producer from the turn’s stream — it did not come within the lane’s bound, could not be read, or ' +
+				`named none — so which model authored the PWA is unknown, and the pin, ${PINNED}, is not shown met`
 		);
+		expect(one.basis.join('\n')).not.toContain('REG-F-509');
 	});
 
 	it('⭐ CONTROL — a bare id pinned, the turn naming it under its provider, is the model pinned: as intended', () => {
@@ -1864,5 +1896,248 @@ describe('⭐ REG-D-112 (E3’s review, 7) — a half-B run that never sent its 
 
 	it('⭐ … and so did a paid run the limit stopped before Send', () => {
 		expect(cellOf(buildRunReport(store, unsent('paid-limit'), { accountNames: NAMES }).report, '1', 'whole run').value).toBe('not reached');
+	});
+});
+
+// ── ⭐⭐ E3'S RE-REVIEW, AND ITS FINDINGS FIXED (`REG-D-112`) ─────────────────────────────────────────────────────────
+// The re-review of E3's fix round found five more. Each fix is held here by the test that was RED before it, or — for a
+// term no test could kill — by the test its ledger entry now dies on (E3-M72, E3-M75, E3-M76: each SURVIVED first).
+
+/**
+ * ⭐ `REG-D-112` (E3's re-review, finding 1) — A TYPE WHOSE PERMITTED CHILDREN ARE ALL CONDITIONAL, from the catalog
+ * blueprints the agent builds from: the root over "Specify wordfreq" (MODEL) and "Build wordfreq", which declares
+ * UNDECLARED and permits "Extend wordfreq" as C1 alone. Instantiation builds no conditional child (`planComposition`;
+ * `REG-F-516`), so Build's unit has none: a LEAF of the tree instantiation built.
+ */
+const CONDITIONAL_TYPES: ObjectRow[] = [
+	AGENT_TYPES[1]!,
+	{
+		id: 'pwutype_build',
+		state: {
+			pwaId: PWA_ID,
+			name: 'Build wordfreq',
+			pwuKind: 'PRODUCT_IMPLEMENTATION',
+			purpose: 'Implement wordfreq and its unit tests.',
+			workDischarge: 'UNDECLARED',
+			isRoot: false,
+			permittedChildTypeIds: ['pwutype_extend'],
+			permittedChildren: [{ typeId: 'pwutype_extend', cardinality: 'C1' }],
+			requiredAssurancePolicyIds: ['pol_intent_preservation'],
+			status: 'ACTIVE'
+		}
+	},
+	{
+		id: 'pwutype_extend',
+		state: {
+			pwaId: PWA_ID,
+			name: 'Extend wordfreq',
+			pwuKind: 'PRODUCT_IMPLEMENTATION',
+			purpose: 'Extend wordfreq where a person asks for it.',
+			workDischarge: 'MODEL',
+			isRoot: false,
+			permittedChildTypeIds: [],
+			promptTemplate: prompt('Extend {subject} for wordfreq: {purpose}'),
+			requiredAssurancePolicyIds: ['pol_intent_preservation'],
+			status: 'ACTIVE'
+		}
+	},
+	{
+		id: 'pwutype_root',
+		state: {
+			...AGENT_TYPES[3]!.state,
+			permittedChildTypeIds: ['pwutype_specify', 'pwutype_build'],
+			permittedChildren: [
+				{ typeId: 'pwutype_specify', cardinality: 'M1' },
+				{ typeId: 'pwutype_build', cardinality: 'M1' }
+			]
+		}
+	}
+];
+/** The units instantiation builds of it: the root, Specify and Build — and nothing under Build. */
+const CONDITIONAL_UNITS = AGENT_UNITS.filter((u) => u.id !== 'pwu_v');
+
+describe('⛔ REG-D-112 (E3’s re-review, 1) — a composite is a unit the tree BUILT children under, never one whose type permits some', () => {
+	const reportOf = (types: readonly ObjectRow[], units: readonly AgentUnit[], ran: Readonly<Record<string, 'model' | 'press'>>) =>
+		buildRunReport(halfBStore({ types, units, ran }), halfBLaneRows({ types, units }), { accountNames: NAMES }).report;
+
+	// ⭐ THE PREDICTED RED: its type permits a live child type, so both checks called it a composite — C4 recorded no trap, and
+	// the report read its stage 3 as intended, "its work is theirs", with no child to do it: REG-F-505's false Yes.
+	it('⭐ a type whose permitted children are all CONDITIONAL, pressed with no model, is a LEAF: broke REG-F-505 at stages 3 and 7, and so is the whole run', () => {
+		const r = reportOf(CONDITIONAL_TYPES, CONDITIONAL_UNITS, { pwu_r: 'press', pwu_s: 'model', pwu_b: 'press' });
+		expect([
+			cellOf(r, '3', 'build-wordfreq').value,
+			cellOf(r, '3', 'build-wordfreq').registerIds,
+			cellOf(r, '7', 'build-wordfreq').value,
+			cellOf(r, '7', 'build-wordfreq').registerIds,
+			cellOf(r, '7', 'whole run').value
+		]).toEqual(['broke', ['REG-F-505'], 'broke', ['REG-F-505'], 'broke']);
+		expect(r.units.find((u) => u.slug === 'build-wordfreq')?.candidateFindings).toEqual(['model-leaf (REG-F-505, REG-F-507)']);
+	});
+
+	it('⭐ C4 records model-leaf for it: the plan gives it no child — and gives one to the root alone', () => {
+		const checks = candidateChecks(CONDITIONAL_TYPES, AGENT_POLICIES);
+		expect(checks.findings.map((f) => [f.check, f.typeName, f.registerIds])).toEqual([
+			['model-leaf', 'Build wordfreq', ['REG-F-505', 'REG-F-507']]
+		]);
+		expect(checks.types.map((t) => [t.name, t.leaf])).toEqual([
+			['Specify wordfreq', true],
+			['Build wordfreq', true],
+			['Extend wordfreq', true],
+			['wordfreq Realization', false]
+		]);
+	});
+
+	// ⭐ THE GENERAL FORM, AT THE ROOT: the report exempted the root by its PLACE, the first unit — §3.2's runs no model by
+	// design because its work is its four phases'. A root the plan gives no child is the Undertaking's one unit, and its
+	// press completing it with no model is the same false Yes: the whole run's.
+	it('⭐ a ROOT whose permitted children are all conditional is the Undertaking’s one unit, a LEAF: pressed with no model, the whole run’s stage 7 is broke, REG-F-505', () => {
+		const types: ObjectRow[] = [
+			{
+				id: 'pwutype_root',
+				state: {
+					...AGENT_TYPES[3]!.state,
+					permittedChildTypeIds: ['pwutype_specify'],
+					permittedChildren: [{ typeId: 'pwutype_specify', cardinality: 'C+' }]
+				}
+			},
+			AGENT_TYPES[1]!
+		];
+		const r = reportOf(types, AGENT_UNITS.filter((u) => u.id === 'pwu_r'), { pwu_r: 'press' });
+		expect([cellOf(r, '2', 'whole run').value, cellOf(r, '7', 'whole run').value, cellOf(r, '7', 'whole run').registerIds]).toEqual([
+			'as intended',
+			'broke',
+			['REG-F-505']
+		]);
+		expect(candidateChecks(types, AGENT_POLICIES).findings.map((f) => [f.check, f.typeName])).toEqual([['model-leaf', 'wordfreq Realization']]);
+	});
+
+	it('⭐ CONTROL — a composite whose children were built reads as intended, and its basis NAMES the children it has', () => {
+		const r = reportOf(SHARED_TYPES, SHARED_UNITS, { pwu_sr: 'press', pwu_sd: 'press', pwu_sb: 'press', pwu_rv_d: 'model', pwu_rv_b: 'model' });
+		expect(['design-wordfreq', 'build-wordfreq'].map((slug) => [cellOf(r, '3', slug).value, cellOf(r, '3', slug).basis])).toEqual([
+			['as intended', ['a composite of the tree, the parent of review-wordfreq: its work is theirs, and its press completed its step with no model run (REG-D-112)']],
+			['as intended', ['a composite of the tree, the parent of review-wordfreq-2: its work is theirs, and its press completed its step with no model run (REG-D-112)']]
+		]);
+	});
+});
+
+describe('⛔ REG-D-112 (E3’s re-review, 2) — the author is checked once the turn SETTLED, against a producer READ; no pin is REG-F-531', () => {
+	const PINNED = `${AUTHOR.providerId}/${AUTHOR.modelId}`;
+	const drafted = halfBStore({ publication: 'DRAFT' });
+	const store = { ...drafted, objects: drafted.objects.filter((x) => x.objectType === 'PROFESSIONAL_WORK_ARCHITECTURE') };
+	/** A paid run whose turn never settled: Send pressed, and its candidate as the lane last read it. */
+	const unsettled = (candidate: object | null, end: string): LaneRows => {
+		const lane = halfBLaneRows();
+		return {
+			...lane,
+			run: {
+				...(lane.run as object),
+				units: [],
+				end: { reason: end },
+				authoring: { pwaId: PWA_ID, sent: true, candidate, accept: null, authorModel: { configured: PINNED, resolved: null }, checks: null }
+			}
+		};
+	};
+	const stageOne = (lane: LaneRows): MatrixCell => cellOf(buildRunReport(store, lane, { accountNames: NAMES }).report, '1', 'whole run');
+
+	// ⭐ THE PREDICTED RED: the lane asks the turn's stream only once its candidate has settled (`recordTheFloor`), so a turn
+	// that never settled was never asked — and stage 1 said no producer "was read", filed under REG-F-509.
+	it('⭐ the server refused the turn before it began — no candidate staged: the author is not checked, and nothing cites REG-F-509', () => {
+		const one = stageOne(unsettled(null, 'authoring-stopped'));
+		expect([one.value, one.registerIds, one.unregistered]).toEqual(['broke', [], true]);
+		expect(one.basis).toContain(
+			`the reviewer: none recorded; the author: not asked — the turn never settled, so the lane never read its stream (configured: ${PINNED})`
+		);
+		// ⭑ No author fault at all — neither a substitution nor an unread producer: the stream was never asked.
+		expect(one.basis.filter((line) => /producer|REG-F-509/.test(line))).toEqual([]);
+	});
+
+	it('⭐ … and so with the allowance outlasted, its candidate still ASSURING', () => {
+		const one = stageOne(unsettled({ status: 'ASSURING', candidateHash: null }, 'allowance-exceeded'));
+		expect([one.value, one.registerIds]).toEqual(['broke', []]);
+		expect(one.basis.filter((line) => /producer|REG-F-509/.test(line))).toEqual([]);
+	});
+
+	it('⛔ no author model pinned: stage 1 BROKE, REG-F-531, whatever the turn’s stream named', () => {
+		const one = cellOf(
+			buildRunReport(halfBStore(), halfBLaneRows({ author: { configured: null, resolved: PINNED } }), { accountNames: NAMES }).report,
+			'1',
+			'whole run'
+		);
+		expect([one.value, one.registerIds]).toEqual(['broke', ['REG-F-531']]);
+		expect(one.basis).toContain('no author model was pinned: half B requires JPWB_AGENT_MODEL, and the record names none (design §4 C3)');
+	});
+});
+
+describe('⛔ REG-D-112 (E3’s re-review, 3) — an authoring END is never relabelled by an archive that fails', () => {
+	const FULL_DISK = 'ENOSPC: no space left on device, copyfile';
+	const failing = async (): Promise<void> => {
+		throw new Error(FULL_DISK);
+	};
+
+	// ⭐ THE PREDICTED RED: a failed archive at an authoring end was thrown, and the run ended `lane-error` in the archive's
+	// words — the authoring's own reason lost from the run's record.
+	it('⭐ each end keeps its own reason when its archive fails — the limit before Send, a candidate not assured, the allowance, the dry stop — the failure noted and recorded', async () => {
+		const ends: Record<string, readonly [HalfBScript, string]> = {
+			'the limit before Send': [{ paid: true, prior: PHASE7_PAID_LIMIT }, 'paid-limit'],
+			'a candidate not assured': [{ paid: true, statuses: ['BLOCKED_EXTERNAL'] }, 'authoring-stopped'],
+			'the allowance outlasted': [{ paid: true, statuses: ['ASSURING'] }, 'allowance-exceeded'],
+			'the dry stop': [{ paid: false }, 'dry-run-stop']
+		};
+		for (const [why, [script, reason]] of Object.entries(ends)) {
+			const l = halfBLane({ ...script, archive: failing });
+			const record = await l.run().catch(() => l.written());
+			expect([record.end?.reason, record.authoring?.archiveFailure, record.problems], why).toEqual([
+				reason,
+				FULL_DISK,
+				[`the authoring archive, at the authoring’s end (${reason}): ${FULL_DISK}`]
+			]);
+		}
+	});
+
+	// ⭐ AND THE DRY REHEARSAL STILL FAILS ON IT: before, the throw ended it `lane-error`, which its verdict refused. Kept as
+	// an end, a failed archive must be refused by name — the authoring archive is the one archive-and-check cycle half B's
+	// rehearsal reaches.
+	it('⛔ a DRY rehearsal whose archive failed fails its verdict, naming the archive — and still counts the model exchanges', async () => {
+		const l = halfBLane({ paid: false, archive: failing });
+		const record = await l.run().catch(() => l.written());
+		expect([laneVerdict(record), record.dryRun]).toEqual([
+			[`the dry run’s authoring archive failed, so the archive it rehearses is not proved: ${FULL_DISK}`],
+			{ modelExchanges: 0 }
+		]);
+	});
+});
+
+describe('⛔ REG-D-112 (E3’s re-review, 4) — the limit before the root counts the calls the store RECORDS: the authoring floor’s', () => {
+	/** A model unit's worst case, as its allowance counts it: each try's review, and each reviewed command's — 140. */
+	const UNIT_WORST = (LANE_BUDGET.tries + PHASE7_REVIEWED_COMMANDS) * LANE_BUDGET.reviewerCallsPerTry;
+	const FLOOR_CALLS = 3;
+	/** One call past the limit with the floor's recorded calls counted, and within it without them. */
+	const PRIOR = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - UNIT_WORST - FLOOR_CALLS + 1;
+
+	// ⭐ THE MUTANT THAT SURVIVED (E3-M75): no test's store held an exchange at the root's check, so the calls recorded were a
+	// term no test could kill — dropped, a MODEL root was pressed with the floor's calls uncounted.
+	it('⭐ a MODEL root whose worst case fits only WITHOUT the floor’s recorded calls is never pressed: the run ends paid-limit, the calls counted', async () => {
+		const l = halfBLane({ paid: true, prior: PRIOR, types: MODEL_ROOT_TYPES, floorCalls: FLOOR_CALLS });
+		const record = await l.run();
+		expect([l.only('beginExecute'), record.end?.reason, record.units[0]?.limitCheck]).toEqual([
+			[],
+			'paid-limit',
+			{
+				prior: PRIOR,
+				recorded: FLOOR_CALLS,
+				reserve: PHASE7_NEGATIVE_CONTROL_RESERVE,
+				ahead: UNIT_WORST,
+				total: PHASE7_PAID_LIMIT + 1,
+				limit: PHASE7_PAID_LIMIT,
+				allowed: false
+			}
+		]);
+	});
+
+	it('⭐ CONTROL — one floor call fewer, the worst case fits exactly: the MODEL root is pressed', async () => {
+		const l = halfBLane({ paid: true, prior: PRIOR, types: MODEL_ROOT_TYPES, floorCalls: FLOOR_CALLS - 1 });
+		const record = await l.run();
+		expect(l.only('beginExecute root')).toEqual(['beginExecute root']);
+		expect(record.units[0]?.limitCheck).toMatchObject({ recorded: FLOOR_CALLS - 1, total: PHASE7_PAID_LIMIT, allowed: true });
 	});
 });
