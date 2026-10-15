@@ -308,6 +308,9 @@ function rowsOf(policy: GoverningDeclaredPolicy, answer: DeclaredPolicyAnswer): 
  *     reads an absent list as empty): `dispositionFromFindings` over no row and no finding answers SATISFIED, so such a
  *     policy was signed off with nothing checked — `REG-F-523`'s shape, one policy down. The record says why
  *     (`noCriterionDeclared`, beside the verdict).
+ *   · ⛔ E12's re-review F5 — AND SO IS A REVIEW THAT ANSWERED NO CRITERION, every row `UNABLE_TO_DETERMINE`: the ladder
+ *     reads only MANDATORY criteria, so a policy none of whose criteria is BLOCKING or CRITICAL (`pol_historical_consistency`)
+ *     passed with nothing checked — F6's shape again, one policy over. A stipulated met counts as an answer where admitted.
  *   · ⭑ IN AN ENGINE BUILT TO ADMIT THEM — never durable, by the `Engine`'s own refusal — a row recorded
  *     `UNABLE_TO_DETERMINE` with `stipulated: 'MET'` beside it counts as met, as the floor's ladder counts one
  *     (`REG-D-071` Q5 (a)); the engine's Gate E reads the same rows the same way, so the verdict and the gate agree.
@@ -325,6 +328,7 @@ function verdictOf(
 			? { ...c, outcome: 'MET' as const }
 			: c
 	);
+	if (counted.every((c) => c.outcome === 'UNABLE_TO_DETERMINE')) return 'INCONCLUSIVE';
 	const fromAnswers = dispositionFromFindings({
 		findings: answer.observations.map((o) => ({ severity: o.severity, open: o.open })),
 		criteria: counted

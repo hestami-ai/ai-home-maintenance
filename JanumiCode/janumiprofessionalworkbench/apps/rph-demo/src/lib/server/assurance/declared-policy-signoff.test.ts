@@ -493,6 +493,31 @@ describe('⭐ planDeclaredSignoff — one assessment per governing DECLARED poli
 		expect(unsatisfyingReviews(p)).toEqual([{ policyId: POL_EMPTY, disposition: 'INCONCLUSIVE' }]);
 	});
 
+	it('⛔ E12’s re-review F5 — a policy whose criteria are ALL non-mandatory, its review answering NONE of them, is INCONCLUSIVE: nothing was checked, whatever the reviewer recommended', () => {
+		// ⛔ PREDICTED RED, read from the code: SATISFIED — every criterion recorded UNABLE_TO_DETERMINE and none mandatory, so
+		// `dispositionFromFindings` over an empty mandatory set passed (F6's general form: `criteria.length === 0` does not reach
+		// it). `pol_historical_consistency`, five criteria all MATERIAL, is ARCHITECTURE_DECISION's default.
+		const POL_MATERIAL = 'pol_01ARZ3NDEKTSV4RRFFQ69GS1V0';
+		const TYPE_MATERIAL = 'pwt_01ARZ3NDEKTSV4RRFFQ69GS1W0';
+		const PWU_MATERIAL = 'pwu_01ARZ3NDEKTSV4RRFFQ69GS1X0';
+		const MATERIAL = [criterion('M1', 'MATERIAL'), criterion('M2', 'MATERIAL')];
+		policy(POL_MATERIAL, 'All material', 'DIFFERENT_AGENT', [], true, MATERIAL);
+		definePwuType(TYPE_MATERIAL, [POL_MATERIAL]);
+		proposePwu(PWU_MATERIAL, TYPE_MATERIAL);
+		const verdictWith = (answer: DeclaredPolicyAnswer, admitStipulatedAnswers = false) =>
+			plan(PWU_MATERIAL, { answers: new Map([[POL_MATERIAL, answer]]), admitStipulatedAnswers });
+		const none = verdictWith(answered(POL_MATERIAL, {}, { criteria: [], observations: [] }, MATERIAL));
+		expect(none.dispositions, 'a review that answered no criterion checked nothing').toEqual(['INCONCLUSIVE']);
+		expect(runReview(none.steps as readonly [string, string, string, unknown][]).ok).toBe(true);
+		expect(stateOf(none.assessmentIds[0]!)?.assessmentState).toBe('INCONCLUSIVE');
+		// ⭐ A stipulated met counts as an answer where it is admitted (`REG-D-071` Q5 (a)), and only there.
+		const stipulated = answered(POL_MATERIAL, { M1: 'STIPULATED', M2: 'STIPULATED' }, {}, MATERIAL);
+		expect(verdictWith(stipulated, true).dispositions, 'a stipulated met, admitted').toEqual(['SATISFIED']);
+		expect(verdictWith(stipulated, false).dispositions, 'a stipulated met, not admitted: nobody judged it').toEqual(['INCONCLUSIVE']);
+		// ⭑ CONTROL — one criterion answered: the policy's stakes decide, as before.
+		expect(verdictWith(answered(POL_MATERIAL, { M2: 'UNABLE_TO_DETERMINE' }, {}, MATERIAL)).dispositions).toEqual(['SATISFIED']);
+	});
+
 	it('⭐ E2 — a stipulated row counts as met in an engine built to admit it, and only there (REG-D-071 Q5 (a))', () => {
 		const stipulatedAll = answered(POL_AGENT, { C1: 'STIPULATED', C2: 'STIPULATED', C3: 'STIPULATED' });
 		const admitting = plan(PWU, { answers: cleanAnswers(PWU, { [POL_AGENT]: stipulatedAll }), admitStipulatedAnswers: true });

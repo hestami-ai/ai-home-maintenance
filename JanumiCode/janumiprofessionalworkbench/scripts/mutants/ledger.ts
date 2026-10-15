@@ -27678,5 +27678,50 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/phase7-live-spec.test.ts"],
 		why: "PROMISE (E12's re-review F4): `refused` is the refusal that STANDS - the last act pressed, when it was refused or got no answer - so a Record Assurance the rule's accepted re-run stood in for, followed by an accepted Mark Satisfied, leaves none standing. WHO RELIES: a reader of run.json, who reads `refused` as what left the sign-off unfinished. WHAT THE MUTATION DOES: Record Assurance's refusal stands though the sign-off was completed. OBSERVED (bun run mutants -- (the E12 re-review ids), 2026-10-15, in the fixer's worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M96-the-first-refusal-stands-past-an-accepted-re-run ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 7 completion E12, the re-review's finding 4 (MINOR): SignOffRecord's doc said the record keeps 'each act, and the first refused, if one was', and both of the rule's re-run paths overwrote Record Assurance's refusal - run.json could show refused: null beside a Record Assurance answered 'failure', its reason only in lane/actions; now each act keeps its own refusal (SignOffAct.refusal) and `refused` is documented as what it is, the refusal that stands"
+	},
+	{
+		id: "E12-M97-a-review-that-answered-nothing-passes-a-policy-with-no-mandatory-criterion",
+		file: "apps/rph-demo/src/lib/server/assurance/declared-policy-signoff.ts",
+		find: "\tif (counted.every((c) => c.outcome === 'UNABLE_TO_DETERMINE')) return 'INCONCLUSIVE';\n",
+		replace: "",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/declared-policy-signoff.test.ts"],
+		why: "PROMISE (E12's re-review F5): a declared review that answered NO criterion of its policy is INCONCLUSIVE - nothing was checked - whatever the ladder over the policy's mandatory criteria would say. WHO RELIES: every declared verdict of a policy none of whose criteria is BLOCKING or CRITICAL (pol_historical_consistency), which the ladder would otherwise pass with nothing checked (REG-F-523's shape, as for F6's policy with no criterion). WHAT THE MUTATION DOES: the limb is dropped, and such a review is SATISFIED. OBSERVED (bun run mutants -- (the E12 re-review ids), 2026-10-15, in the fixer's worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M97-a-review-that-answered-nothing-passes-a-policy-with-no-mandatory-criterion ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion E12, the re-review's finding 5 (MINOR), the general form of the package review's finding 6: a declared policy whose criteria are ALL non-mandatory was SATISFIED when the reviewer answered no criterion - every row UNABLE_TO_DETERMINE, the ladder's mandatory set empty, `criteria.length === 0` not reaching it (pol_historical_consistency, five criteria all MATERIAL, is ARCHITECTURE_DECISION's default); now verdictOf gives INCONCLUSIVE when no criterion was answered, a stipulated met counting where admitted, and the run report's restatement of the verdict rule gives the same"
+	},
+	{
+		id: "E12-M98-a-stipulated-met-never-counts-as-an-answer",
+		file: "apps/rph-demo/src/lib/server/assurance/declared-policy-signoff.ts",
+		find: "\tif (counted.every((c) => c.outcome === 'UNABLE_TO_DETERMINE')) return 'INCONCLUSIVE';",
+		replace: "\tif (rows.every((c) => c.outcome === 'UNABLE_TO_DETERMINE')) return 'INCONCLUSIVE';",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/declared-policy-signoff.test.ts"],
+		why: "PROMISE (E12's re-review F5; REG-D-071 Q5 (a)): in an engine built to admit them, a stipulated met counts as an answer, so a review the stand-in stipulated is not 'nothing answered' - the verdict and Gate E agree. WHO RELIES: the gate lane, whose declared stand-in stipulates every criterion. WHAT THE MUTATION DOES: the limb reads the rows before stipulations are admitted, so every stipulated review of a policy with no mandatory criterion is INCONCLUSIVE. OBSERVED (bun run mutants -- (the E12 re-review ids), 2026-10-15, in the fixer's worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M98-a-stipulated-met-never-counts-as-an-answer ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion E12, the re-review's finding 5 (MINOR), the general form of the package review's finding 6: a declared policy whose criteria are ALL non-mandatory was SATISFIED when the reviewer answered no criterion - every row UNABLE_TO_DETERMINE, the ladder's mandatory set empty, `criteria.length === 0` not reaching it (pol_historical_consistency, five criteria all MATERIAL, is ARCHITECTURE_DECISION's default); now verdictOf gives INCONCLUSIVE when no criterion was answered, a stipulated met counting where admitted, and the run report's restatement of the verdict rule gives the same"
+	},
+	{
+		id: "E12-M99-one-undetermined-criterion-makes-the-verdict-inconclusive",
+		file: "apps/rph-demo/src/lib/server/assurance/declared-policy-signoff.ts",
+		find: "\tif (counted.every((c) => c.outcome === 'UNABLE_TO_DETERMINE')) return 'INCONCLUSIVE';",
+		replace: "\tif (counted.some((c) => c.outcome === 'UNABLE_TO_DETERMINE')) return 'INCONCLUSIVE';",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/declared-policy-signoff.test.ts"],
+		why: "PROMISE (E12's re-review F5): the limb is 'NO criterion answered', not 'some criterion not answered' - once a criterion is answered, the policy's stakes decide (the ladder: an undetermined MATERIAL criterion does not block). WHO RELIES: every declared verdict with one non-mandatory criterion left undetermined. WHAT THE MUTATION DOES: any undetermined criterion makes the verdict INCONCLUSIVE. OBSERVED (bun run mutants -- (the E12 re-review ids), 2026-10-15, in the fixer's worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M99-one-undetermined-criterion-makes-the-verdict-inconclusive ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion E12, the re-review's finding 5 (MINOR), the general form of the package review's finding 6: a declared policy whose criteria are ALL non-mandatory was SATISFIED when the reviewer answered no criterion - every row UNABLE_TO_DETERMINE, the ladder's mandatory set empty, `criteria.length === 0` not reaching it (pol_historical_consistency, five criteria all MATERIAL, is ARCHITECTURE_DECISION's default); now verdictOf gives INCONCLUSIVE when no criterion was answered, a stipulated met counting where admitted, and the run report's restatement of the verdict rule gives the same"
+	},
+	{
+		id: "E12-M100-the-report-restates-the-ladder-alone",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "\tconst given: string = noneAnswered\n\t\t? 'INCONCLUSIVE'",
+		replace: "\tconst given: string = noneAnswered && declared.length < 0\n\t\t? 'INCONCLUSIVE'",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE (E12's re-review F5): the report's 'verdict the answers give' is the one the sign-off computes (verdictOf), its limb for a review that answered no criterion included. WHO RELIES: stage 5b and the declared-verdicts table: without it the sign-off's INCONCLUSIVE reads 'recorded INCONCLUSIVE, and its answers give SATISFIED', and a pre-fix archive's SATISFIED with nothing checked reads as following from its answers. WHAT THE MUTATION DOES: the report reads the ladder alone. OBSERVED (bun run mutants -- (the E12 re-review ids), 2026-10-15, in the fixer's worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M100-the-report-restates-the-ladder-alone ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion E12, the re-review's finding 5 (MINOR), the general form of the package review's finding 6: a declared policy whose criteria are ALL non-mandatory was SATISFIED when the reviewer answered no criterion - every row UNABLE_TO_DETERMINE, the ladder's mandatory set empty, `criteria.length === 0` not reaching it (pol_historical_consistency, five criteria all MATERIAL, is ARCHITECTURE_DECISION's default); now verdictOf gives INCONCLUSIVE when no criterion was answered, a stipulated met counting where admitted, and the run report's restatement of the verdict rule gives the same"
+	},
+	{
+		id: "E12-M101-the-report-s-limb-reads-one-undetermined-criterion",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "\tconst noneAnswered = declared.every((c) => !ANSWERED.has(latest.get(c.id)?.result ?? ''));",
+		replace: "\tconst noneAnswered = declared.some((c) => !ANSWERED.has(latest.get(c.id)?.result ?? ''));",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE (E12's re-review F5): the report's limb, like the sign-off's, is 'NO criterion answered'. WHO RELIES: the declared-verdicts table, where a policy with one criterion answered is read by the ladder. WHAT THE MUTATION DOES: one undetermined criterion makes the answers give INCONCLUSIVE, so a SATISFIED over one answered MATERIAL criterion reads as not following. OBSERVED (bun run mutants -- (the E12 re-review ids), 2026-10-15, in the fixer's worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M101-the-report-s-limb-reads-one-undetermined-criterion ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion E12, the re-review's finding 5 (MINOR), the general form of the package review's finding 6: a declared policy whose criteria are ALL non-mandatory was SATISFIED when the reviewer answered no criterion - every row UNABLE_TO_DETERMINE, the ladder's mandatory set empty, `criteria.length === 0` not reaching it (pol_historical_consistency, five criteria all MATERIAL, is ARCHITECTURE_DECISION's default); now verdictOf gives INCONCLUSIVE when no criterion was answered, a stipulated met counting where admitted, and the run report's restatement of the verdict rule gives the same"
 	}
 ];

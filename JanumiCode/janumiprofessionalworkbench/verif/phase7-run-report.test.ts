@@ -1032,6 +1032,65 @@ describe('⭐⭐ JAN-EXEC Phase 7 completion E2 — stage 5b read from the recor
 		expect([row.state, row.followsFromAnswers, row.value], 'a REJECTED read as an evidence cap').toEqual(['REJECTED', false, 'broke']);
 	});
 
+	// ── ⛔ E12’s re-review F5 — A REVIEW THAT ANSWERED NO CRITERION GIVES INCONCLUSIVE, as the sign-off computes it (`verdictOf`),
+	// though the ladder over a policy none of whose criteria is mandatory would pass it.
+	it('⛔ E12’s re-review F5 — a policy whose criteria are ALL non-mandatory, NONE answered: INCONCLUSIVE follows from its answers, SATISFIED does not', () => {
+		// ⛔ PREDICTED RED, read from the code: the report's restatement read the ladder alone, so the sign-off's INCONCLUSIVE read
+		// "recorded INCONCLUSIVE, and its answers give SATISFIED" — and a pre-fix archive's SATISFIED, with nothing checked,
+		// followed from its answers.
+		const HC = 'pol_historical_consistency';
+		const criteria = POLICY_CRITERIA.get(HC)!;
+		expect(criteria.length > 0 && criteria.every((c) => c.severityIfNotMet === 'MATERIAL'), 'arrangement: every criterion MATERIAL').toBe(true);
+		const verdictOf = (state: string, met = 0) => {
+			const run = aRun();
+			let seq = 90_000;
+			const object = (id: string, objectType: string, state: Record<string, unknown>): StoredObject => ({ id, objectType, state, firstSequence: ++seq });
+			const event = (eventType: string, aggregateId: string, payload: Record<string, unknown>): StoredEvent => ({
+				sequence: ++seq,
+				eventType,
+				aggregateType: '',
+				aggregateId,
+				commandId: null,
+				payload
+			});
+			const store: StoreRows = {
+				...run.store,
+				objects: [
+					...run.store.objects,
+					object(HC, 'ASSURANCE_POLICY', { criteria: criteria.map((c) => ({ id: c.id, severityIfNotMet: c.severityIfNotMet })) }),
+					object('asm_hc', 'ASSURANCE_ASSESSMENT', { assurancePolicyId: HC, subjectObjectIds: ['pwu_design'], assessmentState: state })
+				],
+				events: [
+					...run.store.events,
+					...criteria.map((c, i) =>
+						event('AssuranceCriterionEvaluated', 'asm_hc', { assessmentId: 'asm_hc', criterionId: c.id, result: i < met ? 'MET' : 'UNABLE_TO_DETERMINE' })
+					),
+					event('AssuranceAssessmentCompleted', 'asm_hc', { assessmentId: 'asm_hc', validatorId: DECLARED_REVIEW_VALIDATORS[0] })
+				]
+			};
+			const row = reportOf({ ...run, store }).report.declaredVerdicts.rows.find((d) => d.assessmentId === 'asm_hc')!;
+			return [row.followsFromAnswers, row.registerIds, row.basis];
+		};
+		const unanswered = `${HC}: ${criteria.length} of ${criteria.length} criteria not answered (${criteria.map((c) => c.id).join(', ')})`;
+		expect(verdictOf('INCONCLUSIVE'), 'the sign-off’s INCONCLUSIVE read as a verdict its answers do not give').toEqual([
+			true,
+			['REG-F-489'],
+			[unanswered]
+		]);
+		expect(verdictOf('SATISFIED'), 'a SATISFIED with nothing checked read as following from its answers').toEqual([
+			false,
+			['REG-F-489'],
+			[unanswered, `${HC}: recorded SATISFIED, and its answers give INCONCLUSIVE`]
+		]);
+		// ⭑ CONTROL — one criterion answered: the ladder decides, as before, and SATISFIED follows from it.
+		const rest = criteria.slice(1);
+		expect(verdictOf('SATISFIED', 1), 'one criterion answered').toEqual([
+			true,
+			['REG-F-489'],
+			[`${HC}: ${rest.length} of ${criteria.length} criteria not answered (${rest.map((c) => c.id).join(', ')})`]
+		]);
+	});
+
 	it('⭑ CONTROL — a verdict the pre-E2 sign-off recorded is still read as it was: vacuous by construction (REG-F-523)', () => {
 		const r = reportOf(aRun({ 'end-to-end': { declared: 'legacy' } })).report;
 		expect(shown(cellOf(r, '5b', 'end-to-end'))).toEqual(['vacuous by construction', ['REG-F-406', 'REG-F-523']]);

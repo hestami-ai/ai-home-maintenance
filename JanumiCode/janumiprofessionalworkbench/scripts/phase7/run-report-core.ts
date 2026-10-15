@@ -32,7 +32,8 @@
 import { createHash } from 'node:crypto';
 import { posix } from 'node:path';
 // ⭐ E2 (design B8) — the kernel's own ladder, so "the verdict the answers give" is decided by the rule the sign-off computes
-// it with (`declared-policy-signoff.ts` `verdictOf`), never a restated copy of it. Pure, store-free.
+// it with (`declared-policy-signoff.ts` `verdictOf`), never a restated copy of it. Pure, store-free. ⚠ E12's re-review F5 —
+// save the one limb `verdictOf` applies before the ladder, a review that answered no criterion, which `judgedVerdict` restates.
 import { BLOCKING_SEVERITIES, dispositionFromFindings } from '@janumipwb/rph-assurance';
 import {
 	PHASE7_NEGATIVE_CONTROL_RESERVE,
@@ -2305,6 +2306,7 @@ const EVIDENCE_CEILINGS: ReadonlySet<string> = new Set(['CONDITIONALLY_SATISFIED
  * criterion with no row undetermined — and the assessment's OPEN findings. ⚠ A policy that declares required evidence can
  * cap a verdict below its answers (`supportedDisposition`'s ceiling); such a verdict is read as following when it is the
  * stricter of the two. ⭑ An engine built for tests counts a stipulated row as met; no run this report reads is one.
+ * ⭐ E12's re-review F5 — and a review that answered NO criterion gives INCONCLUSIVE, as `verdictOf` computes it.
  */
 function judgedVerdict(ix: Index, a: StoredObject): Omit<DeclaredVerdict, 'assessmentId' | 'unit' | 'validatorId'> {
 	const policyId = str(a.state.assurancePolicyId);
@@ -2332,13 +2334,19 @@ function judgedVerdict(ix: Index, a: StoredObject): Omit<DeclaredVerdict, 'asses
 		.ofType('ASSURANCE_OBSERVATION')
 		.filter((o) => str(o.state.assessmentId) === a.id && str(o.state.disposition) === 'OPEN')
 		.map((o) => ({ severity: str(o.state.severity) as never, open: true }));
-	const given: string = dispositionFromFindings({
-		findings: open,
-		criteria: declared.map((c) => ({
-			mandatory: c.mandatory,
-			outcome: (latest.get(c.id)?.result ?? 'UNABLE_TO_DETERMINE') as never
-		}))
-	});
+	// ⛔ E12's re-review F5 — the sign-off's limb before the ladder (`verdictOf`): a review that answered NO criterion of the
+	// policy gives INCONCLUSIVE, which the ladder alone, reading mandatory criteria only, does not for a policy none of whose
+	// criteria is mandatory.
+	const noneAnswered = declared.every((c) => !ANSWERED.has(latest.get(c.id)?.result ?? ''));
+	const given: string = noneAnswered
+		? 'INCONCLUSIVE'
+		: dispositionFromFindings({
+				findings: open,
+				criteria: declared.map((c) => ({
+					mandatory: c.mandatory,
+					outcome: (latest.get(c.id)?.result ?? 'UNABLE_TO_DETERMINE') as never
+				}))
+			});
 	const evidenced = Array.isArray(policyState.requiredEvidence) && policyState.requiredEvidence.length > 0;
 	// ⛔ `E12F` F7 — A CAP IS A CEILING'S VALUE: `supportedDisposition` answers SATISFIED, CONDITIONALLY_SATISFIED or
 	// INCONCLUSIVE, so a verdict below its answers follows from them only as one of the two a ceiling can impose. ⛔ Any
