@@ -161,6 +161,26 @@ export function uncheckedCaveat(declared: readonly { readonly criterionResults: 
 	return [`REG-F-523: ${unchecked} of ${declared.length} declared verdicts were signed off with no criterion checked.`];
 }
 
+/**
+ * ⭐ E12's polish (fix2's F10; the lead's delegated decision of 2026-10-15, to be registered) — THE UNIT_PURPOSE FRAMING, STATED
+ * PER RUN. A unit composed of others (the root) has its declared policies judged over its children's work, its reviewer given
+ * the unit's own purpose (`UNIT_PURPOSE`; the route's `declaredReviewWorkOf`), and no reviewer-qualification case measures that
+ * framing: every declared case of case set v5 is in the PRODUCING_PROMPT framing (`scripts/reviewer-qual/materialize.ts`). So
+ * the line names each such unit and the reviews the model reviewer made of it, among the verdicts that speak; it is absent
+ * where there are none — a root signed off before E2, or never. No case set changes.
+ */
+export function unitPurposeCaveat(
+	composites: readonly { readonly unit: string; readonly reviews: number }[]
+): readonly string[] {
+	const made = composites.filter((c) => c.reviews > 0);
+	if (made.length === 0) return [];
+	return [
+		`UNIT_PURPOSE framing: the declared reviews of a unit composed of others (${made.map((c) => `${c.unit}: ${c.reviews}`).join('; ')}) ` +
+			'were made in it — the unit’s own purpose, judged over its children’s work (REG-D-111 (2)) — and no reviewer-qualification ' +
+			'case measures it: every declared case of case set v5 is in the PRODUCING_PROMPT framing.'
+	];
+}
+
 /** The classifications a person gives each adjudication row (P7-4f). This report leaves the field blank. */
 export const ADJUDICATION_CLASSES = [
 	'reviewer right',
@@ -2740,6 +2760,14 @@ export function buildRunReport(
 		problems.push('lane/boot.json names no JPWB_DEMO_DB: no recorded path can be made relative to the workspace');
 	const workspace = demoDb === '' || undertakingId === null ? null : workspaceDirectoryFor(demoDb, undertakingId);
 	const views = units.map((u) => unitView(ix, u, units, lane, pairing, declared, history));
+	// ⭐ E12's polish (fix2's F10) — each unit composed of others, and the verdicts that speak the model reviewer made of it.
+	const parents = new Set(ix.ofType('PROFESSIONAL_WORK_UNIT').map((p) => str(p.state.parentWorkUnitId)));
+	const composites = units
+		.filter((u) => u.object !== null && parents.has(u.object.id))
+		.map((u) => ({
+			unit: u.slug,
+			reviews: declared.filter((d) => d.unit === u.slug && d.validatorId === DECLARED_REVIEW_VALIDATORS[0]).length
+		}));
 	const endReason = str(rec(rec(lane.run).end).reason) || null;
 	// ⛔ D4 — every act the lane presses ends the run when it outlasts its bound: a Begin & Execute, ⭐ E12's re-review F1 —
 	// a recovery act the rule pressed, and a sign-off act. So the end names one of them.
@@ -2778,8 +2806,9 @@ export function buildRunReport(
 			contentRows: store.content === null ? null : store.content.length
 		},
 		answer: {
-			// ⭐ `E12F` F10 — and the `REG-F-523` line where this run's declared verdicts carry no criterion result.
-			alwaysStated: [...ALWAYS_STATED, ...uncheckedCaveat(declared)],
+			// ⭐ `E12F` F10 — and the `REG-F-523` line where this run's declared verdicts carry no criterion result; ⭐ E12's polish
+			// (fix2's F10) — and the UNIT_PURPOSE line where the model reviewer judged a unit composed of others.
+			alwaysStated: [...ALWAYS_STATED, ...uncheckedCaveat(declared), ...unitPurposeCaveat(composites)],
 			counts: cellCounts,
 			open: matrix.filter((c) => c.value === null).length,
 			measured: cellCounts['as intended'] + cellCounts.broke,

@@ -1733,6 +1733,12 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 		expect(md).not.toContain('REG-F-523: the declared policies were signed off with no criterion checked.');
 	});
 
+	/** ⭐ E12’s polish (fix2’s F10) — the caveat a run states whose root’s two declared reviews the model reviewer made. */
+	const UNIT_PURPOSE =
+		'UNIT_PURPOSE framing: the declared reviews of a unit composed of others (root: 2) were made in it — the unit’s own ' +
+		'purpose, judged over its children’s work (REG-D-111 (2)) — and no reviewer-qualification case measures it: every ' +
+		'declared case of case set v5 is in the PRODUCING_PROMPT framing.';
+
 	it('⛔ E12F F10 — the REG-F-523 caveat is KEPT for a run whose declared verdicts carry no criterion result (a pre-E2 archive), and counted for one that mixes them', () => {
 		// ⛔ PREDICTED RED, read from the code: E2 dropped the line for EVERY run, so a report over a pre-E2 archive — its 14
 		// declared verdicts signed off from required evidence alone — opened without the gap it most needs to state.
@@ -1741,13 +1747,26 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 			aRun({ requirements: legacy, design: legacy, implementation: legacy, 'end-to-end': legacy }, { rootDeclared: 'legacy' })
 		).report;
 		expect(pre.answer.alwaysStated).toEqual([...ALWAYS_STATED, 'REG-F-523: the declared policies were signed off with no criterion checked.']);
+		// ⭐ E12’s polish (fix2’s F10) — a run whose root the model reviewer judged states the UNIT_PURPOSE line too (below).
 		const mixed = reportOf(aRun({ 'end-to-end': legacy })).report;
 		expect(mixed.answer.alwaysStated).toEqual([
 			...ALWAYS_STATED,
-			'REG-F-523: 3 of 14 declared verdicts were signed off with no criterion checked.'
+			'REG-F-523: 3 of 14 declared verdicts were signed off with no criterion checked.',
+			UNIT_PURPOSE
 		]);
 		// ⭑ CONTROL — every verdict judged, criterion by criterion: the line stays dropped.
-		expect(reportOf(aRun()).report.answer.alwaysStated).toEqual([...ALWAYS_STATED]);
+		expect(reportOf(aRun()).report.answer.alwaysStated).toEqual([...ALWAYS_STATED, UNIT_PURPOSE]);
+	});
+
+	it('⛔ E12’s polish (fix2’s F10; the lead’s delegated decision of 2026-10-15) — the caveats say the root’s declared reviews were made in the UNIT_PURPOSE framing, which no qualification case measures — where the model reviewer made one', () => {
+		// ⛔ PREDICTED RED, read from the code: no caveat named it — the root's two declared reviews rested on reviewer behaviour no
+		// case of v5 measures (every declared case is in the PRODUCING_PROMPT framing), and the report opened as if they did not.
+		expect(reportOf(aRun()).report.answer.alwaysStated, 'the UNIT_PURPOSE framing went unsaid').toContain(UNIT_PURPOSE);
+		expect(renderMarkdown(reportOf(aRun()).report)).toContain(`  - ${UNIT_PURPOSE}`);
+		// ⭑ CONTROLS — unsaid where the model reviewer made no such review: the root signed off before E2, or never signed off.
+		const said = (o: Parameters<typeof aRun>[1]) =>
+			reportOf(aRun({}, o)).report.answer.alwaysStated.some((s) => s.startsWith('UNIT_PURPOSE'));
+		expect([said({ rootDeclared: 'legacy' }), said({ rootSignedOff: false })]).toEqual([false, false]);
 	});
 
 	it('⛔ a press that outlasted the allowance (D4) is read as cut there — never from its mid-unit archive as if it ended', () => {

@@ -27187,10 +27187,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "E12-M42-the-reg-f-523-caveat-is-dropped-for-every-run",
 		file: "scripts/phase7/run-report-core.ts",
-		find: "alwaysStated: [...ALWAYS_STATED, ...uncheckedCaveat(declared)],",
-		replace: "alwaysStated: [...ALWAYS_STATED, ...uncheckedCaveat([])], // MUTANT: the REG-F-523 line is dropped for every run",
+		find: "alwaysStated: [...ALWAYS_STATED, ...uncheckedCaveat(declared), ...unitPurposeCaveat(composites)],",
+		replace: "alwaysStated: [...ALWAYS_STATED, ...uncheckedCaveat([]), ...unitPurposeCaveat(composites)], // MUTANT: the REG-F-523 line is dropped for every run",
 		expectRed: ["verif/phase7-run-report.test.ts"],
-		why: "PROMISE (E12F F10, the package review's tenth finding): the report opens with the REG-F-523 caveat for a run whose declared verdicts carry no criterion result - a pre-E2 archive, signed off from required evidence alone - since a 'Yes' over such a run carries exactly that gap. WHO RELIES: the sponsor reading a report over an archive made before E2, or one mixing such verdicts. WHAT THE MUTATION DOES: the line is dropped for every run, as E2 dropped it. OBSERVED (bun run mutants -- (the E12F F7 and F10b ids, with E12-M16 and E12-M17), 2026-10-11, in the fixer's worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M42-the-reg-f-523-caveat-is-dropped-for-every-run ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		why: "PROMISE (E12F F10, the package review's tenth finding): the report opens with the REG-F-523 caveat for a run whose declared verdicts carry no criterion result - a pre-E2 archive, signed off from required evidence alone - since a 'Yes' over such a run carries exactly that gap. WHO RELIES: the sponsor reading a report over an archive made before E2, or one mixing such verdicts. WHAT THE MUTATION DOES: the line is dropped for every run, as E2 dropped it. OBSERVED (bun run mutants -- (the E12F F7 and F10b ids, with E12-M16 and E12-M17), 2026-10-11, in the fixer's worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M42-the-reg-f-523-caveat-is-dropped-for-every-run ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯' ⭐ RE-ANCHORED 2026-10-15 (E12's polish, fix2's F10; ledger rule #5 - in the commit that changed the line): the caveats gained the UNIT_PURPOSE line beside it; the mutation is unchanged, the REG-F-523 line dropped for every run. RE-MEASURED (bun run mutants -- (the E12 polish ids), 2026-10-15, in the polish worktree): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M42-the-reg-f-523-caveat-is-dropped-for-every-run ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 7 completion E12 fix round (the package review's findings 7 and 10b): stage 5b is driven over a declared policy that declares required evidence - a cap below the answers is as intended, a verdict above them broke, and (the general form) a REJECTED is no evidence cap (EVIDENCE_CEILINGS, supportedDisposition's two answers short of SATISFIED); the REG-F-523 caveat is stated per run (uncheckedCaveat) - whole for a run whose declared verdicts carry no criterion result, counted for one that mixes them"
 	},
 	{
@@ -27984,5 +27984,32 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/phase7-run-report.test.ts"],
 		why: "PROMISE (E12's polish, fix2's F9): what the report reads as the verdicts - 5b, the table's rows, the heading, the REG-F-523 caveat's count - is the verdicts that speak. WHO RELIES: every reader of the declared verdicts. WHAT THE MUTATION DOES: every verdict, superseded ones included, is read as speaking. OBSERVED (bun run mutants -- (the E12 polish ids), 2026-10-15, in the polish worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M130-the-report-reads-every-verdict-as-speaking ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'; its red, the mutation applied by hand and the file restored byte for byte: 'AssertionError: the review the re-run replaced still speaks: expected [ 'broke', [ 'REG-F-489' ] ] to deeply equal [ 'as intended', [] ]'",
 		source: "JAN-EXEC Phase 7 completion E12, polish (fix2's F9, decided by the lead on 2026-10-15): stage 5b reads the latest declared verdict per (unit, policy), as the product reads it - by updatedAt, ties to the last made; each superseded verdict is listed as history beside the one that superseded it, in 5b's basis and the declared verdicts table, and the heading and the REG-F-523 caveat count the verdicts that speak"
+	},
+	{
+		id: "E12-M131-the-unit-purpose-framing-goes-unsaid",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "...uncheckedCaveat(declared), ...unitPurposeCaveat(composites)],",
+		replace: "...uncheckedCaveat(declared)],",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE (E12's polish, fix2's F10; the lead's delegated decision of 2026-10-15, to be registered): the run report's caveats say the root's declared reviews were made in the UNIT_PURPOSE framing, which no reviewer-qualification case measures - case set v5's declared cases are all PRODUCING_PROMPT. WHO RELIES: the sponsor reading a 'Yes' over the paid run, whose root's two declared verdicts rest on reviewer behaviour no case measured. WHAT THE MUTATION DOES: the line is never stated. OBSERVED (bun run mutants -- (the E12 polish ids), 2026-10-15, in the polish worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M131-the-unit-purpose-framing-goes-unsaid ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'; its red, the mutation applied by hand and the file restored byte for byte: 'AssertionError: expected [ …(2) ] to deeply equal [ …(3) ]'",
+		source: "JAN-EXEC Phase 7 completion E12, polish (fix2's F10, decided by the lead on 2026-10-15): the run report's caveats disclose that the declared reviews of a unit composed of others - the root's - were made in the UNIT_PURPOSE framing, which no reviewer-qualification case measures; stated per run, where the model reviewer made such a review among the verdicts that speak; no case set changes"
+	},
+	{
+		id: "E12-M132-the-unit-purpose-line-counts-reviews-no-model-made",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "d.unit === u.slug && d.validatorId === DECLARED_REVIEW_VALIDATORS[0]",
+		replace: "d.unit === u.slug",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE (E12's polish, fix2's F10): the line counts the reviews the MODEL REVIEWER made in the framing - a root signed off before E2 asked no reviewer anything, so no qualification gap reaches it. WHO RELIES: a report over a pre-E2 archive, which states no such line. WHAT THE MUTATION DOES: every declared verdict of the root counts, the pre-E2 sign-off's included. OBSERVED (bun run mutants -- (the E12 polish ids), 2026-10-15, in the polish worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M132-the-unit-purpose-line-counts-reviews-no-model-made ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'; its red, the mutation applied by hand and the file restored byte for byte: 'AssertionError: expected [ …(3) ] to deeply equal [ …(2) ]'",
+		source: "JAN-EXEC Phase 7 completion E12, polish (fix2's F10, decided by the lead on 2026-10-15): the run report's caveats disclose that the declared reviews of a unit composed of others - the root's - were made in the UNIT_PURPOSE framing, which no reviewer-qualification case measures; stated per run, where the model reviewer made such a review among the verdicts that speak; no case set changes"
+	},
+	{
+		id: "E12-M133-the-unit-purpose-line-names-units-composed-of-none",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "\t\t.filter((u) => u.object !== null && parents.has(u.object.id))\n",
+		replace: "\t\t.filter((u) => u.object !== null)\n",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE (E12's polish, fix2's F10): the line names the units COMPOSED OF OTHERS - the ones the route judges in the UNIT_PURPOSE framing (declaredReviewWorkOf), a phase judged on its own producing prompt is not one. WHO RELIES: the line's own claim of which reviews were made in the framing. WHAT THE MUTATION DOES: every unit is named, the phases with their PRODUCING_PROMPT reviews among them. OBSERVED (bun run mutants -- (the E12 polish ids), 2026-10-15, in the polish worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M133-the-unit-purpose-line-names-units-composed-of-none ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'; its red, the mutation applied by hand and the file restored byte for byte: 'AssertionError: expected [ …(3) ] to deeply equal [ …(3) ]'",
+		source: "JAN-EXEC Phase 7 completion E12, polish (fix2's F10, decided by the lead on 2026-10-15): the run report's caveats disclose that the declared reviews of a unit composed of others - the root's - were made in the UNIT_PURPOSE framing, which no reviewer-qualification case measures; stated per run, where the model reviewer made such a review among the verdicts that speak; no case set changes"
 	}
 ];
