@@ -1638,7 +1638,63 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 		expect([r.run.endReason, r.problems]).toEqual(['allowance-exceeded', []]);
 		// ⛔ The end the lane recorded, with no unit it names, is a problem with the inputs.
 		const unnamed = reportOf(aRun({}, { run: { end: { reason: 'allowance-exceeded' } } })).report;
-		expect(unnamed.problems).toContain('lane/run.json ended allowance-exceeded, and names no unit whose Begin & Execute outlasted its allowance');
+		expect(unnamed.problems).toContain(
+			'lane/run.json ended allowance-exceeded, and names no unit whose Begin & Execute, recovery act or sign-off act outlasted its allowance'
+		);
+	});
+
+	it('⛔ E12’s re-review F1 (D4) — a run the lane ended at a SIGN-OFF act with no answer is read as cut there: its end is no problem, and that unit’s stage 7 broke, the act and its bound named', () => {
+		// ⛔ PREDICTED RED, read from the code: the end's check asked only for a Begin & Execute that outlasted its allowance, so
+		// the lane's own end read as a problem with the inputs; and stage 7 read the unit as a sign-off attempted and refused,
+		// unexplained and unregistered.
+		const completed = { lifecycle: 'EXECUTING', execution: 'SUCCEEDED', assurance: 'UNASSESSED' };
+		const cut = { unit: completed, signedOff: false };
+		const run = aRun(
+			{ design: cut, implementation: cut, 'end-to-end': cut },
+			{ rootSignedOff: false, run: { end: { reason: 'allowance-exceeded' } } }
+		);
+		const laneRun = run.lane.run as { units: Record<string, unknown>[] };
+		const withDesign = (fields: Record<string, unknown>): LaneRows => ({
+			...run.lane,
+			run: { ...laneRun, units: laneRun.units.map((u) => (u.slug === 'design' ? { ...u, ...fields } : u)) }
+		});
+		const outlasted = (ms: number) => ({ status: null, envelopeType: null, timedOutAfterMs: ms, requestFailure: null, after: null });
+		const signedOff = withDesign({
+			signOff: {
+				offered: true,
+				limitCheck: null,
+				recordAssurance: outlasted(4_140_000),
+				rerunDeclared: null,
+				rerunLimitCheck: null,
+				markSatisfied: null,
+				refused: { act: 'Record Assurance', reason: 'no answer within 4140000 ms' },
+				notPressed: null
+			}
+		});
+		const r = buildRunReport(run.store, signedOff, { accountNames: NAMES }).report;
+		expect(r.problems, 'the lane’s own end read as a problem with the inputs').toEqual([]);
+		const c = cellOf(r, '7', 'design');
+		expect([c.value, c.registerIds, c.unregistered]).toEqual(['broke', ['REG-F-527'], true]);
+		expect(c.basis).toEqual([
+			'design: lifecycle EXECUTING, assurance UNASSESSED, step SUCCEEDED, read from an archive taken while its Record Assurance may still have been running',
+			"its Record Assurance gave no answer within 4140000 ms (design D4): the run ended there, and the server is killed with the act unfinished (REG-F-527); no register entry names why it outlasted its bound"
+		]);
+		// ⭑ The sign-offs after it were never attempted: not reached.
+		expect(cellOf(r, '7', 'implementation').basis.at(-1)).toBe('its sign-off was never attempted');
+		// ⭐ D4's general form — the rule's re-run of the declared reviews, and a Mark Satisfied, are each named the same way.
+		for (const [field, act, ms] of [['rerunDeclared', 'Re-run the declared reviews', 4_140_000], ['markSatisfied', 'Mark Satisfied', 300_000]] as const) {
+			const named = withDesign({
+				signOff: { offered: true, recordAssurance: { status: 200, envelopeType: 'failure', after: null }, [field]: outlasted(ms), refused: null, notPressed: null }
+			});
+			const report = buildRunReport(run.store, named, { accountNames: NAMES }).report;
+			expect([report.problems, cellOf(report, '7', 'design').basis.at(-1)?.split(' (design D4)')[0]], act).toEqual([
+				[],
+				`its ${act} gave no answer within ${ms} ms`
+			]);
+		}
+		// ⭐ And a recovery act the rule pressed that outlasted its bound names the end too (D4: it ends the run there).
+		const recovered = withDesign({ recovery: [{ act: 'rerunWork', timedOutAfterMs: 38_160_000, requestFailure: null }] });
+		expect(buildRunReport(run.store, recovered, { accountNames: NAMES }).report.problems).toEqual([]);
 	});
 
 	it('⛔ a break no register entry names is marked so — the cell, the run’s completion over it, the counts and the markdown', () => {

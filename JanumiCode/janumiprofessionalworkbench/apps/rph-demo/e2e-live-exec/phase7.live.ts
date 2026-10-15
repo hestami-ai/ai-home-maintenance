@@ -90,8 +90,10 @@ import { STORE_FILE } from './run-folder';
 //      their bound: a sign-off that would cross it is not pressed, nor is any later one, and the run ends `paid-limit`.
 //      ⭐ `E12F` F3 — a Record Assurance answered with a refusal, whose row then offers re-running the declared reviews that
 //      did not conclude, has them re-run once by the rule (`REG-D-105` (4), `REG-D-112` (a)), the limit read first, then
-//      Mark Satisfied if it was accepted. Dry, no phase was pressed, so the root's alone — ~~by these same acts (D11)~~
-//      rehearsed up to the reviewer call, and nothing pressed (`REG-D-112` (b)).
+//      Mark Satisfied if it was accepted. ⛔ E12's re-review F1 — a sign-off act with NO ANSWER ends the run there, as a
+//      Begin & Execute with none does (D4): nothing is pressed beside it, and the final archive is taken. Dry, no phase was
+//      pressed, so the root's alone — ~~by these same acts (D11)~~ rehearsed up to the reviewer call, and nothing pressed
+//      (`REG-D-112` (b)).
 //
 // ── ⚠ WHAT THIS SPEC ASSERTS, AND WHAT IT ONLY RECORDS ────────────────────────────────────────────────────────────────
 // It asserts its OWN machinery (`laneVerdict`): the boot, the PWA as typed, one unit per type, the dry run's proof of the

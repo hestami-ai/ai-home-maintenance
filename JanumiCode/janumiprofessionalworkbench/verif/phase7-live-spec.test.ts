@@ -93,6 +93,7 @@ import {
 	type ProgramRunner,
 	type RunRecord,
 	type RunUnit,
+	type SignOffAct,
 	type SignOffRecord,
 	type UnitState
 } from '../apps/rph-demo/e2e-live-exec/phase7-operator.js';
@@ -1235,6 +1236,14 @@ const answered = (envelopeType: EnvelopeType, status = 200): ActionOutcome => ({
 	timedOutAfterMs: null,
 	requestFailure: null
 });
+/** ⭐ E12's re-review F1 — what the run record keeps of a sign-off act that was answered (`answered`), and the store after it. */
+const actAnswered = (envelopeType: EnvelopeType, after: UnitState): SignOffAct => ({
+	status: 200,
+	envelopeType,
+	timedOutAfterMs: null,
+	requestFailure: null,
+	after
+});
 const OUTLASTED: ActionOutcome = {
 	status: null,
 	envelopeType: null,
@@ -1642,8 +1651,8 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			laneVerdict(
 				withRootSignOff({
 					...rehearsed,
-					recordAssurance: { status: 200, envelopeType: 'success', after: ASSURED },
-					markSatisfied: { status: 200, envelopeType: 'success', after: SATISFIED },
+					recordAssurance: actAnswered('success', ASSURED),
+					markSatisfied: actAnswered('success', SATISFIED),
 					notPressed: null
 				})
 			),
@@ -1722,17 +1731,17 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			offered: true,
 			// ⭐ `E12F` F2 — the limit read before it: 10 before, 10 recorded, 4 held back, its own 2 × 4 counted.
 			limitCheck: { prior: 10, recorded: 10, reserve: 4, ahead: 8, total: 32, limit: PHASE7_PAID_LIMIT, allowed: true },
-			recordAssurance: { status: 200, envelopeType: 'success', after: ASSURED },
+			recordAssurance: actAnswered('success', ASSURED),
 			rerunDeclared: null,
 			rerunLimitCheck: null,
-			markSatisfied: { status: 200, envelopeType: 'success', after: SATISFIED },
+			markSatisfied: actAnswered('success', SATISFIED),
 			refused: null,
 			notPressed: null
 		});
 		expect(implementation.signOff).toEqual({
 			offered: true,
 			limitCheck: { prior: 10, recorded: 10, reserve: 4, ahead: 12, total: 36, limit: PHASE7_PAID_LIMIT, allowed: true },
-			recordAssurance: { status: 200, envelopeType: 'failure', after: COMPLETED },
+			recordAssurance: actAnswered('failure', COMPLETED),
 			rerunDeclared: null,
 			rerunLimitCheck: null,
 			markSatisfied: null,
@@ -2338,7 +2347,7 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		]);
 		const design = record.units[2]!.signOff!;
 		expect([design.rerunDeclared, design.rerunLimitCheck?.ahead, design.rerunLimitCheck?.allowed, design.markSatisfied?.after, design.refused]).toEqual([
-			{ status: 200, envelopeType: 'success', after: ASSURED },
+			actAnswered('success', ASSURED),
 			16,
 			true,
 			SATISFIED,
@@ -2418,6 +2427,114 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 				refusalOf(ra)
 			).toEqual([[], null, { act: 'Record Assurance', reason: refusalOf(ra) }]);
 		}
+	});
+
+	// ── ⛔⛔ E12’s re-review F1 (D4; `REG-F-535`) — A SIGN-OFF ACT WITH NO ANSWER ENDS THE RUN THERE ───────────────────────────
+	// Since E2 a sign-off act asks the reviewer, and each declared review records its calls only when it finishes: a press
+	// beside one still running runs two units' reviews at once, and the limit read before it misses the calls in flight.
+	it('⛔ E12’s re-review F1 (D4) — a Record Assurance with NO ANSWER ends the run there: nothing is pressed beside it, the final archive is taken, and the run ends for the act', async () => {
+		// ⛔ PREDICTED RED, read from the code: the unanswered press was recorded refused and the lane went on — the page loaded,
+		// implementation's limit read without design's calls in flight, its Record Assurance pressed, then the root's — and the
+		// run ended `complete`.
+		const l = laneOf({
+			paid: true,
+			presses: ALL_COMPLETE,
+			signOffs: {
+				root: GREEN,
+				requirements: GREEN,
+				design: { ra: { ...OUTLASTED, timedOutAfterMs: PHASE7_RECORD_ASSURANCE_MS }, raAfter: ASSESSING },
+				implementation: GREEN,
+				'end-to-end': GREEN
+			}
+		});
+		const record = await l.run();
+		expect(
+			l.only('recordAssurance', 'offersRecordAssurance', 'offersDeclaredRerun', 'rerunDeclared', 'markSatisfied'),
+			'an act was pressed beside a Record Assurance with no answer'
+		).toEqual(['recordAssurance requirements', 'markSatisfied requirements', 'recordAssurance design']);
+		const detail = `Design's Record Assurance outlasted its allowance of ${PHASE7_RECORD_ASSURANCE_MS} ms`;
+		expect(record.end).toEqual({ reason: 'allowance-exceeded', at: expect.any(String), detail });
+		// ⭐ The store read after it, then the final archive, which holds the sign-offs made before it — and nothing else.
+		expect(l.calls.slice(l.calls.indexOf('recordAssurance design'))).toEqual([
+			'recordAssurance design',
+			'read',
+			'screenshot 06-final',
+			'read',
+			'archive 06-final',
+			'flushPosts'
+		]);
+		const design = record.units[2]!.signOff!;
+		expect([design.recordAssurance, design.refused]).toEqual([
+			{ status: null, envelopeType: null, timedOutAfterMs: PHASE7_RECORD_ASSURANCE_MS, requestFailure: null, after: ASSESSING },
+			{ act: 'Record Assurance', reason: `no answer within ${PHASE7_RECORD_ASSURANCE_MS} ms` }
+		]);
+		expect(
+			[record.units[3]!.signOff, record.units[4]!.signOff, record.units[0]!.signOff],
+			'a sign-off after the unanswered one was attempted'
+		).toEqual([null, null, null]);
+		expect(l.written().end?.reason).toBe('allowance-exceeded');
+		expect(laneVerdict(record)).toEqual([`the run ended 'allowance-exceeded', not 'complete': ${detail}`]);
+	});
+
+	it('⛔ E12’s re-review F1 (D4) — and so does the rule’s re-run of the declared reviews with no answer, a Record Assurance lost in transit, and — D4’s general form — a Mark Satisfied with none', async () => {
+		const outlasted = (ms: number): ActionOutcome => ({ ...OUTLASTED, timedOutAfterMs: ms });
+		const cases = [
+			{
+				design: {
+					ra: answered('failure'),
+					raAfter: ASSESSING,
+					rerun: { offered: true, outcome: outlasted(PHASE7_RECORD_ASSURANCE_MS), after: ASSESSING }
+				},
+				last: 'rerunDeclared design',
+				end: ['allowance-exceeded', `Design's Re-run the declared reviews outlasted its allowance of ${PHASE7_RECORD_ASSURANCE_MS} ms`]
+			},
+			{
+				design: { ra: LOST_IN_TRANSIT, raAfter: ASSESSING },
+				last: 'recordAssurance design',
+				end: [
+					'request-failed',
+					"Design's Record Assurance failed in transit (net::ERR_EMPTY_RESPONSE): the server may have stopped, or may still be running it"
+				]
+			},
+			{
+				design: { ...GREEN, ms: outlasted(PHASE7_SIGN_OFF_MS) },
+				last: 'markSatisfied design',
+				end: ['allowance-exceeded', `Design's Mark Satisfied outlasted its allowance of ${PHASE7_SIGN_OFF_MS} ms`]
+			}
+		];
+		for (const c of cases) {
+			const l = laneOf({
+				paid: true,
+				presses: ALL_COMPLETE,
+				signOffs: { root: GREEN, requirements: GREEN, design: c.design, implementation: GREEN, 'end-to-end': GREEN }
+			});
+			const record = await l.run();
+			const acts = l.only('recordAssurance', 'offersRecordAssurance', 'offersDeclaredRerun', 'rerunDeclared', 'markSatisfied');
+			expect(acts.slice(acts.indexOf(c.last) + 1), `${c.last}: an act was pressed after it`).toEqual([]);
+			expect([record.end?.reason, record.end?.detail], c.last).toEqual(c.end);
+			expect(l.archives.at(-1)?.name, `${c.last}: the final archive was not taken`).toBe('06-final');
+		}
+	});
+
+	it('⛔ E12’s re-review F1 — a throw AFTER a sign-off act with no answer keeps why the run ended: the store read beside reviews still running must not relabel it a lane error', async () => {
+		// ⭑ Reads: the root's; two per phase (its limit, its store); requirements' limit, then the store after its Record
+		// Assurance and after its Mark Satisfied; design's limit — and, the fourteenth, the store after design's Record
+		// Assurance, as a server gone would leave it.
+		const l = laneOf({
+			paid: true,
+			presses: ALL_COMPLETE,
+			signOffs: {
+				root: GREEN,
+				requirements: GREEN,
+				design: { ra: { ...OUTLASTED, timedOutAfterMs: PHASE7_RECORD_ASSURANCE_MS }, raAfter: ASSESSING }
+			},
+			readThrowsAt: 14
+		});
+		await expect(l.run()).rejects.toThrow('connect ECONNREFUSED 127.0.0.1:4322');
+		expect([l.written().end?.reason, l.written().end?.detail]).toEqual([
+			'allowance-exceeded',
+			`Design's Record Assurance outlasted its allowance of ${PHASE7_RECORD_ASSURANCE_MS} ms; then: connect ECONNREFUSED 127.0.0.1:4322`
+		]);
 	});
 
 	it('⛔ an `error` envelope, and a redirect, reload the page before the store is read; a refusal does not', async () => {

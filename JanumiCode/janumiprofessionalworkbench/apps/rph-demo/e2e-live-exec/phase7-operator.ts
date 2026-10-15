@@ -1020,6 +1020,12 @@ export async function recover(
 export interface SignOffAct {
 	readonly status: number | null;
 	readonly envelopeType: EnvelopeType | null;
+	/**
+	 * ⭐ E12's re-review F1 (D4) — set when no answer came within the act's bound, or its request failed in transit: the
+	 * server may still be running it, and the run ended there (`unansweredEnd`).
+	 */
+	readonly timedOutAfterMs: number | null;
+	readonly requestFailure: string | null;
 	/** ⭐ D5 — read after the act (`REG-F-540`): an envelope is not the record. */
 	readonly after: UnitState;
 }
@@ -1094,7 +1100,8 @@ export interface RunEnd {
 /**
  * ⛔ D4 — a Begin & Execute with NO ANSWER ends the run there, in either kind: it outlasted its allowance, or its
  * request failed in transit. Either way the server may still be running the unit, so the next is never started beside
- * it (`REG-F-535`, `REG-F-527`). Null for a press that was answered, whatever it said.
+ * it (`REG-F-535`, `REG-F-527`). Null for a press that was answered, whatever it said. ⭐ So does any other act the lane
+ * presses with no answer, named by `act`: a recovery act the rule presses, and ⭐ E12's re-review F1 — a sign-off act.
  */
 export function unansweredEnd(
 	title: string,
@@ -1187,7 +1194,9 @@ export interface LaneHands {
  *      any later sign-off, and the run ends `paid-limit`. ⭐ `E12F` F3 — A RECORD ASSURANCE ANSWERED WITH A REFUSAL, whose
  *      row, read afresh, then offers re-running the declared reviews that did not conclude, has them re-run ONCE by the rule
  *      (`REG-D-105` (4), `REG-D-112` (a)), the limit read first; accepted, Mark Satisfied follows; refused, the unit is left
- *      as found. ~~DRY TOO, BY THE SAME ACTS (design §6 P7-2 D11): no phase completed, so the root is signed off alone.
+ *      as found. ⛔ E12's re-review F1 — A SIGN-OFF ACT WITH NO ANSWER ENDS THE RUN THERE, as a Begin & Execute with none
+ *      does (`unansweredEnd`, D4): its unit's declared reviews may still be running, so nothing is pressed beside them, and
+ *      the final archive is taken. ~~DRY TOO, BY THE SAME ACTS (design §6 P7-2 D11): no phase completed, so the root is signed off alone.
  *      Signing off calls no model~~ ⛔ `E12F` F1: FALSE SINCE E2 — Record Assurance asks the reviewer for one review per
  *      declared policy. ⭐ DRY, THE ROOT'S SIGN-OFF STOPS BEFORE THE REVIEWER CALL, SO SIGNING OFF CALLS NO MODEL
  *      (`REG-D-112` (b)): everything before the press rehearsed — the page loaded afresh, the root's row waited for, Record
@@ -1434,10 +1443,12 @@ export async function runTheLane(r: {
 		// ~~⭐ DRY TOO, BY THESE SAME ACTS (D11): no phase was pressed, so none completed, and the root is signed off alone.~~
 		// ⛔ `E12F` F1 (`REG-D-112` (b)) — DRY, THE ROOT'S SIGN-OFF IS REHEARSED UP TO THE REVIEWER CALL AND NO FURTHER: since E2
 		// Record Assurance asks the reviewer for one review per declared policy, and a dry run calls no model.
-		/** The act's status and envelope, and the unit as the store reads it now (`REG-F-540`). */
+		/** The act's status and envelope, or that no answer came, and the unit as the store reads it now (`REG-F-540`). */
 		const actOf = async (unit: RunUnit, o: ActionOutcome): Promise<SignOffAct> => ({
 			status: o.status,
 			envelopeType: o.envelopeType,
+			timedOutAfterMs: o.timedOutAfterMs,
+			requestFailure: o.requestFailure,
 			after: unitStateOf((await hands.read()).snapshot, unit.unitId!)
 		});
 		const none = {
@@ -1454,10 +1465,15 @@ export async function runTheLane(r: {
 			limitCheck(boot.prior as number, recordedReviewerCalls((await hands.read()).snapshot), signOffWorstCase(unit));
 		const overLimit = (check: LimitCheck): string =>
 			`the limit: ${check.total} of ${check.limit} reviewer calls, the sign-off's own ${check.ahead ?? 0} counted (D8; E12F F2)`;
-		/** Mark Satisfied, after an ACCEPTED Record Assurance or an accepted re-run of the declared reviews. */
+		/**
+		 * Mark Satisfied, after an ACCEPTED Record Assurance or an accepted re-run of the declared reviews. ⛔ E12's re-review F1 —
+		 * with no answer it ends the run, as every act the lane presses does (D4); the end is set before the store is read, so a
+		 * read that fails keeps it.
+		 */
 		const satisfy = async (unit: RunUnit): Promise<{ act: SignOffAct; refused: SignOffRecord['refused'] }> => {
 			const green = await hands.markSatisfied(unit);
 			writeOnce(actionFile(lane, unit, 'markSatisfied'), actionRecordOf(unit, 'markSatisfied', green));
+			reached.end = unansweredEnd(unit.title, green, 'Mark Satisfied');
 			return {
 				act: await actOf(unit, green),
 				refused: green.envelopeType === 'success' ? null : { act: 'Mark Satisfied', reason: refusalOf(green) }
@@ -1468,7 +1484,8 @@ export async function runTheLane(r: {
 		 * row read and nothing pressed. ⭐ `E12F` F2 — the limit read first, its worst case counted; refused, nothing is pressed
 		 * (the loop below then stops the lane). ⭐ `E12F` F3 — a Record Assurance ANSWERED with a refusal whose row, read
 		 * afresh, offers re-running the declared reviews that did not conclude: re-run once by the rule, the limit read first;
-		 * accepted, Mark Satisfied; refused, left as found.
+		 * accepted, Mark Satisfied; refused, left as found. ⛔ E12's re-review F1 — an act with NO ANSWER sets the run's end
+		 * (`reached`) before the store is read, and nothing more is pressed (the loop below then ends the run).
 		 */
 		const signOff = async (unit: RunUnit): Promise<SignOffRecord> => {
 			if (dry) {
@@ -1486,6 +1503,10 @@ export async function runTheLane(r: {
 				actionFile(lane, unit, 'recordAssurance'),
 				actionRecordOf(unit, 'recordAssurance', assured)
 			);
+			// ⛔ E12's re-review F1 (D4; `REG-F-535`) — A RECORD ASSURANCE WITH NO ANSWER ENDS THE RUN: its declared reviews may
+			// still be running on the server, and each records its calls only when it finishes, so a press beside them would run
+			// two units' reviews at once against a limit read short of their calls.
+			reached.end = unansweredEnd(unit.title, assured, 'Record Assurance');
 			const assuredAct = await actOf(unit, assured);
 			if (assured.envelopeType === 'success') {
 				const green = await satisfy(unit);
@@ -1493,9 +1514,9 @@ export async function runTheLane(r: {
 			}
 			const refusedAssurance = { act: 'Record Assurance' as const, reason: refusalOf(assured) };
 			const asRefused = { ...none, offered: true, limitCheck: check, recordAssurance: assuredAct, refused: refusedAssurance };
-			// ⛔ ONLY AN ANSWERED REFUSAL: a press with no answer may still be running its reviews on the server (D4), and the
-			// rule presses nothing beside it.
-			if (unansweredEnd(unit.title, assured, 'Record Assurance') !== null) return asRefused;
+			// ⛔ ONLY AN ANSWERED REFUSAL: a press with no answer may still be running its reviews on the server (D4), so the rule
+			// presses nothing beside it, and ⭐ E12's re-review F1 — the run ends there.
+			if (reached.end !== null) return asRefused;
 			// ⭐ `E12F` F3 — THE RULE (`REG-D-105` (4), `REG-D-112` (a)): ⚠ the page loaded afresh, as the rule's own reads are —
 			// a refusal leaves it stale. A row offering no declared re-run is left as found.
 			await hands.showOverview();
@@ -1507,6 +1528,8 @@ export async function runTheLane(r: {
 				actionFile(lane, unit, 'rerunDeclaredReviews'),
 				actionRecordOf(unit, 'rerunDeclaredReviews', again)
 			);
+			// ⛔ E12's re-review F1 (D4) — the rule's re-run with no answer ends the run too: its reviews may still be running.
+			reached.end = unansweredEnd(unit.title, again, 'Re-run the declared reviews');
 			const againAct = await actOf(unit, again);
 			if (again.envelopeType !== 'success')
 				return {
@@ -1530,6 +1553,9 @@ export async function runTheLane(r: {
 			await hands.showOverview();
 			unit.signOff = await signOff(unit);
 			writeRunRecord(lane, record);
+			// ⛔ E12's re-review F1 (D4; `REG-F-535`) — A SIGN-OFF ACT WITH NO ANSWER: no later sign-off is pressed beside it, and
+			// the run ends for it once the final archive is taken.
+			if (reached.end !== null) break;
 			// ⛔ `E12F` F2 — THE LIMIT REFUSED THIS SIGN-OFF, OR THE RULE'S RE-RUN IN IT: the run ends `paid-limit`, and no later
 			// sign-off is pressed, as no later phase is once the limit stops one (D8).
 			if (unit.signOff.limitCheck?.allowed === false || unit.signOff.rerunLimitCheck?.allowed === false) {
@@ -1544,7 +1570,7 @@ export async function runTheLane(r: {
 		// counted (D11).
 		if (dry)
 			record.dryRun = { modelExchanges: (await hands.read()).snapshot.modelExchanges.length };
-		return end(reason);
+		return reached.end === null ? end(reason) : end(reached.end.reason, reached.end.detail);
 	} catch (e) {
 		const why = e instanceof Error ? e.message : String(e);
 		if (record.end === null)

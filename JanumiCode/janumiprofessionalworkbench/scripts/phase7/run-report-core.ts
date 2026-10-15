@@ -8,7 +8,8 @@
 //     (`unregistered`). ⚠ A cell this report cannot decide is left OPEN, `null`, and names who decides it — stage 6 is
 //     P7-4's checks, a review that concluded against the work is the adjudication's (P7-4f), and runs the archive
 //     cannot count (K5) are a person's — rather than being given one of the five on a guess. ⛔ A unit whose Begin &
-//     Execute outlasted the lane's allowance (D4) is read as cut there, never from its mid-unit archive as if it ended.
+//     Execute outlasted the lane's allowance (D4) is read as cut there, never from its mid-unit archive as if it ended;
+//     ⭐ E12's re-review F1 — and one whose sign-off act outlasted its bound, at stage 7, the act and its bound named.
 //   · THE PAIRING (§2 stage 8; `REG-F-433`) — every Reasoning Review of an execution-plane subject, paired with the
 //     ASSURANCE-plane call that concluded it: answered, no response, refused (a substitute, or a failed repair), no
 //     answer recorded, or not pairable when its subject had more than one floor run. A deterministic floor policy and a
@@ -740,6 +741,29 @@ interface LaneUnit {
 	readonly upstreamNotAssured: boolean | null;
 	readonly limitPrior: number | null;
 	readonly signOffAttempted: boolean;
+	/**
+	 * ⭐ E12's re-review F1 (D4) — the sign-off act that gave no answer within its bound, by its button's name, and the bound:
+	 * the run ended there. null when none did, and for a record written before E12's re-review, which kept no act's bound.
+	 */
+	readonly signOffOutlasted: { readonly act: string; readonly ms: number } | null;
+	/** ⭐ E12's re-review F1 (D4) — a recovery act the rule pressed gave no answer within its bound: the run ended there. */
+	readonly recoveryOutlasted: boolean;
+}
+
+/** ⭐ E12's re-review F1 — the sign-off's acts, by the field the lane records each in and the button's name. */
+const SIGN_OFF_ACTS = [
+	['recordAssurance', 'Record Assurance'],
+	['rerunDeclared', 'Re-run the declared reviews'],
+	['markSatisfied', 'Mark Satisfied']
+] as const;
+
+/** The sign-off act that outlasted its bound, and the bound, or null (`LaneUnit.signOffOutlasted`). */
+function signOffOutlasted(signOff: Record<string, unknown>): LaneUnit['signOffOutlasted'] {
+	for (const [field, act] of SIGN_OFF_ACTS) {
+		const ms = int(rec(signOff[field]).timedOutAfterMs);
+		if (ms !== null) return { act, ms };
+	}
+	return null;
 }
 
 function laneUnits(run: unknown): LaneUnit[] {
@@ -766,7 +790,11 @@ function laneUnits(run: unknown): LaneUnit[] {
 			signOffAttempted:
 				r.signOff !== null &&
 				r.signOff !== undefined &&
-				(str(signOff.notPressed) === '' || (signOff.recordAssurance ?? null) !== null)
+				(str(signOff.notPressed) === '' || (signOff.recordAssurance ?? null) !== null),
+			signOffOutlasted: signOffOutlasted(signOff),
+			recoveryOutlasted: (Array.isArray(r.recovery) ? (r.recovery as unknown[]) : []).some(
+				(x) => int(rec(x).timedOutAfterMs) !== null
+			)
 		};
 	});
 }
@@ -1902,6 +1930,8 @@ interface UnitView {
 	readonly pressed: boolean;
 	/** ⛔ D4 — the allowance its Begin & Execute outlasted, in ms; null when it answered. The run ended at this unit. */
 	readonly timedOut: number | null;
+	/** ⛔ E12's re-review F1 (D4) — its sign-off act that outlasted its bound, and the bound; null when none did. */
+	readonly signOffOutlasted: LaneUnit['signOffOutlasted'];
 	readonly reviews: readonly PairingRow[];
 	readonly runs: UnitRuns;
 	readonly declared: readonly DeclaredVerdict[];
@@ -1942,6 +1972,23 @@ function completion(v: UnitView, row: string): MatrixCell {
 		]);
 	if (s.assurance === 'CONDITIONALLY_SATISFIED')
 		return cell('7', row, 'broke', ['REG-F-403'], [facts, 'a CONDITIONALLY_SATISFIED unit can never be marked satisfied']);
+	// ⛔ E12's re-review F1 (D4) — A SIGN-OFF ACT THAT GAVE NO ANSWER WITHIN ITS BOUND: the run ended there, its final archive
+	// taken while the server may still have been running the act, which is killed unfinished (REG-F-527). Why it outlasted a
+	// bound counted from the reviewer's own, no register entry names.
+	const outlasted = v.signOffOutlasted;
+	if (outlasted !== null)
+		return cell(
+			'7',
+			row,
+			'broke',
+			['REG-F-527'],
+			[
+				`${facts}, read from an archive taken while its ${outlasted.act} may still have been running`,
+				`its ${outlasted.act} gave no answer within ${outlasted.ms} ms (design D4): the run ended there, and the server is ` +
+					'killed with the act unfinished (REG-F-527); no register entry names why it outlasted its bound'
+			],
+			{ unregistered: true }
+		);
 	if (!v.signOffAttempted) return cell('7', row, 'not reached', [], [facts, 'its sign-off was never attempted']);
 	return cell('7', row, 'broke', [], [facts, 'its sign-off was attempted and the unit is not SATISFIED']);
 }
@@ -2394,6 +2441,7 @@ function unitView(
 		stepState,
 		pressed: u.plan !== null || (u.lane?.beginExecute ?? null) !== null,
 		timedOut: u.lane?.beginExecute?.timedOutAfterMs ?? null,
+		signOffOutlasted: u.lane?.signOffOutlasted ?? null,
 		reviews: pairing.rows.filter((r) => r.unit === u.slug),
 		runs: unitRuns(u, units, lane),
 		declared: declared.filter((d) => d.unit === u.slug),
@@ -2512,8 +2560,14 @@ export function buildRunReport(
 	const workspace = demoDb === '' || undertakingId === null ? null : workspaceDirectoryFor(demoDb, undertakingId);
 	const views = units.map((u) => unitView(ix, u, units, lane, pairing, declared));
 	const endReason = str(rec(rec(lane.run).end).reason) || null;
-	if (endReason === 'allowance-exceeded' && views.every((v) => v.timedOut === null))
-		problems.push('lane/run.json ended allowance-exceeded, and names no unit whose Begin & Execute outlasted its allowance');
+	// ⛔ D4 — every act the lane presses ends the run when it outlasts its bound: a Begin & Execute, ⭐ E12's re-review F1 —
+	// a recovery act the rule pressed, and a sign-off act. So the end names one of them.
+	const outlasted = (v: UnitView): boolean =>
+		v.timedOut !== null || v.signOffOutlasted !== null || v.unit.lane?.recoveryOutlasted === true;
+	if (endReason === 'allowance-exceeded' && !views.some(outlasted))
+		problems.push(
+			'lane/run.json ended allowance-exceeded, and names no unit whose Begin & Execute, recovery act or sign-off act outlasted its allowance'
+		);
 	const matrix: MatrixCell[] = [
 		stageOne(ix),
 		stageTwo(undertakingId, structure),
