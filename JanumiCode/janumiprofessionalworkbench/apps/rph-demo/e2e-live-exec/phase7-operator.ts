@@ -455,11 +455,14 @@ export interface RecoveryRecord {
 	readonly envelopeType: EnvelopeType | null;
 	readonly timedOutAfterMs: number | null;
 	readonly requestFailure: string | null;
-	/** null when the act was not pressed. */
+	/**
+	 * null when the act was not pressed — ⭐ E12's polish — or while the store read after it has not come back: the act is kept
+	 * before that read (`recoveryAct`), so a read that throws leaves it here with its bound.
+	 */
 	readonly after: UnitState | null;
 	/**
 	 * ⭐ P7-6 B3 — what the STORE says a re-run came to, read after it (`rerunReading`); null for an abandonment, for a re-run
-	 * not pressed, and for one with no answer (the run ends there).
+	 * not pressed, for one with no answer (the run ends there), ⭐ and while that read has not come back.
 	 */
 	readonly reading: RerunReading | null;
 	/** ⭐ P7-6 B3 — the server's refusal, in its own words, of an act it answered with anything but success; else null. */
@@ -1037,8 +1040,12 @@ export interface SignOffAct {
 	 * null. Kept on the act, so a Record Assurance refused before the rule's re-run keeps its reason whatever follows it.
 	 */
 	readonly refusal: string | null;
-	/** ⭐ D5 — read after the act (`REG-F-540`): an envelope is not the record. */
-	readonly after: UnitState;
+	/**
+	 * ⭐ D5 — read after the act (`REG-F-540`): an envelope is not the record. ⭐ E12's polish (the confirm's F1 residue) — null
+	 * while that read has not come back: the act is kept on the unit's record before it (`actOf`), so a read that throws — the
+	 * server gone — leaves the act here with its bound, and no state.
+	 */
+	readonly after: UnitState | null;
 }
 
 /**
@@ -1309,13 +1316,12 @@ export async function runTheLane(r: {
 			const outcome = await hands.recover(unit, act);
 			writeOnce(actionFile(lane, unit, act), actionRecordOf(unit, act, outcome));
 			reached.end = unansweredEnd(unit.title, outcome, act);
-			// ⚠ As a press: an `error` envelope or a redirect leaves the row gone, so the page is loaded afresh first.
-			const rowGone = !['success', 'failure'].includes(outcome.envelopeType ?? '');
-			if (reached.end === null && rowGone) await hands.showOverview();
-			const { snapshot } = await hands.read();
-			const after = unitStateOf(snapshot, unit.unitId!);
 			const answered = reached.end === null;
-			unit.recovery.push({
+			// ⛔ E12's polish (the confirm's F1 residue, its general form) — THE ACT IS KEPT BEFORE THE STORE IS READ, as `run` keeps
+			// a Begin & Execute's: a read that throws — or the page's reload before it — leaves the act and its bound in
+			// lane/run.json, its `after` and `reading` null. ⛔ It was pushed only after the read, so such a throw lost it, and the
+			// report's check of the lane's end found no act that outlasted its bound.
+			const kept: RecoveryRecord = {
 				act,
 				rationale: RULE_RATIONALE[act],
 				limitCheck: check,
@@ -1323,11 +1329,24 @@ export async function runTheLane(r: {
 				envelopeType: outcome.envelopeType,
 				timedOutAfterMs: outcome.timedOutAfterMs,
 				requestFailure: outcome.requestFailure,
-				after,
-				// ⭐ P7-6 B3 — READ FROM THE STORE: what the re-run came to, which is what the rule decides by.
-				reading: act !== 'abandonPwu' && answered ? rerunReading(planBefore, snapshot, unit.unitId!) : null,
+				after: null,
+				reading: null,
 				refusal: answered && outcome.envelopeType !== 'success' ? refusalOf(outcome) : null,
 				notPressed: null
+			};
+			unit.recovery.push(kept);
+			writeRunRecord(lane, record);
+			// ⚠ As a press: an `error` envelope or a redirect leaves the row gone, so the page is loaded afresh first.
+			const rowGone = !['success', 'failure'].includes(outcome.envelopeType ?? '');
+			if (reached.end === null && rowGone) await hands.showOverview();
+			const { snapshot } = await hands.read();
+			const after = unitStateOf(snapshot, unit.unitId!);
+			// The kept act, completed by the read.
+			unit.recovery.splice(-1, 1, {
+				...kept,
+				after,
+				// ⭐ P7-6 B3 — READ FROM THE STORE: what the re-run came to, which is what the rule decides by.
+				reading: act !== 'abandonPwu' && answered ? rerunReading(planBefore, snapshot, unit.unitId!) : null
 			});
 			unit.after = after;
 			unit.stopped = stoppedAfter(outcome.envelopeType, after);
@@ -1464,18 +1483,35 @@ export async function runTheLane(r: {
 		// ⛔ `E12F` F1 (`REG-D-112` (b)) — DRY, THE ROOT'S SIGN-OFF IS REHEARSED UP TO THE REVIEWER CALL AND NO FURTHER: since E2
 		// Record Assurance asks the reviewer for one review per declared policy, and a dry run calls no model.
 		/**
-		 * The act's status and envelope, or that no answer came, ⭐ its refusal in the server's words (E12's re-review F4), and
-		 * the unit as the store reads it now (`REG-F-540`).
+		 * The act's status and envelope, or that no answer came, and ⭐ its refusal in the server's words (E12's re-review F4) —
+		 * ⭐ E12's polish — the store not read yet (`after` null).
 		 */
-		const actOf = async (unit: RunUnit, o: ActionOutcome): Promise<SignOffAct> => ({
+		const pressedAct = (o: ActionOutcome): SignOffAct => ({
 			status: o.status,
 			envelopeType: o.envelopeType,
 			timedOutAfterMs: o.timedOutAfterMs,
 			requestFailure: o.requestFailure,
 			refusal:
 				o.timedOutAfterMs === null && o.requestFailure === null && o.envelopeType !== 'success' ? refusalOf(o) : null,
-			after: unitStateOf((await hands.read()).snapshot, unit.unitId!)
+			after: null
 		});
+		/**
+		 * The act, and the unit as the store reads it now (`REG-F-540`). ⛔ E12's polish (the confirm's F1 residue) — THE ACT IS
+		 * KEPT ON THE UNIT'S RECORD FIRST (`kept`: the sign-off as it stands with this act), as `run` keeps a Begin & Execute's:
+		 * the record was assigned only when `signOff` returned, so a read that threw — the server gone beside reviews still
+		 * running — left lane/run.json no sign-off for the unit, and the report read the lane's own end as a problem with its
+		 * inputs and the unit's sign-off as never attempted.
+		 */
+		const actOf = async (
+			unit: RunUnit,
+			o: ActionOutcome,
+			kept: (act: SignOffAct) => SignOffRecord
+		): Promise<SignOffAct> => {
+			const act = pressedAct(o);
+			unit.signOff = kept(act);
+			writeRunRecord(lane, record);
+			return { ...act, after: unitStateOf((await hands.read()).snapshot, unit.unitId!) };
+		};
 		const none = {
 			limitCheck: null,
 			recordAssurance: null,
@@ -1491,18 +1527,21 @@ export async function runTheLane(r: {
 		const overLimit = (check: LimitCheck): string =>
 			`the limit: ${check.total} of ${check.limit} reviewer calls, the sign-off's own ${check.ahead ?? 0} counted (D8; E12F F2)`;
 		/**
-		 * Mark Satisfied, after an ACCEPTED Record Assurance or an accepted re-run of the declared reviews. ⛔ E12's re-review F1 —
+		 * Mark Satisfied, after an ACCEPTED Record Assurance or an accepted re-run of the declared reviews — ⭐ E12's polish —
+		 * `before`, the sign-off as it then stands, keeping the act before the store is read (`actOf`). ⛔ E12's re-review F1 —
 		 * with no answer it ends the run, as every act the lane presses does (D4); the end is set before the store is read, so a
 		 * read that fails keeps it.
 		 */
-		const satisfy = async (unit: RunUnit): Promise<{ act: SignOffAct; refused: SignOffRecord['refused'] }> => {
+		const satisfy = async (
+			unit: RunUnit,
+			before: SignOffRecord
+		): Promise<{ act: SignOffAct; refused: SignOffRecord['refused'] }> => {
 			const green = await hands.markSatisfied(unit);
 			writeOnce(actionFile(lane, unit, 'markSatisfied'), actionRecordOf(unit, 'markSatisfied', green));
 			reached.end = unansweredEnd(unit.title, green, 'Mark Satisfied');
-			return {
-				act: await actOf(unit, green),
-				refused: green.envelopeType === 'success' ? null : { act: 'Mark Satisfied', reason: refusalOf(green) }
-			};
+			const refused: SignOffRecord['refused'] =
+				green.envelopeType === 'success' ? null : { act: 'Mark Satisfied', reason: refusalOf(green) };
+			return { act: await actOf(unit, green, (act) => ({ ...before, markSatisfied: act, refused })), refused };
 		};
 		/**
 		 * ⭐ Record Assurance, then — only if it was ACCEPTED — Mark Satisfied, asserting neither (D5). ⭐ `E12F` F1 — DRY, the
@@ -1528,17 +1567,25 @@ export async function runTheLane(r: {
 				actionFile(lane, unit, 'recordAssurance'),
 				actionRecordOf(unit, 'recordAssurance', assured)
 			);
+			const refusedAssurance = { act: 'Record Assurance' as const, reason: refusalOf(assured) };
+			/** ⭐ E12's polish — the sign-off as it stands with Record Assurance: kept on the unit before each store read after it. */
+			const assuredRecord = (act: SignOffAct): SignOffRecord => ({
+				...none,
+				offered: true,
+				limitCheck: check,
+				recordAssurance: act,
+				refused: assured.envelopeType === 'success' ? null : refusedAssurance
+			});
 			// ⛔ E12's re-review F1 (D4; `REG-F-535`) — A RECORD ASSURANCE WITH NO ANSWER ENDS THE RUN: its declared reviews may
 			// still be running on the server, and each records its calls only when it finishes, so a press beside them would run
 			// two units' reviews at once against a limit read short of their calls.
 			reached.end = unansweredEnd(unit.title, assured, 'Record Assurance');
-			const assuredAct = await actOf(unit, assured);
+			const assuredAct = await actOf(unit, assured, assuredRecord);
 			if (assured.envelopeType === 'success') {
-				const green = await satisfy(unit);
+				const green = await satisfy(unit, assuredRecord(assuredAct));
 				return { ...none, offered: true, limitCheck: check, recordAssurance: assuredAct, markSatisfied: green.act, refused: green.refused };
 			}
-			const refusedAssurance = { act: 'Record Assurance' as const, reason: refusalOf(assured) };
-			const asRefused = { ...none, offered: true, limitCheck: check, recordAssurance: assuredAct, refused: refusedAssurance };
+			const asRefused = assuredRecord(assuredAct);
 			// ⛔ ONLY AN ANSWERED REFUSAL: a press with no answer may still be running its reviews on the server (D4), so the rule
 			// presses nothing beside it, and ⭐ E12's re-review F1 — the run ends there.
 			if (reached.end !== null) return asRefused;
@@ -1553,21 +1600,20 @@ export async function runTheLane(r: {
 				actionFile(lane, unit, 'rerunDeclaredReviews'),
 				actionRecordOf(unit, 'rerunDeclaredReviews', again)
 			);
-			// ⛔ E12's re-review F1 (D4) — the rule's re-run with no answer ends the run too: its reviews may still be running.
-			reached.end = unansweredEnd(unit.title, again, 'Re-run the declared reviews');
-			const againAct = await actOf(unit, again);
-			if (again.envelopeType !== 'success')
-				return {
-					...asRefused,
-					rerunLimitCheck: rerunCheck,
-					rerunDeclared: againAct,
-					refused: { act: 'Re-run the declared reviews', reason: refusalOf(again) }
-				};
-			const green = await satisfy(unit);
-			return {
+			/** ⭐ E12's polish — and as it stands with the rule's re-run: kept on the unit before each store read after it. */
+			const rerunRecord = (act: SignOffAct): SignOffRecord => ({
 				...asRefused,
 				rerunLimitCheck: rerunCheck,
-				rerunDeclared: againAct,
+				rerunDeclared: act,
+				refused: again.envelopeType === 'success' ? null : { act: 'Re-run the declared reviews', reason: refusalOf(again) }
+			});
+			// ⛔ E12's re-review F1 (D4) — the rule's re-run with no answer ends the run too: its reviews may still be running.
+			reached.end = unansweredEnd(unit.title, again, 'Re-run the declared reviews');
+			const againAct = await actOf(unit, again, rerunRecord);
+			if (again.envelopeType !== 'success') return rerunRecord(againAct);
+			const green = await satisfy(unit, rerunRecord(againAct));
+			return {
+				...rerunRecord(againAct),
 				markSatisfied: green.act,
 				refused: green.refused
 			};

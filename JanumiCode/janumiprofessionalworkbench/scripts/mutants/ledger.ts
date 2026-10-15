@@ -27529,10 +27529,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "E12-M80-record-assurance-s-end-is-set-after-the-store-is-read",
 		file: "apps/rph-demo/e2e-live-exec/phase7-operator.ts",
-		find: "\t\t\treached.end = unansweredEnd(unit.title, assured, 'Record Assurance');\n\t\t\tconst assuredAct = await actOf(unit, assured);",
-		replace: "\t\t\tconst assuredAct = await actOf(unit, assured);\n\t\t\treached.end = unansweredEnd(unit.title, assured, 'Record Assurance');",
+		find: "\t\t\treached.end = unansweredEnd(unit.title, assured, 'Record Assurance');\n\t\t\tconst assuredAct = await actOf(unit, assured, assuredRecord);",
+		replace: "\t\t\tconst assuredAct = await actOf(unit, assured, assuredRecord);\n\t\t\treached.end = unansweredEnd(unit.title, assured, 'Record Assurance');",
 		expectRed: ["verif/phase7-live-spec.test.ts"],
-		why: "PROMISE (E12's re-review F1; D4's 'a throw after a press with no answer keeps why the run ended'): the end is set BEFORE the store is read after the act, so a read that fails beside reviews still running - the server gone - keeps why the run ended. WHO RELIES: the run's record. WHAT THE MUTATION DOES: the end is set after the read, so a failing read ends the run lane-error. OBSERVED (bun run mutants -- (the E12 re-review ids), 2026-10-15, in the fixer's worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M80-record-assurance-s-end-is-set-after-the-store-is-read ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		why: "PROMISE (E12's re-review F1; D4's 'a throw after a press with no answer keeps why the run ended'): the end is set BEFORE the store is read after the act, so a read that fails beside reviews still running - the server gone - keeps why the run ended. WHO RELIES: the run's record. WHAT THE MUTATION DOES: the end is set after the read, so a failing read ends the run lane-error. OBSERVED (bun run mutants -- (the E12 re-review ids), 2026-10-15, in the fixer's worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M80-record-assurance-s-end-is-set-after-the-store-is-read ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯' ⭐ RE-ANCHORED 2026-10-15 (E12's polish, ledger rule #5 - in the commit that changed the line): actOf takes the sign-off as it stands with the act (assuredRecord), kept on the unit before the read; the mutation is unchanged, the end set after the read. RE-MEASURED (bun run mutants -- (the E12 polish ids), 2026-10-15, in the polish worktree): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M80-record-assurance-s-end-is-set-after-the-store-is-read ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 7 completion E12, the re-review's finding 1 (MATERIAL): a sign-off act that asks the reviewer and gets no answer - Record Assurance, or the rule's re-run of the declared reviews - ends the run there with unansweredEnd's reason, as a Begin & Execute with none does (D4, extended; REG-F-535): nothing is pressed beside it, the final archive is taken, and the run report reads the end and that unit's stage 7 from the act's bound; and D4's general form - a Mark Satisfied with no answer ends the run too, and the report's end check accepts a recovery act's bound as well"
 	},
 	{
@@ -27759,5 +27759,59 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["apps/rph-demo/src/lib/server/assurance/declared-review-route.test.ts"],
 		why: "PROMISE (E12's re-review F7): the tie runs both ways - the ids are read from the operator's own source, so an id the lane presses that the form does not carry reddens the page's test, not only the lane's. WHO RELIES: the paid lane, whose fill would wait out its bound and throw, ending the run lane-error. WHAT THE MUTATION DOES: the lane types its rationale into a field id the form lacks. OBSERVED (bun run mutants -- (the E12 re-review ids), 2026-10-15, in the fixer's worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M105-the-lane-types-into-a-field-the-form-lacks ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 7 completion E12, the re-review's finding 7 (MINOR): the markup test for the declared re-run asked a weaker question than its name - indexOf order alone (row < gate < form), so the form moved into any later branch, the SATISFIED one among them, stayed green - and nothing tied the paid lane's test ids ('rerun-declared-rationale', 'rerun-declared-reviews') to the markup; now the gate and the form must lie before the next '{:else if' after the UNDER_ASSURANCE branch, and each test id the operator presses must be on the form"
+	},
+	{
+		id: "E12-M106-a-sign-off-act-is-kept-only-once-its-read-returns",
+		file: "apps/rph-demo/e2e-live-exec/phase7-operator.ts",
+		find: "\t\t\tunit.signOff = kept(act);\n",
+		replace: "",
+		expectRed: ["verif/phase7-live-spec.test.ts"],
+		why: "PROMISE (E12's polish, the confirm's F1 residue): a sign-off act is kept on the unit's record BEFORE the store is read after it, so a read that throws - the server gone beside reviews still running - leaves the act and its bound in lane/run.json. WHO RELIES: the run report, whose end check and stage 7 read the act's bound from run.json; without it the lane's own end read as a problem with the inputs and the unit's sign-off as never attempted. WHAT THE MUTATION DOES: the record is assigned only when signOff returns, as before the polish. OBSERVED (bun run mutants -- (the E12 polish ids), 2026-10-15, in the polish worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M106-a-sign-off-act-is-kept-only-once-its-read-returns ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'; its red, the mutation applied by hand and the file restored byte for byte: 'AssertionError: the act and its bound were lost with the read after it: expected [ undefined, undefined, …(2) ] to deeply equal [ true, true, …(2) ]'",
+		source: "JAN-EXEC Phase 7 completion E12, polish (the confirm's F1 residue): when the store read after an unanswered sign-off act threw, lane/run.json kept no sign-off record for the unit - the record was assigned only when signOff returned; now each act is kept on the unit's record, and written, before its read; and D4's general form, a recovery act the rule pressed, likewise"
+	},
+	{
+		id: "E12-M107-a-kept-sign-off-act-is-not-on-disk-before-its-read",
+		file: "apps/rph-demo/e2e-live-exec/phase7-operator.ts",
+		find: "\t\t\tunit.signOff = kept(act);\n\t\t\twriteRunRecord(lane, record);\n",
+		replace: "\t\t\tunit.signOff = kept(act);\n",
+		expectRed: ["verif/phase7-live-spec.test.ts"],
+		why: "PROMISE (E12's polish, the confirm's F1 residue): the kept sign-off act is WRITTEN to lane/run.json before the store is read, so a run killed while the read hangs - when no catch writes - leaves it too. WHO RELIES: a reader of run.json after a kill. WHAT THE MUTATION DOES: the act is kept in memory only, so it reaches disk only if the catch writes the record. OBSERVED (bun run mutants -- (the E12 polish ids), 2026-10-15, in the polish worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M107-a-kept-sign-off-act-is-not-on-disk-before-its-read ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'; its red, the mutation applied by hand and the file restored byte for byte: 'AssertionError: the act was not on disk when the read began: expected undefined to be 4140000 // Object.is equality'",
+		source: "JAN-EXEC Phase 7 completion E12, polish (the confirm's F1 residue): when the store read after an unanswered sign-off act threw, lane/run.json kept no sign-off record for the unit - the record was assigned only when signOff returned; now each act is kept on the unit's record, and written, before its read; and D4's general form, a recovery act the rule pressed, likewise"
+	},
+	{
+		id: "E12-M108-a-recovery-act-is-kept-only-once-its-read-returns",
+		file: "apps/rph-demo/e2e-live-exec/phase7-operator.ts",
+		find: "\t\t\tunit.recovery.push(kept);\n",
+		replace: "",
+		expectRed: ["verif/phase7-live-spec.test.ts"],
+		why: "PROMISE (E12's polish, the confirm's F1 residue in its general form): a recovery act the rule pressed is kept on the unit's record before the store is read after it, so a read that throws leaves the act and its bound in lane/run.json. WHO RELIES: the run report's end check, which accepts a recovery act's bound (E12's re-review F1). WHAT THE MUTATION DOES: the kept act is never pushed, so the completed act is recorded only after the read (the splice then inserts it), as before the polish. OBSERVED (bun run mutants -- (the E12 polish ids), 2026-10-15, in the polish worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M108-a-recovery-act-is-kept-only-once-its-read-returns ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'; its red, the mutation applied by hand and the file restored byte for byte: 'AssertionError: the recovery act: expected [] to deeply equal [ [ 'rerunReview', true, …(3) ] ]'",
+		source: "JAN-EXEC Phase 7 completion E12, polish (the confirm's F1 residue): when the store read after an unanswered sign-off act threw, lane/run.json kept no sign-off record for the unit - the record was assigned only when signOff returned; now each act is kept on the unit's record, and written, before its read; and D4's general form, a recovery act the rule pressed, likewise"
+	},
+	{
+		id: "E12-M109-a-kept-recovery-act-is-not-on-disk-before-its-read",
+		file: "apps/rph-demo/e2e-live-exec/phase7-operator.ts",
+		find: "\t\t\tunit.recovery.push(kept);\n\t\t\twriteRunRecord(lane, record);\n",
+		replace: "\t\t\tunit.recovery.push(kept);\n",
+		expectRed: ["verif/phase7-live-spec.test.ts"],
+		why: "PROMISE (E12's polish): the kept recovery act is WRITTEN to lane/run.json before the store is read, so a run killed while the read hangs leaves it too. WHO RELIES: a reader of run.json after a kill. WHAT THE MUTATION DOES: the act is kept in memory only. OBSERVED (bun run mutants -- (the E12 polish ids), 2026-10-15, in the polish worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M109-a-kept-recovery-act-is-not-on-disk-before-its-read ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'; its red, the mutation applied by hand and the file restored byte for byte: 'AssertionError: the recovery act was not on disk when the read began: expected [] to deeply equal [ 38160000 ]'",
+		source: "JAN-EXEC Phase 7 completion E12, polish (the confirm's F1 residue): when the store read after an unanswered sign-off act threw, lane/run.json kept no sign-off record for the unit - the record was assigned only when signOff returned; now each act is kept on the unit's record, and written, before its read; and D4's general form, a recovery act the rule pressed, likewise"
+	},
+	{
+		id: "E12-M110-the-kept-record-loses-the-rules-re-run",
+		file: "apps/rph-demo/e2e-live-exec/phase7-operator.ts",
+		find: "const againAct = await actOf(unit, again, rerunRecord);",
+		replace: "const againAct = await actOf(unit, again, () => asRefused);",
+		expectRed: ["verif/phase7-live-spec.test.ts"],
+		why: "PROMISE (E12's polish): the record kept before the store read after the rule's re-run of the declared reviews holds that re-run, its bound and its limit check. WHO RELIES: the run report, which reads the re-run's bound for the end check and stage 7. WHAT THE MUTATION DOES: the kept record is Record Assurance's alone, so a read that throws after the re-run leaves no trace of it. OBSERVED (bun run mutants -- (the E12 polish ids), 2026-10-15, in the polish worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M110-the-kept-record-loses-the-rules-re-run ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'; its red, the mutation applied by hand and the file restored byte for byte: 'AssertionError: the re-run: expected [ { …(4) }, undefined, null, { …(2) } ] to deeply equal [ { …(4) }, true, …(2) ]'",
+		source: "JAN-EXEC Phase 7 completion E12, polish (the confirm's F1 residue): when the store read after an unanswered sign-off act threw, lane/run.json kept no sign-off record for the unit - the record was assigned only when signOff returned; now each act is kept on the unit's record, and written, before its read; and D4's general form, a recovery act the rule pressed, likewise"
+	},
+	{
+		id: "E12-M111-the-kept-record-loses-mark-satisfied",
+		file: "apps/rph-demo/e2e-live-exec/phase7-operator.ts",
+		find: "(act) => ({ ...before, markSatisfied: act, refused })",
+		replace: "() => before",
+		expectRed: ["verif/phase7-live-spec.test.ts"],
+		why: "PROMISE (E12's polish): the record kept before the store read after Mark Satisfied holds Mark Satisfied and its bound, beside the acts before it. WHO RELIES: the run report, which reads Mark Satisfied's bound for the end check and stage 7. WHAT THE MUTATION DOES: the kept record is the sign-off as it stood before Mark Satisfied, so a read that throws after it leaves no trace of it. OBSERVED (bun run mutants -- (the E12 polish ids), 2026-10-15, in the polish worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M111-the-kept-record-loses-mark-satisfied ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'; its red, the mutation applied by hand and the file restored byte for byte: 'AssertionError: Mark Satisfied: expected [ 'request-failed', { …(4) }, …(2) ] to deeply equal [ 'request-failed', { …(4) }, …(2) ]'",
+		source: "JAN-EXEC Phase 7 completion E12, polish (the confirm's F1 residue): when the store read after an unanswered sign-off act threw, lane/run.json kept no sign-off record for the unit - the record was assigned only when signOff returned; now each act is kept on the unit's record, and written, before its read; and D4's general form, a recovery act the rule pressed, likewise"
 	}
 ];

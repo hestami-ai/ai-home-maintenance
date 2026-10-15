@@ -1340,6 +1340,7 @@ function laneOf(script: Script) {
 	const idOf = (slug: string) => `pwu_${slug}`;
 	let reviewerCallCount = 0;
 	let reads = 0;
+	let onDisk: RunRecord | null = null;
 	const snapshot = (): EngineSnapshot =>
 		({
 			undertakings: [{ id: 'und_1', state: { name: PHASE7_UNDERTAKING.name } }],
@@ -1465,7 +1466,11 @@ function laneOf(script: Script) {
 		read: async () => {
 			reads += 1;
 			calls.push('read');
-			if (reads === script.readThrowsAt) throw new Error('connect ECONNREFUSED 127.0.0.1:4322');
+			if (reads === script.readThrowsAt) {
+				// ⭐ E12's polish — lane/run.json as it stood on disk when the read failed: what a kill there would leave.
+				onDisk = existsSync(lane.run) ? (JSON.parse(readFileSync(lane.run, 'utf8')) as RunRecord) : null;
+				throw new Error('connect ECONNREFUSED 127.0.0.1:4322');
+			}
 			const snap = snapshot();
 			return { text: JSON.stringify(snap), snapshot: snap };
 		},
@@ -1501,6 +1506,8 @@ function laneOf(script: Script) {
 		archives,
 		lane,
 		written: (): RunRecord => JSON.parse(readFileSync(lane.run, 'utf8')) as RunRecord,
+		/** ⭐ E12's polish — lane/run.json as it stood on disk when the `readThrowsAt` read failed; null if none failed. */
+		onDiskAtTheFailedRead: (): RunRecord | null => onDisk,
 		action: (name: string) => existsSync(join(lane.actions, `${name}.json`))
 	};
 }
@@ -2551,6 +2558,84 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			'allowance-exceeded',
 			`Design's Record Assurance outlasted its allowance of ${PHASE7_RECORD_ASSURANCE_MS} ms; then: connect ECONNREFUSED 127.0.0.1:4322`
 		]);
+		// ⛔ E12's polish (the confirm's F1 residue) — AND THE ACT AND ITS BOUND ARE KEPT, whatever the read did. ⛔ PREDICTED RED,
+		// driven by the confirm: design's sign-off was assigned only when `signOff` returned, so lane/run.json held none, and the
+		// report read the lane's own end as a problem with its inputs and design's stage 7 as a sign-off never attempted.
+		const kept = l.written().units[2]!.signOff;
+		expect(
+			[kept?.offered, kept?.limitCheck?.allowed, kept?.recordAssurance, kept?.refused],
+			'the act and its bound were lost with the read after it'
+		).toEqual([
+			true,
+			true,
+			{ status: null, envelopeType: null, timedOutAfterMs: PHASE7_RECORD_ASSURANCE_MS, requestFailure: null, refusal: null, after: null },
+			{ act: 'Record Assurance', reason: `no answer within ${PHASE7_RECORD_ASSURANCE_MS} ms` }
+		]);
+		// ⭐ And on disk BEFORE the read: a run killed while it hung would leave it too — no catch writes then.
+		expect(
+			l.onDiskAtTheFailedRead()?.units[2]?.signOff?.recordAssurance?.timedOutAfterMs,
+			'the act was not on disk when the read began'
+		).toBe(PHASE7_RECORD_ASSURANCE_MS);
+	});
+
+	it('⛔ E12’s polish (the confirm’s F1 residue, its general form) — whatever the store read after it does, an act the lane pressed stays in lane/run.json with its bound: the rule’s re-run of the declared reviews, a Mark Satisfied, and a recovery act', async () => {
+		const outlasted = (ms: number): ActionOutcome => ({ ...OUTLASTED, timedOutAfterMs: ms });
+		const gone = 'connect ECONNREFUSED 127.0.0.1:4322';
+		// ⭑ Reads, as above, to design's limit (13); then the store after its refused Record Assurance (14), the re-run's limit
+		// (15) and — the sixteenth — the store after the re-run, which got no answer.
+		const rerun = laneOf({
+			paid: true,
+			presses: ALL_COMPLETE,
+			signOffs: {
+				root: GREEN,
+				requirements: GREEN,
+				design: { ra: answered('failure'), raAfter: ASSESSING, rerun: { offered: true, outcome: outlasted(PHASE7_RECORD_ASSURANCE_MS), after: ASSESSING } }
+			},
+			readThrowsAt: 16
+		});
+		await expect(rerun.run()).rejects.toThrow(gone);
+		const reran = rerun.written().units[2]!.signOff;
+		expect([reran?.recordAssurance?.after, reran?.rerunLimitCheck?.allowed, reran?.rerunDeclared, reran?.refused], 'the re-run').toEqual([
+			ASSESSING,
+			true,
+			{ status: null, envelopeType: null, timedOutAfterMs: PHASE7_RECORD_ASSURANCE_MS, requestFailure: null, refusal: null, after: null },
+			{ act: 'Re-run the declared reviews', reason: `no answer within ${PHASE7_RECORD_ASSURANCE_MS} ms` }
+		]);
+		// ⭑ Design's limit (13), the store after its accepted Record Assurance (14), and — the fifteenth — after Mark Satisfied,
+		// whose request failed in transit.
+		const satisfied = laneOf({
+			paid: true,
+			presses: ALL_COMPLETE,
+			signOffs: { root: GREEN, requirements: GREEN, design: { ...GREEN, ms: LOST_IN_TRANSIT } },
+			readThrowsAt: 15
+		});
+		await expect(satisfied.run()).rejects.toThrow(gone);
+		const marked = satisfied.written().units[2]!.signOff;
+		expect([satisfied.written().end?.reason, marked?.recordAssurance?.after, marked?.markSatisfied, marked?.refused], 'Mark Satisfied').toEqual([
+			'request-failed',
+			ASSURED,
+			{ status: null, envelopeType: null, timedOutAfterMs: null, requestFailure: 'net::ERR_EMPTY_RESPONSE', refusal: null, after: null },
+			{ act: 'Mark Satisfied', reason: 'no answer: the request failed in transit (net::ERR_EMPTY_RESPONSE)' }
+		]);
+		// ⭑ D4's general form, the run plan's rule — reads: the root's; requirements' limit and store; the re-run's limit; and
+		// — the fifth — the store after the re-run of its review, which got no answer.
+		const recovered = laneOf({
+			paid: true,
+			presses: { ...OTHERS_COMPLETE, requirements: { outcome: answered('failure'), after: WAITING } },
+			recoveries: { requirements: { offers: EVERY_OFFER, acts: { rerunReview: { outcome: outlasted(PHASE7_UNIT_ALLOWANCE_MS), after: WAITING } } } },
+			signOffs: OTHERS_GREEN,
+			readThrowsAt: 5
+		});
+		await expect(recovered.run()).rejects.toThrow(gone);
+		expect(
+			recovered.written().units[1]!.recovery.map((r) => [r.act, r.limitCheck?.allowed, r.timedOutAfterMs, r.after, r.reading]),
+			'the recovery act'
+		).toEqual([['rerunReview', true, PHASE7_UNIT_ALLOWANCE_MS, null, null]]);
+		expect(recovered.written().end?.reason).toBe('allowance-exceeded');
+		expect(
+			recovered.onDiskAtTheFailedRead()?.units[1]?.recovery.map((r) => r.timedOutAfterMs),
+			'the recovery act was not on disk when the read began'
+		).toEqual([PHASE7_UNIT_ALLOWANCE_MS]);
 	});
 
 	it('⛔ an `error` envelope, and a redirect, reload the page before the store is read; a refusal does not', async () => {
