@@ -35,6 +35,7 @@ import { caseReviewInput } from '../scripts/reviewer-qual/materialize.js';
 import { DECLARED_ORACLES_PROPOSED } from '../scripts/reviewer-qual/oracles-v5.js';
 import type { CandidateIdentity } from '../scripts/reviewer-qual/record.js';
 import { evaluateCase } from '../scripts/reviewer-qual/runner.js';
+import { TransportFailure } from '../scripts/reviewer-qual/transports.js';
 
 const REPO = fileURLToPath(new URL('../', import.meta.url));
 const read = <T>(file: string): T => JSON.parse(readFileSync(`${REPO}${file}`, 'utf8')) as T;
@@ -218,5 +219,63 @@ describe('⭐⭐ E2 — measurable by the existing runner, NO MODEL CALLED (desi
 	it('⛔ a planted case answered ALL CLEAN is scored SATISFIED — the plant is the verdict’s, never the scorer’s', async () => {
 		for (const c of DECLARED.filter((x) => !x.id.endsWith('-CLEAN')))
 			expect((await score(c, reply(c, []))).scored.disposition, c.id).toBe('SATISFIED');
+	});
+
+	// ── ⛔⛔ E12’s polish (the confirm’s runner.ts finding) — A DECLARED CASE IS SCORED AS THE DECLARED SIGN-OFF RECORDS ITS VERDICT ──
+	// The scorer read a declared case by the floor composition's ladder, while the sign-off computes the verdict it records
+	// by its own rule (`declared-policy-signoff.ts` `declaredVerdict`): no boundary class and no `REG-D-089` rule (a), its own
+	// limbs, its policy's evidence ceiling. Each case below is one where the two part; the qualification must measure what the
+	// product will record.
+	/** A reply answering every criterion of `c`'s rubric, failing `faulted`, recommending `recommendation`. */
+	const recommending = (c: DeclaredPolicyCase, faulted: readonly string[], recommendation: string) =>
+		JSON.stringify({ ...(JSON.parse(reply(c, faulted)) as object), recommendation });
+	/** `c` judged against another of the catalog's policies, as the catalog seeds it — a case past v5's seven. */
+	const under = (c: DeclaredPolicyCase, policyId: string): DeclaredPolicyCase => {
+		const p = ontology.seedPolicies.find((x) => x.policyId === policyId)!;
+		return {
+			...c,
+			id: `${c.id}-UNDER-${policyId}`,
+			input: { ...c.input, policy: { policyId, name: p.name, purpose: p.purpose, criteria: p.criteria.map((k) => ({ ...k, requiredEvidenceIds: [...k.requiredEvidenceIds] })) } }
+		};
+	};
+
+	it('⛔ E12’s polish — a reply that faults a planted case’s criterion and RECOMMENDS SATISFIED is scored REJECTED, as the sign-off records it — never the floor’s BOUNDARY_REJECTED', async () => {
+		// ⛔ PREDICTED RED, read from the code: BOUNDARY_REJECTED — `classifyValidatorResult` refuses a SATISFIED beside an unmet
+		// mandatory criterion, while `verdictOf` never reads the recommendation and records REJECTED, which meets the bar.
+		for (const c of DECLARED.filter((x) => !x.id.endsWith('-CLEAN')))
+			expect((await score(c, recommending(c, ORACLE.get(c.id)!.faulted, 'SATISFIED'))).scored.disposition, c.id).toBe('REJECTED');
+	});
+
+	it('⛔ E12’s polish — a clean reply RECOMMENDING ESCALATED is scored SATISFIED, as the sign-off records it — REG-D-089’s rule (a) is the floor’s, never the declared verdict’s', async () => {
+		// ⛔ PREDICTED RED, read from the code: ESCALATED — `composeAssuranceOutcome`'s second pass escalates a clean review its
+		// reviewer recommends ESCALATED, and the sign-off records SATISFIED, the recommendation noted beside it.
+		for (const c of DECLARED.filter((x) => x.id.endsWith('-CLEAN')))
+			expect((await score(c, recommending(c, [], 'ESCALATED'))).scored.disposition, c.id).toBe('SATISFIED');
+	});
+
+	it('⛔ E12’s polish — a review that THREW is scored INCONCLUSIVE, its class VALIDATOR_FAILED, as the sign-off records a review that produced no answer', async () => {
+		// ⛔ PREDICTED RED, read from the code: VALIDATOR_FAILED as the disposition — the floor runner's for a throwing validator;
+		// the sign-off reads the throw as the review's failure and records INCONCLUSIVE.
+		const c = DECLARED[0]!;
+		const e = await evaluateCase({
+			case: c,
+			criteria: SEEDED_REASONING_REVIEW_CRITERIA,
+			candidate: STUB,
+			scoringDigest: '0'.repeat(64),
+			call: () => {
+				throw new TransportFailure('TIMEOUT', 'cut at 240000 ms');
+			}
+		});
+		expect([e.scored.disposition, e.scored.resultClass]).toEqual(['INCONCLUSIVE', 'VALIDATOR_FAILED']);
+		expect(new Set(e.scored.criteria.map(([, outcome]) => outcome)), 'every criterion recorded undetermined').toEqual(new Set(['UNABLE_TO_DETERMINE']));
+	});
+
+	it('⛔ E12’s polish — past v5’s seven: a policy with no mandatory criterion, answered NONE, is INCONCLUSIVE; a policy whose own evidence caps a verdict is scored at its ceiling', async () => {
+		// ⛔ PREDICTED RED, read from the code: SATISFIED for each — the ladder reads mandatory criteria only, and no ceiling.
+		const historical = under(DECLARED[0]!, 'pol_historical_consistency');
+		expect(historical.input.policy.criteria.every((k) => !BLOCKING_SEVERITIES.has(k.severityIfNotMet as never)), 'arrangement: no mandatory criterion').toBe(true);
+		expect((await score(historical, JSON.stringify({ findings: [], recommendation: 'SATISFIED' }))).scored.disposition, 'none answered').toBe('INCONCLUSIVE');
+		const fidelity = under(DECLARED[0]!, 'pol_intent_fidelity');
+		expect((await score(fidelity, reply(fidelity, []))).scored.disposition, 'its evidence ceiling').toBe('CONDITIONALLY_SATISFIED');
 	});
 });

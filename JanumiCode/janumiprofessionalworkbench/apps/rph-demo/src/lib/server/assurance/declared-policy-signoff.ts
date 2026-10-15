@@ -173,11 +173,20 @@ function supportedDisposition(
 	engine: EngineHandle,
 	policyId: string
 ): Exclude<AssessmentDisposition, 'REJECTED'> {
-	const required = ((engine.loadObject(policyId)?.state as { requiredEvidence?: unknown } | undefined)
-		?.requiredEvidence ?? []) as ReadonlyArray<{
-		requiredForDispositions?: string;
-		cardinality?: string;
-	}>;
+	return evidenceCeiling(
+		((engine.loadObject(policyId)?.state as { requiredEvidence?: unknown } | undefined)?.requiredEvidence ??
+			[]) as ReadonlyArray<{ requiredForDispositions?: string; cardinality?: string }>
+	);
+}
+
+/**
+ * ⭐ E12's polish (the confirm's runner.ts finding) — `supportedDisposition`'s rule over a policy's `requiredEvidence` list
+ * itself: the sign-off reads the list from the stored policy, and the reviewer qualification from the catalog's seed, which
+ * the store's is copied from (`seedAdditivePolicies`) — so a declared case is scored at the ceiling a sign-off would apply.
+ */
+export function evidenceCeiling(
+	required: ReadonlyArray<{ requiredForDispositions?: string; cardinality?: string }>
+): Exclude<AssessmentDisposition, 'REJECTED'> {
 	// `ZERO_OR_MORE` demands no instance, so it gates nothing — the same exemption Gate A applies via
 	// `demandsAnInstance`. Reproducing the exemption matters: without it the demo policy's own ZERO_OR_MORE
 	// requirement would read as unmet and silently downgrade a verdict that Gate A would have admitted.
@@ -282,7 +291,7 @@ const stricter = (a: AssessmentDisposition, b: AssessmentDisposition): Assessmen
  * criteria, never the answer's rows alone: a row missing from an answer would otherwise go unrecorded and a verdict could
  * stand on a criterion nobody recorded (`RPH-CON-005`'s question). `mandatory` is the policy's (`R25`).
  */
-function rowsOf(policy: GoverningDeclaredPolicy, answer: DeclaredPolicyAnswer): FloorCriterion[] {
+function rowsOf(policy: Pick<GoverningDeclaredPolicy, 'criteria'>, answer: DeclaredPolicyAnswer): FloorCriterion[] {
 	const answered = new Map(answer.criteria.map((c) => [c.criterionId, c]));
 	return policy.criteria.map((c) => {
 		const row = answer.failure === undefined ? answered.get(c.id) : undefined;
@@ -316,7 +325,7 @@ function rowsOf(policy: GoverningDeclaredPolicy, answer: DeclaredPolicyAnswer): 
  *     (`REG-D-071` Q5 (a)); the engine's Gate E reads the same rows the same way, so the verdict and the gate agree.
  */
 function verdictOf(
-	policy: GoverningDeclaredPolicy,
+	policy: Pick<GoverningDeclaredPolicy, 'criteria' | 'evidenceCeiling'>,
 	answer: DeclaredPolicyAnswer,
 	rows: readonly FloorCriterion[],
 	admitStipulatedAnswers: boolean
@@ -338,6 +347,20 @@ function verdictOf(
 		? (fromAnswers as AssessmentDisposition)
 		: 'INCONCLUSIVE';
 	return stricter(verdict, policy.evidenceCeiling);
+}
+
+/**
+ * ⭐ ONE DECLARED POLICY'S VERDICT FROM ITS REVIEW'S ANSWER: every criterion's row (`rowsOf`) and the verdict computed from them
+ * (`verdictOf`) — what `planDeclaredSignoff` records, and ⭐ E12's polish (the confirm's runner.ts finding) what the reviewer
+ * qualification scores a declared case by (`scripts/reviewer-qual/runner.ts`), so it measures the verdict the product records.
+ */
+export function declaredVerdict(
+	policy: Pick<GoverningDeclaredPolicy, 'criteria' | 'evidenceCeiling'>,
+	answer: DeclaredPolicyAnswer,
+	admitStipulatedAnswers: boolean
+): { readonly rows: readonly FloorCriterion[]; readonly disposition: AssessmentDisposition } {
+	const rows = rowsOf(policy, answer);
+	return { rows, disposition: verdictOf(policy, answer, rows, admitStipulatedAnswers) };
 }
 
 /**
@@ -442,9 +465,8 @@ export function planDeclaredSignoff(opts: {
 		const policyVersion = policy.version;
 		const assessmentId = assessmentIds[i]!;
 		const answer = opts.answers.get(policyId) ?? unreviewed(policyId);
-		const rows = rowsOf(policy, answer);
 		// ⛔ PER POLICY, NOT ONE VALUE FOR THE BATCH: each policy is judged on its own answers and its own evidence.
-		const disposition = verdictOf(policy, answer, rows, opts.admitStipulatedAnswers);
+		const { rows, disposition } = declaredVerdict(policy, answer, opts.admitStipulatedAnswers);
 		dispositions.push(disposition);
 		const reviewer = reviewerActor(answer.evaluator, opts.invocations?.get(policyId));
 		// ⭐ `REG-D-111` (3) — A POLICY DEMANDING A HUMAN is the operator's decision, issued by the operator's own session.

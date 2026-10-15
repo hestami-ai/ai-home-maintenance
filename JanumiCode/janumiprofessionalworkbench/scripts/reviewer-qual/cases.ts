@@ -117,7 +117,11 @@ export interface Oracle {
 	/** The criteria the case REQUIRES faulted. A reviewer that faults others as well has not failed discrimination
 	 *  (§5.1 (2)); an empty list on a clean case means ANY fault fails clean acceptance (§5.1 (3)). */
 	readonly faulted: readonly string[];
-	/** The Reasoning Review policy's disposition expected from `composeAssuranceOutcome` over its reference alone. */
+	/**
+	 * The Reasoning Review policy's disposition expected from `composeAssuranceOutcome` over its reference alone — ⭐ E12's
+	 * polish — or, for a declared case, the declared policy's verdict as the sign-off computes it, as oracle set v5 states
+	 * (`runner.ts` `scoreDeclared`).
+	 */
 	readonly disposition: 'SATISFIED' | 'REJECTED';
 	readonly expectation: OracleStanding;
 	/** What the case plants, or why it is clean — for the reader of a failure, never read by a scorer. */

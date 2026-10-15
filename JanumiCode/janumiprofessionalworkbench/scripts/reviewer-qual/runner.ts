@@ -6,7 +6,8 @@
 // reference ALONE (`floor.ts` `deMinimisFloorPlan`, `composeAssuranceOutcome`) — so no fact for the other two floor
 // policies is fabricated, and no argument list is re-typed (the `REG-F-427` scorer's defect, §3.5). The transport sits
 // at the validator's `print` seam, which exists so a conformance run can exercise the REAL validator
-// (`reasoning-review-validator.ts`, `AgyPrint`).
+// (`reasoning-review-validator.ts`, `AgyPrint`). ⭐ E12's polish — save a DECLARED case's outcome, which is the verdict the
+// declared sign-off records, by its own functions (`scoreDeclared`): the product's real path for a declared policy.
 //
 //   · The validator is built with the run's RECORDED evaluator identity, never through `judgeModel()` (§5.3).
 //   · A TRANSPORT FAILURE is recorded as its class, not re-scorable, and scored as the product's own floor runner scores
@@ -25,13 +26,17 @@ import {
 	FLOOR_POLICY_IDS,
 	runDeMinimisFloor,
 	type ReasoningReviewInput,
+	type Validator,
 	type ValidatorResult
 } from '@janumipwb/rph-assurance';
 import type { AssessmentCriterion } from '@janumipwb/rph-contracts';
+import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import {
 	extractJson,
 	splitAnswerSpan
 } from '../../apps/rph-demo/src/lib/server/assurance/agy-cli.js';
+import { createModelDeclaredPolicyReviewer } from '../../apps/rph-demo/src/lib/server/assurance/declared-policy-review.js';
+import { declaredVerdict, evidenceCeiling } from '../../apps/rph-demo/src/lib/server/assurance/declared-policy-signoff.js';
 import {
 	createAgyReasoningReviewValidator,
 	CRITERION_REPAIR_INSTRUCTION
@@ -40,7 +45,7 @@ import {
 	isToolInvocationResult,
 	type ToolInvocationResult
 } from '../../apps/rph-demo/src/lib/server/tools/backing-tool.js';
-import type { QualificationCase } from './cases.js';
+import type { DeclaredPolicyCase, QualificationCase } from './cases.js';
 import { detectMalformations } from './malformations.js';
 import { caseReviewInput } from './materialize.js';
 import { HarnessRefusal, refuseProgramOverrides } from './preflight.js';
@@ -155,10 +160,12 @@ export async function evaluateCase(args: {
 	// floor's seeded rubric the run is handed (`materialize.ts` builds its prompt from them): so its reply's rows are read
 	// against them too. ⛔ Read against the floor's, every row of a well-formed declared reply is recorded as
 	// UNDECLARED_CRITERION_ID and every floor criterion as MISSING_CRITERION — malformations the reviewer never made.
-	// ⚠ ITS SCORE IS THE OTHER ARMS': for a VALID result the floor's composition computes `dispositionFromFindings` over the
+	// ~~⚠ ITS SCORE IS THE OTHER ARMS': for a VALID result the floor's composition computes `dispositionFromFindings` over the
 	// result's own rows and findings — the ladder the declared sign-off computes its verdict by (`declared-policy-signoff.ts`)
 	// — and its DIFFERENT_MODEL requirement is one every candidate meets against the case's fictional producer (measured on
-	// the fourteen cases: a scorer of their own, the ladder alone, scored each of them alike).
+	// the fourteen cases: a scorer of their own, the ladder alone, scored each of them alike).~~ ⛔ E12's polish (the confirm's
+	// runner.ts finding): FALSE — the sign-off does not compute its verdict by the floor's composition, and the two part on v5's
+	// own cases. ⭐ ITS SCORE IS THE SIGN-OFF'S VERDICT (`scoreDeclared`).
 	const caseCriteria = args.case.arm === 'DECLARED_POLICY' ? args.case.input.policy.criteria : args.criteria;
 	const criterionIds = new Set(caseCriteria.map((k) => k.id));
 	const input: ReasoningReviewInput = caseReviewInput(args.case, args.criteria);
@@ -225,10 +232,58 @@ export async function evaluateCase(args: {
 		throw new HarnessRefusal(
 			`${args.case.id}: the validator failed before it called its transport — ${String(thrown)}`
 		);
-	const scored = result
+	const floor = result
 		? scoreResult(args.case, result, args.scoringDigest)
 		: await scoreThrow(args.case, input, validator.validatorId, thrown, args.scoringDigest);
+	const scored =
+		args.case.arm === 'DECLARED_POLICY'
+			? await scoreDeclared(args.case, input, validator, result, thrown, floor, args.candidate)
+			: floor;
 	return { calls, evaluator: evaluatorOf(args.candidate, result, reported), scored };
+}
+
+/**
+ * ⭐⭐ E12's polish (the confirm's runner.ts finding; the qualification measures what the product will record) — A DECLARED CASE,
+ * SCORED AS THE DECLARED SIGN-OFF RECORDS ITS VERDICT: the review read as the product's declared seam reads it
+ * (`createModelDeclaredPolicyReviewer`, over this evaluation's own result or throw — no second call), and the verdict the
+ * sign-off's own function computes (`declaredVerdict`), at the ceiling its policy's evidence sets as the catalog seeds it
+ * (`evidenceCeiling`). ⛔ It was the floor composition's, and the two part on v5's own cases: a reply that faults a BLOCKING
+ * criterion and recommends SATISFIED (the floor's BOUNDARY_REJECTED; the sign-off records REJECTED), a clean reply
+ * recommending ESCALATED (`REG-D-089`'s rule (a): ESCALATED; the sign-off records SATISFIED), and a review that threw
+ * (VALIDATOR_FAILED; the sign-off records INCONCLUSIVE) — and past v5's seven, at the sign-off's own limbs and an evidence
+ * ceiling. ⭑ `resultClass` says whether the review answered (VALID) or failed (VALIDATOR_FAILED), the one distinction the
+ * declared seam draws; `independenceOk` stays the floor reference's check against the case's producer, which the sign-off's
+ * verdict does not read (the kernel checks the declared policy's own requirement at completion, against the unit's producer).
+ */
+async function scoreDeclared(
+	c: DeclaredPolicyCase,
+	input: ReasoningReviewInput,
+	validator: Validator,
+	result: ValidatorResult | undefined,
+	thrown: unknown,
+	floor: ScoredOutcome,
+	candidate: CandidateIdentity
+): Promise<ScoredOutcome> {
+	const seeded = ontology.seedPolicies.find((p) => p.policyId === c.input.policy.policyId);
+	if (seeded === undefined)
+		throw new HarnessRefusal(
+			`${c.id}: the catalog seeds no policy ${c.input.policy.policyId}, so no sign-off would review it`
+		);
+	const answer = await createModelDeclaredPolicyReviewer(
+		{ ...validator, evaluate: () => (result === undefined ? Promise.reject(thrown) : Promise.resolve(result)) },
+		() => ({ actorType: 'AGENT', agentId: candidate.agentId, modelId: candidate.modelLabel, providerId: candidate.provider })
+	).review(c.subject, input);
+	const verdict = declaredVerdict(
+		{ criteria: c.input.policy.criteria, evidenceCeiling: evidenceCeiling(seeded.requiredEvidence) },
+		answer,
+		false
+	);
+	return {
+		...floor,
+		disposition: verdict.disposition,
+		resultClass: answer.failure === undefined ? 'VALID' : 'VALIDATOR_FAILED',
+		criteria: verdict.rows.map((k) => [k.criterionId, k.outcome as CriterionOutcomeName] as const)
+	};
 }
 
 /** The Reasoning Review policy's disposition from `composeAssuranceOutcome` over its reference ALONE. */

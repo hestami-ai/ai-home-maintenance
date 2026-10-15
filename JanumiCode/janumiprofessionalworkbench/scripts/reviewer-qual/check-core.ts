@@ -505,7 +505,9 @@ interface Outcome {
  * ⭐ `JAN-CRITREAD` J2-6 — THE PASS BAR (`REG-D-080`): *"right verdict is selected and approved"*. An evaluation meets
  * it when its disposition IS the oracle's — SATISFIED for a clean case, REJECTED for a planted one. Anything else is
  * not the verdict: an INCONCLUSIVE, or a BOUNDARY_REJECTED the floor returns for a reply that faults the planted
- * criterion and still recommends SATISFIED, misses the bar though it named the defect.
+ * criterion and still recommends SATISFIED, misses the bar though it named the defect. ⭑ E12's polish — a declared case's
+ * disposition is the declared sign-off's verdict, which reads no recommendation (`runner.ts` `scoreDeclared`): that reply
+ * scores REJECTED there, as the sign-off records it.
  */
 const rightVerdict = (o: Oracle, s: ScoredOutcome): boolean => s.disposition === o.disposition;
 /** The oracle's planted criteria an evaluation did NOT fault — its attribution, against the `faulted` list. */
