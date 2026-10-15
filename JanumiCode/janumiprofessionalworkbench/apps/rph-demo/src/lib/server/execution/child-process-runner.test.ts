@@ -574,6 +574,15 @@ describe('createChildProcessRunner — a command actually runs, and every failur
 });
 
 describe('⛔⛔ B2 / B3 — the outcome comes from the CHILD, and `run` always produces one', () => {
+	/** How both children below begin: a DETACHED grandchild that inherits their stdout and stderr. */
+	const STARTS_A_GRANDCHILD_HOLDING_THE_PIPES =
+		'const {spawn}=require("node:child_process");' +
+		// ⚠ THE GRANDCHILD'S `cwd` IS THE SYSTEM TEMP ROOT, NOT THE WORKSPACE. It outlives the run by design, and a
+		// live process holding the workspace as its working directory makes Win32 refuse to remove it — a teardown
+		// failure that would read as a finding about the subject.
+		'const g=spawn(process.execPath,["-e","setTimeout(()=>{},60000)"],{cwd:require("node:os").tmpdir(),stdio:["ignore","inherit","inherit"],detached:true});' +
+		'g.unref();';
+
 	/**
 	 * A child that hands its inherited stdout and stderr to a DETACHED grandchild and then exits immediately.
 	 *
@@ -583,12 +592,28 @@ describe('⛔⛔ B2 / B3 — the outcome comes from the CHILD, and `run` always 
 	 * a 2000ms timeout, having meanwhile set `timedOut: true` for a process that exited 0 in milliseconds.
 	 */
 	const HOLDS_THE_PIPES =
-		'const {spawn}=require("node:child_process");' +
-		// ⚠ THE GRANDCHILD'S `cwd` IS THE SYSTEM TEMP ROOT, NOT THE WORKSPACE. It outlives the run by design, and a
-		// live process holding the workspace as its working directory makes Win32 refuse to remove it — a teardown
-		// failure that would read as a finding about the subject.
-		'const g=spawn(process.execPath,["-e","setTimeout(()=>{},60000)"],{cwd:require("node:os").tmpdir(),stdio:["ignore","inherit","inherit"],detached:true});' +
-		'g.unref();process.stdout.write(String(g.pid));process.exit(0);';
+		STARTS_A_GRANDCHILD_HOLDING_THE_PIPES + 'process.stdout.write(String(g.pid));process.exit(0);';
+
+	/**
+	 * ⭐ `REG-F-452` — B2'S CHILD, WHICH SAYS WHEN IT EXITS: the same grandchild, and then, as its last act, one JSON line —
+	 * the grandchild's pid, to reap, and `exitAt`, its own `Date.now()` as it exits, on the clock this process reads too.
+	 * ⭑ It exits in the write's callback, so the line it wrote is never lost to the exit; `exitAt` is read before both.
+	 */
+	const TELLS_ITS_EXIT =
+		STARTS_A_GRANDCHILD_HOLDING_THE_PIPES +
+		'const exitAt=Date.now();process.stdout.write(JSON.stringify({pid:g.pid,exitAt}),()=>process.exit(0));';
+
+	/** What `TELLS_ITS_EXIT` printed, or undefined when it printed nothing whole (its deadline killed it first). */
+	function toldExit(stdout: string): { readonly pid: number; readonly exitAt: number } | undefined {
+		try {
+			const told = JSON.parse(stdout) as { pid?: unknown; exitAt?: unknown };
+			return typeof told.pid === 'number' && typeof told.exitAt === 'number'
+				? { pid: told.pid, exitAt: told.exitAt }
+				: undefined;
+		} catch {
+			return undefined;
+		}
+	}
 
 	/**
 	 * Whatever the child reported as the grandchild's pid, killed so nothing outlives the spec.
@@ -662,38 +687,104 @@ describe('⛔⛔ B2 / B3 — the outcome comes from the CHILD, and `run` always 
 		// ⛔ THE BUDGET IS SHORTER THAN THE ARRANGEMENT'S DRAIN ON PURPOSE, so the deadline genuinely passes over
 		// an already-exited child — which is the condition the old code could not tell from a real timeout.
 		// THE MUTANT: set `timedOut = true` at the timer without asking whether the child was still running.
-		// ⭑ THE BUDGET IS PLACED INSIDE THE DRAIN WINDOW ON PURPOSE. The child exits in about 70ms on this host and
+		// ⭑ THE BUDGET IS PLACED INSIDE THE DRAIN WINDOW ON PURPOSE. ~~The child exits in about 70ms on this host and
 		// the capture then drains for a second, so a 500ms deadline is one that genuinely PASSES OVER AN EXITED
 		// CHILD — the condition the old code could not tell from a real timeout. The window is an order of
-		// magnitude wider than the startup it has to clear.
+		// magnitude wider than the startup it has to clear.~~ (Under load it was not: `REG-F-452`, below.) The capture
+		// drains for a second after the child exits, so a deadline inside that second genuinely PASSES OVER AN EXITED
+		// CHILD — the condition the old code could not tell from a real timeout.
 		// ⛔ `REG-F-452` — ~~a 500ms deadline~~ THE DEADLINE IS PLACED AFTER AN OBSERVED EXIT, NOT AN ASSUMED ONE. Under a
 		// loaded gate a node child took longer than 500ms to start, so the deadline passed over a child still RUNNING:
 		// `timedOut: true` was then the true observation, and the test reported it as the defect (exit `null`, not 0).
-		// So the deadline steps up, 500ms at a time, which is narrower than the 1000ms drain (`STREAM_DRAIN_GRACE_MS`), so
-		// no step can jump the window between the child's exit and the drain's end. The assertion is made only on the
-		// attempt whose OWN OUTCOME shows the arrangement held: exit 0, and settled at or after its deadline. ⛔ An
-		// attempt where it did not hold asserts nothing, and if none holds, the test fails saying so, never passes.
-		let out: Awaited<ReturnType<ReturnType<typeof runner>['run']>> | undefined;
+		// ~~So the deadline steps up, 500ms at a time … the attempt whose OWN OUTCOME shows the arrangement held: exit 0,
+		// and settled at or after its deadline.~~ That pair did not show the child exited BEFORE the deadline — one still
+		// running when it fired, exiting 0 as the kill landed, gave the same pair — and B2 went red on such an attempt.
+		// ⭐ SO THE CHILD SAYS WHEN IT EXITED (`TELLS_ITS_EXIT`), AND THE DEADLINE IS DRIVEN FROM THAT. Each attempt aims
+		// its deadline `AIM_MS` past the exit the attempt before it recorded — the middle of the drain window, past the
+		// margin (the first attempt, with nothing recorded yet, at 500ms; one whose child printed nothing, at twice its
+		// deadline) — and the assertion is made only on an attempt that shows, by what it recorded, that the arrangement
+		// held:
+		//   · the child exited on its own (exit 0), and its RECORDED exit came at least `MARGIN_MS` before the deadline;
+		//   · THIS process had read that exit before the deadline fired — the child's `exit` event, which the runner reads
+		//     too, came before a sentinel timer armed just ahead of the runner's own, with its delay: it fires in the same
+		//     pass, never after the runner's, so an exit read before it was the runner's fact when its deadline fired (a
+		//     process too starved to read an exit before its own timer fires observes `timedOut: true` truly, as this entry
+		//     says of a child still running);
+		//   · and the DEADLINE settled the run — the runner handed its capture over after the sentinel fired, in that same
+		//     pass, so neither the drain nor the pipes' `close` did, which run in passes of their own.
+		// ⭑ So it is driven through `observeChildRun`, the runner's own seam (`run` hands it the child it started, and
+		// returns its outcome), with a real child and the real kill — which is what lets the test arm beside its timer.
+		// ⛔ An attempt where any of these did not hold asserts nothing; if none holds, the test fails listing every one.
+		const DRAIN_MS = 1_000; // `STREAM_DRAIN_GRACE_MS`, restated rather than imported, as `CAP_BYTES` is.
+		const MARGIN_MS = 250;
+		const AIM_MS = (MARGIN_MS + DRAIN_MS) / 2;
 		const missed: string[] = [];
-		for (let timeoutMs = 500; timeoutMs <= 8_000; timeoutMs += 500) {
-			const attempt = await runner().run({ argv: node(HOLDS_THE_PIPES), cwd, timeoutMs });
-			expect(attempt.ran).toBe(true);
-			if (!attempt.ran) return;
-			reap(attempt.stdout);
-			if (attempt.exitCode === 0 && attempt.durationMs >= timeoutMs) {
-				out = attempt;
-				break;
+		let timeoutMs = 500;
+		for (let attempt = 1; attempt <= 16; attempt += 1) {
+			/** Where each event fell, in the order this process saw them. */
+			let order = 0;
+			let deadlineFired: number | undefined;
+			let exitSeen: number | undefined;
+			let settled: number | undefined;
+			const child = spawn(process.execPath, ['-e', TELLS_ITS_EXIT], {
+				cwd,
+				shell: false,
+				stdio: ['ignore', 'pipe', 'pipe'],
+				windowsHide: true
+			});
+			const armedAt = Date.now();
+			// ⭑ ARMED FIRST, WITH THE RUNNER'S DELAY: the same delay shares one list of timers, served in the order armed.
+			const sentinel = setTimeout(() => {
+				deadlineFired = ++order;
+			}, timeoutMs);
+			const outcome = observeChildRun({
+				child,
+				terminate: () => {
+					child.kill('SIGKILL');
+				},
+				timeoutMs,
+				startedAt: armedAt,
+				workspaceName: basename(cwd),
+				programName: 'jpwb-tells-its-exit',
+				retain: async (): Promise<ProcessOutputRetention> => {
+					settled ??= ++order;
+					return { retained: false, notRetainedBecause: 'not reached on this arm' };
+				}
+			});
+			// ⭑ Added after the runner's own `exit` listener, so it runs in the same emit, just after the runner's.
+			child.on('exit', () => {
+				exitSeen ??= ++order;
+			});
+			const out = await outcome;
+			clearTimeout(sentinel);
+			const told = toldExit(out.ran ? out.stdout : '');
+			if (told !== undefined) reap(String(told.pid));
+			if (
+				out.ran &&
+				out.exitCode === 0 &&
+				told !== undefined &&
+				told.exitAt + MARGIN_MS <= armedAt + timeoutMs &&
+				exitSeen !== undefined &&
+				deadlineFired !== undefined &&
+				exitSeen < deadlineFired &&
+				settled !== undefined &&
+				settled > deadlineFired
+			) {
+				expect(out.timedOut, 'a deadline that passes over an EXITED child is not a timeout').toBe(false);
+				return;
 			}
-			missed.push(`${timeoutMs}ms: exit ${attempt.exitCode}, settled at ${attempt.durationMs}ms`);
+			const recorded = told === undefined ? 'nothing' : `${told.exitAt - armedAt}ms`;
+			missed.push(
+				`deadline ${timeoutMs}ms: exit ${out.ran ? out.exitCode : 'none'}, its recorded exit ${recorded}, the ` +
+					`order exit/deadline/settled ${exitSeen ?? '-'}/${deadlineFired ?? '-'}/${settled ?? '-'}`
+			);
+			timeoutMs =
+				told === undefined
+					? Math.min(timeoutMs * 2, 16_000)
+					: Math.max(told.exitAt - armedAt, 0) + AIM_MS;
 		}
-		expect(
-			out,
+		expect.fail(
 			`the arrangement was never established, a deadline passing over an EXITED child: ${missed.join('; ')}`
-		).toBeDefined();
-		if (!out?.ran) return;
-		expect(out.exitCode).toBe(0);
-		expect(out.timedOut, 'a deadline that passes over an EXITED child is not a timeout').toBe(
-			false
 		);
 	}, 120_000);
 
