@@ -6,12 +6,12 @@
 // inherited the shell, so an operator who exported the selected configuration (`REG-D-084`) turned the gate's stand-ins
 // into real, paid runs. (`turbo run test` did not pass them on: its strict env mode withholds undeclared variables.)
 //
-// ⭑ WHY CHILDREN. The remedy removes the eight when a gate process STARTS, so only a process started with them set can
-// show it working: an in-process assertion is green today and proves nothing. Each case below starts one entry point
-// with all eight EXPORTED and asks, inside it, what it selected:
+// ⭑ WHY CHILDREN. The remedy removes the live-backend variables when a gate process STARTS, so only a process started
+// with them set can show it working: an in-process assertion is green today and proves nothing. Each case below starts
+// one entry point with all of them EXPORTED and asks, inside it, what it selected:
 //   · the root source config and the root artifact config (`vitest.config.ts`, `vitest.dist.config.ts`), and the app's
 //     own `vitest run --passWithNoTests` (the command `turbo run test` runs in `apps/rph-demo`, started directly, since
-//     turbo itself would withhold the eight) — each running the probe,
+//     turbo itself would withhold them) — each running the probe,
 //     `apps/rph-demo/src/lib/server/live-backend-isolation.probe.test.ts`;
 //   · the real Playwright runner on the gate's own config, with `--list` and `live-backend-isolation.reporter.ts`, which
 //     reports the environment the e2e server would be launched with.
@@ -35,8 +35,9 @@ const PROBE = 'src/lib/server/live-backend-isolation.probe.test.ts';
 const REPORTER = join(ROOT, 'verif', 'live-backend-isolation.reporter.ts');
 
 /**
- * The design's eight (D8), each with a value that would select a live backend if it reached the process — RESTATED
- * here, never imported from the module that removes them, so a name that module forgot is still exported.
+ * The live-backend variables — the design's (D8), and those added since, each marked below — each with a value that would
+ * select a live backend if it reached the process — RESTATED here, never imported from the module that removes them, so
+ * a name that module forgot is still exported.
  * ⭐ `JAN-EXEC` Phase 8 (the review of E4, finding 11) — AND A NINTH, `JPWB_REPLAY`: in test mode it turns the declared
  * stand-ins into the replay's arms (`replay/replay-switch.ts`), so a shell that exported it after recording turned the
  * gate's stand-ins into a replay of whatever folder it named. Driven red 2026-10-15, exported here with the ninth left off
@@ -66,17 +67,17 @@ const EXPORTED: Readonly<Record<string, string>> = {
 };
 
 /**
- * ⭑ THE CHILD'S RECEIPT, exported beside the eight. The canary is NOT one of them, so no entry point removes it; the flag
- * tells the probe that this instrument started it. A child that did not receive the exported environment has neither:
- * the vitest probe then skips its receipt case, so the child no longer reports five passed of five, and the Playwright
- * probe lists no canary. Without it, a child started WITHOUT the eight would pass exactly as one that removed them — a
- * control that cannot fail.
+ * ⭑ THE CHILD'S RECEIPT, exported beside the live-backend variables. The canary is NOT one of them, so no entry point
+ * removes it; the flag tells the probe that this instrument started it. A child that did not receive the exported
+ * environment has neither: the vitest probe then skips its receipt case, so the child no longer reports five passed of
+ * five, and the Playwright probe lists no canary. Without it, a child started WITHOUT them would pass exactly as one
+ * that removed them — a control that cannot fail.
  */
 const CANARY = 'JPWB_LIVE_BACKEND_CANARY';
 const RECEIPT: Readonly<Record<string, string>> = { [CANARY]: 'exported', LIVE_BACKEND_PROBE: '1' };
 
 /** This process's environment, less every spelling of PATH and vitest's own worker markers, with PATH = no programs,
- *  the eight exported, and the receipt. */
+ *  the live-backend variables exported, and the receipt. */
 function exportedEnvironment(): NodeJS.ProcessEnv {
 	const env: Record<string, string> = {};
 	for (const [k, v] of Object.entries(process.env))
@@ -115,7 +116,7 @@ const failures = (out: string): string =>
 function expectProbePassed(r: { status: number | null; out: string }): void {
 	expect(
 		r.status,
-		`the probe failed in a child started with the ten exported:\n${failures(r.out)}`
+		`the probe failed in a child started with the live-backend variables exported:\n${failures(r.out)}`
 	).toBe(0);
 	expect(
 		r.out,
@@ -123,17 +124,18 @@ function expectProbePassed(r: { status: number | null; out: string }): void {
 	).toMatch(/Tests\s+5 passed \(5\)/);
 }
 
-describe('⭐ D8 — a gate entry point started with the ten live-backend variables EXPORTED still selects the stand-ins', () => {
-	it('⭑ CONTROL — the arrangement exports all ten, into a PATH that finds no program', () => {
+describe('⭐ D8 — a gate entry point started with every live-backend variable EXPORTED still selects the stand-ins', () => {
+	it('⭑ CONTROL — the arrangement exports every live-backend variable, into a PATH that finds no program', () => {
 		const env = exportedEnvironment();
 		// ⭐ The review of E4, finding 11 — ~~eight~~ nine: the replay switch is the ninth. ⭐ The re-review of its fix
-		// round — ten: the authoring agent's model, which the replay refuses beside its switch.
+		// round — ten: the authoring agent's model, which the replay refuses beside its switch. ⭑ The count is pinned
+		// here, once; the titles and messages name the variables, never their number (the E4 polish round).
 		expect(Object.keys(EXPORTED)).toHaveLength(10);
 		for (const [k, v] of Object.entries(EXPORTED)) expect(env[k]).toBe(v);
 		expect(Object.keys(env).filter((k) => /^path$/i.test(k))).toEqual(['PATH']);
 		expect(env.PATH).toBe(NO_PROGRAMS);
 		for (const [k, v] of Object.entries(RECEIPT)) expect(env[k]).toBe(v);
-		expect(Object.keys(EXPORTED), 'the canary must not be one of the ten').not.toContain(CANARY);
+		expect(Object.keys(EXPORTED), 'the canary must not be one of them').not.toContain(CANARY);
 	});
 
 	it('⭐ every live-backend selection the replay refuses beside its switch is one this instrument exports — so each gate entry point is held to removing it', () => {
@@ -197,7 +199,8 @@ describe('⭐ D8 — a gate entry point started with the ten live-backend variab
 			'a live-backend selection would reach the e2e server'
 		).toEqual([]);
 		// ⭑ CONTROL — the report is the server's environment: it carries the mode the config gives the server, AND the
-		// canary the runner inherited from this parent, so it was composed from the environment the eight were exported in.
+		// canary the runner inherited from this parent, so it was composed from the environment the live-backend variables
+		// were exported in.
 		expect(report.demoMode).toBe('test');
 		expect(
 			report.jpwbVariables,

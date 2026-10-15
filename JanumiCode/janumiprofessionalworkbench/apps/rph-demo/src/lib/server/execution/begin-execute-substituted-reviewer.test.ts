@@ -82,7 +82,7 @@ import { beginExecute, modelWorkUnit } from './begin-execute.testing.js';
 const HUMAN_SENTENCE =
 	"The reviewer recommended escalation to a human reviewer; this workbench cannot record a human's review yet (REG-F-474).";
 
-/** The eight live-backend variables — each case sets only what it names. */
+/** D8's live-backend variables — each case sets only what it names. */
 const LIVE_BACKEND_VARIABLES = [
 	'JPWB_ASSURANCE_TOOL',
 	'JPWB_ASSURANCE_MODEL',
