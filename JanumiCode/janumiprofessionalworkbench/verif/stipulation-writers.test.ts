@@ -70,8 +70,10 @@ const WRITERS: Readonly<Record<string, { readonly why: string; readonly writes: 
 		writes: 1
 	},
 	'apps/rph-demo/src/lib/server/assurance/declared-policy-signoff.test.ts': {
-		why: 'a validator double’s stipulated rows, and an ADMITTING engine to show Gate E and the verdict read them alike',
-		writes: 3
+		why:
+			'a validator double’s stipulated rows, and an ADMITTING engine to show Gate E and the verdict read them alike — ⭐ and ' +
+			'(E12’s re-review F5) that a review answering no criterion is INCONCLUSIVE, a stipulated met counting only where admitted',
+		writes: 4
 	},
 	'apps/rph-demo/src/lib/server/assurance/standin-reasoning-review-validator.test.ts': {
 		why: 'the stand-in’s rules, composed as an ADMITTING engine would compose them',
