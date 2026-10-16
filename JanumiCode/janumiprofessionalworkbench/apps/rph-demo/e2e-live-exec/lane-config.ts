@@ -770,7 +770,9 @@ export const NODE_TIMER_CEILING_MS = 2_147_483_647;
  * EACH UNIT'S SIGN-OFF IS RE-COUNTED FOR ITS OWN POLICIES (`phase7SignOffUnitMs`) in place of §3.2's four
  * (`PHASE7_SIGN_OFF_UNIT_MS`), which half A's arithmetic counts once per unit. ⛔ A unit declaring five was counted as
  * four: the timeout could kill the server inside a sign-off whose every review stayed within its bound (`REG-F-527`). For
- * five units each declaring four, the figure above.
+ * five units each declaring four, the figure above. ⚠ And the ceiling's 23 phases are for units each declaring four:
+ * units declaring more reach it with as many phases or fewer (eight each, 21), units declaring fewer need as many or more
+ * (one each, 25).
  */
 export function phase7HalfBTestTimeoutMs(declared: readonly number[]): number {
 	const phases = declared.length - 1;
