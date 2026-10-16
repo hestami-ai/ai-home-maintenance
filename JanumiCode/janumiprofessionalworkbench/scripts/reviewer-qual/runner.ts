@@ -154,6 +154,13 @@ export async function evaluateCase(args: {
 	readonly call: (prompt: string) => Promise<TransportReply>;
 	readonly scoringDigest: string;
 	readonly now?: () => number;
+	/**
+	 * ⭐ R3-A F3 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — a declared policy's required
+	 * evidence, by its id: what sets the ceiling a declared case is scored at (`evidenceCeiling`). Absent, the catalog's seed,
+	 * which the store's is copied from (`seedAdditivePolicies`) — a run's; the fingerprint hands its own declared seam's
+	 * (`fingerprint.ts`), so its declared corpus is scored at the ceilings it hashes.
+	 */
+	readonly requiredEvidenceOf?: (policyId: string) => RequiredEvidence | undefined;
 }): Promise<Evaluation> {
 	const now = args.now ?? (() => performance.now());
 	// ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (design B5) — A DECLARED CASE IS ANSWERED AGAINST ITS OWN POLICY'S CRITERIA, never the
@@ -235,12 +242,20 @@ export async function evaluateCase(args: {
 	const floor = result
 		? scoreResult(args.case, result, args.scoringDigest)
 		: await scoreThrow(args.case, input, validator.validatorId, thrown, args.scoringDigest);
+	const evidenceOf = args.requiredEvidenceOf ?? seededEvidence;
 	const scored =
 		args.case.arm === 'DECLARED_POLICY'
-			? await scoreDeclared(args.case, input, validator, result, thrown, floor, args.candidate)
+			? await scoreDeclared(args.case, input, validator, result, thrown, floor, args.candidate, evidenceOf)
 			: floor;
 	return { calls, evaluator: evaluatorOf(args.candidate, result, reported), scored };
 }
+
+/** ⭐ R3-A F3 — a declared policy's required evidence, as `evidenceCeiling` reads it. */
+type RequiredEvidence = Parameters<typeof evidenceCeiling>[0];
+/** ⭐ R3-A F3 — the catalog's seed of a policy's required evidence, which the store's is copied from
+ *  (`seedAdditivePolicies`): what a run's declared cases are scored at. */
+const seededEvidence = (policyId: string): RequiredEvidence | undefined =>
+	ontology.seedPolicies.find((p) => p.policyId === policyId)?.requiredEvidence;
 
 /**
  * ⭐⭐ E12's polish (the confirm's runner.ts finding; the qualification measures what the product will record) — A DECLARED CASE,
@@ -254,6 +269,8 @@ export async function evaluateCase(args: {
  * ceiling. ⭑ `resultClass` says whether the review answered (VALID) or failed (VALIDATOR_FAILED), the one distinction the
  * declared seam draws; `independenceOk` stays the floor reference's check against the case's producer, which the sign-off's
  * verdict does not read (the kernel checks the declared policy's own requirement at completion, against the unit's producer).
+ * ⭐ R3-A F3 — the policy's evidence read through `requiredEvidenceOf`: the catalog's seed for a run (`seededEvidence`), the
+ * declared seam's for the fingerprint's declared corpus (`fingerprint.ts`).
  */
 async function scoreDeclared(
 	c: DeclaredPolicyCase,
@@ -262,10 +279,11 @@ async function scoreDeclared(
 	result: ValidatorResult | undefined,
 	thrown: unknown,
 	floor: ScoredOutcome,
-	candidate: CandidateIdentity
+	candidate: CandidateIdentity,
+	requiredEvidenceOf: (policyId: string) => RequiredEvidence | undefined
 ): Promise<ScoredOutcome> {
-	const seeded = ontology.seedPolicies.find((p) => p.policyId === c.input.policy.policyId);
-	if (seeded === undefined)
+	const required = requiredEvidenceOf(c.input.policy.policyId);
+	if (required === undefined)
 		throw new HarnessRefusal(
 			`${c.id}: the catalog seeds no policy ${c.input.policy.policyId}, so no sign-off would review it`
 		);
@@ -274,7 +292,7 @@ async function scoreDeclared(
 		() => ({ actorType: 'AGENT', agentId: candidate.agentId, modelId: candidate.modelLabel, providerId: candidate.provider })
 	).review(c.subject, input);
 	const verdict = declaredVerdict(
-		{ criteria: c.input.policy.criteria, evidenceCeiling: evidenceCeiling(seeded.requiredEvidence) },
+		{ criteria: c.input.policy.criteria, evidenceCeiling: evidenceCeiling(required) },
 		answer,
 		false
 	);

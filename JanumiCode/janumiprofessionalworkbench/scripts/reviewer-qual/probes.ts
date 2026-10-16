@@ -135,7 +135,12 @@
 // ⭐ `PQ-1` — A PROBE THAT CARRIES A CUT IS NAMED `…OVERSIZE…`, AND ONE NAMED SO CARRIES ONE: a cut is what only an input
 // over its budget reaches, and `verif/reviewer-qualification-fingerprint.test.ts` holds the name to the bytes both ways.
 import type { AssuranceSubject, ProfessionalRationaleSummary, ReasoningReviewInput } from '@janumipwb/rph-assurance';
-import { AssuranceSeveritySchema, type AssessmentCriterion, type ObservedToolCallReport } from '@janumipwb/rph-contracts';
+import {
+	AssuranceSeveritySchema,
+	type AssessmentCriterion,
+	type EvidenceRequirement,
+	type ObservedToolCallReport
+} from '@janumipwb/rph-contracts';
 import { buildPwaGraphExport, type PwaGraphNode, type PwaMeta } from '@janumipwb/rph-projections';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { REASONING_REVIEW_BUDGET } from '../../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
@@ -158,7 +163,9 @@ export type ProcessResultBuilder = (source: ProcessResultReviewSource) => Reason
 /**
  * ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (`DESIGN-phase-7-completion.md` B4; `REG-F-553`'s class) — A DECLARED POLICY AS THE
  * REVIEWER IS SHOWN IT: its id, name and purpose, and its criteria; and the independence its sign-off demands, which no
- * prompt shows and the recording gate reads (as the seeded floor policy's is hashed beside its criteria).
+ * prompt shows and the recording gate reads (as the seeded floor policy's is hashed beside its criteria). ⭐ R3-A F3 (the
+ * lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — and its required evidence, which no prompt shows
+ * and which caps the verdict its sign-off records (`declared-policy-signoff.ts` `evidenceCeiling`).
  */
 export interface DeclaredProbePolicy {
 	readonly policyId: string;
@@ -166,6 +173,7 @@ export interface DeclaredProbePolicy {
 	readonly purpose: string;
 	readonly criteria: readonly AssessmentCriterion[];
 	readonly independenceRequirement: string;
+	readonly requiredEvidence: readonly EvidenceRequirement[];
 }
 
 /**
@@ -178,7 +186,8 @@ export const CATALOG_DECLARED_POLICIES: readonly DeclaredProbePolicy[] = ontolog
 	name: p.name,
 	purpose: p.purpose,
 	criteria: p.criteria as unknown as readonly AssessmentCriterion[],
-	independenceRequirement: p.independenceRequirement
+	independenceRequirement: p.independenceRequirement,
+	requiredEvidence: p.requiredEvidence as unknown as readonly EvidenceRequirement[]
 }));
 
 export interface FingerprintProbe {
