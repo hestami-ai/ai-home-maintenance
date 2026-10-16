@@ -667,6 +667,19 @@ function halfBStore(
 		/** ⭐ `REG-D-112` — the agent's types and units; `AGENT_TYPES`, `AGENT_UNITS` unless said. */
 		types?: readonly ObjectRow[];
 		units?: readonly AgentUnit[];
+		/**
+		 * ⭐ The merge of E12 and E3 (J5) — declared verdicts as E12's sign-off records them: under the model reviewer, each
+		 * criterion of its policy evaluated (MET, or UNABLE_TO_DETERMINE where the review answered none), in the order given.
+		 * Each policy is put with one BLOCKING criterion. None unless said.
+		 */
+		declared?: readonly {
+			readonly id: string;
+			readonly unit: string;
+			readonly policy: string;
+			readonly state: string;
+			readonly at: string;
+			readonly answered: boolean;
+		}[];
 	} = {}
 ): StoreRows {
 	let n = 0;
@@ -718,6 +731,39 @@ function halfBStore(
 		})
 	];
 	const events: StoredEvent[] = [];
+	const criterionOf = (policyId: string): string => `${policyId}-01`;
+	for (const policyId of new Set((o.declared ?? []).map((d) => d.policy)))
+		objects.push(
+			object('ASSURANCE_POLICY', policyId, {
+				criteria: [{ id: criterionOf(policyId), severityIfNotMet: 'BLOCKING' }]
+			})
+		);
+	for (const d of o.declared ?? []) {
+		objects.push(
+			object('ASSURANCE_ASSESSMENT', d.id, {
+				assurancePolicyId: d.policy,
+				subjectObjectIds: [d.unit],
+				assessmentState: d.state,
+				updatedAt: d.at,
+				evaluator: { actorId: 'devin', actorType: 'AGENT', executionInstanceId: `declared-review:${d.id}` }
+			})
+		);
+		const emit = (eventType: string, payload: Record<string, unknown>): void =>
+			void events.push({
+				sequence: events.length + 1,
+				eventType,
+				aggregateType: 'ASSURANCE_ASSESSMENT',
+				aggregateId: d.id,
+				commandId: null,
+				payload
+			});
+		emit('AssuranceCriterionEvaluated', {
+			assessmentId: d.id,
+			criterionId: criterionOf(d.policy),
+			result: d.answered ? 'MET' : 'UNABLE_TO_DETERMINE'
+		});
+		emit('AssuranceAssessmentCompleted', { assessmentId: d.id, validatorId: 'reviewer.declared-policy' });
+	}
 	return { objects, events, content: [] };
 }
 
@@ -1835,6 +1881,41 @@ describe('⭐⭐ The merge of E12 and E3 (J1, J2) — half B’s sign-offs count
 			null
 		]);
 		expect(record.end?.reason).toBe('complete');
+	});
+});
+
+describe('⭐ The merge of E12 and E3 (J5) — the run report reads half B’s declared verdicts as it reads half A’s: the latest per (unit, policy), the MODEL root’s among them', () => {
+	// ⭑ THE PREDICTED REDS, each a mutation the ledger already holds, applied by hand to this test: E3-M81 (the root skipped by
+	// its place) drops the MODEL root's 5b cell; E12-M125 (every declared verdict speaks) reads Build's first review, which did
+	// not conclude, as speaking.
+	it('⭐ J5 — a re-run’s verdict speaks for an agent’s unit, the review it replaced listed as history; the MODEL root has a 5b cell of its own; the heading counts the verdicts that speak', () => {
+		const ran = { pwu_r: 'model', pwu_s: 'model', pwu_b: 'model', pwu_v: 'model' } as const;
+		const declared = [
+			{ id: 'asm_b_first', unit: 'pwu_b', policy: 'pol_requirement_coverage', state: 'INCONCLUSIVE', at: '2026-10-11T10:00:00.000Z', answered: false },
+			{ id: 'asm_b_rerun', unit: 'pwu_b', policy: 'pol_requirement_coverage', state: 'SATISFIED', at: '2026-10-11T11:00:00.000Z', answered: true },
+			{ id: 'asm_r', unit: 'pwu_r', policy: 'pol_intent_preservation', state: 'SATISFIED', at: '2026-10-11T12:00:00.000Z', answered: true }
+		];
+		const r = buildRunReport(
+			halfBStore({ types: MODEL_ROOT_TYPES, ran, declared }),
+			halfBLaneRows({ types: MODEL_ROOT_TYPES }),
+			{ accountNames: NAMES }
+		).report;
+		const build = cellOf(r, '5b', 'build-wordfreq');
+		expect([build.value, build.basis.at(-1)]).toEqual([
+			'as intended',
+			'listed as history: pol_requirement_coverage INCONCLUSIVE (asm_b_first, broke), superseded by asm_b_rerun'
+		]);
+		const root = cellOf(r, '5b', 'root');
+		expect([root.value, root.basis[1]]).toEqual(['as intended', 'verdicts: pol_intent_preservation SATISFIED']);
+		expect([
+			r.declaredVerdicts.rows.map((d) => d.assessmentId),
+			r.declaredVerdicts.history.map((d) => d.assessmentId),
+			r.declaredVerdicts.expected
+		]).toEqual([['asm_b_rerun', 'asm_r'], ['asm_b_first'], 5]);
+		// ⭐ E12's UNIT_PURPOSE caveat names the agent's composite, the root, and the one review the model made of it.
+		expect(r.answer.alwaysStated.filter((s) => s.startsWith('UNIT_PURPOSE framing'))).toEqual([
+			expect.stringContaining('(root: 1)')
+		]);
 	});
 });
 
