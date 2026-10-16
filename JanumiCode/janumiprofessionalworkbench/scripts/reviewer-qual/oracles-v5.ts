@@ -2,17 +2,22 @@
 // (`DESIGN-phase-7-completion.md` B5, §6 step 2; DESIGN-what-the-tests-prove.md §5.2, §5.4).
 //
 // VERSION FOUR'S ORACLES, UNCHANGED, AND ONE FOR EACH DECLARED CASE. Version four's forty cases are carried byte for byte
-// (`case-set-v5.ts`), so each keeps its oracle whole. The fourteen declared oracles are PROPOSED here:
+// (`case-set-v5.ts`), so each keeps its oracle whole. The fourteen declared oracles were ~~PROPOSED~~ proposed here, and
+// are ⭐ CONFERRED as proposed (`REG-D-113`, below):
 //   · EACH CLEAN CASE is SATISFIED, faulting nothing — THE AUTHOR'S CLAIM, as every clean case is: a clean verdict asserts
 //     every criterion of the policy met, which no author can make uncontested.
 //   · EACH PLANTED CASE requires its plant's criterion faulted and is REJECTED — every planted criterion is BLOCKING in the
 //     catalog (held by `verif/reviewer-qualification-declared-cases.test.ts`). Its standing is THE AUTHOR'S CLAIM, the alternates a
 //     competent reviewer could file the plant under named in its note; faulting an alternate as well is no discrimination
 //     failure, and the pass bar is the verdict (`REG-D-080`).
-// ⛔ PROPOSED, AWAITING SPONSOR CONFERRAL (design B5: *"Their oracles go to the sponsor for conferral, as `oracles-v4.ts`
+// ~~⛔ PROPOSED, AWAITING SPONSOR CONFERRAL (design B5: *"Their oracles go to the sponsor for conferral, as `oracles-v4.ts`
 // requires. That is one screen, before the paid re-qualification."*): each plant, verdict, faulted criterion and standing
 // is the sponsor's to confer. Until then no qualification run measures against them as conferred — `conferral` says so in
-// the generated record.
+// the generated record.~~
+// ⭐ CONFERRED (`REG-D-113`): asked *"Do you confer the 14 declared-policy answers as proposed: each clean case SATISFIED,
+// each planted case REJECTED on the criterion named in the table?"*, the sponsor chose *"Confer all 14 (Recommended)"*. So
+// `conferral` records them conferred, and the check holds a run to them as it holds one to version four's; every oracle is
+// as it was proposed.
 // Correcting an oracle is a new oracle VERSION, never an edit, and moves no case digest.
 // Generated into `docs/tracking/reviewer-qualification/oracles/` by `generate.ts`; the JSON is never hand-edited.
 import { ORACLES_PROPOSED, type Oracle, type OracleSet, type OracleStanding } from './cases.js';
@@ -22,9 +27,10 @@ import { ORACLES_V4 } from './oracles-v4.js';
 const AUTHORS_CLAIM: OracleStanding = "the author's claim";
 
 /**
- * ⛔ The conferral the declared oracles await — the generated record's own word, read by the cases test and ⭐ `E12F` F5: by
- * the check, which refuses a current set carrying it (`cases.ts` `ORACLES_PROPOSED`, this word's one home). ~~read by the
- * check~~ — it was not, until F5: a run over version five before the sponsor conferred would have gone green.
+ * ⛔ ~~The conferral the declared oracles await~~ ⭐ The word the declared oracles' record carried while they awaited the
+ * sponsor — `REG-D-113` conferred them, and their record carries it no more — read by the check, which refuses a current set
+ * carrying it (`cases.ts` `ORACLES_PROPOSED`, this word's one home), and by the tests that hold the check to that. ~~read by
+ * the check~~ — it was not, until `E12F` F5: a run over version five before the sponsor conferred would have gone green.
  */
 export const DECLARED_ORACLES_PROPOSED = ORACLES_PROPOSED;
 
@@ -94,8 +100,11 @@ export const ORACLES_V5: OracleSet = {
 	caseSetVersion: 5,
 	conferral:
 		'Version four’s oracles carried with every standing unchanged (REG-D-095 and its predecessors). The fourteen ' +
-		`declared-policy oracles are ${DECLARED_ORACLES_PROPOSED}: each case’s plant, expected verdict, faulted criterion ` +
-		'and standing were authored by the agent that also edited what the reviewer reads (the DECLARED_POLICY framing), ' +
-		'so they go to the sponsor before the paid re-qualification (DESIGN-phase-7-completion.md B5, §6 step 2).',
+		'declared-policy oracles were conferred by the sponsor as proposed (REG-D-113: asked “Do you confer the 14 ' +
+		'declared-policy answers as proposed: each clean case SATISFIED, each planted case REJECTED on the criterion named ' +
+		'in the table?”, the sponsor chose “Confer all 14 (Recommended)”) — each case’s plant, expected verdict, faulted ' +
+		'criterion and standing, authored by the agent that also edited what the reviewer reads (the DECLARED_POLICY ' +
+		'framing; DESIGN-phase-7-completion.md B5, §6 step 2). A change to a plant, a verdict, a faulted list or a standing ' +
+		'goes back to the sponsor.',
 	oracles: [...ORACLES_V4.oracles, ...DECLARED_ORACLES]
 };

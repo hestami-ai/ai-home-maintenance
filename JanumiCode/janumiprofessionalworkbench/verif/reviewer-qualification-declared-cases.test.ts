@@ -1,5 +1,5 @@
-// ⭐⭐ `JAN-EXEC` Phase 7 completion E2 — THE DECLARED-POLICY CASES OF CASE SET VERSION FIVE, AND THEIR PROPOSED ORACLES
-// (`DESIGN-phase-7-completion.md` B5; `REG-F-523`; `REG-D-110` (3)).
+// ⭐⭐ `JAN-EXEC` Phase 7 completion E2 — THE DECLARED-POLICY CASES OF CASE SET VERSION FIVE, AND THEIR ~~PROPOSED~~ ORACLES,
+// ⭐ CONFERRED AS PROPOSED (`REG-D-113`) (`DESIGN-phase-7-completion.md` B5; `REG-F-523`; `REG-D-110` (3)).
 //
 // For each of the seven declared policies the Phase 7 run assigns, ONE clean case and ONE planted case, one criterion's
 // defect planted. What is held here:
@@ -10,7 +10,8 @@
 //   · THE PLANT — a planted case differs from its clean twin in the work and the account, never in the policy, the
 //     instruction or the subject;
 //   · THE ORACLES — a clean case SATISFIED faulting nothing, a planted case REJECTED faulting its plant's criterion, which
-//     is BLOCKING in the catalog; every standing the author's claim; ⛔ and every one PROPOSED, AWAITING SPONSOR CONFERRAL;
+//     is BLOCKING in the catalog; every standing the author's claim; ~~⛔ and every one PROPOSED, AWAITING SPONSOR
+//     CONFERRAL~~ ⭐ and every one CONFERRED by the sponsor as proposed (`REG-D-113`), its record saying so in their words;
 //   · MEASURABLE WITH NO MODEL (design B5): the runner's own `evaluateCase`, its transport a stub, scores each case as its
 //     oracle expects when answered so, and a planted case answered all-clean as SATISFIED — the plant is the verdict's.
 // No model is called.
@@ -133,7 +134,7 @@ describe('⭐⭐ E2 — case set v5: version four, then the fourteen declared-po
 	});
 });
 
-describe('⭐⭐ E2 — the declared oracles: PROPOSED, AWAITING SPONSOR CONFERRAL (design B5, §6 step 2)', () => {
+describe('⭐⭐ E2 — the declared oracles: ~~PROPOSED, AWAITING SPONSOR CONFERRAL~~ CONFERRED AS PROPOSED (design B5, §6 step 2; REG-D-113)', () => {
 	it('⭐ a clean case SATISFIED faulting nothing; a planted case REJECTED faulting its plant’s criterion — BLOCKING in the catalog; every standing the author’s claim', () => {
 		for (const c of DECLARED) {
 			const o = ORACLE.get(c.id)!;
@@ -152,9 +153,15 @@ describe('⭐⭐ E2 — the declared oracles: PROPOSED, AWAITING SPONSOR CONFERR
 		}
 	});
 
-	it('⛔ PROPOSED, NOT CONFERRED — the record says so, and version four’s conferred oracles are carried unchanged', () => {
+	// ⭐ The merge of the completion programme — THE SPONSOR CONFERRED THEM (`REG-D-113`): ~~PROPOSED, NOT CONFERRED —
+	// the record says so~~. The record now says they are conferred, in the sponsor's words, and carries the proposal's word no
+	// more, so the check holds a run to them (`ORACLES_NOT_CONFERRED` never fires on today's set).
+	it('⭐ CONFERRED AS PROPOSED (REG-D-113) — the record says so, in the sponsor’s words, and version four’s conferred oracles are carried unchanged', () => {
 		expect(DECLARED_ORACLES_PROPOSED).toBe('PROPOSED, AWAITING SPONSOR CONFERRAL');
-		expect(ORACLES.conferral).toContain(DECLARED_ORACLES_PROPOSED);
+		expect(ORACLES.conferral, 'the record still carries the proposal’s word').not.toContain(DECLARED_ORACLES_PROPOSED);
+		expect(ORACLES.conferral).toContain(
+			'The fourteen declared-policy oracles were conferred by the sponsor as proposed (REG-D-113: asked “Do you confer the 14 declared-policy answers as proposed: each clean case SATISFIED, each planted case REJECTED on the criterion named in the table?”, the sponsor chose “Confer all 14 (Recommended)”)'
+		);
 		const v4 = read<OracleSet>('docs/tracking/reviewer-qualification/oracles/oracles-v4.json');
 		expect(ORACLES.oracles.slice(0, v4.oracles.length)).toEqual(v4.oracles);
 		expect(ORACLES.oracles.slice(v4.oracles.length).map((o) => o.caseId)).toEqual(IDS);
