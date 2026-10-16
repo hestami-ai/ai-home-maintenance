@@ -88,6 +88,26 @@ export const ABANDON_FROM_WAITING_CITATION =
 	'No policy object authorises a person’s choice to abandon a waiting unit, and none is cited: the ruling is the authority, and this Decision is the one AbandonPwu requires (DESIGN-the-stopped-unit-recovery.md RD4).';
 
 /**
+ * ⭐⭐ `E12F` F3 — RE-RUN THE DECLARED REVIEWS THAT DID NOT CONCLUDE: `REG-D-112` (a), which applies `REG-D-104` (1)'s re-run
+ * of a review that did not conclude — and `REG-D-105` (3)'s rule for it — to a unit's DECLARED reviews: only those whose
+ * latest verdict is INCONCLUSIVE, each a new assessment, the old one kept; a declared REJECTED is not re-reviewed
+ * (`REG-D-111` (1)). ⚠ A unit UNDER ASSURANCE, not one waiting after a refused step: its own clause.
+ * ⛔ E12's re-review F2 — ~~"the sponsor's ruling `REG-D-112` (a)"~~: `REG-D-112` is a DECISION delegated under the
+ * sponsor's `REG-D-109` and flagged for the sponsor's confirmation, not a sponsor's ruling, and the citation says so: it is
+ * written into each declared re-run's Decision, a permanent, append-only record (`P76F-C` C5's and `P76F-D` D1's class).
+ */
+export const RERUN_DECLARED_REVIEWS_CITATION =
+	'Authority: REG-D-112 (a), a decision delegated under the sponsor’s REG-D-109 and flagged for the sponsor’s confirmation — a declared review that did not conclude may be re-run, by the person, as a review that did not conclude is re-run under REG-D-104 (1); and REG-D-105 (3), which offers a re-run only after a review that did not conclude: only the declared reviews whose latest verdict is INCONCLUSIVE are re-run, each a new assessment, the old one kept, and a declared REJECTED is not re-reviewed. ' +
+	'No policy object authorises a person’s re-run, and none is cited: REG-D-112 (a) is the authority (DESIGN-the-stopped-unit-recovery.md RD4).';
+
+/**
+ * ⭐ `E12F` F3 — WHAT THE PERSON MUST TYPE to re-run a unit's declared reviews: the choice is their Decision, and its
+ * rationale the only part a later reader can learn WHY from — RD4's rule, for a unit under assurance.
+ */
+export const DECLARED_RERUN_RATIONALE_REQUIRED =
+	'Re-running the declared reviews that did not conclude is recorded as your Decision: say why, in your own words — the rationale is required (REG-D-112 (a); DESIGN-the-stopped-unit-recovery.md RD4).';
+
+/**
  * ⭐ THE DECISION'S RATIONALE: the person's typed text, VERBATIM, a blank line, then the act's citation. ⛔ Nothing in the
  * typed text is altered — not its line breaks, not its punctuation — so the reason a person gave is the reason recorded.
  */

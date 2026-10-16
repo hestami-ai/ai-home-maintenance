@@ -33,6 +33,7 @@ import {
 	PHASE7_PAID_LIMIT,
 	PHASE7_PAID_VARIABLE,
 	PHASE7_PRIOR_CALLS_VARIABLE,
+	PHASE7_RECORD_ASSURANCE_MS,
 	PHASE7_UNIT_ALLOWANCE_MS,
 	REVIEWER_MODEL_VARIABLE
 } from '../apps/rph-demo/e2e-live-exec/lane-config.js';
@@ -47,6 +48,9 @@ import {
 	actionOfUrl,
 	beginExecute,
 	bootOf,
+	DECLARED_RERUN_RATIONALE,
+	declaredRerunOffered,
+	DRY_SIGN_OFF_NOT_REACHED,
 	execFileRunner,
 	inheritedVariables,
 	lanePaths,
@@ -62,11 +66,14 @@ import {
 	priorReviewerCalls,
 	readinessRefusals,
 	recordAssurance,
+	recordAssuranceOffered,
 	recordedReviewerCalls,
 	refusalOf,
+	rerunDeclared,
 	reviewerReadiness,
 	reviewerUnderTest,
 	runTheLane,
+	signOffWorstCase,
 	stoppedAfter,
 	typesAsTyped,
 	unitStateOf,
@@ -86,6 +93,7 @@ import {
 	type ProgramRunner,
 	type RunRecord,
 	type RunUnit,
+	type SignOffAct,
 	type SignOffRecord,
 	type UnitState
 } from '../apps/rph-demo/e2e-live-exec/phase7-operator.js';
@@ -290,6 +298,12 @@ describe('⛔ the spec, from source: Playwright’s own `test`, its own timeout,
 		expect(callsTo(sf, 'recover'), 'recover').toEqual([
 			['page', 'unitRow(page, unit.title)', 'act', 'actionFields']
 		]);
+		// ⭐ `E12F` F1, F3 — the dry rehearsal's read, and the rule's declared re-run: each on the unit's own row.
+		expect(callsTo(sf, 'recordAssuranceOffered'), 'recordAssuranceOffered').toEqual([['unitRow(page, unit.title)']]);
+		expect(callsTo(sf, 'declaredRerunOffered'), 'declaredRerunOffered').toEqual([['unitRow(page, unit.title)']]);
+		expect(callsTo(sf, 'rerunDeclared'), 'rerunDeclared').toEqual([
+			['page', 'unitRow(page, unit.title)', 'actionFields']
+		]);
 		expect(anyMethodCalls(sf, 'waitForResponse')).toEqual([]);
 		expect(callsTo(sf, 'pressAction')).toEqual([]);
 		expect(callsTo(sf, 'pressFormAction')).toEqual([]);
@@ -357,7 +371,12 @@ describe('⛔ D4 — the operator bounds every Begin & Execute by one phase’s 
 			])
 		).toEqual([
 			['beginExecute', "'beginExecute'", 'PHASE7_UNIT_ALLOWANCE_MS'],
-			['recordAssurance', "'recordAssurance'", 'PHASE7_SIGN_OFF_MS'],
+			// ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (design B8) — ~~'PHASE7_SIGN_OFF_MS'~~: Record Assurance runs the unit's
+			// declared reviews now, so it is waited for up to its act and those reviews (`PHASE7_RECORD_ASSURANCE_MS`).
+			['recordAssurance', "'recordAssurance'", 'PHASE7_RECORD_ASSURANCE_MS'],
+			// ⭐ `E12F` F3 — the rule's re-run of the declared reviews that did not conclude: bounded as Record Assurance is, its
+			// act and a review of each declared policy.
+			['rerunDeclared', "'rerunDeclaredReviews'", 'PHASE7_RECORD_ASSURANCE_MS'],
 			['markSatisfied', "'markSatisfied'", 'PHASE7_SIGN_OFF_MS'],
 			// ⭐ P7-6R R-1f — the rule's acts: an abandonment, bounded as a sign-off act; a re-run, as a phase (a re-run of the
 			// work runs the phase again).
@@ -621,7 +640,7 @@ function signOffRow(offered: number) {
 }
 
 describe('⭐ D5 — the sign-off acts on the page: the row waited for, Mark Satisfied only once Record Assurance has left it', () => {
-	it('⛔ Record Assurance waits for the row BEFORE judging it — a row offering it is pressed with the sign-off bound, one offering none is not pressed', async () => {
+	it('⛔ Record Assurance waits for the row BEFORE judging it — a row offering it is pressed with its own bound, its declared reviews counted (E2), one offering none is not pressed', async () => {
 		const offering = signOffRow(1);
 		const pressed = await recordAssurance(offering.page, offering.row, decode);
 		expect(pressed?.envelopeType, 'a row that offers Record Assurance read as offering none').toBe(
@@ -631,12 +650,22 @@ describe('⭐ D5 — the sign-off acts on the page: the row waited for, Mark Sat
 			`wait for the row visible ${PHASE7_UI_MS}`,
 			'click Record Assurance'
 		]);
-		expect(offering.asked).toEqual([{ action: 'recordAssurance', timeout: PHASE7_SIGN_OFF_MS }]);
+		expect(offering.asked).toEqual([{ action: 'recordAssurance', timeout: PHASE7_RECORD_ASSURANCE_MS }]);
 		const bare = signOffRow(0);
 		expect(await recordAssurance(bare.page, bare.row, decode)).toBeNull();
 		expect(bare.log, 'a row that offers no Record Assurance was pressed').toEqual([
 			`wait for the row visible ${PHASE7_UI_MS}`
 		]);
+	});
+
+	it('⛔ E12F F1 (REG-D-112 (b)) — the dry rehearsal READS the row and presses nothing: the row waited for, Record Assurance counted, no click, no POST', async () => {
+		const offering = signOffRow(1);
+		expect(await recordAssuranceOffered(offering.row)).toBe(true);
+		expect([offering.log, offering.asked], 'the rehearsal pressed something').toEqual([
+			[`wait for the row visible ${PHASE7_UI_MS}`],
+			[]
+		]);
+		expect(await recordAssuranceOffered(signOffRow(0).row), 'a row offering none read as offering it').toBe(false);
 	});
 
 	it('⛔ Mark Satisfied is pressed only once Record Assurance has LEFT the row — never the EXECUTING row’s own (P7-3)', async () => {
@@ -671,7 +700,7 @@ function recoveryRow(offered: readonly string[]) {
 		off: () => undefined,
 		waitForResponse: (predicate: (r: unknown) => boolean, options?: { timeout?: number }) => {
 			asked.push({
-				action: ['rerunReview', 'rerunWork', 'abandonPwu'].find((a) =>
+				action: ['rerunReview', 'rerunWork', 'abandonPwu', 'rerunDeclaredReviews'].find((a) =>
 					predicate(response(`${PAGE_URL}?/${a}`, 'POST'))
 				),
 				timeout: options?.timeout
@@ -751,6 +780,19 @@ describe('⭐ P7-6R R-1f — the run plan’s rule’s acts on the page: what th
 	// ⭐⭐ P7-6 B3 (the fix round) — ⛔ THE ABANDONMENT'S FIELD IS RENDERED FOR A WAITING UNIT ONLY (`+page.svelte`: `abandon-
 	// rationale` inside `recoveryByPwu`), so a press on a row that does not carry it must FAIL — at the act's own bound —
 	// never type into nothing and click. Its bound is explicit, so it cannot wait on whatever the page's default became.
+	it('⭐ E12F F3 — the declared re-run: offered by the row’s own test id, the rule’s rationale typed into its own field, its own button pressed, waited for as Record Assurance is', async () => {
+		const offering = recoveryRow(['rerun-declared-reviews', 'rerun-declared-rationale']);
+		expect(await declaredRerunOffered(offering.row)).toBe(true);
+		expect(offering.log).toEqual([`wait for the row visible ${PHASE7_UI_MS}`]);
+		expect(await declaredRerunOffered(recoveryRow(['rerun-review']).row), 'another offer read as the declared re-run').toBe(false);
+		const r = recoveryRow(['rerun-declared-reviews', 'rerun-declared-rationale']);
+		expect((await rerunDeclared(r.page, r.row, decode)).envelopeType).toBe('success');
+		expect([r.log, r.asked], 'the re-run was not typed, pressed, and waited for as Record Assurance is').toEqual([
+			[`fill rerun-declared-rationale: ${DECLARED_RERUN_RATIONALE} (${PHASE7_UI_MS})`, `click rerun-declared-reviews (${PHASE7_UI_MS})`],
+			[{ action: 'rerunDeclaredReviews', timeout: PHASE7_RECORD_ASSURANCE_MS }]
+		]);
+	});
+
 	it('⛔ B3 — an abandonment on a row that does NOT carry its field fails, at its own bound, and presses nothing', async () => {
 		const r = recoveryRow(['rerun-work']);
 		await expect(recover(r.page, r.row, 'abandonPwu', decode)).rejects.toThrow(
@@ -1038,6 +1080,8 @@ const WAITING = unitState('EXECUTING', 'WAITING', 'UNASSESSED', 'WAITING');
 /** ⭐ P7-6R R-1c — a waiting phase abandoned: its step cancelled. */
 const ABANDONED = unitState('ABANDONED', 'WAITING', 'UNASSESSED', 'CANCELLED');
 const ASSURED = unitState('UNDER_ASSURANCE', 'SUCCEEDED', 'SATISFIED', 'SUCCEEDED');
+/** ⭐ `E12F` F3 — left under assessment by a declared review that did not conclude (`REG-D-112` (a)). */
+const ASSESSING = unitState('UNDER_ASSURANCE', 'SUCCEEDED', 'ASSESSING', 'SUCCEEDED');
 const SATISFIED = unitState('SATISFIED', 'SUCCEEDED', 'SATISFIED', 'SUCCEEDED');
 
 describe('⭐ the store, as the run reads it after every act (REG-F-540)', () => {
@@ -1192,6 +1236,18 @@ const answered = (envelopeType: EnvelopeType, status = 200): ActionOutcome => ({
 	timedOutAfterMs: null,
 	requestFailure: null
 });
+/**
+ * ⭐ E12's re-review F1 — what the run record keeps of a sign-off act that was answered (`answered`), and the store after it;
+ * ⭐ F4 — with its refusal, in the server's words, when it was not accepted.
+ */
+const actAnswered = (envelopeType: EnvelopeType, after: UnitState): SignOffAct => ({
+	status: 200,
+	envelopeType,
+	timedOutAfterMs: null,
+	requestFailure: null,
+	refusal: envelopeType === 'success' ? null : `{"type":"${envelopeType}"}`,
+	after
+});
 const OUTLASTED: ActionOutcome = {
 	status: null,
 	envelopeType: null,
@@ -1216,7 +1272,8 @@ interface Script {
 	>;
 	/**
 	 * Each unit's sign-off, by slug: Record Assurance (null: not offered), Mark Satisfied, and the store after each — and
-	 * `calls`, the model calls Record Assurance recorded: a sign-off calls no model (D11), and a dry run must see one that did.
+	 * `calls`, the model calls Record Assurance recorded: ~~a sign-off calls no model (D11)~~ ⛔ `E12F` F1: since E2 it asks
+	 * the reviewer for one review per declared policy, so a dry run must never press it, and the limit counts what it did.
 	 */
 	readonly signOffs?: Readonly<
 		Record<
@@ -1227,6 +1284,11 @@ interface Script {
 				ms?: ActionOutcome;
 				msAfter?: UnitState;
 				calls?: number;
+				/**
+				 * ⭐ `E12F` F3 — after a refused Record Assurance: whether the row offers re-running the declared reviews that did
+				 * not conclude, and what the re-run came to — its answer, the store after it, the reviewer calls it recorded.
+				 */
+				rerun?: { offered: boolean; outcome?: ActionOutcome; after?: UnitState; calls?: number };
 			}
 		>
 	>;
@@ -1236,6 +1298,11 @@ interface Script {
 	readonly titles?: readonly string[];
 	/** The read, counted from 1, that throws as a server gone would. */
 	readonly readThrowsAt?: number;
+	/**
+	 * ⭐ E12's polish (fix3's F1) — the unit, by slug, whose Mark Satisfied hand throws before it presses, as its wait for
+	 * Record Assurance to leave the row does at its bound (`markSatisfied`).
+	 */
+	readonly markSatisfiedThrowsOn?: string;
 	/**
 	 * ⭐ P7-6R R-1f — what each unit's row offers after a stop, by slug, and what each recovery act came to: the answer, the
 	 * store after it, and the reviewer calls it recorded. A unit not named offers no re-run.
@@ -1278,6 +1345,8 @@ function laneOf(script: Script) {
 	const idOf = (slug: string) => `pwu_${slug}`;
 	let reviewerCallCount = 0;
 	let reads = 0;
+	let onDisk: RunRecord | null = null;
+	let onDiskAtMarkSatisfied: RunRecord | null = null;
 	const snapshot = (): EngineSnapshot =>
 		({
 			undertakings: [{ id: 'und_1', state: { name: PHASE7_UNDERTAKING.name } }],
@@ -1376,8 +1445,31 @@ function laneOf(script: Script) {
 			reviewerCallCount += s.calls ?? 0;
 			return s.ra;
 		},
+		// ⭐ `E12F` F1 — the row read, Record Assurance found or not, NOTHING pressed: no call recorded.
+		recordAssuranceOffered: async (unit) => {
+			calls.push(`offersRecordAssurance ${unit.slug}`);
+			return signOffOf(unit).ra !== null;
+		},
+		// ⭐ `E12F` F3 — the row's declared re-run, and the act.
+		declaredRerunOffered: async (unit) => {
+			calls.push(`offersDeclaredRerun ${unit.slug}`);
+			return signOffOf(unit).rerun?.offered === true;
+		},
+		rerunDeclared: async (unit) => {
+			calls.push(`rerunDeclared ${unit.slug}`);
+			const r = signOffOf(unit).rerun;
+			if (r?.outcome === undefined) throw new Error(`the script re-runs no declared review of ${unit.slug}`);
+			if (r.after) store.set(unit.unitId!, r.after);
+			reviewerCallCount += r.calls ?? 0;
+			return r.outcome;
+		},
 		markSatisfied: async (unit) => {
 			calls.push(`markSatisfied ${unit.slug}`);
+			if (unit.slug === script.markSatisfiedThrowsOn) {
+				// ⭐ E12's polish (fix3's F1) — lane/run.json as it stood on disk when the hand threw: what a kill there would leave.
+				onDiskAtMarkSatisfied = existsSync(lane.run) ? (JSON.parse(readFileSync(lane.run, 'utf8')) as RunRecord) : null;
+				throw new errors.TimeoutError(`locator.waitFor: Timeout ${PHASE7_UI_MS}ms exceeded.`);
+			}
 			const s = signOffOf(unit);
 			if (s.msAfter) store.set(unit.unitId!, s.msAfter);
 			return s.ms ?? answered('success');
@@ -1385,7 +1477,11 @@ function laneOf(script: Script) {
 		read: async () => {
 			reads += 1;
 			calls.push('read');
-			if (reads === script.readThrowsAt) throw new Error('connect ECONNREFUSED 127.0.0.1:4322');
+			if (reads === script.readThrowsAt) {
+				// ⭐ E12's polish — lane/run.json as it stood on disk when the read failed: what a kill there would leave.
+				onDisk = existsSync(lane.run) ? (JSON.parse(readFileSync(lane.run, 'utf8')) as RunRecord) : null;
+				throw new Error('connect ECONNREFUSED 127.0.0.1:4322');
+			}
 			const snap = snapshot();
 			return { text: JSON.stringify(snap), snapshot: snap };
 		},
@@ -1421,6 +1517,10 @@ function laneOf(script: Script) {
 		archives,
 		lane,
 		written: (): RunRecord => JSON.parse(readFileSync(lane.run, 'utf8')) as RunRecord,
+		/** ⭐ E12's polish — lane/run.json as it stood on disk when the `readThrowsAt` read failed; null if none failed. */
+		onDiskAtTheFailedRead: (): RunRecord | null => onDisk,
+		/** ⭐ E12's polish (fix3's F1) — lane/run.json as it stood on disk when the `markSatisfiedThrowsOn` hand threw. */
+		onDiskWhenMarkSatisfiedThrew: (): RunRecord | null => onDiskAtMarkSatisfied,
 		action: (name: string) => existsSync(join(lane.actions, `${name}.json`))
 	};
 }
@@ -1460,7 +1560,8 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			signOffs: { root: GREEN }
 		});
 		const record = await l.run();
-		// ⭑ Between the root's archive and the stop come its sign-off and the final archive (D11): the next test's.
+		// ⭑ Between the root's archive and the stop come its sign-off, rehearsed (`E12F` F1), and the final archive (D11): the
+		// next test's.
 		expect(l.calls.slice(0, 5)).toEqual([
 			'setUp',
 			'beginExecute root',
@@ -1480,7 +1581,8 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 	});
 
 	it('⛔ DRY: a root whose press was REFUSED, or a store holding a model exchange, fails the verdict — the dry run proves the press, or nothing', async () => {
-		// ⭑ Each root's sign-off is accepted, so each line here stands alone: the sign-off's are the D11 tests' below.
+		// ⭑ Each root's sign-off is rehearsed as a dry run's must be (`E12F` F1), so each line here stands alone: the sign-off's
+		// are the D11 tests' below.
 		const refused = await laneOf({
 			paid: false,
 			presses: { root: { outcome: answered('failure'), after: STOPPED } },
@@ -1498,24 +1600,22 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		expect(laneVerdict(called)).toEqual(['the dry run recorded 2 model exchange(s)']);
 	});
 
-	it('⛔ DRY, D11 — after the root’s archive the ROOT is signed off by the paid run’s own acts, the page loaded afresh and the store read after each act; then the final archive is taken, and only then are the model exchanges counted', async () => {
+	it('⛔ DRY, D11 — after the root’s archive the ROOT’s sign-off is REHEARSED — ~~by the paid run’s own acts~~ up to the reviewer call (E12F F1, REG-D-112 (b)): the page loaded afresh and the row read; then the final archive is taken, and only then are the model exchanges counted', async () => {
 		const l = laneOf({
 			paid: false,
 			presses: { root: ALL_COMPLETE.root! },
 			signOffs: { root: GREEN }
 		});
 		const record = await l.run();
-		expect(l.calls, 'the dry run’s order after the root’s archive (design §6 P7-2 D11)').toEqual([
+		expect(l.calls, 'the dry run’s order after the root’s archive (design §6 P7-2 D11; E12F F1)').toEqual([
 			'setUp',
 			'beginExecute root',
 			'read',
 			'screenshot 01-root',
 			'archive 01-root',
 			'showOverview',
-			'recordAssurance root',
-			'read',
-			'markSatisfied root',
-			'read',
+			// ⛔ `E12F` F1 — ~~'recordAssurance root', 'read', 'markSatisfied root', 'read'~~: Record Assurance asks a reviewer.
+			'offersRecordAssurance root',
 			'screenshot 06-final',
 			'read',
 			'archive 06-final',
@@ -1523,18 +1623,22 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			'flushPosts'
 		]);
 		const root = record.units[0]!;
-		expect(root.signOff, 'the root’s sign-off is not the store’s, read after each act').toEqual({
+		expect(root.signOff, 'the root’s sign-off is not recorded as not reached in a dry run').toEqual({
 			offered: true,
-			recordAssurance: { status: 200, envelopeType: 'success', after: ASSURED },
-			markSatisfied: { status: 200, envelopeType: 'success', after: SATISFIED },
-			refused: null
+			limitCheck: null,
+			recordAssurance: null,
+			rerunDeclared: null,
+			rerunLimitCheck: null,
+			markSatisfied: null,
+			refused: null,
+			notPressed: DRY_SIGN_OFF_NOT_REACHED
 		});
 		expect(l.written().units[0]!.signOff, 'the run record written lacks the sign-off').toEqual(
 			root.signOff
 		);
 		expect([l.action('01-root-recordAssurance'), l.action('01-root-markSatisfied')]).toEqual([
-			true,
-			true
+			false,
+			false
 		]);
 		expect(
 			l.archives.map((a) => [a.name, a.unitId, a.capturesBefore]),
@@ -1547,93 +1651,44 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		expect(laneVerdict(record)).toEqual([]);
 	});
 
-	it('⛔ DRY, D11 — a model call the sign-off made is COUNTED: the exchanges are read after the sign-off and the final archive, never before, and the verdict says so', async () => {
-		const record = await laneOf({
-			paid: false,
-			presses: { root: ALL_COMPLETE.root! },
-			signOffs: { root: { ...GREEN, calls: 1 } }
-		}).run();
-		expect(record.dryRun, 'the exchanges were counted before the sign-off').toEqual({
-			modelExchanges: 1
-		});
-		expect(laneVerdict(record)).toEqual(['the dry run recorded 1 model exchange(s)']);
-	});
+	// ~~⛔ DRY, D11 — a model call the sign-off made is COUNTED~~ ⛔ `E12F` F1: a dry sign-off presses nothing, so it can make no
+	// model call — the case is `E12F F1`'s above, whose hands would record two and record none. The count itself is read after
+	// the final archive (the order above), and a model exchange the store holds then fails the verdict (the REFUSED case).
 
-	it('⛔ DRY, D11 — the verdict holds the root’s sign-off PROVED: its row offered Record Assurance, both acts answered success, and the store read after Mark Satisfied reads the root SATISFIED in lifecycle and assurance (prediction b, REG-F-523) — each shortfall its own line, with what was read', async () => {
-		const dryWith = async (signOff: NonNullable<Script['signOffs']>[string]) =>
-			laneVerdict(
-				await laneOf({
-					paid: false,
-					presses: { root: ALL_COMPLETE.root! },
-					signOffs: { root: signOff }
-				}).run()
-			);
-		const unread =
-			"the dry run's root is not SATISFIED: the store, read after Mark Satisfied, reads its lifecycle unread and its assurance unread";
-		expect(await dryWith({ ra: null }), 'a row that offered no Record Assurance').toEqual([
-			'the dry run did not sign off the root: its row offered no Record Assurance',
-			"the dry run's sign-off of the root was not accepted: Record Assurance was never pressed, and Mark Satisfied was never pressed",
-			unread
-		]);
+	it('⛔ DRY, D11 — the verdict holds the root’s sign-off REHEARSED UP TO THE REVIEWER CALL (E12F F1, REG-D-112 (b)): its row offered Record Assurance, nothing pressed, the sign-off recorded not reached in a dry run — each shortfall its own line, with what was read', async () => {
+		// ~~both acts answered success, and the store read after Mark Satisfied reads the root SATISFIED (prediction b)~~ — the
+		// root's SATISFIED is the gate's prediction (b) and the paid run's: a dry run that proved it pressed paid calls.
 		expect(
-			await dryWith({ ra: answered('failure'), raAfter: COMPLETED }),
-			'a refused Record Assurance'
-		).toEqual([
-			'the dry run\'s sign-off of the root was not accepted: Record Assurance answered failure, and Mark Satisfied was never pressed (Record Assurance refused: {"type":"failure"})',
-			unread
-		]);
-		expect(
-			await dryWith({
-				ra: answered('success'),
-				raAfter: ASSURED,
-				ms: answered('failure'),
-				msAfter: ASSURED
-			}),
-			'a refused Mark Satisfied'
-		).toEqual([
-			'the dry run\'s sign-off of the root was not accepted: Record Assurance answered success, and Mark Satisfied answered failure (Mark Satisfied refused: {"type":"failure"})',
-			"the dry run's root is not SATISFIED: the store, read after Mark Satisfied, reads its lifecycle UNDER_ASSURANCE and its assurance SATISFIED"
-		]);
-		// ⛔ THE ENVELOPE IS NOT THE RECORD (REG-F-540): both acts accepted, and the store unmoved — on either axis.
-		expect(await dryWith({ ...GREEN, msAfter: ASSURED }), 'the lifecycle unmoved').toEqual([
-			"the dry run's root is not SATISFIED: the store, read after Mark Satisfied, reads its lifecycle UNDER_ASSURANCE and its assurance SATISFIED"
-		]);
-		expect(
-			await dryWith({
-				...GREEN,
-				msAfter: unitState('SATISFIED', 'SUCCEEDED', 'UNASSESSED', 'SUCCEEDED')
-			}),
-			'the assurance unmoved'
-		).toEqual([
-			"the dry run's root is not SATISFIED: the store, read after Mark Satisfied, reads its lifecycle SATISFIED and its assurance UNASSESSED"
-		]);
-		// ⛔ AND TWO RECORDS NO LANE OF TODAY WRITES, WHICH A BROKEN ONE WOULD: a Mark Satisfied accepted after a REFUSED
-		// Record Assurance — the act P7-3 forbids — and a sign-off never attempted.
-		const green = await laneOf({
-			paid: false,
-			presses: { root: ALL_COMPLETE.root! },
-			signOffs: { root: GREEN }
-		}).run();
+			laneVerdict(await laneOf({ paid: false, presses: { root: ALL_COMPLETE.root! }, signOffs: { root: { ra: null } } }).run()),
+			'a row that offered no Record Assurance'
+		).toEqual(['the dry run did not rehearse the root’s sign-off: its row offered no Record Assurance']);
+		// ⛔ AND RECORDS NO LANE OF TODAY WRITES, WHICH A BROKEN ONE WOULD: a sign-off PRESSED in a dry run — each act a reviewer
+		// call since E2 — a rehearsal that did not record why it stopped, and a sign-off never attempted.
+		const green = await laneOf({ paid: false, presses: { root: ALL_COMPLETE.root! }, signOffs: { root: GREEN } }).run();
 		const withRootSignOff = (signOff: SignOffRecord | null): RunRecord => ({
 			...green,
 			units: [{ ...green.units[0]!, signOff }, ...green.units.slice(1)]
 		});
-		const signed = green.units[0]!.signOff!;
+		const rehearsed = green.units[0]!.signOff!;
+		expect(laneVerdict(green), 'CONTROL: the rehearsal as the lane records it').toEqual([]);
 		expect(
 			laneVerdict(
 				withRootSignOff({
-					...signed,
-					recordAssurance: { ...signed.recordAssurance!, envelopeType: 'failure' }
+					...rehearsed,
+					recordAssurance: actAnswered('success', ASSURED),
+					markSatisfied: actAnswered('success', SATISFIED),
+					notPressed: null
 				})
 			),
-			'Mark Satisfied after a refused Record Assurance'
+			'a dry run that pressed the root’s sign-off'
 		).toEqual([
-			"the dry run's sign-off of the root was not accepted: Record Assurance answered failure, and Mark Satisfied answered success"
+			'the dry run pressed the root’s sign-off, which asks the reviewer for each declared policy (REG-D-112 (b)): Record Assurance answered success, and Mark Satisfied answered success'
+		]);
+		expect(laneVerdict(withRootSignOff({ ...rehearsed, notPressed: null })), 'a rehearsal that says nothing of why it stopped').toEqual([
+			'the dry run’s sign-off of the root is not recorded as not reached in a dry run: nothing recorded'
 		]);
 		expect(laneVerdict(withRootSignOff(null)), 'a sign-off never attempted').toEqual([
-			'the dry run did not sign off the root: no sign-off was attempted',
-			"the dry run's sign-off of the root was not accepted: Record Assurance was never pressed, and Mark Satisfied was never pressed",
-			unread
+			'the dry run did not rehearse the root’s sign-off: no sign-off was attempted'
 		]);
 	});
 
@@ -1681,6 +1736,8 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			'markSatisfied requirements',
 			'showOverview',
 			'recordAssurance implementation',
+			// ⭐ `E12F` F3 — a refused Record Assurance: the page loaded afresh, the row read for a declared re-run (it offers none).
+			'showOverview',
 			'showOverview',
 			'recordAssurance end-to-end',
 			'markSatisfied end-to-end',
@@ -1696,15 +1753,24 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		];
 		expect(requirements.signOff, 'each act’s state is not the store’s, read after it').toEqual({
 			offered: true,
-			recordAssurance: { status: 200, envelopeType: 'success', after: ASSURED },
-			markSatisfied: { status: 200, envelopeType: 'success', after: SATISFIED },
-			refused: null
+			// ⭐ `E12F` F2 — the limit read before it: 10 before, 10 recorded, 4 held back, its own 2 × 4 counted.
+			limitCheck: { prior: 10, recorded: 10, reserve: 4, ahead: 8, total: 32, limit: PHASE7_PAID_LIMIT, allowed: true },
+			recordAssurance: actAnswered('success', ASSURED),
+			rerunDeclared: null,
+			rerunLimitCheck: null,
+			markSatisfied: actAnswered('success', SATISFIED),
+			refused: null,
+			notPressed: null
 		});
 		expect(implementation.signOff).toEqual({
 			offered: true,
-			recordAssurance: { status: 200, envelopeType: 'failure', after: COMPLETED },
+			limitCheck: { prior: 10, recorded: 10, reserve: 4, ahead: 12, total: 36, limit: PHASE7_PAID_LIMIT, allowed: true },
+			recordAssurance: actAnswered('failure', COMPLETED),
+			rerunDeclared: null,
+			rerunLimitCheck: null,
 			markSatisfied: null,
-			refused: { act: 'Record Assurance', reason: '{"type":"failure"}' }
+			refused: { act: 'Record Assurance', reason: '{"type":"failure"}' },
+			notPressed: null
 		});
 		expect([design.signOff, root.signOff?.refused]).toEqual([null, null]);
 		expect(l.action('04-implementation-markSatisfied')).toBe(false);
@@ -1982,6 +2048,9 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 	// Now: a new plan whose step WAITS is refused again — abandoned, if the row offers it; no new plan, the re-run was not
 	// made — the server's words kept, the unit left as found; a new plan not waiting — left as found, and recorded.
 	const refusedWith = (error: string): ActionOutcome => ({ ...answered('failure'), decoded: { error } });
+	/** ⭐ E12's re-review F4 — a Record Assurance refused, in the server's own words: a declared review did not conclude. */
+	const DID_NOT_CONCLUDE =
+		"Assurance recorded, and the declared review did not conclude in this PWU's favour: pol_intent_preservation reached INCONCLUSIVE.";
 	const FAILED = unitState('EXECUTING', 'FAILED', 'UNASSESSED', 'FAILED');
 	const OTHERS_COMPLETE = {
 		root: ALL_COMPLETE.root!,
@@ -2167,7 +2236,7 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		]);
 	});
 
-	it('⛔ D8 — at the sponsor’s limit, counting what the store records, the run ends `paid-limit` before the phase, and what completed is still signed off, the root last', async () => {
+	it('⛔ D8 — at the sponsor’s limit, counting what the store records, the run ends `paid-limit` before the phase — ~~and what completed is still signed off, the root last~~ and the first sign-off, its own declared reviews counted, would cross it too: held back, and no later one is pressed (E12F F2)', async () => {
 		// ⭑ `REG-D-108` — the prior spend is set against the limit, so the design phase is the one that reaches it.
 		const l = laneOf({
 			paid: true,
@@ -2179,11 +2248,16 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			signOffs: { root: GREEN, requirements: GREEN }
 		});
 		const record = await l.run();
-		expect(l.only('beginExecute', 'recordAssurance')).toEqual([
+		// ⛔ `E12F` F2 — ~~'recordAssurance requirements', 'recordAssurance root'~~: a limit a phase may not cross, a sign-off's
+		// worst case added, is crossed by the first sign-off — recorded unpressed, its row read and nothing pressed — and the
+		// lane stops there: the root's is never attempted.
+		expect(l.only('beginExecute', 'recordAssurance', 'offersRecordAssurance')).toEqual([
 			'beginExecute root',
 			'beginExecute requirements',
-			'recordAssurance requirements',
-			'recordAssurance root'
+			'offersRecordAssurance requirements'
+		]);
+		expect(record.units.filter((u) => u.signOff !== null).map((u) => [u.slug, u.signOff?.limitCheck?.allowed, u.signOff?.notPressed?.startsWith('the limit: ')])).toEqual([
+			['requirements', false, true]
 		]);
 		expect(record.units[2]!.limitCheck).toEqual({
 			prior: PHASE7_PAID_LIMIT - 10,
@@ -2195,6 +2269,482 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		});
 		expect(record.units[2]!.beginExecute).toBeNull();
 		expect(laneVerdict(record)).toEqual(["the run ended 'paid-limit', not 'complete'"]);
+	});
+
+	// ── ⛔⛔ `E12F` — THE SIGN-OFF ASKS A REVIEWER SINCE E2: A DRY RUN STOPS BEFORE IT (F1), THE LIMIT SEES IT (F2), AND A REVIEW
+	// THAT DID NOT CONCLUDE IS RE-RUN ONCE BY THE RULE (F3) ─────────────────────────────────────────────────────────────────
+	it('⛔ E12F F1 (REG-D-112 (b)) — DRY: the root’s sign-off stops BEFORE the reviewer call — Record Assurance found on its row and NOT pressed, recorded not reached in a dry run — so a sign-off that would ask a reviewer asks none', async () => {
+		// ⛔ PREDICTED RED, read from the code: the dry run signed the root off by the paid run's own acts (D11) — Record
+		// Assurance pressed, which since E2 asks the reviewer once per declared policy — and the verdict then said "the dry
+		// run recorded 2 model exchange(s)": two paid calls, made by the run that may call no model.
+		const l = laneOf({ paid: false, presses: { root: ALL_COMPLETE.root! }, signOffs: { root: { ...GREEN, calls: 2 } } });
+		const record = await l.run();
+		expect(l.only('recordAssurance', 'markSatisfied', 'rerunDeclared'), 'the dry run pressed a sign-off act').toEqual([]);
+		expect(l.only('offersRecordAssurance'), 'the rehearsal did not read the root’s row').toEqual(['offersRecordAssurance root']);
+		expect(record.units[0]!.signOff).toEqual({
+			offered: true,
+			limitCheck: null,
+			recordAssurance: null,
+			rerunDeclared: null,
+			rerunLimitCheck: null,
+			markSatisfied: null,
+			refused: null,
+			notPressed: DRY_SIGN_OFF_NOT_REACHED
+		});
+		expect([l.action('01-root-recordAssurance'), l.action('01-root-markSatisfied')]).toEqual([false, false]);
+		expect(record.dryRun).toEqual({ modelExchanges: 0 });
+		expect(laneVerdict(record), 'a dry run whose sign-off was rehearsed, nothing pressed, failed its verdict').toEqual([]);
+	});
+
+	it('⛔ E12F F2 — PAID: the limit is read before EACH SIGN-OFF, its own declared reviews counted at their bound: the last phase passes its check, and a sign-off that would cross the limit is NOT pressed — recorded, no later sign-off pressed, and the run ends `paid-limit`', async () => {
+		// ⛔ PREDICTED RED, read from the code: every sign-off pressed — the limit was read before each phase and each re-run,
+		// never before a sign-off, whose declared reviews (up to 16 calls for the design phase) it counted nowhere.
+		const prior = PHASE7_PAID_LIMIT - 20;
+		const one = { outcome: answered('success'), after: COMPLETED, calls: 1 };
+		const l = laneOf({
+			paid: true,
+			prior,
+			presses: { root: ALL_COMPLETE.root!, requirements: one, design: one, implementation: one, 'end-to-end': one },
+			signOffs: { root: GREEN, requirements: GREEN, design: GREEN, implementation: GREEN, 'end-to-end': GREEN }
+		});
+		const record = await l.run();
+		// ⭑ The last phase passed its check: 210 + 3 + 4 = 217, under 230.
+		expect(record.units[4]!.limitCheck?.allowed, 'arrangement: the last phase passes its check').toBe(true);
+		// ⭐ requirements (2 policies): 210 + 4 + 4 + 8 = 226, pressed; design (4): 234, held back — and the lane stops there:
+		// implementation's and end-to-end's (230 each, the limit itself) and the root's (226, which alone would fit) are never
+		// attempted.
+		expect(l.only('recordAssurance', 'offersRecordAssurance'), 'a sign-off was pressed past the limit, or after it').toEqual([
+			'recordAssurance requirements',
+			'offersRecordAssurance design'
+		]);
+		expect(record.units.map((u) => [u.slug, u.signOff?.limitCheck?.ahead, u.signOff?.limitCheck?.total, u.signOff?.limitCheck?.allowed])).toEqual([
+			['root', undefined, undefined, undefined],
+			['requirements', 8, 226, true],
+			['design', 16, 234, false],
+			['implementation', undefined, undefined, undefined],
+			['end-to-end', undefined, undefined, undefined]
+		]);
+		expect(
+			[record.units[0]!.signOff, record.units[3]!.signOff, record.units[4]!.signOff],
+			'a sign-off after the limit stopped the lane was attempted'
+		).toEqual([null, null, null]);
+		expect(record.units[2]!.signOff).toEqual({
+			offered: true,
+			limitCheck: { prior, recorded: 4, reserve: 4, ahead: 16, total: 234, limit: PHASE7_PAID_LIMIT, allowed: false },
+			recordAssurance: null,
+			rerunDeclared: null,
+			rerunLimitCheck: null,
+			markSatisfied: null,
+			refused: null,
+			notPressed: "the limit: 234 of 230 reviewer calls, the sign-off's own 16 counted (D8; E12F F2)"
+		});
+		expect(PHASE7_ARCHIVE_UNITS.map((u) => signOffWorstCase(u)), 'each unit’s declared policies × reviewerCallsPerTry').toEqual([8, 8, 16, 12, 12]);
+		expect([record.end?.reason, laneVerdict(record)]).toEqual(['paid-limit', ["the run ended 'paid-limit', not 'complete'"]]);
+	});
+
+	it('⭐ E12F F3 (REG-D-105 (4), REG-D-112 (a)) — PAID: a Record Assurance refused whose row, read afresh, offers re-running the declared reviews that did not conclude has them re-run ONCE by the rule, the limit read first; accepted, Mark Satisfied follows', async () => {
+		// ⛔ PREDICTED RED, read from the code: the refused Record Assurance was recorded and the unit left — UNDER_ASSURANCE and
+		// ASSESSING, stranded, as the page then offered it nothing to do.
+		const l = laneOf({
+			paid: true,
+			prior: 10,
+			presses: ALL_COMPLETE,
+			signOffs: {
+				root: GREEN,
+				requirements: GREEN,
+				design: {
+					ra: refusedWith(DID_NOT_CONCLUDE),
+					raAfter: ASSESSING,
+					calls: 4,
+					rerun: { offered: true, outcome: answered('success'), after: ASSURED, calls: 1 },
+					msAfter: SATISFIED
+				},
+				implementation: GREEN,
+				'end-to-end': GREEN
+			}
+		});
+		const record = await l.run();
+		const onDesign = l.calls.filter((c) => c.endsWith(' design'));
+		expect(onDesign, 'the rule did not re-run the declared reviews of a refused sign-off').toEqual([
+			'beginExecute design',
+			'recordAssurance design',
+			'offersDeclaredRerun design',
+			'rerunDeclared design',
+			'markSatisfied design'
+		]);
+		const design = record.units[2]!.signOff!;
+		expect([design.rerunDeclared, design.rerunLimitCheck?.ahead, design.rerunLimitCheck?.allowed, design.markSatisfied?.after, design.refused]).toEqual([
+			actAnswered('success', ASSURED),
+			16,
+			true,
+			SATISFIED,
+			null
+		]);
+		// ⭐ E12's re-review F4 — Record Assurance's refusal is KEPT, on its own act, though no refusal stands: the rule's accepted
+		// re-run stood in for it, and Mark Satisfied was accepted.
+		expect([design.recordAssurance?.refusal, design.rerunDeclared?.refusal, design.markSatisfied?.refusal]).toEqual([
+			DID_NOT_CONCLUDE,
+			null,
+			null
+		]);
+		expect(l.action('03-design-rerunDeclaredReviews'), 'the re-run’s answer was not kept').toBe(true);
+		expect([record.end?.reason, laneVerdict(record)]).toEqual(['complete', []]);
+	});
+
+	it('⛔ E12F F3 — a declared re-run refused again is LEFT AS FOUND: never a second re-run, no Mark Satisfied; a row offering none, and one the limit stops, are left as found too', async () => {
+		const refusedTwice = await laneOf({
+			paid: true,
+			presses: ALL_COMPLETE,
+			signOffs: {
+				root: GREEN,
+				design: { ra: refusedWith(DID_NOT_CONCLUDE), raAfter: ASSESSING, rerun: { offered: true, outcome: answered('failure'), after: ASSESSING } }
+			}
+		}).run();
+		const twice = refusedTwice.units[2]!.signOff!;
+		expect([twice.rerunDeclared?.envelopeType, twice.markSatisfied, twice.refused]).toEqual([
+			'failure',
+			null,
+			{ act: 'Re-run the declared reviews', reason: '{"type":"failure"}' }
+		]);
+		// ⭐ E12's re-review F4 — the refusal that stands is the re-run's; Record Assurance's own is kept on its act.
+		expect([twice.recordAssurance?.refusal, twice.rerunDeclared?.refusal]).toEqual([DID_NOT_CONCLUDE, '{"type":"failure"}']);
+		const notOffered = laneOf({
+			paid: true,
+			presses: ALL_COMPLETE,
+			signOffs: { root: GREEN, design: { ra: answered('failure'), raAfter: ASSESSING, rerun: { offered: false } } }
+		});
+		const left = (await notOffered.run()).units[2]!.signOff!;
+		expect([left.rerunDeclared, left.refused?.act, notOffered.only('rerunDeclared')]).toEqual([null, 'Record Assurance', []]);
+		// ⭐ The limit read before the re-run stops it, as before a phase: recorded, the run ends `paid-limit`, and the lane stops
+		// there — the root's sign-off, 200 + 12 + 4 + 8 = 224, which would fit, is never attempted.
+		const limited = laneOf({
+			paid: true,
+			prior: PHASE7_PAID_LIMIT - 30,
+			presses: ALL_COMPLETE,
+			signOffs: {
+				root: GREEN,
+				design: { ra: answered('failure'), raAfter: ASSESSING, calls: 12, rerun: { offered: true, outcome: answered('success'), after: ASSURED } }
+			}
+		});
+		const stopped = await limited.run();
+		const atTheLimit = stopped.units[2]!.signOff!;
+		expect([atTheLimit.rerunLimitCheck?.allowed, atTheLimit.rerunDeclared, limited.only('rerunDeclared'), stopped.end?.reason]).toEqual([
+			false,
+			null,
+			[],
+			'paid-limit'
+		]);
+		expect([atTheLimit.notPressed, stopped.units[0]!.signOff, limited.only('recordAssurance root')]).toEqual([
+			"the limit: 232 of 230 reviewer calls, the sign-off's own 16 counted (D8; E12F F2)",
+			null,
+			[]
+		]);
+	});
+
+	it('⛔ E12F F3 — a Record Assurance with NO ANSWER is left as found: the rule re-runs nothing beside a press the server may still be running (D4), whatever the row then offers', async () => {
+		// ⛔ PREDICTED RED, read from the code: the rule took any Record Assurance short of success — one that outlasted its
+		// bound, or whose request failed in transit — for a refusal, read the row afresh and re-ran the declared reviews.
+		const unanswered: readonly ActionOutcome[] = [
+			{ ...OUTLASTED, timedOutAfterMs: PHASE7_RECORD_ASSURANCE_MS },
+			LOST_IN_TRANSIT
+		];
+		for (const ra of unanswered) {
+			const l = laneOf({
+				paid: true,
+				presses: ALL_COMPLETE,
+				signOffs: {
+					root: GREEN,
+					design: { ra, raAfter: ASSESSING, rerun: { offered: true, outcome: answered('success'), after: ASSURED } }
+				}
+			});
+			const design = (await l.run()).units[2]!.signOff!;
+			expect(
+				[l.only('offersDeclaredRerun', 'rerunDeclared', 'markSatisfied design'), design.rerunDeclared, design.refused],
+				refusalOf(ra)
+			).toEqual([[], null, { act: 'Record Assurance', reason: refusalOf(ra) }]);
+		}
+	});
+
+	// ── ⛔⛔ E12’s re-review F1 (D4; `REG-F-535`) — A SIGN-OFF ACT WITH NO ANSWER ENDS THE RUN THERE ───────────────────────────
+	// Since E2 a sign-off act asks the reviewer, and each declared review records its calls only when it finishes: a press
+	// beside one still running runs two units' reviews at once, and the limit read before it misses the calls in flight.
+	it('⛔ E12’s re-review F1 (D4) — a Record Assurance with NO ANSWER ends the run there: nothing is pressed beside it, the final archive is taken, and the run ends for the act', async () => {
+		// ⛔ PREDICTED RED, read from the code: the unanswered press was recorded refused and the lane went on — the page loaded,
+		// implementation's limit read without design's calls in flight, its Record Assurance pressed, then the root's — and the
+		// run ended `complete`.
+		const l = laneOf({
+			paid: true,
+			presses: ALL_COMPLETE,
+			signOffs: {
+				root: GREEN,
+				requirements: GREEN,
+				design: { ra: { ...OUTLASTED, timedOutAfterMs: PHASE7_RECORD_ASSURANCE_MS }, raAfter: ASSESSING },
+				implementation: GREEN,
+				'end-to-end': GREEN
+			}
+		});
+		const record = await l.run();
+		expect(
+			l.only('recordAssurance', 'offersRecordAssurance', 'offersDeclaredRerun', 'rerunDeclared', 'markSatisfied'),
+			'an act was pressed beside a Record Assurance with no answer'
+		).toEqual(['recordAssurance requirements', 'markSatisfied requirements', 'recordAssurance design']);
+		const detail = `Design's Record Assurance outlasted its allowance of ${PHASE7_RECORD_ASSURANCE_MS} ms`;
+		expect(record.end).toEqual({ reason: 'allowance-exceeded', at: expect.any(String), detail });
+		// ⭐ The store read after it, then the final archive, which holds the sign-offs made before it — and nothing else.
+		expect(l.calls.slice(l.calls.indexOf('recordAssurance design'))).toEqual([
+			'recordAssurance design',
+			'read',
+			'screenshot 06-final',
+			'read',
+			'archive 06-final',
+			'flushPosts'
+		]);
+		const design = record.units[2]!.signOff!;
+		expect([design.recordAssurance, design.refused]).toEqual([
+			{ status: null, envelopeType: null, timedOutAfterMs: PHASE7_RECORD_ASSURANCE_MS, requestFailure: null, refusal: null, after: ASSESSING },
+			{ act: 'Record Assurance', reason: `no answer within ${PHASE7_RECORD_ASSURANCE_MS} ms` }
+		]);
+		expect(
+			[record.units[3]!.signOff, record.units[4]!.signOff, record.units[0]!.signOff],
+			'a sign-off after the unanswered one was attempted'
+		).toEqual([null, null, null]);
+		expect(l.written().end?.reason).toBe('allowance-exceeded');
+		expect(laneVerdict(record)).toEqual([`the run ended 'allowance-exceeded', not 'complete': ${detail}`]);
+	});
+
+	it('⛔ E12’s re-review F1 (D4) — and so does the rule’s re-run of the declared reviews with no answer, a Record Assurance lost in transit, and — D4’s general form — a Mark Satisfied with none', async () => {
+		const outlasted = (ms: number): ActionOutcome => ({ ...OUTLASTED, timedOutAfterMs: ms });
+		const cases = [
+			{
+				design: {
+					ra: answered('failure'),
+					raAfter: ASSESSING,
+					rerun: { offered: true, outcome: outlasted(PHASE7_RECORD_ASSURANCE_MS), after: ASSESSING }
+				},
+				last: 'rerunDeclared design',
+				end: ['allowance-exceeded', `Design's Re-run the declared reviews outlasted its allowance of ${PHASE7_RECORD_ASSURANCE_MS} ms`]
+			},
+			{
+				design: { ra: LOST_IN_TRANSIT, raAfter: ASSESSING },
+				last: 'recordAssurance design',
+				end: [
+					'request-failed',
+					"Design's Record Assurance failed in transit (net::ERR_EMPTY_RESPONSE): the server may have stopped, or may still be running it"
+				]
+			},
+			{
+				design: { ...GREEN, ms: outlasted(PHASE7_SIGN_OFF_MS) },
+				last: 'markSatisfied design',
+				end: ['allowance-exceeded', `Design's Mark Satisfied outlasted its allowance of ${PHASE7_SIGN_OFF_MS} ms`]
+			}
+		];
+		for (const c of cases) {
+			const l = laneOf({
+				paid: true,
+				presses: ALL_COMPLETE,
+				signOffs: { root: GREEN, requirements: GREEN, design: c.design, implementation: GREEN, 'end-to-end': GREEN }
+			});
+			const record = await l.run();
+			const acts = l.only('recordAssurance', 'offersRecordAssurance', 'offersDeclaredRerun', 'rerunDeclared', 'markSatisfied');
+			expect(acts.slice(acts.indexOf(c.last) + 1), `${c.last}: an act was pressed after it`).toEqual([]);
+			expect([record.end?.reason, record.end?.detail], c.last).toEqual(c.end);
+			expect(l.archives.at(-1)?.name, `${c.last}: the final archive was not taken`).toBe('06-final');
+		}
+	});
+
+	it('⛔ E12’s re-review F1 — a throw AFTER a sign-off act with no answer keeps why the run ended: the store read beside reviews still running must not relabel it a lane error', async () => {
+		// ⭑ Reads: the root's; two per phase (its limit, its store); requirements' limit, then the store after its Record
+		// Assurance and after its Mark Satisfied; design's limit — and, the fourteenth, the store after design's Record
+		// Assurance, as a server gone would leave it.
+		const l = laneOf({
+			paid: true,
+			presses: ALL_COMPLETE,
+			signOffs: {
+				root: GREEN,
+				requirements: GREEN,
+				design: { ra: { ...OUTLASTED, timedOutAfterMs: PHASE7_RECORD_ASSURANCE_MS }, raAfter: ASSESSING }
+			},
+			readThrowsAt: 14
+		});
+		await expect(l.run()).rejects.toThrow('connect ECONNREFUSED 127.0.0.1:4322');
+		expect([l.written().end?.reason, l.written().end?.detail]).toEqual([
+			'allowance-exceeded',
+			`Design's Record Assurance outlasted its allowance of ${PHASE7_RECORD_ASSURANCE_MS} ms; then: connect ECONNREFUSED 127.0.0.1:4322`
+		]);
+		// ⛔ E12's polish (the confirm's F1 residue) — AND THE ACT AND ITS BOUND ARE KEPT, whatever the read did. ⛔ PREDICTED RED,
+		// driven by the confirm: design's sign-off was assigned only when `signOff` returned, so lane/run.json held none, and the
+		// report read the lane's own end as a problem with its inputs and design's stage 7 as a sign-off never attempted.
+		const kept = l.written().units[2]!.signOff;
+		expect(
+			[kept?.offered, kept?.limitCheck?.allowed, kept?.recordAssurance, kept?.refused],
+			'the act and its bound were lost with the read after it'
+		).toEqual([
+			true,
+			true,
+			{ status: null, envelopeType: null, timedOutAfterMs: PHASE7_RECORD_ASSURANCE_MS, requestFailure: null, refusal: null, after: null },
+			{ act: 'Record Assurance', reason: `no answer within ${PHASE7_RECORD_ASSURANCE_MS} ms` }
+		]);
+		// ⭐ And on disk BEFORE the read: a run killed while it hung would leave it too — no catch writes then.
+		expect(
+			l.onDiskAtTheFailedRead()?.units[2]?.signOff?.recordAssurance?.timedOutAfterMs,
+			'the act was not on disk when the read began'
+		).toBe(PHASE7_RECORD_ASSURANCE_MS);
+	});
+
+	it('⛔ E12’s polish (the confirm’s F1 residue, its general form) — whatever the store read after it does, an act the lane pressed stays in lane/run.json with its bound: the rule’s re-run of the declared reviews, a Mark Satisfied, and a recovery act', async () => {
+		const outlasted = (ms: number): ActionOutcome => ({ ...OUTLASTED, timedOutAfterMs: ms });
+		const gone = 'connect ECONNREFUSED 127.0.0.1:4322';
+		// ⭑ Reads, as above, to design's limit (13); then the store after its refused Record Assurance (14), the re-run's limit
+		// (15) and — the sixteenth — the store after the re-run, which got no answer.
+		const rerun = laneOf({
+			paid: true,
+			presses: ALL_COMPLETE,
+			signOffs: {
+				root: GREEN,
+				requirements: GREEN,
+				design: { ra: answered('failure'), raAfter: ASSESSING, rerun: { offered: true, outcome: outlasted(PHASE7_RECORD_ASSURANCE_MS), after: ASSESSING } }
+			},
+			readThrowsAt: 16
+		});
+		await expect(rerun.run()).rejects.toThrow(gone);
+		const reran = rerun.written().units[2]!.signOff;
+		expect([reran?.recordAssurance?.after, reran?.rerunLimitCheck?.allowed, reran?.rerunDeclared, reran?.refused], 'the re-run').toEqual([
+			ASSESSING,
+			true,
+			{ status: null, envelopeType: null, timedOutAfterMs: PHASE7_RECORD_ASSURANCE_MS, requestFailure: null, refusal: null, after: null },
+			{ act: 'Re-run the declared reviews', reason: `no answer within ${PHASE7_RECORD_ASSURANCE_MS} ms` }
+		]);
+		// ⭑ Design's limit (13), the store after its accepted Record Assurance (14), and — the fifteenth — after Mark Satisfied,
+		// whose request failed in transit.
+		const satisfied = laneOf({
+			paid: true,
+			presses: ALL_COMPLETE,
+			signOffs: { root: GREEN, requirements: GREEN, design: { ...GREEN, ms: LOST_IN_TRANSIT } },
+			readThrowsAt: 15
+		});
+		await expect(satisfied.run()).rejects.toThrow(gone);
+		const marked = satisfied.written().units[2]!.signOff;
+		expect([satisfied.written().end?.reason, marked?.recordAssurance?.after, marked?.markSatisfied, marked?.refused], 'Mark Satisfied').toEqual([
+			'request-failed',
+			ASSURED,
+			{ status: null, envelopeType: null, timedOutAfterMs: null, requestFailure: 'net::ERR_EMPTY_RESPONSE', refusal: null, after: null },
+			{ act: 'Mark Satisfied', reason: 'no answer: the request failed in transit (net::ERR_EMPTY_RESPONSE)' }
+		]);
+		// ⭑ D4's general form, the run plan's rule — reads: the root's; requirements' limit and store; the re-run's limit; and
+		// — the fifth — the store after the re-run of its review, which got no answer.
+		const recovered = laneOf({
+			paid: true,
+			presses: { ...OTHERS_COMPLETE, requirements: { outcome: answered('failure'), after: WAITING } },
+			recoveries: { requirements: { offers: EVERY_OFFER, acts: { rerunReview: { outcome: outlasted(PHASE7_UNIT_ALLOWANCE_MS), after: WAITING } } } },
+			signOffs: OTHERS_GREEN,
+			readThrowsAt: 5
+		});
+		await expect(recovered.run()).rejects.toThrow(gone);
+		expect(
+			recovered.written().units[1]!.recovery.map((r) => [r.act, r.limitCheck?.allowed, r.timedOutAfterMs, r.after, r.reading]),
+			'the recovery act'
+		).toEqual([['rerunReview', true, PHASE7_UNIT_ALLOWANCE_MS, null, null]]);
+		expect(recovered.written().end?.reason).toBe('allowance-exceeded');
+		expect(
+			recovered.onDiskAtTheFailedRead()?.units[1]?.recovery.map((r) => r.timedOutAfterMs),
+			'the recovery act was not on disk when the read began'
+		).toEqual([PHASE7_UNIT_ALLOWANCE_MS]);
+	});
+
+	it('⛔ E12’s polish (fix3’s F1) — the store read after an accepted Record Assurance completes the act on the unit’s record, written before Mark Satisfied: a throw in Mark Satisfied’s wait leaves lane/run.json the state read, not `after: null`', async () => {
+		// ⭑ Requirements' Record Assurance accepted, and the store read after it came back; then its Mark Satisfied hand
+		// throws before it presses, as its wait for Record Assurance to leave the row does at its bound. ⛔ PREDICTED RED,
+		// driven by the check: the read's state was returned and never written back, so lane/run.json kept the act as it
+		// stood before the read, `after` null.
+		const l = laneOf({
+			paid: true,
+			presses: ALL_COMPLETE,
+			signOffs: { root: GREEN, requirements: GREEN },
+			markSatisfiedThrowsOn: 'requirements'
+		});
+		await expect(l.run()).rejects.toThrow(`locator.waitFor: Timeout ${PHASE7_UI_MS}ms exceeded.`);
+		expect(l.calls.slice(l.calls.indexOf('recordAssurance requirements')), 'the throw came after the read').toEqual([
+			'recordAssurance requirements',
+			'read',
+			'markSatisfied requirements',
+			'flushPosts'
+		]);
+		expect(
+			[l.written().end?.reason, l.written().units[1]!.signOff?.recordAssurance],
+			'the state the read after Record Assurance came back with was lost'
+		).toEqual(['lane-error', actAnswered('success', ASSURED)]);
+		// ⭐ And on disk before Mark Satisfied: a run killed in its wait gets no catch to write the record.
+		expect(
+			l.onDiskWhenMarkSatisfiedThrew()?.units[1]?.signOff?.recordAssurance?.after,
+			'the state read was not on disk when Mark Satisfied began'
+		).toEqual(ASSURED);
+	});
+
+	it('⛔ E12’s polish (fix3’s F1, its general form) — and after a REFUSED Record Assurance: a throw before the rule’s re-run of the declared reviews leaves lane/run.json the state read', async () => {
+		// ⭑ Reads to requirements' limit (10); the store after its refused Record Assurance (11); and — the twelfth — the limit
+		// before the rule's re-run, which throws as a server gone would. The re-run is never pressed.
+		const l = laneOf({
+			paid: true,
+			presses: ALL_COMPLETE,
+			signOffs: { root: GREEN, requirements: { ra: answered('failure'), raAfter: ASSESSING, rerun: { offered: true } } },
+			readThrowsAt: 12
+		});
+		await expect(l.run()).rejects.toThrow('connect ECONNREFUSED 127.0.0.1:4322');
+		expect(l.calls.slice(l.calls.indexOf('recordAssurance requirements')), 'the throw came after the read').toEqual([
+			'recordAssurance requirements',
+			'read',
+			'showOverview',
+			'offersDeclaredRerun requirements',
+			'read',
+			'flushPosts'
+		]);
+		expect(
+			l.written().units[1]!.signOff?.recordAssurance,
+			'the state the read after Record Assurance came back with was lost'
+		).toEqual(actAnswered('failure', ASSESSING));
+		expect(
+			l.onDiskAtTheFailedRead()?.units[1]?.signOff?.recordAssurance?.after,
+			'the state read was not on disk when the re-run’s limit was read'
+		).toEqual(ASSESSING);
+	});
+
+	it('⛔ E12’s polish (fix3’s F1, its general form) — and after the rule’s ACCEPTED re-run of the declared reviews: a throw in Mark Satisfied’s wait leaves lane/run.json the state read after the re-run', async () => {
+		// ⭑ Requirements' Record Assurance refused, and the rule's re-run of its declared reviews accepted, the store read
+		// after each; then the Mark Satisfied hand throws before it presses.
+		const l = laneOf({
+			paid: true,
+			presses: ALL_COMPLETE,
+			signOffs: {
+				root: GREEN,
+				requirements: {
+					ra: answered('failure'),
+					raAfter: ASSESSING,
+					rerun: { offered: true, outcome: answered('success'), after: ASSURED }
+				}
+			},
+			markSatisfiedThrowsOn: 'requirements'
+		});
+		await expect(l.run()).rejects.toThrow(`locator.waitFor: Timeout ${PHASE7_UI_MS}ms exceeded.`);
+		expect(l.calls.slice(l.calls.indexOf('recordAssurance requirements')), 'the throw came after the reads').toEqual([
+			'recordAssurance requirements',
+			'read',
+			'showOverview',
+			'offersDeclaredRerun requirements',
+			'read',
+			'rerunDeclared requirements',
+			'read',
+			'markSatisfied requirements',
+			'flushPosts'
+		]);
+		const kept = l.written().units[1]!.signOff;
+		expect(
+			[kept?.recordAssurance, kept?.rerunDeclared],
+			'the state the read after the re-run came back with was lost'
+		).toEqual([actAnswered('failure', ASSESSING), actAnswered('success', ASSURED)]);
+		expect(
+			l.onDiskWhenMarkSatisfiedThrew()?.units[1]?.signOff?.rerunDeclared?.after,
+			'the state read was not on disk when Mark Satisfied began'
+		).toEqual(ASSURED);
 	});
 
 	it('⛔ an `error` envelope, and a redirect, reload the page before the store is read; a refusal does not', async () => {
@@ -2233,9 +2783,14 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		const record = await l.run();
 		expect(record.units[1]!.signOff).toEqual({
 			offered: false,
+			// ⭐ `E12F` F2 — read before the row was: it would have allowed the press.
+			limitCheck: { prior: 0, recorded: 0, reserve: 4, ahead: 8, total: 12, limit: PHASE7_PAID_LIMIT, allowed: true },
 			recordAssurance: null,
+			rerunDeclared: null,
+			rerunLimitCheck: null,
 			markSatisfied: null,
-			refused: null
+			refused: null,
+			notPressed: null
 		});
 		expect(l.only('markSatisfied requirements')).toEqual([]);
 	});

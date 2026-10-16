@@ -22,14 +22,17 @@ import {
 	PHASE7_UNDERTAKING,
 	beginExecute,
 	bootOf,
+	declaredRerunOffered,
 	freshIntrospect,
 	laneVerdict,
 	logPosts,
 	markSatisfied,
 	openLane,
 	recordAssurance,
+	recordAssuranceOffered,
 	recover,
 	recoveryOffers,
+	rerunDeclared,
 	runTheLane,
 	screenshot,
 	typesAsTyped,
@@ -52,11 +55,13 @@ import { STORE_FILE } from './run-folder';
 // A model is called only when `JPWB_PHASE7_PAID=1`, and then the reviewer calls spent before the run (P7-3a's) must be
 // given in `JPWB_PHASE7_PRIOR_REVIEWER_CALLS`. Dry, the spec runs everything that calls no model — the boot record, the
 // readiness check, typing and publishing the PWA, the Undertaking, the ROOT's Begin & Execute (no model), its saved
-// response and one archive-and-check cycle, then the ROOT's sign-off by the paid run's own acts and the final archive
-// (no model either; D11) — then stops, and PROVES the press and the sign-off: the press answered `success` and read from
-// the store as completed; the root's row offering Record Assurance, Record Assurance and Mark Satisfied each answered
-// `success`, and the store reading the root SATISFIED in lifecycle and in assurance; and no model exchange recorded,
-// counted after the sign-off (D5, D11; `laneVerdict`). ⚠ A dry run and the paid run never share a folder: a store is
+// response and one archive-and-check cycle, ~~then the ROOT's sign-off by the paid run's own acts and the final archive
+// (no model either; D11)~~ ⛔ `E12F` F1: FALSE SINCE E2, whose Record Assurance asks the reviewer once per declared policy —
+// then the ROOT's sign-off REHEARSED UP TO THE REVIEWER CALL (`REG-D-112` (b): a dry run calls no model): the page loaded
+// afresh, the root's row waited for, Record Assurance found on it and NOT pressed, the sign-off recorded not reached in a
+// dry run; and the final archive — then stops, and PROVES the press and the rehearsal: the press answered `success` and
+// read from the store as completed; the root's row offering Record Assurance, nothing pressed; and no model exchange
+// recorded, counted after the sign-off (D5, D11; `laneVerdict`). ⚠ A dry run and the paid run never share a folder: a store is
 // seeded only when empty, and command ids restart at every boot (D2).
 //
 // ── ⭐ THE ORDER (D3, D4, D5, D8, D11) — `runTheLane`, in `phase7-operator.ts`, on the HANDS this spec builds below ────
@@ -81,16 +86,25 @@ import { STORE_FILE } from './run-folder';
 //      field the store does not have (D5).
 //   5. SIGN-OFF: Record Assurance, then Mark Satisfied, on each phase that completed, and the root's attempted LAST, the
 //      page loaded afresh for each and the store read after every act, each refusal recorded, never asserted; then the
-//      final archive, `06-final`. Dry, no phase was pressed, so the root's alone, by these same acts (D11).
+//      final archive, `06-final`. ⭐ `E12F` F2 — the LIMIT before each, the sign-off's own declared reviews counted at
+//      their bound: a sign-off that would cross it is not pressed, nor is any later one, and the run ends `paid-limit`.
+//      ⭐ `E12F` F3 — a Record Assurance answered with a refusal, whose row then offers re-running the declared reviews that
+//      did not conclude, has them re-run once by the rule (`REG-D-105` (4), `REG-D-112` (a)), the limit read first, then
+//      Mark Satisfied if it was accepted. ⛔ E12's re-review F1 — a sign-off act with NO ANSWER ends the run there, as a
+//      Begin & Execute with none does (D4): nothing is pressed beside it, and the final archive is taken. Dry, no phase was
+//      pressed, so the root's alone — ~~by these same acts (D11)~~ rehearsed up to the reviewer call, and nothing pressed
+//      (`REG-D-112` (b)).
 //
 // ── ⚠ WHAT THIS SPEC ASSERTS, AND WHAT IT ONLY RECORDS ────────────────────────────────────────────────────────────────
 // It asserts its OWN machinery (`laneVerdict`): the boot, the PWA as typed, one unit per type, the dry run's proof of the
-// root's press and of its sign-off (D11) and its absence of any model call, and an end the run was meant to reach —
+// root's press and of its sign-off ⭐ rehearsed up to the reviewer call (D11; `E12F` F1) and its absence of any model call,
+// and an end the run was meant to reach —
 // `complete` paid, `dry-run-stop` dry. Everything the run is FOR — which phase completed, what each review said, what
 // each command did — is recorded, never asserted: the report reads it (`scripts/phase7/run-report.ts`, D9), because a
 // lane that stopped at a product's first refusal would measure nothing after it. ⛔ The forbidden acts (P7-3) are never
 // pressed here: no step is completed, skipped or retried by hand, no waiver is asked, Mark Satisfied follows an accepted
-// Record Assurance only, nothing is proposed again — ⭐ and nothing is abandoned but by the run plan's rule (step 4). ⚠ It never resets the engine and stipulates nothing:
+// Record Assurance only ⭐ — or the rule's accepted re-run of the declared reviews a refused one left (`E12F` F3) — nothing
+// is proposed again — ⭐ and nothing is abandoned but by the run plan's rule (step 4). ⚠ It never resets the engine and stipulates nothing:
 // the store is durable, and the reviewer is real.
 
 test.describe('LIVE — JAN-EXEC Phase 7: §3.2’s PWA, published, run as an Undertaking on the real executor and reviewer', () => {
@@ -100,7 +114,7 @@ test.describe('LIVE — JAN-EXEC Phase 7: §3.2’s PWA, published, run as an Un
 	}) => {
 		test.setTimeout(PHASE7_TEST_TIMEOUT_MS);
 		// ⛔ NO ACT WAITS UNBOUNDED: this lane sets no action timeout, so a click on a button that never came would wait out
-		// the ~~43-hour~~ ~~85-hour~~ ⭐ 103-hour test (P7-6 B4; `P76F-C` C8). Begin & Execute and the sign-off acts pass bounds of their own ⭐ — and,
+		// the ~~43-hour~~ ~~85-hour~~ ~~103-hour~~ ⭐ 116.6-hour test (P7-6 B4; `P76F-C` C8; `E12F` F2, F3). Begin & Execute and the sign-off acts pass bounds of their own ⭐ — and,
 		// since P7-6 B3, every fill and click the lane makes.
 		page.setDefaultTimeout(PHASE7_UI_MS);
 		const paid = process.env[PHASE7_PAID_VARIABLE] === '1';
@@ -154,6 +168,11 @@ test.describe('LIVE — JAN-EXEC Phase 7: §3.2’s PWA, published, run as an Un
 					await page.getByRole('button', { name: 'overview', exact: true }).click({ timeout: PHASE7_UI_MS });
 				},
 				recordAssurance: (unit) => recordAssurance(page, unitRow(page, unit.title), actionFields),
+				// ⭐ `E12F` F1 — the dry run's rehearsal: the row read, Record Assurance found and never pressed (`REG-D-112` (b)).
+				recordAssuranceOffered: (unit) => recordAssuranceOffered(unitRow(page, unit.title)),
+				// ⭐ `E12F` F3 — the rule's re-run of the declared reviews that did not conclude: the row's offer, and the act.
+				declaredRerunOffered: (unit) => declaredRerunOffered(unitRow(page, unit.title)),
+				rerunDeclared: (unit) => rerunDeclared(page, unitRow(page, unit.title), actionFields),
 				markSatisfied: (unit) => markSatisfied(page, unitRow(page, unit.title), actionFields),
 				// ⭐ P7-6R R-1f — the run plan's rule's two hands: the row's offers, and one act on the row (`REG-D-105` (4)).
 				recoveryOffers: (unit) => recoveryOffers(unitRow(page, unit.title)),

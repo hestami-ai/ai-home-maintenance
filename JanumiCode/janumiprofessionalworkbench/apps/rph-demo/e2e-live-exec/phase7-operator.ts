@@ -10,8 +10,9 @@
 //     (`e2e/phase7-five-unit.e2e.ts`) restated for a lane where a press can take hours and a refusal must not end the run:
 //     each waits on its own action's response, BOUNDED, and keeps its status and raw body (D5);
 //   · THE RUN'S ORDER (`runTheLane`; D4, D5, D8, D11) — the root, then each phase only after the one before has
-//     answered, the limit before each phase, a press with no answer ending the run, then the sign-offs, the root last,
-//     and the final archive; dry, no phase at all, and the root's sign-off alone (D11). ⭑ It lived in the spec until
+//     answered, the limit before each phase ⭐ and each sign-off (`E12F` F2), a press with no answer ending the run, then
+//     the sign-offs, the root last, and the final archive; dry, no phase at all, and the root's sign-off alone (D11), ⭐
+//     rehearsed up to the reviewer call and never pressed (`E12F` F1, `REG-D-112` (b)). ⭑ It lived in the spec until
 //     round 2's fix pass, where nothing could drive it: a dry run that never pressed the root, and a phase past its
 //     allowance that started the next beside it, both passed every test. It runs here on HANDS the spec builds from
 //     the page, so verif drives it on hands of its own;
@@ -34,7 +35,7 @@ import {
 	type Request
 } from '@playwright/test';
 import type { EngineSnapshot, ObjectRow } from '../e2e/support/harness.js';
-import { promptMarkers, type Phase7TypeDeclaration } from '../../../scripts/phase7/pwa-content.js';
+import { PHASE7_PWA, promptMarkers, type Phase7TypeDeclaration } from '../../../scripts/phase7/pwa-content.js';
 import {
 	archiveName,
 	FINAL_ARCHIVE,
@@ -43,11 +44,14 @@ import {
 	type ArchiveUnit
 } from '../../../scripts/phase7/run-archive.js';
 import {
+	LANE_BUDGET,
 	laneKeysRefusal,
+	PHASE7_DECLARED_POLICIES_PER_UNIT,
 	PHASE7_NEGATIVE_CONTROL_RESERVE,
 	PHASE7_INTROSPECT_MS,
 	PHASE7_PAID_LIMIT,
 	PHASE7_PRIOR_CALLS_VARIABLE,
+	PHASE7_RECORD_ASSURANCE_MS,
 	PHASE7_SIGN_OFF_MS,
 	PHASE7_UI_MS,
 	PHASE7_UNIT_ALLOWANCE_MS,
@@ -56,7 +60,7 @@ import {
 } from './lane-config.js';
 
 // ── THE BOUNDS THE LANE'S OWN ACTS WAIT ──────────────────────────────────────────────────────────────────────────────
-// ⛔ THIS LANE SETS NO ACTION TIMEOUT, so every wait without one runs to the test's: ~~43~~ ~~85~~ 103 hours (`lane-config.ts`). Each
+// ⛔ THIS LANE SETS NO ACTION TIMEOUT, so every wait without one runs to the test's: ~~43~~ ~~85~~ ~~103~~ ~~108.7~~ 116.6 hours (`lane-config.ts`). Each
 // act below that calls no model is bounded here, as an allowance, and Begin & Execute by `PHASE7_UNIT_ALLOWANCE_MS`.
 
 // ⭐ `P76F-C` C8 — the UI's bound and a sign-off act's are DEFINED in `lane-config.ts` now, so the spec's timeout counts every
@@ -401,6 +405,12 @@ export interface LimitCheck {
 	readonly prior: number;
 	readonly recorded: number;
 	readonly reserve: number;
+	/**
+	 * ⭐ `E12F` F2 — before a SIGN-OFF, the act's own worst case, counted in `total`: its unit's declared policies, each a
+	 * review of up to `reviewerCallsPerTry` calls (`signOffWorstCase`). Absent before a phase and before the rule's re-run of
+	 * a phase (`recoverByRule`), as before.
+	 */
+	readonly ahead?: number;
 	readonly total: number;
 	readonly limit: number;
 	readonly allowed: boolean;
@@ -445,11 +455,14 @@ export interface RecoveryRecord {
 	readonly envelopeType: EnvelopeType | null;
 	readonly timedOutAfterMs: number | null;
 	readonly requestFailure: string | null;
-	/** null when the act was not pressed. */
+	/**
+	 * null when the act was not pressed — ⭐ E12's polish — or while the store read after it has not come back: the act is kept
+	 * before that read (`recoveryAct`), so a read that throws leaves it here with its bound.
+	 */
 	readonly after: UnitState | null;
 	/**
 	 * ⭐ P7-6 B3 — what the STORE says a re-run came to, read after it (`rerunReading`); null for an abandonment, for a re-run
-	 * not pressed, and for one with no answer (the run ends there).
+	 * not pressed, for one with no answer (the run ends there), ⭐ and while that read has not come back.
 	 */
 	readonly reading: RerunReading | null;
 	/** ⭐ P7-6 B3 — the server's refusal, in its own words, of an act it answered with anything but success; else null. */
@@ -470,7 +483,16 @@ export interface RecoveryRecord {
  */
 export type RerunReading = 'recovered' | 'refused-again' | 'not-made' | 'stopped-otherwise';
 
-/** ⭑ `request-failed` — a Begin & Execute whose request failed in transit (round 2's fix pass; `pressFormAction`). */
+/**
+ * ⭑ `request-failed` — ~~a Begin & Execute whose request failed in transit (round 2's fix pass; `pressFormAction`)~~ ⭐ E12's
+ * polish (the confirm's EndReason finding) — ~~ANY ACT THE LANE PRESSES~~ ⭐ E12's polish (fix3's F2): ANY ACT THE LANE
+ * PRESSES THROUGH `pressFormAction`, each a form action of the Undertaking page, whose request failed in transit, and ⭑
+ * `allowance-exceeded`, any that gave no answer within its bound: both are `unansweredEnd`'s, for a Begin & Execute (round 2's
+ * fix pass; `pressFormAction`), a recovery act the rule pressed (P7-6R R-1f), and a sign-off act — Record Assurance, the rule's
+ * re-run of the declared reviews, Mark Satisfied (E12's re-review F1) — and a throw after one keeps its reason. ⚠ The
+ * set-up's presses (`setUp`) are plain clicks, not pressed through `pressFormAction`: a request of theirs that fails in
+ * transit never ends a run `request-failed`.
+ */
 export type EndReason =
 	| 'complete'
 	| 'dry-run-stop'
@@ -507,17 +529,38 @@ export function unpressed(units: readonly ArchiveUnit[]): RunUnit[] {
 	}));
 }
 
-/** ⭐ D8 — before each phase: prior + recorded + reserve must total UNDER the sponsor's limit (`REG-D-102` (4)). */
-export function limitCheck(prior: number, recorded: number): LimitCheck {
-	const total = prior + recorded + PHASE7_NEGATIVE_CONTROL_RESERVE;
+/**
+ * ⭐ D8 — before each phase: prior + recorded + reserve must total UNDER the sponsor's limit (`REG-D-102` (4)). ⭐ `E12F` F2 —
+ * and before each sign-off, and before the rule's re-run of its declared reviews, with that act's own worst case (`ahead`)
+ * counted too: since E2 Record Assurance asks the reviewer for one review per declared policy (`REG-D-110` (3)), so a
+ * sign-off is a paid act the limit must see before it is pressed.
+ */
+export function limitCheck(prior: number, recorded: number, ahead = 0): LimitCheck {
+	const total = prior + recorded + PHASE7_NEGATIVE_CONTROL_RESERVE + ahead;
 	return {
 		prior,
 		recorded,
 		reserve: PHASE7_NEGATIVE_CONTROL_RESERVE,
+		...(ahead > 0 ? { ahead } : {}),
 		total,
 		limit: PHASE7_PAID_LIMIT,
 		allowed: total < PHASE7_PAID_LIMIT
 	};
+}
+
+/**
+ * ⭐⭐ `E12F` F2 (the E12 package review's second finding) — A SIGN-OFF'S WORST CASE, IN REVIEWER CALLS: its unit's declared
+ * policies (§3.2's PWA, read by the unit's title — `PHASE7_DECLARED_POLICIES_PER_UNIT`, the most any unit carries, should a
+ * title not be found), each reviewed once (`REG-D-110` (3)) in up to `LANE_BUDGET.reviewerCallsPerTry` calls — its call,
+ * retry and repair. ⛔ The declared reviews at sign-off were outside the paid limit: the limit was read before each phase and
+ * each re-run, and a sign-off — up to 16 calls for the design phase — was pressed with no check at all. ⚠ AN UPPER BOUND:
+ * the server reviews those of the type's policies that govern the unit (`governingDeclaredPolicies`), and the rule's re-run
+ * of the declared reviews only those that did not conclude — counted, before that re-run, at this same bound.
+ */
+export function signOffWorstCase(unit: ArchiveUnit): number {
+	const declared =
+		PHASE7_PWA.types.find((t) => t.name === unit.title)?.policyIds.length ?? PHASE7_DECLARED_POLICIES_PER_UNIT;
+	return declared * LANE_BUDGET.reviewerCallsPerTry;
 }
 
 /**
@@ -845,17 +888,57 @@ export async function recordAssurance(
 	row: Locator,
 	decode: Decode
 ): Promise<ActionOutcome | null> {
-	await row.waitFor({ state: 'visible', timeout: PHASE7_UI_MS });
+	// ⭐ `E12F` F1 — the row's wait and the reading of its offer are `recordAssuranceOffered`'s, the dry run's rehearsal: so
+	// what a dry run rehearses is this press's own code, up to the press.
+	if (!(await recordAssuranceOffered(row))) return null;
+	// ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (design B8) — ~~`PHASE7_SIGN_OFF_MS`~~: the press runs a declared review of each of the
+	// unit's policies now (`REG-D-110` (3)), so it is waited for up to its act AND those reviews (`PHASE7_RECORD_ASSURANCE_MS`).
 	const assure = row.getByRole('button', { name: 'Record Assurance', exact: true });
-	if ((await assure.count()) === 0) return null;
-	return pressFormAction(page, 'recordAssurance', assure, PHASE7_SIGN_OFF_MS, decode);
+	return pressFormAction(page, 'recordAssurance', assure, PHASE7_RECORD_ASSURANCE_MS, decode);
+}
+
+/**
+ * ⭐⭐ `E12F` F1 (`REG-D-112` (b)) — WHETHER THE UNIT'S ROW OFFERS RECORD ASSURANCE, READ AND NEVER PRESSED: the row waited
+ * for first, then its button counted — `recordAssurance`'s own first steps. A dry run's sign-off stops here: the press
+ * would ask a reviewer.
+ */
+export async function recordAssuranceOffered(row: Locator): Promise<boolean> {
+	await row.waitFor({ state: 'visible', timeout: PHASE7_UI_MS });
+	return (await row.getByRole('button', { name: 'Record Assurance', exact: true }).count()) > 0;
+}
+
+/**
+ * ⭐⭐ `E12F` F3 (`REG-D-112` (a)) — WHETHER THE UNIT'S ROW OFFERS RE-RUNNING ITS DECLARED REVIEWS THAT DID NOT CONCLUDE, by
+ * the page's own test id, the row waited for first. ⭑ The page offers exactly what the server accepts (`declaredRerunOffer`):
+ * a unit left under assessment by an INCONCLUSIVE declared verdict, and none of them REJECTED.
+ */
+export async function declaredRerunOffered(row: Locator): Promise<boolean> {
+	await row.waitFor({ state: 'visible', timeout: PHASE7_UI_MS });
+	return (await row.getByTestId('rerun-declared-reviews').count()) > 0;
+}
+
+/**
+ * ⭐⭐ `E12F` F3 — THE RULE'S RE-RUN OF THE UNIT'S DECLARED REVIEWS that did not conclude: its rationale typed into its own
+ * field, its own button pressed, waited for as Record Assurance is — its act and a review of each of the unit's declared
+ * policies (`PHASE7_RECORD_ASSURANCE_MS`). Each fill and click bounded by `PHASE7_UI_MS`.
+ */
+export async function rerunDeclared(page: Page, row: Locator, decode: Decode): Promise<ActionOutcome> {
+	await row.getByTestId('rerun-declared-rationale').fill(DECLARED_RERUN_RATIONALE, { timeout: PHASE7_UI_MS });
+	return pressFormAction(
+		page,
+		'rerunDeclaredReviews',
+		row.getByTestId('rerun-declared-reviews'),
+		PHASE7_RECORD_ASSURANCE_MS,
+		decode
+	);
 }
 
 /**
  * ⭐ Mark Satisfied on the unit in `row`, pressed only once Record Assurance has LEFT the row — the gate's one wait
  * (`attemptSignOff`, `e2e/phase7-five-unit.e2e.ts`): the EXECUTING row offers a Mark Satisfied of its own, so a press
  * before the re-render an accepted Record Assurance brings would be Mark Satisfied without Record Assurance, which P7-3
- * forbids. ⛔ `runTheLane` presses this only after an ACCEPTED Record Assurance.
+ * forbids. ⛔ `runTheLane` presses this only after an ACCEPTED Record Assurance ⭐ — or, `E12F` F3, after the rule's ACCEPTED
+ * re-run of the declared reviews a refused one left inconclusive (`REG-D-112` (a)), whose row offers no Record Assurance.
  */
 export async function markSatisfied(
 	page: Page,
@@ -949,21 +1032,81 @@ export async function recover(
 export interface SignOffAct {
 	readonly status: number | null;
 	readonly envelopeType: EnvelopeType | null;
-	/** ⭐ D5 — read after the act (`REG-F-540`): an envelope is not the record. */
-	readonly after: UnitState;
+	/**
+	 * ⭐ E12's re-review F1 (D4) — set when no answer came within the act's bound, or its request failed in transit: the
+	 * server may still be running it, and the run ended there (`unansweredEnd`).
+	 */
+	readonly timedOutAfterMs: number | null;
+	readonly requestFailure: string | null;
+	/**
+	 * ⭐ E12's re-review F4 — the server's refusal, in its own words, of an act it answered with anything but success; else
+	 * null. Kept on the act, so a Record Assurance refused before the rule's re-run keeps its reason whatever follows it.
+	 */
+	readonly refusal: string | null;
+	/**
+	 * ⭐ D5 — read after the act (`REG-F-540`): an envelope is not the record. ⭐ E12's polish (the confirm's F1 residue) — null
+	 * while that read has not come back: the act is kept on the unit's record before it (`actOf`), so a read that throws — the
+	 * server gone — leaves the act here with its bound, and no state. ⭐ E12's polish (fix3's F1) — once it comes back, the act
+	 * on the record is completed with the state it read, and written.
+	 */
+	readonly after: UnitState | null;
 }
 
-/** What the run record keeps of a sign-off: each act, and the first refused, if one was. */
+/**
+ * What the run record keeps of a sign-off: each act, with its own refusal, and ~~the first refused, if one was~~ ⭐ E12's
+ * re-review F4 — the refusal that STANDS (`refused`), if one does: the rule's re-run follows a refused Record Assurance, so
+ * "the first" was never what the record kept.
+ */
 export interface SignOffRecord {
 	/** Whether the row offered Record Assurance at all: a unit that did not complete offers none. */
 	readonly offered: boolean;
+	/**
+	 * ⭐ `E12F` F2 — THE LIMIT, read before Record Assurance with the sign-off's own worst case counted (`signOffWorstCase`,
+	 * D8). null dry — a dry run presses nothing that calls a model (`REG-D-112` (b)).
+	 */
+	readonly limitCheck: LimitCheck | null;
 	readonly recordAssurance: SignOffAct | null;
+	/**
+	 * ⭐ `E12F` F3 (`REG-D-105` (4), applied by `REG-D-112` (a)) — THE RULE'S ONE RE-RUN of the declared reviews that did not
+	 * conclude: pressed only when Record Assurance ANSWERED with a refusal and the row, read afresh, offers it, the limit read
+	 * first (`rerunLimitCheck`). null when not pressed. A re-run refused is left as found: never a second.
+	 */
+	readonly rerunDeclared: SignOffAct | null;
+	readonly rerunLimitCheck: LimitCheck | null;
 	readonly markSatisfied: SignOffAct | null;
+	/**
+	 * ⭐ E12's re-review F4 — THE REFUSAL THAT STANDS: the last act pressed, when it was refused or got no answer — what left
+	 * the sign-off unfinished. null when none does: nothing was pressed, or the sign-off was accepted, a Record Assurance the
+	 * rule's accepted re-run stood in for included (its own reason stays on its act, `SignOffAct.refusal`).
+	 */
 	readonly refused: {
-		readonly act: 'Record Assurance' | 'Mark Satisfied';
+		readonly act: 'Record Assurance' | 'Re-run the declared reviews' | 'Mark Satisfied';
 		readonly reason: string;
 	} | null;
+	/**
+	 * ⭐ `E12F` F1, F2 — WHY AN ACT THAT ASKS A REVIEWER WAS NOT PRESSED: a dry run (`DRY_SIGN_OFF_NOT_REACHED`, `REG-D-112`
+	 * (b)), or the limit (D8), which then stops the lane. null when nothing the row offered was held back.
+	 */
+	readonly notPressed: string | null;
 }
+
+/**
+ * ⭐⭐ `E12F` F1 (the E12 package review's first finding; `REG-D-112` (b): *a dry run calls no model*) — WHAT A DRY RUN'S
+ * SIGN-OFF RECORDS IN PLACE OF RECORD ASSURANCE: not reached. ⛔ Since E2 Record Assurance asks the reviewer for one review per
+ * declared policy (`REG-D-110` (3)), so the dry run's sign-off of the root by the paid run's own acts (D11) would have asked
+ * it to review each of the root's two — paid calls, which `laneVerdict`'s *"the dry run recorded N model exchange(s)"*
+ * would then have counted. Everything before the press is rehearsed: the page loaded afresh, the root's row waited for,
+ * and Record Assurance found on it — never pressed.
+ */
+export const DRY_SIGN_OFF_NOT_REACHED =
+	'not reached in a dry run: Record Assurance asks the reviewer to judge each of the unit’s declared policies, and a dry run calls no model (REG-D-112 (b)); the page was loaded afresh, the row waited for and Record Assurance found on it, and nothing was pressed';
+
+/**
+ * ⭐ `E12F` F3 — THE RATIONALE THE RULE TYPES when it re-runs a unit's declared reviews that did not conclude: the run plan's
+ * rule, naming itself and the decision that extends it, so a reader of the Decision learns which limb this was.
+ */
+export const DECLARED_RERUN_RATIONALE =
+	'The run plan’s rule, REG-D-105 (4), as REG-D-112 (a) extends it to the declared reviews: a declared review that did not conclude is re-run once.';
 
 /** `lane/actions/…`'s body: the unit, the action, and what came back, raw and decoded. */
 export const actionRecordOf = (unit: RunUnit, action: string, o: ActionOutcome) => ({
@@ -988,7 +1131,9 @@ export interface RunEnd {
 /**
  * ⛔ D4 — a Begin & Execute with NO ANSWER ends the run there, in either kind: it outlasted its allowance, or its
  * request failed in transit. Either way the server may still be running the unit, so the next is never started beside
- * it (`REG-F-535`, `REG-F-527`). Null for a press that was answered, whatever it said.
+ * it (`REG-F-535`, `REG-F-527`). Null for a press that was answered, whatever it said. ⭐ So does ~~any other act the lane
+ * presses with no answer~~ ⭐ E12's polish (fix3's F2): any other act the lane presses through `pressFormAction` with no
+ * answer, named by `act`: a recovery act the rule presses, and ⭐ E12's re-review F1 — a sign-off act.
  */
 export function unansweredEnd(
 	title: string,
@@ -1039,6 +1184,12 @@ export interface LaneHands {
 	readonly showOverview: () => Promise<void>;
 	/** Record Assurance on the unit's row, or null when the row offers none (`recordAssurance`). */
 	readonly recordAssurance: (unit: RunUnit) => Promise<ActionOutcome | null>;
+	/** ⭐ `E12F` F1 — whether the unit's row offers Record Assurance, read and never pressed (`recordAssuranceOffered`). */
+	readonly recordAssuranceOffered: (unit: RunUnit) => Promise<boolean>;
+	/** ⭐ `E12F` F3 — whether the unit's row offers re-running its declared reviews that did not conclude (`declaredRerunOffered`). */
+	readonly declaredRerunOffered: (unit: RunUnit) => Promise<boolean>;
+	/** ⭐ `E12F` F3 — the rule's re-run of the unit's declared reviews that did not conclude (`rerunDeclared`). */
+	readonly rerunDeclared: (unit: RunUnit) => Promise<ActionOutcome>;
 	/** Mark Satisfied on the unit's row, once Record Assurance has left it (`markSatisfied`). */
 	readonly markSatisfied: (unit: RunUnit) => Promise<ActionOutcome>;
 	/** ⭐ P7-6R R-1f — what the unit's row offers after a stop (`recoveryOffers`). */
@@ -1070,11 +1221,21 @@ export interface LaneHands {
  *      ends the run as a Begin & Execute with none does (D4); ⭐ P7-6 B3 — "refused again" is the STORE's reading (a new
  *      plan whose step waits), and a re-run never made, or one that left the unit RUNNING or FAILED, is left as found;
  *   4. SIGN-OFF: each phase that completed, then the root LAST, the page loaded afresh for each, the store read after
- *      every act, every refusal recorded and none asserted; then the final archive, `06-final`. ⭐ DRY TOO, BY THE SAME
- *      ACTS (design §6 P7-2 D11): no phase completed, so the root is signed off alone. Signing off calls no model, and
- *      otherwise the sign-off and the final archive would first run in the paid run;
- *   5. DRY, the model exchanges the store holds — read only now, AFTER the sign-off, so that a model call a sign-off
- *      made is counted — and the run ends `dry-run-stop` (D1, D11).
+ *      every act, every refusal recorded and none asserted; then the final archive, `06-final`. ⭐ `E12F` F2 — THE LIMIT
+ *      BEFORE EACH SIGN-OFF, its own worst case counted (`signOffWorstCase`): one that would cross it is not pressed, nor is
+ *      any later sign-off, and the run ends `paid-limit`. ⭐ `E12F` F3 — A RECORD ASSURANCE ANSWERED WITH A REFUSAL, whose
+ *      row, read afresh, then offers re-running the declared reviews that did not conclude, has them re-run ONCE by the rule
+ *      (`REG-D-105` (4), `REG-D-112` (a)), the limit read first; accepted, Mark Satisfied follows; refused, the unit is left
+ *      as found. ⛔ E12's re-review F1 — A SIGN-OFF ACT WITH NO ANSWER ENDS THE RUN THERE, as a Begin & Execute with none
+ *      does (`unansweredEnd`, D4): its unit's declared reviews may still be running, so nothing is pressed beside them, and
+ *      the final archive is taken. ~~DRY TOO, BY THE SAME ACTS (design §6 P7-2 D11): no phase completed, so the root is signed off alone.
+ *      Signing off calls no model~~ ⛔ `E12F` F1: FALSE SINCE E2 — Record Assurance asks the reviewer for one review per
+ *      declared policy. ⭐ DRY, THE ROOT'S SIGN-OFF STOPS BEFORE THE REVIEWER CALL, SO SIGNING OFF CALLS NO MODEL
+ *      (`REG-D-112` (b)): everything before the press rehearsed — the page loaded afresh, the root's row waited for, Record
+ *      Assurance found on it — and nothing pressed, the sign-off recorded `DRY_SIGN_OFF_NOT_REACHED`; then the final
+ *      archive, so it still first runs here and not in the paid run;
+ *   5. DRY, the model exchanges the store holds — read only now, AFTER the sign-off and the final archive, so that a model
+ *      call anything here made is counted — and the run ends `dry-run-stop` (D1, D11).
  * ⛔ A throw ends the run `lane-error`, its record written before it is rethrown — save after a press with no answer,
  * whose end it keeps: the archive of a unit still running can fail, and must not relabel why the run ended.
  */
@@ -1160,13 +1321,12 @@ export async function runTheLane(r: {
 			const outcome = await hands.recover(unit, act);
 			writeOnce(actionFile(lane, unit, act), actionRecordOf(unit, act, outcome));
 			reached.end = unansweredEnd(unit.title, outcome, act);
-			// ⚠ As a press: an `error` envelope or a redirect leaves the row gone, so the page is loaded afresh first.
-			const rowGone = !['success', 'failure'].includes(outcome.envelopeType ?? '');
-			if (reached.end === null && rowGone) await hands.showOverview();
-			const { snapshot } = await hands.read();
-			const after = unitStateOf(snapshot, unit.unitId!);
 			const answered = reached.end === null;
-			unit.recovery.push({
+			// ⛔ E12's polish (the confirm's F1 residue, its general form) — THE ACT IS KEPT BEFORE THE STORE IS READ, as `run` keeps
+			// a Begin & Execute's: a read that throws — or the page's reload before it — leaves the act and its bound in
+			// lane/run.json, its `after` and `reading` null. ⛔ It was pushed only after the read, so such a throw lost it, and the
+			// report's check of the lane's end found no act that outlasted its bound.
+			const kept: RecoveryRecord = {
 				act,
 				rationale: RULE_RATIONALE[act],
 				limitCheck: check,
@@ -1174,11 +1334,24 @@ export async function runTheLane(r: {
 				envelopeType: outcome.envelopeType,
 				timedOutAfterMs: outcome.timedOutAfterMs,
 				requestFailure: outcome.requestFailure,
-				after,
-				// ⭐ P7-6 B3 — READ FROM THE STORE: what the re-run came to, which is what the rule decides by.
-				reading: act !== 'abandonPwu' && answered ? rerunReading(planBefore, snapshot, unit.unitId!) : null,
+				after: null,
+				reading: null,
 				refusal: answered && outcome.envelopeType !== 'success' ? refusalOf(outcome) : null,
 				notPressed: null
+			};
+			unit.recovery.push(kept);
+			writeRunRecord(lane, record);
+			// ⚠ As a press: an `error` envelope or a redirect leaves the row gone, so the page is loaded afresh first.
+			const rowGone = !['success', 'failure'].includes(outcome.envelopeType ?? '');
+			if (reached.end === null && rowGone) await hands.showOverview();
+			const { snapshot } = await hands.read();
+			const after = unitStateOf(snapshot, unit.unitId!);
+			// The kept act, completed by the read.
+			unit.recovery.splice(-1, 1, {
+				...kept,
+				after,
+				// ⭐ P7-6 B3 — READ FROM THE STORE: what the re-run came to, which is what the rule decides by.
+				reading: act !== 'abandonPwu' && answered ? rerunReading(planBefore, snapshot, unit.unitId!) : null
 			});
 			unit.after = after;
 			unit.stopped = stoppedAfter(outcome.envelopeType, after);
@@ -1280,7 +1453,8 @@ export async function runTheLane(r: {
 		const rootEnd = await run(root);
 		if (rootEnd !== null) return end(rootEnd.reason, rootEnd.detail);
 		// ⛔ DRY, NO PHASE IS PRESSED — each is a unit a model runs (D1, D5) — and the run goes from the root's archive to
-		// the sign-off below, the root's alone, and the final archive: the paid run's own acts (design §6 P7-2 D11).
+		// the sign-off below, the root's alone, and the final archive: ~~the paid run's own acts (design §6 P7-2 D11)~~ ⭐
+		// `E12F` F1: the sign-off rehearsed up to the reviewer call and never pressed (`REG-D-112` (b)).
 		const dry = boot.record.mode === 'dry';
 		let reason: EndReason = dry ? 'dry-run-stop' : 'complete';
 		for (const unit of dry ? [] : phases) {
@@ -1310,43 +1484,149 @@ export async function runTheLane(r: {
 		}
 
 		// ── 4. SIGN-OFF: each phase that completed, then the root, LAST — every refusal recorded ─────────────────────
-		// ⭐ DRY TOO, BY THESE SAME ACTS (D11): no phase was pressed, so none completed, and the root is signed off alone.
-		/** The act's status and envelope, and the unit as the store reads it now (`REG-F-540`). */
-		const actOf = async (unit: RunUnit, o: ActionOutcome): Promise<SignOffAct> => ({
+		// ~~⭐ DRY TOO, BY THESE SAME ACTS (D11): no phase was pressed, so none completed, and the root is signed off alone.~~
+		// ⛔ `E12F` F1 (`REG-D-112` (b)) — DRY, THE ROOT'S SIGN-OFF IS REHEARSED UP TO THE REVIEWER CALL AND NO FURTHER: since E2
+		// Record Assurance asks the reviewer for one review per declared policy, and a dry run calls no model.
+		/**
+		 * The act's status and envelope, or that no answer came, and ⭐ its refusal in the server's words (E12's re-review F4) —
+		 * ⭐ E12's polish — the store not read yet (`after` null).
+		 */
+		const pressedAct = (o: ActionOutcome): SignOffAct => ({
 			status: o.status,
 			envelopeType: o.envelopeType,
-			after: unitStateOf((await hands.read()).snapshot, unit.unitId!)
+			timedOutAfterMs: o.timedOutAfterMs,
+			requestFailure: o.requestFailure,
+			refusal:
+				o.timedOutAfterMs === null && o.requestFailure === null && o.envelopeType !== 'success' ? refusalOf(o) : null,
+			after: null
 		});
-		/** ⭐ Record Assurance, then — only if it was ACCEPTED — Mark Satisfied, asserting neither (D5). */
+		/**
+		 * The act, and the unit as the store reads it now (`REG-F-540`). ⛔ E12's polish (the confirm's F1 residue) — THE ACT IS
+		 * KEPT ON THE UNIT'S RECORD FIRST (`kept`: the sign-off as it stands with this act), as `run` keeps a Begin & Execute's:
+		 * the record was assigned only when `signOff` returned, so a read that threw — the server gone beside reviews still
+		 * running — left lane/run.json no sign-off for the unit, and the report read the lane's own end as a problem with its
+		 * inputs and the unit's sign-off as never attempted. ⛔ E12's polish (fix3's F1) — AND COMPLETED ON IT BY THE READ, and
+		 * written, as `recoveryAct` completes its kept act: the read's state was only returned, so a throw in a later step,
+		 * before the next act was kept — Mark Satisfied's wait, say — left lane/run.json the act with `after` null beside a
+		 * read that had come back.
+		 */
+		const actOf = async (
+			unit: RunUnit,
+			o: ActionOutcome,
+			kept: (act: SignOffAct) => SignOffRecord
+		): Promise<SignOffAct> => {
+			const act = pressedAct(o);
+			unit.signOff = kept(act);
+			writeRunRecord(lane, record);
+			const done: SignOffAct = { ...act, after: unitStateOf((await hands.read()).snapshot, unit.unitId!) };
+			unit.signOff = kept(done);
+			writeRunRecord(lane, record);
+			return done;
+		};
+		const none = {
+			limitCheck: null,
+			recordAssurance: null,
+			rerunDeclared: null,
+			rerunLimitCheck: null,
+			markSatisfied: null,
+			refused: null,
+			notPressed: null
+		} as const;
+		/** ⭐ `E12F` F2 — the limit, read from the store now, with `unit`'s sign-off worst case counted (D8). */
+		const signOffLimit = async (unit: RunUnit): Promise<LimitCheck> =>
+			limitCheck(boot.prior as number, recordedReviewerCalls((await hands.read()).snapshot), signOffWorstCase(unit));
+		const overLimit = (check: LimitCheck): string =>
+			`the limit: ${check.total} of ${check.limit} reviewer calls, the sign-off's own ${check.ahead ?? 0} counted (D8; E12F F2)`;
+		/**
+		 * Mark Satisfied, after an ACCEPTED Record Assurance or an accepted re-run of the declared reviews — ⭐ E12's polish —
+		 * `before`, the sign-off as it then stands, keeping the act before the store is read (`actOf`). ⛔ E12's re-review F1 —
+		 * with no answer it ends the run, as ~~every act the lane presses~~ ⭐ E12's polish (fix3's F2): every act the lane presses
+		 * through `pressFormAction` does (D4); the end is set before the store is read, so a read that fails keeps it.
+		 */
+		const satisfy = async (
+			unit: RunUnit,
+			before: SignOffRecord
+		): Promise<{ act: SignOffAct; refused: SignOffRecord['refused'] }> => {
+			const green = await hands.markSatisfied(unit);
+			writeOnce(actionFile(lane, unit, 'markSatisfied'), actionRecordOf(unit, 'markSatisfied', green));
+			reached.end = unansweredEnd(unit.title, green, 'Mark Satisfied');
+			const refused: SignOffRecord['refused'] =
+				green.envelopeType === 'success' ? null : { act: 'Mark Satisfied', reason: refusalOf(green) };
+			return { act: await actOf(unit, green, (act) => ({ ...before, markSatisfied: act, refused })), refused };
+		};
+		/**
+		 * ⭐ Record Assurance, then — only if it was ACCEPTED — Mark Satisfied, asserting neither (D5). ⭐ `E12F` F1 — DRY, the
+		 * row read and nothing pressed. ⭐ `E12F` F2 — the limit read first, its worst case counted; refused, nothing is pressed
+		 * (the loop below then stops the lane). ⭐ `E12F` F3 — a Record Assurance ANSWERED with a refusal whose row, read
+		 * afresh, offers re-running the declared reviews that did not conclude: re-run once by the rule, the limit read first;
+		 * accepted, Mark Satisfied; refused, left as found. ⛔ E12's re-review F1 — an act with NO ANSWER sets the run's end
+		 * (`reached`) before the store is read, and nothing more is pressed (the loop below then ends the run).
+		 */
 		const signOff = async (unit: RunUnit): Promise<SignOffRecord> => {
+			if (dry) {
+				const offered = await hands.recordAssuranceOffered(unit);
+				return { ...none, offered, notPressed: offered ? DRY_SIGN_OFF_NOT_REACHED : null };
+			}
+			const check = await signOffLimit(unit);
+			if (!check.allowed) {
+				const offered = await hands.recordAssuranceOffered(unit);
+				return { ...none, offered, limitCheck: check, notPressed: offered ? overLimit(check) : null };
+			}
 			const assured = await hands.recordAssurance(unit);
-			if (assured === null)
-				return { offered: false, recordAssurance: null, markSatisfied: null, refused: null };
+			if (assured === null) return { ...none, offered: false, limitCheck: check };
 			writeOnce(
 				actionFile(lane, unit, 'recordAssurance'),
 				actionRecordOf(unit, 'recordAssurance', assured)
 			);
-			const assuredAct = await actOf(unit, assured);
-			if (assured.envelopeType !== 'success')
-				return {
-					offered: true,
-					recordAssurance: assuredAct,
-					markSatisfied: null,
-					refused: { act: 'Record Assurance', reason: refusalOf(assured) }
-				};
-			const green = await hands.markSatisfied(unit);
-			writeOnce(
-				actionFile(lane, unit, 'markSatisfied'),
-				actionRecordOf(unit, 'markSatisfied', green)
-			);
-			return {
+			const refusedAssurance = { act: 'Record Assurance' as const, reason: refusalOf(assured) };
+			/** ⭐ E12's polish — the sign-off as it stands with Record Assurance: kept on the unit before each store read after it. */
+			const assuredRecord = (act: SignOffAct): SignOffRecord => ({
+				...none,
 				offered: true,
-				recordAssurance: assuredAct,
-				markSatisfied: await actOf(unit, green),
-				refused:
-					green.envelopeType === 'success'
-						? null
-						: { act: 'Mark Satisfied', reason: refusalOf(green) }
+				limitCheck: check,
+				recordAssurance: act,
+				refused: assured.envelopeType === 'success' ? null : refusedAssurance
+			});
+			// ⛔ E12's re-review F1 (D4; `REG-F-535`) — A RECORD ASSURANCE WITH NO ANSWER ENDS THE RUN: its declared reviews may
+			// still be running on the server, and each records its calls only when it finishes, so a press beside them would run
+			// two units' reviews at once against a limit read short of their calls.
+			reached.end = unansweredEnd(unit.title, assured, 'Record Assurance');
+			const assuredAct = await actOf(unit, assured, assuredRecord);
+			if (assured.envelopeType === 'success') {
+				const green = await satisfy(unit, assuredRecord(assuredAct));
+				return { ...none, offered: true, limitCheck: check, recordAssurance: assuredAct, markSatisfied: green.act, refused: green.refused };
+			}
+			const asRefused = assuredRecord(assuredAct);
+			// ⛔ ONLY AN ANSWERED REFUSAL: a press with no answer may still be running its reviews on the server (D4), so the rule
+			// presses nothing beside it, and ⭐ E12's re-review F1 — the run ends there.
+			if (reached.end !== null) return asRefused;
+			// ⭐ `E12F` F3 — THE RULE (`REG-D-105` (4), `REG-D-112` (a)): ⚠ the page loaded afresh, as the rule's own reads are —
+			// a refusal leaves it stale. A row offering no declared re-run is left as found.
+			await hands.showOverview();
+			if (!(await hands.declaredRerunOffered(unit))) return asRefused;
+			const rerunCheck = await signOffLimit(unit);
+			if (!rerunCheck.allowed) return { ...asRefused, rerunLimitCheck: rerunCheck, notPressed: overLimit(rerunCheck) };
+			const again = await hands.rerunDeclared(unit);
+			writeOnce(
+				actionFile(lane, unit, 'rerunDeclaredReviews'),
+				actionRecordOf(unit, 'rerunDeclaredReviews', again)
+			);
+			/** ⭐ E12's polish — and as it stands with the rule's re-run: kept on the unit before each store read after it. */
+			const rerunRecord = (act: SignOffAct): SignOffRecord => ({
+				...asRefused,
+				rerunLimitCheck: rerunCheck,
+				rerunDeclared: act,
+				refused: again.envelopeType === 'success' ? null : { act: 'Re-run the declared reviews', reason: refusalOf(again) }
+			});
+			// ⛔ E12's re-review F1 (D4) — the rule's re-run with no answer ends the run too: its reviews may still be running.
+			reached.end = unansweredEnd(unit.title, again, 'Re-run the declared reviews');
+			const againAct = await actOf(unit, again, rerunRecord);
+			if (again.envelopeType !== 'success') return rerunRecord(againAct);
+			const green = await satisfy(unit, rerunRecord(againAct));
+			return {
+				...rerunRecord(againAct),
+				markSatisfied: green.act,
+				refused: green.refused
 			};
 		};
 		for (const unit of [...phases.filter((u) => u.stopped === false), root]) {
@@ -1355,14 +1635,24 @@ export async function runTheLane(r: {
 			await hands.showOverview();
 			unit.signOff = await signOff(unit);
 			writeRunRecord(lane, record);
+			// ⛔ E12's re-review F1 (D4; `REG-F-535`) — A SIGN-OFF ACT WITH NO ANSWER: no later sign-off is pressed beside it, and
+			// the run ends for it once the final archive is taken.
+			if (reached.end !== null) break;
+			// ⛔ `E12F` F2 — THE LIMIT REFUSED THIS SIGN-OFF, OR THE RULE'S RE-RUN IN IT: the run ends `paid-limit`, and no later
+			// sign-off is pressed, as no later phase is once the limit stops one (D8).
+			if (unit.signOff.limitCheck?.allowed === false || unit.signOff.rerunLimitCheck?.allowed === false) {
+				reason = 'paid-limit';
+				break;
+			}
 		}
 		note(await hands.screenshot(FINAL_ARCHIVE));
 		await archive(FINAL_ARCHIVE, null, null, await hands.read());
 		// ⛔ DRY, WHAT `laneVerdict` HOLDS IT TO (D1): the model exchanges the store holds, read only now — after the
-		// sign-off and the final archive — so that a model call a sign-off made is counted (D11).
+		// sign-off and the final archive — so that a model call anything before made, the sign-off's rehearsal included, is
+		// counted (D11).
 		if (dry)
 			record.dryRun = { modelExchanges: (await hands.read()).snapshot.modelExchanges.length };
-		return end(reason);
+		return reached.end === null ? end(reason) : end(reached.end.reason, reached.end.detail);
 	} catch (e) {
 		const why = e instanceof Error ? e.message : String(e);
 		if (record.end === null)
@@ -1379,39 +1669,36 @@ const answerOf = (act: SignOffAct | null): string =>
 	act === null ? 'was never pressed' : `answered ${act.envelopeType ?? 'nothing'}`;
 
 /**
- * ⭐ D11 — why the dry run's sign-off of the root is not PROVED, one line per requirement, each with what was read; none
- * when it is: its row offered Record Assurance; Record Assurance and Mark Satisfied each answered `success`; and the
- * store, read after Mark Satisfied, reads the root SATISFIED in lifecycle and in assurance. ⚠ NOTHING STRONGER: those
- * two axes are what the gate's prediction (b) holds a signed-off root to (`e2e/phase7-five-unit.e2e.ts`; `REG-F-523`),
- * and its execution and its step are the press's line. ⛔ Record Assurance is asked of its own envelope: a Mark Satisfied
- * accepted after a refused one — the act P7-3 forbids — is not a proved sign-off.
+ * ~~⭐ D11 — why the dry run's sign-off of the root is not PROVED … Record Assurance and Mark Satisfied each answered
+ * `success`; and the store, read after Mark Satisfied, reads the root SATISFIED in lifecycle and in assurance.~~
+ * ⛔⛔ `E12F` F1 (`REG-D-112` (b): a dry run calls no model) — SINCE E2 RECORD ASSURANCE ASKS THE REVIEWER, so a dry run that
+ * proved the root's sign-off by pressing it would make paid calls. Why the dry run's REHEARSAL of the root's sign-off is not
+ * what a dry run's must be, one line per requirement, each with what was read; none when it is: its row offered Record
+ * Assurance; NOTHING was pressed — no Record Assurance, no re-run, no Mark Satisfied; and the sign-off is recorded not
+ * reached in a dry run (`DRY_SIGN_OFF_NOT_REACHED`). ⚠ The root's SATISFIED is no longer a dry run's to prove: it is the
+ * gate's prediction (b) (`e2e/phase7-five-unit.e2e.ts`), on the declared stand-in, and the paid run's.
  */
 function rootSignOffShortfalls(root: RunUnit): string[] {
 	const signed = root.signOff;
-	const assured = signed?.recordAssurance ?? null;
-	const green = signed?.markSatisfied ?? null;
-	/** ⭑ The root as the store read it after Mark Satisfied, the act that turns it green — never its envelope. */
-	const after = green?.after ?? null;
+	const pressed =
+		signed !== null &&
+		(signed.recordAssurance !== null || signed.rerunDeclared !== null || signed.markSatisfied !== null);
 	return [
 		...(signed?.offered === true
 			? []
 			: [
-					'the dry run did not sign off the root: ' +
+					'the dry run did not rehearse the root’s sign-off: ' +
 						(signed === null ? 'no sign-off was attempted' : 'its row offered no Record Assurance')
 				]),
-		...(assured?.envelopeType === 'success' && green?.envelopeType === 'success'
-			? []
-			: [
-					`the dry run's sign-off of the root was not accepted: Record Assurance ${answerOf(assured)}, and Mark ` +
-						`Satisfied ${answerOf(green)}` +
-						(signed?.refused ? ` (${signed.refused.act} refused: ${signed.refused.reason})` : '')
-				]),
-		...(after?.lifecycleState === 'SATISFIED' && after.assuranceState === 'SATISFIED'
-			? []
-			: [
-					"the dry run's root is not SATISFIED: the store, read after Mark Satisfied, reads its lifecycle " +
-						`${after?.lifecycleState ?? 'unread'} and its assurance ${after?.assuranceState ?? 'unread'}`
-				])
+		...(pressed
+			? [
+					`the dry run pressed the root’s sign-off, which asks the reviewer for each declared policy (REG-D-112 (b)): ` +
+						`Record Assurance ${answerOf(signed.recordAssurance)}, and Mark Satisfied ${answerOf(signed.markSatisfied)}`
+				]
+			: []),
+		...(signed?.offered === true && !pressed && signed.notPressed !== DRY_SIGN_OFF_NOT_REACHED
+			? [`the dry run’s sign-off of the root is not recorded as not reached in a dry run: ${signed.notPressed ?? 'nothing recorded'}`]
+			: [])
 	];
 }
 
@@ -1419,11 +1706,10 @@ function rootSignOffShortfalls(root: RunUnit): string[] {
  * ⭐ WHAT THE SPEC ASSERTS OF ITS OWN MACHINERY, once the record is written: why this run is not the run it was meant to
  * be, one line each; none when it is. PAID, it must COMPLETE. DRY, it must stop where a dry run stops, having PROVED THE
  * ROOT'S PRESS (§6 P7-2: "the dry run also proves one press, its saved response and one archive-and-check cycle"):
- * answered `success`, the store reading its execution and its step SUCCEEDED — AND THE ROOT'S SIGN-OFF (design §6 P7-2
- * D11): its row offering Record Assurance, Record Assurance and Mark Satisfied each answered `success`, and the store,
- * read after Mark Satisfied, reading the root SATISFIED in lifecycle and in assurance — the two axes the gate's
- * prediction (b) holds a signed-off root to (`e2e/phase7-five-unit.e2e.ts`; `REG-F-523`), and nothing stronger — and no
- * model exchange recorded, counted after the sign-off.
+ * answered `success`, the store reading its execution and its step SUCCEEDED — AND THE ROOT'S SIGN-OFF REHEARSED UP TO THE
+ * REVIEWER CALL (~~design §6 P7-2 D11: … Record Assurance and Mark Satisfied each answered `success`, and the store … reading
+ * the root SATISFIED~~ ⛔ `E12F` F1, `REG-D-112` (b)): its row offering Record Assurance, nothing pressed, the sign-off
+ * recorded not reached in a dry run — and no model exchange recorded, counted after the sign-off.
  * ⚠ Everything the run is FOR — which phase completed, what each review said — is the report's, never asserted here.
  */
 export function laneVerdict(record: RunRecord): string[] {

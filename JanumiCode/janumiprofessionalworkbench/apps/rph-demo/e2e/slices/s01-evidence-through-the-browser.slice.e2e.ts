@@ -30,7 +30,15 @@
 // The page is used to ACT; the store is what says the act landed.
 import { expect, type APIRequestContext, type Page } from '@playwright/test';
 
-import { test, declareRisk, gotoHydrated, introspect, resetEngine, type ObjectRow } from '../support/harness';
+import {
+	test,
+	declareRisk,
+	gotoHydrated,
+	introspect,
+	resetEngine,
+	stipulateDeclaredPolicies,
+	type ObjectRow
+} from '../support/harness';
 
 export const SLICE = {
 	id: 'S-01',
@@ -223,6 +231,9 @@ async function receiptCount(request: APIRequestContext, evidenceId: string): Pro
 test.describe('S-01 — the evidence stage, through the browser', () => {
 	test.beforeEach(async ({ request }) => {
 		await resetEngine(request, 'reference');
+		// ⭐ `JAN-EXEC` Phase 7 completion E2 (`REG-F-523`; `REG-D-110` (3)) — the sign-off REVIEWS each declared policy now; in
+		// this lane the declared stand-in answers it only where the test stipulated it (`declared-policy-review.ts`).
+		await stipulateDeclaredPolicies(request);
 	});
 
 	test('S-a — a human proposes evidence through the browser and the ENGINE holds it as PROPOSED', async ({

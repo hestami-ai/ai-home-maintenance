@@ -8,7 +8,8 @@
 //     (`unregistered`). ⚠ A cell this report cannot decide is left OPEN, `null`, and names who decides it — stage 6 is
 //     P7-4's checks, a review that concluded against the work is the adjudication's (P7-4f), and runs the archive
 //     cannot count (K5) are a person's — rather than being given one of the five on a guess. ⛔ A unit whose Begin &
-//     Execute outlasted the lane's allowance (D4) is read as cut there, never from its mid-unit archive as if it ended.
+//     Execute outlasted the lane's allowance (D4) is read as cut there, never from its mid-unit archive as if it ended;
+//     ⭐ E12's re-review F1 — and one whose sign-off act outlasted its bound, at stage 7, the act and its bound named.
 //   · THE PAIRING (§2 stage 8; `REG-F-433`) — every Reasoning Review of an execution-plane subject, paired with the
 //     ASSURANCE-plane call that concluded it: answered, no response, refused (a substitute, or a failed repair), no
 //     answer recorded, or not pairable when its subject had more than one floor run. A deterministic floor policy and a
@@ -19,7 +20,9 @@
 //   · THE AUDIT (P7-3) — each hand act the log can show, the forbidden six first. ⛔ A hand completion is ANY step
 //     success that is not one of Begin & Execute's two shapes (the critic's corrected rule: an operator completion that
 //     names ONE output carries neither of the markers the maps first listed).
-//   · REVIEWER CALLS — a lower bound; the 14 DECLARED VERDICTS, each vacuous by construction (`REG-F-523`); the
+//   · REVIEWER CALLS — a lower bound; the 14 DECLARED VERDICTS, ~~each vacuous by construction (`REG-F-523`)~~ ⭐ E2: each read
+//     from its recorded criterion results — as intended when every criterion is answered and its verdict is the one they
+//     give (`REG-D-110` (3); design B8), a pre-E2 sign-off's still vacuous by construction; the
 //     ADJUDICATION TABLE's rows with the classification left for a person (P7-4f); and the per-command RE-RUN MANIFEST
 //     v1, exactly as `rerun-commands.ts` reads it (P7-4d).
 //
@@ -28,6 +31,10 @@
 // writes for the account name and absolute paths before writing a byte (`REG-F-536`).
 import { createHash } from 'node:crypto';
 import { posix } from 'node:path';
+// ⭐ E2 (design B8) — the kernel's own ladder, so "the verdict the answers give" is decided by the rule the sign-off computes
+// it with (`declared-policy-signoff.ts` `verdictOf`), never a restated copy of it. Pure, store-free. ⚠ E12's re-review F5 —
+// save the one limb `verdictOf` applies before the ladder, a review that answered no criterion, which `judgedVerdict` restates.
+import { BLOCKING_SEVERITIES, dispositionFromFindings } from '@janumipwb/rph-assurance';
 import {
 	PHASE7_NEGATIVE_CONTROL_RESERVE,
 	PHASE7_PAID_LIMIT,
@@ -66,8 +73,21 @@ export const REASONING_REVIEW = 'floor.reasoning-review';
 export const DEMO_POLICY_ID = 'pol_01ARZ3NDEKTSV4RRFFQ69GDEM0';
 /** The finding code Record Blocking Finding records (`DEMO_FINDING_CODE`). */
 export const DEMO_FINDING_CODE = 'DEMO_UNFIT';
-/** The declared-policy sign-off's validator (`declared-policy-signoff.ts` `DEMO_REVIEW_VALIDATOR_ID`). */
+/** ~~The declared-policy sign-off's validator~~ ⭐ E2 — the PRE-E2 sign-off's validator (`declared-policy-signoff.ts`
+ *  `DEMO_REVIEW_VALIDATOR_ID`): a record made before the declared policies were judged carries it, and reads vacuous. */
 export const DECLARED_SIGNOFF_VALIDATOR = 'workbench.independent-review';
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (`REG-F-523`; `REG-D-110` (3)) — THE VALIDATORS A DECLARED VERDICT IS RECORDED UNDER
+ * NOW: the model reviewer, the gate lane's stand-in, a refused selection, and a policy nobody reviewed
+ * (`declared-policy-review.ts`, `declared-policy-signoff.ts`). ⛔ RESTATED, NOT IMPORTED: those modules load the reviewer's
+ * chain, which reads tool variables at load (`REG-D-072` D12); `verif/phase7-run-report.test.ts` holds each to its source.
+ */
+export const DECLARED_REVIEW_VALIDATORS = [
+	'reviewer.declared-policy',
+	'standin.declared-policy-review',
+	'declared-policy-review.unconfigured',
+	'declared-policy-review.missing'
+] as const;
 /** Begin & Execute's root completion (`undertakings/[id]/+page.server.ts`, the TRANSFORMATION path's detail). */
 export const ROOT_COMPLETION_DETAIL =
 	'Demo lifecycle step: it demonstrates the execution axis and authors no artifact.';
@@ -75,6 +95,9 @@ export const ROOT_COMPLETION_DETAIL =
 export const OPERATOR_COMPLETION_DETAIL = 'Operator completed the step without naming a produced output.';
 /** The page's hand failure, when the operator gives no reason (`failStep`'s default `failureReason`). */
 export const OPERATOR_FAILURE_REASON = 'Operator marked the step failed.';
+/** ⭐ E2 — the operator's actor id (`identity.ts`, the session principal): a declared verdict naming it as producer is
+ *  `REG-F-514`'s shape on a model unit. */
+export const OPERATOR_ACTOR_ID = 'local-professional';
 /** The model path's executor, as Begin & Execute names it (`executionProvenance.executedBy.displayName`). */
 export const MODEL_EXECUTOR_NAME = 'Execution model';
 /** Every evidence object of a unit carries this scope, and nothing else ties it to the unit (`+page.server.ts`). */
@@ -112,11 +135,51 @@ export const CELL_VALUES = [
 ] as const;
 export type CellValue = (typeof CELL_VALUES)[number];
 
-/** The two gaps no Phase 7 run can close, which a "Yes" always states (§1). */
+/**
+ * ~~The two gaps no Phase 7 run can close, which a "Yes" always states (§1).~~ ⭐⭐ E2 (`DESIGN-phase-7-completion.md` B8,
+ * §1) — THE GAP NO PHASE 7 RUN CAN CLOSE, which a "Yes" always states. ⛔ The `REG-F-523` line is gone ⭐ `E12F` F10: FROM
+ * WHAT IS ALWAYS STATED, and stated per run instead (`uncheckedCaveat`) — the declared policies are judged now, criterion by
+ * criterion (`REG-D-110` (3)), and stage 5b says, per run, whether they were; a run whose verdicts carry no criterion result
+ * (a pre-E2 archive) still opens with it.
+ * ~~'REG-F-523: the declared policies were signed off with no criterion checked.'~~
+ */
 export const ALWAYS_STATED = [
-	'REG-F-510: the PWA had to name its product, because an Undertaking cannot tell its phases what to build (§3.3).',
-	'REG-F-523: the declared policies were signed off with no criterion checked.'
+	'REG-F-510: the PWA had to name its product, because an Undertaking cannot tell its phases what to build (§3.3).'
 ] as const;
+
+/**
+ * ⛔⛔ `E12F` F10 — ~~THE `REG-F-523` LINE IS GONE~~ FOR EVERY RUN: true of a run whose declared verdicts were judged, and false
+ * of one whose verdicts carry no criterion result — a pre-E2 archive, signed off from required evidence alone, or a verdict
+ * of a policy that declares no criterion. So the caveat is STATED PER RUN, from its declared verdicts: the line whole when
+ * none of them carries a criterion result, counted when some do not, and absent when every one does (or none was recorded).
+ */
+export function uncheckedCaveat(declared: readonly { readonly criterionResults: number }[]): readonly string[] {
+	const unchecked = declared.filter((d) => d.criterionResults === 0).length;
+	if (unchecked === 0) return [];
+	if (unchecked === declared.length)
+		return ['REG-F-523: the declared policies were signed off with no criterion checked.'];
+	return [`REG-F-523: ${unchecked} of ${declared.length} declared verdicts were signed off with no criterion checked.`];
+}
+
+/**
+ * ⭐ E12's polish (fix2's F10; the lead's delegated decision of 2026-10-15, to be registered) — THE UNIT_PURPOSE FRAMING, STATED
+ * PER RUN. A unit composed of others (the root) has its declared policies judged over its children's work, its reviewer given
+ * the unit's own purpose (`UNIT_PURPOSE`; the route's `declaredReviewWorkOf`), and no reviewer-qualification case measures that
+ * framing: every declared case of case set v5 is in the PRODUCING_PROMPT framing (`scripts/reviewer-qual/materialize.ts`). So
+ * the line names each such unit and the reviews the model reviewer made of it, among the verdicts that speak; it is absent
+ * where there are none — a root signed off before E2, or never. No case set changes.
+ */
+export function unitPurposeCaveat(
+	composites: readonly { readonly unit: string; readonly reviews: number }[]
+): readonly string[] {
+	const made = composites.filter((c) => c.reviews > 0);
+	if (made.length === 0) return [];
+	return [
+		`UNIT_PURPOSE framing: the declared reviews of a unit composed of others (${made.map((c) => `${c.unit}: ${c.reviews}`).join('; ')}) ` +
+			'were made in it — the unit’s own purpose, judged over its children’s work (REG-D-111 (2)) — and no reviewer-qualification ' +
+			'case measures it: every declared case of case set v5 is in the PRODUCING_PROMPT framing.'
+	];
+}
 
 /** The classifications a person gives each adjudication row (P7-4f). This report leaves the field blank. */
 export const ADJUDICATION_CLASSES = [
@@ -351,6 +414,12 @@ export interface ReviewerCalls extends ReviewerCallCount {
 		readonly limit: number;
 		readonly under: boolean | null;
 	};
+	/**
+	 * ⭐ E12's polish (fix2's F8; the lead's delegated decision of 2026-10-15, to be registered) — THE LANE'S OWN READS OF THE
+	 * LIMIT, each before a paid act (D8; `E12F` F2): before each phase, each of the rule's re-runs, each sign-off and each re-run
+	 * of the declared reviews, unit by unit — and which held its act back. Read from `lane/run.json`.
+	 */
+	readonly laneLimitChecks: readonly LaneLimitCheck[];
 }
 
 export interface AuditFinding {
@@ -389,8 +458,37 @@ export interface DeclaredVerdict {
 	readonly policyId: string;
 	readonly state: string;
 	readonly criterionResults: number;
-	readonly value: 'vacuous by construction';
+	/**
+	 * ~~`'vacuous by construction'`~~ ⭐ E2 (design B8): `as intended` when every criterion of the policy is answered and the
+	 * recorded verdict is the one those answers give; `broke` otherwise; a pre-E2 sign-off's `vacuous by construction`.
+	 */
+	readonly value: 'as intended' | 'broke' | 'vacuous by construction';
 	readonly registerIds: readonly string[];
+	/** ⭐ E2 — who the verdict is recorded under: the declared reviewer, its stand-in, or the pre-E2 sign-off. */
+	readonly validatorId: string;
+	/**
+	 * ⭐ E2 — the policy's criteria (`declared`), the rows recorded against it (`recorded`, latest per criterion), and of
+	 * those, how many a reviewer answered, came back undetermined, and carried a test's stipulation.
+	 */
+	readonly criteria: {
+		readonly declared: number;
+		readonly recorded: number;
+		readonly answered: number;
+		readonly undetermined: number;
+		readonly stipulatedRows: number;
+	};
+	/** ⭐ E2 — whether the recorded verdict is the one the recorded answers give; `null` for a pre-E2 sign-off. */
+	readonly followsFromAnswers: boolean | null;
+	/** ⭐ E2 — the producer the verdict checked independence against (`REG-F-514`), as the assessment records it. */
+	readonly producer: string | null;
+	/** ⭐ E2 — why, in the record's own terms: what was unanswered, or what the answers give. */
+	readonly basis: readonly string[];
+	/**
+	 * ⭐ E12's polish (fix2's F9; the lead's delegated decision of 2026-10-15, to be registered) — the verdict that speaks for this
+	 * one's (unit, policy) when it is a later one — a re-run of its declared review (`REG-D-112` (a)) — or null when this one
+	 * speaks; read as the product reads it (`supersessions`).
+	 */
+	readonly supersededBy: string | null;
 }
 
 export interface ContentPointer {
@@ -517,7 +615,15 @@ export interface RunReport {
 	readonly pairing: PairingReport;
 	readonly reviewerCalls: ReviewerCalls;
 	readonly audit: AuditReport;
-	readonly declaredVerdicts: { readonly expected: number; readonly rows: readonly DeclaredVerdict[] };
+	/**
+	 * ⭐ E12's polish (fix2's F9) — `rows`, the verdict that speaks per (unit, policy), the latest; `history`, each one a later
+	 * one superseded, its `supersededBy` naming the verdict that speaks.
+	 */
+	readonly declaredVerdicts: {
+		readonly expected: number;
+		readonly rows: readonly DeclaredVerdict[];
+		readonly history: readonly DeclaredVerdict[];
+	};
 	readonly adjudication: { readonly classes: readonly string[]; readonly rows: readonly AdjudicationRow[] };
 	readonly manifest: {
 		readonly commands: number;
@@ -676,6 +782,77 @@ interface LaneUnit {
 	readonly upstreamNotAssured: boolean | null;
 	readonly limitPrior: number | null;
 	readonly signOffAttempted: boolean;
+	/**
+	 * ⭐ E12's re-review F1 (D4) — the sign-off act that gave no answer within its bound, by its button's name, and the bound:
+	 * the run ended there. null when none did, and for a record written before E12's re-review, which kept no act's bound.
+	 */
+	readonly signOffOutlasted: { readonly act: string; readonly ms: number } | null;
+	/** ⭐ E12's re-review F1 (D4) — a recovery act the rule pressed gave no answer within its bound: the run ended there. */
+	readonly recoveryOutlasted: boolean;
+	/**
+	 * ⭐ E12's polish (fix2's F8; the lead's delegated decision of 2026-10-15, to be registered) — WHAT THE LANE HELD BACK OF THE
+	 * SIGN-OFF: before which act, why in the lane's own words (`notPressed`), and the limit check it read first — before Record
+	 * Assurance (a dry run's rehearsal, `REG-D-112` (b), or the limit, D8), or before the rule's re-run of the declared reviews
+	 * (the limit). null when it held nothing back, and for a record written before E12F, which kept no such field.
+	 */
+	readonly signOffHeldBack: {
+		readonly before: string;
+		readonly reason: string;
+		readonly check: LaneLimitCheck | null;
+	} | null;
+	/** ⭐ E12's polish (the same decision) — every read of the limit the lane recorded for the unit, in the order it made them. */
+	readonly limitChecks: readonly LaneLimitCheck[];
+}
+
+/**
+ * ⭐ E12's polish (fix2's F8) — ONE READ OF THE LIMIT THE LANE RECORDED BEFORE A PAID ACT (D8; `E12F` F2): prior + recorded +
+ * reserve + the act's own worst case (`ahead`, 0 where it counted none), and whether that total stayed under the limit — the
+ * act pressed — or not, the act held back (`phase7-operator.ts` `limitCheck`).
+ */
+export interface LaneLimitCheck {
+	readonly unit: string;
+	/** What it was read before: the unit's Begin & Execute, a re-run of it, its sign-off, or a re-run of its declared reviews. */
+	readonly before: string;
+	readonly prior: number;
+	readonly recorded: number;
+	readonly reserve: number;
+	readonly ahead: number;
+	readonly total: number;
+	readonly limit: number;
+	readonly allowed: boolean;
+}
+
+/** A limit check the lane recorded, read loosely: null when it holds no total, limit or verdict to read. */
+function laneLimitCheck(unit: string, before: string, v: unknown): LaneLimitCheck | null {
+	const c = rec(v);
+	const [prior, recorded, reserve, total, limit, allowed] = [int(c.prior), int(c.recorded), int(c.reserve), int(c.total), int(c.limit), bool(c.allowed)];
+	if (prior === null || recorded === null || reserve === null || total === null || limit === null || allowed === null) return null;
+	return { unit, before, prior, recorded, reserve, ahead: int(c.ahead) ?? 0, total, limit, allowed };
+}
+
+/** The rule's re-run a recovery act's limit check was read before, by its act. */
+const RECOVERY_READ: Readonly<Record<string, string>> = {
+	rerunReview: 'the rule’s re-run of its review',
+	rerunWork: 'the rule’s re-run of its work'
+};
+/** ⭐ E12's polish — what a sign-off's hold, and its limit check, was read before. */
+const BEFORE_RECORD_ASSURANCE = 'Record Assurance';
+const BEFORE_DECLARED_RERUN = 'the rule’s re-run of its declared reviews';
+
+/** ⭐ E12's re-review F1 — the sign-off's acts, by the field the lane records each in and the button's name. */
+const SIGN_OFF_ACTS = [
+	['recordAssurance', 'Record Assurance'],
+	['rerunDeclared', 'Re-run the declared reviews'],
+	['markSatisfied', 'Mark Satisfied']
+] as const;
+
+/** The sign-off act that outlasted its bound, and the bound, or null (`LaneUnit.signOffOutlasted`). */
+function signOffOutlasted(signOff: Record<string, unknown>): LaneUnit['signOffOutlasted'] {
+	for (const [field, act] of SIGN_OFF_ACTS) {
+		const ms = int(rec(signOff[field]).timedOutAfterMs);
+		if (ms !== null) return { act, ms };
+	}
+	return null;
 }
 
 function laneUnits(run: unknown): LaneUnit[] {
@@ -684,6 +861,7 @@ function laneUnits(run: unknown): LaneUnit[] {
 		const r = rec(u);
 		const pressed = r.beginExecute !== null && r.beginExecute !== undefined;
 		const be = rec(r.beginExecute);
+		const signOff = rec(r.signOff);
 		return {
 			slug: str(r.slug),
 			unitId: str(r.unitId) || null,
@@ -695,9 +873,44 @@ function laneUnits(run: unknown): LaneUnit[] {
 			stopped: bool(r.stopped),
 			upstreamNotAssured: bool(r.upstreamNotAssured),
 			limitPrior: int(rec(r.limitCheck).prior),
-			signOffAttempted: r.signOff !== null && r.signOff !== undefined
+			// ⛔ `E12F` F1, F2 — a sign-off the lane HELD BACK before Record Assurance (a dry run's, `REG-D-112` (b), or the
+			// limit's, D8) records why in `notPressed` and pressed nothing: never attempted. One whose Record Assurance was
+			// pressed was attempted, whatever was held back after it. ⚠ A record written before E12F carries no such field.
+			signOffAttempted:
+				r.signOff !== null &&
+				r.signOff !== undefined &&
+				(str(signOff.notPressed) === '' || (signOff.recordAssurance ?? null) !== null),
+			signOffOutlasted: signOffOutlasted(signOff),
+			recoveryOutlasted: (Array.isArray(r.recovery) ? (r.recovery as unknown[]) : []).some(
+				(x) => int(rec(x).timedOutAfterMs) !== null
+			),
+			signOffHeldBack: heldBackOf(str(r.slug), signOff),
+			limitChecks: limitChecksOf(str(r.slug), r, signOff)
 		};
 	});
+}
+
+/**
+ * ⭐ E12's polish (fix2's F8) — the sign-off's hold, from its record (`LaneUnit.signOffHeldBack`): with Record Assurance
+ * pressed, what the lane held back was the rule's re-run of the declared reviews, read before it; else the sign-off itself.
+ */
+function heldBackOf(slug: string, signOff: Record<string, unknown>): LaneUnit['signOffHeldBack'] {
+	const reason = str(signOff.notPressed);
+	if (reason === '') return null;
+	if ((signOff.recordAssurance ?? null) !== null)
+		return { before: BEFORE_DECLARED_RERUN, reason, check: laneLimitCheck(slug, BEFORE_DECLARED_RERUN, signOff.rerunLimitCheck) };
+	return { before: BEFORE_RECORD_ASSURANCE, reason, check: laneLimitCheck(slug, 'its sign-off', signOff.limitCheck) };
+}
+
+/** ⭐ E12's polish (fix2's F8) — every read of the limit the lane recorded for one unit, in its order (`LaneUnit.limitChecks`). */
+function limitChecksOf(slug: string, r: Record<string, unknown>, signOff: Record<string, unknown>): LaneLimitCheck[] {
+	const recovery = Array.isArray(r.recovery) ? (r.recovery as unknown[]) : [];
+	return [
+		laneLimitCheck(slug, 'its Begin & Execute', r.limitCheck),
+		...recovery.map((x) => laneLimitCheck(slug, RECOVERY_READ[str(rec(x).act)] ?? `the rule’s ${str(rec(x).act)}`, rec(x).limitCheck)),
+		laneLimitCheck(slug, 'its sign-off', signOff.limitCheck),
+		laneLimitCheck(slug, BEFORE_DECLARED_RERUN, signOff.rerunLimitCheck)
+	].filter((c): c is LaneLimitCheck => c !== null);
 }
 
 // ── THE UNITS ────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -803,6 +1016,8 @@ function resolveUnits(
 /** The id of the unit a floor subject belongs to: a work product's producing unit, a command's by its scope. */
 function ownerOf(subject: StoredObject): string {
 	if (subject.objectType === 'ARTIFACT') return str(subject.state.producingPwuId);
+	// ⭐ E2 — a declared review's subject is the work unit itself: its calls are that unit's.
+	if (subject.objectType === 'PROFESSIONAL_WORK_UNIT') return subject.id;
 	const scope = str(subject.state.scope);
 	return scope.startsWith(EVIDENCE_SCOPE_PREFIX) ? scope.slice(EVIDENCE_SCOPE_PREFIX.length) : '';
 }
@@ -1074,9 +1289,14 @@ function buildPairing(ix: Index, units: readonly Unit[]): PairingReport {
 		'demo sign-off': [],
 		other: []
 	};
-	for (const a of assessments)
+	for (const a of assessments) {
+		const validatorId = str(ix.completionOf.get(a.id)?.payload.validatorId);
+		// ⭐ E2 — a declared review ASKED a reviewer: it is listed with the declared verdicts, its calls counted there, and
+		// never as an assessment that asked no model by design.
+		if ((DECLARED_REVIEW_VALIDATORS as readonly string[]).includes(validatorId)) continue;
 		if (str(a.state.assurancePolicyId) !== REASONING_REVIEW)
-			noModel[noModelKind(str(a.state.assurancePolicyId), str(ix.completionOf.get(a.id)?.payload.validatorId))].push(a.id);
+			noModel[noModelKind(str(a.state.assurancePolicyId), validatorId)].push(a.id);
+	}
 	const counts = Object.fromEntries(PAIRING_LABELS.map((l) => [l, rows.filter((r) => r.label === l).length]));
 	return {
 		rule: PAIRING_RULE,
@@ -1127,7 +1347,8 @@ function buildReviewerCalls(ix: Index, units: readonly Unit[], lane: LaneRows): 
 			total,
 			limit: PAID_LIMIT,
 			under: total === null ? null : total < PAID_LIMIT
-		}
+		},
+		laneLimitChecks: laneUnits(lane.run).flatMap((u) => u.limitChecks)
 	};
 }
 
@@ -1357,6 +1578,30 @@ function handEventsOf(v: AuditView, type: string): StoredEvent[] {
 }
 
 /**
+ * ⭐ `E12F` F3 — THE OPTION A PERSON'S RE-RUN OF A UNIT'S DECLARED REVIEWS SELECTS (`declared-policy-signoff.ts`
+ * `RERUN_DECLARED_REVIEWS`), restated — this report loads no product module — and held to its source by the restatement test.
+ */
+export const DECLARED_RERUN_OPTION = 'RERUN_DECLARED_REVIEWS';
+
+/**
+ * ⭐ `E12F` F3 (`REG-D-112` (a)) — EACH RE-RUN OF A UNIT'S DECLARED REVIEWS THAT DID NOT CONCLUDE, by its Decision: the unit, and
+ * the INCONCLUSIVE assessments it re-ran. ⚠ No plan is revised (`reruns` reads one): each re-run is a new assessment.
+ */
+function declaredReruns(v: AuditView): AuditFinding[] {
+	return v.ix
+		.eventsOfType('DecisionEffective')
+		.filter((e) => str(e.payload.decisionType) === 'REPLAN' && str(e.payload.selectedOption) === DECLARED_RERUN_OPTION)
+		.map((e) => {
+			const [unitId, ...rerun] = strs(e.payload.subjectObjectIds);
+			return findingOf(
+				e,
+				v.unitOfObject(unitId ?? ''),
+				`a person’s re-run of the declared reviews that did not conclude: ${plural(rerun.length, 'assessment', 'assessments')} re-run`
+			);
+		});
+}
+
+/**
  * ⭐ P7-6R R-1c — THE PERSON'S RE-RUNS, each an EFFECTIVE `REPLAN` Decision whose selected option names it (RD4). Listed
  * because each changes what the run measures, and none is forbidden: the paid run's rule makes them (`REG-D-105` (4)).
  * ⭐⭐ `JAN-EXEC` P7-6 B5 (the roadmap's B8) — AND EACH IS LISTED BESIDE THE DECISION THAT MADE IT: the finding is the
@@ -1403,8 +1648,12 @@ function forbiddenActs(v: AuditView, undertakingId: string | null, lane: LaneRow
 		v.ix.eventsOfType(t).map((e) => findingOf(e, null, 'a waiver act'))
 	);
 	const waiverPosts = [posted(lane, ['recordWaiver']), posted(lane, ['grant', 'deny'], '/decisions')];
+	// ⭐ `E12F` F3 — AND THE RULE'S ACCEPTED RE-RUN OF THE DECLARED REVIEWS THAT DID NOT CONCLUDE (`REG-D-112` (a)): the
+	// assurance a Mark Satisfied may follow when Record Assurance was refused and its reviews then concluded.
 	const assured = new Set(
-		lane.actions.filter((a) => a.action === 'recordAssurance' && a.envelopeType === 'success').map((a) => actionUnit(a.file))
+		lane.actions
+			.filter((a) => (a.action === 'recordAssurance' || a.action === 'rerunDeclaredReviews') && a.envelopeType === 'success')
+			.map((a) => actionUnit(a.file))
 	);
 	const unassuredPresses = lane.actions.filter((a) => a.action === 'markSatisfied' && !assured.has(actionUnit(a.file)));
 	const abandons = v.ix.eventsOfType('PwuAbandoned');
@@ -1414,7 +1663,11 @@ function forbiddenActs(v: AuditView, undertakingId: string | null, lane: LaneRow
 		act('retryStep', true, v.ix.eventsOfType('ExecutionStepRetried').map((e) => findingOf(e, onPlan(e), 'a failed step re-queued')), posted(lane, ['retryStep'])),
 		act('waiver', true, waivers, waiverPosts.includes(null) ? null : waiverPosts.reduce<number>((n, p) => n + (p ?? 0), 0)),
 		act('markSatisfied without recordAssurance', true, unassuredSatisfactions(v), unassuredPresses.length, {
-			note: 'POSTs counted from lane/actions: a Mark Satisfied pressed on a unit with no accepted Record Assurance'
+			// ⭐ E12's re-review F6 — the note says what is counted: since `E12F` F3, an accepted re-run of the declared reviews
+			// is the assurance a Mark Satisfied may follow too.
+			note:
+				'POSTs counted from lane/actions: a Mark Satisfied pressed on a unit with no accepted Record Assurance and no ' +
+				'accepted re-run of its declared reviews (REG-D-112 (a))'
 		}),
 		act(
 			'abandon followed by re-proposing',
@@ -1450,6 +1703,8 @@ function otherActs(v: AuditView, undertakingId: string | null, lane: LaneRows): 
 		),
 		act('rerunReview', false, reruns(v, 'RERUN_REVIEW', 'a person’s re-run of the review'), posted(lane, ['rerunReview'])),
 		act('rerunWork', false, reruns(v, 'RERUN_WORK', 'a person’s re-run of the work'), posted(lane, ['rerunWork'])),
+		// ⭐ `E12F` F3 — the rule's re-run of a unit's declared reviews that did not conclude (`REG-D-112` (a)).
+		act('rerunDeclaredReviews', false, declaredReruns(v), posted(lane, ['rerunDeclaredReviews'])),
 		...PAGE_ONLY_ACTS.map(([name, type]) =>
 			act(name, false, handEventsOf(v, type).map((e) => findingOf(e, onPlan(e), type)), posted(lane, [name]))
 		),
@@ -1794,10 +2049,17 @@ interface UnitView {
 	readonly pressed: boolean;
 	/** ⛔ D4 — the allowance its Begin & Execute outlasted, in ms; null when it answered. The run ended at this unit. */
 	readonly timedOut: number | null;
+	/** ⛔ E12's re-review F1 (D4) — its sign-off act that outlasted its bound, and the bound; null when none did. */
+	readonly signOffOutlasted: LaneUnit['signOffOutlasted'];
 	readonly reviews: readonly PairingRow[];
 	readonly runs: UnitRuns;
+	/** ⭐ E12's polish (fix2's F9) — its declared verdicts that speak, the latest per policy (`supersessions`). */
 	readonly declared: readonly DeclaredVerdict[];
+	/** ⭐ E12's polish (fix2's F9) — its declared verdicts a later one superseded, listed as history. */
+	readonly superseded: readonly DeclaredVerdict[];
 	readonly signOffAttempted: boolean;
+	/** ⭐ E12's polish (fix2's F8) — what the lane held back of its sign-off, and why (`LaneUnit.signOffHeldBack`). */
+	readonly heldBack: LaneUnit['signOffHeldBack'];
 	/** Its exchanges, both planes, by what a person can read of each (`exchangeReading`). */
 	readonly exchanges: { readonly total: number; readonly broken: number; readonly unretained: number };
 	readonly contentStore: boolean;
@@ -1834,8 +2096,45 @@ function completion(v: UnitView, row: string): MatrixCell {
 		]);
 	if (s.assurance === 'CONDITIONALLY_SATISFIED')
 		return cell('7', row, 'broke', ['REG-F-403'], [facts, 'a CONDITIONALLY_SATISFIED unit can never be marked satisfied']);
-	if (!v.signOffAttempted) return cell('7', row, 'not reached', [], [facts, 'its sign-off was never attempted']);
-	return cell('7', row, 'broke', [], [facts, 'its sign-off was attempted and the unit is not SATISFIED']);
+	// ⛔ E12's re-review F1 (D4) — A SIGN-OFF ACT THAT GAVE NO ANSWER WITHIN ITS BOUND: the run ended there, its final archive
+	// taken while the server may still have been running the act, which is killed unfinished (REG-F-527). Why it outlasted its
+	// bound, no register entry names.
+	const outlasted = v.signOffOutlasted;
+	if (outlasted !== null)
+		return cell(
+			'7',
+			row,
+			'broke',
+			['REG-F-527'],
+			[
+				`${facts}, read from an archive taken while its ${outlasted.act} may still have been running`,
+				`its ${outlasted.act} gave no answer within ${outlasted.ms} ms (design D4): the run ended there, and the server is ` +
+					'killed with the act unfinished (REG-F-527); no register entry names why it outlasted its bound'
+			],
+			{ unregistered: true }
+		);
+	if (!v.signOffAttempted) return cell('7', row, 'not reached', [], [facts, ...heldBackOr(v, 'its sign-off was never attempted')]);
+	return cell('7', row, 'broke', [], [facts, 'its sign-off was attempted and the unit is not SATISFIED', ...heldBackOr(v)]);
+}
+
+/** ⭐ E12's polish (fix2's F8) — the figures of one read of the limit, as the reviewer-calls section prints the record's own. */
+const limitFigures = (c: LaneLimitCheck): string =>
+	`${c.prior} + ${c.recorded} + ${c.reserve}${c.ahead > 0 ? ` + ${c.ahead} ahead` : ''} = ${c.total} of ${c.limit}, ` +
+	(c.allowed ? 'under it' : 'not under it');
+
+/**
+ * ⭐ E12's polish (fix2's F8; the lead's delegated decision of 2026-10-15, to be registered) — WHAT THE LANE HELD BACK OF A
+ * UNIT'S SIGN-OFF, as stage 7 says it: before which act, why in the lane's own words, and the limit it read; else `otherwise`.
+ * ⛔ A sign-off held back before Record Assurance read "its sign-off was never attempted", the words a run cut short reads, and
+ * a declared re-run held back beside a refused Record Assurance left the limit's part said nowhere.
+ */
+function heldBackOr(v: UnitView, ...otherwise: string[]): string[] {
+	const h = v.heldBack;
+	if (h === null) return otherwise;
+	return [
+		`its sign-off was held back before ${h.before}: ${h.reason}`,
+		...(h.check === null ? [] : [`the limit as the lane read it: ${limitFigures(h.check)}`])
+	];
 }
 
 const triesOf = (u: Unit): string[] => u.tries.map((t) => `${str(t.state.disposition)}:${parseClass(t.state.parseOutcome)}`);
@@ -1984,13 +2283,54 @@ function stageFiveA(v: UnitView, ix: Index): MatrixCell {
 	return cell('5a', row, 'as intended', [], [why, ...unsatisfied]);
 }
 
-/** Stage 5b — the declared policies, signed off with no criterion checked. */
+/**
+ * Stage 5b — ~~the declared policies, signed off with no criterion checked~~ ⭐⭐ E2 (`REG-F-523`; `REG-D-110` (3); design B8):
+ * the declared policies JUDGED, read from what each verdict recorded — AS INTENDED when every one of the unit's declared
+ * verdicts has every criterion of its policy answered and is the verdict those answers give (`DeclaredVerdict.value`).
+ *   · ⛔ a criterion left unanswered breaks it (`REG-F-489`'s shape: a review that did not answer every criterion);
+ *   · ⛔ a verdict the answers do not give breaks it, and no register entry names that;
+ *   · ⚠ a verdict the pre-E2 sign-off recorded is still vacuous by construction (`REG-F-523`, `REG-D-102` (6)).
+ * ⭑ A verdict against the work is AS INTENDED here when its answers give it: 5b asks whether the policies judged, and
+ * stage 7 whether the unit then completed.
+ */
 function stageFiveB(v: UnitView): MatrixCell {
 	if (v.declared.length === 0) return cell('5b', v.unit.slug, 'not reached', [], ['no declared verdict was signed off']);
-	return cell('5b', v.unit.slug, 'vacuous by construction', ['REG-F-523', 'REG-F-406'], [
-		`${plural(v.declared.length, 'declared verdict', 'declared verdicts')}, each computed from the policy's required evidence alone (REG-D-102 (6))`
+	const vacuous = v.declared.filter((d) => d.value === 'vacuous by construction');
+	if (vacuous.length > 0)
+		return cell('5b', v.unit.slug, 'vacuous by construction', ['REG-F-523', 'REG-F-406'], [
+			`${plural(vacuous.length, 'declared verdict', 'declared verdicts')} signed off before E2, each computed from the policy's required evidence alone (REG-D-102 (6))`,
+			...historyOf(v)
+		]);
+	const broke = v.declared.filter((d) => d.value === 'broke');
+	if (broke.length > 0)
+		return cell(
+			'5b',
+			v.unit.slug,
+			'broke',
+			broke.flatMap((d) => d.registerIds),
+			[...broke.flatMap((d) => d.basis), ...historyOf(v)],
+			{ unregistered: broke.some((d) => d.registerIds.length === 0) }
+		);
+	return cell('5b', v.unit.slug, 'as intended', [], [
+		`${plural(v.declared.length, 'declared verdict', 'declared verdicts')}, each with every criterion of its policy answered and its verdict the one its answers give (REG-D-110 (3))`,
+		`verdicts: ${v.declared.map((d) => `${d.policyId} ${d.state}`).join('; ')}`,
+		...historyOf(v)
 	]);
 }
+
+/**
+ * ⭐ E12's polish (fix2's F9; the lead's delegated decision of 2026-10-15, to be registered) — the unit's superseded declared
+ * verdicts, LISTED AS HISTORY beside the verdicts that speak, as P7-6R's re-runs are listed beside the Decision that made each:
+ * 5b reads the latest per (unit, policy) alone (`supersessions`).
+ */
+const historyOf = (v: UnitView): string[] =>
+	v.superseded.length === 0
+		? []
+		: [
+				`listed as history: ${v.superseded
+					.map((d) => `${d.policyId} ${d.state} (${d.assessmentId}, ${d.value}), superseded by ${String(d.supersededBy)}`)
+					.join('; ')}`
+			];
 
 /** Stage 6 — the product: our checks (P7-4), never this report. */
 function stageSix(v: UnitView): MatrixCell {
@@ -2015,8 +2355,12 @@ function stageEight(v: UnitView): MatrixCell {
 	const basis = [
 		`${total - broken - unretained} of ${total} exchange(s) can be read: what each model was asked and what it answered, ` +
 			'each holding what its record claims',
-		'standing: the bytes are readable only from the content store (REG-F-528), and every declared verdict names the ' +
-			'operator as producer (REG-F-514)'
+		// ⭐ E2 (`REG-F-514`) — ~~"and every declared verdict names the operator as producer"~~: the sign-off records the
+		// unit's executor now, so the standing names REG-F-514 only for a verdict that still records the operator.
+		'standing: the bytes are readable only from the content store (REG-F-528)' +
+			(v.declared.some((d) => d.producer === OPERATOR_ACTOR_ID)
+				? ', and a declared verdict names the operator as producer (REG-F-514)'
+				: '')
 	];
 	if (broken > 0)
 		basis.push(
@@ -2105,19 +2449,158 @@ function stageSevenWhole(views: readonly UnitView[]): MatrixCell {
 
 // ── THE REPORT ───────────────────────────────────────────────────────────────────────────────────────────────────────
 
+/** The criterion outcomes a reviewer GAVE — every recorded result but the one that says nobody determined it. */
+const ANSWERED = new Set(['MET', 'NOT_MET', 'PARTIALLY_MET', 'NOT_APPLICABLE']);
+/** §28.2's ladder, strictest first — how two verdicts are compared. */
+const STRICTEST_FIRST = ['REJECTED', 'INCONCLUSIVE', 'CONDITIONALLY_SATISFIED', 'SATISFIED'];
+/**
+ * ⭐ `E12F` F7 — the verdicts a policy's own evidence can CAP a verdict to (`supportedDisposition`'s two answers short of
+ * SATISFIED, `declared-policy-signoff.ts`): never REJECTED, which only answers can reach.
+ */
+const EVIDENCE_CEILINGS: ReadonlySet<string> = new Set(['CONDITIONALLY_SATISFIED', 'INCONCLUSIVE']);
+
+/**
+ * ⭐⭐ E2 (design B8) — WHETHER A DECLARED VERDICT IS THE ONE ITS ANSWERS GIVE, and why: the kernel's ladder
+ * (`dispositionFromFindings`) over the recorded rows — the LATEST per criterion, each mandatory by its POLICY's stakes, a
+ * criterion with no row undetermined — and the assessment's OPEN findings. ⚠ A policy that declares required evidence can
+ * cap a verdict below its answers (`supportedDisposition`'s ceiling); such a verdict is read as following when it is the
+ * stricter of the two. ⭑ An engine built for tests counts a stipulated row as met; no run this report reads is one.
+ * ⭐ E12's re-review F5 — and a review that answered NO criterion gives INCONCLUSIVE, as `verdictOf` computes it.
+ */
+function judgedVerdict(
+	ix: Index,
+	a: StoredObject
+): Omit<DeclaredVerdict, 'assessmentId' | 'unit' | 'validatorId' | 'supersededBy'> {
+	const policyId = str(a.state.assurancePolicyId);
+	const state = str(a.state.assessmentState);
+	const policyState = ix.byId.get(policyId)?.state ?? {};
+	const declared = (Array.isArray(policyState.criteria) ? policyState.criteria : []).map((c) => ({
+		id: str(rec(c).id),
+		mandatory: BLOCKING_SEVERITIES.has(str(rec(c).severityIfNotMet) as never)
+	}));
+	// ⚠ `claimed`, never `stipulated`: this report READS a row's stipulation, and the census of who writes one
+	// (`verif/stipulation-writers.test.ts`) counts every property named so.
+	const latest = new Map<string, { result: string; claimed: boolean }>();
+	for (const e of ix.eventsOfType('AssuranceCriterionEvaluated'))
+		if (str(e.payload.assessmentId) === a.id)
+			latest.set(str(e.payload.criterionId), { result: str(e.payload.result), claimed: str(e.payload.stipulated) === 'MET' });
+	const rows = [...latest.values()];
+	const criteria = {
+		declared: declared.length,
+		recorded: rows.length,
+		answered: rows.filter((r) => ANSWERED.has(r.result)).length,
+		undetermined: rows.filter((r) => r.result === 'UNABLE_TO_DETERMINE').length,
+		stipulatedRows: rows.filter((r) => r.claimed).length
+	};
+	const open = ix
+		.ofType('ASSURANCE_OBSERVATION')
+		.filter((o) => str(o.state.assessmentId) === a.id && str(o.state.disposition) === 'OPEN')
+		.map((o) => ({ severity: str(o.state.severity) as never, open: true }));
+	// ⛔ E12's re-review F5 — the sign-off's limb before the ladder (`verdictOf`): a review that answered NO criterion of the
+	// policy gives INCONCLUSIVE, which the ladder alone, reading mandatory criteria only, does not for a policy none of whose
+	// criteria is mandatory.
+	const noneAnswered = declared.every((c) => !ANSWERED.has(latest.get(c.id)?.result ?? ''));
+	const given: string = noneAnswered
+		? 'INCONCLUSIVE'
+		: dispositionFromFindings({
+				findings: open,
+				criteria: declared.map((c) => ({
+					mandatory: c.mandatory,
+					outcome: (latest.get(c.id)?.result ?? 'UNABLE_TO_DETERMINE') as never
+				}))
+			});
+	const evidenced = Array.isArray(policyState.requiredEvidence) && policyState.requiredEvidence.length > 0;
+	// ⛔ `E12F` F7 — A CAP IS A CEILING'S VALUE: `supportedDisposition` answers SATISFIED, CONDITIONALLY_SATISFIED or
+	// INCONCLUSIVE, so a verdict below its answers follows from them only as one of the two a ceiling can impose. ⛔ Any
+	// stricter verdict was read as capped, a REJECTED over answers that give SATISFIED among them — and no ceiling rejects.
+	const capped =
+		evidenced &&
+		EVIDENCE_CEILINGS.has(state) &&
+		STRICTEST_FIRST.indexOf(state) < STRICTEST_FIRST.indexOf(given);
+	const followsFromAnswers = declared.length > 0 && (state === given || capped);
+	const unanswered = declared.filter((c) => !ANSWERED.has(latest.get(c.id)?.result ?? ''));
+	const basis: string[] = [];
+	const registerIds: string[] = [];
+	if (unanswered.length > 0) {
+		registerIds.push('REG-F-489');
+		basis.push(
+			`${policyId}: ${unanswered.length} of ${declared.length} criteria not answered (${unanswered.map((c) => c.id).join(', ')})`
+		);
+	}
+	if (!followsFromAnswers)
+		basis.push(
+			declared.length === 0
+				? `${policyId}: the policy's criteria are not in the store, so the verdict cannot be read against them`
+				: `${policyId}: recorded ${state}, and its answers give ${given}`
+		);
+	return {
+		policyId,
+		state,
+		criterionResults: ix.criteriaOf.get(a.id)?.length ?? 0,
+		value: unanswered.length === 0 && followsFromAnswers ? 'as intended' : 'broke',
+		registerIds,
+		criteria,
+		followsFromAnswers,
+		producer: str(rec(a.state.producer).actorId) || null,
+		basis
+	};
+}
+
+/**
+ * ⭐ THE DECLARED VERDICTS (P7-4g), each read as design B8 reads it (`judgedVerdict`) — ⚠ or, signed off before E2 (the
+ * sign-off's own validator), vacuous by construction, as `REG-D-102` (6) had the report mark all 14.
+ */
 function declaredVerdicts(ix: Index, units: readonly Unit[]): DeclaredVerdict[] {
-	return ix
-		.ofType('ASSURANCE_ASSESSMENT')
-		.filter((a) => str(ix.completionOf.get(a.id)?.payload.validatorId) === DECLARED_SIGNOFF_VALIDATOR)
-		.map((a) => ({
-			assessmentId: a.id,
-			unit: units.find((u) => u.object !== null && u.object.id === strs(a.state.subjectObjectIds)[0])?.slug ?? null,
-			policyId: str(a.state.assurancePolicyId),
-			state: str(a.state.assessmentState),
-			criterionResults: ix.criteriaOf.get(a.id)?.length ?? 0,
-			value: 'vacuous by construction',
-			registerIds: ['REG-F-523', 'REG-F-406']
-		}));
+	const judged = DECLARED_REVIEW_VALIDATORS as readonly string[];
+	const verdicts = ix.ofType('ASSURANCE_ASSESSMENT').flatMap((a): DeclaredVerdict[] => {
+		const validatorId = str(ix.completionOf.get(a.id)?.payload.validatorId);
+		const unit = units.find((u) => u.object !== null && u.object.id === strs(a.state.subjectObjectIds)[0])?.slug ?? null;
+		const results = ix.criteriaOf.get(a.id)?.length ?? 0;
+		if (validatorId === DECLARED_SIGNOFF_VALIDATOR)
+			return [
+				{
+					assessmentId: a.id,
+					unit,
+					policyId: str(a.state.assurancePolicyId),
+					state: str(a.state.assessmentState),
+					criterionResults: results,
+					value: 'vacuous by construction',
+					registerIds: ['REG-F-523', 'REG-F-406'],
+					validatorId,
+					criteria: { declared: 0, recorded: results, answered: 0, undetermined: 0, stipulatedRows: 0 },
+					followsFromAnswers: null,
+					producer: str(rec(a.state.producer).actorId) || null,
+					basis: ['signed off before E2, from the policy’s required evidence alone (REG-F-523)'],
+					supersededBy: null
+				}
+			];
+		if (!judged.includes(validatorId)) return [];
+		return [{ assessmentId: a.id, unit, validatorId, ...judgedVerdict(ix, a), supersededBy: null }];
+	});
+	return supersessions(ix, verdicts);
+}
+
+/**
+ * ⭐⭐ E12's polish (fix2's F9; the lead's delegated decision of 2026-10-15, to be registered) — WHICH DECLARED VERDICT SPEAKS
+ * for each (subject, policy): the latest, read as the product reads it — by the assessment's `updatedAt`, ties to the last made
+ * (`declared-policy-signoff.ts` `latestDeclaredVerdicts`, the kernel's `latestAssessmentByPolicy`) — and each earlier one names
+ * it (`supersededBy`). ⛔ Every verdict was read as speaking: `REG-D-112` (a) keeps the INCONCLUSIVE review beside its re-run,
+ * so a unit the rule recovered still read 5b broke from the review the re-run replaced, and the heading counted 15 of 14.
+ */
+function supersessions(ix: Index, verdicts: readonly DeclaredVerdict[]): DeclaredVerdict[] {
+	const keyOf = (d: DeclaredVerdict): string =>
+		`${strs(ix.byId.get(d.assessmentId)?.state.subjectObjectIds)[0] ?? ''} ${d.policyId}`;
+	const speaks = new Map<string, { readonly id: string; readonly at: string }>();
+	// ⚠ In the order made: `ofType` sorts by each assessment's first event, the order `listAssessments` reads them in.
+	for (const d of verdicts) {
+		const at = str(ix.byId.get(d.assessmentId)?.state.updatedAt);
+		const prev = speaks.get(keyOf(d));
+		if (prev === undefined || at >= prev.at) speaks.set(keyOf(d), { id: d.assessmentId, at });
+	}
+	return verdicts.map((d) => {
+		const id = speaks.get(keyOf(d))!.id;
+		return id === d.assessmentId ? d : { ...d, supersededBy: id };
+	});
 }
 
 function unitView(
@@ -2126,7 +2609,8 @@ function unitView(
 	units: readonly Unit[],
 	lane: LaneRows,
 	pairing: PairingReport,
-	declared: readonly DeclaredVerdict[]
+	declared: readonly DeclaredVerdict[],
+	history: readonly DeclaredVerdict[]
 ): UnitView {
 	const state = u.object
 		? {
@@ -2153,12 +2637,15 @@ function unitView(
 		stepState,
 		pressed: u.plan !== null || (u.lane?.beginExecute ?? null) !== null,
 		timedOut: u.lane?.beginExecute?.timedOutAfterMs ?? null,
+		signOffOutlasted: u.lane?.signOffOutlasted ?? null,
 		reviews: pairing.rows.filter((r) => r.unit === u.slug),
 		runs: unitRuns(u, units, lane),
 		declared: declared.filter((d) => d.unit === u.slug),
+		superseded: history.filter((d) => d.unit === u.slug),
 		signOffAttempted:
 			u.lane?.signOffAttempted === true ||
 			actions.some((a) => a.action === 'recordAssurance' || a.action === 'markSatisfied'),
+		heldBack: u.lane?.signOffHeldBack ?? null,
 		exchanges: {
 			total: exchanges.length,
 			broken: readings.filter((r) => r === 'does not hold what it claims').length,
@@ -2264,15 +2751,34 @@ export function buildRunReport(
 	if (lane.run === undefined) problems.push('lane/run.json is absent: the lane’s own record of each unit is not read');
 	const { undertakingId, units, structure } = resolveUnits(ix, laneUnits(lane.run), problems);
 	const pairing = buildPairing(ix, units);
-	const declared = declaredVerdicts(ix, units);
+	// ⭐ E12's polish (fix2's F9) — the verdicts that speak, the latest per (unit, policy), and the history beside them.
+	const verdicts = declaredVerdicts(ix, units);
+	const declared = verdicts.filter((d) => d.supersededBy === null);
+	const history = verdicts.filter((d) => d.supersededBy !== null);
 	const demoDb = str(rec(rec(lane.boot).overlay).JPWB_DEMO_DB);
 	if (demoDb === '')
 		problems.push('lane/boot.json names no JPWB_DEMO_DB: no recorded path can be made relative to the workspace');
 	const workspace = demoDb === '' || undertakingId === null ? null : workspaceDirectoryFor(demoDb, undertakingId);
-	const views = units.map((u) => unitView(ix, u, units, lane, pairing, declared));
+	const views = units.map((u) => unitView(ix, u, units, lane, pairing, declared, history));
+	// ⭐ E12's polish (fix2's F10) — each unit composed of others, and the verdicts that speak the model reviewer made of it.
+	const parents = new Set(ix.ofType('PROFESSIONAL_WORK_UNIT').map((p) => str(p.state.parentWorkUnitId)));
+	const composites = units
+		.filter((u) => u.object !== null && parents.has(u.object.id))
+		.map((u) => ({
+			unit: u.slug,
+			reviews: declared.filter((d) => d.unit === u.slug && d.validatorId === DECLARED_REVIEW_VALIDATORS[0]).length
+		}));
 	const endReason = str(rec(rec(lane.run).end).reason) || null;
-	if (endReason === 'allowance-exceeded' && views.every((v) => v.timedOut === null))
-		problems.push('lane/run.json ended allowance-exceeded, and names no unit whose Begin & Execute outlasted its allowance');
+	// ⛔ D4 — ~~every act the lane presses ends the run when it outlasts its bound~~ ⭐ E12's polish (fix3's F2): every act
+	// the lane presses through `pressFormAction` (`phase7-operator.ts`) ends the run `allowance-exceeded` when it outlasts
+	// its bound: a Begin & Execute, ⭐ E12's re-review F1 — a recovery act the rule pressed, and a sign-off act. So that end
+	// names one of them.
+	const outlasted = (v: UnitView): boolean =>
+		v.timedOut !== null || v.signOffOutlasted !== null || v.unit.lane?.recoveryOutlasted === true;
+	if (endReason === 'allowance-exceeded' && !views.some(outlasted))
+		problems.push(
+			'lane/run.json ended allowance-exceeded, and names no unit whose Begin & Execute, recovery act or sign-off act outlasted its allowance'
+		);
 	const matrix: MatrixCell[] = [
 		stageOne(ix),
 		stageTwo(undertakingId, structure),
@@ -2302,7 +2808,9 @@ export function buildRunReport(
 			contentRows: store.content === null ? null : store.content.length
 		},
 		answer: {
-			alwaysStated: ALWAYS_STATED,
+			// ⭐ `E12F` F10 — and the `REG-F-523` line where this run's declared verdicts carry no criterion result; ⭐ E12's polish
+			// (fix2's F10) — and the UNIT_PURPOSE line where the model reviewer judged a unit composed of others.
+			alwaysStated: [...ALWAYS_STATED, ...uncheckedCaveat(declared), ...unitPurposeCaveat(composites)],
 			counts: cellCounts,
 			open: matrix.filter((c) => c.value === null).length,
 			measured: cellCounts['as intended'] + cellCounts.broke,
@@ -2313,7 +2821,7 @@ export function buildRunReport(
 		pairing,
 		reviewerCalls: buildReviewerCalls(ix, units, lane),
 		audit: buildAudit(ix, units, undertakingId, lane),
-		declaredVerdicts: { expected: DECLARED_VERDICTS_EXPECTED, rows: declared },
+		declaredVerdicts: { expected: DECLARED_VERDICTS_EXPECTED, rows: declared, history },
 		adjudication: {
 			classes: ADJUDICATION_CLASSES,
 			rows: pairing.rows.map((row) => adjudicationRow(ix, units, row, workspace, o.accountNames))
@@ -2411,7 +2919,12 @@ function unitLines(r: RunReport): string[] {
 		`- **Recorded:** ${r.reviewerCalls.recorded} (${r.reviewerCalls.noResponse} with no response, ` +
 			`${r.reviewerCalls.retries} retries, ${r.reviewerCalls.repairs} repairs).`,
 		`- **The limit (design D8):** ${limit.prior ?? 'prior spend not given'} + ${limit.recorded} + ${limit.reserve} = ` +
-			`${limit.total ?? '?'} of ${limit.limit}${under}.`
+			`${limit.total ?? '?'} of ${limit.limit}${under}.`,
+		// ⭐ E12's polish (fix2's F8; the lead's delegated decision of 2026-10-15, to be registered) — and the lane's own reads.
+		`- **The lane's own reads of the limit, each before a paid act (design D8; E12F F2):** ${r.reviewerCalls.laneLimitChecks.length}.`,
+		...r.reviewerCalls.laneLimitChecks.map(
+			(c) => `  - ${c.unit}, before ${c.before}: ${limitFigures(c)}${c.allowed ? '' : ': held back'}.`
+		)
 	];
 }
 
@@ -2475,18 +2988,37 @@ function adjudicationLine(a: AdjudicationRow): string {
 	);
 }
 
+/** ⭐ E2 — one declared verdict's line: its answers counted, whether its verdict follows from them, and its value. */
+function declaredLine(d: DeclaredVerdict): string {
+	let follows = '—';
+	if (d.followsFromAnswers !== null) follows = d.followsFromAnswers ? 'yes' : 'no';
+	// ⭐ E12's polish (fix2's F9) — a superseded verdict is history: its value said, and the verdict that superseded it.
+	const value = d.supersededBy === null ? d.value : `${d.value}; history: superseded by ${d.supersededBy}`;
+	return (
+		`| ${d.assessmentId} | ${d.unit ?? '—'} | ${d.policyId} | ${d.state} | ${d.criteria.answered} of ${d.criteria.declared} | ` +
+		`${follows} | ${value} |`
+	);
+}
+
 function verdictLines(r: RunReport): string[] {
 	const unrecorded = Object.entries(r.manifest.unrecordedRuns)
 		.map(([u, n]) => `${u} ${n ?? 'unknown'}`)
 		.join('; ');
+	const history = r.declaredVerdicts.history;
 	return [
-		`## The declared verdicts (P7-4g) — ${r.declaredVerdicts.rows.length} of ${r.declaredVerdicts.expected}, each vacuous by construction`,
+		// ⭐ E2 (design B8) — ~~"each vacuous by construction"~~: each read from its recorded criterion results. ⭐ E12's polish
+		// (fix2's F9) — the count is of the verdicts that speak; each one superseded is listed under the verdict that superseded it.
+		`## The declared verdicts (P7-4g) — ${r.declaredVerdicts.rows.length} of ${r.declaredVerdicts.expected}, each read from its recorded criterion results` +
+			(history.length === 0
+				? ''
+				: `; ${plural(history.length, 'verdict', 'verdicts')} superseded, each listed as history beside the one that superseded it (REG-D-112 (a))`),
 		'',
-		'| Assessment | Unit | Policy | State | Criterion results |',
-		'|---|---|---|---|---|',
-		...r.declaredVerdicts.rows.map(
-			(d) => `| ${d.assessmentId} | ${d.unit ?? '—'} | ${d.policyId} | ${d.state} | ${d.criterionResults} |`
-		),
+		'| Assessment | Unit | Policy | State | Criteria answered | Follows from its answers | Value |',
+		'|---|---|---|---|---|---|---|',
+		...r.declaredVerdicts.rows.flatMap((d) => [
+			declaredLine(d),
+			...history.filter((h) => h.supersededBy === d.assessmentId).map(declaredLine)
+		]),
 		'',
 		'## The adjudication table’s rows (P7-4f) — classification left for a person',
 		'',

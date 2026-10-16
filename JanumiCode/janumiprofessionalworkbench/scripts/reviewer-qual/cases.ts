@@ -11,6 +11,8 @@ import type { AssuranceSubject, ProfessionalRationaleSummary } from '@janumipwb/
 import type { ObservedToolCallReport } from '@janumipwb/rph-contracts';
 import type { PwaGraphNode, PwaMeta } from '@janumipwb/rph-projections';
 import type { ObservedProcessRun } from '../../apps/rph-demo/src/lib/server/tools/process-run-observer.js';
+import type { AssessmentCriterion } from '@janumipwb/rph-contracts';
+import type { DeclaredReviewCommand } from '../../apps/rph-demo/src/lib/server/assurance/review-input.js';
 
 /**
  * ⭐ THE PRODUCER EVERY CASE CARRIES (`REG-D-072` D13). The reasoning-review policy requires `DIFFERENT_MODEL`
@@ -55,6 +57,25 @@ export interface ProcessResultCaseInput {
 	readonly observedToolCalls?: ObservedToolCallReport;
 }
 
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (`DESIGN-phase-7-completion.md` B5; `REG-D-110` (3)) — what the declared-policy arm
+ * hands `declaredPolicyReviewInput`: the declared POLICY it is judged against — its id, name, purpose and criteria, as the
+ * catalog seeds them, carried as literals (a case is data) — the unit's instruction, its work products and the commands it
+ * ran. ⛔ ITS CRITERIA ARE ITS OWN: the runner's `criteria` (the floor's seeded rubric) never reaches a declared case.
+ */
+export interface DeclaredPolicyCaseInput {
+	readonly policy: {
+		readonly policyId: string;
+		readonly name: string;
+		readonly purpose: string;
+		readonly criteria: readonly AssessmentCriterion[];
+	};
+	readonly instruction: string;
+	readonly workProducts: readonly { readonly unit: string; readonly answer: string }[];
+	readonly commands: readonly DeclaredReviewCommand[];
+	readonly rationale?: ProfessionalRationaleSummary;
+}
+
 interface CaseCommon {
 	/** Stable across versions of the set: a case that changes gets a new id (version two's `G2-…`, `case-set-v2.ts`;
 	 *  version three's `G3-…`, `case-set-v3.ts`). */
@@ -75,7 +96,12 @@ export interface ProcessResultCase extends CaseCommon {
 	readonly arm: 'PROCESS_RESULT';
 	readonly input: ProcessResultCaseInput;
 }
-export type QualificationCase = GraphCase | WorkProductCase | ProcessResultCase;
+/** ⭐ E2 (design B5) — the fourth arm: a work unit's work, judged against one of its declared policies. */
+export interface DeclaredPolicyCase extends CaseCommon {
+	readonly arm: 'DECLARED_POLICY';
+	readonly input: DeclaredPolicyCaseInput;
+}
+export type QualificationCase = GraphCase | WorkProductCase | ProcessResultCase | DeclaredPolicyCase;
 
 export interface CaseSet {
 	readonly note: string;
@@ -91,7 +117,11 @@ export interface Oracle {
 	/** The criteria the case REQUIRES faulted. A reviewer that faults others as well has not failed discrimination
 	 *  (§5.1 (2)); an empty list on a clean case means ANY fault fails clean acceptance (§5.1 (3)). */
 	readonly faulted: readonly string[];
-	/** The Reasoning Review policy's disposition expected from `composeAssuranceOutcome` over its reference alone. */
+	/**
+	 * The Reasoning Review policy's disposition expected from `composeAssuranceOutcome` over its reference alone — ⭐ E12's
+	 * polish — or, for a declared case, the declared policy's verdict as the sign-off computes it, as oracle set v5 states
+	 * (`runner.ts` `scoreDeclared`).
+	 */
 	readonly disposition: 'SATISFIED' | 'REJECTED';
 	readonly expectation: OracleStanding;
 	/** What the case plants, or why it is clean — for the reader of a failure, never read by a scorer. */
@@ -120,6 +150,9 @@ export const ORACLES_V3_FILE = 'docs/tracking/reviewer-qualification/oracles/ora
 /** ⭐ `JAN-PRQUAL` `PQ-2` — version four (design D4, §5; `REG-D-095`), beside versions one to three, which stay as history. */
 export const CASE_SET_V4_FILE = 'docs/tracking/reviewer-qualification/cases/case-set-v4.json';
 export const ORACLES_V4_FILE = 'docs/tracking/reviewer-qualification/oracles/oracles-v4.json';
+/** ⭐ `JAN-EXEC` Phase 7 completion E2 — version five (design B5), beside versions one to four, which stay as history. */
+export const CASE_SET_V5_FILE = 'docs/tracking/reviewer-qualification/cases/case-set-v5.json';
+export const ORACLES_V5_FILE = 'docs/tracking/reviewer-qualification/oracles/oracles-v5.json';
 
 /**
  * ⭐ `JAN-CRITREAD` J2-5 — THE CURRENT CASE SET AND ITS ORACLES: what `reviewer:qual:check` holds coverage and
@@ -130,9 +163,21 @@ export const ORACLES_V4_FILE = 'docs/tracking/reviewer-qualification/oracles/ora
  * scope takes in the foundations, and the permit receives the report and the calculations (`REG-D-081`) — under new ids.
  * ⭐ Version four since `JAN-PRQUAL` `PQ-2`: version three's twenty-six cases under their ids, byte for byte, and the
  * fourteen process-result cases the sponsor conferred (DESIGN-process-result-qualification.md §5; `REG-D-095`).
+ * ⭐⭐ Version five since `JAN-EXEC` Phase 7 completion E2 (`DESIGN-phase-7-completion.md` B5): version four's forty cases
+ * under their ids, byte for byte, and fourteen DECLARED-POLICY cases, their oracles PROPOSED, awaiting the sponsor's
+ * conferral (design §6 step 2). ⚠ It moves the case-set digest, so `reviewer:qual:check` owes a RUN (P4).
  */
-export const CURRENT_CASE_SET_FILE = CASE_SET_V4_FILE;
-export const CURRENT_ORACLES_FILE = ORACLES_V4_FILE;
+export const CURRENT_CASE_SET_FILE = CASE_SET_V5_FILE;
+export const CURRENT_ORACLES_FILE = ORACLES_V5_FILE;
+
+/**
+ * ⭐⭐ `E12F` F5 (the E12 package review's fifth finding; `REG-D-073`, oracle integrity) — THE WORDS AN ORACLE SET'S
+ * `conferral` CARRIES WHILE ANY OF ITS ORACLES AWAITS THE SPONSOR: written by the version that proposes them
+ * (`oracles-v5.ts`), and READ BY `reviewer:qual:check`, which refuses a current set carrying them (`ORACLES_NOT_CONFERRED`),
+ * so no run over oracles their author alone has judged can turn the check green. ⚠ A conferred version's statement does not
+ * carry them: conferral is recorded as the sponsor's, in the version that confers.
+ */
+export const ORACLES_PROPOSED = 'PROPOSED, AWAITING SPONSOR CONFERRAL';
 
 /** The one serialization of a generated file: tab-indented JSON, LF, a final newline. */
 export function serializeGenerated(value: CaseSet | OracleSet): string {

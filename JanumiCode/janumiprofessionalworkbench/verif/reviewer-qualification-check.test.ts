@@ -34,23 +34,27 @@ import {
 	CASE_SET_V1_FILE,
 	CASE_SET_V2_FILE,
 	CASE_SET_V3_FILE,
+	CASE_SET_V4_FILE,
 	CURRENT_CASE_SET_FILE,
 	CURRENT_ORACLES_FILE,
 	ORACLES_V1_FILE,
 	ORACLES_V2_FILE,
 	ORACLES_V3_FILE,
+	ORACLES_V4_FILE,
 	type CaseSet,
 	type OracleSet,
 	type QualificationCase
 } from '../scripts/reviewer-qual/cases.js';
 import {
 	checkQualification,
+	ORACLES_NOT_CONFERRED,
 	registerFindings,
 	registerRulings,
 	type CheckInputs,
 	type CheckReport
 } from '../scripts/reviewer-qual/check-core.js';
 import { REGISTER_FILE } from '../scripts/reviewer-qual/check.js';
+import { DECLARED_ORACLES_PROPOSED } from '../scripts/reviewer-qual/oracles-v5.js';
 import { reviewerFingerprintOf, sha256 } from '../scripts/reviewer-qual/digest.js';
 import { reviewerFingerprint, type ReviewerFingerprint } from '../scripts/reviewer-qual/fingerprint.js';
 import {
@@ -86,11 +90,18 @@ const REPO = fileURLToPath(new URL('../', import.meta.url))
 // the set that was current when it was written (DESIGN-process-result-qualification.md D4 makes version four current).
 const CASES = (JSON.parse(readFileSync(`${REPO}/${CASE_SET_V1_FILE}`, 'utf8')) as CaseSet).cases;
 const ORACLES = (JSON.parse(readFileSync(`${REPO}/${ORACLES_V1_FILE}`, 'utf8')) as OracleSet).oracles;
+/** ⭐ `E12F` F5 — version one's conferral statement: conferred (`REG-D-073`). */
+const V1_CONFERRAL = (JSON.parse(readFileSync(`${REPO}/${ORACLES_V1_FILE}`, 'utf8')) as OracleSet).conferral;
 const V2_CASES = (JSON.parse(readFileSync(`${REPO}/${CASE_SET_V2_FILE}`, 'utf8')) as CaseSet).cases;
 const V2_ORACLES = JSON.parse(readFileSync(`${REPO}/${ORACLES_V2_FILE}`, 'utf8')) as OracleSet;
 const V3_SET = JSON.parse(readFileSync(`${REPO}/${CASE_SET_V3_FILE}`, 'utf8')) as CaseSet;
 const V3_CASES = V3_SET.cases;
 const V3_ORACLES = JSON.parse(readFileSync(`${REPO}/${ORACLES_V3_FILE}`, 'utf8')) as OracleSet;
+/** ⭐ `JAN-EXEC` Phase 7 completion E2 — version four, current from `JAN-PRQUAL` `PQ-2` to E2, a fixed fixture since: the
+ *  limbs about records of version three are checked against it, the set that was current when they were written. */
+const V4_SET = JSON.parse(readFileSync(`${REPO}/${CASE_SET_V4_FILE}`, 'utf8')) as CaseSet;
+const V4_CASES = V4_SET.cases;
+const V4_ORACLES = JSON.parse(readFileSync(`${REPO}/${ORACLES_V4_FILE}`, 'utf8')) as OracleSet;
 const CURRENT_SET = JSON.parse(readFileSync(`${REPO}/${CURRENT_CASE_SET_FILE}`, 'utf8')) as CaseSet;
 const CURRENT_ORACLES = JSON.parse(readFileSync(`${REPO}/${CURRENT_ORACLES_FILE}`, 'utf8')) as OracleSet;
 const CURRENT_CASES = CURRENT_SET.cases;
@@ -99,16 +110,21 @@ const CURRENT_CASES = CURRENT_SET.cases;
  * which of its cases outside today's set it planted, so the attribution counts those out aloud (`REG-D-080`).
  * ⭐ `JAN-CRITREAD` J2-7 — version two's among them, as the CLI reads it from disk beside version one's and today's.
  * ⭐ `JAN-PRQUAL` `PQ-2` — and version three's, as the CLI reads it beside the others now version four is today's.
+ * ⭐ `JAN-EXEC` Phase 7 completion E2 — and version four's, now version five is today's.
  */
 const ORACLE_SETS: readonly OracleSet[] = [
 	JSON.parse(readFileSync(`${REPO}/${ORACLES_V1_FILE}`, 'utf8')) as OracleSet,
 	V2_ORACLES,
 	V3_ORACLES,
+	V4_ORACLES,
 	CURRENT_ORACLES
 ];
 /** Every oracle any set holds: a case id two hold carries the same standing in each (the cases test holds that). */
 const ORACLE = new Map(
-	[...ORACLES, ...V2_ORACLES.oracles, ...V3_ORACLES.oracles, ...CURRENT_ORACLES.oracles].map((o) => [o.caseId, o])
+	[...ORACLES, ...V2_ORACLES.oracles, ...V3_ORACLES.oracles, ...V4_ORACLES.oracles, ...CURRENT_ORACLES.oracles].map((o) => [
+		o.caseId,
+		o
+	])
 );
 /** The current case set most limbs are driven over: a clean case, a renamed copy of it, a planted defect. */
 const SUBSET: readonly QualificationCase[] = CASES.filter((c) => ['G-CLEAN', 'G-CLEAN-R1', 'G-RR-04'].includes(c.id));
@@ -175,6 +191,8 @@ let FP: ReviewerFingerprint;
 let CURRENT: RunFingerprint;
 /** Today's fingerprint over the CURRENT case set — the same reviewer; its case prompts and case-set digest differ. */
 let FP_NOW: ReviewerFingerprint;
+/** ⭐ E2 — version four's, a fixed fixture now (`V4_SET`). */
+let FP_V4: ReviewerFingerprint;
 /** `JAN-CRITREAD` J2-7 — today's fingerprint over version two, the fixed fixture of the J2-5 limb. */
 let FP_V2: ReviewerFingerprint;
 /** `JAN-PRQUAL` `PQ-2` — today's fingerprint over version three, the fixed fixture of the J2-7 limb. */
@@ -186,6 +204,7 @@ beforeAll(async () => {
 	vi.stubEnv('PATH', NO_PROGRAMS);
 	FP = await reviewerFingerprint(CASES);
 	FP_NOW = await reviewerFingerprint(CURRENT_CASES);
+	FP_V4 = await reviewerFingerprint(V4_CASES);
 	FP_V2 = await reviewerFingerprint(V2_CASES);
 	FP_V3 = await reviewerFingerprint(V3_CASES);
 	CURRENT = { reviewer: FP.reviewer, scoring: FP.scoring, caseSet: FP.caseSet };
@@ -201,9 +220,12 @@ afterAll(() => {
 });
 
 /** A reply faulting exactly `faulted`, as a reviewer would write it. */
-const judgement = (faulted: readonly string[]): string =>
+const judgement = (
+	faulted: readonly string[],
+	criteria: readonly { readonly id: string }[] = SEEDED_REASONING_REVIEW_CRITERIA
+): string =>
 	JSON.stringify({
-		findings: SEEDED_REASONING_REVIEW_CRITERIA.map((k) => ({
+		findings: criteria.map((k) => ({
 			criterionId: k.id,
 			failed: faulted.includes(k.id),
 			statement: faulted.includes(k.id) ? 'present' : 'absent',
@@ -211,8 +233,15 @@ const judgement = (faulted: readonly string[]): string =>
 		})),
 		recommendation: faulted.length ? 'REJECTED' : 'SATISFIED'
 	});
-/** What each case's oracle expects — a reviewer that gets every case right. */
-const asOracle = (caseId: string): string => judgement(ORACLE.get(caseId)!.faulted);
+/**
+ * ⭐ `JAN-EXEC` Phase 7 completion E2 — a DECLARED case's rubric: its own policy's criteria, which its reviewer answers
+ * (`materialize.ts`), never the floor's.
+ */
+const DECLARED_RUBRIC = new Map(
+	CURRENT_CASES.flatMap((c) => (c.arm === 'DECLARED_POLICY' ? [[c.id, c.input.policy.criteria] as const] : []))
+);
+/** What each case's oracle expects — a reviewer that gets every case right, answering the case's own rubric. */
+const asOracle = (caseId: string): string => judgement(ORACLE.get(caseId)!.faulted, DECLARED_RUBRIC.get(caseId));
 
 /** A record made by the REAL runner over a stub transport that answers as `reply` says. */
 async function recorded(o: {
@@ -266,6 +295,8 @@ const check = (
 		cases: SUBSET,
 		oracles: ORACLES,
 		oracleSets: ORACLE_SETS,
+		// ⭐ `E12F` F5 — the conferral of the oracles the check holds the record to: version one's, conferred, unless said.
+		conferral: V1_CONFERRAL,
 		findings: FINDINGS,
 		struck: new Set(),
 		rulings: RULINGS,
@@ -1172,6 +1203,9 @@ describe('JAN-CRITREAD J2-7 — under case set v3, the committed record’s shap
 });
 
 // ── ⭐ `JAN-PRQUAL` `PQ-2` — the current case set is version four (DESIGN-process-result-qualification.md D4; `REG-D-095`) ─
+// ⭐ `JAN-EXEC` Phase 7 completion E2 — since E2 a fixed fixture, as versions two and three are: these limbs check records
+// of version three against version four, the set that was current when they were written; the current set's own limb
+// follows (version five).
 describe('JAN-PRQUAL PQ-2 — under case set v4, the committed record’s shape — runs of v3 — owes a run over exactly the fourteen process-result cases, of the selected candidate too', () => {
 	/** The cases version four adds — design §5's fourteen, in its order. Written here. */
 	const ADDED = [
@@ -1192,7 +1226,7 @@ describe('JAN-PRQUAL PQ-2 — under case set v4, the committed record’s shape 
 	];
 	const GLM: SelectedCandidate = { transport: 'devin', modelLabel: 'glm-5-3-flash-max' };
 	const onTheCurrentSet = (files: CheckInputs['files'], over: Partial<Omit<CheckInputs, 'files'>> = {}) =>
-		check(files, { current: FP_NOW, cases: CURRENT_CASES, oracles: CURRENT_ORACLES.oracles, ...over });
+		check(files, { current: FP_V4, cases: V4_CASES, oracles: V4_ORACLES.oracles, ...over });
 	/** A run of version three under today's fingerprint — the committed record's shape since `PQ-1`. */
 	const ofVersionThree = (runId: string, candidate?: CandidateIdentity) =>
 		recorded({
@@ -1208,16 +1242,16 @@ describe('JAN-PRQUAL PQ-2 — under case set v4, the committed record’s shape 
 		recorded({
 			runId,
 			date: '2026-10-09T12:00:00.000Z',
-			cases: CURRENT_CASES.filter((c) => ADDED.includes(c.id)),
-			fingerprint: { ...CURRENT, caseSet: FP_NOW.caseSet },
+			cases: V4_CASES.filter((c) => ADDED.includes(c.id)),
+			fingerprint: { ...CURRENT, caseSet: FP_V4.caseSet },
 			versions: { caseSet: 4, oracles: 4 },
 			...(candidate ? { candidate } : {})
 		});
 
 	it('⛔ a run of version three under today’s fingerprint owes a run over exactly the fourteen process-result cases, and nothing else: no reproduction failure, no escalation; a run over them turns it green', async () => {
-		expect([CURRENT_SET.caseSetVersion, CURRENT_ORACLES.oracleVersion], 'the current set is version four').toEqual([4, 4]);
+		expect([V4_SET.caseSetVersion, V4_ORACLES.oracleVersion], 'the set is version four').toEqual([4, 4]);
 		const v3Ids = new Set(V3_CASES.map((c) => c.id));
-		const added = CURRENT_CASES.filter((c) => !v3Ids.has(c.id));
+		const added = V4_CASES.filter((c) => !v3Ids.has(c.id));
 		expect(added.map((c) => c.id)).toEqual(ADDED);
 		expect([...new Set(added.map((c) => c.arm))], 'each a process result').toEqual(['PROCESS_RESULT']);
 		const v3Record = await ofVersionThree('qr-v3-then');
@@ -1249,6 +1283,118 @@ describe('JAN-PRQUAL PQ-2 — under case set v4, the committed record’s shape 
 		expect((await onTheCurrentSet([file([...v3Selected, ...(await ofTheAdded('qr-v4-selected', DEVIN)), selection])])).problems).toEqual(
 			[]
 		);
+	});
+});
+
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7 completion E2 — case set version five (`DESIGN-phase-7-completion.md` B5), current since E2 ───────
+describe('JAN-EXEC Phase 7 completion E2 — under case set v5, a run of v4 owes a run over exactly the fourteen declared-policy cases; a run over them, answered as each oracle expects, turns it green', () => {
+	/** The cases version five adds — the seven declared policies, each its clean case and its planted one. Written here. */
+	const ADDED = [
+		'D-RC-CLEAN',
+		'D-RC-04',
+		'D-IP-CLEAN',
+		'D-IP-02',
+		'D-AD-CLEAN',
+		'D-AD-01',
+		'D-DC-CLEAN',
+		'D-DC-01',
+		'D-AC-CLEAN',
+		'D-AC-01',
+		'D-TA-CLEAN',
+		'D-TA-08',
+		'D-FP-CLEAN',
+		'D-FP-03'
+	];
+	/**
+	 * ⭐ `E12F` F5 — today's oracles AS IF CONFERRED: what these cases hold is coverage and escalation over version five, so
+	 * they hand the check a conferred statement. ⛔ Version five's own reads PROPOSED, and the check refuses it — the next
+	 * test's subject.
+	 */
+	const AS_IF_CONFERRED = 'A fixture: every oracle of today’s set as the sponsor will have conferred it.';
+	const onTheCurrentSet = (files: CheckInputs['files'], over: Partial<Omit<CheckInputs, 'files'>> = {}) =>
+		check(files, {
+			current: FP_NOW,
+			cases: CURRENT_CASES,
+			oracles: CURRENT_ORACLES.oracles,
+			conferral: AS_IF_CONFERRED,
+			...over
+		});
+
+	it('⛔ E12F F5 — while today’s oracles are PROPOSED, a run over version five answered exactly as every oracle expects is NOT green: the conferral is owed, a named problem (REG-D-073)', async () => {
+		// ⛔ PREDICTED RED, read from the code: [] — the check read no conferral, so a run over version five made before the
+		// sponsor confers its oracles went green against oracles nobody but their author had judged.
+		expect(CURRENT_ORACLES.conferral, 'arrangement: version five’s oracles are proposed').toContain(DECLARED_ORACLES_PROPOSED);
+		const v4Record = await recorded({
+			runId: 'qr-v4-unconferred',
+			date: '2026-10-10T12:00:00.000Z',
+			cases: V4_CASES,
+			fingerprint: { ...CURRENT, caseSet: FP_V4.caseSet },
+			versions: { caseSet: 4, oracles: 4 }
+		});
+		const declared = await recorded({
+			runId: 'qr-v5-unconferred',
+			date: '2026-10-11T12:00:00.000Z',
+			cases: CURRENT_CASES.filter((c) => !V4_CASES.some((v) => v.id === c.id)),
+			fingerprint: { ...CURRENT, caseSet: FP_NOW.caseSet },
+			versions: { caseSet: 5, oracles: 5 }
+		});
+		const files = [file([...v4Record, ...declared])];
+		const r = await onTheCurrentSet(files, { conferral: CURRENT_ORACLES.conferral });
+		expect(r.problems, 'a run over unconferred oracles went green').toEqual([
+			{ limb: 'CONFERRAL', message: ORACLES_NOT_CONFERRED }
+		]);
+		// ⭑ CONTROL — the same record, its oracles conferred: green. The conferral is the only difference.
+		expect((await onTheCurrentSet(files)).problems).toEqual([]);
+	});
+
+	it('⛔ a run of version four under today’s fingerprint owes exactly the fourteen declared cases — coverage alone — and a run over them, each answered by its own rubric as its oracle expects, turns it green', async () => {
+		expect([CURRENT_SET.caseSetVersion, CURRENT_ORACLES.oracleVersion], 'the current set is version five').toEqual([5, 5]);
+		const v4Ids = new Set(V4_CASES.map((c) => c.id));
+		const added = CURRENT_CASES.filter((c) => !v4Ids.has(c.id));
+		expect(added.map((c) => c.id)).toEqual(ADDED);
+		expect([...new Set(added.map((c) => c.arm))], 'each a declared-policy case').toEqual(['DECLARED_POLICY']);
+		const v4Record = await recorded({
+			runId: 'qr-v4-then',
+			date: '2026-10-10T12:00:00.000Z',
+			cases: V4_CASES,
+			fingerprint: { ...CURRENT, caseSet: FP_V4.caseSet },
+			versions: { caseSet: 4, oracles: 4 }
+		});
+		const owed = await onTheCurrentSet([file(v4Record)]);
+		expect(owed.problems.map((p) => p.limb), 'coverage alone').toEqual(['COVERAGE']);
+		expect(limb(owed, 'COVERAGE')).toBe(
+			`14 of 54 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer}: ${ADDED.join(', ')} — owed: a RUN over them, or RESCORED lines where no case prompt changed (§5.6 limb 1)`
+		);
+		const declared = await recorded({
+			runId: 'qr-v5-declared',
+			date: '2026-10-11T12:00:00.000Z',
+			cases: added,
+			fingerprint: { ...CURRENT, caseSet: FP_NOW.caseSet },
+			versions: { caseSet: 5, oracles: 5 }
+		});
+		// ⭐ MEASURABLE BY THE EXISTING RUNNER, NO MODEL CALLED (design B5): each declared case scored as its oracle expects.
+		expect((await onTheCurrentSet([file([...v4Record, ...declared])])).problems).toEqual([]);
+	});
+
+	it('⛔ …and a planted declared case answered SATISFIED is a material failure: the reviewer missed the plant (PLANTED_DEFECT_NOT_REJECTED)', async () => {
+		const added = CURRENT_CASES.filter((c) => ADDED.includes(c.id));
+		const missed = await recorded({
+			runId: 'qr-v5-missed',
+			cases: added,
+			fingerprint: { ...CURRENT, caseSet: FP_NOW.caseSet },
+			versions: { caseSet: 5, oracles: 5 },
+			reply: (id) => (id === 'D-TA-08' ? judgement([], DECLARED_RUBRIC.get(id)) : asOracle(id))
+		});
+		const v4Record = await recorded({
+			runId: 'qr-v4-then-2',
+			cases: V4_CASES,
+			fingerprint: { ...CURRENT, caseSet: FP_V4.caseSet },
+			versions: { caseSet: 4, oracles: 4 }
+		});
+		const r = await onTheCurrentSet([file([...v4Record, ...missed])]);
+		expect(r.problems.map((p) => p.limb)).toContain('ESCALATION');
+		expect(limb(r, 'ESCALATION')).toContain('D-TA-08');
 	});
 });
 
@@ -1889,6 +2035,15 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 	 *  (`FAULT_LOST`, `ANSWERED_NOW_UNDETERMINED`), none of them material (`REG-D-080`). */
 	const ATTRIBUTION_HEADER =
 		'reviewer:qual:check — attribution against the oracles’ `faulted` lists, and the criterion-level transitions — reported, never a material failure (REG-D-080):';
+	/**
+	 * ⛔ `E12F` F5 (`REG-D-073`) — WHAT THE CLI SAYS OF A RECORD WITH NOTHING ELSE OWED, WHILE THE COMMITTED ORACLES ARE
+	 * PROPOSED: RED, ONE problem, the conferral. ~~GREEN~~ — a run over version five before the sponsor confers its oracles
+	 * must not turn the check green. So each case below that held the CLI GREEN now holds it red on the conferral alone —
+	 * nothing else owed, which is what GREEN said — and the core's green path is driven with a conferred statement
+	 * (`AS_IF_CONFERRED`). ⚠ When the sponsor confers, the committed oracles' statement changes, and these return to GREEN.
+	 */
+	const ONLY_THE_CONFERRAL = `reviewer:qual:check — RED — 1 problem(s):\n  [CONFERRAL] ${ORACLES_NOT_CONFERRED}\n`;
+	const ONLY_THE_CONFERRAL_HEAD = 'reviewer:qual:check — RED — 1 problem(s):';
 
 	it('⛔ under bare bun the packages resolve to built dist, and the check refuses to run', () => {
 		const r = cli([], ['--records', gitRepo()]);
@@ -1908,38 +2063,39 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		expect(r.out).toContain('is not in a git work tree');
 	});
 
-	it('⛔ RED on an empty record — all 40 cases of the committed set are owed', () => {
+	it('⛔ RED on an empty record — all 54 cases of the committed set are owed', () => {
 		const r = cli(['--conditions=source'], ['--records', gitRepo()]);
 		expect(r.status, r.out).toBe(1);
-		expect(r.out).toContain('40 of 40 current case(s) are not MEASURED under today’s reviewer fingerprint');
+		expect(r.out).toContain('54 of 54 current case(s) are not MEASURED under today’s reviewer fingerprint');
 		expect(r.out).toContain(FP.reviewer);
 		// ⭐ `JAN-CRITREAD` J2-5 — the committed set it holds coverage to is the CURRENT one, with its oracles: version three
 		// from J2-7, version four since `JAN-PRQUAL` `PQ-2` (DESIGN-process-result-qualification.md D4).
-		expect(r.out).toContain('; case set v4, oracles v4\n');
+		// ⭐ E2 — ~~version four since `JAN-PRQUAL` `PQ-2`~~ version five since `JAN-EXEC` Phase 7 completion E2 (design B5).
+		expect(r.out).toContain('; case set v5, oracles v5\n');
 		expect(r.out).toContain(`: ${CURRENT_CASES.map((c) => c.id).join(', ')} — owed`);
-		expect(CURRENT_SET.caseSetVersion).toBe(4);
+		expect(CURRENT_SET.caseSetVersion).toBe(5);
 	});
 
-	it('⭐ GREEN on a TRACKED record that covers the committed set, reproduces, and holds no material failure', async () => {
+	it('⭐ ~~GREEN~~ on a TRACKED record that covers the committed set, reproduces, and holds no material failure — nothing owed but the conferral of today’s oracles (E12F F5)', async () => {
 		const dir = gitRepo();
 		writeFileSync(
 			join(dir, 'runs.ndjson'),
-			text(await recorded({ runId: 'qr-cli-1', cases: CURRENT_CASES, versions: { caseSet: 4, oracles: 4 } }))
+			text(await recorded({ runId: 'qr-cli-1', cases: CURRENT_CASES, versions: { caseSet: 5, oracles: 5 } }))
 		);
 		git(dir, 'add', 'runs.ndjson');
 		const r = cli(['--conditions=source'], ['--records', dir]);
-		expect(r.out).toContain('GREEN');
-		expect(r.status, r.out).toBe(0);
+		expect(r.out).toContain(ONLY_THE_CONFERRAL);
+		expect(r.status, r.out).toBe(1);
 	}, 120_000);
 
 	it('⛔ a record file git does not track, or one changed since it was staged, is NOT READ — green here is green on the commit', async () => {
-		const lines = await recorded({ runId: 'qr-cli-2', cases: CURRENT_CASES, versions: { caseSet: 4, oracles: 4 } });
+		const lines = await recorded({ runId: 'qr-cli-2', cases: CURRENT_CASES, versions: { caseSet: 5, oracles: 5 } });
 		const untracked = gitRepo();
 		writeFileSync(join(untracked, 'runs.ndjson'), text(lines));
 		const r = cli(['--conditions=source'], ['--records', untracked]);
 		expect(r.status, r.out).toBe(1);
 		expect(r.out).toContain('runs.ndjson: not read — git does not track it');
-		expect(r.out, 'and so it covers nothing').toContain('40 of 40 current case(s) are not MEASURED');
+		expect(r.out, 'and so it covers nothing').toContain('54 of 54 current case(s) are not MEASURED');
 
 		const changed = gitRepo();
 		writeFileSync(join(changed, 'runs.ndjson'), text(lines));
@@ -1955,7 +2111,7 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		const missed = await recorded({
 			runId: 'qr-cli-3',
 			cases: CURRENT_CASES,
-			versions: { caseSet: 4, oracles: 4 },
+			versions: { caseSet: 5, oracles: 5 },
 			reply: (id) => (id === 'G3-RR-04' ? judgement([]) : asOracle(id))
 		});
 		writeFileSync(join(dir, 'runs.ndjson'), text([...missed, escalate('qr-cli-3', ['G3-RR-04'], 'REG-F-105')]));
@@ -1968,8 +2124,8 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		expect(r.out).toContain('run qr-cli-3: G3-RR-04 — PLANTED_DEFECT_NOT_REJECTED');
 		writeFileSync(register, '### REG-F-105 — open, for the control\n');
 		const open = cli(['--conditions=source'], ['--records', dir, '--register', register]);
-		expect(open.out, 'CONTROL: the same finding, open').toContain('GREEN');
-		expect(open.status, open.out).toBe(0);
+		expect(open.out, 'CONTROL: the same finding, open — nothing owed but the conferral (E12F F5)').toContain(ONLY_THE_CONFERRAL);
+		expect(open.status, open.out).toBe(1);
 	}, 120_000);
 
 	it('⭐ J2-6 — the CLI PRINTS the attribution report, and is GREEN on a record whose only miss is attribution (REG-D-080)', async () => {
@@ -1977,7 +2133,7 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		const lines = await recorded({
 			runId: 'qr-cli-4',
 			cases: CURRENT_CASES,
-			versions: { caseSet: 4, oracles: 4 },
+			versions: { caseSet: 5, oracles: 5 },
 			reply: (id) => (id === 'W-RR-04' ? judgement([RR02]) : asOracle(id))
 		});
 		writeFileSync(join(dir, 'runs.ndjson'), text(lines));
@@ -1986,19 +2142,23 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		expect(r.out).toContain(
 			[
 				ATTRIBUTION_HEADER,
-				'  run qr-cli-4: the planted criterion named in 27 of 28 answered planted evaluation(s), against today’s oracles',
+				// ⭐ `JAN-EXEC` Phase 7 completion E2 — ~~27 of 28~~: case set v5's seven planted declared cases are counted too
+				// (design B5).
+				'  run qr-cli-4: the planted criterion named in 34 of 35 answered planted evaluation(s), against today’s oracles',
 				'    W-RR-04#1 — REJECTED, the right verdict; RR-04 not faulted (it faulted RR-02)',
-				'reviewer:qual:check — GREEN'
+				// ⛔ `E12F` F5 — ~~GREEN~~: red on the conferral alone (`ONLY_THE_CONFERRAL`).
+				ONLY_THE_CONFERRAL_HEAD
 			].join('\n')
 		);
-		expect(r.status, r.out).toBe(0);
+		expect(r.out).toContain(ONLY_THE_CONFERRAL);
+		expect(r.status, r.out).toBe(1);
 	}, 120_000);
 
 	it('⭐ J2-6 — the CLI counts a run’s planted evaluations outside today’s set OUT ALOUD, by every oracle version on file (REG-D-080)', async () => {
 		// The committed record's shape: a run of version one under today's fingerprint, beside one over today's set.
 		const dir = gitRepo();
 		const v1 = await recorded({ runId: 'qr-cli-5', cases: CASES });
-		const now = await recorded({ runId: 'qr-cli-6', cases: CURRENT_CASES, versions: { caseSet: 4, oracles: 4 } });
+		const now = await recorded({ runId: 'qr-cli-6', cases: CURRENT_CASES, versions: { caseSet: 5, oracles: 5 } });
 		writeFileSync(join(dir, 'runs.ndjson'), text([...v1, ...now]));
 		git(dir, 'add', 'runs.ndjson');
 		const r = cli(['--conditions=source'], ['--records', dir]);
@@ -2006,30 +2166,34 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 			[
 				ATTRIBUTION_HEADER,
 				'  run qr-cli-5: the planted criterion named in 10 of 10 answered planted evaluation(s), against today’s oracles (8 answered planted evaluation(s) of cases not in the current set are not counted)',
-				'  run qr-cli-6: the planted criterion named in 28 of 28 answered planted evaluation(s), against today’s oracles',
-				'reviewer:qual:check — GREEN'
+				// ⭐ E2 — ~~28 of 28~~: and case set v5's seven planted declared cases (design B5).
+				'  run qr-cli-6: the planted criterion named in 35 of 35 answered planted evaluation(s), against today’s oracles',
+				// ⛔ `E12F` F5 — ~~GREEN~~: red on the conferral alone (`ONLY_THE_CONFERRAL`).
+				ONLY_THE_CONFERRAL_HEAD
 			].join('\n')
 		);
-		expect(r.status, r.out).toBe(0);
+		expect(r.out).toContain(ONLY_THE_CONFERRAL);
+		expect(r.status, r.out).toBe(1);
 	}, 120_000);
 
-	it('⭐ SR-4 — the CLI names the SELECTION in force in its header and holds coverage to it: GREEN on the selected candidate’s run, RED for a candidate never run, naming all 40 cases (REG-D-086)', async () => {
+	it('⭐ SR-4 — the CLI names the SELECTION in force in its header and holds coverage to it: GREEN on the selected candidate’s run, RED for a candidate never run, naming all 54 cases (REG-D-086)', async () => {
 		const dir = gitRepo();
-		const glm = await recorded({ runId: 'qr-cli-7', candidate: DEVIN, cases: CURRENT_CASES, versions: { caseSet: 4, oracles: 4 } });
+		const glm = await recorded({ runId: 'qr-cli-7', candidate: DEVIN, cases: CURRENT_CASES, versions: { caseSet: 5, oracles: 5 } });
 		writeFileSync(join(dir, 'runs.ndjson'), text([...glm, select({ transport: 'devin', modelLabel: 'glm-5-3-flash-max' })]));
 		git(dir, 'add', 'runs.ndjson');
 		const r = cli(['--conditions=source'], ['--records', dir]);
 		expect(r.out).toContain(
 			`reviewer:qual:check — the SELECTION in force: devin / glm-5-3-flash-max, on REG-D-084 (runs.ndjson:${glm.length + 1}) — every current case is owed its measurement under today’s fingerprint (REG-D-086)\n`
 		);
-		expect(r.out).toContain('reviewer:qual:check — GREEN');
-		expect(r.status, r.out).toBe(0);
+		// ⛔ `E12F` F5 — ~~GREEN~~: nothing owed but the conferral.
+		expect(r.out).toContain(ONLY_THE_CONFERRAL);
+		expect(r.status, r.out).toBe(1);
 		appendFileSync(join(dir, 'runs.ndjson'), serializeLine(select({ transport: 'devin', modelLabel: 'a-model-never-run' })));
 		git(dir, 'add', 'runs.ndjson');
 		const red = cli(['--conditions=source'], ['--records', dir]);
 		expect(red.status, red.out).toBe(1);
 		expect(red.out).toContain(
-			`  [COVERAGE] 40 of 40 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer} by the SELECTED candidate devin / a-model-never-run (REG-D-084; the SELECTION in force, runs.ndjson:${glm.length + 2}): ${CURRENT_CASES.map((c) => c.id).join(', ')} — owed: a run of the selected candidate over them`
+			`  [COVERAGE] 54 of 54 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer} by the SELECTED candidate devin / a-model-never-run (REG-D-084; the SELECTION in force, runs.ndjson:${glm.length + 2}): ${CURRENT_CASES.map((c) => c.id).join(', ')} — owed: a run of the selected candidate over them`
 		);
 	}, 120_000);
 
@@ -2038,7 +2202,7 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		// with the SELECTION appended.
 		const dir = gitRepo();
 		const v1 = await recorded({ runId: 'qr-cli-8', cases: CASES });
-		const glm = await recorded({ runId: 'qr-cli-9', candidate: DEVIN, cases: CURRENT_CASES, versions: { caseSet: 4, oracles: 4 } });
+		const glm = await recorded({ runId: 'qr-cli-9', candidate: DEVIN, cases: CURRENT_CASES, versions: { caseSet: 5, oracles: 5 } });
 		const lines = [...v1, ...glm, select({ transport: 'devin', modelLabel: 'glm-5-3-flash-max' })];
 		writeFileSync(join(dir, 'runs.ndjson'), text(lines));
 		git(dir, 'add', 'runs.ndjson');
@@ -2062,7 +2226,8 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		expect(control.out, 'CONTROL: the same register, the heading live').toContain(
 			`reviewer:qual:check — the SELECTION in force: devin / glm-5-3-flash-max, on REG-D-084 (runs.ndjson:${lines.length}) — every current case`
 		);
-		expect(control.out).toContain('reviewer:qual:check — GREEN');
-		expect(control.status, control.out).toBe(0);
+		// ⛔ `E12F` F5 — ~~GREEN~~: nothing owed but the conferral.
+		expect(control.out).toContain(ONLY_THE_CONFERRAL);
+		expect(control.status, control.out).toBe(1);
 	}, 120_000);
 });

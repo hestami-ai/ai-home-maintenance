@@ -16,10 +16,12 @@ import {
 	CASE_SET_V2_FILE,
 	CASE_SET_V3_FILE,
 	CASE_SET_V4_FILE,
+	CASE_SET_V5_FILE,
 	ORACLES_V1_FILE,
 	ORACLES_V2_FILE,
 	ORACLES_V3_FILE,
 	ORACLES_V4_FILE,
+	ORACLES_V5_FILE,
 	serializeGenerated,
 	type CaseSet
 } from '../scripts/reviewer-qual/cases.js';
@@ -27,10 +29,12 @@ import { CASE_SET_V1 } from '../scripts/reviewer-qual/case-set-v1.js';
 import { CASE_SET_V2 } from '../scripts/reviewer-qual/case-set-v2.js';
 import { CASE_SET_V3 } from '../scripts/reviewer-qual/case-set-v3.js';
 import { CASE_SET_V4 } from '../scripts/reviewer-qual/case-set-v4.js';
+import { CASE_SET_V5 } from '../scripts/reviewer-qual/case-set-v5.js';
 import { ORACLES_V1 } from '../scripts/reviewer-qual/oracles-v1.js';
 import { ORACLES_V2 } from '../scripts/reviewer-qual/oracles-v2.js';
 import { ORACLES_V3 } from '../scripts/reviewer-qual/oracles-v3.js';
 import { ORACLES_V4 } from '../scripts/reviewer-qual/oracles-v4.js';
+import { ORACLES_V5 } from '../scripts/reviewer-qual/oracles-v5.js';
 
 const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url));
 const read = (file: string): string => readFileSync(`${REPO_ROOT}${file}`, 'utf8');
@@ -115,5 +119,27 @@ describe('JAN-PRQUAL PQ-2 — reviewer-qualification case set v4: version three,
 		// Versions one to three stay committed as history, each still exactly what its own source generates (the limbs above).
 		expect(committedV4().caseSetVersion).toBe(4);
 		expect([committedCases().caseSetVersion, committedV2().caseSetVersion, committedV3().caseSetVersion]).toEqual([1, 2, 3]);
+	});
+});
+
+// ⭐⭐ `JAN-EXEC` Phase 7 completion E2 — version five (`DESIGN-phase-7-completion.md` B5): version four, and the fourteen
+// declared-policy cases, their oracles PROPOSED.
+describe('JAN-EXEC Phase 7 completion E2 — reviewer-qualification case set v5: version four, and the fourteen declared-policy cases', () => {
+	it('⛔ the committed case set v5 and oracles v5 are exactly what the generator writes — never hand-edited', () => {
+		const cases = read(CASE_SET_V5_FILE);
+		const oracles = read(ORACLES_V5_FILE);
+		expect(cases, `${CASE_SET_V5_FILE} is stale — run \`bun run scripts/reviewer-qual/generate.ts\``).toBe(
+			serializeGenerated(CASE_SET_V5)
+		);
+		expect(oracles, `${ORACLES_V5_FILE} is stale — run \`bun run scripts/reviewer-qual/generate.ts\``).toBe(
+			serializeGenerated(ORACLES_V5)
+		);
+		for (const text of [cases, oracles]) {
+			expect(text.includes('\r'), 'LF only').toBe(false);
+			expect(text.charCodeAt(0), 'no BOM').not.toBe(0xfeff);
+		}
+		// Versions one to four stay committed as history, each still exactly what its own source generates (the limbs above).
+		expect((JSON.parse(cases) as CaseSet).caseSetVersion).toBe(5);
+		expect(committedV4().caseSetVersion).toBe(4);
 	});
 });

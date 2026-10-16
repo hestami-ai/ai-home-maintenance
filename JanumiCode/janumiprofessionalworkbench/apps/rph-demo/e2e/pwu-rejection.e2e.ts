@@ -1,5 +1,12 @@
 import { expect } from '@playwright/test';
-import { test, resetEngine, introspect, gotoHydrated, declareRisk } from './support/harness';
+import {
+	test,
+	resetEngine,
+	introspect,
+	gotoHydrated,
+	declareRisk,
+	stipulateDeclaredPolicies
+} from './support/harness';
 
 // S-1b of ROADMAP-decision-subject-scope (REG-F-104) — REJECTION, the third act JPWB-DOC-001 §5.2 reserves to
 // Governance, and the one that was unreachable for a reason worth stating.
@@ -16,6 +23,9 @@ import { test, resetEngine, introspect, gotoHydrated, declareRisk } from './supp
 test.describe('Undertaking Workbench — rejection cites a finding it did not make', () => {
 	test.beforeEach(async ({ request }) => {
 		await resetEngine(request, 'reference');
+		// ⭐ `JAN-EXEC` Phase 7 completion E2 (`REG-F-523`; `REG-D-110` (3)) — the sign-off REVIEWS each declared policy now; in
+		// this lane the declared stand-in answers it only where the test stipulated it (`declared-policy-review.ts`).
+		await stipulateDeclaredPolicies(request);
 	});
 
 	test('a PWU cannot be rejected until a blocking finding stands, and then it can', async ({

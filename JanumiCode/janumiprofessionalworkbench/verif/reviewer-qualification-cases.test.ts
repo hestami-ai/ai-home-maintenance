@@ -360,7 +360,17 @@ describe('JAN-CRITREAD J2-1 — reviewer-qualification case set v1', () => {
 				? { ...first, input: { ...first.input, prompt: over, pwa: { ...first.input.pwa, name: over } } }
 				: first.arm === 'WORK_PRODUCT'
 					? { ...first, input: { ...first.input, producingPrompt: over, answer: over } }
-					: { ...first, input: { ...first.input, producingPrompt: over, run: { ...first.input.run, stdout: over } } };
+					: first.arm === 'PROCESS_RESULT'
+						? { ...first, input: { ...first.input, producingPrompt: over, run: { ...first.input.run, stdout: over } } }
+						: // ⭐ `JAN-EXEC` Phase 7 completion E2 — and the declared-policy arm (design B5): its instruction and its work.
+							{
+								...first,
+								input: {
+									...first.input,
+									instruction: over,
+									workProducts: first.input.workProducts.map((w) => ({ ...w, answer: over }))
+								}
+							};
 		const control = (await promptsFor(oversize)).initial;
 		expect(control.split(CUT_DECLARED).length - 1, 'CONTROL: an oversize instruction and content are each declared cut').toBe(2);
 	});
@@ -1685,7 +1695,10 @@ describe('JAN-PRQUAL PQ-2 — reviewer-qualification case set v4: version three,
 				const { pwa, nodes, ...rest } = c.input;
 				expected = graphReviewInput({ criteria, graph: buildPwaGraphExport(pwa, nodes), ...rest });
 			} else if (c.arm === 'WORK_PRODUCT') expected = workProductReviewInput({ criteria, ...c.input });
-			else expected = processResultReviewInput({ criteria, ...c.input });
+			else if (c.arm === 'PROCESS_RESULT') expected = processResultReviewInput({ criteria, ...c.input });
+			// ⭐ `JAN-EXEC` Phase 7 completion E2 — version four holds no declared-policy case (version five's are held by
+			// `reviewer-qualification-declared-cases.test.ts`).
+			else throw new Error(`${c.id}: version four holds no ${c.arm} case`);
 			expect(expected.framing, `${c.id}: the builder of its arm frames it so`).toBe(c.arm);
 			expect(caseReviewInput(c, criteria, seam), `${c.id}: through the builder handed`).toEqual(expected);
 			expect(caseReviewInput(c, criteria), `${c.id}: through the product’s builder by default`).toEqual(expected);

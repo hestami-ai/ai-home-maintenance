@@ -1,5 +1,12 @@
 import { expect } from '@playwright/test';
-import { test, resetEngine, introspect, gotoHydrated, declareRisk } from './support/harness';
+import {
+	test,
+	resetEngine,
+	introspect,
+	gotoHydrated,
+	declareRisk,
+	stipulateDeclaredPolicies
+} from './support/harness';
 
 // Slice 3 — PWU lifecycle + INV-5 ("no green without assurance"). Drives a PWU through the four axes in the UI and
 // proves the engine keeps execution success and assurance separate: a SUCCEEDED PWU is NOT green until an assurance
@@ -7,6 +14,9 @@ import { test, resetEngine, introspect, gotoHydrated, declareRisk } from './supp
 test.describe('Undertaking Workbench — PWU lifecycle enforces no-green-without-assurance', () => {
 	test.beforeEach(async ({ request }) => {
 		await resetEngine(request, 'reference');
+		// ⭐ `JAN-EXEC` Phase 7 completion E2 (`REG-F-523`; `REG-D-110` (3)) — the sign-off REVIEWS each declared policy now; in
+		// this lane the declared stand-in answers it only where the test stipulated it (`declared-policy-review.ts`).
+		await stipulateDeclaredPolicies(request);
 	});
 
 	// The demo's interactive drive now EARNS its states against the RPH-PWU-006 Given guards (Increment 28+): the
@@ -95,14 +105,28 @@ test.describe('Undertaking Workbench — PWU lifecycle enforces no-green-without
 			expect(asm, `no assessment covers declared policy ${policyId}`).toBeTruthy();
 			expect(asm!.state.assessmentState, `${policyId} was not satisfied`).toBe('SATISFIED');
 			// ⭐ THE PARTY. `evaluator` is what the verdict RECORDS; `updatedBy` is what the engine STAMPS from the
-			// session credential. Asserting both is the whole of `R22`'s discipline: a surface that named a
-			// reviewer it did not issue as would satisfy the first and fail the second.
+			// session credential. ~~Asserting both is the whole of `R22`'s discipline: a surface that named a reviewer it did
+			// not issue as would satisfy the first and fail the second.~~ ⭐ E2 (`REG-F-523`): the evaluator recorded is WHO
+			// JUDGED — here the declared stand-in — and the ISSUER is still the reviewer's own session (`R22`): a surface that
+			// issued the reviewer's commands under the operator's credential fails the second.
 			expect((asm!.state.evaluator as { actorId?: string } | undefined)?.actorId).toBe(
-				'assurance-reviewer-1'
+				'standin-declared-reviewer'
 			);
 			expect((asm!.state.updatedBy as { actorId?: string } | undefined)?.actorId).toBe(
 				'assurance-reviewer-1'
 			);
+			// ⭐ E2 — AND EACH OF ITS CRITERIA IS RECORDED (design B2): one result per criterion of the policy.
+			const criteria = snap.events.filter(
+				(e) =>
+					e.eventType === 'AssuranceCriterionEvaluated' &&
+					(e.payload as { assessmentId?: string }).assessmentId === asm!.id
+			);
+			expect(criteria.length, `${policyId}: no criterion result recorded`).toBeGreaterThan(0);
+			// ⚠ Each STIPULATED in this lane, never judged MET: nothing here is evidence a reviewer judged it.
+			expect(
+				[...new Set(criteria.map((e) => (e.payload as { stipulated?: string }).stipulated))],
+				`${policyId}: a criterion recorded other than as stipulated`
+			).toEqual(['MET']);
 		}
 
 		await page.screenshot({ path: 'e2e-results/pwu-lifecycle-satisfied.png', fullPage: true });

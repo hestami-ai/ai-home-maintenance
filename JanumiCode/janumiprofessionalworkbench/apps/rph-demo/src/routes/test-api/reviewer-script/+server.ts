@@ -1,7 +1,8 @@
 // TEST-MODE ONLY endpoint — a spec declares that it STIPULATES a clean remainder for one PWA and one arm
 // (`JAN-CRITREAD` J1-2; `DESIGN-what-the-tests-prove.md` §4.5; `REG-D-071`).
 //
-// POST `{ pwaId, framing: 'PWA_GRAPH' | 'WORK_PRODUCT', remaining: 'CLEAN' }`. The declared stand-in reviewer then
+// POST `{ pwaId, framing: 'PWA_GRAPH' | 'WORK_PRODUCT' | 'DECLARED_POLICY', remaining: 'CLEAN' }` (⭐ E2: `DECLARED_POLICY`
+// stipulates each declared policy's criteria for the declared stand-in, `declared-policy-review.ts`). The declared stand-in reviewer then
 // answers every criterion the structural checker could not judge on that arm with a CLEAN answer recorded as NOT
 // JUDGED (`UNABLE_TO_DETERMINE` + `stipulated: 'MET'`). A test that registers nothing gets the review it gets today:
 // INCONCLUSIVE.

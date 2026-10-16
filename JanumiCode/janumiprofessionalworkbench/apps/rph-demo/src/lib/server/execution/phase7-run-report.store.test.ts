@@ -91,9 +91,15 @@ vi.mock('../tools/devin-reviewer.js', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('../tools/devin-reviewer.js')>();
 	const { writeFile } = await import('node:fs/promises');
 	const { SEEDED_REASONING_REVIEW_CRITERIA } = await import('@janumipwb/rph-assurance');
-	const judgement = (faulted?: string) =>
+	// ⭐ `JAN-EXEC` Phase 7 completion E2 — a DECLARED policy's review is answered by ITS rubric, read off the prompt (each
+	// rubric line is `- <id>: … [if unmet: …]`), as a reviewer reads it; a floor review by the seeded floor rubric, as before.
+	const rubricOf = (prompt: string): readonly { id: string }[] =>
+		prompt.includes('declared assurance policy')
+			? [...prompt.matchAll(/^- ([A-Za-z0-9_-]+): .* \[if unmet: [A-Z]+\]$/gm)].map((m) => ({ id: m[1]! }))
+			: SEEDED_REASONING_REVIEW_CRITERIA;
+	const judgement = (faulted?: string, criteria: readonly { id: string }[] = SEEDED_REASONING_REVIEW_CRITERIA) =>
 		JSON.stringify({
-			findings: SEEDED_REASONING_REVIEW_CRITERIA.map((c) =>
+			findings: criteria.map((c) =>
 				c.id === faulted
 					? {
 							criterionId: c.id,
@@ -130,7 +136,8 @@ vi.mock('../tools/devin-reviewer.js', async (importOriginal) => {
 					);
 				return {
 					stdout: judgement(
-						prompt.includes('marker-reject') ? 'RR-08-evidence-integrity' : undefined
+						prompt.includes('marker-reject') ? 'RR-08-evidence-integrity' : undefined,
+						rubricOf(prompt)
 					)
 				};
 			})
@@ -724,19 +731,22 @@ describe('JAN-EXEC P7-2 D9 — the run report over stores the product wrote, rea
 			[...new Set(report().pairing.rows.map((r) => r.joinedBy))],
 			'a review the product recorded was not joined by its run’s token'
 		).toEqual(['run token']);
-		// ⛔ The deterministic policies and the sign-offs ask no model: listed so, never as "no answer recorded".
+		// ⛔ The deterministic policies and the demo sign-off ask no model: listed so, never as "no answer recorded".
+		// ⭐ E2 (`REG-D-110` (3)) — ~~and the 7 declared-policy sign-offs~~: each of the 7 declared policies of the three units
+		// signed off is REVIEWED now, one call each, so none is listed as asking no model.
 		expect(
 			Object.fromEntries(
 				Object.entries(report().pairing.noModelAnswerByDesign).map(([k, ids]) => [k, ids.length])
 			)
 		).toEqual({
 			'deterministic floor policy': 76,
-			'declared-policy sign-off': 7,
+			'declared-policy sign-off': 0,
 			'demo sign-off': 3,
 			other: 0
 		});
 		expect(report().reviewerCalls).toMatchObject({
-			recorded: 39,
+			// ⭐ E2 — ~~39~~: the floor's 39, and one call for each of the 7 declared reviews.
+			recorded: 46,
 			noResponse: 2,
 			retries: 1,
 			repairs: 0
@@ -809,20 +819,31 @@ describe('JAN-EXEC P7-2 D9 — the run report over stores the product wrote, rea
 			'P7-4f, the adjudication table'
 		]);
 		expect(at('5a', 'implementation')?.value, 'the hand completion did not break the floor').toBe('broke');
+		// ⭐⭐ E2 (`REG-F-523`; design B8) — ~~vacuous by construction~~: the declared policies of the two phases signed off were
+		// JUDGED, by devin on its seam, and 5b reads each from what it recorded — every criterion answered, each verdict the one
+		// its answers give.
 		expect(PHASES.map((p) => at('5b', p)?.value)).toEqual([
-			'vacuous by construction',
+			'as intended',
 			'not reached',
 			'not reached',
-			'vacuous by construction'
+			'as intended'
 		]);
-		expect(report().declaredVerdicts.rows.map((d) => [d.unit, d.criterionResults])).toEqual([
-			['requirements', 0],
-			['requirements', 0],
-			['end-to-end', 0],
-			['end-to-end', 0],
-			['end-to-end', 0],
-			['root', 0],
-			['root', 0]
+		// ⭐ ONE CRITERION RESULT PER CRITERION OF EACH POLICY (~~0 each~~), the reviewer's verdicts first and a HUMAN's
+		// (`pol_fitness_for_purpose`, the operator's, `REG-D-111` (3)) after them, as the batch issues them.
+		expect(report().declaredVerdicts.rows.map((d) => [d.unit, d.policyId, d.criterionResults, d.value])).toEqual([
+			['requirements', 'pol_requirement_coverage', 6, 'as intended'],
+			['requirements', 'pol_intent_preservation', 7, 'as intended'],
+			['end-to-end', 'pol_test_adequacy', 8, 'as intended'],
+			['end-to-end', 'pol_intent_preservation', 7, 'as intended'],
+			['end-to-end', 'pol_fitness_for_purpose', 7, 'as intended'],
+			['root', 'pol_intent_preservation', 7, 'as intended'],
+			['root', 'pol_fitness_for_purpose', 7, 'as intended']
+		]);
+		// ⭐ `REG-F-514` — each phase's verdicts name its EXECUTOR as producer; the root's, the operator who ran its step.
+		expect([...new Set(report().declaredVerdicts.rows.map((d) => `${d.unit}:${d.producer}`))]).toEqual([
+			'requirements:model:fixture-executor-model',
+			'end-to-end:model:fixture-executor-model',
+			'root:local-professional'
 		]);
 		// ⭐ Stage 8 over what the product stored: each exchange's asked and answered bytes hash to their records — the
 		// design review's two calls that threw included, which got no answer to read.

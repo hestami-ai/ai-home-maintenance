@@ -137,8 +137,10 @@
 import type { AssuranceSubject, ProfessionalRationaleSummary, ReasoningReviewInput } from '@janumipwb/rph-assurance';
 import { AssuranceSeveritySchema, type AssessmentCriterion, type ObservedToolCallReport } from '@janumipwb/rph-contracts';
 import { buildPwaGraphExport, type PwaGraphNode, type PwaMeta } from '@janumipwb/rph-projections';
+import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { REASONING_REVIEW_BUDGET } from '../../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
 import {
+	declaredPolicyReviewInput,
 	graphReviewInput,
 	workProductReviewInput,
 	type ProcessResultReviewSource
@@ -153,6 +155,32 @@ import type { ObservedProcessRun } from '../../apps/rph-demo/src/lib/server/tool
  */
 export type ProcessResultBuilder = (source: ProcessResultReviewSource) => ReasoningReviewInput;
 
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (`DESIGN-phase-7-completion.md` B4; `REG-F-553`'s class) — A DECLARED POLICY AS THE
+ * REVIEWER IS SHOWN IT: its id, name and purpose, and its criteria; and the independence its sign-off demands, which no
+ * prompt shows and the recording gate reads (as the seeded floor policy's is hashed beside its criteria).
+ */
+export interface DeclaredProbePolicy {
+	readonly policyId: string;
+	readonly name: string;
+	readonly purpose: string;
+	readonly criteria: readonly AssessmentCriterion[];
+	readonly independenceRequirement: string;
+}
+
+/**
+ * ⭐ E2 — THE CATALOG'S POLICIES, AS THE PRODUCT SEEDS THEM (`seedAdditivePolicies` copies these fields from
+ * `ontology.seedPolicies`): every policy a work unit can declare, so every declared review's rubric and purpose. The
+ * fingerprint's product seam (`fingerprint.ts` `PRODUCT_SEAMS.declaredPolicies`) and the declared probes' default.
+ */
+export const CATALOG_DECLARED_POLICIES: readonly DeclaredProbePolicy[] = ontology.seedPolicies.map((p) => ({
+	policyId: p.policyId,
+	name: p.name,
+	purpose: p.purpose,
+	criteria: p.criteria as unknown as readonly AssessmentCriterion[],
+	independenceRequirement: p.independenceRequirement
+}));
+
 export interface FingerprintProbe {
 	readonly id: string;
 	/** The branch of assembly the probe reaches — for the reader of a moved fingerprint. */
@@ -160,8 +188,14 @@ export interface FingerprintProbe {
 	/**
 	 * The input under `criteria` — the fingerprint's own criteria, so a criteria change reaches the rubric — and, for a
 	 * process result, built through `processResult` (the graph and work-product probes do not read it).
+	 * ⭐ E2 — and, for a declared review, under `declared`: the catalog's policies as the fingerprint's seam holds them, so a
+	 * change to a declared policy's purpose or criteria reaches its probe's prompt (the other probes do not read it).
 	 */
-	readonly input: (criteria: readonly AssessmentCriterion[], processResult: ProcessResultBuilder) => ReasoningReviewInput;
+	readonly input: (
+		criteria: readonly AssessmentCriterion[],
+		processResult: ProcessResultBuilder,
+		declared?: readonly DeclaredProbePolicy[]
+	) => ReasoningReviewInput;
 }
 
 /** Whom a probe is about. The validator does not read its subject; it is carried because `evaluate` requires one. */
@@ -1408,6 +1442,69 @@ export const FINGERPRINT_PROBES: readonly FingerprintProbe[] = [
 			'process-result framing, production’s shape; BOTH FENCE CHOOSERS over each field of the account as the prompt carries it — in each, a candidate split by each line terminator a reader may not break at, a candidate on a line of each layout the reader states (an override, an embedding, an isolate), the field’s last lines, and the view’s token and the prompt’s each split by a line feed (in a list, an item holding one), written backwards below a line a bidi control lays out, and astride two items',
 		input: (criteria, build) =>
 			asProduction(criteria, build, run(), { rationale: BREAKS_ACCOUNT, observedToolCalls: ONE_CALL })
+	},
+	// ── ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (design B4; `REG-F-553`'s class) — THE DECLARED-POLICY FRAMING ──────────────
+	// ⛔ Without these, no probe reached the `DECLARED_POLICY` framing, so a change to what a declared review's reviewer reads
+	// — its framing text, the policy line, a catalog policy's purpose or criteria — moved no fingerprint, and
+	// `reviewer:qual:check` would stay green over a prompt nobody measured. One probe per catalog policy reaches each
+	// policy's own line and rubric; then the root's shape (many work products, no account) and a cut of the work.
+	...CATALOG_DECLARED_POLICIES.map(
+		(catalogued): FingerprintProbe => ({
+			id: `D-${catalogued.policyId}`,
+			covers: `declared-policy framing; ${catalogued.policyId}'s own purpose and criteria the rubric; one work product, one command, the account declared`,
+			input: (_criteria, _build, declared = CATALOG_DECLARED_POLICIES) => {
+				const policy = declared.find((p) => p.policyId === catalogued.policyId) ?? catalogued;
+				return declaredPolicyReviewInput({
+					policy: { policyId: policy.policyId, name: policy.name, purpose: policy.purpose },
+					criteria: policy.criteria,
+					instruction: PRODUCING_PROMPT,
+					instructionIs: 'PRODUCING_PROMPT',
+					workProducts: [{ unit: 'Condition Survey', answer: ANSWER }],
+					commands: [{ unit: 'Condition Survey', argv: ['pytest', '-rs', 'survey/checks/'], exitCode: 0, timedOut: false }],
+					rationale: RATIONALE
+				});
+			}
+		})
+	),
+	{
+		id: 'D-ROOT',
+		covers:
+			'declared-policy framing; a unit composed of others — its own PURPOSE the standard (E12F F4), its children’s two work products and their commands, one timed out and one with no exit code; no one producer’s account, and the host line that says so',
+		input: (_criteria, _build, declared = CATALOG_DECLARED_POLICIES) => {
+			const policy = declared[0]!;
+			return declaredPolicyReviewInput({
+				policy: { policyId: policy.policyId, name: policy.name, purpose: policy.purpose },
+				criteria: policy.criteria,
+				instruction: INTENT,
+				// ⭐ `E12F` F4 — the root's instruction is its own purpose, and the reviewer is told so (`DECLARED_UNIT_PURPOSE_INTENT`).
+				instructionIs: 'UNIT_PURPOSE',
+				workProducts: [
+					{ unit: 'Condition Survey', answer: ANSWER },
+					{ unit: 'Inspection', answer: 'Panels 4 and 9 to be rebuilt; weep holes at 7 to be cleared.' }
+				],
+				commands: [
+					{ unit: 'Condition Survey', argv: ['pytest', '-rs', 'survey/checks/'], exitCode: null, timedOut: true },
+					{ unit: 'Inspection', argv: ['pytest', 'inspection/'], exitCode: null, timedOut: false }
+				]
+			});
+		}
+	},
+	{
+		id: 'D-OVERSIZE-CONTENT',
+		covers: 'declared-policy framing; only the work oversize, the kept HEAD of its cut holding the first fence candidate',
+		input: (_criteria, _build, declared = CATALOG_DECLARED_POLICIES) => {
+			const policy = declared[0]!;
+			return declaredPolicyReviewInput({
+				policy: { policyId: policy.policyId, name: policy.name, purpose: policy.purpose },
+				criteria: policy.criteria,
+				instruction: PRODUCING_PROMPT,
+				instructionIs: 'PRODUCING_PROMPT',
+				// The kept head holds the first fence candidate, on a line of its own (as `W-OVERSIZE-CONTENT`'s does).
+				workProducts: [{ unit: 'Condition Survey', answer: ['<<<UNTRUSTED-00>>>', OVERSIZE_ANSWER].join('\n') }],
+				commands: [],
+				rationale: RATIONALE
+			});
+		}
 	},
 	// ── the output example, when a policy declares no criterion ──
 	{

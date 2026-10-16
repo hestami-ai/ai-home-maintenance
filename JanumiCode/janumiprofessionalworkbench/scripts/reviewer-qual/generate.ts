@@ -19,10 +19,12 @@ import {
 	CASE_SET_V2_FILE,
 	CASE_SET_V3_FILE,
 	CASE_SET_V4_FILE,
+	CASE_SET_V5_FILE,
 	ORACLES_V1_FILE,
 	ORACLES_V2_FILE,
 	ORACLES_V3_FILE,
 	ORACLES_V4_FILE,
+	ORACLES_V5_FILE,
 	serializeGenerated,
 	type CaseSet,
 	type OracleSet
@@ -31,10 +33,12 @@ import { CASE_SET_V1 } from './case-set-v1.js';
 import { CASE_SET_V2 } from './case-set-v2.js';
 import { CASE_SET_V3 } from './case-set-v3.js';
 import { CASE_SET_V4 } from './case-set-v4.js';
+import { CASE_SET_V5 } from './case-set-v5.js';
 import { ORACLES_V1 } from './oracles-v1.js';
 import { ORACLES_V2 } from './oracles-v2.js';
 import { ORACLES_V3 } from './oracles-v3.js';
 import { ORACLES_V4 } from './oracles-v4.js';
+import { ORACLES_V5 } from './oracles-v5.js';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -42,7 +46,9 @@ const VERSIONS: readonly (readonly [string, CaseSet, string, OracleSet])[] = [
 	[CASE_SET_V1_FILE, CASE_SET_V1, ORACLES_V1_FILE, ORACLES_V1],
 	[CASE_SET_V2_FILE, CASE_SET_V2, ORACLES_V2_FILE, ORACLES_V2],
 	[CASE_SET_V3_FILE, CASE_SET_V3, ORACLES_V3_FILE, ORACLES_V3],
-	[CASE_SET_V4_FILE, CASE_SET_V4, ORACLES_V4_FILE, ORACLES_V4]
+	[CASE_SET_V4_FILE, CASE_SET_V4, ORACLES_V4_FILE, ORACLES_V4],
+	// ⭐ `JAN-EXEC` Phase 7 completion E2 — version five: the declared-policy arm (design B5).
+	[CASE_SET_V5_FILE, CASE_SET_V5, ORACLES_V5_FILE, ORACLES_V5]
 ];
 
 for (const [casesFile, cases, oraclesFile, oracles] of VERSIONS) {

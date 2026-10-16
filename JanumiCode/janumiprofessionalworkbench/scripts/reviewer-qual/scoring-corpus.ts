@@ -5,7 +5,9 @@
 // hashed as outcomes only. So a change anywhere between a reply and its recorded outcome moves the digest: the parse,
 // the repair decision, `coerceJudgement`, the mapper, the ladder, `REG-D-089`'s rule (a), the independence check, the
 // runner's handling of a validator that throws. A change that moves NONE of these outcomes is, by this measure, no
-// change to the scoring.
+// change to the scoring. ⚠ E12's polish — OF THE FLOOR'S ARMS ONLY: every entry is the work-product case below, so a
+// DECLARED case's score — the declared sign-off's verdict (`runner.ts` `scoreDeclared`), at the ceiling its policy's seeded
+// evidence sets — is reached by no entry, and a change confined to it moves no scoring digest.
 //
 // ⭐ EVERY `REG-F-428` CLASS IS HERE — a duplicate key, an unknown id and a corrupted one, a non-boolean `failed`,
 // fenced JSON, prose-wrapped JSON — with the siblings the harness detects, and ONE REPLY THAT FAILS THE FIRST PARSE, so

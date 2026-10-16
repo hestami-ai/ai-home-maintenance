@@ -79,9 +79,11 @@ const SELECTED_RUN = 'qr-2026-09-25-devin-glm-5-3-flash-max-v3';
  * ⭐ `JAN-PRQUAL` `PQ-2` — THE CASES THE SELECTED RUN MEASURED: the current set's graph and work-product arms, which case
  * set v4 carries from v3 byte for byte (`reviewer-qualification-cases.test.ts`). Its process-result arm is v4's own, and
  * owes its own run (DESIGN-process-result-qualification.md D4): no recorded prompt of the selected run is of one.
+ * ⭐ `JAN-EXEC` Phase 7 completion E2 — nor of the DECLARED-POLICY arm, case set v5's own (DESIGN-phase-7-completion.md B5),
+ * which owes its run in turn: v5 carries v4's cases byte for byte (`reviewer-qualification-declared-cases.test.ts`).
  */
 const CASES: readonly QualificationCase[] = committedCaseSet(new URL('../', import.meta.url)).cases.filter(
-	(c) => c.arm !== 'PROCESS_RESULT'
+	(c) => c.arm !== 'PROCESS_RESULT' && c.arm !== 'DECLARED_POLICY'
 );
 /** The committed record — append-only, so the lines read here are the ones the selected run wrote. */
 const RECORD: readonly RecordLine[] = readFileSync(`${REPO}/${RECORD_DIR}/runs.ndjson`, 'utf8')

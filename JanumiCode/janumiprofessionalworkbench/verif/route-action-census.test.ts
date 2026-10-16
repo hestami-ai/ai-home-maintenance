@@ -187,6 +187,11 @@ const PINNED: Readonly<Record<string, readonly string[]>> = {
 		'admitEvidence',
 		'submitEvidence',
 		'recordAssurance',
+		// ⭐ `JAN-EXEC` Phase 7 completion `E12F` F3 (`REG-D-112` (a)): the person's re-run of a unit's declared reviews that did
+		// not conclude. It records the person's Decision and a new assessment for each INCONCLUSIVE policy, the old one kept;
+		// the server refuses it unless the unit is under assessment and the offer stands (`declaredRerunOffer`). It arrived in
+		// E12's first fix round without its pin, and this census stayed red until E12's re-review fix round pinned it.
+		'rerunDeclaredReviews',
 		// S-1b (REG-F-112): the ADVERSE assurance act. Until it landed the workbench could sign work off and
 		// could not fault it — `RecordAssuranceObservation` was dispatched nowhere in the app — which is why
 		// rejection was unreachable. It is an ASSURANCE act, deliberately separate from the governance act below.

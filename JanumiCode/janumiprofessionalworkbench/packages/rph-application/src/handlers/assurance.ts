@@ -20,6 +20,7 @@ import {
 	assessFalsification,
 	classifyEvidenceInvalidation,
 	applicabilitySubjectFrom,
+	declaredAssurancePolicyIds,
 	policyApplicability,
 	TraceGraph
 } from '@janumipwb/rph-domain';
@@ -2147,16 +2148,49 @@ const undeterminedMandatoryCriteria = (
 		});
 	// ⭐ THE ONE ADMITTING BRANCH OF GATE E (`REG-D-071` Q5 (a)): in an engine built to admit them — never durable, by
 	// the `Engine`'s own refusal — a mandatory `UNABLE_TO_DETERMINE` whose latest recording carries `stipulated:
-	// 'MET'` is not held against a positive disposition. ⛔ ONLY UNDER `floor.reasoning-review`: every other policy,
-	// and every engine not built for tests, reads `UNABLE_TO_DETERMINE` exactly as before — never met.
+	// 'MET'` is not held against a positive disposition. ~~⛔ ONLY UNDER `floor.reasoning-review`: every other policy,
+	// and every engine not built for tests, reads `UNABLE_TO_DETERMINE` exactly as before — never met.~~
+	// ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (`REG-F-523`; `REG-D-110` (3); `DESIGN-phase-7-completion.md` B1) — ⛔ UNDER
+	// `floor.reasoning-review`, OR UNDER A POLICY THE ASSESSED WORK UNIT ITSELF DECLARES: the declared policies are judged
+	// now, one review per policy, and in the gate lane a declared stand-in answers them as one answers the floor — every
+	// criterion stipulated CLEAN where the test registered it (`apps/rph-demo` `declared-policy-review.ts`). ⚠ A DEPARTURE
+	// FROM `REG-D-071` Q5 (a)'s scope, reported for a ruling: that scope was the one arm a stand-in then answered. Every
+	// other policy — one the subject does not declare — and every engine not built for tests reads `UNABLE_TO_DETERMINE`
+	// exactly as before: never met. The app's verdict reads the same rows the same way (`declared-policy-signoff.ts`
+	// `verdictOf`), so the verdict and this gate agree, as `REG-D-072` D3 asks of the floor's ladder.
 	const admitted =
-		ctx.admitStipulatedAnswers === true && policyId === FLOOR_POLICY_IDS.REASONING_REVIEW;
+		ctx.admitStipulatedAnswers === true &&
+		(policyId === FLOOR_POLICY_IDS.REASONING_REVIEW || subjectDeclares(ctx, assessmentId, policyId));
 	return [...latest.entries()]
 		.filter(([id, result]) => mandatory.has(id) && result === 'UNABLE_TO_DETERMINE')
 		.filter(([id]) => !(admitted && latestStipulated.get(id) === true))
 		.map(([id]) => id)
 		.sort();
 };
+
+/**
+ * ⭐ E2 — WHETHER A WORK UNIT THIS ASSESSMENT IS OF DECLARES `policyId`: its own `assurancePolicyIds` or its type's
+ * `requiredAssurancePolicyIds` — the kernel's one reading of a declaration (`declaredAssurancePolicyIds`, the set
+ * `RPH-PWU-007` folds). Read from the store, never from the command.
+ */
+function subjectDeclares(ctx: HandlerContext, assessmentId: string, policyId: unknown): boolean {
+	// ⚠ NO `?.`, NO SHAPE TEST AND NO TYPE TEST HERE, AS AT `severityIfNotMet` ABOVE, AND FOR ITS REASON: Gate E runs while
+	// the assessment completes, so it is in the store, and `RequestAssuranceAssessment`'s schema makes `subjectObjectIds` a
+	// required array of ids — an arm for either's absence is a branch no arrangement can reach. A policy id that is not a
+	// string is declared by no unit: `includes` answers false.
+	const { subjectObjectIds } = ctx.store.loadObject(assessmentId)!.state as { subjectObjectIds: string[] };
+	return subjectObjectIds.some((id) => {
+		const unit = ctx.store.loadObject(id);
+		// A subject that is not a work unit declares nothing (driven: an assessment over the Intent).
+		if (unit?.objectType !== 'PROFESSIONAL_WORK_UNIT') return false;
+		const pwu = unit.state as { assurancePolicyIds?: string[]; pwuTypeId?: string };
+		// The union's TYPE half (driven: a policy the unit's type requires, the unit naming none).
+		const pwuType = pwu.pwuTypeId
+			? (ctx.store.loadObject(pwu.pwuTypeId)?.state as { requiredAssurancePolicyIds?: string[] } | undefined)
+			: undefined;
+		return declaredAssurancePolicyIds(pwu, pwuType).includes(policyId as string);
+	});
+}
 
 /** GATE E (`JAN-CRITREAD` `CR-03`) — `RPH-ASR-005`: a POSITIVE disposition may not stand over a mandatory
  *  criterion that came back UNABLE_TO_DETERMINE. Canon states it as an absolute with no policy override:

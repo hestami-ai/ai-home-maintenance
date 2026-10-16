@@ -105,7 +105,14 @@ import { fenceSkeletonDigest } from '../fence-skeleton/digest.js';
 import { CURRENT_CASE_SET_FILE, type CaseSet, type QualificationCase } from './cases.js';
 import { canonicalJson, reviewerFingerprintOf, sha256, type FingerprintComponents } from './digest.js';
 import { caseReviewInput } from './materialize.js';
-import { FINGERPRINT_PROBES, PROBE_SUBJECT, READER_CORPUS, type ProcessResultBuilder } from './probes.js';
+import {
+	CATALOG_DECLARED_POLICIES,
+	FINGERPRINT_PROBES,
+	PROBE_SUBJECT,
+	READER_CORPUS,
+	type DeclaredProbePolicy,
+	type ProcessResultBuilder
+} from './probes.js';
 import type { CandidateIdentity } from './record.js';
 import { evaluateCase } from './runner.js';
 import { CORPUS_CASE, scoringCorpus } from './scoring-corpus.js';
@@ -169,6 +176,14 @@ export interface FingerprintSeams {
 	 * (`TRANSPORT_PREAMBLE`, below). A test swaps it to show one character of it moves `probes`.
 	 */
 	readonly devinPreamble: string;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (`DESIGN-phase-7-completion.md` B4; `REG-F-553`'s class) — THE CATALOG'S DECLARED
+	 * POLICIES, every field a declared review reads or its sign-off demands (`probes.ts` `CATALOG_DECLARED_POLICIES`): hashed
+	 * whole in the `criteria` component — the declared framing's CRITERIA LIMB — and handed to the declared probes, so a
+	 * change to a policy's purpose, a criterion, or the independence its sign-off checks moves the fingerprint. ⛔ Without it a
+	 * declared review's rubric could change under a reviewer nobody re-measured.
+	 */
+	readonly declaredPolicies: readonly DeclaredProbePolicy[];
 }
 
 /** Who the fingerprint's validator says it is: an identity no producer carries, so independence never decides a probe. */
@@ -214,6 +229,8 @@ export const PRODUCT_SEAMS: FingerprintSeams = {
 	independence: SEEDED_INDEPENDENCE,
 	// ⭐ P7-6 I4 — THE PRODUCT'S OWN CONSTANT, the one `devinPrint` writes: never a copy of its text.
 	devinPreamble: DEVIN_REVIEWER_PREAMBLE,
+	// ⭐ E2 — THE CATALOG'S DECLARED POLICIES AS THE PRODUCT SEEDS THEM (`probes.ts`), never a copy of their text.
+	declaredPolicies: CATALOG_DECLARED_POLICIES,
 	// ⛔ THE PRODUCT'S BUILDER ITSELF — the same function `runProcessResultFloor` builds through, never a copy or a wrapper
 	// of it (`verif/reviewer-qualification-fingerprint.test.ts` holds the identity). That is why the production fingerprint
 	// cannot hash a process result other than as the product sends it: the floor's input IS this function's output for
@@ -420,7 +437,10 @@ export async function reviewerFingerprint(
 ): Promise<ReviewerFingerprint> {
 	const prompts = new Map<string, string>();
 	for (const probe of FINGERPRINT_PROBES)
-		prompts.set(probe.id, await probePrompt(seams, PROBE_SUBJECT, probe.input(seams.criteria, seams.processResult)));
+		prompts.set(
+			probe.id,
+			await probePrompt(seams, PROBE_SUBJECT, probe.input(seams.criteria, seams.processResult, seams.declaredPolicies))
+		);
 	if (prompts.has(FENCE_SKELETON)) throw new Error(`a probe is named ${FENCE_SKELETON}, which is the skeleton's entry`);
 	if (prompts.has(FENCE_READER)) throw new Error(`a probe is named ${FENCE_READER}, which is the reader corpus's entry`);
 	if (prompts.has(TRANSPORT_PREAMBLE))
@@ -430,11 +450,18 @@ export async function reviewerFingerprint(
 	const probePrompts = new Map([...prompts, [FENCE_SKELETON, (skeletonDigest ??= fenceSkeletonDigest())]]);
 	probePrompts.set(FENCE_READER, readerTokens());
 	probePrompts.set(TRANSPORT_PREAMBLE, seams.devinPreamble);
-	const components: FingerprintComponents = {
+	const floorComponents: FingerprintComponents = {
 		probes: sha256(JSON.stringify([...probePrompts].map(([id, p]) => [id, sha256(p)]))),
 		budget: sha256(canonicalJson(seams.budget)),
 		criteria: sha256(canonicalJson({ criteria: seams.criteria, independence: seams.independence })),
 		scoring: await scoringDigestOf(seams)
+	};
+	// ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (design B4) — THE DECLARED FRAMING'S CRITERIA LIMB, folded into the criteria
+	// component: the catalog's declared policies whole, beside the floor's rubric and its independence, hashed above as
+	// before. ⛔ Without it a declared policy's criterion, or the independence its sign-off checks, moved no component.
+	const components: FingerprintComponents = {
+		...floorComponents,
+		criteria: sha256(canonicalJson({ floor: floorComponents.criteria, declared: seams.declaredPolicies }))
 	};
 	return {
 		reviewer: reviewerFingerprintOf(components),
