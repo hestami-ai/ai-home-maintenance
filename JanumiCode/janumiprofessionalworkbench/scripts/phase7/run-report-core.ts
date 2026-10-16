@@ -871,7 +871,7 @@ interface LaneUnit {
 	/** ⭐ E12's polish (the same decision) — every read of the limit the lane recorded for the unit, in the order it made them. */
 	readonly limitChecks: readonly LaneLimitCheck[];
 	/**
-	 * ⭐ R3-B F4 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — WHERE THE LANE STOPPED, when it
+	 * ⭐ R3-B F4 (the lead's round-3 item 4) — WHERE THE LANE STOPPED, when it
 	 * skipped this unit's sign-off after stopping at ANOTHER unit's limit check: that unit's slug, and the act its check was
 	 * read before (`signOffsSkipped`). null when the lane did not skip it so.
 	 */
@@ -939,7 +939,7 @@ function signOffOutlasted(signOff: Record<string, unknown>): LaneUnit['signOffOu
 }
 
 /**
- * ⭐ R3-B F4 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — THE SIGN-OFFS THE LANE SKIPPED AFTER
+ * ⭐ R3-B F4 (the lead's round-3 item 4) — THE SIGN-OFFS THE LANE SKIPPED AFTER
  * IT STOPPED AT A LIMIT CHECK, each with where it stopped. The lane signs off the phases that did not stop, in order, then the
  * root, the record's first unit; a sign-off whose limit check — before Record Assurance, or before the rule's re-run of the
  * declared reviews — held its act back ends that loop (`runTheLane`, D8). So every unit after it in that order whose record
@@ -2375,7 +2375,7 @@ const limitFigures = (c: LaneLimitCheck): string =>
  * UNIT'S SIGN-OFF, as stage 7 says it: before which act, why in the lane's own words, and the limit it read; else `otherwise`.
  * ⛔ A sign-off held back before Record Assurance read "its sign-off was never attempted", the words a run cut short reads, and
  * a declared re-run held back beside a refused Record Assurance left the limit's part said nowhere.
- * ⭐ R3-B F4 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — AND A SIGN-OFF THE LANE SKIPPED after
+ * ⭐ R3-B F4 (the lead's round-3 item 4) — AND A SIGN-OFF THE LANE SKIPPED after
  * stopping at another unit's limit check says where it stopped (`skippedWhy`), never `otherwise`. ⛔ Each such unit read "its
  * sign-off was never attempted", the root's included.
  */
@@ -2392,7 +2392,7 @@ function heldBackOr(v: UnitView, ...otherwise: string[]): string[] {
 }
 
 /**
- * ⭐ R3-B F4 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — WHY THE LANE DID NOT ATTEMPT A SIGN-OFF
+ * ⭐ R3-B F4 (the lead's round-3 item 4) — WHY THE LANE DID NOT ATTEMPT A SIGN-OFF
  * IT SKIPPED after stopping at another unit's limit check (`LaneUnit.signOffSkippedAt`): that unit, and the act its check was
  * read before; null for a unit it did not skip so.
  */
@@ -2460,7 +2460,7 @@ const dischargeOf = (ix: Index, u: Unit): string =>
 		'UNDECLARED');
 
 /**
- * ⭐ R3-B F6 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — WHY A UNIT'S TYPE CANNOT BE READ, or
+ * ⭐ R3-B F6 (the lead's round-3 item 6) — WHY A UNIT'S TYPE CANNOT BE READ, or
  * null when it can. Half A's is §3.2's declaration, always read. Half B's is the store's PWU_TYPE the unit names: unreadable
  * when the unit names none, when the store holds no type of that id, or when its `workDischarge` is there and no string.
  * ⚠ A type read that names no discharge is READ — `UNDECLARED` (`dischargeOf`), which keeps a root's reading.
@@ -2478,7 +2478,7 @@ function typeUnreadable(ix: Index, u: Unit): string | null {
 }
 
 /**
- * ⭐ R3-B F6 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — THE CELLS OF A ROOT WHOSE TYPE CANNOT
+ * ⭐ R3-B F6 (the lead's round-3 item 6) — THE CELLS OF A ROOT WHOSE TYPE CANNOT
  * BE READ, FAILED CLOSED: whether its press ran a model, and so which of its stages apply, cannot be decided, so each is
  * reported — a break as it was found, the reason beside it; any other value not determined, OPEN and owed to a person, the
  * reason first. ⛔ Read as UNDECLARED, such a root was skipped by its place, and its stages 3 to 8 were reported nowhere.
@@ -2878,7 +2878,7 @@ function acceptedHashIn(authoring: Record<string, unknown>): string | null {
 }
 
 /**
- * ⭐ R3-B F5 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — HOW AN ACCEPTANCE THAT GOT NO ANSWER
+ * ⭐ R3-B F5 (the lead's round-3 item 5) — HOW AN ACCEPTANCE THAT GOT NO ANSWER
  * WENT UNANSWERED, as the lane kept it (`DesignerActRecord`): no answer within its bound, or its request failed in transit,
  * in the words the lane's `refusalOf` gives each; null for an acceptance answered, and for none pressed.
  */
@@ -2908,7 +2908,7 @@ function noAcceptanceFault(authoring: Record<string, unknown>): string {
  * by the agent", in the cell that says the turn never settled. Otherwise the PWA is still the lane's draft, and the line
  * says what the authoring came to: its candidate as the lane last read it, and the run's end. ⚠ A hash alone is no
  * acceptance: `accepted` is stage 1's one reading of it (`acceptedHashIn`).
- * ⭐ R3-B F5 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — AN ACCEPTANCE THAT GOT NO ANSWER
+ * ⭐ R3-B F5 (the lead's round-3 item 5) — AN ACCEPTANCE THAT GOT NO ANSWER
  * (`unansweredAcceptance`) READS AS NO ANSWER, which the server may still have accepted. ⛔ It read "still the draft the lane
  * created: no candidate of the agent’s was accepted into it" — of a press whose answer never came.
  */
@@ -3032,7 +3032,7 @@ function stageSevenWhole(views: readonly UnitView[]): MatrixCell {
 	if (broke.length > 0) value = 'broke';
 	else if (perUnit.some((c) => c.value === 'not reached')) value = 'not reached';
 	/**
-	 * ⭐ R3-B F4 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — a unit whose sign-off the lane
+	 * ⭐ R3-B F4 (the lead's round-3 item 4) — a unit whose sign-off the lane
 	 * skipped, and whose cell reads it so, says why on its line: the root has no row of its own in half A, and its line was all
 	 * a reader had of its skipped sign-off.
 	 */
@@ -3457,7 +3457,7 @@ export function buildRunReport(
 	// `rootLimitCheck`): its press runs a model, so its tries, reviews and exchanges are measured like any phase's.
 	// ⛔ ~~Every root skipped by its place~~: a MODEL root that broke a stage read as intended. ⭑ §3.2's root declares
 	// HUMAN and keeps its reading, in the whole run's stage 7.
-	// ⭐ R3-B F6 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — AND A ROOT WHOSE TYPE CANNOT BE
+	// ⭐ R3-B F6 (the lead's round-3 item 6) — AND A ROOT WHOSE TYPE CANNOT BE
 	// READ FAILS CLOSED: measured as a phase, its cells reported, broke or not determined, each with why (`failedClosed`).
 	// ⛔ Read as UNDECLARED, it was skipped by its place.
 	const rootUnreadable = units[0] === undefined ? null : typeUnreadable(ix, units[0]);

@@ -2612,7 +2612,7 @@ describe('⛔ E3’s polish, 2 — stage 1 says the agent authored the PWA only 
 		expect(one.basis).toContain('the lane recorded no accepted hash: no one accepted a candidate');
 	});
 
-	// ⛔ R3-B F5 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — AN ACCEPTANCE THAT GOT NO ANSWER
+	// ⛔ R3-B F5 (the lead's round-3 item 5) — AN ACCEPTANCE THAT GOT NO ANSWER
 	// READS AS NO ANSWER: the lane pressed it and heard nothing back — it outlasted its bound, or its request failed in transit
 	// (`pressFormAction`) — so the server may still have accepted the candidate. Never "no candidate accepted".
 	it('⛔ R3-B F5 — an acceptance that got NO ANSWER reads as no answer, which the server may still have accepted — never “no candidate accepted”', () => {
@@ -2758,7 +2758,7 @@ describe('⛔ E3’s polish, 3 — a root that declares MODEL has its cells repo
 		expect(Object.keys(r.manifest.unrecordedRuns)).toEqual(['specify-wordfreq', 'build-wordfreq', 'verify-wordfreq-end-to-end']);
 	});
 
-	// ⛔ R3-B F6 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — A ROOT WHOSE TYPE CANNOT BE READ
+	// ⛔ R3-B F6 (the lead's round-3 item 6) — A ROOT WHOSE TYPE CANNOT BE READ
 	// FAILS CLOSED: whether its press ran a model cannot be decided, so its cells are reported — broke, or not determined —
 	// each with why, never skipped. ⚠ A type READ to declare no discharge is UNDECLARED, the control above.
 	/** The report of a half-B run whose root's type `store` cannot read, held to what failing closed reports. */

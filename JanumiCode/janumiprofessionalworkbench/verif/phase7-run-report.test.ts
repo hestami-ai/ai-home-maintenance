@@ -1994,14 +1994,14 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 			]
 		]);
 		// ~~⭑ CONTROL — a unit the lane never reached, the run stopped at design: never attempted, as before.~~ ⛔ R3-B F4 (the
-		// lead's delegated decision of 2026-10-16, to be registered as REG-D-114): a sign-off the lane skipped after it stopped at
+		// lead's round-3 item 4): a sign-off the lane skipped after it stopped at
 		// design's limit check is not attempted BECAUSE it stopped there — the next test's.
 		expect(cellOf(r, '7', 'implementation').basis.at(-1)).toBe(
 			'its sign-off was not attempted: the lane stopped at the design unit’s limit check, before Record Assurance, and pressed no sign-off after it (D8)'
 		);
 	});
 
-	// ── ⛔ R3-B F4 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — A SIGN-OFF THE LANE SKIPPED AFTER IT
+	// ── ⛔ R3-B F4 (the lead's round-3 item 4) — A SIGN-OFF THE LANE SKIPPED AFTER IT
 	// STOPPED AT A UNIT'S LIMIT CHECK reads as not attempted because the lane stopped there: the lane signs off the phases that
 	// completed, in order, then the root, and a limit check that holds a sign-off back ends that loop (`runTheLane`, D8).
 	it('⛔ R3-B F4 — every later sign-off the lane skipped after stopping at a unit’s limit check, the root’s included, reads as not attempted because the lane stopped there — never as one never attempted', () => {
