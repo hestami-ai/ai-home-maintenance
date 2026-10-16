@@ -1852,11 +1852,31 @@ describe('⛔ REG-D-112 (E3’s review, 2) — the LIMIT is checked before Send 
 				allowed: false
 			}
 		]);
-		expect(refused.end?.detail).toContain('before the root’s press');
+		// ⛔ Round 4's check, F2 — the end's words say what the check counted, as its read records it: one try's reserve. They
+		// said "its worst case of 4 counted", which the root's check no longer counts (`REG-D-114` (14), as amended).
+		expect(refused.end?.detail).toBe(
+			`the limit, before the root’s press: ${PHASE7_PAID_LIMIT + 1} of ${PHASE7_PAID_LIMIT} reviewer calls, ${TRY_RESERVE} ` +
+				'ahead (one try’s reserve) counted (D8; REG-D-112; REG-D-114 (14), as amended 2026-10-16)'
+		);
 		const human = halfBLane({ paid: true, prior, floorCalls: FLOOR_WORST });
 		const pressed = await human.run();
 		expect(human.only('beginExecute root')).toEqual(['beginExecute root']);
 		expect(pressed.units[0]?.limitCheck).toMatchObject({ ahead: 0, counted: 'none: it runs no model', allowed: true });
+	});
+
+	it('⛔ round 4’s check, F2 — CONTROL: a root that runs no model, refused, ends with words saying it counted none — read from its check, never fixed text', async () => {
+		// Arrangement: Send's check let the run through, so the root's, counting none, is refused only when the store records
+		// more reviewer calls after Send than the floor's worst case — here 4 more, past the limit by one.
+		const prior = rootReaching(FLOOR_WORST) + 1;
+		const l = halfBLane({ paid: true, prior, floorCalls: FLOOR_WORST + TRY_RESERVE });
+		const record = await l.run();
+		expect(l.only('beginExecute root'), 'arrangement: the root that runs no model is held back').toEqual([]);
+		expect(record.units[0]?.limitCheck).toMatchObject({ ahead: 0, counted: 'none: it runs no model', allowed: false });
+		expect([record.end?.reason, record.end?.detail]).toEqual([
+			'paid-limit',
+			`the limit, before the root’s press: ${PHASE7_PAID_LIMIT + 1} of ${PHASE7_PAID_LIMIT} reviewer calls, 0 ahead ` +
+				'(none: it runs no model) counted (D8; REG-D-112; REG-D-114 (14), as amended 2026-10-16)'
+		]);
 	});
 
 	it('⛔ REG-D-114 (14), AS AMENDED — a MODEL root whose ONE TRY’S RESERVE brings the total EXACTLY to the limit is pressed', async () => {

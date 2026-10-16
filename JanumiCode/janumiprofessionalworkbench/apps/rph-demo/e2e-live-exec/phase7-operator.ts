@@ -2323,11 +2323,13 @@ export async function runTheLane(r: {
 			const rootCheck = rootLimitCheck(boot.prior as number, snapshot, root.unitId!);
 			root.limitCheck = rootCheck;
 			writeRunRecord(lane, record);
+			// ⛔ Round 4's check, F2 — the end's words say what the check counted (`counted`): one try's reserve for a MODEL
+			// root, none for a root that runs no model. ⛔ They said "its worst case", which this check no longer counts.
 			if (!rootCheck.allowed)
 				return end(
 					'paid-limit',
-					`the limit, before the root’s press: ${rootCheck.total} of ${rootCheck.limit} reviewer calls, its worst ` +
-						`case of ${rootCheck.ahead} counted (D8; REG-D-112)`
+					`the limit, before the root’s press: ${rootCheck.total} of ${rootCheck.limit} reviewer calls, ` +
+						`${rootCheck.ahead} ahead (${rootCheck.counted}) counted (D8; REG-D-112; REG-D-114 (14), as amended 2026-10-16)`
 				);
 		}
 		// ⛔ THE ROOT'S PRESS IS BOUNDED AS EVERY PRESS IS (D4): with no answer, the run ends here, dry or paid.
