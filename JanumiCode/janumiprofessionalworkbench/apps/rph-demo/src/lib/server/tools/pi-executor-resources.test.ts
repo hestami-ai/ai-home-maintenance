@@ -20,6 +20,9 @@
 // prompt, with every switch the executor's options set, and `pi-agent.ts` — read as source, as `pi-executor.ts` is —
 // builds its loader from it with `this.systemPrompt`, and makes one settings manager trusting no project, which its
 // loader and its session both take.
+// ⛔ AND IN EACH MODULE THE SESSION TAKES THE LOADER BUILT THERE (the check of R3-C, F1): a session handed none builds its
+// own at Pi's defaults (`dist/core/sdk.js`, `createAgentSession`), and the closed one is then built, reloaded and never
+// used — which nothing above sees, nor the type-check or lint, since the reload still reads it.
 // ⚠ PI-FREE: the coding agent is not loaded here~~ — the gate's one test that loads any part of Pi is
 // `pi-execution-tools.test.ts`, its core loop alone~~. Pi's real loader and session were driven once, by hand, over a tree
 // holding one of each resource (the commit that made this file quotes what they took)~~, and that is not repeated in the
@@ -92,13 +95,13 @@ function projectTrustedOf(options: ts.Expression | undefined): boolean | string 
 	return 'not a literal';
 }
 
-/** The variable an options argument hands on as its `settingsManager` — or what stands there instead. */
-function settingsManagerOf(options: ts.Expression | undefined): string {
+/** The variable an options argument hands on as its `name` — or what stands there instead. */
+function variableHandedOn(options: ts.Expression | undefined, name: string): string {
 	if (options === undefined || !ts.isObjectLiteralExpression(options))
 		return 'not an object literal';
 	if (options.properties.some(ts.isSpreadAssignment)) return 'a spread';
 	const property = options.properties.find(
-		(p) => p.name !== undefined && ts.isIdentifier(p.name) && p.name.text === 'settingsManager'
+		(p) => p.name !== undefined && ts.isIdentifier(p.name) && p.name.text === name
 	);
 	if (property === undefined) return 'absent';
 	if (ts.isShorthandPropertyAssignment(property)) return property.name.text;
@@ -157,6 +160,13 @@ function systemPromptOf(argument: ts.Expression | undefined, source: ts.SourceFi
 		: 'something else';
 }
 
+/** The variable an expression initialises — or 'nothing'. */
+function boundTo(node: ts.Node): string {
+	return ts.isVariableDeclaration(node.parent) && ts.isIdentifier(node.parent.name)
+		? node.parent.name.text
+		: 'nothing';
+}
+
 /**
  * Every `SettingsManager.…(…)` call in `source` — its method, the `projectTrusted` it gives and the variable it is bound
  * to — and the `settingsManager` that each call of a function `takerNames` names hands on.
@@ -175,18 +185,46 @@ function settingsWiring(source: ts.SourceFile, takerNames: readonly string[]) {
 				managers.push({
 					method: callee.name.text,
 					projectTrusted: projectTrustedOf(node.arguments[2]),
-					boundTo:
-						ts.isVariableDeclaration(node.parent) && ts.isIdentifier(node.parent.name)
-							? node.parent.name.text
-							: 'nothing'
+					boundTo: boundTo(node)
 				});
 			if (ts.isIdentifier(callee) && Object.hasOwn(takers, callee.text))
-				takers[callee.text]!.push(settingsManagerOf(node.arguments[0]));
+				takers[callee.text]!.push(variableHandedOn(node.arguments[0], 'settingsManager'));
 		}
 		ts.forEachChild(node, visit);
 	};
 	visit(source);
 	return { managers, takers };
+}
+
+/**
+ * Every `new DefaultResourceLoader(…)` in `source` — the function its one argument calls and the variable it is bound
+ * to — and the `resourceLoader` that each `createAgentSession(…)` call hands on.
+ */
+function loaderWiring(source: ts.SourceFile) {
+	const loaders: { calls: string; boundTo: string }[] = [];
+	const sessions: string[] = [];
+	const visit = (node: ts.Node): void => {
+		if (
+			ts.isNewExpression(node) &&
+			ts.isIdentifier(node.expression) &&
+			node.expression.text === 'DefaultResourceLoader'
+		) {
+			const args = node.arguments ?? [];
+			loaders.push({
+				calls: calledBy(args.length === 1 ? args[0] : undefined),
+				boundTo: boundTo(node)
+			});
+		}
+		if (
+			ts.isCallExpression(node) &&
+			ts.isIdentifier(node.expression) &&
+			node.expression.text === 'createAgentSession'
+		)
+			sessions.push(variableHandedOn(node.arguments[0], 'resourceLoader'));
+		ts.forEachChild(node, visit);
+	};
+	visit(source);
+	return { loaders, sessions };
 }
 
 describe('⭐ the executor’s resource loader (the lead’s delegated decision of 2026-10-15, to be registered)', () => {
@@ -244,6 +282,20 @@ describe('⭐ the executor’s resource loader (the lead’s delegated decision 
 		// must take exactly one argument, a call of `executorResourceLoaderOptions`.
 		expect(loaderArguments(parsed('./pi-executor.ts')).map(calledBy)).toEqual([
 			'executorResourceLoaderOptions'
+		]);
+	});
+
+	it('⛔ pi-executor.ts’s session takes that loader: its one createAgentSession call hands on, as its resourceLoader, the variable the one loader is bound to', () => {
+		// ⭑ Read as SOURCE, as above. Handed no loader, the session builds its own at Pi's defaults (`dist/core/sdk.js`,
+		// `createAgentSession`), and the one above is built, reloaded and never used: the test above still holds. Of the
+		// gate's other tests, `pi-executor.test.ts` sees it too, in the composite Pi's real loader gives (the check of
+		// R3-C, F1).
+		const wiring = loaderWiring(parsed('./pi-executor.ts'));
+		expect(wiring.loaders, 'the loader, and the variable it is bound to').toEqual([
+			{ calls: 'executorResourceLoaderOptions', boundTo: 'loader' }
+		]);
+		expect(wiring.sessions, 'the resourceLoader each createAgentSession call hands on').toEqual([
+			'loader'
 		]);
 	});
 
@@ -310,6 +362,20 @@ describe('⭐ the authoring agent’s resource loader (the lead’s delegated de
 				systemPrompt: systemPromptOf(argument, source)
 			}))
 		).toEqual([{ calls: 'closedResourceLoaderOptions', systemPrompt: 'this.systemPrompt' }]);
+	});
+
+	it('⛔ pi-agent.ts’s session takes that loader: its one createAgentSession call hands on, as its resourceLoader, the variable the one loader is bound to', () => {
+		// ⭑ Read as SOURCE, as above, for the executor's reason; and no gate test runs the authoring agent's Pi, to see it in
+		// a composite as `pi-executor.test.ts` sees the executor's. Its prompt reaches Pi through this loader alone: a
+		// session handed none takes Pi's own, or a `SYSTEM.md` Pi finds, and none of this agent's
+		// (`dist/core/resource-loader.js`, `discoverSystemPromptFile`; `dist/core/system-prompt.js`) (the check of R3-C, F1).
+		const wiring = loaderWiring(parsed('../agent/pi-agent.ts'));
+		expect(wiring.loaders, 'the loader, and the variable it is bound to').toEqual([
+			{ calls: 'closedResourceLoaderOptions', boundTo: 'loader' }
+		]);
+		expect(wiring.sessions, 'the resourceLoader each createAgentSession call hands on').toEqual([
+			'loader'
+		]);
 	});
 
 	it('⛔ pi-agent.ts trusts no project’s settings: its one settings manager is made with projectTrusted false, and its loader and its session take that one', () => {
