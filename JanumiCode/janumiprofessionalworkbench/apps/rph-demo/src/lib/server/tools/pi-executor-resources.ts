@@ -22,7 +22,15 @@
 // ⚠ AND WHAT IT DOES NOT SWITCH OFF, each an open question of the E4 polish round:
 //   · PI'S SETTINGS are still read, the workspace's `.pi/settings.json` among them — `SettingsManager.create` trusts a
 //     project's by default — and each load still resolves the packages they list, fetching a missing one by npm or git
-//     unless `PI_OFFLINE` is set (`dist/core/package-manager.js`, `resolve`), though nothing in one reaches the executor;
+//     unless `PI_OFFLINE` is set (`dist/core/package-manager.js`, `resolve`), ~~though nothing in one reaches the
+//     executor~~ ⭐ (the check of E4's polish round) and installing it ON THE HOST: npm runs the package's install
+//     scripts, and npm and git run with the server's whole environment (`getEnv`, `spawnCommand`) — the model-provider
+//     keys among it, which the real runner withholds from every command (`child-process-runner.ts`). ⛔ And the executor
+//     can write that file: one unit's `write_file` of `.pi/settings.json` is read by every later unit's session. ⛔ The
+//     settings may also name npm's command (`npmCommand`), which Pi then runs in npm's place — even under `PI_OFFLINE`,
+//     to find npm's global folder, whenever the agent folder's own settings list an npm package Pi's folder does not
+//     hold (`getGlobalNpmRoot`). Driven by hand, 2026-10-15, over Pi's real loader with these options and a stand-in
+//     command: the command a workspace's settings named ran, and saw the server's environment;
 //   · THE WORKING-DIRECTORY LINE names the server's folder, not the workspace: `pi-executor.ts` gives its session no
 //     folder (`SessionManager.inMemory()`), so the session takes `process.cwd()` (`dist/core/sdk.js`).
 // ⭑ A PI-FREE MODULE, as `pi-execution-tools.ts` is: it imports Pi's types alone, so its test loads no part of Pi —
