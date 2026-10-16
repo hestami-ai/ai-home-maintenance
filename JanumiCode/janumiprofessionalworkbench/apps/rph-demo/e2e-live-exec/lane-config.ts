@@ -503,6 +503,48 @@ export const PHASE7_SIGN_OFF_UNIT_MS =
 	PHASE7_INTROSPECT_MS +
 	PHASE7_DECLARED_RERUN_MS;
 
+// ── ⭐⭐ HALF B'S SIGN-OFF BOUNDS, FROM THE POLICIES A UNIT DECLARES AS THE STORE HOLDS THEM (the lead's delegated decision of
+// 2026-10-16, to be registered as REG-D-114) ─────────────────────────────────────────────────────────────────────────────
+// The four figures above are §3.2's: every unit bounded as one declaring four policies, the most any of its units declares
+// (`PHASE7_DECLARED_POLICIES_PER_UNIT`) — half A's, unchanged. Half B's units are the agent's, and one may declare more:
+// bounded as four, its Record Assurance could be abandoned with a review still inside its own bound. So for half B each of
+// them is taken for the unit's own count, read from the store as the limit reads it (`declaredPolicyIdsOf`,
+// `phase7-operator.ts`): the arithmetic above, `policies` in place of four, which `verif/live-exec-lane-config.test.ts`
+// holds equal to the figure above at four.
+
+/** A unit's declared reviews at their bound, for `policies` declared policies: `PHASE7_DECLARED_REVIEWS_MS`'s arithmetic. */
+export function phase7DeclaredReviewsMs(policies: number): number {
+	return policies * LANE_BUDGET.reviewerCallsPerTry * LANE_BUDGET.reviewerCallMs;
+}
+
+/** Record Assurance's bound for a unit declaring `policies`: its act's and its reviews', as `PHASE7_RECORD_ASSURANCE_MS`. */
+export function phase7RecordAssuranceMs(policies: number): number {
+	return PHASE7_SIGN_OFF_MS + phase7DeclaredReviewsMs(policies);
+}
+
+/** The rule's one re-run of the declared reviews, every act at its bound, for `policies`: as `PHASE7_DECLARED_RERUN_MS`. */
+export function phase7DeclaredRerunMs(policies: number): number {
+	return (
+		PHASE7_SHOW_OVERVIEW_MS +
+		PHASE7_UI_MS +
+		PHASE7_INTROSPECT_MS +
+		PHASE7_UI_MS +
+		phase7RecordAssuranceMs(policies) +
+		PHASE7_INTROSPECT_MS
+	);
+}
+
+/** One unit's sign-off, every act at its bound, for `policies`: as `PHASE7_SIGN_OFF_UNIT_MS`. */
+export function phase7SignOffUnitMs(policies: number): number {
+	return (
+		PHASE7_SHOW_OVERVIEW_MS +
+		PHASE7_SIGN_OFF_ACTS * (PHASE7_UI_MS + PHASE7_SIGN_OFF_MS + PHASE7_INTROSPECT_MS) +
+		phase7DeclaredReviewsMs(policies) +
+		PHASE7_INTROSPECT_MS +
+		phase7DeclaredRerunMs(policies)
+	);
+}
+
 /**
  * The spec's own timeout, set with `test.setTimeout` (the config's stays the one-unit lane's) — ⭐⭐ `P76F-C` C8: ~~THE WORST
  * CASE OF THE LANE'S OWN BOUNDS, every act waited for up to its bound and counted by it~~ ⛔ `P76F-D` D4: overstated — the
@@ -548,9 +590,16 @@ export const PHASE7_TEST_TIMEOUT_MS =
  * the lane presses that spends it, that act's own worst case counted: before each sign-off and before the rule's re-run
  * of a unit's declared reviews (`E12F` F2; `signOffWorstCase`), and in half B before Send, the authoring floor's
  * (`REG-D-112`, E3's review finding 2; `PHASE7_AUTHORING_REVIEWER_CALLS`), and, paid, before the root's press, a MODEL
- * root's (`rootLimitCheck`; `PHASE7_UNIT_REVIEWER_CALLS`). ⚠ Two rules, as each package built its own: before a phase, a
+ * root's (`rootLimitCheck`; `PHASE7_UNIT_REVIEWER_CALLS`). ~~⚠ Two rules, as each package built its own: before a phase, a
  * re-run of one and a sign-off the total must be UNDER the limit (`limitCheck`); before Send and the root's press it may
- * reach it (`limitCheckAhead`). ~~150 (`REG-D-102` (4))~~ ~~200: *"Raise limit to 200"* (`REG-D-105` (1), which amends
+ * reach it (`limitCheckAhead`).~~ ⭐ ONE RULE for every check (the lead's delegated decision of 2026-10-16, to be registered
+ * as REG-D-114): the lane may REACH the limit and never pass it by what it counts — the calls spent, those held back and
+ * what the act itself counts must total at most the limit (`limitCheck`). ~~⚠ Before a phase and the rule's re-run of one it
+ * counts their first call only (`PHASE7_PHASE_FIRST_CALL`), as D8 counted no phase's worst case.~~ ⭐ R3-B's fix round, F1 —
+ * and what each act counts is its worst case, before a phase and the rule's re-run of one too: a model unit's before a
+ * phase and before a re-run of its work (`PHASE7_UNIT_REVIEWER_CALLS`), a re-review's before a re-run of its review
+ * (`PHASE7_REREVIEW_REVIEWER_CALLS`). So a phase is started only while the calls spent before the run and those recorded
+ * in it total at most 306: 450, less the 4 held back and the phase's 140. ~~150 (`REG-D-102` (4))~~ ~~200: *"Raise limit to 200"* (`REG-D-105` (1), which amends
  * `REG-D-102` (4)); it covers the re-qualification, the re-run and a few recovery re-runs.~~ ~~230: *"the limit rises
  * to about 230"* (`REG-D-108`, after P2), held as the number its pointer states, for P3.~~ ⭐ `JAN-EXEC` Phase 7
  * completion programme, E3 — 450: *"Raise to about 450 (Recommended)"* (`REG-D-110` (1), after P3; `REG-D-109`), for the
@@ -663,10 +712,24 @@ export const PHASE7_AUTHORING_REVIEWER_CALLS = PHASE7_AUTHORING_FLOOR_RUNS * LAN
  * ⭐⭐ `REG-D-112` (finding 2) — ONE MODEL UNIT'S WORST CASE IN REVIEWER CALLS, as its allowance counts its reviews
  * (`PHASE7_UNIT_ALLOWANCE_MS`): each try's work-product review, and the review of each command reviewed, each of up to
  * `reviewerCallsPerTry` calls — (3 + 32) × 4 = 140. ⛔ Half B checks it before the ROOT's press when the agent's root
- * declares MODEL: §3.2's root runs no model, and the agent's may.
+ * declares MODEL: §3.2's root runs no model, and the agent's may. ⭐ R3-B's fix round, F1 (the lead's delegated decision of
+ * 2026-10-16, to be registered as REG-D-114) — and the lane checks it before each PHASE's press, and before the rule's
+ * re-run of a phase's work, which runs the whole unit again (`runModelUnit`).
  */
 export const PHASE7_UNIT_REVIEWER_CALLS =
 	(LANE_BUDGET.tries + PHASE7_REVIEWED_COMMANDS) * LANE_BUDGET.reviewerCallsPerTry;
+
+/**
+ * ⭐ R3-B's fix round, F1 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — A RE-REVIEW'S WORST
+ * CASE IN REVIEWER CALLS, counted before the rule's re-run of a stopped phase's REVIEW: the floors run again over the
+ * refused attempt's work product and each of its reviewed commands' evidence, and no producer runs (`rerunReview`,
+ * `src/routes/undertakings/[id]/+page.server.ts`), each a review of up to `reviewerCallsPerTry` calls, as
+ * `PHASE7_UNIT_REVIEWER_CALLS` counts a unit's — (1 + 32) × 4 = 132. ⚠ A worst case: only the refused reviews run again.
+ * ~~`PHASE7_PHASE_FIRST_CALL`, 1 — what the one rule counted of a phase and of the rule's re-run of one: its FIRST reviewer
+ * call, NOT its worst case, so a phase let through could still spend past the limit.~~ ⛔ The decision counts each act's
+ * worst case, so the lane never passes the limit by what it counts.
+ */
+export const PHASE7_REREVIEW_REVIEWER_CALLS = (1 + PHASE7_REVIEWED_COMMANDS) * LANE_BUDGET.reviewerCallsPerTry;
 
 /** ⭐ C1 — how long the lane waits between two reads of the candidate's status: each read is the whole dump. */
 export const PHASE7_CANDIDATE_POLL_MS = 5_000;
@@ -692,7 +755,9 @@ export const PHASE7_AUTHORING_MS =
  * ⭐ with E12's sign-off (`PHASE7_SIGN_OFF_UNIT_MS`: its declared reviews, the limit's read before it and the rule's one
  * re-run of them), 38,940 s + 300 s + 41,280 s + 11,280 s = 91,800 s: the terms `PHASE7_TEST_TIMEOUT_MS` counts once for
  * each of §3.2's four phases. ⚠ Its sign-off is bounded as one of four declared policies, §3.2's most
- * (`PHASE7_DECLARED_POLICIES_PER_UNIT`): an agent's unit that declares more is bounded short.
+ * (`PHASE7_DECLARED_POLICIES_PER_UNIT`): ~~an agent's unit that declares more is bounded short~~ ⭐ half B's timeout
+ * re-counts each unit's sign-off for the policies it declares (`phase7HalfBTestTimeoutMs`; the lead's delegated decision
+ * of 2026-10-16, to be registered as REG-D-114).
  */
 export const PHASE7_PER_PHASE_MS =
 	PHASE7_UNIT_RUN_MS +
@@ -710,10 +775,20 @@ export const NODE_TIMER_CEILING_MS = 2_147_483_647;
  * NODE'S TIMER CEILING, past which Playwright would time the test out at once: a PWA of ~~26~~ ⭐ 23 phases or more is
  * given the ceiling, about 596 hours, not its arithmetic. ⚠ Half B STARTS under half
  * A's timeout, which covers the authoring many times over, and the lane extends it here when the units are read.
+ * ⭐⭐ ~~`phases`~~ `declared` (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — the policies each
+ * unit declares as the store holds them, one count per unit, the root first: its phases are the units after the root, and
+ * EACH UNIT'S SIGN-OFF IS RE-COUNTED FOR ITS OWN POLICIES (`phase7SignOffUnitMs`) in place of §3.2's four
+ * (`PHASE7_SIGN_OFF_UNIT_MS`), which half A's arithmetic counts once per unit. ⛔ A unit declaring five was counted as
+ * four: the timeout could kill the server inside a sign-off whose every review stayed within its bound (`REG-F-527`). For
+ * five units each declaring four, the figure above. ⚠ And the ceiling's 23 phases are for units each declaring four:
+ * units declaring more reach it with as many phases or fewer (eight each, 21), units declaring fewer need as many or more
+ * (one each, 25).
  */
-export function phase7HalfBTestTimeoutMs(phases: number): number {
+export function phase7HalfBTestTimeoutMs(declared: readonly number[]): number {
+	const phases = declared.length - 1;
+	const signOffs = declared.reduce((ms, policies) => ms + phase7SignOffUnitMs(policies) - PHASE7_SIGN_OFF_UNIT_MS, 0);
 	return Math.min(
 		NODE_TIMER_CEILING_MS,
-		PHASE7_TEST_TIMEOUT_MS + (phases - PHASE7_MODEL_UNITS) * PHASE7_PER_PHASE_MS + PHASE7_AUTHORING_MS
+		PHASE7_TEST_TIMEOUT_MS + (phases - PHASE7_MODEL_UNITS) * PHASE7_PER_PHASE_MS + signOffs + PHASE7_AUTHORING_MS
 	);
 }

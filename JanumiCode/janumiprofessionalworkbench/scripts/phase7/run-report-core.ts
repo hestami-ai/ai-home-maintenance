@@ -11,7 +11,8 @@
 //     Execute outlasted the lane's allowance (D4) is read as cut there, never from its mid-unit archive as if it ended;
 //     ⭐ E12's re-review F1 — and one whose sign-off act outlasted its bound, at stage 7, the act and its bound named.
 //     ⭐ In half B the phases are the agent's, and a root that declares MODEL is one of them, at stages 3 to 8 too (the
-//     lead's delegated decision of 2026-10-15, to be registered).
+//     lead's delegated decision of 2026-10-15, to be registered). ⭐ R3-B F6 (the lead's round-3 item 6) — and so is a root
+//     whose type cannot be read, its cells failed closed: broke, or not determined, each with why (`failedClosed`).
 //   · THE PAIRING (§2 stage 8; `REG-F-433`) — every Reasoning Review of an execution-plane subject, paired with the
 //     ASSURANCE-plane call that concluded it: answered, no response, refused (a substitute, or a failed repair), no
 //     answer recorded, or not pairable when its subject had more than one floor run. A deterministic floor policy and a
@@ -37,6 +38,8 @@ import { posix } from 'node:path';
 // it with (`declared-policy-signoff.ts` `verdictOf`), never a restated copy of it. Pure, store-free. ⚠ E12's re-review F5 —
 // save the one limb `verdictOf` applies before the ladder, a review that answered no criterion, which `judgedVerdict` restates.
 import { BLOCKING_SEVERITIES, dispositionFromFindings } from '@janumipwb/rph-assurance';
+// ⭐ R3-B F3 — the kernel's own reading of the policies a unit declares, for half B's count of declared verdicts. Pure.
+import { declaredAssurancePolicyIds } from '@janumipwb/rph-domain';
 import {
 	PHASE7_NEGATIVE_CONTROL_RESERVE,
 	PHASE7_PAID_LIMIT,
@@ -438,13 +441,21 @@ export interface ReviewerCallCount {
 export interface ReviewerCalls extends ReviewerCallCount {
 	readonly lowerBound: true;
 	readonly byUnit: Readonly<Record<string, ReviewerCallCount>>;
-	/** Design D8's check, restated over the record: prior + recorded + reserve, under the limit. */
+	/**
+	 * Design D8's check, restated over the record: prior + recorded + reserve~~, under the limit~~ ⭐ against the limit (R3-B's
+	 * fix round): `under` is the fact total < limit, and report.md words the total by the one rule (`runStanding`).
+	 */
 	readonly limit: {
 		readonly prior: number | null;
 		readonly recorded: number;
 		readonly reserve: number;
 		readonly total: number | null;
 		readonly limit: number;
+		/**
+		 * Whether the total is BELOW the limit — a fact, kept as it was. ⚠ Not the one rule's verdict (the lead's delegated
+		 * decision of 2026-10-16, to be registered as REG-D-114), under which a run may reach the limit: report.md words the
+		 * total by it (`runStanding`).
+		 */
 		readonly under: boolean | null;
 	};
 	/**
@@ -628,6 +639,11 @@ export interface AuthoringSummary {
 	 * the lane's record, the store keeping none (`REG-F-504`).
 	 */
 	readonly acceptedHash: string | null;
+	/**
+	 * ⭐ R3-B F5 (the lead's round-3 item 5) — how the acceptance went unanswered (`unansweredAcceptance`), or null: with no
+	 * answer, the hash above is none RECORDED, and the server may still have accepted one.
+	 */
+	readonly unanswered: string | null;
 	/** ⭐ C4 — every finding of the candidate checks, recorded before Submit, none of which refused anything. */
 	readonly findings: readonly {
 		readonly check: string;
@@ -877,14 +893,24 @@ interface LaneUnit {
 	} | null;
 	/** ⭐ E12's polish (the same decision) — every read of the limit the lane recorded for the unit, in the order it made them. */
 	readonly limitChecks: readonly LaneLimitCheck[];
+	/**
+	 * ⭐ R3-B F4 (the lead's round-3 item 4) — WHERE THE LANE STOPPED, when it
+	 * skipped this unit's sign-off after stopping at ANOTHER unit's limit check: that unit's slug, and the act its check was
+	 * read before (`signOffsSkipped`). null when the lane did not skip it so.
+	 */
+	readonly signOffSkippedAt: { readonly slug: string; readonly before: string } | null;
 }
 
 /**
  * ⭐ E12's polish (fix2's F8) — ONE READ OF THE LIMIT THE LANE RECORDED BEFORE A PAID ACT (D8; `E12F` F2): prior + recorded +
  * reserve + the act's own worst case (`ahead`, 0 where it counted none), and whether the lane let the act through
- * (`allowed`) or held it back. ⛔ The merge's fix round, F2 — BY ONE OF TWO RULES (`phase7-operator.ts`): `limitCheck`, before a
+ * (`allowed`) or held it back. ⛔ The merge's fix round, F2 — ~~BY ONE OF TWO RULES (`phase7-operator.ts`): `limitCheck`, before a
  * phase, a re-run of one, a sign-off or a re-run of its declared reviews, lets an act through only with the total UNDER the
- * limit; `limitCheckAhead`, before half B's Send and before half B's root's press, lets it through AT the limit too.
+ * limit; `limitCheckAhead`, before half B's Send and before half B's root's press, lets it through AT the limit too.~~
+ * ⭐ ONE RULE since (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114): every check lets an act
+ * through with its total AT MOST the limit, what it counts of the act always recorded (`ahead`: ~~a phase's and a re-run's
+ * first call~~ ⭐ R3-B's fix round, F1: the act's worst case, a phase's and a re-run's too). ⚠ A record made before it may
+ * hold a total AT the limit held back, by the first rule.
  */
 export interface LaneLimitCheck {
 	/** The unit's slug; `authoring` for half B's read before Send (`AUTHORING_READ`). */
@@ -936,10 +962,39 @@ function signOffOutlasted(signOff: Record<string, unknown>): LaneUnit['signOffOu
 	return null;
 }
 
+/**
+ * ⭐ R3-B F4 (the lead's round-3 item 4) — THE SIGN-OFFS THE LANE SKIPPED AFTER
+ * IT STOPPED AT A LIMIT CHECK, each with where it stopped. The lane signs off the phases that did not stop, in order, then the
+ * root, the record's first unit; a sign-off whose limit check — before Record Assurance, or before the rule's re-run of the
+ * declared reviews — held its act back ends that loop (`runTheLane`, D8). So every unit after it in that order whose record
+ * holds no sign-off was skipped there. ⚠ A unit the record does not say stopped is taken to be in the order: one never
+ * pressed is read as never begun before its sign-off is (`completion`).
+ */
+function signOffsSkipped(rows: readonly Record<string, unknown>[]): Map<Record<string, unknown>, LaneUnit['signOffSkippedAt']> {
+	const heldBefore = (r: Record<string, unknown>): string | null => {
+		const signOff = rec(r.signOff);
+		if (bool(rec(signOff.limitCheck).allowed) === false) return BEFORE_RECORD_ASSURANCE;
+		return bool(rec(signOff.rerunLimitCheck).allowed) === false ? BEFORE_DECLARED_RERUN : null;
+	};
+	const skipped = new Map<Record<string, unknown>, LaneUnit['signOffSkippedAt']>();
+	let stop: LaneUnit['signOffSkippedAt'] = null;
+	for (const r of [...rows.slice(1).filter((x) => bool(x.stopped) !== true), ...rows.slice(0, 1)]) {
+		if (stop !== null) {
+			if (r.signOff === null || r.signOff === undefined) skipped.set(r, stop);
+			continue;
+		}
+		const before = heldBefore(r);
+		if (before !== null) stop = { slug: str(r.slug), before };
+	}
+	return skipped;
+}
+
 function laneUnits(run: unknown): LaneUnit[] {
 	const units = rec(run).units;
-	return (Array.isArray(units) ? (units as unknown[]) : []).map((u) => {
-		const r = rec(u);
+	const rows = (Array.isArray(units) ? (units as unknown[]) : []).map(rec);
+	// ⭐ R3-B F4 — where the lane stopped its sign-offs, for each unit it skipped after.
+	const skipped = signOffsSkipped(rows);
+	return rows.map((r) => {
 		const pressed = r.beginExecute !== null && r.beginExecute !== undefined;
 		const be = rec(r.beginExecute);
 		const signOff = rec(r.signOff);
@@ -966,7 +1021,8 @@ function laneUnits(run: unknown): LaneUnit[] {
 				(x) => int(rec(x).timedOutAfterMs) !== null
 			),
 			signOffHeldBack: heldBackOf(str(r.slug), signOff),
-			limitChecks: limitChecksOf(str(r.slug), r, signOff)
+			limitChecks: limitChecksOf(str(r.slug), r, signOff),
+			signOffSkippedAt: skipped.get(r) ?? null
 		};
 	});
 }
@@ -2309,19 +2365,31 @@ function completion(v: UnitView, row: string): MatrixCell {
 
 /**
  * ⛔ The merge's fix round, F2 — WHERE A READ'S TOTAL STANDS AGAINST THE LIMIT, by its arithmetic: below it, "under it"; AT it and
- * let through, "at it, which this act may reach" — only `limitCheckAhead`'s rule lets a total reach the limit (`LaneLimitCheck`);
- * anything else, "not under it".
+ * let through, "at it, which this act may reach" ~~— only `limitCheckAhead`'s rule lets a total reach the limit (`LaneLimitCheck`);
+ * anything else, "not under it"~~. ⭐ THE WORDS FOLLOW THE ONE RULE (the lead's delegated decision of 2026-10-16, to be
+ * registered as REG-D-114): every check lets an act reach the limit and none lets it pass, so ~~"not under it"~~ a total above
+ * the limit is "past it". ⚠ A total AT it held back is a record made before the one rule: "at it", never one the act may reach.
  */
 function standingOf(c: LaneLimitCheck): string {
 	if (c.total < c.limit) return 'under it';
-	if (c.total === c.limit && c.allowed) return 'at it, which this act may reach';
-	return 'not under it';
+	if (c.total > c.limit) return 'past it';
+	return c.allowed ? 'at it, which this act may reach' : 'at it';
+}
+
+/**
+ * ⭐ WHERE THE RUN'S OWN TOTAL STANDS, as `standingOf` words a read, by the one rule (the lead's delegated decision of
+ * 2026-10-16, to be registered as REG-D-114): a run may reach the limit, and never pass it. ⛔ ~~", NOT under it"~~: a total
+ * equal to the limit read as though it had passed it.
+ */
+function runStanding(total: number, limit: number): string {
+	if (total < limit) return 'under it';
+	return total === limit ? 'at it, which the run may reach' : 'PAST it';
 }
 
 /**
  * ⭐ E12's polish (fix2's F8) — the figures of one read of the limit, as the reviewer-calls section prints the record's own.
  * ⛔ The merge's fix round, F2 — ~~worded by the verdict alone, every read the lane let through "under it"~~: by its arithmetic
- * (`standingOf`), so a read at the limit that `limitCheckAhead` let through is never said to be under it.
+ * (`standingOf`), so a read at the limit that ~~`limitCheckAhead`~~ ⭐ the lane let through is never said to be under it.
  */
 const limitFigures = (c: LaneLimitCheck): string =>
 	`${c.prior} + ${c.recorded} + ${c.reserve}${c.ahead > 0 ? ` + ${c.ahead} ahead` : ''} = ${c.total} of ${c.limit}, ${standingOf(c)}`;
@@ -2331,14 +2399,31 @@ const limitFigures = (c: LaneLimitCheck): string =>
  * UNIT'S SIGN-OFF, as stage 7 says it: before which act, why in the lane's own words, and the limit it read; else `otherwise`.
  * ⛔ A sign-off held back before Record Assurance read "its sign-off was never attempted", the words a run cut short reads, and
  * a declared re-run held back beside a refused Record Assurance left the limit's part said nowhere.
+ * ⭐ R3-B F4 (the lead's round-3 item 4) — AND A SIGN-OFF THE LANE SKIPPED after
+ * stopping at another unit's limit check says where it stopped (`skippedWhy`), never `otherwise`. ⛔ Each such unit read "its
+ * sign-off was never attempted", the root's included.
  */
 function heldBackOr(v: UnitView, ...otherwise: string[]): string[] {
 	const h = v.heldBack;
-	if (h === null) return otherwise;
+	if (h === null) {
+		const skipped = skippedWhy(v);
+		return skipped === null ? otherwise : [skipped];
+	}
 	return [
 		`its sign-off was held back before ${h.before}: ${h.reason}`,
 		...(h.check === null ? [] : [`the limit as the lane read it: ${limitFigures(h.check)}`])
 	];
+}
+
+/**
+ * ⭐ R3-B F4 (the lead's round-3 item 4) — WHY THE LANE DID NOT ATTEMPT A SIGN-OFF
+ * IT SKIPPED after stopping at another unit's limit check (`LaneUnit.signOffSkippedAt`): that unit, and the act its check was
+ * read before; null for a unit it did not skip so.
+ */
+function skippedWhy(v: UnitView): string | null {
+	const at = v.unit.lane?.signOffSkippedAt ?? null;
+	if (at === null) return null;
+	return `its sign-off was not attempted: the lane stopped at the ${at.slug} unit’s limit check, before ${at.before}, and pressed no sign-off after it (D8)`;
 }
 
 /**
@@ -2376,6 +2461,19 @@ function childrenOf(ix: Index, u: Unit, units: readonly Unit[]): string[] {
 const modelRanFor = (u: Unit): boolean => u.tries.some((t) => str(t.state.disposition) === 'ACCEPTED');
 
 /**
+ * ⭐ R3-B F3 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — THE POLICIES A UNIT DECLARES, by the
+ * kernel's own reading (`declaredAssurancePolicyIds`, rph-domain): its `assurancePolicyIds` and its type's
+ * `requiredAssurancePolicyIds`, each once — the set the lane counts a sign-off's limit by (`declaredPolicyIdsOf`). ⛔ The
+ * unit's own list alone left out a policy only its type requires, and counted a repeat twice. ⚠ An upper bound of the
+ * verdicts its sign-off records: the server reviews those that also exist, are ACTIVE and admit the unit.
+ */
+const declaredPoliciesOf = (ix: Index, u: Unit): readonly string[] =>
+	declaredAssurancePolicyIds(
+		{ assurancePolicyIds: strs(u.object?.state.assurancePolicyIds) },
+		{ requiredAssurancePolicyIds: strs(ix.byId.get(u.typeId ?? str(u.object?.state.pwuTypeId))?.state.requiredAssurancePolicyIds) }
+	);
+
+/**
  * ⭐ The lead's delegated decision of 2026-10-15, to be registered — the discharge the unit's TYPE declares, read as the
  * lane reads it before half B's root is pressed (`phase7-operator.ts`, `dischargeOf`): §3.2's declaration in half A, the
  * agent's type in the store in half B, and `UNDECLARED` when neither names one.
@@ -2384,6 +2482,43 @@ const dischargeOf = (ix: Index, u: Unit): string =>
 	u.type?.workDischarge ??
 	(str(ix.ofType('PWU_TYPE').find((t) => t.id === (u.typeId ?? str(u.object?.state.pwuTypeId)))?.state.workDischarge) ||
 		'UNDECLARED');
+
+/**
+ * ⭐ R3-B F6 (the lead's round-3 item 6) — WHY A UNIT'S TYPE CANNOT BE READ, or
+ * null when it can. Half A's is §3.2's declaration, always read. Half B's is the store's PWU_TYPE the unit names: unreadable
+ * when the unit names none, when the store holds no type of that id, or when its `workDischarge` is there and no string.
+ * ⚠ A type read that names no discharge is READ — `UNDECLARED` (`dischargeOf`), which keeps a root's reading.
+ */
+function typeUnreadable(ix: Index, u: Unit): string | null {
+	if (u.type !== undefined) return null;
+	const typeId = u.typeId ?? str(u.object?.state.pwuTypeId);
+	if (typeId === '') return 'the unit names no type';
+	const type = ix.ofType('PWU_TYPE').find((t) => t.id === typeId);
+	if (type === undefined) return `${typeId} is not in the store`;
+	const declared = type.state.workDischarge;
+	return declared === undefined || declared === null || typeof declared === 'string'
+		? null
+		: `${typeId} declares a workDischarge that is no word: ${JSON.stringify(declared)}`;
+}
+
+/**
+ * ⭐ R3-B F6 (the lead's round-3 item 6) — THE CELLS OF A ROOT WHOSE TYPE CANNOT
+ * BE READ, FAILED CLOSED: whether its press ran a model, and so which of its stages apply, cannot be decided, so each is
+ * reported — a break as it was found, the reason beside it; any other value not determined, OPEN and owed to a person, the
+ * reason first. ⛔ Read as UNDECLARED, such a root was skipped by its place: its own cells at stages 3 to 8 were reported
+ * nowhere, and its completion only as its line in the whole run's stage 7 (`stageSevenWhole`).
+ */
+function failedClosed(cells: readonly MatrixCell[], slug: string, why: string): MatrixCell[] {
+	const reason =
+		`the ${slug} unit’s type cannot be read (${why}): whether its press ran a model, and so which of its stages apply, ` +
+		'cannot be decided, so each is reported, never skipped';
+	const owedTo = `a person: the ${slug} unit’s type cannot be read`;
+	return cells.map((c) =>
+		c.value === 'broke'
+			? { ...c, basis: [...c.basis, reason] }
+			: cell(c.stage, c.row, null, [], [reason, ...c.basis], { owedTo: c.owedTo ? `${c.owedTo}; ${owedTo}` : owedTo })
+	);
+}
 
 const triesOf = (u: Unit): string[] => u.tries.map((t) => `${str(t.state.disposition)}:${parseClass(t.state.parseOutcome)}`);
 
@@ -2724,7 +2859,7 @@ function stageOneHalfB(ix: Index, lane: LaneRows): MatrixCell {
 	const faults = [
 		...floor.filter((f) => f.state !== 'SATISFIED').map((f) => `the authoring floor's ${f.policyId} reads ${f.state}`),
 		...(reviewer === null ? ['the floor’s reasoning review names no reviewer'] : []),
-		...(accepted === null ? ['the lane recorded no accepted hash: no one accepted a candidate'] : []),
+		...(accepted === null ? [noAcceptanceFault(authoring)] : []),
 		...(refusal === '' ? [] : [`the acceptance was refused: ${refusal}`]),
 		...(accepted !== null && staged !== null && accepted !== staged
 			? [`the hash accepted, ${accepted}, is not the staged candidate's, ${staged}`]
@@ -2742,7 +2877,8 @@ function stageOneHalfB(ix: Index, lane: LaneRows): MatrixCell {
 			authorshipLine(pwa, status, accepted, authoring, lane),
 			`the authoring floor: ${floor.map((f) => `${f.policyId} ${f.state}`).join(', ')}`,
 			`the reviewer: ${reviewer ?? 'none recorded'}; ${authorRead} (configured: ${configured ?? 'unset'})`,
-			`the accepted hash: ${accepted ?? 'none'}; the candidate as the lane last read it: ${str(candidate.status) || 'none'}`,
+			`the accepted hash: ${accepted ?? noHashAccepted(unansweredAcceptance(authoring))}; ` +
+				`the candidate as the lane last read it: ${str(candidate.status) || 'none'}`,
 			...faults,
 			...authorFaults.faults,
 			...HALF_B_CAVEATS.slice(0, 2).map((c) => `caveat ${c}`)
@@ -2768,12 +2904,52 @@ function acceptedHashIn(authoring: Record<string, unknown>): string | null {
 }
 
 /**
+ * ⭐ R3-B F5 (the lead's round-3 item 5) — HOW AN ACCEPTANCE THAT GOT NO ANSWER
+ * WENT UNANSWERED, as the lane kept it (`DesignerActRecord`): no answer within its bound, or its request failed in transit,
+ * in the words the lane's `refusalOf` gives each; null for an acceptance answered, and for none pressed.
+ */
+function unansweredAcceptance(authoring: Record<string, unknown>): string | null {
+	const accept = rec(authoring.accept);
+	const ms = int(accept.timedOutAfterMs);
+	if (ms !== null) return `no answer within ${ms} ms`;
+	const failure = str(accept.requestFailure);
+	return failure === '' ? null : `no answer: the request failed in transit (${failure})`;
+}
+
+/**
+ * ⭐ R3-B F5 — stage 1's fault when no hash was accepted. ⛔ An acceptance that got NO ANSWER read "no one accepted a
+ * candidate": the server may still have accepted it, and the lane never heard. It reads as no answer.
+ */
+function noAcceptanceFault(authoring: Record<string, unknown>): string {
+	const noAnswer = unansweredAcceptance(authoring);
+	return noAnswer === null
+		? 'the lane recorded no accepted hash: no one accepted a candidate'
+		: `the acceptance got ${noAnswer}: the server may still have accepted it, and the lane recorded no hash`;
+}
+
+/**
+ * ⭐ R3-B F5 — the accepted hash when none was accepted: "none", or, for an acceptance that got NO ANSWER
+ * (`unansweredAcceptance`), none RECORDED and why. ⛔ A bare "none" said no hash was accepted, of a press whose answer never
+ * came.
+ */
+function noHashAccepted(unanswered: string | null): string {
+	return unanswered === null ? 'none' : `none recorded — the acceptance got ${unanswered}`;
+}
+
+/** ⭐ R3-B F5 — report.md's accepted hash when none was accepted: stage 1's reading, and that the server may have one. */
+const acceptedNone = (unanswered: string | null): string =>
+	unanswered === null ? 'none' : `${noHashAccepted(unanswered)}, and the server may still have accepted it`;
+
+/**
  * ⭐ The lead's delegated decision of 2026-10-15, to be registered (E3's polish; the confirm of 60c8a828) — STAGE 1'S
  * FIRST LINE: THE AGENT AUTHORED THE PWA ONLY WHEN A CANDIDATE OF ITS WAS ACCEPTED, the acceptance answered success and
  * named its hash. ⛔ ~~Said whatever the authoring came to~~: a turn the server refused before it began read "authored
  * by the agent", in the cell that says the turn never settled. Otherwise the PWA is still the lane's draft, and the line
  * says what the authoring came to: its candidate as the lane last read it, and the run's end. ⚠ A hash alone is no
  * acceptance: `accepted` is stage 1's one reading of it (`acceptedHashIn`).
+ * ⭐ R3-B F5 (the lead's round-3 item 5) — AN ACCEPTANCE THAT GOT NO ANSWER
+ * (`unansweredAcceptance`) READS AS NO ANSWER, which the server may still have accepted. ⛔ It read "still the draft the lane
+ * created: no candidate of the agent’s was accepted into it" — of a press whose answer never came.
  */
 function authorshipLine(
 	pwa: StoredObject,
@@ -2787,10 +2963,12 @@ function authorshipLine(
 	const turn = str(rec(authoring.candidate).status);
 	const came = turn === '' ? 'no staged candidate' : `a candidate ${turn}`;
 	const end = str(rec(rec(lane.run).end).reason) || 'with no end recorded';
-	return (
-		`${named}, still the draft the lane created: no candidate of the agent’s was accepted into it — the authoring ` +
-		`came to ${came}, and the run ended ${end}`
-	);
+	const noAnswer = unansweredAcceptance(authoring);
+	const accepting =
+		noAnswer === null
+			? ', still the draft the lane created: no candidate of the agent’s was accepted into it'
+			: `: its acceptance of a candidate got ${noAnswer}, and the server may still have accepted it`;
+	return `${named}${accepting} — the authoring came to ${came}, and the run ended ${end}`;
 }
 
 /**
@@ -2892,13 +3070,22 @@ function stageSevenWhole(views: readonly UnitView[]): MatrixCell {
 	let value: CellValue = 'as intended';
 	if (broke.length > 0) value = 'broke';
 	else if (perUnit.some((c) => c.value === 'not reached')) value = 'not reached';
+	/**
+	 * ⭐ R3-B F4 (the lead's round-3 item 4) — a unit whose sign-off the lane
+	 * skipped, and whose cell reads it so, says why on its line: the root has no row of its own in half A, and its line was all
+	 * a reader had of its skipped sign-off.
+	 */
+	const lineOf = (c: MatrixCell, v: UnitView): string => {
+		const why = skippedWhy(v);
+		return why !== null && c.basis.includes(why) ? `${c.row}: ${c.value} — ${why}` : `${c.row}: ${c.value}`;
+	};
 	return cell(
 		'7',
 		WHOLE_RUN,
 		value,
 		broke.flatMap((c) => c.registerIds),
 		[
-			...perUnit.map((c) => `${c.row}: ${c.value}`),
+			...perUnit.map((c, i) => lineOf(c, views[i]!)),
 			'measured as every unit, the root included, SATISFIED in lifecycle and assurance, its plan step SUCCEEDED: an ' +
 				'Undertaking has no completion state (REG-F-533)'
 		],
@@ -3242,6 +3429,8 @@ function authoringSummary(ix: Index, lane: LaneRows, half: RunHalf): AuthoringSu
 		reviewer: floor.find((f) => f.policyId === REASONING_REVIEW)?.evaluator ?? (str(a.reviewer) || null),
 		// ⭐ The check of 241158f4, finding 1 — the hash ACCEPTED, as stage 1 reads it: never a refused acceptance's.
 		acceptedHash: acceptedHashIn(a),
+		// ⭐ R3-B F5 — and how an acceptance that got no answer went unanswered, which stage 1 reads too.
+		unanswered: unansweredAcceptance(a),
 		findings: findingsOf(lane).map(({ typeId: _typeId, ...f }) => f),
 		caveats: HALF_B_CAVEATS
 	};
@@ -3311,12 +3500,20 @@ export function buildRunReport(
 	// `rootLimitCheck`): its press runs a model, so its tries, reviews and exchanges are measured like any phase's.
 	// ⛔ ~~Every root skipped by its place~~: a MODEL root that broke a stage read as intended. ⭑ §3.2's root declares
 	// HUMAN and keeps its reading, in the whole run's stage 7.
-	const phases = views.filter((v, i) => i > 0 || dischargeOf(ix, v.unit) === 'MODEL');
+	// ⭐ R3-B F6 (the lead's round-3 item 6) — AND A ROOT WHOSE TYPE CANNOT BE
+	// READ FAILS CLOSED: measured as a phase, its cells reported, broke or not determined, each with why (`failedClosed`).
+	// ⛔ Read as UNDECLARED, it was skipped by its place.
+	const rootUnreadable = units[0] === undefined ? null : typeUnreadable(ix, units[0]);
+	const phases = views.filter((v, i) => i > 0 || rootUnreadable !== null || dischargeOf(ix, v.unit) === 'MODEL');
+	const cellsOf = (v: UnitView): MatrixCell[] =>
+		v.unit === units[0] && rootUnreadable !== null
+			? failedClosed(phaseCells(v, ix), v.unit.slug, rootUnreadable)
+			: phaseCells(v, ix);
 	const matrix: MatrixCell[] = [
 		stageOne(ix, half, lane),
 		stageTwo(undertakingId, structure),
 		stageSevenWhole(views),
-		...phases.flatMap((v) => phaseCells(v, ix))
+		...phases.flatMap(cellsOf)
 	];
 	const counts = Object.fromEntries(CELL_VALUES.map((value) => [value, matrix.filter((c) => c.value === value).length]));
 	const mode = str(rec(lane.run).mode) || str(rec(lane.boot).mode) || null;
@@ -3358,10 +3555,12 @@ export function buildRunReport(
 		reviewerCalls: buildReviewerCalls(ix, units, lane),
 		audit: buildAudit(ix, units, undertakingId, lane),
 		// ⭐ E3 — half B's declared verdicts are the agent's policies: each unit's, as instantiation copied them from its type.
+		// ⭐ R3-B F3 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — ~~each unit's own list~~: THE
+		// KERNEL'S DECLARED SET of each unit (`declaredPoliciesOf`), the set the lane counts its limit by (J1).
 		declaredVerdicts: {
 			expected:
 				half === 'B'
-					? units.reduce((n, u) => n + strs(u.object?.state.assurancePolicyIds).length, 0)
+					? units.reduce((n, u) => n + declaredPoliciesOf(ix, u).length, 0)
 					: DECLARED_VERDICTS_EXPECTED,
 			rows: declared,
 			history
@@ -3447,8 +3646,8 @@ function matrixLines(r: RunReport): string[] {
 
 function unitLines(r: RunReport): string[] {
 	const limit = r.reviewerCalls.limit;
-	let under = '';
-	if (limit.under !== null) under = limit.under ? ', under it' : ', NOT under it';
+	// ⭐ By the one rule (`runStanding`): ~~limit.under ? ', under it' : ', NOT under it'~~.
+	const under = limit.total === null ? '' : `, ${runStanding(limit.total, limit.limit)}`;
 	return [
 		'## The units',
 		'',
@@ -3508,7 +3707,8 @@ function authoringLines(r: RunReport): string[] {
 		`- **The authoring floor, as the store holds it:** ${a.floor.map((f) => `${f.policyId} ${f.state}`).join(', ') || 'none'}.`,
 		`- **The reviewer:** ${a.reviewer ?? 'none recorded'}. **The author:** ${a.author.resolved ?? 'none recorded'} ` +
 			`(configured: ${a.author.configured ?? 'unset'}).`,
-		`- **The accepted hash:** ${a.acceptedHash ?? 'none'}.`,
+		// ⭐ R3-B F5 — ~~${a.acceptedHash ?? 'none'}~~: with no answer, none RECORDED, and the server may still have accepted one.
+		`- **The accepted hash:** ${a.acceptedHash ?? acceptedNone(a.unanswered)}.`,
 		`- **The candidate checks (C4), recorded before Submit, refusing nothing (REG-D-110 (4)):** ` +
 			`${plural(a.findings.length, 'finding', 'findings')}.`,
 		...a.findings.map(

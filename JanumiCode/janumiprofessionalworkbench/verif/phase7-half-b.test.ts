@@ -373,6 +373,11 @@ interface HalfBScript {
 	/** ⭐ `REG-D-112` (E3's re-review, finding 4) — the ASSURANCE exchanges the authoring floor records once Send is pressed. */
 	readonly floorCalls?: number;
 	/**
+	 * ⭐ R3-B's fix round (F1) — the ASSURANCE exchanges a unit's Begin & Execute records, by the unit's id; none unless said.
+	 * Each phase's check counts its worst case now, so a run that reaches its sign-offs near the limit spends there in a phase.
+	 */
+	readonly unitCalls?: Readonly<Record<string, number>>;
+	/**
 	 * ⭐ The merge of E12 and E3 (J1, J2) — each unit's sign-off, by its slug: what Record Assurance came to, and whether the
 	 * row then offers re-running the declared reviews that did not conclude (`REG-D-112` (a)) and what that came to. A unit
 	 * not named here offers no Record Assurance, as before.
@@ -389,12 +394,15 @@ function halfBLane(script: HalfBScript) {
 	const units = script.units ?? AGENT_UNITS;
 	const calls: string[] = [];
 	const timeouts: number[] = [];
+	/** ⭐ R3-B F2 — each sign-off press the lane asked for, and the bound it gave it. */
+	const bounds: [string, number | undefined][] = [];
 	let clock = 0;
 	let readsAfterSend = 0;
 	let sent = false;
 	let accepted = false;
 	let status = 'DRAFT';
 	let undertaking = false;
+	let unitCallCount = 0;
 	const pressed = new Map<string, typeof COMPLETED>();
 	const statusAt = (n: number) => {
 		const list = script.statuses ?? ['COLLECTING', 'ASSURING', 'READY_TO_COMMIT'];
@@ -434,13 +442,17 @@ function halfBLane(script: HalfBScript) {
 				id: `pln_${id}`,
 				state: { workUnitId: id, steps: [{ stepState: 'SUCCEEDED' }] }
 			})),
-			// ⭐ `REG-D-112` (E3's re-review, finding 4) — the authoring floor's calls, recorded once Send is pressed.
-			modelExchanges: sent
-				? Array.from({ length: script.floorCalls ?? 0 }, (_, i) => ({
-						id: `mex_floor_${i}`,
-						state: { plane: 'ASSURANCE', subjectObjectId: PWA_ID }
-					}))
-				: [],
+			// ⭐ `REG-D-112` (E3's re-review, finding 4) — the authoring floor's calls, recorded once Send is pressed. ⭐ R3-B's
+			// fix round (F1) — and each pressed unit's (`unitCalls`).
+			modelExchanges: [
+				...(sent
+					? Array.from({ length: script.floorCalls ?? 0 }, (_, i) => ({
+							id: `mex_floor_${i}`,
+							state: { plane: 'ASSURANCE', subjectObjectId: PWA_ID }
+						}))
+					: []),
+				...Array.from({ length: unitCallCount }, (_, i) => ({ id: `mex_unit_${i}`, state: { plane: 'ASSURANCE' } }))
+			],
 			evidence: [],
 			artifacts: [],
 			authoringCandidates:
@@ -475,11 +487,13 @@ function halfBLane(script: HalfBScript) {
 		beginExecute: async (unit) => {
 			calls.push(`beginExecute ${unit.slug}`);
 			pressed.set(unit.unitId!, COMPLETED);
+			unitCallCount += script.unitCalls?.[unit.unitId!] ?? 0;
 			return answered('success');
 		},
 		showOverview: async () => void calls.push('showOverview'),
-		recordAssurance: async (unit) => {
+		recordAssurance: async (unit, timeoutMs) => {
 			calls.push(`recordAssurance ${unit.slug}`);
+			bounds.push([`recordAssurance ${unit.slug}`, timeoutMs]);
 			return script.signOffs?.[unit.slug]?.ra ?? null;
 		},
 		// ⭐ The merge of E12 and E3 — E12's sign-off hands, which the lane calls since a sign-off asks the reviewer: a row
@@ -493,8 +507,9 @@ function halfBLane(script: HalfBScript) {
 			calls.push(`offersDeclaredRerun ${unit.slug}`);
 			return script.signOffs?.[unit.slug]?.rerun?.offered === true;
 		},
-		rerunDeclared: async (unit) => {
+		rerunDeclared: async (unit, timeoutMs) => {
 			calls.push(`rerunDeclared ${unit.slug}`);
+			bounds.push([`rerunDeclared ${unit.slug}`, timeoutMs]);
 			const outcome = script.signOffs?.[unit.slug]?.rerun?.outcome;
 			if (outcome === undefined) throw new Error('nothing re-runs its declared reviews here');
 			return outcome;
@@ -588,6 +603,7 @@ function halfBLane(script: HalfBScript) {
 		run: () => runTheLane({ boot, lane, hands, flushPosts: () => void calls.push('flushPosts') }),
 		calls,
 		timeouts,
+		bounds,
 		/** The calls of these kinds, in order. */
 		only: (...kinds: string[]) => calls.filter((c) => kinds.some((k) => c.startsWith(k))),
 		lane,
@@ -708,7 +724,8 @@ function halfBStore(
 					title: u.title,
 					undertakingId: 'und_1',
 					pwuTypeId: u.typeId,
-					assurancePolicyIds: declared,
+					// ⭐ R3-B F3 — as `halfBLane`'s store: the type's copy, unless the unit says otherwise.
+					assurancePolicyIds: u.policies ?? declared,
 					...(u.parent === null ? {} : { parentWorkUnitId: u.parent }),
 					workLifecycleState: ran === undefined ? 'PROPOSED' : 'SATISFIED',
 					executionState: ran === undefined ? 'NOT_STARTED' : 'SUCCEEDED',
@@ -954,6 +971,33 @@ describe('⭐ C5 — the candidate checks’ findings stand beside what each uni
 		// ⭑ The declared verdicts a complete half-B run signs off are the agent's: each unit's own policies, 1 + 2 + 1 + 1.
 		expect(whole.declaredVerdicts.expected).toBe(5);
 	});
+
+	// ⛔ R3-B F3 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — THE COUNT IS THE KERNEL'S DECLARED
+	// SET (`declaredAssurancePolicyIds`, rph-domain): a unit's own policies and its type's, each once — the set the sign-off
+	// reviews from, and the lane's limit counts (J1).
+	/** The report of a complete half-B run whose units' OWN policies are `policies`, by unit id; the type's copy elsewhere. */
+	const reportWithOwnPolicies = (policies: Readonly<Record<string, readonly string[]>>) => {
+		const units = AGENT_UNITS.map((u) => (policies[u.id] === undefined ? u : { ...u, policies: policies[u.id] }));
+		return buildRunReport(halfBStore({ units }), halfBLaneRows({ units }), { accountNames: NAMES }).report;
+	};
+
+	it('⛔ R3-B F3 — half B’s expected count of declared verdicts is the kernel’s declared set: a policy only the unit’s TYPE requires is counted', () => {
+		// ⛔ PREDICTED RED, read from the code: each unit's own `assurancePolicyIds` alone — a policy its type requires and the
+		// unit does not list was expected nowhere.
+		// ⭑ Specify: its own two and its type's two share one — three, the type's `pol_intent_preservation` among them.
+		expect(
+			reportWithOwnPolicies({ pwu_s: ['pol_requirement_coverage', 'pol_extra'] }).declaredVerdicts.expected,
+			'a policy only the type requires'
+		).toBe(1 + 3 + 1 + 1);
+	});
+
+	it('⛔ R3-B F3 — and a policy the unit lists twice is counted once', () => {
+		// ⛔ PREDICTED RED, read from the code: each unit's own list counted as it stands, a repeat twice.
+		expect(
+			reportWithOwnPolicies({ pwu_r: ['pol_intent_preservation', 'pol_intent_preservation'] }).declaredVerdicts.expected,
+			'a policy the unit lists twice'
+		).toBe(1 + 2 + 1 + 1);
+	});
 });
 
 describe('⭐ C1, C3 — the lane’s half, and half B’s author, at boot', () => {
@@ -1058,23 +1102,32 @@ describe('⭐ C3 — the authoring allowance, folded into the timeout', () => {
 				PHASE7_INTROSPECT_MS -
 				PHASE7_SIGN_OFF_UNIT_MS
 		).toBe(PHASE7_MODEL_UNITS * PHASE7_PER_PHASE_MS);
-		expect(phase7HalfBTestTimeoutMs(4)).toBe(PHASE7_TEST_TIMEOUT_MS + PHASE7_AUTHORING_MS);
-		expect(phase7HalfBTestTimeoutMs(4)).toBe(425_225_000);
+		// ⭐ R3-B F2 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — ~~a phase count~~: each unit's
+		// declared policies, the root's first. With every unit declaring §3.2's most, four, the arithmetic is half A's re-counted.
+		const units = (phases: number): number[] => Array.from({ length: phases + 1 }, () => 4);
+		expect(phase7HalfBTestTimeoutMs(units(4))).toBe(PHASE7_TEST_TIMEOUT_MS + PHASE7_AUTHORING_MS);
+		expect(phase7HalfBTestTimeoutMs(units(4))).toBe(425_225_000);
 		// ⭐ And the ceiling's first phase count, as lane-config.ts states it: 23.
-		expect([phase7HalfBTestTimeoutMs(22) < NODE_TIMER_CEILING_MS, phase7HalfBTestTimeoutMs(23)]).toEqual([
+		expect([phase7HalfBTestTimeoutMs(units(22)) < NODE_TIMER_CEILING_MS, phase7HalfBTestTimeoutMs(units(23))]).toEqual([
 			true,
 			NODE_TIMER_CEILING_MS
 		]);
-		expect(phase7HalfBTestTimeoutMs(7) - phase7HalfBTestTimeoutMs(6)).toBe(PHASE7_PER_PHASE_MS);
-		expect(phase7HalfBTestTimeoutMs(1)).toBe(PHASE7_TEST_TIMEOUT_MS - 3 * PHASE7_PER_PHASE_MS + PHASE7_AUTHORING_MS);
-		expect(phase7HalfBTestTimeoutMs(40)).toBe(NODE_TIMER_CEILING_MS);
+		expect(phase7HalfBTestTimeoutMs(units(7)) - phase7HalfBTestTimeoutMs(units(6))).toBe(PHASE7_PER_PHASE_MS);
+		expect(phase7HalfBTestTimeoutMs(units(1))).toBe(PHASE7_TEST_TIMEOUT_MS - 3 * PHASE7_PER_PHASE_MS + PHASE7_AUTHORING_MS);
+		expect(phase7HalfBTestTimeoutMs(units(40))).toBe(NODE_TIMER_CEILING_MS);
 		expect(NODE_TIMER_CEILING_MS).toBe(2_147_483_647);
+		// ⭐ Each unit's sign-off re-counted for its own policies: one more policy, two more reviews — Record Assurance's, and the
+		// rule's one re-run of them — at four calls of 240 s each.
+		expect(phase7HalfBTestTimeoutMs([4, 5, 4, 4, 4]) - phase7HalfBTestTimeoutMs(units(4))).toBe(
+			2 * LANE_BUDGET.reviewerCallsPerTry * LANE_BUDGET.reviewerCallMs
+		);
 	});
 
-	it('⭐ the lane extends the test’s timeout ONCE, when the units are read, by the agent’s phase count', async () => {
+	it('⭐ the lane extends the test’s timeout ONCE, when the units are read, by ~~the agent’s phase count~~ ⭐ each of the agent’s units’ declared policies, the root’s first', async () => {
 		const l = halfBLane({ paid: true });
 		await l.run();
-		expect(l.timeouts).toEqual([phase7HalfBTestTimeoutMs(3)]);
+		// ⭑ AGENT_TYPES: the root, Specify, Build and Verify declare 1, 2, 1 and 1 (`requiredAssurancePolicyIds`).
+		expect(l.timeouts).toEqual([phase7HalfBTestTimeoutMs([1, 2, 1, 1])]);
 	});
 });
 
@@ -1806,7 +1859,7 @@ describe('⛔ the merge’s fix round, F2 and F3 — the run report reads half B
 		return { prior, record, report, md: renderMarkdown(report) };
 	};
 
-	it('⛔ F2 — the root’s read before its press, by the rule that lets an act REACH the limit (`limitCheckAhead`), totals it exactly: it reads “at it”, never “under it”', async () => {
+	it('⛔ F2 — the root’s read before its press, by the rule that lets an act REACH the limit (~~`limitCheckAhead`~~ ⭐ the one rule, `limitCheck`), totals it exactly: it reads “at it”, never “under it”', async () => {
 		// ⛔ PREDICTED RED, read from the code: `limitFigures` worded every read the lane let through "under it" — written for
 		// `limitCheck`, under which an act is let through only below the limit.
 		const { prior, record, md } = await atTheLimit();
@@ -1840,6 +1893,8 @@ describe('⛔ the merge’s fix round, F2 and F3 — the run report reads half B
 describe('⭐⭐ The merge of E12 and E3 (J1, J2) — half B’s sign-offs count the declared reviews of the PUBLISHED PWA, read from the store, and E12’s rule re-runs those that did not conclude', () => {
 	/** One declared review's worst case in reviewer calls (`signOffWorstCase`): its call and its repair, each run once more. */
 	const PER_POLICY = LANE_BUDGET.reviewerCallsPerTry;
+	/** A model unit's worst case, which each phase's check counts since R3-B's fix round (F1): (3 + 32) × 4 = 140. */
+	const UNIT_WORST = (LANE_BUDGET.tries + PHASE7_REVIEWED_COMMANDS) * LANE_BUDGET.reviewerCallsPerTry;
 	/** Five policies — one more than any unit of §3.2 declares (`PHASE7_DECLARED_POLICIES_PER_UNIT`, the lane's fallback). */
 	const FIVE = [
 		'pol_requirement_coverage',
@@ -1861,15 +1916,20 @@ describe('⭐⭐ The merge of E12 and E3 (J1, J2) — half B’s sign-offs count
 	// and no title of the agent's is one of §3.2's — so every half-B unit was counted at the fallback, four policies, and one
 	// that declares five was pressed past the limit.
 	it('⛔ J1 — an agent’s unit declaring FIVE policies is held back where four would have fit: its sign-off’s worst case is the store’s, 5 × 4', async () => {
-		const prior = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - FIVE.length * PER_POLICY + 1;
+		// ⭐ R3-B's fix round (F1) — ~~the prior alone one call past the five's worst case~~: each phase counts its worst case,
+		// a model unit's, so the prior lets each phase through exactly at the limit and the last phase, Verify, spends the
+		// rest: the sign-off reads the same calls as before.
+		const spent = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - FIVE.length * PER_POLICY + 1;
+		const prior = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - UNIT_WORST;
 		expect(
-			prior + PHASE7_NEGATIVE_CONTROL_RESERVE + 4 * PER_POLICY,
+			spent + PHASE7_NEGATIVE_CONTROL_RESERVE + 4 * PER_POLICY,
 			'arrangement: four policies’ worst case would fit'
 		).toBeLessThan(PHASE7_PAID_LIMIT);
 		const l = halfBLane({
 			paid: true,
 			prior,
 			types: FIVE_POLICY_TYPES,
+			unitCalls: { pwu_v: spent - prior },
 			signOffs: { 'specify-wordfreq': { ra: answered('success') } }
 		});
 		const record = await l.run();
@@ -1878,7 +1938,7 @@ describe('⭐⭐ The merge of E12 and E3 (J1, J2) — half B’s sign-offs count
 		]);
 		expect(record.units[1]!.signOff?.limitCheck).toEqual({
 			prior,
-			recorded: 0,
+			recorded: spent - prior,
 			reserve: PHASE7_NEGATIVE_CONTROL_RESERVE,
 			ahead: FIVE.length * PER_POLICY,
 			total: PHASE7_PAID_LIMIT + 1,
@@ -1931,6 +1991,58 @@ describe('⭐⭐ The merge of E12 and E3 (J1, J2) — half B’s sign-offs count
 			null
 		]);
 		expect(record.end?.reason).toBe('complete');
+	});
+
+	// ── ⛔ R3-B F2 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — HALF B'S SIGN-OFF TIME BOUNDS
+	// COME FROM THE UNIT'S DECLARED POLICIES AS THE STORE HOLDS THEM (`declaredPolicyIdsOf`), as J1's limit does: Record
+	// Assurance's, the rule's re-run of the declared reviews, and the test's timeout. Half A's stay §3.2's.
+	/** One declared review at its bound: its call, retry and repair, each `reviewerCallMs` — 960 s. */
+	const REVIEW_MS = PER_POLICY * LANE_BUDGET.reviewerCallMs;
+
+	it('⛔ R3-B F2 — an agent’s unit declaring FIVE policies has its Record Assurance, and the rule’s re-run of its declared reviews, given a bound that covers FIVE reviews; one declaring one, one review', async () => {
+		// ⛔ PREDICTED RED, read from the code: the lane handed its sign-off presses no bound, and each press waited
+		// `PHASE7_RECORD_ASSURANCE_MS` — §3.2's four policies' reviews, 4,140 s — whatever the unit declared.
+		const l = halfBLane({
+			paid: true,
+			types: FIVE_POLICY_TYPES,
+			signOffs: {
+				'specify-wordfreq': {
+					ra: refusal('pol_test_adequacy did not conclude: the reviewer’s call failed'),
+					rerun: { offered: true, outcome: answered('success') }
+				},
+				'build-wordfreq': { ra: answered('success') }
+			}
+		});
+		await l.run();
+		const FIVE_REVIEWS = PHASE7_SIGN_OFF_MS + FIVE.length * REVIEW_MS;
+		const ONE_REVIEW = PHASE7_SIGN_OFF_MS + REVIEW_MS;
+		expect(FIVE_REVIEWS, 'arrangement: five reviews pass §3.2’s four').toBeGreaterThan(PHASE7_SIGN_OFF_MS + 4 * REVIEW_MS);
+		expect(l.bounds, 'a sign-off press was not given the bound of its unit’s own declared reviews').toEqual([
+			['recordAssurance specify-wordfreq', FIVE_REVIEWS],
+			['rerunDeclared specify-wordfreq', FIVE_REVIEWS],
+			['recordAssurance build-wordfreq', ONE_REVIEW],
+			['recordAssurance verify-wordfreq-end-to-end', ONE_REVIEW],
+			['recordAssurance root', ONE_REVIEW]
+		]);
+	});
+
+	it('⛔ R3-B F2 — half B’s timeout counts each unit’s sign-off by the policies the store says it declares: five reviews for the unit declaring five, one for each declaring one', async () => {
+		// ⛔ PREDICTED RED, read from the code: the timeout counted every unit's sign-off as one of four declared policies
+		// (`PHASE7_SIGN_OFF_UNIT_MS`), the agent's units read for their number alone.
+		const l = halfBLane({ paid: true, types: FIVE_POLICY_TYPES });
+		await l.run();
+		/** One unit's sign-off at its bounds, for `policies`: its reviews counted twice — Record Assurance's, and the rule's re-run's. */
+		const share = (policies: number) => PHASE7_SIGN_OFF_UNIT_MS + 2 * (policies - 4) * REVIEW_MS;
+		expect(l.timeouts, 'half B’s timeout counted a sign-off at §3.2’s four policies').toEqual([
+			PHASE7_TEST_TIMEOUT_MS -
+				PHASE7_PER_PHASE_MS +
+				PHASE7_AUTHORING_MS -
+				4 * PHASE7_SIGN_OFF_UNIT_MS +
+				share(1) +
+				share(FIVE.length) +
+				share(1) +
+				share(1)
+		]);
 	});
 });
 
@@ -2517,6 +2629,51 @@ describe('⛔ E3’s polish, 2 — stage 1 says the agent authored the PWA only 
 		]);
 		expect(one.basis).toContain('the lane recorded no accepted hash: no one accepted a candidate');
 	});
+
+	// ⛔ R3-B F5 (the lead's round-3 item 5) — AN ACCEPTANCE THAT GOT NO ANSWER
+	// READS AS NO ANSWER: the lane pressed it and heard nothing back — it outlasted its bound, or its request failed in transit
+	// (`pressFormAction`) — so the server may still have accepted the candidate. Never "no candidate accepted".
+	it('⛔ R3-B F5 — an acceptance that got NO ANSWER reads as no answer, which the server may still have accepted — never “no candidate accepted”', () => {
+		// ⛔ PREDICTED RED, read from the code: the first line said "no candidate of the agent’s was accepted into it", and the
+		// faults "no one accepted a candidate", of an acceptance whose answer never came.
+		const ready = { status: 'READY_TO_COMMIT', candidateHash: CANDIDATE_HASH };
+		const outlasted = { status: null, envelopeType: null, timedOutAfterMs: 300_000, requestFailure: null, refusal: null, acceptedHash: null };
+		const lost = { ...outlasted, timedOutAfterMs: null, requestFailure: 'net::ERR_EMPTY_RESPONSE' };
+		for (const [accept, end, how] of [
+			[outlasted, 'allowance-exceeded', 'no answer within 300000 ms'],
+			[lost, 'request-failed', 'no answer: the request failed in transit (net::ERR_EMPTY_RESPONSE)']
+		] as const) {
+			const r = buildRunReport(store, unaccepted(ready, accept, end), { accountNames: NAMES }).report;
+			const one = cellOf(r, '1', 'whole run');
+			expect(one.basis[0], how).toBe(
+				`the PWA "CLI Product Realization" is DRAFT: its acceptance of a candidate got ${how}, and the server may still have ` +
+					`accepted it — the authoring came to a candidate READY_TO_COMMIT, and the run ended ${end}`
+			);
+			expect(one.basis, how).toContain(`the acceptance got ${how}: the server may still have accepted it, and the lane recorded no hash`);
+			expect(one.basis.join('\n'), how).not.toMatch(/no candidate of the agent’s was accepted|no one accepted a candidate/);
+			// ⛔ AND THE ACCEPTED HASH, as stage 1's fourth line and the authoring section read it, is none RECORDED, with why: a
+			// bare "none" said no hash was accepted, of a press whose answer never came.
+			const acceptedLine = renderMarkdown(r)
+				.split('\n')
+				.find((l) => l.startsWith('- **The accepted hash:**'));
+			expect([one.basis[3], acceptedLine], how).toEqual([
+				`the accepted hash: none recorded — the acceptance got ${how}; the candidate as the lane last read it: READY_TO_COMMIT`,
+				`- **The accepted hash:** none recorded — the acceptance got ${how}, and the server may still have accepted it.`
+			]);
+			expect(r.authoring?.acceptedHash, how).toBeNull();
+		}
+	});
+
+	it('⭐ R3-B F5 — from the lane’s own record: an acceptance that outlasted its bound ends the run there, and the report reads it as no answer', async () => {
+		const l = halfBLane({
+			paid: true,
+			accept: { status: null, envelopeType: null, rawBody: null, decoded: null, timedOutAfterMs: 300_000, requestFailure: null }
+		});
+		const record = await l.run();
+		expect(record.end?.reason, 'arrangement: the acceptance outlasted its bound').toBe('allowance-exceeded');
+		const one = cellOf(buildRunReport(store, { ...halfBLaneRows(), run: l.written() }, { accountNames: NAMES }).report, '1', 'whole run');
+		expect(one.basis).toContain('the acceptance got no answer within 300000 ms: the server may still have accepted it, and the lane recorded no hash');
+	});
 });
 
 describe('⛔ E3’s polish, 3 — a root that declares MODEL has its cells reported like any phase’s; §3.2’s HUMAN root keeps its reading', () => {
@@ -2628,6 +2785,56 @@ describe('⛔ E3’s polish, 3 — a root that declares MODEL has its cells repo
 		expect(r.matrix.filter((c) => c.row === 'root')).toEqual([]);
 		expect(renderMarkdown(r)).toContain('| Stage | specify-wordfreq | build-wordfreq | verify-wordfreq-end-to-end |');
 		expect(Object.keys(r.manifest.unrecordedRuns)).toEqual(['specify-wordfreq', 'build-wordfreq', 'verify-wordfreq-end-to-end']);
+	});
+
+	// ⛔ R3-B F6 (the lead's round-3 item 6) — A ROOT WHOSE TYPE CANNOT BE READ
+	// FAILS CLOSED: whether its press ran a model cannot be decided, so its cells are reported — broke, or not determined —
+	// each with why, never skipped. ⚠ A type READ to declare no discharge is UNDECLARED, the control above.
+	/** The report of a half-B run whose root's type `store` cannot read, held to what failing closed reports. */
+	const failsClosed = (store: StoreRows, why: string): RunReport => {
+		const r = buildRunReport(retained(store), halfBLaneRows(), { accountNames: NAMES }).report;
+		const cells = r.matrix.filter((c) => c.row === 'root');
+		expect(cells.map((c) => c.stage), 'the root’s cells').toEqual(['3', '4', '5a', '5b', '6', '7', '8']);
+		for (const c of cells) {
+			expect(c.value === 'broke' || c.value === null, `${c.stage} reads ${String(c.value)}`).toBe(true);
+			expect(c.basis, c.stage).toContain(
+				`the root unit’s type cannot be read (${why}): whether its press ran a model, and so which of its stages apply, ` +
+					'cannot be decided, so each is reported, never skipped'
+			);
+		}
+		expect(renderMarkdown(r)).toMatch(/\| Stage \| root \|/);
+		expect(Object.keys(r.manifest.unrecordedRuns)).toContain('root');
+		return r;
+	};
+	const PRESSED_ROOT = { ...ALL_MODEL, pwu_r: 'press' } as const;
+
+	it('⛔ R3-B F6 — a root whose type is NOT IN THE STORE has its cells reported, broke or not determined, each with why: never skipped', () => {
+		// ⛔ PREDICTED RED, read from the code: a type the report could not find was read as UNDECLARED, so the root was skipped
+		// by its place: its own cells at stages 3 to 8 were reported nowhere, and its completion only as its line in the whole
+		// run's stage 7 — a fault hidden by the very read that failed.
+		const stored = halfBStore({ ran: PRESSED_ROOT });
+		failsClosed({ ...stored, objects: stored.objects.filter((o) => o.id !== 'pwutype_root') }, 'pwutype_root is not in the store');
+	});
+
+	it('⛔ R3-B F6 — and so does a root whose type declares a discharge that is no word', () => {
+		// ⛔ PREDICTED RED, read from the code: a discharge that is no string was read as UNDECLARED, and the root skipped.
+		const garbled = AGENT_TYPES.map((t) => (t.state.isRoot === true ? { id: t.id, state: { ...t.state, workDischarge: 7 } } : t));
+		failsClosed(halfBStore({ types: garbled, ran: PRESSED_ROOT }), 'pwutype_root declares a workDischarge that is no word: 7');
+	});
+
+	it('⛔ R3-B F6 — a stage the unread root BROKE stays broke, its register ids kept and the reason beside it; every other is not determined', () => {
+		// ⭑ The root ran a model here, its first answer not JSON (K9): stage 4 breaks, as a MODEL root's would.
+		const stored = firstTryUnparsed(halfBStore({ ran: ALL_MODEL }));
+		const r = failsClosed({ ...stored, objects: stored.objects.filter((o) => o.id !== 'pwutype_root') }, 'pwutype_root is not in the store');
+		expect(r.matrix.filter((c) => c.row === 'root').map((c) => [c.stage, c.value, c.registerIds])).toEqual([
+			['3', null, []],
+			['4', 'broke', ['REG-F-519']],
+			['5a', null, []],
+			['5b', null, []],
+			['6', null, []],
+			['7', null, []],
+			['8', null, []]
+		]);
 	});
 });
 
