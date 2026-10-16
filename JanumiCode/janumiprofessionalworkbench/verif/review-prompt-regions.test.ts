@@ -304,7 +304,9 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481) — no host text inside quoted mate
 	// read against the run its builder rendered, as every process-result probe is (below).
 	// ⭐ `JAN-EXEC` Phase 7 completion E2 — ~~the 40 cases of case set v4~~ the 54 of case set v5: and its fourteen declared-policy
 	// cases, each its work one line of JSON in one region (`declaredPolicyReviewInput`).
-	it('⭐ the 54 cases of case set v5 — initial and repair prompt, each process result read against its run, each declared case its work one region', async () => {
+	// ⭐ `JAN-EXEC` Phase 7 completion, round 5 — ~~case set v5~~ the current set, version six since round 5: version five
+	// with D-FP-CLEAN repaired as D6-FP-CLEAN (`REG-D-115`), fifty-four cases still.
+	it('⭐ the 54 cases of the current case set — initial and repair prompt, each process result read against its run, each declared case its work one region', async () => {
 		const cases = committedCaseSet(new URL('../', import.meta.url)).cases;
 		expect(cases).toHaveLength(54);
 		expect(cases.filter((c) => c.arm === 'PROCESS_RESULT'), 'the 14 process-result cases').toHaveLength(14);
