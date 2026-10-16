@@ -77,8 +77,9 @@ import { STORE_FILE } from './run-folder';
 //   2. The PWA, typed and read back from the store, then published; the Undertaking created; its five units read.
 //   3. Begin & Execute on the ROOT, then on each PHASE in order, each started only after the one before has answered
 //      (`REG-F-535`). Before each phase, the LIMIT (D8): the calls spent before, those this store records, and four held
-//      for the negative control must total ~~under~~ ⭐ with the phase's first call AT MOST (the one rule, the lead's
-//      delegated decision of 2026-10-16, to be registered as REG-D-114) the sponsor's limit — ~~150~~ ~~200 (`REG-D-105`
+//      for the negative control must total ~~under~~ ⭐ with the phase's ~~first call~~ ⭐ worst case, a model unit's (R3-B's
+//      fix round, F1), AT MOST (the one rule, the lead's delegated decision of 2026-10-16, to be registered as REG-D-114)
+//      the sponsor's limit — ~~150~~ ~~200 (`REG-D-105`
 //      (1))~~ ⭐ 450 (`REG-D-110` (1)), `lane-config.ts`'s `PHASE7_PAID_LIMIT` — or the run ends `paid-limit`. Each press waits on its own
 //      response for up to one phase's allowance (D4); one with NO ANSWER — it outlasted that allowance, or its request
 //      failed in transit — ends the run there, `allowance-exceeded` or `request-failed`, the root's included, and

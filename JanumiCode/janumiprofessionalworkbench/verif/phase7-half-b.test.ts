@@ -373,6 +373,11 @@ interface HalfBScript {
 	/** ⭐ `REG-D-112` (E3's re-review, finding 4) — the ASSURANCE exchanges the authoring floor records once Send is pressed. */
 	readonly floorCalls?: number;
 	/**
+	 * ⭐ R3-B's fix round (F1) — the ASSURANCE exchanges a unit's Begin & Execute records, by the unit's id; none unless said.
+	 * Each phase's check counts its worst case now, so a run that reaches its sign-offs near the limit spends there in a phase.
+	 */
+	readonly unitCalls?: Readonly<Record<string, number>>;
+	/**
 	 * ⭐ The merge of E12 and E3 (J1, J2) — each unit's sign-off, by its slug: what Record Assurance came to, and whether the
 	 * row then offers re-running the declared reviews that did not conclude (`REG-D-112` (a)) and what that came to. A unit
 	 * not named here offers no Record Assurance, as before.
@@ -397,6 +402,7 @@ function halfBLane(script: HalfBScript) {
 	let accepted = false;
 	let status = 'DRAFT';
 	let undertaking = false;
+	let unitCallCount = 0;
 	const pressed = new Map<string, typeof COMPLETED>();
 	const statusAt = (n: number) => {
 		const list = script.statuses ?? ['COLLECTING', 'ASSURING', 'READY_TO_COMMIT'];
@@ -436,13 +442,17 @@ function halfBLane(script: HalfBScript) {
 				id: `pln_${id}`,
 				state: { workUnitId: id, steps: [{ stepState: 'SUCCEEDED' }] }
 			})),
-			// ⭐ `REG-D-112` (E3's re-review, finding 4) — the authoring floor's calls, recorded once Send is pressed.
-			modelExchanges: sent
-				? Array.from({ length: script.floorCalls ?? 0 }, (_, i) => ({
-						id: `mex_floor_${i}`,
-						state: { plane: 'ASSURANCE', subjectObjectId: PWA_ID }
-					}))
-				: [],
+			// ⭐ `REG-D-112` (E3's re-review, finding 4) — the authoring floor's calls, recorded once Send is pressed. ⭐ R3-B's
+			// fix round (F1) — and each pressed unit's (`unitCalls`).
+			modelExchanges: [
+				...(sent
+					? Array.from({ length: script.floorCalls ?? 0 }, (_, i) => ({
+							id: `mex_floor_${i}`,
+							state: { plane: 'ASSURANCE', subjectObjectId: PWA_ID }
+						}))
+					: []),
+				...Array.from({ length: unitCallCount }, (_, i) => ({ id: `mex_unit_${i}`, state: { plane: 'ASSURANCE' } }))
+			],
 			evidence: [],
 			artifacts: [],
 			authoringCandidates:
@@ -477,6 +487,7 @@ function halfBLane(script: HalfBScript) {
 		beginExecute: async (unit) => {
 			calls.push(`beginExecute ${unit.slug}`);
 			pressed.set(unit.unitId!, COMPLETED);
+			unitCallCount += script.unitCalls?.[unit.unitId!] ?? 0;
 			return answered('success');
 		},
 		showOverview: async () => void calls.push('showOverview'),
@@ -1882,6 +1893,8 @@ describe('⛔ the merge’s fix round, F2 and F3 — the run report reads half B
 describe('⭐⭐ The merge of E12 and E3 (J1, J2) — half B’s sign-offs count the declared reviews of the PUBLISHED PWA, read from the store, and E12’s rule re-runs those that did not conclude', () => {
 	/** One declared review's worst case in reviewer calls (`signOffWorstCase`): its call and its repair, each run once more. */
 	const PER_POLICY = LANE_BUDGET.reviewerCallsPerTry;
+	/** A model unit's worst case, which each phase's check counts since R3-B's fix round (F1): (3 + 32) × 4 = 140. */
+	const UNIT_WORST = (LANE_BUDGET.tries + PHASE7_REVIEWED_COMMANDS) * LANE_BUDGET.reviewerCallsPerTry;
 	/** Five policies — one more than any unit of §3.2 declares (`PHASE7_DECLARED_POLICIES_PER_UNIT`, the lane's fallback). */
 	const FIVE = [
 		'pol_requirement_coverage',
@@ -1903,15 +1916,20 @@ describe('⭐⭐ The merge of E12 and E3 (J1, J2) — half B’s sign-offs count
 	// and no title of the agent's is one of §3.2's — so every half-B unit was counted at the fallback, four policies, and one
 	// that declares five was pressed past the limit.
 	it('⛔ J1 — an agent’s unit declaring FIVE policies is held back where four would have fit: its sign-off’s worst case is the store’s, 5 × 4', async () => {
-		const prior = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - FIVE.length * PER_POLICY + 1;
+		// ⭐ R3-B's fix round (F1) — ~~the prior alone one call past the five's worst case~~: each phase counts its worst case,
+		// a model unit's, so the prior lets each phase through exactly at the limit and the last phase, Verify, spends the
+		// rest: the sign-off reads the same calls as before.
+		const spent = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - FIVE.length * PER_POLICY + 1;
+		const prior = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - UNIT_WORST;
 		expect(
-			prior + PHASE7_NEGATIVE_CONTROL_RESERVE + 4 * PER_POLICY,
+			spent + PHASE7_NEGATIVE_CONTROL_RESERVE + 4 * PER_POLICY,
 			'arrangement: four policies’ worst case would fit'
 		).toBeLessThan(PHASE7_PAID_LIMIT);
 		const l = halfBLane({
 			paid: true,
 			prior,
 			types: FIVE_POLICY_TYPES,
+			unitCalls: { pwu_v: spent - prior },
 			signOffs: { 'specify-wordfreq': { ra: answered('success') } }
 		});
 		const record = await l.run();
@@ -1920,7 +1938,7 @@ describe('⭐⭐ The merge of E12 and E3 (J1, J2) — half B’s sign-offs count
 		]);
 		expect(record.units[1]!.signOff?.limitCheck).toEqual({
 			prior,
-			recorded: 0,
+			recorded: spent - prior,
 			reserve: PHASE7_NEGATIVE_CONTROL_RESERVE,
 			ahead: FIVE.length * PER_POLICY,
 			total: PHASE7_PAID_LIMIT + 1,

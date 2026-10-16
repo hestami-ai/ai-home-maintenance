@@ -594,8 +594,12 @@ export const PHASE7_TEST_TIMEOUT_MS =
  * re-run of one and a sign-off the total must be UNDER the limit (`limitCheck`); before Send and the root's press it may
  * reach it (`limitCheckAhead`).~~ ⭐ ONE RULE for every check (the lead's delegated decision of 2026-10-16, to be registered
  * as REG-D-114): the lane may REACH the limit and never pass it by what it counts — the calls spent, those held back and
- * what the act itself counts must total at most the limit (`limitCheck`). ⚠ Before a phase and the rule's re-run of one it
- * counts their first call only (`PHASE7_PHASE_FIRST_CALL`), as D8 counted no phase's worst case. ~~150 (`REG-D-102` (4))~~ ~~200: *"Raise limit to 200"* (`REG-D-105` (1), which amends
+ * what the act itself counts must total at most the limit (`limitCheck`). ~~⚠ Before a phase and the rule's re-run of one it
+ * counts their first call only (`PHASE7_PHASE_FIRST_CALL`), as D8 counted no phase's worst case.~~ ⭐ R3-B's fix round, F1 —
+ * and what each act counts is its worst case, before a phase and the rule's re-run of one too: a model unit's before a
+ * phase and before a re-run of its work (`PHASE7_UNIT_REVIEWER_CALLS`), a re-review's before a re-run of its review
+ * (`PHASE7_REREVIEW_REVIEWER_CALLS`). So a phase is started only while the calls spent before the run and those recorded
+ * in it total at most 306: 450, less the 4 held back and the phase's 140. ~~150 (`REG-D-102` (4))~~ ~~200: *"Raise limit to 200"* (`REG-D-105` (1), which amends
  * `REG-D-102` (4)); it covers the re-qualification, the re-run and a few recovery re-runs.~~ ~~230: *"the limit rises
  * to about 230"* (`REG-D-108`, after P2), held as the number its pointer states, for P3.~~ ⭐ `JAN-EXEC` Phase 7
  * completion programme, E3 — 450: *"Raise to about 450 (Recommended)"* (`REG-D-110` (1), after P3; `REG-D-109`), for the
@@ -708,18 +712,24 @@ export const PHASE7_AUTHORING_REVIEWER_CALLS = PHASE7_AUTHORING_FLOOR_RUNS * LAN
  * ⭐⭐ `REG-D-112` (finding 2) — ONE MODEL UNIT'S WORST CASE IN REVIEWER CALLS, as its allowance counts its reviews
  * (`PHASE7_UNIT_ALLOWANCE_MS`): each try's work-product review, and the review of each command reviewed, each of up to
  * `reviewerCallsPerTry` calls — (3 + 32) × 4 = 140. ⛔ Half B checks it before the ROOT's press when the agent's root
- * declares MODEL: §3.2's root runs no model, and the agent's may.
+ * declares MODEL: §3.2's root runs no model, and the agent's may. ⭐ R3-B's fix round, F1 (the lead's delegated decision of
+ * 2026-10-16, to be registered as REG-D-114) — and the lane checks it before each PHASE's press, and before the rule's
+ * re-run of a phase's work, which runs the whole unit again (`runModelUnit`).
  */
 export const PHASE7_UNIT_REVIEWER_CALLS =
 	(LANE_BUDGET.tries + PHASE7_REVIEWED_COMMANDS) * LANE_BUDGET.reviewerCallsPerTry;
 
 /**
- * ⭐ THE ONE RULE BEFORE A PHASE'S PRESS, AND BEFORE THE RULE'S RE-RUN OF ONE (the lead's delegated decision of 2026-10-16,
- * to be registered as REG-D-114) — what it counts of the act itself: its FIRST reviewer call, so a phase is never started
- * with no call left under the limit. ⚠ NOT ITS WORST CASE, which D8 never counted before a phase: that is a model unit's,
- * `PHASE7_UNIT_REVIEWER_CALLS`, and a phase let through may still spend past the limit.
+ * ⭐ R3-B's fix round, F1 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — A RE-REVIEW'S WORST
+ * CASE IN REVIEWER CALLS, counted before the rule's re-run of a stopped phase's REVIEW: the floors run again over the
+ * refused attempt's work product and each of its reviewed commands' evidence, and no producer runs (`rerunReview`,
+ * `src/routes/undertakings/[id]/+page.server.ts`), each a review of up to `reviewerCallsPerTry` calls, as
+ * `PHASE7_UNIT_REVIEWER_CALLS` counts a unit's — (1 + 32) × 4 = 132. ⚠ A worst case: only the refused reviews run again.
+ * ~~`PHASE7_PHASE_FIRST_CALL`, 1 — what the one rule counted of a phase and of the rule's re-run of one: its FIRST reviewer
+ * call, NOT its worst case, so a phase let through could still spend past the limit.~~ ⛔ The decision counts each act's
+ * worst case, so the lane never passes the limit by what it counts.
  */
-export const PHASE7_PHASE_FIRST_CALL = 1;
+export const PHASE7_REREVIEW_REVIEWER_CALLS = (1 + PHASE7_REVIEWED_COMMANDS) * LANE_BUDGET.reviewerCallsPerTry;
 
 /** ⭐ C1 — how long the lane waits between two reads of the candidate's status: each read is the whole dump. */
 export const PHASE7_CANDIDATE_POLL_MS = 5_000;

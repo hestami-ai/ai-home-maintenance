@@ -894,8 +894,9 @@ interface LaneUnit {
  * phase, a re-run of one, a sign-off or a re-run of its declared reviews, lets an act through only with the total UNDER the
  * limit; `limitCheckAhead`, before half B's Send and before half B's root's press, lets it through AT the limit too.~~
  * ⭐ ONE RULE since (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114): every check lets an act
- * through with its total AT MOST the limit, what it counts of the act always recorded (`ahead`: a phase's and a re-run's
- * first call). ⚠ A record made before it may hold a total AT the limit held back, by the first rule.
+ * through with its total AT MOST the limit, what it counts of the act always recorded (`ahead`: ~~a phase's and a re-run's
+ * first call~~ ⭐ R3-B's fix round, F1: the act's worst case, a phase's and a re-run's too). ⚠ A record made before it may
+ * hold a total AT the limit held back, by the first rule.
  */
 export interface LaneLimitCheck {
 	/** The unit's slug; `authoring` for half B's read before Send (`AUTHORING_READ`). */

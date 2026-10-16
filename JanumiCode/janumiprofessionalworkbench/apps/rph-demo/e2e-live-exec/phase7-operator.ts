@@ -68,10 +68,10 @@ import {
 	PHASE7_NEGATIVE_CONTROL_RESERVE,
 	PHASE7_INTROSPECT_MS,
 	PHASE7_PAID_LIMIT,
-	PHASE7_PHASE_FIRST_CALL,
 	PHASE7_PRIOR_CALLS_VARIABLE,
 	PHASE7_RECORD_ASSURANCE_MS,
 	phase7RecordAssuranceMs,
+	PHASE7_REREVIEW_REVIEWER_CALLS,
 	PHASE7_SIGN_OFF_MS,
 	PHASE7_UI_MS,
 	PHASE7_UNIT_ALLOWANCE_MS,
@@ -445,8 +445,10 @@ export interface LimitCheck {
 	 * review of up to `reviewerCallsPerTry` calls (`signOffWorstCase`). ~~Absent before a phase and before the rule's re-run of
 	 * a phase (`recoverByRule`), as before.~~ ⭐ ONE RULE (the lead's delegated decision of 2026-10-16, to be registered as
 	 * REG-D-114) — ON EVERY CHECK, what the act itself counts: before Send the authoring floor's worst case, before half B's
-	 * root a MODEL root's (none for a root that runs no model), and before a phase and the rule's re-run of one their first
-	 * call (`PHASE7_PHASE_FIRST_CALL`).
+	 * root a MODEL root's (none for a root that runs no model), and before a phase and the rule's re-run of one ~~their first
+	 * call (`PHASE7_PHASE_FIRST_CALL`)~~ ⭐ their worst case (R3-B's fix round, F1): a model unit's before a phase and before
+	 * the rule's re-run of its work (`PHASE7_UNIT_REVIEWER_CALLS`), a re-review's before the rule's re-run of its review
+	 * (`PHASE7_REREVIEW_REVIEWER_CALLS`).
 	 */
 	readonly ahead: number;
 	readonly total: number;
@@ -588,9 +590,12 @@ export function unpressed(units: readonly ArchiveUnit[]): RunUnit[] {
  * MOST the limit — the lane may reach it, and never pass it by what it counts. ⛔ Two rules stood, one per package: this
  * function let an act through only UNDER the limit, so a sign-off whose worst case brought the total exactly to the limit
  * was held back, while E3's `limitCheckAhead`, before half B's Send and its root's press (`REG-D-112`, E3's review finding
- * 2), let such an act through; its callers call this one now. ⚠ Before a phase, and the rule's re-run of one, the act
+ * 2), let such an act through; its callers call this one now. ~~⚠ Before a phase, and the rule's re-run of one, the act
  * counts its first call only (`PHASE7_PHASE_FIRST_CALL`): D8 never counted a phase's worst case, so a phase let through may
- * still spend past the limit.
+ * still spend past the limit.~~ ⭐ R3-B's fix round, F1 — before a phase, and before the rule's re-run of one, the act
+ * counts its WORST CASE too, as every other check does: a model unit's before a phase and before a re-run of its work
+ * (`PHASE7_UNIT_REVIEWER_CALLS`), a re-review's before a re-run of its review (`PHASE7_REREVIEW_REVIEWER_CALLS`). ⛔ It
+ * counted their first call only, so a phase let through with one call left could spend up to 139 past the limit.
  */
 export function limitCheck(prior: number, recorded: number, ahead: number): LimitCheck {
 	const total = prior + recorded + PHASE7_NEGATIVE_CONTROL_RESERVE + ahead;
@@ -1076,6 +1081,18 @@ export const RULE_RATIONALE: Readonly<Record<RecoveryAct, string>> = {
 	rerunWork:
 		'The run plan’s rule, REG-D-105 (4): a review that concluded against the work has its work re-run once, with the findings.',
 	abandonPwu: 'The run plan’s rule, REG-D-105 (4): a re-run that is refused again is abandoned.'
+};
+
+/**
+ * ⭐ R3-B's fix round, F1 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — WHAT THE ONE RULE
+ * COUNTS OF EACH RE-RUN, its worst case in reviewer calls: a re-review's (`PHASE7_REREVIEW_REVIEWER_CALLS`), the floors run
+ * again over the refused work with no producer; and a model unit's for the work run again, the whole unit
+ * (`PHASE7_UNIT_REVIEWER_CALLS`). ⛔ Until R3-B's fix round the check counted each re-run's first call only. An
+ * abandonment calls no model, and is not checked.
+ */
+const RERUN_WORST_CASE: Readonly<Record<Exclude<RecoveryAct, 'abandonPwu'>, number>> = {
+	rerunReview: PHASE7_REREVIEW_REVIEWER_CALLS,
+	rerunWork: PHASE7_UNIT_REVIEWER_CALLS
 };
 
 /** ⭐ P7-6R R-1f — the choices the row offers, once it is drawn. ⚠ Waited for first, as `recordAssurance` waits. */
@@ -2160,10 +2177,11 @@ export async function runTheLane(r: {
 			await hands.showOverview();
 			const offers = await hands.recoveryOffers(unit);
 			if (!offers.rerunReview && !offers.rerunWork) return null;
-			const rerun: RecoveryAct = offers.rerunReview ? 'rerunReview' : 'rerunWork';
+			const rerun: Exclude<RecoveryAct, 'abandonPwu'> = offers.rerunReview ? 'rerunReview' : 'rerunWork';
 			const { snapshot } = await hands.read();
-			// ⭐ The one rule (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114): the re-run's first call.
-			const check = limitCheck(boot.prior as number, recordedReviewerCalls(snapshot), PHASE7_PHASE_FIRST_CALL);
+			// ⭐ The one rule (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114): ~~the re-run's first
+			// call~~ ⭐ R3-B's fix round (F1): the re-run's worst case (`RERUN_WORST_CASE`).
+			const check = limitCheck(boot.prior as number, recordedReviewerCalls(snapshot), RERUN_WORST_CASE[rerun]);
 			if (!check.allowed) {
 				notPressed(unit, rerun, check, `the limit: ${check.total} of ${check.limit} reviewer calls (D8)`);
 				return 'paid-limit';
@@ -2238,11 +2256,12 @@ export async function runTheLane(r: {
 		const dry = boot.record.mode === 'dry';
 		let reason: EndReason = dry ? 'dry-run-stop' : 'complete';
 		for (const unit of dry ? [] : phases) {
-			// ⭐ The one rule (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114): the phase's first call.
+			// ⭐ The one rule (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114): ~~the phase's first
+			// call~~ ⭐ R3-B's fix round (F1): the phase's worst case, a model unit's.
 			unit.limitCheck = limitCheck(
 				boot.prior as number,
 				recordedReviewerCalls((await hands.read()).snapshot),
-				PHASE7_PHASE_FIRST_CALL
+				PHASE7_UNIT_REVIEWER_CALLS
 			);
 			if (!unit.limitCheck.allowed) {
 				reason = 'paid-limit';
