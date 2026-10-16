@@ -2798,7 +2798,7 @@ function stageOneHalfB(ix: Index, lane: LaneRows): MatrixCell {
 	const faults = [
 		...floor.filter((f) => f.state !== 'SATISFIED').map((f) => `the authoring floor's ${f.policyId} reads ${f.state}`),
 		...(reviewer === null ? ['the floor’s reasoning review names no reviewer'] : []),
-		...(accepted === null ? ['the lane recorded no accepted hash: no one accepted a candidate'] : []),
+		...(accepted === null ? [noAcceptanceFault(authoring)] : []),
 		...(refusal === '' ? [] : [`the acceptance was refused: ${refusal}`]),
 		...(accepted !== null && staged !== null && accepted !== staged
 			? [`the hash accepted, ${accepted}, is not the staged candidate's, ${staged}`]
@@ -2842,12 +2842,39 @@ function acceptedHashIn(authoring: Record<string, unknown>): string | null {
 }
 
 /**
+ * ⭐ R3-B F5 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — HOW AN ACCEPTANCE THAT GOT NO ANSWER
+ * WENT UNANSWERED, as the lane kept it (`DesignerActRecord`): no answer within its bound, or its request failed in transit,
+ * in the words the lane's `refusalOf` gives each; null for an acceptance answered, and for none pressed.
+ */
+function unansweredAcceptance(authoring: Record<string, unknown>): string | null {
+	const accept = rec(authoring.accept);
+	const ms = int(accept.timedOutAfterMs);
+	if (ms !== null) return `no answer within ${ms} ms`;
+	const failure = str(accept.requestFailure);
+	return failure === '' ? null : `no answer: the request failed in transit (${failure})`;
+}
+
+/**
+ * ⭐ R3-B F5 — stage 1's fault when no hash was accepted. ⛔ An acceptance that got NO ANSWER read "no one accepted a
+ * candidate": the server may still have accepted it, and the lane never heard. It reads as no answer.
+ */
+function noAcceptanceFault(authoring: Record<string, unknown>): string {
+	const noAnswer = unansweredAcceptance(authoring);
+	return noAnswer === null
+		? 'the lane recorded no accepted hash: no one accepted a candidate'
+		: `the acceptance got ${noAnswer}: the server may still have accepted it, and the lane recorded no hash`;
+}
+
+/**
  * ⭐ The lead's delegated decision of 2026-10-15, to be registered (E3's polish; the confirm of 60c8a828) — STAGE 1'S
  * FIRST LINE: THE AGENT AUTHORED THE PWA ONLY WHEN A CANDIDATE OF ITS WAS ACCEPTED, the acceptance answered success and
  * named its hash. ⛔ ~~Said whatever the authoring came to~~: a turn the server refused before it began read "authored
  * by the agent", in the cell that says the turn never settled. Otherwise the PWA is still the lane's draft, and the line
  * says what the authoring came to: its candidate as the lane last read it, and the run's end. ⚠ A hash alone is no
  * acceptance: `accepted` is stage 1's one reading of it (`acceptedHashIn`).
+ * ⭐ R3-B F5 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — AN ACCEPTANCE THAT GOT NO ANSWER
+ * (`unansweredAcceptance`) READS AS NO ANSWER, which the server may still have accepted. ⛔ It read "still the draft the lane
+ * created: no candidate of the agent’s was accepted into it" — of a press whose answer never came.
  */
 function authorshipLine(
 	pwa: StoredObject,
@@ -2861,10 +2888,12 @@ function authorshipLine(
 	const turn = str(rec(authoring.candidate).status);
 	const came = turn === '' ? 'no staged candidate' : `a candidate ${turn}`;
 	const end = str(rec(rec(lane.run).end).reason) || 'with no end recorded';
-	return (
-		`${named}, still the draft the lane created: no candidate of the agent’s was accepted into it — the authoring ` +
-		`came to ${came}, and the run ended ${end}`
-	);
+	const noAnswer = unansweredAcceptance(authoring);
+	const accepting =
+		noAnswer === null
+			? ', still the draft the lane created: no candidate of the agent’s was accepted into it'
+			: `: its acceptance of a candidate got ${noAnswer}, and the server may still have accepted it`;
+	return `${named}${accepting} — the authoring came to ${came}, and the run ended ${end}`;
 }
 
 /**

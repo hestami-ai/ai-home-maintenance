@@ -2611,6 +2611,40 @@ describe('⛔ E3’s polish, 2 — stage 1 says the agent authored the PWA only 
 		]);
 		expect(one.basis).toContain('the lane recorded no accepted hash: no one accepted a candidate');
 	});
+
+	// ⛔ R3-B F5 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — AN ACCEPTANCE THAT GOT NO ANSWER
+	// READS AS NO ANSWER: the lane pressed it and heard nothing back — it outlasted its bound, or its request failed in transit
+	// (`pressFormAction`) — so the server may still have accepted the candidate. Never "no candidate accepted".
+	it('⛔ R3-B F5 — an acceptance that got NO ANSWER reads as no answer, which the server may still have accepted — never “no candidate accepted”', () => {
+		// ⛔ PREDICTED RED, read from the code: the first line said "no candidate of the agent’s was accepted into it", and the
+		// faults "no one accepted a candidate", of an acceptance whose answer never came.
+		const ready = { status: 'READY_TO_COMMIT', candidateHash: CANDIDATE_HASH };
+		const outlasted = { status: null, envelopeType: null, timedOutAfterMs: 300_000, requestFailure: null, refusal: null, acceptedHash: null };
+		const lost = { ...outlasted, timedOutAfterMs: null, requestFailure: 'net::ERR_EMPTY_RESPONSE' };
+		for (const [accept, end, how] of [
+			[outlasted, 'allowance-exceeded', 'no answer within 300000 ms'],
+			[lost, 'request-failed', 'no answer: the request failed in transit (net::ERR_EMPTY_RESPONSE)']
+		] as const) {
+			const one = cellOf(buildRunReport(store, unaccepted(ready, accept, end), { accountNames: NAMES }).report, '1', 'whole run');
+			expect(one.basis[0], how).toBe(
+				`the PWA "CLI Product Realization" is DRAFT: its acceptance of a candidate got ${how}, and the server may still have ` +
+					`accepted it — the authoring came to a candidate READY_TO_COMMIT, and the run ended ${end}`
+			);
+			expect(one.basis, how).toContain(`the acceptance got ${how}: the server may still have accepted it, and the lane recorded no hash`);
+			expect(one.basis.join('\n'), how).not.toMatch(/no candidate of the agent’s was accepted|no one accepted a candidate/);
+		}
+	});
+
+	it('⭐ R3-B F5 — from the lane’s own record: an acceptance that outlasted its bound ends the run there, and the report reads it as no answer', async () => {
+		const l = halfBLane({
+			paid: true,
+			accept: { status: null, envelopeType: null, rawBody: null, decoded: null, timedOutAfterMs: 300_000, requestFailure: null }
+		});
+		const record = await l.run();
+		expect(record.end?.reason, 'arrangement: the acceptance outlasted its bound').toBe('allowance-exceeded');
+		const one = cellOf(buildRunReport(store, { ...halfBLaneRows(), run: l.written() }, { accountNames: NAMES }).report, '1', 'whole run');
+		expect(one.basis).toContain('the acceptance got no answer within 300000 ms: the server may still have accepted it, and the lane recorded no hash');
+	});
 });
 
 describe('⛔ E3’s polish, 3 — a root that declares MODEL has its cells reported like any phase’s; §3.2’s HUMAN root keeps its reading', () => {

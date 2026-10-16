@@ -30198,5 +30198,41 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/phase7-run-report.test.ts"],
 		why: "PROMISE (R3-B F4; the lead's delegated decision of 2026-10-16, to be registered as REG-D-114): the root's skipped sign-off reads as not attempted because the lane stopped - and in half A the root has no row of its own, so its line in the whole run's stage 7 says why. WHO RELIES: the reader of the whole run's stage 7. WHAT THE MUTATION DOES: the line says 'root: not reached' and nothing more. Applied by hand first, the file restored byte for byte: 'AssertionError: the root’s sign-off, skipped, said nothing of why: expected [ 'root: not reached', …(5) ] to include 'root: not reached — its sign-off was …'' ('Tests  1 failed | 123 passed (124)'). OBSERVED (bun run mutants -- (R3-B F4's ids and the guards near its lines), 2026-10-16, in the R3-B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R3B-M27-the-root-s-line-says-nothing-of-the-skip ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 7 completion programme, round 3, package R3-B, F4 - a sign-off the lane skipped after stopping at another unit's limit check, the root's included, reads as not attempted because the lane stopped there (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114)"
+	},
+	{
+		id: "R3B-M28-an-unanswered-acceptance-reads-as-no-candidate-accepted",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "const noAnswer = unansweredAcceptance(authoring);\n\tconst accepting =",
+		replace: "const noAnswer = null as string | null;\n\tconst accepting =",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (R3-B F5; the lead's delegated decision of 2026-10-16, to be registered as REG-D-114): stage 1's first line reads an acceptance that got no answer as no answer, which the server may still have accepted - never 'no candidate of the agent’s was accepted into it'. WHO RELIES: the reader of a half-B report whose run ended at the acceptance, allowance-exceeded or request-failed, and P7-5, which must not report a candidate refused that may stand committed. WHAT THE MUTATION DOES: the line reads every unaccepted run as no candidate accepted, the code before the fix. Applied by hand first, the file restored byte for byte: 'AssertionError: no answer within 300000 ms: expected 'the PWA \"CLI Product Realization\" is …' to be 'the PWA \"CLI Product Realization\" is …' // Object.is equality' - the red the fix was built against, observed first at the unchanged code, where the line read '... is DRAFT, still the draft the lane created: no candidate of the agent’s was accepted into it — ...' ('Tests  1 failed | 100 passed (101)'). OBSERVED (bun run mutants -- (R3-B F5's ids and the guards near its lines), 2026-10-16, in the R3-B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R3B-M28-an-unanswered-acceptance-reads-as-no-candidate-accepted ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion programme, round 3, package R3-B, F5 - an acceptance that got no answer reads as no answer, which the server may still have accepted, never as no candidate accepted (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114)"
+	},
+	{
+		id: "R3B-M29-an-unanswered-acceptance-is-faulted-as-no-one-accepting",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "const noAnswer = unansweredAcceptance(authoring);\n\treturn noAnswer === null",
+		replace: "const noAnswer = null as string | null;\n\treturn noAnswer === null",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (R3-B F5; the lead's delegated decision of 2026-10-16, to be registered as REG-D-114): stage 1's fault for an acceptance that got no answer says so - the server may still have accepted it - never 'no one accepted a candidate'. WHO RELIES: the same readers as the first line's. WHAT THE MUTATION DOES: the fault reads 'no one accepted a candidate' whatever the acceptance came to, the code before the fix. Applied by hand first, the file restored byte for byte: 'AssertionError: no answer within 300000 ms: expected [ …(13) ] to include 'the acceptance got no answer within 3…'' and 'AssertionError: expected [ …(12) ] to include 'the acceptance got no answer within 3…'' ('Tests  2 failed | 99 passed (101)'). OBSERVED (bun run mutants -- (R3-B F5's ids and the guards near its lines), 2026-10-16, in the R3-B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R3B-M29-an-unanswered-acceptance-is-faulted-as-no-one-accepting ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion programme, round 3, package R3-B, F5 - an acceptance that got no answer reads as no answer, which the server may still have accepted, never as no candidate accepted (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114)"
+	},
+	{
+		id: "R3B-M30-an-acceptance-past-its-bound-is-read-as-answered",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "if (ms !== null) return `no answer within ${ms} ms`;",
+		replace: "if (ms !== null) void ms;",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (R3-B F5; the lead's delegated decision of 2026-10-16, to be registered as REG-D-114): an acceptance that outlasted its bound (the lane's timedOutAfterMs) is one that got no answer. WHO RELIES: stage 1's line and fault. WHAT THE MUTATION DOES: an outlasted acceptance is read as answered, so it reads 'no candidate accepted' again. Applied by hand first, the file restored byte for byte: 'AssertionError: no answer within 300000 ms: expected 'the PWA \"CLI Product Realization\" is …' to be 'the PWA \"CLI Product Realization\" is …' // Object.is equality' and 'AssertionError: expected [ …(12) ] to include 'the acceptance got no answer within 3…'' ('Tests  2 failed | 99 passed (101)'). OBSERVED (bun run mutants -- (R3-B F5's ids and the guards near its lines), 2026-10-16, in the R3-B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R3B-M30-an-acceptance-past-its-bound-is-read-as-answered ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion programme, round 3, package R3-B, F5 - an acceptance that got no answer reads as no answer, which the server may still have accepted, never as no candidate accepted (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114)"
+	},
+	{
+		id: "R3B-M31-an-acceptance-lost-in-transit-is-read-as-answered",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "return failure === '' ? null : `no answer: the request failed in transit (${failure})`;",
+		replace: "return null;",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (R3-B F5; the lead's delegated decision of 2026-10-16, to be registered as REG-D-114): an acceptance whose request failed in transit (the lane's requestFailure) is one that got no answer. WHO RELIES: stage 1's line and fault. WHAT THE MUTATION DOES: a lost acceptance is read as answered. Applied by hand first, the file restored byte for byte: 'AssertionError: no answer: the request failed in transit (net::ERR_EMPTY_RESPONSE): expected 'the PWA \"CLI Product Realization\" is …' to be 'the PWA \"CLI Product Realization\" is …' // Object.is equality' ('Tests  1 failed | 100 passed (101)'). OBSERVED (bun run mutants -- (R3-B F5's ids and the guards near its lines), 2026-10-16, in the R3-B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R3B-M31-an-acceptance-lost-in-transit-is-read-as-answered ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion programme, round 3, package R3-B, F5 - an acceptance that got no answer reads as no answer, which the server may still have accepted, never as no candidate accepted (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114)"
 	}
 ];
