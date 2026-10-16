@@ -18,7 +18,7 @@
 //
 // ⚠ NO PI IMPORT HERE, DELIBERATELY. `pi-agent.ts` is the ONLY module that may import Pi (the factory
 // dynamic-imports it so ~~the mock path and the whole gate never load~~ ⭐ the mock path never loads Pi's heavy Node
-// deps; the gate loads them in one test alone, `tools/pi-executor.test.ts`: R3-C). This module is
+// deps; the gate loads Pi's coding agent in one test alone, `tools/pi-executor.test.ts`: R3-C). This module is
 // therefore STRUCTURALLY typed against the two properties it touches.
 //
 // ── ⚠⚠ IN-MEMORY ONLY, AND THAT IS A CONTRACT, NOT AN OVERSIGHT ─────────────────────────────────────────────

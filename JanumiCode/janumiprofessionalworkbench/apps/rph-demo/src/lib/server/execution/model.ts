@@ -63,8 +63,8 @@ export async function deterministicExecutionPrint(prompt: string): Promise<strin
  *   · `agyExec` — handed to `agyPrintWithModel`, so a test sees the argv (the model agy is asked to run) and a failure's
  *     sanitised text, and nothing is spawned.
  *   · `openPi` — the Pi opener. ⚠ Its default is the LAZY import below, so ~~the gate never loads Pi's SDK~~ ⭐ loading
- *     this module loads no part of Pi's SDK (R3-C: the gate loads it in one test alone, `tools/pi-executor.test.ts`); a
- *     test hands in its own and so never opens a real Pi session.
+ *     this module loads no part of Pi's SDK (R3-C: the gate loads Pi's coding agent in one test alone,
+ *     `tools/pi-executor.test.ts`); a test hands in its own and so never opens a real Pi session.
  */
 export interface ExecutionSessionDeps {
 	readonly agyExec?: AgyExec;

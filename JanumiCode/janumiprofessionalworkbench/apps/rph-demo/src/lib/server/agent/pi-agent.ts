@@ -1,6 +1,7 @@
 // The LIVE authoring agent, backed by the Pi coding-agent SDK (in-process AgentSession — cloud models, no GPU).
 // This module is the ONLY place Pi is imported; the factory dynamic-imports it, so the mock path ~~(and the whole
-// gate)~~ never loads Pi's heavy Node deps ⭐ (the gate loads them in one test alone, `tools/pi-executor.test.ts`: R3-C).
+// gate)~~ never loads Pi's heavy Node deps ⭐ (the gate loads Pi's coding agent in one test alone,
+// `tools/pi-executor.test.ts`: R3-C).
 // It maps our Pi-agnostic tool descriptors onto Pi `defineTool`s and Pi's event stream onto our normalized
 // AuthoringAgentEvent stream. The agent runs with the built-in coding tools
 // DISABLED (noTools: "builtin") — it can ONLY touch the workbench through our authoring tools. ⭐ And, since the lead's

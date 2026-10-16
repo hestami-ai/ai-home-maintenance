@@ -212,10 +212,12 @@ export function answerFromText(text: string): AdapterAnswer {
  * Classify a session turn that has ended, from the text it produced and how it terminated.
  *
  * ⭑ PURE AND SDK-FREE ON PURPOSE. The adapter that needs it imports Pi's heavy Node deps at module scope, so
- * it has no test in the gate — `model.ts` already records what that costs: *"NO UNIT TEST COULD HAVE CAUGHT
- * IT. Every test of `runModelInvocationStep` INJECTS its own `print` … the one adapter that narrows it was
- * never on any tested path. The LIVE lane found it on its second run."* Keeping the JUDGEMENT here and the
- * plumbing there is what puts this decision on a tested path at all.
+ * ~~it has no test in the gate~~ ⭐ it had no test in the gate when this was written — `model.ts` already records what
+ * that costs: *"NO UNIT TEST COULD HAVE CAUGHT IT. Every test of `runModelInvocationStep` INJECTS its own `print` … the
+ * one adapter that narrows it was never on any tested path. The LIVE lane found it on its second run."* Keeping the
+ * JUDGEMENT here and the plumbing there is what ~~puts this decision on a tested path at all~~ ⭐ lets a test reach every
+ * arm of this decision without loading Pi — though no test calls it directly. ⭐ (R3-C) `pi-executor.test.ts` now opens
+ * the adapter's session in the gate, over Pi's real loader with a faux provider, and its one turn passes through it.
  *
  * ⚠ TEXT WINS WHEN TEXT ARRIVED, AND THE BOUND IS DISCLOSED RATHER THAN HIDDEN. A turn that produced an answer
  * and *then* errored is reported as an answer: the professional's work is not discarded because the transport

@@ -15,8 +15,8 @@
 //
 // ⚠ PI IS IMPORTED ONLY HERE, and only through a dynamic import at the call site, so ~~the mock path and the whole
 // gate never load~~ ⭐ the mock path never loads its heavy Node deps — the rule `agent/index.ts` already follows. ⭐ (R3-C)
-// And the gate loads them in one test alone: `pi-executor.test.ts` imports this module, to open a session over Pi's real
-// loader with a faux provider (`REG-F-512`'s predicted red).
+// And the gate loads the coding agent in one test alone: `pi-executor.test.ts` imports this module, to open a session
+// over Pi's real loader with a faux provider (`REG-F-512`'s predicted red).
 // ⭐ `JAN-EXEC` Phase 8 (`REG-D-112` (d)) — STILL TRUE OF THIS MODULE AND OF THE CODING AGENT IT LOADS. The mapping of the
 // minted tools onto Pi's tool definitions moved to `pi-execution-tools.ts`, which imports only a TYPE from Pi, because it
 // decides the order a turn's calls run in (`REG-F-518`); its test drives that through Pi's CORE loop (`pi-agent-core`,
@@ -83,7 +83,9 @@ function resolveExecutingModel(modelRegistry: ModelRegistry, configured: string)
 /**
  * ~~Wrap the minted execution tools as Pi custom tools.~~ ⭐ `JAN-EXEC` Phase 8 (`REG-D-112` (d)) — MOVED, with its reasons,
  * to `pi-execution-tools.ts` (`toPiExecutionTools`): it decides the order a turn's tool calls run in (`REG-F-518`), and
- * this module loads Pi's SDK at module scope, so nothing in the gate could drive it here.
+ * this module loads Pi's SDK at module scope, so ~~nothing in the gate could drive it here~~ ⭐ nothing in the gate drove it
+ * here then (⭐ R3-C: `pi-executor.test.ts` now imports this module in the gate and opens its session over Pi's real
+ * loader with a faux provider, for one turn answered in text, which calls no tool).
  */
 
 /**
