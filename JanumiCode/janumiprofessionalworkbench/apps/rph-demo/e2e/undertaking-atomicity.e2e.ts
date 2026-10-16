@@ -42,7 +42,8 @@ test.describe('Undertaking Workbench — multi-Command atomicity (SPEC-001-INV-1
 		expect(rootPwu!.state.workLifecycleState).toBe('EXECUTING');
 		expect(rootPwu!.state.executionState).toBe('QUEUED');
 		// ⛔ THE MERGE'S FIX ROUND, F1 — AND THE ROOT'S DECLARED POLICIES SUSPENDED, so its Record Assurance reaches the batch this
-		// test is about. The root is judged over its children's work (REG-D-111 (2)), and the seed's children record no work
+		// test is about. The root is judged over ~~its children's work~~ ⭐ R3-A F1: the work it and every unit below it produced
+		// (REG-D-111 (2)'s general form), and the seed's units record no work
 		// product and no command, so while a declared policy governs the root the route refuses BEFORE any review is asked —
 		// and so before any command is dispatched. Suspended, none governs: no review is asked, and the sequence runs to the
 		// refused hop, its assessment commands first. ⚠ Self-checking: a policy left governing makes the alert below that

@@ -102,9 +102,10 @@ export interface DeclaredPolicyFraming {
  * true of it:
  *   · `PRODUCING_PROMPT` — the prompt the agent that produced the ONE work product judged was given, re-rendered from the
  *     record: the reviewer is told that agent was given exactly it;
- *   · `UNIT_PURPOSE` — the unit's OWN purpose: for a unit composed of others (the root, judged over its children's work,
- *     `REG-D-111` (2)), or one whose work no recorded prompt produced. It is the standard the work is judged against, and
- *     each work product judged was made under its own unit's instruction, which is not shown.
+ *   · `UNIT_PURPOSE` — the unit's OWN purpose: for a unit composed of others (the root, judged over ~~its children's work~~
+ *     ⭐ R3-A F1: the work its whole subtree produced, `REG-D-111` (2)), or one whose work no recorded prompt produced. It
+ *     is the standard the work is judged against, and each work product judged was made under its own unit's instruction,
+ *     which is not shown.
  * ⛔ The framing said of EVERY declared review that the work was produced "by the agents that did its children's work, which
  * was given exactly this instruction" — false of the root, whose instruction is its purpose and whose children each had a
  * prompt of their own.

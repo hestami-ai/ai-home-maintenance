@@ -211,7 +211,10 @@ export interface DeclaredPolicyReviewSource {
 	 * reviewer is told which, and nothing else about it (`DeclaredInstruction`).
 	 */
 	readonly instructionIs: DeclaredInstruction;
-	/** The work products judged, each with the title of the unit that produced it — the unit's own, or its children's. */
+	/**
+	 * The work products judged, each with the title of the unit that produced it — the unit's own, or ~~its children's~~ ⭐ R3-A
+	 * F1: for a unit composed of others, its whole subtree's.
+	 */
 	readonly workProducts: readonly { readonly unit: string; readonly answer: string }[];
 	/** The commands those units ran, as the host recorded them. */
 	readonly commands: readonly DeclaredReviewCommand[];
@@ -225,8 +228,9 @@ export interface DeclaredPolicyReviewSource {
  * policies, and what the declared qualification cases replay (`scripts/reviewer-qual/materialize.ts`).
  *
  * ⭑ THE WORK IS THE UNIT'S WORK PRODUCT AND THE COMMANDS IT RAN (`R18`): the reviewer judges the declared policy over both.
- * For a unit composed of others the work is its CHILDREN's work products and commands, the end-to-end phase's among them
- * (`REG-D-111` (2), DEC-6): the root's own TRANSFORMATION produces nothing.
+ * For a unit composed of others the work is ~~its CHILDREN's work products and commands~~ ⭐ R3-A F1 (`REG-D-111` (2)'s
+ * general form): the work products and commands its whole subtree produced, its own included, the end-to-end phase's among
+ * them (DEC-6) — for §3.2's root, its children's: the root's own TRANSFORMATION produces nothing.
  * ⭐ ONE UNTRUSTED VALUE, IN ITS STATED SERIALIZATION (`REG-F-481`): the work is ONE line of JSON (`jsonLine`, as the graph's
  * content is) — `workProducts`, each work product with the title of the unit that produced it, and `commands`, each command
  * with the exit code and timeout recorded for it — and the host line above it says so (the validator's `DECLARED_POLICY`

@@ -9,7 +9,8 @@
 // ── ⭐ WHAT IT IS ───────────────────────────────────────────────────────────────────────────────────────────────────────
 // One review per (unit, declared policy) pair. The reviewer is asked the policy's OWN criteria — its purpose framing the
 // review (`DECLARED_POLICY`, `reasoning-review-validator.ts` `declaredPolicyLine`) — over the unit's work product and the
-// commands it ran (`R18`; for a unit composed of others, its children's: `REG-D-111` (2)), and answers each criterion.
+// commands it ran (`R18`; for a unit composed of others, ~~its children's~~ ⭐ R3-A F1: its whole subtree's: `REG-D-111` (2)'s
+// general form), and answers each criterion.
 //   · ⭑ THE MACHINERY IS THE VALIDATOR'S OWN: its call, its retry of a call that threw short of its bound, its repairs and
 //     its capture of every try (design B1). A second reviewer with its own transport would be a second thing to qualify.
 //   · ⛔ SEPARATE FROM THE FLOOR'S `FloorPolicyId`: the validator's result cites `floor.reasoning-review` by its type, and

@@ -147,8 +147,9 @@ const UNDERTAKING = {
  * K1's PWA: the same root over ~~ONE model phase~~ ⭐ TWO model phases, and no stipulation of their work products' reviews at
  * first — so the stand-in leaves the first phase's review INCONCLUSIVE. ⛔ The merge's fix round, F1 — the second, the design,
  * runs once its review is stipulated, so the root has work to judge beside the phase that waits: a unit composed of others
- * whose children's work holds nothing to judge is asked no declared review (`nothingToJudge`), so with the waiting phase its
- * only child the root's sign-off would be refused for that, and prediction (a) never asked.
+ * ~~whose children's work holds nothing to judge~~ ⭐ R3-A F1: neither it nor any unit below it holding anything to judge is
+ * asked no declared review (`nothingToJudge`), so with the waiting phase its only child the root's sign-off would be refused
+ * for that, and prediction (a) never asked.
  */
 const STUCK_PWA: Phase7PwaDeclaration = {
 	name: 'CLI Product Realization, unstipulated',
@@ -844,7 +845,8 @@ test.describe('JAN-EXEC Phase 7 P7-1b — the five-unit rehearsal, in the gate l
 
 		// ── 5. ⭐ PREDICTION (a): THE ROOT IS SIGNED OFF WHILE ITS CHILD WAITS ───────────────────────────────────────────
 		// ⛔ The merge's fix round, F1 — ITS OTHER CHILD, THE DESIGN, COMPLETES FIRST, its review stipulated now: the root is
-		// judged over its children's work (REG-D-111 (2)), and with only the waiting phase beneath it, its Record Assurance is
+		// judged over ~~its children's work~~ ⭐ R3-A F1: the work it and every unit below it produced (REG-D-111 (2)'s general
+		// form), and with only the waiting phase beneath it, its Record Assurance is
 		// refused before any review is asked (`nothingToJudge`) — a refusal for having nothing to judge, not prediction (a)'s.
 		await registerStipulation(request, pwaId, 'WORK_PRODUCT');
 		const designRan = await beginExecute(page, DESIGN);

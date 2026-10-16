@@ -167,11 +167,13 @@ export function uncheckedCaveat(declared: readonly { readonly criterionResults: 
 
 /**
  * ⭐ E12's polish (fix2's F10; the lead's delegated decision of 2026-10-15, to be registered) — THE UNIT_PURPOSE FRAMING, STATED
- * PER RUN. A unit composed of others (the root) has its declared policies judged over its children's work, its reviewer given
- * the unit's own purpose (`UNIT_PURPOSE`; the route's `declaredReviewWorkOf`), and no reviewer-qualification case measures that
- * framing: every declared case of case set v5 is in the PRODUCING_PROMPT framing (`scripts/reviewer-qual/materialize.ts`). So
- * the line names each such unit and the reviews the model reviewer made of it, among the verdicts that speak; it is absent
- * where there are none — a root signed off before E2, or never. No case set changes.
+ * PER RUN. A unit composed of others (the root) has its declared policies judged over ~~its children's work~~ ⭐ R3-A F1 (the
+ * lead's delegated decision of 2026-10-16, to be registered as REG-D-114): the work it and every unit below it produced, its
+ * reviewer given the unit's own purpose (`UNIT_PURPOSE`; the route's `declaredReviewWorkOf`), and no reviewer-qualification
+ * case measures that framing: every declared case of case set v5 is in the PRODUCING_PROMPT framing
+ * (`scripts/reviewer-qual/materialize.ts`). So the line names each such unit and the reviews the model reviewer made of it,
+ * among the verdicts that speak; it is absent where there are none — a root signed off before E2, or never. No case set
+ * changes.
  */
 export function unitPurposeCaveat(
 	composites: readonly { readonly unit: string; readonly reviews: number }[]
@@ -180,8 +182,8 @@ export function unitPurposeCaveat(
 	if (made.length === 0) return [];
 	return [
 		`UNIT_PURPOSE framing: the declared reviews of a unit composed of others (${made.map((c) => `${c.unit}: ${c.reviews}`).join('; ')}) ` +
-			'were made in it — the unit’s own purpose, judged over its children’s work (REG-D-111 (2)) — and no reviewer-qualification ' +
-			'case measures it: every declared case of case set v5 is in the PRODUCING_PROMPT framing.'
+			'were made in it — the unit’s own purpose, judged over the work it and every unit below it produced (REG-D-111 (2)) — and ' +
+			'no reviewer-qualification case measures it: every declared case of case set v5 is in the PRODUCING_PROMPT framing.'
 	];
 }
 
