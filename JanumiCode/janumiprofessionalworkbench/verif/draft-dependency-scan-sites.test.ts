@@ -143,6 +143,11 @@ const DECLARED_SCAN_SITES: Record<
 		class: 'DISPLAY',
 		why: 'Waiver decisions (`hasEffectiveWaiver`) — display-only on the turn path, as `REG-F-066` records. A waiver never discharges the floor (ASR-3), so it cannot change what the draft commits.'
 	},
+	'apps/rph-demo/src/lib/server/assurance/declared-policy-signoff.ts :: listAssessments': {
+		calls: 1,
+		class: 'ADVISORY',
+		why: "No draft reads it. `latestDeclaredVerdicts` ranks a work unit's declared assessments, per policy, for the re-run of its declared reviews that did not conclude (`REG-D-112` (a)) — the Undertaking page's offer, and the server's re-check when the person presses it — on the canonical store, never in an authoring turn. It is in this file set only because `assurance/**` is, and being out of date changes nothing a draft commits."
+	},
 	'apps/rph-demo/src/lib/server/assurance/reviewer-answer.ts :: listByType': {
 		calls: 1,
 		class: 'DISPLAY',
