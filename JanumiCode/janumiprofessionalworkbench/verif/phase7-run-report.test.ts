@@ -1956,10 +1956,14 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 	// ── ⛔⛔ E12’s polish (fix2’s F8; the lead’s delegated decision of 2026-10-15, to be registered) — THE REPORT DISCLOSES WHAT THE
 	// LANE HELD BACK: nothing read the sign-off record's `notPressed`, `limitCheck` or `rerunLimitCheck`, so only the header's
 	// "ended: paid-limit" said the limit had acted at all.
-	/** What the lane read of the limit before an act, as `limitCheck` records it (`phase7-operator.ts`). */
+	/**
+	 * What the lane read of the limit before an act, as `limitCheck` records it (`phase7-operator.ts`) — ⭐ by the one rule (the
+	 * lead's delegated decision of 2026-10-16, to be registered as REG-D-114): what the act counts always recorded, and a total
+	 * AT the limit let through. ~~`ahead` only when above 0; `allowed: total < limit`~~
+	 */
 	const read = (prior: number, recorded: number, ahead: number, limit = 230) => {
 		const total = prior + recorded + 4 + ahead;
-		return { prior, recorded, reserve: 4, ...(ahead > 0 ? { ahead } : {}), total, limit, allowed: total < limit };
+		return { prior, recorded, reserve: 4, ahead, total, limit, allowed: total <= limit };
 	};
 	/** A run the lane stopped at design's sign-off: its phases completed, nothing signed off, design's record `signOff`. */
 	const heldAtDesign = (signOff: Record<string, unknown>, unit = { lifecycle: 'EXECUTING', execution: 'SUCCEEDED', assurance: 'UNASSESSED' }) => {
@@ -1985,7 +1989,8 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 			[
 				'design: lifecycle EXECUTING, assurance UNASSESSED, step SUCCEEDED',
 				`its sign-off was held back before Record Assurance: ${OVER}`,
-				'the limit as the lane read it: 210 + 4 + 4 + 16 ahead = 234 of 230, not under it'
+				// ⭐ ONE RULE (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — ~~not under it~~.
+				'the limit as the lane read it: 210 + 4 + 4 + 16 ahead = 234 of 230, past it'
 			]
 		]);
 		// ⭑ CONTROL — a unit the lane never reached, the run stopped at design: never attempted, as before.
@@ -2011,7 +2016,8 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 		expect(cellOf(r, '7', 'design').basis.slice(1), 'the hold of the declared re-run is said nowhere').toEqual([
 			'its sign-off was attempted and the unit is not SATISFIED',
 			`its sign-off was held back before the rule’s re-run of its declared reviews: ${rerunOver}`,
-			'the limit as the lane read it: 206 + 12 + 4 + 16 ahead = 238 of 230, not under it'
+			// ⭐ ONE RULE (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — ~~not under it~~.
+			'the limit as the lane read it: 206 + 12 + 4 + 16 ahead = 238 of 230, past it'
 		]);
 	});
 
@@ -2048,27 +2054,57 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 		]);
 		const md = renderMarkdown(r);
 		expect(md).toContain("- **The lane's own reads of the limit, each before a paid act (design D8; E12F F2):** 6.");
-		expect(md).toContain('  - design, before its sign-off: 210 + 4 + 4 + 16 ahead = 234 of 230, not under it: held back.');
+		// ⭐ ONE RULE (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — ~~not under it~~: past it.
+		expect(md).toContain('  - design, before its sign-off: 210 + 4 + 4 + 16 ahead = 234 of 230, past it: held back.');
 		expect(md).toContain('  - requirements, before its Begin & Execute: 200 + 0 + 4 = 204 of 230, under it.');
 	});
 
-	it('⛔ the merge’s fix round, F2 — each read’s figures are worded by their arithmetic: below the limit “under it”; AT it, let through by the rule that lets an act reach it, “at it”; at it under the rule that does not, “not under it”', () => {
+	it('⛔ the merge’s fix round, F2 — each read’s figures are worded by their arithmetic: below the limit “under it”; AT it, let through by the rule that lets an act reach it, “at it”; at it under the rule that does not, ~~“not under it”~~ ⭐ “at it”, held back (the one rule’s words)', () => {
 		// ⛔ PREDICTED RED, read from the code: `limitFigures` worded a read by its verdict alone — "under it" for every read the
 		// lane let through — so a total EQUAL to the limit that `limitCheckAhead` lets through (Send, half B's root) read "under it".
 		const run = aRun({}, { run: { end: { reason: 'paid-limit' } } });
 		const laneRun = run.lane.run as { units: Record<string, unknown>[] };
 		const at = (slug: string, fields: Record<string, unknown>) => (u: Record<string, unknown>) => (u.slug === slug ? { ...u, ...fields } : u);
-		/** A read by `limitCheckAhead`'s rule: the act's worst case counted, and a total that REACHES the limit let through. */
+		/** A read by ~~`limitCheckAhead`'s rule~~ ⭐ the one rule: the act's worst case counted, and a total that REACHES the limit let through. */
 		const reaching = { prior: 196, recorded: 10, reserve: 4, ahead: 20, total: 230, limit: 230, allowed: true };
+		/** ⭐ A read made before the one rule, by E12's `limitCheck`: a total AT the limit held back. */
+		const heldAtTheLimit = { prior: 216, recorded: 10, reserve: 4, total: 230, limit: 230, allowed: false };
 		const units = laneRun.units
 			.map(at('root', { limitCheck: reaching }))
 			.map(at('requirements', { limitCheck: read(215, 10, 0) }))
-			.map(at('design', { limitCheck: read(216, 10, 0) }));
+			.map(at('design', { limitCheck: heldAtTheLimit }));
 		const md = renderMarkdown(buildRunReport(run.store, { ...run.lane, run: { ...laneRun, units } }, { accountNames: NAMES }).report);
 		expect(md).toContain('  - root, before its Begin & Execute: 196 + 10 + 4 + 20 ahead = 230 of 230, at it, which this act may reach.');
 		expect(md).toContain('  - requirements, before its Begin & Execute: 215 + 10 + 4 = 229 of 230, under it.');
-		// ⭑ `limitCheck`'s rule: the same total held back — never "at it", which says the act may reach the limit.
-		expect(md).toContain('  - design, before its Begin & Execute: 216 + 10 + 4 = 230 of 230, not under it: held back.');
+		// ~~⭑ `limitCheck`'s rule: the same total held back — never "at it", which says the act may reach the limit.~~ ⭐ ONE RULE
+		// (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114): a lane now lets every act reach the limit,
+		// so the same total held back is a record made before the one rule — "at it", never one the act may reach.
+		expect(md).toContain('  - design, before its Begin & Execute: 216 + 10 + 4 = 230 of 230, at it: held back.');
+	});
+
+	it('⛔ ONE RULE (the lead’s delegated decision of 2026-10-16, to be registered as REG-D-114) — the words follow it: a read PAST the limit reads “past it”', () => {
+		// ⛔ PREDICTED RED, read from the code: the words were the old rule's, a total UNDER the limit or not — a read past the
+		// limit "not under it".
+		const run = aRun({}, { run: { end: { reason: 'paid-limit' } } });
+		const laneRun = run.lane.run as { units: Record<string, unknown>[] };
+		const past = { prior: 210, recorded: 4, reserve: 4, ahead: 16, total: 234, limit: 230, allowed: false };
+		const units = laneRun.units.map((u) => (u.slug === 'design' ? { ...u, signOff: { offered: true, limitCheck: past } } : u));
+		const md = renderMarkdown(buildRunReport(run.store, { ...run.lane, run: { ...laneRun, units } }, { accountNames: NAMES }).report);
+		expect(md).toContain('  - design, before its sign-off: 210 + 4 + 4 + 16 ahead = 234 of 230, past it: held back.');
+	});
+
+	it('⛔ ONE RULE — the run’s own total AT the limit reads “at it”, which a run may reach; one past it, “PAST it”', () => {
+		// ⛔ PREDICTED RED, read from the code: a run whose total reached the limit exactly read "NOT under it", as though it had
+		// passed it.
+		const L = PAID_LIMIT;
+		const whole = (prior: number) =>
+			renderMarkdown(
+				reportOf(aRun({}, { lane: { boot: { inherited: { JPWB_PHASE7_PRIOR_REVIEWER_CALLS: String(prior) }, overlay: { JPWB_DEMO_DB: DEMO_DB } } } }))
+					.report
+			);
+		expect(whole(L - 8)).toContain(`- **The limit (design D8):** ${L - 8} + 4 + 4 = ${L} of ${L}, at it, which the run may reach.`);
+		expect(whole(L - 7)).toContain(`- **The limit (design D8):** ${L - 7} + 4 + 4 = ${L + 1} of ${L}, PAST it.`);
+		expect(whole(L - 9)).toContain(`- **The limit (design D8):** ${L - 9} + 4 + 4 = ${L - 1} of ${L}, under it.`);
 	});
 
 	it('⛔ stage 7’s sign-off: the lane’s dry run signs the root off (D11) — the root as intended, the run not reached; one never attempted, in a run cut short — not reached; one refused — broke', () => {

@@ -68,6 +68,7 @@ import {
 	PHASE7_NEGATIVE_CONTROL_RESERVE,
 	PHASE7_INTROSPECT_MS,
 	PHASE7_PAID_LIMIT,
+	PHASE7_PHASE_FIRST_CALL,
 	PHASE7_PRIOR_CALLS_VARIABLE,
 	PHASE7_RECORD_ASSURANCE_MS,
 	PHASE7_SIGN_OFF_MS,
@@ -430,17 +431,23 @@ export interface UnitState {
 	readonly planStepState: string | null;
 }
 
-/** ⭐ D8's check before a phase: the calls spent before, those this run's store records, and those held back. */
+/**
+ * ⭐ D8's check before a ~~phase~~ paid act: the calls spent before, those this run's store records, those held back, ⭐ and
+ * what the act itself counts.
+ */
 export interface LimitCheck {
 	readonly prior: number;
 	readonly recorded: number;
 	readonly reserve: number;
 	/**
 	 * ⭐ `E12F` F2 — before a SIGN-OFF, the act's own worst case, counted in `total`: its unit's declared policies, each a
-	 * review of up to `reviewerCallsPerTry` calls (`signOffWorstCase`). Absent before a phase and before the rule's re-run of
-	 * a phase (`recoverByRule`), as before.
+	 * review of up to `reviewerCallsPerTry` calls (`signOffWorstCase`). ~~Absent before a phase and before the rule's re-run of
+	 * a phase (`recoverByRule`), as before.~~ ⭐ ONE RULE (the lead's delegated decision of 2026-10-16, to be registered as
+	 * REG-D-114) — ON EVERY CHECK, what the act itself counts: before Send the authoring floor's worst case, before half B's
+	 * root a MODEL root's (none for a root that runs no model), and before a phase and the rule's re-run of one their first
+	 * call (`PHASE7_PHASE_FIRST_CALL`).
 	 */
-	readonly ahead?: number;
+	readonly ahead: number;
 	readonly total: number;
 	readonly limit: number;
 	readonly allowed: boolean;
@@ -575,37 +582,26 @@ export function unpressed(units: readonly ArchiveUnit[]): RunUnit[] {
  * and before each sign-off, and before the rule's re-run of its declared reviews, with that act's own worst case (`ahead`)
  * counted too: since E2 Record Assurance asks the reviewer for one review per declared policy (`REG-D-110` (3)), so a
  * sign-off is a paid act the limit must see before it is pressed.
+ * ⭐⭐ ONE RULE FOR EVERY CHECK THE LANE MAKES (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114):
+ * the calls spent before, those the store records, those held back AND WHAT THE ACT ITSELF COUNTS (`ahead`) must total AT
+ * MOST the limit — the lane may reach it, and never pass it by what it counts. ⛔ Two rules stood, one per package: this
+ * function let an act through only UNDER the limit, so a sign-off whose worst case brought the total exactly to the limit
+ * was held back, while E3's `limitCheckAhead`, before half B's Send and its root's press (`REG-D-112`, E3's review finding
+ * 2), let such an act through; its callers call this one now. ⚠ Before a phase, and the rule's re-run of one, the act
+ * counts its first call only (`PHASE7_PHASE_FIRST_CALL`): D8 never counted a phase's worst case, so a phase let through may
+ * still spend past the limit.
  */
-export function limitCheck(prior: number, recorded: number, ahead = 0): LimitCheck {
+export function limitCheck(prior: number, recorded: number, ahead: number): LimitCheck {
 	const total = prior + recorded + PHASE7_NEGATIVE_CONTROL_RESERVE + ahead;
 	return {
 		prior,
 		recorded,
 		reserve: PHASE7_NEGATIVE_CONTROL_RESERVE,
-		...(ahead > 0 ? { ahead } : {}),
+		ahead,
 		total,
 		limit: PHASE7_PAID_LIMIT,
-		allowed: total < PHASE7_PAID_LIMIT
+		allowed: total <= PHASE7_PAID_LIMIT
 	};
-}
-
-/** ⭐ `REG-D-112` — D8's check before an act whose worst case in reviewer calls is known: `ahead`, counted in its total. */
-export interface AheadLimitCheck extends LimitCheck {
-	/** The act's own worst case, in reviewer calls: the authoring floor's before Send, a model root's before its press. */
-	readonly ahead: number;
-}
-
-/**
- * ⭐⭐ `REG-D-112` (E3's review, finding 2) — D8 BEFORE AN ACT WHOSE WORST CASE IS KNOWN: the calls spent before, those the
- * store records, those held back AND THE ACT'S OWN WORST CASE must total WITHIN the limit — the act may spend all of it.
- * ⚠ The phase's check (`limitCheck`) is this rule for an act whose worst case it does not count: its next call, at least,
- * must fit, so its total must be UNDER the limit. ⛔ Half B spent the authoring floor's reviews, and a model root's, before
- * any check: the lane's first was before the first phase.
- */
-export function limitCheckAhead(prior: number, recorded: number, ahead: number): AheadLimitCheck {
-	const spent = limitCheck(prior, recorded);
-	const total = spent.total + ahead;
-	return { ...spent, ahead, total, allowed: total <= spent.limit };
 }
 
 /**
@@ -1375,7 +1371,7 @@ export interface AuthoringRecord {
 	 * ⭐ `REG-D-112` (finding 2) — the limit, checked BEFORE SEND with the authoring floor's worst case counted
 	 * (`PHASE7_AUTHORING_REVIEWER_CALLS`); null when nothing was to be sent — the dry rehearsal stops before it.
 	 */
-	limitCheck: AheadLimitCheck | null;
+	limitCheck: LimitCheck | null;
 	/** The store's reads of the candidate while the turn ran. */
 	polls: number;
 	/** The candidate as last read. */
@@ -1617,7 +1613,8 @@ function designerEnd(o: ActionOutcome, act: string): RunEnd | null {
  *   1. the draft, created through the page — and ⛔ DRY, THE REHEARSAL STOPS HERE, BEFORE SEND: authoring is a model call
  *      (C6). The turn itself is rehearsed in the gate, with the mock agent (`e2e/phase7-half-b.e2e.ts`);
  *   1b. ⭐ `REG-D-112` (E3's review, finding 2) — THE LIMIT, BEFORE SEND (D8), the authoring floor's worst case counted
- *      (`limitCheckAhead`, `PHASE7_AUTHORING_REVIEWER_CALLS`): past it the run ends `paid-limit`, nothing sent;
+ *      (~~`limitCheckAhead`~~ ⭐ `limitCheck`, the one rule; `PHASE7_AUTHORING_REVIEWER_CALLS`): past it the run ends
+ *      `paid-limit`, nothing sent;
  *   2. the request, sent from the designer's chat, the page held where it is;
  *   3. the candidate's status, waited on through the store (`waitForTheCandidate`); the floor's dispositions and its
  *      reviewer recorded, ~~the producer the floor judged (the author's model)~~ ⭐ `REG-D-112` (finding 8) — and the
@@ -1659,7 +1656,7 @@ export async function authorThePwa(r: {
 		};
 	// ⭐ `REG-D-112` (finding 2) — THE LIMIT BEFORE SEND: the authoring floor's reviews are the first calls half B spends.
 	const before = (await read()).snapshot;
-	authoring.limitCheck = limitCheckAhead(r.prior, recordedReviewerCalls(before), PHASE7_AUTHORING_REVIEWER_CALLS);
+	authoring.limitCheck = limitCheck(r.prior, recordedReviewerCalls(before), PHASE7_AUTHORING_REVIEWER_CALLS);
 	save();
 	if (!authoring.limitCheck.allowed)
 		return {
@@ -1810,11 +1807,12 @@ export function dischargeOf(snap: EngineSnapshot, unitId: string): string {
 /**
  * ⭐⭐ `REG-D-112` (E3's review, finding 2) — D8 BEFORE HALF B'S ROOT IS PRESSED: the agent's root may declare MODEL — §3.2's
  * runs none — and then its press runs a model and its reviews, so a MODEL root's worst case is counted
- * (`PHASE7_UNIT_REVIEWER_CALLS`); a root that declares anything else runs no model, and counts none.
+ * (`PHASE7_UNIT_REVIEWER_CALLS`); a root that declares anything else runs no model, and counts none. ⭐ By the one rule
+ * (`limitCheck`; the lead's delegated decision of 2026-10-16, to be registered as REG-D-114).
  */
-export function rootLimitCheck(prior: number, snap: EngineSnapshot, rootId: string): AheadLimitCheck {
+export function rootLimitCheck(prior: number, snap: EngineSnapshot, rootId: string): LimitCheck {
 	const ahead = dischargeOf(snap, rootId) === 'MODEL' ? PHASE7_UNIT_REVIEWER_CALLS : 0;
-	return limitCheckAhead(prior, recordedReviewerCalls(snap), ahead);
+	return limitCheck(prior, recordedReviewerCalls(snap), ahead);
 }
 
 // ── THE RUN'S ORDER (D4, D5, D8) ─────────────────────────────────────────────────────────────────────────────────────
@@ -2138,7 +2136,8 @@ export async function runTheLane(r: {
 			if (!offers.rerunReview && !offers.rerunWork) return null;
 			const rerun: RecoveryAct = offers.rerunReview ? 'rerunReview' : 'rerunWork';
 			const { snapshot } = await hands.read();
-			const check = limitCheck(boot.prior as number, recordedReviewerCalls(snapshot));
+			// ⭐ The one rule (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114): the re-run's first call.
+			const check = limitCheck(boot.prior as number, recordedReviewerCalls(snapshot), PHASE7_PHASE_FIRST_CALL);
 			if (!check.allowed) {
 				notPressed(unit, rerun, check, `the limit: ${check.total} of ${check.limit} reviewer calls (D8)`);
 				return 'paid-limit';
@@ -2213,9 +2212,11 @@ export async function runTheLane(r: {
 		const dry = boot.record.mode === 'dry';
 		let reason: EndReason = dry ? 'dry-run-stop' : 'complete';
 		for (const unit of dry ? [] : phases) {
+			// ⭐ The one rule (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114): the phase's first call.
 			unit.limitCheck = limitCheck(
 				boot.prior as number,
-				recordedReviewerCalls((await hands.read()).snapshot)
+				recordedReviewerCalls((await hands.read()).snapshot),
+				PHASE7_PHASE_FIRST_CALL
 			);
 			if (!unit.limitCheck.allowed) {
 				reason = 'paid-limit';

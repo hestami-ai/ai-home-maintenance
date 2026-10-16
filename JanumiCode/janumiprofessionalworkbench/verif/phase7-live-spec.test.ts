@@ -32,6 +32,7 @@ import {
 	PHASE7_NEGATIVE_CONTROL_RESERVE,
 	PHASE7_PAID_LIMIT,
 	PHASE7_PAID_VARIABLE,
+	PHASE7_PHASE_FIRST_CALL,
 	PHASE7_PRIOR_CALLS_VARIABLE,
 	PHASE7_RECORD_ASSURANCE_MS,
 	PHASE7_UNIT_ALLOWANCE_MS,
@@ -1170,19 +1171,31 @@ describe('⭐ D8 — the limit, and D5 — what the run records of each unit', (
 	// ⭑ `REG-D-108` — THE ARITHMETIC IS READ AGAINST THE LIMIT, NOT A COPY OF IT. These cases pinned 200 and went red when the
 	// sponsor raised the limit to 230; what they hold is the boundary (one under starts, the limit does not), which a
 	// typed number only restates. The limit's VALUE is pinned once, against the register (`live-exec-lane-config.test.ts`).
-	it('⛔ prior + recorded + the reserve must total UNDER the sponsor’s limit: one under it starts a phase, the limit does not', () => {
+	// ⭐⭐ ONE RULE (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — ~~prior + recorded + the reserve
+	// must total UNDER the sponsor's limit: one under it starts a phase, the limit does not~~: prior + recorded + the reserve +
+	// what the act counts must total AT MOST the limit. Before a phase the act counts its first call, so a phase starts with
+	// exactly that call left — the same phases as before — and the record says so.
+	it('⛔ ONE RULE — prior + recorded + the reserve + what the act counts must total AT MOST the sponsor’s limit: a phase starts with its first call reaching it, not past it', () => {
 		const L = PHASE7_PAID_LIMIT;
 		expect(PHASE7_NEGATIVE_CONTROL_RESERVE).toBe(4);
-		expect(limitCheck(L - 50, 45)).toEqual({
+		expect(PHASE7_PHASE_FIRST_CALL).toBe(1);
+		expect(limitCheck(L - 50, 45, PHASE7_PHASE_FIRST_CALL)).toEqual({
 			prior: L - 50,
 			recorded: 45,
 			reserve: 4,
-			total: L - 1,
+			ahead: 1,
+			total: L,
 			limit: L,
 			allowed: true
 		});
-		expect(limitCheck(L - 50, 46).allowed).toBe(false);
-		expect(limitCheck(0, L - 4).allowed).toBe(false);
+		expect(limitCheck(L - 50, 46, PHASE7_PHASE_FIRST_CALL).allowed).toBe(false);
+		expect(limitCheck(0, L - 4, PHASE7_PHASE_FIRST_CALL).allowed).toBe(false);
+		// ⭑ The rule is the same for every act, whatever it counts: at the limit let through, one past it held back.
+		expect([limitCheck(L - 20, 0, 16).allowed, limitCheck(L - 20, 1, 16).allowed, limitCheck(L - 4, 0, 0).allowed]).toEqual([
+			true,
+			false,
+			true
+		]);
 	});
 
 	const state = (executionState: string, planStepState: string): UnitState => ({
@@ -1979,11 +1992,14 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			{
 				act: 'rerunReview',
 				rationale: RULE_RATIONALE.rerunReview,
+				// ⭐ The one rule (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114): the re-run's first
+				// call counted, which would pass the limit — ~~total: PHASE7_PAID_LIMIT~~.
 				limitCheck: {
 					prior: PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - 2,
 					recorded: 2,
 					reserve: PHASE7_NEGATIVE_CONTROL_RESERVE,
-					total: PHASE7_PAID_LIMIT,
+					ahead: 1,
+					total: PHASE7_PAID_LIMIT + 1,
 					limit: PHASE7_PAID_LIMIT,
 					allowed: false
 				},
@@ -1994,7 +2010,7 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 				after: null,
 				reading: null,
 				refusal: null,
-				notPressed: `the limit: ${PHASE7_PAID_LIMIT} of ${PHASE7_PAID_LIMIT} reviewer calls (D8)`
+				notPressed: `the limit: ${PHASE7_PAID_LIMIT + 1} of ${PHASE7_PAID_LIMIT} reviewer calls (D8)`
 			}
 		]);
 		expect(record.end?.reason).toBe('paid-limit');
@@ -2269,11 +2285,14 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		expect(record.units.filter((u) => u.signOff !== null).map((u) => [u.slug, u.signOff?.limitCheck?.allowed, u.signOff?.notPressed?.startsWith('the limit: ')])).toEqual([
 			['requirements', false, true]
 		]);
+		// ⭐ The one rule (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114): the phase's first call
+		// counted, which would pass the limit — ~~total: PHASE7_PAID_LIMIT~~.
 		expect(record.units[2]!.limitCheck).toEqual({
 			prior: PHASE7_PAID_LIMIT - 10,
 			recorded: 6,
 			reserve: 4,
-			total: PHASE7_PAID_LIMIT,
+			ahead: 1,
+			total: PHASE7_PAID_LIMIT + 1,
 			limit: PHASE7_PAID_LIMIT,
 			allowed: false
 		});
@@ -2351,6 +2370,122 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		});
 		expect(PHASE7_ARCHIVE_UNITS.map((u) => signOffWorstCase(u)), 'each unit’s declared policies × reviewerCallsPerTry').toEqual([8, 8, 16, 12, 12]);
 		expect([record.end?.reason, laneVerdict(record)]).toEqual(['paid-limit', ["the run ended 'paid-limit', not 'complete'"]]);
+	});
+
+	// ── ⭐⭐ ONE LIMIT RULE FOR EVERY CHECK (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) ───────
+	// The lane may REACH the limit and never pass it by what it counts: the calls spent before, those the store records, those
+	// held back and what the act itself counts must total AT MOST the limit. ⛔ Two rules stood, one per package: E12's checks
+	// before a sign-off and before the rule's re-run of its declared reviews let an act through only UNDER the limit; E3's
+	// before half B's Send and its root's press let it reach it. They differed only at a total equal to the limit, so each
+	// check is held there: the two E12 checks went red at it; the phase's, the re-run's, Send's and the root's are pinned.
+	it('⛔ ONE RULE — a sign-off whose own worst case brings the total EXACTLY to the limit is pressed; the next, one past it, is held back', async () => {
+		// ⛔ PREDICTED RED, read from the code: `limitCheck` let a sign-off through only with its total UNDER the limit, so the
+		// requirements unit's, its two declared policies' 8 calls bringing the total to the limit exactly, was held back.
+		const prior = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - signOffWorstCase(PHASE7_ARCHIVE_UNITS[1]!);
+		const l = laneOf({
+			paid: true,
+			prior,
+			presses: ALL_COMPLETE,
+			signOffs: { root: GREEN, requirements: GREEN, design: GREEN, implementation: GREEN, 'end-to-end': GREEN }
+		});
+		const record = await l.run();
+		expect(l.only('recordAssurance', 'offersRecordAssurance'), 'a sign-off that reaches the limit was held back').toEqual([
+			'recordAssurance requirements',
+			'offersRecordAssurance design'
+		]);
+		expect([record.units[1]!.signOff?.limitCheck, record.units[2]!.signOff?.limitCheck]).toEqual([
+			{ prior, recorded: 0, reserve: 4, ahead: 8, total: PHASE7_PAID_LIMIT, limit: PHASE7_PAID_LIMIT, allowed: true },
+			{ prior, recorded: 0, reserve: 4, ahead: 16, total: PHASE7_PAID_LIMIT + 8, limit: PHASE7_PAID_LIMIT, allowed: false }
+		]);
+		expect(record.end?.reason).toBe('paid-limit');
+	});
+
+	it('⛔ ONE RULE — the rule’s re-run of the declared reviews, its worst case bringing the total EXACTLY to the limit, is pressed', async () => {
+		// ⛔ PREDICTED RED, read from the code: the re-run's check let it through only UNDER the limit, so design's re-run, its
+		// four policies' 16 calls bringing the total to the limit exactly after Record Assurance spent 12, was held back.
+		const prior = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - 16 - 12;
+		const l = laneOf({
+			paid: true,
+			prior,
+			presses: ALL_COMPLETE,
+			signOffs: {
+				root: GREEN,
+				requirements: GREEN,
+				design: {
+					ra: refusedWith(DID_NOT_CONCLUDE),
+					raAfter: ASSESSING,
+					calls: 12,
+					rerun: { offered: true, outcome: answered('success'), after: ASSURED },
+					msAfter: SATISFIED
+				},
+				implementation: GREEN,
+				'end-to-end': GREEN
+			}
+		});
+		const record = await l.run();
+		expect(l.only('rerunDeclared'), 'a re-run of the declared reviews that reaches the limit was held back').toEqual([
+			'rerunDeclared design'
+		]);
+		expect(record.units[2]!.signOff?.rerunLimitCheck).toEqual({
+			prior,
+			recorded: 12,
+			reserve: 4,
+			ahead: 16,
+			total: PHASE7_PAID_LIMIT,
+			limit: PHASE7_PAID_LIMIT,
+			allowed: true
+		});
+		expect(record.end?.reason).toBe('complete');
+	});
+
+	it('⭐ ONE RULE — before a phase it counts the phase’s first call: a phase is pressed with that call reaching the limit exactly, and the next, with none left, is not', async () => {
+		// ⭑ A PIN, not a red: before the one rule the phase's check let a phase through UNDER the limit, counting nothing of it —
+		// the same phases pressed. What the record now says is what is counted: the phase's first call, never its worst case.
+		const prior = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - PHASE7_PHASE_FIRST_CALL;
+		const l = laneOf({
+			paid: true,
+			prior,
+			presses: { root: ALL_COMPLETE.root!, requirements: { outcome: answered('success'), after: COMPLETED, calls: 1 } },
+			signOffs: { root: GREEN, requirements: GREEN }
+		});
+		const record = await l.run();
+		expect(l.only('beginExecute')).toEqual(['beginExecute root', 'beginExecute requirements']);
+		expect([record.units[1]!.limitCheck, record.units[2]!.limitCheck]).toEqual([
+			{ prior, recorded: 0, reserve: 4, ahead: 1, total: PHASE7_PAID_LIMIT, limit: PHASE7_PAID_LIMIT, allowed: true },
+			{ prior, recorded: 1, reserve: 4, ahead: 1, total: PHASE7_PAID_LIMIT + 1, limit: PHASE7_PAID_LIMIT, allowed: false }
+		]);
+		expect(record.end?.reason).toBe('paid-limit');
+	});
+
+	it('⭐ ONE RULE — before the rule’s re-run of a stopped phase it counts the re-run’s first call: one reaching the limit exactly is pressed', async () => {
+		// ⭑ A PIN, beside `AT THE LIMIT a stopped phase is NOT re-run`, one call further: with its first call the total is the
+		// limit itself, and the re-run is pressed.
+		const prior = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - 2 - PHASE7_PHASE_FIRST_CALL;
+		const l = laneOf({
+			paid: true,
+			prior,
+			presses: { root: ALL_COMPLETE.root!, requirements: { outcome: answered('failure'), after: WAITING, calls: 2 } },
+			recoveries: {
+				requirements: {
+					offers: { rerunReview: true, rerunWork: true, abandon: true },
+					// The re-run spends its one call, so the next phase finds none left.
+					acts: { rerunReview: { outcome: answered('success'), after: COMPLETED, calls: 1 } }
+				}
+			},
+			signOffs: { root: GREEN, requirements: GREEN }
+		});
+		const record = await l.run();
+		expect(l.only('recover ')).toEqual(['recover requirements rerunReview']);
+		expect(record.units[1]!.recovery[0]?.limitCheck).toEqual({
+			prior,
+			recorded: 2,
+			reserve: 4,
+			ahead: 1,
+			total: PHASE7_PAID_LIMIT,
+			limit: PHASE7_PAID_LIMIT,
+			allowed: true
+		});
+		expect([l.only('beginExecute'), record.end?.reason]).toEqual([['beginExecute root', 'beginExecute requirements'], 'paid-limit']);
 	});
 
 	it('⭐ E12F F3 (REG-D-105 (4), REG-D-112 (a)) — PAID: a Record Assurance refused whose row, read afresh, offers re-running the declared reviews that did not conclude has them re-run ONCE by the rule, the limit read first; accepted, Mark Satisfied follows', async () => {

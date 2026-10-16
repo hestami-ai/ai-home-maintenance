@@ -431,6 +431,11 @@ export interface ReviewerCalls extends ReviewerCallCount {
 		readonly reserve: number;
 		readonly total: number | null;
 		readonly limit: number;
+		/**
+		 * Whether the total is BELOW the limit — a fact, kept as it was. ⚠ Not the one rule's verdict (the lead's delegated
+		 * decision of 2026-10-16, to be registered as REG-D-114), under which a run may reach the limit: report.md words the
+		 * total by it (`runStanding`).
+		 */
 		readonly under: boolean | null;
 	};
 	/**
@@ -868,9 +873,12 @@ interface LaneUnit {
 /**
  * ⭐ E12's polish (fix2's F8) — ONE READ OF THE LIMIT THE LANE RECORDED BEFORE A PAID ACT (D8; `E12F` F2): prior + recorded +
  * reserve + the act's own worst case (`ahead`, 0 where it counted none), and whether the lane let the act through
- * (`allowed`) or held it back. ⛔ The merge's fix round, F2 — BY ONE OF TWO RULES (`phase7-operator.ts`): `limitCheck`, before a
+ * (`allowed`) or held it back. ⛔ The merge's fix round, F2 — ~~BY ONE OF TWO RULES (`phase7-operator.ts`): `limitCheck`, before a
  * phase, a re-run of one, a sign-off or a re-run of its declared reviews, lets an act through only with the total UNDER the
- * limit; `limitCheckAhead`, before half B's Send and before half B's root's press, lets it through AT the limit too.
+ * limit; `limitCheckAhead`, before half B's Send and before half B's root's press, lets it through AT the limit too.~~
+ * ⭐ ONE RULE since (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114): every check lets an act
+ * through with its total AT MOST the limit, what it counts of the act always recorded (`ahead`: a phase's and a re-run's
+ * first call). ⚠ A record made before it may hold a total AT the limit held back, by the first rule.
  */
 export interface LaneLimitCheck {
 	/** The unit's slug; `authoring` for half B's read before Send (`AUTHORING_READ`). */
@@ -2295,19 +2303,31 @@ function completion(v: UnitView, row: string): MatrixCell {
 
 /**
  * ⛔ The merge's fix round, F2 — WHERE A READ'S TOTAL STANDS AGAINST THE LIMIT, by its arithmetic: below it, "under it"; AT it and
- * let through, "at it, which this act may reach" — only `limitCheckAhead`'s rule lets a total reach the limit (`LaneLimitCheck`);
- * anything else, "not under it".
+ * let through, "at it, which this act may reach" ~~— only `limitCheckAhead`'s rule lets a total reach the limit (`LaneLimitCheck`);
+ * anything else, "not under it"~~. ⭐ THE WORDS FOLLOW THE ONE RULE (the lead's delegated decision of 2026-10-16, to be
+ * registered as REG-D-114): every check lets an act reach the limit and none lets it pass, so ~~"not under it"~~ a total above
+ * the limit is "past it". ⚠ A total AT it held back is a record made before the one rule: "at it", never one the act may reach.
  */
 function standingOf(c: LaneLimitCheck): string {
 	if (c.total < c.limit) return 'under it';
-	if (c.total === c.limit && c.allowed) return 'at it, which this act may reach';
-	return 'not under it';
+	if (c.total > c.limit) return 'past it';
+	return c.allowed ? 'at it, which this act may reach' : 'at it';
+}
+
+/**
+ * ⭐ WHERE THE RUN'S OWN TOTAL STANDS, as `standingOf` words a read, by the one rule (the lead's delegated decision of
+ * 2026-10-16, to be registered as REG-D-114): a run may reach the limit, and never pass it. ⛔ ~~", NOT under it"~~: a total
+ * equal to the limit read as though it had passed it.
+ */
+function runStanding(total: number, limit: number): string {
+	if (total < limit) return 'under it';
+	return total === limit ? 'at it, which the run may reach' : 'PAST it';
 }
 
 /**
  * ⭐ E12's polish (fix2's F8) — the figures of one read of the limit, as the reviewer-calls section prints the record's own.
  * ⛔ The merge's fix round, F2 — ~~worded by the verdict alone, every read the lane let through "under it"~~: by its arithmetic
- * (`standingOf`), so a read at the limit that `limitCheckAhead` let through is never said to be under it.
+ * (`standingOf`), so a read at the limit that ~~`limitCheckAhead`~~ ⭐ the lane let through is never said to be under it.
  */
 const limitFigures = (c: LaneLimitCheck): string =>
 	`${c.prior} + ${c.recorded} + ${c.reserve}${c.ahead > 0 ? ` + ${c.ahead} ahead` : ''} = ${c.total} of ${c.limit}, ${standingOf(c)}`;
@@ -3431,8 +3451,8 @@ function matrixLines(r: RunReport): string[] {
 
 function unitLines(r: RunReport): string[] {
 	const limit = r.reviewerCalls.limit;
-	let under = '';
-	if (limit.under !== null) under = limit.under ? ', under it' : ', NOT under it';
+	// ⭐ By the one rule (`runStanding`): ~~limit.under ? ', under it' : ', NOT under it'~~.
+	const under = limit.total === null ? '' : `, ${runStanding(limit.total, limit.limit)}`;
 	return [
 		'## The units',
 		'',

@@ -548,9 +548,12 @@ export const PHASE7_TEST_TIMEOUT_MS =
  * the lane presses that spends it, that act's own worst case counted: before each sign-off and before the rule's re-run
  * of a unit's declared reviews (`E12F` F2; `signOffWorstCase`), and in half B before Send, the authoring floor's
  * (`REG-D-112`, E3's review finding 2; `PHASE7_AUTHORING_REVIEWER_CALLS`), and, paid, before the root's press, a MODEL
- * root's (`rootLimitCheck`; `PHASE7_UNIT_REVIEWER_CALLS`). ⚠ Two rules, as each package built its own: before a phase, a
+ * root's (`rootLimitCheck`; `PHASE7_UNIT_REVIEWER_CALLS`). ~~⚠ Two rules, as each package built its own: before a phase, a
  * re-run of one and a sign-off the total must be UNDER the limit (`limitCheck`); before Send and the root's press it may
- * reach it (`limitCheckAhead`). ~~150 (`REG-D-102` (4))~~ ~~200: *"Raise limit to 200"* (`REG-D-105` (1), which amends
+ * reach it (`limitCheckAhead`).~~ ⭐ ONE RULE for every check (the lead's delegated decision of 2026-10-16, to be registered
+ * as REG-D-114): the lane may REACH the limit and never pass it by what it counts — the calls spent, those held back and
+ * what the act itself counts must total at most the limit (`limitCheck`). ⚠ Before a phase and the rule's re-run of one it
+ * counts their first call only (`PHASE7_PHASE_FIRST_CALL`), as D8 counted no phase's worst case. ~~150 (`REG-D-102` (4))~~ ~~200: *"Raise limit to 200"* (`REG-D-105` (1), which amends
  * `REG-D-102` (4)); it covers the re-qualification, the re-run and a few recovery re-runs.~~ ~~230: *"the limit rises
  * to about 230"* (`REG-D-108`, after P2), held as the number its pointer states, for P3.~~ ⭐ `JAN-EXEC` Phase 7
  * completion programme, E3 — 450: *"Raise to about 450 (Recommended)"* (`REG-D-110` (1), after P3; `REG-D-109`), for the
@@ -667,6 +670,14 @@ export const PHASE7_AUTHORING_REVIEWER_CALLS = PHASE7_AUTHORING_FLOOR_RUNS * LAN
  */
 export const PHASE7_UNIT_REVIEWER_CALLS =
 	(LANE_BUDGET.tries + PHASE7_REVIEWED_COMMANDS) * LANE_BUDGET.reviewerCallsPerTry;
+
+/**
+ * ⭐ THE ONE RULE BEFORE A PHASE'S PRESS, AND BEFORE THE RULE'S RE-RUN OF ONE (the lead's delegated decision of 2026-10-16,
+ * to be registered as REG-D-114) — what it counts of the act itself: its FIRST reviewer call, so a phase is never started
+ * with no call left under the limit. ⚠ NOT ITS WORST CASE, which D8 never counted before a phase: that is a model unit's,
+ * `PHASE7_UNIT_REVIEWER_CALLS`, and a phase let through may still spend past the limit.
+ */
+export const PHASE7_PHASE_FIRST_CALL = 1;
 
 /** ⭐ C1 — how long the lane waits between two reads of the candidate's status: each read is the whole dump. */
 export const PHASE7_CANDIDATE_POLL_MS = 5_000;

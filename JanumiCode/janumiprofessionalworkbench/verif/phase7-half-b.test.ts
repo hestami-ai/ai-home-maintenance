@@ -1806,7 +1806,7 @@ describe('⛔ the merge’s fix round, F2 and F3 — the run report reads half B
 		return { prior, record, report, md: renderMarkdown(report) };
 	};
 
-	it('⛔ F2 — the root’s read before its press, by the rule that lets an act REACH the limit (`limitCheckAhead`), totals it exactly: it reads “at it”, never “under it”', async () => {
+	it('⛔ F2 — the root’s read before its press, by the rule that lets an act REACH the limit (~~`limitCheckAhead`~~ ⭐ the one rule, `limitCheck`), totals it exactly: it reads “at it”, never “under it”', async () => {
 		// ⛔ PREDICTED RED, read from the code: `limitFigures` worded every read the lane let through "under it" — written for
 		// `limitCheck`, under which an act is let through only below the limit.
 		const { prior, record, md } = await atTheLimit();
