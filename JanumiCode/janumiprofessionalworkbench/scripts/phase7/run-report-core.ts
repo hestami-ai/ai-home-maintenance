@@ -44,7 +44,8 @@ import {
 	PHASE7_NEGATIVE_CONTROL_RESERVE,
 	PHASE7_PAID_LIMIT,
 	PHASE7_PRIOR_CALLS_VARIABLE,
-	PHASE7_REVIEWED_COMMANDS
+	PHASE7_REVIEWED_COMMANDS,
+	PHASE7_UNIT_REVIEWER_CALLS
 } from '../../apps/rph-demo/e2e-live-exec/lane-config.js';
 import { scanText } from './archive-scan.js';
 import {
@@ -138,6 +139,16 @@ export const RECORDED_RUN_LIMIT = PHASE7_REVIEWED_COMMANDS;
 /** The sponsor's paid limit, in reviewer calls (`REG-D-102` (4)), and the calls held back for P7-4e (design D8). */
 export const PAID_LIMIT = PHASE7_PAID_LIMIT;
 export const NEGATIVE_CONTROL_RESERVE = PHASE7_NEGATIVE_CONTROL_RESERVE;
+/**
+ * ⭐ `REG-D-114` (14), as amended 2026-10-16 — THE CAVEAT THE REVIEWER CALLS CARRY, PLAINLY: the lane checks the limit before
+ * each press and never during one, counting one try's reserve ahead of a phase, the rule's re-run of its work or of its
+ * review, and a MODEL root's press, so what such a press spends after its check is not held to the limit until the next
+ * check. ⚠ Stated for every run: it is a property of the lane, never of what a run happened to spend.
+ */
+export const LIMIT_CAVEAT =
+	`A phase’s own spend can carry the total past the limit: the lane checks the limit before each press, not during one, ` +
+	`and a model unit’s press may spend up to ${PHASE7_UNIT_REVIEWER_CALLS} reviewer calls after its check (REG-D-114 (14), as ` +
+	`amended 2026-10-16; the sponsor’s limit is "about ${PAID_LIMIT}", REG-D-110 (1)).`;
 /** The declared verdicts a complete run signs off: the five units' declared policies, 2 + 2 + 4 + 3 + 3 (§3.2). */
 export const DECLARED_VERDICTS_EXPECTED = 14;
 
@@ -465,6 +476,11 @@ export interface ReviewerCalls extends ReviewerCallCount {
 	 * F3 — half B's read before Send first: kept on the authoring record, not a unit's, it was in no list.
 	 */
 	readonly laneLimitChecks: readonly LaneLimitCheck[];
+	/**
+	 * ⭐ `REG-D-114` (14), as amended 2026-10-16 — the plain caveat those reads carry (`LIMIT_CAVEAT`): a phase's own spend can
+	 * carry the total past the limit, for the lane checks before each press, not during one.
+	 */
+	readonly limitCaveat: string;
 }
 
 export interface AuditFinding {
@@ -909,8 +925,10 @@ interface LaneUnit {
  * limit; `limitCheckAhead`, before half B's Send and before half B's root's press, lets it through AT the limit too.~~
  * ⭐ ONE RULE since (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114): every check lets an act
  * through with its total AT MOST the limit, what it counts of the act always recorded (`ahead`: ~~a phase's and a re-run's
- * first call~~ ⭐ R3-B's fix round, F1: the act's worst case, a phase's and a re-run's too). ⚠ A record made before it may
- * hold a total AT the limit held back, by the first rule.
+ * first call~~ ~~⭐ R3-B's fix round, F1: the act's worst case, a phase's and a re-run's too~~ ⭐ `REG-D-114` (14), as amended
+ * 2026-10-16: one try's reserve before a phase, a re-run of its work or of its review, and a MODEL root's press; an act's
+ * worst case before a sign-off, a re-run of its declared reviews and Send — and, since, what it counted, in words,
+ * `counted`). ⚠ A record made before it may hold a total AT the limit held back, by the first rule.
  */
 export interface LaneLimitCheck {
 	/** The unit's slug; `authoring` for half B's read before Send (`AUTHORING_READ`). */
@@ -924,6 +942,11 @@ export interface LaneLimitCheck {
 	readonly recorded: number;
 	readonly reserve: number;
 	readonly ahead: number;
+	/**
+	 * ⭐ `REG-D-114` (14), as amended 2026-10-16 — what `ahead` counted, in the lane's own words (`phase7-operator.ts`,
+	 * `COUNTED_AHEAD`): one try's reserve, an act's worst case, or none; null for a read recorded before the lane said it.
+	 */
+	readonly counted: string | null;
 	readonly total: number;
 	readonly limit: number;
 	readonly allowed: boolean;
@@ -934,7 +957,7 @@ function laneLimitCheck(unit: string, before: string, v: unknown): LaneLimitChec
 	const c = rec(v);
 	const [prior, recorded, reserve, total, limit, allowed] = [int(c.prior), int(c.recorded), int(c.reserve), int(c.total), int(c.limit), bool(c.allowed)];
 	if (prior === null || recorded === null || reserve === null || total === null || limit === null || allowed === null) return null;
-	return { unit, before, prior, recorded, reserve, ahead: int(c.ahead) ?? 0, total, limit, allowed };
+	return { unit, before, prior, recorded, reserve, ahead: int(c.ahead) ?? 0, counted: str(c.counted) || null, total, limit, allowed };
 }
 
 /** The rule's re-run a recovery act's limit check was read before, by its act. */
@@ -1578,7 +1601,8 @@ function buildReviewerCalls(ix: Index, units: readonly Unit[], lane: LaneRows): 
 			limit: PAID_LIMIT,
 			under: total === null ? null : total < PAID_LIMIT
 		},
-		laneLimitChecks: [...authoringLimitChecks(lane), ...laneUnits(lane.run).flatMap((u) => u.limitChecks)]
+		laneLimitChecks: [...authoringLimitChecks(lane), ...laneUnits(lane.run).flatMap((u) => u.limitChecks)],
+		limitCaveat: LIMIT_CAVEAT
 	};
 }
 
@@ -2390,9 +2414,14 @@ function runStanding(total: number, limit: number): string {
  * ⭐ E12's polish (fix2's F8) — the figures of one read of the limit, as the reviewer-calls section prints the record's own.
  * ⛔ The merge's fix round, F2 — ~~worded by the verdict alone, every read the lane let through "under it"~~: by its arithmetic
  * (`standingOf`), so a read at the limit that ~~`limitCheckAhead`~~ ⭐ the lane let through is never said to be under it.
+ * ⭐ `REG-D-114` (14), as amended 2026-10-16 — AND WHAT THE READ COUNTED AHEAD, in the lane's words (`counted`), a read of none
+ * included: one try's reserve and an act's worst case read alike as figures. ⚠ A read recorded before the lane said it keeps
+ * its figures alone.
  */
-const limitFigures = (c: LaneLimitCheck): string =>
-	`${c.prior} + ${c.recorded} + ${c.reserve}${c.ahead > 0 ? ` + ${c.ahead} ahead` : ''} = ${c.total} of ${c.limit}, ${standingOf(c)}`;
+const limitFigures = (c: LaneLimitCheck): string => {
+	const ahead = c.counted === null ? (c.ahead > 0 ? ` + ${c.ahead} ahead` : '') : ` + ${c.ahead} ahead (${c.counted})`;
+	return `${c.prior} + ${c.recorded} + ${c.reserve}${ahead} = ${c.total} of ${c.limit}, ${standingOf(c)}`;
+};
 
 /**
  * ⭐ E12's polish (fix2's F8; the lead's delegated decision of 2026-10-15, to be registered) — WHAT THE LANE HELD BACK OF A
@@ -3496,8 +3525,8 @@ export function buildRunReport(
 		);
 	// ⭐ The lead's delegated decision of 2026-10-15, to be registered (E3's polish; the confirm of 60c8a828) — THE
 	// PHASES, whose cells stages 3 to 8 report: every unit after the root, which both halves put first; and THE ROOT
-	// ITSELF when its type declares MODEL, as half B's agent may (the lane counts its worst case before its press,
-	// `rootLimitCheck`): its press runs a model, so its tries, reviews and exchanges are measured like any phase's.
+	// ITSELF when its type declares MODEL, as half B's agent may (the lane counts ~~its worst case~~ ⭐ one try's reserve before
+	// its press, `rootLimitCheck`; `REG-D-114` (14), as amended 2026-10-16): its press runs a model, so its tries, reviews and exchanges are measured like any phase's.
 	// ⛔ ~~Every root skipped by its place~~: a MODEL root that broke a stage read as intended. ⭑ §3.2's root declares
 	// HUMAN and keeps its reading, in the whole run's stage 7.
 	// ⭐ R3-B F6 (the lead's round-3 item 6) — AND A ROOT WHOSE TYPE CANNOT BE
@@ -3674,7 +3703,9 @@ function unitLines(r: RunReport): string[] {
 		`- **The lane's own reads of the limit, each before a paid act (design D8; E12F F2):** ${r.reviewerCalls.laneLimitChecks.length}.`,
 		...r.reviewerCalls.laneLimitChecks.map(
 			(c) => `  - ${c.unit}, before ${c.before}: ${limitFigures(c)}${c.allowed ? '' : ': held back'}.`
-		)
+		),
+		// ⭐ `REG-D-114` (14), as amended 2026-10-16 — the reads' plain caveat (`LIMIT_CAVEAT`).
+		`- **Caveat:** ${r.reviewerCalls.limitCaveat}`
 	];
 }
 

@@ -2181,6 +2181,55 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 		expect(whole(L - 9)).toContain(`- **The limit (design D8):** ${L - 9} + 4 + 4 = ${L - 1} of ${L}, under it.`);
 	});
 
+	// ── ⛔ `REG-D-114` (14), AS AMENDED 2026-10-16 — THE REPORT SAYS WHAT EACH CHECK COUNTED, AND THAT A PHASE'S OWN SPEND CAN
+	// CARRY THE TOTAL PAST THE LIMIT: the lane counts one try's reserve before a phase, the rule's re-run of its work or of its
+	// review, and a MODEL root's press — an act's worst case before a sign-off, a re-run of its declared reviews and Send — and
+	// checks before each press, never during one.
+	it('⛔ REG-D-114 (14), as amended — each of the lane’s reads says what it counted ahead of its act, in the lane’s own words; a read recorded before the lane said so, its figures alone', () => {
+		// ⛔ PREDICTED RED, read from the code: `limitFigures` printed `+ N ahead` alone, and nothing for a read that counted none,
+		// so a reader could not tell one try's reserve from an act's worst case, nor a root that runs no model from a read of none.
+		const run = aRun({}, { run: { end: { reason: 'paid-limit' } } });
+		const laneRun = run.lane.run as { units: Record<string, unknown>[] };
+		const at = (slug: string, fields: Record<string, unknown>) => (u: Record<string, unknown>) => (u.slug === slug ? { ...u, ...fields } : u);
+		const said = (prior: number, recorded: number, ahead: number, counted: string) => ({ ...read(prior, recorded, ahead, 450), counted });
+		const units = laneRun.units
+			.map(at('root', { limitCheck: said(300, 3, 0, 'none: it runs no model') }))
+			.map(
+				at('requirements', {
+					limitCheck: said(300, 3, 4, 'one try’s reserve'),
+					recovery: [{ act: 'rerunWork', limitCheck: said(300, 9, 4, 'one try’s reserve') }]
+				})
+			)
+			.map(
+				at('design', {
+					limitCheck: read(300, 12, 0, 450),
+					signOff: { offered: true, limitCheck: said(300, 20, 16, 'its declared reviews’ worst case'), ...unpressed, notPressed: null }
+				})
+			);
+		const md = renderMarkdown(buildRunReport(run.store, { ...run.lane, run: { ...laneRun, units } }, { accountNames: NAMES }).report);
+		const lines = md.split('\n').filter((line) => line.startsWith('  - ') && line.includes(' of 450, '));
+		expect(lines, 'a read of the limit does not say what it counted').toEqual([
+			'  - root, before its Begin & Execute: 300 + 3 + 4 + 0 ahead (none: it runs no model) = 307 of 450, under it.',
+			'  - requirements, before its Begin & Execute: 300 + 3 + 4 + 4 ahead (one try’s reserve) = 311 of 450, under it.',
+			'  - requirements, before the rule’s re-run of its work: 300 + 9 + 4 + 4 ahead (one try’s reserve) = 317 of 450, under it.',
+			// ⭑ CONTROL — a read recorded before the lane said what it counted: its figures alone, as before.
+			'  - design, before its Begin & Execute: 300 + 12 + 4 = 316 of 450, under it.',
+			'  - design, before its sign-off: 300 + 20 + 4 + 16 ahead (its declared reviews’ worst case) = 340 of 450, under it.'
+		]);
+	});
+
+	it('⛔ REG-D-114 (14), as amended — the reviewer calls carry a plain caveat, in report.json and report.md: a phase’s own spend can carry the total past the limit, because the lane checks before each press, not during one', () => {
+		// ⛔ PREDICTED RED, read from the code: the report said nothing of it, so a run whose reads each let a press through read
+		// as a run held to the limit throughout.
+		const caveat =
+			'A phase’s own spend can carry the total past the limit: the lane checks the limit before each press, not during one, ' +
+			'and a model unit’s press may spend up to 140 reviewer calls after its check (REG-D-114 (14), as amended ' +
+			'2026-10-16; the sponsor’s limit is "about 450", REG-D-110 (1)).';
+		const r = reportOf(aRun({})).report;
+		expect(renderMarkdown(r), 'report.md carries no caveat that a press can spend past the limit').toContain(`- **Caveat:** ${caveat}`);
+		expect(r.reviewerCalls.limitCaveat, 'report.json carries no caveat that a press can spend past the limit').toBe(caveat);
+	});
+
 	it('⛔ stage 7’s sign-off: the lane’s dry run signs the root off (D11) — the root as intended, the run not reached; one never attempted, in a run cut short — not reached; one refused — broke', () => {
 		// ⚠ `E12F` F1 — A DRY RUN BEFORE `REG-D-112` (b): its root signed off by the paid run's own acts. Kept, for an archive made
 		// then; a dry run now rehearses the sign-off up to the reviewer call and presses nothing (the case above).

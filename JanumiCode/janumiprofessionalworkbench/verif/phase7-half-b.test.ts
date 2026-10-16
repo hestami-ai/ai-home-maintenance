@@ -44,7 +44,6 @@ import {
 	PHASE7_NEGATIVE_CONTROL_RESERVE,
 	PHASE7_PAID_LIMIT,
 	PHASE7_PER_PHASE_MS,
-	PHASE7_REVIEWED_COMMANDS,
 	PHASE7_SETUP_MS,
 	PHASE7_SIGN_OFF_MS,
 	PHASE7_SIGN_OFF_UNIT_MS,
@@ -374,7 +373,8 @@ interface HalfBScript {
 	readonly floorCalls?: number;
 	/**
 	 * ⭐ R3-B's fix round (F1) — the ASSURANCE exchanges a unit's Begin & Execute records, by the unit's id; none unless said.
-	 * Each phase's check counts its worst case now, so a run that reaches its sign-offs near the limit spends there in a phase.
+	 * ~~Each phase's check counts its worst case now, so a run that reaches its sign-offs near the limit spends there in a
+	 * phase.~~ ⭐ Each phase's check counts one try's reserve (`REG-D-114` (14), as amended 2026-10-16): a phase's own spend.
 	 */
 	readonly unitCalls?: Readonly<Record<string, number>>;
 	/**
@@ -1781,11 +1781,17 @@ describe('⛔ REG-D-112 (E3’s review, 1) — a run that stops during authoring
 	});
 });
 
-describe('⛔ REG-D-112 (E3’s review, 2) — the LIMIT is checked before Send and before the root’s press, each act’s worst case counted', () => {
+describe('⛔ REG-D-112 (E3’s review, 2) — the LIMIT is checked before Send and before the root’s press, ~~each act’s worst case counted~~ ⭐ what each act counts by the one rule as amended (REG-D-114 (14))', () => {
 	/** The authoring floor's worst case: two floor runs, each one review of up to `reviewerCallsPerTry` calls — 8. */
 	const FLOOR_WORST = PHASE7_AUTHORING_FLOOR_RUNS * LANE_BUDGET.reviewerCallsPerTry;
-	/** A model unit's worst case, as its allowance counts it: each try's review, and each reviewed command's — 140. */
-	const UNIT_WORST = (LANE_BUDGET.tries + PHASE7_REVIEWED_COMMANDS) * LANE_BUDGET.reviewerCallsPerTry;
+	/**
+	 * ~~A model unit's worst case, as its allowance counts it: each try's review, and each reviewed command's — 140.~~ ⭐
+	 * `REG-D-114` (14), as amended 2026-10-16 — what a MODEL root counts before its press: ONE TRY'S RESERVE, a review of up to
+	 * `reviewerCallsPerTry` calls — 4, D8's own rule.
+	 */
+	const TRY_RESERVE = LANE_BUDGET.reviewerCallsPerTry;
+	/** The prior that lets Send through, and brings a MODEL root's one try's reserve, the floor having spent `floor`, to the limit. */
+	const rootReaching = (floor: number) => PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - TRY_RESERVE - floor;
 
 	// ⭐ THE PREDICTED RED: half B pressed Send with no check — the first was before the first PHASE, after the authoring
 	// floor's reviews and a model root's had been spent.
@@ -1800,6 +1806,7 @@ describe('⛔ REG-D-112 (E3’s review, 2) — the LIMIT is checked before Send 
 			recorded: 0,
 			reserve: PHASE7_NEGATIVE_CONTROL_RESERVE,
 			ahead: FLOOR_WORST,
+			counted: 'the authoring floor’s worst case',
 			total: PHASE7_PAID_LIMIT + 1,
 			limit: PHASE7_PAID_LIMIT,
 			allowed: false
@@ -1815,40 +1822,71 @@ describe('⛔ REG-D-112 (E3’s review, 2) — the LIMIT is checked before Send 
 		expect(record.authoring?.limitCheck).toMatchObject({ total: PHASE7_PAID_LIMIT, allowed: true });
 	});
 
-	it('⭐ a MODEL root’s worst case is counted before its press: past the limit the root is never pressed; a root that runs no model is pressed at the same count', async () => {
-		const prior = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - UNIT_WORST + 1;
-		const model = halfBLane({ paid: true, prior, types: MODEL_ROOT_TYPES });
+	it('⭐ a MODEL root’s ~~worst case~~ ⭐ one try’s reserve is counted before its press: past the limit the root is never pressed; a root that runs no model is pressed at the same count, counting none', async () => {
+		// ⭐ `REG-D-114` (14), as amended 2026-10-16 — ~~prior: the limit less the reserve and a model unit's 140, plus one~~: the
+		// floor spends its worst case after Send, and the root's one try's reserve then passes the limit by one call.
+		const prior = rootReaching(FLOOR_WORST) + 1;
+		const model = halfBLane({ paid: true, prior, types: MODEL_ROOT_TYPES, floorCalls: FLOOR_WORST });
 		const refused = await model.run();
 		expect([model.only('author.send'), model.only('beginExecute')]).toEqual([['author.send'], []]);
 		expect([refused.end?.reason, refused.units[0]?.limitCheck]).toEqual([
 			'paid-limit',
 			{
 				prior,
-				recorded: 0,
+				recorded: FLOOR_WORST,
 				reserve: PHASE7_NEGATIVE_CONTROL_RESERVE,
-				ahead: UNIT_WORST,
+				ahead: TRY_RESERVE,
+				counted: 'one try’s reserve',
 				total: PHASE7_PAID_LIMIT + 1,
 				limit: PHASE7_PAID_LIMIT,
 				allowed: false
 			}
 		]);
 		expect(refused.end?.detail).toContain('before the root’s press');
-		const human = halfBLane({ paid: true, prior });
+		const human = halfBLane({ paid: true, prior, floorCalls: FLOOR_WORST });
 		const pressed = await human.run();
 		expect(human.only('beginExecute root')).toEqual(['beginExecute root']);
-		expect(pressed.units[0]?.limitCheck).toMatchObject({ ahead: 0, allowed: true });
+		expect(pressed.units[0]?.limitCheck).toMatchObject({ ahead: 0, counted: 'none: it runs no model', allowed: true });
+	});
+
+	it('⛔ REG-D-114 (14), AS AMENDED — a MODEL root whose ONE TRY’S RESERVE brings the total EXACTLY to the limit is pressed', async () => {
+		// ⛔ PREDICTED RED, read from the code: before a MODEL root's press the one rule counted a model unit's WORST CASE, 140
+		// (`REG-D-112`, finding 2), so a root whose one try's reserve reaches the limit exactly was never pressed.
+		const prior = rootReaching(FLOOR_WORST);
+		const l = halfBLane({ paid: true, prior, types: MODEL_ROOT_TYPES, floorCalls: FLOOR_WORST });
+		const record = await l.run();
+		expect(l.only('beginExecute root'), 'a MODEL root whose one try’s reserve reaches the limit was held back').toEqual([
+			'beginExecute root'
+		]);
+		expect(record.units[0]?.limitCheck).toEqual({
+			prior,
+			recorded: FLOOR_WORST,
+			reserve: PHASE7_NEGATIVE_CONTROL_RESERVE,
+			ahead: TRY_RESERVE,
+			counted: 'one try’s reserve',
+			total: PHASE7_PAID_LIMIT,
+			limit: PHASE7_PAID_LIMIT,
+			allowed: true
+		});
 	});
 });
 
 describe('⛔ the merge’s fix round, F2 and F3 — the run report reads half B’s reads of the limit as the lane made them', () => {
 	/** The authoring floor's worst case, counted before Send: 8. */
 	const FLOOR_WORST = PHASE7_AUTHORING_FLOOR_RUNS * LANE_BUDGET.reviewerCallsPerTry;
-	/** A MODEL root's worst case, counted before its press: 140. */
-	const UNIT_WORST = (LANE_BUDGET.tries + PHASE7_REVIEWED_COMMANDS) * LANE_BUDGET.reviewerCallsPerTry;
-	/** A paid half-B run whose MODEL root's read before its press totals the limit EXACTLY, reported from the lane's own record. */
+	/**
+	 * ~~A MODEL root's worst case, counted before its press: 140.~~ ⭐ `REG-D-114` (14), as amended 2026-10-16 — what a MODEL
+	 * root counts before its press: one try's reserve, 4.
+	 */
+	const TRY_RESERVE = LANE_BUDGET.reviewerCallsPerTry;
+	/**
+	 * A paid half-B run whose MODEL root's read before its press totals the limit EXACTLY, reported from the lane's own record.
+	 * ⭐ `REG-D-114` (14), as amended — the authoring floor spends its worst case after Send, so Send's read stays under the
+	 * limit and the root's, one try's reserve ahead, reaches it.
+	 */
 	const atTheLimit = async () => {
-		const prior = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - UNIT_WORST;
-		const l = halfBLane({ paid: true, prior, types: MODEL_ROOT_TYPES });
+		const prior = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - TRY_RESERVE - FLOOR_WORST;
+		const l = halfBLane({ paid: true, prior, types: MODEL_ROOT_TYPES, floorCalls: FLOOR_WORST });
 		await l.run();
 		const record = l.written();
 		const report = buildRunReport(
@@ -1868,8 +1906,8 @@ describe('⛔ the merge’s fix round, F2 and F3 — the run report reads half B
 			allowed: true
 		});
 		expect(md).toContain(
-			`  - root, before its Begin & Execute: ${prior} + 0 + ${PHASE7_NEGATIVE_CONTROL_RESERVE} + ${UNIT_WORST} ahead = ` +
-				`${PHASE7_PAID_LIMIT} of ${PHASE7_PAID_LIMIT}, at it, which this act may reach.`
+			`  - root, before its Begin & Execute: ${prior} + ${FLOOR_WORST} + ${PHASE7_NEGATIVE_CONTROL_RESERVE} + ${TRY_RESERVE} ahead ` +
+				`(one try’s reserve) = ${PHASE7_PAID_LIMIT} of ${PHASE7_PAID_LIMIT}, at it, which this act may reach.`
 		);
 		expect(md, 'a total equal to the limit reads as under it').not.toContain(`= ${PHASE7_PAID_LIMIT} of ${PHASE7_PAID_LIMIT}, under it`);
 	});
@@ -1885,7 +1923,8 @@ describe('⛔ the merge’s fix round, F2 and F3 — the run report reads half B
 			'the authoring’s read before Send is not the first of the lane’s reads'
 		).toEqual(['authoring', 'Send', total, true]);
 		expect(md).toContain(
-			`  - authoring, before Send: ${prior} + 0 + ${PHASE7_NEGATIVE_CONTROL_RESERVE} + ${FLOOR_WORST} ahead = ${total} of ${PHASE7_PAID_LIMIT}, under it.`
+			`  - authoring, before Send: ${prior} + 0 + ${PHASE7_NEGATIVE_CONTROL_RESERVE} + ${FLOOR_WORST} ahead (the authoring floor’s worst ` +
+				`case) = ${total} of ${PHASE7_PAID_LIMIT}, under it.`
 		);
 	});
 });
@@ -1893,8 +1932,6 @@ describe('⛔ the merge’s fix round, F2 and F3 — the run report reads half B
 describe('⭐⭐ The merge of E12 and E3 (J1, J2) — half B’s sign-offs count the declared reviews of the PUBLISHED PWA, read from the store, and E12’s rule re-runs those that did not conclude', () => {
 	/** One declared review's worst case in reviewer calls (`signOffWorstCase`): its call and its repair, each run once more. */
 	const PER_POLICY = LANE_BUDGET.reviewerCallsPerTry;
-	/** A model unit's worst case, which each phase's check counts since R3-B's fix round (F1): (3 + 32) × 4 = 140. */
-	const UNIT_WORST = (LANE_BUDGET.tries + PHASE7_REVIEWED_COMMANDS) * LANE_BUDGET.reviewerCallsPerTry;
 	/** Five policies — one more than any unit of §3.2 declares (`PHASE7_DECLARED_POLICIES_PER_UNIT`, the lane's fallback). */
 	const FIVE = [
 		'pol_requirement_coverage',
@@ -1916,11 +1953,13 @@ describe('⭐⭐ The merge of E12 and E3 (J1, J2) — half B’s sign-offs count
 	// and no title of the agent's is one of §3.2's — so every half-B unit was counted at the fallback, four policies, and one
 	// that declares five was pressed past the limit.
 	it('⛔ J1 — an agent’s unit declaring FIVE policies is held back where four would have fit: its sign-off’s worst case is the store’s, 5 × 4', async () => {
-		// ⭐ R3-B's fix round (F1) — ~~the prior alone one call past the five's worst case~~: each phase counts its worst case,
+		// ~~⭐ R3-B's fix round (F1) — the prior alone one call past the five's worst case: each phase counts its worst case,
 		// a model unit's, so the prior lets each phase through exactly at the limit and the last phase, Verify, spends the
-		// rest: the sign-off reads the same calls as before.
+		// rest: the sign-off reads the same calls as before.~~ ⭐ `REG-D-114` (14), as amended 2026-10-16 — each phase counts one
+		// try's reserve, and the prior alone is one call past the five's worst case again: every phase's check, and Send's, is
+		// under the limit.
 		const spent = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - FIVE.length * PER_POLICY + 1;
-		const prior = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - UNIT_WORST;
+		const prior = spent;
 		expect(
 			spent + PHASE7_NEGATIVE_CONTROL_RESERVE + 4 * PER_POLICY,
 			'arrangement: four policies’ worst case would fit'
@@ -1929,7 +1968,6 @@ describe('⭐⭐ The merge of E12 and E3 (J1, J2) — half B’s sign-offs count
 			paid: true,
 			prior,
 			types: FIVE_POLICY_TYPES,
-			unitCalls: { pwu_v: spent - prior },
 			signOffs: { 'specify-wordfreq': { ra: answered('success') } }
 		});
 		const record = await l.run();
@@ -1938,9 +1976,10 @@ describe('⭐⭐ The merge of E12 and E3 (J1, J2) — half B’s sign-offs count
 		]);
 		expect(record.units[1]!.signOff?.limitCheck).toEqual({
 			prior,
-			recorded: spent - prior,
+			recorded: 0,
 			reserve: PHASE7_NEGATIVE_CONTROL_RESERVE,
 			ahead: FIVE.length * PER_POLICY,
+			counted: 'its declared reviews’ worst case',
 			total: PHASE7_PAID_LIMIT + 1,
 			limit: PHASE7_PAID_LIMIT,
 			allowed: false
@@ -2498,15 +2537,19 @@ describe('⛔ REG-D-112 (E3’s re-review, 3) — an authoring END is never rela
 });
 
 describe('⛔ REG-D-112 (E3’s re-review, 4) — the limit before the root counts the calls the store RECORDS: the authoring floor’s', () => {
-	/** A model unit's worst case, as its allowance counts it: each try's review, and each reviewed command's — 140. */
-	const UNIT_WORST = (LANE_BUDGET.tries + PHASE7_REVIEWED_COMMANDS) * LANE_BUDGET.reviewerCallsPerTry;
-	const FLOOR_CALLS = 3;
+	/**
+	 * ~~A model unit's worst case, as its allowance counts it: each try's review, and each reviewed command's — 140.~~ ⭐
+	 * `REG-D-114` (14), as amended 2026-10-16 — what a MODEL root counts before its press: one try's reserve, 4.
+	 */
+	const TRY_RESERVE = LANE_BUDGET.reviewerCallsPerTry;
+	/** ⭐ The floor's worst case, its two runs' reviews of up to four calls each: so Send's read, before it, stays under the limit. */
+	const FLOOR_CALLS = 8;
 	/** One call past the limit with the floor's recorded calls counted, and within it without them. */
-	const PRIOR = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - UNIT_WORST - FLOOR_CALLS + 1;
+	const PRIOR = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - TRY_RESERVE - FLOOR_CALLS + 1;
 
 	// ⭐ THE MUTANT THAT SURVIVED (E3-M75): no test's store held an exchange at the root's check, so the calls recorded were a
 	// term no test could kill — dropped, a MODEL root was pressed with the floor's calls uncounted.
-	it('⭐ a MODEL root whose worst case fits only WITHOUT the floor’s recorded calls is never pressed: the run ends paid-limit, the calls counted', async () => {
+	it('⭐ a MODEL root whose ~~worst case~~ ⭐ one try’s reserve fits only WITHOUT the floor’s recorded calls is never pressed: the run ends paid-limit, the calls counted', async () => {
 		const l = halfBLane({ paid: true, prior: PRIOR, types: MODEL_ROOT_TYPES, floorCalls: FLOOR_CALLS });
 		const record = await l.run();
 		expect([l.only('beginExecute'), record.end?.reason, record.units[0]?.limitCheck]).toEqual([
@@ -2516,7 +2559,8 @@ describe('⛔ REG-D-112 (E3’s re-review, 4) — the limit before the root coun
 				prior: PRIOR,
 				recorded: FLOOR_CALLS,
 				reserve: PHASE7_NEGATIVE_CONTROL_RESERVE,
-				ahead: UNIT_WORST,
+				ahead: TRY_RESERVE,
+				counted: 'one try’s reserve',
 				total: PHASE7_PAID_LIMIT + 1,
 				limit: PHASE7_PAID_LIMIT,
 				allowed: false
@@ -2524,7 +2568,7 @@ describe('⛔ REG-D-112 (E3’s re-review, 4) — the limit before the root coun
 		]);
 	});
 
-	it('⭐ CONTROL — one floor call fewer, the worst case fits exactly: the MODEL root is pressed', async () => {
+	it('⭐ CONTROL — one floor call fewer, ~~the worst case~~ ⭐ one try’s reserve fits exactly: the MODEL root is pressed', async () => {
 		const l = halfBLane({ paid: true, prior: PRIOR, types: MODEL_ROOT_TYPES, floorCalls: FLOOR_CALLS - 1 });
 		const record = await l.run();
 		expect(l.only('beginExecute root')).toEqual(['beginExecute root']);
