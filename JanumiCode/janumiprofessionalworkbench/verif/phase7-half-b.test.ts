@@ -66,6 +66,7 @@ import {
 	type Dump,
 	type LaneHands,
 	type LanePaths,
+	type RecoveryOffers,
 	type RunRecord
 } from '../apps/rph-demo/e2e-live-exec/phase7-operator.js';
 import {
@@ -345,6 +346,8 @@ const ACCEPTED: ActionOutcome = {
 	decoded: { acceptedCandidate: CANDIDATE_HASH }
 };
 const COMPLETED = { lifecycleState: 'EXECUTING', executionState: 'SUCCEEDED', assuranceState: 'UNASSESSED', planStepState: 'SUCCEEDED' };
+/** ⭐ R4 (the lead's round-4 item 6) — a unit whose press was refused, as the store reads it: waiting for a person (RD2). */
+const WAITING = { lifecycleState: 'EXECUTING', executionState: 'WAITING', assuranceState: 'UNASSESSED', planStepState: 'WAITING' };
 
 interface HalfBScript {
 	readonly paid: boolean;
@@ -377,6 +380,11 @@ interface HalfBScript {
 	 * phase.~~ ⭐ Each phase's check counts one try's reserve (`REG-D-114` (14), as amended 2026-10-16): a phase's own spend.
 	 */
 	readonly unitCalls?: Readonly<Record<string, number>>;
+	/**
+	 * ⭐ R4 (the lead's round-4 item 6) — units whose Begin & Execute is REFUSED, by id: the store then reads each WAITING, and
+	 * its row offers the run plan's rule what is given. Every other unit's press is accepted, as before.
+	 */
+	readonly stops?: Readonly<Record<string, RecoveryOffers>>;
 	/**
 	 * ⭐ The merge of E12 and E3 (J1, J2) — each unit's sign-off, by its slug: what Record Assurance came to, and whether the
 	 * row then offers re-running the declared reviews that did not conclude (`REG-D-112` (a)) and what that came to. A unit
@@ -438,9 +446,9 @@ function halfBLane(script: HalfBScript) {
 						};
 					})
 				: [],
-			executionPlans: [...pressed.keys()].map((id) => ({
+			executionPlans: [...pressed].map(([id, s]) => ({
 				id: `pln_${id}`,
-				state: { workUnitId: id, steps: [{ stepState: 'SUCCEEDED' }] }
+				state: { workUnitId: id, steps: [{ stepState: s.planStepState }] }
 			})),
 			// ⭐ `REG-D-112` (E3's re-review, finding 4) — the authoring floor's calls, recorded once Send is pressed. ⭐ R3-B's
 			// fix round (F1) — and each pressed unit's (`unitCalls`).
@@ -486,9 +494,10 @@ function halfBLane(script: HalfBScript) {
 		},
 		beginExecute: async (unit) => {
 			calls.push(`beginExecute ${unit.slug}`);
-			pressed.set(unit.unitId!, COMPLETED);
+			const stopped = script.stops?.[unit.unitId!] !== undefined;
+			pressed.set(unit.unitId!, stopped ? WAITING : COMPLETED);
 			unitCallCount += script.unitCalls?.[unit.unitId!] ?? 0;
-			return answered('success');
+			return answered(stopped ? 'failure' : 'success');
 		},
 		showOverview: async () => void calls.push('showOverview'),
 		recordAssurance: async (unit, timeoutMs) => {
@@ -518,7 +527,7 @@ function halfBLane(script: HalfBScript) {
 			calls.push(`markSatisfied ${unit.slug}`);
 			return answered('success');
 		},
-		recoveryOffers: async () => ({ rerunReview: false, rerunWork: false, abandon: false }),
+		recoveryOffers: async (unit) => script.stops?.[unit.unitId!] ?? { rerunReview: false, rerunWork: false, abandon: false },
 		recover: async () => {
 			throw new Error('nothing stops here');
 		},
@@ -2573,6 +2582,47 @@ describe('⛔ REG-D-112 (E3’s re-review, 4) — the limit before the root coun
 		const record = await l.run();
 		expect(l.only('beginExecute root')).toEqual(['beginExecute root']);
 		expect(record.units[0]?.limitCheck).toMatchObject({ recorded: FLOOR_CALLS - 1, total: PHASE7_PAID_LIMIT, allowed: true });
+	});
+});
+
+// ── ⛔ R4 (the lead's round-4 item 6) — P76R-M52'S PROPERTY: A RE-RUN THE LIMIT STOPPED ENDS THE RUN `paid-limit` ─────────────
+// Since `REG-D-114` (14), as amended 2026-10-16, the rule's re-run of a stopped phase counts one try's reserve (4), and in
+// half A every later sign-off counts at least 8 (§3.2's least-declaring unit, two policies): the check that stops a re-run
+// stops the next sign-off too, and the run ends `paid-limit` whatever the re-run's own stop set — P76R-M52 SURVIVED its half-A
+// victim. Only a run whose later sign-offs count less than one try's reserve shows the re-run's own end: units that declare
+// no policy, which an agent's PWA may hold.
+
+describe('⛔ R4 (the lead’s round-4 item 6) — a re-run the limit stopped ends the run paid-limit, though every later check fits', () => {
+	/** The agent's PWA, every type declaring NO policy: each sign-off counts none ahead. */
+	const NO_POLICY_TYPES: ObjectRow[] = AGENT_TYPES.map((t) => ({ id: t.id, state: { ...t.state, requiredAssurancePolicyIds: [] } }));
+	/** The authoring floor's worst case, counted before Send: 8. */
+	const FLOOR_WORST = PHASE7_AUTHORING_FLOOR_RUNS * LANE_BUDGET.reviewerCallsPerTry;
+
+	it('⛔ the agent’s Specify phase stops, its re-run held back one call past the limit; the root’s sign-off, counting none, fits — and the run still ends paid-limit, never complete', async () => {
+		// ⭑ Send's read reaches the limit exactly; Specify's own press spends 5, so the re-run's one try's reserve passes it by
+		// one call, and the root's sign-off, counting none, stays 3 under it.
+		const prior = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - FLOOR_WORST;
+		const l = halfBLane({
+			paid: true,
+			prior,
+			types: NO_POLICY_TYPES,
+			stops: { pwu_s: { rerunReview: true, rerunWork: true, abandon: true } },
+			unitCalls: { pwu_s: 5 }
+		});
+		const record = await l.run();
+		expect(l.only('beginExecute'), 'arrangement: Specify stops, and no later phase is pressed').toEqual([
+			'beginExecute root',
+			'beginExecute specify-wordfreq'
+		]);
+		expect(record.units[1]?.recovery.map((r) => [r.act, r.limitCheck?.total, r.limitCheck?.allowed, r.notPressed])).toEqual([
+			['rerunReview', PHASE7_PAID_LIMIT + 1, false, `the limit: ${PHASE7_PAID_LIMIT + 1} of ${PHASE7_PAID_LIMIT} reviewer calls (D8)`]
+		]);
+		expect(record.units[0]?.signOff?.limitCheck, 'arrangement: the root’s sign-off, counting none, fits').toMatchObject({
+			ahead: 0,
+			total: PHASE7_PAID_LIMIT - 3,
+			allowed: true
+		});
+		expect(record.end?.reason, 'a run whose re-run the limit stopped ended as though it had completed').toBe('paid-limit');
 	});
 });
 
