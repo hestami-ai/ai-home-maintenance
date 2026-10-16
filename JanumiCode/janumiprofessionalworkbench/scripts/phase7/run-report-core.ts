@@ -37,6 +37,8 @@ import { posix } from 'node:path';
 // it with (`declared-policy-signoff.ts` `verdictOf`), never a restated copy of it. Pure, store-free. ⚠ E12's re-review F5 —
 // save the one limb `verdictOf` applies before the ladder, a review that answered no criterion, which `judgedVerdict` restates.
 import { BLOCKING_SEVERITIES, dispositionFromFindings } from '@janumipwb/rph-assurance';
+// ⭐ R3-B F3 — the kernel's own reading of the policies a unit declares, for half B's count of declared verdicts. Pure.
+import { declaredAssurancePolicyIds } from '@janumipwb/rph-domain';
 import {
 	PHASE7_NEGATIVE_CONTROL_RESERVE,
 	PHASE7_PAID_LIMIT,
@@ -2382,6 +2384,19 @@ function childrenOf(ix: Index, u: Unit, units: readonly Unit[]): string[] {
 const modelRanFor = (u: Unit): boolean => u.tries.some((t) => str(t.state.disposition) === 'ACCEPTED');
 
 /**
+ * ⭐ R3-B F3 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — THE POLICIES A UNIT DECLARES, by the
+ * kernel's own reading (`declaredAssurancePolicyIds`, rph-domain): its `assurancePolicyIds` and its type's
+ * `requiredAssurancePolicyIds`, each once — the set the lane counts a sign-off's limit by (`declaredPolicyIdsOf`). ⛔ The
+ * unit's own list alone left out a policy only its type requires, and counted a repeat twice. ⚠ An upper bound of the
+ * verdicts its sign-off records: the server reviews those that also exist, are ACTIVE and admit the unit.
+ */
+const declaredPoliciesOf = (ix: Index, u: Unit): readonly string[] =>
+	declaredAssurancePolicyIds(
+		{ assurancePolicyIds: strs(u.object?.state.assurancePolicyIds) },
+		{ requiredAssurancePolicyIds: strs(ix.byId.get(u.typeId ?? str(u.object?.state.pwuTypeId))?.state.requiredAssurancePolicyIds) }
+	);
+
+/**
  * ⭐ The lead's delegated decision of 2026-10-15, to be registered — the discharge the unit's TYPE declares, read as the
  * lane reads it before half B's root is pressed (`phase7-operator.ts`, `dischargeOf`): §3.2's declaration in half A, the
  * agent's type in the store in half B, and `UNDECLARED` when neither names one.
@@ -3362,10 +3377,12 @@ export function buildRunReport(
 		reviewerCalls: buildReviewerCalls(ix, units, lane),
 		audit: buildAudit(ix, units, undertakingId, lane),
 		// ⭐ E3 — half B's declared verdicts are the agent's policies: each unit's, as instantiation copied them from its type.
+		// ⭐ R3-B F3 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — ~~each unit's own list~~: THE
+		// KERNEL'S DECLARED SET of each unit (`declaredPoliciesOf`), the set the lane counts its limit by (J1).
 		declaredVerdicts: {
 			expected:
 				half === 'B'
-					? units.reduce((n, u) => n + strs(u.object?.state.assurancePolicyIds).length, 0)
+					? units.reduce((n, u) => n + declaredPoliciesOf(ix, u).length, 0)
 					: DECLARED_VERDICTS_EXPECTED,
 			rows: declared,
 			history

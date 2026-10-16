@@ -30144,5 +30144,23 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/phase7-live-spec.test.ts"],
 		why: "PROMISE (R3-B F2; the lead's delegated decision of 2026-10-16, to be registered as REG-D-114): the paid spec's hand for the rule's re-run of the declared reviews passes the lane's bound through to the press. WHO RELIES: half B's paid run, which only this spec drives. WHAT THE MUTATION DOES: the hand presses with a bound of its own, section 3.2's four policies'. Applied by hand first, the file restored byte for byte: 'AssertionError: rerunDeclared: expected [ [ 'page', …(3) ] ] to deeply equal [ [ 'page', …(3) ] ]' ('Tests  1 failed | 88 passed (89)'). OBSERVED (bun run mutants -- (R3-B F2's ids and the guards near its lines), 2026-10-16, in the R3-B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R3B-M21-the-spec-presses-the-declared-re-run-with-a-bound-of-its-own ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 7 completion programme, round 3, package R3-B, F2 - half B's sign-off time bounds (Record Assurance's, the rule's re-run of the declared reviews, each unit's sign-off share and the test's timeout) come from the policies each unit declares as the store holds them; half A's stay section 3.2's (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114)"
+	},
+	{
+		id: "R3B-M22-the-count-reads-each-unit-s-own-list",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "? units.reduce((n, u) => n + declaredPoliciesOf(ix, u).length, 0)",
+		replace: "? units.reduce((n, u) => n + strs(u.object?.state.assurancePolicyIds).length, 0)",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (R3-B F3; the lead's delegated decision of 2026-10-16, to be registered as REG-D-114): the run report's half-B count of the declared verdicts a complete run signs off is the kernel's declared set of each unit - its own assurancePolicyIds and its type's requiredAssurancePolicyIds, each once (declaredAssurancePolicyIds) - the set the lane's limit counts (J1). WHO RELIES: the reader of report.md's 'N of M' heading for the declared verdicts, and P7-5, which reads a short count as missing verdicts. WHAT THE MUTATION DOES: the count reads each unit's own list alone, the code before the fix. Applied by hand first, the file restored byte for byte: 'AssertionError: a policy only the type requires: expected 5 to be 6 // Object.is equality' and 'AssertionError: a policy the unit lists twice: expected 6 to be 5 // Object.is equality' - the reds the fix was built against, observed first at the unchanged code ('Tests  2 failed | 97 passed (99)'). OBSERVED (bun run mutants -- (R3-B F3's ids), 2026-10-16, in the R3-B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R3B-M22-the-count-reads-each-unit-s-own-list ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion programme, round 3, package R3-B, F3 - the run report's half-B count of expected declared verdicts is the kernel's declared set of each unit, its own policies and its type's, each once (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114)"
+	},
+	{
+		id: "R3B-M23-the-count-leaves-out-the-type-s-policies",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "{ requiredAssurancePolicyIds: strs(ix.byId.get(u.typeId ?? str(u.object?.state.pwuTypeId))?.state.requiredAssurancePolicyIds) }",
+		replace: "{ requiredAssurancePolicyIds: [] }",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (R3-B F3; the lead's delegated decision of 2026-10-16, to be registered as REG-D-114): the type's required policies are read, by the unit's type, into the kernel's declared set. WHO RELIES: the count of a unit whose own list leaves out a policy its type requires. WHAT THE MUTATION DOES: the type contributes nothing. Applied by hand first, the file restored byte for byte: 'AssertionError: a policy only the type requires: expected 5 to be 6 // Object.is equality' ('Tests  1 failed | 98 passed (99)'). OBSERVED (bun run mutants -- (R3-B F3's ids), 2026-10-16, in the R3-B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R3B-M23-the-count-leaves-out-the-type-s-policies ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion programme, round 3, package R3-B, F3 - the run report's half-B count of expected declared verdicts is the kernel's declared set of each unit, its own policies and its type's, each once (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114)"
 	}
 ];

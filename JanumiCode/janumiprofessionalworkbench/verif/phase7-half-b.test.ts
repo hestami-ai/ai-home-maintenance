@@ -713,7 +713,8 @@ function halfBStore(
 					title: u.title,
 					undertakingId: 'und_1',
 					pwuTypeId: u.typeId,
-					assurancePolicyIds: declared,
+					// ⭐ R3-B F3 — as `halfBLane`'s store: the type's copy, unless the unit says otherwise.
+					assurancePolicyIds: u.policies ?? declared,
 					...(u.parent === null ? {} : { parentWorkUnitId: u.parent }),
 					workLifecycleState: ran === undefined ? 'PROPOSED' : 'SATISFIED',
 					executionState: ran === undefined ? 'NOT_STARTED' : 'SUCCEEDED',
@@ -958,6 +959,33 @@ describe('⭐ C5 — the candidate checks’ findings stand beside what each uni
 		]);
 		// ⭑ The declared verdicts a complete half-B run signs off are the agent's: each unit's own policies, 1 + 2 + 1 + 1.
 		expect(whole.declaredVerdicts.expected).toBe(5);
+	});
+
+	// ⛔ R3-B F3 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — THE COUNT IS THE KERNEL'S DECLARED
+	// SET (`declaredAssurancePolicyIds`, rph-domain): a unit's own policies and its type's, each once — the set the sign-off
+	// reviews from, and the lane's limit counts (J1).
+	/** The report of a complete half-B run whose units' OWN policies are `policies`, by unit id; the type's copy elsewhere. */
+	const reportWithOwnPolicies = (policies: Readonly<Record<string, readonly string[]>>) => {
+		const units = AGENT_UNITS.map((u) => (policies[u.id] === undefined ? u : { ...u, policies: policies[u.id] }));
+		return buildRunReport(halfBStore({ units }), halfBLaneRows({ units }), { accountNames: NAMES }).report;
+	};
+
+	it('⛔ R3-B F3 — half B’s expected count of declared verdicts is the kernel’s declared set: a policy only the unit’s TYPE requires is counted', () => {
+		// ⛔ PREDICTED RED, read from the code: each unit's own `assurancePolicyIds` alone — a policy its type requires and the
+		// unit does not list was expected nowhere.
+		// ⭑ Specify: its own two and its type's two share one — three, the type's `pol_intent_preservation` among them.
+		expect(
+			reportWithOwnPolicies({ pwu_s: ['pol_requirement_coverage', 'pol_extra'] }).declaredVerdicts.expected,
+			'a policy only the type requires'
+		).toBe(1 + 3 + 1 + 1);
+	});
+
+	it('⛔ R3-B F3 — and a policy the unit lists twice is counted once', () => {
+		// ⛔ PREDICTED RED, read from the code: each unit's own list counted as it stands, a repeat twice.
+		expect(
+			reportWithOwnPolicies({ pwu_r: ['pol_intent_preservation', 'pol_intent_preservation'] }).declaredVerdicts.expected,
+			'a policy the unit lists twice'
+		).toBe(1 + 2 + 1 + 1);
 	});
 });
 
