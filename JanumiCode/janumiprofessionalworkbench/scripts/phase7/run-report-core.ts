@@ -11,7 +11,8 @@
 //     Execute outlasted the lane's allowance (D4) is read as cut there, never from its mid-unit archive as if it ended;
 //     ⭐ E12's re-review F1 — and one whose sign-off act outlasted its bound, at stage 7, the act and its bound named.
 //     ⭐ In half B the phases are the agent's, and a root that declares MODEL is one of them, at stages 3 to 8 too (the
-//     lead's delegated decision of 2026-10-15, to be registered).
+//     lead's delegated decision of 2026-10-15, to be registered). ⭐ R3-B F6 (the lead's round-3 item 6) — and so is a root
+//     whose type cannot be read, its cells failed closed: broke, or not determined, each with why (`failedClosed`).
 //   · THE PAIRING (§2 stage 8; `REG-F-433`) — every Reasoning Review of an execution-plane subject, paired with the
 //     ASSURANCE-plane call that concluded it: answered, no response, refused (a substitute, or a failed repair), no
 //     answer recorded, or not pairable when its subject had more than one floor run. A deterministic floor policy and a
@@ -2481,7 +2482,8 @@ function typeUnreadable(ix: Index, u: Unit): string | null {
  * ⭐ R3-B F6 (the lead's round-3 item 6) — THE CELLS OF A ROOT WHOSE TYPE CANNOT
  * BE READ, FAILED CLOSED: whether its press ran a model, and so which of its stages apply, cannot be decided, so each is
  * reported — a break as it was found, the reason beside it; any other value not determined, OPEN and owed to a person, the
- * reason first. ⛔ Read as UNDECLARED, such a root was skipped by its place, and its stages 3 to 8 were reported nowhere.
+ * reason first. ⛔ Read as UNDECLARED, such a root was skipped by its place: its own cells at stages 3 to 8 were reported
+ * nowhere, and its completion only as its line in the whole run's stage 7 (`stageSevenWhole`).
  */
 function failedClosed(cells: readonly MatrixCell[], slug: string, why: string): MatrixCell[] {
 	const reason =

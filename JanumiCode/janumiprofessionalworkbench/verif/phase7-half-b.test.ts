@@ -2781,7 +2781,8 @@ describe('⛔ E3’s polish, 3 — a root that declares MODEL has its cells repo
 
 	it('⛔ R3-B F6 — a root whose type is NOT IN THE STORE has its cells reported, broke or not determined, each with why: never skipped', () => {
 		// ⛔ PREDICTED RED, read from the code: a type the report could not find was read as UNDECLARED, so the root was skipped
-		// by its place, and its stages 3 to 8 were reported nowhere — a fault hidden by the very read that failed.
+		// by its place: its own cells at stages 3 to 8 were reported nowhere, and its completion only as its line in the whole
+		// run's stage 7 — a fault hidden by the very read that failed.
 		const stored = halfBStore({ ran: PRESSED_ROOT });
 		failsClosed({ ...stored, objects: stored.objects.filter((o) => o.id !== 'pwutype_root') }, 'pwutype_root is not in the store');
 	});
