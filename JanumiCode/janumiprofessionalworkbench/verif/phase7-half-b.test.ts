@@ -214,6 +214,12 @@ interface AgentUnit {
 	readonly typeId: string;
 	readonly title: string;
 	readonly parent: string | null;
+	/**
+	 * ⭐ The merge of E12 and E3 (J1) — the unit's OWN `assurancePolicyIds` where they differ from its type's: instantiation
+	 * copies the type's `requiredAssurancePolicyIds` (`routes/undertakings/+page.server.ts`), and the store reads that copy
+	 * unless said.
+	 */
+	readonly policies?: readonly string[];
 }
 /** The units instantiation built, AS THE STORE LISTS THEM — scrambled here, so only the tree can order them. */
 const AGENT_UNITS: readonly AgentUnit[] = [
@@ -366,6 +372,14 @@ interface HalfBScript {
 	readonly acceptThrows?: boolean;
 	/** ⭐ `REG-D-112` (E3's re-review, finding 4) — the ASSURANCE exchanges the authoring floor records once Send is pressed. */
 	readonly floorCalls?: number;
+	/**
+	 * ⭐ The merge of E12 and E3 (J1, J2) — each unit's sign-off, by its slug: what Record Assurance came to, and whether the
+	 * row then offers re-running the declared reviews that did not conclude (`REG-D-112` (a)) and what that came to. A unit
+	 * not named here offers no Record Assurance, as before.
+	 */
+	readonly signOffs?: Readonly<
+		Record<string, { readonly ra: ActionOutcome; readonly rerun?: { readonly offered: boolean; readonly outcome?: ActionOutcome } }>
+	>;
 }
 
 /** A run folder of its own, a store made here, and the half-B hands, each call logged in order. */
@@ -404,6 +418,11 @@ function halfBLane(script: HalfBScript) {
 								undertakingId: 'und_1',
 								pwuTypeId: u.typeId,
 								...(u.parent === null ? {} : { parentWorkUnitId: u.parent }),
+								// ⭐ J1 — as instantiation copies them: the type's `requiredAssurancePolicyIds`, unless the unit says.
+								assurancePolicyIds:
+									u.policies ??
+									(types.find((t) => t.id === u.typeId)?.state.requiredAssurancePolicyIds as string[] | undefined) ??
+									[],
 								workLifecycleState: s?.lifecycleState ?? 'PROPOSED',
 								executionState: s?.executionState ?? 'NOT_STARTED',
 								assuranceState: s?.assuranceState ?? 'UNASSESSED'
@@ -461,20 +480,24 @@ function halfBLane(script: HalfBScript) {
 		showOverview: async () => void calls.push('showOverview'),
 		recordAssurance: async (unit) => {
 			calls.push(`recordAssurance ${unit.slug}`);
-			return null;
+			return script.signOffs?.[unit.slug]?.ra ?? null;
 		},
-		// ⭐ The merge of E12 and E3 — E12's sign-off hands, which the lane calls since a sign-off asks the reviewer: the row
-		// offers no Record Assurance here (`recordAssurance` above), so it offers nothing to rehearse or re-run either.
+		// ⭐ The merge of E12 and E3 — E12's sign-off hands, which the lane calls since a sign-off asks the reviewer: a row
+		// offers Record Assurance only where the script signs its unit off (`recordAssurance` above), and a re-run of its
+		// declared reviews only where the script offers one.
 		recordAssuranceOffered: async (unit) => {
 			calls.push(`offersRecordAssurance ${unit.slug}`);
-			return false;
+			return script.signOffs?.[unit.slug] !== undefined;
 		},
 		declaredRerunOffered: async (unit) => {
 			calls.push(`offersDeclaredRerun ${unit.slug}`);
-			return false;
+			return script.signOffs?.[unit.slug]?.rerun?.offered === true;
 		},
-		rerunDeclared: async () => {
-			throw new Error('nothing re-runs its declared reviews here');
+		rerunDeclared: async (unit) => {
+			calls.push(`rerunDeclared ${unit.slug}`);
+			const outcome = script.signOffs?.[unit.slug]?.rerun?.outcome;
+			if (outcome === undefined) throw new Error('nothing re-runs its declared reviews here');
+			return outcome;
 		},
 		markSatisfied: async (unit) => {
 			calls.push(`markSatisfied ${unit.slug}`);
@@ -1715,6 +1738,103 @@ describe('⛔ REG-D-112 (E3’s review, 2) — the LIMIT is checked before Send 
 		const pressed = await human.run();
 		expect(human.only('beginExecute root')).toEqual(['beginExecute root']);
 		expect(pressed.units[0]?.limitCheck).toMatchObject({ ahead: 0, allowed: true });
+	});
+});
+
+describe('⭐⭐ The merge of E12 and E3 (J1, J2) — half B’s sign-offs count the declared reviews of the PUBLISHED PWA, read from the store, and E12’s rule re-runs those that did not conclude', () => {
+	/** One declared review's worst case in reviewer calls (`signOffWorstCase`): its call and its repair, each run once more. */
+	const PER_POLICY = LANE_BUDGET.reviewerCallsPerTry;
+	/** Five policies — one more than any unit of §3.2 declares (`PHASE7_DECLARED_POLICIES_PER_UNIT`, the lane's fallback). */
+	const FIVE = [
+		'pol_requirement_coverage',
+		'pol_intent_preservation',
+		'pol_design_traceability',
+		'pol_test_adequacy',
+		'pol_fitness_for_purpose'
+	];
+	/** The agent's PWA, its "Specify wordfreq" declaring the five. */
+	const FIVE_POLICY_TYPES: ObjectRow[] = AGENT_TYPES.map((t) =>
+		t.id === 'pwutype_specify' ? { id: t.id, state: { ...t.state, requiredAssurancePolicyIds: FIVE } } : t
+	);
+	const refusal = (error: string): ActionOutcome => ({
+		...answered('failure', `[{"error":1},"${error}"]`),
+		decoded: { error }
+	});
+
+	// ⛔ THE PREDICTED RED (J1): E12 counts a sign-off's worst case from §3.2's PWA by the unit's TITLE (`signOffWorstCase`),
+	// and no title of the agent's is one of §3.2's — so every half-B unit was counted at the fallback, four policies, and one
+	// that declares five was pressed past the limit.
+	it('⛔ J1 — an agent’s unit declaring FIVE policies is held back where four would have fit: its sign-off’s worst case is the store’s, 5 × 4', async () => {
+		const prior = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - FIVE.length * PER_POLICY + 1;
+		expect(
+			prior + PHASE7_NEGATIVE_CONTROL_RESERVE + 4 * PER_POLICY,
+			'arrangement: four policies’ worst case would fit'
+		).toBeLessThan(PHASE7_PAID_LIMIT);
+		const l = halfBLane({
+			paid: true,
+			prior,
+			types: FIVE_POLICY_TYPES,
+			signOffs: { 'specify-wordfreq': { ra: answered('success') } }
+		});
+		const record = await l.run();
+		expect(l.only('recordAssurance', 'offersRecordAssurance'), 'a sign-off was pressed past the limit').toEqual([
+			'offersRecordAssurance specify-wordfreq'
+		]);
+		expect(record.units[1]!.signOff?.limitCheck).toEqual({
+			prior,
+			recorded: 0,
+			reserve: PHASE7_NEGATIVE_CONTROL_RESERVE,
+			ahead: FIVE.length * PER_POLICY,
+			total: PHASE7_PAID_LIMIT + 1,
+			limit: PHASE7_PAID_LIMIT,
+			allowed: false
+		});
+		expect(record.end?.reason).toBe('paid-limit');
+	});
+
+	it('⭐ J1 — the store’s count is the kernel’s DECLARED set (`declaredAssurancePolicyIds`): the unit’s own policies and its type’s, each counted once', async () => {
+		const l = halfBLane({
+			paid: true,
+			units: AGENT_UNITS.map((u) =>
+				u.id === 'pwu_s' ? { ...u, policies: ['pol_requirement_coverage', 'pol_extra'] } : u
+			)
+		});
+		const record = await l.run();
+		// ⭑ Specify: its own two and its type's two share one — three. Every other unit's own are its type's — one each.
+		expect(record.units.map((u) => [u.slug, u.signOff?.limitCheck?.ahead])).toEqual([
+			['root', PER_POLICY],
+			['specify-wordfreq', 3 * PER_POLICY],
+			['build-wordfreq', PER_POLICY],
+			['verify-wordfreq-end-to-end', PER_POLICY]
+		]);
+	});
+
+	it('⭐ J2 — E12’s rule acts on half B’s units too (REG-D-112 (a)): a Record Assurance refused whose row offers re-running the declared reviews that did not conclude has them re-run ONCE — the limit read first, its worst case the store’s — and Mark Satisfied follows', async () => {
+		const l = halfBLane({
+			paid: true,
+			signOffs: {
+				'build-wordfreq': {
+					ra: refusal('pol_requirement_coverage did not conclude: the reviewer’s call failed'),
+					rerun: { offered: true, outcome: answered('success') }
+				}
+			}
+		});
+		const record = await l.run();
+		expect(l.calls.filter((c) => c.endsWith(' build-wordfreq'))).toEqual([
+			'beginExecute build-wordfreq',
+			'recordAssurance build-wordfreq',
+			'offersDeclaredRerun build-wordfreq',
+			'rerunDeclared build-wordfreq',
+			'markSatisfied build-wordfreq'
+		]);
+		const build = record.units.find((u) => u.slug === 'build-wordfreq')!.signOff!;
+		expect([build.rerunLimitCheck?.ahead, build.rerunLimitCheck?.allowed, build.rerunDeclared?.envelopeType, build.refused]).toEqual([
+			PER_POLICY,
+			true,
+			'success',
+			null
+		]);
+		expect(record.end?.reason).toBe('complete');
 	});
 });
 

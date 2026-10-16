@@ -616,11 +616,37 @@ export function limitCheckAhead(prior: number, recorded: number, ahead: number):
  * each re-run, and a sign-off — up to 16 calls for the design phase — was pressed with no check at all. ⚠ AN UPPER BOUND:
  * the server reviews those of the type's policies that govern the unit (`governingDeclaredPolicies`), and the rule's re-run
  * of the declared reviews only those that did not conclude — counted, before that re-run, at this same bound.
+ * ⭐⭐ The merge of E12 and E3 (J1) — OR THE POLICIES THE STORE SAYS THE UNIT DECLARES (`declaredInStore`), which the lane
+ * hands in for half B: its units are the agent's, so by title §3.2's PWA names none of them — or, should an agent's type
+ * share a §3.2 name, another — and each was counted at the fallback of four, short for a unit that declares more.
  */
-export function signOffWorstCase(unit: ArchiveUnit): number {
+export function signOffWorstCase(unit: ArchiveUnit, declaredInStore?: readonly string[]): number {
 	const declared =
-		PHASE7_PWA.types.find((t) => t.name === unit.title)?.policyIds.length ?? PHASE7_DECLARED_POLICIES_PER_UNIT;
+		declaredInStore?.length ??
+		PHASE7_PWA.types.find((t) => t.name === unit.title)?.policyIds.length ??
+		PHASE7_DECLARED_POLICIES_PER_UNIT;
 	return declared * LANE_BUDGET.reviewerCallsPerTry;
+}
+
+/** The strings of a stored list; nothing for anything else. */
+const stringsOf = (v: unknown): string[] =>
+	Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+
+/**
+ * ⭐⭐ The merge of E12 and E3 (J1) — THE POLICIES A UNIT DECLARES, AS THE STORE HOLDS THEM: its own `assurancePolicyIds` and
+ * its type's `requiredAssurancePolicyIds`, each counted once — the kernel's DECLARED half (`declaredAssurancePolicyIds`,
+ * rph-domain), restated because this module imports no package of the engine. ⚠ An upper bound of what its sign-off
+ * reviews: the server reviews those that also exist, are ACTIVE and admit the unit (`selectGoverningPolicies`).
+ */
+export function declaredPolicyIdsOf(snap: EngineSnapshot, unitId: string): readonly string[] {
+	const unit = snap.pwus.find((p) => p.id === unitId);
+	const type = snap.pwuTypes.find((t) => t.id === str(unit?.state.pwuTypeId));
+	return [
+		...new Set([
+			...stringsOf(unit?.state.assurancePolicyIds),
+			...stringsOf(type?.state.requiredAssurancePolicyIds)
+		])
+	];
 }
 
 /**
@@ -2261,9 +2287,16 @@ export async function runTheLane(r: {
 			refused: null,
 			notPressed: null
 		} as const;
-		/** ⭐ `E12F` F2 — the limit, read from the store now, with `unit`'s sign-off worst case counted (D8). */
-		const signOffLimit = async (unit: RunUnit): Promise<LimitCheck> =>
-			limitCheck(boot.prior as number, recordedReviewerCalls((await hands.read()).snapshot), signOffWorstCase(unit));
+		/**
+		 * ⭐ `E12F` F2 — the limit, read from the store now, with `unit`'s sign-off worst case counted (D8). ⭐ The merge of E12
+		 * and E3 (J1) — in half B that worst case is the policies the PUBLISHED PWA's units declare, read from the same store
+		 * (`declaredPolicyIdsOf`): the agent's units are no types of §3.2's PWA.
+		 */
+		const signOffLimit = async (unit: RunUnit): Promise<LimitCheck> => {
+			const { snapshot } = await hands.read();
+			const ahead = signOffWorstCase(unit, half === 'B' ? declaredPolicyIdsOf(snapshot, unit.unitId!) : undefined);
+			return limitCheck(boot.prior as number, recordedReviewerCalls(snapshot), ahead);
+		};
 		const overLimit = (check: LimitCheck): string =>
 			`the limit: ${check.total} of ${check.limit} reviewer calls, the sign-off's own ${check.ahead ?? 0} counted (D8; E12F F2)`;
 		/**
