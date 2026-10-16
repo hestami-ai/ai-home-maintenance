@@ -5,13 +5,15 @@
 // ⭑ WHAT IT ASKS, AND WHERE PI'S OWN ANSWER LIVES. Each option is Pi's (`@earendil-works/pi-coding-agent` 0.80.6,
 // `dist/core/resource-loader.js`, `DefaultResourceLoader.reload`): `noContextFiles` loads no `AGENTS.md` or `CLAUDE.md`;
 // `noExtensions`, `noSkills` and `noPromptTemplates` keep only the paths a caller names, and this one names none; and the
-// appended prompt is what `appendSystemPromptOverride` returns. ⛔ AND EVERY RESOURCE PI DECLARES IT CAN BE TOLD TO LEAVE
-// OUT IS LEFT OUT BUT ITS THEMES, which colour Pi's own screen and reach no instruction — read off the installed Pi's own
-// declaration of those options (`dist/core/resource-loader.d.ts`) with the TypeScript parser, so a kind of resource a Pi
-// upgrade adds reddens here until someone decides about it. ⛔ AND `pi-executor.ts` builds its loader from these options
-// alone — read as source, since importing it would load Pi. ⛔ AND THE ONE SETTINGS MANAGER IT MAKES TRUSTS NO PROJECT,
-// and its loader and its session both take that one (the check of E4's polish round, F1): Pi trusts a project's
-// `.pi/settings.json` by default, and a load installs the packages it lists, running the command it names.
+// appended prompt is what `appendSystemPromptOverride` returns. ⭐ "Names none" is held too (the check of E4's polish
+// round, F4): the options are exactly the nine this module sets, so a path, an override or an inline extension added
+// beside them — each of which Pi takes past the switches — reddens here. ⛔ AND EVERY RESOURCE PI DECLARES IT CAN BE TOLD
+// TO LEAVE OUT IS LEFT OUT BUT ITS THEMES, which colour Pi's own screen and reach no instruction — read off the installed
+// Pi's own declaration of those options (`dist/core/resource-loader.d.ts`) with the TypeScript parser, so a kind of
+// resource a Pi upgrade adds reddens here until someone decides about it. ⛔ AND `pi-executor.ts` builds its loader from
+// these options alone — read as source, since importing it would load Pi. ⛔ AND THE ONE SETTINGS MANAGER IT MAKES TRUSTS
+// NO PROJECT, and its loader and its session both take that one (the check of E4's polish round, F1): Pi trusts a
+// project's `.pi/settings.json` by default, and a load installs the packages it lists, running the command it names.
 // ⚠ PI-FREE: the coding agent is not loaded here — the gate's one test that loads any part of Pi is
 // `pi-execution-tools.test.ts`, its core loop alone. Pi's real loader and session were driven once, by hand, over a tree
 // holding one of each resource (the commit that made this file quotes what they took), and that is not repeated in the
@@ -112,6 +114,25 @@ describe('⭐ the executor’s resource loader (the lead’s delegated decision 
 			system?.('SYSTEM.md, as Pi found it') === EXECUTION_CONTRACT_PROMPT,
 			'the system prompt is the contract'
 		).toBe(true);
+	});
+
+	it('⛔ names nothing beside them — no path, override or inline extension: the options are exactly the nine it sets', () => {
+		// ⭑ Each switch keeps only what a caller names, so what the options NAME is the other half of what they leave out.
+		// In Pi's reload an extension path a caller names loads under `noExtensions`, and so does an inline extension
+		// (`extensionFactories`); a skill or prompt-template path merges in under `noSkills` and `noPromptTemplates`; and
+		// `agentsFilesOverride` applies after `noContextFiles` (`dist/core/resource-loader.js`, `reload`,
+		// `loadFinalExtensionSet`) — so one more key here could undo a switch above while the switch still reads true.
+		expect(Object.keys(OPTIONS).sort()).toEqual([
+			'agentDir',
+			'appendSystemPromptOverride',
+			'cwd',
+			'noContextFiles',
+			'noExtensions',
+			'noPromptTemplates',
+			'noSkills',
+			'settingsManager',
+			'systemPromptOverride'
+		]);
 	});
 
 	it('⛔ every resource the installed Pi declares it can be told to leave out is left out — but its themes, which reach no instruction', () => {
