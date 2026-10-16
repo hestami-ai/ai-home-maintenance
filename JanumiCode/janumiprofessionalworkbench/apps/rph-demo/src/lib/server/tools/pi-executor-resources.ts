@@ -36,7 +36,8 @@
 //     real loader with these options and a workspace whose settings listed a package and named a stand-in command:
 //     trusted, the command ran and saw a variable of the loading process's environment — under `PI_OFFLINE` too, where
 //     the agent folder listed a package Pi's folder did not hold; untrusted, the workspace's settings read as empty and
-//     no command ran, offline or not;
+//     no command ran, offline or not. ⭐ (R3-C) The live lanes' server sets `PI_OFFLINE` (`playwright.live-exec.config.ts`
+//     says what that changes), so there a missing package the agent folder's settings list is not fetched;
 //   · THE WORKING-DIRECTORY LINE names the server's folder, not the workspace: `pi-executor.ts` gives its session no
 //     folder (`SessionManager.inMemory()`), so the session takes `process.cwd()` (`dist/core/sdk.js`).
 // ⭐⭐ AND THE AUTHORING AGENT'S PI NOW TAKES THE SAME CLOSED OPTIONS (the lead's delegated decision of 2026-10-16, to be
