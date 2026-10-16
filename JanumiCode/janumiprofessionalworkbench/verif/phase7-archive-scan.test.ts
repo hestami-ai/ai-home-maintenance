@@ -29,10 +29,11 @@
 //     whose own runs have a share's ratio is a hit at every depth, and fails safe;
 //   · ⭐ (the lead's delegated decision of 2026-10-15, to be registered) the account name, and every path, after an escape
 //     at ANY depth of JSON escaping is a hit — the confirm of E4's second fix round found the account name missed after
-//     an escape two levels deep (`\\n`) — and a share in each spelling the old pattern caught, CommonMark's source spelling
-//     (a leading run of four, a separator of one) among them; ⚠ a drive whose first folder begins with an escape letter is
-//     a hit, and a letter and a colon before an escaped newline are spelled the same: the scan cannot tell the two apart,
-//     and keeps the drive.
+//     an escape two levels deep (`\\n`) — and a share in each spelling the old pattern caught ⭐ but a leading run of two
+//     with a separator of two, which is code's shape and no hit (three of its four; the check of E4's polish round, F3),
+//     CommonMark's source spelling (a leading run of four, a separator of one) among them; ⚠ a drive whose first folder
+//     begins with an escape letter is a hit, and a letter and a colon before an escaped newline are spelled the same: the
+//     scan cannot tell the two apart, and keeps the drive.
 //
 // No model is called, and nothing outside a temporary folder is read but the scan's own script, run by bun.
 import { spawnSync } from 'node:child_process';
@@ -472,7 +473,7 @@ describe('⭐ JAN-EXEC Phase 8 — a UNC share is a hit at EVERY depth of JSON e
 	});
 });
 
-describe('⭐ JAN-EXEC Phase 8 — the account name, and every path, after an escape at ANY depth of JSON escaping; a share in every spelling the old pattern caught (the lead’s delegated decision of 2026-10-15, to be registered; REG-F-536)', () => {
+describe('⭐ JAN-EXEC Phase 8 — the account name, and every path, after an escape at ANY depth of JSON escaping; a share in each spelling the old pattern caught but a leading run of two with a separator of two (the lead’s delegated decision of 2026-10-15, to be registered; REG-F-536)', () => {
 	const esc = String.fromCodePoint(27);
 	/** What may stand right before a token, each a character JSON escapes: a newline, a tab, a control character, a colour code. */
 	const BEFORE: readonly (readonly [string, string])[] = [
@@ -509,8 +510,10 @@ describe('⭐ JAN-EXEC Phase 8 — the account name, and every path, after an es
 				).toContain(kind);
 	});
 
-	it('⭐ a share in each spelling the old pattern caught is a hit at every depth — raw, escaped once, and CommonMark’s source spelling, a leading run of four and a separator of one', () => {
-		// ⭑ Each share by its runs, leading and separating — the label never spells a path (`REG-F-536`).
+	it('⭐ a share in each spelling the old pattern caught but a leading run of two with a separator of two is a hit at every depth — raw, escaped once, and CommonMark’s source spelling, a leading run of four and a separator of one', () => {
+		// ⭑ Each share by its runs, leading and separating — the label never spells a path (`REG-F-536`). ⚠ Three of the old
+		// pattern's four: its fourth, a leading run of two and a separator of two, is code's shape, and the escaped code
+		// above asserts it no hit (a source literal of escaped backslashes, at depth 0; `PATH_PATTERNS`).
 		for (const [lead, separator] of [
 			[2, 1],
 			[4, 2],

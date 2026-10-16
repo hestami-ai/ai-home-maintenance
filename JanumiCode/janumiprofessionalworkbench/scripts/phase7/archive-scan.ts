@@ -95,7 +95,8 @@ const token = (notAfter: string, body: string, flags = 'g'): RegExp =>
  * fixed). Each level of escaping doubles every backslash, so a share's leading run is TWICE its separator at every depth
  * — `\\host\share`, `\\\\host\\share`, `\\\\\\\\host\\\\share` — ⭐ or FOUR TIMES it, at every depth too, in CommonMark's
  * source spelling, where a backslash escapes a backslash and is literal before a letter (the lead's delegated decision of
- * 2026-10-15, to be registered: a share in each spelling the old pattern caught). And escaped code
+ * 2026-10-15, to be registered: a share in each spelling the old pattern caught — ⭐ but one, below: the check of E4's
+ * polish round, F3). And escaped code
  * whose runs are EQUAL keeps them equal at every depth: `/\r\n/` is a run of one before each letter, `\\r\\n` escaped
  * once, `\\\\r\\\\n` twice, as is a source literal of escaped backslashes (`"\\r\\n"`). So the pattern takes a run of 2n or
  * 4n backslashes, a host, and a run of exactly n (`(\\+)\1(?:\1\1)? … \1`).
