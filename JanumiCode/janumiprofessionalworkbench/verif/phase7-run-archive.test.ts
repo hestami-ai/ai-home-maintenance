@@ -623,7 +623,7 @@ describe('⭐ D7, K4 — what Pi loads from around the workspace (REG-F-512), as
 		});
 		expect(k4.pi).toEqual({ exists: true, listing: ['. (not listed: ENOTDIR)'] });
 		expect(k4.findings).toContain(
-			".pi: at the workspace root, where Pi reads settings and resolves the packages they list — and, by default, extensions and prompt files, which the executor's loader is told to leave out (pi-executor-resources.ts)"
+			".pi: at the workspace root, where Pi by default reads settings — resolving the packages they list, and installing a missing one — and loads extensions and prompt files; the executor's Pi takes none of these: its settings trust no project, and its loader is told to leave the rest out (pi-executor.ts, pi-executor-resources.ts)"
 		);
 	});
 

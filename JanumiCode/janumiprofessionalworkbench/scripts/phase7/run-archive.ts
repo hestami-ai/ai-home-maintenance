@@ -30,8 +30,9 @@
 //     `.agents/skills` up to the git root — beside a search of each try's recorded executor input for the blocks Pi
 //     writes when it loaded a file. ⭐ Since the E4 polish round the executor's loader is told to take none of them but
 //     the settings in `.pi/`, and the packages those list (`pi-executor-resources.ts`; the lead's delegated decision
-//     of 2026-10-15, to be registered): K4 reports them still, as the guard behind that, and its search shows whether
-//     any was taken;
+//     of 2026-10-15, to be registered) — ⭐ and since the fix of that round's check (its F1), not those either: the
+//     executor's settings trust no project (`pi-executor.ts`). K4 reports them still, as the guard behind that, and
+//     its search shows whether any was taken;
 //   · K5 (`REG-F-517`) — the capture folders a unit added, against its evidence, and every cause of a folder with none;
 //   · K9 (`REG-F-519`) — each try's parse outcome, its shortfall named by the product's own text;
 //   · the hashes — per file and per folder for `src/`, `test/` and `docs/`, and the whole tree as the manifest takes it;
@@ -814,7 +815,7 @@ export interface K4Check {
 		}[];
 	};
 	readonly workspaceRoot: { readonly exists: boolean; readonly contextFiles: readonly string[] };
-	/** The workspace's `.pi/`, where Pi reads settings and, by default, extensions and prompt files — listed whole. */
+	/** The workspace's `.pi/`, where Pi by default reads settings, extensions and prompt files — listed whole. */
 	readonly pi: { readonly exists: boolean; readonly listing: readonly string[] };
 	/**
 	 * `.agents/skills` in each folder from the workspace up to its git root, else to the drive root
@@ -910,7 +911,7 @@ export function k4Check(input: K4Input): K4Check {
 	// ⚠ Said of the place, not of what is there: a `.pi` that is a FILE is named too, its listing saying it is no folder.
 	if (pi.exists)
 		findings.push(
-			`${piEntry}: at the workspace root, where Pi reads settings and resolves the packages they list — and, by default, extensions and prompt files, which the executor's loader is told to leave out (pi-executor-resources.ts)`
+			`${piEntry}: at the workspace root, where Pi by default reads settings — resolving the packages they list, and installing a missing one — and loads extensions and prompt files; the executor's Pi takes none of these: its settings trust no project, and its loader is told to leave the rest out (pi-executor.ts, pi-executor-resources.ts)`
 		);
 	const chain = upFrom(input.workspace);
 	const gitAt = chain.findIndex((folder) => existsSync(join(folder, '.git')));

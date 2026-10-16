@@ -34,8 +34,9 @@
 //     `dist/core/resource-loader.js`, `dist/core/package-manager.js`). The server makes every phase's working folder
 //     inside this one, so under those defaults a file on this path would steer every phase unseen (`REG-F-512`). ⭐ Since
 //     the E4 polish round the executor's loader is told to take none of them but `.pi`'s settings, and the packages
-//     those list (`pi-executor-resources.ts`; the lead's delegated decision of 2026-10-15, to be registered), and this
-//     rule stands as the guard behind that.
+//     those list (`pi-executor-resources.ts`; the lead's delegated decision of 2026-10-15, to be registered) — ⭐ and
+//     since the fix of that round's check (its F1), not those either: the executor's settings trust no project
+//     (`pi-executor.ts`) — and this rule stands as the guard behind that.
 //
 // ⚠ NOTHING OF THE SERVER'S IS IMPORTED, for `lane-config.ts`'s reason: the runner loads this. What it reads of the host
 // comes through `RunFolderHost`, so `verif/phase7-run-folder.test.ts` drives every rule with no real folder in a refused
@@ -158,8 +159,8 @@ function runFolderRefusal(configured: string, problems: readonly string[]): stri
 			`${PI_CONTEXT_NAMES.join(', ')} in it or above it, and set it before Playwright starts (design §6 ` +
 			`P7-2 D2). By default Pi folds AGENTS.md and CLAUDE.md from its working folder and each folder above it into the ` +
 			`system prompt, reads .agents skills from each, and .pi from its working folder, which the server makes inside ` +
-			`the run folder; the executor's loader is told to leave them out but .pi's settings, and this rule is the guard ` +
-			`behind it. Pi keeps its own settings in a .pi folder in the home folder by default, so wherever that ` +
+			`the run folder; the executor's Pi is told to leave them all out, .pi's settings among them, and this rule is ` +
+			`the guard behind it. Pi keeps its own settings in a .pi folder in the home folder by default, so wherever that ` +
 			`folder exists, the run folder cannot be below the home folder. Unset ${LIVE_RUN_DIR_VARIABLE} to run the ` +
 			`one-unit lane instead.`
 	].join('\n');

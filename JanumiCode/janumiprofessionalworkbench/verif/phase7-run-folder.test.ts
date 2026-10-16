@@ -408,6 +408,11 @@ describe('⭐ P7-2 D2 — the run folder, checked in the runner’s load, every 
 			`${at('scratch', 'CLAUDE.md')} is on the path Pi reads its context from`
 		);
 		expect(thrown).toContain('(design §6 P7-2 D2)');
+		// ⭐ (the check of E4's polish round, F1) What the rule stands behind: the executor's Pi takes none of what it
+		// refuses, `.pi`'s settings among them, since its settings trust no project (`pi-executor.ts`).
+		expect(thrown).toContain(
+			"the executor's Pi is told to leave them all out, .pi's settings among them, and this rule is the guard behind it."
+		);
 	});
 
 	it('⭐ the worker’s load checks nothing — the server has made the store by then — where the runner’s, on the same folder, refuses', () => {
