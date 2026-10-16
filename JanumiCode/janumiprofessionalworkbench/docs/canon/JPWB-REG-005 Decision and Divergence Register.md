@@ -40433,6 +40433,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - The reviewer fingerprint does not move (the cases are not among its components) and stays `06b9d8e5fbca507ba4b2ae1d372251da8332ecbdbece0b652cd1fdcae1d16cb0`.
   - The companion cases of the delegated extension are being built now in v6.
 - **CORRECTION TO P4 ESCALATION RECORD.** P4's BOUNDEDNESS ESCALATION line (`runs.ndjson:784`) says the retry's `D-FP-CLEAN` rejection was *"escalated on its own line"*. No such line was written: once the case left the current set (v6), the check no longer judges it, so none is owed. The rejection stays in the record.
+- ⭑ **2026-10-16 — how the correction's absence was established.** `runs.ndjson`'s 20 ESCALATION lines were searched field by field: 0 have the retry run `qr-2026-10-16-devin-glm-5-3-flash-max-v5-retry` as their `runId`. Positive control: 1 names `D-FP-CLEAN` in its `caseIds`, the BOUNDEDNESS line of the full run (finding `REG-F-499`), so the search reads the field it counts.
 
 ### REG-F-562 — The clean declared case D-FP-CLEAN's record did not back its conferred SATISFIED oracle: 3 of 7 requirements demonstrated and no standard error captured, rejected by the reviewer in P4's retry
 
