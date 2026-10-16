@@ -155,7 +155,7 @@ export async function evaluateCase(args: {
 	readonly scoringDigest: string;
 	readonly now?: () => number;
 	/**
-	 * ⭐ R3-A F3 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — a declared policy's required
+	 * ⭐ R3-A F3 (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (13)) — a declared policy's required
 	 * evidence, by its id: what sets the ceiling a declared case is scored at (`evidenceCeiling`). Absent, the catalog's seed,
 	 * which the store's is copied from (`seedAdditivePolicies`) — a run's; the fingerprint hands its own declared seam's
 	 * (`fingerprint.ts`), so its declared corpus is scored at the ceilings it hashes.

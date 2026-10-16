@@ -504,7 +504,7 @@ export const PHASE7_SIGN_OFF_UNIT_MS =
 	PHASE7_DECLARED_RERUN_MS;
 
 // ── ⭐⭐ HALF B'S SIGN-OFF BOUNDS, FROM THE POLICIES A UNIT DECLARES AS THE STORE HOLDS THEM (the lead's delegated decision of
-// 2026-10-16, to be registered as REG-D-114) ─────────────────────────────────────────────────────────────────────────────
+// 2026-10-16, registered as REG-D-114 (15)) ─────────────────────────────────────────────────────────────────────────────
 // The four figures above are §3.2's: every unit bounded as one declaring four policies, the most any of its units declares
 // (`PHASE7_DECLARED_POLICIES_PER_UNIT`) — half A's, unchanged. Half B's units are the agent's, and one may declare more:
 // bounded as four, its Record Assurance could be abandoned with a review still inside its own bound. So for half B each of
@@ -771,7 +771,7 @@ export const PHASE7_AUTHORING_MS =
  * each of §3.2's four phases. ⚠ Its sign-off is bounded as one of four declared policies, §3.2's most
  * (`PHASE7_DECLARED_POLICIES_PER_UNIT`): ~~an agent's unit that declares more is bounded short~~ ⭐ half B's timeout
  * re-counts each unit's sign-off for the policies it declares (`phase7HalfBTestTimeoutMs`; the lead's delegated decision
- * of 2026-10-16, to be registered as REG-D-114).
+ * of 2026-10-16, registered as REG-D-114 (15)).
  */
 export const PHASE7_PER_PHASE_MS =
 	PHASE7_UNIT_RUN_MS +
@@ -789,7 +789,7 @@ export const NODE_TIMER_CEILING_MS = 2_147_483_647;
  * NODE'S TIMER CEILING, past which Playwright would time the test out at once: a PWA of ~~26~~ ⭐ 23 phases or more is
  * given the ceiling, about 596 hours, not its arithmetic. ⚠ Half B STARTS under half
  * A's timeout, which covers the authoring many times over, and the lane extends it here when the units are read.
- * ⭐⭐ ~~`phases`~~ `declared` (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — the policies each
+ * ⭐⭐ ~~`phases`~~ `declared` (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (15)) — the policies each
  * unit declares as the store holds them, one count per unit, the root first: its phases are the units after the root, and
  * EACH UNIT'S SIGN-OFF IS RE-COUNTED FOR ITS OWN POLICIES (`phase7SignOffUnitMs`) in place of §3.2's four
  * (`PHASE7_SIGN_OFF_UNIT_MS`), which half A's arithmetic counts once per unit. ⛔ A unit declaring five was counted as

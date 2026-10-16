@@ -16,7 +16,7 @@
 // project's `.pi/settings.json` by default, and a load installs a package it lists that is missing, by the command it
 // names.
 // ⭐⭐ AND THE AUTHORING AGENT'S LOADER IS THE SAME, CLOSED, WITH ITS OWN PROMPT (the lead's delegated decision of
-// 2026-10-16, to be registered as REG-D-114): `closedResourceLoaderOptions` keeps the prompt it is given as the system
+// 2026-10-16, registered as REG-D-114 (19)): `closedResourceLoaderOptions` keeps the prompt it is given as the system
 // prompt, with every switch the executor's options set, and `pi-agent.ts` — read as source, as `pi-executor.ts` is —
 // builds its loader from it with `this.systemPrompt`, and makes one settings manager trusting no project, which its
 // loader and its session both take.
@@ -320,7 +320,7 @@ describe('⭐ the executor’s resource loader (the lead’s delegated decision 
 	});
 });
 
-describe('⭐ the authoring agent’s resource loader (the lead’s delegated decision of 2026-10-16, to be registered as REG-D-114)', () => {
+describe('⭐ the authoring agent’s resource loader (the lead’s delegated decision of 2026-10-16, registered as REG-D-114 (19))', () => {
 	it('⭐ closedResourceLoaderOptions keeps the prompt it is given as the system prompt, appends nothing, and leaves out the context files, extensions, skills and prompt templates', () => {
 		const prompt = 'the authoring agent’s own system prompt';
 		const closed = closedResourceLoaderOptions({

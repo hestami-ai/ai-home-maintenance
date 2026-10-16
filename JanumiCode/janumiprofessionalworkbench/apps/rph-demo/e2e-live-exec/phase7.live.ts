@@ -79,7 +79,7 @@ import { STORE_FILE } from './run-folder';
 //      (`REG-F-535`). Before each phase, the LIMIT (D8): the calls spent before, those this store records, and four held
 //      for the negative control must total ~~under~~ ⭐ with the phase's ~~first call~~ ~~⭐ worst case, a model unit's (R3-B's
 //      fix round, F1)~~ ⭐ one try's reserve (`REG-D-114` (14), as amended 2026-10-16), AT MOST (the one rule, the lead's
-//      delegated decision of 2026-10-16, to be registered as REG-D-114) the sponsor's limit — ~~150~~ ~~200 (`REG-D-105`
+//      delegated decision of 2026-10-16, registered as REG-D-114 (14)) the sponsor's limit — ~~150~~ ~~200 (`REG-D-105`
 //      (1))~~ ⭐ 450 (`REG-D-110` (1)), `lane-config.ts`'s `PHASE7_PAID_LIMIT` — or the run ends `paid-limit`. Each press waits on its own
 //      response for up to one phase's allowance (D4); one with NO ANSWER — it outlasted that allowance, or its request
 //      failed in transit — ends the run there, `allowance-exceeded` or `request-failed`, the root's included, and
@@ -194,7 +194,7 @@ test.describe('LIVE — JAN-EXEC Phase 7: §3.2’s PWA, published, run as an Un
 					await page.getByRole('button', { name: 'overview', exact: true }).click({ timeout: PHASE7_UI_MS });
 				},
 				// ⭐ Waited for up to the bound the lane gives it, for the unit's declared policies (the lead's delegated decision of
-				// 2026-10-16, to be registered as REG-D-114).
+				// 2026-10-16, registered as REG-D-114 (15)).
 				recordAssurance: (unit, timeoutMs) =>
 					recordAssurance(page, unitRowById(page, unit.unitId!), actionFields, timeoutMs),
 				// ⭐ `E12F` F1 — the dry run's rehearsal: the row read, Record Assurance found and never pressed (`REG-D-112` (b)).

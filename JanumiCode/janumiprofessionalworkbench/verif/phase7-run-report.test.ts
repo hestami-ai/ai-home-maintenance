@@ -1779,7 +1779,7 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 		expect([said({ rootDeclared: 'legacy' }), said({ rootSignedOff: false })]).toEqual([false, false]);
 	});
 
-	// ── ⭐⭐ R3-A F2 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — A REPLAYED DECLARED VERDICT
+	// ── ⭐⭐ R3-A F2 (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (12)) — A REPLAYED DECLARED VERDICT
 	// carries a validator id of its own, as the floor's replayed review does: the report knows it, and never counts it as live.
 	it('⭐ R3-A F2 — a REPLAYED declared verdict is a declared verdict: stage 5b reads it as it reads a live one, and it is never listed among the assessments that asked no model', () => {
 		// ⛔ RED BEFORE R3-A: the report knew no replayed declared validator, so a replay's declared verdicts were no declared
@@ -2038,7 +2038,7 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 	// "ended: paid-limit" said the limit had acted at all.
 	/**
 	 * What the lane read of the limit before an act, as `limitCheck` records it (`phase7-operator.ts`) — ⭐ by the one rule (the
-	 * lead's delegated decision of 2026-10-16, to be registered as REG-D-114): what the act counts always recorded, and a total
+	 * lead's delegated decision of 2026-10-16, registered as REG-D-114 (14)): what the act counts always recorded, and a total
 	 * AT the limit let through. ~~`ahead` only when above 0; `allowed: total < limit`~~
 	 */
 	const read = (prior: number, recorded: number, ahead: number, limit = 230) => {
@@ -2069,7 +2069,7 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 			[
 				'design: lifecycle EXECUTING, assurance UNASSESSED, step SUCCEEDED',
 				`its sign-off was held back before Record Assurance: ${OVER}`,
-				// ⭐ ONE RULE (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — ~~not under it~~.
+				// ⭐ ONE RULE (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (14)) — ~~not under it~~.
 				'the limit as the lane read it: 210 + 4 + 4 + 16 ahead = 234 of 230, past it'
 			]
 		]);
@@ -2134,7 +2134,7 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 		expect(cellOf(r, '7', 'design').basis.slice(1), 'the hold of the declared re-run is said nowhere').toEqual([
 			'its sign-off was attempted and the unit is not SATISFIED',
 			`its sign-off was held back before the rule’s re-run of its declared reviews: ${rerunOver}`,
-			// ⭐ ONE RULE (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — ~~not under it~~.
+			// ⭐ ONE RULE (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (14)) — ~~not under it~~.
 			'the limit as the lane read it: 206 + 12 + 4 + 16 ahead = 238 of 230, past it'
 		]);
 	});
@@ -2172,7 +2172,7 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 		]);
 		const md = renderMarkdown(r);
 		expect(md).toContain("- **The lane's own reads of the limit, each before a paid act (design D8; E12F F2):** 6.");
-		// ⭐ ONE RULE (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — ~~not under it~~: past it.
+		// ⭐ ONE RULE (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (14)) — ~~not under it~~: past it.
 		expect(md).toContain('  - design, before its sign-off: 210 + 4 + 4 + 16 ahead = 234 of 230, past it: held back.');
 		expect(md).toContain('  - requirements, before its Begin & Execute: 200 + 0 + 4 = 204 of 230, under it.');
 	});
@@ -2195,12 +2195,12 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 		expect(md).toContain('  - root, before its Begin & Execute: 196 + 10 + 4 + 20 ahead = 230 of 230, at it, which this act may reach.');
 		expect(md).toContain('  - requirements, before its Begin & Execute: 215 + 10 + 4 = 229 of 230, under it.');
 		// ~~⭑ `limitCheck`'s rule: the same total held back — never "at it", which says the act may reach the limit.~~ ⭐ ONE RULE
-		// (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114): a lane now lets every act reach the limit,
+		// (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (14)): a lane now lets every act reach the limit,
 		// so the same total held back is a record made before the one rule — "at it", never one the act may reach.
 		expect(md).toContain('  - design, before its Begin & Execute: 216 + 10 + 4 = 230 of 230, at it: held back.');
 	});
 
-	it('⛔ ONE RULE (the lead’s delegated decision of 2026-10-16, to be registered as REG-D-114) — the words follow it: a read PAST the limit reads “past it”', () => {
+	it('⛔ ONE RULE (the lead’s delegated decision of 2026-10-16, registered as REG-D-114 (14)) — the words follow it: a read PAST the limit reads “past it”', () => {
 		// ⛔ PREDICTED RED, read from the code: the words were the old rule's, a total UNDER the limit or not — a read past the
 		// limit "not under it".
 		const run = aRun({}, { run: { end: { reason: 'paid-limit' } } });

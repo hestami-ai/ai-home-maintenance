@@ -982,7 +982,7 @@ describe('⭐ C5 — the candidate checks’ findings stand beside what each uni
 		expect(whole.declaredVerdicts.expected).toBe(5);
 	});
 
-	// ⛔ R3-B F3 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — THE COUNT IS THE KERNEL'S DECLARED
+	// ⛔ R3-B F3 (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (16)) — THE COUNT IS THE KERNEL'S DECLARED
 	// SET (`declaredAssurancePolicyIds`, rph-domain): a unit's own policies and its type's, each once — the set the sign-off
 	// reviews from, and the lane's limit counts (J1).
 	/** The report of a complete half-B run whose units' OWN policies are `policies`, by unit id; the type's copy elsewhere. */
@@ -1112,7 +1112,7 @@ describe('⭐ C3 — the authoring allowance, folded into the timeout', () => {
 				PHASE7_INTROSPECT_MS -
 				PHASE7_SIGN_OFF_UNIT_MS
 		).toBe(PHASE7_MODEL_UNITS * PHASE7_PER_PHASE_MS);
-		// ⭐ R3-B F2 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — ~~a phase count~~: each unit's
+		// ⭐ R3-B F2 (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (15)) — ~~a phase count~~: each unit's
 		// declared policies, the root's first. With every unit declaring §3.2's most, four, the arithmetic is half A's re-counted.
 		const units = (phases: number): number[] => Array.from({ length: phases + 1 }, () => 4);
 		expect(phase7HalfBTestTimeoutMs(units(4))).toBe(PHASE7_TEST_TIMEOUT_MS + PHASE7_AUTHORING_MS);
@@ -2042,7 +2042,7 @@ describe('⭐⭐ The merge of E12 and E3 (J1, J2) — half B’s sign-offs count
 		expect(record.end?.reason).toBe('complete');
 	});
 
-	// ── ⛔ R3-B F2 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — HALF B'S SIGN-OFF TIME BOUNDS
+	// ── ⛔ R3-B F2 (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (15)) — HALF B'S SIGN-OFF TIME BOUNDS
 	// COME FROM THE UNIT'S DECLARED POLICIES AS THE STORE HOLDS THEM (`declaredPolicyIdsOf`), as J1's limit does: Record
 	// Assurance's, the rule's re-run of the declared reviews, and the test's timeout. Half A's stay §3.2's.
 	/** One declared review at its bound: its call, retry and repair, each `reviewerCallMs` — 960 s. */

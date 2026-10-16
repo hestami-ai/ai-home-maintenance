@@ -677,7 +677,7 @@ ${RERUN_DECLARED_REVIEWS_CITATION}`);
 // TRANSFORMATION completes with none. So the root of a three-level tree had its declared reviews asked over no work product
 // and no command — a paid review per policy, each verdict recorded over work no reviewer was shown.
 //
-// ⭐⭐ R3-A F1 — `REG-D-111` (2)'S GENERAL FORM (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114):
+// ⭐⭐ R3-A F1 — `REG-D-111` (2)'S GENERAL FORM (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (11)):
 // ~~refused when no CHILD's work holds anything~~ — a unit composed of others is judged over the work its WHOLE SUBTREE
 // produced: its own work product and commands where it produced any (a MODEL composite), then every unit below it, each
 // under the title of the unit that made it. It is refused as having nothing to judge only when neither it nor any unit below

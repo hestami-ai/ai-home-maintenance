@@ -45,7 +45,7 @@ import {
 /** The validator id a model-judged declared review is recorded under — never `agy.reasoning-review`, a FLOOR validator. */
 export const DECLARED_REVIEW_VALIDATOR_ID = 'reviewer.declared-policy';
 /**
- * ⭐ R3-A F2 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — the id a REPLAYED declared review
+ * ⭐ R3-A F2 (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (12)) — the id a REPLAYED declared review
  * is recorded under: never the live reviewer's, since no reviewer ran — as the floor's replayed review is recorded under
  * `replay.reasoning-review` (`assurance/index.ts`, `REPLAY_REVIEWER_ID`).
  */

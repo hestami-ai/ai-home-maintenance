@@ -8,7 +8,7 @@
 // change to the scoring. ~~⚠ E12's polish — OF THE FLOOR'S ARMS ONLY: every entry is the work-product case below, so a
 // DECLARED case's score — the declared sign-off's verdict (`runner.ts` `scoreDeclared`), at the ceiling its policy's seeded
 // evidence sets — is reached by no entry, and a change confined to it moves no scoring digest.~~ ⭐ R3-A F3 (the lead's
-// delegated decision of 2026-10-16, to be registered as REG-D-114): AND OF THE DECLARED ARM — the declared corpus below
+// delegated decision of 2026-10-16, registered as REG-D-114 (13)): AND OF THE DECLARED ARM — the declared corpus below
 // (`declaredScoringCorpus`), each entry a work unit's work judged against one catalog policy, so a change to how a declared
 // case is scored — `declaredVerdict`, `evidenceCeiling`, the declared seam's reading of a review — moves the digest where an
 // entry stands on it.
@@ -239,7 +239,7 @@ export function scoringCorpus(criteria: readonly AssessmentCriterion[]): readonl
 	];
 }
 
-// ── ⭐⭐ R3-A F3 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — THE DECLARED CORPUS ──────────────
+// ── ⭐⭐ R3-A F3 (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (13)) — THE DECLARED CORPUS ──────────────
 // ⛔ E12's polish scored a declared case as the declared sign-off records its verdict (`runner.ts` `scoreDeclared`), and no
 // entry above was a declared case: a change to that scoring moved no scoring digest, and the reviewer fingerprint with it.
 // Each entry here is one work unit's work judged against ONE catalog policy as the fingerprint's declared seam holds it — its

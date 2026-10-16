@@ -293,7 +293,7 @@ describe('⛔ the spec, from source: Playwright’s own `test`, its own timeout,
 			expect(callsTo(sf, act), act).toEqual([
 				['page', 'unitRowById(page, unit.unitId!)', 'actionFields']
 			]);
-		// ⭐ R3-B F2 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — and Record Assurance waited for
+		// ⭐ R3-B F2 (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (15)) — and Record Assurance waited for
 		// up to the bound the lane hands the spec, never one the spec chooses.
 		expect(callsTo(sf, 'recordAssurance'), 'recordAssurance').toEqual([
 			['page', 'unitRowById(page, unit.unitId!)', 'actionFields', 'timeoutMs']
@@ -386,7 +386,7 @@ describe('⛔ D4 — the operator bounds every Begin & Execute by one phase’s 
 			// ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (design B8) — ~~'PHASE7_SIGN_OFF_MS'~~: Record Assurance runs the unit's
 			// declared reviews now, so it is waited for up to its act and those reviews (~~`PHASE7_RECORD_ASSURANCE_MS`~~ ⭐ the
 			// bound the lane gives it, `timeoutMs`, for the unit's declared policies — R3-B F2; the lead's delegated decision of
-			// 2026-10-16, to be registered as REG-D-114).
+			// 2026-10-16, registered as REG-D-114 (15)).
 			['recordAssurance', "'recordAssurance'", 'timeoutMs'],
 			// ⭐ `E12F` F3 — the rule's re-run of the declared reviews that did not conclude: bounded as Record Assurance is, its
 			// act and a review of each declared policy.
@@ -697,7 +697,7 @@ describe('⭐ D5 — the sign-off acts on the page: the row waited for, Mark Sat
 		expect(r.asked).toEqual([{ action: 'markSatisfied', timeout: PHASE7_SIGN_OFF_MS }]);
 	});
 
-	it('⛔ R3-B F2 (the lead’s delegated decision of 2026-10-16, to be registered as REG-D-114) — Record Assurance and the rule’s re-run of the declared reviews are each waited for up to the bound it is given', async () => {
+	it('⛔ R3-B F2 (the lead’s delegated decision of 2026-10-16, registered as REG-D-114 (15)) — Record Assurance and the rule’s re-run of the declared reviews are each waited for up to the bound it is given', async () => {
 		// ⛔ PREDICTED RED, read from the code: both presses waited `PHASE7_RECORD_ASSURANCE_MS`, §3.2's four policies' reviews,
 		// whatever the unit declared — so a unit of half B's declaring five could be abandoned at 4,140 s with its fifth review
 		// still inside its own bound.
@@ -1211,7 +1211,7 @@ describe('⭐ D8 — the limit, and D5 — what the run records of each unit', (
 	// ⭑ `REG-D-108` — THE ARITHMETIC IS READ AGAINST THE LIMIT, NOT A COPY OF IT. These cases pinned 200 and went red when the
 	// sponsor raised the limit to 230; what they hold is the boundary (one under starts, the limit does not), which a
 	// typed number only restates. The limit's VALUE is pinned once, against the register (`live-exec-lane-config.test.ts`).
-	// ⭐⭐ ONE RULE (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — ~~prior + recorded + the reserve
+	// ⭐⭐ ONE RULE (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (14)) — ~~prior + recorded + the reserve
 	// must total UNDER the sponsor's limit: one under it starts a phase, the limit does not~~: prior + recorded + the reserve +
 	// what the act counts must total AT MOST the limit. ~~Before a phase the act counts its first call, so a phase starts with
 	// exactly that call left — the same phases as before — and the record says so.~~ ~~⭐ R3-B's fix round (F1): before a phase
@@ -2642,7 +2642,7 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		expect(held.end?.reason).toBe('paid-limit');
 	});
 
-	it('⭐ R3-B F2 (the lead’s delegated decision of 2026-10-16, to be registered as REG-D-114) — half A’s sign-off presses are each given §3.2’s bound, four policies’ reviews: its values do not change', async () => {
+	it('⭐ R3-B F2 (the lead’s delegated decision of 2026-10-16, registered as REG-D-114 (15)) — half A’s sign-off presses are each given §3.2’s bound, four policies’ reviews: its values do not change', async () => {
 		// ⛔ PREDICTED RED, read from the code: the lane gave its sign-off hands no bound at all — the press chose its own, the
 		// same for every unit of either half (`PHASE7_RECORD_ASSURANCE_MS`).
 		const l = laneOf({

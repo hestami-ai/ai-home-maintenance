@@ -1310,7 +1310,7 @@ interface DeclaredReviewWork {
 /**
  * ⭐⭐ E2 — THE WORK A UNIT'S DECLARED POLICIES ARE JUDGED OVER (`R18`; design B1, B6). A unit with no children is judged over
  * its own work. ~~A unit with children is judged over ITS CHILDREN's work products and commands~~ ⭐⭐ R3-A F1 (`REG-D-111`
- * (2)'s general form; the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — A UNIT COMPOSED OF
+ * (2)'s general form; the lead's delegated decision of 2026-10-16, registered as REG-D-114 (11)) — A UNIT COMPOSED OF
  * OTHERS IS JUDGED OVER THE WORK ITS WHOLE SUBTREE PRODUCED: its own work product and commands, where it produced any (a
  * MODEL composite), then each unit below it, depth first, each unit's children in the order the store lists them — every
  * work product and command under the title of the unit that made it, the end-to-end phase's evidence among them (DEC-6).

@@ -85,7 +85,7 @@ export const DEMO_FINDING_CODE = 'DEMO_UNFIT';
  *  `DEMO_REVIEW_VALIDATOR_ID`): a record made before the declared policies were judged carries it, and reads vacuous. */
 export const DECLARED_SIGNOFF_VALIDATOR = 'workbench.independent-review';
 /**
- * ⭐ R3-A F2 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — the id a REPLAYED declared verdict
+ * ⭐ R3-A F2 (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (12)) — the id a REPLAYED declared verdict
  * is recorded under (`declared-policy-review.ts` `REPLAY_DECLARED_REVIEW_VALIDATOR_ID`), as the floor's replayed review has one
  * of its own: a declared verdict, and never one the model reviewer made in the run the report reads.
  */
@@ -191,7 +191,7 @@ export function uncheckedCaveat(declared: readonly { readonly criterionResults: 
 /**
  * ⭐ E12's polish (fix2's F10; the lead's delegated decision of 2026-10-15, to be registered) — THE UNIT_PURPOSE FRAMING, STATED
  * PER RUN. A unit composed of others (the root) has its declared policies judged over ~~its children's work~~ ⭐ R3-A F1 (the
- * lead's delegated decision of 2026-10-16, to be registered as REG-D-114): the work it and every unit below it produced, its
+ * lead's delegated decision of 2026-10-16, registered as REG-D-114 (11)): the work it and every unit below it produced, its
  * reviewer given the unit's own purpose (`UNIT_PURPOSE`; the route's `declaredReviewWorkOf`), and no reviewer-qualification
  * case measures that framing: every declared case of case set v5 is in the PRODUCING_PROMPT framing
  * (`scripts/reviewer-qual/materialize.ts`). So the line names each such unit and the reviews the model reviewer made of it,
@@ -464,7 +464,7 @@ export interface ReviewerCalls extends ReviewerCallCount {
 		readonly limit: number;
 		/**
 		 * Whether the total is BELOW the limit — a fact, kept as it was. ⚠ Not the one rule's verdict (the lead's delegated
-		 * decision of 2026-10-16, to be registered as REG-D-114), under which a run may reach the limit: report.md words the
+		 * decision of 2026-10-16, registered as REG-D-114 (14)), under which a run may reach the limit: report.md words the
 		 * total by it (`runStanding`).
 		 */
 		readonly under: boolean | null;
@@ -927,7 +927,7 @@ interface LaneUnit {
  * (`allowed`) or held it back. ⛔ The merge's fix round, F2 — ~~BY ONE OF TWO RULES (`phase7-operator.ts`): `limitCheck`, before a
  * phase, a re-run of one, a sign-off or a re-run of its declared reviews, lets an act through only with the total UNDER the
  * limit; `limitCheckAhead`, before half B's Send and before half B's root's press, lets it through AT the limit too.~~
- * ⭐ ONE RULE since (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114): every check lets an act
+ * ⭐ ONE RULE since (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (14)): every check lets an act
  * through with its total AT MOST the limit, what it counts of the act always recorded (`ahead`: ~~a phase's and a re-run's
  * first call~~ ~~⭐ R3-B's fix round, F1: the act's worst case, a phase's and a re-run's too~~ ⭐ `REG-D-114` (14), as amended
  * 2026-10-16: one try's reserve before a phase, a re-run of its work or of its review, and a MODEL root's press; an act's
@@ -2420,7 +2420,7 @@ function standingOf(c: LaneLimitCheck): string {
 
 /**
  * ⭐ WHERE THE RUN'S OWN TOTAL STANDS, as `standingOf` words a read, by the one rule (the lead's delegated decision of
- * 2026-10-16, to be registered as REG-D-114): a run may reach the limit, and never pass it. ⛔ ~~", NOT under it"~~: a total
+ * 2026-10-16, registered as REG-D-114 (14)): a run may reach the limit, and never pass it. ⛔ ~~", NOT under it"~~: a total
  * equal to the limit read as though it had passed it.
  */
 function runStanding(total: number, limit: number): string {
@@ -2511,7 +2511,7 @@ function childrenOf(ix: Index, u: Unit, units: readonly Unit[]): string[] {
 const modelRanFor = (u: Unit): boolean => u.tries.some((t) => str(t.state.disposition) === 'ACCEPTED');
 
 /**
- * ⭐ R3-B F3 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — THE POLICIES A UNIT DECLARES, by the
+ * ⭐ R3-B F3 (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (16)) — THE POLICIES A UNIT DECLARES, by the
  * kernel's own reading (`declaredAssurancePolicyIds`, rph-domain): its `assurancePolicyIds` and its type's
  * `requiredAssurancePolicyIds`, each once — the set the lane counts a sign-off's limit by (`declaredPolicyIdsOf`). ⛔ The
  * unit's own list alone left out a policy only its type requires, and counted a repeat twice. ⚠ An upper bound of the
@@ -3619,7 +3619,7 @@ export function buildRunReport(
 		reviewerCalls: buildReviewerCalls(ix, units, lane),
 		audit: buildAudit(ix, units, undertakingId, lane),
 		// ⭐ E3 — half B's declared verdicts are the agent's policies: each unit's, as instantiation copied them from its type.
-		// ⭐ R3-B F3 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — ~~each unit's own list~~: THE
+		// ⭐ R3-B F3 (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (16)) — ~~each unit's own list~~: THE
 		// KERNEL'S DECLARED SET of each unit (`declaredPoliciesOf`), the set the lane counts its limit by (J1).
 		declaredVerdicts: {
 			expected:

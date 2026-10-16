@@ -5,7 +5,7 @@
 // It maps our Pi-agnostic tool descriptors onto Pi `defineTool`s and Pi's event stream onto our normalized
 // AuthoringAgentEvent stream. The agent runs with the built-in coding tools
 // DISABLED (noTools: "builtin") — it can ONLY touch the workbench through our authoring tools. ⭐ And, since the lead's
-// delegated decision of 2026-10-16 (to be registered as REG-D-114), with no extension's tools beside them: until then an
+// delegated decision of 2026-10-16 (registered as REG-D-114 (19)), with no extension's tools beside them: until then an
 // extension Pi found around the server's folder or in its agent folder offered its own (`run`, at the loader).
 import {
 	AuthStorage,

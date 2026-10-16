@@ -70,7 +70,7 @@ export function closedResourceLoaderOptions(o: {
 		settingsManager: o.settingsManager,
 		systemPromptOverride: () => o.systemPrompt,
 		// ⭐ Each below was Pi's default until the lead's delegated decision of 2026-10-15, to be registered — and the
-		// authoring agent's until the lead's delegated decision of 2026-10-16 (to be registered as REG-D-114).
+		// authoring agent's until the lead's delegated decision of 2026-10-16 (registered as REG-D-114 (19)).
 		appendSystemPromptOverride: () => [],
 		noContextFiles: true,
 		noExtensions: true,
