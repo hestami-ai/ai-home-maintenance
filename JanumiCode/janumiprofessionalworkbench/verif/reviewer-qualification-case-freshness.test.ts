@@ -148,8 +148,10 @@ describe('JAN-EXEC Phase 7 completion E2 — reviewer-qualification case set v5:
 	});
 });
 
-// ⭐⭐ `JAN-EXEC` Phase 7 completion, round 5 — version six (`REG-D-115`): version five, D-FP-CLEAN repaired as D6-FP-CLEAN.
-describe('JAN-EXEC Phase 7 completion round 5 — reviewer-qualification case set v6: version five, D-FP-CLEAN repaired as D6-FP-CLEAN (REG-D-115)', () => {
+// ⭐⭐ `JAN-EXEC` Phase 7 completion, round 5 — version six (`REG-D-115`): version five, ~~D-FP-CLEAN repaired as D6-FP-CLEAN~~
+// ⭐ four cases repaired, each under a new id: D-FP-CLEAN as D6-FP-CLEAN (the sponsor's ruling), and D-FP-03, D-RC-CLEAN and
+// D-RC-04 as D6-FP-03, D6-RC-CLEAN and D6-RC-04 (its delegated extension).
+describe('JAN-EXEC Phase 7 completion round 5 — reviewer-qualification case set v6: version five, ~~D-FP-CLEAN repaired as D6-FP-CLEAN~~ four cases repaired, D6-RC-CLEAN, D6-RC-04, D6-FP-CLEAN and D6-FP-03 (REG-D-115 and its delegated extension)', () => {
 	it('⛔ the committed case set v6 and oracles v6 are exactly what the generator writes — never hand-edited', () => {
 		const cases = read(CASE_SET_V6_FILE);
 		const oracles = read(ORACLES_V6_FILE);

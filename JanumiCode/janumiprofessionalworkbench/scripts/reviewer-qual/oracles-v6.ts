@@ -21,12 +21,15 @@ import { ORACLES_V5 } from './oracles-v5.js';
 const REPAIRED_NOTE: Readonly<Record<RepairedInV6, string>> = {
 	'D-RC-CLEAN':
 		'Seven requirements cover each outcome the request names — the top-N output, --top, case-insensitivity, ties — and ' +
-		'both failure paths (an unreadable file exits 2, a bad argument 1); each names its source, and what the request does ' +
-		'not state is named a derived decision with its basis — R7 whole, and "positive integer" in R2 and R6, "printed in ' +
-		'lower case" in R3, "prints nothing" in R5 and "a usage message" in R6; R2 and R6 agree on a `--top` that is not a ' +
-		'positive integer; two exclusions are recorded; the word definition is declared an assumption. Version six repairs ' +
+		'both failure paths (an unreadable file exits 2, a bad argument — any invocation the usage line does not allow — 1); ' +
+		'R1 states the request’s constraints (a Node.js command-line tool, its usage line, a UTF-8 text file); each names ' +
+		'its source, and what the request does not state is named a derived decision with its basis — R7 whole, and ' +
+		'"positive integer" in R2 and R6, "printed in lower case" in R3, "prints nothing" in R5 and R6, and in R6 what makes ' +
+		'an argument bad and "a usage message" on standard error; R2 and R6 agree on a `--top` that is not a positive ' +
+		'integer; two exclusions are recorded; the word definition is declared an assumption. Version six repairs ' +
 		'D-RC-CLEAN (REG-D-115’s delegated extension), whose sources gave the request those parts, which it does not state ' +
-		'(RC-05), and whose R2 read as if `--top 0` meant 10.',
+		'(RC-05), whose R2 read as if `--top 0` meant 10, and whose requirements stated no constraint of the request (RC-03) ' +
+		'and two bad arguments only (RC-04).',
 	'D-RC-04':
 		'The two failure paths are dropped (no requirement for an unreadable file or a bad argument; the derived empty-file ' +
 		'requirement kept, renumbered R5), and the account says the failure paths are covered (RC-04). The author’s claim: a ' +
@@ -34,16 +37,18 @@ const REPAIRED_NOTE: Readonly<Record<RepairedInV6, string>> = {
 		'D-RC-04 (REG-D-115’s delegated extension) with its clean twin: the requirements it keeps are D6-RC-CLEAN’s, their ' +
 		'sources and wording repaired, so its plant is all that sets it apart.',
 	'D-FP-CLEAN':
-		'Six runs of the built CLI, each recorded by the host with its exit code, show R1–R7 as the requirements case states ' +
+		'Seven runs of the built CLI, each recorded by the host with its exit code, show R1–R7 as the requirements case states ' +
 		'them: the top two and the default top ten of the sample, whose whole text the work product states, mixed-case words ' +
-		'counted together, equal counts in alphabetical order, the empty file, the missing file exiting 2 with its message on ' +
-		'standard error recorded, and two bad arguments exiting 1 with a usage message on standard error; the verdict and the ' +
-		'account claim what the runs show, the limitations name what was not run (very large files; a file that exists but ' +
-		'cannot be read) and the residual uncertainty what was not tried (non-Latin text). Version six repairs D-FP-CLEAN ' +
+		'counted together, equal counts in alphabetical order, an accented word read whole from a UTF-8 file, the empty ' +
+		'file, the missing file exiting 2 with its message on standard error recorded, and two bad arguments exiting 1 with a ' +
+		'usage message on standard error; the verdict and the account claim what the runs show, the limitations name what ' +
+		'was not run (very large files; a file that exists but cannot be read; the bad arguments beyond the two run) and the ' +
+		'residual uncertainty what was not tried (non-Latin text). Version six repairs D-FP-CLEAN ' +
 		'(REG-D-115), whose two runs showed R1, R2 and R5’s exit code alone while its verdict said each run matched its ' +
 		'requirement.',
 	'D-FP-03':
-		'The CLI printed LETTER counts of the sample whose text the record states (`16 t`, `14 a` for `--top 2`), not words, ' +
+		'The CLI printed LETTER counts of the sample whose text the record states (`16 t`, `14 a` for `--top 2`), and of its ' +
+		'accented file (`6 é`, `3 t`), not words, ' +
 		'while every run exited as its requirements state; the account reads the exit statuses and the shape of the lines as ' +
 		'the product serving its user (FP-03). The author’s claim: a reviewer could file it under FP-01 (an actor cannot ' +
 		'achieve the critical outcome) or FP-04 (technical correctness obscuring product failure) instead. Version six ' +

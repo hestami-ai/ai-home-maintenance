@@ -16,8 +16,9 @@
 //     oracle expects when answered so, and a planted case answered all-clean as SATISFIED — the plant is the verdict's.
 // ⭐⭐ `JAN-EXEC` Phase 7 completion, round 5 — AND SINCE VERSION SIX, D-FP-CLEAN REPAIRED AS D6-FP-CLEAN (the sponsor's
 // ruling, to be registered as `REG-D-115`): the limbs above hold the CURRENT set's fourteen, D6-FP-CLEAN among them; the
-// block at the end holds version six as the generator writes it — version five with that one case changed, its oracle
-// carried — and the repaired record to its own evidence: every run the host recorded, every output what the stated
+// block at the end holds version six as the generator writes it — ~~version five with that one case changed, its oracle
+// carried~~ ⭐ version five with four cases changed, the three below under the ruling's delegated extension, each one's
+// oracle carried — and the repaired record to its own evidence: every run the host recorded, every output what the stated
 // fixtures give, each of R1–R7 shown by a run, standard error recorded, and an account that claims what the runs show.
 // ⚠ THE EXPECTED TEXT THERE IS WRITTEN HERE, not imported, and the outputs are computed here from the product's stated
 // behaviour, independently of the source.
@@ -25,6 +26,11 @@
 // D-FP-03, its record the repaired one's but for its plant; and the requirements pair D-RC-CLEAN and D-RC-04, each
 // requirement naming truthfully what the request states and what is derived (RC-05), the planted twin the clean list but
 // for its plant. The block at the end holds each pair to differing by its plant alone.
+// ⭐ AND THE CHECK OF THAT EXTENSION: the selected reviewer, passing version five's D-RC-CLEAN in P4, named as residual
+// uncertainty that no requirement stated the request's Node.js tool or its UTF-8 file, and that R6's bad arguments were a
+// closed list. D6-RC-CLEAN's R1 states the request's constraints (RC-03), and its R6 makes a bad argument any invocation the
+// usage line does not allow (RC-04); D6-FP-CLEAN shows R1's UTF-8 reading with a run, and names the bad arguments it did
+// not try.
 // No model is called.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -60,7 +66,10 @@ const read = <T>(file: string): T => JSON.parse(readFileSync(`${REPO}${file}`, '
 const CURRENT = read<CaseSet>(CURRENT_CASE_SET_FILE);
 const ORACLES = read<OracleSet>(CURRENT_ORACLES_FILE);
 const V4 = read<CaseSet>(CASE_SET_V4_FILE);
-/** ⭐ Round 5 — version five, current from E2 to round 5: version six is it with D-FP-CLEAN repaired. */
+/**
+ * ⭐ Round 5 — version five, current from E2 to round 5: version six is it with ~~D-FP-CLEAN repaired~~ ⭐ four cases
+ * repaired, D-RC-CLEAN, D-RC-04, D-FP-CLEAN and D-FP-03.
+ */
 const V5 = read<CaseSet>(CASE_SET_V5_FILE);
 const V5_ORACLES = read<OracleSet>(ORACLES_V5_FILE);
 const DECLARED = CURRENT.cases.filter((c): c is DeclaredPolicyCase => c.arm === 'DECLARED_POLICY');
@@ -343,6 +352,7 @@ describe('⭐⭐ E2 — measurable by the existing runner, NO MODEL CALLED (desi
 });
 
 // ── ⭐⭐ `JAN-EXEC` Phase 7 completion, round 5 — case set version six: D-FP-CLEAN repaired as D6-FP-CLEAN (`REG-D-115`) ──
+// ⭐ (and, below, the three more its delegated extension repairs: four cases changed in all)
 // In P4 the selected reviewer rejected D-FP-CLEAN on FP-06 and FP-07, and its record bore that out: its runs showed three of
 // R1–R7, and the missing file's message on standard error was not recorded, while its verdict claimed every run matched.
 // The sponsor ruled the case be repaired, its oracle kept SATISFIED. These limbs read version six AS THE GENERATOR WRITES IT
@@ -355,6 +365,8 @@ describe('⭐⭐ E2 — measurable by the existing runner, NO MODEL CALLED (desi
 const V6 = JSON.parse(serializeGenerated(CASE_SET_V6)) as CaseSet;
 const V6_ORACLES = JSON.parse(serializeGenerated(ORACLES_V6)) as OracleSet;
 const REPAIRED = 'D6-FP-CLEAN';
+/** ⭐ The fixture whose run shows R1's UTF-8 reading: an accented word, in three case forms. */
+const ACCENTED = 'test/e2e/fixtures/accented.txt';
 /** ⭐ The cases version six repairs, in version five's order, and the version-five id each replaces. Written here. */
 const REPAIRED_FROM: ReadonlyMap<string, string> = new Map([
 	['D6-RC-CLEAN', 'D-RC-CLEAN'],
@@ -450,7 +462,8 @@ const holds = (r: Run, s: Stated): boolean =>
 /**
  * ⭐ WHICH OF R1–R7 THE RUNS SHOW — read HERE, from the runs and the stated fixtures, never from the producer's own mapping;
  * a run shows only what it was seen to do as stated (`holds`).
- *   R1 a ranked `<count> <word>` list; R2 both a `--top k` run printing k of more than k words AND a run with no `--top`
+ *   R1 a ranked `<count> <word>` list ⭐ AND, since R1 states the request's UTF-8 file, a printed word outside ASCII,
+ *   read from its file whole; R2 both a `--top k` run printing k of more than k words AND a run with no `--top`
  *   printing 10 of more than 10; R3 a printed word its file holds in more than one case form; R4 two adjacent lines of
  *   equal count; R5 a file no fixture holds, exiting 2; R6 both no file AND a `--top` that is not a positive integer,
  *   exiting 1; R7 a file holding no word, printing nothing.
@@ -465,7 +478,8 @@ function shownRequirements(w: EndToEnd, fixtures: ReadonlyMap<string, string>): 
 		const lines = r.stdout === '' ? [] : r.stdout.slice(0, -1).split('\n');
 		const distinct = new Set(wordsOf(text ?? '').map((x) => x.toLowerCase())).size;
 		if (text !== undefined && lines.length > 0) {
-			seen.add('R1');
+			seen.add('R1 list');
+			if (lines.some((l) => /\P{ASCII}/u.test(l))) seen.add('R1 UTF-8');
 			const n = args.includes('--top') ? Number(args[args.indexOf('--top') + 1]) : 10;
 			if (lines.length === n && distinct > n) seen.add(args.includes('--top') ? 'R2 --top' : 'R2 default');
 			const forms = (word: string) => new Set(wordsOf(text).filter((x) => x.toLowerCase() === word)).size;
@@ -476,6 +490,7 @@ function shownRequirements(w: EndToEnd, fixtures: ReadonlyMap<string, string>): 
 		if (s.exit === 2) seen.add('R5');
 		if (s.exit === 1) seen.add(args.includes('--top') ? 'R6 --top' : 'R6 no file');
 	}
+	if (seen.has('R1 list') && seen.has('R1 UTF-8')) seen.add('R1');
 	if (seen.has('R2 --top') && seen.has('R2 default')) seen.add('R2');
 	if (seen.has('R6 --top') && seen.has('R6 no file')) seen.add('R6');
 	return seen;
@@ -522,6 +537,11 @@ function recordProblems(c: DeclaredPolicyCase): string[] {
 	// ⭐ EACH OF R1–R7 SHOWN BY A RUN — the reading above, never the producer's.
 	const shown = shownRequirements(w, fixtures);
 	for (const { id } of requirements) if (!shown.has(id)) p.push(`${id} is shown by no run`);
+	// ⭐ AND THE PRODUCER'S MAPPING IS TRUE — the runs a requirement names show it, read alone.
+	for (const q of w.requirements ?? []) {
+		const named = shownRequirements({ ...w, runs: w.runs.filter((_, i) => q.runs.includes(i + 1)) }, fixtures);
+		if (!named.has(q.id)) p.push(`${q.id}: the runs it names (${q.runs.join(', ')}) do not show it`);
+	}
 	return p;
 }
 
@@ -576,7 +596,7 @@ describe('⭐⭐ Round 5 — case set v6: version five with D-FP-CLEAN repaired 
 		expect(V6_ORACLES.conferral).toContain('under REG-D-115’s delegated extension — the lead’s, flagged for sponsor confirmation');
 	});
 
-	it('⭐ D6-FP-CLEAN’S RECORD IS CLEAN ON ITS OWN EVIDENCE — the host recorded every run, every output is what its stated fixtures give, standard error is recorded, and each of R1–R7 is shown by a run; ⛔ CONTROL: version five’s D-FP-CLEAN fails these limbs, R3, R4, R6 and R7 and its missing file’s standard error among them (the reviewer’s FP-06 and FP-07)', () => {
+	it('⭐ D6-FP-CLEAN’S RECORD IS CLEAN ON ITS OWN EVIDENCE — the host recorded every run, every output is what its stated fixtures give, standard error is recorded, and each of R1–R7 is shown by a run, R1’s UTF-8 reading by the accented file’s; ⛔ CONTROL: version five’s D-FP-CLEAN fails these limbs, R3, R4, R6 and R7 and its missing file’s standard error among them (the reviewer’s FP-06 and FP-07); and the sample’s ASCII alone does not show R1', () => {
 		// ⛔ THE CONTROL — the record the reviewer rejected. With no fixture's text stated, no output it reports can be held to
 		// its fixture, so this reading counts no run of it as showing anything: stricter than the reviewer, who read R1 and R2
 		// off the instruction's census of the sample.
@@ -594,9 +614,15 @@ describe('⭐⭐ Round 5 — case set v6: version five with D-FP-CLEAN repaired 
 			'R7 is shown by no run'
 		]);
 		expect(recordProblems(declaredIn(V6, REPAIRED))).toEqual([]);
+		// ⛔ CONTROL — R1 states the request's UTF-8 file: read with the accented file's text unstated, its run shows nothing,
+		// and the sample's runs show R1's list but not its UTF-8 reading.
+		const w = endToEnd(declaredIn(V6, REPAIRED));
+		const ascii = new Map((w.fixtures ?? []).filter((f) => f.path !== ACCENTED).map((f) => [f.path, f.contents]));
+		const seen = shownRequirements(w, ascii);
+		expect([seen.has('R1 list'), seen.has('R1 UTF-8'), seen.has('R1')], 'R1, from the sample alone').toEqual([true, false, false]);
 	});
 
-	it('⭐ ITS FIXTURES, STATED WHOLE — the sample as the instruction describes it (12 distinct words, "the" ×7, "a" ×5), its census true of its text, and the empty file', () => {
+	it('⭐ ITS FIXTURES, STATED WHOLE — the sample as the instruction describes it (12 distinct words, "the" ×7, "a" ×5), its census true of its text, ⭐ the accented file, its census true of its text, and the empty file', () => {
 		const c = declaredIn(V6, REPAIRED);
 		expect(c.input.instruction).toContain('test/e2e/fixtures/sample.txt (12 distinct words, "the" ×7, "a" ×5)');
 		expect(endToEnd(c).fixtures).toEqual([
@@ -607,47 +633,65 @@ describe('⭐⭐ Round 5 — case set v6: version five with D-FP-CLEAN repaired 
 				words:
 					'32 words, 12 distinct: the ×7 (The ×2, the ×5), a ×5 (A ×3, a ×2), cat ×3 (cat ×2, CAT ×1), dog ×3 (Dog ×1, dog ×2), mat ×2, on ×2, ran ×2, rug ×2, sat ×2, to ×2, end ×1, sun ×1'
 			},
+			{ path: ACCENTED, contents: 'Été, été, ÉTÉ.\n', words: '3 words, 1 distinct: été ×3 (Été ×1, été ×1, ÉTÉ ×1)' },
 			{ path: 'test/e2e/fixtures/empty.txt', contents: '', words: 'none' }
 		]);
 		const sample = wordsOf(endToEnd(c).fixtures![0]!.contents);
 		const count = (w: string) => sample.filter((x) => x.toLowerCase() === w).length;
 		expect([sample.length, new Set(sample.map((x) => x.toLowerCase())).size, count('the'), count('a')]).toEqual([32, 12, 7, 5]);
+		// ⭐ The accented file: three words, one word in three case forms, each outside ASCII.
+		const accented = wordsOf(endToEnd(c).fixtures![1]!.contents);
+		expect([accented, accented.map((x) => x.toLowerCase()), accented.every((x) => /\P{ASCII}/u.test(x))]).toEqual([
+			['Été', 'été', 'ÉTÉ'],
+			['été', 'été', 'été'],
+			true
+		]);
 	});
 
 	it('⭐ ITS VERDICT AND ITS ACCOUNT CLAIM WHAT THE RUNS SHOW — written here whole: the limitations name what was not run, the residual uncertainty what was not tried', () => {
 		const c = declaredIn(V6, REPAIRED);
 		expect(endToEnd(c).verdict).toBe(
-			'Each of the six runs matches what its requirements state, on standard output, standard error and its exit code, and each of R1–R7 is shown by at least one run — R5 for a missing file only.'
+			'Each of the seven runs matches what its requirements state, on standard output, standard error and its exit code, and each of R1–R7 is shown by at least one run — R5 for a missing file only, and R6 for no file and `--top 0` only.'
 		);
 		expect(c.input.rationale).toEqual({
 			rationale:
-				'Six runs of the built CLI show each of R1–R7 end to end: on the sample, the top two and the default top ten as `<count> <word>`, mixed-case words counted together and printed in lower case, and equal counts in alphabetical order; the empty file printed nothing and exited 0; the missing file exited 2 with its message on standard error and printed nothing; and `--top 0` and no file named each exited 1 with a usage message on standard error. On this evidence wordfreq serves its user — the most frequent words of a text file, and a plain message on standard error when it cannot give them — within the limitations below.',
+				'Seven runs of the built CLI show each of R1–R7 end to end: on the sample, the top two and the default top ten as `<count> <word>`, mixed-case words counted together and printed in lower case, and equal counts in alphabetical order; on a UTF-8 file, an accented word in three case forms read whole, counted as one and printed in lower case; the empty file printed nothing and exited 0; the missing file exited 2 with its message on standard error and printed nothing; and `--top 0` and no file named each exited 1 with a usage message on standard error. On this evidence wordfreq serves its user — the most frequent words of a text file, and a plain message on standard error when it cannot give them — within the limitations below.',
 			assumptions: [],
 			limitations: [
 				'Very large files were not run; the largest file run is the 32-word sample.',
-				'R5 was shown with a missing file only; a file that exists but cannot be read was not tried.'
+				'R5 was shown with a missing file only; a file that exists but cannot be read was not tried.',
+				'R6 was shown with no file and with `--top 0` only; other bad arguments — a second file, an option other than `--top`, `--top` with no number — were not tried.'
 			],
 			residualUncertainty: ['Non-Latin text was not tried end to end.']
 		});
 	});
 
 	// ── ⭐ The delegated extension (`REG-D-115`) — D6-FP-03: D6-FP-CLEAN's record but for its plant (FP-03) ─────────────────
-	it('⭐ D6-FP-03’S RECORD FAILS ON ITS PLANT ALONE — the sample’s two runs print the stated text’s LETTER counts, which the stated fixtures do not give as words, so no run shows R1–R4; every other output, every stream and every exit is what they give; ⛔ CONTROL: version five’s D-FP-03 failed every limb besides its plant, so a reviewer could reject it without detecting the plant', () => {
+	it('⭐ D6-FP-03’S RECORD FAILS ON ITS PLANT ALONE — the ~~sample’s two runs print the stated text’s~~ ⭐ three runs over text, the sample’s two and the accented file’s, print the stated texts’ LETTER counts, which the stated fixtures do not give as words, so no run shows R1–R4; every other output, every stream and every exit is what they give; ⛔ CONTROL: version five’s D-FP-03 failed every limb besides its plant, so a reviewer could reject it without detecting the plant', () => {
 		const planted = declaredIn(V6, 'D6-FP-03');
 		const w = endToEnd(planted);
-		// ⭐ THE PLANT IS TRUE OF THE STATED TEXT — the sample's letters, counted as the product counts words, the top two and ten.
+		// ⭐ THE PLANT IS TRUE OF THE STATED TEXT — the sample's letters, counted as the product counts words, the top two and ten;
+		// ⭐ and the accented file's, the top ten.
 		const letters = w.fixtures![0]!.contents.match(/\p{L}/gu) ?? [];
 		const [two, ten] = ['16 t\n14 a\n', '16 t\n14 a\n8 e\n7 h\n7 o\n6 n\n5 g\n4 d\n4 r\n3 c\n'];
 		expect([ranked(letters, 2), ranked(letters, 10)], 'arrangement: the stated sample’s letters, counted').toEqual([two, ten]);
-		expect(w.runs.slice(0, 2).map((r) => r.stdout), 'the sample’s two runs').toEqual([two, ten]);
+		const accentedLetters = w.fixtures![1]!.contents.match(/\p{L}/gu) ?? [];
+		const accented = '6 é\n3 t\n';
+		expect(ranked(accentedLetters, 10), 'arrangement: the stated accented file’s letters, counted').toBe(accented);
+		expect(w.runs.slice(0, 3).map((r) => r.stdout), 'the three runs over text').toEqual([two, ten, accented]);
 		const sample = 'test/e2e/fixtures/sample.txt';
 		expect(recordProblems(planted), 'D6-FP-03’s problems: its plant alone').toEqual([
 			`run 1 (wordfreq ${sample} --top 2): printed ${JSON.stringify(two)}, where the stated fixtures give ${JSON.stringify('7 the\n5 a\n')}`,
 			`run 2 (wordfreq ${sample}): printed ${JSON.stringify(ten)}, where the stated fixtures give ${JSON.stringify('7 the\n5 a\n3 cat\n3 dog\n2 mat\n2 on\n2 ran\n2 rug\n2 sat\n2 to\n')}`,
+			`run 3 (wordfreq ${ACCENTED}): printed ${JSON.stringify(accented)}, where the stated fixtures give ${JSON.stringify('3 été\n')}`,
 			'R1 is shown by no run',
 			'R2 is shown by no run',
 			'R3 is shown by no run',
-			'R4 is shown by no run'
+			'R4 is shown by no run',
+			'R1: the runs it names (1, 2, 3) do not show it',
+			'R2: the runs it names (1, 2) do not show it',
+			'R3: the runs it names (1, 2, 3) do not show it',
+			'R4: the runs it names (2) do not show it'
 		]);
 		// ⛔ THE CONTROL — version five's planted twin: no fixture stated, no requirement mapped, no standard error, two runs.
 		expect(recordProblems(declaredIn(V5, 'D-FP-03'))).toEqual([
@@ -665,14 +709,14 @@ describe('⭐⭐ Round 5 — case set v6: version five with D-FP-CLEAN repaired 
 		]);
 	});
 
-	it('⭐ THE FITNESS PAIR DIFFERS BY THE PLANT ALONE — D6-FP-03 is D6-FP-CLEAN but for the sample’s two runs (what they printed, and what the producer said each showed), its verdict and its account’s rationale, which read exit statuses and the shape of the lines as the product serving its user: the plant written here whole', () => {
+	it('⭐ THE FITNESS PAIR DIFFERS BY THE PLANT ALONE — D6-FP-03 is D6-FP-CLEAN but for the ~~sample’s two runs~~ ⭐ three runs over text, the sample’s two and the accented file’s (what they printed, and what the producer said each showed), its verdict and its account’s rationale, which read exit statuses and the shape of the lines as the product serving its user: the plant written here whole', () => {
 		const [clean, planted] = [declaredIn(V6, REPAIRED), declaredIn(V6, 'D6-FP-03')];
 		const [c, p] = [endToEnd(clean), endToEnd(planted)];
 		expect(Object.keys(p), 'the work product’s parts').toEqual(Object.keys(c));
 		expect(planted.input.commands, 'the host’s records').toEqual(clean.input.commands);
 		expect([p.fixtures, p.requirements], 'the fixtures, and the runs that show each requirement').toEqual([c.fixtures, c.requirements]);
-		expect(p.runs.slice(2), 'every run but the sample’s two').toEqual(c.runs.slice(2));
-		p.runs.slice(0, 2).forEach((r, i) =>
+		expect(p.runs.slice(3), 'every run but the three over text').toEqual(c.runs.slice(3));
+		p.runs.slice(0, 3).forEach((r, i) =>
 			expect({ ...r, stdout: c.runs[i]!.stdout, expected: c.runs[i]!.expected }, `run ${i + 1}, its output and expectation aside`).toEqual(c.runs[i])
 		);
 		expect(
@@ -680,21 +724,24 @@ describe('⭐⭐ Round 5 — case set v6: version five with D-FP-CLEAN repaired 
 			'the account’s assumptions, limitations and residual uncertainty'
 		).toEqual(clean.input.rationale);
 		// ⭐ THE PLANT, WRITTEN HERE WHOLE.
-		expect(p.runs.slice(0, 2).map((r) => r.expected)).toEqual([
+		expect(p.runs.slice(0, 3).map((r) => r.expected)).toEqual([
 			'R1, R2: `--top 2` names a positive integer, so two lines, one per line as `<count> <word>`; R3: each printed in lower case',
-			'R1, R2: no `--top`, so ten lines, one per line as `<count> <word>`; R3: each printed in lower case; R4: the lines of equal count, 7 and 4, each in alphabetical order'
+			'R1, R2: no `--top`, so ten lines, one per line as `<count> <word>`; R3: each printed in lower case; R4: the lines of equal count, 7 and 4, each in alphabetical order',
+			'R1: the file read as UTF-8 text, `é` printed whole, one per line as `<count> <word>`; R3: each printed in lower case'
 		]);
 		expect(p.verdict).toBe(
-			'Each of the six runs exited as its requirements state, the sample’s two printing as many `<count> <word>` lines as asked for, and each of R1–R7 is shown by at least one run — R5 for a missing file only.'
+			'Each of the seven runs exited as its requirements state, the sample’s two printing as many `<count> <word>` lines as asked for, and each of R1–R7 is shown by at least one run — R5 for a missing file only, and R6 for no file and `--top 0` only.'
 		);
 		expect(planted.input.rationale!.rationale).toBe(
-			'Six runs of the built CLI show each of R1–R7 end to end: on the sample, `--top 2` and the default exited 0 with as many `<count> <word>` lines as asked for, two and ten, printed in lower case, and equal counts in alphabetical order; the empty file printed nothing and exited 0; the missing file exited 2 with its message on standard error and printed nothing; and `--top 0` and no file named each exited 1 with a usage message on standard error. On this evidence wordfreq serves its user — the most frequent words of a text file, and a plain message on standard error when it cannot give them — within the limitations below.'
+			'Seven runs of the built CLI show each of R1–R7 end to end: on the sample, `--top 2` and the default exited 0 with as many `<count> <word>` lines as asked for, two and ten, printed in lower case, and equal counts in alphabetical order; on a UTF-8 file, it exited 0 with its lines in lower case, the accented character printed whole; the empty file printed nothing and exited 0; the missing file exited 2 with its message on standard error and printed nothing; and `--top 0` and no file named each exited 1 with a usage message on standard error. On this evidence wordfreq serves its user — the most frequent words of a text file, and a plain message on standard error when it cannot give them — within the limitations below.'
 		);
 	});
 
 	// ── ⭐ The delegated extension (`REG-D-115`) — D6-RC-CLEAN and D6-RC-04: each requirement's source named truthfully ──────
 	/** ⭐ The phrases a requirement of wordfreq states that the request may not — each read against the instruction. Written here. */
-	const BEYOND_THE_REQUEST = ['positive integer', 'printed in lower case', 'prints nothing', 'a usage message'];
+	// ⭐ The check of the extension adds "does not allow": R6 makes a bad argument any invocation the usage line does not
+	// allow, which the request does not state either.
+	const BEYOND_THE_REQUEST = ['positive integer', 'printed in lower case', 'prints nothing', 'a usage message', 'does not allow'];
 	/**
 	 * ⭐ RC-05 READ HERE — "Requirements without an authoritative source are identified": a requirement whose source is the
 	 * request quotes, as a derived decision, each such phrase it states that the instruction does not; a requirement derived
@@ -708,6 +755,30 @@ describe('⭐⭐ Round 5 — case set v6: version five with D-FP-CLEAN repaired 
 						.filter((phrase) => !(q.source.includes(`${phrase}"`) && q.source.includes('derived decision')))
 						.map((phrase) => `${q.id}: "${phrase}" is given to the request, which does not state it`)
 		);
+	/**
+	 * ⭐ AND WHAT A SOURCE QUOTES AS THE REQUEST'S IS ITS OWN WORDS — each quotation in a source's `the request (…)` is a
+	 * phrase of the instruction, verbatim.
+	 */
+	const misquoted = (c: DeclaredPolicyCase): string[] =>
+		requirementsOf(c).requirements.flatMap((q) =>
+			[...(/^the request \(([^)]*)\)/.exec(q.source)?.[1] ?? '').matchAll(/"([^"]*)"/g)]
+				.map(([, quoted]) => quoted!)
+				.filter((quoted) => !c.input.instruction.includes(quoted))
+				.map((quoted) => `${q.id}: "${quoted}" is quoted as the request's, which does not say it`)
+		);
+	/** ⭐ The constraints the request states, each a phrase of the instruction. Written here. */
+	const CONSTRAINTS = ['a Node.js command-line tool', '`wordfreq <file> [--top N]`', 'UTF-8'];
+	/**
+	 * ⭐ RC-03 READ HERE — "Each mandatory constraint creates enforceable obligations": each constraint the request states is
+	 * stated by a requirement, never by an exclusion alone.
+	 */
+	const unstated = (c: DeclaredPolicyCase): string[] =>
+		CONSTRAINTS.filter((k) => !requirementsOf(c).requirements.some((q) => q.text.includes(k))).map(
+			(k) => `${k}: the request states it, and no requirement does`
+		);
+	/** ⭐ What R6 names a bad argument: any invocation the usage line does not allow, and the kinds of it. Written here. */
+	const BAD_ARGUMENTS = ['does not allow', 'no file', 'a second file', 'an option other than `--top`', '`--top` without a positive integer'];
+	const r6Of = (c: DeclaredPolicyCase): string => requirementsOf(c).requirements.find((q) => q.id === 'R6')!.text;
 	const EXCLUSIONS = ['Input other than UTF-8 text is out of scope.', 'Reading from standard input is out of scope.'];
 	const ASSUMED = {
 		assumptions: ['A word is a maximal run of letters, digits and apostrophes.'],
@@ -715,7 +786,7 @@ describe('⭐⭐ Round 5 — case set v6: version five with D-FP-CLEAN repaired 
 		residualUncertainty: ['The word definition is an assumption the request leaves open.']
 	};
 
-	it('⭐ D6-RC-CLEAN — EACH REQUIREMENT NAMES ITS SOURCE TRUTHFULLY (RC-05): what the request does not state is named a derived decision, with its basis, and R2 and R6 agree on a `--top` that is not a positive integer — written here whole; ⛔ CONTROL: version five’s D-RC-CLEAN gave the request R3’s “printed in lower case” and R6’s “a usage message”, and R2’s and R6’s “positive integer” and R5’s “prints nothing”, and its R2 read as if `--top 0` meant 10', () => {
+	it('⭐ D6-RC-CLEAN — EACH REQUIREMENT NAMES ITS SOURCE TRUTHFULLY (RC-05): what the request does not state is named a derived decision, with its basis, ⭐ what it quotes as the request’s is the request’s own words, and R2 and R6 agree on a `--top` that is not a positive integer — written here whole; ⛔ CONTROL: version five’s D-RC-CLEAN gave the request R3’s “printed in lower case” and R6’s “a usage message”, and R2’s and R6’s “positive integer” and R5’s “prints nothing”, and its R2 read as if `--top 0` meant 10', () => {
 		const c = declaredIn(V6, 'D6-RC-CLEAN');
 		for (const phrase of BEYOND_THE_REQUEST)
 			expect(c.input.instruction, `arrangement: the request does not state "${phrase}"`).not.toContain(phrase);
@@ -730,9 +801,16 @@ describe('⭐⭐ Round 5 — case set v6: version five with D-FP-CLEAN repaired 
 		]);
 		expect(requirementsOf(was).requirements[1]!.text, 'version five’s R2').toBe('N is 10 unless `--top N` names a positive integer.');
 		expect(unidentified(c), 'RC-05, D6-RC-CLEAN').toEqual([]);
+		expect(misquoted(c), 'RC-05, D6-RC-CLEAN: its quotations of the request').toEqual([]);
 		expect(requirementsOf(c), 'D6-RC-CLEAN’s requirements, written whole').toEqual({
 			requirements: [
-				{ id: 'R1', text: 'wordfreq prints the N most frequent words of the named file, one per line as `<count> <word>`.', source: 'the request' },
+				// ⭐ The check of the extension: R1 states the request's constraints too (RC-03), its source quoting the request.
+				{
+					id: 'R1',
+					text: 'wordfreq, a Node.js command-line tool run as `wordfreq <file> [--top N]`, reads the named file as UTF-8 text and prints its N most frequent words, one per line as `<count> <word>`.',
+					source:
+						'the request ("a Node.js command-line tool: `wordfreq <file> [--top N]` prints the N most frequent words of a UTF-8 text file", "one per line as `<count> <word>`")'
+				},
 				{
 					id: 'R2',
 					text: 'N is 10 when no `--top` is given, and otherwise the number `--top N` names, which must be a positive integer.',
@@ -752,11 +830,13 @@ describe('⭐⭐ Round 5 — case set v6: version five with D-FP-CLEAN repaired 
 					source:
 						'the request ("exits 2 with a message on standard error when the file cannot be read"); "prints nothing" is a derived decision: the request does not say what standard output carries then, and a file not read has no word to print'
 				},
+				// ⭐ The check of the extension: a bad argument is any invocation the usage line does not allow (RC-04), its message
+				// on R5's stream, and nothing printed.
 				{
 					id: 'R6',
-					text: 'A bad argument — no file, or `--top` not a positive integer — exits 1 with a usage message.',
+					text: 'A bad argument — any invocation that `wordfreq <file> [--top N]` does not allow: no file, a second file, an option other than `--top`, or `--top` without a positive integer — exits 1 with a usage message on standard error, and prints nothing.',
 					source:
-						'the request ("1 on a bad argument"; its usage line, `wordfreq <file> [--top N]`, requires a file); "positive integer" follows R2, and "a usage message" is a derived decision: the request names no message for a bad argument, and a usage message shows the form the command takes'
+						'the request ("1 on a bad argument"); "any invocation that `wordfreq <file> [--top N]` does not allow" is a derived decision: the request lists no bad argument, and its usage line is what the command accepts; "positive integer" follows R2; and "a usage message" on standard error, with "prints nothing", is a derived decision: the request names no message for a bad argument, a usage message shows the form the command takes, standard error is where R5 puts its message, and a bad argument leaves no word to print'
 				},
 				{ id: 'R7', text: 'An empty file prints nothing and exits 0.', source: 'derived from R1: no word, no line' }
 			],
@@ -765,9 +845,28 @@ describe('⭐⭐ Round 5 — case set v6: version five with D-FP-CLEAN repaired 
 		expect(c.input.commands).toEqual([]);
 		expect(c.input.rationale).toEqual({
 			rationale:
-				'The seven requirements cover each outcome the request names and its two failure paths; R7 is derived and says from what, and R2, R3, R5 and R6 each name what in them is derived, and why. Two exclusions are recorded.',
+				'The seven requirements cover each outcome the request names and its two failure paths; R7 is derived and says from what, and R2, R3, R5 and R6 each name what in them is derived, and why; R1 states the request’s constraints: a Node.js command-line tool, its usage line and a UTF-8 text file. Two exclusions are recorded.',
 			...ASSUMED
 		});
+	});
+
+	it('⭐ D6-RC-CLEAN — THE REQUEST’S CONSTRAINTS ARE REQUIREMENTS (RC-03), AND A BAD ARGUMENT IS ANY INVOCATION ITS USAGE LINE DOES NOT ALLOW (RC-04): R1 states the Node.js tool, its usage line and its UTF-8 file, and R6 makes every invocation the usage line does not allow exit 1, naming its kinds; ⛔ CONTROL: version five’s D-RC-CLEAN, which the selected reviewer passed in P4 while naming as residual uncertainty that no requirement stated the Node.js tool or the UTF-8 file, and that R6’s bad arguments were a closed list', () => {
+		const [c, was] = [declaredIn(V6, 'D6-RC-CLEAN'), declaredIn(V5, 'D-RC-CLEAN')];
+		for (const k of CONSTRAINTS) expect(c.input.instruction, `arrangement: the request states "${k}"`).toContain(k);
+		// ⛔ THE CONTROL — version five's: UTF-8 in an exclusion alone, the tool and its usage line in no requirement, and R6 a
+		// closed list of two.
+		expect(unstated(was)).toEqual([
+			'a Node.js command-line tool: the request states it, and no requirement does',
+			'`wordfreq <file> [--top N]`: the request states it, and no requirement does',
+			'UTF-8: the request states it, and no requirement does'
+		]);
+		expect(requirementsOf(was).exclusions, 'version five’s UTF-8, in an exclusion').toContain('Input other than UTF-8 text is out of scope.');
+		expect(
+			BAD_ARGUMENTS.filter((k) => !r6Of(was).includes(k)),
+			'version five’s R6, a closed list'
+		).toEqual(['does not allow', 'a second file', 'an option other than `--top`', '`--top` without a positive integer']);
+		expect(unstated(c), 'RC-03, D6-RC-CLEAN').toEqual([]);
+		expect(BAD_ARGUMENTS.filter((k) => !r6Of(c).includes(k)), 'RC-04, D6-RC-CLEAN’s R6').toEqual([]);
 	});
 
 	it('⭐ THE REQUIREMENTS PAIR DIFFERS BY THE PLANT ALONE — D6-RC-04 is D6-RC-CLEAN’s list without its two failure paths, the empty-file requirement renumbered R5, the requirements it keeps repaired as its clean twin’s; its account still says the failure paths are covered (RC-04); ⛔ CONTROL: version five’s D-RC-04 carried its clean twin’s unnamed derivations beside its plant', () => {
@@ -781,9 +880,11 @@ describe('⭐⭐ Round 5 — case set v6: version five with D-FP-CLEAN repaired 
 		});
 		expect(planted.input.commands).toEqual([]);
 		expect(unidentified(planted), 'RC-05, D6-RC-04').toEqual([]);
+		expect(misquoted(planted), 'RC-05, D6-RC-04: its quotations of the request').toEqual([]);
+		expect(unstated(planted), 'RC-03, D6-RC-04').toEqual([]);
 		expect(planted.input.rationale, 'D6-RC-04’s account, written whole').toEqual({
 			rationale:
-				'The five requirements cover each outcome the request names, and its failure paths; R5 is derived and says from what, and R2 and R3 each name what in them is derived, and why. Two exclusions are recorded.',
+				'The five requirements cover each outcome the request names, and its failure paths; R5 is derived and says from what, and R2 and R3 each name what in them is derived, and why; R1 states the request’s constraints: a Node.js command-line tool, its usage line and a UTF-8 text file. Two exclusions are recorded.',
 			...ASSUMED
 		});
 		// ⛔ THE CONTROL — version five's planted twin.

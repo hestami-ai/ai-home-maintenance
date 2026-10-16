@@ -1436,7 +1436,8 @@ describe('JAN-EXEC Phase 7 completion E2 — under case set v5, a run of v4 owes
 // ── ⭐⭐ `JAN-EXEC` Phase 7 completion, round 5 — case set version six (`REG-D-115`), current since round 5 ─────────────
 // In P4 the selected reviewer rejected the clean case D-FP-CLEAN once, on a retry of a transport failure, for flaws the
 // case's own record shows; the sponsor ruled the case be repaired and its oracle kept SATISFIED. Version six is version five
-// with that one case repaired, under a new id. These limbs hold the check over P4's record shape to it.
+// with ~~that one case repaired, under a new id~~ ⭐ four cases repaired, each under a new id (the three below). These limbs
+// hold the check over P4's record shape to it.
 // ⭐ And under the ruling's delegated extension (`REG-D-115`), three more: D-FP-CLEAN's planted twin D-FP-03, and the
 // requirements pair D-RC-CLEAN and D-RC-04 — four cases repaired, each under a new id, so the record owes a run of the four.
 describe('JAN-EXEC Phase 7 completion round 5 — under case set v6, P4’s record shape — a run of v5 and a retry that rejected D-FP-CLEAN, of the selected candidate — owes a run over exactly the four repaired cases, D6-RC-CLEAN, D6-RC-04, D6-FP-CLEAN and D6-FP-03 (REG-D-115)', () => {
@@ -2230,7 +2231,8 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		// ⭐ `JAN-CRITREAD` J2-5 — the committed set it holds coverage to is the CURRENT one, with its oracles: version three
 		// from J2-7, version four since `JAN-PRQUAL` `PQ-2` (DESIGN-process-result-qualification.md D4).
 		// ⭐ E2 — ~~version four since `JAN-PRQUAL` `PQ-2`~~ version five since `JAN-EXEC` Phase 7 completion E2 (design B5).
-		// ⭐ Round 5 — ~~version five~~ version six, D-FP-CLEAN repaired (`REG-D-115`).
+		// ⭐ Round 5 — ~~version five~~ version six, ~~D-FP-CLEAN repaired~~ ⭐ four cases repaired: D6-RC-CLEAN, D6-RC-04,
+		// D6-FP-CLEAN and D6-FP-03 (`REG-D-115` and its delegated extension).
 		expect(r.out).toContain('; case set v6, oracles v6\n');
 		expect(r.out).toContain(`: ${CURRENT_CASES.map((c) => c.id).join(', ')} — owed`);
 		expect(CURRENT_SET.caseSetVersion).toBe(6);

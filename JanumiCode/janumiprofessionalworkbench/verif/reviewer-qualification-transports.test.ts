@@ -1218,7 +1218,8 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 			{ caseSetVersion: run.caseSetVersion, oracleVersion: run.oracleVersion },
 			'the versions the RUN line records'
 			// ⭐ `JAN-EXEC` Phase 7 completion E2 — version five, current since E2 (~~4, 4~~).
-			// ⭐ Round 5 — version six, current since round 5: D-FP-CLEAN repaired (`REG-D-115`) (~~5, 5~~).
+			// ⭐ Round 5 — version six, current since round 5: ~~D-FP-CLEAN repaired~~ ⭐ four cases repaired, D6-RC-CLEAN,
+			// D6-RC-04, D6-FP-CLEAN and D6-FP-03 (`REG-D-115` and its delegated extension) (~~5, 5~~).
 		).toEqual({ caseSetVersion: 6, oracleVersion: 6 });
 		// …which are the versions of the files `cases.ts` names current — the ones the check holds coverage to.
 		expect([
