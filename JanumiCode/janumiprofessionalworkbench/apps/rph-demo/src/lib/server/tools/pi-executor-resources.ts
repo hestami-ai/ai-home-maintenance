@@ -30,12 +30,13 @@
 //     whenever the agent folder's settings list an npm package Pi's folder does not hold (`getGlobalNpmRoot`).
 //     ⛔ THE WORKSPACE'S SETTINGS WERE AMONG THEM UNTIL THAT CHECK'S F1 WAS FIXED: Pi trusts a project's
 //     `.pi/settings.json` by default (`SettingsManager.create`), and the executor can write that file — one unit's
-//     `write_file` of it was read by every later unit's session, which installed what it listed, by the command it
-//     named. ⭐ NOW `pi-executor.ts` makes its settings manager trusting no project (`projectTrusted: false`), and the
-//     workspace's settings are not read at all. Driven by hand, 2026-10-15, over Pi's real loader with these options
-//     and a workspace whose settings listed a package and named a stand-in command: trusted, the command ran and saw
-//     the server's environment — under `PI_OFFLINE` too, where the agent folder listed a package Pi's folder did not
-//     hold; untrusted, the workspace's settings read as empty and no command ran, offline or not;
+//     `write_file` of it was read by every later unit's session, whose load installed what it listed and was missing,
+//     by the command it named. ⭐ NOW `pi-executor.ts` makes its settings manager trusting no project
+//     (`projectTrusted: false`), and the workspace's settings are not read at all. Driven by hand, 2026-10-15, over Pi's
+//     real loader with these options and a workspace whose settings listed a package and named a stand-in command:
+//     trusted, the command ran and saw a variable of the loading process's environment — under `PI_OFFLINE` too, where
+//     the agent folder listed a package Pi's folder did not hold; untrusted, the workspace's settings read as empty and
+//     no command ran, offline or not;
 //   · THE WORKING-DIRECTORY LINE names the server's folder, not the workspace: `pi-executor.ts` gives its session no
 //     folder (`SessionManager.inMemory()`), so the session takes `process.cwd()` (`dist/core/sdk.js`).
 // ⭑ A PI-FREE MODULE, as `pi-execution-tools.ts` is: it imports Pi's types alone, so its test loads no part of Pi —

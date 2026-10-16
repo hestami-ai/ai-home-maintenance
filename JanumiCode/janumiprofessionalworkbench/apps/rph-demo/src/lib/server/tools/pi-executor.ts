@@ -170,8 +170,8 @@ export async function openPiExecutionSession(
 	const modelRegistry = ModelRegistry.create(authStorage);
 	// ⛔ TRUSTING NO PROJECT (the check of E4's polish round, F1): Pi trusts a project's `.pi/settings.json` by default, and
 	// the workspace is a project the executor writes into — so a unit's `write_file` of that file made every later unit's
-	// load install the packages it listed, by the command it named, on this host with this server's environment. Untrusted,
-	// the workspace's settings are not read at all; the agent folder's, the operator's own, still are.
+	// load install what it listed and was missing, by the command it named, on this host with this server's environment.
+	// Untrusted, the workspace's settings are not read at all; the agent folder's, the operator's own, still are.
 	const settingsManager = SettingsManager.create(cwd, getAgentDir(), { projectTrusted: false });
 	const model = resolveExecutingModel(modelRegistry, modelId);
 

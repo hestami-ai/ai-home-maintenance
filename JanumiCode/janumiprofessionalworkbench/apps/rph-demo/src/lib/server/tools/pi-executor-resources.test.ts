@@ -13,7 +13,8 @@
 // resource a Pi upgrade adds reddens here until someone decides about it. ⛔ AND `pi-executor.ts` builds its loader from
 // these options alone — read as source, since importing it would load Pi. ⛔ AND THE ONE SETTINGS MANAGER IT MAKES TRUSTS
 // NO PROJECT, and its loader and its session both take that one (the check of E4's polish round, F1): Pi trusts a
-// project's `.pi/settings.json` by default, and a load installs the packages it lists, running the command it names.
+// project's `.pi/settings.json` by default, and a load installs a package it lists that is missing, by the command it
+// names.
 // ⚠ PI-FREE: the coding agent is not loaded here — the gate's one test that loads any part of Pi is
 // `pi-execution-tools.test.ts`, its core loop alone. Pi's real loader and session were driven once, by hand, over a tree
 // holding one of each resource (the commit that made this file quotes what they took), and that is not repeated in the
@@ -65,10 +66,14 @@ function declaredLeaveOuts(): string[] {
 	return names.sort();
 }
 
-/** The `projectTrusted` an options argument gives, as a literal — or what stands there instead. */
+/**
+ * The `projectTrusted` an options argument gives, as a literal — or what stands there instead. ⚠ A spread is no
+ * literal: one after the property may set it again.
+ */
 function projectTrustedOf(options: ts.Expression | undefined): boolean | string {
 	if (options === undefined) return 'no options';
 	if (!ts.isObjectLiteralExpression(options)) return 'not an object literal';
+	if (options.properties.some(ts.isSpreadAssignment)) return 'a spread';
 	const property = options.properties.find(
 		(p) => ts.isPropertyAssignment(p) && ts.isIdentifier(p.name) && p.name.text === 'projectTrusted'
 	);
@@ -178,7 +183,8 @@ describe('⭐ the executor’s resource loader (the lead’s delegated decision 
 		// ⭑ Read as SOURCE, as above. Pi trusts a project's `.pi/settings.json` unless told otherwise
 		// (`dist/core/settings-manager.js`, `projectTrusted ?? true`), and a session handed no manager makes its own, at
 		// that default (`dist/core/sdk.js`, `createAgentSession`). Trusted, the workspace's settings are read on every load,
-		// and the packages they list installed, by the command they name (the check of E4's polish round, F1).
+		// and a package they list that is missing is installed, by the command they name (the check of E4's polish round,
+		// F1).
 		const path = fileURLToPath(new URL('./pi-executor.ts', import.meta.url));
 		const source = ts.createSourceFile(
 			path,
