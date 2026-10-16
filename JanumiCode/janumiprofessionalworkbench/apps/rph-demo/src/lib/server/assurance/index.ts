@@ -193,7 +193,7 @@ export function createDeclaredPolicyReviewer(opts: {
 	// ⛔ A REFUSED SELECTION's validator runs nothing and throws the refusal: answered as a failure, under its own id.
 	if (validator.validatorId === UNCONFIGURED_REVIEWER_ID)
 		return createUnconfiguredDeclaredPolicyReviewer(validator);
-	// ⭐ R3-A F2 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — A REPLAYED DECLARED REVIEW IS
+	// ⭐ R3-A F2 (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (12)) — A REPLAYED DECLARED REVIEW IS
 	// RECORDED AS ONE, as the floor's replayed review is (`replayReviewer`): where the registry's validator is the replay's, every
 	// answer this reviewer gives carries the replay's own id, never the live reviewer's — which the run report reads as a
 	// declared verdict and never counts as the model reviewer's (`scripts/phase7/run-report-core.ts`).

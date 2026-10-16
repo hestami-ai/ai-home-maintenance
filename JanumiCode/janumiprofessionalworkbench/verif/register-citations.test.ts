@@ -36,6 +36,21 @@ function definedIds(): Set<string> {
 	return out;
 }
 
+/** The `.ts`, `.svelte` and `.md` files under `dir`, by the exclusions `citedIds` gives. */
+function walk(dir: string, out: string[] = []): string[] {
+	for (const e of readdirSync(dir)) {
+		if (e === 'node_modules' || e === '.git' || e === 'dist' || e === '.svelte-kit' || e === 'csaa') continue;
+		// This file NAMES the dangling ids in its own docblock and fabricates one in its CONTROL ⭐ — and fabricates
+		// stale citations in the second CONTROL. A gate that scanned itself would report its own examples as findings.
+		if (e === 'register-citations.test.ts') continue;
+		if (e === 'ASTs and Code Analysis') continue; // CSAA's documents, same standing scope rule
+		const p = `${dir}/${e}`;
+		if (statSync(p).isDirectory()) walk(p, out);
+		else if (/\.(ts|svelte|md)$/.test(e)) out.push(p);
+	}
+	return out;
+}
+
 /**
  * Ids the CODE cites, mapped to the files citing them.
  *
@@ -43,19 +58,6 @@ function definedIds(): Set<string> {
  * package, outside this one's remit by standing instruction. That is a scope decision, not a soundness one.
  */
 function citedIds(): Map<string, string[]> {
-	const walk = (dir: string, out: string[] = []): string[] => {
-		for (const e of readdirSync(dir)) {
-			if (e === 'node_modules' || e === '.git' || e === 'dist' || e === '.svelte-kit' || e === 'csaa') continue;
-			// This file NAMES the dangling ids in its own docblock and fabricates one in its CONTROL. A gate that
-			// scanned itself would report its own examples as findings.
-			if (e === 'register-citations.test.ts') continue;
-			if (e === 'ASTs and Code Analysis') continue; // CSAA's documents, same standing scope rule
-			const p = `${dir}/${e}`;
-			if (statSync(p).isDirectory()) walk(p, out);
-			else if (/\.(ts|svelte|md)$/.test(e)) out.push(p);
-		}
-		return out;
-	};
 	// ⚠ MARKDOWN IS SCANNED TOO, and that was a residual this gate's own first version DISCLOSED rather than
 	// closed: `REG-F-139` was invisible to it because the id appeared only in prose and a commit title. Measured
 	// before extending — 248 ids cited across `docs/`, 246 resolving — so the addition is high-signal rather
@@ -74,6 +76,32 @@ function citedIds(): Map<string, string[]> {
 			if (!out.has(m[1]!)) out.set(m[1]!, []);
 			if (!out.get(m[1]!)!.includes(rel)) out.get(m[1]!)!.push(rel);
 		}
+	}
+	return out;
+}
+
+/**
+ * ⭐ JAN-EXEC Phase 7 completion, round 4's check, finding 1 — WHERE A TEXT SAYS AN ENTRY THE CANON DEFINES IS STILL "to be
+ * registered as" it: each such id, with the line its words begin on. Written before the entry was, such a citation tells
+ * its reader the decision is unregistered once it is not; it is made true by citing the entry as registered, with its item
+ * where it has one. ⛔ READ ACROSS A COMMENT'S LINE BREAKS: each line's indent and comment marker (`//`, `/**`, `*`) is
+ * dropped, and the lines joined by a space, for a citation wraps where its comment does. Round 4 rewrote 210 of them, and
+ * six survived it, each wrapped across two lines, because the search that confirmed none was left matched within one.
+ */
+function staleCitations(text: string, defined: ReadonlySet<string>): { id: string; line: number }[] {
+	const lines = text.split('\n').map((l) => l.replace(/^\s*(?:\/\*\*|\/\*|\/\/+|\*)?\s*/, ''));
+	const starts: number[] = [];
+	let at = 0;
+	for (const l of lines) {
+		starts.push(at);
+		at += l.length + 1;
+	}
+	const out: { id: string; line: number }[] = [];
+	for (const m of lines.join(' ').matchAll(/\b[Tt]o\s+be\s+registered\s+as\s+(REG-[DFQ]-\d+)\b/g)) {
+		if (!defined.has(m[1]!)) continue;
+		let line = 0;
+		while (line + 1 < starts.length && starts[line + 1]! <= m.index) line++;
+		out.push({ id: m[1]!, line: line + 1 });
 	}
 	return out;
 }
@@ -152,4 +180,37 @@ describe('register citations resolve', () => {
 		// SAME BUDGET AS THE ASSERTION IT GUARDS — a control that dies first under load leaves the check standing
 		// with nothing proving it discriminates, which is exactly how this file failed before REG-F-169.
 	}, 30_000);
+});
+
+describe('⭐ a citation of an entry the canon defines never calls it still to be registered (round 4’s check, finding 1)', () => {
+	// ⚠ THE CODE ALONE — `packages/ verif/ scripts/ apps/`. `docs/` is left out: a document's words are its author's, and
+	// record what stood when it was written.
+	it('⭐ no code says an entry the canon defines is still “to be registered as” it — its comment’s line breaks included', () => {
+		const defined = definedIds();
+		const stale = ['packages', 'verif', 'scripts', 'apps']
+			.flatMap((d) => walk(`${ROOT}${d}`))
+			.flatMap((f) => staleCitations(readFileSync(f, 'utf8'), defined).map((c) => `${f.slice(ROOT.length)}:${c.line} — ${c.id}`))
+			.sort((a, b) => a.localeCompare(b));
+		expect(
+			stale,
+			`these citations call an entry the canon defines unregistered:\n${stale.join('\n')}\n` +
+				'Cite it as registered, with its item where it has one (registered as REG-D-114 (14)).'
+		).toEqual([]);
+	}, 30_000);
+
+	// CONTROL — `[]` is also what a reader that never joins a comment's lines returns, round 4's own search. This pins that
+	// the reader finds a citation on one line and one wrapped under either marker, and passes one made as registered.
+	it('CONTROL — the reader joins a comment’s lines under either marker, finds the line the words begin on, and passes a citation made as registered', () => {
+		const defined = new Set(['REG-D-114']);
+		expect(staleCitations('\t\t// (to be registered as REG-D-114)', defined)).toEqual([{ id: 'REG-D-114', line: 1 }]);
+		expect(staleCitations('a;\n\t// the decision of 2026-10-16, to be\n\t// registered as REG-D-114), read', defined)).toEqual([
+			{ id: 'REG-D-114', line: 2 }
+		]);
+		expect(staleCitations(' * the decision of 2026-10-16, to be registered\n * as REG-D-114): the lane', defined)).toEqual([
+			{ id: 'REG-D-114', line: 1 }
+		]);
+		expect(staleCitations('// the decision of 2026-10-16, registered\n// as REG-D-114 (14)', defined)).toEqual([]);
+		// An id the canon does not define is the first test's, as a dangling citation, not this one's.
+		expect(staleCitations('// to be registered as REG-D-999', defined)).toEqual([]);
+	});
 });

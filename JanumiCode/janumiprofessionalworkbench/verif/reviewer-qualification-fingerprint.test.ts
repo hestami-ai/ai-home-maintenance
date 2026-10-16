@@ -518,7 +518,7 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint MOVES on each component
 		}
 	}, 120_000);
 
-	// ⭐⭐ R3-A F3 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — THE FINGERPRINT REACHES DECLARED
+	// ⭐⭐ R3-A F3 (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (13)) — THE FINGERPRINT REACHES DECLARED
 	// SCORING. ⛔ The scoring corpus was one work-product case, so how a declared case is scored — `declaredVerdict`,
 	// `evidenceCeiling` and the declared seam (`runner.ts` `scoreDeclared`) — moved no scoring digest; and the declared seam
 	// carried no policy's required evidence, which caps the verdict its sign-off records, so a change to it moved nothing.
@@ -672,7 +672,7 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint does NOT move on what d
 	}, 120_000);
 
 	it('⭐⭐ R3-A F3 — DECLARED SCORING moves it, on a copy: the declared verdict’s computation, its evidence ceiling and the declared seam’s reading of a review, each changed where the product writes it — `scoring` moves, and no other component', () => {
-		// ⛔ RED BEFORE R3-A F3 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114): no corpus entry was a
+		// ⛔ RED BEFORE R3-A F3 (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (13)): no corpus entry was a
 		// declared case, so a change to how one is scored (`runner.ts` `scoreDeclared`) moved no component of the fingerprint.
 		const copy = disposableTree();
 		/** One edit to one copied file, measured, then undone — each a single literal replacement, shown to apply. */

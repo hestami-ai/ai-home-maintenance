@@ -1779,7 +1779,7 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 		expect([said({ rootDeclared: 'legacy' }), said({ rootSignedOff: false })]).toEqual([false, false]);
 	});
 
-	// ── ⭐⭐ R3-A F2 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — A REPLAYED DECLARED VERDICT
+	// ── ⭐⭐ R3-A F2 (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (12)) — A REPLAYED DECLARED VERDICT
 	// carries a validator id of its own, as the floor's replayed review does: the report knows it, and never counts it as live.
 	it('⭐ R3-A F2 — a REPLAYED declared verdict is a declared verdict: stage 5b reads it as it reads a live one, and it is never listed among the assessments that asked no model', () => {
 		// ⛔ RED BEFORE R3-A: the report knew no replayed declared validator, so a replay's declared verdicts were no declared
@@ -1868,8 +1868,11 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 			'design: lifecycle EXECUTING, assurance UNASSESSED, step SUCCEEDED, read from an archive taken while its Record Assurance may still have been running',
 			"its Record Assurance gave no answer within 4140000 ms (design D4): the run ended there, and the server is killed with the act unfinished (REG-F-527); no register entry names why it outlasted its bound"
 		]);
-		// ⭑ The sign-offs after it were never attempted: not reached.
-		expect(cellOf(r, '7', 'implementation').basis.at(-1)).toBe('its sign-off was never attempted');
+		// ⭑ ~~The sign-offs after it were never attempted: not reached.~~ ⭐ R4 (the lead's round-4 item 3) — the sign-offs after it
+		// are not attempted BECAUSE the lane stopped after that act: not reached, and said so (the next test's).
+		expect(cellOf(r, '7', 'implementation').basis.at(-1)).toBe(
+			'its sign-off was not attempted: the lane stopped after the design unit’s Record Assurance, which got no answer, and pressed no sign-off after it (D4)'
+		);
 		// ⭐ D4's general form — the rule's re-run of the declared reviews, and a Mark Satisfied, are each named the same way.
 		for (const [field, act, ms] of [['rerunDeclared', 'Re-run the declared reviews', 4_140_000], ['markSatisfied', 'Mark Satisfied', 300_000]] as const) {
 			const named = withDesign({
@@ -1884,6 +1887,47 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 		// ⭐ And a recovery act the rule pressed that outlasted its bound names the end too (D4: it ends the run there).
 		const recovered = withDesign({ recovery: [{ act: 'rerunWork', timedOutAfterMs: 38_160_000, requestFailure: null }] });
 		expect(buildRunReport(run.store, recovered, { accountNames: NAMES }).report.problems).toEqual([]);
+	});
+
+	// ── ⛔ R4 (the lead's round-4 item 3) — A SIGN-OFF THE LANE SKIPPED AFTER A UNIT'S SIGN-OFF ACT GOT NO ANSWER reads as not
+	// attempted because the lane stopped after that act: the lane's sign-off loop ends there (D4: nothing is pressed beside an
+	// act the server may still be running), as it ends at a limit check that holds one back (D8) — round 3's reading of a
+	// limit stop (R3-B F4), given an unanswered act too.
+	it('⛔ R4 (the lead’s round-4 item 3) — every later sign-off the lane skipped after a unit’s sign-off act got NO ANSWER, the root’s included, reads as not attempted because the lane stopped after that act — never as one never attempted', () => {
+		// ⛔ PREDICTED RED, read from the code: "its sign-off was never attempted", the words a run cut short reads, for each unit
+		// after the one whose act got no answer — whichever act it was, past its bound or lost in transit.
+		const completed = { lifecycle: 'EXECUTING', execution: 'SUCCEEDED', assurance: 'UNASSESSED' };
+		const cut = { unit: completed, signedOff: false };
+		const run = aRun({ design: cut, implementation: cut, 'end-to-end': cut }, { rootSignedOff: false, run: { end: { reason: 'allowance-exceeded' } } });
+		const laneRun = run.lane.run as { units: Record<string, unknown>[] };
+		const designSigned = (field: string, act: Record<string, unknown>): LaneRows => ({
+			...run.lane,
+			run: {
+				...laneRun,
+				units: laneRun.units.map((u) =>
+					u.slug === 'design'
+						? { ...u, signOff: { offered: true, recordAssurance: { status: 200, envelopeType: 'success', after: null }, [field]: act, refused: null, notPressed: null } }
+						: u
+				)
+			}
+		});
+		const outlasted = (ms: number) => ({ status: null, envelopeType: null, timedOutAfterMs: ms, requestFailure: null, after: null });
+		const lost = { status: null, envelopeType: null, timedOutAfterMs: null, requestFailure: 'net::ERR_EMPTY_RESPONSE', after: null };
+		const cases = [
+			['recordAssurance', 'Record Assurance', outlasted(4_140_000)],
+			['recordAssurance', 'Record Assurance', lost],
+			['rerunDeclared', 'Re-run the declared reviews', outlasted(4_140_000)],
+			['markSatisfied', 'Mark Satisfied', lost]
+		] as const;
+		for (const [field, act, pressed] of cases) {
+			const r = buildRunReport(run.store, designSigned(field, pressed), { accountNames: NAMES }).report;
+			const why = `its sign-off was not attempted: the lane stopped after the design unit’s ${act}, which got no answer, and pressed no sign-off after it (D4)`;
+			const kind = `${act}, ${pressed.timedOutAfterMs === null ? 'lost in transit' : 'past its bound'}`;
+			expect([cellOf(r, '7', 'implementation').basis.at(-1), cellOf(r, '7', 'end-to-end').basis.at(-1)], kind).toEqual([why, why]);
+			expect(cellOf(r, '7', 'whole run').basis, `${kind}: the root’s sign-off, skipped, said nothing of why`).toContain(`root: not reached — ${why}`);
+			// ⭑ CONTROL — the unit before the stop, signed off, is not said to have been skipped.
+			expect(cellOf(r, '7', 'requirements').basis.join(' '), kind).not.toContain('was not attempted');
+		}
 	});
 
 	it('⛔ a break no register entry names is marked so — the cell, the run’s completion over it, the counts and the markdown', () => {
@@ -1994,7 +2038,7 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 	// "ended: paid-limit" said the limit had acted at all.
 	/**
 	 * What the lane read of the limit before an act, as `limitCheck` records it (`phase7-operator.ts`) — ⭐ by the one rule (the
-	 * lead's delegated decision of 2026-10-16, to be registered as REG-D-114): what the act counts always recorded, and a total
+	 * lead's delegated decision of 2026-10-16, registered as REG-D-114 (14)): what the act counts always recorded, and a total
 	 * AT the limit let through. ~~`ahead` only when above 0; `allowed: total < limit`~~
 	 */
 	const read = (prior: number, recorded: number, ahead: number, limit = 230) => {
@@ -2025,7 +2069,7 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 			[
 				'design: lifecycle EXECUTING, assurance UNASSESSED, step SUCCEEDED',
 				`its sign-off was held back before Record Assurance: ${OVER}`,
-				// ⭐ ONE RULE (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — ~~not under it~~.
+				// ⭐ ONE RULE (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (14)) — ~~not under it~~.
 				'the limit as the lane read it: 210 + 4 + 4 + 16 ahead = 234 of 230, past it'
 			]
 		]);
@@ -2090,7 +2134,7 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 		expect(cellOf(r, '7', 'design').basis.slice(1), 'the hold of the declared re-run is said nowhere').toEqual([
 			'its sign-off was attempted and the unit is not SATISFIED',
 			`its sign-off was held back before the rule’s re-run of its declared reviews: ${rerunOver}`,
-			// ⭐ ONE RULE (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — ~~not under it~~.
+			// ⭐ ONE RULE (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (14)) — ~~not under it~~.
 			'the limit as the lane read it: 206 + 12 + 4 + 16 ahead = 238 of 230, past it'
 		]);
 	});
@@ -2128,7 +2172,7 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 		]);
 		const md = renderMarkdown(r);
 		expect(md).toContain("- **The lane's own reads of the limit, each before a paid act (design D8; E12F F2):** 6.");
-		// ⭐ ONE RULE (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — ~~not under it~~: past it.
+		// ⭐ ONE RULE (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (14)) — ~~not under it~~: past it.
 		expect(md).toContain('  - design, before its sign-off: 210 + 4 + 4 + 16 ahead = 234 of 230, past it: held back.');
 		expect(md).toContain('  - requirements, before its Begin & Execute: 200 + 0 + 4 = 204 of 230, under it.');
 	});
@@ -2151,12 +2195,12 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 		expect(md).toContain('  - root, before its Begin & Execute: 196 + 10 + 4 + 20 ahead = 230 of 230, at it, which this act may reach.');
 		expect(md).toContain('  - requirements, before its Begin & Execute: 215 + 10 + 4 = 229 of 230, under it.');
 		// ~~⭑ `limitCheck`'s rule: the same total held back — never "at it", which says the act may reach the limit.~~ ⭐ ONE RULE
-		// (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114): a lane now lets every act reach the limit,
+		// (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (14)): a lane now lets every act reach the limit,
 		// so the same total held back is a record made before the one rule — "at it", never one the act may reach.
 		expect(md).toContain('  - design, before its Begin & Execute: 216 + 10 + 4 = 230 of 230, at it: held back.');
 	});
 
-	it('⛔ ONE RULE (the lead’s delegated decision of 2026-10-16, to be registered as REG-D-114) — the words follow it: a read PAST the limit reads “past it”', () => {
+	it('⛔ ONE RULE (the lead’s delegated decision of 2026-10-16, registered as REG-D-114 (14)) — the words follow it: a read PAST the limit reads “past it”', () => {
 		// ⛔ PREDICTED RED, read from the code: the words were the old rule's, a total UNDER the limit or not — a read past the
 		// limit "not under it".
 		const run = aRun({}, { run: { end: { reason: 'paid-limit' } } });
@@ -2179,6 +2223,55 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 		expect(whole(L - 8)).toContain(`- **The limit (design D8):** ${L - 8} + 4 + 4 = ${L} of ${L}, at it, which the run may reach.`);
 		expect(whole(L - 7)).toContain(`- **The limit (design D8):** ${L - 7} + 4 + 4 = ${L + 1} of ${L}, PAST it.`);
 		expect(whole(L - 9)).toContain(`- **The limit (design D8):** ${L - 9} + 4 + 4 = ${L - 1} of ${L}, under it.`);
+	});
+
+	// ── ⛔ `REG-D-114` (14), AS AMENDED 2026-10-16 — THE REPORT SAYS WHAT EACH CHECK COUNTED, AND THAT A PHASE'S OWN SPEND CAN
+	// CARRY THE TOTAL PAST THE LIMIT: the lane counts one try's reserve before a phase, the rule's re-run of its work or of its
+	// review, and a MODEL root's press — an act's worst case before a sign-off, a re-run of its declared reviews and Send — and
+	// checks before each press, never during one.
+	it('⛔ REG-D-114 (14), as amended — each of the lane’s reads says what it counted ahead of its act, in the lane’s own words; a read recorded before the lane said so, its figures alone', () => {
+		// ⛔ PREDICTED RED, read from the code: `limitFigures` printed `+ N ahead` alone, and nothing for a read that counted none,
+		// so a reader could not tell one try's reserve from an act's worst case, nor a root that runs no model from a read of none.
+		const run = aRun({}, { run: { end: { reason: 'paid-limit' } } });
+		const laneRun = run.lane.run as { units: Record<string, unknown>[] };
+		const at = (slug: string, fields: Record<string, unknown>) => (u: Record<string, unknown>) => (u.slug === slug ? { ...u, ...fields } : u);
+		const said = (prior: number, recorded: number, ahead: number, counted: string) => ({ ...read(prior, recorded, ahead, 450), counted });
+		const units = laneRun.units
+			.map(at('root', { limitCheck: said(300, 3, 0, 'none: it runs no model') }))
+			.map(
+				at('requirements', {
+					limitCheck: said(300, 3, 4, 'one try’s reserve'),
+					recovery: [{ act: 'rerunWork', limitCheck: said(300, 9, 4, 'one try’s reserve') }]
+				})
+			)
+			.map(
+				at('design', {
+					limitCheck: read(300, 12, 0, 450),
+					signOff: { offered: true, limitCheck: said(300, 20, 16, 'its declared reviews’ worst case'), ...unpressed, notPressed: null }
+				})
+			);
+		const md = renderMarkdown(buildRunReport(run.store, { ...run.lane, run: { ...laneRun, units } }, { accountNames: NAMES }).report);
+		const lines = md.split('\n').filter((line) => line.startsWith('  - ') && line.includes(' of 450, '));
+		expect(lines, 'a read of the limit does not say what it counted').toEqual([
+			'  - root, before its Begin & Execute: 300 + 3 + 4 + 0 ahead (none: it runs no model) = 307 of 450, under it.',
+			'  - requirements, before its Begin & Execute: 300 + 3 + 4 + 4 ahead (one try’s reserve) = 311 of 450, under it.',
+			'  - requirements, before the rule’s re-run of its work: 300 + 9 + 4 + 4 ahead (one try’s reserve) = 317 of 450, under it.',
+			// ⭑ CONTROL — a read recorded before the lane said what it counted: its figures alone, as before.
+			'  - design, before its Begin & Execute: 300 + 12 + 4 = 316 of 450, under it.',
+			'  - design, before its sign-off: 300 + 20 + 4 + 16 ahead (its declared reviews’ worst case) = 340 of 450, under it.'
+		]);
+	});
+
+	it('⛔ REG-D-114 (14), as amended — the reviewer calls carry a plain caveat, in report.json and report.md: a phase’s own spend can carry the total past the limit, because the lane checks before each press, not during one', () => {
+		// ⛔ PREDICTED RED, read from the code: the report said nothing of it, so a run whose reads each let a press through read
+		// as a run held to the limit throughout.
+		const caveat =
+			'A phase’s own spend can carry the total past the limit: the lane checks the limit before each press, not during one, ' +
+			'and a model unit’s press may spend up to 140 reviewer calls after its check (REG-D-114 (14), as amended ' +
+			'2026-10-16; the sponsor’s limit is "about 450", REG-D-110 (1)).';
+		const r = reportOf(aRun({})).report;
+		expect(renderMarkdown(r), 'report.md carries no caveat that a press can spend past the limit').toContain(`- **Caveat:** ${caveat}`);
+		expect(r.reviewerCalls.limitCaveat, 'report.json carries no caveat that a press can spend past the limit').toBe(caveat);
 	});
 
 	it('⛔ stage 7’s sign-off: the lane’s dry run signs the root off (D11) — the root as intended, the run not reached; one never attempted, in a run cut short — not reached; one refused — broke', () => {

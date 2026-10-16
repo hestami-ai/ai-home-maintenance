@@ -504,7 +504,7 @@ export const PHASE7_SIGN_OFF_UNIT_MS =
 	PHASE7_DECLARED_RERUN_MS;
 
 // ── ⭐⭐ HALF B'S SIGN-OFF BOUNDS, FROM THE POLICIES A UNIT DECLARES AS THE STORE HOLDS THEM (the lead's delegated decision of
-// 2026-10-16, to be registered as REG-D-114) ─────────────────────────────────────────────────────────────────────────────
+// 2026-10-16, registered as REG-D-114 (15)) ─────────────────────────────────────────────────────────────────────────────
 // The four figures above are §3.2's: every unit bounded as one declaring four policies, the most any of its units declares
 // (`PHASE7_DECLARED_POLICIES_PER_UNIT`) — half A's, unchanged. Half B's units are the agent's, and one may declare more:
 // bounded as four, its Record Assurance could be abandoned with a review still inside its own bound. So for half B each of
@@ -589,17 +589,26 @@ export const PHASE7_TEST_TIMEOUT_MS =
  * makes (`REG-D-105` (4)) ⭐ — and, on the completion programme's main line (E12 and E3 merged), before every other act
  * the lane presses that spends it, that act's own worst case counted: before each sign-off and before the rule's re-run
  * of a unit's declared reviews (`E12F` F2; `signOffWorstCase`), and in half B before Send, the authoring floor's
- * (`REG-D-112`, E3's review finding 2; `PHASE7_AUTHORING_REVIEWER_CALLS`), and, paid, before the root's press, a MODEL
- * root's (`rootLimitCheck`; `PHASE7_UNIT_REVIEWER_CALLS`). ~~⚠ Two rules, as each package built its own: before a phase, a
+ * (`REG-D-112`, E3's review finding 2; `PHASE7_AUTHORING_REVIEWER_CALLS`), and, paid, before the root's press, ~~a MODEL
+ * root's (`rootLimitCheck`; `PHASE7_UNIT_REVIEWER_CALLS`)~~ ⭐ not its worst case: a MODEL root's one try's reserve, and
+ * none for a root that runs no model (`rootLimitCheck`; `PHASE7_TRY_RESERVE`; `REG-D-114` (14), as amended 2026-10-16).
+ * ~~⚠ Two rules, as each package built its own: before a phase, a
  * re-run of one and a sign-off the total must be UNDER the limit (`limitCheck`); before Send and the root's press it may
- * reach it (`limitCheckAhead`).~~ ⭐ ONE RULE for every check (the lead's delegated decision of 2026-10-16, to be registered
- * as REG-D-114): the lane may REACH the limit and never pass it by what it counts — the calls spent, those held back and
+ * reach it (`limitCheckAhead`).~~ ⭐ ONE RULE for every check (the lead's delegated decision of 2026-10-16, registered
+ * as REG-D-114 (14)): the lane may REACH the limit and never pass it by what it counts — the calls spent, those held back and
  * what the act itself counts must total at most the limit (`limitCheck`). ~~⚠ Before a phase and the rule's re-run of one it
- * counts their first call only (`PHASE7_PHASE_FIRST_CALL`), as D8 counted no phase's worst case.~~ ⭐ R3-B's fix round, F1 —
+ * counts their first call only (`PHASE7_PHASE_FIRST_CALL`), as D8 counted no phase's worst case.~~ ~~⭐ R3-B's fix round, F1 —
  * and what each act counts is its worst case, before a phase and the rule's re-run of one too: a model unit's before a
  * phase and before a re-run of its work (`PHASE7_UNIT_REVIEWER_CALLS`), a re-review's before a re-run of its review
  * (`PHASE7_REREVIEW_REVIEWER_CALLS`). So a phase is started only while the calls spent before the run and those recorded
- * in it total at most 306: 450, less the 4 held back and the phase's 140. ~~150 (`REG-D-102` (4))~~ ~~200: *"Raise limit to 200"* (`REG-D-105` (1), which amends
+ * in it total at most 306: 450, less the 4 held back and the phase's 140.~~ ⛔ `REG-D-114` (14), as amended 2026-10-16: a
+ * phase's whole worst case would refuse every phase once about 306 calls are spent. ⭐ What each act counts, by the one rule
+ * as amended: before a phase's Begin & Execute, the rule's re-run of its work or of its review, and a MODEL root's press,
+ * ONE TRY'S RESERVE (`PHASE7_TRY_RESERVE`), D8's own rule, for the lane checks again before every later press; before a
+ * sign-off and the rule's re-run of its declared reviews, that act's worst case; before Send, the authoring floor's. So a
+ * phase is started while the calls spent before the run and those recorded in it total at most 442: 450, less the 4 held
+ * back and the phase's 4 — ⚠ and a phase's own spend can carry the total past the limit, since nothing is checked during a
+ * press (`PHASE7_UNIT_REVIEWER_CALLS`), which the run report says. ~~150 (`REG-D-102` (4))~~ ~~200: *"Raise limit to 200"* (`REG-D-105` (1), which amends
  * `REG-D-102` (4)); it covers the re-qualification, the re-run and a few recovery re-runs.~~ ~~230: *"the limit rises
  * to about 230"* (`REG-D-108`, after P2), held as the number its pointer states, for P3.~~ ⭐ `JAN-EXEC` Phase 7
  * completion programme, E3 — 450: *"Raise to about 450 (Recommended)"* (`REG-D-110` (1), after P3; `REG-D-109`), for the
@@ -711,25 +720,32 @@ export const PHASE7_AUTHORING_REVIEWER_CALLS = PHASE7_AUTHORING_FLOOR_RUNS * LAN
 /**
  * ⭐⭐ `REG-D-112` (finding 2) — ONE MODEL UNIT'S WORST CASE IN REVIEWER CALLS, as its allowance counts its reviews
  * (`PHASE7_UNIT_ALLOWANCE_MS`): each try's work-product review, and the review of each command reviewed, each of up to
- * `reviewerCallsPerTry` calls — (3 + 32) × 4 = 140. ⛔ Half B checks it before the ROOT's press when the agent's root
- * declares MODEL: §3.2's root runs no model, and the agent's may. ⭐ R3-B's fix round, F1 (the lead's delegated decision of
- * 2026-10-16, to be registered as REG-D-114) — and the lane checks it before each PHASE's press, and before the rule's
- * re-run of a phase's work, which runs the whole unit again (`runModelUnit`).
+ * `reviewerCallsPerTry` calls — (3 + 32) × 4 = 140. ~~⛔ Half B checks it before the ROOT's press when the agent's root
+ * declares MODEL: §3.2's root runs no model, and the agent's may. ⭐ R3-B's fix round, F1 — and the lane checks it before
+ * each PHASE's press, and before the rule's re-run of a phase's work, which runs the whole unit again (`runModelUnit`).~~
+ * ⛔ `REG-D-114` (14), as amended 2026-10-16: no check counts it — before each of those presses the lane counts one try's
+ * reserve (`PHASE7_TRY_RESERVE`). ⭐ It is what one such press may spend AFTER its check, which nothing checks during the
+ * press: the run report's caveat states it (`scripts/phase7/run-report-core.ts`, `LIMIT_CAVEAT`).
  */
 export const PHASE7_UNIT_REVIEWER_CALLS =
 	(LANE_BUDGET.tries + PHASE7_REVIEWED_COMMANDS) * LANE_BUDGET.reviewerCallsPerTry;
 
+// ~~⭐ R3-B's fix round, F1 — A RE-REVIEW'S WORST CASE IN REVIEWER CALLS, counted before the rule's re-run of a stopped phase's
+// REVIEW: the floors run again over the refused attempt's work product and each of its reviewed commands' evidence, and no
+// producer runs, each a review of up to `reviewerCallsPerTry` calls — (1 + 32) × 4 = 132 (`PHASE7_REREVIEW_REVIEWER_CALLS`).~~
+// ⛔ Removed by `REG-D-114` (14), as amended 2026-10-16: the rule's re-run of a review counts one try's reserve, and nothing
+// read the figure after.
+
 /**
- * ⭐ R3-B's fix round, F1 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — A RE-REVIEW'S WORST
- * CASE IN REVIEWER CALLS, counted before the rule's re-run of a stopped phase's REVIEW: the floors run again over the
- * refused attempt's work product and each of its reviewed commands' evidence, and no producer runs (`rerunReview`,
- * `src/routes/undertakings/[id]/+page.server.ts`), each a review of up to `reviewerCallsPerTry` calls, as
- * `PHASE7_UNIT_REVIEWER_CALLS` counts a unit's — (1 + 32) × 4 = 132. ⚠ A worst case: only the refused reviews run again.
- * ~~`PHASE7_PHASE_FIRST_CALL`, 1 — what the one rule counted of a phase and of the rule's re-run of one: its FIRST reviewer
- * call, NOT its worst case, so a phase let through could still spend past the limit.~~ ⛔ The decision counts each act's
- * worst case, so the lane never passes the limit by what it counts.
+ * ⭐⭐ `REG-D-114` (14), AS AMENDED 2026-10-16 — ONE TRY'S RESERVE, IN REVIEWER CALLS: what the one rule counts ahead of a
+ * phase's Begin & Execute, the rule's re-run of its work or of its review, and a MODEL root's press — one review of up to
+ * `reviewerCallsPerTry` calls, 4: D8's own rule, for the lane checks the limit again before every later press. ⛔ Counted
+ * instead of the act's whole worst case (`PHASE7_UNIT_REVIEWER_CALLS`, 140), which would refuse every phase once about 306
+ * calls are spent. ⚠ So a press is let through while one try's review fits, and what it spends after that is not checked
+ * until the next press: a phase's own spend can carry the total past the limit (the sponsor's limit is "about 450",
+ * `REG-D-110` (1)).
  */
-export const PHASE7_REREVIEW_REVIEWER_CALLS = (1 + PHASE7_REVIEWED_COMMANDS) * LANE_BUDGET.reviewerCallsPerTry;
+export const PHASE7_TRY_RESERVE = LANE_BUDGET.reviewerCallsPerTry;
 
 /** ⭐ C1 — how long the lane waits between two reads of the candidate's status: each read is the whole dump. */
 export const PHASE7_CANDIDATE_POLL_MS = 5_000;
@@ -757,7 +773,7 @@ export const PHASE7_AUTHORING_MS =
  * each of §3.2's four phases. ⚠ Its sign-off is bounded as one of four declared policies, §3.2's most
  * (`PHASE7_DECLARED_POLICIES_PER_UNIT`): ~~an agent's unit that declares more is bounded short~~ ⭐ half B's timeout
  * re-counts each unit's sign-off for the policies it declares (`phase7HalfBTestTimeoutMs`; the lead's delegated decision
- * of 2026-10-16, to be registered as REG-D-114).
+ * of 2026-10-16, registered as REG-D-114 (15)).
  */
 export const PHASE7_PER_PHASE_MS =
 	PHASE7_UNIT_RUN_MS +
@@ -775,7 +791,7 @@ export const NODE_TIMER_CEILING_MS = 2_147_483_647;
  * NODE'S TIMER CEILING, past which Playwright would time the test out at once: a PWA of ~~26~~ ⭐ 23 phases or more is
  * given the ceiling, about 596 hours, not its arithmetic. ⚠ Half B STARTS under half
  * A's timeout, which covers the authoring many times over, and the lane extends it here when the units are read.
- * ⭐⭐ ~~`phases`~~ `declared` (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — the policies each
+ * ⭐⭐ ~~`phases`~~ `declared` (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (15)) — the policies each
  * unit declares as the store holds them, one count per unit, the root first: its phases are the units after the root, and
  * EACH UNIT'S SIGN-OFF IS RE-COUNTED FOR ITS OWN POLICIES (`phase7SignOffUnitMs`) in place of §3.2's four
  * (`PHASE7_SIGN_OFF_UNIT_MS`), which half A's arithmetic counts once per unit. ⛔ A unit declaring five was counted as

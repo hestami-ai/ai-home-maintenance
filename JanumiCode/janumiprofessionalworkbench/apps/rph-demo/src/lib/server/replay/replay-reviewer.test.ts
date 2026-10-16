@@ -584,7 +584,7 @@ describe('⭐ the floor registry’s REPLAY arm (D2)', () => {
 		expect(replayRunFor(dir).consumed().reviewer).toBe(0);
 	});
 
-	// ⛔ RED BEFORE R3-A F2 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114): under the replay a declared
+	// ⛔ RED BEFORE R3-A F2 (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (12)): under the replay a declared
 	// review answered as `reviewer.declared-policy`, the LIVE reviewer's id, so the verdict the sign-off records from it read as a
 	// live one — where the floor's replayed review is recorded under an id of its own ((viii)).
 	it('(xiv) ⭐ R3-A F2 — a REPLAYED declared review is marked as one: the declared reviewer, and every answer it gives — served or thrown — carries the replay’s own validator id, never the live reviewer’s', async () => {

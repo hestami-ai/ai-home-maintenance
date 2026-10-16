@@ -400,7 +400,7 @@ export const noCriterionDeclared = (policyId: string): string =>
 /**
  * ⛔ The merge's fix round, F1 — WHY A UNIT COMPOSED OF OTHERS IS ASKED NO DECLARED REVIEW: its declared policies are judged
  * over ~~its CHILDREN's work (`REG-D-111` (2)), and no child's work holds a work product or a command~~ ⭐ R3-A F1 (`REG-D-111`
- * (2)'s general form; the lead's delegated decision of 2026-10-16, to be registered as REG-D-114): the work its whole
+ * (2)'s general form; the lead's delegated decision of 2026-10-16, registered as REG-D-114 (11)): the work its whole
  * subtree produced, and neither it nor any unit below it holds a work product or a command — a unit composed of others
  * that ran a TRANSFORMATION contributes none of its own, and a unit that has not completed contributes nothing — so a
  * review would be shown nothing to judge. The route refuses it before any review is asked, as it refuses a work product the

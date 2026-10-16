@@ -71,11 +71,10 @@ import {
 	PHASE7_PRIOR_CALLS_VARIABLE,
 	PHASE7_RECORD_ASSURANCE_MS,
 	phase7RecordAssuranceMs,
-	PHASE7_REREVIEW_REVIEWER_CALLS,
 	PHASE7_SIGN_OFF_MS,
+	PHASE7_TRY_RESERVE,
 	PHASE7_UI_MS,
 	PHASE7_UNIT_ALLOWANCE_MS,
-	PHASE7_UNIT_REVIEWER_CALLS,
 	REVIEWER_MODEL_VARIABLE,
 	wiredReviewer,
 	type Phase7Half
@@ -138,7 +137,7 @@ export function inheritedVariables(
 
 /**
  * What the config lays over the operator's shell for the server (`playwright.live-exec.config.ts`, `webServer.env`).
- * ⭐ R3-C — `PI_OFFLINE` among it (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114), so the
+ * ⭐ R3-C — `PI_OFFLINE` among it (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (19)), so the
  * boot records whether the config ran the server's Pi offline.
  */
 export const OVERLAY_KEYS = [
@@ -453,14 +452,20 @@ export interface LimitCheck {
 	/**
 	 * ⭐ `E12F` F2 — before a SIGN-OFF, the act's own worst case, counted in `total`: its unit's declared policies, each a
 	 * review of up to `reviewerCallsPerTry` calls (`signOffWorstCase`). ~~Absent before a phase and before the rule's re-run of
-	 * a phase (`recoverByRule`), as before.~~ ⭐ ONE RULE (the lead's delegated decision of 2026-10-16, to be registered as
-	 * REG-D-114) — ON EVERY CHECK, what the act itself counts: before Send the authoring floor's worst case, before half B's
+	 * a phase (`recoverByRule`), as before.~~ ⭐ ONE RULE (the lead's delegated decision of 2026-10-16, registered as
+	 * REG-D-114 (14), as amended 2026-10-16) — ON EVERY CHECK, what the act itself counts: before Send the authoring floor's worst case, before half B's
 	 * root a MODEL root's (none for a root that runs no model), and before a phase and the rule's re-run of one ~~their first
-	 * call (`PHASE7_PHASE_FIRST_CALL`)~~ ⭐ their worst case (R3-B's fix round, F1): a model unit's before a phase and before
+	 * call (`PHASE7_PHASE_FIRST_CALL`)~~ ~~⭐ their worst case (R3-B's fix round, F1): a model unit's before a phase and before
 	 * the rule's re-run of its work (`PHASE7_UNIT_REVIEWER_CALLS`), a re-review's before the rule's re-run of its review
-	 * (`PHASE7_REREVIEW_REVIEWER_CALLS`).
+	 * (`PHASE7_REREVIEW_REVIEWER_CALLS`).~~ ⭐ `REG-D-114` (14), as amended 2026-10-16: before a phase, the rule's re-run of its
+	 * work or of its review, and a MODEL root's press, one try's reserve (`PHASE7_TRY_RESERVE`).
 	 */
 	readonly ahead: number;
+	/**
+	 * ⭐ `REG-D-114` (14), as amended 2026-10-16 — WHAT `ahead` COUNTED, in words (`COUNTED_AHEAD`), so the run report says what
+	 * each check counted: one try's reserve, an act's worst case, or none.
+	 */
+	readonly counted: string;
 	readonly total: number;
 	readonly limit: number;
 	readonly allowed: boolean;
@@ -556,7 +561,13 @@ export type EndReason =
 	 * not assure; the acceptance, or a designer act after it, was refused; or the PWA did not read PUBLISHED. Nothing can
 	 * run after it. ⚠ A RESULT, recorded with the server's own words — and still not the end a paid run was meant to reach.
 	 */
-	| 'authoring-stopped';
+	| 'authoring-stopped'
+	/**
+	 * ⭐ R4 (the lead's round-4 item 2) — paid, half B's root has a type the lane cannot find or read (`typeUnreadableOf`):
+	 * whether its press runs a model, and so what the limit must count before it, cannot be decided, so it is never pressed.
+	 * ⚠ A RESULT, recorded with why — and not the end a paid run was meant to reach.
+	 */
+	| 'root-type-unreadable';
 
 export interface RunRecord {
 	readonly mode: 'dry' | 'paid';
@@ -595,30 +606,50 @@ export function unpressed(units: readonly ArchiveUnit[]): RunUnit[] {
  * and before each sign-off, and before the rule's re-run of its declared reviews, with that act's own worst case (`ahead`)
  * counted too: since E2 Record Assurance asks the reviewer for one review per declared policy (`REG-D-110` (3)), so a
  * sign-off is a paid act the limit must see before it is pressed.
- * ⭐⭐ ONE RULE FOR EVERY CHECK THE LANE MAKES (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114):
+ * ⭐⭐ ONE RULE FOR EVERY CHECK THE LANE MAKES (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (14)):
  * the calls spent before, those the store records, those held back AND WHAT THE ACT ITSELF COUNTS (`ahead`) must total AT
  * MOST the limit — the lane may reach it, and never pass it by what it counts. ⛔ Two rules stood, one per package: this
  * function let an act through only UNDER the limit, so a sign-off whose worst case brought the total exactly to the limit
  * was held back, while E3's `limitCheckAhead`, before half B's Send and its root's press (`REG-D-112`, E3's review finding
  * 2), let such an act through; its callers call this one now. ~~⚠ Before a phase, and the rule's re-run of one, the act
  * counts its first call only (`PHASE7_PHASE_FIRST_CALL`): D8 never counted a phase's worst case, so a phase let through may
- * still spend past the limit.~~ ⭐ R3-B's fix round, F1 — before a phase, and before the rule's re-run of one, the act
+ * still spend past the limit.~~ ~~⭐ R3-B's fix round, F1 — before a phase, and before the rule's re-run of one, the act
  * counts its WORST CASE too, as every other check does: a model unit's before a phase and before a re-run of its work
  * (`PHASE7_UNIT_REVIEWER_CALLS`), a re-review's before a re-run of its review (`PHASE7_REREVIEW_REVIEWER_CALLS`). ⛔ It
- * counted their first call only, so a phase let through with one call left could spend up to 139 past the limit.
+ * counted their first call only, so a phase let through with one call left could spend up to 139 past the limit.~~
+ * ⭐⭐ `REG-D-114` (14), AS AMENDED 2026-10-16 — before a phase, the rule's re-run of its work or of its review, and a MODEL
+ * root's press, the act counts ONE TRY'S RESERVE (`PHASE7_TRY_RESERVE`), D8's own rule: the lane checks again before every
+ * later press. ⛔ Their whole worst case would refuse every phase once about 306 calls are spent. ⚠ So a phase's own spend
+ * can carry the total past the limit, for nothing checks it during the press; the run report says so. A sign-off and the
+ * rule's re-run of its declared reviews still count their worst case, and Send the authoring floor's. ⭐ And the check
+ * records what it counted, in words (`counted`, `COUNTED_AHEAD`).
  */
-export function limitCheck(prior: number, recorded: number, ahead: number): LimitCheck {
+export function limitCheck(prior: number, recorded: number, ahead: number, counted: string): LimitCheck {
 	const total = prior + recorded + PHASE7_NEGATIVE_CONTROL_RESERVE + ahead;
 	return {
 		prior,
 		recorded,
 		reserve: PHASE7_NEGATIVE_CONTROL_RESERVE,
 		ahead,
+		counted,
 		total,
 		limit: PHASE7_PAID_LIMIT,
 		allowed: total <= PHASE7_PAID_LIMIT
 	};
 }
+
+/**
+ * ⭐ `REG-D-114` (14), as amended 2026-10-16 — WHAT EACH CHECK COUNTED AHEAD OF ITS ACT, as the record says it
+ * (`LimitCheck.counted`) and the run report prints it: one try's reserve before a phase, the rule's re-run of its work or of
+ * its review, and a MODEL root's press; none before a root that runs no model; an act's worst case before a sign-off and
+ * the rule's re-run of its declared reviews (`signOffWorstCase`), and before Send (`PHASE7_AUTHORING_REVIEWER_CALLS`).
+ */
+export const COUNTED_AHEAD = {
+	tryReserve: 'one try’s reserve',
+	noModel: 'none: it runs no model',
+	declaredReviews: 'its declared reviews’ worst case',
+	authoringFloor: 'the authoring floor’s worst case'
+} as const;
 
 /**
  * ⭐⭐ `E12F` F2 (the E12 package review's second finding) — A SIGN-OFF'S WORST CASE, IN REVIEWER CALLS: its unit's declared
@@ -987,7 +1018,7 @@ export async function recordAssurance(
 	decode: Decode,
 	/**
 	 * ⭐ The bound the press is waited for, the lane's (`runTheLane`, `signOffLimit`; the lead's delegated decision of
-	 * 2026-10-16, to be registered as REG-D-114): §3.2's four policies' in half A (`PHASE7_RECORD_ASSURANCE_MS`), the
+	 * 2026-10-16, registered as REG-D-114 (15)): §3.2's four policies' in half A (`PHASE7_RECORD_ASSURANCE_MS`), the
 	 * unit's own declared policies' in half B (`phase7RecordAssuranceMs`).
 	 */
 	timeoutMs: number
@@ -1026,7 +1057,7 @@ export async function declaredRerunOffered(row: Locator): Promise<boolean> {
  * ⭐⭐ `E12F` F3 — THE RULE'S RE-RUN OF THE UNIT'S DECLARED REVIEWS that did not conclude: its rationale typed into its own
  * field, its own button pressed, waited for as Record Assurance is — its act and a review of each of the unit's declared
  * policies (~~`PHASE7_RECORD_ASSURANCE_MS`~~ ⭐ `timeoutMs`, Record Assurance's bound as the lane gives it: the lead's
- * delegated decision of 2026-10-16, to be registered as REG-D-114). Each fill and click bounded by `PHASE7_UI_MS`.
+ * delegated decision of 2026-10-16, registered as REG-D-114 (15)). Each fill and click bounded by `PHASE7_UI_MS`.
  */
 export async function rerunDeclared(page: Page, row: Locator, decode: Decode, timeoutMs: number): Promise<ActionOutcome> {
 	await row.getByTestId('rerun-declared-rationale').fill(DECLARED_RERUN_RATIONALE, { timeout: PHASE7_UI_MS });
@@ -1093,17 +1124,11 @@ export const RULE_RATIONALE: Readonly<Record<RecoveryAct, string>> = {
 	abandonPwu: 'The run plan’s rule, REG-D-105 (4): a re-run that is refused again is abandoned.'
 };
 
-/**
- * ⭐ R3-B's fix round, F1 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — WHAT THE ONE RULE
- * COUNTS OF EACH RE-RUN, its worst case in reviewer calls: a re-review's (`PHASE7_REREVIEW_REVIEWER_CALLS`), the floors run
- * again over the refused work with no producer; and a model unit's for the work run again, the whole unit
- * (`PHASE7_UNIT_REVIEWER_CALLS`). ⛔ Until R3-B's fix round the check counted each re-run's first call only. An
- * abandonment calls no model, and is not checked.
- */
-const RERUN_WORST_CASE: Readonly<Record<Exclude<RecoveryAct, 'abandonPwu'>, number>> = {
-	rerunReview: PHASE7_REREVIEW_REVIEWER_CALLS,
-	rerunWork: PHASE7_UNIT_REVIEWER_CALLS
-};
+// ~~⭐ R3-B's fix round, F1 — WHAT THE ONE RULE COUNTS OF EACH RE-RUN, its worst case in reviewer calls (`RERUN_WORST_CASE`): a
+// re-review's (`PHASE7_REREVIEW_REVIEWER_CALLS`), the floors run again over the refused work with no producer; and a model
+// unit's for the work run again, the whole unit (`PHASE7_UNIT_REVIEWER_CALLS`).~~ ⛔ Removed by `REG-D-114` (14), as amended
+// 2026-10-16: the rule's re-run of either counts one try's reserve (`PHASE7_TRY_RESERVE`), as a phase does
+// (`recoverByRule`). An abandonment calls no model, and is not checked.
 
 /** ⭐ P7-6R R-1f — the choices the row offers, once it is drawn. ⚠ Waited for first, as `recordAssurance` waits. */
 export async function recoveryOffers(row: Locator): Promise<RecoveryOffers> {
@@ -1692,7 +1717,12 @@ export async function authorThePwa(r: {
 		};
 	// ⭐ `REG-D-112` (finding 2) — THE LIMIT BEFORE SEND: the authoring floor's reviews are the first calls half B spends.
 	const before = (await read()).snapshot;
-	authoring.limitCheck = limitCheck(r.prior, recordedReviewerCalls(before), PHASE7_AUTHORING_REVIEWER_CALLS);
+	authoring.limitCheck = limitCheck(
+		r.prior,
+		recordedReviewerCalls(before),
+		PHASE7_AUTHORING_REVIEWER_CALLS,
+		COUNTED_AHEAD.authoringFloor
+	);
 	save();
 	if (!authoring.limitCheck.allowed)
 		return {
@@ -1759,7 +1789,7 @@ export async function authorThePwa(r: {
 		};
 	await author.createUndertaking();
 	// ⭐ The store as the units were read from it, returned beside their rows: half B's timeout is counted from the policies
-	// they declare in it (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114).
+	// they declare in it (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (15)).
 	const { snapshot } = await read();
 	const { units, rows, problems } = runUnitsOf(snapshot, pwaId, r.undertakingName);
 	authoring.unitProblems = [...problems];
@@ -1847,14 +1877,37 @@ export function dischargeOf(snap: EngineSnapshot, unitId: string): string {
 }
 
 /**
+ * ⭐⭐ R4 (the lead's round-4 item 2) — WHY THE LANE CANNOT READ THE DISCHARGE A UNIT'S TYPE DECLARES, or null when it can:
+ * the unit is not in the store, it names no type, the store holds no type of that id, or the type's `workDischarge` is there
+ * and no string — the run report's reading of a root it fails closed on (`run-report-core.ts`, `typeUnreadable`). ⚠ A type
+ * read that names no discharge is READ: `UNDECLARED` (`dischargeOf`), a type that runs no model. ⛔ `dischargeOf` alone reads
+ * each of the four as `UNDECLARED` too, so a root whose type the lane could not find counted none ahead and was pressed.
+ */
+export function typeUnreadableOf(snap: EngineSnapshot, unitId: string): string | null {
+	const unit = snap.pwus.find((p) => p.id === unitId);
+	if (unit === undefined) return `the unit ${unitId} is not in the store`;
+	const typeId = str(unit.state.pwuTypeId);
+	if (typeId === '') return `the unit ${unitId} names no type`;
+	const type = snap.pwuTypes.find((t) => t.id === typeId);
+	if (type === undefined) return `${typeId} is not in the store`;
+	const declared = type.state.workDischarge;
+	return declared === undefined || declared === null || typeof declared === 'string'
+		? null
+		: `${typeId} declares a workDischarge that is no word: ${JSON.stringify(declared)}`;
+}
+
+/**
  * ⭐⭐ `REG-D-112` (E3's review, finding 2) — D8 BEFORE HALF B'S ROOT IS PRESSED: the agent's root may declare MODEL — §3.2's
- * runs none — and then its press runs a model and its reviews, so a MODEL root's worst case is counted
- * (`PHASE7_UNIT_REVIEWER_CALLS`); a root that declares anything else runs no model, and counts none. ⭐ By the one rule
- * (`limitCheck`; the lead's delegated decision of 2026-10-16, to be registered as REG-D-114).
+ * runs none — and then its press runs a model and its reviews, so ~~a MODEL root's worst case is counted
+ * (`PHASE7_UNIT_REVIEWER_CALLS`)~~ ⭐ `REG-D-114` (14), as amended 2026-10-16: a MODEL root counts one try's reserve
+ * (`PHASE7_TRY_RESERVE`), as a phase does; a root that declares anything else runs no model, and counts none. ⭐ By the one
+ * rule (`limitCheck`; the lead's delegated decision of 2026-10-16, registered as REG-D-114 (14), as amended 2026-10-16).
  */
 export function rootLimitCheck(prior: number, snap: EngineSnapshot, rootId: string): LimitCheck {
-	const ahead = dischargeOf(snap, rootId) === 'MODEL' ? PHASE7_UNIT_REVIEWER_CALLS : 0;
-	return limitCheck(prior, recordedReviewerCalls(snap), ahead);
+	const recorded = recordedReviewerCalls(snap);
+	return dischargeOf(snap, rootId) === 'MODEL'
+		? limitCheck(prior, recorded, PHASE7_TRY_RESERVE, COUNTED_AHEAD.tryReserve)
+		: limitCheck(prior, recorded, 0, COUNTED_AHEAD.noModel);
 }
 
 // ── THE RUN'S ORDER (D4, D5, D8) ─────────────────────────────────────────────────────────────────────────────────────
@@ -1922,7 +1975,7 @@ export interface LaneHands {
 	/**
 	 * Record Assurance on the unit's row, or null when the row offers none (`recordAssurance`) — ⭐ waited for up to
 	 * `timeoutMs`, the bound the lane gives it for the unit's declared policies (the lead's delegated decision of
-	 * 2026-10-16, to be registered as REG-D-114).
+	 * 2026-10-16, registered as REG-D-114 (15)).
 	 */
 	readonly recordAssurance: (unit: RunUnit, timeoutMs: number) => Promise<ActionOutcome | null>;
 	/** ⭐ `E12F` F1 — whether the unit's row offers Record Assurance, read and never pressed (`recordAssuranceOffered`). */
@@ -1968,7 +2021,9 @@ export interface LaneHands {
  *   2. the PWA and the Undertaking (`setUp`), and its units — one per type, or the run ends here; ⭐ in half B, the PWA
  *      authored through the page and its units read from it, each by its id, and ⭐ `REG-D-112` the store ARCHIVED however
  *      the authoring ended (`authorThenArchive`, `00-authoring`) — and, paid, the LIMIT before the agent's root is pressed,
- *      a MODEL root's worst case counted (`rootLimitCheck`);
+ *      a MODEL root's ~~worst case~~ ⭐ one try's reserve counted (`rootLimitCheck`; `REG-D-114` (14), as amended 2026-10-16),
+ *      ⭐ and a root whose type the lane cannot find or read never pressed: the run ends `root-type-unreadable`, why in its
+ *      detail (`typeUnreadableOf`; the lead's round-4 item 2);
  *   3. Begin & Execute on the ROOT, then on each PHASE in order, each only after the one before has answered
  *      (`REG-F-535`), each answer kept raw, the unit's state READ FROM THE STORE (`REG-F-540`), and the run archived and
  *      checked. ⛔ A press with NO ANSWER — the root's included — ends the run there (`unansweredEnd`, D4). Before each
@@ -2069,8 +2124,8 @@ export async function runTheLane(r: {
 				return end('authoring-stopped', 'the Undertaking of the published PWA holds no unit: instantiation built none');
 			rowOf = (u) => authored.rows.get(u.unitId!);
 			// ⭐ C3 — THE TIMEOUT, RE-COUNTED FOR THE AGENT'S UNITS: the phases are the root's and the tree's, not §3.2's four. ⭐ And
-			// each unit's sign-off for the policies the store says it declares (the lead's delegated decision of 2026-10-16, to be
-			// registered as REG-D-114), read from the store the units were read from, the root's first.
+			// each unit's sign-off for the policies the store says it declares (the lead's delegated decision of 2026-10-16,
+			// registered as REG-D-114 (15)), read from the store the units were read from, the root's first.
 			hands.extendTimeout?.(
 				phase7HalfBTestTimeoutMs(record.units.map((u) => declaredPolicyIdsOf(authored.snapshot, u.unitId!).length))
 			);
@@ -2189,9 +2244,15 @@ export async function runTheLane(r: {
 			if (!offers.rerunReview && !offers.rerunWork) return null;
 			const rerun: Exclude<RecoveryAct, 'abandonPwu'> = offers.rerunReview ? 'rerunReview' : 'rerunWork';
 			const { snapshot } = await hands.read();
-			// ⭐ The one rule (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114): ~~the re-run's first
-			// call~~ ⭐ R3-B's fix round (F1): the re-run's worst case (`RERUN_WORST_CASE`).
-			const check = limitCheck(boot.prior as number, recordedReviewerCalls(snapshot), RERUN_WORST_CASE[rerun]);
+			// ⭐ The one rule (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (14), as amended 2026-10-16): ~~the re-run's first
+			// call~~ ~~⭐ R3-B's fix round (F1): the re-run's worst case (`RERUN_WORST_CASE`)~~ ⭐ `REG-D-114` (14), as amended
+			// 2026-10-16: one try's reserve, as before a phase — the lane checks again before every later press.
+			const check = limitCheck(
+				boot.prior as number,
+				recordedReviewerCalls(snapshot),
+				PHASE7_TRY_RESERVE,
+				COUNTED_AHEAD.tryReserve
+			);
 			if (!check.allowed) {
 				notPressed(unit, rerun, check, `the limit: ${check.total} of ${check.limit} reviewer calls (D8)`);
 				return 'paid-limit';
@@ -2245,16 +2306,30 @@ export async function runTheLane(r: {
 		};
 
 		// ⭐⭐ `REG-D-112` (finding 2) — HALF B'S ROOT IS THE AGENT'S, AND MAY RUN A MODEL: paid, the limit is checked before
-		// its press, a MODEL root's worst case counted (`rootLimitCheck`). §3.2's root runs none, and half A's is unchecked.
+		// its press, a MODEL root's ~~worst case~~ ⭐ one try's reserve counted (`rootLimitCheck`; `REG-D-114` (14), as amended
+		// 2026-10-16). §3.2's root runs none, and half A's is unchecked.
 		if (half === 'B' && boot.record.mode === 'paid') {
-			const rootCheck = rootLimitCheck(boot.prior as number, (await hands.read()).snapshot, root.unitId!);
+			const { snapshot } = await hands.read();
+			// ⛔ R4 (the lead's round-4 item 2) — A ROOT WHOSE TYPE THE LANE CANNOT FIND OR READ IS NEVER PRESSED: whether its press
+			// runs a model, and so what the limit must count before it, cannot be decided. The run ends by name, why in its detail.
+			// ⛔ The type was read as UNDECLARED (`dischargeOf`), none counted ahead, and the root pressed.
+			const unreadable = typeUnreadableOf(snapshot, root.unitId!);
+			if (unreadable !== null)
+				return end(
+					'root-type-unreadable',
+					`the root’s type cannot be read (${unreadable}): whether its press runs a model, and so what the limit must ` +
+						'count before it, cannot be decided, so it is not pressed (D8; REG-D-112, finding 2)'
+				);
+			const rootCheck = rootLimitCheck(boot.prior as number, snapshot, root.unitId!);
 			root.limitCheck = rootCheck;
 			writeRunRecord(lane, record);
+			// ⛔ Round 4's check, F2 — the end's words say what the check counted (`counted`): one try's reserve for a MODEL
+			// root, none for a root that runs no model. ⛔ They said "its worst case", which this check no longer counts.
 			if (!rootCheck.allowed)
 				return end(
 					'paid-limit',
-					`the limit, before the root’s press: ${rootCheck.total} of ${rootCheck.limit} reviewer calls, its worst ` +
-						`case of ${rootCheck.ahead} counted (D8; REG-D-112)`
+					`the limit, before the root’s press: ${rootCheck.total} of ${rootCheck.limit} reviewer calls, ` +
+						`${rootCheck.ahead} ahead (${rootCheck.counted}) counted (D8; REG-D-112; REG-D-114 (14), as amended 2026-10-16)`
 				);
 		}
 		// ⛔ THE ROOT'S PRESS IS BOUNDED AS EVERY PRESS IS (D4): with no answer, the run ends here, dry or paid.
@@ -2266,12 +2341,15 @@ export async function runTheLane(r: {
 		const dry = boot.record.mode === 'dry';
 		let reason: EndReason = dry ? 'dry-run-stop' : 'complete';
 		for (const unit of dry ? [] : phases) {
-			// ⭐ The one rule (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114): ~~the phase's first
-			// call~~ ⭐ R3-B's fix round (F1): the phase's worst case, a model unit's.
+			// ⭐ The one rule (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (14), as amended 2026-10-16): ~~the phase's first
+			// call~~ ~~⭐ R3-B's fix round (F1): the phase's worst case, a model unit's~~ ⭐ `REG-D-114` (14), as amended
+			// 2026-10-16: one try's reserve, D8's own rule — the lane checks again before every later press, so a phase's own
+			// spend can carry the total past the limit.
 			unit.limitCheck = limitCheck(
 				boot.prior as number,
 				recordedReviewerCalls((await hands.read()).snapshot),
-				PHASE7_UNIT_REVIEWER_CALLS
+				PHASE7_TRY_RESERVE,
+				COUNTED_AHEAD.tryReserve
 			);
 			if (!unit.limitCheck.allowed) {
 				reason = 'paid-limit';
@@ -2347,7 +2425,7 @@ export async function runTheLane(r: {
 		 * ⭐ `E12F` F2 — the limit, read from the store now, with `unit`'s sign-off worst case counted (D8). ⭐ The merge of E12
 		 * and E3 (J1) — in half B that worst case is the policies the PUBLISHED PWA's units declare, read from the same store
 		 * (`declaredPolicyIdsOf`): the agent's units are no types of §3.2's PWA. ⭐⭐ AND THE BOUND THE PRESS IS WAITED FOR
-		 * (`pressMs`; the lead's delegated decision of 2026-10-16, to be registered as REG-D-114), from the same count — Record
+		 * (`pressMs`; the lead's delegated decision of 2026-10-16, registered as REG-D-114 (15)), from the same count — Record
 		 * Assurance's, and the rule's re-run's of the declared reviews: in half B for the unit's own declared policies
 		 * (`phase7RecordAssuranceMs`), in half A §3.2's four policies' (`PHASE7_RECORD_ASSURANCE_MS`), unchanged. ⛔ Every
 		 * press waited §3.2's four policies' reviews, so a unit of half B's declaring five could be abandoned at 4,140 s with
@@ -2358,7 +2436,7 @@ export async function runTheLane(r: {
 			const declared = half === 'B' ? declaredPolicyIdsOf(snapshot, unit.unitId!) : undefined;
 			const ahead = signOffWorstCase(unit, declared);
 			return {
-				check: limitCheck(boot.prior as number, recordedReviewerCalls(snapshot), ahead),
+				check: limitCheck(boot.prior as number, recordedReviewerCalls(snapshot), ahead, COUNTED_AHEAD.declaredReviews),
 				pressMs: declared === undefined ? PHASE7_RECORD_ASSURANCE_MS : phase7RecordAssuranceMs(declared.length)
 			};
 		};

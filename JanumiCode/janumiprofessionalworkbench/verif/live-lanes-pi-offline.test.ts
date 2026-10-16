@@ -1,5 +1,5 @@
-// ⭐ R3-C (`REG-F-512` candidate 1's fifth part; the lead's delegated decision of 2026-10-16, to be registered as
-// REG-D-114) — EVERY LIVE LANE'S SERVER RUNS PI OFFLINE, AND NOTHING LATER IN ITS ENVIRONMENT SETS IT AGAIN.
+// ⭐ R3-C (`REG-F-512` candidate 1's fifth part; the lead's delegated decision of 2026-10-16, registered as
+// REG-D-114 (19)) — EVERY LIVE LANE'S SERVER RUNS PI OFFLINE, AND NOTHING LATER IN ITS ENVIRONMENT SETS IT AGAIN.
 //
 // ⭑ WHAT `PI_OFFLINE` CHANGES, read in the installed Pi (`@earendil-works/pi-coding-agent` 0.80.6). It is read in five
 // files of the coding agent and nowhere else: `dist/core/package-manager.js` (a missing package is not installed, and
@@ -97,7 +97,7 @@ function filesHolding(dir: string, needle: string): string[] {
 	return out.sort();
 }
 
-describe('⭐ every live lane’s server runs Pi offline (the lead’s delegated decision of 2026-10-16, to be registered as REG-D-114)', () => {
+describe('⭐ every live lane’s server runs Pi offline (the lead’s delegated decision of 2026-10-16, registered as REG-D-114 (19))', () => {
 	it('⭑ CONTROL — the population holds the two live lanes: the execution lane and the authoring lane', () => {
 		expect(liveConfigs()).toEqual(
 			expect.arrayContaining(['playwright.live-exec.config.ts', 'playwright.live.config.ts'])

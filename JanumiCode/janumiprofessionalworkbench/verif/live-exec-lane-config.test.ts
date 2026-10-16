@@ -917,7 +917,7 @@ describe('⭐ P7-2 D4 — the Phase 7 lane waits an ALLOWANCE derived from the b
 		});
 	});
 
-	// ⭐⭐ R3-B F2 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — HALF B'S SIGN-OFF BOUNDS ARE THE
+	// ⭐⭐ R3-B F2 (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (15)) — HALF B'S SIGN-OFF BOUNDS ARE THE
 	// ARITHMETIC ABOVE FOR THE UNIT'S OWN DECLARED POLICIES, restated as functions of the count: at §3.2's four they are the
 	// figures above, so the two cannot part, and each policy more adds one review's bound wherever a review is waited for.
 	it('⭐ R3-B F2 — half B’s sign-off bounds are the figures above for the unit’s own policies: equal to them at four, one review’s bound apart for each policy more', () => {

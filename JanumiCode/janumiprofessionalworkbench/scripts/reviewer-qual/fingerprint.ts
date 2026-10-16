@@ -184,7 +184,7 @@ export interface FingerprintSeams {
 	 * whole in the `criteria` component — the declared framing's CRITERIA LIMB — and handed to the declared probes, so a
 	 * change to a policy's purpose, a criterion, or the independence its sign-off checks moves the fingerprint. ⛔ Without it a
 	 * declared review's rubric could change under a reviewer nobody re-measured. ⭐ R3-A F3 (the lead's delegated decision of
-	 * 2026-10-16, to be registered as REG-D-114) — and each policy's required evidence, which caps its sign-off's verdict:
+	 * 2026-10-16, registered as REG-D-114 (13)) — and each policy's required evidence, which caps its sign-off's verdict:
 	 * hashed with the rest, and the input the declared corpus is scored at (`scoringDigestOf`), so a change to it moves the
 	 * criteria component and, where a declared entry's ceiling moves, the scoring digest.
 	 */
@@ -401,7 +401,7 @@ async function casePromptsOf(
 async function scoringDigestOf(seams: FingerprintSeams): Promise<string> {
 	const outcomes: unknown[] = [];
 	const repairs: unknown[] = [];
-	// ⭐ R3-A F3 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — the floor's entries over their one
+	// ⭐ R3-A F3 (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (13)) — the floor's entries over their one
 	// work-product case, then the DECLARED corpus, each entry over its own case, scored as the declared sign-off records its
 	// verdict at the ceiling the declared seam's own required evidence sets (`requiredEvidenceOf`).
 	const corpus: readonly (CorpusEntry & { readonly case: QualificationCase })[] = [

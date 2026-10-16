@@ -5,7 +5,7 @@
 // It maps our Pi-agnostic tool descriptors onto Pi `defineTool`s and Pi's event stream onto our normalized
 // AuthoringAgentEvent stream. The agent runs with the built-in coding tools
 // DISABLED (noTools: "builtin") — it can ONLY touch the workbench through our authoring tools. ⭐ And, since the lead's
-// delegated decision of 2026-10-16 (to be registered as REG-D-114), with no extension's tools beside them: until then an
+// delegated decision of 2026-10-16 (registered as REG-D-114 (19)), with no extension's tools beside them: until then an
 // extension Pi found around the server's folder or in its agent folder offered its own (`run`, at the loader).
 import {
 	AuthStorage,
@@ -121,8 +121,8 @@ export class PiAuthoringAgent implements AuthoringAgent {
 			const authStorage = AuthStorage.create();
 			const modelRegistry = ModelRegistry.create(authStorage);
 			// Read the user's REAL Pi settings (same agent dir the TUI uses) so we inherit their default model.
-			// ⛔ TRUSTING NO PROJECT, as the executor's does (the lead's delegated decision of 2026-10-16, to be registered
-			// as REG-D-114; `REG-F-512`). Pi trusts a project's `.pi/settings.json` by default, and the project here is the
+			// ⛔ TRUSTING NO PROJECT, as the executor's does (the lead's delegated decision of 2026-10-16, registered
+			// as REG-D-114 (19); `REG-F-512`). Pi trusts a project's `.pi/settings.json` by default, and the project here is the
 			// server's own folder: where `JPWB_AGENT_MODEL` named no model, a default model named there chose this agent's
 			// over the operator's, and a package listed there that was missing was installed on each run, by the npm command
 			// named there. Untrusted, that file is not read at all; the agent folder's settings, the operator's own, still are.
@@ -139,8 +139,8 @@ export class PiAuthoringAgent implements AuthoringAgent {
 			emit({ kind: 'status', text: `pi agent · ${model.provider}/${model.id}` });
 
 			// ⭐⭐ THIS AGENT'S INSTRUCTION IS ITS OWN SYSTEM PROMPT AND ITS TOOLS ARE THE AUTHORING TOOLS — NOTHING PI FINDS
-			// AROUND THE SERVER'S FOLDER OR IN ITS AGENT FOLDER (the lead's delegated decision of 2026-10-16, to be
-			// registered as REG-D-114): the executor's closed options (`closedResourceLoaderOptions`), with this prompt.
+			// AROUND THE SERVER'S FOLDER OR IN ITS AGENT FOLDER (the lead's delegated decision of 2026-10-16,
+			// registered as REG-D-114 (19)): the executor's closed options (`closedResourceLoaderOptions`), with this prompt.
 			// ⚠ THIS CHANGES THE AUTHORING AGENT'S BEHAVIOUR. By Pi's defaults, until now: an AGENTS.md or CLAUDE.md from
 			// Pi's agent folder, and from the server's folder and every folder above it, was folded into the instruction
 			// after the prompt; an APPEND_SYSTEM.md from the agent folder, or from the server folder's `.pi/`, was appended

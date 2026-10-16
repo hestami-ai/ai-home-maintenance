@@ -44,7 +44,8 @@ import {
 	PHASE7_NEGATIVE_CONTROL_RESERVE,
 	PHASE7_PAID_LIMIT,
 	PHASE7_PRIOR_CALLS_VARIABLE,
-	PHASE7_REVIEWED_COMMANDS
+	PHASE7_REVIEWED_COMMANDS,
+	PHASE7_UNIT_REVIEWER_CALLS
 } from '../../apps/rph-demo/e2e-live-exec/lane-config.js';
 import { scanText } from './archive-scan.js';
 import {
@@ -84,7 +85,7 @@ export const DEMO_FINDING_CODE = 'DEMO_UNFIT';
  *  `DEMO_REVIEW_VALIDATOR_ID`): a record made before the declared policies were judged carries it, and reads vacuous. */
 export const DECLARED_SIGNOFF_VALIDATOR = 'workbench.independent-review';
 /**
- * ⭐ R3-A F2 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — the id a REPLAYED declared verdict
+ * ⭐ R3-A F2 (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (12)) — the id a REPLAYED declared verdict
  * is recorded under (`declared-policy-review.ts` `REPLAY_DECLARED_REVIEW_VALIDATOR_ID`), as the floor's replayed review has one
  * of its own: a declared verdict, and never one the model reviewer made in the run the report reads.
  */
@@ -138,6 +139,16 @@ export const RECORDED_RUN_LIMIT = PHASE7_REVIEWED_COMMANDS;
 /** The sponsor's paid limit, in reviewer calls (`REG-D-102` (4)), and the calls held back for P7-4e (design D8). */
 export const PAID_LIMIT = PHASE7_PAID_LIMIT;
 export const NEGATIVE_CONTROL_RESERVE = PHASE7_NEGATIVE_CONTROL_RESERVE;
+/**
+ * ⭐ `REG-D-114` (14), as amended 2026-10-16 — THE CAVEAT THE REVIEWER CALLS CARRY, PLAINLY: the lane checks the limit before
+ * each press and never during one, counting one try's reserve ahead of a phase, the rule's re-run of its work or of its
+ * review, and a MODEL root's press, so what such a press spends after its check is not held to the limit until the next
+ * check. ⚠ Stated for every run: it is a property of the lane, never of what a run happened to spend.
+ */
+export const LIMIT_CAVEAT =
+	`A phase’s own spend can carry the total past the limit: the lane checks the limit before each press, not during one, ` +
+	`and a model unit’s press may spend up to ${PHASE7_UNIT_REVIEWER_CALLS} reviewer calls after its check (REG-D-114 (14), as ` +
+	`amended 2026-10-16; the sponsor’s limit is "about ${PAID_LIMIT}", REG-D-110 (1)).`;
 /** The declared verdicts a complete run signs off: the five units' declared policies, 2 + 2 + 4 + 3 + 3 (§3.2). */
 export const DECLARED_VERDICTS_EXPECTED = 14;
 
@@ -180,7 +191,7 @@ export function uncheckedCaveat(declared: readonly { readonly criterionResults: 
 /**
  * ⭐ E12's polish (fix2's F10; the lead's delegated decision of 2026-10-15, to be registered) — THE UNIT_PURPOSE FRAMING, STATED
  * PER RUN. A unit composed of others (the root) has its declared policies judged over ~~its children's work~~ ⭐ R3-A F1 (the
- * lead's delegated decision of 2026-10-16, to be registered as REG-D-114): the work it and every unit below it produced, its
+ * lead's delegated decision of 2026-10-16, registered as REG-D-114 (11)): the work it and every unit below it produced, its
  * reviewer given the unit's own purpose (`UNIT_PURPOSE`; the route's `declaredReviewWorkOf`), and no reviewer-qualification
  * case measures that framing: every declared case of case set v5 is in the PRODUCING_PROMPT framing
  * (`scripts/reviewer-qual/materialize.ts`). So the line names each such unit and the reviews the model reviewer made of it,
@@ -453,7 +464,7 @@ export interface ReviewerCalls extends ReviewerCallCount {
 		readonly limit: number;
 		/**
 		 * Whether the total is BELOW the limit — a fact, kept as it was. ⚠ Not the one rule's verdict (the lead's delegated
-		 * decision of 2026-10-16, to be registered as REG-D-114), under which a run may reach the limit: report.md words the
+		 * decision of 2026-10-16, registered as REG-D-114 (14)), under which a run may reach the limit: report.md words the
 		 * total by it (`runStanding`).
 		 */
 		readonly under: boolean | null;
@@ -465,6 +476,11 @@ export interface ReviewerCalls extends ReviewerCallCount {
 	 * F3 — half B's read before Send first: kept on the authoring record, not a unit's, it was in no list.
 	 */
 	readonly laneLimitChecks: readonly LaneLimitCheck[];
+	/**
+	 * ⭐ `REG-D-114` (14), as amended 2026-10-16 — the plain caveat those reads carry (`LIMIT_CAVEAT`): a phase's own spend can
+	 * carry the total past the limit, for the lane checks before each press, not during one.
+	 */
+	readonly limitCaveat: string;
 }
 
 export interface AuditFinding {
@@ -896,21 +912,28 @@ interface LaneUnit {
 	/**
 	 * ⭐ R3-B F4 (the lead's round-3 item 4) — WHERE THE LANE STOPPED, when it
 	 * skipped this unit's sign-off after stopping at ANOTHER unit's limit check: that unit's slug, and the act its check was
-	 * read before (`signOffsSkipped`). null when the lane did not skip it so.
+	 * read before (`signOffsSkipped`). ⭐ R4 (the lead's round-4 item 3) — or after another unit's sign-off act that got no
+	 * answer: that unit's slug, and the act (`unanswered`). null when the lane did not skip it so.
 	 */
-	readonly signOffSkippedAt: { readonly slug: string; readonly before: string } | null;
+	readonly signOffSkippedAt:
+		| { readonly slug: string; readonly before: string }
+		| { readonly slug: string; readonly unanswered: string }
+		| null;
 }
 
 /**
  * ⭐ E12's polish (fix2's F8) — ONE READ OF THE LIMIT THE LANE RECORDED BEFORE A PAID ACT (D8; `E12F` F2): prior + recorded +
- * reserve + the act's own worst case (`ahead`, 0 where it counted none), and whether the lane let the act through
+ * reserve + ~~the act's own worst case~~ ⭐ what the act counts (`ahead`, 0 where it counted none; `REG-D-114` (14), as
+ * amended 2026-10-16), and whether the lane let the act through
  * (`allowed`) or held it back. ⛔ The merge's fix round, F2 — ~~BY ONE OF TWO RULES (`phase7-operator.ts`): `limitCheck`, before a
  * phase, a re-run of one, a sign-off or a re-run of its declared reviews, lets an act through only with the total UNDER the
  * limit; `limitCheckAhead`, before half B's Send and before half B's root's press, lets it through AT the limit too.~~
- * ⭐ ONE RULE since (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114): every check lets an act
+ * ⭐ ONE RULE since (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (14)): every check lets an act
  * through with its total AT MOST the limit, what it counts of the act always recorded (`ahead`: ~~a phase's and a re-run's
- * first call~~ ⭐ R3-B's fix round, F1: the act's worst case, a phase's and a re-run's too). ⚠ A record made before it may
- * hold a total AT the limit held back, by the first rule.
+ * first call~~ ~~⭐ R3-B's fix round, F1: the act's worst case, a phase's and a re-run's too~~ ⭐ `REG-D-114` (14), as amended
+ * 2026-10-16: one try's reserve before a phase, a re-run of its work or of its review, and a MODEL root's press; an act's
+ * worst case before a sign-off, a re-run of its declared reviews and Send — and, since, what it counted, in words,
+ * `counted`). ⚠ A record made before it may hold a total AT the limit held back, by the first rule.
  */
 export interface LaneLimitCheck {
 	/** The unit's slug; `authoring` for half B's read before Send (`AUTHORING_READ`). */
@@ -924,6 +947,11 @@ export interface LaneLimitCheck {
 	readonly recorded: number;
 	readonly reserve: number;
 	readonly ahead: number;
+	/**
+	 * ⭐ `REG-D-114` (14), as amended 2026-10-16 — what `ahead` counted, in the lane's own words (`phase7-operator.ts`,
+	 * `COUNTED_AHEAD`): one try's reserve, an act's worst case, or none; null for a read recorded before the lane said it.
+	 */
+	readonly counted: string | null;
 	readonly total: number;
 	readonly limit: number;
 	readonly allowed: boolean;
@@ -934,7 +962,7 @@ function laneLimitCheck(unit: string, before: string, v: unknown): LaneLimitChec
 	const c = rec(v);
 	const [prior, recorded, reserve, total, limit, allowed] = [int(c.prior), int(c.recorded), int(c.reserve), int(c.total), int(c.limit), bool(c.allowed)];
 	if (prior === null || recorded === null || reserve === null || total === null || limit === null || allowed === null) return null;
-	return { unit, before, prior, recorded, reserve, ahead: int(c.ahead) ?? 0, total, limit, allowed };
+	return { unit, before, prior, recorded, reserve, ahead: int(c.ahead) ?? 0, counted: str(c.counted) || null, total, limit, allowed };
 }
 
 /** The rule's re-run a recovery act's limit check was read before, by its act. */
@@ -969,12 +997,24 @@ function signOffOutlasted(signOff: Record<string, unknown>): LaneUnit['signOffOu
  * declared reviews — held its act back ends that loop (`runTheLane`, D8). So every unit after it in that order whose record
  * holds no sign-off was skipped there. ⚠ A unit the record does not say stopped is taken to be in the order: one never
  * pressed is read as never begun before its sign-off is (`completion`).
+ * ⭐ R4 (the lead's round-4 item 3) — AND A SIGN-OFF ACT THAT GOT NO ANSWER ENDS THAT LOOP TOO (D4: nothing is pressed beside
+ * an act the server may still be running) — past its bound, or lost in transit, whichever act it was (`SIGN_OFF_ACTS`) — so
+ * every later unit whose record holds no sign-off was skipped after it. ⛔ Each read "its sign-off was never attempted".
  */
 function signOffsSkipped(rows: readonly Record<string, unknown>[]): Map<Record<string, unknown>, LaneUnit['signOffSkippedAt']> {
 	const heldBefore = (r: Record<string, unknown>): string | null => {
 		const signOff = rec(r.signOff);
 		if (bool(rec(signOff.limitCheck).allowed) === false) return BEFORE_RECORD_ASSURANCE;
 		return bool(rec(signOff.rerunLimitCheck).allowed) === false ? BEFORE_DECLARED_RERUN : null;
+	};
+	/** ⭐ R4 (the lead's round-4 item 3) — the sign-off act of `r` that got no answer, by its button's name, or null. */
+	const unansweredAct = (r: Record<string, unknown>): string | null => {
+		const signOff = rec(r.signOff);
+		const act = SIGN_OFF_ACTS.find(([field]) => {
+			const pressed = rec(signOff[field]);
+			return int(pressed.timedOutAfterMs) !== null || str(pressed.requestFailure) !== '';
+		});
+		return act === undefined ? null : act[1];
 	};
 	const skipped = new Map<Record<string, unknown>, LaneUnit['signOffSkippedAt']>();
 	let stop: LaneUnit['signOffSkippedAt'] = null;
@@ -985,6 +1025,8 @@ function signOffsSkipped(rows: readonly Record<string, unknown>[]): Map<Record<s
 		}
 		const before = heldBefore(r);
 		if (before !== null) stop = { slug: str(r.slug), before };
+		const unanswered = unansweredAct(r);
+		if (unanswered !== null) stop = { slug: str(r.slug), unanswered };
 	}
 	return skipped;
 }
@@ -1578,7 +1620,8 @@ function buildReviewerCalls(ix: Index, units: readonly Unit[], lane: LaneRows): 
 			limit: PAID_LIMIT,
 			under: total === null ? null : total < PAID_LIMIT
 		},
-		laneLimitChecks: [...authoringLimitChecks(lane), ...laneUnits(lane.run).flatMap((u) => u.limitChecks)]
+		laneLimitChecks: [...authoringLimitChecks(lane), ...laneUnits(lane.run).flatMap((u) => u.limitChecks)],
+		limitCaveat: LIMIT_CAVEAT
 	};
 }
 
@@ -2366,8 +2409,8 @@ function completion(v: UnitView, row: string): MatrixCell {
 /**
  * ⛔ The merge's fix round, F2 — WHERE A READ'S TOTAL STANDS AGAINST THE LIMIT, by its arithmetic: below it, "under it"; AT it and
  * let through, "at it, which this act may reach" ~~— only `limitCheckAhead`'s rule lets a total reach the limit (`LaneLimitCheck`);
- * anything else, "not under it"~~. ⭐ THE WORDS FOLLOW THE ONE RULE (the lead's delegated decision of 2026-10-16, to be
- * registered as REG-D-114): every check lets an act reach the limit and none lets it pass, so ~~"not under it"~~ a total above
+ * anything else, "not under it"~~. ⭐ THE WORDS FOLLOW THE ONE RULE (the lead's delegated decision of 2026-10-16,
+ * registered as REG-D-114 (14)): every check lets an act reach the limit and none lets it pass, so ~~"not under it"~~ a total above
  * the limit is "past it". ⚠ A total AT it held back is a record made before the one rule: "at it", never one the act may reach.
  */
 function standingOf(c: LaneLimitCheck): string {
@@ -2378,7 +2421,7 @@ function standingOf(c: LaneLimitCheck): string {
 
 /**
  * ⭐ WHERE THE RUN'S OWN TOTAL STANDS, as `standingOf` words a read, by the one rule (the lead's delegated decision of
- * 2026-10-16, to be registered as REG-D-114): a run may reach the limit, and never pass it. ⛔ ~~", NOT under it"~~: a total
+ * 2026-10-16, registered as REG-D-114 (14)): a run may reach the limit, and never pass it. ⛔ ~~", NOT under it"~~: a total
  * equal to the limit read as though it had passed it.
  */
 function runStanding(total: number, limit: number): string {
@@ -2390,9 +2433,14 @@ function runStanding(total: number, limit: number): string {
  * ⭐ E12's polish (fix2's F8) — the figures of one read of the limit, as the reviewer-calls section prints the record's own.
  * ⛔ The merge's fix round, F2 — ~~worded by the verdict alone, every read the lane let through "under it"~~: by its arithmetic
  * (`standingOf`), so a read at the limit that ~~`limitCheckAhead`~~ ⭐ the lane let through is never said to be under it.
+ * ⭐ `REG-D-114` (14), as amended 2026-10-16 — AND WHAT THE READ COUNTED AHEAD, in the lane's words (`counted`), a read of none
+ * included: one try's reserve and an act's worst case read alike as figures. ⚠ A read recorded before the lane said it keeps
+ * its figures alone.
  */
-const limitFigures = (c: LaneLimitCheck): string =>
-	`${c.prior} + ${c.recorded} + ${c.reserve}${c.ahead > 0 ? ` + ${c.ahead} ahead` : ''} = ${c.total} of ${c.limit}, ${standingOf(c)}`;
+const limitFigures = (c: LaneLimitCheck): string => {
+	const ahead = c.counted === null ? (c.ahead > 0 ? ` + ${c.ahead} ahead` : '') : ` + ${c.ahead} ahead (${c.counted})`;
+	return `${c.prior} + ${c.recorded} + ${c.reserve}${ahead} = ${c.total} of ${c.limit}, ${standingOf(c)}`;
+};
 
 /**
  * ⭐ E12's polish (fix2's F8; the lead's delegated decision of 2026-10-15, to be registered) — WHAT THE LANE HELD BACK OF A
@@ -2418,11 +2466,14 @@ function heldBackOr(v: UnitView, ...otherwise: string[]): string[] {
 /**
  * ⭐ R3-B F4 (the lead's round-3 item 4) — WHY THE LANE DID NOT ATTEMPT A SIGN-OFF
  * IT SKIPPED after stopping at another unit's limit check (`LaneUnit.signOffSkippedAt`): that unit, and the act its check was
- * read before; null for a unit it did not skip so.
+ * read before; ⭐ R4 (the lead's round-4 item 3) — or after another unit's sign-off act that got no answer: that unit, and
+ * the act; null for a unit it did not skip so.
  */
 function skippedWhy(v: UnitView): string | null {
 	const at = v.unit.lane?.signOffSkippedAt ?? null;
 	if (at === null) return null;
+	if ('unanswered' in at)
+		return `its sign-off was not attempted: the lane stopped after the ${at.slug} unit’s ${at.unanswered}, which got no answer, and pressed no sign-off after it (D4)`;
 	return `its sign-off was not attempted: the lane stopped at the ${at.slug} unit’s limit check, before ${at.before}, and pressed no sign-off after it (D8)`;
 }
 
@@ -2461,7 +2512,7 @@ function childrenOf(ix: Index, u: Unit, units: readonly Unit[]): string[] {
 const modelRanFor = (u: Unit): boolean => u.tries.some((t) => str(t.state.disposition) === 'ACCEPTED');
 
 /**
- * ⭐ R3-B F3 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — THE POLICIES A UNIT DECLARES, by the
+ * ⭐ R3-B F3 (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (16)) — THE POLICIES A UNIT DECLARES, by the
  * kernel's own reading (`declaredAssurancePolicyIds`, rph-domain): its `assurancePolicyIds` and its type's
  * `requiredAssurancePolicyIds`, each once — the set the lane counts a sign-off's limit by (`declaredPolicyIdsOf`). ⛔ The
  * unit's own list alone left out a policy only its type requires, and counted a repeat twice. ⚠ An upper bound of the
@@ -3058,17 +3109,29 @@ function stageTwo(undertakingId: string | null, structure: UnitStructure): Matri
 	]);
 }
 
-/** Stage 7 for the whole run — every unit, the root included (`REG-F-533`). */
-function stageSevenWhole(views: readonly UnitView[]): MatrixCell {
+/**
+ * Stage 7 for the whole run — every unit, the root included (`REG-F-533`). ⭐ R4 (the lead's round-4 item 4) — the root as its
+ * OWN stage-7 cell reads it: failed closed when its type cannot be read (`rootUnreadable`; `failedClosed`, R3-B F6), so the
+ * run's stage 7 never contradicts it. A unit not determined leaves the run not determined, owed where it is, unless a unit
+ * broke: a break decides the run whatever the others read. ⛔ It read the root by `completion` alone: as intended, beside
+ * the root's own cell, not determined.
+ */
+function stageSevenWhole(views: readonly UnitView[], rootUnreadable: string | null): MatrixCell {
 	// ⛔ E3 (C5) — A RUN WITH NO UNIT HAS COMPLETED NOTHING. Half A always reads §3.2's five; half B reads the Undertaking's,
 	// and a half-B run that stopped before it — a dry rehearsal, a candidate no one accepted — has none, which every-of-none
 	// would read as intended: a "Yes" with nothing run.
 	if (views.length === 0)
 		return cell('7', WHOLE_RUN, 'not reached', [], ['the run holds no work unit: no Undertaking of the run was instantiated']);
-	const perUnit = views.map((v) => completion(v, v.unit.slug));
+	// ⚠ The root is the first unit in both halves, as `buildRunReport` reads it (`cellsOf`).
+	const perUnit = views.map((v, i) => {
+		const own = completion(v, v.unit.slug);
+		return i === 0 && rootUnreadable !== null ? failedClosed([own], v.unit.slug, rootUnreadable)[0]! : own;
+	});
 	const broke = perUnit.filter((c) => c.value === 'broke');
-	let value: CellValue = 'as intended';
+	const undetermined = perUnit.filter((c) => c.value === null);
+	let value: CellValue | null = 'as intended';
 	if (broke.length > 0) value = 'broke';
+	else if (undetermined.length > 0) value = null;
 	else if (perUnit.some((c) => c.value === 'not reached')) value = 'not reached';
 	/**
 	 * ⭐ R3-B F4 (the lead's round-3 item 4) — a unit whose sign-off the lane
@@ -3076,6 +3139,8 @@ function stageSevenWhole(views: readonly UnitView[]): MatrixCell {
 	 * a reader had of its skipped sign-off.
 	 */
 	const lineOf = (c: MatrixCell, v: UnitView): string => {
+		// ⭐ R4 (the lead's round-4 item 4) — a unit not determined says why on its line: its reason comes first (`failedClosed`).
+		if (c.value === null) return `${c.row}: not determined — ${c.basis[0]}`;
 		const why = skippedWhy(v);
 		return why !== null && c.basis.includes(why) ? `${c.row}: ${c.value} — ${why}` : `${c.row}: ${c.value}`;
 	};
@@ -3089,7 +3154,7 @@ function stageSevenWhole(views: readonly UnitView[]): MatrixCell {
 			'measured as every unit, the root included, SATISFIED in lifecycle and assurance, its plan step SUCCEEDED: an ' +
 				'Undertaking has no completion state (REG-F-533)'
 		],
-		{ unregistered: broke.some((c) => c.unregistered === true) }
+		{ unregistered: broke.some((c) => c.unregistered === true), owedTo: value === null ? undetermined[0]?.owedTo : undefined }
 	);
 }
 
@@ -3496,8 +3561,8 @@ export function buildRunReport(
 		);
 	// ⭐ The lead's delegated decision of 2026-10-15, to be registered (E3's polish; the confirm of 60c8a828) — THE
 	// PHASES, whose cells stages 3 to 8 report: every unit after the root, which both halves put first; and THE ROOT
-	// ITSELF when its type declares MODEL, as half B's agent may (the lane counts its worst case before its press,
-	// `rootLimitCheck`): its press runs a model, so its tries, reviews and exchanges are measured like any phase's.
+	// ITSELF when its type declares MODEL, as half B's agent may (the lane counts ~~its worst case~~ ⭐ one try's reserve before
+	// its press, `rootLimitCheck`; `REG-D-114` (14), as amended 2026-10-16): its press runs a model, so its tries, reviews and exchanges are measured like any phase's.
 	// ⛔ ~~Every root skipped by its place~~: a MODEL root that broke a stage read as intended. ⭑ §3.2's root declares
 	// HUMAN and keeps its reading, in the whole run's stage 7.
 	// ⭐ R3-B F6 (the lead's round-3 item 6) — AND A ROOT WHOSE TYPE CANNOT BE
@@ -3512,7 +3577,7 @@ export function buildRunReport(
 	const matrix: MatrixCell[] = [
 		stageOne(ix, half, lane),
 		stageTwo(undertakingId, structure),
-		stageSevenWhole(views),
+		stageSevenWhole(views, rootUnreadable),
 		...phases.flatMap(cellsOf)
 	];
 	const counts = Object.fromEntries(CELL_VALUES.map((value) => [value, matrix.filter((c) => c.value === value).length]));
@@ -3555,7 +3620,7 @@ export function buildRunReport(
 		reviewerCalls: buildReviewerCalls(ix, units, lane),
 		audit: buildAudit(ix, units, undertakingId, lane),
 		// ⭐ E3 — half B's declared verdicts are the agent's policies: each unit's, as instantiation copied them from its type.
-		// ⭐ R3-B F3 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — ~~each unit's own list~~: THE
+		// ⭐ R3-B F3 (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (16)) — ~~each unit's own list~~: THE
 		// KERNEL'S DECLARED SET of each unit (`declaredPoliciesOf`), the set the lane counts its limit by (J1).
 		declaredVerdicts: {
 			expected:
@@ -3674,7 +3739,9 @@ function unitLines(r: RunReport): string[] {
 		`- **The lane's own reads of the limit, each before a paid act (design D8; E12F F2):** ${r.reviewerCalls.laneLimitChecks.length}.`,
 		...r.reviewerCalls.laneLimitChecks.map(
 			(c) => `  - ${c.unit}, before ${c.before}: ${limitFigures(c)}${c.allowed ? '' : ': held back'}.`
-		)
+		),
+		// ⭐ `REG-D-114` (14), as amended 2026-10-16 — the reads' plain caveat (`LIMIT_CAVEAT`).
+		`- **Caveat:** ${r.reviewerCalls.limitCaveat}`
 	];
 }
 

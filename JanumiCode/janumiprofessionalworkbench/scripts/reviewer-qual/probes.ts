@@ -164,7 +164,7 @@ export type ProcessResultBuilder = (source: ProcessResultReviewSource) => Reason
  * ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (`DESIGN-phase-7-completion.md` B4; `REG-F-553`'s class) — A DECLARED POLICY AS THE
  * REVIEWER IS SHOWN IT: its id, name and purpose, and its criteria; and the independence its sign-off demands, which no
  * prompt shows and the recording gate reads (as the seeded floor policy's is hashed beside its criteria). ⭐ R3-A F3 (the
- * lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — and its required evidence, which no prompt shows
+ * lead's delegated decision of 2026-10-16, registered as REG-D-114 (13)) — and its required evidence, which no prompt shows
  * and which caps the verdict its sign-off records (`declared-policy-signoff.ts` `evidenceCeiling`).
  */
 export interface DeclaredProbePolicy {
