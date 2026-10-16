@@ -38814,6 +38814,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - ⭑ **2026-10-09 — remedy 1 built in the product, with one retry** (`JAN-EXEC` Phase 7 P7-2b, `REG-D-102`). In the reasoning-review validator, a devin or agy call that throws before its tool's bound (devin 240 s; agy 180 s, its print timeout) is run once more. The failed call is recorded as `NO_RESPONSE` with the sanitised cause the tool gave, and the second as `RETRY` (`apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts`, `attempt` and `thrownCallDisposal`). A second throw, or a throw at the bound, still ends the review INCONCLUSIVE. The qualification's own transport (`scripts/reviewer-qual/transports.ts`) is unchanged, and this watch item stays open.
 - ⭑ **2026-10-10 — another cause recorded as no response.** Three of P7-3's command reviews ended with devin's *"Response truncated: model hit max output token limit"*: an answer the model ran out of room for, recorded as a thrown call (`REG-F-550`).
 - ⭑ **2026-10-10 — P1, the re-qualification after P7-6: 4 of its 80 calls failed this way** (`qr-2026-10-10-devin-glm-5-3-flash-max-v4`). Each was a REFUSAL short of the 240000 ms bound: G3-RR-04 #1 after 136036 ms, W-RR-08 #1 after 140154 ms, G3-RR-03 #2 after 115215 ms and P-RR-08 #2 after 105103 ms, each recorded *"devin failed after … ms"*. Re-run once under `qr-2026-10-10-devin-glm-5-3-flash-max-v4-retry`, as the qualification's §7.3 provides, all four were REJECTED, the right verdict. So the class recurs at about 5% of calls, under the isolated reviewer as before it.
+- ⭑ **2026-10-16 — P4: three transport failures, each a REFUSAL short of the bound, re-run once** (`9d4efc43`; `runs.ndjson:784`). In the full run (`qr-2026-10-16-devin-glm-5-3-flash-max-v5`), 3 of 108 calls failed at the transport, each short of the 240000 ms bound: W-RR-04 #1 after 90453 ms, D-FP-CLEAN #1 after 103522 ms, and W-RR-03 #2 after 94189 ms; each case's other repetition gave the oracle's verdict. Re-run once under `qr-2026-10-16-devin-glm-5-3-flash-max-v5-retry` (design §7.3), all three answered: W-RR-04 and W-RR-03 were REJECTED, the right verdict; D-FP-CLEAN was REJECTED against the oracle's SATISFIED, for reasons the case's own record supports (`REG-D-115`, `REG-F-562`).
 
 ### REG-F-500 — a ledger mutant of a data file still runs the runner's `tsc` leg, which reads no data file, and one that leaves the run literals valid JSON but breaks the module that loads them is graded KILLED by the load error, with no row run
 
@@ -40118,6 +40119,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - **SEARCHED BEFORE FILING.** The register for lines holding both *`residual uncertainty`* and *`planted`*: 0. For *`PLANTED_DEFECT_NOT_REJECTED`*: 1 line, the entry that defines the predicate (`REG-D-082`), and none about a miss by this reviewer. Positive control: `REG-F-552`, this reviewer's other P7-6-era finding.
 - ⭑ **2026-10-11 — the remedy chosen: the symmetric clause** (`REG-D-110` (2); `DESIGN-phase-7-completion.md` A1).
 - ⭑ **2026-10-16 — the symmetric clause is built** (`6fe1f312`; `REG-D-110` (2)). P4 measures the changed reviewer; P5 measures the execution half with it. The merged gate's qualification red is COVERAGE, with 54 of 54 current cases unmeasured under the changed fingerprint.
+- ⭑ **2026-10-16 — P4: 1 of 68 answered planted evaluations filed as residual uncertainty, P-RR-06 #1, against P1's 2 of 52** (`9d4efc43`; `runs.ndjson:785`). In `qr-2026-10-16-devin-glm-5-3-flash-max-v5`, P-RR-06 #1 answered SATISFIED with the planted defect named only as residual uncertainty (*"hold only under the declared assumption that the site survey and load assumptions are correct; the suite pass cannot itself confirm those inputs"*); repetition 2 was REJECTED, the right verdict. Under the symmetric clause (`REG-D-110` (2)), this is 1 of 68 answered planted evaluations in this run, against P1's 2 of 52 (`W-RR-03` #1, `G3-RR-09` #2).
 
 ### REG-D-107 — SPONSOR RULING: P2 approved after P1 — run the measured end-to-end run again, with recovery, now; and REG-D-106 confirmed
 
@@ -40267,6 +40269,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - ⭑ **2026-10-15 — the declared cases are conferred** (`REG-D-113`). The 14 declared-policy oracles of case set v5 are the sponsor's; P4 runs against them once the programme's fix round is merged and gated.
 - ⭑ **2026-10-11 — the number the lane enforces.** The sponsor's *"about 450"* is held as a number: **The limit is 450 reviewer calls** (`REG-D-102` (4) amended). The lane's `PHASE7_PAID_LIMIT` is to read it from this entry (package E3).
 - ⭑ **2026-10-16 — E1–E4 are built, reviewed, fixed and merged** (`26e60c4e`, fast-forwarded onto `jan-exec/phase7c`; not pushed). The declared oracles are conferred (`REG-D-113`). The final gate is green apart from the predicted qualification COVERAGE red: 54 of 54 current cases are unmeasured under fingerprint `466193114b264d3628dd16a0d00e738a38a3a234f6cb09d72c722bfa7d5cfc85`, after E1's symmetric clause and E12's declared framing changed 54 of 54 case prompts. Round 3 is building `REG-D-114`'s remaining decisions; P4 is next.
+- ⭑ **2026-10-16 — P4 done: 113 calls; 311 of about 450; one clean case repaired per REG-D-115** (`9d4efc43`). Under fingerprint `06b9d8e5fbca507ba4b2ae1d372251da8332ecbdbece0b652cd1fdcae1d16cb0`, P4 measured the selected candidate (devin / `glm-5-3-flash-max`) across canary (2 calls), full run (108 calls) and retry (3 calls). Of answered evaluations in the full run: clean 37 of 37 SATISFIED; planted 67 of 68 REJECTED. The retry answered 3 calls: W-RR-04 and W-RR-03 REJECTED, and D-FP-CLEAN REJECTED against its conferred SATISFIED oracle (`REG-F-562`). The sponsor ruled D-FP-CLEAN be repaired (`REG-D-115`). Programme spend: 311 of the sponsor's limit of about 450 reviewer calls (item (1)).
 
 ### REG-D-111 — DELEGATED (`REG-D-109`): the completion programme's own decisions — a declared REJECTED goes the canon route and is reported, not recovered; the root judged over its children; the operator records fitness-for-purpose's human decision; declared verdicts stay on the assurance plane; the replay recorded from the last paid run
 
@@ -40319,6 +40322,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - Each clean case (`D-RC-CLEAN`, `D-IP-CLEAN`, `D-AD-CLEAN`, `D-DC-CLEAN`, `D-AC-CLEAN`, `D-TA-CLEAN`, `D-FP-CLEAN`) expects SATISFIED with no criterion faulted.
   - Each planted case (`D-RC-04`, `D-IP-02`, `D-AD-01`, `D-DC-01`, `D-AC-01`, `D-TA-08`, `D-FP-03`) expects REJECTED with its one named criterion faulted.
   - Once the generated record cites this ruling, `reviewer:qual:check` no longer reports these oracles as unconferred (`REG-D-073`'s rule). Its coverage stays red until P4 runs.
+- ⭑ **2026-10-16 — D-FP-CLEAN's conferred oracle stood on a flawed record; repaired per REG-D-115; the other oracles stand** (`9d4efc43`, `e715871d`). In P4's retry, the reviewer REJECTED `D-FP-CLEAN`, faulting `FP-06` and `FP-07` for reasons the case's own record bears out (`REG-F-562`). The sponsor ruled to repair the case as `D6-FP-CLEAN` in case set v6, keeping its SATISFIED oracle (`REG-D-115`). The other 13 declared oracles conferred here stand unchanged.
 
 ### REG-D-114 — DELEGATED (`REG-D-109`): the completion programme's fix-round decisions — the merged remedies and the remaining round 3 work
 
@@ -40404,3 +40408,60 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - **WHY.** The page's re-run offer and post-re-run fold read governing policies only. The kernel retains a concluded declared verdict regardless of the policy's status, but a newer unconcluded assessment displaces that verdict before applicability is checked. Separately, folding UNASSESSED over no governing declared policy is a ratified kernel rule; changing it needs a ruling.
 - **REMEDY.** Untested: carry a non-governing declared policy's latest concluded verdict in the page's re-run offer and fold, as the kernel reads it. A lead or sponsor ruling is owed on retaining an earlier concluded vote beneath a newer open assessment, and on the empty-governing-set rule. No remedy was built in round 3. The paid lanes suspend no policy, so this finding is unscheduled.
 - **SEARCHED BEFORE FILING.** Case-insensitive literal line searches of the current register: `REG-F-561` (0), `declaredRerunOffer` (0), `foldAfterRerun` (0), `suspended policy` (0), `suspended` (7), `aggregateAssuranceDisposition` (19), `latestAssessmentByPolicy` (1), and `no declared review of this unit ended INCONCLUSIVE` (0). Positive control: `REG-D-112` (8). Nearest entries: `REG-F-524`, which already records case (D)'s empty-set refusal; `REG-F-437`, which records the latest-assessment reader's clock and version exposure; and `REG-D-112` (a), which authorizes the INCONCLUSIVE-only re-run. This entry adds cases (A), (C) and the recorded vote displaced by a newer open assessment.
+
+### REG-D-115 — SPONSOR RULING: repair the clean Fitness-for-Purpose case D-FP-CLEAN as D6-FP-CLEAN in case set v6, keep its oracle SATISFIED, re-measure it and check the other six clean declared cases; delegated extension to D6-FP-03, D6-RC-CLEAN and D6-RC-04
+
+**Decided 2026-10-16** (sponsor, in session; delegated extension by the lead, flagged for sponsor confirmation). **Type:** SPONSOR RULING. **Status:** ⚠ **OPEN — in force for case set v6; repair built in e715871d, delegated extension being built, re-measurement owed.**
+
+- **THE SPONSOR'S WORDS, verbatim, with the option's description:** Asked *"The clean Fitness-for-Purpose case D-FP-CLEAN has real flaws in its own record (3 of 7 requirements demonstrated; R5's error message claimed but not captured), and the reviewer rejected it once for exactly those. What should happen to it?"*, the sponsor chose *"Repair the case (Recommended)"*. That option read: *"Make its record genuinely clean (runs that show all seven requirements, stderr captured with the message), keep the oracle SATISFIED, re-measure it (2 calls, total 313), and check the other six clean declared cases for the same flaw at no paid cost. The repaired record comes to you in the next report."*
+- **WHAT THE RULING MEANS.**
+  - `D-FP-CLEAN`'s record is repaired to be genuinely clean, showing runs for R1 to R7 with standard error recorded.
+  - Its oracle is kept SATISFIED (`oracles-v6.ts`).
+  - It is re-measured in 2 reviewer calls.
+  - The other six clean declared cases are checked for the same flaw at no paid cost (`r5-out.md`). Four are clean (`D-IP-CLEAN`, `D-AD-CLEAN`, `D-DC-CLEAN`, `D-AC-CLEAN`). `D-RC-CLEAN` was found possibly flawed on RC-05, and `D-TA-CLEAN` had a borderline TA-04 evidence gap.
+- **THE LEAD'S DELEGATED EXTENSION (flagged for sponsor confirmation).** The lead extends the ruling to three companion cases in case set v6, being built now:
+  - `D6-FP-03`: the planted twin of `D-FP-CLEAN` mirrors the repaired record but for its plant (letter counts instead of word counts), which the old twin no longer did.
+  - `D6-RC-CLEAN`: the two additions (lower-case output in R3, usage message in R6) are marked as derived decisions; R2's wording is made to agree with R6 over `--top 0`.
+  - `D6-RC-04`: carries the same fixes, differing from its clean twin only by its plant.
+  - `D-TA-CLEAN` is left as conferred, its gap disclosed, because a reviewer can reasonably judge its tests adequate.
+  - **Re-measurement:** 4 cases × 2 = 8 reviewer calls (total 319 of about 450), run by the lead after the merge.
+- **HOW IT IS BEING BUILT.** Built so far in `e715871d` (branch `p7c-r5`, not yet merged; not built yet beyond `e715871d`):
+  - By the harness's rule that a changed case gets a new id (`cases.ts`), `D-FP-CLEAN` is replaced in place by `D6-FP-CLEAN`.
+  - Fixtures are stated; six runs show R1 to R7 with standard error recorded; an account claims what the runs show.
+  - Its oracle is carried (`oracles-v6.ts`), SATISFIED, naming this entry.
+  - Every other case in `e715871d` is version five's byte for byte, so P4's measurements of the other 53 stand with no `RESCORED` line.
+  - The reviewer fingerprint does not move (the cases are not among its components) and stays `06b9d8e5fbca507ba4b2ae1d372251da8332ecbdbece0b652cd1fdcae1d16cb0`.
+  - The companion cases of the delegated extension are being built now in v6.
+- **CORRECTION TO P4 ESCALATION RECORD.** P4's BOUNDEDNESS ESCALATION line (`runs.ndjson:784`) says the retry's `D-FP-CLEAN` rejection was *"escalated on its own line"*. No such line was written: once the case left the current set (v6), the check no longer judges it, so none is owed. The rejection stays in the record.
+
+### REG-F-562 — The clean declared case D-FP-CLEAN's record did not back its conferred SATISFIED oracle: 3 of 7 requirements demonstrated and no standard error captured, rejected by the reviewer in P4's retry
+
+**Filed 2026-10-16** (P4 retry, `qr-2026-10-16-devin-glm-5-3-flash-max-v5-retry`; confirmed in `case-set-v5.json`). **Status:** ⚠ **OPEN — remedy REG-D-115 is being built; closed after the re-measurement.**
+
+- **WHAT HAPPENED.**
+  - In P4's retry (`qr-2026-10-16-devin-glm-5-3-flash-max-v5-retry`, `9d4efc43`), the selected reviewer REJECTED `D-FP-CLEAN`, faulting criteria `FP-06` and `FP-07` as BLOCKING against its conferred oracle of SATISFIED (`REG-D-113`).
+  - In repetition 2 of the full run (`qr-2026-10-16-devin-glm-5-3-flash-max-v5`), `D-FP-CLEAN` had answered SATISFIED, but noted as residual uncertainty that *"The missing-file run's standard-error message is not captured in the recorded work product (only exit 2 and empty stdout are recorded), so R5's message requirement is asserted rather than evidenced"* and default top-10, bad-argument and case-insensitive paths were not exercised.
+  - In the retry, the reviewer rejected `D-FP-CLEAN`:
+    - `FP-06`: *"The declared limitations and residual uncertainty omit that R3, R4, R6 and R7 (default top-10, case-insensitive comparison, alphabetical tie order, exit 1 on a bad argument) were never exercised end to end, with the producer's own --top 2 choice avoiding the default, so the unqualified conclusion that the user's need is served rests on 3 of 7 requirements and the true residual uncertainty is materially understated and unacceptable."*
+    - `FP-07`: *"The missing-file run records only an empty stdout and exit 2 with no stderr capture, yet the artifact labels it as matching R5 (exit 2 with a message on standard error), so the critical unreadable-file condition's required user-facing message is represented nowhere despite being claimed as verified."*
+  - Reading `case-set-v5.json` confirmed that the case's own record bore out the rejection:
+    - The case records only two runs: `wordfreq test/e2e/fixtures/sample.txt --top 2` (exit 0) and `wordfreq test/e2e/fixtures/missing.txt` (exit 2).
+    - *"no recorded run demonstrates R3, R4, R6 or R7 end to end: the successful run overrides the default, the record supplies no mixed-case comparison or tied-count example, and neither command supplies a bad argument. The missing-file command omits `--top`, but failure to read its input does not demonstrate default top-10 output."*
+    - For R5, the run exercised only *"The exit-code portion of R5. The required message on standard error is unsupported by a recorded stderr result."*
+    - The missing-file command recorded stdout `""` and exit `2`, with *"no stderr field or stderr capture is recorded in either location. An empty stdout is not a record of stderr."*
+    - Yet `input.workProducts[0].answer` claimed expected *"R5: exit 2 with a message on standard error"*, verdict *"each run matches its requirement"*, and rationale *"the user’s need is served"*.
+- **THE OTHER SIX CLEAN DECLARED CASES.**
+  - A check of the other six clean declared cases (`r5-out.md`) found:
+    - Four cases CLEAN: `D-IP-CLEAN`, `D-AD-CLEAN`, `D-DC-CLEAN`, and `D-AC-CLEAN`.
+    - `D-RC-CLEAN` POSSIBLY FLAWED on `RC-05` (*"Requirements without an authoritative source are identified."*): lower-case output (R3) and a usage message (R6) were additions attributed to *"the request"* without identifying them as derived decisions.
+    - `D-TA-CLEAN` has a borderline `TA-04` evidence gap: file-level requirement labels and unit-test command are recorded, but no description demonstrating a CLI/file-reading/output boundary test. It does not establish that the underlying tests lack integration coverage.
+- **WHY IT MATTERS.**
+  - A clean declared case is conferred with an oracle of SATISFIED (`REG-D-113`).
+  - An oracle requiring SATISFIED on a record with real evidence gaps forces the qualification check to punish a reviewer that catches the flaws, or forces the reviewer to pass unevidenced claims.
+  - `reviewer:qual:check` was RED on `CLEAN_NOT_SATISFIED` for `D-FP-CLEAN`.
+- **REMEDY.**
+  - `REG-D-115`: the sponsor ruled to repair `D-FP-CLEAN` as `D6-FP-CLEAN` in case set v6, keeping its oracle SATISFIED, and re-measure it (2 calls).
+  - Built so far in `e715871d`: fixtures stated, six runs showing R1 to R7 with standard error recorded, account claiming what the runs show. Not built yet beyond `e715871d`.
+  - The lead's delegated extension to v6 (flagged for sponsor confirmation) repairs `D6-FP-03`, `D6-RC-CLEAN`, and `D6-RC-04`, and leaves `D-TA-CLEAN` as conferred with its gap disclosed (8 calls re-measurement, total 319 of about 450).
+  - This entry closes after the re-measurement.
+- **SEARCHED BEFORE FILING.** Case-insensitive literal line searches of the current register: `REG-F-562` (0), `D-FP-CLEAN` (1), `D6-FP-CLEAN` (0), `FP-06` (0), `FP-07` (0), `flawed record` (0). Positive control: `D-FP-03` (1). Nearest entries: `REG-D-113` (which conferred the 14 declared-policy oracles), `REG-D-115` (the sponsor's repair ruling), and `REG-F-555` (P4's planted miss).
