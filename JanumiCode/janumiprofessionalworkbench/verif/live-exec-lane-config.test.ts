@@ -76,6 +76,10 @@ import {
 	TEST_TIMEOUT_MS,
 	WIRED_EXECUTORS,
 	laneKeysRefusal,
+	phase7DeclaredRerunMs,
+	phase7DeclaredReviewsMs,
+	phase7RecordAssuranceMs,
+	phase7SignOffUnitMs,
 	requiredLaneKeys,
 	reviewerModelVariable,
 	wiredExecutor,
@@ -911,6 +915,28 @@ describe('⭐ P7-2 D4 — the Phase 7 lane waits an ALLOWANCE derived from the b
 			],
 			numbers: []
 		});
+	});
+
+	// ⭐⭐ R3-B F2 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — HALF B'S SIGN-OFF BOUNDS ARE THE
+	// ARITHMETIC ABOVE FOR THE UNIT'S OWN DECLARED POLICIES, restated as functions of the count: at §3.2's four they are the
+	// figures above, so the two cannot part, and each policy more adds one review's bound wherever a review is waited for.
+	it('⭐ R3-B F2 — half B’s sign-off bounds are the figures above for the unit’s own policies: equal to them at four, one review’s bound apart for each policy more', () => {
+		const review = LANE_BUDGET.reviewerCallsPerTry * LANE_BUDGET.reviewerCallMs;
+		const at = (policies: number) => [
+			phase7DeclaredReviewsMs(policies),
+			phase7RecordAssuranceMs(policies),
+			phase7DeclaredRerunMs(policies),
+			phase7SignOffUnitMs(policies)
+		];
+		expect(at(PHASE7_DECLARED_POLICIES_PER_UNIT), 'half B’s bounds at four are not half A’s').toEqual([
+			PHASE7_DECLARED_REVIEWS_MS,
+			PHASE7_RECORD_ASSURANCE_MS,
+			PHASE7_DECLARED_RERUN_MS,
+			PHASE7_SIGN_OFF_UNIT_MS
+		]);
+		// ⭑ A sign-off waits on its reviews twice: Record Assurance's, and the rule's one re-run of them.
+		expect(at(5).map((ms, i) => ms - at(4)[i]!)).toEqual([review, review, review, 2 * review]);
+		expect([phase7RecordAssuranceMs(0), phase7RecordAssuranceMs(5)]).toEqual([PHASE7_SIGN_OFF_MS, 5_100_000]);
 	});
 
 	// ⭐ `JAN-EXEC` P7-6R — THE LIMIT IS NOW `REG-D-105` (1)'s, which amends `REG-D-102` (4): *"Raise limit to 200"*. The test

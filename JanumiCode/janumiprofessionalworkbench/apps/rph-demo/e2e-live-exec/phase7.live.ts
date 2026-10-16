@@ -192,12 +192,16 @@ test.describe('LIVE — JAN-EXEC Phase 7: §3.2’s PWA, published, run as an Un
 					await gotoHydrated(page, undertakingPath);
 					await page.getByRole('button', { name: 'overview', exact: true }).click({ timeout: PHASE7_UI_MS });
 				},
-				recordAssurance: (unit) => recordAssurance(page, unitRowById(page, unit.unitId!), actionFields),
+				// ⭐ Waited for up to the bound the lane gives it, for the unit's declared policies (the lead's delegated decision of
+				// 2026-10-16, to be registered as REG-D-114).
+				recordAssurance: (unit, timeoutMs) =>
+					recordAssurance(page, unitRowById(page, unit.unitId!), actionFields, timeoutMs),
 				// ⭐ `E12F` F1 — the dry run's rehearsal: the row read, Record Assurance found and never pressed (`REG-D-112` (b)).
 				recordAssuranceOffered: (unit) => recordAssuranceOffered(unitRowById(page, unit.unitId!)),
 				// ⭐ `E12F` F3 — the rule's re-run of the declared reviews that did not conclude: the row's offer, and the act.
 				declaredRerunOffered: (unit) => declaredRerunOffered(unitRowById(page, unit.unitId!)),
-				rerunDeclared: (unit) => rerunDeclared(page, unitRowById(page, unit.unitId!), actionFields),
+				rerunDeclared: (unit, timeoutMs) =>
+					rerunDeclared(page, unitRowById(page, unit.unitId!), actionFields, timeoutMs),
 				markSatisfied: (unit) => markSatisfied(page, unitRowById(page, unit.unitId!), actionFields),
 				// ⭐ P7-6R R-1f — the run plan's rule's two hands: the row's offers, and one act on the row (`REG-D-105` (4)).
 				recoveryOffers: (unit) => recoveryOffers(unitRowById(page, unit.unitId!)),

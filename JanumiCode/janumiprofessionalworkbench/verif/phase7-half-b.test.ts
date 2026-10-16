@@ -389,6 +389,8 @@ function halfBLane(script: HalfBScript) {
 	const units = script.units ?? AGENT_UNITS;
 	const calls: string[] = [];
 	const timeouts: number[] = [];
+	/** ⭐ R3-B F2 — each sign-off press the lane asked for, and the bound it gave it. */
+	const bounds: [string, number | undefined][] = [];
 	let clock = 0;
 	let readsAfterSend = 0;
 	let sent = false;
@@ -478,8 +480,9 @@ function halfBLane(script: HalfBScript) {
 			return answered('success');
 		},
 		showOverview: async () => void calls.push('showOverview'),
-		recordAssurance: async (unit) => {
+		recordAssurance: async (unit, timeoutMs) => {
 			calls.push(`recordAssurance ${unit.slug}`);
+			bounds.push([`recordAssurance ${unit.slug}`, timeoutMs]);
 			return script.signOffs?.[unit.slug]?.ra ?? null;
 		},
 		// ⭐ The merge of E12 and E3 — E12's sign-off hands, which the lane calls since a sign-off asks the reviewer: a row
@@ -493,8 +496,9 @@ function halfBLane(script: HalfBScript) {
 			calls.push(`offersDeclaredRerun ${unit.slug}`);
 			return script.signOffs?.[unit.slug]?.rerun?.offered === true;
 		},
-		rerunDeclared: async (unit) => {
+		rerunDeclared: async (unit, timeoutMs) => {
 			calls.push(`rerunDeclared ${unit.slug}`);
+			bounds.push([`rerunDeclared ${unit.slug}`, timeoutMs]);
 			const outcome = script.signOffs?.[unit.slug]?.rerun?.outcome;
 			if (outcome === undefined) throw new Error('nothing re-runs its declared reviews here');
 			return outcome;
@@ -588,6 +592,7 @@ function halfBLane(script: HalfBScript) {
 		run: () => runTheLane({ boot, lane, hands, flushPosts: () => void calls.push('flushPosts') }),
 		calls,
 		timeouts,
+		bounds,
 		/** The calls of these kinds, in order. */
 		only: (...kinds: string[]) => calls.filter((c) => kinds.some((k) => c.startsWith(k))),
 		lane,
@@ -1058,23 +1063,32 @@ describe('⭐ C3 — the authoring allowance, folded into the timeout', () => {
 				PHASE7_INTROSPECT_MS -
 				PHASE7_SIGN_OFF_UNIT_MS
 		).toBe(PHASE7_MODEL_UNITS * PHASE7_PER_PHASE_MS);
-		expect(phase7HalfBTestTimeoutMs(4)).toBe(PHASE7_TEST_TIMEOUT_MS + PHASE7_AUTHORING_MS);
-		expect(phase7HalfBTestTimeoutMs(4)).toBe(425_225_000);
+		// ⭐ R3-B F2 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — ~~a phase count~~: each unit's
+		// declared policies, the root's first. With every unit declaring §3.2's most, four, the arithmetic is half A's re-counted.
+		const units = (phases: number): number[] => Array.from({ length: phases + 1 }, () => 4);
+		expect(phase7HalfBTestTimeoutMs(units(4))).toBe(PHASE7_TEST_TIMEOUT_MS + PHASE7_AUTHORING_MS);
+		expect(phase7HalfBTestTimeoutMs(units(4))).toBe(425_225_000);
 		// ⭐ And the ceiling's first phase count, as lane-config.ts states it: 23.
-		expect([phase7HalfBTestTimeoutMs(22) < NODE_TIMER_CEILING_MS, phase7HalfBTestTimeoutMs(23)]).toEqual([
+		expect([phase7HalfBTestTimeoutMs(units(22)) < NODE_TIMER_CEILING_MS, phase7HalfBTestTimeoutMs(units(23))]).toEqual([
 			true,
 			NODE_TIMER_CEILING_MS
 		]);
-		expect(phase7HalfBTestTimeoutMs(7) - phase7HalfBTestTimeoutMs(6)).toBe(PHASE7_PER_PHASE_MS);
-		expect(phase7HalfBTestTimeoutMs(1)).toBe(PHASE7_TEST_TIMEOUT_MS - 3 * PHASE7_PER_PHASE_MS + PHASE7_AUTHORING_MS);
-		expect(phase7HalfBTestTimeoutMs(40)).toBe(NODE_TIMER_CEILING_MS);
+		expect(phase7HalfBTestTimeoutMs(units(7)) - phase7HalfBTestTimeoutMs(units(6))).toBe(PHASE7_PER_PHASE_MS);
+		expect(phase7HalfBTestTimeoutMs(units(1))).toBe(PHASE7_TEST_TIMEOUT_MS - 3 * PHASE7_PER_PHASE_MS + PHASE7_AUTHORING_MS);
+		expect(phase7HalfBTestTimeoutMs(units(40))).toBe(NODE_TIMER_CEILING_MS);
 		expect(NODE_TIMER_CEILING_MS).toBe(2_147_483_647);
+		// ⭐ Each unit's sign-off re-counted for its own policies: one more policy, two more reviews — Record Assurance's, and the
+		// rule's one re-run of them — at four calls of 240 s each.
+		expect(phase7HalfBTestTimeoutMs([4, 5, 4, 4, 4]) - phase7HalfBTestTimeoutMs(units(4))).toBe(
+			2 * LANE_BUDGET.reviewerCallsPerTry * LANE_BUDGET.reviewerCallMs
+		);
 	});
 
-	it('⭐ the lane extends the test’s timeout ONCE, when the units are read, by the agent’s phase count', async () => {
+	it('⭐ the lane extends the test’s timeout ONCE, when the units are read, by ~~the agent’s phase count~~ ⭐ each of the agent’s units’ declared policies, the root’s first', async () => {
 		const l = halfBLane({ paid: true });
 		await l.run();
-		expect(l.timeouts).toEqual([phase7HalfBTestTimeoutMs(3)]);
+		// ⭑ AGENT_TYPES: the root, Specify, Build and Verify declare 1, 2, 1 and 1 (`requiredAssurancePolicyIds`).
+		expect(l.timeouts).toEqual([phase7HalfBTestTimeoutMs([1, 2, 1, 1])]);
 	});
 });
 
@@ -1931,6 +1945,58 @@ describe('⭐⭐ The merge of E12 and E3 (J1, J2) — half B’s sign-offs count
 			null
 		]);
 		expect(record.end?.reason).toBe('complete');
+	});
+
+	// ── ⛔ R3-B F2 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — HALF B'S SIGN-OFF TIME BOUNDS
+	// COME FROM THE UNIT'S DECLARED POLICIES AS THE STORE HOLDS THEM (`declaredPolicyIdsOf`), as J1's limit does: Record
+	// Assurance's, the rule's re-run of the declared reviews, and the test's timeout. Half A's stay §3.2's.
+	/** One declared review at its bound: its call, retry and repair, each `reviewerCallMs` — 960 s. */
+	const REVIEW_MS = PER_POLICY * LANE_BUDGET.reviewerCallMs;
+
+	it('⛔ R3-B F2 — an agent’s unit declaring FIVE policies has its Record Assurance, and the rule’s re-run of its declared reviews, given a bound that covers FIVE reviews; one declaring one, one review', async () => {
+		// ⛔ PREDICTED RED, read from the code: the lane handed its sign-off presses no bound, and each press waited
+		// `PHASE7_RECORD_ASSURANCE_MS` — §3.2's four policies' reviews, 4,140 s — whatever the unit declared.
+		const l = halfBLane({
+			paid: true,
+			types: FIVE_POLICY_TYPES,
+			signOffs: {
+				'specify-wordfreq': {
+					ra: refusal('pol_test_adequacy did not conclude: the reviewer’s call failed'),
+					rerun: { offered: true, outcome: answered('success') }
+				},
+				'build-wordfreq': { ra: answered('success') }
+			}
+		});
+		await l.run();
+		const FIVE_REVIEWS = PHASE7_SIGN_OFF_MS + FIVE.length * REVIEW_MS;
+		const ONE_REVIEW = PHASE7_SIGN_OFF_MS + REVIEW_MS;
+		expect(FIVE_REVIEWS, 'arrangement: five reviews pass §3.2’s four').toBeGreaterThan(PHASE7_SIGN_OFF_MS + 4 * REVIEW_MS);
+		expect(l.bounds, 'a sign-off press was not given the bound of its unit’s own declared reviews').toEqual([
+			['recordAssurance specify-wordfreq', FIVE_REVIEWS],
+			['rerunDeclared specify-wordfreq', FIVE_REVIEWS],
+			['recordAssurance build-wordfreq', ONE_REVIEW],
+			['recordAssurance verify-wordfreq-end-to-end', ONE_REVIEW],
+			['recordAssurance root', ONE_REVIEW]
+		]);
+	});
+
+	it('⛔ R3-B F2 — half B’s timeout counts each unit’s sign-off by the policies the store says it declares: five reviews for the unit declaring five, one for each declaring one', async () => {
+		// ⛔ PREDICTED RED, read from the code: the timeout counted every unit's sign-off as one of four declared policies
+		// (`PHASE7_SIGN_OFF_UNIT_MS`), the agent's units read for their number alone.
+		const l = halfBLane({ paid: true, types: FIVE_POLICY_TYPES });
+		await l.run();
+		/** One unit's sign-off at its bounds, for `policies`: its reviews counted twice — Record Assurance's, and the rule's re-run's. */
+		const share = (policies: number) => PHASE7_SIGN_OFF_UNIT_MS + 2 * (policies - 4) * REVIEW_MS;
+		expect(l.timeouts, 'half B’s timeout counted a sign-off at §3.2’s four policies').toEqual([
+			PHASE7_TEST_TIMEOUT_MS -
+				PHASE7_PER_PHASE_MS +
+				PHASE7_AUTHORING_MS -
+				4 * PHASE7_SIGN_OFF_UNIT_MS +
+				share(1) +
+				share(FIVE.length) +
+				share(1) +
+				share(1)
+		]);
 	});
 });
 

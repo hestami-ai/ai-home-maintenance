@@ -28,6 +28,7 @@ import ts from 'typescript';
 import { afterAll, describe, expect, it } from 'vitest';
 import type { EngineSnapshot } from '../apps/rph-demo/e2e/support/harness.js';
 import {
+	LANE_BUDGET,
 	LIVE_RUN_DIR_VARIABLE,
 	PHASE7_NEGATIVE_CONTROL_RESERVE,
 	PHASE7_PAID_LIMIT,
@@ -289,10 +290,15 @@ describe('⛔ the spec, from source: Playwright’s own `test`, its own timeout,
 
 	it('⛔ D4, D5 — every act on a unit is the operator’s, on that unit’s own row; the spec waits on no response itself', () => {
 		// ⭐ `REG-D-112` (E3's review, finding 5) — the unit's own row BY ITS ID: a title may repeat in half B.
-		for (const act of ['beginExecute', 'recordAssurance', 'markSatisfied'])
+		for (const act of ['beginExecute', 'markSatisfied'])
 			expect(callsTo(sf, act), act).toEqual([
 				['page', 'unitRowById(page, unit.unitId!)', 'actionFields']
 			]);
+		// ⭐ R3-B F2 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — and Record Assurance waited for
+		// up to the bound the lane hands the spec, never one the spec chooses.
+		expect(callsTo(sf, 'recordAssurance'), 'recordAssurance').toEqual([
+			['page', 'unitRowById(page, unit.unitId!)', 'actionFields', 'timeoutMs']
+		]);
 		// ⭐ P7-6R R-1f — and the run plan's rule's acts too: the row's offers read, and each act pressed, on the unit's own row.
 		expect(callsTo(sf, 'recoveryOffers'), 'recoveryOffers').toEqual([
 			['unitRowById(page, unit.unitId!)']
@@ -309,7 +315,7 @@ describe('⛔ the spec, from source: Playwright’s own `test`, its own timeout,
 			['unitRowById(page, unit.unitId!)']
 		]);
 		expect(callsTo(sf, 'rerunDeclared'), 'rerunDeclared').toEqual([
-			['page', 'unitRowById(page, unit.unitId!)', 'actionFields']
+			['page', 'unitRowById(page, unit.unitId!)', 'actionFields', 'timeoutMs']
 		]);
 		expect(anyMethodCalls(sf, 'waitForResponse')).toEqual([]);
 		expect(callsTo(sf, 'pressAction')).toEqual([]);
@@ -379,11 +385,13 @@ describe('⛔ D4 — the operator bounds every Begin & Execute by one phase’s 
 		).toEqual([
 			['beginExecute', "'beginExecute'", 'PHASE7_UNIT_ALLOWANCE_MS'],
 			// ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (design B8) — ~~'PHASE7_SIGN_OFF_MS'~~: Record Assurance runs the unit's
-			// declared reviews now, so it is waited for up to its act and those reviews (`PHASE7_RECORD_ASSURANCE_MS`).
-			['recordAssurance', "'recordAssurance'", 'PHASE7_RECORD_ASSURANCE_MS'],
+			// declared reviews now, so it is waited for up to its act and those reviews (~~`PHASE7_RECORD_ASSURANCE_MS`~~ ⭐ the
+			// bound the lane gives it, `timeoutMs`, for the unit's declared policies — R3-B F2; the lead's delegated decision of
+			// 2026-10-16, to be registered as REG-D-114).
+			['recordAssurance', "'recordAssurance'", 'timeoutMs'],
 			// ⭐ `E12F` F3 — the rule's re-run of the declared reviews that did not conclude: bounded as Record Assurance is, its
 			// act and a review of each declared policy.
-			['rerunDeclared', "'rerunDeclaredReviews'", 'PHASE7_RECORD_ASSURANCE_MS'],
+			['rerunDeclared', "'rerunDeclaredReviews'", 'timeoutMs'],
 			['markSatisfied', "'markSatisfied'", 'PHASE7_SIGN_OFF_MS'],
 			// ⭐ P7-6R R-1f — the rule's acts: an abandonment, bounded as a sign-off act; a re-run, as a phase (a re-run of the
 			// work runs the phase again).
@@ -651,9 +659,9 @@ function signOffRow(offered: number) {
 }
 
 describe('⭐ D5 — the sign-off acts on the page: the row waited for, Mark Satisfied only once Record Assurance has left it', () => {
-	it('⛔ Record Assurance waits for the row BEFORE judging it — a row offering it is pressed with its own bound, its declared reviews counted (E2), one offering none is not pressed', async () => {
+	it('⛔ Record Assurance waits for the row BEFORE judging it — a row offering it is pressed with ~~its own bound~~ ⭐ the bound it is given, half A’s here, its declared reviews counted (E2), one offering none is not pressed', async () => {
 		const offering = signOffRow(1);
-		const pressed = await recordAssurance(offering.page, offering.row, decode);
+		const pressed = await recordAssurance(offering.page, offering.row, decode, PHASE7_RECORD_ASSURANCE_MS);
 		expect(pressed?.envelopeType, 'a row that offers Record Assurance read as offering none').toBe(
 			'success'
 		);
@@ -663,7 +671,7 @@ describe('⭐ D5 — the sign-off acts on the page: the row waited for, Mark Sat
 		]);
 		expect(offering.asked).toEqual([{ action: 'recordAssurance', timeout: PHASE7_RECORD_ASSURANCE_MS }]);
 		const bare = signOffRow(0);
-		expect(await recordAssurance(bare.page, bare.row, decode)).toBeNull();
+		expect(await recordAssurance(bare.page, bare.row, decode, PHASE7_RECORD_ASSURANCE_MS)).toBeNull();
 		expect(bare.log, 'a row that offers no Record Assurance was pressed').toEqual([
 			`wait for the row visible ${PHASE7_UI_MS}`
 		]);
@@ -688,6 +696,21 @@ describe('⭐ D5 — the sign-off acts on the page: the row waited for, Mark Sat
 			'click Mark Satisfied'
 		]);
 		expect(r.asked).toEqual([{ action: 'markSatisfied', timeout: PHASE7_SIGN_OFF_MS }]);
+	});
+
+	it('⛔ R3-B F2 (the lead’s delegated decision of 2026-10-16, to be registered as REG-D-114) — Record Assurance and the rule’s re-run of the declared reviews are each waited for up to the bound the LANE gives them: half B’s from the unit’s own declared policies', async () => {
+		// ⛔ PREDICTED RED, read from the code: both presses waited `PHASE7_RECORD_ASSURANCE_MS`, §3.2's four policies' reviews,
+		// whatever the unit declared — so a unit of half B's declaring five could be abandoned at 4,140 s with its fifth review
+		// still inside its own bound.
+		const FIVE_REVIEWS = PHASE7_SIGN_OFF_MS + 5 * LANE_BUDGET.reviewerCallsPerTry * LANE_BUDGET.reviewerCallMs;
+		const offering = signOffRow(1);
+		await recordAssurance(offering.page, offering.row, decode, FIVE_REVIEWS);
+		const r = recoveryRow(['rerun-declared-reviews', 'rerun-declared-rationale']);
+		await rerunDeclared(r.page, r.row, decode, FIVE_REVIEWS);
+		expect([offering.asked, r.asked], 'a press was not waited for up to the bound it was given').toEqual([
+			[{ action: 'recordAssurance', timeout: FIVE_REVIEWS }],
+			[{ action: 'rerunDeclaredReviews', timeout: FIVE_REVIEWS }]
+		]);
 	});
 });
 
@@ -797,7 +820,7 @@ describe('⭐ P7-6R R-1f — the run plan’s rule’s acts on the page: what th
 		expect(offering.log).toEqual([`wait for the row visible ${PHASE7_UI_MS}`]);
 		expect(await declaredRerunOffered(recoveryRow(['rerun-review']).row), 'another offer read as the declared re-run').toBe(false);
 		const r = recoveryRow(['rerun-declared-reviews', 'rerun-declared-rationale']);
-		expect((await rerunDeclared(r.page, r.row, decode)).envelopeType).toBe('success');
+		expect((await rerunDeclared(r.page, r.row, decode, PHASE7_RECORD_ASSURANCE_MS)).envelopeType).toBe('success');
 		expect([r.log, r.asked], 'the re-run was not typed, pressed, and waited for as Record Assurance is').toEqual([
 			[`fill rerun-declared-rationale: ${DECLARED_RERUN_RATIONALE} (${PHASE7_UI_MS})`, `click rerun-declared-reviews (${PHASE7_UI_MS})`],
 			[{ action: 'rerunDeclaredReviews', timeout: PHASE7_RECORD_ASSURANCE_MS }]
@@ -1360,6 +1383,8 @@ interface Script {
 function laneOf(script: Script) {
 	const lane = openLane(folder('lane'));
 	const calls: string[] = [];
+	/** ⭐ R3-B F2 — each sign-off press the lane asked for, and the bound it gave it. */
+	const bounds: [string, number | undefined][] = [];
 	const archives: ArchiveCall[] = [];
 	const store = new Map<string, UnitState>();
 	/** ⭐ P7-6 B3 — each unit's plans: a re-run supersedes the last, whose step it cancels, and adds plan B (RD5). */
@@ -1461,8 +1486,9 @@ function laneOf(script: Script) {
 			reviewerCallCount += r.calls ?? 0;
 			return r.outcome;
 		},
-		recordAssurance: async (unit) => {
+		recordAssurance: async (unit, timeoutMs) => {
 			calls.push(`recordAssurance ${unit.slug}`);
+			bounds.push([`recordAssurance ${unit.slug}`, timeoutMs]);
 			const s = signOffOf(unit);
 			if (s.raAfter) store.set(unit.unitId!, s.raAfter);
 			reviewerCallCount += s.calls ?? 0;
@@ -1478,8 +1504,9 @@ function laneOf(script: Script) {
 			calls.push(`offersDeclaredRerun ${unit.slug}`);
 			return signOffOf(unit).rerun?.offered === true;
 		},
-		rerunDeclared: async (unit) => {
+		rerunDeclared: async (unit, timeoutMs) => {
 			calls.push(`rerunDeclared ${unit.slug}`);
+			bounds.push([`rerunDeclared ${unit.slug}`, timeoutMs]);
 			const r = signOffOf(unit).rerun;
 			if (r?.outcome === undefined) throw new Error(`the script re-runs no declared review of ${unit.slug}`);
 			if (r.after) store.set(unit.unitId!, r.after);
@@ -1535,6 +1562,7 @@ function laneOf(script: Script) {
 	return {
 		run: () => runTheLane({ boot, lane, hands, flushPosts: () => void calls.push('flushPosts') }),
 		calls,
+		bounds,
 		/** The calls of these kinds, in order. */
 		only: (...kinds: string[]) => calls.filter((c) => kinds.some((k) => c.startsWith(k))),
 		archives,
@@ -2486,6 +2514,37 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			allowed: true
 		});
 		expect([l.only('beginExecute'), record.end?.reason]).toEqual([['beginExecute root', 'beginExecute requirements'], 'paid-limit']);
+	});
+
+	it('⭐ R3-B F2 (the lead’s delegated decision of 2026-10-16, to be registered as REG-D-114) — half A’s sign-off presses are each given §3.2’s bound, four policies’ reviews: its values do not change', async () => {
+		// ⛔ PREDICTED RED, read from the code: the lane gave its sign-off hands no bound at all — the press chose its own, the
+		// same for every unit of either half (`PHASE7_RECORD_ASSURANCE_MS`).
+		const l = laneOf({
+			paid: true,
+			prior: 10,
+			presses: ALL_COMPLETE,
+			signOffs: {
+				root: GREEN,
+				requirements: GREEN,
+				design: {
+					ra: refusedWith(DID_NOT_CONCLUDE),
+					raAfter: ASSESSING,
+					rerun: { offered: true, outcome: answered('success'), after: ASSURED },
+					msAfter: SATISFIED
+				},
+				implementation: GREEN,
+				'end-to-end': GREEN
+			}
+		});
+		await l.run();
+		expect(l.bounds, 'a sign-off press of half A was not given §3.2’s bound').toEqual([
+			['recordAssurance requirements', PHASE7_RECORD_ASSURANCE_MS],
+			['recordAssurance design', PHASE7_RECORD_ASSURANCE_MS],
+			['rerunDeclared design', PHASE7_RECORD_ASSURANCE_MS],
+			['recordAssurance implementation', PHASE7_RECORD_ASSURANCE_MS],
+			['recordAssurance end-to-end', PHASE7_RECORD_ASSURANCE_MS],
+			['recordAssurance root', PHASE7_RECORD_ASSURANCE_MS]
+		]);
 	});
 
 	it('⭐ E12F F3 (REG-D-105 (4), REG-D-112 (a)) — PAID: a Record Assurance refused whose row, read afresh, offers re-running the declared reviews that did not conclude has them re-run ONCE by the rule, the limit read first; accepted, Mark Satisfied follows', async () => {
