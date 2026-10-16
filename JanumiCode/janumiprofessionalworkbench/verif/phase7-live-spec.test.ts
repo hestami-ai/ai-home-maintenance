@@ -698,10 +698,12 @@ describe('⭐ D5 — the sign-off acts on the page: the row waited for, Mark Sat
 		expect(r.asked).toEqual([{ action: 'markSatisfied', timeout: PHASE7_SIGN_OFF_MS }]);
 	});
 
-	it('⛔ R3-B F2 (the lead’s delegated decision of 2026-10-16, to be registered as REG-D-114) — Record Assurance and the rule’s re-run of the declared reviews are each waited for up to the bound the LANE gives them: half B’s from the unit’s own declared policies', async () => {
+	it('⛔ R3-B F2 (the lead’s delegated decision of 2026-10-16, to be registered as REG-D-114) — Record Assurance and the rule’s re-run of the declared reviews are each waited for up to the bound it is given', async () => {
 		// ⛔ PREDICTED RED, read from the code: both presses waited `PHASE7_RECORD_ASSURANCE_MS`, §3.2's four policies' reviews,
 		// whatever the unit declared — so a unit of half B's declaring five could be abandoned at 4,140 s with its fifth review
 		// still inside its own bound.
+		// ⭑ The presses' half only: the bound is handed in here. The lane's half, half B's bound from the unit's own declared
+		// policies, is held in `verif/phase7-half-b.test.ts` ('⛔ R3-B F2 — an agent’s unit declaring FIVE policies …').
 		const FIVE_REVIEWS = PHASE7_SIGN_OFF_MS + 5 * LANE_BUDGET.reviewerCallsPerTry * LANE_BUDGET.reviewerCallMs;
 		const offering = signOffRow(1);
 		await recordAssurance(offering.page, offering.row, decode, FIVE_REVIEWS);
@@ -2406,7 +2408,7 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 	// before a sign-off and before the rule's re-run of its declared reviews let an act through only UNDER the limit; E3's
 	// before half B's Send and its root's press let it reach it. They differed only at a total equal to the limit, so each
 	// check is held there: the two E12 checks went red at it; the phase's, the re-run's, Send's and the root's are pinned.
-	it('⛔ ONE RULE — a sign-off whose own worst case brings the total EXACTLY to the limit is pressed; the next, one past it, is held back', async () => {
+	it('⛔ ONE RULE — a sign-off whose own worst case brings the total EXACTLY to the limit is pressed; the next, past it, is held back', async () => {
 		// ⛔ PREDICTED RED, read from the code: `limitCheck` let a sign-off through only with its total UNDER the limit, so the
 		// requirements unit's, its two declared policies' 8 calls bringing the total to the limit exactly, was held back.
 		const prior = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - signOffWorstCase(PHASE7_ARCHIVE_UNITS[1]!);
