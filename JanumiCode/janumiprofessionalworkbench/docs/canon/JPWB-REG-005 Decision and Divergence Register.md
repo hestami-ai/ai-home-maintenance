@@ -37458,6 +37458,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - Left as written, and flagged: `G-CLEAN-R3`'s *"Asset Protection Consent Application"*, read as the rail authority's own consent process.
 - **ORACLE INTEGRITY BINDS FROM HERE.** No increment that edits the reviewer's prompt, criteria or scoring edits the cases or oracles. Version one tunes nothing.
 - **FOR SPONSOR CONFIRMATION:** the standings (above all `W-RR-03`), the `R1` rename, and the `R3` wording.
+- ⭑ **2026-10-16 — proposed oracles refuse qualification** (`439c3915`). `reviewer:qual:check` reports a CONFERRAL problem when the current oracles are PROPOSED. The v5 conferral is recorded under `REG-D-113` (`b34c99a6`); COVERAGE remains red until P4.
 
 ### REG-D-074 — DELEGATED (`REG-D-071`): how the reviewer-qualification runner loads, scores, classifies and RETAINS, where the design left it open
 
@@ -37615,7 +37616,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-F-452 — `child-process-runner.test.ts`'s B2 arrangement assumes a node child exits inside its 500 ms deadline; under a loaded gate it did not, and the test reported a timeout it had correctly observed
 
-**Filed 2026-09-25** (`JAN-CRITREAD` `J1-3`, found by the J1-3 gate run; not a J1-3 change). **Status:** ~~⚠ **OPEN — a load-sensitive arrangement (a flake), not a product defect on this evidence; the remedy is owed.**~~ ~~✅ **CLOSED 2026-10-10** — the remedy is built: B2's deadline is placed after an observed exit, and the file's reaper no longer kills its own worker (the pointer below).~~ ⚠ **REOPENED 2026-10-11** — the reaper's fix holds; B2's new arrangement does not prove an exit before the deadline (the pointer below).
+**Filed 2026-09-25** (`JAN-CRITREAD` `J1-3`, found by the J1-3 gate run; not a J1-3 change). **Status:** ~~⚠ **OPEN — a load-sensitive arrangement (a flake), not a product defect on this evidence; the remedy is owed.**~~ ~~✅ **CLOSED 2026-10-10** — the remedy is built: B2's deadline is placed after an observed exit, and the file's reaper no longer kills its own worker (the pointer below).~~ ~~⚠ **REOPENED 2026-10-11** — the reaper's fix holds; B2's new arrangement does not prove an exit before the deadline (the pointer below).~~ ✅ **CLOSED 2026-10-16** — B2 uses the child's recorded exit; the deliberate reopened-case probe, the load runs and the merge gate are recorded in the pointer below.
 
 - **WHAT HAPPENED.** In `gate:fast`'s parallel `rph-demo` test step, *"⛔⛔ B2 — and it is NOT a timeout: a child that exited 0 in milliseconds did not time out"* failed in 1814 ms. It reported *"a deadline that passes over an EXITED child is not a timeout: expected true to be false"*. In the previous gate run the same test passed in 579 ms. Run alone after the failure, it passed 3 of 3. Nothing in the runner or the test changed in `J1-3`; the file was last changed by `7189c4b7`.
 - **WHY — most likely, not proven.** The arrangement gives the child a 500 ms deadline and relies on its own note: *"The child exits in about 70ms on this host"*. The product sets `timedOut` from whether the child was still running when the deadline passed. On a loaded host, starting a node child can take longer than 500 ms, and then `timedOut: true` is the TRUE observation, not a fabricated one. The test cannot tell which case it got, because it does not observe the child's exit time.
@@ -37635,6 +37636,9 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - **Why that does not prove it.** That pair does not show the child exited BEFORE the deadline. A child still running when the deadline fires, which exits 0 as the kill lands, gives the same pair, and `timedOut: true` is then the true observation.
   - **What still holds.** The reaper's fix: no worker has died since.
   - **The remedy, owed.** Drive the deadline from the child's RECORDED exit, as this entry first said. The child prints its own exit time, and the test asserts only on an attempt whose recorded exit came well before its deadline. Until then, a red here on a loaded run is re-run, and the re-run is recorded.
+- ⭑ **2026-10-16 — ✅ CLOSED: B2 is rebuilt from the child's recorded exit** (`7fa99a4a`, `ae795e41`).
+  - The old file passed 15 of 15 load runs; its flake did not recur there. The reopened case was then driven deliberately in a temporary test: exit 0, timedOut true, recorded exit 1521 ms against a 1500 ms deadline. The old arrangement admitted it and failed; the rebuilt arrangement refused it.
+  - B2 asserts only where the recorded exit precedes the deadline by at least 250 ms, the exit event precedes the sentinel, and the deadline settled the run. The rebuilt file passed 12 of 12 load runs, 35 of 35 tests in each. P2B-x, P2B-q and P2B-d were KILLED. B2 passed in the merge's full gate (`722dbbc5`).
 
 ### REG-D-078 — SPONSOR RULING: the flawed clean case is fixed; the pass-bar question waits on a second candidate, devin with GLM-5.3 Flash at Max effort; Ollama is set aside for the reviewer role; REG-D-075, REG-D-076 and REG-D-077 confirmed
 
@@ -38880,6 +38884,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - `undertaking-scope.e2e.ts:87`: the same after-test request, reset. Its trace was cleared by the next e2e run before it was copied out, as `REG-F-182` warns.
   - `phase7-five-unit.e2e.ts:383`, round 1's own rehearsal: *"apiRequestContext.get: read ECONNRESET"* on `GET /test-api/introspect` (`harness.ts:139`, called from the spec's `:412`). Its trace: sent 5912 ms after the last response, and reset 93 ms later, 6004 ms after it.
   - So five tests have now met it, and one did in every full e2e run of round 1. The remedy this entry owes is paid for at every landing until it is made.
+- ⭑ **2026-10-16 — the ECONNRESET class recurred at the merge's gate** (`722dbbc5`). S-01 S-c failed its first introspect read with *"Error: apiRequestContext.get: read ECONNRESET"* and passed on Playwright's first retry. The final gate at `26e60c4e` passed 109 of 109 e2e tests without a flake.
 
 ### REG-D-100 — SPONSOR RULING: `JAN-EXEC` Phase 7, the live end-to-end, is the next programme; every issue it or its preparation surfaces is registered, because assurance is the methodology's critical value proposition
 
@@ -39078,6 +39083,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   1. Refuse a set `JPWB_AGENT_MODEL` that Pi does not resolve, quoting Pi's error, as the executor does. Untested.
   2. Show Pi's warning on the turn when it builds a custom model id. Untested.
   3. Keep the fallback for an unset variable, and say on the turn when it was used. Untested.
+- ⭑ **2026-10-16 — half B enforces the author's pin** (`ec815606`, `60c8a828`, `241158f4`). A producer read from a settled turn that differs from the pin breaks stage 1 under this entry. An unread producer is an unregistered fault; a missing pin cites `REG-F-531`. No author check runs before the turn settles.
 
 ### REG-F-510 — A work unit's instruction carries nothing of its Undertaking's objective or intended product: a model step's subject is the unit's id, title and description, which instantiation copies from its type, so two Undertakings of one PWA render the same instruction for the same type
 
@@ -39153,6 +39159,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   1. Build the executor's loader closed: `noContextFiles: true`, `noExtensions: true`, an `appendSystemPromptOverride` that returns nothing, settings with `projectTrusted: false`, and `PI_OFFLINE=1` for the server. Untested. Predicted red: a session opened over a workspace holding `AGENTS.md` and `.pi/APPEND_SYSTEM.md` carries neither text in its recorded composite; at HEAD it carries both.
   2. Record what the loader loaded (context files, extensions, packages) on the EXECUTION exchange, and show it to the reviewer. Untested.
 - ⭑ **2026-10-10 — Phase 7 checks what Pi loads, and refuses a run folder under a context file.** Round 2's K4 check reads Pi's agent folder (`AGENTS.md`, `CLAUDE.md`, `APPEND_SYSTEM.md`, which Pi appends even under the executor's override, and `extensions/`), every ancestor of the workspace and its root, and searches each executor input for the context markers Pi writes (design §6 D7). The lane refuses at boot a run folder with such a file in it or above it (D2). On this host the account's home folder holds `.pi`, so no run folder under it is admitted.
+- ⭑ **2026-10-16 — candidate 1, parts 1–4, are built for the executor** (`06465c50`, `733b9410`, `efefad3c`; `REG-D-114` (7)). Its loader takes no context files, extensions, skills or prompt templates, appends nothing, and trusts no project settings (`projectTrusted: false`). The package-install hazard and its driven fix are `REG-F-559`. Round 3 is building the same closure for the authoring agent before P6, and checking whether `PI_OFFLINE=1` can be set for the paid lanes' server without touching model calls; that fifth part remains conditional (`REG-D-114` (19)).
 
 ### REG-F-513 — The Undertaking page shows no review of a unit whose completion the floor refused, nor of any unit's superseded tries, and shows the refusal itself only once, as a form error: its scope admits a work product or command evidence only through a successful completion
 
@@ -39250,7 +39257,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-F-518 — Pi asks the executing model for parallel tool calls and runs one message's calls concurrently, and JPWB's two tools do not ask to run in sequence, so a command can start before a file written in the same message exists
 
-**Filed 2026-10-09** (`JAN-EXEC` Phase 7's mapping, with `REG-D-101`; read from code at `a2d88db6` and from the installed Pi packages, 0.80.6; not driven). **Status:** ⚠ **OPEN — unscheduled.** In Phase 7 a unit that writes its tests and runs them in one message can record a run of files not yet written, and that run is reviewed like any other.
+**Filed 2026-10-09** (`JAN-EXEC` Phase 7's mapping, with `REG-D-101`; read from code at `a2d88db6` and from the installed Pi packages, 0.80.6; not driven). **Status:** ~~⚠ **OPEN — unscheduled.** In Phase 7 a unit that writes its tests and runs them in one message can record a run of files not yet written, and that run is reviewed like any other.~~ ✅ **CLOSED 2026-10-16** — Pi runs a turn's tool calls one at a time (`356fbcd1`; `REG-D-112` (d)); the pointer below.
 
 - **WHAT HAPPENS.**
   - The codex provider requests `parallel_tool_calls: true` (`node_modules/@earendil-works/pi-ai/dist/api/openai-codex-responses.js:352`). Pi's agent runs one message's tool calls in parallel by default (`node_modules/@earendil-works/pi-agent-core/dist/agent.js:130`; `dist/types.d.ts:215-223`). It runs them in sequence only when its config says so or a called tool declares `executionMode: 'sequential'` (`dist/agent-loop.js:287-293`). Otherwise it prepares the calls in order and then starts them together (`dist/agent-loop.js:332-366`, `Promise.all` at `:365`).
@@ -39267,6 +39274,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - ⭑ **2026-10-10 — the ordinal has its first reader.** Round 2's re-run manifest carries each command's order as the order its run COMPLETED, and names it so, since the start order this entry describes is recorded nowhere.
 - ⭑ **2026-10-10 — driven live.** In P7-3's requirements phase, the executor's existence check of `docs/requirements.md` printed `<missing>`, because it ran beside the `write_file` in the same message. The file exists. The command's review refused it as *"the delegated deliverable is absent"* (RR-01, RR-09).
 - ⭑ **2026-10-11 — to be fixed before the recorded run** (`REG-D-112` (d)). A turn's tool calls run one at a time, because a replay must reproduce them in order. This changes the executor's behaviour, and the change is stated where it is made.
+- ⭑ **2026-10-16 — ✅ CLOSED: Pi runs a turn's tool calls one at a time** (`356fbcd1`; `REG-D-112` (d)). Both executor tools declare sequential execution. The change is merged in `26e60c4e`, before the recorded run.
 
 ### REG-F-519 — the executor's answer is all the text the model emits in a tool-using turn, parsed whole as one JSON object, so any text outside the final JSON leaves its account NOT DECLARED for the work product's review and for every command's review
 
@@ -39363,6 +39371,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 - ⭑ **2026-10-10 — the report's label.** This entry asks the run report to count these verdicts as not measured. `REG-D-102` (6), later, has the report mark all 14 vacuous, and the design's §1 keeps "vacuous by construction" as its own value. Round 2's report does that (design §6 D9). The design sentence this entry quotes as stage 5, *"Its declared policies are signed off"*, is not in the design: searched with grep, and with `git log -S` over the design's history (0 each; positive control: "declared policies", 2 lines in the design).
 - ⭑ **2026-10-10 — in P7-3.** 2 of the 14 declared verdicts were issued, both the root's, each vacuous by construction. No phase completed, so the other 12 were never asked for.
 - ⭑ **2026-10-11 — to be resolved:** each declared policy judged by the reviewer, one review per policy, each criterion recorded and the verdict computed from them (`REG-D-110` (3); `DESIGN-phase-7-completion.md` Part B).
+- ⭑ **2026-10-16 — one declared review per (unit, policy) is built** (`2ca341f0`, `2676b940`). Each criterion is recorded and the verdict is computed from the answers. The fix rounds align qualification with sign-off (`cfccfeac`) and make stage 5b read the latest verdict, keeping superseded verdicts as history (`cff3a158`, `50c0c9af`). P5 measures the live sign-offs; the root-framing gap remains `REG-F-558`.
 
 ### REG-F-524 — A work unit whose declared assurance policies all fail to govern it can never be assured: the kernel folds the empty set to UNASSESSED and refuses Record Assurance with a reason that names no policy, the page lists each excluded policy as "REQUIRED — UNASSESSED", and no step before the sign-off warns
 
@@ -39513,6 +39522,10 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - **Run over P3's archive, the recorder could not yet write a real recording.** The archive scan hit 199 times on JSON-escaped code, and a try whose commands raced (`REG-F-518`) is refused.
   - **What it extracted from P3:** all 4 executor turns, all 17 commands and 16 of the 22 reviewer calls.
   - The fix round makes the scan read decoded strings, and `REG-F-518` is fixed before the recorded run (`REG-D-112` (d)).
+- ⭑ **2026-10-16 — the replay's fix rounds are merged** (`26e60c4e`; `REG-D-112` (c), `REG-D-114` (8)–(10)).
+  - The executor key covers the system prompt and tool definitions (`7edf55aa`), then the tool results the model read mid-turn (`5d05b89e`, recording format `jpwb-replay-recording/3`). A result mismatch refuses REPLAY_STALE. A write result's size can still differ in a fresh replay sandbox, including on the recording's host (`d4136240`).
+  - The replay re-creates the recorded published PWA and leaves out the authoring floor. A live backend selection beside the switch is refused, including `JPWB_AGENT=mock` (`7edf55aa`). Declared review calls are kept, keyed by their full prompt and named by the unit reviewed (`02f00a4a`).
+  - The archive scan reads decoded strings (`5c4accf9`) and catches tokens after escapes at any JSON-escaping depth (`2c94fc7f`), with the UNC exception recorded under `REG-F-536`. The committed recording from the last paid run and its replay remain P7 work.
 
 ### REG-F-531 — the live lanes pass the operator's whole shell environment to the server, and the live-exec lane's boot check reads only the backend selections: a stray `JPWB_REVIEW_SEES_PRIOR` changes what the reviewer is given, and a stray `JPWB_AGENT` or `JPWB_AGENT_MODEL` changes the authoring agent, with nothing saying so
 
@@ -39650,6 +39663,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   3. Record the path as a declared host fact, redacted in what reaches the provider.
 - ⭑ **2026-10-10 — what Phase 7 does about it.** The lane's own files hold the account name and absolute paths by construction: the inherited variables, K4's agent-folder path, refusal texts. They stay outside the repository. The run report scans its own output and refuses to write on a hit; an argument naming the account or an absolute path is replaced, and its command is listed apart from the manifest (design §6 D9). One more carrier, found in round 2: an assertion message that quotes a temporary path names the account, and the ledger's OBSERVED texts quote assertion messages. Round 2's entries replace such paths with `%TEMP%`.
 - ⭑ **2026-10-10 — the account's name is already committed, 27 times.** Run over the committed tree (`git grep` for the name, word-bounded, at `7d0f837c`), the scan's rule finds it on 27 lines of 12 files: comments, test fixtures, design and roadmap text, mutation-ledger `why` texts quoting assertion messages, and `W-3`'s measurements. Among them is `packages/rph-ports/src/ports/process-runner.ts`'s own example of a host path fragment. None comes from Phase 7's rounds; round 2 adds none and scrubbed the three its own ledger entries held. A sweep is owed: each test fixture's name replaced and its mutants driven again. It is unscheduled.
+- ⭑ **2026-10-16 — the scan catches tokens where an escape ends, at any JSON-escaping depth** (`2c94fc7f`, `54454cd9`; `REG-D-114` (10)). Before a recording is committed, it scans for the account name, drive paths and UNC paths. UNC leading-run/separator pairs (2,1), (4,2) and (4,1) are caught: 3 of the old pattern's 4 spellings. (2,2) is escaped code's shape and is excluded. Code with a share's ratio and a letter-colon followed by an escaped newline can still yield false positives. This fixes the scan rule; the earlier committed-name sweep remains owed.
 
 ### REG-F-537 — the independence check compares the model ids the tools report by exact string, so another spelling of the same model passes as independent; the limit is disclosed only in an operator message
 
@@ -40095,6 +40109,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - Either moves the reviewer fingerprint and owes a paid re-qualification.
 - **SEARCHED BEFORE FILING.** The register for lines holding both *`residual uncertainty`* and *`planted`*: 0. For *`PLANTED_DEFECT_NOT_REJECTED`*: 1 line, the entry that defines the predicate (`REG-D-082`), and none about a miss by this reviewer. Positive control: `REG-F-552`, this reviewer's other P7-6-era finding.
 - ⭑ **2026-10-11 — the remedy chosen: the symmetric clause** (`REG-D-110` (2); `DESIGN-phase-7-completion.md` A1).
+- ⭑ **2026-10-16 — the symmetric clause is built** (`6fe1f312`; `REG-D-110` (2)). P4 measures the changed reviewer; P5 measures the execution half with it. The merged gate's qualification red is COVERAGE, with 54 of 54 current cases unmeasured under the changed fingerprint.
 
 ### REG-D-107 — SPONSOR RULING: P2 approved after P1 — run the measured end-to-end run again, with recovery, now; and REG-D-106 confirmed
 
@@ -40243,6 +40258,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
      - The candidate checks (the design's C4) record and report what they find. They do not refuse before Submit, so a trap plays out live and the run reports it.
 - ⭑ **2026-10-15 — the declared cases are conferred** (`REG-D-113`). The 14 declared-policy oracles of case set v5 are the sponsor's; P4 runs against them once the programme's fix round is merged and gated.
 - ⭑ **2026-10-11 — the number the lane enforces.** The sponsor's *"about 450"* is held as a number: **The limit is 450 reviewer calls** (`REG-D-102` (4) amended). The lane's `PHASE7_PAID_LIMIT` is to read it from this entry (package E3).
+- ⭑ **2026-10-16 — E1–E4 are built, reviewed, fixed and merged** (`26e60c4e`, fast-forwarded onto `jan-exec/phase7c`; not pushed). The declared oracles are conferred (`REG-D-113`). The final gate is green apart from the predicted qualification COVERAGE red: 54 of 54 current cases are unmeasured under fingerprint `466193114b264d3628dd16a0d00e738a38a3a234f6cb09d72c722bfa7d5cfc85`, after E1's symmetric clause and E12's declared framing changed 54 of 54 case prompts. Round 3 is building `REG-D-114`'s remaining decisions; P4 is next.
 
 ### REG-D-111 — DELEGATED (`REG-D-109`): the completion programme's own decisions — a declared REJECTED goes the canon route and is reported, not recovered; the root judged over its children; the operator records fitness-for-purpose's human decision; declared verdicts stay on the assurance plane; the replay recorded from the last paid run
 
@@ -40272,6 +40288,11 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - **The recording holds the published PWA's content, and the replay re-creates it.** The authoring floor's exchanges are left out.
   - **A live backend selection beside the replay switch is refused**, the authoring agent's included.
 - **(d) Pi runs a turn's tool calls one at a time** (`REG-F-518`). This is fixed before the recorded run, because a replay must reproduce the calls in order. It changes the executor's behaviour.
+- ⭑ **2026-10-16 — (a)–(d) are built and merged** (`26e60c4e`).
+  - **(a)** The page offers the INCONCLUSIVE-only re-run (`7fededd8`). The paid rule reads the limit, re-runs once after an answered refusal, then marks satisfied only if accepted (`abe82f41`). An unanswered sign-off act ends the run (`864bbae2`). Its Decision cites delegated authority and sponsor confirmation owed (`0675e7df`).
+  - **(b)** The dry run rehearses up to Record Assurance and presses nothing (`abe82f41`). Half B stops before Send.
+  - **(c)** The replay re-creates the recorded published PWA, leaves out the authoring floor and refuses a live backend beside its switch (`7edf55aa`).
+  - **(d)** Pi's executor tools run sequentially (`356fbcd1`; `REG-F-518` closed).
 
 ### REG-D-113 — SPONSOR RULING: the 14 declared-policy oracles of reviewer-qualification case set v5, conferred as proposed
 
@@ -40290,3 +40311,57 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - Each clean case (`D-RC-CLEAN`, `D-IP-CLEAN`, `D-AD-CLEAN`, `D-DC-CLEAN`, `D-AC-CLEAN`, `D-TA-CLEAN`, `D-FP-CLEAN`) expects SATISFIED with no criterion faulted.
   - Each planted case (`D-RC-04`, `D-IP-02`, `D-AD-01`, `D-DC-01`, `D-AC-01`, `D-TA-08`, `D-FP-03`) expects REJECTED with its one named criterion faulted.
   - Once the generated record cites this ruling, `reviewer:qual:check` no longer reports these oracles as unconferred (`REG-D-073`'s rule). Its coverage stays red until P4 runs.
+
+### REG-D-114 — DELEGATED (`REG-D-109`): the completion programme's fix-round decisions — the merged remedies and the remaining round 3 work
+
+**Decided 2026-10-16** (lead, under `REG-D-109`'s delegation; raised by the completion programme's fix rounds). **Type:** DECISION — delegated, flagged for sponsor confirmation. **Status:** ⚠ **OPEN — (1)–(10) are built and merged; (11)–(19) are decided and being built in round 3; sponsor confirmation owed.**
+
+- **AUTHORITY AND EVIDENCE.** These decisions pursue the sponsor's *"All of those options should be pursued and resolved."* (`REG-D-109`). E12, E3 and E4 are merged as `26e60c4e`. The merge's 395-entry mutant run at `722dbbc5` reported 388 KILLED, 7 ABOLISHED and 0 SURVIVED; the fix round's 14-entry run reported 14 KILLED. A separate later e2e run exposed PQ7-M104's surviving obsolete lever; its abolition is (18), still being built.
+- **(1) Declared qualification uses the sign-off's verdict** (`cfccfeac`). A declared case is scored through the product's declared-review seam and `declaredVerdict`, at the seeded policy's evidence ceiling. Oracle set v5's own note says *"the declared policy’s verdict as the sign-off computes it"*. The old scorer differed: a planted reply recommending SATISFIED read BOUNDARY_REJECTED instead of REJECTED; a clean reply recommending ESCALATED read ESCALATED instead of SATISFIED.
+- **(2) Stage 5b reads the latest declared verdict per (unit, policy)** (`cff3a158`, `50c0c9af`). Superseded verdicts are listed as history beside the verdict that superseded them.
+- **(3) The run report discloses what the lane held back** (`fd7b0fb9`, `26e60c4e`). A sign-off held back by the limit reads as held back. The lane's limit checks are listed, starting with half B's read before Send, and worded by their arithmetic.
+- **(4) The root's declared reviews use UNIT_PURPOSE** (`985909d7`, `157ea3e0`). No qualification case measures this framing. The run report discloses it as a caveat; no case set changes. The gap remains open as `REG-F-558`.
+- **(5) A verdict bound to another subject version folds as STALE_VERSION, so INCONCLUSIVE** (`488e9c84`). This follows the kernel's version check.
+- **(6) REG-F-505 reaches MODEL units with no built children**, including a root or a type permitted to have children (`ec815606`, `60c8a828`, `241158f4`). A unit is exempt as a composite only when children were built under it.
+- **(7) The executor's Pi loader is closed** (`06465c50`, `733b9410`, `efefad3c`). No context files, extensions, skills or prompt templates are loaded; the appended prompt is empty; `projectTrusted` is false. These are `REG-F-512`'s first remedy candidate, parts 1–4. The lead keeps the settings-trust remedy; `REG-F-559` records the hazard it closes.
+- **(8) The executor's replay key reaches its system prompt and tool definitions** (`7edf55aa`), **and the tool results the model read mid-turn** (`5d05b89e`). Recording format `jpwb-replay-recording/3` carries the result key. The replay-sandbox size limit remains disclosed (`d4136240`).
+- **(9) A live backend selection beside the replay switch is refused**, including `JPWB_AGENT=mock` (`7edf55aa`).
+- **(10) The archive scan finds an account name, drive path or UNC path where an escape ends, at any depth of JSON escaping, before a recording is committed** (`2c94fc7f`, `54454cd9`). UNC pairs (2,1), (4,2) and (4,1), counted as leading run and separator, are caught: 3 of the old pattern's 4 spellings. (2,2) remains excluded as escaped code's shape (`REG-F-536`).
+- **(11) A unit composed of others is judged over its whole subtree's work, plus its own work product when present.** It is refused only when no work product or command evidence exists in it or below it. This generalizes `REG-D-111` (2), written for section 3.2's two-level tree. `1fa32dec` built only the narrower refusal over empty direct-child work; the general rule is decided and being built in round 3 before P4.
+- **(12) A replayed declared verdict carries its own validator id.** Decided and being built in round 3 before P4.
+- **(13) The reviewer fingerprint reaches declared-case scoring and the declared seam's requiredEvidence.** A change to either moves the fingerprint. Decided and being built in round 3 before P4, so P4's measurements bind to it (`REG-F-560`).
+- **(14) One limit rule applies at each check: the lane may reach PHASE7_PAID_LIMIT (450) and may never pass it.** Decided and being built in round 3 before P4. The merged code still has two rules at exactly 450; `26e60c4e` reports their arithmetic without unifying them.
+- **(15) Half B's sign-off time bounds come from the unit's declared policies as the store holds them.** Decided and being built in round 3 before P6.
+- **(16) Half B's expected declared count uses the kernel's declared set:** the unit's own list unioned with its type's required list. Decided and being built in round 3 before P4.
+- **(17) The report distinguishes three readings.** A sign-off skipped after the lane's limit stop reads as stopped there. An acceptance with no answer reads as no answer. A root whose type cannot be read fails closed. Decided and being built in round 3 before P4.
+- **(18) PQ7-M104 is abolished by REG-D-104.** The lever it pinned, Complete on a stopped step, is gone because a stopped step waits. The ledger change is decided and being built in round 3 before P4; the later e2e measurement still reported SURVIVED.
+- **(19) The authoring agent's Pi loader is closed like the executor's before P6.** Set `PI_OFFLINE=1` for the paid lanes' server only if reading Pi's source confirms it touches no model call. Both are being worked on in round 3; the offline part remains conditional (`REG-F-512`'s fifth part).
+
+### REG-F-558 — The root's declared reviews use UNIT_PURPOSE, a framing no reviewer-qualification case measures
+
+**Filed 2026-10-16** (`JAN-EXEC` completion programme; E12's fix and polish reviews). **Status:** ⚠ **OPEN — disclosed in run reports; qualification of this framing remains owed.**
+
+- **WHAT HAPPENED.** The root's declared reviews judge its children's work against the root's own purpose, using UNIT_PURPOSE (`985909d7`). In a half-A run, 2 of the 14 declared reviews use this framing. Case set v5's 14 declared cases use PRODUCING_PROMPT; 0 of 14 measure UNIT_PURPOSE.
+- **WHY.** The root has no single producing instruction for its children's work. Giving it that instruction would misdescribe the subject. The framing is truthful, but qualification of PRODUCING_PROMPT cannot measure it.
+- **REMEDY.** `157ea3e0` adds the caveat to run reports, counting the affected model reviews among the latest verdicts. No case set changes were made (`REG-D-114` (4)); disclosure leaves the qualification gap open.
+- **SEARCHED BEFORE FILING.** Case-insensitive literal line searches of the register: `REG-F-558` (0), `UNIT_PURPOSE` (0), `unitPurposeCaveat` (0), `PRODUCING_PROMPT` (0). Nearest decisions: `REG-D-111` (2), the root's subject, and `REG-D-113`, the 14 declared oracles.
+
+### REG-F-559 — Pi's trusted workspace settings could install a package and run its scripts with the server's environment
+
+**Filed 2026-10-16** (`JAN-EXEC` completion programme; E4's polish check and fix, Pi 0.80.6). **Status:** ~~⚠ **OPEN — workspace settings can cause host execution with the server's environment.**~~ ✅ **CLOSED 2026-10-16** — the executor trusts no project settings; the fix pointer records the evidence. The agent-folder configuration remains a disclosed residue.
+
+- **WHAT HAPPENED.** Pi's `projectTrusted ?? true` let a unit's `.pi/settings.json` reach later executor sessions. A missing package listed there could be installed on the host, with install scripts enabled. The settings could also name `npmCommand`, which Pi ran even with `PI_OFFLINE=1`.
+- **WHY.** This load ran outside the command runner's environment allowlist. The subprocess inherited the server's whole environment, keys included. The checker found it by reading Pi; the fixer then drove the real loader without a model.
+- **REMEDY.** Keep `projectTrusted: false`, as decided in `REG-D-114` (7). `PI_OFFLINE=1` alone leaves the npm-command route open.
+- ⭑ **2026-10-16 — the trusted-workspace route is fixed** (`733b9410`, `efefad3c`; explanatory comment `e226bb0a`). With Pi 0.80.6's real loader, a trusted workspace's stand-in npm command ran and read a probe environment variable, including offline. Real npm ran a local tarball's postinstall offline and it read that variable too. Untrusted, the probes read empty workspace settings and nothing ran. The lead keeps the remedy.
+- **RESIDUE, RECORDED NOT FIXED.** The agent folder's own settings remain trusted and can name an npm command Pi runs. That folder is outside the contained workspace `write_file` surface. The settings-trust switch closes the workspace-settings route only.
+- **SEARCHED BEFORE FILING.** Case-insensitive literal line searches of the register: `REG-F-559` (0), `projectTrusted` (3), `npmCommand` (0), `settings.json` (2), `PI_OFFLINE` (2). The hits describe `REG-F-512`'s loader exposure and proposed closure; this entry records the driven package-install and offline-command hazard and its fix.
+
+### REG-F-560 — The reviewer fingerprint's scoring digest misses declared-case scoring and the declared seam's requiredEvidence
+
+**Filed 2026-10-16** (`JAN-EXEC` completion programme; E12's polish finding and the merge's open questions). **Status:** ⚠ **OPEN — the fingerprint extension is decided and being built in round 3 before P4.**
+
+- **WHAT HAPPENED.** `cfccfeac` changed declared-case scoring to match sign-off, and the scoring digest did not move. The scoring corpus exercises the work-product path. It misses `declaredVerdict` and `evidenceCeiling`; the fingerprint's declared-policy seam also omits `requiredEvidence`.
+- **WHY.** A later declared-scoring or evidence-ceiling change could leave earlier measurements standing under an unchanged fingerprint. E12 reported 0 recorded declared-case measurements at its polish check; P4 is still ahead.
+- **REMEDY.** Extend the scoring digest to declared cases and include `requiredEvidence` in the declared seam (`REG-D-114` (13)). Round 3 is building this before P4, so the measurements bind to the corrected fingerprint. No round 3 result is claimed here.
+- **SEARCHED BEFORE FILING.** Case-insensitive literal line searches of the register: `REG-F-560` (0), `scoreDeclared` (0), `declaredVerdict` (0), `evidenceCeiling` (0), `scoring digest` (5), `scoring-corpus` (4), `requiredEvidence` (88). The digest and corpus hits describe earlier fingerprint work; they do not record this declared-scoring gap.
