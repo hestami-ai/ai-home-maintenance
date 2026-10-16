@@ -40,8 +40,8 @@
 //     says what that changes), so there a missing package the agent folder's settings list is not fetched;
 //   · THE WORKING-DIRECTORY LINE names the server's folder, not the workspace: `pi-executor.ts` gives its session no
 //     folder (`SessionManager.inMemory()`), so the session takes `process.cwd()` (`dist/core/sdk.js`).
-// ⭐⭐ AND THE AUTHORING AGENT'S PI NOW TAKES THE SAME CLOSED OPTIONS (the lead's delegated decision of 2026-10-16, to be
-// registered as REG-D-114; `REG-F-512`): `pi-agent.ts` builds its loader from `closedResourceLoaderOptions` with its own
+// ⭐⭐ AND THE AUTHORING AGENT'S PI NOW TAKES THE SAME CLOSED OPTIONS (the lead's delegated decision of 2026-10-16,
+// registered as REG-D-114 (19); `REG-F-512`): `pi-agent.ts` builds its loader from `closedResourceLoaderOptions` with its own
 // system prompt, and its settings manager trusts no project. ⚠ IT CHANGES THE AUTHORING AGENT'S BEHAVIOUR: `pi-agent.ts`
 // says what it took by Pi's defaults until then.
 // ⭑ A PI-FREE MODULE, as `pi-execution-tools.ts` is: it imports Pi's types alone, so its test loads no part of Pi —

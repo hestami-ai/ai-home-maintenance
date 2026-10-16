@@ -2124,8 +2124,8 @@ export async function runTheLane(r: {
 				return end('authoring-stopped', 'the Undertaking of the published PWA holds no unit: instantiation built none');
 			rowOf = (u) => authored.rows.get(u.unitId!);
 			// ⭐ C3 — THE TIMEOUT, RE-COUNTED FOR THE AGENT'S UNITS: the phases are the root's and the tree's, not §3.2's four. ⭐ And
-			// each unit's sign-off for the policies the store says it declares (the lead's delegated decision of 2026-10-16, to be
-			// registered as REG-D-114), read from the store the units were read from, the root's first.
+			// each unit's sign-off for the policies the store says it declares (the lead's delegated decision of 2026-10-16,
+			// registered as REG-D-114 (15)), read from the store the units were read from, the root's first.
 			hands.extendTimeout?.(
 				phase7HalfBTestTimeoutMs(record.units.map((u) => declaredPolicyIdsOf(authored.snapshot, u.unitId!).length))
 			);

@@ -2408,8 +2408,8 @@ function completion(v: UnitView, row: string): MatrixCell {
 /**
  * ⛔ The merge's fix round, F2 — WHERE A READ'S TOTAL STANDS AGAINST THE LIMIT, by its arithmetic: below it, "under it"; AT it and
  * let through, "at it, which this act may reach" ~~— only `limitCheckAhead`'s rule lets a total reach the limit (`LaneLimitCheck`);
- * anything else, "not under it"~~. ⭐ THE WORDS FOLLOW THE ONE RULE (the lead's delegated decision of 2026-10-16, to be
- * registered as REG-D-114): every check lets an act reach the limit and none lets it pass, so ~~"not under it"~~ a total above
+ * anything else, "not under it"~~. ⭐ THE WORDS FOLLOW THE ONE RULE (the lead's delegated decision of 2026-10-16,
+ * registered as REG-D-114 (14)): every check lets an act reach the limit and none lets it pass, so ~~"not under it"~~ a total above
  * the limit is "past it". ⚠ A total AT it held back is a record made before the one rule: "at it", never one the act may reach.
  */
 function standingOf(c: LaneLimitCheck): string {

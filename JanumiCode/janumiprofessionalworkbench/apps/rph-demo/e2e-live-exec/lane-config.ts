@@ -592,8 +592,8 @@ export const PHASE7_TEST_TIMEOUT_MS =
  * (`REG-D-112`, E3's review finding 2; `PHASE7_AUTHORING_REVIEWER_CALLS`), and, paid, before the root's press, a MODEL
  * root's (`rootLimitCheck`; `PHASE7_UNIT_REVIEWER_CALLS`). ~~⚠ Two rules, as each package built its own: before a phase, a
  * re-run of one and a sign-off the total must be UNDER the limit (`limitCheck`); before Send and the root's press it may
- * reach it (`limitCheckAhead`).~~ ⭐ ONE RULE for every check (the lead's delegated decision of 2026-10-16, to be registered
- * as REG-D-114): the lane may REACH the limit and never pass it by what it counts — the calls spent, those held back and
+ * reach it (`limitCheckAhead`).~~ ⭐ ONE RULE for every check (the lead's delegated decision of 2026-10-16, registered
+ * as REG-D-114 (14)): the lane may REACH the limit and never pass it by what it counts — the calls spent, those held back and
  * what the act itself counts must total at most the limit (`limitCheck`). ~~⚠ Before a phase and the rule's re-run of one it
  * counts their first call only (`PHASE7_PHASE_FIRST_CALL`), as D8 counted no phase's worst case.~~ ~~⭐ R3-B's fix round, F1 —
  * and what each act counts is its worst case, before a phase and the rule's re-run of one too: a model unit's before a
