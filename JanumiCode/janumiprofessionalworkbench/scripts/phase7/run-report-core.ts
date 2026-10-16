@@ -427,7 +427,10 @@ export interface ReviewerCallCount {
 export interface ReviewerCalls extends ReviewerCallCount {
 	readonly lowerBound: true;
 	readonly byUnit: Readonly<Record<string, ReviewerCallCount>>;
-	/** Design D8's check, restated over the record: prior + recorded + reserve, under the limit. */
+	/**
+	 * Design D8's check, restated over the record: prior + recorded + reserve~~, under the limit~~ ⭐ against the limit (R3-B's
+	 * fix round): `under` is the fact total < limit, and report.md words the total by the one rule (`runStanding`).
+	 */
 	readonly limit: {
 		readonly prior: number | null;
 		readonly recorded: number;
