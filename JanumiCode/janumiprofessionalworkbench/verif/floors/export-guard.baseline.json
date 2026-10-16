@@ -132,7 +132,7 @@
 				"suspendAssurancePolicy",
 				"validatorNamedBy"
 			],
-			"unattributedMutants": 9
+			"unattributedMutants": 12
 		},
 		"packages/rph-application/src/handlers/command-precondition.ts": {
 			"consumedExports": [
@@ -242,7 +242,7 @@
 				"startExecutionStep",
 				"supersedeExecutionPlan"
 			],
-			"unattributedMutants": 17
+			"unattributedMutants": 18
 		},
 		"packages/rph-application/src/handlers/floor-gate.ts": {
 			"consumedExports": [
@@ -1253,7 +1253,7 @@
 				"programFileName",
 				"workspaceDirectoryName"
 			],
-			"unattributedMutants": 1
+			"unattributedMutants": 2
 		},
 		"packages/rph-ports/src/ports/storage.ts": {
 			"consumedExports": [
