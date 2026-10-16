@@ -1,5 +1,5 @@
 // ⭐⭐ `JAN-EXEC` Phase 7 completion, round 5 — THE ORACLES FOR CASE SET VERSION SIX, VERSIONED SEPARATELY FROM IT (the
-// sponsor's ruling on D-FP-CLEAN, to be registered as `REG-D-115`, and its delegated extension;
+// sponsor's ruling on D-FP-CLEAN, registered as `REG-D-115`, and its delegated extension;
 // DESIGN-what-the-tests-prove.md §5.2, §5.4).
 //
 // VERSION FIVE'S ORACLES, FOUR CARRIED TO THEIR REPAIRED CASES. Every case of version six but four is version five's, byte
