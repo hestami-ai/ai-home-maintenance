@@ -1958,6 +1958,7 @@ assurance policies gate it.** ⛔ Report what breaks; do not smooth it.
 | P5 | half A again: the "Yes" without `REG-F-523` or `REG-F-555` (paid) | reported to the sponsor |
 | P6 | half B: the authoring agent builds the PWA, then it runs (paid) | reported to the sponsor |
 | P7 | the recording, from the last paid run, and the replay regression committed | the regression replays the recorded matrix at no call |
+- ⭑ **2026-10-16 — E1–E4 are built, reviewed, fixed and merged** (`26e60c4e`); the 14 declared oracles are conferred (`REG-D-113`); round 3 is building `REG-D-114`'s remaining items; P4 is next.
 
 ⚠ *"The results become `TEST_RESULT` evidence"* above ~~is put to the sponsor as the design's §9.5~~ ⭑ is read as `R18`'s OBSERVATION evidence, judged by the reviewer (the sponsor, `REG-D-102` (5)). *"The declared assurance policies gate it"* holds in form only today (the design's stage 5b; §9.6) ⭑ and runs as is, all 14 verdicts reported vacuous (`REG-D-102` (6)). §11's *"It works live"* was measured on 2026-09-14 and has not been driven since; today's live authoring specs cannot pass (`REG-F-506`).
 
