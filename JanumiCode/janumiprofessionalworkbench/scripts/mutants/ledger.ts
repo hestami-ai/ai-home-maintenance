@@ -30279,5 +30279,50 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/phase7-half-b.test.ts"],
 		why: "PROMISE (R3-B F6; the lead's round-3 item 6): an unread root's break stays broke, its register ids kept, and says why the root was measured at all. WHO RELIES: the reader of that break. WHAT THE MUTATION DOES: the break carries no reason. Applied by hand first, the file restored byte for byte: 'AssertionError: 4: expected [ '0 commands became evidence', …(3) ] to include 'the root unit’s type cannot be read (…'' ('Tests  1 failed | 103 passed (104)'). OBSERVED (bun run mutants -- (R3-B F6's ids and the guards near its lines), 2026-10-16, in the R3-B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R3B-M36-an-unread-root-s-break-says-no-why ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 7 completion programme, round 3, package R3-B, F6 - a root whose type cannot be read fails closed in the report: its cells reported, broke or not determined, with the reason, never skipped (the lead's round-3 item 6)"
+	},
+	{
+		id: "R3B-M37-an-unanswered-acceptance-s-hash-reads-as-none",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "`the accepted hash: ${accepted ?? noHashAccepted(unansweredAcceptance(authoring))}; ` +",
+		replace: "`the accepted hash: ${accepted ?? 'none'}; ` +",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (R3-B F5's general form; the lead's round-3 item 5): stage 1's fourth line reads the hash of an acceptance that got no answer as none RECORDED, and why - never a bare 'none', which says no hash was accepted. WHO RELIES: the reader of a half-B report whose run ended at the acceptance, allowance-exceeded or request-failed, and P7-5. WHAT THE MUTATION DOES: the line reads 'none' whatever the acceptance came to, the code before the fix. Applied by hand first, the file restored byte for byte: 'AssertionError: no answer within 300000 ms: expected [ …(2) ] to deeply equal [ …(2) ]' ('Tests  1 failed | 103 passed (104)') - the red the fix was built against, observed first at the unchanged code, where the fourth line read 'the accepted hash: none; the candidate as the lane last read it: READY_TO_COMMIT' and report.md '- **The accepted hash:** none.'. OBSERVED (bun run mutants -- (R3-B F5's general form: its ids, R3B-M28 to R3B-M31 and the guards near its lines), 2026-10-16, in the R3-B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R3B-M37-an-unanswered-acceptance-s-hash-reads-as-none ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion programme, round 3, package R3-B, F5's general form - every reading of an acceptance that got no answer reads as no answer: stage 1's fourth line and report.md's accepted hash too (the lead's round-3 item 5)"
+	},
+	{
+		id: "R3B-M38-no-hash-recorded-reads-as-none",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "return unanswered === null ? 'none' : `none recorded — the acceptance got ${unanswered}`;",
+		replace: "return 'none';",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (R3-B F5's general form; the lead's round-3 item 5): the reading of no hash accepted says none RECORDED, and why, for an acceptance that got no answer. WHO RELIES: stage 1's fourth line and report.md's accepted hash, which both read it. WHAT THE MUTATION DOES: it reads 'none' for every acceptance. Applied by hand first, the file restored byte for byte: 'AssertionError: no answer within 300000 ms: expected [ …(2) ] to deeply equal [ …(2) ]' ('Tests  1 failed | 103 passed (104)'). OBSERVED (bun run mutants -- (R3-B F5's general form: its ids, R3B-M28 to R3B-M31 and the guards near its lines), 2026-10-16, in the R3-B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R3B-M38-no-hash-recorded-reads-as-none ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion programme, round 3, package R3-B, F5's general form - every reading of an acceptance that got no answer reads as no answer: stage 1's fourth line and report.md's accepted hash too (the lead's round-3 item 5)"
+	},
+	{
+		id: "R3B-M39-the-summary-keeps-no-unanswered-acceptance",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "unanswered: unansweredAcceptance(a),",
+		replace: "unanswered: null,",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (R3-B F5's general form; the lead's round-3 item 5): report.json's authoring summary keeps how the acceptance went unanswered (authoring.unanswered), which report.md's accepted hash reads. WHO RELIES: report.md's reader, and a reader of report.json whose authoring.acceptedHash is null. WHAT THE MUTATION DOES: the summary keeps none, so report.md reads a bare 'none'. Applied by hand first, the file restored byte for byte: 'AssertionError: no answer within 300000 ms: expected [ …(2) ] to deeply equal [ …(2) ]' ('Tests  1 failed | 103 passed (104)'). OBSERVED (bun run mutants -- (R3-B F5's general form: its ids, R3B-M28 to R3B-M31 and the guards near its lines), 2026-10-16, in the R3-B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R3B-M39-the-summary-keeps-no-unanswered-acceptance ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion programme, round 3, package R3-B, F5's general form - every reading of an acceptance that got no answer reads as no answer: stage 1's fourth line and report.md's accepted hash too (the lead's round-3 item 5)"
+	},
+	{
+		id: "R3B-M40-the-authoring-section-prints-a-bare-none",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "`- **The accepted hash:** ${a.acceptedHash ?? acceptedNone(a.unanswered)}.`,",
+		replace: "`- **The accepted hash:** ${a.acceptedHash ?? 'none'}.`,",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (R3-B F5's general form; the lead's round-3 item 5): report.md's authoring section reads the hash of an acceptance that got no answer as none recorded, which the server may still have accepted. WHO RELIES: report.md's reader. WHAT THE MUTATION DOES: it prints 'none', the code before the fix. Applied by hand first, the file restored byte for byte: 'AssertionError: no answer within 300000 ms: expected [ …(2) ] to deeply equal [ …(2) ]' ('Tests  1 failed | 103 passed (104)') - the red the fix was built against, observed first at the unchanged code. OBSERVED (bun run mutants -- (R3-B F5's general form: its ids, R3B-M28 to R3B-M31 and the guards near its lines), 2026-10-16, in the R3-B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R3B-M40-the-authoring-section-prints-a-bare-none ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion programme, round 3, package R3-B, F5's general form - every reading of an acceptance that got no answer reads as no answer: stage 1's fourth line and report.md's accepted hash too (the lead's round-3 item 5)"
+	},
+	{
+		id: "R3B-M41-the-authoring-section-drops-what-the-server-may-have-done",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "unanswered === null ? 'none' : `${noHashAccepted(unanswered)}, and the server may still have accepted it`;",
+		replace: "unanswered === null ? 'none' : noHashAccepted(unanswered);",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (R3-B F5's general form; the lead's round-3 item 5): report.md's authoring section, read alone, says the server may still have accepted a candidate whose acceptance got no answer. WHO RELIES: the reader of that section. WHAT THE MUTATION DOES: the clause is dropped. Applied by hand first, the file restored byte for byte: 'AssertionError: no answer within 300000 ms: expected [ …(2) ] to deeply equal [ …(2) ]' ('Tests  1 failed | 103 passed (104)'). OBSERVED (bun run mutants -- (R3-B F5's general form: its ids, R3B-M28 to R3B-M31 and the guards near its lines), 2026-10-16, in the R3-B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R3B-M41-the-authoring-section-drops-what-the-server-may-have-done ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion programme, round 3, package R3-B, F5's general form - every reading of an acceptance that got no answer reads as no answer: stage 1's fourth line and report.md's accepted hash too (the lead's round-3 item 5)"
 	}
 ];

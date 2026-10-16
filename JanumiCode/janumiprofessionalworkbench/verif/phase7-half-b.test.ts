@@ -2625,13 +2625,24 @@ describe('⛔ E3’s polish, 2 — stage 1 says the agent authored the PWA only 
 			[outlasted, 'allowance-exceeded', 'no answer within 300000 ms'],
 			[lost, 'request-failed', 'no answer: the request failed in transit (net::ERR_EMPTY_RESPONSE)']
 		] as const) {
-			const one = cellOf(buildRunReport(store, unaccepted(ready, accept, end), { accountNames: NAMES }).report, '1', 'whole run');
+			const r = buildRunReport(store, unaccepted(ready, accept, end), { accountNames: NAMES }).report;
+			const one = cellOf(r, '1', 'whole run');
 			expect(one.basis[0], how).toBe(
 				`the PWA "CLI Product Realization" is DRAFT: its acceptance of a candidate got ${how}, and the server may still have ` +
 					`accepted it — the authoring came to a candidate READY_TO_COMMIT, and the run ended ${end}`
 			);
 			expect(one.basis, how).toContain(`the acceptance got ${how}: the server may still have accepted it, and the lane recorded no hash`);
 			expect(one.basis.join('\n'), how).not.toMatch(/no candidate of the agent’s was accepted|no one accepted a candidate/);
+			// ⛔ AND THE ACCEPTED HASH, as stage 1's fourth line and the authoring section read it, is none RECORDED, with why: a
+			// bare "none" said no hash was accepted, of a press whose answer never came.
+			const acceptedLine = renderMarkdown(r)
+				.split('\n')
+				.find((l) => l.startsWith('- **The accepted hash:**'));
+			expect([one.basis[3], acceptedLine], how).toEqual([
+				`the accepted hash: none recorded — the acceptance got ${how}; the candidate as the lane last read it: READY_TO_COMMIT`,
+				`- **The accepted hash:** none recorded — the acceptance got ${how}, and the server may still have accepted it.`
+			]);
+			expect(r.authoring?.acceptedHash, how).toBeNull();
 		}
 	});
 

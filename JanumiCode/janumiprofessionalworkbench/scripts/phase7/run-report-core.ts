@@ -622,6 +622,11 @@ export interface AuthoringSummary {
 	 * the lane's record, the store keeping none (`REG-F-504`).
 	 */
 	readonly acceptedHash: string | null;
+	/**
+	 * ⭐ R3-B F5 (the lead's round-3 item 5) — how the acceptance went unanswered (`unansweredAcceptance`), or null: with no
+	 * answer, the hash above is none RECORDED, and the server may still have accepted one.
+	 */
+	readonly unanswered: string | null;
 	/** ⭐ C4 — every finding of the candidate checks, recorded before Submit, none of which refused anything. */
 	readonly findings: readonly {
 		readonly check: string;
@@ -2854,7 +2859,8 @@ function stageOneHalfB(ix: Index, lane: LaneRows): MatrixCell {
 			authorshipLine(pwa, status, accepted, authoring, lane),
 			`the authoring floor: ${floor.map((f) => `${f.policyId} ${f.state}`).join(', ')}`,
 			`the reviewer: ${reviewer ?? 'none recorded'}; ${authorRead} (configured: ${configured ?? 'unset'})`,
-			`the accepted hash: ${accepted ?? 'none'}; the candidate as the lane last read it: ${str(candidate.status) || 'none'}`,
+			`the accepted hash: ${accepted ?? noHashAccepted(unansweredAcceptance(authoring))}; ` +
+				`the candidate as the lane last read it: ${str(candidate.status) || 'none'}`,
 			...faults,
 			...authorFaults.faults,
 			...HALF_B_CAVEATS.slice(0, 2).map((c) => `caveat ${c}`)
@@ -2902,6 +2908,19 @@ function noAcceptanceFault(authoring: Record<string, unknown>): string {
 		? 'the lane recorded no accepted hash: no one accepted a candidate'
 		: `the acceptance got ${noAnswer}: the server may still have accepted it, and the lane recorded no hash`;
 }
+
+/**
+ * ⭐ R3-B F5 — the accepted hash when none was accepted: "none", or, for an acceptance that got NO ANSWER
+ * (`unansweredAcceptance`), none RECORDED and why. ⛔ A bare "none" said no hash was accepted, of a press whose answer never
+ * came.
+ */
+function noHashAccepted(unanswered: string | null): string {
+	return unanswered === null ? 'none' : `none recorded — the acceptance got ${unanswered}`;
+}
+
+/** ⭐ R3-B F5 — report.md's accepted hash when none was accepted: stage 1's reading, and that the server may have one. */
+const acceptedNone = (unanswered: string | null): string =>
+	unanswered === null ? 'none' : `${noHashAccepted(unanswered)}, and the server may still have accepted it`;
 
 /**
  * ⭐ The lead's delegated decision of 2026-10-15, to be registered (E3's polish; the confirm of 60c8a828) — STAGE 1'S
@@ -3392,6 +3411,8 @@ function authoringSummary(ix: Index, lane: LaneRows, half: RunHalf): AuthoringSu
 		reviewer: floor.find((f) => f.policyId === REASONING_REVIEW)?.evaluator ?? (str(a.reviewer) || null),
 		// ⭐ The check of 241158f4, finding 1 — the hash ACCEPTED, as stage 1 reads it: never a refused acceptance's.
 		acceptedHash: acceptedHashIn(a),
+		// ⭐ R3-B F5 — and how an acceptance that got no answer went unanswered, which stage 1 reads too.
+		unanswered: unansweredAcceptance(a),
 		findings: findingsOf(lane).map(({ typeId: _typeId, ...f }) => f),
 		caveats: HALF_B_CAVEATS
 	};
@@ -3666,7 +3687,8 @@ function authoringLines(r: RunReport): string[] {
 		`- **The authoring floor, as the store holds it:** ${a.floor.map((f) => `${f.policyId} ${f.state}`).join(', ') || 'none'}.`,
 		`- **The reviewer:** ${a.reviewer ?? 'none recorded'}. **The author:** ${a.author.resolved ?? 'none recorded'} ` +
 			`(configured: ${a.author.configured ?? 'unset'}).`,
-		`- **The accepted hash:** ${a.acceptedHash ?? 'none'}.`,
+		// ⭐ R3-B F5 — ~~${a.acceptedHash ?? 'none'}~~: with no answer, none RECORDED, and the server may still have accepted one.
+		`- **The accepted hash:** ${a.acceptedHash ?? acceptedNone(a.unanswered)}.`,
 		`- **The candidate checks (C4), recorded before Submit, refusing nothing (REG-D-110 (4)):** ` +
 			`${plural(a.findings.length, 'finding', 'findings')}.`,
 		...a.findings.map(
