@@ -3108,17 +3108,29 @@ function stageTwo(undertakingId: string | null, structure: UnitStructure): Matri
 	]);
 }
 
-/** Stage 7 for the whole run — every unit, the root included (`REG-F-533`). */
-function stageSevenWhole(views: readonly UnitView[]): MatrixCell {
+/**
+ * Stage 7 for the whole run — every unit, the root included (`REG-F-533`). ⭐ R4 (the lead's round-4 item 4) — the root as its
+ * OWN stage-7 cell reads it: failed closed when its type cannot be read (`rootUnreadable`; `failedClosed`, R3-B F6), so the
+ * run's stage 7 never contradicts it. A unit not determined leaves the run not determined, owed where it is, unless a unit
+ * broke: a break decides the run whatever the others read. ⛔ It read the root by `completion` alone: as intended, beside
+ * the root's own cell, not determined.
+ */
+function stageSevenWhole(views: readonly UnitView[], rootUnreadable: string | null): MatrixCell {
 	// ⛔ E3 (C5) — A RUN WITH NO UNIT HAS COMPLETED NOTHING. Half A always reads §3.2's five; half B reads the Undertaking's,
 	// and a half-B run that stopped before it — a dry rehearsal, a candidate no one accepted — has none, which every-of-none
 	// would read as intended: a "Yes" with nothing run.
 	if (views.length === 0)
 		return cell('7', WHOLE_RUN, 'not reached', [], ['the run holds no work unit: no Undertaking of the run was instantiated']);
-	const perUnit = views.map((v) => completion(v, v.unit.slug));
+	// ⚠ The root is the first unit in both halves, as `buildRunReport` reads it (`cellsOf`).
+	const perUnit = views.map((v, i) => {
+		const own = completion(v, v.unit.slug);
+		return i === 0 && rootUnreadable !== null ? failedClosed([own], v.unit.slug, rootUnreadable)[0]! : own;
+	});
 	const broke = perUnit.filter((c) => c.value === 'broke');
-	let value: CellValue = 'as intended';
+	const undetermined = perUnit.filter((c) => c.value === null);
+	let value: CellValue | null = 'as intended';
 	if (broke.length > 0) value = 'broke';
+	else if (undetermined.length > 0) value = null;
 	else if (perUnit.some((c) => c.value === 'not reached')) value = 'not reached';
 	/**
 	 * ⭐ R3-B F4 (the lead's round-3 item 4) — a unit whose sign-off the lane
@@ -3126,6 +3138,8 @@ function stageSevenWhole(views: readonly UnitView[]): MatrixCell {
 	 * a reader had of its skipped sign-off.
 	 */
 	const lineOf = (c: MatrixCell, v: UnitView): string => {
+		// ⭐ R4 (the lead's round-4 item 4) — a unit not determined says why on its line: its reason comes first (`failedClosed`).
+		if (c.value === null) return `${c.row}: not determined — ${c.basis[0]}`;
 		const why = skippedWhy(v);
 		return why !== null && c.basis.includes(why) ? `${c.row}: ${c.value} — ${why}` : `${c.row}: ${c.value}`;
 	};
@@ -3139,7 +3153,7 @@ function stageSevenWhole(views: readonly UnitView[]): MatrixCell {
 			'measured as every unit, the root included, SATISFIED in lifecycle and assurance, its plan step SUCCEEDED: an ' +
 				'Undertaking has no completion state (REG-F-533)'
 		],
-		{ unregistered: broke.some((c) => c.unregistered === true) }
+		{ unregistered: broke.some((c) => c.unregistered === true), owedTo: value === null ? undetermined[0]?.owedTo : undefined }
 	);
 }
 
@@ -3562,7 +3576,7 @@ export function buildRunReport(
 	const matrix: MatrixCell[] = [
 		stageOne(ix, half, lane),
 		stageTwo(undertakingId, structure),
-		stageSevenWhole(views),
+		stageSevenWhole(views, rootUnreadable),
 		...phases.flatMap(cellsOf)
 	];
 	const counts = Object.fromEntries(CELL_VALUES.map((value) => [value, matrix.filter((c) => c.value === value).length]));

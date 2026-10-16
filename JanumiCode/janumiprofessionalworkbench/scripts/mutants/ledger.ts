@@ -23698,10 +23698,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "PQ7-M262-the-run-s-completion-hides-a-unit-s-unregistered-break",
 		file: "scripts/phase7/run-report-core.ts",
-		find: "{ unregistered: broke.some((c) => c.unregistered === true) }",
-		replace: "{ unregistered: false }",
+		find: "unregistered: broke.some((c) => c.unregistered === true), owedTo",
+		replace: "unregistered: false, owedTo",
 		expectRed: ["verif/phase7-run-report.test.ts"],
-		why: "PROMISE: the run's completion carries a unit's unregistered break beside the other units' ids (`stageSevenWhole`). WHO RELIES: the whole-run stage 7, whose ids would otherwise hide that one of its breaks names no entry. WHAT THE MUTATION DOES: the whole-run cell is never marked unregistered. OBSERVED (driven 2026-10-10 on a disposable copy of the working tree, applied and restored byte for byte, its program compiling (tsc --noEmit -p scripts/tsconfig.json)): KILLED - the whole file, as the runner runs it: 1 of its 77 test(s) red in phase7-run-report.test.ts: '⛔ a break no register entry names is marked so — the cell, the run’s completion over it, the counts and the markdown' (AssertionError: expected [ 'broke', [ 'REG-F-511' ], undefined ] to deeply equal [ 'broke', [ 'REG-F-511' ], true ])",
+		why: "PROMISE: the run's completion carries a unit's unregistered break beside the other units' ids (`stageSevenWhole`). WHO RELIES: the whole-run stage 7, whose ids would otherwise hide that one of its breaks names no entry. WHAT THE MUTATION DOES: the whole-run cell is never marked unregistered. OBSERVED (driven 2026-10-10 on a disposable copy of the working tree, applied and restored byte for byte, its program compiling (tsc --noEmit -p scripts/tsconfig.json)): KILLED - the whole file, as the runner runs it: 1 of its 77 test(s) red in phase7-run-report.test.ts: '⛔ a break no register entry names is marked so — the cell, the run’s completion over it, the counts and the markdown' (AssertionError: expected [ 'broke', [ 'REG-F-511' ], undefined ] to deeply equal [ 'broke', [ 'REG-F-511' ], true ]) ⭐ RE-ANCHORED 2026-10-16 (JAN-EXEC Phase 7 completion, round 4, F4; ledger rule #5, in the commit that moved the line): the whole run's stage-7 cell is also owed where an undetermined root's is (owedTo, the lead's round-4 item 4), beside its unregistered flag, so the anchor is the flag as it now reads; the promise and the mutation are unchanged: the whole-run cell is never marked unregistered. Applied by hand first, the file restored byte for byte: 'AssertionError: expected [ 'broke', [ 'REG-F-511' ], undefined ] to deeply equal [ 'broke', [ 'REG-F-511' ], true ]' (1 test red in its victim). RE-OBSERVED (bun run mutants -- R4-M28 to R4-M32, PQ7-M262, R3B-M27, R3B-M35 and R3B-M36 by their full ids, 2026-10-16, in the round-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         PQ7-M262-the-run-s-completion-hides-a-unit-s-unregistered-break ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 7 P7-2 round 2, the fixer of builder R's files after two adversarial verifiers - the run report and the post-run tools (scripts/phase7/run-report-core.ts, run-report.ts, archive-scan.ts, finalize-run.ts), held by verif/phase7-run-report.test.ts, verif/phase7-archive-scan.test.ts and apps/rph-demo/src/lib/server/execution/phase7-run-report.store.test.ts; each fix shown red by its own mutant, driven on a disposable copy (docs/_working/DESIGN-the-live-end-to-end-run.md §1, §2, §6 P7-2 D4, D6, D7, D9; REG-F-511; REG-F-517; REG-F-519; REG-F-527; REG-F-536)"
 	},
 	{
@@ -30988,5 +30988,50 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/phase7-run-report.test.ts"],
 		why: "PROMISE (the lead's round-4 item 3): a sign-off the lane skipped after an unanswered act says so - which unit, which act, and that it got no answer - on its cell and on the root's line in the whole run's stage 7. WHO RELIES: the report's reader, who must tell a lane that stopped from a run cut short. WHAT THE MUTATION DOES: such a sign-off reads 'its sign-off was never attempted'. Applied by hand first, the file restored byte for byte: 'AssertionError: Record Assurance, past its bound: expected [ …(2) ] to deeply equal [ …(2) ]' (2 tests red in its victim). OBSERVED (bun run mutants -- R4-M23 to R4-M27 and R3B-M24 to R3B-M27 by their full ids, 2026-10-16, in the round-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R4-M27-the-unanswered-skip-reads-never-attempted ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 7 completion programme, round 4, F3 - a sign-off the lane skipped after another unit's sign-off act got no answer reads as not attempted because the lane stopped after that act (the lead's round-4 item 3): the lane's sign-off loop ends there (D4), as at a limit check that holds one back (D8, R3-B F4), and the run report says so for every later unit, the root's line included"
+	},
+	{
+		id: "R4-M28-the-run-s-stage-7-is-told-the-root-reads",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "stageSevenWhole(views, rootUnreadable),",
+		replace: "stageSevenWhole(views, null),",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (the lead's round-4 item 4): the whole run's stage 7 reads the root as its own stage-7 cell does - failed closed when its type cannot be read (R3-B F6). WHO RELIES: the run's answer, which must not read as intended beside a root not determined. WHAT THE MUTATION DOES: the whole run's stage 7 is told the root's type reads, and reads the root by its completion alone, as before. Applied by hand first, the file restored byte for byte: 'AssertionError: the run’s stage 7 contradicts the root’s own: expected [ null, 'as intended' ] to deeply equal [ null, null ]' (2 tests red in its victim). OBSERVED (bun run mutants -- R4-M28 to R4-M32, PQ7-M262, R3B-M27, R3B-M35 and R3B-M36 by their full ids, 2026-10-16, in the round-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R4-M28-the-run-s-stage-7-is-told-the-root-reads ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion programme, round 4, F4 - the run's stage 7 never contradicts a root whose own stage-7 cell reads not determined (the lead's round-4 item 4; R3-B F6's failedClosed): it reads the root as its own cell does, not determined, with the root's reason on its line and owed where the root's is, unless a unit broke"
+	},
+	{
+		id: "R4-M29-an-undetermined-root-leaves-the-run-as-intended",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "else if (undetermined.length > 0) value = null;",
+		replace: "else if (undetermined.length < 0) value = null;",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (the lead's round-4 item 4): a unit whose stage 7 is not determined leaves the run's stage 7 not determined. WHO RELIES: the run's answer. WHAT THE MUTATION DOES: it is passed over, and the run reads as intended, or not reached, beside it. Applied by hand first, the file restored byte for byte: 'AssertionError: the run’s stage 7 contradicts the root’s own: expected [ null, 'as intended' ] to deeply equal [ null, null ]' (1 test red in its victim). OBSERVED (bun run mutants -- R4-M28 to R4-M32, PQ7-M262, R3B-M27, R3B-M35 and R3B-M36 by their full ids, 2026-10-16, in the round-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R4-M29-an-undetermined-root-leaves-the-run-as-intended ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion programme, round 4, F4 - the run's stage 7 never contradicts a root whose own stage-7 cell reads not determined (the lead's round-4 item 4; R3-B F6's failedClosed): it reads the root as its own cell does, not determined, with the root's reason on its line and owed where the root's is, unless a unit broke"
+	},
+	{
+		id: "R4-M30-an-undetermined-root-outweighs-a-break",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "if (broke.length > 0) value = 'broke';\n\telse if (undetermined.length > 0) value = null;",
+		replace: "if (undetermined.length > 0) value = null;\n\telse if (broke.length > 0) value = 'broke';",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (the lead's round-4 item 4): a break decides the run's stage 7 whatever the other units read - a root not determined included. WHO RELIES: the run's answer and its register ids. WHAT THE MUTATION DOES: an undetermined root hides another unit's break. Applied by hand first, the file restored byte for byte: 'AssertionError: expected [ null, null, [ 'REG-F-505' ], …(1) ] to deeply equal [ Array(4) ]' (1 test red in its victim). OBSERVED (bun run mutants -- R4-M28 to R4-M32, PQ7-M262, R3B-M27, R3B-M35 and R3B-M36 by their full ids, 2026-10-16, in the round-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R4-M30-an-undetermined-root-outweighs-a-break ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion programme, round 4, F4 - the run's stage 7 never contradicts a root whose own stage-7 cell reads not determined (the lead's round-4 item 4; R3-B F6's failedClosed): it reads the root as its own cell does, not determined, with the root's reason on its line and owed where the root's is, unless a unit broke"
+	},
+	{
+		id: "R4-M31-the-undetermined-line-says-no-why",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "if (c.value === null) return `${c.row}: not determined — ${c.basis[0]}`;",
+		replace: "if (c.value === null) return `${c.row}: not determined`;",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (the lead's round-4 item 4): the root's line in the whole run's stage 7 says why it is not determined, in failedClosed's words. WHO RELIES: the report's reader, who has no root row in half A. WHAT THE MUTATION DOES: the line says not determined, and not why. Applied by hand first, the file restored byte for byte: 'AssertionError: the root’s line: expected 'root: not determined' to match /^root: not determined — the root unit…/' (2 tests red in its victim). OBSERVED (bun run mutants -- R4-M28 to R4-M32, PQ7-M262, R3B-M27, R3B-M35 and R3B-M36 by their full ids, 2026-10-16, in the round-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R4-M31-the-undetermined-line-says-no-why ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion programme, round 4, F4 - the run's stage 7 never contradicts a root whose own stage-7 cell reads not determined (the lead's round-4 item 4; R3-B F6's failedClosed): it reads the root as its own cell does, not determined, with the root's reason on its line and owed where the root's is, unless a unit broke"
+	},
+	{
+		id: "R4-M32-the-run-s-stage-7-owes-no-one",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "owedTo: value === null ? undetermined[0]?.owedTo : undefined }",
+		replace: "owedTo: undefined }",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (the lead's round-4 item 4): a whole run's stage 7 not determined is OPEN and owed where the root's own cell is - a person, the root's type unread. WHO RELIES: report.md's matrix, which prints an open cell by whom it is owed to. WHAT THE MUTATION DOES: the open cell is owed to no one. Applied by hand first, the file restored byte for byte: 'AssertionError: expected [ undefined, …(2) ] to deeply equal [ …(3) ]' (1 test red in its victim). OBSERVED (bun run mutants -- R4-M28 to R4-M32, PQ7-M262, R3B-M27, R3B-M35 and R3B-M36 by their full ids, 2026-10-16, in the round-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R4-M32-the-run-s-stage-7-owes-no-one ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion programme, round 4, F4 - the run's stage 7 never contradicts a root whose own stage-7 cell reads not determined (the lead's round-4 item 4; R3-B F6's failedClosed): it reads the root as its own cell does, not determined, with the root's reason on its line and owed where the root's is, unless a unit broke"
 	}
 ];

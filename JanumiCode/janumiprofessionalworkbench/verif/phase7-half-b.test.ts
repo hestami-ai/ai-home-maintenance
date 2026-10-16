@@ -3013,6 +3013,35 @@ describe('⛔ E3’s polish, 3 — a root that declares MODEL has its cells repo
 			['8', null, []]
 		]);
 	});
+
+	// ⛔ R4 (the lead's round-4 item 4) — THE RUN'S STAGE 7 NEVER CONTRADICTS A ROOT WHOSE OWN STAGE-7 CELL READS NOT DETERMINED:
+	// it reads not determined too, the root's reason on its line and the cell owed to the same person. A break decides it still.
+	it('⛔ R4 (the lead’s round-4 item 4) — the run’s stage 7 does not contradict a root whose own stage-7 cell reads not determined: it reads not determined too, with the root’s reason', () => {
+		// ⛔ PREDICTED RED, read from the code: the whole run's stage 7 read the root by its completion alone — SATISFIED, its step
+		// SUCCEEDED: as intended — beside the root's own stage-7 cell, not determined, failed closed (R3-B F6).
+		const stored = halfBStore({ ran: PRESSED_ROOT });
+		const r = failsClosed({ ...stored, objects: stored.objects.filter((o) => o.id !== 'pwutype_root') }, 'pwutype_root is not in the store');
+		const own = cellOf(r, '7', 'root');
+		const whole = cellOf(r, '7', 'whole run');
+		expect([own.value, whole.value], 'the run’s stage 7 contradicts the root’s own').toEqual([null, null]);
+		expect([whole.owedTo, whole.basis[0], whole.unregistered]).toEqual([
+			own.owedTo,
+			'root: not determined — the root unit’s type cannot be read (pwutype_root is not in the store): whether its press ran a ' +
+				'model, and so which of its stages apply, cannot be decided, so each is reported, never skipped',
+			undefined
+		]);
+		expect(renderMarkdown(r)).toContain('| 7 Completion | open: a person: the root unit’s type cannot be read |');
+	});
+
+	it('⭑ CONTROL — a break decides the run’s stage 7 still: another unit’s, beside a root whose own cell is not determined', () => {
+		// ⭑ The Verify leaf ran no model here, so its stage 7 is broke (REG-F-505), and the run broke with it, whatever the
+		// unread root's own cell reads.
+		const stored = halfBStore({ ran: { ...PRESSED_ROOT, pwu_v: 'press' } });
+		const r = failsClosed({ ...stored, objects: stored.objects.filter((o) => o.id !== 'pwutype_root') }, 'pwutype_root is not in the store');
+		const whole = cellOf(r, '7', 'whole run');
+		expect([cellOf(r, '7', 'root').value, whole.value, whole.registerIds, whole.owedTo]).toEqual([null, 'broke', ['REG-F-505'], undefined]);
+		expect(whole.basis[0], 'the root’s line').toMatch(/^root: not determined — the root unit’s type cannot be read/);
+	});
 });
 
 // ── ⭐⭐ THE CHECK OF 241158f4 — ITS TWO MINORS ─────────────────────────────────────────────────────────────────────
