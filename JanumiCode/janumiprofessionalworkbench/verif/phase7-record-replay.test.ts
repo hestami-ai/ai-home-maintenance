@@ -805,3 +805,99 @@ describe('⛔ REG-F-518 — a try whose commands completed out of the order they
 		]);
 	});
 });
+
+describe('⭐ The merge of E12 and E4 (J3) — a DECLARED review’s reviewer call is recorded, named by the unit it reviewed', () => {
+	// ⭑ E12's Record Assurance asks the reviewer once per declared policy of the unit (`reviewDeclaredPolicies`), each call an
+	// ASSURANCE exchange whose subject is the UNIT itself — `PROFESSIONAL_WORK_UNIT`, never the PWA — so `REG-D-112` (c)'s
+	// exclusion of the authoring floor's review keeps it. A sign-off comes after every phase has run.
+	const row = (id: string, objectType: string, state: Record<string, unknown>, firstSequence: number) => ({
+		id,
+		objectType,
+		state,
+		firstSequence
+	});
+	const head = payloadHead('the-fixture-cwd');
+	const composite = (text: string): string =>
+		JSON.stringify({
+			tools: head.tools,
+			input: [head.instructionsMessage, { role: 'user', content: [{ type: 'input_text', text }] }]
+		});
+	/** One executor try of `unitId`, at `at`, that called no tool. */
+	const tryOf = (id: string, unitId: string, at: string, n: number) =>
+		row(
+			id,
+			'MODEL_EXCHANGE',
+			{
+				plane: 'EXECUTION',
+				subjectObjectId: unitId,
+				invokerId: 'execution.model-invocation:t',
+				requestedAt: at,
+				materializedInputRef: { status: 'STORED', storageKey: `payload-${id}` },
+				rawOutputBeforeCoercionRef: { status: 'STORED', storageKey: 'answer' },
+				observedToolCalls: { observation: 'OBSERVED', calls: [], observedCount: 0 }
+			},
+			n
+		);
+	const DECLARED_PROMPT = 'Judge the requirements of wordfreq against Requirement Coverage, criterion by criterion.';
+	const input: RecorderInput = {
+		store: {
+			objects: [
+				row('pwa', 'PROFESSIONAL_WORK_ARCHITECTURE', { publicationStatus: 'PUBLISHED', rootPwuTypeId: 'pwut' }, 1),
+				tryOf('mex_req', 'pwu_req', '2026-10-11T08:00:00.000Z', 2),
+				tryOf('mex_des', 'pwu_des', '2026-10-11T09:00:00.000Z', 3),
+				// ⭐ Requirements' sign-off, AFTER Design ran: one declared review of it, its subject the unit itself.
+				row(
+					'mex_declared',
+					'MODEL_EXCHANGE',
+					{
+						plane: 'ASSURANCE',
+						invokerId: 'declared-policy-review',
+						assurancePolicyId: 'pol_requirement_coverage',
+						subjectObjectId: 'pwu_req',
+						subjectObjectType: 'PROFESSIONAL_WORK_UNIT',
+						exchangeRole: 'INITIAL',
+						disposition: 'ACCEPTED',
+						requestedAt: '2026-10-11T10:00:00.000Z',
+						respondedAt: '2026-10-11T10:00:05.000Z',
+						resolvedModel: { value: 'fixture-reviewer-model' },
+						resolvedProvider: { value: 'devin' },
+						materializedInputRef: { status: 'STORED', storageKey: 'declared-prompt' },
+						rawOutputBeforeCoercionRef: { status: 'STORED', storageKey: 'declared-reply' },
+						parseOutcome: { outcome: 'PARSED' }
+					},
+					4
+				)
+			],
+			events: [],
+			content: null
+		},
+		content: new Map([
+			['payload-mex_req', composite('Write the requirements.')],
+			['payload-mex_des', composite('Design wordfreq.')],
+			['answer', '{}'],
+			['declared-prompt', DECLARED_PROMPT],
+			['declared-reply', CLEAN]
+		]),
+		units: [
+			{ slug: 'requirements', unitId: 'pwu_req', archive: '02-requirements' },
+			{ slug: 'design', unitId: 'pwu_des', archive: '03-design' }
+		],
+		workspace: resolve(tmpdir(), 'jpwb-no-such-workspace'),
+		home: resolve(tmpdir(), 'jpwb-no-such-home'),
+		captures: new Map(),
+		expectedMatrix: [{ stage: '5b', row: 'requirements', value: 'as intended' }],
+		commit: 'c',
+		reviewerFingerprint: 'f'
+	};
+
+	// ⛔ THE PREDICTED RED: the recorder names a call's unit by the last executor try before it (`unitAt`) — Design's, for a
+	// sign-off that comes after Design ran — and reads a unit's subject type as no framing it knows.
+	it('⛔ J3 — kept by the recorder, keyed by its full prompt, and named by its SUBJECT — the unit it reviewed, not the last to run — in the declared framing', () => {
+		const built = buildRecording(input);
+		expect(built.problems).toEqual([]);
+		expect([
+			built.authoringCallsLeftOut,
+			built.recording?.reviewer.map((c) => [c.unit, c.framing, c.promptSha256])
+		]).toEqual([0, [['requirements', 'declared-policy', sha(DECLARED_PROMPT)]]]);
+	});
+});

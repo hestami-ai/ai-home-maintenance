@@ -288,7 +288,9 @@ const ROLE: Readonly<Record<string, RecordedRole>> = {
 const FRAMING: Readonly<Record<string, string>> = {
 	ARTIFACT: 'work-product',
 	EVIDENCE: 'command',
-	PROFESSIONAL_WORK_ARCHITECTURE: 'pwa'
+	PROFESSIONAL_WORK_ARCHITECTURE: 'pwa',
+	// ⭐ The merge of E12 and E4 (J3) — E12's declared review, whose subject is the unit itself (`reviewDeclaredPolicies`).
+	PROFESSIONAL_WORK_UNIT: 'declared-policy'
 };
 
 /**
@@ -530,7 +532,12 @@ function reviewerCallOf(
 	}
 	const subjectType = str(row.state.subjectObjectType);
 	return {
-		unit: unitAt(tries, requested),
+		// ⭐ The merge of E12 and E4 (J3) — A CALL WHOSE SUBJECT IS A UNIT names that unit: E12's declared review, which a
+		// sign-off makes after every phase ran. ⛔ Named by the last try before it, it was the last phase's, whichever it judged.
+		unit:
+			subjectType === 'PROFESSIONAL_WORK_UNIT'
+				? (x.unitOf.get(str(row.state.subjectObjectId)) ?? str(row.state.subjectObjectId))
+				: unitAt(tries, requested),
 		framing: FRAMING[subjectType] ?? subjectType.toLowerCase(),
 		role: ROLE[str(row.state.exchangeRole)] ?? 'initial',
 		promptSha256: sha256Hex(x.scrub(prompt)),

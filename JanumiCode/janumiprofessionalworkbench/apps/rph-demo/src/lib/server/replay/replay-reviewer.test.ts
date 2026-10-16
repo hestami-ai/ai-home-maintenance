@@ -32,14 +32,17 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { ExchangeRecord } from '../agent/exchange-record.js';
+import type { AssessmentCriterion } from '@janumipwb/rph-contracts';
 import { clearingJudgement } from '../assurance/clearing-reviewer.testing.js';
 import { createExchangeSink } from '../assurance/exchange-capture.js';
-import { createFloorRegistry } from '../assurance/index.js';
+import { createDeclaredPolicyReviewer, createFloorRegistry } from '../assurance/index.js';
 import { noProgramsDirectory } from '../assurance/no-programs.testing.js';
 import {
 	createAgyReasoningReviewValidator,
+	ONE_ROW_PER_CRITERION,
 	type AgyPrint
 } from '../assurance/reasoning-review-validator.js';
+import { declaredPolicyReviewInput } from '../assurance/review-input.js';
 import {
 	RECORDING_FORMAT,
 	recordingFiles,
@@ -53,6 +56,7 @@ import {
 	createReplayRun,
 	forgetReplayRuns,
 	REPLAY_EPOCH_MS,
+	replayRunFor,
 	type ReplayRun
 } from './replay-run.js';
 import { fixtureManifest } from './replay-fixture.testing.js';
@@ -91,18 +95,56 @@ const BOUND = 240_000;
 const TRANSPORT = 'devin exited with code 1: connection reset by peer';
 
 /** The prompt the validator sends for CTX — captured from the validator itself, as the recorder reads it off a run. */
-async function promptOf(ctx: ValidatorContext = CTX): Promise<string> {
+async function promptOf(ctx: ValidatorContext = CTX, subject: AssuranceSubject = SUBJECT): Promise<string> {
 	const seen: string[] = [];
 	const capture: AgyPrint = async (p) => {
 		seen.push(p);
 		return CLEAN;
 	};
 	await createAgyReasoningReviewValidator({ print: capture, modelId: REVIEWER.modelId }).evaluate(
-		SUBJECT,
+		subject,
 		ctx
 	);
 	return seen[0]!;
 }
+
+// ── ⭐ The merge of E12 and E4 (J3, J4) — ONE DECLARED REVIEW, as E12's sign-off asks it of a unit (`reviewDeclaredPolicies`) ──
+const DECLARED_SUBJECT: AssuranceSubject = {
+	subjectId: 'pwu_replayed_sign_off',
+	objectType: 'PROFESSIONAL_WORK_UNIT',
+	semanticVersion: 1,
+	isAiProduced: true,
+	producer: SUBJECT.producer
+};
+const DECLARED_CRITERIA = ['RC-01', 'RC-02'].map(
+	(id) =>
+		({
+			id,
+			name: id,
+			description: `Requirement ${id} is covered.`,
+			criterionType: 'QUALITATIVE',
+			evaluationMethod: 'MODEL_JUDGMENT',
+			requiredEvidenceIds: [],
+			severityIfNotMet: 'BLOCKING',
+			mayBeNotApplicable: false
+		}) as AssessmentCriterion
+);
+const declaredInput = (instructionIs: 'PRODUCING_PROMPT' | 'UNIT_PURPOSE' = 'PRODUCING_PROMPT') =>
+	declaredPolicyReviewInput({
+		policy: {
+			policyId: 'pol_requirement_coverage',
+			name: 'Requirement Coverage',
+			purpose: 'Determine whether approved outcomes are represented by requirements or explicitly excluded.'
+		},
+		criteria: DECLARED_CRITERIA,
+		instruction: 'Write the requirements for wordfreq.',
+		instructionIs,
+		workProducts: [{ unit: 'Requirements', answer: '{"requirements":["R1: it counts words"]}' }],
+		commands: []
+	});
+/** ⭐ J4 — E1's one-row sentence as the prompts of P3's run carried it, before the symmetric clause (6fe1f312). */
+const ONE_ROW_BEFORE_E1 =
+	'Give exactly one row in findings for each criterion listed above: failed=false where the criterion is met, failed=true where it is not. A criterion that is met is recorded as met; do not look for a failure that is not there. An empty findings list leaves every criterion unassessed.';
 
 const call = (
 	prompt: string,
@@ -463,5 +505,82 @@ describe('⭐ the floor registry’s REPLAY arm (D2)', () => {
 		const { review, exchanges } = await floorOver();
 		expect(review?.disposition, 'the recording’s own bound decided the retry').toBe('SATISFIED');
 		expect(exchanges.drain().map((r) => r.exchangeRole)).toEqual(['initial', 'retry']);
+	});
+
+	// ── ⭐⭐ THE MERGE OF E12 AND E4 (J3, J4): E12's DECLARED reviews, which Record Assurance asks since E2, under the replay ──
+	/** `reviewer` written as a recording, and the replay switched on over it, as (vi) does. */
+	const replayingOver = (reviewer: readonly ReviewerCall[], label: string): void => {
+		dir = mkdtempSync(join(tmpdir(), label));
+		for (const [file, text] of Object.entries(recordingFiles(recordingOf(reviewer))))
+			writeFileSync(join(dir, file), text);
+		delete process.env.JPWB_ASSURANCE_TOOL;
+		process.env.PATH = noProgramsDirectory();
+		process.env.JPWB_REPLAY = dir;
+	};
+	const declaredReview = () =>
+		createDeclaredPolicyReviewer({ testMode: true }).review(DECLARED_SUBJECT, declaredInput());
+
+	it('(x) ⭐ the merge (J3) — a DECLARED review under the REPLAY selection is the replay’s too: served from the recording by its full prompt, its reviewer the recording’s', async () => {
+		const prompt = await promptOf({ reasoningReview: declaredInput() }, DECLARED_SUBJECT);
+		replayingOver(
+			[call(prompt, { status: 'ANSWERED', text: clearingJudgement(DECLARED_CRITERIA) }, 5, { framing: 'declared-policy' })],
+			'jpwb-replay-declared-'
+		);
+		const answer = await declaredReview();
+		expect([answer.failure, answer.criteria.map((c) => [c.criterionId, c.outcome])]).toEqual([
+			undefined,
+			[
+				['RC-01', 'MET'],
+				['RC-02', 'MET']
+			]
+		]);
+		expect(answer.evaluator).toMatchObject({ actorType: 'AGENT', ...REVIEWER });
+		expect(replayRunFor(dir).consumed().reviewer, 'the declared review was not served from the recording').toBe(1);
+	});
+
+	// ⛔ THE PREDICTED RED (J3): E12's declared reviewer names who answered a call that threw by the host's configured tool —
+	// devin only when the selection is DEVIN, else agy — and under the replay the selection is REPLAY, so a replayed throw was
+	// recorded as agy's, a reviewer that never ran, where the floor's own replayed review names the recording's.
+	it('(xi) ⛔ the merge (J3) — a declared review whose recorded call THREW at the bound names the RECORDING’s reviewer as who answered it, never the host’s agy', async () => {
+		const prompt = await promptOf({ reasoningReview: declaredInput() }, DECLARED_SUBJECT);
+		replayingOver(
+			[call(prompt, { status: 'THROWN', message: TRANSPORT }, BOUND, { framing: 'declared-policy' })],
+			'jpwb-replay-declared-thrown-'
+		);
+		const answer = await declaredReview();
+		expect(answer.failure ?? '', 'the replayed throw did not fail the review').toContain(TRANSPORT);
+		expect(answer.evaluator, 'a replayed review that threw named a reviewer the recording does not').toEqual({
+			actorType: 'AGENT',
+			...REVIEWER
+		});
+	});
+
+	it('(xii) ⭐ the merge (J4; REG-D-111 (5)) — a recording made before E1’s symmetric clause is STALE at its first reviewer call: the replay asks with the prompt as it reads now', async () => {
+		const now = await promptOf();
+		expect(now, 'arrangement: the prompt the reviewer is sent ends its one-row sentence with the clause').toContain(
+			ONE_ROW_PER_CRITERION
+		);
+		const before = now.replace(ONE_ROW_PER_CRITERION, ONE_ROW_BEFORE_E1);
+		const run = createReplayRun(recordingOf([call(before, { status: 'ANSWERED', text: CLEAN }, 5)]), () => '/unused');
+		await settle(replayed(run).validator.evaluate(SUBJECT, CTX));
+		expect(run.poisonedBy()?.message ?? '').toMatch(
+			new RegExp(
+				`^REPLAY_STALE: reviewer call 1 \\(unit requirements, work-product, initial\\): the prompt's SHA-256 is [0-9a-f]{64}, and the recording's is ${sha256Hex(before)}\\.`
+			)
+		);
+		expect(run.consumed().reviewer, 'a reply recorded over the sentence before E1 was served').toBe(0);
+	});
+
+	it('(xiii) ⭐ the merge (J4) — E12’s declared framing is in the key: a declared review recorded in the other framing is STALE, never answered from it', async () => {
+		const asUnitPurpose = await promptOf({ reasoningReview: declaredInput('UNIT_PURPOSE') }, DECLARED_SUBJECT);
+		const asProducingPrompt = await promptOf({ reasoningReview: declaredInput() }, DECLARED_SUBJECT);
+		expect(asUnitPurpose, 'arrangement: the two framings ask differently').not.toBe(asProducingPrompt);
+		replayingOver(
+			[call(asUnitPurpose, { status: 'ANSWERED', text: clearingJudgement(DECLARED_CRITERIA) }, 5, { framing: 'declared-policy' })],
+			'jpwb-replay-declared-stale-'
+		);
+		const answer = await declaredReview();
+		expect(answer.failure ?? '', 'a declared review asked in another framing was answered').toContain('REPLAY_STALE');
+		expect(replayRunFor(dir).consumed().reviewer).toBe(0);
 	});
 });

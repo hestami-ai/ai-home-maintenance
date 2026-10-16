@@ -164,9 +164,22 @@ export function createDeclaredPolicyReviewer(opts: {
 	if (validator.validatorId === STANDIN_VALIDATOR_ID)
 		return createStandinDeclaredPolicyReviewer({ stipulationFor: stipulations ?? (() => undefined) });
 	// ⚠ WHO ANSWERS A CALL THAT THREW: the identity the host configured, ungraded — what the validator records it under too.
-	const tool = selectReviewer({ testMode: opts.testMode }).kind === 'DEVIN' && !opts.print ? 'devin' : 'agy';
+	const reviewing = selectReviewer({ testMode: opts.testMode });
+	const tool = reviewing.kind === 'DEVIN' && !opts.print ? 'devin' : 'agy';
 	const configured = (): Identity => {
 		try {
+			// ⭐ The merge of E12 and E4 (J3) — UNDER THE REPLAY THE REVIEWER IS THE RECORDING'S, as the floor's replay reviewer
+			// names it (`replayReviewer`, below): the recording opened when the registry above was built, so this reads the same
+			// run. ⛔ A replayed call that threw was answered as the host's agy, a reviewer the replay never runs.
+			if (reviewing.kind === 'REPLAY') {
+				const recorded = replayRunFor(reviewing.recordingDir).recording.manifest.models.reviewer;
+				return {
+					actorType: 'AGENT',
+					agentId: recorded.agentId,
+					modelId: recorded.modelId,
+					providerId: recorded.providerId
+				};
+			}
 			return tool === 'devin'
 				? { actorType: 'AGENT', agentId: 'devin', modelId: assuranceModel(), providerId: 'devin' }
 				: { actorType: 'AGENT', agentId: 'agy', modelId: judgeModel(), providerId: 'google' };

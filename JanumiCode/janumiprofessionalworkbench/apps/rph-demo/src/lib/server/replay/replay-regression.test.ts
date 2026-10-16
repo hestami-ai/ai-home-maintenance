@@ -643,7 +643,8 @@ const recorded = {
 const FRAMING: Readonly<Record<string, string>> = {
 	ARTIFACT: 'work-product',
 	EVIDENCE: 'command',
-	PROFESSIONAL_WORK_ARCHITECTURE: 'pwa'
+	PROFESSIONAL_WORK_ARCHITECTURE: 'pwa',
+	PROFESSIONAL_WORK_UNIT: 'declared-policy'
 };
 
 /**

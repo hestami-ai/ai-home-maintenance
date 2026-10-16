@@ -29844,5 +29844,41 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/phase7-live-spec.test.ts"],
 		why: "PROMISE (the merge's J2; REG-D-112 (a), E3's review finding 5): the rule's re-run of the declared reviews is pressed on the unit's own row, found BY ITS ID. WHO RELIES: the paid lane's rule in half B, where two units may share a title. WHAT THE MUTATION DOES: the re-run is pressed on a row looked for by the title. Applied by hand first: 'AssertionError: rerunDeclared: expected [ [ 'page', …(2) ] ] to deeply equal [ [ 'page', …(2) ] ]' ('Tests  1 failed | 82 passed (83)'). OBSERVED (bun run mutants -- the merge's J1 and J2 ids, 2026-10-15, in the merge worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P7M-M7-the-declared-re-run-is-pressed-on-a-row-by-its-title ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 7 completion programme, the merge of E12, E3 and E4 - J2 (and the merge's conflict in phase7.live.ts): E12's three sign-off hands (recordAssuranceOffered, declaredRerunOffered, rerunDeclared) find their rows by the unit's id, as E3 made every hand do"
+	},
+	{
+		id: "P7M-M8-the-recorder-leaves-out-a-declared-review",
+		file: "scripts/phase7/record-replay-core.ts",
+		find: "\treturn row.state.plane === 'ASSURANCE' && row.state.subjectObjectType !== AUTHORING_FLOOR_SUBJECT;\n",
+		replace: "\treturn row.state.plane === 'ASSURANCE' && row.state.subjectObjectType !== AUTHORING_FLOOR_SUBJECT && row.state.subjectObjectType !== 'PROFESSIONAL_WORK_UNIT';\n",
+		expectRed: ["verif/phase7-record-replay.test.ts"],
+		why: "PROMISE (the merge of E12 and E4, J3; REG-D-112 (c)): the recorder leaves out the AUTHORING floor's review alone - its subject the PWA - and keeps E12's declared reviews, ASSURANCE calls of the execution half whose subject is the unit itself, so a replay of a run that signed a unit off is asked them. WHO RELIES: the replay of P6's recording, past its first sign-off. WHAT THE MUTATION DOES: a call whose subject is a unit is left out too, so the recording ends before the sign-off and its replay is exhausted there. Applied by hand first: 'AssertionError: expected [ 1, [] ] to deeply equal [ +0, [ [ 'requirements', …(2) ] ] ]' ('Tests  1 failed | 12 passed (13)'). OBSERVED (bun run mutants -- the merge's J3 ids, 2026-10-15, in the merge worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P7M-M8-the-recorder-leaves-out-a-declared-review ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion programme, the merge of E12, E3 and E4 - J3: the replay records and replays the declared reviews' reviewer calls, assurance exchanges of the execution half keyed by their full prompt, and the recorder's exclusion of the authoring floor's exchanges (REG-D-112 (c)) does not exclude them"
+	},
+	{
+		id: "P7M-M9-a-declared-review-is-named-by-the-last-try",
+		file: "scripts/phase7/record-replay-core.ts",
+		find: "\t\t\t\t? (x.unitOf.get(str(row.state.subjectObjectId)) ?? str(row.state.subjectObjectId))\n",
+		replace: "\t\t\t\t? unitAt(tries, requested)\n",
+		expectRed: ["verif/phase7-record-replay.test.ts"],
+		why: "PROMISE (the merge's J3; ReviewerCall.unit: 'the unit the reviewed subject belongs to'): a call whose subject is a unit - E12's declared review - is recorded under THAT unit. WHO RELIES: a person reading a REPLAY_STALE about a declared review, which names the call by its unit. WHAT THE MUTATION DOES: the call is named by the last executor try before it, as a floor review is - for a sign-off after every phase ran, the last phase, whichever unit it judged. Applied by hand first: 'AssertionError: expected [ +0, [ [ 'design', …(2) ] ] ] to deeply equal [ +0, [ [ 'requirements', …(2) ] ] ]' ('Tests  1 failed | 12 passed (13)'). OBSERVED (bun run mutants -- the merge's J3 ids, 2026-10-15, in the merge worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P7M-M9-a-declared-review-is-named-by-the-last-try ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion programme, the merge of E12, E3 and E4 - J3: the replay records and replays the declared reviews' reviewer calls, each named by the unit it reviewed and in the declared framing"
+	},
+	{
+		id: "P7M-M10-a-declared-review-has-no-framing-of-its-own",
+		file: "scripts/phase7/record-replay-core.ts",
+		find: "\tPROFESSIONAL_WORK_UNIT: 'declared-policy'\n",
+		replace: "",
+		expectRed: ["verif/phase7-record-replay.test.ts"],
+		why: "PROMISE (the merge's J3): a declared review is recorded in its own framing, 'declared-policy' - what the reviewer was asked to judge - beside 'work-product', 'command' and 'pwa'. WHO RELIES: a person reading the recording or a REPLAY_STALE about it. WHAT THE MUTATION DOES: the framing falls to the subject type's own spelling, 'professional_work_unit'. Applied by hand first: 'AssertionError: expected [ +0, [ [ 'requirements', …(2) ] ] ] to deeply equal [ +0, [ [ 'requirements', …(2) ] ] ]' ('Tests  1 failed | 12 passed (13)'; the framing differs). OBSERVED (bun run mutants -- the merge's J3 ids, 2026-10-15, in the merge worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P7M-M10-a-declared-review-has-no-framing-of-its-own ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion programme, the merge of E12, E3 and E4 - J3: the replay records and replays the declared reviews' reviewer calls, each named by the unit it reviewed and in the declared framing"
+	},
+	{
+		id: "P7M-M11-a-replayed-declared-throw-is-the-host-s-tool-s",
+		file: "apps/rph-demo/src/lib/server/assurance/index.ts",
+		find: "\t\t\t\t\tagentId: recorded.agentId,\n",
+		replace: "\t\t\t\t\tagentId: tool,\n",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replay-reviewer.test.ts"],
+		why: "PROMISE (the merge of E12 and E4, J3; the replay reviewer's rule, 'its configured identity is the recording's reviewer'): under a REPLAY selection a declared review whose replayed call threw is answered as the RECORDING's reviewer, as the floor's replayed review is. WHO RELIES: the replay's record of a sign-off, whose verdict names who judged. WHAT THE MUTATION DOES: the host's tool names it - agy, since the selection is not DEVIN - a reviewer the replay never runs. Applied by hand first: 'AssertionError: a replayed review that threw named a reviewer the recording does not: expected { actorType: 'AGENT', …(3) } to deeply equal { actorType: 'AGENT', …(3) }' ('Tests  1 failed | 12 passed (13)'). Before the fix the same test read 'expected { actorType: 'AGENT', agentId: 'agy' }'. OBSERVED (bun run mutants -- the merge's J3 ids, 2026-10-15, in the merge worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P7M-M11-a-replayed-declared-throw-is-the-host-s-tool-s ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion programme, the merge of E12, E3 and E4 - J3: E12's declared reviewer, under E4's REPLAY selection, names the recording's reviewer as who answered a call that threw"
 	}
 ];
