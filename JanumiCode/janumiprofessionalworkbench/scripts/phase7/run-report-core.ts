@@ -193,8 +193,9 @@ export function uncheckedCaveat(declared: readonly { readonly criterionResults: 
  * PER RUN. A unit composed of others (the root) has its declared policies judged over ~~its children's work~~ ⭐ R3-A F1 (the
  * lead's delegated decision of 2026-10-16, registered as REG-D-114 (11)): the work it and every unit below it produced, its
  * reviewer given the unit's own purpose (`UNIT_PURPOSE`; the route's `declaredReviewWorkOf`), and no reviewer-qualification
- * case measures that framing: every declared case of case set v5 is in the PRODUCING_PROMPT framing
- * (`scripts/reviewer-qual/materialize.ts`). So the line names each such unit and the reviews the model reviewer made of it,
+ * case measures that framing: every declared case ~~of case set v5~~ is in the PRODUCING_PROMPT framing
+ * (`scripts/reviewer-qual/materialize.ts` frames each so, of every version; ⭐ round 5, `REG-D-115`: the line names no version,
+ * since the current set is version six). So the line names each such unit and the reviews the model reviewer made of it,
  * among the verdicts that speak; it is absent where there are none — a root signed off before E2, or never. No case set
  * changes. ⭐ R3-A F2 — and the reviews a REPLAY served it (`replayed`), named as replayed: they stand on the same framing,
  * and are never counted among the model reviewer's.
@@ -209,7 +210,7 @@ export function unitPurposeCaveat(
 	return [
 		`UNIT_PURPOSE framing: the declared reviews of a unit composed of others (${made.map((c) => `${c.unit}: ${counted(c)}`).join('; ')}) ` +
 			'were made in it — the unit’s own purpose, judged over the work it and every unit below it produced (REG-D-111 (2)) — and ' +
-			'no reviewer-qualification case measures it: every declared case of case set v5 is in the PRODUCING_PROMPT framing.'
+			'no reviewer-qualification case measures it: every declared case is in the PRODUCING_PROMPT framing.'
 	];
 }
 

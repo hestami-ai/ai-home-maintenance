@@ -153,6 +153,9 @@ export const ORACLES_V4_FILE = 'docs/tracking/reviewer-qualification/oracles/ora
 /** ⭐ `JAN-EXEC` Phase 7 completion E2 — version five (design B5), beside versions one to four, which stay as history. */
 export const CASE_SET_V5_FILE = 'docs/tracking/reviewer-qualification/cases/case-set-v5.json';
 export const ORACLES_V5_FILE = 'docs/tracking/reviewer-qualification/oracles/oracles-v5.json';
+/** ⭐ `JAN-EXEC` Phase 7 completion, round 5 — version six (`REG-D-115`), beside versions one to five, which stay as history. */
+export const CASE_SET_V6_FILE = 'docs/tracking/reviewer-qualification/cases/case-set-v6.json';
+export const ORACLES_V6_FILE = 'docs/tracking/reviewer-qualification/oracles/oracles-v6.json';
 
 /**
  * ⭐ `JAN-CRITREAD` J2-5 — THE CURRENT CASE SET AND ITS ORACLES: what `reviewer:qual:check` holds coverage and
@@ -166,9 +169,15 @@ export const ORACLES_V5_FILE = 'docs/tracking/reviewer-qualification/oracles/ora
  * ⭐⭐ Version five since `JAN-EXEC` Phase 7 completion E2 (`DESIGN-phase-7-completion.md` B5): version four's forty cases
  * under their ids, byte for byte, and fourteen DECLARED-POLICY cases, their oracles PROPOSED, awaiting the sponsor's
  * conferral (design §6 step 2). ⚠ It moves the case-set digest, so `reviewer:qual:check` owes a RUN (P4).
+ * ⭐⭐ Version six since `JAN-EXEC` Phase 7 completion, round 5 (the sponsor's ruling on D-FP-CLEAN, to be registered as
+ * `REG-D-115`): version five's cases under their ids, byte for byte, but D-FP-CLEAN, repaired as D6-FP-CLEAN in its place,
+ * its oracle kept SATISFIED ~~. ⚠ The repaired case's prompt is new, so `reviewer:qual:check` owes a RUN of it alone~~ ⭐
+ * — and, under the ruling's delegated extension, D-FP-03, D-RC-CLEAN and D-RC-04, repaired as D6-FP-03, D6-RC-CLEAN and
+ * D6-RC-04, their oracles carried. ⚠ The four repaired cases' prompts are new, so `reviewer:qual:check` owes a RUN of them
+ * alone; every other case keeps its measurement.
  */
-export const CURRENT_CASE_SET_FILE = CASE_SET_V5_FILE;
-export const CURRENT_ORACLES_FILE = ORACLES_V5_FILE;
+export const CURRENT_CASE_SET_FILE = CASE_SET_V6_FILE;
+export const CURRENT_ORACLES_FILE = ORACLES_V6_FILE;
 
 /**
  * ⭐⭐ `E12F` F5 (the E12 package review's fifth finding; `REG-D-073`, oracle integrity) — THE WORDS AN ORACLE SET'S

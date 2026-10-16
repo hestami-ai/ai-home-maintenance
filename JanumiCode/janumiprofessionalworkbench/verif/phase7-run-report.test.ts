@@ -1743,11 +1743,15 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 		expect(md).not.toContain('REG-F-523: the declared policies were signed off with no criterion checked.');
 	});
 
-	/** ⭐ E12’s polish (fix2’s F10) — the caveat a run states whose root’s two declared reviews the model reviewer made. */
+	/**
+	 * ⭐ E12’s polish (fix2’s F10) — the caveat a run states whose root’s two declared reviews the model reviewer made.
+	 * ⭐ Round 5 (`REG-D-115`) — ~~"every declared case of case set v5"~~: the current set is version six, and the claim holds of
+	 * every declared case of every version (`materialize.ts` frames each PRODUCING_PROMPT), so it names none.
+	 */
 	const UNIT_PURPOSE =
 		'UNIT_PURPOSE framing: the declared reviews of a unit composed of others (root: 2) were made in it — the unit’s own ' +
 		'purpose, judged over the work it and every unit below it produced (REG-D-111 (2)) — and no reviewer-qualification case ' +
-		'measures it: every declared case of case set v5 is in the PRODUCING_PROMPT framing.';
+		'measures it: every declared case is in the PRODUCING_PROMPT framing.';
 
 	it('⛔ E12F F10 — the REG-F-523 caveat is KEPT for a run whose declared verdicts carry no criterion result (a pre-E2 archive), and counted for one that mixes them', () => {
 		// ⛔ PREDICTED RED, read from the code: E2 dropped the line for EVERY run, so a report over a pre-E2 archive — its 14

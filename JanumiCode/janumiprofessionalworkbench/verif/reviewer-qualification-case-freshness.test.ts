@@ -17,11 +17,13 @@ import {
 	CASE_SET_V3_FILE,
 	CASE_SET_V4_FILE,
 	CASE_SET_V5_FILE,
+	CASE_SET_V6_FILE,
 	ORACLES_V1_FILE,
 	ORACLES_V2_FILE,
 	ORACLES_V3_FILE,
 	ORACLES_V4_FILE,
 	ORACLES_V5_FILE,
+	ORACLES_V6_FILE,
 	serializeGenerated,
 	type CaseSet
 } from '../scripts/reviewer-qual/cases.js';
@@ -30,11 +32,13 @@ import { CASE_SET_V2 } from '../scripts/reviewer-qual/case-set-v2.js';
 import { CASE_SET_V3 } from '../scripts/reviewer-qual/case-set-v3.js';
 import { CASE_SET_V4 } from '../scripts/reviewer-qual/case-set-v4.js';
 import { CASE_SET_V5 } from '../scripts/reviewer-qual/case-set-v5.js';
+import { CASE_SET_V6 } from '../scripts/reviewer-qual/case-set-v6.js';
 import { ORACLES_V1 } from '../scripts/reviewer-qual/oracles-v1.js';
 import { ORACLES_V2 } from '../scripts/reviewer-qual/oracles-v2.js';
 import { ORACLES_V3 } from '../scripts/reviewer-qual/oracles-v3.js';
 import { ORACLES_V4 } from '../scripts/reviewer-qual/oracles-v4.js';
 import { ORACLES_V5 } from '../scripts/reviewer-qual/oracles-v5.js';
+import { ORACLES_V6 } from '../scripts/reviewer-qual/oracles-v6.js';
 
 const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url));
 const read = (file: string): string => readFileSync(`${REPO_ROOT}${file}`, 'utf8');
@@ -141,5 +145,28 @@ describe('JAN-EXEC Phase 7 completion E2 — reviewer-qualification case set v5:
 		// Versions one to four stay committed as history, each still exactly what its own source generates (the limbs above).
 		expect((JSON.parse(cases) as CaseSet).caseSetVersion).toBe(5);
 		expect(committedV4().caseSetVersion).toBe(4);
+	});
+});
+
+// ⭐⭐ `JAN-EXEC` Phase 7 completion, round 5 — version six (`REG-D-115`): version five, ~~D-FP-CLEAN repaired as D6-FP-CLEAN~~
+// ⭐ four cases repaired, each under a new id: D-FP-CLEAN as D6-FP-CLEAN (the sponsor's ruling), and D-FP-03, D-RC-CLEAN and
+// D-RC-04 as D6-FP-03, D6-RC-CLEAN and D6-RC-04 (its delegated extension).
+describe('JAN-EXEC Phase 7 completion round 5 — reviewer-qualification case set v6: version five, ~~D-FP-CLEAN repaired as D6-FP-CLEAN~~ four cases repaired, D6-RC-CLEAN, D6-RC-04, D6-FP-CLEAN and D6-FP-03 (REG-D-115 and its delegated extension)', () => {
+	it('⛔ the committed case set v6 and oracles v6 are exactly what the generator writes — never hand-edited', () => {
+		const cases = read(CASE_SET_V6_FILE);
+		const oracles = read(ORACLES_V6_FILE);
+		expect(cases, `${CASE_SET_V6_FILE} is stale — run \`bun run scripts/reviewer-qual/generate.ts\``).toBe(
+			serializeGenerated(CASE_SET_V6)
+		);
+		expect(oracles, `${ORACLES_V6_FILE} is stale — run \`bun run scripts/reviewer-qual/generate.ts\``).toBe(
+			serializeGenerated(ORACLES_V6)
+		);
+		for (const text of [cases, oracles]) {
+			expect(text.includes('\r'), 'LF only').toBe(false);
+			expect(text.charCodeAt(0), 'no BOM').not.toBe(0xfeff);
+		}
+		// Versions one to five stay committed as history, each still exactly what its own source generates (the limbs above).
+		expect((JSON.parse(cases) as CaseSet).caseSetVersion).toBe(6);
+		expect((JSON.parse(read(CASE_SET_V5_FILE)) as CaseSet).caseSetVersion).toBe(5);
 	});
 });
