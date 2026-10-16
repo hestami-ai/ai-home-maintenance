@@ -53,7 +53,8 @@ const VERSIONS: readonly (readonly [string, CaseSet, string, OracleSet])[] = [
 	[CASE_SET_V4_FILE, CASE_SET_V4, ORACLES_V4_FILE, ORACLES_V4],
 	// ⭐ `JAN-EXEC` Phase 7 completion E2 — version five: the declared-policy arm (design B5).
 	[CASE_SET_V5_FILE, CASE_SET_V5, ORACLES_V5_FILE, ORACLES_V5],
-	// ⭐ `JAN-EXEC` Phase 7 completion, round 5 — version six: D-FP-CLEAN repaired as D6-FP-CLEAN (`REG-D-115`).
+	// ⭐ `JAN-EXEC` Phase 7 completion, round 5 — version six: D-FP-CLEAN repaired as D6-FP-CLEAN (`REG-D-115`), and under its
+	// delegated extension D-FP-03, D-RC-CLEAN and D-RC-04 as D6-FP-03, D6-RC-CLEAN and D6-RC-04.
 	[CASE_SET_V6_FILE, CASE_SET_V6, ORACLES_V6_FILE, ORACLES_V6]
 ];
 

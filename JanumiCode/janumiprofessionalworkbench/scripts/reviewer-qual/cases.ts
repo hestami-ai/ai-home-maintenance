@@ -171,8 +171,10 @@ export const ORACLES_V6_FILE = 'docs/tracking/reviewer-qualification/oracles/ora
  * conferral (design §6 step 2). ⚠ It moves the case-set digest, so `reviewer:qual:check` owes a RUN (P4).
  * ⭐⭐ Version six since `JAN-EXEC` Phase 7 completion, round 5 (the sponsor's ruling on D-FP-CLEAN, to be registered as
  * `REG-D-115`): version five's cases under their ids, byte for byte, but D-FP-CLEAN, repaired as D6-FP-CLEAN in its place,
- * its oracle kept SATISFIED. ⚠ The repaired case's prompt is new, so `reviewer:qual:check` owes a RUN of it alone; every
- * other case keeps its measurement.
+ * its oracle kept SATISFIED ~~. ⚠ The repaired case's prompt is new, so `reviewer:qual:check` owes a RUN of it alone~~ ⭐
+ * — and, under the ruling's delegated extension, D-FP-03, D-RC-CLEAN and D-RC-04, repaired as D6-FP-03, D6-RC-CLEAN and
+ * D6-RC-04, their oracles carried. ⚠ The four repaired cases' prompts are new, so `reviewer:qual:check` owes a RUN of them
+ * alone; every other case keeps its measurement.
  */
 export const CURRENT_CASE_SET_FILE = CASE_SET_V6_FILE;
 export const CURRENT_ORACLES_FILE = ORACLES_V6_FILE;

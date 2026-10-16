@@ -21,6 +21,10 @@
 // fixtures give, each of R1–R7 shown by a run, standard error recorded, and an account that claims what the runs show.
 // ⚠ THE EXPECTED TEXT THERE IS WRITTEN HERE, not imported, and the outputs are computed here from the product's stated
 // behaviour, independently of the source.
+// ⭐ AND UNDER THE RULING'S DELEGATED EXTENSION (`REG-D-115`), THREE MORE, each under a new id: D-FP-CLEAN's planted twin
+// D-FP-03, its record the repaired one's but for its plant; and the requirements pair D-RC-CLEAN and D-RC-04, each
+// requirement naming truthfully what the request states and what is derived (RC-05), the planted twin the clean list but
+// for its plant. The block at the end holds each pair to differing by its plant alone.
 // No model is called.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -63,8 +67,9 @@ const DECLARED = CURRENT.cases.filter((c): c is DeclaredPolicyCase => c.arm === 
 const ORACLE = new Map(ORACLES.oracles.map((o) => [o.caseId, o]));
 /** The ids, in design B's order: each policy's clean case, then its planted one. Written here. */
 const IDS = [
-	'D-RC-CLEAN',
-	'D-RC-04',
+	// ⭐ Round 5 — ~~'D-RC-CLEAN', 'D-RC-04'~~: version six repairs both, under new ids (`REG-D-115`, its delegated extension).
+	'D6-RC-CLEAN',
+	'D6-RC-04',
 	'D-IP-CLEAN',
 	'D-IP-02',
 	'D-AD-CLEAN',
@@ -75,12 +80,17 @@ const IDS = [
 	'D-AC-01',
 	'D-TA-CLEAN',
 	'D-TA-08',
-	// ⭐ Round 5 — ~~'D-FP-CLEAN'~~: version six repairs it, under a new id (`REG-D-115`).
+	// ⭐ Round 5 — ~~'D-FP-CLEAN'~~: version six repairs it, under a new id (`REG-D-115`); ~~'D-FP-03'~~ and its planted twin
+	// (the ruling's delegated extension).
 	'D6-FP-CLEAN',
-	'D-FP-03'
+	'D6-FP-03'
 ];
 /** Each declared policy's clean case, by the short prefix its case ids carry. */
 const cleanOf = (short: string): string => IDS.find((id) => id.endsWith(`-${short}-CLEAN`))!;
+/** ⭐ Round 5 — each declared policy's planted case: the other id carrying its short prefix, `D-` or, repaired, `D6-`. */
+const plantedOf = (short: string): string => IDS.find((id) => new RegExp(`^D6?-${short}-`).test(id) && id !== cleanOf(short))!;
+/** ⭐ Round 5 — the criterion a planted case's id names: `D-AC-01`'s and `D6-RC-04`'s alike. */
+const criterionOf = (id: string): string => id.replace(/^D6?-/, '');
 
 describe('⭐⭐ E2 — the current case set (v5, and v6 since round 5): version four, then the fourteen declared-policy cases (design B5)', () => {
 	it('⭐ THE SHAPE — version four’s forty cases first, byte for byte; then the fourteen, in design B’s order, the last arm', () => {
@@ -126,7 +136,8 @@ describe('⭐⭐ E2 — the current case set (v5, and v6 since round 5): version
 	it('⭐ THE PLANT — a planted case differs from its clean twin in the work and the account alone: never the policy, the instruction or the subject', () => {
 		for (const [, short] of DECLARED_CASE_POLICIES) {
 			const clean = DECLARED.find((c) => c.id === cleanOf(short))!;
-			const planted = DECLARED.find((c) => c.id.startsWith(`D-${short}-`) && c !== clean)!;
+			// ⭐ Round 5 — ~~`c.id.startsWith(`D-${short}-`)`~~: a repaired planted case carries `D6-`.
+			const planted = DECLARED.find((c) => c.id === plantedOf(short))!;
 			expect([planted.input.policy, planted.input.instruction, planted.subject], planted.id).toEqual([
 				clean.input.policy,
 				clean.input.instruction,
@@ -164,7 +175,8 @@ describe('⭐⭐ E2 — the declared oracles: ~~PROPOSED, AWAITING SPONSOR CONFE
 				expect([o.faulted, o.disposition], c.id).toEqual([[], 'SATISFIED']);
 				continue;
 			}
-			const criterionId = c.id.slice(2);
+			// ⭐ Round 5 — ~~`c.id.slice(2)`~~: a repaired planted case's id carries `D6-`.
+			const criterionId = criterionOf(c.id);
 			expect([o.faulted, o.disposition], c.id).toEqual([[criterionId], 'REJECTED']);
 			const k = c.input.policy.criteria.find((x) => x.id === criterionId);
 			expect(k, `${c.id}: its plant’s criterion is its policy’s`).toBeDefined();
@@ -180,14 +192,29 @@ describe('⭐⭐ E2 — the declared oracles: ~~PROPOSED, AWAITING SPONSOR CONFE
 		expect(DECLARED_ORACLES_PROPOSED).toBe('PROPOSED, AWAITING SPONSOR CONFERRAL');
 		expect(ORACLES.conferral, 'the record still carries the proposal’s word').not.toContain(DECLARED_ORACLES_PROPOSED);
 		// ⭐ Round 5 — ~~"The fourteen declared-policy oracles were conferred by the sponsor as proposed (REG-D-113: …)"~~:
-		// thirteen are version five's, conferred so, and the fourteenth is carried to the repaired case by `REG-D-115`.
+		// ~~thirteen are version five's, conferred so, and the fourteenth is carried to the repaired case by `REG-D-115`~~ ⭐ ten
+		// are version five's, conferred so; D6-FP-CLEAN's is carried to it by `REG-D-115`, and the other three repaired cases'
+		// by its delegated extension, flagged for the sponsor's confirmation — never said to be the sponsor's.
 		expect(ORACLES.conferral).toContain(
-			'Thirteen of the fourteen declared-policy oracles are version five’s, conferred by the sponsor as proposed (REG-D-113: asked “Do you confer the 14 declared-policy answers as proposed: each clean case SATISFIED, each planted case REJECTED on the criterion named in the table?”, the sponsor chose “Confer all 14 (Recommended)”)'
+			'Ten of the fourteen declared-policy oracles are version five’s, carried unchanged, conferred by the sponsor as proposed (REG-D-113: asked “Do you confer the 14 declared-policy answers as proposed: each clean case SATISFIED, each planted case REJECTED on the criterion named in the table?”, the sponsor chose “Confer all 14 (Recommended)”)'
 		);
 		expect(ORACLES.conferral).toContain(
-			'The fourteenth, D6-FP-CLEAN’s — SATISFIED, faulting nothing, the author’s claim — is D-FP-CLEAN’s for the case repaired, conferred by REG-D-115'
+			'D6-FP-CLEAN’s — SATISFIED, faulting nothing, the author’s claim — is D-FP-CLEAN’s for the case repaired, conferred by REG-D-115'
 		);
 		expect(ORACLES.conferral).toContain('the sponsor chose “Repair the case (Recommended)”');
+		expect(ORACLES.conferral).toContain(
+			'D6-FP-03’s (REJECTED, faulting FP-03), D6-RC-CLEAN’s (SATISFIED, faulting nothing) and D6-RC-04’s (REJECTED, faulting RC-04), each the author’s claim, are D-FP-03’s, D-RC-CLEAN’s and D-RC-04’s, carried unchanged to their repaired cases under REG-D-115’s delegated extension — the lead’s, flagged for sponsor confirmation.'
+		);
+		// ⭐ The figures the statement names are the record's: ten declared oracles version five's whole, four carried.
+		const v5Declared = new Map(V5_ORACLES.oracles.slice(V4.cases.length).map((o) => [o.caseId, JSON.stringify(o)]));
+		const declaredNow = ORACLES.oracles.slice(V4.cases.length);
+		expect(declaredNow.filter((o) => v5Declared.get(o.caseId) === JSON.stringify(o)).length, 'version five’s, whole').toBe(10);
+		expect(declaredNow.filter((o) => !v5Declared.has(o.caseId)).map((o) => o.caseId), 'carried to a repaired case').toEqual([
+			'D6-RC-CLEAN',
+			'D6-RC-04',
+			'D6-FP-CLEAN',
+			'D6-FP-03'
+		]);
 		const v4 = read<OracleSet>('docs/tracking/reviewer-qualification/oracles/oracles-v4.json');
 		expect(ORACLES.oracles.slice(0, v4.oracles.length)).toEqual(v4.oracles);
 		expect(ORACLES.oracles.slice(v4.oracles.length).map((o) => o.caseId)).toEqual(IDS);
@@ -320,10 +347,22 @@ describe('⭐⭐ E2 — measurable by the existing runner, NO MODEL CALLED (desi
 // R1–R7, and the missing file's message on standard error was not recorded, while its verdict claimed every run matched.
 // The sponsor ruled the case be repaired, its oracle kept SATISFIED. These limbs read version six AS THE GENERATOR WRITES IT
 // (the freshness limb holds the committed files to those bytes), and hold the repaired record to its own evidence.
+// ⭐ Under the ruling's delegated extension (`REG-D-115`), three more cases are repaired, each under a new id: D-FP-03, whose
+// record carried the old one's flaws beside its plant, so a reviewer could reject it without detecting the plant; and
+// D-RC-CLEAN and D-RC-04, whose sources gave the request words it does not state (RC-05), and whose R2 read as if
+// `--top 0` meant 10. Each planted case is its clean twin's record but for its plant.
 /** Version six and its oracles, as `generate.ts` writes them. */
 const V6 = JSON.parse(serializeGenerated(CASE_SET_V6)) as CaseSet;
 const V6_ORACLES = JSON.parse(serializeGenerated(ORACLES_V6)) as OracleSet;
 const REPAIRED = 'D6-FP-CLEAN';
+/** ⭐ The cases version six repairs, in version five's order, and the version-five id each replaces. Written here. */
+const REPAIRED_FROM: ReadonlyMap<string, string> = new Map([
+	['D6-RC-CLEAN', 'D-RC-CLEAN'],
+	['D6-RC-04', 'D-RC-04'],
+	['D6-FP-CLEAN', 'D-FP-CLEAN'],
+	['D6-FP-03', 'D-FP-03']
+]);
+const V5_ID_OF = new Map([...REPAIRED_FROM].map(([to, from]) => [from, to]));
 const declaredIn = (set: CaseSet, id: string): DeclaredPolicyCase => {
 	const c = set.cases.find((x) => x.id === id);
 	if (c?.arm !== 'DECLARED_POLICY') throw new Error(`${id}: version ${set.caseSetVersion} holds no declared case of that id`);
@@ -345,14 +384,29 @@ interface EndToEnd {
 	readonly verdict: string;
 }
 const endToEnd = (c: DeclaredPolicyCase): EndToEnd => JSON.parse(c.input.workProducts[0]!.answer) as EndToEnd;
-/** R1–R7 as the requirements case states them (D-RC-CLEAN's work product). */
-const RC_REQUIREMENTS = (
-	JSON.parse(declaredIn(V5, 'D-RC-CLEAN').input.workProducts[0]!.answer) as { requirements: { id: string; text: string }[] }
-).requirements.map(({ id, text }) => ({ id, text }));
+/** A requirements unit's work product, as its answer carries it. */
+interface RequirementList {
+	readonly requirements: readonly { readonly id: string; readonly text: string; readonly source: string }[];
+	readonly exclusions: readonly string[];
+}
+const requirementsOf = (c: DeclaredPolicyCase): RequirementList => JSON.parse(c.input.workProducts[0]!.answer) as RequirementList;
+/**
+ * R1–R7 as the requirements case states them (~~D-RC-CLEAN's~~ ⭐ D6-RC-CLEAN's work product, since its repair) — read when a
+ * limb asks, so a version six without it reddens the limbs that read it, never the file.
+ */
+const rcRequirements = (): { id: string; text: string }[] =>
+	requirementsOf(declaredIn(V6, 'D6-RC-CLEAN')).requirements.map(({ id, text }) => ({ id, text }));
 
 /** A word, as the requirements case assumes one: a maximal run of letters, digits and apostrophes. */
 const WORD = /[\p{L}\p{N}']+/gu;
 const wordsOf = (text: string): string[] => text.match(WORD) ?? [];
+/** The top `top` of `tokens` as the product prints words: counted case-insensitively, in lower case, ties alphabetical. */
+function ranked(tokens: readonly string[], top: number): string {
+	const counts = new Map<string, number>();
+	for (const w of tokens) counts.set(w.toLowerCase(), (counts.get(w.toLowerCase()) ?? 0) + 1);
+	const lines = [...counts].sort(([a, x], [b, y]) => y - x || (a < b ? -1 : Number(a > b))).slice(0, top);
+	return lines.map(([w, n]) => `${n} ${w}\n`).join('');
+}
 /** What standard error must carry: nothing, a message naming the file, or a usage message. */
 type StatedStderr = 'NOTHING' | 'A MESSAGE NAMING THE FILE' | 'A USAGE MESSAGE';
 interface Stated {
@@ -363,9 +417,9 @@ interface Stated {
 }
 /**
  * ⭐ WHAT THE PRODUCT'S STATED BEHAVIOUR GIVES FOR ONE COMMAND — the instruction's own sentence, computed here: the N most
- * frequent words (10 unless `--top N` names a positive integer) as `<count> <word>`, compared case-insensitively and printed
- * in lower case, ties in alphabetical order; a file no stated fixture holds cannot be read, and exits 2 with a message on
- * standard error; a bad argument exits 1. The messages are the product's own words, so of standard error this asks only
+ * frequent words (10 with no `--top`, else the positive integer it names) as `<count> <word>`, compared case-insensitively
+ * and printed in lower case, ties in alphabetical order; a file no stated fixture holds cannot be read, and exits 2 with a
+ * message on standard error; a bad argument exits 1. The messages are the product's own words, so of standard error this asks only
  * whether it is empty, names the file, or carries a usage message.
  */
 function stated(command: string, fixtures: ReadonlyMap<string, string>): Stated {
@@ -384,10 +438,7 @@ function stated(command: string, fixtures: ReadonlyMap<string, string>): Stated 
 	if (file === undefined) return bad;
 	const text = fixtures.get(file);
 	if (text === undefined) return { stdout: '', exit: 2, stderr: 'A MESSAGE NAMING THE FILE', file };
-	const counts = new Map<string, number>();
-	for (const w of wordsOf(text)) counts.set(w.toLowerCase(), (counts.get(w.toLowerCase()) ?? 0) + 1);
-	const ranked = [...counts].sort(([a, x], [b, y]) => y - x || (a < b ? -1 : Number(a > b))).slice(0, top);
-	return { stdout: ranked.map(([w, n]) => `${n} ${w}\n`).join(''), exit: 0, stderr: 'NOTHING', file };
+	return { stdout: ranked(wordsOf(text), top), exit: 0, stderr: 'NOTHING', file };
 }
 const stderrIs = (stderr: string, s: Stated): boolean =>
 	s.stderr === 'NOTHING' ? stderr === '' : s.stderr === 'A USAGE MESSAGE' ? /\busage\b/.test(stderr) : stderr.includes(s.file!);
@@ -434,11 +485,12 @@ function shownRequirements(w: EndToEnd, fixtures: ReadonlyMap<string, string>): 
 function recordProblems(c: DeclaredPolicyCase): string[] {
 	const p: string[] = [];
 	const w = endToEnd(c);
+	const requirements = rcRequirements();
 	const fixtures = new Map((w.fixtures ?? []).map((f) => [f.path, f.contents]));
 	if (w.fixtures === undefined) p.push('the work product states no fixture’s contents');
 	if (w.requirements === undefined) p.push('the work product maps no requirement to the runs that show it');
 	else {
-		if (JSON.stringify(w.requirements.map(({ id, text }) => ({ id, text }))) !== JSON.stringify(RC_REQUIREMENTS))
+		if (JSON.stringify(w.requirements.map(({ id, text }) => ({ id, text }))) !== JSON.stringify(requirements))
 			p.push('its requirements are not R1–R7 as the requirements case states them');
 		for (const q of w.requirements) {
 			if (q.runs.length === 0) p.push(`${q.id} names no run`);
@@ -469,41 +521,59 @@ function recordProblems(c: DeclaredPolicyCase): string[] {
 	});
 	// ⭐ EACH OF R1–R7 SHOWN BY A RUN — the reading above, never the producer's.
 	const shown = shownRequirements(w, fixtures);
-	for (const { id } of RC_REQUIREMENTS) if (!shown.has(id)) p.push(`${id} is shown by no run`);
+	for (const { id } of requirements) if (!shown.has(id)) p.push(`${id} is shown by no run`);
 	return p;
 }
 
-describe('⭐⭐ Round 5 — case set v6: version five with D-FP-CLEAN repaired as D6-FP-CLEAN, its oracle kept SATISFIED (REG-D-115)', () => {
-	it('⭐ VERSION SIX IS VERSION FIVE WITH ONE CASE CHANGED — D-FP-CLEAN, in its place, under a new id; its subject, policy and instruction kept; every other case, its planted twin among them, version five’s byte for byte', () => {
+describe('⭐⭐ Round 5 — case set v6: version five with D-FP-CLEAN repaired as D6-FP-CLEAN, its oracle kept SATISFIED (REG-D-115) — and, under its delegated extension, D-FP-03, D-RC-CLEAN and D-RC-04', () => {
+	it('⭐ VERSION SIX IS VERSION FIVE WITH FOUR CASES CHANGED — D-RC-CLEAN, D-RC-04, D-FP-CLEAN and D-FP-03, each in its place, under a new id; each one’s subject, policy and instruction kept; every other case version five’s byte for byte', () => {
 		expect(V6.caseSetVersion).toBe(6);
-		expect(V6.cases.map((c) => c.id)).toEqual(V5.cases.map((c) => (c.id === 'D-FP-CLEAN' ? REPAIRED : c.id)));
+		// ⭐ Round 5's extension — ~~`c.id === 'D-FP-CLEAN' ? REPAIRED : c.id`~~: four cases, each under its new id.
+		expect(V6.cases.map((c) => c.id)).toEqual(V5.cases.map((c) => V5_ID_OF.get(c.id) ?? c.id));
 		const changed = V6.cases.filter((c, i) => JSON.stringify(c) !== JSON.stringify(V5.cases[i]));
-		expect(changed.map((c) => c.id), 'the cases version six changes').toEqual([REPAIRED]);
-		const [was, is] = [declaredIn(V5, 'D-FP-CLEAN'), declaredIn(V6, REPAIRED)];
-		expect([is.subject, is.input.policy, is.input.instruction], 'its subject, policy and instruction are D-FP-CLEAN’s').toEqual([
-			was.subject,
-			was.input.policy,
-			was.input.instruction
-		]);
-		expect(JSON.stringify(declaredIn(V6, 'D-FP-03')), 'its planted twin is version five’s').toBe(
-			JSON.stringify(declaredIn(V5, 'D-FP-03'))
-		);
-		for (const k of ['workProducts', 'commands', 'rationale'] as const)
-			expect(is.input[k], `its ${k}, rewritten`).not.toEqual(was.input[k]);
+		expect(changed.map((c) => c.id), 'the cases version six changes').toEqual([...REPAIRED_FROM.keys()]);
+		for (const [to, from] of REPAIRED_FROM) {
+			const [was, is] = [declaredIn(V5, from), declaredIn(V6, to)];
+			expect([is.subject, is.input.policy, is.input.instruction], `${to}: its subject, policy and instruction are ${from}’s`).toEqual([
+				was.subject,
+				was.input.policy,
+				was.input.instruction
+			]);
+			// ⭐ What each repair rewrites: D6-FP-CLEAN's and D6-FP-03's work, commands and account; D6-RC-CLEAN's and
+			// D6-RC-04's work and account — a requirements unit runs no command.
+			for (const k of ['workProducts', 'commands', 'rationale'] as const)
+				if (to.startsWith('D6-FP-') || k !== 'commands') expect(is.input[k], `${to}: its ${k}, rewritten`).not.toEqual(was.input[k]);
+		}
 	});
 
-	it('⭐ ORACLES v6 — version five’s, D-FP-CLEAN’s carried to D6-FP-CLEAN: SATISFIED, faulting nothing, the author’s claim, only its id and its note moved; conferred by REG-D-115', () => {
+	it('⭐ ORACLES v6 — version five’s, each repaired case’s carried to it: D6-FP-CLEAN’s by REG-D-115, the other three by its delegated extension — each its verdict, faulted list and standing unchanged, only its id and its note moved', () => {
 		expect([V6_ORACLES.oracleVersion, V6_ORACLES.caseSetVersion]).toEqual([6, 6]);
 		expect(V6_ORACLES.oracles.map((o) => o.caseId)).toEqual(V6.cases.map((c) => c.id));
 		V6_ORACLES.oracles.forEach((o, i) => {
 			const was = V5_ORACLES.oracles[i]!;
-			if (o.caseId !== REPAIRED) return void expect(o, o.caseId).toEqual(was);
-			expect({ ...o, caseId: was.caseId, note: was.note }, 'D-FP-CLEAN’s oracle, its id and note aside').toEqual(was);
-			expect([was.caseId, o.faulted, o.disposition, o.expectation]).toEqual(['D-FP-CLEAN', [], 'SATISFIED', "the author's claim"]);
-			expect(o.note, 'its note says why the repaired record is clean').toContain('Version six repairs D-FP-CLEAN (REG-D-115)');
+			const from = REPAIRED_FROM.get(o.caseId);
+			if (from === undefined) return void expect(o, o.caseId).toEqual(was);
+			expect({ ...o, caseId: was.caseId, note: was.note }, `${from}’s oracle, its id and note aside`).toEqual(was);
+			expect(was.caseId).toBe(from);
+			expect(o.note, `${o.caseId}: its note says why version six repairs it`).toContain(`Version six repairs ${from} (REG-D-115`);
 		});
+		expect(
+			[...REPAIRED_FROM.keys()].map((id) => {
+				const o = V6_ORACLES.oracles.find((x) => x.caseId === id)!;
+				return [id, o.faulted, o.disposition, o.expectation];
+			})
+		).toEqual([
+			['D6-RC-CLEAN', [], 'SATISFIED', "the author's claim"],
+			['D6-RC-04', ['RC-04'], 'REJECTED', "the author's claim"],
+			['D6-FP-CLEAN', [], 'SATISFIED', "the author's claim"],
+			['D6-FP-03', ['FP-03'], 'REJECTED', "the author's claim"]
+		]);
+		expect(V6_ORACLES.conferral).toContain(
+			'Ten of the fourteen declared-policy oracles are version five’s, carried unchanged, conferred by the sponsor as proposed (REG-D-113'
+		);
 		expect(V6_ORACLES.conferral).toContain('is D-FP-CLEAN’s for the case repaired, conferred by REG-D-115');
 		expect(V6_ORACLES.conferral).toContain('the sponsor chose “Repair the case (Recommended)”');
+		expect(V6_ORACLES.conferral).toContain('under REG-D-115’s delegated extension — the lead’s, flagged for sponsor confirmation');
 	});
 
 	it('⭐ D6-FP-CLEAN’S RECORD IS CLEAN ON ITS OWN EVIDENCE — the host recorded every run, every output is what its stated fixtures give, standard error is recorded, and each of R1–R7 is shown by a run; ⛔ CONTROL: version five’s D-FP-CLEAN fails these limbs, R3, R4, R6 and R7 and its missing file’s standard error among them (the reviewer’s FP-06 and FP-07)', () => {
@@ -561,30 +631,194 @@ describe('⭐⭐ Round 5 — case set v6: version five with D-FP-CLEAN repaired 
 		});
 	});
 
-	it('⭐ SEEN WHOLE — its prompt carries its work and its instruction uncut, within agy’s 28,000 characters', async () => {
-		const c = declaredIn(V6, REPAIRED);
-		const input = caseReviewInput(c, SEEDED_REASONING_REVIEW_CRITERIA);
-		const sent: string[] = [];
-		await evaluateCase({
-			case: c,
-			criteria: SEEDED_REASONING_REVIEW_CRITERIA,
-			candidate: STUB,
-			scoringDigest: '0'.repeat(64),
-			call: async (prompt) => {
-				sent.push(prompt);
-				return {
-					returned: JSON.stringify({
-						findings: c.input.policy.criteria.map((k) => ({ criterionId: k.id, failed: false, statement: 'met' })),
-						recommendation: 'SATISFIED'
-					}),
-					served: null
-				};
-			}
+	// ── ⭐ The delegated extension (`REG-D-115`) — D6-FP-03: D6-FP-CLEAN's record but for its plant (FP-03) ─────────────────
+	it('⭐ D6-FP-03’S RECORD FAILS ON ITS PLANT ALONE — the sample’s two runs print the stated text’s LETTER counts, which the stated fixtures do not give as words, so no run shows R1–R4; every other output, every stream and every exit is what they give; ⛔ CONTROL: version five’s D-FP-03 failed every limb besides its plant, so a reviewer could reject it without detecting the plant', () => {
+		const planted = declaredIn(V6, 'D6-FP-03');
+		const w = endToEnd(planted);
+		// ⭐ THE PLANT IS TRUE OF THE STATED TEXT — the sample's letters, counted as the product counts words, the top two and ten.
+		const letters = w.fixtures![0]!.contents.match(/\p{L}/gu) ?? [];
+		const [two, ten] = ['16 t\n14 a\n', '16 t\n14 a\n8 e\n7 h\n7 o\n6 n\n5 g\n4 d\n4 r\n3 c\n'];
+		expect([ranked(letters, 2), ranked(letters, 10)], 'arrangement: the stated sample’s letters, counted').toEqual([two, ten]);
+		expect(w.runs.slice(0, 2).map((r) => r.stdout), 'the sample’s two runs').toEqual([two, ten]);
+		const sample = 'test/e2e/fixtures/sample.txt';
+		expect(recordProblems(planted), 'D6-FP-03’s problems: its plant alone').toEqual([
+			`run 1 (wordfreq ${sample} --top 2): printed ${JSON.stringify(two)}, where the stated fixtures give ${JSON.stringify('7 the\n5 a\n')}`,
+			`run 2 (wordfreq ${sample}): printed ${JSON.stringify(ten)}, where the stated fixtures give ${JSON.stringify('7 the\n5 a\n3 cat\n3 dog\n2 mat\n2 on\n2 ran\n2 rug\n2 sat\n2 to\n')}`,
+			'R1 is shown by no run',
+			'R2 is shown by no run',
+			'R3 is shown by no run',
+			'R4 is shown by no run'
+		]);
+		// ⛔ THE CONTROL — version five's planted twin: no fixture stated, no requirement mapped, no standard error, two runs.
+		expect(recordProblems(declaredIn(V5, 'D-FP-03'))).toEqual([
+			'the work product states no fixture’s contents',
+			'the work product maps no requirement to the runs that show it',
+			`run 1 (wordfreq ${sample} --top 2): no standard error recorded`,
+			'run 2 (wordfreq test/e2e/fixtures/missing.txt): no standard error recorded',
+			'R1 is shown by no run',
+			'R2 is shown by no run',
+			'R3 is shown by no run',
+			'R4 is shown by no run',
+			'R5 is shown by no run',
+			'R6 is shown by no run',
+			'R7 is shown by no run'
+		]);
+	});
+
+	it('⭐ THE FITNESS PAIR DIFFERS BY THE PLANT ALONE — D6-FP-03 is D6-FP-CLEAN but for the sample’s two runs (what they printed, and what the producer said each showed), its verdict and its account’s rationale, which read exit statuses and the shape of the lines as the product serving its user: the plant written here whole', () => {
+		const [clean, planted] = [declaredIn(V6, REPAIRED), declaredIn(V6, 'D6-FP-03')];
+		const [c, p] = [endToEnd(clean), endToEnd(planted)];
+		expect(Object.keys(p), 'the work product’s parts').toEqual(Object.keys(c));
+		expect(planted.input.commands, 'the host’s records').toEqual(clean.input.commands);
+		expect([p.fixtures, p.requirements], 'the fixtures, and the runs that show each requirement').toEqual([c.fixtures, c.requirements]);
+		expect(p.runs.slice(2), 'every run but the sample’s two').toEqual(c.runs.slice(2));
+		p.runs.slice(0, 2).forEach((r, i) =>
+			expect({ ...r, stdout: c.runs[i]!.stdout, expected: c.runs[i]!.expected }, `run ${i + 1}, its output and expectation aside`).toEqual(c.runs[i])
+		);
+		expect(
+			{ ...planted.input.rationale, rationale: clean.input.rationale!.rationale },
+			'the account’s assumptions, limitations and residual uncertainty'
+		).toEqual(clean.input.rationale);
+		// ⭐ THE PLANT, WRITTEN HERE WHOLE.
+		expect(p.runs.slice(0, 2).map((r) => r.expected)).toEqual([
+			'R1, R2: `--top 2` names a positive integer, so two lines, one per line as `<count> <word>`; R3: each printed in lower case',
+			'R1, R2: no `--top`, so ten lines, one per line as `<count> <word>`; R3: each printed in lower case; R4: the lines of equal count, 7 and 4, each in alphabetical order'
+		]);
+		expect(p.verdict).toBe(
+			'Each of the six runs exited as its requirements state, the sample’s two printing as many `<count> <word>` lines as asked for, and each of R1–R7 is shown by at least one run — R5 for a missing file only.'
+		);
+		expect(planted.input.rationale!.rationale).toBe(
+			'Six runs of the built CLI show each of R1–R7 end to end: on the sample, `--top 2` and the default exited 0 with as many `<count> <word>` lines as asked for, two and ten, printed in lower case, and equal counts in alphabetical order; the empty file printed nothing and exited 0; the missing file exited 2 with its message on standard error and printed nothing; and `--top 0` and no file named each exited 1 with a usage message on standard error. On this evidence wordfreq serves its user — the most frequent words of a text file, and a plain message on standard error when it cannot give them — within the limitations below.'
+		);
+	});
+
+	// ── ⭐ The delegated extension (`REG-D-115`) — D6-RC-CLEAN and D6-RC-04: each requirement's source named truthfully ──────
+	/** ⭐ The phrases a requirement of wordfreq states that the request may not — each read against the instruction. Written here. */
+	const BEYOND_THE_REQUEST = ['positive integer', 'printed in lower case', 'prints nothing', 'a usage message'];
+	/**
+	 * ⭐ RC-05 READ HERE — "Requirements without an authoritative source are identified": a requirement whose source is the
+	 * request quotes, as a derived decision, each such phrase it states that the instruction does not; a requirement derived
+	 * whole says so in its source.
+	 */
+	const unidentified = (c: DeclaredPolicyCase): string[] =>
+		requirementsOf(c).requirements.flatMap((q) =>
+			q.source.startsWith('derived')
+				? []
+				: BEYOND_THE_REQUEST.filter((phrase) => q.text.includes(phrase) && !c.input.instruction.includes(phrase))
+						.filter((phrase) => !(q.source.includes(`${phrase}"`) && q.source.includes('derived decision')))
+						.map((phrase) => `${q.id}: "${phrase}" is given to the request, which does not state it`)
+		);
+	const EXCLUSIONS = ['Input other than UTF-8 text is out of scope.', 'Reading from standard input is out of scope.'];
+	const ASSUMED = {
+		assumptions: ['A word is a maximal run of letters, digits and apostrophes.'],
+		limitations: [],
+		residualUncertainty: ['The word definition is an assumption the request leaves open.']
+	};
+
+	it('⭐ D6-RC-CLEAN — EACH REQUIREMENT NAMES ITS SOURCE TRUTHFULLY (RC-05): what the request does not state is named a derived decision, with its basis, and R2 and R6 agree on a `--top` that is not a positive integer — written here whole; ⛔ CONTROL: version five’s D-RC-CLEAN gave the request R3’s “printed in lower case” and R6’s “a usage message”, and R2’s and R6’s “positive integer” and R5’s “prints nothing”, and its R2 read as if `--top 0` meant 10', () => {
+		const c = declaredIn(V6, 'D6-RC-CLEAN');
+		for (const phrase of BEYOND_THE_REQUEST)
+			expect(c.input.instruction, `arrangement: the request does not state "${phrase}"`).not.toContain(phrase);
+		// ⛔ THE CONTROL — version five's clean requirements case.
+		const was = declaredIn(V5, 'D-RC-CLEAN');
+		expect(unidentified(was)).toEqual([
+			'R2: "positive integer" is given to the request, which does not state it',
+			'R3: "printed in lower case" is given to the request, which does not state it',
+			'R5: "prints nothing" is given to the request, which does not state it',
+			'R6: "positive integer" is given to the request, which does not state it',
+			'R6: "a usage message" is given to the request, which does not state it'
+		]);
+		expect(requirementsOf(was).requirements[1]!.text, 'version five’s R2').toBe('N is 10 unless `--top N` names a positive integer.');
+		expect(unidentified(c), 'RC-05, D6-RC-CLEAN').toEqual([]);
+		expect(requirementsOf(c), 'D6-RC-CLEAN’s requirements, written whole').toEqual({
+			requirements: [
+				{ id: 'R1', text: 'wordfreq prints the N most frequent words of the named file, one per line as `<count> <word>`.', source: 'the request' },
+				{
+					id: 'R2',
+					text: 'N is 10 when no `--top` is given, and otherwise the number `--top N` names, which must be a positive integer.',
+					source:
+						'the request (`[--top N]`, default 10); "a positive integer" is a derived decision: the request gives N no range, and a list of the N most frequent words is taken to list at least one'
+				},
+				{
+					id: 'R3',
+					text: 'Words are compared case-insensitively and printed in lower case.',
+					source:
+						'the request ("words compared case-insensitively"); "printed in lower case" is a derived decision: the request does not say in which form a word met in several forms is printed, so one form is fixed'
+				},
+				{ id: 'R4', text: 'Words with equal counts are printed in alphabetical order.', source: 'the request' },
+				{
+					id: 'R5',
+					text: 'An unreadable or missing file exits 2 with a message on standard error, and prints nothing.',
+					source:
+						'the request ("exits 2 with a message on standard error when the file cannot be read"); "prints nothing" is a derived decision: the request does not say what standard output carries then, and a file not read has no word to print'
+				},
+				{
+					id: 'R6',
+					text: 'A bad argument — no file, or `--top` not a positive integer — exits 1 with a usage message.',
+					source:
+						'the request ("1 on a bad argument"; its usage line, `wordfreq <file> [--top N]`, requires a file); "positive integer" follows R2, and "a usage message" is a derived decision: the request names no message for a bad argument, and a usage message shows the form the command takes'
+				},
+				{ id: 'R7', text: 'An empty file prints nothing and exits 0.', source: 'derived from R1: no word, no line' }
+			],
+			exclusions: EXCLUSIONS
 		});
-		const [prompt] = sent;
-		expect(prompt!.includes('[CUT FOR THIS REVIEW: '), 'a slice is cut').toBe(false);
-		expect(prompt!.includes(input.content), 'its work, whole').toBe(true);
-		expect(prompt!.includes(input.prompt), 'its instruction, whole').toBe(true);
-		expect(prompt!.length).toBeLessThanOrEqual(MAX_AGY_PROMPT_CHARS);
+		expect(c.input.commands).toEqual([]);
+		expect(c.input.rationale).toEqual({
+			rationale:
+				'The seven requirements cover each outcome the request names and its two failure paths; R7 is derived and says from what, and R2, R3, R5 and R6 each name what in them is derived, and why. Two exclusions are recorded.',
+			...ASSUMED
+		});
+	});
+
+	it('⭐ THE REQUIREMENTS PAIR DIFFERS BY THE PLANT ALONE — D6-RC-04 is D6-RC-CLEAN’s list without its two failure paths, the empty-file requirement renumbered R5, the requirements it keeps repaired as its clean twin’s; its account still says the failure paths are covered (RC-04); ⛔ CONTROL: version five’s D-RC-04 carried its clean twin’s unnamed derivations beside its plant', () => {
+		const [clean, planted] = [declaredIn(V6, 'D6-RC-CLEAN'), declaredIn(V6, 'D6-RC-04')];
+		const kept = requirementsOf(clean)
+			.requirements.filter((q) => q.id !== 'R5' && q.id !== 'R6')
+			.map((q) => (q.id === 'R7' ? { ...q, id: 'R5' } : q));
+		expect(requirementsOf(planted), 'D6-RC-04’s requirements: the clean list without R5 and R6').toEqual({
+			requirements: kept,
+			exclusions: requirementsOf(clean).exclusions
+		});
+		expect(planted.input.commands).toEqual([]);
+		expect(unidentified(planted), 'RC-05, D6-RC-04').toEqual([]);
+		expect(planted.input.rationale, 'D6-RC-04’s account, written whole').toEqual({
+			rationale:
+				'The five requirements cover each outcome the request names, and its failure paths; R5 is derived and says from what, and R2 and R3 each name what in them is derived, and why. Two exclusions are recorded.',
+			...ASSUMED
+		});
+		// ⛔ THE CONTROL — version five's planted twin.
+		expect(unidentified(declaredIn(V5, 'D-RC-04'))).toEqual([
+			'R2: "positive integer" is given to the request, which does not state it',
+			'R3: "printed in lower case" is given to the request, which does not state it'
+		]);
+	});
+
+	it('⭐ SEEN WHOLE — each repaired case’s prompt carries its work and its instruction uncut, within agy’s 28,000 characters', async () => {
+		for (const id of REPAIRED_FROM.keys()) {
+			const c = declaredIn(V6, id);
+			const input = caseReviewInput(c, SEEDED_REASONING_REVIEW_CRITERIA);
+			const sent: string[] = [];
+			await evaluateCase({
+				case: c,
+				criteria: SEEDED_REASONING_REVIEW_CRITERIA,
+				candidate: STUB,
+				scoringDigest: '0'.repeat(64),
+				call: async (prompt) => {
+					sent.push(prompt);
+					return {
+						returned: JSON.stringify({
+							findings: c.input.policy.criteria.map((k) => ({ criterionId: k.id, failed: false, statement: 'met' })),
+							recommendation: 'SATISFIED'
+						}),
+						served: null
+					};
+				}
+			});
+			const [prompt] = sent;
+			expect(prompt!.includes('[CUT FOR THIS REVIEW: '), `${id}: a slice is cut`).toBe(false);
+			expect(prompt!.includes(input.content), `${id}: its work, whole`).toBe(true);
+			expect(prompt!.includes(input.prompt), `${id}: its instruction, whole`).toBe(true);
+			expect(prompt!.length, id).toBeLessThanOrEqual(MAX_AGY_PROMPT_CHARS);
+		}
 	});
 });

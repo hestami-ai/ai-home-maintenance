@@ -1437,8 +1437,17 @@ describe('JAN-EXEC Phase 7 completion E2 — under case set v5, a run of v4 owes
 // In P4 the selected reviewer rejected the clean case D-FP-CLEAN once, on a retry of a transport failure, for flaws the
 // case's own record shows; the sponsor ruled the case be repaired and its oracle kept SATISFIED. Version six is version five
 // with that one case repaired, under a new id. These limbs hold the check over P4's record shape to it.
-describe('JAN-EXEC Phase 7 completion round 5 — under case set v6, P4’s record shape — a run of v5 and a retry that rejected D-FP-CLEAN, of the selected candidate — owes a run over exactly D6-FP-CLEAN, D-FP-CLEAN repaired (REG-D-115)', () => {
-	const REPAIRED = 'D6-FP-CLEAN';
+// ⭐ And under the ruling's delegated extension (`REG-D-115`), three more: D-FP-CLEAN's planted twin D-FP-03, and the
+// requirements pair D-RC-CLEAN and D-RC-04 — four cases repaired, each under a new id, so the record owes a run of the four.
+describe('JAN-EXEC Phase 7 completion round 5 — under case set v6, P4’s record shape — a run of v5 and a retry that rejected D-FP-CLEAN, of the selected candidate — owes a run over exactly the four repaired cases, D6-RC-CLEAN, D6-RC-04, D6-FP-CLEAN and D6-FP-03 (REG-D-115)', () => {
+	/** The cases version six repairs, in the current set's order, and the version-five id each replaces. Written here. */
+	const REPAIRED_FROM: ReadonlyMap<string, string> = new Map([
+		['D6-RC-CLEAN', 'D-RC-CLEAN'],
+		['D6-RC-04', 'D-RC-04'],
+		['D6-FP-CLEAN', 'D-FP-CLEAN'],
+		['D6-FP-03', 'D-FP-03']
+	]);
+	const REPAIRED = [...REPAIRED_FROM.keys()];
 	const GLM: SelectedCandidate = { transport: 'devin', modelLabel: 'glm-5-3-flash-max' };
 	/** The current set — version six — and its own oracles, conferred (`REG-D-113`, `REG-D-115`). */
 	const onTheCurrentSet = (files: CheckInputs['files'], over: Partial<Omit<CheckInputs, 'files'>> = {}) =>
@@ -1476,11 +1485,18 @@ describe('JAN-EXEC Phase 7 completion round 5 — under case set v6, P4’s reco
 		select(GLM)
 	];
 
-	it('⛔ under version five the retry’s rejection of D-FP-CLEAN is an un-escalated CLEAN_NOT_SATISFIED; under version six the same record owes a run over D6-FP-CLEAN alone — coverage, of any run and of the selected candidate’s, and nothing else: no reproduction failure, no escalation; a run of the selected candidate over it turns it green', async () => {
+	it('⛔ under version five the retry’s rejection of D-FP-CLEAN is an un-escalated CLEAN_NOT_SATISFIED; under version six the same record owes a run over the four repaired cases alone — coverage, of any run and of the selected candidate’s, and nothing else: no reproduction failure, no escalation; a run of the selected candidate over them turns it green', async () => {
 		expect([CURRENT_SET.caseSetVersion, CURRENT_ORACLES.oracleVersion], 'the current set is version six').toEqual([6, 6]);
 		const v5Ids = new Set(V5_CASES.map((c) => c.id));
-		expect(CURRENT_CASES.filter((c) => !v5Ids.has(c.id)).map((c) => c.id), 'the one case version six changes').toEqual([REPAIRED]);
-		expect(CURRENT_ORACLES.oracles.find((o) => o.caseId === REPAIRED), 'its oracle').toMatchObject({ faulted: [], disposition: 'SATISFIED' });
+		expect(CURRENT_CASES.filter((c) => !v5Ids.has(c.id)).map((c) => c.id), 'the cases version six changes').toEqual(REPAIRED);
+		// ⭐ Each repaired case's oracle is the one its version-five case carried, its verdict and faulted list unchanged.
+		for (const [to, from] of REPAIRED_FROM) {
+			const was = V5_ORACLES.oracles.find((o) => o.caseId === from)!;
+			expect(CURRENT_ORACLES.oracles.find((o) => o.caseId === to), `${to}: its oracle`).toMatchObject({
+				faulted: was.faulted,
+				disposition: was.disposition
+			});
+		}
 		const lines = await p4();
 		// ⭑ CONTROL — under version five, the record the retry wrote is red on that rejection, as the committed record was.
 		expect((await onVersionFive([file(lines)])).problems).toEqual([
@@ -1491,44 +1507,47 @@ describe('JAN-EXEC Phase 7 completion round 5 — under case set v6, P4’s reco
 			}
 		]);
 		// ⭐ Under version six: D-FP-CLEAN is no case of today's set, so its evaluations are reproduced and covered for nothing,
-		// and limb 3 judges them against today's oracles, which hold none for it; D6-FP-CLEAN is owed its run.
+		// and limb 3 judges them against today's oracles, which hold none for it; ⭐ so too the other three cases version six
+		// repairs. The four repaired cases are owed their run.
 		const owed = await onTheCurrentSet([file(lines)]);
 		expect(owed.problems).toEqual([
 			{
 				limb: 'COVERAGE',
-				message: `1 of 54 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer}: ${REPAIRED} — owed: a RUN over them, or RESCORED lines where no case prompt changed (§5.6 limb 1)`
+				message: `4 of 54 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer}: ${REPAIRED.join(', ')} — owed: a RUN over them, or RESCORED lines where no case prompt changed (§5.6 limb 1)`
 			},
 			{
 				limb: 'COVERAGE',
-				message: `1 of 54 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer} by the SELECTED candidate devin / glm-5-3-flash-max (REG-D-084; the SELECTION in force, runs.ndjson:${lines.length}): ${REPAIRED} — owed: a run of the selected candidate over them, or RESCORED lines of its runs where no case prompt changed (§5.6 limb 1; REG-D-086)`
+				message: `4 of 54 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer} by the SELECTED candidate devin / glm-5-3-flash-max (REG-D-084; the SELECTION in force, runs.ndjson:${lines.length}): ${REPAIRED.join(', ')} — owed: a run of the selected candidate over them, or RESCORED lines of its runs where no case prompt changed (§5.6 limb 1; REG-D-086)`
 			}
 		]);
 		const remeasured = await recorded({
 			runId: 'qr-v6-repaired',
 			date: '2026-10-17T12:00:00.000Z',
 			candidate: DEVIN,
-			cases: CURRENT_CASES.filter((c) => c.id === REPAIRED),
+			cases: CURRENT_CASES.filter((c) => REPAIRED.includes(c.id)),
 			fingerprint: { ...CURRENT, caseSet: FP_NOW.caseSet },
 			versions: { caseSet: 6, oracles: 6 }
 		});
 		expect((await onTheCurrentSet([file([...lines, ...remeasured])])).problems).toEqual([]);
 	});
 
-	it('⭐ CONTROL — why the repaired case carries a new id: kept under D-FP-CLEAN, P4’s run of it reads as a prompt that moved while the fingerprint did not — a non-reproduction a re-run does not discharge', async () => {
-		const v5IdOf = (id: string) => (id === REPAIRED ? 'D-FP-CLEAN' : id);
+	it('⭐ CONTROL — why a repaired case carries a new id: kept under its version-five id, P4’s run of it reads as a prompt that moved while the fingerprint did not — a non-reproduction a re-run does not discharge', async () => {
+		const v5IdOf = (id: string) => REPAIRED_FROM.get(id) ?? id;
 		const sameIds = CURRENT_CASES.map((c) => ({ ...c, id: v5IdOf(c.id) }));
 		const current = { ...FP_NOW, casePrompts: new Map([...FP_NOW.casePrompts].map(([id, p]) => [v5IdOf(id), p])) };
 		const rerun = await recorded({
 			runId: 'qr-v6-same-id-rerun',
 			date: '2026-10-17T12:00:00.000Z',
 			candidate: DEVIN,
-			cases: sameIds.filter((c) => c.id === 'D-FP-CLEAN'),
+			cases: sameIds.filter((c) => [...REPAIRED_FROM.values()].includes(c.id)),
 			fingerprint: { ...CURRENT, caseSet: FP_NOW.caseSet }
 		});
 		const r = await onTheCurrentSet([file([...(await p4()), ...rerun])], { current, cases: sameIds, oracles: V5_ORACLES.oracles });
-		expect(limb(r, 'REPRODUCTION')).toContain(
-			'run qr-v5-p4: D-FP-CLEAN#1 initial — the prompt it recorded is not the one today’s reviewer sends, though the fingerprint did not move'
-		);
+		// ⭐ Each of the four, kept under its version-five id, reads as a prompt that moved.
+		for (const from of REPAIRED_FROM.values())
+			expect(limb(r, 'REPRODUCTION')).toContain(
+				`run qr-v5-p4: ${from}#1 initial — the prompt it recorded is not the one today’s reviewer sends, though the fingerprint did not move`
+			);
 		expect(limb(r, 'COVERAGE'), 'the re-run covers every case — only the old record fails').toBe('');
 	});
 });
