@@ -32,7 +32,8 @@
 // delegated decision of 2026-10-15, to be registered): the tool RESULTS the model read mid-turn — `write_file`'s message,
 // `run_command`'s rendered exit, output and structured result (`toPiToolResult`), and Pi's own answer to a call of a tool
 // the step has not minted (`unknownToolResult`) — are keyed call by call (step 3). ⚠ Its one stated limit: a size the
-// tool measures of a scrubbed path is the host's (`recording.ts`, the header's "a size measured of a scrubbed path").
+// tool measures of a scrubbed path is ~~the host's~~ ⭐ the replay's, measured in its sandbox, on the recording's own host
+// too (`recording.ts`, the header's "a size measured of a scrubbed path"; the check of E4's polish round, F2).
 import {
 	producerWorkingDirectory,
 	type ProducerSession,

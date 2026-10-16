@@ -122,7 +122,9 @@ export function fixtureExecutorKey(
  * (`toolResultAsSent`), scrubbed by `scrub` and hashed. A call to a tool not minted is Pi's own answer to it. So a test's
  * recording is keyed exactly as a replay of this code will key its calls, and a change to a rendering moves both.
  * ⭑ `expand` is the test's own expansion of the recorded arguments: a size the tool reports of an expanded path is then
- * the test host's, as the replay's will be. ⚠ It writes into a scratch folder of its own, removed after.
+ * ~~the test host's, as the replay's will be~~ ⭐ the test's own, measured of the paths it expanded to, as a replay's is
+ * measured in its sandbox (the check of E4's polish round, F2). ⚠ It writes into a scratch folder of its own, removed
+ * after.
  */
 export async function fixtureResultSha256(
 	call: Pick<RecordedToolCall, 'name' | 'arguments'>,

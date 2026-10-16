@@ -47,10 +47,15 @@
 // The replay renders the result again from the code under test, as Pi would send it (`toolResultAsSent`), and refuses
 // `REPLAY_STALE` where the hash differs, naming the call and both hashes: a change to how a result is rendered can no
 // longer replay green under an answer made reading the old rendering.
-// ⚠⚠ A SIZE MEASURED OF A SCRUBBED PATH IS THE HOST'S — A LIMIT OF THIS KEY, STATED. The scrub makes a path the same on
-// every host, but not a number measured of text that holds one: a `write_file` whose contents name the run's own
-// workspace is reported as so many bytes, and the replay host's workspace path is another length. Such a call goes
-// `REPLAY_STALE` where the two hosts' directories differ in length, and the refusal says so (`ReplayRun.checkToolResult`).
+// ⚠⚠ A SIZE MEASURED OF A SCRUBBED PATH IS ~~THE HOST'S~~ ⭐ THE REPLAY'S — A LIMIT OF THIS KEY, STATED. The scrub makes a
+// path the same on every host, but not a number measured of text that holds one: a `write_file` whose contents name the
+// run's own workspace is reported as so many bytes, and ~~the replay host's workspace path is another length. Such a call
+// goes `REPLAY_STALE` where the two hosts' directories differ in length~~ ⭐ (the check of E4's polish round, F2) a
+// replay's workspace path is another length, on the recording's own host too: a replay builds its sandbox in a fresh
+// temporary folder (`replay-run.ts`, `disposableRoot`), never at the run's `<JPWB_DEMO_DB>.workspaces`
+// (`workspace-host.ts`), so the two are as long only by chance. Such a call goes `REPLAY_STALE` in EVERY replay whose
+// sandbox path is not as long as the run's workspace path, the recording's own host included, and the refusal says so
+// (`ReplayRun.checkToolResult`).
 //
 // ⛔ SCRUBBED BEFORE IT IS WRITTEN, AND HASHED OVER THE SCRUBBED BYTES (`REG-F-536`). Every executor prompt carries the
 // host's absolute workspace path, which names the operator's account, and a command's output can carry it too. The

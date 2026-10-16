@@ -18,9 +18,10 @@
 //     and ⛔ after any refusal the executor serves no try (finding 7 — its mutant: the poison check deleted);
 //   · ⭐ (the lead's delegated decision of 2026-10-15, to be registered) ⛔ a call whose RESULT, as this code renders it,
 //     is not the one the model read is REPLAY_STALE, naming the call and both hashes; where its arguments name the run's
-//     own directories, the refusal says a size measured of them is the host's; and a call to a tool the step has not
-//     minted is keyed as Pi's own answer to it. Each try here is keyed in its test's own sandbox
-//     (`fixtureResultSha256`).
+//     own directories, the refusal says a size measured of them is ~~the host's~~ ⭐ the replay's, measured in its
+//     sandbox — on the recording's own host too (the check of E4's polish round, F2); and a call to a tool the step has
+//     not minted is keyed as Pi's own answer to it. Each try here is keyed in its test's own sandbox
+//     (`fixtureResultSha256`) — which is why the limit never bites here unasked.
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -119,7 +120,7 @@ let outputDir = '';
 
 /**
  * ⭐ `calls` keyed by what this code renders for each in THIS test's sandbox (`fixtureResultSha256`), as the replay will
- * key them: the write's contents expanded to this test's workspace — a size the tool reports of them is this host's — or,
+ * key them: the write's contents expanded to this test's workspace — a size the tool reports of them is this sandbox's — or,
  * with `workspace`, expanded as if the run's workspace were that path instead.
  */
 async function keyed(
@@ -394,8 +395,10 @@ describe('⭐ the replay executor (D2) — recorded tool calls through the real 
 		expect(run.consumed()).toEqual({ executor: 1, commands: 0, reviewer: 0 });
 	});
 
-	it('⚠ a write whose contents name the run’s workspace reports a size this host measures: recorded where the workspace path was another length, it goes REPLAY_STALE, and says why', async () => {
+	it('⚠ a write whose contents name the run’s workspace reports a size this replay measures in its sandbox: recorded where the workspace path was another length — as a run’s is but by chance, on the recording’s own host too — it goes REPLAY_STALE, and says why', async () => {
 		// ⭑ The recording's stated limit: keyed as if the recorded run's workspace were one character longer than this one.
+		// ⭐ (the check of E4's polish round, F2) A replay's sandbox is a fresh temporary folder on every host, the
+		// recording's own included (`replay-run.ts`, `disposableRoot`), so this is every replay's case, not another host's.
 		const elsewhere: ExecutorTry = {
 			...TRY,
 			toolCalls: await keyed(CALLS, `${workspaceDir}x`)
@@ -404,7 +407,9 @@ describe('⭐ the replay executor (D2) — recorded tool calls through the real 
 		const session = await openReplayExecutionSession(contextOn(run), run);
 
 		await expect(session.turn(TURN)).rejects.toThrow(
-			"⚠ Its arguments name the run's own directories (a scrub token), so a size the tool reports of them is this host's"
+			"⚠ Its arguments name the run's own directories (a scrub token), so a size the tool reports of them is " +
+				"measured in this replay's sandbox — a fresh temporary folder, on the recording's own host too — and " +
+				"differs wherever the sandbox's directories are not as long as the run's: the recording's stated limit."
 		);
 	});
 

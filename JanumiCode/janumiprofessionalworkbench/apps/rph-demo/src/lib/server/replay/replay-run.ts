@@ -341,7 +341,8 @@ export function createReplayRun(
 			const actual = sha256Hex(scrub(rendered));
 			if (actual === call?.resultSha256) return;
 			// ⚠ THE KEY'S STATED LIMIT (`recording.ts`, the header's size of a scrubbed path), said where it bites: a call
-			// whose arguments name the run's own directories may report a size measured of them, which is this host's.
+			// whose arguments name the run's own directories may report a size measured of them, which is ~~this host's~~ ⭐
+			// this replay's, measured in its sandbox — on the recording's own host too (the check of E4's polish round, F2).
 			const named =
 				call !== undefined && SCRUB_TOKENS.some((token) => JSON.stringify(call.arguments).includes(token));
 			throw poison(
@@ -352,8 +353,9 @@ export function createReplayRun(
 						'recorded answer was made reading it.' +
 						(named
 							? " ⚠ Its arguments name the run's own directories (a scrub token), so a size the tool reports of " +
-								"them is this host's, and differs where this host's directories are not as long as the run's — " +
-								"the recording's stated limit."
+								"them is measured in this replay's sandbox — a fresh temporary folder, on the recording's own host " +
+								"too — and differs wherever the sandbox's directories are not as long as the run's: the " +
+								"recording's stated limit."
 							: '')
 				)
 			);
