@@ -912,9 +912,13 @@ interface LaneUnit {
 	/**
 	 * ⭐ R3-B F4 (the lead's round-3 item 4) — WHERE THE LANE STOPPED, when it
 	 * skipped this unit's sign-off after stopping at ANOTHER unit's limit check: that unit's slug, and the act its check was
-	 * read before (`signOffsSkipped`). null when the lane did not skip it so.
+	 * read before (`signOffsSkipped`). ⭐ R4 (the lead's round-4 item 3) — or after another unit's sign-off act that got no
+	 * answer: that unit's slug, and the act (`unanswered`). null when the lane did not skip it so.
 	 */
-	readonly signOffSkippedAt: { readonly slug: string; readonly before: string } | null;
+	readonly signOffSkippedAt:
+		| { readonly slug: string; readonly before: string }
+		| { readonly slug: string; readonly unanswered: string }
+		| null;
 }
 
 /**
@@ -992,12 +996,24 @@ function signOffOutlasted(signOff: Record<string, unknown>): LaneUnit['signOffOu
  * declared reviews — held its act back ends that loop (`runTheLane`, D8). So every unit after it in that order whose record
  * holds no sign-off was skipped there. ⚠ A unit the record does not say stopped is taken to be in the order: one never
  * pressed is read as never begun before its sign-off is (`completion`).
+ * ⭐ R4 (the lead's round-4 item 3) — AND A SIGN-OFF ACT THAT GOT NO ANSWER ENDS THAT LOOP TOO (D4: nothing is pressed beside
+ * an act the server may still be running) — past its bound, or lost in transit, whichever act it was (`SIGN_OFF_ACTS`) — so
+ * every later unit whose record holds no sign-off was skipped after it. ⛔ Each read "its sign-off was never attempted".
  */
 function signOffsSkipped(rows: readonly Record<string, unknown>[]): Map<Record<string, unknown>, LaneUnit['signOffSkippedAt']> {
 	const heldBefore = (r: Record<string, unknown>): string | null => {
 		const signOff = rec(r.signOff);
 		if (bool(rec(signOff.limitCheck).allowed) === false) return BEFORE_RECORD_ASSURANCE;
 		return bool(rec(signOff.rerunLimitCheck).allowed) === false ? BEFORE_DECLARED_RERUN : null;
+	};
+	/** ⭐ R4 (the lead's round-4 item 3) — the sign-off act of `r` that got no answer, by its button's name, or null. */
+	const unansweredAct = (r: Record<string, unknown>): string | null => {
+		const signOff = rec(r.signOff);
+		const act = SIGN_OFF_ACTS.find(([field]) => {
+			const pressed = rec(signOff[field]);
+			return int(pressed.timedOutAfterMs) !== null || str(pressed.requestFailure) !== '';
+		});
+		return act === undefined ? null : act[1];
 	};
 	const skipped = new Map<Record<string, unknown>, LaneUnit['signOffSkippedAt']>();
 	let stop: LaneUnit['signOffSkippedAt'] = null;
@@ -1008,6 +1024,8 @@ function signOffsSkipped(rows: readonly Record<string, unknown>[]): Map<Record<s
 		}
 		const before = heldBefore(r);
 		if (before !== null) stop = { slug: str(r.slug), before };
+		const unanswered = unansweredAct(r);
+		if (unanswered !== null) stop = { slug: str(r.slug), unanswered };
 	}
 	return skipped;
 }
@@ -2447,11 +2465,14 @@ function heldBackOr(v: UnitView, ...otherwise: string[]): string[] {
 /**
  * ⭐ R3-B F4 (the lead's round-3 item 4) — WHY THE LANE DID NOT ATTEMPT A SIGN-OFF
  * IT SKIPPED after stopping at another unit's limit check (`LaneUnit.signOffSkippedAt`): that unit, and the act its check was
- * read before; null for a unit it did not skip so.
+ * read before; ⭐ R4 (the lead's round-4 item 3) — or after another unit's sign-off act that got no answer: that unit, and
+ * the act; null for a unit it did not skip so.
  */
 function skippedWhy(v: UnitView): string | null {
 	const at = v.unit.lane?.signOffSkippedAt ?? null;
 	if (at === null) return null;
+	if ('unanswered' in at)
+		return `its sign-off was not attempted: the lane stopped after the ${at.slug} unit’s ${at.unanswered}, which got no answer, and pressed no sign-off after it (D4)`;
 	return `its sign-off was not attempted: the lane stopped at the ${at.slug} unit’s limit check, before ${at.before}, and pressed no sign-off after it (D8)`;
 }
 

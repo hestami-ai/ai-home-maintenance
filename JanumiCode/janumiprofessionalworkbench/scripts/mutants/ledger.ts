@@ -30943,5 +30943,50 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/phase7-half-b.test.ts"],
 		why: "PROMISE (the lead's round-4 item 2): the run's end records WHY the root's type cannot be read, in typeUnreadableOf's words. WHO RELIES: the operator, who must know which of the four it was. WHAT THE MUTATION DOES: the end says the type cannot be read, and not why. Applied by hand first, the file restored byte for byte: 'AssertionError: expected [ 'root-type-unreadable', …(1) ] to deeply equal [ 'root-type-unreadable', …(1) ]' (2 tests red in its victim). OBSERVED (bun run mutants -- R4-M15 to R4-M22 by their full ids, 2026-10-16, in the round-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R4-M22-the-end-says-no-why         ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 7 completion programme, round 4, F2 - the lane fails closed on a root whose type it cannot find or read (the lead's round-4 item 2): paid, half B never presses such a root - whether its press runs a model, and so what the limit must count before it, cannot be decided - and ends the run root-type-unreadable, why in its detail (typeUnreadableOf, the run report's reading of such a root); a type read that names no discharge stays UNDECLARED"
+	},
+	{
+		id: "R4-M23-the-unanswered-stop-is-never-found",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "if (unanswered !== null) stop = { slug: str(r.slug), unanswered };",
+		replace: "void unanswered;",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE (the lead's round-4 item 3): the report finds where the lane's sign-off loop stopped after a sign-off act with no answer (D4), as it finds a limit stop (R3-B F4). WHO RELIES: every later unit's stage-7 reading. WHAT THE MUTATION DOES: no such stop is found, and every later unit reads 'its sign-off was never attempted'. Applied by hand first, the file restored byte for byte: 'AssertionError: Record Assurance, past its bound: expected [ …(2) ] to deeply equal [ …(2) ]' (2 tests red in its victim). OBSERVED (bun run mutants -- R4-M23 to R4-M27 and R3B-M24 to R3B-M27 by their full ids, 2026-10-16, in the round-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R4-M23-the-unanswered-stop-is-never-found ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion programme, round 4, F3 - a sign-off the lane skipped after another unit's sign-off act got no answer reads as not attempted because the lane stopped after that act (the lead's round-4 item 3): the lane's sign-off loop ends there (D4), as at a limit check that holds one back (D8, R3-B F4), and the run report says so for every later unit, the root's line included"
+	},
+	{
+		id: "R4-M24-a-request-lost-in-transit-is-not-an-unanswered-act",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "return int(pressed.timedOutAfterMs) !== null || str(pressed.requestFailure) !== '';",
+		replace: "return int(pressed.timedOutAfterMs) !== null;",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE (the lead's round-4 item 3): an act whose request failed in transit got no answer, as one past its bound did, and the lane stopped after it (unansweredEnd, D4). WHO RELIES: the later units' readings. WHAT THE MUTATION DOES: an act lost in transit is not read as one with no answer. Applied by hand first, the file restored byte for byte: 'AssertionError: Record Assurance, lost in transit: expected [ …(2) ] to deeply equal [ …(2) ]' (1 test red in its victim). OBSERVED (bun run mutants -- R4-M23 to R4-M27 and R3B-M24 to R3B-M27 by their full ids, 2026-10-16, in the round-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R4-M24-a-request-lost-in-transit-is-not-an-unanswered-act ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion programme, round 4, F3 - a sign-off the lane skipped after another unit's sign-off act got no answer reads as not attempted because the lane stopped after that act (the lead's round-4 item 3): the lane's sign-off loop ends there (D4), as at a limit check that holds one back (D8, R3-B F4), and the run report says so for every later unit, the root's line included"
+	},
+	{
+		id: "R4-M25-an-act-past-its-bound-is-not-an-unanswered-act",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "return int(pressed.timedOutAfterMs) !== null || str(pressed.requestFailure) !== '';",
+		replace: "return str(pressed.requestFailure) !== '';",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE (the lead's round-4 item 3): an act that outlasted its bound got no answer, and the lane stopped after it (D4). WHO RELIES: the later units' readings. WHAT THE MUTATION DOES: an act past its bound is not read as one with no answer. Applied by hand first, the file restored byte for byte: 'AssertionError: Record Assurance, past its bound: expected [ …(2) ] to deeply equal [ …(2) ]' (2 tests red in its victim). OBSERVED (bun run mutants -- R4-M23 to R4-M27 and R3B-M24 to R3B-M27 by their full ids, 2026-10-16, in the round-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R4-M25-an-act-past-its-bound-is-not-an-unanswered-act ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion programme, round 4, F3 - a sign-off the lane skipped after another unit's sign-off act got no answer reads as not attempted because the lane stopped after that act (the lead's round-4 item 3): the lane's sign-off loop ends there (D4), as at a limit check that holds one back (D8, R3-B F4), and the run report says so for every later unit, the root's line included"
+	},
+	{
+		id: "R4-M26-only-record-assurance-is-read-for-no-answer",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "const act = SIGN_OFF_ACTS.find(([field]) => {",
+		replace: "const act = SIGN_OFF_ACTS.slice(0, 1).find(([field]) => {",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE (the lead's round-4 item 3): whichever sign-off act got no answer - Record Assurance, the rule's re-run of the declared reviews, Mark Satisfied - the loop stopped after it (E12's re-review F1, D4's general form). WHO RELIES: the later units' readings. WHAT THE MUTATION DOES: only Record Assurance is read, so a re-run or a Mark Satisfied with no answer leaves the later units reading 'never attempted'. Applied by hand first, the file restored byte for byte: 'AssertionError: Re-run the declared reviews, past its bound: expected [ …(2) ] to deeply equal [ …(2) ]' (1 test red in its victim). OBSERVED (bun run mutants -- R4-M23 to R4-M27 and R3B-M24 to R3B-M27 by their full ids, 2026-10-16, in the round-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R4-M26-only-record-assurance-is-read-for-no-answer ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion programme, round 4, F3 - a sign-off the lane skipped after another unit's sign-off act got no answer reads as not attempted because the lane stopped after that act (the lead's round-4 item 3): the lane's sign-off loop ends there (D4), as at a limit check that holds one back (D8, R3-B F4), and the run report says so for every later unit, the root's line included"
+	},
+	{
+		id: "R4-M27-the-unanswered-skip-reads-never-attempted",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "return `its sign-off was not attempted: the lane stopped after the ${at.slug} unit’s ${at.unanswered}, which got no answer, and pressed no sign-off after it (D4)`;",
+		replace: "return null;",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE (the lead's round-4 item 3): a sign-off the lane skipped after an unanswered act says so - which unit, which act, and that it got no answer - on its cell and on the root's line in the whole run's stage 7. WHO RELIES: the report's reader, who must tell a lane that stopped from a run cut short. WHAT THE MUTATION DOES: such a sign-off reads 'its sign-off was never attempted'. Applied by hand first, the file restored byte for byte: 'AssertionError: Record Assurance, past its bound: expected [ …(2) ] to deeply equal [ …(2) ]' (2 tests red in its victim). OBSERVED (bun run mutants -- R4-M23 to R4-M27 and R3B-M24 to R3B-M27 by their full ids, 2026-10-16, in the round-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R4-M27-the-unanswered-skip-reads-never-attempted ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion programme, round 4, F3 - a sign-off the lane skipped after another unit's sign-off act got no answer reads as not attempted because the lane stopped after that act (the lead's round-4 item 3): the lane's sign-off loop ends there (D4), as at a limit check that holds one back (D8, R3-B F4), and the run report says so for every later unit, the root's line included"
 	}
 ];

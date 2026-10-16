@@ -1868,8 +1868,11 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 			'design: lifecycle EXECUTING, assurance UNASSESSED, step SUCCEEDED, read from an archive taken while its Record Assurance may still have been running',
 			"its Record Assurance gave no answer within 4140000 ms (design D4): the run ended there, and the server is killed with the act unfinished (REG-F-527); no register entry names why it outlasted its bound"
 		]);
-		// ⭑ The sign-offs after it were never attempted: not reached.
-		expect(cellOf(r, '7', 'implementation').basis.at(-1)).toBe('its sign-off was never attempted');
+		// ⭑ ~~The sign-offs after it were never attempted: not reached.~~ ⭐ R4 (the lead's round-4 item 3) — the sign-offs after it
+		// are not attempted BECAUSE the lane stopped after that act: not reached, and said so (the next test's).
+		expect(cellOf(r, '7', 'implementation').basis.at(-1)).toBe(
+			'its sign-off was not attempted: the lane stopped after the design unit’s Record Assurance, which got no answer, and pressed no sign-off after it (D4)'
+		);
 		// ⭐ D4's general form — the rule's re-run of the declared reviews, and a Mark Satisfied, are each named the same way.
 		for (const [field, act, ms] of [['rerunDeclared', 'Re-run the declared reviews', 4_140_000], ['markSatisfied', 'Mark Satisfied', 300_000]] as const) {
 			const named = withDesign({
@@ -1884,6 +1887,47 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 		// ⭐ And a recovery act the rule pressed that outlasted its bound names the end too (D4: it ends the run there).
 		const recovered = withDesign({ recovery: [{ act: 'rerunWork', timedOutAfterMs: 38_160_000, requestFailure: null }] });
 		expect(buildRunReport(run.store, recovered, { accountNames: NAMES }).report.problems).toEqual([]);
+	});
+
+	// ── ⛔ R4 (the lead's round-4 item 3) — A SIGN-OFF THE LANE SKIPPED AFTER A UNIT'S SIGN-OFF ACT GOT NO ANSWER reads as not
+	// attempted because the lane stopped after that act: the lane's sign-off loop ends there (D4: nothing is pressed beside an
+	// act the server may still be running), as it ends at a limit check that holds one back (D8) — round 3's reading of a
+	// limit stop (R3-B F4), given an unanswered act too.
+	it('⛔ R4 (the lead’s round-4 item 3) — every later sign-off the lane skipped after a unit’s sign-off act got NO ANSWER, the root’s included, reads as not attempted because the lane stopped after that act — never as one never attempted', () => {
+		// ⛔ PREDICTED RED, read from the code: "its sign-off was never attempted", the words a run cut short reads, for each unit
+		// after the one whose act got no answer — whichever act it was, past its bound or lost in transit.
+		const completed = { lifecycle: 'EXECUTING', execution: 'SUCCEEDED', assurance: 'UNASSESSED' };
+		const cut = { unit: completed, signedOff: false };
+		const run = aRun({ design: cut, implementation: cut, 'end-to-end': cut }, { rootSignedOff: false, run: { end: { reason: 'allowance-exceeded' } } });
+		const laneRun = run.lane.run as { units: Record<string, unknown>[] };
+		const designSigned = (field: string, act: Record<string, unknown>): LaneRows => ({
+			...run.lane,
+			run: {
+				...laneRun,
+				units: laneRun.units.map((u) =>
+					u.slug === 'design'
+						? { ...u, signOff: { offered: true, recordAssurance: { status: 200, envelopeType: 'success', after: null }, [field]: act, refused: null, notPressed: null } }
+						: u
+				)
+			}
+		});
+		const outlasted = (ms: number) => ({ status: null, envelopeType: null, timedOutAfterMs: ms, requestFailure: null, after: null });
+		const lost = { status: null, envelopeType: null, timedOutAfterMs: null, requestFailure: 'net::ERR_EMPTY_RESPONSE', after: null };
+		const cases = [
+			['recordAssurance', 'Record Assurance', outlasted(4_140_000)],
+			['recordAssurance', 'Record Assurance', lost],
+			['rerunDeclared', 'Re-run the declared reviews', outlasted(4_140_000)],
+			['markSatisfied', 'Mark Satisfied', lost]
+		] as const;
+		for (const [field, act, pressed] of cases) {
+			const r = buildRunReport(run.store, designSigned(field, pressed), { accountNames: NAMES }).report;
+			const why = `its sign-off was not attempted: the lane stopped after the design unit’s ${act}, which got no answer, and pressed no sign-off after it (D4)`;
+			const kind = `${act}, ${pressed.timedOutAfterMs === null ? 'lost in transit' : 'past its bound'}`;
+			expect([cellOf(r, '7', 'implementation').basis.at(-1), cellOf(r, '7', 'end-to-end').basis.at(-1)], kind).toEqual([why, why]);
+			expect(cellOf(r, '7', 'whole run').basis, `${kind}: the root’s sign-off, skipped, said nothing of why`).toContain(`root: not reached — ${why}`);
+			// ⭑ CONTROL — the unit before the stop, signed off, is not said to have been skipped.
+			expect(cellOf(r, '7', 'requirements').basis.join(' '), kind).not.toContain('was not attempted');
+		}
 	});
 
 	it('⛔ a break no register entry names is marked so — the cell, the run’s completion over it, the counts and the markdown', () => {
