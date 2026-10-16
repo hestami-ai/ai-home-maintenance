@@ -28,21 +28,38 @@ const seam = vi.hoisted(() => ({
 	floor: 0,
 	unmet: undefined as string | undefined,
 	/** ⭐ `E12F` F3 — the declared policies whose review's transport FAILS: the review answers nothing, and is INCONCLUSIVE. */
-	failing: new Set<string>()
+	failing: new Set<string>(),
+	/** ⭐ R3-A F1 — what the host's process-run observer reports for the unit being run: none unless a case says so. */
+	observed: undefined as
+		| undefined
+		| {
+				readonly runs: readonly unknown[];
+				readonly observedCount: number;
+				readonly recordedLimit: number;
+		  }
 }));
 
 vi.mock('../execution/model.js', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('../execution/model.js')>();
 	return {
 		...actual,
-		getExecutionSession: vi.fn((selection: Parameters<typeof actual.getExecutionSession>[0]) =>
-			actual.getExecutionSession(selection, {
+		getExecutionSession: vi.fn((selection: Parameters<typeof actual.getExecutionSession>[0]) => {
+			const open = actual.getExecutionSession(selection, {
 				agyExec: async (_file, args) => ({ stdout: await actual.deterministicExecutionPrint(args[1] ?? '') }),
 				openPi: async () => {
 					throw new Error('hermetic: no route test opens a real Pi session');
 				}
-			})
-		)
+			});
+			// ⭑ THE REAL SESSION, its `processRuns` reporting what a case scripted (`seam.observed`), else what it saw.
+			return async (context: Parameters<typeof open>[0]) => {
+				const session = await open(context);
+				return {
+					...session,
+					processRuns: () =>
+						(seam.observed ?? session.processRuns()) as ReturnType<typeof session.processRuns>
+				};
+			};
+		})
 	};
 });
 
@@ -93,6 +110,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { actions, load } from '../../../routes/undertakings/[id]/+page.server.js';
 import { actions as undertakings } from '../../../routes/undertakings/+page.server.js';
 import { actionEvent, beginExecute } from '../execution/begin-execute.testing.js';
+import { createProcessRunObserver, type ObservedProcessRun } from '../tools/process-run-observer.js';
 import { dispatch, getEngine, mintUiId, resetEngine } from '../workbench.js';
 import { noProgramsDirectory } from './no-programs.testing.js';
 import { DECLARED_PRODUCING_PROMPT_INTENT, DECLARED_UNIT_PURPOSE_INTENT } from './reasoning-review-validator.js';
@@ -209,6 +227,7 @@ beforeEach(() => {
 	seam.floor = 0;
 	seam.unmet = undefined;
 	seam.failing.clear();
+	seam.observed = undefined;
 	vi.stubEnv('PATH', noProgramsDirectory());
 	for (const v of LIVE_BACKEND_VARIABLES) vi.stubEnv(v, undefined);
 	vi.stubEnv('JPWB_ASSURANCE_TOOL', 'devin');
@@ -257,7 +276,8 @@ describe('⭐⭐ E2 — Record Assurance reviews each declared policy, and recor
 			.filter((x) => x.assurancePolicyId === POLICY);
 		expect(calls.map((x) => [x.plane, x.runToken])).toEqual([['ASSURANCE', evaluator.executionInstanceId]]);
 		// ⭐ `REG-F-514` — the producer is the model that did the work, never the operator (a unit that did its own work;
-		// ⚠ `E12F` F9: a unit composed of others records its own executor, the operator).
+		// ⚠ `E12F` F9: a unit composed of others records its own executor~~, the operator~~ ⭐ R3-A's fix round: the operator
+		// who ran its TRANSFORMATION, or the model that ran a MODEL composite's own prompt — (b) below).
 		expect((d.assessments[0]!.producer as { actorId?: string }).actorId).toMatch(/^model:/);
 	});
 
@@ -287,8 +307,9 @@ const ROOT_PURPOSE = 'Realize the requirements of the product from the work of i
 /**
  * A root type over ONE child type — the child a MODEL unit declaring `pol_requirement_coverage`, with its own prompt; the
  * root a HUMAN unit (a TRANSFORMATION, no prompt) declaring `pol_intent_preservation` — published and instantiated.
+ * ⭐ R3-A F1 — or the root a MODEL unit with a prompt of its own, as half B's agent may declare it.
  */
-async function rootOverAChild(): Promise<{ readonly root: string; readonly child: string }> {
+async function rootOverAChild(rootDischarge: 'HUMAN' | 'MODEL' = 'HUMAN'): Promise<{ readonly root: string; readonly child: string }> {
 	const pwaId = mintUiId('pwa');
 	const childType = mintUiId('pwut');
 	const rootType = mintUiId('pwut');
@@ -334,7 +355,17 @@ async function rootOverAChild(): Promise<{ readonly root: string; readonly child
 				requiredInputs: [],
 				requiredOutputs: [],
 				requiredAssurancePolicyIds: ['pol_intent_preservation'],
-				workDischarge: 'HUMAN'
+				workDischarge: rootDischarge,
+				...(rootDischarge === 'MODEL'
+					? {
+							promptTemplate: {
+								templateText: 'Realize the product of {subject}.',
+								templateVersion: 1,
+								declaredPlaceholders: ['subject'],
+								status: 'ACTIVE'
+							}
+						}
+					: {})
 			}
 		],
 		['SubmitPwaForReview', 'PROFESSIONAL_WORK_ARCHITECTURE', pwaId, {}],
@@ -645,59 +676,110 @@ ${RERUN_DECLARED_REVIEWS_CITATION}`);
 // lets the agent publish a tree of any depth, and a child composed of others contributes no work of its own: its
 // TRANSFORMATION completes with none. So the root of a three-level tree had its declared reviews asked over no work product
 // and no command — a paid review per policy, each verdict recorded over work no reviewer was shown.
+//
+// ⭐⭐ R3-A F1 — `REG-D-111` (2)'S GENERAL FORM (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114):
+// ~~refused when no CHILD's work holds anything~~ — a unit composed of others is judged over the work its WHOLE SUBTREE
+// produced: its own work product and commands where it produced any (a MODEL composite), then every unit below it, each
+// under the title of the unit that made it. It is refused as having nothing to judge only when neither it nor any unit below
+// it holds a work product or a command.
+
+/** The work a declared review was shown: its one line of JSON (`declaredPolicyReviewInput`), read back off the prompt. */
+function workOf(prompt: string): {
+	readonly workProducts: readonly { readonly workUnit: string; readonly workProduct: string }[];
+	readonly commands: readonly { readonly workUnit: string; readonly command: readonly string[] }[];
+} {
+	const line = prompt.split('\n').filter((l) => l.startsWith('{"workProducts":'));
+	expect(line, 'arrangement: the prompt shows its work as one line of JSON').toHaveLength(1);
+	return JSON.parse(line[0]!) as ReturnType<typeof workOf>;
+}
+
+/** One command the host ran to completion and retained, under `argv`. */
+const aRun = (argv: readonly string[]): Omit<ObservedProcessRun, 'ordinal'> => ({
+	argv,
+	exitCode: 0,
+	timedOut: false,
+	durationMs: 12,
+	outputComplete: true,
+	omittedRegions: [],
+	retention: {
+		retained: true,
+		workspaceOwnerId: 'arranged',
+		purgeability: 'PURGEABLE_AT_EXPIRY',
+		stdoutPath: 'captures/run-1/stdout.txt',
+		stderrPath: 'captures/run-1/stderr.txt',
+		omittedRegions: [],
+		omissionsPath: 'captures/run-1/omissions.json'
+	},
+	stdout: 'run-1: 1 passed\n',
+	stderr: ''
+});
+
+/** What the host's REAL observer reports after `runs` complete — its own bound applied (`process-run-observer.ts`). */
+function observedRuns(runs: readonly Omit<ObservedProcessRun, 'ordinal'>[]) {
+	const observer = createProcessRunObserver();
+	for (const run of runs) observer.ran(run);
+	return observer.observed();
+}
 
 /**
- * A root over ONE unit composed of others, over ONE model unit — three levels, as half B's shared tree has
- * (`verif/phase7-half-b.test.ts`) — each declaring a policy, published and instantiated: the leaf `pol_requirement_coverage`, the two above it
- * `pol_intent_preservation`; the root and the middle HUMAN, each a TRANSFORMATION that produces nothing.
+ * A root over ~~ONE unit~~ ⭐ R3-A F1: TWO units composed of others, each over ONE model unit — three levels, as half B's
+ * shared tree has (`verif/phase7-half-b.test.ts`) — published and instantiated: the root and the two above the model units
+ * HUMAN, each a TRANSFORMATION that produces nothing, each declaring `pol_intent_preservation`; the model units `Requirements`,
+ * declaring `pol_requirement_coverage`, and `Acceptance tests`, declaring nothing.
  */
-async function threeLevelTree(): Promise<{ readonly root: string; readonly middle: string; readonly leaf: string }> {
+async function threeLevelTree(): Promise<{
+	readonly root: string;
+	readonly middle: string;
+	readonly leaf: string;
+	readonly otherMiddle: string;
+	readonly otherLeaf: string;
+}> {
 	const pwaId = mintUiId('pwa');
 	const leafType = mintUiId('pwut');
+	const otherLeafType = mintUiId('pwut');
 	const middleType = mintUiId('pwut');
+	const otherMiddleType = mintUiId('pwut');
 	const rootType = mintUiId('pwut');
-	const composite = (typeId: string, childType: string, name: string, pwuKind: string, purpose: string, isRoot: boolean) => ({
+	const composite = (typeId: string, childTypes: readonly string[], name: string, pwuKind: string, purpose: string, isRoot: boolean) => ({
 		pwuTypeId: typeId,
 		pwaId,
 		pwuKind,
 		name,
 		purpose,
 		isRoot,
-		permittedChildTypeIds: [childType],
-		permittedChildren: [{ typeId: childType, cardinality: 'M1' }],
+		permittedChildTypeIds: [...childTypes],
+		permittedChildren: childTypes.map((typeId) => ({ typeId, cardinality: 'M1' })),
 		requiredInputs: [],
 		requiredOutputs: [],
 		requiredAssurancePolicyIds: [IP],
 		workDischarge: 'HUMAN'
 	});
+	const modelUnit = (typeId: string, name: string, pwuKind: string, policies: readonly string[]) => ({
+		pwuTypeId: typeId,
+		pwaId,
+		pwuKind,
+		name,
+		purpose: `${name}, written`,
+		isRoot: false,
+		permittedChildTypeIds: [],
+		requiredInputs: [],
+		requiredOutputs: [],
+		requiredAssurancePolicyIds: [...policies],
+		workDischarge: 'MODEL',
+		promptTemplate: {
+			templateText: `Write the ${name.toLowerCase()} of {subject}.`,
+			templateVersion: 1,
+			declaredPlaceholders: ['subject'],
+			status: 'ACTIVE'
+		}
+	});
 	const steps: readonly [string, string, string, Record<string, unknown>][] = [
 		['CreatePwa', 'PROFESSIONAL_WORK_ARCHITECTURE', pwaId, { pwaId, name: 'Three-level PWA', description: 'd', domain: 'software', version: '0.1.0' }],
-		[
-			'DefinePwuType',
-			'PWU_TYPE',
-			leafType,
-			{
-				pwuTypeId: leafType,
-				pwaId,
-				pwuKind: 'REQUIREMENT_DEFINITION',
-				name: 'Requirements',
-				purpose: 'Write the requirements',
-				isRoot: false,
-				permittedChildTypeIds: [],
-				requiredInputs: [],
-				requiredOutputs: [],
-				requiredAssurancePolicyIds: [POLICY],
-				workDischarge: 'MODEL',
-				promptTemplate: {
-					templateText: 'Write the requirements of {subject}.',
-					templateVersion: 1,
-					declaredPlaceholders: ['subject'],
-					status: 'ACTIVE'
-				}
-			}
-		],
-		['DefinePwuType', 'PWU_TYPE', middleType, composite(middleType, leafType, 'Architecture', 'ARCHITECTURE_DEFINITION', 'Define the architecture, through the requirements beneath it.', false)],
-		['DefinePwuType', 'PWU_TYPE', rootType, composite(rootType, middleType, 'Realization', 'PRODUCT_REALIZATION', ROOT_PURPOSE, true)],
+		['DefinePwuType', 'PWU_TYPE', leafType, modelUnit(leafType, 'Requirements', 'REQUIREMENT_DEFINITION', [POLICY])],
+		['DefinePwuType', 'PWU_TYPE', otherLeafType, modelUnit(otherLeafType, 'Acceptance tests', 'TEST_DEFINITION', [])],
+		['DefinePwuType', 'PWU_TYPE', middleType, composite(middleType, [leafType], 'Architecture', 'ARCHITECTURE_DEFINITION', 'Define the architecture, through the requirements beneath it.', false)],
+		['DefinePwuType', 'PWU_TYPE', otherMiddleType, composite(otherMiddleType, [otherLeafType], 'Verification', 'INTEGRATED_PRODUCT_VALIDATION', 'Verify the product, through the acceptance tests beneath it.', false)],
+		['DefinePwuType', 'PWU_TYPE', rootType, composite(rootType, [middleType, otherMiddleType], 'Realization', 'PRODUCT_REALIZATION', ROOT_PURPOSE, true)],
 		['SubmitPwaForReview', 'PROFESSIONAL_WORK_ARCHITECTURE', pwaId, {}],
 		['ValidatePwa', 'PROFESSIONAL_WORK_ARCHITECTURE', pwaId, {}],
 		['PublishPwa', 'PROFESSIONAL_WORK_ARCHITECTURE', pwaId, { rootPwuTypeId: rootType }]
@@ -713,34 +795,118 @@ async function threeLevelTree(): Promise<{ readonly root: string; readonly middl
 	expect(created.created, `arrangement: the Undertaking — ${created.data?.error ?? ''}`).toBeDefined();
 	const units = listPwus(getEngine(), created.created!);
 	const of = (typeId: string) => units.find((p) => p.state.pwuTypeId === typeId)!.id;
-	return { root: of(rootType), middle: of(middleType), leaf: of(leafType) };
+	return {
+		root: of(rootType),
+		middle: of(middleType),
+		leaf: of(leafType),
+		otherMiddle: of(otherMiddleType),
+		otherLeaf: of(otherLeafType)
+	};
 }
 
-describe('⛔ the merge’s fix round, F1 — a unit composed of others whose children’s work holds nothing to judge is asked no declared review', () => {
-	it('⛔ a three-level tree, as half B may publish: the root’s Record Assurance is refused before any review is asked, nothing dispatched — and the unit above the model unit, whose child’s work holds a work product, is reviewed (the control)', async () => {
-		// ⛔ PREDICTED RED, read from the code: `declaredReviewWorkOf` gathered the root's ONE child, the middle unit, whose
-		// TRANSFORMATION completed with no output — no work product, no command — and the root's review was asked over that
-		// nothing; this seam answers every criterion met, so the root was assured.
-		const { root, middle, leaf } = await threeLevelTree();
-		for (const pwuId of [root, middle, leaf])
+describe('⭐⭐ R3-A F1 — a unit composed of others is judged over the work its WHOLE SUBTREE produced, and refused only when none of it holds anything', () => {
+	it('⭐ (a) a three-level tree, as half B may publish: the root’s declared review is shown each model unit’s work, two levels down, under its own unit — and the unit above a model unit is reviewed over its child’s (the control)', async () => {
+		// ⛔ RED BEFORE R3-A, read from the code: `declaredReviewWorkOf` gathered the root's CHILDREN only — two units composed of
+		// others, whose TRANSFORMATIONs completed with no output — and refused the root (`nothingToJudge`): the work its declared
+		// policies are about, its model units', was never shown to any review of it.
+		const t = await threeLevelTree();
+		for (const pwuId of [t.root, t.middle, t.otherMiddle])
 			expect((await beginExecute(pwuId)).data?.error, 'arrangement: Begin & Execute').toBeUndefined();
-		expect((await recordAssurance(leaf)).advanced, 'arrangement: the model unit signed off').toBe('assured');
-		// ⭑ THE CONTROL: the middle unit is composed of others too, and its child's work holds a work product — its one review asked.
+		// ⭑ The requirements unit runs one command, two levels below the root.
+		seam.observed = observedRuns([aRun(['node', '--test', 'test/requirements.test.js'])]);
+		expect((await beginExecute(t.leaf)).data?.error, 'arrangement: the requirements unit ran, and one command').toBeUndefined();
+		seam.observed = undefined;
+		expect((await beginExecute(t.otherLeaf)).data?.error, 'arrangement: Begin & Execute').toBeUndefined();
+		expect((await recordAssurance(t.leaf)).advanced, 'arrangement: the model unit signed off').toBe('assured');
+		// ⭑ THE CONTROL: a unit above a model unit, reviewed over its child's work product, as before.
 		seam.declared.length = 0;
-		expect((await recordAssurance(middle)).advanced, 'the middle unit, over its child’s work product, was not signed off').toBe('assured');
+		expect((await recordAssurance(t.middle)).advanced, 'the middle unit, over its child’s work product, was not signed off').toBe('assured');
 		expect(seam.declared, 'one review of the middle unit’s one declared policy').toHaveLength(1);
-		expect(seam.declared[0]).toContain('"workUnit":"Requirements"');
+		expect(workOf(seam.declared[0]!).workProducts.map((w) => w.workUnit)).toEqual(['Requirements']);
 
 		seam.declared.length = 0;
-		const before = getEngine().readAllEvents().length;
-		const r = await recordAssurance(root);
-		expect([r.advanced, r.data?.error], 'the root’s declared review was asked over its children’s nothing').toEqual([
-			undefined,
-			`The declared policies cannot be reviewed: ${nothingToJudge('Realization')}`
+		const r = await recordAssurance(t.root);
+		expect([r.advanced, r.data?.error], 'the root of a three-level tree was refused, its model units’ work never shown').toEqual([
+			'assured',
+			undefined
 		]);
-		// ⛔ ASKED NOTHING, DISPATCHED NOTHING: no review, no exchange record, no assessment — and the root as it was.
+		expect(seam.declared, 'one review of the root’s one declared policy').toHaveLength(1);
+		// ⭐ EVERY MODEL UNIT'S WORK PRODUCT, under its own unit, depth first in the store's order — and nothing for the two units
+		// composed of others between them, whose TRANSFORMATIONs produced nothing.
+		const work = workOf(seam.declared[0]!);
+		expect(work.workProducts.map((w) => w.workUnit), 'the work the root’s review was shown').toEqual(['Requirements', 'Acceptance tests']);
+		// ⭑ Each its own unit's: the fixture's work product echoes the prompt it was given, which names its unit as the subject.
+		expect(work.workProducts.map((w) => w.workProduct.includes(` of ${w.workUnit}.`)), 'each work product its own unit’s').toEqual([
+			true,
+			true
+		]);
+		expect(work.commands.map((c) => [c.workUnit, c.command.join(' ')]), 'the command run two levels down').toEqual([
+			['Requirements', 'node --test test/requirements.test.js']
+		]);
+		// ⭑ Its own purpose the standard, and each work product made under its own unit's instruction (`E12F` F4).
+		expect(seam.declared[0]).toContain(DECLARED_UNIT_PURPOSE_INTENT);
+		expect(seam.declared[0]).toContain(ROOT_PURPOSE);
+	});
+
+	it('⭐ (b) a MODEL root’s OWN work product, and the command it ran, are judged beside its child’s work — its own first, under its own title — and its verdict names a model as producer, never the operator', async () => {
+		// ⛔ RED BEFORE R3-A, read from the code: a unit with children was judged over its CHILDREN's work alone, so a root that ran
+		// a model of its own — half B's agent may declare one — had its declared reviews asked without the work it produced.
+		const { root, child } = await rootOverAChild('MODEL');
+		seam.observed = observedRuns([aRun(['node', '--test', 'test/acceptance.test.js'])]);
+		expect((await beginExecute(root)).data?.error, 'arrangement: the root ran its model, and one command').toBeUndefined();
+		seam.observed = undefined;
+		expect((await beginExecute(child)).data?.error, 'arrangement: the child’s Begin & Execute').toBeUndefined();
+		expect((await recordAssurance(child)).advanced, 'arrangement: the child signed off').toBe('assured');
+		seam.declared.length = 0;
+		expect((await recordAssurance(root)).advanced, 'the MODEL root was not signed off').toBe('assured');
+		expect(seam.declared, 'one declared review of the root').toHaveLength(1);
+		const work = workOf(seam.declared[0]!);
+		expect(work.workProducts.map((w) => w.workUnit), 'the root’s own work product left out of its declared review').toEqual([
+			'Realization',
+			'Requirements'
+		]);
+		expect(work.workProducts[0]!.workProduct, 'the root’s own work product, as its model produced it').toContain(
+			'Realize the product of Realization.'
+		);
+		expect(work.commands.map((c) => [c.workUnit, c.command.join(' ')]), 'the command the root ran').toEqual([
+			['Realization', 'node --test test/acceptance.test.js']
+		]);
+		// ⭑ Its instruction is still its own purpose: no single account is shown for many units' work, its own among them.
+		expect(seam.declared[0]).toContain(DECLARED_UNIT_PURPOSE_INTENT);
+		// ⭐ R3-A's fix round — ITS VERDICT'S PRODUCER IS A MODEL, NEVER THE OPERATOR: a MODEL composite's own executor is the
+		// model that ran its own prompt (`declaredReviewWorkOf`; `REG-F-514`), and its verdict checks independence against it.
+		const verdict = listByType(getEngine(), 'ASSURANCE_ASSESSMENT').find(
+			(a) =>
+				(a.state as { assurancePolicyId?: string }).assurancePolicyId === IP &&
+				((a.state as { subjectObjectIds?: string[] }).subjectObjectIds ?? []).includes(root)
+		);
+		expect(
+			(verdict?.state as { producer?: { actorId?: string } } | undefined)?.producer?.actorId,
+			'the MODEL root’s verdict does not name its model as producer'
+		).toMatch(/^model:/);
+	});
+
+	it('⛔ (c) a unit composed of others with NOTHING in it or anywhere below it is refused before any review is asked, nothing dispatched — and the root above it, whose other branch holds work, is reviewed over that work alone (the control)', async () => {
+		// ⭑ Before R3-A this unit was refused too — its one child held nothing — so its refusal's red is its mutant's
+		// (`P7MF-M1`: the refusal dropped); the control was red there, the root refused for its children's nothing.
+		const t = await threeLevelTree();
+		// The acceptance tests never run: the unit above them, a TRANSFORMATION, holds nothing, and nothing below it does.
+		for (const pwuId of [t.root, t.middle, t.otherMiddle, t.leaf])
+			expect((await beginExecute(pwuId)).data?.error, 'arrangement: Begin & Execute').toBeUndefined();
+		seam.declared.length = 0;
+		const before = getEngine().readAllEvents().length;
+		const r = await recordAssurance(t.otherMiddle);
+		expect([r.advanced, r.data?.error], 'a unit with nothing in it or below it was reviewed').toEqual([
+			undefined,
+			`The declared policies cannot be reviewed: ${nothingToJudge('Verification')}`
+		]);
+		// ⛔ ASKED NOTHING, DISPATCHED NOTHING: no review, no exchange record, no assessment — and the unit as it was.
 		expect(seam.declared, 'a declared review was asked').toEqual([]);
 		expect(getEngine().readAllEvents().length, 'the refusal dispatched something').toBe(before);
-		expect(axesOf(root)).toEqual(['EXECUTING', 'UNASSESSED']);
+		expect(axesOf(t.otherMiddle)).toEqual(['EXECUTING', 'UNASSESSED']);
+		// ⭑ THE CONTROL: the root, over that empty branch and one that holds work, is reviewed over the work that is there.
+		const root = await recordAssurance(t.root);
+		expect([root.advanced, root.data?.error], 'the root, over one branch that holds work, was refused').toEqual(['assured', undefined]);
+		expect(workOf(seam.declared[0]!).workProducts.map((w) => w.workUnit)).toEqual(['Requirements']);
 	});
 });

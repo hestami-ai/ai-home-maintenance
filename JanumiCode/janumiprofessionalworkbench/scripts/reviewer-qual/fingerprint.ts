@@ -17,7 +17,9 @@
 //                  `evaluateCase` — the real validator at its print seam, then the Reasoning Review reference alone —
 //                  hashed as outcomes only, with the repair instruction a failed first parse draws, and the
 //                  malformation classes the harness detects in each reply (a class lost is `MALFORMATION_GAINED`'s
-//                  measure moving, §5.1).
+//                  measure moving, §5.1); ⭐ R3-A F3 — and the DECLARED corpus, each entry scored as the declared sign-off
+//                  records its verdict (`runner.ts` `scoreDeclared`: `declaredVerdict`, at the ceiling `evidenceCeiling`
+//                  sets from the declared seam's required evidence, over the declared seam's reading of the review).
 // Beside it, not in it: the CASE-SET digest (over each case's inputs, never its oracle, §5.5) and each case's prompt
 // hashes, which the check compares with what a run recorded (§5.6 limbs 1 and 2).
 //
@@ -115,7 +117,7 @@ import {
 } from './probes.js';
 import type { CandidateIdentity } from './record.js';
 import { evaluateCase } from './runner.js';
-import { CORPUS_CASE, scoringCorpus } from './scoring-corpus.js';
+import { CORPUS_CASE, declaredScoringCorpus, scoringCorpus, type CorpusEntry } from './scoring-corpus.js';
 
 /** A case's ~~two~~ prompts, as sha256 — the hashes its CALL lines carry for the initial call and ~~the repair~~ each repair. */
 export interface CasePrompts {
@@ -181,7 +183,10 @@ export interface FingerprintSeams {
 	 * POLICIES, every field a declared review reads or its sign-off demands (`probes.ts` `CATALOG_DECLARED_POLICIES`): hashed
 	 * whole in the `criteria` component — the declared framing's CRITERIA LIMB — and handed to the declared probes, so a
 	 * change to a policy's purpose, a criterion, or the independence its sign-off checks moves the fingerprint. ⛔ Without it a
-	 * declared review's rubric could change under a reviewer nobody re-measured.
+	 * declared review's rubric could change under a reviewer nobody re-measured. ⭐ R3-A F3 (the lead's delegated decision of
+	 * 2026-10-16, to be registered as REG-D-114) — and each policy's required evidence, which caps its sign-off's verdict:
+	 * hashed with the rest, and the input the declared corpus is scored at (`scoringDigestOf`), so a change to it moves the
+	 * criteria component and, where a declared entry's ceiling moves, the scoring digest.
 	 */
 	readonly declaredPolicies: readonly DeclaredProbePolicy[];
 }
@@ -390,19 +395,30 @@ async function casePromptsOf(
  * each reply, never a statement or a clock; and the REPAIR INSTRUCTION every repaired entry drew, as the text appended
  * to its first prompt — so a change to the corpus case's own prompt moves no scoring digest, and a change to the
  * instruction does. ⚠ The classes are here because no record can re-detect them: a line keeps only their names, never
- * the reply they were read from (§5.3), so a detection change is visible only as a fingerprint move.
+ * the reply they were read from (§5.3), so a detection change is visible only as a fingerprint move. ⭐ R3-A F3 — over the
+ * floor's corpus and the declared corpus alike (`scoring-corpus.ts` `declaredScoringCorpus`).
  */
 async function scoringDigestOf(seams: FingerprintSeams): Promise<string> {
 	const outcomes: unknown[] = [];
 	const repairs: unknown[] = [];
-	for (const entry of scoringCorpus(seams.criteria)) {
+	// ⭐ R3-A F3 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — the floor's entries over their one
+	// work-product case, then the DECLARED corpus, each entry over its own case, scored as the declared sign-off records its
+	// verdict at the ceiling the declared seam's own required evidence sets (`requiredEvidenceOf`).
+	const corpus: readonly (CorpusEntry & { readonly case: QualificationCase })[] = [
+		...scoringCorpus(seams.criteria).map((entry) => ({ ...entry, case: CORPUS_CASE })),
+		...declaredScoringCorpus(seams.declaredPolicies)
+	];
+	const requiredEvidenceOf = (policyId: string) =>
+		seams.declaredPolicies.find((p) => p.policyId === policyId)?.requiredEvidence;
+	for (const entry of corpus) {
 		const sent: string[] = [];
 		let n = 0;
 		const e = await seams.evaluate({
-			case: CORPUS_CASE,
+			case: entry.case,
 			criteria: seams.criteria,
 			candidate: FINGERPRINT_CANDIDATE,
 			scoringDigest: NO_DIGEST,
+			requiredEvidenceOf,
 			call: async (p) => {
 				sent.push(p);
 				return { returned: entry.replies[Math.min(n++, entry.replies.length - 1)]!, served: null };

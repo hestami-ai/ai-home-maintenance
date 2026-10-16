@@ -1285,7 +1285,10 @@ async function unitWorkOf(
 	};
 }
 
-/** ⭐ E2 — what a unit's declared reviews judge: its own work, or — for a unit composed of others — its children's. */
+/**
+ * ⭐ E2 — what a unit's declared reviews judge: its own work, or — for a unit composed of others — ~~its children's~~ ⭐ R3-A F1:
+ * the work its whole subtree produced, its own included.
+ */
 interface DeclaredReviewWork {
 	readonly instruction: string;
 	/** ⭐ `E12F` F4 — what `instruction` is, which the reviewer is told (`DeclaredInstruction`). */
@@ -1295,22 +1298,28 @@ interface DeclaredReviewWork {
 	readonly rationale?: ProfessionalRationaleSummary;
 	/**
 	 * ⭐ `REG-F-514` — the producer the verdicts check independence against: the unit's OWN executor, else the operator.
-	 * ⛔ `E12F` F9 — WHO DID THE JUDGED WORK FOR A PHASE ONLY: a unit composed of others is judged over its children's work,
-	 * and its producer is still its own — the operator who ran its TRANSFORMATION — so its verdicts check independence
-	 * against the operator, never against the agents whose work they judged.
+	 * ⛔ `E12F` F9 — WHO DID THE JUDGED WORK FOR A PHASE ONLY: a unit composed of others is judged over ~~its children's work~~
+	 * ⭐ R3-A F1: the work of the units below it as well as its own, and its producer is still its own — the operator who ran
+	 * its TRANSFORMATION, or the model that ran a MODEL composite's — so its verdicts check independence against that party,
+	 * never against ~~the agents whose work below it they judged~~ ⭐ R3-A's fix round: the executor of a unit below it whose
+	 * work they judged (one model may have run both, each run its own invocation).
 	 */
 	readonly producer: ActorReference;
 }
 
 /**
- * ⭐⭐ E2 — THE WORK A UNIT'S DECLARED POLICIES ARE JUDGED OVER (`R18`; design B1, B6). A unit with children is judged over
- * ITS CHILDREN's work products and commands, the end-to-end phase's evidence among them (`REG-D-111` (2), DEC-6): its own
- * TRANSFORMATION produces nothing. ⚠ A child with no work product contributes its commands only; the root's instruction is
- * its own purpose, and no single account is shown for many children's work. ⛔ `E12F` F9 — AND ITS PRODUCER IS ITS OWN
- * executor (the operator, for the root), not its children's: independence is checked against who did the judged work for
- * a phase only. ⛔ The merge's fix round, F1 — AND WHEN NO CHILD'S WORK HOLDS A WORK PRODUCT OR A COMMAND, it is refused
- * (`nothingToJudge`): a child composed of others contributes none of its own, so in a tree deeper than §3.2's the root's
- * reviews would be shown nothing to judge.
+ * ⭐⭐ E2 — THE WORK A UNIT'S DECLARED POLICIES ARE JUDGED OVER (`R18`; design B1, B6). A unit with no children is judged over
+ * its own work. ~~A unit with children is judged over ITS CHILDREN's work products and commands~~ ⭐⭐ R3-A F1 (`REG-D-111`
+ * (2)'s general form; the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — A UNIT COMPOSED OF
+ * OTHERS IS JUDGED OVER THE WORK ITS WHOLE SUBTREE PRODUCED: its own work product and commands, where it produced any (a
+ * MODEL composite), then each unit below it, depth first, each unit's children in the order the store lists them — every
+ * work product and command under the title of the unit that made it, the end-to-end phase's evidence among them (DEC-6).
+ * ⭑ For §3.2's two levels that is its children's work, in the order it always was: its own TRANSFORMATION produces nothing.
+ * ⚠ Its instruction is its own purpose, and no single account is shown for many units' work, a MODEL composite's own
+ * among them. ⛔ `E12F` F9 — AND ITS PRODUCER IS ITS OWN executor (the operator, for a root that ran a TRANSFORMATION), not
+ * that of a unit below it: independence is checked against who did the judged work for a phase only. ⛔ The merge's fix
+ * round, F1, in R3-A's form — refused (`nothingToJudge`) only when neither it nor any unit below it holds a work product or a
+ * command: a review would be shown nothing to judge.
  */
 async function declaredReviewWorkOf(
 	pwuId: string,
@@ -1319,8 +1328,9 @@ async function declaredReviewWorkOf(
 	const own = await unitWorkOf(pwuId);
 	if (!own.ok) return own;
 	const producer = own.work.executedBy ?? operator;
-	const children = listPwus(getEngine()).filter((u) => String(u.state.parentWorkUnitId ?? '') === pwuId);
-	if (children.length === 0)
+	const units = listPwus(getEngine());
+	const childrenOf = (id: string) => units.filter((u) => String(u.state.parentWorkUnitId ?? '') === id);
+	if (childrenOf(pwuId).length === 0)
 		return {
 			ok: true,
 			work: {
@@ -1334,16 +1344,25 @@ async function declaredReviewWorkOf(
 		};
 	const workProducts: { unit: string; answer: string }[] = [];
 	const commands: DeclaredReviewCommand[] = [];
-	for (const child of children) {
-		const w = await unitWorkOf(child.id);
-		if (!w.ok) return w;
-		if (w.work.answer !== undefined) workProducts.push({ unit: w.work.title, answer: w.work.answer });
-		commands.push(...w.work.commands);
-	}
+	// ⭐ R3-A F1 — one unit's own work, then each of its children's subtrees in turn: depth first, the store's order.
+	// ⛔ A work product below it that the record cannot rebuild refuses the whole (RD7), as a child's always did.
+	const gather = async (id: string, work: UnitWork): Promise<{ readonly ok: false; readonly refusedBecause: string } | undefined> => {
+		if (work.answer !== undefined) workProducts.push({ unit: work.title, answer: work.answer });
+		commands.push(...work.commands);
+		for (const child of childrenOf(id)) {
+			const w = await unitWorkOf(child.id);
+			if (!w.ok) return w;
+			const refused = await gather(child.id, w.work);
+			if (refused) return refused;
+		}
+		return undefined;
+	};
+	const refused = await gather(pwuId, own.work);
+	if (refused) return refused;
 	if (workProducts.length === 0 && commands.length === 0) return { ok: false, refusedBecause: nothingToJudge(own.work.title) };
-	// ⛔ `E12F` F4 — ITS OWN PURPOSE, never a prompt of its own, and the reviewer is told so: the work judged is its children's,
-	// each made under its own child's instruction (~~`own.work.instruction`~~, which for a unit that ran a prompt of its own
-	// would have been shown as the instruction its children were given).
+	// ⛔ `E12F` F4 — ITS OWN PURPOSE, never a prompt of its own, and the reviewer is told so: the work judged is ~~its children's~~
+	// many units', each made under its own unit's instruction (~~`own.work.instruction`~~, which for a unit that ran a prompt of
+	// its own would have been shown as the instruction the units below it were given).
 	return {
 		ok: true,
 		work: { instruction: own.work.purpose, instructionIs: 'UNIT_PURPOSE', workProducts, commands, producer }
@@ -2760,10 +2779,11 @@ export const actions: Actions = {
 		// `DESIGN-phase-7-completion.md` B1–B3, B6, B7) — AND NOW IT JUDGES: ~~`actingActor(reviewerSession())` reads the
 		// identity off the SAME authenticated session… `producer` is the operator~~ each governing declared policy is
 		// REVIEWED, one review per policy, by the reviewer the floor's own selector selects, over the unit's work product and
-		// commands (its children's, for a unit composed of others); each criterion is recorded, and the verdict is computed
-		// from the answers. The evaluator recorded is WHO JUDGED; the producer is ~~WHO DID THE WORK~~ the unit's OWN executor
-		// (`REG-F-514`) — ⛔ `E12F` F9: who did the judged work for a phase only; for the root it is the operator, while the
-		// work judged is its children's (`declaredReviewWorkOf`).
+		// commands (~~its children's~~ ⭐ R3-A F1: its whole subtree's, for a unit composed of others); each criterion is
+		// recorded, and the verdict is computed from the answers. The evaluator recorded is WHO JUDGED; the producer is ~~WHO DID
+		// THE WORK~~ the unit's OWN executor (`REG-F-514`) — ⛔ `E12F` F9: who did the judged work for a phase only; for the root
+		// it is ~~the operator~~ ⭐ R3-A's fix round: the operator who ran its TRANSFORMATION, or the model that ran a MODEL
+		// composite's own prompt, while the work judged is ~~its children's~~ its subtree's (`declaredReviewWorkOf`).
 		const engine = getEngine();
 		// READ, not assumed. `REG-F-109` says a PWU's semanticVersion cannot move, which makes the literal `1`
 		// this surface uses elsewhere correct today — but the guard that reads it (`declaredPolicyVerdicts`)
@@ -2793,7 +2813,8 @@ export const actions: Actions = {
 		// ⭐ E2 — THE REVIEWS, ASKED BEFORE ANYTHING IS DISPATCHED, as Begin & Execute asks its reviewer (`JAN-SELREV` SR-1, D5):
 		// a reviewer that cannot run refuses here, in its own words, with nothing recorded; and a unit whose work the record
 		// cannot rebuild refuses here too (RD7's rule: no review of a partial reconstruction) — ⭐ as does, the merge's fix round
-		// F1, a unit composed of others whose children's work holds nothing to judge (`nothingToJudge`).
+		// F1, a unit composed of others ~~whose children's work holds~~ ⭐ R3-A F1: neither it nor any unit below it holding
+		// anything to judge (`nothingToJudge`).
 		let producer: ActorReference = evaluator;
 		let answers: ReadonlyMap<string, DeclaredPolicyAnswer> = new Map();
 		let invocations: ReadonlyMap<string, string> = new Map();

@@ -151,7 +151,7 @@ import {
 import type { CallLine, CandidateIdentity } from '../scripts/reviewer-qual/record.js';
 import { evaluateCase, runQualification } from '../scripts/reviewer-qual/runner.js';
 import { caseReviewInput } from '../scripts/reviewer-qual/materialize.js';
-import { CORPUS_CASE, scoringCorpus } from '../scripts/reviewer-qual/scoring-corpus.js';
+import { CORPUS_CASE, declaredScoringCorpus, scoringCorpus } from '../scripts/reviewer-qual/scoring-corpus.js';
 import {
 	fenceSkeletonTable,
 	parseUnicode,
@@ -438,14 +438,18 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint MOVES on each component
 	// ⛔ Before E2's probes no probe reached it, and no component hashed the catalog's policies: a change to the framing's
 	// text, to a policy's purpose, to a criterion of it, or to the independence its sign-off checks moved NO fingerprint, so
 	// `reviewer:qual:check` stayed green over a rubric nobody re-measured (each row below observed red before them).
-	/** The catalog's declared policies as the product seeds them — built HERE from the catalog, never read off the seam. */
+	/**
+	 * The catalog's declared policies as the product seeds them — built HERE from the catalog, never read off the seam.
+	 * ⭐ R3-A F3 — with each policy's required evidence, which caps the verdict its sign-off records (`evidenceCeiling`).
+	 */
 	const catalogDeclared = (): DeclaredProbePolicy[] =>
 		ontology.seedPolicies.map((p) => ({
 			policyId: p.policyId,
 			name: p.name,
 			purpose: p.purpose,
 			criteria: p.criteria as unknown as readonly AssessmentCriterion[],
-			independenceRequirement: p.independenceRequirement
+			independenceRequirement: p.independenceRequirement,
+			requiredEvidence: p.requiredEvidence as unknown as DeclaredProbePolicy['requiredEvidence']
 		}));
 	const withDeclared = (declared: readonly DeclaredProbePolicy[]): FingerprintSeams => ({
 		...PRODUCT_SEAMS,
@@ -513,6 +517,24 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint MOVES on each component
 			expect(fp.components.criteria, `${field}: the criteria component moves`).not.toBe(BASE.components.criteria);
 		}
 	}, 120_000);
+
+	// ⭐⭐ R3-A F3 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — THE FINGERPRINT REACHES DECLARED
+	// SCORING. ⛔ The scoring corpus was one work-product case, so how a declared case is scored — `declaredVerdict`,
+	// `evidenceCeiling` and the declared seam (`runner.ts` `scoreDeclared`) — moved no scoring digest; and the declared seam
+	// carried no policy's required evidence, which caps the verdict its sign-off records, so a change to it moved nothing.
+	it('⭐ R3-A F3 — CONTROL: the product’s declared seam is the catalog’s policies WHOLE — every field a review reads or its sign-off demands, the required evidence among them', () => {
+		expect(PRODUCT_SEAMS.declaredPolicies, 'the declared seam leaves out a field the sign-off reads').toEqual(catalogDeclared());
+	});
+
+	it('⭐⭐ R3-A F3 — a DECLARED POLICY’S REQUIRED EVIDENCE, the ceiling its sign-off’s verdict is capped at: the criteria component moves, and the scoring digest — the declared corpus is scored at the seam’s ceiling', async () => {
+		// ⭑ pol_intent_fidelity's required evidence gates SATISFIED (`SATISFIED_ONLY`); demanding no instance, it gates nothing.
+		const declared = catalogDeclared().map((p) =>
+			p.policyId === 'pol_intent_fidelity'
+				? { ...p, requiredEvidence: p.requiredEvidence.map((r) => ({ ...r, cardinality: 'ZERO_OR_MORE' as const })) }
+				: p
+		);
+		onlyMoved(await reviewerFingerprint(CASES, withDeclared(declared)), ['criteria', 'scoring']);
+	}, 60_000);
 
 	it('⭐ a MALFORMATION RULE — a class the harness no longer detects (the review’s E6): the scoring digest moves, and no case prompt of v1 or of the current set (PQ-2)', async () => {
 		const seams: FingerprintSeams = {
@@ -648,6 +670,48 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint does NOT move on what d
 			for (const k of ['probes', 'budget', 'criteria'] as const) expect(fp.components[k], `${label}: ${k}`).toBe(BASE.components[k]);
 		}
 	}, 120_000);
+
+	it('⭐⭐ R3-A F3 — DECLARED SCORING moves it, on a copy: the declared verdict’s computation, its evidence ceiling and the declared seam’s reading of a review, each changed where the product writes it — `scoring` moves, and no other component', () => {
+		// ⛔ RED BEFORE R3-A F3 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114): no corpus entry was a
+		// declared case, so a change to how one is scored (`runner.ts` `scoreDeclared`) moved no component of the fingerprint.
+		const copy = disposableTree();
+		/** One edit to one copied file, measured, then undone — each a single literal replacement, shown to apply. */
+		const attacked = (rel: string, find: string, replace: string) => {
+			const file = `${copy}/${rel}`;
+			const original = readFileSync(file, 'utf8');
+			expect(original.split(find).length - 1, `${rel}: the attack anchors once`).toBe(1);
+			writeFileSync(file, original.replace(find, () => replace));
+			try {
+				return fingerprintIn(copy);
+			} finally {
+				writeFileSync(file, original);
+			}
+		};
+		const SIGNOFF = 'apps/rph-demo/src/lib/server/assurance/declared-policy-signoff.ts';
+		const SEAM = 'apps/rph-demo/src/lib/server/assurance/declared-policy-review.ts';
+		const attacks: readonly (readonly [label: string, rel: string, find: string, replace: string])[] = [
+			['declaredVerdict: the verdict past its evidence ceiling', SIGNOFF, 'return stricter(verdict, policy.evidenceCeiling);', 'return verdict;'],
+			[
+				'declaredVerdict: a review that answered no criterion read past',
+				SIGNOFF,
+				"\tif (counted.every((c) => c.outcome === 'UNABLE_TO_DETERMINE')) return 'INCONCLUSIVE';\n",
+				''
+			],
+			['evidenceCeiling: SATISFIED_ONLY evidence gating nothing', SIGNOFF, "(rfd === 'SATISFIED_ONLY' && disposition === 'SATISFIED')", 'false'],
+			[
+				'the declared seam: a review’s findings read as none',
+				SEAM,
+				'\t\t\t\t\tcriteria: r.criteria,\n\t\t\t\t\tobservations: r.observations,\n',
+				'\t\t\t\t\tcriteria: r.criteria,\n\t\t\t\t\tobservations: [],\n'
+			]
+		];
+		for (const [label, rel, find, replace] of attacks) {
+			const fp = attacked(rel, find, replace);
+			expect(fp.components.scoring, `${label}: the scoring digest moves`).not.toBe(BASE.components.scoring);
+			// THE CONTROL: the copy measured the tree in everything else, so the move is the attack's.
+			for (const k of ['probes', 'budget', 'criteria'] as const) expect(fp.components[k], `${label}: ${k}`).toBe(BASE.components[k]);
+		}
+	}, 240_000);
 
 	it('⭐ SR-2 (D6) — why the reported-model check is GATED: set in the runner’s validator, on a copy, it moves the scoring digest', () => {
 		// ⛔ The scoring corpus holds replies that report OTHER models (`scoring-corpus.ts`), and their outcomes are hashed.
@@ -4318,6 +4382,51 @@ describe('⭐⭐ P7-6 I5 — the scoring corpus holds the measured run’s reply
 		expect(e.calls.map((c) => c.role), 'two calls: the initial, then the criterion repair').toEqual(['initial', 'criterion-repair']);
 		expect(sent[1], 'the repair carries the line naming the cause').toBe(`${sent[0]}\n\n${CRITERION_REPAIR_LINE}`);
 		expect([e.scored.disposition, e.scored.resultClass], 'the repair’s answer is the one scored').toEqual(['SATISFIED', 'VALID']);
+	});
+});
+
+describe('⭐⭐ R3-A F3 — the DECLARED corpus, each entry PINNED BY ID to the verdict the declared sign-off records', () => {
+	it('⭐ each entry is scored as the sign-off records its verdict — never by the floor composition, and at the ceiling its policy’s own evidence sets, as the seam holds it', async () => {
+		// ⛔ PER ENTRY, as the ER-2 pins above: a set pin is kept green by any one entry, so a mutant of one entry, or of the one
+		// rule it stands on, moves nothing such a pin asks. ⭑ Where the floor composition would score otherwise, the entry says:
+		// a BLOCKING fault recommended SATISFIED (the floor's BOUNDARY_REJECTED), a clean review recommending ESCALATED (the
+		// floor's rule (a)), a review that threw (the floor's VALIDATOR_FAILED disposition).
+		const pinned: readonly [id: string, disposition: string, resultClass: string][] = [
+			['declared-clean', 'SATISFIED', 'VALID'],
+			['declared-fault-recommends-satisfied', 'REJECTED', 'VALID'],
+			['declared-clean-recommends-escalated', 'SATISFIED', 'VALID'],
+			['declared-skipped-row', 'INCONCLUSIVE', 'VALID'],
+			['declared-repair-fails', 'INCONCLUSIVE', 'VALIDATOR_FAILED'],
+			['declared-material-fault', 'CONDITIONALLY_SATISFIED', 'VALID'],
+			['declared-none-answered', 'INCONCLUSIVE', 'VALID'],
+			['declared-evidence-ceiling', 'CONDITIONALLY_SATISFIED', 'VALID']
+		];
+		const corpus = declaredScoringCorpus(PRODUCT_SEAMS.declaredPolicies);
+		expect(corpus.map((e) => e.id), 'the declared corpus, in its order').toEqual(pinned.map(([id]) => id));
+		// ⭑ THE ARRANGEMENT FIRST, where an entry stands on a parting from the floor composition: its reply recommends what the
+		// floor would act on — SATISFIED beside a BLOCKING fault, ESCALATED over a clean review — so no pin passes on an entry
+		// that no longer stands there.
+		const recommendationOf = (id: string): unknown =>
+			(JSON.parse(String(corpus.find((e) => e.id === id)!.replies[0])) as { recommendation?: unknown }).recommendation;
+		expect(
+			[recommendationOf('declared-fault-recommends-satisfied'), recommendationOf('declared-clean-recommends-escalated')],
+			'the entries recommend what the floor composition acts on'
+		).toEqual(['SATISFIED', 'ESCALATED']);
+		const requiredEvidenceOf = (policyId: string) =>
+			PRODUCT_SEAMS.declaredPolicies.find((p) => p.policyId === policyId)?.requiredEvidence;
+		for (const [id, disposition, resultClass] of pinned) {
+			const entry = corpus.find((e) => e.id === id)!;
+			let n = 0;
+			const e = await evaluateCase({
+				case: entry.case,
+				criteria: SEEDED_REASONING_REVIEW_CRITERIA,
+				candidate: FIXTURE,
+				scoringDigest: '0'.repeat(64),
+				requiredEvidenceOf,
+				call: async () => ({ returned: entry.replies[Math.min(n++, entry.replies.length - 1)]!, served: null })
+			});
+			expect([e.scored.disposition, e.scored.resultClass], id).toEqual([disposition, resultClass]);
+		}
 	});
 });
 

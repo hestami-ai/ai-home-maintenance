@@ -277,8 +277,9 @@ function framingText(input: Pick<ReasoningReviewInput, 'framing' | 'declaredPoli
 			};
 		case 'DECLARED_POLICY': {
 			// ⭐⭐ E2 (design B1; `R18`) — A WORK UNIT'S WORK, JUDGED AGAINST ONE OF ITS DECLARED POLICIES: its work product and
-			// the commands it ran (or, for a unit composed of others, its children's — `REG-D-111` (2)), against the policy's
-			// purpose, its criteria the rubric. ⛔ Refused, never sent, when the input names no policy.
+			// the commands it ran (or, for a unit composed of others, ~~its children's~~ ⭐ R3-A F1: its whole subtree's —
+			// `REG-D-111` (2)'s general form), against the policy's purpose, its criteria the rubric. ⛔ Refused, never sent, when
+			// the input names no policy.
 			const policy = input.declaredPolicy;
 			if (!policy) throw new Error(NO_DECLARED_POLICY_STATEMENT);
 			// ⛔ `E12F` F4 (`R14`) — ~~"produced … by a DIFFERENT AI agent (for a unit composed of others, by the agents that did

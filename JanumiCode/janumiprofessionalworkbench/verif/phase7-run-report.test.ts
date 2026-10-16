@@ -98,6 +98,7 @@ import {
 	REDACTED,
 	relativeToWorkspace,
 	renderMarkdown,
+	REPLAYED_DECLARED_REVIEW_VALIDATOR,
 	ROOT_COMPLETION_DETAIL,
 	stepSuccessShape,
 	type ArchiveFacts,
@@ -176,7 +177,8 @@ interface PhaseKnobs {
 	/**
 	 * ⭐ E2 (`REG-F-523`; design B8) — how the unit's declared policies were signed off: JUDGED by a reviewer, one row per
 	 * criterion and the verdict computed from them (the default); by the pre-E2 sign-off (`legacy`); with one mandatory
-	 * criterion left unanswered (`unanswered`); or with a verdict the answers do not give (`off-verdict`).
+	 * criterion left unanswered (`unanswered`); or with a verdict the answers do not give (`off-verdict`). ⭐ R3-A F2 — or judged
+	 * as `judged` is, by a REPLAY of a recorded run (`replayed`): completed under the replayed declared reviewer's own id.
 	 */
 	readonly declared?: DeclaredKnob;
 	/**
@@ -186,7 +188,9 @@ interface PhaseKnobs {
 	 */
 	readonly evidenced?: { readonly policyId: string; readonly recorded: string; readonly unmet?: boolean };
 }
-type DeclaredKnob = 'judged' | 'legacy' | 'unanswered' | 'off-verdict';
+type DeclaredKnob = 'judged' | 'legacy' | 'unanswered' | 'off-verdict' | 'replayed';
+/** ⭐ R3-A F2 — the id a replayed declared verdict is completed under (`declared-policy-review.ts`), written here as the product writes it. */
+const REPLAYED_DECLARED = 'replay.declared-policy';
 /** ⭐ E2 — each catalog policy's criteria, as the product seeds them (`seedAdditivePolicies`). */
 const POLICY_CRITERIA = new Map<string, readonly { readonly id: string; readonly severityIfNotMet: string }[]>(
 	ontology.seedPolicies.map((p) => [p.policyId, p.criteria])
@@ -332,7 +336,10 @@ function aRun(
 				result: (how === 'unanswered' || ev?.unmet === true) && j === 0 ? (ev?.unmet ? 'NOT_MET' : 'UNABLE_TO_DETERMINE') : 'MET'
 			})
 		);
-		emit('AssuranceAssessmentCompleted', asm, { assessmentId: asm, validatorId: DECLARED_REVIEW_VALIDATORS[0] });
+		emit('AssuranceAssessmentCompleted', asm, {
+			assessmentId: asm,
+			validatorId: how === 'replayed' ? REPLAYED_DECLARED : DECLARED_REVIEW_VALIDATORS[0]
+		});
 	};
 	const signOff = (
 		unitId: string,
@@ -560,11 +567,14 @@ describe('JAN-EXEC P7-2 D9 — what the report restates of the product is the pr
 			`export const DEMO_REVIEW_VALIDATOR_ID = '${DECLARED_SIGNOFF_VALIDATOR}';`
 		);
 		// ⭐ E2 — the validators a declared verdict is recorded under now, each where the product declares it.
-		const [model, standin, unconfigured, missing] = DECLARED_REVIEW_VALIDATORS;
+		const [model, standin, unconfigured, missing, replayed] = DECLARED_REVIEW_VALIDATORS;
 		const review = source('apps/rph-demo/src/lib/server/assurance/declared-policy-review.ts');
 		expect(review).toContain(`export const DECLARED_REVIEW_VALIDATOR_ID = '${model}';`);
 		expect(review).toContain(`export const STANDIN_DECLARED_REVIEW_VALIDATOR_ID = '${standin}';`);
 		expect(review).toContain(`export const UNCONFIGURED_DECLARED_REVIEWER_ID = '${unconfigured}';`);
+		// ⭐ R3-A F2 — and a replayed one's, which this file's fixture writes as the product does.
+		expect(review).toContain(`export const REPLAY_DECLARED_REVIEW_VALIDATOR_ID = '${replayed}';`);
+		expect([replayed, REPLAYED_DECLARED_REVIEW_VALIDATOR]).toEqual([REPLAYED_DECLARED, REPLAYED_DECLARED]);
 		expect(source('apps/rph-demo/src/lib/server/assurance/declared-policy-signoff.ts')).toContain(`validatorId: '${missing}',`);
 		// ⭐ `E12F` F3 — the option a person's re-run of the declared reviews selects.
 		expect(source('apps/rph-demo/src/lib/server/assurance/declared-policy-signoff.ts')).toContain(
@@ -1736,8 +1746,8 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 	/** ⭐ E12’s polish (fix2’s F10) — the caveat a run states whose root’s two declared reviews the model reviewer made. */
 	const UNIT_PURPOSE =
 		'UNIT_PURPOSE framing: the declared reviews of a unit composed of others (root: 2) were made in it — the unit’s own ' +
-		'purpose, judged over its children’s work (REG-D-111 (2)) — and no reviewer-qualification case measures it: every ' +
-		'declared case of case set v5 is in the PRODUCING_PROMPT framing.';
+		'purpose, judged over the work it and every unit below it produced (REG-D-111 (2)) — and no reviewer-qualification case ' +
+		'measures it: every declared case of case set v5 is in the PRODUCING_PROMPT framing.';
 
 	it('⛔ E12F F10 — the REG-F-523 caveat is KEPT for a run whose declared verdicts carry no criterion result (a pre-E2 archive), and counted for one that mixes them', () => {
 		// ⛔ PREDICTED RED, read from the code: E2 dropped the line for EVERY run, so a report over a pre-E2 archive — its 14
@@ -1767,6 +1777,32 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 		const said = (o: Parameters<typeof aRun>[1]) =>
 			reportOf(aRun({}, o)).report.answer.alwaysStated.some((s) => s.startsWith('UNIT_PURPOSE'));
 		expect([said({ rootDeclared: 'legacy' }), said({ rootSignedOff: false })]).toEqual([false, false]);
+	});
+
+	// ── ⭐⭐ R3-A F2 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — A REPLAYED DECLARED VERDICT
+	// carries a validator id of its own, as the floor's replayed review does: the report knows it, and never counts it as live.
+	it('⭐ R3-A F2 — a REPLAYED declared verdict is a declared verdict: stage 5b reads it as it reads a live one, and it is never listed among the assessments that asked no model', () => {
+		// ⛔ RED BEFORE R3-A: the report knew no replayed declared validator, so a replay's declared verdicts were no declared
+		// verdicts at all — 5b read "not reached", and the replay regression's matrix could never match its recording's.
+		const r = reportOf(aRun({ requirements: { declared: 'replayed' } })).report;
+		expect(shown(cellOf(r, '5b', 'requirements')), 'a replayed declared verdict was read as none').toEqual(['as intended', []]);
+		const replayed = r.declaredVerdicts.rows.filter((d) => d.unit === 'requirements');
+		expect(replayed.map((d) => d.validatorId)).toEqual([REPLAYED_DECLARED, REPLAYED_DECLARED]);
+		const noModel = Object.values(r.pairing.noModelAnswerByDesign).flat();
+		expect(
+			replayed.filter((d) => noModel.includes(d.assessmentId)),
+			'a replayed declared verdict listed as an assessment that asked no model'
+		).toEqual([]);
+	});
+
+	it('⛔ R3-A F2 — a REPLAYED declared verdict is never counted as a live one: the UNIT_PURPOSE caveat names the root’s replayed reviews as replayed, never among those the model reviewer made', () => {
+		// ⛔ RED BEFORE R3-A: a replay's declared verdicts were recorded under the live reviewer's id, so the caveat counted them
+		// as reviews the model reviewer made; under an id the report did not know, it dropped them, and the caveat went unsaid.
+		const caveat = (o: Parameters<typeof aRun>[1]) =>
+			reportOf(aRun({}, o)).report.answer.alwaysStated.filter((s) => s.startsWith('UNIT_PURPOSE framing'));
+		expect(caveat({ rootDeclared: 'replayed' }), 'the root’s replayed reviews').toEqual([UNIT_PURPOSE.replace('(root: 2)', '(root: 2 replayed)')]);
+		// ⭑ CONTROL — the model reviewer's own, counted as before.
+		expect(caveat({})).toEqual([UNIT_PURPOSE]);
 	});
 
 	it('⛔ a press that outlasted the allowance (D4) is read as cut there — never from its mid-unit archive as if it ended', () => {

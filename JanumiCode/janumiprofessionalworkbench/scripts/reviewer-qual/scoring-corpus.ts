@@ -5,9 +5,13 @@
 // hashed as outcomes only. So a change anywhere between a reply and its recorded outcome moves the digest: the parse,
 // the repair decision, `coerceJudgement`, the mapper, the ladder, `REG-D-089`'s rule (a), the independence check, the
 // runner's handling of a validator that throws. A change that moves NONE of these outcomes is, by this measure, no
-// change to the scoring. ⚠ E12's polish — OF THE FLOOR'S ARMS ONLY: every entry is the work-product case below, so a
+// change to the scoring. ~~⚠ E12's polish — OF THE FLOOR'S ARMS ONLY: every entry is the work-product case below, so a
 // DECLARED case's score — the declared sign-off's verdict (`runner.ts` `scoreDeclared`), at the ceiling its policy's seeded
-// evidence sets — is reached by no entry, and a change confined to it moves no scoring digest.
+// evidence sets — is reached by no entry, and a change confined to it moves no scoring digest.~~ ⭐ R3-A F3 (the lead's
+// delegated decision of 2026-10-16, to be registered as REG-D-114): AND OF THE DECLARED ARM — the declared corpus below
+// (`declaredScoringCorpus`), each entry a work unit's work judged against one catalog policy, so a change to how a declared
+// case is scored — `declaredVerdict`, `evidenceCeiling`, the declared seam's reading of a review — moves the digest where an
+// entry stands on it.
 //
 // ⭐ EVERY `REG-F-428` CLASS IS HERE — a duplicate key, an unknown id and a corrupted one, a non-boolean `failed`,
 // fenced JSON, prose-wrapped JSON — with the siblings the harness detects, and ONE REPLY THAT FAILS THE FIRST PARSE, so
@@ -31,7 +35,13 @@
 // ⚠ THE CORPUS IS NEVER SENT TO A MODEL, and it does not tune anything: it is the fixed input of a measurement.
 import type { AssessmentCriterion } from '@janumipwb/rph-contracts';
 import type { ToolInvocationResult } from '../../apps/rph-demo/src/lib/server/tools/backing-tool.js';
-import { CASE_PRODUCER_MODEL_ID, CASE_PRODUCER_PROVIDER_ID, type WorkProductCase } from './cases.js';
+import {
+	CASE_PRODUCER_MODEL_ID,
+	CASE_PRODUCER_PROVIDER_ID,
+	type DeclaredPolicyCase,
+	type WorkProductCase
+} from './cases.js';
+import type { DeclaredProbePolicy } from './probes.js';
 
 export interface CorpusEntry {
 	readonly id: string;
@@ -225,6 +235,125 @@ export function scoringCorpus(criteria: readonly AssessmentCriterion[]): readonl
 			id: 'clean-recommends-inconclusive',
 			covers: 'every criterion evaluated clean, the recommendation INCONCLUSIVE — SATISFIED stays: rule (a) reads the literal ESCALATED only (REG-D-090)',
 			replies: [reply(ids.map((id) => row(id)), 'INCONCLUSIVE')]
+		}
+	];
+}
+
+// ── ⭐⭐ R3-A F3 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — THE DECLARED CORPUS ──────────────
+// ⛔ E12's polish scored a declared case as the declared sign-off records its verdict (`runner.ts` `scoreDeclared`), and no
+// entry above was a declared case: a change to that scoring moved no scoring digest, and the reviewer fingerprint with it.
+// Each entry here is one work unit's work judged against ONE catalog policy as the fingerprint's declared seam holds it — its
+// criteria the rubric, its required evidence the ceiling — its reply standing where the sign-off's verdict parts from the
+// floor composition's, or turns on a rule of its own:
+//   · over pol_requirement_coverage, every criterion BLOCKING and no evidence required: a clean review, SATISFIED; a BLOCKING
+//     fault recommended SATISFIED, REJECTED (the floor's BOUNDARY_REJECTED); a clean review recommending ESCALATED, SATISFIED
+//     (the floor's `REG-D-089` rule (a) escalates it); a mandatory row never answered, INCONCLUSIVE; a review whose replies
+//     never parse, INCONCLUSIVE and VALIDATOR_FAILED (the floor's VALIDATOR_FAILED disposition);
+//   · over pol_historical_consistency, none of its criteria mandatory: a fault the reviewer calls ADVISORY,
+//     CONDITIONALLY_SATISFIED at the policy's MATERIAL stakes; a review answering no criterion, INCONCLUSIVE (E12's re-review
+//     F5);
+//   · over pol_intent_fidelity, whose own required evidence gates SATISFIED: a clean review, CONDITIONALLY_SATISFIED (its
+//     ceiling).
+// Each is pinned by id to its verdict (`verif/reviewer-qualification-fingerprint.test.ts`).
+
+/** ⭐ R3-A F3 — one declared entry: the replies, and the case they answer — a work unit's work under one catalog policy. */
+export interface DeclaredCorpusEntry extends CorpusEntry {
+	readonly case: DeclaredPolicyCase;
+}
+
+/** ⭐ R3-A F3 — the declared corpus's case over `policy`: a work unit whose producer is the case producer (`REG-D-072` D13). */
+function declaredCorpusCase(
+	policy: Pick<DeclaredProbePolicy, 'policyId' | 'name' | 'purpose' | 'criteria'>
+): DeclaredPolicyCase {
+	return {
+		id: `SCORING-CORPUS-${policy.policyId}`,
+		arm: 'DECLARED_POLICY',
+		subject: {
+			subjectId: 'pwu_01M4B2C5D8F1G4H7J0K3M6N9P3',
+			objectType: 'PROFESSIONAL_WORK_UNIT',
+			semanticVersion: 1,
+			isAiProduced: true,
+			producer: { ...CORPUS_CASE.subject.producer }
+		},
+		input: {
+			policy: { policyId: policy.policyId, name: policy.name, purpose: policy.purpose, criteria: policy.criteria },
+			instruction: 'State the load-monitoring requirements of the footbridge deck, one testable requirement to a line.',
+			workProducts: [
+				{
+					unit: 'Requirements',
+					answer: 'R1: each deck panel’s strain is logged every minute. R2: an alarm is raised past 80% of the design load.'
+				}
+			],
+			commands: [{ unit: 'Requirements', argv: ['node', '--test', 'test/requirements.test.js'], exitCode: 0, timedOut: false }]
+		}
+	};
+}
+
+/** ⭐ R3-A F3 — THE DECLARED CORPUS, over the declared seam's policies (the fingerprint's own), in a fixed order. */
+export function declaredScoringCorpus(declared: readonly DeclaredProbePolicy[]): readonly DeclaredCorpusEntry[] {
+	const caseOver = (policyId: string): DeclaredPolicyCase => {
+		const policy = declared.find((p) => p.policyId === policyId);
+		if (policy === undefined)
+			throw new Error(`the declared corpus judges against ${policyId}, which the declared seam does not hold`);
+		return declaredCorpusCase(policy);
+	};
+	const coverage = caseOver('pol_requirement_coverage');
+	const history = caseOver('pol_historical_consistency');
+	const fidelity = caseOver('pol_intent_fidelity');
+	const idsOf = (c: DeclaredPolicyCase): string[] => c.input.policy.criteria.map((k) => k.id);
+	const rc = idsOf(coverage);
+	const hc = idsOf(history);
+	return [
+		{
+			id: 'declared-clean',
+			covers: 'pol_requirement_coverage, every criterion met: SATISFIED',
+			case: coverage,
+			replies: [reply(rc.map((id) => row(id)))]
+		},
+		{
+			id: 'declared-fault-recommends-satisfied',
+			covers:
+				'a BLOCKING criterion answered NOT MET, SATISFIED recommended: REJECTED, where the floor composition answers BOUNDARY_REJECTED',
+			case: coverage,
+			replies: [reply(rc.map((id, i) => (i === 3 ? row(id, true, 'BLOCKING') : row(id))), 'SATISFIED')]
+		},
+		{
+			id: 'declared-clean-recommends-escalated',
+			covers: 'every criterion met, ESCALATED recommended: SATISFIED, where the floor composition escalates (REG-D-089 rule (a))',
+			case: coverage,
+			replies: [reply(rc.map((id) => row(id)), 'ESCALATED')]
+		},
+		{
+			id: 'declared-skipped-row',
+			covers: 'a mandatory criterion never answered: INCONCLUSIVE',
+			case: coverage,
+			replies: [reply(rc.slice(1).map((id) => row(id)))]
+		},
+		{
+			id: 'declared-repair-fails',
+			covers: 'both replies fail to parse: the review produced no answer, INCONCLUSIVE and VALIDATOR_FAILED',
+			case: coverage,
+			replies: ['I could not decide.', 'Still undecided.']
+		},
+		{
+			id: 'declared-material-fault',
+			covers:
+				'pol_historical_consistency, a MATERIAL criterion the reviewer calls ADVISORY answered NOT MET: CONDITIONALLY_SATISFIED',
+			case: history,
+			replies: [reply(hc.map((id, i) => (i === 1 ? row(id, true, 'ADVISORY') : row(id))), 'SATISFIED')]
+		},
+		{
+			id: 'declared-none-answered',
+			covers:
+				'pol_historical_consistency, no criterion mandatory, a review answering none and its criterion repair none again: INCONCLUSIVE',
+			case: history,
+			replies: ['{"findings":[],"recommendation":"SATISFIED","residualUncertainty":["x"]}']
+		},
+		{
+			id: 'declared-evidence-ceiling',
+			covers: 'pol_intent_fidelity, every criterion met: CONDITIONALLY_SATISFIED, the ceiling its own required evidence sets',
+			case: fidelity,
+			replies: [reply(idsOf(fidelity).map((id) => row(id)))]
 		}
 	];
 }
