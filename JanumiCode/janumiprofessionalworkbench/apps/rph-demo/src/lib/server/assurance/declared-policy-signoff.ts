@@ -59,9 +59,12 @@
 //     IS THE UNIT'S OWN EXECUTOR where the record holds it (`REG-F-514`), handed in by the route. ⛔ `E12F` F9 — ~~IS WHO DID
 //     THE WORK~~: that holds for a unit that did its own work (a phase) and for no other. A unit composed of others (the
 //     root) is judged over ~~its CHILDREN's work~~ ⭐ R3-A F1: the work its whole subtree produced (`REG-D-111` (2)'s
-//     general form), yet its producer is ITS OWN executor — the operator, who ran its TRANSFORMATION — so its independence
+//     general form), yet its producer is ITS OWN executor — ~~the operator, who ran its TRANSFORMATION — so its independence
 //     is checked against the operator, never against the agents whose work below it the review judged. Each of those
-//     units' own verdicts checked those; the root's do not.
+//     units' own verdicts checked those; the root's do not.~~ ⭐ R3-A's fix round: the operator who ran its TRANSFORMATION,
+//     or the model that ran a MODEL composite's own prompt — so its independence is checked against that executor, never
+//     against the executor of a unit below it whose work the review judged (one model may have run both, each run its own
+//     invocation). Each of those units' own verdicts checked its own; the root's do not.
 //   · ⭐ A POLICY DEMANDING A HUMAN (`pol_fitness_for_purpose`) is recorded as the OPERATOR's decision, as a HUMAN actor,
 //     each criterion result citing the reviewer's answer — the reviewer's answers are its evidence (`REG-D-111` (3)); its
 //     commands are the operator's to issue (`humanSteps`).
@@ -441,8 +444,10 @@ export function planDeclaredSignoff(opts: {
 	 * The party that produced the work. Supplied so independence is CHECKED, not skipped. ⭐ E2 (`REG-F-514`): the unit's
 	 * EXECUTOR where the record holds one — the model, its attempt as its invocation — ~~and the operator only where the
 	 * operator did the work~~ and the operator otherwise; the route reads it from the record. ⛔ `E12F` F9 — the unit's OWN
-	 * executor, which is who did the judged work for a phase only: for a unit composed of others (the root) it is the
-	 * operator who ran its TRANSFORMATION, while the work judged is ~~its children's~~ ⭐ R3-A F1: its whole subtree's (header).
+	 * executor, which is who did the judged work for a phase only: for a unit composed of others (the root) it is ~~the
+	 * operator who ran its TRANSFORMATION~~ ⭐ R3-A's fix round: the operator who ran its TRANSFORMATION, or the model that
+	 * ran a MODEL composite's own prompt — while the work judged is ~~its children's~~ ⭐ R3-A F1: its whole subtree's
+	 * (header).
 	 */
 	readonly producer: ActorReference;
 	/** ⭐ E2 — each governing policy's review, as its reviewer answered it: one per policy (`REG-D-110` (3)). */
@@ -600,8 +605,10 @@ export function planDeclaredSignoff(opts: {
 				// ⛔ THE PARTY THAT DID THE WORK, NOT THE REVIEWER, AND THIS FIELD IS THE WHOLE POINT OF THE PHASE. Supplying it
 				// is what makes the §39 invariant-8 check RUN: `completeAssuranceAssessment` skips independence
 				// when either operand is absent, so omitting the producer would buy a green by removing the
-				// question rather than answering it. ⚠ `E12F` F9 — for a unit composed of others, the party that ran ITS
-				// transformation (the operator), not the agents whose work the review judged (the header).
+				// question rather than answering it. ⚠ `E12F` F9 — for a unit composed of others, ~~the party that ran ITS
+				// transformation (the operator), not the agents whose work the review judged~~ ⭐ R3-A's fix round: its OWN
+				// executor — the operator who ran its TRANSFORMATION, or the model that ran a MODEL composite's own prompt —
+				// never the executor of a unit below it, whose work the review judged (the header).
 				producer
 			}
 		]);

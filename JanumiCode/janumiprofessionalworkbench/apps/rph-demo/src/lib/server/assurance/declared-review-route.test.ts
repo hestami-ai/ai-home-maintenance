@@ -276,7 +276,8 @@ describe('⭐⭐ E2 — Record Assurance reviews each declared policy, and recor
 			.filter((x) => x.assurancePolicyId === POLICY);
 		expect(calls.map((x) => [x.plane, x.runToken])).toEqual([['ASSURANCE', evaluator.executionInstanceId]]);
 		// ⭐ `REG-F-514` — the producer is the model that did the work, never the operator (a unit that did its own work;
-		// ⚠ `E12F` F9: a unit composed of others records its own executor, the operator).
+		// ⚠ `E12F` F9: a unit composed of others records its own executor~~, the operator~~ ⭐ R3-A's fix round: the operator
+		// who ran its TRANSFORMATION, or the model that ran a MODEL composite's own prompt — (b) below).
 		expect((d.assessments[0]!.producer as { actorId?: string }).actorId).toMatch(/^model:/);
 	});
 
@@ -847,7 +848,7 @@ describe('⭐⭐ R3-A F1 — a unit composed of others is judged over the work i
 		expect(seam.declared[0]).toContain(ROOT_PURPOSE);
 	});
 
-	it('⭐ (b) a MODEL root’s OWN work product, and the command it ran, are judged beside its child’s work — its own first, under its own title', async () => {
+	it('⭐ (b) a MODEL root’s OWN work product, and the command it ran, are judged beside its child’s work — its own first, under its own title — and its verdict names a model as producer, never the operator', async () => {
 		// ⛔ RED BEFORE R3-A, read from the code: a unit with children was judged over its CHILDREN's work alone, so a root that ran
 		// a model of its own — half B's agent may declare one — had its declared reviews asked without the work it produced.
 		const { root, child } = await rootOverAChild('MODEL');
@@ -872,10 +873,21 @@ describe('⭐⭐ R3-A F1 — a unit composed of others is judged over the work i
 		]);
 		// ⭑ Its instruction is still its own purpose: no single account is shown for many units' work, its own among them.
 		expect(seam.declared[0]).toContain(DECLARED_UNIT_PURPOSE_INTENT);
+		// ⭐ R3-A's fix round — ITS VERDICT'S PRODUCER IS A MODEL, NEVER THE OPERATOR: a MODEL composite's own executor is the
+		// model that ran its own prompt (`declaredReviewWorkOf`; `REG-F-514`), and its verdict checks independence against it.
+		const verdict = listByType(getEngine(), 'ASSURANCE_ASSESSMENT').find(
+			(a) =>
+				(a.state as { assurancePolicyId?: string }).assurancePolicyId === IP &&
+				((a.state as { subjectObjectIds?: string[] }).subjectObjectIds ?? []).includes(root)
+		);
+		expect(
+			(verdict?.state as { producer?: { actorId?: string } } | undefined)?.producer?.actorId,
+			'the MODEL root’s verdict does not name its model as producer'
+		).toMatch(/^model:/);
 	});
 
 	it('⛔ (c) a unit composed of others with NOTHING in it or anywhere below it is refused before any review is asked, nothing dispatched — and the root above it, whose other branch holds work, is reviewed over that work alone (the control)', async () => {
-		// ⭑ At HEAD this unit was refused too — its one child held nothing — so its refusal's red is its mutant's
+		// ⭑ Before R3-A this unit was refused too — its one child held nothing — so its refusal's red is its mutant's
 		// (`P7MF-M1`: the refusal dropped); the control was red there, the root refused for its children's nothing.
 		const t = await threeLevelTree();
 		// The acceptance tests never run: the unit above them, a TRANSFORMATION, holds nothing, and nothing below it does.

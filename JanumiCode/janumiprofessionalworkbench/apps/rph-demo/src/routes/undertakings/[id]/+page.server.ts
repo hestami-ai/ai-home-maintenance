@@ -1301,7 +1301,8 @@ interface DeclaredReviewWork {
 	 * ⛔ `E12F` F9 — WHO DID THE JUDGED WORK FOR A PHASE ONLY: a unit composed of others is judged over ~~its children's work~~
 	 * ⭐ R3-A F1: the work of the units below it as well as its own, and its producer is still its own — the operator who ran
 	 * its TRANSFORMATION, or the model that ran a MODEL composite's — so its verdicts check independence against that party,
-	 * never against the agents whose work below it they judged.
+	 * never against ~~the agents whose work below it they judged~~ ⭐ R3-A's fix round: the executor of a unit below it whose
+	 * work they judged (one model may have run both, each run its own invocation).
 	 */
 	readonly producer: ActorReference;
 }
@@ -2781,7 +2782,8 @@ export const actions: Actions = {
 		// commands (~~its children's~~ ⭐ R3-A F1: its whole subtree's, for a unit composed of others); each criterion is
 		// recorded, and the verdict is computed from the answers. The evaluator recorded is WHO JUDGED; the producer is ~~WHO DID
 		// THE WORK~~ the unit's OWN executor (`REG-F-514`) — ⛔ `E12F` F9: who did the judged work for a phase only; for the root
-		// it is the operator, while the work judged is ~~its children's~~ its subtree's (`declaredReviewWorkOf`).
+		// it is ~~the operator~~ ⭐ R3-A's fix round: the operator who ran its TRANSFORMATION, or the model that ran a MODEL
+		// composite's own prompt, while the work judged is ~~its children's~~ its subtree's (`declaredReviewWorkOf`).
 		const engine = getEngine();
 		// READ, not assumed. `REG-F-109` says a PWU's semanticVersion cannot move, which makes the literal `1`
 		// this surface uses elsewhere correct today — but the guard that reads it (`declaredPolicyVerdicts`)
