@@ -48,6 +48,9 @@ export default defineConfig({
 		reuseExistingServer: false,
 		timeout: 120_000,
 		// Test-mode harness (reset/introspect) but the LIVE Pi agent. JPWB_AGENT_MODEL can override the model.
-		env: { RPH_DEMO_MODE: 'test', JPWB_AGENT: 'pi' }
+		// ⭐ R3-C (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — and Pi offline, as the
+		// execution lane's server runs it: `playwright.live-exec.config.ts` says what that changes, and that it touches no
+		// model call.
+		env: { RPH_DEMO_MODE: 'test', JPWB_AGENT: 'pi', PI_OFFLINE: '1' }
 	}
 });

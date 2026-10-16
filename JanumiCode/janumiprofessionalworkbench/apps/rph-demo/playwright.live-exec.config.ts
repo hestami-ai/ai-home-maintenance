@@ -134,7 +134,17 @@ export default defineConfig({
 			// Unset, a folder is minted under it as before, now once per run: the worker's load of this config names the
 			// runner's folder instead of minting a second (`run-folder.ts`).
 			JPWB_DEMO_DB: liveExecStore(process.env),
-			...passthrough
+			...passthrough,
+			// ⭐ R3-C (`REG-F-512` candidate 1's fifth part; the lead's delegated decision of 2026-10-16, to be registered as
+			// REG-D-114) — THE SERVER RUNS PI OFFLINE, SET LAST SO NOTHING SPREAD ABOVE SETS IT AGAIN. Read in the installed
+			// Pi (`@earendil-works/pi-coding-agent` 0.80.6), it is read by the package manager, the fd and rg download, the
+			// version check, the CLI's start and the interactive mode, and nowhere else. A session's load here reaches the
+			// first alone: a package the agent folder's settings list that is missing is not fetched or installed, by npm or
+			// git (`dist/core/package-manager.js`, `installMissing`). ⚠ Pi still runs npm's `root -g` to find a user package
+			// its own folder does not hold (`getGlobalNpmRoot`), which fetches and installs nothing. ⛔ IT TOUCHES NO MODEL
+			// CALL: neither `pi-ai` nor `pi-agent-core` reads it. ⭑ And it reaches no command the executor runs: the real
+			// runner hands a command an allowlist of this environment (`child-process-runner.ts`) that does not name it.
+			PI_OFFLINE: '1'
 		}
 	}
 });

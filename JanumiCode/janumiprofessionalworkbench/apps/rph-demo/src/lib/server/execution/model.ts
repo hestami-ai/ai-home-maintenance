@@ -62,8 +62,9 @@ export async function deterministicExecutionPrint(prompt: string): Promise<strin
  * both runnable branches: the `AgyExec` precedent (`agy-cli.ts`).
  *   · `agyExec` — handed to `agyPrintWithModel`, so a test sees the argv (the model agy is asked to run) and a failure's
  *     sanitised text, and nothing is spawned.
- *   · `openPi` — the Pi opener. ⚠ Its default is the LAZY import below, so the gate never loads Pi's SDK; a test hands
- *     in its own and so never opens a real Pi session.
+ *   · `openPi` — the Pi opener. ⚠ Its default is the LAZY import below, so ~~the gate never loads Pi's SDK~~ ⭐ loading
+ *     this module loads no part of Pi's SDK (R3-C: the gate loads Pi's coding agent in one test alone,
+ *     `tools/pi-executor.test.ts`); a test hands in its own and so never opens a real Pi session.
  */
 export interface ExecutionSessionDeps {
 	readonly agyExec?: AgyExec;
@@ -79,8 +80,8 @@ export interface ExecutionSessionDeps {
  * no longer asks for the JUDGE model, and a misconfigured executor never reaches here. `beginExecute` asks
  * `selectExecutor` before its dispatch batch and returns a refusal with its guidance, so this takes only a RUNNABLE
  * selection — a refusal cannot reach an executor by type. ⛔ What still fails here, after dispatch, is recorded as a
- * failed step rather than swallowed: an unresolvable Pi model (resolving one needs Pi's SDK, which the gate never
- * loads), a sandbox refusal, and an agy call that fails.
+ * failed step rather than swallowed: an unresolvable Pi model (resolving one needs Pi's SDK, which ~~the gate never
+ * loads~~ ⭐ this module does not load), a sandbox refusal, and an agy call that fails.
  */
 export function getExecutionSession(
 	selection: RunnableExecutorSelection,
@@ -117,7 +118,8 @@ export function getExecutionSession(
 	// would silently restore the collision while every test still passed — which is exactly how it arrived the first
 	// time.
 	if (selection.kind === 'PI') {
-		// Loaded lazily so the gate never pulls Pi's heavy Node deps — the rule `agent/index.ts` already follows.
+		// Loaded lazily so ~~the gate never pulls~~ ⭐ loading this module never pulls Pi's heavy Node deps — the rule
+		// `agent/index.ts` already follows.
 		//
 		// ⛔ RETURNS THE WHOLE RESULT, AND IT USED TO SAY `.then((r) => r.answerText)`. `TS-04` widened this seam
 		// precisely so a tool could report WHO ANSWERED — and this line, written before that, threw the identity

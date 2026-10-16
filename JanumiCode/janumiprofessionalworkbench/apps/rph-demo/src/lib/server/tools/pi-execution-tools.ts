@@ -2,9 +2,12 @@
 // `pi-executor.ts` so the mapping can be driven through Pi's own agent loop in the gate WITHOUT loading the coding agent.
 //
 // ⭑ WHY IT MOVED. `pi-executor.ts` imports `@earendil-works/pi-coding-agent` at module scope (measured 2026-10-15 under
-// node: about sixteen seconds to load cold, four warm), so nothing in the gate imports it, and whatever it decides is on
-// no tested path. This mapping is where the executor's tool-execution ORDER is decided — `REG-F-518` — so it moved here,
-// where nothing loads Pi's SDK:
+// node: about sixteen seconds to load cold, four warm), so ~~nothing in the gate imports it, and whatever it decides is on
+// no tested path~~ ⭐ nothing in the gate imported it when this moved, and whatever it decided was on no tested path
+// (⭐ R3-C: `pi-executor.test.ts` now imports it in the gate and opens its session over Pi's real loader with a faux
+// provider, for one turn answered in text, which calls no tool — so the ORDER decided here is still driven by
+// `pi-execution-tools.test.ts`). This mapping is where the executor's tool-execution ORDER is decided — `REG-F-518` — so
+// it moved here, where nothing loads Pi's SDK:
 // `ToolDefinition` is a type-only import, erased, and `defineTool` (which the adapter used to call) is the identity
 // (`pi-coding-agent/dist/core/extensions/types.js`, `defineTool(tool) { return tool; }`), so the objects built here are
 // what it returned. `pi-execution-tools.test.ts` drives them through `pi-agent-core`'s own loop.

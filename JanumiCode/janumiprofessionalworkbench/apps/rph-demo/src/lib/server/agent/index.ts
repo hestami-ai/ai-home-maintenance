@@ -1,6 +1,7 @@
 // The authoring-agent factory — the seam the SSE route calls. It builds the tool descriptors from the broker and
 // returns either the deterministic MockAuthoringAgent or the live Pi-backed agent. Pi is DYNAMIC-imported so the
-// mock path (and the whole gate) never loads it. Selection: the caller passes an explicit mode; the SSE route uses
+// mock path ~~(and the whole gate)~~ never loads it ⭐ (the gate loads Pi's coding agent in one test alone,
+// `tools/pi-executor.test.ts`: R3-C). Selection: the caller passes an explicit mode; the SSE route uses
 // 'mock' under E2E (RPH_DEMO_MODE=test) and 'pi' only when JPWB_AGENT=pi is set (Pi credentials configured).
 import type { PwaAuthoringBroker } from '@janumipwb/rph-authoring';
 import { buildAuthoringTools } from './tools.js';
@@ -21,7 +22,8 @@ export async function createAuthoringAgent(
 	const tools = buildAuthoringTools(broker, rationale);
 	if (mode === 'mock') return new MockAuthoringAgent(tools, rationale);
 
-	// Live path: load Pi lazily so its heavy Node deps never touch the mock/gate runtime.
+	// Live path: load Pi lazily so its heavy Node deps never touch the mock~~/gate~~ runtime ⭐ (the header names the one
+	// gate test that loads Pi's coding agent: R3-C).
 	const pwa = broker.getPwa();
 	const systemPrompt = buildSystemPrompt({
 		id: pwa?.id ?? '(unknown)',

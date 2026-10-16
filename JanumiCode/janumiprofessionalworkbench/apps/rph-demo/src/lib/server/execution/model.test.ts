@@ -251,9 +251,9 @@ describe('⭐ D4 — Pi is opened with the selection’s model, and only when th
 	});
 
 	it('⛔ pi-executor.ts reads the model it is HANDED — neither `executorModel` nor `JPWB_EXECUTOR_MODEL`', () => {
-		// ⭑ A SOURCE ASSERTION, BECAUSE THE ADAPTER CANNOT BE LOADED HERE: it imports Pi's SDK at module scope, which the
-		// gate never loads (`server-directory-containment.test.ts` gives the same reason for its own). A structural walk,
-		// never a grep, so its prose may still explain what it no longer does.
+		// ⭑ A SOURCE ASSERTION, BECAUSE THE ADAPTER CANNOT BE LOADED HERE: it imports Pi's SDK at module scope, which ~~the
+		// gate never loads~~ ⭐ this file does not load (`server-directory-containment.test.ts` gives the same reason for
+		// its own). A structural walk, never a grep, so its prose may still explain what it no longer does.
 		const reads = environmentModelReads(readSource('../tools/pi-executor.ts'));
 		expect(reads, 'pi-executor.ts reads the executor model itself').toEqual([]);
 		// …and it hands the label it was given to the resolver.

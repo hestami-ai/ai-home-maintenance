@@ -891,7 +891,7 @@ describe('⭐ D3 — the boot record', () => {
 		expect(Object.entries(kept).filter(([, v]) => v !== 'value')).toEqual([]);
 	});
 
-	it('⭐ the overlay is the four keys the config lays over the shell for its server — read from the config’s source', () => {
+	it('⭐ the overlay is the five keys the config lays over the shell for its server — ⭐ R3-C, PI_OFFLINE among them — read from the config’s source', () => {
 		const config = parsed(CONFIG);
 		const env = nodes(config, ts.isPropertyAssignment).find(
 			(p) =>
@@ -917,7 +917,8 @@ describe('⭐ D3 — the boot record', () => {
 			RPH_DEMO_MODE: 'server',
 			JPWB_HARNESS: null,
 			JPWB_SEED: null,
-			JPWB_DEMO_DB: 'D:/run/demo.sqlite'
+			JPWB_DEMO_DB: 'D:/run/demo.sqlite',
+			PI_OFFLINE: null
 		});
 	});
 

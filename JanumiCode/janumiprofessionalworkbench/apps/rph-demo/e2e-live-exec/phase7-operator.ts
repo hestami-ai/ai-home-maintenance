@@ -136,8 +136,18 @@ export function inheritedVariables(
 	);
 }
 
-/** What the config lays over the operator's shell for the server (`playwright.live-exec.config.ts`, `webServer.env`). */
-export const OVERLAY_KEYS = ['RPH_DEMO_MODE', 'JPWB_HARNESS', 'JPWB_SEED', 'JPWB_DEMO_DB'] as const;
+/**
+ * What the config lays over the operator's shell for the server (`playwright.live-exec.config.ts`, `webServer.env`).
+ * ⭐ R3-C — `PI_OFFLINE` among it (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114), so the
+ * boot records whether the config ran the server's Pi offline.
+ */
+export const OVERLAY_KEYS = [
+	'RPH_DEMO_MODE',
+	'JPWB_HARNESS',
+	'JPWB_SEED',
+	'JPWB_DEMO_DB',
+	'PI_OFFLINE'
+] as const;
 export type Overlay = Readonly<Record<(typeof OVERLAY_KEYS)[number], string | null>>;
 
 /** The overlay, read from the config's `webServer.env` as this worker loaded it; null where it sets nothing. */

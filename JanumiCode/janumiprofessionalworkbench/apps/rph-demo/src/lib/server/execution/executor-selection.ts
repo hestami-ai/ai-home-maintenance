@@ -232,8 +232,9 @@ function replaySelection(
  * resolvers' `trim` and throws there — as it does in `selectReviewer` — and is not coerced, because no caller can
  * produce one and the two selectors answer the same input the same way (`JAN-SELRES` RS-1's verification).
  *
- * ⚠ WHAT IT CANNOT SEE, DISCLOSED: whether Pi can RESOLVE the model it names. That needs Pi's SDK, which the gate never
- * loads, so an unresolvable Pi model is still refused when the executor opens — after dispatch (design D4).
+ * ⚠ WHAT IT CANNOT SEE, DISCLOSED: whether Pi can RESOLVE the model it names. That needs Pi's SDK, which ~~the gate never
+ * loads~~ ⭐ this module does not load, so an unresolvable Pi model is still refused when the executor opens — after
+ * dispatch (design D4).
  */
 export function selectExecutor(input: {
 	readonly testMode: boolean;
