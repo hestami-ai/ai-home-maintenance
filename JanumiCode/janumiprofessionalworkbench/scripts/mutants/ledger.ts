@@ -30162,5 +30162,41 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/phase7-half-b.test.ts"],
 		why: "PROMISE (R3-B F3; the lead's delegated decision of 2026-10-16, to be registered as REG-D-114): the type's required policies are read, by the unit's type, into the kernel's declared set. WHO RELIES: the count of a unit whose own list leaves out a policy its type requires. WHAT THE MUTATION DOES: the type contributes nothing. Applied by hand first, the file restored byte for byte: 'AssertionError: a policy only the type requires: expected 5 to be 6 // Object.is equality' ('Tests  1 failed | 98 passed (99)'). OBSERVED (bun run mutants -- (R3-B F3's ids), 2026-10-16, in the R3-B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R3B-M23-the-count-leaves-out-the-type-s-policies ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 7 completion programme, round 3, package R3-B, F3 - the run report's half-B count of expected declared verdicts is the kernel's declared set of each unit, its own policies and its type's, each once (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114)"
+	},
+	{
+		id: "R3B-M24-a-skipped-sign-off-reads-never-attempted",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "const skipped = skippedWhy(v);\n\t\treturn skipped === null ? otherwise : [skipped];",
+		replace: "return otherwise;",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE (R3-B F4; the lead's delegated decision of 2026-10-16, to be registered as REG-D-114): after the lane stops at a sign-off's limit check, every later sign-off it skips, the root's included, reads as not attempted BECAUSE the lane stopped at that unit's limit check - never as 'its sign-off was never attempted', the words of a run cut short. WHO RELIES: the reader of stage 7, and P7-5, which owes a run cut short a different account than a run the limit stopped. WHAT THE MUTATION DOES: a skipped sign-off reads 'its sign-off was never attempted', the code before the fix. Applied by hand first, the file restored byte for byte: 'AssertionError: expected 'its sign-off was never attempted' to be 'its sign-off was not attempted: the l…' // Object.is equality' (twice) and 'AssertionError: expected [ …(2) ] to deeply equal [ …(2) ]' - the reds the fix was built against, observed first at the unchanged code ('Tests  3 failed | 121 passed (124)'). OBSERVED (bun run mutants -- (R3-B F4's ids and the guards near its lines), 2026-10-16, in the R3-B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R3B-M24-a-skipped-sign-off-reads-never-attempted ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion programme, round 3, package R3-B, F4 - a sign-off the lane skipped after stopping at another unit's limit check, the root's included, reads as not attempted because the lane stopped there (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114)"
+	},
+	{
+		id: "R3B-M25-the-lane-s-stop-is-never-found",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "if (before !== null) stop = { slug: str(r.slug), before };",
+		replace: "void before;",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE (R3-B F4; the lead's delegated decision of 2026-10-16, to be registered as REG-D-114): the report finds the unit at whose limit check the lane stopped its sign-offs, the first in the lane's own order - the phases that did not stop, then the root - whose check held its act back. WHO RELIES: every later unit's stage 7. WHAT THE MUTATION DOES: no stop is ever found, so no skipped sign-off says why. Applied by hand first, the file restored byte for byte: 'AssertionError: expected 'its sign-off was never attempted' to be 'its sign-off was not attempted: the l…' // Object.is equality' (twice) and 'AssertionError: expected [ …(2) ] to deeply equal [ …(2) ]' ('Tests  3 failed | 121 passed (124)'). OBSERVED (bun run mutants -- (R3-B F4's ids and the guards near its lines), 2026-10-16, in the R3-B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R3B-M25-the-lane-s-stop-is-never-found ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion programme, round 3, package R3-B, F4 - a sign-off the lane skipped after stopping at another unit's limit check, the root's included, reads as not attempted because the lane stopped there (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114)"
+	},
+	{
+		id: "R3B-M26-a-stop-before-the-declared-re-run-is-not-read",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "return bool(rec(signOff.rerunLimitCheck).allowed) === false ? BEFORE_DECLARED_RERUN : null;",
+		replace: "return null;",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE (R3-B F4; the lead's delegated decision of 2026-10-16, to be registered as REG-D-114): the lane stops its sign-offs at the limit check before the rule's re-run of a unit's declared reviews too (E12F F2), and the later sign-offs say so. WHO RELIES: a run held back after a refused Record Assurance. WHAT THE MUTATION DOES: only a check before Record Assurance is read as the stop. Applied by hand first, the file restored byte for byte: 'AssertionError: expected 'its sign-off was never attempted' to be 'its sign-off was not attempted: the l…' // Object.is equality' ('Tests  1 failed | 123 passed (124)'). OBSERVED (bun run mutants -- (R3-B F4's ids and the guards near its lines), 2026-10-16, in the R3-B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R3B-M26-a-stop-before-the-declared-re-run-is-not-read ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion programme, round 3, package R3-B, F4 - a sign-off the lane skipped after stopping at another unit's limit check, the root's included, reads as not attempted because the lane stopped there (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114)"
+	},
+	{
+		id: "R3B-M27-the-root-s-line-says-nothing-of-the-skip",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "return why !== null && c.basis.includes(why) ? `${c.row}: ${c.value} — ${why}` : `${c.row}: ${c.value}`;",
+		replace: "return `${c.row}: ${c.value}`;",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE (R3-B F4; the lead's delegated decision of 2026-10-16, to be registered as REG-D-114): the root's skipped sign-off reads as not attempted because the lane stopped - and in half A the root has no row of its own, so its line in the whole run's stage 7 says why. WHO RELIES: the reader of the whole run's stage 7. WHAT THE MUTATION DOES: the line says 'root: not reached' and nothing more. Applied by hand first, the file restored byte for byte: 'AssertionError: the root’s sign-off, skipped, said nothing of why: expected [ 'root: not reached', …(5) ] to include 'root: not reached — its sign-off was …'' ('Tests  1 failed | 123 passed (124)'). OBSERVED (bun run mutants -- (R3-B F4's ids and the guards near its lines), 2026-10-16, in the R3-B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R3B-M27-the-root-s-line-says-nothing-of-the-skip ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion programme, round 3, package R3-B, F4 - a sign-off the lane skipped after stopping at another unit's limit check, the root's included, reads as not attempted because the lane stopped there (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114)"
 	}
 ];

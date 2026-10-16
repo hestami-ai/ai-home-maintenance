@@ -870,6 +870,12 @@ interface LaneUnit {
 	} | null;
 	/** ⭐ E12's polish (the same decision) — every read of the limit the lane recorded for the unit, in the order it made them. */
 	readonly limitChecks: readonly LaneLimitCheck[];
+	/**
+	 * ⭐ R3-B F4 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — WHERE THE LANE STOPPED, when it
+	 * skipped this unit's sign-off after stopping at ANOTHER unit's limit check: that unit's slug, and the act its check was
+	 * read before (`signOffsSkipped`). null when the lane did not skip it so.
+	 */
+	readonly signOffSkippedAt: { readonly slug: string; readonly before: string } | null;
 }
 
 /**
@@ -932,10 +938,39 @@ function signOffOutlasted(signOff: Record<string, unknown>): LaneUnit['signOffOu
 	return null;
 }
 
+/**
+ * ⭐ R3-B F4 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — THE SIGN-OFFS THE LANE SKIPPED AFTER
+ * IT STOPPED AT A LIMIT CHECK, each with where it stopped. The lane signs off the phases that did not stop, in order, then the
+ * root, the record's first unit; a sign-off whose limit check — before Record Assurance, or before the rule's re-run of the
+ * declared reviews — held its act back ends that loop (`runTheLane`, D8). So every unit after it in that order whose record
+ * holds no sign-off was skipped there. ⚠ A unit the record does not say stopped is taken to be in the order: one never
+ * pressed is read as never begun before its sign-off is (`completion`).
+ */
+function signOffsSkipped(rows: readonly Record<string, unknown>[]): Map<Record<string, unknown>, LaneUnit['signOffSkippedAt']> {
+	const heldBefore = (r: Record<string, unknown>): string | null => {
+		const signOff = rec(r.signOff);
+		if (bool(rec(signOff.limitCheck).allowed) === false) return BEFORE_RECORD_ASSURANCE;
+		return bool(rec(signOff.rerunLimitCheck).allowed) === false ? BEFORE_DECLARED_RERUN : null;
+	};
+	const skipped = new Map<Record<string, unknown>, LaneUnit['signOffSkippedAt']>();
+	let stop: LaneUnit['signOffSkippedAt'] = null;
+	for (const r of [...rows.slice(1).filter((x) => bool(x.stopped) !== true), ...rows.slice(0, 1)]) {
+		if (stop !== null) {
+			if (r.signOff === null || r.signOff === undefined) skipped.set(r, stop);
+			continue;
+		}
+		const before = heldBefore(r);
+		if (before !== null) stop = { slug: str(r.slug), before };
+	}
+	return skipped;
+}
+
 function laneUnits(run: unknown): LaneUnit[] {
 	const units = rec(run).units;
-	return (Array.isArray(units) ? (units as unknown[]) : []).map((u) => {
-		const r = rec(u);
+	const rows = (Array.isArray(units) ? (units as unknown[]) : []).map(rec);
+	// ⭐ R3-B F4 — where the lane stopped its sign-offs, for each unit it skipped after.
+	const skipped = signOffsSkipped(rows);
+	return rows.map((r) => {
 		const pressed = r.beginExecute !== null && r.beginExecute !== undefined;
 		const be = rec(r.beginExecute);
 		const signOff = rec(r.signOff);
@@ -962,7 +997,8 @@ function laneUnits(run: unknown): LaneUnit[] {
 				(x) => int(rec(x).timedOutAfterMs) !== null
 			),
 			signOffHeldBack: heldBackOf(str(r.slug), signOff),
-			limitChecks: limitChecksOf(str(r.slug), r, signOff)
+			limitChecks: limitChecksOf(str(r.slug), r, signOff),
+			signOffSkippedAt: skipped.get(r) ?? null
 		};
 	});
 }
@@ -2339,14 +2375,31 @@ const limitFigures = (c: LaneLimitCheck): string =>
  * UNIT'S SIGN-OFF, as stage 7 says it: before which act, why in the lane's own words, and the limit it read; else `otherwise`.
  * ⛔ A sign-off held back before Record Assurance read "its sign-off was never attempted", the words a run cut short reads, and
  * a declared re-run held back beside a refused Record Assurance left the limit's part said nowhere.
+ * ⭐ R3-B F4 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — AND A SIGN-OFF THE LANE SKIPPED after
+ * stopping at another unit's limit check says where it stopped (`skippedWhy`), never `otherwise`. ⛔ Each such unit read "its
+ * sign-off was never attempted", the root's included.
  */
 function heldBackOr(v: UnitView, ...otherwise: string[]): string[] {
 	const h = v.heldBack;
-	if (h === null) return otherwise;
+	if (h === null) {
+		const skipped = skippedWhy(v);
+		return skipped === null ? otherwise : [skipped];
+	}
 	return [
 		`its sign-off was held back before ${h.before}: ${h.reason}`,
 		...(h.check === null ? [] : [`the limit as the lane read it: ${limitFigures(h.check)}`])
 	];
+}
+
+/**
+ * ⭐ R3-B F4 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — WHY THE LANE DID NOT ATTEMPT A SIGN-OFF
+ * IT SKIPPED after stopping at another unit's limit check (`LaneUnit.signOffSkippedAt`): that unit, and the act its check was
+ * read before; null for a unit it did not skip so.
+ */
+function skippedWhy(v: UnitView): string | null {
+	const at = v.unit.lane?.signOffSkippedAt ?? null;
+	if (at === null) return null;
+	return `its sign-off was not attempted: the lane stopped at the ${at.slug} unit’s limit check, before ${at.before}, and pressed no sign-off after it (D8)`;
 }
 
 /**
@@ -2913,13 +2966,22 @@ function stageSevenWhole(views: readonly UnitView[]): MatrixCell {
 	let value: CellValue = 'as intended';
 	if (broke.length > 0) value = 'broke';
 	else if (perUnit.some((c) => c.value === 'not reached')) value = 'not reached';
+	/**
+	 * ⭐ R3-B F4 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — a unit whose sign-off the lane
+	 * skipped, and whose cell reads it so, says why on its line: the root has no row of its own in half A, and its line was all
+	 * a reader had of its skipped sign-off.
+	 */
+	const lineOf = (c: MatrixCell, v: UnitView): string => {
+		const why = skippedWhy(v);
+		return why !== null && c.basis.includes(why) ? `${c.row}: ${c.value} — ${why}` : `${c.row}: ${c.value}`;
+	};
 	return cell(
 		'7',
 		WHOLE_RUN,
 		value,
 		broke.flatMap((c) => c.registerIds),
 		[
-			...perUnit.map((c) => `${c.row}: ${c.value}`),
+			...perUnit.map((c, i) => lineOf(c, views[i]!)),
 			'measured as every unit, the root included, SATISFIED in lifecycle and assurance, its plan step SUCCEEDED: an ' +
 				'Undertaking has no completion state (REG-F-533)'
 		],

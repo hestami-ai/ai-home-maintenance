@@ -1993,8 +1993,46 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 				'the limit as the lane read it: 210 + 4 + 4 + 16 ahead = 234 of 230, past it'
 			]
 		]);
-		// ⭑ CONTROL — a unit the lane never reached, the run stopped at design: never attempted, as before.
-		expect(cellOf(r, '7', 'implementation').basis.at(-1)).toBe('its sign-off was never attempted');
+		// ~~⭑ CONTROL — a unit the lane never reached, the run stopped at design: never attempted, as before.~~ ⛔ R3-B F4 (the
+		// lead's delegated decision of 2026-10-16, to be registered as REG-D-114): a sign-off the lane skipped after it stopped at
+		// design's limit check is not attempted BECAUSE it stopped there — the next test's.
+		expect(cellOf(r, '7', 'implementation').basis.at(-1)).toBe(
+			'its sign-off was not attempted: the lane stopped at the design unit’s limit check, before Record Assurance, and pressed no sign-off after it (D8)'
+		);
+	});
+
+	// ── ⛔ R3-B F4 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — A SIGN-OFF THE LANE SKIPPED AFTER IT
+	// STOPPED AT A UNIT'S LIMIT CHECK reads as not attempted because the lane stopped there: the lane signs off the phases that
+	// completed, in order, then the root, and a limit check that holds a sign-off back ends that loop (`runTheLane`, D8).
+	it('⛔ R3-B F4 — every later sign-off the lane skipped after stopping at a unit’s limit check, the root’s included, reads as not attempted because the lane stopped there — never as one never attempted', () => {
+		// ⛔ PREDICTED RED, read from the code: "its sign-off was never attempted", the words a run cut short reads, for each unit
+		// after the one whose check held back; and the root's line in the whole run's stage 7 said only "not reached".
+		const r = heldAtDesign({ offered: true, limitCheck: read(210, 4, 16), ...unpressed, notPressed: OVER });
+		const why =
+			'its sign-off was not attempted: the lane stopped at the design unit’s limit check, before Record Assurance, and pressed no sign-off after it (D8)';
+		expect([cellOf(r, '7', 'implementation').basis.at(-1), cellOf(r, '7', 'end-to-end').basis.at(-1)]).toEqual([why, why]);
+		expect(cellOf(r, '7', 'whole run').basis, 'the root’s sign-off, skipped, said nothing of why').toContain(`root: not reached — ${why}`);
+		// ⭑ CONTROL — a unit BEFORE the stop whose record holds no sign-off is not said to have been skipped by it.
+		expect(cellOf(r, '7', 'requirements').basis.at(-1)).toBe('its sign-off was never attempted');
+	});
+
+	it('⛔ R3-B F4 — and after the lane stopped at the limit check before the rule’s re-run of a unit’s declared reviews, the later sign-offs say that', () => {
+		// ⛔ PREDICTED RED, read from the code: "its sign-off was never attempted".
+		const r = heldAtDesign(
+			{
+				offered: true,
+				limitCheck: read(206, 0, 16),
+				...unpressed,
+				recordAssurance: { status: 200, envelopeType: 'failure', timedOutAfterMs: null, requestFailure: null, refusal: 'not concluded', after: null },
+				rerunLimitCheck: read(206, 12, 16),
+				refused: { act: 'Record Assurance', reason: 'not concluded' },
+				notPressed: "the limit: 238 of 230 reviewer calls, the sign-off's own 16 counted (D8; E12F F2)"
+			},
+			{ lifecycle: 'UNDER_ASSURANCE', execution: 'SUCCEEDED', assurance: 'ASSESSING' }
+		);
+		expect(cellOf(r, '7', 'implementation').basis.at(-1)).toBe(
+			'its sign-off was not attempted: the lane stopped at the design unit’s limit check, before the rule’s re-run of its declared reviews, and pressed no sign-off after it (D8)'
+		);
 	});
 
 	it('⛔ E12’s polish (fix2’s F8) — stage 7: the rule’s re-run of the declared reviews the limit held back is said beside the refused Record Assurance — broke, as before, the hold named', () => {
