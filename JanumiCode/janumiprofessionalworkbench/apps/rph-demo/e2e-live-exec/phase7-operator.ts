@@ -485,10 +485,13 @@ export type RerunReading = 'recovered' | 'refused-again' | 'not-made' | 'stopped
 
 /**
  * ⭑ `request-failed` — ~~a Begin & Execute whose request failed in transit (round 2's fix pass; `pressFormAction`)~~ ⭐ E12's
- * polish (the confirm's EndReason finding) — ANY ACT THE LANE PRESSES whose request failed in transit, and ⭑
+ * polish (the confirm's EndReason finding) — ~~ANY ACT THE LANE PRESSES~~ ⭐ E12's polish (fix3's F2): ANY ACT THE LANE
+ * PRESSES THROUGH `pressFormAction`, each a form action of the Undertaking page, whose request failed in transit, and ⭑
  * `allowance-exceeded`, any that gave no answer within its bound: both are `unansweredEnd`'s, for a Begin & Execute (round 2's
  * fix pass; `pressFormAction`), a recovery act the rule pressed (P7-6R R-1f), and a sign-off act — Record Assurance, the rule's
- * re-run of the declared reviews, Mark Satisfied (E12's re-review F1) — and a throw after one keeps its reason.
+ * re-run of the declared reviews, Mark Satisfied (E12's re-review F1) — and a throw after one keeps its reason. ⚠ The
+ * set-up's presses (`setUp`) are plain clicks, not pressed through `pressFormAction`: a request of theirs that fails in
+ * transit never ends a run `request-failed`.
  */
 export type EndReason =
 	| 'complete'
@@ -1128,8 +1131,9 @@ export interface RunEnd {
 /**
  * ⛔ D4 — a Begin & Execute with NO ANSWER ends the run there, in either kind: it outlasted its allowance, or its
  * request failed in transit. Either way the server may still be running the unit, so the next is never started beside
- * it (`REG-F-535`, `REG-F-527`). Null for a press that was answered, whatever it said. ⭐ So does any other act the lane
- * presses with no answer, named by `act`: a recovery act the rule presses, and ⭐ E12's re-review F1 — a sign-off act.
+ * it (`REG-F-535`, `REG-F-527`). Null for a press that was answered, whatever it said. ⭐ So does ~~any other act the lane
+ * presses with no answer~~ ⭐ E12's polish (fix3's F2): any other act the lane presses through `pressFormAction` with no
+ * answer, named by `act`: a recovery act the rule presses, and ⭐ E12's re-review F1 — a sign-off act.
  */
 export function unansweredEnd(
 	title: string,
@@ -1536,8 +1540,8 @@ export async function runTheLane(r: {
 		/**
 		 * Mark Satisfied, after an ACCEPTED Record Assurance or an accepted re-run of the declared reviews — ⭐ E12's polish —
 		 * `before`, the sign-off as it then stands, keeping the act before the store is read (`actOf`). ⛔ E12's re-review F1 —
-		 * with no answer it ends the run, as every act the lane presses does (D4); the end is set before the store is read, so a
-		 * read that fails keeps it.
+		 * with no answer it ends the run, as ~~every act the lane presses~~ ⭐ E12's polish (fix3's F2): every act the lane presses
+		 * through `pressFormAction` does (D4); the end is set before the store is read, so a read that fails keeps it.
 		 */
 		const satisfy = async (
 			unit: RunUnit,

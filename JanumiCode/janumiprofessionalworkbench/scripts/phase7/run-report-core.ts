@@ -2769,8 +2769,10 @@ export function buildRunReport(
 			reviews: declared.filter((d) => d.unit === u.slug && d.validatorId === DECLARED_REVIEW_VALIDATORS[0]).length
 		}));
 	const endReason = str(rec(rec(lane.run).end).reason) || null;
-	// ⛔ D4 — every act the lane presses ends the run when it outlasts its bound: a Begin & Execute, ⭐ E12's re-review F1 —
-	// a recovery act the rule pressed, and a sign-off act. So the end names one of them.
+	// ⛔ D4 — ~~every act the lane presses ends the run when it outlasts its bound~~ ⭐ E12's polish (fix3's F2): every act
+	// the lane presses through `pressFormAction` (`phase7-operator.ts`) ends the run `allowance-exceeded` when it outlasts
+	// its bound: a Begin & Execute, ⭐ E12's re-review F1 — a recovery act the rule pressed, and a sign-off act. So that end
+	// names one of them.
 	const outlasted = (v: UnitView): boolean =>
 		v.timedOut !== null || v.signOffOutlasted !== null || v.unit.lane?.recoveryOutlasted === true;
 	if (endReason === 'allowance-exceeded' && !views.some(outlasted))
