@@ -923,7 +923,8 @@ interface LaneUnit {
 
 /**
  * ⭐ E12's polish (fix2's F8) — ONE READ OF THE LIMIT THE LANE RECORDED BEFORE A PAID ACT (D8; `E12F` F2): prior + recorded +
- * reserve + the act's own worst case (`ahead`, 0 where it counted none), and whether the lane let the act through
+ * reserve + ~~the act's own worst case~~ ⭐ what the act counts (`ahead`, 0 where it counted none; `REG-D-114` (14), as
+ * amended 2026-10-16), and whether the lane let the act through
  * (`allowed`) or held it back. ⛔ The merge's fix round, F2 — ~~BY ONE OF TWO RULES (`phase7-operator.ts`): `limitCheck`, before a
  * phase, a re-run of one, a sign-off or a re-run of its declared reviews, lets an act through only with the total UNDER the
  * limit; `limitCheckAhead`, before half B's Send and before half B's root's press, lets it through AT the limit too.~~

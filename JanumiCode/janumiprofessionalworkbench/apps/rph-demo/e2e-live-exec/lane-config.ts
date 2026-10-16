@@ -589,8 +589,10 @@ export const PHASE7_TEST_TIMEOUT_MS =
  * makes (`REG-D-105` (4)) ⭐ — and, on the completion programme's main line (E12 and E3 merged), before every other act
  * the lane presses that spends it, that act's own worst case counted: before each sign-off and before the rule's re-run
  * of a unit's declared reviews (`E12F` F2; `signOffWorstCase`), and in half B before Send, the authoring floor's
- * (`REG-D-112`, E3's review finding 2; `PHASE7_AUTHORING_REVIEWER_CALLS`), and, paid, before the root's press, a MODEL
- * root's (`rootLimitCheck`; `PHASE7_UNIT_REVIEWER_CALLS`). ~~⚠ Two rules, as each package built its own: before a phase, a
+ * (`REG-D-112`, E3's review finding 2; `PHASE7_AUTHORING_REVIEWER_CALLS`), and, paid, before the root's press, ~~a MODEL
+ * root's (`rootLimitCheck`; `PHASE7_UNIT_REVIEWER_CALLS`)~~ ⭐ not its worst case: a MODEL root's one try's reserve, and
+ * none for a root that runs no model (`rootLimitCheck`; `PHASE7_TRY_RESERVE`; `REG-D-114` (14), as amended 2026-10-16).
+ * ~~⚠ Two rules, as each package built its own: before a phase, a
  * re-run of one and a sign-off the total must be UNDER the limit (`limitCheck`); before Send and the root's press it may
  * reach it (`limitCheckAhead`).~~ ⭐ ONE RULE for every check (the lead's delegated decision of 2026-10-16, registered
  * as REG-D-114 (14)): the lane may REACH the limit and never pass it by what it counts — the calls spent, those held back and
