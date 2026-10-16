@@ -583,4 +583,31 @@ describe('⭐ the floor registry’s REPLAY arm (D2)', () => {
 		expect(answer.failure ?? '', 'a declared review asked in another framing was answered').toContain('REPLAY_STALE');
 		expect(replayRunFor(dir).consumed().reviewer).toBe(0);
 	});
+
+	// ⛔ RED BEFORE R3-A F2 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114): under the replay a declared
+	// review answered as `reviewer.declared-policy`, the LIVE reviewer's id, so the verdict the sign-off records from it read as a
+	// live one — where the floor's replayed review is recorded under an id of its own ((viii)).
+	it('(xiv) ⭐ R3-A F2 — a REPLAYED declared review is marked as one: the declared reviewer, and every answer it gives — served or thrown — carries the replay’s own validator id, never the live reviewer’s', async () => {
+		const prompt = await promptOf({ reasoningReview: declaredInput() }, DECLARED_SUBJECT);
+		replayingOver(
+			[
+				call(prompt, { status: 'ANSWERED', text: clearingJudgement(DECLARED_CRITERIA) }, 5, { framing: 'declared-policy' }),
+				call(prompt, { status: 'THROWN', message: TRANSPORT }, BOUND, { framing: 'declared-policy' })
+			],
+			'jpwb-replay-declared-id-'
+		);
+		const reviewer = createDeclaredPolicyReviewer({ testMode: true });
+		expect(reviewer.validatorId, 'the declared reviewer under the replay').toBe('replay.declared-policy');
+		const served = await reviewer.review(DECLARED_SUBJECT, declaredInput());
+		const thrown = await reviewer.review(DECLARED_SUBJECT, declaredInput());
+		expect([served.failure, served.validatorId], 'a replayed answer was recorded as the live reviewer’s').toEqual([
+			undefined,
+			'replay.declared-policy'
+		]);
+		expect([thrown.failure?.includes(TRANSPORT), thrown.validatorId], 'a replayed throw was recorded as the live reviewer’s').toEqual([
+			true,
+			'replay.declared-policy'
+		]);
+		expect(replayRunFor(dir).consumed().reviewer, 'both reviews were served from the recording').toBe(2);
+	});
 });

@@ -44,6 +44,12 @@ import {
 
 /** The validator id a model-judged declared review is recorded under — never `agy.reasoning-review`, a FLOOR validator. */
 export const DECLARED_REVIEW_VALIDATOR_ID = 'reviewer.declared-policy';
+/**
+ * ⭐ R3-A F2 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — the id a REPLAYED declared review
+ * is recorded under: never the live reviewer's, since no reviewer ran — as the floor's replayed review is recorded under
+ * `replay.reasoning-review` (`assurance/index.ts`, `REPLAY_REVIEWER_ID`).
+ */
+export const REPLAY_DECLARED_REVIEW_VALIDATOR_ID = 'replay.declared-policy';
 /** The declared stand-in's id (test mode only) — distinct from the floor's `standin.reasoning-review`. */
 export const STANDIN_DECLARED_REVIEW_VALIDATOR_ID = 'standin.declared-policy-review';
 /** The id a refused reviewer selection is recorded under: nothing reviewed. */
@@ -117,22 +123,20 @@ const NOT_A_DECLARED_REVIEW =
  *
  * ⚠ `configured` is who answers a call that THREW: such a call reported no identity, so the record carries the identity
  * the host configured, ungraded — the validator's own rule for its thrown calls (`TryReport`).
+ * ⭐ R3-A F2 — `validatorId` is the id this reviewer and every answer it gives are recorded under: the live reviewer's, or,
+ * under the replay, the replay's own (`REPLAY_DECLARED_REVIEW_VALIDATOR_ID`; `createDeclaredPolicyReviewer` chooses).
  */
 export function createModelDeclaredPolicyReviewer(
 	validator: Validator,
-	configured: () => Identity
+	configured: () => Identity,
+	validatorId: string = DECLARED_REVIEW_VALIDATOR_ID
 ): DeclaredPolicyReviewer {
 	return {
-		validatorId: DECLARED_REVIEW_VALIDATOR_ID,
+		validatorId,
 		async review(subject, input) {
 			const policyId = policyIdOf(input);
 			if (policyId === undefined)
-				return failedAnswer(
-					input.declaredPolicy?.policyId ?? '',
-					DECLARED_REVIEW_VALIDATOR_ID,
-					configured(),
-					NOT_A_DECLARED_REVIEW
-				);
+				return failedAnswer(input.declaredPolicy?.policyId ?? '', validatorId, configured(), NOT_A_DECLARED_REVIEW);
 			try {
 				const r = await validator.evaluate(subject, { reasoningReview: input });
 				// ⭑ The rows and the observations are the POLICY's — `input.criteria` rendered the rubric and scored the reply
@@ -140,7 +144,7 @@ export function createModelDeclaredPolicyReviewer(
 				// read away here.
 				return {
 					policyId,
-					validatorId: DECLARED_REVIEW_VALIDATOR_ID,
+					validatorId,
 					evaluator: r.evaluator,
 					criteria: r.criteria,
 					observations: r.observations,
@@ -150,12 +154,7 @@ export function createModelDeclaredPolicyReviewer(
 				};
 			} catch (e) {
 				// ⛔ ANSWERED, NOT THROWN — the validator's own sanitised statement (its seam sanitises every throw).
-				return failedAnswer(
-					policyId,
-					DECLARED_REVIEW_VALIDATOR_ID,
-					configured(),
-					e instanceof Error ? e.message : String(e)
-				);
+				return failedAnswer(policyId, validatorId, configured(), e instanceof Error ? e.message : String(e));
 			}
 		}
 	};

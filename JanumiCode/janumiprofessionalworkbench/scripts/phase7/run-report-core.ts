@@ -81,16 +81,25 @@ export const DEMO_FINDING_CODE = 'DEMO_UNFIT';
  *  `DEMO_REVIEW_VALIDATOR_ID`): a record made before the declared policies were judged carries it, and reads vacuous. */
 export const DECLARED_SIGNOFF_VALIDATOR = 'workbench.independent-review';
 /**
+ * ⭐ R3-A F2 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — the id a REPLAYED declared verdict
+ * is recorded under (`declared-policy-review.ts` `REPLAY_DECLARED_REVIEW_VALIDATOR_ID`), as the floor's replayed review has one
+ * of its own: a declared verdict, and never one the model reviewer made in the run the report reads.
+ */
+export const REPLAYED_DECLARED_REVIEW_VALIDATOR = 'replay.declared-policy';
+/**
  * ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (`REG-F-523`; `REG-D-110` (3)) — THE VALIDATORS A DECLARED VERDICT IS RECORDED UNDER
  * NOW: the model reviewer, the gate lane's stand-in, a refused selection, and a policy nobody reviewed
- * (`declared-policy-review.ts`, `declared-policy-signoff.ts`). ⛔ RESTATED, NOT IMPORTED: those modules load the reviewer's
- * chain, which reads tool variables at load (`REG-D-072` D12); `verif/phase7-run-report.test.ts` holds each to its source.
+ * (`declared-policy-review.ts`, `declared-policy-signoff.ts`) — ⭐ R3-A F2: and a replay of the model reviewer's.
+ * ⛔ RESTATED, NOT IMPORTED: those modules load the reviewer's chain, which reads tool variables at load (`REG-D-072` D12);
+ * `verif/phase7-run-report.test.ts` holds each to its source. ⚠ The first is the LIVE model reviewer's, the one the
+ * UNIT_PURPOSE caveat counts as the model reviewer's reviews (`unitPurposeCaveat`); a replayed one is never counted with it.
  */
 export const DECLARED_REVIEW_VALIDATORS = [
 	'reviewer.declared-policy',
 	'standin.declared-policy-review',
 	'declared-policy-review.unconfigured',
-	'declared-policy-review.missing'
+	'declared-policy-review.missing',
+	REPLAYED_DECLARED_REVIEW_VALIDATOR
 ] as const;
 /** Begin & Execute's root completion (`undertakings/[id]/+page.server.ts`, the TRANSFORMATION path's detail). */
 export const ROOT_COMPLETION_DETAIL =
@@ -173,15 +182,18 @@ export function uncheckedCaveat(declared: readonly { readonly criterionResults: 
  * case measures that framing: every declared case of case set v5 is in the PRODUCING_PROMPT framing
  * (`scripts/reviewer-qual/materialize.ts`). So the line names each such unit and the reviews the model reviewer made of it,
  * among the verdicts that speak; it is absent where there are none — a root signed off before E2, or never. No case set
- * changes.
+ * changes. ⭐ R3-A F2 — and the reviews a REPLAY served it (`replayed`), named as replayed: they stand on the same framing,
+ * and are never counted among the model reviewer's.
  */
 export function unitPurposeCaveat(
-	composites: readonly { readonly unit: string; readonly reviews: number }[]
+	composites: readonly { readonly unit: string; readonly reviews: number; readonly replayed: number }[]
 ): readonly string[] {
-	const made = composites.filter((c) => c.reviews > 0);
+	const made = composites.filter((c) => c.reviews > 0 || c.replayed > 0);
 	if (made.length === 0) return [];
+	const counted = (c: (typeof made)[number]): string =>
+		[...(c.reviews > 0 ? [`${c.reviews}`] : []), ...(c.replayed > 0 ? [`${c.replayed} replayed`] : [])].join(' and ');
 	return [
-		`UNIT_PURPOSE framing: the declared reviews of a unit composed of others (${made.map((c) => `${c.unit}: ${c.reviews}`).join('; ')}) ` +
+		`UNIT_PURPOSE framing: the declared reviews of a unit composed of others (${made.map((c) => `${c.unit}: ${counted(c)}`).join('; ')}) ` +
 			'were made in it — the unit’s own purpose, judged over the work it and every unit below it produced (REG-D-111 (2)) — and ' +
 			'no reviewer-qualification case measures it: every declared case of case set v5 is in the PRODUCING_PROMPT framing.'
 	];
@@ -3271,13 +3283,15 @@ export function buildRunReport(
 		problems.push('lane/boot.json names no JPWB_DEMO_DB: no recorded path can be made relative to the workspace');
 	const workspace = demoDb === '' || undertakingId === null ? null : workspaceDirectoryFor(demoDb, undertakingId);
 	const views = units.map((u) => unitView(ix, u, units, lane, pairing, declared, history));
-	// ⭐ E12's polish (fix2's F10) — each unit composed of others, and the verdicts that speak the model reviewer made of it.
+	// ⭐ E12's polish (fix2's F10) — each unit composed of others, and the verdicts that speak the model reviewer made of it;
+	// ⭐ R3-A F2 — and, apart from them, those a replay served it.
 	const parents = new Set(ix.ofType('PROFESSIONAL_WORK_UNIT').map((p) => str(p.state.parentWorkUnitId)));
 	const composites = units
 		.filter((u) => u.object !== null && parents.has(u.object.id))
 		.map((u) => ({
 			unit: u.slug,
-			reviews: declared.filter((d) => d.unit === u.slug && d.validatorId === DECLARED_REVIEW_VALIDATORS[0]).length
+			reviews: declared.filter((d) => d.unit === u.slug && d.validatorId === DECLARED_REVIEW_VALIDATORS[0]).length,
+			replayed: declared.filter((d) => d.unit === u.slug && d.validatorId === REPLAYED_DECLARED_REVIEW_VALIDATOR).length
 		}));
 	const endReason = str(rec(rec(lane.run).end).reason) || null;
 	// ⛔ D4 — ~~every act the lane presses ends the run when it outlasts its bound~~ ⭐ E12's polish (fix3's F2): every act

@@ -146,9 +146,9 @@ export interface DeclaredSignoff {
  */
 
 /** ~~`validatorId` for the demo's independent review~~ — ⛔ E2: a verdict is recorded under its REVIEWER's id now
- *  (`DeclaredPolicyAnswer.validatorId`: `reviewer.declared-policy`, or the stand-in's), so this one names no record made
- *  after E2. ⚠ Kept, exported, because records made before E2 carry it and a reader of them keys on it
- *  (`scripts/phase7/run-report-core.ts`). */
+ *  (`DeclaredPolicyAnswer.validatorId`: `reviewer.declared-policy`, or the stand-in's — ⭐ R3-A F2: or, replayed,
+ *  `replay.declared-policy`), so this one names no record made after E2. ⚠ Kept, exported, because records made before E2
+ *  carry it and a reader of them keys on it (`scripts/phase7/run-report-core.ts`). */
 export const DEMO_REVIEW_VALIDATOR_ID = 'workbench.independent-review';
 
 /**
