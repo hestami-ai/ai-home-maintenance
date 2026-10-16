@@ -2467,8 +2467,10 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 	});
 
 	it('⭐ ONE RULE — before a phase it counts the phase’s first call: a phase is pressed with that call reaching the limit exactly, and the next, with none left, is not', async () => {
-		// ⭑ A PIN, not a red: before the one rule the phase's check let a phase through UNDER the limit, counting nothing of it —
-		// the same phases pressed. What the record now says is what is counted: the phase's first call, never its worst case.
+		// ⭑ A PIN OF THE DECISION, not of the record: before the one rule the phase's check let a phase through UNDER the limit,
+		// counting nothing of it — the same phases pressed. What the record now says is what is counted: the phase's first
+		// call, never its worst case. Against the base's operator this test fails on the record alone (no `ahead`, a total one
+		// less): 'AssertionError: expected [ …(2) ] to deeply equal [ …(2) ]'.
 		const prior = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - PHASE7_PHASE_FIRST_CALL;
 		const l = laneOf({
 			paid: true,
@@ -2486,8 +2488,10 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 	});
 
 	it('⭐ ONE RULE — before the rule’s re-run of a stopped phase it counts the re-run’s first call: one reaching the limit exactly is pressed', async () => {
-		// ⭑ A PIN, beside `AT THE LIMIT a stopped phase is NOT re-run`, one call further: with its first call the total is the
-		// limit itself, and the re-run is pressed.
+		// ⭑ A PIN OF THE DECISION, beside `AT THE LIMIT a stopped phase is NOT re-run`, one call further: with its first call
+		// the total is the limit itself, and the re-run is pressed. Against the base's operator the re-run is pressed too, and
+		// this test fails on the record alone (no `ahead`, a total one less): 'AssertionError: expected { prior: 443,
+		// recorded: 2, …(4) } to deeply equal { prior: 443, recorded: 2, …(5) }'.
 		const prior = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - 2 - PHASE7_PHASE_FIRST_CALL;
 		const l = laneOf({
 			paid: true,
