@@ -393,6 +393,17 @@ function citedRationale(reviewer: ActorReference, row: FloorCriterion): string {
 export const noCriterionDeclared = (policyId: string): string =>
 	`${policyId} declares no criterion, so nothing was checked: its verdict is INCONCLUSIVE, never SATISFIED.`;
 
+/**
+ * ⛔ The merge's fix round, F1 — WHY A UNIT COMPOSED OF OTHERS IS ASKED NO DECLARED REVIEW: its declared policies are judged
+ * over its CHILDREN's work (`REG-D-111` (2)), and no child's work holds a work product or a command — a child composed of
+ * others contributes none of its own, and a child that has not completed contributes nothing — so a review would be shown
+ * nothing to judge. The route refuses it before any review is asked, as it refuses a work product the record cannot rebuild
+ * (RD7).
+ */
+export const nothingToJudge = (title: string): string =>
+	`${title} is judged over its children's work (REG-D-111 (2)), and no child's work holds a work product or a command: ` +
+	'a review would be shown nothing to judge, so none is asked for';
+
 /** ⭐ E2 — what a governing policy that was never reviewed is answered with: nothing, and why. ⛔ Never a pass. */
 const unreviewed = (policyId: string): DeclaredPolicyAnswer => ({
 	policyId,

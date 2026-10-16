@@ -96,7 +96,13 @@ import { actionEvent, beginExecute } from '../execution/begin-execute.testing.js
 import { dispatch, getEngine, mintUiId, resetEngine } from '../workbench.js';
 import { noProgramsDirectory } from './no-programs.testing.js';
 import { DECLARED_PRODUCING_PROMPT_INTENT, DECLARED_UNIT_PURPOSE_INTENT } from './reasoning-review-validator.js';
-import { declaredRerunOffer, NEVER_ASSESSED, RERUN_DECLARED_REVIEWS, STALE_VERSION } from './declared-policy-signoff.js';
+import {
+	declaredRerunOffer,
+	NEVER_ASSESSED,
+	nothingToJudge,
+	RERUN_DECLARED_REVIEWS,
+	STALE_VERSION
+} from './declared-policy-signoff.js';
 import {
 	DECLARED_RERUN_RATIONALE_REQUIRED,
 	RERUN_DECLARED_REVIEWS_CITATION
@@ -630,5 +636,111 @@ ${RERUN_DECLARED_REVIEWS_CITATION}`);
 		const laneIds = [...new Set([...operator.matchAll(/getByTestId\('(rerun-declared-[a-z-]+)'\)/g)].map((m) => m[1]!))];
 		expect(laneIds, 'arrangement: the lane presses the form by its field and its button').toHaveLength(2);
 		for (const id of laneIds) expect(formMarkup, `the lane presses ${id}, which the form does not carry`).toContain(`data-testid="${id}"`);
+	});
+});
+
+// ── ⛔ THE MERGE'S FIX ROUND, F1 — A UNIT COMPOSED OF OTHERS WHOSE CHILDREN'S WORK HOLDS NOTHING TO JUDGE ────────────────────
+//
+// A unit composed of others is judged over its CHILDREN's work (`REG-D-111` (2)), a rule written for §3.2's two levels. Half B
+// lets the agent publish a tree of any depth, and a child composed of others contributes no work of its own: its
+// TRANSFORMATION completes with none. So the root of a three-level tree had its declared reviews asked over no work product
+// and no command — a paid review per policy, each verdict recorded over work no reviewer was shown.
+
+/**
+ * A root over ONE unit composed of others, over ONE model unit — three levels, as half B's shared tree has
+ * (`verif/phase7-half-b.test.ts`) — each declaring a policy, published and instantiated: the leaf `pol_requirement_coverage`, the two above it
+ * `pol_intent_preservation`; the root and the middle HUMAN, each a TRANSFORMATION that produces nothing.
+ */
+async function threeLevelTree(): Promise<{ readonly root: string; readonly middle: string; readonly leaf: string }> {
+	const pwaId = mintUiId('pwa');
+	const leafType = mintUiId('pwut');
+	const middleType = mintUiId('pwut');
+	const rootType = mintUiId('pwut');
+	const composite = (typeId: string, childType: string, name: string, pwuKind: string, purpose: string, isRoot: boolean) => ({
+		pwuTypeId: typeId,
+		pwaId,
+		pwuKind,
+		name,
+		purpose,
+		isRoot,
+		permittedChildTypeIds: [childType],
+		permittedChildren: [{ typeId: childType, cardinality: 'M1' }],
+		requiredInputs: [],
+		requiredOutputs: [],
+		requiredAssurancePolicyIds: [IP],
+		workDischarge: 'HUMAN'
+	});
+	const steps: readonly [string, string, string, Record<string, unknown>][] = [
+		['CreatePwa', 'PROFESSIONAL_WORK_ARCHITECTURE', pwaId, { pwaId, name: 'Three-level PWA', description: 'd', domain: 'software', version: '0.1.0' }],
+		[
+			'DefinePwuType',
+			'PWU_TYPE',
+			leafType,
+			{
+				pwuTypeId: leafType,
+				pwaId,
+				pwuKind: 'REQUIREMENT_DEFINITION',
+				name: 'Requirements',
+				purpose: 'Write the requirements',
+				isRoot: false,
+				permittedChildTypeIds: [],
+				requiredInputs: [],
+				requiredOutputs: [],
+				requiredAssurancePolicyIds: [POLICY],
+				workDischarge: 'MODEL',
+				promptTemplate: {
+					templateText: 'Write the requirements of {subject}.',
+					templateVersion: 1,
+					declaredPlaceholders: ['subject'],
+					status: 'ACTIVE'
+				}
+			}
+		],
+		['DefinePwuType', 'PWU_TYPE', middleType, composite(middleType, leafType, 'Architecture', 'ARCHITECTURE_DEFINITION', 'Define the architecture, through the requirements beneath it.', false)],
+		['DefinePwuType', 'PWU_TYPE', rootType, composite(rootType, middleType, 'Realization', 'PRODUCT_REALIZATION', ROOT_PURPOSE, true)],
+		['SubmitPwaForReview', 'PROFESSIONAL_WORK_ARCHITECTURE', pwaId, {}],
+		['ValidatePwa', 'PROFESSIONAL_WORK_ARCHITECTURE', pwaId, {}],
+		['PublishPwa', 'PROFESSIONAL_WORK_ARCHITECTURE', pwaId, { rootPwuTypeId: rootType }]
+	];
+	for (const [commandType, aggregateType, aggregateId, payload] of steps) {
+		const r = dispatch(commandType, aggregateType, aggregateId, payload);
+		expect(r.status, `arrangement: ${commandType} — ${r.error?.message ?? ''}`).toBe('ACCEPTED');
+	}
+	const created = (await undertakings.create(actionEvent('create', { name: 'Three-level Demo', pwaId, ...RISK }) as never)) as {
+		created?: string;
+		data?: { error?: string };
+	};
+	expect(created.created, `arrangement: the Undertaking — ${created.data?.error ?? ''}`).toBeDefined();
+	const units = listPwus(getEngine(), created.created!);
+	const of = (typeId: string) => units.find((p) => p.state.pwuTypeId === typeId)!.id;
+	return { root: of(rootType), middle: of(middleType), leaf: of(leafType) };
+}
+
+describe('⛔ the merge’s fix round, F1 — a unit composed of others whose children’s work holds nothing to judge is asked no declared review', () => {
+	it('⛔ a three-level tree, as half B may publish: the root’s Record Assurance is refused before any review is asked, nothing dispatched — and the unit above the model unit, whose child’s work holds a work product, is reviewed (the control)', async () => {
+		// ⛔ PREDICTED RED, read from the code: `declaredReviewWorkOf` gathered the root's ONE child, the middle unit, whose
+		// TRANSFORMATION completed with no output — no work product, no command — and the root's review was asked over that
+		// nothing; this seam answers every criterion met, so the root was assured.
+		const { root, middle, leaf } = await threeLevelTree();
+		for (const pwuId of [root, middle, leaf])
+			expect((await beginExecute(pwuId)).data?.error, 'arrangement: Begin & Execute').toBeUndefined();
+		expect((await recordAssurance(leaf)).advanced, 'arrangement: the model unit signed off').toBe('assured');
+		// ⭑ THE CONTROL: the middle unit is composed of others too, and its child's work holds a work product — its one review asked.
+		seam.declared.length = 0;
+		expect((await recordAssurance(middle)).advanced, 'the middle unit, over its child’s work product, was not signed off').toBe('assured');
+		expect(seam.declared, 'one review of the middle unit’s one declared policy').toHaveLength(1);
+		expect(seam.declared[0]).toContain('"workUnit":"Requirements"');
+
+		seam.declared.length = 0;
+		const before = getEngine().readAllEvents().length;
+		const r = await recordAssurance(root);
+		expect([r.advanced, r.data?.error], 'the root’s declared review was asked over its children’s nothing').toEqual([
+			undefined,
+			`The declared policies cannot be reviewed: ${nothingToJudge('Realization')}`
+		]);
+		// ⛔ ASKED NOTHING, DISPATCHED NOTHING: no review, no exchange record, no assessment — and the root as it was.
+		expect(seam.declared, 'a declared review was asked').toEqual([]);
+		expect(getEngine().readAllEvents().length, 'the refusal dispatched something').toBe(before);
+		expect(axesOf(root)).toEqual(['EXECUTING', 'UNASSESSED']);
 	});
 });

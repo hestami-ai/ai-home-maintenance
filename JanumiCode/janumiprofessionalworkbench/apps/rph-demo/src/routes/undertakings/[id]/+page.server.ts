@@ -64,6 +64,7 @@ import {
 	foldAfterRerun,
 	governingDeclaredPolicies,
 	NEVER_ASSESSED,
+	nothingToJudge,
 	planDeclaredSignoff,
 	RERUN_DECLARED_REVIEWS,
 	STALE_VERSION,
@@ -1307,7 +1308,9 @@ interface DeclaredReviewWork {
  * TRANSFORMATION produces nothing. ⚠ A child with no work product contributes its commands only; the root's instruction is
  * its own purpose, and no single account is shown for many children's work. ⛔ `E12F` F9 — AND ITS PRODUCER IS ITS OWN
  * executor (the operator, for the root), not its children's: independence is checked against who did the judged work for
- * a phase only.
+ * a phase only. ⛔ The merge's fix round, F1 — AND WHEN NO CHILD'S WORK HOLDS A WORK PRODUCT OR A COMMAND, it is refused
+ * (`nothingToJudge`): a child composed of others contributes none of its own, so in a tree deeper than §3.2's the root's
+ * reviews would be shown nothing to judge.
  */
 async function declaredReviewWorkOf(
 	pwuId: string,
@@ -1337,6 +1340,7 @@ async function declaredReviewWorkOf(
 		if (w.work.answer !== undefined) workProducts.push({ unit: w.work.title, answer: w.work.answer });
 		commands.push(...w.work.commands);
 	}
+	if (workProducts.length === 0 && commands.length === 0) return { ok: false, refusedBecause: nothingToJudge(own.work.title) };
 	// ⛔ `E12F` F4 — ITS OWN PURPOSE, never a prompt of its own, and the reviewer is told so: the work judged is its children's,
 	// each made under its own child's instruction (~~`own.work.instruction`~~, which for a unit that ran a prompt of its own
 	// would have been shown as the instruction its children were given).
@@ -2788,7 +2792,8 @@ export const actions: Actions = {
 		}
 		// ⭐ E2 — THE REVIEWS, ASKED BEFORE ANYTHING IS DISPATCHED, as Begin & Execute asks its reviewer (`JAN-SELREV` SR-1, D5):
 		// a reviewer that cannot run refuses here, in its own words, with nothing recorded; and a unit whose work the record
-		// cannot rebuild refuses here too (RD7's rule: no review of a partial reconstruction).
+		// cannot rebuild refuses here too (RD7's rule: no review of a partial reconstruction) — ⭐ as does, the merge's fix round
+		// F1, a unit composed of others whose children's work holds nothing to judge (`nothingToJudge`).
 		let producer: ActorReference = evaluator;
 		let answers: ReadonlyMap<string, DeclaredPolicyAnswer> = new Map();
 		let invocations: ReadonlyMap<string, string> = new Map();

@@ -24,6 +24,7 @@ import {
 // ⭐ THE RUN'S OWN DECLARATION — the brief, the five types, their prompts and output contracts — from the one module the
 // negative control and the run's lane read too (`scripts/phase7/pwa-content.ts`; its header says why it lives there).
 import {
+	PHASE7_DESIGN,
 	PHASE7_INSTRUCTION_BUDGET,
 	PHASE7_MARKERS,
 	PHASE7_PHASES,
@@ -142,11 +143,21 @@ const UNDERTAKING = {
 	product: 'wordfreq'
 };
 
-/** K1's PWA: the same root over ONE model phase, and no stipulation — so the stand-in leaves its review INCONCLUSIVE. */
+/**
+ * K1's PWA: the same root over ~~ONE model phase~~ ⭐ TWO model phases, and no stipulation of their work products' reviews at
+ * first — so the stand-in leaves the first phase's review INCONCLUSIVE. ⛔ The merge's fix round, F1 — the second, the design,
+ * runs once its review is stipulated, so the root has work to judge beside the phase that waits: a unit composed of others
+ * whose children's work holds nothing to judge is asked no declared review (`nothingToJudge`), so with the waiting phase its
+ * only child the root's sign-off would be refused for that, and prediction (a) never asked.
+ */
 const STUCK_PWA: Phase7PwaDeclaration = {
 	name: 'CLI Product Realization, unstipulated',
 	domain: 'software product',
-	types: [PHASE7_REQUIREMENTS, { ...PHASE7_ROOT, children: [PHASE7_REQUIREMENTS.name] }]
+	types: [
+		PHASE7_REQUIREMENTS,
+		PHASE7_DESIGN,
+		{ ...PHASE7_ROOT, children: [PHASE7_REQUIREMENTS.name, PHASE7_DESIGN.name] }
+	]
 };
 const STUCK_UNDERTAKING = {
 	name: 'wordfreq realization, unstipulated',
@@ -736,13 +747,15 @@ test.describe('JAN-EXEC Phase 7 P7-1b — the five-unit rehearsal, in the gate l
 	}) => {
 		test.setTimeout(60_000);
 		const PHASE = PHASE7_REQUIREMENTS.name;
+		const DESIGN = PHASE7_DESIGN.name;
 		const ROOT = PHASE7_ROOT.name;
 
 		// ── 1. THE PWA AND ITS UNDERTAKING — ⛔ NOTHING REGISTERED, so the stand-in leaves the review INCONCLUSIVE
 		//    (`REG-D-071`), as a reviewer that answers no verdict would ────────────────────────────────────────────────
 		const pwaId = await createDraftPwa(page, request, STUCK_PWA);
 		// ⭐ E2 — the DECLARED policies' stipulation only, so the root's sign-off can conclude beside the stuck phase
-		// (prediction (a)); ⛔ the phase's WORK_PRODUCT review stays unstipulated, as the arm this test drives needs.
+		// (prediction (a)); ⛔ the phase's WORK_PRODUCT review stays unstipulated, as the arm this test drives needs — the
+		// stipulation the design phase runs under comes after the phase has stopped (step 5).
 		await registerStipulation(request, pwaId, 'DECLARED_POLICY');
 		await typePwuTypes(page, request, STUCK_PWA.types);
 		expectTheTypesTyped(await introspect(request), pwaId, STUCK_PWA.types);
@@ -811,7 +824,9 @@ test.describe('JAN-EXEC Phase 7 P7-1b — the five-unit rehearsal, in the gate l
 		await expect(phaseRow.getByTestId('recovery-refusal')).toContainText(
 			'floor.reasoning-review=INCONCLUSIVE'
 		);
-		// ⛔ THE MUTANT, DRIVEN: offer Begin & Execute on an EXECUTING row too — this reddens; the five-unit test stays green.
+		// ~~⛔ THE MUTANT, DRIVEN: offer Begin & Execute on an EXECUTING row too — this reddens; the five-unit test stays green.~~
+		// ⛔ The merge's fix round — NOT SINCE P7-6R R-1d: a waiting unit's row is drawn by a branch of its own, ahead of the
+		// EXECUTING row's, so that mutant (PQ7-M101) never reached this row and survived. It is held at step 5, on the design's.
 		await expect(
 			phaseRow.getByRole('button', { name: 'Begin & Execute', exact: true }),
 			'Begin & Execute is offered only on a PROPOSED unit'
@@ -828,6 +843,23 @@ test.describe('JAN-EXEC Phase 7 P7-1b — the five-unit rehearsal, in the gate l
 		await expect(phaseRow.getByTestId('abandon-rationale')).toBeVisible();
 
 		// ── 5. ⭐ PREDICTION (a): THE ROOT IS SIGNED OFF WHILE ITS CHILD WAITS ───────────────────────────────────────────
+		// ⛔ The merge's fix round, F1 — ITS OTHER CHILD, THE DESIGN, COMPLETES FIRST, its review stipulated now: the root is
+		// judged over its children's work (REG-D-111 (2)), and with only the waiting phase beneath it, its Record Assurance is
+		// refused before any review is asked (`nothingToJudge`) — a refusal for having nothing to judge, not prediction (a)'s.
+		await registerStipulation(request, pwaId, 'WORK_PRODUCT');
+		const designRan = await beginExecute(page, DESIGN);
+		expect(designRan.type, `arrangement: the design phase did not complete: ${refusalOf(designRan)}`).toBe(
+			'success'
+		);
+		// ⭐ AND ITS ROW IS AN EXECUTING ROW THAT DOES NOT WAIT — the one the page draws for a unit that completed, its sign-off
+		// ahead: it offers Record Assurance, and no Begin & Execute, which is offered only on a PROPOSED unit.
+		// ⛔ THE MUTANT, DRIVEN (PQ7-M101): offer Begin & Execute on an EXECUTING row too — this reddens.
+		const designRow = unitRow(page, DESIGN);
+		await expect(designRow.getByRole('button', { name: 'Record Assurance', exact: true })).toBeVisible();
+		await expect(
+			designRow.getByRole('button', { name: 'Begin & Execute', exact: true }),
+			'Begin & Execute is offered only on a PROPOSED unit'
+		).toHaveCount(0);
 		const rootRan = await beginExecute(page, ROOT);
 		expect(rootRan.type, `Begin & Execute on the root was refused: ${refusalOf(rootRan)}`).toBe(
 			'success'

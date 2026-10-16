@@ -34,13 +34,35 @@ test.describe('Undertaking Workbench — multi-Command atomicity (SPEC-001-INV-1
 		page,
 		request
 	}) => {
-		const before = await introspect(request);
-		const rootPwu = before.pwus.find((p) => p.state.title === 'Product Realization');
+		const seeded = await introspect(request);
+		const rootPwu = seeded.pwus.find((p) => p.state.title === 'Product Realization');
 		expect(rootPwu, 'the reference seed must carry a root Product Realization PWU').toBeTruthy();
 		// The arrangement this test depends on. If the seed ever drives the root past EXECUTING/QUEUED the action
 		// below stops being offered and the test would pass vacuously, so the precondition is asserted, not assumed.
 		expect(rootPwu!.state.workLifecycleState).toBe('EXECUTING');
 		expect(rootPwu!.state.executionState).toBe('QUEUED');
+		// ⛔ THE MERGE'S FIX ROUND, F1 — AND THE ROOT'S DECLARED POLICIES SUSPENDED, so its Record Assurance reaches the batch this
+		// test is about. The root is judged over its children's work (REG-D-111 (2)), and the seed's children record no work
+		// product and no command, so while a declared policy governs the root the route refuses BEFORE any review is asked —
+		// and so before any command is dispatched. Suspended, none governs: no review is asked, and the sequence runs to the
+		// refused hop, its assessment commands first. ⚠ Self-checking: a policy left governing makes the alert below that
+		// refusal's, never the engine's.
+		const declared = new Set([
+			...((rootPwu!.state.assurancePolicyIds as string[] | undefined) ?? []),
+			...((seeded.pwuTypes.find((t) => t.id === rootPwu!.state.pwuTypeId)?.state.requiredAssurancePolicyIds as
+				| string[]
+				| undefined) ?? [])
+		]);
+		const suspend = seeded.assurancePolicies
+			.filter((p) => declared.has(p.id) && p.state.status === 'ACTIVE')
+			.map((p) => ['SuspendAssurancePolicy', 'ASSURANCE_POLICY', p.id, { policyId: p.id }]);
+		expect(suspend.length, 'arrangement: the root declares no ACTIVE policy to suspend').toBeGreaterThan(0);
+		const suspended = await request.post('/test-api/dispatch', { data: { steps: suspend } });
+		expect(
+			((await suspended.json()) as { ok: boolean }).ok,
+			'arrangement: the root’s declared policies were not suspended'
+		).toBe(true);
+		const before = await introspect(request);
 
 		await gotoHydrated(page, `/undertakings/${SEEDED_UNDERTAKING}`);
 		await page.getByRole('button', { name: 'overview', exact: true }).click();
