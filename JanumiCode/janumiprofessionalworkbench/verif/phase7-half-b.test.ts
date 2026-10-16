@@ -2757,6 +2757,55 @@ describe('⛔ E3’s polish, 3 — a root that declares MODEL has its cells repo
 		expect(renderMarkdown(r)).toContain('| Stage | specify-wordfreq | build-wordfreq | verify-wordfreq-end-to-end |');
 		expect(Object.keys(r.manifest.unrecordedRuns)).toEqual(['specify-wordfreq', 'build-wordfreq', 'verify-wordfreq-end-to-end']);
 	});
+
+	// ⛔ R3-B F6 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — A ROOT WHOSE TYPE CANNOT BE READ
+	// FAILS CLOSED: whether its press ran a model cannot be decided, so its cells are reported — broke, or not determined —
+	// each with why, never skipped. ⚠ A type READ to declare no discharge is UNDECLARED, the control above.
+	/** The report of a half-B run whose root's type `store` cannot read, held to what failing closed reports. */
+	const failsClosed = (store: StoreRows, why: string): RunReport => {
+		const r = buildRunReport(retained(store), halfBLaneRows(), { accountNames: NAMES }).report;
+		const cells = r.matrix.filter((c) => c.row === 'root');
+		expect(cells.map((c) => c.stage), 'the root’s cells').toEqual(['3', '4', '5a', '5b', '6', '7', '8']);
+		for (const c of cells) {
+			expect(c.value === 'broke' || c.value === null, `${c.stage} reads ${String(c.value)}`).toBe(true);
+			expect(c.basis, c.stage).toContain(
+				`the root unit’s type cannot be read (${why}): whether its press ran a model, and so which of its stages apply, ` +
+					'cannot be decided, so each is reported, never skipped'
+			);
+		}
+		expect(renderMarkdown(r)).toMatch(/\| Stage \| root \|/);
+		expect(Object.keys(r.manifest.unrecordedRuns)).toContain('root');
+		return r;
+	};
+	const PRESSED_ROOT = { ...ALL_MODEL, pwu_r: 'press' } as const;
+
+	it('⛔ R3-B F6 — a root whose type is NOT IN THE STORE has its cells reported, broke or not determined, each with why: never skipped', () => {
+		// ⛔ PREDICTED RED, read from the code: a type the report could not find was read as UNDECLARED, so the root was skipped
+		// by its place, and its stages 3 to 8 were reported nowhere — a fault hidden by the very read that failed.
+		const stored = halfBStore({ ran: PRESSED_ROOT });
+		failsClosed({ ...stored, objects: stored.objects.filter((o) => o.id !== 'pwutype_root') }, 'pwutype_root is not in the store');
+	});
+
+	it('⛔ R3-B F6 — and so does a root whose type declares a discharge that is no word', () => {
+		// ⛔ PREDICTED RED, read from the code: a discharge that is no string was read as UNDECLARED, and the root skipped.
+		const garbled = AGENT_TYPES.map((t) => (t.state.isRoot === true ? { id: t.id, state: { ...t.state, workDischarge: 7 } } : t));
+		failsClosed(halfBStore({ types: garbled, ran: PRESSED_ROOT }), 'pwutype_root declares a workDischarge that is no word: 7');
+	});
+
+	it('⛔ R3-B F6 — a stage the unread root BROKE stays broke, its register ids kept and the reason beside it; every other is not determined', () => {
+		// ⭑ The root ran a model here, its first answer not JSON (K9): stage 4 breaks, as a MODEL root's would.
+		const stored = firstTryUnparsed(halfBStore({ ran: ALL_MODEL }));
+		const r = failsClosed({ ...stored, objects: stored.objects.filter((o) => o.id !== 'pwutype_root') }, 'pwutype_root is not in the store');
+		expect(r.matrix.filter((c) => c.row === 'root').map((c) => [c.stage, c.value, c.registerIds])).toEqual([
+			['3', null, []],
+			['4', 'broke', ['REG-F-519']],
+			['5a', null, []],
+			['5b', null, []],
+			['6', null, []],
+			['7', null, []],
+			['8', null, []]
+		]);
+	});
 });
 
 // ── ⭐⭐ THE CHECK OF 241158f4 — ITS TWO MINORS ─────────────────────────────────────────────────────────────────────

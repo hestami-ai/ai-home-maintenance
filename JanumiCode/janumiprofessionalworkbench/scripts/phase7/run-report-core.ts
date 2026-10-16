@@ -2459,6 +2459,42 @@ const dischargeOf = (ix: Index, u: Unit): string =>
 	(str(ix.ofType('PWU_TYPE').find((t) => t.id === (u.typeId ?? str(u.object?.state.pwuTypeId)))?.state.workDischarge) ||
 		'UNDECLARED');
 
+/**
+ * ⭐ R3-B F6 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — WHY A UNIT'S TYPE CANNOT BE READ, or
+ * null when it can. Half A's is §3.2's declaration, always read. Half B's is the store's PWU_TYPE the unit names: unreadable
+ * when the unit names none, when the store holds no type of that id, or when its `workDischarge` is there and no string.
+ * ⚠ A type read that names no discharge is READ — `UNDECLARED` (`dischargeOf`), which keeps a root's reading.
+ */
+function typeUnreadable(ix: Index, u: Unit): string | null {
+	if (u.type !== undefined) return null;
+	const typeId = u.typeId ?? str(u.object?.state.pwuTypeId);
+	if (typeId === '') return 'the unit names no type';
+	const type = ix.ofType('PWU_TYPE').find((t) => t.id === typeId);
+	if (type === undefined) return `${typeId} is not in the store`;
+	const declared = type.state.workDischarge;
+	return declared === undefined || declared === null || typeof declared === 'string'
+		? null
+		: `${typeId} declares a workDischarge that is no word: ${JSON.stringify(declared)}`;
+}
+
+/**
+ * ⭐ R3-B F6 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — THE CELLS OF A ROOT WHOSE TYPE CANNOT
+ * BE READ, FAILED CLOSED: whether its press ran a model, and so which of its stages apply, cannot be decided, so each is
+ * reported — a break as it was found, the reason beside it; any other value not determined, OPEN and owed to a person, the
+ * reason first. ⛔ Read as UNDECLARED, such a root was skipped by its place, and its stages 3 to 8 were reported nowhere.
+ */
+function failedClosed(cells: readonly MatrixCell[], slug: string, why: string): MatrixCell[] {
+	const reason =
+		`the ${slug} unit’s type cannot be read (${why}): whether its press ran a model, and so which of its stages apply, ` +
+		'cannot be decided, so each is reported, never skipped';
+	const owedTo = `a person: the ${slug} unit’s type cannot be read`;
+	return cells.map((c) =>
+		c.value === 'broke'
+			? { ...c, basis: [...c.basis, reason] }
+			: cell(c.stage, c.row, null, [], [reason, ...c.basis], { owedTo: c.owedTo ? `${c.owedTo}; ${owedTo}` : owedTo })
+	);
+}
+
 const triesOf = (u: Unit): string[] => u.tries.map((t) => `${str(t.state.disposition)}:${parseClass(t.state.parseOutcome)}`);
 
 /** Stage 3 — the phase does the work, and a review's findings reach its next try. */
@@ -3421,12 +3457,20 @@ export function buildRunReport(
 	// `rootLimitCheck`): its press runs a model, so its tries, reviews and exchanges are measured like any phase's.
 	// ⛔ ~~Every root skipped by its place~~: a MODEL root that broke a stage read as intended. ⭑ §3.2's root declares
 	// HUMAN and keeps its reading, in the whole run's stage 7.
-	const phases = views.filter((v, i) => i > 0 || dischargeOf(ix, v.unit) === 'MODEL');
+	// ⭐ R3-B F6 (the lead's delegated decision of 2026-10-16, to be registered as REG-D-114) — AND A ROOT WHOSE TYPE CANNOT BE
+	// READ FAILS CLOSED: measured as a phase, its cells reported, broke or not determined, each with why (`failedClosed`).
+	// ⛔ Read as UNDECLARED, it was skipped by its place.
+	const rootUnreadable = units[0] === undefined ? null : typeUnreadable(ix, units[0]);
+	const phases = views.filter((v, i) => i > 0 || rootUnreadable !== null || dischargeOf(ix, v.unit) === 'MODEL');
+	const cellsOf = (v: UnitView): MatrixCell[] =>
+		v.unit === units[0] && rootUnreadable !== null
+			? failedClosed(phaseCells(v, ix), v.unit.slug, rootUnreadable)
+			: phaseCells(v, ix);
 	const matrix: MatrixCell[] = [
 		stageOne(ix, half, lane),
 		stageTwo(undertakingId, structure),
 		stageSevenWhole(views),
-		...phases.flatMap((v) => phaseCells(v, ix))
+		...phases.flatMap(cellsOf)
 	];
 	const counts = Object.fromEntries(CELL_VALUES.map((value) => [value, matrix.filter((c) => c.value === value).length]));
 	const mode = str(rec(lane.run).mode) || str(rec(lane.boot).mode) || null;
