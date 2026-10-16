@@ -38,6 +38,7 @@
     "xstate": "5.32.5"
   },
   "devDependencies": {
+    "@earendil-works/pi-agent-core": "0.80.6",
     "@playwright/test": "1.61.1",
     "@sveltejs/adapter-auto": "^6.0.0",
     "@sveltejs/kit": "^2.22.0",

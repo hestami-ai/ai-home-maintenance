@@ -173,7 +173,11 @@ export function producerWorkingDirectory(
 			refusedBecause:
 				context.runner.kind === 'REAL'
 					? `The workspace of ${named} is ${context.workspace.materialization} and has no directory on disk, but the wired ProcessRunner is REAL. This is a HOST WIRING ERROR and the session is refused before a single turn is taken: the alternative to refusing is that the producer operates in some other directory — the server's own source tree — while the record says it worked in the Undertaking's workspace.`
-					: `The workspace of ${named} is ${context.workspace.materialization} and has no directory on disk, and the wired ProcessRunner is REFUSING. This is the host's default rather than a misconfiguration: nothing durable is configured, so no producer that needs a working directory can be opened. Configure JPWB_DEMO_DB so the Undertaking gets a durable workspace root.`
+					: // ⭐ `JAN-EXEC` Phase 8 (D2, D3) — the REPLAYED runner's own true sentence: the replay host pairs it with a
+						// FILESYSTEM workspace only (`workspace-host.ts`), so this is its wiring error, and nothing runs live.
+						context.runner.kind === 'REPLAYED'
+						? `The workspace of ${named} is ${context.workspace.materialization} and has no directory on disk, but the wired ProcessRunner is REPLAYED. This is a HOST WIRING ERROR and the session is refused before a single turn is taken: a replay is wired against a FILESYSTEM workspace only, where its recorded tool calls write, and here they have nowhere to go. Nothing runs live in a replay, so no producer operated anywhere.`
+						: `The workspace of ${named} is ${context.workspace.materialization} and has no directory on disk, and the wired ProcessRunner is REFUSING. This is the host's default rather than a misconfiguration: nothing durable is configured, so no producer that needs a working directory can be opened. Configure JPWB_DEMO_DB so the Undertaking gets a durable workspace root.`
 		};
 	// A FILESYSTEM workspace with no directory contradicts its own declaration. Trusting the enum and reading
 	// `directoryPath!` would hand `undefined` to an adapter, and every adapter in reach resolves that to the

@@ -1,7 +1,7 @@
 // `apps/rph-demo`'s own `vitest run` — the app's vite config, plus what only vitest reads.
 //
-// ⭐ `JAN-SELREV` D8 — THIS APP'S OWN `vitest run` starts every test file with the eight live-backend variables
-// REMOVED, as both root configs' projects do: see `verif/live-backend-isolation.ts`. (Under `turbo run test` they never
+// ⭐ `JAN-SELREV` D8 — THIS APP'S OWN `vitest run` starts every test file with the live-backend variables REMOVED, as
+// both root configs' projects do: see `verif/live-backend-isolation.ts`. (Under `turbo run test` they never
 // arrive — turbo's strict env mode withholds them — but the same command started here inherits the shell.)
 //
 // ⭑ A SEPARATE FILE, MERGED OVER `vite.config.ts`, rather than a `test` key in it. vitest types that key on ITS OWN

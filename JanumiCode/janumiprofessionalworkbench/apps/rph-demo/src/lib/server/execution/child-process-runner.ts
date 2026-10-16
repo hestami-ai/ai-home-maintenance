@@ -274,8 +274,8 @@ import {
  */
 const CAPTURE_CAP_BYTES = 64 * 1024;
 
-/** Where a run's captured streams are written inside the output workspace. */
-const CAPTURE_DIRECTORY = 'captures';
+/** Where a run's captures go in the output workspace. ⭐ Phase 8: exported for the REPLAYED runner's one layout. */
+export const CAPTURE_DIRECTORY = 'captures';
 
 /**
  * How long the capture keeps draining after the CHILD has exited, while the pipes are still open.
@@ -531,7 +531,7 @@ function batchTargetReached(
 }
 
 /** What `omissions.json` says, so a capture DIRECTORY declares its own cut — `B6`. */
-function declaredOmissions(regions: readonly ProcessOutputOmission[]): string {
+export function declaredOmissions(regions: readonly ProcessOutputOmission[]): string {
 	return `${JSON.stringify(
 		{
 			note:

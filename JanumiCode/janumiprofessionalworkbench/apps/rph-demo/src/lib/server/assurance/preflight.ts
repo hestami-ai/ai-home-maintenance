@@ -44,7 +44,10 @@ export function assurancePreflight(input: {
 			// application default would be used — a default that the installed agy rejects, so the turn proceeded to
 			// an opaque non-zero exit whose diagnostic is discarded (REG-F-331 / REG-F-326).
 			return { ready: false, code: selection.code, guidance: refusalMessage(selection) };
+		// ⭐ `JAN-EXEC` Phase 8 (D2) — a replay is ready as the stand-in is: no real reviewer is configured to name. Whether its
+		// recording can be read is found when the floor opens it, and a recording that cannot be is a refusal it records.
 		case 'STAND_IN':
+		case 'REPLAY':
 			return { ready: true, code: 'READY', guidance: '' };
 		case 'AGY':
 			return {

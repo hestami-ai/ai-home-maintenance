@@ -1,8 +1,8 @@
-// ⭐ `JAN-SELREV` SR-1 (D8) — THE PROBE A CHILD RUN EXECUTES WITH THE EIGHT LIVE-BACKEND VARIABLES EXPORTED.
+// ⭐ `JAN-SELREV` SR-1 (D8) — THE PROBE A CHILD RUN EXECUTES WITH ~~THE EIGHT~~ ⭐ EVERY LIVE-BACKEND VARIABLE EXPORTED.
 //
-// ⛔ ON ITS OWN IT PROVES ALMOST NOTHING, AND IT SAYS SO. In a clean shell none of the eight is set, so every case below
+// ⛔ ON ITS OWN IT PROVES ALMOST NOTHING, AND IT SAYS SO. In a clean shell none of them is set, so every case below
 // is green whatever the gate's entry points do. Its instrument is `verif/live-backend-isolation.test.ts`, which starts
-// the gate's vitest entry points as CHILD processes with all eight exported and runs this file inside them: an
+// the gate's vitest entry points as CHILD processes with all of them exported and runs this file inside them: an
 // in-process assertion is green today and proves nothing.
 //
 // ⭑ WHAT IT ASKS, per `REG-F-457` G8: each backend switch keys on its variable's ABSENCE — the reviewer on
@@ -24,8 +24,9 @@ import { selectExecutor } from './execution/executor-selection.js';
 import { agentMode, isTestMode } from './workbench.js';
 
 /**
- * The design's eight (D8), RESTATED here and never imported from the module that removes them: a name that module
- * forgot must still be asked about, or its omission would pass here too.
+ * The live-backend variables — the design's (D8) and those added since, each marked below — RESTATED here and never
+ * imported from the module that removes them: a name that module forgot must still be asked about, or its omission
+ * would pass here too.
  */
 const LIVE_BACKEND_VARIABLES = [
 	'JPWB_ASSURANCE_TOOL',
@@ -35,11 +36,17 @@ const LIVE_BACKEND_VARIABLES = [
 	'JPWB_EXECUTOR_MODEL',
 	'JPWB_AGENT',
 	'JPWB_DEVIN_BIN',
-	'JPWB_AGY_BIN'
+	'JPWB_AGY_BIN',
+	// ⭐ `JAN-EXEC` Phase 8 (the review of E4, finding 11) — the ninth: in test mode the replay switch selects the
+	// replay's arms over the stand-ins asked about below (`replay/replay-switch.ts`).
+	'JPWB_REPLAY',
+	// ⭐ The re-review of E4's fix round — the tenth: the authoring agent's model, which the replay refuses beside its
+	// switch (`replay/replay-switch.ts`, `LIVE_SELECTIONS_BESIDE_A_REPLAY`).
+	'JPWB_AGENT_MODEL'
 ] as const;
 
 describe('⭐ D8 — a gate process inherits no live-backend selection', () => {
-	it('none of the eight reached this process', () => {
+	it('none of them reached this process', () => {
 		const reached = LIVE_BACKEND_VARIABLES.filter((v) => process.env[v] !== undefined).map(
 			(v) => `${v}=${JSON.stringify(process.env[v])}`
 		);
@@ -68,9 +75,10 @@ describe('⭐ D8 — a gate process inherits no live-backend selection', () => {
 
 	// ⭑ THE CHILD'S RECEIPT — run only when the instrument started this process (its flag), and the instrument then
 	// requires five passes of five. A child started without the exported environment has no flag, skips this case and
-	// fails that count; an entry point that removed MORE than the eight loses the canary and fails here.
+	// fails that count; an entry point that removed MORE than ~~the eight~~ ⭐ the live-backend variables loses the canary
+	// and fails here.
 	it.runIf(process.env.LIVE_BACKEND_PROBE === '1')(
-		'the environment the instrument exported reached this process — its canary, not one of the eight, survived',
+		'the environment the instrument exported reached this process — its canary, not one of the live-backend variables, survived',
 		() => {
 			expect(process.env.JPWB_LIVE_BACKEND_CANARY).toBe('exported');
 		}

@@ -25,6 +25,40 @@ export function toPiToolResult(result: ToolRunResult): PiCompatibleToolResult {
 	};
 }
 
+/** A tool result as the model is sent it: its content's parts, text or otherwise. */
+export interface SentToolResult {
+	readonly content: ReadonlyArray<{ readonly type: string; readonly text?: string }>;
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 8 (the lead's delegated decision of 2026-10-15, to be registered; the replay's tool-result key) —
+ * WHAT A TOOL'S RESULT REACHES THE MODEL AS: the text an OpenAI Responses payload carries for it, its
+ * `function_call_output`'s `output` — the result's text parts joined by newlines, `(no tool output)` when there are
+ * none, and every unpaired surrogate removed (`@earendil-works/pi-ai` 0.80.6, `dist/api/openai-responses-shared.js`,
+ * `convertResponsesMessages`). It is the payload shape the replay's recorder reads (`scripts/phase7/record-replay-core.ts`).
+ * ⚠ FOR A RESULT OF TEXT ALONE, as every result this host's tools give is: an image part is sent another way, and is not
+ * rendered here. Held to pi-ai's own converter by `tools/pi-execution-tools.test.ts`.
+ */
+export function toolResultAsSent(result: SentToolResult): string {
+	const text = result.content
+		.filter((part) => part.type === 'text')
+		.map((part) => part.text ?? '')
+		.join('\n');
+	return (text.length > 0 ? text : '(no tool output)').replace(
+		/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g,
+		''
+	);
+}
+
+/**
+ * ⭐ PI'S OWN RESULT FOR A CALL TO A TOOL ITS SESSION DOES NOT HAVE — `Tool <name> not found`, as an error result
+ * (`@earendil-works/pi-agent-core` 0.80.6, `dist/agent-loop.js`, `prepareToolCall`). The model reads it as it reads any
+ * result, so a replay renders it for such a call. Held to pi-agent-core's own loop by `tools/pi-execution-tools.test.ts`.
+ */
+export function unknownToolResult(name: string): SentToolResult {
+	return { content: [{ type: 'text', text: `Tool ${name} not found` }] };
+}
+
 /**
  * A Pi execution can succeed at the transport layer while the authoring domain rejects the proposed Command.
  * Our custom-tool adapter records that domain outcome as `result.details.ok`; it must therefore take precedence

@@ -9,13 +9,31 @@
 //   · ⭐ the account name is a hit in any case, as a whole token — ⛔ and never inside a longer word, or a ULID;
 //   · ⛔ what is not a path is not a hit: a relative path — with backslashes, raw or JSON-escaped, too — a URL, an id, a
 //     timestamp — a scan that hits prose blocks every report, and one that hits everything says nothing;
-//   · ⭐ a path or the account name right after an escape (a JSON `\n`, a terminal colour code) is a hit, and a file
-//     written in UTF-16 is read as UTF-16;
+//   · ⭐ a path or the account name right after an escape (a JSON `\n`, a terminal colour code) is a hit — ⭐ at any depth
+//     of JSON escaping (the lead's delegated decision of 2026-10-15, to be registered) — and a file written in UTF-16 is
+//     read as UTF-16;
 //   · ⭐ a folder is walked whole, each hit naming its file relative to what was scanned;
 //   · ⛔ the command line prints each hit's kind and place and NEVER its text, which is the account name itself;
 //   · ⛔ `REG-F-545`: the account is looked for by every source that names it — the user record's name and home folder,
 //     USERPROFILE and USERNAME — and NEVER as `unknown`, which Bun gives as the user record's name when USERNAME is unset;
-//     with no name found the command line refuses, and run under bun as the gate runs it, it still finds the account.
+//     with no name found the command line refuses, and run under bun as the gate runs it, it still finds the account;
+//   · ⭐ (`JAN-EXEC` Phase 8; the review of E4, finding 3) a replay recording is scanned by its DECODED values
+//     (`scanDecodedJson`): ~~code whose JSON spelling reads as a UNC path is no hit, and~~ a real path or the account
+//     name in a value still is a hit, at its place in the value — ⭐ and the account name after an escape inside a value
+//     that is itself JSON ~~, which the line's own text hides~~ (⭐ the line's own text finds it too now, two levels
+//     deep) — synthetic lines only;
+//   · ⭐ (the re-review of E4's fix round: finding 3 was not fixed — decoding one level moved the false hits a level
+//     down) a UNC share is a hit at EVERY depth of JSON escaping, its leading run twice its separator ⭐ or four times it
+//     (CommonMark's source spelling), and escaped code ⭐ whose runs are equal is a hit at none — wherever a recording
+//     holds it: a write_file argument, the answer envelope's files, a review prompt that embeds the work product. ⚠ Code
+//     whose own runs have a share's ratio is a hit at every depth, and fails safe;
+//   · ⭐ (the lead's delegated decision of 2026-10-15, to be registered) the account name, and every path, after an escape
+//     at ANY depth of JSON escaping is a hit — the confirm of E4's second fix round found the account name missed after
+//     an escape two levels deep (`\\n`) — and a share in each spelling the old pattern caught ⭐ but a leading run of two
+//     with a separator of two, which is code's shape and no hit (three of its four; the check of E4's polish round, F3),
+//     CommonMark's source spelling (a leading run of four, a separator of one) among them; ⚠ a drive whose first folder
+//     begins with an escape letter is a hit, and a letter and a colon before an escaped newline are spelled the same: the
+//     scan cannot tell the two apart, and keeps the drive.
 //
 // No model is called, and nothing outside a temporary folder is read but the scan's own script, run by bun.
 import { spawnSync } from 'node:child_process';
@@ -24,10 +42,11 @@ import { tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
+import { splitExecutionEnvelope } from '../apps/rph-demo/src/lib/server/execution/execution-contract.js';
 import {
 	accountNames,
-	escapesBlanked,
 	main,
+	scanDecodedJson,
 	scanTarget,
 	scanText,
 	textsOf,
@@ -68,6 +87,9 @@ const NAMES = ['jdoe'];
 const B = '\\';
 const kinds = (text: string, names: readonly string[] = NAMES) =>
 	scanText(text, 'f', names).map((h) => [h.kind, h.line, h.column]);
+/** `text` as it reads inside a JSON string `depth` levels deep: each level doubles every backslash. */
+const escaped = (text: string, depth: number): string =>
+	Array.from({ length: depth }).reduce<string>((t) => JSON.stringify(t).slice(1, -1), text);
 
 const dirs: string[] = [];
 afterAll(() => {
@@ -120,7 +142,14 @@ describe('JAN-EXEC P7-2 — what the archive scan finds', () => {
 	});
 
 	it('⛔ a relative path with backslashes is no hit in either spelling — raw, or JSON-escaped as the report writes it', () => {
-		for (const path of [`.${B}test${B}unit${B}wordfreq.test.js`, `..${B}src${B}wordfreq.js`, `test${B}unit${B}x.js`]) {
+		// ⭐ (The re-review of E4's fix round) and one whose first separator is doubled: its runs are a share's ratio
+		// (`\\test\u…`), and the `.` before them is what makes it relative — escaping alone no longer tells it apart.
+		for (const path of [
+			`.${B}test${B}unit${B}wordfreq.test.js`,
+			`..${B}src${B}wordfreq.js`,
+			`test${B}unit${B}x.js`,
+			`.${B}${B}test${B}unit${B}x.js`
+		]) {
 			expect(kinds(path), path).toEqual([]);
 			expect(kinds(JSON.stringify({ argv: ['node', '--test', path] })), `${path} as JSON`).toEqual([]);
 		}
@@ -134,14 +163,19 @@ describe('JAN-EXEC P7-2 — what the archive scan finds', () => {
 		const esc = String.fromCodePoint(27);
 		expect(kinds(`${esc}[90mC:${B}runs${B}a.js${esc}[39m`)).toEqual([['drive-path', 1, 6]]);
 		expect(kinds(JSON.stringify(`${esc}[90mjdoe${esc}[39m`))).toEqual([['account-name', 1, 12]]);
-		// ⭐ The view keeps every place: an escaped backslash stays one, and the letter after it a letter.
-		expect(escapesBlanked(JSON.stringify(`a\nb${B}nc`))).toBe(`"a${B} b${B}${B}nc"`);
+		// ~~⭐ The view keeps every place: an escaped backslash stays one, and the letter after it a letter.~~ ⭐ No view any
+		// more (`AFTER_AN_ESCAPE`): the escape before a token is looked behind, never matched, so a hit is the token alone.
+		expect(scanText(JSON.stringify({ stdout: 'user:\njdoe\n' }), 'f', NAMES).map((h) => h.match)).toEqual([
+			'jdoe'
+		]);
 		// ⛔ And in raw text a separator that reads as an escape (`\r` in `C:\runs`) is still found behind a colour code.
 		expect(kinds(`${esc}[90mC:${B}temp${B}new${esc}[39m`)).toEqual([['drive-path', 1, 6]]);
 	});
 
-	it('⛔ an escape is no token end where it is not one: an escaped backslash before a word, or a name inside a longer one', () => {
-		expect(kinds(JSON.stringify(`dir${B}njdoe`))).toEqual([]);
+	it('⛔ a name inside a longer word is no hit after an escape — ⚠ and an escaped backslash and a letter before the name read as an escape: a newline escaped twice is spelled the same, so it is a hit, and fails safe', () => {
+		// ⭐ (the lead's delegated decision of 2026-10-15, to be registered: the account name at ANY depth of escaping.)
+		// ~~No hit:~~ `dir\\njdoe` is the folder `njdoe` escaped once, AND the account name after a newline escaped twice.
+		expect(kinds(JSON.stringify(`dir${B}njdoe`))).toEqual([['account-name', 1, 8]]);
 		expect(kinds(JSON.stringify('line\njdoeson'))).toEqual([]);
 	});
 });
@@ -303,5 +337,200 @@ describe('JAN-EXEC P7-2 — scanning a folder, and the command line', () => {
 		]);
 		const cells = scanStripped(join(d, 'cells.md'));
 		expect([cells.code, cells.out]).toEqual([0, 'phase7/archive-scan — no hit in 1 file(s): no account name and no absolute path\n']);
+	});
+});
+
+describe('⭐ JAN-EXEC Phase 8 — a replay recording is scanned by its DECODED values, never its JSON spelling (the review of E4, finding 3)', () => {
+	// ⭑ BUILT, NOT SPELLED: a drive and a home folder joined at run time, so no line of this file names one (`REG-F-536`).
+	const drive = `${String.fromCodePoint(81)}:`;
+	const decoded = (text: string, jsonl = true) =>
+		scanDecodedJson(text, 'executor.jsonl', NAMES, jsonl).map((h) => [h.file, h.line, h.column, h.kind]);
+
+	it('⛔ code where a recording holds it is no hit — a write_file argument, the answer envelope’s files, a review prompt embedding the work product — and a share there still is', () => {
+		// ⭑ `/\r\n|\n/`, a regular expression of SINGLE backslashes, in each place a Phase 7 recording carries a file the
+		// executor wrote: the write_file call (one JSON level), the contract's envelope, whose work product holds each file's
+		// full text (two: the answer is JSON inside the line), and the work-product review's prompt, which embeds that work
+		// product re-serialised (`splitExecutionEnvelope`; two). The re-review drove the decoded scan red at the last two.
+		const code = `export const lines = (text) => text.split(/${B}r${B}n|${B}n/);\n`;
+		const answer = (document: string): string =>
+			JSON.stringify({
+				workProduct: {
+					documents: [{ path: 'docs/notes.md', text: document }],
+					files: [{ path: 'src/lines.js', text: code }],
+					hashes: [],
+					commands: []
+				},
+				rationale: { rationale: 'written', assumptions: [], limitations: [], residualUncertainty: [] }
+			});
+		const recordingLines = (document: string): string =>
+			[
+				JSON.stringify({
+					unit: 'implementation',
+					toolCalls: [
+						{ name: 'write_file', arguments: { path: 'src/lines.js', contents: code }, outcome: 'COMPLETED' }
+					],
+					answer: { arrived: true, text: answer(document) }
+				}),
+				JSON.stringify({
+					unit: 'implementation',
+					prompt: `Judge this work product.\n${splitExecutionEnvelope(answer(document)).workProduct}\n`
+				})
+			].join('\n');
+		expect(decoded(recordingLines('no path here'))).toEqual([]);
+		// ⭑ CONTROL: the same places hold a share when one is there — in the work product's document, two levels deep.
+		expect(
+			decoded(recordingLines(`copied to ${B}${B}host${B}share${B}out`)).map(([file, , , kind]) => [file, kind])
+		).toEqual([
+			['executor.jsonl:1 $.answer.text', 'unc-path'],
+			['executor.jsonl:2 $.prompt', 'unc-path']
+		]);
+	});
+
+	it('⭐ the account name after an escape inside a value that is itself JSON — the answer envelope — is a hit decoded, placed in its value, and in the line’s own text too, two levels deep', () => {
+		const line = JSON.stringify({
+			unit: 'implementation',
+			answer: {
+				arrived: true,
+				text: JSON.stringify({ workProduct: {}, rationale: { rationale: 'ran as\njdoe' } })
+			}
+		});
+		// ⭑ ~~CONTROL: in the line's own text that newline is `\\n` — an escaped backslash, then a letter — so no token ends
+		// before the name, and a scan of the text passes it.~~ ⭐ In the line's own text that newline is `\\n`, a newline
+		// escaped twice — and an escape ends a token at any depth (`AFTER_AN_ESCAPE`; the lead's delegated decision of
+		// 2026-10-15, to be registered), so the text's own scan finds the name too. Decoded, it is placed in its value.
+		expect(scanText(line, 'executor.jsonl', NAMES).map((h) => h.kind)).toEqual(['account-name']);
+		expect(decoded(line).map(([file, , , kind]) => [file, kind])).toEqual([
+			['executor.jsonl:1 $.answer.text', 'account-name']
+		]);
+	});
+
+	it('⭐ a real drive, share or home path — or the account name — in a decoded value still hits, at its place in the value', () => {
+		const home = ['', 'home', 'someone', 'run'].join('/');
+		const line = JSON.stringify({
+			argv: ['node', '--test', `${drive}${B}elsewhere${B}test`],
+			stdout: `ok\nwritten to ${B}${B}host${B}share${B}out by jdoe\n`,
+			stderr: `see ${home}`
+		});
+		expect(decoded(line)).toEqual([
+			['executor.jsonl:1 $.argv[2]', 1, 1, 'drive-path'],
+			['executor.jsonl:1 $.stdout', 2, 12, 'unc-path'],
+			['executor.jsonl:1 $.stdout', 2, 32, 'account-name'],
+			['executor.jsonl:1 $.stderr', 1, 5, 'home-path']
+		]);
+	});
+
+	it('⛔ a key that names the account is a hit, placed by its ordinal so no place prints it — and so is what lies under it', () => {
+		const hits = scanDecodedJson(
+			JSON.stringify({ unit: 'x', jdoe: { note: `${drive}${B}x` } }),
+			'reviewer.jsonl',
+			NAMES,
+			true
+		);
+		expect(hits.map((h) => [h.file, h.kind])).toEqual([
+			['reviewer.jsonl:1 ${key 2}', 'account-name'],
+			['reviewer.jsonl:1 ${key 2}.note', 'drive-path']
+		]);
+		expect(hits.some((h) => h.file.includes('jdoe')), 'a place printed the name it refused').toBe(false);
+	});
+
+	it('⛔ nothing is skipped for failing to parse: a line that is not JSON is scanned whole, as text — and a blank line still counts', () => {
+		const text = [JSON.stringify({ ok: true }), '', `not json: ${drive}${B}x`].join('\n');
+		expect(decoded(text)).toEqual([['executor.jsonl:3 (as text)', 1, 11, 'drive-path']]);
+	});
+
+	it('⭐ a manifest is ONE JSON value over many lines, read whole', () => {
+		const manifest = JSON.stringify({ models: { reviewer: { note: `ran in ${drive}/runs` } } }, null, 2);
+		expect(scanDecodedJson(manifest, 'recording.json', NAMES, false).map((h) => [h.file, h.kind])).toEqual([
+			['recording.json:1 $.models.reviewer.note', 'drive-path']
+		]);
+	});
+});
+
+describe('⭐ JAN-EXEC Phase 8 — a UNC share is a hit at EVERY depth of JSON escaping, and escaped code whose runs are equal at none (the re-review of E4’s fix round: finding 3 was not fixed)', () => {
+	it('⭐ a share is a hit at depths 0 to 3 — its leading run twice its separator at each, as each level doubles both', () => {
+		for (const share of [`${B}${B}host${B}share${B}x`, `${B}${B}wsl$${B}Ubuntu${B}x`])
+			for (let depth = 0; depth <= 3; depth += 1)
+				expect(kinds(escaped(share, depth)), `${share} at depth ${depth}`).toEqual([['unc-path', 1, 1]]);
+	});
+
+	it('⛔ escaped code is no share at any depth — each of its runs as long as the next: a line split, a word boundary, a unicode escape, a source literal of escaped backslashes', () => {
+		for (const code of [
+			`text.split(/${B}r${B}n|${B}n/)`,
+			`text.match(/${B}bthe${B}b/g)`,
+			`'${B}u00e9t${B}u00e9'`,
+			`text.split("${B}${B}r${B}${B}n")`
+		])
+			for (let depth = 0; depth <= 3; depth += 1)
+				expect(kinds(escaped(code, depth)), `${code} at depth ${depth}`).toEqual([]);
+	});
+
+	it('⚠ code whose own runs are two to one, or four to one, HAS a share’s shape, and is a hit at every depth — the ratio cannot tell it from a share, and the scan fails safe', () => {
+		// ⭑ A regular expression of a literal backslash, a `d` and an escaped dot — runs of two and one — and the same with
+		// a run of four.
+		for (const code of [`/${B}${B}d${B}./`, `/${B}${B}${B}${B}d${B}./`])
+			for (let depth = 0; depth <= 3; depth += 1)
+				expect(kinds(escaped(code, depth)), `${code} at depth ${depth}`).toEqual([['unc-path', 1, 2]]);
+	});
+});
+
+describe('⭐ JAN-EXEC Phase 8 — the account name, and every path, after an escape at ANY depth of JSON escaping; a share in each spelling the old pattern caught but a leading run of two with a separator of two (the lead’s delegated decision of 2026-10-15, to be registered; REG-F-536)', () => {
+	const esc = String.fromCodePoint(27);
+	/** What may stand right before a token, each a character JSON escapes: a newline, a tab, a control character, a colour code. */
+	const BEFORE: readonly (readonly [string, string])[] = [
+		['a newline', '\n'],
+		['a tab', '\t'],
+		['a control character', String.fromCodePoint(1)],
+		['a colour code', `${esc}[90m`]
+	];
+
+	it('⭐ the account name after each, escaped zero to four times, is a hit', () => {
+		for (const [what, before] of BEFORE)
+			for (let depth = 0; depth <= 4; depth += 1)
+				expect(
+					kinds(escaped(`ran as${before}jdoe.`, depth)).map(([kind]) => kind),
+					`after ${what}, at depth ${depth}`
+				).toContain('account-name');
+	});
+
+	it('⭐ a drive, a share — its host or its share name beginning with an escape letter too — a home folder and git’s shell’s drive after a newline, escaped zero to three times, are hits', () => {
+		// ⭑ BUILT, NOT SPELLED: every absolute path joined at run time, so no line of this file names one (`REG-F-536`).
+		const paths: readonly (readonly [string, string])[] = [
+			['drive-path', [`${String.fromCodePoint(81)}:`, 'runs', 'x'].join(B)],
+			['unc-path', ['', '', 'host', 'share', 'x'].join(B)],
+			['unc-path', ['', '', 'nas', 'share', 'x'].join(B)],
+			['unc-path', ['', '', 'host', 'tools', 'x'].join(B)],
+			['home-path', ['', 'home', 'someone', 'x'].join('/')],
+			['msys-path', ['', 'c', 'runs', 'x'].join('/')]
+		];
+		for (const [kind, path] of paths)
+			for (let depth = 0; depth <= 3; depth += 1)
+				expect(
+					kinds(escaped(`files:\n${path}`, depth)).map(([k]) => k),
+					`${kind} at depth ${depth}`
+				).toContain(kind);
+	});
+
+	it('⭐ a share in each spelling the old pattern caught but a leading run of two with a separator of two is a hit at every depth — raw, escaped once, and CommonMark’s source spelling, a leading run of four and a separator of one', () => {
+		// ⭑ Each share by its runs, leading and separating — the label never spells a path (`REG-F-536`). ⚠ Three of the old
+		// pattern's four: its fourth, a leading run of two and a separator of two, is code's shape, and the escaped code
+		// above asserts it no hit (a source literal of escaped backslashes, at depth 0; `PATH_PATTERNS`).
+		for (const [lead, separator] of [
+			[2, 1],
+			[4, 2],
+			[4, 1]
+		] as const)
+			for (let depth = 0; depth <= 3; depth += 1)
+				expect(
+					kinds(escaped(`${B.repeat(lead)}host${B.repeat(separator)}share`, depth)),
+					`a share of runs ${lead} and ${separator}, at depth ${depth}`
+				).toEqual([['unc-path', 1, 1]]);
+	});
+
+	it('⚠ a drive whose first folder begins with an escape letter is a hit — and a letter and a colon before an escaped newline are the same characters: the scan cannot tell them apart, and keeps the drive', () => {
+		// ⭑ The second fix round's residual (a): `a:` before an escaped newline reads as a drive. Removing it would lose
+		// this drive: one spelling, a drive in raw text and a newline escaped once — built, never spelled (`REG-F-536`).
+		const drive = [`${String.fromCodePoint(81)}:`, 'new'].join(B);
+		expect(escaped(`${String.fromCodePoint(81)}:\new`, 1)).toBe(drive);
+		expect(kinds(drive)).toEqual([['drive-path', 1, 1]]);
 	});
 });

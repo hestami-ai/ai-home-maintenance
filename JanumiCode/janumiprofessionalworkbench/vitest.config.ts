@@ -92,8 +92,8 @@ export default defineConfig({
 		// mode — so the flag is correct by construction and cannot drift from the `resolve.conditions` above it.
 		// Cross-platform env plumbing in npm scripts needs `cross-env`; this needs nothing.
 		env: { RPH_TEST_RESOLVE: 'source' },
-		// ⭐ `JAN-SELREV` D8 — every project's test files start with the eight live-backend variables REMOVED, so an
-		// exported selection cannot turn the gate's stand-ins into real, paid runs. Shared with `vitest.dist.config.ts`.
+		// ⭐ `JAN-SELREV` D8 — every project's test files start with the live-backend variables REMOVED, so an exported
+		// selection cannot turn the gate's stand-ins into real, paid runs. Shared with `vitest.dist.config.ts`.
 		setupFiles: [SETUP_LIVE_BACKENDS],
 		// ⭑⭑ JAN-CSAADEC CD-03 — THE SAME WATCHDOGS `vitest.dist.config.ts` HAS SET SINCE IT WAS WRITTEN, AND THE
 		// REASON THEY WERE MISSING HERE IS THE SHAPE THIS REPOSITORY KEEPS FILING. That file says, in terms:

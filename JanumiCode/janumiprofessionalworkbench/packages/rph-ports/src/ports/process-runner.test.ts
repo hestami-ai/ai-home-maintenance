@@ -62,6 +62,25 @@ describe('planProcessRun — the two ports are NOT independent', () => {
 		);
 	});
 
+	it('⭐ `JAN-EXEC` Phase 8 (D2, D3) — a REPLAYED runner against an IN_MEMORY workspace is a WIRING ERROR of its own, never the REAL one’s or the default’s', () => {
+		// ⭑ A THIRD KIND, A THIRD TRUE SENTENCE. A REPLAYED runner starts nothing, so the REAL arm's consequence — a command
+		// executing in some other directory — is false of it; and it is not the hermetic default either: the replay host
+		// pairs it with a FILESYSTEM workspace and nothing else (`workspace-host.ts`). Read with either message, the replay
+		// misconfiguration would describe a different defect from the one it is.
+		const plan = planProcessRun({
+			runner: { kind: 'REPLAYED' },
+			workspace: MEMORY,
+			argv: ['node', '--test'],
+			timeoutMs: 30_000
+		});
+		expect(plan.planned).toBe(false);
+		const said = !plan.planned ? plan.refusedBecause : '';
+		expect(said).toMatch(/WIRING ERROR/);
+		expect(said).toMatch(/REPLAYED/);
+		expect(said, 'the REAL runner’s consequence, false of a runner that starts nothing').not.toMatch(/some other directory/);
+		expect(said, 'the default’s sentence').not.toMatch(/hermetic default/);
+	});
+
 	it('⭑⭑ CONTROL — a FILESYSTEM workspace and a REAL runner PLAN, and the cwd is the WORKSPACE’s own', async () => {
 		// ⛔ WITHOUT THIS THE CHECK IS SATISFIABLE BY REFUSING EVERYTHING, and Phase 2 would find the seam
 		// unusable. ⭑ The second assertion is the one that matters: `cwd` comes FROM `directoryPath` and is not

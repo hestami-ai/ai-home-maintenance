@@ -95,6 +95,9 @@ function oracle(
 function shape(s: ReviewerSelection): Expected {
 	if (s.kind === 'REFUSED') return { kind: 'REFUSED', code: s.code, toolId: s.toolId };
 	if (s.kind === 'STAND_IN') return { kind: 'STAND_IN' };
+	// ⭐ `JAN-EXEC` Phase 8 — the table sets no JPWB_REPLAY, so a REPLAY answer here is the selector reading the switch from
+	// somewhere it was not handed (`replay/replay-selection.test.ts` holds the switch's own table).
+	if (s.kind === 'REPLAY') throw new Error('the table sets no JPWB_REPLAY, and the selector answered REPLAY');
 	return { kind: s.kind, modelId: s.modelId };
 }
 

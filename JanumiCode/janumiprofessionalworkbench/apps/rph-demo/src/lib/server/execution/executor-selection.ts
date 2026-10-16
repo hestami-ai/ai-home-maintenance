@@ -17,6 +17,12 @@ import { AGY_BIN_OVERRIDE } from '../assurance/agy-cli.js';
 import type { ReviewerProgramOverrides } from '../assurance/reviewer-selection.js';
 import { DEVIN_BIN_OVERRIDE } from '../tools/devin-reviewer.js';
 import {
+	besideReplayReason,
+	liveSelectionsBesideReplay,
+	REPLAY_VARIABLE,
+	resolveReplayRecording
+} from '../replay/replay-switch.js';
+import {
 	KNOWN_TOOL_IDS,
 	resolveExecutorModel,
 	resolveExecutorToolId,
@@ -39,10 +45,15 @@ export type ExecutorRefusalCode =
 	| 'EXECUTOR_TOOL_UNKNOWN'
 	| 'EXECUTOR_TOOL_UNWIRED'
 	| 'EXECUTOR_PROGRAM_OVERRIDDEN'
-	| 'EXECUTOR_MODEL_UNSET';
+	| 'EXECUTOR_MODEL_UNSET'
+	// ⭐ `JAN-EXEC` Phase 8 (D2; `REG-D-111` (5)) — the replay switch's two refusals (`replay/replay-switch.ts`).
+	| 'EXECUTOR_REPLAY_OUTSIDE_TEST_MODE'
+	// ⭐ `REG-D-112` (c) — ~~`EXECUTOR_REPLAY_BESIDE_A_TOOL`~~: beside ANY live-backend selection, its general form.
+	| 'EXECUTOR_REPLAY_BESIDE_A_LIVE_SELECTION';
 
 /**
- * The selector's answer — exactly one of four.
+ * The selector's answer — exactly one of ~~four~~ ⭐ five: `JAN-EXEC` Phase 8 adds `REPLAY` (D2), the recording folder
+ * `JPWB_REPLAY` names, honoured in test mode only.
  *
  * ⭑ `REFUSED` CARRIES THE TOOL IT REFUSED, when one was named, so no caller has to re-read the environment to say which
  * configuration was wrong — a second read is a second answer. And `PI`/`AGY` carry the MODEL, which is what opens the
@@ -52,6 +63,9 @@ export type ExecutorSelection =
 	| { readonly kind: 'STAND_IN' }
 	| { readonly kind: 'PI'; readonly modelId: string }
 	| { readonly kind: 'AGY'; readonly modelId: string }
+	// ⭐ `JAN-EXEC` Phase 8 (D2) — the executor answers from a recording: each recorded turn's tool calls run through the
+	// real minted tools, and its recorded answer is returned once the turn text's hash matches (`replay/replay-executor.ts`).
+	| { readonly kind: 'REPLAY'; readonly recordingDir: string }
 	| {
 			readonly kind: 'REFUSED';
 			readonly code: ExecutorRefusalCode;
@@ -167,7 +181,40 @@ function selectedProgramOverridden(
 }
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 8 (`DESIGN-phase-7-completion.md` §5 D2; `REG-D-111` (5); `REG-F-530`) — THE REPLAY SWITCH'S ANSWER,
+ * or `undefined` when `JPWB_REPLAY` is unset. Asked FIRST, before the tool, because each refusal below is about the
+ * switch: outside test mode it is refused whatever tool is named (a replay asked for in a deployed host must not run the
+ * real executor instead), and in test mode it is refused beside ~~a named tool~~ ⭐ any live-backend selection — the
+ * authoring agent, a model, a program override included (`REG-D-112` (c); `liveSelectionsBesideReplay`) — since none may
+ * silently win, and one that did would be a paid call.
+ */
+function replaySelection(
+	env: ExecutorEnvironment,
+	testMode: boolean,
+	toolId: string | undefined,
+	overrides: ExecutorProgramOverrides
+): ExecutorSelection | undefined {
+	const recordingDir = resolveReplayRecording(env[REPLAY_VARIABLE]);
+	if (recordingDir === undefined) return undefined;
+	if (!testMode)
+		return refused(
+			'EXECUTOR_REPLAY_OUTSIDE_TEST_MODE',
+			toolId,
+			`${REPLAY_VARIABLE} is set, and a replay is honoured in test mode only: outside it the executor would answer from ` +
+				'a recording while the record named a model that ran. Unset it, or run in test mode (REG-D-111 (5)).'
+		);
+	const beside = liveSelectionsBesideReplay(env, overrides);
+	if (beside.length > 0)
+		return refused('EXECUTOR_REPLAY_BESIDE_A_LIVE_SELECTION', toolId, besideReplayReason(beside));
+	return { kind: 'REPLAY', recordingDir };
+}
+
+/**
  * Which executor runs.
+ *
+ * ⭐ `JAN-EXEC` Phase 8 — ASKED FIRST: `JPWB_REPLAY` (`replaySelection`, above): REPLAY in test mode with no live backend
+ * selected beside it, else `EXECUTOR_REPLAY_OUTSIDE_TEST_MODE` or ⭐ `EXECUTOR_REPLAY_BESIDE_A_LIVE_SELECTION`
+ * (`REG-D-112` (c)). Unset, the table below is unchanged.
  *
  * ⭑ THE TABLE (D1, D3), in the order it is asked:
  *   1. `EXECUTOR_TOOL_UNSET` — `JPWB_EXECUTOR` absent, `''` or whitespace OUTSIDE test mode. In test mode: the STAND-IN.
@@ -199,6 +246,9 @@ export function selectExecutor(input: {
 	// PROCESS's variable when given `undefined`, so an explicit environment naming no tool, or a tool and no model,
 	// would take them from the process — a second read, which is how two answers come to disagree. `''` is unset to both.
 	const toolId = resolveExecutorToolId(env.JPWB_EXECUTOR ?? '');
+	const overrides = input.overrides ?? { agy: AGY_BIN_OVERRIDE, devin: DEVIN_BIN_OVERRIDE };
+	const replay = replaySelection(env, input.testMode, toolId, overrides);
+	if (replay) return replay;
 	if (toolId === undefined)
 		return input.testMode
 			? { kind: 'STAND_IN' }
@@ -225,11 +275,7 @@ export function selectExecutor(input: {
 			`The executing tool '${toolId}' (JPWB_EXECUTOR) declares the EXECUTION role, but no executor adapter is ` +
 				'wired for it on this host.'
 		);
-	const overridden = selectedProgramOverridden(
-		toolId,
-		input.testMode,
-		input.overrides ?? { agy: AGY_BIN_OVERRIDE, devin: DEVIN_BIN_OVERRIDE }
-	);
+	const overridden = selectedProgramOverridden(toolId, input.testMode, overrides);
 	if (overridden) return overridden;
 	const modelId = resolveExecutorModel(env.JPWB_EXECUTOR_MODEL ?? '');
 	if (modelId === undefined)
@@ -257,7 +303,10 @@ export function executorRecordIdentity(selection: RunnableExecutorSelection): {
 	readonly modelId: string;
 	readonly providerId: string;
 } {
-	if (selection.kind === 'STAND_IN') return { modelId: 'unresolved', providerId: 'unresolved' };
+	// ⭐ `JAN-EXEC` Phase 8 — AND THE REPLAY NAMES NEITHER: no configured model produces a replayed answer. The replay reports
+	// the RECORDED producer itself, graded HOST_CONFIGURED (`replay/replay-executor.ts`); this is only a thrown turn's.
+	if (selection.kind === 'STAND_IN' || selection.kind === 'REPLAY')
+		return { modelId: 'unresolved', providerId: 'unresolved' };
 	return { modelId: selection.modelId, providerId: selection.kind === 'AGY' ? 'agy' : 'pi' };
 }
 

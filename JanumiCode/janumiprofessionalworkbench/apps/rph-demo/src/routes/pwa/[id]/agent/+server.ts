@@ -31,6 +31,7 @@ import {
 	type FloorView
 } from '$lib/server/floor';
 import { assurancePreflight } from '$lib/server/assurance/preflight';
+import { authoringRefusedUnderReplay } from '$lib/server/replay/replay-switch';
 import {
 	beginAuthoringTurn,
 	discardAuthoringTurn,
@@ -333,6 +334,17 @@ export const POST: RequestHandler = async ({ params, request }) => {
 						kind: 'error',
 						message: `This PWA is ${pwa.publicationStatus}, not DRAFT — authoring is closed (a published version is immutable).`
 					});
+					send({ kind: 'done' });
+					return;
+				}
+				// ⭐⭐ `JAN-EXEC` Phase 8 (`REG-D-112` (c)) — NO AUTHORING TURN UNDER THE REPLAY SWITCH, whichever agent is
+				// configured: the replay covers the execution half from the published PWA, its recording holds no authoring
+				// call, and the turn would ask the REPLAY reviewer a PWA review it does not hold — or, with `JPWB_AGENT=pi`,
+				// be a live agent's, which the preflight below also refuses beside the switch. Refused here first, before
+				// the agent is created or a turn begun (`authoring-route-replay.test.ts`).
+				const replayRefusal = authoringRefusedUnderReplay();
+				if (replayRefusal !== undefined) {
+					send({ kind: 'error', message: replayRefusal });
 					send({ kind: 'done' });
 					return;
 				}

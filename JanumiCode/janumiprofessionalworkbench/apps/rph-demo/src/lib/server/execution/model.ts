@@ -15,6 +15,8 @@
 // gets its meaning when it gets an editor.
 import { agyPrintWithModel, type AgyExec } from '../assurance/agy-cli.js';
 import type { RunnableExecutorSelection } from './executor-selection.js';
+import { openReplayExecutionSession } from '../replay/replay-executor.js';
+import { replayRunFor } from '../replay/replay-run.js';
 import {
 	oneShotSession,
 	type OpenProducerSession,
@@ -148,6 +150,12 @@ export function getExecutionSession(
 	if (selection.kind === 'AGY')
 		return async () =>
 			oneShotSession((prompt: string) => agyPrintWithModel(prompt, selection.modelId, deps.agyExec));
+	// ⭐⭐ `JAN-EXEC` Phase 8 (`DESIGN-phase-7-completion.md` §5 D2; `REG-F-530`) — THE FOURTH SESSION: the executor answering
+	// from the recording `JPWB_REPLAY` names (`replay/replay-executor.ts`), opened only for a REPLAY selection, which the
+	// selector answers in test mode alone. ⛔ The recording is read when the step OPENS its producer, never at selection: a
+	// recording that cannot be read is thrown here and recorded as a failed step, as every opener's refusal is.
+	if (selection.kind === 'REPLAY')
+		return async (context) => openReplayExecutionSession(context, replayRunFor(selection.recordingDir));
 	// ⛔ EXHAUSTIVE, AND A SELECTION NOBODY WIRED OPENS NOTHING. The type admits no other kind, so this is unreachable
 	// today; it exists so that a new kind — or a refusal that reached here past the type — is refused when opened,
 	// rather than falling through to whichever tool happened to be written last.

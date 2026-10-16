@@ -85,7 +85,7 @@ import { getEngine, resetEngine } from '../workbench.js';
 import { beginExecute, modelWorkUnit } from './begin-execute.testing.js';
 import { DEFAULT_REPAIR_BOUND } from './loop-detection.js';
 
-/** The eight live-backend variables — each case sets only what it names. */
+/** D8's live-backend variables — each case sets only what it names. */
 const LIVE_BACKEND_VARIABLES = [
 	'JPWB_ASSURANCE_TOOL',
 	'JPWB_ASSURANCE_MODEL',

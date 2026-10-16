@@ -15,10 +15,16 @@
 //
 // ⚠ PI IS IMPORTED ONLY HERE, and only through a dynamic import at the call site, so the mock path and the whole
 // gate never load its heavy Node deps — the rule `agent/index.ts` already follows.
+// ⭐ `JAN-EXEC` Phase 8 (`REG-D-112` (d)) — STILL TRUE OF THIS MODULE AND OF THE CODING AGENT IT LOADS. The mapping of the
+// minted tools onto Pi's tool definitions moved to `pi-execution-tools.ts`, which imports only a TYPE from Pi, because it
+// decides the order a turn's calls run in (`REG-F-518`); its test drives that through Pi's CORE loop (`pi-agent-core`,
+// `pi-ai`'s faux provider), the one gate test that loads any part of Pi's SDK, and never this module.
+// ⭐ And the executor's resource-loader options moved to `pi-executor-resources.ts` (the lead's delegated decision of
+// 2026-10-15, to be registered), which imports types alone from Pi: its test reads Pi's declaration of those options,
+// and this module's source, and loads neither.
 import {
 	AuthStorage,
 	createAgentSession,
-	defineTool,
 	DefaultResourceLoader,
 	getAgentDir,
 	ModelRegistry,
@@ -27,7 +33,6 @@ import {
 	SettingsManager
 } from '@earendil-works/pi-coding-agent';
 import { answerFromTurnEnd } from './backing-tool.js';
-import { EXECUTION_CONTRACT_PROMPT } from '../execution/execution-contract.js';
 import type { AdapterToolObservation, ToolInvocationResult } from './backing-tool.js';
 import {
 	producerWorkingDirectory,
@@ -38,9 +43,9 @@ import {
 	createMaterializedInputRecorder,
 	type PayloadHookHost
 } from '../agent/materialized-input.js';
-import { toPiToolResult } from '../agent/pi-tool-result.js';
-import { toTypeBox } from '../agent/pi-typebox.js';
-import { mintExecutionTools, type ExecutionToolDescriptor } from './execution-tool-surface.js';
+import { mintExecutionTools } from './execution-tool-surface.js';
+import { executorResourceLoaderOptions } from './pi-executor-resources.js';
+import { toPiExecutionTools } from './pi-execution-tools.js';
 import { createToolCallObserver } from './tool-call-observer.js';
 import { createProcessRunObserver } from './process-run-observer.js';
 
@@ -74,26 +79,10 @@ function resolveExecutingModel(modelRegistry: ModelRegistry, configured: string)
 }
 
 /**
- * Wrap the minted execution tools as Pi custom tools.
- *
- * ⭑ THE SAME MAPPING THE AUTHORING AGENT USES, and deliberately so: one `ParamSpec` grammar, one TypeBox
- * translation (`toTypeBox`), one result shape (`toPiToolResult`). ⚠ IT TAKES WHAT `mintExecutionTools` RETURNED
- * AND FILTERS NOTHING — every decision about what the model may have was made at minting time, against the
- * grant. A second filter here would be a second authority over the same question, and the weaker of two
- * authorities is the one that eventually answers.
+ * ~~Wrap the minted execution tools as Pi custom tools.~~ ⭐ `JAN-EXEC` Phase 8 (`REG-D-112` (d)) — MOVED, with its reasons,
+ * to `pi-execution-tools.ts` (`toPiExecutionTools`): it decides the order a turn's tool calls run in (`REG-F-518`), and
+ * this module loads Pi's SDK at module scope, so nothing in the gate could drive it here.
  */
-function toPiExecutionTools(descriptors: readonly ExecutionToolDescriptor[]) {
-	return descriptors.map((d) =>
-		defineTool({
-			name: d.name,
-			label: d.name,
-			description: d.description,
-			parameters: toTypeBox(d.parameters),
-			execute: async (_toolCallId: string, params: Record<string, unknown>) =>
-				toPiToolResult(await d.run(params ?? {}))
-		})
-	);
-}
 
 /**
  * Run ONE bounded turn on Pi and return the work product plus who produced it.
@@ -179,15 +168,21 @@ export async function openPiExecutionSession(
 
 	const authStorage = AuthStorage.create();
 	const modelRegistry = ModelRegistry.create(authStorage);
-	const settingsManager = SettingsManager.create(cwd, getAgentDir());
+	// ⛔ TRUSTING NO PROJECT (the check of E4's polish round, F1): Pi trusts a project's `.pi/settings.json` by default, and
+	// the workspace is a project the executor writes into — so a unit's `write_file` of that file made every later unit's
+	// load install what it listed and was missing, by the command it named, on this host with this server's environment.
+	// Untrusted, the workspace's settings are not read at all; the agent folder's, the operator's own, still are.
+	const settingsManager = SettingsManager.create(cwd, getAgentDir(), { projectTrusted: false });
 	const model = resolveExecutingModel(modelRegistry, modelId);
 
-	const loader = new DefaultResourceLoader({
-		cwd,
-		agentDir: getAgentDir(),
-		settingsManager,
-		systemPromptOverride: () => EXECUTION_CONTRACT_PROMPT
-	});
+	// ⭐⭐ THE EXECUTOR'S INSTRUCTION IS THE CONTRACT AND ITS TOOLS ARE THE MINTED ONES — NOTHING PI FINDS AROUND THE
+	// WORKSPACE (the lead's delegated decision of 2026-10-15, to be registered). ~~The contract overriding the system prompt
+	// alone~~ — Pi's loader is told to leave out the context files, an appended prompt, extensions, skills and prompt
+	// templates too (`executorResourceLoaderOptions`). ⚠ THIS CHANGES THE EXECUTOR'S BEHAVIOUR: by Pi's defaults each of
+	// those reached it until now; `pi-executor-resources.ts` says what each was.
+	const loader = new DefaultResourceLoader(
+		executorResourceLoaderOptions({ cwd, agentDir: getAgentDir(), settingsManager })
+	);
 	await loader.reload();
 
 	const created = await createAgentSession({
@@ -202,6 +197,9 @@ export async function openPiExecutionSession(
 		// ⚠ IN-MEMORY, AND THAT IS A DISCLOSED BOUND. The session survives the work unit and NOT a restart —
 		// so the memory this change adds is per-unit and process-local, which the design states rather than
 		// letting a reader infer durability that is not there.
+		// ⚠ AND GIVEN NO FOLDER, so the session takes `process.cwd()`, and the working-directory line Pi ends the
+		// system prompt with names the server's folder, not the workspace — found in the E4 polish round and not
+		// changed: an open question (`pi-executor-resources.ts`).
 		sessionManager: SessionManager.inMemory(),
 		settingsManager,
 		authStorage,

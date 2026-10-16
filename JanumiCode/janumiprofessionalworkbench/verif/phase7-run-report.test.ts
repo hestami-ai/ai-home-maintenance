@@ -2310,11 +2310,17 @@ describe('JAN-EXEC P7-2 D9 — the per-command re-run manifest (P7-4d)', () => {
 	});
 
 	it('⛔ an argument is scanned as the JSON files will spell it too: one only that spelling names leaves out its command, never the report', () => {
-		// Raw, `\x\y` is one backslash a part — no share; escaped, as report.json writes it, `\\x\\y` reads as one.
-		expect(manifestArgv(['node', '-e', `require('${B}x${B}y')`], 'E:/runs/p7/ws', NAMES)).toEqual({
+		// ~~Raw, `\x\y` is one backslash a part — no share; escaped, as report.json writes it, `\\x\\y` reads as one.~~ ⭐ (The
+		// re-review of E4's fix round: a share is now read by its runs' ratio, which escaping keeps, so no spelling of
+		// `\x\y` is one.) Raw, `a:` and a newline is no drive; escaped, as report.json writes it, `a:\n` reads as one.
+		expect(manifestArgv(['node', '-e', 'const o = { a:\n1 }'], null, NAMES)).toEqual({
 			argv: ['node', '-e', REDACTED],
-			problems: ['argv[2] names unc-path (REG-F-536)']
+			problems: ['argv[2] names drive-path (REG-F-536)']
 		});
+		expect(
+			manifestArgv(['node', '-e', `require('${B}x${B}y')`], null, NAMES),
+			'a share in neither spelling'
+		).toEqual({ argv: ['node', '-e', `require('${B}x${B}y')`], problems: [] });
 		// ⭐ A relative path with backslashes is no absolute path in either spelling: it is written as it is.
 		expect(manifestArgv(['node', '--test', `.${B}test${B}unit${B}x.test.js`], 'E:/runs/p7/ws', NAMES)).toEqual({
 			argv: ['node', '--test', `.${B}test${B}unit${B}x.test.js`],

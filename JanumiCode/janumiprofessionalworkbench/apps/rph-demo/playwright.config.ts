@@ -22,8 +22,8 @@ import { forgetLiveBackendSelections } from '../../verif/live-backend-isolation'
 const PORT = Number(process.env.RPH_E2E_PORT ?? 4319);
 
 // ⭐ `JAN-SELREV` D8 — THE e2e SERVER NEVER INHERITS A LIVE-BACKEND SELECTION. Playwright launches the server below
-// from THIS process's environment (`{ ...process.env, ...webServer.env }`), so the eight live-backend variables are
-// removed here, at config load, before it does: exported, `JPWB_ASSURANCE_TOOL` would turn the declared stand-in into
+// from THIS process's environment (`{ ...process.env, ...webServer.env }`), so the live-backend variables
+// (`LIVE_BACKEND_VARIABLES`) are removed here, at config load, before it does: exported, `JPWB_ASSURANCE_TOOL` would turn the declared stand-in into
 // the real, paid reviewer, `JPWB_EXECUTOR` the fixture into a real executor, and `JPWB_AGENT=pi` the mock into the live
 // agent (`REG-F-457` G8). The live lanes have their own configs, which run the real backends and do not import this one.
 forgetLiveBackendSelections();

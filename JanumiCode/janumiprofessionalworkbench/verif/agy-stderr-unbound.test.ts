@@ -182,13 +182,29 @@ const DEMO_PREFIX = 'apps/rph-demo/src/';
  *
  * ⛔ A THIRD ENTRY NEEDS THE EQUIVALENT WRITTEN IN THE SAME COMMIT AS THE BINDING — which is what the pin
  * below is for: widening this list is an act a reviewer sees rather than a line that appeared.
+ *
+ * ⭐⭐ `JAN-EXEC` Phase 8 E4 (`DESIGN-phase-7-completion.md` §5 D1, D2; `REG-F-530`; `REG-F-536`) — TWO MORE, EACH WITH ITS
+ * DISPOSITION IN ITS OWN HEADER, WRITTEN IN THE COMMIT THAT BINDS IT. The replay must replay commands, never re-run them,
+ * so a run's captured stderr is RECORDED and WRITTEN AGAIN:
+ *   5. `replay/recording.ts` — WHAT A RECORDING CARRIES: each command's captured stderr, in `commands.jsonl`, D1's own
+ *      field. The bytes are the recorded run's capture (`PURGEABLE_AT_EXPIRY`) and its evidence's mint
+ *      (`RETAINED_BY_PARTICIPATION`); the recording adds a COMMITTED copy, which the recorder writes only scrubbed of the
+ *      run's directories and refuses on any archive-scan hit (`REG-F-536`). ⚠ ITS RESIDUAL IS LARGER THAN THE STORES':
+ *      the scan finds the account name and absolute paths, never a secret a command read from disk, and a committed file
+ *      has no purge — git history is its removal path.
+ *   6. `replay/replayed-runner.ts` — WHO WRITES IT BACK: the recorded stderr into the output workspace, `R7`'s
+ *      disposition unchanged (both streams retained, `PURGEABLE_AT_EXPIRY`, referenced by `ProcessRunOutcome.retention`,
+ *      reachable by `Workspace.purge`), and it refuses construction where any of that is untrue, as the real runner does.
  */
 const DISPOSED_STDERR_SITES = [
 	'lib/server/execution/child-process-runner.ts',
 	'lib/server/tools/execution-tool-surface.ts',
 	'lib/server/tools/process-run-observer.ts',
 	// ⭐ `JAN-PRQUAL` `PQ-1` — was `lib/server/execution/process-result-floor.ts`; the renderer, and its disposition, moved.
-	'lib/server/assurance/process-result-render.ts'
+	'lib/server/assurance/process-result-render.ts',
+	// ⭐ `JAN-EXEC` Phase 8 E4 — the recording's stderr, and the replayed runner that writes it back (above: 5, 6).
+	'lib/server/replay/recording.ts',
+	'lib/server/replay/replayed-runner.ts'
 ];
 
 /** REG-Q-066's ORIGINAL subject, named so the bound it actually stated stays closed on its own terms. */
@@ -516,11 +532,14 @@ describe('REG-Q-066 — the stderr hatch is CLOSED BY DISPOSITION, and the dispo
 		// ⭐ `JAN-PRQUAL` `PQ-1`: the fourth entry RE-POINTED with the renderer it disposes of (it read
 		// `'lib/server/execution/process-result-floor.ts'`), its disposition moved into that module's header in the same
 		// change — not a fifth entry.
+		// ⭐ `JAN-EXEC` Phase 8 E4 — widened by two, each disposition in its module's header (the list's own comment: 5, 6).
 		expect(DISPOSED_STDERR_SITES).toEqual([
 			'lib/server/execution/child-process-runner.ts',
 			'lib/server/tools/execution-tool-surface.ts',
 			'lib/server/tools/process-run-observer.ts',
-			'lib/server/assurance/process-result-render.ts'
+			'lib/server/assurance/process-result-render.ts',
+			'lib/server/replay/recording.ts',
+			'lib/server/replay/replayed-runner.ts'
 		]);
 	});
 

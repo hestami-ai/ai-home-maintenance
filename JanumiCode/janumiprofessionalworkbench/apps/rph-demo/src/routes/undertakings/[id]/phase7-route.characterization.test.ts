@@ -138,7 +138,7 @@ import {
 import { getArtifactStore, getEngine, resetEngine } from '../../../lib/server/workbench.js';
 import { actions, load } from './+page.server.js';
 
-/** The eight live-backend variables — each case sets only what it names. */
+/** D8's live-backend variables — each case sets only what it names. */
 const LIVE_BACKEND_VARIABLES = [
 	'JPWB_ASSURANCE_TOOL',
 	'JPWB_ASSURANCE_MODEL',
