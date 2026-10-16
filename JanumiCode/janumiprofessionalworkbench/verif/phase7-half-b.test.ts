@@ -61,6 +61,7 @@ import {
 	overlayOf,
 	producerOfStream,
 	runTheLane,
+	typeUnreadableOf,
 	type ActionOutcome,
 	type Boot,
 	type Dump,
@@ -2623,6 +2624,88 @@ describe('⛔ R4 (the lead’s round-4 item 6) — a re-run the limit stopped en
 			allowed: true
 		});
 		expect(record.end?.reason, 'a run whose re-run the limit stopped ended as though it had completed').toBe('paid-limit');
+	});
+});
+
+// ── ⛔ R4 (the lead's round-4 item 2) — THE LANE FAILS CLOSED ON A ROOT WHOSE TYPE IT CANNOT FIND OR READ ─────────────────────
+// Paid, half B checks the limit before the agent's root is pressed, counting what its press may spend: one try's reserve for a
+// root that declares MODEL, none for one that runs no model (`rootLimitCheck`). ⛔ A type the lane could not find or read was
+// read as UNDECLARED (`dischargeOf`), counted none ahead and pressed: a root whose press may run a model, its calls uncounted.
+// Now it is never pressed, and the run ends `root-type-unreadable`, why in its detail — the run report's own reading of such a
+// root (`typeUnreadable`, R3-B F6). ⭑ Its control: a type read that names no discharge, which is UNDECLARED and runs no model.
+
+describe('⛔ R4 (the lead’s round-4 item 2) — the lane FAILS CLOSED on a root whose type it cannot find or read: never pressed, why recorded, the run ended by name', () => {
+	/** The agent's PWA, its root's type state replaced by `change`'s. */
+	const withRootType = (change: (state: Record<string, unknown>) => Record<string, unknown>): ObjectRow[] =>
+		AGENT_TYPES.map((t) => (t.state.isRoot === true ? { id: t.id, state: change({ ...t.state }) } : t));
+	/** Why the lane ends such a run, as its record's end says it. */
+	const unread = (why: string): string =>
+		`the root’s type cannot be read (${why}): whether its press runs a model, and so what the limit must count before it, ` +
+		'cannot be decided, so it is not pressed (D8; REG-D-112, finding 2)';
+
+	it('⛔ a root whose type is NOT IN THE STORE is never pressed: the run ends root-type-unreadable, saying why', async () => {
+		// ⛔ PREDICTED RED, read from the code: `dischargeOf` read a type it could not find as UNDECLARED, so the root counted
+		// none ahead and was pressed.
+		const l = halfBLane({ paid: true, types: AGENT_TYPES.filter((t) => t.state.isRoot !== true) });
+		const record = await l.run();
+		expect(l.only('beginExecute'), 'a root whose type the lane cannot find was pressed').toEqual([]);
+		expect([record.end?.reason, record.end?.detail]).toEqual(['root-type-unreadable', unread('pwutype_root is not in the store')]);
+		expect([record.units[0]?.limitCheck, l.written().end?.reason]).toEqual([null, 'root-type-unreadable']);
+		expect(laneVerdict(record)).toEqual([
+			`the run ended 'root-type-unreadable', not 'complete': ${unread('pwutype_root is not in the store')}`
+		]);
+	});
+
+	it('⛔ and so is a root that names NO TYPE, and one whose type declares a discharge that is NO WORD', async () => {
+		// ⛔ PREDICTED RED, read from the code: each was read as UNDECLARED, counted none ahead, and pressed.
+		const noType = halfBLane({ paid: true, units: AGENT_UNITS.map((u) => (u.id === 'pwu_r' ? { ...u, typeId: '' } : u)) });
+		const noTypeRecord = await noType.run();
+		const garbled = halfBLane({ paid: true, types: withRootType((s) => ({ ...s, workDischarge: 7 })) });
+		const garbledRecord = await garbled.run();
+		expect([noType.only('beginExecute'), garbled.only('beginExecute')], 'a root whose type the lane cannot read was pressed').toEqual([[], []]);
+		expect([noTypeRecord.end?.reason, noTypeRecord.end?.detail, garbledRecord.end?.reason, garbledRecord.end?.detail]).toEqual([
+			'root-type-unreadable',
+			unread('the unit pwu_r names no type'),
+			'root-type-unreadable',
+			unread('pwutype_root declares a workDischarge that is no word: 7')
+		]);
+	});
+
+	it('⭐ `typeUnreadableOf` reads each way a type cannot be read — the unit not in the store, no type named, the type not in the store, a discharge that is no word — and reads a type that names none, or names one', () => {
+		const snap = (pwus: ObjectRow[], pwuTypes: ObjectRow[]): EngineSnapshot => ({ pwus, pwuTypes }) as unknown as EngineSnapshot;
+		const unit = (pwuTypeId: unknown): ObjectRow => ({ id: 'pwu_r', state: { pwuTypeId } });
+		const type = (state: Record<string, unknown>): ObjectRow => ({ id: 'pwutype_root', state });
+		expect([
+			typeUnreadableOf(snap([], [type({ workDischarge: 'MODEL' })]), 'pwu_r'),
+			typeUnreadableOf(snap([unit(undefined)], [type({ workDischarge: 'MODEL' })]), 'pwu_r'),
+			typeUnreadableOf(snap([unit('pwutype_root')], []), 'pwu_r'),
+			typeUnreadableOf(snap([unit('pwutype_root')], [type({ workDischarge: ['MODEL'] })]), 'pwu_r'),
+			typeUnreadableOf(snap([unit('pwutype_root')], [type({})]), 'pwu_r'),
+			typeUnreadableOf(snap([unit('pwutype_root')], [type({ workDischarge: null })]), 'pwu_r'),
+			typeUnreadableOf(snap([unit('pwutype_root')], [type({ workDischarge: 'MODEL' })]), 'pwu_r')
+		]).toEqual([
+			'the unit pwu_r is not in the store',
+			'the unit pwu_r names no type',
+			'pwutype_root is not in the store',
+			'pwutype_root declares a workDischarge that is no word: ["MODEL"]',
+			null,
+			null,
+			null
+		]);
+	});
+
+	it('⭑ CONTROL — a root whose type names NO discharge is READ, UNDECLARED: it runs no model, counts none ahead, and is pressed', async () => {
+		const l = halfBLane({
+			paid: true,
+			types: withRootType((s) => Object.fromEntries(Object.entries(s).filter(([key]) => key !== 'workDischarge')))
+		});
+		const record = await l.run();
+		expect(l.only('beginExecute root')).toEqual(['beginExecute root']);
+		expect([record.units[0]?.limitCheck?.ahead, record.units[0]?.limitCheck?.counted, record.end?.reason]).toEqual([
+			0,
+			'none: it runs no model',
+			'complete'
+		]);
 	});
 });
 

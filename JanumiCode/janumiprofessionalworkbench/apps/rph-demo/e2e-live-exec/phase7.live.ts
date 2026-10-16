@@ -114,7 +114,7 @@ import { STORE_FILE } from './run-folder';
 // is the operator's (`authorThePwa`), on the `author` hands below. ⚠ Unset or blank, the half is A: everything above.
 // ⭐⭐ `REG-D-112` (E3's review): the LIMIT is checked before Send, the authoring floor's worst case counted, and before the
 // root's press, a MODEL root's ~~worst case~~ ⭐ one try's reserve (`REG-D-114` (14), as amended 2026-10-16) counted (finding
-// 2); the store is ARCHIVED into `lane/archive/00-authoring` however the authoring ends, so even a run that stopped there
+// 2), ⭐ and a root whose type the lane cannot find or read never pressed (`root-type-unreadable`; the lead's round-4 item 2); the store is ARCHIVED into `lane/archive/00-authoring` however the authoring ends, so even a run that stopped there
 // is reported (finding 1); and every unit's row is found BY ITS ID, since a title may repeat (finding 5).
 //
 // ── ⚠ WHAT THIS SPEC ASSERTS, AND WHAT IT ONLY RECORDS ────────────────────────────────────────────────────────────────

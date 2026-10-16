@@ -30871,5 +30871,77 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/phase7-run-report.test.ts"],
 		why: "PROMISE (REG-D-114 (14), as amended 2026-10-16): report.json's reviewer calls carry the plain caveat too (reviewerCalls.limitCaveat), and report.md prints it from there. WHO RELIES: any reader of report.json. WHAT THE MUTATION DOES: report.json carries an empty caveat, and report.md with it. Applied by hand first, the file restored byte for byte: 'AssertionError: report.md carries no caveat that a press can spend past the limit: expected '# Phase 7 run report\\n\\n- **Basis:** …' to contain '- **Caveat:** A phase’s own spend can…'' (1 test red in its victim). OBSERVED (bun run mutants -- (round 4 F1's ids: R4-M1 to R4-M14, the nine it re-anchored and the six it abolished), 2026-10-16, in the round-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R4-M14-report-json-carries-no-caveat ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 7 completion programme, round 4, F1 - REG-D-114 (14), as amended 2026-10-16: one rule at every check, the running total plus what the press can spend before the lane's next check at most the limit - before a phase's Begin & Execute, the rule's re-run of its work or of its review, and a MODEL root's press, one try's reserve (LANE_BUDGET.reviewerCallsPerTry), D8's own rule; before a sign-off and a declared re-run, that act's worst case; before Send, the authoring floor's - each check recording what it counted, and the run report saying so, with the plain caveat that a phase's own spend can carry the total past the limit"
+	},
+	{
+		id: "R4-M15-a-root-whose-type-cannot-be-read-is-pressed",
+		file: "apps/rph-demo/e2e-live-exec/phase7-operator.ts",
+		find: "const unreadable = typeUnreadableOf(snapshot, root.unitId!);",
+		replace: "const unreadable: string | null = null;",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (the lead's round-4 item 2): paid, half B never presses a root whose type the lane cannot find or read - whether its press runs a model, and so what the limit must count before it, cannot be decided. WHO RELIES: P6, whose agent's root may run a model, and the sponsor's limit. WHAT THE MUTATION DOES: the lane never asks, and the root is read as UNDECLARED, counted none ahead and pressed - the build before this round. Applied by hand first, the file restored byte for byte: 'AssertionError: a root whose type the lane cannot find was pressed: expected [ 'beginExecute root', …(3) ] to deeply equal []' (2 tests red in its victim). OBSERVED (bun run mutants -- R4-M15 to R4-M22 by their full ids, 2026-10-16, in the round-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R4-M15-a-root-whose-type-cannot-be-read-is-pressed ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion programme, round 4, F2 - the lane fails closed on a root whose type it cannot find or read (the lead's round-4 item 2): paid, half B never presses such a root - whether its press runs a model, and so what the limit must count before it, cannot be decided - and ends the run root-type-unreadable, why in its detail (typeUnreadableOf, the run report's reading of such a root); a type read that names no discharge stays UNDECLARED"
+	},
+	{
+		id: "R4-M16-the-run-ends-by-another-name",
+		file: "apps/rph-demo/e2e-live-exec/phase7-operator.ts",
+		find: "'root-type-unreadable',\n\t\t\t\t\t`the root’s type cannot be read",
+		replace: "'lane-error',\n\t\t\t\t\t`the root’s type cannot be read",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (the lead's round-4 item 2): the run ends with a reason of its own, root-type-unreadable. WHO RELIES: the run's reader and laneVerdict, which must tell this end from the lane's own faults. WHAT THE MUTATION DOES: the run ends lane-error. Applied by hand first, the file restored byte for byte: 'AssertionError: expected [ 'lane-error', …(1) ] to deeply equal [ 'root-type-unreadable', …(1) ]' (2 tests red in its victim). OBSERVED (bun run mutants -- R4-M15 to R4-M22 by their full ids, 2026-10-16, in the round-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R4-M16-the-run-ends-by-another-name ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion programme, round 4, F2 - the lane fails closed on a root whose type it cannot find or read (the lead's round-4 item 2): paid, half B never presses such a root - whether its press runs a model, and so what the limit must count before it, cannot be decided - and ends the run root-type-unreadable, why in its detail (typeUnreadableOf, the run report's reading of such a root); a type read that names no discharge stays UNDECLARED"
+	},
+	{
+		id: "R4-M17-a-type-not-in-the-store-is-read",
+		file: "apps/rph-demo/e2e-live-exec/phase7-operator.ts",
+		find: "if (type === undefined) return `${typeId} is not in the store`;",
+		replace: "if (type === undefined) return null;",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (the lead's round-4 item 2): a root whose type the store does not hold cannot be read. WHO RELIES: the fail-closed check before the root's press. WHAT THE MUTATION DOES: such a type is read, as UNDECLARED, and the root pressed. Applied by hand first, the file restored byte for byte: 'AssertionError: a root whose type the lane cannot find was pressed: expected [ 'beginExecute root', …(3) ] to deeply equal []' (2 tests red in its victim). OBSERVED (bun run mutants -- R4-M15 to R4-M22 by their full ids, 2026-10-16, in the round-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R4-M17-a-type-not-in-the-store-is-read ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion programme, round 4, F2 - the lane fails closed on a root whose type it cannot find or read (the lead's round-4 item 2): paid, half B never presses such a root - whether its press runs a model, and so what the limit must count before it, cannot be decided - and ends the run root-type-unreadable, why in its detail (typeUnreadableOf, the run report's reading of such a root); a type read that names no discharge stays UNDECLARED"
+	},
+	{
+		id: "R4-M18-a-unit-naming-no-type-is-read",
+		file: "apps/rph-demo/e2e-live-exec/phase7-operator.ts",
+		find: "if (typeId === '') return `the unit ${unitId} names no type`;",
+		replace: "if (typeId === '') return null;",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (the lead's round-4 item 2): a root that names no type cannot have its type read. WHO RELIES: the fail-closed check before the root's press. WHAT THE MUTATION DOES: it is read, as UNDECLARED, and the root pressed. Applied by hand first, the file restored byte for byte: 'AssertionError: a root whose type the lane cannot read was pressed: expected [ [ 'beginExecute root', …(3) ], [] ] to deeply equal [ [], [] ]' (2 tests red in its victim). OBSERVED (bun run mutants -- R4-M15 to R4-M22 by their full ids, 2026-10-16, in the round-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R4-M18-a-unit-naming-no-type-is-read ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion programme, round 4, F2 - the lane fails closed on a root whose type it cannot find or read (the lead's round-4 item 2): paid, half B never presses such a root - whether its press runs a model, and so what the limit must count before it, cannot be decided - and ends the run root-type-unreadable, why in its detail (typeUnreadableOf, the run report's reading of such a root); a type read that names no discharge stays UNDECLARED"
+	},
+	{
+		id: "R4-M19-a-discharge-that-is-no-word-is-read",
+		file: "apps/rph-demo/e2e-live-exec/phase7-operator.ts",
+		find: ": `${typeId} declares a workDischarge that is no word: ${JSON.stringify(declared)}`;",
+		replace: ": null;",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (the lead's round-4 item 2): a type whose workDischarge is there and no string cannot be read. WHO RELIES: the fail-closed check before the root's press. WHAT THE MUTATION DOES: it is read, as UNDECLARED, and the root pressed. Applied by hand first, the file restored byte for byte: 'AssertionError: a root whose type the lane cannot read was pressed: expected [ [], [ 'beginExecute root', …(3) ] ] to deeply equal [ [], [] ]' (2 tests red in its victim). OBSERVED (bun run mutants -- R4-M15 to R4-M22 by their full ids, 2026-10-16, in the round-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R4-M19-a-discharge-that-is-no-word-is-read ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion programme, round 4, F2 - the lane fails closed on a root whose type it cannot find or read (the lead's round-4 item 2): paid, half B never presses such a root - whether its press runs a model, and so what the limit must count before it, cannot be decided - and ends the run root-type-unreadable, why in its detail (typeUnreadableOf, the run report's reading of such a root); a type read that names no discharge stays UNDECLARED"
+	},
+	{
+		id: "R4-M20-a-unit-not-in-the-store-is-read",
+		file: "apps/rph-demo/e2e-live-exec/phase7-operator.ts",
+		find: "if (unit === undefined) return `the unit ${unitId} is not in the store`;",
+		replace: "if (unit === undefined) return null;",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (the lead's round-4 item 2): a unit the store does not hold has no type the lane can read. WHO RELIES: the fail-closed check before the root's press, should the store lose the root between its reads. WHAT THE MUTATION DOES: such a unit's type is read, as UNDECLARED. Applied by hand first, the file restored byte for byte: 'AssertionError: expected [ null, …(6) ] to deeply equal [ …(7) ]' (1 test red in its victim). OBSERVED (bun run mutants -- R4-M15 to R4-M22 by their full ids, 2026-10-16, in the round-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R4-M20-a-unit-not-in-the-store-is-read ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion programme, round 4, F2 - the lane fails closed on a root whose type it cannot find or read (the lead's round-4 item 2): paid, half B never presses such a root - whether its press runs a model, and so what the limit must count before it, cannot be decided - and ends the run root-type-unreadable, why in its detail (typeUnreadableOf, the run report's reading of such a root); a type read that names no discharge stays UNDECLARED"
+	},
+	{
+		id: "R4-M21-a-type-naming-no-discharge-is-unreadable",
+		file: "apps/rph-demo/e2e-live-exec/phase7-operator.ts",
+		find: "return declared === undefined || declared === null || typeof declared === 'string'",
+		replace: "return typeof declared === 'string'",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (the lead's round-4 item 2; R3-B F6's reading): a type read that names no discharge is READ - UNDECLARED, a type that runs no model - and its root pressed, counting none. WHO RELIES: a root that declares no discharge, which the agent's PWA may hold (REG-F-505's trap), and the run report, which reads it so. WHAT THE MUTATION DOES: such a type is unreadable, and the run ends root-type-unreadable. Applied by hand first, the file restored byte for byte: 'AssertionError: expected [] to deeply equal [ 'beginExecute root' ]' (2 tests red in its victim). OBSERVED (bun run mutants -- R4-M15 to R4-M22 by their full ids, 2026-10-16, in the round-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R4-M21-a-type-naming-no-discharge-is-unreadable ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion programme, round 4, F2 - the lane fails closed on a root whose type it cannot find or read (the lead's round-4 item 2): paid, half B never presses such a root - whether its press runs a model, and so what the limit must count before it, cannot be decided - and ends the run root-type-unreadable, why in its detail (typeUnreadableOf, the run report's reading of such a root); a type read that names no discharge stays UNDECLARED"
+	},
+	{
+		id: "R4-M22-the-end-says-no-why",
+		file: "apps/rph-demo/e2e-live-exec/phase7-operator.ts",
+		find: "`the root’s type cannot be read (${unreadable}): whether",
+		replace: "`the root’s type cannot be read: whether",
+		expectRed: ["verif/phase7-half-b.test.ts"],
+		why: "PROMISE (the lead's round-4 item 2): the run's end records WHY the root's type cannot be read, in typeUnreadableOf's words. WHO RELIES: the operator, who must know which of the four it was. WHAT THE MUTATION DOES: the end says the type cannot be read, and not why. Applied by hand first, the file restored byte for byte: 'AssertionError: expected [ 'root-type-unreadable', …(1) ] to deeply equal [ 'root-type-unreadable', …(1) ]' (2 tests red in its victim). OBSERVED (bun run mutants -- R4-M15 to R4-M22 by their full ids, 2026-10-16, in the round-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R4-M22-the-end-says-no-why         ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 completion programme, round 4, F2 - the lane fails closed on a root whose type it cannot find or read (the lead's round-4 item 2): paid, half B never presses such a root - whether its press runs a model, and so what the limit must count before it, cannot be decided - and ends the run root-type-unreadable, why in its detail (typeUnreadableOf, the run report's reading of such a root); a type read that names no discharge stays UNDECLARED"
 	}
 ];

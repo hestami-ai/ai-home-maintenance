@@ -561,7 +561,13 @@ export type EndReason =
 	 * not assure; the acceptance, or a designer act after it, was refused; or the PWA did not read PUBLISHED. Nothing can
 	 * run after it. ⚠ A RESULT, recorded with the server's own words — and still not the end a paid run was meant to reach.
 	 */
-	| 'authoring-stopped';
+	| 'authoring-stopped'
+	/**
+	 * ⭐ R4 (the lead's round-4 item 2) — paid, half B's root has a type the lane cannot find or read (`typeUnreadableOf`):
+	 * whether its press runs a model, and so what the limit must count before it, cannot be decided, so it is never pressed.
+	 * ⚠ A RESULT, recorded with why — and not the end a paid run was meant to reach.
+	 */
+	| 'root-type-unreadable';
 
 export interface RunRecord {
 	readonly mode: 'dry' | 'paid';
@@ -1871,6 +1877,26 @@ export function dischargeOf(snap: EngineSnapshot, unitId: string): string {
 }
 
 /**
+ * ⭐⭐ R4 (the lead's round-4 item 2) — WHY THE LANE CANNOT READ THE DISCHARGE A UNIT'S TYPE DECLARES, or null when it can:
+ * the unit is not in the store, it names no type, the store holds no type of that id, or the type's `workDischarge` is there
+ * and no string — the run report's reading of a root it fails closed on (`run-report-core.ts`, `typeUnreadable`). ⚠ A type
+ * read that names no discharge is READ: `UNDECLARED` (`dischargeOf`), a type that runs no model. ⛔ `dischargeOf` alone reads
+ * each of the four as `UNDECLARED` too, so a root whose type the lane could not find counted none ahead and was pressed.
+ */
+export function typeUnreadableOf(snap: EngineSnapshot, unitId: string): string | null {
+	const unit = snap.pwus.find((p) => p.id === unitId);
+	if (unit === undefined) return `the unit ${unitId} is not in the store`;
+	const typeId = str(unit.state.pwuTypeId);
+	if (typeId === '') return `the unit ${unitId} names no type`;
+	const type = snap.pwuTypes.find((t) => t.id === typeId);
+	if (type === undefined) return `${typeId} is not in the store`;
+	const declared = type.state.workDischarge;
+	return declared === undefined || declared === null || typeof declared === 'string'
+		? null
+		: `${typeId} declares a workDischarge that is no word: ${JSON.stringify(declared)}`;
+}
+
+/**
  * ⭐⭐ `REG-D-112` (E3's review, finding 2) — D8 BEFORE HALF B'S ROOT IS PRESSED: the agent's root may declare MODEL — §3.2's
  * runs none — and then its press runs a model and its reviews, so ~~a MODEL root's worst case is counted
  * (`PHASE7_UNIT_REVIEWER_CALLS`)~~ ⭐ `REG-D-114` (14), as amended 2026-10-16: a MODEL root counts one try's reserve
@@ -1995,7 +2021,9 @@ export interface LaneHands {
  *   2. the PWA and the Undertaking (`setUp`), and its units — one per type, or the run ends here; ⭐ in half B, the PWA
  *      authored through the page and its units read from it, each by its id, and ⭐ `REG-D-112` the store ARCHIVED however
  *      the authoring ended (`authorThenArchive`, `00-authoring`) — and, paid, the LIMIT before the agent's root is pressed,
- *      a MODEL root's ~~worst case~~ ⭐ one try's reserve counted (`rootLimitCheck`; `REG-D-114` (14), as amended 2026-10-16);
+ *      a MODEL root's ~~worst case~~ ⭐ one try's reserve counted (`rootLimitCheck`; `REG-D-114` (14), as amended 2026-10-16),
+ *      ⭐ and a root whose type the lane cannot find or read never pressed: the run ends `root-type-unreadable`, why in its
+ *      detail (`typeUnreadableOf`; the lead's round-4 item 2);
  *   3. Begin & Execute on the ROOT, then on each PHASE in order, each only after the one before has answered
  *      (`REG-F-535`), each answer kept raw, the unit's state READ FROM THE STORE (`REG-F-540`), and the run archived and
  *      checked. ⛔ A press with NO ANSWER — the root's included — ends the run there (`unansweredEnd`, D4). Before each
@@ -2281,7 +2309,18 @@ export async function runTheLane(r: {
 		// its press, a MODEL root's ~~worst case~~ ⭐ one try's reserve counted (`rootLimitCheck`; `REG-D-114` (14), as amended
 		// 2026-10-16). §3.2's root runs none, and half A's is unchecked.
 		if (half === 'B' && boot.record.mode === 'paid') {
-			const rootCheck = rootLimitCheck(boot.prior as number, (await hands.read()).snapshot, root.unitId!);
+			const { snapshot } = await hands.read();
+			// ⛔ R4 (the lead's round-4 item 2) — A ROOT WHOSE TYPE THE LANE CANNOT FIND OR READ IS NEVER PRESSED: whether its press
+			// runs a model, and so what the limit must count before it, cannot be decided. The run ends by name, why in its detail.
+			// ⛔ The type was read as UNDECLARED (`dischargeOf`), none counted ahead, and the root pressed.
+			const unreadable = typeUnreadableOf(snapshot, root.unitId!);
+			if (unreadable !== null)
+				return end(
+					'root-type-unreadable',
+					`the root’s type cannot be read (${unreadable}): whether its press runs a model, and so what the limit must ` +
+						'count before it, cannot be decided, so it is not pressed (D8; REG-D-112, finding 2)'
+				);
+			const rootCheck = rootLimitCheck(boot.prior as number, snapshot, root.unitId!);
 			root.limitCheck = rootCheck;
 			writeRunRecord(lane, record);
 			if (!rootCheck.allowed)
