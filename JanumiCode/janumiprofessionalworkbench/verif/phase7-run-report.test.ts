@@ -2052,6 +2052,25 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 		expect(md).toContain('  - requirements, before its Begin & Execute: 200 + 0 + 4 = 204 of 230, under it.');
 	});
 
+	it('⛔ the merge’s fix round, F2 — each read’s figures are worded by their arithmetic: below the limit “under it”; AT it, let through by the rule that lets an act reach it, “at it”; at it under the rule that does not, “not under it”', () => {
+		// ⛔ PREDICTED RED, read from the code: `limitFigures` worded a read by its verdict alone — "under it" for every read the
+		// lane let through — so a total EQUAL to the limit that `limitCheckAhead` lets through (Send, half B's root) read "under it".
+		const run = aRun({}, { run: { end: { reason: 'paid-limit' } } });
+		const laneRun = run.lane.run as { units: Record<string, unknown>[] };
+		const at = (slug: string, fields: Record<string, unknown>) => (u: Record<string, unknown>) => (u.slug === slug ? { ...u, ...fields } : u);
+		/** A read by `limitCheckAhead`'s rule: the act's worst case counted, and a total that REACHES the limit let through. */
+		const reaching = { prior: 196, recorded: 10, reserve: 4, ahead: 20, total: 230, limit: 230, allowed: true };
+		const units = laneRun.units
+			.map(at('root', { limitCheck: reaching }))
+			.map(at('requirements', { limitCheck: read(215, 10, 0) }))
+			.map(at('design', { limitCheck: read(216, 10, 0) }));
+		const md = renderMarkdown(buildRunReport(run.store, { ...run.lane, run: { ...laneRun, units } }, { accountNames: NAMES }).report);
+		expect(md).toContain('  - root, before its Begin & Execute: 196 + 10 + 4 + 20 ahead = 230 of 230, at it, which this act may reach.');
+		expect(md).toContain('  - requirements, before its Begin & Execute: 215 + 10 + 4 = 229 of 230, under it.');
+		// ⭑ `limitCheck`'s rule: the same total held back — never "at it", which says the act may reach the limit.
+		expect(md).toContain('  - design, before its Begin & Execute: 216 + 10 + 4 = 230 of 230, not under it: held back.');
+	});
+
 	it('⛔ stage 7’s sign-off: the lane’s dry run signs the root off (D11) — the root as intended, the run not reached; one never attempted, in a run cut short — not reached; one refused — broke', () => {
 		// ⚠ `E12F` F1 — A DRY RUN BEFORE `REG-D-112` (b): its root signed off by the paid run's own acts. Kept, for an archive made
 		// then; a dry run now rehearses the sign-off up to the reviewer call and presses nothing (the case above).

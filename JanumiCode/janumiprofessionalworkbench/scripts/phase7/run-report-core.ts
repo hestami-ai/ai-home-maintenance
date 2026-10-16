@@ -436,7 +436,8 @@ export interface ReviewerCalls extends ReviewerCallCount {
 	/**
 	 * ⭐ E12's polish (fix2's F8; the lead's delegated decision of 2026-10-15, to be registered) — THE LANE'S OWN READS OF THE
 	 * LIMIT, each before a paid act (D8; `E12F` F2): before each phase, each of the rule's re-runs, each sign-off and each re-run
-	 * of the declared reviews, unit by unit — and which held its act back. Read from `lane/run.json`.
+	 * of the declared reviews, unit by unit — and which held its act back. Read from `lane/run.json`. ⛔ The merge's fix round,
+	 * F3 — half B's read before Send first: kept on the authoring record, not a unit's, it was in no list.
 	 */
 	readonly laneLimitChecks: readonly LaneLimitCheck[];
 }
@@ -866,12 +867,18 @@ interface LaneUnit {
 
 /**
  * ⭐ E12's polish (fix2's F8) — ONE READ OF THE LIMIT THE LANE RECORDED BEFORE A PAID ACT (D8; `E12F` F2): prior + recorded +
- * reserve + the act's own worst case (`ahead`, 0 where it counted none), and whether that total stayed under the limit — the
- * act pressed — or not, the act held back (`phase7-operator.ts` `limitCheck`).
+ * reserve + the act's own worst case (`ahead`, 0 where it counted none), and whether the lane let the act through
+ * (`allowed`) or held it back. ⛔ The merge's fix round, F2 — BY ONE OF TWO RULES (`phase7-operator.ts`): `limitCheck`, before a
+ * phase, a re-run of one, a sign-off or a re-run of its declared reviews, lets an act through only with the total UNDER the
+ * limit; `limitCheckAhead`, before half B's Send and before half B's root's press, lets it through AT the limit too.
  */
 export interface LaneLimitCheck {
+	/** The unit's slug; `authoring` for half B's read before Send (`AUTHORING_READ`). */
 	readonly unit: string;
-	/** What it was read before: the unit's Begin & Execute, a re-run of it, its sign-off, or a re-run of its declared reviews. */
+	/**
+	 * What it was read before: the unit's Begin & Execute, a re-run of it, its sign-off, or a re-run of its declared reviews —
+	 * or Send.
+	 */
 	readonly before: string;
 	readonly prior: number;
 	readonly recorded: number;
@@ -1011,6 +1018,18 @@ export function halfOf(lane: LaneRows): RunHalf {
 
 /** ⭐ E3 — the lane's record of half B's authoring (`phase7-operator.ts`, `AuthoringRecord`), read loosely. */
 const authoringOf = (lane: LaneRows): Record<string, unknown> => rec(rec(lane.run).authoring);
+
+/** ⛔ The merge's fix round, F3 — what half B's read of the limit before Send is listed as among the lane's reads. */
+const AUTHORING_READ = { unit: 'authoring', before: 'Send' } as const;
+
+/**
+ * ⛔ The merge's fix round, F3 — HALF B'S FIRST READ OF THE LIMIT, kept on the lane's authoring record (`AuthoringRecord.limitCheck`):
+ * read before Send, the authoring floor's worst case counted. None in half A, and none in a dry run, which stops before Send.
+ */
+function authoringLimitChecks(lane: LaneRows): LaneLimitCheck[] {
+	const c = laneLimitCheck(AUTHORING_READ.unit, AUTHORING_READ.before, authoringOf(lane).limitCheck);
+	return c === null ? [] : [c];
+}
 
 /** The run's Undertaking: the one the lane's units belong to, else the store's only one. */
 function undertakingOf(ix: Index, lane: readonly LaneUnit[], problems: string[]): string | null {
@@ -1489,7 +1508,7 @@ function buildReviewerCalls(ix: Index, units: readonly Unit[], lane: LaneRows): 
 			limit: PAID_LIMIT,
 			under: total === null ? null : total < PAID_LIMIT
 		},
-		laneLimitChecks: laneUnits(lane.run).flatMap((u) => u.limitChecks)
+		laneLimitChecks: [...authoringLimitChecks(lane), ...laneUnits(lane.run).flatMap((u) => u.limitChecks)]
 	};
 }
 
@@ -2274,10 +2293,24 @@ function completion(v: UnitView, row: string): MatrixCell {
 	return cell('7', row, 'broke', [], [facts, 'its sign-off was attempted and the unit is not SATISFIED', ...heldBackOr(v)]);
 }
 
-/** ⭐ E12's polish (fix2's F8) — the figures of one read of the limit, as the reviewer-calls section prints the record's own. */
+/**
+ * ⛔ The merge's fix round, F2 — WHERE A READ'S TOTAL STANDS AGAINST THE LIMIT, by its arithmetic: below it, "under it"; AT it and
+ * let through, "at it, which this act may reach" — only `limitCheckAhead`'s rule lets a total reach the limit (`LaneLimitCheck`);
+ * anything else, "not under it".
+ */
+function standingOf(c: LaneLimitCheck): string {
+	if (c.total < c.limit) return 'under it';
+	if (c.total === c.limit && c.allowed) return 'at it, which this act may reach';
+	return 'not under it';
+}
+
+/**
+ * ⭐ E12's polish (fix2's F8) — the figures of one read of the limit, as the reviewer-calls section prints the record's own.
+ * ⛔ The merge's fix round, F2 — ~~worded by the verdict alone, every read the lane let through "under it"~~: by its arithmetic
+ * (`standingOf`), so a read at the limit that `limitCheckAhead` let through is never said to be under it.
+ */
 const limitFigures = (c: LaneLimitCheck): string =>
-	`${c.prior} + ${c.recorded} + ${c.reserve}${c.ahead > 0 ? ` + ${c.ahead} ahead` : ''} = ${c.total} of ${c.limit}, ` +
-	(c.allowed ? 'under it' : 'not under it');
+	`${c.prior} + ${c.recorded} + ${c.reserve}${c.ahead > 0 ? ` + ${c.ahead} ahead` : ''} = ${c.total} of ${c.limit}, ${standingOf(c)}`;
 
 /**
  * ⭐ E12's polish (fix2's F8; the lead's delegated decision of 2026-10-15, to be registered) — WHAT THE LANE HELD BACK OF A

@@ -1787,6 +1787,56 @@ describe('⛔ REG-D-112 (E3’s review, 2) — the LIMIT is checked before Send 
 	});
 });
 
+describe('⛔ the merge’s fix round, F2 and F3 — the run report reads half B’s reads of the limit as the lane made them', () => {
+	/** The authoring floor's worst case, counted before Send: 8. */
+	const FLOOR_WORST = PHASE7_AUTHORING_FLOOR_RUNS * LANE_BUDGET.reviewerCallsPerTry;
+	/** A MODEL root's worst case, counted before its press: 140. */
+	const UNIT_WORST = (LANE_BUDGET.tries + PHASE7_REVIEWED_COMMANDS) * LANE_BUDGET.reviewerCallsPerTry;
+	/** A paid half-B run whose MODEL root's read before its press totals the limit EXACTLY, reported from the lane's own record. */
+	const atTheLimit = async () => {
+		const prior = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - UNIT_WORST;
+		const l = halfBLane({ paid: true, prior, types: MODEL_ROOT_TYPES });
+		await l.run();
+		const record = l.written();
+		const report = buildRunReport(
+			halfBStore({ types: MODEL_ROOT_TYPES }),
+			{ ...halfBLaneRows({ types: MODEL_ROOT_TYPES }), run: record },
+			{ accountNames: NAMES }
+		).report;
+		return { prior, record, report, md: renderMarkdown(report) };
+	};
+
+	it('⛔ F2 — the root’s read before its press, by the rule that lets an act REACH the limit (`limitCheckAhead`), totals it exactly: it reads “at it”, never “under it”', async () => {
+		// ⛔ PREDICTED RED, read from the code: `limitFigures` worded every read the lane let through "under it" — written for
+		// `limitCheck`, under which an act is let through only below the limit.
+		const { prior, record, md } = await atTheLimit();
+		expect(record.units[0]?.limitCheck, 'arrangement: the root’s read totals the limit, and its press is let through').toMatchObject({
+			total: PHASE7_PAID_LIMIT,
+			allowed: true
+		});
+		expect(md).toContain(
+			`  - root, before its Begin & Execute: ${prior} + 0 + ${PHASE7_NEGATIVE_CONTROL_RESERVE} + ${UNIT_WORST} ahead = ` +
+				`${PHASE7_PAID_LIMIT} of ${PHASE7_PAID_LIMIT}, at it, which this act may reach.`
+		);
+		expect(md, 'a total equal to the limit reads as under it').not.toContain(`= ${PHASE7_PAID_LIMIT} of ${PHASE7_PAID_LIMIT}, under it`);
+	});
+
+	it('⛔ F3 — the authoring’s read before Send, half B’s first read of the limit, is listed among the lane’s reads, first', async () => {
+		// ⛔ PREDICTED RED, read from the code: `laneLimitChecks` was built from the units' records alone, and nothing in the
+		// report read `authoring.limitCheck`, so the read that guards half B's first paid act was in no list.
+		const { prior, record, report, md } = await atTheLimit();
+		const total = prior + PHASE7_NEGATIVE_CONTROL_RESERVE + FLOOR_WORST;
+		expect(record.authoring?.limitCheck, 'arrangement: the lane read the limit before Send').toMatchObject({ total, allowed: true });
+		expect(
+			report.reviewerCalls.laneLimitChecks.map((c) => [c.unit, c.before, c.total, c.allowed])[0],
+			'the authoring’s read before Send is not the first of the lane’s reads'
+		).toEqual(['authoring', 'Send', total, true]);
+		expect(md).toContain(
+			`  - authoring, before Send: ${prior} + 0 + ${PHASE7_NEGATIVE_CONTROL_RESERVE} + ${FLOOR_WORST} ahead = ${total} of ${PHASE7_PAID_LIMIT}, under it.`
+		);
+	});
+});
+
 describe('⭐⭐ The merge of E12 and E3 (J1, J2) — half B’s sign-offs count the declared reviews of the PUBLISHED PWA, read from the store, and E12’s rule re-runs those that did not conclude', () => {
 	/** One declared review's worst case in reviewer calls (`signOffWorstCase`): its call and its repair, each run once more. */
 	const PER_POLICY = LANE_BUDGET.reviewerCallsPerTry;
