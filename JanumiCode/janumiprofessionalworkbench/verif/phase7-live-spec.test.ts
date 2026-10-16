@@ -287,22 +287,28 @@ describe('⛔ the spec, from source: Playwright’s own `test`, its own timeout,
 	});
 
 	it('⛔ D4, D5 — every act on a unit is the operator’s, on that unit’s own row; the spec waits on no response itself', () => {
+		// ⭐ `REG-D-112` (E3's review, finding 5) — the unit's own row BY ITS ID: a title may repeat in half B.
 		for (const act of ['beginExecute', 'recordAssurance', 'markSatisfied'])
 			expect(callsTo(sf, act), act).toEqual([
-				['page', 'unitRow(page, unit.title)', 'actionFields']
+				['page', 'unitRowById(page, unit.unitId!)', 'actionFields']
 			]);
 		// ⭐ P7-6R R-1f — and the run plan's rule's acts too: the row's offers read, and each act pressed, on the unit's own row.
 		expect(callsTo(sf, 'recoveryOffers'), 'recoveryOffers').toEqual([
-			['unitRow(page, unit.title)']
+			['unitRowById(page, unit.unitId!)']
 		]);
 		expect(callsTo(sf, 'recover'), 'recover').toEqual([
-			['page', 'unitRow(page, unit.title)', 'act', 'actionFields']
+			['page', 'unitRowById(page, unit.unitId!)', 'act', 'actionFields']
 		]);
-		// ⭐ `E12F` F1, F3 — the dry rehearsal's read, and the rule's declared re-run: each on the unit's own row.
-		expect(callsTo(sf, 'recordAssuranceOffered'), 'recordAssuranceOffered').toEqual([['unitRow(page, unit.title)']]);
-		expect(callsTo(sf, 'declaredRerunOffered'), 'declaredRerunOffered').toEqual([['unitRow(page, unit.title)']]);
+		// ⭐ `E12F` F1, F3 — the dry rehearsal's read, and the rule's declared re-run: each on the unit's own row ⭐ — by its id,
+		// as every act's (`REG-D-112`, E3's review finding 5; the merge of E12 and E3).
+		expect(callsTo(sf, 'recordAssuranceOffered'), 'recordAssuranceOffered').toEqual([
+			['unitRowById(page, unit.unitId!)']
+		]);
+		expect(callsTo(sf, 'declaredRerunOffered'), 'declaredRerunOffered').toEqual([
+			['unitRowById(page, unit.unitId!)']
+		]);
 		expect(callsTo(sf, 'rerunDeclared'), 'rerunDeclared').toEqual([
-			['page', 'unitRow(page, unit.title)', 'actionFields']
+			['page', 'unitRowById(page, unit.unitId!)', 'actionFields']
 		]);
 		expect(anyMethodCalls(sf, 'waitForResponse')).toEqual([]);
 		expect(callsTo(sf, 'pressAction')).toEqual([]);
@@ -381,7 +387,11 @@ describe('⛔ D4 — the operator bounds every Begin & Execute by one phase’s 
 			// ⭐ P7-6R R-1f — the rule's acts: an abandonment, bounded as a sign-off act; a re-run, as a phase (a re-run of the
 			// work runs the phase again).
 			['recover', 'act', 'PHASE7_SIGN_OFF_MS'],
-			['recover', 'act', 'PHASE7_UNIT_ALLOWANCE_MS']
+			['recover', 'act', 'PHASE7_UNIT_ALLOWANCE_MS'],
+			// ⭐ E3 (C1) — half B's designer acts: "Accept exact candidate", then Submit for Review, Validate and Publish, each
+			// bounded as a sign-off act is — none calls a model (`acceptCandidate`, `designerAct`).
+			['acceptCandidate', "'acceptAgentCandidate'", 'PHASE7_SIGN_OFF_MS'],
+			['designerAct', 'act', 'PHASE7_SIGN_OFF_MS']
 		]);
 	});
 
@@ -2308,19 +2318,20 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			signOffs: { root: GREEN, requirements: GREEN, design: GREEN, implementation: GREEN, 'end-to-end': GREEN }
 		});
 		const record = await l.run();
-		// ⭑ The last phase passed its check: 210 + 3 + 4 = 217, under 230.
+		// ⭑ The last phase passed its check: prior + 3 + 4, 13 under the limit. ⭐ The merge of E12 and E3 — each figure is
+		// stated against `PHASE7_PAID_LIMIT`, now 450 (`REG-D-110` (1)): ~~210 + 3 + 4 = 217, under 230~~.
 		expect(record.units[4]!.limitCheck?.allowed, 'arrangement: the last phase passes its check').toBe(true);
-		// ⭐ requirements (2 policies): 210 + 4 + 4 + 8 = 226, pressed; design (4): 234, held back — and the lane stops there:
-		// implementation's and end-to-end's (230 each, the limit itself) and the root's (226, which alone would fit) are never
-		// attempted.
+		// ⭐ requirements (2 policies): prior + 4 + 4 + 8, 4 under the limit, pressed; design (4): 4 over it, held back — and
+		// the lane stops there: implementation's and end-to-end's (the limit itself, each) and the root's (4 under, which
+		// alone would fit) are never attempted.
 		expect(l.only('recordAssurance', 'offersRecordAssurance'), 'a sign-off was pressed past the limit, or after it').toEqual([
 			'recordAssurance requirements',
 			'offersRecordAssurance design'
 		]);
 		expect(record.units.map((u) => [u.slug, u.signOff?.limitCheck?.ahead, u.signOff?.limitCheck?.total, u.signOff?.limitCheck?.allowed])).toEqual([
 			['root', undefined, undefined, undefined],
-			['requirements', 8, 226, true],
-			['design', 16, 234, false],
+			['requirements', 8, PHASE7_PAID_LIMIT - 4, true],
+			['design', 16, PHASE7_PAID_LIMIT + 4, false],
 			['implementation', undefined, undefined, undefined],
 			['end-to-end', undefined, undefined, undefined]
 		]);
@@ -2330,13 +2341,13 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		).toEqual([null, null, null]);
 		expect(record.units[2]!.signOff).toEqual({
 			offered: true,
-			limitCheck: { prior, recorded: 4, reserve: 4, ahead: 16, total: 234, limit: PHASE7_PAID_LIMIT, allowed: false },
+			limitCheck: { prior, recorded: 4, reserve: 4, ahead: 16, total: PHASE7_PAID_LIMIT + 4, limit: PHASE7_PAID_LIMIT, allowed: false },
 			recordAssurance: null,
 			rerunDeclared: null,
 			rerunLimitCheck: null,
 			markSatisfied: null,
 			refused: null,
-			notPressed: "the limit: 234 of 230 reviewer calls, the sign-off's own 16 counted (D8; E12F F2)"
+			notPressed: `the limit: ${PHASE7_PAID_LIMIT + 4} of ${PHASE7_PAID_LIMIT} reviewer calls, the sign-off's own 16 counted (D8; E12F F2)`
 		});
 		expect(PHASE7_ARCHIVE_UNITS.map((u) => signOffWorstCase(u)), 'each unit’s declared policies × reviewerCallsPerTry').toEqual([8, 8, 16, 12, 12]);
 		expect([record.end?.reason, laneVerdict(record)]).toEqual(['paid-limit', ["the run ended 'paid-limit', not 'complete'"]]);
@@ -2416,7 +2427,8 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		const left = (await notOffered.run()).units[2]!.signOff!;
 		expect([left.rerunDeclared, left.refused?.act, notOffered.only('rerunDeclared')]).toEqual([null, 'Record Assurance', []]);
 		// ⭐ The limit read before the re-run stops it, as before a phase: recorded, the run ends `paid-limit`, and the lane stops
-		// there — the root's sign-off, 200 + 12 + 4 + 8 = 224, which would fit, is never attempted.
+		// there — the root's sign-off, prior + 12 + 4 + 8, 6 under the limit, which would fit, is never attempted. ⭐ The merge
+		// of E12 and E3 — stated against `PHASE7_PAID_LIMIT`, now 450: ~~200 + 12 + 4 + 8 = 224~~.
 		const limited = laneOf({
 			paid: true,
 			prior: PHASE7_PAID_LIMIT - 30,
@@ -2435,7 +2447,7 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			'paid-limit'
 		]);
 		expect([atTheLimit.notPressed, stopped.units[0]!.signOff, limited.only('recordAssurance root')]).toEqual([
-			"the limit: 232 of 230 reviewer calls, the sign-off's own 16 counted (D8; E12F F2)",
+			`the limit: ${PHASE7_PAID_LIMIT + 2} of ${PHASE7_PAID_LIMIT} reviewer calls, the sign-off's own 16 counted (D8; E12F F2)`,
 			null,
 			[]
 		]);

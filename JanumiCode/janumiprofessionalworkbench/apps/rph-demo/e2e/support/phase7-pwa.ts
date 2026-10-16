@@ -162,6 +162,15 @@ export function unitRow(page: Page, title: string): Locator {
 		.filter({ has: page.getByRole('cell', { name: title, exact: true }) });
 }
 
+/**
+ * ⭐ `JAN-EXEC` Phase 7 completion programme, `REG-D-112` (E3's review, finding 5) — the overview's row for the unit
+ * `unitId`, BY THE ID THE ROW CARRIES (`data-pwu-id`). ⛔ A title may repeat: instantiation names each unit after its type,
+ * so a type more than one parent permits gives its title to a unit under each, and `unitRow` would find both rows.
+ */
+export function unitRowById(page: Page, unitId: string): Locator {
+	return page.locator(`tr[data-pwu-id=${JSON.stringify(unitId)}]`);
+}
+
 /** SvelteKit's answer to an enhanced form action: its own verdict, at HTTP 200 either way. */
 export interface ActionEnvelope {
 	readonly type: string;

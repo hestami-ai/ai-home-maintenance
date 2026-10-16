@@ -1136,3 +1136,63 @@ export async function archiveUnit(r: ArchiveRequest): Promise<ArchiveOutcome> {
 	});
 	return { captures: captures.map((c) => c.name), checks };
 }
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7 completion programme, E3's review — THE AUTHORING HALF'S ARCHIVE (`REG-D-112`) ────────────────
+
+/**
+ * ⭐ The archive half B takes when its authoring ends — at EVERY end: the authoring stopped, its allowance outlasted, the
+ * dry rehearsal's stop, the limit before Send, a throw — and once its units are read, before the root's `01-root`.
+ * ⛔ WITHOUT IT A RUN THAT STOPPED DURING AUTHORING COULD NEVER BE REPORTED: no unit had been archived, so the run report
+ * found no store to read and refused (`run-report.ts`, *"no archive under lane/archive holds a demo.sqlite"*) — and the
+ * authoring half's own result, a candidate the floor did not assure or a refused act, had no report (E3's review,
+ * finding 1). ⭑ `00`, so it sorts before every unit's archive, and the report reads it only when nothing later exists.
+ */
+export const AUTHORING_ARCHIVE = '00-authoring';
+
+/** What `archiveAuthoring` is asked for: the folder, the server's store, and its dump. */
+export interface AuthoringArchiveRequest {
+	/** `<RUN>/lane/archive/00-authoring`. */
+	readonly archiveDir: string;
+	/** The server's record store, `JPWB_DEMO_DB`. */
+	readonly storePath: string;
+	/** The server's dump, as it answered and as parsed. */
+	readonly introspect: { readonly text: string; readonly snapshot: ArchiveSnapshot };
+}
+
+/**
+ * ⭐ The authoring archive's `checks.json`: the stores as archived, and the reviewer calls the store records — the
+ * authoring floor's, a LOWER bound (D8). ⚠ NO UNIT'S CHECKS: before the Undertaking there is no workspace and no process
+ * output — each recorded ABSENT, so the report reads K5's folder as known-empty, never as unknown — and no try for K4 or
+ * K9 to read.
+ */
+export interface AuthoringChecks {
+	readonly reviewerCalls: ReviewerCalls;
+	readonly archived: {
+		readonly stores: readonly ArchivedStore[];
+		readonly workspace: Absent;
+		readonly processOutput: Absent;
+		readonly tombstones: readonly string[];
+	};
+}
+
+/**
+ * ⭐ ARCHIVE THE STORES AS THE AUTHORING LEFT THEM (`AUTHORING_ARCHIVE`): the dump, both stores BACKED UP and converted to
+ * a rollback journal (D6, as every archive's), and their checks. ⛔ Written once: a folder that exists is refused.
+ */
+export async function archiveAuthoring(r: AuthoringArchiveRequest): Promise<AuthoringChecks> {
+	const { archiveDir } = r;
+	if (existsSync(archiveDir))
+		throw new Error(`refused: the archive ${basename(archiveDir)} already exists, and an archive is written once`);
+	mkdirSync(archiveDir, { recursive: true });
+	writeFileSync(join(archiveDir, 'introspect.json'), r.introspect.text, { flag: 'wx' });
+	const stores = [
+		await archiveStore(RECORD_STORE, r.storePath, archiveDir),
+		await archiveStore(CONTENT_STORE, `${r.storePath}${CONTENT_STORE_SUFFIX}`, archiveDir)
+	];
+	const checks: AuthoringChecks = {
+		reviewerCalls: reviewerCalls(r.introspect.snapshot, null),
+		archived: { stores, workspace: { present: false }, processOutput: { present: false }, tombstones: [] }
+	};
+	writeFileSync(join(archiveDir, 'checks.json'), `${JSON.stringify(checks, null, '\t')}\n`, { flag: 'wx' });
+	return checks;
+}

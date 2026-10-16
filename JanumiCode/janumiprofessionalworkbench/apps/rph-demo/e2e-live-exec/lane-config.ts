@@ -178,7 +178,8 @@ function readAtCallTimeFaults(env: Readonly<Record<string, string | undefined>>)
  */
 function phase7RequestFaults(env: Readonly<Record<string, string | undefined>>): string[] {
 	if (env[LIVE_RUN_DIR_VARIABLE] !== undefined) return [];
-	return [PHASE7_PAID_VARIABLE, PHASE7_PRIOR_CALLS_VARIABLE].flatMap((variable) =>
+	// ⭐ E3 (C1) — and the half: `JPWB_PHASE7_HALF` asks for the Phase 7 run as surely as the two before it.
+	return [PHASE7_PAID_VARIABLE, PHASE7_PRIOR_CALLS_VARIABLE, PHASE7_HALF_VARIABLE].flatMap((variable) =>
 		env[variable]?.trim()
 			? [
 					`  · ${variable}=${JSON.stringify(env[variable])} is refused by a rule of THIS LANE, not of the product: it ` +
@@ -215,7 +216,8 @@ export function requiredLaneKeys(tool: string | undefined): readonly string[] {
  * exception, which is the lane's own and is labelled as such where it is refused: no agy executor
  * (`executorLaneFaults`). ⭐ `JAN-EXEC` Phase 7 `P7-2` (D3) — and two more of the lane's own, labelled the same way: a set
  * `JPWB_REVIEW_SEES_PRIOR` or `JPWB_AGENT` (`readAtCallTimeFaults`). ⭐ (D1) — and a Phase 7 variable set with no run
- * folder (`phase7RequestFaults`).
+ * folder (`phase7RequestFaults`). ⭐ E3 (C1, C3) — and the half: one this lane does not know, or half B with no author's
+ * model (`halfFaults`).
  */
 export function laneKeysRefusal(
 	env: Readonly<Record<string, string | undefined>>
@@ -235,13 +237,16 @@ export function laneKeysRefusal(
 	const callTimeFaults = readAtCallTimeFaults(env);
 	// ⭐ `P7-2` (D1) — A PHASE 7 REQUEST THE CONFIG WOULD RUN AS THE ONE-UNIT SPEC: the lane's own rule.
 	const requestFaults = phase7RequestFaults(env);
+	// ⭐ E3 (C1, C3) — THE HALF, AND HALF B'S AUTHOR: the lane's own rule.
+	const halfLaneFaults = halfFaults(env);
 	if (
 		missing.length === 0 &&
 		unwired === undefined &&
 		overridden === undefined &&
 		executorFaults.length === 0 &&
 		callTimeFaults.length === 0 &&
-		requestFaults.length === 0
+		requestFaults.length === 0 &&
+		halfLaneFaults.length === 0
 	)
 		return undefined;
 	return [
@@ -267,6 +272,7 @@ export function laneKeysRefusal(
 		...executorFaults,
 		...callTimeFaults,
 		...requestFaults,
+		...halfLaneFaults,
 		'The keys:',
 		'  JPWB_EXECUTOR / JPWB_EXECUTOR_MODEL — the tool and model that PRODUCE the work product: pi, with a model Pi ' +
 			'resolves (this lane refuses agy; devin has no executor adapter), and no program override for it',
@@ -538,11 +544,21 @@ export const PHASE7_TEST_TIMEOUT_MS =
 
 /**
  * ⭐ D8 — the sponsor's limit, in reviewer calls, checked before each phase ⭐ and before each re-run the run plan's rule
- * makes (`REG-D-105` (4)). ~~150 (`REG-D-102` (4))~~ ~~200: *"Raise limit to 200"* (`REG-D-105` (1), which amends
- * `REG-D-102` (4)); it covers the re-qualification, the re-run and a few recovery re-runs.~~ ⭐ 230: *"the limit rises
- * to about 230"* (`REG-D-108`, after P2), held as the number its pointer states, for P3.
+ * makes (`REG-D-105` (4)) ⭐ — and, on the completion programme's main line (E12 and E3 merged), before every other act
+ * the lane presses that spends it, that act's own worst case counted: before each sign-off and before the rule's re-run
+ * of a unit's declared reviews (`E12F` F2; `signOffWorstCase`), and in half B before Send, the authoring floor's
+ * (`REG-D-112`, E3's review finding 2; `PHASE7_AUTHORING_REVIEWER_CALLS`), and, paid, before the root's press, a MODEL
+ * root's (`rootLimitCheck`; `PHASE7_UNIT_REVIEWER_CALLS`). ⚠ Two rules, as each package built its own: before a phase, a
+ * re-run of one and a sign-off the total must be UNDER the limit (`limitCheck`); before Send and the root's press it may
+ * reach it (`limitCheckAhead`). ~~150 (`REG-D-102` (4))~~ ~~200: *"Raise limit to 200"* (`REG-D-105` (1), which amends
+ * `REG-D-102` (4)); it covers the re-qualification, the re-run and a few recovery re-runs.~~ ~~230: *"the limit rises
+ * to about 230"* (`REG-D-108`, after P2), held as the number its pointer states, for P3.~~ ⭐ `JAN-EXEC` Phase 7
+ * completion programme, E3 — 450: *"Raise to about 450 (Recommended)"* (`REG-D-110` (1), after P3; `REG-D-109`), for the
+ * whole programme — the re-qualification (P4), half A again (P5) and half B (P6) — held as the number its pointer states,
+ * *"**The limit is 450 reviewer calls**"*, which amends `REG-D-102` (4) again. ⚠ Each paid step still reports before the
+ * next (`REG-D-110` (1)): the limit is the programme's ceiling, not a step's approval.
  */
-export const PHASE7_PAID_LIMIT = 230;
+export const PHASE7_PAID_LIMIT = 450;
 
 /** ⭐ D8 — the reviewer calls held back for the negative control (P7-4e): its own cap (`negative-control.ts`). */
 export const PHASE7_NEGATIVE_CONTROL_RESERVE = 4;
@@ -562,3 +578,142 @@ export const PHASE7_PAID_VARIABLE = 'JPWB_PHASE7_PAID';
 
 /** ⭐ D8 — the reviewer calls spent before this run (P7-3a's), given by the operator. */
 export const PHASE7_PRIOR_CALLS_VARIABLE = 'JPWB_PHASE7_PRIOR_REVIEWER_CALLS';
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7 completion programme, E3 — HALF B, THE AUTHORING HALF (`docs/_working/DESIGN-phase-7-completion.md`
+// §4 C1, C3, C6; `REG-D-109`, `REG-D-110` (4)) ─────────────────────────────────────────────────────────────────────────
+// Half A types §3.2's PWA into the designer as the operator; half B has the LIVE AUTHORING AGENT build it from the run
+// plan's request, naming `wordfreq` (`REG-D-110` (4)), and a person's acceptance of the exact candidate pressed before it
+// is published and run as in P3. ⛔ HALF A STAYS THE DEFAULT: unset or blank, the lane is exactly what it was.
+
+/** ⭐ C1 — which half the Phase 7 lane runs: unset or blank, half A; `B`, the live agent authors the PWA. */
+export const PHASE7_HALF_VARIABLE = 'JPWB_PHASE7_HALF';
+
+export type Phase7Half = 'A' | 'B';
+
+/** The halves this lane knows, by the value `JPWB_PHASE7_HALF` names each. */
+export const PHASE7_HALVES: readonly Phase7Half[] = ['A', 'B'];
+
+/**
+ * The half `env` asks for: `A` when it names none (unset, or blank after trimming); `undefined` when it names one this
+ * lane does not know — matched exactly, after trimming, as every lane variable is (`b` is not `B`).
+ */
+export function phase7Half(env: Readonly<Record<string, string | undefined>>): Phase7Half | undefined {
+	const named = (env[PHASE7_HALF_VARIABLE] ?? '').trim();
+	if (named === '') return 'A';
+	return PHASE7_HALVES.find((h) => h === named);
+}
+
+/**
+ * ⭐ C3 — THE AUTHORING AGENT'S MODEL, which the server reads at every turn (`src/lib/server/agent/pi-agent.ts`,
+ * `resolveModel`). Unset, Pi's configured default authors the PWA, or the first model with credentials (`REG-F-509`), and
+ * nothing in the run said which was asked for (`REG-F-531`): so half B REQUIRES it, and the boot records it (`bootOf`).
+ */
+export const AUTHOR_MODEL_VARIABLE = 'JPWB_AGENT_MODEL';
+
+/**
+ * ⭐ C1, C3 — WHY THE LANE REFUSES THE HALF in `env`, one line per fault: a half this lane does not know, and half B with
+ * no author's model — refused as the lane refuses every unset live variable, before the server starts. A rule of THIS
+ * LANE, labelled as such: the product runs an authoring turn with neither.
+ */
+function halfFaults(env: Readonly<Record<string, string | undefined>>): string[] {
+	const half = phase7Half(env);
+	if (half === undefined)
+		return [
+			`  · ${PHASE7_HALF_VARIABLE}=${JSON.stringify(env[PHASE7_HALF_VARIABLE])} is refused by a rule of THIS LANE: it names ` +
+				`no half of the Phase 7 run — 'A' (the default: §3.2's PWA, typed by the operator) or 'B' (the live authoring ` +
+				'agent builds it; DESIGN-phase-7-completion.md §4 C1). The value is matched exactly, after trimming.'
+		];
+	const authorModel = (env[AUTHOR_MODEL_VARIABLE] ?? '').trim();
+	if (half === 'B' && authorModel === '')
+		return [
+			`  · ${PHASE7_HALF_VARIABLE}='B' runs the live authoring agent, and it is missing ${AUTHOR_MODEL_VARIABLE}, the model ` +
+				"that authors the PWA. Unset, Pi's configured default — or the first model with credentials — authors it, " +
+				'with nothing recording which was asked for (REG-F-531, REG-F-509): a rule of THIS LANE (design §4 C3). Set ' +
+				'it to a provider/id Pi resolves.'
+		];
+	return [];
+}
+
+/**
+ * ⭐ C3 — THE AUTHORING FLOOR'S RUNS IN ONE TURN: the floor after the agent's run, and the ONE auto-refinement pass — a
+ * second run of the agent and of the floor — that may follow it (`src/routes/pwa/[id]/agent/+server.ts`,
+ * `runFloorAfterTurn`: *"auto-refine at most once"*).
+ */
+export const PHASE7_AUTHORING_FLOOR_RUNS = 2;
+
+/**
+ * ⭐⭐ C3 — THE AUTHORING ALLOWANCE: the turn and its reviews, each floor run the agent's run and one review of up to
+ * `reviewerCallsPerTry` calls — ONE TRY's figure of the one-unit lane, derived by reference — 2 × (3,600 s / 3) = 2 ×
+ * (240 s + 4 × 240 s) = 2,400 s (40 minutes). ⚠ AN ALLOWANCE, NOT A BOUND: the agent's turn has none, as the executor's
+ * has none (`executorCallMs`). A turn that outlasts it ends the run there, `allowance-exceeded`: the page that holds the
+ * turn must not leave it (a turn is discarded when its page leaves), and nothing is pressed beside it.
+ */
+export const PHASE7_AUTHORING_ALLOWANCE_MS =
+	PHASE7_AUTHORING_FLOOR_RUNS * (EXECUTE_TIMEOUT_MS / LANE_BUDGET.tries);
+
+/**
+ * ⭐⭐ `REG-D-112` (E3's review, finding 2) — THE AUTHORING TURN'S WORST CASE IN REVIEWER CALLS: each of its floor runs one
+ * review of up to `reviewerCallsPerTry` calls — 2 × 4 = 8, the calls the allowance above counts in time. ⛔ Half B checks
+ * it against the limit BEFORE SEND (D8): the lane's first check had been before the first PHASE, so the authoring floor's
+ * reviews, and a model root's, were spent before the limit was ever asked.
+ */
+export const PHASE7_AUTHORING_REVIEWER_CALLS = PHASE7_AUTHORING_FLOOR_RUNS * LANE_BUDGET.reviewerCallsPerTry;
+
+/**
+ * ⭐⭐ `REG-D-112` (finding 2) — ONE MODEL UNIT'S WORST CASE IN REVIEWER CALLS, as its allowance counts its reviews
+ * (`PHASE7_UNIT_ALLOWANCE_MS`): each try's work-product review, and the review of each command reviewed, each of up to
+ * `reviewerCallsPerTry` calls — (3 + 32) × 4 = 140. ⛔ Half B checks it before the ROOT's press when the agent's root
+ * declares MODEL: §3.2's root runs no model, and the agent's may.
+ */
+export const PHASE7_UNIT_REVIEWER_CALLS =
+	(LANE_BUDGET.tries + PHASE7_REVIEWED_COMMANDS) * LANE_BUDGET.reviewerCallsPerTry;
+
+/** ⭐ C1 — how long the lane waits between two reads of the candidate's status: each read is the whole dump. */
+export const PHASE7_CANDIDATE_POLL_MS = 5_000;
+
+/** ⭐ C1 — the designer's four acts after the turn: Accept exact candidate, then Submit for Review, Validate and Publish. */
+export const PHASE7_DESIGNER_ACTS = 4;
+
+/**
+ * ⭐ C3 — THE AUTHORING'S SHARE OF THE SPEC'S TIMEOUT: the allowance; the poll that may overrun it by one pause and one
+ * read; and each designer act at its bound — its click, its POST (a sign-off act's bound: none of the four calls a model),
+ * and the store read after it — 2,400 s + 5 s + 300 s + 4 × (120 s + 300 s + 300 s) = 5,585 s. ⚠ Creating the draft and
+ * the Undertaking are the setup allowance's, as half A's typing is (`PHASE7_SETUP_MS`).
+ */
+export const PHASE7_AUTHORING_MS =
+	PHASE7_AUTHORING_ALLOWANCE_MS +
+	PHASE7_CANDIDATE_POLL_MS +
+	PHASE7_INTROSPECT_MS +
+	PHASE7_DESIGNER_ACTS * (PHASE7_UI_MS + PHASE7_SIGN_OFF_MS + PHASE7_INTROSPECT_MS);
+
+/**
+ * ⭐ C3 — ONE PHASE'S SHARE OF THE SPEC'S TIMEOUT, each act at its bound: its Begin & Execute and what follows it, the
+ * limit's read before it, the run plan's rule on it, and its sign-off — ~~38,940 s + 300 s + 41,280 s + 1,800 s = 82,320 s~~
+ * ⭐ with E12's sign-off (`PHASE7_SIGN_OFF_UNIT_MS`: its declared reviews, the limit's read before it and the rule's one
+ * re-run of them), 38,940 s + 300 s + 41,280 s + 11,280 s = 91,800 s: the terms `PHASE7_TEST_TIMEOUT_MS` counts once for
+ * each of §3.2's four phases. ⚠ Its sign-off is bounded as one of four declared policies, §3.2's most
+ * (`PHASE7_DECLARED_POLICIES_PER_UNIT`): an agent's unit that declares more is bounded short.
+ */
+export const PHASE7_PER_PHASE_MS =
+	PHASE7_UNIT_RUN_MS +
+	PHASE7_INTROSPECT_MS +
+	PHASE7_RERUNS_PER_PHASE * PHASE7_RECOVERY_MS +
+	PHASE7_SIGN_OFF_UNIT_MS;
+
+/** The longest delay a Node timer takes, 2,147,483,647 ms: past it a timer fires at once. */
+export const NODE_TIMER_CEILING_MS = 2_147_483_647;
+
+/**
+ * ⭐⭐ C3 — HALF B'S TIMEOUT, ONCE ITS UNITS ARE READ (C2: the PWA is the agent's, so its phases are as many as it made):
+ * half A's, re-counted for `phases` phases in place of §3.2's four, plus the authoring's share — for four phases,
+ * ~~372,240 s + 5,585 s = 377,825 s~~ ⭐ 419,640 s + 5,585 s = 425,225 s, half A's counting E12's sign-offs. ⛔ CAPPED AT
+ * NODE'S TIMER CEILING, past which Playwright would time the test out at once: a PWA of ~~26~~ ⭐ 23 phases or more is
+ * given the ceiling, about 596 hours, not its arithmetic. ⚠ Half B STARTS under half
+ * A's timeout, which covers the authoring many times over, and the lane extends it here when the units are read.
+ */
+export function phase7HalfBTestTimeoutMs(phases: number): number {
+	return Math.min(
+		NODE_TIMER_CEILING_MS,
+		PHASE7_TEST_TIMEOUT_MS + (phases - PHASE7_MODEL_UNITS) * PHASE7_PER_PHASE_MS + PHASE7_AUTHORING_MS
+	);
+}

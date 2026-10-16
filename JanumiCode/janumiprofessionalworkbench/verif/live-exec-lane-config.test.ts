@@ -915,13 +915,17 @@ describe('⭐ P7-2 D4 — the Phase 7 lane waits an ALLOWANCE derived from the b
 
 	// ⭐ `JAN-EXEC` P7-6R — THE LIMIT IS NOW `REG-D-105` (1)'s, which amends `REG-D-102` (4): *"Raise limit to 200"*. The test
 	// reads the ruling in force; `REG-D-102`'s own sentence still states the limit it set, which the amendment replaced.
-	it('⭐ D8 — the paid limit is the sponsor’s, read from the ruling in force, REG-D-108, which amends REG-D-102 (4) again', () => {
+	// ⭐ `JAN-EXEC` Phase 7 completion programme, E3 (2026-10-11) — THE RULING IN FORCE IS NOW `REG-D-110` (1): the sponsor
+	// chose *"Raise to about 450 (Recommended)"*, and its pointer holds the number the lane enforces, *"**The limit is 450
+	// reviewer calls**"*, amending `REG-D-102` (4) again. ~~REG-D-108, which amends REG-D-102 (4) again~~ — superseded: its
+	// 230 was P3's. The promise is unchanged: the lane's limit is the sponsor's, read from the register, never a copy.
+	it('⭐ D8 — the paid limit is the sponsor’s, read from the ruling in force, REG-D-110, which amends REG-D-102 (4) again', () => {
 		const register = readFileSync(REGISTER, 'utf8');
-		const at = register.indexOf('### REG-D-108 ');
+		const at = register.indexOf('### REG-D-110 ');
 		const ruling = register.slice(at, register.indexOf('\n### ', at + 1));
-		expect(ruling, 'REG-D-108 does not amend REG-D-102 (4)').toContain('(`REG-D-102` (4) amended)');
+		expect(ruling, 'REG-D-110 does not amend REG-D-102 (4)').toContain('(`REG-D-102` (4) amended)');
 		const limit = /\*\*The limit is (\d+) reviewer calls\*\*/.exec(ruling)?.[1];
-		expect(limit, 'REG-D-108 states its limit').toBeDefined();
+		expect(limit, 'REG-D-110 states its limit').toBeDefined();
 		expect(PHASE7_PAID_LIMIT).toBe(Number(limit));
 	});
 

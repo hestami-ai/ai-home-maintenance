@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { test, expect } from '@playwright/test';
 import { gotoHydrated } from '../e2e/support/harness';
 import {
@@ -7,10 +8,11 @@ import {
 	createUndertakingThroughForm,
 	publishThroughDesigner,
 	typePwuTypes,
-	unitRow
+	unitRowById
 } from '../e2e/support/phase7-pwa';
 import { PHASE7_PWA } from '../../../scripts/phase7/pwa-content';
-import { archiveUnit } from '../../../scripts/phase7/run-archive';
+import { PHASE7_HALF_B_DRAFT } from '../../../scripts/phase7/half-b';
+import { archiveAuthoring, archiveUnit, AUTHORING_ARCHIVE } from '../../../scripts/phase7/run-archive';
 import {
 	LIVE_RUN_DIR_VARIABLE,
 	PHASE7_PAID_VARIABLE,
@@ -20,7 +22,9 @@ import {
 import {
 	PHASE7_UI_MS,
 	PHASE7_UNDERTAKING,
+	acceptCandidate,
 	beginExecute,
+	designerAct,
 	bootOf,
 	declaredRerunOffered,
 	freshIntrospect,
@@ -35,6 +39,8 @@ import {
 	rerunDeclared,
 	runTheLane,
 	screenshot,
+	agentTurnOn,
+	turnRunning,
 	typesAsTyped,
 	unitsOf,
 	withFreshRequest
@@ -71,8 +77,8 @@ import { STORE_FILE } from './run-folder';
 //   2. The PWA, typed and read back from the store, then published; the Undertaking created; its five units read.
 //   3. Begin & Execute on the ROOT, then on each PHASE in order, each started only after the one before has answered
 //      (`REG-F-535`). Before each phase, the LIMIT (D8): the calls spent before, those this store records, and four held
-//      for the negative control must total under the sponsor's limit — ~~150~~ ⭐ 200 (`REG-D-105` (1)) — or the run ends
-//      `paid-limit`. Each press waits on its own
+//      for the negative control must total under the sponsor's limit — ~~150~~ ~~200 (`REG-D-105` (1))~~ ⭐ 450
+//      (`REG-D-110` (1)), `lane-config.ts`'s `PHASE7_PAID_LIMIT` — or the run ends `paid-limit`. Each press waits on its own
 //      response for up to one phase's allowance (D4); one with NO ANSWER — it outlasted that allowance, or its request
 //      failed in transit — ends the run there, `allowance-exceeded` or `request-failed`, the root's included, and
 //      nothing is started beside it. Each answer is kept raw (`lane/actions/`), and the unit's state READ FROM THE STORE
@@ -94,6 +100,20 @@ import { STORE_FILE } from './run-folder';
 //      Begin & Execute with none does (D4): nothing is pressed beside it, and the final archive is taken. Dry, no phase was
 //      pressed, so the root's alone — ~~by these same acts (D11)~~ rehearsed up to the reviewer call, and nothing pressed
 //      (`REG-D-112` (b)).
+//
+// ── ⭐⭐ `JAN-EXEC` Phase 7 completion programme, E3 — HALF B, `JPWB_PHASE7_HALF=B` (`DESIGN-phase-7-completion.md` §4) ─────
+// The same lane, the PWA AUTHORED BY THE LIVE AGENT instead of typed (C1): the draft created through the page; the
+// request — the run plan's, naming `wordfreq` (`REG-D-110` (4)) — sent from the designer's chat, and the page HELD THERE
+// while the turn runs, for a turn whose page leaves is discarded; the candidate's status waited on through the store;
+// "Accept exact candidate" pressed; Submit, Validate and Publish; then the Undertaking, whose units are READ FROM THE
+// PUBLISHED PWA, root first, then the tree's order (C2), and run as in steps 3 to 5. The candidate checks run before
+// Submit and refuse nothing (C4). `JPWB_AGENT_MODEL` is required, and recorded (C3); the timeout is extended once the
+// units are read (`phase7HalfBTestTimeoutMs`). Dry, half B stops before Send: authoring is a model call (C6). The order
+// is the operator's (`authorThePwa`), on the `author` hands below. ⚠ Unset or blank, the half is A: everything above.
+// ⭐⭐ `REG-D-112` (E3's review): the LIMIT is checked before Send, the authoring floor's worst case counted, and before the
+// root's press, a MODEL root's counted (finding 2); the store is ARCHIVED into `lane/archive/00-authoring` however the
+// authoring ends, so even a run that stopped there is reported (finding 1); and every unit's row is found BY ITS ID,
+// since a title may repeat (finding 5).
 //
 // ── ⚠ WHAT THIS SPEC ASSERTS, AND WHAT IT ONLY RECORDS ────────────────────────────────────────────────────────────────
 // It asserts its OWN machinery (`laneVerdict`): the boot, the PWA as typed, one unit per type, the dry run's proof of the
@@ -135,6 +155,8 @@ test.describe('LIVE — JAN-EXEC Phase 7: §3.2’s PWA, published, run as an Un
 			store
 		});
 		let undertakingPath = '';
+		// ⭐ E3 (C1, C3) — half B's turn on the page: Send, and the turn's own stream kept for the producer it names.
+		const turn = agentTurnOn(page);
 
 		// ── THE HANDS: the page and the server, as `runTheLane` uses them ──────────────────────────────────────────────
 		const record = await runTheLane({
@@ -161,22 +183,24 @@ test.describe('LIVE — JAN-EXEC Phase 7: §3.2’s PWA, published, run as an Un
 					undertakingPath = new URL(page.url()).pathname;
 					return unitsOf((await freshIntrospect(base)).snapshot, PHASE7_UNDERTAKING.name);
 				},
-				beginExecute: (unit) => beginExecute(page, unitRow(page, unit.title), actionFields),
+				// ⭐ `REG-D-112` (E3's review, finding 5) — EVERY ACT ON A UNIT FINDS ITS ROW BY THE UNIT'S ID (`unitRowById`), never by
+				// its title: a type more than one parent permits gives its title to a unit under each.
+				beginExecute: (unit) => beginExecute(page, unitRowById(page, unit.unitId!), actionFields),
 				// ⭐ P7-6 B3 — its click bounded by its own timeout: the run plan's rule calls this hand too.
 				showOverview: async () => {
 					await gotoHydrated(page, undertakingPath);
 					await page.getByRole('button', { name: 'overview', exact: true }).click({ timeout: PHASE7_UI_MS });
 				},
-				recordAssurance: (unit) => recordAssurance(page, unitRow(page, unit.title), actionFields),
+				recordAssurance: (unit) => recordAssurance(page, unitRowById(page, unit.unitId!), actionFields),
 				// ⭐ `E12F` F1 — the dry run's rehearsal: the row read, Record Assurance found and never pressed (`REG-D-112` (b)).
-				recordAssuranceOffered: (unit) => recordAssuranceOffered(unitRow(page, unit.title)),
+				recordAssuranceOffered: (unit) => recordAssuranceOffered(unitRowById(page, unit.unitId!)),
 				// ⭐ `E12F` F3 — the rule's re-run of the declared reviews that did not conclude: the row's offer, and the act.
-				declaredRerunOffered: (unit) => declaredRerunOffered(unitRow(page, unit.title)),
-				rerunDeclared: (unit) => rerunDeclared(page, unitRow(page, unit.title), actionFields),
-				markSatisfied: (unit) => markSatisfied(page, unitRow(page, unit.title), actionFields),
+				declaredRerunOffered: (unit) => declaredRerunOffered(unitRowById(page, unit.unitId!)),
+				rerunDeclared: (unit) => rerunDeclared(page, unitRowById(page, unit.unitId!), actionFields),
+				markSatisfied: (unit) => markSatisfied(page, unitRowById(page, unit.unitId!), actionFields),
 				// ⭐ P7-6R R-1f — the run plan's rule's two hands: the row's offers, and one act on the row (`REG-D-105` (4)).
-				recoveryOffers: (unit) => recoveryOffers(unitRow(page, unit.title)),
-				recover: (unit, act) => recover(page, unitRow(page, unit.title), act, actionFields),
+				recoveryOffers: (unit) => recoveryOffers(unitRowById(page, unit.unitId!)),
+				recover: (unit, act) => recover(page, unitRowById(page, unit.unitId!), act, actionFields),
 				read: () => freshIntrospect(base),
 				archive: async (call) =>
 					(
@@ -192,7 +216,30 @@ test.describe('LIVE — JAN-EXEC Phase 7: §3.2’s PWA, published, run as an Un
 							env: process.env
 						})
 					).captures,
-				screenshot: (name) => screenshot(page, join(lane.screenshots, `${name}.png`))
+				// ⭐ `REG-D-112` (finding 1) — half B's authoring, archived however it ended, into `lane/archive/00-authoring`.
+				archiveAuthoring: async (dump) => {
+					await archiveAuthoring({ archiveDir: join(lane.archive, AUTHORING_ARCHIVE), storePath: store, introspect: dump });
+				},
+				screenshot: (name) => screenshot(page, join(lane.screenshots, `${name}.png`)),
+				// ⭐⭐ E3 (C1) — HALF B's HANDS: the designer page, held where the turn is, and the clock. Every read of the store
+				// while the turn runs is a fresh request context (`read`), never the page: a turn is discarded when its page leaves.
+				author: {
+					createDraft: () =>
+						withFreshRequest(base, (request) => createDraftPwa(page, request, PHASE7_HALF_B_DRAFT)),
+					send: (request) => turn.send(request),
+					turnRunning: () => turnRunning(page),
+					producerLine: () => turn.producer(),
+					accept: () => acceptCandidate(page, actionFields),
+					lifecycle: (act) => designerAct(page, act, actionFields),
+					createUndertaking: async () => {
+						await createUndertakingThroughForm(page, PHASE7_UNDERTAKING);
+						undertakingPath = new URL(page.url()).pathname;
+					},
+					pause: (ms) => sleep(ms),
+					now: () => Date.now()
+				},
+				// ⭐ E3 (C3) — half B's timeout, once its units are read: set afresh on the running test, from its start.
+				extendTimeout: (ms) => test.info().setTimeout(ms)
 			}
 		});
 		expect(

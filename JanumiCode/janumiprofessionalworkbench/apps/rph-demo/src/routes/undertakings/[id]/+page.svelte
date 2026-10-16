@@ -214,7 +214,10 @@
 					</thead>
 					<tbody>
 						{#each data.pwuList as p (p.id)}
-							<tr>
+							<!-- ⭐ JAN-EXEC Phase 7 completion programme, REG-D-112 (E3's review, finding 5): the row names its unit's ID. A
+							     unit's title is its type's name, so a type more than one parent permits gives its title to a unit under
+							     each: the Phase 7 lane finds a row by this id, never by the title it shows (`unitRowById`). -->
+							<tr data-pwu-id={p.id}>
 								<td>{p.title}</td>
 								<td><span class="tag">{p.workLifecycleState}</span></td>
 								<td>{p.executionState || '—'}</td>

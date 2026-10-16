@@ -19,8 +19,9 @@
 //   · the store's reads after every act, each through a FRESH request context (`REG-F-540`, `REG-F-501`); the limit
 //     (D8); and every POST the page sends (D5), because the stores keep accepted acts only.
 // ⛔ NOTHING HERE IMPORTS `e2e/support/phase7-pwa.ts`: its imports carry no extension, which verif's NodeNext program
-// refuses (driven, 2026-10-09). So the spec hands the acts the two helpers of it they need — a unit's row (`unitRow`) and
-// the envelope's decoder (`actionFields`) — and each sibling here is named WITH its extension, as `run-folder.ts` does.
+// refuses (driven, 2026-10-09). So the spec hands the acts the two helpers of it they need — a unit's row (~~`unitRow`~~ ⭐
+// `unitRowById`, `REG-D-112`: by the unit's id, a title may repeat) and the envelope's decoder (`actionFields`) — and each
+// sibling here is named WITH its extension, as `run-folder.ts` does.
 // ⚠ AND IT TAKES NO `test`: the spec takes Playwright's own, and this lane stipulates nothing.
 import { execFile } from 'node:child_process';
 import { appendFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
@@ -32,10 +33,21 @@ import {
 	type APIRequestContext,
 	type Locator,
 	type Page,
-	type Request
+	type Request,
+	type Response
 } from '@playwright/test';
 import type { EngineSnapshot, ObjectRow } from '../e2e/support/harness.js';
 import { PHASE7_PWA, promptMarkers, type Phase7TypeDeclaration } from '../../../scripts/phase7/pwa-content.js';
+// ⭐ E3 — half B's request, the order its units are read in, the floor's dispositions, and the candidate checks (C1-C4).
+import { candidateChecks, type CandidateChecks } from '../../../scripts/phase7/candidate-checks.js';
+import {
+	floorDispositions,
+	PHASE7_HALF_B_REQUEST,
+	TURN_SETTLED,
+	unitsInTreeOrder,
+	type FloorDisposition,
+	type TreeUnit
+} from '../../../scripts/phase7/half-b.js';
 import {
 	archiveName,
 	FINAL_ARCHIVE,
@@ -44,8 +56,14 @@ import {
 	type ArchiveUnit
 } from '../../../scripts/phase7/run-archive.js';
 import {
+	AUTHOR_MODEL_VARIABLE,
 	LANE_BUDGET,
 	laneKeysRefusal,
+	phase7Half,
+	phase7HalfBTestTimeoutMs,
+	PHASE7_AUTHORING_ALLOWANCE_MS,
+	PHASE7_AUTHORING_REVIEWER_CALLS,
+	PHASE7_CANDIDATE_POLL_MS,
 	PHASE7_DECLARED_POLICIES_PER_UNIT,
 	PHASE7_NEGATIVE_CONTROL_RESERVE,
 	PHASE7_INTROSPECT_MS,
@@ -55,8 +73,10 @@ import {
 	PHASE7_SIGN_OFF_MS,
 	PHASE7_UI_MS,
 	PHASE7_UNIT_ALLOWANCE_MS,
+	PHASE7_UNIT_REVIEWER_CALLS,
 	REVIEWER_MODEL_VARIABLE,
-	wiredReviewer
+	wiredReviewer,
+	type Phase7Half
 } from './lane-config.js';
 
 // ── THE BOUNDS THE LANE'S OWN ACTS WAIT ──────────────────────────────────────────────────────────────────────────────
@@ -269,6 +289,14 @@ export function reviewerUnderTest(
 export interface BootRecord {
 	readonly startedAt: string;
 	readonly mode: 'dry' | 'paid';
+	/**
+	 * ⭐ E3 (C1) — the half the run is: `A`, §3.2's PWA typed by the operator; `B`, the live agent authors it. null when
+	 * `JPWB_PHASE7_HALF` names no half this lane knows, which the boot refuses. ⚠ Absent from a record written before E3,
+	 * which is half A's.
+	 */
+	readonly half?: Phase7Half | null;
+	/** ⭐ E3 (C3) — the author's model as configured (`JPWB_AGENT_MODEL`), trimmed; null when unset. Required in half B. */
+	readonly authorModel?: string | null;
 	readonly node: string;
 	readonly inherited: Record<string, string>;
 	readonly overlay: Overlay;
@@ -324,6 +352,8 @@ export async function bootOf(b: {
 		record: {
 			startedAt: new Date().toISOString(),
 			mode: b.paid ? 'paid' : 'dry',
+			half: phase7Half(b.env) ?? null,
+			authorModel: (b.env[AUTHOR_MODEL_VARIABLE] ?? '').trim() || null,
 			node: process.version,
 			inherited: inheritedVariables(b.env),
 			overlay,
@@ -500,11 +530,22 @@ export type EndReason =
 	| 'allowance-exceeded'
 	| 'request-failed'
 	| 'refused-at-boot'
-	| 'lane-error';
+	| 'lane-error'
+	/**
+	 * ⭐ E3 (C1) — half B's authoring stopped short of a published PWA: the turn left no candidate, or one the floor did
+	 * not assure; the acceptance, or a designer act after it, was refused; or the PWA did not read PUBLISHED. Nothing can
+	 * run after it. ⚠ A RESULT, recorded with the server's own words — and still not the end a paid run was meant to reach.
+	 */
+	| 'authoring-stopped';
 
 export interface RunRecord {
 	readonly mode: 'dry' | 'paid';
-	readonly units: RunUnit[];
+	/** ⭐ E3 (C1) — the half this run is; absent from a record written before E3, which is half A's. */
+	readonly half?: Phase7Half;
+	/** ⭐ E3 (C2) — §3.2's five in half A; in half B, empty until the PWA is published, then read from it (`runUnitsOf`). */
+	units: RunUnit[];
+	/** ⭐ E3 (C1, C4) — what the authoring half did and found; null in half A. */
+	authoring?: AuthoringRecord | null;
 	/** ⭐ What a dry run read before it stopped: the model exchanges the store holds, which must be none (D1). */
 	dryRun: { readonly modelExchanges: number } | null;
 	/** null while the run is under way. */
@@ -546,6 +587,25 @@ export function limitCheck(prior: number, recorded: number, ahead = 0): LimitChe
 		limit: PHASE7_PAID_LIMIT,
 		allowed: total < PHASE7_PAID_LIMIT
 	};
+}
+
+/** ⭐ `REG-D-112` — D8's check before an act whose worst case in reviewer calls is known: `ahead`, counted in its total. */
+export interface AheadLimitCheck extends LimitCheck {
+	/** The act's own worst case, in reviewer calls: the authoring floor's before Send, a model root's before its press. */
+	readonly ahead: number;
+}
+
+/**
+ * ⭐⭐ `REG-D-112` (E3's review, finding 2) — D8 BEFORE AN ACT WHOSE WORST CASE IS KNOWN: the calls spent before, those the
+ * store records, those held back AND THE ACT'S OWN WORST CASE must total WITHIN the limit — the act may spend all of it.
+ * ⚠ The phase's check (`limitCheck`) is this rule for an act whose worst case it does not count: its next call, at least,
+ * must fit, so its total must be UNDER the limit. ⛔ Half B spent the authoring floor's reviews, and a model root's, before
+ * any check: the lane's first was before the first phase.
+ */
+export function limitCheckAhead(prior: number, recorded: number, ahead: number): AheadLimitCheck {
+	const spent = limitCheck(prior, recorded);
+	const total = spent.total + ahead;
+	return { ...spent, ahead, total, allowed: total <= spent.limit };
 }
 
 /**
@@ -1028,6 +1088,101 @@ export async function recover(
 	return pressFormAction(page, act, row.getByTestId(testId), PHASE7_UNIT_ALLOWANCE_MS, decode);
 }
 
+// ── ⭐ E3 (C1) — HALF B'S ACTS ON THE DESIGNER PAGE ───────────────────────────────────────────────────────────────────
+// Each fill and click carries its own bound (P7-6 B3), and each form action is pressed through `pressFormAction`, so its
+// status and raw body are kept and a press with no answer is returned, never thrown — as every act on the Undertaking page.
+
+/**
+ * ⭐ C1 — the request typed into the designer's chat, and Send pressed. ⛔ NOTHING WAITS HERE, and the page is not moved:
+ * the turn streams to this page, and is discarded if it leaves (`cleanupFailedTurn`). The lane waits on the store.
+ */
+export async function sendToAgent(page: Page, request: string): Promise<void> {
+	await page.getByTestId('agent-input').fill(request, { timeout: PHASE7_UI_MS });
+	await page.getByRole('button', { name: 'Send', exact: true }).click({ timeout: PHASE7_UI_MS });
+}
+
+/** `promise`, or `fallback` once `ms` have passed — whichever comes first. The timer is always cleared. */
+async function within<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	try {
+		return await Promise.race([
+			promise,
+			new Promise<T>((resolve) => {
+				timer = setTimeout(() => resolve(fallback), ms);
+			})
+		]);
+	} finally {
+		clearTimeout(timer);
+	}
+}
+
+/**
+ * ⭐⭐ C1, C3 — THE TURN ON THE PAGE: Send pressed (`sendToAgent`), and the turn's own stream KEPT as the page receives it
+ * — the one place its producer is said (`producerOfStream`). The stream's response is taken from the page's own
+ * `response` event, never waited on: the lane waits on the store. ⚠ Its body is complete only when the turn ends, which
+ * it has when `producer` is asked (the candidate has settled); a body that does not come within a UI act's bound reads
+ * as no producer, recorded as such.
+ */
+export function agentTurnOn(page: Page): {
+	readonly send: (request: string) => Promise<void>;
+	readonly producer: () => Promise<string | null>;
+} {
+	let stream: Promise<string> = Promise.resolve('');
+	return {
+		send: async (request) => {
+			stream = new Promise<string>((resolve) => {
+				const onResponse = (response: Response): void => {
+					const sent = response.request();
+					if (sent.method() !== 'POST' || !new URL(sent.url()).pathname.endsWith('/agent')) return;
+					page.off('response', onResponse);
+					response.text().then(resolve, () => resolve(''));
+				};
+				page.on('response', onResponse);
+			});
+			await sendToAgent(page, request);
+		},
+		producer: async () => producerOfStream(await within(stream, PHASE7_UI_MS, ''))
+	};
+}
+
+/** ⭐ C1 — whether the page's turn is still running: its Send button reads "Working…" while the turn streams. */
+export async function turnRunning(page: Page): Promise<boolean> {
+	return (await page.getByRole('button', { name: /^Working/ }).count()) > 0;
+}
+
+/**
+ * ⭐ C1 — "Accept exact candidate", pressed and waited for as a sign-off act is: it replays the turn's commands into the
+ * store and calls no model (`commitAuthoringTurn`). The form carries the hash the page shows, and the server accepts only
+ * that one (`REG-D-070` §5.4's exact-hash check).
+ */
+export function acceptCandidate(page: Page, decode: Decode): Promise<ActionOutcome> {
+	return pressFormAction(
+		page,
+		'acceptAgentCandidate',
+		page.getByRole('button', { name: 'Accept exact candidate', exact: true }),
+		PHASE7_SIGN_OFF_MS,
+		decode
+	);
+}
+
+/** The designer's button for each act after the acceptance: "Submit for Review →", "Validate →", "Publish". */
+const DESIGNER_BUTTON: Readonly<Record<DesignerAct, RegExp>> = {
+	submitForReview: /^Submit for Review/,
+	validate: /^Validate/,
+	publish: /^Publish$/
+};
+
+/** ⭐ C1 — Submit for Review, Validate or Publish, pressed and waited for as a sign-off act is: none calls a model. */
+export function designerAct(page: Page, act: DesignerAct, decode: Decode): Promise<ActionOutcome> {
+	return pressFormAction(
+		page,
+		act,
+		page.getByRole('button', { name: DESIGNER_BUTTON[act] }),
+		PHASE7_SIGN_OFF_MS,
+		decode
+	);
+}
+
 /** What the run record keeps of one sign-off act: its status and envelope, and the unit as the STORE read it after. */
 export interface SignOffAct {
 	readonly status: number | null;
@@ -1120,6 +1275,522 @@ export const actionRecordOf = (unit: RunUnit, action: string, o: ActionOutcome) 
 	decoded: o.decoded
 });
 
+// ── ⭐⭐ `JAN-EXEC` Phase 7 completion programme, E3 — HALF B: THE PWA AUTHORED THROUGH THE PAGE ─────────────────────────
+// (`docs/_working/DESIGN-phase-7-completion.md` §4 C1 to C4, C6; `REG-D-109`, `REG-D-110` (4); `REG-F-506`'s remedy 1.)
+//
+// The live authoring lane could not pass (`REG-F-506`): it waited on a canonical conversation, which a staged turn writes
+// only into its fork, and it never accepted, submitted, validated or published. Half B does what its remedy says — waits
+// on the CANDIDATE's status (`/test-api/introspect`, `authoringCandidates[].summary.status`) and accepts the exact hash —
+// and goes on to Submit, Validate and Publish, then the Undertaking, whose units it reads from the PUBLISHED PWA (C2).
+// ⛔ THE PAGE STAYS WHERE THE TURN IS: the turn streams to the designer page, and one whose page leaves is discarded
+// (`routes/pwa/[id]/agent/+server.ts`, `cleanupFailedTurn`), so every read while it runs goes through a fresh request
+// context (`REG-F-540`), never the page. ⛔ AND IT STIPULATES NOTHING (`REG-F-477`): the floor is the selected reviewer's.
+
+/** ⭐ C1 — the designer's acts after the acceptance, by their form actions, in the order the PWA's lifecycle takes them. */
+export type DesignerAct = 'submitForReview' | 'validate' | 'publish';
+export const DESIGNER_ACTS: readonly DesignerAct[] = ['submitForReview', 'validate', 'publish'];
+
+/** ⭐ C1 — the page's and the clock's hands in half B, which the spec builds from the page and verif builds of its own. */
+export interface AuthoringHands {
+	/** Create the draft PWA through the home page's form, and open it in the designer: its id, read from the store. */
+	readonly createDraft: () => Promise<string>;
+	/** Type the request into the designer's chat and press Send (`sendToAgent`) — and stay on the page. */
+	readonly send: (request: string) => Promise<void>;
+	/** Whether the page's turn is still running (`turnRunning`): asked only while no candidate is staged. */
+	readonly turnRunning: () => Promise<boolean>;
+	/**
+	 * ⭐ C3 — the producer the turn named in its own stream (`agentTurnOn`), as `<provider>/<model>`, or null. ⚠ THE STREAM
+	 * IS THE ONLY PLACE IT IS SAID: the store records no author for a turn (design §4: *"Its own calls leave no record in
+	 * the store"*), the authoring floor's assessments carry no `producer`, and the page's log loses its status line when
+	 * the turn ends — each found by the gate's rehearsal of this lane, 2026-10-11.
+	 */
+	readonly producerLine: () => Promise<string | null>;
+	/** Press "Accept exact candidate" (`acceptCandidate`). */
+	readonly accept: () => Promise<ActionOutcome>;
+	/** Press Submit for Review, Validate or Publish (`designerAct`). */
+	readonly lifecycle: (act: DesignerAct) => Promise<ActionOutcome>;
+	/** Create the Undertaking of the published PWA through the portfolio's form, and show its overview. */
+	readonly createUndertaking: () => Promise<void>;
+	/** Wait `ms` between two reads of the candidate. */
+	readonly pause: (ms: number) => Promise<void>;
+	/** The clock the allowance is measured on. */
+	readonly now: () => number;
+}
+
+/** ⭐ C1 — a staged candidate as the store's introspect reads it (`authoringCandidates[].summary`). */
+export interface CandidateReading {
+	readonly status: string;
+	readonly candidateHash: string | null;
+	/** Why the turn stopped, in the floor's words (`REG-F-447`); null when it did not. */
+	readonly detail: string | null;
+	readonly remediationAction: string | null;
+	readonly commandCount: number;
+}
+
+/** One of the designer's acts in half B, as the run record keeps it. */
+export interface DesignerActRecord {
+	readonly act: 'acceptAgentCandidate' | DesignerAct;
+	readonly status: number | null;
+	readonly envelopeType: EnvelopeType | null;
+	readonly timedOutAfterMs: number | null;
+	readonly requestFailure: string | null;
+	/** The server's refusal, in its own words, of an act it answered with anything but success; else null. */
+	readonly refusal: string | null;
+}
+
+/** ⭐ E3 (C1, C3, C4) — `lane/run.json`'s record of half B's authoring: what was asked, what came of it, what was found. */
+export interface AuthoringRecord {
+	/** The request sent, verbatim (`PHASE7_HALF_B_REQUEST`). */
+	readonly request: string;
+	pwaId: string | null;
+	/** Whether Send was pressed: never, in the dry rehearsal (C6). */
+	sent: boolean;
+	/**
+	 * ⭐ `REG-D-112` (finding 2) — the limit, checked BEFORE SEND with the authoring floor's worst case counted
+	 * (`PHASE7_AUTHORING_REVIEWER_CALLS`); null when nothing was to be sent — the dry rehearsal stops before it.
+	 */
+	limitCheck: AheadLimitCheck | null;
+	/** The store's reads of the candidate while the turn ran. */
+	polls: number;
+	/** The candidate as last read. */
+	candidate: CandidateReading | null;
+	/** ⭐ The floor's dispositions of the candidate, each policy's latest assessment, read from the turn's fork. */
+	floor: FloorDisposition[];
+	/**
+	 * ⭐ C3 — the author's model: as configured (`JPWB_AGENT_MODEL`), and as the page's turn named the model it resolved
+	 * (`producerLine`) — which may differ, unannounced (`REG-F-509`).
+	 */
+	readonly authorModel: { readonly configured: string | null; resolved: string | null };
+	/** The reasoning review's evaluator, as the floor recorded it. */
+	reviewer: string | null;
+	/** ⭐ The acceptance — and the hash the server says it accepted (`acceptedCandidate`), which no store keeps (`REG-F-504`). */
+	accept: (DesignerActRecord & { readonly acceptedHash: string | null }) | null;
+	/** "Types as accepted": each type as the store holds it once the commit replayed the turn (C2's `typesAsTyped`). */
+	typesAsAccepted: unknown[] | null;
+	/** ⭐ C4 — the candidate checks, recorded before Submit; they refuse nothing (`REG-D-110` (4)). */
+	checks: CandidateChecks | null;
+	/** Submit for Review, Validate and Publish, as each was answered. */
+	lifecycle: DesignerActRecord[];
+	/** Whether the store read the PWA PUBLISHED after Publish; null before. */
+	published: boolean | null;
+	/**
+	 * ⭐ C2 — what reading the units from the published PWA said did not fit (`unitsInTreeOrder`), one line each; ⭐ and,
+	 * `REG-D-112` (finding 5), each title more than one unit bears, which the lane tells apart by id (`runUnitsOf`).
+	 */
+	unitProblems: string[];
+	/**
+	 * ⭐ `REG-D-112` (E3's re-review, finding 3) — why the authoring's archive, taken at an END of the authoring, failed, in its
+	 * own words; null when it did not (`authorThenArchive`). The end is kept as itself, and the dry verdict refuses on this.
+	 */
+	archiveFailure: string | null;
+}
+
+/** ⭐ C1 — an empty authoring record, before anything is done. */
+export const authoringRecordOf = (request: string, configured: string | null): AuthoringRecord => ({
+	request,
+	pwaId: null,
+	sent: false,
+	limitCheck: null,
+	polls: 0,
+	candidate: null,
+	floor: [],
+	authorModel: { configured, resolved: null },
+	reviewer: null,
+	accept: null,
+	typesAsAccepted: null,
+	checks: null,
+	lifecycle: [],
+	published: null,
+	unitProblems: [],
+	archiveFailure: null
+});
+
+/** The staged candidate of `pwaId`, read off the dump — or null when none is staged. */
+export function candidateOf(snap: EngineSnapshot, pwaId: string): CandidateReading | null {
+	const staged = (snap.authoringCandidates ?? []).find((c) => c.pwaId === pwaId);
+	if (staged === undefined) return null;
+	const summary = staged.summary as unknown as Record<string, unknown>;
+	return {
+		status: str(summary.status),
+		candidateHash: str(summary.candidateHash) || null,
+		detail: str(summary.detail) || null,
+		remediationAction: str(summary.remediationAction) || null,
+		commandCount: typeof summary.commandCount === 'number' ? summary.commandCount : 0
+	};
+}
+
+/**
+ * The hash the acceptance names: the action's own `acceptedCandidate`, else the one its raw body carries — and only an
+ * acceptance answered success names one. ⛔ ~~Any answer's body~~ (the check of 241158f4, finding 1): a refusal's words
+ * name hashes too — "Acceptance hash does not match the exact candidate (…)" — and the first was recorded as accepted.
+ */
+export function acceptedHashOf(o: ActionOutcome): string | null {
+	if (o.envelopeType !== 'success') return null;
+	const named = o.decoded?.acceptedCandidate;
+	if (typeof named === 'string' && named !== '') return named;
+	return /sha256:[0-9a-f]{64}/.exec(o.rawBody ?? '')?.[0] ?? null;
+}
+
+/** One designer act as the run record keeps it. */
+const designerActOf = (act: DesignerActRecord['act'], o: ActionOutcome): DesignerActRecord => ({
+	act,
+	status: o.status,
+	envelopeType: o.envelopeType,
+	timedOutAfterMs: o.timedOutAfterMs,
+	requestFailure: o.requestFailure,
+	refusal: o.envelopeType === 'success' || o.envelopeType === null ? null : refusalOf(o)
+});
+
+/** "Types as accepted" (C2): each of the PWA's types as the store holds them — `typesAsTyped`'s reading, held to nothing. */
+export const typesAsAccepted = (snap: EngineSnapshot, pwaId: string): unknown[] =>
+	typesAsTyped(snap, pwaId, []).typed;
+
+/**
+ * ⭐⭐ C2 — THE RUN'S UNITS, READ FROM THE PUBLISHED PWA: the Undertaking's units in the tree's order, the root first
+ * (`unitsInTreeOrder`), and each unit's row BY ITS ID. ⚠ Nothing is refused: what does not fit the tree is listed, and
+ * run (`problems`).
+ * ⭐⭐ `REG-D-112` (E3's review, finding 5) — ~~Two units of one title are refused, as a lane error: the lane addresses a
+ * unit by its row's title (`unitRow`), and could not tell them apart.~~ ⛔ A TITLE MAY REPEAT, and the refusal ended a paid
+ * run `lane-error` after its authoring's spend: instantiation names each unit after its type (`planComposition`), so a
+ * type more than one parent permits is built once under each, one title on each. The lane now tells units apart by ID —
+ * here, in the run record, and on the page (`unitRowById`) — and each repeated title is REPORTED, never refused.
+ */
+export function runUnitsOf(
+	snap: EngineSnapshot,
+	pwaId: string,
+	undertakingName: string
+): {
+	readonly units: readonly TreeUnit[];
+	/** The Undertaking's units, BY ID. */
+	readonly rows: ReadonlyMap<string, ObjectRow>;
+	readonly problems: readonly string[];
+} {
+	const undertaking = snap.undertakings.find((u) => u.state.name === undertakingName);
+	const units = snap.pwus.filter(
+		(p) => undertaking !== undefined && p.state.undertakingId === undertaking.id
+	);
+	const tree = unitsInTreeOrder(
+		units,
+		snap.pwuTypes.filter((t) => t.state.pwaId === pwaId)
+	);
+	const titles = tree.units.map((u) => u.title);
+	const repeated = [...new Set(titles.filter((t, i) => titles.indexOf(t) !== i))].map(
+		(title) =>
+			`${titles.filter((t) => t === title).length} units are titled ${JSON.stringify(title)} — a type more than one ` +
+			'parent permits is built once under each, and two types may share a name — so the lane tells them apart by ' +
+			'id, never by the title their rows show (REG-D-112)'
+	);
+	return { units: tree.units, rows: new Map(units.map((u) => [u.id, u])), problems: [...tree.problems, ...repeated] };
+}
+
+/** Where half B's authoring ended short of its units: the run's end, and why. */
+interface AuthoringEnd {
+	readonly end: RunEnd;
+}
+
+/**
+ * ⭐ C1 — WAIT ON THE CANDIDATE'S STATUS, through the store, until the turn settles (`TURN_SETTLED`): read, and if it has
+ * not, pause and read again, for up to the authoring allowance (C3). ⛔ The page is never asked to move. Ends:
+ *   · `allowance-exceeded` — the turn outlasted its allowance: the page still holds it, and nothing is pressed beside it;
+ *   · `authoring-stopped` — no candidate is staged after the first pause and the page's turn is over: the server refused
+ *     the turn before it began (its words are on the page's agent log).
+ */
+async function waitForTheCandidate(
+	author: AuthoringHands,
+	read: LaneHands['read'],
+	authoring: AuthoringRecord,
+	pwaId: string,
+	save: () => void
+): Promise<{ readonly snapshot: EngineSnapshot } | AuthoringEnd> {
+	const deadline = author.now() + PHASE7_AUTHORING_ALLOWANCE_MS;
+	for (;;) {
+		const { snapshot } = await read();
+		authoring.polls += 1;
+		authoring.candidate = candidateOf(snapshot, pwaId);
+		save();
+		if (authoring.candidate !== null && TURN_SETTLED.has(authoring.candidate.status))
+			return { snapshot };
+		if (authoring.candidate === null && authoring.polls > 1 && !(await author.turnRunning()))
+			return {
+				end: {
+					reason: 'authoring-stopped',
+					detail:
+						'the page’s turn ended and no candidate was staged: the server refused the turn before it began (its ' +
+						'words are on the designer’s agent log)'
+				}
+			};
+		if (author.now() >= deadline)
+			return {
+				end: {
+					reason: 'allowance-exceeded',
+					detail:
+						`the authoring turn outlasted its allowance of ${PHASE7_AUTHORING_ALLOWANCE_MS} ms, its candidate read ` +
+						`${authoring.candidate?.status ?? 'none'}: the page still holds it, and nothing is pressed beside it ` +
+						'(design §4 C3)'
+				}
+			};
+		await author.pause(PHASE7_CANDIDATE_POLL_MS);
+	}
+}
+
+/**
+ * ⭐ C1 — what the floor recorded of the staged candidate — its dispositions and its reviewer — and, ⭐ C3, the author the
+ * page's turn named. ⚠ THE FLOOR'S ASSESSMENTS NAME NO PRODUCER: `recordAssuranceRecordingPlan` completes each with no
+ * `producer` (`packages/rph-engine/src/record-assurance.ts`), so the store says nothing of who authored the candidate the
+ * floor judged. ⭐ `REG-D-112` (finding 8): ~~the turn's status line, `pi agent · <provider>/<id>` (`pi-agent.ts`), is the
+ * one place it is said~~ — the author is READ FROM THE TURN'S OWN STREAM, its `producer` event (`producerOfStream`), the one
+ * place it is said: the page's log loses the status line when the turn ends. The floor's producer is asked only after,
+ * should the product ever record one; today it never has.
+ */
+async function recordTheFloor(
+	authoring: AuthoringRecord,
+	snapshot: EngineSnapshot,
+	pwaId: string,
+	author: AuthoringHands
+): Promise<void> {
+	const staged = (snapshot.authoringCandidates ?? []).find((c) => c.pwaId === pwaId);
+	authoring.floor = floorDispositions(staged?.assessments ?? [], pwaId);
+	authoring.authorModel.resolved =
+		(await author.producerLine()) ?? authoring.floor.find((f) => f.producer !== null)?.producer ?? null;
+	authoring.reviewer =
+		authoring.floor.find((f) => f.policyId === 'floor.reasoning-review')?.evaluator ?? null;
+}
+
+/**
+ * ⭐ C3 — the producer a turn's stream names: its `producer` event, which the agent emits with the model it RESOLVED
+ * (`src/lib/server/agent/pi-agent.ts`: *"emit the resolved identity structurally"*), as `<provider>/<model>`; the first,
+ * should a refinement pass emit it again; null when the stream holds none.
+ */
+export function producerOfStream(stream: string): string | null {
+	for (const line of stream.split('\n')) {
+		if (!line.startsWith('data: ')) continue;
+		let event: { kind?: unknown; producer?: { modelId?: unknown; providerId?: unknown } };
+		try {
+			event = JSON.parse(line.slice('data: '.length)) as typeof event;
+		} catch {
+			continue;
+		}
+		if (event.kind !== 'producer') continue;
+		const model = str(event.producer?.modelId);
+		const provider = str(event.producer?.providerId);
+		return provider !== '' && model !== '' ? `${provider}/${model}` : model || provider || null;
+	}
+	return null;
+}
+
+/** An act with no answer, or one refused, ends the authoring: the end it reached, or null for an accepted act. */
+function designerEnd(o: ActionOutcome, act: string): RunEnd | null {
+	const unanswered = unansweredEnd('the PWA', o, act);
+	if (unanswered !== null) return unanswered;
+	if (o.envelopeType === 'success') return null;
+	return { reason: 'authoring-stopped', detail: `the PWA's ${act} was refused: ${refusalOf(o)}` };
+}
+
+/**
+ * ⭐⭐ C1 — HALF B'S AUTHORING, IN ITS ORDER (design §4 C1; `REG-F-506`'s remedy 1):
+ *   1. the draft, created through the page — and ⛔ DRY, THE REHEARSAL STOPS HERE, BEFORE SEND: authoring is a model call
+ *      (C6). The turn itself is rehearsed in the gate, with the mock agent (`e2e/phase7-half-b.e2e.ts`);
+ *   1b. ⭐ `REG-D-112` (E3's review, finding 2) — THE LIMIT, BEFORE SEND (D8), the authoring floor's worst case counted
+ *      (`limitCheckAhead`, `PHASE7_AUTHORING_REVIEWER_CALLS`): past it the run ends `paid-limit`, nothing sent;
+ *   2. the request, sent from the designer's chat, the page held where it is;
+ *   3. the candidate's status, waited on through the store (`waitForTheCandidate`); the floor's dispositions and its
+ *      reviewer recorded, ~~the producer the floor judged (the author's model)~~ ⭐ `REG-D-112` (finding 8) — and the
+ *      author's model as THE TURN'S OWN STREAM named it (`producerLine`): the floor's assessments name no producer. A
+ *      candidate not READY_TO_COMMIT is accepted by no one: the run ends `authoring-stopped`, with the floor's own words;
+ *   4. "Accept exact candidate", pressed and kept;
+ *   5. ⭐ C4 — THE CANDIDATE CHECKS, on the accepted candidate as the store now holds it, before Submit — recorded and
+ *      reported, REFUSING NOTHING (`REG-D-110` (4)): a trap plays out live, and the run report says which;
+ *   6. Submit for Review, Validate and Publish, each pressed and kept, then the store read for PUBLISHED;
+ *   7. the Undertaking, and its units READ FROM THE PUBLISHED PWA (C2), root first, then the tree's order — ⭐ each by its
+ *      ID (`REG-D-112`, finding 5), the rows returned by id.
+ * ⛔ An act with no answer, or one refused, ends the run there, recorded; nothing after it is pressed. ⭐ Whichever way it
+ * ends, the lane then archives the store (`authorThenArchive`): ~~no end of the authoring is left unreported~~ ⭐
+ * `REG-D-112` (E3's re-review, finding 3) — and the end is recorded as itself: an archive that fails there is recorded
+ * beside it (`archiveFailure`), never thrown over it.
+ */
+export async function authorThePwa(r: {
+	readonly record: RunRecord;
+	readonly authoring: AuthoringRecord;
+	readonly author: AuthoringHands;
+	readonly read: LaneHands['read'];
+	readonly lane: LanePaths;
+	readonly dry: boolean;
+	readonly undertakingName: string;
+	/** ⭐ `REG-D-112` (finding 2) — the reviewer calls spent before the run (D8), which the limit before Send counts. */
+	readonly prior: number;
+}): Promise<{ readonly rows: ReadonlyMap<string, ObjectRow> } | AuthoringEnd> {
+	const { authoring, author, read, lane } = r;
+	const save = () => writeRunRecord(lane, r.record);
+	const pwaId = await author.createDraft();
+	authoring.pwaId = pwaId;
+	save();
+	if (r.dry)
+		return {
+			end: {
+				reason: 'dry-run-stop',
+				detail: 'half B’s dry rehearsal stops before Send: authoring is a model call (design §4 C6)'
+			}
+		};
+	// ⭐ `REG-D-112` (finding 2) — THE LIMIT BEFORE SEND: the authoring floor's reviews are the first calls half B spends.
+	const before = (await read()).snapshot;
+	authoring.limitCheck = limitCheckAhead(r.prior, recordedReviewerCalls(before), PHASE7_AUTHORING_REVIEWER_CALLS);
+	save();
+	if (!authoring.limitCheck.allowed)
+		return {
+			end: {
+				reason: 'paid-limit',
+				detail:
+					`the limit, before Send: ${authoring.limitCheck.total} of ${authoring.limitCheck.limit} reviewer calls, the ` +
+					`authoring floor's worst case of ${authoring.limitCheck.ahead} counted (D8; REG-D-112)`
+			}
+		};
+	await author.send(authoring.request);
+	authoring.sent = true;
+	const waited = await waitForTheCandidate(author, read, authoring, pwaId, save);
+	if ('end' in waited) return waited;
+	await recordTheFloor(authoring, waited.snapshot, pwaId, author);
+	save();
+	const staged = authoring.candidate!;
+	if (staged.status !== 'READY_TO_COMMIT')
+		return {
+			end: {
+				reason: 'authoring-stopped',
+				detail:
+					`the candidate is ${staged.status}, so no one can accept it` +
+					(staged.detail === null ? '' : `: ${staged.detail}`)
+			}
+		};
+	const accepted = await author.accept();
+	writeOnce(join(lane.actions, '00-authoring-acceptAgentCandidate.json'), {
+		action: 'acceptAgentCandidate',
+		...accepted
+	});
+	authoring.accept = {
+		...designerActOf('acceptAgentCandidate', accepted),
+		acceptedHash: acceptedHashOf(accepted)
+	};
+	save();
+	const acceptEnd = designerEnd(accepted, 'Accept exact candidate');
+	if (acceptEnd !== null) return { end: acceptEnd };
+	// ⭐ C4 — ON THE ACCEPTED CANDIDATE, BEFORE SUBMIT, AND NEVER A REFUSAL.
+	const acceptedStore = (await read()).snapshot;
+	authoring.typesAsAccepted = typesAsAccepted(acceptedStore, pwaId);
+	authoring.checks = candidateChecks(
+		acceptedStore.pwuTypes.filter((t) => t.state.pwaId === pwaId),
+		acceptedStore.assurancePolicies
+	);
+	save();
+	for (const act of DESIGNER_ACTS) {
+		const outcome = await author.lifecycle(act);
+		writeOnce(join(lane.actions, `00-authoring-${act}.json`), { action: act, ...outcome });
+		authoring.lifecycle.push(designerActOf(act, outcome));
+		save();
+		const actEnd = designerEnd(outcome, act);
+		if (actEnd !== null) return { end: actEnd };
+	}
+	const pwa = (await read()).snapshot.pwas.find((p) => p.id === pwaId);
+	authoring.published = pwa?.state.publicationStatus === 'PUBLISHED';
+	save();
+	if (!authoring.published)
+		return {
+			end: {
+				reason: 'authoring-stopped',
+				detail: `Publish was answered, and the store reads the PWA ${str(pwa?.state.publicationStatus) || 'absent'}`
+			}
+		};
+	await author.createUndertaking();
+	const { units, rows, problems } = runUnitsOf((await read()).snapshot, pwaId, r.undertakingName);
+	authoring.unitProblems = [...problems];
+	// ⭐ `REG-D-112` (finding 5) — EACH UNIT BY ITS ID from the start: two of one title are two units.
+	r.record.units = unpressed(units.map(({ order, slug, title }) => ({ order, slug, title }))).map((u, i) => ({
+		...u,
+		unitId: units[i]!.unitId
+	}));
+	save();
+	return { rows };
+}
+
+/**
+ * ⭐⭐ `REG-D-112` (E3's review, finding 1) — HALF B'S AUTHORING, THEN ITS ARCHIVE: `authorThePwa`, and then — WHATEVER IT
+ * CAME TO — the store archived as the authoring left it (`archiveAuthoring`, into `lane/archive/00-authoring`): its
+ * candidate not assured, its allowance outlasted, the dry stop, a refused act, the limit before Send, a throw; and once
+ * the units are read, before the root's press. ⛔ Before, no archive was taken until the root's, so a run that stopped
+ * during authoring left no store, and the run report refused it (`run-report.ts`: *"no archive under lane/archive holds
+ * a demo.sqlite"*). Returns the rows by id, or the authoring's end with the dump the archive took — or, when that archive
+ * failed, the store read again, or null if it cannot be.
+ * ⚠ A THROW IS ARCHIVED TOO, as far as it can be: an archive that fails then is noted, never thrown over the throw it
+ * follows, which ends the run `lane-error` in its own words. ⭐⭐ `REG-D-112` (E3's re-review, finding 3) — AND SO IS AN
+ * END: an archive that fails at one is recorded (`archiveFailure`) and noted, never thrown over the end. ⛔ It was thrown,
+ * and the run ended `lane-error` in the archive's words: the limit before Send, the floor's own words, the allowance or
+ * the dry stop lost from `record.end`. ⚠ Once the units are read, a failed archive still throws: the run ends there,
+ * `lane-error`, before the root's press.
+ */
+async function authorThenArchive(r: {
+	readonly record: RunRecord;
+	readonly authoring: AuthoringRecord;
+	readonly hands: LaneHands;
+	readonly lane: LanePaths;
+	readonly boot: Boot;
+	readonly note: (problem: string | null) => void;
+}): Promise<{ readonly rows: ReadonlyMap<string, ObjectRow> } | (AuthoringEnd & { readonly dump: Dump | null })> {
+	const { author, archiveAuthoring, read } = r.hands;
+	if (author === undefined || archiveAuthoring === undefined)
+		throw new Error(
+			'half B was asked for, and the spec handed the lane no authoring hands, or no authoring archive (design §4 C1; REG-D-112)'
+		);
+	const archived = async (): Promise<Dump> => {
+		const dump = await read();
+		await archiveAuthoring(dump);
+		return dump;
+	};
+	let authored: Awaited<ReturnType<typeof authorThePwa>>;
+	try {
+		authored = await authorThePwa({
+			record: r.record,
+			authoring: r.authoring,
+			author,
+			read,
+			lane: r.lane,
+			dry: r.boot.record.mode === 'dry',
+			undertakingName: PHASE7_UNDERTAKING.name,
+			prior: r.boot.prior as number
+		});
+	} catch (e) {
+		await archived().catch((failed: unknown) =>
+			r.note(`the authoring archive, after a throw: ${failed instanceof Error ? failed.message : String(failed)}`)
+		);
+		throw e;
+	}
+	if (!('end' in authored)) {
+		await archived();
+		return authored;
+	}
+	const { end } = authored;
+	const dump = await archived().catch(async (failed: unknown) => {
+		r.authoring.archiveFailure = failed instanceof Error ? failed.message : String(failed);
+		r.note(`the authoring archive, at the authoring’s end (${end.reason}): ${r.authoring.archiveFailure}`);
+		// ⚠ The store read again, for the dry stop's count: an archive opens it read-only, and leaves it as it was.
+		return read().catch(() => null);
+	});
+	return { end, dump };
+}
+
+/** ⭐ `REG-D-112` (finding 2) — the discharge a unit's TYPE declares, as the runner reads it: `UNDECLARED` when none. */
+export function dischargeOf(snap: EngineSnapshot, unitId: string): string {
+	const unit = snap.pwus.find((p) => p.id === unitId);
+	return str(snap.pwuTypes.find((t) => t.id === str(unit?.state.pwuTypeId))?.state.workDischarge) || 'UNDECLARED';
+}
+
+/**
+ * ⭐⭐ `REG-D-112` (E3's review, finding 2) — D8 BEFORE HALF B'S ROOT IS PRESSED: the agent's root may declare MODEL — §3.2's
+ * runs none — and then its press runs a model and its reviews, so a MODEL root's worst case is counted
+ * (`PHASE7_UNIT_REVIEWER_CALLS`); a root that declares anything else runs no model, and counts none.
+ */
+export function rootLimitCheck(prior: number, snap: EngineSnapshot, rootId: string): AheadLimitCheck {
+	const ahead = dischargeOf(snap, rootId) === 'MODEL' ? PHASE7_UNIT_REVIEWER_CALLS : 0;
+	return limitCheckAhead(prior, recordedReviewerCalls(snap), ahead);
+}
+
 // ── THE RUN'S ORDER (D4, D5, D8) ─────────────────────────────────────────────────────────────────────────────────────
 
 /** Where the run ended, and why. */
@@ -1202,13 +1873,29 @@ export interface LaneHands {
 	readonly archive: (call: ArchiveCall) => Promise<readonly string[]>;
 	/** A screenshot into the lane's own folder; why not, if not. */
 	readonly screenshot: (name: string) => Promise<string | null>;
+	/** ⭐ E3 (C1) — half B's hands on the designer page and the clock; a half-B run without them is a lane error. */
+	readonly author?: AuthoringHands;
+	/**
+	 * ⭐ `REG-D-112` (E3's review, finding 1) — archive the store as half B's authoring left it, into
+	 * `lane/archive/00-authoring` (`archiveAuthoring`), whatever way the authoring ended. A half-B run without it is a lane
+	 * error, as one without `author` is.
+	 */
+	readonly archiveAuthoring?: (dump: Dump) => Promise<void>;
+	/**
+	 * ⭐ E3 (C3) — set the test's timeout afresh, from its start: half B's, once its units are read
+	 * (`phase7HalfBTestTimeoutMs`). Half A never calls it.
+	 */
+	readonly extendTimeout?: (ms: number) => void;
 }
 
 /**
  * ⭐⭐ THE RUN, IN ITS ORDER (D4, D5, D8, D11) — and its record, written as it goes, so a run cut off part-way leaves what
  * it reached:
  *   1. the boot record; a refused boot ends the run there, `refused-at-boot`, with nothing pressed;
- *   2. the PWA and the Undertaking (`setUp`), and its units — one per type, or the run ends here;
+ *   2. the PWA and the Undertaking (`setUp`), and its units — one per type, or the run ends here; ⭐ in half B, the PWA
+ *      authored through the page and its units read from it, each by its id, and ⭐ `REG-D-112` the store ARCHIVED however
+ *      the authoring ended (`authorThenArchive`, `00-authoring`) — and, paid, the LIMIT before the agent's root is pressed,
+ *      a MODEL root's worst case counted (`rootLimitCheck`);
  *   3. Begin & Execute on the ROOT, then on each PHASE in order, each only after the one before has answered
  *      (`REG-F-535`), each answer kept raw, the unit's state READ FROM THE STORE (`REG-F-540`), and the run archived and
  *      checked. ⛔ A press with NO ANSWER — the root's included — ends the run there (`unansweredEnd`, D4). Before each
@@ -1247,9 +1934,15 @@ export async function runTheLane(r: {
 	readonly flushPosts: () => void;
 }): Promise<RunRecord> {
 	const { boot, lane, hands } = r;
+	// ⭐ E3 (C1) — THE HALF, as the boot read it; a record written before E3 has none, and is half A's.
+	const half: Phase7Half = boot.record.half ?? 'A';
 	const record: RunRecord = {
 		mode: boot.record.mode,
-		units: unpressed(PHASE7_ARCHIVE_UNITS),
+		half,
+		// ⭐ E3 (C2) — half A's five, declared; half B's, none until they are read from the published PWA.
+		units: half === 'B' ? [] : unpressed(PHASE7_ARCHIVE_UNITS),
+		authoring:
+			half === 'B' ? authoringRecordOf(PHASE7_HALF_B_REQUEST, boot.record.authorModel ?? null) : null,
 		dryRun: null,
 		end: null,
 		problems: []
@@ -1274,18 +1967,41 @@ export async function runTheLane(r: {
 
 	try {
 		// ── 2. THE PWA AND THE UNDERTAKING ──────────────────────────────────────────────────────────────────────────
-		const created = await hands.setUp(note);
-		const titles = [...created.keys()].sort(byCodeUnit);
-		const declared = record.units.map((u) => u.title).sort(byCodeUnit);
-		if (titles.join('\n') !== declared.join('\n'))
-			throw new Error(
-				`instantiation did not build one unit per type: the store holds ${JSON.stringify(titles)}, not ` +
-					JSON.stringify(declared)
-			);
-		for (const u of record.units) u.unitId = created.get(u.title)!.id;
+		// ⭐⭐ E3 (C1, C2) — HALF B AUTHORS IT THROUGH THE PAGE (`authorThePwa`), and its units are READ FROM THE PUBLISHED
+		// PWA — ⭐ `REG-D-112` (finding 5) each BY ITS ID, which the record already holds — so what instantiation built
+		// against the PWA's tree is the report's stage 2. Half A types §3.2's PWA, and holds the store to its five by their
+		// titles, as before. ⭐ `REG-D-112` (finding 1) — and however half B's authoring ends, its store is archived first
+		// (`authorThenArchive`), so even a run that stopped there is reported.
+		let rowOf: (u: RunUnit) => ObjectRow | undefined;
+		if (record.authoring === null || record.authoring === undefined) {
+			const created = await hands.setUp(note);
+			const titles = [...created.keys()].sort(byCodeUnit);
+			const declared = record.units.map((u) => u.title).sort(byCodeUnit);
+			if (titles.join('\n') !== declared.join('\n'))
+				throw new Error(
+					`instantiation did not build one unit per type: the store holds ${JSON.stringify(titles)}, not ` +
+						JSON.stringify(declared)
+				);
+			rowOf = (u) => created.get(u.title);
+		} else {
+			const authored = await authorThenArchive({ record, authoring: record.authoring, hands, lane, boot, note });
+			if ('end' in authored) {
+				// ⛔ DRY (C6), THE MODEL EXCHANGES ARE COUNTED AT THE STOP — on the dump the archive took there: the rehearsal sent
+				// nothing, and the store must say so. With no dump, none is counted, and the verdict says the count is unread.
+				if (authored.end.reason === 'dry-run-stop' && authored.dump !== null)
+					record.dryRun = { modelExchanges: authored.dump.snapshot.modelExchanges.length };
+				return end(authored.end.reason, authored.end.detail);
+			}
+			if (record.units.length === 0)
+				return end('authoring-stopped', 'the Undertaking of the published PWA holds no unit: instantiation built none');
+			rowOf = (u) => authored.rows.get(u.unitId!);
+			// ⭐ C3 — THE TIMEOUT, RE-COUNTED FOR THE AGENT'S UNITS: the phases are the root's and the tree's, not §3.2's four.
+			hands.extendTimeout?.(phase7HalfBTestTimeoutMs(record.units.length - 1));
+		}
+		for (const u of record.units) u.unitId = rowOf(u)!.id;
 		const root = record.units[0]!;
 		const phases = record.units.slice(1);
-		const undertakingId = str(created.get(root.title)!.state.undertakingId);
+		const undertakingId = str(rowOf(root)!.state.undertakingId);
 		writeRunRecord(lane, record);
 
 		// ── 3. EACH UNIT: BEGIN & EXECUTE, THE STORE READ, THE RUN ARCHIVED AND CHECKED ─────────────────────────────
@@ -1449,6 +2165,19 @@ export async function runTheLane(r: {
 			return reached.end;
 		};
 
+		// ⭐⭐ `REG-D-112` (finding 2) — HALF B'S ROOT IS THE AGENT'S, AND MAY RUN A MODEL: paid, the limit is checked before
+		// its press, a MODEL root's worst case counted (`rootLimitCheck`). §3.2's root runs none, and half A's is unchecked.
+		if (half === 'B' && boot.record.mode === 'paid') {
+			const rootCheck = rootLimitCheck(boot.prior as number, (await hands.read()).snapshot, root.unitId!);
+			root.limitCheck = rootCheck;
+			writeRunRecord(lane, record);
+			if (!rootCheck.allowed)
+				return end(
+					'paid-limit',
+					`the limit, before the root’s press: ${rootCheck.total} of ${rootCheck.limit} reviewer calls, its worst ` +
+						`case of ${rootCheck.ahead} counted (D8; REG-D-112)`
+				);
+		}
 		// ⛔ THE ROOT'S PRESS IS BOUNDED AS EVERY PRESS IS (D4): with no answer, the run ends here, dry or paid.
 		const rootEnd = await run(root);
 		if (rootEnd !== null) return end(rootEnd.reason, rootEnd.detail);
@@ -1703,6 +2432,31 @@ function rootSignOffShortfalls(root: RunUnit): string[] {
 }
 
 /**
+ * ⭐ E3 (C6) — why half B's dry rehearsal is not the one it was meant to be, one line each: it made the agent's draft,
+ * pressed no Send — authoring is a model call — and the store, read at the stop, holds no model exchange. ⭐ `REG-D-112`
+ * (E3's re-review, finding 3) — AND ITS ARCHIVE WAS TAKEN: one that fails at the stop is recorded beside it
+ * (`archiveFailure`), no longer the `lane-error` this verdict refused, and the authoring archive is the one
+ * archive-and-check cycle half B's rehearsal reaches.
+ */
+function halfBDryShortfalls(record: RunRecord): string[] {
+	const a = record.authoring;
+	const exchanges = record.dryRun?.modelExchanges ?? null;
+	const archiveFailure = a?.archiveFailure ?? null;
+	return [
+		...(a?.pwaId ? [] : ['the dry run made no draft for the agent to author into']),
+		...(a?.sent === false
+			? []
+			: ['the dry run sent the request: authoring is a model call, and a dry run calls none (design §4 C6)']),
+		...(exchanges === 0
+			? []
+			: [`the dry run recorded ${exchanges ?? 'an unread number of'} model exchange(s)`]),
+		...(archiveFailure === null
+			? []
+			: [`the dry run’s authoring archive failed, so the archive it rehearses is not proved: ${archiveFailure}`])
+	];
+}
+
+/**
  * ⭐ WHAT THE SPEC ASSERTS OF ITS OWN MACHINERY, once the record is written: why this run is not the run it was meant to
  * be, one line each; none when it is. PAID, it must COMPLETE. DRY, it must stop where a dry run stops, having PROVED THE
  * ROOT'S PRESS (§6 P7-2: "the dry run also proves one press, its saved response and one archive-and-check cycle"):
@@ -1721,6 +2475,8 @@ export function laneVerdict(record: RunRecord): string[] {
 				(ended?.detail === undefined ? '' : `: ${ended.detail}`)
 		];
 	if (record.mode === 'paid') return [];
+	// ⭐ E3 (C6) — HALF B'S DRY REHEARSAL STOPS BEFORE SEND, so what it proves is the draft, and that nothing was sent.
+	if (record.half === 'B') return halfBDryShortfalls(record);
 	const root = record.units[0]!;
 	return [
 		...(root.beginExecute?.envelopeType === 'success' && root.stopped === false
