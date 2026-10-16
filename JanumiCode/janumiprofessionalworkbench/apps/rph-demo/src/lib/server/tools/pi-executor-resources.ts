@@ -39,29 +39,50 @@
 //     no command ran, offline or not;
 //   · THE WORKING-DIRECTORY LINE names the server's folder, not the workspace: `pi-executor.ts` gives its session no
 //     folder (`SessionManager.inMemory()`), so the session takes `process.cwd()` (`dist/core/sdk.js`).
+// ⭐⭐ AND THE AUTHORING AGENT'S PI NOW TAKES THE SAME CLOSED OPTIONS (the lead's delegated decision of 2026-10-16, to be
+// registered as REG-D-114; `REG-F-512`): `pi-agent.ts` builds its loader from `closedResourceLoaderOptions` with its own
+// system prompt, and its settings manager trusts no project. ⚠ IT CHANGES THE AUTHORING AGENT'S BEHAVIOUR: `pi-agent.ts`
+// says what it took by Pi's defaults until then.
 // ⭑ A PI-FREE MODULE, as `pi-execution-tools.ts` is: it imports Pi's types alone, so its test loads no part of Pi —
-// `pi-executor.ts` loads the coding agent at module scope, and the gate's one test that loads any of Pi is
-// `pi-execution-tools.test.ts`, its core loop alone. Pi's real loader and session were driven over these options once,
-// by hand (the commit that made this file quotes what they took).
+// `pi-executor.ts` loads the coding agent at module scope~~, and the gate's one test that loads any of Pi is
+// `pi-execution-tools.test.ts`, its core loop alone~~. Pi's real loader and session were driven over these options once,
+// by hand (the commit that made this file quotes what they took). ⭐ (R3-C, `REG-F-512`'s predicted red) And now in the
+// gate: `pi-executor.test.ts` opens the executor's own session over Pi's real loader, in a workspace holding the files
+// Pi would take, with a faux provider and no model, and reads what its recorded composite carries.
 import type { DefaultResourceLoader, SettingsManager } from '@earendil-works/pi-coding-agent';
 import { EXECUTION_CONTRACT_PROMPT } from '../execution/execution-contract.js';
 
-/** What `pi-executor.ts` hands Pi's `DefaultResourceLoader` for an executor session. */
-export function executorResourceLoaderOptions(o: {
+/**
+ * What a session's `DefaultResourceLoader` is handed when its instruction is to be `systemPrompt`, with Pi's own date
+ * and working-directory lines after it, and nothing Pi finds around `cwd` or in its agent folder. The executor's
+ * (`executorResourceLoaderOptions`, below) and the authoring agent's (`pi-agent.ts`).
+ */
+export function closedResourceLoaderOptions(o: {
 	readonly cwd: string;
 	readonly agentDir: string;
 	readonly settingsManager: SettingsManager;
+	readonly systemPrompt: string;
 }): ConstructorParameters<typeof DefaultResourceLoader>[0] {
 	return {
 		cwd: o.cwd,
 		agentDir: o.agentDir,
 		settingsManager: o.settingsManager,
-		systemPromptOverride: () => EXECUTION_CONTRACT_PROMPT,
-		// ⭐ Each below was Pi's default until the lead's delegated decision of 2026-10-15, to be registered.
+		systemPromptOverride: () => o.systemPrompt,
+		// ⭐ Each below was Pi's default until the lead's delegated decision of 2026-10-15, to be registered — and the
+		// authoring agent's until the lead's delegated decision of 2026-10-16 (to be registered as REG-D-114).
 		appendSystemPromptOverride: () => [],
 		noContextFiles: true,
 		noExtensions: true,
 		noSkills: true,
 		noPromptTemplates: true
 	};
+}
+
+/** What `pi-executor.ts` hands Pi's `DefaultResourceLoader` for an executor session: the execution contract, closed. */
+export function executorResourceLoaderOptions(o: {
+	readonly cwd: string;
+	readonly agentDir: string;
+	readonly settingsManager: SettingsManager;
+}): ConstructorParameters<typeof DefaultResourceLoader>[0] {
+	return closedResourceLoaderOptions({ ...o, systemPrompt: EXECUTION_CONTRACT_PROMPT });
 }

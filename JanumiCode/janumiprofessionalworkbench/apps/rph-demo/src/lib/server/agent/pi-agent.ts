@@ -1,8 +1,11 @@
 // The LIVE authoring agent, backed by the Pi coding-agent SDK (in-process AgentSession — cloud models, no GPU).
-// This module is the ONLY place Pi is imported; the factory dynamic-imports it, so the mock path (and the whole
-// gate) never loads Pi's heavy Node deps. It maps our Pi-agnostic tool descriptors onto Pi `defineTool`s and Pi's
-// event stream onto our normalized AuthoringAgentEvent stream. The agent runs with the built-in coding tools
-// DISABLED (noTools: "builtin") — it can ONLY touch the workbench through our authoring tools.
+// This module is the ONLY place Pi is imported; the factory dynamic-imports it, so the mock path ~~(and the whole
+// gate)~~ never loads Pi's heavy Node deps ⭐ (the gate loads them in one test alone, `tools/pi-executor.test.ts`: R3-C).
+// It maps our Pi-agnostic tool descriptors onto Pi `defineTool`s and Pi's event stream onto our normalized
+// AuthoringAgentEvent stream. The agent runs with the built-in coding tools
+// DISABLED (noTools: "builtin") — it can ONLY touch the workbench through our authoring tools. ⭐ And, since the lead's
+// delegated decision of 2026-10-16 (to be registered as REG-D-114), with no extension's tools beside them: until then an
+// extension Pi found around the server's folder or in its agent folder offered its own (`run`, at the loader).
 import {
 	AuthStorage,
 	createAgentSession,
@@ -24,6 +27,7 @@ import {
 } from './materialized-input.js';
 import type { AuthoringAgent, AuthoringToolDescriptor, EmitFn, ParamSpec } from './types.js';
 import { piToolExecutionSucceeded, toPiToolResult } from './pi-tool-result.js';
+import { closedResourceLoaderOptions } from '../tools/pi-executor-resources.js';
 
 /** Map our flat param spec onto a TypeBox object schema (optional wrapper for non-required params). */
 function toTypeBox(spec: ParamSpec): TSchema {
@@ -116,7 +120,14 @@ export class PiAuthoringAgent implements AuthoringAgent {
 			const authStorage = AuthStorage.create();
 			const modelRegistry = ModelRegistry.create(authStorage);
 			// Read the user's REAL Pi settings (same agent dir the TUI uses) so we inherit their default model.
-			const settingsManager = SettingsManager.create(process.cwd(), getAgentDir());
+			// ⛔ TRUSTING NO PROJECT, as the executor's does (the lead's delegated decision of 2026-10-16, to be registered
+			// as REG-D-114; `REG-F-512`). Pi trusts a project's `.pi/settings.json` by default, and the project here is the
+			// server's own folder: where `JPWB_AGENT_MODEL` named no model, a default model named there chose this agent's
+			// over the operator's, and a package listed there that was missing was installed on each run, by the npm command
+			// named there. Untrusted, that file is not read at all; the agent folder's settings, the operator's own, still are.
+			const settingsManager = SettingsManager.create(process.cwd(), getAgentDir(), {
+				projectTrusted: false
+			});
 			const model = await resolveModel(modelRegistry, settingsManager);
 			// §8.12 checks independence against the ACTUAL model/provider, never a role label — so emit the
 			// resolved identity structurally rather than only as display text, and let the floor bind to it.
@@ -126,12 +137,24 @@ export class PiAuthoringAgent implements AuthoringAgent {
 			});
 			emit({ kind: 'status', text: `pi agent · ${model.provider}/${model.id}` });
 
-			const loader = new DefaultResourceLoader({
-				cwd: process.cwd(),
-				agentDir: getAgentDir(),
-				settingsManager,
-				systemPromptOverride: () => this.systemPrompt
-			});
+			// ⭐⭐ THIS AGENT'S INSTRUCTION IS ITS OWN SYSTEM PROMPT AND ITS TOOLS ARE THE AUTHORING TOOLS — NOTHING PI FINDS
+			// AROUND THE SERVER'S FOLDER OR IN ITS AGENT FOLDER (the lead's delegated decision of 2026-10-16, to be
+			// registered as REG-D-114): the executor's closed options (`closedResourceLoaderOptions`), with this prompt.
+			// ⚠ THIS CHANGES THE AUTHORING AGENT'S BEHAVIOUR. By Pi's defaults, until now: an AGENTS.md or CLAUDE.md from
+			// Pi's agent folder, and from the server's folder and every folder above it, was folded into the instruction
+			// after the prompt; an APPEND_SYSTEM.md from the agent folder, or from the server folder's `.pi/`, was appended
+			// under it; the extensions found in both, and in the packages the settings list, were loaded into the server,
+			// their tools offered beside the authoring tools; and a turn beginning with `/` could expand a skill or prompt
+			// template found there. Now the instruction is the prompt with Pi's own date and working-directory lines after
+			// it, and the tools are the authoring tools alone.
+			const loader = new DefaultResourceLoader(
+				closedResourceLoaderOptions({
+					cwd: process.cwd(),
+					agentDir: getAgentDir(),
+					settingsManager,
+					systemPrompt: this.systemPrompt
+				})
+			);
 			await loader.reload();
 
 			const created = await createAgentSession({

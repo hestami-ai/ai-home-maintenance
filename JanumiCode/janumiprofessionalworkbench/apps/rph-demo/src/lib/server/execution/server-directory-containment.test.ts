@@ -2,8 +2,10 @@
 //
 // ⭐ WHY A SOURCE-LEVEL GUARD RATHER THAN A BEHAVIOURAL ONE, STATED PLAINLY. The defect was two literal
 // `process.cwd()` calls in `pi-executor.ts`, and that module statically imports `@earendil-works/pi-coding-agent`
-// — the heavy Node dependency `model.ts` goes out of its way to load lazily so "the gate never pulls Pi's heavy
-// Node deps". Opening a real Pi session to observe its working directory is not something a unit suite can do,
+// — the heavy Node dependency `model.ts` goes out of its way to load lazily so ~~"the gate never pulls Pi's heavy
+// Node deps"~~ ⭐ "loading this module never pulls Pi's heavy Node deps". Opening a real Pi session to observe its
+// working directory ~~is not~~ ⭐ was not something a unit suite could do when this was written (R3-C's
+// `tools/pi-executor.test.ts` opens one, with a faux provider, for its recorded composite),
 // so the behavioural half lives in `producer-session.test.ts` (which proves the ONLY sanctioned source of a
 // working directory REFUSES rather than falling back) and this file proves the other half: that the adapter
 // actually ASKS it, rather than reaching for the process's own directory again.

@@ -193,7 +193,7 @@ function staticGraph(entry: string): {
 
 const slashed = (path: string): string => path.split('\\').join('/');
 
-describe('⭐ D4 — the gate never loads Pi’s SDK: `model.ts` reaches Pi only through the default opener', () => {
+describe('⭐ D4 — loading `model.ts` loads no part of Pi’s SDK: it reaches Pi only through the default opener', () => {
 	it('⛔ model.ts loads the Pi adapter exactly once — dynamically, inside the default opener — and nowhere else', () => {
 		expect(
 			piAdapterLoads(readFileSync(MODEL, 'utf8')),

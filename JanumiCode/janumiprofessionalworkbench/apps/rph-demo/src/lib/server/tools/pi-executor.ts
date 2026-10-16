@@ -13,12 +13,14 @@
 // `customTools: toPiTools(this.tools)` with `noTools: 'builtin'`, and `toTypeBox` is now shared between the two
 // minters rather than copied (`agent/pi-typebox.ts` records why the copy was the hazard).
 //
-// ⚠ PI IS IMPORTED ONLY HERE, and only through a dynamic import at the call site, so the mock path and the whole
-// gate never load its heavy Node deps — the rule `agent/index.ts` already follows.
+// ⚠ PI IS IMPORTED ONLY HERE, and only through a dynamic import at the call site, so ~~the mock path and the whole
+// gate never load~~ ⭐ the mock path never loads its heavy Node deps — the rule `agent/index.ts` already follows. ⭐ (R3-C)
+// And the gate loads them in one test alone: `pi-executor.test.ts` imports this module, to open a session over Pi's real
+// loader with a faux provider (`REG-F-512`'s predicted red).
 // ⭐ `JAN-EXEC` Phase 8 (`REG-D-112` (d)) — STILL TRUE OF THIS MODULE AND OF THE CODING AGENT IT LOADS. The mapping of the
 // minted tools onto Pi's tool definitions moved to `pi-execution-tools.ts`, which imports only a TYPE from Pi, because it
 // decides the order a turn's calls run in (`REG-F-518`); its test drives that through Pi's CORE loop (`pi-agent-core`,
-// `pi-ai`'s faux provider), the one gate test that loads any part of Pi's SDK, and never this module.
+// `pi-ai`'s faux provider)~~, the one gate test that loads any part of Pi's SDK,~~ and never this module.
 // ⭐ And the executor's resource-loader options moved to `pi-executor-resources.ts` (the lead's delegated decision of
 // 2026-10-15, to be registered), which imports types alone from Pi: its test reads Pi's declaration of those options,
 // and this module's source, and loads neither.
