@@ -15438,10 +15438,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "PQ1-V6-the-content-is-cut-one-short",
 		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
-		find: ": excerptHead(plan.framed.subjectSlice, input.content, plan.contentBudget);",
-		replace: ": excerptHead(plan.framed.subjectSlice, input.content, plan.contentBudget - 1); // MUTANT: a graph or work product is cut one short of the budget the assembler leaves",
+		find: "else content = excerptHead(plan.framed.subjectSlice, input.content, plan.contentBudget);",
+		replace: "else content = excerptHead(plan.framed.subjectSlice, input.content, plan.contentBudget - 1); // MUTANT: a graph or work product is cut one short of the budget the assembler leaves",
 		expectRed: ["apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.test.ts"],
-		why: "PROMISE (REASONING_REVIEW_BUDGET; design D2): a graph or work-product content is cut at exactly the room the assembler leaves it, its declaration inside that room. WHO RELIES: the reviewer of an oversize graph or work product, and the fingerprint's budget component. WHAT THE MUTATION DOES: the content limit the prompt obeys is one less than the budget the object and the assembler state. OBSERVED: KILLED — 1 test(s) red in reasoning-review-validator.test.ts: '⛔ a graph or a work product is cut at EXACTLY the room the assembler leaves it: the prompt is PROMPT_BUDGET but for the digits its declaration did not need' (AssertionError: PWA_GRAPH: the content's limit is not the budget the assembler leaves: expected 25999 to be 26000 // Object.is equality)",
+		why: "PROMISE (REASONING_REVIEW_BUDGET; design D2): a graph or work-product content is cut at exactly the room the assembler leaves it, its declaration inside that room. WHO RELIES: the reviewer of an oversize graph or work product, and the fingerprint's budget component. WHAT THE MUTATION DOES: the content limit the prompt obeys is one less than the budget the object and the assembler state. OBSERVED: KILLED — 1 test(s) red in reasoning-review-validator.test.ts: '⛔ a graph or a work product is cut at EXACTLY the room the assembler leaves it: the prompt is PROMPT_BUDGET but for the digits its declaration did not need' (AssertionError: PWA_GRAPH: the content's limit is not the budget the assembler leaves: expected 25999 to be 26000 // Object.is equality) ⭐ RE-ANCHORED 2026-10-18 (JAN-EXEC Phase 7 P5, package B; ledger rule #5): P5 package B F2 made the content's head cut an else branch beside a declared review's builder cut, so the anchor moved from the ternary's arm to that branch. The promise, the attack and the victim are unchanged. RE-OBSERVED (bun run mutants -- the 23 P5B ids and the 5 entries this package re-anchored, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         PQ1-V6-the-content-is-cut-one-short ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-PRQUAL PQ-1 (build, adversarial verification of the product) - each mutant kept the product's tests green until its pin landed (DESIGN-process-result-qualification.md D1, D2; ROADMAP-process-result-qualification.md PQ-1; REG-F-476, REG-F-480..484)"
 	},
 	{
@@ -23393,7 +23393,8 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		find: "return recorded >= RECORDED_RUN_LIMIT",
 		replace: "return recorded > RECORDED_RUN_LIMIT",
 		expectRed: ["apps/rph-demo/src/lib/server/execution/phase7-run-report.store.test.ts"],
-		why: "PROMISE: captured runs that became no evidence are blamed on the evidence join's cap (REG-F-517) only when the join recorded the 32 runs the observer keeps; fewer recorded means a stop dropped them (REG-F-511) (`unrecordedCause`; K5). ⭑ Restated by the fixer: builder R's form named REG-F-517 by the step's state, and the fix reads the cause from the evidence count, so the id is always named and the guard is its choice. WHO RELIES: P7-5's report, which registers every break with its id: the real-store run's end-to-end phase recorded 32 and captured 33. WHAT THE MUTATION DOES: 32 recorded reads as fewer than the cap, so runs past the 32nd are blamed on a stop. ⭑ Re-anchored by the fixer, 2026-10-10: a fix moved the line builder R's form anchored on, so it is restated on the fixed code and driven again. OBSERVED (driven 2026-10-10 on a disposable copy of the working tree, applied and restored byte for byte, its program compiling (tsc --noEmit -p scripts/tsconfig.json)): KILLED - the whole file, as the runner runs it: 1 of its 10 test(s) red in phase7-run-report.store.test.ts: '⭐ the matrix reads the run as it went: the stops broke, the 33rd run broke stage 4, the hand completion broke the floor' (AssertionError: expected [ 'broke', [ 'REG-F-511' ] ] to deeply equal [ 'broke', [ 'REG-F-517' ] ])",
+		supersededBy: "P5B-M15-the-cause-ignores-what-the-k5-check-left-possible",
+		why: "PROMISE: captured runs that became no evidence are blamed on the evidence join's cap (REG-F-517) only when the join recorded the 32 runs the observer keeps; fewer recorded means a stop dropped them (REG-F-511) (`unrecordedCause`; K5). ⭑ Restated by the fixer: builder R's form named REG-F-517 by the step's state, and the fix reads the cause from the evidence count, so the id is always named and the guard is its choice. WHO RELIES: P7-5's report, which registers every break with its id: the real-store run's end-to-end phase recorded 32 and captured 33. WHAT THE MUTATION DOES: 32 recorded reads as fewer than the cap, so runs past the 32nd are blamed on a stop. ⭑ Re-anchored by the fixer, 2026-10-10: a fix moved the line builder R's form anchored on, so it is restated on the fixed code and driven again. OBSERVED (driven 2026-10-10 on a disposable copy of the working tree, applied and restored byte for byte, its program compiling (tsc --noEmit -p scripts/tsconfig.json)): KILLED - the whole file, as the runner runs it: 1 of its 10 test(s) red in phase7-run-report.store.test.ts: '⭐ the matrix reads the run as it went: the stops broke, the 33rd run broke stage 4, the hand completion broke the floor' (AssertionError: expected [ 'broke', [ 'REG-F-511' ] ] to deeply equal [ 'broke', [ 'REG-F-517' ] ]) ⭐ RETIRED 2026-10-18 (JAN-EXEC Phase 7 P5, package B, F5): the line it attacked, the count that named a cause, is gone - P5 showed the count blaming REG-F-511 where the archive's own K5 check had ruled both its limbs out - and the cause of a captured run that became no evidence is now the causes the archive's K5 check leaves possible, so it is supersededBy P5B-M15, which attacks that reading.",
 		source: "JAN-EXEC Phase 7 P7-2 round 2, builder R - the run report and the post-run tools (scripts/phase7/run-report-core.ts, run-report.ts, archive-scan.ts, finalize-run.ts), held by verif/phase7-run-report.test.ts, verif/phase7-archive-scan.test.ts and apps/rph-demo/src/lib/server/execution/phase7-run-report.store.test.ts (the run report over stores the product wrote, read by its own command line); each guard shown red by its own mutant, driven on a disposable copy, each control shown to survive; entered so P7-6's frozen controls re-drive them (docs/_working/DESIGN-the-live-end-to-end-run.md §6 P7-2 D6, D7, D9, P7-3, P7-4d/f/g; REG-F-433; REG-F-536; REG-D-101; REG-D-102)"
 	},
 	{
@@ -24743,10 +24744,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "PQ7-M259b-the-page-is-not-loaded-afresh-before-a-sign-off",
 		file: "apps/rph-demo/e2e-live-exec/phase7-operator.ts",
-		find: "await hands.showOverview();\n\t\t\tunit.signOff = await signOff(unit);",
-		replace: "unit.signOff = await signOff(unit);",
+		find: "await hands.showOverview();\n\t\t\tunit.signOff = unit === root && abandoned.length > 0 ? await held(unit) : await signOff(unit);",
+		replace: "unit.signOff = unit === root && abandoned.length > 0 ? await held(unit) : await signOff(unit);",
 		expectRed: ["verif/phase7-live-spec.test.ts"],
-		why: "PROMISE: the Undertaking page is loaded afresh before each unit's sign-off: after an error envelope the page is the error page, and after a redirect another page, so the next row would read as offering nothing (round 2's verification drove it in headless Edge: every later unit, the root included, offered: false). WHO RELIES: stage 7 and the declared verdicts, which exist only if each completed phase and the root are signed off. WHAT THE MUTATION DOES: the sign-off presses on the page as the last act left it. OBSERVED (driven 2026-10-10 on a disposable copy of the working tree, applied and restored byte for byte, its program compiling (tsc --noEmit -p apps/rph-demo/e2e/tsconfig.json)): KILLED — 1 of its 55 test(s) red in phase7-live-spec.test.ts: '⭐ PAID: each phase in order, the limit read before each; a phase that stops is left as found and the later ones run with an unassured upstream; the sign-off takes each completed phase and the root LAST, the page loaded afresh for each and the store read after every act' (AssertionError: the sign-off’s order, its reloads, or Mark Satisfied after a refused Record Assurance: expected [ Array(7) ] to deeply equal [ 'showOverview', …(10) ])",
+		why: "PROMISE: the Undertaking page is loaded afresh before each unit's sign-off: after an error envelope the page is the error page, and after a redirect another page, so the next row would read as offering nothing (round 2's verification drove it in headless Edge: every later unit, the root included, offered: false). WHO RELIES: stage 7 and the declared verdicts, which exist only if each completed phase and the root are signed off. WHAT THE MUTATION DOES: the sign-off presses on the page as the last act left it. OBSERVED (driven 2026-10-10 on a disposable copy of the working tree, applied and restored byte for byte, its program compiling (tsc --noEmit -p apps/rph-demo/e2e/tsconfig.json)): KILLED — 1 of its 55 test(s) red in phase7-live-spec.test.ts: '⭐ PAID: each phase in order, the limit read before each; a phase that stops is left as found and the later ones run with an unassured upstream; the sign-off takes each completed phase and the root LAST, the page loaded afresh for each and the store read after every act' (AssertionError: the sign-off’s order, its reloads, or Mark Satisfied after a refused Record Assurance: expected [ Array(7) ] to deeply equal [ 'showOverview', …(10) ]) ⭐ RE-ANCHORED 2026-10-18 (JAN-EXEC Phase 7 P5, package B; ledger rule #5): P5 package B F3 made the press hold the root while a phase is ABANDONED, so the sign-off's line moved. The promise, the attack and the victim are unchanged. RE-OBSERVED (bun run mutants -- the 23 P5B ids and the 5 entries this package re-anchored, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         PQ7-M259b-the-page-is-not-loaded-afresh-before-a-sign-off ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 7 P7-2 (round 2, builder S's fix pass) - the two adversarial verifications of the run's lane: a Begin & Execute whose request failed in transit is returned at once and ends the run (request-failed); the run's order moved out of the spec into the operator (runTheLane) and driven on hands made in verif - every press bounded, the root's included, and the dry run's press proved; a press with no answer ends the run; the boot's refusals; the store read after every act, the sign-off's included; the page loaded afresh before each sign-off; K5's hand-off between archives; K4's reading of Pi's agent folder (APPEND_SYSTEM.md, extensions/) and of a .pi that is a file (docs/_working/DESIGN-the-live-end-to-end-run.md §6 P7-2 D1, D3-D8; REG-F-512; REG-F-527; REG-F-535; REG-F-540)"
 	},
 	{
@@ -24878,10 +24879,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "PQ7-M304-the-dry-run-counts-its-model-exchanges-before-its-sign-off",
 		file: "apps/rph-demo/e2e-live-exec/phase7-operator.ts",
-		find: "\t\tfor (const unit of [...phases.filter((u) => u.stopped === false), root]) {\n\t\t\t// ⚠ LOADED AFRESH FOR EACH UNIT: after an `error` envelope the page is the error page, and after a redirect it is\n\t\t\t// another page, so this unit's row would be gone, and read as offering nothing (round 2's fix pass).\n\t\t\tawait hands.showOverview();\n\t\t\tunit.signOff = await signOff(unit);\n\t\t\twriteRunRecord(lane, record);\n\t\t\t// ⛔ E12's re-review F1 (D4; `REG-F-535`) — A SIGN-OFF ACT WITH NO ANSWER: no later sign-off is pressed beside it, and\n\t\t\t// the run ends for it once the final archive is taken.\n\t\t\tif (reached.end !== null) break;\n\t\t\t// ⛔ `E12F` F2 — THE LIMIT REFUSED THIS SIGN-OFF, OR THE RULE'S RE-RUN IN IT: the run ends `paid-limit`, and no later\n\t\t\t// sign-off is pressed, as no later phase is once the limit stops one (D8).\n\t\t\tif (unit.signOff.limitCheck?.allowed === false || unit.signOff.rerunLimitCheck?.allowed === false) {\n\t\t\t\treason = 'paid-limit';\n\t\t\t\tbreak;\n\t\t\t}\n\t\t}\n\t\tnote(await hands.screenshot(FINAL_ARCHIVE));\n\t\tawait archive(FINAL_ARCHIVE, null, null, await hands.read());\n\t\t// ⛔ DRY, WHAT `laneVerdict` HOLDS IT TO (D1): the model exchanges the store holds, read only now — after the\n\t\t// sign-off and the final archive — so that a model call anything before made, the sign-off's rehearsal included, is\n\t\t// counted (D11).\n\t\tif (dry)\n\t\t\trecord.dryRun = { modelExchanges: (await hands.read()).snapshot.modelExchanges.length };",
-		replace: "\t\tif (dry)\n\t\t\trecord.dryRun = { modelExchanges: (await hands.read()).snapshot.modelExchanges.length };\n\t\tfor (const unit of [...phases.filter((u) => u.stopped === false), root]) {\n\t\t\t// ⚠ LOADED AFRESH FOR EACH UNIT: after an `error` envelope the page is the error page, and after a redirect it is\n\t\t\t// another page, so this unit's row would be gone, and read as offering nothing (round 2's fix pass).\n\t\t\tawait hands.showOverview();\n\t\t\tunit.signOff = await signOff(unit);\n\t\t\twriteRunRecord(lane, record);\n\t\t\t// ⛔ E12's re-review F1 (D4; `REG-F-535`) — A SIGN-OFF ACT WITH NO ANSWER: no later sign-off is pressed beside it, and\n\t\t\t// the run ends for it once the final archive is taken.\n\t\t\tif (reached.end !== null) break;\n\t\t\t// ⛔ `E12F` F2 — THE LIMIT REFUSED THIS SIGN-OFF, OR THE RULE'S RE-RUN IN IT: the run ends `paid-limit`, and no later\n\t\t\t// sign-off is pressed, as no later phase is once the limit stops one (D8).\n\t\t\tif (unit.signOff.limitCheck?.allowed === false || unit.signOff.rerunLimitCheck?.allowed === false) {\n\t\t\t\treason = 'paid-limit';\n\t\t\t\tbreak;\n\t\t\t}\n\t\t}\n\t\tnote(await hands.screenshot(FINAL_ARCHIVE));\n\t\tawait archive(FINAL_ARCHIVE, null, null, await hands.read());\n\t\t// ⛔ DRY, WHAT `laneVerdict` HOLDS IT TO (D1): the model exchanges the store holds, read only now — after the\n\t\t// sign-off and the final archive — so that a model call anything before made, the sign-off's rehearsal included, is\n\t\t// counted (D11).",
+		find: "\t\tfor (const unit of [...phases.filter((u) => u.stopped === false), root]) {\n\t\t\t// ⚠ LOADED AFRESH FOR EACH UNIT: after an `error` envelope the page is the error page, and after a redirect it is\n\t\t\t// another page, so this unit's row would be gone, and read as offering nothing (round 2's fix pass).\n\t\t\tawait hands.showOverview();\n\t\t\tunit.signOff = unit === root && abandoned.length > 0 ? await held(unit) : await signOff(unit);\n\t\t\twriteRunRecord(lane, record);\n\t\t\t// ⛔ E12's re-review F1 (D4; `REG-F-535`) — A SIGN-OFF ACT WITH NO ANSWER: no later sign-off is pressed beside it, and\n\t\t\t// the run ends for it once the final archive is taken.\n\t\t\tif (reached.end !== null) break;\n\t\t\t// ⛔ `E12F` F2 — THE LIMIT REFUSED THIS SIGN-OFF, OR THE RULE'S RE-RUN IN IT: the run ends `paid-limit`, and no later\n\t\t\t// sign-off is pressed, as no later phase is once the limit stops one (D8).\n\t\t\tif (unit.signOff.limitCheck?.allowed === false || unit.signOff.rerunLimitCheck?.allowed === false) {\n\t\t\t\treason = 'paid-limit';\n\t\t\t\tbreak;\n\t\t\t}\n\t\t}\n\t\tnote(await hands.screenshot(FINAL_ARCHIVE));\n\t\tawait archive(FINAL_ARCHIVE, null, null, await hands.read());\n\t\t// ⛔ DRY, WHAT `laneVerdict` HOLDS IT TO (D1): the model exchanges the store holds, read only now — after the\n\t\t// sign-off and the final archive — so that a model call anything before made, the sign-off's rehearsal included, is\n\t\t// counted (D11).\n\t\tif (dry)\n\t\t\trecord.dryRun = { modelExchanges: (await hands.read()).snapshot.modelExchanges.length };",
+		replace: "\t\tif (dry)\n\t\t\trecord.dryRun = { modelExchanges: (await hands.read()).snapshot.modelExchanges.length };\n\t\tfor (const unit of [...phases.filter((u) => u.stopped === false), root]) {\n\t\t\t// ⚠ LOADED AFRESH FOR EACH UNIT: after an `error` envelope the page is the error page, and after a redirect it is\n\t\t\t// another page, so this unit's row would be gone, and read as offering nothing (round 2's fix pass).\n\t\t\tawait hands.showOverview();\n\t\t\tunit.signOff = unit === root && abandoned.length > 0 ? await held(unit) : await signOff(unit);\n\t\t\twriteRunRecord(lane, record);\n\t\t\t// ⛔ E12's re-review F1 (D4; `REG-F-535`) — A SIGN-OFF ACT WITH NO ANSWER: no later sign-off is pressed beside it, and\n\t\t\t// the run ends for it once the final archive is taken.\n\t\t\tif (reached.end !== null) break;\n\t\t\t// ⛔ `E12F` F2 — THE LIMIT REFUSED THIS SIGN-OFF, OR THE RULE'S RE-RUN IN IT: the run ends `paid-limit`, and no later\n\t\t\t// sign-off is pressed, as no later phase is once the limit stops one (D8).\n\t\t\tif (unit.signOff.limitCheck?.allowed === false || unit.signOff.rerunLimitCheck?.allowed === false) {\n\t\t\t\treason = 'paid-limit';\n\t\t\t\tbreak;\n\t\t\t}\n\t\t}\n\t\tnote(await hands.screenshot(FINAL_ARCHIVE));\n\t\tawait archive(FINAL_ARCHIVE, null, null, await hands.read());\n\t\t// ⛔ DRY, WHAT `laneVerdict` HOLDS IT TO (D1): the model exchanges the store holds, read only now — after the\n\t\t// sign-off and the final archive — so that a model call anything before made, the sign-off's rehearsal included, is\n\t\t// counted (D11).",
 		expectRed: ["verif/phase7-live-spec.test.ts"],
-		why: "PROMISE: D1, D11: the dry run's model exchanges are read only AFTER the root's sign-off and the final archive, so a model call a sign-off made is counted and fails the verdict: that signing off calls no model is held, not assumed. WHO RELIES: the sponsor's limit, before which nothing may be spent (REG-D-102); and laneVerdict's line that the dry run recorded no model exchange. WHAT THE MUTATION DOES: the count is taken before the sign-off loop, where the dry run took it before D11, so an exchange the sign-off records goes uncounted. OBSERVED (driven 2026-10-10 on a disposable copy of the working tree, applied and restored byte for byte, its program compiling (tsc --noEmit -p apps/rph-demo/e2e/tsconfig.json)): KILLED — 2 of its 58 test(s) red in phase7-live-spec.test.ts: '⛔ DRY, D11 — after the root’s archive the ROOT is signed off by the paid run’s own acts, the page loaded afresh and the store read after each act; then the final archive is taken, and only then are the model exchanges counted' (AssertionError: the dry run’s order after the root’s archive (design §6 P7-2 D11): expected [ 'setUp', 'beginExecute root', …(13) ] to deeply equal [ 'setUp', 'beginExecute root', …(13) ]); '⛔ DRY, D11 — a model call the sign-off made is COUNTED: the exchanges are read after the sign-off and the final archive, never before, and the verdict says so' (AssertionError: the exchanges were counted before the sign-off: expected { modelExchanges: +0 } to deeply equal { modelExchanges: 1 }) ⭐ RE-ANCHORED 2026-10-15 (JAN-EXEC Phase 7 completion E12 fix round, finishing E12F F1 to F3; ledger rule #5, in the commit that moved the line): the sign-off loop gained the limit's stop (E12F F2) and the count's comment was corrected (E12F F1); the mutation is the same, the count moved before the loop. Its second victim, 'a model call the sign-off made is COUNTED', went with F1 - a dry sign-off presses nothing - and the dry order test still holds the count after the final archive. RE-OBSERVED (bun run mutants -- (the E12F finish ids), 2026-10-15, in the fixer's worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         PQ7-M304-the-dry-run-counts-its-model-exchanges-before-its-sign-off ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯' ⭐ RE-ANCHORED 2026-10-15 (JAN-EXEC Phase 7 completion E12, the re-review's fix round, finding 1; ledger rule #5, in the commit that moved the line): the sign-off loop gained its end at a sign-off act with no answer (D4 extended), so the anchor, which spans the loop, is cut again from the loop as it stands; the mutation is the same, the count moved before the loop. RE-OBSERVED (bun run mutants -- (the E12 re-review ids), 2026-10-15, in the fixer's worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         PQ7-M304-the-dry-run-counts-its-model-exchanges-before-its-sign-off ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		why: "PROMISE: D1, D11: the dry run's model exchanges are read only AFTER the root's sign-off and the final archive, so a model call a sign-off made is counted and fails the verdict: that signing off calls no model is held, not assumed. WHO RELIES: the sponsor's limit, before which nothing may be spent (REG-D-102); and laneVerdict's line that the dry run recorded no model exchange. WHAT THE MUTATION DOES: the count is taken before the sign-off loop, where the dry run took it before D11, so an exchange the sign-off records goes uncounted. OBSERVED (driven 2026-10-10 on a disposable copy of the working tree, applied and restored byte for byte, its program compiling (tsc --noEmit -p apps/rph-demo/e2e/tsconfig.json)): KILLED — 2 of its 58 test(s) red in phase7-live-spec.test.ts: '⛔ DRY, D11 — after the root’s archive the ROOT is signed off by the paid run’s own acts, the page loaded afresh and the store read after each act; then the final archive is taken, and only then are the model exchanges counted' (AssertionError: the dry run’s order after the root’s archive (design §6 P7-2 D11): expected [ 'setUp', 'beginExecute root', …(13) ] to deeply equal [ 'setUp', 'beginExecute root', …(13) ]); '⛔ DRY, D11 — a model call the sign-off made is COUNTED: the exchanges are read after the sign-off and the final archive, never before, and the verdict says so' (AssertionError: the exchanges were counted before the sign-off: expected { modelExchanges: +0 } to deeply equal { modelExchanges: 1 }) ⭐ RE-ANCHORED 2026-10-15 (JAN-EXEC Phase 7 completion E12 fix round, finishing E12F F1 to F3; ledger rule #5, in the commit that moved the line): the sign-off loop gained the limit's stop (E12F F2) and the count's comment was corrected (E12F F1); the mutation is the same, the count moved before the loop. Its second victim, 'a model call the sign-off made is COUNTED', went with F1 - a dry sign-off presses nothing - and the dry order test still holds the count after the final archive. RE-OBSERVED (bun run mutants -- (the E12F finish ids), 2026-10-15, in the fixer's worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         PQ7-M304-the-dry-run-counts-its-model-exchanges-before-its-sign-off ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯' ⭐ RE-ANCHORED 2026-10-15 (JAN-EXEC Phase 7 completion E12, the re-review's fix round, finding 1; ledger rule #5, in the commit that moved the line): the sign-off loop gained its end at a sign-off act with no answer (D4 extended), so the anchor, which spans the loop, is cut again from the loop as it stands; the mutation is the same, the count moved before the loop. RE-OBSERVED (bun run mutants -- (the E12 re-review ids), 2026-10-15, in the fixer's worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         PQ7-M304-the-dry-run-counts-its-model-exchanges-before-its-sign-off ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯' ⭐ RE-ANCHORED 2026-10-18 (JAN-EXEC Phase 7 P5, package B; ledger rule #5): P5 package B F3 made the press hold the root while a phase is ABANDONED, so the loop's sign-off line moved in the find and the replace alike. The promise, the attack and the victim are unchanged. RE-OBSERVED (bun run mutants -- the 23 P5B ids and the 5 entries this package re-anchored, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         PQ7-M304-the-dry-run-counts-its-model-exchanges-before-its-sign-off ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 7 P7-2 D11 - the dry run signs off the root and takes the final archive, then stops: runTheLane's dry path joins the paid run's own sign-off and final archive, and counts its model exchanges only after them; laneVerdict holds the root's sign-off PROVED - its row offering Record Assurance, both acts answered success, and the store read after Mark Satisfied reading the root SATISFIED in lifecycle and in assurance, as the gate's prediction (b) holds it; and the run report reads the new dry run - the root as intended, the run not reached (docs/_working/DESIGN-the-live-end-to-end-run.md §6 P7-2 D11; REG-D-101; REG-F-523; REG-F-540)"
 	},
 	{
@@ -27874,10 +27875,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "E12-M118-a-declared-re-run-the-limit-held-back-is-said-nowhere",
 		file: "scripts/phase7/run-report-core.ts",
-		find: "'its sign-off was attempted and the unit is not SATISFIED', ...heldBackOr(v)]",
-		replace: "'its sign-off was attempted and the unit is not SATISFIED']",
+		find: "'its sign-off was attempted and the unit is not SATISFIED', ...heldBackOr(v), ...seen]",
+		replace: "'its sign-off was attempted and the unit is not SATISFIED', ...seen]",
 		expectRed: ["verif/phase7-run-report.test.ts"],
-		why: "PROMISE (E12's polish, fix2's F8): a unit whose refused Record Assurance the rule would have answered with a re-run of its declared reviews, held back by the limit, says so at stage 7 beside the break. WHO RELIES: a reader telling a unit the reviewer left under assessment from one the limit left there. WHAT THE MUTATION DOES: the break reads as before, the limit's part said nowhere. OBSERVED (bun run mutants -- (the E12 polish ids), 2026-10-15, in the polish worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M118-a-declared-re-run-the-limit-held-back-is-said-nowhere ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'; its red, the mutation applied by hand and the file restored byte for byte: 'AssertionError: the hold of the declared re-run is said nowhere: expected [ Array(1) ] to deeply equal [ …(3) ]'",
+		why: "PROMISE (E12's polish, fix2's F8): a unit whose refused Record Assurance the rule would have answered with a re-run of its declared reviews, held back by the limit, says so at stage 7 beside the break. WHO RELIES: a reader telling a unit the reviewer left under assessment from one the limit left there. WHAT THE MUTATION DOES: the break reads as before, the limit's part said nowhere. OBSERVED (bun run mutants -- (the E12 polish ids), 2026-10-15, in the polish worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M118-a-declared-re-run-the-limit-held-back-is-said-nowhere ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'; its red, the mutation applied by hand and the file restored byte for byte: 'AssertionError: the hold of the declared re-run is said nowhere: expected [ Array(1) ] to deeply equal [ …(3) ]' ⭐ RE-ANCHORED 2026-10-18 (JAN-EXEC Phase 7 P5, package B; ledger rule #5): P5 package B F6 added what a composite's declared reviews were judged over (seen) after the hold, so the basis line moved; the mutation still drops the hold and keeps the rest. The promise, the attack and the victim are unchanged. RE-OBSERVED (bun run mutants -- the 23 P5B ids and the 5 entries this package re-anchored, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         E12-M118-a-declared-re-run-the-limit-held-back-is-said-nowhere ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 7 completion E12, polish (fix2's F8, decided by the lead on 2026-10-15): the run report discloses what the lane held back - stage 7 reads a sign-off the lane held back as held back, its reason and the limit it read, and the declared re-run the limit held back beside a refused Record Assurance; the reviewer-calls section lists the lane's own reads of the limit, each before a paid act, and which held its act back"
 	},
 	{
@@ -30754,10 +30755,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "R3B-M27-the-root-s-line-says-nothing-of-the-skip",
 		file: "scripts/phase7/run-report-core.ts",
-		find: "return why !== null && c.basis.includes(why) ? `${c.row}: ${c.value} — ${why}` : `${c.row}: ${c.value}`;",
-		replace: "return `${c.row}: ${c.value}`;",
+		find: "const why = [skippedWhy(v), v.heldBack === null ? null : heldWhy(v.heldBack)",
+		replace: "const why = [null, v.heldBack === null ? null : heldWhy(v.heldBack)",
 		expectRed: ["verif/phase7-run-report.test.ts"],
-		why: "PROMISE (R3-B F4; the lead's round-3 item 4): the root's skipped sign-off reads as not attempted because the lane stopped - and in half A the root has no row of its own, so its line in the whole run's stage 7 says why. WHO RELIES: the reader of the whole run's stage 7. WHAT THE MUTATION DOES: the line says 'root: not reached' and nothing more. Applied by hand first, the file restored byte for byte: 'AssertionError: the root’s sign-off, skipped, said nothing of why: expected [ 'root: not reached', …(5) ] to include 'root: not reached — its sign-off was …'' ('Tests  1 failed | 123 passed (124)'). OBSERVED (bun run mutants -- (R3-B F4's ids and the guards near its lines), 2026-10-16, in the R3-B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R3B-M27-the-root-s-line-says-nothing-of-the-skip ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		why: "PROMISE (R3-B F4; the lead's round-3 item 4): the root's skipped sign-off reads as not attempted because the lane stopped - and in half A the root has no row of its own, so its line in the whole run's stage 7 says why. WHO RELIES: the reader of the whole run's stage 7. WHAT THE MUTATION DOES: the line says 'root: not reached' and nothing more. Applied by hand first, the file restored byte for byte: 'AssertionError: the root’s sign-off, skipped, said nothing of why: expected [ 'root: not reached', …(5) ] to include 'root: not reached — its sign-off was …'' ('Tests  1 failed | 123 passed (124)'). OBSERVED (bun run mutants -- (R3-B F4's ids and the guards near its lines), 2026-10-16, in the R3-B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R3B-M27-the-root-s-line-says-nothing-of-the-skip ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯' ⭐ RE-ANCHORED 2026-10-18 (JAN-EXEC Phase 7 P5, package B; ledger rule #5): P5 package B F3 and F6 made the line read the hold and what was seen beside the skip, so the anchor moved to the list it reads them from; the mutation drops the skip from it. The promise, the attack and the victim are unchanged. RE-OBSERVED (bun run mutants -- the 23 P5B ids and the 5 entries this package re-anchored, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R3B-M27-the-root-s-line-says-nothing-of-the-skip ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 7 completion programme, round 3, package R3-B, F4 - a sign-off the lane skipped after stopping at another unit's limit check, the root's included, reads as not attempted because the lane stopped there (the lead's round-3 item 4)"
 	},
 	{
@@ -31863,5 +31864,392 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/reviewer-qualification-check.test.ts"],
 		why: "PROMISE: the check asks the one predicate the record declares (noReplyToScore). WHO RELIES: limbs 2 and 3. WHAT THE MUTATION DOES: the check asks the old word alone, and a cut call is re-scored and charged. OBSERVED (bun run mutants -- the P5 package A F2 entries by their full ids, 2026-10-18, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M45-the-check-re-scores-a-cut-reply ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 7 P5, package A (F2) - the reviewer qualification records a reply the tool cut at the model's output-token limit as its own class (CallReply OUTPUT_LIMIT), never TRANSPORT_FAILURE / REFUSAL; old lines keep their meaning (REG-D-086); the check reads it as it reads a transport failure: measured, never re-scored, a Boundedness failure"
+	},
+	{
+		id: "P5B-M1-a-unit-below-with-no-completion-is-not-gathered",
+		file: "apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts",
+		find: "\t\t\tif (w.work.heldNoCompletion)\n\t\t\t\tunitsWithoutWork.push({",
+		replace: "\t\t\tif (w.work.heldNoCompletion && w.work.title === '')\n\t\t\t\tunitsWithoutWork.push({",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/declared-review-route.test.ts"],
+		why: "PROMISE: a unit composed of others has its declared reviews told of each unit below it that holds no completion. WHO RELIES: the root's reviewer, which otherwise judges the root's purpose over its phases' work with an abandoned phase simply absent. WHAT THE MUTATION DOES: the route gathers no such unit. OBSERVED (bun run mutants -- the 23 P5B ids and the 5 entries this package re-anchored, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M1-a-unit-below-with-no-completion-is-not-gathered ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B, F1 and F2 - the declared reviews of a unit composed of others name each unit below it that holds no completion, its lifecycle and assurance states, on a host line of its own (P5's root was judged with its abandoned end-to-end phase absent and unsaid), and the cut that bounds the prompt gives each unit its own share (P5's head-only cut kept 21684 of 50586 code points: nothing of Implementation or of any command); section 3.2's prompts with every child completed, and the reviewer fingerprint, unchanged"
+	},
+	{
+		id: "P5B-M2-the-prompt-carries-no-line-for-a-unit-without-work",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "const withoutWork = input.framing === 'DECLARED_POLICY' ? (input.declaredUnitsWithoutWork ?? []) : [];",
+		replace: "const withoutWork: DeclaredUnitWithoutWork[] = [];",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/declared-policy-review.test.ts"],
+		why: "PROMISE: the validator writes one host line for each unit without work a declared review is handed. WHO RELIES: the reviewer. WHAT THE MUTATION DOES: the field is read as empty, and no line is written. OBSERVED (bun run mutants -- the 23 P5B ids and the 5 entries this package re-anchored, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M2-the-prompt-carries-no-line-for-a-unit-without-work ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B, F1 and F2 - the declared reviews of a unit composed of others name each unit below it that holds no completion, its lifecycle and assurance states, on a host line of its own (P5's root was judged with its abandoned end-to-end phase absent and unsaid), and the cut that bounds the prompt gives each unit its own share (P5's head-only cut kept 21684 of 50586 code points: nothing of Implementation or of any command); section 3.2's prompts with every child completed, and the reviewer fingerprint, unchanged"
+	},
+	{
+		id: "P5B-M3-the-fence-is-chosen-without-the-title-on-the-host-line",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "\t\t\t...withoutWork.map((u) => jsonLine(u.unit))",
+		replace: "\t\t\t...withoutWork.map((u) => jsonLine(u.unit)).filter(() => false)",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/declared-policy-review.test.ts"],
+		why: "PROMISE: a unit's title on the host's line is the PWA's (an agent authors it in half B), so the fence chooser reads it. WHO RELIES: every reader of the fence, which must occur nowhere in the prompt but on its own lines. WHAT THE MUTATION DOES: the title is left out of the untrusted bytes, and a title holding the first fence candidate keeps that fence. OBSERVED (bun run mutants -- the 23 P5B ids and the 5 entries this package re-anchored, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M3-the-fence-is-chosen-without-the-title-on-the-host-line ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B, F1 and F2 - the declared reviews of a unit composed of others name each unit below it that holds no completion, its lifecycle and assurance states, on a host line of its own (P5's root was judged with its abandoned end-to-end phase absent and unsaid), and the cut that bounds the prompt gives each unit its own share (P5's head-only cut kept 21684 of 50586 code points: nothing of Implementation or of any command); section 3.2's prompts with every child completed, and the reviewer fingerprint, unchanged"
+	},
+	{
+		id: "P5B-M4-the-builder-never-cuts-the-work-unit-by-unit",
+		file: "apps/rph-demo/src/lib/server/assurance/review-input.ts",
+		find: "units.size > 1 && whole.length > budget",
+		replace: "units.size > 99 && whole.length > budget",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/declared-policy-review.test.ts"],
+		why: "PROMISE: work of more than one unit that is longer than its budget is cut unit by unit, each unit keeping a share. WHO RELIES: the root's reviewer. WHAT THE MUTATION DOES: the work is handed whole, and the validator's head-only cut drops the last units. OBSERVED (bun run mutants -- the 23 P5B ids and the 5 entries this package re-anchored, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M4-the-builder-never-cuts-the-work-unit-by-unit ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B, F1 and F2 - the declared reviews of a unit composed of others name each unit below it that holds no completion, its lifecycle and assurance states, on a host line of its own (P5's root was judged with its abandoned end-to-end phase absent and unsaid), and the cut that bounds the prompt gives each unit its own share (P5's head-only cut kept 21684 of 50586 code points: nothing of Implementation or of any command); section 3.2's prompts with every child completed, and the reviewer fingerprint, unchanged"
+	},
+	{
+		id: "P5B-M5-a-unit-s-dropped-commands-are-not-declared",
+		file: "apps/rph-demo/src/lib/server/assurance/review-input.ts",
+		find: "if (shown === mine.length) return [];",
+		replace: "if (shown <= mine.length) return [];",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/declared-policy-review.test.ts"],
+		why: "PROMISE: a unit whose commands pass its share keeps its first commands, and the cut of the rest is declared. WHO RELIES: the reviewer, told how many of a unit's commands it was not shown. WHAT THE MUTATION DOES: no commands cut is declared. OBSERVED (bun run mutants -- the 23 P5B ids and the 5 entries this package re-anchored, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M5-a-unit-s-dropped-commands-are-not-declared ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B, F1 and F2 - the declared reviews of a unit composed of others name each unit below it that holds no completion, its lifecycle and assurance states, on a host line of its own (P5's root was judged with its abandoned end-to-end phase absent and unsaid), and the cut that bounds the prompt gives each unit its own share (P5's head-only cut kept 21684 of 50586 code points: nothing of Implementation or of any command); section 3.2's prompts with every child completed, and the reviewer fingerprint, unchanged"
+	},
+	{
+		id: "P5B-M6-a-cut-work-product-is-not-declared",
+		file: "apps/rph-demo/src/lib/server/assurance/review-input.ts",
+		find: "if (p.allowance[i]! >= productCost[i]!) return [];",
+		replace: "if (p.allowance[i]! >= 0) return [];",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/declared-policy-review.test.ts"],
+		why: "PROMISE: each work product cut to its unit's share is declared, with what was shown and what was removed. WHO RELIES: the reviewer (section 9.7: a cut is declared, never silent). WHAT THE MUTATION DOES: no work product's cut is declared. OBSERVED (bun run mutants -- the 23 P5B ids and the 5 entries this package re-anchored, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M6-a-cut-work-product-is-not-declared ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B, F1 and F2 - the declared reviews of a unit composed of others name each unit below it that holds no completion, its lifecycle and assurance states, on a host line of its own (P5's root was judged with its abandoned end-to-end phase absent and unsaid), and the cut that bounds the prompt gives each unit its own share (P5's head-only cut kept 21684 of 50586 code points: nothing of Implementation or of any command); section 3.2's prompts with every child completed, and the reviewer fingerprint, unchanged"
+	},
+	{
+		id: "P5B-M7-the-validator-cuts-the-builder-s-work-again",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "else if (builderCut !== undefined) content = { declaration: builderCut, bytes: input.content };",
+		replace: "else if (builderCut !== undefined) content = excerptHead(plan.framed.subjectSlice, input.content, plan.contentBudget);",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/declared-policy-review.test.ts"],
+		why: "PROMISE: work its builder cut is shown with the builder's declarations, and never cut again. WHO RELIES: the reviewer. WHAT THE MUTATION DOES: the validator re-cuts it head-only, dropping the builder's declarations. OBSERVED (bun run mutants -- the 23 P5B ids and the 5 entries this package re-anchored, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M7-the-validator-cuts-the-builder-s-work-again ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B, F1 and F2 - the declared reviews of a unit composed of others name each unit below it that holds no completion, its lifecycle and assurance states, on a host line of its own (P5's root was judged with its abandoned end-to-end phase absent and unsaid), and the cut that bounds the prompt gives each unit its own share (P5's head-only cut kept 21684 of 50586 code points: nothing of Implementation or of any command); section 3.2's prompts with every child completed, and the reviewer fingerprint, unchanged"
+	},
+	{
+		id: "P5B-M8-an-over-budget-builder-cut-is-sent",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "\t\tthrow new Error(DECLARED_WORK_CUT_OVER_BUDGET);",
+		replace: "\t\tvoid DECLARED_WORK_CUT_OVER_BUDGET;",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/declared-policy-review.test.ts"],
+		why: "PROMISE: a builder's cut that does not fit the budget the prompt leaves it is refused, no model called. WHO RELIES: the record, whose declarations must say what was shown. WHAT THE MUTATION DOES: it is sent. OBSERVED (bun run mutants -- the 23 P5B ids and the 5 entries this package re-anchored, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M8-an-over-budget-builder-cut-is-sent ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B, F1 and F2 - the declared reviews of a unit composed of others name each unit below it that holds no completion, its lifecycle and assurance states, on a host line of its own (P5's root was judged with its abandoned end-to-end phase absent and unsaid), and the cut that bounds the prompt gives each unit its own share (P5's head-only cut kept 21684 of 50586 code points: nothing of Implementation or of any command); section 3.2's prompts with every child completed, and the reviewer fingerprint, unchanged"
+	},
+	{
+		id: "P5B-M9-the-root-is-signed-off-beside-an-abandoned-phase",
+		file: "apps/rph-demo/e2e-live-exec/phase7-operator.ts",
+		find: "const abandoned = phases.filter((u) => u.after?.lifecycleState === 'ABANDONED').map((u) => u.title);",
+		replace: "const abandoned = phases.filter((u) => u.after?.lifecycleState === 'ABANDONED-NEVER').map((u) => u.title);",
+		expectRed: ["verif/phase7-live-spec.test.ts"],
+		why: "PROMISE: the lane does not press the root's sign-off while a phase the store reads ABANDONED (the sponsor, 2026-10-18). WHO RELIES: the run's spend and its answer: P5 spent two reviews on a root that said nothing true. WHAT THE MUTATION DOES: no phase is read as abandoned, and the root is signed off. OBSERVED (bun run mutants -- the 23 P5B ids and the 5 entries this package re-anchored, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M9-the-root-is-signed-off-beside-an-abandoned-phase ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B, F3 - the paid lane does not press the root's sign-off while any phase is ABANDONED (the sponsor, 2026-10-18: \"Yes, hold the root\"): it records the root's sign-off not pressed, naming the abandoned phase, and the run report reads it so"
+	},
+	{
+		id: "P5B-M10-the-held-root-names-no-phase",
+		file: "apps/rph-demo/e2e-live-exec/phase7-operator.ts",
+		find: "notPressed: rootHeldOverAbandoned(abandoned)",
+		replace: "notPressed: rootHeldOverAbandoned([])",
+		expectRed: ["verif/phase7-live-spec.test.ts"],
+		why: "PROMISE: the held root's record names each abandoned phase. WHO RELIES: the run report, which prints the hold on the root's line. WHAT THE MUTATION DOES: the hold names none. OBSERVED (bun run mutants -- the 23 P5B ids and the 5 entries this package re-anchored, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M10-the-held-root-names-no-phase ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B, F3 - the paid lane does not press the root's sign-off while any phase is ABANDONED (the sponsor, 2026-10-18: \"Yes, hold the root\"): it records the root's sign-off not pressed, naming the abandoned phase, and the run report reads it so"
+	},
+	{
+		id: "P5B-M11-the-floor-of-a-completed-step-reads-every-command-of-the-unit",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "(v.stepState === 'SUCCEEDED' ? completedSubjects(ix, u) : undefined)",
+		replace: "(v.stepState === 'NEVER' ? completedSubjects(ix, u) : undefined)",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: a completed step's floor is read over what its completion names and its own attempts ran. WHO RELIES: stage 5a's cell. WHAT THE MUTATION DOES: every command of the unit is read again, a superseded plan's refused ones among them. OBSERVED (bun run mutants -- the 23 P5B ids and the 5 entries this package re-anchored, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M11-the-floor-of-a-completed-step-reads-every-command-of-the-unit ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B, F4 - stage 5a takes its subjects from the completion the step recorded (ExecutionStepSucceeded: outputArtifactIds and proposedEvidenceIds) and the commands its own attempts ran, so a superseded plan's refused reviews never read beside the step its re-run completed (P5's design 5a)"
+	},
+	{
+		id: "P5B-M12-a-completion-by-hand-hides-its-own-refused-command",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "...strs(done.payload.proposedEvidenceIds), ...attempted.map((e) => e.id)];",
+		replace: "...strs(done.payload.proposedEvidenceIds), ...attempted.map((e) => e.id).slice(0, 0)];",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: the commands a step's own attempts ran are its floor's subjects, though its completion by hand names none. WHO RELIES: stage 5a's control: a step completed over its own refused command broke. WHAT THE MUTATION DOES: only what the completion names is read. OBSERVED (bun run mutants -- the 23 P5B ids and the 5 entries this package re-anchored, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M12-a-completion-by-hand-hides-its-own-refused-command ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B, F4 - stage 5a takes its subjects from the completion the step recorded (ExecutionStepSucceeded: outputArtifactIds and proposedEvidenceIds) and the commands its own attempts ran, so a superseded plan's refused reviews never read beside the step its re-run completed (P5's design 5a)"
+	},
+	{
+		id: "P5B-M13-a-folder-another-unit-s-evidence-names-is-an-unrecorded-run",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "const named = folders(ix.ofType('EVIDENCE'));",
+		replace: "const named = folders(u.evidence);",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: a capture folder any evidence of the run names is no unrecorded run. WHO RELIES: stage 4's cell. WHAT THE MUTATION DOES: only the unit's own evidence counts, and a phase's re-run's folders read as the next phase's. OBSERVED (bun run mutants -- the 23 P5B ids and the 5 entries this package re-anchored, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M13-a-folder-another-unit-s-evidence-names-is-an-unrecorded-run ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B, F5 - capture folders are attributed through the stdoutPath of all evidence in the archived store, unrecorded only when no evidence names them, and the cause is taken from the archive's own K5 check (P5's implementation stage 4 read design's re-run's three runs as its own, REG-F-511 from a count)"
+	},
+	{
+		id: "P5B-M14-a-unit-is-charged-its-archive-s-diff",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "captured: unrecorded === null ? null : own + unrecorded,",
+		replace: "captured: added === null ? null : added.length,",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: a unit's captured runs are those its evidence names and those no evidence names that its archive gained. WHO RELIES: report.json's runs. WHAT THE MUTATION DOES: the archive's diff is counted again. OBSERVED (bun run mutants -- the 23 P5B ids and the 5 entries this package re-anchored, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M14-a-unit-is-charged-its-archive-s-diff ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B, F5 - capture folders are attributed through the stdoutPath of all evidence in the archived store, unrecorded only when no evidence names them, and the cause is taken from the archive's own K5 check (P5's implementation stage 4 read design's re-run's three runs as its own, REG-F-511 from a count)"
+	},
+	{
+		id: "P5B-M15-the-cause-ignores-what-the-k5-check-left-possible",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "const possible = causes.filter((c) => c.possible).map((c) => c.cause);",
+		replace: "const possible = causes.map((c) => c.cause);",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: the cause is what the archive's K5 check left possible. WHO RELIES: stage 4's register ids. WHAT THE MUTATION DOES: every cause K5 names is read as possible. OBSERVED (bun run mutants -- the 23 P5B ids and the 5 entries this package re-anchored, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M15-the-cause-ignores-what-the-k5-check-left-possible ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B, F5 - capture folders are attributed through the stdoutPath of all evidence in the archived store, unrecorded only when no evidence names them, and the cause is taken from the archive's own K5 check (P5's implementation stage 4 read design's re-run's three runs as its own, REG-F-511 from a count)"
+	},
+	{
+		id: "P5B-M16-a-stop-bears-on-no-register-entry",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "...(cause === K5_STOP_CAUSE || cause === K5_JOIN_CAUSE ? ['REG-F-511'] : [])",
+		replace: "...(cause === K5_JOIN_CAUSE ? ['REG-F-511'] : [])",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: a step that stopped before its evidence join bears on REG-F-511. WHO RELIES: stage 4's register ids. WHAT THE MUTATION DOES: it bears on none. OBSERVED (bun run mutants -- the 23 P5B ids and the 5 entries this package re-anchored, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M16-a-stop-bears-on-no-register-entry ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B, F5 - capture folders are attributed through the stdoutPath of all evidence in the archived store, unrecorded only when no evidence names them, and the cause is taken from the archive's own K5 check (P5's implementation stage 4 read design's re-run's three runs as its own, REG-F-511 from a count)"
+	},
+	{
+		id: "P5B-M17-a-cause-not-recorded-is-guessed",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "return { ids: [], owed: [K5_OWED], basis: [`${runs} became no evidence, and why is not recorded:",
+		replace: "return { ids: ['REG-F-511'], owed: [], basis: [`${runs} became no evidence, and why is not recorded:",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: a captured run whose cause the archive does not record leaves stage 4 open, owed to a person. WHO RELIES: the matrix, which must not read a break by a guessed entry. WHAT THE MUTATION DOES: REG-F-511 is named, as the count did. OBSERVED (bun run mutants -- the 23 P5B ids and the 5 entries this package re-anchored, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M17-a-cause-not-recorded-is-guessed ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B, F5 - capture folders are attributed through the stdoutPath of all evidence in the archived store, unrecorded only when no evidence names them, and the cause is taken from the archive's own K5 check (P5's implementation stage 4 read design's re-run's three runs as its own, REG-F-511 from a count)"
+	},
+	{
+		id: "P5B-M18-the-reader-hands-the-report-no-k5-causes",
+		file: "scripts/phase7/run-report.ts",
+		find: "possible: c?.possible === true }))",
+		replace: "possible: false }))",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: the report's reader hands it each archive's K5 causes from checks.json. WHO RELIES: the command line's report. WHAT THE MUTATION DOES: every cause is read as one the check ruled out, so none is possible and the cell is owed. (Its first form, the reader's guard made false, did not compile - the narrowing of causes was lost - so it attacks the consequence instead: NO_COMPILE, the runner's verdict, verbatim: 'NO_COMPILE     P5B-M18-the-reader-hands-the-report-no-k5-causes scripts/phase7/run-report.ts(247,8): error TS18046: 'causes' is of type 'unknown'.') OBSERVED (bun run mutants -- P5B-M18-the-reader-hands-the-report-no-k5-causes, 2026-10-18, re-formulated after the run of the others, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M18-the-reader-hands-the-report-no-k5-causes ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B, F5 - capture folders are attributed through the stdoutPath of all evidence in the archived store, unrecorded only when no evidence names them, and the cause is taken from the archive's own K5 check (P5's implementation stage 4 read design's re-run's three runs as its own, REG-F-511 from a count)"
+	},
+	{
+		id: "P5B-M19-the-caveat-says-every-unit-below-it",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "\t\tpartial.length === 0",
+		replace: "\t\tpartial.length >= 0",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: the UNIT_PURPOSE caveat says every unit below a composite only where every unit below it contributed work. WHO RELIES: the report's opening caveats. WHAT THE MUTATION DOES: it always says every unit, as P5's did. OBSERVED (bun run mutants -- the 23 P5B ids and the 5 entries this package re-anchored, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M19-the-caveat-says-every-unit-below-it ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B, F6 - the root's completion and the UNIT_PURPOSE caveat say what the root's reviews were judged over and the units that contributed no work, never \"judged over the work it and every unit below it produced\" when they were not; and a held sign-off says why on its line"
+	},
+	{
+		id: "P5B-M20-the-root-s-line-says-not-what-its-reviews-were-judged-over",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "heldWhy(v.heldBack), seenLine(v)].find(",
+		replace: "heldWhy(v.heldBack), null].find(",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: the root's line in the whole run's stage 7 says what its declared reviews were judged over, where a phase contributed no work. WHO RELIES: half A's reader, who has no root row. WHAT THE MUTATION DOES: the line reads as intended and no more. OBSERVED (bun run mutants -- the 23 P5B ids and the 5 entries this package re-anchored, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M20-the-root-s-line-says-not-what-its-reviews-were-judged-over ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B, F6 - the root's completion and the UNIT_PURPOSE caveat say what the root's reviews were judged over and the units that contributed no work, never \"judged over the work it and every unit below it produced\" when they were not; and a held sign-off says why on its line"
+	},
+	{
+		id: "P5B-M21-a-held-sign-off-s-line-says-not-why",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "v.heldBack === null ? null : heldWhy(v.heldBack)",
+		replace: "null",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: a unit whose sign-off the lane held back says why on its line. WHO RELIES: the reader of a held root (F3). WHAT THE MUTATION DOES: a held root reads a bare not reached. OBSERVED (bun run mutants -- the 23 P5B ids and the 5 entries this package re-anchored, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M21-a-held-sign-off-s-line-says-not-why ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B, F6 - the root's completion and the UNIT_PURPOSE caveat say what the root's reviews were judged over and the units that contributed no work, never \"judged over the work it and every unit below it produced\" when they were not; and a held sign-off says why on its line"
+	},
+	{
+		id: "P5B-M22-a-unit-that-holds-no-completion-is-read-as-seen",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "const none = below.filter((p) => !completed(p.id));",
+		replace: "const none = below.filter((p) => !completed(p.id) && p.id === \"\");",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: a unit below a composite that holds no completion is named as contributing no work. WHO RELIES: the root's line and the caveat. WHAT THE MUTATION DOES: none is found. OBSERVED (bun run mutants -- the 23 P5B ids and the 5 entries this package re-anchored, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M22-a-unit-that-holds-no-completion-is-read-as-seen ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B, F6 - the root's completion and the UNIT_PURPOSE caveat say what the root's reviews were judged over and the units that contributed no work, never \"judged over the work it and every unit below it produced\" when they were not; and a held sign-off says why on its line"
+	},
+	{
+		id: "P5B-M23-the-adjudication-offers-a-transport-failure",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "\t`output-token truncation: the reviewer’s reply ended at its output-token limit, its recorded failure reading \"${REVIEWER_OUTPUT_LIMIT_TEXT}\"`,",
+		replace: "\t'transport failure (REG-F-499)',",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: the adjudication classes name the reviewer's output-token truncation by its recorded failure text, in place of a transport failure. WHO RELIES: the person classifying P5's seven no-responses. WHAT THE MUTATION DOES: the old class is offered again. OBSERVED (bun run mutants -- the 23 P5B ids and the 5 entries this package re-anchored, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M23-the-adjudication-offers-a-transport-failure ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B, F7 - the adjudication classes name the reviewer's output-token truncation by the failure text such a review records (\"model hit max output token limit\"), in place of \"transport failure (REG-F-499)\""
+	},
+	{
+		id: "P5B-M24-the-fence-is-chosen-without-the-builder-s-cut-declarations",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "...(input.framing === 'DECLARED_POLICY' && input.declaredWorkCut !== undefined ? [input.declaredWorkCut] : [])",
+		replace: "...(input.framing === 'DECLARED_POLICY' && input.declaredWorkCut !== undefined ? [input.declaredWorkCut] : []).filter(() => false)",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/declared-policy-review.test.ts"],
+		why: "PROMISE: the declarations of a cut the builder made unit by unit name each unit's title (the PWA's, which an agent authors in half B) on host lines before the work, so the fence chooser reads them. WHO RELIES: every reader of the fence, which must occur on no line of the prompt but its own. WHAT THE MUTATION DOES: the declarations are left out of what the fence is chosen over, so a unit with commands and no work product, all of its commands cut and its title holding the first fence candidate, keeps that fence on a host line. OBSERVED (bun run mutants -- P5B-M24-the-fence-is-chosen-without-the-builder-s-cut-declarations P5B-M3-the-fence-is-chosen-without-the-title-on-the-host-line, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M24-the-fence-is-chosen-without-the-builder-s-cut-declarations ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 3 - the fence of a declared review is chosen over its builder's cut declarations too: a unit with commands and no work product whose commands were all cut had its title only in the declaration of that cut, and a title holding <<<UNTRUSTED-00>>> kept that fence on a non-fence line"
+	},
+	{
+		id: "P5B-M25-a-completion-naming-no-output-hides-its-own-work-product",
+		file: "scripts/phase7/run-report-core.ts",
+		find: ": u.artifacts.filter((a) => stepId !== '' && str(a.state.producingExecutionAttemptId).startsWith(`${stepId}#`));",
+		replace: ": u.artifacts.filter((a) => stepId !== '' && str(a.state.producingExecutionAttemptId).startsWith(`${stepId}#`)).slice(0, 0);",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: where a step's completion names no work product (the page's completeStep names none unless the person chose one), the work products its own attempts made are its floor's subjects, as its own attempts' commands are. WHO RELIES: stage 5a's cell: a step completed by hand over its own refused work product broke. WHAT THE MUTATION DOES: none is read, and only what the completion names is. OBSERVED (bun run mutants -- P5B-M25-a-completion-naming-no-output-hides-its-own-work-product P5B-M26-an-empty-subject-list-reads-as-a-satisfied-floor P5B-M11-the-floor-of-a-completed-step-reads-every-command-of-the-unit P5B-M12-a-completion-by-hand-hides-its-own-refused-command, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M25-a-completion-naming-no-output-hides-its-own-work-product ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 4 - stage 5a of a step completed by hand naming no output reads the work product its own attempts made, and an empty subject list reads not reached, never 'all 0 floor assessments are SATISFIED'"
+	},
+	{
+		id: "P5B-M26-an-empty-subject-list-reads-as-a-satisfied-floor",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "if (subjects.length === 0) return cell('5a', row, 'not reached', [], [NO_FLOOR_SUBJECT]);",
+		replace: "if (subjects.length < 0) return cell('5a', row, 'not reached', [], [NO_FLOOR_SUBJECT]);",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: a SUCCEEDED step with nothing of its completion to read reads stage 5a not reached. WHO RELIES: the matrix, which must not read a floor as satisfied over no subject. WHAT THE MUTATION DOES: it reads as intended, 'the step SUCCEEDED and all 0 floor assessments are SATISFIED', as before the check. OBSERVED (bun run mutants -- P5B-M25-a-completion-naming-no-output-hides-its-own-work-product P5B-M26-an-empty-subject-list-reads-as-a-satisfied-floor P5B-M11-the-floor-of-a-completed-step-reads-every-command-of-the-unit P5B-M12-a-completion-by-hand-hides-its-own-refused-command, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M26-an-empty-subject-list-reads-as-a-satisfied-floor ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 4 - stage 5a of a step completed by hand naming no output reads the work product its own attempts made, and an empty subject list reads not reached, never 'all 0 floor assessments are SATISFIED'"
+	},
+	{
+		id: "P5B-M27-the-reader-hands-the-report-no-reading-of-a-prompt",
+		file: "scripts/phase7/run-report.ts",
+		find: "declaredWork: r.bytes === null ? null : declaredWorkShown(r.bytes)",
+		replace: "declaredWork: null",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: the command line's reader reads each content row's bytes for what a declared review's prompt showed of its work, and hands the report that reading. WHO RELIES: the root's line and the UNIT_PURPOSE caveat, read over a run folder. WHAT THE MUTATION DOES: every row is read as no declared review's prompt, so the root's line says each prompt was not read. OBSERVED (bun run mutants -- the 16 entries P5B-M27 to P5B-M42 and the re-measured P5B-M18, P5B-M19, P5B-M20 and P5B-M22, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M27-the-reader-hands-the-report-no-reading-of-a-prompt ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 2 - the root's line and the UNIT_PURPOSE caveat say what the root's declared reviews were GIVEN and, read from each review's prompt in the archived content store, what each prompt SHOWED of it: the host's declarations of its cut and the units its work holds (P5's two root prompts showed the work products of Requirements and Design and no command)"
+	},
+	{
+		id: "P5B-M28-a-heading-inside-quoted-material-is-read-as-the-host-s",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "if (line !== fence) continue;",
+		replace: "if (line !== fence) {\n\t\t\t\tif (heading < 0 && line.startsWith(DECLARED_WORK_HEADING)) heading = i;\n\t\t\t\tcontinue;\n\t\t\t}",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: a prompt is read as its reviewer is told to read it (FENCE_MEANING): a line inside quoted material is the quote's, so a heading, a cut declaration or an entry an instruction holds is never read as the host's. WHO RELIES: what the report says a prompt showed. WHAT THE MUTATION DOES: the work's heading is looked for inside quoted material too, so a quoted instruction's forged heading and cut are read as the host's. OBSERVED (bun run mutants -- the 16 entries P5B-M27 to P5B-M42 and the re-measured P5B-M18, P5B-M19, P5B-M20 and P5B-M22, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M28-a-heading-inside-quoted-material-is-read-as-the-host-s ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 2 - the root's line and the UNIT_PURPOSE caveat say what the root's declared reviews were GIVEN and, read from each review's prompt in the archived content store, what each prompt SHOWED of it: the host's declarations of its cut and the units its work holds (P5's two root prompts showed the work products of Requirements and Design and no command)"
+	},
+	{
+		id: "P5B-M29-a-prompt-s-cut-declarations-are-not-read",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "cuts: lines.slice(heading + 1, open).filter((l) => l.startsWith(CUT_DECLARATION)),",
+		replace: "cuts: [],",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: the host's lines declaring a cut of the work, before the work's fence, are read. WHO RELIES: the root's line, which quotes them. WHAT THE MUTATION DOES: none is read, and every prompt reads as showing all of its work uncut, P5's two included. OBSERVED (bun run mutants -- the 16 entries P5B-M27 to P5B-M42 and the re-measured P5B-M18, P5B-M19, P5B-M20 and P5B-M22, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M29-a-prompt-s-cut-declarations-are-not-read ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 2 - the root's line and the UNIT_PURPOSE caveat say what the root's declared reviews were GIVEN and, read from each review's prompt in the archived content store, what each prompt SHOWED of it: the host's declarations of its cut and the units its work holds (P5's two root prompts showed the work products of Requirements and Design and no command)"
+	},
+	{
+		id: "P5B-M30-the-commands-a-prompt-shows-are-not-counted",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "else tally(commands, unit);",
+		replace: "else tally([], unit);",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: each command entry the shown work holds is counted under its unit. WHO RELIES: the root's line, which names the commands a cut prompt kept. WHAT THE MUTATION DOES: no command is counted, so a prompt that kept its units' commands reads as showing none. OBSERVED (bun run mutants -- the 16 entries P5B-M27 to P5B-M42 and the re-measured P5B-M18, P5B-M19, P5B-M20 and P5B-M22, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M30-the-commands-a-prompt-shows-are-not-counted ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 2 - the root's line and the UNIT_PURPOSE caveat say what the root's declared reviews were GIVEN and, read from each review's prompt in the archived content store, what each prompt SHOWED of it: the host's declarations of its cut and the units its work holds (P5's two root prompts showed the work products of Requirements and Design and no command)"
+	},
+	{
+		id: "P5B-M31-the-work-products-a-prompt-shows-are-not-read",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "if (kind === 'workProduct') workProducts.push(unit);",
+		replace: "if (kind === 'workProduct') void unit;",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: each work product entry the shown work holds, whole or cut, is read under its unit. WHO RELIES: the root's line, which names the units whose work products a cut prompt kept. WHAT THE MUTATION DOES: none is read, so P5's prompts read as showing no work product. OBSERVED (bun run mutants -- the 16 entries P5B-M27 to P5B-M42 and the re-measured P5B-M18, P5B-M19, P5B-M20 and P5B-M22, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M31-the-work-products-a-prompt-shows-are-not-read ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 2 - the root's line and the UNIT_PURPOSE caveat say what the root's declared reviews were GIVEN and, read from each review's prompt in the archived content store, what each prompt SHOWED of it: the host's declarations of its cut and the units its work holds (P5's two root prompts showed the work products of Requirements and Design and no command)"
+	},
+	{
+		id: "P5B-M32-a-cut-prompt-over-units-that-all-completed-says-nothing",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "const wholeShown = [...shownBy.keys()].every((s) => s === SHOWN_WHOLE);",
+		replace: "const wholeShown = true;",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: a composite whose units all completed still has its line where a prompt did not show all of the work, and the caveat never says 'every unit below it produced' of it. WHO RELIES: a production-size root, whose prompt the builder cuts unit by unit. WHAT THE MUTATION DOES: the line is null and the old words stand over a cut prompt. OBSERVED (bun run mutants -- the 16 entries P5B-M27 to P5B-M42 and the re-measured P5B-M18, P5B-M19, P5B-M20 and P5B-M22, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M32-a-cut-prompt-over-units-that-all-completed-says-nothing ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 2 - the root's line and the UNIT_PURPOSE caveat say what the root's declared reviews were GIVEN and, read from each review's prompt in the archived content store, what each prompt SHOWED of it: the host's declarations of its cut and the units its work holds (P5's two root prompts showed the work products of Requirements and Design and no command)"
+	},
+	{
+		id: "P5B-M33-a-policy-s-calls-are-not-counted",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "shownBy.set(shown, by.set(policy, (by.get(policy) ?? 0) + 1));",
+		replace: "shownBy.set(shown, by.set(policy, 1));",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: each policy's calls that were shown alike are counted. WHO RELIES: the root's line, where a retried or re-run declared review is several calls. WHAT THE MUTATION DOES: every policy reads one call. OBSERVED (bun run mutants -- the 16 entries P5B-M27 to P5B-M42 and the re-measured P5B-M18, P5B-M19, P5B-M20 and P5B-M22, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M33-a-policy-s-calls-are-not-counted ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 2 - the root's line and the UNIT_PURPOSE caveat say what the root's declared reviews were GIVEN and, read from each review's prompt in the archived content store, what each prompt SHOWED of it: the host's declarations of its cut and the units its work holds (P5's two root prompts showed the work products of Requirements and Design and no command)"
+	},
+	{
+		id: "P5B-M34-a-prompt-handed-no-reading-reads-as-shown-whole",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "if (shown === undefined) return 'not read here: the report was handed no reading of its prompt';",
+		replace: "if (shown === undefined) return SHOWN_WHOLE;",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: a prompt the reader handed no reading of is said not read, and why. WHO RELIES: the root's line, which must never guess what a prompt showed. WHAT THE MUTATION DOES: it reads as having shown all of the work uncut. OBSERVED (bun run mutants -- the 16 entries P5B-M27 to P5B-M42 and the re-measured P5B-M18, P5B-M19, P5B-M20 and P5B-M22, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M34-a-prompt-handed-no-reading-reads-as-shown-whole ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 2 - the root's line and the UNIT_PURPOSE caveat say what the root's declared reviews were GIVEN and, read from each review's prompt in the archived content store, what each prompt SHOWED of it: the host's declarations of its cut and the units its work holds (P5's two root prompts showed the work products of Requirements and Design and no command)"
+	},
+	{
+		id: "P5B-M35-a-prompt-not-retained-reads-as-shown-whole",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "if (verdict === 'NOT_CLAIMED') return 'not read here: its prompt is not retained';",
+		replace: "if (verdict === 'NOT_CLAIMED') return SHOWN_WHOLE;",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: a call whose record retained no prompt is said not read, and why. WHO RELIES: the root's line. WHAT THE MUTATION DOES: it reads as having shown all of the work uncut. OBSERVED (bun run mutants -- the 16 entries P5B-M27 to P5B-M42 and the re-measured P5B-M18, P5B-M19, P5B-M20 and P5B-M22, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M35-a-prompt-not-retained-reads-as-shown-whole ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 2 - the root's line and the UNIT_PURPOSE caveat say what the root's declared reviews were GIVEN and, read from each review's prompt in the archived content store, what each prompt SHOWED of it: the host's declarations of its cut and the units its work holds (P5's two root prompts showed the work products of Requirements and Design and no command)"
+	},
+	{
+		id: "P5B-M36-a-prompt-that-does-not-hold-what-its-record-claims-is-read",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "if (verdict !== 'VERIFIED') return 'not read here: its prompt does not hold what its record claims';",
+		replace: "if (verdict !== 'VERIFIED' && verdict === 'PURGED') return 'not read here: its prompt does not hold what its record claims';",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: a prompt is read only where its bytes hash to its record (contentVerdict VERIFIED); one that does not is said not read. WHO RELIES: the root's line, whose reading of a prompt must be of the prompt the record names. WHAT THE MUTATION DOES: a row whose bytes do not hash to the record is read all the same. OBSERVED (bun run mutants -- the 16 entries P5B-M27 to P5B-M42 and the re-measured P5B-M18, P5B-M19, P5B-M20 and P5B-M22, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M36-a-prompt-that-does-not-hold-what-its-record-claims-is-read ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 2 - the root's line and the UNIT_PURPOSE caveat say what the root's declared reviews were GIVEN and, read from each review's prompt in the archived content store, what each prompt SHOWED of it: the host's declarations of its cut and the units its work holds (P5's two root prompts showed the work products of Requirements and Design and no command)"
+	},
+	{
+		id: "P5B-M37-a-run-with-no-content-store-says-its-prompts-are-not-what-they-claim",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "if (content === null) return 'not read here: the archive holds no content store';",
+		replace: "if (content === null) return 'not read here: its prompt does not hold what its record claims';",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: where the archive holds no content store, a prompt is said not read for that reason. WHO RELIES: the reader of a root's line over an archive taken without one. WHAT THE MUTATION DOES: it blames the prompt instead, which nothing read. OBSERVED (bun run mutants -- the 16 entries P5B-M27 to P5B-M42 and the re-measured P5B-M18, P5B-M19, P5B-M20 and P5B-M22, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M37-a-run-with-no-content-store-says-its-prompts-are-not-what-they-claim ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 2 - the root's line and the UNIT_PURPOSE caveat say what the root's declared reviews were GIVEN and, read from each review's prompt in the archived content store, what each prompt SHOWED of it: the host's declarations of its cut and the units its work holds (P5's two root prompts showed the work products of Requirements and Design and no command)"
+	},
+	{
+		id: "P5B-M38-a-prompt-that-is-not-a-declared-review-s-reads-as-shown-whole",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "if (shown === null) return 'not read here: its prompt is not a declared review’s';",
+		replace: "if (shown === null) return SHOWN_WHOLE;",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: a call whose prompt the reader found no declared review's work in is said not read, and why. WHO RELIES: the root's line. WHAT THE MUTATION DOES: it reads as having shown all of the work uncut. OBSERVED (bun run mutants -- the 16 entries P5B-M27 to P5B-M42 and the re-measured P5B-M18, P5B-M19, P5B-M20 and P5B-M22, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M38-a-prompt-that-is-not-a-declared-review-s-reads-as-shown-whole ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 2 - the root's line and the UNIT_PURPOSE caveat say what the root's declared reviews were GIVEN and, read from each review's prompt in the archived content store, what each prompt SHOWED of it: the host's declarations of its cut and the units its work holds (P5's two root prompts showed the work products of Requirements and Design and no command)"
+	},
+	{
+		id: "P5B-M39-the-calls-read-are-not-the-composite-s-own",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "if (str(x.state.plane) !== 'ASSURANCE' || str(x.state.subjectObjectId) !== id) continue;",
+		replace: "if (str(x.state.plane) !== 'ASSURANCE' || str(x.state.subjectObjectId) === id) continue;",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: the calls whose prompts are read are the composite's own declared reviews: on the assurance plane, about the unit itself. WHO RELIES: the root's line. WHAT THE MUTATION DOES: the floor's calls about other subjects are read in their place, and the root's are not. OBSERVED (bun run mutants -- the 16 entries P5B-M27 to P5B-M42 and the re-measured P5B-M18, P5B-M19, P5B-M20 and P5B-M22, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M39-the-calls-read-are-not-the-composite-s-own ⎯⎯⎯⎯⎯⎯ Failed Tests 10 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 2 - the root's line and the UNIT_PURPOSE caveat say what the root's declared reviews were GIVEN and, read from each review's prompt in the archived content store, what each prompt SHOWED of it: the host's declarations of its cut and the units its work holds (P5's two root prompts showed the work products of Requirements and Design and no command)"
+	},
+	{
+		id: "P5B-M40-a-prompt-with-no-declared-work-reads-as-one-that-showed-nothing",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "} else if (heading < 0 && line.startsWith(DECLARED_WORK_HEADING)) heading = i;\n\t}\n\treturn null;",
+		replace: "} else if (heading < 0 && line.startsWith(DECLARED_WORK_HEADING)) heading = i;\n\t}\n\treturn { cuts: [], workProducts: [], commands: [] };",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: bytes that are not a declared review's prompt read null, never as a prompt that showed nothing. WHO RELIES: the root's line, which says such a prompt was not read. WHAT THE MUTATION DOES: they read as a declared review's prompt that showed no work. OBSERVED (bun run mutants -- the 16 entries P5B-M27 to P5B-M42 and the re-measured P5B-M18, P5B-M19, P5B-M20 and P5B-M22, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M40-a-prompt-with-no-declared-work-reads-as-one-that-showed-nothing ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 2 - the root's line and the UNIT_PURPOSE caveat say what the root's declared reviews were GIVEN and, read from each review's prompt in the archived content store, what each prompt SHOWED of it: the host's declarations of its cut and the units its work holds (P5's two root prompts showed the work products of Requirements and Design and no command)"
+	},
+	{
+		id: "P5B-M41-the-root-s-line-says-judged-over-what-its-reviews-were-given",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "v.workSeen === null ? null : `its declared reviews were given ${v.workSeen}`;",
+		replace: "v.workSeen === null ? null : `its declared reviews were judged over ${v.workSeen}`;",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: the root's line says what its declared reviews were GIVEN, the route's work before the prompt's own cut, never what they were judged over. WHO RELIES: half A's reader: P5's line read 'judged over the work of Requirements, Design, Implementation and unit tests', and its prompts showed Requirements and part of Design. WHAT THE MUTATION DOES: F6's words are restored. OBSERVED (bun run mutants -- the 16 entries P5B-M27 to P5B-M42 and the re-measured P5B-M18, P5B-M19, P5B-M20 and P5B-M22, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M41-the-root-s-line-says-judged-over-what-its-reviews-were-given ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 2 - the root's line and the UNIT_PURPOSE caveat say what the root's declared reviews were GIVEN and, read from each review's prompt in the archived content store, what each prompt SHOWED of it: the host's declarations of its cut and the units its work holds (P5's two root prompts showed the work products of Requirements and Design and no command)"
+	},
+	{
+		id: "P5B-M42-the-caveat-says-judged-over-what-the-reviews-were-given",
+		file: "scripts/phase7/run-report-core.ts",
+		find: ": `given the work of the units below it that hold a completion (REG-D-111 (2); ",
+		replace: ": `judged over the work of the units below it that hold a completion (REG-D-111 (2); ",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: the UNIT_PURPOSE caveat says what the declared reviews were GIVEN where a unit contributed no work or a prompt did not show all of it. WHO RELIES: the report's opening caveats. WHAT THE MUTATION DOES: F6's 'judged over' is restored. OBSERVED (bun run mutants -- the 16 entries P5B-M27 to P5B-M42 and the re-measured P5B-M18, P5B-M19, P5B-M20 and P5B-M22, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M42-the-caveat-says-judged-over-what-the-reviews-were-given ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 2 - the root's line and the UNIT_PURPOSE caveat say what the root's declared reviews were GIVEN and, read from each review's prompt in the archived content store, what each prompt SHOWED of it: the host's declarations of its cut and the units its work holds (P5's two root prompts showed the work products of Requirements and Design and no command)"
+	},
+	{
+		id: "P5B-M43-a-planned-unit-the-store-lacks-is-not-named",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "const missing = u === units[0] ? units.slice(1).filter((x) => x.object === null).map((x) => x.title) : [];",
+		replace: "const missing: string[] = [];",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: for the root, each planned unit the store does not hold is named as contributing none to what its declared reviews were given. WHO RELIES: the root's line and the UNIT_PURPOSE caveat, over a run whose store lacks a planned phase. WHAT THE MUTATION DOES: no planned unit is read as missing, so a root over three of its four phases reads 'root: as intended' and the caveat 'every unit below it produced'. OBSERVED (bun run mutants -- P5B-M43-a-planned-unit-the-store-lacks-is-not-named, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M43-a-planned-unit-the-store-lacks-is-not-named ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 5 - the branch of workSeenOf for a planned unit the store does not hold had no test and no ledger entry: a fixture whose store lacks the end-to-end phase now reads it named on the root's line and in the caveat"
 	}
 ];

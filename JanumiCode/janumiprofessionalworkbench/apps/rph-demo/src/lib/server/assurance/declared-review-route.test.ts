@@ -29,6 +29,8 @@ const seam = vi.hoisted(() => ({
 	unmet: undefined as string | undefined,
 	/** ⭐ `E12F` F3 — the declared policies whose review's transport FAILS: the review answers nothing, and is INCONCLUSIVE. */
 	failing: new Set<string>(),
+	/** ⭐ P5 package B (F1) — text whose FLOOR review is answered with its first criterion NOT MET, BLOCKING: the step waits. */
+	floorRefuses: undefined as string | undefined,
 	/** ⭐ R3-A F1 — what the host's process-run observer reports for the unit being run: none unless a case says so. */
 	observed: undefined as
 		| undefined
@@ -85,6 +87,17 @@ vi.mock('../tools/devin-reviewer.js', async (importOriginal) => {
 				// ⭐ `E12F` F3 — a declared review of a FAILING policy: devin's program fails, every try (`seam.failing`).
 				if (declared && [...seam.failing].some((id) => prompt.includes(`(${id})`)))
 					throw new Error('hermetic: the declared review’s transport is down');
+				// ⭐ P5 package B (F1) — a floor review of the work `seam.floorRefuses` names: its first criterion NOT MET.
+				if (!declared && seam.floorRefuses !== undefined && prompt.includes(seam.floorRefuses))
+					return {
+						stdout: JSON.stringify({
+							findings: [
+								{ criterionId: SEEDED_REASONING_REVIEW_CRITERIA[0]!.id, failed: true, statement: 'Not met.', severity: 'BLOCKING' }
+							],
+							recommendation: 'REJECTED',
+							residualUncertainty: []
+						})
+					};
 				const ids = declared
 					? [...prompt.matchAll(/^- ([A-Za-z0-9_-]+): .* \[if unmet: [A-Z]+\]$/gm)].map((m) => m[1]!)
 					: SEEDED_REASONING_REVIEW_CRITERIA.map((c) => c.id);
@@ -227,6 +240,7 @@ beforeEach(() => {
 	seam.floor = 0;
 	seam.unmet = undefined;
 	seam.failing.clear();
+	seam.floorRefuses = undefined;
 	seam.observed = undefined;
 	vi.stubEnv('PATH', noProgramsDirectory());
 	for (const v of LIVE_BACKEND_VARIABLES) vi.stubEnv(v, undefined);
@@ -908,5 +922,135 @@ describe('⭐⭐ R3-A F1 — a unit composed of others is judged over the work i
 		const root = await recordAssurance(t.root);
 		expect([root.advanced, root.data?.error], 'the root, over one branch that holds work, was refused').toEqual(['assured', undefined]);
 		expect(workOf(seam.declared[0]!).workProducts.map((w) => w.workUnit)).toEqual(['Requirements']);
+	});
+});
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7 P5, package B (F1) — A ROOT OVER FIVE UNITS, ONE OF THEM ABANDONED ─────────────────────────────────
+//
+// P5's end-to-end phase was refused by its floor, waited, and was abandoned; its root was then signed off, and both of its
+// declared reviews were shown the other phases' work with nothing to say a phase was missing from it.
+
+/** §3.2's shape: a HUMAN root declaring `pol_intent_preservation` over four MODEL phases, each M1, declaring nothing. */
+async function fiveUnitTree(): Promise<{ readonly root: string; readonly phases: readonly string[] }> {
+	const pwaId = mintUiId('pwa');
+	const rootType = mintUiId('pwut');
+	const phases = [
+		['Requirements', 'REQUIREMENT_DEFINITION'],
+		['Design', 'ARCHITECTURE_DEFINITION'],
+		['Implementation and unit tests', 'PRODUCT_IMPLEMENTATION'],
+		['End-to-end verification', 'INTEGRATED_PRODUCT_VALIDATION']
+	].map(([name, pwuKind]) => ({ typeId: mintUiId('pwut'), name: name!, pwuKind: pwuKind! }));
+	const steps: [string, string, string, Record<string, unknown>][] = [
+		['CreatePwa', 'PROFESSIONAL_WORK_ARCHITECTURE', pwaId, { pwaId, name: 'Five-unit PWA', description: 'd', domain: 'software', version: '0.1.0' }],
+		...phases.map(
+			(t): [string, string, string, Record<string, unknown>] => [
+				'DefinePwuType',
+				'PWU_TYPE',
+				t.typeId,
+				{
+					pwuTypeId: t.typeId,
+					pwaId,
+					pwuKind: t.pwuKind,
+					name: t.name,
+					purpose: `${t.name}, written`,
+					isRoot: false,
+					permittedChildTypeIds: [],
+					requiredInputs: [],
+					requiredOutputs: [],
+					requiredAssurancePolicyIds: [],
+					workDischarge: 'MODEL',
+					promptTemplate: {
+						templateText: `Write the ${t.name.toLowerCase()} of {subject}.`,
+						templateVersion: 1,
+						declaredPlaceholders: ['subject'],
+						status: 'ACTIVE'
+					}
+				}
+			]
+		),
+		[
+			'DefinePwuType',
+			'PWU_TYPE',
+			rootType,
+			{
+				pwuTypeId: rootType,
+				pwaId,
+				pwuKind: 'PRODUCT_REALIZATION',
+				name: 'Realization',
+				purpose: ROOT_PURPOSE,
+				isRoot: true,
+				permittedChildTypeIds: phases.map((t) => t.typeId),
+				permittedChildren: phases.map((t) => ({ typeId: t.typeId, cardinality: 'M1' })),
+				requiredInputs: [],
+				requiredOutputs: [],
+				requiredAssurancePolicyIds: [IP],
+				workDischarge: 'HUMAN'
+			}
+		],
+		['SubmitPwaForReview', 'PROFESSIONAL_WORK_ARCHITECTURE', pwaId, {}],
+		['ValidatePwa', 'PROFESSIONAL_WORK_ARCHITECTURE', pwaId, {}],
+		['PublishPwa', 'PROFESSIONAL_WORK_ARCHITECTURE', pwaId, { rootPwuTypeId: rootType }]
+	];
+	for (const [commandType, aggregateType, aggregateId, payload] of steps) {
+		const r = dispatch(commandType, aggregateType, aggregateId, payload);
+		expect(r.status, `arrangement: ${commandType} — ${r.error?.message ?? ''}`).toBe('ACCEPTED');
+	}
+	const created = (await undertakings.create(actionEvent('create', { name: 'Five-unit Demo', pwaId, ...RISK }) as never)) as {
+		created?: string;
+		data?: { error?: string };
+	};
+	expect(created.created, `arrangement: the Undertaking — ${created.data?.error ?? ''}`).toBeDefined();
+	const units = listPwus(getEngine(), created.created!);
+	const of = (typeId: string) => units.find((p) => p.state.pwuTypeId === typeId)!.id;
+	return { root: of(rootType), phases: phases.map((t) => of(t.typeId)) };
+}
+
+describe('⭐⭐ P5 package B (F1) — a root over five units, its end-to-end phase abandoned, is told the phase contributed no work', () => {
+	it('⛔ the root’s declared review names the abandoned phase, its lifecycle and assurance states — and is shown the other three phases’ work', async () => {
+		// ⛔ RED BEFORE F1, driven: the root's prompt was shown Requirements, Design and Implementation, and said nothing of
+		// the end-to-end phase — P5's two root prompts held "abandon" 0 times.
+		const t = await fiveUnitTree();
+		const [requirements, design, implementation, e2e] = t.phases as [string, string, string, string];
+		for (const pwuId of [t.root, requirements, design, implementation])
+			expect((await beginExecute(pwuId)).data?.error, 'arrangement: Begin & Execute').toBeUndefined();
+		// ⭑ The end-to-end phase's floor refuses its work, so it WAITS; the person then abandons it, as P5's run plan's rule did.
+		seam.floorRefuses = 'Write the end-to-end verification of';
+		expect((await beginExecute(e2e)).data?.error, 'arrangement: the end-to-end floor refused').toContain(
+			'the assurance floor is NOT satisfied'
+		);
+		seam.floorRefuses = undefined;
+		const abandoned = (await actions.abandonPwu(
+			actionEvent('abandonPwu', { pwuId: e2e, reason: 'A re-run that is refused again is abandoned.' }) as never
+		)) as { advanced?: string; data?: { error?: string } };
+		expect([abandoned.advanced, abandoned.data?.error], 'arrangement: the abandonment').toEqual(['abandoned', undefined]);
+		expect(axesOf(e2e), 'arrangement: the phase is abandoned').toEqual(['ABANDONED', 'UNASSESSED']);
+		seam.declared.length = 0;
+		await recordAssurance(t.root);
+		expect(seam.declared, 'one declared review of the root').toHaveLength(1);
+		const prompt = seam.declared[0]!;
+		expect(prompt.split('\n'), 'the root’s review is not told of the abandoned phase').toContain(
+			'The work unit "End-to-end verification" below this one holds no completed step — its lifecycle ABANDONED, its ' +
+				'assurance UNASSESSED — so it contributed no work: nothing of it is in the WORK above.'
+		);
+		expect(workOf(prompt).workProducts.map((w) => w.workUnit), 'the work the root’s review was shown').toEqual([
+			'Requirements',
+			'Design',
+			'Implementation and unit tests'
+		]);
+	});
+
+	it('⭑ CONTROL — every phase completed: no such line, and the work of all four', async () => {
+		const t = await fiveUnitTree();
+		for (const pwuId of [t.root, ...t.phases])
+			expect((await beginExecute(pwuId)).data?.error, 'arrangement: Begin & Execute').toBeUndefined();
+		seam.declared.length = 0;
+		await recordAssurance(t.root);
+		expect(seam.declared[0], 'a unit that completed is named as contributing nothing').not.toContain('holds no completed step');
+		expect(workOf(seam.declared[0]!).workProducts.map((w) => w.workUnit)).toEqual([
+			'Requirements',
+			'Design',
+			'Implementation and unit tests',
+			'End-to-end verification'
+		]);
 	});
 });

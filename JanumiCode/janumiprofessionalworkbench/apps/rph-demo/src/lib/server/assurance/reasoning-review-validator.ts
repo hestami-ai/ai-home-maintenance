@@ -27,6 +27,7 @@ import {
 	type ReasoningReviewInput,
 	type ReasoningReviewJudgement,
 	type DeclaredPolicyFraming,
+	type DeclaredUnitWithoutWork,
 	type ReviewFraming,
 	type Severity,
 	type Validator,
@@ -239,6 +240,26 @@ export function declaredPolicyLine(policy: DeclaredPolicyFraming): string {
 		'is that the work does not meet that criterion.'
 	);
 }
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7 P5, package B (F1) — THE HOST'S LINE NAMING A UNIT BELOW A UNIT COMPOSED OF OTHERS THAT HOLDS NO
+ * COMPLETION (`declaredUnitsWithoutWork`): its title, its lifecycle and assurance states, and that it contributed no work.
+ * ⛔ P5's root was judged with its abandoned end-to-end phase simply absent from its work, and nothing in either prompt said
+ * so. ⚠ The title is the PWA's, which an agent authors in half B: it is written JSON-encoded, as a call name the host did
+ * not mint is, and the fence chooser reads it (`promptPlan`).
+ */
+export const declaredUnitWithoutWorkLine = (u: DeclaredUnitWithoutWork): string =>
+	`The work unit ${jsonLine(u.unit)} below this one holds no completed step — its lifecycle ${u.lifecycleState}, its ` +
+	`assurance ${u.assuranceState} — so it contributed no work: nothing of it is in the WORK above.`;
+
+/**
+ * ⭐ P5 package B (F2) — the statement a `DECLARED_POLICY` review fails with when the work its builder cut unit by unit
+ * (`declaredWorkCut`) does not fit the budget this prompt leaves it: cut again here, the builder's declarations would no
+ * longer say what was shown. ⛔ Never sent. Host-authored and fixed, since it becomes a recorded failure.
+ */
+export const DECLARED_WORK_CUT_OVER_BUDGET =
+	'This review was not sent: the work, cut by its builder to a share for each work unit, is longer than the budget this ' +
+	'prompt leaves it, so cutting it again would make the declared cuts untrue. No model was called.';
 
 function framingText(input: Pick<ReasoningReviewInput, 'framing' | 'declaredPolicy' | 'declaredInstruction'>): Framed {
 	const framing: ReviewFraming = input.framing;
@@ -713,6 +734,8 @@ function promptPlan(input: ReasoningReviewInput) {
 	const prefenced = input.framing === 'PROCESS_RESULT';
 	// ⭐ `E12F` F4 — a declared review of a unit's own PURPOSE with no account and no narration has no one producing agent.
 	const noSingleProducer = withNoSingleProducer(input);
+	// ⭐ P5 package B (F1) — each unit below that holds no completion, on a host line of its own after the work; none, no line.
+	const withoutWork = input.framing === 'DECLARED_POLICY' ? (input.declaredUnitsWithoutWork ?? []) : [];
 	const assemble = (fence: string, content: string): string =>
 		[
 			'You are an independent assurance reviewer performing a REASONING REVIEW of an AI-produced professional artifact.',
@@ -727,6 +750,7 @@ function promptPlan(input: ReasoningReviewInput) {
 			framed.subject,
 			'',
 			content,
+			withoutWork.length > 0 ? `\n${withoutWork.map(declaredUnitWithoutWorkLine).join('\n')}` : '',
 			// ⭐ `PQ-1` (`REG-F-481`): the host's own computation, on its own line — never inside the fenced content.
 			subjectHashLine(input.candidateSubjectHash),
 			// ⭐ `R15` — THE HOST'S OWN OBSERVATION, AND ONLY FOR THE FRAMING IT ANSWERS A QUESTION IN. §22.1 makes
@@ -825,7 +849,13 @@ function promptPlan(input: ReasoningReviewInput) {
 		contentBudget,
 		untrustedBytes: [
 			...untrusted.flatMap((e) => (e ? [e.bytes] : [])),
-			...(prefenced ? untrustedCallNames(input.observedToolCalls) : [])
+			...(prefenced ? untrustedCallNames(input.observedToolCalls) : []),
+			// ⭐ P5 package B (F1) — a unit's title on the host's line, JSON-encoded as it is written there.
+			...withoutWork.map((u) => jsonLine(u.unit)),
+			// ⭐ P5 package B's check (finding 3) — and the declarations of a cut its builder made, on host lines before the
+			// work: each names a unit's title, JSON-encoded, and a unit with no work product whose commands are all cut has its
+			// title nowhere else in the prompt.
+			...(input.framing === 'DECLARED_POLICY' && input.declaredWorkCut !== undefined ? [input.declaredWorkCut] : [])
 		]
 	};
 }
@@ -843,6 +873,18 @@ export function processResultContentBudget(
 	input: Omit<ReasoningReviewInput, 'content'> & { readonly framing: 'PROCESS_RESULT' }
 ): number {
 	return promptPlan({ ...input, content: '' }).contentBudget;
+}
+
+/**
+ * ⭐ P5 package B (F2) — THE CONTENT BUDGET OF A DECLARED REVIEW, computed by the same assembler over everything in `input`
+ * but the content, as a process result's is: the budget `declaredPolicyReviewInput` fits a cut it makes unit by unit to.
+ * ⛔ No member of `REASONING_REVIEW_BUDGET` is added for it.
+ */
+export function declaredPolicyContentBudget(
+	input: Omit<ReasoningReviewInput, 'content'> & { readonly framing: 'DECLARED_POLICY' }
+): number {
+	const { contentBudget } = promptPlan({ ...input, content: '' });
+	return contentBudget;
 }
 
 /**
@@ -865,9 +907,15 @@ function judgePrompt(input: ReasoningReviewInput): string {
 	const plan = promptPlan(input);
 	// A graph or a work product: its content is UNTRUSTED, cut to the budget with its cut declared, then fenced.
 	// A process result: its content is the builder's REVIEW view, already fenced — read whole by the chooser, never cut.
-	const content: DeclaredExcerpt = plan.prefenced
-		? { bytes: input.content }
-		: excerptHead(plan.framed.subjectSlice, input.content, plan.contentBudget);
+	// ⭐ P5 package B (F2) — a declared review's work its builder cut unit by unit: shown as cut, its declaration the
+	// builder's, and never cut again here; one that does not fit is refused.
+	const builderCut = input.framing === 'DECLARED_POLICY' ? input.declaredWorkCut : undefined;
+	if (builderCut !== undefined && builderCut.length + 1 + input.content.length > plan.contentBudget)
+		throw new Error(DECLARED_WORK_CUT_OVER_BUDGET);
+	let content: DeclaredExcerpt;
+	if (plan.prefenced) content = { bytes: input.content };
+	else if (builderCut !== undefined) content = { declaration: builderCut, bytes: input.content };
+	else content = excerptHead(plan.framed.subjectSlice, input.content, plan.contentBudget);
 	// ⭐ THE FENCE (`REG-F-481`): the FIRST candidate that occurs — read by eye, in every reading of a slice, which
 	// holds every candidate its bytes hold (`chooseFence`) — in none of the untrusted bytes this prompt carries (the
 	// bytes each cut KEPT, each slice on its own), and, for a process result, in none

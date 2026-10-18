@@ -86,6 +86,7 @@ import { anyStipulationRegistered, stipulationFor, workUnitPwaOf } from '$lib/se
 import type {
 	AssuranceSubject,
 	DeclaredInstruction,
+	DeclaredUnitWithoutWork,
 	Identity,
 	ProfessionalRationaleSummary
 } from '@janumipwb/rph-assurance';
@@ -1180,6 +1181,8 @@ interface UnitWork {
 	readonly commands: readonly DeclaredReviewCommand[];
 	/** ⭐ `REG-F-514` — WHO DID THIS UNIT'S OWN WORK, as its completion records it, its attempt as its invocation. */
 	readonly executedBy?: ActorReference;
+	/** ⭐ P5 package B (F1) — no step of the unit succeeded, so the record holds no completion of it. */
+	readonly heldNoCompletion?: true;
 }
 
 /** The unit's LAST step completion, in log order, with the plan it completed — or nothing, if no step of it succeeded. */
@@ -1233,7 +1236,10 @@ async function unitWorkOf(
 	const purpose = typeFacts.purpose ?? String((pwu?.description ?? '') as string);
 	const completion = lastCompletionOf(pwuId);
 	if (!completion)
-		return { ok: true, work: { title, instruction: purpose, instructionIs: 'UNIT_PURPOSE', purpose, commands: [] } };
+		return {
+			ok: true,
+			work: { title, instruction: purpose, instructionIs: 'UNIT_PURPOSE', purpose, commands: [], heldNoCompletion: true }
+		};
 	const p = completion.payload;
 	const provenance = p.executionProvenance as
 		| { executedBy?: ActorReference; producingExecutionAttemptId?: unknown }
@@ -1297,6 +1303,11 @@ interface DeclaredReviewWork {
 	readonly commands: readonly DeclaredReviewCommand[];
 	readonly rationale?: ProfessionalRationaleSummary;
 	/**
+	 * ⭐ P5 package B (F1) — each unit below a unit composed of others that holds no completion, with its lifecycle and
+	 * assurance states: it contributed no work, and the reviewer is told so (`declaredUnitWithoutWorkLine`).
+	 */
+	readonly unitsWithoutWork?: readonly DeclaredUnitWithoutWork[];
+	/**
 	 * ⭐ `REG-F-514` — the producer the verdicts check independence against: the unit's OWN executor, else the operator.
 	 * ⛔ `E12F` F9 — WHO DID THE JUDGED WORK FOR A PHASE ONLY: a unit composed of others is judged over ~~its children's work~~
 	 * ⭐ R3-A F1: the work of the units below it as well as its own, and its producer is still its own — the operator who ran
@@ -1313,7 +1324,10 @@ interface DeclaredReviewWork {
  * (2)'s general form; the lead's delegated decision of 2026-10-16, registered as REG-D-114 (11)) — A UNIT COMPOSED OF
  * OTHERS IS JUDGED OVER THE WORK ITS WHOLE SUBTREE PRODUCED: its own work product and commands, where it produced any (a
  * MODEL composite), then each unit below it, depth first, each unit's children in the order the store lists them — every
- * work product and command under the title of the unit that made it, the end-to-end phase's evidence among them (DEC-6).
+ * work product and command under the title of the unit that made it, the end-to-end phase's evidence among them (DEC-6)
+ * ⭐ P5 package B (F1): where it holds a completion. A unit below that holds none contributed no work, and is named to the
+ * reviewer with its lifecycle and assurance states (`unitsWithoutWork`) — ⛔ P5's abandoned end-to-end phase was left out
+ * of its root's work, and nothing in the prompt said so.
  * ⭑ For §3.2's two levels that is its children's work, in the order it always was: its own TRANSFORMATION produces nothing.
  * ⚠ Its instruction is its own purpose, and no single account is shown for many units' work, a MODEL composite's own
  * among them. ⛔ `E12F` F9 — AND ITS PRODUCER IS ITS OWN executor (the operator, for a root that ran a TRANSFORMATION), not
@@ -1344,6 +1358,7 @@ async function declaredReviewWorkOf(
 		};
 	const workProducts: { unit: string; answer: string }[] = [];
 	const commands: DeclaredReviewCommand[] = [];
+	const unitsWithoutWork: DeclaredUnitWithoutWork[] = [];
 	// ⭐ R3-A F1 — one unit's own work, then each of its children's subtrees in turn: depth first, the store's order.
 	// ⛔ A work product below it that the record cannot rebuild refuses the whole (RD7), as a child's always did.
 	const gather = async (id: string, work: UnitWork): Promise<{ readonly ok: false; readonly refusedBecause: string } | undefined> => {
@@ -1352,6 +1367,12 @@ async function declaredReviewWorkOf(
 		for (const child of childrenOf(id)) {
 			const w = await unitWorkOf(child.id);
 			if (!w.ok) return w;
+			if (w.work.heldNoCompletion)
+				unitsWithoutWork.push({
+					unit: w.work.title,
+					lifecycleState: String((child.state.workLifecycleState ?? '') as string),
+					assuranceState: String((child.state.assuranceState ?? '') as string)
+				});
 			const refused = await gather(child.id, w.work);
 			if (refused) return refused;
 		}
@@ -1363,10 +1384,8 @@ async function declaredReviewWorkOf(
 	// ⛔ `E12F` F4 — ITS OWN PURPOSE, never a prompt of its own, and the reviewer is told so: the work judged is ~~its children's~~
 	// many units', each made under its own unit's instruction (~~`own.work.instruction`~~, which for a unit that ran a prompt of
 	// its own would have been shown as the instruction the units below it were given).
-	return {
-		ok: true,
-		work: { instruction: own.work.purpose, instructionIs: 'UNIT_PURPOSE', workProducts, commands, producer }
-	};
+	const work: DeclaredReviewWork = { instruction: own.work.purpose, instructionIs: 'UNIT_PURPOSE', workProducts, commands, producer };
+	return { ok: true, work: unitsWithoutWork.length > 0 ? { ...work, unitsWithoutWork } : work };
 }
 
 /** ⭐ E2 — the declared stand-in's lookup: a `DECLARED_POLICY` registration for the unit's PWA, read from the registry. */
@@ -1432,7 +1451,8 @@ async function reviewDeclaredPolicies(
 				instructionIs: work.instructionIs,
 				workProducts: work.workProducts,
 				commands: work.commands,
-				...(work.rationale ? { rationale: work.rationale } : {})
+				...(work.rationale ? { rationale: work.rationale } : {}),
+				...(work.unitsWithoutWork ? { unitsWithoutWork: work.unitsWithoutWork } : {})
 			})
 		);
 		answers.set(policy.policyId, answer);

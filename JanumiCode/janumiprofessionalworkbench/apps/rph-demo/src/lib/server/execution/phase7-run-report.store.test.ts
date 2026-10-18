@@ -174,6 +174,12 @@ import {
 import { manifestProblems, selectUnit } from '../../../../../../scripts/phase7/rerun-commands.js';
 import { workspaceTreeSha256 } from '../../../../../../scripts/phase7/node-tests.js';
 import {
+	K5_JOIN_CAUSE,
+	K5_OWN_FOLDER_CAUSE,
+	K5_STOP_CAUSE,
+	k5CapCause
+} from '../../../../../../scripts/phase7/k5-causes.js';
+import {
 	workspaceDirectoryFor,
 	type RunReport
 } from '../../../../../../scripts/phase7/run-report-core.js';
@@ -571,6 +577,21 @@ beforeAll(async () => {
 			e2eRuns.map((_, i) => `e2e-${i + 1}`)
 		);
 		archiveTheUnit(e2e.order, e2e.slug);
+		// ⭐ P5 package B (F5) — and its K5 check's causes, as the archiver records them for a unit whose join recorded the 32
+		// runs the product keeps (`run-archive.ts` `causesOf`): the report takes the 33rd run's cause from them.
+		writeFileSync(
+			join(archiveOf(e2e.order, e2e.slug), 'checks.json'),
+			JSON.stringify({
+				k5: {
+					causes: [
+						{ cause: k5CapCause(32), possible: true },
+						{ cause: K5_STOP_CAUSE, possible: false },
+						{ cause: K5_JOIN_CAUSE, possible: false },
+						{ cause: K5_OWN_FOLDER_CAUSE, possible: true }
+					]
+				}
+			})
+		);
 
 		// The sign-offs of the units that completed, the root last.
 		for (const u of [requirements, e2e, root]) {
@@ -814,7 +835,7 @@ describe('JAN-EXEC P7-2 D9 — the run report over stores the product wrote, rea
 		]);
 		expect([at('4', 'end-to-end')?.value, at('4', 'end-to-end')?.registerIds]).toEqual([
 			'broke',
-			['REG-F-517']
+			['REG-F-517', 'REG-F-521']
 		]);
 		expect([at('4', 'implementation')?.value, at('4', 'implementation')?.owedTo]).toEqual([
 			null,
@@ -847,6 +868,14 @@ describe('JAN-EXEC P7-2 D9 — the run report over stores the product wrote, rea
 			'end-to-end:model:fixture-executor-model',
 			'root:local-professional'
 		]);
+		// ⭐ P5 package B's check (finding 2) — what the root's reviews were given, and what each prompt the product stored
+		// showed of it, read from those prompts by the command line's reader: all of it, its work small enough to fit.
+		expect(at('7', 'whole run')?.basis[0]).toBe(
+			'root: as intended — its declared reviews were given the work of Requirements, Implementation and unit tests, ' +
+				'End-to-end verification; Design contributed none, holding no completion (lifecycle EXECUTING, assurance ' +
+				'UNASSESSED); and what their prompts showed of it — pol_intent_preservation (1 call) and pol_fitness_for_purpose ' +
+				'(1 call): all of it, uncut'
+		);
 		// ⭐ Stage 8 over what the product stored: each exchange's asked and answered bytes hash to their records — the
 		// design review's two calls that threw included, which got no answer to read.
 		for (const p of PHASES) {

@@ -59,6 +59,7 @@ import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { backup, DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
+import { K5_JOIN_CAUSE, K5_OWN_FOLDER_CAUSE, K5_STOP_CAUSE, k5CapCause } from './k5-causes.js';
 import { workspaceTreeSha256 } from './node-tests.js';
 import {
 	PHASE7_DESIGN,
@@ -584,31 +585,28 @@ function causesOf(
 	const perUnit = 'the final archive reads every unit at once; each unit’s own archive says';
 	return [
 		{
-			cause: `a run after the first ${input.reviewedRunLimit}, which the product keeps as no evidence (REG-F-517)`,
+			cause: k5CapCause(input.reviewedRunLimit),
 			possible: final || evidence >= input.reviewedRunLimit,
 			why: final
 				? perUnit
 				: `the product keeps a unit’s first ${input.reviewedRunLimit} runs to complete, and this unit has ${evidence} evidence object(s)`
 		},
 		{
-			cause:
-				'the step stopped before its evidence join: a try that did not run, a work product that could not be recorded, or a sandbox or executor that refused to open',
+			cause: K5_STOP_CAUSE,
 			possible: final || evidence === 0,
 			why: final
 				? perUnit
 				: 'such a stop returns before any run becomes evidence, so it leaves the unit none'
 		},
 		{
-			cause:
-				'the evidence join refused part-way, and the runs after the one it could not record got none',
+			cause: K5_JOIN_CAUSE,
 			possible: final || joinRefused,
 			why: final
 				? perUnit
 				: `the unit’s refusal ${joinRefused ? 'says' : 'does not say'} a run could not be recorded as evidence`
 		},
 		{
-			cause:
-				'a folder a command wrote itself: a command runs as the server’s user, unconfined (REG-F-521), and can reach this folder',
+			cause: K5_OWN_FOLDER_CAUSE,
 			possible: true,
 			why: without.some((f) => !f.runnerShaped)
 				? 'a folder here does not hold exactly the three files the runner writes'
