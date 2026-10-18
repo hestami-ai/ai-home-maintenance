@@ -29,6 +29,7 @@ import type { AssessmentCriterion, ObservedToolCallReport } from '@janumipwb/rph
 import type {
 	DeclaredInstruction,
 	DeclaredPolicyFraming,
+	DeclaredUnitWithoutWork,
 	ProfessionalRationaleSummary,
 	ReasoningReviewInput
 } from '@janumipwb/rph-assurance';
@@ -36,10 +37,11 @@ import type { PwaGraphExport } from '@janumipwb/rph-projections';
 import type { ObservedProcessRun } from '../tools/process-run-observer.js';
 import { renderProcessResultReview } from './process-result-render.js';
 import {
+	declaredPolicyContentBudget,
 	processResultContentBudget,
 	processResultUntrustedSlices
 } from './reasoning-review-validator.js';
-import { jsonLine } from './review-fence.js';
+import { codePoints, headCutDeclaration, jsonLine } from './review-fence.js';
 
 /** What the authoring floor knows about the draft it reviews. */
 export interface GraphReviewSource {
@@ -220,6 +222,11 @@ export interface DeclaredPolicyReviewSource {
 	readonly commands: readonly DeclaredReviewCommand[];
 	/** ⭑ §9.7 — the producer's CONTRACTED account, when one unit's work is judged and it returned one. */
 	readonly rationale?: ProfessionalRationaleSummary;
+	/**
+	 * ⭐ P5 package B (F1) — for a unit composed of others, each unit below it that holds no completion, so contributed no
+	 * work: named to the reviewer on a host line of its own (`declaredUnitWithoutWorkLine`).
+	 */
+	readonly unitsWithoutWork?: readonly DeclaredUnitWithoutWork[];
 }
 
 /**
@@ -240,27 +247,177 @@ export interface DeclaredPolicyReviewSource {
  * value, beside the agent's arguments — the conservative direction, disclosed on the host line: the host's record is
  * understated as quoted, and no word of the agent's is ever shown as the host's.
  * ⚠ A unit with no work product is judged as it is — an empty `workProducts` — and nothing is invented to fill it.
+ * ⭐⭐ P5 package B (F1, F2) — AND A UNIT BELOW THAT HOLDS NO COMPLETION IS NAMED, each on a host line of its own
+ * (`unitsWithoutWork`); and work of MORE THAN ONE UNIT that is longer than the budget the prompt leaves it is cut UNIT BY
+ * UNIT (`workCutUnitByUnit`), each unit's part to its own share, never head-only across units. ⛔ The head-only cut of
+ * P5's root kept the first 21684 of 50586 code points: Requirements whole, Design to its §5, and nothing of
+ * Implementation or of any command. ⭑ Work of one unit, or work that fits, is built exactly as before.
  */
 export function declaredPolicyReviewInput(source: DeclaredPolicyReviewSource): ReasoningReviewInput {
-	return {
+	const unitsWithoutWork = source.unitsWithoutWork ?? [];
+	const head = {
 		criteria: source.criteria,
 		// ⭑ `R14` — DECLARED BY THE CALLER, and the policy it judges against with it (`declaredPolicy`).
-		framing: 'DECLARED_POLICY',
+		framing: 'DECLARED_POLICY' as const,
 		declaredPolicy: { policyId: source.policy.policyId, name: source.policy.name, purpose: source.policy.purpose },
 		// ⭐ `E12F` F4 — what the instruction IS, so the reviewer is told only what is true of it.
 		declaredInstruction: source.instructionIs,
-		prompt: source.instruction,
-		content: jsonLine({
-			workProducts: source.workProducts.map((w) => ({ workUnit: w.unit, workProduct: w.answer })),
-			commands: source.commands.map((c) => ({
-				workUnit: c.unit,
-				command: c.argv,
-				exitCode: c.exitCode,
-				timedOut: c.timedOut
-			}))
-		}),
-		// ⚠ PASSED UNCONDITIONALLY, as the work-product floor passes it: §9.7 — presence or absence is never a signal.
-		rationale: source.rationale,
-		narration: undefined
+		...(unitsWithoutWork.length > 0 ? { declaredUnitsWithoutWork: unitsWithoutWork } : {}),
+		prompt: source.instruction
 	};
+	// ⚠ PASSED UNCONDITIONALLY, as the work-product floor passes it: §9.7 — presence or absence is never a signal.
+	const tail = { rationale: source.rationale, narration: undefined };
+	const whole = workLine(source.workProducts, source.commands);
+	const units = new Set([...source.workProducts.map((w) => w.unit), ...source.commands.map((c) => c.unit)]);
+	const budget = declaredPolicyContentBudget({ ...head, ...tail });
+	const shared = units.size > 1 && whole.length > budget ? workCutUnitByUnit(source.workProducts, source.commands, budget) : undefined;
+	return shared === undefined
+		? { ...head, content: whole, ...tail }
+		: { ...head, content: shared.content, declaredWorkCut: shared.cut, ...tail };
+}
+
+/** A declared review's work as ONE line of JSON: each work product under its unit's title, then each command it ran. */
+function workLine(
+	workProducts: readonly { readonly unit: string; readonly answer: string }[],
+	commands: readonly DeclaredReviewCommand[]
+): string {
+	return jsonLine({
+		workProducts: workProducts.map((w) => ({ workUnit: w.unit, workProduct: w.answer })),
+		commands: commands.map(commandEntry)
+	});
+}
+
+/** One command's entry on that line: its unit, its arguments, and the exit and timeout the host recorded. */
+const commandEntry = (c: DeclaredReviewCommand) => ({
+	workUnit: c.unit,
+	command: c.argv,
+	exitCode: c.exitCode,
+	timedOut: c.timedOut
+});
+
+/** How long `text` is written inside a string on a JSON line (`jsonLine`): each code point's own escape, summed. */
+const encodedLength = (text: string): number => jsonLine(text).length - 2;
+
+/** The longest code-point prefix of `text` whose length inside a string on a JSON line is at most `limit`. */
+function encodedPrefix(text: string, limit: number): string {
+	let used = 0;
+	let end = 0;
+	for (const ch of text) {
+		const cost = encodedLength(ch);
+		if (used + cost > limit) break;
+		used += cost;
+		end += ch.length;
+	}
+	return text.slice(0, end);
+}
+
+/** Shares of `total` by need: a need at most an equal share of what is left is met, and the rest share what remains alike. */
+function fairShares(needs: readonly number[], total: number): number[] {
+	const shares = needs.map(() => 0);
+	let left = Math.max(0, total);
+	let open = needs.map((_, i) => i);
+	while (open.length > 0) {
+		const each = Math.floor(left / open.length);
+		const met = open.filter((i) => needs[i]! <= each);
+		if (met.length === 0) {
+			for (const i of open) shares[i] = each;
+			break;
+		}
+		for (const i of met) {
+			shares[i] = needs[i]!;
+			left -= needs[i]!;
+		}
+		open = open.filter((i) => needs[i]! > each);
+	}
+	return shares;
+}
+
+/** The declaration of a cut that kept a unit's first `kept` commands of `total`. Host-authored, its title JSON-encoded. */
+export const commandsCutDeclaration = (unit: string, kept: number, total: number, removed: number): string =>
+	`[CUT FOR THIS REVIEW: the commands of ${jsonLine(unit)} — the first ${kept} of its ${total} are shown; the last ${removed} are removed.]`;
+
+/** The slice name a cut of one unit's work product declares: the work product of that unit, its title JSON-encoded. */
+const productSlice = (unit: string): string => `the work product of ${jsonLine(unit)}`;
+
+/**
+ * ⭐⭐ P5 package B (F2) — THE WORK OF MANY UNITS, CUT UNIT BY UNIT to fit `limit` (the declaration lines, a line feed, then
+ * the line of JSON, as a head-only cut's limit counts them): each unit is given an equal share of what is left after the
+ * frame — every unit's title, with none of its work — or less where it needs less (`fairShares`), and within its share its
+ * commands are kept first, in order, then its work products share the rest, each cut to its head. Each cut is declared on
+ * its own line, and the line stays valid JSON in the same shape. ⚠ The declarations' room is reserved at the widest
+ * numbers each could state, and recomputed until the cuts it leaves need no more. ⚠ Undefined when even the frame does
+ * not fit: the validator's head-only cut then stands, as before.
+ */
+function workCutUnitByUnit(
+	workProducts: readonly { readonly unit: string; readonly answer: string }[],
+	commands: readonly DeclaredReviewCommand[],
+	limit: number
+): { readonly content: string; readonly cut: string } | undefined {
+	const units = [...new Set([...workProducts.map((w) => w.unit), ...commands.map((c) => c.unit)])];
+	// ⚠ A comma counted with every command, the first's included: an overcount of one, never an undercount.
+	const commandCost = commands.map((c) => jsonLine(commandEntry(c)).length + 1);
+	const productCost = workProducts.map((w) => encodedLength(w.answer));
+	const frame = workLine(
+		workProducts.map((w) => ({ unit: w.unit, answer: '' })),
+		[]
+	).length;
+	const indices = <T extends { readonly unit: string }>(xs: readonly T[], unit: string) =>
+		xs.flatMap((x, i) => (x.unit === unit ? [i] : []));
+	const plan = (reserve: number) => {
+		const needs = units.map(
+			(u) =>
+				indices(commands, u).reduce((n, i) => n + commandCost[i]!, 0) +
+				indices(workProducts, u).reduce((n, i) => n + productCost[i]!, 0)
+		);
+		const shares = fairShares(needs, limit - frame - reserve);
+		const kept = new Set<number>();
+		const allowance = workProducts.map(() => 0);
+		units.forEach((u, k) => {
+			let room = shares[k]!;
+			for (const i of indices(commands, u)) {
+				if (commandCost[i]! > room) break;
+				kept.add(i);
+				room -= commandCost[i]!;
+			}
+			const products = indices(workProducts, u);
+			fairShares(
+				products.map((i) => productCost[i]!),
+				room
+			).forEach((a, j) => {
+				allowance[products[j]!] = a;
+			});
+		});
+		return { kept, allowance };
+	};
+	const declarations = (p: ReturnType<typeof plan>, widest: boolean): string[] => [
+		...workProducts.flatMap((w, i) => {
+			if (p.allowance[i]! >= productCost[i]!) return [];
+			const total = codePoints(w.answer);
+			const shown = widest ? total : codePoints(encodedPrefix(w.answer, p.allowance[i]!));
+			return [headCutDeclaration(productSlice(w.unit), shown, total, widest ? total : total - shown)];
+		}),
+		...units.flatMap((u) => {
+			const mine = indices(commands, u);
+			const shown = mine.filter((i) => p.kept.has(i)).length;
+			if (shown === mine.length) return [];
+			const total = mine.length;
+			return [commandsCutDeclaration(u, widest ? total : shown, total, widest ? total : total - shown)];
+		})
+	];
+	let reserve = 0;
+	for (let round = 0; round <= workProducts.length + units.length + 1; round++) {
+		const p = plan(reserve);
+		const needed = declarations(p, true).reduce((n, d) => n + d.length + 1, 0);
+		if (needed > reserve) {
+			reserve = needed;
+			continue;
+		}
+		const cut = declarations(p, false).join('\n');
+		const content = workLine(
+			workProducts.map((w, i) => ({ unit: w.unit, answer: encodedPrefix(w.answer, p.allowance[i]!) })),
+			commands.filter((_, i) => p.kept.has(i))
+		);
+		return cut.length + 1 + content.length <= limit ? { content, cut } : undefined;
+	}
+	return undefined;
 }

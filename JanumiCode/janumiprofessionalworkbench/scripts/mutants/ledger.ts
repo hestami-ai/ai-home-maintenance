@@ -15438,10 +15438,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "PQ1-V6-the-content-is-cut-one-short",
 		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
-		find: ": excerptHead(plan.framed.subjectSlice, input.content, plan.contentBudget);",
-		replace: ": excerptHead(plan.framed.subjectSlice, input.content, plan.contentBudget - 1); // MUTANT: a graph or work product is cut one short of the budget the assembler leaves",
+		find: "else content = excerptHead(plan.framed.subjectSlice, input.content, plan.contentBudget);",
+		replace: "else content = excerptHead(plan.framed.subjectSlice, input.content, plan.contentBudget - 1); // MUTANT: a graph or work product is cut one short of the budget the assembler leaves",
 		expectRed: ["apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.test.ts"],
-		why: "PROMISE (REASONING_REVIEW_BUDGET; design D2): a graph or work-product content is cut at exactly the room the assembler leaves it, its declaration inside that room. WHO RELIES: the reviewer of an oversize graph or work product, and the fingerprint's budget component. WHAT THE MUTATION DOES: the content limit the prompt obeys is one less than the budget the object and the assembler state. OBSERVED: KILLED — 1 test(s) red in reasoning-review-validator.test.ts: '⛔ a graph or a work product is cut at EXACTLY the room the assembler leaves it: the prompt is PROMPT_BUDGET but for the digits its declaration did not need' (AssertionError: PWA_GRAPH: the content's limit is not the budget the assembler leaves: expected 25999 to be 26000 // Object.is equality)",
+		why: "PROMISE (REASONING_REVIEW_BUDGET; design D2): a graph or work-product content is cut at exactly the room the assembler leaves it, its declaration inside that room. WHO RELIES: the reviewer of an oversize graph or work product, and the fingerprint's budget component. WHAT THE MUTATION DOES: the content limit the prompt obeys is one less than the budget the object and the assembler state. OBSERVED: KILLED — 1 test(s) red in reasoning-review-validator.test.ts: '⛔ a graph or a work product is cut at EXACTLY the room the assembler leaves it: the prompt is PROMPT_BUDGET but for the digits its declaration did not need' (AssertionError: PWA_GRAPH: the content's limit is not the budget the assembler leaves: expected 25999 to be 26000 // Object.is equality) ⭐ RE-ANCHORED 2026-10-18 (JAN-EXEC Phase 7 P5, package B; ledger rule #5): P5 package B F2 made the content's head cut an else branch beside a declared review's builder cut, so the anchor moved from the ternary's arm to that branch. The promise, the attack and the victim are unchanged. RE-OBSERVED (bun run mutants -- the 23 P5B ids and the 5 entries this package re-anchored, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         PQ1-V6-the-content-is-cut-one-short ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-PRQUAL PQ-1 (build, adversarial verification of the product) - each mutant kept the product's tests green until its pin landed (DESIGN-process-result-qualification.md D1, D2; ROADMAP-process-result-qualification.md PQ-1; REG-F-476, REG-F-480..484)"
 	},
 	{
@@ -31458,5 +31458,77 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/phase7-half-b.test.ts"],
 		why: "PROMISE (round 4's check, finding 2): the end never says the root's check counted its worst case - since REG-D-114 (14) as amended it counts one try's reserve, or none. WHO RELIES: the same readers, who would take a refused MODEL root's 4 for a model unit's worst case beside the caveat's 140. WHAT THE MUTATION DOES: the words round 4 left, restored. Applied by hand first, the file restored byte for byte: 'AssertionError: expected 'the limit, before the root’s press: 4…' to be 'the limit, before the root’s press: 4…' // Object.is equality' (Received: 'the limit, before the root’s press: 451 of 450 reviewer calls, its worst case of 4 counted (D8; REG-D-112)'), and the control's 'AssertionError: expected [ 'paid-limit', …(1) ] to deeply equal [ 'paid-limit', …(1) ]' (2 tests red in its victim: 'Tests  2 failed | 111 passed (113)'). OBSERVED (bun run mutants -- R4-M37, R4-M38, R4-M39 and E3-M45 by their full ids, 2026-10-16, in the round-4 worktree, the check's fixes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R4-M39-the-root-s-limit-end-says-its-worst-case-again ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 7 completion programme, round 4's check, finding 2 - half B's paid-limit end before the root's press said 'its worst case of N counted', false since the amendment made the root's check count one try's reserve (a MODEL root) or none: it now says what the check counted, from the check, and the half-B tests pin the whole detail for both kinds of root"
+	},
+	{
+		id: "P5B-M1-a-unit-below-with-no-completion-is-not-gathered",
+		file: "apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts",
+		find: "\t\t\tif (w.work.heldNoCompletion)\n\t\t\t\tunitsWithoutWork.push({",
+		replace: "\t\t\tif (w.work.heldNoCompletion && w.work.title === '')\n\t\t\t\tunitsWithoutWork.push({",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/declared-review-route.test.ts"],
+		why: "PROMISE: a unit composed of others has its declared reviews told of each unit below it that holds no completion. WHO RELIES: the root's reviewer, which otherwise judges the root's purpose over its phases' work with an abandoned phase simply absent. WHAT THE MUTATION DOES: the route gathers no such unit. OBSERVED (bun run mutants -- the 23 P5B ids and the 5 entries this package re-anchored, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M1-a-unit-below-with-no-completion-is-not-gathered ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B, F1 and F2 - the declared reviews of a unit composed of others name each unit below it that holds no completion, its lifecycle and assurance states, on a host line of its own (P5's root was judged with its abandoned end-to-end phase absent and unsaid), and the cut that bounds the prompt gives each unit its own share (P5's head-only cut kept 21684 of 50586 code points: nothing of Implementation or of any command); section 3.2's prompts with every child completed, and the reviewer fingerprint, unchanged"
+	},
+	{
+		id: "P5B-M2-the-prompt-carries-no-line-for-a-unit-without-work",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "const withoutWork = input.framing === 'DECLARED_POLICY' ? (input.declaredUnitsWithoutWork ?? []) : [];",
+		replace: "const withoutWork: DeclaredUnitWithoutWork[] = [];",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/declared-policy-review.test.ts"],
+		why: "PROMISE: the validator writes one host line for each unit without work a declared review is handed. WHO RELIES: the reviewer. WHAT THE MUTATION DOES: the field is read as empty, and no line is written. OBSERVED (bun run mutants -- the 23 P5B ids and the 5 entries this package re-anchored, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M2-the-prompt-carries-no-line-for-a-unit-without-work ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B, F1 and F2 - the declared reviews of a unit composed of others name each unit below it that holds no completion, its lifecycle and assurance states, on a host line of its own (P5's root was judged with its abandoned end-to-end phase absent and unsaid), and the cut that bounds the prompt gives each unit its own share (P5's head-only cut kept 21684 of 50586 code points: nothing of Implementation or of any command); section 3.2's prompts with every child completed, and the reviewer fingerprint, unchanged"
+	},
+	{
+		id: "P5B-M3-the-fence-is-chosen-without-the-title-on-the-host-line",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "\t\t\t...withoutWork.map((u) => jsonLine(u.unit))",
+		replace: "\t\t\t...withoutWork.map((u) => jsonLine(u.unit)).filter(() => false)",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/declared-policy-review.test.ts"],
+		why: "PROMISE: a unit's title on the host's line is the PWA's (an agent authors it in half B), so the fence chooser reads it. WHO RELIES: every reader of the fence, which must occur nowhere in the prompt but on its own lines. WHAT THE MUTATION DOES: the title is left out of the untrusted bytes, and a title holding the first fence candidate keeps that fence. OBSERVED (bun run mutants -- the 23 P5B ids and the 5 entries this package re-anchored, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M3-the-fence-is-chosen-without-the-title-on-the-host-line ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B, F1 and F2 - the declared reviews of a unit composed of others name each unit below it that holds no completion, its lifecycle and assurance states, on a host line of its own (P5's root was judged with its abandoned end-to-end phase absent and unsaid), and the cut that bounds the prompt gives each unit its own share (P5's head-only cut kept 21684 of 50586 code points: nothing of Implementation or of any command); section 3.2's prompts with every child completed, and the reviewer fingerprint, unchanged"
+	},
+	{
+		id: "P5B-M4-the-builder-never-cuts-the-work-unit-by-unit",
+		file: "apps/rph-demo/src/lib/server/assurance/review-input.ts",
+		find: "units.size > 1 && whole.length > budget",
+		replace: "units.size > 99 && whole.length > budget",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/declared-policy-review.test.ts"],
+		why: "PROMISE: work of more than one unit that is longer than its budget is cut unit by unit, each unit keeping a share. WHO RELIES: the root's reviewer. WHAT THE MUTATION DOES: the work is handed whole, and the validator's head-only cut drops the last units. OBSERVED (bun run mutants -- the 23 P5B ids and the 5 entries this package re-anchored, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M4-the-builder-never-cuts-the-work-unit-by-unit ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B, F1 and F2 - the declared reviews of a unit composed of others name each unit below it that holds no completion, its lifecycle and assurance states, on a host line of its own (P5's root was judged with its abandoned end-to-end phase absent and unsaid), and the cut that bounds the prompt gives each unit its own share (P5's head-only cut kept 21684 of 50586 code points: nothing of Implementation or of any command); section 3.2's prompts with every child completed, and the reviewer fingerprint, unchanged"
+	},
+	{
+		id: "P5B-M5-a-unit-s-dropped-commands-are-not-declared",
+		file: "apps/rph-demo/src/lib/server/assurance/review-input.ts",
+		find: "if (shown === mine.length) return [];",
+		replace: "if (shown <= mine.length) return [];",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/declared-policy-review.test.ts"],
+		why: "PROMISE: a unit whose commands pass its share keeps its first commands, and the cut of the rest is declared. WHO RELIES: the reviewer, told how many of a unit's commands it was not shown. WHAT THE MUTATION DOES: no commands cut is declared. OBSERVED (bun run mutants -- the 23 P5B ids and the 5 entries this package re-anchored, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M5-a-unit-s-dropped-commands-are-not-declared ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B, F1 and F2 - the declared reviews of a unit composed of others name each unit below it that holds no completion, its lifecycle and assurance states, on a host line of its own (P5's root was judged with its abandoned end-to-end phase absent and unsaid), and the cut that bounds the prompt gives each unit its own share (P5's head-only cut kept 21684 of 50586 code points: nothing of Implementation or of any command); section 3.2's prompts with every child completed, and the reviewer fingerprint, unchanged"
+	},
+	{
+		id: "P5B-M6-a-cut-work-product-is-not-declared",
+		file: "apps/rph-demo/src/lib/server/assurance/review-input.ts",
+		find: "if (p.allowance[i]! >= productCost[i]!) return [];",
+		replace: "if (p.allowance[i]! >= 0) return [];",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/declared-policy-review.test.ts"],
+		why: "PROMISE: each work product cut to its unit's share is declared, with what was shown and what was removed. WHO RELIES: the reviewer (section 9.7: a cut is declared, never silent). WHAT THE MUTATION DOES: no work product's cut is declared. OBSERVED (bun run mutants -- the 23 P5B ids and the 5 entries this package re-anchored, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M6-a-cut-work-product-is-not-declared ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B, F1 and F2 - the declared reviews of a unit composed of others name each unit below it that holds no completion, its lifecycle and assurance states, on a host line of its own (P5's root was judged with its abandoned end-to-end phase absent and unsaid), and the cut that bounds the prompt gives each unit its own share (P5's head-only cut kept 21684 of 50586 code points: nothing of Implementation or of any command); section 3.2's prompts with every child completed, and the reviewer fingerprint, unchanged"
+	},
+	{
+		id: "P5B-M7-the-validator-cuts-the-builder-s-work-again",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "else if (builderCut !== undefined) content = { declaration: builderCut, bytes: input.content };",
+		replace: "else if (builderCut !== undefined) content = excerptHead(plan.framed.subjectSlice, input.content, plan.contentBudget);",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/declared-policy-review.test.ts"],
+		why: "PROMISE: work its builder cut is shown with the builder's declarations, and never cut again. WHO RELIES: the reviewer. WHAT THE MUTATION DOES: the validator re-cuts it head-only, dropping the builder's declarations. OBSERVED (bun run mutants -- the 23 P5B ids and the 5 entries this package re-anchored, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M7-the-validator-cuts-the-builder-s-work-again ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B, F1 and F2 - the declared reviews of a unit composed of others name each unit below it that holds no completion, its lifecycle and assurance states, on a host line of its own (P5's root was judged with its abandoned end-to-end phase absent and unsaid), and the cut that bounds the prompt gives each unit its own share (P5's head-only cut kept 21684 of 50586 code points: nothing of Implementation or of any command); section 3.2's prompts with every child completed, and the reviewer fingerprint, unchanged"
+	},
+	{
+		id: "P5B-M8-an-over-budget-builder-cut-is-sent",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "\t\tthrow new Error(DECLARED_WORK_CUT_OVER_BUDGET);",
+		replace: "\t\tvoid DECLARED_WORK_CUT_OVER_BUDGET;",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/declared-policy-review.test.ts"],
+		why: "PROMISE: a builder's cut that does not fit the budget the prompt leaves it is refused, no model called. WHO RELIES: the record, whose declarations must say what was shown. WHAT THE MUTATION DOES: it is sent. OBSERVED (bun run mutants -- the 23 P5B ids and the 5 entries this package re-anchored, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M8-an-over-budget-builder-cut-is-sent ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B, F1 and F2 - the declared reviews of a unit composed of others name each unit below it that holds no completion, its lifecycle and assurance states, on a host line of its own (P5's root was judged with its abandoned end-to-end phase absent and unsaid), and the cut that bounds the prompt gives each unit its own share (P5's head-only cut kept 21684 of 50586 code points: nothing of Implementation or of any command); section 3.2's prompts with every child completed, and the reviewer fingerprint, unchanged"
 	}
 ];

@@ -112,6 +112,17 @@ export interface DeclaredPolicyFraming {
  */
 export type DeclaredInstruction = 'PRODUCING_PROMPT' | 'UNIT_PURPOSE';
 
+/**
+ * ⭐ `JAN-EXEC` Phase 7 P5, package B (F1) — A UNIT BELOW A UNIT COMPOSED OF OTHERS THAT HOLDS NO COMPLETION: its title, and
+ * its lifecycle and assurance states as the store holds them. Such a unit contributed no work to what a declared review of
+ * the unit above it is shown, and the reviewer is told so on a host line of its own (`declaredUnitsWithoutWork`).
+ */
+export interface DeclaredUnitWithoutWork {
+	readonly unit: string;
+	readonly lifecycleState: string;
+	readonly assuranceState: string;
+}
+
 /** The inputs a Validator needs beyond the subject. Deterministic Validators read the fact bags; the Reasoning
  *  Review Validator reads the review input (the intent + the serialized subject content to review). */
 export interface ReasoningReviewInput {
@@ -167,6 +178,19 @@ export interface ReasoningReviewInput {
 	 * than tell the reviewer something about its instruction the host does not know to be true.
 	 */
 	readonly declaredInstruction?: DeclaredInstruction;
+	/**
+	 * ⭐ P5 package B (F1) — the units below a unit composed of others that hold no completion (`DeclaredUnitWithoutWork`),
+	 * each named to the reviewer on a host line of its own. ⛔ READ BY THE `DECLARED_POLICY` FRAMING ONLY; absent or empty,
+	 * the prompt carries no such line.
+	 */
+	readonly declaredUnitsWithoutWork?: readonly DeclaredUnitWithoutWork[];
+	/**
+	 * ⭐ P5 package B (F2) — the host's declaration of the cut its BUILDER made of a declared review's work, one line per
+	 * cut (`declaredPolicyReviewInput`): each unit's part cut to its own share of the budget. The reviewer is shown it before
+	 * the work, as a head-only cut's declaration is, and the content is then never cut again. ⛔ READ BY THE
+	 * `DECLARED_POLICY` FRAMING ONLY.
+	 */
+	readonly declaredWorkCut?: string;
 	readonly prompt: string;
 	readonly content: string;
 	/**
