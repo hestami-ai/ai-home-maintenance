@@ -58,6 +58,8 @@ import {
 	type ScrubPair,
 	type ToolDefinitionKey
 } from '../../apps/rph-demo/src/lib/server/replay/recording.js';
+// ⭐ P5 package A (F1) — the one reading of a reply the tool cut at the model's output-token limit. Pure.
+import { outputLimitOf } from '../../apps/rph-demo/src/lib/server/tools/output-limit.js';
 import { workspaceTreeSha256 } from './node-tests.js';
 import type { StoredObject, StoreRows } from './run-report-core.js';
 
@@ -451,16 +453,27 @@ function executorTryOf(
 	};
 }
 
-/** A reviewer call's reply: a call that threw, its cause as the tool printed it; else its retained raw reply. */
+/** What a failed call's tool printed, scrubbed: its E-5 detail after `THROWN_MARKER`, unwrapped of the seam's prefix. */
+function toolsOwnWords(row: StoredObject, x: Extraction): string {
+	const detail = str(rec(row.state.parseOutcome).detail);
+	const at = detail.indexOf(THROWN_MARKER);
+	const told = at < 0 ? detail : detail.slice(at + THROWN_MARKER.length);
+	return x.scrub(told.startsWith(SEAM_PREFIX) ? told.slice(SEAM_PREFIX.length) : told);
+}
+
+/**
+ * A reviewer call's reply: a call that threw, its cause as the tool printed it; ⭐ (P5 package A, F1) a reply the tool cut
+ * at the model's output-token limit (`outputLimitOf`), its own form — never ANSWERED, which the replay would hand the
+ * validator to parse and repair, a call the run never made; else its retained raw reply.
+ */
 function replyOf(row: StoredObject, x: Extraction): RecordedReply | string {
-	if (row.state.disposition === 'NO_RESPONSE') {
-		const detail = str(rec(row.state.parseOutcome).detail);
-		const at = detail.indexOf(THROWN_MARKER);
-		const told = at < 0 ? detail : detail.slice(at + THROWN_MARKER.length);
-		return {
-			status: 'THROWN',
-			message: x.scrub(told.startsWith(SEAM_PREFIX) ? told.slice(SEAM_PREFIX.length) : told)
-		};
+	if (row.state.disposition === 'NO_RESPONSE') return { status: 'THROWN', message: toolsOwnWords(row, x) };
+	const cut = outputLimitOf(row.state);
+	if (cut !== undefined) {
+		const partial = contentOf(row.state.rawOutputBeforeCoercionRef, x.input.content);
+		if (partial === undefined)
+			return 'its reply was cut at the model’s output-token limit, and the partial reply is not retained, so the cut cannot be replayed';
+		return { status: 'OUTPUT_LIMIT', message: toolsOwnWords(row, x), partialReply: x.scrub(partial), ...cut };
 	}
 	const raw =
 		contentOf(row.state.rawOutputBeforeCoercionRef, x.input.content) ?? reassembled(row, x);

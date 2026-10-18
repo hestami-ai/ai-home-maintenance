@@ -121,6 +121,14 @@ export interface CaptureTryInput {
 	 */
 	readonly unseparatedRawOutput?: 'BLOCKED' | 'RETAINED_FOR_DIAGNOSIS';
 	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7 P5, package A (F1) — A REPLY THE TOOL ENDED AT THE MODEL'S OUTPUT-TOKEN LIMIT
+	 * (`tools/output-limit.ts`), which only the caller can say. Nothing is judged from any of it, so it is kept WHOLE, as
+	 * `RETAINED_FOR_DIAGNOSIS` keeps a reply — PURGEABLE_AT_EXPIRY, its two spans PENDING saying why — whatever span can be
+	 * located in it: a span the cut left is an answer that participated in nothing, and kept RETAINED_BY_PARTICIPATION it
+	 * would claim a judgement rested on it. ⭐ And E-4 says its output was declared truncated (`outputTruncationState`).
+	 */
+	readonly cutAtOutputLimit?: true;
+	/**
 	 * ⭐⭐ P7-6 I2 — THE BACKING TOOL'S OWN RECORD OF THE SESSION (`ToolInvocationResult.sessionExport`: devin's export, which
 	 * lists every step and any tool devin called). Stored PURGEABLE_AT_EXPIRY — a session trace, never Evidence (PER-12) —
 	 * and pointed at from the record: the record's tool-call observation, whose reason already says this adapter could
@@ -216,8 +224,11 @@ export async function captureTry(input: CaptureTryInput): Promise<ExchangeRecord
 				'absence, which PER-9 permits. Store, sink and record consumer land together or not at all.'
 		);
 
+	// ⭐ P5 package A (F1) — E-4 of a reply the tool ended at the model's output-token limit, on either path below.
+	const cutOutput = input.cutAtOutputLimit ? { outputTruncationState: 'declared' as const } : {};
+
 	if (!input.store) {
-		const pending = { ...base, disposition: input.disposition, parseOutcome: input.parseOutcome };
+		const pending = { ...base, ...cutOutput, disposition: input.disposition, parseOutcome: input.parseOutcome };
 		input.sink?.record(pending);
 		return pending;
 	}
@@ -253,7 +264,16 @@ export async function captureTry(input: CaptureTryInput): Promise<ExchangeRecord
 	// filled for the first time since it was authored.
 	let omittedRegions: OmittedRegion[] = [];
 
-	if (!span.located) {
+	if (input.cutAtOutputLimit) {
+		// ⭐ P5 package A (F1) — a reply the tool cut: kept whole for diagnosis, whatever span it holds (`cutAtOutputLimit`).
+		({ answerSpanRef, volunteeredReasoningRef, rawOutputRef } = await unlocatedRefs(
+			input.rawOutput,
+			'RETAINED_FOR_DIAGNOSIS',
+			input.store.durability,
+			put,
+			CUT_REPLY_KEPT
+		));
+	} else if (!span.located) {
 		// ⛔ §9.7's OWN INSTRUCTION, and the only branch that still refuses — ⭐ unless the caller asks to keep the whole
 		// reply for diagnosis (P7-6 I2, the reviewer's plane; `unlocatedRefs`). `located` is a MEASUREMENT
 		// (REG-F-339), so this is entered on evidence about THIS blob rather than on a class of blob assumed
@@ -313,6 +333,7 @@ export async function captureTry(input: CaptureTryInput): Promise<ExchangeRecord
 
 	const recorded: ExchangeRecord = {
 		...base,
+		...cutOutput,
 		materializedInputRef: storedRef(inputRef, input.store.durability, 'RETAINED_BY_PARTICIPATION'),
 		rawOutputBeforeCoercionRef: rawOutputRef,
 		answerSpanRef,
@@ -339,25 +360,35 @@ interface ReplyRefs {
 	readonly rawOutputRef: ContentRef;
 }
 
+/** Why a kept reply's two spans hold nothing, when no answer span could be located in it (P7-6 I2). */
+const UNLOCATED_REPLY_KEPT =
+	'No answer span could be located in this reply, so nothing in it can be told apart as an answer or as ' +
+	'volunteered reasoning (Guide §9.7). The whole reply is kept instead, under rawOutputBeforeCoercionRef, ' +
+	'PURGEABLE_AT_EXPIRY, for diagnosis (ASR-11 limb 3): no judgement rests on its bytes. JAN-EXEC Phase 7 ' +
+	'P7-6 I2; REG-D-103 (2).';
+
+/** ⭐ P5 package A (F1) — why a kept reply's two spans hold nothing, when the tool cut the reply (`cutAtOutputLimit`). */
+const CUT_REPLY_KEPT =
+	'The reviewing tool ended this reply at the model’s output-token limit, so nothing in it is judged — any span in it ' +
+	'is an answer cut short, and participated in nothing. The whole reply is kept instead, under ' +
+	'rawOutputBeforeCoercionRef, PURGEABLE_AT_EXPIRY, for diagnosis (ASR-11 limb 3). JAN-EXEC Phase 7 P5, package A.';
+
 /**
  * The E-2 refs of a reply in which NO answer span could be located: blocked, as Guide §9.7 instructs — or, where the
  * caller asks (`unseparatedRawOutput`, the reviewer's plane, P7-6 I2), the whole reply kept PURGEABLE_AT_EXPIRY for
  * diagnosis, its two spans saying they hold nothing and where the reply is. ⭑ Nothing was cut out of anything in either
- * arm, so neither declares a region.
+ * arm, so neither declares a region. ⭐ P5 package A — and of a reply the tool cut, kept whole the same way, its spans
+ * saying why (`keptBecause`).
  */
 async function unlocatedRefs(
 	rawOutput: string,
 	asked: CaptureTryInput['unseparatedRawOutput'],
 	durability: ContentDurability,
-	put: (bytes: string, purgeability: Purgeability) => Promise<StoredArtifactRef>
+	put: (bytes: string, purgeability: Purgeability) => Promise<StoredArtifactRef>,
+	keptBecause = UNLOCATED_REPLY_KEPT
 ): Promise<ReplyRefs> {
 	if (asked === 'RETAINED_FOR_DIAGNOSIS') {
-		const kept = pendingRef(
-			'No answer span could be located in this reply, so nothing in it can be told apart as an answer or as ' +
-				'volunteered reasoning (Guide §9.7). The whole reply is kept instead, under rawOutputBeforeCoercionRef, ' +
-				'PURGEABLE_AT_EXPIRY, for diagnosis (ASR-11 limb 3): no judgement rests on its bytes. JAN-EXEC Phase 7 ' +
-				'P7-6 I2; REG-D-103 (2).'
-		);
+		const kept = pendingRef(keptBecause);
 		return {
 			answerSpanRef: kept,
 			volunteeredReasoningRef: kept,

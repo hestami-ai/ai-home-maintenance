@@ -45,6 +45,7 @@ import {
 	PROGRAM_OVERRIDE_VARIABLES,
 	sourceResolutionProblem
 } from '../scripts/reviewer-qual/preflight.js';
+import { OutputLimitReached } from '../apps/rph-demo/src/lib/server/tools/output-limit.js';
 import { recordProblems, type CallLine, type RunLine } from '../scripts/reviewer-qual/record.js';
 import { reviewerFingerprint } from '../scripts/reviewer-qual/fingerprint.js';
 import { main } from '../scripts/reviewer-qual/run.js';
@@ -354,6 +355,30 @@ describe('JAN-CRITREAD J2-2 — the product transports (REG-D-072 D12)', () => {
 			modelLabel: 'glm-5-2',
 			argv: null
 		});
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7 P5, package A (F2) — devin's reply cut at the model's output-token limit is passed on as the
+	// product's own class, for the runner to record as one (`runner.ts`): never classified TIMEOUT or REFUSAL by the clock.
+	it('⛔ P5 A — devin’s reply cut at the output-token limit is passed on as its own class — never a TRANSPORT_FAILURE, whatever the clock says', async () => {
+		const cut = new OutputLimitReached('devin invocation failed: Command failed: devin --print (fixture)', {
+			facts: { outputTokens: 25_000 },
+			partialReply: '',
+			observedToolCalls: { canObserve: false, reason: 'The devin adapter cannot observe tool calls (fixture).' }
+		});
+		for (const at of [90_453, 240_000]) {
+			const t = createDevinTransport(
+				{
+					devinPrint: async () => {
+						throw cut;
+					},
+					resolveAssuranceModel: () => 'glm-5-2'
+				},
+				'glm-5-2',
+				{ now: ticking(at) }
+			);
+			// ⛔ THE MUTANT: every throw classified by the clock, as before — P4's "devin failed after N ms", a REFUSAL.
+			expect(await t.call('p').catch((e: unknown) => e), `a cut reply at ${at} ms read as a transport failure`).toBe(cut);
+		}
 	});
 
 	it('⛔ a blank or padded model label is the HARNESS’s fault — refused on every transport before anything is written (the product trims it, so the label recorded would not be the model run)', async () => {

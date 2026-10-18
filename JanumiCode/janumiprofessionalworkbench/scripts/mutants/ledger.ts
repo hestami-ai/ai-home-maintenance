@@ -26622,10 +26622,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "P76F-C-M17-a-call-that-threw-is-taken-for-the-first-reply",
 		file: "apps/rph-demo/src/lib/server/assurance/reviewer-answer.ts",
-		find: "const asked = sorted.find((r) => tryState(r).disposition !== 'NO_RESPONSE');",
+		find: "const asked = sorted.find((r) => tryState(r).disposition !== 'NO_RESPONSE' && outputLimitOf(r.state) === undefined);",
 		replace: "const asked = sorted[0];",
 		expectRed: ["apps/rph-demo/src/lib/server/assurance/reviewer-answer.test.ts"],
-		why: "PROMISE: the 'first reply' of an I5 chain is the first try that GOT a reply - the call's, or its retry's after a throw (`concludedTry`; P7-2b). WHO RELIES: the page's panel under a review whose first call threw and whose retry answered no criterion. WHAT THE MUTATION DOES: the call that threw is taken for the first reply, the chain is not read as I5, and the repair that added nothing is shown. OBSERVED (bun run mutants -- P76F-C-M17-a-call-that-threw-is-taken-for-the-first-reply, 2026-10-10, in the builder's worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P76F-C-M17-a-call-that-threw-is-taken-for-the-first-reply ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		why: "PROMISE: the 'first reply' of an I5 chain is the first try that GOT a reply - the call's, or its retry's after a throw (`concludedTry`; P7-2b). WHO RELIES: the page's panel under a review whose first call threw and whose retry answered no criterion. WHAT THE MUTATION DOES: the call that threw is taken for the first reply, the chain is not read as I5, and the repair that added nothing is shown. OBSERVED (bun run mutants -- P76F-C-M17-a-call-that-threw-is-taken-for-the-first-reply, 2026-10-10, in the builder's worktree, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P76F-C-M17-a-call-that-threw-is-taken-for-the-first-reply ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯' RE-ANCHORED (JAN-EXEC Phase 7 P5, package A, 2026-10-18, ledger rule #5): the line now also passes a reply the tool cut at the model's output-token limit (`outputLimitOf`), so the anchor moved; the same mutation, re-measured (bun run mutants -- the P5 package A F1 entries and P76F-C-M17 by their full ids, 2026-10-18, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P76F-C-M17-a-call-that-threw-is-taken-for-the-first-reply ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 7 P7-6 fix round C (p76-fix-c) C2 - the PWA page's reviewer answer joined to the reasoning review it shows: loadPwaFloor carries that review's floor-run token (reasoningReviewRunToken, its assessment's correlation), the page hands it to loadReviewerAnswer and reads the exchanges from CANONICAL, and within the run the reader returns the try the review concluded from (concludedTry: an answering criterion repair; otherwise, in an I5 chain, the first reply); held through the page's load by apps/rph-demo/src/lib/server/pwa-reviewer-answer-join.test.ts and conjunct by conjunct by apps/rph-demo/src/lib/server/assurance/reviewer-answer.test.ts (REG-F-433; REG-F-552; DESIGN-the-stopped-unit-recovery.md RD10; DESIGN-the-reviewer-isolated.md §4d)"
 	},
 	{
@@ -31458,5 +31458,410 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/phase7-half-b.test.ts"],
 		why: "PROMISE (round 4's check, finding 2): the end never says the root's check counted its worst case - since REG-D-114 (14) as amended it counts one try's reserve, or none. WHO RELIES: the same readers, who would take a refused MODEL root's 4 for a model unit's worst case beside the caveat's 140. WHAT THE MUTATION DOES: the words round 4 left, restored. Applied by hand first, the file restored byte for byte: 'AssertionError: expected 'the limit, before the root’s press: 4…' to be 'the limit, before the root’s press: 4…' // Object.is equality' (Received: 'the limit, before the root’s press: 451 of 450 reviewer calls, its worst case of 4 counted (D8; REG-D-112)'), and the control's 'AssertionError: expected [ 'paid-limit', …(1) ] to deeply equal [ 'paid-limit', …(1) ]' (2 tests red in its victim: 'Tests  2 failed | 111 passed (113)'). OBSERVED (bun run mutants -- R4-M37, R4-M38, R4-M39 and E3-M45 by their full ids, 2026-10-16, in the round-4 worktree, the check's fixes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R4-M39-the-root-s-limit-end-says-its-worst-case-again ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 7 completion programme, round 4's check, finding 2 - half B's paid-limit end before the root's press said 'its worst case of N counted', false since the amendment made the root's check count one try's reserve (a MODEL root) or none: it now says what the check counted, from the check, and the half-B tests pin the whole detail for both kinds of root"
+	},
+	{
+		id: "P5A-M1-the-cut-is-thrown-as-a-plain-failure",
+		file: "apps/rph-demo/src/lib/server/tools/devin-reviewer.ts",
+		find: "throw cut === undefined ? new Error(diagnostic) : new OutputLimitReached(diagnostic, cut);",
+		replace: "throw cut === undefined ? new Error(diagnostic) : new Error(diagnostic);",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-reviewer.test.ts"],
+		why: "PROMISE: a reply devin ended at the model's output-token limit leaves devinPrint as its own class. WHO RELIES: the validator, which records the class from it. WHAT THE MUTATION DOES: the cut is thrown as a plain Error, as before P5 package A - read downstream as a call with no reply. OBSERVED (bun run mutants -- P5A-M1 to P5A-M11 by their full ids, 2026-10-18, re-measured after devinPrint came to read devin's sentence in the rejection's message rather than bind stderr (REG-Q-066), the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M1-the-cut-is-thrown-as-a-plain-failure ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F1) - a reviewer reply devin ended at the model's output-token limit is its own class: devinPrint keeps the exit code, stdout and the export devin wrote, and throws OutputLimitReached (tools/output-limit.ts); the validator records the try REJECTED, its output DECLARED cut, E-5 NOT_ATTEMPTED opening with OUTPUT_LIMIT, the partial reply kept whole and purgeable; the PWA reader, the run report and the replay recorder read it as its own class"
+	},
+	{
+		id: "P5A-M2-the-exports-finish-reason-is-not-read",
+		file: "apps/rph-demo/src/lib/server/tools/devin-reviewer.ts",
+		find: "if (!said && facts.finishReason !== 'max_tokens') return undefined;",
+		replace: "if (!said) return undefined;",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-reviewer.test.ts"],
+		why: "PROMISE: the class is told by devin's sentence on stderr OR by its export's finish reason max_tokens. WHO RELIES: a cut whose stderr names no truncation. WHAT THE MUTATION DOES: the export's finish reason is not read. OBSERVED (bun run mutants -- P5A-M1 to P5A-M11 by their full ids, 2026-10-18, re-measured after devinPrint came to read devin's sentence in the rejection's message rather than bind stderr (REG-Q-066), the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M2-the-exports-finish-reason-is-not-read ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F1) - a reviewer reply devin ended at the model's output-token limit is its own class: devinPrint keeps the exit code, stdout and the export devin wrote, and throws OutputLimitReached (tools/output-limit.ts); the validator records the try REJECTED, its output DECLARED cut, E-5 NOT_ATTEMPTED opening with OUTPUT_LIMIT, the partial reply kept whole and purgeable; the PWA reader, the run report and the replay recorder read it as its own class"
+	},
+	{
+		id: "P5A-M3-devins-truncation-sentence-is-not-read",
+		file: "apps/rph-demo/src/lib/server/tools/devin-reviewer.ts",
+		find: "const said = raw.includes(DEVIN_OUTPUT_LIMIT);",
+		replace: "const said = false;",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-reviewer.test.ts"],
+		why: "PROMISE: devin's own sentence, on stderr and so in the rejection's message ('Response truncated: model hit max output token limit') tells the class - how all seven of P5's cut calls ended. WHO RELIES: every cut call whose export carries no finish reason. WHAT THE MUTATION DOES: stderr is not read. OBSERVED (bun run mutants -- P5A-M1 to P5A-M11 by their full ids, 2026-10-18, re-measured after devinPrint came to read devin's sentence in the rejection's message rather than bind stderr (REG-Q-066), the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M3-devins-truncation-sentence-is-not-read ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F1) - a reviewer reply devin ended at the model's output-token limit is its own class: devinPrint keeps the exit code, stdout and the export devin wrote, and throws OutputLimitReached (tools/output-limit.ts); the validator records the try REJECTED, its output DECLARED cut, E-5 NOT_ATTEMPTED opening with OUTPUT_LIMIT, the partial reply kept whole and purgeable; the PWA reader, the run report and the replay recorder read it as its own class"
+	},
+	{
+		id: "P5A-M4-every-non-zero-exit-is-the-class",
+		file: "apps/rph-demo/src/lib/server/tools/devin-reviewer.ts",
+		find: "if (!said && facts.finishReason !== 'max_tokens') return undefined;",
+		replace: "if (!said && facts.finishReason !== 'max_tokens' && facts.outputTokens === -1) return undefined;",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-reviewer.test.ts"],
+		why: "PROMISE: every other non-zero exit is thrown as before. WHO RELIES: a transport failure, which must not claim a cut reply. WHAT THE MUTATION DOES: no exit is let through - every non-zero exit is the class. OBSERVED (bun run mutants -- P5A-M1 to P5A-M11 by their full ids, 2026-10-18, re-measured after devinPrint came to read devin's sentence in the rejection's message rather than bind stderr (REG-Q-066), the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M4-every-non-zero-exit-is-the-class ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F1) - a reviewer reply devin ended at the model's output-token limit is its own class: devinPrint keeps the exit code, stdout and the export devin wrote, and throws OutputLimitReached (tools/output-limit.ts); the validator records the try REJECTED, its output DECLARED cut, E-5 NOT_ATTEMPTED opening with OUTPUT_LIMIT, the partial reply kept whole and purgeable; the PWA reader, the run report and the replay recorder read it as its own class"
+	},
+	{
+		id: "P5A-M5-a-kill-is-read-as-the-class",
+		file: "apps/rph-demo/src/lib/server/tools/devin-reviewer.ts",
+		find: "if (typeof failed.code !== 'number' || failed.code === 0) return undefined;",
+		replace: "if (failed.code === 0) return undefined;",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-reviewer.test.ts"],
+		why: "PROMISE: only an EXIT is the class - a kill at the bound carries a signal and no exit code. WHO RELIES: a call killed at its 240 s bound, a timeout. WHAT THE MUTATION DOES: the exit code is not asked. OBSERVED (bun run mutants -- P5A-M1 to P5A-M11 by their full ids, 2026-10-18, re-measured after devinPrint came to read devin's sentence in the rejection's message rather than bind stderr (REG-Q-066), the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M5-a-kill-is-read-as-the-class ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F1) - a reviewer reply devin ended at the model's output-token limit is its own class: devinPrint keeps the exit code, stdout and the export devin wrote, and throws OutputLimitReached (tools/output-limit.ts); the validator records the try REJECTED, its output DECLARED cut, E-5 NOT_ATTEMPTED opening with OUTPUT_LIMIT, the partial reply kept whole and purgeable; the PWA reader, the run report and the replay recorder read it as its own class"
+	},
+	{
+		id: "P5A-M6-the-partial-reply-is-dropped",
+		file: "apps/rph-demo/src/lib/server/tools/devin-reviewer.ts",
+		find: "partialReply: typeof failed.stdout === 'string' ? failed.stdout : '',",
+		replace: "partialReply: '',",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-reviewer.test.ts"],
+		why: "PROMISE: a non-zero exit keeps e.stdout - the reply devin printed before it cut it. WHO RELIES: the record, which keeps it for diagnosis. WHAT THE MUTATION DOES: the partial reply is dropped, as before P5 package A. OBSERVED (bun run mutants -- P5A-M1 to P5A-M11 by their full ids, 2026-10-18, re-measured after devinPrint came to read devin's sentence in the rejection's message rather than bind stderr (REG-Q-066), the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M6-the-partial-reply-is-dropped ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F1) - a reviewer reply devin ended at the model's output-token limit is its own class: devinPrint keeps the exit code, stdout and the export devin wrote, and throws OutputLimitReached (tools/output-limit.ts); the validator records the try REJECTED, its output DECLARED cut, E-5 NOT_ATTEMPTED opening with OUTPUT_LIMIT, the partial reply kept whole and purgeable; the PWA reader, the run report and the replay recorder read it as its own class"
+	},
+	{
+		id: "P5A-M7-the-export-of-a-cut-call-is-not-carried",
+		file: "apps/rph-demo/src/lib/server/tools/devin-reviewer.ts",
+		find: "...(exported === undefined ? {} : { sessionExport: exported })",
+		replace: "...{}",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-reviewer.test.ts"],
+		why: "PROMISE: the export devin wrote is read before the finally deletes it, and carried. WHO RELIES: the record, which keeps it and points at it. WHAT THE MUTATION DOES: the export is not carried. OBSERVED (bun run mutants -- P5A-M1 to P5A-M11 by their full ids, 2026-10-18, re-measured after devinPrint came to read devin's sentence in the rejection's message rather than bind stderr (REG-Q-066), the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M7-the-export-of-a-cut-call-is-not-carried ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F1) - a reviewer reply devin ended at the model's output-token limit is its own class: devinPrint keeps the exit code, stdout and the export devin wrote, and throws OutputLimitReached (tools/output-limit.ts); the validator records the try REJECTED, its output DECLARED cut, E-5 NOT_ATTEMPTED opening with OUTPUT_LIMIT, the partial reply kept whole and purgeable; the PWA reader, the run report and the replay recorder read it as its own class"
+	},
+	{
+		id: "P5A-M8-the-exports-output-tokens-are-not-read",
+		file: "apps/rph-demo/src/lib/server/tools/devin-reviewer.ts",
+		find: "...(typeof tokens === 'number' && Number.isSafeInteger(tokens) && tokens >= 0 ? { outputTokens: tokens } : {})",
+		replace: "...{}",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-reviewer.test.ts"],
+		why: "PROMISE: what the export counted of the cut (the last agent step's completion_tokens) is carried. WHO RELIES: E-5's detail, output_tokens. WHAT THE MUTATION DOES: the count is not read. OBSERVED (bun run mutants -- P5A-M1 to P5A-M11 by their full ids, 2026-10-18, re-measured after devinPrint came to read devin's sentence in the rejection's message rather than bind stderr (REG-Q-066), the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M8-the-exports-output-tokens-are-not-read ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F1) - a reviewer reply devin ended at the model's output-token limit is its own class: devinPrint keeps the exit code, stdout and the export devin wrote, and throws OutputLimitReached (tools/output-limit.ts); the validator records the try REJECTED, its output DECLARED cut, E-5 NOT_ATTEMPTED opening with OUTPUT_LIMIT, the partial reply kept whole and purgeable; the PWA reader, the run report and the replay recorder read it as its own class"
+	},
+	{
+		id: "P5A-M9-a-free-text-finish-reason-is-carried",
+		file: "apps/rph-demo/src/lib/server/tools/devin-reviewer.ts",
+		find: "...(typeof reason === 'string' && FINISH_REASON_SHAPE.test(reason) ? { finishReason: reason } : {}),",
+		replace: "...(typeof reason === 'string' ? { finishReason: reason } : {}),",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-reviewer.test.ts"],
+		why: "PROMISE: a finish reason is carried only as a bounded token (FINISH_REASON_SHAPE). WHO RELIES: E-5's detail, on the record plane. WHAT THE MUTATION DOES: any tool-written string is carried. OBSERVED (bun run mutants -- P5A-M1 to P5A-M11 by their full ids, 2026-10-18, re-measured after devinPrint came to read devin's sentence in the rejection's message rather than bind stderr (REG-Q-066), the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M9-a-free-text-finish-reason-is-carried ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F1) - a reviewer reply devin ended at the model's output-token limit is its own class: devinPrint keeps the exit code, stdout and the export devin wrote, and throws OutputLimitReached (tools/output-limit.ts); the validator records the try REJECTED, its output DECLARED cut, E-5 NOT_ATTEMPTED opening with OUTPUT_LIMIT, the partial reply kept whole and purgeable; the PWA reader, the run report and the replay recorder read it as its own class"
+	},
+	{
+		id: "P5A-M10-the-class-carries-the-raw-rejection",
+		file: "apps/rph-demo/src/lib/server/tools/devin-reviewer.ts",
+		find: "new OutputLimitReached(diagnostic, cut)",
+		replace: "new OutputLimitReached(`devin invocation failed: ${raw}`, cut)",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-reviewer.test.ts"],
+		why: "PROMISE: the class's message is the diagnostic every failure carries, the prompt measured out of it (diagnosticCarriesPrompt). WHO RELIES: E-5's detail and the floor's VALIDATOR_EXECUTION_FAILED (PER-12). WHAT THE MUTATION DOES: the class carries the raw rejection, the prompt with it when stderr echoed it. OBSERVED (bun run mutants -- P5A-M1 to P5A-M11 by their full ids, 2026-10-18, re-measured after devinPrint came to read devin's sentence in the rejection's message rather than bind stderr (REG-Q-066), the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M10-the-class-carries-the-raw-rejection ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F1) - a reviewer reply devin ended at the model's output-token limit is its own class: devinPrint keeps the exit code, stdout and the export devin wrote, and throws OutputLimitReached (tools/output-limit.ts); the validator records the try REJECTED, its output DECLARED cut, E-5 NOT_ATTEMPTED opening with OUTPUT_LIMIT, the partial reply kept whole and purgeable; the PWA reader, the run report and the replay recorder read it as its own class"
+	},
+	{
+		id: "P5A-M11-the-model-the-export-names-is-dropped",
+		file: "apps/rph-demo/src/lib/server/tools/devin-reviewer.ts",
+		find: "...(reported ? { producer: { agentId: 'devin', modelId: reported, providerId: 'devin' } } : {}),",
+		replace: "...{},",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-reviewer.test.ts"],
+		why: "PROMISE: the model the export names travels with the cut, so its record is graded PROVIDER_REPORTED. WHO RELIES: the record's E-3. WHAT THE MUTATION DOES: the reported model is dropped. OBSERVED (bun run mutants -- P5A-M1 to P5A-M11 by their full ids, 2026-10-18, re-measured after devinPrint came to read devin's sentence in the rejection's message rather than bind stderr (REG-Q-066), the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M11-the-model-the-export-names-is-dropped ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F1) - a reviewer reply devin ended at the model's output-token limit is its own class: devinPrint keeps the exit code, stdout and the export devin wrote, and throws OutputLimitReached (tools/output-limit.ts); the validator records the try REJECTED, its output DECLARED cut, E-5 NOT_ATTEMPTED opening with OUTPUT_LIMIT, the partial reply kept whole and purgeable; the PWA reader, the run report and the replay recorder read it as its own class"
+	},
+	{
+		id: "P5A-M12-the-class-is-read-by-its-marker-alone",
+		file: "apps/rph-demo/src/lib/server/tools/output-limit.ts",
+		find: "if (s.outputTruncation !== 'DECLARED' || !detail.startsWith(OUTPUT_LIMIT)) return undefined;",
+		replace: "if (!detail.startsWith(OUTPUT_LIMIT)) return undefined;",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/output-limit-reviewer-call.test.ts"],
+		why: "PROMISE: the class is read from a stored record by the PAIR the validator writes together - outputTruncation DECLARED and the marker opening E-5. WHO RELIES: the PWA reader, the run report and the recorder. WHAT THE MUTATION DOES: the marker alone is read. OBSERVED (bun run mutants -- the P5 package A F1 entries and P76F-C-M17 by their full ids, 2026-10-18, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M12-the-class-is-read-by-its-marker-alone ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F1) - a reviewer reply devin ended at the model's output-token limit is its own class: devinPrint keeps the exit code, stdout and the export devin wrote, and throws OutputLimitReached (tools/output-limit.ts); the validator records the try REJECTED, its output DECLARED cut, E-5 NOT_ATTEMPTED opening with OUTPUT_LIMIT, the partial reply kept whole and purgeable; the PWA reader, the run report and the replay recorder read it as its own class"
+	},
+	{
+		id: "P5A-M13-the-class-is-read-by-its-truncation-alone",
+		file: "apps/rph-demo/src/lib/server/tools/output-limit.ts",
+		find: "if (s.outputTruncation !== 'DECLARED' || !detail.startsWith(OUTPUT_LIMIT)) return undefined;",
+		replace: "if (s.outputTruncation !== 'DECLARED') return undefined;",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/output-limit-reviewer-call.test.ts"],
+		why: "PROMISE: the same pair - its other half. WHO RELIES: the same readers. WHAT THE MUTATION DOES: E-4 alone is read. OBSERVED (bun run mutants -- the P5 package A F1 entries and P76F-C-M17 by their full ids, 2026-10-18, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M13-the-class-is-read-by-its-truncation-alone ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F1) - a reviewer reply devin ended at the model's output-token limit is its own class: devinPrint keeps the exit code, stdout and the export devin wrote, and throws OutputLimitReached (tools/output-limit.ts); the validator records the try REJECTED, its output DECLARED cut, E-5 NOT_ATTEMPTED opening with OUTPUT_LIMIT, the partial reply kept whole and purgeable; the PWA reader, the run report and the replay recorder read it as its own class"
+	},
+	{
+		id: "P5A-M14-the-recorded-output-tokens-are-not-read-back",
+		file: "apps/rph-demo/src/lib/server/tools/output-limit.ts",
+		find: "outputTokens: tokens === undefined || tokens === NOT_REPORTED ? null : Number(tokens)",
+		replace: "outputTokens: null",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/output-limit-reviewer-call.test.ts"],
+		why: "PROMISE: outputLimitOf reads back the output tokens E-5 wrote. WHO RELIES: the recorder, which replays the cut with them. WHAT THE MUTATION DOES: the count reads as not reported. OBSERVED (bun run mutants -- the P5 package A F1 entries and P76F-C-M17 by their full ids, 2026-10-18, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M14-the-recorded-output-tokens-are-not-read-back ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F1) - a reviewer reply devin ended at the model's output-token limit is its own class: devinPrint keeps the exit code, stdout and the export devin wrote, and throws OutputLimitReached (tools/output-limit.ts); the validator records the try REJECTED, its output DECLARED cut, E-5 NOT_ATTEMPTED opening with OUTPUT_LIMIT, the partial reply kept whole and purgeable; the PWA reader, the run report and the replay recorder read it as its own class"
+	},
+	{
+		id: "P5A-M15-the-detail-drops-the-output-tokens",
+		file: "apps/rph-demo/src/lib/server/tools/output-limit.ts",
+		find: "output_tokens ${o.facts.outputTokens ?? NOT_REPORTED}",
+		replace: "output_tokens ${NOT_REPORTED}",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/output-limit-reviewer-call.test.ts"],
+		why: "PROMISE: E-5's detail says what the tool counted of the cut. WHO RELIES: a reader of the record, and outputLimitOf. WHAT THE MUTATION DOES: the count is written as not reported. OBSERVED (bun run mutants -- the P5 package A F1 entries and P76F-C-M17 by their full ids, 2026-10-18, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M15-the-detail-drops-the-output-tokens ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F1) - a reviewer reply devin ended at the model's output-token limit is its own class: devinPrint keeps the exit code, stdout and the export devin wrote, and throws OutputLimitReached (tools/output-limit.ts); the validator records the try REJECTED, its output DECLARED cut, E-5 NOT_ATTEMPTED opening with OUTPUT_LIMIT, the partial reply kept whole and purgeable; the PWA reader, the run report and the replay recorder read it as its own class"
+	},
+	{
+		id: "P5A-M16-a-cut-call-is-recorded-as-a-call-with-no-reply",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "e.partialReply,\n\t\t\t\t\t\t\t'rejected',",
+		replace: "'',\n\t\t\t\t\t\t\t'no-response',",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/output-limit-reviewer-call.test.ts"],
+		why: "PROMISE: a cut call is recorded REJECTED - a reply arrived and nothing is judged from it - never NO_RESPONSE. WHO RELIES: every reader of the record; P5's 7 cut calls read 'with no reply'. WHAT THE MUTATION DOES: the cut is captured as a call with no reply, its reply dropped. OBSERVED (bun run mutants -- the P5 package A F1 entries and P76F-C-M17 by their full ids, 2026-10-18, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M16-a-cut-call-is-recorded-as-a-call-with-no-reply ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F1) - a reviewer reply devin ended at the model's output-token limit is its own class: devinPrint keeps the exit code, stdout and the export devin wrote, and throws OutputLimitReached (tools/output-limit.ts); the validator records the try REJECTED, its output DECLARED cut, E-5 NOT_ATTEMPTED opening with OUTPUT_LIMIT, the partial reply kept whole and purgeable; the PWA reader, the run report and the replay recorder read it as its own class"
+	},
+	{
+		id: "P5A-M17-a-cut-reply-is-separated-as-an-answered-one",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "...(e.sessionExport === undefined ? {} : { sessionExport: e.sessionExport })\n\t\t\t\t\t\t\t},\n\t\t\t\t\t\t\ttrue\n",
+		replace: "...(e.sessionExport === undefined ? {} : { sessionExport: e.sessionExport })\n\t\t\t\t\t\t\t},\n\t\t\t\t\t\t\tfalse\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/output-limit-reviewer-call.test.ts"],
+		why: "PROMISE: the cut reply is captured as cut - kept whole, its output declared cut (cutAtOutputLimit). WHO RELIES: the record's E-2 and E-4. WHAT THE MUTATION DOES: the capture is not told, and a located span is kept as an answer. OBSERVED (bun run mutants -- the P5 package A F1 entries and P76F-C-M17 by their full ids, 2026-10-18, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M17-a-cut-reply-is-separated-as-an-answered-one ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F1) - a reviewer reply devin ended at the model's output-token limit is its own class: devinPrint keeps the exit code, stdout and the export devin wrote, and throws OutputLimitReached (tools/output-limit.ts); the validator records the try REJECTED, its output DECLARED cut, E-5 NOT_ATTEMPTED opening with OUTPUT_LIMIT, the partial reply kept whole and purgeable; the PWA reader, the run report and the replay recorder read it as its own class"
+	},
+	{
+		id: "P5A-M18-a-cut-calls-identity-is-the-configured-one",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "? { modelId: e.producer.modelId, providerId: e.producer.providerId, evidence: 'PROVIDER_REPORTED' }",
+		replace: "? configured",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/output-limit-reviewer-call.test.ts"],
+		why: "PROMISE: a cut call's record carries the model its export named, graded PROVIDER_REPORTED. WHO RELIES: E-3. WHAT THE MUTATION DOES: the host's configured identity, ungraded, as for a call that reported nothing. OBSERVED (bun run mutants -- P5A-M18 by its full id, 2026-10-18, re-formed after its first form, model: false && e.producer, did not compile (TS18046: 'e' is of type 'unknown'), the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M18-a-cut-calls-identity-is-the-configured-one ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F1) - a reviewer reply devin ended at the model's output-token limit is its own class: devinPrint keeps the exit code, stdout and the export devin wrote, and throws OutputLimitReached (tools/output-limit.ts); the validator records the try REJECTED, its output DECLARED cut, E-5 NOT_ATTEMPTED opening with OUTPUT_LIMIT, the partial reply kept whole and purgeable; the PWA reader, the run report and the replay recorder read it as its own class"
+	},
+	{
+		id: "P5A-M19-a-cut-calls-export-is-not-kept",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "...(e.sessionExport === undefined ? {} : { sessionExport: e.sessionExport })",
+		replace: "...{}",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/output-limit-reviewer-call.test.ts"],
+		why: "PROMISE: the export devin wrote for a cut call is kept and pointed at. WHO RELIES: anyone diagnosing the cut. WHAT THE MUTATION DOES: it is not kept. OBSERVED (bun run mutants -- the P5 package A F1 entries and P76F-C-M17 by their full ids, 2026-10-18, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M19-a-cut-calls-export-is-not-kept ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F1) - a reviewer reply devin ended at the model's output-token limit is its own class: devinPrint keeps the exit code, stdout and the export devin wrote, and throws OutputLimitReached (tools/output-limit.ts); the validator records the try REJECTED, its output DECLARED cut, E-5 NOT_ATTEMPTED opening with OUTPUT_LIMIT, the partial reply kept whole and purgeable; the PWA reader, the run report and the replay recorder read it as its own class"
+	},
+	{
+		id: "P5A-M20-a-cut-calls-observation-claims-no-reply",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "observation: e.observedToolCalls,",
+		replace: "observation: THROWN_CALL_OBSERVATION,",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/output-limit-reviewer-call.test.ts"],
+		why: "PROMISE: a cut call's record states the tool's own observation, never the thrown call's 'with no reply'. WHO RELIES: the record's R11 report. WHAT THE MUTATION DOES: the thrown call's sentence. OBSERVED (bun run mutants -- the P5 package A F1 entries and P76F-C-M17 by their full ids, 2026-10-18, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M20-a-cut-calls-observation-claims-no-reply ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F1) - a reviewer reply devin ended at the model's output-token limit is its own class: devinPrint keeps the exit code, stdout and the export devin wrote, and throws OutputLimitReached (tools/output-limit.ts); the validator records the try REJECTED, its output DECLARED cut, E-5 NOT_ATTEMPTED opening with OUTPUT_LIMIT, the partial reply kept whole and purgeable; the PWA reader, the run report and the replay recorder read it as its own class"
+	},
+	{
+		id: "P5A-M21-a-cut-reply-is-separated-as-an-answer",
+		file: "apps/rph-demo/src/lib/server/assurance/exchange-capture.ts",
+		find: "if (input.cutAtOutputLimit) {",
+		replace: "if (input.cutAtOutputLimit && !span.located) {",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/output-limit-reviewer-call.test.ts"],
+		why: "PROMISE: a reply the tool cut is kept WHOLE, purgeable, whatever span can be located in it. WHO RELIES: PER-8 - a span the cut left participated in nothing. WHAT THE MUTATION DOES: a cut reply with a located span is separated, its span kept RETAINED_BY_PARTICIPATION. OBSERVED (bun run mutants -- the P5 package A F1 entries and P76F-C-M17 by their full ids, 2026-10-18, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M21-a-cut-reply-is-separated-as-an-answer ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F1) - a reviewer reply devin ended at the model's output-token limit is its own class: devinPrint keeps the exit code, stdout and the export devin wrote, and throws OutputLimitReached (tools/output-limit.ts); the validator records the try REJECTED, its output DECLARED cut, E-5 NOT_ATTEMPTED opening with OUTPUT_LIMIT, the partial reply kept whole and purgeable; the PWA reader, the run report and the replay recorder read it as its own class"
+	},
+	{
+		id: "P5A-M22-a-cut-replys-output-is-not-declared-cut",
+		file: "apps/rph-demo/src/lib/server/assurance/exchange-capture.ts",
+		find: "const cutOutput = input.cutAtOutputLimit ? { outputTruncationState: 'declared' as const } : {};",
+		replace: "const cutOutput = {};",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/output-limit-reviewer-call.test.ts"],
+		why: "PROMISE: E-4 of a cut reply says its output was declared truncated. WHO RELIES: outputLimitOf and every reader. WHAT THE MUTATION DOES: E-4 stays unknown. OBSERVED (bun run mutants -- the P5 package A F1 entries and P76F-C-M17 by their full ids, 2026-10-18, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M22-a-cut-replys-output-is-not-declared-cut ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F1) - a reviewer reply devin ended at the model's output-token limit is its own class: devinPrint keeps the exit code, stdout and the export devin wrote, and throws OutputLimitReached (tools/output-limit.ts); the validator records the try REJECTED, its output DECLARED cut, E-5 NOT_ATTEMPTED opening with OUTPUT_LIMIT, the partial reply kept whole and purgeable; the PWA reader, the run report and the replay recorder read it as its own class"
+	},
+	{
+		id: "P5A-M23-one-truncation-state-answers-input-and-output",
+		file: "apps/rph-demo/src/lib/server/assurance/exchange-recorder.ts",
+		find: "outputTruncation: TRUNCATION[rec.outputTruncationState ?? rec.truncationState],",
+		replace: "outputTruncation: TRUNCATION[rec.truncationState],",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/output-limit-reviewer-call.test.ts"],
+		why: "PROMISE: the projection carries the output's own truncation state when it has one. WHO RELIES: the stored record's outputTruncation, half of the class. WHAT THE MUTATION DOES: one state answers both, as before. OBSERVED (bun run mutants -- the P5 package A F1 entries and P76F-C-M17 by their full ids, 2026-10-18, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M23-one-truncation-state-answers-input-and-output ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F1) - a reviewer reply devin ended at the model's output-token limit is its own class: devinPrint keeps the exit code, stdout and the export devin wrote, and throws OutputLimitReached (tools/output-limit.ts); the validator records the try REJECTED, its output DECLARED cut, E-5 NOT_ATTEMPTED opening with OUTPUT_LIMIT, the partial reply kept whole and purgeable; the PWA reader, the run report and the replay recorder read it as its own class"
+	},
+	{
+		id: "P5A-M24-a-cut-call-is-taken-for-the-first-reply",
+		file: "apps/rph-demo/src/lib/server/assurance/reviewer-answer.ts",
+		find: "const asked = sorted.find((r) => tryState(r).disposition !== 'NO_RESPONSE' && outputLimitOf(r.state) === undefined);",
+		replace: "const asked = sorted.find((r) => tryState(r).disposition !== 'NO_RESPONSE');",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/reviewer-answer.test.ts"],
+		why: "PROMISE: the first reply a review read is past a cut call as it is past a thrown one. WHO RELIES: the PWA page's panel under a review whose first call was cut and whose retry answered no criterion. WHAT THE MUTATION DOES: the cut call is taken for the first reply, and the I5 chain behind it goes unseen. OBSERVED (bun run mutants -- the P5 package A F1 entries and P76F-C-M17 by their full ids, 2026-10-18, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M24-a-cut-call-is-taken-for-the-first-reply ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F1) - a reviewer reply devin ended at the model's output-token limit is its own class: devinPrint keeps the exit code, stdout and the export devin wrote, and throws OutputLimitReached (tools/output-limit.ts); the validator records the try REJECTED, its output DECLARED cut, E-5 NOT_ATTEMPTED opening with OUTPUT_LIMIT, the partial reply kept whole and purgeable; the PWA reader, the run report and the replay recorder read it as its own class"
+	},
+	{
+		id: "P5A-M25-a-cut-repair-is-read-as-a-substitute",
+		file: "apps/rph-demo/src/lib/server/assurance/reviewer-answer.ts",
+		find: "if (outputLimitOf(ended) !== undefined) return asked;",
+		replace: "",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/reviewer-answer.test.ts"],
+		why: "PROMISE: an I5 criterion repair the tool cut kept the first reply's judgement. WHO RELIES: the page's panel. WHAT THE MUTATION DOES: the cut repair, REJECTED and NOT_ATTEMPTED, is read as a substitute refused unread, and shown. OBSERVED (bun run mutants -- the P5 package A F1 entries and P76F-C-M17 by their full ids, 2026-10-18, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M25-a-cut-repair-is-read-as-a-substitute ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F1) - a reviewer reply devin ended at the model's output-token limit is its own class: devinPrint keeps the exit code, stdout and the export devin wrote, and throws OutputLimitReached (tools/output-limit.ts); the validator records the try REJECTED, its output DECLARED cut, E-5 NOT_ATTEMPTED opening with OUTPUT_LIMIT, the partial reply kept whole and purgeable; the PWA reader, the run report and the replay recorder read it as its own class"
+	},
+	{
+		id: "P5A-M26-a-cut-call-reads-as-a-refused-substitute",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "if (outputLimitOf(top.state) !== undefined)",
+		replace: "if (outputLimitOf(top.state) !== undefined && role === '')",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: the run report labels a review that ended on a cut reply output-limit. WHO RELIES: the report's pairing and stage 4. WHAT THE MUTATION DOES: the cut falls to the REJECTED branch and reads 'answered by a model other than the one configured, and refused unread'. OBSERVED (bun run mutants -- the P5 package A F1 entries and P76F-C-M17 by their full ids, 2026-10-18, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M26-a-cut-call-reads-as-a-refused-substitute ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F1) - a reviewer reply devin ended at the model's output-token limit is its own class: devinPrint keeps the exit code, stdout and the export devin wrote, and throws OutputLimitReached (tools/output-limit.ts); the validator records the try REJECTED, its output DECLARED cut, E-5 NOT_ATTEMPTED opening with OUTPUT_LIMIT, the partial reply kept whole and purgeable; the PWA reader, the run report and the replay recorder read it as its own class"
+	},
+	{
+		id: "P5A-M27-the-reports-first-reply-is-a-cut-one",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "const asked = sorted.find((x) => str(x.state.disposition) !== 'NO_RESPONSE' && outputLimitOf(x.state) === undefined);",
+		replace: "const asked = sorted.find((x) => str(x.state.disposition) !== 'NO_RESPONSE');",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: the report's I5 reading starts past a cut call. WHO RELIES: criterionRepairConclusion. WHAT THE MUTATION DOES: the cut call is the first reply, and the I5 chain reads as a refusal. OBSERVED (bun run mutants -- the P5 package A F1 entries and P76F-C-M17 by their full ids, 2026-10-18, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M27-the-reports-first-reply-is-a-cut-one ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F1) - a reviewer reply devin ended at the model's output-token limit is its own class: devinPrint keeps the exit code, stdout and the export devin wrote, and throws OutputLimitReached (tools/output-limit.ts); the validator records the try REJECTED, its output DECLARED cut, E-5 NOT_ATTEMPTED opening with OUTPUT_LIMIT, the partial reply kept whole and purgeable; the PWA reader, the run report and the replay recorder read it as its own class"
+	},
+	{
+		id: "P5A-M28-a-cut-criterion-repair-concludes-nothing",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "else if (outputLimitOf(last?.state) !== undefined) how = 'was cut at the model’s output-token limit';",
+		replace: "else if (outputLimitOf(last?.state) !== undefined && repairEnded === '') how = 'was cut at the model’s output-token limit';",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: an I5 repair the tool cut ended without concluding, and the report says so. WHO RELIES: the report's pairing. WHAT THE MUTATION DOES: the cut repair concludes the review as a substitute's refusal. OBSERVED (bun run mutants -- the P5 package A F1 entries and P76F-C-M17 by their full ids, 2026-10-18, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M28-a-cut-criterion-repair-concludes-nothing ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F1) - a reviewer reply devin ended at the model's output-token limit is its own class: devinPrint keeps the exit code, stdout and the export devin wrote, and throws OutputLimitReached (tools/output-limit.ts); the validator records the try REJECTED, its output DECLARED cut, E-5 NOT_ATTEMPTED opening with OUTPUT_LIMIT, the partial reply kept whole and purgeable; the PWA reader, the run report and the replay recorder read it as its own class"
+	},
+	{
+		id: "P5A-M29-the-recorder-reads-a-cut-reply-as-an-answer",
+		file: "scripts/phase7/record-replay-core.ts",
+		find: "const cut = outputLimitOf(row.state);",
+		replace: "const cut = outputLimitOf(undefined);",
+		expectRed: ["verif/phase7-record-replay.test.ts"],
+		why: "PROMISE: the recorder records a cut review call as OUTPUT_LIMIT. WHO RELIES: the replay, which would hand an ANSWERED partial reply to the validator to parse and repair - a call the recorded run never made. WHAT THE MUTATION DOES: the cut is recorded ANSWERED. OBSERVED (bun run mutants -- the P5 package A F1 entries and P76F-C-M17 by their full ids, 2026-10-18, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M29-the-recorder-reads-a-cut-reply-as-an-answer ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F1) - a reviewer reply devin ended at the model's output-token limit is its own class: devinPrint keeps the exit code, stdout and the export devin wrote, and throws OutputLimitReached (tools/output-limit.ts); the validator records the try REJECTED, its output DECLARED cut, E-5 NOT_ATTEMPTED opening with OUTPUT_LIMIT, the partial reply kept whole and purgeable; the PWA reader, the run report and the replay recorder read it as its own class"
+	},
+	{
+		id: "P5A-M30-a-recorded-cut-is-not-read",
+		file: "apps/rph-demo/src/lib/server/replay/recording.ts",
+		find: "case 'OUTPUT_LIMIT':",
+		replace: "case 'OUTPUT_LIMIT_UNREAD':",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/recording.test.ts"],
+		why: "PROMISE: a recording holding a cut reply reads back whole. WHO RELIES: every replay of a run with a cut call. WHAT THE MUTATION DOES: the form is unknown, and the recording is refused whole. OBSERVED (bun run mutants -- the P5 package A F1 entries and P76F-C-M17 by their full ids, 2026-10-18, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M30-a-recorded-cut-is-not-read ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F1) - a reviewer reply devin ended at the model's output-token limit is its own class: devinPrint keeps the exit code, stdout and the export devin wrote, and throws OutputLimitReached (tools/output-limit.ts); the validator records the try REJECTED, its output DECLARED cut, E-5 NOT_ATTEMPTED opening with OUTPUT_LIMIT, the partial reply kept whole and purgeable; the PWA reader, the run report and the replay recorder read it as its own class"
+	},
+	{
+		id: "P5A-M31-a-recorded-free-text-finish-reason-is-read",
+		file: "apps/rph-demo/src/lib/server/replay/recording.ts",
+		find: "if (v.finishReason !== null && !(isString(v.finishReason) && FINISH_REASON_SHAPE.test(v.finishReason)))",
+		replace: "if (v.finishReason !== null && !isString(v.finishReason))",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/recording.test.ts"],
+		why: "PROMISE: a recorded finish reason is a bounded token or null. WHO RELIES: the replayed record's E-5 detail. WHAT THE MUTATION DOES: any string is read. OBSERVED (bun run mutants -- the P5 package A F1 entries and P76F-C-M17 by their full ids, 2026-10-18, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M31-a-recorded-free-text-finish-reason-is-read ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F1) - a reviewer reply devin ended at the model's output-token limit is its own class: devinPrint keeps the exit code, stdout and the export devin wrote, and throws OutputLimitReached (tools/output-limit.ts); the validator records the try REJECTED, its output DECLARED cut, E-5 NOT_ATTEMPTED opening with OUTPUT_LIMIT, the partial reply kept whole and purgeable; the PWA reader, the run report and the replay recorder read it as its own class"
+	},
+	{
+		id: "P5A-M32-a-recorded-negative-count-is-read",
+		file: "apps/rph-demo/src/lib/server/replay/recording.ts",
+		find: "if (v.outputTokens !== null && !isCount(v.outputTokens))",
+		replace: "if (v.outputTokens !== null && typeof v.outputTokens !== 'number')",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/recording.test.ts"],
+		why: "PROMISE: a recorded output-token count is a count or null. WHO RELIES: the replayed record. WHAT THE MUTATION DOES: any number is read. OBSERVED (bun run mutants -- the P5 package A F1 entries and P76F-C-M17 by their full ids, 2026-10-18, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M32-a-recorded-negative-count-is-read ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F1) - a reviewer reply devin ended at the model's output-token limit is its own class: devinPrint keeps the exit code, stdout and the export devin wrote, and throws OutputLimitReached (tools/output-limit.ts); the validator records the try REJECTED, its output DECLARED cut, E-5 NOT_ATTEMPTED opening with OUTPUT_LIMIT, the partial reply kept whole and purgeable; the PWA reader, the run report and the replay recorder read it as its own class"
+	},
+	{
+		id: "P5A-M33-a-recorded-cut-is-served-as-a-reply",
+		file: "apps/rph-demo/src/lib/server/replay/replay-run.ts",
+		find: "if (call.reply.status === 'OUTPUT_LIMIT')",
+		replace: "if (call.reply.status === 'OUTPUT_LIMIT' && call.elapsedMs < 0)",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replay-reviewer.test.ts"],
+		why: "PROMISE: a recorded cut is thrown again as the product's class. WHO RELIES: the replay, whose replayed try must be recorded as the run's was. WHAT THE MUTATION DOES: the cut is served as an empty reply - parsed, failed, repaired. OBSERVED (bun run mutants -- the P5 package A F1 entries and P76F-C-M17 by their full ids, 2026-10-18, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M33-a-recorded-cut-is-served-as-a-reply ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F1) - a reviewer reply devin ended at the model's output-token limit is its own class: devinPrint keeps the exit code, stdout and the export devin wrote, and throws OutputLimitReached (tools/output-limit.ts); the validator records the try REJECTED, its output DECLARED cut, E-5 NOT_ATTEMPTED opening with OUTPUT_LIMIT, the partial reply kept whole and purgeable; the PWA reader, the run report and the replay recorder read it as its own class"
+	},
+	{
+		id: "P5A-M34-a-recorded-cut-is-not-weighed-against-the-bound",
+		file: "apps/rph-demo/src/lib/server/replay/replay-run.ts",
+		find: "if ((call.reply.status !== 'THROWN' && call.reply.status !== 'OUTPUT_LIMIT') || call.role === 'retry') return;",
+		replace: "if (call.reply.status !== 'THROWN' || call.role === 'retry') return;",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replay-reviewer.test.ts"],
+		why: "PROMISE: a recorded cut is a thrown call, disposed by the product's bound as one is (finding 8). WHO RELIES: replayRunFor, which refuses a recording made under another bound. WHAT THE MUTATION DOES: a cut is not weighed. OBSERVED (bun run mutants -- the P5 package A F1 entries and P76F-C-M17 by their full ids, 2026-10-18, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M34-a-recorded-cut-is-not-weighed-against-the-bound ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F1) - a reviewer reply devin ended at the model's output-token limit is its own class: devinPrint keeps the exit code, stdout and the export devin wrote, and throws OutputLimitReached (tools/output-limit.ts); the validator records the try REJECTED, its output DECLARED cut, E-5 NOT_ATTEMPTED opening with OUTPUT_LIMIT, the partial reply kept whole and purgeable; the PWA reader, the run report and the replay recorder read it as its own class"
+	},
+	{
+		id: "P5A-M35-a-cut-reply-reads-as-a-transport-failure",
+		file: "scripts/reviewer-qual/transports.ts",
+		find: "if (e instanceof OutputLimitReached) throw e;",
+		replace: "",
+		expectRed: ["verif/reviewer-qualification-transports.test.ts"],
+		why: "PROMISE: the devin transport passes the product's class on, for the runner to record as one. WHO RELIES: the qualification record. WHAT THE MUTATION DOES: every throw is classified by the clock - P4's 'devin failed after N ms', a REFUSAL. OBSERVED (bun run mutants -- the P5 package A F2 entries by their full ids, 2026-10-18, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M35-a-cut-reply-reads-as-a-transport-failure ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F2) - the reviewer qualification records a reply the tool cut at the model's output-token limit as its own class (CallReply OUTPUT_LIMIT), never TRANSPORT_FAILURE / REFUSAL; old lines keep their meaning (REG-D-086); the check reads it as it reads a transport failure: measured, never re-scored, a Boundedness failure"
+	},
+	{
+		id: "P5A-M36-a-cut-reply-is-the-harnesss-fault",
+		file: "scripts/reviewer-qual/runner.ts",
+		find: "else if (e instanceof OutputLimitReached)\n",
+		replace: "else if (e instanceof OutputLimitReached && e.message === '')\n",
+		expectRed: ["verif/reviewer-qualification-runner.test.ts"],
+		why: "PROMISE: the runner records a cut reply as OUTPUT_LIMIT. WHO RELIES: the candidate, who is never charged with the harness's fault and whose cut call must be on the record. WHAT THE MUTATION DOES: the cut is read as the harness's fault and the run stops. OBSERVED (bun run mutants -- the P5 package A F2 entries by their full ids, 2026-10-18, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M36-a-cut-reply-is-the-harnesss-fault ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F2) - the reviewer qualification records a reply the tool cut at the model's output-token limit as its own class (CallReply OUTPUT_LIMIT), never TRANSPORT_FAILURE / REFUSAL; old lines keep their meaning (REG-D-086); the check reads it as it reads a transport failure: measured, never re-scored, a Boundedness failure"
+	},
+	{
+		id: "P5A-M37-a-cut-replys-refusal-calls-it-a-transport-failure",
+		file: "scripts/reviewer-qual/runner.ts",
+		find: "'an OUTPUT_LIMIT is not re-scorable: the tool cut the reply at the model’s output-token limit, and nothing of it was kept'",
+		replace: "'a TRANSPORT_FAILURE is not re-scorable: the call returned nothing to replay'",
+		expectRed: ["verif/reviewer-qualification-runner.test.ts"],
+		why: "PROMISE: a cut line is refused for replay in its own words. WHO RELIES: a RESCORED writer and the check's reproduction limb. WHAT THE MUTATION DOES: the refusal calls the cut a transport failure. (Removing the refusal does not compile: replayText's type excludes the cut.) OBSERVED (bun run mutants -- the P5 package A F2 entries by their full ids, 2026-10-18, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M37-a-cut-replys-refusal-calls-it-a-transport-failure ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F2) - the reviewer qualification records a reply the tool cut at the model's output-token limit as its own class (CallReply OUTPUT_LIMIT), never TRANSPORT_FAILURE / REFUSAL; old lines keep their meaning (REG-D-086); the check reads it as it reads a transport failure: measured, never re-scored, a Boundedness failure"
+	},
+	{
+		id: "P5A-M38-the-record-refuses-a-cut-line",
+		file: "scripts/reviewer-qual/record.ts",
+		find: "case 'OUTPUT_LIMIT':",
+		replace: "case 'OUTPUT_LIMIT_UNREAD':",
+		expectRed: ["verif/reviewer-qualification-record.test.ts"],
+		why: "PROMISE: the record accepts an OUTPUT_LIMIT line. WHO RELIES: the runner, whose every line is checked before it is written. WHAT THE MUTATION DOES: the status is unknown, and a run with a cut call stops. OBSERVED (bun run mutants -- the P5 package A F2 entries by their full ids, 2026-10-18, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M38-the-record-refuses-a-cut-line ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F2) - the reviewer qualification records a reply the tool cut at the model's output-token limit as its own class (CallReply OUTPUT_LIMIT), never TRANSPORT_FAILURE / REFUSAL; old lines keep their meaning (REG-D-086); the check reads it as it reads a transport failure: measured, never re-scored, a Boundedness failure"
+	},
+	{
+		id: "P5A-M39-a-free-text-finish-reason-is-recorded",
+		file: "scripts/reviewer-qual/record.ts",
+		find: "finishReason: nullable(str(FINISH_REASON, 'a finish reason (a bounded token)')),",
+		replace: "finishReason: nullable(str()),",
+		expectRed: ["verif/reviewer-qualification-record.test.ts"],
+		why: "PROMISE: a line's finish reason is a bounded token or null (§5.3: no text outside what the record declares). WHO RELIES: the tracked record. WHAT THE MUTATION DOES: any string is admitted. OBSERVED (bun run mutants -- the P5 package A F2 entries by their full ids, 2026-10-18, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M39-a-free-text-finish-reason-is-recorded ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F2) - the reviewer qualification records a reply the tool cut at the model's output-token limit as its own class (CallReply OUTPUT_LIMIT), never TRANSPORT_FAILURE / REFUSAL; old lines keep their meaning (REG-D-086); the check reads it as it reads a transport failure: measured, never re-scored, a Boundedness failure"
+	},
+	{
+		id: "P5A-M40-a-negative-count-is-recorded",
+		file: "scripts/reviewer-qual/record.ts",
+		find: "outputTokens: nullable(int(0)),",
+		replace: "outputTokens: nullable(() => []),",
+		expectRed: ["verif/reviewer-qualification-record.test.ts"],
+		why: "PROMISE: a line's output tokens are a count or null. WHO RELIES: the tracked record. WHAT THE MUTATION DOES: anything is admitted. OBSERVED (bun run mutants -- the P5 package A F2 entries by their full ids, 2026-10-18, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M40-a-negative-count-is-recorded ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F2) - the reviewer qualification records a reply the tool cut at the model's output-token limit as its own class (CallReply OUTPUT_LIMIT), never TRANSPORT_FAILURE / REFUSAL; old lines keep their meaning (REG-D-086); the check reads it as it reads a transport failure: measured, never re-scored, a Boundedness failure"
+	},
+	{
+		id: "P5A-M41-a-cut-line-is-re-scorable",
+		file: "scripts/reviewer-qual/record.ts",
+		find: "rescorable: (x, a) => (x === false ? [] : [`${a}: a cut reply is never re-scorable`])",
+		replace: "rescorable: () => []",
+		expectRed: ["verif/reviewer-qualification-record.test.ts"],
+		why: "PROMISE: a cut line is never re-scorable. WHO RELIES: the RESCORED writer and limb 2. WHAT THE MUTATION DOES: a line claiming rescorable: true is admitted. OBSERVED (bun run mutants -- the P5 package A F2 entries by their full ids, 2026-10-18, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M41-a-cut-line-is-re-scorable  ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F2) - the reviewer qualification records a reply the tool cut at the model's output-token limit as its own class (CallReply OUTPUT_LIMIT), never TRANSPORT_FAILURE / REFUSAL; old lines keep their meaning (REG-D-086); the check reads it as it reads a transport failure: measured, never re-scored, a Boundedness failure"
+	},
+	{
+		id: "P5A-M42-a-cut-evaluation-is-re-stamped",
+		file: "scripts/reviewer-qual/record.ts",
+		find: "!calls.some((k) => k.reply.status === 'OUTPUT_LIMIT') &&",
+		replace: "true &&",
+		expectRed: ["verif/reviewer-qualification-record.test.ts"],
+		why: "PROMISE: an evaluation with a cut call is not one a RESCORED record re-stamps. WHO RELIES: rescore.ts rescoredLines and the check. WHAT THE MUTATION DOES: the cut is not asked. OBSERVED (bun run mutants -- the P5 package A F2 entries by their full ids, 2026-10-18, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M42-a-cut-evaluation-is-re-stamped ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F2) - the reviewer qualification records a reply the tool cut at the model's output-token limit as its own class (CallReply OUTPUT_LIMIT), never TRANSPORT_FAILURE / REFUSAL; old lines keep their meaning (REG-D-086); the check reads it as it reads a transport failure: measured, never re-scored, a Boundedness failure"
+	},
+	{
+		id: "P5A-M43-a-cut-reply-is-scored-as-an-answer",
+		file: "scripts/reviewer-qual/record.ts",
+		find: "reply.status === 'TRANSPORT_FAILURE' || reply.status === 'OUTPUT_LIMIT';",
+		replace: "reply.status === 'TRANSPORT_FAILURE';",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE: the check reads a cut reply as it reads a transport failure - measured, never re-scored, a Boundedness failure. WHO RELIES: limbs 2 and 3. WHAT THE MUTATION DOES: the predicate reads the cut as an answered call - re-scored (it cannot be), its verdict charged. OBSERVED (bun run mutants -- the P5 package A F2 entries by their full ids, 2026-10-18, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M43-a-cut-reply-is-scored-as-an-answer ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F2) - the reviewer qualification records a reply the tool cut at the model's output-token limit as its own class (CallReply OUTPUT_LIMIT), never TRANSPORT_FAILURE / REFUSAL; old lines keep their meaning (REG-D-086); the check reads it as it reads a transport failure: measured, never re-scored, a Boundedness failure"
+	},
+	{
+		id: "P5A-M44-the-records-finish-reason-bound-parts-from-the-products",
+		file: "scripts/reviewer-qual/record.ts",
+		find: "export const FINISH_REASON = /^[A-Za-z_]{1,40}$/;",
+		replace: "export const FINISH_REASON = /^[A-Za-z_]{1,80}$/;",
+		expectRed: ["verif/reviewer-qualification-record.test.ts"],
+		why: "PROMISE: the record's bound on a finish reason is the product's own (restated, since the record imports nothing). WHO RELIES: the restatement's reader. WHAT THE MUTATION DOES: the two part. OBSERVED (bun run mutants -- the P5 package A F2 entries by their full ids, 2026-10-18, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M44-the-records-finish-reason-bound-parts-from-the-products ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F2) - the reviewer qualification records a reply the tool cut at the model's output-token limit as its own class (CallReply OUTPUT_LIMIT), never TRANSPORT_FAILURE / REFUSAL; old lines keep their meaning (REG-D-086); the check reads it as it reads a transport failure: measured, never re-scored, a Boundedness failure"
+	},
+	{
+		id: "P5A-M45-the-check-re-scores-a-cut-reply",
+		file: "scripts/reviewer-qual/check-core.ts",
+		find: "const transportFailed = (e: Evaluation): boolean => e.calls.some((c) => noReplyToScore(c.reply));",
+		replace: "const transportFailed = (e: Evaluation): boolean => e.calls.some((c) => c.reply.status === 'TRANSPORT_FAILURE');",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE: the check asks the one predicate the record declares (noReplyToScore). WHO RELIES: limbs 2 and 3. WHAT THE MUTATION DOES: the check asks the old word alone, and a cut call is re-scored and charged. OBSERVED (bun run mutants -- the P5 package A F2 entries by their full ids, 2026-10-18, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5A-M45-the-check-re-scores-a-cut-reply ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package A (F2) - the reviewer qualification records a reply the tool cut at the model's output-token limit as its own class (CallReply OUTPUT_LIMIT), never TRANSPORT_FAILURE / REFUSAL; old lines keep their meaning (REG-D-086); the check reads it as it reads a transport failure: measured, never re-scored, a Boundedness failure"
 	}
 ];

@@ -13,7 +13,8 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { diagnosticCarriesPrompt } from './diagnostic-safety.js';
 import { answerFromText } from './backing-tool.js';
-import type { ToolInvocationResult } from './backing-tool.js';
+import type { AdapterToolObservation, ToolInvocationResult } from './backing-tool.js';
+import { FINISH_REASON_SHAPE, OutputLimitReached, type OutputLimitFacts } from './output-limit.js';
 
 const run = promisify(execFile);
 
@@ -96,6 +97,85 @@ const DENY_ALL_TOOLS_CONFIG = `${JSON.stringify(
 	null,
 	2
 )}\n`;
+
+/**
+ * ⭐ R11 — WHAT THIS ADAPTER CAN SEE OF TOOL CALLS: nothing, said in its own words on a call devin exited 0 from whose
+ * export named a model, and (P5 package A) on one whose reply devin ended at the output-token limit
+ * (`OutputLimitReached`). ⚠ ONLY THERE: an exit 0 whose export names no model is returned as the bare stdout, and every
+ * other failure is thrown without it.
+ */
+const DEVIN_TOOL_OBSERVATION: AdapterToolObservation = {
+	canObserve: false,
+	reason:
+		'The devin adapter runs `devin --print` to completion and reads its stdout and ATIF export. It ' +
+		'mints no tool surface and watches no session, so it is not in a position to observe tool ' +
+		'calls at all — neither its own (it has none) nor any the tool made internally. A reader must ' +
+		'not read this record as evidence that no command ran.'
+};
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7 P5, package A (F1) — DEVIN'S OWN SENTENCE FOR A REPLY IT ENDED AT THE MODEL'S OUTPUT-TOKEN LIMIT, on
+ * stderr after a non-zero exit. In P5's seven such records, verbatim: *"warning: response truncated (model hit max output
+ * token limit)"*, then *"Error: Response truncated: model hit max output token limit. The output above is incomplete."*
+ */
+export const DEVIN_OUTPUT_LIMIT = 'Response truncated: model hit max output token limit';
+
+/**
+ * ⭐ P5 package A (F1) — what devin's export says of its LAST agent step: the output tokens it counted
+ * (`metrics.completion_tokens`), and a finish reason where it gives one. ⚠ ATIF has no field for a finish reason, and devin
+ * puts its own additions in a step's `extra` (`generation_model`, `telemetry`), so that is where one is read. ⚠ NOT
+ * MEASURED: P5's 37 retained exports are all of calls that answered, and none carries one — so devin's sentence on stderr
+ * is what told P5's cut replies apart, and this the second way.
+ */
+function exportFacts(text: string | undefined): OutputLimitFacts {
+	let parsed: unknown;
+	try {
+		parsed = text === undefined ? undefined : JSON.parse(text);
+	} catch {
+		return {};
+	}
+	const steps = (parsed as { steps?: unknown } | undefined)?.steps;
+	if (!Array.isArray(steps)) return {};
+	const last = [...(steps as { source?: unknown }[])].reverse().find((s) => s?.source === 'agent') as
+		| { metrics?: { completion_tokens?: unknown }; extra?: { finish_reason?: unknown } }
+		| undefined;
+	const tokens = last?.metrics?.completion_tokens;
+	const reason = last?.extra?.finish_reason;
+	return {
+		...(typeof reason === 'string' && FINISH_REASON_SHAPE.test(reason) ? { finishReason: reason } : {}),
+		...(typeof tokens === 'number' && Number.isSafeInteger(tokens) && tokens >= 0 ? { outputTokens: tokens } : {})
+	};
+}
+
+/**
+ * ⭐⭐ P5 package A (F1) — A NON-ZERO EXIT WHOSE REPLY DEVIN ENDED AT THE MODEL'S OUTPUT-TOKEN LIMIT, or `undefined` for any
+ * other failure: told by devin's sentence, or by its export's finish reason. ⚠ The sentence is read in the rejection's
+ * MESSAGE (`raw`), where `execFile` writes devin's stderr after the command: the stream itself is bound nowhere here, so no
+ * retention surface for it is created (`REG-Q-066`). ⛔ ONLY AN EXIT: a kill at the bound carries a signal and no exit code,
+ * and a spawn that failed a string code — those stay what they were.
+ * ⭐ READ HERE, BEFORE THE `finally` REMOVES THE FOLDER: the export devin wrote, and what `execFile` keeps beside the
+ * message — the exit code and stdout, the reply devin printed before it cut it.
+ */
+async function devinOutputLimit(
+	e: unknown,
+	raw: string,
+	exportPath: string
+): Promise<ConstructorParameters<typeof OutputLimitReached>[1] | undefined> {
+	const failed = (e ?? {}) as { code?: unknown; stdout?: unknown };
+	if (typeof failed.code !== 'number' || failed.code === 0) return undefined;
+	const exported = await readFile(exportPath, 'utf8').catch(() => undefined);
+	const facts = exportFacts(exported);
+	const said = raw.includes(DEVIN_OUTPUT_LIMIT);
+	if (!said && facts.finishReason !== 'max_tokens') return undefined;
+	const reported = await readReportedModel(exportPath);
+	return {
+		facts,
+		partialReply: typeof failed.stdout === 'string' ? failed.stdout : '',
+		...(reported ? { producer: { agentId: 'devin', modelId: reported, providerId: 'devin' } } : {}),
+		observedToolCalls: DEVIN_TOOL_OBSERVATION,
+		...(exported === undefined ? {} : { sessionExport: exported })
+	};
+}
 
 /**
  * The exec seam — `AgyExec`'s shape (`assurance/agy-cli.ts`), for the same reason: without it the devin branch could be
@@ -197,7 +277,8 @@ export async function devinPrint(
 		// absence of evidence about the model; returning the bare string lets the caller record what the HOST
 		// configured, graded `HOST_CONFIGURED`, which is the honest fact.
 		// ⚠ DISCLOSED (P7-6 I2): an export that names no model is not carried either — the bare string has no field for
-		// it — and nor is the export of a call that FAILED (the throw below), whose cause is all the caller is handed.
+		// it — and nor is the export of a call that FAILED (the throw below), whose cause is all the caller is handed:
+		// ⭐ save (P5 package A) one whose reply devin ended at the output-token limit, which carries it (`OutputLimitReached`).
 		if (!reported) return stdout;
 		return {
 			// ⭐ `JAN-NOANS` — `execFile` RESOLVES ON EXIT 0, AND EXIT 0 WITH EMPTY STDOUT IS NOT AN ANSWER.
@@ -222,14 +303,7 @@ export async function devinPrint(
 			// completion and reads its stdout plus an ATIF export; it mints no tool surface of its own and
 			// watches no session, so anything devin did internally is devin's business and invisible here.
 			// ⛔ Saying NONE_OBSERVED would claim this adapter looked. It did not look.
-			observedToolCalls: {
-				canObserve: false,
-				reason:
-					'The devin adapter runs `devin --print` to completion and reads its stdout and ATIF export. It ' +
-					'mints no tool surface and watches no session, so it is not in a position to observe tool ' +
-					'calls at all — neither its own (it has none) nor any the tool made internally. A reader must ' +
-					'not read this record as evidence that no command ran.'
-			},
+			observedToolCalls: DEVIN_TOOL_OBSERVATION,
 			// ⭐ P7-6 I2 — devin's own record of the session, for the caller to retain (`ToolInvocationResult.sessionExport`).
 			...(sessionExport === undefined ? {} : { sessionExport })
 		};
@@ -238,12 +312,15 @@ export async function devinPrint(
 		// ⭑ THE MEASUREMENT. If the prompt somehow reached the diagnostic anyway, withhold it — PER-12 forbids
 		// projecting it and this codebase has no redaction. Otherwise the diagnostic is genuinely useful and
 		// destroying it would repeat agy's disclosed loss for no reason.
-		throw new Error(
-			diagnosticCarriesPrompt(raw, prompt)
-				? 'devin invocation failed. Its diagnostic is WITHHELD: it was measured to contain the prompt, ' +
-						'which may not reach the record plane (PER-12), and no redaction exists here.'
-				: `devin invocation failed: ${raw}`
-		);
+		const diagnostic = diagnosticCarriesPrompt(raw, prompt)
+			? 'devin invocation failed. Its diagnostic is WITHHELD: it was measured to contain the prompt, ' +
+				'which may not reach the record plane (PER-12), and no redaction exists here.'
+			: `devin invocation failed: ${raw}`;
+		// ⭐⭐ P5 package A (F1) — A REPLY DEVIN ENDED AT THE MODEL'S OUTPUT-TOKEN LIMIT IS THROWN AS ITS OWN CLASS, the same
+		// diagnostic its message, its partial reply, what the export counted and the export itself beside it
+		// (`devinOutputLimit`). Every other failure is thrown as before.
+		const cut = await devinOutputLimit(e, raw, exportPath);
+		throw cut === undefined ? new Error(diagnostic) : new OutputLimitReached(diagnostic, cut);
 	} finally {
 		await rm(dir, { recursive: true, force: true }).catch(() => undefined);
 	}

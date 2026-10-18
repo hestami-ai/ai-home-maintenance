@@ -64,6 +64,7 @@ import {
 	type CheckInputs,
 	type CheckReport
 } from '../scripts/reviewer-qual/check-core.js';
+import { OutputLimitReached } from '../apps/rph-demo/src/lib/server/tools/output-limit.js';
 import { main, REGISTER_FILE } from '../scripts/reviewer-qual/check.js';
 import { DECLARED_ORACLES_PROPOSED } from '../scripts/reviewer-qual/oracles-v5.js';
 import { reviewerFingerprintOf, sha256 } from '../scripts/reviewer-qual/digest.js';
@@ -301,6 +302,8 @@ async function recorded(o: {
 				if (!caseId) throw new Error('a prompt no case sends');
 				const k = n++;
 				const answer = (o.reply ?? asOracle)(caseId, k);
+				// ⭐ P5 package A (F2) — the product's class for a reply its tool cut, passed on as the devin transport passes it.
+				if (answer instanceof OutputLimitReached) throw answer;
 				if (answer instanceof Error) throw new TransportFailure('TIMEOUT', `cut at 240000 ms (${answer.message})`);
 				return { returned: answer, served: o.served?.(k) ?? null };
 			}
@@ -393,6 +396,27 @@ describe('JAN-CRITREAD J2-3 — limb 1, COVERAGE', () => {
 		const r = await check([file(lines)]);
 		expect(limb(r, 'COVERAGE')).toBe('');
 		expect(limb(r, 'ESCALATION')).toContain('G-CLEAN-R1 — BOUNDEDNESS');
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7 P5, package A (F2) — a reply the tool cut at the model's output-token limit is read as a transport
+	// failure is: MEASURED, never re-scored, a Boundedness failure — its line its own class (`OUTPUT_LIMIT`).
+	it('⭐ P5 A — a reply cut at the output-token limit counts as MEASURED, is never re-scored, and is escalated as a Boundedness failure', async () => {
+		const cut = new OutputLimitReached('devin invocation failed: (fixture)', {
+			facts: { outputTokens: 25_000 },
+			partialReply: '',
+			observedToolCalls: { canObserve: false, reason: 'The devin adapter cannot observe tool calls (fixture).' }
+		});
+		const lines = await recorded({ runId: 'qr-cut-1', reply: (id) => (id === 'G-CLEAN-R1' ? cut : asOracle(id)) });
+		expect(
+			lines.flatMap((l) => (l.kind === 'CALL' && l.caseId === 'G-CLEAN-R1' ? [l.reply.status] : [])),
+			'arrangement: the cut call is recorded as its own class'
+		).toEqual(['OUTPUT_LIMIT']);
+		const r = await check([file(lines)]);
+		expect(limb(r, 'COVERAGE')).toBe('');
+		// ⛔ THE MUTANT: the cut read as an answered evaluation — re-scored (it cannot be), and its verdict charged as wrong.
+		expect(limb(r, 'REPRODUCTION'), 'the check tried to re-score a cut reply').toBe('');
+		expect(limb(r, 'ESCALATION')).toContain('G-CLEAN-R1 — BOUNDEDNESS');
+		expect(limb(r, 'ESCALATION')).not.toContain('CLEAN_NOT_SATISFIED');
 	});
 
 	it('⛔ ONE SERVER-CLOCK DAY (REG-F-429) — an ollama run whose calls straddle the server’s midnight counts for nothing; within one day it covers', async () => {

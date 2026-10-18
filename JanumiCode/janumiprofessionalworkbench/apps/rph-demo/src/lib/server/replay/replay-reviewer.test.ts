@@ -53,6 +53,7 @@ import {
 	type ReviewerCall
 } from './recording.js';
 import {
+	boundDisagreements,
 	createReplayRun,
 	forgetReplayRuns,
 	REPLAY_EPOCH_MS,
@@ -256,6 +257,51 @@ describe('⭐ the replay reviewer — the product’s validator on recorded repl
 			records[1]!.respondedAt
 		]).toEqual([at(0), at(97_674), at(97_674), at(124_274)]);
 		expect(run.consumed().reviewer).toBe(2);
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7 P5, package A (F1) — A RECORDED REPLY THE TOOL CUT AT THE MODEL'S OUTPUT-TOKEN LIMIT IS CUT AGAIN: the
+	// product's class thrown, so the replayed try is recorded as the run's was, and its recorded time decides its retry.
+	it('⛔ P5 A — a recorded OUTPUT_LIMIT reply is thrown again as its class: the replayed try is the class, its retry the next reply', async () => {
+		const prompt = await promptOf();
+		const CUT = 'devin invocation failed: Error: Response truncated: model hit max output token limit.';
+		const run = createReplayRun(
+			recordingOf([
+				call(
+					prompt,
+					{ status: 'OUTPUT_LIMIT', message: CUT, partialReply: '{"findings":[', finishReason: null, outputTokens: 25_000 },
+					90_010
+				),
+				call(prompt, { status: 'ANSWERED', text: CLEAN }, 26_600, { role: 'retry' })
+			]),
+			() => '/unused'
+		);
+		const { validator, exchanges } = replayed(run);
+
+		const outcome = await settle(validator.evaluate(SUBJECT, CTX));
+
+		expect((outcome as { dispositionRecommendation?: string }).dispositionRecommendation).toBe('SATISFIED');
+		const records = exchanges.drain();
+		// ⛔ THE MUTANT: the cut served as a reply — parsed, failed, and repaired, a call the recorded run never made.
+		expect(records.map((r) => [r.exchangeRole, r.disposition, r.outputTruncationState])).toEqual([
+			['initial', 'rejected', 'declared'],
+			['retry', 'accepted', undefined]
+		]);
+		expect(records[0]!.parseOutcome.detail).toContain('after 90010 ms: finish_reason not reported, output_tokens 25000.');
+		expect(records[0]!.parseOutcome.detail).toContain(
+			`What the tool reported, sanitised: reasoning-review backing tool invocation failed: ${CUT}`
+		);
+		expect(run.consumed().reviewer).toBe(2);
+	});
+
+	it('⛔ P5 A — a recorded cut is disposed by the bound as a recorded throw is: one the run let stand short of it disagrees', async () => {
+		const prompt = await promptOf();
+		const cut: RecordedReply = { status: 'OUTPUT_LIMIT', message: 'cut', partialReply: '', finishReason: null, outputTokens: null };
+		// ⛔ THE MUTANT: a cut not weighed — a recording made under another bound replays, and asks for a call it does not hold.
+		expect(boundDisagreements(recordingOf([call(prompt, cut, 90_010), call(prompt, { status: 'ANSWERED', text: CLEAN }, 1)]), BOUND)).toHaveLength(1);
+		expect(
+			boundDisagreements(recordingOf([call(prompt, cut, 90_010), call(prompt, { status: 'ANSWERED', text: CLEAN }, 1, { role: 'retry' })]), BOUND),
+			'CONTROL — retried as the bound says: no disagreement'
+		).toEqual([]);
 	});
 
 	it('(ii) at the bound the recorded throw is a timeout: not run again, and the review fails as the run’s did', async () => {

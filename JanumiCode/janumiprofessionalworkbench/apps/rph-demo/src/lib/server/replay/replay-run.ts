@@ -38,6 +38,7 @@ import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { REVIEWER_CALL_BOUND_MS } from '../assurance/reasoning-review-validator.js';
 import { answerFromText, type ToolInvocationResult } from '../tools/backing-tool.js';
+import { OutputLimitReached } from '../tools/output-limit.js';
 import {
 	expandText,
 	instructionsSha256,
@@ -148,7 +149,9 @@ function replyText(call: ReviewerCall, expand: (s: string) => string): string {
 		case 'NO_ANSWER_SPAN':
 			return call.reply.parses ? 'null' : '';
 		case 'THROWN':
-			// Never reached: a THROWN reply is thrown again before its text is asked for (`reviewerPrint`).
+		case 'OUTPUT_LIMIT':
+			// Never reached: a THROWN reply, and (P5 package A) a cut one, is thrown again before its text is asked for
+			// (`reviewerPrint`).
 			return '';
 	}
 }
@@ -405,6 +408,17 @@ export function createReplayRun(
 			virtualMs += call.elapsedMs;
 			// ⭐ A RECORDED THROW IS THROWN AGAIN, with the tool's own message: the validator's seam sanitises it as it did.
 			if (call.reply.status === 'THROWN') throw new Error(expand(call.reply.message));
+			// ⭐ P5 package A (F1) — A RECORDED CUT IS CUT AGAIN: the product's class, the tool's message, the partial reply and
+			// what the tool reported of the cut — and, as for every replayed reply, no identity a provider reported.
+			if (call.reply.status === 'OUTPUT_LIMIT')
+				throw new OutputLimitReached(expand(call.reply.message), {
+					facts: {
+						...(call.reply.finishReason === null ? {} : { finishReason: call.reply.finishReason }),
+						...(call.reply.outputTokens === null ? {} : { outputTokens: call.reply.outputTokens })
+					},
+					partialReply: expand(call.reply.partialReply),
+					observedToolCalls: REPLAYED_REVIEW_OBSERVATION
+				});
 			const text = replyText(call, expand);
 			return {
 				answer: answerFromText(text),
@@ -439,7 +453,8 @@ export function productCallBoundFor(agentId: string): number | undefined {
 export function boundDisagreements(recording: Recording, bound: number | undefined): string[] {
 	const out: string[] = [];
 	recording.reviewer.forEach((call, index) => {
-		if (call.reply.status !== 'THROWN' || call.role === 'retry') return;
+		// ⭐ P5 package A (F1) — a recorded cut is a thrown call too, disposed by the same bound.
+		if ((call.reply.status !== 'THROWN' && call.reply.status !== 'OUTPUT_LIMIT') || call.role === 'retry') return;
 		const recordedRetry = recording.reviewer[index + 1]?.role === 'retry';
 		const productRetries = bound !== undefined && call.elapsedMs < bound;
 		if (recordedRetry === productRetries) return;

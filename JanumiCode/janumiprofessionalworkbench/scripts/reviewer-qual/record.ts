@@ -222,7 +222,26 @@ export type CallReply =
 			/** True only when the transport refused the call itself, before the tool or server was touched (an
 			 *  over-long prompt) — so nothing was served and no bound was reached. */
 			readonly preContact: boolean;
+	  }
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7 P5, package A (F2) — A REPLY THE TOOL ENDED AT THE MODEL'S OUTPUT-TOKEN LIMIT
+	 * (`tools/output-limit.ts`): a reply came, cut, and nothing of it is judged — nor kept here (§5.3) — only what the tool
+	 * reported of the cut, `null` where it reported nothing; carried as recorded, never re-scored. ⭑ ITS OWN CLASS, NOT A
+	 * TRANSPORT FAILURE: P4's three such calls were written `TRANSPORT_FAILURE` / `REFUSAL`, and those lines keep the
+	 * meaning they were written with (`REG-D-086`).
+	 */
+	| {
+			readonly status: 'OUTPUT_LIMIT';
+			readonly finishReason: string | null;
+			readonly outputTokens: number | null;
+			readonly rescorable: false;
 	  };
+/**
+ * ⭐ P5 package A (F2) — A CALL WITH NO REPLY TO SCORE OR RE-SCORE: cut at the transport, or cut by the tool at the model's
+ * output-token limit. The check reads the two alike — measured, never re-scorable, a Boundedness failure (`check-core.ts`).
+ */
+export const noReplyToScore = (reply: CallReply): boolean =>
+	reply.status === 'TRANSPORT_FAILURE' || reply.status === 'OUTPUT_LIMIT';
 /** The outcome as scored at run time, with the scoring digest it was scored under (§5.4 CALL). */
 export interface ScoredOutcome {
 	readonly scoringDigest: string;
@@ -420,6 +439,12 @@ const SHA256 = /^[0-9a-f]{64}$/;
 const COMMIT = /^[0-9a-f]{40}$/;
 const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/;
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]*$/;
+/**
+ * ⭐ P5 package A (F2) — a finish reason as the product carries one (`tools/output-limit.ts` `FINISH_REASON_SHAPE`): a
+ * bounded token, never free text. ⛔ RESTATED, NOT IMPORTED — this module imports nothing at runtime; held equal by
+ * `verif/reviewer-qualification-record.test.ts`.
+ */
+export const FINISH_REASON = /^[A-Za-z_]{1,40}$/;
 const FINDING = /^REG-F-\d{3,}$/;
 const RULING = /^REG-D-\d{3,}$/;
 
@@ -496,6 +521,8 @@ export function restampable(
 		last !== undefined &&
 		last.scored !== null &&
 		!calls.some((k) => k.reply.status === 'TRANSPORT_FAILURE') &&
+		// ⭐ P5 package A (F2) — nor cut at the model's output-token limit: nothing of the reply was kept to replay.
+		!calls.some((k) => k.reply.status === 'OUTPUT_LIMIT') &&
 		promptsAreToday(calls, casePrompts) &&
 		isCurrent(last.caseId)
 	);
@@ -629,9 +656,17 @@ const reply: Check = (v, at) => {
 						: [];
 				}
 			})(v, at);
+		// ⭐ P5 package A (F2) — a reply the tool cut at the model's output-token limit: what it reported, and nothing more.
+		case 'OUTPUT_LIMIT':
+			return shape({
+				status: str(),
+				finishReason: nullable(str(FINISH_REASON, 'a finish reason (a bounded token)')),
+				outputTokens: nullable(int(0)),
+				rescorable: (x, a) => (x === false ? [] : [`${a}: a cut reply is never re-scorable`])
+			})(v, at);
 		default:
 			return [
-				`${at}.status: ${JSON.stringify(v.status)} is not ANSWERED, NOT_RETAINED, NO_ANSWER_SPAN or TRANSPORT_FAILURE`
+				`${at}.status: ${JSON.stringify(v.status)} is not ANSWERED, NOT_RETAINED, NO_ANSWER_SPAN, TRANSPORT_FAILURE or OUTPUT_LIMIT`
 			];
 	}
 };

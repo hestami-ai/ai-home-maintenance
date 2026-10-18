@@ -227,7 +227,9 @@ export function toRecordModelExchange(
 		inputTruncation: TRUNCATION[rec.truncationState],
 		// The app-local record carries ONE truncation state, so the same measurement answers both questions
 		// until something distinguishes them. Recorded here rather than silently duplicated at the call site.
-		outputTruncation: TRUNCATION[rec.truncationState],
+		// ⭐ P5 package A (F1) — save a reply the tool ended at the model's output-token limit, whose output state is its
+		// own (`outputTruncationState`, `declared`), and distinguishes them.
+		outputTruncation: TRUNCATION[rec.outputTruncationState ?? rec.truncationState],
 		// ⚠ `byteSize` USED TO BE HARDCODED `0` HERE, because the app-local region carried no size and the
 		// contract required one. It was harmless only because nothing ever produced a region — the first
 		// producer would have silently recorded "0 bytes omitted" (`REG-F-345`). Both numbers are now real,

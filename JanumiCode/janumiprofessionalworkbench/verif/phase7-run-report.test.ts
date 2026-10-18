@@ -67,6 +67,8 @@ import {
 } from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
 import { createExchangeSink } from '../apps/rph-demo/src/lib/server/assurance/exchange-capture.js';
 import { mintIdsFor, toRecordModelExchange } from '../apps/rph-demo/src/lib/server/assurance/exchange-recorder.js';
+// ⭐ P5 package A (F1) — the detail the validator writes on a reply the tool ended at the model's output-token limit.
+import { outputLimitDetail } from '../apps/rph-demo/src/lib/server/tools/output-limit.js';
 import {
 	ALWAYS_STATED,
 	buildRunReport,
@@ -674,6 +676,69 @@ describe('JAN-EXEC P7-2 D9 — the pairing of a review with the call that conclu
 			call('REPAIR', 'REJECTED', 2, { parse: 'JSON_PARSE_FAILED' })
 		]);
 		expect([repair.label, repair.refusal]).toEqual(['refused', 'failed-repair']);
+	});
+
+	// ── ⭐⭐ `JAN-EXEC` Phase 7 P5, package A (F1) — A REPLY THE TOOL ENDED AT THE MODEL'S OUTPUT-TOKEN LIMIT HAS ITS OWN LABEL ──
+	// It is recorded REJECTED and NOT_ATTEMPTED — a refused substitute's pair — with E-4's output truncation DECLARED and the
+	// class's marker opening E-5 (`tools/output-limit.ts`). ⛔ Read by its pair alone, the report called it a model other
+	// than the one configured, refused unread.
+	/** A call the tool cut at the model's output-token limit, its E-5 the validator's own (`outputLimitDetail`). */
+	const cutAt = (role: string, ordinal: number) =>
+		exchange(
+			{
+				exchangeRole: role,
+				disposition: 'REJECTED',
+				attemptOrdinal: ordinal,
+				runToken: 'run_1',
+				outputTruncation: 'DECLARED',
+				parseOutcome: {
+					outcome: 'NOT_ATTEMPTED',
+					detail: outputLimitDetail({
+						facts: { outputTokens: 25_000 },
+						partialChars: 0,
+						elapsedMs: 90_010,
+						clause: 'it was itself the one further call a thrown call is given (REG-D-102), so this failure stands',
+						reported: 'reasoning-review backing tool invocation failed: devin invocation failed: (fixture)'
+					})
+				}
+			},
+			`mex_${role}_${ordinal}_run_1`
+		);
+
+	it('⛔ P5 A — the highest call cut at the output-token limit: OUTPUT LIMIT, concluded by it — never a substitute refused unread', () => {
+		const p = pairReview('evd_1', 1, [cutAt('INITIAL', 1), cutAt('RETRY', 2)]);
+		expect([p.label, p.refusal ?? null, p.concludedBy, p.detail]).toEqual([
+			'output-limit',
+			null,
+			'mex_RETRY_2_run_1',
+			"its RETRY call's reply was cut at the model's output-token limit, and nothing was judged from it"
+		]);
+	});
+
+	it('⛔ P5 A — an I5 criterion repair cut at the output-token limit: the review kept the first reply’s judgement, and the report says why', () => {
+		const p = pairReview('art_1', 1, [
+			call('INITIAL', 'REPAIR_REQUESTED', 1, { parse: 'SCHEMA_COERCION_FAILED', detail: `${NO_CRITERION_ANSWERED} x` }),
+			cutAt('REPAIR', 2)
+		]);
+		expect([p.label, p.concludedBy]).toEqual(['no-criterion-answered', 'mex_INITIAL_1_run_1']);
+		expect(p.detail).toContain('its criterion repair was cut at the model’s output-token limit (REG-F-552)');
+	});
+
+	it('⛔ P5 A — after a cut, the first reply is its retry’s: an I5 retry whose repair did not parse concluded it', () => {
+		const p = pairReview('art_1', 1, [
+			cutAt('INITIAL', 1),
+			call('RETRY', 'REPAIR_REQUESTED', 2, { parse: 'SCHEMA_COERCION_FAILED', detail: `${NO_CRITERION_ANSWERED} x` }),
+			call('REPAIR', 'REJECTED', 3, { parse: 'JSON_EXTRACTION_FAILED' })
+		]);
+		expect([p.label, p.concludedBy]).toEqual(['no-criterion-answered', 'mex_RETRY_2_run_1']);
+		expect(p.detail).toContain('its criterion repair did not parse (REG-F-552)');
+	});
+
+	it('⭑ CONTROL — a refused substitute is still REFUSED: the pair without the class’s marker and DECLARED is not the class', () => {
+		const p = pairReview('art_1', 1, [
+			call('INITIAL', 'REJECTED', 1, { parse: 'NOT_ATTEMPTED', detail: 'The reviewing tool reported another model.' })
+		]);
+		expect([p.label, p.refusal]).toEqual(['refused', 'substitute']);
 	});
 
 	it('⛔ no exchange at all, or a last call that concludes nothing: NO ANSWER RECORDED', () => {

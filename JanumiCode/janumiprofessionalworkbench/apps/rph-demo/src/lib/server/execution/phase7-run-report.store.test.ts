@@ -721,6 +721,8 @@ describe('JAN-EXEC P7-2 D9 — the run report over stores the product wrote, rea
 			answered: 37,
 			'no-criterion-answered': 0,
 			'no-response': 1,
+			// ⭐ P5 package A (F1) — a review that ended on a reply the tool cut at the model's output-token limit: none here.
+			'output-limit': 0,
 			refused: 0,
 			'no-answer-recorded': 0,
 			'not-pairable': 0

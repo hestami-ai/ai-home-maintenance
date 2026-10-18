@@ -15,6 +15,7 @@ import { mintIdsFor, toRecordModelExchange } from './exchange-recorder.js';
 import { createAgyReasoningReviewValidator, type AgyPrint } from './reasoning-review-validator.js';
 import { concludedTry, type Try } from './reviewer-answer.js';
 import { pairRun, type StoredObject } from '../../../../../../scripts/phase7/run-report-core.js';
+import { OutputLimitReached } from '../tools/output-limit.js';
 
 /** A reply that PARSES and answers no criterion — the measured run's own shape (`REG-F-552`). */
 const NO_ROWS = '{"findings":[],"recommendation":"SATISFIED","residualUncertainty":["x"]}';
@@ -27,6 +28,24 @@ const ANSWERS = JSON.stringify({
 const NONE_AGAIN = '{"findings":[{"failed":false,"statement":"met"}],"recommendation":"SATISFIED"}';
 /** A reply no JSON can be read from. */
 const PROSE = "I'll check the files the work product names first.";
+/**
+ * ⭐ P5 package A (F1) — a call whose reply the tool ended at the model's output-token limit, as `devinPrint` throws it: the
+ * validator records it REJECTED, its output declared cut, E-5 `NOT_ATTEMPTED` — the outcome a substitute's refusal has.
+ */
+const cut = (): OutputLimitReached =>
+	new OutputLimitReached(
+		'devin invocation failed: Command failed: devin --print\nError: Response truncated: model hit max output token limit. The output above is incomplete.\n',
+		{
+			facts: { outputTokens: 25_000 },
+			partialReply: '{"findings":[',
+			observedToolCalls: { canObserve: false, reason: 'The devin adapter cannot observe tool calls (fixture).' }
+		}
+	);
+/** `t` renumbered as the `role` call at `ordinal` — a chain the stub validator, which runs no retry, cannot write itself. */
+const renumbered = (t: Try, role: string, ordinal: number): Try => ({
+	id: `${role}:${ordinal}`,
+	state: { ...(t.state as object), exchangeRole: role, attemptOrdinal: ordinal }
+});
 
 /**
  * ONE REVIEW'S TRIES AS THE FLOOR STORES THEM: the real validator, its model giving each of `replies` in turn (an `Error`
@@ -156,6 +175,34 @@ describe('⭐⭐ P7-6 C2 — the try a floor run’s review concluded from (REG-
 		expect(concludedTry([threw, at(asked!, 'RETRY', 2), at(repair!, 'REPAIR', 3)])?.id).toBe('RETRY:2');
 	});
 
+	// ⭐⭐ P5 package A (F1) — A REPLY THE TOOL ENDED AT THE MODEL'S OUTPUT-TOKEN LIMIT IS READ AS ONE NOTHING WAS JUDGED FROM:
+	// never the first reply a review read, never a substitute's refusal, whose `REJECTED` and `NOT_ATTEMPTED` it shares.
+	it('⛔ P5 A — an I5 criterion repair cut at the output-token limit: the review kept the FIRST reply’s judgement, so the FIRST reply', async () => {
+		const t = await tries(NO_ROWS, cut());
+		expect(calls(t), 'arrangement').toEqual(['INITIAL:REPAIR_REQUESTED:SCHEMA_COERCION_FAILED', 'REPAIR:REJECTED:NOT_ATTEMPTED']);
+		// ⛔ THE MUTANT: the cut repair read as a substitute refused unread — the review read as failed on it.
+		expect(concludedTry(t)?.id, 'the cut repair was read as a substitute’s refusal').toBe('INITIAL:1');
+	});
+
+	it('⛔ P5 A — after a cut, the first reply is its RETRY’s: an I5 retry whose repair did not parse concluded it', async () => {
+		const [cutCall] = await tries(cut());
+		const [asked, repair] = await tries(NO_ROWS, PROSE);
+		const chain = [cutCall!, renumbered(asked!, 'RETRY', 2), renumbered(repair!, 'REPAIR', 3)];
+		expect(calls(chain), 'arrangement').toEqual([
+			'INITIAL:REJECTED:NOT_ATTEMPTED',
+			'RETRY:REPAIR_REQUESTED:SCHEMA_COERCION_FAILED',
+			'REPAIR:REJECTED:JSON_EXTRACTION_FAILED'
+		]);
+		// ⛔ THE MUTANT: the cut call taken as the first reply the review read — the I5 chain behind it then goes unseen.
+		expect(concludedTry(chain)?.id, 'the cut call was taken as the review’s first reply').toBe('RETRY:2');
+	});
+
+	it('⭑ CONTROL — a cut call alone is the last call the review ended on, as a call with no reply is', async () => {
+		const t = await tries(cut());
+		expect(calls(t), 'arrangement').toEqual(['INITIAL:REJECTED:NOT_ATTEMPTED']);
+		expect(concludedTry(t)?.id).toBe('INITIAL:1');
+	});
+
 	it('⭑ CONTROL — no try, nothing concluded: undefined, never a view of nothing', () => {
 		expect(concludedTry([])).toBeUndefined();
 	});
@@ -231,6 +278,14 @@ describe('⭐⭐ P76F-D D3 — the PWA reader and the run report name the same t
 		['the marker beside another outcome', async () => {
 			const [asked, repair] = await tries(NO_ROWS, PROSE);
 			return [withOutcome(asked!, 'JSON_PARSE_FAILED'), repair!];
+		}],
+		// ⭐ P5 package A (F1) — chains with a reply the tool ended at the model's output-token limit.
+		['a first call cut at the output-token limit, and nothing more', () => tries(cut())],
+		['I5, its repair cut at the output-token limit', () => tries(NO_ROWS, cut())],
+		['a cut call, then an I5 retry whose repair did not parse', async () => {
+			const [cutCall] = await tries(cut());
+			const [asked, repair] = await tries(NO_ROWS, PROSE);
+			return [cutCall!, renumbered(asked!, 'RETRY', 2), renumbered(repair!, 'REPAIR', 3)];
 		}],
 		['no try', async () => []]
 	];
