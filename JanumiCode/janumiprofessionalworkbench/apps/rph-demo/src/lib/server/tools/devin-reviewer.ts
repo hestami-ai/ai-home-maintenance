@@ -99,8 +99,10 @@ const DENY_ALL_TOOLS_CONFIG = `${JSON.stringify(
 )}\n`;
 
 /**
- * ⭐ R11 — WHAT THIS ADAPTER CAN SEE OF TOOL CALLS: nothing, said in its own words, on every call that reaches devin — one
- * that answered, and (P5 package A) one whose reply devin ended at the output-token limit (`OutputLimitReached`).
+ * ⭐ R11 — WHAT THIS ADAPTER CAN SEE OF TOOL CALLS: nothing, said in its own words on a call devin exited 0 from whose
+ * export named a model, and (P5 package A) on one whose reply devin ended at the output-token limit
+ * (`OutputLimitReached`). ⚠ ONLY THERE: an exit 0 whose export names no model is returned as the bare stdout, and every
+ * other failure is thrown without it.
  */
 const DEVIN_TOOL_OBSERVATION: AdapterToolObservation = {
 	canObserve: false,
