@@ -222,6 +222,31 @@ describe('⭐ D5, D6 — one call at a time, observed on arrival', () => {
 			{ name: 'run_command', outcome: 'UNKNOWN' }
 		]);
 	});
+
+	it('S4 — a call still queued from turn n when turn n+1 opens is dropped unrun, though a gate is open again', async () => {
+		// ⛔ THE MUTANT: drop a queued call only while no gate is open. Turn n's call would then run in turn n+1, in the
+		// workspace, recorded as that turn's. (S4 above closes the gate first, so `!gateOpen` alone drops its call.)
+		const slow = deferred();
+		const runner = recordingRunner({}, async (r) => {
+			if (r.argv[1] === 'first') await slow.gate;
+		});
+		const { server, observer } = await serve(['process-execution'], runner);
+		const token = server.openTurn();
+		const first = post(server, callOf('run_command', { argv: ['node', 'first'] }), { token });
+		await until(() => runner.events.length === 1, 'the first call to start');
+		const second = post(server, callOf('run_command', { argv: ['node', 'queued'] }), { token });
+		await until(() => server.transcript().length === 2, 'the second call to arrive');
+		// ⭑ Turn n+1 opens while turn n's second call still waits behind its first; opening it closes turn n.
+		server.openTurn();
+		slow.release();
+		const [, dropped] = await Promise.all([first, second]);
+		expect(dropped.status).toBe(GATE_REFUSED_STATUS);
+		expect(runner.seen.map((r) => r.argv[1])).toEqual(['first']);
+		expect(observer.since(0)).toEqual([
+			{ name: 'run_command', outcome: 'COMPLETED' },
+			{ name: 'run_command', outcome: 'UNKNOWN' }
+		]);
+	});
 });
 
 describe('⭐ D2, D8 — who may call', () => {
@@ -432,5 +457,17 @@ describe('⭐ D9 — the protocol', () => {
 		const { server } = await serve(['file-system']);
 		const token = server.openTurn();
 		expect((await post(server, {}, { token, method: 'GET' })).status).toBe(405);
+	});
+
+	it('a body past the 16 MB bound gets 413, and nothing is run or observed', async () => {
+		// ⛔ THE MUTANT: no bound. The call it carries would run, however large the body the CLI sent.
+		const runner = recordingRunner();
+		const { server, observer } = await serve(['process-execution'], runner);
+		const token = server.openTurn();
+		const oversized = { ...callOf('run_command', { argv: ['node', 'x'] }), pad: 'p'.repeat(16 * 1024 * 1024) };
+		const answered = await post(server, oversized, { token });
+		expect(answered.status).toBe(413);
+		expect(runner.seen).toEqual([]);
+		expect(observer.count()).toBe(0);
 	});
 });

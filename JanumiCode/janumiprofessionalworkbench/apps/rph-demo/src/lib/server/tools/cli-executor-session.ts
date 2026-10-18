@@ -10,8 +10,13 @@
 // workspace changed only inside the host's calls (D14b), merges the CLI's own calls among the host's (D21), grades the
 // model (D22), and returns the host's envelope as E-1 (D17).
 // ⭑ WHAT A DRIVER SUPPLIES (`CliDriver`): the files of its run folder, which the opener writes; its no-model preflight,
-// which the opener runs; its argv and stdin; its config sources; and how to read what its CLI wrote back. A driver never
-// writes a file, never starts a process and never touches the child, so it cannot weaken a guarantee by forgetting one.
+// which the opener runs and bounds; its argv and stdin; its config sources; and how to read what its CLI wrote back. A
+// driver never writes a file, never starts a process and never touches the child, so it cannot weaken a guarantee by
+// forgetting one. ⛔ AND A DRIVER THAT THROWS FAILS THE TURN CLOSED: a change to the workspace outside the host's calls
+// is decided from the manifests alone, and marked, before any of the driver's reading runs (D21a); a throw from
+// `readRecord` is held as a record that could not be read (`CLI_SURFACE_UNPROVEN`), and one from `classifyStderr` as an
+// error stream that could not be classified (`CLI_ERROR`). ⚠ A reading the opener cannot use past that point (one whose
+// events are not a list) still throws the turn, the workspace already marked.
 //
 // ⛔ THE CLI'S OWN TOOLS ARE THE PART THE HOST CANNOT OWN (D4). Only the CLI's config withholds them, and that is the
 // vendor's control, so the host does not rely on it: a turn whose record does not prove the CLI's tool surface, or whose
@@ -68,9 +73,9 @@ import { createToolCallObserver } from './tool-call-observer.js';
 
 /**
  * ⭐ D15 — WHAT OPENS EVERY CLI EXECUTOR'S PROMPT, before the execution contract. Some CLIs' own system prompts push the
- * other way (devin's tells the model to explore and to create `AGENTS.md`), so the host says it once, in bytes the test
- * pins. ⚠ It names no path, port or folder, and it is true of every grant: the server lists only what the step was
- * granted. ⚠ It changes the executor's instruction from Pi's, and E-1 holds it (D17).
+ * other way (devin's tells the model to explore and to create `AGENTS.md`), so the host says it once, in bytes
+ * `cli-executor-session.test.ts` pins by literal. ⚠ It names no path, port or folder, and it is true of every grant: the
+ * server lists only what the step was granted. ⚠ It changes the executor's instruction from Pi's, and E-1 holds it (D17).
  */
 export const EXECUTOR_HOST_TOOLS_PREAMBLE =
 	'You work through the tools of one MCP server, named jpwb, and through nothing else.\n' +
@@ -95,6 +100,12 @@ export const EXECUTOR_RESEND_HISTORY_CHARS = 120_000;
 
 /** ⭐ D19a — the longest excerpt of a known error shape a failure message may carry. ⚠ AUTHORED. */
 const EXCERPT_LIMIT = 300;
+
+/**
+ * ⭐ D18 — THE HOST'S BOUND ON A DRIVER'S NO-MODEL PREFLIGHT, which is a run of the CLI like any other: past it the
+ * preflight's process tree is killed and the session refused. ⚠ AUTHORED.
+ */
+const CLI_PREFLIGHT_TIMEOUT_MS = 60_000;
 
 /** How long the opener waits for a killed CLI to be reported gone before it stops waiting. ⚠ AUTHORED. */
 const KILL_WAIT_MS = 5_000;
@@ -256,7 +267,10 @@ export interface CliPreflight {
 /** ⭐ D12 — what differs between CLIs. One driver per CLI, in `tools/<tool>-executor-driver.ts`. */
 export interface CliDriver {
 	readonly toolId: string;
-	/** ⭐ D21 — the CLI's own plumbing for reaching the host's server. A carrier that runs is not a breach. */
+	/**
+	 * ⭐ D21 — the CLI's own plumbing for reaching the host's server. A carrier that runs is not a breach; one the CLI
+	 * refused is a refused attempt, as any tool of its own is.
+	 */
 	readonly carriers: readonly string[];
 	/** ⭐ D44a — the files the CLI reads configuration from, by name: fingerprinted by `stat` before each turn. */
 	readonly configSources: readonly { readonly name: string; readonly path: string }[];
@@ -310,6 +324,8 @@ export interface CliSessionDeps {
 	/** The dedicated root (D13). Default: `<tmpdir>/jpwb-exec`. */
 	readonly root?: string;
 	readonly turnTimeoutMs?: number;
+	/** The bound on the driver's preflight (D18). Default: `CLI_PREFLIGHT_TIMEOUT_MS`. */
+	readonly preflightTimeoutMs?: number;
 	readonly now?: () => string;
 	/** Where `dispose` reports what it could not finish. ⭑ A fixed sentence and an errno code: never a path. */
 	readonly log?: (line: string) => void;
@@ -328,7 +344,9 @@ type CliFailureCode =
 const FAILURE_SENTENCES: Readonly<Record<CliFailureCode, string>> = {
 	CLI_ENDED_ON_REFUSAL:
 		'The CLI had a call refused and stopped there, with no answer after it, so what it returned is not an answer.',
-	CLI_ERROR: 'The CLI reported an error, or exited with a failing status, so the turn produced no answer.',
+	CLI_ERROR:
+		'The CLI reported an error, exited with a failing status, or left what the host could not read whole, so the turn ' +
+		'produced no answer.',
 	CLI_SURFACE_UNPROVEN:
 		'The CLI’s own record of the turn is absent, unreadable, or does not prove which tools it offered its model, or ' +
 		'its account of the host’s calls differs from the host’s, so nothing shows that only the host’s tools were used.',
@@ -451,12 +469,47 @@ function changedPaths(before: Map<string, string>, after: Map<string, string>): 
 }
 
 /**
- * ⭐ D14a — whether the CLI's record fails to prove its tool surface: absent, unparseable, holding no proof, or naming a
- * host tool the host did not serve. ⭑ Each arm its own, so each can be shown to matter.
+ * What the opener holds of the CLI's record: the driver's reading, or, when the driver's `readRecord` threw, the fact
+ * that it could not be read — of which nothing is kept (D20).
  */
-function surfaceProofFails(record: CliRecordReading, mintedToolNames: readonly string[]): boolean {
+type HeldRecord = CliRecordReading | { readonly read: 'DRIVER_THREW' };
+
+/**
+ * ⭐ D14a, D20 — the driver's reading of its CLI's record, or `ABSENT` when the CLI left none to read. ⛔ A DRIVER THAT
+ * THROWS FAILS THE TURN CLOSED: its throw is held as `DRIVER_THREW`, so the turn is `CLI_SURFACE_UNPROVEN`, never a throw
+ * of the turn's own, which would end it before its classification (a missing export is an expected case: devin only
+ * warns when it fails to write one).
+ */
+async function recordOf(driver: CliDriver, output: CliTurnOutput | undefined): Promise<HeldRecord> {
+	if (output === undefined) return { read: 'ABSENT' };
+	try {
+		return await driver.readRecord(output);
+	} catch {
+		return { read: 'DRIVER_THREW' };
+	}
+}
+
+/**
+ * ⭐ D24 — what the driver recognised in the CLI's stderr lines, or `undefined` when its classifier threw. ⛔ The opener
+ * reads that as an error stream it could not classify, never as one that said nothing: no signal would accept a turn
+ * whose only sign of a refusal is its stderr line (devin's, D19).
+ */
+function signalsOf(driver: CliDriver, lines: readonly string[]): CliStderrSignals | undefined {
+	try {
+		return driver.classifyStderr(lines);
+	} catch {
+		return undefined;
+	}
+}
+
+/**
+ * ⭐ D14a — whether the CLI's record fails to prove its tool surface: absent, unparseable, unreadable by its driver,
+ * holding no proof, or naming a host tool the host did not serve. ⭑ Each arm its own, so each can be shown to matter.
+ */
+function surfaceProofFails(record: HeldRecord, mintedToolNames: readonly string[]): boolean {
 	if (record.read === 'ABSENT') return true;
 	if (record.read === 'UNPARSEABLE') return true;
+	if (record.read === 'DRIVER_THREW') return true;
 	if (record.surface === undefined) return true;
 	return record.surface.some((t) => t.party === 'HOST' && !mintedToolNames.includes(t.name));
 }
@@ -593,6 +646,39 @@ function delay(ms: number): { readonly elapsed: Promise<'ELAPSED'>; cancel(): vo
 	return { elapsed, cancel: () => clearTimeout(timer) };
 }
 
+/**
+ * ⭐ D14, D18 — run a driver's preflight under the host's bound, and say why it refuses the session, or `undefined`.
+ * ⛔ THE BOUND AND THE RUN'S OWN FAILURES ARE THE OPENER'S, ASKED BEFORE THE DRIVER'S REFUSAL (D12): a preflight past the
+ * bound is killed, tree and all; one that could not be started, or whose output was cut, proves nothing, whatever the
+ * driver's refusal would make of what it left.
+ */
+async function preflightRefusal(
+	check: CliPreflight,
+	exec: CliExec,
+	request: Pick<CliExecRequest, 'cwd' | 'env'>,
+	timeoutMs: number
+): Promise<string | undefined> {
+	const child = exec({
+		...request,
+		program: check.invocation.program,
+		args: check.invocation.args,
+		stdin: check.invocation.stdin
+	});
+	const bound = delay(timeoutMs);
+	const first = await Promise.race([child.done, bound.elapsed]);
+	bound.cancel();
+	if (first === 'ELAPSED') {
+		await child.kill();
+		const wait = delay(KILL_WAIT_MS);
+		await Promise.race([child.done, wait.elapsed]);
+		wait.cancel();
+		return `it outlasted the host's bound of ${timeoutMs} ms, and its process tree was killed.`;
+	}
+	if (first.startFailure !== undefined) return `it could not be started (${first.startFailure}).`;
+	if (!first.stdoutComplete) return 'its output passed the host’s bound, so it could not be read whole.';
+	return check.refusal({ exitCode: first.exitCode, stdout: first.stdout });
+}
+
 /** ⛔ D44 — write a driver's file into the run folder, refusing a path outside it. */
 async function writeInside(directory: string, file: CliRunFile, toolId: string): Promise<void> {
 	const target = resolve(directory, file.path);
@@ -634,7 +720,9 @@ interface MergedRecord {
 
 /**
  * ⭐ D21 — THE CLI'S OWN CALLS, MERGED AMONG THE HOST'S IN THE ORDER ITS RECORD GIVES, the host's cross-checked by order and
- * by name. A carrier is the CLI's plumbing for reaching the host's server, and is passed over.
+ * by name. A carrier is the CLI's plumbing for reaching the host's server: one that RAN is passed over, and one the CLI
+ * refused is a refused attempt like any other (devin's print mode ends the session on a rejected `mcp_call_tool`,
+ * `REG-F-549`).
  */
 function mergedWithHostCalls(
 	events: readonly CliRecordEvent[],
@@ -663,7 +751,7 @@ function mergedWithHostCalls(
 			else merged.push(host);
 			continue;
 		}
-		if (carriers.includes(event.name)) continue;
+		if (event.ran && carriers.includes(event.name)) continue;
 		// ⛔ A TOOL OF THE CLI'S OWN, under a name no minted tool can have, so the record keeps the fact of the call and
 		// drops its name (NOT_MINTED).
 		if (event.ran) {
@@ -678,6 +766,20 @@ function mergedWithHostCalls(
 	return { calls: merged, ownRan, mismatch, refusedSinceAnswer };
 }
 
+/** ⭐ D19a — what a `CLI_ERROR` message adds when the driver's classifier threw (D24). */
+const UNCLASSIFIED_ERROR_STREAM =
+	' What the CLI wrote to its error stream could not be classified, so nothing shows it reported no error.';
+
+/**
+ * ⭐ D19a — what follows a `CLI_ERROR` message's fixed sentence: the checked excerpt of a known error shape, if any, and
+ * the sentence saying the error stream went unclassified, if the driver's classifier threw.
+ */
+function cliErrorTail(errorExcerpt: string | undefined, t: TurnFacts): string {
+	const excerpt = checkedExcerpt(errorExcerpt, t.withheld);
+	const said = excerpt === undefined ? '' : ` The CLI reported: “${excerpt}”`;
+	return t.signalsUnread ? `${said}${UNCLASSIFIED_ERROR_STREAM}` : said;
+}
+
 /** What the opener knows of a turn when it classifies it (D19). */
 interface TurnFacts {
 	readonly breach: WorkspaceTaintCode | undefined;
@@ -685,12 +787,14 @@ interface TurnFacts {
 	readonly bound: boolean;
 	readonly timeoutMs: number;
 	readonly cliRun: CliRun | undefined;
-	readonly record: CliRecordReading;
+	readonly record: HeldRecord;
 	readonly surfaceUnproven: boolean;
 	readonly reported: readonly string[];
 	readonly modelId: string;
 	readonly refusedSinceAnswer: boolean;
 	readonly signals: CliStderrSignals;
+	/** The driver's classifier threw, so `signals` is empty for want of a reading, not for want of a signal (D24). */
+	readonly signalsUnread: boolean;
 	/** ⭐ D19a — what an excerpt may not carry. */
 	readonly withheld: readonly string[];
 }
@@ -729,11 +833,10 @@ function turnAnswer(t: TurnFacts): AdapterAnswer {
 		t.cliRun === undefined ||
 		t.cliRun.exitCode !== 0 ||
 		!t.cliRun.stdoutComplete ||
-		errorExcerpt !== undefined
-	) {
-		const excerpt = checkedExcerpt(errorExcerpt, t.withheld);
-		return failure('CLI_ERROR', excerpt === undefined ? '' : ` The CLI reported: “${excerpt}”`);
-	}
+		errorExcerpt !== undefined ||
+		t.signalsUnread
+	)
+		return failure('CLI_ERROR', cliErrorTail(errorExcerpt, t));
 	const text = t.record.read === 'PARSED' ? (t.record.answer ?? '') : '';
 	return text.trim() === '' ? { arrived: false, cause: 'ENDED_WITHOUT_ANSWER' } : { arrived: true, text };
 }
@@ -866,14 +969,12 @@ export async function openCliExecutionSession(
 		fingerprints = driver.configSources.map((s) => [s.name, s.path, fingerprintOf(s.path)] as const);
 		const check = driver.preflight(run);
 		if (check !== undefined) {
-			const output = await exec({
-				program: check.invocation.program,
-				args: check.invocation.args,
-				cwd: cliDirectory,
-				env: cliEnvironment(driver),
-				stdin: check.invocation.stdin
-			}).done;
-			const refusal = check.refusal({ exitCode: output.exitCode, stdout: output.stdout });
+			const refusal = await preflightRefusal(
+				check,
+				exec,
+				{ cwd: cliDirectory, env: cliEnvironment(driver) },
+				deps.preflightTimeoutMs ?? CLI_PREFLIGHT_TIMEOUT_MS
+			);
 			if (refusal !== undefined)
 				throw new Error(`The CLI executor session for '${toolId}' is refused by its preflight: ${refusal}`);
 		}
@@ -913,8 +1014,11 @@ export async function openCliExecutionSession(
 			'call a tool.'
 	};
 
+	/** ⭐ D21a — add the turn's breach to the marker beside the workspace. */
+	const taintWith = (code: WorkspaceTaintCode, turn: number): void =>
+		writeWorkspaceTaint(workspaceDirectory, { code, toolId, turn, at: now() });
+
 	async function takeTurn(text: string): Promise<ToolInvocationResult> {
-		if (disposed) throw new Error('This CLI executor session has been disposed; it takes no further turn.');
 		turns.push(text);
 		answers.push(undefined);
 		const n = turns.length;
@@ -988,21 +1092,22 @@ export async function openCliExecutionSession(
 		const end = await workspaceManifest(workspaceDirectory);
 		for (const path of changedPaths(turnManifests.checkpoint, end)) turnManifests.unexplained.add(path);
 		const unexplained = [...turnManifests.unexplained].sort();
-
 		const transcript: readonly HostToolCall[] = openServer.transcript();
 		const hostCalls: readonly AdapterToolCall[] = observer.since(callsBefore);
 		const cliRun = outcome.run;
-		const record: CliRecordReading =
-			cliRun === undefined || cliRun.startFailure !== undefined
-				? { read: 'ABSENT' }
-				: await driver.readRecord({
-						run: runFolder,
-						turn: n,
-						exitCode: cliRun.exitCode,
-						stdout: cliRun.stdout
-					});
-		const signals = driver.classifyStderr(cliRun?.errorLines ?? []);
 
+		// ⛔ D21a — A CHANGE NOTHING THE HOST RAN EXPLAINS IS DECIDED FROM THE MANIFESTS ALONE, AND MARKED, BEFORE ANY OF THE
+		// DRIVER'S READING RUNS: the CLI's own writes must not be left unmarked in a workspace a re-run reuses because a
+		// driver's code threw.
+		if (unexplained.length > 0) taintWith('CLI_UNEXPLAINED_CHANGE', n);
+		const record = await recordOf(
+			driver,
+			cliRun === undefined || cliRun.startFailure !== undefined
+				? undefined
+				: { run: runFolder, turn: n, exitCode: cliRun.exitCode, stdout: cliRun.stdout }
+		);
+		const classified = signalsOf(driver, cliRun?.errorLines ?? []);
+		const signals: CliStderrSignals = classified ?? {};
 		const merge: MergedRecord =
 			record.read === 'PARSED'
 				? mergedWithHostCalls(record.events, hostCalls, driver.carriers)
@@ -1044,11 +1149,12 @@ export async function openCliExecutionSession(
 			modelId: selection.modelId,
 			refusedSinceAnswer: merge.refusedSinceAnswer,
 			signals,
+			signalsUnread: classified === undefined,
 			withheld
 		});
 
-		if (breach !== undefined)
-			writeWorkspaceTaint(workspaceDirectory, { code: breach, toolId, turn: n, at: now() });
+		// ⭑ An unexplained change was marked above, before the driver's reading; a tool of the CLI's own is known only from it.
+		if (breach === 'CLI_OWN_TOOL_RAN') taintWith(breach, n);
 		if (answer.arrived) answers[n - 1] = answer.text;
 		const identityEvidence: ToolIdentityEvidence =
 			answer.arrived && reported.length === 1 ? 'PROVIDER_REPORTED' : 'HOST_CONFIGURED';
@@ -1071,7 +1177,7 @@ export async function openCliExecutionSession(
 				: {
 						sessionExport: JSON.stringify({
 							breach,
-							cliRecord: record.read === 'ABSENT' ? null : record.raw,
+							cliRecord: record.read === 'ABSENT' || record.read === 'DRIVER_THREW' ? null : record.raw,
 							unexplainedChanges: unexplained
 						})
 					})
@@ -1083,6 +1189,8 @@ export async function openCliExecutionSession(
 		lastTurnObservation: () => lastTurn,
 		processRuns: () => processRuns.observed(),
 		async turn(text: string): Promise<ToolInvocationResult> {
+			// ⛔ Before anything is written or started, and in its own words: a fixed sentence, naming nothing of the run.
+			if (disposed) throw new Error('This CLI executor session has been disposed; it takes no further turn.');
 			try {
 				return await takeTurn(text);
 			} catch (e) {

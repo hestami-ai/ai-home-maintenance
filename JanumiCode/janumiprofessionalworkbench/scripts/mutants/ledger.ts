@@ -31646,7 +31646,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		find: "\t\t\tif (!asked.reply) return;",
 		replace: "\t\t\tif (!asked.reply) {\n\t\t\t\tprocess.stdout.write('\\\\n');\n\t\t\t\treturn;\n\t\t\t}",
 		expectRed: ["apps/rph-demo/src/lib/server/tools/host-tool-bridge.test.ts"],
-		why: "PROMISE: B1 (D10): a request line is relayed and its reply written as one line; a notification writes nothing. WHAT THE MUTATION DOES: writes a blank line for a notification, which a CLI reading one reply per line would read as garbage. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M21-a-blank-line-for-a-notification ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		why: "PROMISE: B1 (D10): a request line is relayed and its reply written as one line; a notification writes nothing. WHAT THE MUTATION DOES: writes a blank line for a notification, which a CLI reading one reply per line would read as garbage. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M21-a-blank-line-for-a-notification ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯' RE-MEASURED in the check's fix round (B4 moved to host-tool-bridge-pin.test.ts, so this file's failures are now the behaviour's alone). OBSERVED (bun run mutants -- MH1-M91 to MH1-M111 by their full ids, with MH1-M21 to MH1-M25 and MH1-M50, 2026-10-18, in the MH-1 worktree, the check's fix round staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M21-a-blank-line-for-a-notification ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-MHX MH-1 - the stdio bridge (DESIGN-multi-harness-executor.md D10, D11; roadmap MH-1 B1-B4)"
 	},
 	{
@@ -31655,7 +31655,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		find: "\t.on('close', () => {\n\t\tconst leave = () => process.exit(0);\n\t\tchain.then(leave, leave);\n\t\tsetTimeout(leave, 500);\n\t});",
 		replace: "\t.on('close', () => process.exit(0));",
 		expectRed: ["apps/rph-demo/src/lib/server/tools/host-tool-bridge.test.ts"],
-		why: "PROMISE: B1 (D10): a CLI that closes its stdin right after its last request still gets the reply. WHAT THE MUTATION DOES: exits the moment stdin closes, so a request already relayed is answered to no one. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M22-exits-the-moment-stdin-closes ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		why: "PROMISE: B1 (D10): a CLI that closes its stdin right after its last request still gets the reply. WHAT THE MUTATION DOES: exits the moment stdin closes, so a request already relayed is answered to no one. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M22-exits-the-moment-stdin-closes ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯' RE-MEASURED in the check's fix round (B4 moved to host-tool-bridge-pin.test.ts, so this file's failures are now the behaviour's alone). OBSERVED (bun run mutants -- MH1-M91 to MH1-M111 by their full ids, with MH1-M21 to MH1-M25 and MH1-M50, 2026-10-18, in the MH-1 worktree, the check's fix round staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M22-exits-the-moment-stdin-closes ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-MHX MH-1 - the stdio bridge (DESIGN-multi-harness-executor.md D10, D11; roadmap MH-1 B1-B4)"
 	},
 	{
@@ -31664,7 +31664,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		find: "const target = new URL(endpoint.url);",
 		replace: "const target = new URL(endpoint.url);\nprocess.stderr.write(JSON.stringify(endpoint));",
 		expectRed: ["apps/rph-demo/src/lib/server/tools/host-tool-bridge.test.ts"],
-		why: "PROMISE: B2 (D11, D41): the token is in no argv element, no stdout line and no stderr byte of the bridge. WHAT THE MUTATION DOES: prints the endpoint, token and all, to the bridge's stderr, which a CLI may log. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M23-prints-the-endpoint        ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		why: "PROMISE: B2 (D11, D41): the token is in no argv element, no stdout line and no stderr byte of the bridge. WHAT THE MUTATION DOES: prints the endpoint, token and all, to the bridge's stderr, which a CLI may log. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M23-prints-the-endpoint        ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯' RE-MEASURED in the check's fix round (B4 moved to host-tool-bridge-pin.test.ts, so this file's failures are now the behaviour's alone; B2 no longer asserts the bridge's argv, which the test itself built). OBSERVED (bun run mutants -- MH1-M91 to MH1-M111 by their full ids, with MH1-M21 to MH1-M25 and MH1-M50, 2026-10-18, in the MH-1 worktree, the check's fix round staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M23-prints-the-endpoint        ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-MHX MH-1 - the stdio bridge (DESIGN-multi-harness-executor.md D10, D11; roadmap MH-1 B1-B4)"
 	},
 	{
@@ -31673,7 +31673,7 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		find: "\t.on('close', () => {\n\t\tconst leave = () => process.exit(0);\n\t\tchain.then(leave, leave);\n\t\tsetTimeout(leave, 500);\n\t});",
 		replace: "\t.on('close', () => setTimeout(() => process.exit(0), 3000));",
 		expectRed: ["apps/rph-demo/src/lib/server/tools/host-tool-bridge.test.ts"],
-		why: "PROMISE: B3 (D10): the bridge exits within a second of its stdin closing. WHAT THE MUTATION DOES: keeps the bridge alive three seconds after its CLI closed its end. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M24-keeps-going-after-stdin-closes ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		why: "PROMISE: B3 (D10): the bridge exits within a second of its stdin closing. WHAT THE MUTATION DOES: keeps the bridge alive three seconds after its CLI closed its end. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M24-keeps-going-after-stdin-closes ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯' RE-MEASURED in the check's fix round (B4 moved to host-tool-bridge-pin.test.ts; both B3 arms now fail, the held-reply arm included). OBSERVED (bun run mutants -- MH1-M91 to MH1-M111 by their full ids, with MH1-M21 to MH1-M25 and MH1-M50, 2026-10-18, in the MH-1 worktree, the check's fix round staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M24-keeps-going-after-stdin-closes ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-MHX MH-1 - the stdio bridge (DESIGN-multi-harness-executor.md D10, D11; roadmap MH-1 B1-B4)"
 	},
 	{
@@ -31681,8 +31681,8 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: "apps/rph-demo/src/lib/server/tools/host-tool-bridge.ts",
 		find: "createInterface({ input: process.stdin, crlfDelay: Infinity })",
 		replace: "createInterface({ input: process.stdin, crlfDelay: 100 })",
-		expectRed: ["apps/rph-demo/src/lib/server/tools/host-tool-bridge.test.ts"],
-		why: "PROMISE: B4 (D11): the bytes writeBridge writes are pinned by hash. WHAT THE MUTATION DOES: changes one value in the bridge's source, which every CLI would then run unseen. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M25-a-byte-of-the-source-changed ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/host-tool-bridge-pin.test.ts"],
+		why: "PROMISE: B4 (D11): the bytes writeBridge writes are pinned by hash. WHAT THE MUTATION DOES: changes one value in the bridge's source, which every CLI would then run unseen. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M25-a-byte-of-the-source-changed ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯' RE-MEASURED in the check's fix round (its victim is now host-tool-bridge-pin.test.ts, where B4 moved; the bridge's bytes changed (a raw node:net socket) and B4 was re-pinned). OBSERVED (bun run mutants -- MH1-M91 to MH1-M111 by their full ids, with MH1-M21 to MH1-M25 and MH1-M50, 2026-10-18, in the MH-1 worktree, the check's fix round staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M25-a-byte-of-the-source-changed ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-MHX MH-1 - the stdio bridge (DESIGN-multi-harness-executor.md D10, D11; roadmap MH-1 B1-B4)"
 	},
 	{
@@ -31905,10 +31905,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "MH1-M50-a-breach-taints-nothing",
 		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
-		find: "\t\t\twriteWorkspaceTaint(workspaceDirectory, { code: breach, toolId, turn: n, at: now() });",
-		replace: "\t\t\tvoid { code: breach, toolId, turn: n, at: now() };",
+		find: "\t\twriteWorkspaceTaint(workspaceDirectory, { code, toolId, turn, at: now() });",
+		replace: "\t\tvoid { code, toolId, turn, at: now() };",
 		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
-		why: "PROMISE: C12, C17 (D21a): a breach marks the workspace tainted. WHAT THE MUTATION DOES: writes no marker, so a re-run reuses a workspace holding bytes nobody recorded. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M50-a-breach-taints-nothing    ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯'",
+		why: "PROMISE: C12, C17 (D21a): a breach marks the workspace tainted. WHAT THE MUTATION DOES: writes no marker, so a re-run reuses a workspace holding bytes nobody recorded. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M50-a-breach-taints-nothing    ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯' RE-MEASURED in the check's fix round (re-anchored: the taint has one writer, taintWith, which an unexplained change reaches before the driver reads the record, and a tool of the CLI’s own after). OBSERVED (bun run mutants -- MH1-M91 to MH1-M111 by their full ids, with MH1-M21 to MH1-M25 and MH1-M50, 2026-10-18, in the MH-1 worktree, the check's fix round staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M50-a-breach-taints-nothing    ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
 	},
 	{
@@ -32270,5 +32270,195 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
 		why: "PROMISE: D12, D35: the opener refuses a driver whose tool is not the selection's; the record names the selection's tool. WHAT THE MUTATION DOES: opens another tool's driver under the selected tool's name. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M90-a-driver-for-another-tool-is-taken ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	// ── JAN-MHX MH-1, the check's fix round (the check of da48766c): one victim per guard the check found unmeasured ──
+	{
+		id: "MH1-M91-a-refused-carrier-is-passed-over",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\tif (event.ran && carriers.includes(event.name)) continue;",
+		replace: "\t\tif (carriers.includes(event.name)) continue;",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE (the check of MH-1, finding 2): C14 (D19, D21): a carrier the CLI REFUSED is a refused attempt like any tool of its own: recorded REFUSED as cli:<carrier>, and, with no assistant message after it, the turn is CLI_ENDED_ON_REFUSAL. devin's print mode ends the session when mcp_call_tool is rejected (REG-F-549). WHAT THE MUTATION DOES: passes over a carrier whether it ran or was refused - the first build's line - so a turn that stopped on a refused carrier is accepted as an answer. OBSERVED (bun run mutants -- MH1-M91 to MH1-M111 by their full ids, with MH1-M21 to MH1-M25 and MH1-M50, 2026-10-18, in the MH-1 worktree, the check's fix round staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M91-a-refused-carrier-is-passed-over ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1, the check's fix round - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M92-readrecord-unguarded",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\ttry {\n\t\treturn await driver.readRecord(output);\n\t} catch {\n\t\treturn { read: 'DRIVER_THREW' };\n\t}",
+		replace: "\treturn await driver.readRecord(output);",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE (the check of MH-1, finding 3): C16, C17 (D14a, D21a): a driver's readRecord that throws fails the turn closed and classified - CLI_UNEXPLAINED_CHANGE with the taint where the workspace changed, CLI_SURFACE_UNPROVEN where it did not. WHAT THE MUTATION DOES: lets the driver's throw (ENOENT for a missing export) escape, so the turn throws a generic error instead of being classified. OBSERVED (bun run mutants -- MH1-M91 to MH1-M111 by their full ids, with MH1-M21 to MH1-M25 and MH1-M50, 2026-10-18, in the MH-1 worktree, the check's fix round staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M92-readrecord-unguarded       ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1, the check's fix round - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M93-a-throwing-driver-s-record-proves-the-surface",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\tif (record.read === 'DRIVER_THREW') return true;",
+		replace: "\tif (record.read === 'DRIVER_THREW') return false;",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE (the check of MH-1, finding 3): C16 (D14a): a record the driver could not read proves no tool surface, so the turn is CLI_SURFACE_UNPROVEN. WHAT THE MUTATION DOES: lets a record whose driver threw pass the surface check, so the turn ends as if nothing had been answered rather than as unproven. OBSERVED (bun run mutants -- MH1-M91 to MH1-M111 by their full ids, with MH1-M21 to MH1-M25 and MH1-M50, 2026-10-18, in the MH-1 worktree, the check's fix round staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M93-a-throwing-driver-s-record-proves-the-surface ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1, the check's fix round - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M94-classifystderr-unguarded",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\ttry {\n\t\treturn driver.classifyStderr(lines);\n\t} catch {\n\t\treturn undefined;\n\t}",
+		replace: "\treturn driver.classifyStderr(lines);",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE (the check of MH-1, finding 3): C20 (D19, D24): a driver's classifyStderr that throws fails the turn CLI_ERROR, classified, saying its error stream went unclassified. WHAT THE MUTATION DOES: lets the driver's throw escape, so the turn throws a generic error instead. OBSERVED (bun run mutants -- MH1-M91 to MH1-M111 by their full ids, with MH1-M21 to MH1-M25 and MH1-M50, 2026-10-18, in the MH-1 worktree, the check's fix round staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M94-classifystderr-unguarded   ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1, the check's fix round - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M95-an-unclassified-error-stream-is-no-signal",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\terrorExcerpt !== undefined ||\n\t\tt.signalsUnread\n",
+		replace: "\t\terrorExcerpt !== undefined\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE (the check of MH-1, finding 3; built fail-closed, where the finding's remedy said 'no signals'): C20 (D19, D24): an error stream the driver could not classify fails the turn, because nothing then shows the CLI reported no error or refusal. WHAT THE MUTATION DOES: reads the throw as no signal at all - the remedy as the finding worded it - so a turn whose only sign of a refusal is its stderr line (devin's rejection line) is accepted as an answer. Applied by hand first, the file restored to the index: 'AssertionError: expected '' to match /^CLI_ERROR: .* What the CLI wrote to …/'. OBSERVED (bun run mutants -- MH1-M91 to MH1-M111 by their full ids, with MH1-M21 to MH1-M25 and MH1-M50, 2026-10-18, in the MH-1 worktree, the check's fix round staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M95-an-unclassified-error-stream-is-no-signal ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1, the check's fix round - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M96-an-unexplained-change-is-not-marked",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\tif (unexplained.length > 0) taintWith('CLI_UNEXPLAINED_CHANGE', n);\n",
+		replace: "",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE (the check of MH-1, finding 3): C17 (D14b, D21a): a change to the workspace outside the host's calls marks the workspace tainted. WHAT THE MUTATION DOES: writes no marker for it, so a re-run reuses a workspace holding a write nobody recorded. OBSERVED (bun run mutants -- MH1-M91 to MH1-M111 by their full ids, with MH1-M21 to MH1-M25 and MH1-M50, 2026-10-18, in the MH-1 worktree, the check's fix round staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M96-an-unexplained-change-is-not-marked ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1, the check's fix round - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M97-the-unexplained-mark-waits-for-the-driver",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\tif (unexplained.length > 0) taintWith('CLI_UNEXPLAINED_CHANGE', n);\n\t\tconst record = await recordOf(\n\t\t\tdriver,\n\t\t\tcliRun === undefined || cliRun.startFailure !== undefined\n\t\t\t\t? undefined\n\t\t\t\t: { run: runFolder, turn: n, exitCode: cliRun.exitCode, stdout: cliRun.stdout }\n\t\t);\n\t\tconst classified = signalsOf(driver, cliRun?.errorLines ?? []);\n\t\tconst signals: CliStderrSignals = classified ?? {};\n\t\tconst merge: MergedRecord =\n\t\t\trecord.read === 'PARSED'\n\t\t\t\t? mergedWithHostCalls(record.events, hostCalls, driver.carriers)\n\t\t\t\t: { calls: hostCalls, ownRan: [], mismatch: false, refusedSinceAnswer: false };\n",
+		replace: "\t\tconst record = await recordOf(\n\t\t\tdriver,\n\t\t\tcliRun === undefined || cliRun.startFailure !== undefined\n\t\t\t\t? undefined\n\t\t\t\t: { run: runFolder, turn: n, exitCode: cliRun.exitCode, stdout: cliRun.stdout }\n\t\t);\n\t\tconst classified = signalsOf(driver, cliRun?.errorLines ?? []);\n\t\tconst signals: CliStderrSignals = classified ?? {};\n\t\tconst merge: MergedRecord =\n\t\t\trecord.read === 'PARSED'\n\t\t\t\t? mergedWithHostCalls(record.events, hostCalls, driver.carriers)\n\t\t\t\t: { calls: hostCalls, ownRan: [], mismatch: false, refusedSinceAnswer: false };\n\t\tif (unexplained.length > 0) taintWith('CLI_UNEXPLAINED_CHANGE', n);\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE (the check of MH-1, finding 3): C17 (D21a): the unexplained change is decided from the manifests alone and marked BEFORE any of the driver's reading runs. WHAT THE MUTATION DOES: moves the mark after the driver's record is read and merged, where the first build wrote it, so a reading the opener cannot use (its events not a list) throws the turn with the workspace unmarked. Applied by hand first, the file restored to the index: 'AssertionError: expected { tainted: false } to deeply equal { Object (tainted, entries) }'. OBSERVED (bun run mutants -- MH1-M91 to MH1-M111 by their full ids, with MH1-M21 to MH1-M25 and MH1-M50, 2026-10-18, in the MH-1 worktree, the check's fix round staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M97-the-unexplained-mark-waits-for-the-driver ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1, the check's fix round - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M98-an-own-tool-breach-is-not-marked",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\tif (breach === 'CLI_OWN_TOOL_RAN') taintWith(breach, n);\n",
+		replace: "",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C12, C28 (D21, D21a): a tool of the CLI's own that ran marks the workspace tainted. WHAT THE MUTATION DOES: writes no marker for that breach (since the check's fix round, the unexplained change is marked on its own, earlier), so a re-run reuses a workspace the CLI's own tool touched. OBSERVED (bun run mutants -- MH1-M91 to MH1-M111 by their full ids, with MH1-M21 to MH1-M25 and MH1-M50, 2026-10-18, in the MH-1 worktree, the check's fix round staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M98-an-own-tool-breach-is-not-marked ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1, the check's fix round - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M99-a-disposed-session-takes-a-turn",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\t\tif (disposed) throw new Error('This CLI executor session has been disposed; it takes no further turn.');\n",
+		replace: "",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE (the check of MH-1, finding 7): a disposed session refuses a turn before anything is written or started, in its own words. WHAT THE MUTATION DOES: removes the check, so the turn writes its prompt into a run folder being removed and meets the closed server, and the record says only that the turn could not run. OBSERVED (bun run mutants -- MH1-M91 to MH1-M111 by their full ids, with MH1-M21 to MH1-M25 and MH1-M50, 2026-10-18, in the MH-1 worktree, the check's fix round staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M99-a-disposed-session-takes-a-turn ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1, the check's fix round - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M100-a-tool-id-outside-its-characters-is-taken",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\tif (driver.toolId !== toolId || !/^[a-z0-9][a-z0-9-]*$/.test(toolId))",
+		replace: "\tif (driver.toolId !== toolId)",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE (the check of MH-1, finding 7): the opener refuses a tool id outside [a-z0-9-] before any folder is made, because the run folder is named from it (D13). WHAT THE MUTATION DOES: removes the character check (MH1-M90 removes only the driver comparison), so 'fake/../../outside' puts the run folder outside the dedicated root, where the stale sweep never looks. Applied by hand first, the file restored to the index: 'AssertionError: promise resolved \"{ retainsHistory: true, …(4) }\" instead of rejecting'. OBSERVED (bun run mutants -- MH1-M91 to MH1-M111 by their full ids, with MH1-M21 to MH1-M25 and MH1-M50, 2026-10-18, in the MH-1 worktree, the check's fix round staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M100-a-tool-id-outside-its-characters-is-taken ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1, the check's fix round - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M101-every-reported-model-is-printed",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\treturn /^[A-Za-z0-9._:/@()+ -]{1,100}$/.test(name) ? `'${name}'` : 'a model name this host will not print';",
+		replace: "\treturn `'${name}'`;",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE (the check of MH-1, finding 7): C18 (D19a, D22): a reported model name outside the printable set is named as one the host will not print, never printed, since the CLI writes it and the message lands on the record plane. WHAT THE MUTATION DOES: prints every reported name, a line break and all. Applied by hand first, the file restored to the index: 'AssertionError: expected 'CLI_MODEL_SUBSTITUTED: The CLI report…' to contain 'Configured: \\'fake-model-1\\'; reporte…''. OBSERVED (bun run mutants -- MH1-M91 to MH1-M111 by their full ids, with MH1-M21 to MH1-M25 and MH1-M50, 2026-10-18, in the MH-1 worktree, the check's fix round staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M101-every-reported-model-is-printed ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1, the check's fix round - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M102-the-preamble-changed",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t'Do not create files the instruction does not ask for, such as AGENTS.md.';",
+		replace: "\t'Do not create files the instruction does not ask for, such as AGENTS.md!';",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE (the check of MH-1, finding 5): D15: the preamble's bytes are pinned by a test, as DEVIN_REVIEWER_PREAMBLE's are. WHAT THE MUTATION DOES: changes one character of the preamble, which every CLI executor is told; C9 finds the preamble by reference, so only the pin can see it. Applied by hand first, the file restored to the index: 'AssertionError: expected 'You work through the tools of one MCP…' to be 'You work through the tools of one MCP…' // Object.is equality'. OBSERVED (bun run mutants -- MH1-M91 to MH1-M111 by their full ids, with MH1-M21 to MH1-M25 and MH1-M50, 2026-10-18, in the MH-1 worktree, the check's fix round staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M102-the-preamble-changed      ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1, the check's fix round - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M103-no-bound-on-the-preflight",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\tstdin: check.invocation.stdin\n\t});\n\tconst bound = delay(timeoutMs);\n\tconst first = await Promise.race([child.done, bound.elapsed]);",
+		replace: "\t\tstdin: check.invocation.stdin\n\t});\n\tconst bound = delay(timeoutMs);\n\tconst first = await Promise.race([child.done, new Promise<'ELAPSED'>(() => undefined)]);",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE (the check of MH-1, finding 8): D18: the driver's preflight is bounded by the host. WHAT THE MUTATION DOES: races the preflight against nothing, so a preflight that never ends hangs the session's open. Its first run was INCONCLUSIVE ('the run TIMED OUT (Error: Test timed out in 15000ms)'): the test then let the hung open run into vitest's timeout, which measures nothing, so the test now races the open against a deadline of its own and fails an assertion; MH1-M103 and MH1-M104 were re-run on that test. Applied by hand first, the file restored to the index: 'AssertionError: expected 'the session was still opening 8000 ms…' to be 'The CLI executor session for \\'fake\\'…' // Object.is equality'. OBSERVED (bun run mutants -- MH1-M91 to MH1-M111 by their full ids, with MH1-M21 to MH1-M25 and MH1-M50, 2026-10-18, in the MH-1 worktree, the check's fix round staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M103-no-bound-on-the-preflight ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1, the check's fix round - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M104-no-kill-at-the-preflight-s-bound",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\tif (first === 'ELAPSED') {\n\t\tawait child.kill();\n",
+		replace: "\tif (first === 'ELAPSED') {\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE (the check of MH-1, finding 8): D18: a preflight past the host's bound is killed, tree and all, before the session is refused. WHAT THE MUTATION DOES: refuses the session and leaves the preflight running. Applied by hand first, the file restored to the index: 'AssertionError: expected +0 to be 1 // Object.is equality'. OBSERVED (bun run mutants -- MH1-M91 to MH1-M111 by their full ids, with MH1-M21 to MH1-M25 and MH1-M50, 2026-10-18, in the MH-1 worktree, the check's fix round staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M104-no-kill-at-the-preflight-s-bound ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1, the check's fix round - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M105-a-preflight-that-could-not-start-is-the-driver-s-to-judge",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\tif (first.startFailure !== undefined) return `it could not be started (${first.startFailure}).`;\n",
+		replace: "",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE (the check of MH-1, finding 8): D12, D14: a preflight that could not be started refuses the session, whatever the driver's refusal function makes of it. WHAT THE MUTATION DOES: leaves it to the driver's refusal function, which may pass an empty listing. OBSERVED (bun run mutants -- MH1-M91 to MH1-M111 by their full ids, with MH1-M21 to MH1-M25 and MH1-M50, 2026-10-18, in the MH-1 worktree, the check's fix round staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M105-a-preflight-that-could-not-start-is-the-driver-s-to-judge ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1, the check's fix round - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M106-a-cut-preflight-is-the-driver-s-to-judge",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\tif (!first.stdoutComplete) return 'its output passed the host’s bound, so it could not be read whole.';\n",
+		replace: "",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE (the check of MH-1, finding 8): D12, D14: a preflight whose output was cut at the host's bound refuses the session, since a cut listing proves nothing. WHAT THE MUTATION DOES: leaves it to the driver's refusal function, which may pass the part it was shown. OBSERVED (bun run mutants -- MH1-M91 to MH1-M111 by their full ids, with MH1-M21 to MH1-M25 and MH1-M50, 2026-10-18, in the MH-1 worktree, the check's fix round staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M106-a-cut-preflight-is-the-driver-s-to-judge ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1, the check's fix round - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M107-no-body-bound",
+		file: "apps/rph-demo/src/lib/server/tools/host-tool-server.ts",
+		find: "\t\t\tif (size > MAX_REQUEST_BYTES) over = true;\n\t\t\telse chunks.push(chunk);",
+		replace: "\t\t\tchunks.push(chunk);",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/host-tool-server.test.ts"],
+		why: "PROMISE (the check of MH-1, finding 7): D9: a request body past 16 MB gets 413, and nothing it carries is run or observed. WHAT THE MUTATION DOES: removes the bound, so the call in an oversized body runs. Applied by hand first, the file restored to the index: 'AssertionError: expected 200 to be 413 // Object.is equality'. OBSERVED (bun run mutants -- MH1-M91 to MH1-M111 by their full ids, with MH1-M21 to MH1-M25 and MH1-M50, 2026-10-18, in the MH-1 worktree, the check's fix round staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M107-no-body-bound             ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1, the check's fix round - the host tool server (DESIGN-multi-harness-executor.md D1-D9; roadmap MH-1 S1-S14)"
+	},
+	{
+		id: "MH1-M108-a-queued-call-runs-in-the-next-turn",
+		file: "apps/rph-demo/src/lib/server/tools/host-tool-server.ts",
+		find: "\t\t\tif (!gateOpen || serial !== turnSerial)",
+		replace: "\t\t\tif (!gateOpen)",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/host-tool-server.test.ts"],
+		why: "PROMISE (the check of MH-1, finding 7): S4 (D6, D8): a call still queued from turn n when turn n+1 opens is dropped unrun, UNKNOWN, though a gate is open again. WHAT THE MUTATION DOES: drops a queued call only while no gate is open, so turn n's call runs in turn n+1, recorded as that turn's. Applied by hand first, the file restored to the index: 'AssertionError: expected 200 to be 409 // Object.is equality'. OBSERVED (bun run mutants -- MH1-M91 to MH1-M111 by their full ids, with MH1-M21 to MH1-M25 and MH1-M50, 2026-10-18, in the MH-1 worktree, the check's fix round staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M108-a-queued-call-runs-in-the-next-turn ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1, the check's fix round - the host tool server (DESIGN-multi-harness-executor.md D1-D9; roadmap MH-1 S1-S14)"
+	},
+	{
+		id: "MH1-M109-an-earlier-turn-s-token-is-an-authentication-failure",
+		file: "apps/rph-demo/src/lib/server/tools/host-tool-server.ts",
+		find: "\t\t\tif (bearer !== undefined && minted.some((token) => sameToken(bearer, token))) {",
+		replace: "\t\t\tif (bearer !== undefined && minted.some((token) => sameToken(bearer, token)) && false) {",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/host-tool-server.test.ts"],
+		why: "PROMISE (the check of MH-1, finding 7): S8 (D2, D8): a request carrying an earlier turn's token meets the gate's own refusal (409) and is counted, so a descendant of an earlier turn's CLI cannot go unseen. WHAT THE MUTATION DOES: answers it as a token never minted (401), uncounted. Applied by hand first, the file restored to the index: 'AssertionError: expected 401 to be 409 // Object.is equality'. OBSERVED (bun run mutants -- MH1-M91 to MH1-M111 by their full ids, with MH1-M21 to MH1-M25 and MH1-M50, 2026-10-18, in the MH-1 worktree, the check's fix round staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M109-an-earlier-turn-s-token-is-an-authentication-failure ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1, the check's fix round - the host tool server (DESIGN-multi-harness-executor.md D1-D9; roadmap MH-1 S1-S14)"
+	},
+	{
+		id: "MH1-M110-the-bridge-posts-with-node-http",
+		file: "apps/rph-demo/src/lib/server/tools/host-tool-bridge.ts",
+		find: "import { connect } from 'node:net';\nimport { createInterface } from 'node:readline';\n\nconst endpoint = JSON.parse(readFileSync(process.argv[2], 'utf8'));\nconst target = new URL(endpoint.url);\nlet chain = Promise.resolve();\n\nfunction post(line) {\n\treturn new Promise((resolve) => {\n\t\tconst body = Buffer.from(line, 'utf8');\n\t\tconst head = Buffer.from(\n\t\t\t'POST ' + target.pathname + ' HTTP/1.0\\\\r\\\\n' +\n\t\t\t\t'Host: 127.0.0.1:' + target.port + '\\\\r\\\\n' +\n\t\t\t\t'Content-Type: application/json\\\\r\\\\n' +\n\t\t\t\t'Content-Length: ' + body.length + '\\\\r\\\\n' +\n\t\t\t\t'Authorization: Bearer ' + endpoint.token + '\\\\r\\\\n\\\\r\\\\n',\n\t\t\t'latin1'\n\t\t);\n\t\tconst chunks = [];\n\t\tlet settled = false;\n\t\tconst settle = (answer) => {\n\t\t\tif (settled) return;\n\t\t\tsettled = true;\n\t\t\tresolve(answer);\n\t\t};\n\t\tconst socket = connect(Number(target.port), '127.0.0.1', () => socket.write(Buffer.concat([head, body])));\n\t\tsocket.on('data', (chunk) => chunks.push(chunk));\n\t\tsocket.on('error', () => settle({ status: 0, text: '' }));\n\t\tsocket.on('close', () => {\n\t\t\tconst reply = Buffer.concat(chunks);\n\t\t\tconst end = reply.indexOf('\\\\r\\\\n\\\\r\\\\n');\n\t\t\tconst status = end < 0 ? null : /^HTTP\\\\/1\\\\.[01] (\\\\d{3})/.exec(reply.subarray(0, end).toString('latin1'));\n\t\t\tsettle(\n\t\t\t\tstatus === null\n\t\t\t\t\t? { status: 0, text: '' }\n\t\t\t\t\t: { status: Number(status[1]), text: reply.subarray(end + 4).toString('utf8') }\n\t\t\t);\n\t\t});\n\t});\n}\n",
+		replace: "import { request } from 'node:http';\nimport { createInterface } from 'node:readline';\n\nconst endpoint = JSON.parse(readFileSync(process.argv[2], 'utf8'));\nconst target = new URL(endpoint.url);\nlet chain = Promise.resolve();\n\nfunction post(line) {\n\treturn new Promise((resolve) => {\n\t\tconst body = Buffer.from(line, 'utf8');\n\t\tconst req = request(\n\t\t\t{\n\t\t\t\thost: target.hostname,\n\t\t\t\tport: Number(target.port),\n\t\t\t\tpath: target.pathname,\n\t\t\t\tmethod: 'POST',\n\t\t\t\theaders: {\n\t\t\t\t\t'content-type': 'application/json',\n\t\t\t\t\t'content-length': body.length,\n\t\t\t\t\tauthorization: 'Bearer ' + endpoint.token\n\t\t\t\t}\n\t\t\t},\n\t\t\t(res) => {\n\t\t\t\tconst chunks = [];\n\t\t\t\tres.on('data', (chunk) => chunks.push(chunk));\n\t\t\t\tres.on('end', () => resolve({ status: res.statusCode, text: Buffer.concat(chunks).toString('utf8') }));\n\t\t\t\tres.on('error', () => resolve({ status: 0, text: '' }));\n\t\t\t}\n\t\t);\n\t\treq.on('error', () => resolve({ status: 0, text: '' }));\n\t\treq.end(body);\n\t});\n}\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/host-tool-bridge.test.ts"],
+		why: "PROMISE (the check of MH-1, finding 4): B5 (D41): the turn's token reaches the host's server and nowhere else: with every proxy variable planted, a decoy proxy receives nothing, under node and under bun. WHAT THE MUTATION DOES: restores the first build's bridge, which posted with node:http - routed through HTTP_PROXY by bun, and by node under NODE_USE_ENV_PROXY=1, so the decoy receives the Authorization header. Applied by hand first, the file restored to the index: 'AssertionError: the decoy proxy received the bridge’s request: expected [ Array(1) ] to deeply equal []'. OBSERVED (bun run mutants -- MH1-M91 to MH1-M111 by their full ids, with MH1-M21 to MH1-M25 and MH1-M50, 2026-10-18, in the MH-1 worktree, the check's fix round staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M110-the-bridge-posts-with-node-http ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1, the check's fix round - the stdio bridge (DESIGN-multi-harness-executor.md D10, D11, D41; roadmap MH-1 B1-B5)"
+	},
+	{
+		id: "MH1-M111-no-half-second-bound",
+		file: "apps/rph-demo/src/lib/server/tools/host-tool-bridge.ts",
+		find: "\t\tsetTimeout(leave, 500);\n",
+		replace: "",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/host-tool-bridge.test.ts"],
+		why: "PROMISE (the check of MH-1, finding 6): B3 (D10): the bridge exits within a second of its stdin closing even while the host holds its reply. WHAT THE MUTATION DOES: deletes only the half-second bound, so a bridge waiting on a reply that never comes outlives its CLI. Applied by hand first, the file restored to the index: 'AssertionError: expected 3009 to be less than 1000'. OBSERVED (bun run mutants -- MH1-M91 to MH1-M111 by their full ids, with MH1-M21 to MH1-M25 and MH1-M50, 2026-10-18, in the MH-1 worktree, the check's fix round staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M111-no-half-second-bound      ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1, the check's fix round - the stdio bridge (DESIGN-multi-harness-executor.md D10, D11, D41; roadmap MH-1 B1-B5)"
 	}
 ];

@@ -260,12 +260,19 @@ function fakeDriver(over: Partial<CliDriver> = {}): CliDriver {
 
 async function open(
 	exec: CliExec,
-	options: { driver?: CliDriver; ctx?: ProducerSessionContext; root?: string; turnTimeoutMs?: number } = {}
+	options: {
+		driver?: CliDriver;
+		ctx?: ProducerSessionContext;
+		root?: string;
+		turnTimeoutMs?: number;
+		preflightTimeoutMs?: number;
+	} = {}
 ): Promise<ProducerSession> {
 	const session = await openCliExecutionSession(options.ctx ?? context(), SELECTION, options.driver ?? fakeDriver(), {
 		exec,
 		root: options.root ?? root,
 		turnTimeoutMs: options.turnTimeoutMs ?? 60_000,
+		...(options.preflightTimeoutMs === undefined ? {} : { preflightTimeoutMs: options.preflightTimeoutMs }),
 		now: () => '2026-10-18T10:00:00Z'
 	});
 	sessions.push(session);
@@ -482,6 +489,27 @@ describe('⭐ D2, D8, D18 — the turn’s bounds, and what survives a turn', ()
 	});
 });
 
+/**
+ * ⭐ D15 — the preamble's bytes, pinned here, by literal, as `DEVIN_REVIEWER_PREAMBLE`'s are in `devin-reviewer.test.ts`.
+ * ⚠ Written out rather than read from the constant: C9 finds the preamble by reference, so without this pin any text
+ * would pass every case.
+ */
+const PINNED_PREAMBLE =
+	'You work through the tools of one MCP server, named jpwb, and through nothing else.\n' +
+	'Its tools are your only tools: at most write_file, which writes a file in this work unit’s workspace, and ' +
+	'run_command, which runs a command there. The server lists the ones this step was granted.\n' +
+	'The workspace is reached only through those tools. No other tool will work, and you must not try one: a file ' +
+	'written or a command run any other way fails this turn.\n' +
+	'Do not create files the instruction does not ask for, such as AGENTS.md.';
+
+describe('⭐ D15 — the preamble', () => {
+	it('D15 — the preamble is the pinned bytes, byte for byte, its line breaks included', () => {
+		// ⛔ THE MUTANT: one character of it changed — a change to what every CLI executor is told, unseen by any other case.
+		expect(Buffer.byteLength(PINNED_PREAMBLE, 'utf8'), 'arrangement: the pinned preamble is 519 bytes').toBe(519);
+		expect(EXECUTOR_HOST_TOOLS_PREAMBLE).toBe(PINNED_PREAMBLE);
+	});
+});
+
 describe('⭐ D16, D17 — repairs re-send, and E-1 is the host’s envelope', () => {
 	const INSTR = 'INSTRUCTION-MARK: produce the work product the instruction describes, in full.';
 	const F1 = 'FINDINGS-1-MARK: the review found the first answer incomplete.';
@@ -638,6 +666,23 @@ describe('⭐ D14a, D19, D21 — what the CLI’s own record must prove', () => 
 		});
 	});
 
+	it('C14 — a CARRIER the CLI refused is a refused attempt too: with no assistant message after it, the turn fails', async () => {
+		// ⛔ THE MUTANT: pass over a carrier whether it ran or was refused. devin's print mode ends the session when its
+		// carrier `mcp_call_tool` is rejected for want of approval (`REG-F-549`), so a refused carrier is the shape such a
+		// record shows, and with no stderr line only the record says the CLI stopped there.
+		const exec = fakeExec(async (cli) => {
+			cli.answer('I will now write the file');
+			cli.own('mcp_call', false);
+		});
+		const result = await turn(await open(exec));
+		expect(messageOf(result)).toMatch(/^CLI_ENDED_ON_REFUSAL: /);
+		expect(result.observedToolCalls).toEqual({
+			canObserve: true,
+			mintedToolNames: ['write_file', 'run_command'],
+			calls: [{ name: 'cli:mcp_call', outcome: 'REFUSED' }]
+		});
+	});
+
 	it('C14 — the CLI’s own rejection line on stderr fails the turn, whatever it exited with', async () => {
 		// ⛔ THE MUTANT: read only the record's refusals. devin's print mode says it on stderr (D19, REG-F-549).
 		const exec = fakeExec(async (cli) => {
@@ -722,6 +767,84 @@ describe('⭐ D14b — the workspace may change only inside the host’s calls',
 	});
 });
 
+describe('⭐ D21a, D14a, D24 — a driver that throws reading what its CLI left fails the turn closed', () => {
+	const enoent = (): NodeJS.ErrnoException =>
+		Object.assign(new Error('the fake driver found no export'), { code: 'ENOENT' });
+	const throwingRecord = (): CliDriver =>
+		fakeDriver({
+			readRecord: async () => {
+				throw enoent();
+			}
+		});
+	/** The CLI writes into the workspace itself, outside any host call, and exits 0. */
+	const ownWrite: Script = async (cli) => {
+		writeFileSync(join(workspaceDir, 'own-write.txt'), 'by the CLI', 'utf8');
+		cli.answer('I will now write the file');
+	};
+	const TAINTED_BY_THE_CHANGE = {
+		tainted: true,
+		entries: [{ code: 'CLI_UNEXPLAINED_CHANGE', toolId: 'fake', turn: 1, at: '2026-10-18T10:00:00Z' }]
+	};
+
+	it('C17 — the CLI’s own write fails the turn CLI_UNEXPLAINED_CHANGE and taints the workspace, though readRecord throws ENOENT', async () => {
+		// ⛔ THE MUTANT: the driver's readRecord unguarded. Its throw ended the turn before the taint was written, so a
+		// re-run would reuse a workspace holding a write nobody recorded, with no mark on it (D21a). A missing export is an
+		// expected case (devin only warns when it fails to write one, D20).
+		const result = await turn(await open(fakeExec(ownWrite), { driver: throwingRecord() }));
+		expect(messageOf(result)).toMatch(/^CLI_UNEXPLAINED_CHANGE: /);
+		expect(readWorkspaceTaint(workspaceDir)).toEqual(TAINTED_BY_THE_CHANGE);
+		expect(JSON.parse(result.sessionExport!)).toEqual({
+			breach: 'CLI_UNEXPLAINED_CHANGE',
+			cliRecord: null,
+			unexplainedChanges: ['own-write.txt']
+		});
+	});
+
+	it('C16 — a readRecord that throws, the workspace unchanged, fails the turn CLI_SURFACE_UNPROVEN', async () => {
+		// ⛔ THE MUTANT: a driver's throw read as a record that proves the surface.
+		const result = await turn(await open(fakeExec(passing), { driver: throwingRecord() }));
+		expect(messageOf(result)).toMatch(/^CLI_SURFACE_UNPROVEN: /);
+		expect(readWorkspaceTaint(workspaceDir)).toEqual({ tainted: false });
+	});
+
+	it('C20 — a classifyStderr that throws fails the turn CLI_ERROR: nothing then shows the CLI reported no error or refusal', async () => {
+		// ⛔ THE MUTANTS: the driver's classifyStderr unguarded; its throw read as no signal at all, which would accept a
+		// turn whose only sign of a refusal is its stderr line (devin's, D19).
+		const driver = fakeDriver({
+			classifyStderr: () => {
+				throw new TypeError('the fake driver misread a line');
+			}
+		});
+		const exec = fakeExec(async (cli) => {
+			cli.answer('{"workProduct":"done","rationale":{}}');
+			return { errorLines: ['FAKE-REJECTED'] };
+		});
+		const result = await turn(await open(exec, { driver }));
+		expect(messageOf(result)).toMatch(
+			/^CLI_ERROR: .* What the CLI wrote to its error stream could not be classified, so nothing shows it reported no error\.$/
+		);
+	});
+
+	it('C17 — a reading the opener cannot use still leaves the change marked: the taint is written before any driver code runs', async () => {
+		// ⛔ THE MUTANT: the taint written once the driver's reading is merged, where the first build wrote it. A reading
+		// that throws there (its events not a list) ended the turn with the workspace unmarked.
+		const driver = fakeDriver({
+			readRecord: async () => ({
+				read: 'PARSED',
+				raw: '{}',
+				surface: [...DEFAULT_SURFACE],
+				events: null as unknown as CliRecordEvent[],
+				reportedModels: [],
+				answer: 'x'
+			})
+		});
+		await expect(turn(await open(fakeExec(ownWrite), { driver }))).rejects.toThrow(
+			"The CLI executor for 'fake' could not run this turn (no error code)."
+		);
+		expect(readWorkspaceTaint(workspaceDir)).toEqual(TAINTED_BY_THE_CHANGE);
+	});
+});
+
 describe('⭐ D22 — the model, read back where the CLI reports it', () => {
 	it('C18 — a reported model other than the configured one fails the turn CLI_MODEL_SUBSTITUTED, naming both', async () => {
 		// ⛔ THE MUTANT: take the reported model.
@@ -732,6 +855,17 @@ describe('⭐ D22 — the model, read back where the CLI reports it', () => {
 		const message = messageOf(await turn(await open(exec)));
 		expect(message.startsWith('CLI_MODEL_SUBSTITUTED: ')).toBe(true);
 		expect(message).toContain("Configured: 'fake-model-1'; reported: 'fake-model-1', 'other-model-2'.");
+	});
+
+	it('C18 — a reported model name this host will not print is said to be one, and never printed', async () => {
+		// ⛔ THE MUTANT: print every reported name. The name is the CLI's to write, and the message lands on the record plane.
+		const exec = fakeExec(async (cli) => {
+			cli.record.reportedModels = ["other-model'\nINJECTED-LINE"];
+			cli.answer('{"workProduct":"done","rationale":{}}');
+		});
+		const message = messageOf(await turn(await open(exec)));
+		expect(message).toContain("Configured: 'fake-model-1'; reported: a model name this host will not print.");
+		expect(message).not.toContain('INJECTED-LINE');
 	});
 
 	it('C19 — one reported model equal to the configured one is PROVIDER_REPORTED; none reported is HOST_CONFIGURED with the configured id', async () => {
@@ -996,5 +1130,86 @@ describe('⭐ D13 — the run folder’s life', () => {
 		await expect(
 			openCliExecutionSession(context(), SELECTION, fakeDriver({ toolId: 'other' }), { exec: fakeExec(passing), root })
 		).rejects.toThrow("No CLI executor driver for 'fake' was handed to its opener");
+	});
+
+	it('refuses a tool id outside its characters, before any folder is made: the run folder is named from it', async () => {
+		// ⛔ THE MUTANT: no character check (MH1-M90 removes only the driver's comparison). `jpwb-exec-fake/../../outside-…`
+		// would put the run folder outside the dedicated root, where the stale sweep never looks.
+		const toolId = 'fake/../../outside';
+		await expect(
+			openCliExecutionSession(context(), { ...SELECTION, toolId }, fakeDriver({ toolId }), { exec: fakeExec(passing), root })
+		).rejects.toThrow(`No CLI executor driver for '${toolId}' was handed to its opener`);
+		expect(readdirSync(container).filter((n) => n.startsWith('outside-'))).toEqual([]);
+	});
+
+	it('a disposed session takes no further turn: it refuses in its own words, and starts nothing', async () => {
+		// ⛔ THE MUTANT: no check. The turn would write its prompt into a run folder being removed and meet the closed
+		// server's refusal, and the record would say only that the turn could not run.
+		const exec = fakeExec(passing);
+		const session = await open(exec);
+		session.dispose();
+		await expect(session.turn('INSTRUCTION')).rejects.toThrow(
+			'This CLI executor session has been disposed; it takes no further turn.'
+		);
+		expect(exec.requests).toHaveLength(0);
+	});
+});
+
+describe('⭐ D14, D18 — the preflight is bounded by the host, and a preflight that did not run whole refuses the session', () => {
+	const preflighting = (): CliDriver =>
+		fakeDriver({
+			// ⭑ The driver's own refusal passes everything, so only the opener's checks can refuse.
+			preflight: () => ({ invocation: { program: 'fake-cli', args: ['list'] }, refusal: () => undefined })
+		});
+
+	it('a preflight that never ends is killed at the host’s bound, and the session is refused', async () => {
+		// ⛔ THE MUTANTS: no bound, so a hung preflight hangs the session's open; no kill at the bound. ⚠ THE OPEN IS RACED
+		// AGAINST A DEADLINE OF THIS TEST'S OWN, so a hung open fails an assertion: a test that merely timed out measured
+		// nothing, and the mutation runner says so (INCONCLUSIVE, found by MH1-M103's first run). The deadline sits past
+		// the bound plus the opener's wait for a killed child (5 s), so the no-kill mutant still settles before it.
+		let kills = 0;
+		const exec: CliExec = () => {
+			let release: (run: CliRun) => void = () => undefined;
+			return {
+				done: new Promise<CliRun>((settle) => (release = settle)),
+				kill: async () => {
+					kills += 1;
+					release({ exitCode: null, stdout: '', stdoutComplete: true, errorLines: [] });
+				}
+			};
+		};
+		const opening = open(exec, { driver: preflighting(), preflightTimeoutMs: 200 }).then(
+			() => 'the session opened',
+			(e: Error) => e.message
+		);
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		const deadline = new Promise<string>((settle) => {
+			timer = setTimeout(() => settle('the session was still opening 8000 ms on'), 8_000);
+		});
+		const settled = await Promise.race([opening, deadline]);
+		clearTimeout(timer);
+		expect(settled).toBe(
+			"The CLI executor session for 'fake' is refused by its preflight: it outlasted the host's bound of 200 ms, and " +
+				'its process tree was killed.'
+		);
+		expect(kills).toBe(1);
+		expect(readdirSync(root).filter((n) => n.startsWith('jpwb-exec-'))).toEqual([]);
+	}, 15_000);
+
+	it.each([
+		[
+			'could not be started',
+			{ exitCode: null, startFailure: 'ENOENT', stdout: '', stdoutComplete: true, errorLines: [] },
+			'it could not be started (ENOENT).'
+		],
+		[
+			'had its output cut at the host’s bound',
+			{ exitCode: 0, stdout: 'jpwb', stdoutComplete: false, errorLines: [] },
+			'its output passed the host’s bound, so it could not be read whole.'
+		]
+	])('a preflight that %s refuses the session, whatever the driver’s own refusal says', async (_, run, said) => {
+		// ⛔ ONE MUTANT PER ARM: that arm left to the driver's refusal function, which here passes everything (D12).
+		const exec: CliExec = () => ({ done: Promise.resolve(run as CliRun), kill: async () => undefined });
+		await expect(open(exec, { driver: preflighting() })).rejects.toThrow(`is refused by its preflight: ${said}`);
 	});
 });

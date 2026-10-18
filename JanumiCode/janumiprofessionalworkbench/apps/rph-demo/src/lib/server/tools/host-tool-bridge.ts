@@ -10,13 +10,18 @@
 // its stdin closes — once what it already relayed is answered, or half a second later at most (⚠ AUTHORED) — so a CLI
 // that closed its end after its last request still reads the reply, and the bridge never outlives its CLI for long.
 // Messages are relayed one at a time, in the order the CLI wrote them, so the order calls reach the host is the order the
-// CLI sent them (D5). It posts with `node:http` to 127.0.0.1, so no proxy setting in the environment it inherits can
-// route it elsewhere.
+// CLI sent them (D5).
+// ⛔ THE TOKEN GOES TO 127.0.0.1 AND NOWHERE ELSE (D41). The bridge writes each request itself, as HTTP/1.0, on a raw
+// `node:net` socket to 127.0.0.1, and reads the reply until the server closes the connection. It uses no HTTP client:
+// bun's `node:http` client sends through `HTTP_PROXY`, and node's does under `NODE_USE_ENV_PROXY=1`, so a proxy in the
+// environment a CLI gives its MCP server would have received the bearer token (found by the check of MH-1). A raw socket
+// is routed through no proxy by either runtime: `host-tool-bridge.test.ts` (B5) plants every proxy variable and runs the
+// bridge under node, and under bun where this host has it.
 //
 // ⛔ ITS SOURCE IS A PINNED CONSTANT, WRITTEN INTO THE RUN'S `host/` FOLDER AND RUN BY THE SERVER'S OWN RUNTIME (D11). The
 // adapter names `process.execPath` as the command, by absolute path: no `PATH` search and no batch shim. The bytes
-// `writeBridge` writes are pinned by `host-tool-bridge.test.ts`, by hash, so a change to them is a change a reviewer
-// sees. It runs under node and under bun, the two runtimes this server runs on.
+// `writeBridge` writes are pinned by `host-tool-bridge-pin.test.ts`, by hash, so a change to them is a change a reviewer
+// sees. Whichever runtime the server runs on runs the bridge, so it is written for node and for bun alike.
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -24,7 +29,7 @@ import { join } from 'node:path';
 const BRIDGE_FILE = 'jpwb-bridge.mjs';
 
 const BRIDGE_SOURCE = `import { readFileSync } from 'node:fs';
-import { request } from 'node:http';
+import { connect } from 'node:net';
 import { createInterface } from 'node:readline';
 
 const endpoint = JSON.parse(readFileSync(process.argv[2], 'utf8'));
@@ -34,27 +39,34 @@ let chain = Promise.resolve();
 function post(line) {
 	return new Promise((resolve) => {
 		const body = Buffer.from(line, 'utf8');
-		const req = request(
-			{
-				host: target.hostname,
-				port: Number(target.port),
-				path: target.pathname,
-				method: 'POST',
-				headers: {
-					'content-type': 'application/json',
-					'content-length': body.length,
-					authorization: 'Bearer ' + endpoint.token
-				}
-			},
-			(res) => {
-				const chunks = [];
-				res.on('data', (chunk) => chunks.push(chunk));
-				res.on('end', () => resolve({ status: res.statusCode, text: Buffer.concat(chunks).toString('utf8') }));
-				res.on('error', () => resolve({ status: 0, text: '' }));
-			}
+		const head = Buffer.from(
+			'POST ' + target.pathname + ' HTTP/1.0\\r\\n' +
+				'Host: 127.0.0.1:' + target.port + '\\r\\n' +
+				'Content-Type: application/json\\r\\n' +
+				'Content-Length: ' + body.length + '\\r\\n' +
+				'Authorization: Bearer ' + endpoint.token + '\\r\\n\\r\\n',
+			'latin1'
 		);
-		req.on('error', () => resolve({ status: 0, text: '' }));
-		req.end(body);
+		const chunks = [];
+		let settled = false;
+		const settle = (answer) => {
+			if (settled) return;
+			settled = true;
+			resolve(answer);
+		};
+		const socket = connect(Number(target.port), '127.0.0.1', () => socket.write(Buffer.concat([head, body])));
+		socket.on('data', (chunk) => chunks.push(chunk));
+		socket.on('error', () => settle({ status: 0, text: '' }));
+		socket.on('close', () => {
+			const reply = Buffer.concat(chunks);
+			const end = reply.indexOf('\\r\\n\\r\\n');
+			const status = end < 0 ? null : /^HTTP\\/1\\.[01] (\\d{3})/.exec(reply.subarray(0, end).toString('latin1'));
+			settle(
+				status === null
+					? { status: 0, text: '' }
+					: { status: Number(status[1]), text: reply.subarray(end + 4).toString('utf8') }
+			);
+		});
 	});
 }
 
