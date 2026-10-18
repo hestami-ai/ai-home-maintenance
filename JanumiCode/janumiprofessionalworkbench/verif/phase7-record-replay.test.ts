@@ -137,6 +137,11 @@ function arrange(
 		readonly reviewPrompt?: string;
 		/** ⭐ The payload holds no output for the command's call: what the model read of it is not there to key. */
 		readonly unanswered?: boolean;
+		/**
+		 * ⭐ `JAN-MHX` MH-7 (design D38) — the executor `lane/boot.json`'s inherited variables name (`JPWB_EXECUTOR`); unset,
+		 * they name none. Any but `pi` is a CLI executor: its try's E-1 is the host's envelope (D17), not Pi's payload.
+		 */
+		readonly executor?: string;
 	} = {}
 ): Arranged {
 	const run = tempDir('run');
@@ -198,6 +203,23 @@ function arrange(
 				: [{ type: 'function_call_output', call_id: 'c2', output: ranOutput(stdout) }])
 		]
 	};
+	// ⭐ `JAN-MHX` MH-7 (D17) — A CLI EXECUTOR'S E-1: what the host sent the CLI, the tools its server served, and its own
+	// transcript of the turn's calls, each with the result it sent back.
+	const envelope = {
+		e1: 'HOST_TO_CLI',
+		prompt: turnText,
+		tools: head.tools.map((t) => ({ name: t.name, description: t.description, inputSchema: t.parameters })),
+		calls: [
+			{
+				name: 'write_file',
+				arguments: { path: 'docs/requirements.md', contents: DOC },
+				result: wroteOutput(workspace),
+				isError: false
+			},
+			{ name: 'run_command', arguments: { argv: ARGV }, result: ranOutput(stdout), isError: false }
+		]
+	};
+	const cli = o.executor !== undefined && o.executor !== 'pi';
 	const exchange = (id: string, state: Record<string, unknown>) => ({
 		id,
 		objectType: 'MODEL_EXCHANGE',
@@ -235,9 +257,17 @@ function arrange(
 			invokerId: 'execution.model-invocation:pwut_1',
 			requestedAt: '2026-10-11T08:00:00.000Z',
 			respondedAt: '2026-10-11T08:01:00.000Z',
-			resolvedModel: { value: 'fixture-executor-model', evidence: 'PROVIDER_REPORTED' },
-			resolvedProvider: { value: 'fixture-provider', evidence: 'PROVIDER_REPORTED' },
-			materializedInputRef: ref(JSON.stringify(composite)),
+			...(cli
+				? {
+						resolvedModel: { value: 'gemini-4-argon-high', evidence: 'HOST_CONFIGURED' },
+						resolvedProvider: { value: o.executor, evidence: 'HOST_CONFIGURED' },
+						materializedInputRef: ref(JSON.stringify(envelope))
+					}
+				: {
+						resolvedModel: { value: 'fixture-executor-model', evidence: 'PROVIDER_REPORTED' },
+						resolvedProvider: { value: 'fixture-provider', evidence: 'PROVIDER_REPORTED' },
+						materializedInputRef: ref(JSON.stringify(composite))
+					}),
 			rawOutputBeforeCoercionRef: ref(o.answer ?? ANSWER),
 			volunteeredReasoningRef: pending,
 			observedToolCalls: {
@@ -407,7 +437,10 @@ function arrange(
 	);
 	writeFileSync(
 		join(lane, 'boot.json'),
-		JSON.stringify({ overlay: { JPWB_DEMO_DB: o.bootDemoDb ?? demoDb } })
+		JSON.stringify({
+			overlay: { JPWB_DEMO_DB: o.bootDemoDb ?? demoDb },
+			...(o.executor === undefined ? {} : { inherited: { JPWB_EXECUTOR: o.executor } })
+		})
 	);
 	mkdirSync(join(lane, 'report'), { recursive: true });
 	writeFileSync(
@@ -643,6 +676,26 @@ describe('⭐ the recorder (D1) — a final archive into a replay recording, scr
 			`lane/boot.json's JPWB_DEMO_DB is not an absolute path as this host's OS family (${osFamilyOf()}) spells one`
 		);
 		expect(existsSync(out)).toBe(false);
+	});
+
+	it('⛔ JAN-MHX MH-7 (design D38) — an archive whose boot names agy, its E-1 the host’s envelope, is refused with the executor sentence before any payload is read', () => {
+		// ⛔ PREDICTED RED, read from the code: the recorder took every try's E-1 for Pi's payload, so a CLI executor's
+		// envelope was refused for a payload reason that names the wrong cause — "its materialized input carries no `input`
+		// list" (`turnOf`) — and never for being another executor's.
+		const out = join(tempDir('out'), 'recording');
+		const r = record(arrange({ executor: 'agy' }), out);
+		expect(r.code, r.out).toBe(1);
+		expect(r.out.split('the run cannot be read whole into a recording:\n')[1]).toBe(
+			"  the replay records Pi executor runs only; this run's executor was agy\n"
+		);
+		expect(existsSync(out)).toBe(false);
+	});
+
+	it('⭑ CONTROL (JAN-MHX MH-7) — an archive whose boot names pi records as before', () => {
+		const out = join(tempDir('out'), 'recording');
+		const r = record(arrange({ executor: 'pi' }), out);
+		expect(r.code, r.out).toBe(0);
+		expect(readRecording(out).executor).toHaveLength(1);
 	});
 
 	it('refuses a run with no final archive: a recording is of the whole run', () => {

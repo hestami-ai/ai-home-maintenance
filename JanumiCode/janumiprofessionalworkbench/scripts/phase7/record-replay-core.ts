@@ -28,6 +28,8 @@
 //   · THE MATRIX — the run report's own (`lane/report/report.json`): the recording expects the run it records.
 // ⛔ ANYTHING THAT CANNOT BE READ AS ABOVE IS A PROBLEM, AND A RECORDING WITH ONE IS NEVER WRITTEN: a replay of half a run
 // is another run.
+// ⛔ `JAN-MHX` MH-7 (design D38) — AND A RUN WHOSE BOOT NAMES AN EXECUTOR OTHER THAN PI IS REFUSED BY THAT NAME, before any
+// payload is read: the executor tries above are read as Pi's payloads, and a CLI executor's E-1 is the host's envelope.
 import { createHash } from 'node:crypto';
 import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -59,7 +61,7 @@ import {
 	type ToolDefinitionKey
 } from '../../apps/rph-demo/src/lib/server/replay/recording.js';
 import { workspaceTreeSha256 } from './node-tests.js';
-import type { StoredObject, StoreRows } from './run-report-core.js';
+import { bootExecutor, type StoredObject, type StoreRows } from './run-report-core.js';
 
 /**
  * ⭑ EACH REVIEWING TOOL'S BOUND, BY ITS AGENT ID — restated from the validator (`reasoning-review-validator.ts`,
@@ -102,6 +104,11 @@ export interface RecorderInput {
 	readonly reviewerFingerprint: string;
 	/** ⭐ The OS family the run ran on — this host's by default (finding 6; `record-replay.ts` holds the run to it). */
 	readonly osFamily?: OsFamily;
+	/**
+	 * ⭐ `JAN-MHX` MH-7 (design D38) — `lane/boot.json`, parsed, for the executor it names (`bootExecutor`). One that names
+	 * none, or none given, refuses nothing here: its tries are read as Pi's payloads, as before.
+	 */
+	readonly boot?: unknown;
 }
 
 export interface RecorderOutput {
@@ -610,6 +617,17 @@ export function buildRecording(i: RecorderInput): RecorderOutput {
 	const authoringCallsLeftOut = exchanges.filter(
 		(e) => e.state.plane === 'ASSURANCE' && !recordsAsReviewerCall(e)
 	).length;
+	// ⛔ `JAN-MHX` MH-7 (design D38) — ANOTHER EXECUTOR'S RUN IS REFUSED BY ITS NAME, BEFORE ANY PAYLOAD IS READ. A CLI
+	// executor's E-1 is the host's envelope (D17), not Pi's payload, so its try's key cannot be built as Pi's is; read as
+	// Pi's, it was refused for a payload reason that names the wrong cause (the envelope carries no `input` list).
+	const executorNamed = bootExecutor(i.boot).tool;
+	if (executorNamed !== null && executorNamed !== 'pi')
+		return {
+			recording: null,
+			problems: [`the replay records Pi executor runs only; this run's executor was ${executorNamed}`],
+			pairs,
+			authoringCallsLeftOut
+		};
 
 	const tried = executionRows.map((row, n) => executorTryOf(row, n, x));
 	const executor = tried.flatMap((t) => (t ? [t.tried] : []));
