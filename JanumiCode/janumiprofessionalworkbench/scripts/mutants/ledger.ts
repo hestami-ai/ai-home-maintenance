@@ -31666,5 +31666,14 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/phase7-run-report.test.ts"],
 		why: "PROMISE: the adjudication classes name the reviewer's output-token truncation by its recorded failure text, in place of a transport failure. WHO RELIES: the person classifying P5's seven no-responses. WHAT THE MUTATION DOES: the old class is offered again. OBSERVED (bun run mutants -- the 23 P5B ids and the 5 entries this package re-anchored, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M23-the-adjudication-offers-a-transport-failure ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 7 P5, package B, F7 - the adjudication classes name the reviewer's output-token truncation by the failure text such a review records (\"model hit max output token limit\"), in place of \"transport failure (REG-F-499)\""
+	},
+	{
+		id: "P5B-M24-the-fence-is-chosen-without-the-builder-s-cut-declarations",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "...(input.framing === 'DECLARED_POLICY' && input.declaredWorkCut !== undefined ? [input.declaredWorkCut] : [])",
+		replace: "...(input.framing === 'DECLARED_POLICY' && input.declaredWorkCut !== undefined ? [input.declaredWorkCut] : []).filter(() => false)",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/declared-policy-review.test.ts"],
+		why: "PROMISE: the declarations of a cut the builder made unit by unit name each unit's title (the PWA's, which an agent authors in half B) on host lines before the work, so the fence chooser reads them. WHO RELIES: every reader of the fence, which must occur on no line of the prompt but its own. WHAT THE MUTATION DOES: the declarations are left out of what the fence is chosen over, so a unit with commands and no work product, all of its commands cut and its title holding the first fence candidate, keeps that fence on a host line. OBSERVED (bun run mutants -- P5B-M24-the-fence-is-chosen-without-the-builder-s-cut-declarations P5B-M3-the-fence-is-chosen-without-the-title-on-the-host-line, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M24-the-fence-is-chosen-without-the-builder-s-cut-declarations ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 3 - the fence of a declared review is chosen over its builder's cut declarations too: a unit with commands and no work product whose commands were all cut had its title only in the declaration of that cut, and a title holding <<<UNTRUSTED-00>>> kept that fence on a non-fence line"
 	}
 ];

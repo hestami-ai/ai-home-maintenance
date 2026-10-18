@@ -850,7 +850,11 @@ function promptPlan(input: ReasoningReviewInput) {
 			...untrusted.flatMap((e) => (e ? [e.bytes] : [])),
 			...(prefenced ? untrustedCallNames(input.observedToolCalls) : []),
 			// ⭐ P5 package B (F1) — a unit's title on the host's line, JSON-encoded as it is written there.
-			...withoutWork.map((u) => jsonLine(u.unit))
+			...withoutWork.map((u) => jsonLine(u.unit)),
+			// ⭐ P5 package B's check (finding 3) — and the declarations of a cut its builder made, on host lines before the
+			// work: each names a unit's title, JSON-encoded, and a unit with no work product whose commands are all cut has its
+			// title nowhere else in the prompt.
+			...(input.framing === 'DECLARED_POLICY' && input.declaredWorkCut !== undefined ? [input.declaredWorkCut] : [])
 		]
 	};
 }
