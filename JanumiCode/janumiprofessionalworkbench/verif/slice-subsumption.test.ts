@@ -625,7 +625,24 @@ describe('SL-L4 — no working artifact claims an item the Slice ledger now deri
 			//     MET; re-measuring the selection on a new arm is not selecting it.
 			//   · `ROADMAP-the-escalation-recommendation.md` (`JAN-ESCREC`) is COMPLETE and touched the same check files. ⛔ It
 			//     changed what a review yields, not what the reviewer reads or which framings qualification measures.
-		).toBe(54);
+			//
+			// 54 -> 55 (2026-10-18): `ROADMAP-multi-harness-executor.md` (`JAN-MHX`, `REG-D-117`). ⭑ THE SPONSOR
+			// REQUIRES EXECUTORS BEYOND PI, AND THEIR HOST TOOL SERVER, CLI DRIVERS AND GUARDS NEED ONE BUILD SEQUENCE.
+			//   · `ROADMAP-backing-agent-tool-suite.md` (`JAN-TOOLSUITE`) separates executor and reviewer configuration
+			//     and records identity. ⛔ TS-03 keeps agy unchanged; TS-08 exits on Pi. A shared MCP tool server and
+			//     workspace-capable CLI drivers would reverse that scope rather than finish it.
+			//   · `ROADMAP-the-selection-residuals.md` (`JAN-SELRES`) owns the executor selector and is COMPLETE.
+			//     ⛔ RS-1 selects and records the configured model; its landed agy path is `agyPrintWithModel`.
+			//     Choosing a backend cannot supply the host tools, CLI session or per-turn surface proof.
+			//   · `ROADMAP-undertaking-execution-sandbox.md` (`JAN-EXEC`) Phase 7 is live end-to-end validation,
+			//     followed by the committed replay. ⛔ Its P7 and completion packages sequence that measurement and
+			//     its remedies; JAN-MHX builds reusable executor adapters that continue beyond P5, which ran on Pi.
+			//   · `ROADMAP-live-execution-lane.md` (`JAN-LIVEEXEC`) exits on a Pi-produced, independently reviewed
+			//     work product. ⛔ LE-03 to LE-05 are an opt-in live observation; reusable CLI drivers and their
+			//     deterministic refusal guards need a build sequence beyond that lane's configuration.
+			// ⭑ IT SUBSUMES THE HARNESS SWITCH: one host-owned tool surface serves devin, agy, Codex and Muse;
+			// Claude Code is designed and deferred. The selector and Phase 7 lane consume that shared mechanism.
+		).toBe(55);
 	});
 
 	it('no census artifact carries a live, uncited status for a rule the ledger derives', () => {

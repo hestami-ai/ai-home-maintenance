@@ -5,7 +5,7 @@
 - **Basis:** branch `jan-exec/phase7c`, head `19a018f3`. Every file reference below was read at that head.
 - **Sources:** the code named in §1; five CLI investigations (devin, agy, Codex, Muse, Claude Code), whose captures sit
   in the scratch folder `.../scratchpad/mhx/`; and the sponsor's answers of 2026-10-18
-  (`mhx/sponsor-words-2026-10-18.md`, to be registered as REG-D-117).
+  (`mhx/sponsor-words-2026-10-18.md`, registered as REG-D-117).
 - **Roadmap:** `ROADMAP-multi-harness-executor.md`, beside this file.
 
 ---
@@ -1012,6 +1012,14 @@ fake CLI and no model (D18).
   model sees what it answered and what was found, but not, in its context, the tool calls it made; the record keeps
   them. Accept re-send for CLI executors? The alternative, each CLI resuming its own session, needs more probes after
   P5.
+
+- ⭑ **2026-10-18 — the sponsor's answers are registered as `REG-D-117`.** These answers override §7 where they differ.
+  - **S1.** No host default model; the model stays required (`REG-D-052`). Defaults belong in guidance and lane configuration.
+  - **S2, changed by the sponsor.** *"it should be either GLM-5.3 Flash Max or DeepSeek V4.1 Flash Max depending on if it's executor or reviewer."* With the reviewer on `glm-5-3-flash-max`, the devin executor and MH-0a probes use `deepseek-v4-1-flash-max`; the identity refusal still applies.
+  - **S3.** Codex uses `gpt-5.6-sol` at high effort on the ChatGPT login; sharing Pi's quota is accepted. It is available again, so its live probe need not wait until 2026-10-22.
+  - **S4.** Build Muse as designed, with contributor mode off per run, telemetry off and the toolset trimmed to the host's tools. The sponsor accepts the terms-summary risks. `muse-wonder-1.0` at high effort is the lead's delegated default, flagged for sponsor confirmation.
+  - **S5.** Claude Code waits for a Console API key; designed and not built, MH-11 deferred.
+  - **S6.** CLI repairs re-send the task with the earlier answers and findings on each; resume remains deferred as MH-12.
 
 ### For the lead (seven)
 

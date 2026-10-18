@@ -1960,6 +1960,12 @@ assurance policies gate it.** ⛔ Report what breaks; do not smooth it.
 | P7 | the recording, from the last paid run, and the replay regression committed | the regression replays the recorded matrix at no call |
 - ⭑ **2026-10-16 — E1–E4 are built, reviewed, fixed and merged** (`26e60c4e`); the 14 declared oracles are conferred (`REG-D-113`); round 3 is building `REG-D-114`'s remaining items; P4 is next.
 - ⭑ **2026-10-16 — P4 complete, GREEN** (`f0c33c17`). 121 reviewer calls in all (canary 2, full run 108, retry 3, re-measurement 8); programme total is 319 of about 450 (`REG-D-110`); case set v6 repaired four cases (`c4ca02eb`, `REG-D-115`, `REG-F-562` closed); `reviewer:qual:check` is GREEN. P5 next.
+- ⭑ **2026-10-18 — P5 ran on Pi; fixes merged; re-run owed** (`REG-D-117`; `d9687e50`).
+  - 44 reviewer calls; programme total 363 of about 450 (`REG-D-110`).
+  - The execution half works: phases ran, were gated and recovered. No finished-Undertaking Yes: End-to-end verification ended ABANDONED / UNASSESSED, its step CANCELLED, while the root and its two declared reviews were SATISFIED.
+  - The output-cap class, root-review input, lane hold and report fixes are merged (`REG-F-563`, `REG-F-564`, `REG-F-565`). The merged re-render has 31 cells, 4 broke, 4 open and 0 breaks with no register entry.
+  - The cap test spent 1 reviewer call (364): `glm-5-3-flash-high` answered the prompt `glm-5-3-flash-max` was cut on (`REG-F-563`). The sponsor chose to qualify it, then re-run P5, the limit rising to about 600 (`REG-D-117` Q10).
+  - Next: map the report's new class (`REG-D-118` (4)) and raise the lane's limit; qualify `glm-5-3-flash-high` on case set v6 (about 113 calls); the sponsor's selection; then re-run P5, about 44 reviewer calls. JAN-MHX remains being built beside this work.
 
 ⚠ *"The results become `TEST_RESULT` evidence"* above ~~is put to the sponsor as the design's §9.5~~ ⭑ is read as `R18`'s OBSERVATION evidence, judged by the reviewer (the sponsor, `REG-D-102` (5)). *"The declared assurance policies gate it"* holds in form only today (the design's stage 5b; §9.6) ⭑ and runs as is, all 14 verdicts reported vacuous (`REG-D-102` (6)). §11's *"It works live"* was measured on 2026-09-14 and has not been driven since; today's live authoring specs cannot pass (`REG-F-506`).
 

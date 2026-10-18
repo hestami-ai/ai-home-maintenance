@@ -6,6 +6,7 @@
   §9 lists every finding and what changed. The package layout and the merge order below are the main change (R1).
 - **The main line:** P5 on agy with `gemini-4-argon-high` (the sponsor's Q3). Every package below either sits on that
   path or runs beside it without blocking it.
+- ⭑ **2026-10-18 — P5 ran on Pi instead** (Q5, `REG-D-117`); agy with `gemini-4-argon-high` remains the sponsor's executor choice for later runs (Q3). JAN-MHX is being built. S2 and S4 are answered: MH-0a runs on `deepseek-v4-1-flash-max` while the reviewer uses GLM; MH-10 is no longer deferred and builds Muse as designed, with the lead's delegated default `muse-wonder-1.0` at high effort. S1, S3, S5 and S6 are recorded in `REG-D-117` and the design's §7 pointer.
 
 ---
 
@@ -495,5 +496,5 @@ green before agy was re-pointed, is MH-5's.
   re-measure of the reviewer's isolation, owed.
 - **Widening `verif/tool-adapter-exports-reachable.test.ts`** to subfolders and `export const`: one register entry.
   First count what it reddens today, then add it with its own control mutant.
-- **The sponsor's answers of 2026-10-18**, to be registered as REG-D-117, before MH-9. S6's answer, when it comes, goes
+- **The sponsor's answers of 2026-10-18**, registered as REG-D-117, before MH-9. S6's answer, when it comes, goes
   with them.
