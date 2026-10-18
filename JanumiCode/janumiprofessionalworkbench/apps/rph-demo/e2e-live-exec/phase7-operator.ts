@@ -1340,6 +1340,17 @@ export const DRY_SIGN_OFF_NOT_REACHED =
 	'not reached in a dry run: Record Assurance asks the reviewer to judge each of the unit’s declared policies, and a dry run calls no model (REG-D-112 (b)); the page was loaded afresh, the row waited for and Record Assurance found on it, and nothing was pressed';
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7 P5, package B (F3; the sponsor, 2026-10-18: *"Yes, hold the root"*) — WHAT THE ROOT'S SIGN-OFF
+ * RECORDS WHILE A PHASE IS ABANDONED, the store's reading after the phase's last act: not pressed, naming each such phase.
+ * ⛔ P5's lane signed its root off seven minutes after its end-to-end phase was abandoned — two paid reviews, and a green
+ * root that said nothing true of the product. ⚠ The lane's rule, not the product's: the page still offers the sign-off
+ * (`e2e/phase7-five-unit.e2e.ts`, prediction (a)). A phase that stopped and was left as found, never abandoned, holds nothing.
+ */
+export const rootHeldOverAbandoned = (titles: readonly string[]): string =>
+	`the root is held, not signed off: ${titles.join(', ')} ${titles.length === 1 ? 'is' : 'are'} ABANDONED, and the lane ` +
+	'signs no root off while a phase is (the sponsor, 2026-10-18: "Yes, hold the root")';
+
+/**
  * ⭐ `E12F` F3 — THE RATIONALE THE RULE TYPES when it re-runs a unit's declared reviews that did not conclude: the run plan's
  * rule, naming itself and the decision that extends it, so a reader of the Decision learns which limb this was.
  */
@@ -2535,11 +2546,19 @@ export async function runTheLane(r: {
 				refused: green.refused
 			};
 		};
+		// ⭐ P5 package B (F3) — the phases the store reads ABANDONED, read after each one's last act (`unit.after`): any holds the
+		// root, its row read and nothing pressed (`rootHeldOverAbandoned`).
+		const abandoned = phases.filter((u) => u.after?.lifecycleState === 'ABANDONED').map((u) => u.title);
+		const held = async (unit: RunUnit): Promise<SignOffRecord> => ({
+			...none,
+			offered: await hands.recordAssuranceOffered(unit),
+			notPressed: rootHeldOverAbandoned(abandoned)
+		});
 		for (const unit of [...phases.filter((u) => u.stopped === false), root]) {
 			// ⚠ LOADED AFRESH FOR EACH UNIT: after an `error` envelope the page is the error page, and after a redirect it is
 			// another page, so this unit's row would be gone, and read as offering nothing (round 2's fix pass).
 			await hands.showOverview();
-			unit.signOff = await signOff(unit);
+			unit.signOff = unit === root && abandoned.length > 0 ? await held(unit) : await signOff(unit);
 			writeRunRecord(lane, record);
 			// ⛔ E12's re-review F1 (D4; `REG-F-535`) — A SIGN-OFF ACT WITH NO ANSWER: no later sign-off is pressed beside it, and
 			// the run ends for it once the final archive is taken.

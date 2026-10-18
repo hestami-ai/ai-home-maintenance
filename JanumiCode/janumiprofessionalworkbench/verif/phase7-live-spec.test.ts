@@ -1830,6 +1830,7 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			'recordAssurance end-to-end',
 			'markSatisfied end-to-end',
 			'showOverview',
+			// ⭑ P5 package B (F3) — THE CONTROL: a phase that stopped and was LEFT AS FOUND, never abandoned, holds no root.
 			'recordAssurance root',
 			'markSatisfied root'
 		]);
@@ -2019,15 +2020,35 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			implementation.limitCheck?.recorded,
 			'the limit before a phase did not count the re-runs'
 		).toBe(2 + 1 + 2 + 3);
+		// ⭐⭐ P5 package B (F3; the sponsor, 2026-10-18: "Yes, hold the root") — AND THE ROOT IS HELD while a phase is ABANDONED:
+		// its row read, nothing pressed, and its sign-off recorded not pressed, naming the abandoned phase. ⛔ RED BEFORE F3,
+		// driven: the root's Record Assurance and Mark Satisfied were pressed after the abandonment, as in P5.
 		expect(
-			l.only('recordAssurance'),
-			'the recovered phase was not signed off, or the abandoned one was'
+			l.only('recordAssurance', 'markSatisfied'),
+			'the recovered phase was not signed off, the abandoned one was, or the root was signed off beside it'
 		).toEqual([
 			'recordAssurance requirements',
+			'markSatisfied requirements',
 			'recordAssurance implementation',
+			'markSatisfied implementation',
 			'recordAssurance end-to-end',
-			'recordAssurance root'
+			'markSatisfied end-to-end'
 		]);
+		const root = record.units[0]!;
+		expect(root.signOff, 'the root’s sign-off is not recorded held, naming the abandoned phase').toEqual({
+			offered: true,
+			limitCheck: null,
+			recordAssurance: null,
+			rerunDeclared: null,
+			rerunLimitCheck: null,
+			markSatisfied: null,
+			refused: null,
+			notPressed:
+				'the root is held, not signed off: Design is ABANDONED, and the lane signs no root off while a phase is (the ' +
+				'sponsor, 2026-10-18: "Yes, hold the root")'
+		});
+		expect(l.written().units[0]!.signOff, 'the run record written lacks the hold').toEqual(root.signOff);
+		expect([l.action('01-root-recordAssurance'), l.action('01-root-markSatisfied')]).toEqual([false, false]);
 		for (const file of [
 			'02-requirements-rerunReview',
 			'03-design-rerunWork',
