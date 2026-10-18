@@ -1195,7 +1195,8 @@ describe('⭐ the store, as the run reads it after every act (REG-F-540)', () =>
  * ~~⭐ R3-B's fix round, F1 — WHAT THE ONE RULE COUNTS BEFORE A PHASE, AND BEFORE THE RULE'S RE-RUN OF ITS WORK: a model unit's
  * worst case, each try's review and each reviewed command's, (3 + 32) × 4 = 140; AND BEFORE THE RULE'S RE-RUN OF A STOPPED
  * PHASE'S REVIEW: a re-review's worst case, (1 + 32) × 4 = 132.~~ ⛔ `REG-D-114` (14), as amended 2026-10-16: a phase's whole
- * worst case would refuse every phase once about 306 calls are spent.
+ * worst case would refuse every phase once about 306 calls are spent ⭐ (at the limit of 450; at today's 600, once 456 are:
+ * 600, less the 4 held back and the phase's 140).
  * ⭐ `REG-D-114` (14), as amended 2026-10-16 — WHAT THE ONE RULE COUNTS BEFORE A PHASE, BEFORE THE RULE'S RE-RUN OF ITS WORK OR
  * OF ITS REVIEW, AND BEFORE A MODEL ROOT'S PRESS: ONE TRY'S RESERVE, a review of up to `reviewerCallsPerTry` calls — 4, D8's
  * own rule: the lane checks the limit again before every later press. ⛔ Restated, never read from the lane, so a figure the
@@ -2563,7 +2564,8 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 	it('⛔ REG-D-114 (14), AS AMENDED — before a phase it counts ONE TRY’S RESERVE: a phase is pressed with it reaching the limit exactly, and the next, one call past it, is not', async () => {
 		// ⛔ PREDICTED RED, read from the code: before a phase the one rule counted the phase's WORST CASE, a model unit's 140
 		// (R3-B's fix round, F1), so a phase whose one try's reserve reaches the limit exactly was held back — as every phase
-		// would be once about 306 calls are spent (`REG-D-114` (14), as amended 2026-10-16). ⭑ Every phase is scripted, so a lane
+		// would be once about 306 calls are spent ⭐ (at the limit of 450; at today's 600, once 456 are: 600, less the 4 held back
+		// and the phase's 140) (`REG-D-114` (14), as amended 2026-10-16). ⭑ Every phase is scripted, so a lane
 		// that presses one past the limit runs on and is caught here by the assertion, not by a script that has no press for it.
 		const prior = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - TRY_RESERVE;
 		const l = laneOf({
