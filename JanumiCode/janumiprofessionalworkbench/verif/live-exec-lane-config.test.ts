@@ -945,14 +945,28 @@ describe('⭐ P7-2 D4 — the Phase 7 lane waits an ALLOWANCE derived from the b
 	// chose *"Raise to about 450 (Recommended)"*, and its pointer holds the number the lane enforces, *"**The limit is 450
 	// reviewer calls**"*, amending `REG-D-102` (4) again. ~~REG-D-108, which amends REG-D-102 (4) again~~ — superseded: its
 	// 230 was P3's. The promise is unchanged: the lane's limit is the sponsor's, read from the register, never a copy.
-	it('⭐ D8 — the paid limit is the sponsor’s, read from the ruling in force, REG-D-110, which amends REG-D-102 (4) again', () => {
+	// ⭐ `JAN-EXEC` Phase 7 P5, package C (F2; 2026-10-18) — THE RULING IN FORCE IS NOW `REG-D-117` Q10, which raises `REG-D-110`
+	// (1)'s limit: the sponsor chose *"Qualify High, then P5 (Recommended)"*, whose text read *"Through P6 the total is about
+	// 580, so the limit rises to about 600."*, and its meaning says *"`REG-D-110` (1)'s limit becomes about 600"*. The number
+	// is read from the sponsor's own chosen text, and its meaning must name the same; ~~REG-D-110's pointer, "**The limit is
+	// 450 reviewer calls**"~~ — superseded: its 450 was P4's to P5's. The promise is unchanged.
+	it('⭐ D8 — the paid limit is the sponsor’s, read from the ruling in force, REG-D-117 Q10, which raises REG-D-110 (1)’s', () => {
 		const register = readFileSync(REGISTER, 'utf8');
-		const at = register.indexOf('### REG-D-110 ');
-		const ruling = register.slice(at, register.indexOf('\n### ', at + 1));
-		expect(ruling, 'REG-D-110 does not amend REG-D-102 (4)').toContain('(`REG-D-102` (4) amended)');
-		const limit = /\*\*The limit is (\d+) reviewer calls\*\*/.exec(ruling)?.[1];
-		expect(limit, 'REG-D-110 states its limit').toBeDefined();
-		expect(PHASE7_PAID_LIMIT).toBe(Number(limit));
+		const entry = (id: string) => {
+			const at = register.indexOf(`### ${id} `);
+			return register.slice(at, register.indexOf('\n### ', at + 1));
+		};
+		expect(entry('REG-D-110'), 'REG-D-110 does not amend REG-D-102 (4)').toContain('(`REG-D-102` (4) amended)');
+		const q10 = entry('REG-D-117')
+			.split('\n- ')
+			.find((item) => item.startsWith('**Q10.**'));
+		expect(q10, 'REG-D-117 records no Q10').toBeDefined();
+		const chosen = /the limit rises to about (\d+)\./.exec(q10!)?.[1];
+		expect(chosen, 'the sponsor’s chosen text in REG-D-117 Q10 states no limit').toBeDefined();
+		expect(q10, 'REG-D-117 Q10’s meaning does not raise REG-D-110 (1)’s limit to the number chosen').toContain(
+			`\`REG-D-110\` (1)'s limit becomes about ${chosen}.`
+		);
+		expect(PHASE7_PAID_LIMIT, 'the lane’s limit is not the one the sponsor chose (REG-D-117 Q10)').toBe(Number(chosen));
 	});
 
 	it('⭐ D8 — the reserve is the negative control’s own cap on reviewer calls (P7-4e)', () => {
@@ -1220,11 +1234,19 @@ describe('⛔ the config and the spec take every one of these from the helper', 
 	// ⭐ `JAN-EXEC` Phase 7 `P7-2` (D10). Since `P7-2b` a reviewer call that throws is recorded `NO_RESPONSE`, carrying the
 	// configured model ungraded, before the call that answers — so the spec's grade assertion read from the FIRST record
 	// would fail a run whose review stood.
-	it('⭐ P7-2 D10 — the spec reads its reviewer’s identity from the first ASSURANCE call that ANSWERED, never a NO_RESPONSE record', () => {
+	// ⭐ `JAN-EXEC` Phase 7 P5, package C (F3; `REG-F-563`) — NOR A CALL WHOSE REPLY THE TOOL CUT AT THE MODEL'S OUTPUT-TOKEN
+	// LIMIT: recorded REJECTED since package A, it answered nothing, and it carries the configured model ungraded whenever
+	// devin's export named none. ⛔ The spec's filter passed it as an answer. Read by the product's own reader of the class
+	// (`outputLimitOf`, `tools/output-limit.ts`), imported, never restated. ⚠ This holds the spec's SOURCE: the lane is paid
+	// and its behaviour is not run here.
+	it('⭐ P7-2 D10 — the spec reads its reviewer’s identity from the first ASSURANCE call that ANSWERED, never a NO_RESPONSE record ⭐ nor one cut at the output-token limit', () => {
 		const sf = parsed(SPEC);
 		expect(initializersOf(sf, 'reviewer')).toEqual(['answered[0]!.resolvedModel as Identity']);
-		expect(initializersOf(sf, 'answered')).toEqual([
-			"assurance.filter((e) => e.disposition !== 'NO_RESPONSE')"
+		expect(initializersOf(sf, 'answered'), 'the spec takes a cut reply for an answer').toEqual([
+			"assurance.filter((e) => e.disposition !== 'NO_RESPONSE' && outputLimitOf(e) === undefined)"
+		]);
+		expect(importsFrom(sf, '../src/lib/server/tools/output-limit'), 'the class is not read by the product’s reader').toEqual([
+			'outputLimitOf'
 		]);
 		expect(assertionsOn(sf, 'answered.length')).toEqual(['toBeGreaterThanOrEqual(1)']);
 		// ⭑ The field and the member it names are the contract's (`rph-contracts` `ModelExchange`), so neither can rot apart.

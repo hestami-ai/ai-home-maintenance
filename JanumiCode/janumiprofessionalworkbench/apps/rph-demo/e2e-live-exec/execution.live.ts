@@ -7,6 +7,7 @@ import {
 	REVIEWER_MODEL_VARIABLE,
 	wiredReviewer
 } from './lane-config';
+import { outputLimitOf } from '../src/lib/server/tools/output-limit';
 
 // JAN-LIVEEXEC — a work unit runs on a REAL model and is reviewed by a REAL, DIFFERENT one.
 //
@@ -195,7 +196,10 @@ test.describe('LIVE — a work unit is executed by a real model and reviewed by 
 		// Since `P7-2b` a reviewer call that throws short of its tool's bound is recorded `NO_RESPONSE` and run once more,
 		// and that record carries the model the host configured, ungraded (`reasoning-review-validator.ts`, `attempt`): read
 		// from it, the grade asserted below would fail a run whose review then stood.
-		const answered = assurance.filter((e) => e.disposition !== 'NO_RESPONSE');
+		// ⭐ `JAN-EXEC` Phase 7 P5, package C (F3) — NOR A CALL WHOSE REPLY THE TOOL CUT AT THE MODEL'S OUTPUT-TOKEN LIMIT
+		// (`outputLimitOf`; `REG-F-563`): recorded REJECTED since package A, it answered nothing, and it carries the configured
+		// model ungraded whenever devin's export named none, so it is passed over as a call that threw is.
+		const answered = assurance.filter((e) => e.disposition !== 'NO_RESPONSE' && outputLimitOf(e) === undefined);
 		expect(answered.length, 'no reviewer call answered').toBeGreaterThanOrEqual(1);
 		const reviewer = answered[0]!.resolvedModel as Identity;
 

@@ -149,11 +149,12 @@ export const NEGATIVE_CONTROL_RESERVE = PHASE7_NEGATIVE_CONTROL_RESERVE;
  * each press and never during one, counting one try's reserve ahead of a phase, the rule's re-run of its work or of its
  * review, and a MODEL root's press, so what such a press spends after its check is not held to the limit until the next
  * check. ⚠ Stated for every run: it is a property of the lane, never of what a run happened to spend.
+ * ⭐ P5 package C (F2) — ~~REG-D-110 (1)~~: the sponsor's limit is now the one `REG-D-117` Q10 chose, raising `REG-D-110` (1)'s.
  */
 export const LIMIT_CAVEAT =
 	`A phase’s own spend can carry the total past the limit: the lane checks the limit before each press, not during one, ` +
 	`and a model unit’s press may spend up to ${PHASE7_UNIT_REVIEWER_CALLS} reviewer calls after its check (REG-D-114 (14), as ` +
-	`amended 2026-10-16; the sponsor’s limit is "about ${PAID_LIMIT}", REG-D-110 (1)).`;
+	`amended 2026-10-16; the sponsor’s limit is "about ${PAID_LIMIT}", REG-D-117 Q10, raising REG-D-110 (1)).`;
 /** The declared verdicts a complete run signs off: the five units' declared policies, 2 + 2 + 4 + 3 + 3 (§3.2). */
 export const DECLARED_VERDICTS_EXPECTED = 14;
 
@@ -2816,6 +2817,9 @@ function idsOfUnconcluded(r: PairingRow): string[] {
 	// ⭐ P7-6 B2 — a review that concluded on a reply answering no criterion is `REG-F-552`'s, whatever its repair came to.
 	if (r.label === 'no-criterion-answered') ids.push('REG-F-552');
 	if (r.label === 'no-response') ids.push('REG-F-499');
+	// ⭐ P5 package C (F1; `REG-D-118` (4)) — a review that ended on a reply the tool cut at the model's output-token limit is
+	// `REG-F-563`'s, the entry that records the cap: never a break no register entry names.
+	if (r.label === 'output-limit') ids.push('REG-F-563');
 	if (r.refusal === 'failed-repair') ids.push('REG-F-489', 'REG-F-428', 'REG-F-479');
 	if (r.label === 'no-answer-recorded') ids.push('REG-F-525');
 	if (r.label === 'not-pairable') ids.push('REG-F-433');

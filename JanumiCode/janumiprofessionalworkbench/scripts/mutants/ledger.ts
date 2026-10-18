@@ -22768,10 +22768,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "PQ7-M115-the-paid-limit-is-not-the-sponsor-s",
 		file: "apps/rph-demo/e2e-live-exec/lane-config.ts",
-		find: "export const PHASE7_PAID_LIMIT = 450;",
-		replace: "export const PHASE7_PAID_LIMIT = 230;",
+		find: "export const PHASE7_PAID_LIMIT = 600;",
+		replace: "export const PHASE7_PAID_LIMIT = 450;",
 		expectRed: ["verif/live-exec-lane-config.test.ts"],
-		why: "PROMISE: the paid limit the Phase 7 spec checks before each phase is the sponsor's, 150 reviewer calls, read from REG-D-102 (4) itself (D8). WHO RELIES: the between-phase limit check, and the sponsor's approval of the three paid steps within it. WHAT THE MUTATION DOES: the lane's limit is 200, so a run could spend past what the sponsor approved. OBSERVED (driven 2026-10-10 on a disposable copy of the working tree, applied and restored byte for byte, its program compiling (tsc --noEmit -p apps/rph-demo/e2e/tsconfig.json)): KILLED — 1 test(s) red in live-exec-lane-config.test.ts: '⭐ D8 — the paid limit is the sponsor’s, read from REG-D-102 (4) itself' (AssertionError: expected 200 to be 150 // Object.is equality) ⭑ RE-ANCHORED 2026-10-10 (JAN-EXEC P7-6R B6): the sponsor raised the limit to 200 (REG-D-105 (1), which amends REG-D-102 (4)), and the test now reads the ruling in force, REG-D-105's '**The limit is 200 reviewer calls**', and that it amends REG-D-102 (4). The promise is the same - the lane's limit is the sponsor's, read from the register - and the mutation now restores the old, superseded 150. OBSERVED again (bun run mutants -- PQ7-M115-the-paid-limit-is-not-the-sponsor-s, 2026-10-10): KILLED         PQ7-M115-the-paid-limit-is-not-the-sponsor-s ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯ ⭑ RE-ANCHORED 2026-10-11 (JAN-EXEC P3, rule #5): the sponsor raised the limit again, to about 230 (REG-D-108), and the test now reads REG-D-108's pointer, '**The limit is 230 reviewer calls**'. The promise is the same; the mutation now restores the superseded 200. OBSERVED again (bun run mutants -- PQ7-M115-the-paid-limit-is-not-the-sponsor-s, 2026-10-11): KILLED         PQ7-M115-the-paid-limit-is-not-the-sponsor-s ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯ ⭑ RE-ANCHORED 2026-10-11 (JAN-EXEC Phase 7 completion programme, package E3, rule #5): the sponsor raised the limit again, to about 450, for the whole programme (REG-D-110 (1), 'Raise to about 450 (Recommended)'), and the test now reads REG-D-110's pointer, '**The limit is 450 reviewer calls**', and that it amends REG-D-102 (4). The promise is the same; the mutation now restores the superseded 230. OBSERVED again (bun run mutants -- PQ7-M115-the-paid-limit-is-not-the-sponsor-s, 2026-10-11): KILLED         PQ7-M115-the-paid-limit-is-not-the-sponsor-s ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯",
+		why: "PROMISE: the paid limit the Phase 7 spec checks before each phase is the sponsor's, 150 reviewer calls, read from REG-D-102 (4) itself (D8). WHO RELIES: the between-phase limit check, and the sponsor's approval of the three paid steps within it. WHAT THE MUTATION DOES: the lane's limit is 200, so a run could spend past what the sponsor approved. OBSERVED (driven 2026-10-10 on a disposable copy of the working tree, applied and restored byte for byte, its program compiling (tsc --noEmit -p apps/rph-demo/e2e/tsconfig.json)): KILLED — 1 test(s) red in live-exec-lane-config.test.ts: '⭐ D8 — the paid limit is the sponsor’s, read from REG-D-102 (4) itself' (AssertionError: expected 200 to be 150 // Object.is equality) ⭑ RE-ANCHORED 2026-10-10 (JAN-EXEC P7-6R B6): the sponsor raised the limit to 200 (REG-D-105 (1), which amends REG-D-102 (4)), and the test now reads the ruling in force, REG-D-105's '**The limit is 200 reviewer calls**', and that it amends REG-D-102 (4). The promise is the same - the lane's limit is the sponsor's, read from the register - and the mutation now restores the old, superseded 150. OBSERVED again (bun run mutants -- PQ7-M115-the-paid-limit-is-not-the-sponsor-s, 2026-10-10): KILLED         PQ7-M115-the-paid-limit-is-not-the-sponsor-s ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯ ⭑ RE-ANCHORED 2026-10-11 (JAN-EXEC P3, rule #5): the sponsor raised the limit again, to about 230 (REG-D-108), and the test now reads REG-D-108's pointer, '**The limit is 230 reviewer calls**'. The promise is the same; the mutation now restores the superseded 200. OBSERVED again (bun run mutants -- PQ7-M115-the-paid-limit-is-not-the-sponsor-s, 2026-10-11): KILLED         PQ7-M115-the-paid-limit-is-not-the-sponsor-s ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯ ⭑ RE-ANCHORED 2026-10-11 (JAN-EXEC Phase 7 completion programme, package E3, rule #5): the sponsor raised the limit again, to about 450, for the whole programme (REG-D-110 (1), 'Raise to about 450 (Recommended)'), and the test now reads REG-D-110's pointer, '**The limit is 450 reviewer calls**', and that it amends REG-D-102 (4). The promise is the same; the mutation now restores the superseded 230. OBSERVED again (bun run mutants -- PQ7-M115-the-paid-limit-is-not-the-sponsor-s, 2026-10-11): KILLED         PQ7-M115-the-paid-limit-is-not-the-sponsor-s ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯ ⭑ RE-ANCHORED 2026-10-18 (JAN-EXEC Phase 7 P5, package C, F2, rule #5): the sponsor raised the limit again, to about 600 (REG-D-117 Q10, 'Qualify High, then P5 (Recommended)', whose text read 'Through P6 the total is about 580, so the limit rises to about 600.'), raising REG-D-110 (1)'s, and the test now reads the number from that chosen text and holds REG-D-117 Q10's meaning to it ('REG-D-110 (1)'s limit becomes about 600'). The promise is the same; the mutation now restores the superseded 450. OBSERVED again (bun run mutants -- the package C entries by their full ids, 2026-10-18, in the package C worktree, the changes staged, the mutant applied and restored by the runner, this entry among them): KILLED         PQ7-M115-the-paid-limit-is-not-the-sponsor-s ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯",
 		source: "JAN-EXEC Phase 7 P7-2 (round 2, builder L) - the run's lane, its configuration: lane-config.ts's Phase 7 allowance and limit, derived from the one-unit lane's budget by reference (D4, D8); the two variables the server reads at call time, refused at boot by a rule of the lane (D3); the run folder, checked in the runner's load only, and one spec collected per run (D1, D2; e2e-live-exec/run-folder.ts); and the one-unit spec's reviewer, read from the first call that answered (D10) (docs/_working/DESIGN-the-live-end-to-end-run.md §6 P7-2; REG-D-101; REG-D-102; REG-F-526; REG-F-531) ⭑ FIXED after round 2's two adversarial verifiers (2026-10-10): the tree rule widened to every git working tree, since P7-3 runs from a worktree; a Phase 7 request with no run folder refused at boot; the one-unit spec's reviewer calls printed and annotated for D8; and the link, near-miss, empty-folder, hand-off and real-host promises each given a test and a mutant. The range PQ7-M110 to PQ7-M139 being full, each new entry takes a letter after the entry whose promise it extends, as TT-M1b does."
 	},
 	{
@@ -32251,5 +32251,113 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/phase7-run-report.test.ts"],
 		why: "PROMISE: for the root, each planned unit the store does not hold is named as contributing none to what its declared reviews were given. WHO RELIES: the root's line and the UNIT_PURPOSE caveat, over a run whose store lacks a planned phase. WHAT THE MUTATION DOES: no planned unit is read as missing, so a root over three of its four phases reads 'root: as intended' and the caveat 'every unit below it produced'. OBSERVED (bun run mutants -- P5B-M43-a-planned-unit-the-store-lacks-is-not-named, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M43-a-planned-unit-the-store-lacks-is-not-named ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 7 P5, package B's check, finding 5 - the branch of workSeenOf for a planned unit the store does not hold had no test and no ledger entry: a fixture whose store lacks the end-to-end phase now reads it named on the root's line and in the caveat"
+	},
+	{
+		id: "P5C-M1-a-cut-review-s-break-cites-no-register-entry",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "if (r.label === 'output-limit') ids.push('REG-F-563');",
+		replace: "// MUTANT: the output-limit label maps to no register id",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE (REG-D-118 (4)): a review that ended on a reply the tool cut at the model's output-token limit bears on REG-F-563, the entry that records the cap. WHO RELIES: stage 4's cell and the report's count of breaks no register entry names, which P7-5 reads. WHAT THE MUTATION DOES: the label maps to nothing, so such a cell reads broke, unregistered, as at package A's merge. OBSERVED (bun run mutants -- the package C entries by their full ids, 2026-10-18, in the package C worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5C-M1-a-cut-review-s-break-cites-no-register-entry ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package C, F1 (REG-D-118 (4)) - the run report maps the pairing label 'output-limit' to REG-F-563, so a stage-4 cell over a review that ended on a reply cut at the model's output-token limit reads broke citing REG-F-563, never unregistered"
+	},
+	{
+		id: "P5C-M2-the-caveat-names-the-superseded-ruling",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "REG-D-117 Q10, raising REG-D-110 (1)).`;",
+		replace: "REG-D-110 (1)).`;",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: the reviewer calls' caveat names the ruling that set the limit it states, REG-D-117 Q10, which raises REG-D-110 (1)'s. WHO RELIES: the report's reader, in report.json and report.md. WHAT THE MUTATION DOES: the caveat says 'about 600' and cites REG-D-110 (1) alone, whose own number was 450. OBSERVED (bun run mutants -- the package C entries by their full ids, 2026-10-18, in the package C worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5C-M2-the-caveat-names-the-superseded-ruling ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package C, F2 (REG-D-117 Q10; REG-D-110 (1)) - the lane's paid limit raised from 450 to 600, the sponsor's 'the limit rises to about 600', read from REG-D-117 Q10, and the report's caveat naming that ruling"
+	},
+	{
+		id: "P5C-M3-the-left-out-message-names-the-transport-alone",
+		file: "scripts/reviewer-qual/check-core.ts",
+		find: "complete, cut neither at the transport nor at the model’s output-token limit, of a current case",
+		replace: "complete, not cut at the transport, of a current case",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE: the RECORD problem for an evaluation a RESCORED record leaves out says which evaluations a re-scoring re-stamps: complete, cut neither at the transport nor at the model's output-token limit (restampable). WHO RELIES: whoever completes a RESCORED record from the message. WHAT THE MUTATION DOES: the message's old words, which left the OUTPUT_LIMIT class out. OBSERVED (bun run mutants -- the package C entries by their full ids, 2026-10-18, in the package C worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5C-M3-the-left-out-message-names-the-transport-alone ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package C, F4 (package A's check, finding 5) - the reviewer qualification's texts and counts read the OUTPUT_LIMIT class: the check's RESCORED message, rescoreEvaluation's refusal (noReplyToScore), and run.ts's summary"
+	},
+	{
+		id: "P5C-M4-rescore-reads-a-cut-only-inside-the-replay",
+		file: "scripts/reviewer-qual/rescore.ts",
+		find: "const failed = calls.find((k) => noReplyToScore(k.reply));",
+		replace: "const failed = calls.find((k) => k.reply.status === 'TRANSPORT_FAILURE');",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE: rescoreEvaluation refuses an evaluation with a call that left no reply to score - a transport failure, or a reply the tool cut at the model's output-token limit (noReplyToScore) - at once, naming it. WHO RELIES: the check's re-scorer and rescoredLines. WHAT THE MUTATION DOES: the cut is asked of the replay, which refuses it in its own words ('the replay failed - HarnessRefusal: an OUTPUT_LIMIT is not re-scorable ...'). OBSERVED (bun run mutants -- the package C entries by their full ids, 2026-10-18, in the package C worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5C-M4-rescore-reads-a-cut-only-inside-the-replay ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package C, F4 (package A's check, finding 5) - the reviewer qualification's texts and counts read the OUTPUT_LIMIT class: the check's RESCORED message, rescoreEvaluation's refusal (noReplyToScore), and run.ts's summary"
+	},
+	{
+		id: "P5C-M5-rescore-names-a-cut-a-transport-failure",
+		file: "scripts/reviewer-qual/rescore.ts",
+		find: "${failed.reply.status === 'OUTPUT_LIMIT' ? 'cut at the model’s output-token limit' : 'a transport failure'}",
+		replace: "${'a transport failure'}",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE: the refusal names the class of the call that left nothing to replay. WHO RELIES: the reader of a non-reproduction. WHAT THE MUTATION DOES: a cut reads as a transport failure. OBSERVED (bun run mutants -- the package C entries by their full ids, 2026-10-18, in the package C worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5C-M5-rescore-names-a-cut-a-transport-failure ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package C, F4 (package A's check, finding 5) - the reviewer qualification's texts and counts read the OUTPUT_LIMIT class: the check's RESCORED message, rescoreEvaluation's refusal (noReplyToScore), and run.ts's summary"
+	},
+	{
+		id: "P5C-M6-rescore-names-a-transport-failure-a-cut",
+		file: "scripts/reviewer-qual/rescore.ts",
+		find: "${failed.reply.status === 'OUTPUT_LIMIT' ? 'cut at the model’s output-token limit' : 'a transport failure'}",
+		replace: "${'cut at the model’s output-token limit'}",
+		expectRed: ["verif/reviewer-qualification-check.test.ts"],
+		why: "PROMISE (the CONTROL's own mutant): a transport failure is still named one. WHO RELIES: the reader of a non-reproduction over P4-style lines. WHAT THE MUTATION DOES: every such call reads as cut. OBSERVED (bun run mutants -- the package C entries by their full ids, 2026-10-18, in the package C worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5C-M6-rescore-names-a-transport-failure-a-cut ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package C, F4 (package A's check, finding 5) - the reviewer qualification's texts and counts read the OUTPUT_LIMIT class: the check's RESCORED message, rescoreEvaluation's refusal (noReplyToScore), and run.ts's summary"
+	},
+	{
+		id: "P5C-M7-the-summary-counts-no-cut-replies",
+		file: "scripts/reviewer-qual/run.ts",
+		find: "const cut = replies.filter((r) => r.status === 'OUTPUT_LIMIT').length;",
+		replace: "const cut = 0;",
+		expectRed: ["verif/reviewer-qualification-transports.test.ts"],
+		why: "PROMISE: the run's last line counts the replies the tool cut at the model's output-token limit beside the transport failures. WHO RELIES: the operator of a paid qualification run, who reads it first. WHAT THE MUTATION DOES: a run whose calls were cut reads as one with none that failed. OBSERVED (bun run mutants -- the package C entries by their full ids, 2026-10-18, in the package C worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5C-M7-the-summary-counts-no-cut-replies ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package C, F4 (package A's check, finding 5) - the reviewer qualification's texts and counts read the OUTPUT_LIMIT class: the check's RESCORED message, rescoreEvaluation's refusal (noReplyToScore), and run.ts's summary"
+	},
+	{
+		id: "P5C-M8-the-cli-prints-a-summary-of-no-calls",
+		file: "scripts/reviewer-qual/run.ts",
+		find: "say(runSummary(args.out!, replies));",
+		replace: "say(runSummary(args.out!, []));",
+		expectRed: ["verif/reviewer-qualification-transports.test.ts"],
+		why: "PROMISE (the CONTROL's own mutant): the CLI's last line is the summary of the calls it appended. WHO RELIES: the operator. WHAT THE MUTATION DOES: main summarises no calls, whatever it appended. OBSERVED (bun run mutants -- the package C entries by their full ids, 2026-10-18, in the package C worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5C-M8-the-cli-prints-a-summary-of-no-calls ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package C, F4 (package A's check, finding 5) - the reviewer qualification's texts and counts read the OUTPUT_LIMIT class: the check's RESCORED message, rescoreEvaluation's refusal (noReplyToScore), and run.ts's summary"
+	},
+	{
+		id: "P5C-M9-a-cut-criterion-repair-fails-the-review",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "\t\t\t\t\tnoReply.add(failure);\n",
+		replace: "\t\t\t\t\tif (!(e instanceof OutputLimitReached)) noReply.add(failure);\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/output-limit-reviewer-call.test.ts"],
+		why: "PROMISE (REG-F-552; REG-D-090): an I5 criterion repair may only add a conclusion, so one cut at the output-token limit keeps the first reply's judgement, as one that got no reply does. WHO RELIES: every floor review whose first reply answered no criterion. WHAT THE MUTATION DOES: noReply.add moved below the cut branch, in effect - the cut branch returns, so the add is skipped for a cut alone - and criterionRepair rethrows the cut: the review fails. Before this entry nothing reddened on it: reviewer-answer.test.ts swallows evaluate's outcome and stays green under the mutant: applied by hand on 2026-10-18 and restored byte for byte, the two files read 'Tests  1 failed | 41 passed (42)', the one red the new test's, 'AssertionError: the cut repair failed the review: expected 'reasoning-review backing tool invocat…' to be null'. OBSERVED (bun run mutants -- the package C entries by their full ids, 2026-10-18, in the package C worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5C-M9-a-cut-criterion-repair-fails-the-review ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package C, F5 (package A's check, finding 4) - the test gaps package A's check named: an I5 criterion repair cut at the output-token limit keeps the first reply's judgement (the validator), and the recorder refuses a cut whose partial reply is not retained"
+	},
+	{
+		id: "P5C-M10-a-cut-not-retained-is-recorded-with-an-empty-reply",
+		file: "scripts/phase7/record-replay-core.ts",
+		find: "\t\t\treturn 'its reply was cut at the model’s output-token limit, and the partial reply is not retained, so the cut cannot be replayed';",
+		replace: "\t\t\treturn { status: 'OUTPUT_LIMIT', message: toolsOwnWords(row, x), partialReply: '', ...cut };",
+		expectRed: ["verif/phase7-record-replay.test.ts"],
+		why: "PROMISE: the recorder refuses, by name and writing nothing, a reviewer call cut at the output-token limit whose partial reply the store did not retain - it cannot be replayed as the run made it. WHO RELIES: the replay of a recorded run. WHAT THE MUTATION DOES: the cut is recorded with an empty partial reply nobody saw. Applied by hand on 2026-10-18 and restored byte for byte, the new test red with 'AssertionError: the cut not retained was not refused by name: expected 'phase7/record-replay — writes replaye…' to contain 'reviewer call 1 (mex_review_1): its r…''. OBSERVED (bun run mutants -- the package C entries by their full ids, 2026-10-18, in the package C worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5C-M10-a-cut-not-retained-is-recorded-with-an-empty-reply ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package C, F5 (package A's check, finding 4) - the test gaps package A's check named: an I5 criterion repair cut at the output-token limit keeps the first reply's judgement (the validator), and the recorder refuses a cut whose partial reply is not retained"
+	},
+	{
+		id: "P5C-M12-the-live-spec-takes-a-cut-reply-for-an-answer",
+		file: "apps/rph-demo/e2e-live-exec/execution.live.ts",
+		find: "&& outputLimitOf(e) === undefined);",
+		replace: "&& outputLimitOf({}) === undefined);",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "PROMISE: the one-unit live spec reads its reviewer's identity from the first ASSURANCE call that answered, passing over a call whose reply the tool cut at the model's output-token limit - recorded REJECTED, it carries the configured model ungraded whenever devin's export named none. WHO RELIES: the spec's PROVIDER_REPORTED and equality assertions on the reviewer, which a cut first call would fail on a review that then stood. WHAT THE MUTATION DOES: the class's reader is asked of nothing, so every cut record passes as an answer. ⚠ The victim holds the spec's SOURCE (the lane is paid and never runs in the gate): this proves the filter's text and its reader, not the lane's behaviour. OBSERVED (bun run mutants -- the package C entries by their full ids, 2026-10-18, in the package C worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5C-M12-the-live-spec-takes-a-cut-reply-for-an-answer ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package C, F3 (package A's check, finding 3; REG-F-563) - the one-unit live spec reads its reviewer from the first call that answered: never a NO_RESPONSE record, nor one cut at the model's output-token limit (outputLimitOf)"
+	},
+	{
+		id: "P5C-M11-the-held-root-cites-no-ruling",
+		file: "apps/rph-demo/e2e-live-exec/phase7-operator.ts",
+		find: "'signs no root off while a phase is (the sponsor, 2026-10-18: \"Yes, hold the root\", REG-D-117 Q7)';",
+		replace: "'signs no root off while a phase is (the sponsor, 2026-10-18: \"Yes, hold the root\")';",
+		expectRed: ["verif/phase7-live-spec.test.ts"],
+		why: "PROMISE: the run record of a root held over an ABANDONED phase names the ruling beside the sponsor's words, REG-D-117 Q7. WHO RELIES: the run report, which prints the hold's reason on the root's line, and P7-5. WHAT THE MUTATION DOES: the record cites the sponsor's words with no register id. OBSERVED (bun run mutants -- the package C entries by their full ids, 2026-10-18, in the package C worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5C-M11-the-held-root-cites-no-ruling ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package C, F6 - the lane's record of a root held over an ABANDONED phase cites REG-D-117 Q7 beside the sponsor's words"
 	}
 ];

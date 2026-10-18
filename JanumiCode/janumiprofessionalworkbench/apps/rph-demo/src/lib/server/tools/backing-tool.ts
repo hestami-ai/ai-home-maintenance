@@ -223,7 +223,9 @@ export function answerFromText(text: string): AdapterAnswer {
  * and *then* errored is reported as an answer: the professional's work is not discarded because the transport
  * died afterwards, which is the rule `splitExecutionEnvelope` already follows one layer up. ⛔ What that costs
  * is that a TRUNCATED answer is currently indistinguishable from a complete one — `outputTruncation` is the
- * field that should carry it, and nothing populates it. Named here, not silently decided.
+ * field that should carry it, and ~~nothing populates it~~ ⭐ nothing sets it for a turn classified here: since P5 package A
+ * the one record it says `DECLARED` on is the reviewer's, for a reply devin ended at the model's output-token limit
+ * (`output-limit.ts`; `exchange-capture.ts`, `cutAtOutputLimit`). Named here, not silently decided.
  */
 export function answerFromTurnEnd(
 	text: string,

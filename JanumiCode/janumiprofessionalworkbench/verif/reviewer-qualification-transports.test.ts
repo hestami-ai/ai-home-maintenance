@@ -48,7 +48,7 @@ import {
 import { OutputLimitReached } from '../apps/rph-demo/src/lib/server/tools/output-limit.js';
 import { recordProblems, type CallLine, type RunLine } from '../scripts/reviewer-qual/record.js';
 import { reviewerFingerprint } from '../scripts/reviewer-qual/fingerprint.js';
-import { main } from '../scripts/reviewer-qual/run.js';
+import { main, runSummary } from '../scripts/reviewer-qual/run.js';
 import { runQualification, type RunFingerprint } from '../scripts/reviewer-qual/runner.js';
 import {
 	AGY_PRINT_TIMEOUT_MS,
@@ -1253,5 +1253,34 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 			CURRENT_ORACLE_SET.caseSetVersion
 		]).toEqual([6, 6, 6]);
 		expect(spawned, 'one call, captured').toHaveLength(1);
+	});
+
+	// ⭐ `JAN-EXEC` Phase 7 P5, package C (F4; package A's check, finding 5) — THE RUN'S LAST LINE COUNTS EACH CALL THAT LEFT NO
+	// REPLY TO SCORE, BY ITS CLASS: a transport failure, and a reply the tool cut at the model's output-token limit
+	// (`OUTPUT_LIMIT`). ⛔ It counted transport failures alone, so a run whose calls were cut read as one with none that failed.
+	it('⛔ P5 C — the run’s summary counts the replies cut at the output-token limit beside the transport failures, and main prints it', async () => {
+		const answered: CallLine['reply'] = { status: 'NO_ANSWER_SPAN', parses: false };
+		const failed: CallLine['reply'] = { status: 'TRANSPORT_FAILURE', failureClass: 'TIMEOUT', reason: 'cut at 240000 ms', rescorable: false, preContact: false };
+		const cut: CallLine['reply'] = { status: 'OUTPUT_LIMIT', finishReason: null, outputTokens: 25_000, rescorable: false };
+		expect(runSummary('run.ndjson', [answered, failed, cut, cut]), 'a cut reply was not counted').toBe(
+			'4 calls appended to run.ndjson; 1 transport failure(s), 2 cut at the model’s output-token limit'
+		);
+		// ⭑ CONTROL — and the CLI's own last line is this summary of the calls it appended.
+		cleanEnv();
+		const out = join(tmp(), 'run.ndjson');
+		const written: string[] = [];
+		const code = await main(
+			['--transport', 'agy', '--model', LABEL, '--out', out, '--cases', 'G3-CLEAN', '--repetitions', '1'],
+			inProcess([], written)
+		);
+		expect(code, written.join('')).toBe(0);
+		const replies = readFileSync(out, 'utf8')
+			.trimEnd()
+			.split('\n')
+			.map((l) => JSON.parse(l) as CallLine | RunLine)
+			.flatMap((l) => (l.kind === 'CALL' ? [l.reply] : []));
+		expect(written.at(-1), 'the CLI’s last line is not the summary of what it appended').toBe(
+			`reviewer-qual — ${runSummary(out, replies)}\n`
+		);
 	});
 });

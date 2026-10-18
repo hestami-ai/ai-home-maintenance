@@ -1340,15 +1340,18 @@ export const DRY_SIGN_OFF_NOT_REACHED =
 	'not reached in a dry run: Record Assurance asks the reviewer to judge each of the unit’s declared policies, and a dry run calls no model (REG-D-112 (b)); the page was loaded afresh, the row waited for and Record Assurance found on it, and nothing was pressed';
 
 /**
- * ⭐⭐ `JAN-EXEC` Phase 7 P5, package B (F3; the sponsor, 2026-10-18: *"Yes, hold the root"*) — WHAT THE ROOT'S SIGN-OFF
+ * ⭐⭐ `JAN-EXEC` Phase 7 P5, package B (F3; the sponsor, 2026-10-18: *"Yes, hold the root"*, ⭐ `REG-D-117` Q7, its boundary
+ * `REG-D-118` (3)) — WHAT THE ROOT'S SIGN-OFF
  * RECORDS WHILE A PHASE IS ABANDONED, the store's reading after the phase's last act: not pressed, naming each such phase.
  * ⛔ P5's lane signed its root off seven minutes after its end-to-end phase was abandoned — two paid reviews, and a green
  * root that said nothing true of the product. ⚠ The lane's rule, not the product's: the page still offers the sign-off
  * (`e2e/phase7-five-unit.e2e.ts`, prediction (a)). A phase that stopped and was left as found, never abandoned, holds nothing.
+ * ⭐ P5 package C (F6) — the record names the ruling beside the sponsor's words: ~~(the sponsor, 2026-10-18: "Yes, hold the
+ * root")~~.
  */
 export const rootHeldOverAbandoned = (titles: readonly string[]): string =>
 	`the root is held, not signed off: ${titles.join(', ')} ${titles.length === 1 ? 'is' : 'are'} ABANDONED, and the lane ` +
-	'signs no root off while a phase is (the sponsor, 2026-10-18: "Yes, hold the root")';
+	'signs no root off while a phase is (the sponsor, 2026-10-18: "Yes, hold the root", REG-D-117 Q7)';
 
 /**
  * ⭐ `E12F` F3 — THE RATIONALE THE RULE TYPES when it re-runs a unit's declared reviews that did not conclude: the run plan's

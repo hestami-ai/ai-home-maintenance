@@ -142,6 +142,8 @@ function arrange(
 		readonly unanswered?: boolean;
 		/** ⭐ P5 package A (F1) — the first review call's reply the tool cut at the model's output-token limit, this partial reply. */
 		readonly cutFirstReview?: string;
+		/** ⭐ P5 package C (F5 (b)) — and that partial reply NOT retained: its ref pending, as a store that kept none records it. */
+		readonly cutNotRetained?: boolean;
 	} = {}
 ): Arranged {
 	const run = tempDir('run');
@@ -316,7 +318,7 @@ function arrange(
 					}
 				: {
 						outputTruncation: 'DECLARED',
-						rawOutputBeforeCoercionRef: ref(o.cutFirstReview),
+						rawOutputBeforeCoercionRef: o.cutNotRetained === true ? pending : ref(o.cutFirstReview),
 						answerSpanRef: pending,
 						volunteeredReasoningRef: pending,
 						parseOutcome: {
@@ -577,6 +579,19 @@ describe('⭐ the recorder (D1) — a final archive into a replay recording, scr
 			finishReason: null,
 			outputTokens: 25_000
 		});
+	});
+
+	// ⭐ P5 package C (F5 (b); package A's check, finding 4) — A CUT WHOSE PARTIAL REPLY THE STORE DID NOT RETAIN CANNOT BE
+	// REPLAYED AS THE RUN MADE IT: the recorder refuses it, by name, and writes nothing — never a cut with an invented reply.
+	it('⛔ P5 C — refuses, writing nothing, a review call cut at the output-token limit whose partial reply is not retained', () => {
+		const out = join(tempDir('out'), 'recording');
+		const r = record(arrange({ cutFirstReview: '{"findings":[', cutNotRetained: true }), out);
+		expect(r.out, 'the cut not retained was not refused by name').toContain(
+			'reviewer call 1 (mex_review_1): its reply was cut at the model’s output-token limit, and the partial reply is not ' +
+				'retained, so the cut cannot be replayed'
+		);
+		expect(r.code, r.out).toBe(1);
+		expect(existsSync(out), 'a recording was written').toBe(false);
 	});
 
 	it('⛔ refuses, writing nothing, when a file of the recording names the account (REG-F-536)', () => {

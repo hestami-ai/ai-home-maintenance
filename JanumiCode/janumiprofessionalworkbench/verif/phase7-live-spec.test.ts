@@ -2020,9 +2020,9 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			implementation.limitCheck?.recorded,
 			'the limit before a phase did not count the re-runs'
 		).toBe(2 + 1 + 2 + 3);
-		// ⭐⭐ P5 package B (F3; the sponsor, 2026-10-18: "Yes, hold the root") — AND THE ROOT IS HELD while a phase is ABANDONED:
-		// its row read, nothing pressed, and its sign-off recorded not pressed, naming the abandoned phase. ⛔ RED BEFORE F3,
-		// driven: the root's Record Assurance and Mark Satisfied were pressed after the abandonment, as in P5.
+		// ⭐⭐ P5 package B (F3; the sponsor, 2026-10-18: "Yes, hold the root", REG-D-117 Q7) — AND THE ROOT IS HELD while a phase is
+		// ABANDONED: its row read, nothing pressed, and its sign-off recorded not pressed, naming the abandoned phase. ⛔ RED
+		// BEFORE F3, driven: the root's Record Assurance and Mark Satisfied were pressed after the abandonment, as in P5.
 		expect(
 			l.only('recordAssurance', 'markSatisfied'),
 			'the recovered phase was not signed off, the abandoned one was, or the root was signed off beside it'
@@ -2045,7 +2045,7 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			refused: null,
 			notPressed:
 				'the root is held, not signed off: Design is ABANDONED, and the lane signs no root off while a phase is (the ' +
-				'sponsor, 2026-10-18: "Yes, hold the root")'
+				'sponsor, 2026-10-18: "Yes, hold the root", REG-D-117 Q7)'
 		});
 		expect(l.written().units[0]!.signOff, 'the run record written lacks the hold').toEqual(root.signOff);
 		expect([l.action('01-root-recordAssurance'), l.action('01-root-markSatisfied')]).toEqual([false, false]);
@@ -2364,7 +2364,8 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		// ⭑ `REG-D-108` — the prior spend is set against the limit, so the design phase is the one that reaches it. ⭐ R3-B's
 		// fix round (F1) — ~~prior: PHASE7_PAID_LIMIT - 10, requirements recording 6~~: each phase counts ~~its worst case~~ ⭐
 		// one try's reserve (`REG-D-114` (14), as amended 2026-10-16), so the prior lets requirements through exactly at the
-		// limit, and requirements spends that reserve: the run then stands at the limit, with the same 446 spent as before.
+		// limit, and requirements spends that reserve: the run then stands at the limit, with the same ~~446~~ ⭐ calls spent as before: the limit less the 4 held back, 596 at
+		// today's 600 (P5 package C, F2).
 		const prior = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - TRY_RESERVE;
 		const l = laneOf({
 			paid: true,
@@ -2445,7 +2446,8 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		const record = await l.run();
 		// ⭑ The last phase passed its check: ~~prior + 3 + 4, 13 under the limit~~ ~~⭐ R3-B's fix round (F1): prior + 0 + 4 + its
 		// worst case, at the limit~~ ⭐ `REG-D-114` (14), as amended: prior + 0 + 4 + one try's reserve, 8 under the limit. ⭐ The
-		// merge of E12 and E3 — each figure is stated against `PHASE7_PAID_LIMIT`, now 450 (`REG-D-110` (1)): ~~210 + 3 + 4 = 217,
+		// merge of E12 and E3 — each figure is stated against `PHASE7_PAID_LIMIT`, now ~~450 (`REG-D-110` (1))~~ ⭐ 600 (`REG-D-117` Q10;
+		// P5 package C, F2): ~~210 + 3 + 4 = 217,
 		// under 230~~.
 		expect(record.units[4]!.limitCheck?.allowed, 'arrangement: the last phase passes its check').toBe(true);
 		// ⭐ requirements (2 policies): prior + ~~4~~ ~~128~~ 0 + 4 + 8, 4 under the limit, pressed; design (4): 4 over it, held
@@ -2769,7 +2771,8 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		expect([left.rerunDeclared, left.refused?.act, notOffered.only('rerunDeclared')]).toEqual([null, 'Record Assurance', []]);
 		// ⭐ The limit read before the re-run stops it, as before a phase: recorded, the run ends `paid-limit`, and the lane stops
 		// there — the root's sign-off, prior + 12 + 4 + 8, 6 under the limit, which would fit, is never attempted. ⭐ The merge
-		// of E12 and E3 — stated against `PHASE7_PAID_LIMIT`, now 450: ~~200 + 12 + 4 + 8 = 224~~. ⭐ R3-B's fix round (F1) —
+		// of E12 and E3 — stated against `PHASE7_PAID_LIMIT`, now ~~450~~ ⭐ 600 (`REG-D-117` Q10; P5 package C, F2):
+		// ~~200 + 12 + 4 + 8 = 224~~. ⭐ R3-B's fix round (F1) —
 		// ~~prior: PHASE7_PAID_LIMIT - 30~~: each phase counts ~~its worst case~~ ⭐ one try's reserve (`REG-D-114` (14), as
 		// amended 2026-10-16), so the calls before the sign-offs are spent before the run, or in its last phase
 		// (`spentBySignOff`), and "prior" above is those calls, the same total.
