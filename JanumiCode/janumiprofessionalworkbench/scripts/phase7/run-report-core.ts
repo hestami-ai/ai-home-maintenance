@@ -207,7 +207,10 @@ export function unitPurposeCaveat(
 		readonly unit: string;
 		readonly reviews: number;
 		readonly replayed: number;
-		/** ⭐ P5 package B (F6) — what its reviews were judged over, where a unit below it contributed no work (`workSeenOf`). */
+		/**
+		 * ⭐ P5 package B (F6) — what its reviews were ~~judged over~~ ⭐ given, and what their prompts showed of it (P5 package B's
+		 * check, finding 2), where a unit below it contributed no work or a prompt did not show all of it (`workSeenOf`).
+		 */
 		readonly seen?: string | null;
 	}[]
 ): readonly string[] {
@@ -216,12 +219,13 @@ export function unitPurposeCaveat(
 	const counted = (c: (typeof made)[number]): string =>
 		[...(c.reviews > 0 ? [`${c.reviews}`] : []), ...(c.replayed > 0 ? [`${c.replayed} replayed`] : [])].join(' and ');
 	// ⛔ P5 package B (F6) — "judged over the work it and every unit below it produced" only where it was: P5's root was
-	// judged with its abandoned end-to-end phase contributing no work, and the caveat said every unit.
+	// judged with its abandoned end-to-end phase contributing no work, and the caveat said every unit. ⭐ Its check, finding
+	// 2: and where a prompt did not show all of the work it was given, as P5's two did not.
 	const partial = made.filter((c) => c.seen);
 	const judged =
 		partial.length === 0
 			? 'judged over the work it and every unit below it produced (REG-D-111 (2))'
-			: `judged over the work of the units below it that hold a completion (REG-D-111 (2); ${partial.map((c) => `${c.unit}: ${c.seen}`).join('; ')})`;
+			: `given the work of the units below it that hold a completion (REG-D-111 (2); ${partial.map((c) => `${c.unit}: ${c.seen}`).join('; ')})`;
 	return [
 		`UNIT_PURPOSE framing: the declared reviews of a unit composed of others (${made.map((c) => `${c.unit}: ${counted(c)}`).join('; ')}) ` +
 			`were made in it — the unit’s own purpose, ${judged} — and ` +
@@ -317,6 +321,11 @@ export interface StoredContent {
 	/** `sha256:<hex>` of the stored bytes, as the reader recomputed it; null when the row holds none. */
 	readonly actualHash: string | null;
 	readonly actualSize: number | null;
+	/**
+	 * ⭐ P5 package B's check (finding 2) — where the bytes are a declared review's prompt, what it SHOWED of its work, as the
+	 * reader read it from them (`declaredWorkShown`); null where they are not one. Absent, the reader handed no reading.
+	 */
+	readonly declaredWork?: DeclaredWorkShown | null;
 }
 
 export interface StoreRows {
@@ -2114,6 +2123,87 @@ export function exchangeReading(x: StoredObject, content: ReadonlyMap<string, St
 	return verdicts.every(([f, v]) => v === 'VERIFIED' || !needed.includes(f)) ? 'readable' : 'not retained';
 }
 
+// ── ⭐⭐ P5 package B's check (finding 2) — WHAT A DECLARED REVIEW'S PROMPT SHOWED OF ITS WORK ─────────────────────────────
+
+/**
+ * What a declared review's prompt SHOWED of the work it was given (`declaredWorkShown`): the host's declarations of a cut of
+ * that work, and the units whose entries the shown work holds. ⚠ Read from the prompt's host lines and the shown work's
+ * structure: no other byte of the prompt reaches the report.
+ */
+export interface DeclaredWorkShown {
+	/** Each host line declaring a cut of the work, as the prompt gives it, in its order: none when the work was shown whole. */
+	readonly cuts: readonly string[];
+	/** The units the shown work holds a work product of, whole or cut, in its order. */
+	readonly workProducts: readonly string[];
+	/** The units the shown work holds commands of, each with how many, in the order of each unit's first. */
+	readonly commands: readonly { readonly unit: string; readonly count: number }[];
+}
+
+/**
+ * The heading of a declared review's work, and how a host line declaring a cut begins — RESTATED, NOT IMPORTED, as the
+ * validators above are (`reasoning-review-validator.ts`'s `DECLARED_POLICY` framing; `review-fence.ts`'s
+ * `headCutDeclaration`): `verif/phase7-run-report.test.ts` reads prompts the product's own validator built.
+ */
+const DECLARED_WORK_HEADING = 'The WORK to judge against that policy, as one line of JSON';
+const CUT_DECLARATION = '[CUT FOR THIS REVIEW: ';
+/** A line of the fence's form (`FENCE_MEANING`): quoted material starts at one and runs to the next line identical to it. */
+const FENCE_FORM = /^<<<UNTRUSTED-\d\d>>>$/;
+
+/**
+ * ⭐⭐ WHAT A DECLARED REVIEW'S PROMPT SHOWED OF ITS WORK, read from its bytes — or null when they are not a declared review's
+ * prompt. The prompt is read as its reviewer is told to read it (`FENCE_MEANING`): quoted material runs from a line of the
+ * fence's form to the next line identical to it. Outside all of it stands the work's heading; then, before the work's own
+ * fence, the host's lines declaring a cut of the work; then the work between its fence lines — one line of JSON, or the
+ * head of one where the validator cut it head-only, as it cut P5's root prompts — whose entries are read by its structure.
+ */
+export function declaredWorkShown(prompt: string): DeclaredWorkShown | null {
+	const lines = prompt.split('\n');
+	let fence: string | null = null;
+	let heading = -1;
+	let open = -1;
+	for (const [i, line] of lines.entries()) {
+		if (fence !== null) {
+			if (line !== fence) continue;
+			if (open >= 0)
+				return {
+					cuts: lines.slice(heading + 1, open).filter((l) => l.startsWith(CUT_DECLARATION)),
+					...entriesOf(lines.slice(open + 1, i).join('\n'))
+				};
+			fence = null;
+		} else if (FENCE_FORM.test(line)) {
+			fence = line;
+			if (heading >= 0) open = i;
+		} else if (heading < 0 && line.startsWith(DECLARED_WORK_HEADING)) heading = i;
+	}
+	return null;
+}
+
+/**
+ * An entry of a declared review's work line (`declaredPolicyReviewInput`): its unit's title, a JSON string, then whether it
+ * is a work product or a command. ⚠ It cannot open inside a string of the line, where every quote is escaped; and an entry
+ * whose title a head cut ends inside is not matched.
+ */
+const WORK_ENTRY = /\{"workUnit":("(?:[^"\\]|\\.)*"),"(workProduct|command)":/g;
+
+/** The entries a declared review's shown work holds, read by its JSON's structure — a head that ends mid-way included. */
+function entriesOf(work: string): Pick<DeclaredWorkShown, 'workProducts' | 'commands'> {
+	const workProducts: string[] = [];
+	const commands: { unit: string; count: number }[] = [];
+	for (const [, title, kind] of work.matchAll(WORK_ENTRY)) {
+		const unit = JSON.parse(title!) as string;
+		if (kind === 'workProduct') workProducts.push(unit);
+		else tally(commands, unit);
+	}
+	return { workProducts, commands };
+}
+
+/** One more command of `unit`, counted under its first entry. */
+function tally(commands: { unit: string; count: number }[], unit: string): void {
+	const mine = commands.find((c) => c.unit === unit);
+	if (mine === undefined) commands.push({ unit, count: 1 });
+	else mine.count += 1;
+}
+
 // ── THE MANIFEST (P7-4d) ─────────────────────────────────────────────────────────────────────────────────────────────
 
 /** The evidence's own floor, as the join concluded it: SATISFIED, or the first unsatisfied policy's state, plan order. */
@@ -2405,8 +2495,9 @@ interface UnitView {
 	 */
 	readonly children: readonly string[];
 	/**
-	 * ⭐ P5 package B (F6) — for a unit composed of others whose declared reviews were made, what they were judged over — the
-	 * work of whom — where a unit below it contributed no work (`workSeenOf`); null otherwise.
+	 * ⭐ P5 package B (F6) — for a unit composed of others whose declared reviews were made, what they were ~~judged over~~ ⭐
+	 * given — the work of whom — and what their prompts showed of it (its check, finding 2), where a unit below it
+	 * contributed no work or a prompt did not show all of it (`workSeenOf`); null otherwise.
 	 */
 	readonly workSeen: string | null;
 }
@@ -2441,7 +2532,8 @@ function completion(v: UnitView, row: string): MatrixCell {
 			'no model ran for this unit: no execution try is recorded and the tree built nothing under it, so it completed as ' +
 				'a TRANSFORMATION with nothing produced, and is not counted done (REG-F-505)'
 		]);
-	// ⭐ P5 package B (F6) — and what a composite's declared reviews were judged over, where a unit below it contributed none.
+	// ⭐ P5 package B (F6) — and what a composite's declared reviews were given, where a unit below it contributed none, and
+	// what their prompts showed of it (its check, finding 2).
 	const line = seenLine(v);
 	const seen = line === null ? [] : [line];
 	if (s?.lifecycle === 'SATISFIED' && s.assurance === 'SATISFIED' && v.stepState === 'SUCCEEDED')
@@ -3482,11 +3574,15 @@ function unitView(
 }
 
 /**
- * ⭐⭐ P5 package B (F6) — WHAT A UNIT COMPOSED OF OTHERS HAD ITS DECLARED REVIEWS JUDGED OVER, as the route gathers it
- * (`declaredReviewWorkOf`): the work of each unit below it that holds a completion — and each that holds none, with its
- * lifecycle and assurance states, contributed none; and, for the root, each planned unit the store does not hold. Null
- * when every unit below it holds a completion and none is missing, and for a unit with none below it. ⛔ P5's root read
- * "judged over the work it and every unit below it produced" with its end-to-end phase abandoned and none of it shown.
+ * ⭐⭐ P5 package B (F6) — WHAT A UNIT COMPOSED OF OTHERS HAD ITS DECLARED REVIEWS ~~JUDGED OVER~~ ⭐ GIVEN (P5 package B's
+ * check, finding 2), as the route gathers it (`declaredReviewWorkOf`): the work of each unit below it that holds a
+ * completion — and each that holds none, with its lifecycle and assurance states, contributed none; and, for the root, each
+ * planned unit the store does not hold. ⭐ AND WHAT EACH REVIEW'S PROMPT SHOWED OF IT (`promptShown`), its calls grouped by
+ * what they were shown: the prompt's own cut is the validator's or its builder's, after the route gave the work. Null when
+ * every unit below it holds a completion, none is missing, and the prompt of each of its calls was read and showed all of
+ * it uncut (or no call was recorded, so there is no prompt to read); and for a unit with none below it. ⛔ P5's root read "judged over the work it and every unit below it produced" with its end-to-end
+ * phase abandoned and none of it shown — ⛔ then, after F6, "judged over the work of Requirements, Design, Implementation
+ * and unit tests", though its two prompts showed the work of Requirements and part of Design, and no command.
  */
 function workSeenOf(ix: Index, u: Unit, units: readonly Unit[]): string | null {
 	const id = u.object?.id;
@@ -3507,8 +3603,21 @@ function workSeenOf(ix: Index, u: Unit, units: readonly Unit[]): string | null {
 	if (below.length === 0) return null;
 	const missing = u === units[0] ? units.slice(1).filter((x) => x.object === null).map((x) => x.title) : [];
 	const none = below.filter((p) => !completed(p.id));
-	if (none.length === 0 && missing.length === 0) return null;
+	// ⭐ P5 package B's check (finding 2) — each declared review's calls: on the assurance plane, about the unit itself.
+	const shownBy = new Map<string, Map<string, number>>();
+	for (const x of ix.ofType('MODEL_EXCHANGE')) {
+		if (str(x.state.plane) !== 'ASSURANCE' || str(x.state.subjectObjectId) !== id) continue;
+		const shown = promptShown(x, ix.content);
+		const by = shownBy.get(shown) ?? new Map<string, number>();
+		const policy = str(x.state.assurancePolicyId) || 'a review naming no policy';
+		shownBy.set(shown, by.set(policy, (by.get(policy) ?? 0) + 1));
+	}
+	const wholeShown = [...shownBy.keys()].every((s) => s === SHOWN_WHOLE);
+	if (none.length === 0 && missing.length === 0 && wholeShown) return null;
 	const given = below.filter((p) => completed(p.id)).map((p) => str(p.state.title));
+	const callsOf = (by: ReadonlyMap<string, number>): string =>
+		[...by].map(([p, n]) => p + inParens(plural(n, 'call', 'calls'))).join(' and ');
+	const prompts = [...shownBy].map(([shown, by]) => `${callsOf(by)}: ${shown}`);
 	return (
 		`the work of ${given.join(', ') || 'no unit below it'}` +
 		none
@@ -3518,13 +3627,45 @@ function workSeenOf(ix: Index, u: Unit, units: readonly Unit[]): string | null {
 					`assurance ${str(p.state.assuranceState)})`
 			)
 			.join('') +
-		missing.map((t) => `; ${t} contributed none, the store holding no such unit`).join('')
+		missing.map((t) => `; ${t} contributed none, the store holding no such unit`).join('') +
+		(prompts.length === 0 ? '' : `; and what their prompts showed of it — ${prompts.join('; ')}`)
 	);
 }
 
-/** ⭐ P5 package B (F6) — the line a composite's completion carries of what its declared reviews were judged over, or null. */
+/** What `promptShown` says of a prompt that showed all of the work it was given: it declares no cut of it. */
+const SHOWN_WHOLE = 'all of it, uncut';
+
+/**
+ * ⭐ P5 package B's check (finding 2) — WHAT ONE DECLARED REVIEW'S CALL WAS SHOWN OF THE WORK IT WAS GIVEN: all of it, where
+ * its prompt declares no cut of it; else the units whose work products and commands the prompt holds, and the host's
+ * declarations of the cut, verbatim. ⛔ Never guessed: a prompt the report cannot read — not retained, in an archive with no
+ * content store, not what its record claims, not a declared review's, or never handed a reading of — is said not read
+ * here, and why.
+ */
+function promptShown(x: StoredObject, content: ReadonlyMap<string, StoredContent> | null): string {
+	const ref = x.state.materializedInputRef;
+	const verdict = contentVerdict(ref, content);
+	if (verdict === 'NOT_CLAIMED') return 'not read here: its prompt is not retained';
+	if (content === null) return 'not read here: the archive holds no content store';
+	if (verdict !== 'VERIFIED') return 'not read here: its prompt does not hold what its record claims';
+	const shown = content.get(str(rec(ref).storageKey))?.declaredWork;
+	if (shown === undefined) return 'not read here: the report was handed no reading of its prompt';
+	if (shown === null) return 'not read here: its prompt is not a declared review’s';
+	if (shown.cuts.length === 0) return SHOWN_WHOLE;
+	// Each title JSON-encoded, as the host's own declarations write it: a title may hold a comma, or "and".
+	const titled = shown.workProducts.map((t) => JSON.stringify(t)).join(', ');
+	const products = shown.workProducts.length === 0 ? 'no work product' : `the work products of ${titled}`;
+	const counted = shown.commands.map((c) => JSON.stringify(c.unit) + inParens(String(c.count))).join(', ');
+	const commands = shown.commands.length === 0 ? 'no command' : `the commands of ${counted}`;
+	return `${products} and ${commands}, cut as the host declared: ${shown.cuts.join(' ')}`;
+}
+
+/**
+ * ⭐ P5 package B (F6) — the line a composite's completion carries of what its declared reviews were ~~judged over~~ ⭐ given,
+ * and what their prompts showed of it (P5 package B's check, finding 2), or null.
+ */
 const seenLine = (v: UnitView): string | null =>
-	v.workSeen === null ? null : `its declared reviews were judged over ${v.workSeen}`;
+	v.workSeen === null ? null : `its declared reviews were given ${v.workSeen}`;
 
 const pointerOf = (r: unknown): ContentPointer | null => {
 	const x = rec(r);
@@ -3705,7 +3846,8 @@ export function buildRunReport(
 			unit: u.slug,
 			reviews: declared.filter((d) => d.unit === u.slug && d.validatorId === DECLARED_REVIEW_VALIDATORS[0]).length,
 			replayed: declared.filter((d) => d.unit === u.slug && d.validatorId === REPLAYED_DECLARED_REVIEW_VALIDATOR).length,
-			// ⭐ P5 package B (F6) — what its reviews were judged over, as its completion says it (`workSeenOf`), its own words.
+			// ⭐ P5 package B (F6) — what its reviews were given, and what their prompts showed of it, as its completion says it
+			// (`workSeenOf`), its own words.
 			seen: views.find((v) => v.unit === u)?.workSeen ?? null
 		}));
 	const endReason = str(rec(rec(lane.run).end).reason) || null;

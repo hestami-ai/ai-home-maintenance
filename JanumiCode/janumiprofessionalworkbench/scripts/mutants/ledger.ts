@@ -31693,5 +31693,149 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/phase7-run-report.test.ts"],
 		why: "PROMISE: a SUCCEEDED step with nothing of its completion to read reads stage 5a not reached. WHO RELIES: the matrix, which must not read a floor as satisfied over no subject. WHAT THE MUTATION DOES: it reads as intended, 'the step SUCCEEDED and all 0 floor assessments are SATISFIED', as before the check. OBSERVED (bun run mutants -- P5B-M25-a-completion-naming-no-output-hides-its-own-work-product P5B-M26-an-empty-subject-list-reads-as-a-satisfied-floor P5B-M11-the-floor-of-a-completed-step-reads-every-command-of-the-unit P5B-M12-a-completion-by-hand-hides-its-own-refused-command, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M26-an-empty-subject-list-reads-as-a-satisfied-floor ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 7 P5, package B's check, finding 4 - stage 5a of a step completed by hand naming no output reads the work product its own attempts made, and an empty subject list reads not reached, never 'all 0 floor assessments are SATISFIED'"
+	},
+	{
+		id: "P5B-M27-the-reader-hands-the-report-no-reading-of-a-prompt",
+		file: "scripts/phase7/run-report.ts",
+		find: "declaredWork: r.bytes === null ? null : declaredWorkShown(r.bytes)",
+		replace: "declaredWork: null",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: the command line's reader reads each content row's bytes for what a declared review's prompt showed of its work, and hands the report that reading. WHO RELIES: the root's line and the UNIT_PURPOSE caveat, read over a run folder. WHAT THE MUTATION DOES: every row is read as no declared review's prompt, so the root's line says each prompt was not read. OBSERVED (bun run mutants -- the 16 entries P5B-M27 to P5B-M42 and the re-measured P5B-M18, P5B-M19, P5B-M20 and P5B-M22, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M27-the-reader-hands-the-report-no-reading-of-a-prompt ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 2 - the root's line and the UNIT_PURPOSE caveat say what the root's declared reviews were GIVEN and, read from each review's prompt in the archived content store, what each prompt SHOWED of it: the host's declarations of its cut and the units its work holds (P5's two root prompts showed the work products of Requirements and Design and no command)"
+	},
+	{
+		id: "P5B-M28-a-heading-inside-quoted-material-is-read-as-the-host-s",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "if (line !== fence) continue;",
+		replace: "if (line !== fence) {\n\t\t\t\tif (heading < 0 && line.startsWith(DECLARED_WORK_HEADING)) heading = i;\n\t\t\t\tcontinue;\n\t\t\t}",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: a prompt is read as its reviewer is told to read it (FENCE_MEANING): a line inside quoted material is the quote's, so a heading, a cut declaration or an entry an instruction holds is never read as the host's. WHO RELIES: what the report says a prompt showed. WHAT THE MUTATION DOES: the work's heading is looked for inside quoted material too, so a quoted instruction's forged heading and cut are read as the host's. OBSERVED (bun run mutants -- the 16 entries P5B-M27 to P5B-M42 and the re-measured P5B-M18, P5B-M19, P5B-M20 and P5B-M22, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M28-a-heading-inside-quoted-material-is-read-as-the-host-s ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 2 - the root's line and the UNIT_PURPOSE caveat say what the root's declared reviews were GIVEN and, read from each review's prompt in the archived content store, what each prompt SHOWED of it: the host's declarations of its cut and the units its work holds (P5's two root prompts showed the work products of Requirements and Design and no command)"
+	},
+	{
+		id: "P5B-M29-a-prompt-s-cut-declarations-are-not-read",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "cuts: lines.slice(heading + 1, open).filter((l) => l.startsWith(CUT_DECLARATION)),",
+		replace: "cuts: [],",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: the host's lines declaring a cut of the work, before the work's fence, are read. WHO RELIES: the root's line, which quotes them. WHAT THE MUTATION DOES: none is read, and every prompt reads as showing all of its work uncut, P5's two included. OBSERVED (bun run mutants -- the 16 entries P5B-M27 to P5B-M42 and the re-measured P5B-M18, P5B-M19, P5B-M20 and P5B-M22, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M29-a-prompt-s-cut-declarations-are-not-read ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 2 - the root's line and the UNIT_PURPOSE caveat say what the root's declared reviews were GIVEN and, read from each review's prompt in the archived content store, what each prompt SHOWED of it: the host's declarations of its cut and the units its work holds (P5's two root prompts showed the work products of Requirements and Design and no command)"
+	},
+	{
+		id: "P5B-M30-the-commands-a-prompt-shows-are-not-counted",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "else tally(commands, unit);",
+		replace: "else tally([], unit);",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: each command entry the shown work holds is counted under its unit. WHO RELIES: the root's line, which names the commands a cut prompt kept. WHAT THE MUTATION DOES: no command is counted, so a prompt that kept its units' commands reads as showing none. OBSERVED (bun run mutants -- the 16 entries P5B-M27 to P5B-M42 and the re-measured P5B-M18, P5B-M19, P5B-M20 and P5B-M22, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M30-the-commands-a-prompt-shows-are-not-counted ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 2 - the root's line and the UNIT_PURPOSE caveat say what the root's declared reviews were GIVEN and, read from each review's prompt in the archived content store, what each prompt SHOWED of it: the host's declarations of its cut and the units its work holds (P5's two root prompts showed the work products of Requirements and Design and no command)"
+	},
+	{
+		id: "P5B-M31-the-work-products-a-prompt-shows-are-not-read",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "if (kind === 'workProduct') workProducts.push(unit);",
+		replace: "if (kind === 'workProduct') void unit;",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: each work product entry the shown work holds, whole or cut, is read under its unit. WHO RELIES: the root's line, which names the units whose work products a cut prompt kept. WHAT THE MUTATION DOES: none is read, so P5's prompts read as showing no work product. OBSERVED (bun run mutants -- the 16 entries P5B-M27 to P5B-M42 and the re-measured P5B-M18, P5B-M19, P5B-M20 and P5B-M22, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M31-the-work-products-a-prompt-shows-are-not-read ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 2 - the root's line and the UNIT_PURPOSE caveat say what the root's declared reviews were GIVEN and, read from each review's prompt in the archived content store, what each prompt SHOWED of it: the host's declarations of its cut and the units its work holds (P5's two root prompts showed the work products of Requirements and Design and no command)"
+	},
+	{
+		id: "P5B-M32-a-cut-prompt-over-units-that-all-completed-says-nothing",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "const wholeShown = [...shownBy.keys()].every((s) => s === SHOWN_WHOLE);",
+		replace: "const wholeShown = true;",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: a composite whose units all completed still has its line where a prompt did not show all of the work, and the caveat never says 'every unit below it produced' of it. WHO RELIES: a production-size root, whose prompt the builder cuts unit by unit. WHAT THE MUTATION DOES: the line is null and the old words stand over a cut prompt. OBSERVED (bun run mutants -- the 16 entries P5B-M27 to P5B-M42 and the re-measured P5B-M18, P5B-M19, P5B-M20 and P5B-M22, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M32-a-cut-prompt-over-units-that-all-completed-says-nothing ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 2 - the root's line and the UNIT_PURPOSE caveat say what the root's declared reviews were GIVEN and, read from each review's prompt in the archived content store, what each prompt SHOWED of it: the host's declarations of its cut and the units its work holds (P5's two root prompts showed the work products of Requirements and Design and no command)"
+	},
+	{
+		id: "P5B-M33-a-policy-s-calls-are-not-counted",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "shownBy.set(shown, by.set(policy, (by.get(policy) ?? 0) + 1));",
+		replace: "shownBy.set(shown, by.set(policy, 1));",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: each policy's calls that were shown alike are counted. WHO RELIES: the root's line, where a retried or re-run declared review is several calls. WHAT THE MUTATION DOES: every policy reads one call. OBSERVED (bun run mutants -- the 16 entries P5B-M27 to P5B-M42 and the re-measured P5B-M18, P5B-M19, P5B-M20 and P5B-M22, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M33-a-policy-s-calls-are-not-counted ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 2 - the root's line and the UNIT_PURPOSE caveat say what the root's declared reviews were GIVEN and, read from each review's prompt in the archived content store, what each prompt SHOWED of it: the host's declarations of its cut and the units its work holds (P5's two root prompts showed the work products of Requirements and Design and no command)"
+	},
+	{
+		id: "P5B-M34-a-prompt-handed-no-reading-reads-as-shown-whole",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "if (shown === undefined) return 'not read here: the report was handed no reading of its prompt';",
+		replace: "if (shown === undefined) return SHOWN_WHOLE;",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: a prompt the reader handed no reading of is said not read, and why. WHO RELIES: the root's line, which must never guess what a prompt showed. WHAT THE MUTATION DOES: it reads as having shown all of the work uncut. OBSERVED (bun run mutants -- the 16 entries P5B-M27 to P5B-M42 and the re-measured P5B-M18, P5B-M19, P5B-M20 and P5B-M22, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M34-a-prompt-handed-no-reading-reads-as-shown-whole ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 2 - the root's line and the UNIT_PURPOSE caveat say what the root's declared reviews were GIVEN and, read from each review's prompt in the archived content store, what each prompt SHOWED of it: the host's declarations of its cut and the units its work holds (P5's two root prompts showed the work products of Requirements and Design and no command)"
+	},
+	{
+		id: "P5B-M35-a-prompt-not-retained-reads-as-shown-whole",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "if (verdict === 'NOT_CLAIMED') return 'not read here: its prompt is not retained';",
+		replace: "if (verdict === 'NOT_CLAIMED') return SHOWN_WHOLE;",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: a call whose record retained no prompt is said not read, and why. WHO RELIES: the root's line. WHAT THE MUTATION DOES: it reads as having shown all of the work uncut. OBSERVED (bun run mutants -- the 16 entries P5B-M27 to P5B-M42 and the re-measured P5B-M18, P5B-M19, P5B-M20 and P5B-M22, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M35-a-prompt-not-retained-reads-as-shown-whole ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 2 - the root's line and the UNIT_PURPOSE caveat say what the root's declared reviews were GIVEN and, read from each review's prompt in the archived content store, what each prompt SHOWED of it: the host's declarations of its cut and the units its work holds (P5's two root prompts showed the work products of Requirements and Design and no command)"
+	},
+	{
+		id: "P5B-M36-a-prompt-that-does-not-hold-what-its-record-claims-is-read",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "if (verdict !== 'VERIFIED') return 'not read here: its prompt does not hold what its record claims';",
+		replace: "if (verdict !== 'VERIFIED' && verdict === 'PURGED') return 'not read here: its prompt does not hold what its record claims';",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: a prompt is read only where its bytes hash to its record (contentVerdict VERIFIED); one that does not is said not read. WHO RELIES: the root's line, whose reading of a prompt must be of the prompt the record names. WHAT THE MUTATION DOES: a row whose bytes do not hash to the record is read all the same. OBSERVED (bun run mutants -- the 16 entries P5B-M27 to P5B-M42 and the re-measured P5B-M18, P5B-M19, P5B-M20 and P5B-M22, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M36-a-prompt-that-does-not-hold-what-its-record-claims-is-read ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 2 - the root's line and the UNIT_PURPOSE caveat say what the root's declared reviews were GIVEN and, read from each review's prompt in the archived content store, what each prompt SHOWED of it: the host's declarations of its cut and the units its work holds (P5's two root prompts showed the work products of Requirements and Design and no command)"
+	},
+	{
+		id: "P5B-M37-a-run-with-no-content-store-says-its-prompts-are-not-what-they-claim",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "if (content === null) return 'not read here: the archive holds no content store';",
+		replace: "if (content === null) return 'not read here: its prompt does not hold what its record claims';",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: where the archive holds no content store, a prompt is said not read for that reason. WHO RELIES: the reader of a root's line over an archive taken without one. WHAT THE MUTATION DOES: it blames the prompt instead, which nothing read. OBSERVED (bun run mutants -- the 16 entries P5B-M27 to P5B-M42 and the re-measured P5B-M18, P5B-M19, P5B-M20 and P5B-M22, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M37-a-run-with-no-content-store-says-its-prompts-are-not-what-they-claim ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 2 - the root's line and the UNIT_PURPOSE caveat say what the root's declared reviews were GIVEN and, read from each review's prompt in the archived content store, what each prompt SHOWED of it: the host's declarations of its cut and the units its work holds (P5's two root prompts showed the work products of Requirements and Design and no command)"
+	},
+	{
+		id: "P5B-M38-a-prompt-that-is-not-a-declared-review-s-reads-as-shown-whole",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "if (shown === null) return 'not read here: its prompt is not a declared review’s';",
+		replace: "if (shown === null) return SHOWN_WHOLE;",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: a call whose prompt the reader found no declared review's work in is said not read, and why. WHO RELIES: the root's line. WHAT THE MUTATION DOES: it reads as having shown all of the work uncut. OBSERVED (bun run mutants -- the 16 entries P5B-M27 to P5B-M42 and the re-measured P5B-M18, P5B-M19, P5B-M20 and P5B-M22, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M38-a-prompt-that-is-not-a-declared-review-s-reads-as-shown-whole ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 2 - the root's line and the UNIT_PURPOSE caveat say what the root's declared reviews were GIVEN and, read from each review's prompt in the archived content store, what each prompt SHOWED of it: the host's declarations of its cut and the units its work holds (P5's two root prompts showed the work products of Requirements and Design and no command)"
+	},
+	{
+		id: "P5B-M39-the-calls-read-are-not-the-composite-s-own",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "if (str(x.state.plane) !== 'ASSURANCE' || str(x.state.subjectObjectId) !== id) continue;",
+		replace: "if (str(x.state.plane) !== 'ASSURANCE' || str(x.state.subjectObjectId) === id) continue;",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: the calls whose prompts are read are the composite's own declared reviews: on the assurance plane, about the unit itself. WHO RELIES: the root's line. WHAT THE MUTATION DOES: the floor's calls about other subjects are read in their place, and the root's are not. OBSERVED (bun run mutants -- the 16 entries P5B-M27 to P5B-M42 and the re-measured P5B-M18, P5B-M19, P5B-M20 and P5B-M22, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M39-the-calls-read-are-not-the-composite-s-own ⎯⎯⎯⎯⎯⎯ Failed Tests 10 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 2 - the root's line and the UNIT_PURPOSE caveat say what the root's declared reviews were GIVEN and, read from each review's prompt in the archived content store, what each prompt SHOWED of it: the host's declarations of its cut and the units its work holds (P5's two root prompts showed the work products of Requirements and Design and no command)"
+	},
+	{
+		id: "P5B-M40-a-prompt-with-no-declared-work-reads-as-one-that-showed-nothing",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "} else if (heading < 0 && line.startsWith(DECLARED_WORK_HEADING)) heading = i;\n\t}\n\treturn null;",
+		replace: "} else if (heading < 0 && line.startsWith(DECLARED_WORK_HEADING)) heading = i;\n\t}\n\treturn { cuts: [], workProducts: [], commands: [] };",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: bytes that are not a declared review's prompt read null, never as a prompt that showed nothing. WHO RELIES: the root's line, which says such a prompt was not read. WHAT THE MUTATION DOES: they read as a declared review's prompt that showed no work. OBSERVED (bun run mutants -- the 16 entries P5B-M27 to P5B-M42 and the re-measured P5B-M18, P5B-M19, P5B-M20 and P5B-M22, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M40-a-prompt-with-no-declared-work-reads-as-one-that-showed-nothing ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 2 - the root's line and the UNIT_PURPOSE caveat say what the root's declared reviews were GIVEN and, read from each review's prompt in the archived content store, what each prompt SHOWED of it: the host's declarations of its cut and the units its work holds (P5's two root prompts showed the work products of Requirements and Design and no command)"
+	},
+	{
+		id: "P5B-M41-the-root-s-line-says-judged-over-what-its-reviews-were-given",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "v.workSeen === null ? null : `its declared reviews were given ${v.workSeen}`;",
+		replace: "v.workSeen === null ? null : `its declared reviews were judged over ${v.workSeen}`;",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: the root's line says what its declared reviews were GIVEN, the route's work before the prompt's own cut, never what they were judged over. WHO RELIES: half A's reader: P5's line read 'judged over the work of Requirements, Design, Implementation and unit tests', and its prompts showed Requirements and part of Design. WHAT THE MUTATION DOES: F6's words are restored. OBSERVED (bun run mutants -- the 16 entries P5B-M27 to P5B-M42 and the re-measured P5B-M18, P5B-M19, P5B-M20 and P5B-M22, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M41-the-root-s-line-says-judged-over-what-its-reviews-were-given ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 2 - the root's line and the UNIT_PURPOSE caveat say what the root's declared reviews were GIVEN and, read from each review's prompt in the archived content store, what each prompt SHOWED of it: the host's declarations of its cut and the units its work holds (P5's two root prompts showed the work products of Requirements and Design and no command)"
+	},
+	{
+		id: "P5B-M42-the-caveat-says-judged-over-what-the-reviews-were-given",
+		file: "scripts/phase7/run-report-core.ts",
+		find: ": `given the work of the units below it that hold a completion (REG-D-111 (2); ",
+		replace: ": `judged over the work of the units below it that hold a completion (REG-D-111 (2); ",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: the UNIT_PURPOSE caveat says what the declared reviews were GIVEN where a unit contributed no work or a prompt did not show all of it. WHO RELIES: the report's opening caveats. WHAT THE MUTATION DOES: F6's 'judged over' is restored. OBSERVED (bun run mutants -- the 16 entries P5B-M27 to P5B-M42 and the re-measured P5B-M18, P5B-M19, P5B-M20 and P5B-M22, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M42-the-caveat-says-judged-over-what-the-reviews-were-given ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 2 - the root's line and the UNIT_PURPOSE caveat say what the root's declared reviews were GIVEN and, read from each review's prompt in the archived content store, what each prompt SHOWED of it: the host's declarations of its cut and the units its work holds (P5's two root prompts showed the work products of Requirements and Design and no command)"
 	}
 ];

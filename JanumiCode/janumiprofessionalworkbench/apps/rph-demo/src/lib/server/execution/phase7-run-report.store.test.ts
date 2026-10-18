@@ -866,6 +866,14 @@ describe('JAN-EXEC P7-2 D9 — the run report over stores the product wrote, rea
 			'end-to-end:model:fixture-executor-model',
 			'root:local-professional'
 		]);
+		// ⭐ P5 package B's check (finding 2) — what the root's reviews were given, and what each prompt the product stored
+		// showed of it, read from those prompts by the command line's reader: all of it, its work small enough to fit.
+		expect(at('7', 'whole run')?.basis[0]).toBe(
+			'root: as intended — its declared reviews were given the work of Requirements, Implementation and unit tests, ' +
+				'End-to-end verification; Design contributed none, holding no completion (lifecycle EXECUTING, assurance ' +
+				'UNASSESSED); and what their prompts showed of it — pol_intent_preservation (1 call) and pol_fitness_for_purpose ' +
+				'(1 call): all of it, uncut'
+		);
 		// ⭐ Stage 8 over what the product stored: each exchange's asked and answered bytes hash to their records — the
 		// design review's two calls that threw included, which got no answer to read.
 		for (const p of PHASES) {

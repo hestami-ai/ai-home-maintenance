@@ -41,6 +41,7 @@ import { accountNames, noAccountName, scanText, type ScanHit } from './archive-s
 import { workspaceTreeSha256 } from './node-tests.js';
 import {
 	buildRunReport,
+	declaredWorkShown,
 	FINAL_ARCHIVE,
 	renderMarkdown,
 	type ActionRecord,
@@ -104,7 +105,11 @@ interface ContentRow {
 	readonly bytes: string | null;
 }
 
-/** The rows of both archived stores, each opened read-only and closed. ⛔ Content bytes are hashed here and never kept. */
+/**
+ * The rows of both archived stores, each opened read-only and closed. ⛔ Content bytes are hashed here and never kept; ⭐ P5
+ * package B's check (finding 2) — and a declared review's prompt is read here for what it showed of its work
+ * (`declaredWorkShown`): the host's lines declaring a cut of it and the units its work holds, never the work itself.
+ */
 export function readStores(archive: string): StoreRows {
 	const record = new Database(join(archive, RECORD_STORE), { readonly: true });
 	let objects: StoredObject[];
@@ -164,7 +169,8 @@ export function readStores(archive: string): StoreRows {
 				byteSize: r.byteSize,
 				purged: r.purged === 1,
 				actualHash: r.bytes === null ? null : `sha256:${createHash('sha256').update(r.bytes, 'utf8').digest('hex')}`,
-				actualSize: r.bytes === null ? null : Buffer.byteLength(r.bytes, 'utf8')
+				actualSize: r.bytes === null ? null : Buffer.byteLength(r.bytes, 'utf8'),
+				declaredWork: r.bytes === null ? null : declaredWorkShown(r.bytes)
 			}));
 		} finally {
 			store.close();
