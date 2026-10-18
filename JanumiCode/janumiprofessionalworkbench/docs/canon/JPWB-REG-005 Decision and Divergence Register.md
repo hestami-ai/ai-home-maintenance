@@ -40274,7 +40274,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-D-111 — DELEGATED (`REG-D-109`): the completion programme's own decisions — a declared REJECTED goes the canon route and is reported, not recovered; the root judged over its children; the operator records fitness-for-purpose's human decision; declared verdicts stay on the assurance plane; the replay recorded from the last paid run
 
-**Decided 2026-10-11** (agent, under the sponsor's *"All of those options should be pursued and resolved"*; `DESIGN-phase-7-completion.md` §7). **Type:** DECISION — delegated, flagged for sponsor confirmation. **Status:** ⚠ **OPEN — in force for the programme; sponsor confirmation owed.**
+**Decided 2026-10-11** (agent, under the sponsor's *"All of those options should be pursued and resolved"*; `DESIGN-phase-7-completion.md` §7). **Type:** DECISION — delegated, flagged for sponsor confirmation. **Status:** ~~⚠ **OPEN — in force for the programme; sponsor confirmation owed.**~~ ✅ **CONFIRMED 2026-10-18** by the sponsor (`REG-D-116`) — in force for the programme.
 
 1. **A declared REJECTED goes canon's route.** That is a blocking finding, then `UNDER_ASSURANCE → REJECTED`, recovered only by a replacement unit (*"Replacement PWU created → SUPERSEDED"*). In the paid run it is reported, not recovered. P7-6R's re-run does not reach a unit already under assurance (`stopped-unit-recovery.ts:386`).
 2. **The root's declared policies are judged over its children's work products and the end-to-end evidence** (DEC-6).
@@ -40285,7 +40285,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-D-112 — DELEGATED (`REG-D-109`): what the completion programme's build review raised — a declared review that did not conclude may be re-run; a dry run calls no model; the replay covers the execution half from the published PWA; Pi runs a turn's tool calls one at a time
 
-**Decided 2026-10-11** (agent, under the sponsor's *"All of those options should be pursued and resolved"*; raised by the adversarial reviews of packages E1–E4). **Type:** DECISION — delegated, flagged for sponsor confirmation. **Status:** ⚠ **OPEN — in force for the programme's fix round; sponsor confirmation owed.**
+**Decided 2026-10-11** (agent, under the sponsor's *"All of those options should be pursued and resolved"*; raised by the adversarial reviews of packages E1–E4). **Type:** DECISION — delegated, flagged for sponsor confirmation. **Status:** ~~⚠ **OPEN — in force for the programme's fix round; sponsor confirmation owed.**~~ ✅ **CONFIRMED 2026-10-18** by the sponsor (`REG-D-116`) — in force for the programme's fix round.
 
 - **(a) A declared review that did not conclude may be re-run.**
   - The trouble as built: one INCONCLUSIVE declared verdict left its unit UNDER_ASSURANCE with no page act that could finish it. P7-6R's re-run does not reach a unit under assurance.
@@ -40327,7 +40327,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-D-114 — DELEGATED (`REG-D-109`): the completion programme's fix-round decisions — the merged remedies and the remaining round 3 work
 
-**Decided 2026-10-16** (lead, under `REG-D-109`'s delegation; raised by the completion programme's fix rounds). **Type:** DECISION — delegated, flagged for sponsor confirmation. **Status:** ⚠ **OPEN — (1)–(10) are built and merged; (11)–(19) are decided and being built in round 3; sponsor confirmation owed.**
+**Decided 2026-10-16** (lead, under `REG-D-109`'s delegation; raised by the completion programme's fix rounds). **Type:** DECISION — delegated, flagged for sponsor confirmation. **Status:** ~~⚠ **OPEN — (1)–(10) are built and merged; (11)–(19) are decided and being built in round 3; sponsor confirmation owed.**~~ ✅ **CONFIRMED 2026-10-18** by the sponsor (`REG-D-116`) — (1)–(19) are built and merged: (1)–(10) at `26e60c4e`, (11)–(13) and (15)–(19) at `ecaa75b5`, (14) as amended at `e4328bf9`.
 
 - **AUTHORITY AND EVIDENCE.** These decisions pursue the sponsor's *"All of those options should be pursued and resolved."* (`REG-D-109`). E12, E3 and E4 are merged as `26e60c4e`. The merge's 395-entry mutant run at `722dbbc5` reported 388 KILLED, 7 ABOLISHED and 0 SURVIVED; the fix round's 14-entry run reported 14 KILLED. A separate later e2e run exposed PQ7-M104's surviving obsolete lever; its abolition is (18), still being built.
 - **(1) Declared qualification uses the sign-off's verdict** (`cfccfeac`). A declared case is scored through the product's declared-review seam and `declaredVerdict`, at the seeded policy's evidence ceiling. Oracle set v5's own note says *"the declared policy’s verdict as the sign-off computes it"*. The old scorer differed: a planted reply recommending SATISFIED read BOUNDARY_REJECTED instead of REJECTED; a clean reply recommending ESCALATED read ESCALATED instead of SATISFIED.
@@ -40412,7 +40412,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
 
 ### REG-D-115 — SPONSOR RULING: repair the clean Fitness-for-Purpose case D-FP-CLEAN as D6-FP-CLEAN in case set v6, keep its oracle SATISFIED, re-measure it and check the other six clean declared cases; delegated extension to D6-FP-03, D6-RC-CLEAN and D6-RC-04
 
-**Decided 2026-10-16** (sponsor, in session; delegated extension by the lead, flagged for sponsor confirmation). **Type:** SPONSOR RULING. **Status:** ⚠ **OPEN — in force for case set v6; repair built in e715871d, delegated extension being built, re-measurement owed.**
+**Decided 2026-10-16** (sponsor, in session; delegated extension by the lead, flagged for sponsor confirmation). **Type:** SPONSOR RULING. **Status:** ~~⚠ **OPEN — in force for case set v6; repair built in e715871d, delegated extension being built, re-measurement owed.**~~ ✅ **CONFIRMED 2026-10-18** — in force for case set v6: built and merged (`c4ca02eb`), measured (`f0c33c17`), `reviewer:qual:check` GREEN; the delegated extension confirmed by the sponsor (`REG-D-116`).
 
 - **THE SPONSOR'S WORDS, verbatim, with the option's description:** Asked *"The clean Fitness-for-Purpose case D-FP-CLEAN has real flaws in its own record (3 of 7 requirements demonstrated; R5's error message claimed but not captured), and the reviewer rejected it once for exactly those. What should happen to it?"*, the sponsor chose *"Repair the case (Recommended)"*. That option read: *"Make its record genuinely clean (runs that show all seven requirements, stderr captured with the message), keep the oracle SATISFIED, re-measure it (2 calls, total 313), and check the other six clean declared cases for the same flaw at no paid cost. The repaired record comes to you in the next report."*
 - **WHAT THE RULING MEANS.**
@@ -40440,6 +40440,7 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - **Measured.** Re-measurement (`qr-2026-10-16-devin-glm-5-3-flash-max-v6`, `f0c33c17`): 8 calls under fingerprint `06b9d8e5fbca507ba4b2ae1d372251da8332ecbdbece0b652cd1fdcae1d16cb0`, 0 transport failures. All 8 calls answered: `D6-RC-CLEAN` SATISFIED x2; `D6-FP-CLEAN` SATISFIED x2; `D6-RC-04` REJECTED x2 (RC-04 named both times); `D6-FP-03` REJECTED x2 (FP-03 named both times). 8 of 8 verdicts were the oracle's, and the planted criterion was named in 4 of 4 planted evaluations.
   - **GREEN.** `reviewer:qual:check` is GREEN, verbatim: *"today's reviewer is covered, the record reproduces, and every material failure is escalated"*.
   - **Status of extension.** The delegated extension (`D6-FP-03`, `D6-RC-CLEAN`, `D6-RC-04`) remains flagged for sponsor confirmation. `D-TA-CLEAN` stays as conferred, its TA-04 gap disclosed.
+- ⭑ **2026-10-18 — the delegated extension is confirmed by the sponsor** (`REG-D-116`). Asked *"Do you confirm the delegated decisions (REG-D-111, REG-D-112, REG-D-114 including the amended limit rule, and REG-D-115's extension)?"*, the sponsor chose *"Confirm all (Recommended)"*.
 
 ### REG-F-562 — The clean declared case D-FP-CLEAN's record did not back its conferred SATISFIED oracle: 3 of 7 requirements demonstrated and no standard error captured, rejected by the reviewer in P4's retry
 
@@ -40477,3 +40478,14 @@ The names were *Probe PWA* / *Service Catalog* / *Floor Blocked*; everything els
   - **Checked and merged.** Checked adversarially by Claude agents, and after the fix round by agy reading the cases against their criteria: both clean cases meet every criterion; each planted twin differs only by its plant. Merged in `c4ca02eb`; citations corrected in `ff72efd6`.
   - **Measured.** Re-measurement (`qr-2026-10-16-devin-glm-5-3-flash-max-v6`, `f0c33c17`): 8 calls under fingerprint `06b9d8e5fbca507ba4b2ae1d372251da8332ecbdbece0b652cd1fdcae1d16cb0`, 0 transport failures. All 8 calls answered: `D6-RC-CLEAN` SATISFIED x2; `D6-FP-CLEAN` SATISFIED x2; `D6-RC-04` REJECTED x2 (RC-04 named both times); `D6-FP-03` REJECTED x2 (FP-03 named both times). 8 of 8 verdicts were the oracle's, and the planted criterion was named in 4 of 4 planted evaluations.
   - **GREEN.** `reviewer:qual:check` is GREEN, verbatim: *"today's reviewer is covered, the record reproduces, and every material failure is escalated"*.
+
+### REG-D-116 — SPONSOR RULING: P5's executor is switched off Pi/openai-codex to another harness (devin, Muse or agy, the lead to choose), and the delegated decisions REG-D-111, REG-D-112, REG-D-114 (with (14) as amended) and REG-D-115's extension are confirmed
+
+**Decided 2026-10-18** (sponsor, in session). **Type:** SPONSOR RULING. **Status:** ⚠ **OPEN — the executor's choice and wiring owed.**
+
+- **THE SPONSOR'S WORDS, verbatim, each with the question:**
+  1. Asked *"P5 and P6 need the executor (Pi on openai-codex/gpt-5.6-sol), which very likely shares the ChatGPT quota that is out until Oct 22, 2:13 AM. How should P5 proceed?"*, the sponsor answered in their own words: *"You are correct that Pi on openai-codex/gpt-5.6-sol share the same ChatGPT quota that is out until October 22, 2:13 AM. Switch executor to one of the other agent harnesses like either Devin, Muse, or Gemini agy."*
+  2. Asked *"Do you confirm the delegated decisions (REG-D-111, REG-D-112, REG-D-114 including the amended limit rule, and REG-D-115's extension)?"*, the sponsor chose *"Confirm all (Recommended)"*.
+- **WHAT EACH MEANS.**
+  1. **The executor switch.** P5 does not wait for the quota; its executor moves off Pi/openai-codex to devin, Muse or agy. The choice among them is the lead's, being investigated now with no model call (of the three, only agy has an executor adapter wired today; devin is catalogued but unwired; Muse is installed but unknown to the code). The run report must disclose that P5's executor differs from P3's (Pi on openai-codex/gpt-5.6-sol). Half B's authoring agent (Pi, the same quota) is in the same position; how P6 proceeds is being investigated too.
+  2. **The delegated decisions confirmed.** The delegated decisions `REG-D-111`, `REG-D-112`, `REG-D-114` (with (14) as amended) and `REG-D-115`'s extension are confirmed by the sponsor.
