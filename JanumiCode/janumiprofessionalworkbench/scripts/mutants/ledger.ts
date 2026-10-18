@@ -31837,5 +31837,14 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/phase7-run-report.test.ts"],
 		why: "PROMISE: the UNIT_PURPOSE caveat says what the declared reviews were GIVEN where a unit contributed no work or a prompt did not show all of it. WHO RELIES: the report's opening caveats. WHAT THE MUTATION DOES: F6's 'judged over' is restored. OBSERVED (bun run mutants -- the 16 entries P5B-M27 to P5B-M42 and the re-measured P5B-M18, P5B-M19, P5B-M20 and P5B-M22, by their full ids, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M42-the-caveat-says-judged-over-what-the-reviews-were-given ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 7 P5, package B's check, finding 2 - the root's line and the UNIT_PURPOSE caveat say what the root's declared reviews were GIVEN and, read from each review's prompt in the archived content store, what each prompt SHOWED of it: the host's declarations of its cut and the units its work holds (P5's two root prompts showed the work products of Requirements and Design and no command)"
+	},
+	{
+		id: "P5B-M43-a-planned-unit-the-store-lacks-is-not-named",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "const missing = u === units[0] ? units.slice(1).filter((x) => x.object === null).map((x) => x.title) : [];",
+		replace: "const missing: string[] = [];",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: for the root, each planned unit the store does not hold is named as contributing none to what its declared reviews were given. WHO RELIES: the root's line and the UNIT_PURPOSE caveat, over a run whose store lacks a planned phase. WHAT THE MUTATION DOES: no planned unit is read as missing, so a root over three of its four phases reads 'root: as intended' and the caveat 'every unit below it produced'. OBSERVED (bun run mutants -- P5B-M43-a-planned-unit-the-store-lacks-is-not-named, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M43-a-planned-unit-the-store-lacks-is-not-named ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 5 - the branch of workSeenOf for a planned unit the store does not hold had no test and no ledger entry: a fixture whose store lacks the end-to-end phase now reads it named on the root's line and in the caveat"
 	}
 ];

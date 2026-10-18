@@ -3365,6 +3365,18 @@ describe('⭐⭐ P5 package B — the report reads a run as P5 went', () => {
 		expect(r.answer.alwaysStated.filter((s) => s.startsWith('UNIT_PURPOSE framing')).join(' ')).toContain('every unit below it produced');
 	});
 
+	it('⛔ F6 (7) — a planned phase the store does not hold: the root’s line and the caveat name it as contributing none', () => {
+		// ⭐ P5 package B's check (finding 5) — the branch for a planned unit the store lacks, which no test reached.
+		const run = aRun({ 'end-to-end': { begun: false } });
+		const store = { ...run.store, objects: run.store.objects.filter((o) => o.id !== 'pwu_end-to-end') };
+		const r = buildRunReport(store, run.lane, { accountNames: NAMES }).report;
+		const missing = '; End-to-end verification contributed none, the store holding no such unit';
+		expect(cellOf(r, '7', 'whole run').basis[0], 'the root’s line does not name the phase the store lacks').toBe(
+			`root: as intended — its declared reviews were given the work of Requirements, Design, Implementation and unit tests${missing}`
+		);
+		expect(r.answer.alwaysStated.filter((s) => s.startsWith('UNIT_PURPOSE framing')).join(' ')).toContain(missing);
+	});
+
 	it('⛔ F7 — the adjudication classes name a review that ended at the reviewer’s output-token limit, by the failure text it records — never a transport failure', () => {
 		// ⛔ RED BEFORE F7, driven: the classes offered "transport failure (REG-F-499)", P5's seven truncations' class by the record.
 		const { classes } = reportOf(aRun()).report.adjudication;
