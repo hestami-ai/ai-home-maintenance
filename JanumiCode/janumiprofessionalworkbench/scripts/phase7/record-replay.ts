@@ -8,7 +8,8 @@
 //     nothing opened, unless it is archived as the lane archives a store (`archivedStoreProblem`, the report's rule);
 //   · the final archive's `process-output/captures/*`, each command's captured bytes;
 //   · each unit archive's `workspace/`, to hold the replayed writes to (`verifyWrites`);
-//   · `lane/run.json` (the units), `lane/boot.json` (`JPWB_DEMO_DB`, so the run's workspace is known to scrub), and
+//   · `lane/run.json` (the units), `lane/boot.json` (`JPWB_DEMO_DB`, so the run's workspace is known to scrub; ⭐ and the
+//     executor it names, a run of any but Pi refused by that name, `JAN-MHX` MH-7, design D38), and
 //     `lane/report/report.json` (the matrix the recording expects — the report is final before anything is recorded).
 // The commit and the reviewer fingerprint are the operator's to give: the archive does not hold the commit its run ran
 // on, and the fingerprint is the one `bun run reviewer:qual:check` printed for that commit.
@@ -227,7 +228,8 @@ export function main(
 		const r = rec(u);
 		return { slug: str(r.slug), unitId: str(r.unitId), archive: str(r.archive) };
 	});
-	const demoDb = str(rec(rec(laneJson(run, 'boot.json')).overlay).JPWB_DEMO_DB);
+	const boot = laneJson(run, 'boot.json');
+	const demoDb = str(rec(rec(boot).overlay).JPWB_DEMO_DB);
 	const undertakings = store.objects.filter((o) => o.objectType === 'UNDERTAKING');
 	const matrix = rec(laneJson(run, 'report', 'report.json')).matrix;
 	const before: string[] = [];
@@ -273,7 +275,8 @@ export function main(
 		expectedMatrix,
 		commit,
 		reviewerFingerprint: fingerprint,
-		osFamily: family
+		osFamily: family,
+		boot
 	});
 	if (built.authoringCallsLeftOut > 0)
 		say(
