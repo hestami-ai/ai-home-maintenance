@@ -19533,10 +19533,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "PQ1-M1562-the-validator-re-reader-reads-every-field-as-carried",
 		file: "verif/reviewer-qualification-fingerprint.test.ts",
-		find: "const chosen = chooseFence([...regions.map((r) => (r.slice === field ? read(regionText(lines, r)) : regionText(lines, r))), ...besides]);",
-		replace: "const chosen = chooseFence([...regions.map((r) => regionText(lines, r)), ...besides]); /* MUTANT: every field read as carried */",
+		find: "...regions.map((r) => (r.slice === field ? read(regionText(lines, r)) : regionText(lines, r))),",
+		replace: "...regions.map((r) => regionText(lines, r)), /* MUTANT: every field read as carried */",
 		expectRed: ["verif/reviewer-qualification-fingerprint.test.ts"],
-		why: "PROMISE: each validator row reads ONE field of the account the way it names (design section 9.3 D7 (the sponsor's answers of 2026-10-05); REG-F-481). WHO RELIES: the reader of a moved fingerprint, and the land step, which take the fingerprint test's rows as the statement of what moves `probes` (scripts/reviewer-qual/fingerprint.ts). WHAT THE MUTATION DOES: the validator's re-reader reads every field as carried. OBSERVED: KILLED — 19 test(s) red in reviewer-qualification-fingerprint.test.ts: '⭐ design §9.3 D7 — a validator chooser that reads the account's rationale as one line of JSON (`jsonLine`, the encoder design §9.3 D7 retired from the lists) moves `probes` through exactly the account-breaks probes, in every framing, and no case prompt' (AssertionError: the reviewer fingerprint moves: expected 'ed39d6cc8c7b4d566c8bdd88f0ac9f67ed028…' not to be 'ed39d6cc8c7b4d566c8bdd88f0ac9f67ed028…' // Object.is equality)",
+		why: "PROMISE: each validator row reads ONE field of the account the way it names (design section 9.3 D7 (the sponsor's answers of 2026-10-05); REG-F-481). WHO RELIES: the reader of a moved fingerprint, and the land step, which take the fingerprint test's rows as the statement of what moves `probes` (scripts/reviewer-qual/fingerprint.ts). WHAT THE MUTATION DOES: the validator's re-reader reads every field as carried. OBSERVED: KILLED — 19 test(s) red in reviewer-qualification-fingerprint.test.ts: '⭐ design §9.3 D7 — a validator chooser that reads the account's rationale as one line of JSON (`jsonLine`, the encoder design §9.3 D7 retired from the lists) moves `probes` through exactly the account-breaks probes, in every framing, and no case prompt' (AssertionError: the reviewer fingerprint moves: expected 'ed39d6cc8c7b4d566c8bdd88f0ac9f67ed028…' not to be 'ed39d6cc8c7b4d566c8bdd88f0ac9f67ed028…' // Object.is equality) ⭐ RE-ANCHORED 2026-10-18 (JAN-EXEC Phase 7 P5, package D, ledger rule #5): the re-reader also reads a declared review's host-line slices now, so its chooser call is written on several lines; the mutation is the same, restated on the line that maps the regions. MEASURED AGAIN (bun run mutants -- the six P5D ids and PQ1-M1562, by their full ids, 2026-10-18, in the package D worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         PQ1-M1562-the-validator-re-reader-reads-every-field-as-carried ⎯⎯⎯⎯⎯⎯ Failed Tests 19 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-PRQUAL PQ-1 (fix round 7, instrument) - design §9.3 D7: the fingerprint sees a fence chooser that reads a field of the account otherwise than the prompt carries it, and a list item holding a line feed written otherwise (DESIGN-process-result-qualification.md §9.3; ROADMAP-process-result-qualification.md PQ-1; REG-F-481, REG-F-476)"
 	},
 	{
@@ -32251,5 +32251,59 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/phase7-run-report.test.ts"],
 		why: "PROMISE: for the root, each planned unit the store does not hold is named as contributing none to what its declared reviews were given. WHO RELIES: the root's line and the UNIT_PURPOSE caveat, over a run whose store lacks a planned phase. WHAT THE MUTATION DOES: no planned unit is read as missing, so a root over three of its four phases reads 'root: as intended' and the caveat 'every unit below it produced'. OBSERVED (bun run mutants -- P5B-M43-a-planned-unit-the-store-lacks-is-not-named, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M43-a-planned-unit-the-store-lacks-is-not-named ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 7 P5, package B's check, finding 5 - the branch of workSeenOf for a planned unit the store does not hold had no test and no ledger entry: a fixture whose store lacks the end-to-end phase now reads it named on the root's line and in the caveat"
+	},
+	{
+		id: "P5D-M1-the-line-naming-a-unit-without-work-is-changed-and-no-probe-sees-it",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "below this one holds no completed step — its lifecycle",
+		replace: "below this one holds no finished step — its lifecycle",
+		expectRed: ["verif/reviewer-qualification-fingerprint.test.ts"],
+		why: "PROMISE: the host line naming a unit below that holds no completion (declaredUnitWithoutWorkLine) reaches a fingerprint probe, so a change to it moves the reviewer fingerprint (REG-D-118 (1)). WHO RELIES: reviewer:qual:check, which reads an unmoved fingerprint as a reviewer the record covers. WHAT THE MUTATION DOES: the line says otherwise; before P5 package D no probe carried it, and the same change made at the print seam moved no fingerprint (driven red before the probes: 'AssertionError: the reviewer fingerprint moves: expected '06b9d8e5fbca507ba4b2ae1d372251da8332e…' not to be '06b9d8e5fbca507ba4b2ae1d372251da8332e…''). OBSERVED (bun run mutants -- the six P5D ids and PQ1-M1562, by their full ids, 2026-10-18, in the package D worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5D-M1-the-line-naming-a-unit-without-work-is-changed-and-no-probe-sees-it ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package D (REG-D-118 (1); REG-F-564; REG-F-553's class) - fingerprint probes reach the text P5 package B added to a declared review of a unit composed of others: the host line naming a unit below that holds no completion, the builder's cut declarations of a unit's commands and of its work product, and the titles the fence chooser reads on those host lines (0 of 61 probe prompts held any of it)"
+	},
+	{
+		id: "P5D-M2-the-declaration-of-a-commands-cut-is-changed-and-no-probe-sees-it",
+		file: "apps/rph-demo/src/lib/server/assurance/review-input.ts",
+		find: "`[CUT FOR THIS REVIEW: the commands of ${jsonLine(unit)} — the first",
+		replace: "`[CUT FOR THIS REVIEW: the command list of ${jsonLine(unit)} — the first",
+		expectRed: ["verif/reviewer-qualification-fingerprint.test.ts"],
+		why: "PROMISE: the builder's declaration of a cut of a unit's commands (commandsCutDeclaration) reaches a fingerprint probe, so a change to it moves the reviewer fingerprint (REG-D-118 (1)). WHO RELIES: reviewer:qual:check. WHAT THE MUTATION DOES: the declaration says otherwise; before P5 package D no probe carried one. OBSERVED (bun run mutants -- the six P5D ids and PQ1-M1562, by their full ids, 2026-10-18, in the package D worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5D-M2-the-declaration-of-a-commands-cut-is-changed-and-no-probe-sees-it ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package D (REG-D-118 (1); REG-F-564; REG-F-553's class) - fingerprint probes reach the text P5 package B added to a declared review of a unit composed of others: the host line naming a unit below that holds no completion, the builder's cut declarations of a unit's commands and of its work product, and the titles the fence chooser reads on those host lines (0 of 61 probe prompts held any of it)"
+	},
+	{
+		id: "P5D-M3-the-declaration-of-a-work-product-cut-is-changed-and-no-probe-sees-it",
+		file: "apps/rph-demo/src/lib/server/assurance/review-input.ts",
+		find: "`the work product of ${jsonLine(unit)}`",
+		replace: "`the output of ${jsonLine(unit)}`",
+		expectRed: ["verif/reviewer-qualification-fingerprint.test.ts"],
+		why: "PROMISE: the builder's declaration of a cut of a unit's work product (productSlice) reaches a fingerprint probe, so a change to it moves the reviewer fingerprint (REG-D-118 (1)). WHO RELIES: reviewer:qual:check. WHAT THE MUTATION DOES: the declaration names the slice otherwise; before P5 package D no probe carried one. OBSERVED (bun run mutants -- the six P5D ids and PQ1-M1562, by their full ids, 2026-10-18, in the package D worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5D-M3-the-declaration-of-a-work-product-cut-is-changed-and-no-probe-sees-it ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package D (REG-D-118 (1); REG-F-564; REG-F-553's class) - fingerprint probes reach the text P5 package B added to a declared review of a unit composed of others: the host line naming a unit below that holds no completion, the builder's cut declarations of a unit's commands and of its work product, and the titles the fence chooser reads on those host lines (0 of 61 probe prompts held any of it)"
+	},
+	{
+		id: "P5D-M4-the-fence-is-chosen-without-the-title-on-the-host-line-and-a-probe-sees-it",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "\t\t\t...withoutWork.map((u) => jsonLine(u.unit))",
+		replace: "\t\t\t...withoutWork.map((u) => jsonLine(u.unit)).filter(() => false)",
+		expectRed: ["verif/reviewer-qualification-fingerprint.test.ts"],
+		why: "PROMISE: P5B-M3's mutation, asked of the fingerprint: a chooser that leaves the titles on the host line naming a unit without work out of what the fence is chosen over moves the reviewer fingerprint (D-ROOT-UNITS-WITHOUT-WORK plants the first candidate in one such title). WHO RELIES: reviewer:qual:check. WHAT THE MUTATION DOES: the title is not read, so that probe keeps <<<UNTRUSTED-00>>> on a host line. OBSERVED (bun run mutants -- the six P5D ids and PQ1-M1562, by their full ids, 2026-10-18, in the package D worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5D-M4-the-fence-is-chosen-without-the-title-on-the-host-line-and-a-probe-sees-it ⎯⎯⎯⎯⎯⎯ Failed Tests 38 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package D (REG-D-118 (1); REG-F-564; REG-F-553's class) - fingerprint probes reach the text P5 package B added to a declared review of a unit composed of others: the host line naming a unit below that holds no completion, the builder's cut declarations of a unit's commands and of its work product, and the titles the fence chooser reads on those host lines (0 of 61 probe prompts held any of it)"
+	},
+	{
+		id: "P5D-M5-the-fence-is-chosen-without-the-builder-s-cut-declarations-and-a-probe-sees-it",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "...(input.framing === 'DECLARED_POLICY' && input.declaredWorkCut !== undefined ? [input.declaredWorkCut] : [])",
+		replace: "...(input.framing === 'DECLARED_POLICY' && input.declaredWorkCut !== undefined ? [input.declaredWorkCut] : []).filter(() => false)",
+		expectRed: ["verif/reviewer-qualification-fingerprint.test.ts"],
+		why: "PROMISE: P5B-M24's mutation, asked of the fingerprint: a chooser that leaves the builder's cut declarations out of what the fence is chosen over moves the reviewer fingerprint (D-OVERSIZE-UNIT-TITLE's title, holding the first candidate, stands in the declaration of its commands cut alone). WHO RELIES: reviewer:qual:check. WHAT THE MUTATION DOES: the declarations are not read, so that probe keeps <<<UNTRUSTED-00>>> on a host line. OBSERVED (bun run mutants -- the six P5D ids and PQ1-M1562, by their full ids, 2026-10-18, in the package D worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5D-M5-the-fence-is-chosen-without-the-builder-s-cut-declarations-and-a-probe-sees-it ⎯⎯⎯⎯⎯⎯ Failed Tests 38 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package D (REG-D-118 (1); REG-F-564; REG-F-553's class) - fingerprint probes reach the text P5 package B added to a declared review of a unit composed of others: the host line naming a unit below that holds no completion, the builder's cut declarations of a unit's commands and of its work product, and the titles the fence chooser reads on those host lines (0 of 61 probe prompts held any of it)"
+	},
+	{
+		id: "P5D-M6-the-fence-is-chosen-without-the-work-its-builder-cut-and-a-probe-sees-it",
+		file: "apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts",
+		find: "const fence = chooseFence([...plan.untrustedBytes, content.bytes]);",
+		replace: "const fence = chooseFence([...plan.untrustedBytes, ...(builderCut !== undefined ? [] : [content.bytes])]);",
+		expectRed: ["verif/reviewer-qualification-fingerprint.test.ts"],
+		why: "PROMISE: the fence of a declared review whose work its builder cut unit by unit is chosen over that work as shown, and the fingerprint sees a chooser that skips it (D-OVERSIZE-UNITS plants the first candidate in the kept HEAD of a work product its builder cut). WHO RELIES: reviewer:qual:check, and every reader of the fence. WHAT THE MUTATION DOES: the chooser skips the work when its builder cut it, so a work product holding the first candidate keeps that fence inside the work. OBSERVED (bun run mutants -- the six P5D ids and PQ1-M1562, by their full ids, 2026-10-18, in the package D worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5D-M6-the-fence-is-chosen-without-the-work-its-builder-cut-and-a-probe-sees-it ⎯⎯⎯⎯⎯⎯ Failed Tests 38 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package D (REG-D-118 (1); REG-F-564; REG-F-553's class) - fingerprint probes reach the text P5 package B added to a declared review of a unit composed of others: the host line naming a unit below that holds no completion, the builder's cut declarations of a unit's commands and of its work product, and the titles the fence chooser reads on those host lines (0 of 61 probe prompts held any of it)"
 	}
 ];

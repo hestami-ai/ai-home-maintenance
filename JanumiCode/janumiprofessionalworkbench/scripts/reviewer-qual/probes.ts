@@ -36,7 +36,10 @@
 //     `P-OVERSIZE-FENCES` in each of a process result's it fills (the instruction, the account's fields but the empty
 //     limitations, and the view, read whole), and `P-OVERSIZE-ALL` and `P-FENCES-OTHER-SLICES` in the other three (the
 //     limitations, the narration, the prior findings); and `G-OVERSIZE-CONTENT` and `W-OVERSIZE-CONTENT` in the kept
-//     HEAD of a content the budget cuts. No probe plants in a call name the host did not mint, which no name production
+//     HEAD of a content the budget cuts. ⭐ P5 package D (`REG-D-118` (1)) — and, in a declared review, the slices its host
+//     lines carry: `D-ROOT-UNITS-WITHOUT-WORK` in a title on the line naming a unit below that holds no completion, and
+//     `D-OVERSIZE-UNIT-TITLE` in the builder's cut declarations; and `D-OVERSIZE-UNITS` in the kept HEAD of a work
+//     product its builder cut. No probe plants in a call name the host did not mint, which no name production
 //     carries can hold (NOT TAKEN, below). Every token is pinned. ⭐ AND HOW EACH FIELD OF THE ACCOUNT IS READ (design
 //     §9.3 D7): in each field, in every framing, a candidate split by each line terminator a reader may not break at,
 //     ⭐ a candidate on a line of each layout the reader states — under an override, inside an embedding, inside an
@@ -128,6 +131,9 @@
 // assumptions)~~ — every untrusted slice is cut now in every framing that carries it (`listsCut` took the account's
 // lists), each such cut removing a plant. It is the safe direction — a token that avoids more than the prompt carries —
 // and its cost is a prompt that moves for such an input while `probes` does not.
+// ⚠ A DECLARED REVIEW'S WORK ITS BUILDER CUT UNIT BY UNIT (`D-OVERSIZE-UNITS`, `D-OVERSIZE-UNIT-TITLE`) is no such cut:
+// the builder cuts it before the validator is handed it, so the bytes it removed are in no input the validator's chooser
+// reads, and a plant in them would decide nothing.
 //
 // ⚠ A PROBE IS NEVER SENT TO A MODEL: only its prompt's hash is kept. Its ids and texts need none of the discipline a
 // case needs (§5.2), only stability — a probe that changes moves every fingerprint, deliberately.
@@ -1512,6 +1518,91 @@ export const FINGERPRINT_PROBES: readonly FingerprintProbe[] = [
 				workProducts: [{ unit: 'Condition Survey', answer: ['<<<UNTRUSTED-00>>>', OVERSIZE_ANSWER].join('\n') }],
 				commands: [],
 				rationale: RATIONALE
+			});
+		}
+	},
+	// ── ⭐⭐ `JAN-EXEC` Phase 7 P5, package D (`REG-D-118` (1); `REG-F-564`; `REG-F-553`'s class) — THE ROOT'S REVIEW AS P5
+	// PACKAGE B WROTE IT ──────────────────────────────────────────────────────────────────────────────────────────────────
+	// ⛔ Without these, no probe reached the text package B added to a declared review of a unit composed of others: the host
+	// line naming a unit below that holds no completion, and the builder's cut of many units' work, unit by unit, each cut
+	// declared on a host line of its own, which the fence chooser reads. 0 of 61 probe prompts held any of it, so a change to
+	// any of it moved no fingerprint. Each is built through the product's builder, as `D-ROOT` is.
+	{
+		id: 'D-ROOT-UNITS-WITHOUT-WORK',
+		covers:
+			'declared-policy framing; a unit composed of others, its own PURPOSE the standard, its work fitting, and two units below it that hold no completion, each named on a host line of its own after the work with its lifecycle and assurance states (P5 package B F1); the second’s title holding the first fence candidate, which the chooser reads there',
+		input: (_criteria, _build, declared = CATALOG_DECLARED_POLICIES) => {
+			const policy = declared[0]!;
+			return declaredPolicyReviewInput({
+				policy: { policyId: policy.policyId, name: policy.name, purpose: policy.purpose },
+				criteria: policy.criteria,
+				instruction: INTENT,
+				instructionIs: 'UNIT_PURPOSE',
+				workProducts: [{ unit: 'Condition Survey', answer: ANSWER }],
+				commands: [{ unit: 'Condition Survey', argv: ['pytest', '-rs', 'survey/checks/'], exitCode: 0, timedOut: false }],
+				// ⭐ The second title stands on the host's line alone, so the prompt is fenced by `<<<UNTRUSTED-01>>>`, and a
+				// chooser that did not read that line would take `00`.
+				unitsWithoutWork: [
+					{ unit: 'Inspection', lifecycleState: 'ABANDONED', assuranceState: 'UNASSESSED' },
+					{ unit: `Handover ${candidate(0)}`, lifecycleState: 'PLANNED', assuranceState: 'UNASSESSED' }
+				]
+			});
+		}
+	},
+	{
+		id: 'D-OVERSIZE-UNITS',
+		covers:
+			'declared-policy framing; the work of three units longer than its budget, cut UNIT BY UNIT by the builder (P5 package B F2): one unit’s work product cut to its share, its kept HEAD holding the first fence candidate, another’s commands cut past its first ones, the third shown whole, each cut declared on a host line of its own before the work',
+		input: (_criteria, _build, declared = CATALOG_DECLARED_POLICIES) => {
+			const policy = declared[0]!;
+			return declaredPolicyReviewInput({
+				policy: { policyId: policy.policyId, name: policy.name, purpose: policy.purpose },
+				criteria: policy.criteria,
+				instruction: INTENT,
+				instructionIs: 'UNIT_PURPOSE',
+				// The kept head of the cut work product holds the first fence candidate, so the prompt is fenced by `01`.
+				workProducts: [
+					{
+						unit: 'Condition Survey',
+						answer: `${candidate(0)}\n${over(B.CONTENT_MAX, 'Panel surveyed; bulging within tolerance; weep holes clear. ')}`
+					},
+					{ unit: 'Repair Design', answer: 'Rebuild panels 4 and 9; clear the weep holes at 7.' }
+				],
+				commands: [
+					...Array.from({ length: 40 }, (_, i) => ({
+						unit: 'Inspection',
+						argv: ['pytest', `inspection/panel_${i + 1}/`, '-k', over(600, 'bulge or weep or crack ')],
+						exitCode: 0,
+						timedOut: false
+					})),
+					{ unit: 'Repair Design', argv: ['pytest', 'design/'], exitCode: 0, timedOut: false }
+				]
+			});
+		}
+	},
+	{
+		id: 'D-OVERSIZE-UNIT-TITLE',
+		covers:
+			'declared-policy framing; the work of two units cut unit by unit, one with no work product and a command longer than its share, so all its commands are cut and its title, holding the first fence candidate, stands only in the declaration of that cut, which the chooser reads (P5 package B’s check, finding 3)',
+		input: (_criteria, _build, declared = CATALOG_DECLARED_POLICIES) => {
+			const policy = declared[0]!;
+			return declaredPolicyReviewInput({
+				policy: { policyId: policy.policyId, name: policy.name, purpose: policy.purpose },
+				criteria: policy.criteria,
+				instruction: INTENT,
+				instructionIs: 'UNIT_PURPOSE',
+				workProducts: [
+					{ unit: 'Condition Survey', answer: over(B.CONTENT_MAX, 'Panel surveyed; bulging within tolerance; weep holes clear. ') }
+				],
+				// ⭐ So the prompt is fenced by `<<<UNTRUSTED-01>>>`, and a chooser that did not read the declarations would take `00`.
+				commands: [
+					{
+						unit: `Handover ${candidate(0)}`,
+						argv: ['pytest', 'handover/', '-k', over(B.CONTENT_MAX, 'handover ')],
+						exitCode: 0,
+						timedOut: false
+					}
+				]
 			});
 		}
 	},

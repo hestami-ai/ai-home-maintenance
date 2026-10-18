@@ -475,6 +475,39 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint MOVES on each component
 		expect(await movedNow(seams), 'the case prompts of the current set that move').toEqual(CURRENT_DECLARED);
 	});
 
+	it.each([
+		['the line naming a unit below that holds no completion', 'holds no completed step', 'holds no finished step', ['D-ROOT-UNITS-WITHOUT-WORK']],
+		[
+			'the declaration of a cut of a unit’s commands',
+			'[CUT FOR THIS REVIEW: the commands of ',
+			'[CUT FOR THIS REVIEW: the command list of ',
+			['D-OVERSIZE-UNITS', 'D-OVERSIZE-UNIT-TITLE']
+		],
+		[
+			'the declaration of a cut of a unit’s work product',
+			'[CUT FOR THIS REVIEW: the work product of ',
+			'[CUT FOR THIS REVIEW: the output of ',
+			['D-OVERSIZE-UNITS', 'D-OVERSIZE-UNIT-TITLE']
+		]
+	] as const)(
+		'⭐⭐ P5 package D (REG-D-118 (1)) — the root review’s new host text, %s, changed: `probes` moves through exactly the probes that carry it — and no case prompt, of v1 or of the current set',
+		async (_label, find, replace, probes) => {
+			// ⛔ RED BEFORE P5 PACKAGE D's PROBES: 0 of 61 probe prompts held this text, so the change moved no fingerprint.
+			const seams: FingerprintSeams = {
+				...PRODUCT_SEAMS,
+				validator: (print) => PRODUCT_SEAMS.validator((p) => print(p.replaceAll(find, replace)))
+			};
+			const fp = await reviewerFingerprint(CASES, seams);
+			onlyMoved(fp, ['probes']);
+			expect(movedProbes(fp), 'the probes that carry it').toEqual(probes);
+			expect(fp.casePrompts, 'no case of v1 is a declared review').toEqual(BASE.casePrompts);
+			// ⚠ NOR ANY CASE OF THE CURRENT SET: no case names a unit below that holds no completion, nor has its work cut by its
+			// builder, so a qualification over the current set measures none of this text (the gap `REG-D-118` (1) leaves to
+			// `REG-F-558`).
+			expect(await movedNow(seams), 'the case prompts of the current set that move').toEqual([]);
+		}
+	);
+
 	it('⭐⭐ E2 — a DECLARED POLICY’S PURPOSE, one catalog policy’s: its own probe and the criteria component move — and no case prompt, each case carrying its policy as a literal', async () => {
 		const declared = catalogDeclared().map((p) =>
 			p.policyId === 'pol_test_adequacy' ? { ...p, purpose: `${p.purpose}!` } : p
@@ -821,13 +854,59 @@ describe('JAN-CRITREAD J2-3 — the probe set reaches every branch of prompt ass
 			'You are judging this work against ONE declared assurance policy, ',
 			'The WORK to judge against that policy, as one line of JSON',
 			'"timedOut":true',
-			'"exitCode":null'
+			'"exitCode":null',
+			// ⭐⭐ `JAN-EXEC` Phase 7 P5, package D (`REG-D-118` (1); `REG-F-564`) — and what P5 package B added to the root's
+			// review: the host line naming a unit below that holds no completion, and the builder's cut of many units' work,
+			// unit by unit, declared for a unit's commands and for its work product. ⛔ 0 of 61 probe prompts held any of them.
+			'holds no completed step',
+			'[CUT FOR THIS REVIEW: the commands of ',
+			'[CUT FOR THIS REVIEW: the work product of '
 		])
 			expect(any(needle), needle).toBe(true);
 		// ⭐ E2 — one declared probe per catalog policy, each naming its own policy in its policy line.
 		for (const id of ['pol_requirement_coverage', 'pol_fitness_for_purpose'])
 			expect(prompt(`D-${id}`).includes(`(${id}). Its purpose: `), id).toBe(true);
 		expect(prompt('G-DECLARED').includes('(NOT DECLARED'), 'a declared account renders as itself').toBe(false);
+	});
+
+	it('⭐⭐ P5 package D (REG-D-118 (1)) — THE ARRANGEMENT: D-ROOT-UNITS-WITHOUT-WORK names both units on host lines, its `00` on the second’s alone; D-OVERSIZE-UNITS declares a cut of one unit’s work product and of another’s commands past its first, and shows the third whole; D-OVERSIZE-UNIT-TITLE’s `00` stands in its commands cut’s declaration alone; each planted probe is fenced by `01`', () => {
+		const linesOf = (id: string) => prompt(id).split('\n');
+		const fenceOf = (lines: readonly string[]) => lines.find((l) => FENCE_LINE.test(l));
+		const holding00 = (lines: readonly string[]) => lines.filter((l) => l.includes('<<<UNTRUSTED-00>>>'));
+		const root = linesOf('D-ROOT-UNITS-WITHOUT-WORK');
+		expect(
+			root.filter((l) => l.includes('holds no completed step')).map((l) => /^The work unit (".*?") below this one /.exec(l)?.[1]),
+			'D-ROOT-UNITS-WITHOUT-WORK: a line for each unit without work'
+		).toEqual(['"Inspection"', '"Handover <<<UNTRUSTED-00>>>"']);
+		expect(holding00(root), 'D-ROOT-UNITS-WITHOUT-WORK: `00` on the second title’s line alone').toEqual([
+			root.find((l) => l.startsWith('The work unit "Handover '))
+		]);
+		const units = linesOf('D-OVERSIZE-UNITS');
+		const cuts = units.filter((l) => l.startsWith(CUT_DECLARED));
+		expect(cuts.map((l) => l.slice(0, l.indexOf(' — '))), 'D-OVERSIZE-UNITS: the cuts its builder declared').toEqual([
+			'[CUT FOR THIS REVIEW: the work product of "Condition Survey"',
+			'[CUT FOR THIS REVIEW: the commands of "Inspection"'
+		]);
+		const kept = Number(/the first (\d+) of its 40 are shown/.exec(cuts[1]!)?.[1]);
+		expect(kept > 0 && kept < 40, `D-OVERSIZE-UNITS: some of Inspection’s commands kept (${kept})`).toBe(true);
+		const work = JSON.parse(units.find((l) => l.startsWith('{"workProducts":'))!) as {
+			workProducts: { workUnit: string; workProduct: string }[];
+			commands: { workUnit: string }[];
+		};
+		expect(
+			[work.workProducts.find((w) => w.workUnit === 'Repair Design')?.workProduct, work.commands.filter((c) => c.workUnit === 'Repair Design').length],
+			'D-OVERSIZE-UNITS: the third unit shown whole'
+		).toEqual(['Rebuild panels 4 and 9; clear the weep holes at 7.', 1]);
+		const title = linesOf('D-OVERSIZE-UNIT-TITLE');
+		expect(holding00(title), 'D-OVERSIZE-UNIT-TITLE: `00` in the declaration of its commands cut alone').toEqual([
+			'[CUT FOR THIS REVIEW: the commands of "Handover <<<UNTRUSTED-00>>>" — the first 0 of its 1 are shown; the last 1 are removed.]'
+		]);
+		for (const [id, lines] of [
+			['D-ROOT-UNITS-WITHOUT-WORK', root],
+			['D-OVERSIZE-UNITS', units],
+			['D-OVERSIZE-UNIT-TITLE', title]
+		] as const)
+			expect(fenceOf(lines), `${id}: the prompt’s token`).toBe('<<<UNTRUSTED-01>>>');
 	});
 
 	// ~~`contentBudget` — how much of the content the prompt carries, measured up to ` …(truncated)`~~ — `PQ-1`: a cut is
@@ -1746,13 +1825,27 @@ const unmintedNamesOf = (input: ReasoningReviewInput): string[] =>
 		c.toolName !== undefined && c.nameProvenance !== 'MINTED_BY_HOST' ? [jsonLine(c.toolName)] : []
 	);
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7 P5, package D (`REG-D-118` (1)) — what a declared review's chooser reads on HOST lines, by the name
+ * of a slice (`reasoning-review-validator.ts` `promptPlan`): each title on a line naming a unit below that holds no
+ * completion, JSON-encoded as it is written there, and the declarations of the cut its builder made, which name titles.
+ */
+const declaredHostSlicesOf = (input: ReasoningReviewInput): readonly (readonly [slice: string, text: string])[] =>
+	input.framing === 'DECLARED_POLICY'
+		? [
+				...(input.declaredUnitsWithoutWork ?? []).map((u) => ['the title of a unit without work', jsonLine(u.unit)] as const),
+				...(input.declaredWorkCut === undefined ? [] : [["the builder's cut declarations", input.declaredWorkCut] as const])
+			]
+		: [];
+/**
  * `prompt` re-fenced with the token a validator chooser would choose that read only the regions `kept` keeps — and,
- * for a process result, the view whole and each unminted call name, as the product's reads them.
+ * for a process result, the view whole and each unminted call name, ⭐ and for a declared review the slices on its host
+ * lines that `kept` keeps (`declaredHostSlicesOf`), as the product's reads them.
  */
 function revalidated(prompt: string, input: ReasoningReviewInput, kept: (slice: string, cut: boolean) => boolean): string {
 	const { lines, token, regions } = promptRegions(prompt);
 	const chosen = chooseFence([
 		...regions.filter((r) => kept(r.slice, r.cut)).map((r) => regionText(lines, r)),
+		...declaredHostSlicesOf(input).flatMap(([slice, text]) => (kept(slice, false) ? [text] : [])),
 		// ⭐ The view of a process result, read whole, is a slice of its own here (`'the view'`), as the product's reads it.
 		...(input.framing === 'PROCESS_RESULT' ? [...(kept('the view', false) ? [input.content] : []), ...unmintedNamesOf(input)] : [])
 	]);
@@ -1810,11 +1903,26 @@ const VALIDATOR_CHOOSER_RULES: Readonly<Record<string, ValidatorChooserRule>> = 
 	// it, read when whole. ⛔ No probe held a candidate in a cut content, so this rule moved no probe (driven on a disposable
 	// copy); `G-OVERSIZE-CONTENT` and `W-OVERSIZE-CONTENT` hold one in the kept HEAD now.
 	// ⭐ `JAN-EXEC` Phase 7 completion E2 — AND THE DECLARED WORK, CUT (design B4): `D-OVERSIZE-CONTENT` holds a candidate in
-	// the kept HEAD of its cut content, so the rule moves it too.
+	// the kept HEAD of its cut content, so the rule moves it too. ⭐ P5 package D — and `D-OVERSIZE-UNITS`, whose work its
+	// builder cut unit by unit, in the kept HEAD of one unit's work product.
 	'the content of a graph or a work product, when it is cut': {
-		moves: ['G-OVERSIZE-CONTENT', 'W-OVERSIZE-CONTENT', 'D-OVERSIZE-CONTENT'],
+		moves: ['G-OVERSIZE-CONTENT', 'W-OVERSIZE-CONTENT', 'D-OVERSIZE-CONTENT', 'D-OVERSIZE-UNITS'],
 		kept: (s, _f, cut) => !(s === 'the content' && cut),
 		framings: ['G', 'W', 'D']
+	},
+	// ⭐⭐ `JAN-EXEC` Phase 7 P5, package D (`REG-D-118` (1)) — AND WHAT A DECLARED REVIEW'S CHOOSER READS ON ITS HOST LINES
+	// (`declaredHostSlicesOf`): a title on the line naming a unit below that holds no completion (P5 package B F1), and the
+	// declarations of the cut its builder made (package B's check, finding 3). ⛔ No probe planted in either, so a chooser
+	// that skipped one moved no fingerprint.
+	'the title of a unit without work, on its host line': {
+		moves: ['D-ROOT-UNITS-WITHOUT-WORK'],
+		kept: (s) => s !== 'the title of a unit without work',
+		framings: ['D']
+	},
+	"the builder's cut declarations of a declared review's work": {
+		moves: ['D-OVERSIZE-UNIT-TITLE'],
+		kept: (s) => s !== "the builder's cut declarations",
+		framings: ['D']
 	},
 	// ⭐ `PQ-1` (`REG-F-481`) — EACH FIELD OF THE ACCOUNT, THE NARRATION AND THE PRIOR FINDINGS, IN EVERY FRAMING THAT CARRIES
 	// THEM. ⛔ They moved a graph's probe and a process result's, never a work product's, and no process-result probe
@@ -2071,12 +2179,17 @@ const FIELD_READING_ROWS: readonly (readonly [field: string, reading: string])[]
 const ACCOUNT_BREAKS_PROBES: readonly string[] = ['G-ACCOUNT-BREAKS', 'W-ACCOUNT-BREAKS', 'P-ACCOUNT-BREAKS'];
 /**
  * `prompt` re-fenced with the token a validator chooser would choose that read `field` by `read` — every other region,
- * and a process result's view whole and each unminted call name, as the product's reads them.
+ * and a process result's view whole and each unminted call name, ⭐ and a declared review's host-line slices
+ * (`declaredHostSlicesOf`), as the product's reads them.
  */
 function reread(prompt: string, input: ReasoningReviewInput, field: string, read: (text: string) => string): string {
 	const { lines, token, regions } = promptRegions(prompt);
 	const besides = input.framing === 'PROCESS_RESULT' ? [input.content, ...unmintedNamesOf(input)] : [];
-	const chosen = chooseFence([...regions.map((r) => (r.slice === field ? read(regionText(lines, r)) : regionText(lines, r))), ...besides]);
+	const chosen = chooseFence([
+		...regions.map((r) => (r.slice === field ? read(regionText(lines, r)) : regionText(lines, r))),
+		...besides,
+		...declaredHostSlicesOf(input).map(([, text]) => text)
+	]);
 	expect(chosen, 'a token is chosen').toBeDefined();
 	return prompt.split(token).join(chosen!);
 }
@@ -3461,6 +3574,10 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 			'the prior findings': (i) => jsonLine(i.prior!.gaps)
 		};
 		const plantless: string[] = [];
+		// ⭐ P5 package D (`REG-D-118` (1)) — a declared review's work its BUILDER cut unit by unit is handed to the validator
+		// as cut: the bytes that cut removed are in no input the validator is given, so no chooser can read them, and the
+		// region holds the whole of what it was handed. Counted apart, and named.
+		const builderCuts: string[] = [];
 		let cuts = 0;
 		for (const probe of FINGERPRINT_PROBES) {
 			const sent = BASE.probePrompts.get(probe.id)!;
@@ -3473,6 +3590,11 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 			const { lines, token, regions } = promptRegions(sent);
 			const viewToken = input.framing === 'PROCESS_RESULT' ? viewParts(input.content).token : undefined;
 			for (const r of regions.filter((x) => x.cut)) {
+				if (input.framing === 'DECLARED_POLICY' && input.declaredWorkCut !== undefined && r.slice === 'the content') {
+					expect(regionText(lines, r), `${probe.id}: the builder’s cut work is shown as it was handed`).toBe(input.content);
+					builderCuts.push(probe.id);
+					continue;
+				}
 				cuts += 1;
 				const value = whole[r.slice]!(input);
 				const kept = regionText(lines, r);
@@ -3503,6 +3625,7 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 			'P-OVERSIZE-AT-ITS-BUDGET: stderr (the view’s)',
 			'P-OVERSIZE-ALL: stdout (the view’s)'
 		]);
+		expect(builderCuts, 'the declared reviews whose work their builder cut').toEqual(['D-OVERSIZE-UNITS', 'D-OVERSIZE-UNIT-TITLE']);
 	});
 
 	it('⭐ A REFUSAL IS HASHED, IN EVERY FRAMING — G-NO-FENCE’s instruction, W-NO-FENCE’s answer and P-NO-FENCE’s stdout each print every candidate, so the validator refuses each before any prompt exists, and `probes` hashes the refusal: the statement and the content refused; no other probe is refused', () => {
