@@ -126,13 +126,24 @@ export interface CaptureTryInput {
 	 * and pointed at from the record: the record's tool-call observation, whose reason already says this adapter could
 	 * not watch the session, gains where the tool's own account of it is kept.
 	 * ⛔ THE POINTER IS WHAT MAKES IT LAWFUL: stored with nothing pointing at it, it would be the orphan `REG-F-336` C-2
-	 * forbids. So beside an OBSERVED report — an arm that may carry no reason (`model-exchange.ts`) — it is NOT stored. No
-	 * adapter that observes calls writes an export today.
+	 * forbids. So beside an OBSERVED report — an arm that may carry no reason (`model-exchange.ts`) — it is NOT stored.
+	 * ~~No adapter that observes calls writes an export today.~~ ⭐ `JAN-MHX` MH-1: the CLI executor session observes calls
+	 * and hands on its CLI's record on a breach alone; the execution step passes that as `breachRecord` below, never here.
 	 * ⚠ NOT A TYPED FIELD, AND SAID SO: `MODEL_EXCHANGE` has no ref for a session export, and adding one is a ratified
 	 * contract change (the design §10 route, `R11`'s act). Until then the pointer is prose, bounded with the reason it
 	 * joins (`RecordPlaneProseSchema`, 4,096 characters; devin's reason and the pointer are under 1,000).
 	 */
 	readonly toolSessionExport?: string;
+	/**
+	 * ⭐⭐ `JAN-MHX` MH-1 (`DESIGN-multi-harness-executor.md` D20) — A CLI EXECUTOR'S OWN RECORD OF A TURN THAT BREACHED: a
+	 * tool of the CLI's own that ran, or a workspace change outside the host's calls. On a breach it is the only account of
+	 * what the CLI did, so it is kept: stored PURGEABLE_AT_EXPIRY — a session trace, never Evidence (PER-12) — and pointed at
+	 * from the failure message, `parseOutcome.detail`, after the failure's own words. ⛔ The pointer is what keeps it from
+	 * being the orphan `REG-F-336` C-2 forbids, and the failure message is where one can go: the turn's tool-call report is
+	 * often OBSERVED, which may carry no reason. ⭑ Confirmed against `model-exchange.ts`: its handler checks nothing of
+	 * `parseOutcome.detail`, and the contract types it a plain string. On a turn that passes there is none to keep.
+	 */
+	readonly breachRecord?: string;
 }
 
 /** A disclosed absence, which PER-9 permits — as distinct from the silent one it forbids. */
@@ -319,7 +330,8 @@ export async function captureTry(input: CaptureTryInput): Promise<ExchangeRecord
 		volunteeredReasoningRef,
 		omittedRegions,
 		disposition: input.disposition,
-		parseOutcome: input.parseOutcome,
+		// ⭐ `JAN-MHX` MH-1 (D20) — the failure as the caller worded it, and, beside a CLI executor's breach, where its record is kept.
+		parseOutcome: await withBreachRecord(input.store, input.tenantPrefix, input.parseOutcome, input.breachRecord),
 		// ⭐ P7-6 I2 — the observation as the adapter reported it, and, where the tool wrote one, where its export is kept.
 		observedToolCalls: await withSessionExport(
 			input.store,
@@ -395,5 +407,31 @@ async function withSessionExport(
 			`${report.reason ?? ''} ⭑ The backing tool's own export of this session, which lists every step and any tool ` +
 			`it called, is kept on the content plane, PURGEABLE_AT_EXPIRY: storage key ${ref.storageKey}, ` +
 			`${ref.contentHash}, ${ref.byteSize} bytes (JAN-EXEC Phase 7 P7-6 I2).`
+	};
+}
+
+/**
+ * ⭐⭐ `JAN-MHX` MH-1 (D20) — KEEP A CLI EXECUTOR'S RECORD OF A TURN THAT BREACHED, AND SAY IN THE FAILURE WHERE IT IS
+ * (`CaptureTryInput.breachRecord`). The pointer follows the failure's own words, which stay whole.
+ */
+async function withBreachRecord(
+	store: ArtifactStore,
+	tenantPrefix: string,
+	outcome: ExchangeParseOutcome,
+	bytes: string | undefined
+): Promise<ExchangeParseOutcome> {
+	if (bytes === undefined) return outcome;
+	const kept = await store.put({
+		tenantPrefix,
+		bytes,
+		mediaType: 'application/json',
+		purgeability: 'PURGEABLE_AT_EXPIRY'
+	});
+	return {
+		...outcome,
+		detail:
+			`${outcome.detail} ⭑ The CLI's own record of this turn, with the workspace paths that changed outside the host's ` +
+			`calls, is kept on the content plane, PURGEABLE_AT_EXPIRY: storage key ${kept.storageKey}, ${kept.contentHash}, ` +
+			`${kept.byteSize} bytes (JAN-MHX D20).`
 	};
 }

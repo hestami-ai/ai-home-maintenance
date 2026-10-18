@@ -437,8 +437,12 @@ function captureSink(stream: 'STDOUT' | 'STDERR') {
  * The child's environment — an allowlist of the parent's, never the parent's.
  *
  * See the header for what this buys, what it costs and what it does not reach.
+ *
+ * ⭐ `JAN-MHX` MH-1 (D43) — EXPORTED, SO ONE ALLOWLIST SERVES BOTH ITS USERS: the commands a model runs, here, and the CLI
+ * executor a session starts (`tools/cli-executor-session.ts`), which adds its driver's constants beside it and never
+ * widens it.
  */
-function childEnvironment(parent: NodeJS.ProcessEnv): Record<string, string> {
+export function childEnvironment(parent: NodeJS.ProcessEnv): Record<string, string> {
 	const permitted = new Set(INHERITED_ENVIRONMENT_NAMES.map((name) => name.toUpperCase()));
 	const out: Record<string, string> = {};
 	for (const [name, value] of Object.entries(parent))

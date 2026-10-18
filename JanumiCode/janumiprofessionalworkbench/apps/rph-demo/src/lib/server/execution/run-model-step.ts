@@ -494,7 +494,10 @@ export async function runModelInvocationStep(
 			observedToolCalls: governedToolCallReport(
 				produced?.observedToolCalls ?? input.session.lastTurnObservation()
 			),
-			promptTemplateFingerprint: plan.fingerprint
+			promptTemplateFingerprint: plan.fingerprint,
+			// ⭐ `JAN-MHX` MH-1 (D20) — a CLI executor hands on its CLI's record only for a turn that breached, and on that
+			// turn it is the only account of what the CLI did, so it is kept beside the try.
+			...(produced?.sessionExport === undefined ? {} : { breachRecord: produced.sessionExport })
 		});
 		record(input, sink);
 		return {

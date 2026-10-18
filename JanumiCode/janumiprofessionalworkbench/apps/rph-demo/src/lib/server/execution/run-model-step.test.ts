@@ -1257,3 +1257,34 @@ describe('JAN-EXEC P0 — the exchange record must not disclose an absence the S
 		expect(stored, 'and carries none of the interior').not.toContain(REASONING);
 	});
 });
+
+describe('⭐⭐ `JAN-MHX` MH-1 (D20; C28) — a breach’s record reaches the store, pointed at from the try’s failure message', () => {
+	const KEPT = '{"breach":"CLI_OWN_TOOL_RAN","cliRecord":"{}","unexplainedChanges":[]}';
+	const breached = () =>
+		oneShotSession(async () => ({
+			answer: {
+				arrived: false as const,
+				cause: 'CALL_FAILED' as const,
+				reportedBy: 'TOOL' as const,
+				message: 'CLI_OWN_TOOL_RAN: fixture.'
+			},
+			rawOutput: '',
+			producer: { agentId: 'execution.model-invocation', modelId: 'm', providerId: 'fake' },
+			identityEvidence: 'HOST_CONFIGURED' as const,
+			observedToolCalls: { canObserve: true as const, mintedToolNames: [], calls: [{ name: 'cli:shell', outcome: 'UNKNOWN' as const }] },
+			sessionExport: KEPT
+		}));
+
+	it('⭐ the no-answer arm hands the session’s record to the capture, which keeps it PURGEABLE_AT_EXPIRY and names where', async () => {
+		// ⛔ THE MUTANT: the step does not hand it on, so the only account of the breach is deleted with the run folder.
+		const { input, dispatched, store } = harness({ session: breached() });
+		const out = await runModelInvocationStep(input);
+		expect(out.ran).toBe(false);
+		const detail = dispatched.at(-1)!.parseOutcome.detail;
+		expect(detail).toContain('CLI_OWN_TOOL_RAN: fixture.');
+		const key = /storage key (\S+?),/.exec(detail)?.[1];
+		expect(key, 'the failure message names where the record is kept').toBeDefined();
+		expect(await store.get(key!)).toBe(KEPT);
+		expect((await store.stat(key!))?.purgeability).toBe('PURGEABLE_AT_EXPIRY');
+	});
+});

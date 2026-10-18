@@ -66,6 +66,14 @@ export type ExecutorSelection =
 	// ⭐ `JAN-EXEC` Phase 8 (D2) — the executor answers from a recording: each recorded turn's tool calls run through the
 	// real minted tools, and its recorded answer is returned once the turn text's hash matches (`replay/replay-executor.ts`).
 	| { readonly kind: 'REPLAY'; readonly recordingDir: string }
+	// ⭐ `JAN-MHX` MH-1 (D30) — an external CLI executing through the host's own tools (`tools/cli-executor-session.ts`), with
+	// the driver its tool names. ⚠ Nothing selects it yet: a tool joins `WIRED_EXECUTORS` with its driver's package.
+	| {
+			readonly kind: 'CLI';
+			readonly toolId: string;
+			readonly modelId: string;
+			readonly effort?: string;
+	  }
 	| {
 			readonly kind: 'REFUSED';
 			readonly code: ExecutorRefusalCode;
@@ -308,6 +316,9 @@ export function executorRecordIdentity(selection: RunnableExecutorSelection): {
 	// the RECORDED producer itself, graded HOST_CONFIGURED (`replay/replay-executor.ts`); this is only a thrown turn's.
 	if (selection.kind === 'STAND_IN' || selection.kind === 'REPLAY')
 		return { modelId: 'unresolved', providerId: 'unresolved' };
+	// ⭐ `JAN-MHX` MH-1 (D30, D35) — A CLI EXECUTOR NAMES ITS OWN TOOL, as the devin reviewer names `devin`: without this arm
+	// it would be recorded as `pi`.
+	if (selection.kind === 'CLI') return { modelId: selection.modelId, providerId: selection.toolId };
 	return { modelId: selection.modelId, providerId: selection.kind === 'AGY' ? 'agy' : 'pi' };
 }
 
