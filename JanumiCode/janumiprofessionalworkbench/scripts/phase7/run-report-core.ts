@@ -2790,6 +2790,10 @@ function stageFour(v: UnitView, ix: Index): MatrixCell {
  * attempts ran, which a completion by hand names none of. ⛔ Every command of the unit was read, so a superseded plan's
  * refused reviews were read beside the step its re-run completed: P5's design 5a broke over plan A's two. ⚠ Undefined when
  * the record holds no completion of that plan: every command of the unit is read then, as before.
+ * ⭐ P5 package B's check (finding 4) — and, where the completion names no work product (the page's `completeStep` names
+ * none unless the person chose one), the work products its own attempts made (`producingExecutionAttemptId`), as its own
+ * attempts' commands are read. ⛔ Only what the completion named was read, so a completion by hand naming no output hid
+ * its step's own refused work product.
  */
 function completedSubjects(ix: Index, u: Unit): StoredObject[] | undefined {
 	const plan = u.plan;
@@ -2801,12 +2805,22 @@ function completedSubjects(ix: Index, u: Unit): StoredObject[] | undefined {
 	const attempted = u.evidence.filter(
 		(e) => stepId !== '' && str(rec(e.state.contentReference).producingExecutionAttemptId).startsWith(`${stepId}#`)
 	);
-	const ids = [...strs(done.payload.outputArtifactIds), ...strs(done.payload.proposedEvidenceIds), ...attempted.map((e) => e.id)];
+	const named = strs(done.payload.outputArtifactIds);
+	const made =
+		named.length > 0
+			? []
+			: u.artifacts.filter((a) => stepId !== '' && str(a.state.producingExecutionAttemptId).startsWith(`${stepId}#`));
+	const ids = [...named, ...made.map((a) => a.id), ...strs(done.payload.proposedEvidenceIds), ...attempted.map((e) => e.id)];
 	return [...new Set(ids)].flatMap((id) => {
 		const subject = ix.byId.get(id);
 		return subject === undefined ? [] : [subject];
 	});
 }
+
+/** Why stage 5a reads a SUCCEEDED step not reached: its completion names nothing, and nothing is recorded as its attempts'. */
+const NO_FLOOR_SUBJECT =
+	'the step SUCCEEDED by a completion that names no work product and no command, and the record holds none that its own ' +
+	'attempts made: there is no floor of it to read';
 
 /** Stage 5a — a phase completes only when its three checks pass, for the work product and for each command. */
 function stageFiveA(v: UnitView, ix: Index): MatrixCell {
@@ -2816,6 +2830,8 @@ function stageFiveA(v: UnitView, ix: Index): MatrixCell {
 	if (v.timedOut !== null) return cell('5a', row, 'not reached', [], [midUnit(v.timedOut)]);
 	if (u.plan === null || lastArtifact === undefined) return cell('5a', row, 'not reached', [], ['no work product reached the floor']);
 	const subjects = (v.stepState === 'SUCCEEDED' ? completedSubjects(ix, u) : undefined) ?? [lastArtifact, ...u.evidence];
+	// ⛔ P5 package B's check (finding 4) — a completion with nothing of it to read is no floor all SATISFIED: it read "all 0".
+	if (subjects.length === 0) return cell('5a', row, 'not reached', [], [NO_FLOOR_SUBJECT]);
 	const unsatisfied = subjects.flatMap((s) =>
 		floorOf(ix, s.id)
 			.filter((f) => f.state !== 'SATISFIED')

@@ -31675,5 +31675,23 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["apps/rph-demo/src/lib/server/assurance/declared-policy-review.test.ts"],
 		why: "PROMISE: the declarations of a cut the builder made unit by unit name each unit's title (the PWA's, which an agent authors in half B) on host lines before the work, so the fence chooser reads them. WHO RELIES: every reader of the fence, which must occur on no line of the prompt but its own. WHAT THE MUTATION DOES: the declarations are left out of what the fence is chosen over, so a unit with commands and no work product, all of its commands cut and its title holding the first fence candidate, keeps that fence on a host line. OBSERVED (bun run mutants -- P5B-M24-the-fence-is-chosen-without-the-builder-s-cut-declarations P5B-M3-the-fence-is-chosen-without-the-title-on-the-host-line, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M24-the-fence-is-chosen-without-the-builder-s-cut-declarations ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 7 P5, package B's check, finding 3 - the fence of a declared review is chosen over its builder's cut declarations too: a unit with commands and no work product whose commands were all cut had its title only in the declaration of that cut, and a title holding <<<UNTRUSTED-00>>> kept that fence on a non-fence line"
+	},
+	{
+		id: "P5B-M25-a-completion-naming-no-output-hides-its-own-work-product",
+		file: "scripts/phase7/run-report-core.ts",
+		find: ": u.artifacts.filter((a) => stepId !== '' && str(a.state.producingExecutionAttemptId).startsWith(`${stepId}#`));",
+		replace: ": u.artifacts.filter((a) => stepId !== '' && str(a.state.producingExecutionAttemptId).startsWith(`${stepId}#`)).slice(0, 0);",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: where a step's completion names no work product (the page's completeStep names none unless the person chose one), the work products its own attempts made are its floor's subjects, as its own attempts' commands are. WHO RELIES: stage 5a's cell: a step completed by hand over its own refused work product broke. WHAT THE MUTATION DOES: none is read, and only what the completion names is. OBSERVED (bun run mutants -- P5B-M25-a-completion-naming-no-output-hides-its-own-work-product P5B-M26-an-empty-subject-list-reads-as-a-satisfied-floor P5B-M11-the-floor-of-a-completed-step-reads-every-command-of-the-unit P5B-M12-a-completion-by-hand-hides-its-own-refused-command, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M25-a-completion-naming-no-output-hides-its-own-work-product ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 4 - stage 5a of a step completed by hand naming no output reads the work product its own attempts made, and an empty subject list reads not reached, never 'all 0 floor assessments are SATISFIED'"
+	},
+	{
+		id: "P5B-M26-an-empty-subject-list-reads-as-a-satisfied-floor",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "if (subjects.length === 0) return cell('5a', row, 'not reached', [], [NO_FLOOR_SUBJECT]);",
+		replace: "if (subjects.length < 0) return cell('5a', row, 'not reached', [], [NO_FLOOR_SUBJECT]);",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE: a SUCCEEDED step with nothing of its completion to read reads stage 5a not reached. WHO RELIES: the matrix, which must not read a floor as satisfied over no subject. WHAT THE MUTATION DOES: it reads as intended, 'the step SUCCEEDED and all 0 floor assessments are SATISFIED', as before the check. OBSERVED (bun run mutants -- P5B-M25-a-completion-naming-no-output-hides-its-own-work-product P5B-M26-an-empty-subject-list-reads-as-a-satisfied-floor P5B-M11-the-floor-of-a-completed-step-reads-every-command-of-the-unit P5B-M12-a-completion-by-hand-hides-its-own-refused-command, 2026-10-18, in the package B worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5B-M26-an-empty-subject-list-reads-as-a-satisfied-floor ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 P5, package B's check, finding 4 - stage 5a of a step completed by hand naming no output reads the work product its own attempts made, and an empty subject list reads not reached, never 'all 0 floor assessments are SATISFIED'"
 	}
 ];

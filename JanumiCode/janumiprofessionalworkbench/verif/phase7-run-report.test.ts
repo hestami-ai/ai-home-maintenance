@@ -156,8 +156,11 @@ interface PhaseKnobs {
 	readonly commandReview?: readonly Call[];
 	readonly stepState?: string;
 	readonly unit?: { readonly lifecycle: string; readonly execution: string; readonly assurance: string };
-	/** How the step's success was recorded: Begin & Execute's model path, by hand, or not at all. */
-	readonly completion?: 'model' | 'hand' | 'none';
+	/**
+	 * How the step's success was recorded: Begin & Execute's model path, by hand (naming the work product, or, ⭐ P5 package
+	 * B's check, naming no output: `completeStep`'s default), or not at all.
+	 */
+	readonly completion?: 'model' | 'hand' | 'hand-no-output' | 'none';
 	/** Capture folders the unit's archive gained. Default: one per command. */
 	readonly captures?: number;
 	readonly signedOff?: boolean;
@@ -433,7 +436,13 @@ function aRun(
 			});
 		const evidence: string[] = [];
 		if (k.workProducts !== 0) {
-			put('ARTIFACT', art, { producingPwuId: id, storageKey: `k_${art}`, contentHash: `sha256:${sha(art)}` });
+			// ⭐ P5 package B's check (finding 4) — and the attempt that made it, as Begin & Execute records it: the step's first.
+			put('ARTIFACT', art, {
+				producingPwuId: id,
+				producingExecutionAttemptId: `step_${spec.slug}#1`,
+				storageKey: `k_${art}`,
+				contentHash: `sha256:${sha(art)}`
+			});
 			floor(art, k.workProductFloor ?? SATISFIED);
 			// ⭐ P7-6 B7 — each review's recording carried its floor run's token, as the floor now records it.
 			if (k.reviewToken !== undefined) emit('AssuranceAssessmentRequested', `asmt_${art}_2`, {}, null, k.reviewToken);
@@ -479,12 +488,15 @@ function aRun(
 				`ui-${++ui}`
 			);
 			hop(id, plan);
-		} else if (completion === 'hand')
+		} else if (completion === 'hand' || completion === 'hand-no-output')
 			emit(
 				'ExecutionStepSucceeded',
 				plan,
 				{
-					outputArtifactIds: [art],
+					// ⭐ P5 package B's check (finding 4) — `completeStep` names no output unless the person chose one.
+					...(completion === 'hand'
+						? { outputArtifactIds: [art] }
+						: { outputArtifactIds: [], noOutputResult: { reason: 'NO_DOWNSTREAM_CONSUMABLE_RESULT', detail: OPERATOR_COMPLETION_DETAIL } }),
 					proposedEvidenceIds: [],
 					executionProvenance: { executedBy: { actorId: 'local-professional', actorType: 'HUMAN', displayName: 'Operator' } }
 				},
@@ -3210,6 +3222,37 @@ describe('⭐⭐ P5 package B — the report reads a run as P5 went', () => {
 		expect(cellOf(r, '5a', 'design').basis).toEqual([
 			'the step SUCCEEDED with its floor not satisfied',
 			'command evd_design_1: floor.reasoning-review REJECTED'
+		]);
+	});
+
+	it('⛔ check finding 4 (5a) — a step completed by hand NAMING NO OUTPUT, over its own refused work product: the work product its attempt made is read, and the floor broke', () => {
+		// ⛔ RED BEFORE, driven: "as intended", its basis "the step SUCCEEDED and all 0 floor assessments are SATISFIED" — the
+		// page's `completeStep` names no output by default, and no evidence, so nothing at all was read.
+		const r = reportOf(
+			aRun({ design: { stepState: 'SUCCEEDED', completion: 'hand-no-output', workProductFloor: ['SATISFIED', 'SATISFIED', 'REJECTED'] } })
+		).report;
+		const c = cellOf(r, '5a', 'design');
+		expect([c.value, c.basis], 'a completion that names no output hid its own refused work product').toEqual([
+			'broke',
+			['the step SUCCEEDED with its floor not satisfied', 'work product art_design: floor.reasoning-review REJECTED']
+		]);
+	});
+
+	it('⛔ check finding 4 (5a) — a completion that names nothing, over a record that says of nothing that its attempts made it: NOT REACHED, never all 0 SATISFIED', () => {
+		const run = aRun({ design: { stepState: 'SUCCEEDED', completion: 'hand-no-output' } });
+		// The work product's record does not say which attempt made it, as a record made before RD6 set the field does not.
+		const unattributed = (o: StoredObject): StoredObject =>
+			o.id === 'art_design'
+				? { ...o, state: Object.fromEntries(Object.entries(o.state).filter(([k]) => k !== 'producingExecutionAttemptId')) }
+				: o;
+		const r = buildRunReport({ ...run.store, objects: run.store.objects.map(unattributed) }, run.lane, { accountNames: NAMES }).report;
+		const c = cellOf(r, '5a', 'design');
+		expect([c.value, c.basis], 'an empty subject list read as a satisfied floor').toEqual([
+			'not reached',
+			[
+				'the step SUCCEEDED by a completion that names no work product and no command, and the record holds none that its ' +
+					'own attempts made: there is no floor of it to read'
+			]
 		]);
 	});
 
