@@ -218,8 +218,8 @@ export function unitPurposeCaveat(
 }
 
 /**
- * ⭐ `JAN-MHX` MH-7 (design D37) — P3'S EXECUTOR: Pi, its EXECUTION exchanges recording `gpt-5.6-sol`. P5's cells are read
- * beside P3's, so a run whose record does not show this executor says so among what a "Yes" always states.
+ * ⭐ `JAN-MHX` MH-7 (design D37) — P3'S EXECUTOR: Pi, its answered EXECUTION exchanges recording `gpt-5.6-sol`. P5's cells
+ * are read beside P3's, so a run whose record does not show this executor says so among what a "Yes" always states.
  */
 export const P3_EXECUTOR = { tool: 'pi', modelId: 'gpt-5.6-sol' } as const;
 
@@ -230,17 +230,28 @@ export const P3_EXECUTOR = { tool: 'pi', modelId: 'gpt-5.6-sol' } as const;
 export const CODEX_EXECUTOR = 'codex';
 
 /**
+ * ⭐ `JAN-MHX` MH-7 (design D37) — THE MODELS THE EXECUTOR'S ANSWERED EXCHANGES RECORDED, each once, in `recorded`'s order.
+ * ⛔ An exchange that got no answer (`NO_RESPONSE`) is left out: it records the selection's configured label, graded
+ * HOST_CONFIGURED (`run-model-step.ts`, its no-answer and `catch` arms record `input.modelId`), and no model answered it.
+ */
+function answeredModels(recorded: readonly ExecutorModelCount[]): string[] {
+	return [...new Set(recorded.filter((m) => m.exchanges > m.unanswered).map((m) => m.modelId).filter((m) => m !== ''))];
+}
+
+/**
  * ⭐ `JAN-MHX` MH-7 (design D37) — THE CAVEAT OF A RUN WHOSE EXECUTOR IS NOT P3'S: its cells measure another producer, and
  * do not compare one for one with P3's. ⛔ A run whose record cannot show which executor it had — its boot names no tool,
- * or no exchange recorded a model — says that instead, and claims no other producer. None for P3's own executor.
+ * or no answered exchange recorded a model — says that instead, and claims no other producer; and where none of its
+ * exchanges got an answer, it says so. None for P3's own executor.
  */
 export function executorCaveat(e: ExecutorSummary): readonly string[] {
 	if (e.p3Executor === 'yes') return [];
-	const models = [...new Set(e.recorded.map((m) => m.modelId).filter((m) => m !== ''))];
+	const models = answeredModels(e.recorded);
 	const p3 = `P3’s (${P3_EXECUTOR.tool}, its exchanges recording ${P3_EXECUTOR.modelId})`;
-	const ran =
-		`this run’s was ${e.tool ?? 'a tool the boot does not name'}, ` +
-		(models.length === 0 ? 'recording no model' : `recording ${models.join(' and ')}`);
+	let recorded = models.length === 0 ? 'recording no model' : `recording ${models.join(' and ')}`;
+	if (e.recorded.length > 0 && e.recorded.every((m) => m.unanswered === m.exchanges))
+		recorded = 'and none of its exchanges got an answer';
+	const ran = `this run’s was ${e.tool ?? 'a tool the boot does not name'}, ${recorded}`;
 	return e.p3Executor === 'no'
 		? [`The executor is not ${p3}: ${ran}. Its cells measure another producer, and do not compare one for one with P3’s (JAN-MHX D37).`]
 		: [`The record does not show that the executor was ${p3}: ${ran}. Its cells are not shown to compare one for one with P3’s (JAN-MHX D37).`];
@@ -776,13 +787,21 @@ export interface RunReport {
 	readonly problems: readonly string[];
 }
 
-/** ⭐ `JAN-MHX` MH-7 (design D37) — one model the EXECUTION exchanges recorded, with its grade, and how many recorded it. */
+/**
+ * ⭐ `JAN-MHX` MH-7 (design D37) — one model the EXECUTION exchanges recorded, with its grade, how many recorded it, and how
+ * many of those got no answer.
+ */
 export interface ExecutorModelCount {
 	/** `resolvedModel.value`; '' where the exchange recorded none. */
 	readonly modelId: string;
 	/** `resolvedModel.evidence`; '' where the exchange recorded none. */
 	readonly evidence: string;
 	readonly exchanges: number;
+	/**
+	 * Of `exchanges`, those whose disposition is `NO_RESPONSE`. ⛔ Such an exchange records the selection's configured label,
+	 * not a model that answered (`answeredModels`).
+	 */
+	readonly unanswered: number;
 }
 
 /** ⭐ `JAN-MHX` MH-7 (design D37) — THE EXECUTOR, as the boot configured it and the EXECUTION exchanges recorded it. */
@@ -796,9 +815,10 @@ export interface ExecutorSummary {
 	/** Each model and grade the EXECUTION exchanges recorded, in the order each was first recorded. */
 	readonly recorded: readonly ExecutorModelCount[];
 	/**
-	 * Whether the record shows P3's executor (`P3_EXECUTOR`): `yes`, the boot names pi and every exchange that recorded a
-	 * model recorded gpt-5.6-sol, one at least; `no`, the boot names another tool or an exchange recorded another model;
-	 * `not shown`, neither — the boot names no tool, or no exchange recorded a model.
+	 * Whether the record shows P3's executor (`P3_EXECUTOR`): `yes`, the boot names pi and every answered exchange that
+	 * recorded a model recorded gpt-5.6-sol, one at least; `no`, the boot names another tool or an answered exchange recorded
+	 * another model; `not shown`, neither — the boot names no tool, or no answered exchange recorded a model. ⛔ An exchange
+	 * that got no answer is not judged (`answeredModels`).
 	 */
 	readonly p3Executor: 'yes' | 'no' | 'not shown';
 }
@@ -1728,10 +1748,17 @@ function executorSummary(ix: Index, lane: LaneRows): ExecutorSummary {
 		const modelId = str(rec(x.state.resolvedModel).value);
 		const evidence = str(rec(x.state.resolvedModel).evidence);
 		const key = JSON.stringify([modelId, evidence]);
-		counts.set(key, { modelId, evidence, exchanges: (counts.get(key)?.exchanges ?? 0) + 1 });
+		const unanswered = str(x.state.disposition) === 'NO_RESPONSE' ? 1 : 0;
+		counts.set(key, {
+			modelId,
+			evidence,
+			exchanges: (counts.get(key)?.exchanges ?? 0) + 1,
+			unanswered: (counts.get(key)?.unanswered ?? 0) + unanswered
+		});
 	}
 	const recorded = [...counts.values()];
-	const models = recorded.map((m) => m.modelId).filter((m) => m !== '');
+	// ⛔ Judged on the answered exchanges alone: one that got no answer records the host's configured label.
+	const models = answeredModels(recorded);
 	let p3Executor: ExecutorSummary['p3Executor'] = 'not shown';
 	if ((named.tool !== null && named.tool !== P3_EXECUTOR.tool) || models.some((m) => m !== P3_EXECUTOR.modelId))
 		p3Executor = 'no';
@@ -3808,14 +3835,15 @@ function versionLine(v: ExecutorSummary['version']): string {
 
 /**
  * ⭐ `JAN-MHX` MH-7 (design D37) — THE EXECUTOR'S LINE: the tool, its version at boot and at the end, the model and effort
- * configured, and each model the EXECUTION exchanges recorded, with its grade and count. A HOST_CONFIGURED model is said to
- * be the host's configuration, not the tool's report; and of Codex, that its tool surface is the measured version's, not
- * the turn's (D14a), and that a substitution of its model cannot be detected (D22).
+ * configured, and each model the EXECUTION exchanges recorded, with its grade and count, and how many of those got no
+ * answer. A HOST_CONFIGURED model is said to be the host's configuration, not the tool's report; and of Codex, that its tool
+ * surface is the measured version's, not the turn's (D14a), and that a substitution of its model cannot be detected (D22).
  */
 function executorLine(e: ExecutorSummary): string {
-	const counted = e.recorded.map(
-		(m) => `${m.modelId || 'no model'} (${m.evidence || 'no grade'}) in ${plural(m.exchanges, 'exchange', 'exchanges')}`
-	);
+	const counted = e.recorded.map((m) => {
+		const unanswered = m.unanswered > 0 ? ` (${m.unanswered} with no answer)` : '';
+		return `${m.modelId || 'no model'} (${m.evidence || 'no grade'}) in ${plural(m.exchanges, 'exchange', 'exchanges')}${unanswered}`;
+	});
 	const recorded =
 		counted.length === 0 ? 'no EXECUTION exchange is recorded' : `the EXECUTION exchanges recorded ${counted.join(', ')}`;
 	const hostConfigured = e.recorded.some((m) => m.evidence === 'HOST_CONFIGURED')

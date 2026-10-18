@@ -31604,5 +31604,79 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/phase7-run-report.test.ts"],
 		why: "PROMISE (JAN-MHX design D37, fail closed): P3's executor is shown by the model its exchanges recorded, so Pi with no exchange recording a model is not shown to be P3's, and the caveat says so. WHO RELIES: the reader comparing a run whose tries recorded no model with P3's. WHAT THE MUTATION DOES: the boot's naming pi alone reads as P3's executor. OBSERVED (bun run mutants -- (the MH-7 ids), 2026-10-18, in the MH-7 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH7-M16-pi-recording-no-model-reads-as-p3-s ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-MHX MH-7 (ROADMAP-multi-harness-executor.md MH-7, tests 1 to 6; design D37, D38): the run report's executor line and its caveat, and the recorder's refusal of a run whose boot names an executor other than pi"
+	},
+	// ── ⭐ JAN-MHX MH-7, THE CHECK'S FIX ROUND (finding 1, MATERIAL) — A TRY THAT GOT NO ANSWER RECORDS THE SELECTION'S LABEL,
+	// HOST_CONFIGURED, AND IS NOT JUDGED AS A MODEL THAT RAN ───────────────────────────────────────────────────────────────
+	{
+		id: "MH7-M17-a-try-that-got-no-answer-is-judged-as-a-model-that-ran",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "const models = answeredModels(recorded);",
+		replace: "const models = recorded.map((m) => m.modelId).filter((m) => m !== ''); // MUTANT: every exchange is judged, a try that got no answer among them",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE (JAN-MHX design D37; the check of MH-7, finding 1): P3's executor is judged on the exchanges a model answered. A try that got no answer (run-model-step.ts, the no-answer and catch arms) records the selection's configured label, openai-codex/gpt-5.6-sol for Pi, graded HOST_CONFIGURED, and no model answered it. WHO RELIES: the reader of a Pi run one of whose tries got no answer, and of a run in which none did (the quota out, REG-D-116's case), told the producer changed when it did not. WHAT THE MUTATION DOES: the judgment reads every exchange, as MH-7 first built it, so the host's label counts as a model other than gpt-5.6-sol and the caveat says the cells measure another producer. OBSERVED (bun run mutants -- (the MH-7 fix round's ids), 2026-10-18, in the MH-7 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH7-M17-a-try-that-got-no-answer-is-judged-as-a-model-that-ran ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-7, the check's fix round (finding 1, MATERIAL): the run report judges P3's executor on the answered EXECUTION exchanges alone - a try that got no answer records the selection's configured label, HOST_CONFIGURED - and its line says how many of each model's exchanges got no answer"
+	},
+	{
+		id: "MH7-M18-a-run-in-which-no-try-got-an-answer-is-judged-on-the-host-s-label",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "const models = answeredModels(recorded);",
+		replace: "const models = answeredModels(recorded).length > 0 ? answeredModels(recorded) : recorded.map((m) => m.modelId).filter((m) => m !== ''); // MUTANT: with no answered exchange, the judgment falls back to every exchange",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE (the check of MH-7, finding 1): a run in which no try got an answer is not shown to be P3's, and is never said to measure another producer, since nothing was produced at all. WHO RELIES: the reader of a run whose executor's quota was out. WHAT THE MUTATION DOES: where no exchange was answered, the judgment falls back to what the exchanges recorded, the host's label, and calls it another producer. OBSERVED (bun run mutants -- (the MH-7 fix round's ids), 2026-10-18, in the MH-7 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH7-M18-a-run-in-which-no-try-got-an-answer-is-judged-on-the-host-s-label ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-7, the check's fix round (finding 1, MATERIAL): the run report judges P3's executor on the answered EXECUTION exchanges alone - a try that got no answer records the selection's configured label, HOST_CONFIGURED - and its line says how many of each model's exchanges got no answer"
+	},
+	{
+		id: "MH7-M19-the-caveat-names-the-host-s-label-as-a-model-recorded",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "const models = answeredModels(e.recorded);",
+		replace: "const models = [...new Set(e.recorded.map((m) => m.modelId).filter((m) => m !== ''))]; // MUTANT: the caveat names every model recorded, the host's label among them",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE (the check of MH-7, finding 1): the caveat names the models the answered exchanges recorded, the ground the judgment stands on, and never the host's configured label a try that got no answer records. WHO RELIES: the reader told which models produced the cells. WHAT THE MUTATION DOES: the caveat lists every recorded model, so a Pi run's caveat names openai-codex/gpt-5.6-sol beside gpt-5.6-sol and gpt-5.5, as though it had answered. OBSERVED (bun run mutants -- (the MH-7 fix round's ids), 2026-10-18, in the MH-7 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH7-M19-the-caveat-names-the-host-s-label-as-a-model-recorded ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-7, the check's fix round (finding 1, MATERIAL): the run report judges P3's executor on the answered EXECUTION exchanges alone - a try that got no answer records the selection's configured label, HOST_CONFIGURED - and its line says how many of each model's exchanges got no answer"
+	},
+	{
+		id: "MH7-M20-an-answered-host-configured-model-is-left-out-as-though-unanswered",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "recorded.filter((m) => m.exchanges > m.unanswered)",
+		replace: "recorded.filter((m) => m.evidence !== 'HOST_CONFIGURED') /* MUTANT: an answered HOST_CONFIGURED model is left out as though it got no answer */",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE (the check of MH-7, finding 1, the control): what is left out is an exchange that got no answer, not a grade. agy's and Codex's answered exchanges record their model HOST_CONFIGURED, equal to the configured one by construction, and they are the ground of their caveat. WHO RELIES: the reader of P5's report, whose agy exchanges are all HOST_CONFIGURED. WHAT THE MUTATION DOES: every HOST_CONFIGURED row is left out, the shape of the finding's alternative fix taken too far, so an agy run's caveat says it recorded no model. OBSERVED (bun run mutants -- (the MH-7 fix round's ids), 2026-10-18, in the MH-7 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH7-M20-an-answered-host-configured-model-is-left-out-as-though-unanswered ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-7, the check's fix round (finding 1, MATERIAL): the run report judges P3's executor on the answered EXECUTION exchanges alone - a try that got no answer records the selection's configured label, HOST_CONFIGURED - and its line says how many of each model's exchanges got no answer"
+	},
+	{
+		id: "MH7-M21-a-run-with-a-try-that-got-no-answer-is-judged-on-nothing",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "const models = answeredModels(recorded);",
+		replace: "const models = recorded.some((m) => m.unanswered > 0) ? [] : answeredModels(recorded); // MUTANT: a run with any try that got no answer is judged on nothing",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE (the check of MH-7, finding 1, the control): the answered exchanges beside a try that got no answer are still judged, so a Pi run whose answered exchange recorded gpt-5.5 is another producer though one of its tries got no answer. WHO RELIES: the reader of a run whose model changed and one of whose tries failed. WHAT THE MUTATION DOES: one try with no answer leaves the whole run unjudged, so it reads as not shown, and P3's own run with a failed repair carries a caveat. OBSERVED (bun run mutants -- (the MH-7 fix round's ids), 2026-10-18, in the MH-7 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH7-M21-a-run-with-a-try-that-got-no-answer-is-judged-on-nothing ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-7, the check's fix round (finding 1, MATERIAL): the run report judges P3's executor on the answered EXECUTION exchanges alone - a try that got no answer records the selection's configured label, HOST_CONFIGURED - and its line says how many of each model's exchanges got no answer"
+	},
+	{
+		id: "MH7-M22-a-run-in-which-no-try-got-an-answer-is-said-to-have-recorded-no-model",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "recorded = 'and none of its exchanges got an answer';",
+		replace: "recorded = 'recording no model'; // MUTANT: a run in which no try got an answer is said to have recorded no model",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE (the check of MH-7, finding 1): where none of a run's exchanges got an answer, its caveat says so. WHO RELIES: the reader of a run whose quota was out, whose exchanges did record a model, the host's configured label. WHAT THE MUTATION DOES: the caveat says the run recorded no model, which its own header line contradicts. OBSERVED (bun run mutants -- (the MH-7 fix round's ids), 2026-10-18, in the MH-7 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH7-M22-a-run-in-which-no-try-got-an-answer-is-said-to-have-recorded-no-model ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-7, the check's fix round (finding 1, MATERIAL): the run report judges P3's executor on the answered EXECUTION exchanges alone - a try that got no answer records the selection's configured label, HOST_CONFIGURED - and its line says how many of each model's exchanges got no answer"
+	},
+	{
+		id: "MH7-M23-a-run-with-no-exchange-is-said-to-have-had-none-answered",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "if (e.recorded.length > 0 && e.recorded.every((m) => m.unanswered === m.exchanges))",
+		replace: "if (e.recorded.every((m) => m.unanswered === m.exchanges)) // MUTANT: a run with no EXECUTION exchange is said to have had none answered",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE (the check of MH-7, finding 1): the wording that none of a run's exchanges got an answer is stated only of a run that had exchanges; a run that reached no EXECUTION exchange recorded no model, and its caveat says that. WHO RELIES: the reader of a run that stopped before any Begin & Execute. WHAT THE MUTATION DOES: every on an empty list is true, so a run with no exchange is said to have had exchanges that got no answer. OBSERVED (bun run mutants -- (the MH-7 fix round's ids), 2026-10-18, in the MH-7 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH7-M23-a-run-with-no-exchange-is-said-to-have-had-none-answered ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-7, the check's fix round (finding 1, MATERIAL): the run report judges P3's executor on the answered EXECUTION exchanges alone - a try that got no answer records the selection's configured label, HOST_CONFIGURED - and its line says how many of each model's exchanges got no answer"
+	},
+	{
+		id: "MH7-M24-the-line-never-says-which-exchanges-got-no-answer",
+		file: "scripts/phase7/run-report-core.ts",
+		find: "const unanswered = m.unanswered > 0 ? ` (${m.unanswered} with no answer)` : '';",
+		replace: "const unanswered = ''; // MUTANT: the executor's line never says how many exchanges got no answer",
+		expectRed: ["verif/phase7-run-report.test.ts"],
+		why: "PROMISE (the check of MH-7, finding 1): the executor's line keeps every recorded model with its grade, and says how many of its exchanges got no answer, so a reader sees why the host's label is not judged. WHO RELIES: the reader of a Pi run one of whose tries failed, shown two models and no caveat. WHAT THE MUTATION DOES: the line lists the host's label like a model that answered. OBSERVED (bun run mutants -- (the MH-7 fix round's ids), 2026-10-18, in the MH-7 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH7-M24-the-line-never-says-which-exchanges-got-no-answer ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-7, the check's fix round (finding 1, MATERIAL): the run report judges P3's executor on the answered EXECUTION exchanges alone - a try that got no answer records the selection's configured label, HOST_CONFIGURED - and its line says how many of each model's exchanges got no answer"
 	}
 ];

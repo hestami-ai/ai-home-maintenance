@@ -210,13 +210,19 @@ type Slug = 'requirements' | 'design' | 'implementation' | 'end-to-end';
 interface ExecutorKnob {
 	/** `JPWB_EXECUTOR`, `JPWB_EXECUTOR_MODEL` and `JPWB_EXECUTOR_EFFORT`, as the boot inherited them; one left out is unset. */
 	readonly inherited: Readonly<Record<string, string>>;
-	/** What each EXECUTION exchange recorded: the model, the provider and their grade. */
+	/**
+	 * What each EXECUTION exchange that got an answer recorded: the model, the provider and their grade. ⛔ A try that got no
+	 * answer (`NO_RESPONSE`) records what the product records for one instead (`noAnswerIdentity`).
+	 */
 	readonly recorded: { readonly modelId: string; readonly providerId: string; readonly evidence: string };
 	/** The version runs the lane recorded (`ProgramRun`, as `phase7-operator.ts` records one); left out, none. */
 	readonly versionAtBoot?: { readonly exitCode: number; readonly stdout: string };
 	readonly versionAtEnd?: { readonly exitCode: number; readonly stdout: string };
 }
-/** P3's executor — Pi, configured `openai-codex/gpt-5.6-sol`, its exchanges recording `gpt-5.6-sol` — every run's by default. */
+/**
+ * P3's executor — Pi, configured `openai-codex/gpt-5.6-sol`, its answered exchanges recording `gpt-5.6-sol` — every run's by
+ * default.
+ */
 const P3_EXECUTOR: ExecutorKnob = {
 	inherited: { JPWB_EXECUTOR: 'pi', JPWB_EXECUTOR_MODEL: 'openai-codex/gpt-5.6-sol' },
 	recorded: { modelId: 'gpt-5.6-sol', providerId: 'openai-codex', evidence: 'PROVIDER_REPORTED' }
@@ -228,8 +234,19 @@ const AGY_EXECUTOR: ExecutorKnob = {
 	versionAtBoot: { exitCode: 0, stdout: '1.4.2\n' },
 	versionAtEnd: { exitCode: 0, stdout: '1.4.2\n' }
 };
+/**
+ * ⭐ `JAN-MHX` MH-7 — WHAT A TRY THAT GOT NO ANSWER RECORDS, as the product records it: the selection's own model — the boot's
+ * `JPWB_EXECUTOR_MODEL`, `openai-codex/gpt-5.6-sol` for Pi — and its tool as the provider, graded HOST_CONFIGURED
+ * (`run-model-step.ts`'s no-answer and `catch` arms record `input.modelId`; the route's `fallbackIdentity` is
+ * `executorRecordIdentity`'s; `identityFacts` grades an identity with no evidence HOST_CONFIGURED). No model reported it.
+ */
+const noAnswerIdentity = (e: ExecutorKnob) => ({
+	modelId: e.inherited.JPWB_EXECUTOR_MODEL ?? '',
+	providerId: e.inherited.JPWB_EXECUTOR ?? '',
+	evidence: 'HOST_CONFIGURED'
+});
 /** A version run as `phase7-operator.ts` records one (`ProgramRun`). */
-const versionRun = (v: { readonly exitCode: number; readonly stdout: string }) => ({ ...v, stderr: '', failure: null });
+const versionRun =(v: { readonly exitCode: number; readonly stdout: string }) => ({ ...v, stderr: '', failure: null });
 const SATISFIED: Floor = ['SATISFIED', 'SATISFIED', 'SATISFIED'];
 const sha = (s: string) => createHash('sha256').update(s).digest('hex');
 
@@ -454,18 +471,21 @@ function aRun(
 		put('EXECUTION_PLAN', plan, { workUnitId: id, steps: [{ id: `step_${spec.slug}`, stepState }] });
 		emit('ExecutionStepStarted', plan, { stepId: `step_${spec.slug}` });
 		const art = `art_${spec.slug}`;
-		for (const [i, t] of (k.tries ?? [{ disposition: 'ACCEPTED' }]).entries())
+		for (const [i, t] of (k.tries ?? [{ disposition: 'ACCEPTED' }]).entries()) {
+			// ⭐ `JAN-MHX` MH-7 — a try that got no answer records the selection's label, as the product records it.
+			const identity = t.disposition === 'NO_RESPONSE' ? noAnswerIdentity(executor) : executor.recorded;
 			put('MODEL_EXCHANGE', `mex_${spec.slug}_try${i}`, {
 				plane: 'EXECUTION',
 				subjectObjectId: id,
 				disposition: t.disposition,
 				parseOutcome: t.parse ?? { outcome: 'PARSED', detail: '' },
 				// ⭐ `JAN-MHX` MH-7 — the identity the exchange recorded, as `exchange-recorder.ts` writes its two facts.
-				resolvedModel: { availability: 'REPORTED', evidence: executor.recorded.evidence, value: t.model ?? executor.recorded.modelId },
-				resolvedProvider: { availability: 'REPORTED', evidence: executor.recorded.evidence, value: executor.recorded.providerId },
+				resolvedModel: { availability: 'REPORTED', evidence: identity.evidence, value: t.model ?? identity.modelId },
+				resolvedProvider: { availability: 'REPORTED', evidence: identity.evidence, value: identity.providerId },
 				workProductDerivation: { storageKey: `k_${art}` },
 				...refs(`mex_${spec.slug}_try${i}`, t.disposition, k.content)
 			});
+		}
 		const evidence: string[] = [];
 		if (k.workProducts !== 0) {
 			put('ARTIFACT', art, { producingPwuId: id, storageKey: `k_${art}`, contentHash: `sha256:${sha(art)}` });
@@ -1640,7 +1660,7 @@ describe('⭐ JAN-MHX MH-7 (design D37) — the run report names the executor, a
 			configuredModel: 'gemini-4-argon-high',
 			configuredEffort: null,
 			version: { atBoot: '1.4.2', atEnd: '1.4.2' },
-			recorded: [{ modelId: 'gemini-4-argon-high', evidence: 'HOST_CONFIGURED', exchanges: 4 }],
+			recorded: [{ modelId: 'gemini-4-argon-high', evidence: 'HOST_CONFIGURED', exchanges: 4, unanswered: 0 }],
 			p3Executor: 'no'
 		});
 	});
@@ -1658,8 +1678,8 @@ describe('⭐ JAN-MHX MH-7 (design D37) — the run report names the executor, a
 	it('⭐ two recorded models are listed, each with its count — and one that is not gpt-5.6-sol is another producer', () => {
 		const r = reportOf(aRun({ design: { tries: [{ disposition: 'ACCEPTED', model: 'gpt-5.5' }] } })).report;
 		expect(r.executor.recorded).toEqual([
-			{ modelId: 'gpt-5.6-sol', evidence: 'PROVIDER_REPORTED', exchanges: 3 },
-			{ modelId: 'gpt-5.5', evidence: 'PROVIDER_REPORTED', exchanges: 1 }
+			{ modelId: 'gpt-5.6-sol', evidence: 'PROVIDER_REPORTED', exchanges: 3, unanswered: 0 },
+			{ modelId: 'gpt-5.5', evidence: 'PROVIDER_REPORTED', exchanges: 1, unanswered: 0 }
 		]);
 		expect(renderMarkdown(r)).toContain(
 			'the EXECUTION exchanges recorded gpt-5.6-sol (PROVIDER_REPORTED) in 3 exchanges, gpt-5.5 (PROVIDER_REPORTED) in 1 exchange.\n'
@@ -1716,6 +1736,71 @@ describe('⭐ JAN-MHX MH-7 (design D37) — the run report names the executor, a
 				'are not shown to compare one for one with P3’s (JAN-MHX D37).'
 		]);
 		expect(renderMarkdown(unreported)).toContain('the EXECUTION exchanges recorded no model (NONE) in 4 exchanges.\n');
+	});
+
+	// ⛔ PREDICTED RED, read from the code: `executorSummary` judged every EXECUTION exchange, and a try that got no answer
+	// records the selection's label — `openai-codex/gpt-5.6-sol`, HOST_CONFIGURED (`noAnswerIdentity`) — which is not
+	// `gpt-5.6-sol`. So P3's own executor, one of whose tries got no answer, was said to measure another producer, and a run in
+	// which no try got an answer was said to measure one too, though nothing was produced at all.
+	const stopped = { stepState: 'FAILED', unit: { lifecycle: 'EXECUTING', execution: 'RUNNING', assurance: 'UNASSESSED' } };
+	const thrown = { outcome: 'NOT_ATTEMPTED', detail: 'The model call itself failed: provider error' };
+
+	it('⛔ a Pi try that got no answer — its exchange recording the host’s label — is no other producer, and the line lists it with its grade', () => {
+		// Design: try 1 answered and its work product was reviewed REJECTED; the repair's executor call failed (the `catch` arm).
+		const r = reportOf(
+			aRun({
+				design: {
+					...stopped,
+					tries: [{ disposition: 'ACCEPTED' }, { disposition: 'NO_RESPONSE', parse: thrown }],
+					workProductFloor: ['SATISFIED', 'SATISFIED', 'REJECTED']
+				}
+			})
+		).report;
+		expect(caveatsOf(r), 'a try that got no answer was read as another producer').toEqual([]);
+		expect(r.executor.p3Executor).toBe('yes');
+		expect(renderMarkdown(r)).toContain(
+			'the EXECUTION exchanges recorded gpt-5.6-sol (PROVIDER_REPORTED) in 4 exchanges, openai-codex/gpt-5.6-sol ' +
+				'(HOST_CONFIGURED) in 1 exchange (1 with no answer). A HOST_CONFIGURED model is the host’s configuration, not the ' +
+				'tool’s report.\n'
+		);
+	});
+
+	it('⛔ a run in which no try got an answer — the quota out — is not shown to be P3’s, and is never said to measure another producer', () => {
+		const r = reportOf(
+			aRun({
+				requirements: { ...stopped, tries: [{ disposition: 'NO_RESPONSE', parse: { outcome: 'EMPTY_RESPONSE', detail: '' } }], workProducts: 0 },
+				design: { begun: false },
+				implementation: { begun: false },
+				'end-to-end': { begun: false }
+			})
+		).report;
+		expect(caveatsOf(r)).toEqual([
+			`The record does not show that the executor was P3’s ${P3}: this run’s was pi, and none of its exchanges got an ` +
+				'answer. Its cells are not shown to compare one for one with P3’s (JAN-MHX D37).'
+		]);
+		expect(r.executor.p3Executor).toBe('not shown');
+		expect(renderMarkdown(r)).toContain(
+			'the EXECUTION exchanges recorded openai-codex/gpt-5.6-sol (HOST_CONFIGURED) in 1 exchange (1 with no answer).'
+		);
+		// ⭑ A run that reached no EXECUTION exchange at all recorded no model, and had no exchange to go unanswered.
+		const none = reportOf(
+			aRun({ requirements: { begun: false }, design: { begun: false }, implementation: { begun: false }, 'end-to-end': { begun: false } })
+		).report;
+		expect(caveatsOf(none)).toEqual([
+			`The record does not show that the executor was P3’s ${P3}: this run’s was pi, recording no model. Its cells are not ` +
+				'shown to compare one for one with P3’s (JAN-MHX D37).'
+		]);
+	});
+
+	it('⭑ CONTROL — an answered exchange is judged beside a try that got none: a model that is not gpt-5.6-sol is another producer, and the caveat names no host label', () => {
+		const r = reportOf(
+			aRun({ design: { tries: [{ disposition: 'NO_RESPONSE', parse: thrown }, { disposition: 'ACCEPTED', model: 'gpt-5.5' }] } })
+		).report;
+		expect(caveatsOf(r)).toEqual([
+			`The executor is not P3’s ${P3}: this run’s was pi, recording gpt-5.6-sol and gpt-5.5. Its cells measure another ` +
+				'producer, and do not compare one for one with P3’s (JAN-MHX D37).'
+		]);
+		expect(r.executor.p3Executor).toBe('no');
 	});
 });
 
