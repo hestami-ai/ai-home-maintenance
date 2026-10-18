@@ -537,3 +537,63 @@ describe('⭐⭐ P7-6 I2 — a reply no answer span can be located in, KEPT for 
 		expect(rec.observedToolCalls).toEqual(CAPTURE_FACTS.observedToolCalls);
 	});
 });
+
+describe('⭐⭐ `JAN-MHX` MH-1 (D20; C28) — a CLI executor’s own record, kept beside a breach and pointed at from the failure message', () => {
+	const BREACH = '{"breach":"CLI_OWN_TOOL_RAN","cliRecord":"{}","unexplainedChanges":[]}';
+	const FAILED = {
+		outcome: 'EMPTY_RESPONSE' as const,
+		detail: 'No answer bytes reached this host on this try. CLI_OWN_TOOL_RAN: fixture.'
+	};
+	const OBSERVED = {
+		observation: 'OBSERVED' as const,
+		calls: [{ ordinal: 1, nameProvenance: 'NOT_MINTED' as const, outcome: 'UNKNOWN' as const }],
+		observedCount: 1,
+		recordedLimit: 32
+	};
+
+	it('⭐ the record is stored PURGEABLE_AT_EXPIRY, and the parse outcome’s detail names where, beside an OBSERVED report', async () => {
+		// ⛔ THE MUTANT: never store it. On a breach the CLI's record is the only account of what the CLI did (D20).
+		const { store, sink } = harness();
+		const rec = await captureTry({
+			store,
+			sink,
+			tenantPrefix: TENANT,
+			exchangeId: 'exch-breach',
+			role: 'initial',
+			model: MODEL,
+			...CAPTURE_FACTS,
+			parseOutcome: FAILED,
+			observedToolCalls: OBSERVED,
+			prompt: 'P',
+			rawOutput: '',
+			disposition: 'no-response',
+			breachRecord: BREACH
+		});
+		// ⭐ The failure's own words stay first, whole; the pointer follows them.
+		expect(rec.parseOutcome.detail.startsWith(FAILED.detail)).toBe(true);
+		const key = /storage key (\S+?),/.exec(rec.parseOutcome.detail)?.[1];
+		expect(key, 'the failure message names the record’s storage key').toBeDefined();
+		expect(await store.get(key!)).toBe(BREACH);
+		expect((await store.stat(key!))?.purgeability).toBe('PURGEABLE_AT_EXPIRY');
+		expect(rec.observedToolCalls, 'the OBSERVED report is untouched: it may carry no reason').toEqual(OBSERVED);
+	});
+
+	it('⭑ CONTROL — with no breach record, the failure message is the caller’s alone', async () => {
+		const { store, sink } = harness();
+		const rec = await captureTry({
+			store,
+			sink,
+			tenantPrefix: TENANT,
+			exchangeId: 'exch-nobreach',
+			role: 'initial',
+			model: MODEL,
+			...CAPTURE_FACTS,
+			parseOutcome: FAILED,
+			observedToolCalls: OBSERVED,
+			prompt: 'P',
+			rawOutput: '',
+			disposition: 'no-response'
+		});
+		expect(rec.parseOutcome).toEqual(FAILED);
+	});
+});

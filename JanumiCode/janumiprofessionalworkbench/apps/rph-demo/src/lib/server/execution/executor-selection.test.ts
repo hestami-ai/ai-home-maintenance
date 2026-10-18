@@ -116,6 +116,9 @@ function shape(s: ExecutorSelection): Expected {
 	// ⭐ `JAN-EXEC` Phase 8 — the table sets no JPWB_REPLAY, so a REPLAY answer here is the selector reading the switch from
 	// somewhere it was not handed (`replay/replay-selection.test.ts` holds the switch's own table).
 	if (s.kind === 'REPLAY') throw new Error('the table sets no JPWB_REPLAY, and the selector answered REPLAY');
+	// ⭐ `JAN-MHX` MH-1 — nothing selects the `CLI` kind until a driver's package wires its tool, so it is an answer no row
+	// of this table may get.
+	if (s.kind === 'CLI') throw new Error('no tool is wired to the CLI kind yet, and the selector answered CLI');
 	return { kind: s.kind, modelId: s.modelId };
 }
 
@@ -474,6 +477,19 @@ describe('⭐ D4 — the record’s fallback identity is the selection’s', () 
 		expect(executorRecordIdentity({ kind: 'STAND_IN' })).toEqual({
 			modelId: 'unresolved',
 			providerId: 'unresolved'
+		});
+	});
+
+	it('⛔ `JAN-MHX` MH-1 (M2; D30, D35) — a CLI selection names its TOOL as the provider, never pi', () => {
+		// ⭑ RED FIRST: before the `CLI` arm, the provider was `selection.kind === 'AGY' ? 'agy' : 'pi'`, so every tool a CLI
+		// executor ran would have been recorded as Pi's. Two tools, so a constant `'agy'` cannot pass either.
+		expect(executorRecordIdentity({ kind: 'CLI', toolId: 'agy', modelId: 'fixture-z' })).toEqual({
+			modelId: 'fixture-z',
+			providerId: 'agy'
+		});
+		expect(executorRecordIdentity({ kind: 'CLI', toolId: 'devin', modelId: 'fixture-w' })).toEqual({
+			modelId: 'fixture-w',
+			providerId: 'devin'
 		});
 	});
 });

@@ -269,7 +269,11 @@ export interface ToolInvocationResult {
 	/** E-3 evidence grade, supplied by the tool that answered. */
 	readonly identityEvidence: ToolIdentityEvidence;
 	/**
-	 * ⭑ E-1 — THE PROVIDER PAYLOAD AS SENT, when the tool can report it.
+	 * ⭑ E-1 — ~~THE PROVIDER PAYLOAD AS SENT, when the tool can report it.~~ ⭐ `JAN-MHX` MH-1 (D17) — THE INPUT AS SENT BY
+	 * THE HOST TO THE TOOL THAT CALLS THE PROVIDER, when the tool can report it: for Pi, the provider payload it sent; for a
+	 * CLI executor, the host's envelope — the prompt it sent the CLI, the tools its server served, and its own transcript
+	 * of the turn's tool calls, each with the result sent back (`tools/cli-executor-session.ts`). ⚠ What a CLI adds itself,
+	 * its own system prompt and tool schemas, the host never sees, so the envelope cannot hold it (PER-9 E-1).
 	 *
 	 * ⚠ THIS IS NOT THE TURN TEXT, AND THE DIFFERENCE IS THE POINT. With a HELD session (`JAN-EXECSESS`)
 	 * the model's real input is the system prompt plus every prior turn plus this one; recording the turn
@@ -303,6 +307,9 @@ export interface ToolInvocationResult {
 	 * ⚠ CONTENT, NEVER A RECORD FIELD: model-chosen text, the prompt and this host's own devin setup among it (`REG-F-548`'s
 	 * pointer), so it is stored PURGEABLE_AT_EXPIRY on the content plane and only pointed at from the record.
 	 * ⭑ `undefined` means the tool wrote none, or none could be read — an absence of the record, never "no tool ran".
+	 * ⭐ `JAN-MHX` MH-1 (D20) — A CLI EXECUTOR SETS IT ON A TURN THAT BREACHED, AND ON NO OTHER: its CLI's record with the
+	 * workspace paths that changed outside the host's calls. The execution step keeps it beside the failed try
+	 * (`captureTry`'s `breachRecord`); on a turn that passes there is none, so nothing unpointed-at is stored.
 	 */
 	readonly sessionExport?: string;
 }

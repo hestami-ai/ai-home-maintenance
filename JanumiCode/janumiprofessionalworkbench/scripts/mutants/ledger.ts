@@ -31458,5 +31458,817 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/phase7-half-b.test.ts"],
 		why: "PROMISE (round 4's check, finding 2): the end never says the root's check counted its worst case - since REG-D-114 (14) as amended it counts one try's reserve, or none. WHO RELIES: the same readers, who would take a refused MODEL root's 4 for a model unit's worst case beside the caveat's 140. WHAT THE MUTATION DOES: the words round 4 left, restored. Applied by hand first, the file restored byte for byte: 'AssertionError: expected 'the limit, before the root’s press: 4…' to be 'the limit, before the root’s press: 4…' // Object.is equality' (Received: 'the limit, before the root’s press: 451 of 450 reviewer calls, its worst case of 4 counted (D8; REG-D-112)'), and the control's 'AssertionError: expected [ 'paid-limit', …(1) ] to deeply equal [ 'paid-limit', …(1) ]' (2 tests red in its victim: 'Tests  2 failed | 111 passed (113)'). OBSERVED (bun run mutants -- R4-M37, R4-M38, R4-M39 and E3-M45 by their full ids, 2026-10-16, in the round-4 worktree, the check's fixes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         R4-M39-the-root-s-limit-end-says-its-worst-case-again ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 7 completion programme, round 4's check, finding 2 - half B's paid-limit end before the root's press said 'its worst case of N counted', false since the amendment made the root's check count one try's reserve (a MODEL root) or none: it now says what the check counted, from the check, and the half-B tests pin the whole detail for both kinds of root"
+	},
+	// ── JAN-MHX MH-1 (DESIGN-multi-harness-executor.md; roadmap MH-1): the host tool server, the bridge, the CLI executor session, the CLI kind ──
+	{
+		id: "MH1-M1-tools-list-serves-the-catalog",
+		file: "apps/rph-demo/src/lib/server/tools/host-tool-server.ts",
+		find: "const served: ServedTool[] = input.tools.map((tool) => ({",
+		replace: "const served: ServedTool[] = (await import('./execution-tool-surface.js')).EXECUTION_TOOL_CATALOG.map((tool) => ({",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/host-tool-server.test.ts"],
+		why: "PROMISE: S1 (D3): tools/list names exactly the tools minted for the session; a grant of [file-system] lists write_file alone. WHAT THE MUTATION DOES: tools/list serves EXECUTION_TOOL_CATALOG, so the model is told of run_command, which the grant withheld. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M1-tools-list-serves-the-catalog ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the host tool server (DESIGN-multi-harness-executor.md D1-D9; roadmap MH-1 S1-S14)"
+	},
+	{
+		id: "MH1-M2-an-unminted-name-runs-another-tool",
+		file: "apps/rph-demo/src/lib/server/tools/host-tool-server.ts",
+		find: "const tool = input.tools.find((t) => t.name === name);",
+		replace: "const tool = input.tools.find((t) => t.name === name) ?? input.tools[0];",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/host-tool-server.test.ts"],
+		why: "PROMISE: S2 (D3): a tools/call of a name the host did not mint runs nothing and is observed FAILED, graded NOT_MINTED. WHAT THE MUTATION DOES: a name the host did not mint is dispatched to a minted tool, so the call runs and is observed by that tool's outcome. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M2-an-unminted-name-runs-another-tool ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the host tool server (DESIGN-multi-harness-executor.md D1-D9; roadmap MH-1 S1-S14)"
+	},
+	{
+		id: "MH1-M3-an-unminted-call-is-observed-completed",
+		file: "apps/rph-demo/src/lib/server/tools/host-tool-server.ts",
+		find: "input.observer.ended(callId, unknown, true);",
+		replace: "input.observer.ended(callId, unknown, false);",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/host-tool-server.test.ts"],
+		why: "PROMISE: S2 (D3, D6): a call to a name the host did not mint is observed FAILED, as Pi observes an unknown tool. WHAT THE MUTATION DOES: the unknown call is ended without the error flag, so it is observed COMPLETED. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M3-an-unminted-call-is-observed-completed ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the host tool server (DESIGN-multi-harness-executor.md D1-D9; roadmap MH-1 S1-S14)"
+	},
+	{
+		id: "MH1-M4-no-queue",
+		file: "apps/rph-demo/src/lib/server/tools/host-tool-server.ts",
+		find: "const reply = queue.then(async (): Promise<Reply> => {",
+		replace: "const reply = Promise.resolve().then(async (): Promise<Reply> => {",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/host-tool-server.test.ts"],
+		why: "PROMISE: S3 (D5; REG-F-518): calls run one at a time, in arrival order; the second starts after the first ends. WHAT THE MUTATION DOES: removes the queue, so a second command starts while the first still runs. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M4-no-queue                    ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the host tool server (DESIGN-multi-harness-executor.md D1-D9; roadmap MH-1 S1-S14)"
+	},
+	{
+		id: "MH1-M5-started-when-it-leaves-the-queue",
+		file: "apps/rph-demo/src/lib/server/tools/host-tool-server.ts",
+		find: "\t\tinput.observer.started(callId, name);\n\t\tconst entry = { name, arguments: args, result: null as string | null, isError: false };\n\t\ttranscript.push(entry);\n\t\tconst reply = queue.then(async (): Promise<Reply> => {\n\t\t\t// ⛔ DROPPED UNRUN: its turn's gate closed while it waited. It stays started with no end — UNKNOWN.\n\t\t\tif (!gateOpen || serial !== turnSerial)\n\t\t\t\treturn rpcError(id, -32000, 'The turn ended before the host ran this call; it was not run.', GATE_REFUSED_STATUS);\n",
+		replace: "\t\tconst entry = { name, arguments: args, result: null as string | null, isError: false };\n\t\ttranscript.push(entry);\n\t\tconst reply = queue.then(async (): Promise<Reply> => {\n\t\t\t// ⛔ DROPPED UNRUN: its turn's gate closed while it waited. It stays started with no end — UNKNOWN.\n\t\t\tif (!gateOpen || serial !== turnSerial)\n\t\t\t\treturn rpcError(id, -32000, 'The turn ended before the host ran this call; it was not run.', GATE_REFUSED_STATUS);\n\t\t\tinput.observer.started(callId, name);\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/host-tool-server.test.ts"],
+		why: "PROMISE: S4 (D6): a call is observed as started when it ARRIVES; one dropped unrun when its turn closes stays UNKNOWN. WHAT THE MUTATION DOES: starts the call when it leaves the queue, so a queued call dropped at the turn's end vanishes from the record. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M5-started-when-it-leaves-the-queue ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the host tool server (DESIGN-multi-harness-executor.md D1-D9; roadmap MH-1 S1-S14)"
+	},
+	{
+		id: "MH1-M6-no-token-check",
+		file: "apps/rph-demo/src/lib/server/tools/host-tool-server.ts",
+		find: "\t\t\tsend({ status: 401 });\n\t\t\treturn;\n",
+		replace: "",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/host-tool-server.test.ts"],
+		why: "PROMISE: S5 (D2): a missing or wrong token gets 401, runs nothing and observes nothing. WHAT THE MUTATION DOES: skips the token check, so any local process may call run_command during a turn. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M6-no-token-check              ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the host tool server (DESIGN-multi-harness-executor.md D1-D9; roadmap MH-1 S1-S14)"
+	},
+	{
+		id: "MH1-M7-no-host-check",
+		file: "apps/rph-demo/src/lib/server/tools/host-tool-server.ts",
+		find: "request.headers.host !== `127.0.0.1:${port}` || ",
+		replace: "",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/host-tool-server.test.ts"],
+		why: "PROMISE: S6 (D2): a request whose Host is not 127.0.0.1:<port> gets 403. WHAT THE MUTATION DOES: skips the Host check, so a page reached through DNS rebinding is served. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M7-no-host-check               ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the host tool server (DESIGN-multi-harness-executor.md D1-D9; roadmap MH-1 S1-S14)"
+	},
+	{
+		id: "MH1-M8-no-origin-check",
+		file: "apps/rph-demo/src/lib/server/tools/host-tool-server.ts",
+		find: " || request.headers.origin !== undefined",
+		replace: "",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/host-tool-server.test.ts"],
+		why: "PROMISE: S6 (D2): a request carrying an Origin gets 403. WHAT THE MUTATION DOES: skips the Origin check, so a browser's request is served. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M8-no-origin-check             ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the host tool server (DESIGN-multi-harness-executor.md D1-D9; roadmap MH-1 S1-S14)"
+	},
+	{
+		id: "MH1-M9-no-gate",
+		file: "apps/rph-demo/src/lib/server/tools/host-tool-server.ts",
+		find: "\t\tif (!gateOpen) {\n\t\t\trefused += 1;\n\t\t\tsend({ status: GATE_REFUSED_STATUS });\n\t\t\treturn;\n\t\t}\n",
+		replace: "",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/host-tool-server.test.ts"],
+		why: "PROMISE: S7 (D8): a call with no turn open is refused by the gate, counted, and not observed. WHAT THE MUTATION DOES: removes the gate, so outside a turn a call meets only the token check. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M9-no-gate                     ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the host tool server (DESIGN-multi-harness-executor.md D1-D9; roadmap MH-1 S1-S14)"
+	},
+	{
+		id: "MH1-M10-one-token-per-session",
+		file: "apps/rph-demo/src/lib/server/tools/host-tool-server.ts",
+		find: "const token = randomBytes(32).toString('hex');",
+		replace: "const token = minted[0] ?? randomBytes(32).toString('hex');",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/host-tool-server.test.ts"],
+		why: "PROMISE: S8 (D2, D8): turn n's token, sent after turn n+1 opens on a connection held across the change, meets the gate and is counted. WHAT THE MUTATION DOES: mints one token per session, so a descendant of turn n's CLI acts in turn n+1. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M10-one-token-per-session      ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the host tool server (DESIGN-multi-harness-executor.md D1-D9; roadmap MH-1 S1-S14)"
+	},
+	{
+		id: "MH1-M11-close-leaves-the-gate-open",
+		file: "apps/rph-demo/src/lib/server/tools/host-tool-server.ts",
+		find: "\t\tclose() {\n\t\t\tshutGate();\n",
+		replace: "\t\tclose() {\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/host-tool-server.test.ts"],
+		why: "PROMISE: S9 (D8, D13): on a connection opened before close(), a call sent right after close() returns meets the gate and is counted. WHAT THE MUTATION DOES: closes the socket without closing the gate, so a call on a held connection is served after close(). OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M11-close-leaves-the-gate-open ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the host tool server (DESIGN-multi-harness-executor.md D1-D9; roadmap MH-1 S1-S14)"
+	},
+	{
+		id: "MH1-M12-server-runs-the-tool-with-other-arguments",
+		file: "apps/rph-demo/src/lib/server/tools/host-tool-server.ts",
+		find: "result = toPiToolResult(await tool.run(isRecord(args) ? args : {}));",
+		replace: "result = toPiToolResult(await tool.run({}));",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/host-tool-server.test.ts"],
+		why: "PROMISE: S10, a CONTROL (D6): run_command through the server and the same minted tool called directly give equal process-run observations. WHAT THE MUTATION DOES: the server runs the tool with arguments other than the ones the CLI sent, so the two observations differ. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M12-server-runs-the-tool-with-other-arguments ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the host tool server (DESIGN-multi-harness-executor.md D1-D9; roadmap MH-1 S1-S14)"
+	},
+	{
+		id: "MH1-M13-iserror-from-the-exit-code",
+		file: "apps/rph-demo/src/lib/server/tools/host-tool-server.ts",
+		find: "const isError = threw || !result.details.ok;",
+		replace: "const isError = threw || (typeof (result.details.data as { exitCode?: unknown } | undefined)?.exitCode === 'number' ? (result.details.data as { exitCode: number }).exitCode !== 0 : !result.details.ok);",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/host-tool-server.test.ts"],
+		why: "PROMISE: S11 (D7): the result text is toPiToolResult's and isError is true exactly when ok is false. WHAT THE MUTATION DOES: sets isError from the exit code, so a test suite that failed reads as a call that failed. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M13-iserror-from-the-exit-code ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the host tool server (DESIGN-multi-harness-executor.md D1-D9; roadmap MH-1 S1-S14)"
+	},
+	{
+		id: "MH1-M14-failed-for-ok-false",
+		file: "apps/rph-demo/src/lib/server/tools/host-tool-server.ts",
+		find: "input.observer.ended(callId, result, threw);",
+		replace: "input.observer.ended(callId, result, threw || !result.details.ok);",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/host-tool-server.test.ts"],
+		why: "PROMISE: S12 (D6): ok:false is REFUSED, a throw is FAILED, ok:true with exit 1 is COMPLETED. WHAT THE MUTATION DOES: observes ok:false as FAILED, so the governed seam's own refusal reads as a host fault. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M14-failed-for-ok-false        ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the host tool server (DESIGN-multi-harness-executor.md D1-D9; roadmap MH-1 S1-S14)"
+	},
+	{
+		id: "MH1-M15-a-throw-echoes-its-message",
+		file: "apps/rph-demo/src/lib/server/tools/host-tool-server.ts",
+		find: "} catch {\n\t\t\t\tthrew = true;\n\t\t\t\tresult = toPiToolResult({ ok: false, summary: HOST_FAILED_SENTENCE });",
+		replace: "} catch (e) {\n\t\t\t\tthrew = true;\n\t\t\t\tresult = toPiToolResult({ ok: false, summary: String(e) });",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/host-tool-server.test.ts"],
+		why: "PROMISE: S12 (D7): a tool that throws is answered with the host's fixed sentence, never the thrown message. WHAT THE MUTATION DOES: echoes the thrown message to the CLI, and it named a host path. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M15-a-throw-echoes-its-message ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the host tool server (DESIGN-multi-harness-executor.md D1-D9; roadmap MH-1 S1-S14)"
+	},
+	{
+		id: "MH1-M16-serves-the-param-spec",
+		file: "apps/rph-demo/src/lib/server/tools/host-tool-server.ts",
+		find: "inputSchema: JSON.parse(JSON.stringify(toTypeBox(tool.parameters))) as unknown,",
+		replace: "inputSchema: tool.parameters,",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/host-tool-server.test.ts"],
+		why: "PROMISE: S13, a CONTROL (D9): each tool's inputSchema is toTypeBox(parameters) serialised, the replay's executorKeyOf form. WHAT THE MUTATION DOES: serves the host's own parameter spec, which no provider was ever sent. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M16-serves-the-param-spec      ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the host tool server (DESIGN-multi-harness-executor.md D1-D9; roadmap MH-1 S1-S14)"
+	},
+	{
+		id: "MH1-M17-transcript-omits-the-result",
+		file: "apps/rph-demo/src/lib/server/tools/host-tool-server.ts",
+		find: "\t\t\tentry.result = textOf(result.content);\n\t\t\tentry.isError = isError;",
+		replace: "\t\t\tentry.isError = isError;",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/host-tool-server.test.ts"],
+		why: "PROMISE: S14 (D17): the transcript holds each call's name, arguments and result as sent, in arrival order. WHAT THE MUTATION DOES: omits the result, so E-1 holds the calls and not what the model read of them. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M17-transcript-omits-the-result ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the host tool server (DESIGN-multi-harness-executor.md D1-D9; roadmap MH-1 S1-S14)"
+	},
+	{
+		id: "MH1-M18-initialize-ignores-the-version-asked",
+		file: "apps/rph-demo/src/lib/server/tools/host-tool-server.ts",
+		find: "typeof asked === 'string' && PROTOCOL_VERSIONS.includes(asked) ? asked : PROTOCOL_VERSIONS.at(-1),",
+		replace: "PROTOCOL_VERSIONS.at(-1),",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/host-tool-server.test.ts"],
+		why: "PROMISE: D9: initialize answers in the protocol version the client asked for when this server knows it. WHAT THE MUTATION DOES: always answers in the newest version, which a client on an older one may refuse. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M18-initialize-ignores-the-version-asked ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the host tool server (DESIGN-multi-harness-executor.md D1-D9; roadmap MH-1 S1-S14)"
+	},
+	{
+		id: "MH1-M19-get-is-served",
+		file: "apps/rph-demo/src/lib/server/tools/host-tool-server.ts",
+		find: "if (request.method !== 'POST') {",
+		replace: "if (request.method === 'DELETE') {",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/host-tool-server.test.ts"],
+		why: "PROMISE: D9: a GET gets 405; there is no event stream. WHAT THE MUTATION DOES: lets a GET through to the gate and the dispatcher. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M19-get-is-served              ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the host tool server (DESIGN-multi-harness-executor.md D1-D9; roadmap MH-1 S1-S14)"
+	},
+	{
+		id: "MH1-M20-a-notification-is-answered",
+		file: "apps/rph-demo/src/lib/server/tools/host-tool-server.ts",
+		find: "\t\tif (isNotification) return { status: 202 };\n",
+		replace: "",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/host-tool-server.test.ts"],
+		why: "PROMISE: D9: a notification gets 202 and no body. WHAT THE MUTATION DOES: answers a notification as a request, with a JSON-RPC body. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M20-a-notification-is-answered ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the host tool server (DESIGN-multi-harness-executor.md D1-D9; roadmap MH-1 S1-S14)"
+	},
+	{
+		id: "MH1-M21-a-blank-line-for-a-notification",
+		file: "apps/rph-demo/src/lib/server/tools/host-tool-bridge.ts",
+		find: "\t\t\tif (!asked.reply) return;",
+		replace: "\t\t\tif (!asked.reply) {\n\t\t\t\tprocess.stdout.write('\\\\n');\n\t\t\t\treturn;\n\t\t\t}",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/host-tool-bridge.test.ts"],
+		why: "PROMISE: B1 (D10): a request line is relayed and its reply written as one line; a notification writes nothing. WHAT THE MUTATION DOES: writes a blank line for a notification, which a CLI reading one reply per line would read as garbage. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M21-a-blank-line-for-a-notification ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the stdio bridge (DESIGN-multi-harness-executor.md D10, D11; roadmap MH-1 B1-B4)"
+	},
+	{
+		id: "MH1-M22-exits-the-moment-stdin-closes",
+		file: "apps/rph-demo/src/lib/server/tools/host-tool-bridge.ts",
+		find: "\t.on('close', () => {\n\t\tconst leave = () => process.exit(0);\n\t\tchain.then(leave, leave);\n\t\tsetTimeout(leave, 500);\n\t});",
+		replace: "\t.on('close', () => process.exit(0));",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/host-tool-bridge.test.ts"],
+		why: "PROMISE: B1 (D10): a CLI that closes its stdin right after its last request still gets the reply. WHAT THE MUTATION DOES: exits the moment stdin closes, so a request already relayed is answered to no one. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M22-exits-the-moment-stdin-closes ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the stdio bridge (DESIGN-multi-harness-executor.md D10, D11; roadmap MH-1 B1-B4)"
+	},
+	{
+		id: "MH1-M23-prints-the-endpoint",
+		file: "apps/rph-demo/src/lib/server/tools/host-tool-bridge.ts",
+		find: "const target = new URL(endpoint.url);",
+		replace: "const target = new URL(endpoint.url);\nprocess.stderr.write(JSON.stringify(endpoint));",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/host-tool-bridge.test.ts"],
+		why: "PROMISE: B2 (D11, D41): the token is in no argv element, no stdout line and no stderr byte of the bridge. WHAT THE MUTATION DOES: prints the endpoint, token and all, to the bridge's stderr, which a CLI may log. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M23-prints-the-endpoint        ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the stdio bridge (DESIGN-multi-harness-executor.md D10, D11; roadmap MH-1 B1-B4)"
+	},
+	{
+		id: "MH1-M24-keeps-going-after-stdin-closes",
+		file: "apps/rph-demo/src/lib/server/tools/host-tool-bridge.ts",
+		find: "\t.on('close', () => {\n\t\tconst leave = () => process.exit(0);\n\t\tchain.then(leave, leave);\n\t\tsetTimeout(leave, 500);\n\t});",
+		replace: "\t.on('close', () => setTimeout(() => process.exit(0), 3000));",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/host-tool-bridge.test.ts"],
+		why: "PROMISE: B3 (D10): the bridge exits within a second of its stdin closing. WHAT THE MUTATION DOES: keeps the bridge alive three seconds after its CLI closed its end. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M24-keeps-going-after-stdin-closes ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the stdio bridge (DESIGN-multi-harness-executor.md D10, D11; roadmap MH-1 B1-B4)"
+	},
+	{
+		id: "MH1-M25-a-byte-of-the-source-changed",
+		file: "apps/rph-demo/src/lib/server/tools/host-tool-bridge.ts",
+		find: "createInterface({ input: process.stdin, crlfDelay: Infinity })",
+		replace: "createInterface({ input: process.stdin, crlfDelay: 100 })",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/host-tool-bridge.test.ts"],
+		why: "PROMISE: B4 (D11): the bytes writeBridge writes are pinned by hash. WHAT THE MUTATION DOES: changes one value in the bridge's source, which every CLI would then run unseen. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M25-a-byte-of-the-source-changed ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the stdio bridge (DESIGN-multi-harness-executor.md D10, D11; roadmap MH-1 B1-B4)"
+	},
+	{
+		id: "MH1-M26-taint-written-inside-the-workspace",
+		file: "apps/rph-demo/src/lib/server/execution/workspace-taint.ts",
+		find: "return `${workspaceDirectory.slice(0, end)}${TAINT_SUFFIX}`;",
+		replace: "return `${workspaceDirectory}/${TAINT_SUFFIX}`;",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/workspace-taint.test.ts"],
+		why: "PROMISE: D21a: the marker is written BESIDE the workspace, never inside it. WHAT THE MUTATION DOES: writes it inside the workspace, where the executor could delete it. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M26-taint-written-inside-the-workspace ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the taint marker (DESIGN-multi-harness-executor.md D21a)"
+	},
+	{
+		id: "MH1-M27-taint-overwritten",
+		file: "apps/rph-demo/src/lib/server/execution/workspace-taint.ts",
+		find: "const taints = reading.tainted ? [...reading.entries, taint] : [taint];",
+		replace: "const taints = reading.tainted ? [taint] : [taint];",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/workspace-taint.test.ts"],
+		why: "PROMISE: D21a: a second breach is added to the marker, not written over the first. WHAT THE MUTATION DOES: overwrites the marker, so the first breach's try vanishes from it. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M27-taint-overwritten          ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the taint marker (DESIGN-multi-harness-executor.md D21a)"
+	},
+	{
+		id: "MH1-M28-unreadable-taint-is-no-taint",
+		file: "apps/rph-demo/src/lib/server/execution/workspace-taint.ts",
+		find: "\t} catch {\n\t\treturn { tainted: true, entries: [] };\n\t}",
+		replace: "\t} catch {\n\t\treturn { tainted: false };\n\t}",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/workspace-taint.test.ts"],
+		why: "PROMISE: D21a: a marker that exists and cannot be read still taints; the reader fails closed. WHAT THE MUTATION DOES: reads an unreadable marker as no taint. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M28-unreadable-taint-is-no-taint ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the taint marker (DESIGN-multi-harness-executor.md D21a)"
+	},
+	{
+		id: "MH1-M29-driver-table-reads-the-prototype",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-drivers.ts",
+		find: "return Object.hasOwn(CLI_EXECUTOR_DRIVERS, toolId) ? CLI_EXECUTOR_DRIVERS[toolId]!() : undefined;",
+		replace: "return CLI_EXECUTOR_DRIVERS[toolId]?.();",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-drivers.test.ts"],
+		why: "PROMISE: D12: the driver table answers only for a tool it holds; a name it inherits from Object.prototype is not a tool. WHAT THE MUTATION DOES: looks the tool up without Object.hasOwn, so toString is called as a driver. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M29-driver-table-reads-the-prototype ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M30-cli-recorded-as-pi",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "\tif (selection.kind === 'CLI') return { modelId: selection.modelId, providerId: selection.toolId };\n",
+		replace: "",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
+		why: "PROMISE: M2 (D30, D35): executorRecordIdentity of a CLI selection names its tool as the provider. WHAT THE MUTATION DOES: leaves executorRecordIdentity as it was, which names every CLI executor pi. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M30-cli-recorded-as-pi         ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI selection kind and its branch (DESIGN-multi-harness-executor.md D30, D35; roadmap MH-1 M1, M2)"
+	},
+	{
+		id: "MH1-M31-cli-opened-as-agy",
+		file: "apps/rph-demo/src/lib/server/execution/model.ts",
+		find: "\t\treturn async (context) => openCli(context, selection);",
+		replace: "\t\treturn async () =>\n\t\t\toneShotSession((prompt: string) => agyPrintWithModel(prompt, selection.modelId, deps.agyExec));",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/model.test.ts"],
+		why: "PROMISE: M1 (D30): a CLI selection opens through deps.openCli, never the text-only agy opener or Pi. WHAT THE MUTATION DOES: the CLI branch opens the text-only agy session, an agy --print with no workspace and no tools, and never deps.openCli. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M31-cli-opened-as-agy          ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI selection kind and its branch (DESIGN-multi-harness-executor.md D30, D35; roadmap MH-1 M1, M2)"
+	},
+	{
+		id: "MH1-M32-cli-opened-with-no-driver",
+		file: "apps/rph-demo/src/lib/server/execution/model.ts",
+		find: "\t\t\t\tif (driver === undefined)\n\t\t\t\t\tthrow new Error(",
+		replace: "\t\t\t\tif (driver === undefined)\n\t\t\t\t\tvoid new Error(",
+		expectRed: [],
+		expectNoCompile: "driver is CliDriver | undefined after the refusal is dropped, and openCliExecutionSession takes a CliDriver (TS2345): the refusal is the narrowing",
+		why: "PROMISE: M1 (D12, D30): with no driver wired for its tool, the CLI opener refuses; it cannot open a session without one. WHAT THE MUTATION DOES: keeps the refusal's sentence and drops the throw, so the opener would hand an absent driver to openCliExecutionSession. TYPE_PREVENTED: driver is CliDriver | undefined there, which openCliExecutionSession does not take (TS2345). OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): TYPE_PREVENTED - the runner's verdict, verbatim: 'TYPE_PREVENTED MH1-M32-cli-opened-with-no-driver  driver is CliDriver | undefined after the refusal is dropped, and openCliExecutionSessio…'",
+		source: "JAN-MHX MH-1 - the CLI selection kind and its branch (DESIGN-multi-harness-executor.md D30, D35; roadmap MH-1 M1, M2)"
+	},
+	{
+		id: "MH1-M33-breach-record-never-stored",
+		file: "apps/rph-demo/src/lib/server/assurance/exchange-capture.ts",
+		find: "parseOutcome: await withBreachRecord(input.store, input.tenantPrefix, input.parseOutcome, input.breachRecord),",
+		replace: "parseOutcome: input.parseOutcome,",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/exchange-capture.test.ts"],
+		why: "PROMISE: C28 (D20): a CLI executor's record of a turn that breached is stored PURGEABLE_AT_EXPIRY and pointed at from the failure message. WHAT THE MUTATION DOES: never stores it, so on a breach the only account of what the CLI did is lost with the run folder. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M33-breach-record-never-stored ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M34-breach-record-not-handed-on",
+		file: "apps/rph-demo/src/lib/server/execution/run-model-step.ts",
+		find: "\t\t\t...(produced?.sessionExport === undefined ? {} : { breachRecord: produced.sessionExport })\n",
+		replace: "",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/run-model-step.test.ts"],
+		why: "PROMISE: C28 (D20): the execution step hands a CLI executor's breach record to the capture on the no-answer arm. WHAT THE MUTATION DOES: does not hand it on, so the capture has nothing to keep. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M34-breach-record-not-handed-on ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M35-secret-in-the-shared-allowlist",
+		file: "apps/rph-demo/src/lib/server/execution/child-process-runner.ts",
+		find: "\t'TZ'\n];",
+		replace: "\t'TZ',\n\t'JPWB_FAKE_CLI_SECRET'\n];",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C4 (D43): a driver's declared secret reaches the CLI's environment and no command the model runs. WHAT THE MUTATION DOES: adds it to the shared allowlist, which also serves every command the model runs. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M35-secret-in-the-shared-allowlist ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M36-cli-runs-in-the-workspace",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\t\t\tcwd: runFolder.cliDirectory,\n\t\t\t\tenv: cliEnvironment(driver),\n\t\t\t\tstdin: invocation.stdin",
+		replace: "\t\t\t\tcwd: workspaceDirectory,\n\t\t\t\tenv: cliEnvironment(driver),\n\t\t\t\tstdin: invocation.stdin",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C1 (D13): the CLI starts in the run's cli/ folder, not the workspace and not the server's folder. WHAT THE MUTATION DOES: starts it in the workspace, a folder the executor writes into and the CLI would read configuration from. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M36-cli-runs-in-the-workspace  ⎯⎯⎯⎯⎯⎯ Failed Tests 46 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M37-endpoint-under-cli",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "const endpointPath = join(hostDirectory, 'endpoint.json');",
+		replace: "const endpointPath = join(cliDirectory, 'endpoint.json');",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C2 (D13, D41): the endpoint file is in host/, not under the CLI's working folder. WHAT THE MUTATION DOES: writes it into cli/, where a CLI that reads its working folder finds the token. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M37-endpoint-under-cli         ⎯⎯⎯⎯⎯⎯ Failed Tests 29 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M38-cli-gets-the-server-environment",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "const env: Record<string, string> = { ...childEnvironment(process.env), ...driver.environment };",
+		replace: "const env: Record<string, string> = { ...(process.env as Record<string, string>), ...driver.environment };",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C3 (D43): the CLI's environment is the allowlist plus its driver's constants, never the server's. WHAT THE MUTATION DOES: passes process.env, so a provider key in the server's environment would change account and billing. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M38-cli-gets-the-server-environment ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M39-token-in-the-environment",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\t\t\tcwd: runFolder.cliDirectory,\n\t\t\t\tenv: cliEnvironment(driver),",
+		replace: "\t\t\t\tcwd: runFolder.cliDirectory,\n\t\t\t\tenv: { ...cliEnvironment(driver), JPWB_MCP_TOKEN: token },",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C5 (D40, D41, D42): no turn's token is in any argv element, environment variable, result field or failure message. WHAT THE MUTATION DOES: hands the token to the CLI as JPWB_MCP_TOKEN. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M39-token-in-the-environment   ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M40-no-kill-at-the-bound",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\t\t\tawait child.kill();\n",
+		replace: "",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C6 (D18): a CLI that never exits is killed at the bound; the turn is CALL_ABORTED and a call after it is refused. WHAT THE MUTATION DOES: never kills it. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M40-no-kill-at-the-bound       ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M41-kill-the-cli-alone",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "return { done, kill: () => killTree(child.pid) };",
+		replace: "return { done, kill: async () => void child.kill() };",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C7 (D18): at the bound the CLI's whole process tree is killed, its grandchild included. WHAT THE MUTATION DOES: kills the CLI's own process alone; the predicted red is the grandchild still alive. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M41-kill-the-cli-alone         ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M42-a-session-s-first-token-stays-current",
+		file: "apps/rph-demo/src/lib/server/tools/host-tool-server.ts",
+		find: "\t\t\tminted.push(token);\n\t\t\tcurrent = token;",
+		replace: "\t\t\tminted.push(token);\n\t\t\tcurrent = minted[0];",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C8 (D2, D8): a descendant that outlived its CLI, calling with the old token in the next turn, is refused and not observed. WHAT THE MUTATION DOES: keeps the session's first token current, so the orphan's call runs in turn 2 and is recorded as turn 2's. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M42-a-session-s-first-token-stays-current ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M43-resend-carries-only-the-last-try",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\tparts.push(...tries.slice(leftOut), `This turn:\\n\\n${turns[n - 1]}`);",
+		replace: "\tparts.push(...tries.slice(-1), `This turn:\\n\\n${turns[n - 1]}`);",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C9 (D16): a repair re-sends the instruction and every earlier answer with the findings on each. WHAT THE MUTATION DOES: carries only the last try, so the model cannot see that it repeats an earlier failure. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M43-resend-carries-only-the-last-try ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M44-resend-sends-the-turn-alone",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\treturn { prompt: `${systemPrompt}\\n\\n${userPrompt}`, userPrompt };\n}",
+		replace: "\treturn { prompt: turns[n - 1]!, userPrompt: turns[n - 1]! };\n}",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C9 (D16, D17): try 3's prompt holds the preamble, the contract, the instruction, every earlier answer and finding, and the turn; E-1's prompt is it. WHAT THE MUTATION DOES: sends the turn alone, oneShotSession's shape: a repair with no task in it. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M44-resend-sends-the-turn-alone ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M45-resend-cuts-mid-pair",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\tif (size + tries[k]!.length > EXECUTOR_RESEND_HISTORY_CHARS) break;",
+		replace: "\t\tif (size + tries[k]!.length > EXECUTOR_RESEND_HISTORY_CHARS) {\n\t\t\ttries[k] = tries[k]!.slice(-(EXECUTOR_RESEND_HISTORY_CHARS - size));\n\t\t\tkept += 1;\n\t\t\tbreak;\n\t\t}",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C10 (D16): past the history bound the oldest try is left out WHOLE, and the prompt says how many were left out. WHAT THE MUTATION DOES: cuts the oldest try mid-pair, so the model reads half an answer as though it were the whole. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M45-resend-cuts-mid-pair       ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M46-e1-is-the-prompt-alone",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\t\tmaterializedInput: JSON.stringify(envelope),",
+		replace: "\t\t\tmaterializedInput: prompt,",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C11 (D17): E-1 is the host's envelope: the prompt, the tools as served, and the calls with their results. WHAT THE MUTATION DOES: records the prompt alone, which drops every argument and result the model saw. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M46-e1-is-the-prompt-alone     ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M47-own-calls-ignored",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\tif (event.ran) {\n\t\t\townRan.push(event.name);\n\t\t\tmerged.push({ name: `cli:${event.name}`, outcome: 'UNKNOWN' });\n\t\t} else {",
+		replace: "\t\tif (event.ran) {\n\t\t} else {",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C12 (D21): a tool of the CLI's own that RAN fails the turn CLI_OWN_TOOL_RAN. WHAT THE MUTATION DOES: ignores the CLI's own tools that ran, so a CLI that wrote with its own tool passes and the record holds no call for it. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M47-own-calls-ignored          ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M48-own-calls-appended-after-the-host-s",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\t\tcalls: merge.mismatch ? hostCalls : merge.calls",
+		replace: "\t\t\tcalls: merge.mismatch ? hostCalls : [...merge.calls.filter((c) => !c.name.startsWith('cli:')), ...merge.calls.filter((c) => c.name.startsWith('cli:'))]",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C12 (D21; §1.14): the CLI's own calls sit among the host's in the order the CLI's record gives; ordinals are load-bearing. WHAT THE MUTATION DOES: appends them after the host's, so the record says the CLI's own call came later than it did. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M48-own-calls-appended-after-the-host-s ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M49-an-offered-own-tool-is-no-breach",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\tif (merge.ownRan.length > 0 || offeredOwn.length > 0) breach = 'CLI_OWN_TOOL_RAN';",
+		replace: "\t\tif (merge.ownRan.length > 0) breach = 'CLI_OWN_TOOL_RAN';",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C12 (D14a): a surface that offers a tool of the CLI's own beside its carriers is a breach, though nothing shows it ran. WHAT THE MUTATION DOES: fails only on a tool the record shows running; the vendor's record can hide a step (D20). OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M49-an-offered-own-tool-is-no-breach ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M50-a-breach-taints-nothing",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\t\twriteWorkspaceTaint(workspaceDirectory, { code: breach, toolId, turn: n, at: now() });",
+		replace: "\t\t\tvoid { code: breach, toolId, turn: n, at: now() };",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C12, C17 (D21a): a breach marks the workspace tainted. WHAT THE MUTATION DOES: writes no marker, so a re-run reuses a workspace holding bytes nobody recorded. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M50-a-breach-taints-nothing    ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M51-no-cross-check-of-the-host-s-calls",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "const surfaceUnproven = surfaceProofFails(record, mintedToolNames) || merge.mismatch;",
+		replace: "const surfaceUnproven = surfaceProofFails(record, mintedToolNames);",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C13 (D21): a record whose host calls differ from the host's, in order or by name, fails the turn CLI_SURFACE_UNPROVEN. WHAT THE MUTATION DOES: skips the cross-check, so the CLI's own calls are placed by a record that disagrees with the host. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M51-no-cross-check-of-the-host-s-calls ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M52-a-recorded-refusal-is-gone-past",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\tif (t.refusedSinceAnswer || t.signals.rejectedACall === true) return failure('CLI_ENDED_ON_REFUSAL');",
+		replace: "\tif (t.signals.rejectedACall === true) return failure('CLI_ENDED_ON_REFUSAL');",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C14 (D19; REG-F-549): a refusal with no assistant message after it fails the turn CLI_ENDED_ON_REFUSAL. WHAT THE MUTATION DOES: records the refusal and goes on (the first draft's D21), so partial text after a refusal is graded an answer. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M52-a-recorded-refusal-is-gone-past ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M53-a-rejection-line-is-gone-past",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\tif (t.refusedSinceAnswer || t.signals.rejectedACall === true) return failure('CLI_ENDED_ON_REFUSAL');",
+		replace: "\tif (t.refusedSinceAnswer) return failure('CLI_ENDED_ON_REFUSAL');",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C14 (D19): the CLI's own rejection line on stderr fails the turn CLI_ENDED_ON_REFUSAL. WHAT THE MUTATION DOES: reads only the record's refusals, though devin's print mode says it on stderr. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M53-a-rejection-line-is-gone-past ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M54-a-call-rejected-before-sending-is-dropped",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\t\t\tmerged.push({ name: event.name, outcome: 'REFUSED' });\n",
+		replace: "",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C15 (D3, D21): a call the CLI rejected before sending it is in the observation as REFUSED. WHAT THE MUTATION DOES: drops it, so the attempt vanishes, which it does not for Pi. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M54-a-call-rejected-before-sending-is-dropped ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M55-an-absent-record-proves-the-surface",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\tif (record.read === 'ABSENT') return true;",
+		replace: "\tif (record.read === 'ABSENT') return false;",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C16 (D14a): a turn whose CLI wrote no record fails CLI_SURFACE_UNPROVEN. WHAT THE MUTATION DOES: lets the absent arm through. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M55-an-absent-record-proves-the-surface ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M56-an-unparseable-record-proves-the-surface",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\tif (record.read === 'UNPARSEABLE') return true;",
+		replace: "\tif (record.read === 'UNPARSEABLE') return false;",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C16 (D14a): a turn whose record cannot be parsed fails CLI_SURFACE_UNPROVEN. WHAT THE MUTATION DOES: lets the unparseable arm through. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M56-an-unparseable-record-proves-the-surface ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M57-a-record-without-proof-proves-the-surface",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\tif (record.surface === undefined) return true;",
+		replace: "\tif (record.surface === undefined) return false;",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C16 (D14a): a turn whose record holds no proof of the tool surface fails CLI_SURFACE_UNPROVEN. WHAT THE MUTATION DOES: lets the arm without proof through. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M57-a-record-without-proof-proves-the-surface ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M58-an-unserved-host-tool-proves-the-surface",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\treturn record.surface.some((t) => t.party === 'HOST' && !mintedToolNames.includes(t.name));",
+		replace: "\treturn false;",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C16 (D14a): a proof naming a host tool the host did not serve fails CLI_SURFACE_UNPROVEN. WHAT THE MUTATION DOES: accepts any host tool the record names. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M58-an-unserved-host-tool-proves-the-surface ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M59-no-manifest",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\tconst unexplained = [...turnManifests.unexplained].sort();",
+		replace: "\t\tconst unexplained: string[] = [];",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C17 (D14b): a file changed in the workspace outside the host's calls fails the turn CLI_UNEXPLAINED_CHANGE. WHAT THE MUTATION DOES: takes no manifest, so a CLI's own write passes unseen. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M59-no-manifest                ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M60-manifests-only-at-the-turn-s-ends",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\t\t\t\tmanifests.checkpoint = await workspaceManifest(workspaceDirectory);",
+		replace: "\t\t\t\t\tawait workspaceManifest(workspaceDirectory);",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C17 (D14b): a host write_file, and a command writing during its call, explain their changes. WHAT THE MUTATION DOES: never advances the checkpoint past a host call, a manifest at the turn's ends only, so the host's own writes read as unexplained. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M60-manifests-only-at-the-turn-s-ends ⎯⎯⎯⎯⎯⎯ Failed Tests 15 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M61-the-reported-model-is-taken",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\tif (t.reported.some((m) => m !== t.modelId))",
+		replace: "\tif (t.reported.some((m) => m !== t.modelId && false))",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C18 (D22): a reported model other than the configured one fails the turn CLI_MODEL_SUBSTITUTED, naming both. WHAT THE MUTATION DOES: takes the reported model, so a model nobody chose does the work while the record names the one chosen. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M61-the-reported-model-is-taken ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M62-always-provider-reported",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\t\tanswer.arrived && reported.length === 1 ? 'PROVIDER_REPORTED' : 'HOST_CONFIGURED';",
+		replace: "\t\t\t'PROVIDER_REPORTED';",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C19 (D22): one reported model equal to the configured one is PROVIDER_REPORTED; none reported is HOST_CONFIGURED. WHAT THE MUTATION DOES: grades every turn PROVIDER_REPORTED, the shape of pi-executor.ts's grade. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M62-always-provider-reported   ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M63-volunteered-reasoning-dropped",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\t\t\t? { volunteeredReasoning: record.volunteeredReasoning }",
+		replace: "\t\t\t\t? {}",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C19 (D23): reasoning the CLI returned apart from its answer is returned as volunteered reasoning. WHAT THE MUTATION DOES: drops it silently, the undeclared omission REG-D-057 forbids. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M63-volunteered-reasoning-dropped ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M64-nothing-is-an-answer",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\treturn text.trim() === '' ? { arrived: false, cause: 'ENDED_WITHOUT_ANSWER' } : { arrived: true, text };",
+		replace: "\treturn { arrived: true, text };",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C20 (D19; JAN-NOANS): exit 0 with nothing is ENDED_WITHOUT_ANSWER. WHAT THE MUTATION DOES: grades an empty answer as one that arrived (REG-F-410). OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M64-nothing-is-an-answer       ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M65-a-failing-exit-is-an-answer",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\tt.cliRun.exitCode !== 0 ||\n",
+		replace: "",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C20 (D19): a CLI that exits non-zero is CLI_ERROR, even with an answer in its record. WHAT THE MUTATION DOES: reads the record's answer whatever the CLI exited with. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M65-a-failing-exit-is-an-answer ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M66-a-cut-stdout-is-an-answer",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\t!t.cliRun.stdoutComplete ||\n",
+		replace: "",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C20 (D19): a stdout cut at the host's bound is CLI_ERROR, not an answer. WHAT THE MUTATION DOES: reads a cut stdout's record as complete. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M66-a-cut-stdout-is-an-answer  ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M67-a-start-failure-is-unproven",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\tif (t.cliRun?.startFailure !== undefined)\n\t\treturn failure('CLI_ERROR', ` It could not be started (${t.cliRun.startFailure}).`);\n",
+		replace: "",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C20 (D19): a program that could not be started is CLI_ERROR naming its errno code. WHAT THE MUTATION DOES: files it under the record it never wrote, CLI_SURFACE_UNPROVEN, and the errno code is lost. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M67-a-start-failure-is-unproven ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M68-the-cli-s-own-timeout-is-an-answer",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\tif (t.signals.timedOut === true)",
+		replace: "\tif (t.signals.timedOut === true && false)",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C20 (D18, D19): the CLI's own timeout warning is CALL_ABORTED, not an answer. WHAT THE MUTATION DOES: grades the partial output agy returns on its own timeout (1.1.28) as an answer. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M68-the-cli-s-own-timeout-is-an-answer ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M69-excerpt-unbounded",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "const excerpt = blanked(raw).trim().slice(0, EXCERPT_LIMIT);",
+		replace: "const excerpt = blanked(raw).trim();",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C20 (D19a): a known-shape excerpt is kept to 300 characters. WHAT THE MUTATION DOES: keeps the whole line, so the permanent record plane takes whatever length a CLI printed. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M69-excerpt-unbounded          ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M70-excerpt-may-carry-the-prompt",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\tconst withheld = [\n\t\t\tprompt,\n",
+		replace: "\t\tconst withheld = [\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C20 (D19a; PER-12): an excerpt carrying the prompt is withheld, and the code stays. WHAT THE MUTATION DOES: leaves the prompt out of what an excerpt is measured against. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M70-excerpt-may-carry-the-prompt ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M71-excerpt-may-carry-a-served-argument",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "[...stringsIn(call.arguments), ...(call.result === null ? [] : [call.result])]",
+		replace: "[...(call.result === null ? [] : [call.result])]",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C20 (D19a; R11): an excerpt carrying an argument the host served is withheld, and the code stays. WHAT THE MUTATION DOES: leaves the served arguments out of what an excerpt is measured against. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M71-excerpt-may-carry-a-served-argument ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M72-excerpt-may-carry-a-served-result",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "[...stringsIn(call.arguments), ...(call.result === null ? [] : [call.result])]",
+		replace: "[...stringsIn(call.arguments)]",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C20 (D19a; R11): an excerpt carrying a result the host served is withheld, and the code stays. WHAT THE MUTATION DOES: leaves the served results out of what an excerpt is measured against. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M72-excerpt-may-carry-a-served-result ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M73-excerpt-may-carry-the-run-path",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\t\trunFolder.directory,\n\t\t\trunFolder.directory.replaceAll('\\\\', '/'),\n",
+		replace: "",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C20 (D19a, D42): an excerpt carrying the run folder's path is withheld, and the code stays. WHAT THE MUTATION DOES: leaves the run path out of what an excerpt is measured against. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M73-excerpt-may-carry-the-run-path ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M74-excerpt-may-carry-the-port",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\t\tString(openServer.port),\n\t\t\ttoken\n",
+		replace: "\t\t\ttoken\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C20 (D19a, D42): an excerpt carrying the server's port is withheld, and the code stays. WHAT THE MUTATION DOES: leaves the port out of what an excerpt is measured against. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M74-excerpt-may-carry-the-port ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M75-excerpt-may-carry-the-token",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\t\tString(openServer.port),\n\t\t\ttoken\n\t\t];",
+		replace: "\t\t\tString(openServer.port)\n\t\t];",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C20 (D19a, D42): an excerpt carrying the turn's token is withheld, and the code stays. WHAT THE MUTATION DOES: leaves the token out of what an excerpt is measured against. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M75-excerpt-may-carry-the-token ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M76-an-unknown-stderr-line-reaches-the-message",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "t.record.read === 'PARSED' && t.record.errorExcerpt !== undefined ? t.record.errorExcerpt : t.signals.errorExcerpt;",
+		replace: "t.record.read === 'PARSED' && t.record.errorExcerpt !== undefined ? t.record.errorExcerpt : (t.signals.errorExcerpt ?? t.cliRun?.errorLines.at(-1));",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C20 (D19a, D24): a stderr line of no shape the driver knows never reaches the message. WHAT THE MUTATION DOES: falls back to the CLI's last stderr line, which can echo an argument, a result or a host path. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M76-an-unknown-stderr-line-reaches-the-message ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M77-fingerprint-only-at-open",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\tconst changed = sources.filter(([, path, at]) => fingerprintOf(path) !== at).map(([name]) => name);",
+		replace: "\t\tconst changed: string[] = [];",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C21 (D44a): a config source whose size or modified time changed refuses the next turn EXECUTOR_CONFIG_CHANGED, before any spawn. WHAT THE MUTATION DOES: fingerprints only when the session opens, so a config the model rewrote steers the next try. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M77-fingerprint-only-at-open   ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M78-ancestors-checked-only-at-open",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\tconst appeared = ancestorConfiguration(root, home, existsSync);",
+		replace: "\t\tconst appeared: string[] = [];",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C21 (D13, D44a): a CLI's project configuration appearing in an ancestor of the root refuses the next turn. WHAT THE MUTATION DOES: checks the ancestors only when the session opens. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M78-ancestors-checked-only-at-open ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M79-ancestor-configuration-not-refused",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\tif (above.length > 0)\n\t\tthrow new Error(",
+		replace: "\tif (above.length > 0)\n\t\tvoid new Error(",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C22 (D13): a dedicated root with an ancestor holding a CLI's project configuration refuses the session. WHAT THE MUTATION DOES: skips the check. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M79-ancestor-configuration-not-refused ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M80-no-exception-in-the-home-folder",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\t\tif (!(isHome && CLI_USER_DIRECTORIES_IN_HOME.includes(name)) && exists(join(dir, name)))",
+		replace: "\t\t\tif (exists(join(dir, name)))",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C22 (D13, as this build qualifies it): in the home folder the CLIs' own user directories are not project configuration. WHAT THE MUTATION DOES: refuses them there too, which refused every session on a host whose temporary folder is under the home folder. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M80-no-exception-in-the-home-folder ⎯⎯⎯⎯⎯⎯ Failed Tests 51 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M81-every-name-passed-over-in-the-home-folder",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\t\tif (!(isHome && CLI_USER_DIRECTORIES_IN_HOME.includes(name)) && exists(join(dir, name)))",
+		replace: "\t\t\tif (!isHome && exists(join(dir, name)))",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C22 (D13): in the home folder every name but the CLIs' own user directories is still refused (a CLAUDE.md there is). WHAT THE MUTATION DOES: passes over every name in the home folder. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M81-every-name-passed-over-in-the-home-folder ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M82-the-gate-left-to-the-server-s-close",
+		file: "apps/rph-demo/src/lib/server/tools/host-tool-server.ts",
+		find: "\t\tclose() {\n\t\t\tshutGate();\n\t\t\tclosing ??= new Promise<void>((resolve) => {\n\t\t\t\tsetTimeout(() => {\n",
+		replace: "\t\tclose() {\n\t\t\tclosing ??= new Promise<void>((resolve) => {\n\t\t\t\tsetTimeout(() => {\n\t\t\t\t\tshutGate();\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C23 (D8, D13): when dispose() returns, the gate is closed and the token revoked. WHAT THE MUTATION DOES: leaves the gate to the server's close, after its grace, so a call made just after dispose() is served. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M82-the-gate-left-to-the-server-s-close ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M83-dispose-leaves-the-cli-running",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\t\tvoid active?.kill();\n",
+		replace: "",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C23 (D13, D18): disposing a session mid-turn kills its CLI. WHAT THE MUTATION DOES: leaves the CLI running after its session is gone. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M83-dispose-leaves-the-cli-running ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M84-sweep-removes-every-run-folder",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\tif (pid === undefined || processIsAlive(Number(pid))) continue;",
+		replace: "\t\tif (pid === undefined) continue;",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C24 (D13): opening removes a stale run folder whose server pid is dead, and keeps one whose pid is live. WHAT THE MUTATION DOES: removes every one, a live session's included. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M84-sweep-removes-every-run-folder ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M85-a-failed-open-leaves-its-folder-and-server",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\tawait server?.close();\n\t\tawait rm(directory, { recursive: true, force: true }).catch(() => undefined);\n\t\tthrow e;",
+		replace: "\t\tthrow e;",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C25 (D13): a failure to open removes the run folder and closes the server. WHAT THE MUTATION DOES: no finally: a refused open leaves a listening server and a run folder behind. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M85-a-failed-open-leaves-its-folder-and-server ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M86-last-turn-set-after-the-try",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\t\t// ⭐ `B-2` — IN THE `finally`, so a turn that throws still says which calls reached the host.\n\t\t\tlastTurn = { canObserve: true, mintedToolNames, calls: observer.since(callsBefore) };\n",
+		replace: "",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C26 (B-2): after a turn whose CLI throws, lastTurnObservation() holds the calls made before it. WHAT THE MUTATION DOES: sets the observation after the try only, so a throw loses calls already observed. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M86-last-turn-set-after-the-try ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M87-a-throw-rethrown-raw",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\t\t\tconst code = (e as NodeJS.ErrnoException | undefined)?.code;\n\t\t\t\tthrow new Error(",
+		replace: "\t\t\t\tconst code = (e as NodeJS.ErrnoException | undefined)?.code;\n\t\t\t\tif (code === undefined) throw e;\n\t\t\t\tthrow new Error(",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C26 (D42): a turn that throws throws an errno code and a fixed sentence, never the CLI's own error. WHAT THE MUTATION DOES: rethrows the CLI's own error, which named the run folder's path. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M87-a-throw-rethrown-raw       ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M88-a-driver-writes-outside-its-run-folder",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\tif (inside === '' || inside.startsWith('..') || isAbsolute(inside))\n\t\tthrow new Error(",
+		replace: "\tif (inside === '' || inside.startsWith('..') || isAbsolute(inside))\n\t\tvoid new Error(",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C27 (D44): every path a driver writes lies inside the run folder. WHAT THE MUTATION DOES: lets a driver write to the temporary root. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M88-a-driver-writes-outside-its-run-folder ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M89-the-cli-record-handed-on-every-turn",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\t\t...(breach === undefined\n\t\t\t\t? {}\n\t\t\t\t: {",
+		replace: "\t\t\t...(false\n\t\t\t\t? {}\n\t\t\t\t: {",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: C28 (D20): on a breach the CLI's record goes with the answer, to be kept; on a turn that passes it does not. WHAT THE MUTATION DOES: hands it on every turn, an orphan REG-F-336 C-2 forbids once kept. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M89-the-cli-record-handed-on-every-turn ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
+	},
+	{
+		id: "MH1-M90-a-driver-for-another-tool-is-taken",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\tif (driver.toolId !== toolId || !/^[a-z0-9][a-z0-9-]*$/.test(toolId))",
+		replace: "\tif (!/^[a-z0-9][a-z0-9-]*$/.test(toolId))",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: D12, D35: the opener refuses a driver whose tool is not the selection's; the record names the selection's tool. WHAT THE MUTATION DOES: opens another tool's driver under the selected tool's name. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M90-a-driver-for-another-tool-is-taken ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
 	}
 ];

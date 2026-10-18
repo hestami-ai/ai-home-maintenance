@@ -60,6 +60,10 @@ export interface ProducerSession {
 	 * THROUGH this host's own `ProcessRunner` port: if no run was recorded, no run happened. `observedCount: 0`
 	 * is therefore an observed absence and never an absence of observation — the one place in this seam where
 	 * those two genuinely coincide, and it is said here so nobody later assumes the discriminator was forgotten.
+	 * ⭐ `JAN-MHX` MH-1 (D14a, D14b) — ⚠ FOR A CLI EXECUTOR, ONLY ON A TURN THAT PASSED BOTH CHECKS. A CLI has a shell of its
+	 * own, which only its configuration withholds, so "no run recorded" means "none happened" only where the turn's record
+	 * proved the CLI's tool surface and the workspace changed only inside the host's calls. A turn that failed either is
+	 * CALL_FAILED (`tools/cli-executor-session.ts`), and its absence of runs is not an observed one.
 	 */
 	processRuns(): ProcessRunObservation;
 	/** Released when the work unit stops being worked on — satisfied, escalated, or out of tries. */

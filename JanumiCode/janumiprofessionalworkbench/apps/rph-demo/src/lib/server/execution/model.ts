@@ -58,17 +58,23 @@ export async function deterministicExecutionPrint(prompt: string): Promise<strin
 }
 
 /**
- * ⭐ `JAN-SELRES` RS-1 (D4) — the two seams `getExecutionSession` opens through, injectable ONLY so the gate can reach
- * both runnable branches: the `AgyExec` precedent (`agy-cli.ts`).
+ * ⭐ `JAN-SELRES` RS-1 (D4) — the ~~two~~ ⭐ three seams `getExecutionSession` opens through, injectable ONLY so the gate
+ * can reach ~~both~~ ⭐ every runnable branch: the `AgyExec` precedent (`agy-cli.ts`).
  *   · `agyExec` — handed to `agyPrintWithModel`, so a test sees the argv (the model agy is asked to run) and a failure's
  *     sanitised text, and nothing is spawned.
  *   · `openPi` — the Pi opener. ⚠ Its default is the LAZY import below, so ~~the gate never loads Pi's SDK~~ ⭐ loading
  *     this module loads no part of Pi's SDK (R3-C: the gate loads Pi's coding agent in one test alone,
  *     `tools/pi-executor.test.ts`); a test hands in its own and so never opens a real Pi session.
+ *   · ⭐ `openCli` — `JAN-MHX` MH-1 (D30): the CLI executor's opener, handed the whole `CLI` selection. Its default, also
+ *     lazy, finds the tool's driver (`tools/cli-executor-drivers.ts`) and opens `openCliExecutionSession` with it.
  */
 export interface ExecutionSessionDeps {
 	readonly agyExec?: AgyExec;
 	readonly openPi?: (context: ProducerSessionContext, modelId: string) => Promise<ProducerSession>;
+	readonly openCli?: (
+		context: ProducerSessionContext,
+		selection: Extract<RunnableExecutorSelection, { readonly kind: 'CLI' }>
+	) => Promise<ProducerSession>;
 }
 
 /**
@@ -158,6 +164,25 @@ export function getExecutionSession(
 	// recording that cannot be read is thrown here and recorded as a failed step, as every opener's refusal is.
 	if (selection.kind === 'REPLAY')
 		return async (context) => openReplayExecutionSession(context, replayRunFor(selection.recordingDir));
+	// ⭐⭐ `JAN-MHX` MH-1 (D12, D30) — THE FIFTH SESSION: an external CLI, executing through the host's own tool server, with the
+	// driver its tool names. ⚠ Nothing selects it until a driver's package wires its tool (`executor-selection.ts`), and with
+	// no driver for the tool it opens nothing. Loaded lazily, as Pi is, so selecting a CLI costs nothing and loads nothing.
+	if (selection.kind === 'CLI') {
+		const openCli =
+			deps.openCli ??
+			(async (
+				context: ProducerSessionContext,
+				cli: Extract<RunnableExecutorSelection, { readonly kind: 'CLI' }>
+			) => {
+				const driver = (await import('../tools/cli-executor-drivers.js')).cliExecutorDriver(cli.toolId);
+				if (driver === undefined)
+					throw new Error(
+						`No CLI executor driver is wired for the tool '${cli.toolId}'; refusing rather than substituting one.`
+					);
+				return (await import('../tools/cli-executor-session.js')).openCliExecutionSession(context, cli, driver);
+			});
+		return async (context) => openCli(context, selection);
+	}
 	// ⛔ EXHAUSTIVE, AND A SELECTION NOBODY WIRED OPENS NOTHING. The type admits no other kind, so this is unreachable
 	// today; it exists so that a new kind — or a refusal that reached here past the type — is refused when opened,
 	// rather than falling through to whichever tool happened to be written last.

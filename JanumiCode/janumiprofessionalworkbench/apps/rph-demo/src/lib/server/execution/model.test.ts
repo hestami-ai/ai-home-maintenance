@@ -224,6 +224,35 @@ describe('⭐ PER-12 — a failed agy executor call carries no prompt content in
 	});
 });
 
+describe('⭐ `JAN-MHX` MH-1 (D30) — a CLI selection opens through `deps.openCli`, and through nothing else', () => {
+	it('⛔ M1 — deps.openCli receives the sandbox and the selection; neither the text-only agy opener nor Pi is reached', async () => {
+		// ⭑ RED FIRST: before the `CLI` branch, the kind fell to the exhaustive refusal, "No executor is wired for the
+		// selection", and opened nothing.
+		const opened = oneShotSession(async () => 'unused');
+		const openCli = vi.fn(async () => opened);
+		const agyExec = vi.fn(capturingExec([]));
+		const openPi = vi.fn(async () => oneShotSession(async () => 'unused'));
+		const selection = { kind: 'CLI', toolId: 'agy', modelId: 'fixture-cli-model' } as const;
+		const opener = getExecutionSession(selection, { openCli, agyExec, openPi });
+		expect(openCli, 'the CLI was opened on selection, before the opener was called').not.toHaveBeenCalled();
+		const session = await opener(SANDBOX);
+		expect(openCli).toHaveBeenCalledTimes(1);
+		expect(openCli).toHaveBeenCalledWith(SANDBOX, selection);
+		expect(session).toBe(opened);
+		await session.turn('fixture turn');
+		expect(agyExec, 'a CLI selection reached the text-only agy opener').not.toHaveBeenCalled();
+		expect(openPi, 'a CLI selection reached Pi').not.toHaveBeenCalled();
+	});
+
+	it('⛔ with no driver wired for its tool, the default opener refuses, naming the tool', async () => {
+		// ⭑ The driver table is empty until a driver's package fills it (`cli-executor-drivers.ts`): nothing selects the
+		// `CLI` kind yet, and a selection that reached here anyway opens nothing.
+		await expect(
+			getExecutionSession({ kind: 'CLI', toolId: 'agy', modelId: 'fixture-cli-model' })(SANDBOX)
+		).rejects.toThrow("No CLI executor driver is wired for the tool 'agy'");
+	});
+});
+
 describe('⭐ D4 — Pi is opened with the selection’s model, and only when the opener is called', () => {
 	it('⛔ deps.openPi receives the SELECTION’s model and the sandbox, and is not called until the returned opener is', async () => {
 		// ⭑ SUCCEEDS "selecting pi does NOT spawn or import Pi until the call is actually made": that case could only

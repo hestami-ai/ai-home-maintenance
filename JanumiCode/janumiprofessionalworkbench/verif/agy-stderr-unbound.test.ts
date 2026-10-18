@@ -195,6 +195,14 @@ const DEMO_PREFIX = 'apps/rph-demo/src/';
  *   6. `replay/replayed-runner.ts` — WHO WRITES IT BACK: the recorded stderr into the output workspace, `R7`'s
  *      disposition unchanged (both streams retained, `PURGEABLE_AT_EXPIRY`, referenced by `ProcessRunOutcome.retention`,
  *      reachable by `Workspace.purge`), and it refuses construction where any of that is untrue, as the real runner does.
+ *
+ * ⭐⭐ `JAN-MHX` MH-1 (`DESIGN-multi-harness-executor.md` D24) — ONE MORE, ITS DISPOSITION IN ITS OWN HEADER, WRITTEN IN THE
+ * COMMIT THAT BINDS IT:
+ *   7. `tools/cli-executor-session.ts` — WHO READS A CLI EXECUTOR'S STDERR: the opener binds the CLI's stream in one place,
+ *      reads it into memory, bounded, and hands its lines to the driver for classification only. Nothing of it is
+ *      retained; what can reach a record is a failure code and a known-shape excerpt of at most 300 characters, withheld
+ *      when it carries the prompt, anything the host served in the turn, the run folder's path, the port or the token.
+ *      ⚠ ITS RESIDUAL: an excerpt echoing what none of those checks name reaches the record plane, which has no removal path.
  */
 const DISPOSED_STDERR_SITES = [
 	'lib/server/execution/child-process-runner.ts',
@@ -204,7 +212,9 @@ const DISPOSED_STDERR_SITES = [
 	'lib/server/assurance/process-result-render.ts',
 	// ⭐ `JAN-EXEC` Phase 8 E4 — the recording's stderr, and the replayed runner that writes it back (above: 5, 6).
 	'lib/server/replay/recording.ts',
-	'lib/server/replay/replayed-runner.ts'
+	'lib/server/replay/replayed-runner.ts',
+	// ⭐ `JAN-MHX` MH-1 — a CLI executor's stderr, read for classification and never retained (above: 7).
+	'lib/server/tools/cli-executor-session.ts'
 ];
 
 /** REG-Q-066's ORIGINAL subject, named so the bound it actually stated stays closed on its own terms. */
@@ -533,13 +543,15 @@ describe('REG-Q-066 — the stderr hatch is CLOSED BY DISPOSITION, and the dispo
 		// `'lib/server/execution/process-result-floor.ts'`), its disposition moved into that module's header in the same
 		// change — not a fifth entry.
 		// ⭐ `JAN-EXEC` Phase 8 E4 — widened by two, each disposition in its module's header (the list's own comment: 5, 6).
+		// ⭐ `JAN-MHX` MH-1 — widened by one, its disposition in its module's header (the list's own comment: 7).
 		expect(DISPOSED_STDERR_SITES).toEqual([
 			'lib/server/execution/child-process-runner.ts',
 			'lib/server/tools/execution-tool-surface.ts',
 			'lib/server/tools/process-run-observer.ts',
 			'lib/server/assurance/process-result-render.ts',
 			'lib/server/replay/recording.ts',
-			'lib/server/replay/replayed-runner.ts'
+			'lib/server/replay/replayed-runner.ts',
+			'lib/server/tools/cli-executor-session.ts'
 		]);
 	});
 
