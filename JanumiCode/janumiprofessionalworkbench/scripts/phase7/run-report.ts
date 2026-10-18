@@ -229,9 +229,11 @@ export function readLane(run: string, archiveRead: string): LaneRows {
 			// ⭑ What the archiver recorded of the process-output (`run-archive.ts`): absent from the run, or copied. Read loosely —
 			// an archive cut short has no checks.json, and its missing folder then stays UNKNOWN, never "none" (K5).
 			const checks = readJson(join(archiveDir, name, 'checks.json'), `lane/archive/${name}/checks.json`, problems) as
-				| { archived?: { processOutput?: { present?: unknown } } }
+				| { archived?: { processOutput?: { present?: unknown } }; k5?: { causes?: unknown } }
 				| undefined;
 			const present = checks?.archived?.processOutput?.present;
+			// ⭐ P5 package B (F5) — K5's causes as the archive recorded them, each whether its record left it possible.
+			const causes = checks?.k5?.causes;
 			return {
 				name,
 				workspaceTree: isDirectory(workspace) ? workspaceTreeSha256(workspace) : null,
@@ -240,7 +242,10 @@ export function readLane(run: string, archiveRead: string): LaneRows {
 					: isDirectory(output)
 						? []
 						: null,
-				processOutputRecorded: typeof present === 'boolean' ? present : null
+				processOutputRecorded: typeof present === 'boolean' ? present : null,
+				k5Causes: Array.isArray(causes)
+					? causes.map((c: { cause?: unknown; possible?: unknown }) => ({ cause: String(c?.cause ?? ''), possible: c?.possible === true }))
+					: null
 			};
 		});
 	return {

@@ -48,6 +48,8 @@ import {
 	PHASE7_UNIT_REVIEWER_CALLS
 } from '../../apps/rph-demo/e2e-live-exec/lane-config.js';
 import { scanText } from './archive-scan.js';
+// ⭐ P5 package B (F5) — the causes the archive's K5 check names, in the words it writes them (`run-archive.ts`).
+import { K5_JOIN_CAUSE, K5_STOP_CAUSE } from './k5-causes.js';
 import {
 	PHASE7_DESIGN,
 	PHASE7_E2E,
@@ -201,25 +203,48 @@ export function uncheckedCaveat(declared: readonly { readonly criterionResults: 
  * and are never counted among the model reviewer's.
  */
 export function unitPurposeCaveat(
-	composites: readonly { readonly unit: string; readonly reviews: number; readonly replayed: number }[]
+	composites: readonly {
+		readonly unit: string;
+		readonly reviews: number;
+		readonly replayed: number;
+		/** ⭐ P5 package B (F6) — what its reviews were judged over, where a unit below it contributed no work (`workSeenOf`). */
+		readonly seen?: string | null;
+	}[]
 ): readonly string[] {
 	const made = composites.filter((c) => c.reviews > 0 || c.replayed > 0);
 	if (made.length === 0) return [];
 	const counted = (c: (typeof made)[number]): string =>
 		[...(c.reviews > 0 ? [`${c.reviews}`] : []), ...(c.replayed > 0 ? [`${c.replayed} replayed`] : [])].join(' and ');
+	// ⛔ P5 package B (F6) — "judged over the work it and every unit below it produced" only where it was: P5's root was
+	// judged with its abandoned end-to-end phase contributing no work, and the caveat said every unit.
+	const partial = made.filter((c) => c.seen);
+	const judged =
+		partial.length === 0
+			? 'judged over the work it and every unit below it produced (REG-D-111 (2))'
+			: `judged over the work of the units below it that hold a completion (REG-D-111 (2); ${partial.map((c) => `${c.unit}: ${c.seen}`).join('; ')})`;
 	return [
 		`UNIT_PURPOSE framing: the declared reviews of a unit composed of others (${made.map((c) => `${c.unit}: ${counted(c)}`).join('; ')}) ` +
-			'were made in it — the unit’s own purpose, judged over the work it and every unit below it produced (REG-D-111 (2)) — and ' +
+			`were made in it — the unit’s own purpose, ${judged} — and ` +
 			'no reviewer-qualification case measures it: every declared case is in the PRODUCING_PROMPT framing.'
 	];
 }
 
-/** The classifications a person gives each adjudication row (P7-4f). This report leaves the field blank. */
+/**
+ * ⭐ P5 package B (F7) — THE WORDS A REVIEW'S RECORDED FAILURE CARRIES when the reviewer's reply ended at its output-token limit:
+ * devin's own, in every one of P5's seven reviews recorded with no response, and in every such review of the runs before it.
+ */
+export const REVIEWER_OUTPUT_LIMIT_TEXT = 'model hit max output token limit';
+
+/**
+ * The classifications a person gives each adjudication row (P7-4f). This report leaves the field blank. ⛔ P5 package B (F7) —
+ * ~~'transport failure (REG-F-499)'~~: none of the reviews recorded with no response so far was one — each ended at the
+ * reviewer's output-token limit — so the class is named by the failure text such a review records (`REVIEWER_OUTPUT_LIMIT_TEXT`).
+ */
 export const ADJUDICATION_CLASSES = [
 	'reviewer right',
 	'reviewer wrong',
 	'join defect (REG-F-485, REG-F-486)',
-	'transport failure (REG-F-499)',
+	`output-token truncation: the reviewer’s reply ended at its output-token limit, its recorded failure reading "${REVIEWER_OUTPUT_LIMIT_TEXT}"`,
 	'malformed reply (REG-F-489, REG-F-428, REG-F-479)'
 ] as const;
 
@@ -329,6 +354,12 @@ export interface ArchiveFacts {
 	 * `checks.json` says, as in an archive cut short.
 	 */
 	readonly processOutputRecorded?: boolean | null;
+	/**
+	 * ⭐ P5 package B (F5) — what its `checks.json` records of K5's causes of a capture folder no evidence names
+	 * (`run-archive.ts`, `k5.causes`; worded by `k5-causes.ts`), each whether the record leaves it possible — or null when no
+	 * `checks.json` records a K5 check.
+	 */
+	readonly k5Causes?: readonly { readonly cause: string; readonly possible: boolean }[] | null;
 }
 
 export interface LaneRows {
@@ -598,12 +629,24 @@ export interface AdjudicationRow {
 export interface UnitRuns {
 	/** Runs that became evidence. */
 	readonly recorded: number;
-	/** Capture folders the unit's archive gained — one per run the runner completed; null when an archive is missing. */
+	/**
+	 * ~~Capture folders the unit's archive gained~~ ⭐ P5 package B (F5): the capture folders that are the unit's — those its
+	 * own evidence names that an archive of the run lists, and those its archive gained that no evidence names — one per run
+	 * the runner completed; null when an archive is missing.
+	 */
 	readonly captured: number | null;
-	/** Captured runs no evidence names; null when `captured` is. */
+	/** Captured runs ~~no evidence names~~ ⭐ F5: its archive gained, that no evidence of the run names; null when `captured` is. */
 	readonly unrecorded: number | null;
-	/** Why the captured runs became no evidence, read from how many the join recorded (`unrecordedCause`). */
+	/**
+	 * Why the captured runs became no evidence, ~~read from how many the join recorded~~ ⭐ F5: the causes the unit's archive's
+	 * K5 check leaves possible, in its words (`unrecordedCause`); null when none became no evidence, or when that is not
+	 * recorded (`causeNotRecorded`).
+	 */
 	readonly cause: string | null;
+	/** ⭐ F5 — the register ids those causes bear on. */
+	readonly causeIds: readonly string[];
+	/** ⭐ F5 — why the cause is not recorded: the archive holds no K5 check, or one that leaves no cause possible. */
+	readonly causeNotRecorded: string | null;
 	/** ⛔ When `captured` is null, why: which archive holds no capture listing. Unknown is never read as zero. */
 	readonly unknownBecause: string | null;
 	/** `run_command` calls the executor's tries list as COMPLETED — a witness, and a lower bound when a try's list was cut. */
@@ -2239,33 +2282,48 @@ function capturesAdded(
 	return { added: mine.filter((c) => !prior.includes(c)), unknownBecause: null };
 }
 
+/** The register ids a K5 cause bears on: those its words name, and `REG-F-511` for a stop or a join refused part-way. */
+const k5CauseIds = (cause: string): string[] => [
+	...(cause.match(/REG-F-\d+/g) ?? []),
+	...(cause === K5_STOP_CAUSE || cause === K5_JOIN_CAUSE ? ['REG-F-511'] : [])
+];
+
 /**
- * ⭐ WHY A UNIT'S CAPTURED RUNS BECAME NO EVIDENCE, read from how many its join recorded: the join records every run the
- * observer kept — the first 32 — so 32 recorded means the rest ran past the cap (`REG-F-517`), and fewer means the join
- * never ran, or was refused part-way: a stop drops the commands it has not joined (`REG-F-511`, its last limb).
+ * ⭐ WHY A UNIT'S CAPTURED RUNS BECAME NO EVIDENCE — ~~read from how many its join recorded: … 32 recorded means the rest ran
+ * past the cap (`REG-F-517`), and fewer means the join never ran, or was refused part-way (`REG-F-511`)~~ ⭐⭐ P5 package B
+ * (F5): the causes the unit's archive's own K5 check leaves possible (`run-archive.ts` `causesOf`), in its words, and the
+ * register ids each bears on. ⛔ The count named P5's implementation REG-F-511, though its archive's K5 check had ruled both
+ * of REG-F-511's limbs out. ⚠ Not recorded when the archive holds no K5 check, or one that leaves no cause possible.
  */
 export function unrecordedCause(
-	unrecorded: number | null,
-	recorded: number
-): { readonly cause: string; readonly registerId: 'REG-F-517' | 'REG-F-511' } | null {
-	if (unrecorded === null || unrecorded === 0) return null;
-	return recorded >= RECORDED_RUN_LIMIT
-		? {
-				cause: `runs past the ${RECORDED_RUN_LIMIT}nd (REG-F-517): the evidence join recorded the ${RECORDED_RUN_LIMIT} runs the observer keeps, and no more`,
-				registerId: 'REG-F-517'
-			}
-		: {
-				cause:
-					'the step stopped before its evidence join recorded them, or the join was refused part-way: a stop drops ' +
-					'the commands it has not joined from the record (REG-F-511)',
-				registerId: 'REG-F-511'
-			};
+	a: ArchiveFacts | undefined,
+	archive: string
+): { readonly cause: string; readonly registerIds: readonly string[] } | { readonly notRecorded: string } {
+	const causes = a?.k5Causes;
+	if (causes === undefined || causes === null) return { notRecorded: `the archive ${archive}’s checks.json holds no K5 check` };
+	const possible = causes.filter((c) => c.possible).map((c) => c.cause);
+	if (possible.length === 0) return { notRecorded: `the archive ${archive}’s K5 check leaves none of its causes possible` };
+	return {
+		cause: `the archive’s K5 check leaves possible ${possible.join('; or ')}`,
+		registerIds: [...new Set(possible.flatMap(k5CauseIds))]
+	};
 }
 
-function unitRuns(u: Unit, units: readonly Unit[], lane: LaneRows): UnitRuns {
-	const named = new Set(u.evidence.map(captureFolder).filter((f): f is string => f !== undefined));
+/**
+ * K5 for one unit: its runs, recorded and captured. ⭐⭐ P5 package B (F5) — A CAPTURE FOLDER IS ATTRIBUTED BY THE EVIDENCE
+ * THAT NAMES IT (its `stdoutPath`), of every unit of the run, and is an unrecorded run only when no evidence names it; only
+ * such a folder is charged to the unit whose archive gained it. ⛔ Every folder an archive gained over the one before was
+ * charged to that archive's unit, so the three runs of design's re-run, made after design's archive was taken, read as
+ * implementation's runs that became no evidence (P5).
+ */
+function unitRuns(u: Unit, units: readonly Unit[], lane: LaneRows, ix: Index): UnitRuns {
+	const folders = (es: readonly StoredObject[]) => new Set(es.map(captureFolder).filter((f): f is string => f !== undefined));
+	const named = folders(ix.ofType('EVIDENCE'));
+	const listed = new Set(lane.archives.flatMap((a) => a.captures ?? []));
+	const own = [...folders(u.evidence)].filter((f) => listed.has(f)).length;
 	const { added, unknownBecause } = capturesAdded(u, units, lane);
 	const unrecorded = added === null ? null : added.filter((c) => !named.has(c)).length;
+	const why = unrecorded ? unrecordedCause(archiveFacts(lane, u), archiveNameOf(u.order, u.slug)) : undefined;
 	let observedCalls = 0;
 	let observedCallsCut = false;
 	for (const t of u.tries) {
@@ -2277,9 +2335,11 @@ function unitRuns(u: Unit, units: readonly Unit[], lane: LaneRows): UnitRuns {
 	}
 	return {
 		recorded: u.evidence.length,
-		captured: added === null ? null : added.length,
+		captured: unrecorded === null ? null : own + unrecorded,
 		unrecorded,
-		cause: unrecordedCause(unrecorded, u.evidence.length)?.cause ?? null,
+		cause: why !== undefined && 'cause' in why ? why.cause : null,
+		causeIds: why !== undefined && 'cause' in why ? why.registerIds : [],
+		causeNotRecorded: why !== undefined && 'notRecorded' in why ? why.notRecorded : null,
 		unknownBecause,
 		observedCalls,
 		observedCallsCut
@@ -2344,6 +2404,11 @@ interface UnitView {
 	 * children are all conditional permits them, and its unit has none (`REG-F-516`).
 	 */
 	readonly children: readonly string[];
+	/**
+	 * ⭐ P5 package B (F6) — for a unit composed of others whose declared reviews were made, what they were judged over — the
+	 * work of whom — where a unit below it contributed no work (`workSeenOf`); null otherwise.
+	 */
+	readonly workSeen: string | null;
 }
 
 /** Why a stage after 3 never concluded for a unit whose Begin & Execute outlasted the lane's allowance (D4). */
@@ -2376,8 +2441,11 @@ function completion(v: UnitView, row: string): MatrixCell {
 			'no model ran for this unit: no execution try is recorded and the tree built nothing under it, so it completed as ' +
 				'a TRANSFORMATION with nothing produced, and is not counted done (REG-F-505)'
 		]);
+	// ⭐ P5 package B (F6) — and what a composite's declared reviews were judged over, where a unit below it contributed none.
+	const line = seenLine(v);
+	const seen = line === null ? [] : [line];
 	if (s?.lifecycle === 'SATISFIED' && s.assurance === 'SATISFIED' && v.stepState === 'SUCCEEDED')
-		return cell('7', row, 'as intended', [], [facts]);
+		return cell('7', row, 'as intended', [], [facts, ...seen]);
 	// ⚠ THE UNIT'S OWN EXECUTION, NOT ONLY ITS STEP: a step completed by hand leaves the unit EXECUTING, as stopped as before.
 	if (v.stepState !== 'SUCCEEDED' || s?.execution !== 'SUCCEEDED')
 		return cell('7', row, 'broke', ['REG-F-511'], [
@@ -2385,7 +2453,7 @@ function completion(v: UnitView, row: string): MatrixCell {
 			'a unit that stops can never be run again, only abandoned'
 		]);
 	if (s.assurance === 'CONDITIONALLY_SATISFIED')
-		return cell('7', row, 'broke', ['REG-F-403'], [facts, 'a CONDITIONALLY_SATISFIED unit can never be marked satisfied']);
+		return cell('7', row, 'broke', ['REG-F-403'], [facts, 'a CONDITIONALLY_SATISFIED unit can never be marked satisfied', ...seen]);
 	// ⛔ E12's re-review F1 (D4) — A SIGN-OFF ACT THAT GAVE NO ANSWER WITHIN ITS BOUND: the run ended there, its final archive
 	// taken while the server may still have been running the act, which is killed unfinished (REG-F-527). Why it outlasted its
 	// bound, no register entry names.
@@ -2404,7 +2472,7 @@ function completion(v: UnitView, row: string): MatrixCell {
 			{ unregistered: true }
 		);
 	if (!v.signOffAttempted) return cell('7', row, 'not reached', [], [facts, ...heldBackOr(v, 'its sign-off was never attempted')]);
-	return cell('7', row, 'broke', [], [facts, 'its sign-off was attempted and the unit is not SATISFIED', ...heldBackOr(v)]);
+	return cell('7', row, 'broke', [], [facts, 'its sign-off was attempted and the unit is not SATISFIED', ...heldBackOr(v), ...seen]);
 }
 
 /**
@@ -2458,11 +2526,11 @@ function heldBackOr(v: UnitView, ...otherwise: string[]): string[] {
 		const skipped = skippedWhy(v);
 		return skipped === null ? otherwise : [skipped];
 	}
-	return [
-		`its sign-off was held back before ${h.before}: ${h.reason}`,
-		...(h.check === null ? [] : [`the limit as the lane read it: ${limitFigures(h.check)}`])
-	];
+	return [heldWhy(h), ...(h.check === null ? [] : [`the limit as the lane read it: ${limitFigures(h.check)}`])];
 }
+
+/** What the lane held back of a unit's sign-off, before which act, and why in its own words (`heldBackOr`'s first line). */
+const heldWhy = (h: NonNullable<UnitView['heldBack']>): string => `its sign-off was held back before ${h.before}: ${h.reason}`;
 
 /**
  * ⭐ R3-B F4 (the lead's round-3 item 4) — WHY THE LANE DID NOT ATTEMPT A SIGN-OFF
@@ -2656,11 +2724,11 @@ function runsDropped(v: UnitView): { readonly ids: string[]; readonly owed: stri
 			? { ids: [], owed: [], basis: [] }
 			: { ids: [], owed: [K5_OWED], basis: [`whether a captured run became no evidence is unknown: ${v.runs.unknownBecause}`] };
 	if (unrecorded === 0) return { ids: [], owed: [], basis: [] };
-	return {
-		ids: [unrecordedCause(unrecorded, v.unit.evidence.length)!.registerId],
-		owed: [],
-		basis: [`${plural(unrecorded, 'captured run', 'captured runs')} became no evidence: ${v.runs.cause}`]
-	};
+	const runs = plural(unrecorded, 'captured run', 'captured runs');
+	// ⭐ P5 package B (F5) — the cause the archive's K5 check left possible; ⛔ and where it records none, the cell is owed.
+	if (v.runs.cause === null)
+		return { ids: [], owed: [K5_OWED], basis: [`${runs} became no evidence, and why is not recorded: ${v.runs.causeNotRecorded}`] };
+	return { ids: [...v.runs.causeIds], owed: [], basis: [`${runs} became no evidence: ${v.runs.cause}`] };
 }
 
 /** K9 (`REG-F-519`): each answered try whose account reached a review as not declared — its basis, one line a try. */
@@ -2677,7 +2745,7 @@ function undeclaredAccounts(u: Unit): string[] {
 /**
  * Stage 4 — every command becomes evidence, and every piece of evidence is reviewed.
  *   · K5: captured runs no evidence names broke it, by `unrecordedCause` — ⛔ and runs that cannot be counted leave it
- *     OPEN, never read as none;
+ *     OPEN, never read as none; ⭐ P5 package B (F5) — and so do runs whose cause the archive does not record;
  *   · K9: ⛔ an account is judged where it was HANDED — each answered try's to its work product's review, the last one's
  *     to every command's — and a try that got no answer reached no review, so its parse says nothing here;
  *   · a review not answered broke it; one answered against the work is the adjudication's (P7-4f).
@@ -2716,6 +2784,30 @@ function stageFour(v: UnitView, ix: Index): MatrixCell {
 	return cell('4', row, 'as intended', [], [...basis, `${plural(v.reviews.length, 'review', 'reviews')}, each answered SATISFIED`]);
 }
 
+/**
+ * ⭐⭐ P5 package B (F4) — THE SUBJECTS OF THE FLOOR OF A STEP THAT COMPLETED: what its completion names (`ExecutionStepSucceeded`
+ * on the unit's last plan: its output work products and the commands it proposed as evidence), and every command its own
+ * attempts ran, which a completion by hand names none of. ⛔ Every command of the unit was read, so a superseded plan's
+ * refused reviews were read beside the step its re-run completed: P5's design 5a broke over plan A's two. ⚠ Undefined when
+ * the record holds no completion of that plan: every command of the unit is read then, as before.
+ */
+function completedSubjects(ix: Index, u: Unit): StoredObject[] | undefined {
+	const plan = u.plan;
+	if (plan === null) return undefined;
+	const done = ix.eventsOfType('ExecutionStepSucceeded').filter((e) => e.aggregateId === plan.id).at(-1);
+	if (done === undefined) return undefined;
+	const steps = plan.state.steps;
+	const stepId = str(rec(Array.isArray(steps) ? steps[0] : undefined).id);
+	const attempted = u.evidence.filter(
+		(e) => stepId !== '' && str(rec(e.state.contentReference).producingExecutionAttemptId).startsWith(`${stepId}#`)
+	);
+	const ids = [...strs(done.payload.outputArtifactIds), ...strs(done.payload.proposedEvidenceIds), ...attempted.map((e) => e.id)];
+	return [...new Set(ids)].flatMap((id) => {
+		const subject = ix.byId.get(id);
+		return subject === undefined ? [] : [subject];
+	});
+}
+
 /** Stage 5a — a phase completes only when its three checks pass, for the work product and for each command. */
 function stageFiveA(v: UnitView, ix: Index): MatrixCell {
 	const u = v.unit;
@@ -2723,7 +2815,7 @@ function stageFiveA(v: UnitView, ix: Index): MatrixCell {
 	const lastArtifact = u.artifacts.at(-1);
 	if (v.timedOut !== null) return cell('5a', row, 'not reached', [], [midUnit(v.timedOut)]);
 	if (u.plan === null || lastArtifact === undefined) return cell('5a', row, 'not reached', [], ['no work product reached the floor']);
-	const subjects = [lastArtifact, ...u.evidence];
+	const subjects = (v.stepState === 'SUCCEEDED' ? completedSubjects(ix, u) : undefined) ?? [lastArtifact, ...u.evidence];
 	const unsatisfied = subjects.flatMap((s) =>
 		floorOf(ix, s.id)
 			.filter((f) => f.state !== 'SATISFIED')
@@ -3142,8 +3234,12 @@ function stageSevenWhole(views: readonly UnitView[], rootUnreadable: string | nu
 	const lineOf = (c: MatrixCell, v: UnitView): string => {
 		// ⭐ R4 (the lead's round-4 item 4) — a unit not determined says why on its line: its reason comes first (`failedClosed`).
 		if (c.value === null) return `${c.row}: not determined — ${c.basis[0]}`;
-		const why = skippedWhy(v);
-		return why !== null && c.basis.includes(why) ? `${c.row}: ${c.value} — ${why}` : `${c.row}: ${c.value}`;
+		// ⭐ P5 package B (F3, F6) — and so does a unit whose sign-off the lane HELD BACK, and a composite whose declared reviews
+		// a unit below it contributed no work to: the root's line is all half A has of either.
+		const why = [skippedWhy(v), v.heldBack === null ? null : heldWhy(v.heldBack), seenLine(v)].find(
+			(w): w is string => w !== null && c.basis.includes(w)
+		);
+		return why === undefined ? `${c.row}: ${c.value}` : `${c.row}: ${c.value} — ${why}`;
 	};
 	return cell(
 		'7',
@@ -3351,7 +3447,7 @@ function unitView(
 		timedOut: u.lane?.beginExecute?.timedOutAfterMs ?? null,
 		signOffOutlasted: u.lane?.signOffOutlasted ?? null,
 		reviews: pairing.rows.filter((r) => r.unit === u.slug),
-		runs: unitRuns(u, units, lane),
+		runs: unitRuns(u, units, lane, ix),
 		declared: declared.filter((d) => d.unit === u.slug),
 		superseded: history.filter((d) => d.unit === u.slug),
 		signOffAttempted:
@@ -3364,9 +3460,55 @@ function unitView(
 			unretained: readings.filter((r) => r === 'not retained').length
 		},
 		contentStore: ix.content !== null,
-		children: childrenOf(ix, u, units)
+		children: childrenOf(ix, u, units),
+		workSeen: declared.some((d) => d.unit === u.slug) ? workSeenOf(ix, u, units) : null
 	};
 }
+
+/**
+ * ⭐⭐ P5 package B (F6) — WHAT A UNIT COMPOSED OF OTHERS HAD ITS DECLARED REVIEWS JUDGED OVER, as the route gathers it
+ * (`declaredReviewWorkOf`): the work of each unit below it that holds a completion — and each that holds none, with its
+ * lifecycle and assurance states, contributed none; and, for the root, each planned unit the store does not hold. Null
+ * when every unit below it holds a completion and none is missing, and for a unit with none below it. ⛔ P5's root read
+ * "judged over the work it and every unit below it produced" with its end-to-end phase abandoned and none of it shown.
+ */
+function workSeenOf(ix: Index, u: Unit, units: readonly Unit[]): string | null {
+	const id = u.object?.id;
+	if (id === undefined) return null;
+	const all = ix.ofType('PROFESSIONAL_WORK_UNIT');
+	const completed = (unitId: string): boolean => {
+		const plans = new Set(ix.ofType('EXECUTION_PLAN').filter((p) => str(p.state.workUnitId) === unitId).map((p) => p.id));
+		return ix.eventsOfType('ExecutionStepSucceeded').some((e) => plans.has(e.aggregateId));
+	};
+	const below: StoredObject[] = [];
+	const walk = (parent: string): void => {
+		for (const child of all.filter((p) => str(p.state.parentWorkUnitId) === parent)) {
+			below.push(child);
+			walk(child.id);
+		}
+	};
+	walk(id);
+	if (below.length === 0) return null;
+	const missing = u === units[0] ? units.slice(1).filter((x) => x.object === null).map((x) => x.title) : [];
+	const none = below.filter((p) => !completed(p.id));
+	if (none.length === 0 && missing.length === 0) return null;
+	const given = below.filter((p) => completed(p.id)).map((p) => str(p.state.title));
+	return (
+		`the work of ${given.join(', ') || 'no unit below it'}` +
+		none
+			.map(
+				(p) =>
+					`; ${str(p.state.title)} contributed none, holding no completion (lifecycle ${str(p.state.workLifecycleState)}, ` +
+					`assurance ${str(p.state.assuranceState)})`
+			)
+			.join('') +
+		missing.map((t) => `; ${t} contributed none, the store holding no such unit`).join('')
+	);
+}
+
+/** ⭐ P5 package B (F6) — the line a composite's completion carries of what its declared reviews were judged over, or null. */
+const seenLine = (v: UnitView): string | null =>
+	v.workSeen === null ? null : `its declared reviews were judged over ${v.workSeen}`;
 
 const pointerOf = (r: unknown): ContentPointer | null => {
 	const x = rec(r);
@@ -3546,7 +3688,9 @@ export function buildRunReport(
 		.map((u) => ({
 			unit: u.slug,
 			reviews: declared.filter((d) => d.unit === u.slug && d.validatorId === DECLARED_REVIEW_VALIDATORS[0]).length,
-			replayed: declared.filter((d) => d.unit === u.slug && d.validatorId === REPLAYED_DECLARED_REVIEW_VALIDATOR).length
+			replayed: declared.filter((d) => d.unit === u.slug && d.validatorId === REPLAYED_DECLARED_REVIEW_VALIDATOR).length,
+			// ⭐ P5 package B (F6) — what its reviews were judged over, as its completion says it (`workSeenOf`), its own words.
+			seen: views.find((v) => v.unit === u)?.workSeen ?? null
 		}));
 	const endReason = str(rec(rec(lane.run).end).reason) || null;
 	// ⛔ D4 — ~~every act the lane presses ends the run when it outlasts its bound~~ ⭐ E12's polish (fix3's F2): every act
