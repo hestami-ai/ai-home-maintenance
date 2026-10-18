@@ -12,6 +12,8 @@
 //   · The validator is built with the run's RECORDED evaluator identity, never through `judgeModel()` (§5.3).
 //   · A TRANSPORT FAILURE is recorded as its class, not re-scorable, and scored as the product's own floor runner scores
 //     a validator that throws (`validators.ts` `runFloorResults`: an execution-failed result, VALIDATOR_FAILED).
+//   · ⭐ P5 package A (F2) — so is a reply the product's tool cut at the model's output-token limit, recorded as its own
+//     class (`OUTPUT_LIMIT`), never as a transport failure.
 //   · Anything else a transport throws is the HARNESS's fault, and the run stops (§5.1: a candidate is measured on what
 //     it did, never on what the harness did).
 //   · RETENTION (§5.3): a line keeps `splitAnswerSpan(raw).answer` only when it parses as one JSON value, and then only
@@ -45,6 +47,7 @@ import {
 	isToolInvocationResult,
 	type ToolInvocationResult
 } from '../../apps/rph-demo/src/lib/server/tools/backing-tool.js';
+import { OutputLimitReached } from '../../apps/rph-demo/src/lib/server/tools/output-limit.js';
 import type { DeclaredPolicyCase, QualificationCase } from './cases.js';
 import { detectMalformations } from './malformations.js';
 import { caseReviewInput } from './materialize.js';
@@ -220,6 +223,23 @@ export async function evaluateCase(args: {
 						},
 						malformations: [],
 						served: e.served
+					});
+				// ⭐⭐ P5 package A (F2) — a reply the tool ended at the model's output-token limit (the product's own class,
+				// `tools/output-limit.ts`): what the tool reported of the cut, nothing of the reply (§5.3), never re-scored. ⭑ The
+				// validator records it and fails the review, scored as a throw is (`scoreThrow`).
+				else if (e instanceof OutputLimitReached)
+					calls.push({
+						role,
+						promptSha256: sha256(prompt),
+						elapsedMs: elapsed(),
+						reply: {
+							status: 'OUTPUT_LIMIT',
+							finishReason: e.facts.finishReason ?? null,
+							outputTokens: e.facts.outputTokens ?? null,
+							rescorable: false
+						},
+						malformations: [],
+						served: null
 					});
 				// ⚠ The validator sanitises whatever its seam throws, so the harness's own fault leaves by this variable.
 				else harness = e;
@@ -532,7 +552,9 @@ export async function runQualification(i: RunInputs): Promise<(RunLine | CallLin
  *   · NO_ANSWER_SPAN — `null` if the product's parse accepted the reply (any bare scalar coerces to the same empty
  *     judgement), the empty string if it did not.
  */
-function replayText(reply: Exclude<CallReply, { readonly status: 'TRANSPORT_FAILURE' }>): string {
+function replayText(
+	reply: Exclude<CallReply, { readonly status: 'TRANSPORT_FAILURE' } | { readonly status: 'OUTPUT_LIMIT' }>
+): string {
 	switch (reply.status) {
 		case 'ANSWERED':
 			return reply.answer;
@@ -577,6 +599,11 @@ export function replayReplies(
 		if (reply.status === 'TRANSPORT_FAILURE')
 			throw new HarnessRefusal(
 				`a ${reply.failureClass} is not re-scorable: the call returned nothing to replay`
+			);
+		// ⭐ P5 package A (F2) — nor is a reply the tool cut: nothing of it was kept to replay (§5.3).
+		if (reply.status === 'OUTPUT_LIMIT')
+			throw new HarnessRefusal(
+				'an OUTPUT_LIMIT is not re-scorable: the tool cut the reply at the model’s output-token limit, and nothing of it was kept'
 			);
 		return asReported(replayText(reply), evaluator);
 	});

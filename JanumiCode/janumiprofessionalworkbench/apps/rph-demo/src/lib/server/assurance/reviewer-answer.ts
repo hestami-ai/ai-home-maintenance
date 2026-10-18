@@ -23,6 +23,7 @@ import type { AuthedEngineHandle } from '@janumipwb/rph-engine';
 // ⭐ `P76F-C` C2 — the validator's own I5 marker, imported (this module runs in the app, where the validator is loaded
 // anyway); the run report RESTATES it instead (`REG-D-072` D12), held equal by verif.
 import { NO_CRITERION_ANSWERED } from './reasoning-review-validator.js';
+import { outputLimitOf } from '../tools/output-limit.js';
 
 export interface ReviewerAnswerView {
 	readonly exchangeId: string;
@@ -84,8 +85,9 @@ export function concludedTry(sorted: readonly Try[]): Try | undefined {
 	// ⭐ `P76F-D` D3 — THE GENERAL RULE, as the run report's (`concludedBy`): the highest ordinal, when a review concludes on
 	// it; none when it is a reply that asked for a repair the record does not hold.
 	const general = last !== undefined && CONCLUDES.has(String(tryState(last).disposition)) ? last : undefined;
-	// The first try that got a reply: the call's, or its retry's after a throw.
-	const asked = sorted.find((r) => tryState(r).disposition !== 'NO_RESPONSE');
+	// The first try that got a reply: the call's, or its retry's after a throw — ⭐ or (P5 package A) after a reply the tool
+	// ended at the model's output-token limit, from which nothing was judged (`outputLimitOf`).
+	const asked = sorted.find((r) => tryState(r).disposition !== 'NO_RESPONSE' && outputLimitOf(r.state) === undefined);
 	if (asked === undefined) return general;
 	const outcome = tryState(asked).parseOutcome;
 	const i5 =
@@ -99,6 +101,9 @@ export function concludedTry(sorted: readonly Try[]): Try | undefined {
 	// ⚠ A substitute is REFUSED unread (`REJECTED`, `NOT_ATTEMPTED`); a repair that got no reply is `NO_RESPONSE`, whose
 	// outcome is `NOT_ATTEMPTED` too — so the disposition tells them apart, never the outcome alone.
 	const ended = tryState(after.at(-1) ?? asked);
+	// ⭐ P5 package A (F1) — a repair the tool cut at the model's output-token limit shares a substitute's REJECTED and
+	// NOT_ATTEMPTED, and is none: it ended without concluding, and the review kept the first reply's judgement.
+	if (outputLimitOf(ended) !== undefined) return asked;
 	const substituted = ended.disposition === 'REJECTED' && ended.parseOutcome?.outcome === 'NOT_ATTEMPTED';
 	// ⭐⭐ `P76F-D` D3 — THE FIRST REPLY'S JUDGEMENT WAS KEPT ONLY BY A REPAIR THE RECORD HOLDS, ENDED WITHOUT CONCLUDING: no
 	// reply, or refused. With no repair on the record, `ended` is the request itself (`REPAIR_REQUESTED`) — and a repair

@@ -48,6 +48,7 @@ import { ORACLES_PROPOSED, type Oracle, type OracleSet, type QualificationCase }
 import { canonicalJson, reviewerFingerprintOf, type FingerprintComponents } from './digest.js';
 import {
 	MATERIAL_FAILURE_CLASSES,
+	noReplyToScore,
 	promptsAreToday,
 	recordProblems,
 	restampable,
@@ -217,7 +218,11 @@ const evaluationKey = (caseId: string, repetition: number) => `${caseId}#${repet
 const lastOf = (e: Evaluation): CallLine => e.calls[e.calls.length - 1]!;
 /** An evaluation is complete when its last call carries the outcome — a run stopped part-way leaves one that is not. */
 const complete = (e: Evaluation): boolean => lastOf(e).scored !== null;
-const transportFailed = (e: Evaluation): boolean => e.calls.some((c) => c.reply.status === 'TRANSPORT_FAILURE');
+/**
+ * An evaluation with a call that left no reply to score: cut at the transport — ⭐ or (P5 package A, F2) cut by the tool at
+ * the model's output-token limit (`noReplyToScore`), read alike: measured, never re-scored, a Boundedness failure.
+ */
+const transportFailed = (e: Evaluation): boolean => e.calls.some((c) => noReplyToScore(c.reply));
 const scoredOf = (e: Evaluation): ScoredOutcome => lastOf(e).scored!;
 
 interface Parsed {
@@ -315,7 +320,8 @@ function resolveRescore(x: At<RescoredLine>, p: Parsed, taken: ReadonlySet<strin
 	const evaluation = source.evaluations.get(evaluationKey(line.caseId, line.repetition));
 	if (!evaluation || !complete(evaluation))
 		return `${at}: RESCORED names ${label}, which run ${line.sourceRunId} holds no complete evaluation of`;
-	if (transportFailed(evaluation)) return `${at}: RESCORED re-stamps ${label}, a transport failure — never re-scorable`;
+	if (transportFailed(evaluation))
+		return `${at}: RESCORED re-stamps ${label}, a call cut at the transport or at the model’s output-token limit — never re-scorable`;
 	return { line, at, source, evaluation };
 }
 

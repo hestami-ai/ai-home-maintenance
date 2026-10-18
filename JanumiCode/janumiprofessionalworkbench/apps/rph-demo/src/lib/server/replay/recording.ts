@@ -14,8 +14,8 @@
 //                    capture's bytes (stdout, stderr) — or the refusal it gave;
 //   reviewer.jsonl   one line per REVIEWER CALL ⭐ OF THE EXECUTION HALF, in dispatch order: the unit, the framing, the
 //                    role, `promptSha256` (over the scrubbed prompt), the prompt's own bytes, the reply (ANSWERED /
-//                    NOT_RETAINED / NO_ANSWER_SPAN / THROWN with its sanitised message), the evaluator, and the call's
-//                    ELAPSED time.
+//                    NOT_RETAINED / NO_ANSWER_SPAN / THROWN with its sanitised message / ⭐ OUTPUT_LIMIT, a reply the
+//                    tool cut, P5 package A), the evaluator, and the call's ELAPSED time.
 //
 // ⛔ ALL THREE MUST REPLAY (`REG-F-530`): a replay of the executor alone either pays the reviewer and runs real commands,
 // or reviews with the stand-in and stops at the first unit. So the recording holds the reviewer's answers and the
@@ -95,6 +95,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, isAbsolute, join } from 'node:path';
 import type { ProcessOutputOmission } from '@janumipwb/rph-ports';
+import { FINISH_REASON_SHAPE } from '../tools/output-limit.js';
 
 /**
  * The format's own name and version. ⛔ A reader refuses any other: a recording of another shape replays another run.
@@ -610,7 +611,19 @@ export type RecordedReply =
 	| { readonly status: 'ANSWERED'; readonly text: string }
 	| { readonly status: 'NOT_RETAINED' }
 	| { readonly status: 'NO_ANSWER_SPAN'; readonly parses: boolean }
-	| { readonly status: 'THROWN'; readonly message: string };
+	| { readonly status: 'THROWN'; readonly message: string }
+	/**
+	 * ⭐ `JAN-EXEC` Phase 7 P5, package A (F1) — a call whose reply the tool cut at the model's output-token limit
+	 * (`tools/output-limit.ts`): the tool's own message, as THROWN's is; the partial reply; and what the tool reported of
+	 * the cut, `null` where it reported nothing. The replay throws the cut again (`replay-run.ts`, `reviewerPrint`).
+	 */
+	| {
+			readonly status: 'OUTPUT_LIMIT';
+			readonly message: string;
+			readonly partialReply: string;
+			readonly finishReason: string | null;
+			readonly outputTokens: number | null;
+	  };
 
 export type RecordedRole = 'initial' | 'repair' | 'retry';
 const ROLES: ReadonlySet<unknown> = new Set<RecordedRole>(['initial', 'repair', 'retry']);
@@ -880,6 +893,19 @@ function replyOf(v: unknown, where: string): RecordedReply {
 			return { status: 'NO_ANSWER_SPAN', parses: field(v, 'parses', where, isBoolean, 'boolean') };
 		case 'THROWN':
 			return { status: 'THROWN', message: field(v, 'message', where, isString, 'string') };
+		// ⭐ P5 package A (F1) — a reply the tool cut at the model's output-token limit.
+		case 'OUTPUT_LIMIT':
+			if (v.finishReason !== null && !(isString(v.finishReason) && FINISH_REASON_SHAPE.test(v.finishReason)))
+				refuse(where, 'has a `finishReason` that is neither a bounded token nor null');
+			if (v.outputTokens !== null && !isCount(v.outputTokens))
+				refuse(where, 'has an `outputTokens` that is neither a count nor null');
+			return {
+				status: 'OUTPUT_LIMIT',
+				message: field(v, 'message', where, isString, 'string'),
+				partialReply: field(v, 'partialReply', where, isString, 'string'),
+				finishReason: v.finishReason as string | null,
+				outputTokens: v.outputTokens as number | null
+			};
 		default:
 			return refuse(where, 'has a `reply.status` this replay does not know');
 	}

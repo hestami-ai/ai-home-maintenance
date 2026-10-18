@@ -163,6 +163,12 @@ export interface ExchangeRecord {
 	/** INDEX, NEVER SUBSTITUTE (PER-9). Present or not, it does not satisfy E-1 — see `unsatisfiedElements`. */
 	readonly promptTemplateFingerprint?: string;
 	readonly truncationState: TruncationState;
+	/**
+	 * ⭐ `JAN-EXEC` Phase 7 P5, package A (F1) — E-4 FOR THE OUTPUT ALONE, where it is a fact of its own: `declared` on a reply
+	 * the tool ended at the model's output-token limit (`tools/output-limit.ts`), which says so. Absent, `truncationState`
+	 * answers for the output too, as it always has.
+	 */
+	readonly outputTruncationState?: TruncationState;
 	readonly omittedRegions: readonly OmittedRegion[];
 	readonly disposition?: ExchangeDisposition;
 	/** 1-based position of this try within its run. The aggregate id orders nothing across aggregates. */

@@ -46,6 +46,7 @@ import {
 	toolDefinitionsSha256
 } from '../apps/rph-demo/src/lib/server/replay/recording.js';
 import { fixtureKeyOf } from '../apps/rph-demo/src/lib/server/replay/replay-fixture.testing.js';
+import { outputLimitDetail } from '../apps/rph-demo/src/lib/server/tools/output-limit.js';
 import { scanText } from '../scripts/phase7/archive-scan.js';
 import {
 	buildRecording,
@@ -100,6 +101,8 @@ const payloadHead = (cwd: string) => ({
 	tools: KEY.tools.map((t) => ({ type: 'function', ...t, strict: false }))
 });
 const TRANSPORT = 'devin exited with code 1: connection reset by peer';
+/** ⭐ P5 package A (F1) — devin's diagnostic for a reply it cut at the model's output-token limit, its stderr's last line. */
+const CUT = 'devin invocation failed: Error: Response truncated: model hit max output token limit. The output above is incomplete.';
 /**
  * ⭐ What the model READ of each call — its `function_call_output` — which the recording keys (`resultSha256`; the
  * lead's delegated decision of 2026-10-15, to be registered). ⭑ The write's names the workspace, so its key is taken
@@ -137,6 +140,8 @@ function arrange(
 		readonly reviewPrompt?: string;
 		/** ⭐ The payload holds no output for the command's call: what the model read of it is not there to key. */
 		readonly unanswered?: boolean;
+		/** ⭐ P5 package A (F1) — the first review call's reply the tool cut at the model's output-token limit, this partial reply. */
+		readonly cutFirstReview?: string;
 	} = {}
 ): Arranged {
 	const run = tempDir('run');
@@ -288,22 +293,43 @@ function arrange(
 			}
 		},
 		// ⭑ The first review call threw short of its bound — its cause printing devin's temp folder under the home folder.
+		// ⭐ P5 package A (F1) — or, with `cutFirstReview`, its reply the tool cut at the model's output-token limit, recorded
+		// as the validator records one: REJECTED, its output DECLARED cut, the reply kept whole, E-5 the class's detail.
 		exchange('mex_review_1', {
 			plane: 'ASSURANCE',
 			subjectObjectId: 'art_1',
 			subjectObjectType: 'ARTIFACT',
 			exchangeRole: 'INITIAL',
-			disposition: 'NO_RESPONSE',
+			disposition: o.cutFirstReview === undefined ? 'NO_RESPONSE' : 'REJECTED',
 			requestedAt: '2026-10-11T08:01:00.000Z',
 			respondedAt: '2026-10-11T08:02:37.674Z',
 			resolvedModel: { value: 'fixture-reviewer-model' },
 			resolvedProvider: { value: 'devin' },
 			materializedInputRef: ref(o.reviewPrompt ?? REVIEW_PROMPT),
-			rawOutputBeforeCoercionRef: pending,
-			parseOutcome: {
-				outcome: 'NOT_ATTEMPTED',
-				detail: `The reviewing tool’s call failed after 97674 ms with no reply, short of the tool’s 240000 ms bound, so it is run once more (REG-D-102). What the tool reported, sanitised: reasoning-review backing tool invocation failed: ${TRANSPORT} --prompt-file ${join(home, 'AppData', 'Local', 'Temp', 'jpwb-devin-x', 'prompt.txt')}`
-			}
+			...(o.cutFirstReview === undefined
+				? {
+						rawOutputBeforeCoercionRef: pending,
+						parseOutcome: {
+							outcome: 'NOT_ATTEMPTED',
+							detail: `The reviewing tool’s call failed after 97674 ms with no reply, short of the tool’s 240000 ms bound, so it is run once more (REG-D-102). What the tool reported, sanitised: reasoning-review backing tool invocation failed: ${TRANSPORT} --prompt-file ${join(home, 'AppData', 'Local', 'Temp', 'jpwb-devin-x', 'prompt.txt')}`
+						}
+					}
+				: {
+						outputTruncation: 'DECLARED',
+						rawOutputBeforeCoercionRef: ref(o.cutFirstReview),
+						answerSpanRef: pending,
+						volunteeredReasoningRef: pending,
+						parseOutcome: {
+							outcome: 'NOT_ATTEMPTED',
+							detail: outputLimitDetail({
+								facts: { outputTokens: 25_000 },
+								partialChars: o.cutFirstReview.length,
+								elapsedMs: 97_674,
+								clause: 'short of the tool’s 240000 ms bound, so it is run once more (REG-D-102)',
+								reported: `reasoning-review backing tool invocation failed: ${CUT} --prompt-file ${join(home, 'AppData', 'Local', 'Temp', 'jpwb-devin-x', 'prompt.txt')}`
+							})
+						}
+					})
 		}),
 		// ⭑ Its retry answered — the reply kept in two halves, as the reviewer's replies are (`REG-D-057`).
 		exchange('mex_review_2', {
@@ -529,6 +555,28 @@ describe('⭐ the recorder (D1) — a final archive into a replay recording, scr
 		// ⭑ The two halves, reassembled (`REG-D-057`).
 		expect(recording.reviewer[1]!.reply).toEqual({ status: 'ANSWERED', text: `${CLEAN}\n` });
 		expect(recording.reviewer[1]!.promptSha256).toBe(sha256Hex(REVIEW_PROMPT));
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7 P5, package A (F1) — A REVIEW CALL THE TOOL CUT AT THE MODEL'S OUTPUT-TOKEN LIMIT is recorded as its
+	// own form, the cut replayed as a cut: what the tool printed, the partial reply and what it reported of the cut.
+	it('⛔ P5 A — a review call the tool cut at the output-token limit is recorded OUTPUT_LIMIT — never as a reply that ANSWERED', () => {
+		const out = join(tempDir('out'), 'recording');
+		const r = record(arrange({ cutFirstReview: '{"findings":[' }), out);
+		expect(r.code, r.out).toBe(0);
+		const recording = readRecording(out);
+		// ⛔ THE MUTANT: the cut read by its disposition alone — a reply REJECTED, kept whole: recorded ANSWERED, and replayed
+		// to the validator as a reply to parse and repair, a call the recorded run never made.
+		expect(recording.reviewer.map((c) => [c.role, c.reply.status]), 'a cut reply was recorded as an answer').toEqual([
+			['initial', 'OUTPUT_LIMIT'],
+			['retry', 'ANSWERED']
+		]);
+		expect(recording.reviewer[0]!.reply).toEqual({
+			status: 'OUTPUT_LIMIT',
+			message: `${CUT} --prompt-file ${join('JPWB_REPLAY_HOME_NATIVE', 'AppData', 'Local', 'Temp', 'jpwb-devin-x', 'prompt.txt')}`,
+			partialReply: '{"findings":[',
+			finishReason: null,
+			outputTokens: 25_000
+		});
 	});
 
 	it('⛔ refuses, writing nothing, when a file of the recording names the account (REG-F-536)', () => {

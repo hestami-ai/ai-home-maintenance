@@ -30,6 +30,7 @@ import { describe, expect, it } from 'vitest';
 import { splitAnswerSpan } from '../apps/rph-demo/src/lib/server/assurance/agy-cli.js';
 import { createAgyReasoningReviewValidator } from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
 import type { ToolInvocationResult } from '../apps/rph-demo/src/lib/server/tools/backing-tool.js';
+import { OutputLimitReached } from '../apps/rph-demo/src/lib/server/tools/output-limit.js';
 import {
 	CASE_PRODUCER_MODEL_ID,
 	CASE_PRODUCER_PROVIDER_ID,
@@ -621,6 +622,36 @@ describe('JAN-CRITREAD J2-2 — the runner, over a stub transport', () => {
 				criteria: recorded.criteria.map((k) => [k.criterionId, k.outcome])
 			});
 			expect(call.scored?.disposition).toBe('VALIDATOR_FAILED');
+		}
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7 P5, package A (F2) — A REPLY THE TOOL ENDED AT THE MODEL'S OUTPUT-TOKEN LIMIT IS ITS OWN CLASS on
+	// the record, never a TRANSPORT_FAILURE / REFUSAL: P4's three such calls were recorded "devin failed after N ms".
+	it('⛔ P5 A — a reply cut at the output-token limit is recorded OUTPUT_LIMIT, what the tool reported kept, scored as a throw is, never re-scorable', async () => {
+		for (const facts of [{ finishReason: 'max_tokens', outputTokens: 25_000 }, {}] as const) {
+			const stub = stubTransport(() => {
+				throw new OutputLimitReached('devin invocation failed: (fixture)', {
+					facts,
+					partialReply: '{"findings":[{"criterionId":"RR-01"',
+					observedToolCalls: { canObserve: false, reason: 'The devin adapter cannot observe tool calls (fixture).' }
+				});
+			});
+			// ⛔ THE MUTANT: the cut read as the harness's own fault — the run stops, and the candidate's call is never recorded.
+			const lines = await runQualification(inputs({ transport: stub, cases: [caseById('W-RR-04')] }));
+			expect(recordProblems(lines.map(serializeLine).join(''), { tracked: false })).toEqual([]);
+			expect(lines).toHaveLength(2);
+			const call = lines[1] as CallLine;
+			expect(call.reply, 'a cut reply recorded as something else').toEqual({
+				status: 'OUTPUT_LIMIT',
+				finishReason: 'finishReason' in facts ? facts.finishReason : null,
+				outputTokens: 'outputTokens' in facts ? facts.outputTokens : null,
+				rescorable: false
+			});
+			expect(call.malformations).toEqual([]);
+			expect(call.scored?.disposition, 'scored as the product scores a validator that throws').toBe('VALIDATOR_FAILED');
+			// ⛔ NO BYTE OF THE PARTIAL REPLY IN THE LINE (§5.3), and nothing to replay.
+			expect(serializeLine(call)).not.toContain('criterionId');
+			expect(() => replayReplies([call])).toThrow('an OUTPUT_LIMIT is not re-scorable');
 		}
 	});
 

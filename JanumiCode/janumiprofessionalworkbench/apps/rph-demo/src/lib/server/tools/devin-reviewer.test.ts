@@ -21,6 +21,7 @@ import {
 // `node:child_process` into the Validator. Adapter-level sanitising is a discipline; seam-level is a
 // property, and TS-06 made it the seam's.
 import { diagnosticCarriesPrompt } from './diagnostic-safety.js';
+import { OutputLimitReached } from './output-limit.js';
 
 const LONG = 'Assess the northern delivery route against the safety rubric. '.repeat(8);
 
@@ -311,5 +312,178 @@ describe('⭐⭐ P7-6 I4 — the reviewer is told it has NO TOOLS: the preamble 
 		// ⛔ THE MUTANT: the prompt written without the preamble — the reviewer is again an agent that may reach for a
 		// tool, and in print mode a tool it may not use ends its session with no answer (`REG-F-549`, probe 2).
 		expect(seen[0]!.promptFile).toBe(`${MEASURED_PREAMBLE}${prompt}`);
+	});
+});
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7 P5, package A (F1) — A REPLY DEVIN ENDED AT THE MODEL'S OUTPUT-TOKEN LIMIT IS ITS OWN CLASS ──
+//
+// In P5, 7 of 44 reviewer calls ended so: devin exited non-zero with the two stderr lines below, and `devinPrint` threw
+// its message alone — the partial reply, the exit code and the export devin wrote all dropped — so the call was recorded
+// as one that got no reply. These cases throw what `execFile` really rejects with: the command and stderr in the message,
+// the exit code, stdout and stderr beside it.
+
+/** devin's stderr when it ends a reply at the model's output-token limit — verbatim from P5's seven records. */
+const DEVIN_TRUNCATED_STDERR =
+	'warning: response truncated (model hit max output token limit)\nError: Response truncated: model hit max output token limit. The output above is incomplete.\n';
+
+/** How a fixture devin's call ends: its exit code (null for a kill, beside its signal), stdout and stderr. */
+interface Exit {
+	readonly code: number | null;
+	readonly signal?: string;
+	readonly stdout: string;
+	readonly stderr: string;
+}
+
+/** What node's `execFile` rejects with when its program fails: the command and stderr in the message. */
+function exitRejection(file: string, args: readonly string[], exit: Exit): Error {
+	const cmd = [file, ...args].join(' ');
+	return Object.assign(new Error(`Command failed: ${cmd}\n${exit.stderr}`), {
+		code: exit.code,
+		killed: exit.signal !== undefined,
+		signal: exit.signal ?? null,
+		cmd,
+		stdout: exit.stdout,
+		stderr: exit.stderr
+	});
+}
+
+/**
+ * A devin export as devin 3000.11.92 writes one (the shape of P5's 37 retained exports): the agent's step last, its
+ * completion tokens counted, its model in `extra`. `extra` adds to the last step's.
+ */
+const exportOf = (completionTokens: number, extra: Record<string, unknown> = {}) =>
+	JSON.stringify({
+		schema_version: 'ATIF-v1.7',
+		steps: [
+			{ step_id: 1, source: 'user', message: 'the prompt', extra: {} },
+			{
+				step_id: 2,
+				source: 'agent',
+				model_name: 'GLM-5.3 Flash Max',
+				message: '',
+				reasoning_content: 'thinking',
+				tool_calls: [],
+				metrics: { prompt_tokens: 17_409, completion_tokens: completionTokens, cached_tokens: 4_480 },
+				extra: { generation_model: 'glm-5-3-flash-max', ...extra }
+			}
+		]
+	});
+
+/** A devin that writes `exportBody` where its argv says (unless undefined), then fails as `exit` says. */
+function failingDevin(exportBody: string | undefined, exit: Exit) {
+	let folder = '';
+	const exec: DevinExec = async (file, args, options) => {
+		folder = options.cwd;
+		if (exportBody !== undefined) await writeFile(args[args.indexOf('--export') + 1]!, exportBody, 'utf8');
+		throw exitRejection(file, args, exit);
+	};
+	return { exec, folder: () => folder };
+}
+
+/** What `devinPrint` threw. */
+async function thrownBy(p: Promise<unknown>): Promise<unknown> {
+	return p.then(
+		() => new Error('fixture: devinPrint resolved where it was to throw'),
+		(e: unknown) => e
+	);
+}
+
+describe('⭐⭐ P5 package A (F1) — a reply devin ended at the model’s output-token limit is thrown as its own class', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs();
+	});
+
+	it('⛔ devin’s truncation on stderr: OutputLimitReached, with the export’s output tokens, the partial reply, the model and the export — the folder still removed', async () => {
+		vi.stubEnv('JPWB_ASSURANCE_MODEL', 'glm-5-3-flash-max');
+		const EXPORT = exportOf(25_000);
+		const devin = failingDevin(EXPORT, { code: 1, stdout: '{"findings":[PARTIAL', stderr: DEVIN_TRUNCATED_STDERR });
+		const thrown = await thrownBy(devinPrint('Judge the work product.', devin.exec));
+		// ⛔ THE MUTANT: the catch keeps the message alone, as before — a plain Error, read downstream as a call with no reply.
+		expect(thrown, 'the truncation was thrown as a plain failure').toBeInstanceOf(OutputLimitReached);
+		const cut = thrown as OutputLimitReached;
+		expect(cut.facts, 'what the export counted of the cut').toEqual({ outputTokens: 25_000 });
+		expect(cut.partialReply, 'stdout, the reply devin printed before it cut it').toBe('{"findings":[PARTIAL');
+		expect(cut.producer, 'the model the export names').toEqual({
+			agentId: 'devin',
+			modelId: 'glm-5-3-flash-max',
+			providerId: 'devin'
+		});
+		expect(cut.sessionExport, 'the export devin wrote, read before the folder went').toBe(EXPORT);
+		expect(cut.observedToolCalls.canObserve).toBe(false);
+		// ⭐ The diagnostic is the one every failure carries, devin's own words in it, unchanged.
+		expect(cut.message).toMatch(/^devin invocation failed: Command failed: devin --print --model glm-5-3-flash-max /);
+		expect(cut.message.endsWith(`\n${DEVIN_TRUNCATED_STDERR}`)).toBe(true);
+		expect(existsSync(devin.folder()), 'arrangement: the folder, export and all, is removed').toBe(false);
+	});
+
+	it('⛔ the export’s finish_reason max_tokens, with stderr that names no truncation: the same class, the finish reason carried', async () => {
+		vi.stubEnv('JPWB_ASSURANCE_MODEL', 'glm-5-3-flash-max');
+		const devin = failingDevin(exportOf(25_000, { finish_reason: 'max_tokens' }), {
+			code: 1,
+			stdout: '',
+			stderr: 'Error: the turn ended\n'
+		});
+		const thrown = await thrownBy(devinPrint('Judge the work product.', devin.exec));
+		// ⛔ THE MUTANT: the export's finish reason not read — only devin's sentence on stderr tells the class.
+		expect(thrown, 'a finish reason of max_tokens was not read as the class').toBeInstanceOf(OutputLimitReached);
+		expect((thrown as OutputLimitReached).facts).toEqual({ finishReason: 'max_tokens', outputTokens: 25_000 });
+		expect((thrown as OutputLimitReached).partialReply).toBe('');
+	});
+
+	it('⛔ a finish reason that is not a bounded token is not carried — the class still told by devin’s sentence', async () => {
+		vi.stubEnv('JPWB_ASSURANCE_MODEL', 'glm-5-3-flash-max');
+		const devin = failingDevin(exportOf(25_000, { finish_reason: 'max tokens; and the prompt was: Judge' }), {
+			code: 1,
+			stdout: '',
+			stderr: DEVIN_TRUNCATED_STDERR
+		});
+		const thrown = await thrownBy(devinPrint('Judge the work product.', devin.exec));
+		expect(thrown).toBeInstanceOf(OutputLimitReached);
+		// ⛔ THE MUTANT: any string taken — tool-written free text would reach the record plane in E-5's detail.
+		expect((thrown as OutputLimitReached).facts, 'free text carried as a finish reason').toEqual({
+			outputTokens: 25_000
+		});
+	});
+
+	it('⭐ CONTROL — every other non-zero exit is thrown as before: a plain Error, its message unchanged', async () => {
+		vi.stubEnv('JPWB_ASSURANCE_MODEL', 'glm-5-3-flash-max');
+		const stderr = 'Error: upstream connection reset by peer\n';
+		const devin = failingDevin(exportOf(812), { code: 1, stdout: '', stderr });
+		const thrown = await thrownBy(devinPrint('Judge the work product.', devin.exec));
+		// ⛔ THE MUTANT: every non-zero exit read as the class — a transport failure would claim a cut reply.
+		expect(thrown, 'another failure was thrown as the output-limit class').not.toBeInstanceOf(OutputLimitReached);
+		expect(thrown).toBeInstanceOf(Error);
+		expect((thrown as Error).message).toMatch(
+			/^devin invocation failed: Command failed: devin --print --model glm-5-3-flash-max /
+		);
+		expect((thrown as Error).message.endsWith(`\n${stderr}`)).toBe(true);
+	});
+
+	it('⭐ CONTROL — a kill, which carries a signal and no exit code, is not the class, whatever stderr says', async () => {
+		vi.stubEnv('JPWB_ASSURANCE_MODEL', 'glm-5-3-flash-max');
+		const devin = failingDevin(exportOf(25_000), {
+			code: null,
+			signal: 'SIGTERM',
+			stdout: '',
+			stderr: DEVIN_TRUNCATED_STDERR
+		});
+		const thrown = await thrownBy(devinPrint('Judge the work product.', devin.exec));
+		// ⛔ THE MUTANT: the exit code not asked — a call killed at its bound, a timeout, would be recorded as a cut reply.
+		expect(thrown, 'a kill was thrown as the output-limit class').not.toBeInstanceOf(OutputLimitReached);
+		expect((thrown as Error).message).toMatch(/^devin invocation failed: Command failed: /);
+	});
+
+	it('⛔ the prompt is still measured out of the diagnostic: a truncation whose stderr echoes the prompt is the class, its diagnostic WITHHELD', async () => {
+		vi.stubEnv('JPWB_ASSURANCE_MODEL', 'glm-5-3-flash-max');
+		const devin = failingDevin(exportOf(25_000), {
+			code: 1,
+			stdout: '',
+			stderr: `${LONG}\n${DEVIN_TRUNCATED_STDERR}`
+		});
+		const thrown = await thrownBy(devinPrint(LONG, devin.exec));
+		expect(thrown).toBeInstanceOf(OutputLimitReached);
+		// ⛔ THE MUTANT: the class's message built from the raw rejection — the prompt would reach E-5's detail (PER-12).
+		expect((thrown as Error).message).toMatch(/^devin invocation failed\. Its diagnostic is WITHHELD/);
+		expect(diagnosticCarriesPrompt((thrown as Error).message, LONG)).toBe(false);
 	});
 });

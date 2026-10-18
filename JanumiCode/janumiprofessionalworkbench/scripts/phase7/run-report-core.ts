@@ -47,6 +47,9 @@ import {
 	PHASE7_REVIEWED_COMMANDS,
 	PHASE7_UNIT_REVIEWER_CALLS
 } from '../../apps/rph-demo/e2e-live-exec/lane-config.js';
+// ⭐ P5 package A (F1) — the one reading of a reply the tool ended at the model's output-token limit, from a stored
+// record. Pure: it loads no reviewer.
+import { outputLimitOf } from '../../apps/rph-demo/src/lib/server/tools/output-limit.js';
 import { scanText } from './archive-scan.js';
 import {
 	PHASE7_DESIGN,
@@ -384,11 +387,14 @@ export interface MatrixCell {
  * How a review's pairing reads. ⭐ P7-6 B2 — `no-criterion-answered`: the review concluded on a reply that PARSED and
  * answered no criterion, after its one criterion repair (P7-6 I5) answered none, did not parse or got no reply —
  * `REG-F-552`'s case, never a failed repair nor a no response, which the record's last call would otherwise say.
+ * ⭐ P5 package A (F1) — `output-limit`: the review ended on a reply the tool cut at the model's output-token limit
+ * (`outputLimitOf`), never a refused substitute, whose REJECTED and NOT_ATTEMPTED it shares, nor a call with no reply.
  */
 export type PairingLabel =
 	| 'answered'
 	| 'no-criterion-answered'
 	| 'no-response'
+	| 'output-limit'
 	| 'refused'
 	| 'no-answer-recorded'
 	| 'not-pairable';
@@ -396,6 +402,7 @@ export const PAIRING_LABELS: readonly PairingLabel[] = [
 	'answered',
 	'no-criterion-answered',
 	'no-response',
+	'output-limit',
 	'refused',
 	'no-answer-recorded',
 	'not-pairable'
@@ -1344,6 +1351,14 @@ function concludedBy(top: StoredObject): Conclusion {
 					: `its ${role} call threw and was not run again — at or past its tool's bound, or under a tool that declares none`,
 			concludedBy: top.id
 		};
+	// ⭐ P5 package A (F1) — a reply the tool cut at the model's output-token limit is REJECTED and NOT_ATTEMPTED, a
+	// substitute's pair, and is none: told by the class's own pair (`outputLimitOf`), before the pair below reads it.
+	if (outputLimitOf(top.state) !== undefined)
+		return {
+			label: 'output-limit',
+			detail: `its ${role} call's reply was cut at the model's output-token limit, and nothing was judged from it`,
+			concludedBy: top.id
+		};
 	if (disposition === 'REJECTED') {
 		// A substitute is refused before any parse (`reasoning-review-validator.ts`, `timed`); a failed repair after one.
 		const substitute = str(rec(top.state.parseOutcome).outcome) === 'NOT_ATTEMPTED';
@@ -1385,7 +1400,8 @@ function criterionRepairConclusion(sorted: readonly StoredObject[]): Conclusion 
 	const i5Marked = (x: StoredObject | undefined): boolean =>
 		str(rec(x?.state.parseOutcome).outcome) === 'SCHEMA_COERCION_FAILED' &&
 		str(rec(x?.state.parseOutcome).detail).startsWith(NO_CRITERION_ANSWERED);
-	const asked = sorted.find((x) => str(x.state.disposition) !== 'NO_RESPONSE');
+	// ⭐ P5 package A (F1) — the first reply the review READ: past a call that threw, and past a reply the tool cut.
+	const asked = sorted.find((x) => str(x.state.disposition) !== 'NO_RESPONSE' && outputLimitOf(x.state) === undefined);
 	if (asked === undefined || str(asked.state.disposition) !== 'REPAIR_REQUESTED' || !i5Marked(asked)) return undefined;
 	const after = sorted.filter((x) => ordinalOf(x) > ordinalOf(asked));
 	const answered = after.find((x) => str(x.state.disposition) === 'ACCEPTED');
@@ -1399,6 +1415,8 @@ function criterionRepairConclusion(sorted: readonly StoredObject[]): Conclusion 
 	const repairEnded = str(last?.state.disposition);
 	let how: string;
 	if (repairEnded === 'NO_RESPONSE') how = 'got no reply';
+	// ⭐ P5 package A (F1) — a repair the tool cut at the model's output-token limit ended without concluding, too.
+	else if (outputLimitOf(last?.state) !== undefined) how = 'was cut at the model’s output-token limit';
 	else if (repairEnded === 'REJECTED' && str(rec(last?.state.parseOutcome).outcome) !== 'NOT_ATTEMPTED')
 		how = i5Marked(last) ? 'answered none either' : 'did not parse';
 	else return undefined;

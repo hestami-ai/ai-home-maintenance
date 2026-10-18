@@ -171,6 +171,40 @@ describe('⭐ the recording’s format (D1)', () => {
 		);
 	});
 
+	// ⭐ `JAN-EXEC` Phase 7 P5, package A (F1) — a reviewer reply the tool cut at the model's output-token limit, recorded as
+	// its own form: read back whole; what it says of the cut held to a bounded token and a count, as the product carries them.
+	it('⭐ P5 A — a reply cut at the output-token limit reads back whole; a free-text finish reason or a negative count is refused', () => {
+		const cut: Recording = {
+			...RECORDING,
+			reviewer: [
+				{
+					...RECORDING.reviewer[0]!,
+					reply: {
+						status: 'OUTPUT_LIMIT',
+						message: 'devin invocation failed: (fixture)',
+						partialReply: '{"findings":[',
+						finishReason: 'max_tokens',
+						outputTokens: 25_000
+					}
+				}
+			]
+		};
+		const files = recordingFiles(cut);
+		// ⛔ THE MUTANT: the form not read — a recording of a run with one cut reply is refused whole.
+		expect(readRecording(written(files))).toEqual(cut);
+		const at = (from: string, to: string) => ({
+			...files,
+			[RECORDING_FILES.reviewer]: files[RECORDING_FILES.reviewer]!.replace(from, to)
+		});
+		// ⛔ THE MUTANTS: either fact taken as it stands — tool-written free text reaching E-5's detail on replay.
+		expect(() => readRecording(written(at('"max_tokens"', '"max tokens; the prompt was: Judge"')))).toThrow(
+			'reviewer.jsonl:1 has a `finishReason` that is neither a bounded token nor null'
+		);
+		expect(() => readRecording(written(at('25000', '-1')))).toThrow(
+			'reviewer.jsonl:1 has an `outputTokens` that is neither a count nor null'
+		);
+	});
+
 	it('⛔ refuses a recording made on the other OS family, with a reason of its own — never REPLAY_STALE at its first path', () => {
 		const here = process.platform === 'win32' ? 'windows' : 'posix';
 		const there = here === 'windows' ? 'posix' : 'windows';

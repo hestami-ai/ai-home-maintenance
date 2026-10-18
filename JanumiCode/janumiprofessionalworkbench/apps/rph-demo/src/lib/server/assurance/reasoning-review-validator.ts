@@ -51,6 +51,7 @@ import {
 	type ToolInvocationResult
 } from '../tools/backing-tool.js';
 import { governedToolCallReport } from '../tools/observed-tool-calls.js';
+import { OutputLimitReached, outputLimitDetail } from '../tools/output-limit.js';
 import type { ExchangeParseOutcome } from '../agent/exchange-record.js';
 import type { ObservedToolCallReport } from '@janumipwb/rph-contracts';
 import { allocate } from './process-result-render.js';
@@ -1253,7 +1254,8 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 			// ⭐ P7-6 I2 — the LATEST call's session export, set afresh by every call (`attempt`) and so never an earlier
 			// call's (`TryReport.sessionExport`).
 			let toolSessionExport: string | undefined;
-			// ⭐ P7-6 I5 — every error `attempt` made of a call that got NO REPLY (the sanitised form `timed` rethrows). The I5
+			// ⭐ P7-6 I5 — every error `attempt` made of a call that got NO REPLY (the sanitised form `timed` rethrows) — ⭐ or (P5
+			// package A) a reply the tool ended at the model's output-token limit, from which nothing is judged. The I5
 			// repair reads it to tell "the repair got no reply" — after which the first judgement stands — from a refusal of
 			// who answered or a retention fault, which propagate as everywhere in this validator.
 			const noReply = new WeakSet<Error>();
@@ -1296,7 +1298,9 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 				times: { requestedAt: string; respondedAt: string },
 				parseOutcome: ExchangeParseOutcome,
 				predecessor?: ExchangeRecord,
-				reported: TryReport = reportedSoFar()
+				reported: TryReport = reportedSoFar(),
+				// ⭐ P5 package A (F1) — a reply the tool ended at the model's output-token limit (`OutputLimitReached`).
+				cutAtOutputLimit = false
 			) => {
 				tryCounter += 1;
 				return captureTry({
@@ -1335,6 +1339,8 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 					// ⚠ A MIXED reply is still separated, never stored whole: the record plane refuses a stored blob beside a
 					// stored reasoning span (`REG-D-056`), and its two halves reassemble it (`REG-D-057`).
 					...(disposition === 'no-response' ? {} : { unseparatedRawOutput: 'RETAINED_FOR_DIAGNOSIS' as const }),
+					// ⭐ P5 package A (F1) — a cut reply is kept WHOLE, whatever span it holds, and its output declared cut.
+					...(cutAtOutputLimit ? { cutAtOutputLimit: true as const } : {}),
 					// ⭐ P7-6 I2 — and the tool's own export of THIS call's session, retained and pointed at.
 					...(reported.sessionExport === undefined ? {} : { toolSessionExport: reported.sessionExport })
 				});
@@ -1350,6 +1356,9 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 			 * TRY THAT HAPPENED"*). It is recorded `no-response`, the sponsor's word for a thrown call (`JAN-NOANS`) — never
 			 * `rejected`, which says an answer arrived and was refused — and E-5 says no parse was attempted, carrying the
 			 * time against the tool's bound and the SANITISED cause (`REG-F-499`'s first remedy).
+			 * ⭐ P5 package A (F1) — SAVE A REPLY THE TOOL ENDED AT THE MODEL'S OUTPUT-TOKEN LIMIT (`OutputLimitReached`): a reply
+			 * DID arrive, cut, and nothing is judged from it — so it is `rejected`, with what its tool reported of it, as its
+			 * own class (`tools/output-limit.ts`); the rest of this paragraph is of a call that got no reply.
 			 * ⭐ ITS IDENTITY IS THE ONE THE HOST CONFIGURED, UNGRADED (`configured`): the call reported none, so an identity an
 			 * earlier call reported, graded `PROVIDER_REPORTED`, would be a confirmation nobody gave (`TryReport`).
 			 * ⚠ A RETENTION FAULT IN THAT CAPTURE PROPAGATES, in place of the call's own error, as one does from every capture
@@ -1428,6 +1437,41 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 					const times = { requestedAt, respondedAt: clock() };
 					const elapsedMs = Date.parse(times.respondedAt) - Date.parse(times.requestedAt);
 					const disposal = thrownCallDisposal(role, elapsedMs, callBound);
+					// ⭐⭐ P5 package A (F1) — A REPLY THE TOOL ENDED AT THE MODEL'S OUTPUT-TOKEN LIMIT IS ITS OWN CLASS, never a call
+					// with no reply: `rejected` — a reply arrived, and nothing is judged from it — its partial reply kept whole for
+					// diagnosis and its output declared cut (`cutAtOutputLimit`), E-5 opening with the class's marker
+					// (`outputLimitDetail`), and what its tool reported of it: the model its export named, graded so, its
+					// observation and its export. ⭐ The thrown call's rule is unchanged (`disposal`): run once more short of the
+					// bound, and its sanitised error is the one `timed` rethrows.
+					if (e instanceof OutputLimitReached) {
+						const cut = await capture(
+							role,
+							p,
+							e.partialReply,
+							'rejected',
+							times,
+							{
+								outcome: 'NOT_ATTEMPTED',
+								detail: outputLimitDetail({
+									facts: e.facts,
+									partialChars: e.partialReply.length,
+									elapsedMs,
+									clause: disposal.clause,
+									reported: failure.message
+								})
+							},
+							predecessor,
+							{
+								model: e.producer
+									? { modelId: e.producer.modelId, providerId: e.producer.providerId, evidence: 'PROVIDER_REPORTED' }
+									: configured,
+								observation: e.observedToolCalls,
+								...(e.sessionExport === undefined ? {} : { sessionExport: e.sessionExport })
+							},
+							true
+						);
+						return { answered: false, failure, failed: cut, runOnceMore: disposal.runOnceMore };
+					}
 					const failed = await capture(
 						role,
 						p,

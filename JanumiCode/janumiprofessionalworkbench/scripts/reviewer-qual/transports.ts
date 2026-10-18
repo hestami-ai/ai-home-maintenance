@@ -2,7 +2,9 @@
 //
 // A transport answers one question — "send this prompt; what came back?" — and classifies every way it can fail to
 // answer as a TIMEOUT or a REFUSAL (§5.4), which the record carries as not re-scorable. Anything else it throws is the
-// HARNESS's fault and stops the run: a candidate is never charged with the harness's defect.
+// HARNESS's fault and stops the run: a candidate is never charged with the harness's defect. ⭐ P5 package A (F2) — save a
+// reply the product's tool cut at the model's output-token limit, passed on as the product's own class
+// (`OutputLimitReached`), which the runner records as one (`OUTPUT_LIMIT`).
 //
 //   · `agy` and `devin` ARE THE PRODUCT'S OWN `agyPrint` and `devinPrint`, with their own bounds — deployable. They
 //     choose their model from the environment and their program at module load (`REG-D-072` D12), so
@@ -17,6 +19,9 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { AgyExec } from '../../apps/rph-demo/src/lib/server/assurance/agy-cli.js';
 import type { ToolInvocationResult } from '../../apps/rph-demo/src/lib/server/tools/backing-tool.js';
+// ⭐ P5 package A (F2) — the product's class for a reply its tool cut at the model's output-token limit. ⚠ A pure module,
+// which reads nothing at load (`REG-D-072` D12): not either product transport.
+import { OutputLimitReached } from '../../apps/rph-demo/src/lib/server/tools/output-limit.js';
 import { HarnessRefusal, modelLabelProblem, refuseProgramOverrides } from './preflight.js';
 import type {
 	CandidateIdentity,
@@ -55,7 +60,8 @@ export interface Transport {
 	readonly name: TransportName;
 	/** Who the candidate is, and what it is served, for the RUN line. */
 	identify(): Promise<CandidateIdentity>;
-	/** Throws `TransportFailure` for a call that got no reply, `HarnessRefusal` for the harness's own fault. */
+	/** Throws `TransportFailure` for a call that got no reply, `HarnessRefusal` for the harness's own fault — and (P5
+	 *  package A) the product's `OutputLimitReached` for a reply its tool cut at the model's output-token limit. */
 	call(prompt: string): Promise<TransportReply>;
 	/** Release what the transport holds — Ollama unloads its model. */
 	close?(): Promise<void>;
@@ -328,7 +334,10 @@ export function createDevinTransport(
 			const started = now();
 			try {
 				return { returned: await devin.devinPrint(prompt), served: null };
-			} catch {
+			} catch (e) {
+				// ⭐ P5 package A (F2) — a reply devin ended at the model's output-token limit is the product's own class, passed
+				// on for the runner to record as one: never a TIMEOUT or a REFUSAL read off the clock.
+				if (e instanceof OutputLimitReached) throw e;
 				const elapsed = Math.round(now() - started);
 				throw elapsed >= DEVIN_KILL_MS
 					? new TransportFailure(

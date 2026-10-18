@@ -36,12 +36,15 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
+import { FINISH_REASON_SHAPE } from '../apps/rph-demo/src/lib/server/tools/output-limit.js';
 import {
 	appendOnlyProblems,
+	FINISH_REASON,
 	lineProblems,
 	RECORD_DIR,
 	RECORD_LINE_KINDS,
 	recordProblems,
+	restampable,
 	serializeLine,
 	serverDayOf,
 	type CallLine,
@@ -779,5 +782,68 @@ describe('JAN-CRITREAD J2-2 — the record is append-only against git', () => {
 		// ⚠ THE POPULATION, STATED RATHER THAN ASSERTED: no run is recorded before J2-4, so today both limbs measure
 		// nothing here — the fixtures above are what show each can fail. A file on disk that git has not yet seen (a
 		// run written before its commit) is checked for its content above, and joins the history limb once committed.
+	});
+});
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7 P5, package A (F2) — A REPLY THE TOOL ENDED AT THE MODEL'S OUTPUT-TOKEN LIMIT, ITS OWN CLASS ──
+// P4's three such calls are recorded TRANSPORT_FAILURE / REFUSAL, "devin failed after N ms", the cause dropped. A line now
+// says so in a status of its own — and the lines already written keep their meaning (`REG-D-086`).
+describe('⭐⭐ P5 package A (F2) — OUTPUT_LIMIT: a reply the tool cut at the model’s output-token limit', () => {
+	const CALL_CUT: CallLine = {
+		...CALL_TIMEOUT,
+		elapsedMs: 90_453,
+		reply: { status: 'OUTPUT_LIMIT', finishReason: 'max_tokens', outputTokens: 25_000, rescorable: false }
+	};
+
+	it('⭐ a line the record accepts, with what the tool reported of the cut — or null where it reported nothing', () => {
+		// ⛔ THE MUTANT: the record knows no such status — a cut call could only be written as a transport failure again.
+		expect(lineProblems(CALL_CUT), 'the record refuses the class').toEqual([]);
+		expect(
+			lineProblems({
+				...CALL_CUT,
+				reply: { status: 'OUTPUT_LIMIT', finishReason: null, outputTokens: null, rescorable: false }
+			})
+		).toEqual([]);
+		expect(recordProblems(text([RUN, CALL_NO_SPAN, CALL_CUT]), { tracked: true })).toEqual([]);
+	});
+
+	it('⛔ never re-scorable, its facts bounded, and nothing beside them — no byte of the partial reply', () => {
+		const at = (reply: Record<string, unknown>) =>
+			lineProblems({ ...CALL_CUT, reply: { ...CALL_CUT.reply, ...reply } }).join('\n');
+		expect(at({ rescorable: true })).toContain('CALL.reply.rescorable: a cut reply is never re-scorable');
+		expect(at({ finishReason: 'max tokens; the prompt was: Judge' })).toContain('CALL.reply.finishReason');
+		expect(at({ outputTokens: -1 })).toContain('CALL.reply.outputTokens');
+		expect(at({ partialReply: '{"findings":[' })).toContain('CALL.reply: unexpected key "partialReply"');
+	});
+
+	it('⭐ the record’s bound on a finish reason is the product’s own — restated, since the record imports nothing', () => {
+		expect(String(FINISH_REASON)).toBe(String(FINISH_REASON_SHAPE));
+	});
+
+	it('⭐ old lines keep their meaning (REG-D-086): a TRANSPORT_FAILURE / REFUSAL line, as P4 wrote its three, still reads as it did', () => {
+		const p4: CallLine = {
+			...CALL_TIMEOUT,
+			elapsedMs: 90_453,
+			reply: {
+				status: 'TRANSPORT_FAILURE',
+				failureClass: 'REFUSAL',
+				reason: 'devin failed after 90453 ms',
+				rescorable: false,
+				preContact: false
+			}
+		};
+		expect(lineProblems(p4)).toEqual([]);
+	});
+
+	it('⛔ an evaluation with a cut call is not one a RESCORED record re-stamps — nothing of it was kept to replay', () => {
+		const prompts = new Map([
+			['W-CLEAN', { initial: CALL_NO_SPAN.promptSha256, repair: CALL_CUT.promptSha256, 'criterion-repair': HEX('f') }]
+		]);
+		const current = () => true;
+		// ⭐ CONTROL — the same evaluation, its repair answered: re-stampable, so the refusal below is the cut's.
+		const answeredRepair: CallLine = { ...CALL_CUT, reply: CALL_ANSWERED.reply, malformations: [] };
+		expect(restampable([CALL_NO_SPAN, answeredRepair], current, prompts), 'arrangement').toBe(true);
+		// ⛔ THE MUTANT: a cut call not asked — the writer re-stamps an evaluation that has no reply to re-score.
+		expect(restampable([CALL_NO_SPAN, CALL_CUT], current, prompts), 'a cut evaluation was re-stampable').toBe(false);
 	});
 });
