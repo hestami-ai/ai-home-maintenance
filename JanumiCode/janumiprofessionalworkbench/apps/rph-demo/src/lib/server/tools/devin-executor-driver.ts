@@ -8,8 +8,9 @@
 //   · `allow: ["mcp__jpwb__*"]` in the run folder's project config is what approves a host call made through devin's
 //     carrier `mcp_call_tool` in print mode. Without it devin rejects the call, writes its rejection line on stderr,
 //     exits 0 with blank stdout, and its export ends on the rejected call (call 2).
-//   · `shell.setup_complete: true` in the `--config`. Without it print mode waits on devin's interactive setup screen
-//     ("We strongly recommend connecting your Git provider…") until the host's bound kills it (MH-0a's F1).
+//   · `shell.setup_complete: true` in the `--config`. Without it, the account's org in the file, print mode waited on
+//     devin's interactive setup screen ("We strongly recommend connecting your Git provider…") until the probe's bound
+//     killed it (MH-0a's F1).
 //   · The preflight is `devin --config <file> mcp list`, the global option before the subcommand: after it, devin refuses
 //     ("error: unexpected argument '--config' found"). The listing connects to no server.
 //   · The export is ATIF-v1.7. What devin offered its model is `agent.tool_definitions[].function.name`; a host call is
@@ -20,13 +21,19 @@
 //
 // ⛔ WHAT THIS DRIVER DOES NOT HOLD, STATED (MH-0a's open questions, the lead's to rule):
 //   · THE ACCOUNT'S `devin.org_id`, which MH-0a's passing call carried in its `--config` beside `setup_complete`. It is
-//     account data, not this repository's, so the `--config` here is those bytes without it — a form no call has run. If
-//     devin then runs its first-run setup again, it writes the org into the `--config` file, and the opener refuses the
-//     next turn for the changed file (D44a).
+//     account data, not this repository's, so the `--config` here is those bytes without it — a form no call has run, so
+//     what devin does with it is unmeasured. ~~If devin then runs its first-run setup again, it writes the org into the
+//     `--config` file, and the opener refuses the next turn for the changed file (D44a).~~ ⭐ `JAN-MHX` MH-4, the check's
+//     fix — that was one outcome of two, and neither was measured on this form. The setup MH-0a did meet both wrote and
+//     waited: with neither key, devin wrote the org into that `--config` itself and exited 1 after 673,729 ms; with the
+//     org and no `setup_complete`, it was still waiting when the probe's bound killed it, at 420,294 ms. So on this form
+//     devin may wait on its setup screen until the host's bound, the turn CALL_ABORTED (D18), or rewrite the `--config`
+//     file, which refuses the next turn (D44a).
 //   · THE SURFACE devin 3000.11.92 OFFERS beside its carriers: `ask_user_question`, `find_file_by_name`, `mcp_read_resource`
 //     and `skill`, which this config does not remove (`skill` and `mcp_read_resource` are disabled, and offered anyway).
 //     Each is a tool of devin's own offered to its model, so the opener fails every such turn `CLI_OWN_TOOL_RAN` and
-//     marks the workspace (D14a, D21a), until a ruling and a probe say otherwise (MH-0a's F2).
+//     marks the workspace (D14a, D21a), until a ruling and a probe say otherwise (MH-0a's F2). ⭐ `JAN-MHX` MH-4, the
+//     check's fix — so the selector wires devin in test mode only (`execution/executor-selection.ts`, D30).
 //   · A CALL devin rejects BEFORE sending it for an unknown name or a malformed argument: whether its export records one is
 //     unmeasured. Only a rejection for want of approval was, and the export holds it.
 import { readFile } from 'node:fs/promises';
@@ -101,7 +108,7 @@ const USER_CONFIG_BYTES = `${JSON.stringify(
 		read_config_from: READ_CONFIG_FROM_OFF,
 		// ⭑ devin reaches the host's server through the bridge on 127.0.0.1, which no proxy may stand in front of.
 		proxy: { mode: 'system', no_proxy: '127.0.0.1,localhost' },
-		// ⛔ MH-0a's F1: without it print mode waits on devin's interactive setup screen until the host's bound kills it.
+		// ⛔ MH-0a's F1: without it, the org in the file, print mode waited on devin's setup screen until the probe's bound.
 		shell: { setup_complete: true }
 	},
 	null,
@@ -184,8 +191,11 @@ function listingRefusal(
 	return undefined;
 }
 
-/** ⭐ D14a — what devin offered its model, by name, or `undefined` when the export holds no proof of it. */
-function surfaceOf(agent: unknown): CliToolRef[] | undefined {
+/**
+ * ⭐ D14a — what devin offered its model, by name, or `undefined` when the export holds no proof of it. `called` is every
+ * function its agent steps called.
+ */
+function surfaceOf(agent: unknown, called: ReadonlySet<string>): CliToolRef[] | undefined {
 	if (!isRecord(agent) || !Array.isArray(agent.tool_definitions)) return undefined;
 	const names = agent.tool_definitions.map((definition) =>
 		isRecord(definition) && isRecord(definition.function) && typeof definition.function.name === 'string'
@@ -194,6 +204,9 @@ function surfaceOf(agent: unknown): CliToolRef[] | undefined {
 	);
 	// ⛔ A DEFINITION THAT NAMES NO TOOL leaves the offer unknown, so nothing shows which tools devin offered.
 	if (names.some((name) => name === undefined)) return undefined;
+	// ⛔ `JAN-MHX` MH-4, the check's fix — A STEP THAT CALLS A FUNCTION THE OFFER DOES NOT HOLD: the record contradicts itself,
+	// so its offer proves nothing about what devin offered. An empty offer beside any call is one such record.
+	if ([...called].some((name) => !names.includes(name))) return undefined;
 	// ⭑ Every one is devin's own: devin lists the host's tools through its carrier `mcp_list_tools`, never here (MH-0a).
 	return names.map((name) => ({ party: 'OWN', name: name! }));
 }
@@ -226,11 +239,51 @@ function eventOf(call: unknown, rejected: Set<unknown>, serverName: string): Cli
 }
 
 /**
+ * The sources of the steps MH-0a's exports held: devin's own system steps, the user's prompt, and the agent's steps. Only
+ * an agent step named a model or carried a call.
+ */
+const MEASURED_STEP_SOURCES: readonly unknown[] = ['system', 'user', 'agent'];
+
+/** One step of devin's export, as `readExport` takes it. */
+type ExportStep =
+	| {
+			readonly read: 'AGENT';
+			readonly step: Readonly<Record<string, unknown>>;
+			readonly model: string;
+			readonly calls: readonly unknown[];
+	  }
+	| { readonly read: 'PASSED_OVER' }
+	| { readonly read: 'REFUSED' };
+
+/**
+ * ⛔ `JAN-MHX` MH-4, the check's fix — ONE STEP, READ ONLY IN A SHAPE MH-0a MEASURED: an agent step that names its model,
+ * its calls a list; or a system or user step, passed over, that carries no call. Every other step is REFUSED, and its
+ * export reads as one that could not be read: a step this reader passed over would take with it what it holds — the
+ * model that served it, the tools devin ran in it.
+ */
+function exportStepOf(step: unknown): ExportStep {
+	if (!isRecord(step) || !MEASURED_STEP_SOURCES.includes(step.source)) return { read: 'REFUSED' };
+	const calls: unknown = step.tool_calls ?? [];
+	if (!Array.isArray(calls)) return { read: 'REFUSED' };
+	if (step.source !== 'agent') return calls.length > 0 ? { read: 'REFUSED' } : { read: 'PASSED_OVER' };
+	const model = isRecord(step.extra) ? step.extra.generation_model : undefined;
+	if (typeof model !== 'string' || model === '') return { read: 'REFUSED' };
+	return { read: 'AGENT', step, model, calls };
+}
+
+/** The function a call of devin's names, or `''` when it names none. */
+const functionNameOf = (call: unknown): string =>
+	isRecord(call) && typeof call.function_name === 'string' ? call.function_name : '';
+
+/**
  * ⭐ D20 — devin's export, read: its surface (D14a), its calls in its own order (D21), every model it reports (D22), and
  * the reasoning it returned (D23). The answer is stdout, after devin's blank lines.
  * ⛔ AN EXPORT OF ANOTHER SCHEMA, OR ONE WITH AN AGENT STEP THAT NAMES NO MODEL, IS NOT THE RECORD MH-0a MEASURED, and
  * reads as one that could not be read: nothing then shows which model served that step, and `PROVIDER_REPORTED` would
  * claim the provider said.
+ * ⛔ `JAN-MHX` MH-4, the check's fix — AND SO DOES ONE WITH A STEP OF ANOTHER SHAPE (`exportStepOf`), OR WITH NO AGENT STEP
+ * AT ALL: read, either would report less than it holds — no model, so the answer graded `HOST_CONFIGURED` and D22's
+ * compare never asked, or no call where devin may have run one. D20: devin can hide steps from its export.
  */
 function readExport(raw: string, stdout: string, serverName: string): CliRecordReading {
 	let parsed: unknown;
@@ -244,10 +297,14 @@ function readExport(raw: string, stdout: string, serverName: string): CliRecordR
 	const events: CliRecordEvent[] = [];
 	const models = new Set<string>();
 	const reasoning: string[] = [];
-	for (const step of parsed.steps) {
-		if (!isRecord(step) || step.source !== 'agent') continue;
-		const model = isRecord(step.extra) ? step.extra.generation_model : undefined;
-		if (typeof model !== 'string' || model === '') return { read: 'UNPARSEABLE', raw };
+	const called = new Set<string>();
+	let agentSteps = 0;
+	for (const entry of parsed.steps) {
+		const read = exportStepOf(entry);
+		if (read.read === 'REFUSED') return { read: 'UNPARSEABLE', raw };
+		if (read.read === 'PASSED_OVER') continue;
+		const { step, model, calls } = read;
+		agentSteps += 1;
 		models.add(model);
 		if (typeof step.reasoning_content === 'string' && step.reasoning_content.trim() !== '')
 			reasoning.push(step.reasoning_content);
@@ -255,13 +312,16 @@ function readExport(raw: string, stdout: string, serverName: string): CliRecordR
 		// speaking — devin writes "\n\n" before its calls (MH-0a).
 		if (typeof step.message === 'string' && step.message.trim() !== '') events.push({ kind: 'ASSISTANT_MESSAGE' });
 		const rejected = rejectedCallIds(step.observation);
-		for (const call of Array.isArray(step.tool_calls) ? step.tool_calls : [])
+		for (const call of calls) {
+			called.add(functionNameOf(call));
 			events.push(eventOf(call, rejected, serverName));
+		}
 	}
+	if (agentSteps === 0) return { read: 'UNPARSEABLE', raw };
 	return {
 		read: 'PARSED',
 		raw,
-		surface: surfaceOf(parsed.agent),
+		surface: surfaceOf(parsed.agent, called),
 		events,
 		reportedModels: [...models],
 		answer: stdout.replace(/^(?:\r?\n)+/, ''),

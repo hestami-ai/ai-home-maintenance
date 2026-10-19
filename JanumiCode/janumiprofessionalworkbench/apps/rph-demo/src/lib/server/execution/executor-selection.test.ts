@@ -9,8 +9,12 @@
 // ⭑ EVERY TOOL THAT DECLARES EXECUTION IS COVERED, read off the catalog rather than listed, and the oracle keys the
 // override on the TOOL rather than on today's wiring: the day a devin executor is wired, the table demands that its
 // `JPWB_DEVIN_BIN` refuse it — the rule is inherited, not remembered. ⭐ `JAN-MHX` MH-4 — THAT DAY CAME: devin is wired to
-// the `CLI` kind with its driver (D30), and its rows now answer it, the override refusal included. No catalogued EXECUTION
-// tool is left unwired, so the UNWIRED limb is held over a catalog that holds one (`executor-selection-unwired.test.ts`).
+// the `CLI` kind with its driver (D30), and its rows now answer it~~, the override refusal included. No catalogued
+// EXECUTION tool is left unwired, so the UNWIRED limb is held over a catalog that holds one
+// (`executor-selection-unwired.test.ts`)~~. ⭐ MH-4, the check's fix — IN TEST MODE ONLY, until a live devin turn is
+// confirmed (D30; MH-9): on the surface devin 3000.11.92 offered in MH-0a, every turn fails `CLI_OWN_TOOL_RAN` and taints
+// the workspace (MH-0a's F2). So devin's server-mode rows answer UNWIRED, before its override is asked about, and its
+// test-mode rows the `CLI` kind; a catalog tool wired in no mode is `executor-selection-unwired.test.ts`'s.
 //
 // ⭐ AND THE SUCCESSORS (design §4.5). `executorToolId()`, `executorModel()` and `model.ts`'s own `TEST_MODE` are gone;
 // the assertions `model.test.ts` and `backing-tool.test.ts` made on them are restated below, each with equal or
@@ -94,10 +98,12 @@ const EXECUTION_TOOLS = BACKING_TOOLS.filter((t) => t.roles.includes('EXECUTION'
 	(t) => t.toolId
 );
 /**
- * D1, RESTATED: the executor adapters this host has, and what each opens. ⭐ `JAN-MHX` MH-4 (D30) — devin's opens the `CLI`
- * kind, naming its tool.
+ * D1, RESTATED: the executor adapters this host has, and what each opens. ~~⭐ `JAN-MHX` MH-4 (D30) — devin's opens the `CLI`
+ * kind, naming its tool.~~ ⭐ MH-4, the check's fix — in every mode: agy's and Pi's.
  */
-const WIRED: Readonly<Record<string, 'AGY' | 'PI' | 'CLI'>> = { agy: 'AGY', pi: 'PI', devin: 'CLI' };
+const WIRED: Readonly<Record<string, 'AGY' | 'PI' | 'CLI'>> = { agy: 'AGY', pi: 'PI' };
+/** ⭐ `JAN-MHX` MH-4, the check's fix (D30), RESTATED: the adapters wired in test mode only — devin's, which opens `CLI`. */
+const WIRED_IN_TEST_MODE_ONLY: Readonly<Record<string, 'CLI'>> = { devin: 'CLI' };
 /** D3, RESTATED: the override each tool's adapter captures — per TOOL, whether or not it is wired today. */
 const OVERRIDE_OF: Readonly<Record<string, keyof ExecutorProgramOverrides>> = {
 	agy: 'agy',
@@ -155,7 +161,7 @@ function oracle(
 			: { kind: 'REFUSED', code: 'EXECUTOR_TOOL_UNSET', toolId: undefined };
 	if (!EXECUTION_TOOLS.includes(t))
 		return { kind: 'REFUSED', code: 'EXECUTOR_TOOL_UNKNOWN', toolId: t };
-	const opens = WIRED[t];
+	const opens = WIRED[t] ?? (testMode ? WIRED_IN_TEST_MODE_ONLY[t] : undefined);
 	if (opens === undefined) return { kind: 'REFUSED', code: 'EXECUTOR_TOOL_UNWIRED', toolId: t };
 	const own = OVERRIDE_OF[t];
 	if (!testMode && own !== undefined && overrides[own] !== undefined)
@@ -273,18 +279,21 @@ describe('⛔ D3 — only the SELECTED tool’s captured override refuses, and o
 	});
 
 	// ~~⭑ an UNWIRED tool is refused as unwired BEFORE its override is asked about — devin with JPWB_DEVIN_BIN set~~
-	// ⭐ `JAN-MHX` MH-4 — STRUCK: devin is wired (D30), so its override is now ITS refusal, as agy's is — the rule the table's
-	// `OVERRIDE_OF` keyed on the tool for this day. An unwired tool has no override to ask about: none is catalogued now.
+	// ~~⭐ `JAN-MHX` MH-4 — STRUCK: devin is wired (D30), so its override is now ITS refusal, as agy's is — the rule the
+	// table's `OVERRIDE_OF` keyed on the tool for this day. An unwired tool has no override to ask about: none is catalogued
+	// now.~~ ⭐ MH-4, the check's fix — RESTORED, for server mode: devin is wired in test mode only (D30), so outside it devin
+	// is refused as unwired before its override is asked about; in test mode the override is the tests' own, and honoured.
+	// The day devin is wired outside test mode, `OVERRIDE_OF` makes its override its refusal there, as agy's is.
 	for (const program of ['C:/stand-in/devin.exe', ''])
-		it(`⛔ devin, JPWB_DEVIN_BIN=${JSON.stringify(program)}: refused outside test mode, naming the variable and REG-F-459 — honoured in test mode`, () => {
-			// ⭑ RED FIRST: devin was refused EXECUTOR_TOOL_UNWIRED before its override was asked about.
+		it(`⭑ devin, JPWB_DEVIN_BIN=${JSON.stringify(program)}: refused as UNWIRED outside test mode, before its override is asked about — honoured in test mode`, () => {
+			// ⭑ RED FIRST: MH-4 wired devin in every mode, and it was refused EXECUTOR_PROGRAM_OVERRIDDEN here.
 			const env = { JPWB_EXECUTOR: 'devin', JPWB_EXECUTOR_MODEL: 'deepseek-v4-1-flash-max' };
 			const overrides = { agy: undefined, devin: program, codex: undefined };
-			const got = selectExecutor({ testMode: false, env, overrides });
-			expect(got.kind === 'REFUSED' && got.code).toBe('EXECUTOR_PROGRAM_OVERRIDDEN');
-			expect(reasonOf(got)).toContain(`JPWB_DEVIN_BIN=${JSON.stringify(program)}`);
-			expect(reasonOf(got)).toContain("the product’s own 'devin' program");
-			expect(reasonOf(got)).toContain('REG-F-459');
+			expect(shape(selectExecutor({ testMode: false, env, overrides }))).toEqual({
+				kind: 'REFUSED',
+				code: 'EXECUTOR_TOOL_UNWIRED',
+				toolId: 'devin'
+			});
 			expect(selectExecutor({ testMode: true, env, overrides })).toEqual({
 				kind: 'CLI',
 				toolId: 'devin',
@@ -323,9 +332,10 @@ describe('what a refusal SAYS — the reason names the fault, and every one carr
 		// ⭑ THE CATALOG'S REFUSAL LISTS THE CATALOG — "This host can drive: agy, pi, devin" — and this reason is printed
 		// beside the guidance. An operator who followed it to ~~`devin`~~ a tool with no executor adapter would be refused
 		// again, as UNWIRED: the steer D1 took out of the guidance, back in the reason (`JAN-SELRES` RS-1's verification). The
-		// catalog's verdict and its REG-D-052 sentence stay; the list is the one the selector admits. ⭐ `JAN-MHX` MH-4 — devin
+		// catalog's verdict and its REG-D-052 sentence stay; the list is the one the selector admits. ~~⭐ `JAN-MHX` MH-4 — devin
 		// is wired now (D30), so the list offers it; the catalog's own sentence is still replaced, and a catalog that holds a
-		// tool nobody wired is `executor-selection-unwired.test.ts`'s.
+		// tool nobody wired is `executor-selection-unwired.test.ts`'s.~~ ⭐ MH-4, the check's fix — devin is wired in test
+		// mode only (D30), so a server's reason offers agy and Pi alone again, and never devin, which it refuses.
 		const got = selectExecutor({
 			testMode: false,
 			env: { JPWB_EXECUTOR: 'nosuchtool', JPWB_EXECUTOR_MODEL: 'fixture-executor' },
@@ -333,12 +343,13 @@ describe('what a refusal SAYS — the reason names the fault, and every one carr
 		});
 		const reason = got.kind === 'REFUSED' ? got.reason : '';
 		expect(reason).toMatch(/Unknown backing tool 'nosuchtool'\./);
+		expect(reason, 'the reason offers devin as a tool to set').not.toMatch(/devin/);
 		expect(reason).not.toContain('This host can drive:');
-		expect(reason).toContain('This host has an executor adapter for: agy, pi, devin.');
+		expect(reason).toContain('This host has an executor adapter for: agy, pi.');
 		expect(reason).toContain('the fiction REG-D-052 forbids');
 		// ⭑ AND THE TOOLS IT OFFERS ARE EXACTLY THE ONES ADMITTED — each one it names, set with a model, is selected.
 		const offered = /executor adapter for: ([^.]*)\./.exec(reason)?.[1]?.split(', ') ?? [];
-		expect(offered).toEqual(['agy', 'pi', 'devin']);
+		expect(offered).toEqual(['agy', 'pi']);
 		for (const tool of offered)
 			expect(
 				selectExecutor({
@@ -353,6 +364,27 @@ describe('what a refusal SAYS — the reason names the fault, and every one carr
 	// ~~⛔ devin → EXECUTOR_TOOL_UNWIRED: declared for EXECUTION, no executor adapter on this host~~ ⭐ `JAN-MHX` MH-4 —
 	// STRUCK: devin has its executor adapter now (D30; MH-4's test 7, below). The refusal's words are held over a catalog
 	// that declares a tool nobody wired (`executor-selection-unwired.test.ts`).
+	// ⭐ MH-4, the check's fix — RESTORED for server mode, where devin is refused again, with words of its own: the adapter
+	// exists, and is wired in test mode only, and the reason says why, so an operator is not sent looking for one.
+	it('⛔ server mode, devin → EXECUTOR_TOOL_UNWIRED: its adapter is wired in test mode only, and the reason says why — in test mode, the CLI kind', () => {
+		// ⭑ RED FIRST: MH-4 wired devin in every mode, so a server selected it, and its first live turn would fail
+		// CLI_OWN_TOOL_RAN and taint the workspace, which nothing in this host clears.
+		const env = { JPWB_EXECUTOR: 'devin', JPWB_EXECUTOR_MODEL: 'deepseek-v4-1-flash-max' };
+		const got = selectExecutor({ testMode: false, env, overrides: NO_OVERRIDES });
+		expect(shape(got)).toEqual({ kind: 'REFUSED', code: 'EXECUTOR_TOOL_UNWIRED', toolId: 'devin' });
+		expect(reasonOf(got)).toContain(
+			"The executing tool 'devin' (JPWB_EXECUTOR) declares the EXECUTION role, but its executor adapter is wired in test " +
+				'mode only (JAN-MHX D30)'
+		);
+		expect(reasonOf(got)).toContain('CLI_OWN_TOOL_RAN');
+		expect(reasonOf(got)).toContain('WORKSPACE_TAINTED');
+		expect(reasonOf(got)).toContain('once a live devin turn is confirmed (MH-9)');
+		expect(selectExecutor({ testMode: true, env, overrides: NO_OVERRIDES })).toEqual({
+			kind: 'CLI',
+			toolId: 'devin',
+			modelId: 'deepseek-v4-1-flash-max'
+		});
+	});
 
 	// ⭐ SUCCESSOR of `backing-tool.test.ts:116-128` (`executorModel` refuses when unset, and names the fallback it
 	// refuses) — STRONGER: for agy AND Pi, in both modes, with the JUDGE model configured beside it.
@@ -383,10 +415,15 @@ describe('what a refusal SAYS — the reason names the fault, and every one carr
 describe('⭐ D1 — the guidance names the WIRED tools, both variables, no default, and ASR-13 with the selected reviewer', () => {
 	// ⭐ SUCCESSOR of `backing-tool.test.ts:130-139`'s `/agy, pi, devin/` — ⚠ A DELIBERATE CHANGE OF WHAT IS PINNED, made
 	// stronger: that refusal listed the CATALOG, steering an operator to `devin`, which the next refusal forbids.
-	// ~~⛔ it lists the wired tools — agy, pi — and NOT devin~~ ⭐ `JAN-MHX` MH-4 — devin is wired (D30), so the guidance lists
-	// it; a catalog holding a tool nobody wired, which the guidance must not offer, is `executor-selection-unwired.test.ts`'s.
-	it('⛔ it lists the wired tools — agy, pi, devin', () => {
-		expect(EXECUTOR_GUIDANCE).toContain('executor adapter for: agy, pi, devin —');
+	// ~~⛔ it lists the wired tools — agy, pi — and NOT devin~~ ~~⭐ `JAN-MHX` MH-4 — devin is wired (D30), so the guidance
+	// lists it; a catalog holding a tool nobody wired, which the guidance must not offer, is
+	// `executor-selection-unwired.test.ts`'s.~~ ⭐ MH-4, the check's fix — RESTORED: devin is wired in test mode only (D30),
+	// and the guidance is the operator's, whose server refuses it.
+	it('⛔ it lists the wired tools — agy, pi — and NOT devin', () => {
+		expect(EXECUTOR_GUIDANCE).toMatch(/agy, pi/);
+		expect(EXECUTOR_GUIDANCE).not.toMatch(/devin, /);
+		expect(EXECUTOR_GUIDANCE).not.toMatch(/\bpi, devin\b/);
+		expect(EXECUTOR_GUIDANCE).not.toMatch(/'devin'|JPWB_EXECUTOR=devin/);
 	});
 
 	it('⭑ and the tools it lists are EXACTLY the ones the selector admits — the list is the table it dispatches on', () => {
@@ -398,7 +435,7 @@ describe('⭐ D1 — the guidance names the WIRED tools, both variables, no defa
 					overrides: NO_OVERRIDES
 				}).kind !== 'REFUSED'
 		);
-		expect(admitted.sort()).toEqual(['agy', 'devin', 'pi']);
+		expect(admitted.sort()).toEqual(['agy', 'pi']);
 		expect(/executor adapter for: ([^—]*) —/.exec(EXECUTOR_GUIDANCE)?.[1]?.split(', ').sort()).toEqual(admitted);
 	});
 
@@ -603,6 +640,19 @@ const executing = (
 		overrides: NO_OVERRIDES,
 		reviewer
 	});
+/** ⭐ `JAN-MHX` MH-4, the check's fix — the same IN TEST MODE, where devin's executor is wired (D30). */
+const executingInTestMode = (
+	tool: string,
+	model: string,
+	reviewer?: { readonly toolId: string; readonly modelId: string },
+	extra: Readonly<Record<string, string>> = {}
+) =>
+	selectExecutor({
+		testMode: true,
+		env: { JPWB_EXECUTOR: tool, JPWB_EXECUTOR_MODEL: model, ...extra },
+		overrides: NO_OVERRIDES,
+		reviewer
+	});
 const reasonOf = (s: ExecutorSelection): string => (s.kind === 'REFUSED' ? s.reason : '');
 
 describe('⭐ `JAN-MHX` MH-3 (D33) — the executor’s model may not be the reviewer’s, by spelling or by family, and a model the table does not list is refused', () => {
@@ -759,15 +809,18 @@ describe('⭐ `JAN-MHX` MH-3 (D33) — the executor’s model may not be the rev
 });
 
 describe('⭐ `JAN-MHX` MH-3 (D32) — JPWB_EXECUTOR_EFFORT is refused where nothing would read it, and required where the tool takes it', () => {
-	for (const [tool, model, because] of [
-		['pi', 'openai-codex/gpt-5.6-sol', 'Pi runs with thinking off'],
-		['agy', 'gemini-4-argon-high', 'its model ids name their effort'],
-		// ⭐ `JAN-MHX` MH-4 — devin's row, reached through the selector now that devin is wired (D30).
-		['devin', 'deepseek-v4-1-flash-max', 'its model ids name their effort']
+	for (const [tool, model, because, testMode] of [
+		['pi', 'openai-codex/gpt-5.6-sol', 'Pi runs with thinking off', false],
+		['agy', 'gemini-4-argon-high', 'its model ids name their effort', false],
+		// ⭐ `JAN-MHX` MH-4 — devin's row, reached through the selector now that devin is wired (D30). ⭐ MH-4, the check's
+		// fix — in test mode, where it is wired.
+		['devin', 'deepseek-v4-1-flash-max', 'its model ids name their effort', true]
 	] as const)
-		it(`⛔ test 6 — ${tool} with JPWB_EXECUTOR_EFFORT=high → EXECUTOR_EFFORT_NOT_TAKEN, saying why`, () => {
+		it(`⛔ test 6 — ${tool}${testMode ? ', in test mode,' : ''} with JPWB_EXECUTOR_EFFORT=high → EXECUTOR_EFFORT_NOT_TAKEN, saying why`, () => {
 			// ⭑ RED FIRST: the selector read no effort, and answered the tool's selection.
-			const got = executing(tool, model, undefined, { JPWB_EXECUTOR_EFFORT: 'high' });
+			const got = (testMode ? executingInTestMode : executing)(tool, model, undefined, {
+				JPWB_EXECUTOR_EFFORT: 'high'
+			});
 			expect(shape(got)).toEqual({
 				kind: 'REFUSED',
 				code: 'EXECUTOR_EFFORT_NOT_TAKEN',
@@ -825,18 +878,26 @@ describe('⭐ `JAN-MHX` MH-3 (D31; the sponsor’s answers of 2026-10-18, S1) �
 			'JPWB_EXECUTOR_MODEL must still be set'
 		);
 		// ⭑ AND THE WIRED TOOLS ONLY, as every refusal lists them.
-		expect(got.kind === 'REFUSED' && got.guidance).toContain('executor adapter for: agy, pi, devin —');
+		expect(got.kind === 'REFUSED' && got.guidance).toContain('executor adapter for: agy, pi —');
 	});
 
 	it('⛔ S2 — devin’s guidance names BOTH devin models, and the one a devin executor runs beside the GLM reviewer', () => {
 		// ⭐ `JAN-MHX` MH-4 — asked with no model, since devin is wired (D30) and a model selects it: the refusal of the
-		// missing model carries the guidance, as agy's does above.
+		// missing model carries the guidance, as agy's does above. ⭐ MH-4, the check's fix — in test mode, where devin is
+		// wired; outside it devin's refusal, UNWIRED, carries the same guidance (below).
 		const got = selectExecutor({
-			testMode: false,
+			testMode: true,
 			env: { JPWB_EXECUTOR: 'devin' },
 			overrides: NO_OVERRIDES
 		});
 		expect(shape(got)).toEqual({ kind: 'REFUSED', code: 'EXECUTOR_MODEL_UNSET', toolId: 'devin' });
+		const unwired = selectExecutor({
+			testMode: false,
+			env: { JPWB_EXECUTOR: 'devin', JPWB_EXECUTOR_MODEL: 'deepseek-v4-1-flash-max' },
+			overrides: NO_OVERRIDES
+		});
+		expect(shape(unwired)).toEqual({ kind: 'REFUSED', code: 'EXECUTOR_TOOL_UNWIRED', toolId: 'devin' });
+		expect(unwired.kind === 'REFUSED' && unwired.guidance).toBe(got.kind === 'REFUSED' && got.guidance);
 		const guidance = got.kind === 'REFUSED' ? got.guidance : '';
 		expectGuidanceFor(guidance, 'devin');
 		expect(guidance).toContain(
@@ -867,10 +928,12 @@ describe('⭐ `JAN-MHX` MH-3 (D31; the sponsor’s answers of 2026-10-18, S1) �
 	});
 });
 
-describe('⭐ `JAN-MHX` MH-4 (D30; the sponsor’s S2) — devin is wired: S2’s model selects it beside the GLM reviewer, and GLM is still refused', () => {
+// ⭐ MH-4, the check's fix — the rule keys on the reviewer, not the mode (MH-3), so test 7 is asked in test mode, where
+// devin is wired (D30), beside the real reviewer: and outside test mode devin is refused UNWIRED, whatever its model.
+describe('⭐ `JAN-MHX` MH-4 (D30; the sponsor’s S2) — devin is wired in test mode only: there S2’s model selects it beside the GLM reviewer, and GLM is still refused', () => {
 	it('⛔ test 7 — devin on deepseek-v4-1-flash-max, beside devin reviewing on glm-5-3-flash-max → the CLI selection, naming devin', () => {
 		// ⭑ RED FIRST: devin was refused EXECUTOR_TOOL_UNWIRED, declared for EXECUTION with no executor adapter.
-		expect(executing('devin', 'deepseek-v4-1-flash-max', GLM_REVIEWER)).toEqual({
+		expect(executingInTestMode('devin', 'deepseek-v4-1-flash-max', GLM_REVIEWER)).toEqual({
 			kind: 'CLI',
 			toolId: 'devin',
 			modelId: 'deepseek-v4-1-flash-max'
@@ -879,15 +942,24 @@ describe('⭐ `JAN-MHX` MH-4 (D30; the sponsor’s S2) — devin is wired: S2’
 
 	it('⛔ test 7 — devin on the reviewer’s own model, or on another effort of it, is still refused EXECUTOR_MODEL_IS_THE_REVIEWERS', () => {
 		for (const model of ['glm-5-3-flash-max', 'glm-5-3-flash-high'])
-			expect(shape(executing('devin', model, GLM_REVIEWER)), model).toEqual({
+			expect(shape(executingInTestMode('devin', model, GLM_REVIEWER)), model).toEqual({
 				kind: 'REFUSED',
 				code: 'EXECUTOR_MODEL_IS_THE_REVIEWERS',
 				toolId: 'devin'
 			});
 	});
 
+	it('⛔ MH-4, the check’s fix — outside test mode, beside the same reviewer, devin on S2’s model is refused EXECUTOR_TOOL_UNWIRED', () => {
+		// ⭑ RED FIRST: MH-4 answered the CLI selection here, so a server would pay for a devin turn that fails.
+		expect(shape(executing('devin', 'deepseek-v4-1-flash-max', GLM_REVIEWER))).toEqual({
+			kind: 'REFUSED',
+			code: 'EXECUTOR_TOOL_UNWIRED',
+			toolId: 'devin'
+		});
+	});
+
 	it('⭑ the record names devin as the provider of a devin executor’s work (D35)', () => {
-		const selected = executing('devin', 'deepseek-v4-1-flash-max', GLM_REVIEWER);
+		const selected = executingInTestMode('devin', 'deepseek-v4-1-flash-max', GLM_REVIEWER);
 		if (selected.kind !== 'CLI') throw new Error('arrangement: devin on S2’s model is selected');
 		expect(executorRecordIdentity(selected)).toEqual({ modelId: 'deepseek-v4-1-flash-max', providerId: 'devin' });
 	});

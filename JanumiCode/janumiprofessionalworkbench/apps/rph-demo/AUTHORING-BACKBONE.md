@@ -124,7 +124,8 @@ The following fixes address concrete failures observed during a large natural-la
     executor alike: outside it, an override for the SELECTED reviewer tool refuses the review, and `JPWB_AGY_BIN` set
     while agy is the executor refuses the model step before dispatch.
   - **The executor is selected the way the reviewer is** (`execution/executor-selection.ts`, `JAN-SELRES` `RS-1`).
-    Outside test mode an unset or unknown tool, devin (no executor adapter), a missing `JPWB_EXECUTOR_MODEL` and a
+    Outside test mode an unset or unknown tool, devin (its executor adapter is wired in test mode only, `JAN-MHX`
+    MH-4), a missing `JPWB_EXECUTOR_MODEL` and a
     replaced agy program are refused before anything is dispatched. One selection opens the executor and names the
     record, so the model agy is asked to run is the model recorded (`REG-F-458`, `REG-F-459` closed).
   - **The gate never inherits this configuration.** Its tests and its e2e server start with the live-backend

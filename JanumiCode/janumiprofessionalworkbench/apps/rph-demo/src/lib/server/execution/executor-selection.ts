@@ -95,7 +95,8 @@ export type ExecutorSelection =
 	| { readonly kind: 'REPLAY'; readonly recordingDir: string }
 	// ⭐ `JAN-MHX` MH-1 (D30) — an external CLI executing through the host's own tools (`tools/cli-executor-session.ts`), with
 	// the driver its tool names. ~~⚠ Nothing selects it yet~~: a tool joins `WIRED_EXECUTORS` with its driver's package —
-	// ⭐ `JAN-MHX` MH-4: devin's has (D30).
+	// ~~⭐ `JAN-MHX` MH-4: devin's has (D30).~~ ⭐ `JAN-MHX` MH-4, the check's fix: devin's joined
+	// `WIRED_IN_TEST_MODE_ONLY`, so only test mode selects it yet (D30).
 	| {
 			readonly kind: 'CLI';
 			readonly toolId: string;
@@ -117,28 +118,78 @@ export type RunnableExecutorSelection = Exclude<ExecutorSelection, { readonly ki
  * ⭑ THE EXECUTOR ADAPTERS THIS HOST HAS, AND WHAT EACH SELECTION OPENS — the table the selector dispatches on, and the
  * one its guidance lists. ~~`devin` declares EXECUTION in the catalog (`backing-tool.ts`) but has no executor adapter, so
  * it is not here~~: the catalog says what a tool CAN do, this says what this host WIRED.
- * ⭐ `JAN-MHX` MH-4 (D30) — AND devin, WIRED TO THE `CLI` KIND, with its driver (`tools/devin-executor-driver.ts`), which
- * the CLI executor session opens: a selection of it names its tool.
+ * ~~⭐ `JAN-MHX` MH-4 (D30) — AND devin, WIRED TO THE `CLI` KIND, with its driver (`tools/devin-executor-driver.ts`), which
+ * the CLI executor session opens: a selection of it names its tool.~~ ⭐ `JAN-MHX` MH-4, the check's fix — devin is not
+ * here: it is wired in test mode only (`WIRED_IN_TEST_MODE_ONLY`, below).
  */
-const WIRED_EXECUTORS = { agy: 'AGY', pi: 'PI', devin: 'CLI' } as const;
+const WIRED_EXECUTORS = { agy: 'AGY', pi: 'PI' } as const;
 
-type WiredExecutor = keyof typeof WIRED_EXECUTORS;
+/**
+ * ⭐⭐ `JAN-MHX` MH-4, the check's fix (D30) — THE EXECUTOR ADAPTERS WIRED IN TEST MODE ONLY: built, and driven by the tests'
+ * stand-ins, with no live turn of theirs yet passed. "Wired" means a host adapter exists AND WAS DRIVEN, and MH-0a drove
+ * devin: in both of its calls devin 3000.11.92 offered its model tools of its own that the driver's configuration does not
+ * remove (`ask_user_question`, `find_file_by_name`, `mcp_read_resource`, `skill`; MH-0a's F2), and the CLI executor
+ * session fails such a turn `CLI_OWN_TOOL_RAN` and marks the workspace tainted, which nothing in this host clears yet. So
+ * outside test mode a devin selection would spend an operator's devin call and leave its Undertaking refusing Begin &
+ * Execute and re-run (`WORKSPACE_TAINTED`). Its tool joins `WIRED_EXECUTORS` once a live devin turn is confirmed (MH-9).
+ * ⚠ The guidance and the unknown tool's reason list `WIRED_EXECUTORS` alone: they are the operator's, and an operator's
+ * server, outside test mode, refuses these.
+ */
+const WIRED_IN_TEST_MODE_ONLY = { devin: 'CLI' } as const;
 
-/** Whether this host has an executor adapter for `toolId` — read off the table, so the check and the guidance agree. */
-const isWiredExecutor = (toolId: string): toolId is WiredExecutor =>
-	Object.hasOwn(WIRED_EXECUTORS, toolId);
+type WiredExecutor = keyof typeof WIRED_EXECUTORS | keyof typeof WIRED_IN_TEST_MODE_ONLY;
+
+/**
+ * Whether this host has an executor adapter wired for `toolId` in the mode it runs in — read off the two tables, so the
+ * check and the guidance agree.
+ */
+const isWiredExecutor = (toolId: string, testMode: boolean): toolId is WiredExecutor =>
+	Object.hasOwn(WIRED_EXECUTORS, toolId) ||
+	(testMode && Object.hasOwn(WIRED_IN_TEST_MODE_ONLY, toolId));
+
+/** What each wired tool's selection opens, in whichever mode it is wired. */
+const OPENS: Readonly<Record<WiredExecutor, 'AGY' | 'PI' | 'CLI'>> = {
+	...WIRED_EXECUTORS,
+	...WIRED_IN_TEST_MODE_ONLY
+};
 
 /** The wired executor tools as every refusal lists them — read off the table, once, for the guidance and the reason. */
 const WIRED_TOOL_LIST = Object.keys(WIRED_EXECUTORS).join(', ');
 
+/** ⭐ `JAN-MHX` MH-4, the check's fix — why each tool wired in test mode only is not wired outside it, for its refusal. */
+const NOT_WIRED_OUTSIDE_TEST_MODE_BECAUSE: Readonly<
+	Record<keyof typeof WIRED_IN_TEST_MODE_ONLY, string>
+> = {
+	devin:
+		'devin 3000.11.92 offered its model tools of its own that the adapter’s configuration does not remove, in both ' +
+		'probe calls that recorded its offer, and this host fails such a turn CLI_OWN_TOOL_RAN and marks the workspace ' +
+		'tainted, after which Begin & Execute and a re-run refuse the Undertaking (WORKSPACE_TAINTED) and nothing in this ' +
+		'host clears the mark. It is wired outside test mode once a live devin turn is confirmed (MH-9).'
+};
+
+/**
+ * The refusal's reason for a tool wired in test mode only, outside it, or `undefined` for any other tool: the adapter
+ * exists, so the reason says so, and why it does not run here.
+ */
+function testModeOnlyReason(toolId: string): string | undefined {
+	if (!Object.hasOwn(WIRED_IN_TEST_MODE_ONLY, toolId)) return undefined;
+	const because =
+		NOT_WIRED_OUTSIDE_TEST_MODE_BECAUSE[toolId as keyof typeof WIRED_IN_TEST_MODE_ONLY];
+	return (
+		`The executing tool '${toolId}' (JPWB_EXECUTOR) declares the EXECUTION role, but its executor adapter is wired in ` +
+		`test mode only (JAN-MHX D30): ${because}`
+	);
+}
+
 /**
  * ⛔ THE CATALOG'S REFUSAL, WITH ITS LIST REPLACED BY THE WIRED ONE (`REG-F-460`'s general form). `selectBackingTool`
  * answers for every role, so its refusal of an unknown tool says "This host can drive: agy, pi, devin" — true of the
- * catalog, and for the executor it offered `devin`, which the next refusal (UNWIRED) forbade until devin was wired: the
+ * catalog, and for the executor it offered `devin`, which the next refusal (UNWIRED) forbade ~~until devin was wired~~ ⭐
+ * and, outside test mode, still forbids (`JAN-MHX` MH-4, the check's fix: devin is wired in test mode only, D30): the
  * steer D1 removed from the guidance, back in the reason printed beside it (`JAN-SELRES` RS-1's verification). The
  * catalog's verdict and its `REG-D-052` sentence are kept as the catalog words them; only the list becomes the
- * executor's. ⭐ `JAN-MHX` MH-4 — devin is wired now (D30), so the two lists hold the same tools; the sentence is still
- * replaced, so the day the catalog declares a tool nobody wired, the reason does not offer it.
+ * executor's. ~~⭐ `JAN-MHX` MH-4 — devin is wired now (D30), so the two lists hold the same tools; the sentence is still
+ * replaced, so the day the catalog declares a tool nobody wired, the reason does not offer it.~~
  * ⚠ KEYED ON THE CATALOG'S OWN SENTENCE, built from the list it is built from: were its wording to change, the list
  * would silently stay the catalog's — which `executor-selection.test.ts` reddens on, because the reason may not say
  * "This host can drive:".
@@ -151,9 +202,10 @@ const withTheWiredList = (catalogRefusal: string): string =>
 /**
  * ⛔ D3 — THE VARIABLE THAT REPLACES EACH TOOL'S PROGRAM, for every EXECUTION tool whose adapter captures one. Keyed by
  * TOOL, not by wiring: `devin` was listed while it was unwired, so the day a devin executor was wired it inherited the
- * refusal rather than waiting for someone to remember it — ⭐ `JAN-MHX` MH-4 (D30), the day it was. Pi has none — it
- * runs in-process, through its SDK — and what redirects it instead (`PI_CODING_AGENT_DIR`) is disclosed, not refused
- * (design D3).
+ * refusal rather than waiting for someone to remember it — ~~⭐ `JAN-MHX` MH-4 (D30), the day it was~~ ⭐ `JAN-MHX` MH-4,
+ * the check's fix: devin is wired in test mode only, where an override is honoured, so the day it is wired outside test
+ * mode (D30). Pi has none — it runs in-process, through its SDK — and what redirects it instead (`PI_CODING_AGENT_DIR`)
+ * is disclosed, not refused (design D3).
  */
 const PROGRAM_VARIABLE: Readonly<
 	Record<string, { readonly variable: string; readonly captured: keyof ExecutorProgramOverrides }>
@@ -170,7 +222,9 @@ const PROGRAM_VARIABLE: Readonly<
  *
  * ⛔ THE WIRED TOOLS, NEVER THE CATALOG. `executorToolId()`'s refusal listed `agy, pi, devin` — the catalog — and so
  * steered an operator to `devin`, which the next refusal forbids. The list is derived from `WIRED_EXECUTORS`, the table
- * the selector dispatches on, so the two cannot disagree.
+ * the selector dispatches on, so the two cannot disagree. ⚠ `JAN-MHX` MH-4, the check's fix — a tool wired in test mode
+ * only (`WIRED_IN_TEST_MODE_ONLY`, devin) is selected there and not listed here, in either mode: this text is the
+ * operator's, and an operator's server refuses it.
  *
  * ⚠ GUIDANCE, NEVER A FALLBACK. No code path reads the reviewer's model named here as a value (`REG-D-052`).
  */
@@ -531,8 +585,9 @@ function replaySelection(
  *   1. `EXECUTOR_TOOL_UNSET` — `JPWB_EXECUTOR` absent, `''` or whitespace OUTSIDE test mode. In test mode: the STAND-IN.
  *   2. `EXECUTOR_TOOL_UNKNOWN` — `selectBackingTool(tool, 'EXECUTION')` refuses it: a tool the catalog does not know
  *      (matched exactly, after the trim), or one that does not declare EXECUTION.
- *   3. `EXECUTOR_TOOL_UNWIRED` — a catalogued EXECUTION tool with no executor adapter (~~`devin` today~~ ⭐ none today:
- *      `JAN-MHX` MH-4 wired devin, the last, D30).
+ *   3. `EXECUTOR_TOOL_UNWIRED` — a catalogued EXECUTION tool with no executor adapter (~~`devin` today~~ ~~⭐ none today:
+ *      `JAN-MHX` MH-4 wired devin, the last, D30~~) ⭐ wired for the mode the host runs in: outside test mode, `devin`,
+ *      whose adapter is wired in test mode only, with a reason that says so (`JAN-MHX` MH-4, the check's fix; D30).
  *   4. `EXECUTOR_PROGRAM_OVERRIDDEN` — outside test mode, the SELECTED tool's captured program override, even `''`,
  *      before its model is asked about: the program is refused whatever model it would run.
  *   5. `EXECUTOR_MODEL_UNSET` — `JPWB_EXECUTOR_MODEL` absent, `''` or whitespace, for every wired tool alike. It never falls
@@ -597,12 +652,13 @@ export function selectExecutor(input: {
 			`The executing tool '${toolId}' (JPWB_EXECUTOR) is refused: ${withTheWiredList(catalogRefusal)}`
 		);
 	}
-	if (!isWiredExecutor(toolId))
+	if (!isWiredExecutor(toolId, input.testMode))
 		return refused(
 			'EXECUTOR_TOOL_UNWIRED',
 			toolId,
-			`The executing tool '${toolId}' (JPWB_EXECUTOR) declares the EXECUTION role, but no executor adapter is ` +
-				'wired for it on this host.'
+			testModeOnlyReason(toolId) ??
+				`The executing tool '${toolId}' (JPWB_EXECUTOR) declares the EXECUTION role, but no executor adapter is ` +
+					'wired for it on this host.'
 		);
 	const overridden = selectedProgramOverridden(toolId, input.testMode, overrides);
 	if (overridden) return overridden;
@@ -626,7 +682,7 @@ export function selectExecutor(input: {
 	const dependent =
 		input.reviewer === undefined ? undefined : independenceRefusal(toolId, modelId, input.reviewer);
 	if (dependent) return dependent;
-	const kind = WIRED_EXECUTORS[toolId];
+	const kind = OPENS[toolId];
 	// ⭐ `JAN-MHX` MH-4 (D30) — a CLI selection names its tool, which finds its driver (`tools/cli-executor-drivers.ts`).
 	return kind === 'CLI' ? { kind, toolId, modelId } : { kind, modelId };
 }

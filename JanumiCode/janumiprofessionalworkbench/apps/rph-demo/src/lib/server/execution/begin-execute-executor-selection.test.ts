@@ -8,8 +8,9 @@
 // both sides both calls ran one model while the record showed two (`REG-F-458`).
 //
 // ⭑ WHAT MUST HOLD (§4.3, §4.4).
-//   · Every refusal code reachable here — UNSET, UNKNOWN, ~~UNWIRED~~ (⭐ `JAN-MHX` MH-4 wired devin, the last catalogued
-//     tool without an executor adapter, so no route input reaches it; `executor-selection-unwired.test.ts` holds it),
+//   · Every refusal code reachable here — UNSET, UNKNOWN, UNWIRED (~~⭐ `JAN-MHX` MH-4 wired devin, the last catalogued
+//     tool without an executor adapter, so no route input reaches it; `executor-selection-unwired.test.ts` holds it~~ ⭐
+//     MH-4, the check's fix: devin is wired in test mode only, D30, so this server mode reaches it again, for devin),
 //     MODEL_UNSET, ⭐ and `JAN-MHX` MH-3's MODEL_IS_THE_REVIEWERS,
 //     MODEL_UNCLASSIFIED and EFFORT_NOT_TAKEN — refuses in SERVER mode with the reviewer ADMITTED (devin with a model, no
 //     captured `JPWB_DEVIN_BIN`), so the only refusal is the executor's: the guidance is returned, nothing is dispatched,
@@ -49,7 +50,7 @@ vi.mock('./model.js', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('./model.js')>();
 	return {
 		...actual,
-		// ⭑ THE ROUTE'S OWN SELECTION IS OPENED — only the two runnable seams are replaced, never the choice.
+		// ⭑ THE ROUTE'S OWN SELECTION IS OPENED — only the ~~two~~ runnable seams are replaced, never the choice.
 		getExecutionSession: vi.fn((selection: Parameters<typeof actual.getExecutionSession>[0]) =>
 			actual.getExecutionSession(selection, {
 				agyExec: async (file, args) => {
@@ -62,6 +63,11 @@ vi.mock('./model.js', async (importOriginal) => {
 				openPi: async (_context, modelId) => {
 					seam.pi.push(modelId);
 					throw new Error('hermetic: no route test opens a real Pi session');
+				},
+				// ⭐ `JAN-MHX` MH-4, the check's fix — and the CLI executor's opener, which would start the tool's own program:
+				// no route test opens a real devin.
+				openCli: async () => {
+					throw new Error('hermetic: no route test opens a real CLI executor');
 				}
 			})
 		)
@@ -155,8 +161,15 @@ describe('⭐ D4 — beginExecute asks the executor selector before it dispatche
 			env: { JPWB_EXECUTOR: 'nosuchtool', JPWB_EXECUTOR_MODEL: 'fixture-executor-model' },
 			says: "Unknown backing tool 'nosuchtool'"
 		},
-		// ~~EXECUTOR_TOOL_UNWIRED: devin, declared for EXECUTION with no executor adapter~~ ⭐ `JAN-MHX` MH-4 — STRUCK: devin is
-		// wired (D30). Its row is now the reviewer's own model, refused for a devin executor as it is for agy's, below.
+		// ~~EXECUTOR_TOOL_UNWIRED: devin, declared for EXECUTION with no executor adapter~~ ~~⭐ `JAN-MHX` MH-4 — STRUCK: devin
+		// is wired (D30). Its row is now the reviewer's own model, refused for a devin executor as it is for agy's, below.~~
+		// ⭐ MH-4, the check's fix — RESTORED: devin is wired in test mode only (D30), so this server refuses it, on S2's model
+		// too, before anything is dispatched. ⭑ RED FIRST: MH-4 wired it in every mode, and the step was dispatched.
+		{
+			name: 'EXECUTOR_TOOL_UNWIRED (devin, wired in test mode only)',
+			env: { JPWB_EXECUTOR: 'devin', JPWB_EXECUTOR_MODEL: 'deepseek-v4-1-flash-max' },
+			says: "The executing tool 'devin' (JPWB_EXECUTOR) declares the EXECUTION role, but its executor adapter is wired in test mode only"
+		},
 		{
 			name: 'EXECUTOR_MODEL_UNSET (agy)',
 			env: { JPWB_EXECUTOR: 'agy' },
@@ -174,11 +187,9 @@ describe('⭐ D4 — beginExecute asks the executor selector before it dispatche
 			env: { JPWB_EXECUTOR: 'agy', JPWB_EXECUTOR_MODEL: 'fixture-assurance-model' },
 			says: "The executing tool 'agy' would run fixture-assurance-model, the model the reviewer (devin) runs"
 		},
-		{
-			name: 'EXECUTOR_MODEL_IS_THE_REVIEWERS (devin)',
-			env: { JPWB_EXECUTOR: 'devin', JPWB_EXECUTOR_MODEL: 'fixture-assurance-model' },
-			says: "The executing tool 'devin' would run fixture-assurance-model, the model the reviewer (devin) runs"
-		},
+		// ~~EXECUTOR_MODEL_IS_THE_REVIEWERS (devin): devin on fixture-assurance-model, the reviewer's own~~ ⭐ MH-4, the check's
+		// fix — STRUCK: in server mode devin is refused UNWIRED (above) before its model is asked about; beside a real reviewer
+		// in test mode, where it is wired, `executor-selection.test.ts`'s test 7 refuses the reviewer's model for it.
 		{
 			name: 'EXECUTOR_MODEL_UNCLASSIFIED',
 			env: { JPWB_EXECUTOR: 'agy', JPWB_EXECUTOR_MODEL: 'gemini-4-argon-high' },

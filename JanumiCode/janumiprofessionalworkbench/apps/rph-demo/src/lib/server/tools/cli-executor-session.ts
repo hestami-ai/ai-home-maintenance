@@ -956,6 +956,7 @@ export async function openCliExecutionSession(
 	let server: HostToolServer | undefined;
 	let run: CliRunFolder;
 	let runFiles: readonly CliRunFile[];
+	let bridgeFile: CliRunFile;
 	let fingerprints: readonly (readonly [string, string, string])[];
 	try {
 		const cliDirectory = join(directory, 'cli');
@@ -980,11 +981,18 @@ export async function openCliExecutionSession(
 		// ⛔ D41 — THE ENDPOINT FILE IS IN `host/`, OUTSIDE THE CLI'S WORKING FOLDER. Until a turn opens it holds no token.
 		const endpointPath = join(hostDirectory, 'endpoint.json');
 		writeFileSync(endpointPath, JSON.stringify({ url: server.url, token: null }), 'utf8');
+		const bridgePath = await writeBridge(hostDirectory);
+		// ⭐ `JAN-MHX` MH-4, the check's fix (D44a) — THE BRIDGE'S BYTES, READ BACK AS WRITTEN: the CLI's MCP entry runs this
+		// file at every turn, so it is held to them as the driver's own files are.
+		bridgeFile = {
+			path: relative(directory, bridgePath).replaceAll('\\', '/'),
+			bytes: readFileSync(bridgePath, 'utf8')
+		};
 		run = {
 			directory,
 			cliDirectory,
 			hostDirectory,
-			bridgePath: await writeBridge(hostDirectory),
+			bridgePath,
 			endpointPath,
 			nodePath: process.execPath,
 			serverName: HOST_TOOL_SERVER_NAME,
@@ -1011,7 +1019,7 @@ export async function openCliExecutionSession(
 	}
 	const openServer = server;
 	const runFolder = run;
-	const declaredRunFiles = runFiles;
+	const writtenRunFiles: readonly CliRunFile[] = [...runFiles, bridgeFile];
 	const sources = fingerprints;
 
 	/** Every turn's text, as `run-model-step` sent it, and each try's answer, if one arrived (D16). */
@@ -1032,8 +1040,10 @@ export async function openCliExecutionSession(
 		// ⭐ `JAN-MHX` MH-4 — AND THE RUN FOLDER'S OWN FILES, which the CLI reads its configuration from at every turn: each must
 		// still be the bytes the opener wrote. devin rewrote its own `--config` file in its first-run setup (MH-0a's F1), and a
 		// command the model runs can rewrite any of them; the preflight checked them once, at the open. ⭑ Named by its place
-		// in the run folder, never by its path.
-		const rewritten = declaredRunFiles
+		// in the run folder, never by its path. ⭐ MH-4, the check's fix — "every file" was more than this held: it holds the
+		// driver's declared files and the bridge, which the CLI's MCP entry runs. The endpoint file and the prompt files are
+		// the opener's to rewrite at each turn, and are not compared.
+		const rewritten = writtenRunFiles
 			.filter((file) => contentOf(resolve(runFolder.directory, file.path)) !== file.bytes)
 			.map((file) => `the run folder’s ${file.path}`);
 		const appeared = ancestorConfiguration(root, home, existsSync);

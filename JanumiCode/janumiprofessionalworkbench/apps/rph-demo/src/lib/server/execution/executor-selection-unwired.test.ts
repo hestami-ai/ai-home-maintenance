@@ -2,10 +2,12 @@
 // THAT DECLARES A TOOL NOBODY WIRED.
 //
 // ⭑ WHY A FILE OF ITS OWN. MH-4 wired devin, the last catalogued EXECUTION tool without an executor adapter, so over the
-// real catalog no input reaches `EXECUTOR_TOOL_UNWIRED`, and the list of wired tools the guidance and the unknown tool's
-// reason offer holds the same three tools as the catalog's. Both guards stay for the day the catalog declares a tool
-// before its driver lands — and a guard no input reaches is one no test could fail. So this file loads the selector
-// against the real catalog with one more EXECUTION tool, `fixture-unwired`, for which no executor adapter is wired.
+// real catalog no input reaches `EXECUTOR_TOOL_UNWIRED`~~, and the list of wired tools the guidance and the unknown tool's
+// reason offer holds the same three tools as the catalog's~~ ⭐ in test mode (MH-4, the check's fix: devin is wired in
+// test mode only, D30, so outside it devin's rows reach the limb, in `executor-selection.test.ts`, and the guidance lists
+// agy and Pi). Both guards stay for the day the catalog declares a tool before its driver lands — and a guard no input
+// reaches is one no test could fail. So this file loads the selector against the real catalog with one more EXECUTION
+// tool, `fixture-unwired`, for which no executor adapter is wired in any mode.
 import { describe, expect, it, vi } from 'vitest';
 import { EXECUTOR_GUIDANCE, selectExecutor, type ExecutorProgramOverrides } from './executor-selection.js';
 import { selectBackingTool } from '../tools/backing-tool.js';
@@ -36,10 +38,15 @@ describe('⭐ MH-4 — over a catalog that declares a tool nobody wired', () => 
 		// ⚠ WITHOUT THIS a catalog the mock failed to extend would send fixture-unwired to the UNKNOWN limb, and the case
 		// below would be testing that limb while its name said otherwise.
 		expect(selectBackingTool('fixture-unwired', 'EXECUTION').toolId).toBe('fixture-unwired');
-		for (const tool of ['agy', 'pi', 'devin'])
+		// ⭐ MH-4, the check's fix — devin in test mode, the one mode it is wired in (D30).
+		for (const [tool, testMode] of [
+			['agy', false],
+			['pi', false],
+			['devin', true]
+		] as const)
 			expect(
 				selectExecutor({
-					testMode: false,
+					testMode,
 					env: { JPWB_EXECUTOR: tool, JPWB_EXECUTOR_MODEL: 'fixture-executor' },
 					overrides: NO_OVERRIDES
 				}).kind,
@@ -62,10 +69,11 @@ describe('⭐ MH-4 — over a catalog that declares a tool nobody wired', () => 
 			);
 		});
 
-	it('⛔ the guidance offers the wired tools — agy, pi, devin — and never the catalog’s tool nobody wired', () => {
+	it('⛔ the guidance offers the wired tools — agy, pi — and never the catalog’s tool nobody wired', () => {
 		// ⛔ THE MUTANT: the guidance lists the catalog. An operator following it to fixture-unwired would be refused again,
-		// as UNWIRED (`REG-F-460`'s general form).
-		expect(EXECUTOR_GUIDANCE).toContain('executor adapter for: agy, pi, devin —');
+		// as UNWIRED (`REG-F-460`'s general form). ⭐ MH-4, the check's fix — ~~agy, pi, devin~~ agy and Pi: devin is wired in
+		// test mode only (D30), and the guidance is the operator's.
+		expect(EXECUTOR_GUIDANCE).toContain('executor adapter for: agy, pi —');
 		expect(EXECUTOR_GUIDANCE).not.toContain('fixture-unwired');
 	});
 
@@ -78,7 +86,7 @@ describe('⭐ MH-4 — over a catalog that declares a tool nobody wired', () => 
 		});
 		const reason = got.kind === 'REFUSED' ? got.reason : '';
 		expect(reason).toMatch(/Unknown backing tool 'nosuchtool'\./);
-		expect(reason).toContain('This host has an executor adapter for: agy, pi, devin.');
+		expect(reason).toContain('This host has an executor adapter for: agy, pi.');
 		expect(reason).not.toContain('fixture-unwired');
 	});
 });

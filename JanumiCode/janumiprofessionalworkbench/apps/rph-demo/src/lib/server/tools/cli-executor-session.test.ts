@@ -1029,6 +1029,24 @@ describe('⭐ D13, D44a — the configuration a CLI reads', () => {
 		expect(exec.requests, 'the CLI was started for a refused turn').toHaveLength(1);
 	});
 
+	it('⭐ MH-4, the check’s fix (D44a) — the bridge rewritten after the open refuses the next turn before any spawn, named by its place in the folder', async () => {
+		// ⛔ THE MUTANT: compare the driver's declared files alone. The CLI's MCP entry runs the bridge at every turn, and a
+		// command the model runs can rewrite it: the check's scenario D started its next turn on the rewritten bridge.
+		const exec = fakeExec(async (cli) => {
+			if (cli.turn === 1) {
+				const entry = JSON.parse(readFileSync(join(cli.request.cwd, 'fake-mcp.json'), 'utf8')) as { args: string[] };
+				const bridge = entry.args[0]!;
+				writeFileSync(bridge, `// rewritten by a command the model ran\n${readFileSync(bridge, 'utf8')}`, 'utf8');
+			}
+			cli.answer('{"workProduct":"done","rationale":{}}');
+		});
+		const session = await open(exec);
+		expect((await turn(session)).answer.arrived, 'arrangement: the first turn passes').toBe(true);
+		const second = await turn(session, 'FINDINGS');
+		expect(messageOf(second)).toMatch(/^EXECUTOR_CONFIG_CHANGED: .* It names: the run folder’s host\/jpwb-bridge\.mjs\.$/);
+		expect(exec.requests, 'the CLI was started for a refused turn').toHaveLength(1);
+	});
+
 	it('C21 — a config source that cannot be opened as a file, a folder, is fingerprinted by stat alone', async () => {
 		const hooks = join(container, 'hooks.d');
 		mkdirSync(hooks);

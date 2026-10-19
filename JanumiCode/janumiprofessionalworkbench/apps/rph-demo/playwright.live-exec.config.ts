@@ -18,8 +18,10 @@ import { liveExecStore, liveExecTestMatch } from './e2e-live-exec/run-folder';
 // (`src/lib/server/assurance/reviewer-selection.ts`): an unset or unknown tool, a missing model or a program override
 // (`JPWB_AGY_BIN`, `JPWB_DEVIN_BIN`) is refused, and a model step is refused before its executor opens.
 // ⭐ `JAN-SELRES` RS-1 (D1, D3, D4) — AND SO IS ITS EXECUTOR (`src/lib/server/execution/executor-selection.ts`): an unset
-// or unknown `JPWB_EXECUTOR`, an unwired one (`devin`), an agy executor whose program `JPWB_AGY_BIN` replaces, or an
-// unset `JPWB_EXECUTOR_MODEL` refuses the model step before anything is dispatched. ⚠ WHAT STILL REFUSES AFTER DISPATCH,
+// or unknown `JPWB_EXECUTOR`, an unwired one (`devin` — ⭐ `JAN-MHX` MH-4 gave it an executor adapter, wired in test mode
+// only until a live devin turn is confirmed, D30, so outside test mode, where this lane runs, it is still refused as
+// unwired), an agy executor whose program `JPWB_AGY_BIN` replaces, or an unset `JPWB_EXECUTOR_MODEL` refuses the model
+// step before anything is dispatched. ⚠ WHAT STILL REFUSES AFTER DISPATCH,
 // as before: a Pi model Pi cannot resolve (only Pi's SDK can say), a refused sandbox and a refused context policy are
 // found when the executor opens, and recorded as a started-then-failed step. `e2e-live-exec/lane-config.ts` restates the
 // executor rules and refuses them at boot, with one rule of the lane's own: no agy executor.
