@@ -8,7 +8,9 @@
 // both sides both calls ran one model while the record showed two (`REG-F-458`).
 //
 // ⭑ WHAT MUST HOLD (§4.3, §4.4).
-//   · Every refusal code reachable here — UNSET, UNKNOWN, UNWIRED, MODEL_UNSET, ⭐ and `JAN-MHX` MH-3's MODEL_IS_THE_REVIEWERS,
+//   · Every refusal code reachable here — UNSET, UNKNOWN, ~~UNWIRED~~ (⭐ `JAN-MHX` MH-4 wired devin, the last catalogued
+//     tool without an executor adapter, so no route input reaches it; `executor-selection-unwired.test.ts` holds it),
+//     MODEL_UNSET, ⭐ and `JAN-MHX` MH-3's MODEL_IS_THE_REVIEWERS,
 //     MODEL_UNCLASSIFIED and EFFORT_NOT_TAKEN — refuses in SERVER mode with the reviewer ADMITTED (devin with a model, no
 //     captured `JPWB_DEVIN_BIN`), so the only refusal is the executor's: the guidance is returned, nothing is dispatched,
 //     and the executor is never opened. PROGRAM_OVERRIDDEN needs agy-cli to have CAPTURED `JPWB_AGY_BIN` at load, so it
@@ -153,11 +155,8 @@ describe('⭐ D4 — beginExecute asks the executor selector before it dispatche
 			env: { JPWB_EXECUTOR: 'nosuchtool', JPWB_EXECUTOR_MODEL: 'fixture-executor-model' },
 			says: "Unknown backing tool 'nosuchtool'"
 		},
-		{
-			name: 'EXECUTOR_TOOL_UNWIRED',
-			env: { JPWB_EXECUTOR: 'devin', JPWB_EXECUTOR_MODEL: 'fixture-executor-model' },
-			says: "The executing tool 'devin' (JPWB_EXECUTOR) declares the EXECUTION role, but no executor adapter"
-		},
+		// ~~EXECUTOR_TOOL_UNWIRED: devin, declared for EXECUTION with no executor adapter~~ ⭐ `JAN-MHX` MH-4 — STRUCK: devin is
+		// wired (D30). Its row is now the reviewer's own model, refused for a devin executor as it is for agy's, below.
 		{
 			name: 'EXECUTOR_MODEL_UNSET (agy)',
 			env: { JPWB_EXECUTOR: 'agy' },
@@ -174,6 +173,11 @@ describe('⭐ D4 — beginExecute asks the executor selector before it dispatche
 			name: 'EXECUTOR_MODEL_IS_THE_REVIEWERS',
 			env: { JPWB_EXECUTOR: 'agy', JPWB_EXECUTOR_MODEL: 'fixture-assurance-model' },
 			says: "The executing tool 'agy' would run fixture-assurance-model, the model the reviewer (devin) runs"
+		},
+		{
+			name: 'EXECUTOR_MODEL_IS_THE_REVIEWERS (devin)',
+			env: { JPWB_EXECUTOR: 'devin', JPWB_EXECUTOR_MODEL: 'fixture-assurance-model' },
+			says: "The executing tool 'devin' would run fixture-assurance-model, the model the reviewer (devin) runs"
 		},
 		{
 			name: 'EXECUTOR_MODEL_UNCLASSIFIED',

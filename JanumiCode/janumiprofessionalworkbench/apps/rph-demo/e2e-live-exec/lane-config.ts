@@ -66,9 +66,10 @@ export function reviewerModelVariable(tool: string | undefined): ReviewerModelVa
 
 /**
  * ⭐ `JAN-SELRES` RS-1 (D5) — the executing tools this host has an executor adapter for (`executor-selection.ts`,
- * `WIRED_EXECUTORS`). ⚠ `devin` declares EXECUTION in the catalog and has no executor adapter, so the product refuses it.
+ * `WIRED_EXECUTORS`). ~~⚠ `devin` declares EXECUTION in the catalog and has no executor adapter, so the product refuses
+ * it.~~ ⭐ `JAN-MHX` MH-4 — devin's executor is wired (D30), in the product's table's order.
  */
-export const WIRED_EXECUTORS = ['agy', 'pi'] as const;
+export const WIRED_EXECUTORS = ['agy', 'pi', 'devin'] as const;
 
 export type WiredExecutor = (typeof WIRED_EXECUTORS)[number];
 
@@ -85,9 +86,12 @@ export function wiredExecutor(tool: string | undefined): WiredExecutor | undefin
  * The variable that replaces each wired executor's program — agy's, the same variable the agy reviewer reads, because
  * it is the same adapter's one capture (`agy-cli.ts`, `AGY_BIN_OVERRIDE`). Pi has none: it runs in-process. ⛔ Outside
  * test mode the product refuses the SELECTED executor's override whenever it is set, even to `''` (`REG-F-459`).
+ * ⭐ `JAN-MHX` MH-4 — and devin's, for the same reason: its executor driver runs the program `devin-reviewer.ts` captured
+ * (`DEVIN_BIN_OVERRIDE`).
  */
 export const EXECUTOR_PROGRAM_VARIABLE: Readonly<Partial<Record<WiredExecutor, string>>> = {
-	agy: REVIEWER_PROGRAM_VARIABLE.agy
+	agy: REVIEWER_PROGRAM_VARIABLE.agy,
+	devin: REVIEWER_PROGRAM_VARIABLE.devin
 };
 
 /**
@@ -280,7 +284,7 @@ export function laneKeysRefusal(
 		...halfLaneFaults,
 		'The keys:',
 		'  JPWB_EXECUTOR / JPWB_EXECUTOR_MODEL — the tool and model that PRODUCE the work product: pi, with a model Pi ' +
-			'resolves (this lane refuses agy; devin has no executor adapter), and no program override for it',
+			'resolves, or devin, with a model devin runs (this lane refuses agy), and no program override for it',
 		'  JPWB_ASSURANCE_TOOL — the tool that REVIEWS it, with the model that tool reads:',
 		'    devin — JPWB_ASSURANCE_MODEL (`devin models list` shows what the account offers)',
 		'    agy   — JPWB_JUDGE_MODEL (a label the installed agy recognises: agy rejects an unknown one, and its error ' +

@@ -94,7 +94,8 @@ export type ExecutorSelection =
 	// real minted tools, and its recorded answer is returned once the turn text's hash matches (`replay/replay-executor.ts`).
 	| { readonly kind: 'REPLAY'; readonly recordingDir: string }
 	// ⭐ `JAN-MHX` MH-1 (D30) — an external CLI executing through the host's own tools (`tools/cli-executor-session.ts`), with
-	// the driver its tool names. ⚠ Nothing selects it yet: a tool joins `WIRED_EXECUTORS` with its driver's package.
+	// the driver its tool names. ~~⚠ Nothing selects it yet~~: a tool joins `WIRED_EXECUTORS` with its driver's package —
+	// ⭐ `JAN-MHX` MH-4: devin's has (D30).
 	| {
 			readonly kind: 'CLI';
 			readonly toolId: string;
@@ -114,10 +115,12 @@ export type RunnableExecutorSelection = Exclude<ExecutorSelection, { readonly ki
 
 /**
  * ⭑ THE EXECUTOR ADAPTERS THIS HOST HAS, AND WHAT EACH SELECTION OPENS — the table the selector dispatches on, and the
- * one its guidance lists. `devin` declares EXECUTION in the catalog (`backing-tool.ts`) but has no executor adapter, so
- * it is not here: the catalog says what a tool CAN do, this says what this host WIRED.
+ * one its guidance lists. ~~`devin` declares EXECUTION in the catalog (`backing-tool.ts`) but has no executor adapter, so
+ * it is not here~~: the catalog says what a tool CAN do, this says what this host WIRED.
+ * ⭐ `JAN-MHX` MH-4 (D30) — AND devin, WIRED TO THE `CLI` KIND, with its driver (`tools/devin-executor-driver.ts`), which
+ * the CLI executor session opens: a selection of it names its tool.
  */
-const WIRED_EXECUTORS = { agy: 'AGY', pi: 'PI' } as const;
+const WIRED_EXECUTORS = { agy: 'AGY', pi: 'PI', devin: 'CLI' } as const;
 
 type WiredExecutor = keyof typeof WIRED_EXECUTORS;
 
@@ -131,12 +134,14 @@ const WIRED_TOOL_LIST = Object.keys(WIRED_EXECUTORS).join(', ');
 /**
  * ⛔ THE CATALOG'S REFUSAL, WITH ITS LIST REPLACED BY THE WIRED ONE (`REG-F-460`'s general form). `selectBackingTool`
  * answers for every role, so its refusal of an unknown tool says "This host can drive: agy, pi, devin" — true of the
- * catalog, and for the executor it offers `devin`, which the next refusal (UNWIRED) forbids: the steer D1 removed from
- * the guidance, back in the reason printed beside it (`JAN-SELRES` RS-1's verification). The catalog's verdict and its
- * `REG-D-052` sentence are kept as the catalog words them; only the list becomes the executor's.
+ * catalog, and for the executor it offered `devin`, which the next refusal (UNWIRED) forbade until devin was wired: the
+ * steer D1 removed from the guidance, back in the reason printed beside it (`JAN-SELRES` RS-1's verification). The
+ * catalog's verdict and its `REG-D-052` sentence are kept as the catalog words them; only the list becomes the
+ * executor's. ⭐ `JAN-MHX` MH-4 — devin is wired now (D30), so the two lists hold the same tools; the sentence is still
+ * replaced, so the day the catalog declares a tool nobody wired, the reason does not offer it.
  * ⚠ KEYED ON THE CATALOG'S OWN SENTENCE, built from the list it is built from: were its wording to change, the list
- * would silently stay the catalog's — which `executor-selection.test.ts` reddens on, because the reason may not name
- * devin.
+ * would silently stay the catalog's — which `executor-selection.test.ts` reddens on, because the reason may not say
+ * "This host can drive:".
  */
 const CATALOG_LIST_SENTENCE = `This host can drive: ${KNOWN_TOOL_IDS.join(', ')}.`;
 const WIRED_LIST_SENTENCE = `This host has an executor adapter for: ${WIRED_TOOL_LIST}.`;
@@ -145,9 +150,10 @@ const withTheWiredList = (catalogRefusal: string): string =>
 
 /**
  * ⛔ D3 — THE VARIABLE THAT REPLACES EACH TOOL'S PROGRAM, for every EXECUTION tool whose adapter captures one. Keyed by
- * TOOL, not by wiring: `devin` is listed although it is unwired today, so the day a devin executor is wired it
- * inherits the refusal rather than waiting for someone to remember it. Pi has none — it runs in-process, through its
- * SDK — and what redirects it instead (`PI_CODING_AGENT_DIR`) is disclosed, not refused (design D3).
+ * TOOL, not by wiring: `devin` was listed while it was unwired, so the day a devin executor was wired it inherited the
+ * refusal rather than waiting for someone to remember it — ⭐ `JAN-MHX` MH-4 (D30), the day it was. Pi has none — it
+ * runs in-process, through its SDK — and what redirects it instead (`PI_CODING_AGENT_DIR`) is disclosed, not refused
+ * (design D3).
  */
 const PROGRAM_VARIABLE: Readonly<
 	Record<string, { readonly variable: string; readonly captured: keyof ExecutorProgramOverrides }>
@@ -525,10 +531,11 @@ function replaySelection(
  *   1. `EXECUTOR_TOOL_UNSET` — `JPWB_EXECUTOR` absent, `''` or whitespace OUTSIDE test mode. In test mode: the STAND-IN.
  *   2. `EXECUTOR_TOOL_UNKNOWN` — `selectBackingTool(tool, 'EXECUTION')` refuses it: a tool the catalog does not know
  *      (matched exactly, after the trim), or one that does not declare EXECUTION.
- *   3. `EXECUTOR_TOOL_UNWIRED` — a catalogued EXECUTION tool with no executor adapter (`devin` today).
+ *   3. `EXECUTOR_TOOL_UNWIRED` — a catalogued EXECUTION tool with no executor adapter (~~`devin` today~~ ⭐ none today:
+ *      `JAN-MHX` MH-4 wired devin, the last, D30).
  *   4. `EXECUTOR_PROGRAM_OVERRIDDEN` — outside test mode, the SELECTED tool's captured program override, even `''`,
  *      before its model is asked about: the program is refused whatever model it would run.
- *   5. `EXECUTOR_MODEL_UNSET` — `JPWB_EXECUTOR_MODEL` absent, `''` or whitespace, for Pi and agy alike. It never falls
+ *   5. `EXECUTOR_MODEL_UNSET` — `JPWB_EXECUTOR_MODEL` absent, `''` or whitespace, for every wired tool alike. It never falls
  *      back to `JPWB_JUDGE_MODEL`, and says so. ⭐ `JAN-MHX` MH-3 (D31): nor to the sponsor's default for the tool, which
  *      the guidance names (`EXECUTOR_DEFAULT_MODELS`).
  *   6. ⭐ `JAN-MHX` MH-3 (D32) — `EXECUTOR_EFFORT_NOT_TAKEN` / `EXECUTOR_EFFORT_UNSET` — `JPWB_EXECUTOR_EFFORT` (trimmed,
@@ -619,7 +626,9 @@ export function selectExecutor(input: {
 	const dependent =
 		input.reviewer === undefined ? undefined : independenceRefusal(toolId, modelId, input.reviewer);
 	if (dependent) return dependent;
-	return { kind: WIRED_EXECUTORS[toolId], modelId };
+	const kind = WIRED_EXECUTORS[toolId];
+	// ⭐ `JAN-MHX` MH-4 (D30) — a CLI selection names its tool, which finds its driver (`tools/cli-executor-drivers.ts`).
+	return kind === 'CLI' ? { kind, toolId, modelId } : { kind, modelId };
 }
 
 /**

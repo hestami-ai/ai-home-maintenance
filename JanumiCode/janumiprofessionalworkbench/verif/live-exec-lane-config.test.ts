@@ -342,7 +342,8 @@ describe('⭐ the lane refuses the executor the product refuses, asked without a
 			);
 		}
 		expect(wiredExecutor(undefined)).toBeUndefined();
-		expect([...WIRED_EXECUTORS].sort()).toEqual(['agy', 'pi']);
+		// ⭐ `JAN-MHX` MH-4 — devin's executor is wired (D30), and the mirror follows the product's table.
+		expect([...WIRED_EXECUTORS].sort()).toEqual(['agy', 'devin', 'pi']);
 	});
 
 	const EXECUTOR_TOOLS = [
@@ -460,14 +461,15 @@ describe('⭐ the lane refuses the executor the product refuses, asked without a
 	});
 
 	it('⛔ an executor the product does not run is refused, named, with the tools it may be', () => {
-		for (const tool of ['devin', 'Agy', 'nosuchtool']) {
+		// ⭐ `JAN-MHX` MH-4 — ~~devin~~ no longer among them: the product runs a devin executor (D30).
+		for (const tool of ['Agy', 'nosuchtool']) {
 			const refusal = laneKeysRefusal({
 				...COMPLETE,
 				JPWB_ASSURANCE_TOOL: 'devin',
 				JPWB_EXECUTOR: tool
 			});
 			expect(refusal ?? 'NO REFUSAL', tool).toContain(`JPWB_EXECUTOR='${tool}' names no executor`);
-			expect(refusal ?? 'NO REFUSAL', tool).toContain('(agy, pi)');
+			expect(refusal ?? 'NO REFUSAL', tool).toContain('(agy, pi, devin)');
 		}
 	});
 
@@ -484,8 +486,39 @@ describe('⭐ the lane refuses the executor the product refuses, asked without a
 			);
 			expect(refusal ?? 'NO REFUSAL').toContain('REG-F-459');
 		}
-		// ⭑ The variable is the agy adapter's one capture — the same the reviewer limb refuses for an agy reviewer.
-		expect(EXECUTOR_PROGRAM_VARIABLE).toEqual({ agy: REVIEWER_PROGRAM_VARIABLE.agy });
+		// ⭑ The variable is the agy adapter's one capture — the same the reviewer limb refuses for an agy reviewer. ⭐ `JAN-MHX`
+		// MH-4 — and devin's, the devin adapter's one capture, which its executor driver runs too.
+		expect(EXECUTOR_PROGRAM_VARIABLE).toEqual({
+			agy: REVIEWER_PROGRAM_VARIABLE.agy,
+			devin: REVIEWER_PROGRAM_VARIABLE.devin
+		});
+	});
+
+	it('⛔ `JAN-MHX` MH-4 — the devin executor’s program override is refused as the product refuses it, even empty, naming it', () => {
+		// ⭑ RED FIRST: the lane refused devin as no executor it had, whatever the override. ⭑ An agy reviewer, so the
+		// reviewer limb, which refuses JPWB_DEVIN_BIN for a devin reviewer, refuses nothing here.
+		for (const value of ['C:/fixture/devin.exe', '']) {
+			const refusal = laneKeysRefusal({
+				...COMPLETE,
+				JPWB_ASSURANCE_TOOL: 'agy',
+				JPWB_EXECUTOR: 'devin',
+				JPWB_EXECUTOR_MODEL: 'deepseek-v4-1-flash-max',
+				JPWB_DEVIN_BIN: value
+			});
+			expect(refusal ?? 'NO REFUSAL').toContain(
+				`JPWB_DEVIN_BIN=${JSON.stringify(value)} replaces the devin executor's program`
+			);
+			expect(refusal ?? 'NO REFUSAL').toContain('REG-F-459');
+		}
+		// ⭑ CONTROL — with no override, the devin executor boots the lane beside the lane's own reviewer.
+		expect(
+			laneKeysRefusal({
+				...COMPLETE,
+				JPWB_ASSURANCE_TOOL: 'devin',
+				JPWB_EXECUTOR: 'devin',
+				JPWB_EXECUTOR_MODEL: 'deepseek-v4-1-flash-max'
+			})
+		).toBeUndefined();
 	});
 
 	it('⭑ the lane’s agy rule says it is the lane’s, not the product’s — and the spec still makes the assertion it rests on', () => {
