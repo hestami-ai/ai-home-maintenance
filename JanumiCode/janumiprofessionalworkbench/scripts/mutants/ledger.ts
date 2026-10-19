@@ -32960,5 +32960,41 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["apps/rph-demo/src/lib/server/execution/begin-execute-workspace-taint.test.ts"],
 		why: "PROMISE (D21a): the mark is read beside the Undertaking's workspace - the work unit's owner, which a CLI executor's session ran in. WHO RELIES: every unit of a tainted Undertaking. WHAT THE MUTATION DOES: the mark is looked for beside a directory named for the work unit, never found, and the step dispatched. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M31-begin-execute-looks-beside-the-work-unit-s-id ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-MHX MH-3 - the taint refusal (DESIGN-multi-harness-executor.md D21a; ROADMAP-multi-harness-executor.md MH-3 test 11): Begin & Execute and a re-run of the work refuse WORKSPACE_TAINTED before they dispatch"
+	},
+	{
+		id: "MH3-M32-the-lane-s-executor-model-is-unlisted",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "\t\t'openai-codex/gpt-5.6-sol',\n",
+		replace: "",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "PROMISE (D33; the check's MINOR finding on the lane's executor mirror): the arrangement the lane's verif test boots - Pi on the model P3 ran, openai-codex/gpt-5.6-sol, beside devin on glm-5-3-flash-max - is one the product runs when it is asked as Begin & Execute asks it, beside the reviewer the same environment's preflight admits. WHO RELIES: every Pi run of the Phase 7 lane, which would otherwise boot, spend the reviewer calls the run makes before its first model step, and only then be refused at Begin & Execute. WHAT THE MUTATION DOES: P3's spelling leaves the model-family table (the edit MH3-M7 asks of the selector's own test), so the product refuses that arrangement beside the lane's reviewer as unclassified; asked without the reviewer, as the test asked it before this fix, the product compares nothing and still answers PI. OBSERVED (bun run mutants -- MH3-M32, MH3-M33, MH3-M34 and MH3-M35 by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M32-the-lane-s-executor-model-is-unlisted ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-3, the check's fix - the lane's executor mirror (the MINOR finding on verif/live-exec-lane-config.test.ts and lane-config.ts laneKeysRefusal; DESIGN-multi-harness-executor.md D32, D33, D36): the Pi executor that boots the lane is asked beside the lane's own reviewer, on the model P3 ran, and the gap of the reviewer-less, effort-less mirror is pinned until MH-8"
+	},
+	{
+		id: "MH3-M33-the-preflight-admits-devin-and-names-no-reviewer",
+		file: "apps/rph-demo/src/lib/server/assurance/preflight.ts",
+		find: "\t\t\t\treviewer: { toolId: 'devin', modelId: selection.modelId }\n",
+		replace: "\t\t\t\t// MUTANT: the preflight admits devin and names no reviewer\n",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "PROMISE (the control in 'a Pi executor the product runs beside the lane's own reviewer boots the lane'): the reviewer handed to the selector is the lane's own, admitted by the preflight - with none handed in, the selector compares nothing, and the test's PI answer would hold of any model. WHO RELIES: that test, and the pinned gap's two D33 rows, which take the reviewer from the preflight the same way. WHAT THE MUTATION DOES: the preflight admits devin and names no reviewer, so Begin & Execute and the test hand the selector nothing to compare; the test can redden only at its control, since the selector asked with no reviewer still answers PI. OBSERVED (bun run mutants -- MH3-M32, MH3-M33, MH3-M34 and MH3-M35 by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M33-the-preflight-admits-devin-and-names-no-reviewer ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-3, the check's fix - the lane's executor mirror (the MINOR finding on verif/live-exec-lane-config.test.ts and lane-config.ts laneKeysRefusal; DESIGN-multi-harness-executor.md D32, D33, D36): the Pi executor that boots the lane is asked beside the lane's own reviewer, on the model P3 ran, and the gap of the reviewer-less, effort-less mirror is pinned until MH-8"
+	},
+	{
+		id: "MH3-M34-the-lane-refuses-an-effort-the-product-refuses",
+		file: "apps/rph-demo/e2e-live-exec/lane-config.ts",
+		find: "\t\t...(strayExecutor !== undefined\n",
+		replace: "\t\t...(env.JPWB_EXECUTOR_EFFORT?.trim() ? ['  · MUTANT: the lane refuses an effort the product refuses'] : []),\n\t\t...(strayExecutor !== undefined\n",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "PROMISE (the pinned gap, until MH-8): the lane does not yet refuse JPWB_EXECUTOR_EFFORT set for a tool the host hands none (D32, EXECUTOR_EFFORT_NOT_TAKEN), and a test says so, so that when the lane restates D32 the pin reddens and is turned into rows of the mirror's table, rather than the table being read as agreement while the gap stands. WHO RELIES: MH-8, which owes the full mirror, and a reader of the table. WHAT THE MUTATION DOES: the lane refuses a set effort, as MH-8's mirror would; the pin's effort row is the only arrangement in the file that sets one. OBSERVED (bun run mutants -- MH3-M32, MH3-M33, MH3-M34 and MH3-M35 by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M34-the-lane-refuses-an-effort-the-product-refuses ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-3, the check's fix - the lane's executor mirror (the MINOR finding on verif/live-exec-lane-config.test.ts and lane-config.ts laneKeysRefusal; DESIGN-multi-harness-executor.md D32, D33, D36): the Pi executor that boots the lane is asked beside the lane's own reviewer, on the model P3 ran, and the gap of the reviewer-less, effort-less mirror is pinned until MH-8"
+	},
+	{
+		id: "MH3-M35-the-lane-refuses-the-reviewer-s-own-model",
+		file: "apps/rph-demo/e2e-live-exec/lane-config.ts",
+		find: "\t\t...(strayExecutor !== undefined\n",
+		replace: "\t\t...(env.JPWB_EXECUTOR_MODEL !== undefined && env.JPWB_EXECUTOR_MODEL === env.JPWB_ASSURANCE_MODEL ? ['  · MUTANT: the lane refuses the reviewer’s own model'] : []),\n\t\t...(strayExecutor !== undefined\n",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "PROMISE (the pinned gap, until MH-8): the lane does not yet refuse an executor model that is the reviewer's (D33, EXECUTOR_MODEL_IS_THE_REVIEWERS, asked beside the lane's own reviewer), and a test says so, which reddens when the lane restates it. WHO RELIES: MH-8 and a reader of the table, as for MH3-M34. WHAT THE MUTATION DOES: the lane refuses an executor model equal to JPWB_ASSURANCE_MODEL, as MH-8's mirror would for the reviewer's own id; the pin's row for the reviewer's own model is the only arrangement in the file that sets one. OBSERVED (bun run mutants -- MH3-M32, MH3-M33, MH3-M34 and MH3-M35 by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M35-the-lane-refuses-the-reviewer-s-own-model ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-3, the check's fix - the lane's executor mirror (the MINOR finding on verif/live-exec-lane-config.test.ts and lane-config.ts laneKeysRefusal; DESIGN-multi-harness-executor.md D32, D33, D36): the Pi executor that boots the lane is asked beside the lane's own reviewer, on the model P3 ran, and the gap of the reviewer-less, effort-less mirror is pinned until MH-8"
 	}
 ];

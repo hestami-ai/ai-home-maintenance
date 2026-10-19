@@ -218,6 +218,11 @@ export function requiredLaneKeys(tool: string | undefined): readonly string[] {
  * `JPWB_REVIEW_SEES_PRIOR` or `JPWB_AGENT` (`readAtCallTimeFaults`). ⭐ (D1) — and a Phase 7 variable set with no run
  * folder (`phase7RequestFaults`). ⭐ E3 (C1, C3) — and the half: one this lane does not know, or half B with no author's
  * model (`halfFaults`).
+ * ⚠ `JAN-MHX` MH-3 — NOT YET THE EXECUTOR SELECTOR'S EFFORT AND INDEPENDENCE REFUSALS (D32, D33). The product refuses
+ * `JPWB_EXECUTOR_EFFORT` set for a tool the host hands none, and an executor model that is the reviewer's, by id or
+ * family, or that its model-family table does not list. This restates neither, so a lane can boot that Begin & Execute
+ * then refuses, after whatever reviewer calls the run spends before its first model step. Restating them is owed to
+ * MH-8; `verif/live-exec-lane-config.test.ts` pins the gap.
  */
 export function laneKeysRefusal(
 	env: Readonly<Record<string, string | undefined>>
