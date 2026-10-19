@@ -245,8 +245,8 @@ describe('⭐ `JAN-MHX` MH-1 (D30) — a CLI selection opens through `deps.openC
 	});
 
 	it('⛔ with no driver wired for its tool, the default opener refuses, naming the tool', async () => {
-		// ⭑ The driver table is empty until a driver's package fills it (`cli-executor-drivers.ts`): nothing selects the
-		// `CLI` kind yet, and a selection that reached here anyway opens nothing.
+		// ⭑ The driver table holds a tool's driver only once its package fills it (`cli-executor-drivers.ts`; ⭐ Muse's alone
+		// since `JAN-MHX` MH-10): nothing selects the `CLI` kind for agy, and a selection that reached here anyway opens nothing.
 		await expect(
 			getExecutionSession({ kind: 'CLI', toolId: 'agy', modelId: 'fixture-cli-model' })(SANDBOX)
 		).rejects.toThrow("No CLI executor driver is wired for the tool 'agy'");

@@ -45,7 +45,10 @@ const TOOLS: readonly (string | undefined)[] = [
 	'Agy',
 	'nosuchtool',
 	// ⭐ `JAN-MHX` MH-3 — a tool the sponsor named a default for, which the catalog does not know yet.
-	'codex'
+	'codex',
+	// ⭐ `JAN-MHX` MH-10 — the first tool wired to the `CLI` kind. It takes its effort as a flag of its own and the table
+	// sets none, so each of its rows with a model is refused for its effort.
+	'muse'
 ];
 const MODELS: readonly {
 	readonly name: string;
@@ -65,25 +68,30 @@ const OVERRIDES: readonly {
 	readonly name: string;
 	readonly overrides: ExecutorProgramOverrides;
 }[] = [
-	{ name: 'no override', overrides: { agy: undefined, devin: undefined, codex: undefined } },
+	{ name: 'no override', overrides: { agy: undefined, devin: undefined, codex: undefined, muse: undefined } },
 	{
 		name: 'JPWB_AGY_BIN set',
-		overrides: { agy: 'C:/stand-in/agy.exe', devin: undefined, codex: undefined }
+		overrides: { agy: 'C:/stand-in/agy.exe', devin: undefined, codex: undefined, muse: undefined }
 	},
 	{
 		name: 'JPWB_DEVIN_BIN set',
-		overrides: { agy: undefined, devin: 'C:/stand-in/devin.exe', codex: undefined }
+		overrides: { agy: undefined, devin: 'C:/stand-in/devin.exe', codex: undefined, muse: undefined }
 	},
-	{ name: 'JPWB_AGY_BIN empty', overrides: { agy: '', devin: undefined, codex: undefined } },
-	{ name: 'JPWB_DEVIN_BIN empty', overrides: { agy: undefined, devin: '', codex: undefined } },
+	{ name: 'JPWB_AGY_BIN empty', overrides: { agy: '', devin: undefined, codex: undefined, muse: undefined } },
+	{ name: 'JPWB_DEVIN_BIN empty', overrides: { agy: undefined, devin: '', codex: undefined, muse: undefined } },
 	{
 		name: 'both set',
-		overrides: { agy: 'C:/stand-in/agy.exe', devin: 'C:/stand-in/devin.exe', codex: undefined }
+		overrides: { agy: 'C:/stand-in/agy.exe', devin: 'C:/stand-in/devin.exe', codex: undefined, muse: undefined }
 	},
 	// ⭐ `JAN-MHX` MH-3 (D34) — Codex's override: no Codex adapter is wired, so it refuses no row of this table.
 	{
 		name: 'JPWB_CODEX_BIN set',
-		overrides: { agy: undefined, devin: undefined, codex: 'stand-in/codex.exe' }
+		overrides: { agy: undefined, devin: undefined, codex: 'stand-in/codex.exe', muse: undefined }
+	},
+	// ⭐ `JAN-MHX` MH-10 (D34) — Muse's override, the driver's capture: outside test mode it refuses Muse's rows.
+	{
+		name: 'JPWB_MUSE_BIN set',
+		overrides: { agy: undefined, devin: undefined, codex: undefined, muse: 'stand-in/muse-bin.exe' }
 	}
 ];
 
@@ -91,14 +99,17 @@ const OVERRIDES: readonly {
 const EXECUTION_TOOLS = BACKING_TOOLS.filter((t) => t.roles.includes('EXECUTION')).map(
 	(t) => t.toolId
 );
-/** D1, RESTATED: the executor adapters this host has, and what each opens. */
-const WIRED: Readonly<Record<string, 'AGY' | 'PI'>> = { agy: 'AGY', pi: 'PI' };
+/** D1, RESTATED: the executor adapters this host has, and what each opens. ⭐ `JAN-MHX` MH-10: Muse opens a CLI session. */
+const WIRED: Readonly<Record<string, 'AGY' | 'PI' | 'CLI'>> = { agy: 'AGY', pi: 'PI', muse: 'CLI' };
 /** D3, RESTATED: the override each tool's adapter captures — per TOOL, whether or not it is wired today. */
 const OVERRIDE_OF: Readonly<Record<string, keyof ExecutorProgramOverrides>> = {
 	agy: 'agy',
 	devin: 'devin',
-	codex: 'codex'
+	codex: 'codex',
+	muse: 'muse'
 };
+/** ⭐ `JAN-MHX` MH-3 (D32), RESTATED for the wired tools: those that take their effort as a flag of their own. */
+const REQUIRES_EFFORT: readonly string[] = ['muse'];
 /**
  * ⭐ `JAN-MHX` MH-3 (D31; the sponsor's answers of 2026-10-18, S1–S4), RESTATED: the model the guidance names for each
  * chosen tool that has a sponsor's default. Pi has none.
@@ -128,13 +139,17 @@ function expectGuidanceFor(guidance: string, tool: string | undefined): void {
 type Expected =
 	| { readonly kind: 'STAND_IN' }
 	| { readonly kind: 'AGY' | 'PI'; readonly modelId: string }
+	| { readonly kind: 'CLI'; readonly toolId: string; readonly modelId: string; readonly effort?: string }
 	| {
 			readonly kind: 'REFUSED';
 			readonly code: ExecutorRefusalCode;
 			readonly toolId: string | undefined;
 	  };
 
-/** D1 and D3, restated, in the design's order. ⚠ A refused override outranks a missing model. */
+/**
+ * D1 and D3, restated, in the design's order. ⚠ A refused override outranks a missing model. ⭐ `JAN-MHX` MH-3 (D32): and
+ * a missing model outranks a missing effort, which the table never sets.
+ */
 function oracle(
 	testMode: boolean,
 	tool: string | undefined,
@@ -155,7 +170,8 @@ function oracle(
 	if (!testMode && own !== undefined && overrides[own] !== undefined)
 		return { kind: 'REFUSED', code: 'EXECUTOR_PROGRAM_OVERRIDDEN', toolId: t };
 	if (m === undefined) return { kind: 'REFUSED', code: 'EXECUTOR_MODEL_UNSET', toolId: t };
-	return { kind: opens, modelId: m };
+	if (REQUIRES_EFFORT.includes(t)) return { kind: 'REFUSED', code: 'EXECUTOR_EFFORT_UNSET', toolId: t };
+	return opens === 'CLI' ? { kind: 'CLI', toolId: t, modelId: m } : { kind: opens, modelId: m };
 }
 
 /** The selection, minus the prose — the shape the oracle predicts. */
@@ -165,23 +181,29 @@ function shape(s: ExecutorSelection): Expected {
 	// ⭐ `JAN-EXEC` Phase 8 — the table sets no JPWB_REPLAY, so a REPLAY answer here is the selector reading the switch from
 	// somewhere it was not handed (`replay/replay-selection.test.ts` holds the switch's own table).
 	if (s.kind === 'REPLAY') throw new Error('the table sets no JPWB_REPLAY, and the selector answered REPLAY');
-	// ⭐ `JAN-MHX` MH-1 — nothing selects the `CLI` kind until a driver's package wires its tool, so it is an answer no row
-	// of this table may get.
-	if (s.kind === 'CLI') throw new Error('no tool is wired to the CLI kind yet, and the selector answered CLI');
+	// ⭐ `JAN-MHX` MH-10 — the `CLI` kind, with the tool, the model and the effort it opens with.
+	if (s.kind === 'CLI')
+		return {
+			kind: 'CLI',
+			toolId: s.toolId,
+			modelId: s.modelId,
+			...(s.effort === undefined ? {} : { effort: s.effort })
+		};
 	return { kind: s.kind, modelId: s.modelId };
 }
 
 const NO_OVERRIDES: ExecutorProgramOverrides = {
 	agy: undefined,
 	devin: undefined,
-	codex: undefined
+	codex: undefined,
+	muse: undefined
 };
 
 describe('⭐ the selector answers the design’s table — every mode, tool, model and program override', () => {
-	it('⭑ arrangement — the catalog’s EXECUTION tools are agy, pi and devin, and the table names every one', () => {
+	it('⭑ arrangement — the catalog’s EXECUTION tools are agy, pi, devin and ⭐ muse, and the table names every one', () => {
 		// ⚠ WITHOUT THIS the table below could pass over a catalog that lost a tool, and its rows for that tool would be
 		// testing the UNKNOWN limb while their names said otherwise.
-		expect([...EXECUTION_TOOLS].sort()).toEqual(['agy', 'devin', 'pi']);
+		expect([...EXECUTION_TOOLS].sort()).toEqual(['agy', 'devin', 'muse', 'pi']);
 		for (const t of EXECUTION_TOOLS) expect(TOOLS, `the table names ${t}`).toContain(t);
 	});
 
@@ -210,7 +232,8 @@ describe('⛔ D3 — only the SELECTED tool’s captured override refuses, and o
 		const stray: ExecutorProgramOverrides = {
 			agy: 'C:/stand-in/agy.exe',
 			devin: undefined,
-			codex: undefined
+			codex: undefined,
+			muse: undefined
 		};
 		const host = {
 			JPWB_EXECUTOR: 'pi',
@@ -231,7 +254,7 @@ describe('⛔ D3 — only the SELECTED tool’s captured override refuses, and o
 			selectExecutor({
 				testMode: false,
 				env: host,
-				overrides: { agy: '', devin: '', codex: undefined }
+				overrides: { agy: '', devin: '', codex: undefined, muse: undefined }
 			})
 		).toEqual({ kind: 'PI', modelId: 'fixture-pi-model' });
 	});
@@ -239,7 +262,7 @@ describe('⛔ D3 — only the SELECTED tool’s captured override refuses, and o
 	for (const program of ['C:/stand-in/agy.exe', ''])
 		it(`agy, JPWB_AGY_BIN=${JSON.stringify(program)}: refused outside test mode, naming the variable, the program and REG-F-459 — honoured in test mode`, () => {
 			const env = { JPWB_EXECUTOR: 'agy', JPWB_EXECUTOR_MODEL: 'fixture-executor' };
-			const overrides = { agy: program, devin: undefined, codex: undefined };
+			const overrides = { agy: program, devin: undefined, codex: undefined, muse: undefined };
 			const got = selectExecutor({ testMode: false, env, overrides });
 			expect(got.kind === 'REFUSED' && got.code).toBe('EXECUTOR_PROGRAM_OVERRIDDEN');
 			const reason = got.kind === 'REFUSED' ? got.reason : '';
@@ -260,7 +283,7 @@ describe('⛔ D3 — only the SELECTED tool’s captured override refuses, and o
 				selectExecutor({
 					testMode: false,
 					env: { JPWB_EXECUTOR: 'agy' },
-					overrides: { agy: 'C:/stand-in/agy.exe', devin: undefined, codex: undefined }
+					overrides: { agy: 'C:/stand-in/agy.exe', devin: undefined, codex: undefined, muse: undefined }
 				})
 			)
 		).toEqual({ kind: 'REFUSED', code: 'EXECUTOR_PROGRAM_OVERRIDDEN', toolId: 'agy' });
@@ -272,7 +295,7 @@ describe('⛔ D3 — only the SELECTED tool’s captured override refuses, and o
 				selectExecutor({
 					testMode: false,
 					env: { JPWB_EXECUTOR: 'devin', JPWB_EXECUTOR_MODEL: 'fixture-executor' },
-					overrides: { agy: undefined, devin: 'C:/stand-in/devin.exe', codex: undefined }
+					overrides: { agy: undefined, devin: 'C:/stand-in/devin.exe', codex: undefined, muse: undefined }
 				})
 			)
 		).toEqual({ kind: 'REFUSED', code: 'EXECUTOR_TOOL_UNWIRED', toolId: 'devin' });
@@ -319,16 +342,21 @@ describe('what a refusal SAYS — the reason names the fault, and every one carr
 		expect(reason).toMatch(/Unknown backing tool 'nosuchtool'\./);
 		expect(reason, 'the reason offers devin as a tool to set').not.toMatch(/devin/);
 		expect(reason).not.toContain('This host can drive:');
-		expect(reason).toContain('This host has an executor adapter for: agy, pi.');
+		expect(reason).toContain('This host has an executor adapter for: agy, pi, muse.');
 		expect(reason).toContain('the fiction REG-D-052 forbids');
-		// ⭑ AND THE TOOLS IT OFFERS ARE EXACTLY THE ONES ADMITTED — each one it names, set with a model, is selected.
+		// ⭑ AND THE TOOLS IT OFFERS ARE EXACTLY THE ONES ADMITTED — each one it names, set with a model (⭐ and, for a tool that
+		// takes one, an effort), is selected.
 		const offered = /executor adapter for: ([^.]*)\./.exec(reason)?.[1]?.split(', ') ?? [];
-		expect(offered).toEqual(['agy', 'pi']);
+		expect(offered).toEqual(['agy', 'pi', 'muse']);
 		for (const tool of offered)
 			expect(
 				selectExecutor({
 					testMode: false,
-					env: { JPWB_EXECUTOR: tool, JPWB_EXECUTOR_MODEL: 'fixture-executor' },
+					env: {
+						JPWB_EXECUTOR: tool,
+						JPWB_EXECUTOR_MODEL: 'fixture-executor',
+						...(REQUIRES_EFFORT.includes(tool) ? { JPWB_EXECUTOR_EFFORT: 'high' } : {})
+					},
 					overrides: NO_OVERRIDES
 				}).kind,
 				`the reason offers '${tool}', which the selector refuses`
@@ -374,8 +402,8 @@ describe('what a refusal SAYS — the reason names the fault, and every one carr
 describe('⭐ D1 — the guidance names the WIRED tools, both variables, no default, and ASR-13 with the selected reviewer', () => {
 	// ⭐ SUCCESSOR of `backing-tool.test.ts:130-139`'s `/agy, pi, devin/` — ⚠ A DELIBERATE CHANGE OF WHAT IS PINNED, made
 	// stronger: that refusal listed the CATALOG, steering an operator to `devin`, which the next refusal forbids.
-	it('⛔ it lists the wired tools — agy, pi — and NOT devin', () => {
-		expect(EXECUTOR_GUIDANCE).toMatch(/agy, pi/);
+	it('⛔ it lists the wired tools — agy, pi, ⭐ muse — and NOT devin', () => {
+		expect(EXECUTOR_GUIDANCE).toMatch(/agy, pi, muse/);
 		expect(EXECUTOR_GUIDANCE).not.toMatch(/devin, /);
 		expect(EXECUTOR_GUIDANCE).not.toMatch(/\bpi, devin\b/);
 		expect(EXECUTOR_GUIDANCE).not.toMatch(/'devin'|JPWB_EXECUTOR=devin/);
@@ -386,12 +414,16 @@ describe('⭐ D1 — the guidance names the WIRED tools, both variables, no defa
 			(t) =>
 				selectExecutor({
 					testMode: false,
-					env: { JPWB_EXECUTOR: t, JPWB_EXECUTOR_MODEL: 'fixture-executor' },
+					env: {
+						JPWB_EXECUTOR: t,
+						JPWB_EXECUTOR_MODEL: 'fixture-executor',
+						...(REQUIRES_EFFORT.includes(t) ? { JPWB_EXECUTOR_EFFORT: 'high' } : {})
+					},
 					overrides: NO_OVERRIDES
 				}).kind !== 'REFUSED'
 		);
-		expect(admitted.sort()).toEqual(['agy', 'pi']);
-		expect(EXECUTOR_GUIDANCE).toContain(`for: ${['agy', 'pi'].join(', ')} —`);
+		expect(admitted.sort()).toEqual(['agy', 'muse', 'pi']);
+		expect(EXECUTOR_GUIDANCE).toContain(`for: ${['agy', 'pi', 'muse'].join(', ')} —`);
 	});
 
 	it('names both variables, and that neither has a default', () => {
@@ -488,14 +520,16 @@ describe('⭐ D3 — the overrides the selector acts on are the ones the ADAPTER
 	});
 
 	/** The agy adapter and the selector, loaded afresh with `JPWB_AGY_BIN` as given, then the variable removed again. */
-	async function loadedWith(agyBin: string | undefined, codexBin?: string) {
+	async function loadedWith(agyBin: string | undefined, codexBin?: string, museBin?: string) {
 		vi.resetModules();
 		vi.stubEnv('JPWB_AGY_BIN', agyBin);
 		vi.stubEnv('JPWB_DEVIN_BIN', undefined);
 		vi.stubEnv('JPWB_CODEX_BIN', codexBin);
+		vi.stubEnv('JPWB_MUSE_BIN', museBin);
 		const loaded = await import('./executor-selection.js');
 		vi.stubEnv('JPWB_AGY_BIN', undefined);
 		vi.stubEnv('JPWB_CODEX_BIN', undefined);
+		vi.stubEnv('JPWB_MUSE_BIN', undefined);
 		return loaded;
 	}
 	const AGY_HOST = { JPWB_EXECUTOR: 'agy', JPWB_EXECUTOR_MODEL: 'fixture-executor' };
@@ -546,6 +580,31 @@ describe('⭐ D3 — the overrides the selector acts on are the ones the ADAPTER
 		expect(none.selectExecutor({ testMode: true, env: replay })).toEqual({
 			kind: 'REPLAY',
 			recordingDir: 'recordings/one-unit'
+		});
+	});
+
+	it('⛔ `JAN-MHX` MH-10 (D34) — JPWB_MUSE_BIN is CAPTURED when the Muse driver loads: with no overrides handed in, it refuses a Muse executor — though the variable is gone now', async () => {
+		// ⛔ THE MUTANT: the selector reads JPWB_MUSE_BIN from the environment at selection, not the driver's capture.
+		const MUSE_HOST = {
+			JPWB_EXECUTOR: 'muse',
+			JPWB_EXECUTOR_MODEL: 'muse-wonder-1.0',
+			JPWB_EXECUTOR_EFFORT: 'high'
+		};
+		const captured = await loadedWith(undefined, undefined, 'stand-in/muse-bin.exe');
+		expect(
+			process.env.JPWB_MUSE_BIN,
+			'the arrangement removed the variable after the load'
+		).toBeUndefined();
+		const got = captured.selectExecutor({ testMode: false, env: MUSE_HOST });
+		expect(got.kind === 'REFUSED' && got.code).toBe('EXECUTOR_PROGRAM_OVERRIDDEN');
+		expect(got.kind === 'REFUSED' && got.reason).toContain('JPWB_MUSE_BIN="stand-in/muse-bin.exe"');
+		// ⭑ CONTROL — with nothing captured, the same host is selected.
+		const none = await loadedWith(undefined);
+		expect(none.selectExecutor({ testMode: false, env: MUSE_HOST })).toEqual({
+			kind: 'CLI',
+			toolId: 'muse',
+			modelId: 'muse-wonder-1.0',
+			effort: 'high'
 		});
 	});
 });
@@ -720,7 +779,7 @@ describe('⭐ `JAN-MHX` MH-3 (D33) — the executor’s model may not be the rev
 				selectExecutor({
 					testMode: false,
 					env: { JPWB_EXECUTOR: 'agy', JPWB_EXECUTOR_MODEL: 'glm-5-3-flash-max' },
-					overrides: { agy: 'C:/stand-in/agy.exe', devin: undefined, codex: undefined },
+					overrides: { agy: 'C:/stand-in/agy.exe', devin: undefined, codex: undefined, muse: undefined },
 					reviewer: GLM_REVIEWER
 				})
 			)
@@ -782,7 +841,8 @@ describe('⭐ `JAN-MHX` MH-3 (D32) — JPWB_EXECUTOR_EFFORT is refused where not
 	});
 
 	it('⛔ the rule, per tool: Codex, Claude Code and Muse REQUIRE it (EXECUTOR_EFFORT_UNSET), and take it once set', () => {
-		// ⭑ No tool that requires an effort is wired yet, so this half of the rule is asked of the rule itself.
+		// ⭑ Asked of the rule itself, for the three tools that take an effort: only Muse of them is wired (⭐ `JAN-MHX` MH-10),
+		// and the selector's own Muse rows are below.
 		for (const tool of ['codex', 'claude', 'muse'] as const) {
 			const unset = executorEffortRefusal(tool, undefined);
 			expect(unset && shape(unset), tool).toEqual({
@@ -815,7 +875,7 @@ describe('⭐ `JAN-MHX` MH-3 (D31; the sponsor’s answers of 2026-10-18, S1) �
 			'JPWB_EXECUTOR_MODEL must still be set'
 		);
 		// ⭑ AND THE WIRED TOOLS ONLY, as every refusal lists them.
-		expect(got.kind === 'REFUSED' && got.guidance).toContain('executor adapter for: agy, pi —');
+		expect(got.kind === 'REFUSED' && got.guidance).toContain('executor adapter for: agy, pi, muse —');
 	});
 
 	it('⛔ S2 — devin’s guidance names BOTH devin models, and the one a devin executor runs beside the GLM reviewer', () => {
@@ -852,5 +912,77 @@ describe('⭐ `JAN-MHX` MH-3 (D31; the sponsor’s answers of 2026-10-18, S1) �
 		expect(pi.kind === 'REFUSED' && pi.guidance).toBe(EXECUTOR_GUIDANCE);
 		const unset = selectExecutor({ testMode: false, env: {}, overrides: NO_OVERRIDES });
 		expect(unset.kind === 'REFUSED' && unset.guidance).toBe(EXECUTOR_GUIDANCE);
+	});
+});
+
+describe('⭐ `JAN-MHX` MH-10 (design §4.4, D30, D32–D34; the sponsor’s S4) — Muse is wired: a CLI selection with its effort, beside the reviewer, running the product’s own program', () => {
+	const EFFORT = { JPWB_EXECUTOR_EFFORT: 'high' } as const;
+
+	it('⛔ Muse on muse-wonder-1.0 at high effort → the CLI selection, carrying the tool, the model and the effort', () => {
+		// ⭑ RED FIRST: the catalog did not know Muse, so the selector answered EXECUTOR_TOOL_UNKNOWN.
+		// ⛔ THE MUTANTS: Muse left out of WIRED_EXECUTORS (UNWIRED); the CLI selection without its effort, which the driver
+		// would then have no flag for.
+		expect(executing('muse', 'muse-wonder-1.0', GLM_REVIEWER, EFFORT)).toEqual({
+			kind: 'CLI',
+			toolId: 'muse',
+			modelId: 'muse-wonder-1.0',
+			effort: 'high'
+		});
+		// ⭑ The effort is read as every variable here is: trimmed.
+		expect(executing('muse', 'muse-wonder-1.0', undefined, { JPWB_EXECUTOR_EFFORT: '  max \n' })).toEqual({
+			kind: 'CLI',
+			toolId: 'muse',
+			modelId: 'muse-wonder-1.0',
+			effort: 'max'
+		});
+	});
+
+	it('⛔ Muse with no effort, or a blank one → EXECUTOR_EFFORT_UNSET: its user configuration would decide it', () => {
+		for (const extra of [{}, { JPWB_EXECUTOR_EFFORT: '   ' }] as Readonly<Record<string, string>>[]) {
+			const got = executing('muse', 'muse-wonder-1.0', GLM_REVIEWER, extra);
+			expect(shape(got)).toEqual({ kind: 'REFUSED', code: 'EXECUTOR_EFFORT_UNSET', toolId: 'muse' });
+			expect(reasonOf(got)).toContain('JPWB_EXECUTOR_EFFORT is not set');
+		}
+	});
+
+	it('⛔ the family table places the sponsor’s Muse model from Muse’s own listing; the other ids it listed stay unclassified beside a real reviewer', () => {
+		// ⛔ THE MUTANT: no Muse family, so muse-wonder-1.0 is refused as unclassified beside the GLM reviewer.
+		expect(shape(executing('muse', 'muse-wonder-1.0', GLM_REVIEWER, EFFORT))).toEqual({
+			kind: 'CLI',
+			toolId: 'muse',
+			modelId: 'muse-wonder-1.0',
+			effort: 'high'
+		});
+		// ⭑ `muse serve`'s model list also named these; nothing measured says which, if any, is muse-wonder-1.0 under another
+		// spelling, so none is placed.
+		for (const other of ['muse-wonder-full-1.0', 'muse-spark-1.3', 'muse-spark-1.2'])
+			expect(shape(executing('muse', other, GLM_REVIEWER, EFFORT)), other).toEqual({
+				kind: 'REFUSED',
+				code: 'EXECUTOR_MODEL_UNCLASSIFIED',
+				toolId: 'muse'
+			});
+	});
+
+	for (const program of ['stand-in/muse-bin.exe', ''])
+		it(`⛔ JPWB_MUSE_BIN=${JSON.stringify(program)}: refused outside test mode, naming the variable — honoured in test mode`, () => {
+			// ⛔ THE MUTANT: no program variable for Muse, so a replaced program runs and is recorded as Muse's (REG-F-459).
+			const env = { JPWB_EXECUTOR: 'muse', JPWB_EXECUTOR_MODEL: 'muse-wonder-1.0', ...EFFORT };
+			const overrides = { ...NO_OVERRIDES, muse: program };
+			const got = selectExecutor({ testMode: false, env, overrides });
+			expect(shape(got)).toEqual({ kind: 'REFUSED', code: 'EXECUTOR_PROGRAM_OVERRIDDEN', toolId: 'muse' });
+			expect(reasonOf(got)).toContain(`JPWB_MUSE_BIN=${JSON.stringify(program)}`);
+			expect(reasonOf(got)).toContain("the product’s own 'muse' program");
+			expect(selectExecutor({ testMode: true, env, overrides })).toEqual({
+				kind: 'CLI',
+				toolId: 'muse',
+				modelId: 'muse-wonder-1.0',
+				effort: 'high'
+			});
+		});
+
+	it('⭑ the record names muse as the provider', () => {
+		const selection = executing('muse', 'muse-wonder-1.0', GLM_REVIEWER, EFFORT);
+		if (selection.kind !== 'CLI') throw new Error('arrangement: Muse at high effort is selected');
+		expect(executorRecordIdentity(selection)).toEqual({ modelId: 'muse-wonder-1.0', providerId: 'muse' });
 	});
 });

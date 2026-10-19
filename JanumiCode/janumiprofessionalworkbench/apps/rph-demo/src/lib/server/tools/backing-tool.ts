@@ -104,6 +104,24 @@ export const BACKING_TOOLS: readonly BackingTool[] = Object.freeze([
 			// `--prompt-file` keeps the prompt out of argv entirely — stronger than stdin.
 			diagnostics: 'PROMPT_FREE'
 		}
+	},
+	{
+		// ⭐ `JAN-MHX` MH-10 (`DESIGN-multi-harness-executor.md` D35, §4.4) — MEASURED by MH-10's probes on Muse 1.4.10:
+		// `muse exec` executed through the host's tools (P2, P3). ⭑ EXECUTION ALONE: no reviewer drives Muse, so nothing
+		// measured it reviewing.
+		toolId: 'muse',
+		roles: ['EXECUTION'],
+		reports: {
+			// Every model step's `model_completed` names the model, in its session log. ⚠ In every step measured it named the
+			// configured one, so no run showed whether it is the provider's report or an echo of the request.
+			identity: 'PROVIDER_REPORTED',
+			// ⚠ A label (`muse-wonder-1.0`), not a version.
+			version: false,
+			// Its reasoning summary is an event of its own, apart from the answer.
+			reasoning: 'STRUCTURAL',
+			// `--prompt-file` keeps the prompt out of argv.
+			diagnostics: 'PROMPT_FREE'
+		}
 	}
 ]);
 
@@ -119,10 +137,11 @@ export const KNOWN_TOOL_IDS: readonly string[] = BACKING_TOOLS.map((t) => t.tool
 export function selectBackingTool(
 	toolId: string,
 	role: BackingToolRole,
-	// ⚠ INJECTABLE ONLY SO THE ROLE REFUSAL IS REACHABLE IN THE GATE. Every tool in the real catalog declares
+	// ⚠ INJECTABLE SO THE ROLE REFUSAL WAS REACHABLE IN THE GATE. Every tool in the real catalog declared
 	// BOTH roles, so with the catalog hard-wired the role branch below could never be entered and its test
 	// would assert nothing — "a control that cannot fail", which this repository has shipped before. Same
-	// reasoning as `AgyExec`.
+	// reasoning as `AgyExec`. ⭐ `JAN-MHX` MH-10 — Muse declares EXECUTION alone, so the real catalog reaches the
+	// branch now too (`backing-tool.test.ts`); the injected catalog's test still holds the branch for any tool.
 	catalog: readonly BackingTool[] = BACKING_TOOLS
 ): BackingTool {
 	const tool = catalog.find((t) => t.toolId === toolId);

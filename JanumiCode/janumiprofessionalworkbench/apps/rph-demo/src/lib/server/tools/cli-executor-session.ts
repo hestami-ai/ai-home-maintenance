@@ -168,6 +168,12 @@ export interface CliRunFolder {
 	readonly nodePath: string;
 	/** The MCP server's name. */
 	readonly serverName: string;
+	/**
+	 * ⭐ D3 — the tools minted for the session's grant, in the order the server lists them: what a CLI's own allow-list
+	 * names, so it names no tool the host did not mint (`JAN-MHX` MH-10: Muse refuses a run whose toolset names a tool it
+	 * cannot resolve).
+	 */
+	readonly mintedToolNames: readonly string[];
 	/** The preamble and the execution contract, for a driver whose CLI takes a system prompt from a file (D15). */
 	readonly systemPrompt: string;
 }
@@ -186,6 +192,12 @@ export interface CliInvocation {
 	readonly args: readonly string[];
 	/** What the CLI reads on stdin, or nothing: stdin is closed at once. */
 	readonly stdin?: string;
+	/**
+	 * ⭐ D43 — constants this one start's environment carries beside the allowlist and the driver's own `environment`, for
+	 * a value that names a folder of the run or of the turn (`JAN-MHX` MH-10: Muse's data root, one per turn). ⭑ The
+	 * opener adds them to the CLI's environment only, never to the shared allowlist.
+	 */
+	readonly environment?: Readonly<Record<string, string>>;
 }
 
 /** One turn, as a driver is told it. */
@@ -692,9 +704,16 @@ async function writeInside(directory: string, file: CliRunFile, toolId: string):
 	await writeFile(target, file.bytes, 'utf8');
 }
 
-/** The CLI's environment (D43): the allowlist, the driver's constants, and its declared secret, if the server holds one. */
-function cliEnvironment(driver: CliDriver): Record<string, string> {
-	const env: Record<string, string> = { ...childEnvironment(process.env), ...driver.environment };
+/**
+ * The CLI's environment (D43): the allowlist, the driver's constants, the invocation's own, and the driver's declared
+ * secret, if the server holds one.
+ */
+function cliEnvironment(driver: CliDriver, invocation: CliInvocation): Record<string, string> {
+	const env: Record<string, string> = {
+		...childEnvironment(process.env),
+		...driver.environment,
+		...invocation.environment
+	};
 	const secret = driver.secretVariable === undefined ? undefined : process.env[driver.secretVariable];
 	if (driver.secretVariable !== undefined && secret !== undefined) env[driver.secretVariable] = secret;
 	return env;
@@ -963,6 +982,7 @@ export async function openCliExecutionSession(
 			endpointPath,
 			nodePath: process.execPath,
 			serverName: HOST_TOOL_SERVER_NAME,
+			mintedToolNames,
 			systemPrompt: `${EXECUTOR_HOST_TOOLS_PREAMBLE}\n\n${EXECUTION_CONTRACT_PROMPT}`
 		};
 		for (const file of driver.runFolderFiles(run)) await writeInside(directory, file, toolId);
@@ -972,7 +992,7 @@ export async function openCliExecutionSession(
 			const refusal = await preflightRefusal(
 				check,
 				exec,
-				{ cwd: cliDirectory, env: cliEnvironment(driver) },
+				{ cwd: cliDirectory, env: cliEnvironment(driver, check.invocation) },
 				deps.preflightTimeoutMs ?? CLI_PREFLIGHT_TIMEOUT_MS
 			);
 			if (refusal !== undefined)
@@ -1064,7 +1084,7 @@ export async function openCliExecutionSession(
 				program: invocation.program,
 				args: invocation.args,
 				cwd: runFolder.cliDirectory,
-				env: cliEnvironment(driver),
+				env: cliEnvironment(driver, invocation),
 				stdin: invocation.stdin
 			});
 			active = child;

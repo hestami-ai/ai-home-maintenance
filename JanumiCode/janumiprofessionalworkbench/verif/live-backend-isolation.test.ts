@@ -50,6 +50,8 @@ const REPORTER = join(ROOT, 'verif', 'live-backend-isolation.reporter.ts');
  * for half B's authoring turned every gate replay test into that refusal.
  * ⭐ AND AN ELEVENTH AND A TWELFTH (`JAN-MHX` MH-3, design D39): `JPWB_EXECUTOR_EFFORT`, a selection the executor selector
  * reads, and `JPWB_CODEX_BIN`, a program override the selector captures when it loads.
+ * ⭐ AND A THIRTEENTH (`JAN-MHX` MH-10, design D34, D39): `JPWB_MUSE_BIN`, the program override the Muse driver captures
+ * when it loads.
  */
 const EXPORTED: Readonly<Record<string, string>> = {
 	JPWB_ASSURANCE_TOOL: 'devin',
@@ -65,6 +67,7 @@ const EXPORTED: Readonly<Record<string, string>> = {
 	JPWB_DEVIN_BIN: join(NO_PROGRAMS, 'devin-exported-override'),
 	JPWB_AGY_BIN: join(NO_PROGRAMS, 'agy-exported-override'),
 	JPWB_CODEX_BIN: join(NO_PROGRAMS, 'codex-exported-override'),
+	JPWB_MUSE_BIN: join(NO_PROGRAMS, 'muse-exported-override'),
 	// ⛔ A folder INSIDE the empty directory that holds no recording: were the switch to reach a selector, it would
 	// replay nothing.
 	JPWB_REPLAY: join(NO_PROGRAMS, 'replay-exported-recording')
@@ -133,9 +136,9 @@ describe('⭐ D8 — a gate entry point started with every live-backend variable
 		const env = exportedEnvironment();
 		// ⭐ The review of E4, finding 11 — ~~eight~~ nine: the replay switch is the ninth. ⭐ The re-review of its fix
 		// round — ten: the authoring agent's model, which the replay refuses beside its switch. ⭐ `JAN-MHX` MH-3 — twelve:
-		// the executor's effort and Codex's program override. ⭑ The count is pinned here, once; the titles and messages name
-		// the variables, never their number (the E4 polish round).
-		expect(Object.keys(EXPORTED)).toHaveLength(12);
+		// the executor's effort and Codex's program override. ⭐ `JAN-MHX` MH-10 — thirteen: Muse's program override. ⭑ The
+		// count is pinned here, once; the titles and messages name the variables, never their number (the E4 polish round).
+		expect(Object.keys(EXPORTED)).toHaveLength(13);
 		for (const [k, v] of Object.entries(EXPORTED)) expect(env[k]).toBe(v);
 		expect(Object.keys(env).filter((k) => /^path$/i.test(k))).toEqual(['PATH']);
 		expect(env.PATH).toBe(NO_PROGRAMS);

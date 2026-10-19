@@ -18,12 +18,17 @@
 // effort nothing would read, names the sponsor's default model for the chosen tool without applying it, and captures
 // `JPWB_CODEX_BIN`.
 //
+// ⭐⭐ `JAN-MHX` MH-10 (`DESIGN-multi-harness-executor.md` §4.4, D30, D34; the sponsor's S4) — AND MUSE IS THE FIRST TOOL
+// WIRED TO THE `CLI` KIND: it opens a CLI session through its driver (`tools/muse-executor-driver.ts`), with the effort it
+// takes as a flag of its own, and `JPWB_MUSE_BIN`, which the driver captures, is refused outside test mode.
+//
 // ⚠ IT LIVES OUTSIDE `lib/server/tools` ON PURPOSE, for the reviewer selector's reason: that directory holds the
 // backing-tool ADAPTERS, and `verif/tool-adapter-exports-reachable.test.ts` holds each of their exports to a production
 // reference.
 import { AGY_BIN_OVERRIDE } from '../assurance/agy-cli.js';
 import type { ReviewerProgramOverrides } from '../assurance/reviewer-selection.js';
 import { DEVIN_BIN_OVERRIDE } from '../tools/devin-reviewer.js';
+import { MUSE_BIN_OVERRIDE } from '../tools/muse-executor-driver.js';
 import {
 	besideReplayReason,
 	liveSelectionsBesideReplay,
@@ -45,10 +50,12 @@ export type ExecutorEnvironment = Readonly<Record<string, string | undefined>>;
  * `JPWB_DEVIN_BIN` (`devin-reviewer.ts`). ⭑ THE REVIEWER'S RECORD, READ BY A SECOND SELECTOR: one capture per adapter,
  * whichever role runs it. `undefined` is unset; `''` is SET, to an empty program name, which the adapter would run.
  * ⭐ `JAN-MHX` MH-3 (D34) — AND `JPWB_CODEX_BIN`, the executor's own: no reviewer runs Codex, so the reviewer's record has no
- * key for it (`CODEX_BIN_OVERRIDE`, below).
+ * key for it (`CODEX_BIN_OVERRIDE`, below). ⭐ `JAN-MHX` MH-10 (D34) — and `JPWB_MUSE_BIN`, which the Muse driver captures
+ * (`MUSE_BIN_OVERRIDE`), for the same reason.
  */
 export type ExecutorProgramOverrides = ReviewerProgramOverrides & {
 	readonly codex: string | undefined;
+	readonly muse: string | undefined;
 };
 
 /**
@@ -94,7 +101,7 @@ export type ExecutorSelection =
 	// real minted tools, and its recorded answer is returned once the turn text's hash matches (`replay/replay-executor.ts`).
 	| { readonly kind: 'REPLAY'; readonly recordingDir: string }
 	// ⭐ `JAN-MHX` MH-1 (D30) — an external CLI executing through the host's own tools (`tools/cli-executor-session.ts`), with
-	// the driver its tool names. ⚠ Nothing selects it yet: a tool joins `WIRED_EXECUTORS` with its driver's package.
+	// the driver its tool names. A tool joins `WIRED_EXECUTORS` with its driver's package: ⭐ Muse's first (MH-10).
 	| {
 			readonly kind: 'CLI';
 			readonly toolId: string;
@@ -116,8 +123,9 @@ export type RunnableExecutorSelection = Exclude<ExecutorSelection, { readonly ki
  * ⭑ THE EXECUTOR ADAPTERS THIS HOST HAS, AND WHAT EACH SELECTION OPENS — the table the selector dispatches on, and the
  * one its guidance lists. `devin` declares EXECUTION in the catalog (`backing-tool.ts`) but has no executor adapter, so
  * it is not here: the catalog says what a tool CAN do, this says what this host WIRED.
+ * ⭐ `JAN-MHX` MH-10 — Muse opens the `CLI` kind, through the driver `tools/cli-executor-drivers.ts` holds for it.
  */
-const WIRED_EXECUTORS = { agy: 'AGY', pi: 'PI' } as const;
+const WIRED_EXECUTORS = { agy: 'AGY', pi: 'PI', muse: 'CLI' } as const;
 
 type WiredExecutor = keyof typeof WIRED_EXECUTORS;
 
@@ -155,7 +163,9 @@ const PROGRAM_VARIABLE: Readonly<
 	agy: { variable: 'JPWB_AGY_BIN', captured: 'agy' },
 	devin: { variable: 'JPWB_DEVIN_BIN', captured: 'devin' },
 	// ⭐ `JAN-MHX` MH-3 (D34) — not in the catalog yet, so nothing selects it; listed for devin's reason, above.
-	codex: { variable: 'JPWB_CODEX_BIN', captured: 'codex' }
+	codex: { variable: 'JPWB_CODEX_BIN', captured: 'codex' },
+	// ⭐ `JAN-MHX` MH-10 (D34) — the Muse driver's capture: it runs that program in place of the installed one.
+	muse: { variable: 'JPWB_MUSE_BIN', captured: 'muse' }
 };
 
 /**
@@ -189,7 +199,8 @@ export const EXECUTOR_GUIDANCE =
  * ⭑ devin's is S2's: a devin executor runs whichever of the sponsor's two devin models the reviewer does not, and the
  * selected reviewer runs glm-5-3-flash-max (`REG-D-084`). Muse's is the lead's choice, which S4 delegated: the catalog's
  * default, flagged for the sponsor. Pi has none: the sponsor named none.
- * ⭑ KEYED BY TOOL, as `PROGRAM_VARIABLE` is: Codex, Claude Code and Muse are not in the catalog yet.
+ * ⭑ KEYED BY TOOL, as `PROGRAM_VARIABLE` is: ~~Codex, Claude Code and Muse are not in the catalog yet~~ Codex and Claude
+ * Code are not in the catalog yet (⭐ Muse is, since `JAN-MHX` MH-10).
  */
 const EXECUTOR_DEFAULT_MODELS: Readonly<
 	Record<string, { readonly modelId: string; readonly effort?: string; readonly because?: string }>
@@ -258,9 +269,10 @@ const EFFORT_RULE: Readonly<
 
 /**
  * ⭐ `JAN-MHX` MH-3 (D32) — the refusal of the effort `toolId` was configured with, or `undefined` when there is none.
- * ⚠ EXPORTED FOR ITS TEST, AND THE REASON IS A REACH: no wired tool REQUIRES an effort yet, so through `selectExecutor`
- * only the not-taken arm can be driven, and the required arm would be a guard no test could fail — `selectBackingTool`'s
- * injectable catalog, for the same reason.
+ * ⚠ EXPORTED FOR ITS TEST, AND THE REASON IS A REACH: when it landed no wired tool REQUIRED an effort, so through
+ * `selectExecutor` only the not-taken arm could be driven, and the required arm would have been a guard no test could fail
+ * — `selectBackingTool`'s injectable catalog, for the same reason. ⭐ `JAN-MHX` MH-10: Muse requires one and is wired, so
+ * the selector reaches that arm now too; Codex and Claude Code are still asked of the rule alone.
  */
 export function executorEffortRefusal(
 	toolId: keyof typeof EFFORT_RULE,
@@ -298,8 +310,12 @@ export function executorEffortRefusal(
  *   · `agy models` — agy 1.4.2, 2026-10-18: slugs and labels;
  *   · `codex debug models` — Codex 0.162.1, 2026-10-18: slug and display name;
  *   · Claude Code's id, FROM ITS DOCUMENTATION, no listing having been run;
- *   · Pi's, AS P3 CONFIGURED IT (`JPWB_EXECUTOR_MODEL`), a model the Phase 7 lane ran, not a listing.
- * ⭑ FIVE FAMILIES: the design's four, and DeepSeek V4.1 Flash, the model the sponsor chose for a devin executor (S2).
+ *   · Pi's, AS P3 CONFIGURED IT (`JPWB_EXECUTOR_MODEL`), a model the Phase 7 lane ran, not a listing;
+ *   · ⭐ `JAN-MHX` MH-10 — `muse serve`'s model list (`model/list`), Muse 1.4.10, 2026-10-18: model id and label.
+ * ⭑ ~~FIVE~~ SIX FAMILIES: the design's four, DeepSeek V4.1 Flash, the model the sponsor chose for a devin executor (S2),
+ * and ⭐ Muse Wonder 1.0, the lead's choice for Muse, which S4 delegated.
+ * ⚠ Muse's list also names muse-wonder-full-1.0, muse-spark-1.3 and muse-spark-1.2. Nothing measured says which, if any, is
+ * muse-wonder-1.0 under another spelling, so none is placed, and each is refused as unlisted beside a real reviewer.
  * ⚠ devin lists GLM-5.3, without "Flash", as a family of its own. It is not here, so it is refused as unlisted, never
  * compared as another model.
  */
@@ -394,6 +410,10 @@ const MODEL_FAMILIES: Readonly<Record<string, readonly string[]>> = {
 		'deepseek-v4-1-flash-max',
 		'DeepSeek V4.1 Flash High',
 		'DeepSeek V4.1 Flash Max'
+	],
+	'Muse Wonder 1.0': [
+		// `muse serve`'s model list: its id, which is also its label
+		'muse-wonder-1.0'
 	]
 };
 
@@ -528,7 +548,7 @@ function replaySelection(
  *   3. `EXECUTOR_TOOL_UNWIRED` — a catalogued EXECUTION tool with no executor adapter (`devin` today).
  *   4. `EXECUTOR_PROGRAM_OVERRIDDEN` — outside test mode, the SELECTED tool's captured program override, even `''`,
  *      before its model is asked about: the program is refused whatever model it would run.
- *   5. `EXECUTOR_MODEL_UNSET` — `JPWB_EXECUTOR_MODEL` absent, `''` or whitespace, for Pi and agy alike. It never falls
+ *   5. `EXECUTOR_MODEL_UNSET` — `JPWB_EXECUTOR_MODEL` absent, `''` or whitespace, for every wired tool. It never falls
  *      back to `JPWB_JUDGE_MODEL`, and says so. ⭐ `JAN-MHX` MH-3 (D31): nor to the sponsor's default for the tool, which
  *      the guidance names (`EXECUTOR_DEFAULT_MODELS`).
  *   6. ⭐ `JAN-MHX` MH-3 (D32) — `EXECUTOR_EFFORT_NOT_TAKEN` / `EXECUTOR_EFFORT_UNSET` — `JPWB_EXECUTOR_EFFORT` (trimmed,
@@ -567,6 +587,7 @@ export function selectExecutor(input: {
 	const overrides = input.overrides ?? {
 		agy: AGY_BIN_OVERRIDE,
 		devin: DEVIN_BIN_OVERRIDE,
+		muse: MUSE_BIN_OVERRIDE,
 		codex: CODEX_BIN_OVERRIDE
 	};
 	const replay = replaySelection(env, input.testMode, toolId, overrides);
@@ -610,16 +631,18 @@ export function selectExecutor(input: {
 				'producer/reviewer collision the executor’s own configuration exists to remove.'
 		);
 	// ⭐ `JAN-MHX` MH-3 (D32) — the effort, read as every variable here is: trimmed, and blank is unset.
-	const effortRefused = executorEffortRefusal(
-		toolId,
-		env.JPWB_EXECUTOR_EFFORT?.trim() || undefined
-	);
+	const effort = env.JPWB_EXECUTOR_EFFORT?.trim() || undefined;
+	const effortRefused = executorEffortRefusal(toolId, effort);
 	if (effortRefused) return effortRefused;
 	// ⭐ `JAN-MHX` MH-3 (D33) — then the model beside the reviewer's, when a real one was admitted.
 	const dependent =
 		input.reviewer === undefined ? undefined : independenceRefusal(toolId, modelId, input.reviewer);
 	if (dependent) return dependent;
-	return { kind: WIRED_EXECUTORS[toolId], modelId };
+	// ⭐ `JAN-MHX` MH-10 (D30) — a CLI selection carries its tool, and the effort the tool takes, to its driver.
+	const opens = WIRED_EXECUTORS[toolId];
+	if (opens === 'CLI')
+		return { kind: 'CLI', toolId, modelId, ...(effort === undefined ? {} : { effort }) };
+	return { kind: opens, modelId };
 }
 
 /**

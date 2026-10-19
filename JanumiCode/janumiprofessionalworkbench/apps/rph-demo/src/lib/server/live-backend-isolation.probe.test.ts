@@ -46,7 +46,9 @@ const LIVE_BACKEND_VARIABLES = [
 	// ⭐ `JAN-MHX` MH-3 (design D39) — the eleventh and the twelfth: the executor's effort, which the executor selector
 	// reads, and Codex's program override, which it captures when it loads.
 	'JPWB_EXECUTOR_EFFORT',
-	'JPWB_CODEX_BIN'
+	'JPWB_CODEX_BIN',
+	// ⭐ `JAN-MHX` MH-10 (design D34, D39) — the thirteenth: Muse's program override, which its driver captures when it loads.
+	'JPWB_MUSE_BIN'
 ] as const;
 
 describe('⭐ D8 — a gate process inherits no live-backend selection', () => {

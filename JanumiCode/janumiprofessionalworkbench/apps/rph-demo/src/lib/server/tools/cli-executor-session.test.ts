@@ -1155,6 +1155,68 @@ describe('⭐ D13 — the run folder’s life', () => {
 	});
 });
 
+// ⭐ `JAN-MHX` MH-10 (design D3, D43; §4.4) — WHAT A DRIVER IS TOLD, AND WHAT ONE START MAY CARRY OF ITS OWN: the tools
+// minted for the grant, which Muse's own toolset must name exactly (it refuses a run whose toolset names a tool it cannot
+// resolve), and an invocation's own environment, which carries Muse's data root, a folder of the run and of the turn.
+describe('⭐ MH-10 — the minted tools a driver is told, and an invocation’s own environment', () => {
+	it('the run folder names the tools minted for the step’s grant, in the order the server lists them', async () => {
+		// ⛔ THE MUTANT: tell the driver the catalog's two names whatever the grant, so a CLI's allow-list names a tool the
+		// host did not mint.
+		const told: (readonly string[])[] = [];
+		const telling = fakeDriver({
+			runFolderFiles: (run) => {
+				told.push(run.mintedToolNames);
+				return fakeDriver().runFolderFiles(run);
+			}
+		});
+		await open(fakeExec(passing), { driver: telling, ctx: { ...context(), grantedCapabilities: ['file-system'] } });
+		await open(fakeExec(passing), { driver: telling });
+		expect(told).toEqual([['write_file'], ['write_file', 'run_command']]);
+	});
+
+	it('an invocation’s own environment reaches that start, beside the driver’s constants, each turn its own', async () => {
+		// ⛔ THE MUTANT: the opener drops the invocation's environment, so a per-turn value never reaches the CLI.
+		const exec = fakeExec(passing);
+		const driver = fakeDriver({
+			invocation: (t) => ({
+				program: 'fake-cli',
+				args: ['--turn', String(t.turn), '--prompt-file', t.promptPath, '--model', t.modelId],
+				environment: { FAKE_TURN_FOLDER: join(t.run.hostDirectory, `turn-${t.turn}`) }
+			})
+		});
+		const session = await open(exec, { driver });
+		await turn(session, 'INSTRUCTION');
+		await turn(session, 'FINDINGS');
+		const [first, second] = exec.requests;
+		expect(first!.env.FAKE_TURN_FOLDER).toBe(join(exec.clis[0]!.hostDirectory, 'turn-1'));
+		expect(second!.env.FAKE_TURN_FOLDER).toBe(join(exec.clis[1]!.hostDirectory, 'turn-2'));
+		expect(first!.env.FAKE_CLI_CONSTANT, 'the driver’s own constant').toBe('on');
+	});
+
+	it('a preflight invocation’s own environment reaches the preflight', async () => {
+		// ⛔ THE MUTANT: the preflight's start gets the driver's constants alone.
+		const seen: Readonly<Record<string, string>>[] = [];
+		const exec: CliExec = (req) => {
+			seen.push(req.env);
+			return {
+				done: Promise.resolve({ exitCode: 0, stdout: 'jpwb', stdoutComplete: true, errorLines: [] }),
+				kill: async () => undefined
+			};
+		};
+		const driver = fakeDriver({
+			preflight: (run) => ({
+				invocation: { program: 'fake-cli', args: ['list'], environment: { FAKE_PREFLIGHT_FOLDER: run.hostDirectory } },
+				refusal: () => undefined
+			})
+		});
+		await open(exec, { driver });
+		expect(seen).toHaveLength(1);
+		expect(seen[0]!.FAKE_PREFLIGHT_FOLDER).toBeDefined();
+		expect(basename(seen[0]!.FAKE_PREFLIGHT_FOLDER!)).toBe('host');
+		expect(seen[0]!.FAKE_CLI_CONSTANT).toBe('on');
+	});
+});
+
 describe('⭐ D14, D18 — the preflight is bounded by the host, and a preflight that did not run whole refuses the session', () => {
 	const preflighting = (): CliDriver =>
 		fakeDriver({

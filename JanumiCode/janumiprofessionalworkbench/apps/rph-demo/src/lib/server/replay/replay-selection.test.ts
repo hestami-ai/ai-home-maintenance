@@ -14,7 +14,12 @@ import { liveSelectionsBesideReplay } from './replay-switch.js';
 
 /** ⭑ A folder the selector only names: it reads no file, so no absolute path need be spelled here (`REG-F-536`). */
 const DIR = 'recordings/one-unit';
-const NO_OVERRIDES = { agy: undefined, devin: undefined, codex: undefined } as const;
+const NO_OVERRIDES = {
+	agy: undefined,
+	devin: undefined,
+	codex: undefined,
+	muse: undefined
+} as const;
 
 describe('JPWB_REPLAY — the replay switch, read by both selectors (D2)', () => {
 	it('test mode with the switch set answers REPLAY, for the executor and the reviewer alike', () => {
@@ -123,8 +128,8 @@ describe('JPWB_REPLAY — the replay switch, read by both selectors (D2)', () =>
 		}
 		// ⭑ And a program override the adapters captured is one too: beside a replay it would override nothing.
 		for (const overrides of [
-			{ agy: 'agy-elsewhere', devin: undefined, codex: undefined },
-			{ agy: undefined, devin: 'devin-elsewhere', codex: undefined }
+			{ agy: 'agy-elsewhere', devin: undefined, codex: undefined, muse: undefined },
+			{ agy: undefined, devin: 'devin-elsewhere', codex: undefined, muse: undefined }
 		]) {
 			const env = { JPWB_REPLAY: DIR };
 			expect(selectExecutor({ testMode: true, env, overrides })).toMatchObject({
@@ -147,7 +152,10 @@ describe('JPWB_REPLAY — the replay switch, read by both selectors (D2)', () =>
 		for (const blank of ['', '   '])
 			expect(liveSelectionsBesideReplay({ JPWB_EXECUTOR_EFFORT: blank }, NO_OVERRIDES)).toEqual([]);
 		expect(
-			liveSelectionsBesideReplay({}, { agy: undefined, devin: undefined, codex: 'codex-elsewhere' })
+			liveSelectionsBesideReplay(
+				{},
+				{ agy: undefined, devin: undefined, codex: 'codex-elsewhere', muse: undefined }
+			)
 		).toEqual(['JPWB_CODEX_BIN']);
 		// ⛔ A PROGRAM OVERRIDE IS THE ADAPTER'S CAPTURE, NEVER THE ENVIRONMENT: set in the environment after load, no adapter
 		// reads it, so it is not a selection here — the capture is (above).
@@ -170,13 +178,33 @@ describe('JPWB_REPLAY — the replay switch, read by both selectors (D2)', () =>
 		const besideCodex = selectExecutor({
 			testMode: true,
 			env: { JPWB_REPLAY: DIR },
-			overrides: { agy: undefined, devin: undefined, codex: 'codex-elsewhere' }
+			overrides: { agy: undefined, devin: undefined, codex: 'codex-elsewhere', muse: undefined }
 		});
 		expect(besideCodex).toMatchObject({
 			kind: 'REFUSED',
 			code: 'EXECUTOR_REPLAY_BESIDE_A_LIVE_SELECTION'
 		});
 		expect(besideCodex.kind === 'REFUSED' ? besideCodex.reason : '').toContain('JPWB_CODEX_BIN');
+	});
+
+	it('⛔ `JAN-MHX` MH-10 (D39) — JPWB_MUSE_BIN is a live selection from the captured overrides, never from the environment', () => {
+		// ⛔ THE MUTANT: the Muse override is left out, so a replay beside a captured Muse program answers from its recording
+		// while the override looked as though it took effect.
+		const museElsewhere = { ...NO_OVERRIDES, muse: 'muse-elsewhere' };
+		expect(liveSelectionsBesideReplay({}, museElsewhere)).toEqual(['JPWB_MUSE_BIN']);
+		expect(liveSelectionsBesideReplay({ JPWB_MUSE_BIN: 'muse-elsewhere' }, NO_OVERRIDES)).toEqual(
+			[]
+		);
+		const besideMuse = selectExecutor({
+			testMode: true,
+			env: { JPWB_REPLAY: DIR },
+			overrides: museElsewhere
+		});
+		expect(besideMuse).toMatchObject({
+			kind: 'REFUSED',
+			code: 'EXECUTOR_REPLAY_BESIDE_A_LIVE_SELECTION'
+		});
+		expect(besideMuse.kind === 'REFUSED' ? besideMuse.reason : '').toContain('JPWB_MUSE_BIN');
 	});
 
 	it('the replay is a ready reviewer to the preflight, and the executor’s record falls back to no configured model', () => {

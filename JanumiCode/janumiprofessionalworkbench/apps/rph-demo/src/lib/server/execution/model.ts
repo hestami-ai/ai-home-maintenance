@@ -165,8 +165,9 @@ export function getExecutionSession(
 	if (selection.kind === 'REPLAY')
 		return async (context) => openReplayExecutionSession(context, replayRunFor(selection.recordingDir));
 	// ⭐⭐ `JAN-MHX` MH-1 (D12, D30) — THE FIFTH SESSION: an external CLI, executing through the host's own tool server, with the
-	// driver its tool names. ⚠ Nothing selects it until a driver's package wires its tool (`executor-selection.ts`), and with
-	// no driver for the tool it opens nothing. Loaded lazily, as Pi is, so selecting a CLI costs nothing and loads nothing.
+	// driver its tool names. ⚠ Nothing selects it for a tool until a driver's package wires that tool (`executor-selection.ts`;
+	// ⭐ Muse's, `JAN-MHX` MH-10, is the first), and with no driver for the tool it opens nothing. Loaded lazily, as Pi is, so
+	// selecting a CLI costs nothing and loads nothing.
 	if (selection.kind === 'CLI') {
 		const openCli =
 			deps.openCli ??

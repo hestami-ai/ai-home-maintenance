@@ -38,6 +38,8 @@
  * ⭐ AND AN ELEVENTH AND A TWELFTH (`JAN-MHX` MH-3, `DESIGN-multi-harness-executor.md` D39): `JPWB_EXECUTOR_EFFORT`, a
  * selection the executor selector reads, and `JPWB_CODEX_BIN`, a program override it captures when it loads (driven red:
  * `live-backend-isolation.test.ts`, all four children, with both exported there and left off this list).
+ * ⭐ AND A THIRTEENTH (`JAN-MHX` MH-10, design D34, D39): `JPWB_MUSE_BIN`, the program override the Muse driver captures when
+ * it loads (driven red: `live-backend-isolation.test.ts`, all four children, with it exported there and left off this list).
  */
 export const LIVE_BACKEND_VARIABLES = [
 	'JPWB_ASSURANCE_TOOL',
@@ -49,6 +51,7 @@ export const LIVE_BACKEND_VARIABLES = [
 	'JPWB_AGENT',
 	'JPWB_AGENT_MODEL',
 	'JPWB_CODEX_BIN',
+	'JPWB_MUSE_BIN',
 	'JPWB_DEVIN_BIN',
 	'JPWB_AGY_BIN',
 	'JPWB_REPLAY'

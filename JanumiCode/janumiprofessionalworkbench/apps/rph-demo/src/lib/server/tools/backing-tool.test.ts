@@ -30,9 +30,10 @@ describe('JAN-TOOLSUITE — the suite admits a tool by DECLARATION', () => {
 	});
 
 	it('⛔ REFUSES a tool for a role it does not declare', () => {
-		// ⚠ THIS NEEDED AN INJECTED CATALOG TO BE A REAL TEST. Every tool in the shipped catalog declares BOTH
-		// roles, so against the real one this branch is unreachable and the test would assert nothing while
-		// showing green — the "control that cannot fail" defect.
+		// ⚠ THIS NEEDED AN INJECTED CATALOG TO BE A REAL TEST. Every tool in the shipped catalog declared BOTH
+		// roles, so against the real one this branch was unreachable and the test would have asserted nothing while
+		// showing green — the "control that cannot fail" defect. ⭐ `JAN-MHX` MH-10: Muse declares EXECUTION alone, and
+		// its own case below reaches the branch through the real catalog.
 		//
 		// THE MUTANT: ignore `roles`. The field becomes decoration and a tool can be selected for work it was
 		// never measured against.
@@ -88,6 +89,23 @@ describe('JAN-TOOLSUITE — the declarations record what was MEASURED', () => {
 		expect(byId('agy').reports.diagnostics).toBe('PROMPT_BEARING');
 		expect(byId('pi').reports.diagnostics).toBe('PROMPT_FREE');
 		expect(byId('devin').reports.diagnostics).toBe('PROMPT_FREE');
+	});
+
+	it('⭐ `JAN-MHX` MH-10 (design D35, §4.4) — Muse declares what its probes MEASURED: it executes, reports its model, and returns its reasoning apart', () => {
+		// ⭑ MEASURED (MH-10's probes, Muse 1.4.10): `muse exec` executed through the host's tools (P2, P3); every model step's
+		// `model_completed` named the model; the reasoning summary is its own event; the prompt is a `--prompt-file`.
+		// ⛔ THE MUTANT: Muse declares the ASSURANCE role too, which nothing measured — no reviewer drives it.
+		const muse = byId('muse');
+		expect(muse.roles).toEqual(['EXECUTION']);
+		expect(muse.reports).toEqual({
+			identity: 'PROVIDER_REPORTED',
+			version: false,
+			reasoning: 'STRUCTURAL',
+			diagnostics: 'PROMPT_FREE'
+		});
+		expect(() => selectBackingTool('muse', 'ASSURANCE')).toThrow(
+			"Backing tool 'muse' does not declare the ASSURANCE role (it declares: EXECUTION)."
+		);
 	});
 });
 

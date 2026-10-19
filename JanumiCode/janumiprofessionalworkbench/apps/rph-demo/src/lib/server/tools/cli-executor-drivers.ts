@@ -1,12 +1,17 @@
 // ⭐⭐ `JAN-MHX` MH-1 (`DESIGN-multi-harness-executor.md` D12, D30) — THE TABLE A CLI EXECUTOR'S DRIVER IS FOUND IN.
 //
-// ⭑ ONE ENTRY PER DRIVER, ADDED BY THE PACKAGE THAT LANDS IT: agy's (MH-5), devin's (MH-4), Codex's (MH-6). Each driver is
-// a top-level `tools/<tool>-executor-driver.ts`, exported as a function, so `verif/tool-adapter-exports-reachable.test.ts`
-// holds it to a production caller — this table. ⚠ EMPTY TODAY: no CLI executor is wired, and nothing selects the `CLI`
-// kind until a driver's package adds its tool to `WIRED_EXECUTORS` (`execution/executor-selection.ts`).
+// ⭑ ONE ENTRY PER DRIVER, ADDED BY THE PACKAGE THAT LANDS IT: agy's (MH-5), devin's (MH-4), Codex's (MH-6), ⭐ Muse's
+// (MH-10). Each driver is a top-level `tools/<tool>-executor-driver.ts`, exported as a function, so
+// `verif/tool-adapter-exports-reachable.test.ts` holds it to a production caller — this table. ⚠ ~~EMPTY TODAY: no CLI
+// executor is wired~~ ⭐ Muse's is the first, and nothing selects the `CLI` kind for a tool until its driver's package adds
+// the tool to `WIRED_EXECUTORS` (`execution/executor-selection.ts`).
 import type { CliDriver } from './cli-executor-session.js';
+import { museExecutorDriver } from './muse-executor-driver.js';
 
-const CLI_EXECUTOR_DRIVERS: Readonly<Record<string, () => CliDriver>> = {};
+/** ⭑ Each entry makes a fresh driver: one per session, so nothing a driver holds of one session reaches another. */
+const CLI_EXECUTOR_DRIVERS: Readonly<Record<string, () => CliDriver>> = {
+	muse: () => museExecutorDriver()
+};
 
 /** The driver for `toolId`, or `undefined` when none is wired. ⛔ Own keys only: a prototype name is not a tool. */
 export function cliExecutorDriver(toolId: string): CliDriver | undefined {

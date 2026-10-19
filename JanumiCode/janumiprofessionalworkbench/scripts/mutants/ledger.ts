@@ -12099,10 +12099,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "RS1-M5-the-environment-is-read-not-the-capture",
 		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
-		find: "const overrides = input.overrides ?? {\n\t\tagy: AGY_BIN_OVERRIDE,\n\t\tdevin: DEVIN_BIN_OVERRIDE,\n\t\tcodex: CODEX_BIN_OVERRIDE\n\t};",
-		replace: "const overrides = input.overrides ?? {\n\t\tagy: process.env.JPWB_AGY_BIN,\n\t\tdevin: process.env.JPWB_DEVIN_BIN,\n\t\tcodex: CODEX_BIN_OVERRIDE\n\t}; // MUTANT: the environment, not the capture",
+		find: "const overrides = input.overrides ?? {\n\t\tagy: AGY_BIN_OVERRIDE,\n\t\tdevin: DEVIN_BIN_OVERRIDE,\n\t\tmuse: MUSE_BIN_OVERRIDE,\n\t\tcodex: CODEX_BIN_OVERRIDE\n\t};",
+		replace: "const overrides = input.overrides ?? {\n\t\tagy: process.env.JPWB_AGY_BIN,\n\t\tdevin: process.env.JPWB_DEVIN_BIN,\n\t\tmuse: MUSE_BIN_OVERRIDE,\n\t\tcodex: CODEX_BIN_OVERRIDE\n\t}; // MUTANT: the environment, not the capture",
 		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
-		why: "PROMISE (JAN-SELRES D3): the override refused is the one agy-cli.ts CAPTURED at load, which is the program it runs for the life of the process. WHO RELIES: a server whose JPWB_AGY_BIN was unset after it started, while agy-cli.ts still runs the replacement. WHAT THE MUTATION DOES: the selector reads the environment at dispatch, sees nothing set, and admits the agy executor that runs the replaced program. OBSERVED: KILLED — 1 test(s) red in executor-selection.test.ts: '⛔ with no overrides handed in, a captured JPWB_AGY_BIN refuses an agy executor — though the variable is gone now' (AssertionError: expected false to be 'EXECUTOR_PROGRAM_OVERRIDDEN' // Object.is equality) RE-ANCHORED 2026-10-15 (JAN-EXEC Phase 8, the E4 fix round; ledger rule #5 - in the commit that moved the line): REG-D-112 (c) hoisted the overrides into one const overrides, which the replay's beside-the-switch refusal reads too, so the anchor moved to it. THE GUARANTEE IS UNCHANGED: the mutation still reads the environment at dispatch in place of the capture. Measured again after the move (bun run mutants -- E4-M, with SR1-M26, SR2-M23, RS1-M1, RS1-M5, P2B-x, P2B-q and P2B-d by their full ids, 2026-10-15, in the fixer's worktree, the round's changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         RS1-M5-the-environment-is-read-not-the-capture ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯' ⭐ RE-ANCHORED 2026-10-18 (JAN-MHX MH-3; ledger rule #5 - in the commit that changed the line): the captured overrides gained Codex’s (D34), so the object is written over lines; the mutation is unchanged for agy and devin, read from the environment, and Codex’s capture is MH3-M15’s. RE-MEASURED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         RS1-M5-the-environment-is-read-not-the-capture ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		why: "PROMISE (JAN-SELRES D3): the override refused is the one agy-cli.ts CAPTURED at load, which is the program it runs for the life of the process. WHO RELIES: a server whose JPWB_AGY_BIN was unset after it started, while agy-cli.ts still runs the replacement. WHAT THE MUTATION DOES: the selector reads the environment at dispatch, sees nothing set, and admits the agy executor that runs the replaced program. OBSERVED: KILLED — 1 test(s) red in executor-selection.test.ts: '⛔ with no overrides handed in, a captured JPWB_AGY_BIN refuses an agy executor — though the variable is gone now' (AssertionError: expected false to be 'EXECUTOR_PROGRAM_OVERRIDDEN' // Object.is equality) RE-ANCHORED 2026-10-15 (JAN-EXEC Phase 8, the E4 fix round; ledger rule #5 - in the commit that moved the line): REG-D-112 (c) hoisted the overrides into one const overrides, which the replay's beside-the-switch refusal reads too, so the anchor moved to it. THE GUARANTEE IS UNCHANGED: the mutation still reads the environment at dispatch in place of the capture. Measured again after the move (bun run mutants -- E4-M, with SR1-M26, SR2-M23, RS1-M1, RS1-M5, P2B-x, P2B-q and P2B-d by their full ids, 2026-10-15, in the fixer's worktree, the round's changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         RS1-M5-the-environment-is-read-not-the-capture ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯' ⭐ RE-ANCHORED 2026-10-18 (JAN-MHX MH-3; ledger rule #5 - in the commit that changed the line): the captured overrides gained Codex’s (D34), so the object is written over lines; the mutation is unchanged for agy and devin, read from the environment, and Codex’s capture is MH3-M15’s. RE-MEASURED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         RS1-M5-the-environment-is-read-not-the-capture ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯' RE-ANCHORED (JAN-MHX MH-10, ledger rule #5, in the commit that moved the code): the capture gained Muse's line (`muse: MUSE_BIN_OVERRIDE`), so the block it anchors on gained a line. THE GUARANTEE, THE ATTACK AND THE VICTIM ARE UNCHANGED. Measured after the move: (bun run mutants -- the 53 MH10 ids and the seven entries MH-10 re-anchored, by their full ids, 2026-10-18, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         RS1-M5-the-environment-is-read-not-the-capture ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
 	},
 	{
@@ -31779,10 +31779,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "MH1-M36-cli-runs-in-the-workspace",
 		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
-		find: "\t\t\t\tcwd: runFolder.cliDirectory,\n\t\t\t\tenv: cliEnvironment(driver),\n\t\t\t\tstdin: invocation.stdin",
-		replace: "\t\t\t\tcwd: workspaceDirectory,\n\t\t\t\tenv: cliEnvironment(driver),\n\t\t\t\tstdin: invocation.stdin",
+		find: "\t\t\t\tcwd: runFolder.cliDirectory,\n\t\t\t\tenv: cliEnvironment(driver, invocation),\n\t\t\t\tstdin: invocation.stdin",
+		replace: "\t\t\t\tcwd: workspaceDirectory,\n\t\t\t\tenv: cliEnvironment(driver, invocation),\n\t\t\t\tstdin: invocation.stdin",
 		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
-		why: "PROMISE: C1 (D13): the CLI starts in the run's cli/ folder, not the workspace and not the server's folder. WHAT THE MUTATION DOES: starts it in the workspace, a folder the executor writes into and the CLI would read configuration from. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M36-cli-runs-in-the-workspace  ⎯⎯⎯⎯⎯⎯ Failed Tests 46 ⎯⎯⎯⎯⎯⎯⎯'",
+		why: "PROMISE: C1 (D13): the CLI starts in the run's cli/ folder, not the workspace and not the server's folder. WHAT THE MUTATION DOES: starts it in the workspace, a folder the executor writes into and the CLI would read configuration from. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M36-cli-runs-in-the-workspace  ⎯⎯⎯⎯⎯⎯ Failed Tests 46 ⎯⎯⎯⎯⎯⎯⎯' RE-ANCHORED (JAN-MHX MH-10, ledger rule #5, in the commit that moved the code): `cliEnvironment` gained the invocation, so a start's own environment reaches it (D43). THE GUARANTEE, THE ATTACK AND THE VICTIM ARE UNCHANGED. Measured after the move: (bun run mutants -- the 53 MH10 ids and the seven entries MH-10 re-anchored, by their full ids, 2026-10-18, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M36-cli-runs-in-the-workspace  ⎯⎯⎯⎯⎯⎯ Failed Tests 53 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
 	},
 	{
@@ -31797,19 +31797,19 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "MH1-M38-cli-gets-the-server-environment",
 		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
-		find: "const env: Record<string, string> = { ...childEnvironment(process.env), ...driver.environment };",
-		replace: "const env: Record<string, string> = { ...(process.env as Record<string, string>), ...driver.environment };",
+		find: "\t\t...childEnvironment(process.env),\n",
+		replace: "\t\t...(process.env as Record<string, string>),\n",
 		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
-		why: "PROMISE: C3 (D43): the CLI's environment is the allowlist plus its driver's constants, never the server's. WHAT THE MUTATION DOES: passes process.env, so a provider key in the server's environment would change account and billing. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M38-cli-gets-the-server-environment ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		why: "PROMISE: C3 (D43): the CLI's environment is the allowlist plus its driver's constants, never the server's. WHAT THE MUTATION DOES: passes process.env, so a provider key in the server's environment would change account and billing. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M38-cli-gets-the-server-environment ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯' RE-ANCHORED (JAN-MHX MH-10, ledger rule #5, in the commit that moved the code): `cliEnvironment`'s spread was broken over lines when it gained the invocation's environment. THE GUARANTEE, THE ATTACK AND THE VICTIM ARE UNCHANGED. Measured after the move: (bun run mutants -- the 53 MH10 ids and the seven entries MH-10 re-anchored, by their full ids, 2026-10-18, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M38-cli-gets-the-server-environment ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
 	},
 	{
 		id: "MH1-M39-token-in-the-environment",
 		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
-		find: "\t\t\t\tcwd: runFolder.cliDirectory,\n\t\t\t\tenv: cliEnvironment(driver),",
-		replace: "\t\t\t\tcwd: runFolder.cliDirectory,\n\t\t\t\tenv: { ...cliEnvironment(driver), JPWB_MCP_TOKEN: token },",
+		find: "\t\t\t\tcwd: runFolder.cliDirectory,\n\t\t\t\tenv: cliEnvironment(driver, invocation),",
+		replace: "\t\t\t\tcwd: runFolder.cliDirectory,\n\t\t\t\tenv: { ...cliEnvironment(driver, invocation), JPWB_MCP_TOKEN: token },",
 		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
-		why: "PROMISE: C5 (D40, D41, D42): no turn's token is in any argv element, environment variable, result field or failure message. WHAT THE MUTATION DOES: hands the token to the CLI as JPWB_MCP_TOKEN. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M39-token-in-the-environment   ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		why: "PROMISE: C5 (D40, D41, D42): no turn's token is in any argv element, environment variable, result field or failure message. WHAT THE MUTATION DOES: hands the token to the CLI as JPWB_MCP_TOKEN. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M39-token-in-the-environment   ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯' RE-ANCHORED (JAN-MHX MH-10, ledger rule #5, in the commit that moved the code): `cliEnvironment` gained the invocation. THE GUARANTEE, THE ATTACK AND THE VICTIM ARE UNCHANGED. Measured after the move: (bun run mutants -- the 53 MH10 ids and the seven entries MH-10 re-anchored, by their full ids, 2026-10-18, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M39-token-in-the-environment   ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
 	},
 	{
@@ -32748,19 +32748,19 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "MH3-M8-the-effort-is-never-read",
 		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
-		find: "\t\tenv.JPWB_EXECUTOR_EFFORT?.trim() || undefined\n",
-		replace: "\t\tundefined // MUTANT: JPWB_EXECUTOR_EFFORT is never read\n",
+		find: "\tconst effort = env.JPWB_EXECUTOR_EFFORT?.trim() || undefined;\n",
+		replace: "\tconst effort = undefined; // MUTANT: JPWB_EXECUTOR_EFFORT is never read\n",
 		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
-		why: "PROMISE (D32; roadmap MH-3 test 6): an effort set for a tool the host hands none is refused (EXECUTOR_EFFORT_NOT_TAKEN). WHO RELIES: an operator who set JPWB_EXECUTOR_EFFORT for Pi, which runs with thinking off - a variable read by nothing must not look as though it took effect. WHAT THE MUTATION DOES: the variable is never read, so Pi with an effort is selected. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M8-the-effort-is-never-read    ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯'",
+		why: "PROMISE (D32; roadmap MH-3 test 6): an effort set for a tool the host hands none is refused (EXECUTOR_EFFORT_NOT_TAKEN). WHO RELIES: an operator who set JPWB_EXECUTOR_EFFORT for Pi, which runs with thinking off - a variable read by nothing must not look as though it took effect. WHAT THE MUTATION DOES: the variable is never read, so Pi with an effort is selected. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M8-the-effort-is-never-read    ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯' RE-ANCHORED (JAN-MHX MH-10, ledger rule #5, in the commit that moved the code): the effort is read once into `effort`, which the CLI selection carries too, so the read moved out of the refusal's call. THE GUARANTEE, THE ATTACK AND THE VICTIM ARE UNCHANGED. Measured after the move: (bun run mutants -- the 53 MH10 ids and the seven entries MH-10 re-anchored, by their full ids, 2026-10-18, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M8-the-effort-is-never-read    ⎯⎯⎯⎯⎯⎯ Failed Tests 11 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-MHX MH-3 - the selector (DESIGN-multi-harness-executor.md D31-D34, D39; ROADMAP-multi-harness-executor.md MH-3 tests 1-7, 10, 12, 13; the sponsor’s answers of 2026-10-18, S1-S4): the identity refusals, the effort rule, the defaults named and never applied, and JPWB_CODEX_BIN captured"
 	},
 	{
 		id: "MH3-M9-a-blank-effort-is-a-set-one",
 		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
-		find: "\t\tenv.JPWB_EXECUTOR_EFFORT?.trim() || undefined\n",
-		replace: "\t\tenv.JPWB_EXECUTOR_EFFORT // MUTANT: a blank effort is a set one\n",
+		find: "\tconst effort = env.JPWB_EXECUTOR_EFFORT?.trim() || undefined;\n",
+		replace: "\tconst effort = env.JPWB_EXECUTOR_EFFORT; // MUTANT: a blank effort is a set one\n",
 		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
-		why: "PROMISE (D32): JPWB_EXECUTOR_EFFORT is read as every variable here is - trimmed, and blank or whitespace is unset. WHO RELIES: a shell that exports it empty. WHAT THE MUTATION DOES: a blank effort refuses a Pi executor as though an effort were set. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M9-a-blank-effort-is-a-set-one ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		why: "PROMISE (D32): JPWB_EXECUTOR_EFFORT is read as every variable here is - trimmed, and blank or whitespace is unset. WHO RELIES: a shell that exports it empty. WHAT THE MUTATION DOES: a blank effort refuses a Pi executor as though an effort were set. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M9-a-blank-effort-is-a-set-one ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯' RE-ANCHORED (JAN-MHX MH-10, ledger rule #5, in the commit that moved the code): as for MH3-M8. THE GUARANTEE, THE ATTACK AND THE VICTIM ARE UNCHANGED. Measured after the move: (bun run mutants -- the 53 MH10 ids and the seven entries MH-10 re-anchored, by their full ids, 2026-10-18, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M9-a-blank-effort-is-a-set-one ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-MHX MH-3 - the selector (DESIGN-multi-harness-executor.md D31-D34, D39; ROADMAP-multi-harness-executor.md MH-3 tests 1-7, 10, 12, 13; the sponsor’s answers of 2026-10-18, S1-S4): the identity refusals, the effort rule, the defaults named and never applied, and JPWB_CODEX_BIN captured"
 	},
 	{
@@ -32784,10 +32784,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "MH3-M12-the-reviewer-s-model-is-asked-before-the-effort",
 		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
-		find: "\tconst effortRefused = executorEffortRefusal(\n\t\ttoolId,\n\t\tenv.JPWB_EXECUTOR_EFFORT?.trim() || undefined\n\t);\n\tif (effortRefused) return effortRefused;\n\t// ⭐ `JAN-MHX` MH-3 (D33) — then the model beside the reviewer's, when a real one was admitted.\n\tconst dependent =\n\t\tinput.reviewer === undefined ? undefined : independenceRefusal(toolId, modelId, input.reviewer);\n\tif (dependent) return dependent;\n",
-		replace: "\t// MUTANT: the reviewer's model is asked before the effort\n\t// ⭐ `JAN-MHX` MH-3 (D33) — then the model beside the reviewer's, when a real one was admitted.\n\tconst dependent =\n\t\tinput.reviewer === undefined ? undefined : independenceRefusal(toolId, modelId, input.reviewer);\n\tif (dependent) return dependent;\n\tconst effortRefused = executorEffortRefusal(\n\t\ttoolId,\n\t\tenv.JPWB_EXECUTOR_EFFORT?.trim() || undefined\n\t);\n\tif (effortRefused) return effortRefused;\n",
+		find: "\tconst effortRefused = executorEffortRefusal(toolId, effort);\n\tif (effortRefused) return effortRefused;\n\t// ⭐ `JAN-MHX` MH-3 (D33) — then the model beside the reviewer's, when a real one was admitted.\n\tconst dependent =\n\t\tinput.reviewer === undefined ? undefined : independenceRefusal(toolId, modelId, input.reviewer);\n\tif (dependent) return dependent;\n",
+		replace: "\t// MUTANT: the reviewer's model is asked before the effort\n\t// ⭐ `JAN-MHX` MH-3 (D33) — then the model beside the reviewer's, when a real one was admitted.\n\tconst dependent =\n\t\tinput.reviewer === undefined ? undefined : independenceRefusal(toolId, modelId, input.reviewer);\n\tif (dependent) return dependent;\n\tconst effortRefused = executorEffortRefusal(toolId, effort);\n\tif (effortRefused) return effortRefused;\n",
 		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
-		why: "PROMISE (D32, D33; the selector's table, rows 6 and 7): the executor's own configuration is asked first - its effort - and its model beside the reviewer's after. WHO RELIES: the operator shown one refusal at a time, the one their own configuration owes. WHAT THE MUTATION DOES: an effort beside the reviewer's own model is refused for the model instead. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M12-the-reviewer-s-model-is-asked-before-the-effort ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		why: "PROMISE (D32, D33; the selector's table, rows 6 and 7): the executor's own configuration is asked first - its effort - and its model beside the reviewer's after. WHO RELIES: the operator shown one refusal at a time, the one their own configuration owes. WHAT THE MUTATION DOES: an effort beside the reviewer's own model is refused for the model instead. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M12-the-reviewer-s-model-is-asked-before-the-effort ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯' RE-ANCHORED (JAN-MHX MH-10, ledger rule #5, in the commit that moved the code): as for MH3-M8: the refusal is asked of `effort`, read once above it. THE GUARANTEE, THE ATTACK AND THE VICTIM ARE UNCHANGED. Measured after the move: (bun run mutants -- the 53 MH10 ids and the seven entries MH-10 re-anchored, by their full ids, 2026-10-18, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M12-the-reviewer-s-model-is-asked-before-the-effort ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-MHX MH-3 - the selector (DESIGN-multi-harness-executor.md D31-D34, D39; ROADMAP-multi-harness-executor.md MH-3 tests 1-7, 10, 12, 13; the sponsor’s answers of 2026-10-18, S1-S4): the identity refusals, the effort rule, the defaults named and never applied, and JPWB_CODEX_BIN captured"
 	},
 	{
@@ -32996,5 +32996,483 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/live-exec-lane-config.test.ts"],
 		why: "PROMISE (the pinned gap, until MH-8): the lane does not yet refuse an executor model that is the reviewer's (D33, EXECUTOR_MODEL_IS_THE_REVIEWERS, asked beside the lane's own reviewer), and a test says so, which reddens when the lane restates it. WHO RELIES: MH-8 and a reader of the table, as for MH3-M34. WHAT THE MUTATION DOES: the lane refuses an executor model equal to JPWB_ASSURANCE_MODEL, as MH-8's mirror would for the reviewer's own id; the pin's row for the reviewer's own model is the only arrangement in the file that sets one. OBSERVED (bun run mutants -- MH3-M32, MH3-M33, MH3-M34 and MH3-M35 by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M35-the-lane-refuses-the-reviewer-s-own-model ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-MHX MH-3, the check's fix - the lane's executor mirror (the MINOR finding on verif/live-exec-lane-config.test.ts and lane-config.ts laneKeysRefusal; DESIGN-multi-harness-executor.md D32, D33, D36): the Pi executor that boots the lane is asked beside the lane's own reviewer, on the model P3 ran, and the gap of the reviewer-less, effort-less mirror is pinned until MH-8"
+	},
+	// ── JAN-MHX MH-10 (DESIGN-multi-harness-executor.md §4.4; the sponsor’s S4): the Muse driver, Muse wired to the CLI kind, the opener’s two additions ──
+	{
+		id: "MH10-M1-the-design-s-mcp-entry-with-its-type-key",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "\t\t\t\t\t\tcommand: turn.run.nodePath,\n",
+		replace: "\t\t\t\t\t\ttype: 'stdio', // MUTANT: the design's entry, which Muse refuses as an unknown key\n\t\t\t\t\t\tcommand: turn.run.nodePath,\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: the MCP entry is {\"command\", \"args\", \"framing\"} and no other key (§4.4, as Muse 1.4.10 takes it). WHO RELIES: every Muse turn: Muse refuses a run whose -c entry carries a key it does not know (\"unknown key: no such setting\", MH-10 probe P1a). WHAT THE MUTATION DOES: the design's \"type\":\"stdio\" key is restored, so every Muse run would be refused before it started. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M1-the-design-s-mcp-entry-with-its-type-key ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M2-the-design-s-camel-case-framing",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "const MCP_FRAMING = 'line_delimited_json';",
+		replace: "const MCP_FRAMING = 'lineDelimitedJson'; // MUTANT: the design's spelling, which Muse refuses",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: the framing is \"line_delimited_json\" (§4.4, measured). WHO RELIES: every Muse turn: Muse refuses \"lineDelimitedJson\" (\"the JSON type does not fit this setting\", MH-10 probe). WHAT THE MUTATION DOES: the design's spelling is restored. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M2-the-design-s-camel-case-framing ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M3-the-session-log-is-switched-off",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "\t\t\t\t\t'--json',\n",
+		replace: "\t\t\t\t\t'--json',\n\t\t\t\t\t'--no-session-log', // MUTANT: no record of the offered tools\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: the session log is kept, inside the turn's own data root (D14a; MH-10 probe M3). WHO RELIES: the surface proof: the session log is the only record that names the tools Muse offered its model. WHAT THE MUTATION DOES: --no-session-log is passed, so no turn could prove its surface. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M3-the-session-log-is-switched-off ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M4-contributor-mode-on",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "\t\t\t\t\t'--contributor-mode',\n\t\t\t\t\t'off',\n",
+		replace: "\t\t\t\t\t'--contributor-mode',\n\t\t\t\t\t'on', // MUTANT: contributor mode on\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: contributor mode is off for each run (the sponsor’s S4, D45). WHO RELIES: the sponsor, who took the terms risk on the condition that contributor mode is off per run. WHAT THE MUTATION DOES: contributor mode is turned on. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M4-contributor-mode-on        ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M5-telemetry-left-on",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "\t\t\t\t\t'telemetry.enabled=false',\n",
+		replace: "\t\t\t\t\t'telemetry.enabled=true', // MUTANT: telemetry left on\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: telemetry is off for each run (the sponsor’s S4, D45). WHO RELIES: the sponsor, as for MH10-M4. WHAT THE MUTATION DOES: telemetry is turned on. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M5-telemetry-left-on          ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M6-the-approval-judge-runs",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "\t\t\t\t\t'--approval-judge',\n\t\t\t\t\t'off',\n",
+		replace: "\t\t\t\t\t'--approval-judge',\n\t\t\t\t\t'on', // MUTANT: the approval judge runs\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: the approval judge is off (§4.4): it is a model call of its own. WHO RELIES: the run's cost and its record, which count no hidden model call. WHAT THE MUTATION DOES: the approval judge is turned on. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M6-the-approval-judge-runs    ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M7-parallel-calls-are-left-to-muse",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "\t\t\t\t\t'--no-parallel-tool-calls',\n",
+		replace: "\t\t\t\t\t// MUTANT: parallel calls left to Muse\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: parallel tool calls are switched off where the CLI has the switch (D5). WHO RELIES: the order of the host's calls, which must be the order the model meant. WHAT THE MUTATION DOES: the switch is left out. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M7-parallel-calls-are-left-to-muse ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M8-the-toolset-names-both-tools-whatever-the-grant",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "const toolset = turn.run.mintedToolNames.map((name) => `mcp__${server}__${name}`);",
+		replace: "const toolset = ['write_file', 'run_command'].map((name) => `mcp__${server}__${name}`); // MUTANT: the design's toolset, whatever the grant",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: the toolset names exactly the tools minted for the grant (D3). WHO RELIES: a work unit granted file-system alone: Muse refuses a run whose toolset names a tool it cannot resolve (\"unknown tool names\", MH-10 probe M12). WHAT THE MUTATION DOES: the design's two names are passed whatever was minted. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M8-the-toolset-names-both-tools-whatever-the-grant ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M9-the-prompt-rides-in-argv",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "\t\t\t\t\t'--prompt-file',\n\t\t\t\t\tturn.promptPath,\n",
+		replace: "\t\t\t\t\t'--prompt-file',\n\t\t\t\t\tturn.promptPath,\n\t\t\t\t\tturn.userPrompt, // MUTANT: the prompt in argv\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: the prompt goes in the prompt file, never in argv (D15, D40). WHO RELIES: every turn: argv is seen by every process on the host, and a failure diagnostic can echo it. WHAT THE MUTATION DOES: the user prompt is passed as an argument too. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M9-the-prompt-rides-in-argv   ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M10-muse-writes-into-the-operator-s-data-root",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "\t\t\t\tenvironment: { XDG_DATA_HOME: dataRootOf(turn.run, turn.turn) }\n",
+		replace: "\t\t\t\tenvironment: {} // MUTANT: no data root of the turn's own\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: each turn runs with a data root of its own, in host/ (D44; MH-10 probe M5). WHO RELIES: the operator's own store, which a turn would otherwise write its session log and tracing into, and the turn, which would load the operator's memory. WHAT THE MUTATION DOES: XDG_DATA_HOME is left out. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M10-muse-writes-into-the-operator-s-data-root ⎯⎯⎯⎯⎯⎯ Failed Tests 11 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M11-every-turn-shares-the-first-turn-s-data-root",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "\tjoin(run.hostDirectory, `muse-data-${turn}`);",
+		replace: "\tjoin(run.hostDirectory, `muse-data-${Math.min(turn, 1)}`); // MUTANT: every turn the first turn's data root",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: each turn's data root is its own (D16: a fresh CLI per try). WHO RELIES: a repair turn, whose record must be its own and whose Muse must not load an earlier turn's session. WHAT THE MUTATION DOES: every turn runs in the first turn's data root. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M11-every-turn-shares-the-first-turn-s-data-root ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M12-muse-no-auto-update-is-left-out",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "\t\tenvironment: { MUSE_NO_AUTO_UPDATE: '1' },\n",
+		replace: "\t\tenvironment: {}, // MUTANT: MUSE_NO_AUTO_UPDATE left out\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: the environment carries the design's MUSE_NO_AUTO_UPDATE=1 (§4.4; D43). WHO RELIES: a later program that is the launcher, which reads it (the binary does not, MH-10 probe M11). WHAT THE MUTATION DOES: the constant is left out. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M12-muse-no-auto-update-is-left-out ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M13-a-version-file-is-taken-as-it-is",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "\tif (!MUSE_RELEASE.test(release))\n",
+		replace: "\tif (!MUSE_RELEASE.test(release) && release === '') // MUTANT: the version file's contents taken as they are\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: the install's .muse-version must hold a release of Muse's own form, or the session is refused when it opens. WHO RELIES: the host, whose program a version file written by a model-run command could otherwise name (R12, R13). WHAT THE MUTATION DOES: any contents are taken as the release, so a path names another program. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M13-a-version-file-is-taken-as-it-is ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M14-a-missing-install-is-left-to-the-turn",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "\tif (installDirectory === undefined)\n",
+		replace: "\tif (installDirectory === undefined) return 'muse-bin.exe'; // MUTANT: no install left to the turn\n\tif (installDirectory === '')\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: a host that names no install folder refuses the session when it opens, saying why. WHO RELIES: the operator, who must learn why no Muse session opens, before any turn. WHAT THE MUTATION DOES: a program named nowhere is handed to the turn. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M14-a-missing-install-is-left-to-the-turn ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M15-the-override-is-ignored",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "\t\t\tprogram = host.programOverride ?? installedProgram(host.installDirectory);\n",
+		replace: "\t\t\tprogram = installedProgram(host.installDirectory); // MUTANT: the override is ignored\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: JPWB_MUSE_BIN, as captured, is run in the installed binary's place (D34; test mode alone, the selector refusing it elsewhere). WHO RELIES: a test standing in for Muse, which would otherwise start the operator's real Muse. WHAT THE MUTATION DOES: the override is ignored. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M15-the-override-is-ignored   ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M16-the-override-is-read-when-the-driver-is-made",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "\t\tprogramOverride: MUSE_BIN_OVERRIDE\n",
+		replace: "\t\tprogramOverride: process.env.JPWB_MUSE_BIN // MUTANT: read when the driver is made, not captured at load\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: the override is the one captured when the module loaded (D34, REG-F-459). WHO RELIES: a server whose JPWB_MUSE_BIN was set after it started, when the selector, holding the capture, refuses nothing. WHAT THE MUTATION DOES: the environment is read when the driver is made, so a program the selector never saw runs. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M16-the-override-is-read-when-the-driver-is-made ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M17-no-effort-starts-muse-anyway",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "\t\t\tif (turn.effort === undefined)\n\t\t\t\tthrow new Error(\n",
+		replace: "\t\t\tif (turn.effort === undefined) return { program, args: ['exec'] }; // MUTANT: started with no effort flag\n\t\t\tif (turn.effort === '')\n\t\t\t\tthrow new Error(\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: a turn handed no effort starts nothing (D32): Muse would take its own configuration's. WHO RELIES: every Muse turn, whose effort is configuration. WHAT THE MUTATION DOES: Muse is started with no effort flag. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M17-no-effort-starts-muse-anyway ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M18-the-installed-release-is-no-source",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "\t\t\t\t\t\t{\n\t\t\t\t\t\t\tname: 'Muse’s installed release (.muse-version)',\n\t\t\t\t\t\t\tpath: join(host.installDirectory, '.muse-version')\n\t\t\t\t\t\t},\n",
+		replace: "\t\t\t\t\t\t// MUTANT: the installed release is no source\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: .muse-version is fingerprinted before each turn, and a change refuses it (D44a). WHO RELIES: a session whose Muse was updated, or whose version file was rewritten, under it. WHAT THE MUTATION DOES: the version file is left off the sources. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M18-the-installed-release-is-no-source ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M19-muse-s-settings-are-no-source",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "\t\t\t{\n\t\t\t\tname: 'Muse’s settings (.config/muse/settings.json)',\n\t\t\t\tpath: join(configuration, 'settings.json')\n\t\t\t},\n",
+		replace: "\t\t\t// MUTANT: Muse's settings are no source\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: settings.json is fingerprinted before each turn (D44a): Muse loads it (settings.load source=\"user_settings\", MH-10 probe). WHO RELIES: the next try, which a model-run command could steer by rewriting Muse's settings. WHAT THE MUTATION DOES: the settings are left off the sources. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M19-muse-s-settings-are-no-source ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M20-a-missing-log-reads-as-an-empty-one",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "\tif (logs.length === 0) return { read: 'ABSENT' };\n\t// ⛔ ONE SESSION PER TURN: a second log in the turn's own root is one the host cannot place.\n\tconst sessionLog = logs.length === 1 ? readFileSync(logs[0]!, 'utf8') : null;\n",
+		replace: "\t// MUTANT: a missing log read as an empty one\n\tconst sessionLog = logs.length === 1 ? readFileSync(logs[0]!, 'utf8') : logs.length === 0 ? '' : null;\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: no session log is an ABSENT record (D14a). WHO RELIES: the surface proof, which an absent record must fail. WHAT THE MUTATION DOES: a missing log is read as an empty one. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M20-a-missing-log-reads-as-an-empty-one ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M21-the-first-of-two-logs-is-taken",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "\tconst sessionLog = logs.length === 1 ? readFileSync(logs[0]!, 'utf8') : null;\n",
+		replace: "\tconst sessionLog = logs.length >= 1 ? readFileSync(logs[0]!, 'utf8') : null; // MUTANT: the first log found is the turn's\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: a turn's root holding two session logs is UNPARSEABLE: the host cannot place the turn's. WHO RELIES: the record the turn is judged on. WHAT THE MUTATION DOES: the first log found is taken. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M21-the-first-of-two-logs-is-taken ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M22-a-line-that-is-no-json-is-skipped",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "\t\tif (record === undefined) return undefined;\n",
+		replace: "\t\tif (record === undefined) continue; // MUTANT: a line that is not JSON is skipped\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: a line that is not a JSON object makes the record UNPARSEABLE. WHO RELIES: the surface proof and the calls, which a cut record must not seem to carry whole. WHAT THE MUTATION DOES: such a line is skipped. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M22-a-line-that-is-no-json-is-skipped ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M23-a-transaction-s-records-are-passed-over",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "\t\t\trecord.retained_frame === undefined ? [record as MuseRecord] : childrenOf(record);\n",
+		replace: "\t\t\t[record as MuseRecord]; // MUTANT: a transaction's records passed over\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: records Muse commits inside a retained transaction are read in their place. WHO RELIES: the breach check, which a tool run recorded inside one would otherwise escape. WHAT THE MUTATION DOES: a transaction's records are passed over. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M23-a-transaction-s-records-are-passed-over ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M24-no-model-request-proves-an-empty-surface",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "\tif (configured.length === 0) return undefined;\n",
+		replace: "\tif (configured.length === 0) return new Set<string>(); // MUTANT: no request proves an empty surface\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: a record with no configured model request proves no surface (D14a). WHO RELIES: the surface proof. WHAT THE MUTATION DOES: no request reads as an empty surface. OBSERVED (bun run mutants -- MH10-M24-no-model-request-proves-an-empty-surface; its first run reported 'SURVIVED       MH10-M24-no-model-request-proves-an-empty-surface Tests  34 passed (34)', because its victim row also tripped the tracing count's check, and the row now trips the request check alone, 2026-10-18, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M24-no-model-request-proves-an-empty-surface ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M25-a-toolset-that-is-no-list-is-passed-over",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "\t\tif (!Array.isArray(active) || !active.every((n) => typeof n === 'string')) return undefined;\n",
+		replace: "\t\tif (!Array.isArray(active)) continue; // MUTANT: a toolset that is no list is passed over\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: every configured request names its active tools as a list of names. WHO RELIES: the surface proof. WHAT THE MUTATION DOES: a toolset that is no list is passed over. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M25-a-toolset-that-is-no-list-is-passed-over ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M26-another-server-s-tool-is-passed-over",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "\tentries.every((entry) => (entry as { readonly server_name?: unknown })?.server_name === server);",
+		replace: "\tentries.every((entry) => (entry as { readonly server_name?: unknown })?.server_name !== undefined); // MUTANT: another server's tool passed over",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: every MCP tool Muse saw is the host's server's (D14, in the turn). WHO RELIES: the host, against a server the operator's settings add, which Muse would start. WHAT THE MUTATION DOES: another server's tool is accepted. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M26-another-server-s-tool-is-passed-over ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M27-no-tracing-line-is-accepted",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "\tif (lines.length === 0) return false;\n",
+		replace: "\tif (lines.length === 0) return true; // MUTANT: no tracing line is accepted\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: Muse's own tracing must count the tools it registered (D14a). WHO RELIES: the surface proof, against provider-hosted and deferred tools no list shows. WHAT THE MUTATION DOES: a record with no tracing line is accepted. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M27-no-tracing-line-is-accepted ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M28-a-deferred-tool-is-passed-over",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "\t\t\tcountIn(line, DEFERRED_COUNT) === 0 &&\n",
+		replace: "\t\t\ttrue /* MUTANT: a deferred tool passed over */ &&\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: none of the tools Muse registered is deferred. WHO RELIES: the surface proof: a deferred tool could be loaded later, unlisted. WHAT THE MUTATION DOES: a deferred tool is passed over. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M28-a-deferred-tool-is-passed-over ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M29-a-provider-hosted-tool-is-passed-over",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "\t\t\tcountIn(line, HOSTED_COUNT) === 0\n",
+		replace: "\t\t\ttrue /* MUTANT: a provider-hosted tool passed over */\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: none of the tools Muse registered is hosted by the provider. WHO RELIES: the surface proof: a provider-hosted tool runs where the host sees nothing. WHAT THE MUTATION DOES: a provider-hosted tool is passed over. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M29-a-provider-hosted-tool-is-passed-over ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M30-the-active-count-is-not-compared",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "\t\t\tcountIn(line, ACTIVE_COUNT) === active &&\n",
+		replace: "\t\t\ttrue /* MUTANT: the active count is not compared */ &&\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: Muse's tracing counts as many active tools as the requests name. WHO RELIES: the surface proof. WHAT THE MUTATION DOES: the count is not compared. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M30-the-active-count-is-not-compared ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M31-muse-s-own-tools-are-dropped-from-the-surface",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "\treturn [...names].map((name) =>\n",
+		replace: "\treturn [...names].filter((name) => name.startsWith(prefix)).map((name) => // MUTANT: Muse's own tools dropped from the surface\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: a surface that offers a tool of Muse's own is a breach (D14a, D21). WHO RELIES: the workspace, whose taint marks a turn whose CLI offered its model its own tools. WHAT THE MUTATION DOES: Muse's own tools are dropped from the surface. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M31-muse-s-own-tools-are-dropped-from-the-surface ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M32-the-host-s-names-are-kept-whole",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "\t\t? { kind: 'HOST_CALL', name: name.slice(prefix.length), sent: happened }\n",
+		replace: "\t\t? { kind: 'HOST_CALL', name, sent: happened } // MUTANT: the host's names kept whole\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: a host call is named by its minted name (D21). WHO RELIES: the cross-check of the record's host calls with the host's own. WHAT THE MUTATION DOES: the canonical mcp__jpwb__ names are kept. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M32-the-host-s-names-are-kept-whole ⎯⎯⎯⎯⎯⎯ Failed Tests 10 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M33-muse-s-own-effects-are-passed-over",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "\t\t\tevents.push(calledEvent(record.payload!.record!.tool_name as string, true, prefix));\n",
+		replace: "\t\t\tif ((record.payload!.record!.tool_name as string).startsWith(prefix)) events.push(calledEvent(record.payload!.record!.tool_name as string, true, prefix)); // MUTANT: Muse's own effects passed over\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: a tool of Muse's own that ran is a breach (D21). WHO RELIES: the workspace, which a tool of Muse's own may have written. WHAT THE MUTATION DOES: Muse's own effects are passed over. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M33-muse-s-own-effects-are-passed-over ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M34-a-call-muse-never-started-is-dropped",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "\t\t\t\tif (!started.has(call.callId)) events.push(calledEvent(call.name, false, prefix));\n",
+		replace: "\t\t\t\tif (!started.has(call.callId) && call.callId === '') events.push(calledEvent(call.name, false, prefix)); // MUTANT: dropped\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: a call the model committed that Muse never started is a refused attempt (D3, D21). WHO RELIES: the record, which keeps every attempt as NOT_MINTED exists to, and D19's refusal row. WHAT THE MUTATION DOES: such a call is dropped. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M34-a-call-muse-never-started-is-dropped ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M35-a-committed-call-is-read-as-sent",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "\t\t\t\tif (!started.has(call.callId)) events.push(calledEvent(call.name, false, prefix));\n",
+		replace: "\t\t\t\tevents.push(calledEvent(call.name, true, prefix)); // MUTANT: a committed call read as sent\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: a committed call is SENT only when Muse started its effect (D21). WHO RELIES: the refusal row (CLI_ENDED_ON_REFUSAL). WHAT THE MUTATION DOES: every committed call is read as sent. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M35-a-committed-call-is-read-as-sent ⎯⎯⎯⎯⎯⎯ Failed Tests 10 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M36-the-last-step-s-model-alone",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "\tconst models = completed.map((e) => e!.model);\n",
+		replace: "\tconst models = completed.slice(-1).map((e) => e!.model); // MUTANT: the last step's model alone\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: every model step's model is read (D22). WHO RELIES: the record, whose producer must be every model that served. WHAT THE MUTATION DOES: the last step's model alone is read, the reviewer's defect (devin-reviewer.ts .at(-1)). OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M36-the-last-step-s-model-alone ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M37-a-model-less-step-is-passed-over",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "\tconst models = completed.map((e) => e!.model);\n",
+		replace: "\tconst models = completed.map((e) => e!.model).filter((m) => m !== null); // MUTANT: a model-less step passed over\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: a model step that names no model makes the record UNPARSEABLE (D22). WHO RELIES: the identity grade, which an unnamed step would leave unread. WHAT THE MUTATION DOES: such a step is passed over. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M37-a-model-less-step-is-passed-over ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M38-the-failed-terminal-is-passed-over",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "\tconst failedRun = out.filter((r) => r.payload_type === 'run.terminal.failed').at(-1);\n",
+		replace: "\tconst failedRun = out.filter((r) => r.payload_type === 'run.terminal.failed!').at(-1); // MUTANT: the failed terminal passed over\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: a run.terminal.failed reason is the excerpt of a known error shape (D19a). WHO RELIES: the operator, who must learn why a turn failed. WHAT THE MUTATION DOES: the failed terminal is passed over. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M38-the-failed-terminal-is-passed-over ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M39-the-reasoning-summaries-are-dropped",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "\t\t...(summaries.length === 0 ? {} : { volunteeredReasoning: summaries.join('\\n\\n') }),\n",
+		replace: "\t\t// MUTANT: the reasoning summaries dropped\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: the reasoning summaries are volunteered reasoning (D23). WHO RELIES: the PER-12 retention, which must see reasoning that arose. WHAT THE MUTATION DOES: they are dropped, read as none having arisen. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M39-the-reasoning-summaries-are-dropped ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M40-the-first-error-line-is-the-excerpt",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "\t\t\tconst known = lines.find((line) => KNOWN_ERROR_LINES.some((shape) => shape.test(line)));\n",
+		replace: "\t\t\tconst known = lines[0]; // MUTANT: the first line, whatever its shape\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: only a line of a known shape is an excerpt (D19a, D24). WHO RELIES: every clean turn: Muse writes its workspace root on every run. WHAT THE MUTATION DOES: the first line is the excerpt. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M40-the-first-error-line-is-the-excerpt ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M41-a-run-that-ended-failed-is-no-known-shape",
+		file: "apps/rph-demo/src/lib/server/tools/muse-executor-driver.ts",
+		find: "const KNOWN_ERROR_LINES = [/^muse: -c \\S+: refusing run: /, /^run ended with Failed: /];",
+		replace: "const KNOWN_ERROR_LINES = [/^muse: -c \\S+: refusing run: /]; // MUTANT: a run that ended failed is no known shape",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/muse-executor-driver.test.ts"],
+		why: "PROMISE: Muse's \"run ended with Failed:\" line is a known shape (D24). WHO RELIES: the operator, as for MH10-M38. WHAT THE MUTATION DOES: the shape is not known. OBSERVED (bun run mutants -- MH10-M1 to MH10-M41 but M24, by their full ids, re-measured after MH10-M24's victim row was corrected, the victim being their own, 2026-10-18 to 2026-10-19, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M41-a-run-that-ended-failed-is-no-known-shape ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M42-muse-is-not-wired",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "\tObject.hasOwn(WIRED_EXECUTORS, toolId);",
+		replace: "\tObject.hasOwn(WIRED_EXECUTORS, toolId) && toolId !== 'muse'; // MUTANT: Muse is not wired",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
+		why: "PROMISE: Muse is wired to the CLI kind (D30; the sponsor’s S4). WHO RELIES: an operator who sets JPWB_EXECUTOR=muse. WHAT THE MUTATION DOES: Muse is refused as unwired. OBSERVED (bun run mutants -- the 53 MH10 ids and the seven entries MH-10 re-anchored, by their full ids, 2026-10-18, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M42-muse-is-not-wired         ⎯⎯⎯⎯⎯⎯ Failed Tests 105 ⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M43-the-cli-selection-loses-its-effort",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "\t\treturn { kind: 'CLI', toolId, modelId, ...(effort === undefined ? {} : { effort }) };\n",
+		replace: "\t\treturn { kind: 'CLI', toolId, modelId }; // MUTANT: the CLI selection without its effort\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
+		why: "PROMISE: a CLI selection carries the effort its tool takes (D32). WHO RELIES: the Muse driver, which starts nothing without one. WHAT THE MUTATION DOES: the effort is dropped. OBSERVED (bun run mutants -- the 53 MH10 ids and the seven entries MH-10 re-anchored, by their full ids, 2026-10-18, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M43-the-cli-selection-loses-its-effort ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M44-no-muse-family",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "\t'Muse Wonder 1.0': [\n\t\t// `muse serve`'s model list: its id, which is also its label\n\t\t'muse-wonder-1.0'\n\t]\n",
+		replace: "\t'Muse Wonder 1.0': [] // MUTANT: no Muse family\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
+		why: "PROMISE: the family table places muse-wonder-1.0, from Muse's own listing (D33). WHO RELIES: a Muse executor beside the GLM reviewer. WHAT THE MUTATION DOES: Muse's model is unlisted, refused as unclassified. OBSERVED (bun run mutants -- the 53 MH10 ids and the seven entries MH-10 re-anchored, by their full ids, 2026-10-18, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M44-no-muse-family            ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M45-muse-has-no-program-variable",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "\tmuse: { variable: 'JPWB_MUSE_BIN', captured: 'muse' }\n",
+		replace: "\t// MUTANT: Muse has no program variable\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
+		why: "PROMISE: JPWB_MUSE_BIN is refused outside test mode (D34, REG-F-459). WHO RELIES: the record, which names Muse whatever program ran. WHAT THE MUTATION DOES: the override is not refused. OBSERVED (bun run mutants -- the 53 MH10 ids and the seven entries MH-10 re-anchored, by their full ids, 2026-10-18, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M45-muse-has-no-program-variable ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 9 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M46-the-muse-override-is-read-at-selection",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "\t\tmuse: MUSE_BIN_OVERRIDE,\n",
+		replace: "\t\tmuse: MUSE_BIN_OVERRIDE && process.env.JPWB_MUSE_BIN, // MUTANT: the environment at selection, not the driver's capture\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
+		why: "PROMISE: the override refused is the one the driver captured at load (D34). WHO RELIES: a server whose shell unset the variable after it started, while the driver still runs the capture. WHAT THE MUTATION DOES: the environment is read at selection. OBSERVED (bun run mutants -- the 53 MH10 ids and the seven entries MH-10 re-anchored, by their full ids, 2026-10-18, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M46-the-muse-override-is-read-at-selection ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M47-the-muse-override-is-no-selection-beside-a-replay",
+		file: "apps/rph-demo/src/lib/server/replay/replay-switch.ts",
+		find: "\t\t...(overrides.muse === undefined ? [] : ['JPWB_MUSE_BIN']),\n",
+		replace: "\t\t// MUTANT: the Muse override is no selection beside a replay\n",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replay-selection.test.ts"],
+		why: "PROMISE: a captured JPWB_MUSE_BIN refuses a replay beside it (D39; REG-D-112 (c)). WHO RELIES: an operator whose override would do nothing beside a replay. WHAT THE MUTATION DOES: it is not a live selection. OBSERVED (bun run mutants -- the 53 MH10 ids and the seven entries MH-10 re-anchored, by their full ids, 2026-10-18, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M47-the-muse-override-is-no-selection-beside-a-replay ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M48-the-gate-keeps-jpwb-muse-bin",
+		file: "verif/live-backend-isolation.ts",
+		find: "\t'JPWB_MUSE_BIN',\n",
+		replace: "",
+		expectRed: ["verif/live-backend-isolation.test.ts"],
+		why: "PROMISE: every gate entry point removes JPWB_MUSE_BIN before the driver captures it (D39). WHO RELIES: the gate, whose stand-ins an exported override would turn toward a real program. WHAT THE MUTATION DOES: it reaches every gate child. OBSERVED (bun run mutants -- the 53 MH10 ids and the seven entries MH-10 re-anchored, by their full ids, 2026-10-18, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M48-the-gate-keeps-jpwb-muse-bin ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M49-muse-declares-a-role-nothing-measured",
+		file: "apps/rph-demo/src/lib/server/tools/backing-tool.ts",
+		find: "\t\troles: ['EXECUTION'],\n",
+		replace: "\t\troles: ['EXECUTION', 'ASSURANCE'], // MUTANT: Muse declares a role nothing measured\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/backing-tool.test.ts"],
+		why: "PROMISE: the catalog declares only what was measured (D35). WHO RELIES: the reviewer selector, which would admit Muse as a reviewer nothing measured. WHAT THE MUTATION DOES: Muse declares ASSURANCE too. OBSERVED (bun run mutants -- the 53 MH10 ids and the seven entries MH-10 re-anchored, by their full ids, 2026-10-18, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M49-muse-declares-a-role-nothing-measured ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M50-the-table-lacks-muse",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-drivers.ts",
+		find: "\tmuse: () => museExecutorDriver()\n",
+		replace: "\tmuse_left_out: () => museExecutorDriver() // MUTANT: Muse's driver left out of the table\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-drivers.test.ts"],
+		why: "PROMISE: the driver table holds Muse's driver (D12). WHO RELIES: a Muse selection, which opens through the table. WHAT THE MUTATION DOES: the table holds no driver for muse. OBSERVED (bun run mutants -- the 53 MH10 ids and the seven entries MH-10 re-anchored, by their full ids, 2026-10-18, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M50-the-table-lacks-muse      ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M51-the-catalog-s-names-are-told",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\t\tserverName: HOST_TOOL_SERVER_NAME,\n\t\t\tmintedToolNames,\n",
+		replace: "\t\t\tserverName: HOST_TOOL_SERVER_NAME,\n\t\t\tmintedToolNames: ['write_file', 'run_command'], // MUTANT: the catalog's names, whatever the grant\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: the run folder names the tools minted for the grant (D3). WHO RELIES: a driver whose CLI's allow-list must name only minted tools (Muse's toolset). WHAT THE MUTATION DOES: the catalog's two names are told. OBSERVED (bun run mutants -- the 53 MH10 ids and the seven entries MH-10 re-anchored, by their full ids, 2026-10-18, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M51-the-catalog-s-names-are-told ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M52-the-turn-s-own-environment-is-dropped",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\t\t\tenv: cliEnvironment(driver, invocation),\n",
+		replace: "\t\t\t\tenv: cliEnvironment(driver, { program: '', args: [] }), // MUTANT: the turn's own environment dropped\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: an invocation's own environment reaches that start (D43). WHO RELIES: a driver whose per-turn value names a folder of the turn (Muse's data root). WHAT THE MUTATION DOES: the turn's own environment is dropped. OBSERVED (bun run mutants -- the 53 MH10 ids and the seven entries MH-10 re-anchored, by their full ids, 2026-10-18, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M52-the-turn-s-own-environment-is-dropped ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
+	},
+	{
+		id: "MH10-M53-the-preflight-s-own-environment-is-dropped",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\t\t\t{ cwd: cliDirectory, env: cliEnvironment(driver, check.invocation) },\n",
+		replace: "\t\t\t\t{ cwd: cliDirectory, env: cliEnvironment(driver, { program: '', args: [] }) }, // MUTANT: the preflight's own environment dropped\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE: a preflight invocation's own environment reaches the preflight (D43). WHO RELIES: a driver whose preflight needs a folder of the run. WHAT THE MUTATION DOES: the preflight's own environment is dropped. OBSERVED (bun run mutants -- the 53 MH10 ids and the seven entries MH-10 re-anchored, by their full ids, 2026-10-18, in the MH-10 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH10-M53-the-preflight-s-own-environment-is-dropped ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-10 - the Muse driver (DESIGN-multi-harness-executor.md §4.4, D12, D30, D34, D35, D39; the sponsor’s answers of 2026-10-18, S4; MH-10’s probes P1 to P3): built as designed, with the MCP entry, the data root of the turn’s own and the session log the probes measured"
 	}
 ];

@@ -335,7 +335,7 @@ describe('⭐ the lane refuses the executor the product refuses, asked without a
 			const product = selectExecutor({
 				testMode: false,
 				env: { JPWB_EXECUTOR: tool, JPWB_EXECUTOR_MODEL: 'fixture-model' },
-				overrides: { ...NO_OVERRIDES, codex: undefined }
+				overrides: { ...NO_OVERRIDES, codex: undefined, muse: undefined }
 			});
 			expect(wiredExecutor(tool) !== undefined, JSON.stringify(tool)).toBe(
 				product.kind !== 'REFUSED'
@@ -394,7 +394,8 @@ describe('⭐ the lane refuses the executor the product refuses, asked without a
 						overrides: {
 							agy: row.env.JPWB_AGY_BIN,
 							devin: row.env.JPWB_DEVIN_BIN,
-							codex: undefined
+							codex: undefined,
+							muse: undefined
 						}
 					});
 					const faults = faultsOf(laneKeysRefusal(env));
@@ -426,7 +427,7 @@ describe('⭐ the lane refuses the executor the product refuses, asked without a
 			selectExecutor({
 				testMode: false,
 				env,
-				overrides: { agy: 'C:/fixture/agy.exe', devin: undefined, codex: undefined },
+				overrides: { agy: 'C:/fixture/agy.exe', devin: undefined, codex: undefined, muse: undefined },
 				reviewer
 			})
 		).toEqual({ kind: 'PI', modelId: COMPLETE.JPWB_EXECUTOR_MODEL });
@@ -451,7 +452,7 @@ describe('⭐ the lane refuses the executor the product refuses, asked without a
 				selectExecutor({
 					testMode: false,
 					env,
-					overrides: { ...NO_OVERRIDES, codex: undefined },
+					overrides: { ...NO_OVERRIDES, codex: undefined, muse: undefined },
 					reviewer: assurancePreflight({ testMode: false, env }).reviewer
 				}),
 				`the product, beside the lane’s own reviewer`

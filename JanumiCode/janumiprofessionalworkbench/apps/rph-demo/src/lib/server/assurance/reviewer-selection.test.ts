@@ -152,8 +152,13 @@ describe('what a refusal SAYS — it names the fault, and every one carries the 
 			tool: 'pi',
 			says: "The reviewing tool 'pi' (JPWB_ASSURANCE_TOOL) declares the ASSURANCE role, but no reviewer adapter"
 		},
-		// ⭑ The catalog's own refusal, carried whole — it lists what this host CAN drive.
-		{ tool: 'nope', says: "Unknown backing tool 'nope'. This host can drive: agy, pi, devin." }
+		// ⭑ The catalog's own refusal, carried whole — it lists what this host CAN drive, ⭐ Muse among it since `JAN-MHX`
+		// MH-10, though Muse declares no ASSURANCE role (the next case).
+		{ tool: 'nope', says: "Unknown backing tool 'nope'. This host can drive: agy, pi, devin, muse." },
+		{
+			tool: 'muse',
+			says: "The reviewing tool 'muse' (JPWB_ASSURANCE_TOOL) is refused: Backing tool 'muse' does not declare the ASSURANCE role (it declares: EXECUTION)."
+		}
 	];
 	for (const r of REASONS)
 		it(`tool ${JSON.stringify(r.tool)}: "${r.says}"`, () => {
