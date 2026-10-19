@@ -34,8 +34,8 @@
 // — or throws — as the case scripts, and writes the ATIF export naming the CONFIGURED model; and a case may say what the
 // host's process-run observer saw (`processRuns`), which the route then joins as evidence and reviews.
 //
-// ⛔ HERMETIC. devin's exec seam starts nothing; the agy executor's seam answers the fixture and Pi's opener refuses,
-// though the stand-in opens neither; no process is started (a run is a value); PATH finds no program.
+// ⛔ HERMETIC. devin's exec seam starts nothing; ~~the agy executor's seam answers the fixture~~ ⭐ a CLI executor's
+// opener (`JAN-MHX` MH-5: agy's) and Pi's opener refuse, though the stand-in opens neither; no process is started (a run is a value); PATH finds no program.
 import { vi } from 'vitest';
 
 vi.hoisted(() => {
@@ -68,9 +68,10 @@ vi.mock('../../../lib/server/execution/model.js', async (importOriginal) => {
 		...actual,
 		getExecutionSession: vi.fn((selection: Parameters<typeof actual.getExecutionSession>[0]) => {
 			const open = actual.getExecutionSession(selection, {
-				agyExec: async (_file, args) => ({
-					stdout: await actual.deterministicExecutionPrint(args[1] ?? '')
-				}),
+				// ⭐ `JAN-MHX` MH-5 — ~~`agyExec`~~: agy executes as a CLI now, and no case here opens one.
+				openCli: async () => {
+					throw new Error('hermetic: no route test opens a CLI executor session');
+				},
 				openPi: async () => {
 					throw new Error('hermetic: no route test opens a real Pi session');
 				}

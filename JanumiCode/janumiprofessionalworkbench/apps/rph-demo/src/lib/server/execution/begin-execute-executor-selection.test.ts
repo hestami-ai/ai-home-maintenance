@@ -23,8 +23,9 @@
 //     stand-in records no configured model.
 //   · The REVIEWER is asked first (D4): with both refused, the operator is shown the reviewer's refusal.
 //
-// ⛔ HERMETIC. Every session the route opens goes through the seams — agy through a capturing `AgyExec` that answers
-// with the fixture's envelope (or what a case scripted), Pi through an opener that refuses — devin's reviewer adapter
+// ⛔ HERMETIC. Every session the route opens goes through the seams — ~~agy through a capturing `AgyExec`~~ ⭐ `JAN-MHX`
+// MH-5: agy's CLI executor through a capturing `openCli`, a one-shot session that answers with the fixture's envelope (or
+// what a case scripted), Pi through an opener that refuses — devin's reviewer adapter
 // refuses too, and PATH finds no program. The server-mode refusals admit devin as the REVIEWER, and on their green path
 // nothing is dispatched; a mutant that let one dispatch would reach `devinPrint`, so it is replaced here rather than
 // left to PATH alone (`JAN-SELRES` RS-1's verification). Admitted SERVER-mode executors are pinned at SELECTOR level
@@ -37,37 +38,39 @@ vi.hoisted(() => {
 
 /**
  * What the executor seams saw, and what agy answers next. Hoisted, because the `model.js` factory below runs before
- * this file's body. `agyAnswers` is a queue a case may fill: each agy call takes the next, and the fixture's envelope
- * once it is empty.
+ * this file's body. `agyAnswers` is a queue a case may fill: each agy ~~call~~ ⭐ turn takes the next, and the fixture's
+ * envelope once it is empty. ⭐ `JAN-MHX` MH-5 — `agy` holds each turn agy's CLI executor was given: the selection its
+ * session was opened with, and the turn's text.
  */
 const seam = vi.hoisted(() => ({
-	agy: [] as { readonly file: string; readonly args: readonly string[] }[],
+	agy: [] as { readonly toolId: string; readonly modelId: string; readonly text: string }[],
 	pi: [] as string[],
 	agyAnswers: [] as string[]
 }));
 
 vi.mock('./model.js', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('./model.js')>();
+	const { oneShotSession } = await import('./producer-session.js');
 	return {
 		...actual,
 		// ⭑ THE ROUTE'S OWN SELECTION IS OPENED — only the ~~two~~ runnable seams are replaced, never the choice.
 		getExecutionSession: vi.fn((selection: Parameters<typeof actual.getExecutionSession>[0]) =>
 			actual.getExecutionSession(selection, {
-				agyExec: async (file, args) => {
-					seam.agy.push({ file, args });
-					return {
-						stdout:
-							seam.agyAnswers.shift() ?? (await actual.deterministicExecutionPrint(args[1] ?? ''))
-					};
+				// ⭐ `JAN-MHX` MH-5 — ~~`agyExec`~~: agy executes as a CLI now. ⚠ A ONE-SHOT SESSION THAT ANSWERS, NOT agy's REAL
+				// ONE, which passes no turn until agy's record can prove its tool surface (`tools/agy-executor-driver.ts`): these
+				// cases are the route's, and the real session's own are in `model.test.ts` and the driver's test.
+				// ⭐ `JAN-MHX` MH-4, the check's fix — and for every other tool the CLI executor's opener, which would start the
+				// tool's own program, refuses: no route test opens a real devin.
+				openCli: async (_context, cli) => {
+					if (cli.toolId !== 'agy') throw new Error('hermetic: no route test opens a real CLI executor');
+					return oneShotSession(async (text: string) => {
+						seam.agy.push({ toolId: cli.toolId, modelId: cli.modelId, text });
+						return seam.agyAnswers.shift() ?? (await actual.deterministicExecutionPrint(text));
+					});
 				},
 				openPi: async (_context, modelId) => {
 					seam.pi.push(modelId);
 					throw new Error('hermetic: no route test opens a real Pi session');
-				},
-				// ⭐ `JAN-MHX` MH-4, the check's fix — and the CLI executor's opener, which would start the tool's own program:
-				// no route test opens a real devin.
-				openCli: async () => {
-					throw new Error('hermetic: no route test opens a real CLI executor');
 				}
 			})
 		)
@@ -310,7 +313,9 @@ const executionExchanges = () =>
 		.filter((x) => x.plane === 'EXECUTION');
 
 describe('⭐ D2 + D4 — the model agy runs is the model recorded, from one selection (REG-F-458)', () => {
-	it('⛔ agy executing with JPWB_EXECUTOR_MODEL=x and JPWB_JUDGE_MODEL=y: argv carries x, never y, and the record names x, HOST_CONFIGURED', async () => {
+	// ⭐ `JAN-MHX` MH-5 — ~~argv carries x~~: agy's CLI session is opened with the selection, whose model its driver passes as
+	// `--model` on every turn (`tools/agy-executor-driver.test.ts` pins that argv).
+	it('⛔ agy executing with JPWB_EXECUTOR_MODEL=x and JPWB_JUDGE_MODEL=y: its session is opened with x, never y, and the record names x, HOST_CONFIGURED', async () => {
 		vi.stubEnv('JPWB_EXECUTOR', 'agy');
 		vi.stubEnv('JPWB_EXECUTOR_MODEL', 'fixture-executor-x');
 		vi.stubEnv('JPWB_JUDGE_MODEL', 'fixture-judge-y');
@@ -324,11 +329,9 @@ describe('⭐ D2 + D4 — the model agy runs is the model recorded, from one sel
 			/^The model ran/
 		);
 		expect(seam.agy.length, 'agy was never called').toBeGreaterThan(0);
-		for (const { args } of seam.agy) {
-			expect(args[args.indexOf('--model') + 1], 'the model agy was asked to run').toBe(
-				'fixture-executor-x'
-			);
-			expect(args, 'the judge model reached the executor’s argv').not.toContain('fixture-judge-y');
+		for (const { toolId, modelId } of seam.agy) {
+			expect(toolId).toBe('agy');
+			expect(modelId, 'the model agy was asked to run').toBe('fixture-executor-x');
 		}
 		const exchanges = executionExchanges();
 		expect(exchanges.length, 'no EXECUTION exchange was recorded').toBeGreaterThan(0);
@@ -341,7 +344,7 @@ describe('⭐ D2 + D4 — the model agy runs is the model recorded, from one sel
 		}
 	});
 
-	it('⛔ and on a REPAIR turn too: the second agy call runs x, and both tries’ EXECUTION records name x', async () => {
+	it('⛔ and on a REPAIR turn too: the second agy turn runs x, and both tries’ EXECUTION records name x', async () => {
 		// ⭑ ONE SELECTION, EVERY TRY. The model is read once, before dispatch, and the session and the record's fallback
 		// identity both come from it — so a per-try re-read would show only on a turn after the first, which no other
 		// case here reaches. The first answer's only value restates its prompt: the stand-in reports the structural
@@ -358,18 +361,14 @@ describe('⭐ D2 + D4 — the model agy runs is the model recorded, from one sel
 			/^The model ran/
 		);
 		expect(seam.agy.length, 'no repair turn ran — no finding was sent back').toBe(2);
-		expect(seam.agy[0]!.args[1], 'arrangement: the first answer restates its own prompt').toContain(
+		expect(seam.agy[0]!.text, 'arrangement: the first answer restates its own prompt').toContain(
 			RESTATED
 		);
-		expect(seam.agy[1]!.args[1], 'the second turn is the REPAIR, carrying the finding').toContain(
+		expect(seam.agy[1]!.text, 'the second turn is the REPAIR, carrying the finding').toContain(
 			'RR-01-no-problem-substitution'
 		);
-		for (const { args } of seam.agy) {
-			expect(args[args.indexOf('--model') + 1], 'the model agy was asked to run').toBe(
-				'fixture-executor-x'
-			);
-			expect(args, 'the judge model reached the executor’s argv').not.toContain('fixture-judge-y');
-		}
+		for (const { modelId } of seam.agy)
+			expect(modelId, 'the model agy was asked to run').toBe('fixture-executor-x');
 		const exchanges = executionExchanges();
 		expect(exchanges.length, 'one EXECUTION exchange per try').toBe(2);
 		for (const x of exchanges) {

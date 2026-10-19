@@ -13,7 +13,6 @@
 // `JPWB_EXECUTOR_MODEL`), read ONCE by the executor selector (`executor-selection.ts`) before dispatch, and this module
 // opens what that selection names; it reads no environment and no test-mode constant of its own. The binding still
 // gets its meaning when it gets an editor.
-import { agyPrintWithModel, type AgyExec } from '../assurance/agy-cli.js';
 import type { RunnableExecutorSelection } from './executor-selection.js';
 import { openReplayExecutionSession } from '../replay/replay-executor.js';
 import { replayRunFor } from '../replay/replay-run.js';
@@ -58,10 +57,11 @@ export async function deterministicExecutionPrint(prompt: string): Promise<strin
 }
 
 /**
- * ⭐ `JAN-SELRES` RS-1 (D4) — the ~~two~~ ⭐ three seams `getExecutionSession` opens through, injectable ONLY so the gate
- * can reach ~~both~~ ⭐ every runnable branch: the `AgyExec` precedent (`agy-cli.ts`).
- *   · `agyExec` — handed to `agyPrintWithModel`, so a test sees the argv (the model agy is asked to run) and a failure's
- *     sanitised text, and nothing is spawned.
+ * ⭐ `JAN-SELRES` RS-1 (D4) — the ~~two~~ ⭐ ~~three~~ ⭐ two seams `getExecutionSession` opens through, injectable ONLY so
+ * the gate can reach ~~both~~ ⭐ every runnable branch: the `AgyExec` precedent (`agy-cli.ts`).
+ *   · ~~`agyExec` — handed to `agyPrintWithModel`, so a test sees the argv (the model agy is asked to run) and a failure's
+ *     sanitised text, and nothing is spawned.~~ ⭐ `JAN-MHX` MH-5 — GONE with the text-only agy executor it reached: agy
+ *     executes as a CLI, through `openCli`.
  *   · `openPi` — the Pi opener. ⚠ Its default is the LAZY import below, so ~~the gate never loads Pi's SDK~~ ⭐ loading
  *     this module loads no part of Pi's SDK (R3-C: the gate loads Pi's coding agent in one test alone,
  *     `tools/pi-executor.test.ts`); a test hands in its own and so never opens a real Pi session.
@@ -69,7 +69,6 @@ export async function deterministicExecutionPrint(prompt: string): Promise<strin
  *     lazy, finds the tool's driver (`tools/cli-executor-drivers.ts`) and opens `openCliExecutionSession` with it.
  */
 export interface ExecutionSessionDeps {
-	readonly agyExec?: AgyExec;
 	readonly openPi?: (context: ProducerSessionContext, modelId: string) => Promise<ProducerSession>;
 	readonly openCli?: (
 		context: ProducerSessionContext,
@@ -87,7 +86,7 @@ export interface ExecutionSessionDeps {
  * `selectExecutor` before its dispatch batch and returns a refusal with its guidance, so this takes only a RUNNABLE
  * selection — a refusal cannot reach an executor by type. ⛔ What still fails here, after dispatch, is recorded as a
  * failed step rather than swallowed: an unresolvable Pi model (resolving one needs Pi's SDK, which ~~the gate never
- * loads~~ ⭐ this module does not load), a sandbox refusal, and an agy call that fails.
+ * loads~~ ⭐ this module does not load), a sandbox refusal, and ~~an agy call that fails~~ ⭐ a CLI session that cannot open.
  */
 export function getExecutionSession(
 	selection: RunnableExecutorSelection,
@@ -151,13 +150,13 @@ export function getExecutionSession(
 				(await import('../tools/pi-executor.js')).openPiExecutionSession(context, modelId));
 		return async (context) => openPi(context, selection.modelId);
 	}
-	// ⚠ `agy --print` is a fresh process per call: no memory, and the session says so.
-	// ⭐ `JAN-SELRES` RS-1 (D2; `REG-F-458`) — AND IT RUNS THE SELECTION'S MODEL. This called `agyPrint`, which pins
-	// `JPWB_JUDGE_MODEL`, while the step recorded `JPWB_EXECUTOR_MODEL`: with agy on both sides, both calls ran one model
-	// and the record showed two. `agyPrintWithModel` shares `agyPrint`'s argv, bounds and sanitising catch.
-	if (selection.kind === 'AGY')
-		return async () =>
-			oneShotSession((prompt: string) => agyPrintWithModel(prompt, selection.modelId, deps.agyExec));
+	// ~~⚠ `agy --print` is a fresh process per call: no memory, and the session says so.~~
+	// ~~⭐ `JAN-SELRES` RS-1 (D2; `REG-F-458`) — AND IT RUNS THE SELECTION'S MODEL. …~~
+	// ~~`if (selection.kind === 'AGY') return async () => oneShotSession((prompt) => agyPrintWithModel(prompt, …))`~~
+	// ⭐ `JAN-MHX` MH-5 (D30) — RETIRED, STRUCK IN PLACE: the text-only agy executor, a fresh `agy --print` per try with no
+	// workspace and no tools, which sent a repair's findings alone to a process that had never seen the task. agy now
+	// executes as a CLI (the `CLI` branch below, through `tools/agy-executor-driver.ts`), and the model it runs is still the
+	// one the record names (`REG-F-458`): the opener hands the driver the selection's.
 	// ⭐⭐ `JAN-EXEC` Phase 8 (`DESIGN-phase-7-completion.md` §5 D2; `REG-F-530`) — THE FOURTH SESSION: the executor answering
 	// from the recording `JPWB_REPLAY` names (`replay/replay-executor.ts`), opened only for a REPLAY selection, which the
 	// selector answers in test mode alone. ⛔ The recording is read when the step OPENS its producer, never at selection: a
@@ -165,8 +164,9 @@ export function getExecutionSession(
 	if (selection.kind === 'REPLAY')
 		return async (context) => openReplayExecutionSession(context, replayRunFor(selection.recordingDir));
 	// ⭐⭐ `JAN-MHX` MH-1 (D12, D30) — THE FIFTH SESSION: an external CLI, executing through the host's own tool server, with the
-	// driver its tool names. ⚠ Nothing selects it until a driver's package wires its tool (`executor-selection.ts`), and with
-	// no driver for the tool it opens nothing. Loaded lazily, as Pi is, so selecting a CLI costs nothing and loads nothing.
+	// driver its tool names. ~~⚠ Nothing selects it until a driver's package wires its tool (`executor-selection.ts`)~~ ⭐ MH-5:
+	// agy is selected as one; with no driver for the tool it opens nothing. Loaded lazily, as Pi is, so selecting a CLI costs
+	// nothing and loads nothing.
 	if (selection.kind === 'CLI') {
 		const openCli =
 			deps.openCli ??

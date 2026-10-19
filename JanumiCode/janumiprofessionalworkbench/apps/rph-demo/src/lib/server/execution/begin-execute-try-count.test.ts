@@ -11,8 +11,10 @@
 // held against an INDEPENDENT one: every try records its own EXECUTION exchange (`PER-9`), so the number of those is
 // the number of tries, whatever the message says.
 //
-// ⛔ HERMETIC, on `begin-execute-executor-selection.test.ts`'s arrangement: agy through a capturing `AgyExec` that answers
-// with the fixture's envelope or what a case scripted, Pi through an opener that refuses, devin's reviewer adapter
+// ⛔ HERMETIC, on `begin-execute-executor-selection.test.ts`'s arrangement: agy through a capturing ~~`AgyExec`~~ ⭐
+// `openCli` (`JAN-MHX` MH-5: agy executes as a CLI) that answers with the fixture's envelope or what a case scripted —
+// a one-shot session, not agy's real one, which passes no turn until agy's record can prove its tool surface
+// (`tools/agy-executor-driver.ts`) — Pi through an opener that refuses, devin's reviewer adapter
 // refusing, and PATH finding no program. Test mode, and no reviewer named, so the declared stand-in reviews.
 import { vi } from 'vitest';
 
@@ -20,10 +22,11 @@ vi.hoisted(() => {
 	process.env.RPH_DEMO_MODE = 'test';
 });
 
-/** What the executor seams saw, and what agy answers next — the RS-1 queue: each call takes the next, then the fixture.
- *  `trend` scripts the loop's trend for the one case that must run to the repair bound; unset, the real one answers. */
+/** What the executor seams saw, and what agy answers next — the RS-1 queue: each ~~call~~ ⭐ turn takes the next, then the
+ *  fixture. `trend` scripts the loop's trend for the one case that must run to the repair bound; unset, the real one
+ *  answers. ⭐ `JAN-MHX` MH-5 — `agy` holds the text of each turn agy's CLI executor was given. */
 const seam = vi.hoisted(() => ({
-	agy: [] as { readonly file: string; readonly args: readonly string[] }[],
+	agy: [] as { readonly text: string }[],
 	pi: [] as string[],
 	agyAnswers: [] as string[],
 	trend: undefined as 'CONVERGING' | undefined
@@ -31,17 +34,16 @@ const seam = vi.hoisted(() => ({
 
 vi.mock('./model.js', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('./model.js')>();
+	const { oneShotSession } = await import('./producer-session.js');
 	return {
 		...actual,
 		getExecutionSession: vi.fn((selection: Parameters<typeof actual.getExecutionSession>[0]) =>
 			actual.getExecutionSession(selection, {
-				agyExec: async (file, args) => {
-					seam.agy.push({ file, args });
-					return {
-						stdout:
-							seam.agyAnswers.shift() ?? (await actual.deterministicExecutionPrint(args[1] ?? ''))
-					};
-				},
+				openCli: async () =>
+					oneShotSession(async (text: string) => {
+						seam.agy.push({ text });
+						return seam.agyAnswers.shift() ?? (await actual.deterministicExecutionPrint(text));
+					}),
 				openPi: async (_context, modelId) => {
 					seam.pi.push(modelId);
 					throw new Error('hermetic: no route test opens a real Pi session');
@@ -174,7 +176,7 @@ describe('⭐ REG-F-469 — "reviewed over N tries" counts the tries that ran', 
 
 		expect(message, 'the model step did not run to its review').toMatch(/^The model ran/);
 		expect(seam.agy.length, 'arrangement: no repair turn ran — no finding was sent back').toBe(2);
-		expect(seam.agy[1]!.args[1], 'arrangement: the second turn is the REPAIR').toContain(
+		expect(seam.agy[1]!.text, 'arrangement: the second turn is the REPAIR').toContain(
 			'RR-01-no-problem-substitution'
 		);
 		expect(triesRecorded(), 'arrangement: one EXECUTION exchange per try').toBe(2);

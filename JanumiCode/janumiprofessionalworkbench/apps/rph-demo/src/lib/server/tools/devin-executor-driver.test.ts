@@ -804,7 +804,9 @@ describe('⭐ MH-4 test 6 — devin’s store in the run folder, and the configu
 		const session = await open(exec);
 		expect((await turn(session)).answer.arrived, 'arrangement: the first turn passes').toBe(true);
 		const second = await turn(session, 'FINDINGS');
-		expect(messageOf(second)).toMatch(/^EXECUTOR_CONFIG_CHANGED: .* It names: the run folder’s host\/user-config\.json\.$/);
+		expect(messageOf(second)).toMatch(
+			/^EXECUTOR_CONFIG_CHANGED: .* It names: host\/user-config\.json, which no longer holds the bytes the opener wrote\.$/
+		);
 		expect(exec.turns, 'devin was started for a refused turn').toHaveLength(1);
 	});
 });

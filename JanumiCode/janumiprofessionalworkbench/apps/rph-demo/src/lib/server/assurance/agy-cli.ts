@@ -10,7 +10,8 @@ const execFileAsync = promisify(execFile);
  * `JPWB_AGY_BIN` was unset, `''` when it was set empty. Exported so the reviewer selector refuses what this module
  * will actually run — outside test mode, a set override refuses an agy review (`REG-F-441`). ⚠ Still honoured here, in
  * every mode: the harness's argv assertion is tested against a captured override, and the agy EXECUTOR
- * (`agyPrintWithModel`) runs through this module too — ~~outside test mode that half is not refused (`REG-F-459`)~~
+ * ~~(`agyPrintWithModel`) runs through this module too~~ ⭐ `JAN-MHX` MH-5: runs the program this captured, through its
+ * CLI driver (`tools/agy-executor-driver.ts`) — ~~outside test mode that half is not refused (`REG-F-459`)~~
  * ⭐ `JAN-SELRES` RS-1 (D3): and outside test mode the EXECUTOR selector refuses it too, before dispatch
  * (`execution/executor-selection.ts`; `REG-F-459`). The refusal is the selectors'; this module still runs what it
  * captured, which is why the value to refuse is exported.
@@ -73,8 +74,9 @@ export const MAX_AGY_PROMPT_CHARS = 28_000;
 
 /** The exec seam. Injectable ONLY so the sanitisation boundary is reachable in the gate — as an inline call it
  *  could be exercised only by driving a real agy, so the regression that reintroduces the leak would be silent.
- *  ⭐ `JAN-SELRES` RS-1 (D4) — and so the agy EXECUTOR's argv is: `getExecutionSession` passes it through, which is
- *  how the gate sees which model the executor asked agy to run. */
+ *  ~~⭐ `JAN-SELRES` RS-1 (D4) — and so the agy EXECUTOR's argv is: `getExecutionSession` passes it through, which is
+ *  how the gate sees which model the executor asked agy to run.~~ ⭐ `JAN-MHX` MH-5: the agy executor no longer calls
+ *  through here; it is a CLI executor, whose argv its driver's test pins. */
 export type AgyExec = (
 	file: string,
 	args: readonly string[],
@@ -83,26 +85,26 @@ export type AgyExec = (
 
 /**
  * ⭐ `JAN-SELRES` RS-1 (D2) — WHOSE PROMPT AN agy CALL CARRIES, and so where its failure is written. It decides what
- * the sanitised failure SAYS and nothing else: the argv, the bounds and the catch are ONE implementation for both.
+ * the sanitised failure SAYS and nothing else: the argv, the bounds and the catch are ONE implementation ~~for both~~.
  *   · `JUDGE` — the Reasoning Review's prompt (`agyPrint`). Its failure becomes a projected
  *     `VALIDATOR_EXECUTION_FAILED` observation, and that text is pinned byte for byte (`agy-cli.test.ts`, the
  *     qualification harness), so it is unchanged.
- *   · `EXECUTOR` — a work unit's instruction (`agyPrintWithModel`, which the agy executor calls). Its failure is written
- *     into the EXECUTION exchange record and the step's failure reason (`runModelInvocationStep`), and the execution
- *     plane has no sanitiser of its own — so the executor's leak would be the judge's, one plane over (`PER-12`).
+ *   · ~~`EXECUTOR` — a work unit's instruction (`agyPrintWithModel`, which the agy executor calls). Its failure is
+ *     written into the EXECUTION exchange record and the step's failure reason (`runModelInvocationStep`), and the
+ *     execution plane has no sanitiser of its own — so the executor's leak would be the judge's, one plane over
+ *     (`PER-12`).~~ ⭐ `JAN-MHX` MH-5 — RETIRED with `agyPrintWithModel`, its only caller: the agy executor is a CLI
+ *     executor now, whose failure is a code and a checked excerpt (`tools/cli-executor-session.ts`, D19a).
  */
-type AgyCallRole = 'JUDGE' | 'EXECUTOR';
+type AgyCallRole = 'JUDGE';
 
 /** What the withheld diagnostic carried, and where the message would have been written — per role, for a true text. */
 const WITHHELD_FROM: Record<AgyCallRole, { readonly prompt: string; readonly record: string }> = {
 	JUDGE: {
 		prompt: 'entire judge prompt',
 		record: 'verbatim into a projected VALIDATOR_EXECUTION_FAILED observation'
-	},
-	EXECUTOR: {
-		prompt: 'entire work-unit instruction',
-		record: "verbatim into the EXECUTION exchange record and the step's failure reason"
 	}
+	// ~~`EXECUTOR: { prompt: 'entire work-unit instruction', record: "verbatim into the EXECUTION exchange record and the
+	// step's failure reason" }`~~ ⭐ `JAN-MHX` MH-5 — retired with its role (above).
 };
 
 /** ⛔ Fails closed above the command-line budget (`MAX_AGY_PROMPT_CHARS`), before anything is spawned. */
@@ -117,8 +119,9 @@ function refuseOverBudget(prompt: string): void {
 
 /**
  * ⭐ `JAN-SELRES` RS-1 (D2) — THE ONE IMPLEMENTATION: one non-interactive `agy --print "<prompt>"` call with the model
- * it is HANDED pinned as `--model`, returning stdout. Both callers reach agy only through here, so the argv, the
- * bounds and the sanitising catch cannot drift apart — a second copy of the catch is a second place for the leak.
+ * it is HANDED pinned as `--model`, returning stdout. ~~Both callers reach agy only through here~~ ⭐ `JAN-MHX` MH-5: its
+ * one caller is `agyPrint`, so the argv, the bounds and the sanitising catch cannot drift apart — a second copy of the
+ * catch is a second place for the leak.
  */
 async function agyCall(
 	prompt: string,
@@ -140,19 +143,22 @@ async function agyCall(
 		// Node's execFile rejection message is `Command failed: <full argv>\n<full stderr>` — and argv carries
 		// THE ENTIRE PROMPT. For the JUDGE, that error is caught in rph-assurance's floor runner and written
 		// VERBATIM into a `VALIDATOR_EXECUTION_FAILED` observation `statement`, which is dispatched through
-		// `RecordAssuranceObservation` and PROJECTED onto the assurance view. For the EXECUTOR it is written into
-		// the EXECUTION exchange record's parse outcome and the step's `FailExecutionStep` reason — both permanent.
+		// `RecordAssuranceObservation` and PROJECTED onto the assurance view. ~~For the EXECUTOR it is written into
+		// the EXECUTION exchange record's parse outcome and the step's `FailExecutionStep` reason — both permanent.~~
+		// ⭐ `JAN-MHX` MH-5: the executor no longer calls through here.
 		//
 		// So rethrowing puts the whole materialized prompt — for the judge the graph export, rubric, the producer's
-		// declared rationale and narration; for the executor the rendered instruction and the repair findings — into
-		// a permanent record with no redaction (finding #60). `PER-12`: never logged, never projected. `PER-9`:
-		// retention is "subject to recorded redaction".
+		// declared rationale and narration~~; for the executor the rendered instruction and the repair findings~~ — into
+		// a permanent record with no redaction (finding #60). ⭐ `JAN-MHX` MH-5: no executor calls through here, so the
+		// judge's is the only prompt it can carry. `PER-12`: never logged, never projected. `PER-9`: retention is
+		// "subject to recorded redaction".
 		//
 		// ⚠ AND THE DIAGNOSTIC IS DELIBERATELY LOST RATHER THAN RELOCATED. Its lawful home is the exchange
 		// record's E-5 (`REG-F-326`), which is not wired yet, or the LOG plane, where `PER-9` says redaction is
 		// legal — and this codebase has no redaction at all. Until one exists, a DISCLOSED loss beats an
 		// unlawful retention. The classification below is what a caller needs to act; the content is what it
-		// may not carry. ⭑ The ROLE changes only which prompt and which record the sentence names, so each is true.
+		// may not carry. ~~⭑ The ROLE changes only which prompt and which record the sentence names, so each is true.~~
+		// ⭐ `JAN-MHX` MH-5: one role is left, the JUDGE, and the sentence names its prompt and its record.
 		const code = (e as { code?: unknown })?.code;
 		const withheld = WITHHELD_FROM[role];
 		throw new Error(
@@ -183,24 +189,11 @@ export async function agyPrint(
 	return agyCall(prompt, judgeModel(), 'JUDGE', exec);
 }
 
-/**
- * ⭐ `JAN-SELRES` RS-1 (D2; `REG-F-458` remedy (a)) — one agy call that runs THE MODEL IT IS HANDED: the agy
- * EXECUTOR's, which `getExecutionSession` passes from the executor selection (`JPWB_EXECUTOR_MODEL`).
- *
- * ⛔ WHAT IT REPLACED. The agy executor called `agyPrint`, so it ran `JPWB_JUDGE_MODEL` while the step recorded
- * `JPWB_EXECUTOR_MODEL`: with agy executing AND reviewing, both calls ran one model while the record showed two, and
- * `DIFFERENT_MODEL` passed on a fiction. Now the model named, the model run and the model recorded are one read.
- * ⚠ agy reports no model, so the record's grade stays `HOST_CONFIGURED` — which is now TRUE: the host configured the
- * model it passed.
- */
-export async function agyPrintWithModel(
-	prompt: string,
-	model: string,
-	exec: AgyExec = execFileAsync as unknown as AgyExec
-): Promise<string> {
-	refuseOverBudget(prompt);
-	return agyCall(prompt, model, 'EXECUTOR', exec);
-}
+// ~~`export async function agyPrintWithModel(prompt, model, exec)`~~ ⭐ `JAN-MHX` MH-5 (`DESIGN-multi-harness-executor.md`
+// D30) — GONE, STRUCK IN PLACE: one agy call running the model it was HANDED, the agy EXECUTOR's, which `JAN-SELRES` RS-1
+// (D2; `REG-F-458` remedy (a)) wrote so the model named, run and recorded were one read. Its only caller was the text-only
+// agy executor, which `execution/model.ts` retired: agy executes as a CLI now (`tools/agy-executor-driver.ts`), handed
+// the selection's model by its opener, so `REG-F-458`'s one read holds there.
 
 /**
  * The answer span and everything around it, VERBATIM.

@@ -1863,9 +1863,11 @@ async function runModelUnit(u: ModelUnitRun) {
 				// ⚠ IT SURVIVED BECAUSE NOTHING REACHED IT. These values are the HOST_CONFIGURED FALLBACK,
 				// used only when the tool reports no identity of its own~~: the success path always overrides
 				// them with `produced.producer`. So the only readers were the `catch` arm and — now —
-				// `JAN-NOANS`'s no-answer arm~~ — ⭐ `JAN-SELRES` D4, CORRECTED: which for the agy executor, whose
-				// answer is a bare string, is EVERY call, the successful ones included; only Pi's success path
-				// overrides them with `produced.producer`. The defect became visible on the first live run that
+				// `JAN-NOANS`'s no-answer arm~~ — ⭐ `JAN-SELRES` D4, CORRECTED: which for ~~the agy executor~~ ⭐ the
+				// stand-in, whose answer is a bare string, is EVERY call, the successful ones included; only ~~Pi's
+				// success path overrides~~ ⭐ Pi's success path and every turn a CLI executor returns override them
+				// with `produced.producer` (`JAN-MHX` MH-5: agy's text-only executor, whose answer was a bare string,
+				// is retired, and agy is a CLI executor). The defect became visible on the first live run that
 				// took the fallback: an EXECUTION exchange whose `resolvedModel` read `gemini-3.1-pro-high`.
 				//
 				// ⭑ MEASURED, NOT REASONED. `checkIndependence('DIFFERENT_MODEL', …)` reads this field, so a

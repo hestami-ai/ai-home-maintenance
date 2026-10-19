@@ -103,9 +103,10 @@ vi.mock('../../../lib/server/execution/model.js', async (importOriginal) => {
 		...actual,
 		getExecutionSession: vi.fn((selection: Parameters<typeof actual.getExecutionSession>[0]) => {
 			const open = actual.getExecutionSession(selection, {
-				agyExec: async (_file, args) => ({
-					stdout: await actual.deterministicExecutionPrint(args[1] ?? '')
-				}),
+				// ⭐ `JAN-MHX` MH-5 — ~~`agyExec`~~: agy executes as a CLI now, and no case here opens one.
+				openCli: async () => {
+					throw new Error('hermetic: no route test opens a CLI executor session');
+				},
 				openPi: async () => {
 					throw new Error('hermetic: no route test opens a real Pi session');
 				}

@@ -99,9 +99,10 @@ const EXECUTION_TOOLS = BACKING_TOOLS.filter((t) => t.roles.includes('EXECUTION'
 );
 /**
  * D1, RESTATED: the executor adapters this host has, and what each opens. ~~⭐ `JAN-MHX` MH-4 (D30) — devin's opens the `CLI`
- * kind, naming its tool.~~ ⭐ MH-4, the check's fix — in every mode: agy's and Pi's.
+ * kind, naming its tool.~~ ⭐ MH-4, the check's fix — in every mode: agy's and Pi's. ⭐ `JAN-MHX` MH-5 (D30): agy opens the
+ * `CLI` kind, its driver's; ~~`agy: 'AGY'`~~, the text-only agy executor, is retired.
  */
-const WIRED: Readonly<Record<string, 'AGY' | 'PI' | 'CLI'>> = { agy: 'AGY', pi: 'PI' };
+const WIRED: Readonly<Record<string, 'CLI' | 'PI'>> = { agy: 'CLI', pi: 'PI' };
 /** ⭐ `JAN-MHX` MH-4, the check's fix (D30), RESTATED: the adapters wired in test mode only — devin's, which opens `CLI`. */
 const WIRED_IN_TEST_MODE_ONLY: Readonly<Record<string, 'CLI'>> = { devin: 'CLI' };
 /** D3, RESTATED: the override each tool's adapter captures — per TOOL, whether or not it is wired today. */
@@ -138,8 +139,8 @@ function expectGuidanceFor(guidance: string, tool: string | undefined): void {
 
 type Expected =
 	| { readonly kind: 'STAND_IN' }
-	| { readonly kind: 'AGY' | 'PI'; readonly modelId: string }
-	| { readonly kind: 'CLI'; readonly toolId: string; readonly modelId: string }
+	| { readonly kind: 'PI'; readonly modelId: string }
+	| { readonly kind: 'CLI'; readonly toolId: string; readonly modelId: string; readonly effort?: string }
 	| {
 			readonly kind: 'REFUSED';
 			readonly code: ExecutorRefusalCode;
@@ -167,7 +168,7 @@ function oracle(
 	if (!testMode && own !== undefined && overrides[own] !== undefined)
 		return { kind: 'REFUSED', code: 'EXECUTOR_PROGRAM_OVERRIDDEN', toolId: t };
 	if (m === undefined) return { kind: 'REFUSED', code: 'EXECUTOR_MODEL_UNSET', toolId: t };
-	return opens === 'CLI' ? { kind: 'CLI', toolId: t, modelId: m } : { kind: opens, modelId: m };
+	return opens === 'CLI' ? { kind: 'CLI', toolId: t, modelId: m } : { kind: 'PI', modelId: m };
 }
 
 /** The selection, minus the prose — the shape the oracle predicts. */
@@ -177,9 +178,16 @@ function shape(s: ExecutorSelection): Expected {
 	// ⭐ `JAN-EXEC` Phase 8 — the table sets no JPWB_REPLAY, so a REPLAY answer here is the selector reading the switch from
 	// somewhere it was not handed (`replay/replay-selection.test.ts` holds the switch's own table).
 	if (s.kind === 'REPLAY') throw new Error('the table sets no JPWB_REPLAY, and the selector answered REPLAY');
-	// ~~⭐ `JAN-MHX` MH-1 — nothing selects the `CLI` kind until a driver's package wires its tool, so it is an answer no row
-	// of this table may get.~~ ⭐ `JAN-MHX` MH-4 — devin's package wired it (D30): the kind and the tool it names.
-	if (s.kind === 'CLI') return { kind: 'CLI', toolId: s.toolId, modelId: s.modelId };
+	// ~~⭐ `JAN-MHX` MH-1 — nothing selects the `CLI` kind until a driver's package wires its tool, so it is an answer no
+	// row of this table may get.~~ ⭐ `JAN-MHX` MH-4 — devin's package wired it (D30): the kind and the tool it names.
+	// ⭐ `JAN-MHX` MH-5 — agy's rows get it, with no effort: agy is handed none (D32).
+	if (s.kind === 'CLI')
+		return {
+			kind: 'CLI',
+			toolId: s.toolId,
+			modelId: s.modelId,
+			...(s.effort === undefined ? {} : { effort: s.effort })
+		};
 	return { kind: s.kind, modelId: s.modelId };
 }
 
@@ -261,7 +269,8 @@ describe('⛔ D3 — only the SELECTED tool’s captured override refuses, and o
 			expect(reason).toContain('even when it is empty');
 			// ⭑ In test mode an override is the tests' own, and it is run.
 			expect(selectExecutor({ testMode: true, env, overrides })).toEqual({
-				kind: 'AGY',
+				kind: 'CLI',
+				toolId: 'agy',
 				modelId: 'fixture-executor'
 			});
 		});
@@ -491,20 +500,22 @@ describe('the selector reads the environment it is handed, and the mode it is to
 		vi.stubEnv('JPWB_EXECUTOR', 'agy');
 		vi.stubEnv('JPWB_EXECUTOR_MODEL', 'from-the-process');
 		expect(selectExecutor({ testMode: true })).toEqual({
-			kind: 'AGY',
+			kind: 'CLI',
+			toolId: 'agy',
 			modelId: 'from-the-process'
 		});
 	});
 
 	// ⭐ SUCCESSOR of `model.test.ts:134-142` (configuring the executor in test mode selects a real tool, not the fixture).
-	it('⭑ in test mode, naming agy with a model selects AGY — not the stand-in — with the assurance switch unset', () => {
+	// ⭐ `JAN-MHX` MH-5 (D30) — and what it selects is agy's CLI executor: ~~`AGY`~~, the text-only one, is retired.
+	it('⭑ in test mode, naming agy with a model selects agy’s CLI executor — not the stand-in — with the assurance switch unset', () => {
 		expect(
 			selectExecutor({
 				testMode: true,
 				env: { JPWB_EXECUTOR: 'agy', JPWB_EXECUTOR_MODEL: 'fixture-executor' },
 				overrides: NO_OVERRIDES
 			})
-		).toEqual({ kind: 'AGY', modelId: 'fixture-executor' });
+		).toEqual({ kind: 'CLI', toolId: 'agy', modelId: 'fixture-executor' });
 	});
 
 	// ⭐ SUCCESSOR of `model.test.ts:144-152` (the ASSURANCE switch alone no longer makes the executor live).
@@ -566,7 +577,8 @@ describe('⭐ D3 — the overrides the selector acts on are the ones the ADAPTER
 		).toEqual({ kind: 'PI', modelId: 'fixture-pi-model' });
 		const none = await loadedWith(undefined);
 		expect(none.selectExecutor({ testMode: false, env: AGY_HOST })).toEqual({
-			kind: 'AGY',
+			kind: 'CLI',
+			toolId: 'agy',
 			modelId: 'fixture-executor'
 		});
 	});
@@ -596,11 +608,9 @@ describe('⭐ D3 — the overrides the selector acts on are the ones the ADAPTER
 });
 
 describe('⭐ D4 — the record’s fallback identity is the selection’s', () => {
-	it('agy and Pi name their model and their TOOL; the stand-in names neither', () => {
-		expect(executorRecordIdentity({ kind: 'AGY', modelId: 'fixture-x' })).toEqual({
-			modelId: 'fixture-x',
-			providerId: 'agy'
-		});
+	// ~~`agy and Pi name their model and their TOOL`~~ ⭐ `JAN-MHX` MH-5 — agy's text-only `AGY` kind is retired, so its row
+	// went with it: agy is a CLI selection now, whose identity the case below holds.
+	it('Pi names its model and its TOOL; the stand-in names neither', () => {
 		expect(executorRecordIdentity({ kind: 'PI', modelId: 'fixture-y' })).toEqual({
 			modelId: 'fixture-y',
 			providerId: 'pi'
@@ -657,7 +667,8 @@ const reasonOf = (s: ExecutorSelection): string => (s.kind === 'REFUSED' ? s.rea
 
 describe('⭐ `JAN-MHX` MH-3 (D33) — the executor’s model may not be the reviewer’s, by spelling or by family, and a model the table does not list is refused', () => {
 	it('⛔ test 1 — agy on glm-5-3-flash-max, beside devin reviewing on glm-5-3-flash-max → EXECUTOR_MODEL_IS_THE_REVIEWERS', () => {
-		// ⭑ RED FIRST: the selector asked nothing about the reviewer, and answered `{ kind: 'AGY', modelId }`.
+		// ⭑ RED FIRST: the selector asked nothing about the reviewer, and answered `{ kind: 'AGY', modelId }` — ⭐ MH-5: the
+		// text-only kind agy then selected, retired since.
 		const got = executing('agy', 'glm-5-3-flash-max', GLM_REVIEWER);
 		expect(shape(got)).toEqual({
 			kind: 'REFUSED',
@@ -730,7 +741,8 @@ describe('⭐ `JAN-MHX` MH-3 (D33) — the executor’s model may not be the rev
 
 	it('⭑ test 4, CONTROL — another family is admitted: agy on gemini-4-argon-high, and Pi on gpt-5.6-sol in both its spellings', () => {
 		expect(executing('agy', 'gemini-4-argon-high', GLM_REVIEWER)).toEqual({
-			kind: 'AGY',
+			kind: 'CLI',
+			toolId: 'agy',
 			modelId: 'gemini-4-argon-high'
 		});
 		expect(executing('pi', 'gpt-5.6-sol', GLM_REVIEWER)).toEqual({
@@ -745,16 +757,18 @@ describe('⭐ `JAN-MHX` MH-3 (D33) — the executor’s model may not be the rev
 		// ⭑ And beside S2's other devin model, which a devin executor runs: GLM is then the executor's to run.
 		expect(
 			executing('agy', 'glm-5-3-flash-max', { toolId: 'devin', modelId: 'deepseek-v4-1-flash-max' })
-		).toEqual({ kind: 'AGY', modelId: 'glm-5-3-flash-max' });
+		).toEqual({ kind: 'CLI', toolId: 'agy', modelId: 'glm-5-3-flash-max' });
 	});
 
 	it('⭑ test 5 — with no reviewer handed in (the stand-in, or a replay), nothing is compared', () => {
 		expect(executing('agy', 'glm-5-3-flash-max')).toEqual({
-			kind: 'AGY',
+			kind: 'CLI',
+			toolId: 'agy',
 			modelId: 'glm-5-3-flash-max'
 		});
 		expect(executing('agy', 'fixture-unlisted-model')).toEqual({
-			kind: 'AGY',
+			kind: 'CLI',
+			toolId: 'agy',
 			modelId: 'fixture-unlisted-model'
 		});
 	});
