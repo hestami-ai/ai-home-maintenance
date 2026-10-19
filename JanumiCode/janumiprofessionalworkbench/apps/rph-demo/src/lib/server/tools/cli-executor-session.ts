@@ -279,7 +279,11 @@ export interface CliDriver {
 	/** ⭐ D43 — a secret the CLI needs, by variable name: given to the CLI's process only, never to the allowlist. */
 	readonly secretVariable?: string;
 	runFolderFiles(run: CliRunFolder): readonly CliRunFile[];
-	preflight(run: CliRunFolder): CliPreflight | undefined;
+	/**
+	 * ⭐ D14 — its no-model check, or `undefined` for none. ⭐ `JAN-MHX` MH-6 — handed the session's selection, so a driver
+	 * can refuse, before any turn, a model or an effort its CLI's tool surface was not measured on (Codex's, §4.3).
+	 */
+	preflight(run: CliRunFolder, selection: CliExecutorSelection): CliPreflight | undefined;
 	invocation(turn: CliTurnInput): CliInvocation;
 	readRecord(output: CliTurnOutput): Promise<CliRecordReading>;
 	classifyStderr(lines: readonly string[]): CliStderrSignals;
@@ -967,7 +971,7 @@ export async function openCliExecutionSession(
 		};
 		for (const file of driver.runFolderFiles(run)) await writeInside(directory, file, toolId);
 		fingerprints = driver.configSources.map((s) => [s.name, s.path, fingerprintOf(s.path)] as const);
-		const check = driver.preflight(run);
+		const check = driver.preflight(run, selection);
 		if (check !== undefined) {
 			const refusal = await preflightRefusal(
 				check,

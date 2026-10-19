@@ -242,8 +242,11 @@ const PARSED_EXTENSIONS = ['.ts', '.mts', '.cts', '.js', '.mjs', '.cjs', '.svelt
  *
  * ⚠ A FILE HERE IS A FILE NOBODY LOOKS AT. That is lawful for a stylesheet and unlawful for anything a
  * bundler can execute, which is why the membership assertion below forbids a third category.
+ * ⭐ `JAN-MHX` MH-6 — `.json`, decided when the first arrived (the Codex driver's pinned catalog,
+ * `tools/codex-executor-catalog.json`): data a module imports, which the bundler parses as JSON and never runs, so
+ * no stream can be bound in it.
  */
-const NOT_A_SOURCE_EXTENSION = ['.css', '.html'];
+const NOT_A_SOURCE_EXTENSION = ['.css', '.html', '.json'];
 
 /** The extension of a file name, lower-cased, or `''` when it has none. */
 function extensionOf(name: string): string {

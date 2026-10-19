@@ -23,6 +23,7 @@
 // reference.
 import { AGY_BIN_OVERRIDE } from '../assurance/agy-cli.js';
 import type { ReviewerProgramOverrides } from '../assurance/reviewer-selection.js';
+import { CODEX_BIN_OVERRIDE } from '../tools/codex-executor-driver.js';
 import { DEVIN_BIN_OVERRIDE } from '../tools/devin-reviewer.js';
 import {
 	besideReplayReason,
@@ -45,20 +46,18 @@ export type ExecutorEnvironment = Readonly<Record<string, string | undefined>>;
  * `JPWB_DEVIN_BIN` (`devin-reviewer.ts`). ⭑ THE REVIEWER'S RECORD, READ BY A SECOND SELECTOR: one capture per adapter,
  * whichever role runs it. `undefined` is unset; `''` is SET, to an empty program name, which the adapter would run.
  * ⭐ `JAN-MHX` MH-3 (D34) — AND `JPWB_CODEX_BIN`, the executor's own: no reviewer runs Codex, so the reviewer's record has no
- * key for it (`CODEX_BIN_OVERRIDE`, below).
+ * key for it (~~`CODEX_BIN_OVERRIDE`, below~~ ⭐ MH-6: `CODEX_BIN_OVERRIDE`, the Codex driver's capture).
  */
 export type ExecutorProgramOverrides = ReviewerProgramOverrides & {
 	readonly codex: string | undefined;
 };
 
-/**
- * ⭐ `JAN-MHX` MH-3 (D34) — `JPWB_CODEX_BIN`, CAPTURED WHEN THIS MODULE LOADS, as `devin-reviewer.ts` captures
- * `JPWB_DEVIN_BIN`: the value to refuse is the one read once, at load, never the environment at selection.
- * ⚠ NO CODEX ADAPTER EXISTS YET, so nothing runs a program this names. Today it refuses beside a replay
- * (`liveSelectionsBesideReplay`); `PROGRAM_VARIABLE` keys it by tool, so the day a Codex executor is wired the selected
- * tool's refusal reads it too.
- */
-const CODEX_BIN_OVERRIDE: string | undefined = process.env.JPWB_CODEX_BIN;
+// ~~⭐ `JAN-MHX` MH-3 (D34) — `JPWB_CODEX_BIN`, CAPTURED WHEN THIS MODULE LOADS, as `devin-reviewer.ts` captures
+// `JPWB_DEVIN_BIN` … ⚠ NO CODEX ADAPTER EXISTS YET, so nothing runs a program this names. Today it refuses beside a replay
+// (`liveSelectionsBesideReplay`); `PROGRAM_VARIABLE` keys it by tool, so the day a Codex executor is wired the selected
+// tool's refusal reads it too.~~ ⭐ `JAN-MHX` MH-6 — THE CAPTURE MOVED TO THE ADAPTER THAT RUNS IT
+// (`tools/codex-executor-driver.ts`, `CODEX_BIN_OVERRIDE`), as `JPWB_DEVIN_BIN`'s is `devin-reviewer.ts`'s: one capture,
+// which the driver runs and this selector refuses outside test mode for the selected tool, and beside a replay always.
 
 /** Why the executor is refused — in the order the selector asks. Each names the refusal, so a caller need not parse. */
 export type ExecutorRefusalCode =
@@ -116,8 +115,10 @@ export type RunnableExecutorSelection = Exclude<ExecutorSelection, { readonly ki
  * ⭑ THE EXECUTOR ADAPTERS THIS HOST HAS, AND WHAT EACH SELECTION OPENS — the table the selector dispatches on, and the
  * one its guidance lists. `devin` declares EXECUTION in the catalog (`backing-tool.ts`) but has no executor adapter, so
  * it is not here: the catalog says what a tool CAN do, this says what this host WIRED.
+ * ⭐ `JAN-MHX` MH-6 (D30) — `codex` opens the `CLI` kind: an external CLI executing through the host's own tools, with the
+ * driver `tools/cli-executor-drivers.ts` holds for it.
  */
-const WIRED_EXECUTORS = { agy: 'AGY', pi: 'PI' } as const;
+const WIRED_EXECUTORS = { agy: 'AGY', pi: 'PI', codex: 'CLI' } as const;
 
 type WiredExecutor = keyof typeof WIRED_EXECUTORS;
 
@@ -130,7 +131,8 @@ const WIRED_TOOL_LIST = Object.keys(WIRED_EXECUTORS).join(', ');
 
 /**
  * ⛔ THE CATALOG'S REFUSAL, WITH ITS LIST REPLACED BY THE WIRED ONE (`REG-F-460`'s general form). `selectBackingTool`
- * answers for every role, so its refusal of an unknown tool says "This host can drive: agy, pi, devin" — true of the
+ * answers for every role, so its refusal of an unknown tool says "This host can drive: agy, pi, devin" (⭐ `JAN-MHX` MH-6:
+ * ", codex" after it) — true of the
  * catalog, and for the executor it offers `devin`, which the next refusal (UNWIRED) forbids: the steer D1 removed from
  * the guidance, back in the reason printed beside it (`JAN-SELRES` RS-1's verification). The catalog's verdict and its
  * `REG-D-052` sentence are kept as the catalog words them; only the list becomes the executor's.
@@ -154,7 +156,8 @@ const PROGRAM_VARIABLE: Readonly<
 > = {
 	agy: { variable: 'JPWB_AGY_BIN', captured: 'agy' },
 	devin: { variable: 'JPWB_DEVIN_BIN', captured: 'devin' },
-	// ⭐ `JAN-MHX` MH-3 (D34) — not in the catalog yet, so nothing selects it; listed for devin's reason, above.
+	// ⭐ `JAN-MHX` MH-3 (D34) — ~~not in the catalog yet, so nothing selects it; listed for devin's reason, above.~~ ⭐ MH-6 —
+	// wired, so a selected Codex's captured override is refused outside test mode.
 	codex: { variable: 'JPWB_CODEX_BIN', captured: 'codex' }
 };
 
@@ -189,7 +192,8 @@ export const EXECUTOR_GUIDANCE =
  * ⭑ devin's is S2's: a devin executor runs whichever of the sponsor's two devin models the reviewer does not, and the
  * selected reviewer runs glm-5-3-flash-max (`REG-D-084`). Muse's is the lead's choice, which S4 delegated: the catalog's
  * default, flagged for the sponsor. Pi has none: the sponsor named none.
- * ⭑ KEYED BY TOOL, as `PROGRAM_VARIABLE` is: Codex, Claude Code and Muse are not in the catalog yet.
+ * ⭑ KEYED BY TOOL, as `PROGRAM_VARIABLE` is: ~~Codex,~~ Claude Code and Muse are not in the catalog yet (⭐ `JAN-MHX` MH-6:
+ * Codex is).
  */
 const EXECUTOR_DEFAULT_MODELS: Readonly<
 	Record<string, { readonly modelId: string; readonly effort?: string; readonly because?: string }>
@@ -258,9 +262,10 @@ const EFFORT_RULE: Readonly<
 
 /**
  * ⭐ `JAN-MHX` MH-3 (D32) — the refusal of the effort `toolId` was configured with, or `undefined` when there is none.
- * ⚠ EXPORTED FOR ITS TEST, AND THE REASON IS A REACH: no wired tool REQUIRES an effort yet, so through `selectExecutor`
- * only the not-taken arm can be driven, and the required arm would be a guard no test could fail — `selectBackingTool`'s
- * injectable catalog, for the same reason.
+ * ⚠ EXPORTED FOR ITS TEST, AND THE REASON IS A REACH: ~~no wired tool REQUIRES an effort yet, so through `selectExecutor`
+ * only the not-taken arm can be driven, and the required arm would be a guard no test could fail~~ ⭐ `JAN-MHX` MH-6 —
+ * Codex, wired, requires one, so both arms are driven through `selectExecutor` too; Claude Code's and Muse's rows, unwired,
+ * only through this — `selectBackingTool`'s injectable catalog, for the same reason.
  */
 export function executorEffortRefusal(
 	toolId: keyof typeof EFFORT_RULE,
@@ -609,17 +614,30 @@ export function selectExecutor(input: {
 				'review failed). ⛔ It deliberately does NOT fall back to JPWB_JUDGE_MODEL: that fallback is exactly the ' +
 				'producer/reviewer collision the executor’s own configuration exists to remove.'
 		);
-	// ⭐ `JAN-MHX` MH-3 (D32) — the effort, read as every variable here is: trimmed, and blank is unset.
-	const effortRefused = executorEffortRefusal(
-		toolId,
-		env.JPWB_EXECUTOR_EFFORT?.trim() || undefined
-	);
+	// ⭐ `JAN-MHX` MH-3 (D32) — the effort, read as every variable here is: trimmed, and blank is unset. ⭐ MH-6 — READ ONCE:
+	// the refusal asks it, and a CLI selection carries the same value to its driver.
+	const effort = env.JPWB_EXECUTOR_EFFORT?.trim() || undefined;
+	const effortRefused = executorEffortRefusal(toolId, effort);
 	if (effortRefused) return effortRefused;
 	// ⭐ `JAN-MHX` MH-3 (D33) — then the model beside the reviewer's, when a real one was admitted.
 	const dependent =
 		input.reviewer === undefined ? undefined : independenceRefusal(toolId, modelId, input.reviewer);
 	if (dependent) return dependent;
-	return { kind: WIRED_EXECUTORS[toolId], modelId };
+	return wiredSelection(toolId, modelId, effort);
+}
+
+/**
+ * What a wired tool's selection opens, with its model. ⭐ `JAN-MHX` MH-6 (D30, D32) — A CLI EXECUTOR CARRIES ITS TOOL, which
+ * names its driver, and the effort the driver hands the CLI: without it, the CLI's own user configuration would choose one.
+ */
+function wiredSelection(
+	toolId: WiredExecutor,
+	modelId: string,
+	effort: string | undefined
+): RunnableExecutorSelection {
+	const kind = WIRED_EXECUTORS[toolId];
+	if (kind === 'CLI') return { kind, toolId, modelId, ...(effort === undefined ? {} : { effort }) };
+	return { kind, modelId };
 }
 
 /**

@@ -1212,4 +1212,20 @@ describe('⭐ D14, D18 — the preflight is bounded by the host, and a preflight
 		const exec: CliExec = () => ({ done: Promise.resolve(run as CliRun), kill: async () => undefined });
 		await expect(open(exec, { driver: preflighting() })).rejects.toThrow(`is refused by its preflight: ${said}`);
 	});
+
+	it('⭐ `JAN-MHX` MH-6 — the preflight is handed the session’s selection, so a driver can refuse a model or effort it was not measured on', async () => {
+		// ⛔ THE MUTANT: hand the preflight another selection than the one the session runs. Codex's driver refuses, before
+		// any turn, a model its pinned catalog does not hold and an effort the catalog does not list (§4.3, D14a): the
+		// surface Probe 0 measured is that catalog's, and only the selection says which model the turns will ask for.
+		const seen: unknown[] = [];
+		await open(fakeExec(passing), {
+			driver: fakeDriver({
+				preflight: (_run, selection) => {
+					seen.push(selection);
+					return undefined;
+				}
+			})
+		});
+		expect(seen).toEqual([SELECTION]);
+	});
 });

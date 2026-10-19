@@ -104,6 +104,23 @@ export const BACKING_TOOLS: readonly BackingTool[] = Object.freeze([
 			// `--prompt-file` keeps the prompt out of argv entirely — stronger than stdin.
 			diagnostics: 'PROMPT_FREE'
 		}
+	},
+	// ⭐ `JAN-MHX` MH-6 (`DESIGN-multi-harness-executor.md` §4.3, D35) — the Codex CLI, with what MH-0c MEASURED driving
+	// codex-cli 0.162.1: Probe 0's arms against a local mock, and Probe 1's two live calls. ⭑ EXECUTION only: it was never
+	// measured reviewing, and no reviewer adapter runs it.
+	{
+		toolId: 'codex',
+		roles: ['EXECUTION'],
+		reports: {
+			// ⭑ Its `--json` record names no model in any arm; a reroute notice is the one signal of another (the driver's).
+			identity: 'HOST_CONFIGURED',
+			version: false,
+			// ⭑ MEASURED ABSENCE: no `reasoning` item reached the record in either live call — the catalog the driver pins
+			// asks for no summary (`default_reasoning_summary: "none"`).
+			reasoning: 'NONE',
+			// The prompt goes on stdin (`-`), so the argv a diagnostic could echo carries none of it.
+			diagnostics: 'PROMPT_FREE'
+		}
 	}
 ]);
 

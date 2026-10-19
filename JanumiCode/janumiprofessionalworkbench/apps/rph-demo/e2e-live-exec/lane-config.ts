@@ -67,8 +67,9 @@ export function reviewerModelVariable(tool: string | undefined): ReviewerModelVa
 /**
  * ⭐ `JAN-SELRES` RS-1 (D5) — the executing tools this host has an executor adapter for (`executor-selection.ts`,
  * `WIRED_EXECUTORS`). ⚠ `devin` declares EXECUTION in the catalog and has no executor adapter, so the product refuses it.
+ * ⭐ `JAN-MHX` MH-6 — and `codex`, which the product wires as a CLI executor.
  */
-export const WIRED_EXECUTORS = ['agy', 'pi'] as const;
+export const WIRED_EXECUTORS = ['agy', 'pi', 'codex'] as const;
 
 export type WiredExecutor = (typeof WIRED_EXECUTORS)[number];
 
@@ -85,9 +86,11 @@ export function wiredExecutor(tool: string | undefined): WiredExecutor | undefin
  * The variable that replaces each wired executor's program — agy's, the same variable the agy reviewer reads, because
  * it is the same adapter's one capture (`agy-cli.ts`, `AGY_BIN_OVERRIDE`). Pi has none: it runs in-process. ⛔ Outside
  * test mode the product refuses the SELECTED executor's override whenever it is set, even to `''` (`REG-F-459`).
+ * ⭐ `JAN-MHX` MH-6 — and Codex's, `JPWB_CODEX_BIN`, its driver's capture (`codex-executor-driver.ts`).
  */
 export const EXECUTOR_PROGRAM_VARIABLE: Readonly<Partial<Record<WiredExecutor, string>>> = {
-	agy: REVIEWER_PROGRAM_VARIABLE.agy
+	agy: REVIEWER_PROGRAM_VARIABLE.agy,
+	codex: 'JPWB_CODEX_BIN'
 };
 
 /**
@@ -101,6 +104,8 @@ export const EXECUTOR_PROGRAM_VARIABLE: Readonly<Partial<Record<WiredExecutor, s
  * pass with one — it asserts the producer's identity is `PROVIDER_REPORTED` (`execution.live.ts`), and agy reports no
  * model, so its record is `HOST_CONFIGURED` by design. An agy lane would boot and spend up to the whole Begin & Execute
  * wait failing there, so it is refused at boot, and the refusal says whose rule it is.
+ * ⭐ `JAN-MHX` MH-6 — AND NO CODEX EXECUTOR, FOR THE SAME REASON: its record names no model either. ⚠ Until MH-8 holds each
+ * executor to the grade it earns (`EXECUTOR_IDENTITY_EVIDENCE`, design D36), which replaces both rules.
  */
 function executorLaneFaults(env: Readonly<Record<string, string | undefined>>): string[] {
 	const executorTool = env.JPWB_EXECUTOR?.trim();
@@ -131,6 +136,14 @@ function executorLaneFaults(env: Readonly<Record<string, string | undefined>>): 
 					"  · JPWB_EXECUTOR='agy' is refused by a rule of THIS LANE, not of the product: the lane's spec asserts " +
 						'that the producing tool reports its own model (PROVIDER_REPORTED, e2e-live-exec/execution.live.ts), ' +
 						'and agy reports none — its record is HOST_CONFIGURED by design. The product runs an agy executor; ' +
+						'this lane cannot pass with one. Use JPWB_EXECUTOR=pi.'
+				]
+			: []),
+		...(executorId === 'codex'
+			? [
+					"  · JPWB_EXECUTOR='codex' is refused by a rule of THIS LANE, not of the product: the lane's spec asserts " +
+						'that the producing tool reports its own model (PROVIDER_REPORTED, e2e-live-exec/execution.live.ts), ' +
+						'and Codex reports none — its record is HOST_CONFIGURED by design. The product runs a Codex executor; ' +
 						'this lane cannot pass with one. Use JPWB_EXECUTOR=pi.'
 				]
 			: [])

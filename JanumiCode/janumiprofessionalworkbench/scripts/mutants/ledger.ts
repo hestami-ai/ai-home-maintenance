@@ -32748,19 +32748,19 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "MH3-M8-the-effort-is-never-read",
 		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
-		find: "\t\tenv.JPWB_EXECUTOR_EFFORT?.trim() || undefined\n",
-		replace: "\t\tundefined // MUTANT: JPWB_EXECUTOR_EFFORT is never read\n",
+		find: "const effort = env.JPWB_EXECUTOR_EFFORT?.trim() || undefined;",
+		replace: "const effort: string | undefined = undefined; // MUTANT: JPWB_EXECUTOR_EFFORT is never read",
 		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
-		why: "PROMISE (D32; roadmap MH-3 test 6): an effort set for a tool the host hands none is refused (EXECUTOR_EFFORT_NOT_TAKEN). WHO RELIES: an operator who set JPWB_EXECUTOR_EFFORT for Pi, which runs with thinking off - a variable read by nothing must not look as though it took effect. WHAT THE MUTATION DOES: the variable is never read, so Pi with an effort is selected. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M8-the-effort-is-never-read    ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯'",
+		why: "PROMISE (D32; roadmap MH-3 test 6): an effort set for a tool the host hands none is refused (EXECUTOR_EFFORT_NOT_TAKEN). WHO RELIES: an operator who set JPWB_EXECUTOR_EFFORT for Pi, which runs with thinking off - a variable read by nothing must not look as though it took effect. WHAT THE MUTATION DOES: the variable is never read, so Pi with an effort is selected. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M8-the-effort-is-never-read    ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯' ⭐ RE-ANCHORED BY JAN-MHX MH-6 (ledger rule #5: the effort is now read once, `const effort = ...`, and handed to the refusal) and RE-MEASURED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M8-the-effort-is-never-read    ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-MHX MH-3 - the selector (DESIGN-multi-harness-executor.md D31-D34, D39; ROADMAP-multi-harness-executor.md MH-3 tests 1-7, 10, 12, 13; the sponsor’s answers of 2026-10-18, S1-S4): the identity refusals, the effort rule, the defaults named and never applied, and JPWB_CODEX_BIN captured"
 	},
 	{
 		id: "MH3-M9-a-blank-effort-is-a-set-one",
 		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
-		find: "\t\tenv.JPWB_EXECUTOR_EFFORT?.trim() || undefined\n",
-		replace: "\t\tenv.JPWB_EXECUTOR_EFFORT // MUTANT: a blank effort is a set one\n",
+		find: "const effort = env.JPWB_EXECUTOR_EFFORT?.trim() || undefined;",
+		replace: "const effort = env.JPWB_EXECUTOR_EFFORT; // MUTANT: a blank effort is a set one",
 		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
-		why: "PROMISE (D32): JPWB_EXECUTOR_EFFORT is read as every variable here is - trimmed, and blank or whitespace is unset. WHO RELIES: a shell that exports it empty. WHAT THE MUTATION DOES: a blank effort refuses a Pi executor as though an effort were set. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M9-a-blank-effort-is-a-set-one ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		why: "PROMISE (D32): JPWB_EXECUTOR_EFFORT is read as every variable here is - trimmed, and blank or whitespace is unset. WHO RELIES: a shell that exports it empty. WHAT THE MUTATION DOES: a blank effort refuses a Pi executor as though an effort were set. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M9-a-blank-effort-is-a-set-one ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯' ⭐ RE-ANCHORED BY JAN-MHX MH-6 (ledger rule #5: the effort is now read once, `const effort = ...`, and handed to the refusal) and RE-MEASURED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M9-a-blank-effort-is-a-set-one ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-MHX MH-3 - the selector (DESIGN-multi-harness-executor.md D31-D34, D39; ROADMAP-multi-harness-executor.md MH-3 tests 1-7, 10, 12, 13; the sponsor’s answers of 2026-10-18, S1-S4): the identity refusals, the effort rule, the defaults named and never applied, and JPWB_CODEX_BIN captured"
 	},
 	{
@@ -32784,10 +32784,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "MH3-M12-the-reviewer-s-model-is-asked-before-the-effort",
 		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
-		find: "\tconst effortRefused = executorEffortRefusal(\n\t\ttoolId,\n\t\tenv.JPWB_EXECUTOR_EFFORT?.trim() || undefined\n\t);\n\tif (effortRefused) return effortRefused;\n\t// ⭐ `JAN-MHX` MH-3 (D33) — then the model beside the reviewer's, when a real one was admitted.\n\tconst dependent =\n\t\tinput.reviewer === undefined ? undefined : independenceRefusal(toolId, modelId, input.reviewer);\n\tif (dependent) return dependent;\n",
-		replace: "\t// MUTANT: the reviewer's model is asked before the effort\n\t// ⭐ `JAN-MHX` MH-3 (D33) — then the model beside the reviewer's, when a real one was admitted.\n\tconst dependent =\n\t\tinput.reviewer === undefined ? undefined : independenceRefusal(toolId, modelId, input.reviewer);\n\tif (dependent) return dependent;\n\tconst effortRefused = executorEffortRefusal(\n\t\ttoolId,\n\t\tenv.JPWB_EXECUTOR_EFFORT?.trim() || undefined\n\t);\n\tif (effortRefused) return effortRefused;\n",
+		find: "\tconst effortRefused = executorEffortRefusal(toolId, effort);\n\tif (effortRefused) return effortRefused;\n\t// ⭐ `JAN-MHX` MH-3 (D33) — then the model beside the reviewer's, when a real one was admitted.\n\tconst dependent =\n\t\tinput.reviewer === undefined ? undefined : independenceRefusal(toolId, modelId, input.reviewer);\n\tif (dependent) return dependent;\n",
+		replace: "\t// MUTANT: the reviewer's model is asked before the effort\n\t// ⭐ `JAN-MHX` MH-3 (D33) — then the model beside the reviewer's, when a real one was admitted.\n\tconst dependent =\n\t\tinput.reviewer === undefined ? undefined : independenceRefusal(toolId, modelId, input.reviewer);\n\tif (dependent) return dependent;\n\tconst effortRefused = executorEffortRefusal(toolId, effort);\n\tif (effortRefused) return effortRefused;\n",
 		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
-		why: "PROMISE (D32, D33; the selector's table, rows 6 and 7): the executor's own configuration is asked first - its effort - and its model beside the reviewer's after. WHO RELIES: the operator shown one refusal at a time, the one their own configuration owes. WHAT THE MUTATION DOES: an effort beside the reviewer's own model is refused for the model instead. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M12-the-reviewer-s-model-is-asked-before-the-effort ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		why: "PROMISE (D32, D33; the selector's table, rows 6 and 7): the executor's own configuration is asked first - its effort - and its model beside the reviewer's after. WHO RELIES: the operator shown one refusal at a time, the one their own configuration owes. WHAT THE MUTATION DOES: an effort beside the reviewer's own model is refused for the model instead. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M12-the-reviewer-s-model-is-asked-before-the-effort ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯' ⭐ RE-ANCHORED BY JAN-MHX MH-6 (ledger rule #5: the effort is now read once, `const effort = ...`, and handed to the refusal) and RE-MEASURED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M12-the-reviewer-s-model-is-asked-before-the-effort ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-MHX MH-3 - the selector (DESIGN-multi-harness-executor.md D31-D34, D39; ROADMAP-multi-harness-executor.md MH-3 tests 1-7, 10, 12, 13; the sponsor’s answers of 2026-10-18, S1-S4): the identity refusals, the effort rule, the defaults named and never applied, and JPWB_CODEX_BIN captured"
 	},
 	{
@@ -32996,5 +32996,494 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/live-exec-lane-config.test.ts"],
 		why: "PROMISE (the pinned gap, until MH-8): the lane does not yet refuse an executor model that is the reviewer's (D33, EXECUTOR_MODEL_IS_THE_REVIEWERS, asked beside the lane's own reviewer), and a test says so, which reddens when the lane restates it. WHO RELIES: MH-8 and a reader of the table, as for MH3-M34. WHAT THE MUTATION DOES: the lane refuses an executor model equal to JPWB_ASSURANCE_MODEL, as MH-8's mirror would for the reviewer's own id; the pin's row for the reviewer's own model is the only arrangement in the file that sets one. OBSERVED (bun run mutants -- MH3-M32, MH3-M33, MH3-M34 and MH3-M35 by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M35-the-lane-refuses-the-reviewer-s-own-model ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-MHX MH-3, the check's fix - the lane's executor mirror (the MINOR finding on verif/live-exec-lane-config.test.ts and lane-config.ts laneKeysRefusal; DESIGN-multi-harness-executor.md D32, D33, D36): the Pi executor that boots the lane is asked beside the lane's own reviewer, on the model P3 ran, and the gap of the reviewer-less, effort-less mirror is pinned until MH-8"
+	},
+	// ── ⭐ JAN-MHX MH-6 — THE CODEX DRIVER: its pinned catalog and argv, its preflight's version, model and effort ──────
+	// refusals, its readings of the JSONL and the error stream, Codex wired as the CLI kind, its catalog entry and the lane
+	// mirror ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+	{
+		id: "MH6-M1-the-catalog-offers-the-host-tools-behind-search",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "const CATALOG_BYTES = JSON.stringify(CODEX_CATALOG);",
+		replace: "const CATALOG_BYTES = JSON.stringify({ models: [{ ...CODEX_CATALOG.models[0]!, supports_search_tool: true }] }); // MUTANT: the catalog with search on",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (§4.3, MH-0c F1; roadmap MH-6 test 1): the run folder holds the catalog Probe 1's second call ran with, byte for byte, search off. WHO RELIES: every Codex turn - with search on, live gpt-5.6-sol could not load the host's tools and answered BLOCKED. WHAT THE MUTATION DOES: the catalog offers the host's tools only behind tool_search. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M1-the-catalog-offers-the-host-tools-behind-search ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M2-the-argv-drops-approvals-reviewer",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "\t\t\t\t\t'-c',\n\t\t\t\t\t'approvals_reviewer=\"user\"',\n",
+		replace: "\t\t\t\t\t// MUTANT: approvals_reviewer dropped\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (§4.3; roadmap MH-6 test 2, its named mutant): approvals go to no auto-review thread. WHO RELIES: the quota, and the record - this host's config routes approvals to an auto-review thread on the same account. WHAT THE MUTATION DOES: the argv loses approvals_reviewer=\"user\". OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M2-the-argv-drops-approvals-reviewer ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M3-the-argv-drops-strict-config",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "'--strict-config',",
+		replace: "// MUTANT: --strict-config dropped",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (MH-0c F6): an unknown -c key refuses the run before any request. WHO RELIES: every pinned -c setting, which Codex would otherwise ignore with only a notice if misspelt. WHAT THE MUTATION DOES: --strict-config is dropped. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M3-the-argv-drops-strict-config ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M4-the-argv-drops-ignore-rules",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "'--ignore-rules',",
+		replace: "// MUTANT: --ignore-rules dropped",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (MH-0c F7): the execpolicy rules files are not loaded. WHO RELIES: the turn, whose commands are the host's. WHAT THE MUTATION DOES: --ignore-rules is dropped, so ~/.codex/rules is read. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M4-the-argv-drops-ignore-rules ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M5-the-argv-drops-ephemeral",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "'--ephemeral',",
+		replace: "// MUTANT: --ephemeral dropped",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (§4.3, D44; MH-0c F15): the prompt and the host's results stay out of CODEX_HOME. WHO RELIES: retention (PER-9) - without it both land in a rollout and two sqlite logs. WHAT THE MUTATION DOES: --ephemeral is dropped. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M5-the-argv-drops-ephemeral    ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M6-a-sandbox-that-writes",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "'read-only',",
+		replace: "'workspace-write', // MUTANT: a sandbox that writes",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (§4.3; MH-0c F9): Codex runs read-only, the backstop under the catalog. WHO RELIES: the workspace, reached only through the host's tools. WHAT THE MUTATION DOES: -s workspace-write. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M6-a-sandbox-that-writes       ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M7-host-calls-need-approval",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "default_tools_approval_mode=\"approve\", ",
+		replace: "",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (MH-0c F12): the host's tools run without an approval Codex cannot ask for. WHO RELIES: every host call - without it each ends \"MCP tool call requires approval, but approval policy is never\". WHAT THE MUTATION DOES: the approve mode is dropped from the server entry. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M7-host-calls-need-approval    ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M8-host-calls-in-parallel",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "supports_parallel_tool_calls=false}",
+		replace: "supports_parallel_tool_calls=true}",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (D5; MH-0c F13): the host's calls arrive one at a time, in the model's order. WHO RELIES: a run_command that must follow its write_file. WHAT THE MUTATION DOES: parallel calls on. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M8-host-calls-in-parallel      ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M9-the-prompt-rides-in-argv",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "'--ignore-rules',\n\t\t\t\t\t'-'\n",
+		replace: "'--ignore-rules',\n\t\t\t\t\tturn.prompt // MUTANT: the prompt in argv\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (D15, D40; roadmap MH-6 test 3): the prompt goes on stdin, never in argv. WHO RELIES: every diagnostic that echoes a command line (PER-12). WHAT THE MUTATION DOES: the prompt is the last argument. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M9-the-prompt-rides-in-argv    ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M10-no-version-check",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "if (version === CODEX_VERSION) return undefined;",
+		replace: "if (version === CODEX_VERSION || version !== '') return undefined; // MUTANT: no version check",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (D14a; roadmap MH-6 test 5, its named mutant): any codex --version but the one MH-0c measured refuses the session. WHO RELIES: the surface proof, a measurement of one version. WHAT THE MUTATION DOES: any version passes. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M10-no-version-check           ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M11-a-failing-version-exit-is-read",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "if (exitCode !== 0)",
+		replace: "if (exitCode === null) // MUTANT: a failing exit is read as a version",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (D14a): a --version that exited non-zero proves no version. WHO RELIES: the version pin. WHAT THE MUTATION DOES: a failing exit's output is read. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M11-a-failing-version-exit-is-read ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M12-another-model-is-run",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "if (selection.modelId !== CATALOG_MODEL)",
+		replace: "if (selection.modelId === '') // MUTANT: another model is run",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (§4.3, D14a): the driver runs only the model its pinned catalog holds. WHO RELIES: the surface proof - another model's tools were never measured. WHAT THE MUTATION DOES: any model opens. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M12-another-model-is-run       ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M13-any-effort-is-taken",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "if (selection.effort === undefined || !CATALOG_EFFORTS.includes(selection.effort))",
+		replace: "if (selection.effort === undefined) // MUTANT: any effort is taken",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (D32): the effort is one the pinned catalog lists, which also keeps its TOML string to a word. WHO RELIES: the argv's -c model_reasoning_effort. WHAT THE MUTATION DOES: any effort string is written into the argv. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M13-any-effort-is-taken        ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M14-no-effort-is-taken",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "if (selection.effort === undefined || !CATALOG_EFFORTS.includes(selection.effort))",
+		replace: "if (selection.effort !== undefined && !CATALOG_EFFORTS.includes(selection.effort)) // MUTANT: no effort is taken",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (D32): a session with no effort is refused - unset, Codex's user config would choose one. WHO RELIES: the effort the sponsor chose. WHAT THE MUTATION DOES: no effort opens. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M14-no-effort-is-taken         ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M15-a-quote-in-a-path-is-written",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "if (NOT_TOML_LITERAL.test(path))",
+		replace: "if (NOT_TOML_LITERAL.test(path) && path === '') // MUTANT: a quote in a path is written",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (§4.3): every path the argv writes into a TOML literal string can be one. WHO RELIES: the -c table - a quote ends the string, and the rest is read as configuration. WHAT THE MUTATION DOES: no check. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M15-a-quote-in-a-path-is-written ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M16-any-server-name-is-a-key",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "if (!/^[A-Za-z0-9_-]+$/.test(run.serverName))",
+		replace: "if (run.serverName === '') // MUTANT: any server name is written as a key",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (§4.3): the server is named as a bare TOML key. WHO RELIES: the -c mcp_servers.<name> table. WHAT THE MUTATION DOES: a name with a dot is written, splitting the key. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M16-any-server-name-is-a-key   ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M17-the-program-by-a-relative-path",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "program: join(\n\t\t\tappData,\n",
+		replace: "program: join(\n\t\t\t// MUTANT: the program by a relative path, not under the install\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (§4.3, D11's reason): the program is Codex's own executable, by absolute path, where the npm install put it. WHO RELIES: the version pin and the turn - never the npm shim, never a search. WHAT THE MUTATION DOES: the path loses its install folder. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M17-the-program-by-a-relative-path ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M18-the-capture-is-not-run",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "CODEX_BIN_OVERRIDE === undefined ? measuredProgram() : { program: CODEX_BIN_OVERRIDE };",
+		replace: "measuredProgram(); // MUTANT: the capture is not run",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (D34): the driver runs the JPWB_CODEX_BIN it captured, which the selector honours in test mode and refuses outside it. WHO RELIES: a test-mode stand-in - a variable read by nothing must not look as though it took effect. WHAT THE MUTATION DOES: the measured path whatever the capture. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M18-the-capture-is-not-run     ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M19-a-relative-appdata-is-taken",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "if (appData === undefined || !isAbsolute(appData))",
+		replace: "if (appData === undefined) // MUTANT: a relative APPDATA is taken",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (§4.3): an unset or relative %APPDATA% names no program. WHO RELIES: the turn - a relative program is resolved against the run's cli/. WHAT THE MUTATION DOES: a relative APPDATA is taken. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M19-a-relative-appdata-is-taken ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M20-a-call-refused-for-approval-was-sent",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "textOf(objectOf(item.error)?.message) === NOT_SENT_FOR_APPROVAL;",
+		replace: "textOf(objectOf(item.error)?.message) === ''; // MUTANT: a call refused for approval was sent",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (D21; MH-0c F12): a host call Codex refused for approval never reached the host, and is a refused attempt. WHO RELIES: the observation, and the refusal row of D19. WHAT THE MUTATION DOES: it is read as sent, so the cross-check fails the turn as a disagreeing record. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M20-a-call-refused-for-approval-was-sent ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M21-a-declined-host-call-was-sent",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "sent: status !== 'declined' && !refusedForApproval",
+		replace: "sent: !refusedForApproval /* MUTANT: a declined call was sent */",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (D21): a declined host call was not sent. WHO RELIES: the observation. WHAT THE MUTATION DOES: a declined call is read as sent. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M21-a-declined-host-call-was-sent ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M22-resource-functions-are-host-calls",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "if (RESOURCE_FUNCTIONS.has(tool))",
+		replace: "if (RESOURCE_FUNCTIONS.has(tool) && tool === '') // MUTANT: Codex's resource functions are host calls",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (MH-0c F5): an mcp_tool_call on jpwb naming Codex's resource functions is Codex's own carrier, not a host call. WHO RELIES: every turn the model reaches for resources - the host never receives those as tool calls. WHAT THE MUTATION DOES: they are host calls, and the cross-check fails the turn. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M22-resource-functions-are-host-calls ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M23-a-refused-resource-call-ran",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "ran: status === 'completed' }",
+		replace: "ran: true /* MUTANT: a refused resource call ran */ }",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (D21; MH-0c F5): a resource call the host refused is a refused attempt, recorded REFUSED in its place. WHO RELIES: the observation, and the refusal row of D19. WHAT THE MUTATION DOES: it is passed over as a carrier that ran. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M23-a-refused-resource-call-ran ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M24-a-carrier-known-by-name-on-any-server",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "if (server !== serverName)",
+		replace: "if (server !== serverName && !RESOURCE_FUNCTIONS.has(tool)) // MUTANT: a carrier known by its name on any server",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (D21): a call to another MCP server is a tool of Codex's own that ran, whatever its tool is named. WHO RELIES: the breach detector - a server of the operator's could name a tool as a carrier. WHAT THE MUTATION DOES: such a tool passes as plumbing. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M24-a-carrier-known-by-name-on-any-server ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M25-another-server-s-tool-is-the-host-s",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "if (server !== serverName)",
+		replace: "if (server !== serverName && tool === '') // MUTANT: another server's tool is the host's",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (D21): only jpwb's calls are the host's. WHO RELIES: the breach detector. WHAT THE MUTATION DOES: another server's write_file is read as the host's. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M25-another-server-s-tool-is-the-host-s ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M26-a-completed-own-item-did-not-run",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "ran: item.status !== 'declined'",
+		replace: "ran: item.status === 'declined' /* MUTANT: a completed item of Codex's own did not run */",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (D21; roadmap MH-6 test 4): a completed command_execution, file_change, web_search or collaboration call is a tool of Codex's own that ran - a breach. WHO RELIES: the workspace and the record. WHAT THE MUTATION DOES: it is read as refused. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M26-a-completed-own-item-did-not-run ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M27-a-failed-command-did-not-run",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "ran: item.status !== 'declined'",
+		replace: "ran: item.status === 'completed' /* MUTANT: a failed command did not run */",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (D21): a command that failed ran - it exited non-zero. WHO RELIES: the breach detector. WHAT THE MUTATION DOES: a failed command is read as refused. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M27-a-failed-command-did-not-run ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M28-turn-failed-is-no-error",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "if (shape.failed !== undefined) return shape.failed.message ?? '';",
+		replace: "if (shape.failed !== undefined) return undefined; // MUTANT: turn.failed is no error",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (D19, D19a; roadmap MH-6 test 4): turn.failed is CLI_ERROR with its message as the excerpt. WHO RELIES: the try's record of why no answer came. WHAT THE MUTATION DOES: turn.failed carries no error. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M28-turn-failed-is-no-error    ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M29-a-reroute-is-a-notice",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "if (said.startsWith(REROUTED))",
+		replace: "if (said.startsWith(REROUTED) && said === '') // MUTANT: a reroute is a notice",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (D22; MH-0c F10; roadmap MH-6 test 4): a reroute notice reports the model that served, so the turn fails CLI_MODEL_SUBSTITUTED. WHO RELIES: REG-D-052 - Codex answers and exits 0 after a reroute. WHAT THE MUTATION DOES: the reroute is read as a notice. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M29-a-reroute-is-a-notice      ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M30-no-notice-is-benign",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "BENIGN_NOTICES.some((notice) => said.startsWith(notice));",
+		replace: "said === BENIGN_NOTICES.join(''); // MUTANT: no notice is benign",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (MH-0c fact 7): the two transport notices Probe 0 measured before a turn that completed are not errors. WHO RELIES: a turn on a flaky network. WHAT THE MUTATION DOES: every notice fails the turn. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M30-no-notice-is-benign        ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M31-an-unknown-error-is-passed-over",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "return shape.unknownError || read.unknownError ? '' : undefined;",
+		replace: "return undefined; // MUTANT: an unknown error is passed over",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (D19): an error of no shape the driver knows fails the turn, its excerpt withheld. WHO RELIES: the try - an ignored-config notice is one, which --strict-config prevents. WHAT THE MUTATION DOES: it is passed over. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M31-an-unknown-error-is-passed-over ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M32-a-line-it-cannot-read-is-skipped",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "if (event === undefined || typeof event.type !== 'string') return undefined;",
+		replace: "if (event === undefined || typeof event.type !== 'string') continue; // MUTANT: a line it cannot read is skipped",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (D14a): a record read in part is not one - any line that is not a JSON event makes it unparseable. WHO RELIES: the surface proof. WHAT THE MUTATION DOES: such a line is skipped. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M32-a-line-it-cannot-read-is-skipped ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M33-an-unknown-event-is-passed-over",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "\t\tdefault:\n\t\t\treturn false;\n",
+		replace: "\t\tdefault:\n\t\t\treturn true; // MUTANT: an event of an unknown type is passed over\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (D14a): an event of a type this version does not write makes the record unparseable. WHO RELIES: the version pin's reading. WHAT THE MUTATION DOES: it is passed over. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M33-an-unknown-event-is-passed-over ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M34-the-surface-is-declared-for-any-record",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "surface: wholeTurn ? MEASURED_OWN_SURFACE : undefined,",
+		replace: "surface: MEASURED_OWN_SURFACE, // MUTANT: the surface is declared for any record",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (D14a): the measured surface is declared only for one whole turn. WHO RELIES: CLI_SURFACE_UNPROVEN - the pin and the catalog prove only a turn Codex ran to its end. WHAT THE MUTATION DOES: any parsed record declares it. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M34-the-surface-is-declared-for-any-record ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M35-a-terminal-event-not-last-ends-the-turn",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "shape.terminalAt === events.length - 1;",
+		replace: "shape.terminalAt !== undefined; // MUTANT: a terminal event not last ends the turn",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (D14a): the terminal event is the record's last. WHO RELIES: the surface proof. WHAT THE MUTATION DOES: events after it are accepted. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M35-a-terminal-event-not-last-ends-the-turn ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M36-turn-1-s-answer-on-every-turn",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "`last-${output.turn}.txt`",
+		replace: "`last-1.txt` /* MUTANT: turn 1's answer on every turn */",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (D16): each try's answer is that try's last message. WHO RELIES: a repair, which re-sends every earlier answer. WHAT THE MUTATION DOES: turn 1's file is read on every turn. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M36-turn-1-s-answer-on-every-turn ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M37-the-excerpt-carries-what-the-model-chose",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "return { errorExcerpt: `codex_core::tools::router: ${known?.words ?? 'error'}` };",
+		replace: "return { errorExcerpt: `codex_core::tools::router: ${said}` }; // MUTANT: the excerpt carries what the model chose",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (D19a): a router excerpt carries Codex's words only, cut before the name or command the model chose. WHO RELIES: the record plane, which has no removal path. WHAT THE MUTATION DOES: the whole line is excerpted. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M37-the-excerpt-carries-what-the-model-chose ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M38-the-router-s-refusals-are-ignored",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "return { errorExcerpt: `codex_core::tools::router: ${known?.words ?? 'error'}` };",
+		replace: "continue; // MUTANT: the router's refusals are ignored",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (MH-0c F4; D21): a call Codex refused before sending it, which its JSONL does not hold, fails the turn CLI_ERROR. WHO RELIES: the observation, which would otherwise be accepted missing an attempt it cannot place. WHAT THE MUTATION DOES: the error stream's refusals are ignored. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M38-the-router-s-refusals-are-ignored ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M39-a-resource-failure-the-record-holds-is-an-error",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "if (said === undefined || MIRRORED_IN_THE_RECORD.some((prefix) => said.startsWith(prefix)))",
+		replace: "if (said === undefined) // MUTANT: a resource failure the record holds is an error",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (MH-0c F5): a resource call's failure on the error stream is passed over - the JSONL holds it, in order. WHO RELIES: a turn whose model reached for resources and then answered. WHAT THE MUTATION DOES: it fails the turn. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M39-a-resource-failure-the-record-holds-is-an-error ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M40-the-global-agents-md-is-not-fingerprinted",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "{ name: '~/.codex/AGENTS.md', path: join(home, '.codex', 'AGENTS.md') },",
+		replace: "// MUTANT: ~/.codex/AGENTS.md is not fingerprinted",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (D44a; MH-0c F8): ~/.codex/AGENTS.md is declared and fingerprinted before each turn. WHO RELIES: the next try - it reaches the model despite the flags, and run_command can write it. WHAT THE MUTATION DOES: it is not declared. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M40-the-global-agents-md-is-not-fingerprinted ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M41-a-message-is-not-one",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "out.events.push({ kind: 'ASSISTANT_MESSAGE' });",
+		replace: "// MUTANT: a message is not one",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (D19, D21): every agent_message is an assistant message in the record's order. WHO RELIES: the refusal row - an answer after a refusal lets the try stand. WHAT THE MUTATION DOES: messages vanish, so every refusal ends the turn. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M41-a-message-is-not-one       ⎯⎯⎯⎯⎯⎯ Failed Tests 12 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M42-an-item-is-placed-at-each-of-its-events",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "if (!shape.items.has(id)) shape.order.push(id);",
+		replace: "shape.order.push(id); // MUTANT: an item is placed at each of its events",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (D21): an item is placed once, where it first appeared. WHO RELIES: the cross-check by order and name. WHAT THE MUTATION DOES: a started-then-completed call is placed twice. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M42-an-item-is-placed-at-each-of-its-events ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M43-reasoning-is-dropped",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "read.reasoning.length === 0 ? {}",
+		replace: "read.reasoning.length >= 0 ? {} /* MUTANT: reasoning is dropped */",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (D23): reasoning Codex returns is volunteered reasoning. WHO RELIES: PER-12's retention. WHAT THE MUTATION DOES: it is dropped. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M43-reasoning-is-dropped       ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M44-any-version-is-printed",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "/^[A-Za-z0-9._ -]{1,60}$/.test(text) ? `'${text}'` : 'a version this host will not print'",
+		replace: "`'${text}'` /* MUTANT: any version is printed */",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (D19a's reason): a refusal prints a version only of a short, plain shape. WHO RELIES: the session's refusal, which a wrong program's output reaches. WHAT THE MUTATION DOES: any output is printed. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M44-any-version-is-printed     ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M45-the-cli-selection-drops-its-effort",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "if (kind === 'CLI') return { kind, toolId, modelId, ...(effort === undefined ? {} : { effort }) };",
+		replace: "if (kind === 'CLI') return { kind, toolId, modelId }; // MUTANT: the effort is dropped",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
+		why: "PROMISE (D30, D32; roadmap MH-6 test 6): a Codex selection carries the effort the driver hands the CLI. WHO RELIES: the Codex driver - without it, Codex's user config (this host's says ultra) would choose. WHAT THE MUTATION DOES: the CLI selection loses its effort. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M45-the-cli-selection-drops-its-effort ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M46-the-preflight-is-handed-another-selection",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "const check = driver.preflight(run, selection);",
+		replace: "const check = driver.preflight(run, { ...selection, modelId: '' }); // MUTANT: another selection",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE (D14; MH-6): the preflight is handed the session's own selection. WHO RELIES: the Codex driver's refusal of a model or effort its surface was not measured on. WHAT THE MUTATION DOES: it is handed another. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M46-the-preflight-is-handed-another-selection ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M47-codex-is-left-out-of-the-table",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-drivers.ts",
+		find: "\tcodex: codexExecutorDriver\n",
+		replace: "\t// MUTANT: Codex left out of the table\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-drivers.test.ts"],
+		why: "PROMISE (D12, D30): the table holds Codex's driver. WHO RELIES: the CLI branch of getExecutionSession, which opens nothing without it. WHAT THE MUTATION DOES: Codex is left out. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M47-codex-is-left-out-of-the-table ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M48-codex-reports-its-own-model",
+		file: "apps/rph-demo/src/lib/server/tools/backing-tool.ts",
+		find: "the one signal of another (the driver's).\n\t\t\tidentity: 'HOST_CONFIGURED',",
+		replace: "the one signal of another (the driver's).\n\t\t\tidentity: 'PROVIDER_REPORTED', // MUTANT: Codex reports its own model",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/backing-tool.test.ts"],
+		why: "PROMISE (D35; roadmap MH-6 test 7): the catalog entry declares what MH-0c measured - Codex names no model, so HOST_CONFIGURED. WHO RELIES: the record's identity grade. WHAT THE MUTATION DOES: PROVIDER_REPORTED, for a model nothing reported. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M48-codex-reports-its-own-model ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M49-codex-declares-a-role-nobody-measured",
+		file: "apps/rph-demo/src/lib/server/tools/backing-tool.ts",
+		find: "roles: ['EXECUTION'],",
+		replace: "roles: ['EXECUTION', 'ASSURANCE'], // MUTANT: Codex declares a role nobody measured",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/backing-tool.test.ts"],
+		why: "PROMISE (D35; roadmap MH-6 test 7): Codex declares EXECUTION only - it was never measured reviewing. WHO RELIES: the catalog's declaration. WHAT THE MUTATION DOES: it declares ASSURANCE. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M49-codex-declares-a-role-nobody-measured ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M50-a-codex-reviewer-is-admitted-past-the-role",
+		file: "apps/rph-demo/src/lib/server/tools/backing-tool.ts",
+		find: "roles: ['EXECUTION'],",
+		replace: "roles: ['EXECUTION', 'ASSURANCE'], // MUTANT: Codex declares a role nobody measured",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/reviewer-selection.test.ts"],
+		why: "PROMISE (D35): a reviewer set to codex is refused for the role it does not declare. WHO RELIES: the reviewer selector, asked of the same edit as MH6-M49 - the reviewer's refusal, not the declaration. WHAT THE MUTATION DOES: codex declares ASSURANCE, and the reviewer selector reaches the next refusal. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M50-a-codex-reviewer-is-admitted-past-the-role ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M51-nothing-is-captured",
+		file: "apps/rph-demo/src/lib/server/tools/codex-executor-driver.ts",
+		find: "export const CODEX_BIN_OVERRIDE: string | undefined = process.env.JPWB_CODEX_BIN;",
+		replace: "export const CODEX_BIN_OVERRIDE: string | undefined = undefined; // MUTANT: nothing is captured",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/codex-executor-driver.test.ts"],
+		why: "PROMISE (D34): JPWB_CODEX_BIN is captured when the driver loads. WHO RELIES: the driver, which runs it, and the selector, which refuses it. WHAT THE MUTATION DOES: nothing is captured. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M51-nothing-is-captured        ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M52-the-lane-admits-a-codex-executor",
+		file: "apps/rph-demo/e2e-live-exec/lane-config.ts",
+		find: "\t\t...(executorId === 'codex'\n",
+		replace: "\t\t...(false // MUTANT: the lane admits a Codex executor\n",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "PROMISE (D36, until MH-8): the lane refuses a Codex executor by its own rule - the spec asserts PROVIDER_REPORTED, and Codex reports no model. WHO RELIES: the lane operator, who would otherwise wait out the whole Begin & Execute bound to fail there. WHAT THE MUTATION DOES: a Codex lane boots. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M52-the-lane-admits-a-codex-executor ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M53-the-lane-leaves-codex-s-override",
+		file: "apps/rph-demo/e2e-live-exec/lane-config.ts",
+		find: "\tcodex: 'JPWB_CODEX_BIN'\n",
+		replace: "\t// MUTANT: the lane leaves Codex's override\n",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "PROMISE (D34, D36): the lane restates the product's refusal of a set JPWB_CODEX_BIN for a Codex executor. WHO RELIES: the lane operator. WHAT THE MUTATION DOES: the override is not named. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M53-the-lane-leaves-codex-s-override ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
+	},
+	{
+		id: "MH6-M54-json-is-left-undecided",
+		file: "verif/agy-stderr-unbound.test.ts",
+		find: "const NOT_A_SOURCE_EXTENSION = ['.css', '.html', '.json'];",
+		replace: "const NOT_A_SOURCE_EXTENSION = ['.css', '.html']; // MUTANT: .json left undecided",
+		expectRed: ["verif/agy-stderr-unbound.test.ts"],
+		why: "PROMISE (REG-Q-066's W3): every extension under the demo's source tree is probed or declared not a source. WHO RELIES: the gate's population - .json arrived with the Codex catalog. WHAT THE MUTATION DOES: .json is in neither list. OBSERVED (bun run mutants -- the 54 MH6 ids and MH3-M8, MH3-M9, MH3-M12 by their full ids, 2026-10-18, in the MH-6 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH6-M54-json-is-left-undecided     ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-6 - the Codex driver (DESIGN-multi-harness-executor.md §4.3, D14a, D19, D21, D22, D30, D32, D44a; ROADMAP-multi-harness-executor.md MH-6 tests 1-7; MH-0c, codex-cli 0.162.1, Probe 0 and Probe 1): the pinned catalog and argv, the version, model and effort refusals, the JSONL and error-stream readings, Codex wired as the CLI kind, its catalog entry, and the lane mirror"
 	}
 ];

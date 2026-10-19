@@ -89,6 +89,24 @@ describe('JAN-TOOLSUITE — the declarations record what was MEASURED', () => {
 		expect(byId('pi').reports.diagnostics).toBe('PROMPT_FREE');
 		expect(byId('devin').reports.diagnostics).toBe('PROMPT_FREE');
 	});
+
+	it('⭐ `JAN-MHX` MH-6 (roadmap test 7) — Codex declares what MH-0c measured, and executes only', () => {
+		// ⭑ EACH VALUE FROM THE PROBE, NOT FROM DOCUMENTATION (codex-cli 0.162.1, Probe 0's arms and Probe 1's two calls):
+		//   · identity — its `--json` record names no model in any arm, so only the host asserts one;
+		//   · reasoning — no `reasoning` item reached the record in either live call: the catalog the driver pins asks for no
+		//     summary (`default_reasoning_summary: "none"`), so the measured value is an absence;
+		//   · diagnostics — the prompt goes on stdin (`-`), so the argv a diagnostic could echo carries none of it;
+		//   · roles — it was measured executing, never reviewing.
+		// THE MUTANTS: PROVIDER_REPORTED, the shape the record would then claim for a model nothing reported; and the
+		// ASSURANCE role, which no probe measured.
+		expect(byId('codex').roles).toEqual(['EXECUTION']);
+		expect(byId('codex').reports).toEqual({
+			identity: 'HOST_CONFIGURED',
+			version: false,
+			reasoning: 'NONE',
+			diagnostics: 'PROMPT_FREE'
+		});
+	});
 });
 
 describe('JAN-TOOLSUITE — the executor has its OWN configuration', () => {

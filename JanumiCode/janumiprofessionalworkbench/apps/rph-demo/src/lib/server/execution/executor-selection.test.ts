@@ -44,7 +44,8 @@ const TOOLS: readonly (string | undefined)[] = [
 	'devin',
 	'Agy',
 	'nosuchtool',
-	// ⭐ `JAN-MHX` MH-3 — a tool the sponsor named a default for, which the catalog does not know yet.
+	// ⭐ `JAN-MHX` MH-3 — a tool the sponsor named a default for, ~~which the catalog does not know yet~~ ⭐ MH-6: catalogued and
+	// wired, and refused in every row with a model because the table sets no effort, which Codex takes as a flag (D32).
 	'codex'
 ];
 const MODELS: readonly {
@@ -80,7 +81,8 @@ const OVERRIDES: readonly {
 		name: 'both set',
 		overrides: { agy: 'C:/stand-in/agy.exe', devin: 'C:/stand-in/devin.exe', codex: undefined }
 	},
-	// ⭐ `JAN-MHX` MH-3 (D34) — Codex's override: no Codex adapter is wired, so it refuses no row of this table.
+	// ⭐ `JAN-MHX` MH-3 (D34) — Codex's override: ~~no Codex adapter is wired, so it refuses no row of this table~~ ⭐ MH-6:
+	// it refuses Codex's rows outside test mode, as `OVERRIDE_OF` keys it.
 	{
 		name: 'JPWB_CODEX_BIN set',
 		overrides: { agy: undefined, devin: undefined, codex: 'stand-in/codex.exe' }
@@ -91,8 +93,13 @@ const OVERRIDES: readonly {
 const EXECUTION_TOOLS = BACKING_TOOLS.filter((t) => t.roles.includes('EXECUTION')).map(
 	(t) => t.toolId
 );
-/** D1, RESTATED: the executor adapters this host has, and what each opens. */
-const WIRED: Readonly<Record<string, 'AGY' | 'PI'>> = { agy: 'AGY', pi: 'PI' };
+/** D1, RESTATED: the executor adapters this host has, and what each opens. ⭐ `JAN-MHX` MH-6 — Codex opens the CLI kind. */
+const WIRED: Readonly<Record<string, 'AGY' | 'PI' | 'CLI'>> = { agy: 'AGY', pi: 'PI', codex: 'CLI' };
+/** ⭐ `JAN-MHX` MH-6 (D32), RESTATED: the wired tools that take their effort as a flag, and so require one. */
+const EFFORT_REQUIRED: readonly string[] = ['codex'];
+/** The effort a wired tool must be asked with to be admitted: one where it is required, none where it is not. */
+const effortFor = (tool: string): Readonly<Record<string, string>> =>
+	EFFORT_REQUIRED.includes(tool) ? { JPWB_EXECUTOR_EFFORT: 'high' } : {};
 /** D3, RESTATED: the override each tool's adapter captures — per TOOL, whether or not it is wired today. */
 const OVERRIDE_OF: Readonly<Record<string, keyof ExecutorProgramOverrides>> = {
 	agy: 'agy',
@@ -128,6 +135,7 @@ function expectGuidanceFor(guidance: string, tool: string | undefined): void {
 type Expected =
 	| { readonly kind: 'STAND_IN' }
 	| { readonly kind: 'AGY' | 'PI'; readonly modelId: string }
+	| { readonly kind: 'CLI'; readonly toolId: string; readonly modelId: string; readonly effort?: string }
 	| {
 			readonly kind: 'REFUSED';
 			readonly code: ExecutorRefusalCode;
@@ -155,7 +163,9 @@ function oracle(
 	if (!testMode && own !== undefined && overrides[own] !== undefined)
 		return { kind: 'REFUSED', code: 'EXECUTOR_PROGRAM_OVERRIDDEN', toolId: t };
 	if (m === undefined) return { kind: 'REFUSED', code: 'EXECUTOR_MODEL_UNSET', toolId: t };
-	return { kind: opens, modelId: m };
+	// ⭐ `JAN-MHX` MH-6 (D32) — the table sets no effort, so a tool that requires one is refused for it.
+	if (EFFORT_REQUIRED.includes(t)) return { kind: 'REFUSED', code: 'EXECUTOR_EFFORT_UNSET', toolId: t };
+	return opens === 'CLI' ? { kind: opens, toolId: t, modelId: m } : { kind: opens, modelId: m };
 }
 
 /** The selection, minus the prose — the shape the oracle predicts. */
@@ -165,9 +175,15 @@ function shape(s: ExecutorSelection): Expected {
 	// ⭐ `JAN-EXEC` Phase 8 — the table sets no JPWB_REPLAY, so a REPLAY answer here is the selector reading the switch from
 	// somewhere it was not handed (`replay/replay-selection.test.ts` holds the switch's own table).
 	if (s.kind === 'REPLAY') throw new Error('the table sets no JPWB_REPLAY, and the selector answered REPLAY');
-	// ⭐ `JAN-MHX` MH-1 — nothing selects the `CLI` kind until a driver's package wires its tool, so it is an answer no row
-	// of this table may get.
-	if (s.kind === 'CLI') throw new Error('no tool is wired to the CLI kind yet, and the selector answered CLI');
+	// ⭐ `JAN-MHX` MH-1 — ~~nothing selects the `CLI` kind until a driver's package wires its tool, so it is an answer no row
+	// of this table may get~~ ⭐ MH-6: Codex is the `CLI` kind, with its tool and its effort.
+	if (s.kind === 'CLI')
+		return {
+			kind: 'CLI',
+			toolId: s.toolId,
+			modelId: s.modelId,
+			...(s.effort === undefined ? {} : { effort: s.effort })
+		};
 	return { kind: s.kind, modelId: s.modelId };
 }
 
@@ -178,10 +194,10 @@ const NO_OVERRIDES: ExecutorProgramOverrides = {
 };
 
 describe('⭐ the selector answers the design’s table — every mode, tool, model and program override', () => {
-	it('⭑ arrangement — the catalog’s EXECUTION tools are agy, pi and devin, and the table names every one', () => {
+	it('⭑ arrangement — the catalog’s EXECUTION tools are agy, pi, devin and ⭐ (MH-6) codex, and the table names every one', () => {
 		// ⚠ WITHOUT THIS the table below could pass over a catalog that lost a tool, and its rows for that tool would be
 		// testing the UNKNOWN limb while their names said otherwise.
-		expect([...EXECUTION_TOOLS].sort()).toEqual(['agy', 'devin', 'pi']);
+		expect([...EXECUTION_TOOLS].sort()).toEqual(['agy', 'codex', 'devin', 'pi']);
 		for (const t of EXECUTION_TOOLS) expect(TOOLS, `the table names ${t}`).toContain(t);
 	});
 
@@ -306,8 +322,8 @@ describe('what a refusal SAYS — the reason names the fault, and every one carr
 	});
 
 	it('⛔ and that reason offers only the WIRED tools — never devin, which the next refusal forbids (REG-F-460’s general form)', () => {
-		// ⭑ THE CATALOG'S REFUSAL LISTS THE CATALOG — "This host can drive: agy, pi, devin" — and this reason is printed
-		// beside the guidance. An operator who followed it to `devin` would be refused again, as UNWIRED: the steer D1
+		// ⭑ THE CATALOG'S REFUSAL LISTS THE CATALOG — "This host can drive: agy, pi, devin" (⭐ MH-6: ", codex" after it) —
+		// and this reason is printed beside the guidance. An operator who followed it to `devin` would be refused again, as UNWIRED: the steer D1
 		// took out of the guidance, back in the reason (`JAN-SELRES` RS-1's verification). The catalog's verdict and its
 		// REG-D-052 sentence stay; the list is the one the selector admits.
 		const got = selectExecutor({
@@ -319,16 +335,17 @@ describe('what a refusal SAYS — the reason names the fault, and every one carr
 		expect(reason).toMatch(/Unknown backing tool 'nosuchtool'\./);
 		expect(reason, 'the reason offers devin as a tool to set').not.toMatch(/devin/);
 		expect(reason).not.toContain('This host can drive:');
-		expect(reason).toContain('This host has an executor adapter for: agy, pi.');
+		expect(reason).toContain('This host has an executor adapter for: agy, pi, codex.');
 		expect(reason).toContain('the fiction REG-D-052 forbids');
-		// ⭑ AND THE TOOLS IT OFFERS ARE EXACTLY THE ONES ADMITTED — each one it names, set with a model, is selected.
+		// ⭑ AND THE TOOLS IT OFFERS ARE EXACTLY THE ONES ADMITTED — each one it names, set with a model (⭐ MH-6: and the
+		// effort it requires), is selected.
 		const offered = /executor adapter for: ([^.]*)\./.exec(reason)?.[1]?.split(', ') ?? [];
-		expect(offered).toEqual(['agy', 'pi']);
+		expect(offered).toEqual(['agy', 'pi', 'codex']);
 		for (const tool of offered)
 			expect(
 				selectExecutor({
 					testMode: false,
-					env: { JPWB_EXECUTOR: tool, JPWB_EXECUTOR_MODEL: 'fixture-executor' },
+					env: { JPWB_EXECUTOR: tool, JPWB_EXECUTOR_MODEL: 'fixture-executor', ...effortFor(tool) },
 					overrides: NO_OVERRIDES
 				}).kind,
 				`the reason offers '${tool}', which the selector refuses`
@@ -374,8 +391,8 @@ describe('what a refusal SAYS — the reason names the fault, and every one carr
 describe('⭐ D1 — the guidance names the WIRED tools, both variables, no default, and ASR-13 with the selected reviewer', () => {
 	// ⭐ SUCCESSOR of `backing-tool.test.ts:130-139`'s `/agy, pi, devin/` — ⚠ A DELIBERATE CHANGE OF WHAT IS PINNED, made
 	// stronger: that refusal listed the CATALOG, steering an operator to `devin`, which the next refusal forbids.
-	it('⛔ it lists the wired tools — agy, pi — and NOT devin', () => {
-		expect(EXECUTOR_GUIDANCE).toMatch(/agy, pi/);
+	it('⛔ it lists the wired tools — agy, pi, ⭐ (MH-6) codex — and NOT devin', () => {
+		expect(EXECUTOR_GUIDANCE).toMatch(/agy, pi, codex/);
 		expect(EXECUTOR_GUIDANCE).not.toMatch(/devin, /);
 		expect(EXECUTOR_GUIDANCE).not.toMatch(/\bpi, devin\b/);
 		expect(EXECUTOR_GUIDANCE).not.toMatch(/'devin'|JPWB_EXECUTOR=devin/);
@@ -386,12 +403,12 @@ describe('⭐ D1 — the guidance names the WIRED tools, both variables, no defa
 			(t) =>
 				selectExecutor({
 					testMode: false,
-					env: { JPWB_EXECUTOR: t, JPWB_EXECUTOR_MODEL: 'fixture-executor' },
+					env: { JPWB_EXECUTOR: t, JPWB_EXECUTOR_MODEL: 'fixture-executor', ...effortFor(t) },
 					overrides: NO_OVERRIDES
 				}).kind !== 'REFUSED'
 		);
-		expect(admitted.sort()).toEqual(['agy', 'pi']);
-		expect(EXECUTOR_GUIDANCE).toContain(`for: ${['agy', 'pi'].join(', ')} —`);
+		expect(admitted.sort()).toEqual(['agy', 'codex', 'pi']);
+		expect(EXECUTOR_GUIDANCE).toContain(`for: ${['agy', 'pi', 'codex'].join(', ')} —`);
 	});
 
 	it('names both variables, and that neither has a default', () => {
@@ -528,8 +545,9 @@ describe('⭐ D3 — the overrides the selector acts on are the ones the ADAPTER
 
 	it('⛔ `JAN-MHX` MH-3 (D34, D39) — JPWB_CODEX_BIN is CAPTURED when the selector loads: beside a replay it refuses, though the variable is gone now', async () => {
 		// ⭑ RED FIRST: nothing captured `JPWB_CODEX_BIN`, so the replay answered REPLAY beside a Codex program override.
-		// No Codex adapter is wired, so the replay is the one place the capture refuses today; the day one is, the table
-		// above (`OVERRIDE_OF`) holds its tool to the same refusal as agy's.
+		// ~~No Codex adapter is wired, so the replay is the one place the capture refuses today; the day one is, the table
+		// above (`OVERRIDE_OF`) holds its tool to the same refusal as agy's.~~ ⭐ MH-6 — one is: the table above holds Codex
+		// to agy's refusal, and the capture is now the Codex driver's, which loading the selector loads.
 		const replay = { JPWB_REPLAY: 'recordings/one-unit' };
 		const captured = await loadedWith(undefined, 'stand-in/codex.exe');
 		expect(
@@ -782,7 +800,8 @@ describe('⭐ `JAN-MHX` MH-3 (D32) — JPWB_EXECUTOR_EFFORT is refused where not
 	});
 
 	it('⛔ the rule, per tool: Codex, Claude Code and Muse REQUIRE it (EXECUTOR_EFFORT_UNSET), and take it once set', () => {
-		// ⭑ No tool that requires an effort is wired yet, so this half of the rule is asked of the rule itself.
+		// ⭑ ~~No tool that requires an effort is wired yet~~ ⭐ MH-6: of the three, only Codex is wired (its half through the
+		// selector is below), so this half of the rule is asked of the rule itself.
 		for (const tool of ['codex', 'claude', 'muse'] as const) {
 			const unset = executorEffortRefusal(tool, undefined);
 			expect(unset && shape(unset), tool).toEqual({
@@ -815,7 +834,7 @@ describe('⭐ `JAN-MHX` MH-3 (D31; the sponsor’s answers of 2026-10-18, S1) �
 			'JPWB_EXECUTOR_MODEL must still be set'
 		);
 		// ⭑ AND THE WIRED TOOLS ONLY, as every refusal lists them.
-		expect(got.kind === 'REFUSED' && got.guidance).toContain('executor adapter for: agy, pi —');
+		expect(got.kind === 'REFUSED' && got.guidance).toContain('executor adapter for: agy, pi, codex —');
 	});
 
 	it('⛔ S2 — devin’s guidance names BOTH devin models, and the one a devin executor runs beside the GLM reviewer', () => {
@@ -853,4 +872,46 @@ describe('⭐ `JAN-MHX` MH-3 (D31; the sponsor’s answers of 2026-10-18, S1) �
 		const unset = selectExecutor({ testMode: false, env: {}, overrides: NO_OVERRIDES });
 		expect(unset.kind === 'REFUSED' && unset.guidance).toBe(EXECUTOR_GUIDANCE);
 	});
+});
+
+describe('⭐ `JAN-MHX` MH-6 (roadmap test 6; design §4.3, D30, D32, D34) — Codex is wired, as a CLI executor that takes its effort as a flag', () => {
+	it('⛔ Codex with a model and no JPWB_EXECUTOR_EFFORT → EXECUTOR_EFFORT_UNSET: unset, its user configuration would decide it', () => {
+		// ⭑ RED FIRST: the catalog had no Codex, so the selector answered EXECUTOR_TOOL_UNKNOWN.
+		const got = executing('codex', 'gpt-5.6-sol');
+		expect(shape(got)).toEqual({ kind: 'REFUSED', code: 'EXECUTOR_EFFORT_UNSET', toolId: 'codex' });
+		expect(reasonOf(got)).toContain('JPWB_EXECUTOR_EFFORT is not set');
+	});
+
+	it('⭐ with its effort, Codex is the CLI kind, carrying the tool, the model and the effort the driver hands the CLI', () => {
+		// ⛔ THE MUTANT: drop the effort from the selection. The driver then has no effort to pass, and the CLI's own user
+		// configuration would choose one (D32) — this host's says `ultra`.
+		expect(executing('codex', 'gpt-5.6-sol', undefined, { JPWB_EXECUTOR_EFFORT: ' high ' })).toEqual({
+			kind: 'CLI',
+			toolId: 'codex',
+			modelId: 'gpt-5.6-sol',
+			effort: 'high'
+		});
+		// ⭑ AND BESIDE THE SELECTED REVIEWER: GPT-5.6 Sol is not of the GLM-5.3 Flash family (D33).
+		expect(executing('codex', 'gpt-5.6-sol', GLM_REVIEWER, { JPWB_EXECUTOR_EFFORT: 'high' })).toEqual({
+			kind: 'CLI',
+			toolId: 'codex',
+			modelId: 'gpt-5.6-sol',
+			effort: 'high'
+		});
+	});
+
+	for (const program of ['stand-in/codex.exe', ''])
+		it(`⛔ JPWB_CODEX_BIN=${JSON.stringify(program)} → EXECUTOR_PROGRAM_OVERRIDDEN outside test mode, and honoured in test mode`, () => {
+			const env = { JPWB_EXECUTOR: 'codex', JPWB_EXECUTOR_MODEL: 'gpt-5.6-sol', JPWB_EXECUTOR_EFFORT: 'high' };
+			const overrides = { agy: undefined, devin: undefined, codex: program };
+			const got = selectExecutor({ testMode: false, env, overrides });
+			expect(shape(got)).toEqual({ kind: 'REFUSED', code: 'EXECUTOR_PROGRAM_OVERRIDDEN', toolId: 'codex' });
+			expect(reasonOf(got)).toContain(`JPWB_CODEX_BIN=${JSON.stringify(program)}`);
+			expect(selectExecutor({ testMode: true, env, overrides })).toEqual({
+				kind: 'CLI',
+				toolId: 'codex',
+				modelId: 'gpt-5.6-sol',
+				effort: 'high'
+			});
+		});
 });
