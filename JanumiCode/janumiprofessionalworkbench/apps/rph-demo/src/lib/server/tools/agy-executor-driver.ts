@@ -17,9 +17,21 @@
 // command on agy's tool calls that neither the host nor agy's record of the turn shows (design §4.2, R23). ⛔ Never with
 // `--disable-slash-commands`, which would send `/hooks` to the model as a prompt; and a listing that shows a turn was
 // taken refuses the session, so an agy that stopped answering it free would be refused, not paid on every open.
-// ⚠ ONCE, NOT EVERY TURN, because the opener runs one preflight: a hook file created later is caught before each turn by
-// D44a's fingerprint of `~/.gemini/config/hooks.json` and of the plugins folder (`AGY_CONFIG_SOURCES`). The residual: a
-// hook added inside a plugin folder that already exists changes neither, and goes unseen until the next session.
+// ⚠ ONCE, NOT EVERY TURN, because the opener runs one preflight. ~~A hook file created later is caught before each turn
+// by D44a's fingerprint of `~/.gemini/config/hooks.json` and of the plugins folder (`AGY_CONFIG_SOURCES`). The residual:
+// a hook added inside a plugin folder that already exists changes neither, and goes unseen until the next session.~~
+// ⭐ MH-5's check found that sentence false: it missed agy's workspace. What stands in for `/hooks` before each later turn
+// is the opener's D44a check, which refuses the turn (`EXECUTOR_CONFIG_CHANGED`) before agy starts:
+//   · the fingerprints of `~/.gemini/config/hooks.json` and of the plugins folder (`AGY_CONFIG_SOURCES`);
+//   · that `cli/` holds the agent file alone, byte for byte as the opener wrote it (and the bridge in `host/`, which agy
+//     starts, its bytes too). `cli/` is agy's workspace, a config source agy reads on every turn: P0 showed agy listing
+//     `<cwd>/.agents/hooks.json` under this agent, in a fresh folder, headless. So a `hooks.json` a command plants in
+//     `cli/.agents/`, or a rewrite of the agent file's frontmatter, refuses the next turn. ⭑ MH-0b's P1, P1b and P3 left
+//     `cli/` holding the agent file alone; whether `/hooks` writes there is unmeasured, and if it does, the first turn is
+//     refused (the closed direction).
+// ⚠ What neither covers: a hook added inside a plugin folder that already exists changes no fingerprint, and goes unseen
+// until the next session; and a hook planted DURING a turn is caught before the next one, while whether agy would run it
+// later in the same turn is unmeasured.
 //
 // ⛔⛔ THE SURFACE PROOF (D14a): NONE. agy's record cannot show which tools it offered its model. Its stream-json `init`
 // event lists the same 60 tools — its own shell, file and browser tools among them — whatever the agent file says: for
@@ -54,8 +66,11 @@
 //
 // ⛔ agy's LOG HOLDS THE ACCOUNT'S E-MAIL ADDRESS AT EVERY LAUNCH (B12). It is written into `host/`, one file per turn, read
 // in memory for its model lines alone, and never part of the reading's `raw` (which the opener keeps beside a breach,
-// D20); the run folder goes at dispose. ⚠ The retention residual this driver cannot close (B11, D44): every stream-json
-// process leaves a conversation in the operator's `~/.gemini/antigravity-cli/conversations`.
+// D20); the run folder goes at dispose. ⛔ AND THE RECORD ITSELF HOLDS THE RUN FOLDER'S PATH (D42): stream-json's
+// `init.cwd` is `cli/`'s path, and on Windows the run folder sits under the account's temporary folder, whose path holds
+// the account's name. So `raw` is the record with that path blanked (`withoutRunFolder`).
+// ⚠ The retention residual this driver cannot close (B11, D44): every stream-json process leaves a conversation in the
+// operator's `~/.gemini/antigravity-cli/conversations`.
 //
 // ⭑ ITS PROGRAM: the override `agy-cli.ts` captured when it loaded — honoured in test mode only, since the selector refuses
 // one outside it (`JPWB_AGY_BIN`, `REG-F-459`) — else the first `agy.exe` (`agy` off Windows) on the server's PATH, as the
@@ -373,6 +388,22 @@ function modelsTheLogNames(log: string): string[] {
 	return named;
 }
 
+/** What stands in a record for the run folder's path. */
+const RUN_FOLDER_BLANK = '<run folder>';
+
+/**
+ * ⛔ D42 — the record with the run folder's path blanked, in each form agy may write it: JSON-escaped, as stream-json's
+ * `init.cwd` carries it (P1b); as it is; and with forward slashes.
+ */
+function withoutRunFolder(record: string, directory: string): string {
+	const forms = [
+		JSON.stringify(directory).slice(1, -1),
+		directory,
+		directory.replaceAll('\\', '/')
+	];
+	return forms.reduce((text, form) => text.replaceAll(form, RUN_FOLDER_BLANK), record);
+}
+
 /** ⭐ D24 — the `short_error` of agy's `AGY_ERROR: {…}` line, a shape agy documents and MH-0b saw (B4, B17). */
 function shortErrorOf(line: string): string | undefined {
 	try {
@@ -447,6 +478,7 @@ export function agyExecutorDriver(): CliDriver {
 			const configured = modelOfTurn.get(output.turn);
 			if (configured === undefined)
 				throw new Error('The agy driver was asked to read a turn it did not start.');
+			const raw = withoutRunFolder(output.stdout, output.run.directory);
 			let stream: AgyStream;
 			let logged: string[];
 			try {
@@ -456,13 +488,13 @@ export function agyExecutorDriver(): CliDriver {
 					await readFile(logOf(output.run, output.turn), 'utf8').catch(() => '')
 				);
 			} catch (e) {
-				if (e instanceof UnreadableRecord) return { read: 'UNPARSEABLE', raw: output.stdout };
+				if (e instanceof UnreadableRecord) return { read: 'UNPARSEABLE', raw };
 				throw e;
 			}
 			const named = [...(stream.initModel === undefined ? [] : [stream.initModel]), ...logged];
 			return {
 				read: 'PARSED',
-				raw: output.stdout,
+				raw,
 				// ⛔ B5 — agy's record holds no proof of the tools it offered (see the header).
 				surface: undefined,
 				events: stream.events,

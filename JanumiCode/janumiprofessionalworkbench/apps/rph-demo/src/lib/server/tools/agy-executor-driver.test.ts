@@ -12,7 +12,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { request } from 'node:http';
 import { homedir, tmpdir } from 'node:os';
-import { delimiter, dirname, join, relative } from 'node:path';
+import { basename, delimiter, dirname, join, relative } from 'node:path';
 import type { ProcessRunOutcome, ProcessRunner } from '@janumipwb/rph-ports';
 import { EXECUTION_CONTRACT_PROMPT } from '../execution/execution-contract.js';
 import { createFilesystemWorkspace } from '../execution/filesystem-workspace.js';
@@ -72,7 +72,7 @@ const completingRunner: ProcessRunner = {
 	})
 };
 
-function context(): ProducerSessionContext {
+function context(runner: ProcessRunner = completingRunner): ProducerSessionContext {
 	return {
 		workspace: createFilesystemWorkspace({
 			ownerKind: 'UNDERTAKING',
@@ -80,7 +80,7 @@ function context(): ProducerSessionContext {
 			purgeability: 'RETAINED_BY_PARTICIPATION',
 			directoryPath: workspaceDir
 		}),
-		runner: completingRunner,
+		runner,
 		grantedCapabilities: ['file-system', 'process-execution'],
 		bindingAuthorizationStatus: 'AUTHORIZED'
 	};
@@ -278,9 +278,10 @@ function playedAgy(
 				token: string;
 			};
 			const out = [
+				// ⭑ `cwd` is agy's working folder, the run's `cli/`, by its real path, as P1b's init carried it.
 				line('init', {
 					model: script.initModel ?? MODEL,
-					cwd: 'fixture-cwd',
+					cwd: req.cwd,
 					agent: AGY_EXECUTOR_AGENT,
 					tools: ['run_command', 'write_to_file', 'view_file'],
 					permission_mode: 'request-review'
@@ -384,8 +385,8 @@ function playedAgy(
 	return Object.assign(exec, { requests });
 }
 
-async function open(exec: CliExec): Promise<ProducerSession> {
-	const session = await openCliExecutionSession(context(), SELECTION, agyExecutorDriver(), {
+async function open(exec: CliExec, runner?: ProcessRunner): Promise<ProducerSession> {
+	const session = await openCliExecutionSession(context(runner), SELECTION, agyExecutorDriver(), {
 		exec,
 		root: join(container, 'root'),
 		turnTimeoutMs: 60_000,
@@ -669,6 +670,82 @@ describe('⭐ test 9 — the preflight: agy’s free hooks listing, and the sess
 	});
 });
 
+// ── the run folder, before each later turn ───────────────────────────────────────────────────────────────────────
+
+describe('⭐ D44a — agy’s workspace, `cli/`, is a config source it reads on every turn, so it is checked before each one', () => {
+	/** A hooks file of P0's shape (`10-F-hooks-agent`: agy lists `<cwd>/.agents/hooks.json` under this agent), its command a fixture string. */
+	const PLANTED_HOOKS = JSON.stringify({
+		hooks: [
+			{
+				name: 'planted',
+				event: 'PreToolUse',
+				matcher: '*',
+				type: 'command',
+				command: 'fixture-command'
+			}
+		]
+	});
+
+	it('⭑ CONTROL — two turns with nothing planted: the second is started, so the check refuses nothing the opener wrote', async () => {
+		const exec = playedAgy([P1B, P1B]);
+		const session = await open(exec);
+		await turnOf(session);
+		const second = await turnOf(session, 'MH5-FINDINGS');
+		expect(messageOf(second)).toMatch(/^CLI_SURFACE_UNPROVEN: /);
+		expect(exec.requests).toHaveLength(3);
+	});
+
+	it('⛔ a hooks.json a command plants in cli/.agents/ during a turn refuses the next turn before agy starts, naming no planted name', async () => {
+		// ⛔ THE MUTANT: no check of what `cli/` holds, so the next turn runs under a hook that neither the host nor agy's
+		// record shows (R12, R13: `run_command` is arbitrary code as the server user).
+		const exec = playedAgy([
+			{ acts: [{ host: 'run_command', args: { argv: ['node', 'plant.js'] } }, { says: 'DONE' }] },
+			P1B
+		]);
+		const planting: ProcessRunner = {
+			kind: 'REAL',
+			run: async (request) => {
+				writeFileSync(join(exec.requests[0]!.cwd, '.agents', 'hooks.json'), PLANTED_HOOKS, 'utf8');
+				return completingRunner.run(request);
+			}
+		};
+		const session = await open(exec, planting);
+		expect(messageOf(await turnOf(session))).toMatch(/^CLI_SURFACE_UNPROVEN: /);
+		expect(
+			existsSync(join(exec.requests[0]!.cwd, '.agents', 'hooks.json')),
+			'arrangement: the command planted it'
+		).toBe(true);
+		const second = await turnOf(session, 'MH5-FINDINGS');
+		expect(messageOf(second)).toMatch(
+			/^EXECUTOR_CONFIG_CHANGED: .* It names: the CLI’s working folder, cli\/, which holds 1 entry the opener did not write\.$/
+		);
+		expect(messageOf(second)).not.toContain('hooks.json');
+		expect(exec.requests, 'agy was started for a refused turn').toHaveLength(2);
+		expect(second.observedToolCalls.canObserve).toBe(false);
+	});
+
+	it('⛔ a rewrite of the agent file’s frontmatter between turns refuses the next turn, naming the file', async () => {
+		// ⛔ THE MUTANT: the opener's files checked for presence, not for their bytes, so a frontmatter rewritten to inherit
+		// the operator's customizations — here in a rewrite of the same size — steers the next turn.
+		const exec = playedAgy([P1B, P1B]);
+		const session = await open(exec);
+		await turnOf(session);
+		const agent = join(dirname(exec.requests[0]!.cwd), AGY_AGENT_FILE);
+		const written = readFileSync(agent, 'utf8');
+		const rewritten = written.replace(
+			'inheritCustomizations: false',
+			'inheritCustomizations: true '
+		);
+		expect(rewritten.length, 'arrangement: a rewrite of the same size').toBe(written.length);
+		writeFileSync(agent, rewritten, 'utf8');
+		const second = await turnOf(session, 'MH5-FINDINGS');
+		expect(messageOf(second)).toMatch(
+			/^EXECUTOR_CONFIG_CHANGED: .* It names: cli\/\.agents\/agents\/jpwb-executor\.md, which no longer holds the bytes the opener wrote\.$/
+		);
+		expect(exec.requests, 'agy was started for a refused turn').toHaveLength(2);
+	});
+});
+
 // ── the record, read back ────────────────────────────────────────────────────────────────────────────────────────
 
 describe('⭐ test 8 — the surface proof agy’s record cannot give (B5), and what its steps do show', () => {
@@ -847,6 +924,7 @@ describe('⭐ test 8 — the surface proof agy’s record cannot give (B5), and 
 describe('⛔ a record of a shape this driver does not know fails the reading closed (UNPARSEABLE)', () => {
 	const cases: Record<string, string[]> = {
 		'a line that is not JSON': ['{"event":"init"'],
+		'a line that is not an event': ['{"type":"init","init":{}}'],
 		'an event this driver does not know': [line('tool_call', { name: 'x' })],
 		'an event without its payload': ['{"event":"init"}'],
 		'a step of a type it does not know': [step(1, { state: 'DONE', step_type: 'checkpoint' })],
@@ -869,7 +947,9 @@ describe('⛔ a record of a shape this driver does not know fails the reading cl
 	};
 	for (const [name, lines] of Object.entries(cases))
 		it(name, async () => {
-			// ⛔ ONE MUTANT FOR THE WHOLE TABLE: the reading takes what it does not know as nothing.
+			// ⛔ THE MUTANTS: one for the whole table, the reading's catch taking a record it cannot read for one that says
+			// nothing; and one for each line that refuses, so no row rests on the table's mutant alone. ⭑ The unknown event
+			// and the second result are refused by one line, and share its mutant.
 			const driver = agyExecutorDriver();
 			const run = runFolder();
 			driver.invocation(turnInput(run));
@@ -879,6 +959,67 @@ describe('⛔ a record of a shape this driver does not know fails the reading cl
 				raw: stdout
 			});
 		});
+});
+
+describe('⛔ D42 — the run folder’s path reaches no record: agy’s init carries it as `cwd` (P1b), and the reading blanks it', () => {
+	it('⛔ on a breach, the record kept beside it holds no form of the run folder’s path, whose Windows form holds the account’s name', async () => {
+		// ⛔ THE MUTANT: the record kept as agy wrote it.
+		const exec = playedAgy([{ acts: [{ own: 'write_to_file' }, { says: 'DONE' }] }]);
+		const result = await turnOf(await open(exec));
+		expect(messageOf(result)).toMatch(/^CLI_OWN_TOOL_RAN: /);
+		const run = dirname(exec.requests[1]!.cwd);
+		const kept = JSON.parse(result.sessionExport!) as { cliRecord: string };
+		expect(
+			kept.cliRecord,
+			'arrangement: the init line, with its cwd, is in the record kept'
+		).toMatch(/^\{"event":"init","init":\{"model":"gemini-4-argon-high","cwd":"/);
+		for (const form of [run, run.replaceAll('\\', '/'), JSON.stringify(run).slice(1, -1)])
+			expect(kept.cliRecord).not.toContain(form);
+		expect(result.sessionExport).not.toContain(basename(run));
+		expect(kept.cliRecord).toContain('"cwd":"<run folder>');
+	});
+
+	it('⛔ it is blanked in each form — as it is, with forward slashes, and JSON-escaped — in a record read and in one that is not', async () => {
+		// ⛔ ONE MUTANT PER FORM. ⭑ A run folder whose path holds backslashes, so the three forms differ on any system; a form
+		// as it is, single backslashes and all, cannot sit in a JSON line, so it is in the record that cannot be read.
+		const driver = agyExecutorDriver();
+		const run = runFolder('fixture-root\\jpwb-exec-agy-1-abcdef');
+		driver.invocation(turnInput(run));
+		const forms = [
+			run.directory,
+			run.directory.replaceAll('\\', '/'),
+			JSON.stringify(run.directory).slice(1, -1)
+		];
+		const read = await driver.readRecord({
+			run,
+			turn: 1,
+			exitCode: 0,
+			stdout: [
+				line('init', { model: MODEL, cwd: `${run.directory}\\cli` }),
+				line('result', { status: 'SUCCESS', response: `wrote ${forms[1]}/host/x` })
+			].join('\n')
+		});
+		const unread = await driver.readRecord({
+			run,
+			turn: 1,
+			exitCode: 0,
+			stdout: [line('init', { model: MODEL }), `a line naming ${run.directory}\\cli`].join('\n')
+		});
+		for (const reading of [read, unread])
+			for (const form of forms)
+				expect(reading.read === 'ABSENT' ? '' : reading.raw).not.toContain(form);
+		expect(read).toMatchObject({
+			read: 'PARSED',
+			raw: [
+				line('init', { model: MODEL, cwd: '<run folder>\\cli' }),
+				line('result', { status: 'SUCCESS', response: 'wrote <run folder>/host/x' })
+			].join('\n')
+		});
+		expect(unread).toEqual({
+			read: 'UNPARSEABLE',
+			raw: `${line('init', { model: MODEL })}\na line naming <run folder>\\cli`
+		});
+	});
 });
 
 // ── the model ────────────────────────────────────────────────────────────────────────────────────────────────────

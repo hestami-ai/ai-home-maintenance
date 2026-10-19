@@ -39,7 +39,7 @@
 //     disk — reaches the exchange's parse outcome, on the record plane, which has no removal path. The excerpt's bound
 //     and the driver's recognition of a shape are what keep it short and specific.
 import { spawn } from 'node:child_process';
-import { existsSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { lstat, mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
@@ -232,7 +232,10 @@ export type CliRecordReading =
 	| { readonly read: 'UNPARSEABLE'; readonly raw: string }
 	| {
 			readonly read: 'PARSED';
-			/** The record as the CLI wrote it — kept beside a breach (D20), and never otherwise. */
+			/**
+			 * The record as the CLI wrote it, save what its driver blanks so that it reaches no record (D42: agy's driver
+			 * blanks the run folder's path) — kept beside a breach (D20), and never otherwise.
+			 */
 			readonly raw: string;
 			/** ⭐ D14a — the tools the CLI offered its model this turn, or `undefined`: the record holds no proof. */
 			readonly surface: readonly CliToolRef[] | undefined;
@@ -358,8 +361,8 @@ const FAILURE_SENTENCES: Readonly<Record<CliFailureCode, string>> = {
 		'workspace is marked tainted.',
 	CLI_MODEL_SUBSTITUTED: 'The CLI reports that a model other than the configured one served the turn.',
 	EXECUTOR_CONFIG_CHANGED:
-		'A configuration source the CLI reads changed since the session opened, so the turn was refused before the CLI ' +
-		'was started.'
+		'A configuration source the CLI reads, or a file of its run folder, changed since the session opened, so the turn ' +
+		'was refused before the CLI was started.'
 };
 
 /** ⭐ D19a — a failure message: the code, its fixed sentence, and any checked excerpt or naming the opener adds. */
@@ -428,6 +431,72 @@ function fingerprintOf(path: string): string {
 	} catch {
 		return 'absent';
 	}
+}
+
+/** ⭐ D44a — a file the opener wrote into the run folder for the CLI to read or run: a driver's, or the bridge. */
+interface WrittenFile {
+	/** Inside the run folder, `/`-separated, e.g. `cli/.agents/agents/jpwb-executor.md`. */
+	readonly path: string;
+	readonly bytes: Buffer;
+}
+
+/** Whether a path is a file holding exactly `bytes`. ⭑ A link is not followed: a link in a written file's place is a change. */
+function holdsBytes(path: string, bytes: Buffer): boolean {
+	try {
+		return lstatSync(path).isFile() && readFileSync(path).equals(bytes);
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Every entry under a folder, inside it and `/`-separated, a folder's with a trailing `/`. ⭑ No link is followed. A
+ * folder that cannot be read is one entry no file names, since nothing shows what it holds.
+ */
+function entriesUnder(dir: string, prefix = '', out: string[] = []): string[] {
+	let entries;
+	try {
+		entries = readdirSync(dir, { withFileTypes: true });
+	} catch {
+		out.push(`${prefix}\0unreadable`);
+		return out;
+	}
+	for (const entry of entries) {
+		const path = `${prefix}${entry.name}`;
+		if (!entry.isDirectory()) out.push(path);
+		else {
+			out.push(`${path}/`);
+			entriesUnder(join(dir, entry.name), `${path}/`, out);
+		}
+	}
+	return out;
+}
+
+/**
+ * ⭐ D44a — WHAT IN THE RUN FOLDER CHANGED SINCE THE OPENER WROTE IT: each file it wrote for the CLI to read or run that
+ * no longer holds its bytes, and any entry in `cli/` it did not write. ⛔ `cli/` is the CLI's working folder, which a CLI
+ * reads configuration from on every turn (agy lists `cli/.agents/hooks.json` as a hook source under its agent, MH-0b
+ * P0), and `run_command` can write there as it can anywhere (R12, R13). ⭑ These are the opener's own files, so they are
+ * read; no config source of the operator's is. ⭑ It never prints a name the model chose: an entry it planted is counted.
+ */
+function runFolderChange(directory: string, written: readonly WrittenFile[]): string[] {
+	const named: string[] = [];
+	const expected = new Set<string>();
+	for (const file of written) {
+		if (!holdsBytes(join(directory, file.path), file.bytes))
+			named.push(`${file.path}, which no longer holds the bytes the opener wrote`);
+		if (!file.path.startsWith('cli/')) continue;
+		const parts = file.path.split('/').slice(1);
+		for (let k = 1; k < parts.length; k++) expected.add(`${parts.slice(0, k).join('/')}/`);
+		expected.add(parts.join('/'));
+	}
+	const planted = entriesUnder(join(directory, 'cli')).filter((entry) => !expected.has(entry)).length;
+	if (planted > 0)
+		named.push(
+			`the CLI’s working folder, cli/, which holds ${planted} ${planted === 1 ? 'entry' : 'entries'} the opener did ` +
+				'not write'
+		);
+	return named;
 }
 
 /** ⭐ D14b — a workspace's manifest: each entry's path, size and modified time. No contents are read. */
@@ -932,6 +1001,7 @@ export async function openCliExecutionSession(
 	let server: HostToolServer | undefined;
 	let run: CliRunFolder;
 	let fingerprints: readonly (readonly [string, string, string])[];
+	let written: readonly WrittenFile[];
 	try {
 		const cliDirectory = join(directory, 'cli');
 		const hostDirectory = join(directory, 'host');
@@ -965,7 +1035,14 @@ export async function openCliExecutionSession(
 			serverName: HOST_TOOL_SERVER_NAME,
 			systemPrompt: `${EXECUTOR_HOST_TOOLS_PREAMBLE}\n\n${EXECUTION_CONTRACT_PROMPT}`
 		};
-		for (const file of driver.runFolderFiles(run)) await writeInside(directory, file, toolId);
+		const files = driver.runFolderFiles(run);
+		for (const file of files) await writeInside(directory, file, toolId);
+		// ⭐ D44a — WHAT THE OPENER WROTE FOR THE CLI TO READ OR RUN, held to be checked before each turn (`runFolderChange`).
+		const inside = (path: string): string => relative(directory, resolve(directory, path)).replaceAll('\\', '/');
+		written = [
+			...files.map((file) => ({ path: inside(file.path), bytes: Buffer.from(file.bytes, 'utf8') })),
+			{ path: inside(run.bridgePath), bytes: readFileSync(run.bridgePath) }
+		];
 		fingerprints = driver.configSources.map((s) => [s.name, s.path, fingerprintOf(s.path)] as const);
 		const check = driver.preflight(run);
 		if (check !== undefined) {
@@ -986,6 +1063,7 @@ export async function openCliExecutionSession(
 	const openServer = server;
 	const runFolder = run;
 	const sources = fingerprints;
+	const runFolderFiles = written;
 
 	/** Every turn's text, as `run-model-step` sent it, and each try's answer, if one arrived (D16). */
 	const turns: string[] = [];
@@ -999,11 +1077,18 @@ export async function openCliExecutionSession(
 			'is not evidence that no tool ran.'
 	};
 
-	/** ⭐ D44a — what changed since the session opened, before any spawn, or `undefined`. */
+	/**
+	 * ⭐ D44a — what changed since the session opened, before any spawn, or `undefined`: a config source's fingerprint, a
+	 * CLI's project configuration in an ancestor of the root, or the run folder (`runFolderChange`).
+	 */
 	function configChange(): string | undefined {
 		const changed = sources.filter(([, path, at]) => fingerprintOf(path) !== at).map(([name]) => name);
 		const appeared = ancestorConfiguration(root, home, existsSync);
-		const named = [...changed, ...appeared.map((hit) => `an ancestor of the dedicated root now holds ${hit}`)];
+		const named = [
+			...changed,
+			...appeared.map((hit) => `an ancestor of the dedicated root now holds ${hit}`),
+			...runFolderChange(runFolder.directory, runFolderFiles)
+		];
 		return named.length === 0 ? undefined : named.join('; ');
 	}
 

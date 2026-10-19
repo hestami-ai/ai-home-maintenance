@@ -33340,10 +33340,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "MH5-M36-the-log-reaches-the-record",
 		file: "apps/rph-demo/src/lib/server/tools/agy-executor-driver.ts",
-		find: "\t\t\t\traw: output.stdout,\n",
-		replace: "\t\t\t\traw: output.stdout + (await readFile(logOf(output.run, output.turn), 'utf8').catch(() => '')), // MUTANT\n",
+		find: "\t\t\t\traw,\n",
+		replace: "\t\t\t\traw: raw + (await readFile(logOf(output.run, output.turn), 'utf8').catch(() => '')), // MUTANT\n",
 		expectRed: ["apps/rph-demo/src/lib/server/tools/agy-executor-driver.test.ts"],
-		why: "PROMISE (MH-0b B12; D19a, D20, D42): agy's log holds the account's e-mail address at every launch, and no byte of it reaches the reading, whose raw is kept beside a breach. WHO RELIES: the operator, whose address would otherwise be stored with the try. WHAT THE MUTATION DOES: the log is appended to the record kept on a breach. OBSERVED (bun run mutants -- the 50 MH5 ids, the two re-formulated and the 59 entries whose target or victim MH-5 changed, by their full ids, 2026-10-18, in the MH-5 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH5-M36-the-log-reaches-the-record ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		why: "PROMISE (MH-0b B12; D19a, D20, D42): agy's log holds the account's e-mail address at every launch, and no byte of it reaches the reading, whose raw is kept beside a breach. WHO RELIES: the operator, whose address would otherwise be stored with the try. WHAT THE MUTATION DOES: the log is appended to the record kept on a breach. OBSERVED (bun run mutants -- the 50 MH5 ids, the two re-formulated and the 59 entries whose target or victim MH-5 changed, by their full ids, 2026-10-18, in the MH-5 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH5-M36-the-log-reaches-the-record ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯' ⭐ RE-ANCHORED 2026-10-19 (JAN-MHX MH-5, the check's fix; ledger rule #5 - in the commit that moved the anchor): readRecord's return reads `raw`, the record with the run folder's path blanked (D42), where it read `raw: output.stdout`; the mutation (the log appended to the record a breach keeps), the guard and the victim are unchanged. RE-MEASURED (bun run mutants -- the 17 new MH5 ids and the re-anchored MH5-M36 by their full ids, 2026-10-19, in the MH-5 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH5-M36-the-log-reaches-the-record ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-MHX MH-5 - the agy driver (DESIGN-multi-harness-executor.md §4.2, D12-D24; ROADMAP-multi-harness-executor.md MH-5 tests 1-9; the agy probes MH-0b ran on agy 1.4.2)"
 	},
 	{
@@ -33453,5 +33453,158 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["apps/rph-demo/src/lib/server/assurance/agy-failure-sanitisation.test.ts"],
 		why: "PROMISE (JAN-SELRES D2, unchanged by the executor's retirement): agyPrint's failure text is byte-identical, naming the judge's prompt. WHO RELIES: the projected VALIDATOR_EXECUTION_FAILED observation and its readers. WHAT THE MUTATION DOES: the failure text names the work-unit instruction the retired executor's role named - RS1-M20's mutation, expressed without the role it switched. OBSERVED (bun run mutants -- the 50 MH5 ids, the two re-formulated and the 59 entries whose target or victim MH-5 changed, by their full ids, 2026-10-18, in the MH-5 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH5-M50-the-judge-s-failure-names-the-executor-s-prompt ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-MHX MH-5 - agy re-pointed at its driver (DESIGN-multi-harness-executor.md D16, D30; ROADMAP-multi-harness-executor.md MH-5 tests 11-13): agy selected as the CLI kind, the driver table, the text-only agy executor retired"
+	},
+	{
+		id: "MH5-M51-an-entry-planted-in-cli-is-passed-over",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\tif (planted > 0)\n",
+		replace: "\tif (planted > 0 && (false as boolean)) // MUTANT: an entry in cli/ the opener did not write is passed over\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/agy-executor-driver.test.ts"],
+		why: "PROMISE (D44a, R23; the check's MATERIAL finding): before each turn, cli/ - the CLI's working folder, which agy reads its configuration from on every turn (MH-0b P0: agy lists <cwd>/.agents/hooks.json under the run's agent) - holds only the files the opener wrote, and the turn after one that planted another is refused EXECUTOR_CONFIG_CHANGED before the CLI starts. WHO RELIES: every later turn of a session, which a run_command of an earlier one (arbitrary code, R12, R13) could otherwise put under a hook that neither the host nor agy's record shows. WHAT THE MUTATION DOES: the check counts the planted entry and does not name it, so the next turn runs. OBSERVED (bun run mutants -- the 17 new MH5 ids and the re-anchored MH5-M36 by their full ids, 2026-10-19, in the MH-5 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH5-M51-an-entry-planted-in-cli-is-passed-over ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-5, the check's fix - the MATERIAL finding on agy-executor-driver.ts's header, cli-executor-session.ts configChange and the report's F3 (DESIGN-multi-harness-executor.md D44a, D11, §4.2, R23): before each turn the opener holds the run folder's own files to their bytes, with nothing else in cli/"
+	},
+	{
+		id: "MH5-M52-a-written-file-is-held-to-exist-not-to-its-bytes",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\treturn lstatSync(path).isFile() && readFileSync(path).equals(bytes);\n",
+		replace: "\t\treturn lstatSync(path).isFile() && (readFileSync(path).equals(bytes) || (true as boolean)); // MUTANT: a written file is held to exist, not to its bytes\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/agy-executor-driver.test.ts"],
+		why: "PROMISE (D44a; the check's MATERIAL finding): each file the opener wrote for the CLI to read holds its bytes before each turn, so a rewrite of the agent file's frontmatter or its rules refuses the next turn. WHO RELIES: every later turn, whose agent - what it inherits, its servers, its rules - only the agent file sets. WHAT THE MUTATION DOES: a written file is checked to be a file, not for its bytes, so a rewrite under the same name passes. OBSERVED (bun run mutants -- the 17 new MH5 ids and the re-anchored MH5-M36 by their full ids, 2026-10-19, in the MH-5 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH5-M52-a-written-file-is-held-to-exist-not-to-its-bytes ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-5, the check's fix - the MATERIAL finding on agy-executor-driver.ts's header, cli-executor-session.ts configChange and the report's F3 (DESIGN-multi-harness-executor.md D44a, D11, §4.2, R23): before each turn the opener holds the run folder's own files to their bytes, with nothing else in cli/"
+	},
+	{
+		id: "MH5-M53-the-bridge-is-not-checked",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\t\t{ path: inside(run.bridgePath), bytes: readFileSync(run.bridgePath) }\n",
+		replace: "\t\t\t// MUTANT: the bridge is left out of what the opener checks\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE (D44a, D11; the general form of the check's MATERIAL finding): the bridge, which the CLI starts on every turn, holds the bytes the opener wrote, or the next turn is refused. WHO RELIES: every later turn, in which a bridge the model rewrote would run unrecorded code in the CLI's tree, as a planted hook would. WHAT THE MUTATION DOES: the bridge is not among the files checked. OBSERVED (bun run mutants -- the 17 new MH5 ids and the re-anchored MH5-M36 by their full ids, 2026-10-19, in the MH-5 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH5-M53-the-bridge-is-not-checked  ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-5, the check's fix - the MATERIAL finding on agy-executor-driver.ts's header, cli-executor-session.ts configChange and the report's F3 (DESIGN-multi-harness-executor.md D44a, D11, §4.2, R23): before each turn the opener holds the run folder's own files to their bytes, with nothing else in cli/"
+	},
+	{
+		id: "MH5-M54-the-record-is-kept-as-agy-wrote-it",
+		file: "apps/rph-demo/src/lib/server/tools/agy-executor-driver.ts",
+		find: "\t\t\tconst raw = withoutRunFolder(output.stdout, output.run.directory);\n",
+		replace: "\t\t\tconst raw = (true as boolean) ? output.stdout : withoutRunFolder(output.stdout, output.run.directory); // MUTANT: the record kept as agy wrote it\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/agy-executor-driver.test.ts"],
+		why: "PROMISE (D42, D20; the check's MINOR finding): the run folder's path reaches no record - and the record a breach keeps is agy's stream-json, whose init.cwd is cli/'s path (P1b), which on Windows sits under the account's temporary folder and so holds the account's name. WHO RELIES: the operator, whose account name would be stored with the try (sessionExport, captureTry's breachRecord), and MH-9's positive control, a breach by design. WHAT THE MUTATION DOES: raw is the record as agy wrote it. OBSERVED (bun run mutants -- the 17 new MH5 ids and the re-anchored MH5-M36 by their full ids, 2026-10-19, in the MH-5 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH5-M54-the-record-is-kept-as-agy-wrote-it ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-5, the check's fix - the MINOR finding on agy-executor-driver.ts's raw (DESIGN-multi-harness-executor.md D42, D20): the record a breach keeps holds no form of the run folder's path"
+	},
+	{
+		id: "MH5-M55-the-json-escaped-path-is-not-blanked",
+		file: "apps/rph-demo/src/lib/server/tools/agy-executor-driver.ts",
+		find: "\t\tJSON.stringify(directory).slice(1, -1),\n",
+		replace: "\t\t// MUTANT: the JSON-escaped form, the one init.cwd carries, is not blanked\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/agy-executor-driver.test.ts"],
+		why: "PROMISE (D42): the run folder's path is blanked in its JSON-escaped form, the form stream-json's init.cwd carries (P1b). WHO RELIES: as for MH5-M54. WHAT THE MUTATION DOES: that form is left in the record. OBSERVED (bun run mutants -- the 17 new MH5 ids and the re-anchored MH5-M36 by their full ids, 2026-10-19, in the MH-5 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH5-M55-the-json-escaped-path-is-not-blanked ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-5, the check's fix - the MINOR finding on agy-executor-driver.ts's raw (DESIGN-multi-harness-executor.md D42, D20): the record a breach keeps holds no form of the run folder's path"
+	},
+	{
+		id: "MH5-M56-the-path-as-it-is-is-not-blanked",
+		file: "apps/rph-demo/src/lib/server/tools/agy-executor-driver.ts",
+		find: "\t\tdirectory,\n",
+		replace: "\t\t// MUTANT: the path as it is is not blanked\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/agy-executor-driver.test.ts"],
+		why: "PROMISE (D42): the run folder's path is blanked as it is, single backslashes and all - a form only a line agy writes outside JSON could carry, so it is kept in the raw of a record that cannot be read. WHO RELIES: as for MH5-M54. WHAT THE MUTATION DOES: that form is left in the record. OBSERVED (bun run mutants -- the 17 new MH5 ids and the re-anchored MH5-M36 by their full ids, 2026-10-19, in the MH-5 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH5-M56-the-path-as-it-is-is-not-blanked ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-5, the check's fix - the MINOR finding on agy-executor-driver.ts's raw (DESIGN-multi-harness-executor.md D42, D20): the record a breach keeps holds no form of the run folder's path"
+	},
+	{
+		id: "MH5-M57-the-forward-slash-path-is-not-blanked",
+		file: "apps/rph-demo/src/lib/server/tools/agy-executor-driver.ts",
+		find: "\t\tdirectory.replaceAll('\\\\', '/')\n",
+		replace: "\t\t// MUTANT: the path with forward slashes is not blanked\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/agy-executor-driver.test.ts"],
+		why: "PROMISE (D42): the run folder's path is blanked with forward slashes too, the form a tool's output may print. WHO RELIES: as for MH5-M54. WHAT THE MUTATION DOES: that form is left in the record. OBSERVED (bun run mutants -- the 17 new MH5 ids and the re-anchored MH5-M36 by their full ids, 2026-10-19, in the MH-5 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH5-M57-the-forward-slash-path-is-not-blanked ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-5, the check's fix - the MINOR finding on agy-executor-driver.ts's raw (DESIGN-multi-harness-executor.md D42, D20): the record a breach keeps holds no form of the run folder's path"
+	},
+	{
+		id: "MH5-M58-an-unreadable-record-is-read-as-one-that-says-nothing",
+		file: "apps/rph-demo/src/lib/server/tools/agy-executor-driver.ts",
+		find: "\t\t\t\tif (e instanceof UnreadableRecord) return { read: 'UNPARSEABLE', raw };\n",
+		replace: "\t\t\t\tif (e instanceof UnreadableRecord) return { read: 'PARSED', raw, surface: undefined, events: [], reportedModels: [], answer: undefined }; // MUTANT: a record this driver cannot read is read as one that says nothing\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/agy-executor-driver.test.ts"],
+		why: "PROMISE (D20, D21; the check's MINOR finding on the table): a record of any shape this driver does not know is UNPARSEABLE, never a reading that says nothing - the whole table's mutant, which the table's comment names. WHO RELIES: the breach and refusal rules, which rest on knowing every step agy recorded: an empty PARSED reading shows no breach and no refusal. WHAT THE MUTATION DOES: readRecord's catch returns a PARSED reading with no events. OBSERVED (bun run mutants -- the 17 new MH5 ids and the re-anchored MH5-M36 by their full ids, 2026-10-19, in the MH-5 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH5-M58-an-unreadable-record-is-read-as-one-that-says-nothing ⎯⎯⎯⎯⎯⎯ Failed Tests 14 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-5, the check's fix - the MINOR finding on agy-executor-driver.test.ts's UNPARSEABLE table and the MH5 ledger block (DESIGN-multi-harness-executor.md D20, D21): the table's own mutant, and one for each line that refuses"
+	},
+	{
+		id: "MH5-M59-a-line-that-is-not-json-is-read-as-an-empty-init",
+		file: "apps/rph-demo/src/lib/server/tools/agy-executor-driver.ts",
+		find: "\t\tthrow new UnreadableRecord('a line that is not JSON');\n",
+		replace: "\t\treturn { event: 'init', payload: {} }; // MUTANT: a line that is not JSON is read as an init that says nothing\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/agy-executor-driver.test.ts"],
+		why: "PROMISE (D20): a line of the record that is not JSON fails the reading closed. WHO RELIES: the breach and refusal rules - a cut or garbled line could be the step that shows a tool of agy's own ran. WHAT THE MUTATION DOES: such a line is read as an init that says nothing. OBSERVED (bun run mutants -- the 17 new MH5 ids and the re-anchored MH5-M36 by their full ids, 2026-10-19, in the MH-5 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH5-M59-a-line-that-is-not-json-is-read-as-an-empty-init ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-5, the check's fix - the MINOR finding on agy-executor-driver.test.ts's UNPARSEABLE table and the MH5 ledger block (DESIGN-multi-harness-executor.md D20, D21): the table's own mutant, and one for each line that refuses"
+	},
+	{
+		id: "MH5-M60-a-line-that-is-not-an-event-is-read-as-an-empty-init",
+		file: "apps/rph-demo/src/lib/server/tools/agy-executor-driver.ts",
+		find: "\t\tthrow new UnreadableRecord('a line that is not an event');\n",
+		replace: "\t\treturn { event: 'init', payload: {} }; // MUTANT: a line that is not an event is read as an init that says nothing\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/agy-executor-driver.test.ts"],
+		why: "PROMISE (D20): a JSON line that is not an event - no event name - fails the reading closed; the table had no row for it, and one was added with this mutant. WHO RELIES: as for MH5-M59. WHAT THE MUTATION DOES: such a line is read as an init that says nothing. OBSERVED (bun run mutants -- the 17 new MH5 ids and the re-anchored MH5-M36 by their full ids, 2026-10-19, in the MH-5 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH5-M60-a-line-that-is-not-an-event-is-read-as-an-empty-init ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-5, the check's fix - the MINOR finding on agy-executor-driver.test.ts's UNPARSEABLE table and the MH5 ledger block (DESIGN-multi-harness-executor.md D20, D21): the table's own mutant, and one for each line that refuses"
+	},
+	{
+		id: "MH5-M61-an-event-without-its-payload-is-read-with-an-empty-one",
+		file: "apps/rph-demo/src/lib/server/tools/agy-executor-driver.ts",
+		find: "\tif (!isRecord(payload)) throw new UnreadableRecord('an event without its payload');\n",
+		replace: "\tif (!isRecord(payload)) return { event: parsed.event, payload: {} }; // MUTANT: an event without its payload is read with an empty one\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/agy-executor-driver.test.ts"],
+		why: "PROMISE (D20): an event whose payload is missing, or not an object, fails the reading closed. WHO RELIES: as for MH5-M59 - a step update without its payload says nothing of the step. WHAT THE MUTATION DOES: the event is read with an empty payload. OBSERVED (bun run mutants -- the 17 new MH5 ids and the re-anchored MH5-M36 by their full ids, 2026-10-19, in the MH-5 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH5-M61-an-event-without-its-payload-is-read-with-an-empty-one ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-5, the check's fix - the MINOR finding on agy-executor-driver.test.ts's UNPARSEABLE table and the MH5 ledger block (DESIGN-multi-harness-executor.md D20, D21): the table's own mutant, and one for each line that refuses"
+	},
+	{
+		id: "MH5-M62-a-step-without-its-index-is-read-as-step-0",
+		file: "apps/rph-demo/src/lib/server/tools/agy-executor-driver.ts",
+		find: "\t\tthrow new UnreadableRecord('a step without its index');\n",
+		replace: "\t\treturn 0; // MUTANT: a step without its index is read as step 0\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/agy-executor-driver.test.ts"],
+		why: "PROMISE (D20, D21): a step update without its index fails the reading closed - each step is read at its last update, by index, and the record's order is the index order. WHO RELIES: the order the CLI's own calls are merged in among the host's, whose ordinals are load-bearing. WHAT THE MUTATION DOES: the update is read as step 0, the user's input. OBSERVED (bun run mutants -- the 17 new MH5 ids and the re-anchored MH5-M36 by their full ids, 2026-10-19, in the MH-5 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH5-M62-a-step-without-its-index-is-read-as-step-0 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-5, the check's fix - the MINOR finding on agy-executor-driver.test.ts's UNPARSEABLE table and the MH5 ledger block (DESIGN-multi-harness-executor.md D20, D21): the table's own mutant, and one for each line that refuses"
+	},
+	{
+		id: "MH5-M63-a-step-in-an-unknown-state-is-read",
+		file: "apps/rph-demo/src/lib/server/tools/agy-executor-driver.ts",
+		find: "\tif (!STEP_TYPES.has(step.step_type) || !STEP_STATES.has(step.state))\n",
+		replace: "\tif (!STEP_TYPES.has(step.step_type)) // MUTANT: a step in any state is read\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/agy-executor-driver.test.ts"],
+		why: "PROMISE (D20): a step in a state agy 1.4.2 was not seen to write (B17: ACTIVE, DONE, ERROR) fails the reading closed; MH5-M31 attacks the type half of the same line. WHO RELIES: the rejection rule, which reads ERROR, and the breach rule, which reads an own tool's step in any other state as one that ran. WHAT THE MUTATION DOES: a step in another state is read. OBSERVED (bun run mutants -- the 17 new MH5 ids and the re-anchored MH5-M36 by their full ids, 2026-10-19, in the MH-5 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH5-M63-a-step-in-an-unknown-state-is-read ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-5, the check's fix - the MINOR finding on agy-executor-driver.test.ts's UNPARSEABLE table and the MH5 ledger block (DESIGN-multi-harness-executor.md D20, D21): the table's own mutant, and one for each line that refuses"
+	},
+	{
+		id: "MH5-M64-a-tool-step-without-its-tool-is-read-as-nothing",
+		file: "apps/rph-demo/src/lib/server/tools/agy-executor-driver.ts",
+		find: "\t\tthrow new UnreadableRecord('a tool step without its tool');\n",
+		replace: "\t\treturn undefined; // MUTANT: a tool step without its tool is read as nothing\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/agy-executor-driver.test.ts"],
+		why: "PROMISE (D21): a tool step whose tool cannot be named fails the reading closed. WHO RELIES: the breach rule - an unnamed step could be a tool of agy's own that ran. WHAT THE MUTATION DOES: the step adds nothing to the reading's events. OBSERVED (bun run mutants -- the 17 new MH5 ids and the re-anchored MH5-M36 by their full ids, 2026-10-19, in the MH-5 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH5-M64-a-tool-step-without-its-tool-is-read-as-nothing ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-5, the check's fix - the MINOR finding on agy-executor-driver.test.ts's UNPARSEABLE table and the MH5 ledger block (DESIGN-multi-harness-executor.md D20, D21): the table's own mutant, and one for each line that refuses"
+	},
+	{
+		id: "MH5-M65-a-result-of-another-status-is-read",
+		file: "apps/rph-demo/src/lib/server/tools/agy-executor-driver.ts",
+		find: "\t\tthrow new UnreadableRecord('a result of a status this driver does not know');\n",
+		replace: "\t\tvoid status; // MUTANT: a result of another status is read as one with no answer\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/agy-executor-driver.test.ts"],
+		why: "PROMISE (D19, D20): a result whose status is neither SUCCESS nor ERROR fails the reading closed. WHO RELIES: the turn's classification, which reads SUCCESS for the answer and ERROR for agy's error. WHAT THE MUTATION DOES: such a result is read as one with no answer and no error. OBSERVED (bun run mutants -- the 17 new MH5 ids and the re-anchored MH5-M36 by their full ids, 2026-10-19, in the MH-5 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH5-M65-a-result-of-another-status-is-read ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-5, the check's fix - the MINOR finding on agy-executor-driver.test.ts's UNPARSEABLE table and the MH5 ledger block (DESIGN-multi-harness-executor.md D20, D21): the table's own mutant, and one for each line that refuses"
+	},
+	{
+		id: "MH5-M66-denied-actions-that-are-not-a-list-are-read-as-none",
+		file: "apps/rph-demo/src/lib/server/tools/agy-executor-driver.ts",
+		find: "\tif (!Array.isArray(denied)) throw new UnreadableRecord('denied actions that are not a list');\n\tfor (const entry of denied)\n",
+		replace: "\t// MUTANT: denied actions that are not a list are read as none\n\tfor (const entry of Array.isArray(denied) ? denied : [])\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/agy-executor-driver.test.ts"],
+		why: "PROMISE (D21): result.denied_actions of any shape but a list fails the reading closed. WHO RELIES: the refusal rule - a denied action is a refused attempt, and one after the last thing the model said ends the turn CLI_ENDED_ON_REFUSAL. WHAT THE MUTATION DOES: such a value is read as no denied action. OBSERVED (bun run mutants -- the 17 new MH5 ids and the re-anchored MH5-M36 by their full ids, 2026-10-19, in the MH-5 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH5-M66-denied-actions-that-are-not-a-list-are-read-as-none ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-5, the check's fix - the MINOR finding on agy-executor-driver.test.ts's UNPARSEABLE table and the MH5 ledger block (DESIGN-multi-harness-executor.md D20, D21): the table's own mutant, and one for each line that refuses"
+	},
+	{
+		id: "MH5-M67-a-denied-action-of-another-shape-is-read-by-its-text",
+		file: "apps/rph-demo/src/lib/server/tools/agy-executor-driver.ts",
+		find: "\tthrow new UnreadableRecord('a denied action of a shape this driver does not know');\n",
+		replace: "\treturn String(entry); // MUTANT: a denied action of another shape is named by its text\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/agy-executor-driver.test.ts"],
+		why: "PROMISE (D21): a denied action that is neither a name nor an object naming its tool fails the reading closed. WHO RELIES: the record's refused attempts, each under the name agy gave it. WHAT THE MUTATION DOES: it is recorded under its text, a name agy never gave it. OBSERVED (bun run mutants -- the 17 new MH5 ids and the re-anchored MH5-M36 by their full ids, 2026-10-19, in the MH-5 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH5-M67-a-denied-action-of-another-shape-is-read-by-its-text ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-5, the check's fix - the MINOR finding on agy-executor-driver.test.ts's UNPARSEABLE table and the MH5 ledger block (DESIGN-multi-harness-executor.md D20, D21): the table's own mutant, and one for each line that refuses"
 	}
 ];

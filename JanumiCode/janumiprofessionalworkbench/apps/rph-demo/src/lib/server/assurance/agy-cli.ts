@@ -148,15 +148,17 @@ async function agyCall(
 		// ⭐ `JAN-MHX` MH-5: the executor no longer calls through here.
 		//
 		// So rethrowing puts the whole materialized prompt — for the judge the graph export, rubric, the producer's
-		// declared rationale and narration; for the executor the rendered instruction and the repair findings — into
-		// a permanent record with no redaction (finding #60). `PER-12`: never logged, never projected. `PER-9`:
-		// retention is "subject to recorded redaction".
+		// declared rationale and narration~~; for the executor the rendered instruction and the repair findings~~ — into
+		// a permanent record with no redaction (finding #60). ⭐ `JAN-MHX` MH-5: no executor calls through here, so the
+		// judge's is the only prompt it can carry. `PER-12`: never logged, never projected. `PER-9`: retention is
+		// "subject to recorded redaction".
 		//
 		// ⚠ AND THE DIAGNOSTIC IS DELIBERATELY LOST RATHER THAN RELOCATED. Its lawful home is the exchange
 		// record's E-5 (`REG-F-326`), which is not wired yet, or the LOG plane, where `PER-9` says redaction is
 		// legal — and this codebase has no redaction at all. Until one exists, a DISCLOSED loss beats an
 		// unlawful retention. The classification below is what a caller needs to act; the content is what it
-		// may not carry. ⭑ The ROLE changes only which prompt and which record the sentence names, so each is true.
+		// may not carry. ~~⭑ The ROLE changes only which prompt and which record the sentence names, so each is true.~~
+		// ⭐ `JAN-MHX` MH-5: one role is left, the JUDGE, and the sentence names its prompt and its record.
 		const code = (e as { code?: unknown })?.code;
 		const withheld = WITHHELD_FROM[role];
 		throw new Error(

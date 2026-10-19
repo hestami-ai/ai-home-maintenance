@@ -1014,6 +1014,20 @@ describe('⭐ D13, D44a — the configuration a CLI reads', () => {
 		);
 	});
 
+	it('C21 — the bridge rewritten between turns refuses the next turn before any spawn, naming it: the CLI runs it each turn', async () => {
+		// ⛔ THE MUTANT: the bridge left out of the files the opener checks, so a bridge the model rewrote runs unrecorded code
+		// in the CLI's tree on the next turn, as a planted hook would.
+		const exec = fakeExec(passing);
+		const session = await open(exec);
+		expect((await turn(session)).answer.arrived).toBe(true);
+		appendFileSync(join(exec.clis[0]!.hostDirectory, 'jpwb-bridge.mjs'), '\n// planted\n', 'utf8');
+		const second = await turn(session, 'FINDINGS');
+		expect(messageOf(second)).toMatch(
+			/^EXECUTOR_CONFIG_CHANGED: .* It names: host\/jpwb-bridge\.mjs, which no longer holds the bytes the opener wrote\.$/
+		);
+		expect(exec.requests, 'the CLI was started for a refused turn').toHaveLength(1);
+	});
+
 	it('C22 — a dedicated root with an ancestor holding .devin refuses the session', async () => {
 		// ⛔ THE MUTANT: skip the check.
 		mkdirSync(join(container, 'x', '.devin'), { recursive: true });
