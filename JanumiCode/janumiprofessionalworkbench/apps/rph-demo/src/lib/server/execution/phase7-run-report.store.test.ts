@@ -131,7 +131,7 @@ vi.mock('../tools/devin-reviewer.js', async (importOriginal) => {
 				if (exportPath !== undefined)
 					await writeFile(
 						exportPath,
-						JSON.stringify({ steps: [{ extra: { generation_model: 'fixture-assurance-model' } }] }),
+						JSON.stringify({ steps: [{ extra: { generation_model: 'glm-5-3-flash-max' } }] }),
 						'utf8'
 					);
 				return {
@@ -196,12 +196,17 @@ const LANE = join(fixture.dir, 'lane');
 const FINAL = join(LANE, 'archive', '06-final');
 /** A second run folder, whose final archive keeps its store in WAL mode. */
 const UNCONVERTED = join(fixture.dir, 'unconverted');
-/** The live-backend selection this run needs: devin reviewing, agy executing, each with its model. */
+/**
+ * The live-backend selection this run needs: devin reviewing, agy executing, each with its model.
+ * ⭐ `JAN-MHX` MH-3 (D33) — MODELS THE FAMILY TABLE LISTS, of two families: outside test mode the executor selector refuses
+ * an executor model beside a real reviewer's when either is unlisted, so the fixture labels this run used were refused
+ * before its first model step (`EXECUTOR_MODEL_UNCLASSIFIED`). The reviewer's is the selected one (`REG-D-084`).
+ */
 const BACKEND = {
 	JPWB_ASSURANCE_TOOL: 'devin',
-	JPWB_ASSURANCE_MODEL: 'fixture-assurance-model',
+	JPWB_ASSURANCE_MODEL: 'glm-5-3-flash-max',
 	JPWB_EXECUTOR: 'agy',
-	JPWB_EXECUTOR_MODEL: 'fixture-executor-model'
+	JPWB_EXECUTOR_MODEL: 'gemini-4-argon-high'
 } as const;
 const RISK = {
 	'risk.consequence': 'HIGH',
@@ -841,8 +846,8 @@ describe('JAN-EXEC P7-2 D9 — the run report over stores the product wrote, rea
 		]);
 		// ⭐ `REG-F-514` — each phase's verdicts name its EXECUTOR as producer; the root's, the operator who ran its step.
 		expect([...new Set(report().declaredVerdicts.rows.map((d) => `${d.unit}:${d.producer}`))]).toEqual([
-			'requirements:model:fixture-executor-model',
-			'end-to-end:model:fixture-executor-model',
+			'requirements:model:gemini-4-argon-high',
+			'end-to-end:model:gemini-4-argon-high',
 			'root:local-professional'
 		]);
 		// ⭐ Stage 8 over what the product stored: each exchange's asked and answered bytes hash to their records — the

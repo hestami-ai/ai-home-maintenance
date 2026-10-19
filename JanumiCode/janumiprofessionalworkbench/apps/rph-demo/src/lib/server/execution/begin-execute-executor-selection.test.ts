@@ -8,10 +8,12 @@
 // both sides both calls ran one model while the record showed two (`REG-F-458`).
 //
 // ⭑ WHAT MUST HOLD (§4.3, §4.4).
-//   · Every refusal code reachable here — UNSET, UNKNOWN, UNWIRED, MODEL_UNSET — refuses in SERVER mode with the
-//     reviewer ADMITTED (devin with a model, no captured `JPWB_DEVIN_BIN`), so the only refusal is the executor's: the
-//     guidance is returned, nothing is dispatched, and the executor is never opened. PROGRAM_OVERRIDDEN needs agy-cli to
-//     have CAPTURED `JPWB_AGY_BIN` at load, so it has a file of its own (`begin-execute-program-overridden.test.ts`).
+//   · Every refusal code reachable here — UNSET, UNKNOWN, UNWIRED, MODEL_UNSET, ⭐ and `JAN-MHX` MH-3's MODEL_IS_THE_REVIEWERS,
+//     MODEL_UNCLASSIFIED and EFFORT_NOT_TAKEN — refuses in SERVER mode with the reviewer ADMITTED (devin with a model, no
+//     captured `JPWB_DEVIN_BIN`), so the only refusal is the executor's: the guidance is returned, nothing is dispatched,
+//     and the executor is never opened. PROGRAM_OVERRIDDEN needs agy-cli to have CAPTURED `JPWB_AGY_BIN` at load, so it
+//     has a file of its own (`begin-execute-program-overridden.test.ts`). ⭐ MH-3's two model refusals compare the
+//     executor's model with the model of the reviewer the PREFLIGHT admitted, so they hold that the route hands it on.
 //   · A server-mode TRANSFORMATION step with NOTHING configured succeeds — the control, which can fail: in test mode
 //     (the reviewer file's control) the selector answers STAND_IN, so it could not.
 //   · The model agy is asked to run is the model recorded (`REG-F-458`) — on EVERY try, a repair turn included — and a
@@ -165,6 +167,28 @@ describe('⭐ D4 — beginExecute asks the executor selector before it dispatche
 			name: 'EXECUTOR_MODEL_UNSET (pi)',
 			env: { JPWB_EXECUTOR: 'pi' },
 			says: "The executing tool 'pi' has no model: JPWB_EXECUTOR_MODEL is not set"
+		},
+		// ⭐ `JAN-MHX` MH-3 (D33; roadmap MH-3 test 10) — the reviewer the preflight admitted runs `fixture-assurance-model`.
+		// ⭑ RED FIRST: the route asked the selector without the reviewer, and the step was dispatched.
+		{
+			name: 'EXECUTOR_MODEL_IS_THE_REVIEWERS',
+			env: { JPWB_EXECUTOR: 'agy', JPWB_EXECUTOR_MODEL: 'fixture-assurance-model' },
+			says: "The executing tool 'agy' would run fixture-assurance-model, the model the reviewer (devin) runs"
+		},
+		{
+			name: 'EXECUTOR_MODEL_UNCLASSIFIED',
+			env: { JPWB_EXECUTOR: 'agy', JPWB_EXECUTOR_MODEL: 'gemini-4-argon-high' },
+			says: "does not list 'fixture-assurance-model'"
+		},
+		// ⭐ `JAN-MHX` MH-3 (D32) — Pi runs with thinking off, so an effort would be read by nothing.
+		{
+			name: 'EXECUTOR_EFFORT_NOT_TAKEN (pi)',
+			env: {
+				JPWB_EXECUTOR: 'pi',
+				JPWB_EXECUTOR_MODEL: 'openai-codex/gpt-5.6-sol',
+				JPWB_EXECUTOR_EFFORT: 'high'
+			},
+			says: 'The executing tool \'pi\' is handed no effort by this host, and JPWB_EXECUTOR_EFFORT="high" is set'
 		}
 	];
 	for (const c of REFUSED)

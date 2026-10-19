@@ -321,7 +321,7 @@ describe('⭐ the lane refuses the executor the product refuses — and one more
 			const product = selectExecutor({
 				testMode: false,
 				env: { JPWB_EXECUTOR: tool, JPWB_EXECUTOR_MODEL: 'fixture-model' },
-				overrides: NO_OVERRIDES
+				overrides: { ...NO_OVERRIDES, codex: undefined }
 			});
 			expect(wiredExecutor(tool) !== undefined, JSON.stringify(tool)).toBe(
 				product.kind !== 'REFUSED'
@@ -377,7 +377,11 @@ describe('⭐ the lane refuses the executor the product refuses — and one more
 					const product = selectExecutor({
 						testMode: false,
 						env: executor,
-						overrides: { agy: row.env.JPWB_AGY_BIN, devin: row.env.JPWB_DEVIN_BIN }
+						overrides: {
+							agy: row.env.JPWB_AGY_BIN,
+							devin: row.env.JPWB_DEVIN_BIN,
+							codex: undefined
+						}
 					});
 					const faults = faultsOf(laneKeysRefusal(env));
 					const productFaults = faults.filter((l) => !l.includes(LANE_RULE));
@@ -400,7 +404,7 @@ describe('⭐ the lane refuses the executor the product refuses — and one more
 			selectExecutor({
 				testMode: false,
 				env,
-				overrides: { agy: 'C:/fixture/agy.exe', devin: undefined }
+				overrides: { agy: 'C:/fixture/agy.exe', devin: undefined, codex: undefined }
 			})
 		).toEqual({ kind: 'PI', modelId: COMPLETE.JPWB_EXECUTOR_MODEL });
 	});

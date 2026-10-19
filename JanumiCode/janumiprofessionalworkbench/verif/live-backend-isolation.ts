@@ -35,6 +35,9 @@
  * beside its switch (`LIVE_SELECTIONS_BESIDE_A_REPLAY`), so a shell that exported it for half B's authoring turned the
  * gate's replay tests into that refusal (driven red: the replay's tests, 4 failed; and `live-backend-isolation.test.ts`,
  * all four children, with it exported there and left off this list).
+ * ⭐ AND AN ELEVENTH AND A TWELFTH (`JAN-MHX` MH-3, `DESIGN-multi-harness-executor.md` D39): `JPWB_EXECUTOR_EFFORT`, a
+ * selection the executor selector reads, and `JPWB_CODEX_BIN`, a program override it captures when it loads (driven red:
+ * `live-backend-isolation.test.ts`, all four children, with both exported there and left off this list).
  */
 export const LIVE_BACKEND_VARIABLES = [
 	'JPWB_ASSURANCE_TOOL',
@@ -42,8 +45,10 @@ export const LIVE_BACKEND_VARIABLES = [
 	'JPWB_JUDGE_MODEL',
 	'JPWB_EXECUTOR',
 	'JPWB_EXECUTOR_MODEL',
+	'JPWB_EXECUTOR_EFFORT',
 	'JPWB_AGENT',
 	'JPWB_AGENT_MODEL',
+	'JPWB_CODEX_BIN',
 	'JPWB_DEVIN_BIN',
 	'JPWB_AGY_BIN',
 	'JPWB_REPLAY'

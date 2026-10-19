@@ -16,7 +16,7 @@ import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve as resolvePath, sep } from 'node:path';
 import { planProcessRun } from '@janumipwb/rph-ports';
-import { resolveUndertakingSandbox } from './workspace-host.js';
+import { resolveUndertakingSandbox, undertakingWorkspaceDirectory } from './workspace-host.js';
 
 const UND = 'und_01ARZ3NDEKTSV4RRFFQ69G5PAA';
 const OTHER = 'und_01ARZ3NDEKTSV4RRFFQ69G5PBB';
@@ -485,5 +485,39 @@ describe('⛔ durability is DECLARED by the process, not assumed from the absenc
 			process.env.RPH_DEMO_MODE = mode;
 			expect(resolveUndertakingSandbox(UND).workspace.materialization, mode).toBe('IN_MEMORY');
 		}
+	});
+});
+
+// ⭐ `JAN-MHX` MH-3 (`DESIGN-multi-harness-executor.md` D21a) — THE DIRECTORY A REFUSAL LOOKS BESIDE, READ BEFORE ANY
+// SANDBOX IS RESOLVED: Begin & Execute and a re-run of the work read a CLI executor's taint mark there before they dispatch.
+describe('⭐ `JAN-MHX` MH-3 — the durable arm’s directory, read without resolving the sandbox', () => {
+	it('⛔ it is the directory the sandbox gives the same owner on the same root — and it creates nothing', () => {
+		// ⛔ THE MUTANT: derive it apart from the sandbox. A mark written beside the directory a session ran in would then be
+		// looked for somewhere else, and a tainted workspace would be dispatched into.
+		const read = undertakingWorkspaceDirectory(UND, root);
+		expect(read).toBe(resolvePath(join(root, UND_DIRECTORY)));
+		expect(existsSync(read!), 'reading the directory created it').toBe(false);
+		expect(resolveUndertakingSandbox(UND, root).workspace.directoryPath).toBe(read);
+		expect(undertakingWorkspaceDirectory(OTHER, root)).not.toBe(read);
+	});
+
+	it('⭐ by default it reads the durable root as the sandbox does: only a process that declares it serves has one', () => {
+		const db = join(root, 'demo.sqlite');
+		process.env.JPWB_DEMO_DB = db;
+		process.env.RPH_DEMO_MODE = 'test';
+		expect(undertakingWorkspaceDirectory(UND)).toBeUndefined();
+		process.env.RPH_DEMO_MODE = 'server';
+		expect(undertakingWorkspaceDirectory(UND)).toBe(
+			resolvePath(join(`${db}.workspaces`, UND_DIRECTORY))
+		);
+	});
+
+	it('⛔ undefined wherever the sandbox would take no durable arm: no root, a root relative to the process, an owner id it refuses', () => {
+		expect(undertakingWorkspaceDirectory(UND, undefined)).toBeUndefined();
+		expect(undertakingWorkspaceDirectory(UND, '')).toBeUndefined();
+		for (const relative of ['workspaces', '\\workspaces', 'C:workspaces'])
+			expect(undertakingWorkspaceDirectory(UND, relative), relative).toBeUndefined();
+		for (const hostile of ['', '..', '../elsewhere', 'a/b', '/etc', 'C:\\Windows', '.'])
+			expect(undertakingWorkspaceDirectory(hostile, root), hostile).toBeUndefined();
 	});
 });

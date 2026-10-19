@@ -7470,10 +7470,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// THE OWNER SUBDIRECTORY IS THE WHOLE DERIVATION. `getArtifactStore()` gets away with a bare process
 		// singleton because it is content-addressed and puts the tenant in the KEY; a path-named workspace has only
 		// this one expression to do the same job.
-		find: "\tconst directoryPath = resolvePath(join(root, `${segment}-${ownerFingerprint(undertakingId)}`));",
-		replace: "\tconst directoryPath = resolvePath(root); // MUTANT: the root itself is every Undertaking's workspace",
+		find: "\treturn resolvePath(join(root, `${segment}-${ownerFingerprint(undertakingId)}`));",
+		replace: "\treturn resolvePath(root); // MUTANT: the root itself is every Undertaking's workspace",
 		expectRed: ["apps/rph-demo/src/lib/server/execution/workspace-host.test.ts"],
-		why: "PROMISE: \"one durable root from one env key, one subdirectory DERIVED from the owner id, RESOLVED PER REQUEST\" - the pattern this file follows rather than invents. WHO RELIES: every Undertaking on the host, and the isolation between them. WHAT THE MUTATION DOES TO THEM: two Undertakings executing on one workbench write into the same directory, so one product's `src/index.ts` is silently overwritten by another's - and because both READ successfully, nothing anywhere reports a fault. The victim asserts the resolved directory is strictly BELOW the root and that two owners get two directories; a control asserts the second owner cannot read the first's file, which is what makes 'they share a directory' distinguishable from 'they each have one'.",
+		why: "PROMISE: \"one durable root from one env key, one subdirectory DERIVED from the owner id, RESOLVED PER REQUEST\" - the pattern this file follows rather than invents. WHO RELIES: every Undertaking on the host, and the isolation between them. WHAT THE MUTATION DOES TO THEM: two Undertakings executing on one workbench write into the same directory, so one product's `src/index.ts` is silently overwritten by another's - and because both READ successfully, nothing anywhere reports a fault. The victim asserts the resolved directory is strictly BELOW the root and that two owners get two directories; a control asserts the second owner cannot read the first's file, which is what makes 'they share a directory' distinguishable from 'they each have one'. ⭐ RE-ANCHORED 2026-10-18 (JAN-MHX MH-3; ledger rule #5 - in the commit that moved the line): the derivation moved into durableDeliverableDirectory, which resolveUndertakingSandbox and the taint refusal’s undertakingWorkspaceDirectory both read; the mutation is unchanged, the root itself every Undertaking’s workspace. RE-MEASURED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P2-f-every-undertaking-shares-one-directory ⎯⎯⎯⎯⎯⎯ Failed Tests 10 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 2 - the owner-derivation limb of `resolveUndertakingSandbox`"
 	},
 	{
@@ -7483,10 +7483,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		// undertaking - the producer session is disposed per work unit, `beginExecute` mints a fresh plan and step
 		// per click, and the only pre-existing filesystem scratch is a `mkdtemp` created and removed inside ONE
 		// call - so per-invocation is exactly the default that emerges when nobody rules otherwise.
-		find: "\tconst directoryPath = resolvePath(join(root, `${segment}-${ownerFingerprint(undertakingId)}`));",
-		replace: "\tconst directoryPath = resolvePath(join(root, `${segment}-${ownerFingerprint(undertakingId)}`, Math.random().toString(36).slice(2))); // MUTANT: a fresh directory per invocation",
+		find: "\treturn resolvePath(join(root, `${segment}-${ownerFingerprint(undertakingId)}`));",
+		replace: "\treturn resolvePath(join(root, `${segment}-${ownerFingerprint(undertakingId)}`, Math.random().toString(36).slice(2))); // MUTANT: a fresh directory per invocation",
 		expectRed: ["apps/rph-demo/src/lib/server/execution/workspace-host.test.ts"],
-		why: "PROMISE: `R8` - \"the workspace is the DELIVERABLE and must persist\", owned by the UNDERTAKING. The spike measured the consequence directly: with one UNDERTAKING-owned directory a SECOND step, in a NEW session with a NEW plan, ran against a file the FIRST step wrote. WHO RELIES: every multi-phase PWA - which is the target this whole programme exists to reach. WHAT THE MUTATION DOES TO THEM: each `beginExecute` click resolves a directory nothing else will ever resolve again, so a seven-phase realization lens builds SEVEN FRAGMENTS instead of one product, and every individual step still reports success. Nothing in the record says the phases were disconnected. The victim is the cross-session read; a resolution that is not STABLE cannot satisfy it, and stability is the only property that makes 'resolved per request rather than held' safe.",
+		why: "PROMISE: `R8` - \"the workspace is the DELIVERABLE and must persist\", owned by the UNDERTAKING. The spike measured the consequence directly: with one UNDERTAKING-owned directory a SECOND step, in a NEW session with a NEW plan, ran against a file the FIRST step wrote. WHO RELIES: every multi-phase PWA - which is the target this whole programme exists to reach. WHAT THE MUTATION DOES TO THEM: each `beginExecute` click resolves a directory nothing else will ever resolve again, so a seven-phase realization lens builds SEVEN FRAGMENTS instead of one product, and every individual step still reports success. Nothing in the record says the phases were disconnected. The victim is the cross-session read; a resolution that is not STABLE cannot satisfy it, and stability is the only property that makes 'resolved per request rather than held' safe. ⭐ RE-ANCHORED 2026-10-18 (JAN-MHX MH-3; ledger rule #5 - in the commit that moved the line): the derivation moved into durableDeliverableDirectory; the mutation is unchanged, a fresh directory per invocation. RE-MEASURED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P2-g-a-fresh-workspace-per-invocation ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 2 - the R8 lifecycle limb of `resolveUndertakingSandbox`"
 	},
 	{
@@ -12099,10 +12099,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "RS1-M5-the-environment-is-read-not-the-capture",
 		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
-		find: "const overrides = input.overrides ?? { agy: AGY_BIN_OVERRIDE, devin: DEVIN_BIN_OVERRIDE };",
-		replace: "const overrides = input.overrides ?? { agy: process.env.JPWB_AGY_BIN, devin: process.env.JPWB_DEVIN_BIN }; // MUTANT: the environment, not the capture",
+		find: "const overrides = input.overrides ?? {\n\t\tagy: AGY_BIN_OVERRIDE,\n\t\tdevin: DEVIN_BIN_OVERRIDE,\n\t\tcodex: CODEX_BIN_OVERRIDE\n\t};",
+		replace: "const overrides = input.overrides ?? {\n\t\tagy: process.env.JPWB_AGY_BIN,\n\t\tdevin: process.env.JPWB_DEVIN_BIN,\n\t\tcodex: CODEX_BIN_OVERRIDE\n\t}; // MUTANT: the environment, not the capture",
 		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
-		why: "PROMISE (JAN-SELRES D3): the override refused is the one agy-cli.ts CAPTURED at load, which is the program it runs for the life of the process. WHO RELIES: a server whose JPWB_AGY_BIN was unset after it started, while agy-cli.ts still runs the replacement. WHAT THE MUTATION DOES: the selector reads the environment at dispatch, sees nothing set, and admits the agy executor that runs the replaced program. OBSERVED: KILLED — 1 test(s) red in executor-selection.test.ts: '⛔ with no overrides handed in, a captured JPWB_AGY_BIN refuses an agy executor — though the variable is gone now' (AssertionError: expected false to be 'EXECUTOR_PROGRAM_OVERRIDDEN' // Object.is equality) RE-ANCHORED 2026-10-15 (JAN-EXEC Phase 8, the E4 fix round; ledger rule #5 - in the commit that moved the line): REG-D-112 (c) hoisted the overrides into one const overrides, which the replay's beside-the-switch refusal reads too, so the anchor moved to it. THE GUARANTEE IS UNCHANGED: the mutation still reads the environment at dispatch in place of the capture. Measured again after the move (bun run mutants -- E4-M, with SR1-M26, SR2-M23, RS1-M1, RS1-M5, P2B-x, P2B-q and P2B-d by their full ids, 2026-10-15, in the fixer's worktree, the round's changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         RS1-M5-the-environment-is-read-not-the-capture ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		why: "PROMISE (JAN-SELRES D3): the override refused is the one agy-cli.ts CAPTURED at load, which is the program it runs for the life of the process. WHO RELIES: a server whose JPWB_AGY_BIN was unset after it started, while agy-cli.ts still runs the replacement. WHAT THE MUTATION DOES: the selector reads the environment at dispatch, sees nothing set, and admits the agy executor that runs the replaced program. OBSERVED: KILLED — 1 test(s) red in executor-selection.test.ts: '⛔ with no overrides handed in, a captured JPWB_AGY_BIN refuses an agy executor — though the variable is gone now' (AssertionError: expected false to be 'EXECUTOR_PROGRAM_OVERRIDDEN' // Object.is equality) RE-ANCHORED 2026-10-15 (JAN-EXEC Phase 8, the E4 fix round; ledger rule #5 - in the commit that moved the line): REG-D-112 (c) hoisted the overrides into one const overrides, which the replay's beside-the-switch refusal reads too, so the anchor moved to it. THE GUARANTEE IS UNCHANGED: the mutation still reads the environment at dispatch in place of the capture. Measured again after the move (bun run mutants -- E4-M, with SR1-M26, SR2-M23, RS1-M1, RS1-M5, P2B-x, P2B-q and P2B-d by their full ids, 2026-10-15, in the fixer's worktree, the round's changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         RS1-M5-the-environment-is-read-not-the-capture ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯' ⭐ RE-ANCHORED 2026-10-18 (JAN-MHX MH-3; ledger rule #5 - in the commit that changed the line): the captured overrides gained Codex’s (D34), so the object is written over lines; the mutation is unchanged for agy and devin, read from the environment, and Codex’s capture is MH3-M15’s. RE-MEASURED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         RS1-M5-the-environment-is-read-not-the-capture ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
 	},
 	{
@@ -12153,19 +12153,19 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "RS1-M11-the-route-refuses-nothing",
 		file: "apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts",
-		find: "\t\t\tconst selected = selectExecutor({ testMode: isTestMode() });\n",
+		find: "\t\t\tconst selected = selectExecutor({ testMode: isTestMode(), reviewer: reviewing });\n",
 		replace: "\t\t\tconst selected = { kind: 'STAND_IN' } as ReturnType<typeof selectExecutor>; // MUTANT: the route refuses nothing\n",
 		expectRed: ["apps/rph-demo/src/lib/server/execution/begin-execute-executor-selection.test.ts"],
-		why: "PROMISE (JAN-SELRES D4): beginExecute asks the executor selector for a MODEL step and returns its refusal before dispatch. WHO RELIES: a server host with a misconfigured executor, whose model step must be refused with guidance, the work unit left as it was. WHAT THE MUTATION DOES: the selector is never asked; every model step opens the fixture executor and runs, in server mode too. OBSERVED: KILLED — 7 test(s) red in begin-execute-executor-selection.test.ts: '⛔ EXECUTOR_TOOL_UNSET: the guidance is returned, nothing is dispatched, the executor is never opened' (AssertionError: the step was not refused with the executor’s reason: expected 'The model ran, its work product was r…' to contain 'JPWB_EXECUTOR is not set'); '⛔ EXECUTOR_TOOL_UNKNOWN: the guidance is returned, nothing is dispatched, the executor is never opened' (AssertionError: the step was not refused with the executor’s reason: expected 'The model ran, its work product was r…' to contain 'Unknown backing tool \\'nosuchtool\\'')",
+		why: "PROMISE (JAN-SELRES D4): beginExecute asks the executor selector for a MODEL step and returns its refusal before dispatch. WHO RELIES: a server host with a misconfigured executor, whose model step must be refused with guidance, the work unit left as it was. WHAT THE MUTATION DOES: the selector is never asked; every model step opens the fixture executor and runs, in server mode too. OBSERVED: KILLED — 7 test(s) red in begin-execute-executor-selection.test.ts: '⛔ EXECUTOR_TOOL_UNSET: the guidance is returned, nothing is dispatched, the executor is never opened' (AssertionError: the step was not refused with the executor’s reason: expected 'The model ran, its work product was r…' to contain 'JPWB_EXECUTOR is not set'); '⛔ EXECUTOR_TOOL_UNKNOWN: the guidance is returned, nothing is dispatched, the executor is never opened' (AssertionError: the step was not refused with the executor’s reason: expected 'The model ran, its work product was r…' to contain 'Unknown backing tool \\'nosuchtool\\'') ⭐ RE-ANCHORED 2026-10-18 (JAN-MHX MH-3; ledger rule #5 - in the commit that changed the line): the selector is handed the reviewer the preflight admitted (D33); the mutation is unchanged, the selector never asked. RE-MEASURED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         RS1-M11-the-route-refuses-nothing  ⎯⎯⎯⎯⎯⎯ Failed Tests 10 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
 	},
 	{
 		id: "RS1-M12-the-route-asks-in-test-mode-always",
 		file: "apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts",
-		find: "\t\t\tconst selected = selectExecutor({ testMode: isTestMode() });\n",
-		replace: "\t\t\tconst selected = selectExecutor({ testMode: true }); // MUTANT: asked in test mode whatever the host runs in\n",
+		find: "\t\t\tconst selected = selectExecutor({ testMode: isTestMode(), reviewer: reviewing });\n",
+		replace: "\t\t\tconst selected = selectExecutor({ testMode: true, reviewer: reviewing }); // MUTANT: asked in test mode whatever the host runs in\n",
 		expectRed: ["apps/rph-demo/src/lib/server/execution/begin-execute-executor-selection.test.ts"],
-		why: "PROMISE (JAN-SELRES D4; G4): the selector is asked in the mode the host runs in - the only test-mode read is the caller's. WHO RELIES: a server host with no executor configured, whose model step must be refused rather than answered by the fixture. WHAT THE MUTATION DOES: beginExecute always asks in test mode, so an unset executor outside test mode opens the stand-in and records a canned echo as work. OBSERVED: KILLED — 1 test(s) red in begin-execute-executor-selection.test.ts: '⛔ EXECUTOR_TOOL_UNSET: the guidance is returned, nothing is dispatched, the executor is never opened' (AssertionError: the step was not refused with the executor’s reason: expected 'The model ran, its work product was r…' to contain 'JPWB_EXECUTOR is not set')",
+		why: "PROMISE (JAN-SELRES D4; G4): the selector is asked in the mode the host runs in - the only test-mode read is the caller's. WHO RELIES: a server host with no executor configured, whose model step must be refused rather than answered by the fixture. WHAT THE MUTATION DOES: beginExecute always asks in test mode, so an unset executor outside test mode opens the stand-in and records a canned echo as work. OBSERVED: KILLED — 1 test(s) red in begin-execute-executor-selection.test.ts: '⛔ EXECUTOR_TOOL_UNSET: the guidance is returned, nothing is dispatched, the executor is never opened' (AssertionError: the step was not refused with the executor’s reason: expected 'The model ran, its work product was r…' to contain 'JPWB_EXECUTOR is not set') ⭐ RE-ANCHORED 2026-10-18 (JAN-MHX MH-3; ledger rule #5 - in the commit that changed the line): the selector is handed the reviewer the preflight admitted (D33); the mutation is unchanged, asked in test mode whatever the host runs in. RE-MEASURED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         RS1-M12-the-route-asks-in-test-mode-always ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
 	},
 	{
@@ -12333,10 +12333,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "RS1-M31-the-executor-is-asked-before-the-reviewer",
 		file: "apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts",
-		find: "\t\tif (isModelStep) {\n\t\t\tconst reviewer = assurancePreflight({ testMode: isTestMode() });\n\t\t\tif (!reviewer.ready) return fail(400, { error: reviewer.guidance });\n\t\t}\n\n\t\t// ── ⭐ `JAN-SELRES` RS-1 (D4) — AND ITS EXECUTOR IS SELECTED HERE, ONCE, BEFORE ANYTHING IS DISPATCHED ──────────\n\t\t//\n\t\t// ⛔ THE EXECUTOR'S CONFIGURATION USED TO BE READ IN THREE PLACES, NONE OF THEM BEFORE DISPATCH: `model.ts` chose\n\t\t// the fixture on its own load-time test-mode constant, `agyPrint` read the JUDGE model at call time, and Pi's\n\t\t// opener read `JPWB_EXECUTOR_MODEL` — so an unset or unknown tool, devin (declared, unwired) and an unset model\n\t\t// were all found when the executor OPENED, after the batch below had started the step, and recorded as a\n\t\t// started-then-failed step (design §2 G3). ⭑ Now the selector is asked HERE, after the reviewer, in the mode the\n\t\t// host runs in: a refusal returns its reason and guidance and the work unit stays as it was.\n\t\t// ⭑ THE ONE SELECTION then opens the executor and names the record's fallback identity (below), so the model\n\t\t// configured, the model run and the model recorded are one read.\n\t\t// ⚠ A TRANSFORMATION STEP asks neither selector — the operator completes it.\n\t\t// ⚠ DEFINITE, NOT OPTIONAL — `outcome`'s idiom below: assigned for exactly the steps the model branch runs.\n\t\tlet executor!: RunnableExecutorSelection;\n\t\tif (isModelStep) {\n\t\t\tconst selected = selectExecutor({ testMode: isTestMode() });\n\t\t\tif (selected.kind === 'REFUSED') return fail(400, { error: executorRefusalMessage(selected) });\n\t\t\texecutor = selected;\n\t\t}\n",
-		replace: "\n\t\t// ── ⭐ `JAN-SELRES` RS-1 (D4) — AND ITS EXECUTOR IS SELECTED HERE, ONCE, BEFORE ANYTHING IS DISPATCHED ──────────\n\t\t//\n\t\t// ⛔ THE EXECUTOR'S CONFIGURATION USED TO BE READ IN THREE PLACES, NONE OF THEM BEFORE DISPATCH: `model.ts` chose\n\t\t// the fixture on its own load-time test-mode constant, `agyPrint` read the JUDGE model at call time, and Pi's\n\t\t// opener read `JPWB_EXECUTOR_MODEL` — so an unset or unknown tool, devin (declared, unwired) and an unset model\n\t\t// were all found when the executor OPENED, after the batch below had started the step, and recorded as a\n\t\t// started-then-failed step (design §2 G3). ⭑ Now the selector is asked HERE, after the reviewer, in the mode the\n\t\t// host runs in: a refusal returns its reason and guidance and the work unit stays as it was.\n\t\t// ⭑ THE ONE SELECTION then opens the executor and names the record's fallback identity (below), so the model\n\t\t// configured, the model run and the model recorded are one read.\n\t\t// ⚠ A TRANSFORMATION STEP asks neither selector — the operator completes it.\n\t\t// ⚠ DEFINITE, NOT OPTIONAL — `outcome`'s idiom below: assigned for exactly the steps the model branch runs.\n\t\tlet executor!: RunnableExecutorSelection;\n\t\tif (isModelStep) {\n\t\t\tconst selected = selectExecutor({ testMode: isTestMode() });\n\t\t\tif (selected.kind === 'REFUSED') return fail(400, { error: executorRefusalMessage(selected) });\n\t\t\texecutor = selected;\n\t\t}\n\t\t// MUTANT: the executor is asked BEFORE the reviewer\n\t\tif (isModelStep) {\n\t\t\tconst reviewer = assurancePreflight({ testMode: isTestMode() });\n\t\t\tif (!reviewer.ready) return fail(400, { error: reviewer.guidance });\n\t\t}\n",
+		find: "\t\tif (isModelStep) {\n\t\t\tconst reviewer = assurancePreflight({ testMode: isTestMode() });\n\t\t\tif (!reviewer.ready) return fail(400, { error: reviewer.guidance });\n\t\t\treviewing = reviewer.reviewer;\n\t\t}\n\n\t\t// ── ⭐ `JAN-SELRES` RS-1 (D4) — AND ITS EXECUTOR IS SELECTED HERE, ONCE, BEFORE ANYTHING IS DISPATCHED ──────────\n\t\t//\n\t\t// ⛔ THE EXECUTOR'S CONFIGURATION USED TO BE READ IN THREE PLACES, NONE OF THEM BEFORE DISPATCH: `model.ts` chose\n\t\t// the fixture on its own load-time test-mode constant, `agyPrint` read the JUDGE model at call time, and Pi's\n\t\t// opener read `JPWB_EXECUTOR_MODEL` — so an unset or unknown tool, devin (declared, unwired) and an unset model\n\t\t// were all found when the executor OPENED, after the batch below had started the step, and recorded as a\n\t\t// started-then-failed step (design §2 G3). ⭑ Now the selector is asked HERE, after the reviewer, in the mode the\n\t\t// host runs in: a refusal returns its reason and guidance and the work unit stays as it was.\n\t\t// ⭑ THE ONE SELECTION then opens the executor and names the record's fallback identity (below), so the model\n\t\t// configured, the model run and the model recorded are one read.\n\t\t// ⚠ A TRANSFORMATION STEP asks neither selector — the operator completes it.\n\t\t// ⚠ DEFINITE, NOT OPTIONAL — `outcome`'s idiom below: assigned for exactly the steps the model branch runs.\n\t\t// ⭐ `JAN-MHX` MH-3 — THE SELECTOR IS HANDED THE REVIEWER (D33), so an executor model of the reviewer's family, or one\n\t\t// no listing places, is refused here rather than by the floor after the paid work. ⭐ AND A WORKSPACE A CLI\n\t\t// EXECUTOR'S BREACH MARKED REFUSES THE STEP (D21a): the work would land beside bytes no one recorded. ⚠ A\n\t\t// TRANSFORMATION STEP is refused by neither: no executor runs in it and no review reads it.\n\t\tlet executor!: RunnableExecutorSelection;\n\t\tif (isModelStep) {\n\t\t\tconst selected = selectExecutor({ testMode: isTestMode(), reviewer: reviewing });\n\t\t\tif (selected.kind === 'REFUSED') return fail(400, { error: executorRefusalMessage(selected) });\n\t\t\texecutor = selected;\n\t\t\tconst tainted = workspaceTaintRefusal(\n\t\t\t\tundertakingWorkspaceDirectory(String((pwu?.undertakingId ?? '') as string))\n\t\t\t);\n\t\t\tif (tainted) return fail(400, { error: tainted });\n\t\t}\n",
+		replace: "\n\t\t// ── ⭐ `JAN-SELRES` RS-1 (D4) — AND ITS EXECUTOR IS SELECTED HERE, ONCE, BEFORE ANYTHING IS DISPATCHED ──────────\n\t\t//\n\t\t// ⛔ THE EXECUTOR'S CONFIGURATION USED TO BE READ IN THREE PLACES, NONE OF THEM BEFORE DISPATCH: `model.ts` chose\n\t\t// the fixture on its own load-time test-mode constant, `agyPrint` read the JUDGE model at call time, and Pi's\n\t\t// opener read `JPWB_EXECUTOR_MODEL` — so an unset or unknown tool, devin (declared, unwired) and an unset model\n\t\t// were all found when the executor OPENED, after the batch below had started the step, and recorded as a\n\t\t// started-then-failed step (design §2 G3). ⭑ Now the selector is asked HERE, after the reviewer, in the mode the\n\t\t// host runs in: a refusal returns its reason and guidance and the work unit stays as it was.\n\t\t// ⭑ THE ONE SELECTION then opens the executor and names the record's fallback identity (below), so the model\n\t\t// configured, the model run and the model recorded are one read.\n\t\t// ⚠ A TRANSFORMATION STEP asks neither selector — the operator completes it.\n\t\t// ⚠ DEFINITE, NOT OPTIONAL — `outcome`'s idiom below: assigned for exactly the steps the model branch runs.\n\t\t// ⭐ `JAN-MHX` MH-3 — THE SELECTOR IS HANDED THE REVIEWER (D33), so an executor model of the reviewer's family, or one\n\t\t// no listing places, is refused here rather than by the floor after the paid work. ⭐ AND A WORKSPACE A CLI\n\t\t// EXECUTOR'S BREACH MARKED REFUSES THE STEP (D21a): the work would land beside bytes no one recorded. ⚠ A\n\t\t// TRANSFORMATION STEP is refused by neither: no executor runs in it and no review reads it.\n\t\tlet executor!: RunnableExecutorSelection;\n\t\tif (isModelStep) {\n\t\t\tconst selected = selectExecutor({ testMode: isTestMode(), reviewer: reviewing });\n\t\t\tif (selected.kind === 'REFUSED') return fail(400, { error: executorRefusalMessage(selected) });\n\t\t\texecutor = selected;\n\t\t\tconst tainted = workspaceTaintRefusal(\n\t\t\t\tundertakingWorkspaceDirectory(String((pwu?.undertakingId ?? '') as string))\n\t\t\t);\n\t\t\tif (tainted) return fail(400, { error: tainted });\n\t\t}\n\t\t// MUTANT: the executor is asked BEFORE the reviewer\n\t\tif (isModelStep) {\n\t\t\tconst reviewer = assurancePreflight({ testMode: isTestMode() });\n\t\t\tif (!reviewer.ready) return fail(400, { error: reviewer.guidance });\n\t\t\treviewing = reviewer.reviewer;\n\t\t}\n",
 		expectRed: ["apps/rph-demo/src/lib/server/execution/begin-execute-executor-selection.test.ts"],
-		why: "PROMISE (JAN-SELRES D4; roadmap RS-1): beginExecute asks the executor selector AFTER the reviewer preflight, which JAN-SELREV D5 placed and D4 leaves unchanged - so with both misconfigured the operator is shown the reviewer's refusal first. WHO RELIES: the operator of a host whose reviewer and executor are both unconfigured, who is told to fix the reviewer (REG-D-084) before being told anything about the executor. WHAT THE MUTATION DOES: the executor block is moved above the reviewer block, so the executor's refusal (JPWB_EXECUTOR is not set) answers first and the reviewer's is not shown. OBSERVED: KILLED — 1 test(s) red in begin-execute-executor-selection.test.ts: '⛔ server mode, devin with no model AND no executor configured → the reviewer’s guidance, not the executor’s; nothing is dispatched' (AssertionError: the step was not refused with the REVIEWER’s reason: expected 'JPWB_EXECUTOR is not set, and there i…' to contain '\\'devin\\' has no model: JPWB_ASSURANC…')",
+		why: "PROMISE (JAN-SELRES D4; roadmap RS-1): beginExecute asks the executor selector AFTER the reviewer preflight, which JAN-SELREV D5 placed and D4 leaves unchanged - so with both misconfigured the operator is shown the reviewer's refusal first. WHO RELIES: the operator of a host whose reviewer and executor are both unconfigured, who is told to fix the reviewer (REG-D-084) before being told anything about the executor. WHAT THE MUTATION DOES: the executor block is moved above the reviewer block, so the executor's refusal (JPWB_EXECUTOR is not set) answers first and the reviewer's is not shown. OBSERVED: KILLED — 1 test(s) red in begin-execute-executor-selection.test.ts: '⛔ server mode, devin with no model AND no executor configured → the reviewer’s guidance, not the executor’s; nothing is dispatched' (AssertionError: the step was not refused with the REVIEWER’s reason: expected 'JPWB_EXECUTOR is not set, and there i…' to contain '\\'devin\\' has no model: JPWB_ASSURANC…') ⭐ RE-ANCHORED 2026-10-18 (JAN-MHX MH-3; ledger rule #5 - in the commit that changed the lines): the reviewer block keeps the reviewer it admitted for the selector (D33), and the executor block gained the taint refusal (D21a); the mutation is unchanged, the reviewer preflight moved after the executor selection. RE-MEASURED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         RS1-M31-the-executor-is-asked-before-the-reviewer ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
 	},
 	{
@@ -32680,5 +32680,285 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/phase7-run-report.test.ts"],
 		why: "PROMISE (the check of MH-7, finding 1): the executor's line keeps every recorded model with its grade, and says how many of its exchanges got no answer, so a reader sees why the host's label is not judged. WHO RELIES: the reader of a Pi run one of whose tries failed, shown two models and no caveat. WHAT THE MUTATION DOES: the line lists the host's label like a model that answered. OBSERVED (bun run mutants -- (the MH-7 fix round's ids), 2026-10-18, in the MH-7 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH7-M24-the-line-never-says-which-exchanges-got-no-answer ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-MHX MH-7, the check's fix round (finding 1, MATERIAL): the run report judges P3's executor on the answered EXECUTION exchanges alone - a try that got no answer records the selection's configured label, HOST_CONFIGURED - and its line says how many of each model's exchanges got no answer"
+	},
+	// ── JAN-MHX MH-3 (DESIGN-multi-harness-executor.md D21a, D31-D34, D39; roadmap MH-3): the selector, the identity refusals, the taint refusal ──
+	{
+		id: "MH3-M1-the-reviewer-is-never-compared",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "\t\tinput.reviewer === undefined ? undefined : independenceRefusal(toolId, modelId, input.reviewer);\n",
+		replace: "\t\tinput.reviewer === undefined ? undefined : undefined; // MUTANT: the executor's model is never compared with the reviewer's\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
+		why: "PROMISE (D33; roadmap MH-3 test 1): handed the reviewer the request's preflight admitted, the selector refuses an executor model that is the reviewer's. WHO RELIES: every phase of a run whose executor would run the reviewer's model - the floor's DIFFERENT_MODEL check refuses each review only after the paid work. WHAT THE MUTATION DOES: the reviewer handed in is never compared, so agy on glm-5-3-flash-max beside devin on glm-5-3-flash-max is selected. OBSERVED (bun run mutants -- MH3-M1 and MH3-M11 by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner; reformulated as a consequence mutation after the first run reported NO_COMPILE - its first form lost TypeScript's narrowing, so it never reached the code): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M1-the-reviewer-is-never-compared ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-3 - the selector (DESIGN-multi-harness-executor.md D31-D34, D39; ROADMAP-multi-harness-executor.md MH-3 tests 1-7, 10, 12, 13; the sponsor’s answers of 2026-10-18, S1-S4): the identity refusals, the effort rule, the defaults named and never applied, and JPWB_CODEX_BIN captured"
+	},
+	{
+		id: "MH3-M2-the-reviewer-s-own-id-is-compared-only-by-family",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "\tif (modelId === reviewer.modelId)\n",
+		replace: "\tif (modelId === reviewer.modelId && reviewer.modelId === '') // MUTANT: the reviewer's own id is compared only by family\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
+		why: "PROMISE (D33): the reviewer's own model id is the reviewer's model whether or not the family table lists it. WHO RELIES: a host whose reviewer runs a model no listing places, beside an executor configured with the same id. WHAT THE MUTATION DOES: the exact arm never fires, so an unlisted id equal to the reviewer's is refused as merely unclassified, and a listed one is refused for its family with the wrong reason. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M2-the-reviewer-s-own-id-is-compared-only-by-family ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-3 - the selector (DESIGN-multi-harness-executor.md D31-D34, D39; ROADMAP-multi-harness-executor.md MH-3 tests 1-7, 10, 12, 13; the sponsor’s answers of 2026-10-18, S1-S4): the identity refusals, the effort rule, the defaults named and never applied, and JPWB_CODEX_BIN captured"
+	},
+	{
+		id: "MH3-M3-one-unlisted-side-is-compared-anyway",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "\tif (executorFamily === undefined || reviewerFamily === undefined) {\n",
+		replace: "\tif (executorFamily === undefined && reviewerFamily === undefined) { // MUTANT: refused as unlisted only when both are\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
+		why: "PROMISE (D33; roadmap MH-3 test 3): with a real reviewer, an executor model the family table does not list is refused (EXECUTOR_MODEL_UNCLASSIFIED), naming it - an exact compare would pass another spelling or effort of the reviewer's model. WHO RELIES: the reviewer's independence when a CLI lists a new effort level or a dated suffix. WHAT THE MUTATION DOES: an unlisted executor model beside a listed reviewer is compared by family, finds none, and is selected. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M3-one-unlisted-side-is-compared-anyway ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-3 - the selector (DESIGN-multi-harness-executor.md D31-D34, D39; ROADMAP-multi-harness-executor.md MH-3 tests 1-7, 10, 12, 13; the sponsor’s answers of 2026-10-18, S1-S4): the identity refusals, the effort rule, the defaults named and never applied, and JPWB_CODEX_BIN captured"
+	},
+	{
+		id: "MH3-M4-the-reviewer-s-unlisted-slug-goes-unnamed",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "\t\t\t...(reviewerFamily === undefined ? [reviewer.modelId] : [])\n",
+		replace: "\t\t\t// MUTANT: the reviewer's unlisted slug is not named\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
+		why: "PROMISE (D33): the refusal names the slug the table does not list - the reviewer's, when it is the reviewer's model that is unplaced. WHO RELIES: the operator who must extend the table from a measured listing before that model can run. WHAT THE MUTATION DOES: beside an unlisted reviewer model the refusal names nothing it could not place. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M4-the-reviewer-s-unlisted-slug-goes-unnamed ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-3 - the selector (DESIGN-multi-harness-executor.md D31-D34, D39; ROADMAP-multi-harness-executor.md MH-3 tests 1-7, 10, 12, 13; the sponsor’s answers of 2026-10-18, S1-S4): the identity refusals, the effort rule, the defaults named and never applied, and JPWB_CODEX_BIN captured"
+	},
+	{
+		id: "MH3-M5-another-effort-of-the-reviewer-s-model-passes",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "\tif (executorFamily === reviewerFamily)\n",
+		replace: "\tif (executorFamily === reviewerFamily && modelId === reviewer.modelId) // MUTANT: one family is not the reviewer’s model\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
+		why: "PROMISE (D33; roadmap MH-3 test 2): another effort or spelling of the reviewer's model - glm-5-3-flash-high beside glm-5-3-flash-max - is refused by family. WHO RELIES: the floor's DIFFERENT_MODEL check, which compares by exact string and would pass it falsely. WHAT THE MUTATION DOES: only the reviewer's exact id is refused, so another effort of its model is selected. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M5-another-effort-of-the-reviewer-s-model-passes ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-3 - the selector (DESIGN-multi-harness-executor.md D31-D34, D39; ROADMAP-multi-harness-executor.md MH-3 tests 1-7, 10, 12, 13; the sponsor’s answers of 2026-10-18, S1-S4): the identity refusals, the effort rule, the defaults named and never applied, and JPWB_CODEX_BIN captured"
+	},
+	{
+		id: "MH3-M6-glm-5-3-flash-high-is-unlisted",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "\t\t'glm-5-3-flash-high',\n",
+		replace: "",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
+		why: "PROMISE (D33): the family table holds the slugs devin's own listing gave for GLM-5.3 Flash. WHO RELIES: the family refusal, which can place only what the table lists. WHAT THE MUTATION DOES: the High effort leaves the table, so beside the GLM reviewer it is refused as unclassified rather than as the reviewer's model - the table, not the compare, decides. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M6-glm-5-3-flash-high-is-unlisted ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-3 - the selector (DESIGN-multi-harness-executor.md D31-D34, D39; ROADMAP-multi-harness-executor.md MH-3 tests 1-7, 10, 12, 13; the sponsor’s answers of 2026-10-18, S1-S4): the identity refusals, the effort rule, the defaults named and never applied, and JPWB_CODEX_BIN captured"
+	},
+	{
+		id: "MH3-M7-pi-s-p3-spelling-is-unlisted",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "\t\t'openai-codex/gpt-5.6-sol',\n",
+		replace: "",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
+		why: "PROMISE (roadmap MH-3: Pi's slugs included, from the models P3 ran, marked so): Pi on the model P3 configured, openai-codex/gpt-5.6-sol, is placed in GPT-5.6 Sol and admitted beside the GLM reviewer. WHO RELIES: every Pi run of the Phase 7 lane. WHAT THE MUTATION DOES: P3's own spelling is refused as unclassified. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M7-pi-s-p3-spelling-is-unlisted ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-3 - the selector (DESIGN-multi-harness-executor.md D31-D34, D39; ROADMAP-multi-harness-executor.md MH-3 tests 1-7, 10, 12, 13; the sponsor’s answers of 2026-10-18, S1-S4): the identity refusals, the effort rule, the defaults named and never applied, and JPWB_CODEX_BIN captured"
+	},
+	{
+		id: "MH3-M8-the-effort-is-never-read",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "\t\tenv.JPWB_EXECUTOR_EFFORT?.trim() || undefined\n",
+		replace: "\t\tundefined // MUTANT: JPWB_EXECUTOR_EFFORT is never read\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
+		why: "PROMISE (D32; roadmap MH-3 test 6): an effort set for a tool the host hands none is refused (EXECUTOR_EFFORT_NOT_TAKEN). WHO RELIES: an operator who set JPWB_EXECUTOR_EFFORT for Pi, which runs with thinking off - a variable read by nothing must not look as though it took effect. WHAT THE MUTATION DOES: the variable is never read, so Pi with an effort is selected. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M8-the-effort-is-never-read    ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-3 - the selector (DESIGN-multi-harness-executor.md D31-D34, D39; ROADMAP-multi-harness-executor.md MH-3 tests 1-7, 10, 12, 13; the sponsor’s answers of 2026-10-18, S1-S4): the identity refusals, the effort rule, the defaults named and never applied, and JPWB_CODEX_BIN captured"
+	},
+	{
+		id: "MH3-M9-a-blank-effort-is-a-set-one",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "\t\tenv.JPWB_EXECUTOR_EFFORT?.trim() || undefined\n",
+		replace: "\t\tenv.JPWB_EXECUTOR_EFFORT // MUTANT: a blank effort is a set one\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
+		why: "PROMISE (D32): JPWB_EXECUTOR_EFFORT is read as every variable here is - trimmed, and blank or whitespace is unset. WHO RELIES: a shell that exports it empty. WHAT THE MUTATION DOES: a blank effort refuses a Pi executor as though an effort were set. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M9-a-blank-effort-is-a-set-one ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-3 - the selector (DESIGN-multi-harness-executor.md D31-D34, D39; ROADMAP-multi-harness-executor.md MH-3 tests 1-7, 10, 12, 13; the sponsor’s answers of 2026-10-18, S1-S4): the identity refusals, the effort rule, the defaults named and never applied, and JPWB_CODEX_BIN captured"
+	},
+	{
+		id: "MH3-M10-a-required-effort-may-be-left-unset",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "\t\treturn effort !== undefined\n",
+		replace: "\t\treturn effort !== undefined || rule.taken === 'REQUIRED' // MUTANT: a required effort may be left unset\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
+		why: "PROMISE (D32): a tool that takes its effort as a flag of its own - Codex, Claude Code, Muse - is refused without JPWB_EXECUTOR_EFFORT (EXECUTOR_EFFORT_UNSET): unset, the tool's own user configuration would decide it. WHO RELIES: the Codex executor MH-6 wires, whose effort the sponsor chose (high). WHAT THE MUTATION DOES: an unset effort is admitted. No wired tool requires one yet, so the rule is asked directly (executorEffortRefusal). OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M10-a-required-effort-may-be-left-unset ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-3 - the selector (DESIGN-multi-harness-executor.md D31-D34, D39; ROADMAP-multi-harness-executor.md MH-3 tests 1-7, 10, 12, 13; the sponsor’s answers of 2026-10-18, S1-S4): the identity refusals, the effort rule, the defaults named and never applied, and JPWB_CODEX_BIN captured"
+	},
+	{
+		id: "MH3-M11-an-effort-is-admitted-where-nothing-reads-it",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "\treturn effort === undefined\n\t\t? undefined\n",
+		replace: "\treturn effort === undefined || effort !== '' // MUTANT: an effort is admitted where nothing reads it\n\t\t? undefined\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
+		why: "PROMISE (D32; roadmap MH-3 test 6): an effort set for Pi, agy or devin is refused, saying why nothing would read it. WHO RELIES: the operator, and the run report, which would otherwise record an effort no tool was given. WHAT THE MUTATION DOES: the not-taken arm admits every effort. OBSERVED (bun run mutants -- MH3-M1 and MH3-M11 by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner; reformulated as a consequence mutation after the first run reported NO_COMPILE - its first form lost TypeScript's narrowing, so it never reached the code): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M11-an-effort-is-admitted-where-nothing-reads-it ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-3 - the selector (DESIGN-multi-harness-executor.md D31-D34, D39; ROADMAP-multi-harness-executor.md MH-3 tests 1-7, 10, 12, 13; the sponsor’s answers of 2026-10-18, S1-S4): the identity refusals, the effort rule, the defaults named and never applied, and JPWB_CODEX_BIN captured"
+	},
+	{
+		id: "MH3-M12-the-reviewer-s-model-is-asked-before-the-effort",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "\tconst effortRefused = executorEffortRefusal(\n\t\ttoolId,\n\t\tenv.JPWB_EXECUTOR_EFFORT?.trim() || undefined\n\t);\n\tif (effortRefused) return effortRefused;\n\t// ⭐ `JAN-MHX` MH-3 (D33) — then the model beside the reviewer's, when a real one was admitted.\n\tconst dependent =\n\t\tinput.reviewer === undefined ? undefined : independenceRefusal(toolId, modelId, input.reviewer);\n\tif (dependent) return dependent;\n",
+		replace: "\t// MUTANT: the reviewer's model is asked before the effort\n\t// ⭐ `JAN-MHX` MH-3 (D33) — then the model beside the reviewer's, when a real one was admitted.\n\tconst dependent =\n\t\tinput.reviewer === undefined ? undefined : independenceRefusal(toolId, modelId, input.reviewer);\n\tif (dependent) return dependent;\n\tconst effortRefused = executorEffortRefusal(\n\t\ttoolId,\n\t\tenv.JPWB_EXECUTOR_EFFORT?.trim() || undefined\n\t);\n\tif (effortRefused) return effortRefused;\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
+		why: "PROMISE (D32, D33; the selector's table, rows 6 and 7): the executor's own configuration is asked first - its effort - and its model beside the reviewer's after. WHO RELIES: the operator shown one refusal at a time, the one their own configuration owes. WHAT THE MUTATION DOES: an effort beside the reviewer's own model is refused for the model instead. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M12-the-reviewer-s-model-is-asked-before-the-effort ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-3 - the selector (DESIGN-multi-harness-executor.md D31-D34, D39; ROADMAP-multi-harness-executor.md MH-3 tests 1-7, 10, 12, 13; the sponsor’s answers of 2026-10-18, S1-S4): the identity refusals, the effort rule, the defaults named and never applied, and JPWB_CODEX_BIN captured"
+	},
+	{
+		id: "MH3-M13-the-sponsor-s-default-is-applied",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "resolveExecutorModel(env.JPWB_EXECUTOR_MODEL ?? '')",
+		replace: "(resolveExecutorModel(env.JPWB_EXECUTOR_MODEL ?? '') ?? EXECUTOR_DEFAULT_MODELS[toolId]?.modelId) /* MUTANT: the sponsor's default is applied */",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
+		why: "PROMISE (D31; the sponsor's S1): the host fills in no default model - the model stays required (REG-D-052), and the sponsor's choice is named in the guidance only. WHO RELIES: every host, against the rot REG-F-331 recorded, when a pinned label stopped being recognised and every review failed. WHAT THE MUTATION DOES: agy with no JPWB_EXECUTOR_MODEL runs gemini-4-argon-high. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M13-the-sponsor-s-default-is-applied ⎯⎯⎯⎯⎯⎯ Failed Tests 71 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-3 - the selector (DESIGN-multi-harness-executor.md D31-D34, D39; ROADMAP-multi-harness-executor.md MH-3 tests 1-7, 10, 12, 13; the sponsor’s answers of 2026-10-18, S1-S4): the identity refusals, the effort rule, the defaults named and never applied, and JPWB_CODEX_BIN captured"
+	},
+	{
+		id: "MH3-M14-every-tool-is-told-agy-s-default",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "\t\t`${EXECUTOR_GUIDANCE} The sponsor’s choice of model for ${toolId} is ${modelId}` +\n",
+		replace: "\t\t`${EXECUTOR_GUIDANCE} The sponsor’s choice of model for ${toolId} is ${modelId === '' ? modelId : EXECUTOR_DEFAULT_MODELS.agy!.modelId}` + // MUTANT: every tool is told agy's default\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
+		why: "PROMISE (D31; roadmap MH-3 test 7; the sponsor's S2): the guidance names the CHOSEN tool's default - for devin, deepseek-v4-1-flash-max, the one of its two models the reviewer does not run. WHO RELIES: the operator configuring a tool. WHAT THE MUTATION DOES: every tool's guidance names agy's model. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M14-every-tool-is-told-agy-s-default ⎯⎯⎯⎯⎯⎯ Failed Tests 170 ⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-3 - the selector (DESIGN-multi-harness-executor.md D31-D34, D39; ROADMAP-multi-harness-executor.md MH-3 tests 1-7, 10, 12, 13; the sponsor’s answers of 2026-10-18, S1-S4): the identity refusals, the effort rule, the defaults named and never applied, and JPWB_CODEX_BIN captured"
+	},
+	{
+		id: "MH3-M15-the-codex-override-is-read-from-the-environment",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "\t\tcodex: CODEX_BIN_OVERRIDE\n",
+		replace: "\t\tcodex: process.env.JPWB_CODEX_BIN // MUTANT: the environment at selection, not the capture\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
+		why: "PROMISE (D34, D39): JPWB_CODEX_BIN is captured when the selector loads, and the capture is what is refused - as JPWB_AGY_BIN and JPWB_DEVIN_BIN are. WHO RELIES: a server whose shell unset the variable after it started. WHAT THE MUTATION DOES: the environment is read at selection, so a captured override beside a replay is not refused. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M15-the-codex-override-is-read-from-the-environment ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-3 - the selector (DESIGN-multi-harness-executor.md D31-D34, D39; ROADMAP-multi-harness-executor.md MH-3 tests 1-7, 10, 12, 13; the sponsor’s answers of 2026-10-18, S1-S4): the identity refusals, the effort rule, the defaults named and never applied, and JPWB_CODEX_BIN captured"
+	},
+	{
+		id: "MH3-M16-the-effort-is-no-selection-beside-a-replay",
+		file: "apps/rph-demo/src/lib/server/replay/replay-switch.ts",
+		find: "\t'JPWB_EXECUTOR_EFFORT',\n",
+		replace: "",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replay-selection.test.ts"],
+		why: "PROMISE (D39; roadmap MH-3 test 13): JPWB_EXECUTOR_EFFORT is a live selection read from the environment, refused beside a replay. WHO RELIES: an operator replaying a recording with an effort exported. WHAT THE MUTATION DOES: the replay answers from its recording while the effort looks as though it took effect. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M16-the-effort-is-no-selection-beside-a-replay ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-3 - the selector (DESIGN-multi-harness-executor.md D31-D34, D39; ROADMAP-multi-harness-executor.md MH-3 tests 1-7, 10, 12, 13; the sponsor’s answers of 2026-10-18, S1-S4): the identity refusals, the effort rule, the defaults named and never applied, and JPWB_CODEX_BIN captured"
+	},
+	{
+		id: "MH3-M17-the-codex-override-is-read-from-the-environment-list",
+		file: "apps/rph-demo/src/lib/server/replay/replay-switch.ts",
+		find: "\t\t...(overrides.codex === undefined ? [] : ['JPWB_CODEX_BIN'])\n",
+		replace: "\t\t...((env.JPWB_CODEX_BIN?.trim() ?? '') === '' ? [] : ['JPWB_CODEX_BIN']) // MUTANT: read from the environment, where no adapter reads it after load\n",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replay-selection.test.ts"],
+		why: "PROMISE (D39; roadmap MH-3 test 13, its named mutant): JPWB_CODEX_BIN beside a replay is the override the selector CAPTURED, handed in apart, never the environment - which by design holds no program override. WHO RELIES: the replay's refusal of a live selection beside it. WHAT THE MUTATION DOES: a captured Codex override is not named, and one set in the environment after load is. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M17-the-codex-override-is-read-from-the-environment-list ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-3 - the selector (DESIGN-multi-harness-executor.md D31-D34, D39; ROADMAP-multi-harness-executor.md MH-3 tests 1-7, 10, 12, 13; the sponsor’s answers of 2026-10-18, S1-S4): the identity refusals, the effort rule, the defaults named and never applied, and JPWB_CODEX_BIN captured"
+	},
+	{
+		id: "MH3-M18-the-gate-keeps-jpwb-executor-effort",
+		file: "verif/live-backend-isolation.ts",
+		find: "\t'JPWB_EXECUTOR_EFFORT',\n",
+		replace: "",
+		expectRed: ["verif/live-backend-isolation.test.ts"],
+		why: "PROMISE (D39; roadmap MH-3 test 12): every gate entry point removes JPWB_EXECUTOR_EFFORT before a test reads it. WHO RELIES: an operator who exported it for a lane, then ran the gate. WHAT THE MUTATION DOES: it reaches every gate child - and the replay's tests, which refuse it beside the switch. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M18-the-gate-keeps-jpwb-executor-effort ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-3 - the selector (DESIGN-multi-harness-executor.md D31-D34, D39; ROADMAP-multi-harness-executor.md MH-3 tests 1-7, 10, 12, 13; the sponsor’s answers of 2026-10-18, S1-S4): the identity refusals, the effort rule, the defaults named and never applied, and JPWB_CODEX_BIN captured"
+	},
+	{
+		id: "MH3-M19-the-gate-keeps-jpwb-codex-bin",
+		file: "verif/live-backend-isolation.ts",
+		find: "\t'JPWB_CODEX_BIN',\n",
+		replace: "",
+		expectRed: ["verif/live-backend-isolation.test.ts"],
+		why: "PROMISE (D39; roadmap MH-3 test 12): every gate entry point removes JPWB_CODEX_BIN before the selector captures it. WHO RELIES: the gate's replay tests, which a captured override would refuse. WHAT THE MUTATION DOES: an exported Codex override reaches every gate child. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M19-the-gate-keeps-jpwb-codex-bin ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-3 - the selector (DESIGN-multi-harness-executor.md D31-D34, D39; ROADMAP-multi-harness-executor.md MH-3 tests 1-7, 10, 12, 13; the sponsor’s answers of 2026-10-18, S1-S4): the identity refusals, the effort rule, the defaults named and never applied, and JPWB_CODEX_BIN captured"
+	},
+	{
+		id: "MH3-M20-the-refusal-looks-beside-another-directory",
+		file: "apps/rph-demo/src/lib/server/execution/workspace-host.ts",
+		find: "\t\t? durableDeliverableDirectory(root, ownSegment, undertakingId)\n",
+		replace: "\t\t? resolvePath(join(root, ownSegment)) // MUTANT: derived apart from the sandbox, without the owner's fingerprint\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/workspace-host.test.ts"],
+		why: "PROMISE (D21a): the directory a refusal reads the taint beside is the one the sandbox's durable arm gives the same owner - one derivation for both. WHO RELIES: Begin & Execute and a re-run of the work, which must find the mark a CLI executor's breach wrote. WHAT THE MUTATION DOES: the refusal looks beside a directory no session ran in, so a tainted workspace is dispatched into. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M20-the-refusal-looks-beside-another-directory ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-3 - the taint refusal (DESIGN-multi-harness-executor.md D21a; ROADMAP-multi-harness-executor.md MH-3 test 11): Begin & Execute and a re-run of the work refuse WORKSPACE_TAINTED before they dispatch"
+	},
+	{
+		id: "MH3-M21-a-root-relative-to-the-process-is-read",
+		file: "apps/rph-demo/src/lib/server/execution/workspace-host.ts",
+		find: "\tif (root === undefined || root === '' || !rootedIndependentlyOfTheProcess(root)) return undefined;\n",
+		replace: "\tif (root === undefined || root === '') return undefined; // MUTANT: a root relative to the process is read\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/workspace-host.test.ts"],
+		why: "PROMISE (D21a): the reader answers only where the sandbox would take its durable arm, and the sandbox refuses a root that resolves against the process. WHO RELIES: the server's own tree, which a relative root would put a mark-read in. WHAT THE MUTATION DOES: a relative root is resolved against the process's directory. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M21-a-root-relative-to-the-process-is-read ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-3 - the taint refusal (DESIGN-multi-harness-executor.md D21a; ROADMAP-multi-harness-executor.md MH-3 test 11): Begin & Execute and a re-run of the work refuse WORKSPACE_TAINTED before they dispatch"
+	},
+	{
+		id: "MH3-M22-an-owner-id-the-sandbox-refuses-is-read",
+		file: "apps/rph-demo/src/lib/server/execution/workspace-host.ts",
+		find: "\treturn ownSegment === undertakingId && !ownSegment.includes('/')\n",
+		replace: "\treturn ownSegment !== undefined // MUTANT: an owner id the sandbox refuses is read\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/workspace-host.test.ts"],
+		why: "PROMISE (D21a): the reader refuses the owner ids the sandbox refuses - one path segment, no separator. WHO RELIES: the containment the sandbox's own check holds. WHAT THE MUTATION DOES: an id naming a nested path is read as a workspace directory. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M22-an-owner-id-the-sandbox-refuses-is-read ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-3 - the taint refusal (DESIGN-multi-harness-executor.md D21a; ROADMAP-multi-harness-executor.md MH-3 test 11): Begin & Execute and a re-run of the work refuse WORKSPACE_TAINTED before they dispatch"
+	},
+	{
+		id: "MH3-M23-test-mode-reads-the-durable-root",
+		file: "apps/rph-demo/src/lib/server/execution/workspace-host.ts",
+		find: "durableWorkspaceRoot(process.env)\n): string | undefined {",
+		replace: "(process.env.JPWB_DEMO_DB ? `${process.env.JPWB_DEMO_DB}.workspaces` : undefined) /* MUTANT: test mode reads the durable root too */\n): string | undefined {",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/workspace-host.test.ts"],
+		why: "PROMISE (D21a): by default the reader takes the durable root as the sandbox does - only a process that declares it serves has one. WHO RELIES: every test-mode process, whose workspaces are in memory. WHAT THE MUTATION DOES: a test-mode process with JPWB_DEMO_DB set reads marks beside directories its sandbox never uses. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M23-test-mode-reads-the-durable-root ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-3 - the taint refusal (DESIGN-multi-harness-executor.md D21a; ROADMAP-multi-harness-executor.md MH-3 test 11): Begin & Execute and a re-run of the work refuse WORKSPACE_TAINTED before they dispatch"
+	},
+	{
+		id: "MH3-M24-the-refusal-names-no-breach",
+		file: "apps/rph-demo/src/lib/server/execution/workspace-taint.ts",
+		find: "\t\t\t: reading.entries.map(breachNamed).join('; ');\n",
+		replace: "\t\t\t: 'a breach'; // MUTANT: the refusal names no breach\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/workspace-taint.test.ts"],
+		why: "PROMISE (D21a): the refusal names each breach the marker holds - its code, the turn and the tool. WHO RELIES: the person who must decide what to do with the workspace. WHAT THE MUTATION DOES: the refusal says only that there was a breach. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M24-the-refusal-names-no-breach ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-3 - the taint refusal (DESIGN-multi-harness-executor.md D21a; ROADMAP-multi-harness-executor.md MH-3 test 11): Begin & Execute and a re-run of the work refuse WORKSPACE_TAINTED before they dispatch"
+	},
+	{
+		id: "MH3-M25-the-refusal-prints-the-marker-s-path",
+		file: "apps/rph-demo/src/lib/server/execution/workspace-taint.ts",
+		find: "${basename(workspaceTaintPath(workspaceDirectory))}",
+		replace: "${workspaceTaintPath(workspaceDirectory)}",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/workspace-taint.test.ts"],
+		why: "PROMISE (D21a; R11): the refusal names the marker's file, never its path - a host path reaches no message. WHO RELIES: the page, which shows the refusal. WHAT THE MUTATION DOES: the absolute path of the workspace's parent is printed. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M25-the-refusal-prints-the-marker-s-path ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-3 - the taint refusal (DESIGN-multi-harness-executor.md D21a; ROADMAP-multi-harness-executor.md MH-3 test 11): Begin & Execute and a re-run of the work refuse WORKSPACE_TAINTED before they dispatch"
+	},
+	{
+		id: "MH3-M26-an-unreadable-marker-refuses-nothing",
+		file: "apps/rph-demo/src/lib/server/execution/workspace-taint.ts",
+		find: "\tif (!reading.tainted) return undefined;\n\tconst breaches",
+		replace: "\tif (!reading.tainted || reading.entries.length === 0) return undefined; // MUTANT: an unreadable marker refuses nothing\n\tconst breaches",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/workspace-taint.test.ts"],
+		why: "PROMISE (D21a): an unreadable marker still refuses - the reader fails closed, and the refusal says which breach made it is unknown. WHO RELIES: a workspace whose marker a person half-cleared. WHAT THE MUTATION DOES: a marker that cannot be read refuses nothing. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M26-an-unreadable-marker-refuses-nothing ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-3 - the taint refusal (DESIGN-multi-harness-executor.md D21a; ROADMAP-multi-harness-executor.md MH-3 test 11): Begin & Execute and a re-run of the work refuse WORKSPACE_TAINTED before they dispatch"
+	},
+	{
+		id: "MH3-M27-begin-execute-hands-the-selector-no-reviewer",
+		file: "apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts",
+		find: "\t\t\tconst selected = selectExecutor({ testMode: isTestMode(), reviewer: reviewing });\n",
+		replace: "\t\t\tconst selected = selectExecutor({ testMode: isTestMode() }); // MUTANT: the reviewer is not handed on\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/begin-execute-executor-selection.test.ts"],
+		why: "PROMISE (D33; roadmap MH-3 test 10): Begin & Execute hands the selector the reviewer its preflight admitted. WHO RELIES: every model step whose executor model is the reviewer's. WHAT THE MUTATION DOES: the selector compares nothing, the step is dispatched, and the floor refuses its review after the paid work. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M27-begin-execute-hands-the-selector-no-reviewer ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-3 - the selector (DESIGN-multi-harness-executor.md D31-D34, D39; ROADMAP-multi-harness-executor.md MH-3 tests 1-7, 10, 12, 13; the sponsor’s answers of 2026-10-18, S1-S4): the identity refusals, the effort rule, the defaults named and never applied, and JPWB_CODEX_BIN captured"
+	},
+	{
+		id: "MH3-M28-a-re-run-of-the-work-hands-the-selector-no-reviewer",
+		file: "apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts",
+		find: "const chosen = selectExecutor({ testMode: isTestMode(), reviewer: reviewerReady.reviewer });",
+		replace: "const chosen = selectExecutor({ testMode: isTestMode() }); // MUTANT: the reviewer is not handed on",
+		expectRed: ["apps/rph-demo/src/routes/undertakings/[id]/stopped-unit-recovery.route.test.ts"],
+		why: "PROMISE (D33; roadmap MH-3 test 10, 'the same for rerunWork'): a re-run of the work hands the selector the reviewer its preflight admitted. WHO RELIES: a waiting unit re-run beside the reviewer's model. WHAT THE MUTATION DOES: the re-run is dispatched, a fresh session opened and paid for. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M28-a-re-run-of-the-work-hands-the-selector-no-reviewer ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-3 - the selector (DESIGN-multi-harness-executor.md D31-D34, D39; ROADMAP-multi-harness-executor.md MH-3 tests 1-7, 10, 12, 13; the sponsor’s answers of 2026-10-18, S1-S4): the identity refusals, the effort rule, the defaults named and never applied, and JPWB_CODEX_BIN captured"
+	},
+	{
+		id: "MH3-M29-begin-execute-ignores-the-taint",
+		file: "apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts",
+		find: "\t\t\t);\n\t\t\tif (tainted) return fail(400, { error: tainted });\n",
+		replace: "\t\t\t);\n\t\t\tvoid tainted; // MUTANT: the mark is read and ignored\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/begin-execute-workspace-taint.test.ts"],
+		why: "PROMISE (D21a; roadmap MH-3 test 11): Begin & Execute refuses a model step while a CLI executor's breach marks the workspace (WORKSPACE_TAINTED), before anything is dispatched. WHO RELIES: the next unit's review and evidence, which could rest on bytes no one recorded. WHAT THE MUTATION DOES: the mark is read and the step dispatched. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M29-begin-execute-ignores-the-taint ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-3 - the taint refusal (DESIGN-multi-harness-executor.md D21a; ROADMAP-multi-harness-executor.md MH-3 test 11): Begin & Execute and a re-run of the work refuse WORKSPACE_TAINTED before they dispatch"
+	},
+	{
+		id: "MH3-M30-a-re-run-of-the-work-ignores-the-taint",
+		file: "apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts",
+		find: "\t\t);\n\t\tif (tainted) return fail(400, { error: tainted });\n",
+		replace: "\t\t);\n\t\tvoid tainted; // MUTANT: the mark is read and ignored\n",
+		expectRed: ["apps/rph-demo/src/routes/undertakings/[id]/stopped-unit-recovery.route.test.ts"],
+		why: "PROMISE (D21a; roadmap MH-3 test 11): a re-run of the work, which reuses the workspace, is refused while a breach marks it. WHO RELIES: the re-run's review and evidence. WHAT THE MUTATION DOES: the re-run is dispatched into the marked workspace. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M30-a-re-run-of-the-work-ignores-the-taint ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-3 - the taint refusal (DESIGN-multi-harness-executor.md D21a; ROADMAP-multi-harness-executor.md MH-3 test 11): Begin & Execute and a re-run of the work refuse WORKSPACE_TAINTED before they dispatch"
+	},
+	{
+		id: "MH3-M31-begin-execute-looks-beside-the-work-unit-s-id",
+		file: "apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts",
+		find: "\t\t\t\tundertakingWorkspaceDirectory(String((pwu?.undertakingId ?? '') as string))\n",
+		replace: "\t\t\t\tundertakingWorkspaceDirectory(pwuId) // MUTANT: looked for beside the work unit’s id, not its Undertaking’s\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/begin-execute-workspace-taint.test.ts"],
+		why: "PROMISE (D21a): the mark is read beside the Undertaking's workspace - the work unit's owner, which a CLI executor's session ran in. WHO RELIES: every unit of a tainted Undertaking. WHAT THE MUTATION DOES: the mark is looked for beside a directory named for the work unit, never found, and the step dispatched. OBSERVED (bun run mutants -- the 31 MH3 ids and the six re-anchored by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M31-begin-execute-looks-beside-the-work-unit-s-id ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-3 - the taint refusal (DESIGN-multi-harness-executor.md D21a; ROADMAP-multi-harness-executor.md MH-3 test 11): Begin & Execute and a re-run of the work refuse WORKSPACE_TAINTED before they dispatch"
 	}
 ];

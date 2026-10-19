@@ -188,6 +188,37 @@ function ownerFingerprint(undertakingId: string): string {
 }
 
 /**
+ * The deliverable directory the DURABLE arm gives an owner: one subdirectory of the root, named by the owner and its
+ * fingerprint. ⭑ One expression, read by `resolveUndertakingSandbox` and by `undertakingWorkspaceDirectory`, so the
+ * directory a step runs in and the one a refusal looks beside cannot come apart.
+ */
+function durableDeliverableDirectory(root: string, segment: string, undertakingId: string): string {
+	return resolvePath(join(root, `${segment}-${ownerFingerprint(undertakingId)}`));
+}
+
+/**
+ * ⭐ `JAN-MHX` MH-3 (`DESIGN-multi-harness-executor.md` D21a) — THE DIRECTORY `resolveUndertakingSandbox` WOULD GIVE AN
+ * UNDERTAKING ON ITS DURABLE ARM, CREATING NOTHING, or `undefined` where that arm would not be taken: no durable root, a
+ * root that resolves against the process, or an owner id the sandbox refuses.
+ *
+ * ⭑ WHY IT EXISTS: a CLI executor's breach is marked beside the workspace its session ran in (`workspace-taint.ts`), and
+ * Begin & Execute and a re-run of the work must read that mark BEFORE they dispatch — so before the sandbox is resolved,
+ * which creates directories and, under a replay, takes the replay's own. A CLI executor's session refuses any workspace
+ * without a directory (`producerWorkingDirectory`), and a replay runs no CLI executor, so the durable arm is the only one
+ * a mark can be beside.
+ */
+export function undertakingWorkspaceDirectory(
+	undertakingId: string,
+	root: string | undefined = durableWorkspaceRoot(process.env)
+): string | undefined {
+	if (root === undefined || root === '' || !rootedIndependentlyOfTheProcess(root)) return undefined;
+	const ownSegment = containedWorkspacePath(undertakingId);
+	return ownSegment === undertakingId && !ownSegment.includes('/')
+		? durableDeliverableDirectory(root, ownSegment, undertakingId)
+		: undefined;
+}
+
+/**
  * ⭐⭐ `JAN-EXEC` Phase 8 (`DESIGN-phase-7-completion.md` §5 D3; `REG-F-530`) — A REPLAY'S SANDBOX: FILESYSTEM workspaces
  * under the replay's DISPOSABLE root, paired with the REPLAYED runner.
  *
@@ -299,11 +330,12 @@ export function resolveUndertakingSandbox(
 			`'${root}' cannot be an Undertaking workspace root: it is not absolute, so it resolves against this process's own working directory and the deliverable would land inside the server's tree. Refusing rather than resolving it: configure JPWB_DEMO_DB with an absolute path.`
 		);
 
-	// ⭑ ONE SUBDIRECTORY PER OWNER, DERIVED — never a fresh directory per call. This single expression is what
-	// makes a second step, in a new session with a new plan, land in the same place as the first.
+	// ⭑ ONE SUBDIRECTORY PER OWNER, DERIVED — never a fresh directory per call. This single derivation
+	// (`durableDeliverableDirectory`) is what makes a second step, in a new session with a new plan, land in the same
+	// place as the first.
 	// ⛔ AND THE FINGERPRINT IS WHAT MAKES THE DERIVATION INJECTIVE ON A CASE-INSENSITIVE FILESYSTEM (bound 2):
 	// without it `UND-ALPHA` and `und-alpha` are two ids, two strings, and ONE directory on disk.
-	const directoryPath = resolvePath(join(root, `${segment}-${ownerFingerprint(undertakingId)}`));
+	const directoryPath = durableDeliverableDirectory(root, segment, undertakingId);
 	// Created eagerly so the deliverable is INSPECTABLE the moment the Undertaking starts executing (`R8`),
 	// rather than only once something has been written into it. `recursive` makes this idempotent per request.
 	mkdirSync(directoryPath, { recursive: true });
