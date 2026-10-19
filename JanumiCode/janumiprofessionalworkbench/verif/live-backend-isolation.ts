@@ -36,7 +36,8 @@
  * gate's replay tests into that refusal (driven red: the replay's tests, 4 failed; and `live-backend-isolation.test.ts`,
  * all four children, with it exported there and left off this list).
  * ⭐ AND AN ELEVENTH AND A TWELFTH (`JAN-MHX` MH-3, `DESIGN-multi-harness-executor.md` D39): `JPWB_EXECUTOR_EFFORT`, a
- * selection the executor selector reads, and `JPWB_CODEX_BIN`, a program override it captures when it loads (driven red:
+ * selection the executor selector reads, and `JPWB_CODEX_BIN`, a program override ~~it captures when it loads~~ ⭐
+ * (`JAN-MHX` MH-6) the Codex driver captures when it loads, which the selector imports, and refuses (driven red:
  * `live-backend-isolation.test.ts`, all four children, with both exported there and left off this list).
  */
 export const LIVE_BACKEND_VARIABLES = [

@@ -171,7 +171,11 @@ describe('⭐ D3 — an agy executor whose program was replaced is refused outsi
 			serverName: 'jpwb',
 			systemPrompt: 'fixture system prompt'
 		};
-		expect(driver.preflight(run)?.invocation.program).toBe(STAND_IN_PROGRAM);
+		// ⭐ `JAN-MHX` MH-6 — handed the session's selection, as the opener hands it; agy's driver declares one check.
+		const check = driver.preflight(run, { kind: 'CLI', toolId: 'agy', modelId: 'fixture-executor-model' });
+		expect(check !== undefined && 'invocation' in check ? check.invocation.program : undefined).toBe(
+			STAND_IN_PROGRAM
+		);
 		expect(
 			driver.invocation({
 				run,

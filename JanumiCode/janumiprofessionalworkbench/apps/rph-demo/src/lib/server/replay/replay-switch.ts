@@ -53,7 +53,8 @@ export const LIVE_SELECTIONS_BESIDE_A_REPLAY = [
 /**
  * ⭐ `REG-D-112` (c) — THE LIVE-BACKEND SELECTIONS SET BESIDE THE SWITCH, by name: each environment variable above that is
  * set (blank or whitespace is unset, the selectors' rule), and each program override the adapters captured
- * (`JPWB_AGY_BIN`, `JPWB_DEVIN_BIN`, ⭐ and `JPWB_CODEX_BIN`, which the executor selector captures — `JAN-MHX` MH-3, D39;
+ * (`JPWB_AGY_BIN`, `JPWB_DEVIN_BIN`, ⭐ and `JPWB_CODEX_BIN`, which ~~the executor selector captures~~ ⭐ (`JAN-MHX` MH-6)
+ * the Codex driver captures and the executor selector hands in — `JAN-MHX` MH-3, D39;
  * the reviewer's selector has no Codex key, and hands none). Empty when none is — the only arrangement a replay runs in.
  */
 export function liveSelectionsBesideReplay(

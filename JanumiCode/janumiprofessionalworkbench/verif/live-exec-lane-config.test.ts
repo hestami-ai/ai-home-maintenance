@@ -345,7 +345,9 @@ describe('⭐ the lane refuses the executor the product refuses, asked without a
 		// ~~⭐ `JAN-MHX` MH-4 — devin's executor is wired (D30), and the mirror follows the product's table.~~ ⭐ MH-4, the
 		// check's fix — in test mode only, and this lane runs outside it, so the mirror holds agy and Pi, as the product's
 		// table outside test mode does.
-		expect([...WIRED_EXECUTORS].sort()).toEqual(['agy', 'pi']);
+		// ⭐ `JAN-MHX` MH-6 — and Codex, wired; the table above leaves it out because it asks without an effort, which the
+		// product requires of Codex (D32) and the lane refuses Codex by its own rule anyway (below).
+		expect([...WIRED_EXECUTORS].sort()).toEqual(['agy', 'codex', 'pi']);
 	});
 
 	const EXECUTOR_TOOLS = [
@@ -472,7 +474,7 @@ describe('⭐ the lane refuses the executor the product refuses, asked without a
 				JPWB_EXECUTOR: tool
 			});
 			expect(refusal ?? 'NO REFUSAL', tool).toContain(`JPWB_EXECUTOR='${tool}' names no executor`);
-			expect(refusal ?? 'NO REFUSAL', tool).toContain('(agy, pi)');
+			expect(refusal ?? 'NO REFUSAL', tool).toContain('(agy, pi, codex)');
 		}
 	});
 
@@ -491,8 +493,12 @@ describe('⭐ the lane refuses the executor the product refuses, asked without a
 		}
 		// ⭑ The variable is the agy adapter's one capture — the same the reviewer limb refuses for an agy reviewer. ~~⭐
 		// `JAN-MHX` MH-4 — and devin's, the devin adapter's one capture, which its executor driver runs too.~~ ⭐ MH-4, the
-		// check's fix — agy's alone again: the lane refuses a devin executor whatever its override (below).
-		expect(EXECUTOR_PROGRAM_VARIABLE).toEqual({ agy: REVIEWER_PROGRAM_VARIABLE.agy });
+		// check's fix — ~~agy's alone again~~ not devin's: the lane refuses a devin executor whatever its override (below).
+		// ⭐ `JAN-MHX` MH-6 — and Codex's, its driver's capture, which no reviewer has.
+		expect(EXECUTOR_PROGRAM_VARIABLE).toEqual({
+			agy: REVIEWER_PROGRAM_VARIABLE.agy,
+			codex: 'JPWB_CODEX_BIN'
+		});
 	});
 
 	// ~~⛔ `JAN-MHX` MH-4 — the devin executor’s program override is refused as the product refuses it, even empty, naming
@@ -532,6 +538,46 @@ describe('⭐ the lane refuses the executor the product refuses, asked without a
 		// ⛔ THE REASON, HELD FROM SOURCE: were the spec to stop asserting a provider-reported producer, this rule would
 		// refuse a configuration for nothing — so the pin reddens and the rule is re-decided.
 		expect(assertionsOn(parsed(SPEC), 'producer.evidence')).toEqual(["toBe('PROVIDER_REPORTED')"]);
+	});
+
+	// ⭐ `JAN-MHX` MH-6 — THE PRODUCT WIRES CODEX, SO THE LANE MIRRORS IT, and refuses it by the rule it holds agy to: Codex's
+	// record names no model, so it is HOST_CONFIGURED, and the spec asserts PROVIDER_REPORTED. ⚠ Until MH-8 replaces that
+	// rule with each executor's own grade (`EXECUTOR_IDENTITY_EVIDENCE`, design D36).
+	const CODEX_LANE = {
+		...COMPLETE,
+		JPWB_ASSURANCE_TOOL: 'devin',
+		JPWB_EXECUTOR: 'codex',
+		JPWB_EXECUTOR_MODEL: 'gpt-5.6-sol',
+		JPWB_EXECUTOR_EFFORT: 'high'
+	};
+
+	it('⭐ `JAN-MHX` MH-6 — Codex is refused by the lane’s own rule, not as a tool the product has no adapter for — and the product runs it beside the lane’s reviewer', () => {
+		// ⭑ RED FIRST: the lane refused Codex as naming "no executor this host has an adapter for", and said the product
+		// refuses it — false once the product wires it.
+		const refusal = laneKeysRefusal(CODEX_LANE) ?? 'NO REFUSAL';
+		expect(refusal).not.toContain('names no executor');
+		expect(refusal).toContain(`JPWB_EXECUTOR='codex' ${LANE_RULE}`);
+		expect(refusal).toContain('PROVIDER_REPORTED');
+		expect(refusal).toContain('The product runs a Codex executor');
+		expect(wiredExecutor('codex')).toBe('codex');
+		expect(
+			selectExecutor({
+				testMode: false,
+				env: CODEX_LANE,
+				overrides: { ...NO_OVERRIDES, codex: undefined },
+				reviewer: assurancePreflight({ testMode: false, env: CODEX_LANE }).reviewer
+			})
+		).toEqual({ kind: 'CLI', toolId: 'codex', modelId: 'gpt-5.6-sol', effort: 'high' });
+	});
+
+	it('⛔ `JAN-MHX` MH-6 — the Codex executor’s program override is refused as the product refuses it, even empty, naming it', () => {
+		for (const value of ['fixture/codex.exe', '']) {
+			const refusal = laneKeysRefusal({ ...CODEX_LANE, JPWB_CODEX_BIN: value }) ?? 'NO REFUSAL';
+			expect(refusal).toContain(
+				`JPWB_CODEX_BIN=${JSON.stringify(value)} replaces the codex executor's program`
+			);
+			expect(refusal).toContain('REG-F-459');
+		}
 	});
 });
 

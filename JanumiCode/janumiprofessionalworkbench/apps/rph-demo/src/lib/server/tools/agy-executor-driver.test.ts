@@ -25,6 +25,7 @@ import {
 	openCliExecutionSession,
 	type CliExec,
 	type CliExecRequest,
+	type CliPreflight,
 	type CliRecordReading,
 	type CliRunFolder,
 	type CliTurnInput
@@ -32,6 +33,17 @@ import {
 
 const MODEL = 'gemini-4-argon-high';
 const SELECTION = { kind: 'CLI', toolId: 'agy', modelId: MODEL } as const;
+
+/**
+ * ⭐ `JAN-MHX` MH-6 — the driver's no-model check, asked as the opener asks it: handed the session's selection, and
+ * answered with one check or a list. agy's declares one.
+ */
+function preflightOf(run: CliRunFolder, driver = agyExecutorDriver()): CliPreflight {
+	const declared = driver.preflight(run, SELECTION);
+	if (declared === undefined || !('invocation' in declared))
+		throw new Error('arrangement: the agy driver declares one preflight check');
+	return declared;
+}
 const PROGRAM_NAME = process.platform === 'win32' ? 'agy.exe' : 'agy';
 
 let container = '';
@@ -271,7 +283,7 @@ function playedAgy(
 		requests.push(req);
 		const done = (async () => {
 			if (req.args.includes('/hooks'))
-				return { exitCode: 0, stdout: listing, stdoutComplete: true, errorLines: [] };
+				return { exitCode: 0, stdout: listing, stdoutComplete: true, errorLines: [], errorLinesComplete: true };
 			const script = scripts[next++] ?? {};
 			const endpoint = JSON.parse(readFileSync(endpointNamedBy(req.cwd), 'utf8')) as {
 				url: string;
@@ -377,7 +389,8 @@ function playedAgy(
 				exitCode: script.exitCode ?? 0,
 				stdout: `${out.join('\n')}\n`,
 				stdoutComplete: true,
-				errorLines: [...(script.errorLines ?? [])]
+				errorLines: [...(script.errorLines ?? [])],
+				errorLinesComplete: true
 			};
 		})();
 		return { done, kill: async () => undefined };
@@ -475,7 +488,7 @@ describe('⭐ test 1, 2 — the run folder: one agent file, P1b’s frontmatter 
 		for (const f of driver.runFolderFiles(run))
 			expect(inside(join(run.directory, f.path)), f.path).toBe(true);
 		const args = driver.invocation(turnInput(run)).args;
-		const preflightArgs = driver.preflight(run)!.invocation.args;
+		const preflightArgs = preflightOf(run, driver).invocation.args;
 		expect(dirname(args[args.indexOf('--log-file') + 1]!)).toBe(run.hostDirectory);
 		expect(dirname(preflightArgs[preflightArgs.indexOf('--log-file') + 1]!)).toBe(
 			run.hostDirectory
@@ -598,7 +611,7 @@ describe('⭐ test 9 — the preflight: agy’s free hooks listing, and the sess
 	it('⛔ its argv, pinned: `/hooks` for this agent, as JSON, logged in host/ — and never with slash commands off', () => {
 		// ⛔ THE MUTANT: `--disable-slash-commands` here, which would send `/hooks` to the model as a prompt.
 		const run = runFolder();
-		const check = agyExecutorDriver().preflight(run)!;
+		const check = preflightOf(run);
 		expect(check.invocation.program).toBe(join(programs, PROGRAM_NAME));
 		expect(check.invocation.args).toEqual([
 			'-p',
@@ -630,7 +643,7 @@ describe('⭐ test 9 — the preflight: agy’s free hooks listing, and the sess
 
 	it('⛔ each other arm refuses: a turn taken, another answer, unreadable JSON, a failing exit', () => {
 		// ⛔ ONE MUTANT PER ARM.
-		const refusal = agyExecutorDriver().preflight(runFolder())!.refusal;
+		const refusal = preflightOf(runFolder()).refusal;
 		const tookATurn = JSON.stringify({ ...JSON.parse(NO_HOOKS), num_turns: 1 });
 		expect(refusal({ exitCode: 0, stdout: tookATurn })).toContain(
 			'took the hooks listing as a model turn'
@@ -663,7 +676,7 @@ describe('⭐ test 9 — the preflight: agy’s free hooks listing, and the sess
 
 	it('⭑ the refusal names how many hooks, never their names or sources', () => {
 		const said =
-			agyExecutorDriver().preflight(runFolder())!.refusal({ exitCode: 0, stdout: ONE_HOOK }) ?? '';
+			preflightOf(runFolder()).refusal({ exitCode: 0, stdout: ONE_HOOK }) ?? '';
 		expect(said).not.toContain('jpwb-guard');
 		expect(said).not.toContain('fixture-source');
 		expect(said).not.toContain('fixture-command');

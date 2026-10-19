@@ -152,8 +152,10 @@ describe('what a refusal SAYS — it names the fault, and every one carries the 
 			tool: 'pi',
 			says: "The reviewing tool 'pi' (JPWB_ASSURANCE_TOOL) declares the ASSURANCE role, but no reviewer adapter"
 		},
-		// ⭑ The catalog's own refusal, carried whole — it lists what this host CAN drive.
-		{ tool: 'nope', says: "Unknown backing tool 'nope'. This host can drive: agy, pi, devin." }
+		// ⭑ The catalog's own refusal, carried whole — it lists what this host CAN drive. ⭐ `JAN-MHX` MH-6 — Codex among them,
+		// which declares EXECUTION only, so a reviewer set to it is refused for the role.
+		{ tool: 'nope', says: "Unknown backing tool 'nope'. This host can drive: agy, pi, devin, codex." },
+		{ tool: 'codex', says: "Backing tool 'codex' does not declare the ASSURANCE role (it declares: EXECUTION)." }
 	];
 	for (const r of REASONS)
 		it(`tool ${JSON.stringify(r.tool)}: "${r.says}"`, () => {

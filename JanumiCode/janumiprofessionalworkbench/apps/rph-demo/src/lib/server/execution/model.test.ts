@@ -186,7 +186,7 @@ describe('⭐ `JAN-MHX` MH-5 (D16, D30) — agy executes as a CLI: selected as o
 				? JSON.stringify({ status: 'SUCCESS', num_turns: 0, command: { name: 'hooks', data: { hooks: [] } } })
 				: JSON.stringify({ event: 'result', result: { status: 'SUCCESS', response: 'fixture answer' } });
 			return {
-				done: Promise.resolve({ exitCode: 0, stdout, stdoutComplete: true, errorLines: [] }),
+				done: Promise.resolve({ exitCode: 0, stdout, stdoutComplete: true, errorLines: [], errorLinesComplete: true }),
 				kill: async () => undefined
 			};
 		};

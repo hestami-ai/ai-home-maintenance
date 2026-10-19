@@ -69,16 +69,17 @@ describe('⭐ MH-4 — over a catalog that declares a tool nobody wired', () => 
 			);
 		});
 
-	it('⛔ the guidance offers the wired tools — agy, pi — and never the catalog’s tool nobody wired', () => {
+	it('⛔ the guidance offers the wired tools — agy, pi, ⭐ (MH-6) codex — and never the catalog’s tool nobody wired', () => {
 		// ⛔ THE MUTANT: the guidance lists the catalog. An operator following it to fixture-unwired would be refused again,
 		// as UNWIRED (`REG-F-460`'s general form). ⭐ MH-4, the check's fix — ~~agy, pi, devin~~ agy and Pi: devin is wired in
-		// test mode only (D30), and the guidance is the operator's.
-		expect(EXECUTOR_GUIDANCE).toContain('executor adapter for: agy, pi —');
+		// test mode only (D30), and the guidance is the operator's. ⭐ `JAN-MHX` MH-6 — and Codex, wired in every mode (D30).
+		expect(EXECUTOR_GUIDANCE).toContain('executor adapter for: agy, pi, codex —');
 		expect(EXECUTOR_GUIDANCE).not.toContain('fixture-unwired');
 	});
 
 	it('⛔ and an unknown tool’s reason offers the wired tools, never the catalog’s list, which names the tool nobody wired', () => {
 		// ⛔ THE MUTANT: the catalog's sentence, "This host can drive: …", stays in the reason printed beside the guidance.
+		// ⭐ `JAN-MHX` MH-6 — the wired tools it offers include Codex.
 		const got = selectExecutor({
 			testMode: false,
 			env: { JPWB_EXECUTOR: 'nosuchtool', JPWB_EXECUTOR_MODEL: 'fixture-executor' },
@@ -86,7 +87,7 @@ describe('⭐ MH-4 — over a catalog that declares a tool nobody wired', () => 
 		});
 		const reason = got.kind === 'REFUSED' ? got.reason : '';
 		expect(reason).toMatch(/Unknown backing tool 'nosuchtool'\./);
-		expect(reason).toContain('This host has an executor adapter for: agy, pi.');
+		expect(reason).toContain('This host has an executor adapter for: agy, pi, codex.');
 		expect(reason).not.toContain('fixture-unwired');
 	});
 });

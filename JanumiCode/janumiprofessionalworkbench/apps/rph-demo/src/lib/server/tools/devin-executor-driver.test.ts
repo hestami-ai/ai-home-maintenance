@@ -23,6 +23,7 @@ import {
 	openCliExecutionSession,
 	type CliExec,
 	type CliExecRequest,
+	type CliPreflight,
 	type CliRun,
 	type CliRunFolder
 } from './cli-executor-session.js';
@@ -60,6 +61,17 @@ const places = () => ({
 	localAppData: join(container, 'AppData', 'Local')
 });
 const driver = () => devinExecutorDriver(places());
+
+/**
+ * ⭐ `JAN-MHX` MH-6 — the driver's no-model check, asked as the opener asks it: handed the session's selection, and
+ * answered with one check or a list. devin's declares one.
+ */
+function preflightOf(run: CliRunFolder): CliPreflight {
+	const declared = driver().preflight(run, SELECTION);
+	if (declared === undefined || !('invocation' in declared))
+		throw new Error('arrangement: the devin driver declares one preflight check');
+	return declared;
+}
 
 /** A run folder as the opener hands it to a driver, under this test's container. */
 function runFolder(): CliRunFolder {
@@ -277,13 +289,13 @@ function fakeDevin(script: Script): CliExec & { requests: CliExecRequest[]; turn
 		requests.push(req);
 		if (req.args.includes('mcp')) {
 			const stdout = measuredListing(req.cwd);
-			return { done: Promise.resolve({ exitCode: 0, stdout, stdoutComplete: true, errorLines: [] }), kill: async () => undefined };
+			return { done: Promise.resolve({ exitCode: 0, stdout, stdoutComplete: true, errorLines: [], errorLinesComplete: true }), kill: async () => undefined };
 		}
 		const devin = new FakeDevin(req);
 		turns.push(devin);
 		const done = script(devin).then((over) => {
 			devin.writeExport();
-			return { exitCode: 0, stdout: devin.stdout(), stdoutComplete: true, errorLines: [], ...over };
+			return { exitCode: 0, stdout: devin.stdout(), stdoutComplete: true, errorLines: [], errorLinesComplete: true, ...over };
 		});
 		return { done, kill: async () => undefined };
 	};
@@ -507,12 +519,12 @@ describe('⭐ MH-4 test 3 — the preflight: devin’s own listing of its MCP se
 	const listing = (servers: string) => `Configured MCP servers:\n\n${servers}\n`;
 	const jpwb = (from = source()) => `  • jpwb\n    Command: node bridge endpoint\n    Source: ${from}\n`;
 	const refusalOf = (stdout: string, exitCode: number | null = 0) =>
-		driver().preflight(runFolder())!.refusal({ exitCode, stdout });
+		preflightOf(runFolder()).refusal({ exitCode, stdout });
 
 	it('runs `devin --config <host/user-config.json> mcp list`: the global option before the subcommand', () => {
 		// ⛔ THE MUTANT: `mcp list --config …`, which devin 3000.11.92 refuses ("error: unexpected argument '--config' found").
 		const run = runFolder();
-		const check = driver().preflight(run)!;
+		const check = preflightOf(run);
 		expect(check.invocation.args).toEqual(['--config', join(run.hostDirectory, 'user-config.json'), 'mcp', 'list']);
 		expect(check.invocation.program).toBe(driver().invocation({ run, turn: 1, modelId: MODEL, effort: undefined, prompt: '', userPrompt: '', promptPath: '' }).program);
 	});
