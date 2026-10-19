@@ -10,7 +10,8 @@
 // (`RPH_DEMO_MODE=server` with `JPWB_DEMO_DB` under a temp folder; `workspace-host.ts` reads both per call). Everything
 // else stays test mode: the executor and the reviewer are the declared stand-ins, which `workbench.ts` chose at load.
 //
-// ⛔ HERMETIC. The stand-ins call no model; agy's exec seam starts nothing; devin's adapter refuses, asserted never
+// ⛔ HERMETIC. The stand-ins call no model; ~~agy's exec seam starts nothing~~ ⭐ a CLI executor's opener refuses
+// (`JAN-MHX` MH-5: agy's); devin's adapter refuses, asserted never
 // called; PATH finds no program; every directory is under `os.tmpdir()`.
 import { vi } from 'vitest';
 
@@ -24,8 +25,9 @@ vi.mock('./model.js', async (importOriginal) => {
 		...actual,
 		getExecutionSession: vi.fn((selection: Parameters<typeof actual.getExecutionSession>[0]) =>
 			actual.getExecutionSession(selection, {
-				agyExec: async () => {
-					throw new Error('hermetic: no taint test calls agy');
+				// ⭐ `JAN-MHX` MH-5 — ~~`agyExec`~~: agy executes as a CLI now, and no case here opens one.
+				openCli: async () => {
+					throw new Error('hermetic: no route test opens a CLI executor session');
 				},
 				openPi: async () => {
 					throw new Error('hermetic: no route test opens a real Pi session');

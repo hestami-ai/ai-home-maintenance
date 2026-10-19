@@ -15,7 +15,9 @@
 // commands, the 33rd past the observer's cap (`REG-F-517`), and one naming a path outside the workspace. Then the
 // sign-offs of the units that completed, the root last.
 //
-// ⚠ WHAT IS ARRANGED RATHER THAN RUN: the executor (agy, on its exec seam, answering the fixture's envelope) writes no
+// ⚠ WHAT IS ARRANGED RATHER THAN RUN: the executor (agy, on its ~~exec seam~~ ⭐ CLI opener's seam — `JAN-MHX` MH-5 —
+// answering the fixture's envelope from a one-shot session, since agy's real one passes no turn until agy's record can
+// prove its tool surface) writes no
 // file and runs no command, so the files a phase writes and the capture folder each completed run leaves are written
 // here, as the model and the runner would have left them; and the lane's own files (`lane/run.json` and the rest) are
 // written here as the spec writes them.
@@ -62,13 +64,12 @@ const seam = vi.hoisted(() => ({
 
 vi.mock('./model.js', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('./model.js')>();
+	const { oneShotSession } = await import('./producer-session.js');
 	return {
 		...actual,
 		getExecutionSession: vi.fn((selection: Parameters<typeof actual.getExecutionSession>[0]) => {
 			const open = actual.getExecutionSession(selection, {
-				agyExec: async (_file, args) => ({
-					stdout: await actual.deterministicExecutionPrint(args[1] ?? '')
-				}),
+				openCli: async () => oneShotSession(actual.deterministicExecutionPrint),
 				openPi: async () => {
 					throw new Error('hermetic: no Pi session is opened here');
 				}

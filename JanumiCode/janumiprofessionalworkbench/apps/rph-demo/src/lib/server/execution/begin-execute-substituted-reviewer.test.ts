@@ -14,8 +14,9 @@
 // PROGRAM is replaced: `devinPrint` is the real adapter handed an exec seam that writes the ATIF export devin writes,
 // naming `substituted-model` as the model it ran.
 //
-// ⛔ HERMETIC. devin's exec seam starts nothing; the executor's seams are replaced as `begin-execute-executor-selection
-// .test.ts` replaces them (agy captured, Pi refused), though the stand-in opens neither; PATH finds no program.
+// ⛔ HERMETIC. devin's exec seam starts nothing; the executor's seams are replaced ~~as `begin-execute-executor-selection
+// .test.ts` replaces them (agy captured, Pi refused)~~ ⭐ (`JAN-MHX` MH-5: a CLI executor's opener refused, Pi's refused),
+// though the stand-in opens neither; PATH finds no program.
 import { vi } from 'vitest';
 
 vi.hoisted(() => {
@@ -24,7 +25,6 @@ vi.hoisted(() => {
 
 /** What the seams saw. Hoisted: the mock factories below run before this file's body. */
 const seam = vi.hoisted(() => ({
-	agy: [] as { readonly file: string; readonly args: readonly string[] }[],
 	pi: [] as string[],
 	devin: [] as { readonly file: string; readonly args: readonly string[] }[]
 }));
@@ -35,9 +35,9 @@ vi.mock('./model.js', async (importOriginal) => {
 		...actual,
 		getExecutionSession: vi.fn((selection: Parameters<typeof actual.getExecutionSession>[0]) =>
 			actual.getExecutionSession(selection, {
-				agyExec: async (file, args) => {
-					seam.agy.push({ file, args });
-					return { stdout: await actual.deterministicExecutionPrint(args[1] ?? '') };
+				// ⭐ `JAN-MHX` MH-5 — ~~`agyExec`~~: agy executes as a CLI now, and no case here opens one.
+				openCli: async () => {
+					throw new Error('hermetic: no route test opens a CLI executor session');
 				},
 				openPi: async (_context, modelId) => {
 					seam.pi.push(modelId);
@@ -96,7 +96,6 @@ const LIVE_BACKEND_VARIABLES = [
 
 beforeEach(() => {
 	resetEngine('reference');
-	seam.agy.length = 0;
 	seam.pi.length = 0;
 	seam.devin.length = 0;
 	vi.stubEnv('PATH', noProgramsDirectory());

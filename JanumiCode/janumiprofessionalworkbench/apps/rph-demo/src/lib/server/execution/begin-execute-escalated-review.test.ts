@@ -26,8 +26,8 @@
 // recorded, and a case may say the host ran one command (`processRuns`), which the route then joins as evidence and
 // reviews — the one arm the stand-in cannot reach by itself, because it runs no commands.
 //
-// ⛔ HERMETIC. devin's exec seam starts nothing; the agy executor's seam answers the fixture and Pi's opener refuses,
-// though the stand-in opens neither; no process is started (the run is a value); PATH finds no program.
+// ⛔ HERMETIC. devin's exec seam starts nothing; ~~the agy executor's seam answers the fixture~~ ⭐ a CLI executor's
+// opener (`JAN-MHX` MH-5: agy's) and Pi's opener refuse, though the stand-in opens neither; no process is started (the run is a value); PATH finds no program.
 import { vi } from 'vitest';
 
 vi.hoisted(() => {
@@ -36,7 +36,6 @@ vi.hoisted(() => {
 
 /** What the seams saw and answer. Hoisted: the mock factories below run before this file's body. */
 const seam = vi.hoisted(() => ({
-	agy: [] as { readonly file: string; readonly args: readonly string[] }[],
 	pi: [] as string[],
 	devin: [] as { readonly file: string; readonly args: readonly string[] }[],
 	/** What devin answers every review. */
@@ -58,9 +57,9 @@ vi.mock('./model.js', async (importOriginal) => {
 		...actual,
 		getExecutionSession: vi.fn((selection: Parameters<typeof actual.getExecutionSession>[0]) => {
 			const open = actual.getExecutionSession(selection, {
-				agyExec: async (file, args) => {
-					seam.agy.push({ file, args });
-					return { stdout: await actual.deterministicExecutionPrint(args[1] ?? '') };
+				// ⭐ `JAN-MHX` MH-5 — ~~`agyExec`~~: agy executes as a CLI now, and no case here opens one.
+				openCli: async () => {
+					throw new Error('hermetic: no route test opens a CLI executor session');
 				},
 				openPi: async (_context, modelId) => {
 					seam.pi.push(modelId);
@@ -238,7 +237,6 @@ const A_RUN: ObservedProcessRun = {
 
 beforeEach(() => {
 	resetEngine('reference');
-	seam.agy.length = 0;
 	seam.pi.length = 0;
 	seam.devin.length = 0;
 	seam.turns.length = 0;

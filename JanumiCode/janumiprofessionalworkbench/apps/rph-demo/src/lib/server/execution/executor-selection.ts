@@ -83,18 +83,21 @@ export type ExecutorRefusalCode =
  * `JPWB_REPLAY` names, honoured in test mode only.
  *
  * ⭑ `REFUSED` CARRIES THE TOOL IT REFUSED, when one was named, so no caller has to re-read the environment to say which
- * configuration was wrong — a second read is a second answer. And `PI`/`AGY` carry the MODEL, which is what opens the
- * executor AND what the record names: one read, so the model configured, run and recorded cannot come apart.
+ * configuration was wrong — a second read is a second answer. And ~~`PI`/`AGY`~~ ⭐ `PI` and `CLI` carry the MODEL, which
+ * is what opens the executor AND what the record names: one read, so the model configured, run and recorded cannot come
+ * apart.
  */
 export type ExecutorSelection =
 	| { readonly kind: 'STAND_IN' }
 	| { readonly kind: 'PI'; readonly modelId: string }
-	| { readonly kind: 'AGY'; readonly modelId: string }
+	// ~~| { readonly kind: 'AGY'; readonly modelId: string }~~ ⭐ `JAN-MHX` MH-5 (D30) — RETIRED: the text-only agy executor
+	// (`agy --print`, no workspace and no tools) could not do a work unit's work. agy is selected as the `CLI` kind below.
 	// ⭐ `JAN-EXEC` Phase 8 (D2) — the executor answers from a recording: each recorded turn's tool calls run through the
 	// real minted tools, and its recorded answer is returned once the turn text's hash matches (`replay/replay-executor.ts`).
 	| { readonly kind: 'REPLAY'; readonly recordingDir: string }
 	// ⭐ `JAN-MHX` MH-1 (D30) — an external CLI executing through the host's own tools (`tools/cli-executor-session.ts`), with
-	// the driver its tool names. ⚠ Nothing selects it yet: a tool joins `WIRED_EXECUTORS` with its driver's package.
+	// the driver its tool names. ~~⚠ Nothing selects it yet: a tool joins `WIRED_EXECUTORS` with its driver's package.~~
+	// ⭐ MH-5: agy is the first tool selected as one (`WIRED_EXECUTORS`).
 	| {
 			readonly kind: 'CLI';
 			readonly toolId: string;
@@ -116,8 +119,9 @@ export type RunnableExecutorSelection = Exclude<ExecutorSelection, { readonly ki
  * ⭑ THE EXECUTOR ADAPTERS THIS HOST HAS, AND WHAT EACH SELECTION OPENS — the table the selector dispatches on, and the
  * one its guidance lists. `devin` declares EXECUTION in the catalog (`backing-tool.ts`) but has no executor adapter, so
  * it is not here: the catalog says what a tool CAN do, this says what this host WIRED.
+ * ⭐ `JAN-MHX` MH-5 (D30) — ~~`agy: 'AGY'`~~ agy opens the `CLI` kind, through its driver (`tools/agy-executor-driver.ts`).
  */
-const WIRED_EXECUTORS = { agy: 'AGY', pi: 'PI' } as const;
+const WIRED_EXECUTORS = { agy: 'CLI', pi: 'PI' } as const;
 
 type WiredExecutor = keyof typeof WIRED_EXECUTORS;
 
@@ -619,14 +623,17 @@ export function selectExecutor(input: {
 	const dependent =
 		input.reviewer === undefined ? undefined : independenceRefusal(toolId, modelId, input.reviewer);
 	if (dependent) return dependent;
-	return { kind: WIRED_EXECUTORS[toolId], modelId };
+	return WIRED_EXECUTORS[toolId] === 'CLI'
+		? { kind: 'CLI', toolId, modelId }
+		: { kind: 'PI', modelId };
 }
 
 /**
  * ⭐ D4 — THE RECORD'S FALLBACK IDENTITY, FROM THE SAME SELECTION THAT OPENED THE EXECUTOR.
  *
- * ⚠ USED ONLY WHEN THE TOOL REPORTS NO IDENTITY OF ITS OWN — which for agy (a bare string) is every call, graded
- * `HOST_CONFIGURED`. It used to be `resolveExecutorModel()`/`resolveExecutorToolId()`, read again per try: a second
+ * ⚠ USED ONLY WHEN THE TOOL REPORTS NO IDENTITY OF ITS OWN — which for ~~agy (a bare string)~~ the stand-in is every call,
+ * graded `HOST_CONFIGURED`; ⭐ `JAN-MHX` MH-5: agy's CLI session reports its producer on every turn it takes, so for agy
+ * this is a turn that threw. It used to be `resolveExecutorModel()`/`resolveExecutorToolId()`, read again per try: a second
  * read of what the selection already answered, and with the agy executor running the JUDGE model it named a model that
  * never ran (`REG-F-458`). ⭑ The provider is the TOOL — the provider proper is embedded in the model label and only the
  * tool can resolve it — and the stand-in names neither, because no configured model produced its answer.
@@ -642,7 +649,8 @@ export function executorRecordIdentity(selection: RunnableExecutorSelection): {
 	// ⭐ `JAN-MHX` MH-1 (D30, D35) — A CLI EXECUTOR NAMES ITS OWN TOOL, as the devin reviewer names `devin`: without this arm
 	// it would be recorded as `pi`.
 	if (selection.kind === 'CLI') return { modelId: selection.modelId, providerId: selection.toolId };
-	return { modelId: selection.modelId, providerId: selection.kind === 'AGY' ? 'agy' : 'pi' };
+	// ~~`selection.kind === 'AGY' ? 'agy' : 'pi'`~~ ⭐ `JAN-MHX` MH-5 — the `AGY` kind is retired, so the one left is Pi.
+	return { modelId: selection.modelId, providerId: 'pi' };
 }
 
 /** The whole refusal as one sentence pair — what `beginExecute` returns before dispatch. */

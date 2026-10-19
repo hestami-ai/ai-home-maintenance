@@ -69,11 +69,15 @@ export interface ProducerSession {
 	/** Released when the work unit stops being worked on — satisfied, escalated, or out of tries. */
 	dispose(): void;
 	/**
-	 * ⚠ DOES THIS PRODUCER ACTUALLY REMEMBER? Declared, because two of the three adapters DO NOT, and a caller
-	 * that assumed otherwise would send a bare findings turn to a model with no idea what it is about.
+	 * ⚠ DOES THIS PRODUCER ACTUALLY REMEMBER? Declared, because ~~two of the three adapters~~ ⭐ the fixture DOES
+	 * NOT, and a caller that assumed otherwise would send a bare findings turn to a model with no idea what it is
+	 * about.
 	 *
-	 * ⛔ Retrofitting memory onto `agy` or the fixture would be the fabricated-capability defect: they have
-	 * none. They implement this interface with INDEPENDENT turns and say so here.
+	 * ⛔ Retrofitting memory onto ~~`agy` or~~ the fixture would be the fabricated-capability defect: ~~they have
+	 * none. They implement~~ ⭐ it has none, and implements this interface with INDEPENDENT turns and says so here.
+	 * ⭐ `JAN-MHX` MH-5 — the text-only agy executor that also had none is retired: agy executes as a CLI, whose session
+	 * re-sends each earlier try's answer and the findings on it with every turn (`tools/cli-executor-session.ts`, D16),
+	 * and declares `true` for that reason.
 	 */
 	readonly retainsHistory: boolean;
 }
@@ -202,7 +206,8 @@ export function producerWorkingDirectory(
  * ⭑ THIS IS AN HONEST ADAPTER, NOT A SHIM. `agy --print` and the deterministic fixture genuinely have no
  * memory: every invocation is a fresh process with a fresh context. Presenting them through the session
  * interface lets one caller drive every backing tool, while `retainsHistory: false` keeps the difference
- * VISIBLE rather than papering over it.
+ * VISIBLE rather than papering over it. ⭐ `JAN-MHX` MH-5 — the fixture is the one it wraps now: the text-only agy
+ * executor (`agy --print`) is retired, and agy executes as a CLI.
  */
 export function oneShotSession(
 	call: (prompt: string) => Promise<string | ToolInvocationResult>
