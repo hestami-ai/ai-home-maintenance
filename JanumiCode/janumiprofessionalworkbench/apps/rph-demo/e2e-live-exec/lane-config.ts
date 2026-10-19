@@ -11,7 +11,8 @@
 // the product's rules are RESTATED here and the verif test asks the product whether they still agree — the reviewer
 // selector (`src/lib/server/assurance/reviewer-selection.ts`), the repair bound, and the two reviewer adapters.
 // ⭐ `JAN-SELRES` RS-1 (D5) — AND THE EXECUTOR SELECTOR (`src/lib/server/execution/executor-selection.ts`), whose rules
-// are restated the same way, beside ONE rule that is this lane's own and says so: no agy executor.
+// are restated the same way, beside ONE rule that is this lane's own and says so: no agy executor. ⚠ `JAN-MHX` MH-10 —
+// and muse, which the product wires and this lane does not run until MH-8 adds its rows; its refusal says so.
 
 /**
  * The reviewing tools this host has an adapter for, and the variable each reads its model from
@@ -65,8 +66,11 @@ export function reviewerModelVariable(tool: string | undefined): ReviewerModelVa
 }
 
 /**
- * ⭐ `JAN-SELRES` RS-1 (D5) — the executing tools this host has an executor adapter for (`executor-selection.ts`,
- * `WIRED_EXECUTORS`). ⚠ `devin` declares EXECUTION in the catalog and has no executor adapter, so the product refuses it.
+ * ⭐ `JAN-SELRES` RS-1 (D5) — the executing tools this lane knows: agy and pi, which the product's selector wires
+ * (`executor-selection.ts`, `WIRED_EXECUTORS`). ⚠ `devin` declares EXECUTION in the catalog and has no executor adapter, so
+ * the product refuses it. ⚠ `JAN-MHX` MH-10 — the product also wires `muse`, and this lane does not run it until MH-8 adds
+ * its mirror, effort and identity rows: the lane refuses muse as a tool it does not know, where the product, handed an
+ * effort, runs it. `verif/live-exec-lane-config.test.ts` pins that gap by name.
  */
 export const WIRED_EXECUTORS = ['agy', 'pi'] as const;
 
@@ -95,7 +99,8 @@ export const EXECUTOR_PROGRAM_VARIABLE: Readonly<Partial<Record<WiredExecutor, s
  *
  * ⭑ THE PRODUCT'S RULES, RESTATED — a tool the product's selector would not run (unknown, or unwired), and outside
  * test mode, where this lane runs, a set program override for the selected executor. An unset tool or model is the
- * `missing` line's, not this one's.
+ * `missing` line's, not this one's. ⚠ `JAN-MHX` MH-10 — and muse, which the product wires and this lane does not yet run:
+ * the line for a tool the lane does not know refuses it, and says so, until MH-8 adds its rows.
  *
  * ⛔ AND ONE RULE OF THE LANE'S OWN, LABELLED AS SUCH: no agy executor. The product runs one; this lane's spec cannot
  * pass with one — it asserts the producer's identity is `PROVIDER_REPORTED` (`execution.live.ts`), and agy reports no
@@ -115,8 +120,9 @@ function executorLaneFaults(env: Readonly<Record<string, string | undefined>>): 
 	return [
 		...(strayExecutor !== undefined
 			? [
-					`  · JPWB_EXECUTOR='${strayExecutor}' names no executor this host has an adapter for (${WIRED_EXECUTORS.join(', ')}). ` +
-						'The id is matched exactly, after trimming, and the product refuses any other.'
+					`  · JPWB_EXECUTOR='${strayExecutor}' names no executor this lane knows (${WIRED_EXECUTORS.join(', ')}). ` +
+						'The id is matched exactly, after trimming. The product refuses any other but muse, which it also ' +
+						'wires; this lane does not run muse until MH-8 adds its mirror, effort and identity rows.'
 				]
 			: []),
 		...(executorReplaced !== undefined
@@ -214,7 +220,8 @@ export function requiredLaneKeys(tool: string | undefined): readonly string[] {
  * product's selector refuses it, and a set program override for the selected tool because the product refuses that
  * outside test mode, where this lane runs. ⭐ `JAN-SELRES` RS-1 (D5) — the same holds for the EXECUTOR, with ONE
  * exception, which is the lane's own and is labelled as such where it is refused: no agy executor
- * (`executorLaneFaults`). ⭐ `JAN-EXEC` Phase 7 `P7-2` (D3) — and two more of the lane's own, labelled the same way: a set
+ * (`executorLaneFaults`); ⚠ `JAN-MHX` MH-10 — and muse, which the product wires and this lane refuses, in a line that says
+ * so, until MH-8. ⭐ `JAN-EXEC` Phase 7 `P7-2` (D3) — and two more of the lane's own, labelled the same way: a set
  * `JPWB_REVIEW_SEES_PRIOR` or `JPWB_AGENT` (`readAtCallTimeFaults`). ⭐ (D1) — and a Phase 7 variable set with no run
  * folder (`phase7RequestFaults`). ⭐ E3 (C1, C3) — and the half: one this lane does not know, or half B with no author's
  * model (`halfFaults`).

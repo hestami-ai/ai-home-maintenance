@@ -22,10 +22,11 @@
 //
 // ⭑ WHAT IT READS BACK (D20): the session log of the turn's data root, Muse's local tracing beside it, and the JSONL on
 // stdout. The surface proof is every `model_request_configured` toolset, with Muse's own count of the tools it registered
-// (none deferred, none hosted by the provider) and every MCP tool it saw from the host's server alone. The calls are the
-// model's committed tool calls and the tool effects Muse started, in the log's order: a call the model made that Muse
-// never started is a refused attempt (D21). The model is every step's `model_completed.model` (D22). The answer is
-// stdout's `run.terminal.completed` text; a `run.terminal.failed` reason is an error of a known shape (D19a).
+// (none deferred, none hosted by the provider) and its identity catalog of the MCP tools it saw: present, the host's
+// server's alone, and exactly the minted tools. The calls are the model's committed tool calls and the tool effects Muse started,
+// in the log's order: a call the model made that Muse never started is a refused attempt (D21). The model is every step's
+// `model_completed.model` (D22). The answer is stdout's `run.terminal.completed` text; a `run.terminal.failed` or
+// `run.terminal.cancelled` record is an error event, its reason the excerpt when that is text (D19, D19a).
 // ⚠ RESIDUALS, STATED: Muse rewrites a call's arguments before it sends them (P3: a string became a one-element list), so
 // the record matches the host's by name and order, never by arguments; the host's own transcript is E-1 (D17). How Muse
 // records a call it rejects before starting it was not measured: P2 and P3 rejected none. Whether contributor mode and
@@ -202,18 +203,36 @@ function activeToolNames(session: readonly MuseRecord[]): Set<string> | undefine
 	return names;
 }
 
-/** Whether one identity catalog of Muse's names only tools of the host's server. */
-const catalogIsTheHosts = (entries: unknown, server: string): boolean =>
-	Array.isArray(entries) &&
-	entries.every((entry) => (entry as { readonly server_name?: unknown })?.server_name === server);
+/**
+ * Whether one identity catalog of Muse's is the host's server's alone, serving exactly the minted tools: no entry of
+ * another server's, and the names it gives the minted ones, each once.
+ */
+function catalogIsTheHosts(entries: unknown, server: string, minted: readonly string[]): boolean {
+	if (!Array.isArray(entries)) return false;
+	const theHosts = (
+		entries as readonly { readonly server_name?: unknown; readonly raw_tool_name?: unknown }[]
+	).filter((entry) => entry?.server_name === server);
+	if (theHosts.length !== entries.length) return false;
+	const names = theHosts.map((entry) => entry.raw_tool_name);
+	return names.length === minted.length && minted.every((name) => names.includes(name));
+}
 
-/** Whether every MCP tool Muse saw is the host's server's: the in-turn check that no other server was connected (D14). */
-const onlyTheHostsServer = (session: readonly MuseRecord[], server: string): boolean =>
-	session.every(
-		(record) =>
-			record.payload_type !== 'runtime.mcp_tool_identity_catalog' ||
-			catalogIsTheHosts(record.payload?.entries, server)
+/**
+ * Whether Muse's record shows the host's server as the only one it connected, serving exactly the minted tools: the
+ * in-turn check that no other server was connected (D14). ⛔ A RECORD WITH NO IDENTITY CATALOG PROVES NOTHING, so it fails
+ * (D14a): a Muse that stopped writing the catalog, or renamed it, would otherwise pass by saying nothing.
+ */
+function onlyTheHostsServer(
+	session: readonly MuseRecord[],
+	server: string,
+	minted: readonly string[]
+): boolean {
+	const catalogs = session.filter(
+		(record) => record.payload_type === 'runtime.mcp_tool_identity_catalog'
 	);
+	if (catalogs.length === 0) return false;
+	return catalogs.every((record) => catalogIsTheHosts(record.payload?.entries, server, minted));
+}
 
 const ACTIVE_COUNT = /\bactive_tool_count=(\d+)\b/;
 const DEFERRED_COUNT = /\bdeferred_tool_count=(\d+)\b/;
@@ -244,17 +263,22 @@ function tracingAgrees(tracing: readonly string[], active: number): boolean {
 
 /**
  * ⭐ D14a — THE TOOLS MUSE OFFERED ITS MODEL, or `undefined` when its record does not prove them: every model request it
- * configured names its active tools, every MCP tool it saw is the host's server's, and its own tracing agrees. A tool
- * named `mcp__<server>__<name>` is the host's; any other is Muse's own.
+ * configured names its active tools, its identity catalog shows the host's server alone serving exactly the minted
+ * tools, and its own tracing agrees. A tool named `mcp__<server>__<name>` is the host's; any other is Muse's own.
  */
 function offeredSurface(
 	session: readonly MuseRecord[],
 	tracing: readonly string[],
-	server: string
+	run: CliRunFolder
 ): CliToolRef[] | undefined {
+	const server = run.serverName;
 	const names = activeToolNames(session);
 	if (names === undefined) return undefined;
-	if (!onlyTheHostsServer(session, server) || !tracingAgrees(tracing, names.size)) return undefined;
+	if (
+		!onlyTheHostsServer(session, server, run.mintedToolNames) ||
+		!tracingAgrees(tracing, names.size)
+	)
+		return undefined;
 	const prefix = `mcp__${server}__`;
 	return [...names].map((name) =>
 		name.startsWith(prefix)
@@ -322,6 +346,21 @@ function callsIn(session: readonly MuseRecord[], server: string): CliRecordEvent
 	return events;
 }
 
+/** ⭐ D19 — the terminal records of a run that ended in error: it failed, or it was cancelled. */
+const ERROR_TERMINALS: readonly unknown[] = ['run.terminal.failed', 'run.terminal.cancelled'];
+
+/**
+ * ⭐ D19, D19a — the excerpt a run that ended in error carries: its reason when that is text, else the record's own kind.
+ * ⛔ EITHER WAY AN ERROR EVENT: whatever the exit status, and whatever the reason holds, Muse's error never becomes a turn
+ * that ended without an answer, which would be the producer's shortfall (`REG-F-410`).
+ */
+function errorEventOf(terminal: MuseRecord): string {
+	const reason = terminal.payload?.reason;
+	return typeof reason === 'string' && reason.trim() !== ''
+		? reason
+		: String(terminal.payload_type);
+}
+
 /**
  * ⭐ D20 — what Muse's record of one turn says, read whole: the session log of the turn's own data root, its local tracing
  * beside it, and its JSONL on stdout.
@@ -349,9 +388,8 @@ function museRecordOf(output: CliTurnOutput): CliRecordReading {
 		.filter((path) => path.endsWith('.log'))
 		.map((path) => readFileSync(path, 'utf8'));
 	const completedRun = out.filter((r) => r.payload_type === 'run.terminal.completed').at(-1);
-	const failedRun = out.filter((r) => r.payload_type === 'run.terminal.failed').at(-1);
+	const endedInError = out.filter((r) => ERROR_TERMINALS.includes(r.payload_type)).at(-1);
 	const answer = completedRun?.payload?.text;
-	const errorExcerpt = failedRun?.payload?.reason;
 	// ⭐ D23 — the reasoning Muse returns as plain text, its summaries; never its encrypted reasoning.
 	const summaries = session
 		.map(runEvent)
@@ -361,12 +399,12 @@ function museRecordOf(output: CliTurnOutput): CliRecordReading {
 	return {
 		read: 'PARSED',
 		raw,
-		surface: offeredSurface(session, tracing, output.run.serverName),
+		surface: offeredSurface(session, tracing, output.run),
 		events,
 		reportedModels: models,
 		answer: typeof answer === 'string' ? answer : undefined,
 		...(summaries.length === 0 ? {} : { volunteeredReasoning: summaries.join('\n\n') }),
-		...(typeof errorExcerpt === 'string' ? { errorExcerpt } : {})
+		...(endedInError === undefined ? {} : { errorExcerpt: errorEventOf(endedInError) })
 	};
 }
 

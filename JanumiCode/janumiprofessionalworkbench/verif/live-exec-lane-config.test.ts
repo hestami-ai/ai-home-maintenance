@@ -472,6 +472,38 @@ describe('⭐ the lane refuses the executor the product refuses, asked without a
 		}
 	});
 
+	// ⚠ `JAN-MHX` MH-10 — THE OTHER DIRECTION, PINNED BY NAME UNTIL MH-8 CLOSES IT: the product wires muse, and this lane
+	// refuses it. The tables above leave muse out, and must: asked without an effort, the product refuses muse
+	// (`EXECUTOR_EFFORT_UNSET`), so a row would read as agreement. Handed one, which an operator's shell may carry, the
+	// product runs it. When MH-8 adds muse's mirror, effort and identity rows, this reddens, and becomes rows of them.
+	it('⚠ not yet mirrored, owed to MH-8: the product runs a Muse executor handed an effort, and the lane refuses it, saying why', () => {
+		const env = {
+			...COMPLETE,
+			JPWB_ASSURANCE_TOOL: 'devin',
+			JPWB_EXECUTOR: 'muse',
+			JPWB_EXECUTOR_MODEL: 'muse-wonder-1.0',
+			JPWB_EXECUTOR_EFFORT: 'high'
+		};
+		expect(
+			selectExecutor({
+				testMode: false,
+				env,
+				overrides: { ...NO_OVERRIDES, codex: undefined, muse: undefined },
+				reviewer: assurancePreflight({ testMode: false, env }).reviewer
+			}),
+			'the product, beside the lane’s own reviewer'
+		).toEqual({ kind: 'CLI', toolId: 'muse', modelId: 'muse-wonder-1.0', effort: 'high' });
+		expect(wiredExecutor('muse'), 'the lane’s mirror').toBeUndefined();
+		const refusal = laneKeysRefusal(env) ?? 'NO REFUSAL';
+		expect(refusal).toContain("JPWB_EXECUTOR='muse' names no executor this lane knows (agy, pi).");
+		expect(refusal).toContain(
+			'The product refuses any other but muse, which it also wires; this lane does not run muse until MH-8 adds ' +
+				'its mirror, effort and identity rows.'
+		);
+		// ⛔ The sentence MH-10's wiring made false.
+		expect(refusal).not.toContain('the product refuses any other.');
+	});
+
 	it('⛔ the agy executor’s program override is refused as the product refuses it, even empty, naming it', () => {
 		for (const value of ['C:/fixture/agy.exe', '']) {
 			const refusal = laneKeysRefusal({

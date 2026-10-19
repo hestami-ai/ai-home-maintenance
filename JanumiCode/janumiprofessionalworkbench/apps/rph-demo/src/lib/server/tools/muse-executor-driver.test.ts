@@ -172,8 +172,14 @@ const terminalCompleted = (text: string) =>
 		text,
 		reason: null
 	});
-const terminalFailed = (reason: string) =>
+const terminalFailed = (reason: unknown) =>
 	rec('run.terminal.failed', { kind: 'run_terminal', terminal: 'failed', text: '', reason });
+/**
+ * ⚠ NOT MEASURED: no probe ran a cancelled turn. The record kind is one Muse's binary names (its strings, MH-10's probe);
+ * its shape here is the failed one's.
+ */
+const terminalCancelled = (reason: unknown) =>
+	rec('run.terminal.cancelled', { kind: 'run_terminal', terminal: 'cancelled', text: '', reason });
 /** Muse's local-tracing line for the tools it registered. */
 const surfaceLine = (active: number, deferred = 0, hosted = 0) =>
 	'2026-10-18T19:12:52.691662Z INFO tbh.local.tool tools/registration_selection_diagnostic.rs:17 ' +
@@ -808,6 +814,42 @@ describe('⭐ D14a, D20, D22 — what Muse’s record must prove', () => {
 				[surfaceLine(2)]
 			],
 			[
+				// ⭑ Its requests name the host's two tools and its tracing counts two, so only the catalog's absence refuses: a
+				// Muse that stopped writing the catalog, or renamed it, would otherwise prove the surface by saying nothing.
+				'Muse’s record holds no identity catalog',
+				(s: object[]) => s.filter((_, k) => k !== 2),
+				[surfaceLine(2)]
+			],
+			[
+				// ⭑ Every entry is the host's server's and both minted names are there, so only their count refuses.
+				'Muse’s identity catalog names a tool of the host’s server that the host did not mint',
+				(s: object[]) =>
+					s.toSpliced(
+						2,
+						1,
+						identityCatalog([
+							['jpwb', 'run_command'],
+							['jpwb', 'write_file'],
+							['jpwb', 'delete_file']
+						])
+					),
+				[surfaceLine(2)]
+			],
+			[
+				// ⭑ Every entry is the host's server's and they number two, so only the missing minted name refuses.
+				'Muse’s identity catalog names another tool in a minted one’s place',
+				(s: object[]) =>
+					s.toSpliced(
+						2,
+						1,
+						identityCatalog([
+							['jpwb', 'run_command'],
+							['jpwb', 'delete_file']
+						])
+					),
+				[surfaceLine(2)]
+			],
+			[
 				'its tracing holds no surface line',
 				(s: object[]) => s,
 				['INFO settings.load outcome="loaded"']
@@ -945,6 +987,32 @@ describe('⭐ D19, D19a, D24 — Muse’s errors', () => {
 			'The CLI reported: “provider stream failed after 10 attempts”'
 		);
 	});
+
+	it.each([
+		[
+			'a run.terminal.failed whose reason is not text',
+			() => terminalFailed({ code: 'provider' }),
+			'run.terminal.failed'
+		],
+		[
+			'a run.terminal.cancelled',
+			() => terminalCancelled('cancelled before the model answered'),
+			'cancelled before the model answered'
+		]
+	])(
+		'⛔ %s, at exit 0, is a CLI_ERROR, never a turn that ended without an answer',
+		async (_, terminal, said) => {
+			// ⛔ THE MUTANTS: a reason that is not text read as no error; a cancelled run read as no error. Either way the turn
+			// would be ENDED_WITHOUT_ANSWER, a shortfall of the producer's, where Muse reported an error (D19; REG-F-410).
+			const exec = museExec(async (muse) => {
+				await clean(muse);
+				muse.out = [terminal()];
+			});
+			const result = await turn(await open(exec));
+			expect(messageOf(result)).toMatch(/^CLI_ERROR: /);
+			expect(messageOf(result)).toContain(`The CLI reported: “${said}”`);
+		}
+	);
 
 	it('⛔ Muse’s known error lines are excerpts; the workspace-root line it writes on every run never is', async () => {
 		// ⛔ THE MUTANTS: the first line taken whatever its shape — the workspace root, which the opener then withholds, and
