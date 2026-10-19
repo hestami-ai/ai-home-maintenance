@@ -15,8 +15,9 @@
 // compares the two by exact string, after the work is done: the same model refused every review only then, and another
 // spelling or effort of it passed. Now the selector is handed the reviewer the same request's preflight admitted, and
 // refuses a model of the reviewer's family, or one no measured listing places (`MODEL_FAMILIES`). It also refuses an
-// effort nothing would read, names the sponsor's default model for the chosen tool without applying it, and captures
-// `JPWB_CODEX_BIN`.
+// effort nothing would read, names the sponsor's default model for the chosen tool without applying it, and ~~captures
+// `JPWB_CODEX_BIN`~~ ⭐ `JAN-MHX` MH-6 — refuses `JPWB_CODEX_BIN`, which the Codex driver captures
+// (`tools/codex-executor-driver.ts`, `CODEX_BIN_OVERRIDE`).
 //
 // ⚠ IT LIVES OUTSIDE `lib/server/tools` ON PURPOSE, for the reviewer selector's reason: that directory holds the
 // backing-tool ADAPTERS, and `verif/tool-adapter-exports-reachable.test.ts` holds each of their exports to a production

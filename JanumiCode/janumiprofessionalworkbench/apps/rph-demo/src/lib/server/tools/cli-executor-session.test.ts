@@ -203,7 +203,7 @@ function fakeExec(script: Script): CliExec & { requests: CliExecRequest[]; clis:
 			script(cli).then((over) => {
 				if (cli.exitsNever) return;
 				cli.writeRecord();
-				resolve({ exitCode: 0, stdout: '', stdoutComplete: true, errorLines: [], ...over });
+				resolve({ exitCode: 0, stdout: '', stdoutComplete: true, errorLines: [], errorLinesComplete: true, ...over });
 			}, reject);
 		});
 		return {
@@ -214,7 +214,7 @@ function fakeExec(script: Script): CliExec & { requests: CliExecRequest[]; clis:
 			kill: async () => {
 				killed += 1;
 				await new Promise((r) => setTimeout(r, 200));
-				release({ exitCode: null, stdout: '', stdoutComplete: true, errorLines: [] });
+				release({ exitCode: null, stdout: '', stdoutComplete: true, errorLines: [], errorLinesComplete: true });
 			}
 		};
 	};
@@ -914,6 +914,54 @@ describe('⭐ D19, D19a — every turn ends as an answer or a stated cause, and 
 		expect(messageOf(await turn(await open(exec))).startsWith('CLI_ERROR: ')).toBe(true);
 	});
 
+	it('C20 — an error stream cut at the host’s bound is CLI_ERROR, not an answer: nothing shows it held no error', async () => {
+		// ⛔ THE MUTANT: classify the lines kept as though they were the whole stream. For Codex the error stream is the
+		// only record of a call it rejected before sending it (MH-0c F4), and the lines its driver passes over echo what the
+		// model chose, so a model can push the stream past the bound before the one line that matters.
+		const exec = fakeExec(async (cli) => {
+			cli.answer('{"workProduct":"done","rationale":{}}');
+			return { errorLines: ['a line the driver knows no shape of'], errorLinesComplete: false };
+		});
+		expect(messageOf(await turn(await open(exec)))).toMatch(
+			/^CLI_ERROR: .* What the CLI wrote to its error stream passed the host’s bound, so it could not be read whole, and nothing shows it reported no error\.$/
+		);
+	});
+
+	it('C20 — the production capture says when it cut the error stream: past its bound the turn fails, under it the answer stands', async () => {
+		// ⛔ THE MUTANT: `spawnCli` reports every error stream whole. ⭑ A real child, by this runtime's own executable: it
+		// writes the record the fake driver reads, then its error stream, and exits 0.
+		const script = join(container, 'fake-cli-stderr.cjs');
+		writeFileSync(
+			script,
+			[
+				"const { writeFileSync } = require('node:fs');",
+				'const [, , record, bytes] = process.argv;',
+				`writeFileSync(record, JSON.stringify({ surface: ${JSON.stringify(DEFAULT_SURFACE)}, events: [{ kind: 'ASSISTANT_MESSAGE' }], reportedModels: [], answer: 'done' }));`,
+				"process.stderr.write('e'.repeat(Number(bytes)) + '\\n', () => process.exit(0));"
+			].join('\n'),
+			'utf8'
+		);
+		const writing = (bytes: number): CliDriver =>
+			fakeDriver({
+				invocation: (t) => ({
+					program: process.execPath,
+					args: [script, join(t.run.hostDirectory, `record-${t.turn}.json`), String(bytes)]
+				})
+			});
+		const opened = async (bytes: number) => {
+			const session = await openCliExecutionSession(context(), SELECTION, writing(bytes), { root, turnTimeoutMs: 30_000 });
+			sessions.push(session);
+			return session;
+		};
+		expect((await turn(await opened(1024))).answer, 'CONTROL: an error stream under the bound').toEqual({
+			arrived: true,
+			text: 'done'
+		});
+		expect(messageOf(await turn(await opened(300 * 1024)))).toMatch(
+			/^CLI_ERROR: .* What the CLI wrote to its error stream passed the host’s bound, so it could not be read whole, and nothing shows it reported no error\.$/
+		);
+	}, 30_000);
+
 	it('C20 — a program that could not be started is CLI_ERROR naming its errno code', async () => {
 		const exec = fakeExec(async () => ({ exitCode: null, startFailure: 'ENOENT' }));
 		expect(messageOf(await turn(await open(exec)))).toMatch(/^CLI_ERROR: .* It could not be started \(ENOENT\)\.$/);
@@ -1076,7 +1124,7 @@ describe('⭐ D13 — the run folder’s life', () => {
 		let url = '';
 		const exec: CliExec = (req) => {
 			url = (JSON.parse(readFileSync(join(dirname(req.cwd), 'host', 'endpoint.json'), 'utf8')) as { url: string }).url;
-			return { done: Promise.resolve({ exitCode: 0, stdout: 'not ours', stdoutComplete: true, errorLines: [] }), kill: async () => undefined };
+			return { done: Promise.resolve({ exitCode: 0, stdout: 'not ours', stdoutComplete: true, errorLines: [], errorLinesComplete: true }), kill: async () => undefined };
 		};
 		const driver = fakeDriver({
 			preflight: () => ({ invocation: { program: 'fake-cli', args: ['list'] }, refusal: () => 'the fake preflight refused' })
@@ -1174,7 +1222,7 @@ describe('⭐ D14, D18 — the preflight is bounded by the host, and a preflight
 				done: new Promise<CliRun>((settle) => (release = settle)),
 				kill: async () => {
 					kills += 1;
-					release({ exitCode: null, stdout: '', stdoutComplete: true, errorLines: [] });
+					release({ exitCode: null, stdout: '', stdoutComplete: true, errorLines: [], errorLinesComplete: true });
 				}
 			};
 		};
@@ -1199,12 +1247,12 @@ describe('⭐ D14, D18 — the preflight is bounded by the host, and a preflight
 	it.each([
 		[
 			'could not be started',
-			{ exitCode: null, startFailure: 'ENOENT', stdout: '', stdoutComplete: true, errorLines: [] },
+			{ exitCode: null, startFailure: 'ENOENT', stdout: '', stdoutComplete: true, errorLines: [], errorLinesComplete: true },
 			'it could not be started (ENOENT).'
 		],
 		[
 			'had its output cut at the host’s bound',
-			{ exitCode: 0, stdout: 'jpwb', stdoutComplete: false, errorLines: [] },
+			{ exitCode: 0, stdout: 'jpwb', stdoutComplete: false, errorLines: [], errorLinesComplete: true },
 			'its output passed the host’s bound, so it could not be read whole.'
 		]
 	])('a preflight that %s refuses the session, whatever the driver’s own refusal says', async (_, run, said) => {
@@ -1213,10 +1261,39 @@ describe('⭐ D14, D18 — the preflight is bounded by the host, and a preflight
 		await expect(open(exec, { driver: preflighting() })).rejects.toThrow(`is refused by its preflight: ${said}`);
 	});
 
+	it('⭐ `JAN-MHX` MH-6 — a driver’s list of checks runs in order before any turn, and the first that refuses refuses the session', async () => {
+		// ⛔ THE MUTANT: run only the first check, the one check MH-1 built for. Codex's driver asks its version, then its
+		// MCP listing (D14), and a listing that names a second server must refuse the session though the version passed.
+		const asked: string[] = [];
+		const exec: CliExec = (req) => {
+			asked.push(req.args.join(' '));
+			return {
+				done: Promise.resolve({ exitCode: 0, stdout: req.args[0]!, stdoutComplete: true, errorLines: [], errorLinesComplete: true }),
+				kill: async () => undefined
+			};
+		};
+		const checking = (refuseAt: string): CliDriver =>
+			fakeDriver({
+				preflight: () => [
+					{ invocation: { program: 'fake-cli', args: ['version'] }, refusal: ({ stdout }) => (stdout === refuseAt ? `${stdout} refused` : undefined) },
+					{ invocation: { program: 'fake-cli', args: ['list'] }, refusal: ({ stdout }) => (stdout === refuseAt ? `${stdout} refused` : undefined) }
+				]
+			});
+		await expect(open(exec, { driver: checking('list') })).rejects.toThrow(
+			"The CLI executor session for 'fake' is refused by its preflight: list refused"
+		);
+		expect(asked, 'both checks, in order').toEqual(['version', 'list']);
+		asked.length = 0;
+		await expect(open(exec, { driver: checking('version') })).rejects.toThrow('is refused by its preflight: version refused');
+		expect(asked, 'the first refusal stops the open before the next check starts').toEqual(['version']);
+		expect(readdirSync(root).filter((n) => n.startsWith('jpwb-exec-'))).toEqual([]);
+	});
+
 	it('⭐ `JAN-MHX` MH-6 — the preflight is handed the session’s selection, so a driver can refuse a model or effort it was not measured on', async () => {
 		// ⛔ THE MUTANT: hand the preflight another selection than the one the session runs. Codex's driver refuses, before
-		// any turn, a model its pinned catalog does not hold and an effort the catalog does not list (§4.3, D14a): the
-		// surface Probe 0 measured is that catalog's, and only the selection says which model the turns will ask for.
+		// any turn, a model its pinned catalog does not hold and ~~an effort the catalog does not list~~ ⭐ MH-6's check fix:
+		// any effort but high, the one its surface was measured at (§4.3, D14a): the surface Probe 0 measured is that
+		// catalog's at that effort, and only the selection says which model and effort the turns will ask for.
 		const seen: unknown[] = [];
 		await open(fakeExec(passing), {
 			driver: fakeDriver({

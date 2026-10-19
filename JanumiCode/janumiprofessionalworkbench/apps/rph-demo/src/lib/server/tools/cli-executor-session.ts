@@ -30,7 +30,8 @@
 // `verif/agy-stderr-unbound.test.ts` reddened when this file bound a CLI's stderr, and this is the answer it asks for.
 //   · ONE BINDING, HERE: `spawnCli` reads the CLI's stderr into memory, bounded (`CLI_ERROR_TEXT_BYTES`), and hands the
 //     lines to the driver's `classifyStderr` for CLASSIFICATION ONLY — agy's error and timeout lines, devin's rejection
-//     line, a CLI's error text. A driver is handed lines, never the child, so no driver binds a stream.
+//     line, a CLI's error text. A driver is handed lines, never the child, so no driver binds a stream. ⭐ (`JAN-MHX`
+//     MH-6's check fix) A stream cut at the bound is handed to no driver: the turn is `CLI_ERROR`.
 //   · NEVER RETAINED: no byte of the stream is written to a file, an artifact or a record. What can reach a record is a
 //     failure CODE and, where the driver recognised a known error shape, an excerpt of at most `EXCERPT_LIMIT` characters,
 //     withheld whenever it carries the prompt, an argument or result the host served in the turn, the run folder's path,
@@ -116,7 +117,10 @@ const DRAIN_GRACE_MS = 1_000;
 /** The most of a CLI's stdout the opener keeps. Past it the turn is CLI_ERROR: a cut record is not one. ⚠ AUTHORED. */
 const CLI_OUTPUT_BYTES = 32 * 1024 * 1024;
 
-/** The most of a CLI's error stream the opener reads for classification. ⚠ AUTHORED. */
+/**
+ * The most of a CLI's error stream the opener reads for classification. ⚠ AUTHORED. ⭐ `JAN-MHX` MH-6's check fix — past
+ * it the stream is not classified, and the turn is CLI_ERROR: a cut stream is not one, as a cut record is not.
+ */
 const CLI_ERROR_TEXT_BYTES = 256 * 1024;
 
 /**
@@ -282,8 +286,13 @@ export interface CliDriver {
 	/**
 	 * ⭐ D14 — its no-model check, or `undefined` for none. ⭐ `JAN-MHX` MH-6 — handed the session's selection, so a driver
 	 * can refuse, before any turn, a model or an effort its CLI's tool surface was not measured on (Codex's, §4.3).
+	 * ⭐ MH-6's check fix — OR A LIST OF CHECKS, which the opener runs in order, each under its bound, the first refusal
+	 * refusing the session: Codex's driver asks its version, then its MCP listing.
 	 */
-	preflight(run: CliRunFolder, selection: CliExecutorSelection): CliPreflight | undefined;
+	preflight(
+		run: CliRunFolder,
+		selection: CliExecutorSelection
+	): CliPreflight | readonly CliPreflight[] | undefined;
 	invocation(turn: CliTurnInput): CliInvocation;
 	readRecord(output: CliTurnOutput): Promise<CliRecordReading>;
 	classifyStderr(lines: readonly string[]): CliStderrSignals;
@@ -308,6 +317,12 @@ export interface CliRun {
 	readonly stdoutComplete: boolean;
 	/** The CLI's error stream, as lines, for the driver's classification only (D24). */
 	readonly errorLines: readonly string[];
+	/**
+	 * `false` when the error stream passed `CLI_ERROR_TEXT_BYTES`, so `errorLines` holds only its start. ⭐ `JAN-MHX` MH-6's
+	 * check fix — the opener then reads the stream as one it could not classify (D24): for Codex it is the only record of a
+	 * call Codex rejected before sending it (MH-0c F4), and the lines before that one can be as long as the model chooses.
+	 */
+	readonly errorLinesComplete: boolean;
 }
 
 /** A started CLI. */
@@ -624,7 +639,8 @@ const spawnCli: CliExec = (request) => {
 				...(startFailure === undefined ? {} : { startFailure }),
 				stdout: out.text(),
 				stdoutComplete: out.complete(),
-				errorLines: err.text().split(/\r?\n/).filter((line) => line !== '')
+				errorLines: err.text().split(/\r?\n/).filter((line) => line !== ''),
+				errorLinesComplete: err.complete()
 			});
 		};
 		child.on('error', (cause: NodeJS.ErrnoException) => {
@@ -774,14 +790,20 @@ function mergedWithHostCalls(
 const UNCLASSIFIED_ERROR_STREAM =
 	' What the CLI wrote to its error stream could not be classified, so nothing shows it reported no error.';
 
+/** ⭐ D19a — what a `CLI_ERROR` message adds when the error stream was cut at `CLI_ERROR_TEXT_BYTES` (D24). */
+const CUT_ERROR_STREAM =
+	' What the CLI wrote to its error stream passed the host’s bound, so it could not be read whole, and nothing shows ' +
+	'it reported no error.';
+
 /**
  * ⭐ D19a — what follows a `CLI_ERROR` message's fixed sentence: the checked excerpt of a known error shape, if any, and
- * the sentence saying the error stream went unclassified, if the driver's classifier threw.
+ * the sentence saying the error stream went unclassified, if it was cut or the driver's classifier threw.
  */
 function cliErrorTail(errorExcerpt: string | undefined, t: TurnFacts): string {
 	const excerpt = checkedExcerpt(errorExcerpt, t.withheld);
 	const said = excerpt === undefined ? '' : ` The CLI reported: “${excerpt}”`;
-	return t.signalsUnread ? `${said}${UNCLASSIFIED_ERROR_STREAM}` : said;
+	if (!t.signalsUnread) return said;
+	return `${said}${t.errorStreamCut ? CUT_ERROR_STREAM : UNCLASSIFIED_ERROR_STREAM}`;
 }
 
 /** What the opener knows of a turn when it classifies it (D19). */
@@ -797,8 +819,13 @@ interface TurnFacts {
 	readonly modelId: string;
 	readonly refusedSinceAnswer: boolean;
 	readonly signals: CliStderrSignals;
-	/** The driver's classifier threw, so `signals` is empty for want of a reading, not for want of a signal (D24). */
+	/**
+	 * The error stream was not classified — the driver's classifier threw, or ⭐ (`JAN-MHX` MH-6's check fix) the stream
+	 * was cut — so `signals` is empty for want of a reading, not for want of a signal (D24).
+	 */
 	readonly signalsUnread: boolean;
+	/** The error stream passed `CLI_ERROR_TEXT_BYTES`, so it was not handed to the classifier at all. */
+	readonly errorStreamCut: boolean;
 	/** ⭐ D19a — what an excerpt may not carry. */
 	readonly withheld: readonly string[];
 }
@@ -971,8 +998,10 @@ export async function openCliExecutionSession(
 		};
 		for (const file of driver.runFolderFiles(run)) await writeInside(directory, file, toolId);
 		fingerprints = driver.configSources.map((s) => [s.name, s.path, fingerprintOf(s.path)] as const);
-		const check = driver.preflight(run, selection);
-		if (check !== undefined) {
+		const declared = driver.preflight(run, selection);
+		// ⭐ `JAN-MHX` MH-6's check fix — every check the driver declares, in its order; the first refusal refuses the session.
+		const checks = declared === undefined ? [] : 'invocation' in declared ? [declared] : declared;
+		for (const check of checks) {
 			const refusal = await preflightRefusal(
 				check,
 				exec,
@@ -1110,7 +1139,10 @@ export async function openCliExecutionSession(
 				? undefined
 				: { run: runFolder, turn: n, exitCode: cliRun.exitCode, stdout: cliRun.stdout }
 		);
-		const classified = signalsOf(driver, cliRun?.errorLines ?? []);
+		// ⛔ `JAN-MHX` MH-6's check fix — A CUT ERROR STREAM IS NOT CLASSIFIED: what it held past the bound is unknown, so its
+		// first lines cannot show it reported no error, or no call the CLI rejected before sending it (MH-0c F4).
+		const errorStreamCut = cliRun !== undefined && !cliRun.errorLinesComplete;
+		const classified = errorStreamCut ? undefined : signalsOf(driver, cliRun?.errorLines ?? []);
 		const signals: CliStderrSignals = classified ?? {};
 		const merge: MergedRecord =
 			record.read === 'PARSED'
@@ -1154,6 +1186,7 @@ export async function openCliExecutionSession(
 			refusedSinceAnswer: merge.refusedSinceAnswer,
 			signals,
 			signalsUnread: classified === undefined,
+			errorStreamCut,
 			withheld
 		});
 

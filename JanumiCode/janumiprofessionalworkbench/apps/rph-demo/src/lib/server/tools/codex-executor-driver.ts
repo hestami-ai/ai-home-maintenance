@@ -2,21 +2,36 @@
 // when the Codex CLI executes a work unit through the host's own tools. Everything the CLIs share is the opener's
 // (`cli-executor-session.ts`, D12); this file says only what Codex needs and how to read what it writes back.
 //
-// ⭑ EVERY VALUE HERE IS ONE MH-0c MEASURED, on codex-cli 0.162.1 on this host: Probe 0's arms against a local mock of the
-// Responses API, and Probe 1's two live calls on gpt-5.6-sol at high effort, on the operator's ChatGPT login (the sponsor's
-// S3). Where a measurement moved the design, the line says which:
+// ⭑ ~~EVERY VALUE HERE IS ONE MH-0c MEASURED, on codex-cli 0.162.1 on this host~~ ⭐ MH-6's check fix — WHAT MH-0c MEASURED,
+// on Codex 0.162.1 on this host (the version each request to Probe 0's mock named in its user agent,
+// `codex_exec/0.162.1`): Probe 0's arms against a local mock of the Responses API, and Probe 1's two live calls on
+// gpt-5.6-sol, on the operator's ChatGPT login (the sponsor's S3) — every arm and both calls at `high` effort. Where a
+// measurement moved the design, the line says which:
 //   · THE CATALOG (`codex-executor-catalog.json`) is the bytes Probe 1's second call ran with: §4.3's host-only catalog with
 //     `supports_search_tool: false`. With search on, Codex offered the host's tools only behind `tool_search`, and live
 //     gpt-5.6-sol could not load them: Probe 1's first call called no host tool and answered BLOCKED (MH-0c F1).
 //   · THE ARGV is §4.3's, with `--strict-config` (an unknown `-c` key is otherwise only ignored, F6) and `--ignore-rules`
 //     (the execpolicy rules files §4.3 left on, F7) — Probe 1's second call's, element for element.
+// ⚠ AND WHAT THIS DRIVER HOLDS THAT NO MH-0c CAPTURE SHOWS:
+//   · THE `--version` LINE, `codex-cli 0.162.1`. The version is the user agent's, and `codex-cli` is the name the binary
+//     carries for itself; the line as `--version` prints it is in no capture. A line of any other form refuses the
+//     session, the closed direction. MH-9 must confirm the exact line, model-free, before its calls.
+//   · THE MCP LISTING AS THIS DRIVER ASKS IT (the preflight's second check). MH-0c's preflight arm listed the servers with
+//     the turn's `-c` pairs, under an empty CODEX_HOME; the `--disable` flags beside them, and the operator's home, are
+//     this build's. A listing Codex will not print refuses the session, the closed direction. MH-9 must run the preflight,
+//     model-free, before its calls.
 //
-// ⛔ THE SURFACE PROOF (D14a) IS A MEASUREMENT OF ONE VERSION AND ONE CATALOG, NOT OF THE TURN. Codex's `--json` record lists
-// no tools, so nothing a turn leaves shows what Codex offered its model. What Probe 0's mock saw in the request, with these
-// flags and this catalog, is Codex's four functions of its own beside the host's (`MEASURED_OWN_SURFACE`, F2), and the
-// driver holds every turn to the conditions it was measured under: the preflight refuses any other `codex --version`, and
-// a model or effort the catalog does not hold, before the first turn. The run report says the surface is the measured
-// version's (D37).
+// ⛔ THE SURFACE PROOF (D14a) IS A MEASUREMENT OF ONE VERSION, ONE CATALOG AND ONE EFFORT, NOT OF THE TURN. Codex's `--json`
+// record lists no tools, so nothing a turn leaves shows what Codex offered its model. What Probe 0's mock saw in the
+// request, with these flags and this catalog at `high`, is Codex's four functions of its own beside the host's
+// (`MEASURED_OWN_SURFACE`, F2)~~, and the driver holds every turn to the conditions it was measured under: the preflight
+// refuses any other `codex --version`, and a model or effort the catalog does not hold, before the first turn~~. ⭐ MH-6's
+// check fix — The driver holds every session to the version, the model and the effort that surface was measured at,
+// before the first turn: the preflight refuses any other `codex --version`, a model the catalog does not hold, and every
+// effort but `high` (the catalog lists five more, and describes `ultra` as "Maximum reasoning with automatic task
+// delegation", which could change the tool surface). It refuses, too, an MCP listing that names any server but the run
+// folder's `jpwb` (D14). Between turns the program the version check ran is fingerprinted beside the configuration sources
+// Codex reads (D44a). The run report says the surface is the measured version's (D37).
 //
 // ⭑ WHAT THE RECORD HOLDS, AND WHAT IT DOES NOT (D20, D21).
 //   · An `mcp_tool_call` on `jpwb` that names a host tool is a host call; one that names Codex's resource functions is
@@ -32,9 +47,18 @@
 // ⚠ THE RESIDUALS, STATED.
 //   · `enabled_tools` names both host tools whatever the grant minted; it was measured only with both served. A grant of
 //     one is served one by the host (D3), and what Codex makes of a name the server does not list is unmeasured.
-//   · Only `high` was run live. The other efforts the catalog lists are admitted because Codex validates them against the
-//     same catalog; the surface at each is Probe 0's measurement at `high`.
+//   · ~~Only `high` was run live. The other efforts the catalog lists are admitted because Codex validates them against the
+//     same catalog; the surface at each is Probe 0's measurement at `high`.~~ ⭐ MH-6's check fix — only `high` is admitted.
 //   · Other Codex processes on this host write `~/.codex` (F17), so only the declared sources below refuse a turn.
+//   · ⭐ MH-6's check fix — THE VERSION IS CHECKED ONCE, WHEN THE SESSION OPENS. Before each later turn the program it ran is
+//     fingerprinted by `stat` alone, so a `codex.exe` replaced by `run_command` refuses the next turn; one replaced by a file
+//     of the same size and modified time would not be seen.
+//   · ⭐ MH-6's check fix — THE SKILLS FOLDERS ARE FINGERPRINTED BY A FOLDER'S OWN STAT, which changes when an entry is
+//     created in it or removed from it. A change inside a folder that already exists under them — a file added to a skill,
+//     an edited `SKILL.md` — changes no modified time the stat reads, and is not seen.
+//   · ⭐ MH-6's check fix — THE MCP LISTING IS NOT HANDED `--ignore-user-config`, which is `exec`'s own flag, so it reads
+//     `config.toml`, which the turn leaves unread: a server defined there refuses the session though the turn would not
+//     start it, the closed direction. Unmeasured under the operator's home (above), as the listing's other sources are.
 //   · Codex still contacts OpenAI before its first model call, and sends the run folder's absolute path with every request
 //     (F16); and its base instructions, in the catalog, still say to use `apply_patch`, which is not offered.
 import { readFile } from 'node:fs/promises';
@@ -59,16 +83,23 @@ import type {
  */
 export const CODEX_BIN_OVERRIDE: string | undefined = process.env.JPWB_CODEX_BIN;
 
-/** The one version MH-0c measured (D14a). ⛔ Any other is refused before the first turn. */
+/**
+ * The `--version` line of the one version MH-0c measured (D14a). ⚠ The version was measured; the line's form was not (the
+ * header). ⛔ Any other line is refused before the first turn.
+ */
 const CODEX_VERSION = 'codex-cli 0.162.1';
 
 /** The model the pinned catalog holds — the one model this driver runs. */
 const CATALOG_MODEL: string = CODEX_CATALOG.models[0]!.slug;
 
-/** The efforts the pinned catalog lists for that model, which Codex validates the configured one against. */
-const CATALOG_EFFORTS: readonly string[] = CODEX_CATALOG.models[0]!.supported_reasoning_levels.map(
-	(l) => l.effort
-);
+// ~~/** The efforts the pinned catalog lists for that model, which Codex validates the configured one against. */
+// const CATALOG_EFFORTS …~~ ⭐ MH-6's check fix — five of the six were never run, so none of them is admitted.
+
+/**
+ * The one effort every MH-0c arm and both live calls ran at (the sponsor's S3), and so the one this driver admits. ⭑ The
+ * pinned catalog lists it, so Codex validates it against the catalog the turn runs.
+ */
+const MEASURED_EFFORT = 'high';
 
 /** The catalog's bytes, as Probe 1's second call read them: the file is the measured file, and serialises to it whole. */
 const CATALOG_BYTES = JSON.stringify(CODEX_CATALOG);
@@ -233,7 +264,7 @@ function textOf(value: unknown): string | undefined {
 	return typeof value === 'string' ? value : undefined;
 }
 
-/** A line's JSON, or `undefined` when it is not JSON. */
+/** A line's JSON (⭐ MH-6's check fix: or the MCP listing's whole output), or `undefined` when it is not JSON. */
 function jsonOf(line: string): unknown {
 	try {
 		return JSON.parse(line);
@@ -498,8 +529,9 @@ function refuseUnwritablePaths(run: CliRunFolder): void {
 }
 
 /**
- * ⛔ THE CONDITIONS THE SURFACE WAS MEASURED UNDER (D14a), asked before any turn: the catalog's model, and an effort the
- * catalog lists — which is also what keeps the effort's TOML string to a word.
+ * ⛔ THE CONDITIONS THE SURFACE WAS MEASURED UNDER (D14a), asked before any turn: the catalog's model, and ~~an effort the
+ * catalog lists~~ ⭐ MH-6's check fix — the one effort MH-0c ran — which is also what keeps the effort's TOML string to a
+ * word.
  */
 function refuseUnmeasuredSelection(selection: CliExecutorSelection): void {
 	if (selection.modelId !== CATALOG_MODEL)
@@ -507,11 +539,68 @@ function refuseUnmeasuredSelection(selection: CliExecutorSelection): void {
 			`it runs only the model its pinned catalog holds, ${CATALOG_MODEL}, and this session names ` +
 				`${JSON.stringify(selection.modelId)}: another model's tool surface was never measured.`
 		);
-	if (selection.effort === undefined || !CATALOG_EFFORTS.includes(selection.effort))
+	if (selection.effort !== MEASURED_EFFORT)
 		throw refusedBecause(
-			`its effort must be one its pinned catalog lists (${CATALOG_EFFORTS.join(', ')}), and this session names ` +
-				`${selection.effort === undefined ? 'none' : JSON.stringify(selection.effort)}.`
+			`its effort must be ${MEASURED_EFFORT}, the one effort its tool surface was measured at, and this session ` +
+				`names ${selection.effort === undefined ? 'none' : JSON.stringify(selection.effort)}.`
 		);
+}
+
+/**
+ * ⭐ D14, D44a — WHAT THE ARGV SAYS TO CODEX'S CONFIGURATION: every `-c` pair and every `--disable`, in the argv's order.
+ * The turn hands them to `exec`, and the preflight's MCP listing the same, so the listing is of the configuration the turn
+ * runs.
+ */
+function configurationFlags(run: CliRunFolder, effort: string | undefined): string[] {
+	return [
+		'-c',
+		`model_reasoning_effort="${effort}"`,
+		'-c',
+		'approval_policy="never"',
+		'-c',
+		'approvals_reviewer="user"',
+		'-c',
+		'web_search="disabled"',
+		'-c',
+		'project_doc_max_bytes=0',
+		'-c',
+		`model_catalog_json='${join(run.hostDirectory, 'catalog.json')}'`,
+		...DISABLED_FEATURES.flatMap((feature) => ['--disable', feature]),
+		'-c',
+		`mcp_servers.${run.serverName}={command='${run.nodePath}', args=['${run.bridgePath}', '${run.endpointPath}'], ` +
+			'required=true, startup_timeout_sec=30, tool_timeout_sec=180, default_tools_approval_mode="approve", ' +
+			'enabled_tools=["write_file", "run_command"], supports_parallel_tool_calls=false}'
+	];
+}
+
+/**
+ * ⛔ D14 — THE REFUSAL OF WHAT `codex mcp list --json` PRINTED, or `undefined` when it names one server, the run folder's
+ * `jpwb`, started by the server's own runtime with the bridge and the endpoint file. A server any source Codex still reads
+ * defines would be started with the turn's Codex, a process the host never recorded, and seen only if the model called it.
+ * ⭑ Each server is the shape MH-0c's preflight arm printed (`name`, `transport.command`, `transport.args`). ⛔ A refusal
+ * counts servers and names none: their names and commands are the configuration's strings, never printed (D42).
+ */
+function listingRefusal(
+	run: CliRunFolder,
+	output: { readonly exitCode: number | null; readonly stdout: string }
+): string | undefined {
+	if (output.exitCode !== 0)
+		return `\`codex mcp list\` exited with ${output.exitCode}, so the MCP servers Codex would start could not be read.`;
+	const listed = jsonOf(output.stdout);
+	if (!Array.isArray(listed))
+		return 'its MCP listing could not be read as a list of servers, so the MCP servers Codex would start are unknown.';
+	if (listed.length !== 1)
+		return `its MCP listing names ${listed.length} servers, and the run folder’s jpwb must be the only one (JAN-MHX D14).`;
+	const server = objectOf(listed[0]);
+	if (server?.name !== run.serverName)
+		return 'the one server its MCP listing names is not the run folder’s jpwb (JAN-MHX D14).';
+	const transport = objectOf(server?.transport);
+	const startsTheBridge =
+		transport?.command === run.nodePath &&
+		JSON.stringify(transport?.args) === JSON.stringify([run.bridgePath, run.endpointPath]);
+	if (!startsTheBridge)
+		return 'its MCP listing’s jpwb does not start the run folder’s bridge with the server’s own runtime (JAN-MHX D14).';
+	return undefined;
 }
 
 /** ⛔ D14a — the refusal of what `codex --version` printed, or `undefined` for the one version MH-0c measured. */
@@ -540,11 +629,22 @@ export function codexExecutorDriver(): CliDriver {
 		carriers: CODEX_CARRIERS,
 		// ⭐ D44a — `config.toml` and the rules folder are ignored by `--ignore-user-config` and `--ignore-rules`, and
 		// fingerprinted anyway; the global `AGENTS.md` reaches the model despite both (MH-0c F8), and `run_command` can
-		// write it.
+		// write it. ⭐ MH-6's check fix — and three more `run_command` can write: `AGENTS.override.md`, which Codex's
+		// codex-home instructions module names before `AGENTS.md` (the binary's strings; unmeasured); the skills folder and
+		// `.system`, the root A23's requests listed skills from in a developer message despite the flags (each a folder's
+		// stat: the residual above); and the program the version check ran, by `stat`, never opened, since the version is
+		// checked only when the session opens.
 		configSources: [
 			{ name: '~/.codex/config.toml', path: join(home, '.codex', 'config.toml') },
 			{ name: '~/.codex/AGENTS.md', path: join(home, '.codex', 'AGENTS.md') },
-			{ name: '~/.codex/rules', path: join(home, '.codex', 'rules') }
+			{
+				name: '~/.codex/AGENTS.override.md',
+				path: join(home, '.codex', 'AGENTS.override.md')
+			},
+			{ name: '~/.codex/rules', path: join(home, '.codex', 'rules') },
+			{ name: '~/.codex/skills', path: join(home, '.codex', 'skills') },
+			{ name: '~/.codex/skills/.system', path: join(home, '.codex', 'skills', '.system') },
+			...('refusal' in found ? [] : [{ name: 'the Codex program', path: found.program }])
 		],
 		// ⭑ D43 — the allowlist alone: Codex runs on the operator's ChatGPT login in its own home (S3), which the allowlist's
 		// home variables reach, and no key.
@@ -553,12 +653,24 @@ export function codexExecutorDriver(): CliDriver {
 			refuseUnwritablePaths(run);
 			return [{ path: 'host/catalog.json', bytes: CATALOG_BYTES }];
 		},
-		preflight(_run, selection) {
+		preflight(run, selection) {
 			refuseUnmeasuredSelection(selection);
-			return {
-				invocation: { program: programOrRefuse(), args: ['--version'] },
-				refusal: ({ exitCode, stdout }) => versionRefusal(exitCode, stdout)
-			};
+			const program = programOrRefuse();
+			return [
+				{
+					invocation: { program, args: ['--version'] },
+					refusal: ({ exitCode, stdout }) => versionRefusal(exitCode, stdout)
+				},
+				// ⭐ D14 — MH-6's check fix: the MCP servers Codex would start, listed by Codex itself, no model, with the
+				// turn's own configuration flags (MH-0c's preflight arm, with the `-c` pairs alone, listed `jpwb` alone).
+				{
+					invocation: {
+						program,
+						args: ['mcp', 'list', '--json', ...configurationFlags(run, selection.effort)]
+					},
+					refusal: (output) => listingRefusal(run, output)
+				}
+			];
 		},
 		invocation(turn) {
 			const run = turn.run;
@@ -578,23 +690,7 @@ export function codexExecutorDriver(): CliDriver {
 					'read-only',
 					'-m',
 					turn.modelId,
-					'-c',
-					`model_reasoning_effort="${turn.effort}"`,
-					'-c',
-					'approval_policy="never"',
-					'-c',
-					'approvals_reviewer="user"',
-					'-c',
-					'web_search="disabled"',
-					'-c',
-					'project_doc_max_bytes=0',
-					'-c',
-					`model_catalog_json='${join(run.hostDirectory, 'catalog.json')}'`,
-					...DISABLED_FEATURES.flatMap((feature) => ['--disable', feature]),
-					'-c',
-					`mcp_servers.${run.serverName}={command='${run.nodePath}', args=['${run.bridgePath}', '${run.endpointPath}'], ` +
-						'required=true, startup_timeout_sec=30, tool_timeout_sec=180, default_tools_approval_mode="approve", ' +
-						'enabled_tools=["write_file", "run_command"], supports_parallel_tool_calls=false}',
+					...configurationFlags(run, turn.effort),
 					'--strict-config',
 					'--ignore-rules',
 					'-'

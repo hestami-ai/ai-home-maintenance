@@ -49,7 +49,8 @@ const REPORTER = join(ROOT, 'verif', 'live-backend-isolation.reporter.ts');
  * refuses beside its switch (`replay/replay-switch.ts`, `LIVE_SELECTIONS_BESIDE_A_REPLAY`) — so a shell that exported it
  * for half B's authoring turned every gate replay test into that refusal.
  * ⭐ AND AN ELEVENTH AND A TWELFTH (`JAN-MHX` MH-3, design D39): `JPWB_EXECUTOR_EFFORT`, a selection the executor selector
- * reads, and `JPWB_CODEX_BIN`, a program override the selector captures when it loads.
+ * reads, and `JPWB_CODEX_BIN`, a program override ~~the selector captures when it loads~~ ⭐ (`JAN-MHX` MH-6) the Codex
+ * driver captures when it loads (`tools/codex-executor-driver.ts`), which the selector imports.
  */
 const EXPORTED: Readonly<Record<string, string>> = {
 	JPWB_ASSURANCE_TOOL: 'devin',

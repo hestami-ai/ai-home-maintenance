@@ -13,7 +13,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { request } from 'node:http';
 import { homedir, tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import type { ProcessRunOutcome, ProcessRunner } from '@janumipwb/rph-ports';
 import { createFilesystemWorkspace } from '../execution/filesystem-workspace.js';
 import type { ProducerSession, ProducerSessionContext } from '../execution/producer-session.js';
@@ -21,9 +21,11 @@ import { readWorkspaceTaint } from '../execution/workspace-taint.js';
 import type { ToolInvocationResult } from './backing-tool.js';
 import {
 	openCliExecutionSession,
+	type CliDriver,
 	type CliExec,
 	type CliExecRequest,
 	type CliExecutorSelection,
+	type CliPreflight,
 	type CliRecordReading,
 	type CliRun,
 	type CliRunFolder,
@@ -90,6 +92,60 @@ function turnInput(turn = 1, run = runFolder()): CliTurnInput {
 }
 
 const sha256 = (text: string): string => createHash('sha256').update(text, 'utf8').digest('hex');
+
+/** A driver's no-model checks, in the order the opener runs them (D14): none, one, or a list. */
+function checksOf(
+	driver: CliDriver = codexExecutorDriver(),
+	selection: CliExecutorSelection = SELECTION,
+	run: CliRunFolder = runFolder()
+): readonly CliPreflight[] {
+	const declared = driver.preflight(run, selection);
+	return declared === undefined ? [] : 'invocation' in declared ? [declared] : declared;
+}
+
+/** Where the npm install puts Codex's own executable under an `%APPDATA%`, as MH-0c ran it. */
+const programUnder = (appData: string): string =>
+	join(
+		appData,
+		'npm',
+		'node_modules',
+		'@openai',
+		'codex',
+		'node_modules',
+		'@openai',
+		'codex-win32-x64',
+		'vendor',
+		'x86_64-pc-windows-msvc',
+		'bin',
+		'codex.exe'
+	);
+
+/**
+ * The one server `codex mcp list --json` printed in MH-0c's preflight arm (`runs/preflight/mcp-list.json`, under an empty
+ * CODEX_HOME), its paths replaced by the run folder's.
+ */
+function measuredServer(
+	run: CliRunFolder,
+	over: Record<string, unknown> = {}
+): Record<string, unknown> {
+	return {
+		name: 'jpwb',
+		enabled: true,
+		disabled_reason: null,
+		transport: {
+			type: 'stdio',
+			command: run.nodePath,
+			args: [run.bridgePath, run.endpointPath],
+			env: null,
+			env_vars: [],
+			cwd: null
+		},
+		startup_timeout_sec: 30.0,
+		tool_timeout_sec: 180.0,
+		auth_status: 'unsupported',
+		...over
+	};
+}
 
 // ── The JSONL, in the shapes MH-0c measured (paths and identifiers replaced) ─────────────────────────────────────────
 
@@ -279,6 +335,18 @@ describe('⭐ §4.3 — the run folder, the argv and the stdin (roadmap MH-6 tes
 		expect(() => codexExecutorDriver().runFolderFiles(run)).not.toThrow(/a'quote/);
 	});
 
+	it('⛔ the node runtime’s path, which lies outside the run folder, is held to the same rule: its own arm, tripped alone', () => {
+		// ⛔ THE MUTANT: leave the node runtime out of the paths asked. Every other fixture runs `process.execPath`, and a
+		// quote in the host folder trips the bridge's and the endpoint's arms with the host's own, so only this arrangement
+		// holds a quote in the runtime's path and nowhere else.
+		const run = { ...runFolder(), nodePath: join(container, "node'runtime", 'node.exe') };
+		expect(() => codexExecutorDriver().runFolderFiles(run)).toThrow(
+			"The CLI executor session for 'codex' is refused: the node runtime's path holds a character a TOML literal " +
+				'string cannot carry'
+		);
+		expect(() => codexExecutorDriver().runFolderFiles(run)).not.toThrow(/node'runtime/);
+	});
+
 	it('⛔ a server name a bare TOML key cannot be refuses the session: the argv names it as `mcp_servers.<name>`', () => {
 		// ⛔ THE MUTANT: no check. A dot or a space would split or end the key, and Codex would read another table.
 		expect(() =>
@@ -294,23 +362,8 @@ describe('⭐ §4.3 — the run folder, the argv and the stdin (roadmap MH-6 tes
 		// a PowerShell script, which node will not start with the shell off, and not what MH-0c measured.
 		vi.stubEnv('APPDATA', join(container, 'AppData', 'Roaming'));
 		const driver = codexExecutorDriver();
-		const program = join(
-			container,
-			'AppData',
-			'Roaming',
-			'npm',
-			'node_modules',
-			'@openai',
-			'codex',
-			'node_modules',
-			'@openai',
-			'codex-win32-x64',
-			'vendor',
-			'x86_64-pc-windows-msvc',
-			'bin',
-			'codex.exe'
-		);
-		expect(driver.preflight(runFolder(), SELECTION)?.invocation.program).toBe(program);
+		const program = programUnder(join(container, 'AppData', 'Roaming'));
+		expect(checksOf(driver).map((check) => check.invocation.program)).toEqual([program, program]);
 		expect(driver.invocation(turnInput()).program).toBe(program);
 	});
 
@@ -319,10 +372,7 @@ describe('⭐ §4.3 — the run folder, the argv and the stdin (roadmap MH-6 tes
 		// run's cli/, where no install is.
 		for (const appData of [undefined, join('relative', 'AppData', 'Roaming')]) {
 			vi.stubEnv('APPDATA', appData);
-			expect(
-				() => codexExecutorDriver().preflight(runFolder(), SELECTION),
-				String(appData)
-			).toThrow(
+			expect(() => checksOf(codexExecutorDriver()), String(appData)).toThrow(
 				"The CLI executor session for 'codex' is refused: its program is Codex’s own executable under %APPDATA%"
 			);
 		}
@@ -337,19 +387,74 @@ describe('⭐ §4.3 — the run folder, the argv and the stdin (roadmap MH-6 tes
 		vi.stubEnv('JPWB_CODEX_BIN', undefined);
 		expect(loaded.CODEX_BIN_OVERRIDE).toBe('stand-in/codex.exe');
 		const driver = loaded.codexExecutorDriver();
-		expect(driver.preflight(runFolder(), SELECTION)?.invocation.program).toBe('stand-in/codex.exe');
+		expect(checksOf(driver).map((check) => check.invocation.program)).toEqual([
+			'stand-in/codex.exe',
+			'stand-in/codex.exe'
+		]);
 		expect(driver.invocation(turnInput()).program).toBe('stand-in/codex.exe');
+		// ⭑ And the program fingerprinted before each turn is the one the driver runs (D44a).
+		expect(driver.configSources).toContainEqual({
+			name: 'the Codex program',
+			path: 'stand-in/codex.exe'
+		});
 		vi.resetModules();
 	});
 
-	it('⭐ D44a — the configuration sources Codex reads are declared: its config, its global AGENTS.md, and its rules folder', () => {
+	it('⭐ D44a — the configuration sources Codex reads are declared: its config, its instructions, its rules, its skills, and its program', () => {
 		// ⛔ THE MUTANT: drop `~/.codex/AGENTS.md`. Probe 0 planted one and it reached the model despite
 		// `--ignore-user-config` and `project_doc_max_bytes=0` (MH-0c F8), and `run_command` can write it.
+		vi.stubEnv('APPDATA', join(container, 'AppData', 'Roaming'));
 		expect(codexExecutorDriver().configSources).toEqual([
 			{ name: '~/.codex/config.toml', path: join(homedir(), '.codex', 'config.toml') },
 			{ name: '~/.codex/AGENTS.md', path: join(homedir(), '.codex', 'AGENTS.md') },
-			{ name: '~/.codex/rules', path: join(homedir(), '.codex', 'rules') }
+			{
+				name: '~/.codex/AGENTS.override.md',
+				path: join(homedir(), '.codex', 'AGENTS.override.md')
+			},
+			{ name: '~/.codex/rules', path: join(homedir(), '.codex', 'rules') },
+			{ name: '~/.codex/skills', path: join(homedir(), '.codex', 'skills') },
+			{ name: '~/.codex/skills/.system', path: join(homedir(), '.codex', 'skills', '.system') },
+			{ name: 'the Codex program', path: programUnder(join(container, 'AppData', 'Roaming')) }
 		]);
+	});
+
+	it('⭐ D44a — ~/.codex/AGENTS.override.md is declared: Codex reads it before AGENTS.md, and run_command can create it', () => {
+		// ⛔ THE MUTANT: drop it. Codex's codex-home instructions module names `AGENTS.override.md` before `AGENTS.md` (the
+		// binary's strings), and the AGENTS.md beside it reached the model despite the flags (MH-0c F8): a file the model
+		// creates there between turns would reach the next turn's prompt with no `EXECUTOR_CONFIG_CHANGED`.
+		expect(codexExecutorDriver().configSources).toContainEqual({
+			name: '~/.codex/AGENTS.override.md',
+			path: join(homedir(), '.codex', 'AGENTS.override.md')
+		});
+	});
+
+	it('⭐ D44a — ~/.codex/skills is declared, by a folder’s stat: a skill folder created in it changes its modified time', () => {
+		// ⛔ THE MUTANT: drop it. Each of Probe 0's A23 requests carried a `<skills_instructions>` developer message listing
+		// the skills Codex found in its home, despite `--ignore-user-config` and `--disable skill_search`.
+		expect(codexExecutorDriver().configSources).toContainEqual({
+			name: '~/.codex/skills',
+			path: join(homedir(), '.codex', 'skills')
+		});
+	});
+
+	it('⭐ D44a — ~/.codex/skills/.system is declared: it is the skill root A23’s requests listed', () => {
+		// ⛔ THE MUTANT: drop it. A skill folder created under `.system` changes `.system`'s modified time and not the
+		// skills folder's, so the stat of `~/.codex/skills` alone would not see it.
+		expect(codexExecutorDriver().configSources).toContainEqual({
+			name: '~/.codex/skills/.system',
+			path: join(homedir(), '.codex', 'skills', '.system')
+		});
+	});
+
+	it('⭐ D44a, D14a — the program the version check ran is declared, by a stat alone: the version is checked once, at open', () => {
+		// ⛔ THE MUTANT: drop it. The version pin is the whole basis of Codex's surface proof, and `run_command` can replace
+		// `codex.exe` between turns: every later turn would run an unmeasured program while the record claimed the measured
+		// surface.
+		vi.stubEnv('APPDATA', join(container, 'AppData', 'Roaming'));
+		expect(codexExecutorDriver().configSources).toContainEqual({
+			name: 'the Codex program',
+			path: programUnder(join(container, 'AppData', 'Roaming'))
+		});
 	});
 
 	it('⭑ D43 — the CLI gets the allowlist and no constant or secret of the driver’s: the ChatGPT login is in its own home', () => {
@@ -361,8 +466,8 @@ describe('⭐ §4.3 — the run folder, the argv and the stdin (roadmap MH-6 tes
 
 describe('⭐ D14, D14a — the preflight: the version, the model and the effort Probe 0 measured (roadmap MH-6 test 5)', () => {
 	const preflight = () => {
-		const check = codexExecutorDriver().preflight(runFolder(), SELECTION);
-		if (check === undefined) throw new Error('the Codex driver has no preflight');
+		const check = checksOf().find((c) => c.invocation.args[0] === '--version');
+		if (check === undefined) throw new Error('the Codex driver asks no version');
 		return check;
 	};
 
@@ -396,17 +501,147 @@ describe('⭐ D14, D14a — the preflight: the version, the model and the effort
 		);
 	});
 
-	it('⛔ an effort the catalog does not list, or none, refuses the session before any turn', () => {
-		// ⛔ THE MUTANT: no effort check. The effort is written into a TOML string on the argv, and nothing would hold it to
-		// the levels the catalog lists.
+	it('⛔ every effort but high, the one every MH-0c arm ran at, refuses the session before any turn, naming it', () => {
+		// ⛔ THE MUTANTS: take any effort the catalog lists (the first build's rule: five of the six were never run, and the
+		// catalog describes `ultra` as "Maximum reasoning with automatic task delegation", which could change the tool
+		// surface); take no effort (unset, Codex's user configuration would choose one).
 		const driver = codexExecutorDriver();
-		for (const effort of ['ludicrous', 'high" , web_search="live', undefined])
-			expect(() => driver.preflight(runFolder(), { ...SELECTION, effort }), String(effort)).toThrow(
-				"The CLI executor session for 'codex' is refused: its effort must be one its pinned catalog lists"
+		for (const effort of [
+			'low',
+			'medium',
+			'xhigh',
+			'max',
+			'ultra',
+			'ludicrous',
+			'high" , web_search="live'
+		])
+			expect(() => driver.preflight(runFolder(), { ...SELECTION, effort }), effort).toThrow(
+				"The CLI executor session for 'codex' is refused: its effort must be high, the one effort its tool surface " +
+					`was measured at, and this session names ${JSON.stringify(effort)}.`
 			);
-		for (const effort of ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'])
-			expect(() => driver.preflight(runFolder(), { ...SELECTION, effort }), effort).not.toThrow();
+		expect(() => driver.preflight(runFolder(), { ...SELECTION, effort: undefined })).toThrow(
+			'its effort must be high, the one effort its tool surface was measured at, and this session names none.'
+		);
+		expect(() => driver.preflight(runFolder(), SELECTION), 'high').not.toThrow();
 	});
+
+	it('⭑ high is an effort the pinned catalog lists, so Codex validates the one effort admitted against the catalog it runs', () => {
+		const catalog = JSON.parse(codexExecutorDriver().runFolderFiles(runFolder())[0]!.bytes) as {
+			models: { supported_reasoning_levels: { effort: string }[] }[];
+		};
+		expect(catalog.models[0]!.supported_reasoning_levels.map((l) => l.effort)).toContain('high');
+	});
+});
+
+describe('⭐ D14 — the preflight lists the MCP servers Codex would start, and refuses any but the run folder’s jpwb', () => {
+	const listing = (run: CliRunFolder = runFolder()) => {
+		const check = checksOf(codexExecutorDriver(), SELECTION, run).find(
+			(c) => c.invocation.args[0] === 'mcp'
+		);
+		if (check === undefined) throw new Error('the Codex driver asks no MCP listing');
+		return check;
+	};
+
+	it('⭐ it asks `codex mcp list --json` after the version, with the turn’s own configuration flags, element for element', () => {
+		// ⛔ THE MUTANTS: no listing (the first build's preflight held the version alone, so nothing in a session showed which
+		// MCP servers Codex started); a listing without the turn's flags (it would list a configuration the turn never runs).
+		const run = runFolder();
+		const checks = checksOf(codexExecutorDriver(), SELECTION, run);
+		expect(checks.map((c) => c.invocation.args.slice(0, 3))).toEqual([
+			['--version'],
+			['mcp', 'list', '--json']
+		]);
+		const turnArgs = codexExecutorDriver().invocation(turnInput(1, run)).args;
+		const flags = turnArgs.slice(turnArgs.indexOf('-m') + 2, turnArgs.indexOf('--strict-config'));
+		expect(flags, 'arrangement: the turn’s flags hold its server entry').toContain(
+			`mcp_servers.jpwb={command='${run.nodePath}', args=['${run.bridgePath}', '${run.endpointPath}'], required=true, ` +
+				'startup_timeout_sec=30, tool_timeout_sec=180, default_tools_approval_mode="approve", ' +
+				'enabled_tools=["write_file", "run_command"], supports_parallel_tool_calls=false}'
+		);
+		expect(flags, 'arrangement: and its other -c pairs and --disable flags').toContain(
+			'approvals_reviewer="user"'
+		);
+		expect(listing(run).invocation.args).toEqual(['mcp', 'list', '--json', ...flags]);
+		expect(listing(run).invocation.stdin).toBeUndefined();
+	});
+
+	it('⭑ the one server MH-0c’s preflight arm listed, with this run folder’s paths, passes', () => {
+		const run = runFolder();
+		const stdout = `${JSON.stringify([measuredServer(run)], null, 2)}\n`;
+		expect(listing(run).refusal({ exitCode: 0, stdout })).toBeUndefined();
+	});
+
+	it.each([
+		[
+			'a second server beside jpwb',
+			(run: CliRunFolder) => [measuredServer(run), measuredServer(run, { name: 'operator' })],
+			'its MCP listing names 2 servers, and the run folder’s jpwb must be the only one'
+		],
+		[
+			'no server at all',
+			() => [],
+			'its MCP listing names 0 servers, and the run folder’s jpwb must be the only one'
+		],
+		[
+			'one server of another name',
+			(run: CliRunFolder) => [measuredServer(run, { name: 'operator' })],
+			'the one server its MCP listing names is not the run folder’s jpwb'
+		],
+		[
+			'jpwb started by another program',
+			(run: CliRunFolder) => [
+				measuredServer(run, {
+					transport: {
+						type: 'stdio',
+						command: join(container, 'other', 'node.exe'),
+						args: [run.bridgePath, run.endpointPath]
+					}
+				})
+			],
+			'its MCP listing’s jpwb does not start the run folder’s bridge with the server’s own runtime'
+		],
+		[
+			'jpwb with other arguments',
+			(run: CliRunFolder) => [
+				measuredServer(run, {
+					transport: {
+						type: 'stdio',
+						command: run.nodePath,
+						args: [run.bridgePath, join(container, 'other', 'endpoint.json')]
+					}
+				})
+			],
+			'its MCP listing’s jpwb does not start the run folder’s bridge with the server’s own runtime'
+		]
+	])('⛔ a listing holding %s refuses the session, and names no path', (_, servers, said) => {
+		// ⛔ ONE MUTANT PER ARM: that arm left out. A server any source Codex still reads defines would be started by Codex,
+		// a process the host never recorded, and seen only if the model called it (D14).
+		const run = runFolder();
+		const refusal = listing(run).refusal({ exitCode: 0, stdout: JSON.stringify(servers(run)) });
+		expect(refusal).toBe(`${said} (JAN-MHX D14).`);
+		expect(refusal).not.toContain(container);
+	});
+
+	it.each([
+		[
+			{ exitCode: 1, stdout: '' },
+			'`codex mcp list` exited with 1, so the MCP servers Codex would start could not be read.'
+		],
+		[
+			{ exitCode: 0, stdout: 'jpwb  node  bridge\n' },
+			'its MCP listing could not be read as a list of servers, so the MCP servers Codex would start are unknown.'
+		],
+		[
+			{ exitCode: 0, stdout: '{"servers":[]}' },
+			'its MCP listing could not be read as a list of servers, so the MCP servers Codex would start are unknown.'
+		]
+	])(
+		'⛔ a listing that did not end well, or is not a JSON list, refuses the session',
+		(output, said) => {
+			// ⛔ ONE MUTANT PER ARM: a failing exit read as a listing; a listing that is not a list read as an empty one.
+			expect(listing().refusal(output)).toBe(said);
+		}
+	);
 });
 
 describe('⭐ D14a, D19, D21, D22 — what the JSONL record holds (roadmap MH-6 test 4)', () => {
@@ -683,6 +918,25 @@ describe('⭐ D14a, D19, D21, D22 — what the JSONL record holds (roadmap MH-6 
 			expect(parsed(await read(stdout)).surface, stdout).toBeUndefined();
 	});
 
+	it.each([
+		// ⭑ One thread, one terminal event and it last: only the first event is not the thread's.
+		['the thread not first', lines(TURN, THREAD, COMPLETED)],
+		// ⭑ The thread first, and the last event terminal: only the count of terminal events is not one.
+		['two terminal events, the last one last', lines(THREAD, TURN, COMPLETED, COMPLETED)]
+	])(
+		'⛔ a record with %s holds no proof of the surface: that conjunct alone refuses it',
+		async (_, stdout) => {
+			// ⛔ ONE MUTANT PER CONJUNCT: `events[0]?.type === 'thread.started'` removed; `shape.terminals === 1` removed. Every
+			// arrangement above trips two conjuncts or another one (TURN, msg, COMPLETED fails the first-event check AND the
+			// one-thread check), so none of them shows either conjunct matters.
+			expect(parsed(await read(stdout)).surface).toBeUndefined();
+			// ⭑ CONTROL: the same events in the one order that is a whole turn declare it.
+			expect(parsed(await read(lines(THREAD, TURN, COMPLETED))).surface).toEqual(
+				MEASURED_OWN_SURFACE
+			);
+		}
+	);
+
 	it('⛔ a line that is not a JSON event, or an event of a type this driver does not know, makes the record unparseable', async () => {
 		// ⛔ THE MUTANT: pass over a line the driver cannot read. A record read in part is not one (D14a).
 		for (const stdout of [
@@ -828,8 +1082,10 @@ class FakeCodex {
 	readonly events: unknown[] = [THREAD, TURN];
 	readonly errorLines: string[] = [];
 	exitCode = 0;
+	errorLinesComplete = true;
 	terminal: unknown = COMPLETED;
-	private readonly endpoint: { url: string; token: string };
+	/** The endpoint file as Codex's bridge reads it: the server's URL and the turn's token. */
+	readonly endpoint: { url: string; token: string };
 	private readonly lastPath: string;
 	private next = 0;
 	constructor(readonly request: CliExecRequest) {
@@ -875,41 +1131,84 @@ class FakeCodex {
 	}
 }
 
-/** The seam playing Codex: `--version` answers `version`; `exec` runs the script. */
+/**
+ * What `codex mcp list --json` prints for the argv it was given, as the seam plays it: the server the `-c` entry
+ * configures, in the shape MH-0c's preflight arm measured, then any server `besides` adds.
+ */
+function listedServers(
+	args: readonly string[],
+	besides: readonly Record<string, unknown>[]
+): string {
+	const entry = args.find((a) => a.startsWith('mcp_servers.jpwb='));
+	const configured =
+		entry === undefined
+			? []
+			: [
+					{
+						name: 'jpwb',
+						enabled: true,
+						disabled_reason: null,
+						transport: {
+							type: 'stdio',
+							command: /command='([^']*)'/.exec(entry)![1],
+							args: [.../args=\['([^']*)', '([^']*)'\]/.exec(entry)!.slice(1)],
+							env: null,
+							env_vars: [],
+							cwd: null
+						},
+						startup_timeout_sec: 30.0,
+						tool_timeout_sec: 180.0,
+						auth_status: 'unsupported'
+					}
+				];
+	return `${JSON.stringify([...configured, ...besides], null, 2)}\n`;
+}
+
+/**
+ * The seam playing Codex: `--version` answers `version`; `mcp list` lists what its argv configures, and `besides`;
+ * `exec` runs the script. ⭑ Every Codex it started is kept, so a test can read the endpoint each one read.
+ */
 function codexExec(
 	script: (codex: FakeCodex) => Promise<void>,
-	version = 'codex-cli 0.162.1'
-): CliExec & { requests: CliExecRequest[] } {
+	version = 'codex-cli 0.162.1',
+	besides: readonly Record<string, unknown>[] = []
+): CliExec & { requests: CliExecRequest[]; codexes: FakeCodex[] } {
 	const requests: CliExecRequest[] = [];
+	const codexes: FakeCodex[] = [];
+	const answered = (stdout: string) => ({
+		done: Promise.resolve({
+			exitCode: 0,
+			stdout,
+			stdoutComplete: true,
+			errorLines: [],
+			errorLinesComplete: true
+		}),
+		kill: async () => undefined
+	});
 	const exec: CliExec = (req) => {
 		requests.push(req);
-		if (req.args[0] === '--version')
-			return {
-				done: Promise.resolve({
-					exitCode: 0,
-					stdout: `${version}\n`,
-					stdoutComplete: true,
-					errorLines: []
-				}),
-				kill: async () => undefined
-			};
+		if (req.args[0] === '--version') return answered(`${version}\n`);
+		if (req.args[0] === 'mcp') return answered(listedServers(req.args, besides));
 		const codex = new FakeCodex(req);
+		codexes.push(codex);
 		const done = script(codex).then((): CliRun => ({
 			exitCode: codex.exitCode,
 			stdout: codex.stdout(),
 			stdoutComplete: true,
-			errorLines: codex.errorLines
+			errorLines: codex.errorLines,
+			errorLinesComplete: codex.errorLinesComplete
 		}));
 		return { done, kill: async () => undefined };
 	};
-	return Object.assign(exec, { requests });
+	return Object.assign(exec, { requests, codexes });
 }
 
 async function open(
 	exec: CliExec,
-	selection: CliExecutorSelection = SELECTION
+	selection: CliExecutorSelection = SELECTION,
+	driver: CliDriver = codexExecutorDriver()
 ): Promise<ProducerSession> {
-	const session = await openCliExecutionSession(context(), selection, codexExecutorDriver(), {
+	const session = await openCliExecutionSession(context(), selection, driver, {
 		exec,
 		root,
 		turnTimeoutMs: 60_000,
@@ -953,9 +1252,113 @@ describe('⭐ the Codex driver through the real opener', () => {
 		expect(readFileSync(join(workspaceDir, 'a.txt'), 'utf8')).toBe('hello');
 		expect(readWorkspaceTaint(workspaceDir).tainted).toBe(false);
 		expect(result.sessionExport).toBeUndefined();
-		// ⭑ The preflight ran first, then the turn, with the prompt on stdin.
-		expect(exec.requests.map((r) => r.args[0])).toEqual(['--version', 'exec']);
-		expect(exec.requests[1]!.stdin).toContain('INSTRUCTION');
+		// ⭑ The preflight ran first, its version and then its MCP listing, then the turn, with the prompt on stdin.
+		expect(exec.requests.map((r) => r.args[0])).toEqual(['--version', 'mcp', 'exec']);
+		expect(exec.requests[2]!.stdin).toContain('INSTRUCTION');
+		// ⛔ D40 — THE TURN'S TOKEN, AS CODEX'S BRIDGE READ IT FROM THE ENDPOINT FILE, IS IN NO ELEMENT OF ANY ARGV CODEX WAS
+		// GIVEN, NO VARIABLE OF ITS ENVIRONMENT, AND NOT ITS STDIN. ⛔ THE MUTANT: the opener appends the token to the CLI's
+		// stdin, where the cli-executor-session tests' C5, which asks argv and the environment, does not look.
+		const token = exec.codexes[0]!.endpoint.token;
+		expect(token, 'arrangement: the token Codex read').toMatch(/^[0-9a-f]{64}$/);
+		for (const r of exec.requests) {
+			const asked = r.args[0]!;
+			expect(
+				r.args.some((a) => a.includes(token)),
+				`${asked}: argv`
+			).toBe(false);
+			expect(
+				Object.values(r.env).some((v) => v.includes(token)),
+				`${asked}: environment`
+			).toBe(false);
+			expect(r.stdin ?? '', `${asked}: stdin`).not.toContain(token);
+		}
+	});
+
+	it('⛔ D14 through the opener — an MCP server beside jpwb in Codex’s listing refuses the session, and Codex never runs a turn', async () => {
+		// ⛔ THE MUTANT: no listing in the preflight. A server any source Codex still reads defines would be started with the
+		// turn's Codex, and nothing in the session would show it.
+		const exec = codexExec(async (codex) => codex.answer(ANSWER), 'codex-cli 0.162.1', [
+			{
+				name: 'operator',
+				enabled: true,
+				transport: { type: 'stdio', command: 'operator-server', args: [] }
+			}
+		]);
+		await expect(open(exec)).rejects.toThrow(
+			"The CLI executor session for 'codex' is refused by its preflight: its MCP listing names 2 servers, and the run " +
+				'folder’s jpwb must be the only one (JAN-MHX D14).'
+		);
+		expect(exec.requests.map((r) => r.args[0])).toEqual(['--version', 'mcp']);
+	});
+
+	it.each([
+		[
+			'a skill folder created in ~/.codex/skills',
+			'~/.codex/skills',
+			(home: string) => mkdirSync(join(home, '.codex', 'skills', 'planted'))
+		],
+		[
+			'a skill folder created in the listed root',
+			'~/.codex/skills/.system',
+			(home: string) => mkdirSync(join(home, '.codex', 'skills', '.system', 'planted'))
+		],
+		[
+			'an AGENTS.override.md planted in ~/.codex',
+			'~/.codex/AGENTS.override.md',
+			(home: string) => writeFileSync(join(home, '.codex', 'AGENTS.override.md'), 'planted', 'utf8')
+		],
+		[
+			'Codex’s program replaced',
+			'the Codex program',
+			(_home: string, program: string) =>
+				writeFileSync(program, 'another program, of another size', 'utf8')
+		]
+	])(
+		'⛔ D44a through the opener — %s between turns refuses the next turn, naming it',
+		async (_, name, plant) => {
+			// ⭑ The home and %APPDATA% stand in only while the driver is made, which is when it names its sources; the opener
+			// then runs under this host's own home, as its ancestor check needs.
+			const home = join(container, 'home');
+			mkdirSync(join(home, '.codex', 'skills', '.system'), { recursive: true });
+			const appData = join(container, 'AppData', 'Roaming');
+			const program = programUnder(appData);
+			mkdirSync(dirname(program), { recursive: true });
+			writeFileSync(program, 'a program', 'utf8');
+			vi.stubEnv('USERPROFILE', home);
+			vi.stubEnv('HOME', home);
+			vi.stubEnv('APPDATA', appData);
+			const driver = codexExecutorDriver();
+			vi.unstubAllEnvs();
+			const exec = codexExec(async (codex) => codex.answer(ANSWER));
+			const session = await open(exec, SELECTION, driver);
+			expect((await turn(session)).answer).toEqual({ arrived: true, text: ANSWER });
+			await new Promise((r) => setTimeout(r, 20));
+			plant(home, program);
+			const second = await turn(session, 'THE FINDINGS');
+			expect(messageOf(second)).toMatch(
+				new RegExp(`^EXECUTOR_CONFIG_CHANGED: .* It names: ${name.replaceAll('.', '\\.')}\\.$`)
+			);
+			expect(
+				exec.requests.map((r) => r.args[0]),
+				'Codex was started for the refused turn'
+			).toEqual(['--version', 'mcp', 'exec']);
+		}
+	);
+
+	it('⛔ an error stream the opener could not read whole fails the turn CLI_ERROR, though its JSONL and its answer are whole', async () => {
+		// ⭑ The scenario of F4: the error stream is the only record of a call Codex rejected before sending it, the
+		// resource-failure lines the driver passes over echo the uri the model chose (A21), so a model can push the stream
+		// past the opener's bound before a call Codex rejects. Cut, the stream cannot show there was none.
+		const exec = codexExec(async (codex) => {
+			codex.errorLines.push(
+				`2026-10-18T19:22:58.853142Z ERROR codex_core::tools::router: error=resources/read failed: resources/read failed for \`jpwb\` (${'x'.repeat(200)}): Mcp error: -32601`
+			);
+			codex.errorLinesComplete = false;
+			codex.answer(ANSWER);
+		});
+		const said = messageOf(await turn(await open(exec)));
+		expect(said).toMatch(/^CLI_ERROR: /);
+		expect(said).toContain('passed the host’s bound, so it could not be read whole');
 	});
 
 	it('⭑ a repair turn reads its own last-message file: turn 2’s answer is turn 2’s', async () => {
