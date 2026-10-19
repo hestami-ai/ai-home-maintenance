@@ -36,10 +36,13 @@ export function resolveReplayRecording(configured: string | undefined): string |
  * CAPTURED when they loaded and the selectors are handed apart (`overrides`), and less this switch itself. Among them is
  * `JPWB_AGENT_MODEL`, the authoring agent's model (`agent/pi-agent.ts`) — ⭐ which the gate's entry points remove too
  * since the re-review of E4's fix round, so one a shell exported never turns a gate replay test into this refusal.
+ * ⭐ `JAN-MHX` MH-3 (`DESIGN-multi-harness-executor.md` D39) — and `JPWB_EXECUTOR_EFFORT`, a selection the executor selector
+ * reads from the environment. `JPWB_CODEX_BIN`, a program override, is not here: it is captured, and handed apart.
  */
 export const LIVE_SELECTIONS_BESIDE_A_REPLAY = [
 	'JPWB_EXECUTOR',
 	'JPWB_EXECUTOR_MODEL',
+	'JPWB_EXECUTOR_EFFORT',
 	'JPWB_ASSURANCE_TOOL',
 	'JPWB_ASSURANCE_MODEL',
 	'JPWB_JUDGE_MODEL',
@@ -50,16 +53,22 @@ export const LIVE_SELECTIONS_BESIDE_A_REPLAY = [
 /**
  * ⭐ `REG-D-112` (c) — THE LIVE-BACKEND SELECTIONS SET BESIDE THE SWITCH, by name: each environment variable above that is
  * set (blank or whitespace is unset, the selectors' rule), and each program override the adapters captured
- * (`JPWB_AGY_BIN`, `JPWB_DEVIN_BIN`). Empty when none is — the only arrangement a replay runs in.
+ * (`JPWB_AGY_BIN`, `JPWB_DEVIN_BIN`, ⭐ and `JPWB_CODEX_BIN`, which the executor selector captures — `JAN-MHX` MH-3, D39;
+ * the reviewer's selector has no Codex key, and hands none). Empty when none is — the only arrangement a replay runs in.
  */
 export function liveSelectionsBesideReplay(
 	env: Readonly<Record<string, string | undefined>>,
-	overrides: { readonly agy: string | undefined; readonly devin: string | undefined }
+	overrides: {
+		readonly agy: string | undefined;
+		readonly devin: string | undefined;
+		readonly codex?: string | undefined;
+	}
 ): string[] {
 	return [
 		...LIVE_SELECTIONS_BESIDE_A_REPLAY.filter((name) => (env[name]?.trim() ?? '') !== ''),
 		...(overrides.agy === undefined ? [] : ['JPWB_AGY_BIN']),
-		...(overrides.devin === undefined ? [] : ['JPWB_DEVIN_BIN'])
+		...(overrides.devin === undefined ? [] : ['JPWB_DEVIN_BIN']),
+		...(overrides.codex === undefined ? [] : ['JPWB_CODEX_BIN'])
 	];
 }
 

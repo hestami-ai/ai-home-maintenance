@@ -89,7 +89,7 @@ import type {
 	Identity,
 	ProfessionalRationaleSummary
 } from '@janumipwb/rph-assurance';
-import { assurancePreflight } from '$lib/server/assurance/preflight';
+import { assurancePreflight, type AssurancePreflightResult } from '$lib/server/assurance/preflight';
 import { ASSURANCE_REVIEWER_CREDENTIAL, actingActor } from '$lib/server/identity';
 import { runModelInvocationStep } from '$lib/server/execution/run-model-step';
 import { runWorkProductFloor } from '$lib/server/execution/work-product-floor';
@@ -115,7 +115,11 @@ import {
 } from '$lib/server/execution/executor-selection';
 import { resolveContextPolicy } from '$lib/server/execution/context-policy';
 import { stepBindingFor } from '$lib/server/execution/step-binding';
-import { resolveUndertakingSandbox } from '$lib/server/execution/workspace-host';
+import {
+	resolveUndertakingSandbox,
+	undertakingWorkspaceDirectory
+} from '$lib/server/execution/workspace-host';
+import { workspaceTaintRefusal } from '$lib/server/execution/workspace-taint';
 // ⭐ `JAN-EXEC` P7-6R R-1 — the stopped unit, read from the record: its wait, the person's three choices, and RD7's rebuild.
 import {
 	attemptKeyOf,
@@ -2299,9 +2303,12 @@ export const actions: Actions = {
 		// ⚠ WHAT THIS CANNOT SEE: a devin configured but unusable — not on the server's PATH, not signed in (inferred,
 		// untested), or run from an untrusted directory — is found at the first review and RECORDED there, after the
 		// paid work.
+		// ⭐ `JAN-MHX` MH-3 (D33) — the real reviewer the preflight admitted is kept, for the executor selector below.
+		let reviewing: AssurancePreflightResult['reviewer'];
 		if (isModelStep) {
 			const reviewer = assurancePreflight({ testMode: isTestMode() });
 			if (!reviewer.ready) return fail(400, { error: reviewer.guidance });
+			reviewing = reviewer.reviewer;
 		}
 
 		// ── ⭐ `JAN-SELRES` RS-1 (D4) — AND ITS EXECUTOR IS SELECTED HERE, ONCE, BEFORE ANYTHING IS DISPATCHED ──────────
@@ -2316,11 +2323,19 @@ export const actions: Actions = {
 		// configured, the model run and the model recorded are one read.
 		// ⚠ A TRANSFORMATION STEP asks neither selector — the operator completes it.
 		// ⚠ DEFINITE, NOT OPTIONAL — `outcome`'s idiom below: assigned for exactly the steps the model branch runs.
+		// ⭐ `JAN-MHX` MH-3 — THE SELECTOR IS HANDED THE REVIEWER (D33), so an executor model of the reviewer's family, or one
+		// no listing places, is refused here rather than by the floor after the paid work. ⭐ AND A WORKSPACE A CLI
+		// EXECUTOR'S BREACH MARKED REFUSES THE STEP (D21a): the work would land beside bytes no one recorded. ⚠ A
+		// TRANSFORMATION STEP is refused by neither: no executor runs in it and no review reads it.
 		let executor!: RunnableExecutorSelection;
 		if (isModelStep) {
-			const selected = selectExecutor({ testMode: isTestMode() });
+			const selected = selectExecutor({ testMode: isTestMode(), reviewer: reviewing });
 			if (selected.kind === 'REFUSED') return fail(400, { error: executorRefusalMessage(selected) });
 			executor = selected;
+			const tainted = workspaceTaintRefusal(
+				undertakingWorkspaceDirectory(String((pwu?.undertakingId ?? '') as string))
+			);
+			if (tainted) return fail(400, { error: tainted });
 		}
 
 		// ── ⭑⭑ JAN-EXECGOV EG-02 — `STA-8` STOPS BEING UNMET ────────────────────────────────────────────────
@@ -3319,8 +3334,14 @@ export const actions: Actions = {
 			});
 		const reviewerReady = assurancePreflight({ testMode: isTestMode() });
 		if (!reviewerReady.ready) return fail(400, { error: reviewerReady.guidance });
-		const chosen = selectExecutor({ testMode: isTestMode() });
+		// ⭐ `JAN-MHX` MH-3 — handed the reviewer the preflight admitted (D33), and refused while a CLI executor's breach marks
+		// the workspace this re-run reuses (D21a), as Begin & Execute is.
+		const chosen = selectExecutor({ testMode: isTestMode(), reviewer: reviewerReady.reviewer });
 		if (chosen.kind === 'REFUSED') return fail(400, { error: executorRefusalMessage(chosen) });
+		const tainted = workspaceTaintRefusal(
+			undertakingWorkspaceDirectory(String((pwu?.undertakingId ?? '') as string))
+		);
+		if (tainted) return fail(400, { error: tainted });
 
 		const decisionId = mintUiId('dec');
 		const planB = mintUiId('plan');

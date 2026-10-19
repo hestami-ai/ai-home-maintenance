@@ -48,6 +48,8 @@ const REPORTER = join(ROOT, 'verif', 'live-backend-isolation.reporter.ts');
  * ⭐ AND A TENTH, `JPWB_AGENT_MODEL` (the re-review of E4's fix round): the authoring agent's model, which the replay
  * refuses beside its switch (`replay/replay-switch.ts`, `LIVE_SELECTIONS_BESIDE_A_REPLAY`) — so a shell that exported it
  * for half B's authoring turned every gate replay test into that refusal.
+ * ⭐ AND AN ELEVENTH AND A TWELFTH (`JAN-MHX` MH-3, design D39): `JPWB_EXECUTOR_EFFORT`, a selection the executor selector
+ * reads, and `JPWB_CODEX_BIN`, a program override the selector captures when it loads.
  */
 const EXPORTED: Readonly<Record<string, string>> = {
 	JPWB_ASSURANCE_TOOL: 'devin',
@@ -55,12 +57,14 @@ const EXPORTED: Readonly<Record<string, string>> = {
 	JPWB_JUDGE_MODEL: 'exported-judge-model',
 	JPWB_EXECUTOR: 'agy',
 	JPWB_EXECUTOR_MODEL: 'exported-executor-model',
+	JPWB_EXECUTOR_EFFORT: 'exported-executor-effort',
 	JPWB_AGENT: 'pi',
 	JPWB_AGENT_MODEL: 'exported-agent-model',
 	// ⛔ Paths INSIDE the empty directory, to files that do not exist: were an override to reach an adapter, it would
 	// name no program.
 	JPWB_DEVIN_BIN: join(NO_PROGRAMS, 'devin-exported-override'),
 	JPWB_AGY_BIN: join(NO_PROGRAMS, 'agy-exported-override'),
+	JPWB_CODEX_BIN: join(NO_PROGRAMS, 'codex-exported-override'),
 	// ⛔ A folder INSIDE the empty directory that holds no recording: were the switch to reach a selector, it would
 	// replay nothing.
 	JPWB_REPLAY: join(NO_PROGRAMS, 'replay-exported-recording')
@@ -128,9 +132,10 @@ describe('⭐ D8 — a gate entry point started with every live-backend variable
 	it('⭑ CONTROL — the arrangement exports every live-backend variable, into a PATH that finds no program', () => {
 		const env = exportedEnvironment();
 		// ⭐ The review of E4, finding 11 — ~~eight~~ nine: the replay switch is the ninth. ⭐ The re-review of its fix
-		// round — ten: the authoring agent's model, which the replay refuses beside its switch. ⭑ The count is pinned
-		// here, once; the titles and messages name the variables, never their number (the E4 polish round).
-		expect(Object.keys(EXPORTED)).toHaveLength(10);
+		// round — ten: the authoring agent's model, which the replay refuses beside its switch. ⭐ `JAN-MHX` MH-3 — twelve:
+		// the executor's effort and Codex's program override. ⭑ The count is pinned here, once; the titles and messages name
+		// the variables, never their number (the E4 polish round).
+		expect(Object.keys(EXPORTED)).toHaveLength(12);
 		for (const [k, v] of Object.entries(EXPORTED)) expect(env[k]).toBe(v);
 		expect(Object.keys(env).filter((k) => /^path$/i.test(k))).toEqual(['PATH']);
 		expect(env.PATH).toBe(NO_PROGRAMS);

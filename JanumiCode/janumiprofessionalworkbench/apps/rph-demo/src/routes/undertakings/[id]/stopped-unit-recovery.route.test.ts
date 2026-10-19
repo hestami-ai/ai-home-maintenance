@@ -157,6 +157,9 @@ vi.mock('../../../lib/server/tools/devin-reviewer.js', async (importOriginal) =>
 import { SEEDED_REASONING_REVIEW_CRITERIA } from '@janumipwb/rph-assurance';
 import { getObject, listByType } from '@janumipwb/rph-engine';
 import { readFileSync } from 'node:fs';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { noProgramsDirectory } from '../../../lib/server/assurance/no-programs.testing.js';
@@ -178,6 +181,8 @@ import {
 	createProcessRunObserver,
 	type ObservedProcessRun
 } from '../../../lib/server/tools/process-run-observer.js';
+import { resolveUndertakingSandbox } from '../../../lib/server/execution/workspace-host.js';
+import { writeWorkspaceTaint } from '../../../lib/server/execution/workspace-taint.js';
 import { getArtifactStore, getEngine, resetEngine, uiSession } from '../../../lib/server/workbench.js';
 import { stepSuccessShape } from '../../../../../../scripts/phase7/run-report-core.js';
 import { actions, load } from './+page.server.js';
@@ -1199,5 +1204,78 @@ describe('⭐⭐ P76F-D D2 — the engine refused the completion and no review o
 			offers: { rerunReview: false, rerunWork: true, abandon: true },
 			refusal: ''
 		});
+	});
+});
+
+// ── ⭐ `JAN-MHX` MH-3 (`DESIGN-multi-harness-executor.md` D33, D21a; roadmap MH-3 tests 10 and 11) — A RE-RUN OF THE WORK
+// ASKS THE EXECUTOR SELECTOR WITH THE REVIEWER THE PREFLIGHT ADMITTED, AND IS REFUSED WHILE THE WORKSPACE IS TAINTED ──
+// ⭑ RED FIRST, both: the route asked the selector without the reviewer and read no marker, so each re-run was dispatched.
+// ⭑ The taint is marked beside the directory the DURABLE arm gives the Undertaking (`resolveUndertakingSandbox`), and the
+// host is made to resolve that arm for the re-run (`RPH_DEMO_MODE=server`, `JPWB_DEMO_DB` under a temp folder) — the
+// arrangement `begin-execute-workspace-taint.test.ts` gives Begin & Execute.
+describe('⭐ `JAN-MHX` MH-3 — a re-run of the work is refused, before anything is dispatched, beside the reviewer’s model or a tainted workspace', () => {
+	it('⛔ (D33) the executor would run the reviewer’s own model: refused, no session opened, nothing recorded, the unit still waiting', async () => {
+		const k = await aWaitingUnit([], REJECTED);
+		const events = getEngine().readAllEvents().length;
+		const sessions = seam.sessions;
+		vi.stubEnv('JPWB_EXECUTOR', 'agy');
+		vi.stubEnv('JPWB_EXECUTOR_MODEL', 'fixture-assurance-model');
+
+		const result = await act('rerunWork', { pwuId: k.pwuId, rationale: 'Try the work again.' });
+
+		expect(
+			result.data?.error ?? '',
+			'the re-run was not refused for the reviewer’s model'
+		).toContain(
+			"The executing tool 'agy' would run fixture-assurance-model, the model the reviewer (devin) runs"
+		);
+		expect(getEngine().readAllEvents().length, 'a refused re-run recorded something').toBe(events);
+		expect(seam.sessions, 'a refused re-run opened a session').toBe(sessions);
+		expect(axesOf(k.pwuId)).toEqual(['EXECUTING', 'WAITING']);
+	});
+
+	it('⛔ (D21a) a marker beside the workspace: WORKSPACE_TAINTED — no session opened, nothing recorded, the unit still waiting', async () => {
+		const k = await aWaitingUnit([], REJECTED);
+		const container = await mkdtemp(join(tmpdir(), 'jpwb-taint-rerun-'));
+		try {
+			const db = join(container, 'demo.sqlite');
+			const undertakingId = String(
+				(getObject(getEngine(), k.pwuId) as Record<string, unknown>).undertakingId
+			);
+			const directory = resolveUndertakingSandbox(undertakingId, `${db}.workspaces`).workspace
+				.directoryPath;
+			expect(
+				directory,
+				'arrangement: the durable arm gives the workspace a directory'
+			).toBeDefined();
+			writeWorkspaceTaint(directory!, {
+				code: 'CLI_UNEXPLAINED_CHANGE',
+				toolId: 'agy',
+				turn: 1,
+				at: '2026-10-18T10:00:00.000Z'
+			});
+			vi.stubEnv('RPH_DEMO_MODE', 'server');
+			vi.stubEnv('JPWB_DEMO_DB', db);
+			const events = getEngine().readAllEvents().length;
+			const sessions = seam.sessions;
+
+			const result = await act('rerunWork', { pwuId: k.pwuId, rationale: 'Try the work again.' });
+
+			expect(
+				result.data?.error ?? '',
+				'the re-run was not refused for its tainted workspace'
+			).toContain('WORKSPACE_TAINTED');
+			expect(result.data?.error).toContain(
+				"CLI_UNEXPLAINED_CHANGE, on turn 1 of the executing tool 'agy'"
+			);
+			expect(getEngine().readAllEvents().length, 'a refused re-run recorded something').toBe(
+				events
+			);
+			expect(seam.sessions, 'a refused re-run opened a session').toBe(sessions);
+			expect(axesOf(k.pwuId)).toEqual(['EXECUTING', 'WAITING']);
+		} finally {
+			vi.unstubAllEnvs();
+			await rm(container, { recursive: true, force: true });
+		}
 	});
 });

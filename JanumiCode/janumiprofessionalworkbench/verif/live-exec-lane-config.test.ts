@@ -92,6 +92,7 @@ import {
 } from '../apps/rph-demo/e2e-live-exec/phase7-operator.js';
 import { agyPrint } from '../apps/rph-demo/src/lib/server/assurance/agy-cli.js';
 import { createFloorRegistry } from '../apps/rph-demo/src/lib/server/assurance/index.js';
+import { assurancePreflight } from '../apps/rph-demo/src/lib/server/assurance/preflight.js';
 import { selectExecutor } from '../apps/rph-demo/src/lib/server/execution/executor-selection.js';
 import { noProgramsDirectory } from '../apps/rph-demo/src/lib/server/assurance/no-programs.testing.js';
 import { createAgyReasoningReviewValidator } from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
@@ -119,10 +120,15 @@ const REGISTER = fileURLToPath(
 const MODEL_VARIABLES = ['JPWB_JUDGE_MODEL', 'JPWB_ASSURANCE_MODEL'] as const;
 const NO_OVERRIDES = { agy: undefined, devin: undefined } as const;
 
-/** Every variable the lane reads, set — the arrangement each refusal case removes one thing from. */
+/**
+ * Every variable the lane reads, set — the arrangement each refusal case removes one thing from.
+ * ⭐ `JAN-MHX` MH-3 (D33) — the executor's model is the one P3 ran, which the product's model-family table lists, so the
+ * product admits it beside this arrangement's devin reviewer. `openai-codex/gpt-5.4-mini`, which it held before, is a
+ * model the table does not list, refused beside that reviewer as unclassified.
+ */
 const COMPLETE = {
 	JPWB_EXECUTOR: 'pi',
-	JPWB_EXECUTOR_MODEL: 'openai-codex/gpt-5.4-mini',
+	JPWB_EXECUTOR_MODEL: 'openai-codex/gpt-5.6-sol',
 	JPWB_ASSURANCE_MODEL: 'glm-5-3-flash-max',
 	JPWB_JUDGE_MODEL: 'Gemini 3.1 Pro (High)'
 } as const;
@@ -296,7 +302,15 @@ describe('⛔ the lane refuses a program override where the product does — the
 // TO ITS OWN (above): over a table, with the product asked outside test mode — where the lane runs — and handed the
 // overrides the shell would have made the adapters capture. ⭑ ONE RULE IS THE LANE'S OWN, and the table holds it apart
 // from the product's: no agy executor, because the spec asserts a provider-reported producer.
-describe('⭐ the lane refuses the executor the product refuses — and one more, labelled as the lane’s own', () => {
+// ⚠ `JAN-MHX` MH-3 — THE TABLE IS THE MIRROR WITHOUT A REVIEWER AND WITHOUT AN EFFORT. The product's selector gained
+// refusals the lane does not restate: `JPWB_EXECUTOR_EFFORT` set for a tool the host hands none (D32,
+// `EXECUTOR_EFFORT_NOT_TAKEN`), and an executor model that is the reviewer's, by id or family, or that the model-family
+// table does not list (D33, `EXECUTOR_MODEL_IS_THE_REVIEWERS`, `EXECUTOR_MODEL_UNCLASSIFIED`), asked beside the reviewer
+// the preflight admits. The table asks the product with no reviewer and no effort, so it holds the lane to the rules the
+// lane restates, and to no more. The full mirror is owed to MH-8: the lane refusing at boot what D32 refuses and what D33
+// refuses beside the lane's own reviewer, with the table asking beside that reviewer and gaining effort rows. Until then
+// the gap is pinned below, by name, so that it is not read as agreement.
+describe('⭐ the lane refuses the executor the product refuses, asked without a reviewer or an effort — and one more, labelled as the lane’s own', () => {
 	/** The line the lane's own rule writes — the one refusal the product does not make. */
 	const LANE_RULE = 'is refused by a rule of THIS LANE, not of the product';
 	/** Each reason the lane gives, one per line. */
@@ -321,7 +335,7 @@ describe('⭐ the lane refuses the executor the product refuses — and one more
 			const product = selectExecutor({
 				testMode: false,
 				env: { JPWB_EXECUTOR: tool, JPWB_EXECUTOR_MODEL: 'fixture-model' },
-				overrides: NO_OVERRIDES
+				overrides: { ...NO_OVERRIDES, codex: undefined }
 			});
 			expect(wiredExecutor(tool) !== undefined, JSON.stringify(tool)).toBe(
 				product.kind !== 'REFUSED'
@@ -370,14 +384,18 @@ describe('⭐ the lane refuses the executor the product refuses — and one more
 	for (const tool of EXECUTOR_TOOLS)
 		for (const model of EXECUTOR_MODELS)
 			for (const row of PROGRAM_ROWS)
-				it(`JPWB_EXECUTOR=${JSON.stringify(tool)} · JPWB_EXECUTOR_MODEL=${JSON.stringify(model)} · ${row.name}: the lane refuses what the product refuses`, () => {
+				it(`JPWB_EXECUTOR=${JSON.stringify(tool)} · JPWB_EXECUTOR_MODEL=${JSON.stringify(model)} · ${row.name}: the lane refuses what the product, asked without a reviewer or an effort, refuses`, () => {
 					const executor = { JPWB_EXECUTOR: tool, JPWB_EXECUTOR_MODEL: model, ...row.env };
 					// The lane's full environment: the reviewer's keys all present and admitted, so any fault is the executor's.
 					const env = { ...COMPLETE, ...row.reviewer, ...executor };
 					const product = selectExecutor({
 						testMode: false,
 						env: executor,
-						overrides: { agy: row.env.JPWB_AGY_BIN, devin: row.env.JPWB_DEVIN_BIN }
+						overrides: {
+							agy: row.env.JPWB_AGY_BIN,
+							devin: row.env.JPWB_DEVIN_BIN,
+							codex: undefined
+						}
 					});
 					const faults = faultsOf(laneKeysRefusal(env));
 					const productFaults = faults.filter((l) => !l.includes(LANE_RULE));
@@ -393,16 +411,52 @@ describe('⭐ the lane refuses the executor the product refuses — and one more
 					).toBe(wiredExecutor(tool) === 'agy');
 				});
 
-	it('⛔ a Pi executor the product runs boots the lane — the stray JPWB_AGY_BIN of SR2-M20’s host included', () => {
+	// ⭐ `JAN-MHX` MH-3 (D33) — AND THE PRODUCT IS ASKED AS BEGIN & EXECUTE ASKS IT: beside the reviewer the same
+	// environment's preflight admits, which is the lane's own. Asked without one, the selector compares nothing.
+	it('⛔ a Pi executor the product runs beside the lane’s own reviewer boots the lane — the stray JPWB_AGY_BIN of SR2-M20’s host included', () => {
 		const env = { ...COMPLETE, JPWB_ASSURANCE_TOOL: 'devin', JPWB_AGY_BIN: 'C:/fixture/agy.exe' };
 		expect(laneKeysRefusal(env)).toBeUndefined();
+		const { reviewer } = assurancePreflight({ testMode: false, env });
+		// ⭑ A CONTROL: with no reviewer handed in, the selector compares nothing, and the assertion below holds of any model.
+		expect(reviewer, 'the lane’s own reviewer, admitted by the preflight').toEqual({
+			toolId: 'devin',
+			modelId: COMPLETE.JPWB_ASSURANCE_MODEL
+		});
 		expect(
 			selectExecutor({
 				testMode: false,
 				env,
-				overrides: { agy: 'C:/fixture/agy.exe', devin: undefined }
+				overrides: { agy: 'C:/fixture/agy.exe', devin: undefined, codex: undefined },
+				reviewer
 			})
 		).toEqual({ kind: 'PI', modelId: COMPLETE.JPWB_EXECUTOR_MODEL });
+	});
+
+	// ⚠ `JAN-MHX` MH-3 — THE GAP, PINNED UNTIL MH-8 CLOSES IT. Each arrangement boots the lane, and the product refuses it
+	// at Begin & Execute, after whatever reviewer calls the run spends before its first model step. When the lane restates
+	// D32 and D33, this reddens, and MH-8 turns it into rows of the table above.
+	it('⚠ not yet mirrored, owed to MH-8: the lane boots where the product refuses an effort, or a model beside the lane’s own reviewer', () => {
+		const arrangements = [
+			{ JPWB_EXECUTOR_MODEL: 'openai-codex/gpt-5.4-mini', refused: 'EXECUTOR_MODEL_UNCLASSIFIED' },
+			{ JPWB_EXECUTOR_MODEL: 'glm-5-3-flash-max', refused: 'EXECUTOR_MODEL_IS_THE_REVIEWERS' },
+			{ JPWB_EXECUTOR_EFFORT: 'high', refused: 'EXECUTOR_EFFORT_NOT_TAKEN' }
+		] as const;
+		for (const { refused, ...executor } of arrangements) {
+			const env = { ...COMPLETE, JPWB_ASSURANCE_TOOL: 'devin', ...executor };
+			expect(
+				laneKeysRefusal(env),
+				`the lane, where the product refuses ${refused}`
+			).toBeUndefined();
+			expect(
+				selectExecutor({
+					testMode: false,
+					env,
+					overrides: { ...NO_OVERRIDES, codex: undefined },
+					reviewer: assurancePreflight({ testMode: false, env }).reviewer
+				}),
+				`the product, beside the lane’s own reviewer`
+			).toMatchObject({ kind: 'REFUSED', code: refused });
+		}
 	});
 
 	it('⛔ an executor the product does not run is refused, named, with the tools it may be', () => {

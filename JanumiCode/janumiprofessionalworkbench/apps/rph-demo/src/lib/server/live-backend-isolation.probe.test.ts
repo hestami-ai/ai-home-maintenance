@@ -42,7 +42,11 @@ const LIVE_BACKEND_VARIABLES = [
 	'JPWB_REPLAY',
 	// ⭐ The re-review of E4's fix round — the tenth: the authoring agent's model, which the replay refuses beside its
 	// switch (`replay/replay-switch.ts`, `LIVE_SELECTIONS_BESIDE_A_REPLAY`).
-	'JPWB_AGENT_MODEL'
+	'JPWB_AGENT_MODEL',
+	// ⭐ `JAN-MHX` MH-3 (design D39) — the eleventh and the twelfth: the executor's effort, which the executor selector
+	// reads, and Codex's program override, which it captures when it loads.
+	'JPWB_EXECUTOR_EFFORT',
+	'JPWB_CODEX_BIN'
 ] as const;
 
 describe('⭐ D8 — a gate process inherits no live-backend selection', () => {
