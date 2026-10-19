@@ -126,7 +126,8 @@ bun run --filter @janumipwb/rph-demo dev
 - **The executor.** A model step needs `JPWB_EXECUTOR`, a tool this host has an executor adapter for (`agy` or `pi`),
   and `JPWB_EXECUTOR_MODEL`, the model that tool runs. Neither has a default, and the executor's model never falls back
   to the reviewer's. Outside test mode these are refused before anything is dispatched, with a message that says what
-  to set: an unset or unknown tool, `devin` (no executor adapter is wired for it), a missing model, and `JPWB_AGY_BIN`
+  to set: an unset or unknown tool, `devin` (its executor adapter is wired in test mode only, until a live devin turn
+  is confirmed: `JAN-MHX` MH-4), a missing model, and `JPWB_AGY_BIN`
   set while agy is the executor. In test mode an unset tool selects the deterministic test fixture. For agy,
   `JPWB_EXECUTOR_MODEL` must be a label agy recognises: it is the model agy is asked to run and the model the record
   names, graded `HOST_CONFIGURED` because agy reports none (`REG-F-458` and `REG-F-459` are closed by `JAN-SELRES`

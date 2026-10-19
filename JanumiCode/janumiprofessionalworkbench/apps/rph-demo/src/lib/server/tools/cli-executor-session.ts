@@ -39,7 +39,7 @@
 //     disk — reaches the exchange's parse outcome, on the record plane, which has no removal path. The excerpt's bound
 //     and the driver's recognition of a shape are what keep it short and specific.
 import { spawn } from 'node:child_process';
-import { existsSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { lstat, mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
@@ -276,6 +276,11 @@ export interface CliDriver {
 	readonly configSources: readonly { readonly name: string; readonly path: string }[];
 	/** ⭐ D43 — constants the CLI's environment carries beside the allowlist. */
 	readonly environment: Readonly<Record<string, string>>;
+	/**
+	 * ⭐ D43 — `JAN-MHX` MH-4: the constants that name a folder of the run's own (devin's `DEVIN_SESSIONS_DIR`), which no
+	 * fixed constant can. Carried beside `environment`, at the preflight and at every turn.
+	 */
+	runEnvironment?(run: CliRunFolder): Readonly<Record<string, string>>;
 	/** ⭐ D43 — a secret the CLI needs, by variable name: given to the CLI's process only, never to the allowlist. */
 	readonly secretVariable?: string;
 	runFolderFiles(run: CliRunFolder): readonly CliRunFile[];
@@ -427,6 +432,18 @@ function fingerprintOf(path: string): string {
 		return `${s.isDirectory() ? 'directory' : 'file'}:${s.size}:${s.mtimeMs}`;
 	} catch {
 		return 'absent';
+	}
+}
+
+/**
+ * ⭐ `JAN-MHX` MH-4 (D44a) — a run-folder file's text, or `undefined` when it cannot be read. ⭑ Read, where a source is only
+ * fingerprinted: the host wrote these bytes itself, so it reads nothing of the operator's.
+ */
+function contentOf(path: string): string | undefined {
+	try {
+		return readFileSync(path, 'utf8');
+	} catch {
+		return undefined;
 	}
 }
 
@@ -692,9 +709,16 @@ async function writeInside(directory: string, file: CliRunFile, toolId: string):
 	await writeFile(target, file.bytes, 'utf8');
 }
 
-/** The CLI's environment (D43): the allowlist, the driver's constants, and its declared secret, if the server holds one. */
-function cliEnvironment(driver: CliDriver): Record<string, string> {
-	const env: Record<string, string> = { ...childEnvironment(process.env), ...driver.environment };
+/**
+ * The CLI's environment (D43): the allowlist, the driver's constants, those naming the run's own folders, and its declared
+ * secret, if the server holds one.
+ */
+function cliEnvironment(driver: CliDriver, run: CliRunFolder): Record<string, string> {
+	const env: Record<string, string> = {
+		...childEnvironment(process.env),
+		...driver.environment,
+		...driver.runEnvironment?.(run)
+	};
 	const secret = driver.secretVariable === undefined ? undefined : process.env[driver.secretVariable];
 	if (driver.secretVariable !== undefined && secret !== undefined) env[driver.secretVariable] = secret;
 	return env;
@@ -931,6 +955,8 @@ export async function openCliExecutionSession(
 	const directory = await mkdtemp(join(root, `${RUN_FOLDER_PREFIX}${toolId}-${process.pid}-`));
 	let server: HostToolServer | undefined;
 	let run: CliRunFolder;
+	let runFiles: readonly CliRunFile[];
+	let bridgeFile: CliRunFile;
 	let fingerprints: readonly (readonly [string, string, string])[];
 	try {
 		const cliDirectory = join(directory, 'cli');
@@ -955,24 +981,32 @@ export async function openCliExecutionSession(
 		// ⛔ D41 — THE ENDPOINT FILE IS IN `host/`, OUTSIDE THE CLI'S WORKING FOLDER. Until a turn opens it holds no token.
 		const endpointPath = join(hostDirectory, 'endpoint.json');
 		writeFileSync(endpointPath, JSON.stringify({ url: server.url, token: null }), 'utf8');
+		const bridgePath = await writeBridge(hostDirectory);
+		// ⭐ `JAN-MHX` MH-4, the check's fix (D44a) — THE BRIDGE'S BYTES, READ BACK AS WRITTEN: the CLI's MCP entry runs this
+		// file at every turn, so it is held to them as the driver's own files are.
+		bridgeFile = {
+			path: relative(directory, bridgePath).replaceAll('\\', '/'),
+			bytes: readFileSync(bridgePath, 'utf8')
+		};
 		run = {
 			directory,
 			cliDirectory,
 			hostDirectory,
-			bridgePath: await writeBridge(hostDirectory),
+			bridgePath,
 			endpointPath,
 			nodePath: process.execPath,
 			serverName: HOST_TOOL_SERVER_NAME,
 			systemPrompt: `${EXECUTOR_HOST_TOOLS_PREAMBLE}\n\n${EXECUTION_CONTRACT_PROMPT}`
 		};
-		for (const file of driver.runFolderFiles(run)) await writeInside(directory, file, toolId);
+		runFiles = driver.runFolderFiles(run);
+		for (const file of runFiles) await writeInside(directory, file, toolId);
 		fingerprints = driver.configSources.map((s) => [s.name, s.path, fingerprintOf(s.path)] as const);
 		const check = driver.preflight(run);
 		if (check !== undefined) {
 			const refusal = await preflightRefusal(
 				check,
 				exec,
-				{ cwd: cliDirectory, env: cliEnvironment(driver) },
+				{ cwd: cliDirectory, env: cliEnvironment(driver, run) },
 				deps.preflightTimeoutMs ?? CLI_PREFLIGHT_TIMEOUT_MS
 			);
 			if (refusal !== undefined)
@@ -985,6 +1019,7 @@ export async function openCliExecutionSession(
 	}
 	const openServer = server;
 	const runFolder = run;
+	const writtenRunFiles: readonly CliRunFile[] = [...runFiles, bridgeFile];
 	const sources = fingerprints;
 
 	/** Every turn's text, as `run-model-step` sent it, and each try's answer, if one arrived (D16). */
@@ -1002,8 +1037,21 @@ export async function openCliExecutionSession(
 	/** ⭐ D44a — what changed since the session opened, before any spawn, or `undefined`. */
 	function configChange(): string | undefined {
 		const changed = sources.filter(([, path, at]) => fingerprintOf(path) !== at).map(([name]) => name);
+		// ⭐ `JAN-MHX` MH-4 — AND THE RUN FOLDER'S OWN FILES, which the CLI reads its configuration from at every turn: each must
+		// still be the bytes the opener wrote. devin rewrote its own `--config` file in its first-run setup (MH-0a's F1), and a
+		// command the model runs can rewrite any of them; the preflight checked them once, at the open. ⭑ Named by its place
+		// in the run folder, never by its path. ⭐ MH-4, the check's fix — "every file" was more than this held: it holds the
+		// driver's declared files and the bridge, which the CLI's MCP entry runs. The endpoint file and the prompt files are
+		// the opener's to rewrite at each turn, and are not compared.
+		const rewritten = writtenRunFiles
+			.filter((file) => contentOf(resolve(runFolder.directory, file.path)) !== file.bytes)
+			.map((file) => `the run folder’s ${file.path}`);
 		const appeared = ancestorConfiguration(root, home, existsSync);
-		const named = [...changed, ...appeared.map((hit) => `an ancestor of the dedicated root now holds ${hit}`)];
+		const named = [
+			...changed,
+			...rewritten,
+			...appeared.map((hit) => `an ancestor of the dedicated root now holds ${hit}`)
+		];
 		return named.length === 0 ? undefined : named.join('; ');
 	}
 
@@ -1064,7 +1112,7 @@ export async function openCliExecutionSession(
 				program: invocation.program,
 				args: invocation.args,
 				cwd: runFolder.cliDirectory,
-				env: cliEnvironment(driver),
+				env: cliEnvironment(driver, runFolder),
 				stdin: invocation.stdin
 			});
 			active = child;

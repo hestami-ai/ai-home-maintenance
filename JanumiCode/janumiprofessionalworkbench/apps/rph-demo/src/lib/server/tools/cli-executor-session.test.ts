@@ -327,6 +327,28 @@ describe('⭐ D13, D41, D43 — where the CLI runs, and what it is given', () =>
 		expect(Object.keys(env).some((k) => k.toUpperCase() === 'PATH'), 'the allowlist itself reached the CLI').toBe(true);
 	});
 
+	it('⭐ MH-4 (D43) — a driver’s per-run constants reach the CLI’s environment, at its preflight and at each turn, naming the run’s own folders', async () => {
+		// ⛔ THE MUTANT: merge only the driver's fixed constants. devin's `DEVIN_SESSIONS_DIR` names a folder of the run's own
+		// (`<run>/host/sessions`), which no fixed constant can (`JAN-MHX` D43; MH-0a's F10: devin honours it).
+		const turns = fakeExec(passing);
+		const preflights: CliExecRequest[] = [];
+		const exec: CliExec = (req) => {
+			if (req.args[0] !== 'list') return turns(req);
+			preflights.push(req);
+			return { done: Promise.resolve({ exitCode: 0, stdout: 'listed', stdoutComplete: true, errorLines: [] }), kill: async () => undefined };
+		};
+		const driver = fakeDriver({
+			runEnvironment: (run) => ({ FAKE_RUN_SESSIONS: join(run.hostDirectory, 'sessions') }),
+			preflight: () => ({ invocation: { program: 'fake-cli', args: ['list'] }, refusal: () => undefined })
+		});
+		await turn(await open(exec, { driver }));
+		const sessionsDir = join(turns.clis[0]!.hostDirectory, 'sessions');
+		// ⭑ Compared, not printed: the folder is under the system's temporary folder, whose path names the account.
+		expect(preflights[0]!.env.FAKE_RUN_SESSIONS === sessionsDir, 'the preflight').toBe(true);
+		expect(turns.requests[0]!.env.FAKE_RUN_SESSIONS === sessionsDir, 'the turn').toBe(true);
+		expect(turns.requests[0]!.env.FAKE_CLI_CONSTANT, 'the fixed constants still').toBe('on');
+	});
+
 	it('C4 — a driver’s declared secret reaches the CLI’s environment, no command the model runs, and nothing the result holds', async () => {
 		// ⛔ THE MUTANT: add it to the shared allowlist, which also serves every command the model runs.
 		const SECRET = 'the-fake-cli-secret-value-4c1e';
@@ -990,6 +1012,39 @@ describe('⭐ D13, D44a — the configuration a CLI reads', () => {
 		expect(messageOf(second)).toMatch(/^EXECUTOR_CONFIG_CHANGED: .* It names: fake settings\.$/);
 		expect(exec.requests, 'the CLI was started for a refused turn').toHaveLength(1);
 		expect(second.observedToolCalls.canObserve).toBe(false);
+	});
+
+	it('⭐ MH-4 (D44a) — a file of the run folder rewritten after the open refuses the next turn before any spawn, named by its place in the folder', async () => {
+		// ⛔ THE MUTANT: check only the declared sources. devin rewrote its own `--config` file in its first-run setup
+		// (MH-0a's F1), and a command the model runs can rewrite any file of the run folder, which the CLI reads its
+		// configuration from at every turn; the preflight checked it once, at the open.
+		const exec = fakeExec(async (cli) => {
+			if (cli.turn === 1) appendFileSync(join(cli.request.cwd, 'fake-mcp.json'), ' ', 'utf8');
+			cli.answer('{"workProduct":"done","rationale":{}}');
+		});
+		const session = await open(exec);
+		expect((await turn(session)).answer.arrived, 'arrangement: the first turn passes').toBe(true);
+		const second = await turn(session, 'FINDINGS');
+		expect(messageOf(second)).toMatch(/^EXECUTOR_CONFIG_CHANGED: .* It names: the run folder’s cli\/fake-mcp\.json\.$/);
+		expect(exec.requests, 'the CLI was started for a refused turn').toHaveLength(1);
+	});
+
+	it('⭐ MH-4, the check’s fix (D44a) — the bridge rewritten after the open refuses the next turn before any spawn, named by its place in the folder', async () => {
+		// ⛔ THE MUTANT: compare the driver's declared files alone. The CLI's MCP entry runs the bridge at every turn, and a
+		// command the model runs can rewrite it: the check's scenario D started its next turn on the rewritten bridge.
+		const exec = fakeExec(async (cli) => {
+			if (cli.turn === 1) {
+				const entry = JSON.parse(readFileSync(join(cli.request.cwd, 'fake-mcp.json'), 'utf8')) as { args: string[] };
+				const bridge = entry.args[0]!;
+				writeFileSync(bridge, `// rewritten by a command the model ran\n${readFileSync(bridge, 'utf8')}`, 'utf8');
+			}
+			cli.answer('{"workProduct":"done","rationale":{}}');
+		});
+		const session = await open(exec);
+		expect((await turn(session)).answer.arrived, 'arrangement: the first turn passes').toBe(true);
+		const second = await turn(session, 'FINDINGS');
+		expect(messageOf(second)).toMatch(/^EXECUTOR_CONFIG_CHANGED: .* It names: the run folder’s host\/jpwb-bridge\.mjs\.$/);
+		expect(exec.requests, 'the CLI was started for a refused turn').toHaveLength(1);
 	});
 
 	it('C21 — a config source that cannot be opened as a file, a folder, is fingerprinted by stat alone', async () => {

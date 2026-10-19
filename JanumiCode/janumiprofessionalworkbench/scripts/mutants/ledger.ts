@@ -12074,8 +12074,8 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
 		find: "\t\t\t'EXECUTOR_TOOL_UNWIRED',\n",
 		replace: "\t\t\t'EXECUTOR_TOOL_UNKNOWN', // MUTANT: an unwired tool is coded unknown\n",
-		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
-		why: "PROMISE (JAN-SELRES D1): each refusal names its own code, so a caller acts on it without parsing prose - devin, declared for EXECUTION with no executor adapter, is EXECUTOR_TOOL_UNWIRED, not UNKNOWN. WHO RELIES: every caller that branches on the code, and the operator reading which configuration was wrong. WHAT THE MUTATION DOES: devin is coded as a tool the catalog does not know, though the catalog declares it. OBSERVED: KILLED — 73 test(s) red in executor-selection.test.ts: 'test mode · tool \"devin\" · no model · no override' (AssertionError: expected { kind: 'REFUSED', …(2) } to deeply equal { kind: 'REFUSED', …(2) }); 'test mode · tool \"devin\" · no model · JPWB_AGY_BIN set' (AssertionError: expected { kind: 'REFUSED', …(2) } to deeply equal { kind: 'REFUSED', …(2) })",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection-unwired.test.ts"],
+		why: "PROMISE (JAN-SELRES D1): each refusal names its own code, so a caller acts on it without parsing prose - devin, declared for EXECUTION with no executor adapter, is EXECUTOR_TOOL_UNWIRED, not UNKNOWN. WHO RELIES: every caller that branches on the code, and the operator reading which configuration was wrong. WHAT THE MUTATION DOES: devin is coded as a tool the catalog does not know, though the catalog declares it. OBSERVED: KILLED — 73 test(s) red in executor-selection.test.ts: 'test mode · tool \"devin\" · no model · no override' (AssertionError: expected { kind: 'REFUSED', …(2) } to deeply equal { kind: 'REFUSED', …(2) }); 'test mode · tool \"devin\" · no model · JPWB_AGY_BIN set' (AssertionError: expected { kind: 'REFUSED', …(2) } to deeply equal { kind: 'REFUSED', …(2) }) ⭐ RE-MEASURED 2026-10-18 (JAN-MHX MH-4; ledger rule #5): MH-4 wired devin (D30), the last catalogued EXECUTION tool without an executor adapter, so over the real catalog no input reaches this refusal, and its old victim, executor-selection.test.ts, cannot redden on it. THE MUTATION IS UNCHANGED, AND SO IS ITS PROMISE IN ITS GENERAL FORM: a catalogued EXECUTION tool with no executor adapter is EXECUTOR_TOOL_UNWIRED, not UNKNOWN. Its victim is now executor-selection-unwired.test.ts, which loads the selector against the real catalog with one more EXECUTION tool, fixture-unwired, that nobody wired. RE-MEASURED (bun run mutants -- the 198 existing entries MH-4's change can reach, by their full ids, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         RS1-M2-an-unwired-tool-is-coded-unknown ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯' ⭐ RE-MEASURED 2026-10-19 (JAN-MHX MH-4, the check's fix round, F1; ledger rule #5): devin is wired in test mode only (D30), so outside test mode its rows in executor-selection.test.ts reach this refusal again, and redden on it; the named victim stays executor-selection-unwired.test.ts, whose tool is wired in no mode. OBSERVED (bun run mutants -- the four entries this round named one victim for, by their full ids, 2026-10-19, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         RS1-M2-an-unwired-tool-is-coded-unknown ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯' ALSO RED, NOT NAMED (each suite run alone with the mutant applied, from a scratch script that restored the file from its saved bytes; the worktree equalled the index after): executor-selection.test.ts: exit=1, 'Tests 47 failed | 930 passed (977)'.",
 		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
 	},
 	{
@@ -12145,9 +12145,9 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		id: "RS1-M10-the-guidance-lists-the-catalog",
 		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
 		find: "Object.keys(WIRED_EXECUTORS).join(', ')",
-		replace: "['agy', 'pi', 'devin'].join(', ') /* MUTANT: the catalog, not the wired tools */",
-		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
-		why: "PROMISE (JAN-SELRES D1): the guidance lists the WIRED executor tools - the table the selector dispatches on - never the catalog. WHO RELIES: the operator following the refusal's guidance. WHAT THE MUTATION DOES: the guidance offers devin, which the very next refusal forbids as EXECUTOR_TOOL_UNWIRED. OBSERVED: KILLED — 3 test(s) red in executor-selection.test.ts: '⛔ and that reason offers only the WIRED tools — never devin, which the next refusal forbids (REG-F-460’s general form)' (AssertionError: the reason offers devin as a tool to set: expected 'The executing tool \\'nosuchtool\\' (JP…' not to match /devin/); '⛔ it lists the wired tools — agy, pi — and NOT devin' (AssertionError: expected 'Set JPWB_EXECUTOR to the tool that ex…' not to match /\\bpi, devin\\b/)",
+		replace: "KNOWN_TOOL_IDS.join(', ') /* MUTANT: the catalog, not the wired tools */",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection-unwired.test.ts"],
+		why: "PROMISE (JAN-SELRES D1): the guidance lists the WIRED executor tools - the table the selector dispatches on - never the catalog. WHO RELIES: the operator following the refusal's guidance. WHAT THE MUTATION DOES: the guidance offers devin, which the very next refusal forbids as EXECUTOR_TOOL_UNWIRED. OBSERVED: KILLED — 3 test(s) red in executor-selection.test.ts: '⛔ and that reason offers only the WIRED tools — never devin, which the next refusal forbids (REG-F-460’s general form)' (AssertionError: the reason offers devin as a tool to set: expected 'The executing tool \\'nosuchtool\\' (JP…' not to match /devin/); '⛔ it lists the wired tools — agy, pi — and NOT devin' (AssertionError: expected 'Set JPWB_EXECUTOR to the tool that ex…' not to match /\\bpi, devin\\b/) ⭐ REFORMULATED 2026-10-18 (JAN-MHX MH-4; ledger rule #5): its replacement was the catalog's tools written out, agy, pi, devin. With devin wired (D30) the wired list is that same list, in that order, so the mutant could no longer differ from the code. The promise is unchanged - the guidance lists the wired tools, never the catalog - so the replacement is now the catalog itself (KNOWN_TOOL_IDS), and its victim the file that loads a catalog holding a tool nobody wired (executor-selection-unwired.test.ts). RE-MEASURED (bun run mutants -- the 198 existing entries MH-4's change can reach, by their full ids, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         RS1-M10-the-guidance-lists-the-catalog ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯' ⭐ RE-MEASURED 2026-10-19 (JAN-MHX MH-4, the check's fix round, F1; ledger rule #5): the wired list is agy, pi again, devin being wired in test mode only (D30), so the replacement, the catalog (KNOWN_TOOL_IDS: agy, pi, devin), offers devin, and executor-selection.test.ts's 'NOT devin' assertions redden again; the named victim stays the unwired file. OBSERVED (bun run mutants -- the four entries this round named one victim for, by their full ids, 2026-10-19, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         RS1-M10-the-guidance-lists-the-catalog ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯' ALSO RED, NOT NAMED (each suite run alone with the mutant applied, from a scratch script that restored the file from its saved bytes; the worktree equalled the index after): executor-selection.test.ts: exit=1, 'Tests 4 failed | 973 passed (977)'.",
 		source: "JAN-SELRES RS-1 - the executor: one selector, the model it records, no replaced program (DESIGN-the-selection-residuals.md revision 2, D1-D5, D9 executor half; ROADMAP-the-selection-residuals.md RS-1; REG-F-458, REG-F-459); RS1-M31..M35 from RS-1's adversarial verification (ADV-M1, ADV-M3, the UNKNOWN reason's catalog list, ADV-M2, the repair turn)"
 	},
 	{
@@ -31779,10 +31779,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "MH1-M36-cli-runs-in-the-workspace",
 		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
-		find: "\t\t\t\tcwd: runFolder.cliDirectory,\n\t\t\t\tenv: cliEnvironment(driver),\n\t\t\t\tstdin: invocation.stdin",
-		replace: "\t\t\t\tcwd: workspaceDirectory,\n\t\t\t\tenv: cliEnvironment(driver),\n\t\t\t\tstdin: invocation.stdin",
+		find: "\t\t\t\tcwd: runFolder.cliDirectory,\n\t\t\t\tenv: cliEnvironment(driver, runFolder),\n\t\t\t\tstdin: invocation.stdin",
+		replace: "\t\t\t\tcwd: workspaceDirectory,\n\t\t\t\tenv: cliEnvironment(driver, runFolder),\n\t\t\t\tstdin: invocation.stdin",
 		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
-		why: "PROMISE: C1 (D13): the CLI starts in the run's cli/ folder, not the workspace and not the server's folder. WHAT THE MUTATION DOES: starts it in the workspace, a folder the executor writes into and the CLI would read configuration from. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M36-cli-runs-in-the-workspace  ⎯⎯⎯⎯⎯⎯ Failed Tests 46 ⎯⎯⎯⎯⎯⎯⎯'",
+		why: "PROMISE: C1 (D13): the CLI starts in the run's cli/ folder, not the workspace and not the server's folder. WHAT THE MUTATION DOES: starts it in the workspace, a folder the executor writes into and the CLI would read configuration from. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M36-cli-runs-in-the-workspace  ⎯⎯⎯⎯⎯⎯ Failed Tests 46 ⎯⎯⎯⎯⎯⎯⎯' ⭐ RE-ANCHORED 2026-10-18 (JAN-MHX MH-4; ledger rule #5 - in the commit that moved the line): the CLI's environment gained the driver's per-run constants (CliDriver.runEnvironment, D43), so cliEnvironment takes the run folder and its object is written over lines. THE MUTATION AND ITS PROMISE ARE UNCHANGED. RE-MEASURED (bun run mutants -- the 198 existing entries MH-4's change can reach, by their full ids, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M36-cli-runs-in-the-workspace  ⎯⎯⎯⎯⎯⎯ Failed Tests 54 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
 	},
 	{
@@ -31797,19 +31797,19 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "MH1-M38-cli-gets-the-server-environment",
 		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
-		find: "const env: Record<string, string> = { ...childEnvironment(process.env), ...driver.environment };",
-		replace: "const env: Record<string, string> = { ...(process.env as Record<string, string>), ...driver.environment };",
+		find: "\t\t...childEnvironment(process.env),\n",
+		replace: "\t\t...(process.env as Record<string, string>),\n",
 		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
-		why: "PROMISE: C3 (D43): the CLI's environment is the allowlist plus its driver's constants, never the server's. WHAT THE MUTATION DOES: passes process.env, so a provider key in the server's environment would change account and billing. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M38-cli-gets-the-server-environment ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		why: "PROMISE: C3 (D43): the CLI's environment is the allowlist plus its driver's constants, never the server's. WHAT THE MUTATION DOES: passes process.env, so a provider key in the server's environment would change account and billing. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M38-cli-gets-the-server-environment ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯' ⭐ RE-ANCHORED 2026-10-18 (JAN-MHX MH-4; ledger rule #5 - in the commit that moved the line): the CLI's environment gained the driver's per-run constants (CliDriver.runEnvironment, D43), so cliEnvironment takes the run folder and its object is written over lines. THE MUTATION AND ITS PROMISE ARE UNCHANGED. RE-MEASURED (bun run mutants -- the 198 existing entries MH-4's change can reach, by their full ids, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M38-cli-gets-the-server-environment ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
 	},
 	{
 		id: "MH1-M39-token-in-the-environment",
 		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
-		find: "\t\t\t\tcwd: runFolder.cliDirectory,\n\t\t\t\tenv: cliEnvironment(driver),",
-		replace: "\t\t\t\tcwd: runFolder.cliDirectory,\n\t\t\t\tenv: { ...cliEnvironment(driver), JPWB_MCP_TOKEN: token },",
+		find: "\t\t\t\tcwd: runFolder.cliDirectory,\n\t\t\t\tenv: cliEnvironment(driver, runFolder),",
+		replace: "\t\t\t\tcwd: runFolder.cliDirectory,\n\t\t\t\tenv: { ...cliEnvironment(driver, runFolder), JPWB_MCP_TOKEN: token },",
 		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
-		why: "PROMISE: C5 (D40, D41, D42): no turn's token is in any argv element, environment variable, result field or failure message. WHAT THE MUTATION DOES: hands the token to the CLI as JPWB_MCP_TOKEN. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M39-token-in-the-environment   ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		why: "PROMISE: C5 (D40, D41, D42): no turn's token is in any argv element, environment variable, result field or failure message. WHAT THE MUTATION DOES: hands the token to the CLI as JPWB_MCP_TOKEN. OBSERVED (bun run mutants -- MH1-M1 to MH1-M90 by their full ids, 2026-10-18, in the MH-1 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M39-token-in-the-environment   ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯' ⭐ RE-ANCHORED 2026-10-18 (JAN-MHX MH-4; ledger rule #5 - in the commit that moved the line): the CLI's environment gained the driver's per-run constants (CliDriver.runEnvironment, D43), so cliEnvironment takes the run folder and its object is written over lines. THE MUTATION AND ITS PROMISE ARE UNCHANGED. RE-MEASURED (bun run mutants -- the 198 existing entries MH-4's change can reach, by their full ids, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH1-M39-token-in-the-environment   ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-MHX MH-1 - the CLI executor session (DESIGN-multi-harness-executor.md D12-D24, D40-D44a; roadmap MH-1 C1-C28)"
 	},
 	{
@@ -32996,5 +32996,448 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/live-exec-lane-config.test.ts"],
 		why: "PROMISE (the pinned gap, until MH-8): the lane does not yet refuse an executor model that is the reviewer's (D33, EXECUTOR_MODEL_IS_THE_REVIEWERS, asked beside the lane's own reviewer), and a test says so, which reddens when the lane restates it. WHO RELIES: MH-8 and a reader of the table, as for MH3-M34. WHAT THE MUTATION DOES: the lane refuses an executor model equal to JPWB_ASSURANCE_MODEL, as MH-8's mirror would for the reviewer's own id; the pin's row for the reviewer's own model is the only arrangement in the file that sets one. OBSERVED (bun run mutants -- MH3-M32, MH3-M33, MH3-M34 and MH3-M35 by their full ids, 2026-10-18, in the MH-3 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH3-M35-the-lane-refuses-the-reviewer-s-own-model ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-MHX MH-3, the check's fix - the lane's executor mirror (the MINOR finding on verif/live-exec-lane-config.test.ts and lane-config.ts laneKeysRefusal; DESIGN-multi-harness-executor.md D32, D33, D36): the Pi executor that boots the lane is asked beside the lane's own reviewer, on the model P3 ran, and the gap of the reviewer-less, effort-less mirror is pinned until MH-8"
+	},
+	{
+		id: "MH4-M1-the-reviewer-s-mcp-deny",
+		file: "apps/rph-demo/src/lib/server/tools/devin-executor-driver.ts",
+		find: "const DENIED_TOOLS = ['read', 'edit', 'write', 'grep', 'glob', 'exec', 'web_search', 'Fetch(*)'];",
+		replace: "const DENIED_TOOLS = ['read', 'edit', 'write', 'grep', 'glob', 'exec', 'web_search', 'Fetch(*)', 'mcp__*']; // MUTANT: the reviewer's deny",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-executor-driver.test.ts"],
+		why: "PROMISE (MH-4 test 1; design section 4.1): the run folder's project config denies no mcp__ pattern. WHO RELIES: every host call a devin executor makes through mcp_call_tool. WHAT THE MUTATION DOES: adds the reviewer's DENY_ALL_TOOLS_CONFIG deny, mcp__*, which wins over any allow, so devin would reject every host call. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M1-the-reviewer-s-mcp-deny     ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)"
+	},
+	{
+		id: "MH4-M2-the-host-s-tools-not-allowed",
+		file: "apps/rph-demo/src/lib/server/tools/devin-executor-driver.ts",
+		find: "permissions: { deny: DENIED_TOOLS, allow: [`mcp__${run.serverName}__*`] },",
+		replace: "permissions: { deny: DENIED_TOOLS }, // MUTANT: the host's tools not allowed",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-executor-driver.test.ts"],
+		why: "PROMISE (MH-4 test 1; MH-0a's F4): the project config allows mcp__jpwb__*, which is what approves a host call made through mcp_call_tool in print mode. WHO RELIES: every devin turn - without the rule devin rejects the first host call and ends the session (MH-0a's call 2). WHAT THE MUTATION DOES: drops the allow rule. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M2-the-host-s-tools-not-allowed ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)"
+	},
+	{
+		id: "MH4-M3-claude-s-config-read",
+		file: "apps/rph-demo/src/lib/server/tools/devin-executor-driver.ts",
+		find: "\tclaude: false,\n",
+		replace: "\tclaude: true, // MUTANT: devin reads Claude Code's config\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-executor-driver.test.ts"],
+		why: "PROMISE (MH-4 test 1; design section 4.1): every read_config_from is off, in the project config and in the --config. WHO RELIES: the turn's isolation from ~/.claude/settings.json and its hooks, which devin reads while read_config_from.claude is on. WHAT THE MUTATION DOES: turns read_config_from.claude on in both files. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M3-claude-s-config-read        ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)"
+	},
+	{
+		id: "MH4-M4-setup-not-complete",
+		file: "apps/rph-demo/src/lib/server/tools/devin-executor-driver.ts",
+		find: "\t\tshell: { setup_complete: true }\n",
+		replace: "\t\t// MUTANT: setup_complete dropped\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-executor-driver.test.ts"],
+		why: "PROMISE (MH-4 test 1; MH-0a's F1): the --config carries shell.setup_complete: true. WHO RELIES: every devin turn - without it, print mode waits on devin's interactive setup screen until the host's bound kills it (MH-0a's attempts 1 and 2). WHAT THE MUTATION DOES: drops the key. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M4-setup-not-complete          ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)"
+	},
+	{
+		id: "MH4-M5-the-proxy-exemption-dropped",
+		file: "apps/rph-demo/src/lib/server/tools/devin-executor-driver.ts",
+		find: "\t\tproxy: { mode: 'system', no_proxy: '127.0.0.1,localhost' },\n",
+		replace: "\t\t// MUTANT: the proxy line dropped\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-executor-driver.test.ts"],
+		why: "PROMISE (MH-4 test 1; design section 4.1): the --config is the bytes MH-0a ran with, its proxy line among them, which keeps devin's loopback to the host off any proxy. WHO RELIES: every host call, which goes from the bridge to 127.0.0.1. WHAT THE MUTATION DOES: drops the proxy line. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M5-the-proxy-exemption-dropped ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)"
+	},
+	{
+		id: "MH4-M6-a-disabled-tool-dropped",
+		file: "apps/rph-demo/src/lib/server/tools/devin-executor-driver.ts",
+		find: "\t'todo_write',\n\t'mcp_read_resource'\n];",
+		replace: "\t'todo_write'\n]; // MUTANT: mcp_read_resource no longer disabled",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-executor-driver.test.ts"],
+		why: "PROMISE (MH-4 test 1; design section 4.1): the --config disables the 25 tools MH-0a's file named. WHO RELIES: the turn's surface proof (D14a), which fails on any tool of devin's own offered. WHAT THE MUTATION DOES: drops one of the 25. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M6-a-disabled-tool-dropped     ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)"
+	},
+	{
+		id: "MH4-M7-no-config-flag",
+		file: "apps/rph-demo/src/lib/server/tools/devin-executor-driver.ts",
+		find: "\t\t\t\t\t'false',\n\t\t\t\t\t'--config',\n\t\t\t\t\tuserConfigOf(turn.run)\n",
+		replace: "\t\t\t\t\t'false'\n\t\t\t\t\t// MUTANT: no --config\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-executor-driver.test.ts"],
+		why: "PROMISE (MH-4 test 2): the turn's argv names the run folder's --config. WHO RELIES: every control the --config carries - the 25 disabled tools, read_config_from off, setup_complete. WHAT THE MUTATION DOES: drops --config, so devin reads the operator's own user config. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M7-no-config-flag              ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)"
+	},
+	{
+		id: "MH4-M8-dangerous-permission-mode",
+		file: "apps/rph-demo/src/lib/server/tools/devin-executor-driver.ts",
+		find: "\t\t\t\t\t'--respect-workspace-trust',\n",
+		replace: "\t\t\t\t\t'--permission-mode',\n\t\t\t\t\t'dangerous', // MUTANT\n\t\t\t\t\t'--respect-workspace-trust',\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-executor-driver.test.ts"],
+		why: "PROMISE (MH-4 test 2; design section 4.1): never --permission-mode dangerous. WHO RELIES: every turn - the mode approves devin's own tools as well as the host's. WHAT THE MUTATION DOES: passes it. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M8-dangerous-permission-mode   ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)"
+	},
+	{
+		id: "MH4-M9-config-after-the-subcommand",
+		file: "apps/rph-demo/src/lib/server/tools/devin-executor-driver.ts",
+		find: "args: ['--config', userConfigOf(run), 'mcp', 'list']",
+		replace: "args: ['mcp', 'list', '--config', userConfigOf(run)] /* MUTANT: the order devin refuses */",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-executor-driver.test.ts"],
+		why: "PROMISE (MH-4 test 3; MH-0a's F3): the preflight is devin --config <file> mcp list, the global option before the subcommand. WHO RELIES: every session's open - in the other order devin 3000.11.92 refuses (error: unexpected argument '--config' found) and the session could never open. WHAT THE MUTATION DOES: puts --config after mcp list, the design's first spelling. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M9-config-after-the-subcommand ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)"
+	},
+	{
+		id: "MH4-M10-a-second-server-passes-the-count",
+		file: "apps/rph-demo/src/lib/server/tools/devin-executor-driver.ts",
+		find: "\tif (servers.length !== 1)\n",
+		replace: "\tif (servers.length === 0) // MUTANT: a second server passes the count\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-executor-driver.test.ts"],
+		why: "PROMISE (MH-4 test 3; D14): a listing with a second MCP server refuses the session, saying so. WHO RELIES: the turn's isolation from an MCP server the operator configured. WHAT THE MUTATION DOES: lets the count of two servers pass. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M10-a-second-server-passes-the-count ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)"
+	},
+	{
+		id: "MH4-M11-a-source-outside-passes",
+		file: "apps/rph-demo/src/lib/server/tools/devin-executor-driver.ts",
+		find: "\t\treturn 'its server’s source is outside the run folder.';\n",
+		replace: "\t\treturn undefined; // MUTANT: a source outside the run folder passes\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-executor-driver.test.ts"],
+		why: "PROMISE (MH-4 test 3; D14): the one server's source must lie inside the run folder. WHO RELIES: every session - a jpwb entry read from a user-level file is not the run folder's own. WHAT THE MUTATION DOES: admits a source outside the run folder. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M11-a-source-outside-passes    ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)"
+	},
+	{
+		id: "MH4-M12-no-server-passes",
+		file: "apps/rph-demo/src/lib/server/tools/devin-executor-driver.ts",
+		find: "\tif (lines[0]?.startsWith('No MCP servers configured.')) return NO_SERVER;\n",
+		replace: "\tif (lines[0]?.startsWith('No MCP servers configured.')) return undefined; // MUTANT: no server passes\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-executor-driver.test.ts"],
+		why: "PROMISE (MH-4 test 3; D14): devin's no-server listing refuses the session. WHO RELIES: every session - devin then does not read the run folder's own entry, so the model has no host tools. WHAT THE MUTATION DOES: admits the listing. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M12-no-server-passes           ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)"
+	},
+	{
+		id: "MH4-M13-the-exit-status-ignored",
+		file: "apps/rph-demo/src/lib/server/tools/devin-executor-driver.ts",
+		find: "\tif (output.exitCode !== 0) return `it exited with status ${String(output.exitCode)}.`;\n",
+		replace: "\t// MUTANT: the exit status ignored\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-executor-driver.test.ts"],
+		why: "PROMISE (MH-4 test 3): a preflight that exited with a failing status refuses the session, whatever it printed. WHO RELIES: every session's open. WHAT THE MUTATION DOES: reads a failed listing as a passing one. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M13-the-exit-status-ignored    ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)"
+	},
+	{
+		id: "MH4-M14-the-home-folder-not-expanded",
+		file: "apps/rph-demo/src/lib/server/tools/devin-executor-driver.ts",
+		find: ".replace(/^~(?=[\\\\/])/, () => home)",
+		replace: " /* MUTANT: ~ not expanded */",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-executor-driver.test.ts"],
+		why: "PROMISE (MH-4 test 3; MH-0a's listings): devin writes a source under the home folder from ~, and the driver reads it as the home folder. WHO RELIES: every session on this host, whose temporary folder, and so the run folder, is under the home folder. WHAT THE MUTATION DOES: leaves ~ unexpanded, so the measured listing's source reads as outside the run folder and every session is refused. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M14-the-home-folder-not-expanded ⎯⎯⎯⎯⎯⎯ Failed Tests 19 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)"
+	},
+	{
+		id: "MH4-M15-another-shape-read-as-the-listing",
+		file: "apps/rph-demo/src/lib/server/tools/devin-executor-driver.ts",
+		find: "\tif (lines[0] !== 'Configured MCP servers:')\n\t\treturn 'its output is not the listing this driver knows, so it shows nothing about devin’s MCP servers.';\n",
+		replace: "\t// MUTANT: the listing's first line not checked\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-executor-driver.test.ts"],
+		why: "PROMISE (MH-4 test 3): output whose first line is not devin's listing header refuses the session. WHO RELIES: every session - a listing of another shape, its servers and sources as this one's, would otherwise be read as devin 3000.11.92's. WHAT THE MUTATION DOES: drops the header check. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M15-another-shape-read-as-the-listing ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)"
+	},
+	{
+		id: "MH4-M16-a-server-not-named-jpwb-passes",
+		file: "apps/rph-demo/src/lib/server/tools/devin-executor-driver.ts",
+		find: "\tif (servers[0] !== run.serverName) return 'the one MCP server it lists is not the run folder’s own.';\n",
+		replace: "\t// MUTANT: the server's name not checked\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-executor-driver.test.ts"],
+		why: "PROMISE (MH-4 test 3): the one server listed must be the run folder's own, jpwb. WHO RELIES: every session. WHAT THE MUTATION DOES: admits one server of another name. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M16-a-server-not-named-jpwb-passes ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)"
+	},
+	{
+		id: "MH4-M17-no-source-passes-the-count",
+		file: "apps/rph-demo/src/lib/server/tools/devin-executor-driver.ts",
+		find: "\tif (sources.length !== 1)\n",
+		replace: "\tif (sources.length > 1) // MUTANT: no source passes the count\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-executor-driver.test.ts"],
+		why: "PROMISE (MH-4 test 3): a listing that names no single source for its server refuses the session, saying so. WHO RELIES: the source check after it, which can only say where the entry was read from when there is one. WHAT THE MUTATION DOES: lets a listing with no source line through the count. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M17-no-source-passes-the-count ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)"
+	},
+	{
+		id: "MH4-M18-host-calls-read-by-the-design-s-spelling",
+		file: "apps/rph-demo/src/lib/server/tools/devin-executor-driver.ts",
+		find: "\tif (name === 'mcp_call_tool' && args.server_name === serverName && typeof args.tool_name === 'string')\n\t\treturn { kind: 'HOST_CALL', name: args.tool_name, sent: went };\n",
+		replace: "\tif (name.startsWith(`mcp__${serverName}__`)) // MUTANT: the design's guess at the spelling\n\t\treturn { kind: 'HOST_CALL', name: name.slice(`mcp__${serverName}__`.length), sent: went };\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-executor-driver.test.ts"],
+		why: "PROMISE (MH-4 test 4; MH-0a's F8): a host call in devin's export is mcp_call_tool with arguments.server_name the host's server and arguments.tool_name the minted name. WHO RELIES: the cross-check of devin's record with the host's own calls (D21). WHAT THE MUTATION DOES: reads host calls from mcp__jpwb__* function names, the design's unmeasured guess, so a measured export shows none and its carrier calls read as reaching another server. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M18-host-calls-read-by-the-design-s-spelling ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)"
+	},
+	{
+		id: "MH4-M19-a-rejected-call-read-as-sent",
+		file: "apps/rph-demo/src/lib/server/tools/devin-executor-driver.ts",
+		find: "\tconst went = !rejected.has(c.tool_call_id);\n",
+		replace: "\tconst went = rejected.size >= 0; // MUTANT: every call went\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-executor-driver.test.ts"],
+		why: "PROMISE (MH-4 test 5; MH-0a's F5): a call whose observation is 'Tool execution was rejected by the user' is one devin rejected - a REFUSED attempt, after which the turn may have ended. WHO RELIES: CLI_ENDED_ON_REFUSAL (D19) and the observation's REFUSED entry (D21). WHAT THE MUTATION DOES: reads every call as sent. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M19-a-rejected-call-read-as-sent ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)"
+	},
+	{
+		id: "MH4-M20-the-rejection-line-ignored",
+		file: "apps/rph-demo/src/lib/server/tools/devin-executor-driver.ts",
+		find: "return lines.some((line) => line.startsWith(REJECTION_LINE)) ? { rejectedACall: true } : {};",
+		replace: "return lines.length < 0 ? { rejectedACall: true } : {}; // MUTANT: classified by the exit code",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-executor-driver.test.ts"],
+		why: "PROMISE (MH-4 test 5; D19): devin's rejection line on stderr fails the turn CLI_ENDED_ON_REFUSAL. WHO RELIES: a turn whose export does not show the rejection - devin exits 0 with blank stdout, which reads as ENDED_WITHOUT_ANSWER. WHAT THE MUTATION DOES: ignores the line, so the turn is classified by its exit code. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M20-the-rejection-line-ignored ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)"
+	},
+	{
+		id: "MH4-M21-no-tool-definitions-proves-the-surface",
+		file: "apps/rph-demo/src/lib/server/tools/devin-executor-driver.ts",
+		find: "\tif (!isRecord(agent) || !Array.isArray(agent.tool_definitions)) return undefined;\n",
+		replace: "\tif (!isRecord(agent) || !Array.isArray(agent.tool_definitions)) return []; // MUTANT\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-executor-driver.test.ts"],
+		why: "PROMISE (MH-4 test 4; D14a): an export with no tool_definitions holds no proof of the surface, and the turn is CLI_SURFACE_UNPROVEN. WHO RELIES: every turn's surface proof. WHAT THE MUTATION DOES: reads a missing list as an empty offer, which proves the surface. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M21-no-tool-definitions-proves-the-surface ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)"
+	},
+	{
+		id: "MH4-M22-a-nameless-definition-passes",
+		file: "apps/rph-demo/src/lib/server/tools/devin-executor-driver.ts",
+		find: "\tif (names.some((name) => name === undefined)) return undefined;\n",
+		replace: "\t// MUTANT: a definition that names no tool passes\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-executor-driver.test.ts"],
+		why: "PROMISE (MH-4 test 4; D14a): a tool definition that names no tool leaves the offer unknown, and the turn is CLI_SURFACE_UNPROVEN. WHO RELIES: every turn's surface proof. WHAT THE MUTATION DOES: lets the nameless definition through as a tool of devin's own named undefined. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M22-a-nameless-definition-passes ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)"
+	},
+	{
+		id: "MH4-M23-another-schema-read",
+		file: "apps/rph-demo/src/lib/server/tools/devin-executor-driver.ts",
+		find: "parsed.schema_version !== EXPORT_SCHEMA || ",
+		replace: "",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-executor-driver.test.ts"],
+		why: "PROMISE (MH-4 test 4): an export of a schema other than ATIF-v1.7, the one MH-0a measured, is a record the driver cannot read. WHO RELIES: every field read from it - a later devin's export could move them. WHAT THE MUTATION DOES: reads any schema. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M23-another-schema-read        ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)"
+	},
+	{
+		id: "MH4-M24-a-step-with-no-model-passes",
+		file: "apps/rph-demo/src/lib/server/tools/devin-executor-driver.ts",
+		find: "\tif (typeof model !== 'string' || model === '') return { read: 'REFUSED' };\n",
+		replace: "\tif (typeof model !== 'string' || model === '') return { read: 'PASSED_OVER' }; // MUTANT: the step is passed over\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-executor-driver.test.ts"],
+		why: "PROMISE (MH-4 test 4; D22): an agent step that names no generation_model makes the export unreadable. WHO RELIES: the PROVIDER_REPORTED grade, which would claim the provider named the model of a step it did not name. WHAT THE MUTATION DOES: passes over the step. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M24-a-step-with-no-model-passes ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯' ⭐ RE-ANCHORED 2026-10-19 (JAN-MHX MH-4, the check's fix round, F2; ledger rule #5): the check moved into exportStepOf, which reads one step in a shape MH-0a measured; the mutation is the same in effect - the step that names no model is passed over. RE-OBSERVED (bun run mutants -- the 18 ids of this fix round's targeted run, by their full ids, 2026-10-19, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M24-a-step-with-no-model-passes ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)"
+	},
+	{
+		id: "MH4-M25-the-last-step-s-model-alone",
+		file: "apps/rph-demo/src/lib/server/tools/devin-executor-driver.ts",
+		find: "\t\tmodels.add(model);\n",
+		replace: "\t\tmodels.clear(); // MUTANT: the reviewer's reading, the last step's model alone\n\t\tmodels.add(model);\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-executor-driver.test.ts"],
+		why: "PROMISE (MH-4 test 4; D22; design L5): every distinct generation_model is reported, not only the last step's. WHO RELIES: CLI_MODEL_SUBSTITUTED - a turn devin routed partly to another model. WHAT THE MUTATION DOES: keeps the last step's model alone, devin-reviewer.ts's readReportedModel reading. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M25-the-last-step-s-model-alone ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)"
+	},
+	{
+		id: "MH4-M26-another-server-read-as-a-carrier",
+		file: "apps/rph-demo/src/lib/server/tools/devin-executor-driver.ts",
+		find: "\tif (name === 'mcp_call_tool') return { kind: 'OWN_TOOL', name: 'mcp_call_tool (another server)', ran: went };\n",
+		replace: "\t// MUTANT: the carrier to another server passed over\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-executor-driver.test.ts"],
+		why: "PROMISE (MH-4 test 4; D21): mcp_call_tool reaching a server not the host's is a tool of devin's own that ran. WHO RELIES: the breach rule - whatever that server did, the host never recorded. WHAT THE MUTATION DOES: passes it over as a carrier. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M26-another-server-read-as-a-carrier ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)"
+	},
+	{
+		id: "MH4-M27-a-blank-message-speaks",
+		file: "apps/rph-demo/src/lib/server/tools/devin-executor-driver.ts",
+		find: "if (typeof step.message === 'string' && step.message.trim() !== '') events.push({ kind: 'ASSISTANT_MESSAGE' });",
+		replace: "if (typeof step.message === 'string' && step.message !== '') events.push({ kind: 'ASSISTANT_MESSAGE' }); // MUTANT",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-executor-driver.test.ts"],
+		why: "PROMISE (MH-4 test 5; MH-0a's export): a step whose message is blank lines is not the model speaking. WHO RELIES: CLI_ENDED_ON_REFUSAL - devin writes a message of line breaks on its steps, so a blank step after a refusal would read as an answer after it. WHAT THE MUTATION DOES: counts a message of line breaks as an assistant message. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M27-a-blank-message-speaks     ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)"
+	},
+	{
+		id: "MH4-M28-the-message-after-its-calls",
+		file: "apps/rph-demo/src/lib/server/tools/devin-executor-driver.ts",
+		find: "\t\tif (typeof step.message === 'string' && step.message.trim() !== '') events.push({ kind: 'ASSISTANT_MESSAGE' });\n\t\tconst rejected = rejectedCallIds(step.observation);\n\t\tfor (const call of calls) {\n\t\t\tcalled.add(functionNameOf(call));\n\t\t\tevents.push(eventOf(call, rejected, serverName));\n\t\t}\n",
+		replace: "\t\tconst rejected = rejectedCallIds(step.observation);\n\t\tfor (const call of calls) {\n\t\t\tcalled.add(functionNameOf(call));\n\t\t\tevents.push(eventOf(call, rejected, serverName));\n\t\t}\n\t\t// MUTANT: the message read after the step's calls\n\t\tif (typeof step.message === 'string' && step.message.trim() !== '') events.push({ kind: 'ASSISTANT_MESSAGE' });\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-executor-driver.test.ts"],
+		why: "PROMISE (MH-4 test 5; D21's order): a step's message comes before its calls, as the model wrote them. WHO RELIES: CLI_ENDED_ON_REFUSAL - what the model wrote in the step it was refused in is not an answer after the refusal. WHAT THE MUTATION DOES: reads the message after the step's calls. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M28-the-message-after-its-calls ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯' ⭐ RE-ANCHORED 2026-10-19 (JAN-MHX MH-4, the check's fix round, F2 and F3; ledger rule #5): the step's calls are now the list exportStepOf read, and each call's function is collected for the surface proof; the mutation is unchanged - the message read after the step's calls. RE-OBSERVED (bun run mutants -- the 18 ids of this fix round's targeted run, by their full ids, 2026-10-19, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M28-the-message-after-its-calls ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)"
+	},
+	{
+		id: "MH4-M29-devin-s-blank-lines-kept",
+		file: "apps/rph-demo/src/lib/server/tools/devin-executor-driver.ts",
+		find: "\t\tanswer: stdout.replace(/^(?:\\r?\\n)+/, ''),\n",
+		replace: "\t\tanswer: stdout, // MUTANT: devin's blank lines kept\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-executor-driver.test.ts"],
+		why: "PROMISE (MH-4 test 4; MH-0a's F18): the answer is stdout after devin's blank lines. WHO RELIES: the work product's text, which the execution contract's parser and the reviewer read. WHAT THE MUTATION DOES: keeps the blank lines. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M29-devin-s-blank-lines-kept   ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)"
+	},
+	{
+		id: "MH4-M30-the-reasoning-dropped",
+		file: "apps/rph-demo/src/lib/server/tools/devin-executor-driver.ts",
+		find: "\t\t...(reasoning.length === 0 ? {} : { volunteeredReasoning: reasoning.join('\\n\\n') })\n",
+		replace: "\t\t// MUTANT: the reasoning dropped\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-executor-driver.test.ts"],
+		why: "PROMISE (D23; REG-D-057): the reasoning_content devin's export carries on its agent steps is returned as volunteered reasoning, never discarded unsaid. WHO RELIES: the exchange record, which records it as an observed presence under PER-12. WHAT THE MUTATION DOES: drops it. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M30-the-reasoning-dropped      ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)"
+	},
+	{
+		id: "MH4-M31-the-sessions-folder-in-cli",
+		file: "apps/rph-demo/src/lib/server/tools/devin-executor-driver.ts",
+		find: "runEnvironment: (run) => ({ DEVIN_SESSIONS_DIR: join(run.hostDirectory, 'sessions') }),",
+		replace: "runEnvironment: (run) => ({ DEVIN_SESSIONS_DIR: join(run.cliDirectory, 'sessions') }), // MUTANT",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-executor-driver.test.ts"],
+		why: "PROMISE (MH-4 test 6; D44; MH-0a's F10): devin's session store is in the run folder's host/, outside its working folder, and goes with the run folder. WHO RELIES: retention - the store holds the session's prompts and results. WHAT THE MUTATION DOES: puts it in cli/, devin's working folder, beside its config. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M31-the-sessions-folder-in-cli ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)"
+	},
+	{
+		id: "MH4-M32-a-config-source-dropped",
+		file: "apps/rph-demo/src/lib/server/tools/devin-executor-driver.ts",
+		find: "\t\t\t{ name: '~/.claude/settings.json', path: join(places.home, '.claude', 'settings.json') }\n",
+		replace: "\t\t\t// MUTANT: Claude Code's settings, which devin reads, not fingerprinted\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-executor-driver.test.ts"],
+		why: "PROMISE (MH-4 test 6; D44a): every config source devin reads is declared, so a change to it refuses the next turn. WHO RELIES: every turn after the first - a command the model runs can rewrite any of them. WHAT THE MUTATION DOES: drops ~/.claude/settings.json from the declared sources. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M32-a-config-source-dropped    ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)"
+	},
+	{
+		id: "MH4-M33-a-missing-export-throws",
+		file: "apps/rph-demo/src/lib/server/tools/devin-executor-driver.ts",
+		find: "\t\t\t\tif ((e as NodeJS.ErrnoException).code === 'ENOENT') return { read: 'ABSENT' };\n",
+		replace: "\t\t\t\t// MUTANT: a missing export thrown\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-executor-driver.test.ts"],
+		why: "PROMISE (MH-4 test 4; D20): an export devin did not write reads as absent, an expected case - devin only warns when it fails to write one. WHO RELIES: the opener's reading of the turn. WHAT THE MUTATION DOES: throws instead. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M33-a-missing-export-throws    ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)"
+	},
+	{
+		id: "MH4-M34-the-per-run-constants-dropped",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\t...driver.runEnvironment?.(run)\n",
+		replace: "\t\t// MUTANT: the per-run constants dropped\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE (D43; MH-4): a driver's per-run constants, which name folders of the run's own, reach the CLI's environment at its preflight and at each turn. WHO RELIES: devin's DEVIN_SESSIONS_DIR, which keeps its session store in the run folder. WHAT THE MUTATION DOES: merges only the driver's fixed constants. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M34-the-per-run-constants-dropped ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)"
+	},
+	{
+		id: "MH4-M35-the-run-folder-s-files-unchecked",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\t\t\t...rewritten,\n",
+		replace: "\t\t\t// MUTANT: the run folder's files unchecked\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE (D44a; MH-4; MH-0a's F1): before each turn every file of the run folder is still the bytes the opener wrote, or the turn is refused EXECUTOR_CONFIG_CHANGED. WHO RELIES: every turn after the first - devin rewrote its own --config in its first-run setup, and a command the model runs can rewrite any of them, while the preflight checked them once, at the open. WHAT THE MUTATION DOES: checks only the declared sources. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M35-the-run-folder-s-files-unchecked ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯' ⭐ CORRECTED 2026-10-19 (JAN-MHX MH-4's check, F4): 'every file of the run folder' said more than this guard held - it compared the driver's declared files alone. Since the check's fix it compares those and the bridge (host/jpwb-bridge.mjs, MH4-M46); the endpoint file and the prompt files are the opener's to rewrite at each turn, and are not compared. The mutation drops both. RE-OBSERVED (bun run mutants -- the 18 ids of this fix round's targeted run, by their full ids, 2026-10-19, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M35-the-run-folder-s-files-unchecked ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)"
+	},
+	{
+		id: "MH4-M36-a-devin-selection-opens-pi",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "\treturn kind === 'CLI' ? { kind, toolId, modelId } : { kind, modelId };\n",
+		replace: "\treturn kind === 'CLI' ? { kind: 'PI', modelId } : { kind, modelId }; // MUTANT: a devin selection opens Pi\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
+		why: "PROMISE (MH-4 test 7; D30): devin's selection is the CLI kind, which the CLI executor session opens with devin's driver. WHO RELIES: every devin executor - and its record (D35). WHAT THE MUTATION DOES: answers a devin selection as Pi's. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M36-a-devin-selection-opens-pi ⎯⎯⎯⎯⎯⎯ Failed Tests 37 ⎯⎯⎯⎯⎯⎯⎯' ⭐ RE-MEASURED 2026-10-19 (JAN-MHX MH-4, the check's fix round, F1): devin is wired in test mode only (D30), so the victim's rows that reach the CLI kind are its test-mode rows; outside test mode devin is refused EXECUTOR_TOOL_UNWIRED before this line. OBSERVED (bun run mutants -- the 18 ids of this fix round's targeted run, by their full ids, 2026-10-19, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M36-a-devin-selection-opens-pi ⎯⎯⎯⎯⎯⎯ Failed Tests 26 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)"
+	},
+	{
+		id: "MH4-M37-a-cli-selection-names-another-tool",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "\treturn kind === 'CLI' ? { kind, toolId, modelId } : { kind, modelId };\n",
+		replace: "\treturn kind === 'CLI' ? { kind, toolId: 'agy', modelId } : { kind, modelId }; // MUTANT: it names another tool\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
+		why: "PROMISE (MH-4 test 7; D30, D35): a CLI selection names the tool selected, which finds its driver and is the record's provider. WHO RELIES: every devin executor. WHAT THE MUTATION DOES: names another tool. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M37-a-cli-selection-names-another-tool ⎯⎯⎯⎯⎯⎯ Failed Tests 37 ⎯⎯⎯⎯⎯⎯⎯' ⭐ RE-MEASURED 2026-10-19 (JAN-MHX MH-4, the check's fix round, F1): devin is wired in test mode only (D30), so the victim's rows that reach the CLI kind are its test-mode rows; outside test mode devin is refused EXECUTOR_TOOL_UNWIRED before this line. OBSERVED (bun run mutants -- the 18 ids of this fix round's targeted run, by their full ids, 2026-10-19, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M37-a-cli-selection-names-another-tool ⎯⎯⎯⎯⎯⎯ Failed Tests 26 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)"
+	},
+	{
+		id: "MH4-M38-the-lane-s-mirror-leaves-devin-out",
+		file: "apps/rph-demo/e2e-live-exec/lane-config.ts",
+		find: "export const WIRED_EXECUTORS = ['agy', 'pi', 'devin'] as const;\n\nexport type WiredExecutor = (typeof WIRED_EXECUTORS)[number];",
+		replace: "export const WIRED_EXECUTORS = ['agy', 'pi'] as const; // MUTANT: the mirror leaves devin out\n\nexport type WiredExecutor = (typeof WIRED_EXECUTORS)[number] | 'devin';",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "PROMISE (roadmap MH-4, Then; D36): the lane's mirror of the product's wired executors holds devin. WHO RELIES: a lane run with a devin executor, which the product runs. WHAT THE MUTATION DOES: leaves devin out of the mirror, so the lane refuses at boot what the product runs. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M38-the-lane-s-mirror-leaves-devin-out ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)",
+		supersededBy: "MH4-M49-the-lane-s-mirror-holds-devin - MH-4's check, F1: devin's executor is wired in test mode only (D30), and the lane runs outside it, so the mirror leaves devin out; the guard is now that the mirror never holds devin"
+	},
+	{
+		id: "MH4-M39-the-lane-admits-devin-s-override",
+		file: "apps/rph-demo/e2e-live-exec/lane-config.ts",
+		find: "\tdevin: REVIEWER_PROGRAM_VARIABLE.devin\n",
+		replace: "\t// MUTANT: devin's override not mirrored\n",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "PROMISE (D34; REG-F-459): the lane refuses at boot a JPWB_DEVIN_BIN set for a devin executor, as the product refuses it outside test mode. WHO RELIES: the lane's operator, who must not boot a browser to be refused by a 400. WHAT THE MUTATION DOES: drops devin's override from the lane's mirror. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M39-the-lane-admits-devin-s-override ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)",
+		supersededBy: "MH4-M49-the-lane-s-mirror-holds-devin - MH-4's check, F1: the lane refuses a devin executor whatever its override, as the product refuses devin outside test mode (MH4-M47 holds the product's half); devin's override returns to the lane's mirror with devin's wiring outside test mode"
+	},
+	{
+		id: "MH4-M40-the-table-holds-no-devin-driver",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-drivers.ts",
+		find: "\tdevin: () => devinExecutorDriver()\n",
+		replace: "\t'devin-x': () => devinExecutorDriver() // MUTANT: no driver for devin\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-drivers.test.ts"],
+		why: "PROMISE (D12, D30): the driver table answers devin's driver. WHO RELIES: model.ts's CLI branch, which refuses a selection whose tool has no driver. WHAT THE MUTATION DOES: leaves devin's entry out. OBSERVED (bun run mutants -- MH4-M, 2026-10-18, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M40-the-table-holds-no-devin-driver ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4 - the devin driver (DESIGN-multi-harness-executor.md section 4.1, D12-D24, D30, D43, D44a; ROADMAP-multi-harness-executor.md MH-4 tests 1-7; MH-0a's findings F1, F2, F3, F4, F5, F7, F8, F10, F18)"
+	},
+	{
+		id: "MH4-M41-an-export-with-no-agent-step-is-read",
+		file: "apps/rph-demo/src/lib/server/tools/devin-executor-driver.ts",
+		find: "\tif (agentSteps === 0) return { read: 'UNPARSEABLE', raw };\n",
+		replace: "\tif (agentSteps < 0) return { read: 'UNPARSEABLE', raw }; // MUTANT: an export with no agent step is read\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-executor-driver.test.ts"],
+		why: "PROMISE (MH-4's check, F2; D20, D22): an ATIF-v1.7 export with no agent step reads as one that could not be read, so the turn is CLI_SURFACE_UNPROVEN. WHO RELIES: D22's compare - with no agent step no model is reported, and the opener grades the answer HOST_CONFIGURED and never asks whether another model served the turn (the check's scenario B). WHAT THE MUTATION DOES: reads the export, its reported models empty. OBSERVED (bun run mutants -- the 18 ids of this fix round's targeted run, by their full ids, 2026-10-19, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M41-an-export-with-no-agent-step-is-read ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4, the check's fix round - its six findings, each fix-before-merge: devin wired in test mode only until a live devin turn is confirmed (D30); devin's export read only in the shapes MH-0a measured (D20, D22); an offer that does not hold the functions its steps called proves nothing (D14a); the bridge held to its bytes before each turn (D44a); and three comments made true (DESIGN-multi-harness-executor.md section 4.1)"
+	},
+	{
+		id: "MH4-M42-a-step-of-an-unmeasured-source-is-passed-over",
+		file: "apps/rph-demo/src/lib/server/tools/devin-executor-driver.ts",
+		find: "\tif (!isRecord(step) || !MEASURED_STEP_SOURCES.includes(step.source)) return { read: 'REFUSED' };\n",
+		replace: "\tif (!isRecord(step)) return { read: 'REFUSED' }; // MUTANT: a step of any source is read as MH-0a's were\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-executor-driver.test.ts"],
+		why: "PROMISE (MH-4's check, F2): a step whose source is none of the three MH-0a measured (system, user, agent) makes the export unreadable. WHO RELIES: D22 and D21 - a step under another source would be passed over whole, the model it names and the calls it carries with it. WHAT THE MUTATION DOES: lets a step of any source through, so the test's assistant step, naming another model, is passed over and the turn passes PROVIDER_REPORTED. OBSERVED (bun run mutants -- the 18 ids of this fix round's targeted run, by their full ids, 2026-10-19, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M42-a-step-of-an-unmeasured-source-is-passed-over ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4, the check's fix round - its six findings, each fix-before-merge: devin wired in test mode only until a live devin turn is confirmed (D30); devin's export read only in the shapes MH-0a measured (D20, D22); an offer that does not hold the functions its steps called proves nothing (D14a); the bridge held to its bytes before each turn (D44a); and three comments made true (DESIGN-multi-harness-executor.md section 4.1)"
+	},
+	{
+		id: "MH4-M43-a-system-step-s-calls-are-passed-over",
+		file: "apps/rph-demo/src/lib/server/tools/devin-executor-driver.ts",
+		find: "\tif (step.source !== 'agent') return calls.length > 0 ? { read: 'REFUSED' } : { read: 'PASSED_OVER' };\n",
+		replace: "\tif (step.source !== 'agent') return { read: 'PASSED_OVER' }; // MUTANT: a system or user step's calls are passed over\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-executor-driver.test.ts"],
+		why: "PROMISE (MH-4's check, F2's general form): a system or user step that carries a call makes the export unreadable - in MH-0a's exports only agent steps carried calls. WHO RELIES: D21's breach rule - a tool of devin's own that ran in such a step would otherwise be read by nothing. WHAT THE MUTATION DOES: passes the step over, and its exec call with it. OBSERVED (bun run mutants -- the 18 ids of this fix round's targeted run, by their full ids, 2026-10-19, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M43-a-system-step-s-calls-are-passed-over ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4, the check's fix round - its six findings, each fix-before-merge: devin wired in test mode only until a live devin turn is confirmed (D30); devin's export read only in the shapes MH-0a measured (D20, D22); an offer that does not hold the functions its steps called proves nothing (D14a); the bridge held to its bytes before each turn (D44a); and three comments made true (DESIGN-multi-harness-executor.md section 4.1)"
+	},
+	{
+		id: "MH4-M44-an-agent-step-s-calls-of-another-shape-are-read-as-none",
+		file: "apps/rph-demo/src/lib/server/tools/devin-executor-driver.ts",
+		find: "\tconst calls: unknown = step.tool_calls ?? [];\n",
+		replace: "\tconst calls: unknown = Array.isArray(step.tool_calls) ? step.tool_calls : []; // MUTANT: calls of another shape read as none\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-executor-driver.test.ts"],
+		why: "PROMISE (MH-4's check, F2's general form): an agent step whose tool_calls is present and not a list makes the export unreadable. WHO RELIES: D21 - what it holds is devin's calls, and read as none they could hide a tool of its own that ran. WHAT THE MUTATION DOES: reads them as no calls, the driver's first reading. OBSERVED (bun run mutants -- the 18 ids of this fix round's targeted run, by their full ids, 2026-10-19, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M44-an-agent-step-s-calls-of-another-shape-are-read-as-none ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4, the check's fix round - its six findings, each fix-before-merge: devin wired in test mode only until a live devin turn is confirmed (D30); devin's export read only in the shapes MH-0a measured (D20, D22); an offer that does not hold the functions its steps called proves nothing (D14a); the bridge held to its bytes before each turn (D44a); and three comments made true (DESIGN-multi-harness-executor.md section 4.1)"
+	},
+	{
+		id: "MH4-M45-the-offer-is-read-without-the-calls",
+		file: "apps/rph-demo/src/lib/server/tools/devin-executor-driver.ts",
+		find: "\tif ([...called].some((name) => !names.includes(name))) return undefined;\n",
+		replace: "\t// MUTANT: the offer read without the calls its steps made\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/devin-executor-driver.test.ts"],
+		why: "PROMISE (MH-4's check, F3; D14a): an offer that does not hold a function the agent steps called proves nothing, an empty offer included, and the turn is CLI_SURFACE_UNPROVEN. WHO RELIES: every turn's surface proof - a record that contradicts itself is no proof of what devin offered (the check's scenario A: tool_definitions [] beside calls through mcp_call_tool passed, PROVIDER_REPORTED). WHAT THE MUTATION DOES: reads the offer alone. OBSERVED (bun run mutants -- the 18 ids of this fix round's targeted run, by their full ids, 2026-10-19, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M45-the-offer-is-read-without-the-calls ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4, the check's fix round - its six findings, each fix-before-merge: devin wired in test mode only until a live devin turn is confirmed (D30); devin's export read only in the shapes MH-0a measured (D20, D22); an offer that does not hold the functions its steps called proves nothing (D14a); the bridge held to its bytes before each turn (D44a); and three comments made true (DESIGN-multi-harness-executor.md section 4.1)"
+	},
+	{
+		id: "MH4-M46-the-bridge-is-not-compared",
+		file: "apps/rph-demo/src/lib/server/tools/cli-executor-session.ts",
+		find: "\tconst writtenRunFiles: readonly CliRunFile[] = [...runFiles, bridgeFile];\n",
+		replace: "\tconst writtenRunFiles: readonly CliRunFile[] = [...runFiles, bridgeFile].filter((f) => f !== bridgeFile); // MUTANT: the bridge not compared\n",
+		expectRed: ["apps/rph-demo/src/lib/server/tools/cli-executor-session.test.ts"],
+		why: "PROMISE (MH-4's check, F4; D44a): before each turn the bridge is still the bytes the opener wrote, or the turn is refused EXECUTOR_CONFIG_CHANGED, naming host/jpwb-bridge.mjs. WHO RELIES: every turn after the first - the CLI's MCP entry runs the bridge at every turn, and a command the model runs can rewrite it (the check's scenario D started turn 2 on a rewritten bridge). WHAT THE MUTATION DOES: compares the driver's declared files alone, the opener's first form. OBSERVED (bun run mutants -- the 18 ids of this fix round's targeted run, by their full ids, 2026-10-19, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M46-the-bridge-is-not-compared ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4, the check's fix round - its six findings, each fix-before-merge: devin wired in test mode only until a live devin turn is confirmed (D30); devin's export read only in the shapes MH-0a measured (D20, D22); an offer that does not hold the functions its steps called proves nothing (D14a); the bridge held to its bytes before each turn (D44a); and three comments made true (DESIGN-multi-harness-executor.md section 4.1)"
+	},
+	{
+		id: "MH4-M47-devin-is-wired-outside-test-mode",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "\tif (!isWiredExecutor(toolId, input.testMode))\n",
+		replace: "\tif (!isWiredExecutor(toolId, true)) // MUTANT: a tool wired in test mode only is wired in every mode\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
+		why: "PROMISE (MH-4's check, F1; D30): devin's executor is wired in test mode only until a live devin turn is confirmed (MH-9), so outside test mode it is refused EXECUTOR_TOOL_UNWIRED before anything is dispatched. WHO RELIES: an operator's server and the Phase 7 lane - on the surface devin 3000.11.92 offered in both of MH-0a's calls every turn fails CLI_OWN_TOOL_RAN and taints the workspace, which nothing in the host clears, so a selection would spend a devin call and leave its Undertaking refusing Begin & Execute and re-run. WHAT THE MUTATION DOES: asks the tables as if in test mode, so a server selects devin - MH-4's first wiring. OBSERVED (bun run mutants -- the four entries this round named one victim for, by their full ids, 2026-10-19, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M47-devin-is-wired-outside-test-mode ⎯⎯⎯⎯⎯⎯ Failed Tests 48 ⎯⎯⎯⎯⎯⎯⎯' ALSO RED, NOT NAMED (each suite run alone with the mutant applied, from a scratch script that restored the file from its saved bytes; the worktree equalled the index after): begin-execute-executor-selection.test.ts: exit=1, 'Tests 1 failed | 12 passed (13)'; live-exec-lane-config.test.ts: exit=1, 'Tests 5 failed | 172 passed (177)'.",
+		source: "JAN-MHX MH-4, the check's fix round - its six findings, each fix-before-merge: devin wired in test mode only until a live devin turn is confirmed (D30); devin's export read only in the shapes MH-0a measured (D20, D22); an offer that does not hold the functions its steps called proves nothing (D14a); the bridge held to its bytes before each turn (D44a); and three comments made true (DESIGN-multi-harness-executor.md section 4.1)"
+	},
+	{
+		id: "MH4-M48-devin-s-refusal-gives-the-generic-reason",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "\t\t\ttestModeOnlyReason(toolId) ??\n",
+		replace: "\t\t\t// MUTANT: the generic reason, as if devin had no adapter\n",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
+		why: "PROMISE (MH-4's check, F1): outside test mode devin's refusal says its adapter exists and is wired in test mode only, and why. WHO RELIES: the operator who reads it - the generic 'no executor adapter is wired for it' would send them looking for an adapter that exists. WHAT THE MUTATION DOES: gives devin the generic reason. OBSERVED (bun run mutants -- the four entries this round named one victim for, by their full ids, 2026-10-19, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M48-devin-s-refusal-gives-the-generic-reason ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯' ALSO RED, NOT NAMED (each suite run alone with the mutant applied, from a scratch script that restored the file from its saved bytes; the worktree equalled the index after): begin-execute-executor-selection.test.ts: exit=1, 'Tests 1 failed | 12 passed (13)'.",
+		source: "JAN-MHX MH-4, the check's fix round - its six findings, each fix-before-merge: devin wired in test mode only until a live devin turn is confirmed (D30); devin's export read only in the shapes MH-0a measured (D20, D22); an offer that does not hold the functions its steps called proves nothing (D14a); the bridge held to its bytes before each turn (D44a); and three comments made true (DESIGN-multi-harness-executor.md section 4.1)"
+	},
+	{
+		id: "MH4-M49-the-lane-s-mirror-holds-devin",
+		file: "apps/rph-demo/e2e-live-exec/lane-config.ts",
+		find: "export const WIRED_EXECUTORS = ['agy', 'pi'] as const;\n",
+		replace: "export const WIRED_EXECUTORS = ['agy', 'pi', 'devin'] as const; // MUTANT: the mirror holds devin, which the product refuses here\n",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "PROMISE (MH-4's check, F1; D36): the lane's mirror holds no executor the product refuses outside test mode, where the lane runs - and devin's is wired in test mode only. WHO RELIES: the lane's operator - a mirror holding devin boots a lane that Begin & Execute then refuses, after whatever the run spent before its first model step. WHAT THE MUTATION DOES: puts back MH-4's first mirror. OBSERVED (bun run mutants -- the 18 ids of this fix round's targeted run, by their full ids, 2026-10-19, in the MH-4 worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         MH4-M49-the-lane-s-mirror-holds-devin ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-MHX MH-4, the check's fix round - its six findings, each fix-before-merge: devin wired in test mode only until a live devin turn is confirmed (D30); devin's export read only in the shapes MH-0a measured (D20, D22); an offer that does not hold the functions its steps called proves nothing (D14a); the bridge held to its bytes before each turn (D44a); and three comments made true (DESIGN-multi-harness-executor.md section 4.1)"
 	}
 ];

@@ -342,6 +342,9 @@ describe('⭐ the lane refuses the executor the product refuses, asked without a
 			);
 		}
 		expect(wiredExecutor(undefined)).toBeUndefined();
+		// ~~⭐ `JAN-MHX` MH-4 — devin's executor is wired (D30), and the mirror follows the product's table.~~ ⭐ MH-4, the
+		// check's fix — in test mode only, and this lane runs outside it, so the mirror holds agy and Pi, as the product's
+		// table outside test mode does.
 		expect([...WIRED_EXECUTORS].sort()).toEqual(['agy', 'pi']);
 	});
 
@@ -460,6 +463,8 @@ describe('⭐ the lane refuses the executor the product refuses, asked without a
 	});
 
 	it('⛔ an executor the product does not run is refused, named, with the tools it may be', () => {
+		// ~~⭐ `JAN-MHX` MH-4 — devin no longer among them: the product runs a devin executor (D30).~~ ⭐ MH-4, the check's fix
+		// — devin among them again: the product runs a devin executor in test mode only (D30), and this lane runs outside it.
 		for (const tool of ['devin', 'Agy', 'nosuchtool']) {
 			const refusal = laneKeysRefusal({
 				...COMPLETE,
@@ -484,8 +489,36 @@ describe('⭐ the lane refuses the executor the product refuses, asked without a
 			);
 			expect(refusal ?? 'NO REFUSAL').toContain('REG-F-459');
 		}
-		// ⭑ The variable is the agy adapter's one capture — the same the reviewer limb refuses for an agy reviewer.
+		// ⭑ The variable is the agy adapter's one capture — the same the reviewer limb refuses for an agy reviewer. ~~⭐
+		// `JAN-MHX` MH-4 — and devin's, the devin adapter's one capture, which its executor driver runs too.~~ ⭐ MH-4, the
+		// check's fix — agy's alone again: the lane refuses a devin executor whatever its override (below).
 		expect(EXECUTOR_PROGRAM_VARIABLE).toEqual({ agy: REVIEWER_PROGRAM_VARIABLE.agy });
+	});
+
+	// ~~⛔ `JAN-MHX` MH-4 — the devin executor’s program override is refused as the product refuses it, even empty, naming
+	// it; and, its control, with no override the devin executor boots the lane beside the lane's own reviewer.~~ ⭐ MH-4, the
+	// check's fix — STRUCK: the product refuses a devin executor outside test mode (D30), where this lane runs, so the lane
+	// refuses it at boot, override or none, and an operator never boots a browser to pay for a devin turn that fails.
+	it('⛔ `JAN-MHX` MH-4, the check’s fix — a devin executor on S2’s model is refused at boot, with or without an override, as the product refuses it outside test mode', () => {
+		// ⭑ RED FIRST: MH-4's lane booted a devin executor beside the lane's own reviewer.
+		for (const program of [undefined, 'C:/fixture/devin.exe']) {
+			const refusal = laneKeysRefusal({
+				...COMPLETE,
+				JPWB_ASSURANCE_TOOL: 'agy',
+				JPWB_EXECUTOR: 'devin',
+				JPWB_EXECUTOR_MODEL: 'deepseek-v4-1-flash-max',
+				...(program === undefined ? {} : { JPWB_DEVIN_BIN: program })
+			});
+			expect(refusal ?? 'NO REFUSAL').toContain("JPWB_EXECUTOR='devin' names no executor");
+			expect(
+				selectExecutor({
+					testMode: false,
+					env: { JPWB_EXECUTOR: 'devin', JPWB_EXECUTOR_MODEL: 'deepseek-v4-1-flash-max' },
+					overrides: { ...NO_OVERRIDES, devin: program, codex: undefined }
+				}),
+				'the product, asked as the lane runs it'
+			).toMatchObject({ kind: 'REFUSED', code: 'EXECUTOR_TOOL_UNWIRED' });
+		}
 	});
 
 	it('⭑ the lane’s agy rule says it is the lane’s, not the product’s — and the spec still makes the assertion it rests on', () => {

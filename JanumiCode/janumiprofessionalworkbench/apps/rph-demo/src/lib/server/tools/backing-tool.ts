@@ -375,7 +375,8 @@ export function isToolInvocationResult(v: string | ToolInvocationResult): v is T
 // (`execution/executor-selection.ts`, `selectExecutor`). The two accessors that stood here, `executorToolId()` and
 // `executorModel()`, THREW when the executor OPENED — after `StartExecutionStep` — so every misconfiguration was
 // recorded as a started-then-failed step; and `executorToolId()`'s refusal listed the CATALOG (`agy, pi, devin`),
-// steering an operator to `devin`, which has no executor adapter. The selector took their production callers, so they
+// steering an operator to `devin`, which ~~has~~ then had no executor adapter (⭐ `JAN-MHX` MH-4 gave it one, wired in
+// test mode only, D30). The selector took their production callers, so they
 // went (`verif/tool-adapter-exports-reachable.test.ts` requires it); the two resolvers below are what it reads.
 
 export function resolveExecutorToolId(configured = process.env.JPWB_EXECUTOR): string | undefined {
