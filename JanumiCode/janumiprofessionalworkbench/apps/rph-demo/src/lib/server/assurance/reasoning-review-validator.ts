@@ -1001,8 +1001,8 @@ function classifyParse(raw: string, error: unknown): ExchangeParseOutcome {
  * ⭐ `JAN-SELREV` SR-2 (D6) — why a review by a substituted model fails: both ids, and the remedy.
  *
  * ⛔ THE REMEDY IS NOT THE CONFIGURATION. The configured model is the one that was qualified and selected
- * (`REG-D-084`); pointing the configuration at whatever the tool served instead would make the record agree with a
- * reviewer nobody measured. So the guidance says re-qualify or re-select, never reconfigure.
+ * (~~`REG-D-084`~~ ⭐ `REG-D-119`); pointing the configuration at whatever the tool served instead would make the
+ * record agree with a reviewer nobody measured. So the guidance says re-qualify or re-select, never reconfigure.
  */
 function substitutedModel(
 	agentId: string | undefined,
