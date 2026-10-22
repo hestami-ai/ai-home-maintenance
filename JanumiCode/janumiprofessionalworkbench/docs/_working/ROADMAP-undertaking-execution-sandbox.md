@@ -1972,6 +1972,11 @@ assurance policies gate it.** ⛔ Report what breaks; do not smooth it.
   - On the main line already: the report's new class (`REG-D-118` (4)) and the lane's limit of 600 (`2f70afc0`).
   - With the selection's registration, on `p7c-high` (the main line merged in, `64243eef`): the product's strings and the lane's refusal name High (`6b5fce13`, `3f0500bb`), and the record's ACKNOWLEDGED, ESCALATION and SELECTION lines are appended.
   - Next: P5 again on High, about 44 reviewer calls (total about 528); then P6, about 60 (total about 588). JAN-MHX is stopped and resumable (`p7c-mhx`).
+- ⭑ **2026-10-22 — P5 complete on High (run-7); next P6, then P7** (`REG-D-119`, `REG-D-120`).
+  - The root and 4 of 4 phases are SATISFIED in lifecycle and assurance, with their plan steps SUCCEEDED. The report records 23 cells as intended, 0 broke and 7 open; those 7 have since been classified or checked. The seeded-deviation arm was not judged because its reference baseline failed.
+  - The sponsor left the adjudication to the lead: row 1 reviewer right; rows 2–5 malformed reply (`REG-F-566`), recovered by the lane's re-run (`REG-D-120` Q16 and Q17).
+  - Run-7 spent 43 reviewer calls and the High negative control 2: programme total 529 of about 650 (`REG-D-120` Q15). The lane's limit moves to 650 with it.
+  - Next: P6, half B, then P7, the replay. JAN-MHX remains stopped and resumable.
 
 ⚠ *"The results become `TEST_RESULT` evidence"* above ~~is put to the sponsor as the design's §9.5~~ ⭑ is read as `R18`'s OBSERVATION evidence, judged by the reviewer (the sponsor, `REG-D-102` (5)). *"The declared assurance policies gate it"* holds in form only today (the design's stage 5b; §9.6) ⭑ and runs as is, all 14 verdicts reported vacuous (`REG-D-102` (6)). §11's *"It works live"* was measured on 2026-09-14 and has not been driven since; today's live authoring specs cannot pass (`REG-F-506`).
 

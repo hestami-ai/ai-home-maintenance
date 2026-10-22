@@ -199,3 +199,42 @@ Each goes design, roadmap, code, and names the test that must fail first. P7-4's
 | What stopped the others | the reviewer's agent harness ended its own session (`REG-F-549`); a stopped unit could not be run again (`REG-F-511`) | a code block inside valid JSON read as the answer (`REG-F-557`) | none |
 | Work-product reviews concluded | 0 of 4 | 4 of 4 | 4 of 4 |
 | Reviewer calls | 36 | 41 | 22 |
+
+## 11. P5: half A again, on the completion programme's build and then on GLM-5.3 Flash High (2026-10-18 to 2026-10-22) — every unit completes
+
+**The answer for half A is yes: a finished Undertaking.** In run-7, 5 of 5 units, the root included, are SATISFIED in lifecycle and assurance, with their plan steps SUCCEEDED. This Yes carries the report's two caveats: the PWA had to name its product (`REG-F-510`), and the root's declared reviews use UNIT_PURPOSE framing that no reviewer-qualification case measures (`REG-F-558`).
+
+- **The three runs.**
+  - **Run-5, 2026-10-18:** 44 reviewer calls. End-to-end verification ended ABANDONED / UNASSESSED, its step CANCELLED, while the root was signed off SATISFIED. The output cap prevented a finished-Undertaking Yes (`REG-F-563`). The root reviews' prompts showed only Requirements and part of Design, omitting the other work they were said to judge (`REG-F-564`). The input and report fixes were merged before the re-run.
+  - **Run-6, 2026-10-22:** void. The dry run passed, but 4 of 4 phases failed at their first executor call because the provider rejected Pi's token. No executor answered, and 0 reviewer calls were made. Pi's own readiness check had said ready (`REG-F-568`).
+  - **Run-7, 2026-10-22:** from `1f1746d8`, with Pi on `openai-codex/gpt-5.6-sol` executing and devin on `glm-5-3-flash-high` reviewing (`REG-D-119`). The paid Playwright run reported *"1 passed (18.2m)"*. Requirements needed 2 tries; design, implementation and end-to-end needed 1 each. The root and 4 of 4 phases completed. The root reviews were given the work of the four phases, and their prompts showed work products and commands from the four, with cuts declared unit by unit.
+- **The stage matrix:** 31 cells, 23 as intended, 0 broke, 0 not reached, 0 vacuous by construction, 1 not measured in this half and 7 open. The 7 open were 3 evidence-and-review cells awaiting adjudication and 4 product cells awaiting P7-4a to c. All 7 have since been classified or checked below; the seeded-deviation arm remains unjudged because its baseline failed. The authoring cell remains unmeasured in half A.
+- **The reviewer.**
+  - The real catch was adjudication row 1: Requirements' E2E-3 example contradicted its own tie-break rule. The reviewer REJECTED it under RR-07; the executor corrected the example, and the second draft was SATISFIED.
+  - In 4 of 29 reasoning-review replies, High put RR-03's answer under an undeclared id. Each reply recommended SATISFIED, but its review scored INCONCLUSIVE. The lane's built re-run recovered 4 of 4 to SATISFIED (`REG-F-566`, `REG-D-105` (4)).
+  - The sponsor delegated the classifications to the lead: row 1 reviewer right; rows 2–5 malformed reply (`REG-D-120` Q16 and Q17). These classifications resolve the 3 open evidence-and-review cells as intended.
+  - The pairing records 29 answered, with 0 no-criterion-answered, 0 no-response, 0 output-limit, 0 refused, 0 no-answer-recorded and 0 not-pairable. The run found 0 forbidden acts; 20 commands were in the manifest and 0 left out.
+- **The product (P7-4a to e).**
+  - **Acceptance:** requirements 0 of 7 and design 0 of 7, before the product exists; implementation, end-to-end and final archives 7 of 7 each.
+  - **Seeded faults:** the reference baseline failed, so the 7 seeded deviations were not judged: 0 caught and 0 missed. The product's own 7 end-to-end tests pass on its product, but its help test pins wording beyond the brief and fails on the faithful reference CLI. On the product's source, the end-to-end mutation arm judged 85 mutants, reporting 65 caught and 19 survived; the unit arm judged 85, reporting 71 caught and 14 survived.
+  - **Spawn check:** static SPAWNS and dynamic SPAWNS. The end-to-end tests start the real tool.
+  - **Per-command re-runs:** implementation 2 re-run, 2 agree; end-to-end 3 re-run, 3 agree; 0 disagree. The other commands wrote documents and could not be re-run.
+  - **Negative control on High:** REJECTED twice, faulting RR-03, RR-04, RR-06 and RR-09 both times. The expectation held, for 2 reviewer calls (`REG-D-120` Q14).
+- **Spend:** 484 reviewer calls before run-7, then 43 in run-7 and 2 in the negative control: 529 of about 650 under `REG-D-120` Q15. Run-7 recorded 0 no-response calls, 0 retries and 0 repairs. Its report's reserve of 4 was held back, not spent. Run-6 added 0 reviewer calls and 7 executor calls including its probes. The lane's limit moves to 650 with `REG-D-120`.
+- **What a Yes still states, and what is not yet measured.**
+  - The PWA had to name `wordfreq` (`REG-F-510`).
+  - The root reviews used UNIT_PURPOSE framing, with the four phases' work and the cuts their stored prompts declare. Qualification still measures no case in that framing (`REG-F-558`).
+  - Live PWA authoring is half B, next as P6.
+  - The replay follows as P7.
+  - The report's adjudication classes name `REG-F-566` from the change that lands with `REG-D-120`.
+
+### The run's arc
+
+| | P5 run-5 | P5 run-7 |
+|---|---|---|
+| Phases completed | End-to-end ABANDONED; no finished-Undertaking Yes | 4 of 4; the root also SATISFIED |
+| What stopped the others | the reviewer's output cap (`REG-F-563`) | none left stopped; the four criterion-id slips were recovered |
+| Work-product reviews concluded | — | 5 of 5: Requirements twice, the other three phases once each |
+| Reviewer calls | 44 | 43 |
+
+Reviewer-call figures in this table are for the runs themselves; run-7's later negative control added 2.
