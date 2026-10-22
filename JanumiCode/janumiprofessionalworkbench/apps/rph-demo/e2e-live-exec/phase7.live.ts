@@ -80,7 +80,8 @@ import { STORE_FILE } from './run-folder';
 //      for the negative control must total ~~under~~ ⭐ with the phase's ~~first call~~ ~~⭐ worst case, a model unit's (R3-B's
 //      fix round, F1)~~ ⭐ one try's reserve (`REG-D-114` (14), as amended 2026-10-16), AT MOST (the one rule, the lead's
 //      delegated decision of 2026-10-16, registered as REG-D-114 (14)) the sponsor's limit — ~~150~~ ~~200 (`REG-D-105`
-//      (1))~~ ~~⭐ 450 (`REG-D-110` (1))~~ ⭐ 600 (`REG-D-117` Q10, raising `REG-D-110` (1)'s), `lane-config.ts`'s
+//      (1))~~ ~~⭐ 450 (`REG-D-110` (1))~~ ~~⭐ 600 (`REG-D-117` Q10, raising `REG-D-110` (1)'s)~~ ⭐ 650 (`REG-D-120` Q15,
+//      raising `REG-D-110` (1)'s), `lane-config.ts`'s
 //      `PHASE7_PAID_LIMIT` — or the run ends `paid-limit`. Each press waits on its own
 //      response for up to one phase's allowance (D4); one with NO ANSWER — it outlasted that allowance, or its request
 //      failed in transit — ends the run there, `allowance-exceeded` or `request-failed`, the root's included, and

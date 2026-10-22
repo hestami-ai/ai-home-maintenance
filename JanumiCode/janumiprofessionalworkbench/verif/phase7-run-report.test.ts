@@ -2390,10 +2390,12 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 		// as a run held to the limit throughout.
 		// ⭐ P5 package C (F2) — ~~the sponsor’s limit is "about 450", REG-D-110 (1)~~: the sponsor raised it to about 600
 		// (`REG-D-117` Q10, raising `REG-D-110` (1)'s), and the caveat names the ruling that set it.
+		// ⭐ P6 package L (F1) — ~~"about 600", REG-D-117 Q10~~: the sponsor raised it again, to about 650 (`REG-D-120` Q15,
+		// raising `REG-D-110` (1)'s), and the caveat names that ruling.
 		const caveat =
 			'A phase’s own spend can carry the total past the limit: the lane checks the limit before each press, not during one, ' +
 			'and a model unit’s press may spend up to 140 reviewer calls after its check (REG-D-114 (14), as amended ' +
-			'2026-10-16; the sponsor’s limit is "about 600", REG-D-117 Q10, raising REG-D-110 (1)).';
+			'2026-10-16; the sponsor’s limit is "about 650", REG-D-120 Q15, raising REG-D-110 (1)).';
 		const r = reportOf(aRun({})).report;
 		expect(renderMarkdown(r), 'report.md carries no caveat that a press can spend past the limit').toContain(`- **Caveat:** ${caveat}`);
 		expect(r.reviewerCalls.limitCaveat, 'report.json carries no caveat that a press can spend past the limit').toBe(caveat);
@@ -3490,6 +3492,20 @@ describe('⭐⭐ P5 package B — the report reads a run as P5 went', () => {
 		expect(classes, 'a transport failure is still offered').not.toContain('transport failure (REG-F-499)');
 		expect(classes.filter((c) => c.includes('"model hit max output token limit"')), 'no class names the truncation').toHaveLength(1);
 		expect(renderMarkdown(reportOf(aRun()).report)).toContain('model hit max output token limit');
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7 P6, package L (F2; `REG-D-120` Q17) — THE MALFORMED-REPLY CLASS NAMES `REG-F-566`, beside `REG-F-489`,
+	// `REG-F-428` and `REG-F-479`: GLM-5.3 Flash High filing a criterion's answer under an id the policy does not declare. Run-7's
+	// four command reviews that filed RR-03's answer so were classified malformed reply (`REG-F-566`), and the class the report
+	// offered named the older three alone.
+	it('⛔ P6 L F2 — the malformed-reply class names REG-F-566, a criterion’s answer under an undeclared id, beside REG-F-489, REG-F-428 and REG-F-479', () => {
+		const malformed = 'malformed reply (REG-F-489, REG-F-428, REG-F-479, REG-F-566)';
+		const { report } = reportOf(aRun());
+		expect(
+			report.adjudication.classes.filter((c) => c.startsWith('malformed reply')),
+			'the malformed-reply class does not name REG-F-566 beside the older three'
+		).toEqual([malformed]);
+		expect(renderMarkdown(report), 'report.md does not offer the class').toContain(`; ${malformed}.`);
 	});
 });
 

@@ -150,11 +150,12 @@ export const NEGATIVE_CONTROL_RESERVE = PHASE7_NEGATIVE_CONTROL_RESERVE;
  * review, and a MODEL root's press, so what such a press spends after its check is not held to the limit until the next
  * check. ⚠ Stated for every run: it is a property of the lane, never of what a run happened to spend.
  * ⭐ P5 package C (F2) — ~~REG-D-110 (1)~~: the sponsor's limit is now the one `REG-D-117` Q10 chose, raising `REG-D-110` (1)'s.
+ * ⭐ P6 package L (F1) — ~~REG-D-117 Q10~~: the sponsor's limit is now the one `REG-D-120` Q15 chose, raising `REG-D-110` (1)'s.
  */
 export const LIMIT_CAVEAT =
 	`A phase’s own spend can carry the total past the limit: the lane checks the limit before each press, not during one, ` +
 	`and a model unit’s press may spend up to ${PHASE7_UNIT_REVIEWER_CALLS} reviewer calls after its check (REG-D-114 (14), as ` +
-	`amended 2026-10-16; the sponsor’s limit is "about ${PAID_LIMIT}", REG-D-117 Q10, raising REG-D-110 (1)).`;
+	`amended 2026-10-16; the sponsor’s limit is "about ${PAID_LIMIT}", REG-D-120 Q15, raising REG-D-110 (1)).`;
 /** The declared verdicts a complete run signs off: the five units' declared policies, 2 + 2 + 4 + 3 + 3 (§3.2). */
 export const DECLARED_VERDICTS_EXPECTED = 14;
 
@@ -247,13 +248,15 @@ export const REVIEWER_OUTPUT_LIMIT_TEXT = 'model hit max output token limit';
  * The classifications a person gives each adjudication row (P7-4f). This report leaves the field blank. ⛔ P5 package B (F7) —
  * ~~'transport failure (REG-F-499)'~~: none of the reviews recorded with no response so far was one — each ended at the
  * reviewer's output-token limit — so the class is named by the failure text such a review records (`REVIEWER_OUTPUT_LIMIT_TEXT`).
+ * ⭐ P6 package L (F2; `REG-D-120` Q17) — and the malformed reply names `REG-F-566` beside the older three: a criterion's answer
+ * filed under an id the policy does not declare, the class P5's run-7 rows 2–5 were given.
  */
 export const ADJUDICATION_CLASSES = [
 	'reviewer right',
 	'reviewer wrong',
 	'join defect (REG-F-485, REG-F-486)',
 	`output-token truncation: the reviewer’s reply ended at its output-token limit, its recorded failure reading "${REVIEWER_OUTPUT_LIMIT_TEXT}"`,
-	'malformed reply (REG-F-489, REG-F-428, REG-F-479)'
+	'malformed reply (REG-F-489, REG-F-428, REG-F-479, REG-F-566)'
 ] as const;
 
 export interface UnitSpec {
