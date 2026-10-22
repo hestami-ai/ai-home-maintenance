@@ -7,6 +7,7 @@
 - **The main line:** P5 on agy with `gemini-4-argon-high` (the sponsor's Q3). Every package below either sits on that
   path or runs beside it without blocking it.
 - ⭑ **2026-10-18 — P5 ran on Pi instead** (Q5, `REG-D-117`); agy with `gemini-4-argon-high` remains the sponsor's executor choice for later runs (Q3). JAN-MHX is being built. S2 and S4 are answered: MH-0a runs on `deepseek-v4-1-flash-max` while the reviewer uses GLM; MH-10 is no longer deferred and builds Muse as designed, with the lead's delegated default `muse-wonder-1.0` at high effort. S1, S3, S5 and S6 are recorded in `REG-D-117` and the design's §7 pointer.
+- ⭑ **2026-10-19 — the build is stopped, resumable; the reviewer is now `glm-5-3-flash-high`** (`REG-D-117`, `REG-D-119`). The build was stopped on 2026-10-19 at the sponsor's word (*"We are at near token usage max for the week so prepare to pause."*) after 28 of its agents finished. Its integration branch `p7c-mhx` (`ae234e95`) holds MH-1, MH-7, MH-3, MH-4, MH-5 and MH-6 and is resumable; nothing of the build is on the main line. With the reviewer now `glm-5-3-flash-high`, MH-3's identity refusal must refuse the reviewer's model family (`REG-D-118` (5)). As merged on `p7c-mhx` (`f95e2864`), it compares families on both sides, so by reading it refuses `glm-5-3-flash-max` beside a `glm-5-3-flash-high` reviewer. No test there puts `glm-5-3-flash-high` on the reviewer's side (red 2 puts it on the executor's), so that direction is untested. A devin executor runs `deepseek-v4-1-flash-max`.
 
 ---
 

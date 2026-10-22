@@ -1966,6 +1966,12 @@ assurance policies gate it.** ⛔ Report what breaks; do not smooth it.
   - The output-cap class, root-review input, lane hold and report fixes are merged (`REG-F-563`, `REG-F-564`, `REG-F-565`). The merged re-render has 31 cells, 4 broke, 4 open and 0 breaks with no register entry.
   - The cap test spent 1 reviewer call (364): `glm-5-3-flash-high` answered the prompt `glm-5-3-flash-max` was cut on (`REG-F-563`). The sponsor chose to qualify it, then re-run P5, the limit rising to about 600 (`REG-D-117` Q10).
   - Next: map the report's new class (`REG-D-118` (4)) and raise the lane's limit; qualify `glm-5-3-flash-high` on case set v6 (about 113 calls); the sponsor's selection; then re-run P5, about 44 reviewer calls. JAN-MHX remains being built beside this work.
+- ⭑ **2026-10-19 — `glm-5-3-flash-high` qualified on case set v6 and SELECTED** (`REG-D-119`; `af3140ff`, on `p7c-high`, not merged).
+  - 120 reviewer calls, every one answered, none cut; programme total 484 of about 600 (`REG-D-110`). Full run: clean 37 of 38 SATISFIED, planted 70 of 70 REJECTED, median 7278 ms a call.
+  - Its slip: one criterion's row under an undeclared id in 4 of 120 calls, which left 2 clean reviews INCONCLUSIVE (`REG-F-566`).
+  - On the main line already: the report's new class (`REG-D-118` (4)) and the lane's limit of 600 (`2f70afc0`).
+  - With the selection's registration, on `p7c-high` (the main line merged in, `64243eef`): the product's strings and the lane's refusal name High (`6b5fce13`, `3f0500bb`), and the record's ACKNOWLEDGED, ESCALATION and SELECTION lines are appended.
+  - Next: P5 again on High, about 44 reviewer calls (total about 528); then P6, about 60 (total about 588). JAN-MHX is stopped and resumable (`p7c-mhx`).
 
 ⚠ *"The results become `TEST_RESULT` evidence"* above ~~is put to the sponsor as the design's §9.5~~ ⭑ is read as `R18`'s OBSERVATION evidence, judged by the reviewer (the sponsor, `REG-D-102` (5)). *"The declared assurance policies gate it"* holds in form only today (the design's stage 5b; §9.6) ⭑ and runs as is, all 14 verdicts reported vacuous (`REG-D-102` (6)). §11's *"It works live"* was measured on 2026-09-14 and has not been driven since; today's live authoring specs cannot pass (`REG-F-506`).
 
