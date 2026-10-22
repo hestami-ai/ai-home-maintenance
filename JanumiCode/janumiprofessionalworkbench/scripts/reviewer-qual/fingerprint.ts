@@ -333,8 +333,8 @@ const readerTokens = (): string => JSON.stringify(READER_CORPUS.map((w) => [w.sl
  * holds every RUN line to it, whichever transport the run used (`check-core.ts`) — so the preamble moves agy's and
  * ollama's fingerprints too, though neither transport sends it: their prompts are the validator's alone, unchanged by
  * it. That over-reach is the safe direction — it can only ask for a measurement a candidate did not need, never accept
- * one that is stale — and it asks for none today: the SELECTION in force names devin (`REG-D-084`), and the any-candidate
- * coverage limb is answered by the selected candidate's runs.
+ * one that is stale — and it asks for none today: the SELECTION in force names devin (~~`REG-D-084`~~ ⭐ `REG-D-084`'s and
+ * `REG-D-119`'s alike), and the any-candidate coverage limb is answered by the selected candidate's runs.
  * ⛔ WHAT IT DOES NOT REACH: the CASE prompts. A run records the hash of the prompt the validator hands its transport
  * (`runner.ts`), BEFORE `devinPrint` prepends — so a change to the preamble ALONE moves no case prompt, and the check
  * would read it as a move "outside every case prompt": owing an ACKNOWLEDGED line, and admitting RESCORED re-stamps of

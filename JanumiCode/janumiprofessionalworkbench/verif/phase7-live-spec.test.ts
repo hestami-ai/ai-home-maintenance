@@ -950,7 +950,7 @@ describe('⭐ D3 — the boot record', () => {
 		).toEqual({
 			refusal:
 				'JPWB_ASSURANCE_TOOL="agy" is refused by a rule of THIS SPEC: its readiness check is devin’s (design §6 ' +
-				'P7-2 D3), and Phase 7 is measured with the selected reviewer, devin (REG-D-084, REG-D-102).'
+				'P7-2 D3), and Phase 7 is measured with the selected reviewer, devin (REG-D-119, REG-D-102).'
 		});
 		expect(reviewerUnderTest({ JPWB_ASSURANCE_TOOL: 'devin', [variable]: '  ' })).toEqual({
 			refusal: `${variable} is not set.`
@@ -977,7 +977,10 @@ function scripted(
 }
 const READY = {
 	'--version': { exitCode: 0, stdout: 'devin 3000.6.14\n' },
-	'models list': { exitCode: 0, stdout: 'GLM-5.3 Flash Max   glm-5-3-flash-max\nGPT 5   gpt-5\n' }
+	'models list': {
+		exitCode: 0,
+		stdout: 'GLM-5.3 Flash Max   glm-5-3-flash-max\nGLM-5.3 Flash High   glm-5-3-flash-high\nGPT 5   gpt-5\n'
+	}
 };
 
 describe('⭐ D3 — devin’s readiness: its version and its model list, the configured model in it, no model called', () => {
@@ -1045,12 +1048,12 @@ describe('⭐ D3 — devin’s readiness: its version and its model list, the co
 });
 
 describe('⭐ D3 — the boot: what the run starts from, and EVERY reason it may not go on, at once', () => {
-	/** A paid Phase 7 run's keys, as the selected arrangement sets them (REG-D-084), its run folder named. */
+	/** A paid Phase 7 run's keys, as the selected arrangement sets them (~~REG-D-084~~ ⭐ REG-D-119), its run folder named. */
 	const keys = {
 		JPWB_EXECUTOR: 'pi',
 		JPWB_EXECUTOR_MODEL: 'openai-codex/gpt-5.6-sol',
 		JPWB_ASSURANCE_TOOL: 'devin',
-		[REVIEWER_MODEL_VARIABLE.devin]: 'glm-5-3-flash-max',
+		[REVIEWER_MODEL_VARIABLE.devin]: 'glm-5-3-flash-high',
 		[LIVE_RUN_DIR_VARIABLE]: 'D:/runs/phase7-1',
 		[PHASE7_PAID_VARIABLE]: '1'
 	};

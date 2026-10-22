@@ -59,7 +59,7 @@ describe('assurancePreflight — live authoring cannot outrun its mandatory revi
 		expect(r.ready).toBe(false);
 		expect(r.code).toBe('REVIEWER_TOOL_UNSET');
 		expect(r.guidance).toContain('JPWB_ASSURANCE_TOOL is not set');
-		expect(r.guidance).toContain('REG-D-084');
+		expect(r.guidance).toContain('REG-D-119');
 	});
 
 	it('⭐ a devin-only host is READY — no JPWB_JUDGE_MODEL is asked of a host that does not run agy', () => {
@@ -194,7 +194,7 @@ describe('⭐ SR-2 (D7) — a captured program override refuses the preflight, b
 		expect(server.ready).toBe(false);
 		expect(server.code).toBe('REVIEWER_PROGRAM_OVERRIDDEN');
 		expect(server.guidance).toContain('JPWB_DEVIN_BIN="C:/stand-in/devin.exe"');
-		expect(server.guidance).toContain('REG-D-084');
+		expect(server.guidance).toContain('REG-D-119');
 		expect(fresh({ testMode: true, env }).ready, 'in test mode the override is honoured').toBe(
 			true
 		);

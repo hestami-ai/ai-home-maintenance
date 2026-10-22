@@ -8,7 +8,7 @@
 //
 // ⭑ WHAT MUST HOLD. In test mode, with devin NAMED and no model, the registry refuses the review; so the route must
 // refuse the turn with the selector's guidance BEFORE anything begins — one `error` event naming devin's missing
-// model and `REG-D-084`, then `done`; no authoring turn begun and no agent created. And the route must ask in the mode
+// model and `REG-D-119`, then `done`; no authoring turn begun and no agent created. And the route must ask in the mode
 // the host runs in: outside test mode an unset tool is a refusal, which a route that always said `testMode: true`
 // would answer with the stand-in.
 //
@@ -106,7 +106,7 @@ describe('⭐ D5 — the authoring route refuses a turn its floor registry would
 		expect(events[0]!.message).toContain(
 			"The reviewing tool 'devin' has no model: JPWB_ASSURANCE_MODEL is not set"
 		);
-		expect(events[0]!.message).toContain('REG-D-084');
+		expect(events[0]!.message).toContain('REG-D-119');
 		expect(
 			vi.mocked(createAuthoringAgent),
 			'an authoring agent was created for a refused turn'
@@ -128,7 +128,7 @@ describe('⭐ D5 — the authoring route refuses a turn its floor registry would
 			`the route did not refuse before the turn: ${JSON.stringify(events).slice(0, 600)}`
 		).toEqual(['error', 'done']);
 		expect(events[0]!.message).toContain('JPWB_ASSURANCE_TOOL is not set');
-		expect(events[0]!.message).toContain('REG-D-084');
+		expect(events[0]!.message).toContain('REG-D-119');
 		expect(vi.mocked(createAuthoringAgent)).not.toHaveBeenCalled();
 		expect(getPendingAuthoringTurn(pwaId)).toBeUndefined();
 	});

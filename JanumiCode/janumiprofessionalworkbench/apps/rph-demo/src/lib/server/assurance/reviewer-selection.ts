@@ -75,15 +75,16 @@ export type ReviewerSelection =
 	  };
 
 /**
- * What every refusal tells the operator: `REG-D-084`'s selection and the independence guidance of the design's §1.
+ * What every refusal tells the operator: ~~`REG-D-084`'s~~ ⭐ `REG-D-119`'s selection (devin with glm-5-3-flash-high, which
+ * replaced `REG-D-084`'s glm-5-3-flash-max on 2026-10-19) and the independence guidance of the design's §1.
  *
  * ⛔ GUIDANCE, NEVER A FALLBACK (D1). No code path reads these labels as a value. `REG-D-052` rules that the reviewing
  * model is configured and never pinned, and `REG-F-331`'s argument — a pinned label rots when the installed tool stops
  * recognising it — applies to a selected label as much as to any other.
  */
 export const SELECTED_REVIEWER_GUIDANCE =
-	'The selected reviewer (REG-D-084) is devin with glm-5-3-flash-max: set JPWB_ASSURANCE_TOOL=devin and ' +
-	'JPWB_ASSURANCE_MODEL=glm-5-3-flash-max. That selection is configuration, not a default this host falls back to ' +
+	'The selected reviewer (REG-D-119) is devin with glm-5-3-flash-high: set JPWB_ASSURANCE_TOOL=devin and ' +
+	'JPWB_ASSURANCE_MODEL=glm-5-3-flash-high. That selection is configuration, not a default this host falls back to ' +
 	'(REG-D-052); agy (JPWB_ASSURANCE_TOOL=agy with JPWB_JUDGE_MODEL), and devin with another model, stay ' +
 	'configurable. ⚠ Independence (ASR-13): neither the executor (JPWB_EXECUTOR_MODEL, for agy and Pi alike) ' +
 	'nor the authoring agent (JPWB_AGENT_MODEL, else Pi’s own settings, else the first ' +

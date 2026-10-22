@@ -119,10 +119,12 @@ describe('⭐ the selector answers the design’s table — every mode, tool, mo
 });
 
 describe('what a refusal SAYS — it names the fault, and every one carries the selection and the independence rule', () => {
-	it('⭑ the guidance names REG-D-084’s selection as configuration, and ASR-13’s independence rule', () => {
+	it('⭑ the guidance names ~~REG-D-084’s~~ ⭐ REG-D-119’s selection as configuration, and ASR-13’s independence rule', () => {
+		// ⭐ `REG-D-119` — the sponsor selected devin with glm-5-3-flash-high on 2026-10-19, replacing `REG-D-084`'s
+		// glm-5-3-flash-max.
 		expect(SELECTED_REVIEWER_GUIDANCE).toContain(
-			'The selected reviewer (REG-D-084) is devin with glm-5-3-flash-max: set JPWB_ASSURANCE_TOOL=devin and ' +
-				'JPWB_ASSURANCE_MODEL=glm-5-3-flash-max.'
+			'The selected reviewer (REG-D-119) is devin with glm-5-3-flash-high: set JPWB_ASSURANCE_TOOL=devin and ' +
+				'JPWB_ASSURANCE_MODEL=glm-5-3-flash-high.'
 		);
 		expect(SELECTED_REVIEWER_GUIDANCE).toContain(
 			'not a default this host falls back to (REG-D-052)'

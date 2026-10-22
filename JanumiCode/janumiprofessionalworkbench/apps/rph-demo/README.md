@@ -77,12 +77,12 @@ The mandatory Reasoning Review judges an authoring turn's candidate before it ca
 model step's work product before the step can complete. When the authoring agent's run throws before the review, or
 the producing model never resolves, no review runs, and the candidate cannot be committed. Outside test mode
 (`bun run dev`, or `RPH_DEMO_MODE=server`) no reviewer runs until one is configured: there is no default tool and no
-default model (`REG-D-052`). The sponsor's selection (`REG-D-084`) is devin with GLM-5.3 Flash Max. That is
+default model (`REG-D-052`). The sponsor's selection (`REG-D-119`) is devin with GLM-5.3 Flash High. That is
 configuration you set, not a value the application falls back to. For example, in PowerShell:
 
 ```powershell
 $env:JPWB_ASSURANCE_TOOL = 'devin'
-$env:JPWB_ASSURANCE_MODEL = 'glm-5-3-flash-max'
+$env:JPWB_ASSURANCE_MODEL = 'glm-5-3-flash-high'
 bun run --filter @janumipwb/rph-demo dev
 ```
 

@@ -346,7 +346,7 @@ describe('⭐ D1 — the guidance names the WIRED tools, both variables, no defa
 
 	it('names the GLM-5.3 Flash rule the reviewer’s guidance states, with the selection it follows from', () => {
 		expect(EXECUTOR_GUIDANCE).toContain(
-			'The selected reviewer (REG-D-084) is devin with glm-5-3-flash-max'
+			'The selected reviewer (REG-D-119) is devin with glm-5-3-flash-high'
 		);
 		expect(EXECUTOR_GUIDANCE).toContain(
 			'may not run a GLM-5.3 Flash model under any provider or spelling'

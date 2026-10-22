@@ -32,8 +32,9 @@ const PORT = 4322;
 
 // ⛔ NO MODEL LABEL IS PINNED HERE (REG-D-052: the model is configured, never pinned; REG-F-331 measured what
 // pinning costs — a rotted label made EVERY review fail). The keys are passed THROUGH from the operator's
-// environment; the app refuses, with its own reasoning, when one is unset. The selected reviewer (REG-D-084, devin
-// with glm-5-3-flash-max) is named in the refusal below as the documented configuration, never as a value.
+// environment; the app refuses, with its own reasoning, when one is unset. The selected reviewer (~~REG-D-084, devin
+// with glm-5-3-flash-max~~ ⭐ REG-D-119, devin with glm-5-3-flash-high) is named in the refusal below as the documented
+// configuration, never as a value.
 //
 // ⭑ THE GUARD BELOW IS OPERATOR UX, NOT A SECOND POLICY. Without it the run boots, drives a browser for a
 // minute, and fails deep inside a form submission with a 400 — so it names every missing key at once, up front.

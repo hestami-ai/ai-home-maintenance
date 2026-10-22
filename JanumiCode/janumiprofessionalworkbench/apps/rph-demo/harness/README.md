@@ -39,7 +39,7 @@ assessment's `evaluator`. (The earlier `AUTHORING_ASSESSMENT` object and its fai
 favour of this floor.) The **same role, two implementations**:
 
 - **Product runtime** — the reviewer that `src/lib/server/assurance/reviewer-selection.ts` selects. Outside test mode
-  it is configuration: the sponsor's selection (`REG-D-084`) is devin with `glm-5-3-flash-max`, and agy with
+  it is configuration: the sponsor's selection (`REG-D-119`) is devin with `glm-5-3-flash-high`, and agy with
   `JPWB_JUDGE_MODEL` stays configurable. Its independence from the authoring agent (exec ≠ assurance) is checked on
   the recorded model ids, never assumed from a vendor. Setup and preconditions are in the app README's
   [reasoning reviewer](../README.md#the-reasoning-reviewer) section.

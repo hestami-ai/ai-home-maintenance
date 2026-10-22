@@ -138,7 +138,7 @@ export const EXECUTOR_GUIDANCE =
 	'reviewer’s. ⚠ Independence (ASR-13): the executor’s model may not be the reviewing model under any provider, ' +
 	'spelling or effort variant — agy labels name an effort (“(High)”), and the independence check compares the model ' +
 	'ids the tools report by exact string, so another spelling of the reviewer’s model would pass it falsely. The ' +
-	'selected reviewer (REG-D-084) is devin with glm-5-3-flash-max, so the executor may not run a GLM-5.3 Flash model ' +
+	'selected reviewer (REG-D-119) is devin with glm-5-3-flash-high, so the executor may not run a GLM-5.3 Flash model ' +
 	'under any provider or spelling.';
 
 const refused = (

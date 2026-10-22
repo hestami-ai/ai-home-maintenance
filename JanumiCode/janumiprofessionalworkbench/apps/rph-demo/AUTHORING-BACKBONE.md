@@ -91,9 +91,10 @@ The following fixes address concrete failures observed during a large natural-la
   reviewer or claim it is healthy.
   - **The reviewer is configuration.** Outside test mode, `JPWB_ASSURANCE_TOOL` names the tool, and the tool's own
     variable names its model: `JPWB_ASSURANCE_MODEL` for devin, `JPWB_JUDGE_MODEL` for agy. There is no default tool
-    and no default model (`REG-D-052`). The sponsor's selection (`REG-D-084`) is `JPWB_ASSURANCE_TOOL=devin` with
-    `JPWB_ASSURANCE_MODEL=glm-5-3-flash-max`. It is the documented configuration, not a value the code falls back to,
-    and agy stays configurable.
+    and no default model (`REG-D-052`). ~~The sponsor's selection (`REG-D-084`) is `JPWB_ASSURANCE_TOOL=devin` with
+    `JPWB_ASSURANCE_MODEL=glm-5-3-flash-max`.~~ ⭑ **SUPERSEDED 2026-10-19** (`REG-D-119`): the sponsor's selection is
+    `JPWB_ASSURANCE_TOOL=devin` with `JPWB_ASSURANCE_MODEL=glm-5-3-flash-high`. It is the documented configuration,
+    not a value the code falls back to, and agy stays configurable.
   - **Unset or wrong, the turn is refused.** In any mode, an unknown tool, `pi` (no reviewer adapter is wired), or a
     missing model refuses the turn before the agent runs. Outside test mode, so do an unset tool (in test mode it
     selects the declared stand-in) and a program override for the SELECTED tool — `JPWB_DEVIN_BIN` for devin,

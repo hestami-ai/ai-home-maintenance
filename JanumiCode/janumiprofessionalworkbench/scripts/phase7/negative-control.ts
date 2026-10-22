@@ -2,7 +2,7 @@
 // A UNIT-TESTS-ONLY RUN BESIDE AN ACCOUNT CLAIMING FULL FITNESS, WHICH THE REVIEWER MUST REFUSE.
 //
 //   bun --conditions=source scripts/phase7/negative-control.ts --out <result.json> [--stub rejected|satisfied]
-//   bun --conditions=source scripts/phase7/negative-control.ts --out <result.json> --live --model glm-5-3-flash-max
+//   bun --conditions=source scripts/phase7/negative-control.ts --out <result.json> --live --model glm-5-3-flash-high
 //
 // ⛔ `--live` CALLS THE SELECTED REVIEWER AND IS PAID. It is the OPERATOR's, in P7-4e, within the sponsor's limit — at most
 // 4 reviewer calls (`MAX_REVIEWER_CALLS`), enforced here, not hoped for. Without `--live` this is a DRY RUN: a stub answers

@@ -8,7 +8,7 @@
 // to it: a composition that took the real-reviewer branch whenever retention was wired would pass every registry test.
 //
 // ⭑ WHAT MUST HOLD, on each floor, with devin NAMED and no model: the run resolves without throwing; the reasoning
-// review records `VALIDATOR_EXECUTION_FAILED` carrying the refusal and `REG-D-084`'s guidance; the floor fails closed;
+// review records `VALIDATOR_EXECUTION_FAILED` carrying the refusal and `REG-D-119`'s guidance; the floor fails closed;
 // and the event log names the refusing validator, `reasoning-review.unconfigured`, and never `agy.reasoning-review`.
 //
 // ⛔ HERMETIC. PATH finds no program and `JPWB_JUDGE_MODEL` is unset, so even a composition that selected agy would
@@ -60,7 +60,7 @@ function expectTheRefusalRecorded(host: EngineHandle): void {
 	);
 	expect(log, 'the refusal was recorded as agy’s work').not.toContain('agy.reasoning-review');
 	expect(log).toContain(REFUSAL);
-	expect(log).toContain('REG-D-084');
+	expect(log).toContain('REG-D-119');
 }
 
 /** The refusal's statement, as the floor's own observations carry it. */
@@ -74,7 +74,7 @@ function expectTheRefusalObserved(
 	).toBeGreaterThan(0);
 	const statements = failed.map((o) => o.statement).join('\n');
 	expect(statements).toContain(REFUSAL);
-	expect(statements).toContain('REG-D-084');
+	expect(statements).toContain('REG-D-119');
 }
 
 let opened: EngineHandle | undefined;

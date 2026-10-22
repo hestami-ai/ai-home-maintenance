@@ -221,11 +221,11 @@ describe('⭐ the lane requires exactly what its tool reads', () => {
 		}
 	});
 
-	it('the refusal names the selected reviewer (REG-D-084) as configuration, never as a default', () => {
+	it('the refusal names the selected reviewer (~~REG-D-084~~ ⭐ REG-D-119) as configuration, never as a default', () => {
 		const refusal = laneKeysRefusal({}) ?? 'NO REFUSAL';
 		expect(refusal).toContain('JPWB_ASSURANCE_TOOL=devin');
-		expect(refusal).toContain('JPWB_ASSURANCE_MODEL=glm-5-3-flash-max');
-		expect(refusal).toContain('REG-D-084');
+		expect(refusal).toContain('JPWB_ASSURANCE_MODEL=glm-5-3-flash-high');
+		expect(refusal).toContain('REG-D-119');
 		expect(refusal).toMatch(/not a default/);
 	});
 });

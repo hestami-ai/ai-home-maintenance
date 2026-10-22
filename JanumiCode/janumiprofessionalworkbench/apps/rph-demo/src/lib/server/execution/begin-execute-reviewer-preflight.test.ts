@@ -201,7 +201,7 @@ describe('⭐ D5 — beginExecute asks the reviewer selector before it dispatche
 				result.data?.error ?? '',
 				'the step was not refused with the reviewer guidance'
 			).toContain(c.names);
-			expect(result.data?.error).toContain('REG-D-084');
+			expect(result.data?.error).toContain('REG-D-119');
 			expect(result.status).toBe(400);
 			expect(eventCount(), 'a refused step dispatched something').toBe(before);
 			expect(
@@ -233,7 +233,7 @@ describe('⭐ D5 — beginExecute asks the reviewer selector before it dispatche
 			result.data?.error ?? '',
 			'the server-mode step was not refused for its unset tool'
 		).toContain('JPWB_ASSURANCE_TOOL is not set');
-		expect(result.data?.error).toContain('REG-D-084');
+		expect(result.data?.error).toContain('REG-D-119');
 		expect(result.status).toBe(400);
 		expect(eventCount(), 'a refused step dispatched something').toBe(before);
 		expect(

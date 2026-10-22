@@ -40,8 +40,9 @@ import { outputLimitOf } from '../src/lib/server/tools/output-limit';
 // the required JSON output but omitted the Section 9.7 professional rationale summary entirely, implicitly
 // treating output production as sufficient without accounting for how the obligation was discharged."*
 // ⚠ GLM-5.2 was the reviewer CONFIGURED for those runs, not the lane's reviewer: the lane reviews with whatever
-// `JPWB_ASSURANCE_TOOL` names and that tool's model variable (`lane-config.ts`). The selected reviewer (`REG-D-084`)
-// is devin with `glm-5-3-flash-max` — configuration an operator sets, never a default (`REG-D-052`).
+// `JPWB_ASSURANCE_TOOL` names and that tool's model variable (`lane-config.ts`). The selected reviewer (~~`REG-D-084`~~
+// ⭐ `REG-D-119`) is devin with ~~`glm-5-3-flash-max`~~ ⭐ `glm-5-3-flash-high` — configuration an operator sets, never a
+// default (`REG-D-052`).
 //
 // ⚠⚠ THAT REJECTION EXPOSES AN INCOHERENCE THIS SPEC DOES NOT RESOLVE, AND MUST NOT HIDE. The executor's own
 // system prompt says *"Do not narrate, do not explain your reasoning"* — so we INSTRUCTED the producer not to

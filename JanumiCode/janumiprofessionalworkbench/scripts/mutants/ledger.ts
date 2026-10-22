@@ -11541,10 +11541,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "SR3-M7-refusal-loses-selected-configuration",
 		file: "apps/rph-demo/e2e-live-exec/lane-config.ts",
-		find: "'The selected reviewer (REG-D-084) is JPWB_ASSURANCE_TOOL=devin with JPWB_ASSURANCE_MODEL=glm-5-3-flash-max: ' +",
+		find: "'The selected reviewer (REG-D-119) is JPWB_ASSURANCE_TOOL=devin with JPWB_ASSURANCE_MODEL=glm-5-3-flash-high: ' +",
 		replace: "'The selected reviewer is devin: ' +",
 		expectRed: ["verif/live-exec-lane-config.test.ts"],
-		why: "D9: the lane names the selected reviewer as configuration. A refusal that dropped the variables, the model or the ruling would leave the operator without the documented value; the selected-reviewer test must redden. OBSERVED: KILLED — 1 test(s) red in live-exec-lane-config.test.ts: 'the refusal names the selected reviewer (REG-D-084) as configuration, never as a default' (AssertionError: expected 'The live execution lane cannot start:…' to contain 'JPWB_ASSURANCE_TOOL=devin')",
+		why: "D9: the lane names the selected reviewer as configuration. A refusal that dropped the variables, the model or the ruling would leave the operator without the documented value; the selected-reviewer test must redden. OBSERVED: KILLED — 1 test(s) red in live-exec-lane-config.test.ts: 'the refusal names the selected reviewer (REG-D-084) as configuration, never as a default' (AssertionError: expected 'The live execution lane cannot start:…' to contain 'JPWB_ASSURANCE_TOOL=devin') ⭑ RE-ANCHORED 2026-10-22 (JAN-EXEC Phase 7, the selection of devin / glm-5-3-flash-high, REG-D-119, rule #5): the sponsor selected devin with glm-5-3-flash-high on 2026-10-19, replacing REG-D-084's glm-5-3-flash-max, so the lane's refusal now names JPWB_ASSURANCE_MODEL=glm-5-3-flash-high and REG-D-119, and the test, now 'the refusal names the selected reviewer (~~REG-D-084~~ ⭐ REG-D-119) as configuration, never as a default', pins both. The promise and the mutation are the same, restated on the new line. OBSERVED again (bun run mutants -- SR3-M7 and the four D119 ids, by their full ids, 2026-10-22, in the p7c-high worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         SR3-M7-refusal-loses-selected-configuration ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-SELREV SR-3 (DESIGN-the-selected-reviewer.md D9; ROADMAP-the-selected-reviewer.md SR-3; DESIGN-the-selected-reviewer.md §2 G9; REG-F-461) — the live execution lane requires, compares and waits for what its reviewer reads and may take"
 	},
 	{
@@ -32440,5 +32440,41 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/reviewer-qualification-fingerprint.test.ts"],
 		why: "PROMISE: the field re-reader (reread) chooses over exactly what the product's validator chooser reads, a declared review's host-line slices among it, so a row that reads one field of the account otherwise moves only what that reading moves (REG-D-118 (1)). PQ1-V1610 asks the same of a process result's view. WHO RELIES: the field re-reader's CONTROL and the field-reading rows, which the reader of a moved fingerprint takes as the statement of what moves probes. WHAT THE MUTATION DOES: the re-reader leaves the host-line slices out. OBSERVED (bun run mutants -- the three ids, by their full ids, 2026-10-18, in the package D worktree, the ledger staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P5D-M9-the-field-re-reader-forgets-a-declared-review-s-host-line-slices ⎯⎯⎯⎯⎯⎯ Failed Tests 20 ⎯⎯⎯⎯⎯⎯⎯'. Red, by name (the same mutation on a disposable copy of the test file): the 19 validator field-reading rows ('the probes that plant in that field both ways: expected [ 'G-ACCOUNT-BREAKS', …(4) ] to deeply equal [ 'G-ACCOUNT-BREAKS', …(2) ]') and the field re-reader's CONTROL ('nothing moves').",
 		source: "JAN-EXEC Phase 7 P5, package D's check, finding 2 - the re-fencers' branches that read a declared review's host-line slices (declaredHostSlicesOf, in revalidated and in reread) had no ledger entry: the rechooser forgetting them, the rechooser reading them whatever its row keeps, and the field re-reader forgetting them, each asked of the fingerprint test (REG-D-118 (1))"
+	},
+	{
+		id: "D119-M1-the-reviewer-guidance-names-the-superseded-selection",
+		file: "apps/rph-demo/src/lib/server/assurance/reviewer-selection.ts",
+		find: "'The selected reviewer (REG-D-119) is devin with glm-5-3-flash-high: set JPWB_ASSURANCE_TOOL=devin and ' +\n\t'JPWB_ASSURANCE_MODEL=glm-5-3-flash-high.",
+		replace: "'The selected reviewer (REG-D-084) is devin with glm-5-3-flash-max: set JPWB_ASSURANCE_TOOL=devin and ' +\n\t'JPWB_ASSURANCE_MODEL=glm-5-3-flash-max.",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/reviewer-selection.test.ts"],
+		why: "PROMISE: every refusal of the reviewer tells the operator the selection in force, REG-D-119's devin with glm-5-3-flash-high, as configuration (SELECTED_REVIEWER_GUIDANCE). WHO RELIES: the operator configuring a host from a refusal: the authoring preflight, beginExecute and both floors carry this guidance. WHAT THE MUTATION DOES: the guidance names REG-D-084's superseded selection, glm-5-3-flash-max, again, so an operator would configure the reviewer the sponsor replaced. OBSERVED (bun run mutants -- SR3-M7 and the four D119 ids, by their full ids, 2026-10-22, in the p7c-high worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         D119-M1-the-reviewer-guidance-names-the-superseded-selection ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 - the sponsor's selection of devin / glm-5-3-flash-high on 2026-10-19 (REG-D-119), replacing REG-D-084's glm-5-3-flash-max: the reviewer's and the executor's guidance, the live lane's refusal and the Phase 7 operator's refusal name it, and the tests that pinned REG-D-084's selection pin REG-D-119's (package D's survey, sections B to D, and its check's finding 2)"
+	},
+	{
+		id: "D119-M2-the-executor-guidance-names-the-superseded-selection",
+		file: "apps/rph-demo/src/lib/server/execution/executor-selection.ts",
+		find: "'selected reviewer (REG-D-119) is devin with glm-5-3-flash-high, so the executor may not run a GLM-5.3 Flash model ' +",
+		replace: "'selected reviewer (REG-D-084) is devin with glm-5-3-flash-max, so the executor may not run a GLM-5.3 Flash model ' +",
+		expectRed: ["apps/rph-demo/src/lib/server/execution/executor-selection.test.ts"],
+		why: "PROMISE: the executor's guidance names the selected reviewer its GLM-5.3 Flash rule follows from, REG-D-119's devin with glm-5-3-flash-high (EXECUTOR_GUIDANCE; ASR-13). WHO RELIES: the operator choosing an executor model independent of the reviewer's. WHAT THE MUTATION DOES: the guidance names REG-D-084's superseded selection, glm-5-3-flash-max. OBSERVED (bun run mutants -- SR3-M7 and the four D119 ids, by their full ids, 2026-10-22, in the p7c-high worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         D119-M2-the-executor-guidance-names-the-superseded-selection ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 - the sponsor's selection of devin / glm-5-3-flash-high on 2026-10-19 (REG-D-119), replacing REG-D-084's glm-5-3-flash-max: the reviewer's and the executor's guidance, the live lane's refusal and the Phase 7 operator's refusal name it, and the tests that pinned REG-D-084's selection pin REG-D-119's (package D's survey, sections B to D, and its check's finding 2)"
+	},
+	{
+		id: "D119-M3-the-lane-refusal-names-the-superseded-selection",
+		file: "apps/rph-demo/e2e-live-exec/lane-config.ts",
+		find: "'The selected reviewer (REG-D-119) is JPWB_ASSURANCE_TOOL=devin with JPWB_ASSURANCE_MODEL=glm-5-3-flash-high: ' +",
+		replace: "'The selected reviewer (REG-D-084) is JPWB_ASSURANCE_TOOL=devin with JPWB_ASSURANCE_MODEL=glm-5-3-flash-max: ' +",
+		expectRed: ["verif/live-exec-lane-config.test.ts"],
+		why: "PROMISE: the live lane's refusal names the selected reviewer as REG-D-119's configuration, JPWB_ASSURANCE_TOOL=devin with JPWB_ASSURANCE_MODEL=glm-5-3-flash-high (laneKeysRefusal). WHO RELIES: the operator starting a paid lane, who sets its keys from this refusal. WHAT THE MUTATION DOES: the refusal names REG-D-084's superseded selection, glm-5-3-flash-max: it keeps the variables, a model and a ruling, which SR3-M7's mutation drops, so only a pin of the selection in force sees it. OBSERVED (bun run mutants -- SR3-M7 and the four D119 ids, by their full ids, 2026-10-22, in the p7c-high worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         D119-M3-the-lane-refusal-names-the-superseded-selection ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 - the sponsor's selection of devin / glm-5-3-flash-high on 2026-10-19 (REG-D-119), replacing REG-D-084's glm-5-3-flash-max: the reviewer's and the executor's guidance, the live lane's refusal and the Phase 7 operator's refusal name it, and the tests that pinned REG-D-084's selection pin REG-D-119's (package D's survey, sections B to D, and its check's finding 2)"
+	},
+	{
+		id: "D119-M4-the-phase-7-refusal-of-another-reviewer-cites-the-superseded-selection",
+		file: "apps/rph-demo/e2e-live-exec/phase7-operator.ts",
+		find: "'(REG-D-119, REG-D-102).'",
+		replace: "'(REG-D-084, REG-D-102).'",
+		expectRed: ["verif/phase7-live-spec.test.ts"],
+		why: "PROMISE: the Phase 7 spec's refusal of a reviewing tool other than devin cites the selection in force, REG-D-119, beside REG-D-102 (reviewerUnderTest). WHO RELIES: the operator of a paid Phase 7 run, told why another wired tool is refused. WHAT THE MUTATION DOES: the refusal cites REG-D-084's superseded selection. OBSERVED (bun run mutants -- SR3-M7 and the four D119 ids, by their full ids, 2026-10-22, in the p7c-high worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         D119-M4-the-phase-7-refusal-of-another-reviewer-cites-the-superseded-selection ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 - the sponsor's selection of devin / glm-5-3-flash-high on 2026-10-19 (REG-D-119), replacing REG-D-084's glm-5-3-flash-max: the reviewer's and the executor's guidance, the live lane's refusal and the Phase 7 operator's refusal name it, and the tests that pinned REG-D-084's selection pin REG-D-119's (package D's survey, sections B to D, and its check's finding 2)"
 	}
 ];

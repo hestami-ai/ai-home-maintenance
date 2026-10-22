@@ -4,7 +4,8 @@
 // replaceable implementation of the mandatory Reasoning Review floor policy (§8.4) — runs whatever backing tool its
 // `print` seam is given, and agy (`agyPrint`) is only that seam's default. The product gives it the reviewer
 // `reviewer-selection.ts` selects (`assurance/index.ts`): devin with its configured model — the sponsor's selection is
-// `glm-5-3-flash-max` (`REG-D-084`), configuration and never a default — or agy with `JPWB_JUDGE_MODEL`. Independence
+// ~~`glm-5-3-flash-max` (`REG-D-084`)~~ ⭐ `glm-5-3-flash-high` (`REG-D-119`), configuration and never a default — or agy
+// with `JPWB_JUDGE_MODEL`. Independence
 // from the producer is not assumed from a vendor: `checkIndependence` (`packages/rph-assurance`) compares the identities
 // recorded, and under `DIFFERENT_MODEL` their model ids by exact string. The recorded validator id
 // `agy.reasoning-review` is kept whichever tool reviews — records are already written under it

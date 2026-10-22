@@ -154,7 +154,7 @@ describe('the devin branch is reached through its exec seam, with nothing inject
 
 describe('⛔ outside test mode a misconfigured reviewer is RECORDED, never thrown, and never run as agy', () => {
 	// Each arrangement leaves `JPWB_JUDGE_MODEL` unset, so agy could not run even if a mutant selected it — and every
-	// statement must name what was wrong AND carry `REG-D-084`'s selection and the independence guidance.
+	// statement must name what was wrong AND carry `REG-D-119`'s selection and the independence guidance.
 	const CASES: readonly {
 		readonly name: string;
 		readonly env: Readonly<Record<string, string>>;
@@ -190,9 +190,9 @@ describe('⛔ outside test mode a misconfigured reviewer is RECORDED, never thro
 			expect(failed).toHaveLength(1);
 			const statement = failed[0]!.statement;
 			expect(statement).toContain(c.names);
-			expect(statement).toContain('REG-D-084');
+			expect(statement).toContain('REG-D-119');
 			expect(statement).toContain(
-				'JPWB_ASSURANCE_TOOL=devin and JPWB_ASSURANCE_MODEL=glm-5-3-flash-max'
+				'JPWB_ASSURANCE_TOOL=devin and JPWB_ASSURANCE_MODEL=glm-5-3-flash-high'
 			);
 			expect(statement).toContain('ASR-13');
 			expect(
@@ -444,7 +444,7 @@ describe('⛔ SR-2 (D7) — a program override: refused outside test mode for th
 			const failed = review.observations.filter((o) => o.code === 'VALIDATOR_EXECUTION_FAILED');
 			expect(failed).toHaveLength(1);
 			expect(failed[0]!.statement).toContain(`JPWB_DEVIN_BIN=${JSON.stringify(program)}`);
-			expect(failed[0]!.statement).toContain('REG-D-084');
+			expect(failed[0]!.statement).toContain('REG-D-119');
 		});
 
 	it('agy, JPWB_AGY_BIN set: refused and recorded, the injected print never called', async () => {

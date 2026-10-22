@@ -57,7 +57,7 @@ export function createFloorRegistry(opts: {
 	/**
 	 * ⭐ `JAN-SELREV` SR-1 — the devin PROGRAM, injectable at its exec seam, so the devin branch is reached with nothing
 	 * injected but the program. Every real-path test injects `print`, which wins, so until this seam existed no test had
-	 * ever reached the branch the selected reviewer (`REG-D-084`) runs on.
+	 * ever reached the branch the selected reviewer (~~`REG-D-084`~~ ⭐ `REG-D-119`) runs on.
 	 */
 	devinExec?: DevinExec;
 	clock?: () => string;
@@ -120,9 +120,9 @@ export function createFloorRegistry(opts: {
 								// Claiming `zhipu` for a GLM model would assert a relationship this host cannot see.
 								providerId: 'devin',
 								// ⭐ `JAN-SELREV` SR-2 (D6) — devin REPORTS the model that answered, and a model other than
-								// the one configured fails the review: the selected reviewer (`REG-D-084`) is the model
-								// qualified, so a substitute's review is not its review. Set HERE ONLY — the fingerprint and
-								// the qualification runner build the validator without it (`reasoning-review-validator.ts`).
+								// the one configured fails the review: the selected reviewer (~~`REG-D-084`~~ ⭐ `REG-D-119`) is
+								// the model qualified, so a substitute's review is not its review. Set HERE ONLY — the fingerprint
+								// and the qualification runner build the validator without it (`reasoning-review-validator.ts`).
 								requireReportedModel: true
 							}
 						: {})

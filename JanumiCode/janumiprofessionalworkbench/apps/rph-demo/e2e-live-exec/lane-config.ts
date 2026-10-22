@@ -281,7 +281,7 @@ export function laneKeysRefusal(
 		'    agy   — JPWB_JUDGE_MODEL (a label the installed agy recognises: agy rejects an unknown one, and its error ' +
 			'output lists the labels it knows — REG-F-331)',
 		'  and, for the reviewing tool, no program override (JPWB_DEVIN_BIN, JPWB_AGY_BIN).',
-		'The selected reviewer (REG-D-084) is JPWB_ASSURANCE_TOOL=devin with JPWB_ASSURANCE_MODEL=glm-5-3-flash-max: ' +
+		'The selected reviewer (REG-D-119) is JPWB_ASSURANCE_TOOL=devin with JPWB_ASSURANCE_MODEL=glm-5-3-flash-high: ' +
 			'configuration you set, not a default (REG-D-052).',
 		'⚠ The producing and reviewing models must DIFFER, or the reasoning review is refused for non-independence ' +
 			'(ASR-13) — which is the check working, not a fault.'

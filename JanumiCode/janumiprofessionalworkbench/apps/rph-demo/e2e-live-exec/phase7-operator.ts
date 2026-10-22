@@ -279,7 +279,7 @@ export function readinessRefusals(r: Readiness): string[] {
 /**
  * ⭐ D3 — the reviewer this run is readied for: devin and its configured model, or why not. ⚠ A RULE OF THIS SPEC: the
  * design's readiness check is devin's (§6 P7-2 D3), and the run is measured with the selected reviewer, devin
- * (`REG-D-084`, `REG-D-102`), so another wired tool is refused here rather than run unready.
+ * (~~`REG-D-084`~~ ⭐ `REG-D-119`, `REG-D-102`), so another wired tool is refused here rather than run unready.
  */
 export function reviewerUnderTest(
 	env: Readonly<Record<string, string | undefined>>
@@ -290,7 +290,7 @@ export function reviewerUnderTest(
 			refusal:
 				`JPWB_ASSURANCE_TOOL=${JSON.stringify(env.JPWB_ASSURANCE_TOOL ?? null)} is refused by a rule of THIS SPEC: its ` +
 				'readiness check is devin’s (design §6 P7-2 D3), and Phase 7 is measured with the selected reviewer, devin ' +
-				'(REG-D-084, REG-D-102).'
+				'(REG-D-119, REG-D-102).'
 		};
 	const model = env[REVIEWER_MODEL_VARIABLE[tool]]?.trim();
 	return model ? { model } : { refusal: `${REVIEWER_MODEL_VARIABLE[tool]} is not set.` };
