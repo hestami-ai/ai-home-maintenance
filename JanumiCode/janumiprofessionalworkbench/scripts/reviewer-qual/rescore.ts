@@ -13,6 +13,7 @@ import { SEEDED_REASONING_REVIEW_CRITERIA } from '@janumipwb/rph-assurance';
 import type { AssessmentCriterion } from '@janumipwb/rph-contracts';
 import type { QualificationCase } from './cases.js';
 import {
+	noReplyToScore,
 	restampable,
 	type CallLine,
 	type CasePromptHashes,
@@ -38,8 +39,13 @@ export async function rescoreEvaluation(
 	scoringDigest: string,
 	criteria: readonly AssessmentCriterion[] = SEEDED_REASONING_REVIEW_CRITERIA
 ): Promise<ScoredOutcome> {
-	const failed = calls.find((k) => k.reply.status === 'TRANSPORT_FAILURE');
-	if (failed) throw new NotRescorable(`its ${failed.role} call returned nothing to replay (a transport failure)`);
+	// ⭐ P5 package C (F4; package A's check, finding 5) — and a call the tool cut at the model's output-token limit, read as
+	// the record reads it (`noReplyToScore`): refused here by its class, never later inside the replay.
+	const failed = calls.find((k) => noReplyToScore(k.reply));
+	if (failed)
+		throw new NotRescorable(
+			`its ${failed.role} call returned nothing to replay (${failed.reply.status === 'OUTPUT_LIMIT' ? 'cut at the model’s output-token limit' : 'a transport failure'})`
+		);
 	let replayed;
 	try {
 		replayed = await evaluateCase({

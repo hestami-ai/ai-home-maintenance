@@ -151,6 +151,11 @@ interface Call {
 	readonly parse?: string;
 	/** E-5's detail, as the validator wrote it — what tells a P7-6 I5 chain (`NO_CRITERION_ANSWERED`, the marker opening it). */
 	readonly detail?: string;
+	/**
+	 * ⭐ P5 package C (F1) — E-4's output truncation, as the floor projects it: `DECLARED` with the class's detail is a reply
+	 * the tool cut at the model's output-token limit (`outputLimitOf`). Absent, the record carries none, as before.
+	 */
+	readonly outputTruncation?: string;
 }
 interface PhaseKnobs {
 	/** Begin & Execute was pressed. Default true. */
@@ -304,6 +309,7 @@ function aRun(
 				exchangeRole: c.role,
 				disposition: c.disposition,
 				parseOutcome: { outcome: c.parse ?? 'PARSED', detail: c.detail ?? '' },
+				...(c.outputTruncation === undefined ? {} : { outputTruncation: c.outputTruncation }),
 				...refs(`mex_${subject}_${i}`, c.disposition)
 			})
 		);
@@ -2382,10 +2388,12 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 	it('⛔ REG-D-114 (14), as amended — the reviewer calls carry a plain caveat, in report.json and report.md: a phase’s own spend can carry the total past the limit, because the lane checks before each press, not during one', () => {
 		// ⛔ PREDICTED RED, read from the code: the report said nothing of it, so a run whose reads each let a press through read
 		// as a run held to the limit throughout.
+		// ⭐ P5 package C (F2) — ~~the sponsor’s limit is "about 450", REG-D-110 (1)~~: the sponsor raised it to about 600
+		// (`REG-D-117` Q10, raising `REG-D-110` (1)'s), and the caveat names the ruling that set it.
 		const caveat =
 			'A phase’s own spend can carry the total past the limit: the lane checks the limit before each press, not during one, ' +
 			'and a model unit’s press may spend up to 140 reviewer calls after its check (REG-D-114 (14), as amended ' +
-			'2026-10-16; the sponsor’s limit is "about 450", REG-D-110 (1)).';
+			'2026-10-16; the sponsor’s limit is "about 600", REG-D-117 Q10, raising REG-D-110 (1)).';
 		const r = reportOf(aRun({})).report;
 		expect(renderMarkdown(r), 'report.md carries no caveat that a press can spend past the limit').toContain(`- **Caveat:** ${caveat}`);
 		expect(r.reviewerCalls.limitCaveat, 'report.json carries no caveat that a press can spend past the limit').toBe(caveat);
@@ -2554,6 +2562,40 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 			'broke',
 			['REG-F-428', 'REG-F-479', 'REG-F-489']
 		]);
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7 P5, package C (F1; `REG-D-118` (4)) — A REVIEW THAT ENDED ON A REPLY THE TOOL CUT AT THE MODEL'S
+	// OUTPUT-TOKEN LIMIT bears on `REG-F-563`, the entry that records the cap. ⛔ Since package A labelled such a review
+	// `output-limit`, its stage-4 cell read broke with no id — unregistered — where the same failure, labelled `no-response`,
+	// had cited `REG-F-499`.
+	it('⛔ P5 C — a review that ended on a cut at the output-token limit broke stage 4 citing REG-F-563 — never unregistered', () => {
+		/** A call the tool cut, as the floor projects it: REJECTED, NOT_ATTEMPTED, its output DECLARED cut, E-5 the class's. */
+		const cutAt = (role: string, ordinal: number, clause: string) => ({
+			role,
+			disposition: 'REJECTED',
+			ordinal,
+			parse: 'NOT_ATTEMPTED',
+			outputTruncation: 'DECLARED',
+			detail: outputLimitDetail({
+				facts: { outputTokens: 25_000 },
+				partialChars: 0,
+				elapsedMs: 90_010,
+				clause,
+				reported: 'reasoning-review backing tool invocation failed: devin invocation failed: (fixture)'
+			})
+		});
+		const cut = [
+			cutAt('INITIAL', 1, 'short of the tool’s 240000 ms bound, so it is run once more (REG-D-102)'),
+			cutAt('RETRY', 2, 'it was itself the one further call a thrown call is given (REG-D-102), so this failure stands')
+		];
+		const workProduct = reportOf(aRun({ design: { review: cut } })).report;
+		const reviewed = cellOf(workProduct, '4', 'design');
+		expect(reviewed.basis, 'arrangement: the review reads as package A labels it').toContain('the review of work product art_design is output-limit');
+		// ⛔ THE MUTANT: the label mapped to nothing — the cell broke, unregistered, as at package A's merge.
+		expect(shown(reviewed), 'a cut review’s break cites no register entry').toEqual(['broke', ['REG-F-563']]);
+		expect(reviewed.unregistered, 'a cut review’s break reads unregistered').toBeUndefined();
+		const command = reportOf(aRun({ implementation: { commands: 1, commandReview: cut } })).report;
+		expect(shown(cellOf(command, '4', 'implementation')), 'a cut command review').toEqual(['broke', ['REG-F-520', 'REG-F-563']]);
 	});
 
 	it('⛔ a command with no review broke stage 4, unregistered — however its other cells read', () => {

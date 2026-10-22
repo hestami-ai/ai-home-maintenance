@@ -419,6 +419,40 @@ describe('JAN-CRITREAD J2-3 — limb 1, COVERAGE', () => {
 		expect(limb(r, 'ESCALATION')).not.toContain('CLEAN_NOT_SATISFIED');
 	});
 
+	// ⭐ `JAN-EXEC` Phase 7 P5, package C (F4; package A's check, finding 5) — and `rescoreEvaluation`, asked to re-score one,
+	// refuses it by its own class, before any replay: ⛔ it named only a transport failure, so a cut evaluation failed later,
+	// inside the replay, in its words ("the replay failed — …"), not as the call that left nothing to replay.
+	it('⛔ P5 C — rescoreEvaluation refuses a cut evaluation at once, as a call that left nothing to replay, naming the cut', async () => {
+		const cut = new OutputLimitReached('devin invocation failed: (fixture)', {
+			facts: { outputTokens: 25_000 },
+			partialReply: '',
+			observedToolCalls: { canObserve: false, reason: 'The devin adapter cannot observe tool calls (fixture).' }
+		});
+		const lines = await recorded({ runId: 'qr-cut-2', reply: (id) => (id === 'G-CLEAN-R1' ? cut : asOracle(id)) });
+		const calls = lines.filter((l): l is CallLine => l.kind === 'CALL' && l.caseId === 'G-CLEAN-R1');
+		expect(calls.map((c) => [c.role, c.reply.status]), 'arrangement: one call, cut').toEqual([['initial', 'OUTPUT_LIMIT']]);
+		const refused = await rescoreEvaluation(
+			lines.find((l): l is RunLine => l.kind === 'RUN')!,
+			SUBSET.find((c) => c.id === 'G-CLEAN-R1')!,
+			calls,
+			FP.scoring
+		).catch((e: unknown) => e);
+		expect(String(refused), 'a cut evaluation was refused by another rule').toBe(
+			'NotRescorable: its initial call returned nothing to replay (cut at the model’s output-token limit)'
+		);
+		// ⭑ CONTROL — a transport failure is still refused as one: the cut's words are the cut's alone.
+		const timedOut = await recorded({ runId: 'qr-timeout-2', reply: (id) => (id === 'G-CLEAN-R1' ? new Error('the bound') : asOracle(id)) });
+		const failed = await rescoreEvaluation(
+			timedOut.find((l): l is RunLine => l.kind === 'RUN')!,
+			SUBSET.find((c) => c.id === 'G-CLEAN-R1')!,
+			timedOut.filter((l): l is CallLine => l.kind === 'CALL' && l.caseId === 'G-CLEAN-R1'),
+			FP.scoring
+		).catch((e: unknown) => e);
+		expect(String(failed), 'a transport failure was named a cut').toBe(
+			'NotRescorable: its initial call returned nothing to replay (a transport failure)'
+		);
+	});
+
 	it('⛔ ONE SERVER-CLOCK DAY (REG-F-429) — an ollama run whose calls straddle the server’s midnight counts for nothing; within one day it covers', async () => {
 		const clocks = ['Thu, 24 Sep 2026 03:58:00 GMT', 'Thu, 24 Sep 2026 03:59:30 GMT', 'Thu, 24 Sep 2026 03:59:50 GMT'];
 		const served = (list: readonly string[]) => (n: number) => ({ templateSha256: HEX('2'), serverClock: list[n]! });
@@ -664,9 +698,13 @@ describe('JAN-ESCREC ER-2 — a RESCORED record re-stamps the WHOLE of its sourc
 	const ALL_SIX = ['G-CLEAN#1', 'G-CLEAN#2', 'G-CLEAN-R1#1', 'G-CLEAN-R1#2', 'G-RR-04#1', 'G-RR-04#2'];
 	/** Where the check places a line of a one-file record. */
 	const at = (lines: readonly RecordLine[], line: RecordLine) => `runs.ndjson:${lines.indexOf(line) + 1}`;
-	/** The RECORD problem for an evaluation a RESCORED record leaves out, verbatim — placed at the record's first line. */
+	/**
+	 * The RECORD problem for an evaluation a RESCORED record leaves out, verbatim — placed at the record's first line.
+	 * ⭐ P5 package C (F4) — ~~"not cut at the transport"~~: nor cut by the tool at the model's output-token limit, the class
+	 * the check reads alike (`noReplyToScore`).
+	 */
 	const leftOut = (lines: readonly RecordLine[], rescoreId: string, evaluation: string, runId: string) =>
-		`${at(lines, lines.find((l) => l.kind === 'RESCORED' && l.rescoreId === rescoreId)!)}: RESCORED ${rescoreId} leaves out ${evaluation} of run ${runId}, which a re-scoring of that run re-stamps (\`rescoredLines\`) — complete, not cut at the transport, of a current case and re-scorable today: a RESCORED record re-stamps the whole of its source run, or what it covers and escalates rests on the repetitions it kept`;
+		`${at(lines, lines.find((l) => l.kind === 'RESCORED' && l.rescoreId === rescoreId)!)}: RESCORED ${rescoreId} leaves out ${evaluation} of run ${runId}, which a re-scoring of that run re-stamps (\`rescoredLines\`) — complete, cut neither at the transport nor at the model’s output-token limit, of a current case and re-scorable today: a RESCORED record re-stamps the whole of its source run, or what it covers and escalates rests on the repetitions it kept`;
 	/** The RECORD problem for a line re-stamping an evaluation a re-scoring does not yield, verbatim. */
 	const tooMany = (lines: readonly RecordLine[], line: RescoredLine) =>
 		`${at(lines, line)}: RESCORED ${line.rescoreId} re-stamps ${label(line)} of run ${line.sourceRunId}, which a re-scoring of that run does not (\`rescoredLines\`) — today’s path cannot re-score it`;

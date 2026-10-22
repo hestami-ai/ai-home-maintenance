@@ -3,7 +3,8 @@
 // A STATIC CHECK THAT RUNS NO MODEL. Every record not SUPERSEDED is in its population, whatever fingerprint it carries —
 // so whether a failure has been written up is a property of the record that holds it, not of the definition currently
 // in force, and no later change of definition, acknowledgement or re-run can retire it. Three limbs:
-//   1. COVERAGE — every current case, by TODAY's prompt hashes, MEASURED (answered, or failed at the transport) in a RUN,
+//   1. COVERAGE — every current case, by TODAY's prompt hashes, MEASURED (answered, or failed at the transport ⭐ or cut by
+//      the tool at the model's output-token limit, P5 package A's class, `noReplyToScore`) in a RUN,
 //      or a RESCORED record, carrying today's fingerprint. A scoring-only move is discharged by RESCORED lines; a move
 //      of the prompt side (the probe set, the budget, the criteria) that no recorded case prompt shows owes an
 //      ACKNOWLEDGED line besides, WHATEVER RUNS EXIST under the new fingerprint; a case whose prompt changed owes a
@@ -1007,7 +1008,9 @@ async function restampsWhole(ctx: Ctx, struck: ReadonlySet<string>): Promise<voi
 			if (owed && !x)
 				ctx.problems.push({
 					limb: 'RECORD',
-					message: `${at}: RESCORED ${line.rescoreId} leaves out ${label} of run ${source.run.runId}, which a re-scoring of that run re-stamps (\`rescoredLines\`) — complete, not cut at the transport, of a current case and re-scorable today: a RESCORED record re-stamps the whole of its source run, or what it covers and escalates rests on the repetitions it kept`
+					// ⭐ P5 package C (F4) — ~~"not cut at the transport"~~: nor cut by the tool at the model's output-token limit,
+					// which `restampable` refuses too (`record.ts`).
+					message: `${at}: RESCORED ${line.rescoreId} leaves out ${label} of run ${source.run.runId}, which a re-scoring of that run re-stamps (\`rescoredLines\`) — complete, cut neither at the transport nor at the model’s output-token limit, of a current case and re-scorable today: a RESCORED record re-stamps the whole of its source run, or what it covers and escalates rests on the repetitions it kept`
 				});
 			else if (!owed && x && ctx.caseIds.has(e.caseId))
 				ctx.problems.push({

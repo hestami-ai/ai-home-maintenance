@@ -32,6 +32,7 @@ import {
 	sourceResolutionProblem,
 	SOURCE_PROBE
 } from './preflight.js';
+import type { CallReply } from './record.js';
 import type { RunFingerprint } from './runner.js';
 import type { CandidateSpec, TransportDeps } from './transports.js';
 
@@ -171,6 +172,16 @@ function candidateSpec(args: Args): CandidateSpec {
 }
 
 /**
+ * The run's last line: the calls appended to `out`, and those of `replies` that failed at the transport — ⭐ and (P5
+ * package C, F4) those the tool cut at the model's output-token limit, counted apart: each left no reply to score.
+ */
+export function runSummary(out: string, replies: readonly CallReply[]): string {
+	const failures = replies.filter((r) => r.status === 'TRANSPORT_FAILURE').length;
+	const cut = replies.filter((r) => r.status === 'OUTPUT_LIMIT').length;
+	return `${replies.length} calls appended to ${out}; ${failures} transport failure(s), ${cut} cut at the model’s output-token limit`;
+}
+
+/**
  * The run. Returns the exit code: 0 run recorded, 2 refused before anything was written, 3 no fingerprint could be computed,
  * 4 the harness stopped the run part-way — the lines appended before it stay, and name no fault of the candidate's.
  */
@@ -246,8 +257,7 @@ export async function main(argv: readonly string[], deps: CliDeps): Promise<numb
 		say(selected);
 		return 2;
 	}
-	let calls = 0;
-	let failures = 0;
+	const replies: CallReply[] = [];
 	let appended = 0;
 	try {
 		const transport = await transports.loadTransport(
@@ -271,9 +281,7 @@ export async function main(argv: readonly string[], deps: CliDeps): Promise<numb
 			onLine: (line) => {
 				appendFileSync(args.out!, record.serializeLine(line));
 				appended += 1;
-				if (line.kind !== 'CALL') return;
-				calls += 1;
-				if (line.reply.status === 'TRANSPORT_FAILURE') failures += 1;
+				if (line.kind === 'CALL') replies.push(line.reply);
 			}
 		});
 	} catch (e) {
@@ -282,7 +290,7 @@ export async function main(argv: readonly string[], deps: CliDeps): Promise<numb
 		say(e.message);
 		return appended === 0 ? 2 : 4;
 	}
-	say(`${calls} calls appended to ${args.out}; ${failures} transport failure(s)`);
+	say(runSummary(args.out!, replies));
 	return 0;
 }
 

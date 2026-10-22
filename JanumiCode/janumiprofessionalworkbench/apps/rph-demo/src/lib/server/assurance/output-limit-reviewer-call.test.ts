@@ -227,6 +227,37 @@ describe('⭐⭐ P5 package A (F1) — a call cut at the model’s output-token 
 		).toEqual([`reasoning-review backing tool invocation failed: ${DIAGNOSTIC}`]);
 	});
 
+	// ⭐ P5 package C (F5 (a); package A's check, finding 4) — AN I5 CRITERION REPAIR CUT AT THE OUTPUT-TOKEN LIMIT KEEPS THE FIRST
+	// REPLY'S JUDGEMENT, as one that got no reply does: the repair may only ADD a conclusion (`REG-F-552`; `REG-D-090`). The
+	// cut's error is among those `criterionRepair` absorbs (`noReply`); ⛔ outside it, the cut failed a review its first reply
+	// had already judged. `reviewer-answer.test.ts` holds the READER of this chain; this holds the VALIDATOR.
+	it('⛔ an I5 criterion repair cut twice at the output-token limit: the review resolves on the FIRST reply’s judgement, never failing', async () => {
+		/** A reply that PARSES and answers no criterion — the measured run's shape (`REG-F-552`). */
+		const NO_ROWS = '{"findings":[],"recommendation":"SATISFIED","residualUncertainty":["x"]}';
+		const { prompts, print } = tool(NO_ROWS, cut(), cut(''));
+		const { validator, exchanges } = reviewer(print, clockAt(0, 1_000, 1_100, 91_000, 91_100, 181_000));
+
+		const outcome = await settle(validator.evaluate(SUBJECT, CTX));
+
+		expect(prompts, 'the first reply, its repair, and the repair’s one further call').toHaveLength(3);
+		expect(
+			exchanges.drain().map((r) => [r.exchangeRole, r.disposition, r.outputTruncationState ?? null]),
+			'arrangement: the repair was cut, and its retry too'
+		).toEqual([
+			['initial', 'repair-requested', null],
+			['repair', 'rejected', 'declared'],
+			['retry', 'rejected', 'declared']
+		]);
+		// ⛔ THE MUTANT: the cut's error not absorbed — the review failed on a repair that could only have added a conclusion.
+		expect(outcome instanceof Error ? outcome.message : null, 'the cut repair failed the review').toBeNull();
+		const result = outcome as { executionFailed: boolean; dispositionRecommendation?: string; criteria: readonly { outcome: string }[] };
+		expect(result.executionFailed).toBe(false);
+		expect(result.dispositionRecommendation, 'the first reply’s recommendation').toBe('SATISFIED');
+		expect(new Set(result.criteria.map((c) => c.outcome)), 'every criterion unassessed, as the first reply left them').toEqual(
+			new Set(['UNABLE_TO_DETERMINE'])
+		);
+	});
+
 	it('⛔ with no store, the record still says its output was cut — the class is the record’s, not the store’s', async () => {
 		const { print } = tool(cut(), CLEAN);
 		const { validator, exchanges } = reviewer(print, clockAt(0, 90_010, 90_100, 120_000));
