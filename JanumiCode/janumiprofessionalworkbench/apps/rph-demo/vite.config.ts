@@ -1,12 +1,15 @@
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 import { createRequire } from 'node:module';
+import { harnessKeepAlive } from './src/lib/server/harness-keep-alive';
 
 const require = createRequire(import.meta.url);
 const elkBrowserEntry = require.resolve('elkjs/lib/elk.bundled.js');
 
 export default defineConfig({
-	plugins: [sveltekit()],
+	// ⭐ `REG-F-501` — in harness mode, the dev server keeps an idle connection open longer than any test can last
+	// (`src/lib/server/harness-keep-alive.ts`); outside it, Node's defaults stand.
+	plugins: [sveltekit(), harnessKeepAlive()],
 	// Resolve the workspace @janumipwb/* packages to their TS SOURCE (the "source" export condition each package
 	// declares) instead of built dist. This means `bun run dev` picks up engine edits immediately — no `bun run
 	// build` in between (fixes the G3 dev-loop footgun). Vite compiles the source on the fly; production `vite build`
