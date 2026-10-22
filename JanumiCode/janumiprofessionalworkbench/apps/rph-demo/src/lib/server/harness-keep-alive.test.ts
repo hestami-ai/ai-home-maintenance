@@ -119,7 +119,7 @@ describe('⭐ REG-F-501 — the harness keep-alive plugin', () => {
 		}
 	});
 
-	it('⭐ the app’s Vite config carries it, and there it applies in harness mode', async () => {
+	it('⭐ the app’s Vite config carries it, and there it applies in harness mode alone', async () => {
 		const { default: config } = await import('../../../vite.config.js');
 		const plugin = pluginsOf(config.plugins ?? []).find(
 			(p) => p.name === 'jpwb-harness-keep-alive'
@@ -133,5 +133,19 @@ describe('⭐ REG-F-501 — the harness keep-alive plugin', () => {
 		const httpServer = createServer();
 		configure(plugin!, httpServer);
 		expect(httpServer.keepAliveTimeout).toBe(HARNESS_KEEP_ALIVE_TIMEOUT_MS);
+		// ⚠ The CONTROL's plugins are given an env; this one reads process.env, so it is asked outside harness mode too.
+		for (const [mode, harness] of [
+			['', ''],
+			['server', '0']
+		] as const) {
+			vi.stubEnv('RPH_DEMO_MODE', mode);
+			vi.stubEnv('JPWB_HARNESS', harness);
+			const devServer = createServer();
+			configure(plugin!, devServer);
+			expect(
+				timeoutsOf(devServer),
+				`the plugin vite.config.ts carries, outside harness mode: RPH_DEMO_MODE='${mode}' JPWB_HARNESS='${harness}'`
+			).toEqual(timeoutsOf(createServer()));
+		}
 	});
 });
