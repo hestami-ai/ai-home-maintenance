@@ -16,7 +16,7 @@
 // report fields and never touches `valid`, so the structural ValidatePwa gate is unchanged; a proof-harness asserts
 // on `coherent`.
 
-import type { CardinalityCode, ExecutionBoundary } from '@janumipwb/rph-contracts';
+import type { CardinalityCode, ConstraintDisposition, ExecutionBoundary } from '@janumipwb/rph-contracts';
 import { leafKind } from './leaf.js';
 
 /** ⭐ `REG-F-503` remedy 1 — one permitted child's rule as the type stores it: which type, how many, and when. */
@@ -33,6 +33,28 @@ export interface PwaGraphPromptTemplate {
 	readonly outputContract?: string;
 	readonly status: 'ACTIVE' | 'DRAFT';
 	readonly templateVersion: number;
+}
+
+/** ⭐ `REG-D-125` (design D3) — a delegated type's boundary contract as the type stores it: the counterparty that does its
+ *  work, the assurance policies that counterparty attests, and when the contract applies. */
+export interface PwaGraphBoundaryContract {
+	readonly counterpartyLabel: string;
+	readonly attestedAssurancePolicyIds: readonly string[];
+	readonly applicabilityNote?: string;
+}
+
+/** ⭐ `REG-D-125` (design D3) — one constraint's disposition in a type's context specification, as the type stores it. */
+export interface PwaGraphConstraintDisposition {
+	readonly constraintId: string;
+	readonly fate: ConstraintDisposition['fate'];
+	readonly rationale?: string;
+}
+
+/** ⭐ `REG-D-125` (design D3) — a type's context specification as the type stores it: the elements its context requires,
+ *  and what becomes of each constraint it is handed. */
+export interface PwaGraphContextSpecification {
+	readonly requiredElements: readonly string[];
+	readonly constraintDispositions: readonly PwaGraphConstraintDisposition[];
 }
 
 export interface PwaGraphNode {
@@ -68,6 +90,16 @@ export interface PwaGraphNode {
 	readonly requiredAssurancePolicyIds?: readonly string[];
 	readonly permittedChildren?: readonly PwaGraphChildRule[];
 	readonly promptTemplate?: PwaGraphPromptTemplate;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, the review in parts, B1 (`REG-D-125`; DESIGN-authoring-review-in-parts.md D3; `REG-F-503`'s
+	 * remainder) — THE REST OF WHAT THE TYPE DECLARES, carried for the review of each type as a part, whose subject is the
+	 * type's whole stored definition: the rule its completion is judged by, a delegated type's boundary contract, and its
+	 * context specification. ⚠ OPTIONAL, AND ABSENT MUST STAY ABSENT, as for the four fields above: a field the stored type
+	 * does not hold is omitted, and an empty value its author stored is carried as authored.
+	 */
+	readonly completionRule?: string;
+	readonly boundaryContract?: PwaGraphBoundaryContract;
+	readonly contextSpecification?: PwaGraphContextSpecification;
 }
 
 export interface PwaMeta {
@@ -76,6 +108,9 @@ export interface PwaMeta {
 	readonly domain: string;
 	readonly version: string;
 	readonly publicationStatus: string;
+	/** ⭐ `REG-D-125` (design D3) — the PWA's description as stored, which the root type's review is shown. ⚠ Absent stays
+	 *  absent; an empty description is carried as authored. */
+	readonly description?: string;
 }
 
 export interface PermitsEdge {

@@ -24,7 +24,9 @@ import { PwaAuthoringBroker } from '@janumipwb/rph-authoring';
 import { buildPwaGraphExport, type PwaGraphExport, type PwaGraphNode } from '@janumipwb/rph-projections';
 import {
 	makeRphError,
+	type BoundaryContract,
 	type CommandResult,
+	type ContextSpecification,
 	type DomainCommand,
 	type PermittedChildRule,
 	type PromptTemplate
@@ -697,10 +699,20 @@ const promptPart = (
  * ⚠ ABSENT STAYS ABSENT, AND AN AUTHORED EMPTY VALUE STAYS AUTHORED: a field the stored type does not hold is left out, and
  * a stored `''` or `[]` is carried as it is. A type with no template carries none — an empty one would report an
  * instruction nobody wrote. Of the template, its text and output contract with its status and version.
+ * ⭐⭐ The review in parts, B1 (`REG-D-125`) — then the rest of what the type declares, after the four (`remainderPart`).
  */
 const declaredPart = (
 	state: Readonly<Record<string, unknown>>
-): Pick<PwaGraphNode, 'purpose' | 'requiredAssurancePolicyIds' | 'permittedChildren' | 'promptTemplate'> => {
+): Pick<
+	PwaGraphNode,
+	| 'purpose'
+	| 'requiredAssurancePolicyIds'
+	| 'permittedChildren'
+	| 'promptTemplate'
+	| 'completionRule'
+	| 'boundaryContract'
+	| 'contextSpecification'
+> => {
 	const template = state.promptTemplate as PromptTemplate | undefined;
 	return {
 		...(typeof state.purpose === 'string' ? { purpose: state.purpose } : {}),
@@ -723,6 +735,45 @@ const declaredPart = (
 						...(template.outputContract !== undefined ? { outputContract: template.outputContract } : {}),
 						status: template.status,
 						templateVersion: template.templateVersion
+					}
+				}
+			: {}),
+		...remainderPart(state)
+	};
+};
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, the review in parts, B1 (`REG-D-125`; DESIGN-authoring-review-in-parts.md D3; `REG-F-503`'s
+ * remainder) — THE REST OF WHAT THE TYPE DECLARES, as a spread-ready fragment after `declaredPart`'s four: its completion
+ * rule, a delegated type's boundary contract and its context specification, each read from the stored type. ⛔ F1 carried
+ * none of them, and a type reviewed as a part is reviewed on its whole stored definition. ⚠ The same two rules: a field the
+ * stored type does not hold is left out, and a stored `''` or `[]` is carried as it is.
+ */
+const remainderPart = (
+	state: Readonly<Record<string, unknown>>
+): Pick<PwaGraphNode, 'completionRule' | 'boundaryContract' | 'contextSpecification'> => {
+	const contract = state.boundaryContract as BoundaryContract | undefined;
+	const context = state.contextSpecification as ContextSpecification | undefined;
+	return {
+		...(typeof state.completionRule === 'string' ? { completionRule: state.completionRule } : {}),
+		...(contract !== undefined
+			? {
+					boundaryContract: {
+						counterpartyLabel: contract.counterpartyLabel,
+						attestedAssurancePolicyIds: [...contract.attestedAssurancePolicyIds],
+						...(contract.applicabilityNote !== undefined ? { applicabilityNote: contract.applicabilityNote } : {})
+					}
+				}
+			: {}),
+		...(context !== undefined
+			? {
+					contextSpecification: {
+						requiredElements: [...context.requiredElements],
+						constraintDispositions: context.constraintDispositions.map((d) => ({
+							constraintId: d.constraintId,
+							fate: d.fate,
+							...(d.rationale !== undefined ? { rationale: d.rationale } : {})
+						}))
 					}
 				}
 			: {})
@@ -774,7 +825,10 @@ export function buildPwaExport(
 			name: String((pwa.name ?? pwaId) as string),
 			domain: String((pwa.domain ?? '') as string),
 			version: String((pwa.version ?? '') as string),
-			publicationStatus: String((pwa.publicationStatus ?? 'DRAFT') as string)
+			publicationStatus: String((pwa.publicationStatus ?? 'DRAFT') as string),
+			// ⭐⭐ The review in parts, B1 (`REG-D-125`; design D3) — and its description, which the root type's review is
+			// shown: as stored, or left out.
+			...(typeof pwa.description === 'string' ? { description: pwa.description } : {})
 		},
 		nodes
 	);

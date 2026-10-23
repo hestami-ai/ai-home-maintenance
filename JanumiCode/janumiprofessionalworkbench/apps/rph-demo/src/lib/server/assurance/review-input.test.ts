@@ -284,11 +284,13 @@ const LITERAL_EXPORT_JSON =
  * them once `realizeLiteralGraph` has defined them: each type carries, after its literal fields, what its author's command
  * stored — its purpose (its name, as written below), no declared policy and no child rule (`definePwuType` stores `[]` for
  * each when none is given). Written out, as `LITERAL_EXPORT_JSON` is; the pins' content over the engine's export.
+ * ⭐ The review in parts, B1 (`REG-D-125`) — and, after those, the completion rule `definePwuType` stores for a type defined
+ * without one; and the PWA carries the description its command stored.
  */
 const LITERAL_ENGINE_EXPORT_JSON =
-	'{"pwa":{"id":"pwa_01K5QFBR8Z0000000000000P01","name":"Footbridge","domain":"civil-engineering","version":"1.0.0","publicationStatus":"DRAFT"},' +
-	'"nodes":[{"id":"pwut_01K5QFBR8Z0000000000000T01","name":"Review","pwuKind":"STRUCTURAL_REVIEW","isRoot":true,"permittedChildTypeIds":["pwut_01K5QFBR8Z0000000000000T02"],"requiredInputs":[],"requiredOutputs":[],"executionBoundary":"INTERNAL","purpose":"Review","requiredAssurancePolicyIds":[],"permittedChildren":[]},' +
-	'{"id":"pwut_01K5QFBR8Z0000000000000T02","name":"Survey","pwuKind":"SITE_INVESTIGATION","isRoot":false,"permittedChildTypeIds":[],"requiredInputs":[],"requiredOutputs":["site-survey"],"executionBoundary":"INTERNAL","purpose":"Survey","requiredAssurancePolicyIds":[],"permittedChildren":[]}],' +
+	'{"pwa":{"id":"pwa_01K5QFBR8Z0000000000000P01","name":"Footbridge","domain":"civil-engineering","version":"1.0.0","publicationStatus":"DRAFT","description":"A literal graph the pins are written against."},' +
+	'"nodes":[{"id":"pwut_01K5QFBR8Z0000000000000T01","name":"Review","pwuKind":"STRUCTURAL_REVIEW","isRoot":true,"permittedChildTypeIds":["pwut_01K5QFBR8Z0000000000000T02"],"requiredInputs":[],"requiredOutputs":[],"executionBoundary":"INTERNAL","purpose":"Review","requiredAssurancePolicyIds":[],"permittedChildren":[],"completionRule":"Execution succeeded AND required outputs exist AND assurance satisfied"},' +
+	'{"id":"pwut_01K5QFBR8Z0000000000000T02","name":"Survey","pwuKind":"SITE_INVESTIGATION","isRoot":false,"permittedChildTypeIds":[],"requiredInputs":[],"requiredOutputs":["site-survey"],"executionBoundary":"INTERNAL","purpose":"Survey","requiredAssurancePolicyIds":[],"permittedChildren":[],"completionRule":"Execution succeeded AND required outputs exist AND assurance satisfied"}],' +
 	'"permits":[{"parent":"pwut_01K5QFBR8Z0000000000000T01","child":"pwut_01K5QFBR8Z0000000000000T02"}],' +
 	'"dataFlow":[],"artifacts":[{"name":"site-survey","producedBy":["pwut_01K5QFBR8Z0000000000000T02"],"consumedBy":[]}],' +
 	'"roots":["pwut_01K5QFBR8Z0000000000000T01"]}';
