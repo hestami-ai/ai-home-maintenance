@@ -156,7 +156,9 @@ export function buildPwuLifecycleTopologyTool(): AuthoringToolDescriptor {
 }
 
 /** Build the tool descriptors for a broker primarily scoped to one DRAFT PWA. Assurance-policy creation is the
- *  explicit exception: it mutates the shared workbench library. `rationale` collects the §9.7 professional
+ *  explicit exception: it ~~mutates the shared workbench library~~ ⭐ (`REG-F-505`) creates a policy for the shared
+ *  workbench library, not the PWA — in the staged turn, in the turn's candidate, which reaches that library only when
+ *  the professional accepts it. `rationale` collects the §9.7 professional
  *  rationale summary the producer returns — see ./rationale for why it is a tool and not scraped narration. */
 export function buildAuthoringTools(
 	broker: PwaAuthoringBroker,
@@ -466,7 +468,7 @@ export function buildAuthoringTools(
 		{
 			name: 'create_assurance_policy',
 			description:
-				'Create a NEW DRAFT Assurance Policy in the SHARED workbench-wide library. It cannot be referenced from a PWU Type until a human reviews and activates it in the policy manager; this agent has no policy-activation tool. This mutation is NOT scoped to the current PWA DRAFT and has no undo/rollback in this authoring session. Call it only when the user explicitly authorizes a genuinely new shared treatment not covered by an existing policy; otherwise reuse an ACTIVE policy from list_assurance_policies or ask. Never recreate the mandatory floor: it always applies.',
+				'Create a NEW DRAFT Assurance Policy for the SHARED workbench-wide library. Like your other changes it is staged: it is created as a DRAFT in your candidate, and it reaches the shared library only when the professional accepts the candidate; if they discard the candidate, the policy is dropped with it. Once accepted it is not scoped to the current PWA DRAFT: it is a workbench-wide library entry, which reverting the PWA DRAFT does not remove. Even then it cannot be referenced from a PWU Type until a human reviews and activates it in the policy manager; this agent has no policy-activation tool. Call it only when the user explicitly authorizes a genuinely new shared treatment not covered by an existing policy; otherwise reuse an ACTIVE policy from list_assurance_policies or ask. Never recreate the mandatory floor: it always applies.',
 			parameters: {
 				name: {
 					type: 'string',
@@ -512,7 +514,7 @@ export function buildAuthoringTools(
 				});
 				return fromProposal(
 					r,
-					`Created workbench-wide Assurance Policy "${str(a.name)}" as ${r.id} in DRAFT. A human must review and activate it in the policy manager before any PWU Type may reference it. This shared-library mutation is not scoped to the current PWA DRAFT and is not reversible in this session.`
+					`Created Assurance Policy "${str(a.name)}" as ${r.id}, a DRAFT in this turn's candidate. It reaches the shared workbench-wide library only if the professional accepts the candidate, and is dropped if they discard it; once accepted, a human must still review and activate it in the policy manager before any PWU Type may reference it.`
 				);
 			}
 		},

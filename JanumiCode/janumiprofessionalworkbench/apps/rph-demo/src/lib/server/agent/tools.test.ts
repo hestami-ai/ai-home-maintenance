@@ -477,3 +477,50 @@ describe('EG-07b — the agent can declare discharge and author a prompt', () =>
 		expect(captured[0]).not.toHaveProperty('promptTemplate');
 	});
 });
+
+// ⭐ `REG-F-505` (`REG-D-121` Q18; the package A check's MINOR finding) — create_assurance_policy says what the staged turn
+// does with the policy it creates, as GOVERNANCE does: a DRAFT in the turn's candidate (the broker writes to the fork,
+// `authoring-turn.ts`), which reaches the shared library only when the professional accepts the candidate, is dropped if
+// they discard it, and after acceptance still needs a human to activate it. ⛔ Both texts said the policy went into the
+// shared library at once, with no undo: the account `REG-F-505` names, which the agent reads beside GOVERNANCE and could
+// repeat in the narration the reviewer reads.
+describe('create_assurance_policy describes the staged turn (REG-F-505)', () => {
+	const sink = { declare: vi.fn(), get: () => undefined } as unknown as RationaleSink;
+	const createTool = (createPolicy: () => unknown = () => ({ ok: true, id: 'pol_x', status: 'ACCEPTED' })) =>
+		buildAuthoringTools({ help: () => ({}), createPolicy } as unknown as PwaAuthoringBroker, sink).find(
+			(t) => t.name === 'create_assurance_policy'
+		)!;
+
+	it('⛔ its description: a DRAFT in the candidate, the shared library only on acceptance, dropped on discard', () => {
+		const { description } = createTool();
+		expect(description, 'the policy is staged in the candidate').toContain('it is created as a DRAFT in your candidate');
+		expect(description, 'it reaches the shared library on acceptance only').toContain(
+			'it reaches the shared library only when the professional accepts the candidate'
+		);
+		expect(description, 'discard drops it').toContain('if they discard the candidate, the policy is dropped with it');
+		expect(description, 'activation is still a human’s, after acceptance').toContain(
+			'Even then it cannot be referenced from a PWU Type until a human reviews and activates it in the policy manager'
+		);
+		expect(description, 'the account REG-F-505 names').not.toMatch(
+			/has no undo\/rollback in this authoring session|Create a NEW DRAFT Assurance Policy in the SHARED/
+		);
+	});
+
+	it('⛔ its result: the policy it created is a DRAFT in the candidate, and what happens to it next', () => {
+		const result = createTool().run({ name: 'Tenant Isolation Review' });
+		expect(result.ok).toBe(true);
+		expect(result.summary, 'the created policy is staged in the candidate').toContain(
+			`Created Assurance Policy "Tenant Isolation Review" as pol_x, a DRAFT in this turn's candidate.`
+		);
+		expect(result.summary, 'it reaches the shared library on acceptance only').toContain(
+			'It reaches the shared workbench-wide library only if the professional accepts the candidate'
+		);
+		expect(result.summary, 'discard drops it').toContain('and is dropped if they discard it');
+		expect(result.summary, 'activation is still a human’s, after acceptance').toContain(
+			'once accepted, a human must still review and activate it in the policy manager before any PWU Type may reference it'
+		);
+		expect(result.summary, 'the account REG-F-505 names').not.toMatch(
+			/Created workbench-wide Assurance Policy|is not reversible in this session/
+		);
+	});
+});

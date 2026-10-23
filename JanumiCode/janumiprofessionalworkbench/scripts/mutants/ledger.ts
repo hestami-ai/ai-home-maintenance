@@ -32876,5 +32876,59 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["apps/rph-demo/src/lib/server/assurance/declared-review-route.test.ts"],
 		why: "PROMISE (REG-F-569 remedy: 'Generalize the existing guard and retain its reason: a review would be shown nothing to judge, so none is asked for'): both refusals end in that reason, held in one string. WHO RELIES: the run report and the operator, who read the same refusal for a leaf and a composite. WHAT THE MUTATION DOES: the reason is reworded. ⚠ The composite's (c) builds its expected text with nothingToJudge and agrees with this mutation; the leaf test pins the reason's words. Seen red with this mutation applied by hand, 1 of 16 tests: 'AssertionError: expected 'The declared policies cannot be revie…' to match /: a review would be shown nothing to …/'. OBSERVED (bun run mutants -- the four package A F4 entries and the four it re-anchors or re-measures, by their full ids, 2026-10-22, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P6A-M31-the-refusal-gives-another-reason ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
 		source: "JAN-EXEC Phase 7 after P6, package A, F4 (REG-F-569; REG-D-121 Q18; DESIGN-phase-7-completion.md section 4a, E4) - declaredReviewWorkOf refuses a declared review over empty work for a leaf as for a composite, before any reviewer call or assessment, naming the unit in the existing refusal's words"
+	},
+	{
+		id: "P6A-M32-the-tool-says-its-policy-goes-to-the-shared-library-at-once",
+		file: "apps/rph-demo/src/lib/server/agent/tools.ts",
+		find: "it is created as a DRAFT in your candidate, and it reaches the shared library only when the professional accepts the candidate;",
+		replace: "it is created as a DRAFT in the shared library at once;",
+		expectRed: ["apps/rph-demo/src/lib/server/agent/tools.test.ts"],
+		why: "PROMISE (REG-F-505; REG-D-121 Q18; the package A check's MINOR finding): create_assurance_policy's description says, as GOVERNANCE does, that the policy it creates is a DRAFT in the turn's candidate (the turn's broker writes to the fork, authoring-turn.ts beginAuthoringTurn: canonical.fork()), and reaches the shared library only when the professional accepts the candidate. WHO RELIES: the authoring agent, which reads the tool's schema beside GOVERNANCE, and the reviewer, who reads the narration the agent writes from both. WHAT THE MUTATION DOES: the description says the policy goes into the shared library at once, the claim REG-F-505's text names. Seen red first, the tests written and the tool as it stood: 'AssertionError: the policy is staged in the candidate: expected 'Create a NEW DRAFT Assurance Policy i…' to contain 'it is created as a DRAFT in your cand…''; with this mutation applied by hand, the description test alone, 1 of 19 tests: 'AssertionError: the policy is staged in the candidate: expected 'Create a NEW DRAFT Assurance Policy f…' to contain 'it is created as a DRAFT in your cand…''. OBSERVED (bun run mutants -- the six entries of the check's E1 finding, by their full ids, 2026-10-23, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P6A-M32-the-tool-says-its-policy-goes-to-the-shared-library-at-once ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 after P6, package A's check, the MINOR finding on E1 (REG-F-505; REG-D-121 Q18) - create_assurance_policy's description and its success summary describe the staged turn, as E1's GOVERNANCE does"
+	},
+	{
+		id: "P6A-M33-the-tool-says-nothing-of-a-discard",
+		file: "apps/rph-demo/src/lib/server/agent/tools.ts",
+		find: "; if they discard the candidate, the policy is dropped with it.",
+		replace: ".",
+		expectRed: ["apps/rph-demo/src/lib/server/agent/tools.test.ts"],
+		why: "PROMISE (REG-F-505): the description says a discarded candidate takes the created policy with it (authoring-turn.ts discardAuthoringTurn closes the fork, and canonical state never changed). WHO RELIES: the agent, told by the old text that its policy had no undo in the session, and the professional, whose discard is that undo. WHAT THE MUTATION DOES: the discard goes unmentioned again, while the rest of the staged account stands. Seen red with this mutation applied by hand, the description test alone, 1 of 19 tests: 'AssertionError: discard drops it: expected 'Create a NEW DRAFT Assurance Policy f…' to contain 'if they discard the candidate, the po…''. OBSERVED (bun run mutants -- the six entries of the check's E1 finding, by their full ids, 2026-10-23, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P6A-M33-the-tool-says-nothing-of-a-discard ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 after P6, package A's check, the MINOR finding on E1 (REG-F-505; REG-D-121 Q18) - create_assurance_policy's description and its success summary describe the staged turn, as E1's GOVERNANCE does"
+	},
+	{
+		id: "P6A-M34-the-tool-says-nothing-of-activation",
+		file: "apps/rph-demo/src/lib/server/agent/tools.ts",
+		find: "Even then it cannot be referenced from a PWU Type until a human reviews and activates it in the policy manager; ",
+		replace: "",
+		expectRed: ["apps/rph-demo/src/lib/server/agent/tools.test.ts"],
+		why: "PROMISE (REG-F-505; GOVERNANCE: 'after creating a DRAFT shared policy, tell the human it must be reviewed and activated in the policy manager before reference'): the description says that, accepted, the policy still cannot be referenced until a human activates it. WHO RELIES: the agent, which has no policy-activation tool, and the professional it must tell. WHAT THE MUTATION DOES: the activation step goes unmentioned, so acceptance reads as the last step. ⚠ The claim stood in the old text; no test pinned it until this package. Seen red with this mutation applied by hand, the description test alone, 1 of 19 tests: 'AssertionError: activation is still a human’s, after acceptance: expected 'Create a NEW DRAFT Assurance Policy f…' to contain 'Even then it cannot be referenced fro…''. OBSERVED (bun run mutants -- the six entries of the check's E1 finding, by their full ids, 2026-10-23, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P6A-M34-the-tool-says-nothing-of-activation ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 after P6, package A's check, the MINOR finding on E1 (REG-F-505; REG-D-121 Q18) - create_assurance_policy's description and its success summary describe the staged turn, as E1's GOVERNANCE does"
+	},
+	{
+		id: "P6A-M35-the-result-says-the-policy-is-in-the-shared-library",
+		file: "apps/rph-demo/src/lib/server/agent/tools.ts",
+		find: "a DRAFT in this turn's candidate. It reaches the shared workbench-wide library only if the professional accepts the candidate, and is dropped if they discard it;",
+		replace: "a DRAFT in the shared workbench-wide library;",
+		expectRed: ["apps/rph-demo/src/lib/server/agent/tools.test.ts"],
+		why: "PROMISE (REG-F-505; the package A check's MINOR finding): what the tool returns after each create, which the agent reads as the outcome of its own act, says the policy is a DRAFT in the turn's candidate that reaches the shared library only on acceptance and is dropped on discard. WHO RELIES: the agent's narration of what it did, which the reviewer reads, and the professional deciding to accept or discard. WHAT THE MUTATION DOES: the result says the policy is in the shared library, as 'Created workbench-wide Assurance Policy … This shared-library mutation is not scoped to the current PWA DRAFT and is not reversible in this session' did. Seen red first, the tests written and the tool as it stood: 'AssertionError: the created policy is staged in the candidate: expected 'Created workbench-wide Assurance Poli…' to contain 'Created Assurance Policy \"Tenant Isol…''; with this mutation applied by hand, the result test alone, 1 of 19 tests: 'AssertionError: the created policy is staged in the candidate: expected 'Created Assurance Policy \"Tenant Isol…' to contain 'Created Assurance Policy \"Tenant Isol…''. OBSERVED (bun run mutants -- the six entries of the check's E1 finding, by their full ids, 2026-10-23, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P6A-M35-the-result-says-the-policy-is-in-the-shared-library ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 after P6, package A's check, the MINOR finding on E1 (REG-F-505; REG-D-121 Q18) - create_assurance_policy's description and its success summary describe the staged turn, as E1's GOVERNANCE does"
+	},
+	{
+		id: "P6A-M36-the-result-says-nothing-of-a-discard",
+		file: "apps/rph-demo/src/lib/server/agent/tools.ts",
+		find: ", and is dropped if they discard it;",
+		replace: ";",
+		expectRed: ["apps/rph-demo/src/lib/server/agent/tools.test.ts"],
+		why: "PROMISE (REG-F-505): the result says a discard drops the policy it created. WHO RELIES: the agent, which the old result told its policy was 'not reversible in this session'. WHAT THE MUTATION DOES: the discard goes unmentioned in the result, while its staging and acceptance stand. Seen red with this mutation applied by hand, the result test alone, 1 of 19 tests: 'AssertionError: discard drops it: expected 'Created Assurance Policy \"Tenant Isol…' to contain 'and is dropped if they discard it''. OBSERVED (bun run mutants -- the six entries of the check's E1 finding, by their full ids, 2026-10-23, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P6A-M36-the-result-says-nothing-of-a-discard ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 after P6, package A's check, the MINOR finding on E1 (REG-F-505; REG-D-121 Q18) - create_assurance_policy's description and its success summary describe the staged turn, as E1's GOVERNANCE does"
+	},
+	{
+		id: "P6A-M37-the-result-says-nothing-of-activation",
+		file: "apps/rph-demo/src/lib/server/agent/tools.ts",
+		find: "; once accepted, a human must still review and activate it in the policy manager before any PWU Type may reference it.",
+		replace: ".",
+		expectRed: ["apps/rph-demo/src/lib/server/agent/tools.test.ts"],
+		why: "PROMISE (REG-F-505): the result says that, once accepted, the policy still needs a human to review and activate it in the policy manager before any PWU Type may reference it. WHO RELIES: the agent, which must tell the human so (GOVERNANCE), having no activation tool. WHAT THE MUTATION DOES: the activation step goes unmentioned in the result. ⚠ The claim stood in the old result; no test pinned it until this package. Seen red with this mutation applied by hand, the result test alone, 1 of 19 tests: 'AssertionError: activation is still a human’s, after acceptance: expected 'Created Assurance Policy \"Tenant Isol…' to contain 'once accepted, a human must still rev…''. OBSERVED (bun run mutants -- the six entries of the check's E1 finding, by their full ids, 2026-10-23, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P6A-M37-the-result-says-nothing-of-activation ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 after P6, package A's check, the MINOR finding on E1 (REG-F-505; REG-D-121 Q18) - create_assurance_policy's description and its success summary describe the staged turn, as E1's GOVERNANCE does"
 	}
 ];
