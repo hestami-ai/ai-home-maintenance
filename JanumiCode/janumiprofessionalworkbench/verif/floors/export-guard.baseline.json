@@ -44,15 +44,17 @@
 				"assembleStepContext",
 				"prepareModelInvocation",
 				"resolveInvocationSubject",
-				"resolvePwuTypeFacts"
+				"resolvePwuTypeFacts",
+				"WORK_UNIT_MARKERS"
 			],
 			"guardedExports": [
 				"assembleStepContext",
 				"prepareModelInvocation",
 				"resolveInvocationSubject",
-				"resolvePwuTypeFacts"
+				"resolvePwuTypeFacts",
+				"WORK_UNIT_MARKERS"
 			],
-			"unattributedMutants": 0
+			"unattributedMutants": 2
 		},
 		"packages/rph-application/src/handlers/abandon-authorization.ts": {
 			"consumedExports": [
@@ -654,9 +656,11 @@
 		},
 		"packages/rph-authoring/src/broker.ts": {
 			"consumedExports": [
+				"policyPwuKinds",
 				"PwaAuthoringBroker"
 			],
 			"guardedExports": [
+				"policyPwuKinds",
 				"PwaAuthoringBroker"
 			],
 			"unattributedMutants": 0
@@ -664,15 +668,17 @@
 		"packages/rph-authoring/src/catalog.ts": {
 			"consumedExports": [
 				"catalogTemplate",
+				"policyKindsText",
 				"PWU_TYPE_CATALOG",
 				"PWU_TYPE_HELP"
 			],
 			"guardedExports": [
 				"catalogTemplate",
+				"policyKindsText",
 				"PWU_TYPE_CATALOG",
 				"PWU_TYPE_HELP"
 			],
-			"unattributedMutants": 0
+			"unattributedMutants": 1
 		},
 		"packages/rph-authoring/src/lint.ts": {
 			"consumedExports": [
