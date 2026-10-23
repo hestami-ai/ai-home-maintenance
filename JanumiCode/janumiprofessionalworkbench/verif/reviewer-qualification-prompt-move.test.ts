@@ -61,7 +61,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { renderRationale } from '../apps/rph-demo/src/lib/server/agent/rationale.js';
 import { FENCE_MEANING } from '../apps/rph-demo/src/lib/server/assurance/review-fence.js';
 import { ONE_ROW_PER_CRITERION } from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
-import { CASE_SET_V3_FILE, type CaseSet, type QualificationCase } from '../scripts/reviewer-qual/cases.js';
+import { CASE_SET_V6_FILE, type CaseSet, type QualificationCase } from '../scripts/reviewer-qual/cases.js';
 import { committedCaseSet, PRODUCT_SEAMS, reviewerFingerprint } from '../scripts/reviewer-qual/fingerprint.js';
 import { caseReviewInput } from '../scripts/reviewer-qual/materialize.js';
 import {
@@ -86,13 +86,15 @@ const SELECTED_RUN = 'qr-2026-09-25-devin-glm-5-3-flash-max-v3';
  * ⭐ `JAN-EXEC` Phase 7 completion E2 — nor of the DECLARED-POLICY arm, case set v5's own (DESIGN-phase-7-completion.md B5),
  * which owes its run in turn: v5 carries v4's cases byte for byte (`reviewer-qualification-declared-cases.test.ts`).
  * ⭐ Package P F3 — nor of the six graph cases case set v7 adds (`REG-D-123` Q25), which no run has measured: the cases kept
- * here are the current set's of those two arms that case set v3 holds, by id.
+ * here are the current set's of those two arms that case set ~~v3~~ ⭐ v6 holds, by id. ⛔ NOT v3's: v3 holds no case of
+ * the other two arms, so its ids alone excluded them and the two arm conditions above decided nothing — a pin taking every
+ * arm passed (PQ2-V114 SURVIVED). v6 holds every arm, so the arm conditions decide again.
  */
-const V3_IDS: ReadonlySet<string> = new Set(
-	(JSON.parse(readFileSync(`${REPO}/${CASE_SET_V3_FILE}`, 'utf8')) as CaseSet).cases.map((c) => c.id)
+const V6_IDS: ReadonlySet<string> = new Set(
+	(JSON.parse(readFileSync(`${REPO}/${CASE_SET_V6_FILE}`, 'utf8')) as CaseSet).cases.map((c) => c.id)
 );
 const CASES: readonly QualificationCase[] = committedCaseSet(new URL('../', import.meta.url)).cases.filter(
-	(c) => c.arm !== 'PROCESS_RESULT' && c.arm !== 'DECLARED_POLICY' && V3_IDS.has(c.id)
+	(c) => c.arm !== 'PROCESS_RESULT' && c.arm !== 'DECLARED_POLICY' && V6_IDS.has(c.id)
 );
 /** The committed record — append-only, so the lines read here are the ones the selected run wrote. */
 const RECORD: readonly RecordLine[] = readFileSync(`${REPO}/${RECORD_DIR}/runs.ndjson`, 'utf8')
