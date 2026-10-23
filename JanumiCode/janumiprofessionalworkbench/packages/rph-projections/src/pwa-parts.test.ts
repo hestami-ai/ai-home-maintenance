@@ -1,10 +1,11 @@
 // ⭐⭐ `JAN-EXEC` Phase 7, the review in parts, B1 (`REG-D-125`; DESIGN-authoring-review-in-parts.md D1-D3) — THE PARTS OF AN
 // AUTHORED PWA, ONE PER TYPE: each its whole definition as the export carries it, and its place in the PWA as context.
 //
-// Each control below is the design's own (roadmap §9a.2): absent versus authored-empty fields, a delegated contract, stored
+// The design's own controls are here (roadmap §9a.2): absent versus authored-empty fields, a delegated contract, stored
 // context, the root's PWA description, sibling prompt text kept out of the skeletons, flow across a middle composite's
-// boundary, and several roots (one part per type, no review added). The exports are built by the real builder over literal
-// nodes, as every reviewer case's graph is.
+// boundary, and several roots (one part per type, no review added). So are the package check's three: a leaf exported
+// before its ancestors, a type two composites permit, and a flow between a composite and its own child. The exports are
+// built by the real builder over literal nodes, as every reviewer case's graph is.
 import { describe, expect, it } from 'vitest';
 import { buildPwaGraphExport, type PwaGraphNode, type PwaMeta } from './pwa-graph.js';
 import { pwaTypeParts } from './pwa-parts.js';
@@ -147,6 +148,18 @@ describe('⭐⭐ the review in parts, B1 — pwaTypeParts: one part per type, it
 		expect(unnamedPurpose, 'an ancestor with no purpose carries none').toEqual([{ name: 'R', pwuKind: 'R' }]);
 	});
 
+	it('⭐ the ancestors are ROOT FIRST by their depth below a root, not by the export’s order — a leaf the agent defined before the composites that permit it', () => {
+		const leaf = node({ id: 'l', name: 'Leaf' });
+		const middle = node({ id: 'm', name: 'Middle', purpose: 'Build the middle.', permittedChildTypeIds: ['l'] });
+		const root = node({ id: 'r', name: 'Root', isRoot: true, purpose: 'Build the whole.', permittedChildTypeIds: ['m'] });
+		const ex = buildPwaGraphExport(PWA, [leaf, middle, root]);
+		expect(ex.nodes.map((n) => n.id), 'arrangement: the leaf is exported first and the root last').toEqual(['l', 'm', 'r']);
+		expect(pwaTypeParts(ex)[0]!.context.ancestors).toEqual([
+			{ name: 'Root', pwuKind: 'ROOT', purpose: 'Build the whole.' },
+			{ name: 'Middle', pwuKind: 'MIDDLE', purpose: 'Build the middle.' }
+		]);
+	});
+
 	it('⭐ its PARENT’S RULE for it: the cardinality and applicability note the parent stores — or the parent’s name alone where it stores none', () => {
 		expect(partOf('pwut_BUILD').context.parentRules).toEqual([
 			{ parent: 'Realization', cardinality: 'M1', applicabilityNote: 'Every realization is built.' }
@@ -154,6 +167,23 @@ describe('⭐⭐ the review in parts, B1 — pwaTypeParts: one part per type, it
 		expect(partOf('pwut_CHECK').context.parentRules, 'a rule with no note').toEqual([{ parent: 'Realization', cardinality: 'C1' }]);
 		expect(partOf('pwut_CODE').context.parentRules, 'a parent that stores no rule for it').toEqual([{ parent: 'Build' }]);
 		expect(partOf('pwut_ROOT').context.parentRules, 'the root has no parent').toEqual([]);
+	});
+
+	it('⭐ a type two composites permit gets EACH one’s rule for it, in the export’s order — not the first parent’s alone', () => {
+		const shared = node({ id: 's', name: 'Shared' });
+		const first = node({
+			id: 'a',
+			name: 'First',
+			permittedChildTypeIds: ['s'],
+			permittedChildren: [{ typeId: 's', cardinality: 'M1', applicabilityNote: 'Every first is shared.' }]
+		});
+		const second = node({ id: 'b', name: 'Second', permittedChildTypeIds: ['s'], permittedChildren: [{ typeId: 's', cardinality: 'C1' }] });
+		const root = node({ id: 'r', name: 'Root', isRoot: true, permittedChildTypeIds: ['a', 'b'] });
+		const parts = pwaTypeParts(buildPwaGraphExport(PWA, [root, first, second, shared]));
+		expect(parts.find((p) => p.typeId === 's')!.context.parentRules).toEqual([
+			{ parent: 'First', cardinality: 'M1', applicabilityNote: 'Every first is shared.' },
+			{ parent: 'Second', cardinality: 'C1' }
+		]);
 	});
 
 	it('⭐ the ARTIFACTS it consumes and produces, with every type that produces and consumes each, by name', () => {
@@ -213,6 +243,45 @@ describe('⭐⭐ the review in parts, B1 — pwaTypeParts: one part per type, it
 			acrossBoundary: []
 		});
 		expect('dataFlow' in partOf('pwut_CODE').context, 'a leaf carries no data flow').toBe(false);
+	});
+
+	it('⛔ a flow between a composite and its OWN child is in neither list of its data flow, and not among its parent’s children — the composite’s own artifacts carry it', () => {
+		// Middle feeds its child (brief) and consumes its child's output (draft); the root feeds Middle (plan); the child's
+		// draft also leaves Middle's subtree for Sibling, the root's other child.
+		const root = node({ id: 'r', name: 'Root', isRoot: true, permittedChildTypeIds: ['p', 'q'], requiredOutputs: ['plan'] });
+		const middle = node({
+			id: 'p',
+			name: 'Middle',
+			permittedChildTypeIds: ['c'],
+			requiredInputs: ['plan', 'draft'],
+			requiredOutputs: ['brief']
+		});
+		const child = node({ id: 'c', name: 'Child', requiredInputs: ['brief'], requiredOutputs: ['draft'] });
+		const sibling = node({ id: 'q', name: 'Sibling', requiredInputs: ['draft'] });
+		const ex = buildPwaGraphExport(PWA, [root, middle, child, sibling]);
+		expect(ex.dataFlow, 'arrangement: a flow from the root to Middle, and each way between Middle and its child').toEqual([
+			{ producer: 'r', consumer: 'p', artifact: 'plan' },
+			{ producer: 'p', consumer: 'c', artifact: 'brief' },
+			{ producer: 'c', consumer: 'p', artifact: 'draft' },
+			{ producer: 'c', consumer: 'q', artifact: 'draft' }
+		]);
+		const contextOf = (id: string) => pwaTypeParts(ex).find((p) => p.typeId === id)!.context;
+		expect(contextOf('p').dataFlow, 'Middle: brief and draft between it and its child are in neither list').toEqual({
+			amongChildren: [],
+			acrossBoundary: [
+				{ producer: 'Root', consumer: 'Middle', artifact: 'plan' },
+				{ producer: 'Child', consumer: 'Sibling', artifact: 'draft' }
+			]
+		});
+		expect(contextOf('p').artifacts, 'Middle’s own artifacts carry both, each end named').toEqual([
+			{ name: 'brief', producedBy: ['Middle'], consumedBy: ['Child'] },
+			{ name: 'draft', producedBy: ['Child'], consumedBy: ['Middle', 'Sibling'] },
+			{ name: 'plan', producedBy: ['Root'], consumedBy: ['Middle'] }
+		]);
+		expect(contextOf('r').dataFlow, 'the root: plan, from it to its child, is not among its children; draft, between two children’s subtrees, is').toEqual({
+			amongChildren: [{ producer: 'Child', consumer: 'Sibling', artifact: 'draft' }],
+			acrossBoundary: []
+		});
 	});
 
 	it('⭐ SEVERAL ROOTS: still one part per type, no review added for the whole — and each root’s subject carries the PWA', () => {

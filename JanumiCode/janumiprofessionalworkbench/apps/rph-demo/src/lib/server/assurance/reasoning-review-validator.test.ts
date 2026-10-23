@@ -3472,6 +3472,24 @@ describe('⭐ JAN-PRQUAL PQ-1 (REG-F-480, REG-F-483) — the edges of a head-onl
 		expect(prompts, 'one unit over: no prompt').toEqual([]);
 	});
 
+	it('⛔ the review in parts, B1 (REG-D-125) — a PART CARRYING ITS BUILDER’S CUT DECLARATIONS is measured with them and their line feed: exactly at its room it is sent whole, the prompt PROMPT_BUDGET exactly; one unit over is refused', async () => {
+		const { content: _part, ...rest } = { ...ctx({ framing: 'PWA_TYPE' }).reasoningReview! };
+		const room = pwaTypeContentBudget({ ...rest, framing: 'PWA_TYPE' });
+		const declaredPartCut = headCutDeclaration('the skeleton of the child "Code" ("pwut_CODE")', 40, 90, 50);
+		const fits = 'z'.repeat(room - declaredPartCut.length - 1);
+		const exact = await promptOf({ ...rest, declaredPartCut, content: fits });
+		expect(exact.length, 'the part at its room, its declarations in it: the prompt is the budget').toBe(B.PROMPT_BUDGET);
+		expect(exact, 'the declarations on the line before the part’s fence, the part whole').toContain(`\n${declaredPartCut}\n${fenceCandidate(0)}\n${fits}\n`);
+		expect(exact.split('[CUT FOR THIS REVIEW: ').length - 1, 'and nothing is cut again').toBe(1);
+		const { prompts, print } = capturing();
+		await expect(
+			createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(SUBJECT, {
+				reasoningReview: { ...rest, declaredPartCut, content: `${fits}z` }
+			})
+		).rejects.toThrow(pwaTypeOverBudgetStatement(room + 1, room));
+		expect(prompts, 'one unit over: no prompt').toEqual([]);
+	});
+
 	it('⛔ a head-only cut of ASTRAL text counts code points — 3000 × U+1F600: the first 1941 shown, the last 1059 removed', async () => {
 		const p = await promptOf({ ...ctx({ framing: 'WORK_PRODUCT', prompt: '\u{1F600}'.repeat(3_000) }).reasoningReview! });
 		const lines = p.split('\n');
