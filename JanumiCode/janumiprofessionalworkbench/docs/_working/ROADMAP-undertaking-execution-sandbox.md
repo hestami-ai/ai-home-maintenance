@@ -1992,6 +1992,10 @@ assurance policies gate it.** ⛔ Report what breaks; do not smooth it.
   - Run-11 spent 2 reviewer calls: programme total 539 of about 800 (`REG-D-123` Q26). P6 remains incomplete.
   - Next: `DESIGN-phase-7-completion.md` §4c F1–F5, the new graph oracles' sponsor conferral, then the selected reviewer's measurement and `reviewer:qual:check` GREEN. The proposed measurement costs about 40 calls: 19 graph cases × 2 repetitions, plus a 2-call canary.
   - Then P6 again, about 140 reviewer calls for a 16-type PWA, bringing the estimated total to about 720 of 800. Report its result and spend before P7, the committed paid recording and its replay.
+- ⭑ **2026-10-23 — section 4c is built; the review in parts now precedes P6 again** (`d46bf640`; `REG-F-571`, `REG-D-125`).
+  - F1, F2, F3 and F5 are built and merged on p7c-p6r; F4's qualification red was shown. No reviewer call was made (`p6pq-facts.md`). The whole-PWA review would show about 52% of run-11's 16-type candidate after F1, with the cut declared.
+  - Revision 1 is in `DESIGN-authoring-review-in-parts.md`, with its build order in this roadmap's §9a. The build and qualification are owed; the catchers are PROPOSED, awaiting the sponsor, and the depth-3 case question is open. The parts' measurement replaces F4's 19-graph-case measurement.
+  - Next: B1–B9, then P6's result and spend reported before P7. Planned spend is about 56 qualification calls, or about 70 with the depth-3 pair, then about 172 for P6 again (about 140 at run time, as the earlier estimate, plus at most 32 initial authoring calls) before retry and repair overhead: about 767, or 781, from 539 spent of about 800.
 
 ⚠ *"The results become `TEST_RESULT` evidence"* above ~~is put to the sponsor as the design's §9.5~~ ⭑ is read as `R18`'s OBSERVATION evidence, judged by the reviewer (the sponsor, `REG-D-102` (5)). *"The declared assurance policies gate it"* holds in form only today (the design's stage 5b; §9.6) ⭑ and runs as is, all 14 verdicts reported vacuous (`REG-D-102` (6)). §11's *"It works live"* was measured on 2026-09-14 and has not been driven since; today's live authoring specs cannot pass (`REG-F-506`).
 
@@ -1999,6 +2003,104 @@ assurance policies gate it.** ⛔ Report what breaks; do not smooth it.
 explicit switch under the same fail-closed test-mode rule the existing mock arms obey. ⛔ **Blocked behind
 Phase 0** — a recording of the wrong bytes replays a different run.
 ⚠ **2026-10-09:** replaying the executor alone cannot replay a Phase 7 run. The reviewer's answers and the commands' results must replay too, or a replay still pays the reviewer and runs real commands (`REG-F-530`).
+
+## 9a. The review of an authored PWA in parts, built and qualified before P6 again (`REG-D-125`)
+
+**Programme:** `JAN-EXEC` Phase 7; `REG-D-125`, after section 4c's build at `d46bf640`.
+**Design:** `DESIGN-authoring-review-in-parts.md`, revision 1, 2026-10-23.
+**Status:** revision 1, 2026-10-23. B1–B9 are the build and measurement order. No step below is claimed built. The 27 part oracles (13 clean parts carried, 14 catchers proposed) await the sponsor's conferral; the depth-3 case choice is open.
+
+### 9a.1 The build rule
+
+- **Red first.** Each package begins with a failing behavioral check for its stated guarantee. Keep a positive control beside a refusal. An unconditional refusal must fail that control.
+- **The ledger.** Add the package's proposed `ARP-B1-*` through `ARP-B9-*` entries to `scripts/mutants/ledger.ts`, with unique production anchors and named victim tests. These are proposed ledger labels, not existing entries. Preserve superseded entries with their recorded successor.
+- **The gate.** Run `gate:fast` and the package's ledger mutants. Until B8 supplies conferral and measurement, report the predicted qualification CONFERRAL and COVERAGE reds separately. No other red is an accepted package result. B8 owes the complete green gate.
+- **Evidence.** Component checks and killed mutants establish the built behavior. Paid qualification establishes the selected reviewer's measured behavior on the case set. P6 establishes the live authoring and execution result. Keep those claims separate.
+
+### 9a.2 B1 — the parts
+
+- **Red first.** A 16-type authored PWA's materialized floor review hands each type's prompt text whole to some reviewer prompt. Today's whole-graph review shows about half the candidate after F1 (`REG-F-571`).
+- **Build.** Extend the export with the stored fields D3 names. Add a pure export-to-parts function and the shared part-input builder. Each part carries a whole subject, ancestor context, its parent's rule, child skeletons, artifact peers and the composite's data flow. Authored bytes remain fenced.
+- **Bounds.** Protect the whole subject. Allocate and declare context cuts child by child, counting declarations inside their room. Refuse an oversized subject rather than letting a generic head cut remove it.
+- **Controls.** Absent versus authored-empty fields; a delegated contract; stored context; the root's PWA description; sibling prompt text excluded from skeletons; flow across a middle composite's boundary; several roots (one part per type, no added review); an oversized individual subject.
+- **Measure.** Compare the complete D3 view with S-C's smaller measured view on a run-11-shaped fixture. Record the resulting sizes and cut declarations. Keep today's budgets.
+- **Gate and ledger.** `gate:fast`, with only the qualification reds carried. Proposed `ARP-B1-*` mutants drop a stored field, lose a later type's prompt, include a child's prompt text in its skeleton, omit boundary flow, head-cut across children, omit a cut declaration, or truncate the protected subject. An unconditional builder refusal must fail the fitting-subject control.
+
+### 9a.3 B2 — the `PWA_TYPE` framing
+
+- **Red first.** A captured part prompt identifies its type subject, distinguishes subject from context, and asks a composite to judge its children's composition. An account claim about an unseen type cannot support a finding about that unseen type.
+- **Build.** Add `PWA_TYPE` to the product union, framing switch, structural checker and the applicable test enumerations listed in design D4. Keep the nine policy criteria, independence, account and narration bounds.
+- **History.** Retain `PWA_GRAPH` and its builder for historical case sets. Its framing is no longer selected by the authoring floor once B3 lands.
+- **Gate and ledger.** `gate:fast`, with the qualification reds carried. Proposed `ARP-B2-*` mutants describe a part as the whole graph, omit the composition instruction, treat template text as executed evidence, admit an unseen-type claim, or bypass the full-subject budget refusal. Extend shared fence and account mutants to a part arrangement.
+
+### 9a.4 B3 — the floor, recorded per part
+
+- **Red first.** A round over several types records separate type-subject assessments, retains their exchanges under one run token, and returns the strictest required result. One missing, rejected, independence-invalid or operationally failed part blocks the aggregate.
+- **Build.** Evaluate the two deterministic whole-PWA policies once. Evaluate Reasoning Review sequentially for each part. Compose each part through the existing criterion, boundary and independence rules, then fold the required part outcomes deterministically.
+- **Recording.** Use one single-subject recording plan per part, current stored versions, distinct command prefixes and one round token. Drain each exchange under its actual part subject through the canonical witness. A candidate with several roots adds no review; its deterministic check refuses it.
+- **Read-back.** Require one complete expected part inventory under the current round token. A partial new round cannot borrow an older part's assessment. Update the floor reader and authoring dependency groups for type-subject records.
+- **Publication.** Extend the authoring PWA gate so its two whole-PWA deterministic assessments and its complete current part-review set discharge the floor together. Type assessments alone cannot satisfy today's PWA-only lookup. Missing or stale parts still refuse publication.
+- **Gate and ledger.** `gate:fast`, with the qualification reds carried. Proposed `ARP-B3-*` mutants overwrite parts in a policy-keyed map, average outcomes, omit an expected part, mix tokens, accept a stale version, write an exchange under the PWA instead of its type, drop the witness, or bypass the publication fold. Include successful acceptance and publication controls.
+
+### 9a.5 B4 — the turn and refinement
+
+- **Red first.** A finding with no type name in its prose carries its host-supplied type id and name into the refinement directive. After refinement, each part is reviewed under the new candidate hash and round token.
+- **Build.** Group findings by type. Preserve the distinction between subject findings and operational reviewer failures. Keep one automatic refinement and rebuild the entire part inventory after it.
+- **Acceptance.** Bind assurance to the complete candidate hash and accept only the aggregate. Preserve the guarded acceptance and dependency checks.
+- **Controls.** Misleading type names in reviewer prose; a refinement adding or removing a type; an operational failure that produces no graph-edit instruction; a changed candidate refused at acceptance.
+- **Gate and ledger.** `gate:fast`, with the qualification reds carried. Proposed `ARP-B4-*` mutants derive identity from prose, drop a later type's findings, retain an earlier round's result, skip a newly added type, refine after an operational failure, allow a second automatic refinement, or bypass the accepted-hash comparison.
+
+### 9a.6 B5 — the inspector
+
+- **Red first.** With a candidate staged, Playwright shows each type's own review under that type and the strictest aggregate at the PWA. Two rounds with distinct retained answers display the selected round's answers.
+- **Build.** Extend the page load and read-only inspector for part assessments, criterion results, findings, stipulation disclosures and retained answers. Preserve F2's prompt text and output-contract display.
+- **Controls.** A failed part beside satisfied siblings; an incomplete round; an unavailable retained answer; an assessment without the join token; and a valid answer whose prose names another type.
+- **Gate and ledger.** `gate:fast`, including the Playwright coverage. Proposed `ARP-B5-*` mutants collapse reviews by policy, attach a finding to the selected UI type instead of its assessment subject, join an answer by subject alone, hide an incomplete part, or show a satisfied aggregate over a failed part.
+
+### 9a.7 B6 — the default lane and the wait
+
+- **Red first.** A PWA-scoped stipulation answers its parts, a part-specific registration takes precedence, and reset removes both. The lane accepts neither an unstipulated stand-in pass nor one with no evaluated mandatory row.
+- **Build.** Extend the registry key and registration validation; add the part-aware structural-checker arm; pass the owning PWA id from the floor; and classify `PWU_TYPE` subjects in the lane control. Preserve the recorded distinction between evaluated and stipulated criteria.
+- **Wait.** Keep the deadline-based poll and its allowance-exceeded stop. Today's allowance is 40 minutes, with five-second pauses. Derive its review component from the staged part count, two possible rounds and today's four calls per review at a 240-second call bound. Refresh the count after refinement and carry the allowance into the spec timeout.
+- **Spend reserve.** Replace the constant eight-call authoring reserve with part-aware accounting. Before Send use an explicit anticipated inventory; before invoking the assembled review round check its actual inventory against that reserve and the remaining limit. A larger candidate must not silently inherit the smaller estimate.
+- **Run records.** Update the lane's authoring floor read and report so it records the complete part set and aggregate rather than selecting one PWA-subject Reasoning Review.
+- **Gate and ledger.** `gate:fast`, the default lane's browser checks and deterministic delayed-review clock tests. Proposed `ARP-B6-*` mutants drop PWA fallback, reverse part precedence, retain registrations after reset, misclassify a type, treat stipulated rows as evaluated, retain the one-review wait arithmetic, retain the eight-call reserve, or accept after the allowance expires.
+
+### 9a.8 B7 — the qualification arm and version 8
+
+- **Red first.** `PWA_TYPE` materializes through the production builder; a change confined to its framing or part assembly moves the fingerprint; proposed catchers and missing selected-candidate coverage keep the qualification check red.
+- **Cases.** Add the arm to `cases.ts` and `materialize.ts`. Author versioned case-set v8 and oracle-set v8 sources and generated records. Carry the 41 non-graph inputs byte for byte. Add the 27 part cases specified in design §5, with stable part identities and source-case provenance.
+- **Oracles.** Carry the clean part verdicts from their conferred PWA oracles. Keep them, the 14 catcher assignments, rejected verdicts, faulted criteria and proposed standings together on the sponsor's screen. Mark the pending conferral of all 27 explicitly.
+- **Probes.** Add the leaf, composite/data-flow, root/account, children's-skeleton cut and absent-field probes. Extend applicable shared fence, account, stakes, repair and scoring-corpus arrangements.
+- **Fingerprint.** Switch the current set to v8 with zero `PWA_GRAPH` cases, then remove graph probes from the current fingerprint. Keep v1–v7 graph materialization and historical-version assertions.
+- **Controls.** Verify the 41 carried cases' initial and repair prompt hashes. A changed prompt owes a RUN. A transport or output-limit failure is never a rescore source.
+- **Gate and ledger.** `gate:fast`, with the pending CONFERRAL and COVERAGE reds named. Proposed `ARP-B7-*` mutants bypass the production builder, omit a new probe, retain a graph probe in the current fingerprint, mutate a carried case, accept proposed oracles, accept changed-prompt RESCORED coverage, or accept coverage from an unselected candidate.
+
+### 9a.9 B8 — conferral, measurement and integration
+
+- **Red first.** The check refuses the proposed catcher oracles and missing current selected-reviewer coverage. A recorded conferral alone cannot clear missing paid measurements.
+- **Sponsor's screen.** Present design §5's catcher table, the 13 clean part oracles carried from their conferred PWA oracles, and §7's depth-3 choice. Record the sponsor's conferral or amendments of all 27 part oracles before paid calls. If the depth-3 pair is chosen, fix its part inventory and confer its two PWA oracles first.
+- **Historical code record.** Record `REG-D-124` in `oracles-v7.ts` and regenerate the historical oracle record. Preserve its six verdicts and faulted lists and the register's account of the proposed standings. Derive v8's G7 source oracles from that record.
+- **Canary, then full run.** Measure the selected devin / `glm-5-3-flash-high` reviewer with a two-call canary, then 27 part cases at two repetitions: 56 planned calls in all. With the optional depth-3 pair, the estimate is about 70. No paid call measures `PWA_GRAPH` again.
+- **Unchanged cases.** Append RESCORED lines for the 41 unchanged cases only after verifying their recorded prompt hashes. Include the eligible source evaluations required by the check.
+- **Failures.** Apply the recorded verdict bar and oracle/escalation rules. A criterion-attribution difference alone remains informational under `REG-D-080`. Do not repair a case or change an oracle to fit a paid reply without its governed disposition.
+- **Gate and ledger.** `reviewer:qual:check` GREEN, then complete `gate:fast` GREEN and the package mutants. Proposed `ARP-B8-*` mutants skip conferral, omit a selected-candidate measurement, suppress a material failure's escalation, accept a changed-prompt rescore, or leave an eligible source evaluation out of the rescore record.
+- **Integration.** Merge the gated build and qualification record to `jan-exec/phase7c`. Report measured calls and remaining allowance. If qualification exceeded its plan, ask the sponsor about `REG-D-110`'s limit before P6.
+
+### 9a.10 B9 — P6 again, then its report before P7
+
+- **Red first.** A run report with a missing part, an unmatched reviewer exchange or incomplete aggregate cannot establish the authoring half's Yes. Retain a complete successful control.
+- **Run.** On the integrated build, run P6 again through live authoring, exact-candidate acceptance, publication and execution. Record the part inventory, both possible review rounds, aggregate, accepted hash and actual reviewer calls.
+- **Planned cost.** About 140 reviewer calls at run time (the lead's estimate from run-7's 43 reviewer calls for 5 units, scaled to 16 MODEL types; `run11-facts.md`), plus at most 32 initial authoring calls for 16 types: about 172 before retry and repair overhead.
+- **Gate and ledger.** Keep `gate:fast` GREEN and the lane's applicable report and acceptance checks. Proposed `ARP-B9-*` mutants let a report omit a required part, pair a review to another round, count an incomplete aggregate as accepted, or report an estimated spend as the measured spend.
+- **Report before P7.** State P6's result, unreached work, findings and spend. Then P7 records and replays the final paid run under its existing replay-only admission and stale-prompt rules.
+
+### 9a.11 What can proceed in parallel
+
+- **After agreeing the part shape.** B1's pure builder and B2's framing can be developed beside the initial B5 presentation work and B6 registry work. B3 depends on B1 and B2; B4 depends on B3's result shape.
+- **Qualification preparation.** B7's case splitting and proposed oracle screen can proceed beside B3–B6. Its final probes and fingerprint wait for the production builder and framing to settle.
+- **Shared surfaces.** Serialize changes to `validators.ts`, `review-input.ts`, `floor.ts`, qualification version pointers, generated records and `scripts/mutants/ledger.ts`. Parallel builders need isolated worktrees, declared file ownership and one integration authority.
+- **The final sequence.** Integrate B1–B7 before freezing prompts for B8. Conferral precedes paid measurement. Green qualification and integration precede B9. P6's report precedes P7.
 
 ---
 

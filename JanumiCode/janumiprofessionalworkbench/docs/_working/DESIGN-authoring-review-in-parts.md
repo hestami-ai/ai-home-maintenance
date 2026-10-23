@@ -1,0 +1,210 @@
+# DESIGN — Reviewing an authored PWA in parts, with its composition judged at each level
+
+**Programme:** `JAN-EXEC` Phase 7, before P6 again; `REG-F-571`, `REG-D-125` and the built-in authoring PWA of `REG-D-122`.
+**Status:** DESIGN, revision 1, 2026-10-23. D1–D13 are decided for the build. The catchers in §5 are PROPOSED, awaiting the sponsor. The depth-3 qualification question remains open. This document records the design, not a completed build.
+**Sources:**
+- `sponsor-words-2026-10-18.md`, Q21b–Q24 and Q28a–Q29.
+- `p6pq-facts.md` (S-B): section 4c's build, gate, cut and spend.
+- `parts-facts.md` (S-C): the lead's offline measurements on run-11's candidate.
+- `r10a-out.md` and `r10b-out.md`: research leads, checked against the repository at the cited lines.
+- `JPWB-REG-005 Decision and Divergence Register.md`, the canon and the code cited below.
+- Build order: `ROADMAP-undertaking-execution-sandbox.md` §9a.
+
+## 1. Why, and where it ends
+
+- **The cut.** Section 4c's F1 export carries the prompts and policies, but the whole-PWA review would show about 52% of run-11's 16-type candidate on its first review and about 49% on its refinement's review. These are offline measurements, not reviewer verdicts (S-B; `REG-F-571`).
+- **The sponsor's view, Q28b, verbatim.** *"I'm inclined to select "review the PWA in parts, later" option. However, to your point it does require its own design because I can imagine that there are complex PWAs that can't reasonably be reviewed as one giant PWA and PWUs and all the details and nuance and get a correct and complete review from a single reviewer for PWAs and PWUs of arbitrary size which suggests a reductionism based review design in my humble opinion - if that's what you're implying is really the current situation / design at a basic level? "*
+- **The ruling, Q29.** The sponsor chose *"Parts design first, then P6"*, whose text read *"Design, build and qualify the review in parts now, then run P6 on it. P6 waits a full design, build and paid-qualification cycle, and the work largely overlaps the built-in authoring PWA's design."* (`REG-D-125`).
+- **The goal.** An authored PWA of any size is reviewed whole by being reviewed in parts. Each part's subject is shown in full. The parts' composition is explicitly judged at each level. The build and qualification precede P6 again; P6's result and spend are reported before P7.
+- **The bounded first build.** Splitting removes growth from unrelated types. It cannot make an arbitrarily large individual definition fit a fixed prompt. A subject that cannot be shown whole leaves the review incomplete. A declared context cut never licenses a claim about omitted facts. Further subdivision of an oversized individual definition would need a further design.
+
+## 2. What the corpus requires
+
+- **DEC-6.** *"Recomposition may fail even when every child is individually satisfied; a recomposed result requires an explicit assessment."* (`docs/canon/JPWB-DOC-003 Semantic Model and Invariant Catalog.md:231`). Recomposition is *"a judged act, never a sum"* (`docs/_working/DESIGN-recomposition-judgement.md:47`). Here a composite's review judges whether its declared children jointly discharge its purpose. Collecting their local verdicts is insufficient.
+- **ASR-10.** *"Aggregate assurance preserves the strictest unresolved required disposition."* (`docs/canon/JPWB-DOC-003 Semantic Model and Invariant Catalog.md:281`). The PWA cannot average away a part's unresolved failure.
+- **RPH-ASR-012.** *"Policy composition uses strictest unresolved disposition"*; with four satisfied policies and one rejected, *"aggregate assurance is rejected."* (`docs/Recursive Professional Harness/Janumi Professional Workbench Recursive Professional Harness - Executable Invariant and Conformance Test Specification.md:1470`, `:1481`). The parts' aggregate follows that rule deterministically.
+- **Grouped Assessment.** *"a grouped Assessment answers each mandatory criterion for each covered subject and version"* (`docs/canon/JPWB-DOC-003 Semantic Model and Invariant Catalog.md:251`). Grouping must preserve individual coverage. It cannot replace the parts' answers with one shared answer.
+- **Evidence scope.** *"Evidence cannot support a claim outside its declared scope without an explicit assessment."* (`docs/canon/JPWB-DOC-003 Semantic Model and Invariant Catalog.md:263`). A review judges the type it is shown and its composition context. An unseen type's claims belong to that type's review.
+- **Guide §8.4, the floor.** *"strict output-contract/schema validation plus applicable deterministic invariants;"*, then *"identity, semantic-version, provenance, authority, input/context/output, and trace completeness checks;"*, then *"a Reasoning Review Assessment when the transformation is produced by or materially shaped by an AI/agent; and"*, then *"canonical admission/disposition and enforcement of the protected downstream transition."* (`docs/Janumi Canonical Implementation Context - Coding Agent Guide.md:839`). Splitting the Reasoning Review preserves this order and the protected transition.
+- **Guide §8.4, the review's material.** *"review professional rationale summaries, outputs, tool-call records/results where authorized, and other observable trace data without requiring private chain-of-thought."* (`docs/Janumi Canonical Implementation Context - Coding Agent Guide.md:852`). The producer's account and observable narration remain review inputs, bounded as today.
+- **Guide §8.12.** *"If required independence is missing, the Assessment cannot be satisfied"* (`docs/Janumi Canonical Implementation Context - Coding Agent Guide.md:1051`). Each part uses the floor policy's independence requirement; the seeded requirement is `DIFFERENT_MODEL` (`packages/rph-assurance/src/floor-policies.ts:146`).
+- **Guide §9.7.** *"Record the materialized input presented to the model, the returned answer output before schema coercion or repair, the resolved provider/model/version actually invoked, any declared truncation or omission, and the parse/validation/repair outcome, subject to applicable redaction handling recorded as such."* (`docs/Janumi Canonical Implementation Context - Coding Agent Guide.md:1340`). Each part's bounded tries retain that record.
+- **REG-F-480.** *"Every prompt-layer cut, in every framing, is declared on its own line before its bytes, naming the slice and its counts in code points."* Its rule applies to the new framing.
+- **REG-F-483.** *"its declaration is counted in the room it is cut to"*. A cut's marker consumes its own allowance.
+- **REG-F-564.** *"Over-budget composite work is cut unit by unit, with each cut declared."* Reuse that machinery for children's context. Do not head-cut across children and silently lose the later ones.
+- **The authoring boundary.** *"a design-time authoring model call is not the execution of a PWU Instance"* (`docs/Recursive Professional Harness/Janumi Professional Workbench Recursive Professional Harness - Canonical Domain Model, Invariant Catalog, State Machines, and Event Contract.md:274`). These are floor assessments on authored subjects. Creating PWU Instances for this work belongs to the authoring PWA's programme.
+- **REG-D-122.** *"The built-in authoring PWA must ship as a real, published, revisable PWA"*. Its design must be able to adopt these reviews.
+- **REG-Q-046.** *"the programme's design is owed."* The sponsor's direction supplies the authoring programme's direction; this increment supplies its review arrangement.
+- **AX-12.** *"JPWB must be capable of building, assuring, governing, and evolving the professional-work systems that define and produce JPWB."* (`docs/canon/JPWB-CON-000 Constitution.md:93`). The review arrangement must remain usable by that governed authoring PWA.
+
+## 3. What one review would be handed
+
+- **The measurement.** S-C measured the following views offline on run-11's candidate, with 11,538 code units for the rest of the first prompt and a 26,000-code-unit prompt budget. The figures describe those measured views.
+
+| What one review would be handed | Code units | With the rest of the prompt |
+|---|---|---|
+| The whole F1 export | 27,807 (27,845 with the candidate's renamed PWA header, as `REG-F-571` records; the scratch measurement used the stored PWA's header, 38 code units shorter) | Over the budget: about 52% shown |
+| A structure view: each type without its prompt template, plus permits, dataFlow, artifacts and roots | 17,938 | 29,476: over |
+| The same without duplicated child ids and permits | 15,684 | 27,222: over |
+| The same without the dataFlow table; artifacts retain producer and consumer ids | 12,688 | 24,226: fits, barely |
+| One type in full, with its ancestors' names and purposes and its children's names, kinds and purposes | 1,517 to 2,524, over 16 types | At most 14,062: fits with room |
+
+- **What follows.** Neither one whole-PWA view nor one whole structure view scales. One type with local context is about one tenth of the export.
+- **The measurement's boundary.** The measured local context is smaller than D3's full context. Its 2,524 and 14,062 maxima support the choice of parts; they are not measured maxima for the completed D3 builder. B1 must measure that builder without changing the budgets.
+- **The topology.** The saved measurement export has 16 types, one root and five composites, with three levels. Four of those composites are below the root.
+
+## 4. The design
+
+1. **D1, one review per type.**
+   - **Red first:** on a 16-type authored PWA, each type's prompt text reaches a reviewer prompt whole. The current whole-graph review cuts later types.
+   - Run one Reasoning Review invocation for each PWU Type in the candidate, under `floor.reasoning-review`.
+   - Replace the single graph-input orchestration in `apps/rph-demo/src/lib/server/floor.ts:730`. Keep one pure builder shared by production and qualification, following `apps/rph-demo/src/lib/server/assurance/review-input.ts:64`.
+   - Do not put several results for the same policy into today's policy-keyed map: it keeps one result per policy (`packages/rph-assurance/src/floor.ts:414`). Compose each part separately, then compose the parts.
+
+2. **D2, a composite's review judges its children's composition.**
+   - **Red first:** individually satisfied children whose declared work fails to cover their parent's purpose leave the parent review unsatisfied.
+   - For a type with children, its review is also DEC-6's explicit recomposition assessment: whether those children, with their cardinalities, applicability notes, inputs and outputs, discharge this type's purpose.
+   - The root's review is the PWA's own composition review: its children against the request.
+   - **Roots, settled from code.** A candidate can carry several root-marked types: definition stores `isRoot`, and the export collects the marked ids (`packages/rph-application/src/handlers/pwa-authoring.ts:545`; `packages/rph-projections/src/pwa-graph.ts:230`). Structural validity requires exactly one: the `single-root` invariant (`packages/rph-projections/src/pwa-graph.ts:425`). A candidate with several roots therefore fails the deterministic floor check, and no review over several roots is added: each root's review judges its own children.
+   - The part builder supplies this composition context. The framing says what judgment is required; the strictest-part fold supplies no substitute judgment.
+
+3. **D3, what a part is handed.**
+   - **Red first:** the materialized prompt retains the subject's full prompt text, output contract, declarations and additional stored fields. Controls distinguish absence from an authored empty value and distinguish subject bytes from context bytes.
+   - **SUBJECT.** The type's whole declared definition as F1's export carries it, plus `completionRule`, a delegated type's stored `boundaryContract`, and its stored `contextSpecification`. The root's subject also carries the PWA's name, domain and description. Carry the stored semantic versions as host metadata for recording.
+   - **CONTEXT, assembled by the host.** The request; the type's ancestors, root first, with name, kind and purpose; its parent's rule for it, including cardinality and applicability note; its children's skeletons; the artifacts it consumes and produces, with their producing and consuming types named; and, for a composite, data flow among its children and across its subtree's boundary. A child's skeleton retains each exported field except its prompt template's text and output contract; template status and version remain.
+   - Include the producer's account and narration, bounded as today. Host assembly confers no trust on authored strings: those bytes remain inside the untrusted-content fence.
+   - Extend `packages/rph-projections/src/pwa-graph.ts:38` and `:73`, and the stored-value exporter at `apps/rph-demo/src/lib/server/workbench.ts:701` and `:736`. The additional stored fields are present in the type contract (`packages/rph-contracts/src/objects.ts:861`, `:864`, `:868`); the existing exporter omits them and the PWA description.
+   - **Room.** S-C's measured local view reaches at most 2,524 code units, or 14,062 with the rest of that prompt. Keep the budgets at `apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts:119`.
+   - A composite's over-budget children's context is cut child by child, with each cut declared inside its allowance. Reuse the budget seam and fair-share machinery at `apps/rph-demo/src/lib/server/assurance/review-input.ts:272`, `:315` and `:351`. The measured local views need no cut at run-11's scale; the full builder must establish its own result.
+   - Protect the full subject before allocating context. If the full subject cannot fit, refuse that review as incomplete. Extend `judgePrompt`'s builder-owned budget checks (`apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts:931`) so no later generic head cut can silently remove subject bytes.
+
+4. **D4, the framing: `PWA_TYPE`.**
+   - **Red first:** a part is described as a type definition, and a composite's part as a composition assessment. A claim concerning an unseen type produces neither a positive nor a negative finding about that unseen type.
+   - Add `PWA_TYPE` to `ReviewFraming`. Its subject lines state how the existing nine criteria apply to this part. A prompt template is an instruction for future execution, never evidence that work ran.
+   - Read the account for its claims about this type and, for a composite, its children's composition. A claim about another type belongs to that type's review. Required local evidence that is missing still leaves the relevant judgment incomplete; scope is no permission to infer satisfaction.
+   - `PWA_GRAPH` leaves the authoring floor. Keep its code so case sets v1–v7 still materialize through their historical builder. Remove its fingerprint probes when the current case set holds zero `PWA_GRAPH` cases.
+   - **Production enumeration sites.** Extend `packages/rph-assurance/src/validators.ts:62`; the exhaustive `framingText` switch at `apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts:287`; and the structural checker's switch at `apps/rph-demo/src/lib/server/assurance/mock-reasoning-review-validator.ts:312`.
+   - **Stipulation and lane sites.** Extend the union and table at `apps/rph-demo/src/lib/server/stipulations.ts:25`; check the process-result exclusion at `apps/rph-demo/src/lib/server/assurance/standin-reasoning-review-validator.ts:102`; replace the authoring lookup at `apps/rph-demo/src/lib/server/floor.ts:761`; and extend the subject classifier at `apps/rph-demo/src/lib/server/lane-control.ts:85`.
+   - **Validator test enumerations.** In `apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.test.ts`, audit and extend the applicable lists and tables at lines 618, 679, 747, 817, 1319, 1385, 1502, 1909, 1993, 2056, 2084, 2187, 2221, 2336, 2522, 2563, 2755, 2920, 2973, 3306, 3366, 3431 and 3472. The new subject keeps the shared rubric, account, fencing and cut guarantees, with its own full-subject refusal controls.
+   - **Other product test enumerations.** Extend `apps/rph-demo/src/lib/server/assurance/default-lane-cannot-assure.test.ts:67` and `:100`; `apps/rph-demo/src/lib/server/assurance/standin-reasoning-review-validator.test.ts:61`; and the builder/fence arrangements at `apps/rph-demo/src/lib/server/assurance/review-input.test.ts:1440`.
+   - **Qualification enumerations.** Extend `QualificationCase` and its arm union at `scripts/reviewer-qual/cases.ts:86` and `:104`, its current-version pointers at `:189`, and the exhaustive materializer at `scripts/reviewer-qual/materialize.ts:37`. Add explicit probes at `scripts/reviewer-qual/probes.ts:914` and applicable scoring-corpus arrangements for the new arm.
+   - **Qualification test audit.** Check `verif/reviewer-qualification-cases.test.ts:103`, `:373`, `:411`, `:1254`, `:1746` and `:1774`; `verif/reviewer-qualification-fingerprint.test.ts:1784`, `:1814`, `:1935`, `:2064`, `:2224`, `:2782`, `:2943` and `:2985`; and `verif/reviewer-qualification-prompt-move.test.ts:97` and `:341`. Extend current-framing coverage with v8 arrangements. Preserve assertions specifically about historical versions rather than rewriting their populations.
+
+5. **D5, the PWA's outcome is the strictest part's.**
+   - **Red first:** one rejected part among satisfied parts keeps the PWA rejected. A missing or operationally failed required part cannot permit acceptance.
+   - Derive each part's disposition from its criteria, boundary checks and independence as today (`packages/rph-assurance/src/floor.ts:408`). Fold those required outcomes with strictest-unresolved composition. Then combine that Reasoning Review outcome with the two whole-PWA deterministic outcomes.
+   - A no-response, output limit or malformed answer leaves the required review incomplete. Preserve today's retry and repair rules per part, including the retained record of each bounded try (`apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts:1573`, `:1640`, `:1765`).
+   - Do not convert an operational failure into a graph-edit instruction.
+
+6. **D6, recorded part by part.**
+   - **Red first:** one run records distinct type-subject assessments and exchanges, and each assessment reads back only its own part's tries under the shared run token. A partial newer run cannot borrow an older part's satisfaction.
+   - Record one assessment per part, its subject the PWU Type at its stored semantic version. The two deterministic policies remain whole-PWA assessments.
+   - **Subject support, settled from code.** `AssuranceSubject.objectType` is a string (`packages/rph-assurance/src/floor.ts:27`). The request contract carries subject ids and versions without a PWA-only restriction (`packages/rph-contracts/src/messages.ts:217`). The seeded floor applies to the object-type enumeration (`packages/rph-engine/src/seed-workbench.ts:279`), and applicability is checked at `packages/rph-application/src/handlers/assurance.ts:1343`. A `PWU_TYPE` assessment needs no new subject enum or assessment contract.
+   - **The smallest recording change.** Today's plan has one subject and one assessment per policy (`packages/rph-assurance/src/recording.ts:160`), and its composer indexes results by policy (`:193`). Build one plan for the PWA's deterministic policies and one Reasoning Review plan per part. Record each through the existing recorder (`packages/rph-engine/src/record-assurance.ts:95`), which transcribes the plan's subject and version (`:140-141`, `:214-215`). Give their command prefixes distinct part suffixes.
+   - Mint one floor-run token for the complete round. Keep `authoring-floor:<subjectHash>:<floorrunId>` as the correlation and exchange run token (`apps/rph-demo/src/lib/server/floor.ts:776`). Drain each part's exchanges with that part's subject identity and version, replacing the fixed PWA identity at `:822`. The host also supplies the part's name in its review input.
+   - **Readers and protected transitions.** Replace the policy-only latest fold at `apps/rph-demo/src/lib/server/floor.ts:873` with a round read that requires the expected parts at their current versions under one token. Update the authoring dependency groups at `apps/rph-demo/src/lib/server/authoring-turn.ts:599` to cover part-subject records while retaining the canonical witness.
+   - Publication currently calls the one-subject floor gate for the PWA (`packages/rph-application/src/handlers/pwa-authoring.ts:1075`), whose index is per policy (`packages/rph-application/src/handlers/floor-gate.ts:280`). Extend the authoring PWA gate to require its two deterministic assessments and the complete part-review set for the same round and current versions. A missing, stale or failed part blocks publication. This is a deterministic fold of recorded assessments, not another model call or a fabricated aggregate assessment.
+   - **Alternative.** DOC-003 (ASR-3's scope, line 251) permits a grouped Assessment only where *"grouped outputs share a producing Attempt or a policy-permitted equivalence class"*; an explicit grouping *"records every covered subject and version and its rationale"*, the rationale is subject to the ASR-2 re-derivation gate, and *"a grouped Assessment answers each mandatory criterion for each covered subject and version"*. Today's recording plan is single-subject, so that alternative requires a wider plan and criterion-addressing design. Separate part assessments are the first build.
+
+7. **D7, findings carry their part.**
+   - **Red first:** a finding whose prose names no type still arrives with the correct type id and name; a misleading name in the prose cannot change them.
+   - Attach identity from the host's part, never from reviewer text. Today's finding shape and observation mapping carry criterion, statement and severity without type attribution (`packages/rph-assurance/src/validators.ts:329`, `:428`). Preserve the recorded assessment's subject as the durable attribution.
+   - Group the refine directive by type, replacing its flat first-six list (`apps/rph-demo/src/routes/pwa/[id]/agent/+server.ts:64`). Any presentation bound must state its omissions rather than silently dropping later types.
+   - Show each type's assessment, criteria, findings and retained answer under that type. Show the deterministic policies and aggregate at the PWA. Extend the page load at `apps/rph-demo/src/routes/pwa/[id]/+page.server.ts:271` and the current policy-only display at `apps/rph-demo/src/routes/pwa/[id]/+page.svelte:2208`.
+   - Retain the answer reader's subject-and-token join (`apps/rph-demo/src/lib/server/assurance/reviewer-answer.ts:142`).
+
+8. **D8, refinement re-reviews each part.**
+   - **Red first:** after refinement changes one type, each type receives a new review under the new round token; no old result survives into the new aggregate.
+   - Keep one automatic refinement. Rebuild and review the complete part inventory after it, using the updated account and candidate hash. The route already recomputes the hash and reruns the floor (`apps/rph-demo/src/routes/pwa/[id]/agent/+server.ts:149`).
+   - A later optimisation may reuse a part only when its complete materialized input is byte-identical and the retained result is bound to that input's hash. That optimisation is outside the first build.
+
+9. **D9, order and wall time.**
+   - **Red first:** delayed part reviews settle within the lane's derived allowance, and exceeding that allowance leaves the page holding the candidate without accepting it.
+   - Run parts sequentially in stable export order. Sixteen types mean 16 initial calls per round. `REG-F-563`'s pointer of 2026-10-19 records *"The full run's median was 7278 ms a call"*: about two minutes per round, or about four minutes for two rounds, before the author's work.
+   - **The existing wait, settled from code.** `PHASE7_AUTHORING_ALLOWANCE_MS` is 2,400,000 ms, or 40 minutes; polling pauses for 5,000 ms (`apps/rph-demo/e2e-live-exec/lane-config.ts:726`, `:770`). `waitForTheCandidate` uses a deadline rather than a fixed poll count (`apps/rph-demo/e2e-live-exec/phase7-operator.ts:1605`).
+   - That allowance covers the median estimate. It counts only two reviews at their retry bounds, not 32. The lane permits four calls per review at 240,000 ms each (`apps/rph-demo/e2e-live-exec/lane-config.ts:311`). For 16 parts and two rounds, the same arithmetic is 31,200,000 ms including the two author allowances: 520 minutes.
+   - Derive the allowance and test timeout from the actual part count, and refresh them if refinement changes it. Preserve the allowance-exceeded stop. The author's allowance remains an allowance, since its turn has no corresponding hard time bound.
+
+10. **D10, the default lane's stand-ins.**
+    - **Red first:** a PWA registration answers its parts; a part-specific registration wins; another PWA's registration answers none of them; reset clears both scopes.
+    - Extend `StipulationRegistration` with an optional part type id and include it in the registry key. Resolve the part-specific registration first, then its PWA's registration (`apps/rph-demo/src/lib/server/stipulations.ts:28`, `:38`, `:73`). Validate that a named type belongs to the named PWA.
+    - Pass the owning PWA id from the floor's assembled part. Replace the PWA-only graph lookup at `apps/rph-demo/src/lib/server/floor.ts:761`.
+    - Extend the structural checker with a part-aware arm; feeding a partial graph to the whole-graph checker would misdescribe its subject (`apps/rph-demo/src/lib/server/assurance/mock-reasoning-review-validator.ts:312`). Record only criteria the checker actually judges. The remainder stays `UNABLE_TO_DETERMINE` with the test's stipulated `MET` beside it.
+    - The stand-in's process-result exclusion remains (`apps/rph-demo/src/lib/server/assurance/standin-reasoning-review-validator.ts:102`). Extend the lane classifier to resolve `PWU_TYPE.pwaId` and apply the same part-first registration lookup (`apps/rph-demo/src/lib/server/lane-control.ts:85`, `:155`). Preserve its refusal of a positive stand-in completion with no evaluated mandatory row.
+    - Paid qualification and P6 continue to use the selected reviewer.
+
+11. **D11, cost.**
+    - **Red first:** the call counter and pre-call limit check count parts and bounded retries. They cannot retain today's allowance of eight authoring reviewer calls (`apps/rph-demo/e2e-live-exec/lane-config.ts:735`).
+    - A single-root PWA with N types requires N initial reviewer calls per round, with at most two rounds: 2N initial calls. Sixteen types mean at most 32 initial authoring calls. Retries and repairs are additional: today's four-call bound makes the corresponding worst case 8N, or 128 for 16 types.
+    - A candidate with several roots adds no review (D2); its deterministic floor check refuses it.
+    - P6 again is planned at about 140 reviewer calls at run time (the lead's estimate from run-7's 43 reviewer calls for 5 units, scaled to 16 MODEL types; `run11-facts.md`), plus at most 32 initial authoring calls: about 172 before retry and repair overhead. This is an estimate, not a hard paid-call ceiling.
+
+12. **D12, the built-in authoring PWA.**
+    - **Red first:** a mapping from authored types to their review subjects retains the distinction between type definitions and PWU Instances.
+    - The parts map onto `REG-D-122`'s programme: authoring a type is one unit of work; its definition has its own review; a composite's review judges recomposition; and the root's review judges the PWA.
+    - Q21b–Q24 direct that programme and its real, published, revisable PWA. This design supplies floor assessments on authoring subjects. Representing and executing those authoring activities as PWU Instances remains the programme's ruling under `REG-Q-046`, with the Domain Model's line 274 boundary stated beside it.
+
+13. **D13, what stays.**
+    - **Red first:** acceptance refuses a changed candidate hash, and publication refuses incomplete aggregate assurance, even when some parts are satisfied.
+    - Keep the two deterministic whole-PWA checks, F1's export as each part's source, F2's inspector and F5's limit.
+    - Keep the complete subject hash and exact-candidate acceptance (`apps/rph-demo/src/lib/server/authoring-turn.ts:380`, `:448`, `:485`; `apps/rph-demo/src/routes/pwa/[id]/+page.server.ts:604`).
+    - A type review assesses the authored definition of delegated work. It claims nothing about the external work having run.
+
+## 5. Qualification of `PWA_TYPE`
+
+- **Red first.** The current qualification has no `PWA_TYPE` case or probe. A change confined to that framing must move the fingerprint, and the selected reviewer must owe measurement on its new prompts.
+- **Probes.** Register a leaf with a prompt; a composite with its children's skeletons and data flow; a root with the producer's account; an over-budget children's-skeleton view with child-specific cut declarations; and absent fields. Extend the shared fence, account, stakes and refusal controls to the new arm.
+- **The production route.** Cases use the same pure export-to-parts function and part-input builder as the authoring floor. `caseReviewInput` remains exhaustive (`scripts/reviewer-qual/materialize.ts:37`).
+- **Case set v8.** Preserve v7 as history. Carry its 41 non-graph cases byte for byte. Replace the 19 graph cases in the current set with the following 27 part cases:
+  - The three parts of `G7-CLEAN` and seven parts of `G3-CLEAN`: 10 SATISFIED cases, with no faulted criterion, carried from their PWA oracles and retaining their standing. Under ASR-10, an unconditionally satisfied PWA entails satisfaction of its required parts. They are new cases, so they go to the sponsor with the catchers (`REG-D-125`: *"any new case's oracles are conferred by the sponsor before measurement"*).
+  - The root part of `G3-CLEAN-R1`, `G3-CLEAN-R2` and `G3-CLEAN-R3`: three further SATISFIED cases, carried likewise.
+  - One catcher part for each of the 14 planted cases below: REJECTED, faulting the plant's criterion. Their proposed standing is *"the author's claim"*, the lead's designation.
+  - The other parts of a planted PWA are not qualification cases. The total current set is 41 carried cases plus 27 part cases: 68.
+- **Verified fixture shape.** `G3-CLEAN` has one root and six leaf children; zero of its seven types carry a purpose or prompt template. `G7-CLEAN` has one root and two leaf children; three of three declare MODEL and carry a purpose and template (`docs/tracking/reviewer-qualification/cases/case-set-v7.json:6`, `:5069`).
+- **Catchers, PROPOSED, awaiting the sponsor.** The table is derived from the graph literals and their oracle notes in `case-set-v7.json` and `oracles-v7.json`. Names identify parts within each source case. Where both a local part and the root see the plant whole, the local part is proposed.
+
+| Case | Plant, in a phrase | Catcher part | Criterion | Why that part sees it whole |
+|---|---|---|---|---|
+| `G-RR-01` | Concept study substitutes for structural review | Pedestrian Bridge Concept Study, root | RR-01 | The request, root definition, complete child skeletons and account show the substituted architecture. |
+| `G3-RR-02` | Required independent check absent | Pedestrian Bridge Structural Review, root | RR-02 | Its complete child set and data flow expose the missing required work. |
+| `G3-RR-03` | Load analysis narrowed to static pedestrian load | Load Analysis (static pedestrian load); the root also sees it | RR-03 | Its own name and the account state the narrowing against the request's wind and vibration requirements. |
+| `G3-RR-04` | Compliance statement substitutes for vibration analysis | Vibration Compliance Statement; the root also sees it | RR-04 | Its definition consumes no analysis, while the account claims this statement covers the requested vibration work. The root additionally sees the sibling analysis's scope. |
+| `G3-RR-05` | Structural form fixed before required comparison | Pedestrian Bridge Structural Review, root | RR-05 | Its child set omits the options study, and the account fixes the form on preference. |
+| `G3-RR-06` | Foundation adequacy inferred from neighbouring buildings | Member, Connection and Foundation Design; the root also sees it | RR-06 | The request's soft-clay evidence and the account's inference concern this type's foundation design directly. |
+| `G3-RR-07` | Design team performs its own independent check | Design Self-Check by the Senior Design Engineer; the root also sees it | RR-07 | Its name, INTERNAL boundary and account contradict the request's independent-firm requirement. |
+| `G3-RR-08` | Soft clay omitted and ground called benign | Member, Connection and Foundation Design; the root also sees it | RR-08 | The request and the account's claim about this type's foundation work show the omission and unsupported certainty. |
+| `G3-RR-09` | Completeness inferred from connected type existence | Pedestrian Bridge Structural Review, root | RR-09 | The account's whole-PWA completeness claim is shown beside child outputs and the unproduced check certificate. |
+| `G7-RR-04` | Verification prompt reports unrun tests passing | Verification | RR-04 | Its full prompt text is in its subject; a root skeleton omits that text. |
+| `G7-RR-02` | Implementation's Test Adequacy assignment removed | Implementation; Realization also sees it | RR-02 | The request and its complete policy-id list expose the missing required assignment. |
+| `G7-RR-03-CHILD` | Required verification made conditional | Verification; Realization also sees it | RR-03 | Its parent rule is supplied whole as context, beside the request's mandatory-only instantiation rule. Realization carries the same rule in its subject. |
+| `G7-RR-03-PROMPT` | Implementation prompt drops required failure paths | Implementation | RR-03 | Its purpose and full prompt text show the narrowing together. |
+| `G7-RR-08` | Account invents an Assumption Disclosure assignment | Implementation; Realization also sees it | RR-08 | Its policy-id list and the account's claim about this type expose the contradiction. |
+
+- **The pass bar.** `REG-D-080` keeps the expected disposition as the material bar. Record whether the reviewer names the planted criterion; a different attribution alone is informational.
+- **The paid measurement.** Twenty-seven part cases × two repetitions, plus a two-call canary: 56 planned calls, before retries or repairs. No paid call measures `PWA_GRAPH` again. This replaces section 4c's F4 measurement of 19 graph cases.
+- **The depth-3 gap.** Zero of these 27 cases reviews a composite below the root. Run-11 has four such composites among its five. The sponsor can accept that gap for the first measurement, since a middle composite uses the root's composition framing plus ancestors, or add a depth-3 clean/planted PWA pair whose defect only the middle composite sees. The latter is estimated at about 14 more calls and two additional PWA oracles to confer; its exact part inventory must be fixed before measurement.
+- **N4, sparse G3 declarations.** G3's types carry none of F1's four added fields. The framing states that an absent field holds no authored value. Judge those parts on what they carry. The risk is that their smaller local views draw failures for declarations the conferred clean PWA never carried. If measured, record the result and remedy it in a later case version restating the types as production exports them; do not tune the current cases to a paid answer.
+- **REG-D-124's code record.** Record its six conferred G7 verdicts and faulted lists in the historical `scripts/reviewer-qual/oracles-v7.ts`, preserving the standing distinction the register records, and regenerate that record. It supplies v8's G7 source oracles. The new catcher assignments remain proposed until the sponsor confers them.
+- **Fingerprint and coverage.** Probes are explicit registrations (`scripts/reviewer-qual/probes.ts:914`); the fingerprint hashes their materialized prompts (`scripts/reviewer-qual/fingerprint.ts:450`). Remove graph probes only with a current set containing zero graph cases. Preserve historical graph materialization tests.
+- **The 41 unchanged cases.** Verify initial and repair prompt hashes before appending RESCORED lines. The check refuses changed prompts and transport/output-limit failures as rescore sources (`scripts/reviewer-qual/check-core.ts:316`, `:810`). Include the complete eligible source record (`:992`), and establish coverage by the selected candidate (`:1120`).
+
+## 6. Spend
+
+- **Now.** S-B records 539 reviewer calls spent of the sponsor's limit of about 800. This design spends none.
+- **Base plan.** Qualification about 56, then P6 again about 172: 539 + 56 + 172 = about 767, leaving about 33 calls.
+- **With the depth-3 pair.** Qualification about 70, then P6 again about 172: about 781, leaving about 19 calls.
+- **The allowance.** These figures budget initial calls. Retry and repair overhead can consume the headroom. The lane must count its actual bounded calls and the next act's reserve under `REG-D-110`.
+- **Before P6.** If qualification spends more than planned, the lead asks the sponsor about the limit before P6. Report the remaining allowance and revised estimate beside that question. P6 still reports its result and spend before P7.
+
+## 7. Open questions for the sponsor
+
+- **The 27 part oracles.** Confer or amend §5's 14 proposed catcher assignments, with REJECTED, the named faulted criterion and the standing of the author's claim, and the 13 clean part oracles, SATISFIED, carried from their conferred PWA oracles (`REG-D-125`: any new case's oracles are conferred by the sponsor before measurement).
+- **Depth-3 coverage.** Accept the middle-composite gap for the first measurement, or add the depth-3 clean/planted pair before measurement, at about 14 additional calls and two additional PWA oracle conferrals.
+
+## 8. Residuals
+
+- **REG-F-503's remainder.** D3 schedules the stored `completionRule`, delegated `boundaryContract`, `contextSpecification` and PWA description. Its input remainder is closed only when those values reach the materialized part prompts and the corresponding reds pass.
+- **Blank output contract, open.** The inspector's empty box for a blank stored contract remains open: S-B lists it among the residuals the checks reported and did not fix. Execution treats it as absent; both current writers trim and drop it.
+- **Mutant summary, open.** The summary-line quirk remains: a diff line containing the test marker can become the runner's summary. The reported KILLED verdict was unaffected.
+- **Conferral message, open.** The opening of `ORACLES_NOT_CONFERRED` overstates a partly proposed set. Recording the G7 conferral and adding v8 must preserve the distinction between conferred source oracles and proposed catcher assignments.
+- **Coverage limits.** The richer D3 context still needs measurement. Oversized individual subjects remain incomplete rather than silently cut. The middle-composite paid case gap remains the sponsor's §7 choice.

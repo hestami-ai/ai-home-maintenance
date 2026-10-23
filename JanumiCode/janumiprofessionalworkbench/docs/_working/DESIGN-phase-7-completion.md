@@ -186,6 +186,14 @@ P6's third run, half B, run-11 at `9172fe85` on 2026-10-23, measured E5's effect
 
 - **The order and spend.** Build F1–F5, confer the six new oracles, measure and bring qualification GREEN, then run P6 again. From 539 spent, the planned 40 qualification calls and about 140 for P6 reach about 719, or about 720 of 800. These are estimates, not calls already spent. P6 reports its result and spend before P7 commits the final paid recording and its replay.
 
+## 4d. After section 4c's build: the review in parts (`REG-F-571`, `REG-D-125`)
+
+- ⭑ **2026-10-23 — section 4c's export, inspector, cases and limit are built; its measurement is replaced by the parts' measurement.** F1, F2, F3 and F5 are built and merged on p7c-p6r at `d46bf640`, not yet on `jan-exec/phase7c` (`p6pq-facts.md`). F4's red was shown: `reviewer:qual:check` reported one CONFERRAL problem and two COVERAGE problems; the other gate steps were green. The merge's gate run passed 110 Playwright tests, and 70 of 70 mutants were killed. No reviewer call was made.
+- **The cut.** The lead's offline measurement found that the whole-PWA review would show about 52% of run-11's 16-type candidate after F1, and about 49% on its refinement's review (`REG-F-571`).
+- **The ruling.** The sponsor chose to design, build and qualify the review in parts before P6 again (`REG-D-125`). Revision 1 is in `DESIGN-authoring-review-in-parts.md`, with build order B1–B9 in `ROADMAP-undertaking-execution-sandbox.md` §9a. Its build and qualification remain owed. The catcher assignments are PROPOSED, awaiting the sponsor; the depth-3 case question is open.
+- **What section 4c contributes.** Keep F1's export as each part's source, F2's inspector and F5's limit. F3's graph cases remain in v7 as history; their oracles supply v8's part oracles, with the G7 conferral's code record owed under `REG-D-124`. F4's 19-graph-case paid measurement is replaced by the part-case measurement. No paid call measures `PWA_GRAPH` again.
+- **Next.** Build and qualify the parts, then P6 again, reporting its result and spend before P7.
+
 ## 5. Part D — the replay (Phase 8)
 
 - **What the research found.**
