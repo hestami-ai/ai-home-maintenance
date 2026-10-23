@@ -21,9 +21,12 @@ import type { EngineHandle } from '@janumipwb/rph-engine';
  * criteria. A registration for it stipulates every criterion of every declared policy of that PWA's units CLEAN, recorded
  * `UNABLE_TO_DETERMINE` with `stipulated: 'MET'` beside it, exactly as the floor arm records its remainder: that stand-in
  * has no checker, so nothing of a declared policy is judged in the gate lane, and the record says so.
+ * ⭐ The review in parts, B2 (`REG-D-125`; design D4, D10) — AND `PWA_TYPE`: one type of an authored PWA, reviewed as a part.
+ * The stand-in asks its lookup about a part as it asks about a graph; ⚠ the authoring floor reviews no part yet, so its
+ * lookup (`floor.ts`) answers none, and a registration on this arm answers nothing until the floor hands it one.
  */
-export type StipulableFraming = 'PWA_GRAPH' | 'WORK_PRODUCT' | 'DECLARED_POLICY';
-const FRAMINGS: readonly StipulableFraming[] = ['PWA_GRAPH', 'WORK_PRODUCT', 'DECLARED_POLICY'];
+export type StipulableFraming = 'PWA_GRAPH' | 'WORK_PRODUCT' | 'DECLARED_POLICY' | 'PWA_TYPE';
+const FRAMINGS: readonly StipulableFraming[] = ['PWA_GRAPH', 'WORK_PRODUCT', 'DECLARED_POLICY', 'PWA_TYPE'];
 
 export interface StipulationRegistration {
 	readonly pwaId: string;

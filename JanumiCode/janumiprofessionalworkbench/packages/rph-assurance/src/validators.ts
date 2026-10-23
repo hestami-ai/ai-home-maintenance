@@ -83,7 +83,17 @@ export type ReviewFraming =
 	 * app's declared-policy sign-off, never as a `ValidatorResult` citing a `FloorPolicyId`. ⚠ So `ASR-4`'s bound above
 	 * holds here as for the other three: the rubric is the policy's own criteria, never a second rubric.
 	 */
-	| 'DECLARED_POLICY';
+	| 'DECLARED_POLICY'
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, the review in parts, B2 (`REG-D-125`; DESIGN-authoring-review-in-parts.md D4) — ONE TYPE of an
+	 * authored PWA, its whole declared definition the subject and its place in the PWA the context: its ancestors, its
+	 * parent's rule for it, its children's skeletons, the artifacts it shares and, for a type with children, their data flow
+	 * (`pwaTypeReviewInput`). A type with children is judged for their composition too (DEC-6), and the root against the
+	 * request. A review in this framing reviews one type, under the floor's own Reasoning Review policy and its criteria.
+	 * ⚠ `PWA_GRAPH` STAYS: the authoring floor still reviews the whole graph through it, and the historical case sets
+	 * materialize through it.
+	 */
+	| 'PWA_TYPE';
 
 /**
  * ⭐⭐ E2 (`DESIGN-phase-7-completion.md` B1) — WHAT A `DECLARED_POLICY` REVIEW TELLS THE REVIEWER ABOUT THE POLICY IT
@@ -191,6 +201,13 @@ export interface ReasoningReviewInput {
 	 * `DECLARED_POLICY` FRAMING ONLY.
 	 */
 	readonly declaredWorkCut?: string;
+	/**
+	 * ⭐ The review in parts, B1 (`REG-D-125`; design D3) — the host's declaration of the cut its BUILDER made of a part's
+	 * children's skeletons, one line per child cut (`pwaTypeReviewInput`): each child's skeleton cut to its own share of the
+	 * budget, the subject never. The reviewer is shown it before the part, and the part is never cut again. ⛔ READ BY THE
+	 * `PWA_TYPE` FRAMING ONLY.
+	 */
+	readonly declaredPartCut?: string;
 	readonly prompt: string;
 	readonly content: string;
 	/**

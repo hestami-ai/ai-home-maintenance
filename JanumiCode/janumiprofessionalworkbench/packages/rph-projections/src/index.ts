@@ -8,6 +8,7 @@ export * from './pwu-replay.js';
 export * from './work-projection.js';
 export * from './graph-view.js';
 export * from './pwa-graph.js';
+export * from './pwa-parts.js';
 export * from './pwa-graph-report.js';
 export * from './leaf.js';
 export * from './handoff-order.js';

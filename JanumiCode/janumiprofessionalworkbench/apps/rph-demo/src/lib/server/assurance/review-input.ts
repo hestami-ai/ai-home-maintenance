@@ -33,15 +33,16 @@ import type {
 	ProfessionalRationaleSummary,
 	ReasoningReviewInput
 } from '@janumipwb/rph-assurance';
-import type { PwaGraphExport } from '@janumipwb/rph-projections';
+import type { PwaGraphExport, PwaTypePart } from '@janumipwb/rph-projections';
 import type { ObservedProcessRun } from '../tools/process-run-observer.js';
 import { renderProcessResultReview } from './process-result-render.js';
 import {
 	declaredPolicyContentBudget,
 	processResultContentBudget,
-	processResultUntrustedSlices
+	processResultUntrustedSlices,
+	pwaTypeContentBudget
 } from './reasoning-review-validator.js';
-import { codePoints, headCutDeclaration, jsonLine } from './review-fence.js';
+import { codePoints, headCutDeclaration, headOf, jsonLine } from './review-fence.js';
 
 /** What the authoring floor knows about the draft it reviews. */
 export interface GraphReviewSource {
@@ -85,6 +86,78 @@ export function graphReviewInput(source: GraphReviewSource): ReasoningReviewInpu
 		...(source.rationale ? { rationale: source.rationale } : {}),
 		narration: source.narration ?? '',
 		...(source.priorGaps?.length ? { prior: { gaps: source.priorGaps } } : {})
+	};
+}
+
+/** ⭐⭐ The review in parts, B1 — what the authoring floor knows about ONE TYPE of the draft it reviews. */
+export interface PwaTypeReviewSource {
+	/** The ACTIVE `floor.reasoning-review` policy's criteria, read from the store by the caller (`reasoningReviewCriteria`). */
+	readonly criteria: readonly AssessmentCriterion[];
+	/** The request the PWA was authored from — the intent the producing agent was given. */
+	readonly prompt: string;
+	/** One part of the candidate's export: a type, with its place in the PWA (`pwaTypeParts`). */
+	readonly part: PwaTypePart;
+	/** Exact app-local semantic hash of the candidate reviewed in this run. */
+	readonly candidateSubjectHash?: string;
+	/** The §9.7 contracted account the producer RETURNED — one, for the whole PWA. Undefined = it declared none. */
+	readonly rationale?: ProfessionalRationaleSummary;
+	/** The producer's observable narration — §8.4 admits "other observable trace data". Never its interior. */
+	readonly narration?: string;
+	readonly priorGaps?: readonly string[];
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, the review in parts, B1 (`REG-D-125`; DESIGN-authoring-review-in-parts.md D1, D3) — THE ONE BUILDER OF
+ * A PART'S REVIEW INPUT: one type of an authored PWA, reviewed in the `PWA_TYPE` framing, its whole definition the subject and
+ * its place in the PWA the context (`pwaTypeParts`). ⛔ One reviewer reading the whole PWA saw about half of run-11's 16 types
+ * once their prompts and policies were exported (`REG-F-571`).
+ *
+ * ⭐ THE PART IS LINES OF JSON, ONE UNTRUSTED VALUE IN ONE FENCE (`REG-F-481`; `jsonLine`, so no authored byte can break a
+ * line): the SUBJECT, `{"subject":…}`; the CONTEXT, `{"context":…}`; then one line per child, `{"childSkeleton":…}`, in the
+ * order the type permits them. The request is the instruction slice, and the account, the narration and the prior findings
+ * are passed as the graph's are — bounded by the validator as today.
+ * ⭐ IT FITS THE BUDGET THE VALIDATOR'S OWN ASSEMBLER LEAVES IT (`pwaTypeContentBudget`, measured over the input without its
+ * content, in the key order it is returned in), and THE SUBJECT IS PROTECTED: a part over that budget has its children's
+ * skeletons cut child by child, each cut declared (`declaredPartCut`, `childSkeletonsCut`), and the subject and context lines
+ * never. ⚠ A part that cannot fit so is handed on whole, and the validator refuses it as incomplete — never head-cut.
+ */
+export function pwaTypeReviewInput(source: PwaTypeReviewSource): ReasoningReviewInput {
+	const head = {
+		criteria: source.criteria,
+		// ⭑ `R14` — DECLARED BY THE CALLER, never inferred from the subject.
+		framing: 'PWA_TYPE' as const,
+		prompt: source.prompt
+	};
+	// ⚠ As `graphReviewInput` passes them: the hash only when non-empty, the account when returned, the narration always,
+	// the prior findings when there are any.
+	const { candidateSubjectHash: hash, rationale: account, priorGaps: gaps } = source;
+	const tail = {
+		...(hash ? { candidateSubjectHash: hash } : {}),
+		...(account ? { rationale: account } : {}),
+		narration: source.narration ?? '',
+		...(gaps?.length ? { prior: { gaps } } : {})
+	};
+	const lines = partLines(source.part);
+	const whole = [lines.subject, lines.context, ...lines.children.map((c) => c.line)].join('\n');
+	const budget = pwaTypeContentBudget({ ...head, ...tail });
+	const cut = whole.length > budget ? childSkeletonsCut(lines, budget) : undefined;
+	return cut === undefined
+		? { ...head, content: whole, ...tail }
+		: { ...head, content: cut.content, declaredPartCut: cut.cut, ...tail };
+}
+
+/** A part as its review shows it: the subject's line, the context's line, and each child's line with its name and id. */
+interface PartLines {
+	readonly subject: string;
+	readonly context: string;
+	readonly children: readonly { readonly name: string; readonly id: string; readonly line: string }[];
+}
+
+function partLines(part: PwaTypePart): PartLines {
+	return {
+		subject: jsonLine({ subject: part.subject }),
+		context: jsonLine({ context: part.context }),
+		children: part.childSkeletons.map((s) => ({ name: s.name, id: s.id, line: jsonLine({ childSkeleton: s }) }))
 	};
 }
 
@@ -417,6 +490,48 @@ function workCutUnitByUnit(
 			workProducts.map((w, i) => ({ unit: w.unit, answer: encodedPrefix(w.answer, p.allowance[i]!) })),
 			commands.filter((_, i) => p.kept.has(i))
 		);
+		return cut.length + 1 + content.length <= limit ? { content, cut } : undefined;
+	}
+	return undefined;
+}
+
+/** The slice a cut of one child's skeleton declares: that child's skeleton, its name and its id JSON-encoded. */
+const skeletonSlice = (child: { readonly name: string; readonly id: string }): string =>
+	`the skeleton of the child ${jsonLine(child.name)} (${jsonLine(child.id)})`;
+
+/**
+ * ⭐⭐ The review in parts, B1 (design D3; `REG-F-564`'s general form, "cut unit by unit, with each cut declared") — A PART OVER
+ * ITS BUDGET, ITS CHILDREN'S SKELETONS CUT CHILD BY CHILD to fit `limit` (the declaration lines, a line feed, then the part, as
+ * a head-only cut's limit counts them). ⭐ THE SUBJECT AND CONTEXT LINES ARE KEPT WHOLE; each child's line is given an equal
+ * share of what they leave, or less where it needs less (`fairShares`, as a composite's work is shared), its HEAD kept within
+ * its share and its cut declared on a line of its own in code points (`REG-F-480`, `REG-F-483`). ⛔ Never one head cut across
+ * the children, which would keep the first and lose the later ones whole. ⚠ The declarations' room is reserved at the widest
+ * numbers each could state, and recomputed until the cuts it leaves need no more. ⚠ Undefined when even the subject and
+ * context, with a line feed for each child, do not fit: the part is then handed on whole, and the validator refuses it.
+ */
+function childSkeletonsCut(lines: PartLines, limit: number): { readonly content: string; readonly cut: string } | undefined {
+	const kept = `${lines.subject}\n${lines.context}`;
+	const frame = kept.length + lines.children.length;
+	const declarations = (shares: readonly number[], widest: boolean): string[] =>
+		lines.children.flatMap((c, i) => {
+			if (c.line.length <= shares[i]!) return [];
+			const total = codePoints(c.line);
+			const shown = widest ? total : codePoints(headOf(c.line, shares[i]!));
+			return [headCutDeclaration(skeletonSlice(c), shown, total, widest ? total : total - shown)];
+		});
+	let reserve = 0;
+	for (let round = 0; round <= lines.children.length + 1; round++) {
+		const shares = fairShares(
+			lines.children.map((c) => c.line.length),
+			limit - frame - reserve
+		);
+		const needed = declarations(shares, true).reduce((n, d) => n + d.length + 1, 0);
+		if (needed > reserve) {
+			reserve = needed;
+			continue;
+		}
+		const cut = declarations(shares, false).join('\n');
+		const content = [kept, ...lines.children.map((c, i) => headOf(c.line, shares[i]!))].join('\n');
 		return cut.length + 1 + content.length <= limit ? { content, cut } : undefined;
 	}
 	return undefined;
