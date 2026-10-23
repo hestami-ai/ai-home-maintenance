@@ -1199,8 +1199,9 @@ describe('⭐ the store, as the run reads it after every act (REG-F-540)', () =>
  * worst case, each try's review and each reviewed command's, (3 + 32) × 4 = 140; AND BEFORE THE RULE'S RE-RUN OF A STOPPED
  * PHASE'S REVIEW: a re-review's worst case, (1 + 32) × 4 = 132.~~ ⛔ `REG-D-114` (14), as amended 2026-10-16: a phase's whole
  * worst case would refuse every phase once about 306 calls are spent ⭐ (at the limit of 450; ~~at today's 600, once 456 are:
- * 600, less the 4 held back and the phase's 140~~ ⭐ at today's 650, once 506 are: 650, less the 4 held back and the phase's
- * 140, P6 package L, F1; `REG-D-120` Q15).
+ * 600, less the 4 held back and the phase's 140~~ ~~⭐ at today's 650, once 506 are: 650, less the 4 held back and the
+ * phase's 140, P6 package L, F1; `REG-D-120` Q15~~ ⭐ at today's 800, once 656 are: 800, less the 4 held back and the phase's
+ * 140, package Q, F5; `REG-D-123` Q26).
  * ⭐ `REG-D-114` (14), as amended 2026-10-16 — WHAT THE ONE RULE COUNTS BEFORE A PHASE, BEFORE THE RULE'S RE-RUN OF ITS WORK OR
  * OF ITS REVIEW, AND BEFORE A MODEL ROOT'S PRESS: ONE TRY'S RESERVE, a review of up to `reviewerCallsPerTry` calls — 4, D8's
  * own rule: the lane checks the limit again before every later press. ⛔ Restated, never read from the lane, so a figure the
@@ -2370,7 +2371,8 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		// fix round (F1) — ~~prior: PHASE7_PAID_LIMIT - 10, requirements recording 6~~: each phase counts ~~its worst case~~ ⭐
 		// one try's reserve (`REG-D-114` (14), as amended 2026-10-16), so the prior lets requirements through exactly at the
 		// limit, and requirements spends that reserve: the run then stands at the limit, with the same ~~446~~ ⭐ calls spent as before: the limit less the 4 held back, ~~596 at
-		// today's 600 (P5 package C, F2)~~ ⭐ 646 at today's 650 (P6 package L, F1; `REG-D-120` Q15).
+		// today's 600 (P5 package C, F2)~~ ~~⭐ 646 at today's 650 (P6 package L, F1; `REG-D-120` Q15)~~ ⭐ 796 at today's 800
+		// (package Q, F5; `REG-D-123` Q26).
 		const prior = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - TRY_RESERVE;
 		const l = laneOf({
 			paid: true,
@@ -2452,7 +2454,7 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		// ⭑ The last phase passed its check: ~~prior + 3 + 4, 13 under the limit~~ ~~⭐ R3-B's fix round (F1): prior + 0 + 4 + its
 		// worst case, at the limit~~ ⭐ `REG-D-114` (14), as amended: prior + 0 + 4 + one try's reserve, 8 under the limit. ⭐ The
 		// merge of E12 and E3 — each figure is stated against `PHASE7_PAID_LIMIT`, now ~~450 (`REG-D-110` (1))~~ ~~⭐ 600 (`REG-D-117` Q10;
-		// P5 package C, F2)~~ ⭐ 650 (`REG-D-120` Q15; P6 package L, F1): ~~210 + 3 + 4 = 217,
+		// P5 package C, F2)~~ ~~⭐ 650 (`REG-D-120` Q15; P6 package L, F1)~~ ⭐ 800 (`REG-D-123` Q26; package Q, F5): ~~210 + 3 + 4 = 217,
 		// under 230~~.
 		expect(record.units[4]!.limitCheck?.allowed, 'arrangement: the last phase passes its check').toBe(true);
 		// ⭐ requirements (2 policies): prior + ~~4~~ ~~128~~ 0 + 4 + 8, 4 under the limit, pressed; design (4): 4 over it, held
@@ -2569,8 +2571,9 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		// ⛔ PREDICTED RED, read from the code: before a phase the one rule counted the phase's WORST CASE, a model unit's 140
 		// (R3-B's fix round, F1), so a phase whose one try's reserve reaches the limit exactly was held back — as every phase
 		// would be once about 306 calls are spent ⭐ (at the limit of 450; ~~at today's 600, once 456 are: 600, less the 4 held back
-		// and the phase's 140~~ ⭐ at today's 650, once 506 are: 650, less the 4 held back and the phase's 140, P6 package L, F1;
-		// `REG-D-120` Q15) (`REG-D-114` (14), as amended 2026-10-16). ⭑ Every phase is scripted, so a lane
+		// and the phase's 140~~ ~~⭐ at today's 650, once 506 are: 650, less the 4 held back and the phase's 140, P6 package L, F1;
+		// `REG-D-120` Q15~~ ⭐ at today's 800, once 656 are: 800, less the 4 held back and the phase's 140, package Q, F5;
+		// `REG-D-123` Q26) (`REG-D-114` (14), as amended 2026-10-16). ⭑ Every phase is scripted, so a lane
 		// that presses one past the limit runs on and is caught here by the assertion, not by a script that has no press for it.
 		const prior = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - TRY_RESERVE;
 		const l = laneOf({
@@ -2778,8 +2781,8 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		expect([left.rerunDeclared, left.refused?.act, notOffered.only('rerunDeclared')]).toEqual([null, 'Record Assurance', []]);
 		// ⭐ The limit read before the re-run stops it, as before a phase: recorded, the run ends `paid-limit`, and the lane stops
 		// there — the root's sign-off, prior + 12 + 4 + 8, 6 under the limit, which would fit, is never attempted. ⭐ The merge
-		// of E12 and E3 — stated against `PHASE7_PAID_LIMIT`, now ~~450~~ ~~⭐ 600 (`REG-D-117` Q10; P5 package C, F2)~~ ⭐ 650
-		// (`REG-D-120` Q15; P6 package L, F1):
+		// of E12 and E3 — stated against `PHASE7_PAID_LIMIT`, now ~~450~~ ~~⭐ 600 (`REG-D-117` Q10; P5 package C, F2)~~ ~~⭐ 650
+		// (`REG-D-120` Q15; P6 package L, F1)~~ ⭐ 800 (`REG-D-123` Q26; package Q, F5):
 		// ~~200 + 12 + 4 + 8 = 224~~. ⭐ R3-B's fix round (F1) —
 		// ~~prior: PHASE7_PAID_LIMIT - 30~~: each phase counts ~~its worst case~~ ⭐ one try's reserve (`REG-D-114` (14), as
 		// amended 2026-10-16), so the calls before the sign-offs are spent before the run, or in its last phase

@@ -955,23 +955,33 @@ describe('⭐ P7-2 D4 — the Phase 7 lane waits an ALLOWANCE derived from the b
 	// becomes about 650"*. The number is read from the label the sponsor chose, and its meaning must name the same; ~~REG-D-117
 	// Q10's chosen text, "the limit rises to about 600."~~ — superseded: its 600 was the qualification's, P5's re-run's and the
 	// negative control's. The promise is unchanged.
-	it('⭐ D8 — the paid limit is the sponsor’s, read from the ruling in force, REG-D-120 Q15, which raises REG-D-110 (1)’s', () => {
+	// ⭐ `JAN-EXEC` Phase 7 after P6's third run, package Q (F5; 2026-10-23) — THE RULING IN FORCE IS NOW `REG-D-123` Q26, which
+	// raises `REG-D-110` (1)'s limit again: the sponsor chose *"Raise the limit to about 800 (Recommended)"*, and its meaning
+	// says *"`REG-D-110` (1)'s limit becomes about 800"*. The number is read from the label the sponsor chose, whose words are
+	// not Q15's (*"Raise to about 650"*), and the meaning from Q26's own MEANING; ~~REG-D-120 Q15's chosen label, "Raise to
+	// about 650 (Recommended)"~~ — superseded: its 650 left about 111 calls after the 539 spent, short of the about 140 P6
+	// costs with the agent's 16-type PWA (Q26's question). The promise is unchanged.
+	it('⭐ D8 — the paid limit is the sponsor’s, read from the ruling in force, REG-D-123 Q26, which raises REG-D-110 (1)’s', () => {
 		const register = readFileSync(REGISTER, 'utf8');
 		const entry = (id: string) => {
 			const at = register.indexOf(`### ${id} `);
-			return register.slice(at, register.indexOf('\n### ', at + 1));
+			// ⭑ The ruling in force may be the register's last entry, with no heading after it.
+			const next = register.indexOf('\n### ', at + 1);
+			return register.slice(at, next === -1 ? undefined : next);
 		};
 		expect(entry('REG-D-110'), 'REG-D-110 does not amend REG-D-102 (4)').toContain('(`REG-D-102` (4) amended)');
-		const q15 = entry('REG-D-120')
+		const q26 = entry('REG-D-123')
 			.split('\n- ')
-			.find((item) => item.startsWith('**Q15.**'));
-		expect(q15, 'REG-D-120 records no Q15').toBeDefined();
-		const chosen = /the sponsor chose \*"Raise to about (\d+) \(Recommended\)"\*/.exec(q15!)?.[1];
-		expect(chosen, 'the label the sponsor chose in REG-D-120 Q15 states no limit').toBeDefined();
-		expect(q15, 'REG-D-120 Q15’s meaning does not raise REG-D-110 (1)’s limit to the number chosen').toContain(
+			.find((item) => item.startsWith('**Q26.**'));
+		expect(q26, 'REG-D-123 records no Q26').toBeDefined();
+		const chosen = /the sponsor chose \*"Raise the limit to about (\d+) \(Recommended\)"\*/.exec(q26!)?.[1];
+		expect(chosen, 'the label the sponsor chose in REG-D-123 Q26 states no limit').toBeDefined();
+		const meaning = q26!.split('\n  - ').find((part) => part.startsWith('**MEANING.**'));
+		expect(meaning, 'REG-D-123 Q26 records no MEANING').toBeDefined();
+		expect(meaning, 'REG-D-123 Q26’s meaning does not raise REG-D-110 (1)’s limit to the number chosen').toContain(
 			`\`REG-D-110\` (1)'s limit becomes about ${chosen}.`
 		);
-		expect(PHASE7_PAID_LIMIT, 'the lane’s limit is not the one the sponsor chose (REG-D-120 Q15)').toBe(Number(chosen));
+		expect(PHASE7_PAID_LIMIT, 'the lane’s limit is not the one the sponsor chose (REG-D-123 Q26)').toBe(Number(chosen));
 	});
 
 	it('⭐ D8 — the reserve is the negative control’s own cap on reviewer calls (P7-4e)', () => {

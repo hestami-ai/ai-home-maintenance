@@ -603,14 +603,16 @@ export const PHASE7_TEST_TIMEOUT_MS =
  * (`PHASE7_REREVIEW_REVIEWER_CALLS`). So a phase is started only while the calls spent before the run and those recorded
  * in it total at most 306: 450, less the 4 held back and the phase's 140.~~ ⛔ `REG-D-114` (14), as amended 2026-10-16: a
  * phase's whole worst case would refuse every phase once about 306 calls are spent ⭐ (at the limit of 450; ~~at today's
- * 600, once 456 are: 600, less the 4 held back and the phase's 140~~ ⭐ at today's 650, once 506 are: 650, less the 4 held
- * back and the phase's 140, P6 package L, F1; `REG-D-120` Q15). ⭐ What each act counts, by the one rule
+ * 600, once 456 are: 600, less the 4 held back and the phase's 140~~ ~~⭐ at today's 650, once 506 are: 650, less the 4
+ * held back and the phase's 140, P6 package L, F1; `REG-D-120` Q15~~ ⭐ at today's 800, once 656 are: 800, less the 4 held
+ * back and the phase's 140, package Q, F5; `REG-D-123` Q26). ⭐ What each act counts, by the one rule
  * as amended: before a phase's Begin & Execute, the rule's re-run of its work or of its review, and a MODEL root's press,
  * ONE TRY'S RESERVE (`PHASE7_TRY_RESERVE`), D8's own rule, for the lane checks again before every later press; before a
  * sign-off and the rule's re-run of its declared reviews, that act's worst case; before Send, the authoring floor's. So a
  * phase is started while the calls spent before the run and those recorded in it total at most ~~442: 450, less the 4 held
- * back and the phase's 4~~ ~~⭐ 592: 600, less the 4 held back and the phase's 4 (P5 package C, F2; `REG-D-114` (14))~~ ⭐
- * 642: 650, less the 4 held back and the phase's 4 (P6 package L, F1; `REG-D-114` (14)) — ⚠ and
+ * back and the phase's 4~~ ~~⭐ 592: 600, less the 4 held back and the phase's 4 (P5 package C, F2; `REG-D-114` (14))~~ ~~⭐
+ * 642: 650, less the 4 held back and the phase's 4 (P6 package L, F1; `REG-D-114` (14))~~ ⭐ 792: 800, less the 4 held back
+ * and the phase's 4 (package Q, F5; `REG-D-114` (14)) — ⚠ and
  * a phase's own spend can carry the total past the limit, since nothing is checked during a
  * press (`PHASE7_UNIT_REVIEWER_CALLS`), which the run report says. ~~150 (`REG-D-102` (4))~~ ~~200: *"Raise limit to 200"* (`REG-D-105` (1), which amends
  * `REG-D-102` (4)); it covers the re-qualification, the re-run and a few recovery re-runs.~~ ~~230: *"the limit rises
@@ -621,13 +623,17 @@ export const PHASE7_TEST_TIMEOUT_MS =
  * 2026-10-18) — 600: the sponsor chose *"Qualify High, then P5 (Recommended)"*, whose text read *"Through P6 the total is
  * about 580, so the limit rises to about 600."* (`REG-D-117` Q10), raising `REG-D-110` (1)'s limit for the rest of the
  * programme — the qualification of `glm-5-3-flash-high`, P5's re-run and half B (P6) — held as the number the sponsor's
- * chosen text states.~~ ⭐ `JAN-EXEC` Phase 7 P6, package L (F1; 2026-10-22) — 650: the sponsor chose *"Raise to about 650
+ * chosen text states.~~ ~~⭐ `JAN-EXEC` Phase 7 P6, package L (F1; 2026-10-22) — 650: the sponsor chose *"Raise to about 650
  * (Recommended)"*, whose text read *"Room for P6 to finish even with a retry or two. Its spend still reports before P7."*
  * (`REG-D-120` Q15, asked before half B, P6), and its meaning reads *"`REG-D-110` (1)'s limit becomes about 650"* — held
- * as the number the sponsor's chosen label states. ⚠ Each paid step still reports before the next (`REG-D-110` (1)): the
- * limit is the programme's ceiling, not a step's approval.
+ * as the number the sponsor's chosen label states.~~ ⭐ `JAN-EXEC` Phase 7 after P6's third run, package Q (F5; 2026-10-23)
+ * — 800: the sponsor chose *"Raise the limit to about 800 (Recommended)"*, whose text read *"Enough for the full
+ * agent-authored PWA plus a retry or two. P6 still reports back before P7."* (`REG-D-123` Q26, asked after P6's third run,
+ * half B, run-11), and its meaning reads *"`REG-D-110` (1)'s limit becomes about 800"* — held as the number the sponsor's
+ * chosen label states. ⚠ Each paid step still reports before the next (`REG-D-110` (1)): the limit is the programme's
+ * ceiling, not a step's approval.
  */
-export const PHASE7_PAID_LIMIT = 650;
+export const PHASE7_PAID_LIMIT = 800;
 
 /** ⭐ D8 — the reviewer calls held back for the negative control (P7-4e): its own cap (`negative-control.ts`). */
 export const PHASE7_NEGATIVE_CONTROL_RESERVE = 4;
@@ -752,10 +758,11 @@ export const PHASE7_UNIT_REVIEWER_CALLS =
  * phase's Begin & Execute, the rule's re-run of its work or of its review, and a MODEL root's press — one review of up to
  * `reviewerCallsPerTry` calls, 4: D8's own rule, for the lane checks the limit again before every later press. ⛔ Counted
  * instead of the act's whole worst case (`PHASE7_UNIT_REVIEWER_CALLS`, 140), which would refuse every phase once about ~~306~~
- * ~~⭐ 456~~ ⭐ 506 calls are spent (306 at the limit of 450, 456 at 600). ⚠ So a press is let through while one try's review
- * fits, and what it spends after that is not checked until the next press: a phase's own spend can carry the total past
- * the limit (the sponsor's limit is ~~"about 450", `REG-D-110` (1)~~ ~~⭐ "about 600", `REG-D-117` Q10, raising `REG-D-110`
- * (1)'s~~ ⭐ "about 650", `REG-D-120` Q15, raising `REG-D-110` (1)'s).
+ * ~~⭐ 456~~ ~~⭐ 506~~ ⭐ 656 calls are spent (306 at the limit of 450, 456 at 600, 506 at 650). ⚠ So a press is let through
+ * while one try's review fits, and what it spends after that is not checked until the next press: a phase's own spend can
+ * carry the total past the limit (the sponsor's limit is ~~"about 450", `REG-D-110` (1)~~ ~~⭐ "about 600", `REG-D-117` Q10,
+ * raising `REG-D-110` (1)'s~~ ~~⭐ "about 650", `REG-D-120` Q15, raising `REG-D-110` (1)'s~~ ⭐ "about 800", `REG-D-123` Q26,
+ * raising `REG-D-110` (1)'s).
  */
 export const PHASE7_TRY_RESERVE = LANE_BUDGET.reviewerCallsPerTry;
 

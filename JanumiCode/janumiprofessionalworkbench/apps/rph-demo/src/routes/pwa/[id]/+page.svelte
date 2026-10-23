@@ -1933,6 +1933,23 @@
 									<span class="leafkind">no instruction is authored for this type</span>
 								{/if}
 							</p>
+							<!-- ⭐ `REG-F-503` remedy 2 (`REG-D-123` Q25; `DESIGN-phase-7-completion.md` §4c, F2) — AND WHAT IT SAYS. Beside
+							     a staged candidate the form is hidden, so this panel is where the person accepting its exact hash reads
+							     each prompt: its text and output contract as stored, as plain text with their line breaks and indentation
+							     kept. An absent output contract is said to be absent, never shown as an empty one. -->
+							{#if current.promptTemplate}
+								<span class="promptpart">Text</span>
+								<pre class="prompttext" data-testid="inspector-prompt-text">{current.promptTemplate.templateText}</pre>
+								<span class="promptpart">Output contract</span>
+								{#if current.promptTemplate.outputContract !== undefined}
+									<pre class="prompttext" data-testid="inspector-prompt-contract">{current.promptTemplate.outputContract}</pre>
+								{:else}
+									<p data-testid="inspector-prompt-contract-none">
+										<span class="promptbadge none">NONE</span>
+										<span class="leafkind">no output contract is authored for this prompt</span>
+									</p>
+								{/if}
+							{/if}
 						</div>
 						<div class="field">
 							<span class="flabel">Completion rule</span><p class="mono">{current.completionRule || '—'}</p>
@@ -3106,6 +3123,28 @@
 	.leafkind {
 		color: var(--outline);
 		font-size: 11px;
+	}
+	/* ⭐ `REG-F-503` remedy 2 — a prompt's text and output contract as stored: `pre-wrap` keeps their line breaks and
+	   indentation and wraps a long line, and a long prompt scrolls inside its box. */
+	.promptpart {
+		display: block;
+		margin-top: 6px;
+		color: var(--outline);
+		font-size: 11px;
+	}
+	.prompttext {
+		margin: 2px 0 0;
+		padding: 0.4rem 0.5rem;
+		background: rgba(127, 127, 127, 0.08);
+		border-radius: 3px;
+		color: var(--on-variant);
+		font-family: 'Source Code Pro', monospace;
+		font-size: 11.5px;
+		line-height: 1.45;
+		white-space: pre-wrap;
+		word-break: break-word;
+		max-height: 16rem;
+		overflow: auto;
 	}
 	.assurancerail {
 		border-left: 2px solid var(--assurance-border);
