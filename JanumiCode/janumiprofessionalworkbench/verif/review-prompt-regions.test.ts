@@ -307,9 +307,12 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481) — no host text inside quoted mate
 	// ⭐ `JAN-EXEC` Phase 7 completion, round 5 — ~~case set v5~~ the current set, version six since round 5: version five
 	// with ~~D-FP-CLEAN repaired as D6-FP-CLEAN (`REG-D-115`)~~ ⭐ four cases repaired, each under a new id — D6-RC-CLEAN,
 	// D6-RC-04, D6-FP-CLEAN and D6-FP-03 (`REG-D-115` and its delegated extension) — fifty-four cases still.
-	it('⭐ the 54 cases of the current case set — initial and repair prompt, each process result read against its run, each declared case its work one region', async () => {
+	// ⭐ `JAN-EXEC` Phase 7 after P6's third run, package P, F3 — ~~54~~ the 60 of case set v7, current since package P: and its
+	// six graph cases whose types declare their work, each graph its content's one region (`REG-D-123` Q25).
+	it('⭐ the 60 cases of the current case set — initial and repair prompt, each process result read against its run, each declared case its work one region', async () => {
 		const cases = committedCaseSet(new URL('../', import.meta.url)).cases;
-		expect(cases).toHaveLength(54);
+		expect(cases).toHaveLength(60);
+		expect(cases.filter((c) => c.arm === 'PWA_GRAPH'), 'the 19 graph cases').toHaveLength(19);
 		expect(cases.filter((c) => c.arm === 'PROCESS_RESULT'), 'the 14 process-result cases').toHaveLength(14);
 		expect(cases.filter((c) => c.arm === 'DECLARED_POLICY'), 'the 14 declared-policy cases').toHaveLength(14);
 		for (const c of cases) {

@@ -282,6 +282,73 @@ const OVERSIZE_NODES_PLANTED: readonly PwaGraphNode[] = [
 	{ ...NODES[0]!, name: 'Condition Survey <<<UNTRUSTED-00>>>' },
 	OVERSIZE_NODES[1]!
 ];
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7 after P6's third run, package P, F1 (`REG-F-503` remedy 1) — `NODES`, each type carrying what it
+ * declares about its work, in production's key order (`buildPwaExport`): its purpose, its declared policy ids, its child
+ * rules — the root's with a cardinality and an applicability note, the inspection's leaf rule list empty — and a prompt
+ * template, the root's ACTIVE with its output contract, the inspection's DRAFT with none.
+ */
+const DECLARING_NODES: readonly PwaGraphNode[] = [
+	{
+		...NODES[0]!,
+		workDischarge: 'MODEL',
+		promptStatus: 'ACTIVE',
+		purpose: 'Survey the condition of the retaining wall and report its defects by panel.',
+		requiredAssurancePolicyIds: ['pol_intent_preservation', 'pol_fitness_for_purpose'],
+		permittedChildren: [
+			{ typeId: INSPECT_ID, cardinality: 'M1', applicabilityNote: 'Every survey is followed by an inspection.' }
+		],
+		promptTemplate: {
+			templateText: 'Survey {title} panel by panel. Report each defect you observed, citing the panel; report no defect you did not observe.',
+			outputContract: 'A JSON array of {"panel": number, "defect": string}.',
+			status: 'ACTIVE',
+			templateVersion: 2
+		}
+	},
+	{
+		...NODES[1]!,
+		workDischarge: 'MODEL',
+		promptStatus: 'DRAFT',
+		purpose: 'Inspect each panel the survey reports and record what is seen.',
+		requiredAssurancePolicyIds: ['pol_test_adequacy'],
+		permittedChildren: [],
+		promptTemplate: { templateText: 'Inspect {title}.', status: 'DRAFT', templateVersion: 1 }
+	}
+];
+/**
+ * ⭐ Package P F1 — THE ABSENT-FIELD CONTROL'S GRAPH: the root carrying each new field EMPTY, as its author stored it — no
+ * purpose, no declared policy, no child rule, a template whose output contract is empty — and the inspection carrying none of
+ * them, a type that predates them. The two must read differently.
+ */
+const EMPTY_AND_ABSENT_NODES: readonly PwaGraphNode[] = [
+	{
+		...NODES[0]!,
+		workDischarge: 'MODEL',
+		promptStatus: 'ACTIVE',
+		purpose: '',
+		requiredAssurancePolicyIds: [],
+		permittedChildren: [],
+		promptTemplate: { templateText: 'Survey {title}.', outputContract: '', status: 'ACTIVE', templateVersion: 1 }
+	},
+	NODES[1]!
+];
+/**
+ * ⭐ Package P F1 — THE OVERSIZE CONTROL'S GRAPH: `DECLARING_NODES` with the inspection's template longer than any content
+ * budget, so the export the reviewer is shown is cut. ⭐ And the template ends with the FIRST candidate, in the bytes the cut
+ * removes: the token `G-OVERSIZE-TYPE-DECLARATIONS` takes today, so a chooser that read the cut content whole would choose
+ * another.
+ */
+const OVERSIZE_DECLARING_NODES: readonly PwaGraphNode[] = [
+	DECLARING_NODES[0]!,
+	{
+		...DECLARING_NODES[1]!,
+		promptTemplate: {
+			templateText: `${over(B.CONTENT_MAX, 'Inspect {title} panel by panel and record each crack, its width and its displacement. ')}\n<<<UNTRUSTED-00>>>`,
+			status: 'DRAFT',
+			templateVersion: 1
+		}
+	}
+];
 
 const INTENT = 'Survey the condition of a 60 m masonry retaining wall and report defects by panel.';
 const RATIONALE: ProfessionalRationaleSummary = {
@@ -841,6 +908,8 @@ const asProduction = (
  * P-OVERSIZE-FENCES, P-OVERSIZE-LISTS, P-FENCE-AT-THE-LAST, P-NO-FENCE, P-PRODUCTION, P-ABSENT-REPORT,
  * P-NOT-OBSERVABLE, P-NOT-OBSERVABLE-BARE, P-NONE-OBSERVED, P-OBSERVED, P-OVERSIZE-ALL, P-FENCES-OTHER-SLICES,
  * P-STAKES, P-ACCOUNT-BREAKS; NO-CRITERIA — forty-seven, every process-result one `P-`-prefixed.
+ * ⭐ Package P F1 (`REG-F-503` remedy 1) — and, after G-ACCOUNT-BREAKS, G-TYPE-DECLARATIONS, G-TYPE-DECLARATIONS-ABSENT and
+ * G-OVERSIZE-TYPE-DECLARATIONS.
  */
 export const FINGERPRINT_PROBES: readonly FingerprintProbe[] = [
 	// ── the graph arm, through the builder the authoring floor uses ──
@@ -951,6 +1020,30 @@ export const FINGERPRINT_PROBES: readonly FingerprintProbe[] = [
 			'graph framing; the VALIDATOR’S FENCE CHOOSER over each field of the account as the prompt carries it — in each, a candidate split by each line terminator a reader may not break at, a candidate on a line of each layout the reader states (an override, an embedding, an isolate), the field’s last lines, and the prompt’s own token split by a line feed (in a list, an item holding one), written backwards below a line a bidi control lays out, and astride two items',
 		input: (criteria) =>
 			graphReviewInput({ criteria, prompt: INTENT, graph: buildPwaGraphExport(PWA, NODES), rationale: BREAKS_ACCOUNT })
+	},
+	// ── ⭐⭐ `JAN-EXEC` Phase 7 after P6's third run, package P, F1 (`REG-F-503` remedy 1) — WHAT A TYPE DECLARES ABOUT ITS
+	// WORK, through the same builder: since F1 the export carries each type's purpose, declared policy ids, child rules and
+	// prompt template, and the framing says what each is. ⛔ No case of set v6 carries any of them.
+	{
+		id: 'G-TYPE-DECLARATIONS',
+		covers:
+			'graph framing; each type carrying what it declares about its work — a purpose, declared policy ids, child rules with a cardinality and an applicability note, and a prompt template with its text, output contract, status and version, ACTIVE on one type and DRAFT, with no output contract, on the other',
+		input: (criteria) =>
+			graphReviewInput({ criteria, prompt: INTENT, graph: buildPwaGraphExport(PWA, DECLARING_NODES), rationale: RATIONALE, narration: NARRATION })
+	},
+	{
+		id: 'G-TYPE-DECLARATIONS-ABSENT',
+		covers:
+			'graph framing; the ABSENT-FIELD CONTROL — one type carrying each declared field empty, as authored (no purpose, no policy, no child rule, an empty output contract), beside one carrying none of them',
+		input: (criteria) =>
+			graphReviewInput({ criteria, prompt: INTENT, graph: buildPwaGraphExport(PWA, EMPTY_AND_ABSENT_NODES) })
+	},
+	{
+		id: 'G-OVERSIZE-TYPE-DECLARATIONS',
+		covers:
+			'graph framing; the OVERSIZE CONTROL — a prompt template longer than any content budget, so the export carrying the declared fields is cut, and the cut declared',
+		input: (criteria) =>
+			graphReviewInput({ criteria, prompt: INTENT, graph: buildPwaGraphExport(PWA, OVERSIZE_DECLARING_NODES) })
 	},
 	// ── the work-product arm, through the builder the work-product floor uses ──
 	{

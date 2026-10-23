@@ -21,8 +21,14 @@ import { ontology, validateOntology } from '@janumipwb/rph-product-realization-p
 import { SqliteArtifactStore, SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { createInMemoryArtifactStore, type ArtifactStore } from '@janumipwb/rph-ports';
 import { PwaAuthoringBroker } from '@janumipwb/rph-authoring';
-import { buildPwaGraphExport, type PwaGraphExport } from '@janumipwb/rph-projections';
-import { makeRphError, type CommandResult, type DomainCommand } from '@janumipwb/rph-contracts';
+import { buildPwaGraphExport, type PwaGraphExport, type PwaGraphNode } from '@janumipwb/rph-projections';
+import {
+	makeRphError,
+	type CommandResult,
+	type DomainCommand,
+	type PermittedChildRule,
+	type PromptTemplate
+} from '@janumipwb/rph-contracts';
 import { monotonicFactory } from 'ulid';
 import {
 	AGENT_CREDENTIAL,
@@ -684,6 +690,45 @@ const promptPart = (
 	return status === 'ACTIVE' || status === 'DRAFT' ? { promptStatus: status } : {};
 };
 
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7 after P6's third run, package P, F1 (`REG-F-503` remedy 1; `REG-D-123` Q25) — WHAT THE TYPE
+ * DECLARES ABOUT ITS WORK, as a spread-ready fragment: its purpose, its declared policy ids, its child rules and its prompt
+ * template, each read from the stored type. ⛔ The whole-PWA reviewer was shown none of them (`REG-F-503`).
+ * ⚠ ABSENT STAYS ABSENT, AND AN AUTHORED EMPTY VALUE STAYS AUTHORED: a field the stored type does not hold is left out, and
+ * a stored `''` or `[]` is carried as it is. A type with no template carries none — an empty one would report an
+ * instruction nobody wrote. Of the template, its text and output contract with its status and version.
+ */
+const declaredPart = (
+	state: Readonly<Record<string, unknown>>
+): Pick<PwaGraphNode, 'purpose' | 'requiredAssurancePolicyIds' | 'permittedChildren' | 'promptTemplate'> => {
+	const template = state.promptTemplate as PromptTemplate | undefined;
+	return {
+		...(typeof state.purpose === 'string' ? { purpose: state.purpose } : {}),
+		...(Array.isArray(state.requiredAssurancePolicyIds)
+			? { requiredAssurancePolicyIds: [...(state.requiredAssurancePolicyIds as string[])] }
+			: {}),
+		...(Array.isArray(state.permittedChildren)
+			? {
+					permittedChildren: (state.permittedChildren as PermittedChildRule[]).map((r) => ({
+						typeId: r.typeId,
+						cardinality: r.cardinality,
+						...(r.applicabilityNote !== undefined ? { applicabilityNote: r.applicabilityNote } : {})
+					}))
+				}
+			: {}),
+		...(template !== undefined
+			? {
+					promptTemplate: {
+						templateText: template.templateText,
+						...(template.outputContract !== undefined ? { outputContract: template.outputContract } : {}),
+						status: template.status,
+						templateVersion: template.templateVersion
+					}
+				}
+			: {})
+	};
+};
+
 /** The current PWA's PWU-Type graph as the canonical export a judge reads (engine truth, not the render model).
  *  `pwaVersion` (optional) scopes the node set to ONE version of the PWA: `listPwuTypes` filters by pwaId only, but a
  *  PWU_TYPE binds to a VERSIONED PWA (RPH-CON-009), so a republished PWA has two versions' types under one pwaId —
@@ -718,7 +763,10 @@ export function buildPwaExport(
 		// would tell every reviewer that a type PREDATING the question had been ASKED and DEFERRED — the exact
 		// collapse `workDischarge` was introduced to remove, re-created at the surface that reports it.
 		...dischargePart(t.state),
-		...promptPart(t.state)
+		...promptPart(t.state),
+		// ⭐⭐ package P F1 (`REG-F-503` remedy 1) — and what the type declares about its work, after the fields above, each
+		// carried as stored or left out (`declaredPart`).
+		...declaredPart(t.state)
 	}));
 	return buildPwaGraphExport(
 		{

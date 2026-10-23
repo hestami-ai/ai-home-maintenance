@@ -869,6 +869,51 @@ describe('JAN-CRITREAD J2-3 — the probe set reaches every branch of prompt ass
 		expect(prompt('G-DECLARED').includes('(NOT DECLARED'), 'a declared account renders as itself').toBe(false);
 	});
 
+	// ⭐⭐ `JAN-EXEC` Phase 7 after P6's third run, package P, F1 (`REG-F-503` remedy 1; DESIGN-phase-7-completion.md §4c) —
+	// THE EXPORT'S NEW FIELDS, PROBED THROUGH THE GRAPH BUILDER. The graph cases of case set v6 carry none of them, and a case's
+	// prompt stands beside the reviewer fingerprint, not in it (`fingerprint.ts`): without probes that carry them, a change to
+	// how the reviewer is shown a type's declared policies, purpose, child rules or prompt would move no probe's prompt, and so
+	// not the fingerprint.
+	it('⭐⭐ package P F1 (REG-F-503 remedy 1) — the G probes carry what a type declares about its work: every field present, an authored empty value beside an absent one, and the content cut', () => {
+		const graph = FINGERPRINT_PROBES.filter((p) => p.id.startsWith('G-')).map((p) => p.id);
+		for (const needle of [
+			'"purpose":"Survey',
+			'"requiredAssurancePolicyIds":["',
+			'"permittedChildren":[{"typeId":"',
+			'"applicabilityNote":"',
+			'"promptTemplate":{"templateText":"',
+			'"outputContract":"',
+			'"status":"ACTIVE","templateVersion":',
+			'"status":"DRAFT","templateVersion":'
+		])
+			expect(graph.some((id) => prompt(id).includes(needle)), needle).toBe(true);
+		// ⭐ THE ABSENT-FIELD CONTROL — one type carrying each field EMPTY, as authored, beside one carrying none of them.
+		const declared = (id: string) => {
+			const input = FINGERPRINT_PROBES.find((p) => p.id === id)?.input(PRODUCT_SEAMS.criteria, PRODUCT_SEAMS.processResult);
+			expect(input, `probe ${id}`).toBeDefined();
+			return (JSON.parse(input!.content) as { nodes: Record<string, unknown>[] }).nodes.map((n) => ({
+				purpose: n.purpose,
+				requiredAssurancePolicyIds: n.requiredAssurancePolicyIds,
+				permittedChildren: n.permittedChildren,
+				outputContract: (n.promptTemplate as { outputContract?: unknown } | undefined)?.outputContract,
+				absent: ['purpose', 'requiredAssurancePolicyIds', 'permittedChildren', 'promptTemplate'].filter((k) => !(k in n))
+			}));
+		};
+		expect(declared('G-TYPE-DECLARATIONS-ABSENT')).toEqual([
+			{ purpose: '', requiredAssurancePolicyIds: [], permittedChildren: [], outputContract: '', absent: [] },
+			{
+				purpose: undefined,
+				requiredAssurancePolicyIds: undefined,
+				permittedChildren: undefined,
+				outputContract: undefined,
+				absent: ['purpose', 'requiredAssurancePolicyIds', 'permittedChildren', 'promptTemplate']
+			}
+		]);
+		// ⭐ THE OVERSIZE CONTROL — a prompt template longer than any content budget: the content is cut, and the cut declared.
+		expect(prompt('G-OVERSIZE-TYPE-DECLARATIONS'), 'the content cut, and declared').toContain(`\n${CUT_DECLARED}the artifact — `);
+		expect(prompt('G-TYPE-DECLARATIONS').includes(CUT_DECLARED), 'G-TYPE-DECLARATIONS is seen whole').toBe(false);
+	});
+
 	it('⭐⭐ P5 package D (REG-D-118 (1)) — THE ARRANGEMENT: D-ROOT-UNITS-WITHOUT-WORK names both units on host lines, its `00` on the second’s alone; D-OVERSIZE-UNITS declares a cut of one unit’s work product and of another’s commands past its first, and shows the third whole; D-OVERSIZE-UNIT-TITLE’s `00` stands in its commands cut’s declaration alone; each planted probe is fenced by `01`', () => {
 		const linesOf = (id: string) => prompt(id).split('\n');
 		const fenceOf = (lines: readonly string[]) => lines.find((l) => FENCE_LINE.test(l));

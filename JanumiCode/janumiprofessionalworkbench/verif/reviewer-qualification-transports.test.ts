@@ -1245,13 +1245,14 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 			// ⭐ `JAN-EXEC` Phase 7 completion E2 — version five, current since E2 (~~4, 4~~).
 			// ⭐ Round 5 — version six, current since round 5: ~~D-FP-CLEAN repaired~~ ⭐ four cases repaired, D6-RC-CLEAN,
 			// D6-RC-04, D6-FP-CLEAN and D6-FP-03 (`REG-D-115` and its delegated extension) (~~5, 5~~).
-		).toEqual({ caseSetVersion: 6, oracleVersion: 6 });
+			// ⭐ Package P F3 — version seven, current since package P: six graph cases added (`REG-D-123` Q25) (~~6, 6~~).
+		).toEqual({ caseSetVersion: 7, oracleVersion: 7 });
 		// …which are the versions of the files `cases.ts` names current — the ones the check holds coverage to.
 		expect([
 			CURRENT_SET.caseSetVersion,
 			CURRENT_ORACLE_SET.oracleVersion,
 			CURRENT_ORACLE_SET.caseSetVersion
-		]).toEqual([6, 6, 6]);
+		]).toEqual([7, 7, 7]);
 		expect(spawned, 'one call, captured').toHaveLength(1);
 	});
 

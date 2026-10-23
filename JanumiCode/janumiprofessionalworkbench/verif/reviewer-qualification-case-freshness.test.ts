@@ -18,12 +18,14 @@ import {
 	CASE_SET_V4_FILE,
 	CASE_SET_V5_FILE,
 	CASE_SET_V6_FILE,
+	CASE_SET_V7_FILE,
 	ORACLES_V1_FILE,
 	ORACLES_V2_FILE,
 	ORACLES_V3_FILE,
 	ORACLES_V4_FILE,
 	ORACLES_V5_FILE,
 	ORACLES_V6_FILE,
+	ORACLES_V7_FILE,
 	serializeGenerated,
 	type CaseSet
 } from '../scripts/reviewer-qual/cases.js';
@@ -33,12 +35,14 @@ import { CASE_SET_V3 } from '../scripts/reviewer-qual/case-set-v3.js';
 import { CASE_SET_V4 } from '../scripts/reviewer-qual/case-set-v4.js';
 import { CASE_SET_V5 } from '../scripts/reviewer-qual/case-set-v5.js';
 import { CASE_SET_V6 } from '../scripts/reviewer-qual/case-set-v6.js';
+import { CASE_SET_V7 } from '../scripts/reviewer-qual/case-set-v7.js';
 import { ORACLES_V1 } from '../scripts/reviewer-qual/oracles-v1.js';
 import { ORACLES_V2 } from '../scripts/reviewer-qual/oracles-v2.js';
 import { ORACLES_V3 } from '../scripts/reviewer-qual/oracles-v3.js';
 import { ORACLES_V4 } from '../scripts/reviewer-qual/oracles-v4.js';
 import { ORACLES_V5 } from '../scripts/reviewer-qual/oracles-v5.js';
 import { ORACLES_V6 } from '../scripts/reviewer-qual/oracles-v6.js';
+import { ORACLES_V7 } from '../scripts/reviewer-qual/oracles-v7.js';
 
 const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url));
 const read = (file: string): string => readFileSync(`${REPO_ROOT}${file}`, 'utf8');
@@ -168,5 +172,27 @@ describe('JAN-EXEC Phase 7 completion round 5 — reviewer-qualification case se
 		// Versions one to five stay committed as history, each still exactly what its own source generates (the limbs above).
 		expect((JSON.parse(cases) as CaseSet).caseSetVersion).toBe(6);
 		expect((JSON.parse(read(CASE_SET_V5_FILE)) as CaseSet).caseSetVersion).toBe(5);
+	});
+});
+
+// ⭐⭐ `JAN-EXEC` Phase 7 after P6's third run, package P, F3 — version seven (`REG-D-123` Q25): version six, and six graph cases
+// whose types declare their work, their oracles proposed.
+describe('JAN-EXEC Phase 7 after P6’s third run, package P — reviewer-qualification case set v7: version six, and six graph cases whose types declare their work (REG-D-123 Q25)', () => {
+	it('⛔ the committed case set v7 and oracles v7 are exactly what the generator writes — never hand-edited', () => {
+		const cases = read(CASE_SET_V7_FILE);
+		const oracles = read(ORACLES_V7_FILE);
+		expect(cases, `${CASE_SET_V7_FILE} is stale — run \`bun run scripts/reviewer-qual/generate.ts\``).toBe(
+			serializeGenerated(CASE_SET_V7)
+		);
+		expect(oracles, `${ORACLES_V7_FILE} is stale — run \`bun run scripts/reviewer-qual/generate.ts\``).toBe(
+			serializeGenerated(ORACLES_V7)
+		);
+		for (const text of [cases, oracles]) {
+			expect(text.includes('\r'), 'LF only').toBe(false);
+			expect(text.charCodeAt(0), 'no BOM').not.toBe(0xfeff);
+		}
+		// Versions one to six stay committed as history, each still exactly what its own source generates (the limbs above).
+		expect((JSON.parse(cases) as CaseSet).caseSetVersion).toBe(7);
+		expect((JSON.parse(read(CASE_SET_V6_FILE)) as CaseSet).caseSetVersion).toBe(6);
 	});
 });

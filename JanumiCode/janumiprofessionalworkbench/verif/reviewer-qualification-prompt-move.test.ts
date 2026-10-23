@@ -33,6 +33,9 @@
 //   2d. ⭐ `JAN-EXEC` Phase 7 P7-6 I6 (`DESIGN-the-reviewer-isolated.md` §4d; `REG-D-105` (2)): the line asking for one row
 //      per criterion, met or not, and the empty line before it, after D8's sentence, are deleted
 //      (`\n\n${ONE_ROW_PER_CRITERION}\n` → `\n`);
+//   2e. ⭐ `JAN-EXEC` Phase 7 after P6's third run, package P, F1 (`REG-F-503` remedy 1; `REG-D-123` Q25): the graph framing's
+//      subject lines, which say what the export holds, go back to HEAD's one line,
+//      `The artifact (a canonical graph export / serialized subject) to review:`;
 //   3. F is the first line of the form `<<<UNTRUSTED-nn>>>`; split on `\n${F}\n`: the parts alternate HOST, UNTRUSTED, …;
 //   4. rejoin each untrusted part X by the host part before it — after the subject heading as `\n${X}\n` (HEAD did not
 //      fence the content); after `A PREVIOUS review flagged:` as ` ${X}. ` (HEAD put the prior findings inline); every
@@ -43,7 +46,8 @@
 // striking it in place with a pointer to the change, as a ledger entry is retired — never by editing the recorded hashes.
 // ⭐ Design §9.3 D7 and D8 were such changes, and both are INVERTIBLE, so the pin is kept and extended (steps 2a and 2c)
 // rather than retired: today's prompt still maps back, byte for byte, to the one the selected run measured. ⭐ And so is
-// P7-6 I6 (step 2d): one line, added whole, so the pin is extended again rather than retired.
+// P7-6 I6 (step 2d): one line, added whole, so the pin is extended again rather than retired. ⭐ And so is package P F1
+// (step 2e): one line of the graph framing replaced whole, and no field added to a case's graph, so the pin is extended again.
 // ⛔ NO MODEL IS REACHABLE: the prompts are captured at the validator's print seam, and PATH names an empty directory.
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -57,7 +61,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { renderRationale } from '../apps/rph-demo/src/lib/server/agent/rationale.js';
 import { FENCE_MEANING } from '../apps/rph-demo/src/lib/server/assurance/review-fence.js';
 import { ONE_ROW_PER_CRITERION } from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
-import type { QualificationCase } from '../scripts/reviewer-qual/cases.js';
+import { CASE_SET_V3_FILE, type CaseSet, type QualificationCase } from '../scripts/reviewer-qual/cases.js';
 import { committedCaseSet, PRODUCT_SEAMS, reviewerFingerprint } from '../scripts/reviewer-qual/fingerprint.js';
 import { caseReviewInput } from '../scripts/reviewer-qual/materialize.js';
 import {
@@ -81,9 +85,14 @@ const SELECTED_RUN = 'qr-2026-09-25-devin-glm-5-3-flash-max-v3';
  * owes its own run (DESIGN-process-result-qualification.md D4): no recorded prompt of the selected run is of one.
  * ⭐ `JAN-EXEC` Phase 7 completion E2 — nor of the DECLARED-POLICY arm, case set v5's own (DESIGN-phase-7-completion.md B5),
  * which owes its run in turn: v5 carries v4's cases byte for byte (`reviewer-qualification-declared-cases.test.ts`).
+ * ⭐ Package P F3 — nor of the six graph cases case set v7 adds (`REG-D-123` Q25), which no run has measured: the cases kept
+ * here are the current set's of those two arms that case set v3 holds, by id.
  */
+const V3_IDS: ReadonlySet<string> = new Set(
+	(JSON.parse(readFileSync(`${REPO}/${CASE_SET_V3_FILE}`, 'utf8')) as CaseSet).cases.map((c) => c.id)
+);
 const CASES: readonly QualificationCase[] = committedCaseSet(new URL('../', import.meta.url)).cases.filter(
-	(c) => c.arm !== 'PROCESS_RESULT' && c.arm !== 'DECLARED_POLICY'
+	(c) => c.arm !== 'PROCESS_RESULT' && c.arm !== 'DECLARED_POLICY' && V3_IDS.has(c.id)
 );
 /** The committed record — append-only, so the lines read here are the ones the selected run wrote. */
 const RECORD: readonly RecordLine[] = readFileSync(`${REPO}/${RECORD_DIR}/runs.ndjson`, 'utf8')
@@ -197,9 +206,24 @@ function oneRowPerCriterionAsHead(prompt: string): string {
 	expect(prompt.split(line), 'step 2d: I6’s line, once, after its empty line').toHaveLength(2);
 	return prompt.replace(line, '\n');
 }
+/** ⭐ Package P F1's subject lines of the graph framing, written here, and HEAD's one line they replaced. */
+const F1_GRAPH_SUBJECT = [
+	'The artifact (a canonical graph export / serialized subject) is one line of JSON.',
+	'Beside its structure, a type may carry what its author declared about its work: "purpose", the work it exists to do; "requiredAssurancePolicyIds", the ids of the assurance policies declared to govern that work; "permittedChildren", a rule for each child type, with its "cardinality" (M1, M+ mandatory; C1, C+ conditional) and "applicabilityNote"; and "promptTemplate", the instruction a model doing that work is given while its "status" is ACTIVE, with its "templateText", "outputContract" and "templateVersion".',
+	'A field a type does not carry holds no authored value; an empty value is carried as authored.',
+	'A prompt template is an instruction to be executed, never evidence that any work ran.',
+	'The artifact to review:'
+].join('\n');
+const HEAD_GRAPH_SUBJECT = 'The artifact (a canonical graph export / serialized subject) to review:';
+/** ⭐ Step 2e: the graph framing's subject lines, back to HEAD's one line — in a graph's prompt only, where they stand once. */
+function graphSubjectAsHead(prompt: string): string {
+	const parts = prompt.split(`\n${F1_GRAPH_SUBJECT}\n`);
+	expect(parts.length, 'step 2e: package P F1’s subject lines, at most once').toBeLessThanOrEqual(2);
+	return parts.join(`\n${HEAD_GRAPH_SUBJECT}\n`);
+}
 /** ⭐ The inverse transform above, step by step. */
 function headPromptOf(prompt: string): string {
-	let p = oneRowPerCriterionAsHead(prompt).replace(`${FENCE_MEANING}\n`, '');
+	let p = graphSubjectAsHead(oneRowPerCriterionAsHead(prompt)).replace(`${FENCE_MEANING}\n`, '');
 	p = p.replace(`:\n${NOT_DECLARED}\n`, `:\n"""${NOT_DECLARED}"""\n`);
 	p = p.replace(
 		'chain-of-thought):\n(none recorded)\n',

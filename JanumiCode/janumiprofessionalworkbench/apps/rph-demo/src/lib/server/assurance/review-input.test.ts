@@ -279,6 +279,19 @@ const LITERAL_EXPORT_JSON =
 	'"permits":[{"parent":"pwut_01K5QFBR8Z0000000000000T01","child":"pwut_01K5QFBR8Z0000000000000T02"}],' +
 	'"dataFlow":[],"artifacts":[{"name":"site-survey","producedBy":["pwut_01K5QFBR8Z0000000000000T02"],"consumedBy":[]}],' +
 	'"roots":["pwut_01K5QFBR8Z0000000000000T01"]';
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7 after P6's third run, package P, F1 (`REG-F-503` remedy 1) — `LITERAL_NODES` as the ENGINE exports
+ * them once `realizeLiteralGraph` has defined them: each type carries, after its literal fields, what its author's command
+ * stored — its purpose (its name, as written below), no declared policy and no child rule (`definePwuType` stores `[]` for
+ * each when none is given). Written out, as `LITERAL_EXPORT_JSON` is; the pins' content over the engine's export.
+ */
+const LITERAL_ENGINE_EXPORT_JSON =
+	'{"pwa":{"id":"pwa_01K5QFBR8Z0000000000000P01","name":"Footbridge","domain":"civil-engineering","version":"1.0.0","publicationStatus":"DRAFT"},' +
+	'"nodes":[{"id":"pwut_01K5QFBR8Z0000000000000T01","name":"Review","pwuKind":"STRUCTURAL_REVIEW","isRoot":true,"permittedChildTypeIds":["pwut_01K5QFBR8Z0000000000000T02"],"requiredInputs":[],"requiredOutputs":[],"executionBoundary":"INTERNAL","purpose":"Review","requiredAssurancePolicyIds":[],"permittedChildren":[]},' +
+	'{"id":"pwut_01K5QFBR8Z0000000000000T02","name":"Survey","pwuKind":"SITE_INVESTIGATION","isRoot":false,"permittedChildTypeIds":[],"requiredInputs":[],"requiredOutputs":["site-survey"],"executionBoundary":"INTERNAL","purpose":"Survey","requiredAssurancePolicyIds":[],"permittedChildren":[]}],' +
+	'"permits":[{"parent":"pwut_01K5QFBR8Z0000000000000T01","child":"pwut_01K5QFBR8Z0000000000000T02"}],' +
+	'"dataFlow":[],"artifacts":[{"name":"site-survey","producedBy":["pwut_01K5QFBR8Z0000000000000T02"],"consumedBy":[]}],' +
+	'"roots":["pwut_01K5QFBR8Z0000000000000T01"]}';
 
 /** Put `LITERAL_NODES` into an engine through the commands an author uses, so production can export and review it. */
 function realizeLiteralGraph(engine: AuthedEngineHandle): void {
@@ -302,6 +315,74 @@ function realizeLiteralGraph(engine: AuthedEngineHandle): void {
 			requiredInputs: [...n.requiredInputs],
 			requiredOutputs: [...n.requiredOutputs]
 		});
+}
+
+// ── ⭐⭐ package P F1 (`REG-F-503` remedy 1) — a graph whose types declare what they do ──────────────────────────────────
+const AUTHORED_PWA = 'pwa_01K5QFBR8Z0000000000000P02';
+const AUTHORED_ROOT = 'pwut_01K5QFBR8Z0000000000000T03';
+const AUTHORED_CHECK = 'pwut_01K5QFBR8Z0000000000000T04';
+/** What each type of the authored graph declares about its work, in node order: exactly what the export must carry. */
+const AUTHORED_DECLARED = [
+	{
+		purpose: 'Construct and verify wordfreq from the supplied requirements and design, and report the result.',
+		requiredAssurancePolicyIds: ['pol_intent_preservation', 'pol_fitness_for_purpose'],
+		permittedChildren: [
+			{ typeId: AUTHORED_CHECK, cardinality: 'M1', applicabilityNote: 'Every realization is verified before it is reported.' }
+		],
+		promptTemplate: {
+			templateText: 'Realize {title}: synthesize the result from your child’s verification report, citing each run it cites.',
+			outputContract: 'A JSON object: {"result": string, "evidence": string[]}.',
+			status: 'ACTIVE',
+			templateVersion: 1
+		}
+	},
+	{
+		purpose: 'Run the built wordfreq against its requirements and report what each run shows.',
+		requiredAssurancePolicyIds: ['pol_intent_preservation', 'pol_test_adequacy', 'pol_fitness_for_purpose'],
+		permittedChildren: [],
+		promptTemplate: {
+			templateText: 'Verify {title}: run each requirement’s check and report its actual output; never report a test you did not run.',
+			outputContract: 'A JSON object: {"runs": {"command": string, "exit": number, "output": string}[]}.',
+			status: 'ACTIVE',
+			templateVersion: 3
+		}
+	}
+] as const;
+
+/** Put the authored graph into an engine through the commands an author uses, its policies the catalog's. */
+function realizeAuthoredGraph(engine: AuthedEngineHandle): void {
+	dispatch(engine, 'CreatePwa', 'PROFESSIONAL_WORK_ARCHITECTURE', AUTHORED_PWA, {
+		pwaId: AUTHORED_PWA,
+		name: 'wordfreq',
+		description: 'A graph whose types declare their work.',
+		domain: 'software',
+		version: '1.0.0'
+	});
+	const [root, check] = AUTHORED_DECLARED;
+	dispatch(engine, 'DefinePwuType', 'PWU_TYPE', AUTHORED_CHECK, {
+		pwuTypeId: AUTHORED_CHECK,
+		pwaId: AUTHORED_PWA,
+		pwuKind: 'INTEGRATED_PRODUCT_VALIDATION',
+		name: 'Verification',
+		isRoot: false,
+		workDischarge: 'MODEL',
+		...check,
+		permittedChildren: [...check.permittedChildren],
+		requiredAssurancePolicyIds: [...check.requiredAssurancePolicyIds],
+		promptTemplate: { ...check.promptTemplate, declaredPlaceholders: ['title'] }
+	});
+	dispatch(engine, 'DefinePwuType', 'PWU_TYPE', AUTHORED_ROOT, {
+		pwuTypeId: AUTHORED_ROOT,
+		pwaId: AUTHORED_PWA,
+		pwuKind: 'PRODUCT_REALIZATION',
+		name: 'Realization',
+		isRoot: true,
+		workDischarge: 'MODEL',
+		...root,
+		permittedChildren: [...root.permittedChildren],
+		requiredAssurancePolicyIds: [...root.requiredAssurancePolicyIds],
+		promptTemplate: { ...root.promptTemplate, declaredPlaceholders: ['title'] }
+	});
 }
 
 describe('JAN-CRITREAD J2-1 — the graph arm: graphReviewInput is what runPwaFloor builds', () => {
@@ -330,8 +411,10 @@ describe('JAN-CRITREAD J2-1 — the graph arm: graphReviewInput is what runPwaFl
 		resetEngine('empty');
 		const session = getEngine().as(SESSION_CREDENTIAL);
 		realizeLiteralGraph(session);
+		// ⭐ package P F1 (`REG-F-503` remedy 1) — ~~`JSON.stringify(LITERAL_EXPORT)`~~: the engine's export carries what the
+		// author's commands stored on each type besides its literal fields (`LITERAL_ENGINE_EXPORT_JSON`).
 		expect(JSON.stringify(buildPwaExport(LITERAL_PWA, session)), 'the engine exports the literal graph').toBe(
-			JSON.stringify(LITERAL_EXPORT)
+			LITERAL_ENGINE_EXPORT_JSON
 		);
 		for (const { label, opts } of GRAPH_OPTIONS) {
 			const production = await captureProduction((print) =>
@@ -340,8 +423,38 @@ describe('JAN-CRITREAD J2-1 — the graph arm: graphReviewInput is what runPwaFl
 			const module = moduleGraphInput(session, LITERAL_PWA, opts);
 			expectSameInput(module, production.input, `the call site — ${label}`);
 			expect(await materialize(module), `the materialized prompt — ${label}`).toBe(production.prompt);
-			expectSameInput(module, GRAPH_PINS[label], `the pin — ${label}`);
+			// ⭐ package P F1 — every key of the pin, its content the engine's export.
+			expectSameInput(module, { ...GRAPH_PINS[label], content: LITERAL_ENGINE_EXPORT_JSON }, `the pin — ${label}`);
 		}
+	});
+
+	it('⭐⭐ package P F1 (REG-F-503 remedy 1) — an AUTHORED graph put in an engine: each type’s declared policy ids, purpose, child rules and prompt template reach the reviewer’s content through the floor’s one route, inside its fence', async () => {
+		resetEngine('empty');
+		const session = getEngine().as(SESSION_CREDENTIAL);
+		realizeAuthoredGraph(session);
+		const opts: GraphOptions = { prompt: 'Construct and verify wordfreq from the supplied requirements and design.' };
+		const production = await captureProduction((print) =>
+			runPwaFloor(AUTHORED_PWA, { ...opts, producer: PRODUCER, print }, session)
+		);
+		const nodes = (JSON.parse(production.input.content) as { nodes: Record<string, unknown>[] }).nodes;
+		expect(nodes.map((n) => n.id), 'arrangement: the two types, in the order defined').toEqual([AUTHORED_CHECK, AUTHORED_ROOT]);
+		expect(
+			nodes.map((n) => ({
+				purpose: n.purpose,
+				requiredAssurancePolicyIds: n.requiredAssurancePolicyIds,
+				permittedChildren: n.permittedChildren,
+				promptTemplate: n.promptTemplate
+			})),
+			'what the reviewer is handed of each type’s declared work'
+		).toEqual([AUTHORED_DECLARED[1], AUTHORED_DECLARED[0]]);
+		// ⭐ ONE ROUTE: the floor's input is the module's over `buildPwaExport` (`floor.ts` → `graphReviewInput` → `jsonLine`)…
+		expectSameInput(moduleGraphInput(session, AUTHORED_PWA, opts), production.input, 'the call site');
+		// …and the content stands whole on one line between two lines of the prompt's fence.
+		const lines = production.prompt.split('\n');
+		const at = lines.indexOf(production.input.content);
+		expect(at, 'the content, whole, on a line of its own').toBeGreaterThan(0);
+		expect(lines[at - 1], 'a fence line before it').toMatch(/^<<<UNTRUSTED-\d\d>>>$/);
+		expect(lines[at + 1], 'the same fence line after it').toBe(lines[at - 1]);
 	});
 
 	it('⛔ the PINS — graphReviewInput over the literal graph, written out (every branch of the assembly)', () => {
@@ -1094,6 +1207,9 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 — a 64 KiB process result, read whole by noth
 //      per criterion, met or not, and the empty line before it, after D8's sentence, are deleted
 //      (`\n\n${ONE_ROW_PER_CRITERION}\n` → `\n`) — a decided change, named here so the pin still says the prompt moved
 //      by exactly what was decided;
+//   2e. ⭐ `JAN-EXEC` Phase 7 after P6's third run, package P, F1 (`REG-F-503` remedy 1; `REG-D-123` Q25): the graph
+//      framing's subject lines, which say what the export holds, go back to HEAD's one line,
+//      `The artifact (a canonical graph export / serialized subject) to review:` — a decided change, named here as 2d is;
 //   3. F is the first line of the form `<<<UNTRUSTED-nn>>>`; split the prompt on `\n${F}\n`, so its parts alternate HOST,
 //      UNTRUSTED, HOST, … (no untrusted part contains F, by the chooser);
 //   4. rejoin each untrusted part X by the host part before it: after the subject heading (ending `to review:` or
@@ -1185,8 +1301,23 @@ function oneRowPerCriterionAsHead(prompt: string): string {
 	expect(prompt.split(line), 'step 2d: I6’s line, once, after its empty line').toHaveLength(2);
 	return prompt.replace(line, '\n');
 }
+/** ⭐ Package P F1's subject lines of the graph framing, written here, and HEAD's one line they replaced. */
+const F1_GRAPH_SUBJECT = [
+	'The artifact (a canonical graph export / serialized subject) is one line of JSON.',
+	'Beside its structure, a type may carry what its author declared about its work: "purpose", the work it exists to do; "requiredAssurancePolicyIds", the ids of the assurance policies declared to govern that work; "permittedChildren", a rule for each child type, with its "cardinality" (M1, M+ mandatory; C1, C+ conditional) and "applicabilityNote"; and "promptTemplate", the instruction a model doing that work is given while its "status" is ACTIVE, with its "templateText", "outputContract" and "templateVersion".',
+	'A field a type does not carry holds no authored value; an empty value is carried as authored.',
+	'A prompt template is an instruction to be executed, never evidence that any work ran.',
+	'The artifact to review:'
+].join('\n');
+const HEAD_GRAPH_SUBJECT = 'The artifact (a canonical graph export / serialized subject) to review:';
+/** Step 2e: the graph framing's subject lines, back to HEAD's one line — in a graph's prompt only, where they stand once. */
+function graphSubjectAsHead(prompt: string): string {
+	const parts = prompt.split(`\n${F1_GRAPH_SUBJECT}\n`);
+	expect(parts.length, 'step 2e: package P F1’s subject lines, at most once').toBeLessThanOrEqual(2);
+	return parts.join(`\n${HEAD_GRAPH_SUBJECT}\n`);
+}
 function headPromptOf(prompt: string): string {
-	let p = oneRowPerCriterionAsHead(prompt).replace(`${FENCE_MEANING}\n`, '');
+	let p = graphSubjectAsHead(oneRowPerCriterionAsHead(prompt)).replace(`${FENCE_MEANING}\n`, '');
 	p = p.replace(`:\n${NOT_DECLARED}\n`, `:\n"""${NOT_DECLARED}"""\n`);
 	p = p.replace('chain-of-thought):\n(none recorded)\n', 'chain-of-thought):\n"""(none recorded)"""\n');
 	p = hashAsHead(accountAsHead(rubricAsHead(p)));

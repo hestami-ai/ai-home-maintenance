@@ -262,6 +262,28 @@ export const DECLARED_WORK_CUT_OVER_BUDGET =
 	'This review was not sent: the work, cut by its builder to a share for each work unit, is longer than the budget this ' +
 	'prompt leaves it, so cutting it again would make the declared cuts untrue. No model was called.';
 
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7 after P6's third run, package P, F1 (`REG-F-503` remedy 1; `REG-D-123` Q25) — THE GRAPH FRAMING'S
+ * SUBJECT LINES: what the export holds. ⛔ They read only *"The artifact (a canonical graph export / serialized subject) to
+ * review:"*, and the export carried no type's declared policies, purpose, child rules or prompt. F1 carries each that a type
+ * declares (`buildPwaExport`), and these host lines say what each is, that a type not carrying one holds no authored value
+ * for it, and that a prompt template is an instruction to be executed, never evidence that work ran. ⭑ The criteria are
+ * unchanged (`REG-F-383`, G-5): what the reviewer is told the export holds moves, never the rubric it judges by.
+ * ⚠ "Mandatory" and "conditional" are the canonical vocabulary's (`CardinalityCode`'s note: "M1 mandatory-exactly-one; M+
+ * mandatory-one-or-more; C1 conditional-zero-or-one; C+ conditional-zero-or-more"). The last line still ends the subject
+ * with "to review:".
+ * ⚠ AND THEY ARE SCAFFOLDING, which the content's budget is measured after (`promptPlan`): the fingerprint's
+ * `G-OVERSIZE-ALL`, every other slice of its review over its limit, keeps the first 4,040 code points of its content with
+ * them, its budget still the prompt's remainder and above `CONTENT_MIN` (`verif/reviewer-qualification-fingerprint.test.ts`).
+ */
+const PWA_GRAPH_SUBJECT = [
+	'The artifact (a canonical graph export / serialized subject) is one line of JSON.',
+	'Beside its structure, a type may carry what its author declared about its work: "purpose", the work it exists to do; "requiredAssurancePolicyIds", the ids of the assurance policies declared to govern that work; "permittedChildren", a rule for each child type, with its "cardinality" (M1, M+ mandatory; C1, C+ conditional) and "applicabilityNote"; and "promptTemplate", the instruction a model doing that work is given while its "status" is ACTIVE, with its "templateText", "outputContract" and "templateVersion".',
+	'A field a type does not carry holds no authored value; an empty value is carried as authored.',
+	'A prompt template is an instruction to be executed, never evidence that any work ran.',
+	'The artifact to review:'
+].join('\n');
+
 function framingText(input: Pick<ReasoningReviewInput, 'framing' | 'declaredPolicy' | 'declaredInstruction'>): Framed {
 	const framing: ReviewFraming = input.framing;
 	switch (framing) {
@@ -295,7 +317,9 @@ function framingText(input: Pick<ReasoningReviewInput, 'framing' | 'declaredPoli
 			return {
 				intent: 'The artifact was produced by a DIFFERENT AI agent from this intent:',
 				intentSlice: 'the intent',
-				subject: 'The artifact (a canonical graph export / serialized subject) to review:',
+				// ⭐⭐ package P F1 (`REG-F-503` remedy 1) — ~~'The artifact (a canonical graph export / serialized subject) to
+				// review:'~~: what the export holds, then the line that heads the content (`PWA_GRAPH_SUBJECT`).
+				subject: PWA_GRAPH_SUBJECT,
 				subjectSlice: 'the artifact'
 			};
 		case 'DECLARED_POLICY': {

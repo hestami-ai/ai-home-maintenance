@@ -16,8 +16,24 @@
 // report fields and never touches `valid`, so the structural ValidatePwa gate is unchanged; a proof-harness asserts
 // on `coherent`.
 
-import type { ExecutionBoundary } from '@janumipwb/rph-contracts';
+import type { CardinalityCode, ExecutionBoundary } from '@janumipwb/rph-contracts';
 import { leafKind } from './leaf.js';
+
+/** ⭐ `REG-F-503` remedy 1 — one permitted child's rule as the type stores it: which type, how many, and when. */
+export interface PwaGraphChildRule {
+	readonly typeId: string;
+	readonly cardinality: CardinalityCode;
+	readonly applicabilityNote?: string;
+}
+
+/** ⭐ `REG-F-503` remedy 1 — a type's prompt template as the export carries it: its text and output contract, with its
+ *  status and version. Its declared placeholders are not carried. */
+export interface PwaGraphPromptTemplate {
+	readonly templateText: string;
+	readonly outputContract?: string;
+	readonly status: 'ACTIVE' | 'DRAFT';
+	readonly templateVersion: number;
+}
 
 export interface PwaGraphNode {
 	readonly id: string;
@@ -40,6 +56,18 @@ export interface PwaGraphNode {
 	 *  template still sitting in `'DRAFT'`. `'ACTIVE'` is the only value under which the instruction actually
 	 *  renders — see `renderPromptTemplate`. */
 	readonly promptStatus?: 'ACTIVE' | 'DRAFT';
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7 after P6's third run, package P, F1 (`REG-F-503` remedy 1; `REG-D-123` Q25) — WHAT THE TYPE
+	 * DECLARES ABOUT ITS WORK, carried into the whole-PWA review: the work it exists to do, the assurance policies declared to
+	 * govern it, each child rule with its cardinality and applicability note, and the instruction a model doing its work is
+	 * given. ⛔ The reviewer was shown none of them, and its SATISFIED was bound to a hash that covers them all.
+	 * ⚠ OPTIONAL, AND ABSENT MUST STAY ABSENT, as `workDischarge` must: a field the stored type does not hold is omitted, and an
+	 * empty value its author stored is carried as authored. Neither stands in for the other.
+	 */
+	readonly purpose?: string;
+	readonly requiredAssurancePolicyIds?: readonly string[];
+	readonly permittedChildren?: readonly PwaGraphChildRule[];
+	readonly promptTemplate?: PwaGraphPromptTemplate;
 }
 
 export interface PwaMeta {

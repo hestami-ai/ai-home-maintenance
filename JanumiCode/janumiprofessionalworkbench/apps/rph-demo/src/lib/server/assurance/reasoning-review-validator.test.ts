@@ -782,6 +782,45 @@ describe('JAN-LIVEEXEC LE-02 — the reviewer is told what it is actually lookin
 	});
 });
 
+// ── ⭐⭐ `JAN-EXEC` Phase 7 after P6's third run, package P, F1 (`REG-F-503` remedy 1; `REG-D-123` Q25) ─────────────────
+// THE GRAPH FRAMING SAYS WHAT THE EXPORT HOLDS. Since F1 the export carries, for a type that declares them, its purpose, its
+// declared policy ids, its child rules and its prompt template (`buildPwaExport`). The host's lines before the content say
+// what each is, that a type not carrying one holds no authored value for it, and that a prompt template is an instruction to
+// be executed, never evidence that work ran (DESIGN-phase-7-completion.md §4c, F1). The nine criteria do not move
+// (`REG-F-383`, G-5): the rubric is the policy's, and nothing here touches it.
+describe('⭐⭐ package P F1 (REG-F-503 remedy 1) — the PWA_GRAPH framing says what the export holds, on host lines before the content', () => {
+	/** The host's lines F1 puts in the graph framing, written here, byte for byte. */
+	const DESCRIPTION = [
+		'The artifact (a canonical graph export / serialized subject) is one line of JSON.',
+		'Beside its structure, a type may carry what its author declared about its work: "purpose", the work it exists to do; "requiredAssurancePolicyIds", the ids of the assurance policies declared to govern that work; "permittedChildren", a rule for each child type, with its "cardinality" (M1, M+ mandatory; C1, C+ conditional) and "applicabilityNote"; and "promptTemplate", the instruction a model doing that work is given while its "status" is ACTIVE, with its "templateText", "outputContract" and "templateVersion".',
+		'A field a type does not carry holds no authored value; an empty value is carried as authored.',
+		'A prompt template is an instruction to be executed, never evidence that any work ran.',
+		'The artifact to review:'
+	];
+	const promptOf = async (framing: ReviewFraming): Promise<string> => {
+		const { prompts, print } = capturing();
+		await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(SUBJECT, ctx({ framing }));
+		expect(prompts, `${framing}: one prompt`).toHaveLength(1);
+		return prompts[0]!;
+	};
+
+	it('⭐ RED FIRST — the graph framing names each field the export may carry, says an absent one holds no authored value, and calls a prompt template an instruction to be executed, never evidence that work ran', async () => {
+		const lines = (await promptOf('PWA_GRAPH')).split('\n');
+		for (const line of DESCRIPTION) expect(lines, 'the graph framing’s host line').toContain(line);
+		// ⭐ In this order, each on its own line — and the content's fence on the line after the last.
+		const at = lines.indexOf(DESCRIPTION[0]!);
+		expect(lines.slice(at, at + DESCRIPTION.length), 'the lines, in order').toEqual(DESCRIPTION);
+		expect(lines[at + DESCRIPTION.length], 'then the content’s fence').toMatch(/^<<<UNTRUSTED-\d\d>>>$/);
+	});
+
+	it('⭐ CONTROL — the description is the graph framing’s alone: no other framing carries any line of it', async () => {
+		for (const framing of ['WORK_PRODUCT', 'PROCESS_RESULT'] as const) {
+			const lines = (await promptOf(framing)).split('\n');
+			expect(DESCRIPTION.filter((line) => lines.includes(line)), framing).toEqual([]);
+		}
+	});
+});
+
 // ── ⭑⭑ JAN-ASRIDENT AI-02/AI-03 — THE REVIEWER'S *ACTUAL* IDENTITY REACHES THE RECORD ──────────────────────
 //
 // `ASR-4` (`DOC-003:253`) requires an evaluator *"whose actual identities and lineage are recorded"*; `PER-9`

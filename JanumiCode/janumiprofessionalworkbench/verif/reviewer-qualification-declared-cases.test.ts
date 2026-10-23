@@ -47,6 +47,7 @@ import {
 	CURRENT_CASE_SET_FILE,
 	CURRENT_ORACLES_FILE,
 	ORACLES_V5_FILE,
+	ORACLES_V6_FILE,
 	serializeGenerated,
 	type CaseSet,
 	type DeclaredPolicyCase,
@@ -102,11 +103,17 @@ const plantedOf = (short: string): string => IDS.find((id) => new RegExp(`^D6?-$
 const criterionOf = (id: string): string => id.replace(/^D6?-/, '');
 
 describe('⭐⭐ E2 — the current case set (v5, and v6 since round 5): version four, then the fourteen declared-policy cases (design B5)', () => {
-	it('⭐ THE SHAPE — version four’s forty cases first, byte for byte; then the fourteen, in design B’s order, the last arm', () => {
+	it('⭐ THE SHAPE — version four’s forty cases first, byte for byte; then the fourteen, in design B’s order — the last arm through version six, version seven’s six graph cases after them', () => {
 		// ⭐ Round 5 — ~~[5, 5, 5]~~: the current set and its oracles are version six (`REG-D-115`).
-		expect([CURRENT.caseSetVersion, ORACLES.oracleVersion, ORACLES.caseSetVersion]).toEqual([6, 6, 6]);
+		// ⭐ Package P F3 — ~~[6, 6, 6]~~: version seven, which carries version six's cases byte for byte and adds six graph
+		// cases after them (`REG-D-123` Q25; `reviewer-qualification-cases.test.ts`), so the fourteen are the last arm no more.
+		expect([CURRENT.caseSetVersion, ORACLES.oracleVersion, ORACLES.caseSetVersion]).toEqual([7, 7, 7]);
 		expect(CURRENT.cases.slice(0, V4.cases.length).map((c) => JSON.stringify(c))).toEqual(V4.cases.map((c) => JSON.stringify(c)));
-		expect(CURRENT.cases.slice(V4.cases.length).map((c) => c.id)).toEqual(IDS);
+		expect(CURRENT.cases.slice(V4.cases.length, V4.cases.length + IDS.length).map((c) => c.id)).toEqual(IDS);
+		expect(
+			CURRENT.cases.slice(V4.cases.length + IDS.length).map((c) => c.arm),
+			'package P F3: only graph cases after them'
+		).toEqual(Array(6).fill('PWA_GRAPH'));
 		expect(DECLARED.map((c) => c.id)).toEqual(IDS);
 		expect(DECLARED_CASE_POLICIES.map(([policyId]) => policyId)).toEqual([
 			'pol_requirement_coverage',
@@ -197,9 +204,19 @@ describe('⭐⭐ E2 — the declared oracles: ~~PROPOSED, AWAITING SPONSOR CONFE
 	// ⭐ The merge of the completion programme — THE SPONSOR CONFERRED THEM (`REG-D-113`): ~~PROPOSED, NOT CONFERRED —
 	// the record says so~~. The record now says they are conferred, in the sponsor's words, and carries the proposal's word no
 	// more, so the check holds a run to them (`ORACLES_NOT_CONFERRED` never fires on today's set).
+	// ⭐ Package P F3 (`REG-D-123` Q25) — ~~never fires on today's set~~: version seven's statement is version six's, whole, and
+	// then a sentence saying its six NEW graph-case oracles are PROPOSED, so the check refuses today's set until the sponsor
+	// confers those six (`reviewer-qualification-cases.test.ts`). The declared oracles' own statement is version six's, and
+	// still carries no proposal's word.
 	it('⭐ CONFERRED AS PROPOSED (REG-D-113) — the record says so, in the sponsor’s words, and version four’s conferred oracles are carried unchanged', () => {
 		expect(DECLARED_ORACLES_PROPOSED).toBe('PROPOSED, AWAITING SPONSOR CONFERRAL');
-		expect(ORACLES.conferral, 'the record still carries the proposal’s word').not.toContain(DECLARED_ORACLES_PROPOSED);
+		const declaredStatement = read<OracleSet>(ORACLES_V6_FILE).conferral;
+		expect(declaredStatement, 'the record still carries the proposal’s word').not.toContain(DECLARED_ORACLES_PROPOSED);
+		expect(ORACLES.conferral.startsWith(`${declaredStatement} `), 'package P F3: version seven’s statement opens with it, whole').toBe(true);
+		expect(
+			ORACLES.conferral.slice(declaredStatement.length).split(DECLARED_ORACLES_PROPOSED).length - 1,
+			'package P F3: the proposal’s word after it, once, of the six graph cases'
+		).toBe(1);
 		// ⭐ Round 5 — ~~"The fourteen declared-policy oracles were conferred by the sponsor as proposed (REG-D-113: …)"~~:
 		// ~~thirteen are version five's, conferred so, and the fourteenth is carried to the repaired case by `REG-D-115`~~ ⭐ ten
 		// are version five's, conferred so; D6-FP-CLEAN's is carried to it by `REG-D-115`, and the other three repaired cases'
@@ -216,7 +233,8 @@ describe('⭐⭐ E2 — the declared oracles: ~~PROPOSED, AWAITING SPONSOR CONFE
 		);
 		// ⭐ The figures the statement names are the record's: ten declared oracles version five's whole, four carried.
 		const v5Declared = new Map(V5_ORACLES.oracles.slice(V4.cases.length).map((o) => [o.caseId, JSON.stringify(o)]));
-		const declaredNow = ORACLES.oracles.slice(V4.cases.length);
+		// ⭐ Package P F3 — ~~`slice(V4.cases.length)`~~: the declared oracles, before version seven's six graph-case ones.
+		const declaredNow = ORACLES.oracles.slice(V4.cases.length, V4.cases.length + IDS.length);
 		expect(declaredNow.filter((o) => v5Declared.get(o.caseId) === JSON.stringify(o)).length, 'version five’s, whole').toBe(10);
 		expect(declaredNow.filter((o) => !v5Declared.has(o.caseId)).map((o) => o.caseId), 'carried to a repaired case').toEqual([
 			'D6-RC-CLEAN',
@@ -226,7 +244,7 @@ describe('⭐⭐ E2 — the declared oracles: ~~PROPOSED, AWAITING SPONSOR CONFE
 		]);
 		const v4 = read<OracleSet>('docs/tracking/reviewer-qualification/oracles/oracles-v4.json');
 		expect(ORACLES.oracles.slice(0, v4.oracles.length)).toEqual(v4.oracles);
-		expect(ORACLES.oracles.slice(v4.oracles.length).map((o) => o.caseId)).toEqual(IDS);
+		expect(ORACLES.oracles.slice(v4.oracles.length, v4.oracles.length + IDS.length).map((o) => o.caseId)).toEqual(IDS);
 	});
 });
 
