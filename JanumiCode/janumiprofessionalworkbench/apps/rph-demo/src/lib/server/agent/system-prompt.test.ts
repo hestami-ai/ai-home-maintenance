@@ -19,7 +19,8 @@ describe('buildSystemPrompt authoring-backbone boundaries', () => {
 		expect(prompt).toContain('Do not encode "then"');
 		expect(prompt).not.toContain('data-flow = "then"');
 		expect(prompt).not.toContain('for the ordering');
-		expect(prompt).toMatch(/commits to the DRAFT immediately/);
+		// ⭐ `REG-F-505` remedy 1 — this pinned "commits to the DRAFT immediately"; each proposal lands in the turn's candidate.
+		expect(prompt).toMatch(/Each successful mutating tool proposal is applied to the candidate at once/);
 		expect(prompt).toMatch(/workbench-wide shared-library entry/);
 		expect(prompt).toMatch(/requires explicit user authorization/);
 		expect(prompt).toMatch(/REUSE only ACTIVE non-floor ids/);
@@ -30,16 +31,68 @@ describe('buildSystemPrompt authoring-backbone boundaries', () => {
 		expect(prompt).toMatch(/authoring tools reject any newly added DRAFT/);
 		expect(prompt).toMatch(/do not reference its id until then/);
 		expect(prompt).toMatch(/reverting the PWA DRAFT removes a shared policy/);
-		expect(prompt).toMatch(/reviews the resulting DRAFT after the fact/);
-		expect(prompt).toMatch(/not through a per-tool preview\/accept step/);
+		// ⭐ `REG-F-505` remedy 1 — these pinned "reviews the resulting DRAFT after the fact, not through a per-tool
+		// preview/accept step": the professional accepts the whole candidate, replayed in one transaction.
+		expect(prompt).toMatch(/then the candidate waits for the professional/);
+		expect(prompt).toMatch(
+			/Acceptance replays the candidate's recorded changes, a created policy among them, onto the DRAFT and the shared library in one transaction/
+		);
 		expect(prompt).toMatch(/scaffold_graph is atomic only within that one invocation/);
 		expect(prompt).toMatch(/link_types cardinality/);
 		expect(prompt).toMatch(/ID_COLLISION.*not a stale-read conflict/);
 		expect(prompt).toMatch(/do not refresh and retry the same unchanged create\/scaffold/);
 		expect(prompt).toMatch(/obtain the user's explicit acceptance first/);
-		expect(prompt).toContain(
-			'There is no staged preview, whole-turn transaction, semantic undo, or rollback'
+		// ⭐ `REG-F-505` remedy 1 — this pinned "There is no staged preview, whole-turn transaction, semantic undo, or
+		// rollback"; the staging exists, and what is still absent is an undo after acceptance.
+		expect(prompt).toContain('After acceptance there is no semantic undo or rollback');
+	});
+
+	// ⭐ `REG-F-505` remedy 1 (`REG-D-121` Q18; `DESIGN-phase-7-completion.md` §4a E1): each turn runs on a fork of
+	// canonical and reaches the DRAFT only when the professional accepts the exact candidate, so GOVERNANCE says so.
+	it('⭐ GOVERNANCE describes the staged turn: the fork, the floor, acceptance of the exact candidate hash, and discard', () => {
+		const prompt = buildSystemPrompt({
+			id: 'PWA-TEST',
+			name: 'Test PWA',
+			domain: 'testing',
+			publicationStatus: 'DRAFT'
+		});
+		const governance = prompt.slice(prompt.indexOf('GOVERNANCE'), prompt.indexOf('CURRENT PWA'));
+		expect(governance, 'arrangement: the GOVERNANCE section').toMatch(/^GOVERNANCE — read carefully/);
+
+		expect(governance).toContain('It works on a candidate: an isolated fork of the workbench');
+		expect(governance).toContain('Nothing you do reaches the DRAFT or the shared library during your turn.');
+		expect(governance).toContain('the workbench runs the assurance floor over the candidate');
+		expect(governance).toContain('only by the professional, who accepts the exact candidate by its hash');
+		expect(governance).toContain('The professional may instead discard the candidate');
+		expect(governance).toContain(
+			'none of its changes, a created policy among them, ever reaches the DRAFT or the shared library'
 		);
+		// ⛔ The staging this prompt used to call absent.
+		expect(governance).not.toMatch(/commits to the DRAFT immediately/);
+		expect(governance).not.toMatch(/reviews the resulting DRAFT after the fact/);
+		expect(governance).not.toContain('There is no staged preview');
+	});
+
+	// ⭐ `REG-F-505` remedy 2 (`DESIGN-phase-7-completion.md` §4a E1): a PWA meant to run needs MODEL and an ACTIVE
+	// prompt on each type a model is to execute; the catalog's blueprints leave that question open.
+	it('⭐ HOW TO WORK: a type a model is to run declares MODEL and an ACTIVE prompt, using only supplied markers, and blueprints leave the discharge open', () => {
+		const prompt = buildSystemPrompt({
+			id: 'PWA-TEST',
+			name: 'Test PWA',
+			domain: 'testing',
+			publicationStatus: 'DRAFT'
+		});
+		const howToWork = prompt.slice(prompt.indexOf('HOW TO WORK'), prompt.indexOf('GOVERNANCE'));
+		expect(howToWork, 'arrangement: the HOW TO WORK section').toMatch(/^HOW TO WORK\n1\. /);
+
+		expect(howToWork).toContain(
+			'a type a model is to execute declares workDischarge MODEL and carries an ACTIVE prompt'
+		);
+		expect(howToWork).toContain('armed with promptActive true');
+		expect(howToWork).toContain('using only the markers a work unit supplies');
+		expect(howToWork).toContain('a DRAFT prompt, or a marker no work unit supplies, refuses');
+		expect(howToWork).toContain('Catalog blueprints leave the discharge choice open');
+		expect(howToWork).toContain('decide it, with edit_pwu_type, for every type you copy');
 	});
 
 	// JAN-PRPWA-DS-001 SPEC-1 / DR-001 DWP-01: the agnostic core states the STD-1 leaf criterion (both branches),
