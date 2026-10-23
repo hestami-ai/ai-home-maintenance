@@ -1987,6 +1987,11 @@ assurance policies gate it.** ⛔ Report what breaks; do not smooth it.
   - Run-10 spent 1 reviewer call: programme total 537 of about 650.
   - Next: build E5 in `DESIGN-phase-7-completion.md` §4b, then run P6 again with the same request, about 60 reviewer calls and total about 597 of 650. E5 defaults authored work types to MODEL with an ACTIVE prompt unless the request assigns the work to a person; escalation-review types default to HUMAN.
   - Then P7: the committed paid recording and its replay in `gate:fast`. The built-in authoring PWA is to be designed as its own programme: a real, published, revisable PWA under AX-12, with the interim default registered as its first default (`REG-D-122` Q21b–Q24).
+- ⭑ **2026-10-23 — P6's third run measured E5's effect, then stopped at the authoring review** (`07bf6340`, `9172fe85`; run-11; `REG-D-123`).
+  - The candidate declared MODEL on 16 of 16 types. The reviewer, shown no prompt text or declared policy ids, rejected it twice (`REG-F-503`). The turn stopped REVISION_REQUIRED before acceptance or publication.
+  - Run-11 spent 2 reviewer calls: programme total 539 of about 800 (`REG-D-123` Q26). P6 remains incomplete.
+  - Next: `DESIGN-phase-7-completion.md` §4c F1–F5, the new graph oracles' sponsor conferral, then the selected reviewer's measurement and `reviewer:qual:check` GREEN. The proposed measurement costs about 40 calls: 19 graph cases × 2 repetitions, plus a 2-call canary.
+  - Then P6 again, about 140 reviewer calls for a 16-type PWA, bringing the estimated total to about 720 of 800. Report its result and spend before P7, the committed paid recording and its replay.
 
 ⚠ *"The results become `TEST_RESULT` evidence"* above ~~is put to the sponsor as the design's §9.5~~ ⭑ is read as `R18`'s OBSERVATION evidence, judged by the reviewer (the sponsor, `REG-D-102` (5)). *"The declared assurance policies gate it"* holds in form only today (the design's stage 5b; §9.6) ⭑ and runs as is, all 14 verdicts reported vacuous (`REG-D-102` (6)). §11's *"It works live"* was measured on 2026-09-14 and has not been driven since; today's live authoring specs cannot pass (`REG-F-506`).
 
