@@ -99,6 +99,29 @@
   - `REG-F-504`: the acceptance leaves no record.
   - `REG-F-516`: conditional children are never instantiated.
 
+## 4a. After P6: the authoring agent's fixes (`REG-D-121` Q18)
+
+P6 ran in half B, run-9, but its Yes is still owed. The accepted PWA had 9 of 9 types declaring HUMAN with no prompt. These four fixes are decided; their build and P6 again are owed.
+
+1. **E1, the authoring instructions (`REG-F-505`, remedies 1 and 2).**
+   - Rewrite GOVERNANCE in `apps/rph-demo/src/lib/server/agent/system-prompt.ts` around the staged turn: the fork, the floor, the professional's acceptance of the exact candidate hash, and discard.
+   - HOW TO WORK says that a type a model is to run declares MODEL work discharge and an ACTIVE prompt, using only markers its unit supplies. Catalog blueprints leave the discharge choice open.
+   - **Red first:** the prompt tests require those instructions. Today's prompt fails them; the assertions that pin immediate commitment and absent staging move with the correction.
+2. **E2, the supplied markers (`REG-F-507`, remedies 1 and 2).**
+   - Derive the work-unit marker list from the one render map in `packages/rph-application/src/execution-invocation.ts` and the fields its work-unit resolver supplies. Name it in `packages/rph-authoring/src/catalog.ts`'s shared help and the system prompt.
+   - The work-unit vocabulary is `{subject}`, `{title}`, `{description}` and `{purpose}`, with a value required for a marker used. `{statement}` has no work-unit value today. Replace the designer form's `{criteria}` example with supplied markers only, and flag a marker outside that set.
+   - **Red first:** shared-help and prompt checks require the map's supplied vocabulary; the form check requires an example that renders against a work unit. Today's unnamed vocabulary and `{criteria}` example fail.
+3. **E3, the policy kinds (`REG-F-524`).**
+   - Carry each policy's kind conditions through `AssurancePolicyView` and `listPolicies` in `packages/rph-authoring/src/broker.ts`. Both the agent's policy listing and the form show them, so the author can choose policies that govern the type's kind.
+   - **Red first:** a policy read from the engine retains its kind conditions in both authoring consumers. Today's view drops them.
+4. **E4, refuse a declared review over empty work (`REG-F-569`).**
+   - Apply the refusal in `declaredReviewWorkOf` to a leaf or a composite. A leaf contributes its own work; a composite contributes its subtree's. When both work products and commands are empty, refuse before a reviewer call or an assessment.
+   - Name the unit and reuse the existing refusal's words: *"a review would be shown nothing to judge, so none is asked for"*.
+   - **Red first:** an empty leaf is refused with 0 reviewer calls and no SATISFIED record. Today's leaf return bypasses that check. Keep the empty-composite refusal and controls holding a work product or command evidence.
+
+- **The boundary.** E1 changes author instructions; E2 changes marker help and the example; E3 changes the policy view; E4 stops an empty review before invocation. Reviewer framing, criteria and scoring stay as they are. The reviewer fingerprint is expected to stay unchanged: **to be checked** before the paid run.
+- **The live measurement.** `REG-F-505` remedy 2 says *"it changes what the agent does and owes a live measurement before anything relies on it"*. P6 again supplies that measurement: about 60 reviewer calls, total about 596 of 650 (`REG-D-121` Q18).
+
 ## 5. Part D — the replay (Phase 8)
 
 - **What the research found.**
@@ -118,6 +141,7 @@
   - Built early, against P3's archive as an uncommitted development fixture. Once Parts A and B land, P3 goes STALE, which gives the stale path its red at no cost.
   - Recorded from the last paid run, so it replays the final code.
   - It must precede the recorded run's fixes for `REG-F-518` (concurrent tool calls) and record each call's elapsed time.
+- ⭑ **2026-10-22 — the sponsor answered the replay's two questions** (`REG-D-121` Q19 and Q20). A replayed reviewer judgement counts only in the replay test lane, re-asserting the recorded matrix; it never enters a product record. A changed reviewer prompt refuses as stale, and the gate stays red until a fresh paid recording is made, about 45 reviewer calls each time. Today's `gate:fast` reaches the small fixture replay test through the app's tests. P7 still owes the committed paid recording and its replay wired into `gate:fast`.
 
 ## 6. The order, and why
 

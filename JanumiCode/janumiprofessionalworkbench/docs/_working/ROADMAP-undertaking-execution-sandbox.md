@@ -1977,6 +1977,11 @@ assurance policies gate it.** ⛔ Report what breaks; do not smooth it.
   - The sponsor left the adjudication to the lead: row 1 reviewer right; rows 2–5 malformed reply (`REG-F-566`), recovered by the lane's re-run (`REG-D-120` Q16 and Q17).
   - Run-7 spent 43 reviewer calls and the High negative control 2: programme total 529 of about 650 (`REG-D-120` Q15). The lane's limit moves to 650 with it.
   - Next: P6, half B, then P7, the replay. JAN-MHX remains stopped and resumable.
+- ⭑ **2026-10-22 — P6 ran in half B, run-9; its Yes is still owed** (`142cd8f0`; `REG-D-121`).
+  - The accepted PWA had 9 of 9 types declaring HUMAN with no prompt. The report counted 7 cells as intended, 15 broke, 29 not reached and 8 open. Candidate checks met `REG-F-505`, `REG-F-507` and `REG-F-524`; an implementation leaf recorded SATISFIED over empty work (`REG-F-569`).
+  - Run-8 spent 0 reviewer calls before `REG-F-501` stopped it. Run-9 spent 7: programme total 536 of about 650.
+  - Next: build the authoring agent's fixes in `DESIGN-phase-7-completion.md` §4a, then P6 again, about 60 reviewer calls and total about 596 of 650.
+  - Then P7: commit the paid recording and wire its replay into `gate:fast`. Q19 admits recorded reviewer judgements only in the replay test lane, never a product record. Q20 keeps the gate red on a stale recording until a fresh paid recording replaces it, about 45 reviewer calls each time. The existing fixture replay test already runs through the gate's app tests.
 
 ⚠ *"The results become `TEST_RESULT` evidence"* above ~~is put to the sponsor as the design's §9.5~~ ⭑ is read as `R18`'s OBSERVATION evidence, judged by the reviewer (the sponsor, `REG-D-102` (5)). *"The declared assurance policies gate it"* holds in form only today (the design's stage 5b; §9.6) ⭑ and runs as is, all 14 verdicts reported vacuous (`REG-D-102` (6)). §11's *"It works live"* was measured on 2026-09-14 and has not been driven since; today's live authoring specs cannot pass (`REG-F-506`).
 
