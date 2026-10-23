@@ -94,7 +94,7 @@ async function typePwuType(
 	for (const policyId of t.policyIds) {
 		const name = policyNames.get(policyId);
 		expect(name, `the policy library holds no ${policyId} to declare on ${t.name}`).toBeTruthy();
-		await page.getByRole('checkbox', { name: name!, exact: true }).check();
+		await declaredPolicyCheckbox(page, name!).check();
 	}
 	await page.getByRole('button', { name: 'Add type' }).click();
 	await expect(
@@ -104,6 +104,19 @@ async function typePwuType(
 		page.getByRole('button', { name: 'Add type' }),
 		'the type form did not close'
 	).toHaveCount(0);
+}
+
+/**
+ * ⭐ `REG-F-524` (`REG-D-121` Q18, E3) — THE DECLARED POLICIES' PICKER CHECKBOX FOR THE POLICY NAMED `name`. The picker
+ * shows the PWU kinds a policy governs inside its label (`policyKindsText`: "governs PWU kinds …"), so the checkbox's
+ * accessible name is the policy's name, then that text for a policy that names kinds. ⛔ An exact match on the name alone
+ * finds no checkbox for such a policy, and waited out each test that typed one. ⚠ The name is still matched whole, at
+ * the start: a policy whose name merely begins with it is another policy.
+ */
+export function declaredPolicyCheckbox(page: Page, name: string): Locator {
+	return page.getByRole('checkbox', {
+		name: new RegExp(`^${escapeRegExp(name)}(?: governs PWU kinds .+)?$`)
+	});
 }
 
 /**
@@ -123,6 +136,21 @@ export async function publishThroughDesigner(
 	await expect(page.getByText('Published versions are immutable')).toBeVisible();
 	const pwa = (await introspect(request)).pwas.find((p) => p.id === pwaId);
 	expect(pwa?.state.publicationStatus, 'the PWA did not publish').toBe('PUBLISHED');
+}
+
+/**
+ * ⭐ `REG-F-569` (`REG-D-121` Q18) — a PWA of the spec's own, typed into the designer and published: `createDraftPwa`,
+ * `typePwuTypes` and `publishThroughDesigner` in turn. Returns its id, read from the store.
+ */
+export async function publishPwaThroughDesigner(
+	page: Page,
+	request: APIRequestContext,
+	pwa: Phase7PwaDeclaration
+): Promise<string> {
+	const pwaId = await createDraftPwa(page, request, pwa);
+	await typePwuTypes(page, request, pwa.types);
+	await publishThroughDesigner(page, request, pwaId);
+	return pwaId;
 }
 
 // ── THE UNDERTAKING PAGE ────────────────────────────────────────────────────────────────────────────────────────────

@@ -1,6 +1,7 @@
 import { expect } from '@playwright/test';
 import { test, resetEngine, introspect, gotoHydrated } from './support/harness';
 import { shot } from './support/gallery';
+import { declaredPolicyCheckbox } from './support/phase7-pwa';
 
 // §11.7.2 / §11.7.4 — authoring per-child cardinality (M1/M+/C1/C+) and declared assurance policies through the
 // inspector form, then seeing them render: a cardinality badge on each permitted child + the assurance rail (locked
@@ -45,7 +46,8 @@ test.describe('PWA Designer — cardinality + assurance rail', () => {
 		await page
 			.getByRole('combobox', { name: 'Cardinality for Behavior Definition' })
 			.selectOption('M+');
-		await page.getByRole('checkbox', { name: 'Intent Preservation', exact: true }).check();
+		// ⭐ `REG-F-524` (E3) — by its name, the kinds it governs following it in the picker's label (`declaredPolicyCheckbox`).
+		await declaredPolicyCheckbox(page, 'Intent Preservation').check();
 		await page.getByRole('button', { name: 'Save changes' }).click();
 
 		// TRUTH: the engine recorded the cardinality rule + the declared policy on the root type.

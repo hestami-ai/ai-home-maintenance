@@ -36,9 +36,9 @@ import {
 	gotoHydrated,
 	introspect,
 	resetEngine,
-	stipulateDeclaredPolicies,
 	type ObjectRow
 } from '../support/harness';
+import { actionFields, pressAction, publishPwaThroughDesigner } from '../support/phase7-pwa';
 
 export const SLICE = {
 	id: 'S-01',
@@ -164,14 +164,21 @@ async function tab(page: Page, name: string): Promise<void> {
  * work units. The journey then did every act correctly and proved nothing: evidence reached PWU A's
  * assessment while PWU B was signed off by a fresh one that had never seen it, which is EXACTLY the failure
  * clause (e) exists to catch, arrived at by accident.
+ *
+ * ⭐ `REG-F-569` (`REG-D-121` Q18) — OF THE REFERENCE SEED'S PWA AND ITS ARCHITECTURE DEFINITION, unless `from` names a PWA
+ * the caller published and the type to instantiate from it, as S-e does. ⚠ By the PWA's id then, the option's value: with
+ * a second PWA published, an index would name either.
  */
-async function startEvidenceableWork(page: Page): Promise<string> {
+async function startEvidenceableWork(
+	page: Page,
+	from?: { readonly pwaId: string; readonly typeName: string }
+): Promise<string> {
 	await gotoHydrated(page, '/undertakings');
 	await page.getByRole('button', { name: '+ New Undertaking' }).click();
 	await page.getByPlaceholder(/Undertaking name/i).fill('Evidence Slice');
 	await page
 		.getByRole('combobox', { name: 'Instantiate from published PWA' })
-		.selectOption({ index: 1 });
+		.selectOption(from ? from.pwaId : { index: 1 });
 	await declareRisk(page);
 	await page.getByRole('button', { name: 'Create Undertaking' }).click();
 	const link = page.getByRole('link', { name: /Evidence Slice/ });
@@ -180,7 +187,7 @@ async function startEvidenceableWork(page: Page): Promise<string> {
 	await tab(page, 'overview');
 	await page
 		.getByRole('combobox', { name: 'Select a PWU Type' })
-		.selectOption({ label: 'Architecture Definition' });
+		.selectOption({ label: from ? from.typeName : 'Architecture Definition' });
 	await page.getByPlaceholder(/Instance title/i).fill('Evidenced Work');
 	await declareRisk(page);
 	await page.getByRole('button', { name: 'Instantiate PWU' }).click();
@@ -231,9 +238,10 @@ async function receiptCount(request: APIRequestContext, evidenceId: string): Pro
 test.describe('S-01 — the evidence stage, through the browser', () => {
 	test.beforeEach(async ({ request }) => {
 		await resetEngine(request, 'reference');
-		// ⭐ `JAN-EXEC` Phase 7 completion E2 (`REG-F-523`; `REG-D-110` (3)) — the sign-off REVIEWS each declared policy now; in
-		// this lane the declared stand-in answers it only where the test stipulated it (`declared-policy-review.ts`).
-		await stipulateDeclaredPolicies(request);
+		// ~~⭐ `JAN-EXEC` Phase 7 completion E2 (`REG-F-523`; `REG-D-110` (3)) — the sign-off REVIEWS each declared policy now; in
+		// this lane the declared stand-in answers it only where the test stipulated it (`declared-policy-review.ts`).~~
+		// ⭐ `REG-F-569` (`REG-D-121` Q18) — no clause here asks a declared review: the one sign-off, S-e's, is of a unit whose
+		// type declares no policy, so no stipulation is registered.
 	});
 
 	test('S-a — a human proposes evidence through the browser and the ENGINE holds it as PROPOSED', async ({
@@ -328,7 +336,29 @@ test.describe('S-01 — the evidence stage, through the browser', () => {
 	});
 
 	test('S-e — and the sign-off then RECORDS what it considered', async ({ page, request }) => {
-		const pwuId = await startEvidenceableWork(page);
+		// ⛔ `REG-F-569` (`REG-D-121` Q18) — ITS WORK IS OF A TYPE THAT DECLARES NO POLICY, so its sign-off reaches the join this
+		// clause is about. The reference seed's Architecture Definition declares four, and no model runs it: its step completes
+		// with no work product and no command, so its sign-off is refused before any declared review is asked, and completes
+		// nothing. ⚠ SUSPENDING THE FOUR IS NO WAY AROUND IT, DRIVEN: the kernel's fold then composes UNASSESSED over declared
+		// policies none of which governs, and refuses SATISFIED (`unsupportedSatisfaction`; `REG-F-524`). The declared review is
+		// not this clause's subject — the join is, and the assessment that records it is the operator's own sign-off, under the
+		// demo policy the evidence was submitted to — so S-e publishes a PWA of its own: one Architecture Definition a person
+		// does, declaring no policy.
+		const pwaId = await publishPwaThroughDesigner(page, request, {
+			name: 'Evidence Slice PWA',
+			domain: 'software product',
+			types: [
+				{
+					name: 'Evidenced Architecture',
+					pwuKind: 'ARCHITECTURE_DEFINITION',
+					purpose: 'Define the architecture the operator then evidences.',
+					workDischarge: 'HUMAN',
+					isRoot: true,
+					policyIds: []
+				}
+			]
+		});
+		const pwuId = await startEvidenceableWork(page, { pwaId, typeName: 'Evidenced Architecture' });
 		const id = await proposeThroughBrowser(page, request, {
 			scope: EVIDENCE_SCOPE,
 			uri: EVIDENCE_URI,
@@ -350,10 +380,20 @@ test.describe('S-01 — the evidence stage, through the browser', () => {
 
 		// Sign the work off through the surface's own existing affordance.
 		await tab(page, 'overview');
-		await page
-			.locator(`form[action="?/recordAssurance"]:has(input[value="${pwuId}"])`)
-			.getByRole('button', { name: 'Record Assurance' })
-			.click();
+		// ⚠ THE SIGN-OFF'S OWN VERDICT FIRST (`REG-F-569`). A refused sign-off completes no assessment at all, and the poll below
+		// then times out with this clause's message, which names an assessment that considered nothing: the red `S-01-M3`
+		// predicts, for a cause it does not name. So a refusal reddens here, in its own words.
+		const signedOff = await pressAction(
+			page,
+			'recordAssurance',
+			page
+				.locator(`form[action="?/recordAssurance"]:has(input[value="${pwuId}"])`)
+				.getByRole('button', { name: 'Record Assurance' })
+		);
+		expect(
+			signedOff.type,
+			`the sign-off was refused: ${String(actionFields(signedOff).error ?? JSON.stringify(signedOff))}`
+		).toBe('success');
 
 		// ⚠ THIS IS THE CLAUSE THE WHOLE WORK PACKAGE IS FOR. Before SWP-06 `evidenceConsideredIds` was
 		// unconditionally `[]`: the workbench reached SATISFIED with a §20 ValidatorResult recording that it had

@@ -4,9 +4,9 @@ import {
 	resetEngine,
 	introspect,
 	gotoHydrated,
-	declareRisk,
-	stipulateDeclaredPolicies
+	declareRisk
 } from './support/harness';
+import { publishPwaThroughDesigner } from './support/phase7-pwa';
 
 // S-1b of ROADMAP-decision-subject-scope (REG-F-104) — REJECTION, the third act JPWB-DOC-001 §5.2 reserves to
 // Governance, and the one that was unreachable for a reason worth stating.
@@ -23,9 +23,10 @@ import {
 test.describe('Undertaking Workbench — rejection cites a finding it did not make', () => {
 	test.beforeEach(async ({ request }) => {
 		await resetEngine(request, 'reference');
-		// ⭐ `JAN-EXEC` Phase 7 completion E2 (`REG-F-523`; `REG-D-110` (3)) — the sign-off REVIEWS each declared policy now; in
-		// this lane the declared stand-in answers it only where the test stipulated it (`declared-policy-review.ts`).
-		await stipulateDeclaredPolicies(request);
+		// ~~⭐ `JAN-EXEC` Phase 7 completion E2 (`REG-F-523`; `REG-D-110` (3)) — the sign-off REVIEWS each declared policy now; in
+		// this lane the declared stand-in answers it only where the test stipulated it (`declared-policy-review.ts`).~~
+		// ⭐ `REG-F-569` (`REG-D-121` Q18) — no test here asks a declared review: the one sign-off, the CONTROL's, is of a unit
+		// whose type declares no policy, so no stipulation is registered.
 	});
 
 	test('a PWU cannot be rejected until a blocking finding stands, and then it can', async ({
@@ -140,14 +141,45 @@ test.describe('Undertaking Workbench — rejection cites a finding it did not ma
 		page,
 		request
 	}) => {
+		// ⛔ `REG-F-569` (`REG-D-121` Q18) — THE TWO UNITS ARE OF A PWA OF THIS TEST'S OWN, whose types declare no policy, so
+		// the innocent's sign-off reaches UNDER_ASSURANCE. A unit of the reference seed's PWA declares policies and no model
+		// runs it: its step completes with no work product and no command, so its sign-off is refused before any declared
+		// review is asked, and its row stays EXECUTING. ⚠ Suspending its policies is no way around it, driven: its row still
+		// did not reach UNDER_ASSURANCE, and in S-01's S-e the same arrangement's sign-off was refused by the kernel's fold,
+		// which composes UNASSESSED over declared policies none of which governs (`unsupportedSatisfaction`; `REG-F-524`). The
+		// declared review is not this control's subject; the reject affordance's subject scope is. A root a person does and
+		// one mandatory child, so the Undertaking instantiates two.
+		const pwaId = await publishPwaThroughDesigner(page, request, {
+			name: 'Scope Pilot PWA',
+			domain: 'software product',
+			types: [
+				{
+					name: 'Scoped Leaf',
+					pwuKind: 'SCOPED_LEAF',
+					purpose: 'Do the work a finding may name.',
+					workDischarge: 'HUMAN',
+					policyIds: []
+				},
+				{
+					name: 'Scoped Root',
+					pwuKind: 'SCOPED_ROOT',
+					purpose: 'Hold the scoped work under one Undertaking.',
+					workDischarge: 'HUMAN',
+					isRoot: true,
+					children: ['Scoped Leaf'],
+					policyIds: []
+				}
+			]
+		});
 		await gotoHydrated(page, '/undertakings');
 		await page.getByRole('button', { name: '+ New Undertaking' }).click();
 		await page.getByPlaceholder(/Undertaking name/i).fill('Scope Pilot');
 		await page.getByPlaceholder(/Objective/i).fill('Prove findings are subject-scoped');
 		await page.getByPlaceholder(/Intended product/i).fill('Scope Pilot App');
+		// ⚠ BY ITS ID, the option's value: the reference seed's PWA is published too, so an index would name either.
 		await page
 			.getByRole('combobox', { name: 'Instantiate from published PWA' })
-			.selectOption({ index: 1 });
+			.selectOption(pwaId);
 		await declareRisk(page);
 		await page.getByRole('button', { name: 'Create Undertaking' }).click();
 		const row = page.getByRole('link', { name: /Scope Pilot/ });

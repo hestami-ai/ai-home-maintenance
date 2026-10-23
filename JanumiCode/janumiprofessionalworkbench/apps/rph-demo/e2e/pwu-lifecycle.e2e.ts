@@ -5,8 +5,9 @@ import {
 	introspect,
 	gotoHydrated,
 	declareRisk,
-	stipulateDeclaredPolicies
+	registerStipulation
 } from './support/harness';
+import { publishPwaThroughDesigner } from './support/phase7-pwa';
 
 // Slice 3 — PWU lifecycle + INV-5 ("no green without assurance"). Drives a PWU through the four axes in the UI and
 // proves the engine keeps execution success and assurance separate: a SUCCEEDED PWU is NOT green until an assurance
@@ -14,22 +15,55 @@ import {
 test.describe('Undertaking Workbench — PWU lifecycle enforces no-green-without-assurance', () => {
 	test.beforeEach(async ({ request }) => {
 		await resetEngine(request, 'reference');
-		// ⭐ `JAN-EXEC` Phase 7 completion E2 (`REG-F-523`; `REG-D-110` (3)) — the sign-off REVIEWS each declared policy now; in
-		// this lane the declared stand-in answers it only where the test stipulated it (`declared-policy-review.ts`).
-		await stipulateDeclaredPolicies(request);
+		// ~~⭐ `JAN-EXEC` Phase 7 completion E2 (`REG-F-523`; `REG-D-110` (3)) — the sign-off REVIEWS each declared policy now; in
+		// this lane the declared stand-in answers it only where the test stipulated it (`declared-policy-review.ts`).~~
+		// ⭐ `REG-F-569` (`REG-D-121` Q18) — the one sign-off here is of a unit of the test's own PWA, which registers its
+		// stipulations in the test body, after that PWA exists (`registerStipulation`'s rule).
 	});
 
 	// The demo's interactive drive now EARNS its states against the RPH-PWU-006 Given guards (Increment 28+): the
 	// controller can no longer declare executionState=SUCCEEDED or assuranceState=SATISFIED. beginExecute runs a real
-	// EXECUTION_PLAN with a succeeded TRANSFORMATION step (cited on the SUCCEEDED hop); recordAssurance requests +
-	// completes a SATISFIED ASSURANCE_ASSESSMENT under a NONE-independence demo policy (cited on the SATISFIED hop).
-	// This test drives that whole path end to end through the UI and still proves INV-5 (no green without assurance).
+	// EXECUTION_PLAN with a succeeded ~~TRANSFORMATION~~ ⭐ MODEL_INVOCATION step (cited on the SUCCEEDED hop);
+	// recordAssurance requests + completes a SATISFIED ASSURANCE_ASSESSMENT under a NONE-independence demo policy (cited
+	// on the SATISFIED hop). This test drives that whole path end to end through the UI and still proves INV-5 (no green
+	// without assurance).
+	//
+	// ⭐⭐ `REG-F-569` (`REG-D-121` Q18) — AND THE UNIT IT SIGNS OFF HAS WORK TO JUDGE. A declared review over no work product
+	// and no command is refused before any review is asked, for a leaf as for a unit composed of others. The reference
+	// seed's Architecture Definition declares no discharge, so Begin & Execute completes it as a TRANSFORMATION that
+	// produces nothing, and its sign-off is refused. So this test types its own Architecture Definition into the designer —
+	// the seed type's kind, purpose and declared policies, read from the store, but declaring MODEL with an ACTIVE prompt —
+	// and signs off a unit of that. The test-mode stand-in executor runs it (`selectExecutor`), and the test stipulates
+	// its work product's review remainder and its declared policies' criteria, for that PWA (`JAN-CRITREAD` J1-3).
 	test('a PWU only becomes SATISFIED after its assurance is SATISFIED', async ({ page, request }) => {
-		// Arrange: a fresh Undertaking with one PROPOSED PWU.
+		// Arrange: a PWA whose one type a model runs, published; then a fresh Undertaking of it, where the test instantiates
+		// 'Arch Work' of that type.
+		const seed = (await introspect(request)).pwuTypes.find(
+			(t) => t.state.pwuKind === 'ARCHITECTURE_DEFINITION' && t.state.name === 'Architecture Definition'
+		);
+		expect(seed, 'arrangement: the reference seed carries an Architecture Definition type').toBeTruthy();
+		const pwaId = await publishPwaThroughDesigner(page, request, {
+			name: 'Lifecycle Architecture',
+			domain: 'software product',
+			types: [
+				{
+					name: 'Architecture Definition',
+					pwuKind: 'ARCHITECTURE_DEFINITION',
+					purpose: String(seed!.state.purpose),
+					workDischarge: 'MODEL',
+					prompt: 'Define the architecture of {subject}.',
+					isRoot: true,
+					policyIds: (seed!.state.requiredAssurancePolicyIds as string[] | undefined) ?? []
+				}
+			]
+		});
+		await registerStipulation(request, pwaId, 'WORK_PRODUCT');
+		await registerStipulation(request, pwaId, 'DECLARED_POLICY');
 		await gotoHydrated(page, '/undertakings');
 		await page.getByRole('button', { name: '+ New Undertaking' }).click();
 		await page.getByPlaceholder(/Undertaking name/i).fill('Lifecycle Demo');
-		await page.getByRole('combobox', { name: 'Instantiate from published PWA' }).selectOption({ index: 1 });
+		// ⚠ BY ITS ID, the option's value: the reference seed's PWA is published too, so an index would name either.
+		await page.getByRole('combobox', { name: 'Instantiate from published PWA' }).selectOption(pwaId);
 		await declareRisk(page); // DR-002 W-4: the form refuses without a judgement
 		await page.getByRole('button', { name: 'Create Undertaking' }).click();
 		const row = page.getByRole('link', { name: /Lifecycle Demo/ });
@@ -44,9 +78,9 @@ test.describe('Undertaking Workbench — PWU lifecycle enforces no-green-without
 
 		// Act 1: Begin & Execute -> executionState SUCCEEDED, but still UNASSESSED (amber, NOT green).
 		// ROW-SCOPED since DR-002 W-3: an Undertaking now instantiates its PWA's composition tree on creation, so
-		// this workbench holds eight auto-instantiated PROPOSED PWUs alongside 'Arch Work' and a bare locator
-		// resolves to nine buttons. Scoping to the row NAMES the subject, which the bare locator only ever did by
-		// accident of there being one.
+		// this workbench holds ~~eight auto-instantiated PROPOSED PWUs~~ ⭐ (`REG-F-569`) one auto-instantiated PROPOSED PWU,
+		// its PWA's root, alongside 'Arch Work' and a bare locator resolves to ~~nine~~ two buttons. Scoping to the row
+		// NAMES the subject, which the bare locator only ever did by accident of there being one.
 		await page
 			.getByRole('row', { name: /Arch Work/ })
 			.getByRole('button', { name: 'Begin & Execute' })
@@ -57,6 +91,18 @@ test.describe('Undertaking Workbench — PWU lifecycle enforces no-green-without
 		expect(pwu.state.executionState).toBe('SUCCEEDED');
 		expect(pwu.state.assuranceState).toBe('UNASSESSED');
 		expect(pwu.state.workLifecycleState).not.toBe('SATISFIED');
+		// ⭐ `REG-F-569` — and its step's completion names a work product, which is what its declared reviews judge. ⚠ Self-checking:
+		// a completion naming none would have the sign-off below refused, before any review, for a cause not this test's.
+		const plans = new Set(
+			snap.executionPlans.filter((p) => p.state.workUnitId === pwu.id).map((p) => p.id)
+		);
+		const completion = snap.events.find(
+			(e) => e.eventType === 'ExecutionStepSucceeded' && plans.has(String(e.aggregateId))
+		);
+		expect(
+			((completion?.payload as { outputArtifactIds?: unknown[] } | undefined)?.outputArtifactIds ?? []).length,
+			'arrangement: Arch Work’s step recorded no work product, so there is nothing for its declared reviews to judge'
+		).toBeGreaterThan(0);
 
 		// Act 2: try to Mark Satisfied WITHOUT assurance -> the engine rejects; the PWU is still not SATISFIED.
 		await page.getByRole('button', { name: 'Mark Satisfied' }).click();
