@@ -17,8 +17,8 @@
 //     verification those two and Fitness for Purpose — each a policy the catalog applies to the kind that declares it. The
 //     account claims only what the graph declares: it names no policy, no cardinality and no prompt's content.
 //   · THE PLANTED TWINS — G7-CLEAN's names, topology, inputs, outputs and ACTIVE statuses, each changing only its one named
-//     instruction, assignment, rule or account (`PLANTED_IN_V7`), so its defect shows only by comparing the newly shown fields
-//     with the request or the account.
+//     instruction, assignment, rule or account (listed in `PLANTED_IN_V7`), so its defect shows only by comparing the newly
+//     shown fields with the request or the account.
 // ⛔ A CASE IS DATA, AND ITS IDS ARE PRODUCTION'S SHAPE: one PWA and three types, each a real ULID — a millisecond time from
 // one authoring session (the PWA first, then each type seconds after the one before), then 80 random bits — minted once and
 // fixed here, with no three letters together (`case-set-v1.ts` says why). Each node's keys are in the order `buildPwaExport`
@@ -210,8 +210,9 @@ const graphCase = (id: string, plant: Plantable = {}, implementation = IMPLEMENT
 });
 
 /**
- * ⭐ THE SIX, in the design's order: the clean case, then each planted twin, with the one thing it changes and the criterion
- * it plants (DESIGN-phase-7-completion.md §4c, F3's table).
+ * ⭐ THE FIVE PLANTED TWINS, in the design's order, each with the criterion it plants and the one thing it changes
+ * (DESIGN-phase-7-completion.md §4c, F3's table). Descriptive: `GRAPH_CASES_V7` below makes each twin, and the cases test
+ * holds each plant by its path (`PLANTED_V7`).
  */
 export const PLANTED_IN_V7 = [
 	{ id: 'G7-RR-04', criterion: 'RR-04-no-proxy-satisfaction', changes: 'the verification prompt’s evidence instruction' },
