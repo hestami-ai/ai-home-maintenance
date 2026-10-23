@@ -151,11 +151,12 @@ export const NEGATIVE_CONTROL_RESERVE = PHASE7_NEGATIVE_CONTROL_RESERVE;
  * check. ⚠ Stated for every run: it is a property of the lane, never of what a run happened to spend.
  * ⭐ P5 package C (F2) — ~~REG-D-110 (1)~~: the sponsor's limit is now the one `REG-D-117` Q10 chose, raising `REG-D-110` (1)'s.
  * ⭐ P6 package L (F1) — ~~REG-D-117 Q10~~: the sponsor's limit is now the one `REG-D-120` Q15 chose, raising `REG-D-110` (1)'s.
+ * ⭐ Package Q (F5) — ~~REG-D-120 Q15~~: the sponsor's limit is now the one `REG-D-123` Q26 chose, raising `REG-D-110` (1)'s.
  */
 export const LIMIT_CAVEAT =
 	`A phase’s own spend can carry the total past the limit: the lane checks the limit before each press, not during one, ` +
 	`and a model unit’s press may spend up to ${PHASE7_UNIT_REVIEWER_CALLS} reviewer calls after its check (REG-D-114 (14), as ` +
-	`amended 2026-10-16; the sponsor’s limit is "about ${PAID_LIMIT}", REG-D-120 Q15, raising REG-D-110 (1)).`;
+	`amended 2026-10-16; the sponsor’s limit is "about ${PAID_LIMIT}", REG-D-123 Q26, raising REG-D-110 (1)).`;
 /** The declared verdicts a complete run signs off: the five units' declared policies, 2 + 2 + 4 + 3 + 3 (§3.2). */
 export const DECLARED_VERDICTS_EXPECTED = 14;
 
