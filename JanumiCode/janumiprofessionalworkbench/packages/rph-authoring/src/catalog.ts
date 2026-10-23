@@ -15,8 +15,10 @@ import { WORK_UNIT_MARKERS } from '@janumipwb/rph-application/execution-invocati
  */
 export { WORK_UNIT_MARKERS };
 const BRACED = WORK_UNIT_MARKERS.map((m) => `{${m}}`);
-export const WORK_UNIT_MARKER_LIST: string =
-	BRACED.length > 1 ? `${BRACED.slice(0, -1).join(', ')} and ${BRACED.at(-1)}` : (BRACED[0] ?? '');
+// ⚠ Joined without a branch: an arm for a list of one, which the map does not hold, would be code no test can reach.
+export const WORK_UNIT_MARKER_LIST: string = [BRACED.slice(0, -1).join(', '), ...BRACED.slice(-1)]
+	.filter((part) => part.length > 0)
+	.join(' and ');
 
 /** ⭐ `REG-F-507` — the markers among `markers` that no work unit supplies: a step using one is refused at render. */
 export function markersNoWorkUnitSupplies(markers: readonly string[]): string[] {
