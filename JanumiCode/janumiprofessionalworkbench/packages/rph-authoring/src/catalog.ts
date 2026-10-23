@@ -2,9 +2,26 @@
 // agent's tool schemas) explains the fields, and (b) a copy-on-use CATALOG of reusable PWU Type blueprints (the
 // Product Realization PWA's §7 work areas — the seed "PWU library"). The engine's DefinePwuType / EditPwuType
 // accept all of these fields; "start from template" simply pre-fills them, and the engine copy is fully editable
-// afterward (no cross-PWA coupling). This module is PURE DATA (no engine import) so it is browser-safe and is
-// exported from the "@janumipwb/rph-authoring/catalog" subpath — importing it never drags the Node engine into a
-// browser bundle.
+// afterward (no cross-PWA coupling). This module is PURE (no engine import: its one import is the work-unit marker
+// list, from `rph-application`'s pure `execution-invocation` module through that package's own subpath) so it is
+// browser-safe and is exported from the "@janumipwb/rph-authoring/catalog" subpath — importing it never drags the
+// Node engine into a browser bundle.
+import { WORK_UNIT_MARKERS } from '@janumipwb/rph-application/execution-invocation';
+
+/**
+ * ⭐ `REG-F-507` remedy 2 (`REG-D-121` Q18) — THE MARKERS A WORK UNIT SUPPLIES ITS PROMPT, read from the engine's one
+ * render map (`WORK_UNIT_MARKERS`), so the help both authors read, the designer form and the agent's instructions name
+ * what a unit fills and cannot name another. Written as they name it: "{subject}, {title}, {description} and {purpose}".
+ */
+export { WORK_UNIT_MARKERS };
+const BRACED = WORK_UNIT_MARKERS.map((m) => `{${m}}`);
+export const WORK_UNIT_MARKER_LIST: string =
+	BRACED.length > 1 ? `${BRACED.slice(0, -1).join(', ')} and ${BRACED.at(-1)}` : (BRACED[0] ?? '');
+
+/** ⭐ `REG-F-507` — the markers among `markers` that no work unit supplies: a step using one is refused at render. */
+export function markersNoWorkUnitSupplies(markers: readonly string[]): string[] {
+	return markers.filter((m) => !WORK_UNIT_MARKERS.includes(m));
+}
 
 export const PWU_TYPE_HELP = {
 	name: 'The human name of this reusable PWU Type (e.g. "Architecture Definition").',
@@ -59,8 +76,9 @@ export const PWU_TYPE_HELP = {
 		'model is given — and an unanswered question is shown as unanswered rather than assumed. ⚠ It is also what ' +
 		'lets an execution step request a runtime binding: only a MODEL type gets one.',
 	promptTemplateText:
-		'What an agent is told when this type is executed. Use {placeholder} markers for values supplied at run ' +
-		'time; a marker nothing supplies refuses the step rather than rendering empty.',
+		'What an agent is told when this type is executed. Use markers, a name in braces, for values supplied at run ' +
+		`time: a work unit supplies ${WORK_UNIT_MARKER_LIST}, and a marker nothing supplies refuses the step rather ` +
+		'than rendering empty.',
 	// ⛔ EG-06: this said *"An answer that does not match is inert — it creates no findings and changes
 	// nothing"*, and BOTH limbs were wrong. There is no matcher at all — `work-product-floor.ts` says so
 	// itself: *"`PromptTemplate.outputContract` is FREE TEXT … not machine-checkable, so contract conformance

@@ -11,6 +11,12 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./execution-invocation": {
+      "source": "./src/execution-invocation.ts",
+      "types": "./dist/execution-invocation.d.ts",
+      "import": "./dist/execution-invocation.js",
+      "default": "./dist/execution-invocation.js"
     }
   },
   "main": "./dist/index.js",

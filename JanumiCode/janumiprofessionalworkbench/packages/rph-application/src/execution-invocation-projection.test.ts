@@ -13,7 +13,7 @@
 // `OutputDefinitionSchema = z.record(z.string(), z.unknown())` — OBJECTS. A cast in the demo route laundered
 // them into `readonly string[]`, `execution-invocation.ts:94` rendered them with `.join(', ')`, and every
 // executing model and every reviewer was shown `Required outputs: [object Object]`.
-import type { DomainCommand } from '@janumipwb/rph-contracts';
+import type { DomainCommand, PromptTemplate } from '@janumipwb/rph-contracts';
 import type { AuthedEngine } from '@janumipwb/rph-application';
 import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
@@ -23,7 +23,8 @@ import {
 	assembleStepContext,
 	prepareModelInvocation,
 	resolveInvocationSubject,
-	resolvePwuTypeFacts
+	resolvePwuTypeFacts,
+	WORK_UNIT_MARKERS
 } from './execution-invocation.js';
 import { DEFAULT_CONTEXT_ASSEMBLY_POLICY } from './context-assembly.js';
 
@@ -196,6 +197,43 @@ describe('⭐ AS-02 — the invocation subject is built from a REAL stored work 
 		);
 		expect('criteria' in ctx, 'absent, not present-and-empty — the refusal depends on this').toBe(false);
 		expect(ctx.subject, 'the control must still supply what the unit HAS').toBe('Route Assessment');
+	});
+
+	// ── ⭐ `REG-F-507` (`REG-D-121` Q18; `DESIGN-phase-7-completion.md` §4a E2) — THE MARKERS A WORK UNIT SUPPLIES ──────
+	//
+	// The authoring help, the designer form and the agent's instructions name `WORK_UNIT_MARKERS`, which is read from the
+	// render map. ⭑ HELD HERE TO THE RESOLVER: a real stored unit, resolved as the route resolves it and with its type's
+	// purpose beside it, fills every marker the list names; `{statement}`, in the map, fills from nothing.
+	it('⭐ REG-F-507 — WORK_UNIT_MARKERS are the markers a REAL stored work unit fills, its type’s purpose beside it, and {statement} is not one', () => {
+		expect(WORK_UNIT_MARKERS, 'the work-unit vocabulary (DESIGN-phase-7-completion.md §4a E2)').toEqual([
+			'subject',
+			'title',
+			'description',
+			'purpose'
+		]);
+		expect(proposePwu([{ outputId: `out_${PWU}`, kind: 'DOCUMENT' }]).status, 'arrangement: a stored unit').toBe(
+			'ACCEPTED'
+		);
+		// ⭑ As the route hands it to the step (`routes/undertakings/[id]/+page.server.ts`): the unit's own fields, its
+		// type's purpose beside them.
+		const subject = {
+			...resolveInvocationSubject((id) => store.loadObject(id)?.state, PWU),
+			purpose: 'assess the route against the approved need'
+		};
+		const declaring = (markers: readonly string[]): PromptTemplate => ({
+			templateText: markers.map((m) => `{${m}}`).join(' '),
+			templateVersion: 1,
+			declaredPlaceholders: [...markers],
+			status: 'ACTIVE'
+		});
+		expect(
+			Object.keys(assembleStepContext(subject, declaring(WORK_UNIT_MARKERS))),
+			'a marker the list names that a stored unit does not fill'
+		).toEqual([...WORK_UNIT_MARKERS]);
+		// ⛔ CONTROL — `{statement}` is in the render map and a stored unit fills it from nothing: left out for that reason.
+		expect(Object.keys(assembleStepContext(subject, declaring([...WORK_UNIT_MARKERS, 'statement'])))).toEqual([
+			...WORK_UNIT_MARKERS
+		]);
 	});
 
 	// ── ⭐⭐ `JAN-ASSERTED` `AS-04` — THE BOUNDARY REFUSES ON SHAPE, NOT ONLY ON ABSENCE ──────────────────────────

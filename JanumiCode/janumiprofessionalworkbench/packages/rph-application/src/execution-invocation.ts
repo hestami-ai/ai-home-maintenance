@@ -57,6 +57,9 @@ export interface InvocationSubject {
 	readonly purpose?: string;
 }
 
+/** ⭐ `REG-F-507` — what a work unit's own record puts in its subject: `resolveInvocationSubject` returns these and no other. */
+export type WorkUnitFields = Pick<InvocationSubject, 'id' | 'title' | 'description'>;
+
 /**
  * ⭐⭐ `JAN-ASSERTED` `R30` — BUILD THE SUBJECT BY **PARSING** THE STORED WORK UNIT, NEVER BY ASSERTING IT.
  *
@@ -83,7 +86,7 @@ export interface InvocationSubject {
 export function resolveInvocationSubject(
 	find: (objectId: string) => unknown,
 	pwuId: string
-): InvocationSubject {
+): WorkUnitFields {
 	const raw = find(pwuId);
 	if (raw === undefined || raw === null)
 		throw new Error(
@@ -179,6 +182,49 @@ export type InvocationPlan =
 	| { readonly ready: false; readonly reason: string };
 
 /**
+ * THE RENDER MAP: each marker a template may declare, and the value a subject gives it — `undefined` where the
+ * subject has none. The one map `assembleStepContext` renders from, and `WORK_UNIT_MARKERS` is read from.
+ */
+function renderMap(subject: InvocationSubject): Record<string, string | undefined> {
+	// ⭐⭐ EVERY VALUE HERE IS A STRING IN ITS OWN CONTRACT, AND THAT IS NOW AN INVARIANT OF THIS MAP RATHER
+	// THAN A COINCIDENCE (`JAN-ASSERTED` `R29`, `REG-F-411`). `expectedOutputs` and `inputRequirements` used to
+	// sit in this literal rendered with `.join(', ')`; their contracts declare ARRAYS OF OBJECTS, so what a
+	// producer actually received was `[object Object]`. ⛔ A structured field does not belong in a map whose
+	// values are handed to a professional verbatim — if one is ever wanted here it needs a ratified rendering,
+	// not a `.join`.
+	return {
+		subject: subject.title ?? subject.statement,
+		title: subject.title,
+		description: subject.description,
+		statement: subject.statement,
+		purpose: subject.purpose
+	};
+}
+
+/**
+ * ⭐ `REG-F-507` (`REG-D-121` Q18) — A SUBJECT CARRYING EVERY FIELD A WORK UNIT SUPPLIES: its own (`WorkUnitFields`) and its
+ * type's purpose, which the route sets beside them when the type has one. `Required` makes a field added to
+ * `WorkUnitFields` a field this must carry too, and the annotation refuses one a work unit does not supply.
+ */
+const SUPPLIED_BY_A_WORK_UNIT: Required<WorkUnitFields> & Required<Pick<InvocationSubject, 'purpose'>> = {
+	id: 'id',
+	title: 'title',
+	description: 'description',
+	purpose: 'purpose'
+};
+
+/**
+ * ⭐ `REG-F-507` — THE MARKERS A WORK UNIT'S PROMPT MAY USE: each marker the render map fills from what a work unit
+ * supplies. `{statement}` is in the map and fills from a field no work unit has, so it is not one, and a marker the map
+ * does not name is filled by nothing. The help both authors read and the authoring agent's instructions name these,
+ * read from here (`rph-authoring`'s `catalog.ts`, `PWU_TYPE_HELP.promptTemplateText`); a marker outside them refuses
+ * its step at render (`prompt-render.ts`).
+ */
+export const WORK_UNIT_MARKERS: readonly string[] = Object.entries(renderMap(SUPPLIED_BY_A_WORK_UNIT))
+	.filter(([, value]) => value !== undefined)
+	.map(([marker]) => marker);
+
+/**
  * Build the context a template will be rendered against, from the work unit's OWN fields.
  *
  * ⚠ THIS DOES NOT REFUSE, AND THAT IS DELIBERATE. A field the work unit cannot supply is simply absent here;
@@ -194,19 +240,7 @@ export function assembleStepContext(
 	subject: InvocationSubject,
 	template: PromptTemplate
 ): Record<string, string> {
-	// ⭐⭐ EVERY VALUE HERE IS A STRING IN ITS OWN CONTRACT, AND THAT IS NOW AN INVARIANT OF THIS MAP RATHER
-	// THAN A COINCIDENCE (`JAN-ASSERTED` `R29`, `REG-F-411`). `expectedOutputs` and `inputRequirements` used to
-	// sit in this literal rendered with `.join(', ')`; their contracts declare ARRAYS OF OBJECTS, so what a
-	// producer actually received was `[object Object]`. ⛔ A structured field does not belong in a map whose
-	// values are handed to a professional verbatim — if one is ever wanted here it needs a ratified rendering,
-	// not a `.join`.
-	const available: Record<string, string | undefined> = {
-		subject: subject.title ?? subject.statement,
-		title: subject.title,
-		description: subject.description,
-		statement: subject.statement,
-		purpose: subject.purpose
-	};
+	const available = renderMap(subject);
 	const context: Record<string, string> = {};
 	for (const name of template.declaredPlaceholders) {
 		const value = available[name];

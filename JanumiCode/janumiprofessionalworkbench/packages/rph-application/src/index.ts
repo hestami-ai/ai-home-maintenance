@@ -45,7 +45,13 @@ export {
 	assembleStepContext,
 	prepareModelInvocation,
 	resolveInvocationSubject,
-	resolvePwuTypeFacts
+	resolvePwuTypeFacts,
+	WORK_UNIT_MARKERS
 } from './execution-invocation.js';
-export type { ContextAssembly, InvocationPlan, InvocationSubject } from './execution-invocation.js';
+export type {
+	ContextAssembly,
+	InvocationPlan,
+	InvocationSubject,
+	WorkUnitFields
+} from './execution-invocation.js';
 export * from './context-assembly.js';

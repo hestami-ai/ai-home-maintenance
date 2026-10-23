@@ -29,6 +29,7 @@
     "check-types": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@janumipwb/rph-application": "workspace:*",
     "@janumipwb/rph-contracts": "workspace:*",
     "@janumipwb/rph-engine": "workspace:*"
   },

@@ -85,6 +85,7 @@
       "name": "@janumipwb/rph-authoring",
       "version": "0.0.0",
       "dependencies": {
+        "@janumipwb/rph-application": "workspace:*",
         "@janumipwb/rph-contracts": "workspace:*",
         "@janumipwb/rph-engine": "workspace:*",
       },

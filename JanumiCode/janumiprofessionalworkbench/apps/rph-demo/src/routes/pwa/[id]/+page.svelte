@@ -42,7 +42,9 @@
 		PWU_TYPE_HELP,
 		ASSURANCE_POLICY_FIELDS,
 		ASSURANCE_FLOOR,
-		assurancePolicyLabel
+		assurancePolicyLabel,
+		WORK_UNIT_MARKER_LIST,
+		markersNoWorkUnitSupplies
 	} from '$lib/authoring/pwuType';
 	import type { PageData } from './$types';
 	let {
@@ -1598,7 +1600,7 @@
 									data-testid="pwu-type-prompt"
 									bind:value={f.promptTemplateText}
 									rows="5"
-									placeholder={'Assess {subject} against {criteria}, and report findings.'}
+									placeholder={'Assess {subject} against {purpose}, and report findings.'}
 								></textarea>
 								<input type="hidden" name="promptTemplateVersion" value={f.promptTemplateVersion} />
 								{#if f.promptTemplateText.trim()}
@@ -1607,6 +1609,7 @@
 											[...f.promptTemplateText.matchAll(/\{([A-Za-z][A-Za-z0-9_]*)\}/g)].map((m) => m[1])
 										)
 									]}
+									{@const unsupplied = markersNoWorkUnitSupplies(markers)}
 									<p class="promptnote" data-testid="pwu-type-prompt-markers">
 										{#if markers.length}
 											Context this prompt needs: {markers.join(', ')}
@@ -1614,6 +1617,14 @@
 											No context markers — this prompt is the same every run.
 										{/if}
 									</p>
+									<!-- ⭐ REG-F-507 remedy 2 — a marker no work unit supplies refuses the step when it runs, after the PWA
+									     is published and can no longer change (REG-F-508), so the form says so while it still can. -->
+									{#if unsupplied.length}
+										<p class="promptwarn" data-testid="pwu-type-prompt-unsupplied">
+											No work unit supplies {unsupplied.map((m) => `{${m}}`).join(', ')}: a step using this prompt is refused
+											when it runs. A work unit supplies {WORK_UNIT_MARKER_LIST}.
+										</p>
+									{/if}
 								{/if}
 							</div>
 							<div class="ffield" hidden={f.workDischarge !== 'MODEL'}>
@@ -3432,6 +3443,11 @@
 		margin: 0.3rem 0 0;
 		font-size: 0.72rem;
 		color: var(--muted, #667);
+	}
+	.promptwarn {
+		margin: 0.3rem 0 0;
+		font-size: 0.72rem;
+		color: var(--warn, #8a5320);
 	}
 	.promptactive {
 		display: flex;

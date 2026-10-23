@@ -127,9 +127,10 @@ export interface DefineTypeInput {
 	 * (*"text plus arming, AFTER the review surface lands"*), which `EG-07a` discharged.
 	 *
 	 * ⚠ TAKEN ASSEMBLED, NOT AS FLAT TEXT, and the package boundary is the reason: `declaredPlaceholders` must
-	 * be derived by `markersIn`, which lives in `rph-application` — and this package depends only on contracts
-	 * and the engine. Assembling it here would either duplicate the marker grammar (a second spelling of one
-	 * rule) or add a package edge to satisfy a convenience. The caller assembles; this carries.
+	 * be derived by `markersIn`, which lives in `rph-application` — and this package imports `rph-application`
+	 * only for the catalog's work-unit markers (`REG-F-507`), from its pure `execution-invocation` module.
+	 * Assembling it here would either duplicate the marker grammar (a second spelling of one rule) or widen that
+	 * edge to satisfy a convenience. The caller assembles; this carries.
 	 *
 	 * ⛔ `status: 'ACTIVE'` IS THE ARMING ACT. `renderPromptTemplate` refuses a DRAFT, and the authoring handler
 	 * refuses an ACTIVE template on a type that does not declare MODEL — so arming and declaring are one

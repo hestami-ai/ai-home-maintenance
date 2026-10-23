@@ -1,3 +1,4 @@
+import { markersIn, WORK_UNIT_MARKERS } from '@janumipwb/rph-application';
 import { describe, expect, it } from 'vitest';
 import { buildSystemPrompt } from './system-prompt.js';
 
@@ -93,6 +94,27 @@ describe('buildSystemPrompt authoring-backbone boundaries', () => {
 		expect(howToWork).toContain('a DRAFT prompt, or a marker no work unit supplies, refuses');
 		expect(howToWork).toContain('Catalog blueprints leave the discharge choice open');
 		expect(howToWork).toContain('decide it, with edit_pwu_type, for every type you copy');
+	});
+
+	// ⭐ `REG-F-507` remedy 2 (`DESIGN-phase-7-completion.md` §4a E2): the instructions name the markers a work unit
+	// supplies, read from the one render map, as the shared help names them.
+	it('⭐ HOW TO WORK names the markers a work unit supplies — {subject}, {title}, {description} and {purpose} — and no other', () => {
+		const prompt = buildSystemPrompt({
+			id: 'PWA-TEST',
+			name: 'Test PWA',
+			domain: 'testing',
+			publicationStatus: 'DRAFT'
+		});
+		expect(markersIn(prompt), 'the markers the instructions name').toEqual([
+			'subject',
+			'title',
+			'description',
+			'purpose'
+		]);
+		expect(markersIn(prompt), 'read from the render map').toEqual([...WORK_UNIT_MARKERS]);
+		expect(prompt).toContain(
+			'A work unit supplies {subject}, {title}, {description} and {purpose}, and no other marker.'
+		);
 	});
 
 	// JAN-PRPWA-DS-001 SPEC-1 / DR-001 DWP-01: the agnostic core states the STD-1 leaf criterion (both branches),
