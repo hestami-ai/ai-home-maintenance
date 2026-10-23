@@ -397,6 +397,9 @@ function citedRationale(reviewer: ActorReference, row: FloorCriterion): string {
 export const noCriterionDeclared = (policyId: string): string =>
 	`${policyId} declares no criterion, so nothing was checked: its verdict is INCONCLUSIVE, never SATISFIED.`;
 
+/** The reason a declared review over empty work is not asked for, as `nothingToJudge` gives it for a leaf and a composite. */
+const NOTHING_TO_JUDGE = 'a review would be shown nothing to judge, so none is asked for';
+
 /**
  * ⛔ The merge's fix round, F1 — WHY A UNIT COMPOSED OF OTHERS IS ASKED NO DECLARED REVIEW: its declared policies are judged
  * over ~~its CHILDREN's work (`REG-D-111` (2)), and no child's work holds a work product or a command~~ ⭐ R3-A F1 (`REG-D-111`
@@ -405,10 +408,16 @@ export const noCriterionDeclared = (policyId: string): string =>
  * that ran a TRANSFORMATION contributes none of its own, and a unit that has not completed contributes nothing — so a
  * review would be shown nothing to judge. The route refuses it before any review is asked, as it refuses a work product the
  * record cannot rebuild (RD7).
+ * ⭐ `REG-F-569` (`REG-D-121` Q18) — AND WHY A LEAF IS ASKED NONE: it is judged over its own work, and when that holds no work
+ * product and no command, a review would be shown nothing to judge too. P6's run-9 asked one over
+ * `{"workProducts":[],"commands":[]}` for a leaf whose TRANSFORMATION produced nothing, and recorded its SATISFIED. The
+ * route refuses a leaf as it refuses a unit composed of others, and both refusals give the same reason.
  */
-export const nothingToJudge = (title: string): string =>
-	`${title} is judged over the work it and every unit below it produced (REG-D-111 (2)), and none of them holds a work ` +
-	'product or a command: a review would be shown nothing to judge, so none is asked for';
+export const nothingToJudge = (title: string, composite: boolean): string =>
+	composite
+		? `${title} is judged over the work it and every unit below it produced (REG-D-111 (2)), and none of them holds a work ` +
+			`product or a command: ${NOTHING_TO_JUDGE}`
+		: `${title} is judged over its own work, and it holds no work product and no command (REG-D-121 Q18): ${NOTHING_TO_JUDGE}`;
 
 /** ⭐ E2 — what a governing policy that was never reviewed is answered with: nothing, and why. ⛔ Never a pass. */
 const unreviewed = (policyId: string): DeclaredPolicyAnswer => ({

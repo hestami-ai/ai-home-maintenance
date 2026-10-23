@@ -912,7 +912,7 @@ describe('⭐⭐ R3-A F1 — a unit composed of others is judged over the work i
 		const r = await recordAssurance(t.otherMiddle);
 		expect([r.advanced, r.data?.error], 'a unit with nothing in it or below it was reviewed').toEqual([
 			undefined,
-			`The declared policies cannot be reviewed: ${nothingToJudge('Verification')}`
+			`The declared policies cannot be reviewed: ${nothingToJudge('Verification', true)}`
 		]);
 		// ⛔ ASKED NOTHING, DISPATCHED NOTHING: no review, no exchange record, no assessment — and the unit as it was.
 		expect(seam.declared, 'a declared review was asked').toEqual([]);
@@ -1052,5 +1052,76 @@ describe('⭐⭐ P5 package B (F1) — a root over five units, its end-to-end ph
 			'Implementation and unit tests',
 			'End-to-end verification'
 		]);
+	});
+});
+
+// ── ⛔ `REG-F-569` (`REG-D-121` Q18; `DESIGN-phase-7-completion.md` §4a E4) — A LEAF'S DECLARED REVIEW OVER EMPTY WORK ─────────
+//
+// P6's half B, run-9: the implementation leaf, a TRANSFORMATION, completed with nothing produced, and its declared review was
+// asked over `{"workProducts":[],"commands":[]}`. The reviewer answered SATISFIED, and the unit was recorded SATISFIED for work
+// that did not exist. The refusal a unit composed of others had (the merge's fix round, F1) did not reach a leaf.
+
+/** A HUMAN work unit with no children — a TRANSFORMATION, no prompt — of a type declaring `pol_requirement_coverage`, of a kind it governs. */
+async function declaringHumanLeaf(): Promise<string> {
+	const pwaId = mintUiId('pwa');
+	const typeId = mintUiId('pwut');
+	const steps: readonly [string, string, string, Record<string, unknown>][] = [
+		['CreatePwa', 'PROFESSIONAL_WORK_ARCHITECTURE', pwaId, { pwaId, name: 'Human leaf PWA', description: 'd', domain: 'software', version: '0.1.0' }],
+		[
+			'DefinePwuType',
+			'PWU_TYPE',
+			typeId,
+			{
+				pwuTypeId: typeId,
+				pwaId,
+				pwuKind: 'REQUIREMENT_DEFINITION',
+				name: 'Requirements',
+				purpose: 'Write the requirements',
+				isRoot: true,
+				permittedChildTypeIds: [],
+				requiredInputs: [],
+				requiredOutputs: [],
+				requiredAssurancePolicyIds: [POLICY],
+				workDischarge: 'HUMAN'
+			}
+		],
+		['SubmitPwaForReview', 'PROFESSIONAL_WORK_ARCHITECTURE', pwaId, {}],
+		['ValidatePwa', 'PROFESSIONAL_WORK_ARCHITECTURE', pwaId, {}],
+		['PublishPwa', 'PROFESSIONAL_WORK_ARCHITECTURE', pwaId, { rootPwuTypeId: typeId }]
+	];
+	for (const [commandType, aggregateType, aggregateId, payload] of steps) {
+		const r = dispatch(commandType, aggregateType, aggregateId, payload);
+		expect(r.status, `arrangement: ${commandType} — ${r.error?.message ?? ''}`).toBe('ACCEPTED');
+	}
+	const created = (await undertakings.create(actionEvent('create', { name: 'Human Leaf Demo', pwaId, ...RISK }) as never)) as {
+		created?: string;
+		data?: { error?: string };
+	};
+	expect(created.created, `arrangement: the Undertaking — ${created.data?.error ?? ''}`).toBeDefined();
+	return listPwus(getEngine(), created.created!).find((p) => p.state.pwuTypeId === typeId)!.id;
+}
+
+describe('⛔ REG-F-569 — a leaf whose work holds nothing is refused its declared review, as an empty unit composed of others is', () => {
+	it('⛔ a leaf with no work product and no command is refused before any reviewer call or assessment, its refusal naming it in the existing words', async () => {
+		// ⛔ RED BEFORE THE FIX, driven: `declaredReviewWorkOf` returned a leaf's own work before the empty-work check, the review
+		// was asked over nothing, the stand-in reviewer answered every criterion met, and Record Assurance answered `assured`.
+		const pwuId = await declaringHumanLeaf();
+		expect((await beginExecute(pwuId)).data?.error, 'arrangement: its TRANSFORMATION completed, producing nothing').toBeUndefined();
+		seam.declared.length = 0;
+		seam.floor = 0;
+		const before = getEngine().readAllEvents().length;
+		const r = await recordAssurance(pwuId);
+		expect([r.advanced, r.data?.error], 'a leaf with nothing to judge was reviewed').toEqual([
+			undefined,
+			`The declared policies cannot be reviewed: ${nothingToJudge('Requirements', false)}`
+		]);
+		// ⭑ The unit named, and the existing refusal's reason, verbatim.
+		expect(r.data?.error).toContain('Requirements is judged over its own work');
+		expect(r.data?.error).toMatch(/: a review would be shown nothing to judge, so none is asked for$/);
+		// ⛔ 0 REVIEWER CALLS, NOTHING RECORDED: no review, no exchange, no assessment (so no SATISFIED one), and the unit as it was.
+		expect([seam.declared.length, seam.floor], 'a reviewer was called').toEqual([0, 0]);
+		expect(getEngine().readAllEvents().length, 'the refusal dispatched something').toBe(before);
+		expect(declaredRecord(pwuId).assessments, 'an assessment was recorded').toEqual([]);
+		expect(axesOf(pwuId)).toEqual(['EXECUTING', 'UNASSESSED']);
 	});
 });

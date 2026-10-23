@@ -1333,7 +1333,8 @@ interface DeclaredReviewWork {
  * among them. ⛔ `E12F` F9 — AND ITS PRODUCER IS ITS OWN executor (the operator, for a root that ran a TRANSFORMATION), not
  * that of a unit below it: independence is checked against who did the judged work for a phase only. ⛔ The merge's fix
  * round, F1, in R3-A's form — refused (`nothingToJudge`) only when neither it nor any unit below it holds a work product or a
- * command: a review would be shown nothing to judge.
+ * command: a review would be shown nothing to judge. ⛔ `REG-F-569` (`REG-D-121` Q18) — AND SO IS A LEAF whose own work holds
+ * neither, by the same check: its review is refused before any reviewer call or assessment, as a composite's is.
  */
 async function declaredReviewWorkOf(
 	pwuId: string,
@@ -1344,18 +1345,9 @@ async function declaredReviewWorkOf(
 	const producer = own.work.executedBy ?? operator;
 	const units = listPwus(getEngine());
 	const childrenOf = (id: string) => units.filter((u) => String(u.state.parentWorkUnitId ?? '') === id);
-	if (childrenOf(pwuId).length === 0)
-		return {
-			ok: true,
-			work: {
-				instruction: own.work.instruction,
-				instructionIs: own.work.instructionIs,
-				workProducts: own.work.answer === undefined ? [] : [{ unit: own.work.title, answer: own.work.answer }],
-				commands: own.work.commands,
-				...(own.work.rationale ? { rationale: own.work.rationale } : {}),
-				producer
-			}
-		};
+	// ⭐ `REG-F-569` (`REG-D-121` Q18) — A LEAF IS GATHERED AS A UNIT COMPOSED OF OTHERS IS, its own work and no unit below it,
+	// so the one refusal below reaches it too: it returned its own work before that check, and was reviewed over nothing.
+	const composite = childrenOf(pwuId).length > 0;
 	const workProducts: { unit: string; answer: string }[] = [];
 	const commands: DeclaredReviewCommand[] = [];
 	const unitsWithoutWork: DeclaredUnitWithoutWork[] = [];
@@ -1380,7 +1372,19 @@ async function declaredReviewWorkOf(
 	};
 	const refused = await gather(pwuId, own.work);
 	if (refused) return refused;
-	if (workProducts.length === 0 && commands.length === 0) return { ok: false, refusedBecause: nothingToJudge(own.work.title) };
+	if (workProducts.length === 0 && commands.length === 0) return { ok: false, refusedBecause: nothingToJudge(own.work.title, composite) };
+	if (!composite)
+		return {
+			ok: true,
+			work: {
+				instruction: own.work.instruction,
+				instructionIs: own.work.instructionIs,
+				workProducts,
+				commands,
+				...(own.work.rationale ? { rationale: own.work.rationale } : {}),
+				producer
+			}
+		};
 	// ⛔ `E12F` F4 — ITS OWN PURPOSE, never a prompt of its own, and the reviewer is told so: the work judged is ~~its children's~~
 	// many units', each made under its own unit's instruction (~~`own.work.instruction`~~, which for a unit that ran a prompt of
 	// its own would have been shown as the instruction the units below it were given).
@@ -2834,7 +2838,7 @@ export const actions: Actions = {
 		// a reviewer that cannot run refuses here, in its own words, with nothing recorded; and a unit whose work the record
 		// cannot rebuild refuses here too (RD7's rule: no review of a partial reconstruction) — ⭐ as does, the merge's fix round
 		// F1, a unit composed of others ~~whose children's work holds~~ ⭐ R3-A F1: neither it nor any unit below it holding
-		// anything to judge (`nothingToJudge`).
+		// anything to judge (`nothingToJudge`) — ⭐ `REG-F-569`: and a leaf whose own work holds nothing to judge.
 		let producer: ActorReference = evaluator;
 		let answers: ReadonlyMap<string, DeclaredPolicyAnswer> = new Map();
 		let invocations: ReadonlyMap<string, string> = new Map();
