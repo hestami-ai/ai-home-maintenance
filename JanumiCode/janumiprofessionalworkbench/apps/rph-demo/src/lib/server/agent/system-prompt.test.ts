@@ -86,8 +86,10 @@ describe('buildSystemPrompt authoring-backbone boundaries', () => {
 		const howToWork = prompt.slice(prompt.indexOf('HOW TO WORK'), prompt.indexOf('GOVERNANCE'));
 		expect(howToWork, 'arrangement: the HOW TO WORK section').toMatch(/^HOW TO WORK\n1\. /);
 
+		// ⭐ `REG-D-122` Q22 (§4b E5) — this pinned "a type a model is to execute declares …"; the default now says
+		// which types those are.
 		expect(howToWork).toContain(
-			'a type a model is to execute declares workDischarge MODEL and carries an ACTIVE prompt'
+			'A type whose work the workbench carries out declares workDischarge MODEL and carries an ACTIVE prompt'
 		);
 		expect(howToWork).toContain('armed with promptActive true');
 		expect(howToWork).toContain('using only the markers a work unit supplies');
@@ -114,6 +116,34 @@ describe('buildSystemPrompt authoring-backbone boundaries', () => {
 		expect(markersIn(prompt), 'read from the render map').toEqual([...WORK_UNIT_MARKERS]);
 		expect(prompt).toContain(
 			'A work unit supplies {subject}, {title}, {description} and {purpose}, and no other marker.'
+		);
+	});
+
+	// ⭐ `REG-D-122` Q22 (`DESIGN-phase-7-completion.md` §4b E5): run-10's accepted PWA declared 15 of 15 types HUMAN
+	// with no prompt, its request leaving who does the work unstated. In a PWA the agent authors, MODEL is the default,
+	// a request that says a person does the work overrides it, and a type that reviews or decides an escalation
+	// declares HUMAN; ordinary assurance reviews are policies, not types.
+	it("⭐ HOW TO WORK: MODEL is the default in a PWA the agent authors, the request's words override it, a type that reviews or decides an escalation declares HUMAN, and ordinary assurance reviews stay with the reviewer model", () => {
+		const prompt = buildSystemPrompt({
+			id: 'PWA-TEST',
+			name: 'Test PWA',
+			domain: 'testing',
+			publicationStatus: 'DRAFT'
+		});
+		const howToWork = prompt.slice(prompt.indexOf('HOW TO WORK'), prompt.indexOf('GOVERNANCE'));
+		expect(howToWork, 'arrangement: the HOW TO WORK section').toMatch(/^HOW TO WORK\n1\. /);
+
+		expect(howToWork, 'the default').toContain(
+			"In a PWA you author, MODEL is the default: when the request does not say who does a type's work, the workbench carries it out."
+		);
+		expect(howToWork, "the request's exception").toContain(
+			"The request's words override that default: when the request says a person does a type's work, that type declares HUMAN."
+		);
+		expect(howToWork, 'the escalation review').toContain(
+			'A type that reviews or decides an escalation declares HUMAN.'
+		);
+		expect(howToWork, 'ordinary assurance reviews').toContain(
+			'Ordinary assurance reviews stay with the reviewer model: they are policies, not types.'
 		);
 	});
 
