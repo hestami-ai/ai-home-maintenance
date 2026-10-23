@@ -15,5 +15,6 @@ export {
 	type AssurancePolicyOption,
 	WORK_UNIT_MARKERS,
 	WORK_UNIT_MARKER_LIST,
-	markersNoWorkUnitSupplies
+	markersNoWorkUnitSupplies,
+	policyKindsText
 } from '@janumipwb/rph-authoring/catalog';

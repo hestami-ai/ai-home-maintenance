@@ -177,6 +177,19 @@ export interface AssurancePolicyView {
 	readonly status: string;
 	/** True for a locked de minimis floor policy (always-applies, non-editable). */
 	readonly isFloor: boolean;
+	/**
+	 * ⭐ `REG-F-524` (`REG-D-121` Q18) — the PWU kinds the policy governs: its applicability's `pwuKindConditions`
+	 * (DOC-004 §5.1), which the kernel matches exactly (`policyApplicability`). ABSENT when it names none, which no kind
+	 * excludes. A unit whose kind is not listed is not governed by it, and is never assessed under it.
+	 */
+	readonly pwuKinds?: readonly string[];
+}
+
+/** ⭐ `REG-F-524` — the kinds a policy's applicability names (`pwuKindConditions`), or `undefined` when it names none. */
+export function policyPwuKinds(state: Record<string, unknown>): readonly string[] | undefined {
+	const conditions = (state.applicability as { pwuKindConditions?: unknown } | undefined)?.pwuKindConditions;
+	const kinds = Array.isArray(conditions) ? conditions.filter((k): k is string => typeof k === 'string') : [];
+	return kinds.length > 0 ? kinds : undefined;
 }
 
 /** Fields accepted when creating a new Assurance Policy (only name is required; the rest default sensibly). */
@@ -346,14 +359,18 @@ export class PwaAuthoringBroker {
 	/** The workbench Assurance Policy library (real ASSURANCE_POLICY objects). The 3 floor policies are flagged. A
 	 *  PWU Type may declare any ACTIVE non-floor policy via requiredAssurancePolicyIds. */
 	listPolicies(): AssurancePolicyView[] {
-		return listAssurancePolicies(this.engine).map((r) => ({
-			id: r.id,
-			name: String((r.state.name ?? r.id) as string),
-			purpose: String((r.state.purpose ?? '') as string),
-			version: String((r.state.version ?? '') as string),
-			status: String((r.state.status ?? 'DRAFT') as string),
-			isFloor: FLOOR_POLICY_IDS.has(r.id)
-		}));
+		return listAssurancePolicies(this.engine).map((r) => {
+			const pwuKinds = policyPwuKinds(r.state);
+			return {
+				id: r.id,
+				name: String((r.state.name ?? r.id) as string),
+				purpose: String((r.state.purpose ?? '') as string),
+				version: String((r.state.version ?? '') as string),
+				status: String((r.state.status ?? 'DRAFT') as string),
+				isFloor: FLOOR_POLICY_IDS.has(r.id),
+				...(pwuKinds ? { pwuKinds } : {})
+			};
+		});
 	}
 
 	/** Per-field authoring help — the single source both the inspector form and the agent tool schemas surface. */

@@ -27,7 +27,7 @@ import {
 	readPolicyFields,
 	successorPolicyPayload
 } from './policy-fields';
-import { lintComposition } from '@janumipwb/rph-authoring';
+import { lintComposition, policyPwuKinds } from '@janumipwb/rph-authoring';
 
 const CARDINALITY_CODES: ReadonlySet<CardinalityCode> = new Set(['M1', 'M+', 'C1', 'C+']);
 /** Clamp a form-supplied cardinality to a valid code (anything else -> M1, mandatory exactly one). */
@@ -238,7 +238,10 @@ export const load: PageServerLoad = async ({ params }) => {
 					String((c.description ?? '') as string)
 				)
 			: [],
-		isFloor: FLOOR_POLICY_IDS.has(p.id)
+		isFloor: FLOOR_POLICY_IDS.has(p.id),
+		// ⭐ `REG-F-524` (`REG-D-121` Q18) — the PWU kinds the policy governs, read as the broker's policy view reads them,
+		// so the picker shows the author the kinds a policy governs; undefined for a policy that names none.
+		pwuKinds: policyPwuKinds(p.state)
 	}));
 	// ⭑⭑ JAN-EXECGOV EG-07c — `lint.ts`'s own header says *"The agent runs this on itself (the
 	// review_composition tool) and fixes findings; A HUMAN CAN READ THE SAME LIST."* That last clause was

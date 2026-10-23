@@ -3,7 +3,12 @@
 // these pass, the agent's tools are exercising a verified layer and only the LLM wiring remains to test live.
 import type { DomainCommand } from '@janumipwb/rph-contracts';
 import { testDirectory } from '@janumipwb/rph-ports/testing';
-import { createEngine, type AuthedEngineHandle } from '@janumipwb/rph-engine';
+import {
+	createEngine,
+	listAssurancePolicies,
+	seedPolicyLibrary,
+	type AuthedEngineHandle
+} from '@janumipwb/rph-engine';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { monotonicFactory } from 'ulid';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -118,6 +123,25 @@ describe('PwaAuthoringBroker — the LLM-agnostic PWA-authoring capability layer
 			status: 'DRAFT',
 			isFloor: false
 		});
+	});
+
+	// ⭐ `REG-F-524` (`REG-D-121` Q18; `DESIGN-phase-7-completion.md` §4a E3): a policy whose kinds exclude a type's kind
+	// does not govern its units, so the author must see the kinds to choose policies that govern the type's kind.
+	it('⭐ REG-F-524 — a policy read from the engine keeps the PWU kinds it governs; one that names none carries none', () => {
+		seedPolicyLibrary(setup);
+		const kindsStored = (state: Record<string, unknown>) =>
+			(state.applicability as { pwuKindConditions?: readonly string[] } | undefined)?.pwuKindConditions;
+		const scoped = listAssurancePolicies(engine).filter((p) => (kindsStored(p.state)?.length ?? 0) > 0);
+		expect(scoped.length, 'arrangement: the seeded catalog scopes its policies by kind').toBeGreaterThan(0);
+		const listed = new Map(broker.listPolicies().map((p) => [p.id, p]));
+		for (const p of scoped)
+			expect(listed.get(p.id)?.pwuKinds, `${p.id}: the view dropped the kinds it governs`).toEqual(
+				kindsStored(p.state)
+			);
+		// ⭑ CONTROL — a policy that names no kind carries none: the kernel reads its absence as unrestricted.
+		const r = broker.createPolicy({ name: 'Unscoped Review' });
+		expect(r.ok, r.error).toBe(true);
+		expect(broker.listPolicies().find((p) => p.id === r.id)).not.toHaveProperty('pwuKinds');
 	});
 
 	// ---- PROPOSE: define / edit / remove ----

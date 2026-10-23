@@ -44,7 +44,8 @@
 		ASSURANCE_FLOOR,
 		assurancePolicyLabel,
 		WORK_UNIT_MARKER_LIST,
-		markersNoWorkUnitSupplies
+		markersNoWorkUnitSupplies,
+		policyKindsText
 	} from '$lib/authoring/pwuType';
 	import type { PageData } from './$types';
 	let {
@@ -1826,6 +1827,11 @@
 												onchange={(e) => togglePolicy(p.id, e.currentTarget.checked)}
 											/>
 											{p.name}
+											<!-- ⭐ REG-F-524 — a policy governs only the kinds it names, so the author chooses one that governs
+											     this type's kind: declared on another kind, it is never assessed for this type's units. -->
+											{#if p.pwuKinds}
+												<span class="policykinds" data-testid="policy-kinds">{policyKindsText(p.pwuKinds)}</span>
+											{/if}
 										</label>
 									{/each}
 									{#each inactiveSelectedPolicyIds as policyId (policyId)}
@@ -2824,6 +2830,11 @@
 		font-size: 9px;
 		font-weight: 700;
 		letter-spacing: 0.04em;
+	}
+	.policykinds {
+		margin-left: auto;
+		font-size: 9px;
+		color: var(--outline);
 	}
 	.childrow {
 		display: flex;

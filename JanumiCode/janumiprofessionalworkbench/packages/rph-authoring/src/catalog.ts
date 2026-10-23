@@ -227,6 +227,14 @@ export function catalogTemplate(key: string): PwuTypeTemplate | undefined {
 	return PWU_TYPE_CATALOG.find((t) => t.key === key);
 }
 
+/**
+ * ⭐ `REG-F-524` (`REG-D-121` Q18) — WHICH PWU KINDS A POLICY GOVERNS, as the agent's policy listing and the designer form
+ * both say it: the kinds its applicability names, or nothing for a policy that names none, which no kind excludes.
+ */
+export function policyKindsText(pwuKinds: readonly string[] | undefined): string {
+	return pwuKinds && pwuKinds.length > 0 ? `governs PWU kinds ${pwuKinds.join(', ')}` : '';
+}
+
 /** One assurance policy as the authoring surfaces present it (id + human label + one-line blurb). */
 export interface AssurancePolicyOption {
 	readonly id: string;

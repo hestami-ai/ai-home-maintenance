@@ -32777,5 +32777,68 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		source: "JAN-EXEC Phase 7 after P6, package A, F2 (REG-F-507 remedies 1 and 2; REG-D-121 Q18; DESIGN-phase-7-completion.md section 4a, E2) - the markers a work unit supplies, derived from the one render map and the fields its resolver supplies, named in the shared help and the system prompt; the designer form's example renders against a work unit, and the form flags a marker outside the set",
 		expectNoCompile:
 			"SUPPLIED_BY_A_WORK_UNIT is annotated Required<WorkUnitFields> & …, so every field WorkUnitFields names is one the literal must carry. Driven by hand, the mutation applied and the file restored byte for byte, tsc -p packages/rph-application/tsconfig.json: 'error TS2322: Type '{ id: string; title: string; description: string; purpose: string; }' is not assignable to type 'Required<WorkUnitFields> & Required<Pick<InvocationSubject, \"purpose\">>'. Property 'statement' is missing in type '{ id: string; title: string; description: string; purpose: string; }' but required in type 'Required<WorkUnitFields>'.' (exit 2)."
+	},
+	{
+		id: "P6A-M21-the-policy-view-drops-the-kinds-again",
+		file: "packages/rph-authoring/src/broker.ts",
+		find: "\t\t\t\t...(pwuKinds ? { pwuKinds } : {})\n",
+		replace: "\t\t\t\t// MUTANT: the view drops the kinds the policy governs\n",
+		expectRed: ["packages/rph-authoring/src/broker.test.ts"],
+		why: "PROMISE (REG-F-524; REG-D-121 Q18): AssurancePolicyView carries each policy's kind conditions, its applicability's pwuKindConditions as the engine holds them, through listPolicies, so the agent's policy listing and the designer form can show which kinds a policy governs. WHO RELIES: half B's author, whose 8 of 8 non-root units in P6 run-9 declared policies that do not govern their kind (REG-F-524's note of 2026-10-22). WHAT THE MUTATION DOES: the view drops the kinds, as before this package. Seen red first, the test written and the view as it stood, and with this mutation applied by hand, 1 of the file's 28 tests: 'AssertionError: pol_intent_fidelity: the view dropped the kinds it governs: expected undefined to deeply equal [ …(4) ]'. OBSERVED (bun run mutants -- the seven package A F3 entries, by their full ids, 2026-10-22, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P6A-M21-the-policy-view-drops-the-kinds-again ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 after P6, package A, F3 (REG-F-524; REG-D-121 Q18; DESIGN-phase-7-completion.md section 4a, E3) - each policy's kind conditions carried through AssurancePolicyView and listPolicies, and shown by the agent's policy listing and the designer form"
+	},
+	{
+		id: "P6A-M22-a-policy-naming-no-kind-carries-an-empty-list",
+		file: "packages/rph-authoring/src/broker.ts",
+		find: "\treturn kinds.length > 0 ? kinds : undefined;",
+		replace: "\treturn kinds; // MUTANT: a policy naming no kind carries an empty list",
+		expectRed: ["packages/rph-authoring/src/broker.test.ts"],
+		why: "PROMISE (REG-F-524): a policy that names no kind carries no pwuKinds, as the seeder writes none rather than [] (seed-workbench.ts: '[] would read as applies to no PWU kind and absent reads as unrestricted'); the kernel reads either as unrestricted (policyApplicability). The CONTROL's own mutant: the scoped assertions are satisfied by a reader that hands every policy a list. WHO RELIES: the listing and the form, which name kinds only for a policy that has them. WHAT THE MUTATION DOES: such a policy carries an empty list. Seen red with this mutation applied by hand, 1 of 28 tests, the CONTROL: 'AssertionError: expected { …(7) } to not have property \"pwuKinds\"'. OBSERVED (bun run mutants -- the seven package A F3 entries, by their full ids, 2026-10-22, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P6A-M22-a-policy-naming-no-kind-carries-an-empty-list ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 after P6, package A, F3 (REG-F-524; REG-D-121 Q18; DESIGN-phase-7-completion.md section 4a, E3) - each policy's kind conditions carried through AssurancePolicyView and listPolicies, and shown by the agent's policy listing and the designer form"
+	},
+	{
+		id: "P6A-M23-the-form-is-not-given-the-kinds",
+		file: "apps/rph-demo/src/routes/pwa/[id]/+page.server.ts",
+		find: "\t\tpwuKinds: policyPwuKinds(p.state)\n",
+		replace: "\t\tpwuKinds: undefined as readonly string[] | undefined // MUTANT: the form is not given the kinds\n",
+		expectRed: ["apps/rph-demo/src/routes/pwa/[id]/policy-kinds.test.ts"],
+		why: "PROMISE (REG-F-524): the designer page's load gives the form each policy's kinds, read by the broker's own reader (policyPwuKinds), as the engine holds them. WHO RELIES: a professional choosing a type's declared policies in the form. WHAT THE MUTATION DOES: the form is given no kinds. Seen red first, the test written and the load as it stood, and with this mutation applied by hand, 1 of 2 tests: 'AssertionError: pol_intent_fidelity: the form is not given the kinds it governs: expected undefined to deeply equal [ …(4) ]'. OBSERVED (bun run mutants -- the seven package A F3 entries, by their full ids, 2026-10-22, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P6A-M23-the-form-is-not-given-the-kinds ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 after P6, package A, F3 (REG-F-524; REG-D-121 Q18; DESIGN-phase-7-completion.md section 4a, E3) - each policy's kind conditions carried through AssurancePolicyView and listPolicies, and shown by the agent's policy listing and the designer form"
+	},
+	{
+		id: "P6A-M24-the-agent-s-listing-names-no-kinds",
+		file: "apps/rph-demo/src/lib/server/agent/tools.ts",
+		find: "\t\t\t\t\t\t\treturn kinds ? `${line} — ${kinds}` : line;",
+		replace: "\t\t\t\t\t\t\treturn line; // MUTANT: the listing names no kinds",
+		expectRed: ["apps/rph-demo/src/lib/server/agent/tools.test.ts"],
+		why: "PROMISE (REG-F-524): list_assurance_policies names, on each policy's line, the PWU kinds it governs, in the words the form uses (policyKindsText). WHO RELIES: the authoring agent, which reads the line beside the JSON its tool result carries. WHAT THE MUTATION DOES: the line names no kinds. Seen red first, the test written and the listing as it stood, and with this mutation applied by hand, 1 of the file's 17 tests: 'AssertionError: the kinds a policy governs are not in the listing: expected 'pol_requirement_coverage — Requiremen…' to be 'pol_requirement_coverage — Requiremen…' // Object.is equality'. OBSERVED (bun run mutants -- the seven package A F3 entries, by their full ids, 2026-10-22, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P6A-M24-the-agent-s-listing-names-no-kinds ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 after P6, package A, F3 (REG-F-524; REG-D-121 Q18; DESIGN-phase-7-completion.md section 4a, E3) - each policy's kind conditions carried through AssurancePolicyView and listPolicies, and shown by the agent's policy listing and the designer form"
+	},
+	{
+		id: "P6A-M25-the-listing-does-not-say-what-the-kinds-mean",
+		file: "apps/rph-demo/src/lib/server/agent/tools.ts",
+		find: "A policy that lists PWU kinds governs a type only of one of those kinds: declared on a type of another kind, it is never assessed for the units of that type, so declare it only on a type whose pwuKind it lists. ",
+		replace: "",
+		expectRed: ["apps/rph-demo/src/lib/server/agent/tools.test.ts"],
+		why: "PROMISE (REG-F-524): the tool's description says what the kinds mean: a policy that lists kinds governs a type only of one of them (policyApplicability's exact match), so the agent declares it only on such a type. WHO RELIES: the agent, which otherwise reads the kinds as a description and declares the policy where it governs nothing. WHAT THE MUTATION DOES: the sentence goes. Seen red with this mutation applied by hand, 1 of 17 tests: 'AssertionError: expected 'List the ACTIVE workbench Assurance P…' to contain 'A policy that lists PWU kinds governs…''. OBSERVED (bun run mutants -- the seven package A F3 entries, by their full ids, 2026-10-22, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P6A-M25-the-listing-does-not-say-what-the-kinds-mean ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 after P6, package A, F3 (REG-F-524; REG-D-121 Q18; DESIGN-phase-7-completion.md section 4a, E3) - each policy's kind conditions carried through AssurancePolicyView and listPolicies, and shown by the agent's policy listing and the designer form"
+	},
+	{
+		id: "P6A-M26-the-kinds-text-says-nothing",
+		file: "packages/rph-authoring/src/catalog.ts",
+		find: "\treturn pwuKinds && pwuKinds.length > 0 ? `governs PWU kinds ${pwuKinds.join(', ')}` : '';",
+		replace: "\treturn pwuKinds && pwuKinds.length < 0 ? `governs PWU kinds ${pwuKinds.join(', ')}` : ''; // MUTANT: the kinds text says nothing",
+		expectRed: ["apps/rph-demo/src/lib/server/agent/tools.test.ts"],
+		why: "PROMISE (REG-F-524): policyKindsText, the one wording the agent's listing and the form both show, names a scoped policy's kinds. WHO RELIES: both consumers, which render it. WHAT THE MUTATION DOES: it says nothing for any policy, so neither consumer shows kinds although the view carries them. Seen red with this mutation applied by hand, 1 of 17 tests: 'AssertionError: the kinds a policy governs are not in the listing: expected 'pol_requirement_coverage — Requiremen…' to be 'pol_requirement_coverage — Requiremen…' // Object.is equality'. OBSERVED (bun run mutants -- the seven package A F3 entries, by their full ids, 2026-10-22, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P6A-M26-the-kinds-text-says-nothing ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 after P6, package A, F3 (REG-F-524; REG-D-121 Q18; DESIGN-phase-7-completion.md section 4a, E3) - each policy's kind conditions carried through AssurancePolicyView and listPolicies, and shown by the agent's policy listing and the designer form"
+	},
+	{
+		id: "P6A-M27-the-picker-shows-no-kinds",
+		file: "apps/rph-demo/src/routes/pwa/[id]/+page.svelte",
+		find: "<span class=\"policykinds\" data-testid=\"policy-kinds\">{policyKindsText(p.pwuKinds)}</span>",
+		replace: "<span class=\"policykinds\" data-testid=\"policy-kinds\"></span>",
+		expectRed: ["apps/rph-demo/src/routes/pwa/[id]/policy-kinds.test.ts"],
+		why: "PROMISE (REG-F-524): the declared policies' picker shows each pickable policy's kinds beside its name, inside its row. WHO RELIES: a professional choosing a type's declared policies. WHAT THE MUTATION DOES: the row shows no kinds. ⚠ A MARKUP CHECK, as the undertaking page's own (declared-review-route.test.ts): the victim reads the form's markup and pins the rendering expression's text; no rendered page is asked. Seen red first, the test written and the picker as it stood, and with this mutation applied by hand, 1 of 2 tests: 'AssertionError: each pickable policy’s kinds, after its name: expected [ true, true, false ] to deeply equal [ true, true, true ]'. OBSERVED (bun run mutants -- the seven package A F3 entries, by their full ids, 2026-10-22, in the package A worktree, the changes staged, the mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         P6A-M27-the-picker-shows-no-kinds  ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'",
+		source: "JAN-EXEC Phase 7 after P6, package A, F3 (REG-F-524; REG-D-121 Q18; DESIGN-phase-7-completion.md section 4a, E3) - each policy's kind conditions carried through AssurancePolicyView and listPolicies, and shown by the agent's policy listing and the designer form"
 	}
 ];

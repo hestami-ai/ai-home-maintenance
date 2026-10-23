@@ -218,6 +218,43 @@ describe('PWU-Type boundary tool params (JAN-PRPWA DWP-04)', () => {
 		);
 	});
 
+	// ⭐ `REG-F-524` (`REG-D-121` Q18; `DESIGN-phase-7-completion.md` §4a E3): the listing names the kinds each policy
+	// governs, so the agent declares a policy only on a type of a kind it governs.
+	it('⭐ REG-F-524 — list_assurance_policies names the PWU kinds a policy governs, and says what they mean', () => {
+		const listPolicies = () => [
+			{
+				id: 'pol_requirement_coverage',
+				name: 'Requirement Coverage',
+				purpose: 'p',
+				version: '1.0.0',
+				status: 'ACTIVE',
+				isFloor: false,
+				pwuKinds: ['PRODUCT_BEHAVIOR_DEFINITION', 'REQUIREMENT_DEFINITION']
+			},
+			{
+				id: 'pol_unscoped',
+				name: 'Unscoped Review',
+				purpose: 'p',
+				version: '1.0.0',
+				status: 'ACTIVE',
+				isFloor: false
+			}
+		];
+		const tool = find({ listPolicies }, 'list_assurance_policies');
+		const result = tool.run({});
+		expect(result.summary, 'the kinds a policy governs are not in the listing').toBe(
+			'pol_requirement_coverage — Requirement Coverage [ACTIVE] — governs PWU kinds PRODUCT_BEHAVIOR_DEFINITION, REQUIREMENT_DEFINITION\n' +
+				'pol_unscoped — Unscoped Review [ACTIVE]'
+		);
+		expect((result.data as { pwuKinds?: readonly string[] }[]).map((p) => p.pwuKinds)).toEqual([
+			['PRODUCT_BEHAVIOR_DEFINITION', 'REQUIREMENT_DEFINITION'],
+			undefined
+		]);
+		expect(tool.description).toContain(
+			'A policy that lists PWU kinds governs a type only of one of those kinds'
+		);
+	});
+
 	it('define_pwu_type: rejects a garbage executionBoundary and does not call the broker', () => {
 		const defineType = vi.fn(() => ({ ok: true, id: 'pwut_x', status: 'ACCEPTED' }));
 		const tool = find({ defineType }, 'define_pwu_type');

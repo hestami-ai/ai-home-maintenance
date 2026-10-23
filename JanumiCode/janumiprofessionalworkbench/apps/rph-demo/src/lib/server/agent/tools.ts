@@ -5,6 +5,7 @@
 // explain the fields identically. The Pi adapter and the mock both consume these descriptors unchanged.
 import {
 	lintComposition,
+	policyKindsText,
 	type BoundaryContract,
 	type CardinalityCode,
 	type ExecutionBoundary,
@@ -273,7 +274,7 @@ export function buildAuthoringTools(
 		{
 			name: 'list_assurance_policies',
 			description:
-				'List the ACTIVE workbench Assurance Policies. The LOCKED mandatory floor policies always apply and must never be declared; every other listed policy may be referenced via requiredAssurancePolicyIds. Policies awaiting human activation are NOT listed — including one you just created with create_assurance_policy, which a human activates in the policy manager. Use create_assurance_policy only for a genuinely new required treatment.',
+				'List the ACTIVE workbench Assurance Policies. The LOCKED mandatory floor policies always apply and must never be declared; every other listed policy may be referenced via requiredAssurancePolicyIds. A policy that lists PWU kinds governs a type only of one of those kinds: declared on a type of another kind, it is never assessed for the units of that type, so declare it only on a type whose pwuKind it lists. Policies awaiting human activation are NOT listed — including one you just created with create_assurance_policy, which a human activates in the policy manager. Use create_assurance_policy only for a genuinely new required treatment.',
 			parameters: {},
 			mutates: false,
 			// ⭑ ONLY ACTIVE POLICIES ARE SHOWN TO THE ASSISTANT (`JAN-CRITREAD` `DD-5`, `REG-D-070` Q3(c)). A draft can
@@ -291,8 +292,13 @@ export function buildAuthoringTools(
 				const pols = broker.listPolicies().filter((p) => p.status === 'ACTIVE');
 				return {
 					ok: true,
+					// ⭐ `REG-F-524` — each policy with the PWU kinds it governs, in the words the designer form uses.
 					summary: pols
-						.map((p) => `${p.id} — ${p.name} [${p.isFloor ? 'MANDATORY/locked' : p.status}]`)
+						.map((p) => {
+							const line = `${p.id} — ${p.name} [${p.isFloor ? 'MANDATORY/locked' : p.status}]`;
+							const kinds = policyKindsText(p.pwuKinds);
+							return kinds ? `${line} — ${kinds}` : line;
+						})
 						.join('\n'),
 					data: pols
 				};
