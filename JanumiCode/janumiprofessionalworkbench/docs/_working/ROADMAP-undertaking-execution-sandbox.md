@@ -1982,6 +1982,11 @@ assurance policies gate it.** ⛔ Report what breaks; do not smooth it.
   - Run-8 spent 0 reviewer calls before `REG-F-501` stopped it. Run-9 spent 7: programme total 536 of about 650.
   - Next: build the authoring agent's fixes in `DESIGN-phase-7-completion.md` §4a, then P6 again, about 60 reviewer calls and total about 596 of 650.
   - Then P7: commit the paid recording and wire its replay into `gate:fast`. Q19 admits recorded reviewer judgements only in the replay test lane, never a product record. Q20 keeps the gate red on a stale recording until a fresh paid recording replaces it, about 45 reviewer calls each time. The existing fixture replay test already runs through the gate's app tests.
+- ⭑ **2026-10-23 — P6 again ran in half B, run-10; E5 and another P6 come next** (`e3dab441`; `REG-D-122`).
+  - E1–E4 are built. The accepted PWA still declared 15 of 15 types HUMAN with no prompt. Candidate checks recorded 0 policy-governs findings and the run recorded 0 paired reviews. The false SATISFIED over empty work did not recur (`REG-F-569`); the missing human-work record is `REG-F-570`. Half B's Yes remains owed.
+  - Run-10 spent 1 reviewer call: programme total 537 of about 650.
+  - Next: build E5 in `DESIGN-phase-7-completion.md` §4b, then run P6 again with the same request, about 60 reviewer calls and total about 597 of 650. E5 defaults authored work types to MODEL with an ACTIVE prompt unless the request assigns the work to a person; escalation-review types default to HUMAN.
+  - Then P7: the committed paid recording and its replay in `gate:fast`. The built-in authoring PWA is to be designed as its own programme: a real, published, revisable PWA under AX-12, with the interim default registered as its first default (`REG-D-122` Q21b–Q24).
 
 ⚠ *"The results become `TEST_RESULT` evidence"* above ~~is put to the sponsor as the design's §9.5~~ ⭑ is read as `R18`'s OBSERVATION evidence, judged by the reviewer (the sponsor, `REG-D-102` (5)). *"The declared assurance policies gate it"* holds in form only today (the design's stage 5b; §9.6) ⭑ and runs as is, all 14 verdicts reported vacuous (`REG-D-102` (6)). §11's *"It works live"* was measured on 2026-09-14 and has not been driven since; today's live authoring specs cannot pass (`REG-F-506`).
 

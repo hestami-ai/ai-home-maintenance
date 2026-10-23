@@ -122,6 +122,24 @@ P6 ran in half B, run-9, but its Yes is still owed. The accepted PWA had 9 of 9 
 - **The boundary.** E1 changes author instructions; E2 changes marker help and the example; E3 changes the policy view; E4 stops an empty review before invocation. Reviewer framing, criteria and scoring stay as they are. The reviewer fingerprint is expected to stay unchanged: **to be checked** before the paid run.
 - **The live measurement.** `REG-F-505` remedy 2 says *"it changes what the agent does and owes a live measurement before anything relies on it"*. P6 again supplies that measurement: about 60 reviewer calls, total about 596 of 650 (`REG-D-121` Q18).
 
+## 4b. After P6 again: the interim default and the built-in authoring PWA (`REG-D-122`)
+
+P6 again ran in half B, run-10, at `e3dab441` on 2026-10-23. E1–E4 are built. The accepted PWA still declared 15 of 15 types HUMAN with no prompt, and half B's Yes is still owed. The sponsor answered with an interim default, followed by a built-in authoring PWA's design.
+
+- **E5, the interim default (`REG-D-122` Q22 and Q23).**
+  - HOW TO WORK in `apps/rph-demo/src/lib/server/agent/system-prompt.ts` says that, in a PWA the agent authors, a type whose work the workbench carries out defaults to MODEL work discharge with an ACTIVE prompt using only markers its unit supplies, unless the request says a person does that work.
+  - A type that reviews or decides an escalation declares HUMAN. Ordinary assurance reviews stay with the reviewer model: they are policies, not types.
+  - The blueprints retain UNDECLARED (`REG-F-353`). This ruling registers E5 as the built-in authoring PWA's first default.
+  - **Red first:** the prompt test requires the default and the request's exception. Today's HOW TO WORK gives conditional instructions for model and human work but leaves the default unanswered, so it fails this proposed requirement. E5 is decided; its build and measurement are owed.
+- **The live measurement.** Run P6 again at about 60 reviewer calls, taking 537 spent to about 597 of 650. Use the same request as run-9 and run-10, so the change measured is E5 alone. Then P7 supplies the committed paid recording and replay.
+- **The built-in authoring PWA, to be designed as its own programme (`REG-D-122` Q21b and Q24).** It must be a real, published, revisable PWA, with visible types, policies and defaults, governed like another PWA. This applies AX-12 self-hosting (`docs/canon/JPWB-CON-000 Constitution.md:93`). Its design must settle:
+  - **The authoring/runtime boundary.** The domain model says *"a design-time authoring model call is not the execution of a PWU Instance"* (`docs/Recursive Professional Harness/Janumi Professional Workbench Recursive Professional Harness - Canonical Domain Model, Invariant Catalog, State Machines, and Event Contract.md:274`). Settle how authoring work is represented and executed as a PWA alongside that recorded boundary.
+  - **The Shape Engineering precedent.** The handbook says *"The Shape Engineering effort should itself be represented through PWUs."* and *"This makes PWA creation an instance of the same professional cognition model it produces."* (`docs/Constitution Discussion/Shape Engineering Handbook.md:1699`, `:1721`). `REG-Q-046` records its candidate standing; `REG-D-122` supplies the sponsor's direction.
+  - **The deliberate blueprint choice.** Keep the blueprints' UNDECLARED distinct from the authoring programme's default and the request's human-work exception (`REG-F-353`; `REG-D-122` Q22).
+  - **The human escalation review.** Settle how a human receives and records an escalation review on the authoring side, where that path remains owed (`REG-F-474`; `REG-D-122` Q22).
+  - **The platform boundary.** The agent's PLATFORM VS CONTENT rule assigns loop/retry control and context assembly to the platform and forbids creating them as PWU Types (`apps/rph-demo/src/lib/server/agent/system-prompt.ts`, PLATFORM VS CONTENT). Settle the authoring work's types within that rule.
+  - **The authoring floor's asserted checks.** `apps/rph-demo/src/lib/server/floor.ts:724` supplies `schemaValid: true`, with the comment *"the PWA + PWU Types are engine-validated on creation"*. At `:614`, it supplies `traceComplete: true`, with the comment *"WITHHELD — no ratified trace-completeness definition; see the doc comment."* Settle what the authoring PWA's assurance can claim and how these asserted checks are disclosed.
+
 ## 5. Part D — the replay (Phase 8)
 
 - **What the research found.**
