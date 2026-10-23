@@ -120,10 +120,14 @@ describe('buildSystemPrompt authoring-backbone boundaries', () => {
 	});
 
 	// ⭐ `REG-D-122` Q22 (`DESIGN-phase-7-completion.md` §4b E5): run-10's accepted PWA declared 15 of 15 types HUMAN
-	// with no prompt, its request leaving who does the work unstated. In a PWA the agent authors, MODEL is the default,
-	// a request that says a person does the work overrides it, and a type that reviews or decides an escalation
-	// declares HUMAN; ordinary assurance reviews are policies, not types.
-	it("⭐ HOW TO WORK: MODEL is the default in a PWA the agent authors, the request's words override it, a type that reviews or decides an escalation declares HUMAN, and ordinary assurance reviews stay with the reviewer model", () => {
+	// with no prompt, its request leaving who does the work unstated. In a PWA the agent authors, a type that reviews or
+	// decides an escalation declares HUMAN, MODEL is the default for every other INTERNAL type, a request that says a
+	// person does the work overrides it, and ordinary assurance reviews are policies, not types.
+	// ⭐ The check of E5: its default covered every type the request is silent about, so read literally it also told a
+	// type that reviews or decides an escalation, and a leaf the agent judges DELEGATED_EXTERNAL, to declare MODEL; the
+	// engine refuses any workDischarge on a delegated type (rph-application, handlers/pwa-authoring.ts). So the default
+	// is pinned with its limit, and the escalation rule as the exception its "every other" names, just before it.
+	it("⭐ HOW TO WORK: a type that reviews or decides an escalation declares HUMAN, MODEL is the default for every other INTERNAL type in a PWA the agent authors, the request's words override it, and ordinary assurance reviews stay with the reviewer model", () => {
 		const prompt = buildSystemPrompt({
 			id: 'PWA-TEST',
 			name: 'Test PWA',
@@ -134,13 +138,16 @@ describe('buildSystemPrompt authoring-backbone boundaries', () => {
 		expect(howToWork, 'arrangement: the HOW TO WORK section').toMatch(/^HOW TO WORK\n1\. /);
 
 		expect(howToWork, 'the default').toContain(
-			"In a PWA you author, MODEL is the default: when the request does not say who does a type's work, the workbench carries it out."
+			"For every other INTERNAL type in a PWA you author, MODEL is the default: when the request does not say who does that type's work, the workbench carries it out."
 		);
 		expect(howToWork, "the request's exception").toContain(
 			"The request's words override that default: when the request says a person does a type's work, that type declares HUMAN."
 		);
 		expect(howToWork, 'the escalation review').toContain(
 			'A type that reviews or decides an escalation declares HUMAN.'
+		);
+		expect(howToWork, "the exception the default's 'every other' names").toContain(
+			'A type that reviews or decides an escalation declares HUMAN. For every other INTERNAL type'
 		);
 		expect(howToWork, 'ordinary assurance reviews').toContain(
 			'Ordinary assurance reviews stay with the reviewer model: they are policies, not types.'
