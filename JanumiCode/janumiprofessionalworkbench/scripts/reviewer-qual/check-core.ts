@@ -126,11 +126,13 @@ export type CheckLimb = 'RECORD' | 'CONFERRAL' | 'COVERAGE' | 'REPRODUCTION' | '
 /**
  * ⭐⭐ `E12F` F5 (`REG-D-073`) — THE CONFERRAL PROBLEM: today's oracles are proposed, not conferred, so no run over today's
  * case set can qualify a reviewer against them. Named once, here, so the check and its test say the same words.
+ * ⚠ It fires on every set with oracles awaiting the sponsor, so it names no one version's step: it sends the operator to the
+ * current oracle file's conferral statement, which names them (package P's check, N5).
  */
 export const ORACLES_NOT_CONFERRED =
 	`today’s oracles are ${ORACLES_PROPOSED}: their author proposed them and the sponsor has not conferred them, so no run ` +
-	'over today’s case set can qualify a reviewer against them — owed: the sponsor’s conferral (REG-D-073; ' +
-	'DESIGN-phase-7-completion.md §6 step 2)';
+	'over today’s case set can qualify a reviewer against them — owed: the sponsor’s conferral (REG-D-073; the current ' +
+	'oracle file’s conferral statement names what is owed)';
 export interface CheckProblem {
 	readonly limb: CheckLimb;
 	readonly message: string;

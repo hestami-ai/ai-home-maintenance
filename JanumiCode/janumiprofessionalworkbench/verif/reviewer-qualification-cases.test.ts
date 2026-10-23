@@ -2506,6 +2506,18 @@ describe('⭐⭐ package P F3 — reviewer-qualification case set v7: version si
 		expect(await conferralProblems(committedOraclesV6().conferral)).toEqual([]);
 	});
 
+	it('⛔ WHAT THE REFUSAL SAYS IS OWED — it fires on every set with oracles awaiting the sponsor, so it names no one version’s step: it sends the operator to the current oracle file’s conferral statement, which names the six', () => {
+		// Package P's check (N5): the refusal cited DESIGN-phase-7-completion.md §6 step 2 — the declared cases' conferral,
+		// owed by version five and given (REG-D-113) — while version seven owes the six graph cases' (§4c, F4).
+		expect(ORACLES_NOT_CONFERRED, 'it cites no design step, which would name one version’s conferral').not.toMatch(/DESIGN-|§/);
+		expect(ORACLES_NOT_CONFERRED, 'it sends the operator to the current oracle file’s statement').toContain(
+			'the current oracle file’s conferral statement names what is owed'
+		);
+		expect(generatedOraclesV7().conferral, 'which names the six').toContain(
+			`(${NEW_V7.slice(0, -1).join(', ')} and ${NEW_V7.at(-1)}) are ${ORACLES_PROPOSED}`
+		);
+	});
+
 	it('⭐ THE ORACLES COMPOSE — for each of the six, a reply faulting exactly its oracle’s criteria scores to its disposition, with independence met', async () => {
 		const oracles = new Map(generatedOraclesV7().oracles.map((o) => [o.caseId, o]));
 		expect(newV7().map((c) => c.id), 'the arrangement: the six').toEqual(NEW_V7);
