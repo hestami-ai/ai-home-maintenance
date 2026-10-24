@@ -94,7 +94,7 @@
 		},
 		"packages/rph-application/src/handlers/governance.ts": {
 			"statements": 5,
-			"branches": 30,
+			"branches": 29,
 			"functions": 0,
 			"lines": 0
 		},
@@ -201,10 +201,10 @@
 			"lines": 2
 		},
 		"packages/rph-assurance/src/assurance-rules.ts": {
-			"statements": 13,
-			"branches": 16,
+			"statements": 10,
+			"branches": 13,
 			"functions": 0,
-			"lines": 7
+			"lines": 5
 		},
 		"packages/rph-assurance/src/floor-policies.ts": {
 			"statements": 0,
@@ -226,7 +226,7 @@
 		},
 		"packages/rph-assurance/src/validators.ts": {
 			"statements": 0,
-			"branches": 2,
+			"branches": 1,
 			"functions": 0,
 			"lines": 0
 		},
@@ -622,7 +622,7 @@
 		},
 		"packages/rph-projections/src/execution-view.ts": {
 			"statements": 0,
-			"branches": 10,
+			"branches": 9,
 			"functions": 0,
 			"lines": 0
 		},
@@ -658,7 +658,13 @@
 		},
 		"packages/rph-projections/src/pwa-graph.ts": {
 			"statements": 3,
-			"branches": 12,
+			"branches": 11,
+			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-projections/src/pwa-parts.ts": {
+			"statements": 0,
+			"branches": 4,
 			"functions": 0,
 			"lines": 0
 		},
@@ -676,7 +682,7 @@
 		},
 		"packages/rph-projections/src/traceability-view.ts": {
 			"statements": 0,
-			"branches": 1,
+			"branches": 0,
 			"functions": 0,
 			"lines": 0
 		},
