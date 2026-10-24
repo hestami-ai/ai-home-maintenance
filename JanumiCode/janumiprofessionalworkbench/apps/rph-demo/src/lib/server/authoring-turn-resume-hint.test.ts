@@ -116,6 +116,25 @@ describe('⭐ JAN-ESCREC D3 — resumeHintText: the resume banner names an escal
 		).toBe(revision);
 	});
 
+	it('⭐ package E, E1 — REVISION_REQUIRED beside parts whose reviews failed: the revision is the concluded parts’ findings’, and the failed parts are named and reviewed again — WHOLE', () => {
+		const failed = '"Build" (pwut_01ARZ3NDEKTSV4RRFFQ69G5Q11)';
+		expect(
+			resumeHintText({
+				status: 'REVISION_REQUIRED',
+				detail: 'The candidate did not satisfy the floor.',
+				failedReviews: failed
+			})
+		).toBe(
+			`Revision requested by the findings of the types whose reviews concluded — the Reasoning Review of ${failed} failed operationally and recorded no finding, and every type, the failed ones included, is reviewed again when the revised candidate is. This candidate is preserved. Refine it in the chat below (it continues on the same candidate), or Discard.`
+		);
+		// ⭑ Keyed on the status too: a BLOCKED_EXTERNAL turn never names a part this way (only a revision request carries them).
+		expect(
+			resumeHintText({ status: 'BLOCKED_EXTERNAL', detail: INCOMPLETE_REVIEW_GUIDANCE, failedReviews: failed })
+		).toBe(
+			`The review did not produce a usable verdict — ${INCOMPLETE_REVIEW_GUIDANCE} This candidate is preserved. Refine it in the chat below (it continues on the same candidate), or Discard.`
+		);
+	});
+
 	it.each(
 		Object.keys(NOT_RESUMABLE) as Exclude<
 			AuthoringTurnState,

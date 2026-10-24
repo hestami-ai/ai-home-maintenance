@@ -249,3 +249,163 @@ describe('⭐ JAN-ESCREC D3 — the waiver target skips the reviewer’s recomme
 		expect(listDecisions(getEngine(), { kind: 'WORKSPACE' })).toEqual([]);
 	});
 });
+
+// ⭐⭐ The review in parts, PACKAGE E, E2 (DESIGN-authoring-review-in-parts.md D6; guide §8.15: a waiver records the *"exact
+// object and semantic version"*) — A WAIVER OF A PART'S FINDING NAMES THE PART.
+//
+// ⛔ WHAT WAS WRONG. The PWA's Reasoning Review is the fold of its parts, its observations every part's in export order, so the
+// waiver took the FIRST observation across all the parts — a satisfied part's among them — and named the PWA as the waived
+// object. ⭑ WHAT MUST HOLD: the first part that blocks and records a finding, that finding, and that part's type at its stored
+// semantic version as the waived object; the PWA stays its downstream impact, and the PWA's floor reads the waiver as its own.
+describe('⭐⭐ package E, E2 — the waiver names the blocking part: its type at its stored version, and its own finding', () => {
+	/** A second type, defined after the first: the export lists it second, so its part comes after the first's. */
+	const SECOND = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5W03';
+
+	/** One part's reasoning review, concluded as given, with `observations` in that order. */
+	function stagePart(
+		typeId: string,
+		assessmentId: string,
+		observations: readonly (typeof SUBJECT_FINDING)[],
+		concludeAs: 'REJECTED' | 'SATISFIED'
+	): void {
+		const version = Number(getObject(getEngine(), typeId)?.semanticVersion ?? 1);
+		const subject = { subjectObjectIds: [typeId], subjectSemanticVersions: { [typeId]: version } };
+		arrange('RequestAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {
+			assessmentId,
+			assurancePolicyId: POLICY,
+			policyVersion: '1',
+			...subject,
+			claimIds: []
+		});
+		arrange('BeginAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {});
+		observations.forEach((o, i) =>
+			arrange('RecordAssuranceObservation', 'ASSURANCE_OBSERVATION', `${assessmentId.replace('assess_', 'obs_').slice(0, -1)}${i}`, {
+				assessmentId,
+				observationType: 'FINDING',
+				...o
+			})
+		);
+		arrange('CompleteAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {
+			validatorResult: {
+				validatorId: 'staged.reasoning-review',
+				validatorVersion: '1',
+				policyId: POLICY,
+				policyVersion: '1',
+				assessmentId,
+				...subject,
+				claimResults: [],
+				evidenceConsideredIds: [],
+				evidenceRejected: [],
+				observations: observations.map((o) => ({ ...o, subjectObjectIds: [typeId] })),
+				dispositionRecommendation: concludeAs,
+				recommendedControlActions: [],
+				residualUncertainty: [],
+				limitations: [],
+				executionProvenance: {}
+			}
+		});
+	}
+
+	beforeEach(() => {
+		arrange('DefinePwuType', 'PWU_TYPE', SECOND, {
+			pwuTypeId: SECOND,
+			pwaId: PWA,
+			pwuKind: 'BUILD',
+			name: 'Build',
+			purpose: 'Build the work',
+			isRoot: false,
+			permittedChildTypeIds: [],
+			requiredInputs: [],
+			requiredOutputs: [],
+			requiredAssurancePolicyIds: []
+		});
+	});
+
+	it('⛔ RED — a satisfied part’s observation first, a rejected part’s finding second: the waiver names the rejected part, at its stored version, and its finding', async () => {
+		stagePart(TYPE, 'assess_01ARZ3NDEKTSV4RRFFQ69G5W20', [INFORMATIONAL_FINDING], 'SATISFIED');
+		stagePart(SECOND, 'assess_01ARZ3NDEKTSV4RRFFQ69G5W30', [SUBJECT_FINDING], 'REJECTED');
+		const floor = loadPwaFloor(PWA);
+		expect(
+			floor?.parts?.map((p) => [p.typeId, p.disposition, p.observations.map((o) => o.code)]),
+			'arrangement: the satisfied part’s observation is not first in the fold'
+		).toEqual([
+			[TYPE, 'SATISFIED', ['RR-08']],
+			[SECOND, 'REJECTED', ['RR-04']]
+		]);
+
+		const offered = await theLoadOffersTheForm();
+		const result = await recordWaiver();
+		expect(result.data?.error, 'arrangement: the waiver was refused').toBeUndefined();
+		expect(offered, 'the page withholds the form beside a part’s finding the action records against').toBe(true);
+		const decision = getObject(getEngine(), result.waived!) as
+			| {
+					readonly subjectObjectIds?: readonly string[];
+					readonly subjectSemanticVersions?: Record<string, number>;
+					readonly waiver?: {
+						readonly waivedPolicyId?: string;
+						readonly waivedCriterionId?: string;
+						readonly downstreamImpactObjectIds?: readonly string[];
+					};
+			  }
+			| undefined;
+		expect(decision?.subjectObjectIds, 'the waiver does not name the blocking part as the waived object').toEqual([SECOND]);
+		expect(decision?.subjectSemanticVersions, 'the waived object is not pinned at its stored version').toEqual({
+			[SECOND]: getObject(getEngine(), SECOND)?.semanticVersion
+		});
+		expect(decision?.waiver?.waivedPolicyId).toBe(POLICY);
+		expect(decision?.waiver?.waivedCriterionId, 'the waiver named another part’s observation').toBe('RR-04');
+		expect(decision?.waiver?.downstreamImpactObjectIds, 'the PWA is not the downstream impact').toEqual([PWA]);
+		// ⭐ AND THE PWA'S FLOOR READS IT AS THE PWA'S: the panel's "waiver recorded" badge keys on this.
+		expect(loadPwaFloor(PWA)?.waived, 'the PWA’s floor does not read a waiver of its part').toBe(true);
+	});
+
+	it('⭑ CONTROL — a finding of the PWA’s own policy is waived on the PWA, as before', async () => {
+		// The schema/invariant policy, staged REJECTED with a finding: no part is the object.
+		const assessmentId = 'assess_01ARZ3NDEKTSV4RRFFQ69G5W40';
+		const version = Number(getObject(getEngine(), PWA)?.semanticVersion ?? 1);
+		const subject = { subjectObjectIds: [PWA], subjectSemanticVersions: { [PWA]: version } };
+		const finding = {
+			findingCode: 'PWA_GRAPH_NOT_WELL_FORMED',
+			severity: 'BLOCKING',
+			statement: 'Deterministic invariant violated: PWA_GRAPH_NOT_WELL_FORMED'
+		};
+		arrange('RequestAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {
+			assessmentId,
+			assurancePolicyId: 'floor.schema-invariant',
+			policyVersion: '1',
+			...subject,
+			claimIds: []
+		});
+		arrange('BeginAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {});
+		arrange('RecordAssuranceObservation', 'ASSURANCE_OBSERVATION', 'obs_01ARZ3NDEKTSV4RRFFQ69G5W41', {
+			assessmentId,
+			observationType: 'POLICY_VIOLATION',
+			...finding
+		});
+		arrange('CompleteAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {
+			validatorResult: {
+				validatorId: 'staged.schema-invariant',
+				validatorVersion: '1',
+				policyId: 'floor.schema-invariant',
+				policyVersion: '1',
+				assessmentId,
+				...subject,
+				claimResults: [],
+				evidenceConsideredIds: [],
+				evidenceRejected: [],
+				observations: [{ ...finding, subjectObjectIds: [PWA] }],
+				dispositionRecommendation: 'REJECTED',
+				recommendedControlActions: [],
+				residualUncertainty: [],
+				limitations: [],
+				executionProvenance: {}
+			}
+		});
+		const result = await recordWaiver();
+		expect(result.data?.error, 'arrangement: the waiver was refused').toBeUndefined();
+		const decision = getObject(getEngine(), result.waived!) as
+			| { readonly subjectObjectIds?: readonly string[]; readonly waiver?: { readonly waivedPolicyId?: string } }
+			| undefined;
+		expect([decision?.subjectObjectIds, decision?.waiver?.waivedPolicyId]).toEqual([[PWA], 'floor.schema-invariant']);
+	});
+});

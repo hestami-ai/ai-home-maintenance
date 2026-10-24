@@ -77,7 +77,12 @@ The following fixes address concrete failures observed during a large natural-la
   page shows, so it never says "revise the graph" where the guidance says not to: it says revise; or that revising
   does not address a review that reached no verdict; or both, when a non-review floor policy also rejected the graph
   (`JAN-SELRES` `RS-3`); or, for an escalated review, that it is to be routed to a human reviewer, whose review
-  this workbench cannot record yet (`JAN-ESCREC` `ER-1`, `REG-F-474`). The hint renders first in the floor panel.
+  this workbench cannot record yet (`JAN-ESCREC` `ER-1`, `REG-F-474`); or, in a round reviewed in parts where some
+  part's review failed operationally and another part concluded with findings that ask for revision, that revising
+  answers those findings, the failed parts named and reviewed again with every type when the floor re-runs (the
+  review in parts, package E, E1). There the classifier answers `REFINE_SUBJECT`: the concluded parts' findings go
+  back, the one automatic refinement runs, the failed parts are named beside them and never sent as a finding, and
+  the staged candidate's banner names them too. The hint renders first in the floor panel.
   Where the reviewer also recommended escalation beside findings or an incomplete review, one informational line
   says so after the hint; the recommendation is never sent back to the producer as a finding.
 - ~~Before a host configuration that uses the real reviewer starts an isolated agent candidate, an app-local preflight

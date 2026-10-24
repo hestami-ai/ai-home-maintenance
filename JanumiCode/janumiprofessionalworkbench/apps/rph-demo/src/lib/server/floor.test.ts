@@ -991,6 +991,7 @@ describe('⭐ JAN-ESCREC D3 — the recommendation is never a subject finding, a
 //   · NOT_BY_REVISION → `WITH_AN_INCOMPLETE_REVIEW`: the review reached no usable verdict, and the recommendation is
 //     recorded with it;
 //   · ROUTE_TO_HUMAN → `undefined`: the hint says the escalation itself, so the line would say it twice;
+//   · ⭐ REVISE_BESIDE_FAILED_REVIEWS (package E, E1) → `BESIDE_FINDINGS`: the concluded parts' findings come first;
 // and `undefined` beside a satisfied floor, and beside a review that recorded no recommendation, whatever the hint.
 // ⛔ Keyed on the hint's answer, not on the review's disposition: an ESCALATED review beside a REJECTED identity policy reads
 // REVISE_AND_REVIEW, which names no escalation, so the line is shown there.
@@ -1141,6 +1142,48 @@ describe('⭐ JAN-ESCREC D3 — escalationRecommendationNote: which sentence the
 					]
 				}),
 				note: undefined
+			}
+		],
+		// ⭐ The review in parts, package E, E1 — a round answered by revision beside a part whose review did not execute: the
+		// findings of the part that concluded come first, so the line is said beside them.
+		REVISE_BESIDE_FAILED_REVIEWS: [
+			{
+				shape:
+					'a REJECTED part carrying the recommendation beside its finding, beside a part whose review did not execute',
+				floor: ((): FloorView => {
+					const failed = {
+						typeId: 'pwut_01ARZ3NDEKTSV4RRFFQ69G5P01',
+						typeName: 'Build',
+						semanticVersion: 1,
+						disposition: 'INCONCLUSIVE',
+						independenceOk: false,
+						observations: [
+							{ code: 'VALIDATOR_EXECUTION_FAILED', severity: 'MATERIAL', statement: 'No reply.' }
+						]
+					};
+					const rejected = {
+						typeId: 'pwut_01ARZ3NDEKTSV4RRFFQ69G5P02',
+						typeName: 'Check',
+						semanticVersion: 1,
+						disposition: 'REJECTED',
+						independenceOk: true,
+						observations: [subjectFinding, recommendation]
+					};
+					return floorView({
+						aggregate: 'REJECTED',
+						policies: [
+							policy('floor.schema-invariant', 'SATISFIED'),
+							policy('floor.identity-provenance', 'SATISFIED'),
+							reviewPolicy({
+								disposition: 'REJECTED',
+								independenceOk: false,
+								observations: [...failed.observations, ...rejected.observations]
+							})
+						],
+						parts: [failed, rejected]
+					});
+				})(),
+				note: 'BESIDE_FINDINGS'
 			}
 		]
 	};

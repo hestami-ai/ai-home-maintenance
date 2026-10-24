@@ -378,6 +378,63 @@ describe('runPwaFloor records the floor through the AUTHENTICATED session (REG-F
 			expect(await loadReviewerAnswer(ROOT, 'authoring-floor', session, getArtifactStore())).toBeUndefined();
 		});
 
+		// ⭐ The review in parts, package E, E4 — THE DISCLOSURE OF AN ANSWER NOT RETAINED NAMES ITS EXCHANGE. The reader handed
+		// `readAnswerSpan` the stored state, which carries no `exchangeId` (`AS-06`, `reviewer-answer.ts`), so the inspector read
+		// "The answer span was not retained for undefined". A call recorded with its answer's bytes disclosed as not retained,
+		// as `e2e/inspector-part-reviews.e2e.ts` stages one.
+		it('⭐ an answer not retained: the disclosure names the exchange it read, whole', async () => {
+			const exchangeId = 'mex_01ARZ3NDEKTSV4RRFFQ69G5PE4';
+			const reason = 'staged by the test: no bytes were kept for this answer';
+			const pending = (why: string) => ({ status: 'PENDING_CONTENT_PLANE', reason: why });
+			const unprobed = { availability: 'NOT_PROBED', evidence: 'NONE', rationale: 'staged by the test: no model was called' };
+			expect(
+				dispatch(
+					'RecordModelExchange',
+					exchangeId,
+					{
+						exchangeId,
+						exchangeRole: 'INITIAL',
+						attemptOrdinal: 1,
+						runToken: 'authoring-floor:floorrun_e4',
+						plane: 'ASSURANCE',
+						invokerId: 'test.staged-reviewer',
+						assurancePolicyId: 'floor.reasoning-review',
+						subjectObjectId: ROOT,
+						subjectObjectType: 'PWU_TYPE',
+						subjectSemanticVersion: 1,
+						resolvedProvider: unprobed,
+						resolvedModel: unprobed,
+						resolvedModelVersion: unprobed,
+						materializedInputRef: pending('staged by the test: no prompt was sent'),
+						rawOutputBeforeCoercionRef: pending('staged by the test: no reply arrived'),
+						answerSpanRef: pending(reason),
+						volunteeredReasoningRef: pending('staged by the test: no reply arrived'),
+						inputRedactionManifestRef: pending('staged by the test: no prompt was sent'),
+						redactionState: 'NOT_IMPLEMENTED',
+						inputTruncation: 'NONE_DECLARED',
+						outputTruncation: 'NONE_DECLARED',
+						omittedRegions: [],
+						disposition: 'ACCEPTED',
+						parseOutcome: { outcome: 'PARSED', detail: '' },
+						requestedAt: TS,
+						respondedAt: TS,
+						workProductDerivation: {
+							relation: 'NO_WORK_PRODUCT_EXPECTED',
+							reason: 'staged by the test: a review answers criteria and produces no work product'
+						},
+						observedToolCalls: { observation: 'NOT_OBSERVABLE', reason: 'staged by the test: no tool ran' }
+					},
+					'MODEL_EXCHANGE'
+				).status,
+				'arrangement: the call is recorded'
+			).toBe('ACCEPTED');
+			const view = await loadReviewerAnswer(ROOT, 'authoring-floor:floorrun_e4', session, getArtifactStore());
+			expect(view?.answer, 'arrangement: an answer was shown').toBeUndefined();
+			expect(view?.disclosure, 'the disclosure does not name the exchange it read').toBe(
+				`The answer span was not retained for ${exchangeId}: ${reason}`
+			);
+		});
+
 		it('⭑ E-2 is RETAINED end to end, split at retention — REG-D-056', async () => {
 			await runPwaFloor(
 				PWA,

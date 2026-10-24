@@ -22,6 +22,9 @@ import { SESSION_CREDENTIAL } from './identity.js';
 import { getEngine, mintUiId, resetEngine } from './workbench.js';
 import {
 	classifyFloorRemediation,
+	escalationRecommendationNote,
+	floorBlockedHint,
+	floorFailedReviews,
 	loadPwaFloor,
 	loadSubjectFloor,
 	partsDisposition,
@@ -29,6 +32,7 @@ import {
 	refineDirective,
 	runPwaFloor,
 	type FloorObservationView,
+	type FloorPartView,
 	type FloorProducer,
 	type FloorView
 } from './floor.js';
@@ -134,6 +138,23 @@ async function runRound(
 	return { floor, prompts };
 }
 
+/** The classifier's guidance for valid subject findings, verbatim (`floor.ts`) — restated, so a change to it reddens here. */
+const REFINE_GUIDANCE =
+	'PublishPwa remains blocked while valid Reasoning Review findings are open. Revise the reviewed PWA graph and/or its recorded professional rationale as the coded findings require, then rerun assurance.';
+/** ⭐ Package E, E1 — what the guidance adds beside parts whose reviews failed operationally, each named as the host names it. */
+const failedBeside = (...parts: string[]): string => {
+	const named: string[] = [];
+	for (let i = 0; i < parts.length; i += 2) named.push(`"${parts[i + 1]}" (${parts[i]})`);
+	return `The Reasoning Review of ${named.join(', ')} failed operationally and recorded no finding: that failure is not a defect in the PWA, and every type, the failed ones included, is reviewed again when assurance reruns.`;
+};
+/** The classifier's guidance for a review that did not execute, verbatim. */
+const EXECUTION_FAILED_GUIDANCE =
+	'PublishPwa remains blocked because the mandatory Reasoning Review did not execute. Configure or retry the reviewer; if it remains unavailable, change to a permitted independent validator and rerun assurance. Do not revise the PWA or record a waiver in response to this execution failure.';
+/** A call that got no reply — the reviewing tool's throw, which the validator records `VALIDATOR_EXECUTION_FAILED`. */
+const noResponse = (): never => {
+	throw new Error('the reviewing tool did not respond');
+};
+
 const review = (f: FloorView | undefined) => f?.policies.find((p) => p.policyId === REVIEW);
 const assessments = () => listByType(session, 'ASSURANCE_ASSESSMENT');
 const subjectOf = (row: { readonly state: Record<string, unknown> }) => (row.state.subjectObjectIds as string[])[0];
@@ -236,7 +257,10 @@ describe('⭐⭐ B3 — one round, one review per type, recorded part by part un
 		expect(review(back)?.observations.map((o) => o.typeId)).toEqual([CHECK]);
 	});
 
-	it('⛔ an OPERATIONAL failure of one part leaves the review incomplete, and never becomes a graph-edit instruction — even beside another part’s finding', async () => {
+	it('⛔ an OPERATIONAL failure of one part leaves the review incomplete, and never becomes a graph-edit instruction of its own — ⭐ beside another part’s finding, the round is answered by revision (package E, E1)', async () => {
+		// ⭐ A DELIBERATE EXPECTATION CHANGE (the lead's decision on package B's check): this held the round to
+		// RETRY_OR_CONFIGURE_REVIEWER, no finding and no refinement — while the panel listed Check's finding. Now Check's finding
+		// goes back, Build's failed review is named beside it, and neither is a finding about Build.
 		const { floor } = await runRound({
 			[BUILD]: () => {
 				throw new Error('the reviewing tool did not respond');
@@ -244,12 +268,20 @@ describe('⭐⭐ B3 — one round, one review per type, recorded part by part un
 			[CHECK]: rejecting('The check reports runs it never made.')
 		});
 		expect(floor?.parts?.map((p) => p.disposition)).toEqual(['INCONCLUSIVE', 'REJECTED', 'SATISFIED']);
-		expect(floor?.satisfied).toBe(false);
+		expect(
+			floor?.parts?.[0]?.observations.map((o) => o.code),
+			'arrangement: Build’s review did not fail operationally'
+		).toContain('VALIDATOR_EXECUTION_FAILED');
+		expect(floor?.satisfied, 'the round was treated as SATISFIED').toBe(false);
 		const remediation = classifyFloorRemediation(floor!);
-		expect(remediation.action, 'a failed review was answered by revising the graph').toBe(
-			'RETRY_OR_CONFIGURE_REVIEWER'
-		);
-		expect([remediation.autoRefine, remediation.findings]).toEqual([false, []]);
+		expect(remediation.action, 'the rejected part’s finding was not answered by revision').toBe('REFINE_SUBJECT');
+		expect(remediation.autoRefine, 'the one automatic refinement does not run').toBe(true);
+		expect(
+			remediation.findings.map((f) => [f.typeId, f.typeName, f.code, f.statement]),
+			'a failed part’s record became a finding'
+		).toEqual([[CHECK, 'Check', reasoningReviewCriteria(session)[0]!.id, 'The check reports runs it never made.']]);
+		expect(remediation.failedParts, 'the failed part is not named').toEqual([{ typeId: BUILD, typeName: 'Build' }]);
+		expect(remediation.guidance).toBe(`${REFINE_GUIDANCE} ${failedBeside(BUILD, 'Build')}`);
 	});
 
 	it('⛔ an independence-invalid review blocks the round, and is answered by changing the reviewer', async () => {
@@ -498,5 +530,297 @@ describe('⭐⭐ B4 — the turn: findings by type, the whole inventory again af
 		expect(() => markAuthoringTurnAssured(turn, reviewed)).toThrow(
 			`Assurance is stale: reviewer subject ${reviewed}, current candidate ${hashAuthoringSubject(turn)}.`
 		);
+	});
+});
+
+// ⭐⭐ The review in parts, PACKAGE E — what the checks of packages B and C left to the lead, as the lead decided it
+// (DESIGN-authoring-review-in-parts.md D5, D6, D8). E1: a round whose concluded parts ask for revision is answered by revision
+// beside parts whose reviews failed operationally, the failed parts named and reviewed again. E3: a PWA with no type had
+// nothing to review. E2: a waiver of a part's finding names the part's type, and the PWA's floor reads it as covering the PWA.
+
+/** One part of a round as a reader hands it, each observation carrying the part's type. */
+const partView = (
+	typeId: string,
+	typeName: string,
+	disposition: string,
+	observations: readonly { readonly code: string; readonly severity: string; readonly statement: string }[],
+	independenceOk = true
+): FloorPartView => ({
+	typeId,
+	typeName,
+	semanticVersion: 1,
+	disposition,
+	independenceOk,
+	observations: observations.map((o) => ({ ...o, typeId, typeName }))
+});
+/** A round over `parts`, folded as the floor folds one, beside two deterministic policies that passed. */
+const roundOf = (parts: readonly FloorPartView[]): FloorView => ({
+	subjectId: PWA,
+	aggregate: partsDisposition(parts),
+	satisfied: false,
+	waived: false,
+	policies: [
+		{ policyId: 'floor.schema-invariant', disposition: 'SATISFIED', independenceOk: true, observations: [] },
+		{ policyId: 'floor.identity-provenance', disposition: 'SATISFIED', independenceOk: true, observations: [] },
+		{
+			policyId: REVIEW,
+			disposition: partsDisposition(parts),
+			independenceOk: parts.every((p) => p.independenceOk),
+			observations: parts.flatMap((p) => p.observations)
+		}
+	],
+	reasoningGaps: [],
+	parts
+});
+
+describe('⭐⭐ Package E, E1 — revision beside parts whose reviews failed operationally', () => {
+	it('⭐ the read-back says it, and so do the hint and the directive: revise for the concluded part’s finding, the failed part named and reviewed again', async () => {
+		await runRound({ [BUILD]: noResponse, [CHECK]: rejecting('The check reports runs it never made.') });
+		const back = loadPwaFloor(PWA, session)!;
+		const remediation = classifyFloorRemediation(back);
+		expect([remediation.action, remediation.autoRefine, remediation.failedParts]).toEqual([
+			'REFINE_SUBJECT',
+			true,
+			[{ typeId: BUILD, typeName: 'Build' }]
+		]);
+		expect(remediation.findings.map((f) => f.typeId), 'a finding not the concluded part’s').toEqual([CHECK]);
+		expect(floorBlockedHint(back), 'the hint said revising does not address it').toBe('REVISE_BESIDE_FAILED_REVIEWS');
+		expect(floorFailedReviews(back)).toBe(`"Build" (${BUILD})`);
+		const directive = refineDirective('Build wordfreq.', remediation.findings, remediation.failedParts);
+		expect(directive).toContain(`Findings about the type "Check" (${CHECK}):\n1. [`);
+		expect(directive, 'the directive does not name the failed part').toContain(
+			`\n\nThe review of 1 type(s) failed operationally and recorded no finding about them; every type, these included, is reviewed again after this revision. Do not change them on account of that failure:\n- "Build" (${BUILD})\n\nOriginal intent: Build wordfreq.`
+		);
+		expect(directive, 'the failed part’s record was sent as a finding').not.toContain('the reviewing tool did not respond');
+	});
+
+	it('⭑ CONTROL — every part’s review failed: the retry answer stands, whole, and no part is named', async () => {
+		const { floor } = await runRound({ [BUILD]: noResponse, [CHECK]: noResponse, [ROOT]: noResponse });
+		expect(floor?.parts?.map((p) => p.disposition), 'arrangement: every part failed').toEqual([
+			'INCONCLUSIVE',
+			'INCONCLUSIVE',
+			'INCONCLUSIVE'
+		]);
+		expect(classifyFloorRemediation(floor!)).toEqual({
+			action: 'RETRY_OR_CONFIGURE_REVIEWER',
+			autoRefine: false,
+			findings: [],
+			guidance: EXECUTION_FAILED_GUIDANCE
+		});
+		expect(floorBlockedHint(floor!)).toBe('NOT_BY_REVISION');
+		expect(floorFailedReviews(floor!)).toBeUndefined();
+	});
+
+	it('⭑ CONTROL — one part’s review failed and the rest SATISFIED: the retry answer stands, whole', async () => {
+		const { floor } = await runRound({ [BUILD]: noResponse });
+		expect(floor?.parts?.map((p) => p.disposition)).toEqual(['INCONCLUSIVE', 'SATISFIED', 'SATISFIED']);
+		expect(classifyFloorRemediation(floor!)).toEqual({
+			action: 'RETRY_OR_CONFIGURE_REVIEWER',
+			autoRefine: false,
+			findings: [],
+			guidance: EXECUTION_FAILED_GUIDANCE
+		});
+		expect(floorBlockedHint(floor!)).toBe('NOT_BY_REVISION');
+	});
+
+	it('⭑ CONTROL — one REJECTED part and the rest SATISFIED: the revision answer as before — no part named, by the guidance, the hint or the directive', async () => {
+		const { floor } = await runRound({ [CHECK]: rejecting('The check reports runs it never made.') });
+		const remediation = classifyFloorRemediation(floor!);
+		expect([remediation.action, remediation.autoRefine, remediation.guidance]).toEqual([
+			'REFINE_SUBJECT',
+			true,
+			REFINE_GUIDANCE
+		]);
+		expect(remediation.failedParts).toBeUndefined();
+		expect(floorBlockedHint(floor!)).toBe('REVISE');
+		expect(floorFailedReviews(floor!)).toBeUndefined();
+		expect(refineDirective('Build wordfreq.', remediation.findings, remediation.failedParts)).not.toContain(
+			'failed operationally'
+		);
+	});
+
+	it('⛔ the concluded parts’ reviews not independent of the producer: the faulting reply is no valid verdict, and the retry answer stands', async () => {
+		// The producer named as the reviewer's own model, as the independence case above names it: Check's faulting reply then
+		// concludes nothing (an independence-invalid result is no authoritative finding), so nothing asks for revision.
+		const floor = await withLiveReviewerSeam(() =>
+			runPwaFloor(
+				PWA,
+				{
+					prompt: 'Author it.',
+					producer: { ...PRODUCER, modelId: 'test-judge-model', providerId: 'google' },
+					canonical: session,
+					print: async (prompt) => {
+						const typeId = partOf(prompt);
+						if (typeId === BUILD) return noResponse();
+						return typeId === CHECK
+							? rejecting('The check reports runs it never made.')
+							: clearingJudgement(reasoningReviewCriteria(session));
+					}
+				},
+				session
+			)
+		);
+		expect(floor?.parts?.map((p) => [p.disposition, p.independenceOk]), 'arrangement').toEqual([
+			['INCONCLUSIVE', false],
+			['INCONCLUSIVE', false],
+			['INCONCLUSIVE', false]
+		]);
+		expect(
+			floor?.parts?.[1]?.observations.map((o) => o.code),
+			'arrangement: Check’s reply faulted a criterion'
+		).toContain(reasoningReviewCriteria(session)[0]!.id);
+		const remediation = classifyFloorRemediation(floor!);
+		expect(remediation.action, 'a finding of a review not independent of the producer went back').toBe(
+			'RETRY_OR_CONFIGURE_REVIEWER'
+		);
+		expect([remediation.findings, remediation.failedParts]).toEqual([[], undefined]);
+	});
+
+	it('⛔ the reviewer’s recommendation beside the rejected part is no finding, and the panel’s line is said beside the findings', async () => {
+		const escalatedFault = JSON.stringify({
+			...JSON.parse(rejecting('The check reports runs it never made.')),
+			recommendation: 'ESCALATED'
+		});
+		const { floor } = await runRound({ [BUILD]: noResponse, [CHECK]: escalatedFault });
+		expect(floor?.parts?.[1]?.observations.map((o) => o.code), 'arrangement: the recommendation is recorded').toContain(
+			'REVIEWER_RECOMMENDED_ESCALATION'
+		);
+		const remediation = classifyFloorRemediation(floor!);
+		expect(remediation.findings.map((f) => f.code), 'the recommendation was sent back as a finding').toEqual([
+			reasoningReviewCriteria(session)[0]!.id
+		]);
+		expect(escalationRecommendationNote(floor!), 'the line beside the findings was not said').toBe('BESIDE_FINDINGS');
+	});
+
+	it('⛔ a part refused for a substituted model beside a rejected part: the substitution’s own remedy, never revision', () => {
+		const floor = roundOf([
+			partView(
+				BUILD,
+				'Build',
+				'INCONCLUSIVE',
+				[
+					{ code: 'VALIDATOR_EXECUTION_FAILED', severity: 'MATERIAL', statement: 'Another model answered.' },
+					{ code: 'VALIDATOR_MODEL_SUBSTITUTED', severity: 'MATERIAL', statement: 'Another model answered.' }
+				],
+				false
+			),
+			partView(CHECK, 'Check', 'REJECTED', [
+				{ code: 'RR-01-no-problem-substitution', severity: 'BLOCKING', statement: 'Reports a run it never made.' }
+			]),
+			partView(ROOT, 'Realize', 'SATISFIED', [])
+		]);
+		expect(classifyFloorRemediation(floor).action, 'a refused substitute was answered by revising the graph').toBe(
+			'REQUALIFY_OR_RESELECT_REVIEWER'
+		);
+		// CONTROL — the same round, the part's review failing for no substitution, is answered by revision.
+		const failed = roundOf([
+			partView(
+				BUILD,
+				'Build',
+				'INCONCLUSIVE',
+				[{ code: 'VALIDATOR_EXECUTION_FAILED', severity: 'MATERIAL', statement: 'No reply.' }],
+				false
+			),
+			...floor.parts!.slice(1)
+		]);
+		expect(classifyFloorRemediation(failed).action).toBe('REFINE_SUBJECT');
+	});
+});
+
+describe('⭐ Package E, E3 — a PWA with no type had nothing to review', () => {
+	const EMPTY = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5Q01';
+	/** The guidance, verbatim — restated, so a change to it reddens here. */
+	const NO_TYPE_GUIDANCE =
+		"PublishPwa remains blocked because the PWA defines no PWU Type, so the mandatory Reasoning Review, which reviews each of the PWA's types, had nothing to review. Author the PWA's types, then rerun assurance. The reviewer did not fail: do not configure or change it, or record a waiver, in response.";
+
+	it('⭐ RED — answered by authoring the types, never by configuring or changing the reviewer, and the hint says to revise', async () => {
+		send('CreatePwa', 'PROFESSIONAL_WORK_ARCHITECTURE', EMPTY, {
+			pwaId: EMPTY,
+			name: 'empty',
+			description: 'A PWA with no type yet.',
+			domain: 'software',
+			version: '1.0.0'
+		});
+		const prompts: string[] = [];
+		const floor = await withLiveReviewerSeam(() =>
+			runPwaFloor(
+				EMPTY,
+				{
+					prompt: 'Author it.',
+					producer: PRODUCER,
+					canonical: session,
+					print: async (prompt) => {
+						prompts.push(prompt);
+						return clearingJudgement(reasoningReviewCriteria(session));
+					}
+				},
+				session
+			)
+		);
+		expect(prompts, 'arrangement: a reviewer was called').toEqual([]);
+		expect([floor?.parts, review(floor)?.disposition], 'arrangement: no part, the fold of none').toEqual([
+			[],
+			'UNASSESSED'
+		]);
+		const expected = {
+			action: 'RESOLVE_OTHER_FLOOR_FINDINGS',
+			autoRefine: false,
+			findings: [],
+			guidance: NO_TYPE_GUIDANCE
+		};
+		expect(classifyFloorRemediation(floor!), 'a PWA with no type was answered as the reviewer’s failure').toEqual(expected);
+		expect(floorBlockedHint(floor!), 'the hint said revising does not address it').toBe('REVISE');
+		expect(classifyFloorRemediation(loadPwaFloor(EMPTY, session)!), 'the read-back').toEqual(expected);
+	});
+
+	it('⭑ CONTROL — a round that holds none of the parts the store holds: the review is incomplete, and the reviewer’s remedy stands', async () => {
+		await runRound();
+		const version = session.loadObject(PWA)!.semanticVersion;
+		const assessmentId = mintUiId('asmt');
+		send(
+			'RequestAssuranceAssessment',
+			'ASSURANCE_ASSESSMENT',
+			assessmentId,
+			{
+				assessmentId,
+				assurancePolicyId: 'floor.schema-invariant',
+				policyVersion: '1',
+				subjectObjectIds: [PWA],
+				subjectSemanticVersions: { [PWA]: version },
+				claimIds: []
+			},
+			'authoring-floor:floorrun_partial'
+		);
+		const back = loadPwaFloor(PWA, session)!;
+		expect(back.parts?.map((p) => p.disposition), 'arrangement').toEqual(['MISSING', 'MISSING', 'MISSING']);
+		expect(classifyFloorRemediation(back).action).toBe('RETRY_OR_CONFIGURE_REVIEWER');
+	});
+});
+
+describe('⭐ Package E, E2 — a waiver of a part names its type, and the PWA’s floor reads it as covering the PWA', () => {
+	it('⭐ a waiver naming one type: the round run and the round read back are each waived — and neither before it', async () => {
+		const { floor: before } = await runRound({ [CHECK]: rejecting('The check reports runs it never made.') });
+		expect([before?.waived, loadPwaFloor(PWA, session)?.waived], 'arrangement: waived before any waiver').toEqual([
+			false,
+			false
+		]);
+		const waiverId = 'dec_01ARZ3NDEKTSV4RRFFQ69G5Q20';
+		const criterion = reasoningReviewCriteria(session)[0]!.id;
+		send('RequestWaiver', 'DECISION', waiverId, {
+			subjectObjectIds: [CHECK],
+			scope: criterion,
+			rationale: 'Accepted: the check’s gap is understood and owned.',
+			duration: 'until superseded',
+			affectedObjectIds: [PWA],
+			waivedPolicyId: REVIEW,
+			waivedCriterionId: criterion,
+			waivedFindingIds: [],
+			compensatingControls: [],
+			reviewConditions: []
+		});
+		send('GrantWaiver', 'DECISION', waiverId, { waiverDecisionId: waiverId, duration: 'until superseded' });
+		expect(loadPwaFloor(PWA, session)?.waived, 'the read-back of a PWA a part of which a waiver names').toBe(true);
+		const { floor: after } = await runRound({ [CHECK]: rejecting('The check reports runs it never made.') });
+		expect(after?.waived, 'the round run over a PWA a part of which a waiver names').toBe(true);
 	});
 });

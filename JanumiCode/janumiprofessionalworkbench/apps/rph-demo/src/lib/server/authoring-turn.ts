@@ -32,6 +32,8 @@ export interface AuthoringTurn {
 	readonly detail?: string;
 	/** ⭐ `JAN-ESCREC` D3 — the floor classifier's action a BLOCKED_EXTERNAL turn stopped on (see the summary's). */
 	readonly remediationAction?: FloorRemediationAction;
+	/** ⭐ The review in parts, package E, E1 — the parts a REVISION_REQUIRED turn's floor could not review (see the summary's). */
+	readonly failedReviews?: string;
 }
 
 interface MutableAuthoringTurn {
@@ -55,6 +57,7 @@ interface MutableAuthoringTurn {
 	assuredSubjectHash?: string;
 	detail?: string;
 	remediationAction?: FloorRemediationAction;
+	failedReviews?: string;
 }
 
 export interface AuthoringTurnSummary {
@@ -71,6 +74,13 @@ export interface AuthoringTurnSummary {
 	 * `detail`, and only an external block sets it again.
 	 */
 	readonly remediationAction?: FloorRemediationAction;
+	/**
+	 * ⭐ The review in parts, package E, E1 (the lead's decision) — THE PARTS WHOSE REVIEWS FAILED OPERATIONALLY beside the
+	 * findings a REVISION_REQUIRED turn stopped on, as the floor names them (`FloorRemediation.failedParts`, `partsNamed`), so
+	 * the resume banner says they are reviewed again when the revised candidate is — as DATA, never read from `detail`. Absent
+	 * on every other stop, and forgotten by a resume, as `remediationAction` is.
+	 */
+	readonly failedReviews?: string;
 	readonly candidateHash?: string;
 	readonly assuredSubjectHash?: string;
 	readonly commandCount: number;
@@ -147,6 +157,9 @@ function publicTurn(turn: MutableAuthoringTurn): AuthoringTurn {
 		},
 		get remediationAction() {
 			return turn.remediationAction;
+		},
+		get failedReviews() {
+			return turn.failedReviews;
 		}
 	};
 }
@@ -399,8 +412,13 @@ export function markAuthoringTurnValid(turn: AuthoringTurn): string {
 	return hashAuthoringSubject(turn);
 }
 
-/** A candidate defect requires revision; canonical state remains unchanged. */
-export function markAuthoringTurnRevisionRequired(turn: AuthoringTurn, detail: string): void {
+/** A candidate defect requires revision; canonical state remains unchanged. ⭐ Package E, E1: `failedReviews` names the parts
+ *  whose reviews failed operationally beside the findings, when the floor names any (the summary's). */
+export function markAuthoringTurnRevisionRequired(
+	turn: AuthoringTurn,
+	detail: string,
+	failedReviews?: string
+): void {
 	const current = mutable(turn);
 	if (stateOf(current) === 'COLLECTING') {
 		transition(current, { type: 'VALIDATE' }, 'VALIDATING');
@@ -409,6 +427,7 @@ export function markAuthoringTurnRevisionRequired(turn: AuthoringTurn, detail: s
 		transition(current, { type: 'CANDIDATE_FINDINGS' }, 'REVISION_REQUIRED');
 	}
 	current.detail = detail;
+	current.failedReviews = failedReviews;
 	finalizeAuthoringTurn(turn);
 }
 
@@ -444,6 +463,7 @@ export function resumeAuthoringTurn(pwaId: string): AuthoringTurn | undefined {
 	turn.candidateHash = undefined;
 	turn.assuredSubjectHash = undefined;
 	turn.remediationAction = undefined;
+	turn.failedReviews = undefined;
 	turn.detail = undefined;
 	return publicTurn(turn);
 }
@@ -837,6 +857,7 @@ export function summarizeAuthoringTurn(turn: AuthoringTurn): AuthoringTurnSummar
 		status: turn.status,
 		...(turn.detail !== undefined ? { detail: turn.detail } : {}),
 		...(turn.remediationAction !== undefined ? { remediationAction: turn.remediationAction } : {}),
+		...(turn.failedReviews !== undefined ? { failedReviews: turn.failedReviews } : {}),
 		candidateHash: turn.candidateHash,
 		assuredSubjectHash: turn.assuredSubjectHash,
 		commandCount: turn.commands.length,
@@ -862,13 +883,20 @@ export function summarizeAuthoringTurn(turn: AuthoringTurn): AuthoringTurnSummar
  * branch had no test — no reviewer the default e2e lane can select recommends ESCALATED — and a mutant keying it on the
  * wrong status survived its e2e victim. `authoring-turn-resume-hint.test.ts` holds every branch whole;
  * `e2e/resume-hint.e2e.ts` holds the INCOMPLETE banner whole in the browser, which proves the template renders this.
+ *
+ * ⭐ The review in parts, package E, E1 (the lead's decision) — A REVISION REQUESTED BESIDE PARTS WHOSE REVIEWS FAILED says
+ * so: the findings of the parts that concluded ask for the revision, and the failed parts, named, are reviewed again with
+ * every type when the revised candidate is (`failedReviews`, data the route sets). ⛔ Such a round read "The review did not
+ * produce a usable verdict" beside a panel listing a rejected part's finding.
  */
 export function resumeHintText(
-	turn: Pick<AuthoringTurnSummary, 'status' | 'detail' | 'remediationAction'>
+	turn: Pick<AuthoringTurnSummary, 'status' | 'detail' | 'remediationAction' | 'failedReviews'>
 ): string | undefined {
 	const escalated =
 		turn.status === 'BLOCKED_EXTERNAL' && turn.remediationAction === 'ESCALATE_REVIEW';
 	const refine = `Refine it in the chat below (it continues on the same candidate${escalated ? ', and refining re-runs the same automated reviewer' : ''}), or Discard.`;
+	if (turn.status === 'REVISION_REQUIRED' && turn.failedReviews !== undefined)
+		return `Revision requested by the findings of the types whose reviews concluded — the Reasoning Review of ${turn.failedReviews} failed operationally and recorded no finding, and every type, the failed ones included, is reviewed again when the revised candidate is. This candidate is preserved. ${refine}`;
 	if (turn.status === 'REVISION_REQUIRED')
 		return `Revision requested — this candidate is preserved. ${refine}`;
 	if (turn.status !== 'BLOCKED_EXTERNAL') return undefined;
