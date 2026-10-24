@@ -54,8 +54,8 @@ export const ORACLES_V9: OracleSet = {
 		'confirmed by the sponsor as restated (REG-D-129, Q34: asked “Do you confirm the restated bridge cases as shown (each ' +
 		'type given a purpose as production stores it, each planted twin differing only where its defect is), with their ' +
 		"expected verdicts unchanged, so High's re-measurement on them counts?”, the sponsor chose “Confirm as restated " +
-		'(Recommended)”): their expected verdicts, faulted criteria, catchers and standings stand as the sponsor conferred them ' +
-		'(REG-D-126 Q30), and the confirmation changes none of them. The other ' +
+		'(Recommended)”): their expected verdicts, faulted criteria, catcher assignments and standings stand as REG-D-126 ' +
+		'conferred them, and the confirmation changes none of them. The other ' +
 		`${CASE_SET_V8.cases.length - RESTATED_PART_CASES.length} — the 41 non-part cases and the 16 part cases of G7-CLEAN, its ` +
 		'planted twins and the 3-level pair — are conferred, as recorded above.',
 	oracles: ORACLES_V8.oracles

@@ -3457,8 +3457,8 @@ describe('⭐⭐ the review in parts, B8a — reviewer-qualification case set v9
 		expect(conferral, 'Q33b, quoted').toContain(
 			'the sponsor chose “Fix both first (Recommended)”, whose text read “Design note, then build: policy names and applicable policies in each part; the bridge cases restated as production stores them, their expected verdicts unchanged and shown to you to confirm;'
 		);
-		expect(conferral, 'the 19, named as confirmed, in the sponsor’s words').toContain(
-			`The 19 part cases cut from the restated bridge cases — ${restated.join(', ')} — were confirmed by the sponsor as restated (REG-D-129, Q34: asked “Do you confirm the restated bridge cases as shown (each type given a purpose as production stores it, each planted twin differing only where its defect is), with their expected verdicts unchanged, so High's re-measurement on them counts?”, the sponsor chose “Confirm as restated (Recommended)”): their expected verdicts, faulted criteria, catchers and standings stand as the sponsor conferred them (REG-D-126 Q30), and the confirmation changes none of them.`
+		expect(conferral, 'the 19, named as confirmed, in the sponsor’s words, their oracles standing as REG-D-129 says, not as the sponsor’s Q30 answer').toContain(
+			`The 19 part cases cut from the restated bridge cases — ${restated.join(', ')} — were confirmed by the sponsor as restated (REG-D-129, Q34: asked “Do you confirm the restated bridge cases as shown (each type given a purpose as production stores it, each planted twin differing only where its defect is), with their expected verdicts unchanged, so High's re-measurement on them counts?”, the sponsor chose “Confirm as restated (Recommended)”): their expected verdicts, faulted criteria, catcher assignments and standings stand as REG-D-126 conferred them, and the confirmation changes none of them.`
 		);
 		expect(conferral, 'the other 57 conferred').toContain('The other 57 — the 41 non-part cases and the 16 part cases of G7-CLEAN, its planted twins and the 3-level pair — are conferred, as recorded above.');
 		expect(conferral, 'no proposal’s word').not.toContain(ORACLES_PROPOSED);
