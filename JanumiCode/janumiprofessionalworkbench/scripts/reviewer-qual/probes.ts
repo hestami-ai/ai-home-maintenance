@@ -4,7 +4,8 @@
 // assembly that no qualification case exercises. So it hashes the prompts of THESE inputs — or, for one the validator
 // refuses, the refusal — chosen to reach every branch a prompt can take (what none can, and why, is said below), and
 // separate from the cases (which are data the sponsor confers; §5.2):
-//   · each framing — the graph, the work product, and the process result with each observation kind and its absent
+//   · each framing — ~~the graph~~ ⭐ the part (B7: the graph framing's probes left the fingerprint with case set v8, which
+//     holds no graph case), the work product, and the process result with each observation kind and its absent
 //     report (the process-result arm has no case in version one, `REG-D-072` D17);
 //   · the rationale absent (the "NOT DECLARED" instruction fifteen of sixteen lane prompts carried) and present, with an
 //     empty list inside it; narration present and absent; prior gaps present; a candidate subject hash;
@@ -30,13 +31,15 @@
 //     assumptions and residual uncertainty, argv, stdout's HEAD and TAIL, stderr), each spelled through its own family
 //     of the skeleton's generated table or its own rule of the reader the chooser models, and `P-FENCES-OTHER-SLICES`
 //     in the three it leaves empty (the limitations, which production sends, and the narration and the prior findings,
-//     which it never does). THE VALIDATOR'S: `G-OVERSIZE-FENCES` in each of a graph's slices (the instruction, a node's
-//     name, each field of the account — the limitations cut — the narration, the prior findings); `W-FENCES` in each of
+//     which it never does). THE VALIDATOR'S: ~~`G-OVERSIZE-FENCES` in each of a graph's slices~~ `T-OVERSIZE-FENCES` in
+//     each of a part's slices (the request, a type's name in the part, each field of the account — the limitations cut —
+//     the narration, the prior findings); `W-FENCES` in each of
 //     a work product's (the instruction, the answer, each field of the account, the prior findings);
 //     `P-OVERSIZE-FENCES` in each of a process result's it fills (the instruction, the account's fields but the empty
 //     limitations, and the view, read whole), and `P-OVERSIZE-ALL` and `P-FENCES-OTHER-SLICES` in the other three (the
-//     limitations, the narration, the prior findings); and `G-OVERSIZE-CONTENT` and `W-OVERSIZE-CONTENT` in the kept
-//     HEAD of a content the budget cuts. ⭐ P5 package D (`REG-D-118` (1)) — and, in a declared review, the slices its host
+//     limitations, the narration, the prior findings); and ~~`G-OVERSIZE-CONTENT` and~~ `W-OVERSIZE-CONTENT` in the kept
+//     HEAD of a content the budget cuts (a part's content is never cut by the validator). ⭐ P5 package D (`REG-D-118`
+//     (1)) — and, in a declared review, the slices its host
 //     lines carry: `D-ROOT-UNITS-WITHOUT-WORK` in a title on the line naming a unit below that holds no completion, and
 //     `D-OVERSIZE-UNIT-TITLE` in the builder's cut declarations; and `D-OVERSIZE-UNITS` in the kept HEAD of a work
 //     product its builder cut. No probe plants in a call name the host did not mint, which no name production
@@ -45,7 +48,7 @@
 //     ⭐ a candidate on a line of each layout the reader states — under an override, inside an embedding, inside an
 //     isolate (`LAID_OUT_LINES`), the field's last three lines — and each chooser's own token where only the field read
 //     otherwise holds it — split by a line feed (in a list, an item holding one), written backwards below a line a bidi
-//     control lays out, and astride two items (`BREAKS_ACCOUNT`; `G-ACCOUNT-BREAKS`, `W-ACCOUNT-BREAKS`,
+//     control lays out, and astride two items (`BREAKS_ACCOUNT`; `T-ACCOUNT-BREAKS`, `W-ACCOUNT-BREAKS`,
 //     `P-ACCOUNT-BREAKS`) — so a chooser that reads a field otherwise than the prompt carries it (a list as one line of
 //     JSON, a terminator as a line feed, its line feeds read away, a list's items joined, ⭐ its bidi controls read away,
 //     or any one family of them, or its last line read away), in every framing or in one alone, chooses another token.
@@ -57,9 +60,9 @@
 //     pop read away while the other stays (the line is laid out still); and a line that holds no candidate as the
 //     prompt carries it, read away — each moves nothing. ⭐ AND WHAT NO CHOOSER MAY READ: the token a chooser
 //     takes, planted where it must not read it — in the bytes a cut removes: the instruction's tail
-//     (`OVERSIZE_INTENT`); the end of a graph's content, a work product's, the rationale, the narration and the prior
-//     findings (`OVERSIZE_NODES`, `OVERSIZE_ANSWER`, `OVERSIZE_RATIONALE`, `OVERSIZE_NARRATION`, `OVERSIZE_GAPS`); the
-//     end of the limitations `G-OVERSIZE-FENCES` cuts, and of each list `G-OVERSIZE-LISTS`, `W-OVERSIZE-LISTS` and
+//     (`OVERSIZE_INTENT`); the end of ~~a graph's content,~~ a work product's, the rationale, the narration and the prior
+//     findings (~~`OVERSIZE_NODES`,~~ `OVERSIZE_ANSWER`, `OVERSIZE_RATIONALE`, `OVERSIZE_NARRATION`, `OVERSIZE_GAPS`); the
+//     end of the limitations `T-OVERSIZE-FENCES` cuts, and of each list `T-OVERSIZE-LISTS`, `W-OVERSIZE-LISTS` and
 //     `P-OVERSIZE-LISTS` cut (`listsCut`); the middle of a view's command line, stdout and stderr
 //     (`P-OVERSIZE-COMMAND`, `P-OVERSIZE-FENCES`, `P-OVERSIZE-STREAMS`); and, for EACH of a process result's two
 //     choosers, the ends of the assumptions and the residual uncertainty `P-OVERSIZE-FENCES` ties (each holding the
@@ -69,7 +72,7 @@
 //     `W-OVERSIZE-EDGES`'s answer (the validator's chooser), and the stdout of `P-OVERSIZE-CONTENT`,
 //     `P-OVERSIZE-SURROGATE`, `P-OVERSIZE-STREAMS` and `P-OVERSIZE-ALL`, both streams of `P-OVERSIZE-ROOM-EDGES` and
 //     all three slices of `P-OVERSIZE-AT-ITS-BUDGET` (the view's), each a residual named below. And astride two slices
-//     (`W-FENCES`'s instruction and answer, `G-OVERSIZE-FENCES`'s instruction and rationale, `P-OVERSIZE-FENCES`'s
+//     (`W-FENCES`'s instruction and answer, `T-OVERSIZE-FENCES`'s request and rationale, `P-OVERSIZE-FENCES`'s
 //     stdout and stderr), astride the two parts of a cut (`P-OVERSIZE-FENCES`'s stdout), split by a line feed, and
 //     written backwards, or with its runs reversed, on a line with no bidi control (`FENCE_UNREAD`): so a chooser that
 //     reads MORE than the prompt carries in any of those ways — what a planted cut removed, two slices or a cut's two
@@ -79,7 +82,7 @@
 //     site moves a probe — and in an account list, where design §9.3 D7 retired the encoder, so they reach its region
 //     raw; an account with every field and an empty one, and two of its fields tied (`allocate`); and the chooser's own
 //     edges — a stdout that prints every candidate but the last two (`P-FENCE-AT-THE-LAST`, its prompt fenced by the
-//     last) and, in EVERY framing, slices that print them all (`G-NO-FENCE`, `W-NO-FENCE`, `P-NO-FENCE`, each refused);
+//     last) and, in EVERY framing, slices that print them all (`T-NO-FENCE`, `W-NO-FENCE`, `P-NO-FENCE`, each refused);
 //   · ⭐ WHAT THE SKELETON'S TABLE READS, WHOLE, AND THE READER ITS CHOOSER MODELS: dropping any of the six families the
 //     plants are spelled through moves `P-OVERSIZE-FENCES`, and so does dropping any rule of the reader a plant stands
 //     on — four of how a code point is read (a line terminator read as nothing too, every reading of a code point, a
@@ -101,12 +104,12 @@
 //     (`P-OVERSIZE-AT-ITS-BUDGET`);
 //   · ⭐ THE RUBRIC'S STAKES (design §9.3 D8: each criterion's `severityIfNotMet` beside it, read from the policy):
 //     every floor criterion declares BLOCKING, so a rubric that showed a constant, or wrote any other stakes otherwise,
-//     moved no probe. `G-STAKES`, `W-STAKES` and `P-STAKES` hand each framing a policy whose criteria declare each of
+//     moved no probe. `T-STAKES`, `W-STAKES` and `P-STAKES` hand each framing a policy whose criteria declare each of
 //     the five (`withEveryStakes`), so each value is shown, and pinned, in every framing.
 // ⭐ A REFUSAL IS HASHED TOO (`fingerprint.ts` `probePrompt`): a probe the validator refuses before any prompt exists is
 // hashed as the statement it refuses with and the content it was handed — so an edit that SENDS what is refused today,
 // in any framing (a chooser that never fails closed, or a validator that fails closed in one framing alone:
-// `G-NO-FENCE`, `W-NO-FENCE`, `P-NO-FENCE`), or refuses what is sent today (a refusal edge moved by one unit:
+// `T-NO-FENCE`, `W-NO-FENCE`, `P-NO-FENCE`), or refuses what is sent today (a refusal edge moved by one unit:
 // `P-OVERSIZE-AT-ITS-BUDGET`; a chooser that tries any number of candidates short of a hundred: `P-FENCE-AT-THE-LAST`),
 // moves `probes` — and so does one that tries more than a hundred, which sends what `P-NO-FENCE` is refused today.
 // ~~a chooser that tries ten candidates: `P-FENCE-PAST-TEN`~~ — its prompt was fenced by the twelfth, so a chooser that
@@ -147,12 +150,12 @@ import {
 	type EvidenceRequirement,
 	type ObservedToolCallReport
 } from '@janumipwb/rph-contracts';
-import { buildPwaGraphExport, type PwaGraphNode, type PwaMeta } from '@janumipwb/rph-projections';
+import { buildPwaGraphExport, pwaTypeParts, type PwaGraphNode, type PwaMeta, type PwaTypePart } from '@janumipwb/rph-projections';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { REASONING_REVIEW_BUDGET } from '../../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
 import {
 	declaredPolicyReviewInput,
-	graphReviewInput,
+	pwaTypeReviewInput,
 	workProductReviewInput,
 	type ProcessResultReviewSource
 } from '../../apps/rph-demo/src/lib/server/assurance/review-input.js';
@@ -202,7 +205,7 @@ export interface FingerprintProbe {
 	readonly covers: string;
 	/**
 	 * The input under `criteria` — the fingerprint's own criteria, so a criteria change reaches the rubric — and, for a
-	 * process result, built through `processResult` (the graph and work-product probes do not read it).
+	 * process result, built through `processResult` (the part and work-product probes do not read it).
 	 * ⭐ E2 — and, for a declared review, under `declared`: the catalog's policies as the fingerprint's seam holds them, so a
 	 * change to a declared policy's purpose or criteria reaches its probe's prompt (the other probes do not read it).
 	 */
@@ -261,61 +264,6 @@ const NODES: readonly PwaGraphNode[] = [
 	node(INSPECT_ID, 'Visual Inspection', 'INSPECTION', { requiredInputs: ['survey-report'] })
 ];
 /**
- * The same graph, with one output name long enough that the export overruns every content budget — ⭐ and a second
- * output named with the SECOND candidate, in the end the cut removes: the token `G-OVERSIZE-ALL` and
- * `G-OVERSIZE-CONTENT` take today (`REG-F-481`; design D2 under the sponsor's answer (a): a chooser reads each slice as
- * the prompt carries it), so a chooser that read a cut content whole would choose another.
- */
-const OVERSIZE_NODES: readonly PwaGraphNode[] = [
-	NODES[0]!,
-	node(INSPECT_ID, 'Visual Inspection', 'INSPECTION', {
-		requiredOutputs: [over(B.CONTENT_MAX, 'crack-width-and-displacement-record-per-panel-'), '<<<UNTRUSTED-01>>>']
-	})
-];
-/**
- * ⭐ `PQ-1` (`REG-F-481`) — `G-OVERSIZE-CONTENT`'s GRAPH: `OVERSIZE_NODES` with the root type NAMED with the first candidate,
- * so the kept HEAD of the content the budget CUTS holds it. ⛔ No probe held a candidate in a cut content, so a validator
- * chooser that skipped the content of a graph or a work product only when it was cut — and fenced the prompt with a token
- * the content holds, the forged-block path `REG-F-481` closed — moved no probe (driven on a disposable copy).
- */
-const OVERSIZE_NODES_PLANTED: readonly PwaGraphNode[] = [
-	{ ...NODES[0]!, name: 'Condition Survey <<<UNTRUSTED-00>>>' },
-	OVERSIZE_NODES[1]!
-];
-/**
- * ⭐⭐ `JAN-EXEC` Phase 7 after P6's third run, package P, F1 (`REG-F-503` remedy 1) — `NODES`, each type carrying what it
- * declares about its work, in production's key order (`buildPwaExport`): its purpose, its declared policy ids, its child
- * rules — the root's with a cardinality and an applicability note, the inspection's leaf rule list empty — and a prompt
- * template, the root's ACTIVE with its output contract, the inspection's DRAFT with none.
- */
-const DECLARING_NODES: readonly PwaGraphNode[] = [
-	{
-		...NODES[0]!,
-		workDischarge: 'MODEL',
-		promptStatus: 'ACTIVE',
-		purpose: 'Survey the condition of the retaining wall and report its defects by panel.',
-		requiredAssurancePolicyIds: ['pol_intent_preservation', 'pol_fitness_for_purpose'],
-		permittedChildren: [
-			{ typeId: INSPECT_ID, cardinality: 'M1', applicabilityNote: 'Every survey is followed by an inspection.' }
-		],
-		promptTemplate: {
-			templateText: 'Survey {title} panel by panel. Report each defect you observed, citing the panel; report no defect you did not observe.',
-			outputContract: 'A JSON array of {"panel": number, "defect": string}.',
-			status: 'ACTIVE',
-			templateVersion: 2
-		}
-	},
-	{
-		...NODES[1]!,
-		workDischarge: 'MODEL',
-		promptStatus: 'DRAFT',
-		purpose: 'Inspect each panel the survey reports and record what is seen.',
-		requiredAssurancePolicyIds: ['pol_test_adequacy'],
-		permittedChildren: [],
-		promptTemplate: { templateText: 'Inspect {title}.', status: 'DRAFT', templateVersion: 1 }
-	}
-];
-/**
  * ⭐ Package P F1 — THE ABSENT-FIELD CONTROL'S GRAPH: the root carrying each new field EMPTY, as its author stored it — no
  * purpose, no declared policy, no child rule, a template whose output contract is empty — and the inspection carrying none of
  * them, a type that predates them. The two must read differently.
@@ -332,22 +280,132 @@ const EMPTY_AND_ABSENT_NODES: readonly PwaGraphNode[] = [
 	},
 	NODES[1]!
 ];
+// ── ⭐⭐ `JAN-EXEC` Phase 7, the review in parts, B7 (`REG-D-125`; DESIGN-authoring-review-in-parts.md §5) — THE PARTS' GRAPHS ──
+/** The PWA of the part probes, with a description, which a root's subject carries (design D3). */
+const PWA_DESCRIBED: PwaMeta = { ...PWA, description: 'A condition survey of a 60 m masonry retaining wall, panel by panel.' };
+/** One part of the PWA `nodes` define: the type `typeId`'s, cut by the product's own `pwaTypeParts`. */
+function partOf(nodes: readonly PwaGraphNode[], typeId: string, pwa: PwaMeta = PWA): PwaTypePart {
+	const part = pwaTypeParts(buildPwaGraphExport(pwa, nodes)).find((x) => x.typeId === typeId);
+	if (part === undefined) throw new Error(`no part of ${typeId}`);
+	return part;
+}
+const FIELDWORK_ID = 'pwut_01M4A7KQ5W8Y1A4C7E0G3J6M9P';
+const PANEL_ID = 'pwut_01M4A7KX8Z1B4D7F0H3K6N9Q2S';
+const DRAINAGE_ID = 'pwut_01M4A7M3B4E7G0J3M6P9S2V5X8';
+const REPORT_ID = 'pwut_01M4A7M9E7H0K3N6Q9T2W5Z8B1';
 /**
- * ⭐ Package P F1 — THE OVERSIZE CONTROL'S GRAPH: `DECLARING_NODES` with the inspection's template longer than any content
- * budget, so the export the reviewer is shown is cut. ⭐ And the template ends with the FIRST candidate, in the bytes the cut
- * removes: the token `G-OVERSIZE-TYPE-DECLARATIONS` takes today, so a chooser that read the cut content whole would choose
- * another.
+ * ⭐ A THREE-LEVEL PWA, every type carrying what it declares (design D3): the survey root; the fieldwork, a middle composite
+ * permitting the panel inspection (M1) and the drainage check (C1, with an applicability note); and the report, delegated,
+ * with its boundary contract and context specification. The fieldwork's children's flow runs among them (the inspection to
+ * the check) and across its subtree's boundary (the inspection, and the fieldwork itself, to the report).
  */
-const OVERSIZE_DECLARING_NODES: readonly PwaGraphNode[] = [
-	DECLARING_NODES[0]!,
-	{
-		...DECLARING_NODES[1]!,
+const PART_NODES: readonly PwaGraphNode[] = [
+	node(ROOT_ID, 'Condition Survey', 'SURVEY', {
+		isRoot: true,
+		permittedChildTypeIds: [FIELDWORK_ID, REPORT_ID],
+		requiredInputs: ['wall-drawings'],
+		requiredOutputs: ['survey-findings'],
+		workDischarge: 'MODEL',
+		promptStatus: 'ACTIVE',
+		purpose: 'Survey the condition of the retaining wall and report its defects by panel.',
+		requiredAssurancePolicyIds: ['pol_intent_preservation', 'pol_fitness_for_purpose'],
+		permittedChildren: [
+			{ typeId: FIELDWORK_ID, cardinality: 'M1', applicabilityNote: 'Every survey goes on site.' },
+			{ typeId: REPORT_ID, cardinality: 'M1' }
+		],
 		promptTemplate: {
-			templateText: `${over(B.CONTENT_MAX, 'Inspect {title} panel by panel and record each crack, its width and its displacement. ')}\n<<<UNTRUSTED-00>>>`,
-			status: 'DRAFT',
+			templateText: 'Survey {title} through its fieldwork and its report; claim no defect the fieldwork did not record.',
+			outputContract: 'A JSON object: {"defects": [{"panel": number, "defect": string}]}.',
+			status: 'ACTIVE',
+			templateVersion: 2
+		},
+		completionRule: 'The report names every panel.'
+	}),
+	node(FIELDWORK_ID, 'Survey Fieldwork', 'FIELDWORK', {
+		permittedChildTypeIds: [PANEL_ID, DRAINAGE_ID],
+		requiredInputs: ['wall-drawings', 'panel-defects', 'drainage-findings'],
+		requiredOutputs: ['fieldwork-record'],
+		workDischarge: 'MODEL',
+		promptStatus: 'ACTIVE',
+		purpose: 'Inspect every panel on site and check the drainage behind it.',
+		requiredAssurancePolicyIds: ['pol_intent_preservation'],
+		permittedChildren: [
+			{ typeId: PANEL_ID, cardinality: 'M1', applicabilityNote: 'Every panel is inspected.' },
+			{ typeId: DRAINAGE_ID, cardinality: 'C1', applicabilityNote: 'Only where the weep holes are blocked.' }
+		],
+		promptTemplate: {
+			templateText: 'Compose the fieldwork record of {title} from its inspections; record nothing they did not observe.',
+			outputContract: 'A JSON object: {"panels": number, "defects": string[]}.',
+			status: 'ACTIVE',
 			templateVersion: 1
 		}
-	}
+	}),
+	node(PANEL_ID, 'Panel Inspection', 'INSPECTION', {
+		requiredInputs: ['wall-drawings'],
+		requiredOutputs: ['panel-defects'],
+		workDischarge: 'MODEL',
+		promptStatus: 'ACTIVE',
+		purpose: 'Inspect each panel and record each crack, its width and its displacement.',
+		requiredAssurancePolicyIds: ['pol_test_adequacy'],
+		permittedChildren: [],
+		promptTemplate: {
+			templateText:
+				'Inspect {title} panel by panel. Record each crack you observed, its width and its displacement; record nothing you did not observe.',
+			outputContract: 'A JSON array of {"panel": number, "crack": string, "widthMm": number}.',
+			status: 'ACTIVE',
+			templateVersion: 3
+		}
+	}),
+	node(DRAINAGE_ID, 'Drainage Check', 'INSPECTION', {
+		requiredInputs: ['panel-defects'],
+		requiredOutputs: ['drainage-findings'],
+		workDischarge: 'MODEL',
+		promptStatus: 'DRAFT',
+		purpose: 'Check the weep holes of each panel the inspection reports.',
+		requiredAssurancePolicyIds: [],
+		permittedChildren: [],
+		promptTemplate: { templateText: 'Check {title}.', status: 'DRAFT', templateVersion: 1 }
+	}),
+	node(REPORT_ID, 'Survey Report', 'REPORTING', {
+		requiredInputs: ['fieldwork-record', 'panel-defects'],
+		requiredOutputs: ['survey-findings'],
+		executionBoundary: 'DELEGATED_EXTERNAL',
+		purpose: 'Report the survey’s findings, panel by panel.',
+		boundaryContract: {
+			counterpartyLabel: 'An independent reporting engineer',
+			attestedAssurancePolicyIds: ['pol_fitness_for_purpose']
+		},
+		contextSpecification: {
+			requiredElements: ['the fieldwork record'],
+			constraintDispositions: [{ constraintId: 'CON-1', fate: 'PROPAGATED' }]
+		}
+	})
+];
+/**
+ * ⭐ A COMPOSITE WIDER THAN ITS ROOM: a root permitting six children, each a purpose of 5,000 characters, so its part is over
+ * its budget and its children's skeletons are cut child by child, each cut declared (`pwaTypeReviewInput`).
+ */
+const WIDE_NODES: readonly PwaGraphNode[] = (() => {
+	const ids = Array.from({ length: 6 }, (_, i) => `pwut_01M4A7MF${String(i).padStart(18, '0')}`);
+	return [
+		node(ROOT_ID, 'Condition Survey', 'SURVEY', {
+			isRoot: true,
+			permittedChildTypeIds: ids,
+			purpose: 'Survey every panel of the wall.'
+		}),
+		...ids.map((id, i) =>
+			node(id, `Panel Group ${i + 1}`, 'INSPECTION', { purpose: over(5_000, `Inspect panel group ${i + 1} on site. `) })
+		)
+	];
+})();
+/** ⭐ A TYPE WHOSE OWN DEFINITION IS LONGER THAN ANY PROMPT: its subject cannot be shown whole, so its review is refused. */
+const HUGE_NODES: readonly PwaGraphNode[] = [
+	node(ROOT_ID, 'Condition Survey', 'SURVEY', {
+		isRoot: true,
+		workDischarge: 'MODEL',
+		promptStatus: 'ACTIVE',
+		promptTemplate: { templateText: over(30_000, 'Survey {title} panel by panel. '), status: 'ACTIVE', templateVersion: 1 }
+	})
 ];
 
 const INTENT = 'Survey the condition of a 60 m masonry retaining wall and report defects by panel.';
@@ -359,7 +417,7 @@ const RATIONALE: ProfessionalRationaleSummary = {
 };
 /**
  * ⭐ EACH OVERSIZE SLICE BELOW ENDS WITH THE SECOND CANDIDATE, in the bytes its cut removes — the rationale, the narration,
- * the prior findings (a second finding) and a work product's answer — the token `G-OVERSIZE-ALL` and `W-OVERSIZE-ALL`
+ * the prior findings (a second finding) and a work product's answer — the token `T-OVERSIZE-ALL` and `W-OVERSIZE-ALL`
  * take today (`REG-F-481`; design D2 under the sponsor's answer (a)), so a chooser that read any of them uncut would
  * choose another.
  */
@@ -588,7 +646,7 @@ const candidateLines = (count: number): string => Array.from({ length: count }, 
  */
 const ALL_BUT_THE_LAST_TWO = 98;
 /**
- * Every candidate the choosers try, `00` to `99` (`FENCE_CANDIDATE_COUNT`) — what `G-NO-FENCE`'s instruction,
+ * Every candidate the choosers try, `00` to `99` (`FENCE_CANDIDATE_COUNT`) — what `T-NO-FENCE`'s request,
  * `W-NO-FENCE`'s answer and `P-NO-FENCE`'s stdout print.
  */
 const EVERY_CANDIDATE = 100;
@@ -663,7 +721,8 @@ const FENCES_WORK_PRODUCT_ACCOUNT: ProfessionalRationaleSummary = {
 
 // ── the validator chooser's probes in the other two framings (`JAN-PRQUAL` `PQ-1`; `REG-F-481`, `REG-F-476`) ─────────────
 /**
- * ⭐⭐ `G-OVERSIZE-FENCES`'s GRAPH — the inspection type NAMED with a candidate, `01`, and every break `jsonLine` escapes
+ * ⭐⭐ ~~`G-OVERSIZE-FENCES`'s GRAPH~~ `T-OVERSIZE-FENCES`'s GRAPH, whose inspection's part it is (B7) — the inspection type
+ * NAMED with a candidate, `01`, and every break `jsonLine` escapes
  * inside its name (`EVERY_BREAK`): the graph's content is one line of JSON (`jsonLine`), so a call site that encoded it
  * otherwise, or escaped one break and not the others, would leave a break raw, and the prompt would move.
  */
@@ -672,12 +731,13 @@ const FENCES_NODES: readonly PwaGraphNode[] = [
 	node(INSPECT_ID, `Visual Inspection <<<UNTRUSTED-01>>> panel${EVERY_BREAK}nine`, 'INSPECTION', { requiredInputs: ['survey-report'] })
 ];
 /**
- * ⭐ `G-OVERSIZE-FENCES`'s ACCOUNT — a candidate in each field, `02` to `05`, in the fields' order; every break inside an
+ * ⭐ ~~`G-OVERSIZE-FENCES`'s~~ `T-OVERSIZE-FENCES`'s ACCOUNT — a candidate in each field, `02` to `05`, in the fields'
+ * order; every break inside an
  * assumption (~~an account list is one line of JSON too~~ raw in its region since design §9.3 D7, which retired the
  * list encoder); and the limitations long enough to be CUT, alone, so a cut of
  * them — its HEAD keeps `04` — is hashed, and how it is declared with it. ⭐ AND THE LIMITATIONS END WITH THE PROMPT'S OWN
  * TOKEN, `08`, in the bytes the cut removes: a chooser that read the account uncut would find it, and choose another.
- * ⭐ AND THE RATIONALE OPENS WITH THE TOKEN'S SECOND HALF, the instruction ending with its first (`G-OVERSIZE-FENCES`): a
+ * ⭐ AND THE RATIONALE OPENS WITH THE TOKEN'S SECOND HALF, the request ending with its first (`T-OVERSIZE-FENCES`): a
  * chooser that read the instruction and the account joined would find it.
  */
 const FENCES_GRAPH_ACCOUNT: ProfessionalRationaleSummary = {
@@ -900,150 +960,156 @@ const asProduction = (
 /**
  * ⭐ THE PROBE SET, in a fixed order — the order, like each prompt, is part of what is hashed (`probes` hashes the list of
  * `[id, sha256(prompt)]` pairs in this order, then the skeleton's digest, then the reader corpus's tokens). Since
- * `PQ-1` (design D3) it is: G-BARE, G-DECLARED, G-PRIOR, G-OVERSIZE-CONTENT, G-OVERSIZE-ALL, G-OVERSIZE-FENCES,
- * G-OVERSIZE-LISTS, G-NO-FENCE, G-STAKES, G-ACCOUNT-BREAKS; W-BARE, W-DECLARED-PRIOR, W-OVERSIZE-CONTENT,
+ * `PQ-1` (design D3) it is: ~~G-BARE, G-DECLARED, G-PRIOR, G-OVERSIZE-CONTENT, G-OVERSIZE-ALL, G-OVERSIZE-FENCES,
+ * G-OVERSIZE-LISTS, G-NO-FENCE, G-STAKES, G-ACCOUNT-BREAKS;~~ ⭐ B7: T-LEAF, T-COMPOSITE, T-ROOT, T-OVERSIZE-CHILDREN,
+ * T-ABSENT-FIELDS, T-SUBJECT-REFUSED, T-OVERSIZE-ALL, T-OVERSIZE-FENCES, T-OVERSIZE-LISTS, T-NO-FENCE, T-STAKES,
+ * T-ACCOUNT-BREAKS; W-BARE, W-DECLARED-PRIOR, W-OVERSIZE-CONTENT,
  * W-OVERSIZE-ALL, W-OVERSIZE-EDGES, W-FENCES, W-OVERSIZE-LISTS, W-NO-FENCE, W-STAKES, W-ACCOUNT-BREAKS; P-CLEAN,
  * P-SIGNAL, P-TIMED-OUT, P-INCOMPLETE-CAPTURE, P-STDOUT-CAPTURE-CUT, P-STDERR-CAPTURE-CUT, P-OVERSIZE-CONTENT,
  * P-OVERSIZE-COMMAND, P-OVERSIZE-SURROGATE, P-OVERSIZE-ROOM-EDGES, P-OVERSIZE-STREAMS, P-OVERSIZE-AT-ITS-BUDGET,
  * P-OVERSIZE-FENCES, P-OVERSIZE-LISTS, P-FENCE-AT-THE-LAST, P-NO-FENCE, P-PRODUCTION, P-ABSENT-REPORT,
  * P-NOT-OBSERVABLE, P-NOT-OBSERVABLE-BARE, P-NONE-OBSERVED, P-OBSERVED, P-OVERSIZE-ALL, P-FENCES-OTHER-SLICES,
  * P-STAKES, P-ACCOUNT-BREAKS; NO-CRITERIA — forty-seven, every process-result one `P-`-prefixed.
- * ⭐ Package P F1 (`REG-F-503` remedy 1) — and, after G-ACCOUNT-BREAKS, G-TYPE-DECLARATIONS, G-TYPE-DECLARATIONS-ABSENT and
- * G-OVERSIZE-TYPE-DECLARATIONS.
+ * ~~⭐ Package P F1 (`REG-F-503` remedy 1) — and, after G-ACCOUNT-BREAKS, G-TYPE-DECLARATIONS, G-TYPE-DECLARATIONS-ABSENT and
+ * G-OVERSIZE-TYPE-DECLARATIONS.~~ ⭐ B7 — the graph framing's probes left the fingerprint with case set v8; NO-CRITERIA is a
+ * part's now.
  */
 export const FINGERPRINT_PROBES: readonly FingerprintProbe[] = [
-	// ── the graph arm, through the builder the authoring floor uses ──
+	// ── ⭐⭐ `JAN-EXEC` Phase 7, the review in parts, B7 (`REG-D-125`; DESIGN-authoring-review-in-parts.md §5) — THE PART ARM,
+	// through the builder the authoring floor is to review each type with (`pwaTypeReviewInput`), over parts cut by the product's
+	// own `pwaTypeParts`. ⛔ The graph arm's probes LEFT the fingerprint with case set v8, which holds no graph case (design
+	// D4: "Remove its fingerprint probes when the current case set holds zero `PWA_GRAPH` cases"): ~~G-BARE, G-DECLARED,
+	// G-PRIOR, G-OVERSIZE-CONTENT, G-OVERSIZE-ALL, G-OVERSIZE-FENCES, G-OVERSIZE-LISTS, G-NO-FENCE, G-STAKES, G-ACCOUNT-BREAKS,
+	// G-TYPE-DECLARATIONS, G-TYPE-DECLARATIONS-ABSENT, G-OVERSIZE-TYPE-DECLARATIONS~~. Each shared control they held is held
+	// here in the part framing instead, and the design's five part probes stand beside them.
 	{
-		id: 'G-BARE',
-		covers: 'graph framing; rationale NOT DECLARED; narration absent; no prior gaps; no subject hash',
+		// ⭐ Design §5 — A LEAF WITH A PROMPT: its whole definition the subject, its ACTIVE template's text and output contract
+		// among it; the account declared, with an empty list; the narration; a candidate subject hash.
+		id: 'T-LEAF',
+		covers:
+			'part framing; a LEAF with an ACTIVE prompt and its output contract; its ancestors, its parent’s rule and its artifacts’ peers as context; rationale declared, with an empty list; narration; a candidate subject hash',
 		input: (criteria) =>
-			graphReviewInput({ criteria, prompt: INTENT, graph: buildPwaGraphExport(PWA, NODES) })
-	},
-	{
-		id: 'G-DECLARED',
-		covers: 'graph framing; rationale declared, with an empty list; narration; a candidate subject hash',
-		input: (criteria) =>
-			graphReviewInput({
+			pwaTypeReviewInput({
 				criteria,
 				prompt: INTENT,
-				graph: buildPwaGraphExport(PWA, NODES),
+				part: partOf(PART_NODES, PANEL_ID),
 				candidateSubjectHash: 'a3f1c9e07b52d846',
 				rationale: RATIONALE,
 				narration: NARRATION
 			})
 	},
 	{
-		id: 'G-PRIOR',
-		covers: 'graph framing; prior gaps present',
-		input: (criteria) =>
-			graphReviewInput({ criteria, prompt: INTENT, graph: buildPwaGraphExport(PWA, NODES), priorGaps: GAPS })
+		// ⭐ Design §5 — A COMPOSITE WITH ITS CHILDREN'S SKELETONS AND DATA FLOW: a middle composite, its children's skeletons
+		// (a DRAFT template among them, kept to its status and version), the flow among them and across its boundary; the
+		// account NOT DECLARED, the narration absent, prior gaps present.
+		id: 'T-COMPOSITE',
+		covers:
+			'part framing; a middle COMPOSITE — its children’s skeletons, a conditional child rule, and the data flow among its children and across its subtree’s boundary; rationale NOT DECLARED; narration absent; prior gaps present',
+		input: (criteria) => pwaTypeReviewInput({ criteria, prompt: INTENT, part: partOf(PART_NODES, FIELDWORK_ID), priorGaps: GAPS })
 	},
 	{
-		id: 'G-OVERSIZE-CONTENT',
-		covers: 'graph framing; only the content oversize, the kept HEAD of its cut holding the first fence candidate',
+		// ⭐ Design §5 — THE ROOT WITH THE PRODUCER'S ACCOUNT: the PWA's name, domain and description on its subject, a delegated
+		// child's boundary contract and context specification in its skeleton, the account and the narration.
+		id: 'T-ROOT',
+		covers:
+			'part framing; the ROOT with the producer’s account and narration — the PWA’s name, domain and description in its subject, its stored completion rule, and a delegated child carrying its boundary contract and context specification',
 		input: (criteria) =>
-			graphReviewInput({ criteria, prompt: INTENT, graph: buildPwaGraphExport(PWA, OVERSIZE_NODES_PLANTED) })
+			pwaTypeReviewInput({
+				criteria,
+				prompt: INTENT,
+				part: partOf(PART_NODES, ROOT_ID, PWA_DESCRIBED),
+				rationale: RATIONALE,
+				narration: NARRATION
+			})
 	},
 	{
-		id: 'G-OVERSIZE-ALL',
-		covers: 'graph framing; every slice oversize at once — intent, rubric, prior, rationale, narration, content',
+		// ⭐ Design §5 — AN OVER-BUDGET CHILDREN'S-SKELETON VIEW WITH CHILD-SPECIFIC CUT DECLARATIONS: its builder cuts each
+		// child's skeleton to a share and declares each cut by the child's ordinal and type id (A2 (3)), the subject whole.
+		id: 'T-OVERSIZE-CHILDREN',
+		covers:
+			'part framing; a composite over its room — its children’s skeletons cut child by child by its builder, each cut declared by the child’s ordinal and type id, its subject and context whole',
+		input: (criteria) => pwaTypeReviewInput({ criteria, prompt: INTENT, part: partOf(WIDE_NODES, ROOT_ID) })
+	},
+	{
+		// ⭐ Design §5 — ABSENT FIELDS: the root carrying each declared field EMPTY, as authored, and giving its child no rule; the
+		// child carrying none of them; the PWA storing no description. The two must read differently.
+		id: 'T-ABSENT-FIELDS',
+		covers:
+			'part framing; the ABSENT-FIELD CONTROL — a subject carrying each declared field empty, as authored (no purpose, no policy, no child rule, an empty output contract), beside a child carrying none of them, the PWA with no description',
+		input: (criteria) => pwaTypeReviewInput({ criteria, prompt: INTENT, part: partOf(EMPTY_AND_ABSENT_NODES, ROOT_ID) })
+	},
+	{
+		// ⭐ The full-subject refusal (design D3): a type whose own definition no prompt can hold is refused as incomplete, never
+		// cut — hashed as the refusal (`fingerprint.ts` `probePrompt`), so a validator that cut a part instead moves `probes`.
+		id: 'T-SUBJECT-REFUSED',
+		covers:
+			'part framing; a REFUSAL — a subject longer than the room the prompt leaves it, refused as incomplete before any prompt: hashed as the statement and the part',
+		input: (criteria) => pwaTypeReviewInput({ criteria, prompt: INTENT, part: partOf(HUGE_NODES, ROOT_ID) })
+	},
+	{
+		// ⭐ Every bounded slice beside the part oversize at once — the request, the rubric, the prior findings, the rationale and
+		// the narration (`OVERSIZE_*`); the part itself is never cut by the validator, so it stays within its room.
+		id: 'T-OVERSIZE-ALL',
+		covers: 'part framing; every bounded slice oversize at once — request, rubric, prior, rationale, narration — the part within its room',
 		input: (criteria) =>
-			graphReviewInput({
+			pwaTypeReviewInput({
 				criteria: oversizeCriteria(criteria),
 				prompt: OVERSIZE_INTENT,
-				graph: buildPwaGraphExport(PWA, OVERSIZE_NODES),
+				part: partOf(NODES, ROOT_ID),
 				rationale: OVERSIZE_RATIONALE,
 				narration: OVERSIZE_NARRATION,
 				priorGaps: OVERSIZE_GAPS
 			})
 	},
 	{
-		// ⭐⭐ `PQ-1` (`REG-F-481`, `REG-F-476`) — THE VALIDATOR'S CHOOSER OVER A GRAPH, every slice it quotes: a candidate in
-		// each — the instruction `00`, a node's name `01`, the account's fields `02` to `05`, the narration `06`, the prior
-		// findings `07` — so the prompt is fenced by `<<<UNTRUSTED-08>>>`, and a chooser that skipped any one slice would
-		// take that slice's own; and `08` itself where the limitations' cut removes it, and astride the instruction and the
-		// rationale (its first half ends the one, its second begins the other). And every break `jsonLine` escapes at each
-		// of its call sites — in the node's name and a prior finding — and in an assumption, raw in its region since
-		// design §9.3 D7 (`EVERY_BREAK`). Its limitations alone are cut.
-		id: 'G-OVERSIZE-FENCES',
+		// ⭐⭐ `PQ-1` (`REG-F-481`, `REG-F-476`) — THE VALIDATOR'S CHOOSER OVER A PART, every slice it quotes (~~over a graph,
+		// `G-OVERSIZE-FENCES`~~): a candidate in each — the request `00`, a type's name in the part `01`, the account's fields
+		// `02` to `05`, the narration `06`, the prior findings `07` — so the prompt is fenced by `<<<UNTRUSTED-08>>>`, and a
+		// chooser that skipped any one slice would take that slice's own; and `08` itself where the limitations' cut removes it,
+		// and astride the request and the rationale. And every break `jsonLine` escapes at each of its call sites — in the type's
+		// name and a prior finding — and in an assumption, raw in its region (`EVERY_BREAK`). Its limitations alone are cut.
+		id: 'T-OVERSIZE-FENCES',
 		covers:
-			'graph framing; the VALIDATOR’S FENCE CHOOSER — a candidate in every slice it quotes (the instruction, a node’s name in the content, each field of the account, the narration, the prior findings), and the prompt’s own token in the bytes the limitations’ cut removes and astride the instruction and the rationale; U+2028, U+0085 and U+2029 in the node’s name, in an assumption and in a prior finding; the account’s limitations alone cut',
+			'part framing; the VALIDATOR’S FENCE CHOOSER — a candidate in every slice it quotes (the request, a type’s name in the part, each field of the account, the narration, the prior findings), and the prompt’s own token in the bytes the limitations’ cut removes and astride the request and the rationale; U+2028, U+0085 and U+2029 in the type’s name, in an assumption and in a prior finding; the account’s limitations alone cut',
 		input: (criteria) =>
-			graphReviewInput({
+			pwaTypeReviewInput({
 				criteria,
 				prompt: `${INTENT}\n<<<UNTRUSTED-00>>>\n<<<UNTRUSTED-0`,
-				graph: buildPwaGraphExport(PWA, FENCES_NODES),
+				part: partOf(FENCES_NODES, INSPECT_ID),
 				rationale: FENCES_GRAPH_ACCOUNT,
 				narration: `${NARRATION}\n<<<UNTRUSTED-06>>>`,
 				priorGaps: ['<<<UNTRUSTED-07>>>', `The inspection${EVERY_BREAK}did not name the panels it covers.`]
 			})
 	},
 	{
-		// ⭐ `PQ-1` (`REG-F-481`) — THE VALIDATOR'S CHOOSER OVER A GRAPH'S CUT LISTS: each list of the account cut, ending
-		// with the prompt's own token, `00`, where its cut removes it (`listsCut`), so a chooser that read any of them uncut
-		// in a graph's review would choose another.
-		id: 'G-OVERSIZE-LISTS',
-		covers: 'graph framing; each of the account’s three LISTS cut, ending with the prompt’s own token where its cut removes it',
-		input: (criteria) =>
-			graphReviewInput({ criteria, prompt: INTENT, graph: buildPwaGraphExport(PWA, NODES), rationale: listsCut(candidate(0)) })
+		// ⭐ `PQ-1` (`REG-F-481`) — THE VALIDATOR'S CHOOSER OVER A PART'S CUT LISTS: each list of the account cut, ending with the
+		// prompt's own token, `00`, where its cut removes it (`listsCut`).
+		id: 'T-OVERSIZE-LISTS',
+		covers: 'part framing; each of the account’s three LISTS cut, ending with the prompt’s own token where its cut removes it',
+		input: (criteria) => pwaTypeReviewInput({ criteria, prompt: INTENT, part: partOf(NODES, ROOT_ID), rationale: listsCut(candidate(0)) })
 	},
 	{
-		// ⭐ `PQ-1` (`REG-F-481`) — A REFUSAL IN THE GRAPH FRAMING: an instruction that prints EVERY candidate, so the
-		// validator refuses the review (`NO_FENCE_STATEMENT`) before any prompt exists — hashed as the refusal
-		// (`fingerprint.ts` `probePrompt`), so a validator that failed closed for a process result alone, and SENT this,
-		// moves `probes`.
-		id: 'G-NO-FENCE',
+		// ⭐ `PQ-1` (`REG-F-481`) — A REFUSAL IN THE PART FRAMING: a request that prints EVERY candidate, so the validator refuses
+		// the review (`NO_FENCE_STATEMENT`) before any prompt exists — hashed as the refusal.
+		id: 'T-NO-FENCE',
 		covers:
-			'graph framing; a REFUSAL — an instruction that prints every fence candidate, so the validator refuses the review before any prompt: hashed as the statement and the content',
+			'part framing; a REFUSAL — a request that prints every fence candidate, so the validator refuses the review before any prompt: hashed as the statement and the part',
 		input: (criteria) =>
-			graphReviewInput({
-				criteria,
-				prompt: `${INTENT}\n${candidateLines(EVERY_CANDIDATE)}`,
-				graph: buildPwaGraphExport(PWA, NODES)
-			})
+			pwaTypeReviewInput({ criteria, prompt: `${INTENT}\n${candidateLines(EVERY_CANDIDATE)}`, part: partOf(NODES, ROOT_ID) })
 	},
 	{
-		// ⭐ DESIGN §9.3 D8 — THE RUBRIC'S STAKES IN THE GRAPH FRAMING: `G-BARE` over a policy whose criteria declare each of
-		// the five stakes (`withEveryStakes`), so a rubric that showed a constant, or wrote any value otherwise, moves it.
-		id: 'G-STAKES',
-		covers: 'graph framing; the rubric’s STAKES — a policy whose criteria declare each of the five, each shown beside its criterion',
-		input: (criteria) =>
-			graphReviewInput({ criteria: withEveryStakes(criteria), prompt: INTENT, graph: buildPwaGraphExport(PWA, NODES) })
+		// ⭐ DESIGN §9.3 D8 — THE RUBRIC'S STAKES IN THE PART FRAMING: a policy whose criteria declare each of the five stakes.
+		id: 'T-STAKES',
+		covers: 'part framing; the rubric’s STAKES — a policy whose criteria declare each of the five, each shown beside its criterion',
+		input: (criteria) => pwaTypeReviewInput({ criteria: withEveryStakes(criteria), prompt: INTENT, part: partOf(NODES, ROOT_ID) })
 	},
 	{
-		// ⭐ DESIGN §9.3 D7 (`REG-F-481`) — THE VALIDATOR'S CHOOSER OVER A GRAPH'S ACCOUNT, EACH FIELD READ AS THE PROMPT
-		// CARRIES IT (`BREAKS_ACCOUNT`): fenced by ~~`<<<UNTRUSTED-24>>>`, past the twenty-four~~ `<<<UNTRUSTED-36>>>`, past
-		// the thirty-six candidates its four fields hold, each split by a terminator a reader may not break at or on a
-		// line a bidi control lays out — and `36` where only a field read otherwise holds it.
-		id: 'G-ACCOUNT-BREAKS',
+		// ⭐ DESIGN §9.3 D7 (`REG-F-481`) — THE VALIDATOR'S CHOOSER OVER A PART'S ACCOUNT, EACH FIELD READ AS THE PROMPT CARRIES IT
+		// (`BREAKS_ACCOUNT`): fenced by `<<<UNTRUSTED-36>>>`, past the thirty-six candidates its four fields hold.
+		id: 'T-ACCOUNT-BREAKS',
 		covers:
-			'graph framing; the VALIDATOR’S FENCE CHOOSER over each field of the account as the prompt carries it — in each, a candidate split by each line terminator a reader may not break at, a candidate on a line of each layout the reader states (an override, an embedding, an isolate), the field’s last lines, and the prompt’s own token split by a line feed (in a list, an item holding one), written backwards below a line a bidi control lays out, and astride two items',
-		input: (criteria) =>
-			graphReviewInput({ criteria, prompt: INTENT, graph: buildPwaGraphExport(PWA, NODES), rationale: BREAKS_ACCOUNT })
-	},
-	// ── ⭐⭐ `JAN-EXEC` Phase 7 after P6's third run, package P, F1 (`REG-F-503` remedy 1) — WHAT A TYPE DECLARES ABOUT ITS
-	// WORK, through the same builder: since F1 the export carries each type's purpose, declared policy ids, child rules and
-	// prompt template, and the framing says what each is. ⛔ No case of set v6 carries any of them.
-	{
-		id: 'G-TYPE-DECLARATIONS',
-		covers:
-			'graph framing; each type carrying what it declares about its work — a purpose, declared policy ids, child rules with a cardinality and an applicability note, and a prompt template with its text, output contract, status and version, ACTIVE on one type and DRAFT, with no output contract, on the other',
-		input: (criteria) =>
-			graphReviewInput({ criteria, prompt: INTENT, graph: buildPwaGraphExport(PWA, DECLARING_NODES), rationale: RATIONALE, narration: NARRATION })
-	},
-	{
-		id: 'G-TYPE-DECLARATIONS-ABSENT',
-		covers:
-			'graph framing; the ABSENT-FIELD CONTROL — one type carrying each declared field empty, as authored (no purpose, no policy, no child rule, an empty output contract), beside one carrying none of them',
-		input: (criteria) =>
-			graphReviewInput({ criteria, prompt: INTENT, graph: buildPwaGraphExport(PWA, EMPTY_AND_ABSENT_NODES) })
-	},
-	{
-		id: 'G-OVERSIZE-TYPE-DECLARATIONS',
-		covers:
-			'graph framing; the OVERSIZE CONTROL — a prompt template longer than any content budget, so the export carrying the declared fields is cut, and the cut declared',
-		input: (criteria) =>
-			graphReviewInput({ criteria, prompt: INTENT, graph: buildPwaGraphExport(PWA, OVERSIZE_DECLARING_NODES) })
+			'part framing; the VALIDATOR’S FENCE CHOOSER over each field of the account as the prompt carries it — in each, a candidate split by each line terminator a reader may not break at, a candidate on a line of each layout the reader states (an override, an embedding, an isolate), the field’s last lines, and the prompt’s own token split by a line feed (in a list, an item holding one), written backwards below a line a bidi control lays out, and astride two items',
+		input: (criteria) => pwaTypeReviewInput({ criteria, prompt: INTENT, part: partOf(NODES, ROOT_ID), rationale: BREAKS_ACCOUNT })
 	},
 	// ── the work-product arm, through the builder the work-product floor uses ──
 	{
@@ -1064,8 +1130,10 @@ export const FINGERPRINT_PROBES: readonly FingerprintProbe[] = [
 			})
 	},
 	{
-		// ⭐ `PQ-1` (`REG-F-481`) — its answer opens with the first candidate, in the kept HEAD of its cut, as
-		// `G-OVERSIZE-CONTENT`'s root type is named with it (`OVERSIZE_NODES_PLANTED`, which says why).
+		// ⭐ `PQ-1` (`REG-F-481`) — its answer opens with the first candidate, in the kept HEAD of its cut: ⛔ no probe held a
+		// candidate in a cut content, so a validator chooser that skipped a cut content and fenced the prompt with a token the
+		// content holds moved no probe (driven on a disposable copy). ~~as `G-OVERSIZE-CONTENT`'s root type is named with it~~
+		// — B7: the graph framing's probes left the fingerprint.
 		id: 'W-OVERSIZE-CONTENT',
 		covers: 'work-product framing; only the content oversize, the kept HEAD of its cut holding the first fence candidate',
 		input: (criteria) =>
@@ -1121,7 +1189,7 @@ export const FINGERPRINT_PROBES: readonly FingerprintProbe[] = [
 			})
 	},
 	{
-		// ⭐ `PQ-1` (`REG-F-481`) — THE VALIDATOR'S CHOOSER OVER A WORK PRODUCT'S CUT LISTS: as `G-OVERSIZE-LISTS`, in this
+		// ⭐ `PQ-1` (`REG-F-481`) — THE VALIDATOR'S CHOOSER OVER A WORK PRODUCT'S CUT LISTS: as `T-OVERSIZE-LISTS`, in this
 		// framing.
 		id: 'W-OVERSIZE-LISTS',
 		covers: 'work-product framing; each of the account’s three LISTS cut, ending with the prompt’s own token where its cut removes it',
@@ -1149,7 +1217,7 @@ export const FINGERPRINT_PROBES: readonly FingerprintProbe[] = [
 	},
 	{
 		// ⭐ DESIGN §9.3 D7 (`REG-F-481`) — THE VALIDATOR'S CHOOSER OVER A WORK PRODUCT'S ACCOUNT, EACH FIELD READ AS THE
-		// PROMPT CARRIES IT: as `G-ACCOUNT-BREAKS`, in this framing.
+		// PROMPT CARRIES IT: as `T-ACCOUNT-BREAKS`, in this framing.
 		id: 'W-ACCOUNT-BREAKS',
 		covers:
 			'work-product framing; the VALIDATOR’S FENCE CHOOSER over each field of the account as the prompt carries it — in each, a candidate split by each line terminator a reader may not break at, a candidate on a line of each layout the reader states (an override, an embedding, an isolate), the field’s last lines, and the prompt’s own token split by a line feed (in a list, an item holding one), written backwards below a line a bidi control lays out, and astride two items',
@@ -1421,7 +1489,7 @@ export const FINGERPRINT_PROBES: readonly FingerprintProbe[] = [
 		// ⭐ `PQ-1` (`REG-F-481`) — A REFUSAL: a stdout that prints EVERY candidate, so the view is rendered unfenced and the
 		// validator, reading it whole, refuses the review (`NO_FENCE_STATEMENT`) before any prompt exists. Hashed as the
 		// refusal — the statement and the view (`fingerprint.ts` `probePrompt`) — so a chooser that never failed closed,
-		// and SENT it, moves `probes`; as `G-NO-FENCE` and `W-NO-FENCE` stand in the other two framings, so a validator
+		// and SENT it, moves `probes`; as `T-NO-FENCE` and `W-NO-FENCE` stand in the other two framings, so a validator
 		// that failed closed in one framing alone moves it too. ⚠ It carries no account: what it hashes is the statement
 		// and the view, never the account's lines, so an account here would be one no change to how an account is
 		// rendered could move.
@@ -1701,9 +1769,10 @@ export const FINGERPRINT_PROBES: readonly FingerprintProbe[] = [
 	},
 	// ── the output example, when a policy declares no criterion ──
 	{
+		// ⭐ The review in parts, B7 — ~~over a graph~~ over a part: the graph framing's probes left the fingerprint.
 		id: 'NO-CRITERIA',
 		covers: 'the output example with no criterion to name (CRITERION-ID)',
-		input: () => graphReviewInput({ criteria: [], prompt: INTENT, graph: buildPwaGraphExport(PWA, NODES) })
+		input: () => pwaTypeReviewInput({ criteria: [], prompt: INTENT, part: partOf(NODES, ROOT_ID) })
 	}
 ];
 

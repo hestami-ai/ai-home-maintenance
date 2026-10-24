@@ -128,11 +128,16 @@ export type CheckLimb = 'RECORD' | 'CONFERRAL' | 'COVERAGE' | 'REPRODUCTION' | '
  * case set can qualify a reviewer against them. Named once, here, so the check and its test say the same words.
  * ⚠ It fires on every set with oracles awaiting the sponsor, so it names no one version's step: it sends the operator to the
  * current oracle file's conferral statement, which names them (package P's check, N5).
+ * ⭐ The review in parts, package D (design §8, the conferral message) — AND IT SAYS ONLY WHAT THE CHECK READ: the oracle
+ * file's statement, never the register. ⛔ It said *"their author proposed them and the sponsor has not conferred them"*,
+ * false from `REG-D-124`'s ruling until its code record: a conferral can stand in the register while the record lags. So it
+ * names both things that can be owed.
  */
 export const ORACLES_NOT_CONFERRED =
-	`today’s oracles are ${ORACLES_PROPOSED}: their author proposed them and the sponsor has not conferred them, so no run ` +
-	'over today’s case set can qualify a reviewer against them — owed: the sponsor’s conferral (REG-D-073; the current ' +
-	'oracle file’s conferral statement names what is owed)';
+	`today’s oracle file records oracles as ${ORACLES_PROPOSED}, and records no conferral of them, so no run over today’s ` +
+	'case set can qualify a reviewer against them — owed: the sponsor’s conferral, or, where the register already holds it, ' +
+	'its record in the current oracle file’s conferral statement (REG-D-073; the current oracle file’s conferral statement ' +
+	'names what is owed)';
 export interface CheckProblem {
 	readonly limb: CheckLimb;
 	readonly message: string;

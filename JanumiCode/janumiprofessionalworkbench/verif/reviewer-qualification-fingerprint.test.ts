@@ -14,7 +14,7 @@
 //   · THE PROBE SET is pinned to reach what its needles name (each framing, observation kind, account and narration
 //     shape), the two content caps a probe can reach through the oversize-together probes — which is why the third,
 //     `CONTENT_MAX`, is hashed as a constant — and, since `PQ-1`, each rule a row below names: among them the refusal of
-//     a review no fence can enclose, in EVERY framing (`G-NO-FENCE`, `W-NO-FENCE`, `P-NO-FENCE`), and the chooser at its
+//     a review no fence can enclose, in EVERY framing (`T-NO-FENCE`, `W-NO-FENCE`, `P-NO-FENCE`), and the chooser at its
 //     LAST candidate (`P-FENCE-AT-THE-LAST`), so a validator that fails closed in one framing alone, or a chooser that
 //     tries any number of candidates but a hundred, moves `probes`. And the skeleton's table, which no probe can plant
 //     whole, is hashed whole, as it reads (the skeleton's digest, beside the probes, held to the literal its determinism
@@ -97,6 +97,8 @@ import {
 	OBSERVATION_HEADING,
 	processResultContentBudget,
 	processResultUntrustedSlices,
+	pwaTypeContentBudget,
+	pwaTypeOverBudgetStatement,
 	REASONING_REVIEW_BUDGET
 } from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
 import { renderProcessResultReview } from '../apps/rph-demo/src/lib/server/assurance/process-result-render.js';
@@ -475,6 +477,44 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint MOVES on each component
 		expect(await movedNow(seams), 'the case prompts of the current set that move').toEqual(CURRENT_DECLARED);
 	});
 
+	// ⭐⭐ The review in parts, B7 (`REG-D-125`; DESIGN-authoring-review-in-parts.md §5: "A change confined to that framing must
+	// move the fingerprint, and the selected reviewer must owe measurement on its new prompts") — THE PART FRAMING'S TEXT.
+	// ⛔ No probe and no case was in the `PWA_TYPE` framing, so a change to what the reviewer of a part reads moved nothing.
+	it('⭐⭐ B7 — the PART FRAMING’S TEXT, its first subject line changed: the probes move, and of the case prompts exactly the current set’s 35 part cases’ — none of v1’s', async () => {
+		const seams: FingerprintSeams = {
+			...PRODUCT_SEAMS,
+			validator: (print) =>
+				PRODUCT_SEAMS.validator((p) =>
+					print(p.replace('The artifact is ONE type of an authored PWA', 'The artifact is ONE type of a PWA an agent authored'))
+				)
+		};
+		const fp = await reviewerFingerprint(CASES, seams);
+		onlyMoved(fp, ['probes']);
+		expect(movedProbes(fp), 'the probes that move: the part framing’s — NO-CRITERIA among them — each refused one aside').toEqual(
+			FINGERPRINT_PROBES.filter((x) => x.input(PRODUCT_SEAMS.criteria, PRODUCT_SEAMS.processResult).framing === 'PWA_TYPE')
+				.map((x) => x.id)
+				.filter((id) => !BASE.probePrompts.get(id)!.startsWith(`${REFUSED}\n`))
+		);
+		expect(fp.casePrompts, 'no case of v1 is a part').toEqual(BASE.casePrompts);
+		const parts = CURRENT_CASES.filter((c) => c.arm === 'PWA_TYPE').map((c) => c.id);
+		expect(parts, 'the arrangement: the current set holds the 35').toHaveLength(35);
+		expect(await movedNow(seams), 'the case prompts of the current set that move').toEqual(parts);
+	});
+
+	// ⭐⭐ B7 (design D4: "Remove its fingerprint probes when the current case set holds zero `PWA_GRAPH` cases") — NO PROBE OF THE
+	// CURRENT FINGERPRINT IS IN THE GRAPH FRAMING, and the current set holds no graph case: what the authoring floor's reviewer is
+	// to be handed is a part.
+	it('⛔ B7 — the graph framing’s probes have LEFT the fingerprint: no probe is built in the PWA_GRAPH framing, and no probe’s prompt describes a graph export; the current set holds no graph case', () => {
+		expect(CURRENT_CASES.filter((c) => c.arm === 'PWA_GRAPH'), 'the arrangement: no graph case is current').toEqual([]);
+		const graph = FINGERPRINT_PROBES.filter(
+			(x) => x.input(PRODUCT_SEAMS.criteria, PRODUCT_SEAMS.processResult, PRODUCT_SEAMS.declaredPolicies).framing === 'PWA_GRAPH'
+		).map((x) => x.id);
+		expect(graph, 'probes in the graph framing').toEqual([]);
+		expect([...BASE.probePrompts].filter(([, p]) => p.includes('a canonical graph export')).map(([id]) => id)).toEqual([]);
+		// ⭑ CONTROL — the part framing's probes stand in their place.
+		expect(FINGERPRINT_PROBES.filter((x) => x.id.startsWith('T-')).length, 'the part framing’s probes').toBeGreaterThan(0);
+	});
+
 	it.each([
 		['the line naming a unit below that holds no completion', 'holds no completed step', 'holds no finished step', ['D-ROOT-UNITS-WITHOUT-WORK']],
 		[
@@ -810,7 +850,12 @@ describe('JAN-CRITREAD J2-3 — the probe set reaches every branch of prompt ass
 	it('⭐ every framing, every observation kind and its absent report, the rationale both ways, narration, prior gaps, the subject hash', () => {
 		expect(BASE.probePrompts.size).toBe(FINGERPRINT_PROBES.length);
 		for (const needle of [
-			'a canonical graph export',
+			// ⭐ The review in parts, B7 — ~~'a canonical graph export'~~: the graph framing's probes left the fingerprint with
+			// case set v8, and the part framing's stand in their place — its subject lines, a refused subject, and a builder's cut
+			// of a composite's children.
+			'The artifact is ONE type of an authored PWA',
+			'This review was not sent: the part it was handed',
+			'[CUT FOR THIS REVIEW: the skeleton of child ',
 			'The WORK PRODUCT to review',
 			'The COMMAND RESULT to review',
 			// ~~'The host reported nothing about tool calls'~~, ~~'… OBSERVE tool calls: '~~, ~~'… OBSERVE tool calls.'~~ —
@@ -866,7 +911,7 @@ describe('JAN-CRITREAD J2-3 — the probe set reaches every branch of prompt ass
 		// ⭐ E2 — one declared probe per catalog policy, each naming its own policy in its policy line.
 		for (const id of ['pol_requirement_coverage', 'pol_fitness_for_purpose'])
 			expect(prompt(`D-${id}`).includes(`(${id}). Its purpose: `), id).toBe(true);
-		expect(prompt('G-DECLARED').includes('(NOT DECLARED'), 'a declared account renders as itself').toBe(false);
+		expect(prompt('T-LEAF').includes('(NOT DECLARED'), 'a declared account renders as itself').toBe(false);
 	});
 
 	// ⭐⭐ `JAN-EXEC` Phase 7 after P6's third run, package P, F1 (`REG-F-503` remedy 1; DESIGN-phase-7-completion.md §4c) —
@@ -874,8 +919,12 @@ describe('JAN-CRITREAD J2-3 — the probe set reaches every branch of prompt ass
 	// prompt stands beside the reviewer fingerprint, not in it (`fingerprint.ts`): without probes that carry them, a change to
 	// how the reviewer is shown a type's declared policies, purpose, child rules or prompt would move no probe's prompt, and so
 	// not the fingerprint.
-	it('⭐⭐ package P F1 (REG-F-503 remedy 1) — the G probes carry what a type declares about its work: every field present, an authored empty value beside an absent one, and the content cut', () => {
-		const graph = FINGERPRINT_PROBES.filter((p) => p.id.startsWith('G-')).map((p) => p.id);
+	// ⭐⭐ The review in parts, B7 (design §5) — ~~the G probes~~ THE PART PROBES carry them now, through the part builder: the
+	// graph framing's probes left the fingerprint with case set v8, which holds no graph case. And what design D3 adds a part:
+	// a stored completion rule, a delegated type's boundary contract and context specification, the PWA's description on the
+	// root, the ancestors, the parent's rule and a composite's data flow among its children and across its boundary.
+	it('⭐⭐ package P F1 (REG-F-503 remedy 1) — ~~the G probes~~ ⭐ B7: the T probes carry what a type declares about its work: every field present, an authored empty value beside an absent one, ~~and the content cut~~ ⭐ the children’s skeletons cut child by child and a subject too long to show refused; and what D3 adds a part', () => {
+		const graph = FINGERPRINT_PROBES.filter((p) => p.id.startsWith('T-')).map((p) => p.id);
 		for (const needle of [
 			'"purpose":"Survey',
 			'"requiredAssurancePolicyIds":["',
@@ -884,14 +933,26 @@ describe('JAN-CRITREAD J2-3 — the probe set reaches every branch of prompt ass
 			'"promptTemplate":{"templateText":"',
 			'"outputContract":"',
 			'"status":"ACTIVE","templateVersion":',
-			'"status":"DRAFT","templateVersion":'
+			'"status":"DRAFT","templateVersion":',
+			// ⭐ B7 — and D3's, a part's.
+			'"completionRule":"',
+			'"boundaryContract":{"counterpartyLabel":"',
+			'"contextSpecification":{"requiredElements":[',
+			'"pwa":{"name":"Retaining Wall Condition Survey","domain":"civil-structural","description":"',
+			'"ancestors":[{"name":"Condition Survey"',
+			'"parentRules":[{"parent":"',
+			'"dataFlow":{"amongChildren":[{"producer":"',
+			'"acrossBoundary":[{"producer":"',
+			'{"childSkeleton":{"id":"'
 		])
 			expect(graph.some((id) => prompt(id).includes(needle)), needle).toBe(true);
 		// ⭐ THE ABSENT-FIELD CONTROL — one type carrying each field EMPTY, as authored, beside one carrying none of them.
 		const declared = (id: string) => {
 			const input = FINGERPRINT_PROBES.find((p) => p.id === id)?.input(PRODUCT_SEAMS.criteria, PRODUCT_SEAMS.processResult);
 			expect(input, `probe ${id}`).toBeDefined();
-			return (JSON.parse(input!.content) as { nodes: Record<string, unknown>[] }).nodes.map((n) => ({
+			// ⭐ B7 — a part's lines: its subject's type, then each child's skeleton.
+			const [subject, , ...children] = input!.content.split('\n').map((l) => JSON.parse(l) as Record<string, Record<string, unknown>>);
+			return [subject!.subject!.type as Record<string, unknown>, ...children.map((c) => c.childSkeleton!)].map((n) => ({
 				purpose: n.purpose,
 				requiredAssurancePolicyIds: n.requiredAssurancePolicyIds,
 				permittedChildren: n.permittedChildren,
@@ -899,7 +960,7 @@ describe('JAN-CRITREAD J2-3 — the probe set reaches every branch of prompt ass
 				absent: ['purpose', 'requiredAssurancePolicyIds', 'permittedChildren', 'promptTemplate'].filter((k) => !(k in n))
 			}));
 		};
-		expect(declared('G-TYPE-DECLARATIONS-ABSENT')).toEqual([
+		expect(declared('T-ABSENT-FIELDS')).toEqual([
 			{ purpose: '', requiredAssurancePolicyIds: [], permittedChildren: [], outputContract: '', absent: [] },
 			{
 				purpose: undefined,
@@ -909,9 +970,19 @@ describe('JAN-CRITREAD J2-3 — the probe set reaches every branch of prompt ass
 				absent: ['purpose', 'requiredAssurancePolicyIds', 'permittedChildren', 'promptTemplate']
 			}
 		]);
-		// ⭐ THE OVERSIZE CONTROL — a prompt template longer than any content budget: the content is cut, and the cut declared.
-		expect(prompt('G-OVERSIZE-TYPE-DECLARATIONS'), 'the content cut, and declared').toContain(`\n${CUT_DECLARED}the artifact — `);
-		expect(prompt('G-TYPE-DECLARATIONS').includes(CUT_DECLARED), 'G-TYPE-DECLARATIONS is seen whole').toBe(false);
+		// ~~⭐ THE OVERSIZE CONTROL — a prompt template longer than any content budget: the content is cut, and the cut declared.~~
+		// ⭐ B7 — a part's content is never cut by the validator: its builder cuts a composite's children child by child, each
+		// declared by its ordinal and type id, and a subject too long to show is refused whole.
+		expect(prompt('T-OVERSIZE-CHILDREN'), 'the children’s skeletons cut, each declared').toContain(`\n${CUT_DECLARED}the skeleton of child 1 of 6 (type id "`);
+		expect(prompt('T-SUBJECT-REFUSED').startsWith(`${REFUSED}\nThis review was not sent: the part it was handed`), 'a subject too long, refused').toBe(true);
+		for (const id of ['T-LEAF', 'T-COMPOSITE', 'T-ROOT'])
+			expect(prompt(id).includes(CUT_DECLARED), `${id} is seen whole`).toBe(false);
+		// ⭐ Design §5's leaf with a prompt: T-LEAF's subject is a leaf, its ACTIVE template's text and output contract whole.
+		const [leaf, , ...leafChildren] = inputOf('T-LEAF').content.split('\n');
+		expect(leafChildren, 'T-LEAF: a leaf, no child’s skeleton').toEqual([]);
+		expect(leaf, 'T-LEAF: its ACTIVE prompt and output contract on its subject line').toContain(
+			'"promptTemplate":{"templateText":"Inspect {title} panel by panel. Record each crack you observed, its width and its displacement; record nothing you did not observe.","outputContract":"'
+		);
 	});
 
 	it('⭐⭐ P5 package D (REG-D-118 (1)) — THE ARRANGEMENT: D-ROOT-UNITS-WITHOUT-WORK names both units on host lines, its `00` on the second’s alone; D-OVERSIZE-UNITS declares a cut of one unit’s work product and of another’s commands past its first, and shows the third whole; D-OVERSIZE-UNIT-TITLE’s `00` stands in its commands cut’s declaration alone; each planted probe is fenced by `01`', () => {
@@ -998,9 +1069,10 @@ describe('JAN-CRITREAD J2-3 — the probe set reaches every branch of prompt ass
 		// each declaration names, in prompt order. The process result's content is cut by its BUILDER (stdout, HEAD and
 		// TAIL), never by the validator (design D2).
 		// ⭐ `PQ-1` (`REG-F-481`): the account is fenced field by field, so its cut names the FIELD it cut — the rationale.
-		expect(cutSlices(prompt('G-OVERSIZE-ALL')), 'graph: intent, rubric, prior, rationale, narration, content').toEqual([
-			'the intent',
-			'the artifact',
+		// ⭐ B7 — ~~graph: intent, rubric, prior, rationale, narration, content~~: the part framing's — its request, rubric, prior,
+		// rationale and narration; its part is never cut by the validator (a part over its room is refused).
+		expect(cutSlices(prompt('T-OVERSIZE-ALL')), 'part: request, rubric, prior, rationale, narration').toEqual([
+			'the request',
 			"the account's rationale",
 			'the narration',
 			'the prior findings',
@@ -1022,7 +1094,6 @@ describe('JAN-CRITREAD J2-3 — the probe set reaches every branch of prompt ass
 			'the rubric'
 		]);
 		for (const [id, slice] of [
-			['G-OVERSIZE-CONTENT', 'the artifact'],
 			['W-OVERSIZE-CONTENT', 'the work product'],
 			['P-OVERSIZE-CONTENT', 'stdout'],
 			['P-OVERSIZE-COMMAND', 'the command line'],
@@ -1035,9 +1106,7 @@ describe('JAN-CRITREAD J2-3 — the probe set reaches every branch of prompt ass
 		// The budget left after the scaffolding binds for the graph and work product; the call list pushes the
 		// process result below it, to CONTENT_MIN. No probe reaches CONTENT_MAX — which is why it is hashed as a constant.
 		for (const [id, slice] of [
-			['G-OVERSIZE-ALL', 'the artifact'],
 			['W-OVERSIZE-ALL', 'the work product'],
-			['G-OVERSIZE-CONTENT', 'the artifact'],
 			['W-OVERSIZE-CONTENT', 'the work product']
 		] as const) {
 			const b = headCut(prompt(id), slice).limit;
@@ -1064,7 +1133,7 @@ describe('JAN-CRITREAD J2-3 — the probe set reaches every branch of prompt ass
 			expect(prompt(id).includes(`\n${input.content}\n`), `${id}: the prompt carries the view whole`).toBe(true);
 		}
 		// ~~`/from this intent:\n"""([\s\S]*?)"""/` at USER_INTENT_MAX + TRUNCATED.length~~ — `PQ-1`: read off its declaration.
-		expect(headCut(prompt('G-OVERSIZE-ALL'), 'the intent').limit, 'the instruction is cut at USER_INTENT_MAX').toBe(
+		expect(headCut(prompt('T-OVERSIZE-ALL'), 'the request').limit, 'the instruction is cut at USER_INTENT_MAX').toBe(
 			B.USER_INTENT_MAX
 		);
 	});
@@ -1203,11 +1272,11 @@ describe('JAN-CRITREAD J2-3 — the probe set reaches every branch of prompt ass
 		// lines the declaration precedes. So each limit is read off its declaration, checked against its bytes (`headCut`):
 		// as strong as before at every slice, and the narration is now held in the process-result framing too.
 		const intentOf: Readonly<Record<string, string>> = {
-			'G-OVERSIZE-ALL': 'the intent',
+			'T-OVERSIZE-ALL': 'the request',
 			'W-OVERSIZE-ALL': 'the instruction',
 			'P-OVERSIZE-ALL': 'the instruction'
 		};
-		for (const id of ['G-OVERSIZE-ALL', 'W-OVERSIZE-ALL', 'P-OVERSIZE-ALL']) {
+		for (const id of ['T-OVERSIZE-ALL', 'W-OVERSIZE-ALL', 'P-OVERSIZE-ALL']) {
 			const p = prompt(id);
 			expect(headCut(p, intentOf[id]!).limit, `${id}: the intent, at USER_INTENT_MAX`).toBe(B.USER_INTENT_MAX);
 			// ⭐ Design §9.3 D8: an empty line stands between the rubric and the recommendation sentence, no byte of the rubric.
@@ -1226,15 +1295,13 @@ describe('JAN-CRITREAD J2-3 — the probe set reaches every branch of prompt ass
 				`${id}: the account, at RATIONALE_MAX`
 			).toBe(B.RATIONALE_MAX);
 		}
-		for (const id of ['G-OVERSIZE-ALL', 'P-OVERSIZE-ALL'])
+		for (const id of ['T-OVERSIZE-ALL', 'P-OVERSIZE-ALL'])
 			expect(headCut(prompt(id), 'the narration').limit, `${id}: the narration, at NARRATION_MAX`).toBe(B.NARRATION_MAX);
 		// The content takes what the scaffolding leaves of PROMPT_BUDGET, ~~so the whole prompt is the budget and its cut~~ so
 		// the scaffolding and the content's limit are PROMPT_BUDGET exactly, and the prompt is never longer: it is short of it
 		// by the digits the content's declaration did not need (the reserve was made at the widest numbers).
-		for (const [id, slice] of [
-			['G-OVERSIZE-ALL', 'the artifact'],
-			['W-OVERSIZE-ALL', 'the work product']
-		] as const) {
+		// ⭐ B7 — ~~and the graph's~~: a part's content is never cut, so no part probe stands on this edge.
+		for (const [id, slice] of [['W-OVERSIZE-ALL', 'the work product']] as const) {
 			const p = prompt(id);
 			const c = headCut(p, slice);
 			expect(
@@ -1781,7 +1848,7 @@ const HOST_LINE_CHANGES: Readonly<Record<string, HostLineChange>> = {
 	'the account’s section heading, inside the rationale’s region': {
 		carries: (i) => i.rationale !== undefined,
 		// ⭐ `JAN-EXEC` Phase 7 completion E2 — and the DECLARED framing (design B4): its probes carry the account too.
-		framings: ['G', 'W', 'P', 'D'],
+		framings: ['T', 'W', 'P', 'D'],
 		change: (prompt) => {
 			const heading = headingOf(prompt);
 			const lines = prompt.split('\n');
@@ -1797,7 +1864,7 @@ const HOST_LINE_CHANGES: Readonly<Record<string, HostLineChange>> = {
 				carries: (i: ReasoningReviewInput) => (i.rationale?.[k].length ?? 0) > 0,
 				// ⭐ E2 — and the DECLARED framing where its probes' account (`RATIONALE`) lists the field: its assumptions and
 				// its residual uncertainty, and no limitation.
-				framings: k === 'limitations' ? ['G', 'W', 'P'] : ['G', 'W', 'P', 'D'],
+				framings: k === 'limitations' ? ['T', 'W', 'P'] : ['T', 'W', 'P', 'D'],
 				// ~~`${label}, as a JSON array of strings:`~~ — D7: HEAD's label.
 				change: labelInside(`${ACCOUNT_LIST_LABELS[k]}:`)
 			}
@@ -1806,12 +1873,13 @@ const HOST_LINE_CHANGES: Readonly<Record<string, HostLineChange>> = {
 	'an empty list’s "(none declared)" line, quoted': {
 		carries: (i) => ACCOUNT_LISTS.some((k) => i.rationale?.[k].length === 0),
 		// ⭐ E2 — and the DECLARED framing: its probes' account declares no limitation.
-		framings: ['G', 'W', 'P', 'D'],
+		framings: ['T', 'W', 'P', 'D'],
 		change: noneDeclaredQuoted
 	},
 	'the candidate’s subject hash, merged back into the content': {
 		carries: (i) => Boolean(i.candidateSubjectHash),
-		framings: ['G'],
+		// ⭐ B7 — ~~['G']~~: the part framing carries the hash on its host line too (`T-LEAF`).
+		framings: ['T'],
 		change: hashInContent
 	}
 };
@@ -1880,7 +1948,10 @@ const declaredHostSlicesOf = (input: ReasoningReviewInput): readonly (readonly [
 				...(input.declaredUnitsWithoutWork ?? []).map((u) => ['the title of a unit without work', jsonLine(u.unit)] as const),
 				...(input.declaredWorkCut === undefined ? [] : [["the builder's cut declarations", input.declaredWorkCut] as const])
 			]
-		: [];
+		: // ⭐ The review in parts, B7 — and a part's: the declarations of the children's skeletons its builder cut.
+			input.framing === 'PWA_TYPE' && input.declaredPartCut !== undefined
+			? [["the builder's cut declarations", input.declaredPartCut] as const]
+			: [];
 /**
  * `prompt` re-fenced with the token a validator chooser would choose that read only the regions `kept` keeps — and,
  * for a process result, the view whole and each unminted call name, ⭐ and for a declared review the slices on its host
@@ -1930,14 +2001,15 @@ const ACCOUNT_SLICES: readonly string[] = [
 ];
 const VALIDATOR_CHOOSER_RULES: Readonly<Record<string, ValidatorChooserRule>> = {
 	'the instruction': {
-		moves: ['G-OVERSIZE-ALL', 'G-OVERSIZE-FENCES', 'W-OVERSIZE-ALL', 'W-FENCES', 'P-OVERSIZE-FENCES', 'P-OVERSIZE-ALL', 'P-FENCES-OTHER-SLICES'],
+		moves: ['T-OVERSIZE-ALL', 'T-OVERSIZE-FENCES', 'W-OVERSIZE-ALL', 'W-FENCES', 'P-OVERSIZE-FENCES', 'P-OVERSIZE-ALL', 'P-FENCES-OTHER-SLICES'],
 		kept: (s) => s !== 'the instruction',
-		framings: ['G', 'W', 'P']
+		framings: ['T', 'W', 'P']
 	},
-	'the content of a graph': {
-		moves: ['G-OVERSIZE-CONTENT', 'G-OVERSIZE-FENCES'],
-		kept: (s, f) => !(s === 'the content' && f === 'PWA_GRAPH'),
-		framings: ['G']
+	// ⭐ B7 — ~~'the content of a graph'~~: the content of a part, whose type's name `T-OVERSIZE-FENCES` plants `01` in.
+	'the content of a part': {
+		moves: ['T-OVERSIZE-FENCES'],
+		kept: (s, f) => !(s === 'the content' && f === 'PWA_TYPE'),
+		framings: ['T']
 	},
 	'the content of a work product': {
 		moves: ['W-OVERSIZE-CONTENT', 'W-FENCES'],
@@ -1950,10 +2022,11 @@ const VALIDATOR_CHOOSER_RULES: Readonly<Record<string, ValidatorChooserRule>> = 
 	// ⭐ `JAN-EXEC` Phase 7 completion E2 — AND THE DECLARED WORK, CUT (design B4): `D-OVERSIZE-CONTENT` holds a candidate in
 	// the kept HEAD of its cut content, so the rule moves it too. ⭐ P5 package D — and `D-OVERSIZE-UNITS`, whose work its
 	// builder cut unit by unit, in the kept HEAD of one unit's work product.
+	// ⭐ B7 — ~~a graph's~~: a part's content is never cut by the validator, and the children its builder cuts hold no plant.
 	'the content of a graph or a work product, when it is cut': {
-		moves: ['G-OVERSIZE-CONTENT', 'W-OVERSIZE-CONTENT', 'D-OVERSIZE-CONTENT', 'D-OVERSIZE-UNITS'],
+		moves: ['W-OVERSIZE-CONTENT', 'D-OVERSIZE-CONTENT', 'D-OVERSIZE-UNITS'],
 		kept: (s, _f, cut) => !(s === 'the content' && cut),
-		framings: ['G', 'W', 'D']
+		framings: ['W', 'D']
 	},
 	// ⭐⭐ `JAN-EXEC` Phase 7 P5, package D (`REG-D-118` (1)) — AND WHAT A DECLARED REVIEW'S CHOOSER READS ON ITS HOST LINES
 	// (`declaredHostSlicesOf`): a title on the line naming a unit below that holds no completion (P5 package B F1), and the
@@ -1978,34 +2051,34 @@ const VALIDATOR_CHOOSER_RULES: Readonly<Record<string, ValidatorChooserRule>> = 
 	// `BREAKS_ACCOUNT`), so each row that stops reading a field of it moves them too.
 	"the account's rationale": {
 		moves: [
-			'G-OVERSIZE-FENCES',
-			'G-ACCOUNT-BREAKS',
+			'T-OVERSIZE-FENCES',
+			'T-ACCOUNT-BREAKS',
 			'W-FENCES',
 			'W-ACCOUNT-BREAKS',
 			'P-OVERSIZE-FENCES',
 			'P-ACCOUNT-BREAKS'
 		],
 		kept: (s) => s !== "the account's rationale",
-		framings: ['G', 'W', 'P']
+		framings: ['T', 'W', 'P']
 	},
 	"the account's assumptions": {
 		moves: [
-			'G-OVERSIZE-FENCES',
-			'G-ACCOUNT-BREAKS',
+			'T-OVERSIZE-FENCES',
+			'T-ACCOUNT-BREAKS',
 			'W-FENCES',
 			'W-ACCOUNT-BREAKS',
 			'P-OVERSIZE-FENCES',
 			'P-ACCOUNT-BREAKS'
 		],
 		kept: (s) => s !== "the account's assumptions",
-		framings: ['G', 'W', 'P']
+		framings: ['T', 'W', 'P']
 	},
-	// ~~"the account's limitations — cut", moving G-OVERSIZE-FENCES alone~~ — its limitations alone are cut; a work
+	// ~~"the account's limitations — cut", moving T-OVERSIZE-FENCES alone~~ — its limitations alone are cut; a work
 	// product's and a process result's are whole.
 	"the account's limitations": {
 		moves: [
-			'G-OVERSIZE-FENCES',
-			'G-ACCOUNT-BREAKS',
+			'T-OVERSIZE-FENCES',
+			'T-ACCOUNT-BREAKS',
 			'W-FENCES',
 			'W-ACCOUNT-BREAKS',
 			'P-OVERSIZE-ALL',
@@ -2013,30 +2086,30 @@ const VALIDATOR_CHOOSER_RULES: Readonly<Record<string, ValidatorChooserRule>> = 
 			'P-ACCOUNT-BREAKS'
 		],
 		kept: (s) => s !== "the account's limitations",
-		framings: ['G', 'W', 'P']
+		framings: ['T', 'W', 'P']
 	},
 	"the account's residual uncertainty": {
 		moves: [
-			'G-OVERSIZE-FENCES',
-			'G-ACCOUNT-BREAKS',
+			'T-OVERSIZE-FENCES',
+			'T-ACCOUNT-BREAKS',
 			'W-FENCES',
 			'W-ACCOUNT-BREAKS',
 			'P-OVERSIZE-FENCES',
 			'P-ACCOUNT-BREAKS'
 		],
 		kept: (s) => s !== "the account's residual uncertainty",
-		framings: ['G', 'W', 'P']
+		framings: ['T', 'W', 'P']
 	},
 	// ⚠ A work product's prompt carries no narration: `workProductReviewInput` sends none.
 	'the narration': {
-		moves: ['G-OVERSIZE-FENCES', 'P-OVERSIZE-ALL', 'P-FENCES-OTHER-SLICES'],
+		moves: ['T-OVERSIZE-FENCES', 'P-OVERSIZE-ALL', 'P-FENCES-OTHER-SLICES'],
 		kept: (s) => s !== 'the narration',
-		framings: ['G', 'P']
+		framings: ['T', 'P']
 	},
 	'the prior findings': {
-		moves: ['G-OVERSIZE-FENCES', 'W-FENCES', 'P-OVERSIZE-ALL', 'P-FENCES-OTHER-SLICES'],
+		moves: ['T-OVERSIZE-FENCES', 'W-FENCES', 'P-OVERSIZE-ALL', 'P-FENCES-OTHER-SLICES'],
 		kept: (s) => s !== 'the prior findings',
-		framings: ['G', 'W', 'P']
+		framings: ['T', 'W', 'P']
 	},
 	// ⭐ …AND EACH IN ONE FRAMING ALONE, as the review drove them: the account and the prior findings of a work product, and
 	// the limitations of a process result.
@@ -2077,21 +2150,26 @@ function encodedRaw(prompt: string, input: ReasoningReviewInput, which: (slice: 
 	const { lines, regions } = promptRegions(prompt);
 	for (const r of regions)
 		if (!r.cut && which(r.slice, input.framing)) {
-			const raw = JSON.stringify(JSON.parse(regionText(lines, r)) as unknown);
+			// ⭐ B7 — each line of the region its own JSON value: a part's content is lines of JSON, each one of `jsonLine`'s.
+			const raw = lines
+				.slice(r.from, r.to)
+				.map((l) => JSON.stringify(JSON.parse(l) as unknown))
+				.join('\n');
 			lines.splice(r.from, r.to - r.from, ...raw.split('\n'));
 		}
 	return lines.join('\n');
 }
 const ENCODER_CALL_SITES: Readonly<Record<string, { readonly moves: readonly string[]; readonly which: (slice: string, framing: ReasoningReviewInput['framing']) => boolean }>> = {
-	// ~~'an account list (every break in G-OVERSIZE-FENCES’s assumptions)': moves G-OVERSIZE-FENCES~~ — design §9.3 D7
+	// ~~'an account list (every break in T-OVERSIZE-FENCES’s assumptions)': moves T-OVERSIZE-FENCES~~ — design §9.3 D7
 	// RETIRED THAT CALL SITE: "the one-line JSON encoder no longer applies to the lists", so a list's breaks reach its
 	// region raw, by design, and there is no encoder there to hold. What a list's region holds now is held by
-	// `LIST_SERIALIZATION_CHANGES` below (its items after `  - `), and where its raw breaks stand by the G-OVERSIZE-FENCES
+	// `LIST_SERIALIZATION_CHANGES` below (its items after `  - `), and where its raw breaks stand by the T-OVERSIZE-FENCES
 	// arrangement row.
-	'the prior findings (every break in G-OVERSIZE-FENCES’s)': { moves: ['G-OVERSIZE-FENCES'], which: (s) => s === 'the prior findings' },
-	'the content of a graph (every break in a node’s name of G-OVERSIZE-FENCES)': {
-		moves: ['G-OVERSIZE-FENCES'],
-		which: (s, f) => s === 'the content' && f === 'PWA_GRAPH'
+	'the prior findings (every break in T-OVERSIZE-FENCES’s)': { moves: ['T-OVERSIZE-FENCES'], which: (s) => s === 'the prior findings' },
+	// ⭐ B7 — ~~the content of a graph (every break in a node’s name)~~: the content of a part, a type's name on its subject line.
+	'the content of a part (every break in a type’s name of T-OVERSIZE-FENCES)': {
+		moves: ['T-OVERSIZE-FENCES'],
+		which: (s, f) => s === 'the content' && f === 'PWA_TYPE'
 	}
 };
 /** The account's three lists, as the prompt's regions name them. */
@@ -2221,7 +2299,7 @@ const FIELD_READING_ROWS: readonly (readonly [field: string, reading: string])[]
 );
 /** The probes that plant in each field of the account both ways (`probes.ts` `BREAKS_ACCOUNT`), in the probe set's
  *  order. */
-const ACCOUNT_BREAKS_PROBES: readonly string[] = ['G-ACCOUNT-BREAKS', 'W-ACCOUNT-BREAKS', 'P-ACCOUNT-BREAKS'];
+const ACCOUNT_BREAKS_PROBES: readonly string[] = ['T-ACCOUNT-BREAKS', 'W-ACCOUNT-BREAKS', 'P-ACCOUNT-BREAKS'];
 /**
  * `prompt` re-fenced with the token a validator chooser would choose that read `field` by `read` — every other region,
  * and a process result's view whole and each unminted call name, ⭐ and a declared review's host-line slices
@@ -2262,7 +2340,7 @@ const holds = (text: string, n: number): boolean =>
 // beside it, read from the policy, and glosses three recommendation values by those stakes. Each row below is one such
 // thing changed at the validator's print seam, and must move exactly the probes — and the case prompts — that carry it.
 // ⛔ Every floor criterion declares BLOCKING, so a rubric that showed a constant, or wrote one stakes value otherwise,
-// moved no probe handed the fingerprint's own criteria: `G-STAKES`, `W-STAKES` and `P-STAKES` are handed criteria
+// moved no probe handed the fingerprint's own criteria: `T-STAKES`, `W-STAKES` and `P-STAKES` are handed criteria
 // declaring each of the five (`probes.ts` `withEveryStakes`).
 /** How the rubric writes a criterion's stakes beside it (`reasoning-review-validator.ts`; design §9.3 D8). */
 const stakesMark = (stakes: string): string => `[if unmet: ${stakes}]`;
@@ -2518,7 +2596,7 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 			'<<<UNTRUSTED-01>>>'
 		]);
 		for (const [id, token, why] of [
-			['G-OVERSIZE-ALL', '<<<UNTRUSTED-01>>>', 'past the 00 its cut instruction keeps'],
+			['T-OVERSIZE-ALL', '<<<UNTRUSTED-01>>>', 'past the 00 its cut instruction keeps'],
 			['W-OVERSIZE-ALL', '<<<UNTRUSTED-01>>>', 'past the 00 its cut instruction keeps'],
 			['P-OVERSIZE-ALL', '<<<UNTRUSTED-05>>>', 'past the 00 its cut instruction keeps, its view’s own 01, and the 02 to 04 of its limitations, narration and prior findings']
 		] as const)
@@ -2779,7 +2857,7 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 	);
 
 	it('⭐ THE ARRANGEMENT — in every framing, a probe whose account has every field, and one whose account has an empty list', () => {
-		for (const framing of ['G', 'W', 'P']) {
+		for (const framing of ['T', 'W', 'P']) {
 			const accounts = FINGERPRINT_PROBES.filter((x) => x.id.startsWith(`${framing}-`)).flatMap((x) => {
 				const r = x.input(PRODUCT_SEAMS.criteria, PRODUCT_SEAMS.processResult).rationale;
 				return r ? [r] : [];
@@ -2807,7 +2885,7 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 		60_000
 	);
 
-	it('⭐ THE VALIDATOR’S CHOOSER IS HASHED IN EVERY FRAMING — G-OVERSIZE-FENCES’s prompt is fenced by `<<<UNTRUSTED-08>>>`, past a candidate in each of its eight slices; W-FENCES’s by `<<<UNTRUSTED-07>>>`, past a candidate in each of its seven; G-OVERSIZE-CONTENT’s and W-OVERSIZE-CONTENT’s by `<<<UNTRUSTED-01>>>`, past the candidate the HEAD of their cut content keeps; and P-FENCE-AT-THE-LAST’s view by `<<<UNTRUSTED-98>>>` and its prompt by `<<<UNTRUSTED-99>>>`, the LAST candidate', () => {
+	it('⭐ THE VALIDATOR’S CHOOSER IS HASHED IN EVERY FRAMING — T-OVERSIZE-FENCES’s prompt is fenced by `<<<UNTRUSTED-08>>>`, past a candidate in each of its eight slices; W-FENCES’s by `<<<UNTRUSTED-07>>>`, past a candidate in each of its seven; G-OVERSIZE-CONTENT’s and W-OVERSIZE-CONTENT’s by `<<<UNTRUSTED-01>>>`, past the candidate the HEAD of their cut content keeps; and P-FENCE-AT-THE-LAST’s view by `<<<UNTRUSTED-98>>>` and its prompt by `<<<UNTRUSTED-99>>>`, the LAST candidate', () => {
 		// ⛔ WHY (`PQ-1`; `REG-F-481`, `REG-F-476`): `P-OVERSIZE-FENCES` plants in every slice a process result's prompt carries,
 		// and no probe planted in the narration, the prior findings, a graph or a work product — so a validator chooser that
 		// skipped one of them moved no fingerprint; and no token was past the tenth candidate, so a chooser that tried ten
@@ -2820,8 +2898,7 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 		const promptToken = (id: string): string => BASE.probePrompts.get(id)!.split('\n').find((l) => FENCE_LINE.test(l))!;
 		const viewToken = (id: string): string => inputOf(id).content.split('\n').find((l) => FENCE_LINE.test(l))!;
 		for (const [id, token] of [
-			['G-OVERSIZE-CONTENT', '<<<UNTRUSTED-01>>>'],
-			['G-OVERSIZE-FENCES', '<<<UNTRUSTED-08>>>'],
+			['T-OVERSIZE-FENCES', '<<<UNTRUSTED-08>>>'],
 			['W-OVERSIZE-CONTENT', '<<<UNTRUSTED-01>>>'],
 			['W-FENCES', '<<<UNTRUSTED-07>>>'],
 			['P-FENCE-AT-THE-LAST', '<<<UNTRUSTED-99>>>']
@@ -2829,7 +2906,8 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 			expect(promptToken(id), `${id}: the prompt’s token`).toBe(token);
 		// ⭐ THE ARRANGEMENT (`PQ-1`; `REG-F-481`): each content-only probe's content is CUT, and the HEAD its cut keeps holds
 		// the first candidate — so a chooser that skipped a cut content, and read a whole one, would fence with `00`.
-		for (const id of ['G-OVERSIZE-CONTENT', 'W-OVERSIZE-CONTENT']) {
+		// ⭐ B7 — ~~and G-OVERSIZE-CONTENT's~~: a part's content is never cut.
+		for (const id of ['W-OVERSIZE-CONTENT']) {
 			const r = promptRegions(BASE.probePrompts.get(id)!);
 			const content = r.regions.filter((x) => x.slice === 'the content');
 			expect(
@@ -2841,10 +2919,10 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 			'<<<UNTRUSTED-98>>>'
 		);
 		// ⭐ THE ARRANGEMENT: each slice of the graph holds its candidate, in the order the chain needs.
-		const { lines, regions } = promptRegions(BASE.probePrompts.get('G-OVERSIZE-FENCES')!);
+		const { lines, regions } = promptRegions(BASE.probePrompts.get('T-OVERSIZE-FENCES')!);
 		expect(
 			regions.map((r) => [r.slice, /<<<UNTRUSTED-(\d\d)>>>/.exec(regionText(lines, r))?.[1]]),
-			'G-OVERSIZE-FENCES: one candidate in each slice, 00 to 07'
+			'T-OVERSIZE-FENCES: one candidate in each slice, 00 to 07'
 		).toEqual([
 			['the instruction', '00'],
 			['the content', '01'],
@@ -2871,7 +2949,7 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 		]);
 	});
 
-	it('⭐ THE ARRANGEMENT — G-OVERSIZE-FENCES carries EVERY break `jsonLine` escapes at each call site that encodes it — U+2028, U+0085 and U+2029 in a node’s name and in a prior finding, each escaped in its region — and in an assumption, raw in its region alone since design §9.3 D7; and its limitations alone are cut', () => {
+	it('⭐ THE ARRANGEMENT — T-OVERSIZE-FENCES carries EVERY break `jsonLine` escapes at each call site that encodes it — U+2028, U+0085 and U+2029 in a node’s name and in a prior finding, each escaped in its region — and in an assumption, raw in its region alone since design §9.3 D7; and its limitations alone are cut', () => {
 		// ⛔ WHY (`PQ-1`; `REG-F-481`, `REG-F-476`): each site carried ONE break, so a site that escaped that break alone, and
 		// left the other two raw — a raw line break inside a line of JSON, the forging path `jsonLine` closed — moved no
 		// probe (driven on a disposable copy, at each of the four sites). Every break is planted at every site now.
@@ -2879,11 +2957,15 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 		// assumption's breaks reach the prompt RAW — the agent's own words, inside the assumptions' region, as the rationale's
 		// prose always has. ~~each escaped in its region, none raw in the prompt~~: what holds now is that every raw break
 		// stands inside that region, none on a host line, and the chooser reads the region as carried.
-		const input = FINGERPRINT_PROBES.find((x) => x.id === 'G-OVERSIZE-FENCES')!.input(PRODUCT_SEAMS.criteria, PRODUCT_SEAMS.processResult);
-		const p = BASE.probePrompts.get('G-OVERSIZE-FENCES')!;
+		const input = FINGERPRINT_PROBES.find((x) => x.id === 'T-OVERSIZE-FENCES')!.input(PRODUCT_SEAMS.criteria, PRODUCT_SEAMS.processResult);
+		const p = BASE.probePrompts.get('T-OVERSIZE-FENCES')!;
 		const raw = (text: string) => JSON_LINE_BREAKS.filter((c) => text.includes(String.fromCharCode(c)));
 		expect(
-			[raw(JSON.stringify(JSON.parse(input.content))), raw(JSON.stringify(input.rationale!.assumptions)), raw(JSON.stringify(input.prior!.gaps))],
+			[
+				raw(input.content.split('\n').map((l) => JSON.stringify(JSON.parse(l) as unknown)).join('\n')),
+				raw(JSON.stringify(input.rationale!.assumptions)),
+				raw(JSON.stringify(input.prior!.gaps))
+			],
 			'the arrangement: every break in each of the three call sites’ values'
 		).toEqual([JSON_LINE_BREAKS, JSON_LINE_BREAKS, JSON_LINE_BREAKS]);
 		const { lines, regions } = promptRegions(p);
@@ -2940,7 +3022,7 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 			const showing = showingAListWhole();
 			expect(movedProbes(fp), 'the probes whose prompt shows a list whole').toEqual(showing);
 			// ⭐ E2 — ~~G, W, P~~: and the DECLARED framing, whose probes show their account's lists whole.
-			expect([...new Set(showing.map((id) => id[0]))], 'in every framing').toEqual(['G', 'W', 'P', 'D']);
+			expect([...new Set(showing.map((id) => id[0]))], 'in every framing').toEqual(['T', 'W', 'P', 'D']);
 			// ⭐ A CASE PROMPT MOVES TOO, unlike a renderer change: every prompt with an account carries its lists so (D7 moved
 			// every case prompt). Exactly the cases whose account holds a list — every case is seen whole, so none is cut.
 			const carrying = CASES.filter((c) => {
@@ -2982,7 +3064,7 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 			// ⭐ E2 — ~~G, W, P~~: and the DECLARED framing where its probes' account (`RATIONALE`) carries it — every field
 			// but the limitations, which it leaves empty.
 			expect([...new Set(carrying.map((id) => id[0]))], 'in every framing').toEqual(
-				name.includes('limitations') ? ['G', 'W', 'P'] : ['G', 'W', 'P', 'D']
+				name.includes('limitations') ? ['T', 'W', 'P'] : ['T', 'W', 'P', 'D']
 			);
 			const cases = CASES.filter((k) => layout.carries(caseReviewInput(k, PRODUCT_SEAMS.criteria))).map((k) => k.id);
 			expect(cases.length, 'the arrangement: a case carries it').toBeGreaterThan(0);
@@ -3006,7 +3088,7 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 			// probe's rubric is that policy's own criteria (design B4).
 			const inDeclared = CATALOG_STAKES.has(stakes) ? ['D'] : [];
 			expect([...new Set(showing.map((id) => id[0]))], 'the arrangement: it is shown in every framing').toEqual([
-				'G',
+				'T',
 				'W',
 				'P',
 				...inDeclared
@@ -3038,7 +3120,7 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 		120_000
 	);
 
-	it('⭐ design §9.3 D8 — a rubric that writes EVERY stakes as BLOCKING, the policy’s unread, moves `probes` through G-STAKES, W-STAKES and P-STAKES alone, and no case prompt: every floor criterion declares BLOCKING', async () => {
+	it('⭐ design §9.3 D8 — a rubric that writes EVERY stakes as BLOCKING, the policy’s unread, moves `probes` through T-STAKES, W-STAKES and P-STAKES alone, and no case prompt: every floor criterion declares BLOCKING', async () => {
 		// ⛔ WHY (design §9.3 D8; `ASR-4`: the criteria are the policy's own): the probes and the cases are handed the floor
 		// policy's criteria, every one BLOCKING, so a rubric that ignored the policy and wrote BLOCKING beside each moved no
 		// probe and no case prompt (driven on a disposable copy). The three stakes probes are the only place it shows.
@@ -3050,10 +3132,10 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 		};
 		const fp = await reviewerFingerprint(CASES, seams);
 		onlyMoved(fp, ['probes']);
-		// ⭐ `JAN-EXEC` Phase 7 completion E2 — ~~G-STAKES, W-STAKES and P-STAKES alone~~: and each DECLARED probe whose catalog
+		// ⭐ `JAN-EXEC` Phase 7 completion E2 — ~~T-STAKES, W-STAKES and P-STAKES alone~~: and each DECLARED probe whose catalog
 		// policy declares a stakes other than BLOCKING (design B4) — its rubric is that policy's own.
 		expect(movedProbes(fp), 'the probes handed every stakes').toEqual([
-			'G-STAKES',
+			'T-STAKES',
 			'W-STAKES',
 			'P-STAKES',
 			...DECLARED_PROBES_BEYOND_BLOCKING()
@@ -3108,7 +3190,7 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 		expect(listsReserialized(p, jsonLine).split('\n')[10]).toBe(jsonLine(['one\ntwo', 'three']));
 	});
 
-	it('⭐ THE ARRANGEMENT — the account-breaks probes (design §9.3 D7): G-ACCOUNT-BREAKS’s and W-ACCOUNT-BREAKS’s prompts are fenced by `<<<UNTRUSTED-36>>>`, and P-ACCOUNT-BREAKS’s view by `36` and its prompt by `37`, past the nine candidates each field of the account holds, six each split by one terminator a reader may not break at and three each on a line of its own one layout lays out — under an override, inside an embedding, inside an isolate; each field is shown whole, as D7 writes it, each list holding an item with a line feed; and each way of reading a field otherwise reads its plants as stated', () => {
+	it('⭐ THE ARRANGEMENT — the account-breaks probes (design §9.3 D7): T-ACCOUNT-BREAKS’s and W-ACCOUNT-BREAKS’s prompts are fenced by `<<<UNTRUSTED-36>>>`, and P-ACCOUNT-BREAKS’s view by `36` and its prompt by `37`, past the nine candidates each field of the account holds, six each split by one terminator a reader may not break at and three each on a line of its own one layout lays out — under an override, inside an embedding, inside an isolate; each field is shown whole, as D7 writes it, each list holding an item with a line feed; and each way of reading a field otherwise reads its plants as stated', () => {
 		// ⛔ WHY (design §9.3 D7; `REG-F-481`): every plant in an account slice was read by every reading of it, and none
 		// was split by a break, so a chooser that read a field otherwise than the prompt carries it moved no probe (driven
 		// on a disposable copy). So each field holds six candidates read only as carried — each split by one terminator a
@@ -3325,19 +3407,19 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 		120_000
 	);
 
-	// ~~U+0085 and U+2029 alone, through G-OVERSIZE-FENCES alone~~ — `PQ-1` (`REG-F-481`): every break is planted at every
+	// ~~U+0085 and U+2029 alone, through T-OVERSIZE-FENCES alone~~ — `PQ-1` (`REG-F-481`): every break is planted at every
 	// call site a probe reaches now, the command line of `P-OVERSIZE-FENCES` among them, so each break left raw moves both.
 	it.each([
 		['U+0085', 0x85],
 		['U+2028', 0x2028],
 		['U+2029', 0x2029]
 	] as const)(
-		'⭐ `jsonLine` leaving %s raw — at every call site at once, the fence module loaded afresh — moves `probes` through the two probes that plant it, G-OVERSIZE-FENCES and P-OVERSIZE-FENCES, and no case prompt of v1 or of the current set (PQ-2)',
+		'⭐ `jsonLine` leaving %s raw — at every call site at once, the fence module loaded afresh — moves `probes` through the two probes that plant it, T-OVERSIZE-FENCES and P-OVERSIZE-FENCES, and no case prompt of v1 or of the current set (PQ-2)',
 		async (_name, left) => {
 			expect(jsonLineLeaving(0)({ a: 'x' }), 'CONTROL: leaving none raw, it is `jsonLine`').toBe(jsonLine({ a: 'x' }));
 			const fp = await freshOverFence(() => ({ jsonLine: jsonLineLeaving(left) }));
 			onlyMoved(fp, ['probes']);
-			expect(movedProbes(fp), 'the probes that plant that break').toEqual(['G-OVERSIZE-FENCES', 'P-OVERSIZE-FENCES']);
+			expect(movedProbes(fp), 'the probes that plant that break').toEqual(['T-OVERSIZE-FENCES', 'P-OVERSIZE-FENCES']);
 			expect(fp.casePrompts, 'no case prompt moves').toEqual(BASE.casePrompts);
 			// ⭐ `PQ-2` (design D4) — nor any of the current set, measured: no case's command line or content holds the break.
 			const now = await freshOverFence(() => ({ jsonLine: jsonLineLeaving(left) }), CURRENT_CASES);
@@ -3346,7 +3428,7 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 		240_000
 	);
 
-	it('⭐ WHAT NO CHOOSER MAY READ IS PLANTED, AND WOULD DECIDE — each chooser’s token in the bytes a cut removes (every cut a probe takes but those standing on a cut’s own arithmetic; for both choosers of a process result, in each tied list and in each slice P-OVERSIZE-ALL’s prompt cuts), astride two slices (W-FENCES, G-OVERSIZE-FENCES, P-OVERSIZE-FENCES) and astride a cut’s two parts (P-OVERSIZE-FENCES’s stdout), split by a line feed, and written backwards and with its runs reversed on a line with no bidi control: in no slice as the prompt carries it, and a chooser that read it would choose another token', () => {
+	it('⭐ WHAT NO CHOOSER MAY READ IS PLANTED, AND WOULD DECIDE — each chooser’s token in the bytes a cut removes (every cut a probe takes but those standing on a cut’s own arithmetic; for both choosers of a process result, in each tied list and in each slice P-OVERSIZE-ALL’s prompt cuts), astride two slices (W-FENCES, T-OVERSIZE-FENCES, P-OVERSIZE-FENCES) and astride a cut’s two parts (P-OVERSIZE-FENCES’s stdout), split by a line feed, and written backwards and with its runs reversed on a line with no bidi control: in no slice as the prompt carries it, and a chooser that read it would choose another token', () => {
 		// ⛔ WHY (`PQ-1`; `REG-F-481`, `REG-F-476`; design D2 under the sponsor's answer (a)): a chooser reads each slice AS THE
 		// PROMPT CARRIES IT — the bytes a cut KEPT, each slice on its own. Every plant stood where a chooser must read, so a
 		// chooser that read MORE — each slice whole, the bytes its cut removed included, or its slices joined — chose the
@@ -3450,11 +3532,11 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 			...pfTexts,
 			bulleted(fences.rationale!.assumptions)
 		]);
-		// THE VALIDATOR'S CHOOSER, OVER A GRAPH (`G-OVERSIZE-FENCES`): the end its limitations' cut removes.
-		const graph = FINGERPRINT_PROBES.find((x) => x.id === 'G-OVERSIZE-FENCES')!.input(PRODUCT_SEAMS.criteria, PRODUCT_SEAMS.processResult);
-		const g = promptRegions(BASE.probePrompts.get('G-OVERSIZE-FENCES')!);
+		// THE VALIDATOR'S CHOOSER, OVER A GRAPH (`T-OVERSIZE-FENCES`): the end its limitations' cut removes.
+		const graph = FINGERPRINT_PROBES.find((x) => x.id === 'T-OVERSIZE-FENCES')!.input(PRODUCT_SEAMS.criteria, PRODUCT_SEAMS.processResult);
+		const g = promptRegions(BASE.probePrompts.get('T-OVERSIZE-FENCES')!);
 		decides(
-			'G-OVERSIZE-FENCES, the end of the limitations their cut removes',
+			'T-OVERSIZE-FENCES, the end of the limitations their cut removes',
 			'<<<UNTRUSTED-08>>>',
 			'<<<UNTRUSTED-08>>>',
 			g.regions.map((r) => regionText(g.lines, r)),
@@ -3465,9 +3547,9 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 		const gTexts = g.regions.map((r) => regionText(g.lines, r));
 		expect(
 			[gTexts[0]!.endsWith('\n<<<UNTRUSTED-0'), g.regions[2]!.slice, gTexts[2]!.startsWith('8>>>\n')],
-			'G-OVERSIZE-FENCES: the token’s first half ends the instruction, the rest begins the rationale'
+			'T-OVERSIZE-FENCES: the token’s first half ends the instruction, the rest begins the rationale'
 		).toEqual([true, "the account's rationale", true]);
-		decides('G-OVERSIZE-FENCES, astride its instruction and its rationale', '<<<UNTRUSTED-08>>>', '<<<UNTRUSTED-08>>>', gTexts, [
+		decides('T-OVERSIZE-FENCES, astride its instruction and its rationale', '<<<UNTRUSTED-08>>>', '<<<UNTRUSTED-08>>>', gTexts, [
 			gTexts[0]! + gTexts[2]!,
 			...gTexts
 		]);
@@ -3482,9 +3564,9 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 			'the prior findings': (input) => jsonLine(input.prior!.gaps)
 		};
 		for (const [id, slices] of [
-			['G-OVERSIZE-ALL', ['the instruction', 'the content', "the account's rationale", 'the narration', 'the prior findings']],
+			// ⭐ B7 — ~~and the content~~: a part's content is never cut by the validator.
+			['T-OVERSIZE-ALL', ['the instruction', "the account's rationale", 'the narration', 'the prior findings']],
 			['W-OVERSIZE-ALL', ['the instruction', 'the content', "the account's rationale", 'the prior findings']],
-			['G-OVERSIZE-CONTENT', ['the content']],
 			['W-OVERSIZE-CONTENT', ['the content']]
 		] as const) {
 			const input = FINGERPRINT_PROBES.find((x) => x.id === id)!.input(PRODUCT_SEAMS.criteria, PRODUCT_SEAMS.processResult);
@@ -3522,7 +3604,7 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 		// process-result probe the limitations, so a chooser that read one of them uncut there moved nothing (driven on a
 		// disposable copy).
 		for (const [id, promptsOwn, viewsOwn] of [
-			['G-OVERSIZE-LISTS', '<<<UNTRUSTED-00>>>', undefined],
+			['T-OVERSIZE-LISTS', '<<<UNTRUSTED-00>>>', undefined],
 			['W-OVERSIZE-LISTS', '<<<UNTRUSTED-00>>>', undefined],
 			['P-OVERSIZE-LISTS', '<<<UNTRUSTED-01>>>', '<<<UNTRUSTED-00>>>']
 		] as const) {
@@ -3635,7 +3717,11 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 			const { lines, token, regions } = promptRegions(sent);
 			const viewToken = input.framing === 'PROCESS_RESULT' ? viewParts(input.content).token : undefined;
 			for (const r of regions.filter((x) => x.cut)) {
-				if (input.framing === 'DECLARED_POLICY' && input.declaredWorkCut !== undefined && r.slice === 'the content') {
+				// ⭐ B7 — and a part whose children's skeletons its builder cut (`declaredPartCut`), handed to the validator as cut.
+				const builderCut =
+					(input.framing === 'DECLARED_POLICY' && input.declaredWorkCut !== undefined) ||
+					(input.framing === 'PWA_TYPE' && input.declaredPartCut !== undefined);
+				if (builderCut && r.slice === 'the content') {
 					expect(regionText(lines, r), `${probe.id}: the builder’s cut work is shown as it was handed`).toBe(input.content);
 					builderCuts.push(probe.id);
 					continue;
@@ -3670,10 +3756,14 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 			'P-OVERSIZE-AT-ITS-BUDGET: stderr (the view’s)',
 			'P-OVERSIZE-ALL: stdout (the view’s)'
 		]);
-		expect(builderCuts, 'the declared reviews whose work their builder cut').toEqual(['D-OVERSIZE-UNITS', 'D-OVERSIZE-UNIT-TITLE']);
+		expect(builderCuts, 'the declared reviews whose work their builder cut, ⭐ and the part whose children its builder cut').toEqual([
+			'T-OVERSIZE-CHILDREN',
+			'D-OVERSIZE-UNITS',
+			'D-OVERSIZE-UNIT-TITLE'
+		]);
 	});
 
-	it('⭐ A REFUSAL IS HASHED, IN EVERY FRAMING — G-NO-FENCE’s instruction, W-NO-FENCE’s answer and P-NO-FENCE’s stdout each print every candidate, so the validator refuses each before any prompt exists, and `probes` hashes the refusal: the statement and the content refused; no other probe is refused', () => {
+	it('⭐ A REFUSAL IS HASHED, IN EVERY FRAMING — T-NO-FENCE’s instruction, W-NO-FENCE’s answer and P-NO-FENCE’s stdout each print every candidate, so the validator refuses each before any prompt exists, and `probes` hashes the refusal: the statement and the content refused; no other probe is refused', () => {
 		// ⛔ WHY (`PQ-1`; `REG-F-481`, `REG-F-476`): only a process result was refused, so a validator that failed closed for a
 		// process result alone — and SENT a graph or a work product whose slices hold every candidate, fenced by one that
 		// occurs in it, the forged-block path `REG-F-481` closed — moved no fingerprint (driven on a disposable copy).
@@ -3682,7 +3772,7 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 		expect(input.content.split('\n'), 'the view is rendered unfenced, and says so').toContain(NO_FENCE_LINE);
 		expect(BASE.probePrompts.get('P-NO-FENCE'), 'the refusal, hashed as a prompt is').toBe([REFUSED, NO_FENCE_STATEMENT, input.content].join('\n'));
 		for (const [id, slice] of [
-			['G-NO-FENCE', (i: ReasoningReviewInput) => i.prompt],
+			['T-NO-FENCE', (i: ReasoningReviewInput) => i.prompt],
 			['W-NO-FENCE', (i: ReasoningReviewInput) => i.content]
 		] as const) {
 			const i = FINGERPRINT_PROBES.find((x) => x.id === id)!.input(PRODUCT_SEAMS.criteria, PRODUCT_SEAMS.processResult);
@@ -3692,7 +3782,12 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 		expect(
 			FINGERPRINT_PROBES.map((x) => x.id).filter((id) => BASE.probePrompts.get(id)!.startsWith(`${REFUSED}\n`)),
 			'the probes the validator refuses'
-		).toEqual(['G-NO-FENCE', 'W-NO-FENCE', 'P-NO-FENCE']);
+			// ⭐ B7 — and a part whose subject is too long to show, refused whole (`T-SUBJECT-REFUSED`).
+		).toEqual(['T-SUBJECT-REFUSED', 'T-NO-FENCE', 'W-NO-FENCE', 'P-NO-FENCE']);
+		const { content: part, ...huge } = inputOf('T-SUBJECT-REFUSED');
+		expect(BASE.probePrompts.get('T-SUBJECT-REFUSED'), 'the full-subject refusal, hashed as a prompt is').toBe(
+			[REFUSED, pwaTypeOverBudgetStatement(part.length, pwaTypeContentBudget({ ...huge, framing: 'PWA_TYPE' })), part].join('\n')
+		);
 	});
 
 	it('⭐ a chooser that NEVER FAILS CLOSED — every candidate occurring, it fences with the last anyway — moves `probes` through the three refused probes, one in each framing, each refusal now a prompt, and no case prompt of v1 or of the current set (PQ-2)', async () => {
@@ -3701,8 +3796,8 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 		});
 		const fp = await freshOverFence(neverClosed);
 		onlyMoved(fp, ['probes']);
-		expect(movedProbes(fp), 'the probes the validator refuses').toEqual(['G-NO-FENCE', 'W-NO-FENCE', 'P-NO-FENCE']);
-		for (const id of ['G-NO-FENCE', 'W-NO-FENCE', 'P-NO-FENCE'])
+		expect(movedProbes(fp), 'the probes the validator refuses').toEqual(['T-NO-FENCE', 'W-NO-FENCE', 'P-NO-FENCE']);
+		for (const id of ['T-NO-FENCE', 'W-NO-FENCE', 'P-NO-FENCE'])
 			expect(fp.probePrompts.get(id)!.startsWith(`${REFUSED}\n`), `${id}: sent, where it was refused`).toBe(false);
 		expect(fp.casePrompts, 'no case prompt moves').toEqual(BASE.casePrompts);
 		// ⭐ `PQ-2` (design D4) — nor any of the current set's: no case prints every candidate.
@@ -4392,7 +4487,7 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481) — the fingerprint reaches the ske
 	];
 	const movedByRule = (name: string): string[] =>
 		ACCOUNT_BREAKS_RULES.some((rule) => name.startsWith(rule))
-			? ['G-ACCOUNT-BREAKS', 'W-ACCOUNT-BREAKS', 'P-OVERSIZE-FENCES', 'P-ACCOUNT-BREAKS']
+			? ['T-ACCOUNT-BREAKS', 'W-ACCOUNT-BREAKS', 'P-OVERSIZE-FENCES', 'P-ACCOUNT-BREAKS']
 			: ['P-OVERSIZE-FENCES'];
 	it.each(READER_RULES)(
 		'⭐ the reader’s rule: %s — dropped, it moves `probes` through P-OVERSIZE-FENCES and the probes that plant by that rule alone (the account-breaks probes, by a terminator and by each layout rule their laid-out lines stand on), its view’s token falling to the plant it no longer reads',

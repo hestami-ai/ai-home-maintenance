@@ -3,25 +3,34 @@
 //
 // VERSION SIX'S ORACLES, UNCHANGED, AND ONE FOR EACH NEW GRAPH CASE. Version six's 54 cases are carried byte for byte
 // (`case-set-v7.ts`), so each keeps its oracle whole, with its standing and its conferral. The six new oracles' verdicts and
-// faulted criteria are the lead's draft (design §4c, F3's table and its G7-CLEAN paragraph), PROPOSED here, each with a
-// standing:
+// faulted criteria are the lead's draft (design §4c, F3's table and its G7-CLEAN paragraph), ~~PROPOSED here~~ proposed here
+// and ⭐ CONFERRED as proposed (`REG-D-124`, below), each with a standing:
 //   · G7-CLEAN is SATISFIED, faulting nothing — THE AUTHOR'S CLAIM, as the draft gives it and as every clean case is: a clean
 //     verdict asserts every criterion met, which no author can make uncontested.
 //   · EACH PLANTED TWIN requires its plant's criterion faulted and is REJECTED. ⚠ The draft's table gives no twin a standing:
 //     each is proposed here as THE AUTHOR'S CLAIM too, the criteria a competent reviewer could file the plant under instead
 //     named in its note: faulting one as well is no discrimination failure, and the pass bar is the verdict (`REG-D-080`).
-// ⛔ PROPOSED, AWAITING SPONSOR CONFERRAL (design §4c, F4: "First present one sponsor screen with the six proposed cases,
+// ~~⛔ PROPOSED, AWAITING SPONSOR CONFERRAL (design §4c, F4: "First present one sponsor screen with the six proposed cases,
 // their plants, verdicts, faulted criteria and standings, as `REG-D-113` did for the declared cases. Record the sponsor's
 // conferral before the paid measurement."): until the sponsor confers them, `conferral` carries `ORACLES_PROPOSED`, and
-// `reviewer:qual:check` refuses the current set (`ORACLES_NOT_CONFERRED`), so no run over them can turn it green.
+// `reviewer:qual:check` refuses the current set (`ORACLES_NOT_CONFERRED`), so no run over them can turn it green.~~
+// ⭐ CONFERRED (`REG-D-124`, recorded by the review in parts, package D, B8's code record): asked *"Do you confirm these six
+// expected verdicts for the new graph cases, so High's measurement on them counts? (1 clean SATISFIED; 5 planted, each
+// REJECTED for its one named defect.)"*, the sponsor chose *"Confirm all six (Recommended)"*. So `conferral` records the six
+// verdicts and faulted criteria conferred as proposed, and carries `ORACLES_PROPOSED` no more. ⚠ THE STANDINGS WERE NOT ON
+// THE SPONSOR'S SCREEN (the register's account): each, the author's claim, was the builder's proposal, and is carried as
+// proposed, beside the graph arm's precedent, uncontested, for G-RR-01 and G3-RR-02 to G3-RR-09. Every oracle is as it was
+// proposed. Version seven is history since version eight (`cases.ts`); its six source oracles carry into version eight's
+// part cases (`oracles-v8.ts`).
 // Correcting an oracle is a new oracle VERSION, never an edit, and moves no case digest.
 // Generated into `docs/tracking/reviewer-qualification/oracles/` by `generate.ts`; the JSON is never hand-edited.
-import { ORACLES_PROPOSED, type Oracle, type OracleSet, type OracleStanding } from './cases.js';
+import type { Oracle, OracleSet, OracleStanding } from './cases.js';
 import { ORACLES_V6 } from './oracles-v6.js';
 
 const AUTHORS_CLAIM: OracleStanding = "the author's claim";
 
-/** ⭐ The six proposed oracles, in the case set's order: the clean case, then each planted twin. */
+/** ⭐ The six ~~proposed~~ oracles, conferred as proposed (`REG-D-124`), in the case set's order: the clean case, then each
+ *  planted twin. */
 const GRAPH_ORACLES_V7: readonly Oracle[] = [
 	{
 		caseId: 'G7-CLEAN',
@@ -104,10 +113,13 @@ export const ORACLES_V7: OracleSet = {
 	caseSetVersion: 7,
 	conferral:
 		`${ORACLES_V6.conferral} The six graph-case oracles version seven adds (G7-CLEAN, G7-RR-04, G7-RR-02, G7-RR-03-CHILD, ` +
-		`G7-RR-03-PROMPT and G7-RR-08) are ${ORACLES_PROPOSED}: each case’s plant, expected verdict, faulted criterion and ` +
-		'G7-CLEAN’s standing are the lead’s draft (DESIGN-phase-7-completion.md §4c, F3); each twin’s standing, which the draft ' +
-		'does not give, is proposed beside them as the author’s claim. Their data was authored by the agent that also edited ' +
-		'what the reviewer reads (the PWA_GRAPH framing, F1), so they go to the sponsor before the paid measurement (REG-D-123 ' +
-		'Q25; §4c, F4).',
+		'G7-RR-03-PROMPT and G7-RR-08) were conferred by the sponsor as proposed (REG-D-124, Q27: asked “Do you confirm these ' +
+		'six expected verdicts for the new graph cases, so High\'s measurement on them counts? (1 clean SATISFIED; 5 planted, ' +
+		'each REJECTED for its one named defect.)”, the sponsor chose “Confirm all six (Recommended)”) — each case’s plant, ' +
+		'expected verdict and faulted criterion, the lead’s draft (DESIGN-phase-7-completion.md §4c, F3), its data authored by ' +
+		'the agent that also edited what the reviewer reads (the PWA_GRAPH framing, F1). The standings were not on the ' +
+		'sponsor’s screen: each, the author’s claim, was the builder’s proposal, and is carried as proposed, beside the graph ' +
+		'arm’s precedent, uncontested, for G-RR-01 and G3-RR-02 to G3-RR-09. A change to a plant, a verdict, a faulted list or ' +
+		'a standing goes back to the sponsor.',
 	oracles: [...ORACLES_V6.oracles, ...GRAPH_ORACLES_V7]
 };

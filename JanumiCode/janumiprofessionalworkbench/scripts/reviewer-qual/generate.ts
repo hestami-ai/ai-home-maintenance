@@ -22,6 +22,7 @@ import {
 	CASE_SET_V5_FILE,
 	CASE_SET_V6_FILE,
 	CASE_SET_V7_FILE,
+	CASE_SET_V8_FILE,
 	ORACLES_V1_FILE,
 	ORACLES_V2_FILE,
 	ORACLES_V3_FILE,
@@ -29,6 +30,7 @@ import {
 	ORACLES_V5_FILE,
 	ORACLES_V6_FILE,
 	ORACLES_V7_FILE,
+	ORACLES_V8_FILE,
 	serializeGenerated,
 	type CaseSet,
 	type OracleSet
@@ -40,6 +42,7 @@ import { CASE_SET_V4 } from './case-set-v4.js';
 import { CASE_SET_V5 } from './case-set-v5.js';
 import { CASE_SET_V6 } from './case-set-v6.js';
 import { CASE_SET_V7 } from './case-set-v7.js';
+import { CASE_SET_V8 } from './case-set-v8.js';
 import { ORACLES_V1 } from './oracles-v1.js';
 import { ORACLES_V2 } from './oracles-v2.js';
 import { ORACLES_V3 } from './oracles-v3.js';
@@ -47,6 +50,7 @@ import { ORACLES_V4 } from './oracles-v4.js';
 import { ORACLES_V5 } from './oracles-v5.js';
 import { ORACLES_V6 } from './oracles-v6.js';
 import { ORACLES_V7 } from './oracles-v7.js';
+import { ORACLES_V8 } from './oracles-v8.js';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -62,7 +66,10 @@ const VERSIONS: readonly (readonly [string, CaseSet, string, OracleSet])[] = [
 	[CASE_SET_V6_FILE, CASE_SET_V6, ORACLES_V6_FILE, ORACLES_V6],
 	// ⭐ `JAN-EXEC` Phase 7 after P6's third run, package P, F3 — version seven: six graph cases whose types declare their work
 	// (`REG-D-123` Q25), their oracles proposed.
-	[CASE_SET_V7_FILE, CASE_SET_V7, ORACLES_V7_FILE, ORACLES_V7]
+	[CASE_SET_V7_FILE, CASE_SET_V7, ORACLES_V7_FILE, ORACLES_V7],
+	// ⭐ `JAN-EXEC` Phase 7, the review in parts, B7 — version eight: version seven's 41 non-graph cases and 35 part cases
+	// (`REG-D-125`, `REG-D-126`), their oracles conferred.
+	[CASE_SET_V8_FILE, CASE_SET_V8, ORACLES_V8_FILE, ORACLES_V8]
 ];
 
 for (const [casesFile, cases, oraclesFile, oracles] of VERSIONS) {

@@ -46,6 +46,7 @@ import {
 	CASE_SET_V4_FILE,
 	CASE_SET_V5_FILE,
 	CASE_SET_V6_FILE,
+	CASE_SET_V7_FILE,
 	CURRENT_CASE_SET_FILE,
 	CURRENT_ORACLES_FILE,
 	ORACLES_V1_FILE,
@@ -54,6 +55,7 @@ import {
 	ORACLES_V4_FILE,
 	ORACLES_V5_FILE,
 	ORACLES_V6_FILE,
+	ORACLES_V7_FILE,
 	type CaseSet,
 	type OracleSet,
 	type QualificationCase
@@ -126,6 +128,11 @@ const V5_ORACLES = JSON.parse(readFileSync(`${REPO}/${ORACLES_V5_FILE}`, 'utf8')
 const V6_SET = JSON.parse(readFileSync(`${REPO}/${CASE_SET_V6_FILE}`, 'utf8')) as CaseSet;
 const V6_CASES = V6_SET.cases;
 const V6_ORACLES = JSON.parse(readFileSync(`${REPO}/${ORACLES_V6_FILE}`, 'utf8')) as OracleSet;
+/** ⭐ The review in parts, B7 — version seven, current from package P to B7, a fixed fixture since: its limb checks package
+ *  P's record shape (F4), and version eight's checks a run of it. */
+const V7_SET = JSON.parse(readFileSync(`${REPO}/${CASE_SET_V7_FILE}`, 'utf8')) as CaseSet;
+const V7_CASES = V7_SET.cases;
+const V7_ORACLES = JSON.parse(readFileSync(`${REPO}/${ORACLES_V7_FILE}`, 'utf8')) as OracleSet;
 const CURRENT_SET = JSON.parse(readFileSync(`${REPO}/${CURRENT_CASE_SET_FILE}`, 'utf8')) as CaseSet;
 const CURRENT_ORACLES = JSON.parse(readFileSync(`${REPO}/${CURRENT_ORACLES_FILE}`, 'utf8')) as OracleSet;
 const CURRENT_CASES = CURRENT_SET.cases;
@@ -145,6 +152,7 @@ const ORACLE_SETS: readonly OracleSet[] = [
 	V4_ORACLES,
 	V5_ORACLES,
 	V6_ORACLES,
+	V7_ORACLES,
 	CURRENT_ORACLES
 ];
 /** Every oracle any set holds: a case id two hold carries the same standing in each (the cases test holds that). */
@@ -156,6 +164,7 @@ const ORACLE = new Map(
 		...V4_ORACLES.oracles,
 		...V5_ORACLES.oracles,
 		...V6_ORACLES.oracles,
+		...V7_ORACLES.oracles,
 		...CURRENT_ORACLES.oracles
 	].map((o) => [o.caseId, o])
 );
@@ -230,6 +239,8 @@ let FP_V4: ReviewerFingerprint;
 let FP_V5: ReviewerFingerprint;
 /** ⭐ Package P F3 — version six's, a fixed fixture now (`V6_SET`). */
 let FP_V6: ReviewerFingerprint;
+/** ⭐ The review in parts, B7 — version seven's, a fixed fixture now (`V7_SET`). */
+let FP_V7: ReviewerFingerprint;
 /** `JAN-CRITREAD` J2-7 — today's fingerprint over version two, the fixed fixture of the J2-5 limb. */
 let FP_V2: ReviewerFingerprint;
 /** `JAN-PRQUAL` `PQ-2` — today's fingerprint over version three, the fixed fixture of the J2-7 limb. */
@@ -244,11 +255,12 @@ beforeAll(async () => {
 	FP_V4 = await reviewerFingerprint(V4_CASES);
 	FP_V5 = await reviewerFingerprint(V5_CASES);
 	FP_V6 = await reviewerFingerprint(V6_CASES);
+	FP_V7 = await reviewerFingerprint(V7_CASES);
 	FP_V2 = await reviewerFingerprint(V2_CASES);
 	FP_V3 = await reviewerFingerprint(V3_CASES);
 	CURRENT = { reviewer: FP.reviewer, scoring: FP.scoring, caseSet: FP.caseSet };
 	CASE_OF = new Map(
-		[...FP.casePrompts, ...FP_V2.casePrompts, ...FP_V3.casePrompts, ...FP_V5.casePrompts, ...FP_V6.casePrompts, ...FP_NOW.casePrompts].flatMap(
+		[...FP.casePrompts, ...FP_V2.casePrompts, ...FP_V3.casePrompts, ...FP_V5.casePrompts, ...FP_V6.casePrompts, ...FP_V7.casePrompts, ...FP_NOW.casePrompts].flatMap(
 			([id, p]) => [[p.initial, id] as const, [p.repair, id] as const]
 		)
 	);
@@ -277,7 +289,7 @@ const judgement = (
  */
 const DECLARED_RUBRIC = new Map(
 	// ⭐ Round 5 — version five's among them: its D-FP-CLEAN is no case of today's set.
-	[...V5_CASES, ...CURRENT_CASES].flatMap((c) => (c.arm === 'DECLARED_POLICY' ? [[c.id, c.input.policy.criteria] as const] : []))
+	[...V5_CASES, ...V7_CASES, ...CURRENT_CASES].flatMap((c) => (c.arm === 'DECLARED_POLICY' ? [[c.id, c.input.policy.criteria] as const] : []))
 );
 /** What each case's oracle expects — a reviewer that gets every case right, answering the case's own rubric. */
 const asOracle = (caseId: string): string => judgement(ORACLE.get(caseId)!.faulted, DECLARED_RUBRIC.get(caseId));
@@ -1631,7 +1643,10 @@ describe('JAN-EXEC Phase 7 completion round 5 — under case set v6, P4’s reco
 });
 
 // ── ⭐⭐ `JAN-EXEC` Phase 7 after P6's third run, package P, F4's red (`REG-D-123` Q25; DESIGN-phase-7-completion.md §4c) ──
-// Version seven is current, and package P F1 moved the reviewer fingerprint ON PURPOSE: its graph framing moves every graph
+// ⭐ The review in parts, B7 — ~~Version seven is current~~ version seven, a fixed fixture since version eight (`V7_SET`), and
+// its six new oracles conferred (`REG-D-124`, recorded in `oracles-v7.ts`): the record's shape below owes their conferral no
+// more, and the limb is held by a statement that reads PROPOSED, as version seven's did before the record (`AS_IF_PROPOSED_V7`).
+// Version seven was current, and package P F1 moved the reviewer fingerprint ON PURPOSE: its graph framing moves every graph
 // case's prompt, and its probes reach the export's new fields. ⭐ A fingerprint move alone is no qualification (`REG-D-086`):
 // the committed record's shape — the selected candidate's run of version six under the fingerprint before F1 — owes a run of
 // the selected candidate over the nineteen graph cases (thirteen whose prompts moved, six new), RESCORED lines for the other
@@ -1639,11 +1654,13 @@ describe('JAN-EXEC Phase 7 completion round 5 — under case set v6, P4’s reco
 // of the six new oracles.
 describe('⭐⭐ package P F4 — under case set v7 and the fingerprint F1 moved, the selected candidate’s run of v6 owes a run over exactly the nineteen graph cases, RESCORED lines for the other forty-one, and the conferral of the six new oracles (REG-D-123 Q25, REG-D-086)', () => {
 	const GLM: SelectedCandidate = { transport: 'devin', modelLabel: 'glm-5-3-flash-max' };
-	const GRAPH = (): string[] => CURRENT_CASES.filter((c) => c.arm === 'PWA_GRAPH').map((c) => c.id);
-	const OTHERS = (): string[] => CURRENT_CASES.filter((c) => c.arm !== 'PWA_GRAPH').map((c) => c.id);
-	/** Today's set — version seven — and its oracles, under `conferral` (the committed statement, unless said). */
-	const onVersionSeven = (files: CheckInputs['files'], conferral = CURRENT_ORACLES.conferral) =>
-		check(files, { current: FP_NOW, cases: CURRENT_CASES, oracles: CURRENT_ORACLES.oracles, conferral });
+	const GRAPH = (): string[] => V7_CASES.filter((c) => c.arm === 'PWA_GRAPH').map((c) => c.id);
+	const OTHERS = (): string[] => V7_CASES.filter((c) => c.arm !== 'PWA_GRAPH').map((c) => c.id);
+	/** ~~Today's set~~ Version seven and its oracles, under `conferral` (its committed statement, unless said). */
+	const onVersionSeven = (files: CheckInputs['files'], conferral = V7_ORACLES.conferral) =>
+		check(files, { current: FP_V7, cases: V7_CASES, oracles: V7_ORACLES.oracles, conferral });
+	/** ⭐ B7 — version seven's statement as it read before `REG-D-124`'s record: its six new oracles proposed. */
+	const AS_IF_PROPOSED_V7 = `${V6_ORACLES.conferral} The six graph-case oracles version seven adds are ${DECLARED_ORACLES_PROPOSED}.`;
 	/** The definition before F1: today's but for the probes, which F1 moved. */
 	const BEFORE_F1 = (): RunFingerprint => ({ ...moved('probes'), caseSet: FP_V6.caseSet });
 	/**
@@ -1668,8 +1685,8 @@ describe('⭐⭐ package P F4 — under case set v7 and the fingerprint F1 moved
 	/** The COVERAGE problem's first line, as the check words it, for `who` (the any-candidate limb, or the selected one's). */
 	const owed = (who: 'any' | 'selected', lines: readonly RecordLine[]) =>
 		who === 'any'
-			? `60 of 60 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer}: ${CURRENT_CASES.map((c) => c.id).join(', ')} — owed: a RUN over them, or RESCORED lines where no case prompt changed (§5.6 limb 1)`
-			: `60 of 60 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer} by the SELECTED candidate devin / glm-5-3-flash-max (REG-D-084; the SELECTION in force, runs.ndjson:${lines.length}): ${CURRENT_CASES.map((c) => c.id).join(', ')} — owed: a run of the selected candidate over them, or RESCORED lines of its runs where no case prompt changed (§5.6 limb 1; REG-D-086)`;
+			? `60 of 60 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer}: ${V7_CASES.map((c) => c.id).join(', ')} — owed: a RUN over them, or RESCORED lines where no case prompt changed (§5.6 limb 1)`
+			: `60 of 60 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer} by the SELECTED candidate devin / glm-5-3-flash-max (REG-D-084; the SELECTION in force, runs.ndjson:${lines.length}): ${V7_CASES.map((c) => c.id).join(', ')} — owed: a run of the selected candidate over them, or RESCORED lines of its runs where no case prompt changed (§5.6 limb 1; REG-D-086)`;
 	/** The hint beside it: the cases whose prompts the run recorded are today's, which RESCORED lines discharge. */
 	const hint = (ids: readonly string[]) =>
 		`same prompts under an earlier fingerprint in qr-v6-before-f1: ${ids.join(', ')} — RESCORED lines discharge those where no case prompt changed (§5.6 limb 1)`;
@@ -1677,32 +1694,37 @@ describe('⭐⭐ package P F4 — under case set v7 and the fingerprint F1 moved
 		rescoredLines(
 			lines.find((l): l is RunLine => l.kind === 'RUN')!,
 			lines.filter((l): l is CallLine => l.kind === 'CALL'),
-			CURRENT_CASES,
-			FP_NOW.casePrompts,
+			V7_CASES,
+			FP_V7.casePrompts,
 			{
 				rescoreId: 'rs-v6-before-f1',
 				date: '2026-10-23T12:00:00.000Z',
 				commit: 'b'.repeat(40),
 				reviewer: FP.reviewer,
 				scoring: FP.scoring,
-				caseSet: FP_NOW.caseSet
+				caseSet: FP_V7.caseSet
 			}
 		);
 
-	it('⛔ RED, AND EXACTLY SO — the conferral of the six new oracles, and coverage of all sixty, by any candidate and by the selected one, each naming the forty-one whose prompts did not move as RESCORED lines discharge them; no ACKNOWLEDGED line is owed, and nothing else', async () => {
-		expect([CURRENT_SET.caseSetVersion, CURRENT_ORACLES.oracleVersion], 'the current set is version seven').toEqual([7, 7]);
+	it('⛔ RED, AND EXACTLY SO — ~~the conferral of the six new oracles, and~~ coverage of all sixty, by any candidate and by the selected one, each naming the forty-one whose prompts did not move as RESCORED lines discharge them; no ACKNOWLEDGED line is owed, and nothing else — ⭐ the six conferred (REG-D-124); a statement that reads PROPOSED owes their conferral besides', async () => {
+		expect([V7_SET.caseSetVersion, V7_ORACLES.oracleVersion], 'version seven').toEqual([7, 7]);
 		expect([GRAPH().length, OTHERS().length], 'graph cases, the others').toEqual([19, 41]);
 		expect(FP.reviewer, 'arrangement: the run’s fingerprint is not today’s').not.toBe(BEFORE_F1().reviewer);
 		const lines = [...(await v6Run()), select(GLM)];
-		const r = await onVersionSeven([file(lines)]);
-		expect(r.problems).toEqual([
-			{ limb: 'CONFERRAL', message: ORACLES_NOT_CONFERRED },
+		const coverage = [
 			{ limb: 'COVERAGE', message: [owed('any', lines), hint(OTHERS())].join('\n    ') },
 			{ limb: 'COVERAGE', message: [owed('selected', lines), hint(OTHERS())].join('\n    ') }
+		];
+		// ⭐ B7 — ~~the CONFERRAL problem first~~: `REG-D-124` is recorded, so coverage alone is owed.
+		expect((await onVersionSeven([file(lines)])).problems).toEqual(coverage);
+		// ⭑ CONTROL — version seven's statement as it read before the record: the conferral owed, then the same coverage.
+		expect((await onVersionSeven([file(lines)], AS_IF_PROPOSED_V7)).problems).toEqual([
+			{ limb: 'CONFERRAL', message: ORACLES_NOT_CONFERRED },
+			...coverage
 		]);
 	});
 
-	it('⭐ RESCORED lines of that run for the forty-one and a run of the selected candidate over the nineteen graph cases under today’s fingerprint leave the conferral alone — and with it recorded, GREEN', async () => {
+	it('⭐ RESCORED lines of that run for the forty-one and a run of the selected candidate over the nineteen graph cases under today’s fingerprint leave ~~the conferral alone — and with it recorded,~~ nothing owed: GREEN, the six conferred (REG-D-124); a statement that reads PROPOSED owes the conferral alone', async () => {
 		const v6 = await v6Run();
 		const rescored = await restampToday(v6);
 		expect(rescored.map((l) => l.caseId), 'the forty-one, and no graph case: their prompts moved').toEqual(OTHERS());
@@ -1710,16 +1732,17 @@ describe('⭐⭐ package P F4 — under case set v7 and the fingerprint F1 moved
 			runId: 'qr-v7-graph',
 			date: '2026-10-23T14:00:00.000Z',
 			candidate: DEVIN,
-			cases: CURRENT_CASES.filter((c) => c.arm === 'PWA_GRAPH'),
-			fingerprint: { ...CURRENT, caseSet: FP_NOW.caseSet },
+			cases: V7_CASES.filter((c) => c.arm === 'PWA_GRAPH'),
+			fingerprint: { ...CURRENT, caseSet: FP_V7.caseSet },
 			versions: { caseSet: 7, oracles: 7 }
 		});
 		const lines = [...v6, ...rescored, ...graphRun, select(GLM)];
-		expect((await onVersionSeven([file(lines)])).problems, 'the conferral alone').toEqual([
+		// ⭐ B7 — ~~the conferral alone~~: GREEN, its six conferred (`REG-D-124`).
+		expect((await onVersionSeven([file(lines)])).problems, 'nothing owed').toEqual([]);
+		// ⭑ CONTROL — the same record, its statement as it read before the record: the conferral alone. It is the only difference.
+		expect((await onVersionSeven([file(lines)], AS_IF_PROPOSED_V7)).problems, 'the conferral alone').toEqual([
 			{ limb: 'CONFERRAL', message: ORACLES_NOT_CONFERRED }
 		]);
-		// ⭑ CONTROL — the same record, its oracles conferred: GREEN. The conferral is the only difference.
-		expect((await onVersionSeven([file(lines)], 'A fixture: the six new oracles as the sponsor will have conferred them.')).problems).toEqual([]);
 		// ⭑ CONTROL — without the graph run, the nineteen are owed: by any candidate, and by the selected one.
 		const withoutRun = (await onVersionSeven([file([...v6, ...rescored, select(GLM)])])).problems.filter((p) => p.limb === 'COVERAGE');
 		expect(withoutRun, 'by any candidate, and by the selected one').toHaveLength(2);
@@ -1728,6 +1751,169 @@ describe('⭐⭐ package P F4 — under case set v7 and the fingerprint F1 moved
 			expect(first.startsWith('19 of 60 current case(s) are not MEASURED'), first).toBe(true);
 			expect(first, 'the nineteen graph cases, and no other').toContain(`: ${GRAPH().join(', ')} — owed`);
 		}
+	});
+});
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7, the review in parts, B7 (`REG-D-125`, `REG-D-126`; DESIGN-authoring-review-in-parts.md §5) ──────
+// Version eight is current, and B7 moved the reviewer fingerprint ON PURPOSE: the graph framing's probes left it, and the part
+// framing's came. ⭐ A fingerprint move alone is no qualification (`REG-D-086`): the record's shape — the selected candidate's
+// run of version seven under the fingerprint before B7, every case answered as its oracle expects — owes a run of the selected
+// candidate over the 35 part cases, RESCORED lines for the 41 carried cases, whose prompts did not move, and no conferral: the
+// 35 part oracles are the sponsor's (Q30, Q31). ⚠ AND AN ACKNOWLEDGED LINE (§5.6 limb 1): no case prompt the run recorded
+// shows the move — its graph cases are no case of version eight, and the 41's prompts did not move — so the check asks for
+// the line naming today's fingerprint, with the cases added to exercise the change: the 35.
+describe('⭐⭐ the review in parts, B7 — under case set v8 and the fingerprint B7 moved, the selected candidate’s run of v7 owes a run over exactly the 35 part cases and RESCORED lines for the other 41, and no conferral (REG-D-126, REG-D-086)', () => {
+	const GLM: SelectedCandidate = { transport: 'devin', modelLabel: 'glm-5-3-flash-max' };
+	const PARTS = (): string[] => CURRENT_CASES.filter((c) => c.arm === 'PWA_TYPE').map((c) => c.id);
+	const CARRIED = (): string[] => CURRENT_CASES.filter((c) => c.arm !== 'PWA_TYPE').map((c) => c.id);
+	/** Today's set — version eight — and its oracles, under their committed statement. */
+	const onVersionEight = (files: CheckInputs['files']) =>
+		check(files, { current: FP_NOW, cases: CURRENT_CASES, oracles: CURRENT_ORACLES.oracles, conferral: CURRENT_ORACLES.conferral });
+	/** The definition before B7: today's but for the probes, which B7 moved. */
+	const BEFORE_B7 = (): RunFingerprint => ({ ...moved('probes'), caseSet: FP_V7.caseSet });
+	/** The selected candidate's run of version seven under the definition before B7, every case answered as its oracle expects. */
+	const v7Run = (): Promise<RecordLine[]> =>
+		recorded({
+			runId: 'qr-v7-before-b7',
+			date: '2026-10-23T18:00:00.000Z',
+			candidate: DEVIN,
+			cases: V7_CASES,
+			fingerprint: BEFORE_B7(),
+			versions: { caseSet: 7, oracles: 7 }
+		});
+	const owed = (who: 'any' | 'selected', lines: readonly RecordLine[]) =>
+		who === 'any'
+			? `76 of 76 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer}: ${CURRENT_CASES.map((c) => c.id).join(', ')} — owed: a RUN over them, or RESCORED lines where no case prompt changed (§5.6 limb 1)`
+			: `76 of 76 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer} by the SELECTED candidate devin / glm-5-3-flash-max (REG-D-084; the SELECTION in force, runs.ndjson:${lines.length}): ${CURRENT_CASES.map((c) => c.id).join(', ')} — owed: a run of the selected candidate over them, or RESCORED lines of its runs where no case prompt changed (§5.6 limb 1; REG-D-086)`;
+	const hint = (ids: readonly string[]) =>
+		`same prompts under an earlier fingerprint in qr-v7-before-b7: ${ids.join(', ')} — RESCORED lines discharge those where no case prompt changed (§5.6 limb 1)`;
+	/** The ACKNOWLEDGED line §5.6 limb 1 asks for, as the check words it. */
+	const acknowledgementOwed = (): string =>
+		`the reviewer fingerprint moved outside every case prompt since run qr-v7-before-b7 — the probe set, the budget or the ` +
+		`criteria moved, and no case prompt recorded under it differs from today’s: an ACKNOWLEDGED line naming ${FP.reviewer} ` +
+		'is owed, with the case added to exercise the change or the reason none is needed, whatever runs exist under it (§5.6 limb 1)';
+	/** That line: today's fingerprint, the 35 part cases the cases added to exercise the move. */
+	const acknowledged = (): RecordLine => ({
+		kind: 'ACKNOWLEDGED',
+		date: '2026-10-24T13:00:00.000Z',
+		reviewerFingerprint: FP.reviewer,
+		addedCaseIds: PARTS()
+	});
+	const restampToday = (lines: readonly RecordLine[]) =>
+		rescoredLines(
+			lines.find((l): l is RunLine => l.kind === 'RUN')!,
+			lines.filter((l): l is CallLine => l.kind === 'CALL'),
+			CURRENT_CASES,
+			FP_NOW.casePrompts,
+			{
+				rescoreId: 'rs-v7-before-b7',
+				date: '2026-10-24T12:00:00.000Z',
+				commit: 'b'.repeat(40),
+				reviewer: FP.reviewer,
+				scoring: FP.scoring,
+				caseSet: FP_NOW.caseSet
+			}
+		);
+
+	it('⛔ RED, AND EXACTLY SO — coverage of all 76, by any candidate and by the selected one, each naming the 41 carried cases, whose prompts did not move, as RESCORED lines discharge them; an ACKNOWLEDGED line owed, the move reaching no recorded case prompt; no CONFERRAL problem, nothing else', async () => {
+		expect([CURRENT_SET.caseSetVersion, CURRENT_ORACLES.oracleVersion], 'the current set is version eight').toEqual([8, 8]);
+		expect([PARTS().length, CARRIED().length], 'part cases, the others').toEqual([35, 41]);
+		expect(FP.reviewer, 'arrangement: the run’s fingerprint is not today’s').not.toBe(BEFORE_B7().reviewer);
+		const lines = [...(await v7Run()), select(GLM)];
+		expect((await onVersionEight([file(lines)])).problems).toEqual([
+			{ limb: 'COVERAGE', message: acknowledgementOwed() },
+			{ limb: 'COVERAGE', message: [owed('any', lines), hint(CARRIED())].join('\n    ') },
+			{ limb: 'COVERAGE', message: [owed('selected', lines), hint(CARRIED())].join('\n    ') }
+		]);
+	});
+
+	it('⭐ RESCORED lines of that run for the 41, the ACKNOWLEDGED line naming the 35 added, and a run of the selected candidate over the 35 part cases under today’s fingerprint, each answered as its oracle expects: GREEN; without the line, it alone is owed; without the run, the 35 alone, by any candidate and by the selected one', async () => {
+		const v7 = await v7Run();
+		const rescored = await restampToday(v7);
+		expect(rescored.map((l) => l.caseId), 'the 41, and no part case: no record holds a part’s prompt').toEqual(CARRIED());
+		const partRun = await recorded({
+			runId: 'qr-v8-parts',
+			date: '2026-10-24T14:00:00.000Z',
+			candidate: DEVIN,
+			cases: CURRENT_CASES.filter((c) => c.arm === 'PWA_TYPE'),
+			fingerprint: { ...CURRENT, caseSet: FP_NOW.caseSet },
+			versions: { caseSet: 8, oracles: 8 }
+		});
+		expect((await onVersionEight([file([...v7, ...rescored, acknowledged(), ...partRun, select(GLM)])])).problems, 'nothing owed').toEqual([]);
+		expect((await onVersionEight([file([...v7, ...rescored, ...partRun, select(GLM)])])).problems, 'without the line, it alone').toEqual([
+			{ limb: 'COVERAGE', message: acknowledgementOwed() }
+		]);
+		const withoutRun = (await onVersionEight([file([...v7, ...rescored, acknowledged(), select(GLM)])])).problems;
+		expect(withoutRun.map((p) => p.limb), 'coverage alone, by any candidate and by the selected one').toEqual(['COVERAGE', 'COVERAGE']);
+		for (const p of withoutRun) {
+			const first = p.message.split('\n')[0]!;
+			expect(first.startsWith('35 of 76 current case(s) are not MEASURED'), first).toBe(true);
+			expect(first, 'the 35 part cases, and no other').toContain(`: ${PARTS().join(', ')} — owed`);
+		}
+	});
+
+	it('⛔ ANOTHER CANDIDATE’S RUN OVER THE 35 COVERS THEM FOR NO SELECTION: it discharges the any-candidate limb, and the selected candidate still owes the 35 (REG-D-086)', async () => {
+		const v7 = await v7Run();
+		const rescored = await restampToday(v7);
+		const agyParts = await recorded({
+			runId: 'qr-v8-parts-agy',
+			date: '2026-10-24T14:00:00.000Z',
+			cases: CURRENT_CASES.filter((c) => c.arm === 'PWA_TYPE'),
+			fingerprint: { ...CURRENT, caseSet: FP_NOW.caseSet },
+			versions: { caseSet: 8, oracles: 8 }
+		});
+		const r = await onVersionEight([file([...v7, ...rescored, acknowledged(), ...agyParts, select(GLM)])]);
+		expect(r.problems.map((p) => p.message.split('\n')[0]!.slice(0, 160)), 'the selected candidate’s 35 alone').toEqual([
+			`35 of 76 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer} by the SELECTED candidate devin / glm-5-3-flash-max`.slice(0, 160)
+		]);
+	});
+
+	it('⛔ A CARRIED CASE WHOSE RECORDED PROMPT IS NOT TODAY’S IS NO RESCORED SOURCE: it owes a run beside the 35, though its run’s other cases are re-stamped (§5.6 limb 1)', async () => {
+		const v7 = tamper(await v7Run(), 'W-CLEAN', (call) => ({ ...call, promptSha256: sha256(`${call.promptSha256} — not today’s`) }));
+		const rescored = await restampToday(v7);
+		expect(rescored.map((l) => l.caseId), 'the 40 whose prompts are today’s').toEqual(CARRIED().filter((id) => id !== 'W-CLEAN'));
+		const partRun = await recorded({
+			runId: 'qr-v8-parts',
+			date: '2026-10-24T14:00:00.000Z',
+			candidate: DEVIN,
+			cases: CURRENT_CASES.filter((c) => c.arm === 'PWA_TYPE'),
+			fingerprint: { ...CURRENT, caseSet: FP_NOW.caseSet },
+			versions: { caseSet: 8, oracles: 8 }
+		});
+		const r = await onVersionEight([file([...v7, ...rescored, acknowledged(), ...partRun, select(GLM)])]);
+		const coverage = r.problems.filter((p) => p.limb === 'COVERAGE').map((p) => p.message.split('\n')[0]!);
+		expect(coverage, 'by any candidate, and by the selected one').toHaveLength(2);
+		for (const first of coverage) expect(first, 'W-CLEAN alone owed').toMatch(/^1 of 76 current case\(s\) are not MEASURED .*: W-CLEAN — owed/);
+	});
+
+	it('⭐ A PART CASE IS SCORED ON ITS OWN DISPOSITION, ITS ATTRIBUTION REPORTED (REG-D-080) — a catcher answered REJECTED on another criterion than its oracle’s is no material failure, and is reported; one answered SATISFIED is a material failure the check escalates', async () => {
+		const catcher = 'G8-RR-02.T05';
+		const RR04 = SEEDED_REASONING_REVIEW_CRITERIA[3]!.id;
+		const v7 = await v7Run();
+		const rescored = await restampToday(v7);
+		const run = (reply: (id: string) => string) =>
+			recorded({
+				runId: 'qr-v8-attr',
+				date: '2026-10-24T14:00:00.000Z',
+				candidate: DEVIN,
+				cases: CURRENT_CASES.filter((c) => c.arm === 'PWA_TYPE'),
+				fingerprint: { ...CURRENT, caseSet: FP_NOW.caseSet },
+				versions: { caseSet: 8, oracles: 8 },
+				reply
+			});
+		const misattributed = await onVersionEight([
+			file([...v7, ...rescored, acknowledged(), ...(await run((id) => (id === catcher ? judgement([RR04]) : asOracle(id)))), select(GLM)])
+		]);
+		expect(misattributed.problems, 'REJECTED on another criterion: no material failure').toEqual([]);
+		expect(misattributed.attribution.join('\n'), 'reported').toContain(
+			`${catcher}#1 — REJECTED, the right verdict; RR-02 not faulted (it faulted RR-04)`
+		);
+		const missed = await onVersionEight([
+			file([...v7, ...rescored, acknowledged(), ...(await run((id) => (id === catcher ? judgement([]) : asOracle(id)))), select(GLM)])
+		]);
+		expect(limb(missed, 'ESCALATION')).toBe(
+			`run qr-v8-attr: ${catcher} — PLANTED_DEFECT_NOT_REJECTED — no ESCALATION line cites a register finding for it (§5.6 limb 3)`
+		);
 	});
 });
 
@@ -1994,18 +2180,19 @@ describe('JAN-CRITREAD J2-6 — the pass bar is the right verdict (REG-D-080): a
 	});
 
 	it('⛔ NO SILENT SHRINK — a run’s planted evaluations of cases outside today’s set are counted out ALOUD, by the oracle version the run recorded', async () => {
-		// Version one's 26 cases against today's set: 10 planted cases are still in it; G-RR-02…09, planted in version
+		// Version one's 26 cases against today's set: ~~10 planted cases are still in it; G-RR-02…09~~ ⭐ B7 — version eight holds
+		// none of version one's graph cases: its 9 planted work-product cases are still in it; G-RR-01…09, planted in version
 		// one, are not — and nor are its 4 clean graph cases, which were never in M.
 		const v1Record = await recorded({ runId: 'qr-attr-8', cases: CASES });
 		const onTheCurrentSet = (over: Partial<Omit<CheckInputs, 'files'>> = {}) =>
 			check([file(v1Record)], { current: FP_NOW, cases: CURRENT_CASES, oracles: CURRENT_ORACLES.oracles, ...over });
-		const head8 = head('qr-attr-8', 10, 10);
+		const head8 = head('qr-attr-8', 9, 9);
 		expect((await onTheCurrentSet()).attribution).toEqual([
-			`${head8} (8 answered planted evaluation(s) of cases not in the current set are not counted)`
+			`${head8} (9 answered planted evaluation(s) of cases not in the current set are not counted)`
 		]);
 		// Its own version is what says which were planted: not held, they are still counted out — as of unknown standing.
 		expect((await onTheCurrentSet({ oracleSets: [CURRENT_ORACLES] })).attribution).toEqual([
-			`${head8} (12 answered evaluation(s) of cases not in the current set are not counted: oracles v1, which say which were planted, are not held)`
+			`${head8} (13 answered evaluation(s) of cases not in the current set are not counted: oracles v1, which say which were planted, are not held)`
 		]);
 	});
 
@@ -2382,15 +2569,19 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 	const GREEN =
 		'reviewer:qual:check — GREEN — today’s reviewer is covered, the record reproduces, and every material failure is escalated\n';
 	/**
-	 * ⛔ Package P F3 (`REG-D-123` Q25; `REG-D-073`) — WHAT THE CLI SAYS OF A RECORD WITH NOTHING ELSE OWED WHILE TODAY'S
+	 * ~~⛔ Package P F3 (`REG-D-123` Q25; `REG-D-073`) — WHAT THE CLI SAYS OF A RECORD WITH NOTHING ELSE OWED WHILE TODAY'S
 	 * ORACLES ARE PROPOSED, as it said under `E12F` F5: RED, ONE problem, the conferral. Version seven's six graph-case oracles
 	 * await the sponsor, so each case below that held the CLI GREEN holds it red on the conferral alone — nothing else owed,
 	 * which is what GREEN said — and GREEN is driven by a conferred fixture statement in the case that runs `main` on a
 	 * disposable root. ~~`GREEN_HEAD`~~, which no case reads now. ⚠ When the sponsor confers the six, the committed statement
-	 * changes: the CLI is GREEN again on these records, and each case below must expect GREEN again.
+	 * changes: the CLI is GREEN again on these records, and each case below must expect GREEN again.~~
+	 * ⭐ The review in parts, B7 — THEY RETURN TO GREEN: today's set is version eight, its 35 part oracles conferred by the
+	 * sponsor (`REG-D-126` Q30, Q31) and its 41 carried with theirs, so a record with nothing owed is GREEN again. The conferral
+	 * limb stays held, through the CLI's own reading of the oracle file, by the case that runs `main` on a disposable root whose
+	 * current oracle file is made to read PROPOSED (`ONLY_THE_CONFERRAL`).
 	 */
 	const ONLY_THE_CONFERRAL = `reviewer:qual:check — RED — 1 problem(s):\n  [CONFERRAL] ${ORACLES_NOT_CONFERRED}\n`;
-	const ONLY_THE_CONFERRAL_HEAD = 'reviewer:qual:check — RED — 1 problem(s):';
+	const GREEN_HEAD = 'reviewer:qual:check — GREEN';
 
 	it('⛔ under bare bun the packages resolve to built dist, and the check refuses to run', () => {
 		const r = cli([], ['--records', gitRepo()]);
@@ -2410,11 +2601,11 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		expect(r.out).toContain('is not in a git work tree');
 	});
 
-	it('⛔ RED on an empty record — all 60 cases of the committed set are owed', () => {
+	it('⛔ RED on an empty record — all 76 cases of the committed set are owed', () => {
 		const r = cli(['--conditions=source'], ['--records', gitRepo()]);
 		expect(r.status, r.out).toBe(1);
-		// ⭐ Package P F3 — ~~54 of 54~~: version seven's sixty.
-		expect(r.out).toContain('60 of 60 current case(s) are not MEASURED under today’s reviewer fingerprint');
+		// ⭐ Package P F3 — ~~54 of 54~~: version seven's sixty. ⭐ B7 — ~~60 of 60~~: version eight's 76.
+		expect(r.out).toContain('76 of 76 current case(s) are not MEASURED under today’s reviewer fingerprint');
 		expect(r.out).toContain(FP.reviewer);
 		// ⭐ `JAN-CRITREAD` J2-5 — the committed set it holds coverage to is the CURRENT one, with its oracles: version three
 		// from J2-7, version four since `JAN-PRQUAL` `PQ-2` (DESIGN-process-result-qualification.md D4).
@@ -2422,21 +2613,22 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		// ⭐ Round 5 — ~~version five~~ version six, ~~D-FP-CLEAN repaired~~ ⭐ four cases repaired: D6-RC-CLEAN, D6-RC-04,
 		// D6-FP-CLEAN and D6-FP-03 (`REG-D-115` and its delegated extension).
 		// ⭐ Package P F3 — ~~version six~~ version seven: six graph cases added, their oracles proposed (`REG-D-123` Q25).
-		expect(r.out).toContain('; case set v7, oracles v7\n');
+		// ⭐ B7 — ~~version seven~~ version eight: 35 part cases for the graph cases, their oracles conferred (`REG-D-126`).
+		expect(r.out).toContain('; case set v8, oracles v8\n');
 		expect(r.out).toContain(`: ${CURRENT_CASES.map((c) => c.id).join(', ')} — owed`);
-		expect(CURRENT_SET.caseSetVersion).toBe(7);
+		expect(CURRENT_SET.caseSetVersion).toBe(8);
 	});
 
-	it('⭐ on a TRACKED record that covers the committed set, reproduces, and holds no material failure: ~~GREEN, its oracles conferred (REG-D-113)~~ nothing owed but the conferral of version seven’s six new oracles (package P F3)', async () => {
+	it('⭐ on a TRACKED record that covers the committed set, reproduces, and holds no material failure: ~~nothing owed but the conferral of version seven’s six new oracles (package P F3)~~ ⭐ GREEN, its oracles conferred (REG-D-126, B7)', async () => {
 		const dir = gitRepo();
 		writeFileSync(
 			join(dir, 'runs.ndjson'),
-			text(await recorded({ runId: 'qr-cli-1', cases: CURRENT_CASES, versions: { caseSet: 7, oracles: 7 } }))
+			text(await recorded({ runId: 'qr-cli-1', cases: CURRENT_CASES, versions: { caseSet: 8, oracles: 8 } }))
 		);
 		git(dir, 'add', 'runs.ndjson');
 		const r = cli(['--conditions=source'], ['--records', dir]);
-		expect(r.out).toContain(ONLY_THE_CONFERRAL);
-		expect(r.status, r.out).toBe(1);
+		expect(r.out).toContain(GREEN);
+		expect(r.status, r.out).toBe(0);
 	}, 120_000);
 
 	// ⭐ The merge of the completion programme (`E12F` F5, after `REG-D-113`) — THE CLI HANDS THE CHECK ITS ORACLE FILE'S
@@ -2445,11 +2637,13 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 	// oracle files and register copied — ~~whose version five is made to read PROPOSED again~~.
 	// ⭐ Package P F3 (`REG-D-123` Q25) — AND NOW THE CASE RUNS THE OTHER WAY: the committed oracles read PROPOSED again (version
 	// seven's six), so the copy is RED on the conferral alone, and the same copy given a conferred statement is GREEN.
-	it('⛔ E12F F5 — the CLI reads the conferral off its oracle file: ~~a version five still PROPOSED, nothing else owed, is RED on the conferral alone; the committed one is GREEN~~ the committed version seven, its six new oracles PROPOSED, nothing else owed, is RED on the conferral alone; the same file, its conferral recorded, is GREEN', async () => {
+	// ⭐ The review in parts, B7 — AND BACK AGAIN: the committed version eight is conferred (`REG-D-126`), so the copy is GREEN,
+	// and the same copy made to read PROPOSED is RED on the conferral alone.
+	it('⛔ E12F F5 — the CLI reads the conferral off its oracle file: ~~the committed version seven, its six new oracles PROPOSED, nothing else owed, is RED on the conferral alone; the same file, its conferral recorded, is GREEN~~ ⭐ B7: the committed version eight, conferred, is GREEN; the same file made to read PROPOSED, nothing else owed, is RED on the conferral alone', async () => {
 		const dir = gitRepo();
 		writeFileSync(
 			join(dir, 'runs.ndjson'),
-			text(await recorded({ runId: 'qr-cli-proposed', cases: CURRENT_CASES, versions: { caseSet: 7, oracles: 7 } }))
+			text(await recorded({ runId: 'qr-cli-proposed', cases: CURRENT_CASES, versions: { caseSet: 8, oracles: 8 } }))
 		);
 		git(dir, 'add', 'runs.ndjson');
 		const root = tmp();
@@ -2477,30 +2671,30 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 			}
 		};
 		const committed = await run();
-		expect(committed.out, 'the CLI handed the check no conferral').toContain(ONLY_THE_CONFERRAL);
-		expect(committed.code, committed.out).toBe(1);
+		expect(committed.out, 'arrangement: the committed oracles, copied, are GREEN').toContain(GREEN);
+		expect(committed.code, committed.out).toBe(0);
 		const current = join(root, CURRENT_ORACLES_FILE);
 		const set = JSON.parse(readFileSync(current, 'utf8')) as OracleSet;
-		expect(set.conferral, 'arrangement: the committed oracles, copied, are proposed').toContain(DECLARED_ORACLES_PROPOSED);
-		writeFileSync(current, JSON.stringify({ ...set, conferral: 'A fixture: version seven’s oracles, as the sponsor will have conferred them.' }));
-		const conferred = await run();
-		expect(conferred.out, 'CONTROL: the same file, its conferral recorded').toContain(GREEN);
-		expect(conferred.code, conferred.out).toBe(0);
+		expect(set.conferral, 'arrangement: the committed oracles, copied, are conferred').not.toContain(DECLARED_ORACLES_PROPOSED);
+		writeFileSync(current, JSON.stringify({ ...set, conferral: `A fixture: version eight’s part oracles are ${DECLARED_ORACLES_PROPOSED}.` }));
+		const proposed = await run();
+		expect(proposed.out, 'the CLI handed the check no conferral').toContain(ONLY_THE_CONFERRAL);
+		expect(proposed.code, proposed.out).toBe(1);
 	}, 120_000);
 
 	it('⛔ a record file git does not track, or one changed since it was staged, is NOT READ — green here is green on the commit', async () => {
-		const lines = await recorded({ runId: 'qr-cli-2', cases: CURRENT_CASES, versions: { caseSet: 7, oracles: 7 } });
+		const lines = await recorded({ runId: 'qr-cli-2', cases: CURRENT_CASES, versions: { caseSet: 8, oracles: 8 } });
 		const untracked = gitRepo();
 		writeFileSync(join(untracked, 'runs.ndjson'), text(lines));
 		const r = cli(['--conditions=source'], ['--records', untracked]);
 		expect(r.status, r.out).toBe(1);
 		expect(r.out).toContain('runs.ndjson: not read — git does not track it');
-		expect(r.out, 'and so it covers nothing').toContain('60 of 60 current case(s) are not MEASURED');
+		expect(r.out, 'and so it covers nothing').toContain('76 of 76 current case(s) are not MEASURED');
 
 		const changed = gitRepo();
 		writeFileSync(join(changed, 'runs.ndjson'), text(lines));
 		git(changed, 'add', 'runs.ndjson');
-		appendFileSync(join(changed, 'runs.ndjson'), serializeLine(escalate('qr-cli-2', ['G3-CLEAN'])));
+		appendFileSync(join(changed, 'runs.ndjson'), serializeLine(escalate('qr-cli-2', ['G3-CLEAN.T01'])));
 		const c = cli(['--conditions=source'], ['--records', changed]);
 		expect(c.status, c.out).toBe(1);
 		expect(c.out).toContain('runs.ndjson: not read — it differs from what git has staged');
@@ -2508,33 +2702,35 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 
 	it('⛔ an ESCALATION citing a finding the register STRIKES clears nothing, end to end — and one it holds open does', async () => {
 		const dir = gitRepo();
+		// ⭐ B7 — ~~G3-RR-04~~: its catcher part, G3-RR-04.T05, version eight's case for its plant.
 		const missed = await recorded({
 			runId: 'qr-cli-3',
 			cases: CURRENT_CASES,
-			versions: { caseSet: 7, oracles: 7 },
-			reply: (id) => (id === 'G3-RR-04' ? judgement([]) : asOracle(id))
+			versions: { caseSet: 8, oracles: 8 },
+			reply: (id) => (id === 'G3-RR-04.T05' ? judgement([]) : asOracle(id))
 		});
-		writeFileSync(join(dir, 'runs.ndjson'), text([...missed, escalate('qr-cli-3', ['G3-RR-04'], 'REG-F-105')]));
+		writeFileSync(join(dir, 'runs.ndjson'), text([...missed, escalate('qr-cli-3', ['G3-RR-04.T05'], 'REG-F-105')]));
 		git(dir, 'add', 'runs.ndjson');
 		const register = join(tmp(), 'register.md');
 		writeFileSync(register, '### ~~REG-F-105~~ — RULED\n');
 		const r = cli(['--conditions=source'], ['--records', dir, '--register', register]);
 		expect(r.status, r.out).toBe(1);
 		expect(r.out).toContain('ESCALATION cites REG-F-105, whose register heading is struck');
-		expect(r.out).toContain('run qr-cli-3: G3-RR-04 — PLANTED_DEFECT_NOT_REJECTED');
+		expect(r.out).toContain('run qr-cli-3: G3-RR-04.T05 — PLANTED_DEFECT_NOT_REJECTED');
 		writeFileSync(register, '### REG-F-105 — open, for the control\n');
 		const open = cli(['--conditions=source'], ['--records', dir, '--register', register]);
 		// ⭐ Package P F3 — ~~GREEN, its oracles conferred (REG-D-113)~~: nothing owed but the conferral of the six new oracles.
-		expect(open.out, 'CONTROL: the same finding, open — nothing owed but the conferral').toContain(ONLY_THE_CONFERRAL);
-		expect(open.status, open.out).toBe(1);
+		// ⭐ B7 — GREEN again, version eight's oracles conferred (`REG-D-126`).
+		expect(open.out, 'CONTROL: the same finding, open — GREEN').toContain(GREEN);
+		expect(open.status, open.out).toBe(0);
 	}, 120_000);
 
-	it('⭐ J2-6 — the CLI PRINTS the attribution report, and owes nothing for a record whose only miss is attribution (REG-D-080) — ~~GREEN~~ nothing but the conferral (package P F3)', async () => {
+	it('⭐ J2-6 — the CLI PRINTS the attribution report, and owes nothing for a record whose only miss is attribution (REG-D-080) — ~~nothing but the conferral (package P F3)~~ ⭐ GREEN (B7)', async () => {
 		const dir = gitRepo();
 		const lines = await recorded({
 			runId: 'qr-cli-4',
 			cases: CURRENT_CASES,
-			versions: { caseSet: 7, oracles: 7 },
+			versions: { caseSet: 8, oracles: 8 },
 			reply: (id) => (id === 'W-RR-04' ? judgement([RR02]) : asOracle(id))
 		});
 		writeFileSync(join(dir, 'runs.ndjson'), text(lines));
@@ -2546,44 +2742,47 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 				// ⭐ `JAN-EXEC` Phase 7 completion E2 — ~~27 of 28~~: case set v5's seven planted declared cases are counted too
 				// (design B5).
 				// ⭐ Package P F3 — ~~34 of 35~~: and case set v7's five planted graph cases.
-				'  run qr-cli-4: the planted criterion named in 39 of 40 answered planted evaluation(s), against today’s oracles',
+				// ⭐ B7 — ~~39 of 40~~: case set v8's 26 planted carried cases and its 15 catchers.
+				'  run qr-cli-4: the planted criterion named in 40 of 41 answered planted evaluation(s), against today’s oracles',
 				'    W-RR-04#1 — REJECTED, the right verdict; RR-04 not faulted (it faulted RR-02)',
 				// ⭐ `REG-D-113` — GREEN again: ~~red on the conferral alone (`E12F` F5)~~.
-				// ⭐ Package P F3 — ~~GREEN~~: red on the conferral alone again (`ONLY_THE_CONFERRAL`).
-				ONLY_THE_CONFERRAL_HEAD
+				// ⭐ Package P F3 — ~~GREEN~~: red on the conferral alone again (`ONLY_THE_CONFERRAL`). ⭐ B7 — GREEN again.
+				GREEN_HEAD
 			].join('\n')
 		);
-		expect(r.out).toContain(ONLY_THE_CONFERRAL);
-		expect(r.status, r.out).toBe(1);
+		expect(r.out).toContain(GREEN);
+		expect(r.status, r.out).toBe(0);
 	}, 120_000);
 
 	it('⭐ J2-6 — the CLI counts a run’s planted evaluations outside today’s set OUT ALOUD, by every oracle version on file (REG-D-080)', async () => {
 		// The committed record's shape: a run of version one under today's fingerprint, beside one over today's set.
 		const dir = gitRepo();
 		const v1 = await recorded({ runId: 'qr-cli-5', cases: CASES });
-		const now = await recorded({ runId: 'qr-cli-6', cases: CURRENT_CASES, versions: { caseSet: 7, oracles: 7 } });
+		const now = await recorded({ runId: 'qr-cli-6', cases: CURRENT_CASES, versions: { caseSet: 8, oracles: 8 } });
 		writeFileSync(join(dir, 'runs.ndjson'), text([...v1, ...now]));
 		git(dir, 'add', 'runs.ndjson');
 		const r = cli(['--conditions=source'], ['--records', dir]);
 		expect(r.out).toContain(
 			[
 				ATTRIBUTION_HEADER,
-				'  run qr-cli-5: the planted criterion named in 10 of 10 answered planted evaluation(s), against today’s oracles (8 answered planted evaluation(s) of cases not in the current set are not counted)',
+				// ⭐ B7 — ~~10 of 10 … (8 …)~~: version eight holds none of version one's graph cases, G-RR-01 among them.
+				'  run qr-cli-5: the planted criterion named in 9 of 9 answered planted evaluation(s), against today’s oracles (9 answered planted evaluation(s) of cases not in the current set are not counted)',
 				// ⭐ E2 — ~~28 of 28~~: and case set v5's seven planted declared cases (design B5).
 				// ⭐ Package P F3 — ~~35 of 35~~: and case set v7's five planted graph cases.
-				'  run qr-cli-6: the planted criterion named in 40 of 40 answered planted evaluation(s), against today’s oracles',
+				// ⭐ B7 — ~~40 of 40~~: case set v8's 26 planted carried cases and its 15 catchers.
+				'  run qr-cli-6: the planted criterion named in 41 of 41 answered planted evaluation(s), against today’s oracles',
 				// ⭐ `REG-D-113` — GREEN again: ~~red on the conferral alone (`E12F` F5)~~.
-				// ⭐ Package P F3 — ~~GREEN~~: red on the conferral alone again (`ONLY_THE_CONFERRAL`).
-				ONLY_THE_CONFERRAL_HEAD
+				// ⭐ Package P F3 — ~~GREEN~~: red on the conferral alone again (`ONLY_THE_CONFERRAL`). ⭐ B7 — GREEN again.
+				GREEN_HEAD
 			].join('\n')
 		);
-		expect(r.out).toContain(ONLY_THE_CONFERRAL);
-		expect(r.status, r.out).toBe(1);
+		expect(r.out).toContain(GREEN);
+		expect(r.status, r.out).toBe(0);
 	}, 120_000);
 
-	it('⭐ SR-4 — the CLI names the SELECTION in force in its header and holds coverage to it: ~~GREEN~~ nothing but the conferral owed (package P F3) on the selected candidate’s run, coverage owed for a candidate never run, naming all 60 cases (REG-D-086)', async () => {
+	it('⭐ SR-4 — the CLI names the SELECTION in force in its header and holds coverage to it: ~~nothing but the conferral owed (package P F3)~~ ⭐ GREEN (B7) on the selected candidate’s run, coverage owed for a candidate never run, naming all 76 cases (REG-D-086)', async () => {
 		const dir = gitRepo();
-		const glm = await recorded({ runId: 'qr-cli-7', candidate: DEVIN, cases: CURRENT_CASES, versions: { caseSet: 7, oracles: 7 } });
+		const glm = await recorded({ runId: 'qr-cli-7', candidate: DEVIN, cases: CURRENT_CASES, versions: { caseSet: 8, oracles: 8 } });
 		writeFileSync(join(dir, 'runs.ndjson'), text([...glm, select({ transport: 'devin', modelLabel: 'glm-5-3-flash-max' })]));
 		git(dir, 'add', 'runs.ndjson');
 		const r = cli(['--conditions=source'], ['--records', dir]);
@@ -2591,24 +2790,24 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 			`reviewer:qual:check — the SELECTION in force: devin / glm-5-3-flash-max, on REG-D-084 (runs.ndjson:${glm.length + 1}) — every current case is owed its measurement under today’s fingerprint (REG-D-086)\n`
 		);
 		// ⭐ `REG-D-113` — GREEN again: ~~nothing owed but the conferral (`E12F` F5)~~.
-		// ⭐ Package P F3 — ~~GREEN~~: nothing owed but the conferral of the six new oracles.
-		expect(r.out).toContain(ONLY_THE_CONFERRAL);
-		expect(r.status, r.out).toBe(1);
+		// ⭐ Package P F3 — ~~GREEN~~: nothing owed but the conferral of the six new oracles. ⭐ B7 — GREEN again.
+		expect(r.out).toContain(GREEN);
+		expect(r.status, r.out).toBe(0);
 		appendFileSync(join(dir, 'runs.ndjson'), serializeLine(select({ transport: 'devin', modelLabel: 'a-model-never-run' })));
 		git(dir, 'add', 'runs.ndjson');
 		const red = cli(['--conditions=source'], ['--records', dir]);
 		expect(red.status, red.out).toBe(1);
 		expect(red.out).toContain(
-			`  [COVERAGE] 60 of 60 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer} by the SELECTED candidate devin / a-model-never-run (REG-D-084; the SELECTION in force, runs.ndjson:${glm.length + 2}): ${CURRENT_CASES.map((c) => c.id).join(', ')} — owed: a run of the selected candidate over them`
+			`  [COVERAGE] 76 of 76 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer} by the SELECTED candidate devin / a-model-never-run (REG-D-084; the SELECTION in force, runs.ndjson:${glm.length + 2}): ${CURRENT_CASES.map((c) => c.id).join(', ')} — owed: a run of the selected candidate over them`
 		);
 	}, 120_000);
 
-	it('⛔ SR-4 — a SELECTION whose ruling the register it reads STRIKES is RED end to end, and its header says the ruling is WITHDRAWN; the same register, the heading live, is ~~GREEN~~ red on the conferral alone (REG-D-086; package P F3)', async () => {
+	it('⛔ SR-4 — a SELECTION whose ruling the register it reads STRIKES is RED end to end, and its header says the ruling is WITHDRAWN; the same register, the heading live, is ~~red on the conferral alone (package P F3)~~ ⭐ GREEN (REG-D-086; B7)', async () => {
 		// The committed record's shape — a run of version one beside one over today's set, here the selected candidate's —
 		// with the SELECTION appended.
 		const dir = gitRepo();
 		const v1 = await recorded({ runId: 'qr-cli-8', cases: CASES });
-		const glm = await recorded({ runId: 'qr-cli-9', candidate: DEVIN, cases: CURRENT_CASES, versions: { caseSet: 7, oracles: 7 } });
+		const glm = await recorded({ runId: 'qr-cli-9', candidate: DEVIN, cases: CURRENT_CASES, versions: { caseSet: 8, oracles: 8 } });
 		const lines = [...v1, ...glm, select({ transport: 'devin', modelLabel: 'glm-5-3-flash-max' })];
 		writeFileSync(join(dir, 'runs.ndjson'), text(lines));
 		git(dir, 'add', 'runs.ndjson');
@@ -2633,8 +2832,8 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 			`reviewer:qual:check — the SELECTION in force: devin / glm-5-3-flash-max, on REG-D-084 (runs.ndjson:${lines.length}) — every current case`
 		);
 		// ⭐ `REG-D-113` — GREEN again: ~~nothing owed but the conferral (`E12F` F5)~~.
-		// ⭐ Package P F3 — ~~GREEN~~: nothing owed but the conferral of the six new oracles.
-		expect(control.out).toContain(ONLY_THE_CONFERRAL);
-		expect(control.status, control.out).toBe(1);
+		// ⭐ Package P F3 — ~~GREEN~~: nothing owed but the conferral of the six new oracles. ⭐ B7 — GREEN again.
+		expect(control.out).toContain(GREEN);
+		expect(control.status, control.out).toBe(0);
 	}, 120_000);
 });

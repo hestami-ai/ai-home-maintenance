@@ -103,17 +103,22 @@ const plantedOf = (short: string): string => IDS.find((id) => new RegExp(`^D6?-$
 const criterionOf = (id: string): string => id.replace(/^D6?-/, '');
 
 describe('⭐⭐ E2 — the current case set (v5, and v6 since round 5): version four, then the fourteen declared-policy cases (design B5)', () => {
-	it('⭐ THE SHAPE — version four’s forty cases first, byte for byte; then the fourteen, in design B’s order — the last arm through version six, version seven’s six graph cases after them', () => {
+	it('⭐ THE SHAPE — version four’s ~~forty~~ non-graph cases first, byte for byte; then the fourteen, in design B’s order — the last arm through version six, ~~version seven’s six graph cases~~ ⭐ version eight’s 35 part cases after them', () => {
 		// ⭐ Round 5 — ~~[5, 5, 5]~~: the current set and its oracles are version six (`REG-D-115`).
 		// ⭐ Package P F3 — ~~[6, 6, 6]~~: version seven, which carries version six's cases byte for byte and adds six graph
 		// cases after them (`REG-D-123` Q25; `reviewer-qualification-cases.test.ts`), so the fourteen are the last arm no more.
-		expect([CURRENT.caseSetVersion, ORACLES.oracleVersion, ORACLES.caseSetVersion]).toEqual([7, 7, 7]);
-		expect(CURRENT.cases.slice(0, V4.cases.length).map((c) => JSON.stringify(c))).toEqual(V4.cases.map((c) => JSON.stringify(c)));
-		expect(CURRENT.cases.slice(V4.cases.length, V4.cases.length + IDS.length).map((c) => c.id)).toEqual(IDS);
+		// ⭐ The review in parts, B7 — ~~[7, 7, 7]~~: version eight, which carries version seven's 41 non-graph cases byte for
+		// byte — version four's work-product and process-result cases, then the fourteen — and 35 part cases after them
+		// (`REG-D-126`); version four's graph cases are no case of it.
+		expect([CURRENT.caseSetVersion, ORACLES.oracleVersion, ORACLES.caseSetVersion]).toEqual([8, 8, 8]);
+		const v4NonGraph = V4.cases.filter((c) => c.arm !== 'PWA_GRAPH');
+		expect(v4NonGraph, 'the arrangement: version four’s 27 non-graph cases').toHaveLength(27);
+		expect(CURRENT.cases.slice(0, v4NonGraph.length).map((c) => JSON.stringify(c))).toEqual(v4NonGraph.map((c) => JSON.stringify(c)));
+		expect(CURRENT.cases.slice(v4NonGraph.length, v4NonGraph.length + IDS.length).map((c) => c.id)).toEqual(IDS);
 		expect(
-			CURRENT.cases.slice(V4.cases.length + IDS.length).map((c) => c.arm),
-			'package P F3: only graph cases after them'
-		).toEqual(Array(6).fill('PWA_GRAPH'));
+			CURRENT.cases.slice(v4NonGraph.length + IDS.length).map((c) => c.arm),
+			'⭐ B7: only part cases after them'
+		).toEqual(Array(35).fill('PWA_TYPE'));
 		expect(DECLARED.map((c) => c.id)).toEqual(IDS);
 		expect(DECLARED_CASE_POLICIES.map(([policyId]) => policyId)).toEqual([
 			'pol_requirement_coverage',
@@ -212,11 +217,12 @@ describe('⭐⭐ E2 — the declared oracles: ~~PROPOSED, AWAITING SPONSOR CONFE
 		expect(DECLARED_ORACLES_PROPOSED).toBe('PROPOSED, AWAITING SPONSOR CONFERRAL');
 		const declaredStatement = read<OracleSet>(ORACLES_V6_FILE).conferral;
 		expect(declaredStatement, 'the record still carries the proposal’s word').not.toContain(DECLARED_ORACLES_PROPOSED);
-		expect(ORACLES.conferral.startsWith(`${declaredStatement} `), 'package P F3: version seven’s statement opens with it, whole').toBe(true);
-		expect(
-			ORACLES.conferral.slice(declaredStatement.length).split(DECLARED_ORACLES_PROPOSED).length - 1,
-			'package P F3: the proposal’s word after it, once, of the six graph cases'
-		).toBe(1);
+		// ⭐ The review in parts, B7 — ~~version seven's statement opens with it, whole, and the proposal's word after it, once,
+		// of the six graph cases~~: version eight's carries it whole, as the 41's conferral, and the proposal's word nowhere —
+		// the six graph cases are conferred (`REG-D-124`) and no case of version eight, and its part oracles are conferred too
+		// (`REG-D-126`).
+		expect(ORACLES.conferral, 'B7: version eight’s statement carries it, whole').toContain(` carried with every standing unchanged: ${declaredStatement} `);
+		expect(ORACLES.conferral, 'B7: and the proposal’s word nowhere').not.toContain(DECLARED_ORACLES_PROPOSED);
 		// ⭐ Round 5 — ~~"The fourteen declared-policy oracles were conferred by the sponsor as proposed (REG-D-113: …)"~~:
 		// ~~thirteen are version five's, conferred so, and the fourteenth is carried to the repaired case by `REG-D-115`~~ ⭐ ten
 		// are version five's, conferred so; D6-FP-CLEAN's is carried to it by `REG-D-115`, and the other three repaired cases'
@@ -234,7 +240,10 @@ describe('⭐⭐ E2 — the declared oracles: ~~PROPOSED, AWAITING SPONSOR CONFE
 		// ⭐ The figures the statement names are the record's: ten declared oracles version five's whole, four carried.
 		const v5Declared = new Map(V5_ORACLES.oracles.slice(V4.cases.length).map((o) => [o.caseId, JSON.stringify(o)]));
 		// ⭐ Package P F3 — ~~`slice(V4.cases.length)`~~: the declared oracles, before version seven's six graph-case ones.
-		const declaredNow = ORACLES.oracles.slice(V4.cases.length, V4.cases.length + IDS.length);
+		// ⭐ The review in parts, B7 — ~~`slice(V4.cases.length, …)`~~: by their ids, version eight holding none of version four's
+		// graph cases before them.
+		const declaredNow = ORACLES.oracles.filter((o) => IDS.includes(o.caseId));
+		expect(declaredNow.map((o) => o.caseId), 'the arrangement: the fourteen, in order').toEqual(IDS);
 		expect(declaredNow.filter((o) => v5Declared.get(o.caseId) === JSON.stringify(o)).length, 'version five’s, whole').toBe(10);
 		expect(declaredNow.filter((o) => !v5Declared.has(o.caseId)).map((o) => o.caseId), 'carried to a repaired case').toEqual([
 			'D6-RC-CLEAN',
@@ -243,8 +252,12 @@ describe('⭐⭐ E2 — the declared oracles: ~~PROPOSED, AWAITING SPONSOR CONFE
 			'D6-FP-03'
 		]);
 		const v4 = read<OracleSet>('docs/tracking/reviewer-qualification/oracles/oracles-v4.json');
-		expect(ORACLES.oracles.slice(0, v4.oracles.length)).toEqual(v4.oracles);
-		expect(ORACLES.oracles.slice(v4.oracles.length, v4.oracles.length + IDS.length).map((o) => o.caseId)).toEqual(IDS);
+		// ⭐ The review in parts, B7 — ~~version four's oracles first, whole~~: version four's for its non-graph cases, whole,
+		// version eight holding none of its graph cases.
+		const v4NonGraph = v4.oracles.filter((o) => !o.caseId.startsWith('G'));
+		expect(v4NonGraph, 'the arrangement: version four’s 27 non-graph oracles').toHaveLength(27);
+		expect(ORACLES.oracles.slice(0, v4NonGraph.length)).toEqual(v4NonGraph);
+		expect(ORACLES.oracles.slice(v4NonGraph.length, v4NonGraph.length + IDS.length).map((o) => o.caseId)).toEqual(IDS);
 	});
 });
 

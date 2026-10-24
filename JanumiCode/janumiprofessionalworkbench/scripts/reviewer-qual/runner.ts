@@ -8,6 +8,9 @@
 // at the validator's `print` seam, which exists so a conformance run can exercise the REAL validator
 // (`reasoning-review-validator.ts`, `AgyPrint`). ⭐ E12's polish — save a DECLARED case's outcome, which is the verdict the
 // declared sign-off records, by its own functions (`scoreDeclared`): the product's real path for a declared policy.
+// ⭐ The review in parts, B7 (`REG-D-125`) — a PART case (`PWA_TYPE`) is scored as every floor case is: its own Reasoning Review
+// disposition, `composeAssuranceOutcome` over the Reasoning Review reference alone, its subject the type it reviews; the check
+// holds that disposition to its oracle and reports its attribution (`REG-D-080`).
 //
 //   · The validator is built with the run's RECORDED evaluator identity, never through `judgeModel()` (§5.3).
 //   · A TRANSPORT FAILURE is recorded as its class, not re-scorable, and scored as the product's own floor runner scores
