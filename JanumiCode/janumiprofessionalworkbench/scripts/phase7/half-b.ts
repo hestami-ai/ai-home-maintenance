@@ -325,16 +325,48 @@ export interface FloorDisposition {
  * ⭐ C1 — THE FLOOR'S DISPOSITIONS of the PWA `pwaId`: each policy's LATEST assessment of it, in the plan's order — the
  * last in `assessments`' order, which is the record's. Read from a candidate's fork before acceptance, and from the store
  * after, where the commit replayed them unchanged.
+ * ⭐ The review in parts, B3 (`REG-D-125`): the floor reviews each type of the PWA as a part, under the type. Given the PWA's
+ * types (`typeIds`), the Reasoning Review's row is their aggregate — each type's latest review, the strictest of them
+ * (`partsState`) — its evaluator and producer the first type's. Without them, the PWA's own review, as before.
  */
-export function floorDispositions(assessments: readonly Row[], pwaId: string): FloorDisposition[] {
-	const ofPwa = assessments.filter((a) => strs(a.state.subjectObjectIds)[0] === pwaId);
+export function floorDispositions(
+	assessments: readonly Row[],
+	pwaId: string,
+	typeIds?: readonly string[]
+): FloorDisposition[] {
+	const latestOf = (subjectId: string, policyId: string) =>
+		assessments
+			.filter(
+				(a) => strs(a.state.subjectObjectIds)[0] === subjectId && str(a.state.assurancePolicyId) === policyId
+			)
+			.at(-1);
 	return AUTHORING_FLOOR_POLICIES.map((policyId) => {
-		const latest = ofPwa.filter((a) => str(a.state.assurancePolicyId) === policyId).at(-1);
+		const parts =
+			policyId === 'floor.reasoning-review' && typeIds !== undefined
+				? typeIds.map((typeId) => latestOf(typeId, policyId))
+				: undefined;
+		const latest = parts === undefined ? latestOf(pwaId, policyId) : parts[0];
 		return {
 			policyId,
-			state: latest === undefined ? 'MISSING' : str(latest.state.assessmentState),
+			state:
+				parts !== undefined
+					? partsState(parts)
+					: latest === undefined
+						? 'MISSING'
+						: str(latest.state.assessmentState),
 			evaluator: identityOf(latest?.state.evaluator),
 			producer: identityOf(latest?.state.producer)
 		};
 	});
+}
+
+/**
+ * ⭐ B3 — the strictest of the parts' review states: REJECTED where one is, else MISSING where a type has none (or there is no
+ * type at all), else the first that is not SATISFIED, else SATISFIED.
+ */
+function partsState(parts: readonly (Row | undefined)[]): string {
+	const states = parts.map((p) => (p === undefined ? 'MISSING' : str(p.state.assessmentState)));
+	if (states.includes('REJECTED')) return 'REJECTED';
+	if (states.length === 0 || states.includes('MISSING')) return 'MISSING';
+	return states.find((s) => s !== 'SATISFIED') ?? 'SATISFIED';
 }

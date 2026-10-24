@@ -9,15 +9,18 @@
 // ASSURANCE_ASSESSMENT + ASSURANCE_OBSERVATION objects via the shared recorder. Nothing here self-dispositions;
 // composeAssuranceOutcome does the strictest-unresolved composition, and the PublishPwa gate (rph-application)
 // enforces it.
-import { analyzePwaGraph } from '@janumipwb/rph-projections';
+import { analyzePwaGraph, pwaTypeParts, type PwaTypePart } from '@janumipwb/rph-projections';
 import {
 	aggregateDisposition,
+	assuranceRecordingPlan,
 	FLOOR_POLICY_IDS,
 	REVIEWER_RECOMMENDED_ESCALATION,
-	runFloorAndPlanRecording,
+	runFloorPolicies,
 	VALIDATOR_FAILURE_CODES,
 	VALIDATOR_MODEL_SUBSTITUTED,
+	type AssuranceRecordingPlan,
 	type AssuranceSubject,
+	type ComposeOptions,
 	type IdentityProvenanceFacts,
 	type PolicyAssessment,
 	type ProfessionalRationaleSummary,
@@ -28,8 +31,10 @@ import {
 	listAssessments,
 	listDecisions,
 	listObservations,
+	listPwuTypes,
 	recordAssuranceRecordingPlan,
-	type AuthedEngineHandle
+	type AuthedEngineHandle,
+	type EngineHandle
 } from '@janumipwb/rph-engine';
 import {
 	AssuranceDispositionRecommendationSchema,
@@ -37,11 +42,12 @@ import {
 } from '@janumipwb/rph-contracts';
 import type { ArtifactStore } from '@janumipwb/rph-ports';
 import { createFloorRegistry } from './assurance/index.js';
-import { graphReviewInput } from './assurance/review-input.js';
+import { pwaTypeReviewInput } from './assurance/review-input.js';
 import { stipulationFor } from './stipulations.js';
 import type { AgyPrint } from './assurance/reasoning-review-validator.js';
 import { createExchangeSink } from './assurance/exchange-capture.js';
 import { recordExchanges } from './assurance/exchange-recorder.js';
+import type { ExchangeRecord } from './agent/exchange-record.js';
 import { SESSION_CREDENTIAL } from './identity.js';
 import { canonicalActsOf } from './authoring-turn.js';
 import { buildPwaExport, getArtifactStore, getEngine, hostNow, isTestMode, mintUiId } from './workbench.js';
@@ -110,6 +116,31 @@ export interface FloorObservationView {
 	readonly code: string;
 	readonly severity: string;
 	readonly statement: string;
+	/**
+	 * ⭐ The review in parts, B4 (`REG-D-125`; DESIGN-authoring-review-in-parts.md D7) — THE TYPE A PART'S OBSERVATION IS
+	 * ABOUT, SUPPLIED BY THE HOST: the PWU Type its review was recorded under — that assessment's subject — and the type's
+	 * stored name. ⛔ Never read from the reviewer's prose, which may name any type it likes. Absent on an observation of
+	 * a policy over the whole PWA, and on any floor that reviews no PWA in parts.
+	 */
+	readonly typeId?: string;
+	readonly typeName?: string;
+}
+
+/**
+ * ⭐⭐ The review in parts, B3 (`REG-D-125`; DESIGN-authoring-review-in-parts.md D1, D6) — ONE TYPE'S REASONING REVIEW IN A
+ * FLOOR ROUND: the type, named by the host, at the stored version a review of it is bound to, and that review as it was
+ * recorded in the round — or `MISSING`, when the round holds none at that version.
+ */
+export interface FloorPartView {
+	readonly typeId: string;
+	readonly typeName: string;
+	readonly semanticVersion: number;
+	readonly disposition: string;
+	/** No independence violation is recorded on the part's review (a `MISSING` part has none recorded either). */
+	readonly independenceOk: boolean;
+	/** The review's observations, each carrying this part's type (`FloorObservationView.typeId`). */
+	readonly observations: FloorObservationView[];
+	readonly criteria?: CriterionTally;
 }
 
 export interface FloorPolicyView {
@@ -144,13 +175,15 @@ export function tallyCriteria(
 /**
  * ⭐ THE ONE-LINE STATUS OF A FLOOR RUN, for the agent's log (`JAN-CRITREAD` J1-2; §4.4). A SATISFIED floor whose
  * reasoning review rests on a TEST's stipulations says so on the same line: the prefix every reader matches on is
- * kept, and what follows it is true.
+ * kept, and what follows it is true. ⭐ The review in parts (`REG-D-125`): a review in parts says over how many types its
+ * criteria were counted, every part's together.
  */
 export function floorStatusLine(f: FloorView): string {
 	if (f.satisfied) {
 		const rr = f.policies.find((p) => p.policyId === FLOOR_POLICY_IDS.REASONING_REVIEW)?.criteria;
+		const over = f.parts === undefined ? '' : ` of ${f.parts.length} type(s)`;
 		if (rr && rr.stipulated > 0)
-			return `⚖ Assurance floor SATISFIED (test mode) — schema and provenance pass; reasoning review: ${rr.evaluated} criteria evaluated, ${rr.stipulated} stipulated by the test, not reviewed.`;
+			return `⚖ Assurance floor SATISFIED (test mode) — schema and provenance pass; reasoning review${over}: ${rr.evaluated} criteria evaluated, ${rr.stipulated} stipulated by the test, not reviewed.`;
 		return '⚖ Assurance floor SATISFIED — schema, provenance, and an independent reasoning review all pass.';
 	}
 	const validFindings = classifyFloorRemediation(f).findings.length;
@@ -207,10 +240,19 @@ export interface FloorView {
 	 * FLOOR-RUN TOKEN OF THE REASONING REVIEW THIS VIEW SHOWS: its assessment's correlation, which its run's reviewer calls
 	 * carry as their `runToken` (one token per floor run, P7-6 B7). The page hands it to `loadReviewerAnswer`, so the answer
 	 * shown under this floor is the one ITS review concluded from — never another run's on the subject.
-	 * ⚠ Set by `loadPwaFloor` (the page's read); absent when no reasoning review is recorded, and on `runPwaFloor`'s return,
-	 * which no page renders an answer under.
+	 * ⚠ Set by `loadPwaFloor` (the page's read) and `loadSubjectFloor`; absent when no reasoning review is recorded, and on
+	 * `runPwaFloor`'s return, which no page renders an answer under. ⭐ The review in parts (`REG-D-125`): on a PWA's floor it is
+	 * the ROUND's token, which each part's assessments and reviewer calls carry; the page joins each part's answer to its
+	 * part's subject and this token (`partAnswers`).
 	 */
 	readonly reasoningReviewRunToken?: string;
+	/**
+	 * ⭐⭐ The review in parts, B3 (`REG-D-125`; design D1, D5, D6) — EACH TYPE'S OWN REASONING REVIEW, IN EXPORT ORDER: one part
+	 * per type of the PWA. The `floor.reasoning-review` entry of `policies` is their fold (`partsDisposition`), never a
+	 * recorded assessment of its own. Set by the authoring floor's two readers (`runPwaFloor`, `loadPwaFloor`); absent on a
+	 * floor over any other subject (the execution plane's).
+	 */
+	readonly parts?: readonly FloorPartView[];
 }
 
 /** The authoring-plane response to an unsatisfied floor. Only a valid Reasoning Review finding about the reviewed
@@ -443,6 +485,49 @@ export function classifyFloorRemediation(floor: FloorView): FloorRemediation {
 	};
 }
 
+/** How many findings about one type the refinement directive lists; the rest of that type's are counted, never dropped. */
+const FINDINGS_LISTED_PER_TYPE = 6;
+
+/**
+ * Turn the Reasoning Review's open findings into an auto-refinement directive for the executor (`routes/pwa/[id]/agent/
+ * +server.ts`, which sends it once, when `classifyFloorRemediation` answers `REFINE_SUBJECT`).
+ *
+ * ⭐ The review in parts, B4 (`REG-D-125`; DESIGN-authoring-review-in-parts.md D7) — GROUPED BY TYPE, each type named by the
+ * HOST: the id and name each finding carries from the part it was recorded under (`FloorObservationView.typeId`), never
+ * from the reviewer's prose. Every type with a finding is listed, in the order the findings come, which is export order;
+ * within a type its first `FINDINGS_LISTED_PER_TYPE` findings are, and how many more there are is said on a line of its
+ * own. ⛔ It listed the round's first six findings, so a later type's were dropped without a word.
+ */
+export function refineDirective(prompt: string, findings: readonly FloorObservationView[]): string {
+	const byType = new Map<string, { readonly name?: string; readonly findings: FloorObservationView[] }>();
+	for (const finding of findings) {
+		const key = finding.typeId ?? '';
+		const group = byType.get(key) ?? { name: finding.typeName, findings: [] };
+		group.findings.push(finding);
+		byType.set(key, group);
+	}
+	const sections = [...byType].map(([typeId, group]) => {
+		const listed = group.findings
+			.slice(0, FINDINGS_LISTED_PER_TYPE)
+			.map((finding, i) => `${i + 1}. [${finding.code}] ${finding.statement}`);
+		const omitted = group.findings.length - listed.length;
+		return [
+			typeId === ''
+				? 'Findings about the PWA as a whole:'
+				: `Findings about the type ${JSON.stringify(group.name ?? typeId)} (${typeId}):`,
+			...listed,
+			...(omitted > 0 ? [`(${omitted} further finding(s) about this type are not listed here.)`] : [])
+		].join('\n');
+	});
+	return [
+		'An independent assurance Reasoning Review produced valid findings about the authored PWA subject, reviewed type by type.',
+		'Revise the PWA graph and/or its recorded professional rationale as each coded finding requires; do not merely restate the intent:',
+		sections.join('\n\n'),
+		'',
+		`Original intent: ${prompt}`
+	].join('\n');
+}
+
 /** Which of ~~three~~ four sentences the PWA page's blocked hint reads — see `floorBlockedHint`. ⭐ `JAN-ESCREC` D3 added
  *  `'ROUTE_TO_HUMAN'`. */
 export type FloorBlockedHint =
@@ -615,11 +700,6 @@ export function identityProvenanceFactsOf(
 	};
 }
 
-const isFloorPolicy = (id: unknown): boolean =>
-	id === FLOOR_POLICY_IDS.SCHEMA_INVARIANT ||
-	id === FLOOR_POLICY_IDS.IDENTITY_PROVENANCE ||
-	id === FLOOR_POLICY_IDS.REASONING_REVIEW;
-
 /** True iff an EFFECTIVE governance WAIVER Decision covers `subjectId`. ⚠ NOT "the auditable override of a
  *  blocking floor", which is what this said: under ASR-3 nothing overrides the floor. It is an auditable record
  *  of accepted risk, and the floor blocks regardless (REG-F-202). */
@@ -658,9 +738,21 @@ function retryingWhenBusy(handle: AuthedEngineHandle): Pick<AuthedEngineHandle, 
 	};
 }
 
-/** Run the de minimis floor over the current DRAFT PWA graph and RECORD it as canonical assessments/observations.
- *  Returns the composed view (or undefined if the PWA/graph is unavailable). `priorGaps` are surfaced to the
- *  Reasoning Review so a re-run judges whether the previous findings are genuinely resolved. */
+/**
+ * Run the de minimis floor over the current DRAFT PWA graph and RECORD it as canonical assessments/observations.
+ * Returns the composed view (or undefined if the PWA/graph is unavailable). `priorFindings` are surfaced to the
+ * Reasoning Review so a re-run judges whether the previous findings are genuinely resolved.
+ *
+ * ⭐⭐ `JAN-EXEC` Phase 7, the review in parts, B3 (`REG-D-125`; DESIGN-authoring-review-in-parts.md D1, D5, D6, D9) — ONE
+ * ROUND, REVIEWED IN PARTS. The export is built once; the PWA's two deterministic policies are run once over the PWA; the
+ * Reasoning Review is run once per type, sequentially in export order, over that type's part (`pwaTypeParts`, through
+ * `pwaTypeReviewInput`), its subject the PWU Type at its stored semantic version. ⛔ One reviewer reading the whole PWA saw
+ * about half of run-11's 16 types once their prompts and policies were exported (`REG-F-571`). Each part is composed on
+ * its own — never into one policy-keyed map, which keeps one result per policy (`rph-assurance` `floor.ts`) — and the parts
+ * fold to the strictest unresolved part's (`partsDisposition`), beside the deterministic outcomes. The round is recorded
+ * as one plan for the deterministic policies and one plan per part, under ONE floor-run token, each with a command prefix
+ * of its own; each part's exchanges are drained under that part's own subject.
+ */
 export async function runPwaFloor(
 	pwaId: string,
 	opts: {
@@ -695,7 +787,12 @@ export async function runPwaFloor(
 		artifacts?: ArtifactStore;
 		/** The producer's observable narration — §8.4 admits "other observable trace data". Never its interior. */
 		narration?: string;
-		priorGaps?: string[];
+		/**
+		 * ⭐ The review in parts, B4 (`REG-D-125`; design D4, D8) — the findings the previous round sent back to the producer,
+		 * each carrying its type (`FloorObservationView.typeId`). A part is shown its own type's, never another's: a claim
+		 * about another type belongs to that type's review.
+		 */
+		priorFindings?: readonly FloorObservationView[];
 	},
 	// This path RECORDS an assurance floor, so it needs a session. SESSION rather than SYSTEM: the floor
 	// is run because a professional asked for it, and the record should say so.
@@ -712,31 +809,20 @@ export async function runPwaFloor(
 	const graphExport = buildPwaExport(pwaId, engine);
 	if (!pwa || !graphExport) return undefined;
 	const report = analyzePwaGraph(graphExport);
+	const producer = { actorType: 'AGENT' as const, ...opts.producer };
 	const subject: AssuranceSubject = {
 		subjectId: pwaId,
 		objectType: 'PROFESSIONAL_WORK_ARCHITECTURE',
 		semanticVersion: Number(pwa.semanticVersion ?? 1),
 		isAiProduced: true,
-		producer: { actorType: 'AGENT' as const, ...opts.producer }
+		producer
 	};
 	const ctx: ValidatorContext = {
 		schemaInvariant: {
 			schemaValid: true, // the PWA + PWU Types are engine-validated on creation
 			invariantViolations: report.valid ? [] : ['PWA_GRAPH_NOT_WELL_FORMED']
 		},
-		identityProvenance: identityProvenanceFactsOf(pwa, opts.producer),
-		// ⭐ BUILT BY THE ONE MODULE REVIEWER QUALIFICATION REPLAYS (`JAN-CRITREAD` J2-1): what the reviewer is handed
-		// for a graph is `graphReviewInput`'s, and `review-input.test.ts` holds this call to it byte for byte.
-		reasoningReview: graphReviewInput({
-			// The POLICY's criteria, read from the store — not a constant. See reasoningReviewCriteria().
-			criteria: reasoningReviewCriteria(engine),
-			prompt: opts.prompt,
-			graph: graphExport,
-			candidateSubjectHash: opts.candidateSubjectHash,
-			rationale: opts.rationale,
-			narration: opts.narration,
-			priorGaps: opts.priorGaps
-		})
+		identityProvenance: identityProvenanceFactsOf(pwa, opts.producer)
 	};
 	// MXR-05. BOTH OR NEITHER: `captureTry` refuses a store supplied without a sink, because bytes retained
 	// with no record referencing them are the orphan REG-F-336 C-2 forbids.
@@ -748,22 +834,58 @@ export async function runPwaFloor(
 	// adapter (MXR-07) is what turns the disclosure into a fix.
 	const artifacts = opts.artifacts ?? getArtifactStore();
 	const exchanges = createExchangeSink();
-	const plan = await runFloorAndPlanRecording(
-		subject,
-		ctx,
-		createFloorRegistry({
-			testMode: isTestMode(),
-			artifacts,
-			exchanges,
-			...(opts.print ? { print: opts.print } : {}),
-			// ⭐ THE GRAPH ARM'S SUBJECT IS THE PWA ITSELF, so its registration is looked up by that id — and nothing is
-			// read from any engine to do it, so a turn's fork sees no extra by-id read (`REG-D-072` D6).
-			stipulations: (s, framing) => (framing === 'PWA_GRAPH' ? stipulationFor(s.subjectId, 'PWA_GRAPH') : undefined)
-		}),
-		// ⭐ THE ENGINE THIS FLOOR RECORDS INTO decides whether a stipulated answer counts (`REG-D-071` Q5) — the same
-		// engine whose Gate E will judge the completion, so the two cannot disagree. Never `isTestMode()`.
-		{ admitStipulatedAnswers: engine.admitStipulatedAnswers }
-	);
+	const registry = createFloorRegistry({
+		testMode: isTestMode(),
+		artifacts,
+		exchanges,
+		...(opts.print ? { print: opts.print } : {}),
+		// ⭐ B6 — EACH PART IS ASKED ABOUT WITH THE PWA IT BELONGS TO, which this floor knows: the part's own registration,
+		// else its PWA's (`stipulationFor`). Nothing is read from any engine to do it, so a turn's fork sees no extra by-id
+		// read (`REG-D-072` D6).
+		stipulations: (s, framing) =>
+			framing === 'PWA_TYPE' ? stipulationFor(pwaId, 'PWA_TYPE', s.subjectId) : undefined
+	});
+	// ⭐ THE ENGINE THIS FLOOR RECORDS INTO decides whether a stipulated answer counts (`REG-D-071` Q5) — the same
+	// engine whose Gate E will judge the completion, so the two cannot disagree. Never `isTestMode()`.
+	const composing: ComposeOptions = { admitStipulatedAnswers: engine.admitStipulatedAnswers };
+	const deterministic = await runFloorPolicies(subject, ctx, registry, [
+		FLOOR_POLICY_IDS.SCHEMA_INVARIANT,
+		FLOOR_POLICY_IDS.IDENTITY_PROVENANCE
+	]);
+	const pwaPlan = assuranceRecordingPlan(subject, deterministic.plan, deterministic.results, composing);
+	// ⭐ THE PARTS, ONE AFTER ANOTHER IN EXPORT ORDER (design D9), each through the one builder qualification replays
+	// (`pwaTypeReviewInput`), with the POLICY's criteria read from the store (`reasoningReviewCriteria`) and its subject the
+	// type at the version the store holds — read by its id from the same listing the export was built from.
+	const criteria = reasoningReviewCriteria(engine);
+	const stored = storedTypes(engine, pwaId);
+	const reviewed: ReviewedPart[] = [];
+	for (const part of pwaTypeParts(graphExport)) {
+		const partSubject: AssuranceSubject = {
+			subjectId: part.typeId,
+			objectType: 'PWU_TYPE',
+			semanticVersion: stored.get(part.typeId)!.semanticVersion,
+			isAiProduced: true,
+			producer
+		};
+		const reasoningReview = pwaTypeReviewInput({
+			criteria,
+			prompt: opts.prompt,
+			part,
+			candidateSubjectHash: opts.candidateSubjectHash,
+			rationale: opts.rationale,
+			narration: opts.narration,
+			priorGaps: (opts.priorFindings ?? [])
+				.filter((f) => f.typeId === part.typeId)
+				.map((f) => f.statement)
+		});
+		// The sink keeps every try of the round in order, so this part's are the ones its own review added.
+		const before = exchanges.drain().length;
+		const run = await runFloorPolicies(partSubject, { reasoningReview }, registry, [
+			FLOOR_POLICY_IDS.REASONING_REVIEW
+		]);
+		reviewed.push({ part, subject: partSubject, run, tries: exchanges.drain().slice(before) });
+	}
+	const partPlans = composeParts(reviewed, pwaPlan, composing);
 	// ⭐⭐ `JAN-EXEC` P7-6 B7 — `REG-F-433`'s JOIN KEY: ONE TOKEN FOR THIS FLOOR RUN, minted once (RD10, as corrected; the
 	// execution plane's twin is `floor-over-subject.ts`, `floorRunToken`). ⛔ The assessments were correlated
 	// `authoring-floor:<candidate hash>` — the same for every run over one candidate, and bare `authoring-floor` with none —
@@ -773,15 +895,23 @@ export async function runPwaFloor(
 	// the old correlation — the plane and the candidate's hash — followed by the run's own id, the recording's `idPrefix`.
 	// ⚠ ON A TURN the assessments go to the fork and the exchanges to canonical (`REG-F-433`'s "DIFFERENT STORES"): the
 	// token is a string both carry, so the join survives the turn's commit, which replays the fork's commands unchanged.
+	// ⭐ B3 — AND IT IS THE WHOLE ROUND'S: the PWA's plan and every part's carry it, so the round's readers can ask for the
+	// complete inventory under one token (`loadPwaFloor`; `rph-application`'s publication gate).
 	const floorRunId = mintUiId('floorrun');
 	const floorRunToken = `${opts.candidateSubjectHash ? `authoring-floor:${opts.candidateSubjectHash}` : 'authoring-floor'}:${floorRunId}`;
-	recordAssuranceRecordingPlan(engine, plan, {
-		issuedAt: hostNow(),
-		correlationId: floorRunToken,
-		idPrefix: floorRunId,
-		newId: (prefix) => mintUiId(prefix)
-	});
-	// ⭑ THE DRAIN — PER-9's durable exchange record, one per bounded try.
+	const record = (plan: AssuranceRecordingPlan, idPrefix: string) =>
+		recordAssuranceRecordingPlan(engine, plan, {
+			issuedAt: hostNow(),
+			correlationId: floorRunToken,
+			idPrefix,
+			newId: (prefix) => mintUiId(prefix)
+		});
+	record(pwaPlan, floorRunId);
+	// ⛔ A PREFIX OF ITS OWN FOR EACH PART: the recorder numbers its commands from one in every plan, and a command whose
+	// idempotency key repeats is answered DUPLICATE — accepted by the recorder, and never applied.
+	reviewed.forEach((r, i) => record(partPlans[i]!, `${floorRunId}-${r.part.typeId}`));
+	// ⭑ THE DRAIN — PER-9's durable exchange record, one per bounded try, ⭐ B3: each part's tries under that part's own
+	// subject, the type at the version its review was bound to.
 	//
 	// ⛔ ON THE CANONICAL HANDLE, DELIBERATELY, AND NOT ON `engine`. This function is called with
 	// `turn.engine` — the authoring fork's CANDIDATE engine (`+server.ts:127`, `:153`). Dispatching there
@@ -796,51 +926,10 @@ export async function runPwaFloor(
 	const canonical = retryingWhenBusy(
 		opts.canonical ?? witness?.as(SESSION_CREDENTIAL) ?? getEngine().as(SESSION_CREDENTIAL)
 	);
-	const drained = exchanges.drain();
-	if (drained.length > 0) {
-		const outcome = recordExchanges(
-			(payload, aggregateId) =>
-				canonical.dispatch({
-					commandId: mintUiId('cmd'),
-					commandType: 'RecordModelExchange',
-					commandSchemaVersion: 1,
-					targetAggregateType: 'MODEL_EXCHANGE',
-					targetAggregateId: aggregateId,
-					issuedAt: hostNow(),
-					// ⭐ B7 — the run's token, as its assessments carry it: never the subject's constant.
-					correlationId: floorRunToken,
-					idempotencyKey: `mex:${aggregateId}`,
-					payload
-				}),
-			drained,
-			{
-				// ⭐ B7 — THE SAME TOKEN, never a second mint: the field `loadReviewerAnswer` groups a run's calls by.
-				runToken: floorRunToken,
-				plane: 'ASSURANCE',
-				invokerId: 'agy.reasoning-review',
-				assurancePolicyId: FLOOR_POLICY_IDS.REASONING_REVIEW,
-				subjectObjectId: pwaId,
-				subjectObjectType: 'PROFESSIONAL_WORK_ARCHITECTURE',
-				subjectSemanticVersion: 1,
-				newId: (prefix) => mintUiId(prefix)
-			}
-		);
-		// A retention fault must not fail an assurance run that already reached its conclusion — but it must
-		// not vanish either. Surfacing it is the disclosed shortfall PER-9 permits; swallowing it is the
-		// silent omission it forbids.
-		if (outcome.failures.length > 0)
-			console.warn(
-				`[MXR] ${outcome.recorded}/${drained.length} exchange records written; ${outcome.failures.length} failed: ${outcome.failures.join('; ')}`
-			);
-	}
+	for (const r of reviewed) drainTries(canonical, r, floorRunToken);
 
-	const rr = plan.assessments.find((a) => a.policyId === FLOOR_POLICY_IDS.REASONING_REVIEW);
-	return {
-		subjectId: pwaId,
-		aggregate: plan.aggregate,
-		satisfied: plan.gatePermitsTransition,
-		waived: hasEffectiveWaiver(engine, pwaId),
-		policies: plan.assessments.map((a) => ({
+	return floorViewOf(pwaId, {
+		deterministic: pwaPlan.assessments.map((a) => ({
 			policyId: a.policyId,
 			disposition: a.disposition,
 			independenceOk: a.independenceOk,
@@ -851,17 +940,210 @@ export async function runPwaFloor(
 			})),
 			criteria: tallyCriteria(a.criteria)
 		})),
-		// ⭐ `JAN-ESCREC` D3 — never the reviewer's recommendation: it stays on `policies`, and is not a finding.
-		reasoningGaps: rr
-			? rr.observations.filter((o) => !isReviewerRecommendation(o)).map((o) => o.statement)
-			: []
-	};
+		parts: reviewed.map((r, i) => {
+			const a = partPlans[i]!.assessments.find((x) => x.policyId === FLOOR_POLICY_IDS.REASONING_REVIEW);
+			const named = { typeId: r.part.typeId, typeName: r.part.subject.type.name };
+			return {
+				...named,
+				semanticVersion: r.subject.semanticVersion,
+				disposition: a?.disposition ?? PART_MISSING,
+				// No review recorded, no violation recorded: a MISSING part blocks on its own.
+				independenceOk: a?.independenceOk ?? true,
+				observations: (a?.observations ?? []).map((o) => ({
+					code: o.code,
+					severity: o.severity,
+					statement: o.statement,
+					...named
+				})),
+				...(a === undefined ? {} : { criteria: tallyCriteria(a.criteria) })
+			};
+		}),
+		waived: hasEffectiveWaiver(engine, pwaId)
+	});
 }
 
-const includesSubject = (state: Record<string, unknown>, pwaId: string): boolean => {
-	const s = state.subjectObjectIds;
-	return Array.isArray(s) && (s as string[]).includes(pwaId);
-};
+/** One part of a round, reviewed: the part, its subject, the review's run, and the tries that review made. */
+interface ReviewedPart {
+	readonly part: PwaTypePart;
+	readonly subject: AssuranceSubject;
+	readonly run: Awaited<ReturnType<typeof runFloorPolicies>>;
+	readonly tries: readonly ExchangeRecord[];
+}
+
+/** The disposition of a part the round holds no review of, at the version the store holds. */
+const PART_MISSING = 'MISSING';
+
+const reviewIn = (plan: AssuranceRecordingPlan) =>
+	plan.assessments.find((a) => a.policyId === FLOOR_POLICY_IDS.REASONING_REVIEW);
+
+/**
+ * ⭐ B3 — EACH PART'S PLAN, COMPOSED ALONE, THEN `REG-D-089`'S CONDITION (iv) READ ACROSS THE ROUND. A part's plan holds its
+ * review and nothing else, so composed alone a clean review its reviewer escalates is ESCALATED whatever the rest of the
+ * round holds. The ruling escalates only when *"nothing else already blocks"*: so where the PWA's deterministic policies,
+ * or another part's review as the ladder computed it, are not SATISFIED, the part is composed again knowing it
+ * (`blockedOutsideThePlan`), and keeps the ladder's SATISFIED with its recommendation recorded beside it.
+ */
+function composeParts(
+	reviewed: readonly ReviewedPart[],
+	pwaPlan: AssuranceRecordingPlan,
+	composing: ComposeOptions
+): AssuranceRecordingPlan[] {
+	const alone = reviewed.map((r) =>
+		assuranceRecordingPlan(r.subject, r.run.plan, r.run.results, composing)
+	);
+	// What each review computed before the rule moved it: only a SATISFIED review is ever escalated.
+	const computed = alone.map((plan) => {
+		const disposition = reviewIn(plan)?.disposition;
+		return disposition === 'ESCALATED' ? 'SATISFIED' : disposition;
+	});
+	return alone.map((plan, i) => {
+		if (reviewIn(plan)?.disposition !== 'ESCALATED') return plan;
+		const blocked =
+			!pwaPlan.gatePermitsTransition || computed.some((d, j) => j !== i && d !== 'SATISFIED');
+		if (!blocked) return plan;
+		const r = reviewed[i]!;
+		return assuranceRecordingPlan(r.subject, r.run.plan, r.run.results, {
+			...composing,
+			blockedOutsideThePlan: true
+		});
+	});
+}
+
+/** Record one part's tries, through `canonical`, under the part's own subject and the round's token. */
+function drainTries(
+	canonical: Pick<AuthedEngineHandle, 'dispatch'>,
+	reviewed: ReviewedPart,
+	floorRunToken: string
+): void {
+	if (reviewed.tries.length === 0) return;
+	const outcome = recordExchanges(
+		(payload, aggregateId) =>
+			canonical.dispatch({
+				commandId: mintUiId('cmd'),
+				commandType: 'RecordModelExchange',
+				commandSchemaVersion: 1,
+				targetAggregateType: 'MODEL_EXCHANGE',
+				targetAggregateId: aggregateId,
+				issuedAt: hostNow(),
+				// ⭐ B7 — the run's token, as its assessments carry it: never the subject's constant.
+				correlationId: floorRunToken,
+				idempotencyKey: `mex:${aggregateId}`,
+				payload
+			}),
+		reviewed.tries,
+		{
+			// ⭐ B7 — THE SAME TOKEN, never a second mint: the field `loadReviewerAnswer` groups a run's calls by.
+			runToken: floorRunToken,
+			plane: 'ASSURANCE',
+			invokerId: 'agy.reasoning-review',
+			assurancePolicyId: FLOOR_POLICY_IDS.REASONING_REVIEW,
+			// ⭐ B3 — the part's own subject: the type, at the version its review was bound to (design D6).
+			subjectObjectId: reviewed.subject.subjectId,
+			subjectObjectType: 'PWU_TYPE',
+			subjectSemanticVersion: reviewed.subject.semanticVersion,
+			newId: (prefix) => mintUiId(prefix)
+		}
+	);
+	// A retention fault must not fail an assurance run that already reached its conclusion — but it must
+	// not vanish either. Surfacing it is the disclosed shortfall PER-9 permits; swallowing it is the
+	// silent omission it forbids.
+	if (outcome.failures.length > 0)
+		console.warn(
+			`[MXR] ${outcome.recorded}/${reviewed.tries.length} exchange records written; ${outcome.failures.length} failed: ${outcome.failures.join('; ')}`
+		);
+}
+
+/** A PWA's live types as the store holds them, by id, in the order the export lists them: each one's name and version. */
+function storedTypes(
+	engine: EngineHandle,
+	pwaId: string
+): Map<string, { readonly name: string; readonly semanticVersion: number }> {
+	return new Map(
+		listPwuTypes(engine, pwaId).map((t) => [
+			t.id,
+			{
+				name: String((t.state.name ?? t.id) as string),
+				semanticVersion: Number(t.state.semanticVersion ?? 1)
+			}
+		])
+	);
+}
+
+/**
+ * ⭐⭐ The review in parts, B3 (`REG-D-125`; design D5; ASR-10, RPH-ASR-012) — THE PWA'S REASONING REVIEW OUTCOME IS THE
+ * STRICTEST UNRESOLVED PART'S (`aggregateDisposition`). Every part is required: one rejected part among satisfied ones
+ * keeps it REJECTED, and a part with no concluded review — missing from the round, stale, or still in progress — leaves
+ * it UNASSESSED. ⛔ A PWA with no part has no review at all, so it is UNASSESSED too: the fold of nothing is not a
+ * SATISFIED. ⭑ An escalated part is kept as itself where nothing but escalations is unresolved, so the classifier routes
+ * it to a human; the aggregate alone reads a required ESCALATED as INCONCLUSIVE.
+ */
+export function partsDisposition(parts: readonly Pick<FloorPartView, 'disposition'>[]): string {
+	if (parts.length === 0) return 'UNASSESSED';
+	const folded = aggregateDisposition(
+		parts.map(
+			(p): PolicyAssessment => ({
+				required: true,
+				disposition: CONCLUDED_DISPOSITIONS.has(p.disposition)
+					? (p.disposition as PolicyAssessment['disposition'])
+					: 'MISSING'
+			})
+		)
+	);
+	return folded === 'INCONCLUSIVE' &&
+		parts.every((p) => p.disposition === 'SATISFIED' || p.disposition === 'ESCALATED')
+		? 'ESCALATED'
+		: folded;
+}
+
+/** The floor's three policies, in the order every view lists them. */
+const FLOOR_ORDER = [
+	FLOOR_POLICY_IDS.SCHEMA_INVARIANT,
+	FLOOR_POLICY_IDS.IDENTITY_PROVENANCE,
+	FLOOR_POLICY_IDS.REASONING_REVIEW
+];
+
+/**
+ * ⭐ B3 — ONE ROUND AS THE PAGE AND THE ROUTE READ IT: the deterministic policies as recorded, and the Reasoning Review as
+ * the fold of its parts — its disposition `partsDisposition`'s, its observations every part's in export order, each
+ * carrying its type, and its criteria their sum. ⚠ That review entry is a VIEW of the parts, and no assessment of its own.
+ */
+function floorViewOf(
+	pwaId: string,
+	round: {
+		readonly deterministic: readonly FloorPolicyView[];
+		readonly parts: readonly FloorPartView[];
+		readonly waived: boolean;
+		readonly runToken?: string;
+	}
+): FloorView {
+	const review: FloorPolicyView = {
+		policyId: FLOOR_POLICY_IDS.REASONING_REVIEW,
+		disposition: partsDisposition(round.parts),
+		independenceOk: round.parts.every((p) => p.independenceOk),
+		observations: round.parts.flatMap((p) => p.observations),
+		criteria: {
+			evaluated: round.parts.reduce((n, p) => n + (p.criteria?.evaluated ?? 0), 0),
+			stipulated: round.parts.reduce((n, p) => n + (p.criteria?.stipulated ?? 0), 0)
+		}
+	};
+	const policies = [...round.deterministic, review];
+	return {
+		subjectId: pwaId,
+		aggregate: floorAggregate(FLOOR_ORDER, policies),
+		satisfied: FLOOR_ORDER.every(
+			(policyId) => policies.find((p) => p.policyId === policyId)?.disposition === 'SATISFIED'
+		),
+		waived: round.waived,
+		policies,
+		// ⭐ `JAN-ESCREC` D3 — never the reviewer's recommendation: it stays on `policies`, and is not a finding.
+		reasoningGaps: review.observations
+			.filter((o) => !isReviewerRecommendation(o))
+			.map((o) => o.statement),
+		// ⭐ C2 — the shown round's own floor run, read from ITS record: the answer under this floor is joined to it.
+		...(round.runToken === undefined ? {} : { reasoningReviewRunToken: round.runToken }),
+		parts: round.parts
+	};
+}
 
 interface LatestAssessment {
 	readonly id: string;
@@ -869,34 +1151,81 @@ interface LatestAssessment {
 	readonly at: string;
 }
 
-/** Latest recorded floor assessment per policy for the subject (by updatedAt; ties → last seen). */
-function latestFloorAssessments(
+const subjectsOf = (state: Record<string, unknown>): readonly string[] =>
+	Array.isArray(state.subjectObjectIds) ? (state.subjectObjectIds as string[]) : [];
+
+const isDeterministicFloorPolicy = (id: unknown): boolean =>
+	id === FLOOR_POLICY_IDS.SCHEMA_INVARIANT || id === FLOOR_POLICY_IDS.IDENTITY_PROVENANCE;
+
+const isFloorPolicy = (id: unknown): boolean =>
+	isDeterministicFloorPolicy(id) || id === FLOOR_POLICY_IDS.REASONING_REVIEW;
+
+/** The later of two assessments by `updatedAt`, ties to the one seen last — the order every floor reader ranks by. */
+const later = (prev: LatestAssessment | undefined, next: LatestAssessment): LatestAssessment =>
+	!prev || next.at >= prev.at ? next : prev;
+
+/**
+ * ⭐⭐ The review in parts, B3 (`REG-D-125`; design D6) — THE LATEST RECORDED ROUND OF A PWA'S FLOOR, NEVER A PER-POLICY
+ * LATEST. The round is the floor run of the latest floor assessment over the PWA's deterministic policies or over one of
+ * its live types' Reasoning Review — its floor-run token, `REG-F-433`'s join key, read off its first event. Its
+ * deterministic assessments are the PWA's under that token, and its parts the latest Reasoning Review of each live type
+ * under that token. ⛔ So a part a newer round does not hold is not read from an older one: a partial newer round never
+ * borrows an older part's result. ⚠ A review of the PWA as a whole graph is in no round's inventory.
+ */
+function latestFloorRound(
 	engine: AuthedEngineHandle,
-	pwaId: string
-): Map<string, LatestAssessment> {
-	const latest = new Map<string, LatestAssessment>();
-	// WORKSPACE: the subject here is a PWA, which is not owned by any Undertaking — the `includesSubject(…, pwaId)`
-	// filter on the next line is this query's real scope. An UNDERTAKING scope would return nothing.
-	for (const a of listAssessments(engine, { kind: 'WORKSPACE' })) {
-		if (!includesSubject(a.state, pwaId) || !isFloorPolicy(a.state.assurancePolicyId)) continue;
-		const policyId = String(a.state.assurancePolicyId as string);
-		const at = String((a.state.updatedAt ?? '') as string);
-		const prev = latest.get(policyId);
-		if (!prev || at >= prev.at) latest.set(policyId, { id: a.id, state: a.state, at });
+	pwaId: string,
+	typeIds: ReadonlySet<string>
+):
+	| {
+			readonly token: string | undefined;
+			readonly deterministic: ReadonlyMap<string, LatestAssessment>;
+			readonly parts: ReadonlyMap<string, LatestAssessment>;
+	  }
+	| undefined {
+	const tokens = new Map<string, string>();
+	for (const e of engine.readAllEvents())
+		if (e.aggregateType === 'ASSURANCE_ASSESSMENT' && !tokens.has(e.aggregateId))
+			tokens.set(e.aggregateId, e.correlationId);
+	const inRound: { readonly a: LatestAssessment; readonly key: string; readonly part: boolean }[] = [];
+	let newest: LatestAssessment | undefined;
+	// WORKSPACE: the subjects here are a PWA and its types, which no Undertaking owns — the subject filter on the next lines
+	// is this query's real scope. An UNDERTAKING scope would return nothing.
+	for (const r of listAssessments(engine, { kind: 'WORKSPACE' })) {
+		const policy = r.state.assurancePolicyId;
+		const subjects = subjectsOf(r.state);
+		const a = { id: r.id, state: r.state, at: String((r.state.updatedAt ?? '') as string) };
+		if (subjects.includes(pwaId) && isDeterministicFloorPolicy(policy))
+			inRound.push({ a, key: String(policy), part: false });
+		else if (policy === FLOOR_POLICY_IDS.REASONING_REVIEW) {
+			const typeId = subjects.find((s) => typeIds.has(s));
+			if (typeId === undefined) continue;
+			inRound.push({ a, key: typeId, part: true });
+		} else continue;
+		newest = later(newest, a);
 	}
-	return latest;
+	if (newest === undefined) return undefined;
+	const token = tokens.get(newest.id);
+	const deterministic = new Map<string, LatestAssessment>();
+	const parts = new Map<string, LatestAssessment>();
+	for (const { a, key, part } of inRound) {
+		if (tokens.get(a.id) !== token) continue;
+		const into = part ? parts : deterministic;
+		into.set(key, later(into.get(key), a));
+	}
+	return { token, deterministic, parts };
 }
 
-/** Floor observations for the subject, grouped by their assessment id. */
-function observationsByAssessment(
+/** Observations of the named assessments, grouped by their assessment id. */
+function observationsOf(
 	engine: AuthedEngineHandle,
-	pwaId: string
-): Map<string, { code: string; severity: string; statement: string }[]> {
-	const byId = new Map<string, { code: string; severity: string; statement: string }[]>();
-	// WORKSPACE, for the same reason as the assessment fold above: the subject is a PWA.
+	assessmentIds: ReadonlySet<string>
+): Map<string, FloorObservationView[]> {
+	const byId = new Map<string, FloorObservationView[]>();
+	// WORKSPACE, for the same reason as the round above: the subjects are a PWA and its types.
 	for (const o of listObservations(engine, { kind: 'WORKSPACE' })) {
-		if (!includesSubject(o.state, pwaId)) continue;
 		const aid = String((o.state.assessmentId ?? '') as string);
+		if (!assessmentIds.has(aid)) continue;
 		const list = byId.get(aid) ?? [];
 		list.push({
 			code: String((o.state.findingCode ?? o.state.observationType ?? '') as string),
@@ -964,27 +1293,31 @@ function latestCriterionRows(
 	return new Map([...byAssessment].map(([id, rows]) => [id, [...rows.values()]]));
 }
 
-/** The latest recorded floor outcome for a PWA, read back from the canonical ASSURANCE_ASSESSMENT/OBSERVATION
- *  objects (the read surface the UI renders). Undefined if no floor has been recorded for the subject yet. */
+/**
+ * The latest recorded floor outcome for a PWA, read back from the canonical ASSURANCE_ASSESSMENT/OBSERVATION objects (the
+ * read surface the UI renders). Undefined if no floor has been recorded for the subject yet.
+ *
+ * ⭐⭐ The review in parts, B3 (`REG-D-125`; design D6) — THE LATEST ROUND (`latestFloorRound`), WITH ITS COMPLETE EXPECTED
+ * PART INVENTORY: one part per live type of the PWA, in export order, each the round's review of that type at the version
+ * the store holds now. A type the round holds no review of — added since, or reviewed only in an older round — and a
+ * review bound to another version of its type, are each a `MISSING` part, which keeps the floor unsatisfied.
+ */
 export function loadPwaFloor(
 	pwaId: string,
 	engine: AuthedEngineHandle = getEngine().as(SESSION_CREDENTIAL)
 ): FloorView | undefined {
-	const latest = latestFloorAssessments(engine, pwaId);
-	if (latest.size === 0) return undefined;
-	const obsByAssessment = observationsByAssessment(engine, pwaId);
-	const criteriaByAssessment = latestCriterionRows(engine, new Set([...latest.values()].map((a) => a.id)));
-	const order = [
-		FLOOR_POLICY_IDS.SCHEMA_INVARIANT,
-		FLOOR_POLICY_IDS.IDENTITY_PROVENANCE,
-		FLOOR_POLICY_IDS.REASONING_REVIEW
-	];
-	const policies: FloorPolicyView[] = [];
-	for (const policyId of order) {
-		const a = latest.get(policyId);
+	const types = storedTypes(engine, pwaId);
+	const round = latestFloorRound(engine, pwaId, new Set(types.keys()));
+	if (round === undefined) return undefined;
+	const ids = new Set([...round.deterministic.values(), ...round.parts.values()].map((a) => a.id));
+	const obsByAssessment = observationsOf(engine, ids);
+	const criteriaByAssessment = latestCriterionRows(engine, ids);
+	const deterministic: FloorPolicyView[] = [];
+	for (const policyId of FLOOR_ORDER) {
+		const a = round.deterministic.get(policyId);
 		if (!a) continue;
 		const obs = obsByAssessment.get(a.id) ?? [];
-		policies.push({
+		deterministic.push({
 			policyId,
 			disposition: String((a.state.assessmentState ?? 'INCONCLUSIVE') as string),
 			// Derived from the RECORDED violation, never asserted. This read-back path hardcoded `true`, so every
@@ -996,14 +1329,89 @@ export function loadPwaFloor(
 			criteria: tallyCriteria(criteriaByAssessment.get(a.id) ?? [])
 		});
 	}
-	const satisfied = order.every((p) => latest.get(p)?.state.assessmentState === 'SATISFIED');
+	const parts: FloorPartView[] = [...types].map(([typeId, type]) => {
+		const named = { typeId, typeName: type.name };
+		const a = round.parts.get(typeId);
+		const bound = (a?.state.subjectSemanticVersions as Record<string, unknown> | undefined)?.[typeId];
+		if (a === undefined || bound !== type.semanticVersion)
+			return {
+				...named,
+				semanticVersion: type.semanticVersion,
+				disposition: PART_MISSING,
+				independenceOk: true,
+				observations: []
+			};
+		const obs = (obsByAssessment.get(a.id) ?? []).map((o) => ({ ...o, ...named }));
+		return {
+			...named,
+			semanticVersion: type.semanticVersion,
+			disposition: String((a.state.assessmentState ?? 'INCONCLUSIVE') as string),
+			independenceOk: !obs.some((o) => o.code === 'INDEPENDENCE_VIOLATION'),
+			observations: obs,
+			criteria: tallyCriteria(criteriaByAssessment.get(a.id) ?? [])
+		};
+	});
+	return floorViewOf(pwaId, {
+		deterministic,
+		parts,
+		waived: hasEffectiveWaiver(engine, pwaId),
+		...(round.parts.size === 0 || round.token === undefined ? {} : { runToken: round.token })
+	});
+}
+
+/** Latest recorded floor assessment per policy for the subject (by updatedAt; ties → last seen). */
+function latestFloorAssessments(
+	engine: AuthedEngineHandle,
+	subjectId: string
+): Map<string, LatestAssessment> {
+	const latest = new Map<string, LatestAssessment>();
+	// WORKSPACE: the subject is filtered on the next line, which is this query's real scope.
+	for (const a of listAssessments(engine, { kind: 'WORKSPACE' })) {
+		if (!subjectsOf(a.state).includes(subjectId) || !isFloorPolicy(a.state.assurancePolicyId)) continue;
+		const policyId = String(a.state.assurancePolicyId as string);
+		const at = String((a.state.updatedAt ?? '') as string);
+		latest.set(policyId, later(latest.get(policyId), { id: a.id, state: a.state, at }));
+	}
+	return latest;
+}
+
+/**
+ * The latest recorded floor outcome over ONE subject, policy by policy (by updatedAt; ties → last seen), read back from the
+ * canonical ASSURANCE_ASSESSMENT/OBSERVATION objects. Undefined if no floor has been recorded for the subject yet.
+ * ⭐ The review in parts, B3 (`REG-D-125`) — THE EXECUTION PLANE'S READER of a work product's floor
+ * (`stopped-unit-recovery.ts`), keyed on `subjectObjectIds` alone, as `loadPwaFloor` was before a PWA's floor was read as a
+ * round. ⚠ A PWA's floor is `loadPwaFloor`'s: its Reasoning Review is recorded under its types, never under the PWA.
+ */
+export function loadSubjectFloor(
+	subjectId: string,
+	engine: AuthedEngineHandle = getEngine().as(SESSION_CREDENTIAL)
+): FloorView | undefined {
+	const latest = latestFloorAssessments(engine, subjectId);
+	if (latest.size === 0) return undefined;
+	const ids = new Set([...latest.values()].map((a) => a.id));
+	const obsByAssessment = observationsOf(engine, ids);
+	const criteriaByAssessment = latestCriterionRows(engine, ids);
+	const policies: FloorPolicyView[] = [];
+	for (const policyId of FLOOR_ORDER) {
+		const a = latest.get(policyId);
+		if (!a) continue;
+		const obs = obsByAssessment.get(a.id) ?? [];
+		policies.push({
+			policyId,
+			disposition: String((a.state.assessmentState ?? 'INCONCLUSIVE') as string),
+			// Derived from the RECORDED violation, never asserted (see `loadPwaFloor`).
+			independenceOk: !obs.some((o) => o.code === 'INDEPENDENCE_VIOLATION'),
+			observations: obs,
+			criteria: tallyCriteria(criteriaByAssessment.get(a.id) ?? [])
+		});
+	}
 	const rr = latest.get(FLOOR_POLICY_IDS.REASONING_REVIEW);
 	const runToken = rr === undefined ? undefined : floorRunTokenOf(engine, rr.id);
 	return {
-		subjectId: pwaId,
-		aggregate: floorAggregate(order, policies),
-		satisfied,
-		waived: hasEffectiveWaiver(engine, pwaId),
+		subjectId,
+		aggregate: floorAggregate(FLOOR_ORDER, policies),
+		satisfied: FLOOR_ORDER.every((p) => latest.get(p)?.state.assessmentState === 'SATISFIED'),
+		waived: hasEffectiveWaiver(engine, subjectId),
 		policies,
 		// ⭐ `JAN-ESCREC` D3 — never the reviewer's recommendation: it stays on `policies`, and is not a finding.
 		reasoningGaps: rr
@@ -1018,9 +1426,9 @@ export function loadPwaFloor(
 
 /**
  * ⭐ C2 (`REG-F-433`) — the floor-run token an assessment carries: the correlation its recording plan was dispatched under
- * (`runPwaFloor` — one token for the run's assessments and its reviewer calls, P7-6 B7), read off the assessment's FIRST
- * event, its request. ⛔ Never from the assessment's state, which carries no correlation; and never the subject's latest
- * run's — that is the join this replaces. `undefined` when the record holds no event of it.
+ * (one token for the run's assessments and its reviewer calls, P7-6 B7), read off the assessment's FIRST event, its
+ * request. ⛔ Never from the assessment's state, which carries no correlation; and never the subject's latest run's — that
+ * is the join this replaces. `undefined` when the record holds no event of it.
  */
 function floorRunTokenOf(engine: AuthedEngineHandle, assessmentId: string): string | undefined {
 	return engine.readAllEvents().find((e) => e.aggregateId === assessmentId)?.correlationId;

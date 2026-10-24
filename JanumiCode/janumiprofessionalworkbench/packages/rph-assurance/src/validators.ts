@@ -90,8 +90,8 @@ export type ReviewFraming =
 	 * parent's rule for it, its children's skeletons, the artifacts it shares and, for a type with children, their data flow
 	 * (`pwaTypeReviewInput`). A type with children is judged for their composition too (DEC-6), and the root against the
 	 * request. A review in this framing reviews one type, under the floor's own Reasoning Review policy and its criteria.
-	 * ⚠ `PWA_GRAPH` STAYS: the authoring floor still reviews the whole graph through it, and the historical case sets
-	 * materialize through it.
+	 * ⚠ `PWA_GRAPH` STAYS: the historical case sets materialize through it. ⭐ B3: the authoring floor reviews in this framing,
+	 * one review per type, and no longer through `PWA_GRAPH`.
 	 */
 	| 'PWA_TYPE';
 
@@ -618,9 +618,12 @@ function failedResult(
 async function runFloorResults(
 	subject: AssuranceSubject,
 	ctx: ValidatorContext,
-	registry: ValidatorRegistry
+	registry: ValidatorRegistry,
+	policyIds?: readonly FloorPolicyId[]
 ): Promise<{ plan: FloorPolicyRef[]; results: ValidatorResult[] }> {
-	const plan = deMinimisFloorPlan(subject);
+	const plan = deMinimisFloorPlan(subject).filter(
+		(p) => policyIds === undefined || policyIds.includes(p.policyId)
+	);
 	const results: ValidatorResult[] = [];
 	for (const p of plan) {
 		const v = registry.get(p.policyId);
@@ -650,6 +653,21 @@ export async function runDeMinimisFloor(
 ): Promise<AssuranceOutcome> {
 	const { plan, results } = await runFloorResults(subject, ctx, registry);
 	return composeAssuranceOutcome(subject, plan, results, opts);
+}
+
+/**
+ * ⭐ The review in parts, B3 (`REG-D-125`; DESIGN-authoring-review-in-parts.md D1, D5) — THE NAMED POLICIES OF A SUBJECT'S
+ * FLOOR, RUN AS `runDeMinimisFloor` RUNS THEM, THEIR RESULTS RETURNED UNCOMPOSED. The authoring floor runs a PWA's two
+ * deterministic policies once over the PWA and its Reasoning Review once over each of its types, so it composes each plan
+ * itself (`assuranceRecordingPlan`) and folds the parts. ⚠ A policy the subject's own plan does not hold is not run.
+ */
+export async function runFloorPolicies(
+	subject: AssuranceSubject,
+	ctx: ValidatorContext,
+	registry: ValidatorRegistry,
+	policyIds: readonly FloorPolicyId[]
+): Promise<{ plan: FloorPolicyRef[]; results: ValidatorResult[] }> {
+	return runFloorResults(subject, ctx, registry, policyIds);
 }
 
 /**

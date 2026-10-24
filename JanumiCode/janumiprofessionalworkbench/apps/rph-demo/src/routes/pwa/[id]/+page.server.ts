@@ -345,6 +345,23 @@ export const load: PageServerLoad = async ({ params }) => {
 			canonicalEngine.as(SESSION_CREDENTIAL),
 			getArtifactStore()
 		),
+		// ⭐ The review in parts, B3 (`REG-D-125`; design D6, D7) — AND EACH TYPE'S, its part's answer: joined to the part's own
+		// subject and the shown round's token, from CANONICAL as the one above is. ⚠ The PWA itself records no reviewer call
+		// once its review is in parts, so the answer above is absent beside such a floor; the panel renders these under each
+		// type once the inspector shows the parts (roadmap 9a.6, B5).
+		partAnswers: (
+			await Promise.all(
+				(floor?.parts ?? []).map(async (part) => {
+					const answer = await loadReviewerAnswer(
+						part.typeId,
+						floor?.reasoningReviewRunToken,
+						canonicalEngine.as(SESSION_CREDENTIAL),
+						getArtifactStore()
+					);
+					return answer === undefined ? [] : [{ typeId: part.typeId, typeName: part.typeName, answer }];
+				})
+			)
+		).flat(),
 		// A pending fork is a PREVIEW. The graph/transcript/floor above read it, while this flag makes the authority
 		// boundary explicit to the browser and supplies the exact hash required by the accept action.
 		authoringTurn: candidate ? summarizeAuthoringTurn(candidate) : undefined,

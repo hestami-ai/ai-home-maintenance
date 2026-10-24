@@ -114,6 +114,30 @@ describe('⭐ D4 — devin named with no model is RECORDED on both floors, never
 			}
 		});
 		expect(created.status, 'arrangement: CreatePwa').toBe('ACCEPTED');
+		// ⭐ The review in parts, B3 (`REG-D-125`) — one type, so one part for the refused reviewer to be asked about.
+		const typed = session.dispatch({
+			commandId: 'setup-2',
+			commandType: 'DefinePwuType',
+			commandSchemaVersion: 1,
+			targetAggregateType: 'PWU_TYPE',
+			targetAggregateId: 'pwut_01ARZ3NDEKTSV4RRFFQ69G5P10',
+			issuedAt: TS,
+			correlationId: 'setup',
+			idempotencyKey: 'setup-idem-2',
+			payload: {
+				pwuTypeId: 'pwut_01ARZ3NDEKTSV4RRFFQ69G5P10',
+				pwaId: PWA,
+				pwuKind: 'PLAN',
+				name: 'Plan',
+				purpose: 'Plan the work',
+				isRoot: true,
+				permittedChildTypeIds: [],
+				requiredInputs: [],
+				requiredOutputs: [],
+				requiredAssurancePolicyIds: []
+			}
+		});
+		expect(typed.status, 'arrangement: DefinePwuType').toBe('ACCEPTED');
 
 		const floor = await runPwaFloor(
 			PWA,

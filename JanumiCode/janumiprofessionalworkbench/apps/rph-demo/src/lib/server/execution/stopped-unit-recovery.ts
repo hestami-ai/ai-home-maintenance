@@ -69,7 +69,7 @@ import { processRunFromEvidence } from '../assurance/process-result-render.js';
 import {
 	classifyFloorRemediation,
 	isOperationalRemediation,
-	loadPwaFloor,
+	loadSubjectFloor,
 	type FloorRemediationAction,
 	type FloorView
 } from '../floor.js';
@@ -280,12 +280,13 @@ function latestFloorAssessmentIds(engine: EngineHandle, subjectId: string): Map<
 }
 
 /**
- * A subject's floor as recorded. ⭑ `loadPwaFloor` IS SUBJECT-AGNOSTIC — it keys on `subjectObjectIds` alone; its name is the
- * authoring plane's, its first caller's. A subject with no floor recorded at all reads as a review that did not run.
+ * A subject's floor as recorded. ⭑ `loadSubjectFloor` IS SUBJECT-AGNOSTIC — it keys on `subjectObjectIds` alone. ⭐ The review
+ * in parts (`REG-D-125`): `loadPwaFloor`, which this read until a PWA's floor was read as a round of parts, is a PWA's. A
+ * subject with no floor recorded at all reads as a review that did not run.
  */
 function recordedFloorOf(engine: AuthedEngineHandle, subjectId: string): FloorView {
 	return (
-		loadPwaFloor(subjectId, engine) ?? {
+		loadSubjectFloor(subjectId, engine) ?? {
 			subjectId,
 			aggregate: 'UNASSESSED',
 			satisfied: false,

@@ -1257,7 +1257,13 @@ describe('⭐ JAN-ESCREC D3 — the read-back says what the run concluded, and l
 		reviewCriteria?: (criteria: readonly AssessmentCriterion[]) => AssessmentCriterion[]
 	): {
 		readonly session: AuthedEngineHandle;
-		readonly send: (type: string, aggregateType: string, id: string, payload: unknown) => void;
+		readonly send: (
+			type: string,
+			aggregateType: string,
+			id: string,
+			payload: unknown,
+			correlationId?: string
+		) => void;
 	} {
 		let tick = 0;
 		let events = 0;
@@ -1269,7 +1275,13 @@ describe('⭐ JAN-ESCREC D3 — the read-back says what the run concluded, and l
 		});
 		const session = host.as(SESSION_CREDENTIAL);
 		let sequence = 0;
-		const send = (type: string, aggregateType: string, id: string, payload: unknown): void => {
+		const send = (
+			type: string,
+			aggregateType: string,
+			id: string,
+			payload: unknown,
+			correlationId = 'escrec-setup'
+		): void => {
 			sequence += 1;
 			const command = {
 				commandId: `escrec-${sequence}`,
@@ -1278,7 +1290,7 @@ describe('⭐ JAN-ESCREC D3 — the read-back says what the run concluded, and l
 				targetAggregateType: aggregateType,
 				targetAggregateId: id,
 				issuedAt: '2026-10-01T09:00:00Z',
-				correlationId: 'escrec-setup',
+				correlationId,
 				idempotencyKey: `escrec-idem-${sequence}`,
 				payload
 			} as DomainCommand;
@@ -1366,9 +1378,15 @@ describe('⭐ JAN-ESCREC D3 — the read-back says what the run concluded, and l
 
 		const back = loadPwaFloor(PWA, session);
 		expect(review(back)?.disposition).toBe('ESCALATED');
-		// ⭑ READ FROM THE OBJECT: the recorded code, severity and statement.
+		// ⭑ READ FROM THE OBJECT: the recorded code, severity and statement — ⭐ B4: and the part's type, from the host.
 		expect(review(back)?.observations).toEqual([
-			{ code: RECOMMENDATION_CODE, severity: 'INFORMATIONAL', statement: RECOMMENDATION_STATEMENT }
+			{
+				code: RECOMMENDATION_CODE,
+				severity: 'INFORMATIONAL',
+				statement: RECOMMENDATION_STATEMENT,
+				typeId: ROOT_TYPE,
+				typeName: 'Plan'
+			}
 		]);
 		expect(
 			back?.reasoningGaps,
@@ -1427,24 +1445,33 @@ describe('⭐ JAN-ESCREC D3 — the read-back says what the run concluded, and l
 			loadPwaFloor(PWA, session)?.aggregate,
 			'arrangement: the satisfied floor did not read back SATISFIED'
 		).toBe('SATISFIED');
-		// A fresh review of the same subject, begun and left ASSESSING: the LATEST, so the one the reader takes.
+		// A fresh review of the same subject, begun and left ASSESSING: the LATEST, so the one the reader takes. ⭐ B3: of the
+		// PWA's one part, its type, in the round the run recorded — the round reader takes a part's review from its round.
 		const assessmentId = 'assess_01ARZ3NDEKTSV4RRFFQ69G5E02';
-		const version = Number(getObject(session, PWA)?.semanticVersion ?? 1);
-		send('RequestAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {
+		const version = Number(getObject(session, ROOT_TYPE)?.semanticVersion ?? 1);
+		const round = loadPwaFloor(PWA, session)?.reasoningReviewRunToken;
+		send(
+			'RequestAssuranceAssessment',
+			'ASSURANCE_ASSESSMENT',
 			assessmentId,
-			assurancePolicyId: 'floor.reasoning-review',
-			policyVersion: '1',
-			subjectObjectIds: [PWA],
-			subjectSemanticVersions: { [PWA]: version },
-			claimIds: []
-		});
-		send('BeginAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {});
+			{
+				assessmentId,
+				assurancePolicyId: 'floor.reasoning-review',
+				policyVersion: '1',
+				subjectObjectIds: [ROOT_TYPE],
+				subjectSemanticVersions: { [ROOT_TYPE]: version },
+				claimIds: []
+			},
+			round
+		);
+		send('BeginAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {}, round);
 
 		const back = loadPwaFloor(PWA, session);
 		expect(
-			review(back)?.disposition,
+			back?.parts?.map((p) => p.disposition),
 			'arrangement: the reader did not take the review in progress'
-		).toBe('ASSESSING');
+		).toEqual(['ASSESSING']);
+		expect(review(back)?.disposition, 'the review in progress folded as a concluded one').toBe('UNASSESSED');
 		expect(back?.aggregate, 'a review in progress read back as a concluded one').toBe('UNASSESSED');
 	});
 
@@ -1457,47 +1484,63 @@ describe('⭐ JAN-ESCREC D3 — the read-back says what the run concluded, and l
 		const { session, send } = engineWithAPwa();
 		const run = await runFloor(session, reply('SATISFIED'));
 		expect(run?.satisfied, 'arrangement: the clean floor was not satisfied').toBe(true);
+		// ⭐ B3 — of the PWA's one part, its type, in the round the run recorded (the control above says why).
 		const assessmentId = 'assess_01ARZ3NDEKTSV4RRFFQ69G5E03';
-		const version = Number(getObject(session, PWA)?.semanticVersion ?? 1);
+		const version = Number(getObject(session, ROOT_TYPE)?.semanticVersion ?? 1);
+		const round = loadPwaFloor(PWA, session)?.reasoningReviewRunToken;
 		const finding = {
 			findingCode: 'RR-08-evidence-integrity',
 			severity: 'MATERIAL',
 			statement: 'A cited source is summarised but not linked.'
 		};
-		send('RequestAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {
+		send(
+			'RequestAssuranceAssessment',
+			'ASSURANCE_ASSESSMENT',
 			assessmentId,
-			assurancePolicyId: 'floor.reasoning-review',
-			policyVersion: '1',
-			subjectObjectIds: [PWA],
-			subjectSemanticVersions: { [PWA]: version },
-			claimIds: []
-		});
-		send('BeginAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {});
-		send('RecordAssuranceObservation', 'ASSURANCE_OBSERVATION', 'obs_01ARZ3NDEKTSV4RRFFQ69G5E04', {
-			assessmentId,
-			observationType: 'FINDING',
-			...finding
-		});
-		send('CompleteAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {
-			validatorResult: {
-				validatorId: 'staged.reasoning-review',
-				validatorVersion: '1',
-				policyId: 'floor.reasoning-review',
-				policyVersion: '1',
+			{
 				assessmentId,
-				subjectObjectIds: [PWA],
-				subjectSemanticVersions: { [PWA]: version },
-				claimResults: [],
-				evidenceConsideredIds: [],
-				evidenceRejected: [],
-				observations: [{ ...finding, subjectObjectIds: [PWA] }],
-				dispositionRecommendation: 'CONDITIONALLY_SATISFIED',
-				recommendedControlActions: [],
-				residualUncertainty: [],
-				limitations: [],
-				executionProvenance: {}
-			}
-		});
+				assurancePolicyId: 'floor.reasoning-review',
+				policyVersion: '1',
+				subjectObjectIds: [ROOT_TYPE],
+				subjectSemanticVersions: { [ROOT_TYPE]: version },
+				claimIds: []
+			},
+			round
+		);
+		send('BeginAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {}, round);
+		send(
+			'RecordAssuranceObservation',
+			'ASSURANCE_OBSERVATION',
+			'obs_01ARZ3NDEKTSV4RRFFQ69G5E04',
+			{ assessmentId, observationType: 'FINDING', ...finding },
+			round
+		);
+		send(
+			'CompleteAssuranceAssessment',
+			'ASSURANCE_ASSESSMENT',
+			assessmentId,
+			{
+				validatorResult: {
+					validatorId: 'staged.reasoning-review',
+					validatorVersion: '1',
+					policyId: 'floor.reasoning-review',
+					policyVersion: '1',
+					assessmentId,
+					subjectObjectIds: [ROOT_TYPE],
+					subjectSemanticVersions: { [ROOT_TYPE]: version },
+					claimResults: [],
+					evidenceConsideredIds: [],
+					evidenceRejected: [],
+					observations: [{ ...finding, subjectObjectIds: [ROOT_TYPE] }],
+					dispositionRecommendation: 'CONDITIONALLY_SATISFIED',
+					recommendedControlActions: [],
+					residualUncertainty: [],
+					limitations: [],
+					executionProvenance: {}
+				}
+			},
+			round
+		);
 
 		const back = loadPwaFloor(PWA, session);
 		expect(

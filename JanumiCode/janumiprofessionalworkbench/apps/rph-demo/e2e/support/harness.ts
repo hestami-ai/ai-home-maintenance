@@ -89,7 +89,13 @@ export interface EngineSnapshot {
 		readonly completionEvents: ReadonlyArray<Record<string, unknown>>;
 	}>;
 	/** ⭐ J1-3 — the stipulation registry as the server holds it; a reset discards it. */
-	readonly stipulations: ReadonlyArray<{ readonly pwaId: string; readonly framing: string; readonly remaining: string }>;
+	readonly stipulations: ReadonlyArray<{
+		readonly pwaId: string;
+		readonly framing: string;
+		/** ⭐ The review in parts, B6 — the one part a registration names, when it names one. */
+		readonly typeId?: string;
+		readonly remaining: string;
+	}>;
 	/** ⭐ J1-3 — the lane control's marks (one per boot or reset) and the violations it has kept. */
 	readonly lane: {
 		readonly marks: ReadonlyArray<{ readonly id: number; readonly openedBy: string; readonly mark: number; readonly tests: readonly string[] }>;
@@ -122,7 +128,9 @@ export async function registerStipulation(
 	pwaId: string,
 	// ⭐ `JAN-EXEC` Phase 7 completion E2 — and `DECLARED_POLICY`: each declared policy of the PWA's units, stipulated CLEAN
 	// by the declared stand-in, recorded NOT JUDGED (`declared-policy-review.ts`).
-	framing: 'PWA_GRAPH' | 'WORK_PRODUCT' | 'DECLARED_POLICY'
+	// ⭐ The review in parts, B6 (`REG-D-125`) — and `PWA_TYPE`: each type of the PWA, which the authoring floor reviews as a
+	// part, stipulated CLEAN beyond what the structural checker judges of it.
+	framing: 'PWA_GRAPH' | 'WORK_PRODUCT' | 'DECLARED_POLICY' | 'PWA_TYPE'
 ): Promise<void> {
 	const res = await request.post('/test-api/reviewer-script', { data: { pwaId, framing, remaining: 'CLEAN' } });
 	expect(res.ok(), `registerStipulation(${pwaId}, ${framing}): ${await res.text()}`).toBeTruthy();
@@ -135,6 +143,40 @@ export async function registerStipulation(
  */
 export async function stipulateDeclaredPolicies(request: APIRequestContext): Promise<void> {
 	for (const pwa of (await introspect(request)).pwas) await registerStipulation(request, pwa.id, 'DECLARED_POLICY');
+}
+
+/**
+ * ⭐ The review in parts, B3 (`REG-D-125`) — WHERE A SPEC STAGES A PWA'S REASONING REVIEW: its ROOT TYPE, the part whose review
+ * the panel then shows, at the type's stored version, and INTO the PWA's latest recorded floor round — under the floor-run
+ * token its schema/invariant assessment was recorded with (`/test-api/dispatch`'s `correlationId`), so the round's other
+ * parts and its deterministic policies stay as the floor recorded them. The authoring floor reviews each type as a part,
+ * under the type, and its readers read one round.
+ */
+export async function theRootPartOfTheLatestRound(
+	request: APIRequestContext,
+	pwaId: string
+): Promise<{ readonly typeId: string; readonly version: number; readonly correlationId: string }> {
+	const snap = await introspect(request);
+	const root = snap.pwuTypes.find((t) => t.state.pwaId === pwaId && t.state.isRoot === true);
+	expect(root, `arrangement: ${pwaId} has a root type`).toBeDefined();
+	const schema = new Set(
+		snap.assessments
+			.filter(
+				(a) =>
+					a.state.assurancePolicyId === 'floor.schema-invariant' &&
+					(a.state.subjectObjectIds as string[] | undefined)?.includes(pwaId)
+			)
+			.map((a) => a.id)
+	);
+	const firsts = snap.events.filter(
+		(e, i) => schema.has(String(e.aggregateId)) && snap.events.findIndex((x) => x.aggregateId === e.aggregateId) === i
+	);
+	expect(firsts.length, `arrangement: ${pwaId} has a recorded floor round`).toBeGreaterThan(0);
+	return {
+		typeId: root!.id,
+		version: Number(root!.state.semanticVersion ?? 1),
+		correlationId: String(firsts.at(-1)!.correlationId)
+	};
 }
 
 /** Navigate and wait for Svelte to hydrate (so toggle/enhance handlers are attached before we interact). One call

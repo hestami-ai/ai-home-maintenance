@@ -34,7 +34,7 @@ test.describe('PWA coherence — artifact-flow conservation (ASHRAE-shaped)', ()
 		// what the structural checker cannot judge — recorded as not judged, and disclosed. No assertion here changes.
 		// (Q2 (d): this graph is deliberately not COHERENT — the test checks what the product does AFTER acceptance.)
 		const pwaId = (await introspect(request)).pwas.find((p) => p.state.name === 'ASHRAE Lifecycle Coherence')!.id;
-		await registerStipulation(request, pwaId, 'PWA_GRAPH');
+		await registerStipulation(request, pwaId, 'PWA_TYPE');
 		await page.getByTestId('agent-input').fill(
 			JSON.stringify({
 				plan: [

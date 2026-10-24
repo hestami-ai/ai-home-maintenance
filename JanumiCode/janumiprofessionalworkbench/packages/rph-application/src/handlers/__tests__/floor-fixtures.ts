@@ -96,8 +96,11 @@ export function seedFloorPolicies(engine: DispatchLike, now: string = SEED_TS): 
 				name: def.name,
 				purpose: def.purpose,
 				rationale: def.rationale,
+				// ⭐ The review in parts, B3 (`REG-D-125`) — and `PWU_TYPE`: the authoring floor reviews each type of a PWA as a
+				// part, its Reasoning Review recorded under the type (the seeded policies apply to every object type).
 				applicableObjectTypes: [
 					'PROFESSIONAL_WORK_ARCHITECTURE',
+					'PWU_TYPE',
 					'PROFESSIONAL_WORK_UNIT',
 					'ARTIFACT'
 				],

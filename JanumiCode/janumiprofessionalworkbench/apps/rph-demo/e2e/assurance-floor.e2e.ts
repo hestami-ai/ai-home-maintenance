@@ -90,15 +90,16 @@ test.describe('Assurance floor (mock) — staged binding and guarded admission',
 	}) => {
 		// ⭐⭐ RESTATED (`JAN-CRITREAD` J1-3; `REG-D-071` Q6b). This test was titled "a clean graph yields a SATISFIED
 		// floor, recorded canonically, and publishes" and was written to claim that a REVIEWER can satisfy the floor. On
-		// this lane nobody judges seven of the nine criteria: the declared stand-in records the structural checker's two
-		// real judgements, and the remainder THIS TEST stipulates, each `UNABLE_TO_DETERMINE` with `stipulated: 'MET'`
+		// this lane nobody judges eight of the nine criteria of each type's review (⭐ the review in parts, `REG-D-125`): the
+		// declared stand-in records the structural checker's one real judgement of each part, and the remainder THIS TEST
+		// stipulates, each `UNABLE_TO_DETERMINE` with `stipulated: 'MET'`
 		// beside it — counted as met only because this engine was built for tests. So it now claims what it can prove:
 		// the product carries a STIPULATED SATISFIED through — staged, accepted, recorded canonically, published — and
 		// says, on the record and in its status line, that the pass rests on a stipulation. Whether a reviewer can EARN
 		// it moved to reviewer qualification (`reviewer:qual:check`; `docs/tracking/reviewer-qualification/`).
 		const pwaId = await createDraft(page, request, 'Floor Happy');
 		// The stipulation: in the test body, after the reset, with the PWA id read from the store (§4.5).
-		await registerStipulation(request, pwaId, 'PWA_GRAPH');
+		await registerStipulation(request, pwaId, 'PWA_TYPE');
 		const body = await scaffold(request, pwaId, [
 			{
 				tempKey: 'root',
@@ -111,40 +112,45 @@ test.describe('Assurance floor (mock) — staged binding and guarded admission',
 		]);
 		expect(body).toContain('Assurance floor SATISFIED');
 		// ⭐ AND THE STATUS LINE SAYS WHAT THE PASS RESTS ON (§4.4) — the prefix above is kept; what follows it is true.
-		expect(body).toContain('reasoning review: 2 criteria evaluated, 7 stipulated by the test, not reviewed');
+		// ⭐ The review in parts (`REG-D-125`): the two types are reviewed as parts, the checker judging one criterion of
+		// each (RR-04) and the test stipulating the other eight.
+		expect(body).toContain(
+			'reasoning review of 2 type(s): 2 criteria evaluated, 16 stipulated by the test, not reviewed'
+		);
 		expect((await introspect(request)).assessments).toEqual([]);
 		await acceptAgentCandidate(request, pwaId, body);
 
-		// TRUTH after exact acceptance: three floor assessments commit with the graph, all SATISFIED.
+		// TRUTH after exact acceptance: the floor's assessments commit with the graph, all SATISFIED — the two deterministic
+		// policies over the PWA, and ⭐ the reasoning review of each of its types, its part.
 		const snap = await introspect(request);
 		const floor = floorFor(snap, pwaId);
 		expect(floor.get('floor.schema-invariant')).toBe('SATISFIED');
 		expect(floor.get('floor.identity-provenance')).toBe('SATISFIED');
-		expect(floor.get('floor.reasoning-review')).toBe('SATISFIED');
+		const types = snap.pwuTypes.filter((t) => t.state.pwaId === pwaId);
+		expect(types.map((t) => floorFor(snap, t.id).get('floor.reasoning-review'))).toEqual(['SATISFIED', 'SATISFIED']);
 
-		// ⭐ WHAT THAT SATISFIED RESTS ON, CRITERION BY CRITERION, AS RECORDED CANONICALLY (§4.6). Every criterion of the
-		// policy is recorded; the checker's two are EVALUATED `MET` with no stipulation beside them; the other seven are
-		// `UNABLE_TO_DETERMINE` — nobody judged them — with the test's stipulation beside each. ⚠ NOT "ONCE": the handler
-		// lets a criterion be recorded again and Gate E reads the latest (`undetermined-criterion-gate.test.ts`, "a later
-		// determination SUPERSEDES…"), so the rows are folded the same way and no count of recordings is claimed.
-		const rows = rowsOf(snap.events, reviewOf(snap.assessments, pwaId).id);
-		expect(
-			rows.map(([id]) => id),
-			'every criterion of the policy is recorded (its latest recording read, as Gate E reads it)'
-		).toEqual(policyCriteria(snap));
-		expect(
-			rows.filter(([, , claim]) => claim === null),
-			'the structural checker judged RR-04 and RR-09 on this arm, and only those'
-		).toEqual([
-			['RR-04-no-proxy-satisfaction', 'MET', null],
-			['RR-09-no-completeness-from-existence', 'MET', null]
-		]);
-		const stipulatedRows = rows.filter(([, , claim]) => claim !== null);
-		expect(stipulatedRows, 'seven criteria the checker cannot judge').toHaveLength(7);
-		expect(
-			stipulatedRows.filter(([, result, claim]) => result !== 'UNABLE_TO_DETERMINE' || claim !== 'MET'),
-			'a stipulated row must say nobody judged it, with the test’s answer BESIDE the result'
-		).toEqual([]);
+		// ⭐ WHAT THAT SATISFIED RESTS ON, CRITERION BY CRITERION, AS RECORDED CANONICALLY (§4.6), PART BY PART. Every
+		// criterion of the policy is recorded; the checker's one is EVALUATED `MET` with no stipulation beside it; the other
+		// eight are `UNABLE_TO_DETERMINE` — nobody judged them — with the test's stipulation beside each. ⚠ NOT "ONCE": the
+		// handler lets a criterion be recorded again and Gate E reads the latest (`undetermined-criterion-gate.test.ts`, "a
+		// later determination SUPERSEDES…"), so the rows are folded the same way and no count of recordings is claimed.
+		for (const t of types) {
+			const rows = rowsOf(snap.events, reviewOf(snap.assessments, t.id).id);
+			expect(
+				rows.map(([id]) => id),
+				'every criterion of the policy is recorded (its latest recording read, as Gate E reads it)'
+			).toEqual(policyCriteria(snap));
+			expect(
+				rows.filter(([, , claim]) => claim === null),
+				'the structural checker judged RR-04 on the part arm, and only it'
+			).toEqual([['RR-04-no-proxy-satisfaction', 'MET', null]]);
+			const stipulatedRows = rows.filter(([, , claim]) => claim !== null);
+			expect(stipulatedRows, 'eight criteria the checker cannot judge').toHaveLength(8);
+			expect(
+				stipulatedRows.filter(([, result, claim]) => result !== 'UNABLE_TO_DETERMINE' || claim !== 'MET'),
+				'a stipulated row must say nobody judged it, with the test’s answer BESIDE the result'
+			).toEqual([]);
+		}
 
 		// The panel renders the disposition read back from the canonical objects.
 		await gotoHydrated(page, `/pwa/${pwaId}`);
@@ -167,7 +173,7 @@ test.describe('Assurance floor (mock) — staged binding and guarded admission',
 		// ⭐ THE CLEAN STIPULATION IS REGISTERED HERE TOO (`JAN-CRITREAD` J1-3; §4.6), and the review must STILL reject: a
 		// stipulation covers only what the checker did NOT judge, so it can never overrule the checker's own fault. This
 		// is the lane's one real discrimination check.
-		await registerStipulation(request, pwaId, 'PWA_GRAPH');
+		await registerStipulation(request, pwaId, 'PWA_TYPE');
 		const body = await scaffold(request, pwaId, [
 			{
 				tempKey: 'root',
@@ -198,8 +204,10 @@ test.describe('Assurance floor (mock) — staged binding and guarded admission',
 		// read from every failed finding — and changes only this row, because the mapper keys findings last-wins
 		// (`REG-D-072` D4). This assertion is what catches that one.
 		const staged = canonical.authoringCandidates.find((c) => c.pwaId === pwaId)!;
+		// ⭐ The review in parts (`REG-D-125`): the dead end is the producing type's, found on its own part.
+		const arch = staged.pwuTypes.find((t) => t.state.name === 'Architecture Definition')!;
 		expect(
-			rowsOf(staged.criterionEvents, reviewOf(staged.assessments, pwaId).id).filter(
+			rowsOf(staged.criterionEvents, reviewOf(staged.assessments, arch.id).id).filter(
 				([id]) => id === 'RR-04-no-proxy-satisfaction'
 			),
 			'the checker’s own RR-04 fault must be recorded as it judged it, never stipulated over'

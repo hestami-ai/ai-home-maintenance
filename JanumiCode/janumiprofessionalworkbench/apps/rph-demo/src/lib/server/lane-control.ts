@@ -43,6 +43,7 @@ import type { StoredObject } from '@janumipwb/rph-ports';
 import { STANDIN_VALIDATOR_ID } from './assurance/standin-reasoning-review-validator.js';
 import { STANDIN_DECLARED_REVIEW_VALIDATOR_ID } from './assurance/declared-policy-review.js';
 import {
+	registrationFor,
 	workProductPwaOf,
 	workUnitPwaOf,
 	type StipulableFraming,
@@ -81,14 +82,24 @@ interface Completion {
 	readonly subjectObjectIds?: readonly string[];
 }
 
-/** The PWA and arm a completion's subject answers to, or `undefined` when no registration could name it. */
+/**
+ * The PWA and arm a completion's subject answers to, or `undefined` when no registration could name it. ⭐ The review in
+ * parts, B6 (`REG-D-125`; design D10): a PWU Type is a part of the PWA its `pwaId` names, on the part arm, and the type
+ * itself is the part (`typeId`).
+ */
 function armOf(
 	source: LaneSource,
 	subjectId: string
-): { pwaId: string; framing: StipulableFraming } | undefined {
+): { pwaId: string; framing: StipulableFraming; typeId?: string } | undefined {
 	const subject = source.loadObject(subjectId);
 	if (subject?.objectType === 'PROFESSIONAL_WORK_ARCHITECTURE')
 		return { pwaId: subjectId, framing: 'PWA_GRAPH' };
+	if (subject?.objectType === 'PWU_TYPE') {
+		const pwaId = (subject.state as { pwaId?: unknown } | undefined)?.pwaId;
+		return typeof pwaId === 'string' && pwaId !== ''
+			? { pwaId, framing: 'PWA_TYPE', typeId: subjectId }
+			: undefined;
+	}
 	if (subject?.objectType !== 'ARTIFACT') return undefined;
 	const pwaId = workProductPwaOf(source, subjectId);
 	return pwaId === undefined ? undefined : { pwaId, framing: 'WORK_PRODUCT' };
@@ -154,9 +165,14 @@ function limbOneReasons(
 		reasons.push('it rests on NO evaluated mandatory row — nobody read the subject');
 	const arm = armOf(source, subjectId);
 	if (arm === undefined)
-		reasons.push(`its subject ${subjectId} is neither a PWA nor a work product with a PWA`);
-	else if (!registrations.some((r) => r.pwaId === arm.pwaId && r.framing === arm.framing))
-		reasons.push(`no test registered a stipulation for ${arm.pwaId} on ${arm.framing}`);
+		reasons.push(
+			`its subject ${subjectId} is neither a PWA, a type of a PWA, nor a work product with a PWA`
+		);
+	// ⭐ B6 — THE FLOOR'S OWN LOOKUP (`registrationFor`): a part's registration, else its PWA's.
+	else if (registrationFor(registrations, arm.pwaId, arm.framing, arm.typeId) === undefined)
+		reasons.push(
+			`no test registered a stipulation for ${arm.pwaId} on ${arm.framing}${arm.typeId === undefined ? '' : ` (nor for its part ${arm.typeId})`}`
+		);
 	return reasons;
 }
 

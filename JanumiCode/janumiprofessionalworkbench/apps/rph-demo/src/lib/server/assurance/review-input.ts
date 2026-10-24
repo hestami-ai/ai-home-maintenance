@@ -61,7 +61,11 @@ export interface GraphReviewSource {
 	readonly priorGaps?: readonly string[];
 }
 
-/** The reasoning-review input for a DRAFT PWA graph — what `runPwaFloor` hands the reviewer. */
+/**
+ * The reasoning-review input for a DRAFT PWA graph — what `runPwaFloor` handed the reviewer until the review in parts.
+ * ⭐ B3 (`REG-D-125`): the authoring floor hands the reviewer one part per type (`pwaTypeReviewInput`); this builder stays for
+ * the historical case sets, which materialize through it.
+ */
 export function graphReviewInput(source: GraphReviewSource): ReasoningReviewInput {
 	return {
 		// The POLICY's criteria, read from the store — not a constant. See `reasoningReviewCriteria()`.

@@ -36,6 +36,9 @@ import { getArtifactStore } from './workbench.js';
 
 const TS = '2026-08-05T09:00:00Z';
 const PWA = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5P00';
+/** ⭐ The review in parts, B3 (`REG-D-125`) — the PWA's one type: the floor reviews each type as a part, so a PWA with no
+ *  type has no reasoning review to record. */
+const ROOT = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5P10';
 const PRODUCER: FloorProducer = {
 	agentId: 'jpwb-authoring-agent',
 	modelId: 'pi-authoring',
@@ -47,13 +50,18 @@ describe('runPwaFloor records the floor through the AUTHENTICATED session (REG-F
 	let session: AuthedEngineHandle;
 	let sequence: number;
 
-	function dispatch(commandType: string, targetAggregateId: string, payload: unknown) {
+	function dispatch(
+		commandType: string,
+		targetAggregateId: string,
+		payload: unknown,
+		targetAggregateType = 'PROFESSIONAL_WORK_ARCHITECTURE'
+	) {
 		sequence += 1;
 		const command: DomainCommand = {
 			commandId: `setup-${sequence}`,
 			commandType,
 			commandSchemaVersion: 1,
-			targetAggregateType: 'PROFESSIONAL_WORK_ARCHITECTURE',
+			targetAggregateType,
 			targetAggregateId,
 			issuedAt: TS,
 			correlationId: 'setup',
@@ -83,6 +91,25 @@ describe('runPwaFloor records the floor through the AUTHENTICATED session (REG-F
 				domain: 'software',
 				version: '1.0.0'
 			}).status
+		).toBe('ACCEPTED');
+		expect(
+			dispatch(
+				'DefinePwuType',
+				ROOT,
+				{
+					pwuTypeId: ROOT,
+					pwaId: PWA,
+					pwuKind: 'PLAN',
+					name: 'Plan',
+					purpose: 'Plan the work',
+					isRoot: true,
+					permittedChildTypeIds: [],
+					requiredInputs: [],
+					requiredOutputs: [],
+					requiredAssurancePolicyIds: []
+				},
+				'PWU_TYPE'
+			).status
 		).toBe('ACCEPTED');
 	});
 
@@ -183,7 +210,9 @@ describe('runPwaFloor records the floor through the AUTHENTICATED session (REG-F
 			const state = records[0]!.state as Record<string, unknown>;
 			expect(state.plane).toBe('ASSURANCE');
 			expect(state.invokerId).toBe('agy.reasoning-review');
-			expect(state.subjectObjectId, 'the record names what was being judged').toBe(PWA);
+			// ⭐ B3 — the part it judged: the type, under its own subject (DESIGN-authoring-review-in-parts.md D6).
+			expect(state.subjectObjectId, 'the record names what was being judged').toBe(ROOT);
+			expect(state.subjectObjectType).toBe('PWU_TYPE');
 
 			// E-1 is retained (REG-D-050 classified it RETAINED_BY_PARTICIPATION), and the record DISCLOSES that
 			// its bytes are process-local — the inverse orphan REG-F-342 made visible instead of silent.
@@ -210,7 +239,8 @@ describe('runPwaFloor records the floor through the AUTHENTICATED session (REG-F
 			);
 
 			// ⭐ `P76F-C` C2 — joined to the floor shown: the token of ITS reasoning review (`reasoningReviewRunToken`).
-			const view = await loadReviewerAnswer(PWA, loadPwaFloor(PWA, session)?.reasoningReviewRunToken, session, getArtifactStore());
+			// ⭐ B3 — by the part's subject, the type its review was recorded under.
+			const view = await loadReviewerAnswer(ROOT, loadPwaFloor(PWA, session)?.reasoningReviewRunToken, session, getArtifactStore());
 			expect(view, 'no exchange was found for the subject').toBeDefined();
 			expect(view!.answer, 'the reviewer answer did not survive the round trip').toBe(JUDGEMENT);
 			expect(view!.disclosure, 'a verified read must say it was verified').toMatch(/re-hashed/i);
@@ -278,12 +308,34 @@ describe('runPwaFloor records the floor through the AUTHENTICATED session (REG-F
 				listByType(session, 'MODEL_EXCHANGE').map((r) => (r.state as Record<string, unknown>).attemptOrdinal),
 				'arrangement: one try per run, both at ordinal 1 — the tie REG-F-433 drove'
 			).toEqual([1, 1]);
-			// ⭐ `P76F-C` C2 — by the token of the review the floor SHOWS, the later one (`latestFloorAssessments`).
-			const view = await loadReviewerAnswer(PWA, loadPwaFloor(PWA, session)?.reasoningReviewRunToken, session, getArtifactStore());
+			// ⭐ `P76F-C` C2 — by the token of the review the floor SHOWS, the later one (⭐ B3: the latest round, `latestFloorRound`).
+			const view = await loadReviewerAnswer(ROOT, loadPwaFloor(PWA, session)?.reasoningReviewRunToken, session, getArtifactStore());
 			expect(view?.answer, 'the reader returned the OLDER run’s answer (REG-F-433)').toBe(second);
 		});
 
 		it('⛔ REG-F-433 — ONE token per floor run: its assessments’ correlation IS its exchanges’ runToken and their correlation; two runs, two tokens', async () => {
+			// ⭑ A SECOND ROOT, so each run's schema/invariant policy records an observation for the correlation below to read:
+			// with one well-formed type, a clean round records none.
+			expect(
+				dispatch(
+					'DefinePwuType',
+					'pwut_01ARZ3NDEKTSV4RRFFQ69G5P11',
+					{
+						pwuTypeId: 'pwut_01ARZ3NDEKTSV4RRFFQ69G5P11',
+						pwaId: PWA,
+						pwuKind: 'DESIGN',
+						name: 'Design',
+						purpose: 'Design the work',
+						isRoot: true,
+						permittedChildTypeIds: [],
+						requiredInputs: [],
+						requiredOutputs: [],
+						requiredAssurancePolicyIds: []
+					},
+					'PWU_TYPE'
+				).status,
+				'arrangement: a second root'
+			).toBe('ACCEPTED');
 			for (const run of ['the first run', 'the second run'])
 				await runPwaFloor(
 					PWA,
@@ -323,7 +375,7 @@ describe('runPwaFloor records the floor through the AUTHENTICATED session (REG-F
 				{ prompt: 'assess it', producer: PRODUCER, print: async () => answering('a run'), canonical: session },
 				session
 			);
-			expect(await loadReviewerAnswer(PWA, 'authoring-floor', session, getArtifactStore())).toBeUndefined();
+			expect(await loadReviewerAnswer(ROOT, 'authoring-floor', session, getArtifactStore())).toBeUndefined();
 		});
 
 		it('⭑ E-2 is RETAINED end to end, split at retention — REG-D-056', async () => {

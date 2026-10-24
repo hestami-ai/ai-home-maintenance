@@ -86,6 +86,19 @@ describe('⭐ the agent’s lines carry the disclosure beside the verdict — an
 		expect(line).not.toContain('independent reasoning review all pass');
 	});
 
+	it('⭐ the review in parts (REG-D-125) — a review in parts says over how many types its criteria were counted', () => {
+		const line = floorStatusLine({
+			...view({ evaluated: 2, stipulated: 16 }),
+			parts: [
+				{ typeId: 'pwut_a', typeName: 'A', semanticVersion: 1, disposition: 'SATISFIED', independenceOk: true, observations: [] },
+				{ typeId: 'pwut_b', typeName: 'B', semanticVersion: 1, disposition: 'SATISFIED', independenceOk: true, observations: [] }
+			]
+		});
+		expect(line).toBe(
+			'⚖ Assurance floor SATISFIED (test mode) — schema and provenance pass; reasoning review of 2 type(s): 2 criteria evaluated, 16 stipulated by the test, not reviewed.'
+		);
+	});
+
 	it('⭐ CONTROL — a floor nobody stipulated reads exactly as before', () => {
 		expect(floorStatusLine(view({ evaluated: 9, stipulated: 0 }))).toBe(
 			'⚖ Assurance floor SATISFIED — schema, provenance, and an independent reasoning review all pass.'
@@ -123,19 +136,21 @@ describe('⭐ the floor view carries the tally on the run AND on the read-back',
 	});
 	afterEach(() => clearAuthoringTurns());
 
-	it('⛔ the run reports 2 evaluated / 7 stipulated, and so does the canonical read-back after acceptance', async () => {
+	it('⛔ the run reports 1 evaluated / 8 stipulated, and so does the canonical read-back after acceptance', async () => {
 		// THE MUTANTS: the run's view drops the tally; the read-back folds nothing. Either makes the panel and the
-		// chip show a plain SATISFIED for a verdict that rests on seven criteria nobody judged.
-		registerStipulation(getEngine(), { pwaId: PWA, framing: 'PWA_GRAPH', remaining: 'CLEAN' });
+		// chip show a plain SATISFIED for a verdict that rests on eight criteria nobody judged.
+		// ⭐ The review in parts, B3 (`REG-D-125`) — the one type is reviewed as a part, on the part arm, whose structural
+		// checker judges one criterion of nine (`RR-04`); the PWA's registration answers its parts.
+		registerStipulation(getEngine(), { pwaId: PWA, framing: 'PWA_TYPE', remaining: 'CLEAN' });
 		const turn = beginAuthoringTurn(PWA);
 		expect(turn.broker.defineType({ name: 'Plan', pwuKind: 'PLAN', isRoot: true }).ok).toBe(true);
 		const subjectHash = markAuthoringTurnValid(turn);
 		const floor = await runPwaFloor(PWA, { prompt: 'Author.', producer: PRODUCER, candidateSubjectHash: subjectHash }, turn.engine);
 		const rr = (f: FloorView | undefined) => f?.policies.find((p) => p.policyId === FLOOR_POLICY_IDS.REASONING_REVIEW);
-		expect(rr(floor)?.criteria).toEqual({ evaluated: 2, stipulated: 7 });
+		expect(rr(floor)?.criteria).toEqual({ evaluated: 1, stipulated: 8 });
 
 		expect(commitAuthoringTurn(turn, markAuthoringTurnAssured(turn, subjectHash))).toMatchObject({ ok: true });
-		expect(rr(loadPwaFloor(PWA, session))?.criteria).toEqual({ evaluated: 2, stipulated: 7 });
+		expect(rr(loadPwaFloor(PWA, session))?.criteria).toEqual({ evaluated: 1, stipulated: 8 });
 	});
 });
 

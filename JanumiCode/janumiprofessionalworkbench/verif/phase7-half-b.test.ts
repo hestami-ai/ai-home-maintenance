@@ -333,6 +333,18 @@ const FLOOR_OF_THE_CANDIDATE: ObjectRow[] = [
 	}
 }));
 
+/**
+ * ⭐ The review in parts, B3 (`REG-D-125`) — the same floor as the turn's fork holds it now: the PWA's two deterministic
+ * assessments, and a Reasoning Review of each of `types`, each under its type, as the authoring floor records it.
+ */
+const floorOfTheCandidate = (types: readonly ObjectRow[]): ObjectRow[] => [
+	...FLOOR_OF_THE_CANDIDATE.filter((a) => a.state.assurancePolicyId !== 'floor.reasoning-review'),
+	...types.map((t, i) => ({
+		id: `asm_floor_part_${i}`,
+		state: { ...FLOOR_OF_THE_CANDIDATE[2]!.state, subjectObjectIds: [t.id] }
+	}))
+];
+
 const answered = (envelopeType: string, data = '[{}]'): ActionOutcome => ({
 	status: 200,
 	envelopeType: envelopeType as ActionOutcome['envelopeType'],
@@ -477,7 +489,7 @@ function halfBLane(script: HalfBScript) {
 									commandCount: 9
 								},
 								pwuTypes: types,
-								assessments: FLOOR_OF_THE_CANDIDATE,
+								assessments: floorOfTheCandidate(types),
 								conversations: [],
 								criterionEvents: [],
 								completionEvents: []
@@ -1499,6 +1511,33 @@ describe('⭐ C1 — the floor’s dispositions, as the record holds them', () =
 		]);
 		expect([identityOf({ modelId: 'm' }), identityOf({ displayName: 'd' }), identityOf(undefined)]).toEqual(['m', 'd', null]);
 		expect(AUTHORING_FLOOR_POLICIES).toEqual(FLOOR_POLICIES);
+	});
+
+	// ⭐ The review in parts, B3 (`REG-D-125`): the floor reviews each type of the PWA as a part, under the type, so the lane's
+	// read of the Reasoning Review is the aggregate of the PWA's types' reviews — its strictest.
+	it('⭐ given the PWA’s types, the Reasoning Review is their aggregate: a rejected part rejects it, a missing one leaves it MISSING', () => {
+		const a = (id: string, state: string, subject: string, evaluator?: object) => ({
+			id,
+			state: { assurancePolicyId: 'floor.reasoning-review', subjectObjectIds: [subject], assessmentState: state, ...(evaluator ? { evaluator } : {}) }
+		});
+		const review = (rows: { id: string; state: Record<string, unknown> }[], typeIds: string[]) =>
+			floorDispositions(rows, PWA_ID, typeIds).find((f) => f.policyId === 'floor.reasoning-review');
+		const clean = [a('1', 'SATISFIED', 't1', { modelId: 'glm', providerId: 'devin' }), a('2', 'SATISFIED', 't2')];
+		expect(review(clean, ['t1', 't2'])).toEqual({
+			policyId: 'floor.reasoning-review',
+			state: 'SATISFIED',
+			evaluator: 'devin/glm',
+			producer: null
+		});
+		expect(review([...clean, a('3', 'REJECTED', 't2')], ['t1', 't2'])?.state, 'the strictest part').toBe('REJECTED');
+		expect(review([a('3', 'REJECTED', 't2')], ['t3', 't2'])?.state, 'a rejection is stricter than a missing part').toBe(
+			'REJECTED'
+		);
+		expect(review(clean, ['t1', 't2', 't3'])?.state, 'a type with no review').toBe('MISSING');
+		expect(review([a('1', 'SATISFIED', 't1'), a('2', 'INCONCLUSIVE', 't2')], ['t1', 't2'])?.state).toBe('INCONCLUSIVE');
+		expect(review(clean, [])?.state, 'no type, no review').toBe('MISSING');
+		// ⛔ A review of the PWA as a whole counts for no part.
+		expect(review([a('1', 'SATISFIED', PWA_ID)], ['t1'])?.state).toBe('MISSING');
 	});
 });
 

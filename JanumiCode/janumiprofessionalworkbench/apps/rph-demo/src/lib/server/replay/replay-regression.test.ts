@@ -695,10 +695,12 @@ beforeAll(async () => {
 		const laneB = await laneRun(rootB, { authoringFloor: true });
 		const observedB = await observe(laneB, paidB);
 		expect(paidB.turns, 'arrangement: the half-B paid run took one executor turn').toHaveLength(1);
+		// ⭐ The review in parts, B3 (`REG-D-125`) — the authoring floor reviews each type of the PWA as a part.
+		const typesB = listByType(getEngine(), 'PWU_TYPE').filter((t) => t.state.status !== 'REMOVED').length;
 		expect(
 			paidB.calls.map((c) => c.prompt.length > 0),
-			'arrangement: the half-B pass reviewed the PWA, its work product and its command'
-		).toHaveLength(3);
+			'arrangement: the half-B pass reviewed each type of the PWA, its work product and its command'
+		).toHaveLength(typesB + 2);
 		recorded.halfB = await recordingOfPass(
 			paidB,
 			observedB.matrix,

@@ -35,6 +35,9 @@ type ActionEvent = Parameters<typeof actions.recordWaiver>[0];
 type LoadEvent = Parameters<typeof load>[0];
 
 const PWA = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5W00';
+/** ⭐ The review in parts, B3 (`REG-D-125`) — the PWA's one type, whose review the floor shows: a reasoning review is a
+ *  part's, recorded under its type. */
+const TYPE = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5W02';
 const POLICY = 'floor.reasoning-review';
 
 /** `REG-D-090`'s observation, restated: the code as a literal — the RECORDED word — and the statement byte for byte. */
@@ -63,7 +66,7 @@ function arrange(commandType: string, aggregateType: string, id: string, payload
 }
 
 /**
- * The reasoning review's assessment of the PWA, carrying `observations` IN THAT ORDER — the recommendation typed
+ * The reasoning review's assessment of the PWA's type (⭐ B3: its one part), carrying `observations` IN THAT ORDER — the recommendation typed
  * RECOMMENDATION, as the recorder types it — and CONCLUDED as given. No producer is named, so no independence is checked.
  */
 function stageAReview(
@@ -71,13 +74,13 @@ function stageAReview(
 	concludeAs: 'REJECTED' | 'ESCALATED'
 ): void {
 	const assessmentId = 'assess_01ARZ3NDEKTSV4RRFFQ69G5W01';
-	const version = Number(getObject(getEngine(), PWA)?.semanticVersion ?? 1);
+	const version = Number(getObject(getEngine(), TYPE)?.semanticVersion ?? 1);
 	arrange('RequestAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {
 		assessmentId,
 		assurancePolicyId: POLICY,
 		policyVersion: '1',
-		subjectObjectIds: [PWA],
-		subjectSemanticVersions: { [PWA]: version },
+		subjectObjectIds: [TYPE],
+		subjectSemanticVersions: { [TYPE]: version },
 		claimIds: []
 	});
 	arrange('BeginAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {});
@@ -100,12 +103,12 @@ function stageAReview(
 			policyId: POLICY,
 			policyVersion: '1',
 			assessmentId,
-			subjectObjectIds: [PWA],
-			subjectSemanticVersions: { [PWA]: version },
+			subjectObjectIds: [TYPE],
+			subjectSemanticVersions: { [TYPE]: version },
 			claimResults: [],
 			evidenceConsideredIds: [],
 			evidenceRejected: [],
-			observations: observations.map((o) => ({ ...o, subjectObjectIds: [PWA] })),
+			observations: observations.map((o) => ({ ...o, subjectObjectIds: [TYPE] })),
 			dispositionRecommendation: concludeAs,
 			recommendedControlActions: [],
 			residualUncertainty: [],
@@ -152,6 +155,18 @@ beforeEach(() => {
 		description: 'A DRAFT PWA whose reasoning review carries the recommendation.',
 		domain: 'software',
 		version: '1.0.0'
+	});
+	arrange('DefinePwuType', 'PWU_TYPE', TYPE, {
+		pwuTypeId: TYPE,
+		pwaId: PWA,
+		pwuKind: 'PLAN',
+		name: 'Plan',
+		purpose: 'Plan the work',
+		isRoot: true,
+		permittedChildTypeIds: [],
+		requiredInputs: [],
+		requiredOutputs: [],
+		requiredAssurancePolicyIds: []
 	});
 });
 

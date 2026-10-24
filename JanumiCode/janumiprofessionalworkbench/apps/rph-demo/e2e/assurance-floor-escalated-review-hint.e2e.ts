@@ -5,7 +5,8 @@ import {
 	introspect,
 	gotoHydrated,
 	acceptAgentCandidate,
-	registerStipulation
+	registerStipulation,
+	theRootPartOfTheLatestRound
 } from './support/harness';
 import { expectTheHintOnScreen } from './support/floor-panel';
 
@@ -68,6 +69,13 @@ const ESCALATED_ASSESSMENT = 'assess_01ARZ3NDEKTSV4RRFFQ69G5FD1';
 const REJECTED_ASSESSMENT = 'assess_01ARZ3NDEKTSV4RRFFQ69G5FD4';
 const INCONCLUSIVE_ASSESSMENT = 'assess_01ARZ3NDEKTSV4RRFFQ69G5FD5';
 
+/**
+ * ⭐ The review in parts, B3 (`REG-D-125`) — what the chip adds beside the staged review: the round's OTHER part, the child
+ * type, keeps the accepted floor's review, which the declared stand-in passed on the test's stipulation of eight of its
+ * nine criteria — and the chip says so.
+ */
+const THE_OTHER_PART = ' · 8 stipulated by the test';
+
 /** The hint's fourth sentence (`DESIGN-the-escalation-recommendation.md` D3; `REG-D-090`), whole. */
 const ROUTE_TO_HUMAN_HINT =
 	"Publishing is blocked until the floor is SATISFIED — the Reasoning Review recommended escalation to a human reviewer, and this workbench cannot record a human's review yet (REG-F-474). Revising the graph does not address this.";
@@ -125,7 +133,7 @@ async function draftWithSatisfiedFloor(
 	const pwaId = (await introspect(request)).pwas[0]!.id;
 	// ⭐ THE TEST STIPULATES THE REVIEW'S REMAINDER (`JAN-CRITREAD` J1-3), in the body, after the reset, with the PWA's
 	// id READ FROM THE STORE — as the waiver spec does. The SATISFIED floor below is disclosed as stipulated.
-	await registerStipulation(request, pwaId, 'PWA_GRAPH');
+	await registerStipulation(request, pwaId, 'PWA_TYPE');
 
 	const res = await request.post(`/pwa/${pwaId}/agent`, {
 		data: {
@@ -166,6 +174,8 @@ async function draftWithSatisfiedFloor(
  * ⛔ NEVER A POSITIVE DISPOSITION: the lane control fails the run on any positive reasoning review but the declared
  * stand-in's (`lib/server/lane-control.ts`, LIMB 2), and a staged one is not the stand-in's. So a CONDITIONALLY_SATISFIED
  * review is never staged here; `floor.test.ts` holds its read-back, and the header chip's words, in-process.
+ * ⭐ The review in parts, B3 (`REG-D-125`): the review is of the PWA's ROOT TYPE, its part, staged INTO the accepted floor's
+ * round (`theRootPartOfTheLatestRound`) — so the round's other part and its deterministic policies stay SATISFIED.
  */
 async function stageAReview(
 	request: APIRequestContext,
@@ -174,10 +184,10 @@ async function stageAReview(
 	observations: readonly StagedObservation[],
 	concludeAs: 'ESCALATED' | 'REJECTED' | 'INCONCLUSIVE'
 ): Promise<void> {
-	const pwa = (await introspect(request)).pwas.find((p) => p.id === pwaId)!;
-	const version = Number(pwa.state.semanticVersion ?? 1);
+	const { typeId: subjectId, version, correlationId } = await theRootPartOfTheLatestRound(request, pwaId);
 	const res = await request.post('/test-api/dispatch', {
 		data: {
+			correlationId,
 			steps: [
 				[
 					'RequestAssuranceAssessment',
@@ -187,8 +197,8 @@ async function stageAReview(
 						assessmentId,
 						assurancePolicyId: POLICY,
 						policyVersion: POLICY_VERSION,
-						subjectObjectIds: [pwaId],
-						subjectSemanticVersions: { [pwaId]: version },
+						subjectObjectIds: [subjectId],
+						subjectSemanticVersions: { [subjectId]: version },
 						claimIds: []
 					}
 				],
@@ -210,15 +220,15 @@ async function stageAReview(
 							policyId: POLICY,
 							policyVersion: POLICY_VERSION,
 							assessmentId,
-							subjectObjectIds: [pwaId],
-							subjectSemanticVersions: { [pwaId]: version },
+							subjectObjectIds: [subjectId],
+							subjectSemanticVersions: { [subjectId]: version },
 							claimResults: [],
 							evidenceConsideredIds: [],
 							evidenceRejected: [],
 							observations: observations.map(
 								({ observationId: _id, observationType: _type, ...recorded }) => ({
 									...recorded,
-									subjectObjectIds: [pwaId]
+									subjectObjectIds: [subjectId]
 								})
 							),
 							dispositionRecommendation: concludeAs,
@@ -327,7 +337,7 @@ test.describe('Assurance floor — an escalated review is routed to a human', ()
 		// ⭐ THE CHIP: a required ESCALATED review reads INCONCLUSIVE (`aggregateDisposition`), never UNASSESSED.
 		await expect(page.getByTestId('assurance-disposition')).toHaveText('⚖ INCONCLUSIVE');
 		// ⭑ And the header chip says so in words — the label the server answers (`floorChipLabel`), rendered as it is.
-		await expect(page.getByTestId('assurance-chip')).toHaveText('⚖ floor inconclusive');
+		await expect(page.getByTestId('assurance-chip')).toHaveText(`⚖ floor inconclusive${THE_OTHER_PART}`);
 		// ⛔ NOT A FINDING: the recommendation is not listed among the reasoning-review findings.
 		await expect(page.locator('ul.floorgaps')).toHaveCount(0);
 
@@ -375,7 +385,7 @@ test.describe('Assurance floor — an escalated review is routed to a human', ()
 
 		await gotoHydrated(page, `/pwa/${pwaId}`);
 		await expect(page.getByTestId('assurance-disposition')).toHaveText('⚖ REJECTED');
-		await expect(page.getByTestId('assurance-chip')).toHaveText('⚖ floor rejected');
+		await expect(page.getByTestId('assurance-chip')).toHaveText(`⚖ floor rejected${THE_OTHER_PART}`);
 		// The finding is listed among the findings, and the recommendation is not.
 		await expect(page.locator('ul.floorgaps li')).toHaveText([STAGED_FINDING.statement]);
 		await expect(page.getByTestId('floor-blocked-hint')).toHaveText(
@@ -446,7 +456,7 @@ test.describe('Assurance floor — an escalated review is routed to a human', ()
 
 		await gotoHydrated(page, `/pwa/${pwaId}`);
 		await expect(page.getByTestId('assurance-disposition')).toHaveText('⚖ INCONCLUSIVE');
-		await expect(page.getByTestId('assurance-chip')).toHaveText('⚖ floor inconclusive');
+		await expect(page.getByTestId('assurance-chip')).toHaveText(`⚖ floor inconclusive${THE_OTHER_PART}`);
 		// ⛔ NOT A FINDING, AND NO FINDING AT ALL: nothing is listed under "Reasoning-review findings".
 		await expect(page.locator('ul.floorgaps')).toHaveCount(0);
 		await expect(page.getByTestId('floor-blocked-hint')).toHaveText(NOT_BY_REVISION_HINT);

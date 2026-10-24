@@ -195,7 +195,8 @@ describe('⭐ D7 — a review refused for a substituted model blocks the turn EX
 		const events = await postInstruction(pwaId);
 
 		expect(events.at(-1)?.kind).toBe('done');
-		expect(seam.calls.length, 'arrangement: the devin branch reviewed the candidate').toBe(1);
+		// ⭐ B3 (`REG-D-125`) — one call per part: the candidate's two types.
+		expect(seam.calls.length, 'arrangement: the devin branch reviewed each of the candidate’s two types').toBe(2);
 		expect(seam.calls[0]!.args.slice(0, 3)).toEqual(['--print', '--model', CONFIGURED]);
 		const turn = getPendingAuthoringTurn(pwaId);
 		expect(turn, 'the refused turn left no staged candidate').toBeDefined();
@@ -227,7 +228,8 @@ describe('⭐ D7 — a review refused for a substituted model blocks the turn EX
 		const events = await postInstruction(pwaId);
 
 		expect(events.at(-1)?.kind).toBe('done');
-		expect(seam.calls.length, 'arrangement: the devin branch reviewed the candidate').toBe(1);
+		// ⭐ B3 (`REG-D-125`) — one call per part: the candidate's two types.
+		expect(seam.calls.length, 'arrangement: the devin branch reviewed each of the candidate’s two types').toBe(2);
 		const turn = getPendingAuthoringTurn(pwaId);
 		expect(turn, 'the turn left no staged candidate').toBeDefined();
 		expect(turn!.status, 'a valid subject finding did not require revision').toBe(
@@ -291,7 +293,8 @@ describe('⭐ RS-3 — the page load answers the blocked hint from the staged ca
 
 		await postInstruction(pwaId, TWO_ROOTS_PLAN);
 
-		expect(seam.calls.length, 'arrangement: the devin branch reviewed the candidate').toBe(1);
+		// ⭐ B3 (`REG-D-125`) — one call per part: the candidate's two types.
+		expect(seam.calls.length, 'arrangement: the devin branch reviewed each of the candidate’s two types').toBe(2);
 		expect(getPendingAuthoringTurn(pwaId)?.status, 'arrangement: the refusal was not staged').toBe(
 			'BLOCKED_EXTERNAL'
 		);
@@ -321,7 +324,8 @@ describe('⭐ RS-3 — the page load answers the blocked hint from the staged ca
 
 		await postInstruction(pwaId, TWO_ROOTS_PLAN);
 
-		expect(seam.calls.length, 'arrangement: the devin branch reviewed the candidate').toBe(1);
+		// ⭐ B3 (`REG-D-125`) — one call per part: the candidate's two types.
+		expect(seam.calls.length, 'arrangement: the devin branch reviewed each of the candidate’s two types').toBe(2);
 		expect(
 			getPendingAuthoringTurn(pwaId)?.status,
 			'arrangement: the schema finding was not staged for revision'

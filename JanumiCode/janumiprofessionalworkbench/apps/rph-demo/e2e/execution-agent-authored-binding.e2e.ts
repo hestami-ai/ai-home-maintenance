@@ -39,10 +39,11 @@ test.describe('Undertaking Workbench — an AGENT-authored type executes under a
 		// ⭐ THE TEST STIPULATES THE REVIEW'S REMAINDER (`JAN-CRITREAD` J1-3; `DESIGN-what-the-tests-prove.md` §4.5,
 		// §4.6): in the body, after the reset, with the PWA's id READ FROM THE STORE. The declared stand-in then answers
 		// what the structural checker cannot judge — recorded as not judged, and disclosed. No assertion here changes.
-		// ⚠ THE GRAPH ARM ONLY: this spec's work-product review stays unstipulated — INCONCLUSIVE, as before — and
+		// ⚠ THE PART ARM ONLY (⭐ the review in parts, `REG-D-125`: each type of the PWA, reviewed as a part): this spec's
+		// work-product review stays unstipulated — INCONCLUSIVE, as before — and
 		// nothing here asserts on it (§4.6). The lane control checks that it never passes.
 		const pwaId = (await introspect(request)).pwas.find((p) => p.state.name === 'Agent Discharge PWA')!.id;
-		await registerStipulation(request, pwaId, 'PWA_GRAPH');
+		await registerStipulation(request, pwaId, 'PWA_TYPE');
 		await gotoHydrated(page, (await card.getAttribute('href'))!);
 
 		// ── 2. THE AGENT AUTHORS THE TYPE, DISCHARGE AND ALL ──────────────────────────────────────────────
@@ -152,10 +153,11 @@ test.describe('Undertaking Workbench — an AGENT-authored type executes under a
 		// ⭐ THE TEST STIPULATES THE REVIEW'S REMAINDER (`JAN-CRITREAD` J1-3; `DESIGN-what-the-tests-prove.md` §4.5,
 		// §4.6): in the body, after the reset, with the PWA's id READ FROM THE STORE. The declared stand-in then answers
 		// what the structural checker cannot judge — recorded as not judged, and disclosed. No assertion here changes.
-		// ⚠ THE GRAPH ARM ONLY: this spec's work-product review stays unstipulated — INCONCLUSIVE, as before — and
+		// ⚠ THE PART ARM ONLY (⭐ the review in parts, `REG-D-125`: each type of the PWA, reviewed as a part): this spec's
+		// work-product review stays unstipulated — INCONCLUSIVE, as before — and
 		// nothing here asserts on it (§4.6). The lane control checks that it never passes.
 		const pwaId = (await introspect(request)).pwas.find((p) => p.state.name === 'Agent Silent PWA')!.id;
-		await registerStipulation(request, pwaId, 'PWA_GRAPH');
+		await registerStipulation(request, pwaId, 'PWA_TYPE');
 		await gotoHydrated(page, (await card.getAttribute('href'))!);
 
 		const plan = {

@@ -33,7 +33,7 @@ test.describe('PWA graph — structural validity report', () => {
 		// §4.6): in the body, after the reset, with the PWA's id READ FROM THE STORE. The declared stand-in then answers
 		// what the structural checker cannot judge — recorded as not judged, and disclosed. No assertion here changes.
 		const pwaId = (await introspect(request)).pwas.find((p) => p.state.name === 'Valid Graph PWA')!.id;
-		await registerStipulation(request, pwaId, 'PWA_GRAPH');
+		await registerStipulation(request, pwaId, 'PWA_TYPE');
 		await runPlan(page, {
 			plan: [
 				{
@@ -77,8 +77,13 @@ test.describe('PWA graph — structural validity report', () => {
 		expect(report.metrics.maxDepth).toBeGreaterThanOrEqual(2);
 	});
 
-	test('an unlinked type is caught as an orphan (connected invariant fails)', async ({ page }) => {
+	test('an unlinked type is caught as an orphan (connected invariant fails)', async ({ page, request }) => {
 		await openDraft(page, 'Orphan Graph PWA');
+		// ⭐ The review in parts (`REG-D-125`): each type is reviewed as a part, and well-formedness is the PWA's — the
+		// deterministic schema/invariant policy judges the orphan, no one part holds it. So the review's remainder is
+		// stipulated here too, as above, and the orphan alone is what asks for revision.
+		const pwaId = (await introspect(request)).pwas.find((p) => p.state.name === 'Orphan Graph PWA')!.id;
+		await registerStipulation(request, pwaId, 'PWA_TYPE');
 		await runPlan(page, {
 			plan: [
 				{

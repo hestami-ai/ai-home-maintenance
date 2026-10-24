@@ -24,8 +24,8 @@ import {
 	classifyFloorRemediation,
 	floorStatusLine,
 	isOperationalRemediation,
+	refineDirective,
 	runPwaFloor,
-	type FloorObservationView,
 	type FloorProducer,
 	type FloorRemediation,
 	type FloorView
@@ -59,21 +59,6 @@ function compactArgs(args: Record<string, unknown> | undefined): string {
 /** A one-line status summary of a floor run for the agent log — `floorStatusLine`, which carries the §4.4
  *  disclosure when the reasoning review rests on a test's stipulations. */
 const floorStatus = (f: FloorView): string => floorStatusLine(f);
-
-/** Turn the Reasoning Review's open findings into an auto-refinement directive for the executor. */
-function refineDirective(prompt: string, findings: readonly FloorObservationView[]): string {
-	const list = findings
-		.slice(0, 6)
-		.map((finding, i) => `${i + 1}. [${finding.code}] ${finding.statement}`)
-		.join('\n');
-	return [
-		'An independent assurance Reasoning Review produced valid findings about the authored PWA subject.',
-		'Revise the PWA graph and/or its recorded professional rationale as each coded finding requires; do not merely restate the intent:',
-		list,
-		'',
-		`Original intent: ${prompt}`
-	].join('\n');
-}
 
 interface FloorTurnResult {
 	readonly floor?: FloorView;
@@ -147,6 +132,9 @@ async function runFloorAfterTurn(ctx: {
 				text: '↻ Auto-refinement pass (addressing valid reviewer subject findings)…'
 			});
 			await agent.run(refineDirective(instruction, remediation.findings), onEvent, signal);
+			// ⭐ B4 (design D8) — THE WHOLE PART INVENTORY AGAIN, under the new candidate hash and a new round token: the
+			// floor rebuilds the parts from the refined candidate's export, so a type the refinement added is reviewed and
+			// one it removed is not, and no earlier round's result enters this one.
 			subjectHash = hashAuthoringSubject(turn);
 			floor = await runPwaFloor(
 				pwaId,
@@ -156,7 +144,8 @@ async function runFloorAfterTurn(ctx: {
 					// Re-read after the refinement pass: the producer may have declared a revised account.
 					rationale: agent.rationale(),
 					narration: planText(),
-					priorGaps: remediation.findings.map((finding) => finding.statement),
+					// ⭐ B4 — each part is shown its own type's earlier findings (`runPwaFloor`).
+					priorFindings: remediation.findings,
 					candidateSubjectHash: subjectHash
 				},
 				turn.engine

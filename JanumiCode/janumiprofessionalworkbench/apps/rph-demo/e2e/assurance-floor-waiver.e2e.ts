@@ -5,7 +5,8 @@ import {
 	introspect,
 	gotoHydrated,
 	acceptAgentCandidate,
-	registerStipulation
+	registerStipulation,
+	theRootPartOfTheLatestRound
 } from './support/harness';
 
 // A RECORDED WAIVER DOES NOT CLEAR THE DE MINIMIS FLOOR — asserted at the SURFACE (ASR-3, REG-F-202).
@@ -53,7 +54,7 @@ test.describe('Assurance floor — a recorded waiver does not clear it', () => {
 		// §4.6): in the body — this helper runs in each test's — after the reset, with the PWA's id READ FROM THE STORE.
 		// The declared stand-in then answers what the structural checker cannot judge — recorded as not judged, and
 		// disclosed. No assertion here changes.
-		await registerStipulation(request, pwaId, 'PWA_GRAPH');
+		await registerStipulation(request, pwaId, 'PWA_TYPE');
 
 		const res = await request.post(`/pwa/${pwaId}/agent`, {
 			data: {
@@ -105,14 +106,15 @@ test.describe('Assurance floor — a recorded waiver does not clear it', () => {
 	 *   · ⭐ `JAN-ESCREC` ER-2 step 7 — the third `REJECTED`, a subject finding a waiver names: the floor a later accepted
 	 *     turn then SATISFIES, with the waiver still EFFECTIVE (`ER1-V401`).
 	 * No assertion in this file changed.
+	 * ⭐ The review in parts, B3 (`REG-D-125`): the review is of the PWA's ROOT TYPE, its part, staged INTO the accepted floor's
+	 * round (`theRootPartOfTheLatestRound`), so the round's other part and its deterministic policies stay SATISFIED.
 	 */
 	async function blockTheFloor(
 		request: APIRequestContext,
 		pwaId: string,
 		concludeAs: 'REJECTED' | 'INCONCLUSIVE'
 	): Promise<void> {
-		const pwa = (await introspect(request)).pwas.find((p) => p.id === pwaId)!;
-		const version = Number(pwa.state.semanticVersion ?? 1);
+		const { typeId: subjectId, version, correlationId } = await theRootPartOfTheLatestRound(request, pwaId);
 		const assessmentId = 'assess_01ARZ3NDEKTSV4RRFFQ69G5FA1';
 		const observationId = 'obs_01ARZ3NDEKTSV4RRFFQ69G5FA2';
 		const finding = {
@@ -133,12 +135,12 @@ test.describe('Assurance floor — a recorded waiver does not clear it', () => {
 					policyId: POLICY,
 					policyVersion: POLICY_VERSION,
 					assessmentId,
-					subjectObjectIds: [pwaId],
-					subjectSemanticVersions: { [pwaId]: version },
+					subjectObjectIds: [subjectId],
+					subjectSemanticVersions: { [subjectId]: version },
 					claimResults: [],
 					evidenceConsideredIds: [],
 					evidenceRejected: [],
-					observations: [{ ...finding, subjectObjectIds: [pwaId] }],
+					observations: [{ ...finding, subjectObjectIds: [subjectId] }],
 					dispositionRecommendation: concludeAs,
 					recommendedControlActions: [],
 					residualUncertainty: [],
@@ -149,6 +151,7 @@ test.describe('Assurance floor — a recorded waiver does not clear it', () => {
 		];
 		const res = await request.post('/test-api/dispatch', {
 			data: {
+				correlationId,
 				steps: [
 					[
 						'RequestAssuranceAssessment',
@@ -158,8 +161,8 @@ test.describe('Assurance floor — a recorded waiver does not clear it', () => {
 							assessmentId,
 							assurancePolicyId: POLICY,
 							policyVersion: POLICY_VERSION,
-							subjectObjectIds: [pwaId],
-							subjectSemanticVersions: { [pwaId]: version },
+							subjectObjectIds: [subjectId],
+							subjectSemanticVersions: { [subjectId]: version },
 							claimIds: []
 						}
 					],

@@ -1,5 +1,5 @@
-// ⭐ THE STIPULATION REGISTRY — what a TEST has declared it stipulates, per (PWA, framing) (`JAN-CRITREAD` J1-2;
-// `DESIGN-what-the-tests-prove.md` §4.5; `REG-D-072` D6).
+// ⭐ THE STIPULATION REGISTRY — what a TEST has declared it stipulates, per (PWA, framing) — ⭐ and, on the part arm, per part
+// of the PWA (the review in parts, B6) — (`JAN-CRITREAD` J1-2; `DESIGN-what-the-tests-prove.md` §4.5; `REG-D-072` D6).
 //
 // In test engines only, the declared stand-in reviewer answers what the structural checker cannot judge with a CLEAN
 // answer the TEST stipulates — recorded `UNABLE_TO_DETERMINE` with `stipulated: 'MET'` beside it. The test says so
@@ -22,8 +22,8 @@ import type { EngineHandle } from '@janumipwb/rph-engine';
  * `UNABLE_TO_DETERMINE` with `stipulated: 'MET'` beside it, exactly as the floor arm records its remainder: that stand-in
  * has no checker, so nothing of a declared policy is judged in the gate lane, and the record says so.
  * ⭐ The review in parts, B2 (`REG-D-125`; design D4, D10) — AND `PWA_TYPE`: one type of an authored PWA, reviewed as a part.
- * The stand-in asks its lookup about a part as it asks about a graph; ⚠ the authoring floor reviews no part yet, so its
- * lookup (`floor.ts`) answers none, and a registration on this arm answers nothing until the floor hands it one.
+ * ⭐ B6: the authoring floor reviews each type of a PWA as a part, and asks about each with the PWA it belongs to
+ * (`floor.ts`): a registration for the PWA answers every part of it, and one naming a type (`typeId`) answers that part.
  */
 export type StipulableFraming = 'PWA_GRAPH' | 'WORK_PRODUCT' | 'DECLARED_POLICY' | 'PWA_TYPE';
 const FRAMINGS: readonly StipulableFraming[] = ['PWA_GRAPH', 'WORK_PRODUCT', 'DECLARED_POLICY', 'PWA_TYPE'];
@@ -31,6 +31,12 @@ const FRAMINGS: readonly StipulableFraming[] = ['PWA_GRAPH', 'WORK_PRODUCT', 'DE
 export interface StipulationRegistration {
 	readonly pwaId: string;
 	readonly framing: StipulableFraming;
+	/**
+	 * ⭐ The review in parts, B6 (`REG-D-125`; design D10) — ONE PART OF THAT PWA: the PWU Type a `PWA_TYPE` registration
+	 * answers alone. Absent, the registration answers every part of the PWA; present, it answers this part, and is asked
+	 * before the PWA's (`registrationFor`).
+	 */
+	readonly typeId?: string;
 	/** Version one's whole grammar: the remainder the checker could not judge is stipulated CLEAN. */
 	readonly remaining: 'CLEAN';
 }
@@ -39,7 +45,8 @@ export interface StipulationRegistration {
 export class StipulationRefused extends Error {}
 
 const registered = new Map<string, StipulationRegistration>();
-const key = (pwaId: string, framing: StipulableFraming) => `${pwaId}\u0000${framing}`;
+const key = (pwaId: string, framing: StipulableFraming, typeId?: string) =>
+	`${pwaId}\u0000${framing}\u0000${typeId ?? ''}`;
 
 /**
  * Record that the test stipulates the remainder CLEAN for `pwaId` under `framing`.
@@ -63,18 +70,63 @@ export function registerStipulation(engine: EngineHandle, reg: unknown): Stipula
 		throw new StipulationRefused(
 			`the current engine holds no PWA ${r.pwaId}: register a stipulation after the PWA exists, reading its id from the store`
 		);
+	const typeId = r.typeId === undefined ? undefined : partOf(engine, r.pwaId, r.framing as StipulableFraming, r.typeId);
 	const accepted: StipulationRegistration = {
 		pwaId: r.pwaId,
 		framing: r.framing as StipulableFraming,
+		...(typeId === undefined ? {} : { typeId }),
 		remaining: 'CLEAN'
 	};
-	registered.set(key(accepted.pwaId, accepted.framing), accepted);
+	registered.set(key(accepted.pwaId, accepted.framing, accepted.typeId), accepted);
 	return accepted;
 }
 
-/** The registered remainder for (PWA, framing), if a test registered one. Reads nothing but this map. */
-export function stipulationFor(pwaId: string, framing: StipulableFraming): 'CLEAN' | undefined {
-	return registered.get(key(pwaId, framing))?.remaining;
+/**
+ * ⭐ B6 — the part a registration names, checked: only on the part arm, and only a type the named PWA holds. ⛔ A type of
+ * another PWA would answer a part of a PWA the registration does not name; a type the engine does not hold yet, whatever
+ * later took its id.
+ */
+function partOf(engine: EngineHandle, pwaId: string, framing: StipulableFraming, typeId: unknown): string {
+	if (framing !== 'PWA_TYPE')
+		throw new StipulationRefused(`a stipulation names a type (\`typeId\`) only on the part arm, PWA_TYPE, not on ${framing}`);
+	if (typeof typeId !== 'string' || typeId === '')
+		throw new StipulationRefused('a stipulation’s `typeId`, when given, names one PWU Type of the PWA');
+	const type = engine.loadObject(typeId);
+	const owner = (type?.state as { pwaId?: unknown } | undefined)?.pwaId;
+	if (type?.objectType !== 'PWU_TYPE' || owner !== pwaId)
+		throw new StipulationRefused(
+			`the current engine holds no PWU Type ${typeId} of PWA ${pwaId}: a part's registration names a type of the PWA it names`
+		);
+	return typeId;
+}
+
+/**
+ * ⭐⭐ The review in parts, B6 (`REG-D-125`; design D10) — THE ONE LOOKUP OF A REGISTRATION, over any list of them: for a
+ * part (`typeId`), its own registration first, then its PWA's; otherwise the PWA's alone. Pure, so the floor's lookup
+ * (through `stipulationFor`) and the lane control's classifier (`lane-control.ts`) answer the same question the same way.
+ */
+export function registrationFor(
+	registrations: Iterable<StipulationRegistration>,
+	pwaId: string,
+	framing: StipulableFraming,
+	typeId?: string
+): StipulationRegistration | undefined {
+	const all = [...registrations];
+	const find = (part: string | undefined) =>
+		all.find((r) => r.pwaId === pwaId && r.framing === framing && r.typeId === part);
+	return (typeId === undefined ? undefined : find(typeId)) ?? find(undefined);
+}
+
+/**
+ * The registered remainder for (PWA, framing), if a test registered one — ⭐ B6: for one part of the PWA (`typeId`), its own
+ * registration's, else its PWA's (`registrationFor`). Reads nothing but this map.
+ */
+export function stipulationFor(
+	pwaId: string,
+	framing: StipulableFraming,
+	typeId?: string
+): 'CLEAN' | undefined {
+	return registrationFor(registered.values(), pwaId, framing, typeId)?.remaining;
 }
 
 /** Whether anything is registered — so a lookup can decline before reading the store at all. */

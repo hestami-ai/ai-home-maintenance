@@ -102,9 +102,9 @@ test.describe('Phase 7 half B — the turn, accepted, published and run, through
 		const author: AuthoringHands = {
 			createDraft: async () => {
 				pwaId = await createDraftPwa(page, request, PHASE7_HALF_B_DRAFT);
-				// ⭐ STIPULATED HERE, IN THE BODY, WITH THE ID READ FROM THE STORE (`JAN-CRITREAD` J1-3): the graph's review and
-				// the work products', so the declared stand-in answers what the structural checker cannot judge.
-				await registerStipulation(request, pwaId, 'PWA_GRAPH');
+				// ⭐ STIPULATED HERE, IN THE BODY, WITH THE ID READ FROM THE STORE (`JAN-CRITREAD` J1-3): the review of each type
+				// of the graph (⭐ the review in parts, `REG-D-125`) and the work products', so the declared stand-in answers what the structural checker cannot judge.
+				await registerStipulation(request, pwaId, 'PWA_TYPE');
 				await registerStipulation(request, pwaId, 'WORK_PRODUCT');
 				return pwaId;
 			},

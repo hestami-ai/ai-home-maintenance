@@ -1649,7 +1649,12 @@ async function recordTheFloor(
 	author: AuthoringHands
 ): Promise<void> {
 	const staged = (snapshot.authoringCandidates ?? []).find((c) => c.pwaId === pwaId);
-	authoring.floor = floorDispositions(staged?.assessments ?? [], pwaId);
+	// ⭐ The review in parts, B3 (`REG-D-125`): the Reasoning Review is each type's, the staged candidate's types read here.
+	authoring.floor = floorDispositions(
+		staged?.assessments ?? [],
+		pwaId,
+		(staged?.pwuTypes ?? []).map((t) => t.id)
+	);
 	authoring.authorModel.resolved =
 		(await author.producerLine()) ?? authoring.floor.find((f) => f.producer !== null)?.producer ?? null;
 	authoring.reviewer =

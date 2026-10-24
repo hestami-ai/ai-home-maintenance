@@ -129,9 +129,14 @@ const DECLARED_SCAN_SITES: Record<
 		why: 'G2. `buildPwaExport` is the graph the floor hands the reviewer; on a turn it is built from the FORK, so the set is the types of the draft itself.'
 	},
 	'apps/rph-demo/src/lib/server/floor.ts :: listAssessments': {
+		calls: 2,
+		class: 'DECLARED',
+		why: 'G3. ⭐ The review in parts (`REG-D-125`): `latestFloorRound` ranks the review records of the PWA and of each of its types into the latest round — the set a canonical reader ranks in an order-sensitive way and the commit of this draft writes into (DESIGN §3.2 job (b)); G3 covers the PWA’s records and its per-type groups each type’s. The second call, `latestFloorAssessments`, is the execution plane’s reader of a work product’s floor (`loadSubjectFloor`), which no draft reads.'
+	},
+	'apps/rph-demo/src/lib/server/floor.ts :: listPwuTypes': {
 		calls: 1,
 		class: 'DECLARED',
-		why: 'G3. `latestFloorAssessments` ranks the review records of the PWA per floor policy — the set a canonical reader ranks in an order-sensitive way and the commit of this draft writes into (DESIGN §3.2 job (b)).'
+		why: 'G2. ⭐ The review in parts (`REG-D-125`): `storedTypes` reads the PWA’s live types — on a turn, the draft’s own, on its fork — for each part’s stored name and semantic version, and for the round reader’s expected inventory.'
 	},
 	'apps/rph-demo/src/lib/server/floor.ts :: listObservations': {
 		calls: 1,
