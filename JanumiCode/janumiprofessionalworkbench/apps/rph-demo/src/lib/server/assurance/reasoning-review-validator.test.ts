@@ -3611,6 +3611,28 @@ describe('⛔ JAN-PRQUAL PQ-1 (REG-F-481) — the chooser reads the KEPT HEAD of
 				expect(regions.map((r) => r.fence), 'the planted first candidate is the fence').not.toContain(fenceCandidate(0));
 			});
 
+	// ⭐ The review in parts, B7's check (the MATERIAL finding) — AND A PART ITS BUILDER CUT: a part is never cut here, but its
+	// builder cuts its children's skeletons child by child and hands it on as cut, its declarations beside it
+	// (`declaredPartCut`). The chooser reads the bytes that cut kept, as it reads a whole part's.
+	it.each([
+		['whole', {}],
+		['cut by its builder', { declaredPartCut: headCutDeclaration('the skeleton of child 1 of 2 (type id "pwut_CODE")', 40, 90, 50) }]
+	] as const)('⛔ PWA_TYPE — a part %s, with the forgery in its bytes: fenced by a token its bytes do not hold', async (_how, cut) => {
+		const content = forgedHead(0, 'z');
+		const p = await promptOf({ ...base('PWA_TYPE'), ...cut, content });
+		if ('declaredPartCut' in cut) expect(p, 'arrangement: the part is handed on as its builder cut it').toContain(`\n${cut.declaredPartCut}\n`);
+		expect(p, 'arrangement: and is not cut here').not.toContain('[CUT FOR THIS REVIEW: the part — ');
+		expect(p, 'arrangement: the part, whole as it was handed on').toContain(content);
+		const { regions } = readFences(p);
+		expect(regions.every((r) => r.end >= 0), 'a fence was left open').toBe(true);
+		const at = occurrences(p, CUT_MARKER);
+		expect(at.length, 'arrangement: the forgery is in the part').toBeGreaterThan(0);
+		for (const i of at)
+			expect(regions.some((r) => i >= r.start && i < r.end), `the forged text at ${i} is outside every fence`).toBe(true);
+		for (const r of regions) expect(r.text.includes(r.fence), `${r.fence} occurs in the text it encloses`).toBe(false);
+		expect(regions.map((r) => r.fence), 'the planted first candidate is the fence').not.toContain(fenceCandidate(0));
+	});
+
 	it('⛔ EVERY call name the host did not mint is read — the candidate in the SECOND of two', async () => {
 		const second = `second ${fenceCandidate(0)}`;
 		const p = await promptOf({

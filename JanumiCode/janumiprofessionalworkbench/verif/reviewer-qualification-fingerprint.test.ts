@@ -2006,8 +2006,9 @@ const VALIDATOR_CHOOSER_RULES: Readonly<Record<string, ValidatorChooserRule>> = 
 		framings: ['T', 'W', 'P']
 	},
 	// ⭐ B7 — ~~'the content of a graph'~~: the content of a part, whose type's name `T-OVERSIZE-FENCES` plants `01` in.
+	// ⭐ B7's check (the MATERIAL finding) — and `T-OVERSIZE-CHILDREN`, `00` in the kept HEAD of a child its builder cut.
 	'the content of a part': {
-		moves: ['T-OVERSIZE-FENCES'],
+		moves: ['T-OVERSIZE-CHILDREN', 'T-OVERSIZE-FENCES'],
 		kept: (s, f) => !(s === 'the content' && f === 'PWA_TYPE'),
 		framings: ['T']
 	},
@@ -2022,11 +2023,14 @@ const VALIDATOR_CHOOSER_RULES: Readonly<Record<string, ValidatorChooserRule>> = 
 	// ⭐ `JAN-EXEC` Phase 7 completion E2 — AND THE DECLARED WORK, CUT (design B4): `D-OVERSIZE-CONTENT` holds a candidate in
 	// the kept HEAD of its cut content, so the rule moves it too. ⭐ P5 package D — and `D-OVERSIZE-UNITS`, whose work its
 	// builder cut unit by unit, in the kept HEAD of one unit's work product.
-	// ⭐ B7 — ~~a graph's~~: a part's content is never cut by the validator, and the children its builder cuts hold no plant.
+	// ⭐ B7 — ~~a graph's~~: a part's content is never cut by the validator ~~, and the children its builder cuts hold no
+	// plant~~. ⭐ B7's check (the MATERIAL finding) — but its builder cuts its children's skeletons child by child
+	// (`declaredPartCut`), the part arm's `D-OVERSIZE-UNITS`: `T-OVERSIZE-CHILDREN` holds `00` in the kept HEAD of one, so a
+	// chooser that skipped a part its builder cut, the forged-region path `REG-F-481` closed, moves it too.
 	'the content of a graph or a work product, when it is cut': {
-		moves: ['W-OVERSIZE-CONTENT', 'D-OVERSIZE-CONTENT', 'D-OVERSIZE-UNITS'],
+		moves: ['T-OVERSIZE-CHILDREN', 'W-OVERSIZE-CONTENT', 'D-OVERSIZE-CONTENT', 'D-OVERSIZE-UNITS'],
 		kept: (s, _f, cut) => !(s === 'the content' && cut),
-		framings: ['W', 'D']
+		framings: ['T', 'W', 'D']
 	},
 	// ⭐⭐ `JAN-EXEC` Phase 7 P5, package D (`REG-D-118` (1)) — AND WHAT A DECLARED REVIEW'S CHOOSER READS ON ITS HOST LINES
 	// (`declaredHostSlicesOf`): a title on the line naming a unit below that holds no completion (P5 package B F1), and the
@@ -2885,7 +2889,7 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 		60_000
 	);
 
-	it('⭐ THE VALIDATOR’S CHOOSER IS HASHED IN EVERY FRAMING — T-OVERSIZE-FENCES’s prompt is fenced by `<<<UNTRUSTED-08>>>`, past a candidate in each of its eight slices; W-FENCES’s by `<<<UNTRUSTED-07>>>`, past a candidate in each of its seven; G-OVERSIZE-CONTENT’s and W-OVERSIZE-CONTENT’s by `<<<UNTRUSTED-01>>>`, past the candidate the HEAD of their cut content keeps; and P-FENCE-AT-THE-LAST’s view by `<<<UNTRUSTED-98>>>` and its prompt by `<<<UNTRUSTED-99>>>`, the LAST candidate', () => {
+	it('⭐ THE VALIDATOR’S CHOOSER IS HASHED IN EVERY FRAMING — T-OVERSIZE-FENCES’s prompt is fenced by `<<<UNTRUSTED-08>>>`, past a candidate in each of its eight slices; W-FENCES’s by `<<<UNTRUSTED-07>>>`, past a candidate in each of its seven; T-OVERSIZE-CHILDREN’s and W-OVERSIZE-CONTENT’s by `<<<UNTRUSTED-01>>>`, past the candidate the HEAD of their cut content keeps; and P-FENCE-AT-THE-LAST’s view by `<<<UNTRUSTED-98>>>` and its prompt by `<<<UNTRUSTED-99>>>`, the LAST candidate', () => {
 		// ⛔ WHY (`PQ-1`; `REG-F-481`, `REG-F-476`): `P-OVERSIZE-FENCES` plants in every slice a process result's prompt carries,
 		// and no probe planted in the narration, the prior findings, a graph or a work product — so a validator chooser that
 		// skipped one of them moved no fingerprint; and no token was past the tenth candidate, so a chooser that tried ten
@@ -2898,6 +2902,7 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 		const promptToken = (id: string): string => BASE.probePrompts.get(id)!.split('\n').find((l) => FENCE_LINE.test(l))!;
 		const viewToken = (id: string): string => inputOf(id).content.split('\n').find((l) => FENCE_LINE.test(l))!;
 		for (const [id, token] of [
+			['T-OVERSIZE-CHILDREN', '<<<UNTRUSTED-01>>>'],
 			['T-OVERSIZE-FENCES', '<<<UNTRUSTED-08>>>'],
 			['W-OVERSIZE-CONTENT', '<<<UNTRUSTED-01>>>'],
 			['W-FENCES', '<<<UNTRUSTED-07>>>'],
@@ -2906,8 +2911,10 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 			expect(promptToken(id), `${id}: the prompt’s token`).toBe(token);
 		// ⭐ THE ARRANGEMENT (`PQ-1`; `REG-F-481`): each content-only probe's content is CUT, and the HEAD its cut keeps holds
 		// the first candidate — so a chooser that skipped a cut content, and read a whole one, would fence with `00`.
-		// ⭐ B7 — ~~and G-OVERSIZE-CONTENT's~~: a part's content is never cut.
-		for (const id of ['W-OVERSIZE-CONTENT']) {
+		// ⭐ B7 — ~~and G-OVERSIZE-CONTENT's~~ ~~: a part's content is never cut.~~ ⭐ B7's check (the MATERIAL finding) — a part's
+		// content is never cut by the validator, but `T-OVERSIZE-CHILDREN`'s is cut by its builder, child by child, and handed
+		// on as cut: one content region, its cut declared before its fence, the HEAD it keeps holding `00`.
+		for (const id of ['T-OVERSIZE-CHILDREN', 'W-OVERSIZE-CONTENT']) {
 			const r = promptRegions(BASE.probePrompts.get(id)!);
 			const content = r.regions.filter((x) => x.slice === 'the content');
 			expect(

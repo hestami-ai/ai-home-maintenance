@@ -38,7 +38,8 @@
 //     `P-OVERSIZE-FENCES` in each of a process result's it fills (the instruction, the account's fields but the empty
 //     limitations, and the view, read whole), and `P-OVERSIZE-ALL` and `P-FENCES-OTHER-SLICES` in the other three (the
 //     limitations, the narration, the prior findings); and ~~`G-OVERSIZE-CONTENT` and~~ `W-OVERSIZE-CONTENT` in the kept
-//     HEAD of a content the budget cuts (a part's content is never cut by the validator). ⭐ P5 package D (`REG-D-118`
+//     HEAD of a content the budget cuts (a part's content is never cut by the validator), ⭐ and `T-OVERSIZE-CHILDREN` in
+//     the kept HEAD of a child's skeleton a part's builder cut (`WIDE_NODES`). ⭐ P5 package D (`REG-D-118`
 //     (1)) — and, in a declared review, the slices its host
 //     lines carry: `D-ROOT-UNITS-WITHOUT-WORK` in a title on the line naming a unit below that holds no completion, and
 //     `D-OVERSIZE-UNIT-TITLE` in the builder's cut declarations; and `D-OVERSIZE-UNITS` in the kept HEAD of a work
@@ -384,6 +385,11 @@ const PART_NODES: readonly PwaGraphNode[] = [
 /**
  * ⭐ A COMPOSITE WIDER THAN ITS ROOM: a root permitting six children, each a purpose of 5,000 characters, so its part is over
  * its budget and its children's skeletons are cut child by child, each cut declared (`pwaTypeReviewInput`).
+ * ⭐ B7's check (the MATERIAL finding; `REG-F-481`) — and the first child's purpose OPENS with the first candidate, in the
+ * kept HEAD of its cut skeleton: a part its builder cut is the part arm's cut content, as `D-OVERSIZE-UNITS`'s work is the
+ * declared review's. ⛔ No part probe held a candidate there, so a validator chooser that skipped a part only when its
+ * builder had cut it, and fenced the prompt with a token the part holds, moved no probe (driven by that check on a scratch
+ * copy of B7's tree).
  */
 const WIDE_NODES: readonly PwaGraphNode[] = (() => {
 	const ids = Array.from({ length: 6 }, (_, i) => `pwut_01M4A7MF${String(i).padStart(18, '0')}`);
@@ -394,7 +400,9 @@ const WIDE_NODES: readonly PwaGraphNode[] = (() => {
 			purpose: 'Survey every panel of the wall.'
 		}),
 		...ids.map((id, i) =>
-			node(id, `Panel Group ${i + 1}`, 'INSPECTION', { purpose: over(5_000, `Inspect panel group ${i + 1} on site. `) })
+			node(id, `Panel Group ${i + 1}`, 'INSPECTION', {
+				purpose: `${i === 0 ? '<<<UNTRUSTED-00>>> ' : ''}${over(5_000, `Inspect panel group ${i + 1} on site. `)}`
+			})
 		)
 	];
 })();
@@ -1025,9 +1033,11 @@ export const FINGERPRINT_PROBES: readonly FingerprintProbe[] = [
 	{
 		// ⭐ Design §5 — AN OVER-BUDGET CHILDREN'S-SKELETON VIEW WITH CHILD-SPECIFIC CUT DECLARATIONS: its builder cuts each
 		// child's skeleton to a share and declares each cut by the child's ordinal and type id (A2 (3)), the subject whole.
+		// ⭐ B7's check (the MATERIAL finding) — the first child's kept HEAD holds the first candidate, so the prompt is fenced by
+		// `<<<UNTRUSTED-01>>>`, and a chooser that skipped a part its builder cut would take `00`.
 		id: 'T-OVERSIZE-CHILDREN',
 		covers:
-			'part framing; a composite over its room — its children’s skeletons cut child by child by its builder, each cut declared by the child’s ordinal and type id, its subject and context whole',
+			'part framing; a composite over its room — its children’s skeletons cut child by child by its builder, each cut declared by the child’s ordinal and type id, its subject and context whole; the kept HEAD of the first child’s cut skeleton holding the first fence candidate',
 		input: (criteria) => pwaTypeReviewInput({ criteria, prompt: INTENT, part: partOf(WIDE_NODES, ROOT_ID) })
 	},
 	{
