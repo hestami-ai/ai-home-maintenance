@@ -34113,10 +34113,10 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "ARP-B7-M6-the-part-oracles-are-recorded-proposed",
 		file: "scripts/reviewer-qual/oracles-v8.ts",
-		find: "'criterion or a catcher goes back to the sponsor.',",
-		replace: "'criterion or a catcher goes back to the sponsor. PROPOSED, AWAITING SPONSOR CONFERRAL', // MUTANT: the part oracles are recorded proposed",
+		find: "'catcher goes back to the sponsor.',",
+		replace: "'catcher goes back to the sponsor. PROPOSED, AWAITING SPONSOR CONFERRAL', // MUTANT: the part oracles are recorded proposed",
 		expectRed: ["verif/reviewer-qualification-cases.test.ts"],
-		why: "PROMISE (REG-D-126 Q30, Q31; roadmap §9a.9: 'Record REG-D-126 Q30-Q31 in v8's oracle source'): version eight's conferral statement records the sponsor's conferral and carries no ORACLES_PROPOSED word. WHO RELIES: reviewer:qual:check's CONFERRAL limb, and every reader of oracles-v8.json. WHAT THE MUTATION DOES: the statement carries the proposal's word. OBSERVED (bun run mutants -- ARP-B7- and the re-anchored and re-measured entries, 2026-10-23, in the package D worktree, the changes staged, each mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         ARP-B7-M6-the-part-oracles-are-recorded-proposed ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'.",
+		why: "PROMISE (REG-D-126 Q30, Q31; roadmap §9a.9: 'Record REG-D-126 Q30-Q31 in v8's oracle source'): version eight's conferral statement records the sponsor's conferral and carries no ORACLES_PROPOSED word. WHO RELIES: reviewer:qual:check's CONFERRAL limb, and every reader of oracles-v8.json. WHAT THE MUTATION DOES: the statement carries the proposal's word. OBSERVED (bun run mutants -- ARP-B7- and the re-anchored and re-measured entries, 2026-10-23, in the package D worktree, the changes staged, each mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         ARP-B7-M6-the-part-oracles-are-recorded-proposed ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'. RE-ANCHORED (rule #5) to the statement's new last line (B7's check, its second MINOR finding, rewrapped it) and re-measured: (bun run mutants -- ARP-B7-M6 ARP-B7-M27 ARP-B7-M28 ARP-B7-M29 ARP-B7-M30, 2026-10-24, in the package D worktree, the changes staged, each mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         ARP-B7-M6-the-part-oracles-are-recorded-proposed ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'.",
 		source: "JAN-EXEC Phase 7, the review in parts, package D, the code records of B8 (REG-D-124; REG-D-126 Q30, Q31; design §5, §8) - oracles-v7.ts records the six graph oracles conferred as proposed, the standings as the register records them; oracles-v8.ts records Q30's 27 and Q31's eight; ORACLES_NOT_CONFERRED says only what the check read"
 	},
 	{
@@ -34298,5 +34298,41 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.test.ts"],
 		why: "PROMISE (B7's check, its third MINOR finding): the part framing's context line says what the reviewer is shown - a composite's artifacts and data flow name the type itself, and a type outside its subtree, by its own name, and any other type inside its subtree by the child whose subtree holds it (pwa-parts.ts peerNames; G8-CLEAN's Verification part lists acrossBoundary flows from Tool Build to Verification and from Verification to Realization). WHO RELIES: the reviewer of a composite, which reads the names in its context as the framing says they are. WHAT THE MUTATION DOES: the line says A2 (2)'s first sentence again, by which a type inside its subtree - the type itself among them - is named by a child. OBSERVED (bun run mutants -- ARP-A2-M8 ARP-B7-M26, 2026-10-24, in the package D worktree, the changes staged, each mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         ARP-B7-M26-the-part-framing-names-the-type-itself-by-a-child ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'.",
 		source: "JAN-EXEC Phase 7, the review in parts, package D, B7's check, the third MINOR finding (REG-D-125; design D3, D4) - the PWA_TYPE framing's context line names the type itself, inside its own subtree, by its own name, as pwa-parts.ts peerNames names it, and any other type of its subtree by the child whose subtree holds it"
+	},
+	{
+		id: "ARP-B7-M27-a-g8-clean-part-claims-a-source-oracle",
+		file: "scripts/reviewer-qual/oracles-v8.ts",
+		find: "cleanG8('G8-CLEAN.T03', '“Tool Build”'),",
+		replace: "clean('G8-CLEAN.T03', '“Tool Build”', 'G8-CLEAN'), // MUTANT: a G8-CLEAN part carries a source oracle G8-CLEAN does not have",
+		expectRed: ["verif/reviewer-qualification-cases.test.ts"],
+		why: "PROMISE (B7's check, its second MINOR finding): a part of G8-CLEAN is SATISFIED because Q31 conferred it directly - G8-CLEAN is no case and has no oracle - and its note claims no source oracle and no carried standing. WHO RELIES: the reader of a failure on a G8 part, who is told where its verdict came from. WHAT THE MUTATION DOES: one part's note is the Q30 clean parts' again, carrying a source oracle that does not exist. OBSERVED (bun run mutants -- ARP-B7-M6 ARP-B7-M27 ARP-B7-M28 ARP-B7-M29 ARP-B7-M30, 2026-10-24, in the package D worktree, the changes staged, each mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         ARP-B7-M27-a-g8-clean-part-claims-a-source-oracle ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'.",
+		source: "JAN-EXEC Phase 7, the review in parts, package D, B7's check, the second MINOR finding (REG-D-126 Q30, Q31; REG-D-124's form; design §5) - each v8 part oracle's note says where its verdict and its standing come from: G8-CLEAN has no oracle, so its seven parts were conferred directly by Q31; the pair's standings, on no screen, are the builder's proposal, carried as proposed; the 14 catchers' alone are the lead's designation; no note doubles a comma"
+	},
+	{
+		id: "ARP-B7-M28-the-twin-s-standing-is-the-lead-s-designation",
+		file: "scripts/reviewer-qual/oracles-v8.ts",
+		find: "? `(design §5, the 3-level pair; REG-D-126 Q31, its expected verdict conferred as described). ${PAIR_STANDING}`",
+		replace: "? `(design §5, the 3-level pair; REG-D-126 Q31, its expected verdict conferred as described). Its standing, the author’s claim, is the lead’s designation.` // MUTANT: the twin's standing is the lead's designation",
+		expectRed: ["verif/reviewer-qualification-cases.test.ts"],
+		why: "PROMISE (B7's check, its second MINOR finding; REG-D-124's form): G8-RR-02's catcher's standing, which Q31's screen did not show, is recorded as the builder's proposal, carried as proposed - never the lead's designation, which design §5 and REG-D-126 give the 14 catchers alone. WHO RELIES: the reader of oracles-v8.json, told which standings anyone designated. WHAT THE MUTATION DOES: the twin's note gives its standing as the lead's designation. OBSERVED (bun run mutants -- ARP-B7-M6 ARP-B7-M27 ARP-B7-M28 ARP-B7-M29 ARP-B7-M30, 2026-10-24, in the package D worktree, the changes staged, each mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         ARP-B7-M28-the-twin-s-standing-is-the-lead-s-designation ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'.",
+		source: "JAN-EXEC Phase 7, the review in parts, package D, B7's check, the second MINOR finding (REG-D-126 Q30, Q31; REG-D-124's form; design §5) - each v8 part oracle's note says where its verdict and its standing come from: G8-CLEAN has no oracle, so its seven parts were conferred directly by Q31; the pair's standings, on no screen, are the builder's proposal, carried as proposed; the 14 catchers' alone are the lead's designation; no note doubles a comma"
+	},
+	{
+		id: "ARP-B7-M29-a-root-part-s-note-doubles-its-comma",
+		file: "scripts/reviewer-qual/oracles-v8.ts",
+		find: "clean('G7-CLEAN.T01', 'The root, “Realization”', 'G7-CLEAN'),",
+		replace: "clean('G7-CLEAN.T01', 'The root, “Realization”,', 'G7-CLEAN'), // MUTANT: a root part's note doubles its comma",
+		expectRed: ["verif/reviewer-qualification-cases.test.ts"],
+		why: "PROMISE (B7's check, its second MINOR finding, the cosmetic part): no part oracle's note reads ',,'. WHO RELIES: the reader of oracles-v8.json. WHAT THE MUTATION DOES: G7-CLEAN's root part is named with a trailing comma again, so its note reads 'The root, “Realization”,, a part of'. OBSERVED (bun run mutants -- ARP-B7-M6 ARP-B7-M27 ARP-B7-M28 ARP-B7-M29 ARP-B7-M30, 2026-10-24, in the package D worktree, the changes staged, each mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         ARP-B7-M29-a-root-part-s-note-doubles-its-comma ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'.",
+		source: "JAN-EXEC Phase 7, the review in parts, package D, B7's check, the second MINOR finding (REG-D-126 Q30, Q31; REG-D-124's form; design §5) - each v8 part oracle's note says where its verdict and its standing come from: G8-CLEAN has no oracle, so its seven parts were conferred directly by Q31; the pair's standings, on no screen, are the builder's proposal, carried as proposed; the 14 catchers' alone are the lead's designation; no note doubles a comma"
+	},
+	{
+		id: "ARP-B7-M30-the-conferral-gives-the-pair-the-lead-s-designation",
+		file: "scripts/reviewer-qual/oracles-v8.ts",
+		find: "'catchers’ standing, the author’s claim, is the lead’s designation. The 3-level pair’s standings were not on the ' +",
+		replace: "'catchers’ standing, and each of the pair’s, is the author’s claim, the lead’s designation. The 3-level pair’s standings were not on the ' + // MUTANT: the conferral gives the pair the lead's designation",
+		expectRed: ["verif/reviewer-qualification-cases.test.ts"],
+		why: "PROMISE (B7's check, its second MINOR finding): version eight's conferral statement gives the lead's designation to the 14 catchers' standings alone, and records the 3-level pair's eight as the builder's proposal, not on the sponsor's screen, carried as proposed. WHO RELIES: reviewer:qual:check's reader of the statement, and every reader of oracles-v8.json. WHAT THE MUTATION DOES: the statement says the pair's standings are the lead's designation again. OBSERVED (bun run mutants -- ARP-B7-M6 ARP-B7-M27 ARP-B7-M28 ARP-B7-M29 ARP-B7-M30, 2026-10-24, in the package D worktree, the changes staged, each mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         ARP-B7-M30-the-conferral-gives-the-pair-the-lead-s-designation ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'.",
+		source: "JAN-EXEC Phase 7, the review in parts, package D, B7's check, the second MINOR finding (REG-D-126 Q30, Q31; REG-D-124's form; design §5) - each v8 part oracle's note says where its verdict and its standing come from: G8-CLEAN has no oracle, so its seven parts were conferred directly by Q31; the pair's standings, on no screen, are the builder's proposal, carried as proposed; the 14 catchers' alone are the lead's designation; no note doubles a comma"
 	}
 ];

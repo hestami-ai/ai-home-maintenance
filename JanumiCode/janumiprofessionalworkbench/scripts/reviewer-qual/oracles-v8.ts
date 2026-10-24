@@ -10,7 +10,10 @@
 //   · THE 14 CATCHERS (Q30) — REJECTED, faulting the criterion named at the part named in design §5's table; `G7-RR-03-CHILD`'s
 //     at the root, Realization. Each standing, the author's claim, is the lead's designation.
 //   · THE 3-LEVEL PAIR (Q31) — G8-CLEAN's seven parts SATISFIED, faulting nothing, and G8-RR-02's Verification REJECTED,
-//     faulting RR-02, as described. Their standings are the author's claim, as every clean case's and every catcher's.
+//     faulting RR-02, as described: conferred directly, for neither of the pair is a case of this set or has an oracle of its
+//     own. ~~Their standings are the author's claim, as every clean case's and every catcher's.~~ ⭐ B7's check (its second
+//     MINOR finding) — their standings were not on the sponsor's screen: each, the author's claim, is the builder's
+//     proposal, carried as proposed, as `REG-D-124`'s record carries the six graph oracles' (`oracles-v7.ts`).
 // ⭐ CONFERRED, NEVER PROPOSED: `conferral` records both questions and the sponsor's answers, and carries no `ORACLES_PROPOSED`.
 // A change to a plant, a verdict, a criterion or a catcher goes back to the sponsor (Q31's own condition).
 // Correcting an oracle is a new oracle VERSION, never an edit, and moves no case digest.
@@ -34,7 +37,7 @@ const RR = {
 	'09': 'RR-09-no-completeness-from-existence'
 } as const;
 
-/** A clean part's oracle: SATISFIED, nothing faulted, its source PWA's oracle carried with its standing. */
+/** A clean part's oracle (Q30): SATISFIED, nothing faulted, its source PWA's oracle carried with its standing. */
 const clean = (caseId: string, part: string, source: string): Oracle => ({
 	caseId,
 	faulted: [],
@@ -42,7 +45,30 @@ const clean = (caseId: string, part: string, source: string): Oracle => ({
 	expectation: AUTHORS_CLAIM,
 	note:
 		`${part}, a part of ${source}, whose oracle is SATISFIED with nothing faulted: under ASR-10 each of its required parts is ` +
-		`satisfied, so this part is too (REG-D-126 ${source.startsWith('G8') ? 'Q31' : 'Q30'}). The source oracle’s standing, the author’s claim, is carried.`
+		'satisfied, so this part is too (REG-D-126 Q30). The source oracle’s standing, the author’s claim, is carried.'
+});
+
+/**
+ * ⭐ B7's check (its second MINOR finding) — HOW THE 3-LEVEL PAIR'S STANDINGS ARE CARRIED: Q31's screen showed verdicts and
+ * no standing, so each is the builder's proposal, carried as proposed — `REG-D-124`'s form for the six graph oracles.
+ */
+const PAIR_STANDING =
+	'Its standing, the author’s claim, is the builder’s proposal: Q31’s screen showed no standing, so it is carried as proposed, ' +
+	'as REG-D-124’s record carries the six graph oracles’.';
+
+/**
+ * ⭐ B7's check — A PART OF G8-CLEAN: SATISFIED, nothing faulted, conferred directly by Q31 — G8-CLEAN is no case of this set
+ * and has no oracle, so there is no source oracle to carry.
+ */
+const cleanG8 = (caseId: string, part: string): Oracle => ({
+	caseId,
+	faulted: [],
+	disposition: 'SATISFIED',
+	expectation: AUTHORS_CLAIM,
+	note:
+		`${part}, a part of G8-CLEAN, the clean 3-level PWA: SATISFIED with nothing faulted, conferred directly by REG-D-126 Q31 ` +
+		'(“One clean 3-level PWA, every part expected SATISFIED”); G8-CLEAN is no case of this set and has no oracle of its own. ' +
+		PAIR_STANDING
 });
 
 /** A catcher's oracle: REJECTED, its plant's criterion faulted, at the part design §5's table names. */
@@ -52,22 +78,24 @@ const catcher = (caseId: string, part: string, source: string, rr: keyof typeof 
 	disposition: 'REJECTED',
 	expectation: AUTHORS_CLAIM,
 	note:
-		`${part} catches ${source}’s plant — ${plant} — and faults it (RR-${rr}): ${why} (design §5’s table; REG-D-126 ` +
-		`${source.startsWith('G8') ? 'Q31' : 'Q30'}). Its standing, the author’s claim, is the lead’s designation.`
+		`${part} catches ${source}’s plant — ${plant} — and faults it (RR-${rr}): ${why} ` +
+		(source.startsWith('G8')
+			? `(design §5, the 3-level pair; REG-D-126 Q31, its expected verdict conferred as described). ${PAIR_STANDING}`
+			: '(design §5’s table; REG-D-126 Q30). Its standing, the author’s claim, is the lead’s designation.')
 });
 
 /** ⭐ The 35 part-case oracles, in the case set's order — each written out, as the sponsor conferred it. */
 const PART_ORACLES_V8: readonly Oracle[] = [
-	clean('G3-CLEAN.T01', 'The root, “Pedestrian Bridge Structural Review”,', 'G3-CLEAN'),
+	clean('G3-CLEAN.T01', 'The root, “Pedestrian Bridge Structural Review”', 'G3-CLEAN'),
 	clean('G3-CLEAN.T02', '“Site and Geotechnical Survey”', 'G3-CLEAN'),
 	clean('G3-CLEAN.T03', '“Structural Form Options Study”', 'G3-CLEAN'),
 	clean('G3-CLEAN.T04', '“Load Analysis (pedestrian, wind, vibration)”', 'G3-CLEAN'),
 	clean('G3-CLEAN.T05', '“Member, Connection and Foundation Design”', 'G3-CLEAN'),
 	clean('G3-CLEAN.T06', '“Independent Design Check”', 'G3-CLEAN'),
 	clean('G3-CLEAN.T07', '“Rail Authority Permit Submission”', 'G3-CLEAN'),
-	clean('G3-CLEAN-R1.T01', 'The root, “Rail Footbridge Engineering Assessment”,', 'G3-CLEAN-R1'),
-	clean('G3-CLEAN-R2.T01', 'The root, “Station Road Footbridge Review”,', 'G3-CLEAN-R2'),
-	clean('G3-CLEAN-R3.T01', 'The root, “Crossing Structure Appraisal”,', 'G3-CLEAN-R3'),
+	clean('G3-CLEAN-R1.T01', 'The root, “Rail Footbridge Engineering Assessment”', 'G3-CLEAN-R1'),
+	clean('G3-CLEAN-R2.T01', 'The root, “Station Road Footbridge Review”', 'G3-CLEAN-R2'),
+	clean('G3-CLEAN-R3.T01', 'The root, “Crossing Structure Appraisal”', 'G3-CLEAN-R3'),
 	catcher(
 		'G-RR-01.T01',
 		'The root, “Pedestrian Bridge Concept Study”,',
@@ -140,7 +168,7 @@ const PART_ORACLES_V8: readonly Oracle[] = [
 		'completeness is inferred from the connected types’ existence',
 		'the account’s whole-PWA completeness claim is shown beside its children’s outputs and the unproduced check certificate'
 	),
-	clean('G7-CLEAN.T01', 'The root, “Realization”,', 'G7-CLEAN'),
+	clean('G7-CLEAN.T01', 'The root, “Realization”', 'G7-CLEAN'),
 	clean('G7-CLEAN.T02', '“Implementation”', 'G7-CLEAN'),
 	clean('G7-CLEAN.T03', '“Verification”', 'G7-CLEAN'),
 	catcher(
@@ -183,13 +211,13 @@ const PART_ORACLES_V8: readonly Oracle[] = [
 		'the account invents an Assumption Disclosure assignment',
 		'its policy-id list and the account’s claim about this type expose the contradiction'
 	),
-	clean('G8-CLEAN.T01', 'The root, “Realization”,', 'G8-CLEAN'),
-	clean('G8-CLEAN.T02', '“Implementation”', 'G8-CLEAN'),
-	clean('G8-CLEAN.T03', '“Tool Build”', 'G8-CLEAN'),
-	clean('G8-CLEAN.T04', '“Unit Tests”', 'G8-CLEAN'),
-	clean('G8-CLEAN.T05', '“Verification”', 'G8-CLEAN'),
-	clean('G8-CLEAN.T06', '“Verification Preparation”', 'G8-CLEAN'),
-	clean('G8-CLEAN.T07', '“End-to-End Verification”', 'G8-CLEAN'),
+	cleanG8('G8-CLEAN.T01', 'The root, “Realization”'),
+	cleanG8('G8-CLEAN.T02', '“Implementation”'),
+	cleanG8('G8-CLEAN.T03', '“Tool Build”'),
+	cleanG8('G8-CLEAN.T04', '“Unit Tests”'),
+	cleanG8('G8-CLEAN.T05', '“Verification”'),
+	cleanG8('G8-CLEAN.T06', '“Verification Preparation”'),
+	cleanG8('G8-CLEAN.T07', '“End-to-End Verification”'),
 	catcher(
 		'G8-RR-02.T05',
 		'“Verification”',
@@ -226,8 +254,10 @@ export const ORACLES_V8: OracleSet = {
 		'“Add the 3-level pair (Recommended)”, whose text read “One clean 3-level PWA, every part expected SATISFIED, and a twin ' +
 		'in which one middle phase\'s children leave out work that phase\'s own purpose requires, expected REJECTED on RR-02 at ' +
 		'that phase\'s review. Choosing this confirms those expected verdicts. About 14 more calls (qualification about 70).” — ' +
-		'G8-CLEAN’s seven parts SATISFIED and G8-RR-02’s Verification REJECTED, faulting RR-02, as described. Each catcher’s ' +
-		'standing, and each of the pair’s, is the author’s claim, the lead’s designation. A change to a plant, a verdict, a ' +
-		'criterion or a catcher goes back to the sponsor.',
+		'G8-CLEAN’s seven parts SATISFIED and G8-RR-02’s Verification REJECTED, faulting RR-02, as described. Each of the 14 ' +
+		'catchers’ standing, the author’s claim, is the lead’s designation. The 3-level pair’s standings were not on the ' +
+		'sponsor’s screen: Q31 showed none, and each of its eight, the author’s claim, is the builder’s proposal, carried as ' +
+		'proposed, as REG-D-124’s record carries the six graph oracles’. A change to a plant, a verdict, a criterion or a ' +
+		'catcher goes back to the sponsor.',
 	oracles: [...CARRIED_ORACLES, ...PART_ORACLES_V8]
 };

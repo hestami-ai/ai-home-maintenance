@@ -2905,6 +2905,42 @@ describe('⭐⭐ the review in parts, B7 — reviewer-qualification case set v8:
 			expect(set.oracles.find((o) => o.caseId === c.id)!.expectation, c.id).toBe(v7.get(c.sourceCaseId)!.expectation);
 	});
 
+	it('⭐ B7’s check (the second MINOR finding) — EACH NOTE SAYS WHERE ITS VERDICT AND ITS STANDING COME FROM: G8-CLEAN, which has no oracle, gives its parts none to carry — Q31 conferred them directly — and the pair’s standings, which no screen showed, are the builder’s proposal, carried as proposed (REG-D-124’s form); the 14 catchers’ alone are the lead’s designation; no note holds a doubled comma', () => {
+		// ⭐ THE ARRANGEMENT: G8-CLEAN and G8-RR-02 are no case of version eight, and no oracle of version seven or eight is theirs.
+		const sets = [JSON.parse(read(ORACLES_V7_FILE)) as OracleSet, generatedOraclesV8()];
+		expect(sets.flatMap((s) => s.oracles.filter((o) => o.caseId === 'G8-CLEAN' || o.caseId === 'G8-RR-02')), 'no oracle of the pair itself').toEqual([]);
+		expect(generatedV8().cases.filter((c) => c.id === 'G8-CLEAN' || c.id === 'G8-RR-02'), 'nor any case').toEqual([]);
+		const notes = new Map(generatedOraclesV8().oracles.map((o) => [o.caseId, o.note]));
+		const g8Clean = partsV8().filter((c) => c.sourceCaseId === 'G8-CLEAN').map((c) => c.id);
+		expect(g8Clean, 'arrangement: G8-CLEAN’s seven parts').toHaveLength(7);
+		for (const id of g8Clean) {
+			const note = notes.get(id)!;
+			expect(note, `${id}: no source oracle to carry`).not.toMatch(/whose oracle is|source oracle/);
+			expect(note, `${id}: conferred directly`).toContain('conferred directly by REG-D-126 Q31');
+			expect(note, `${id}: its standing the builder’s proposal`).toContain('is the builder’s proposal: Q31’s screen showed no standing, so it is carried as proposed');
+		}
+		const twin = notes.get('G8-RR-02.T05')!;
+		expect(twin, 'G8-RR-02’s catcher: its standing the builder’s proposal').toContain('is the builder’s proposal: Q31’s screen showed no standing, so it is carried as proposed');
+		expect(twin, 'never the lead’s designation').not.toContain('designation');
+		expect(twin, 'nor a row of design §5’s table').not.toContain('table');
+		// ⭑ CONTROL — the 14 catchers’ standing IS the lead’s designation, and the 13 clean parts carry their source oracles’.
+		const q30Catchers = DESIGN_CATCHERS.filter(([source]) => !source.startsWith('G8'));
+		expect(q30Catchers, 'arrangement: the 14 of Q30’s table').toHaveLength(14);
+		for (const [source, part] of q30Catchers) {
+			const c = partsV8().find((x) => x.sourceCaseId === source && typeNameOf(x) === part)!;
+			expect(notes.get(c.id), `${c.id}: the lead’s designation`).toContain('Its standing, the author’s claim, is the lead’s designation.');
+		}
+		for (const c of partsV8().filter((x) => x.sourceCaseId.includes('CLEAN') && !x.sourceCaseId.startsWith('G8')))
+			expect(notes.get(c.id), `${c.id}: its source oracle’s standing`).toContain('The source oracle’s standing, the author’s claim, is carried.');
+		expect([...notes].filter(([, n]) => /,\s*,/.test(n)).map(([id]) => id), 'notes with a doubled comma').toEqual([]);
+		const { conferral } = generatedOraclesV8();
+		expect(conferral, 'the catchers’ standing').toContain('Each of the 14 catchers’ standing, the author’s claim, is the lead’s designation.');
+		expect(conferral, 'the pair’s').toContain(
+			'The 3-level pair’s standings were not on the sponsor’s screen: Q31 showed none, and each of its eight, the author’s claim, is the builder’s proposal, carried as proposed, as REG-D-124’s record carries the six graph oracles’.'
+		);
+		expect(conferral, 'not the lead’s designation for the pair').not.toContain('each of the pair’s, is the author’s claim, the lead’s designation');
+	});
+
 	it('⭐ CONFERRED (REG-D-126 Q30, Q31) — the record quotes both questions and the sponsor’s answers, carries the 41’s conferral whole and no proposal’s word; reviewer:qual:check finds no CONFERRAL problem in it', async () => {
 		const { conferral } = generatedOraclesV8();
 		expect(conferral, 'the 41’s conferral, carried whole').toContain(`carried with every standing unchanged: ${committedOraclesV6().conferral} `);
