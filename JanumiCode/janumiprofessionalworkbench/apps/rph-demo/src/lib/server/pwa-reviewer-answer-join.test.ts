@@ -42,17 +42,18 @@ type Answer = { readonly attemptOrdinal: number; readonly answer?: string };
 type Shown = {
 	readonly floor?: { readonly policies: readonly { readonly policyId: string; readonly disposition: string }[] };
 	readonly reviewerAnswer?: Answer;
-	readonly partAnswers: readonly { readonly typeId: string; readonly answer: Answer }[];
+	readonly typeReviews: readonly { readonly typeId: string; readonly answer?: Answer }[];
 };
 /**
- * ⭐ B3 — the page's load, its one part's answer read where the review now is: under the part (`partAnswers`). ⛔ And the
- * PWA's own answer is asked to be absent every time: a round in parts records no reviewer call under the PWA.
+ * ⭐ B3 — the page's load, its one part's answer read where the review now is: under the part (~~`partAnswers`~~ ⭐ B5:
+ * `typeReviews`, each type's own review, its answer with it). ⛔ And the PWA's own answer is asked to be absent every time: a
+ * round in parts records no reviewer call under the PWA.
  */
 const page = async (): Promise<Shown & { readonly reviewerAnswer?: Answer }> => {
 	const shown = (await load(event)) as Shown;
 	expect(shown.reviewerAnswer, 'the PWA itself has no reviewer answer once its review is in parts').toBeUndefined();
-	expect(shown.partAnswers.map((p) => p.typeId), 'the answer is not under the part').toEqual([ROOT]);
-	return { ...shown, reviewerAnswer: shown.partAnswers[0]!.answer };
+	expect(shown.typeReviews.map((p) => p.typeId), 'the answer is not under the part').toEqual([ROOT]);
+	return { ...shown, reviewerAnswer: shown.typeReviews[0]!.answer };
 };
 
 /** A reply answering every criterion of the seeded policy, met — told apart from another by `run`. */

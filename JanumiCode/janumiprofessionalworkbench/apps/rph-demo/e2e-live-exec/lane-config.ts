@@ -589,7 +589,8 @@ export const PHASE7_TEST_TIMEOUT_MS =
  * makes (`REG-D-105` (4)) ⭐ — and, on the completion programme's main line (E12 and E3 merged), before every other act
  * the lane presses that spends it, that act's own worst case counted: before each sign-off and before the rule's re-run
  * of a unit's declared reviews (`E12F` F2; `signOffWorstCase`), and in half B before Send, the authoring floor's
- * (`REG-D-112`, E3's review finding 2; `PHASE7_AUTHORING_REVIEWER_CALLS`), and, paid, before the root's press, ~~a MODEL
+ * (`REG-D-112`, E3's review finding 2; ~~`PHASE7_AUTHORING_REVIEWER_CALLS`~~ ⭐ `phase7AuthoringReviewerCalls` for the
+ * anticipated inventory, the review in parts, B6), and, paid, before the root's press, ~~a MODEL
  * root's (`rootLimitCheck`; `PHASE7_UNIT_REVIEWER_CALLS`)~~ ⭐ not its worst case: a MODEL root's one try's reserve, and
  * none for a root that runs no model (`rootLimitCheck`; `PHASE7_TRY_RESERVE`; `REG-D-114` (14), as amended 2026-10-16).
  * ~~⚠ Two rules, as each package built its own: before a phase, a
@@ -604,15 +605,17 @@ export const PHASE7_TEST_TIMEOUT_MS =
  * in it total at most 306: 450, less the 4 held back and the phase's 140.~~ ⛔ `REG-D-114` (14), as amended 2026-10-16: a
  * phase's whole worst case would refuse every phase once about 306 calls are spent ⭐ (at the limit of 450; ~~at today's
  * 600, once 456 are: 600, less the 4 held back and the phase's 140~~ ~~⭐ at today's 650, once 506 are: 650, less the 4
- * held back and the phase's 140, P6 package L, F1; `REG-D-120` Q15~~ ⭐ at today's 800, once 656 are: 800, less the 4 held
- * back and the phase's 140, package Q, F5; `REG-D-123` Q26). ⭐ What each act counts, by the one rule
+ * held back and the phase's 140, P6 package L, F1; `REG-D-120` Q15~~ ~~⭐ at today's 800, once 656 are: 800, less the 4 held
+ * back and the phase's 140, package Q, F5; `REG-D-123` Q26~~ ⭐ at today's 900, once 756 are: 900, less the 4 held back and
+ * the phase's 140, the review in parts, package C, B6; `REG-D-126` Q32). ⭐ What each act counts, by the one rule
  * as amended: before a phase's Begin & Execute, the rule's re-run of its work or of its review, and a MODEL root's press,
  * ONE TRY'S RESERVE (`PHASE7_TRY_RESERVE`), D8's own rule, for the lane checks again before every later press; before a
  * sign-off and the rule's re-run of its declared reviews, that act's worst case; before Send, the authoring floor's. So a
  * phase is started while the calls spent before the run and those recorded in it total at most ~~442: 450, less the 4 held
  * back and the phase's 4~~ ~~⭐ 592: 600, less the 4 held back and the phase's 4 (P5 package C, F2; `REG-D-114` (14))~~ ~~⭐
- * 642: 650, less the 4 held back and the phase's 4 (P6 package L, F1; `REG-D-114` (14))~~ ⭐ 792: 800, less the 4 held back
- * and the phase's 4 (package Q, F5; `REG-D-114` (14)) — ⚠ and
+ * 642: 650, less the 4 held back and the phase's 4 (P6 package L, F1; `REG-D-114` (14))~~ ~~⭐ 792: 800, less the 4 held back
+ * and the phase's 4 (package Q, F5; `REG-D-114` (14))~~ ⭐ 892: 900, less the 4 held back and the phase's 4 (the review in
+ * parts, package C, B6; `REG-D-114` (14)) — ⚠ and
  * a phase's own spend can carry the total past the limit, since nothing is checked during a
  * press (`PHASE7_UNIT_REVIEWER_CALLS`), which the run report says. ~~150 (`REG-D-102` (4))~~ ~~200: *"Raise limit to 200"* (`REG-D-105` (1), which amends
  * `REG-D-102` (4)); it covers the re-qualification, the re-run and a few recovery re-runs.~~ ~~230: *"the limit rises
@@ -626,14 +629,17 @@ export const PHASE7_TEST_TIMEOUT_MS =
  * chosen text states.~~ ~~⭐ `JAN-EXEC` Phase 7 P6, package L (F1; 2026-10-22) — 650: the sponsor chose *"Raise to about 650
  * (Recommended)"*, whose text read *"Room for P6 to finish even with a retry or two. Its spend still reports before P7."*
  * (`REG-D-120` Q15, asked before half B, P6), and its meaning reads *"`REG-D-110` (1)'s limit becomes about 650"* — held
- * as the number the sponsor's chosen label states.~~ ⭐ `JAN-EXEC` Phase 7 after P6's third run, package Q (F5; 2026-10-23)
+ * as the number the sponsor's chosen label states.~~ ~~⭐ `JAN-EXEC` Phase 7 after P6's third run, package Q (F5; 2026-10-23)
  * — 800: the sponsor chose *"Raise the limit to about 800 (Recommended)"*, whose text read *"Enough for the full
  * agent-authored PWA plus a retry or two. P6 still reports back before P7."* (`REG-D-123` Q26, asked after P6's third run,
  * half B, run-11), and its meaning reads *"`REG-D-110` (1)'s limit becomes about 800"* — held as the number the sponsor's
- * chosen label states. ⚠ Each paid step still reports before the next (`REG-D-110` (1)): the limit is the programme's
- * ceiling, not a step's approval.
+ * chosen label states.~~ ⭐ `JAN-EXEC` Phase 7, the review in parts, package C (B6; 2026-10-24) — 900: the sponsor chose
+ * *"Raise to about 900 (Recommended)"*, whose text read *"Room for retries in qualification and in P6. P6 still reports
+ * back before P7."* (`REG-D-126` Q32, asked after revision 1 of the review-in-parts design), and its meaning reads
+ * *"`REG-D-110` (1)'s limit becomes about 900."* — held as the number the sponsor's chosen label states. ⚠ Each paid step
+ * still reports before the next (`REG-D-110` (1)): the limit is the programme's ceiling, not a step's approval.
  */
-export const PHASE7_PAID_LIMIT = 800;
+export const PHASE7_PAID_LIMIT = 900;
 
 /** ⭐ D8 — the reviewer calls held back for the negative control (P7-4e): its own cap (`negative-control.ts`). */
 export const PHASE7_NEGATIVE_CONTROL_RESERVE = 4;
@@ -717,22 +723,47 @@ function halfFaults(env: Readonly<Record<string, string | undefined>>): string[]
 export const PHASE7_AUTHORING_FLOOR_RUNS = 2;
 
 /**
- * ⭐⭐ C3 — THE AUTHORING ALLOWANCE: the turn and its reviews, each floor run the agent's run and one review of up to
+ * ⭐⭐ C3 — THE AUTHORING ALLOWANCE: ~~the turn and its reviews, each floor run the agent's run and one review of up to
  * `reviewerCallsPerTry` calls — ONE TRY's figure of the one-unit lane, derived by reference — 2 × (3,600 s / 3) = 2 ×
- * (240 s + 4 × 240 s) = 2,400 s (40 minutes). ⚠ AN ALLOWANCE, NOT A BOUND: the agent's turn has none, as the executor's
- * has none (`executorCallMs`). A turn that outlasts it ends the run there, `allowance-exceeded`: the page that holds the
- * turn must not leave it (a turn is discarded when its page leaves), and nothing is pressed beside it.
+ * (240 s + 4 × 240 s) = 2,400 s (40 minutes)~~ ⭐⭐ the review in parts, B6 (`REG-D-125`; design D9; roadmap 9a.7, "Wait") —
+ * FOR `parts` TYPES: each floor run the agent's run, at the executor's allowance, and ONE REVIEW OF EACH PART of up to
+ * `reviewerCallsPerTry` calls at the reviewer's bound, derived from the one-unit lane's budget by reference — 2 × (240 s +
+ * parts × 4 × 240 s): 2,400 s (40 minutes) for one part, 31,200 s (520 minutes) for run-11's sixteen. ⛔ The figure was
+ * one part's for every turn: it counted two reviews in all, and the floor now reviews each type of the candidate in each of
+ * its two possible rounds (design D9). ⚠ AT LEAST ONE PART: the turn stages its types as the agent authors them, so a count
+ * read before the first is staged says nothing of the candidate to come, and is given one part's, the 2,400 s every turn was
+ * given before. ⚠ AN ALLOWANCE, NOT A BOUND: the agent's turn has none, as the executor's has none (`executorCallMs`). A
+ * turn that outlasts it ends the run there, `allowance-exceeded`: the page that holds the turn must not leave it (a turn is
+ * discarded when its page leaves), and nothing is pressed beside it.
  */
-export const PHASE7_AUTHORING_ALLOWANCE_MS =
-	PHASE7_AUTHORING_FLOOR_RUNS * (EXECUTE_TIMEOUT_MS / LANE_BUDGET.tries);
+export function phase7AuthoringAllowanceMs(parts: number): number {
+	return (
+		PHASE7_AUTHORING_FLOOR_RUNS *
+		(LANE_BUDGET.executorCallMs + Math.max(1, parts) * LANE_BUDGET.reviewerCallsPerTry * LANE_BUDGET.reviewerCallMs)
+	);
+}
 
 /**
- * ⭐⭐ `REG-D-112` (E3's review, finding 2) — THE AUTHORING TURN'S WORST CASE IN REVIEWER CALLS: each of its floor runs one
- * review of up to `reviewerCallsPerTry` calls — 2 × 4 = 8, the calls the allowance above counts in time. ⛔ Half B checks
- * it against the limit BEFORE SEND (D8): the lane's first check had been before the first PHASE, so the authoring floor's
- * reviews, and a model root's, were spent before the limit was ever asked.
+ * ⭐⭐ The review in parts, B6 (`REG-D-125`; design D11; roadmap 9a.7, "Spend reserve") — THE INVENTORY ANTICIPATED BEFORE SEND:
+ * no candidate exists before the request is sent, so the reserve the limit counts there is stated for the types it is
+ * expected to make — sixteen, run-11's candidate (`REG-F-571`; design §3's measurement and D11's arithmetic). ⚠ An estimate,
+ * never a bound: the agent may author more, and the lane reads the inventory its turn actually stages
+ * (`phase7-operator.ts`, `waitForTheCandidate`).
  */
-export const PHASE7_AUTHORING_REVIEWER_CALLS = PHASE7_AUTHORING_FLOOR_RUNS * LANE_BUDGET.reviewerCallsPerTry;
+export const PHASE7_AUTHORING_ANTICIPATED_PARTS = 16;
+
+/**
+ * ⭐⭐ `REG-D-112` (E3's review, finding 2) — THE AUTHORING TURN'S WORST CASE IN REVIEWER CALLS: ~~each of its floor runs one
+ * review of up to `reviewerCallsPerTry` calls — 2 × 4 = 8, the calls the allowance above counts in time~~ ⭐⭐ the review in
+ * parts, B6 (design D11) — FOR `parts` TYPES: each of its floor runs a review of each part, each of up to
+ * `reviewerCallsPerTry` calls — 2 × parts × 4: 128 for sixteen, the calls the allowance above counts in time. ⛔ It was a
+ * constant, 8, and a candidate of sixteen types inherited it. ⛔ Half B checks it against the limit BEFORE SEND (D8), for the
+ * anticipated inventory (`PHASE7_AUTHORING_ANTICIPATED_PARTS`): the lane's first check had been before the first PHASE, so
+ * the authoring floor's reviews, and a model root's, were spent before the limit was ever asked.
+ */
+export function phase7AuthoringReviewerCalls(parts: number): number {
+	return PHASE7_AUTHORING_FLOOR_RUNS * parts * LANE_BUDGET.reviewerCallsPerTry;
+}
 
 /**
  * ⭐⭐ `REG-D-112` (finding 2) — ONE MODEL UNIT'S WORST CASE IN REVIEWER CALLS, as its allowance counts its reviews
@@ -758,11 +789,11 @@ export const PHASE7_UNIT_REVIEWER_CALLS =
  * phase's Begin & Execute, the rule's re-run of its work or of its review, and a MODEL root's press — one review of up to
  * `reviewerCallsPerTry` calls, 4: D8's own rule, for the lane checks the limit again before every later press. ⛔ Counted
  * instead of the act's whole worst case (`PHASE7_UNIT_REVIEWER_CALLS`, 140), which would refuse every phase once about ~~306~~
- * ~~⭐ 456~~ ~~⭐ 506~~ ⭐ 656 calls are spent (306 at the limit of 450, 456 at 600, 506 at 650). ⚠ So a press is let through
- * while one try's review fits, and what it spends after that is not checked until the next press: a phase's own spend can
- * carry the total past the limit (the sponsor's limit is ~~"about 450", `REG-D-110` (1)~~ ~~⭐ "about 600", `REG-D-117` Q10,
- * raising `REG-D-110` (1)'s~~ ~~⭐ "about 650", `REG-D-120` Q15, raising `REG-D-110` (1)'s~~ ⭐ "about 800", `REG-D-123` Q26,
- * raising `REG-D-110` (1)'s).
+ * ~~⭐ 456~~ ~~⭐ 506~~ ~~⭐ 656~~ ⭐ 756 calls are spent (306 at the limit of 450, 456 at 600, 506 at 650, 656 at 800). ⚠ So
+ * a press is let through while one try's review fits, and what it spends after that is not checked until the next press: a
+ * phase's own spend can carry the total past the limit (the sponsor's limit is ~~"about 450", `REG-D-110` (1)~~ ~~⭐ "about
+ * 600", `REG-D-117` Q10, raising `REG-D-110` (1)'s~~ ~~⭐ "about 650", `REG-D-120` Q15, raising `REG-D-110` (1)'s~~ ~~⭐
+ * "about 800", `REG-D-123` Q26, raising `REG-D-110` (1)'s~~ ⭐ "about 900", `REG-D-126` Q32, raising `REG-D-110` (1)'s).
  */
 export const PHASE7_TRY_RESERVE = LANE_BUDGET.reviewerCallsPerTry;
 
@@ -777,12 +808,17 @@ export const PHASE7_DESIGNER_ACTS = 4;
  * read; and each designer act at its bound — its click, its POST (a sign-off act's bound: none of the four calls a model),
  * and the store read after it — 2,400 s + 5 s + 300 s + 4 × (120 s + 300 s + 300 s) = 5,585 s. ⚠ Creating the draft and
  * the Undertaking are the setup allowance's, as half A's typing is (`PHASE7_SETUP_MS`).
+ * ⭐ The review in parts, B6 (design D9) — FOR `parts` TYPES, the allowance theirs (`phase7AuthoringAllowanceMs`): 5,585 s at
+ * one part, as before, and 34,385 s at sixteen.
  */
-export const PHASE7_AUTHORING_MS =
-	PHASE7_AUTHORING_ALLOWANCE_MS +
-	PHASE7_CANDIDATE_POLL_MS +
-	PHASE7_INTROSPECT_MS +
-	PHASE7_DESIGNER_ACTS * (PHASE7_UI_MS + PHASE7_SIGN_OFF_MS + PHASE7_INTROSPECT_MS);
+export function phase7AuthoringMs(parts: number): number {
+	return (
+		phase7AuthoringAllowanceMs(parts) +
+		PHASE7_CANDIDATE_POLL_MS +
+		PHASE7_INTROSPECT_MS +
+		PHASE7_DESIGNER_ACTS * (PHASE7_UI_MS + PHASE7_SIGN_OFF_MS + PHASE7_INTROSPECT_MS)
+	);
+}
 
 /**
  * ⭐ C3 — ONE PHASE'S SHARE OF THE SPEC'S TIMEOUT, each act at its bound: its Begin & Execute and what follows it, the
@@ -809,7 +845,8 @@ export const NODE_TIMER_CEILING_MS = 2_147_483_647;
  * ~~372,240 s + 5,585 s = 377,825 s~~ ⭐ 419,640 s + 5,585 s = 425,225 s, half A's counting E12's sign-offs. ⛔ CAPPED AT
  * NODE'S TIMER CEILING, past which Playwright would time the test out at once: a PWA of ~~26~~ ⭐ 23 phases or more is
  * given the ceiling, about 596 hours, not its arithmetic. ⚠ Half B STARTS under half
- * A's timeout, which covers the authoring many times over, and the lane extends it here when the units are read.
+ * A's timeout, which covers ~~the authoring~~ ⭐ one part's authoring many times over, and the lane extends it ⭐ while its
+ * turn runs, for the parts it stages (`phase7HalfBAuthoringTimeoutMs`), and here when the units are read.
  * ⭐⭐ ~~`phases`~~ `declared` (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (15)) — the policies each
  * unit declares as the store holds them, one count per unit, the root first: its phases are the units after the root, and
  * EACH UNIT'S SIGN-OFF IS RE-COUNTED FOR ITS OWN POLICIES (`phase7SignOffUnitMs`) in place of §3.2's four
@@ -818,12 +855,26 @@ export const NODE_TIMER_CEILING_MS = 2_147_483_647;
  * five units each declaring four, the figure above. ⚠ And the ceiling's 23 phases are for units each declaring four:
  * units declaring more reach it with as many phases or fewer (eight each, 21), units declaring fewer need as many or more
  * (one each, 25).
+ * ⭐ The review in parts, B6 (design D9) — AND THE AUTHORING'S SHARE FOR THE `parts` ITS TURN STAGED (`phase7AuthoringMs`), the
+ * largest count the lane read: the figures above are one part's, 5,585 s, and at sixteen parts the share is 34,385 s, so for
+ * four phases 454,025 s. ⚠ The ceiling's three phase counts above hold at one part and at sixteen alike.
  */
-export function phase7HalfBTestTimeoutMs(declared: readonly number[]): number {
+export function phase7HalfBTestTimeoutMs(declared: readonly number[], parts: number): number {
 	const phases = declared.length - 1;
 	const signOffs = declared.reduce((ms, policies) => ms + phase7SignOffUnitMs(policies) - PHASE7_SIGN_OFF_UNIT_MS, 0);
 	return Math.min(
 		NODE_TIMER_CEILING_MS,
-		PHASE7_TEST_TIMEOUT_MS + (phases - PHASE7_MODEL_UNITS) * PHASE7_PER_PHASE_MS + signOffs + PHASE7_AUTHORING_MS
+		PHASE7_TEST_TIMEOUT_MS + (phases - PHASE7_MODEL_UNITS) * PHASE7_PER_PHASE_MS + signOffs + phase7AuthoringMs(parts)
 	);
+}
+
+/**
+ * ⭐ The review in parts, B6 (design D9: *"carry the allowance into the spec timeout"*) — HALF B'S TIMEOUT WHILE ITS TURN RUNS:
+ * half A's, which half B starts under, and the authoring's share for the `parts` its turn has staged — capped at Node's
+ * timer ceiling. The lane sets it each time it derives a larger allowance (`waitForTheCandidate`), so a turn the allowance
+ * still holds is not cut off by the test's own timeout: from 217 parts on, the authoring's share alone is longer than half
+ * A's timeout.
+ */
+export function phase7HalfBAuthoringTimeoutMs(parts: number): number {
+	return Math.min(NODE_TIMER_CEILING_MS, PHASE7_TEST_TIMEOUT_MS + phase7AuthoringMs(parts));
 }

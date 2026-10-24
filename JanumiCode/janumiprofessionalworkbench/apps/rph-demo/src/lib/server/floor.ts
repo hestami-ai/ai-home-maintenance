@@ -243,7 +243,7 @@ export interface FloorView {
 	 * ⚠ Set by `loadPwaFloor` (the page's read) and `loadSubjectFloor`; absent when no reasoning review is recorded, and on
 	 * `runPwaFloor`'s return, which no page renders an answer under. ⭐ The review in parts (`REG-D-125`): on a PWA's floor it is
 	 * the ROUND's token, which each part's assessments and reviewer calls carry; the page joins each part's answer to its
-	 * part's subject and this token (`partAnswers`).
+	 * part's subject and this token (~~`partAnswers`~~ ⭐ B5: `typeReviews`, `routes/pwa/[id]/+page.server.ts`).
 	 */
 	readonly reasoningReviewRunToken?: string;
 	/**

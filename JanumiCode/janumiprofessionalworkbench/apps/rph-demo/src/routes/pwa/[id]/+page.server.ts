@@ -52,14 +52,16 @@ import {
 	type UiCommandInput
 } from '$lib/server/workbench';
 import { markersIn } from '@janumipwb/rph-application';
-import { loadReviewerAnswer } from '$lib/server/assurance/reviewer-answer';
+import { loadReviewerAnswer, type ReviewerAnswerView } from '$lib/server/assurance/reviewer-answer';
 import { getArtifactStore } from '$lib/server/workbench';
 import {
 	escalationRecommendationNote,
 	floorBlockedHint,
 	floorChipLabel,
 	loadPwaFloor,
+	type CriterionTally,
 	type FloorObservationView,
+	type FloorPartView,
 	type FloorPolicyView,
 	type FloorView
 } from '$lib/server/floor';
@@ -119,6 +121,47 @@ function waiverTargetOf(floor: FloorView | undefined): {
 	// target. ⭑ IMPORTED, never restated (`verif/validator-failure-codes-imported.test.ts`).
 	const finding = blocking.observations.find((o) => o.code !== REVIEWER_RECOMMENDED_ESCALATION);
 	return { blocking, finding };
+}
+
+/** ⭐ The review in parts, B5 — one type's own review, as the inspector shows it under that type (`typeReviewOf`). */
+interface TypeReviewView {
+	readonly typeId: string;
+	readonly typeName: string;
+	readonly semanticVersion: number;
+	/** The part's disposition in the shown round; `MISSING` where the round holds no review of the type at this version. */
+	readonly disposition: string;
+	/** False for a `MISSING` part: the round holds no review of the type, so nothing below was recorded. */
+	readonly reviewed: boolean;
+	readonly criteria?: CriterionTally;
+	/** The statements of the part's observations, save the reviewer's recommendation, which `escalationRecommended` says. */
+	readonly findings: readonly string[];
+	readonly escalationRecommended: boolean;
+	/** The reviewer's answer of this part's review, joined to its subject and the round's token; absent where none is recorded. */
+	readonly answer?: ReviewerAnswerView;
+}
+
+/**
+ * ⭐⭐ The review in parts, B5 (`REG-D-125`; DESIGN-authoring-review-in-parts.md D7; roadmap 9a.6) — ONE TYPE'S OWN REVIEW, AS THE
+ * INSPECTOR SHOWS IT UNDER THAT TYPE: the part the shown round holds of it (`FloorView.parts`) — its disposition, or `MISSING`
+ * where the round holds no review of the type at its stored version; its criteria, evaluated and stipulated; its findings,
+ * each observation its review recorded save the reviewer's recommendation, which is said beside them; and its reviewer's
+ * answer (`loadReviewerAnswer`). ⛔ Each from the type's own part, whose observations carry the type their assessment was
+ * recorded under — never from the floor's Reasoning Review row, which folds every part (`partsDisposition`), and never from
+ * the reviewer's prose, which may name any type.
+ */
+function typeReviewOf(part: FloorPartView, answer: ReviewerAnswerView | undefined): TypeReviewView {
+	const recommendation = (o: FloorObservationView): boolean => o.code === REVIEWER_RECOMMENDED_ESCALATION;
+	return {
+		typeId: part.typeId,
+		typeName: part.typeName,
+		semanticVersion: part.semanticVersion,
+		disposition: part.disposition,
+		reviewed: part.disposition !== 'MISSING',
+		...(part.criteria === undefined ? {} : { criteria: part.criteria }),
+		findings: part.observations.filter((o) => !recommendation(o)).map((o) => o.statement),
+		escalationRecommended: part.observations.some(recommendation),
+		...(answer === undefined ? {} : { answer })
+	};
 }
 
 export const load: PageServerLoad = async ({ params }) => {
@@ -347,21 +390,23 @@ export const load: PageServerLoad = async ({ params }) => {
 		),
 		// ⭐ The review in parts, B3 (`REG-D-125`; design D6, D7) — AND EACH TYPE'S, its part's answer: joined to the part's own
 		// subject and the shown round's token, from CANONICAL as the one above is. ⚠ The PWA itself records no reviewer call
-		// once its review is in parts, so the answer above is absent beside such a floor; the panel renders these under each
-		// type once the inspector shows the parts (roadmap 9a.6, B5).
-		partAnswers: (
-			await Promise.all(
-				(floor?.parts ?? []).map(async (part) => {
-					const answer = await loadReviewerAnswer(
+		// once its review is in parts, so the answer above is absent beside such a floor; ~~the panel renders these under each
+		// type once the inspector shows the parts (roadmap 9a.6, B5)~~ ⭐⭐ B5 (roadmap 9a.6) — so each type's own review is read
+		// here whole, its answer with it (`typeReviewOf`), one per part of the shown round in the export's order: the inspector
+		// renders it under that type, and the floor panel lists them beside the PWA's policies.
+		typeReviews: await Promise.all(
+			(floor?.parts ?? []).map(async (part) =>
+				typeReviewOf(
+					part,
+					await loadReviewerAnswer(
 						part.typeId,
 						floor?.reasoningReviewRunToken,
 						canonicalEngine.as(SESSION_CREDENTIAL),
 						getArtifactStore()
-					);
-					return answer === undefined ? [] : [{ typeId: part.typeId, typeName: part.typeName, answer }];
-				})
+					)
+				)
 			)
-		).flat(),
+		),
 		// A pending fork is a PREVIEW. The graph/transcript/floor above read it, while this flag makes the authority
 		// boundary explicit to the browser and supplies the exact hash required by the accept action.
 		authoringTurn: candidate ? summarizeAuthoringTurn(candidate) : undefined,

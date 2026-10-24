@@ -41,6 +41,7 @@ import { PHASE7_PWA, promptMarkers, type Phase7TypeDeclaration } from '../../../
 // ⭐ E3 — half B's request, the order its units are read in, the floor's dispositions, and the candidate checks (C1-C4).
 import { candidateChecks, type CandidateChecks } from '../../../scripts/phase7/candidate-checks.js';
 import {
+	correlationsOf,
 	floorDispositions,
 	PHASE7_HALF_B_REQUEST,
 	TURN_SETTLED,
@@ -60,9 +61,11 @@ import {
 	LANE_BUDGET,
 	laneKeysRefusal,
 	phase7Half,
+	phase7AuthoringAllowanceMs,
+	phase7AuthoringReviewerCalls,
+	phase7HalfBAuthoringTimeoutMs,
 	phase7HalfBTestTimeoutMs,
-	PHASE7_AUTHORING_ALLOWANCE_MS,
-	PHASE7_AUTHORING_REVIEWER_CALLS,
+	PHASE7_AUTHORING_ANTICIPATED_PARTS,
 	PHASE7_CANDIDATE_POLL_MS,
 	PHASE7_DECLARED_POLICIES_PER_UNIT,
 	PHASE7_NEGATIVE_CONTROL_RESERVE,
@@ -621,8 +624,9 @@ export function unpressed(units: readonly ArchiveUnit[]): RunUnit[] {
  * root's press, the act counts ONE TRY'S RESERVE (`PHASE7_TRY_RESERVE`), D8's own rule: the lane checks again before every
  * later press. ⛔ Their whole worst case would refuse every phase once about 306 calls are spent ⭐ (at the limit of 450;
  * ~~at today's 600, once 456 are: 600, less the 4 held back and the phase's 140~~ ~~⭐ at today's 650, once 506 are: 650,
- * less the 4 held back and the phase's 140, P6 package L, F1; `REG-D-120` Q15~~ ⭐ at today's 800, once 656 are: 800, less
- * the 4 held back and the phase's 140, package Q, F5; `REG-D-123` Q26). ⚠ So a phase's own spend
+ * less the 4 held back and the phase's 140, P6 package L, F1; `REG-D-120` Q15~~ ~~⭐ at today's 800, once 656 are: 800, less
+ * the 4 held back and the phase's 140, package Q, F5; `REG-D-123` Q26~~ ⭐ at today's 900, once 756 are: 900, less the 4 held
+ * back and the phase's 140, the review in parts, package C, B6; `REG-D-126` Q32). ⚠ So a phase's own spend
  * can carry the total past the limit, for nothing checks it during the press; the run report says so. A sign-off and the
  * rule's re-run of its declared reviews still count their worst case, and Send the authoring floor's. ⭐ And the check
  * records what it counted, in words (`counted`, `COUNTED_AHEAD`).
@@ -645,13 +649,16 @@ export function limitCheck(prior: number, recorded: number, ahead: number, count
  * ⭐ `REG-D-114` (14), as amended 2026-10-16 — WHAT EACH CHECK COUNTED AHEAD OF ITS ACT, as the record says it
  * (`LimitCheck.counted`) and the run report prints it: one try's reserve before a phase, the rule's re-run of its work or of
  * its review, and a MODEL root's press; none before a root that runs no model; an act's worst case before a sign-off and
- * the rule's re-run of its declared reviews (`signOffWorstCase`), and before Send (`PHASE7_AUTHORING_REVIEWER_CALLS`).
+ * the rule's re-run of its declared reviews (`signOffWorstCase`), and before Send (~~`PHASE7_AUTHORING_REVIEWER_CALLS`~~ ⭐ the
+ * review in parts, B6: `phase7AuthoringReviewerCalls`, for the inventory anticipated — and, once the turn has settled, for
+ * the inventory it staged, Send's check counted again, `AuthoringRecord.inventoryCheck`).
  */
 export const COUNTED_AHEAD = {
 	tryReserve: 'one try’s reserve',
 	noModel: 'none: it runs no model',
 	declaredReviews: 'its declared reviews’ worst case',
-	authoringFloor: 'the authoring floor’s worst case'
+	authoringFloor: `the authoring floor’s worst case, for ${PHASE7_AUTHORING_ANTICIPATED_PARTS} anticipated types`,
+	stagedInventory: 'the authoring floor’s worst case, for the types its turn staged'
 } as const;
 
 /**
@@ -1447,14 +1454,38 @@ export interface AuthoringRecord {
 	sent: boolean;
 	/**
 	 * ⭐ `REG-D-112` (finding 2) — the limit, checked BEFORE SEND with the authoring floor's worst case counted
-	 * (`PHASE7_AUTHORING_REVIEWER_CALLS`); null when nothing was to be sent — the dry rehearsal stops before it.
+	 * (~~`PHASE7_AUTHORING_REVIEWER_CALLS`~~ ⭐ the review in parts, B6: `phase7AuthoringReviewerCalls`, for the inventory
+	 * anticipated, `PHASE7_AUTHORING_ANTICIPATED_PARTS`); null when nothing was to be sent — the dry rehearsal stops before it.
 	 */
 	limitCheck: LimitCheck | null;
 	/** The store's reads of the candidate while the turn ran. */
 	polls: number;
 	/** The candidate as last read. */
 	candidate: CandidateReading | null;
-	/** ⭐ The floor's dispositions of the candidate, each policy's latest assessment, read from the turn's fork. */
+	/**
+	 * ⭐ The review in parts, B6 (`REG-D-125`; design D9, D11) — THE INVENTORY THE TURN STAGED: the most types any read of the
+	 * candidate held, which every review round of the turn reviews as parts. 0 until a type is staged.
+	 */
+	parts: number;
+	/**
+	 * ⭐ B6 (design D9) — the allowance the wait was held to when it stopped: derived from `parts`, and refreshed whenever a
+	 * read staged more (`phase7AuthoringAllowanceMs`); null until the lane waits.
+	 */
+	allowanceMs: number | null;
+	/**
+	 * ⭐ B6 (design D11; roadmap 9a.7, "Spend reserve") — SEND'S CHECK, COUNTED AGAIN FOR THE INVENTORY THE TURN STAGED, made
+	 * once the turn settled: the calls spent before the run and those recorded before Send, the reserve, and the authoring
+	 * floor's worst case for `parts` (`COUNTED_AHEAD.stagedInventory`); null where the turn staged no more than was anticipated,
+	 * or did not settle. ⚠ It refuses nothing: the floor's rounds run inside the Send press, where the lane checks nothing
+	 * (`REG-D-114` (14)), so this says whether the reserve held — a larger candidate never inherits the smaller estimate
+	 * unsaid — and the next check, before the root's press, counts the calls the store records.
+	 */
+	inventoryCheck: LimitCheck | null;
+	/**
+	 * ⭐ The floor's dispositions of the candidate, ~~each policy's latest assessment~~ ⭐ (the review in parts, B6) of its latest
+	 * round, read from the turn's fork: the PWA's two deterministic assessments, and the Reasoning Review as the aggregate of
+	 * its complete part set, each of the candidate's types and its review in the round (`FloorDisposition.parts`).
+	 */
 	floor: FloorDisposition[];
 	/**
 	 * ⭐ C3 — the author's model: as configured (`JPWB_AGENT_MODEL`), and as the page's turn named the model it resolved
@@ -1493,6 +1524,9 @@ export const authoringRecordOf = (request: string, configured: string | null): A
 	limitCheck: null,
 	polls: 0,
 	candidate: null,
+	parts: 0,
+	allowanceMs: null,
+	inventoryCheck: null,
 	floor: [],
 	authorModel: { configured, resolved: null },
 	reviewer: null,
@@ -1594,19 +1628,36 @@ interface AuthoringEnd {
  *   · `allowance-exceeded` — the turn outlasted its allowance: the page still holds it, and nothing is pressed beside it;
  *   · `authoring-stopped` — no candidate is staged after the first pause and the page's turn is over: the server refused
  *     the turn before it began (its words are on the page's agent log).
+ * ⭐⭐ The review in parts, B6 (`REG-D-125`; design D9; roadmap 9a.7, "Wait") — THE ALLOWANCE IS THE STAGED INVENTORY'S, refreshed
+ * at every read: each read counts the types the candidate holds, the most any read held is the turn's inventory
+ * (`AuthoringRecord.parts`), and the deadline is the allowance for it from the wait's start (`phase7AuthoringAllowanceMs`) —
+ * so a type the refinement adds extends it, and one it removes does not shorten it, its first round having reviewed it. Each
+ * larger allowance is carried into the spec's timeout (`extendTimeout`, `phase7HalfBAuthoringTimeoutMs`). ⛔ It was one
+ * constant, 2,400 s: two reviews at their retry bounds, where a sixteen-type candidate's two rounds are 32 (design D9).
  */
 async function waitForTheCandidate(
 	author: AuthoringHands,
 	read: LaneHands['read'],
 	authoring: AuthoringRecord,
 	pwaId: string,
-	save: () => void
+	save: () => void,
+	extendTimeout: ((ms: number) => void) | undefined
 ): Promise<{ readonly snapshot: EngineSnapshot } | AuthoringEnd> {
-	const deadline = author.now() + PHASE7_AUTHORING_ALLOWANCE_MS;
+	const start = author.now();
+	authoring.allowanceMs = phase7AuthoringAllowanceMs(authoring.parts);
 	for (;;) {
 		const { snapshot } = await read();
 		authoring.polls += 1;
 		authoring.candidate = candidateOf(snapshot, pwaId);
+		const staged = (snapshot.authoringCandidates ?? []).find((c) => c.pwaId === pwaId)?.pwuTypes.length ?? 0;
+		if (staged > authoring.parts) {
+			authoring.parts = staged;
+			const allowance = phase7AuthoringAllowanceMs(staged);
+			if (allowance > authoring.allowanceMs) {
+				authoring.allowanceMs = allowance;
+				extendTimeout?.(phase7HalfBAuthoringTimeoutMs(staged));
+			}
+		}
 		save();
 		if (authoring.candidate !== null && TURN_SETTLED.has(authoring.candidate.status))
 			return { snapshot };
@@ -1619,14 +1670,15 @@ async function waitForTheCandidate(
 						'words are on the designer’s agent log)'
 				}
 			};
+		const deadline = start + authoring.allowanceMs;
 		if (author.now() >= deadline)
 			return {
 				end: {
 					reason: 'allowance-exceeded',
 					detail:
-						`the authoring turn outlasted its allowance of ${PHASE7_AUTHORING_ALLOWANCE_MS} ms, its candidate read ` +
-						`${authoring.candidate?.status ?? 'none'}: the page still holds it, and nothing is pressed beside it ` +
-						'(design §4 C3)'
+						`the authoring turn outlasted its allowance of ${authoring.allowanceMs} ms for ${Math.max(1, authoring.parts)} ` +
+						`part(s), its candidate read ${authoring.candidate?.status ?? 'none'}: the page still holds it, and nothing ` +
+						'is pressed beside it (design §4 C3, the review in parts D9)'
 				}
 			};
 		await author.pause(PHASE7_CANDIDATE_POLL_MS);
@@ -1650,10 +1702,12 @@ async function recordTheFloor(
 ): Promise<void> {
 	const staged = (snapshot.authoringCandidates ?? []).find((c) => c.pwaId === pwaId);
 	// ⭐ The review in parts, B3 (`REG-D-125`): the Reasoning Review is each type's, the staged candidate's types read here.
+	// ⭐ B6 — and of ONE round, the complete part set: each assessment's token read off the candidate's own completions.
 	authoring.floor = floorDispositions(
 		staged?.assessments ?? [],
 		pwaId,
-		(staged?.pwuTypes ?? []).map((t) => t.id)
+		staged?.pwuTypes ?? [],
+		correlationsOf(staged?.completionEvents ?? [])
 	);
 	authoring.authorModel.resolved =
 		(await author.producerLine()) ?? authoring.floor.find((f) => f.producer !== null)?.producer ?? null;
@@ -1696,10 +1750,11 @@ function designerEnd(o: ActionOutcome, act: string): RunEnd | null {
  *   1. the draft, created through the page — and ⛔ DRY, THE REHEARSAL STOPS HERE, BEFORE SEND: authoring is a model call
  *      (C6). The turn itself is rehearsed in the gate, with the mock agent (`e2e/phase7-half-b.e2e.ts`);
  *   1b. ⭐ `REG-D-112` (E3's review, finding 2) — THE LIMIT, BEFORE SEND (D8), the authoring floor's worst case counted
- *      (~~`limitCheckAhead`~~ ⭐ `limitCheck`, the one rule; `PHASE7_AUTHORING_REVIEWER_CALLS`): past it the run ends
- *      `paid-limit`, nothing sent;
+ *      (~~`limitCheckAhead`~~ ⭐ `limitCheck`, the one rule; ~~`PHASE7_AUTHORING_REVIEWER_CALLS`~~ ⭐ the review in parts, B6:
+ *      `phase7AuthoringReviewerCalls`, for the inventory anticipated): past it the run ends `paid-limit`, nothing sent;
  *   2. the request, sent from the designer's chat, the page held where it is;
- *   3. the candidate's status, waited on through the store (`waitForTheCandidate`); the floor's dispositions and its
+ *   3. the candidate's status, waited on through the store (`waitForTheCandidate`), ⭐ B6 its allowance the staged
+ *      inventory's, and, where it staged more than was anticipated, Send's check counted again for it; the floor's dispositions and its
  *      reviewer recorded, ~~the producer the floor judged (the author's model)~~ ⭐ `REG-D-112` (finding 8) — and the
  *      author's model as THE TURN'S OWN STREAM named it (`producerLine`): the floor's assessments name no producer. A
  *      candidate not READY_TO_COMMIT is accepted by no one: the run ends `authoring-stopped`, with the floor's own words;
@@ -1724,6 +1779,8 @@ export async function authorThePwa(r: {
 	readonly undertakingName: string;
 	/** ⭐ `REG-D-112` (finding 2) — the reviewer calls spent before the run (D8), which the limit before Send counts. */
 	readonly prior: number;
+	/** ⭐ The review in parts, B6 (design D9) — the spec's timeout, set afresh as the wait derives a larger allowance. */
+	readonly extendTimeout?: (ms: number) => void;
 }): Promise<{ readonly rows: ReadonlyMap<string, ObjectRow>; readonly snapshot: EngineSnapshot } | AuthoringEnd> {
 	const { authoring, author, read, lane } = r;
 	const save = () => writeRunRecord(lane, r.record);
@@ -1738,11 +1795,12 @@ export async function authorThePwa(r: {
 			}
 		};
 	// ⭐ `REG-D-112` (finding 2) — THE LIMIT BEFORE SEND: the authoring floor's reviews are the first calls half B spends.
+	// ⭐ The review in parts, B6 (design D11) — counted for the inventory anticipated: before Send, no candidate exists.
 	const before = (await read()).snapshot;
 	authoring.limitCheck = limitCheck(
 		r.prior,
 		recordedReviewerCalls(before),
-		PHASE7_AUTHORING_REVIEWER_CALLS,
+		phase7AuthoringReviewerCalls(PHASE7_AUTHORING_ANTICIPATED_PARTS),
 		COUNTED_AHEAD.authoringFloor
 	);
 	save();
@@ -1757,8 +1815,18 @@ export async function authorThePwa(r: {
 		};
 	await author.send(authoring.request);
 	authoring.sent = true;
-	const waited = await waitForTheCandidate(author, read, authoring, pwaId, save);
+	const waited = await waitForTheCandidate(author, read, authoring, pwaId, save, r.extendTimeout);
 	if ('end' in waited) return waited;
+	// ⭐ The review in parts, B6 (design D11; roadmap 9a.7, "Spend reserve") — A LARGER CANDIDATE NEVER INHERITS THE SMALLER
+	// ESTIMATE UNSAID: where the turn staged more types than Send's check counted, that check is counted again for the
+	// inventory it staged, and recorded (`AuthoringRecord.inventoryCheck`).
+	if (authoring.parts > PHASE7_AUTHORING_ANTICIPATED_PARTS)
+		authoring.inventoryCheck = limitCheck(
+			r.prior,
+			authoring.limitCheck.recorded,
+			phase7AuthoringReviewerCalls(authoring.parts),
+			COUNTED_AHEAD.stagedInventory
+		);
 	await recordTheFloor(authoring, waited.snapshot, pwaId, author);
 	save();
 	const staged = authoring.candidate!;
@@ -1870,7 +1938,8 @@ async function authorThenArchive(r: {
 			lane: r.lane,
 			dry: r.boot.record.mode === 'dry',
 			undertakingName: PHASE7_UNDERTAKING.name,
-			prior: r.boot.prior as number
+			prior: r.boot.prior as number,
+			extendTimeout: r.hands.extendTimeout
 		});
 	} catch (e) {
 		await archived().catch((failed: unknown) =>
@@ -2148,8 +2217,12 @@ export async function runTheLane(r: {
 			// ⭐ C3 — THE TIMEOUT, RE-COUNTED FOR THE AGENT'S UNITS: the phases are the root's and the tree's, not §3.2's four. ⭐ And
 			// each unit's sign-off for the policies the store says it declares (the lead's delegated decision of 2026-10-16,
 			// registered as REG-D-114 (15)), read from the store the units were read from, the root's first.
+			// ⭐ The review in parts, B6 (design D9) — and the authoring's share for the inventory its turn staged.
 			hands.extendTimeout?.(
-				phase7HalfBTestTimeoutMs(record.units.map((u) => declaredPolicyIdsOf(authored.snapshot, u.unitId!).length))
+				phase7HalfBTestTimeoutMs(
+					record.units.map((u) => declaredPolicyIdsOf(authored.snapshot, u.unitId!).length),
+					record.authoring.parts
+				)
 			);
 		}
 		for (const u of record.units) u.unitId = rowOf(u)!.id;

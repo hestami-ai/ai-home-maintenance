@@ -2394,10 +2394,12 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 		// raising `REG-D-110` (1)'s), and the caveat names that ruling.
 		// ⭐ Package Q (F5) — ~~"about 650", REG-D-120 Q15~~: the sponsor raised it again, to about 800 (`REG-D-123` Q26, raising
 		// `REG-D-110` (1)'s), and the caveat names that ruling.
+		// ⭐ The review in parts, package C (B6) — ~~"about 800", REG-D-123 Q26~~: the sponsor raised it again, to about 900
+		// (`REG-D-126` Q32, raising `REG-D-110` (1)'s), and the caveat names that ruling.
 		const caveat =
 			'A phase’s own spend can carry the total past the limit: the lane checks the limit before each press, not during one, ' +
 			'and a model unit’s press may spend up to 140 reviewer calls after its check (REG-D-114 (14), as amended ' +
-			'2026-10-16; the sponsor’s limit is "about 800", REG-D-123 Q26, raising REG-D-110 (1)).';
+			'2026-10-16; the sponsor’s limit is "about 900", REG-D-126 Q32, raising REG-D-110 (1)).';
 		const r = reportOf(aRun({})).report;
 		expect(renderMarkdown(r), 'report.md carries no caveat that a press can spend past the limit').toContain(`- **Caveat:** ${caveat}`);
 		expect(r.reviewerCalls.limitCaveat, 'report.json carries no caveat that a press can spend past the limit').toBe(caveat);

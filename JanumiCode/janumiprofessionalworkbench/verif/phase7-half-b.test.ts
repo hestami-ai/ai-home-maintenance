@@ -33,10 +33,13 @@ import {
 	laneKeysRefusal,
 	NODE_TIMER_CEILING_MS,
 	phase7Half,
+	phase7AuthoringAllowanceMs,
+	phase7AuthoringMs,
+	phase7AuthoringReviewerCalls,
+	phase7HalfBAuthoringTimeoutMs,
 	phase7HalfBTestTimeoutMs,
-	PHASE7_AUTHORING_ALLOWANCE_MS,
+	PHASE7_AUTHORING_ANTICIPATED_PARTS,
 	PHASE7_AUTHORING_FLOOR_RUNS,
-	PHASE7_AUTHORING_MS,
 	PHASE7_CANDIDATE_POLL_MS,
 	PHASE7_DESIGNER_ACTS,
 	PHASE7_INTROSPECT_MS,
@@ -77,6 +80,7 @@ import {
 } from '../scripts/phase7/candidate-checks.js';
 import {
 	AUTHORING_FLOOR_POLICIES,
+	correlationsOf,
 	floorDispositions,
 	identityOf,
 	PHASE7_HALF_B_DRAFT,
@@ -313,6 +317,14 @@ const MODEL_ROOT_TYPES: ObjectRow[] = AGENT_TYPES.map((t) =>
 		? { id: t.id, state: { ...t.state, workDischarge: 'MODEL', promptTemplate: prompt('Realize {subject}: {purpose}') } }
 		: t
 );
+/**
+ * ⭐ The review in parts, B6 — a candidate of SIXTEEN types, run-11's count (`REG-F-571`) and the inventory the lane anticipates
+ * before Send (`PHASE7_AUTHORING_ANTICIPATED_PARTS`): the shape of each is immaterial to the wait, which counts them.
+ */
+const SIXTEEN_TYPES: ObjectRow[] = Array.from({ length: 16 }, (_, i) => ({
+	id: `pwutype_part_${i + 1}`,
+	state: { pwaId: PWA_ID, name: `Part ${i + 1}`, pwuKind: 'PRODUCT_IMPLEMENTATION', isRoot: i === 0, permittedChildTypeIds: [], status: 'ACTIVE' }
+}));
 const CANDIDATE_HASH = `sha256:${'ab'.repeat(32)}`;
 const AUTHOR = { providerId: 'openai-codex', modelId: 'gpt-5.6-sol' };
 const REVIEWER = { providerId: 'devin', modelId: 'glm-5-3-flash-max' };
@@ -388,6 +400,19 @@ interface HalfBScript {
 	/** ⭐ `REG-D-112` (E3's re-review, finding 4) — the ASSURANCE exchanges the authoring floor records once Send is pressed. */
 	readonly floorCalls?: number;
 	/**
+	 * ⭐ The review in parts, B6 — the types the candidate holds at each read after Send, the last repeated: the inventory
+	 * the turn has staged so far. `types` at every read unless said.
+	 */
+	readonly staged?: readonly (readonly ObjectRow[])[];
+	/**
+	 * ⭐ B6 — the candidate's floor as its fork holds it, with the candidate's own completions, each under its round's token;
+	 * one round of `floorOfTheCandidate` over the staged types, with none, unless said.
+	 */
+	readonly candidateFloor?: {
+		readonly assessments: readonly ObjectRow[];
+		readonly completionEvents: readonly Record<string, unknown>[];
+	};
+	/**
 	 * ⭐ R3-B's fix round (F1) — the ASSURANCE exchanges a unit's Begin & Execute records, by the unit's id; none unless said.
 	 * ~~Each phase's check counts its worst case now, so a run that reaches its sign-offs near the limit spends there in a
 	 * phase.~~ ⭐ Each phase's check counts one try's reserve (`REG-D-114` (14), as amended 2026-10-16): a phase's own spend.
@@ -428,6 +453,10 @@ function halfBLane(script: HalfBScript) {
 	const statusAt = (n: number) => {
 		const list = script.statuses ?? ['COLLECTING', 'ASSURING', 'READY_TO_COMMIT'];
 		return list[Math.min(n, list.length) - 1] ?? 'READY_TO_COMMIT';
+	};
+	const stagedAt = (n: number): readonly ObjectRow[] => {
+		const list = script.staged ?? [types];
+		return list[Math.min(n, list.length) - 1] ?? types;
 	};
 	const snapshot = (): EngineSnapshot => {
 		const candidateStatus = sent && !accepted && script.noCandidate !== true ? statusAt(readsAfterSend) : null;
@@ -488,11 +517,11 @@ function halfBLane(script: HalfBScript) {
 									...(script.detail === undefined ? {} : { detail: script.detail }),
 									commandCount: 9
 								},
-								pwuTypes: types,
-								assessments: floorOfTheCandidate(types),
+								pwuTypes: stagedAt(readsAfterSend),
+								assessments: script.candidateFloor?.assessments ?? floorOfTheCandidate(stagedAt(readsAfterSend)),
 								conversations: [],
 								criterionEvents: [],
-								completionEvents: []
+								completionEvents: script.candidateFloor?.completionEvents ?? []
 							}
 						]
 		} as unknown as EngineSnapshot;
@@ -696,7 +725,12 @@ describe('⭐⭐ C1, C2 — HALF B, IN ITS ORDER: `runTheLane` on hands made her
 function halfBStore(
 	o: {
 		publication?: string;
+		/** The schema/invariant assessment's state, the identity/provenance one's, and each type's review's; all SATISFIED unless said. */
 		floor?: readonly string[];
+		/** ⭐ The review in parts, B6 — a type's review concluded otherwise, by the type's id. */
+		parts?: Readonly<Record<string, string>>;
+		/** ⭐ B6 — a Reasoning Review of the PWA as a whole, recorded after the round's parts, as the PWA-only floor recorded it. */
+		wholePwaReview?: string;
 		/** Each unit's run, by its id: `model`, an execution try answered and its step SUCCEEDED; `press`, its step
 		 *  SUCCEEDED with no try — a TRANSFORMATION the press completed; absent, never begun. Each one run is signed off. */
 		ran?: Readonly<Record<string, 'model' | 'press'>>;
@@ -733,9 +767,22 @@ function halfBStore(
 			name: 'CLI Product Realization',
 			publicationStatus: o.publication ?? 'PUBLISHED'
 		}),
-		...FLOOR_OF_THE_CANDIDATE.map((a, i) =>
-			object('ASSURANCE_ASSESSMENT', a.id, { ...a.state, assessmentState: floor[i] })
+		// ⭐ The review in parts, B6 (`REG-D-125`) — the floor as a round in parts records it: the PWA's two deterministic
+		// assessments, then a Reasoning Review of each type, each concluded as `floor` says of the review unless `parts` names
+		// the type. ~~`FLOOR_OF_THE_CANDIDATE`, its review of the PWA as a whole~~, which a round in parts never records: one is
+		// put after the parts only where `wholePwaReview` says.
+		...floorOfTheCandidate(o.types ?? AGENT_TYPES).map((a, i) =>
+			object('ASSURANCE_ASSESSMENT', a.id, {
+				...a.state,
+				assessmentState:
+					a.state.assurancePolicyId === 'floor.reasoning-review'
+						? (o.parts?.[(a.state.subjectObjectIds as string[])[0]!] ?? floor[2])
+						: floor[i]
+			})
 		),
+		...(o.wholePwaReview === undefined
+			? []
+			: [object('ASSURANCE_ASSESSMENT', 'asm_floor_whole', { ...FLOOR_OF_THE_CANDIDATE[2]!.state, assessmentState: o.wholePwaReview })]),
 		...(o.types ?? AGENT_TYPES).map((t) => object('PWU_TYPE', t.id, t.state)),
 		object('UNDERTAKING', 'und_1', { name: 'wordfreq realization', status: 'ACTIVE' }),
 		...(o.units ?? AGENT_UNITS).filter((u) => !(o.dropped ?? []).includes(u.id)).flatMap((u) => {
@@ -877,6 +924,9 @@ describe('⭐ C5 — stage 1 of a half-B run reads what failed, and states its c
 			'the authoring floor: floor.schema-invariant SATISFIED, floor.identity-provenance SATISFIED, floor.reasoning-review SATISFIED',
 			"the reviewer: devin/glm-5-3-flash-max; the author, as the page's turn named it: openai-codex/gpt-5.6-sol (configured: openai-codex/gpt-5.6-sol)",
 			`the accepted hash: ${CANDIDATE_HASH}; the candidate as the lane last read it: READY_TO_COMMIT`,
+			// ⭐ The review in parts, B6 — the round's complete part set, in the order the store holds the types.
+			"the authoring floor's reasoning review, by type: Verify wordfreq end to end SATISFIED, Specify wordfreq SATISFIED, " +
+				'Build wordfreq SATISFIED, wordfreq Realization SATISFIED',
 			`caveat ${HALF_B_CAVEATS[0]}`,
 			`caveat ${HALF_B_CAVEATS[1]}`
 		]);
@@ -1087,30 +1137,40 @@ describe('⭐ C1, C3 — the lane’s half, and half B’s author, at boot', () 
 });
 
 describe('⭐ C3 — the authoring allowance, folded into the timeout', () => {
-	it('⭐ two floor runs — the floor, and the one auto-refinement pass the agent route makes — each one try of the one-unit lane: 2,400 s', () => {
+	/** One review at its bound: `reviewerCallsPerTry` calls, each at the reviewer's. */
+	const REVIEW_MS = LANE_BUDGET.reviewerCallsPerTry * LANE_BUDGET.reviewerCallMs;
+
+	// ⭐ The review in parts, B6 (`REG-D-125`; design D9) — ~~2,400 s for every turn~~: each floor run reviews each type of the
+	// candidate as a part, so the allowance is the inventory's — 2,400 s at one part, as before, and 31,200 s at sixteen.
+	it('⭐ two floor runs — the floor, and the one auto-refinement pass the agent route makes — each the agent’s run and one review of each part: 2,400 s at one part, 31,200 s at sixteen', () => {
 		const route = readFileSync(join(REPO, 'apps/rph-demo/src/routes/pwa/[id]/agent/+server.ts'), 'utf8');
 		expect(route).toContain('auto-refine at most once');
 		expect(route.split('await runPwaFloor(').length - 1, 'the route runs the floor once, and once more to refine').toBe(
 			PHASE7_AUTHORING_FLOOR_RUNS
 		);
-		expect(PHASE7_AUTHORING_ALLOWANCE_MS).toBe(
-			PHASE7_AUTHORING_FLOOR_RUNS * (LANE_BUDGET.executorCallMs + LANE_BUDGET.reviewerCallsPerTry * LANE_BUDGET.reviewerCallMs)
+		expect([1, 2, 16].map(phase7AuthoringAllowanceMs)).toEqual(
+			[1, 2, 16].map((parts) => PHASE7_AUTHORING_FLOOR_RUNS * (LANE_BUDGET.executorCallMs + parts * REVIEW_MS))
 		);
-		expect([PHASE7_AUTHORING_ALLOWANCE_MS, EXECUTE_TIMEOUT_MS / LANE_BUDGET.tries]).toEqual([2_400_000, 1_200_000]);
+		expect([phase7AuthoringAllowanceMs(1), phase7AuthoringAllowanceMs(16), EXECUTE_TIMEOUT_MS / LANE_BUDGET.tries]).toEqual([
+			2_400_000, 31_200_000, 1_200_000
+		]);
+		// ⭑ AT LEAST ONE PART: a turn that has staged no type yet is given one part's, the 2,400 s every turn had.
+		expect(phase7AuthoringAllowanceMs(0)).toBe(2_400_000);
 	});
 
-	it('⭐ the authoring’s share: the allowance, one overrunning poll, and four designer acts each at its bound — 5,585 s', () => {
+	it('⭐ the authoring’s share: the allowance, one overrunning poll, and four designer acts each at its bound — 5,585 s at one part, 34,385 s at sixteen', () => {
 		expect([PHASE7_CANDIDATE_POLL_MS, PHASE7_DESIGNER_ACTS, DESIGNER_ACTS.length + 1]).toEqual([5_000, 4, 4]);
-		expect(PHASE7_AUTHORING_MS).toBe(
-			PHASE7_AUTHORING_ALLOWANCE_MS +
-				PHASE7_CANDIDATE_POLL_MS +
-				PHASE7_INTROSPECT_MS +
-				4 * (PHASE7_UI_MS + PHASE7_SIGN_OFF_MS + PHASE7_INTROSPECT_MS)
-		);
-		expect(PHASE7_AUTHORING_MS).toBe(5_585_000);
+		for (const parts of [1, 16])
+			expect(phase7AuthoringMs(parts)).toBe(
+				phase7AuthoringAllowanceMs(parts) +
+					PHASE7_CANDIDATE_POLL_MS +
+					PHASE7_INTROSPECT_MS +
+					4 * (PHASE7_UI_MS + PHASE7_SIGN_OFF_MS + PHASE7_INTROSPECT_MS)
+			);
+		expect([phase7AuthoringMs(1), phase7AuthoringMs(16)]).toEqual([5_585_000, 34_385_000]);
 	});
 
-	it('⭐ half B’s timeout: half A’s re-counted for the agent’s phases, plus the authoring; capped at Node’s timer ceiling', () => {
+	it('⭐ half B’s timeout: half A’s re-counted for the agent’s phases, plus the authoring for its parts; capped at Node’s timer ceiling', () => {
 		// ⭑ ONE PHASE'S SHARE is exactly what half A's arithmetic counts once per phase: the timeout less its setup, the
 		// root's run, the final screenshot and read, and the root's sign-off, over its four phases. ⭐ The merge of E12 and E3
 		// — a sign-off now counts its declared reviews, the limit's read before it and the rule's re-run of them
@@ -1127,29 +1187,86 @@ describe('⭐ C3 — the authoring allowance, folded into the timeout', () => {
 		// ⭐ R3-B F2 (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (15)) — ~~a phase count~~: each unit's
 		// declared policies, the root's first. With every unit declaring §3.2's most, four, the arithmetic is half A's re-counted.
 		const units = (phases: number): number[] => Array.from({ length: phases + 1 }, () => 4);
-		expect(phase7HalfBTestTimeoutMs(units(4))).toBe(PHASE7_TEST_TIMEOUT_MS + PHASE7_AUTHORING_MS);
-		expect(phase7HalfBTestTimeoutMs(units(4))).toBe(425_225_000);
-		// ⭐ And the ceiling's first phase count, as lane-config.ts states it: 23.
-		expect([phase7HalfBTestTimeoutMs(units(22)) < NODE_TIMER_CEILING_MS, phase7HalfBTestTimeoutMs(units(23))]).toEqual([
-			true,
-			NODE_TIMER_CEILING_MS
-		]);
-		expect(phase7HalfBTestTimeoutMs(units(7)) - phase7HalfBTestTimeoutMs(units(6))).toBe(PHASE7_PER_PHASE_MS);
-		expect(phase7HalfBTestTimeoutMs(units(1))).toBe(PHASE7_TEST_TIMEOUT_MS - 3 * PHASE7_PER_PHASE_MS + PHASE7_AUTHORING_MS);
-		expect(phase7HalfBTestTimeoutMs(units(40))).toBe(NODE_TIMER_CEILING_MS);
+		expect(phase7HalfBTestTimeoutMs(units(4), 1)).toBe(PHASE7_TEST_TIMEOUT_MS + phase7AuthoringMs(1));
+		expect(phase7HalfBTestTimeoutMs(units(4), 1)).toBe(425_225_000);
+		// ⭐ The review in parts, B6 — the authoring's share is the inventory's: sixteen parts, 454,025 s for four phases.
+		expect(phase7HalfBTestTimeoutMs(units(4), 16)).toBe(454_025_000);
+		// ⭐ And the ceiling's first phase count, as lane-config.ts states it: 23, at one part and at sixteen alike.
+		for (const parts of [1, 16])
+			expect([
+				phase7HalfBTestTimeoutMs(units(22), parts) < NODE_TIMER_CEILING_MS,
+				phase7HalfBTestTimeoutMs(units(23), parts)
+			]).toEqual([true, NODE_TIMER_CEILING_MS]);
+		expect(phase7HalfBTestTimeoutMs(units(7), 1) - phase7HalfBTestTimeoutMs(units(6), 1)).toBe(PHASE7_PER_PHASE_MS);
+		expect(phase7HalfBTestTimeoutMs(units(1), 1)).toBe(
+			PHASE7_TEST_TIMEOUT_MS - 3 * PHASE7_PER_PHASE_MS + phase7AuthoringMs(1)
+		);
+		expect(phase7HalfBTestTimeoutMs(units(40), 1)).toBe(NODE_TIMER_CEILING_MS);
 		expect(NODE_TIMER_CEILING_MS).toBe(2_147_483_647);
 		// ⭐ Each unit's sign-off re-counted for its own policies: one more policy, two more reviews — Record Assurance's, and the
 		// rule's one re-run of them — at four calls of 240 s each.
-		expect(phase7HalfBTestTimeoutMs([4, 5, 4, 4, 4]) - phase7HalfBTestTimeoutMs(units(4))).toBe(
-			2 * LANE_BUDGET.reviewerCallsPerTry * LANE_BUDGET.reviewerCallMs
-		);
+		expect(phase7HalfBTestTimeoutMs([4, 5, 4, 4, 4], 1) - phase7HalfBTestTimeoutMs(units(4), 1)).toBe(2 * REVIEW_MS);
+		// ⭐ B6 — while the turn runs: half A's, which half B starts under, and the authoring's share for the parts staged.
+		expect([phase7HalfBAuthoringTimeoutMs(1), phase7HalfBAuthoringTimeoutMs(16)]).toEqual([
+			PHASE7_TEST_TIMEOUT_MS + phase7AuthoringMs(1),
+			PHASE7_TEST_TIMEOUT_MS + phase7AuthoringMs(16)
+		]);
+		expect(phase7HalfBAuthoringTimeoutMs(2_000)).toBe(NODE_TIMER_CEILING_MS);
 	});
 
-	it('⭐ the lane extends the test’s timeout ONCE, when the units are read, by ~~the agent’s phase count~~ ⭐ each of the agent’s units’ declared policies, the root’s first', async () => {
+	it('⭐ the lane extends the test’s timeout when its turn stages more than one part’s allowance holds, and when the units are read, by ~~the agent’s phase count~~ ⭐ each of the agent’s units’ declared policies, the root’s first, and the parts its turn staged', async () => {
 		const l = halfBLane({ paid: true });
 		await l.run();
-		// ⭑ AGENT_TYPES: the root, Specify, Build and Verify declare 1, 2, 1 and 1 (`requiredAssurancePolicyIds`).
-		expect(l.timeouts).toEqual([phase7HalfBTestTimeoutMs([1, 2, 1, 1])]);
+		// ⭑ AGENT_TYPES: four types staged — the root, Specify, Build and Verify, which declare 1, 2, 1 and 1
+		// (`requiredAssurancePolicyIds`).
+		expect(l.timeouts).toEqual([phase7HalfBAuthoringTimeoutMs(4), phase7HalfBTestTimeoutMs([1, 2, 1, 1], 4)]);
+	});
+
+	// ⭐⭐ The review in parts, B6 (`REG-D-125`; design D9: *"delayed part reviews settle within the lane's derived allowance, and
+	// exceeding that allowance leaves the page holding the candidate without accepting it"*) — on the lane's own clock.
+	// ⛔ PREDICTED RED, read from the code: the deadline was 2,400 s whatever the candidate staged, so a sixteen-type turn whose
+	// rounds took an hour ended `allowance-exceeded` at forty minutes, and its candidate was never accepted.
+	it('⛔ a sixteen-part turn whose rounds take an hour is waited for: its allowance is its inventory’s, and the candidate is accepted', async () => {
+		const reads = (60 * 60 * 1000) / PHASE7_CANDIDATE_POLL_MS;
+		const l = halfBLane({
+			paid: true,
+			staged: [SIXTEEN_TYPES],
+			statuses: [...Array.from({ length: reads }, () => 'ASSURING'), 'READY_TO_COMMIT']
+		});
+		const record = await l.run();
+		expect(record.end?.reason, 'the lane gave up on a turn its allowance still held').not.toBe('allowance-exceeded');
+		expect(l.only('author.accept')).toEqual(['author.accept']);
+		expect([record.authoring?.parts, record.authoring?.allowanceMs, record.authoring?.polls]).toEqual([
+			16,
+			phase7AuthoringAllowanceMs(16),
+			reads + 1
+		]);
+	});
+
+	it('⛔ past its inventory’s allowance the stop is kept: the page still holds the turn, and nothing is accepted', async () => {
+		const l = halfBLane({ paid: true, staged: [SIXTEEN_TYPES], statuses: ['ASSURING'] });
+		const record = await l.run();
+		const polls = phase7AuthoringAllowanceMs(16) / PHASE7_CANDIDATE_POLL_MS;
+		expect([record.end?.reason, record.authoring?.polls]).toEqual(['allowance-exceeded', polls + 1]);
+		expect(record.end?.detail).toContain(
+			`the authoring turn outlasted its allowance of ${phase7AuthoringAllowanceMs(16)} ms for 16 part(s), its candidate read ASSURING`
+		);
+		expect(l.only('author.accept', 'beginExecute')).toEqual([]);
+	});
+
+	it('⭐ the allowance is refreshed from every read: a type the refinement adds extends it, one it removes does not shorten it, and none staged yet is one part’s', async () => {
+		const at = (n: number) => SIXTEEN_TYPES.slice(0, n);
+		const l = halfBLane({
+			paid: true,
+			// ⭑ Nothing staged at the first read, two at the second, five once the refinement adds three, three once it removes two.
+			staged: [at(0), at(2), at(5), at(3)],
+			statuses: ['COLLECTING', 'ASSURING', 'ASSURING', 'ASSURING', 'READY_TO_COMMIT']
+		});
+		const record = await l.run();
+		expect([record.authoring?.parts, record.authoring?.allowanceMs]).toEqual([5, phase7AuthoringAllowanceMs(5)]);
+		// ⭑ Each larger allowance carried into the spec's timeout as it was derived: two parts', then five's — none for the read
+		// that staged nothing, nor for the one that staged fewer.
+		expect(l.timeouts.slice(0, 2)).toEqual([phase7HalfBAuthoringTimeoutMs(2), phase7HalfBAuthoringTimeoutMs(5)]);
 	});
 });
 
@@ -1166,12 +1283,23 @@ describe('⭐ C1, C4, C6 — what the lane does, and records, in half B', () => 
 			'READY_TO_COMMIT',
 			CANDIDATE_HASH
 		]);
+		// ⭐ The review in parts, B6 — and the Reasoning Review's complete part set: each of the candidate's types, its review.
 		expect(a.floor).toEqual(
 			AUTHORING_FLOOR_POLICIES.map((policyId) => ({
 				policyId,
 				state: 'SATISFIED',
 				evaluator: policyId === 'floor.reasoning-review' ? 'devin/glm-5-3-flash-max' : null,
-				producer: null
+				producer: null,
+				...(policyId === 'floor.reasoning-review'
+					? {
+							parts: AGENT_TYPES.map((t) => ({
+								typeId: t.id,
+								typeName: t.state.name,
+								state: 'SATISFIED',
+								evaluator: 'devin/glm-5-3-flash-max'
+							}))
+						}
+					: {})
 			}))
 		);
 		expect([a.authorModel, a.reviewer, a.accept?.acceptedHash, a.accept?.envelopeType]).toEqual([
@@ -1299,11 +1427,14 @@ describe('⭐ C1, C4, C6 — what the lane does, and records, in half B', () => 
 	it('⛔ C3 — a turn that outlasts its allowance ends the run there, allowance-exceeded: the page still holds it, and nothing is pressed', async () => {
 		const l = halfBLane({ paid: true, statuses: ['ASSURING'] });
 		const record = await l.run();
-		const polls = PHASE7_AUTHORING_ALLOWANCE_MS / PHASE7_CANDIDATE_POLL_MS;
+		// ⭐ The review in parts, B6 — the allowance of the four types the turn staged (`AGENT_TYPES`).
+		const polls = phase7AuthoringAllowanceMs(4) / PHASE7_CANDIDATE_POLL_MS;
 		expect(l.only('author.pause')).toHaveLength(polls);
 		expect(l.only('author.accept', 'beginExecute')).toEqual([]);
 		expect([record.end?.reason, record.authoring?.polls]).toEqual(['allowance-exceeded', polls + 1]);
-		expect(record.end?.detail).toContain(`the authoring turn outlasted its allowance of ${PHASE7_AUTHORING_ALLOWANCE_MS} ms, its candidate read ASSURING`);
+		expect(record.end?.detail).toContain(
+			`the authoring turn outlasted its allowance of ${phase7AuthoringAllowanceMs(4)} ms for 4 part(s), its candidate read ASSURING`
+		);
 	});
 
 	it('⛔ a turn the server refused before it began stages no candidate: once the page’s turn is over, the run ends, never waiting out the allowance', async () => {
@@ -1493,21 +1624,36 @@ describe('⭐ C2 — the order rule: the root first, then the tree’s order', (
 });
 
 describe('⭐ C1 — the floor’s dispositions, as the record holds them', () => {
-	it('⭐ each policy’s LATEST assessment of the PWA, in the plan’s order; MISSING where there is none; the identities as provider/model', () => {
-		const a = (id: string, policyId: string, state: string, subject = PWA_ID, evaluator?: object) => ({
-			id,
-			state: { assurancePolicyId: policyId, subjectObjectIds: [subject], assessmentState: state, ...(evaluator ? { evaluator } : {}) }
-		});
+	/** A floor assessment of `subject` under `policyId`, concluded as `state`. */
+	const a = (id: string, policyId: string, state: string, subject: string, evaluator?: object) => ({
+		id,
+		state: { assurancePolicyId: policyId, subjectObjectIds: [subject], assessmentState: state, ...(evaluator ? { evaluator } : {}) }
+	});
+	const rr = (id: string, state: string, subject: string, evaluator?: object) =>
+		a(id, 'floor.reasoning-review', state, subject, evaluator);
+	const type = (id: string, name: string) => ({ id, state: { pwaId: PWA_ID, name } });
+	/** Every assessment in one round, under one token. */
+	const oneRound = (): string => 'authoring-floor:run-1';
+	/** The round each assessment was recorded in, by its id's first letter: `A1` is round A's. */
+	const roundOf = (id: string): string => `authoring-floor:${id[0]}`;
+
+	it('⭐ each policy’s LATEST assessment of the PWA in its round, in the plan’s order; MISSING where there is none; the identities as provider/model', () => {
 		const rows = [
-			a('1', 'floor.reasoning-review', 'INCONCLUSIVE'),
-			a('2', 'floor.schema-invariant', 'SATISFIED'),
-			a('3', 'floor.reasoning-review', 'SATISFIED', PWA_ID, { modelId: 'glm', providerId: 'devin' }),
+			rr('1', 'INCONCLUSIVE', 't1'),
+			a('2', 'floor.schema-invariant', 'SATISFIED', PWA_ID),
+			rr('3', 'SATISFIED', 't1', { modelId: 'glm', providerId: 'devin' }),
 			a('4', 'floor.identity-provenance', 'REJECTED', 'pwa_other')
 		];
-		expect(floorDispositions(rows, PWA_ID)).toEqual([
+		expect(floorDispositions(rows, PWA_ID, [type('t1', 'Plan')], oneRound)).toEqual([
 			{ policyId: 'floor.schema-invariant', state: 'SATISFIED', evaluator: null, producer: null },
 			{ policyId: 'floor.identity-provenance', state: 'MISSING', evaluator: null, producer: null },
-			{ policyId: 'floor.reasoning-review', state: 'SATISFIED', evaluator: 'devin/glm', producer: null }
+			{
+				policyId: 'floor.reasoning-review',
+				state: 'SATISFIED',
+				evaluator: 'devin/glm',
+				producer: null,
+				parts: [{ typeId: 't1', typeName: 'Plan', state: 'SATISFIED', evaluator: 'devin/glm' }]
+			}
 		]);
 		expect([identityOf({ modelId: 'm' }), identityOf({ displayName: 'd' }), identityOf(undefined)]).toEqual(['m', 'd', null]);
 		expect(AUTHORING_FLOOR_POLICIES).toEqual(FLOOR_POLICIES);
@@ -1516,28 +1662,95 @@ describe('⭐ C1 — the floor’s dispositions, as the record holds them', () =
 	// ⭐ The review in parts, B3 (`REG-D-125`): the floor reviews each type of the PWA as a part, under the type, so the lane's
 	// read of the Reasoning Review is the aggregate of the PWA's types' reviews — its strictest.
 	it('⭐ given the PWA’s types, the Reasoning Review is their aggregate: a rejected part rejects it, a missing one leaves it MISSING', () => {
-		const a = (id: string, state: string, subject: string, evaluator?: object) => ({
-			id,
-			state: { assurancePolicyId: 'floor.reasoning-review', subjectObjectIds: [subject], assessmentState: state, ...(evaluator ? { evaluator } : {}) }
-		});
+		const types = (...ids: string[]) => ids.map((id) => type(id, id.toUpperCase()));
 		const review = (rows: { id: string; state: Record<string, unknown> }[], typeIds: string[]) =>
-			floorDispositions(rows, PWA_ID, typeIds).find((f) => f.policyId === 'floor.reasoning-review');
-		const clean = [a('1', 'SATISFIED', 't1', { modelId: 'glm', providerId: 'devin' }), a('2', 'SATISFIED', 't2')];
+			floorDispositions(rows, PWA_ID, types(...typeIds), oneRound).find((f) => f.policyId === 'floor.reasoning-review');
+		const clean = [rr('1', 'SATISFIED', 't1', { modelId: 'glm', providerId: 'devin' }), rr('2', 'SATISFIED', 't2')];
 		expect(review(clean, ['t1', 't2'])).toEqual({
 			policyId: 'floor.reasoning-review',
 			state: 'SATISFIED',
 			evaluator: 'devin/glm',
-			producer: null
+			producer: null,
+			parts: [
+				{ typeId: 't1', typeName: 'T1', state: 'SATISFIED', evaluator: 'devin/glm' },
+				{ typeId: 't2', typeName: 'T2', state: 'SATISFIED', evaluator: null }
+			]
 		});
-		expect(review([...clean, a('3', 'REJECTED', 't2')], ['t1', 't2'])?.state, 'the strictest part').toBe('REJECTED');
-		expect(review([a('3', 'REJECTED', 't2')], ['t3', 't2'])?.state, 'a rejection is stricter than a missing part').toBe(
+		expect(review([...clean, rr('3', 'REJECTED', 't2')], ['t1', 't2'])?.state, 'the strictest part').toBe('REJECTED');
+		expect(review([rr('3', 'REJECTED', 't2')], ['t3', 't2'])?.state, 'a rejection is stricter than a missing part').toBe(
 			'REJECTED'
 		);
 		expect(review(clean, ['t1', 't2', 't3'])?.state, 'a type with no review').toBe('MISSING');
-		expect(review([a('1', 'SATISFIED', 't1'), a('2', 'INCONCLUSIVE', 't2')], ['t1', 't2'])?.state).toBe('INCONCLUSIVE');
+		expect(review([rr('1', 'SATISFIED', 't1'), rr('2', 'INCONCLUSIVE', 't2')], ['t1', 't2'])?.state).toBe('INCONCLUSIVE');
 		expect(review(clean, [])?.state, 'no type, no review').toBe('MISSING');
 		// ⛔ A review of the PWA as a whole counts for no part.
-		expect(review([a('1', 'SATISFIED', PWA_ID)], ['t1'])?.state).toBe('MISSING');
+		expect(review([rr('1', 'SATISFIED', PWA_ID)], ['t1'])?.state).toBe('MISSING');
+	});
+
+	// ⭐⭐ The review in parts, B6 (`REG-D-125`; design D6; roadmap 9a.7, "Run records") — ONE ROUND, AND ITS COMPLETE PART SET.
+	// ⛔ PREDICTED RED, read from the code: given the types, the read took each type's latest review in the WHOLE record, and each
+	// deterministic policy's, so a newer round that holds no review of a type borrowed an older round's.
+	it('⛔ one round: a newer round that holds no review of a type does not borrow an older round’s, and its deterministic rows are its own', () => {
+		const types = [type('t1', 'Plan'), type('t2', 'Build')];
+		const older = [
+			a('A1', 'floor.schema-invariant', 'SATISFIED', PWA_ID),
+			a('A2', 'floor.identity-provenance', 'REJECTED', PWA_ID),
+			rr('A3', 'SATISFIED', 't1'),
+			rr('A4', 'SATISFIED', 't2')
+		];
+		const newer = [
+			a('B1', 'floor.schema-invariant', 'SATISFIED', PWA_ID),
+			a('B2', 'floor.identity-provenance', 'SATISFIED', PWA_ID),
+			rr('B3', 'SATISFIED', 't1')
+		];
+		const read = (rows: { id: string; state: Record<string, unknown> }[]) =>
+			floorDispositions(rows, PWA_ID, types, roundOf).map((f) => [
+				f.policyId,
+				f.state,
+				...(f.parts ?? []).map((p) => `${p.typeName} ${p.state}`)
+			]);
+		expect(read([...older, ...newer]), 'the newer round borrowed an older round’s review of Build').toEqual([
+			['floor.schema-invariant', 'SATISFIED'],
+			['floor.identity-provenance', 'SATISFIED'],
+			['floor.reasoning-review', 'MISSING', 'Plan SATISFIED', 'Build MISSING']
+		]);
+		// ⭑ CONTROL — the newer round complete: its own parts, and nothing of the older round's rejection.
+		expect(read([...older, ...newer, rr('B4', 'SATISFIED', 't2')])).toEqual([
+			['floor.schema-invariant', 'SATISFIED'],
+			['floor.identity-provenance', 'SATISFIED'],
+			['floor.reasoning-review', 'SATISFIED', 'Plan SATISFIED', 'Build SATISFIED']
+		]);
+		// ⭑ CONTROL — the older round alone is read as it was recorded.
+		expect(read(older)).toEqual([
+			['floor.schema-invariant', 'SATISFIED'],
+			['floor.identity-provenance', 'REJECTED'],
+			['floor.reasoning-review', 'SATISFIED', 'Plan SATISFIED', 'Build SATISFIED']
+		]);
+	});
+
+	it('⛔ never one PWA-subject Reasoning Review: a review of the PWA as a whole neither stands for the row nor names the round', () => {
+		const types = [type('t1', 'Plan'), type('t2', 'Build')];
+		const round = [
+			a('A1', 'floor.schema-invariant', 'SATISFIED', PWA_ID),
+			a('A2', 'floor.identity-provenance', 'SATISFIED', PWA_ID),
+			rr('A3', 'SATISFIED', 't1'),
+			rr('A4', 'REJECTED', 't2')
+		];
+		const review = (rows: { id: string; state: Record<string, unknown> }[]) =>
+			floorDispositions(rows, PWA_ID, types, roundOf).find((f) => f.policyId === 'floor.reasoning-review')?.state;
+		expect(review([rr('A0', 'SATISFIED', PWA_ID), ...round]), 'a whole-PWA review stood for the parts').toBe('REJECTED');
+		// ⛔ Recorded LAST, under a token of its own, it is still no round: the round is the parts'.
+		expect(review([...round, rr('C1', 'SATISFIED', PWA_ID)]), 'a whole-PWA review named the round').toBe('REJECTED');
+	});
+
+	it('⭐ each assessment’s token is the correlation of the first event that names it and carries one', () => {
+		const tokenOf = correlationsOf([
+			{ aggregateId: 'asm_1', correlationId: '' },
+			{ aggregateId: 'asm_1', correlationId: 'authoring-floor:run-1' },
+			{ aggregateId: 'asm_1', correlationId: 'authoring-floor:run-2' },
+			{ aggregateId: 'asm_2', correlationId: 'authoring-floor:run-2' }
+		]);
+		expect(['asm_1', 'asm_2', 'asm_3'].map(tokenOf)).toEqual(['authoring-floor:run-1', 'authoring-floor:run-2', undefined]);
 	});
 });
 
@@ -1613,7 +1826,7 @@ describe('⭐⭐ C4 — the candidate checks: each trap found, and nothing refus
 
 // ── THE SPEC, FROM SOURCE: half B's hands are the operator's acts, on the page ────────────────────────────────────────
 
-describe('⛔ the spec, from source: half B’s hands are the operator’s own acts, and its timeout is extended once', () => {
+describe('⛔ the spec, from source: half B’s hands are the operator’s own acts, and its timeout is ~~extended once~~ ⭐ set afresh on the running test', () => {
 	const sf = ts.createSourceFile(
 		'phase7.live.ts',
 		readFileSync(join(REPO, 'apps/rph-demo/e2e-live-exec/phase7.live.ts'), 'utf8'),
@@ -1831,8 +2044,11 @@ describe('⛔ REG-D-112 (E3’s review, 1) — a run that stops during authoring
 });
 
 describe('⛔ REG-D-112 (E3’s review, 2) — the LIMIT is checked before Send and before the root’s press, ~~each act’s worst case counted~~ ⭐ what each act counts by the one rule as amended (REG-D-114 (14))', () => {
-	/** The authoring floor's worst case: two floor runs, each one review of up to `reviewerCallsPerTry` calls — 8. */
-	const FLOOR_WORST = PHASE7_AUTHORING_FLOOR_RUNS * LANE_BUDGET.reviewerCallsPerTry;
+	/**
+	 * The authoring floor's worst case: two floor runs, each ~~one review~~ ⭐ (the review in parts, B6) a review of each part, of up
+	 * to `reviewerCallsPerTry` calls — ~~8~~ ⭐ 128, counted before Send for the inventory anticipated, sixteen types.
+	 */
+	const FLOOR_WORST = phase7AuthoringReviewerCalls(PHASE7_AUTHORING_ANTICIPATED_PARTS);
 	/**
 	 * ~~A model unit's worst case, as its allowance counts it: each try's review, and each reviewed command's — 140.~~ ⭐
 	 * `REG-D-114` (14), as amended 2026-10-16 — what a MODEL root counts before its press: ONE TRY'S RESERVE, a review of up to
@@ -1855,7 +2071,7 @@ describe('⛔ REG-D-112 (E3’s review, 2) — the LIMIT is checked before Send 
 			recorded: 0,
 			reserve: PHASE7_NEGATIVE_CONTROL_RESERVE,
 			ahead: FLOOR_WORST,
-			counted: 'the authoring floor’s worst case',
+			counted: 'the authoring floor’s worst case, for 16 anticipated types',
 			total: PHASE7_PAID_LIMIT + 1,
 			limit: PHASE7_PAID_LIMIT,
 			allowed: false
@@ -1941,8 +2157,8 @@ describe('⛔ REG-D-112 (E3’s review, 2) — the LIMIT is checked before Send 
 });
 
 describe('⛔ the merge’s fix round, F2 and F3 — the run report reads half B’s reads of the limit as the lane made them', () => {
-	/** The authoring floor's worst case, counted before Send: 8. */
-	const FLOOR_WORST = PHASE7_AUTHORING_FLOOR_RUNS * LANE_BUDGET.reviewerCallsPerTry;
+	/** The authoring floor's worst case, counted before Send: ~~8~~ ⭐ (the review in parts, B6) 128, for sixteen anticipated types. */
+	const FLOOR_WORST = phase7AuthoringReviewerCalls(PHASE7_AUTHORING_ANTICIPATED_PARTS);
 	/**
 	 * ~~A MODEL root's worst case, counted before its press: 140.~~ ⭐ `REG-D-114` (14), as amended 2026-10-16 — what a MODEL
 	 * root counts before its press: one try's reserve, 4.
@@ -1993,7 +2209,7 @@ describe('⛔ the merge’s fix round, F2 and F3 — the run report reads half B
 		).toEqual(['authoring', 'Send', total, true]);
 		expect(md).toContain(
 			`  - authoring, before Send: ${prior} + 0 + ${PHASE7_NEGATIVE_CONTROL_RESERVE} + ${FLOOR_WORST} ahead (the authoring floor’s worst ` +
-				`case) = ${total} of ${PHASE7_PAID_LIMIT}, under it.`
+				`case, for 16 anticipated types) = ${total} of ${PHASE7_PAID_LIMIT}, under it.`
 		);
 	});
 });
@@ -2025,10 +2241,13 @@ describe('⭐⭐ The merge of E12 and E3 (J1, J2) — half B’s sign-offs count
 		// ~~⭐ R3-B's fix round (F1) — the prior alone one call past the five's worst case: each phase counts its worst case,
 		// a model unit's, so the prior lets each phase through exactly at the limit and the last phase, Verify, spends the
 		// rest: the sign-off reads the same calls as before.~~ ⭐ `REG-D-114` (14), as amended 2026-10-16 — each phase counts one
-		// try's reserve, and the prior alone is one call past the five's worst case again: every phase's check, and Send's, is
-		// under the limit.
+		// try's reserve, and ~~the prior alone~~ ⭐ the calls spent before the sign-off are one call past the five's worst case
+		// again: every phase's check is under the limit ⭐ and Send's reaches it.
 		const spent = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - FIVE.length * PER_POLICY + 1;
-		const prior = spent;
+		// ⭐ The review in parts, B6 — Send now counts the floor's worst case for sixteen anticipated types, 128: the prior is what
+		// lets Send reach the limit exactly, and the floor's recorded calls bring the run to the calls spent before the sign-off.
+		const prior = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - phase7AuthoringReviewerCalls(PHASE7_AUTHORING_ANTICIPATED_PARTS);
+		const floorCalls = spent - prior;
 		expect(
 			spent + PHASE7_NEGATIVE_CONTROL_RESERVE + 4 * PER_POLICY,
 			'arrangement: four policies’ worst case would fit'
@@ -2036,6 +2255,7 @@ describe('⭐⭐ The merge of E12 and E3 (J1, J2) — half B’s sign-offs count
 		const l = halfBLane({
 			paid: true,
 			prior,
+			floorCalls,
 			types: FIVE_POLICY_TYPES,
 			signOffs: { 'specify-wordfreq': { ra: answered('success') } }
 		});
@@ -2045,7 +2265,7 @@ describe('⭐⭐ The merge of E12 and E3 (J1, J2) — half B’s sign-offs count
 		]);
 		expect(record.units[1]!.signOff?.limitCheck).toEqual({
 			prior,
-			recorded: 0,
+			recorded: floorCalls,
 			reserve: PHASE7_NEGATIVE_CONTROL_RESERVE,
 			ahead: FIVE.length * PER_POLICY,
 			counted: 'its declared reviews’ worst case',
@@ -2141,10 +2361,12 @@ describe('⭐⭐ The merge of E12 and E3 (J1, J2) — half B’s sign-offs count
 		await l.run();
 		/** One unit's sign-off at its bounds, for `policies`: its reviews counted twice — Record Assurance's, and the rule's re-run's. */
 		const share = (policies: number) => PHASE7_SIGN_OFF_UNIT_MS + 2 * (policies - 4) * REVIEW_MS;
+		// ⭑ The review in parts, B6 — after the timeout the wait carried for the four types its turn staged.
 		expect(l.timeouts, 'half B’s timeout counted a sign-off at §3.2’s four policies').toEqual([
+			phase7HalfBAuthoringTimeoutMs(4),
 			PHASE7_TEST_TIMEOUT_MS -
 				PHASE7_PER_PHASE_MS +
-				PHASE7_AUTHORING_MS -
+				phase7AuthoringMs(4) -
 				4 * PHASE7_SIGN_OFF_UNIT_MS +
 				share(1) +
 				share(FIVE.length) +
@@ -2611,8 +2833,11 @@ describe('⛔ REG-D-112 (E3’s re-review, 4) — the limit before the root coun
 	 * `REG-D-114` (14), as amended 2026-10-16 — what a MODEL root counts before its press: one try's reserve, 4.
 	 */
 	const TRY_RESERVE = LANE_BUDGET.reviewerCallsPerTry;
-	/** ⭐ The floor's worst case, its two runs' reviews of up to four calls each: so Send's read, before it, stays under the limit. */
-	const FLOOR_CALLS = 8;
+	/**
+	 * ⭐ The floor's worst case, its two runs' reviews of up to four calls each ⭐ (the review in parts, B6) of each of sixteen
+	 * anticipated parts, ~~8~~ 128: so Send's read, before it, stays under the limit.
+	 */
+	const FLOOR_CALLS = phase7AuthoringReviewerCalls(PHASE7_AUTHORING_ANTICIPATED_PARTS);
 	/** One call past the limit with the floor's recorded calls counted, and within it without them. */
 	const PRIOR = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - TRY_RESERVE - FLOOR_CALLS + 1;
 
@@ -2655,16 +2880,18 @@ describe('⛔ REG-D-112 (E3’s re-review, 4) — the limit before the root coun
 describe('⛔ R4 (the lead’s round-4 item 6) — a re-run the limit stopped ends the run paid-limit, though every later check fits', () => {
 	/** The agent's PWA, every type declaring NO policy: each sign-off counts none ahead. */
 	const NO_POLICY_TYPES: ObjectRow[] = AGENT_TYPES.map((t) => ({ id: t.id, state: { ...t.state, requiredAssurancePolicyIds: [] } }));
-	/** The authoring floor's worst case, counted before Send: 8. */
-	const FLOOR_WORST = PHASE7_AUTHORING_FLOOR_RUNS * LANE_BUDGET.reviewerCallsPerTry;
+	/** The authoring floor's worst case, counted before Send: ~~8~~ ⭐ (the review in parts, B6) 128, for sixteen anticipated types. */
+	const FLOOR_WORST = phase7AuthoringReviewerCalls(PHASE7_AUTHORING_ANTICIPATED_PARTS);
 
 	it('⛔ the agent’s Specify phase stops, its re-run held back one call past the limit; the root’s sign-off, counting none, fits — and the run still ends paid-limit, never complete', async () => {
-		// ⭑ Send's read reaches the limit exactly; Specify's own press spends 5, so the re-run's one try's reserve passes it by
-		// one call, and the root's sign-off, counting none, stays 3 under it.
+		// ⭑ Send's read reaches the limit exactly; ⭐ (the review in parts, B6) the floor spends 8 short of the worst case Send
+		// counted; Specify's own press spends 5, so the re-run's one try's reserve passes it by one call, and the root's sign-off,
+		// counting none, stays 3 under it.
 		const prior = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - FLOOR_WORST;
 		const l = halfBLane({
 			paid: true,
 			prior,
+			floorCalls: FLOOR_WORST - 8,
 			types: NO_POLICY_TYPES,
 			stops: { pwu_s: { rerunReview: true, rerunWork: true, abandon: true } },
 			unitCalls: { pwu_s: 5 }
@@ -3123,5 +3350,213 @@ describe('⛔ The check of 241158f4, 1 — only an acceptance answered SUCCESS n
 			null,
 			refusal
 		]);
+	});
+});
+
+// ── ⭐⭐ THE REVIEW IN PARTS, B6 (`REG-D-125`; DESIGN-authoring-review-in-parts.md D6, D11; roadmap 9a.7) ───────────────────────
+// The floor reviews each type of the candidate as a part, in each of its two possible rounds: the spend reserve before Send
+// counts parts, the inventory the turn staged is counted against it, and the lane's record and the run report hold ONE round
+// and its complete part set — never one Reasoning Review of the PWA as a whole, which a round in parts never records.
+
+describe('⭐⭐ The review in parts, B6 — the authoring’s spend reserve counts parts, and the lane and the report record one round’s complete part set', () => {
+	/** The authoring floor's worst case for the inventory anticipated before Send: 2 × 16 × 4. */
+	const FLOOR_WORST = phase7AuthoringReviewerCalls(PHASE7_AUTHORING_ANTICIPATED_PARTS);
+	/** The prior that brings Send's read to the limit exactly. */
+	const AT_SEND = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - FLOOR_WORST;
+	/** A candidate of TWENTY types: four more than anticipated. */
+	const TWENTY_TYPES: ObjectRow[] = Array.from({ length: 20 }, (_, i) => ({
+		id: `pwutype_more_${i + 1}`,
+		state: { pwaId: PWA_ID, name: `More ${i + 1}`, pwuKind: 'PRODUCT_IMPLEMENTATION', isRoot: i === 0, permittedChildTypeIds: [], status: 'ACTIVE' }
+	}));
+	const STAGED_INVENTORY = 'the authoring floor’s worst case, for the types its turn staged';
+
+	it('⭐ the authoring’s worst case counts each part in each of its two rounds, four calls a review: 8 for one part, 128 for the sixteen anticipated before Send', () => {
+		expect([1, 4, 16, 20].map(phase7AuthoringReviewerCalls)).toEqual(
+			[1, 4, 16, 20].map((parts) => PHASE7_AUTHORING_FLOOR_RUNS * parts * LANE_BUDGET.reviewerCallsPerTry)
+		);
+		expect([PHASE7_AUTHORING_ANTICIPATED_PARTS, FLOOR_WORST, phase7AuthoringReviewerCalls(1)]).toEqual([16, 128, 8]);
+	});
+
+	// ⛔ PREDICTED RED, read from the code: no read counted the inventory the turn staged, so a candidate larger than the reserve
+	// counted before Send inherited that reserve unsaid.
+	it('⛔ a candidate staging MORE types than anticipated: Send’s check is counted again for the inventory it staged, its passing the limit recorded — and nothing refused', async () => {
+		const l = halfBLane({ paid: true, prior: AT_SEND, staged: [TWENTY_TYPES] });
+		const record = await l.run();
+		expect([record.authoring?.limitCheck?.total, record.authoring?.limitCheck?.allowed], 'arrangement: Send reaches the limit').toEqual([
+			PHASE7_PAID_LIMIT,
+			true
+		]);
+		expect(record.authoring?.parts).toBe(20);
+		expect(record.authoring?.inventoryCheck, 'the inventory the turn staged was never counted').toEqual({
+			prior: AT_SEND,
+			recorded: 0,
+			reserve: PHASE7_NEGATIVE_CONTROL_RESERVE,
+			ahead: phase7AuthoringReviewerCalls(20),
+			counted: STAGED_INVENTORY,
+			total: PHASE7_PAID_LIMIT + phase7AuthoringReviewerCalls(20) - FLOOR_WORST,
+			limit: PHASE7_PAID_LIMIT,
+			allowed: false
+		});
+		// ⚠ IT REFUSES NOTHING: the floor's rounds ran inside the Send press, which no check stops (`REG-D-114` (14)); the candidate
+		// is accepted, and the root's check counts the calls the store records.
+		expect(l.only('author.accept')).toEqual(['author.accept']);
+	});
+
+	it('⭐ CONTROL — a candidate within the anticipated inventory is not counted again: the reserve held', async () => {
+		const l = halfBLane({ paid: true, prior: AT_SEND, staged: [SIXTEEN_TYPES] });
+		const record = await l.run();
+		expect([record.authoring?.parts, record.authoring?.inventoryCheck]).toEqual([16, null]);
+	});
+
+	it('⭐ the report lists Send’s check counted again among the lane’s reads, after Send’s own, past the limit where it is', () => {
+		const lane = halfBLaneRows();
+		const inventoryCheck = {
+			prior: AT_SEND,
+			recorded: 0,
+			reserve: PHASE7_NEGATIVE_CONTROL_RESERVE,
+			ahead: phase7AuthoringReviewerCalls(20),
+			counted: STAGED_INVENTORY,
+			total: AT_SEND + PHASE7_NEGATIVE_CONTROL_RESERVE + phase7AuthoringReviewerCalls(20),
+			limit: PHASE7_PAID_LIMIT,
+			allowed: false
+		};
+		const sendCheck = { ...inventoryCheck, ahead: FLOOR_WORST, counted: 'the authoring floor’s worst case, for 16 anticipated types', total: PHASE7_PAID_LIMIT, allowed: true };
+		const run = lane.run as { authoring: Record<string, unknown> };
+		const out = buildRunReport(
+			halfBStore(),
+			{ ...lane, run: { ...run, authoring: { ...run.authoring, limitCheck: sendCheck, inventoryCheck } } },
+			{ accountNames: NAMES }
+		).report;
+		expect(out.reviewerCalls.laneLimitChecks.map((c) => [c.unit, c.before, c.total, c.allowed]).slice(0, 2)).toEqual([
+			['authoring', 'Send', PHASE7_PAID_LIMIT, true],
+			['authoring', 'Send, counted again for the inventory its turn staged', inventoryCheck.total, false]
+		]);
+		expect(renderMarkdown(out)).toContain(
+			`  - authoring, before Send, counted again for the inventory its turn staged: ${AT_SEND} + 0 + ` +
+				`${PHASE7_NEGATIVE_CONTROL_RESERVE} + ${phase7AuthoringReviewerCalls(20)} ahead (${STAGED_INVENTORY}) = ` +
+				`${inventoryCheck.total} of ${PHASE7_PAID_LIMIT}, past it: nothing held back, its rounds having run inside the Send press.`
+		);
+	});
+
+	// ⛔ PREDICTED RED, read from the code: given the types, the lane took each type's latest review in the whole fork, so a
+	// refinement's round that held no review of a type borrowed the first round's.
+	it('⛔ the lane records ONE round of the fork, its complete part set: a refinement’s round that holds no review of a type borrows none from the first round', async () => {
+		const tokenOf = (round: number) => `authoring-floor:sha256:candidate-${round}:floorrun_${round}`;
+		const first = floorOfTheCandidate(AGENT_TYPES).map((a) => ({ id: `r1_${a.id}`, state: a.state }));
+		const second = floorOfTheCandidate(AGENT_TYPES)
+			.filter((a) => (a.state.subjectObjectIds as string[])[0] !== 'pwutype_build')
+			.map((a) => ({ id: `r2_${a.id}`, state: a.state }));
+		const completion = (round: number) => (a: ObjectRow) => ({
+			eventType: 'AssuranceAssessmentCompleted',
+			aggregateId: a.id,
+			correlationId: tokenOf(round)
+		});
+		const l = halfBLane({
+			paid: true,
+			candidateFloor: {
+				assessments: [...first, ...second],
+				completionEvents: [...first.map(completion(1)), ...second.map(completion(2))]
+			}
+		});
+		const record = await l.run();
+		const review = record.authoring?.floor.find((f) => f.policyId === 'floor.reasoning-review');
+		expect(review?.parts?.map((p) => [p.typeName, p.state]), 'the second round borrowed the first round’s review of Build').toEqual(
+			AGENT_TYPES.map((t) => [t.state.name, t.id === 'pwutype_build' ? 'MISSING' : 'SATISFIED'])
+		);
+		expect(review?.state).toBe('MISSING');
+	});
+
+	// ⛔ PREDICTED RED, read from the code: the report read each policy's latest assessment of the PWA, so its Reasoning Review was
+	// the one PWA-subject review in the store, recorded last here, and the round's rejected part was never read.
+	it('⛔ stage 1 reads the round’s parts, never one PWA-subject review: beside a whole-PWA review SATISFIED, a REJECTED part reads BROKE, by name', () => {
+		const one = cellOf(
+			buildRunReport(halfBStore({ parts: { pwutype_build: 'REJECTED' }, wholePwaReview: 'SATISFIED' }), halfBLaneRows(), {
+				accountNames: NAMES
+			}).report,
+			'1',
+			'whole run'
+		);
+		expect([one.value, one.unregistered]).toEqual(['broke', true]);
+		expect(one.basis).toContain("the authoring floor's floor.reasoning-review reads REJECTED");
+		expect(one.basis).toContain(
+			"the authoring floor's reasoning review, by type: Verify wordfreq end to end SATISFIED, Specify wordfreq SATISFIED, " +
+				'Build wordfreq REJECTED, wordfreq Realization SATISFIED'
+		);
+	});
+
+	it('⛔ the report reads the latest ROUND alone: a type its round did not review is MISSING, never an older round’s review of it', () => {
+		const store = halfBStore();
+		// ⭑ An older round, recorded first and under a token of its own, which reviewed every type; the newer one, the store's,
+		// holds no review of Build.
+		const older: StoredObject[] = store.objects
+			.filter((o) => o.objectType === 'ASSURANCE_ASSESSMENT')
+			.map((o, i) => ({ ...o, id: `older_${o.id}`, firstSequence: -100 + i }));
+		const newer = store.objects.filter(
+			(o) => !(o.objectType === 'ASSURANCE_ASSESSMENT' && (o.state.subjectObjectIds as string[])[0] === 'pwutype_build')
+		);
+		const requested = (o: StoredObject, i: number, token: string): StoredEvent => ({
+			sequence: i + 1,
+			eventType: 'AssuranceAssessmentRequested',
+			aggregateType: 'ASSURANCE_ASSESSMENT',
+			aggregateId: o.id,
+			commandId: null,
+			correlationId: token,
+			payload: { assessmentId: o.id }
+		});
+		const events = [
+			...older.map((o, i) => requested(o, i, 'authoring-floor:older')),
+			...newer
+				.filter((o) => o.objectType === 'ASSURANCE_ASSESSMENT')
+				.map((o, i) => requested(o, older.length + i, 'authoring-floor:newer'))
+		];
+		const r = buildRunReport({ ...store, objects: [...older, ...newer], events: [...events, ...store.events] }, halfBLaneRows(), {
+			accountNames: NAMES
+		}).report;
+		expect(r.authoring?.floor.find((f) => f.policyId === 'floor.reasoning-review')).toEqual({
+			policyId: 'floor.reasoning-review',
+			state: 'MISSING',
+			parts: AGENT_TYPES.map((t) => ({
+				typeId: t.id,
+				typeName: t.state.name,
+				state: t.id === 'pwutype_build' ? 'MISSING' : 'SATISFIED'
+			}))
+		});
+	});
+
+	it('⭐ the report’s part set is the PWA’s own types: a type of another PWA in the store is no part of it', () => {
+		const store = halfBStore();
+		const other: StoredObject = {
+			id: 'pwutype_other',
+			objectType: 'PWU_TYPE',
+			state: { pwaId: 'pwa_other', name: 'Another PWA’s type' },
+			firstSequence: 1_000
+		};
+		const one = cellOf(
+			buildRunReport({ ...store, objects: [...store.objects, other] }, halfBLaneRows(), { accountNames: NAMES }).report,
+			'1',
+			'whole run'
+		);
+		expect(one.value, 'another PWA’s type was read as an unreviewed part').toBe('as intended');
+	});
+
+	it('⭐ report.json’s authoring floor carries the round’s part set beside its aggregate, and report.md prints it', () => {
+		const r = buildRunReport(halfBStore({ parts: { pwutype_verify: 'INCONCLUSIVE' } }), halfBLaneRows(), { accountNames: NAMES }).report;
+		expect(r.authoring?.floor).toEqual([
+			{ policyId: 'floor.schema-invariant', state: 'SATISFIED' },
+			{ policyId: 'floor.identity-provenance', state: 'SATISFIED' },
+			{
+				policyId: 'floor.reasoning-review',
+				state: 'INCONCLUSIVE',
+				parts: AGENT_TYPES.map((t) => ({
+					typeId: t.id,
+					typeName: t.state.name,
+					state: t.id === 'pwutype_verify' ? 'INCONCLUSIVE' : 'SATISFIED'
+				}))
+			}
+		]);
+		expect(renderMarkdown(r)).toContain(
+			'- **Its reasoning review, by type:** Verify wordfreq end to end INCONCLUSIVE, Specify wordfreq SATISFIED, ' +
+				'Build wordfreq SATISFIED, wordfreq Realization SATISFIED.'
+		);
 	});
 });
