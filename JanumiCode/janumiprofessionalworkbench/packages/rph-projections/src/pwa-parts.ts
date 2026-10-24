@@ -7,8 +7,8 @@
 // with children, the data flow among them and across its subtree's boundary (design D3). A type with children is judged for
 // their composition too (DEC-6), so a composite's part carries what that judgment needs, and its children's own definitions
 // are left to their own parts.
-// ⭐ A2 (2) — AND A COMPOSITE'S CONTEXT NAMES ITS CHILDREN, NEVER ITS GRANDCHILDREN: a type inside its subtree, on an
-// artifact or a flow, is named by the child whose subtree holds it (`peerNames`). Its grandchildren's composition is their
+// ⭐ A2 (2) — AND A COMPOSITE'S CONTEXT NAMES ITS CHILDREN, NEVER ITS GRANDCHILDREN: a type inside its subtree but itself, on
+// an artifact or a flow, is named by the child whose subtree holds it (`peerNames`). Its grandchildren's composition is their
 // parent's part's to judge, and their definitions are in no skeleton it is shown.
 //
 // PURE AND BROWSER-SAFE, like the export it reads, so that one function can give the authoring floor and the reviewer
@@ -52,7 +52,8 @@ export interface PwaPartParentRule {
 
 /**
  * An artifact the subject consumes or produces, with every type of the PWA that produces and consumes it, by name.
- * ⭐ A2 (2) — on a composite's part, a type inside its subtree is named by the child whose subtree holds it, each name once.
+ * ⭐ A2 (2) — on a composite's part, a type inside its subtree but itself is named by the child whose subtree holds it, each
+ * name once.
  */
 export interface PwaPartArtifact {
 	readonly name: string;
@@ -71,8 +72,9 @@ export interface PwaPartFlow {
  * A composite's data flow: each edge from one child's subtree to another's, and each edge with one end inside its own subtree
  * and the other outside. ⚠ An edge within one child's subtree is that child's own composition's, and an edge between the type
  * itself and its subtree is in its own `artifacts` already, so neither is listed here.
- * ⭐ A2 (2) — each listed BY CHILD: an end inside its subtree is named by the child whose subtree holds it, an end outside
- * by its own name, so edges that name the same producer, consumer and artifact are listed once.
+ * ⭐ A2 (2) — each listed BY CHILD: an end inside its subtree but the type itself is named by the child whose subtree holds
+ * it, the type itself and an end outside by its own name, so edges that name the same producer, consumer and artifact are
+ * listed once.
  */
 export interface PwaPartDataFlow {
 	readonly amongChildren: readonly PwaPartFlow[];
