@@ -433,8 +433,9 @@ export function classifyFloorRemediation(floor: FloorView): FloorRemediation {
 	}
 
 	// ⭐ `JAN-ESCREC` D3 — AND NEVER THE REVIEWER'S RECOMMENDATION (`isReviewerRecommendation`, above). THIS ONE FILTER IS
-	// EVERY PATH TO THE PRODUCER: its `findings` are `refineDirective`'s and `priorGaps`' (`routes/pwa/[id]/agent/+server.ts`)
-	// and `openPerTry`'s and `priorFindings`' (`routes/undertakings/[id]/+page.server.ts`), and `floorStatusLine` counts them.
+	// EVERY PATH TO THE PRODUCER: its `findings` are `refineDirective`'s (below) and the authoring route's `priorFindings`,
+	// which `runPwaFloor` narrows to each part's own type (`routes/pwa/[id]/agent/+server.ts`), and `openPerTry`'s and
+	// `priorFindings`' (`routes/undertakings/[id]/+page.server.ts`), and `floorStatusLine` counts them.
 	const subjectFindings = review.observations.filter(
 		(o) => !OPERATIONAL_REVIEW_CODES.has(o.code) && !isReviewerRecommendation(o)
 	);
