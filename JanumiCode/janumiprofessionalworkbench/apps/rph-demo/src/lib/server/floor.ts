@@ -149,6 +149,17 @@ export interface FloorPartView {
 	readonly criterionResults?: readonly CriterionResultView[];
 }
 
+/** A part as the host names it: its type's id and stored name. */
+export type FloorPartName = Pick<FloorPartView, 'typeId' | 'typeName'>;
+
+/**
+ * ⭐ The review in parts, package E, E1 — PARTS NAMED IN A SENTENCE, as the refinement directive names a type: each one's name
+ * quoted, then its id, comma-separated.
+ */
+export function partsNamed(parts: readonly FloorPartName[]): string {
+	return parts.map((p) => `${JSON.stringify(p.typeName)} (${p.typeId})`).join(', ');
+}
+
 /**
  * ⭐ The review in parts, B5 (package C's check) — ONE CRITERION'S RECORDED RESULT: the latest `AssuranceCriterionEvaluated` of
  * it (`latestCriterionRows`), and beside it what a TEST stipulated (`REG-D-071`), as the event carries it.
@@ -235,7 +246,8 @@ export interface FloorView {
 	readonly subjectId: string;
 	readonly aggregate: string;
 	readonly satisfied: boolean;
-	/** True iff an EFFECTIVE governance WAIVER covers the subject. ⚠ THAT IS ALL IT MEANS. This docblock read
+	/** True iff an EFFECTIVE governance WAIVER covers the subject — ⭐ on a PWA's floor, the PWA or one of its live types, whose
+	 *  part a waiver names (package E, E2; `hasEffectiveWaiver`). ⚠ THAT IS ALL IT MEANS. This docblock read
 	 *  "— publication is permitted despite the floor", and it was the contract-level source of every waiver claim
 	 *  the UI made: `data.floor.waived` gates the badge and the hint on the floor panel, and both said what this
 	 *  line told them to say. ASR-3 makes the floor UNCONDITIONAL (REG-F-202), so an EFFECTIVE waiver permits
@@ -322,6 +334,13 @@ export interface FloorRemediation {
 	readonly findings: readonly FloorObservationView[];
 	/** Human/operator guidance. The route emits this verbatim after the fail-closed floor result. */
 	readonly guidance: string;
+	/**
+	 * ⭐ The review in parts, package E, E1 (the lead's decision; DESIGN-authoring-review-in-parts.md D5, D8) — THE PARTS WHOSE
+	 * REVIEWS FAILED OPERATIONALLY BESIDE `findings`: set only on the `REFINE_SUBJECT` that answers a round in which other
+	 * parts concluded with findings that ask for revision (`revisionBesideFailedParts`). None is a finding; each is reviewed
+	 * again, with every part, when assurance reruns.
+	 */
+	readonly failedParts?: readonly FloorPartName[];
 }
 
 /**
@@ -399,6 +418,24 @@ export function classifyFloorRemediation(floor: FloorView): FloorRemediation {
 		};
 	}
 
+	// ⭐ The review in parts, package E, E3 — A PWA WITH NO TYPE HAD NOTHING TO REVIEW. The review is one per type, and the fold
+	// of no part is UNASSESSED (`partsDisposition`): answered by the catch-all below, it read "configure or change the
+	// reviewer", of a review that called none. Authoring the types answers it, as it answers the schema/invariant policy's
+	// finding beside it: a graph with no type has no root.
+	if (floor.parts?.length === 0) {
+		return {
+			action: 'RESOLVE_OTHER_FLOOR_FINDINGS',
+			autoRefine: false,
+			findings: [],
+			guidance:
+				"PublishPwa remains blocked because the PWA defines no PWU Type, so the mandatory Reasoning Review, which reviews each of the PWA's types, had nothing to review. Author the PWA's types, then rerun assurance. The reviewer did not fail: do not configure or change it, or record a waiver, in response."
+		};
+	}
+
+	// ⭐ E1 — a round in parts whose concluded parts ask for revision, beside parts whose reviews failed operationally.
+	const revision = revisionBesideFailedParts(floor);
+	if (revision !== undefined) return revision;
+
 	// ⭐ `JAN-SELRES` D7 — A SUBSTITUTED MODEL, BEFORE ANY OTHER FAILED REVIEW. ⛔ BEFORE, AND IT MUST BE: the substitution
 	// is always recorded BESIDE `VALIDATOR_EXECUTION_FAILED` (it refines it, `rph-assurance` D6), so the execution-failure
 	// branch below would take it first and answer "configure or retry" — the remedy its own refusal forbids.
@@ -452,7 +489,15 @@ export function classifyFloorRemediation(floor: FloorView): FloorRemediation {
 	// EVERY PATH TO THE PRODUCER: its `findings` are `refineDirective`'s (below) and the authoring route's `priorFindings`,
 	// which `runPwaFloor` narrows to each part's own type (`routes/pwa/[id]/agent/+server.ts`), and `openPerTry`'s and
 	// `priorFindings`' (`routes/undertakings/[id]/+page.server.ts`), and `floorStatusLine` counts them.
-	const subjectFindings = review.observations.filter(
+	// ⭐ The review in parts, package E's check (`REG-D-059`; design D5) — AND OF A REVIEW IN PARTS, ONLY THE OBSERVATIONS OF THE
+	// PARTS WHOSE OWN DISPOSITION FEEDS BACK. The fold is the strictest part's, so beside one REJECTED part the rule below read
+	// every part's observations as findings: an INCONCLUSIVE part's, a boundary-rejected reply's fault among them, and a
+	// SATISFIED part's INFORMATIONAL one.
+	const judged =
+		floor.parts === undefined
+			? review.observations
+			: floor.parts.filter((p) => FEEDS_BACK_TO_PRODUCER.has(p.disposition)).flatMap((p) => p.observations);
+	const subjectFindings = judged.filter(
 		(o) => !OPERATIONAL_REVIEW_CODES.has(o.code) && !isReviewerRecommendation(o)
 	);
 	// ⛔ ONLY A DISPOSITION THAT ACTUALLY JUDGES THE SUBJECT MAY SEND WORK BACK TO ITS PRODUCER.
@@ -502,6 +547,50 @@ export function classifyFloorRemediation(floor: FloorView): FloorRemediation {
 	};
 }
 
+/** A part whose review failed operationally — no reply, the output limit, a reply that did not parse after its repair: each a
+ *  thrown validator failure, recorded `VALIDATOR_EXECUTION_FAILED` (`rph-assurance` `failedResult`). ⭑ Exported for the
+ *  waiver's target (`routes/pwa/[id]/+page.server.ts` `blockingPolicyOf`), which names such a part last. */
+export const failedOperationally = (part: FloorPartView): boolean =>
+	part.observations.some((o) => o.code === 'VALIDATOR_EXECUTION_FAILED');
+
+/**
+ * ⭐⭐ The review in parts, package E, E1 (the lead's decision; DESIGN-authoring-review-in-parts.md D5, D7, D8) — A ROUND IN PARTS
+ * IS ANSWERED BY REVISION WHEN ITS CONCLUDED PARTS ASK FOR IT, BESIDE PARTS WHOSE REVIEWS FAILED OPERATIONALLY.
+ *
+ * ⛔ The fold carries every part's observations, so one part's `VALIDATOR_EXECUTION_FAILED` beside another part's REJECTED
+ * review sent the whole round to "configure or retry the reviewer": no finding went back, no refinement ran, and the page said
+ * the review produced no usable verdict while it listed the rejected part's finding.
+ *
+ * So the round without its failed parts is classified as any round is (`floorViewOf` over the other parts, the deterministic
+ * policies as recorded), and when that answers `REFINE_SUBJECT` its findings go back, with the failed parts named
+ * (`failedParts`): the one automatic refinement runs, and the floor then reviews every part again, the failed ones included
+ * (`runPwaFloor` rebuilds the whole inventory; design D8). ⛔ A failed part's record is never a finding (D5), and the round is
+ * never SATISFIED by this: `floor` is unchanged, its fold the strictest part's.
+ * ⭑ `undefined`, and the ladder answers, when no part failed; when a failed part's review was refused for a substituted model,
+ * whose remedy is the sponsor's and which a re-review would bill again (`REQUALIFY_OR_RESELECT_REVIEWER`); and when the other
+ * parts are answered otherwise — every part failed (the round without them has no part), the rest SATISFIED, a review not
+ * independent of the producer, an escalation, or no finding that asks for revision: today's retry answer stands.
+ */
+function revisionBesideFailedParts(floor: FloorView): FloorRemediation | undefined {
+	const parts = floor.parts ?? [];
+	const failed = parts.filter(failedOperationally);
+	if (failed.length === 0) return undefined;
+	if (failed.some((p) => p.observations.some((o) => o.code === VALIDATOR_MODEL_SUBSTITUTED))) return undefined;
+	const concluded = floorViewOf(floor.subjectId, {
+		deterministic: floor.policies.filter((p) => p.policyId !== FLOOR_POLICY_IDS.REASONING_REVIEW),
+		parts: parts.filter((p) => !failed.includes(p)),
+		waived: floor.waived
+	});
+	const answer = classifyFloorRemediation(concluded);
+	if (answer.action !== 'REFINE_SUBJECT') return undefined;
+	const failedParts = failed.map((p) => ({ typeId: p.typeId, typeName: p.typeName }));
+	return {
+		...answer,
+		failedParts,
+		guidance: `${answer.guidance} The Reasoning Review of ${partsNamed(failedParts)} failed operationally and recorded no finding: that failure is not a defect in the PWA, and every type, the failed ones included, is reviewed again when assurance reruns.`
+	};
+}
+
 /** How many findings about one type the refinement directive lists; the rest of that type's are counted, never dropped. */
 const FINDINGS_LISTED_PER_TYPE = 6;
 
@@ -514,8 +603,14 @@ const FINDINGS_LISTED_PER_TYPE = 6;
  * from the reviewer's prose. Every type with a finding is listed, in the order the findings come, which is export order;
  * within a type its first `FINDINGS_LISTED_PER_TYPE` findings are, and how many more there are is said on a line of its
  * own. ⛔ It listed the round's first six findings, so a later type's were dropped without a word.
+ * ⭐ Package E, E1 — and the types whose reviews failed operationally beside those findings (`FloorRemediation.failedParts`),
+ * named on lines of their own after the findings: none is a finding, and each is reviewed again after the revision.
  */
-export function refineDirective(prompt: string, findings: readonly FloorObservationView[]): string {
+export function refineDirective(
+	prompt: string,
+	findings: readonly FloorObservationView[],
+	failedParts: readonly FloorPartName[] = []
+): string {
 	const byType = new Map<string, { readonly name?: string; readonly findings: FloorObservationView[] }>();
 	for (const finding of findings) {
 		const key = finding.typeId ?? '';
@@ -540,15 +635,22 @@ export function refineDirective(prompt: string, findings: readonly FloorObservat
 		'An independent assurance Reasoning Review produced valid findings about the authored PWA subject, reviewed type by type.',
 		'Revise the PWA graph and/or its recorded professional rationale as each coded finding requires; do not merely restate the intent:',
 		sections.join('\n\n'),
+		...(failedParts.length === 0
+			? []
+			: [
+					'',
+					`The review of ${failedParts.length} type(s) failed operationally and recorded no finding about them; every type, these included, is reviewed again after this revision. Do not change them on account of that failure:`,
+					...failedParts.map((p) => `- ${partsNamed([p])}`)
+				]),
 		'',
 		`Original intent: ${prompt}`
 	].join('\n');
 }
 
-/** Which of ~~three~~ four sentences the PWA page's blocked hint reads — see `floorBlockedHint`. ⭐ `JAN-ESCREC` D3 added
- *  `'ROUTE_TO_HUMAN'`. */
+/** Which of ~~three~~ ~~four~~ five sentences the PWA page's blocked hint reads — see `floorBlockedHint`. ⭐ `JAN-ESCREC` D3
+ *  added `'ROUTE_TO_HUMAN'`; ⭐ the review in parts, package E, E1, `'REVISE_BESIDE_FAILED_REVIEWS'`. */
 export type FloorBlockedHint =
-	'REVISE' | 'NOT_BY_REVISION' | 'REVISE_AND_REVIEW' | 'ROUTE_TO_HUMAN';
+	'REVISE' | 'NOT_BY_REVISION' | 'REVISE_AND_REVIEW' | 'ROUTE_TO_HUMAN' | 'REVISE_BESIDE_FAILED_REVIEWS';
 
 /**
  * ⭐ `JAN-ESCREC` D3 — DOES A FLOOR POLICY OTHER THAN THE REVIEW RECORD A FINDING AGAINST THE GRAPH? The question the last
@@ -586,6 +688,11 @@ function rejectsTheGraph(floor: FloorView): boolean {
  *     ⛔ THE INSERTION SHAPE IS THE DESIGN'S: one line after the `'REVISE'` line, asking the classifier AGAIN — never a
  *     cached call, so that line stays byte-identical — and asking `rejectsTheGraph`, never the last line's predicate, which
  *     stays byte-identical too.
+ *   · ⭐ `'REVISE_BESIDE_FAILED_REVIEWS'` (the review in parts, package E, E1) — the classifier answers `REFINE_SUBJECT` beside
+ *     parts whose reviews failed operationally (`FloorRemediation.failedParts`): revising answers the findings, and the
+ *     failed parts are reviewed again, with every part, when the floor re-runs. The page names them beside the sentence
+ *     (`floorFailedReviews`, `routes/pwa/[id]/+page.server.ts`). ⛔ Asked one line BEFORE the `'REVISE'` line, which would
+ *     take it first, so that line stays byte-identical.
  *
  * ⛔ THE FLOOR'S OWN CLASSIFIER DECIDES WHETHER THE REVIEW IS THE PROBLEM, so the hint and the guidance cannot disagree
  * about the review. This function adds only what the classifier does not ask when it answers an operational review:
@@ -620,6 +727,7 @@ function rejectsTheGraph(floor: FloorView): boolean {
  */
 export function floorBlockedHint(floor: FloorView): FloorBlockedHint | undefined {
 	if (floor.satisfied) return undefined;
+	if (classifyFloorRemediation(floor).failedParts !== undefined) return 'REVISE_BESIDE_FAILED_REVIEWS';
 	if (!isOperationalRemediation(classifyFloorRemediation(floor).action)) return 'REVISE';
 	if (classifyFloorRemediation(floor).action === 'ESCALATE_REVIEW' && !rejectsTheGraph(floor)) return 'ROUTE_TO_HUMAN';
 	return floor.policies.some(
@@ -627,6 +735,16 @@ export function floorBlockedHint(floor: FloorView): FloorBlockedHint | undefined
 	)
 		? 'REVISE_AND_REVIEW'
 		: 'NOT_BY_REVISION';
+}
+
+/**
+ * ⭐ The review in parts, package E, E1 — THE PARTS THE BLOCKED HINT NAMES BESIDE `'REVISE_BESIDE_FAILED_REVIEWS'`: those whose
+ * reviews failed operationally, as the classifier names them (`FloorRemediation.failedParts`, `partsNamed`); `undefined` on
+ * every other floor.
+ */
+export function floorFailedReviews(floor: FloorView): string | undefined {
+	const failed = classifyFloorRemediation(floor).failedParts;
+	return failed === undefined ? undefined : partsNamed(failed);
 }
 
 /** Which sentence the floor panel says when the reviewer also recommended escalation — see `escalationRecommendationNote`.
@@ -673,6 +791,9 @@ export function escalationRecommendationNote(
 		case 'REVISE':
 		case 'REVISE_AND_REVIEW':
 			return 'BESIDE_FINDINGS';
+		// ⭐ Package E, E1 — the findings of the parts whose reviews concluded are addressed first, beside those that failed.
+		case 'REVISE_BESIDE_FAILED_REVIEWS':
+			return 'BESIDE_FINDINGS';
 		case 'NOT_BY_REVISION':
 			return 'WITH_AN_INCOMPLETE_REVIEW';
 		// ⭑ ROUTE_TO_HUMAN says the escalation itself. And a SATISFIED floor's hint is `undefined` (`floorBlockedHint`'s first
@@ -717,18 +838,19 @@ export function identityProvenanceFactsOf(
 	};
 }
 
-/** True iff an EFFECTIVE governance WAIVER Decision covers `subjectId`. ⚠ NOT "the auditable override of a
+/** True iff an EFFECTIVE governance WAIVER Decision covers one of `subjectIds`. ⚠ NOT "the auditable override of a
  *  blocking floor", which is what this said: under ASR-3 nothing overrides the floor. It is an auditable record
- *  of accepted risk, and the floor blocks regardless (REG-F-202). */
-function hasEffectiveWaiver(engine: AuthedEngineHandle, subjectId: string): boolean {
-	// WORKSPACE, and deliberately so (SPEC-001 INV-02 / FORK-9): this lookup's subject is the `subjectId` argument
+ *  of accepted risk, and the floor blocks regardless (REG-F-202). ⭐ The review in parts, package E, E2: a PWA's floor asks
+ *  of the PWA and of each of its live types, since a waiver of a part's finding names the type it was recorded about. */
+function hasEffectiveWaiver(engine: AuthedEngineHandle, ...subjectIds: string[]): boolean {
+	// WORKSPACE, and deliberately so (SPEC-001 INV-02 / FORK-9): this lookup's subjects are the `subjectIds` argument
 	// filtered below, not an Undertaking. A waiver may be authored anywhere in the workspace and still cover this
 	// subject, so narrowing the read to one Undertaking would hide legitimate overrides.
 	return listDecisions(engine, { kind: 'WORKSPACE' }).some(
 		(d) =>
 			d.state.decisionType === 'WAIVER' &&
 			d.state.status === 'EFFECTIVE' &&
-			(d.state.subjectObjectIds as string[] | undefined)?.includes(subjectId)
+			subjectIds.some((id) => (d.state.subjectObjectIds as string[] | undefined)?.includes(id) === true)
 	);
 }
 
@@ -975,7 +1097,7 @@ export async function runPwaFloor(
 				...(a === undefined ? {} : { criteria: tallyCriteria(a.criteria) })
 			};
 		}),
-		waived: hasEffectiveWaiver(engine, pwaId)
+		waived: hasEffectiveWaiver(engine, pwaId, ...stored.keys())
 	});
 }
 
@@ -1374,7 +1496,7 @@ export function loadPwaFloor(
 	return floorViewOf(pwaId, {
 		deterministic,
 		parts,
-		waived: hasEffectiveWaiver(engine, pwaId),
+		waived: hasEffectiveWaiver(engine, pwaId, ...types.keys()),
 		...(round.parts.size === 0 || round.token === undefined ? {} : { runToken: round.token })
 	});
 }

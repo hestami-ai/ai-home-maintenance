@@ -20,7 +20,10 @@ import type {
 	PermittedChildRule
 } from '@janumipwb/rph-authoring';
 import type { AssessmentCriterion, PromptTemplate } from '@janumipwb/rph-contracts';
-import { REVIEWER_RECOMMENDED_ESCALATION } from '@janumipwb/rph-assurance';
+import {
+	FLOOR_POLICY_IDS as ASSURANCE_FLOOR_POLICY_IDS,
+	REVIEWER_RECOMMENDED_ESCALATION
+} from '@janumipwb/rph-assurance';
 import {
 	listOrDefault,
 	policyEditPatch,
@@ -56,8 +59,10 @@ import { loadReviewerAnswer, type ReviewerAnswerView } from '$lib/server/assuran
 import { getArtifactStore } from '$lib/server/workbench';
 import {
 	escalationRecommendationNote,
+	failedOperationally,
 	floorBlockedHint,
 	floorChipLabel,
+	floorFailedReviews,
 	loadPwaFloor,
 	type CriterionResultView,
 	type CriterionTally,
@@ -107,12 +112,16 @@ function toLogEntry(e: ConversationEntry): LogEntry {
  * publication status alone, so beside a review whose only observation is the reviewer's recommendation — every ESCALATED
  * review, and an incomplete one its reviewer escalated — the page offered "Record accepted risk" and the action refused it.
  * `waiver-target-recommendation.test.ts` holds the load's answer to the action's outcome.
+ * ⭐ The review in parts, package E, E2 (DESIGN-authoring-review-in-parts.md D6; guide §8.15's "exact object and semantic
+ * version") — beside a Reasoning Review in parts, the finding is the first of a part that BLOCKS (`blockingPolicyOf`) — a part
+ * whose review failed operationally only where no other blocking part records one — and it carries that part's type
+ * (`FloorObservationView.typeId`): the object `recordWaiver` names.
  */
 function waiverTargetOf(floor: FloorView | undefined): {
 	readonly blocking: FloorPolicyView | undefined;
 	readonly finding: FloorObservationView | undefined;
 } {
-	const blocking = floor?.policies.find((p) => p.disposition !== 'SATISFIED');
+	const blocking = blockingPolicyOf(floor);
 	if (!blocking) return { blocking, finding: undefined };
 	// ⭐ `JAN-ESCREC` D3 (`REG-D-090`) — NEVER THE REVIEWER'S RECOMMENDATION. A reasoning review carries
 	// `REVIEWER_RECOMMENDED_ESCALATION` whenever its reviewer recommended ESCALATED: ALONE on the clean review rule (a)
@@ -122,6 +131,28 @@ function waiverTargetOf(floor: FloorView | undefined): {
 	// target. ⭑ IMPORTED, never restated (`verif/validator-failure-codes-imported.test.ts`).
 	const finding = blocking.observations.find((o) => o.code !== REVIEWER_RECOMMENDED_ESCALATION);
 	return { blocking, finding };
+}
+
+/**
+ * ⭐ The review in parts, package E, E2 — THE POLICY A WAIVER WOULD NAME: the first that is not SATISFIED; and when that is the
+ * Reasoning Review of a PWA reviewed in parts, with the observations of its blocking parts alone, in export order (the failed
+ * ones last, below). ⛔ The fold lists every part's observations (`floor.ts` `floorViewOf`), so the waiver took the first
+ * across all the parts — a satisfied part's among them — and named the PWA.
+ * ⭐ Package E's check, the MINOR finding — THE PARTS WHOSE REVIEWS FAILED OPERATIONALLY COME LAST (`failedOperationally`). A
+ * failed part blocks too, so first in export order it was the part named, its `VALIDATOR_EXECUTION_FAILED` the criterion
+ * waived, beside a rejected part's finding, which the round is answered by revising for (E1). ⭑ Last, not left out: where no
+ * other blocking part records an observation a waiver may name, the failed part's is still the one named, as before.
+ */
+function blockingPolicyOf(floor: FloorView | undefined): FloorPolicyView | undefined {
+	const blocking = floor?.policies.find((p) => p.disposition !== 'SATISFIED');
+	if (blocking?.policyId !== ASSURANCE_FLOOR_POLICY_IDS.REASONING_REVIEW || floor?.parts === undefined) return blocking;
+	const parts = floor.parts.filter((p) => p.disposition !== 'SATISFIED');
+	return {
+		...blocking,
+		observations: [...parts.filter((p) => !failedOperationally(p)), ...parts.filter(failedOperationally)].flatMap(
+			(p) => p.observations
+		)
+	};
 }
 
 /** ⭐ The review in parts, B5 — one type's own review, as the inspector shows it under that type (`typeReviewOf`). */
@@ -358,6 +389,10 @@ export const load: PageServerLoad = async ({ params }) => {
 		// guidance for a failed review says not to revise the PWA. `undefined` when no floor is recorded, and beside a
 		// satisfied one.
 		floorBlockedHint: floor === undefined ? undefined : floorBlockedHint(floor),
+		// ⭐ The review in parts, package E, E1 — AND THE PARTS THE HINT NAMES beside its `'REVISE_BESIDE_FAILED_REVIEWS'` sentence:
+		// those whose reviews failed operationally, as the classifier names them (`floorFailedReviews`). `undefined` beside
+		// every other floor.
+		floorFailedReviews: floor === undefined ? undefined : floorFailedReviews(floor),
 		// ⭐ `JAN-ESCREC` D3 (`REG-D-089`; the ER-1 app verifier's finding [7], and its re-verifier's [0]) — AND WHAT THE PANEL
 		// SAYS WHEN THE REVIEWER ALSO RECOMMENDED ESCALATION (`escalationRecommendationNote`): WHICH of two informational
 		// sentences — beside the findings, or with an incomplete review — never whether one. A boolean here once put "beside
@@ -885,8 +920,12 @@ export const actions: Actions = {
 				error: `Cannot waive ${blocking.policyId}: no open finding is recorded for it, and a waiver must name the finding it waives (DOC-004 §12.2).`
 			});
 		const waiverId = mintUiId('dec');
+		// ⭐ The review in parts, package E, E2 (design D6; guide §8.15) — THE EXACT OBJECT: the type a part's finding was recorded
+		// about, whose stored semantic version `RequestWaiver` pins beside it; the PWA for a finding of its own policies. The
+		// PWA stays the downstream impact either way: its publication is what the floor gates.
+		const waived = finding.typeId ?? params.id;
 		const req = dispatch('RequestWaiver', 'DECISION', waiverId, {
-			subjectObjectIds: [params.id],
+			subjectObjectIds: [waived],
 			scope: finding.code,
 			rationale,
 			duration: 'until superseded',

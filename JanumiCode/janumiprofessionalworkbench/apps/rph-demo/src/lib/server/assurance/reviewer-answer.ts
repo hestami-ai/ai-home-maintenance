@@ -152,7 +152,9 @@ export async function loadReviewerAnswer(
 	const shown = concludedTry(rows);
 	if (shown === undefined) return undefined;
 
-	const state = shown.state as unknown as ResolvableExchange;
+	// ⭐ The review in parts, package E, E4 — WITH ITS ID: the stored state carries none (`AS-06`, below), and the readers name
+	// the exchange by it, so the disclosure beside every unretained answer read "The answer span was not retained for undefined".
+	const state = { ...(shown.state as object), exchangeId: shown.id } as ResolvableExchange;
 	const report = await verifyExchangeContent(state, store);
 	const verdicts = report.refs.map((r) => ({ field: r.field, verdict: r.verdict }));
 	const read = await readAnswerSpan(state, store);

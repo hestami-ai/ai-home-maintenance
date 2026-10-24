@@ -335,7 +335,8 @@ test.describe('PWA Designer — the inspector shows each type’s own review, an
 		await inspect(page, 'Product Realization');
 		const answer = review.getByTestId('inspector-review-answer');
 		await expect(answer).toBeVisible();
-		await expect(answer.locator('.revansnote')).toContainText(ROUND_ONE);
+		// ⭐ Package E, E4 — WHOLE, so a disclosure naming no exchange (`not retained for undefined`) fails here.
+		await expect(answer.locator('.revansnote')).toHaveText(`The answer span was not retained for mex_01ARZ3NDEKTSV4RRFFQ69G5PC1: ${ROUND_ONE}`);
 		await expect(answer.locator('.revanstext'), 'bytes the page could not read were shown as the answer').toHaveCount(0);
 		// ⭑ CONTROL — the sibling's review made no call in the round, and none is shown under it.
 		await inspect(page, 'Architecture Definition');
@@ -367,7 +368,9 @@ test.describe('PWA Designer — the inspector shows each type’s own review, an
 		});
 		await gotoHydrated(page, `/pwa/${pwaId}`);
 		await inspect(page, 'Product Realization');
-		await expect(review.getByTestId('inspector-review-answer').locator('.revansnote')).toContainText(ROUND_TWO);
+		await expect(review.getByTestId('inspector-review-answer').locator('.revansnote')).toHaveText(
+			`The answer span was not retained for mex_01ARZ3NDEKTSV4RRFFQ69G5PC2: ${ROUND_TWO}`
+		);
 		await expect(review).not.toContainText(ROUND_ONE);
 	});
 });

@@ -148,13 +148,18 @@ test.describe('Assurance floor — the blocked hint follows the floor’s own cl
 			readonly observationId: string;
 			readonly observation: typeof EXECUTION_FAILED;
 			readonly concludeAs: 'REJECTED' | 'INCONCLUSIVE';
+			/** ⭐ Package E, E1 — a reasoning review of this type, named, in place of the root's. */
+			readonly onType?: string;
 		}
 	): Promise<void> {
 		const { policyId, assessmentId, observationId, observation, concludeAs } = staged;
-		const pwa = (await introspect(request)).pwas.find((p) => p.id === pwaId)!;
+		const snapshot = await introspect(request);
+		const pwa = snapshot.pwas.find((p) => p.id === pwaId)!;
 		const part = await theRootPartOfTheLatestRound(request, pwaId);
-		const subjectId = policyId === POLICY ? part.typeId : pwaId;
-		const version = policyId === POLICY ? part.version : Number(pwa.state.semanticVersion ?? 1);
+		const named = snapshot.pwuTypes.find((t) => t.state.pwaId === pwaId && t.state.name === staged.onType);
+		const reviewed = named === undefined ? part : { typeId: named.id, version: Number(named.state.semanticVersion ?? 1) };
+		const subjectId = policyId === POLICY ? reviewed.typeId : pwaId;
+		const version = policyId === POLICY ? reviewed.version : Number(pwa.state.semanticVersion ?? 1);
 		const res = await request.post('/test-api/dispatch', {
 			data: {
 				correlationId: part.correlationId,
@@ -398,6 +403,40 @@ test.describe('Assurance floor — the blocked hint follows the floor’s own cl
 		const hint = page.getByTestId('floor-blocked-hint');
 		await expect(hint).toHaveCount(1);
 		await expect(hint).toHaveText(REVISE_HINT);
+		await expectTheHintOnScreen(page);
+	});
+
+	// ⭐ The review in parts, package E, E1 (the lead's decision) — ONE PART'S REVIEW FAILED BESIDE ANOTHER PART'S REJECTION: the
+	// round is answered by revision, so the hint says to revise for the findings, names the part whose review failed, and says
+	// every type is reviewed again. ⛔ It said revising does not address the block, beside the rejected part's finding.
+	test('⭐ a part’s review that did not execute BESIDE another part’s rejection: the hint says revise for the findings, and names the failed part, whole', async ({
+		page,
+		request
+	}) => {
+		const pwaId = await draftWithSatisfiedFloor(page, request, 'Floor Failed Part Beside A Rejection Hint');
+		await stageAReview(request, pwaId, EXECUTION_FAILED, 'INCONCLUSIVE');
+		await stageAnAssessment(request, pwaId, {
+			policyId: POLICY,
+			assessmentId: 'assess_01ARZ3NDEKTSV4RRFFQ69G5FD1',
+			observationId: 'obs_01ARZ3NDEKTSV4RRFFQ69G5FD2',
+			observation: SUBJECT_FINDING,
+			concludeAs: 'REJECTED',
+			onType: 'Architecture Definition'
+		});
+		const root = await theRootPartOfTheLatestRound(request, pwaId);
+
+		await gotoHydrated(page, `/pwa/${pwaId}`);
+		// Arrangement: the root's review did not execute, the child's rejected the graph, and both are on the panel.
+		await expect(page.getByTestId('assurance-disposition')).toContainText('REJECTED');
+		await expect(page.locator('ul.floorgaps')).toContainText(EXECUTION_FAILED_STATEMENT);
+		await expect(page.locator('ul.floorgaps')).toContainText(SUBJECT_FINDING.statement);
+
+		const hint = page.getByTestId('floor-blocked-hint');
+		await expect(hint).toHaveCount(1);
+		await expect(hint).toHaveText(
+			`Publishing is blocked until the floor is SATISFIED — revise the graph for the findings the floor records against it and re-run. The Reasoning Review of "Product Realization" (${root.typeId}) failed operationally and recorded no finding; every type, the failed ones included, is reviewed again when the floor re-runs.`
+		);
+		await expect(hint).not.toContainText(/waiv/i);
 		await expectTheHintOnScreen(page);
 	});
 });

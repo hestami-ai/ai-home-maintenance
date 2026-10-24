@@ -24,6 +24,7 @@ import {
 	classifyFloorRemediation,
 	floorStatusLine,
 	isOperationalRemediation,
+	partsNamed,
 	refineDirective,
 	runPwaFloor,
 	type FloorProducer,
@@ -131,10 +132,16 @@ async function runFloorAfterTurn(ctx: {
 				kind: 'status',
 				text: '↻ Auto-refinement pass (addressing valid reviewer subject findings)…'
 			});
-			await agent.run(refineDirective(instruction, remediation.findings), onEvent, signal);
+			// ⭐ Package E, E1 — the directive also names the parts whose reviews failed beside the findings (`failedParts`).
+			await agent.run(
+				refineDirective(instruction, remediation.findings, remediation.failedParts),
+				onEvent,
+				signal
+			);
 			// ⭐ B4 (design D8) — THE WHOLE PART INVENTORY AGAIN, under the new candidate hash and a new round token: the
 			// floor rebuilds the parts from the refined candidate's export, so a type the refinement added is reviewed and
-			// one it removed is not, and no earlier round's result enters this one.
+			// one it removed is not, and no earlier round's result enters this one. ⭐ E1: a part whose review failed is
+			// reviewed again here like every other.
 			subjectHash = hashAuthoringSubject(turn);
 			floor = await runPwaFloor(
 				pwaId,
@@ -242,8 +249,14 @@ function applyFloorDisposition(
 		'The candidate did not satisfy the authoring assurance floor.';
 	// ⭐ `JAN-ESCREC` D3 — THE ACTION RIDES ON THE TURN, AS DATA, so the page's resume banner can name an escalation
 	// (`ESCALATE_REVIEW`) without matching the guidance's prose. Undefined when the floor could not run.
+	// ⭐ Package E, E1 — and a revision requested beside parts whose reviews failed names them, as data, for the banner.
 	if (operational) markAuthoringTurnExternalBlock(turn, detail, remediation?.action);
-	else markAuthoringTurnRevisionRequired(turn, detail);
+	else
+		markAuthoringTurnRevisionRequired(
+			turn,
+			detail,
+			remediation?.failedParts === undefined ? undefined : partsNamed(remediation.failedParts)
+		);
 	send({
 		kind: 'status',
 		text: 'The candidate remains staged for inspection or discard; canonical DRAFT is unchanged.'

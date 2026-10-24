@@ -2219,6 +2219,12 @@
 								<p class="floorhint" data-testid="floor-blocked-hint">
 									Publishing is blocked until the floor is SATISFIED — the Reasoning Review recommended escalation to a human reviewer, and this workbench cannot record a human's review yet (REG-F-474). Revising the graph does not address this.
 								</p>
+							<!-- ⭐ The review in parts, package E, E1 — revision answers the findings of the parts whose reviews concluded, and
+							     the parts whose reviews failed operationally are named, as the server names them (`floorFailedReviews`). -->
+							{:else if data.floorBlockedHint === 'REVISE_BESIDE_FAILED_REVIEWS'}
+								<p class="floorhint" data-testid="floor-blocked-hint">
+									Publishing is blocked until the floor is SATISFIED — revise the graph for the findings the floor records against it and re-run. The Reasoning Review of {data.floorFailedReviews} failed operationally and recorded no finding; every type, the failed ones included, is reviewed again when the floor re-runs.
+								</p>
 							{:else}
 								<p class="floorhint" data-testid="floor-blocked-hint">
 									Publishing is blocked until the floor is SATISFIED — revise the graph and re-run.
