@@ -1,7 +1,7 @@
 # DESIGN — Reviewing an authored PWA in parts, with its composition judged at each level
 
 **Programme:** `JAN-EXEC` Phase 7, before P6 again; `REG-F-571`, `REG-D-125` and the built-in authoring PWA of `REG-D-122`.
-**Status:** ~~DESIGN, revision 1, 2026-10-23. D1–D13 are decided for the build. The catchers in §5 are PROPOSED, awaiting the sponsor. The depth-3 qualification question remains open. This document records the design, not a completed build.~~ DESIGN, revision 2, 2026-10-23. D1–D13 are decided for the build. The 27 part oracles are conferred and the 3-level pair is added, with its expected verdicts conferred as described (`REG-D-126` Q30–Q31). The limit is about 900 (Q32). The build, code records of conferral and paid measurement remain owed, then P6 again.
+**Status:** ~~DESIGN, revision 1, 2026-10-23. D1–D13 are decided for the build. The catchers in §5 are PROPOSED, awaiting the sponsor. The depth-3 qualification question remains open. This document records the design, not a completed build.~~ ~~DESIGN, revision 2, 2026-10-23. D1–D13 are decided for the build. The 27 part oracles are conferred and the 3-level pair is added, with its expected verdicts conferred as described (`REG-D-126` Q30–Q31). The limit is about 900 (Q32). The build, code records of conferral and paid measurement remain owed, then P6 again.~~ DESIGN, revision 3, 2026-10-24 (`REG-D-127`). Packages A–D are built and integrated on `p7c-p6r` at `bc3df507`; case set v8 has been measured. D3a and case set v9 are decided for the build. Package E is being built (`REG-D-128`). The policy context, restated bridge cases, sponsor confirmation, measurement and green integration remain owed, then P6 again. The limit remains about 900.
 **Sources:**
 - `sponsor-words-2026-10-18.md`, Q21b–Q24 and ~~Q28a–Q29~~ Q28a–Q32.
 - `p6pq-facts.md` (S-B): section 4c's build, gate, cut and spend.
@@ -9,6 +9,7 @@
 - `r10a-out.md` and `r10b-out.md`: research leads, checked against the repository at the cited lines.
 - `JPWB-REG-005 Decision and Divergence Register.md`, the canon and the code cited below.
 - Build order: `ROADMAP-undertaking-execution-sandbox.md` §9a.
+- Revision 3: `sponsor-words-2026-10-18.md`, Q33a–Q33b; `v8-facts.md` (S-D), the build, delegated decisions, record lines and paid measurement; `REG-F-572`, `REG-F-573`, `REG-D-127` and `REG-D-128`.
 
 ## 1. Why, and where it ends
 
@@ -77,6 +78,14 @@
    - **Room.** S-C's measured local view reaches at most 2,524 code units, or 14,062 with the rest of that prompt. Keep the budgets at `apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts:119`.
    - A composite's over-budget children's context is cut child by child, with each cut declared inside its allowance. Reuse the budget seam and fair-share machinery at `apps/rph-demo/src/lib/server/assurance/review-input.ts:272`, `:315` and `:351`. The measured local views need no cut at run-11's scale; the full builder must establish its own result.
    - Protect the full subject before allocating context. If the full subject cannot fit, refuse that review as incomplete. Extend `judgePrompt`'s builder-owned budget checks (`apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts:931`) so no later generic head cut can silently remove subject bytes.
+
+**D3a, the declared policies named, and those the kind may take (`REG-D-127`).**
+   - **Red first:** a part whose kind may take Test Adequacy and which omits that assignment shows both facts. Its subject's declared-policy list omits Test Adequacy; its context's applicable-policy list includes that policy's id, name and purpose. A declared assignment also retains its name and purpose in the materialized prompt.
+   - **SUBJECT.** Alongside the type's declared policy ids, show each declared policy with its id, name and purpose.
+   - **CONTEXT.** List the policy library's ACTIVE non-floor policies whose kind conditions name the subject's kind or name no kinds. Carry each policy's id, name and purpose. This makes a missing applicable policy visible in the part; the reviewer judges the assignment against the request.
+   - Read the library's stored values through the existing policy view and kind-condition semantics (`packages/rph-authoring/src/broker.ts:172`, `:189`, `:361`). Extend the part material carried by `packages/rph-projections/src/pwa-parts.ts`. Keep policy names and purposes inside the authored-content fence.
+   - Qualification cases carry the policy library their materialization reads: the seeded library. Production and qualification use the same library read and part-building route.
+   - The policy context changes each part's prompt. Extend its probes and move the fingerprint. The 35 part cases owe fresh paid measurement; unchanged non-part cases retain the prompt-hash checks for RESCORED coverage.
 
 4. **D4, the framing: `PWA_TYPE`.**
    - **Red first:** a part is described as a type definition, and a composite's part as a composition assessment. A claim concerning an unseen type produces neither a positive nor a negative finding about that unseen type.
@@ -200,6 +209,14 @@
 - **Fingerprint and coverage.** Probes are explicit registrations (`scripts/reviewer-qual/probes.ts:914`); the fingerprint hashes their materialized prompts (`scripts/reviewer-qual/fingerprint.ts:450`). Remove graph probes only with a current set containing zero graph cases. Preserve historical graph materialization tests.
 - **The 41 unchanged cases.** Verify initial and repair prompt hashes before appending RESCORED lines. The check refuses changed prompts and transport/output-limit failures as rescore sources (`scripts/reviewer-qual/check-core.ts:316`, `:810`). Include the complete eligible source record (`:992`), and establish coverage by the selected candidate (`:1120`).
 
+- **Revision 3: the v8 measurement, 2026-10-24.** S-D records 72 calls: a two-call canary, then 35 part cases at two repetitions. The canary answered `G7-CLEAN.T02` SATISFIED and `G8-RR-02.T05` REJECTED naming RR-02. In the full run, production-shaped clean parts were SATISFIED in 20 of 20 evaluations; bridge roots in 8 of 8; bridge leaves in 5 of 12, with 7 REJECTED (`REG-F-572`). Planted catchers were REJECTED in 28 of 30, with the planted criterion named in 25 of 30. Both misses were `G7-RR-02.T02`, the removed Test Adequacy assignment (`REG-F-573`). Across the canary and full run there were 0 transport failures and 0 calls cut at the model's output-token limit. The check has no COVERAGE problem and six ESCALATION problems. These are measured results; P6 remains owed.
+- **Case set v9 (`REG-D-127`).** The v8 inventory and construction above remain history. Preserve case set v8 and its paid record. Carry v8's 41 non-part cases byte for byte. Carry its 35 part cases with their expected verdicts, faulted criteria, catcher assignments and standings unchanged (`REG-D-126`).
+  - **Policy material.** Carry the seeded policy library that qualification materialization reads. Materialize D3a through the same route as production. The 35 part prompts change and owe measurement.
+  - **Bridge cases.** Restate the bridge source PWAs as production stores a type it defines: a purpose for each type, authored to match the clean PWA's account. Each planted twin differs from `G3-CLEAN` only where its plant is. The planted type's purpose is consistent with its plant. Preserve the expected verdicts.
+  - **Sponsor confirmation before measurement.** Show the restated bridge cases to the sponsor to confirm. A new case version preserves v8's measured inputs rather than tuning them in place.
+  - **Probes and fingerprint.** Register the declared-policy names and purposes, applicable-policy list and seeded-library materialization. The fingerprint moves. Preserve historical graph and v8 materialization.
+  - **Measurement.** After the build and confirmation, run a two-call canary, then the 35 part cases at two repetitions: 35 × 2 + 2 = 72 planned calls before retries and repairs. Re-establish the 41 carried cases' eligible RESCORED coverage under the new fingerprint after checking initial and repair prompt hashes. Record the ACKNOWLEDGED line for the fingerprint change. Apply the conferred verdict bar and escalation rules; obtain GREEN qualification and the complete green gate before integration and P6 again.
+
 ## 6. Spend
 
 - **Now.** S-B records 539 reviewer calls spent of the sponsor's limit of about ~~800~~ 900 (`REG-D-126` Q32). This design spends none.
@@ -207,6 +224,8 @@
 - **With the depth-3 pair.** ~~Qualification about 70, then P6 again about 172: about 781, leaving about 19 calls.~~ The pair is included in the base plan (`REG-D-126` Q31). Its seven clean parts and one catcher add 16 planned calls. The fixed qualification inventory is 35 part cases, costing 72 calls with the canary.
 - **The allowance.** These figures budget initial calls. Retry and repair overhead can consume the headroom. The lane must count its actual bounded calls and the next act's reserve under `REG-D-110`.
 - **Before P6.** If qualification spends more than planned, the lead asks the sponsor about the limit before P6. Report the remaining allowance and revised estimate beside that question. P6 still reports its result and spend before P7.
+- **Revision 3, current spend and plan, 2026-10-24 (`REG-D-127`).** The figures above record revision 2's plan. S-D records 611 calls now spent: 539 + 72 for v8. Measuring v9 is planned at about 72 calls, then P6 again at about 172: 611 + 72 + 172 = about 855 of about 900, leaving about 45 before retries and repairs. The lead raises the limit question again if P6 needs more. P6 reports its result and spend before P7.
+- **The reserve (`REG-D-128`).** Before Send, the lane assumes 16 types: 128 calls at four calls per review over two rounds. It counts the actual inventory again after the turn settles and reports it. The lane cannot intervene between review rounds inside one Send request; `LIMIT_CAVEAT` discloses that a press can spend past the limit. The reserve and the planned 172-call P6 estimate serve different purposes.
 
 ## 7. ~~Open questions for the sponsor~~ Answered by the sponsor, 2026-10-23 (`REG-D-126`)
 
