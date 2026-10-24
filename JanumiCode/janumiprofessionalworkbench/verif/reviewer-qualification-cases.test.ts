@@ -3060,7 +3060,8 @@ function byNameOf(source: GraphCase, id: string): string {
 //   · D3a IN THE CASES — G7-RR-02.T02's part shows Test Adequacy among the policies its kind may take and not among those it
 //     declares; a G7 part names its declared policies;
 //   · THE BRIDGE RESTATED — each type as `definePwuType` stores it, with a purpose; G3-CLEAN's seven purposes as written here;
-//     the renamed copies renamed and nothing else; each planted twin G3-CLEAN restated but where its plant is (diffed);
+//     the renamed copies renamed and nothing else; each planted twin G3-CLEAN restated but where its plant is (diffed); the
+//     planted types' purposes as written here, under one rule for every twin, and what the catcher parts show of them;
 //     production's graph;
 //   · THE ORACLES — version eight's, unchanged; the conferral naming the 19 restated cases as awaiting the sponsor's
 //     confirmation, and the check reporting that confirmation as owed, never a missing conferral;
@@ -3121,7 +3122,8 @@ const G3_CLEAN_PURPOSES: readonly (readonly [name: string, purpose: string])[] =
 ];
 /**
  * ⭐ EACH TWIN'S EVERY DIFFERENCE FROM G3-CLEAN, restated — written here: what version seven's twin already differed in (its
- * plant), and, after `+`, what the restatement adds, each at a type its plant changes. Named by the type's name in G3-CLEAN.
+ * plant), and, after `+`, what the restatement adds, each at a type whose purpose its plant changes (`PLANTED_PURPOSES_V9`)
+ * or, for G3-RR-07's check, the boundary contract its INTERNAL boundary leaves unstored. Named by the type's name in G3-CLEAN.
  */
 const TWIN_DIFFERENCES_V9: Readonly<Record<string, readonly string[]>> = {
 	'G-RR-01': [
@@ -3146,6 +3148,7 @@ const TWIN_DIFFERENCES_V9: Readonly<Record<string, readonly string[]>> = {
 		'narration',
 		'removed Independent Design Check',
 		'Pedestrian Bridge Structural Review.permittedChildTypeIds',
+		'+ Pedestrian Bridge Structural Review.purpose',
 		'Rail Authority Permit Submission.requiredInputs',
 		'+ Rail Authority Permit Submission.purpose'
 	],
@@ -3154,6 +3157,7 @@ const TWIN_DIFFERENCES_V9: Readonly<Record<string, readonly string[]>> = {
 		'rationale',
 		'narration',
 		'Pedestrian Bridge Structural Review.permittedChildTypeIds',
+		'+ Pedestrian Bridge Structural Review.purpose',
 		'Load Analysis (pedestrian, wind, vibration).name',
 		'+ Load Analysis (pedestrian, wind, vibration).purpose',
 		'added Vibration Compliance Statement'
@@ -3163,20 +3167,79 @@ const TWIN_DIFFERENCES_V9: Readonly<Record<string, readonly string[]>> = {
 		'narration',
 		'removed Structural Form Options Study',
 		'Pedestrian Bridge Structural Review.permittedChildTypeIds',
+		'+ Pedestrian Bridge Structural Review.purpose',
 		'Load Analysis (pedestrian, wind, vibration).requiredInputs',
 		'+ Load Analysis (pedestrian, wind, vibration).purpose'
 	],
-	'G3-RR-06': ['rationale', '+ Member, Connection and Foundation Design.purpose'],
+	'G3-RR-06': ['rationale'],
 	'G3-RR-07': [
 		'rationale',
+		'+ Pedestrian Bridge Structural Review.purpose',
 		'Independent Design Check.name',
 		'Independent Design Check.executionBoundary',
 		'+ Independent Design Check.purpose',
 		'+ Independent Design Check.boundaryContract'
 	],
-	'G3-RR-08': ['rationale', '+ Member, Connection and Foundation Design.purpose'],
+	'G3-RR-08': ['rationale'],
 	'G3-RR-09': ['rationale', 'Independent Design Check.requiredOutputs']
 };
+/**
+ * ⭐ THE PLANTED TYPES' PURPOSES, as the sponsor is shown them — written here: for each planted twin, each type whose purpose
+ * its plant changes, by its name in that twin. ONE RULE FOR EVERY TWIN: a type keeps G3-CLEAN's purpose while that purpose is
+ * still true of it; a type its plant gives other work — in the twin's graph and its account alike — says that work as the
+ * twin's own account states it, and a root's work is its children's, as its purpose lists them. A plant that sets the account
+ * against the graph stays where version seven put it, and no purpose takes the account's side: G3-RR-06's and G3-RR-08's
+ * design, which their accounts say works from the load model while their graphs give it the geotechnical report too, and
+ * G3-RR-09's check, which its account calls complete while its graph gives it no output, keep G3-CLEAN's purposes.
+ */
+const PLANTED_PURPOSES_V9: readonly (readonly [source: string, type: string, purpose: string])[] = [
+	[
+		'G-RR-01',
+		'Pedestrian Bridge Concept Study',
+		'Deliver the bridge review as a concept study: establish the bridge’s appearance, show it in its setting, and confirm through public consultation that the bridge is acceptable.'
+	],
+	['G-RR-01', 'Visual Concept', 'Establish the bridge’s appearance in concept sketches.'],
+	['G-RR-01', 'Photorealistic Renderings', 'Show the bridge in its setting in photorealistic renderings made from the concept sketches.'],
+	['G-RR-01', 'Public Consultation', 'Confirm with the public, from the renderings, that the bridge is acceptable, in a consultation report.'],
+	[
+		'G3-RR-02',
+		'Pedestrian Bridge Structural Review',
+		'Carry out the structural review of the 40 m single-span steel pedestrian bridge over the two-track rail line, each obligation of the instruction by a type of its own: the site and geotechnical survey, the selection of a structural form after comparing the viable options, the load analysis to the Eurocodes, the member, connection and foundation design, and the permit submission to the rail authority.'
+	],
+	[
+		'G3-RR-02',
+		'Rail Authority Permit Submission',
+		'Make the permit submission to the rail authority once the design is complete, with the design calculations, the drawings and the geotechnical report.'
+	],
+	['G3-RR-03', 'Load Analysis (static pedestrian load)', 'Analyse the selected structural form to the Eurocodes for the static pedestrian load only, producing the load model.'],
+	[
+		'G3-RR-04',
+		'Pedestrian Bridge Structural Review',
+		'Carry out the structural review of the 40 m single-span steel pedestrian bridge over the two-track rail line, each obligation of the instruction by a type of its own: the site and geotechnical survey, the selection of a structural form after comparing the viable options, the load analysis to the Eurocodes, the statement recording that the bridge complies with the comfort criteria for pedestrian-induced vibration, the member, connection and foundation design, the independent design check by a firm that took no part in the design, and the permit submission to the rail authority.'
+	],
+	['G3-RR-04', 'Load Analysis (pedestrian, wind)', 'Analyse the selected structural form to the Eurocodes for pedestrian and wind loading, producing the load model.'],
+	['G3-RR-04', 'Vibration Compliance Statement', 'Record that the bridge complies with the comfort criteria for pedestrian-induced vibration.'],
+	[
+		'G3-RR-05',
+		'Pedestrian Bridge Structural Review',
+		'Carry out the structural review of the 40 m single-span steel pedestrian bridge over the two-track rail line, its structural form fixed at the outset as a cable-stayed deck, each obligation of the instruction by a type of its own: the site and geotechnical survey, the load analysis to the Eurocodes, the member, connection and foundation design, the independent design check by a firm that took no part in the design, and the permit submission to the rail authority.'
+	],
+	[
+		'G3-RR-05',
+		'Load Analysis (pedestrian, wind, vibration)',
+		'Analyse the cable-stayed deck to the Eurocodes for pedestrian, wind and pedestrian-induced vibration loading, with the foundation stiffness the geotechnical report gives in its dynamic model, producing the load model.'
+	],
+	[
+		'G3-RR-07',
+		'Pedestrian Bridge Structural Review',
+		'Carry out the structural review of the 40 m single-span steel pedestrian bridge over the two-track rail line, each obligation of the instruction by a type of its own: the site and geotechnical survey, the selection of a structural form after comparing the viable options, the load analysis to the Eurocodes, the member, connection and foundation design, the design check within the design team by its senior design engineer, and the permit submission to the rail authority.'
+	],
+	[
+		'G3-RR-07',
+		'Design Self-Check by the Senior Design Engineer',
+		'Check the bridge’s design within the design team, by its senior design engineer, who knows the design best, certifying the design calculations and drawings.'
+	]
+];
 /**
  * Where two graph cases differ: the request, the PWA, the account or the narration whole; each type the first holds and the
  * second does not, and the reverse; and, for a type both hold by id, each key of it that differs, by its name in the first.
@@ -3312,7 +3375,7 @@ describe('⭐⭐ the review in parts, B8a — reviewer-qualification case set v9
 		);
 	});
 
-	it('⛔ EACH PLANTED TWIN DIFFERS FROM G3-CLEAN ONLY WHERE ITS PLANT IS (diffed): what version seven’s twin differed in, and the purpose of each type its plant changes; ⭑ and every restated purpose the twin carries for a type its plant leaves is G3-CLEAN’s', () => {
+	it('⛔ EACH PLANTED TWIN DIFFERS FROM G3-CLEAN ONLY WHERE ITS PLANT IS (diffed): what version seven’s twin differed in, and the purpose of each type whose purpose its plant changes; ⭑ and every restated purpose the twin carries for any other type is G3-CLEAN’s', () => {
 		const v7 = (id: string) => committedV7().cases.find((c): c is GraphCase => c.id === id && c.arm === 'PWA_GRAPH')!;
 		for (const [id, expected] of Object.entries(TWIN_DIFFERENCES_V9)) {
 			const before = bridgeDifferences(v7('G3-CLEAN'), v7(id));
@@ -3325,6 +3388,52 @@ describe('⭐⭐ the review in parts, B8a — reviewer-qualification case set v9
 			const n = bridgeV9(row.source).input.nodes.find((x) => x.name === row.type);
 			expect(n?.purpose, `${row.source}/${row.type}`).toBe(row.purpose);
 		}
+	});
+
+	it('⭐ THE PLANTED TYPES’ PURPOSES — the restatement’s are the ones written here, as the sponsor is shown them, row for row', () => {
+		expect(
+			RESTATED_PLANTS_V9.map((r) => [r.source, r.type, r.purpose]),
+			'the planted purposes, as the sponsor is shown them'
+		).toEqual(PLANTED_PURPOSES_V9);
+	});
+
+	it('⛔ ONE RULE FOR EVERY TWIN — each type version seven’s plant changes in the graph has its purpose restated, but G3-RR-09’s check, which its account calls complete; and each type whose purpose is restated is one its plant changes in the graph, but G3-RR-07’s root, whose purpose lists its check’s work', () => {
+		// Each type version seven's plant changes in the graph — added, or a key of it differing from G3-CLEAN's — by its name there.
+		const v7 = (id: string) => committedV7().cases.find((c): c is GraphCase => c.id === id && c.arm === 'PWA_GRAPH')!;
+		const clean = new Map(v7('G3-CLEAN').input.nodes.map((n) => [n.id, JSON.stringify(n)]));
+		const changedInGraph = BRIDGE_SOURCES.slice(4).flatMap((id) =>
+			v7(id)
+				.input.nodes.filter((n) => clean.get(n.id) !== JSON.stringify(n))
+				.map((n) => `${id}/${n.name}`)
+		);
+		const restatedTypes = RESTATED_PLANTS_V9.map((r) => `${r.source}/${r.type}`);
+		expect(
+			changedInGraph.filter((t) => !restatedTypes.includes(t)),
+			'changed in the graph, its purpose G3-CLEAN’s: G3-RR-09’s check alone, which its account calls complete'
+		).toEqual(['G3-RR-09/Independent Design Check']);
+		expect(
+			restatedTypes.filter((t) => !changedInGraph.includes(t)),
+			'its purpose restated, unchanged in the graph: G3-RR-07’s root alone, whose purpose lists its check’s work'
+		).toEqual(['G3-RR-07/Pedestrian Bridge Structural Review']);
+	});
+
+	it('⛔ WHAT THE CATCHER PARTS SHOW, THROUGH THE MATERIALIZED PROMPT — no catcher shows a purpose naming work its twin drops, its own or an ancestor’s; ⭑ CONTROL: a plant that sets the account against the graph stays in the account, the design G3-CLEAN’s', async () => {
+		const shown = async (id: string) => {
+			const { initial } = await promptsFor(partV9(id));
+			const json = (key: string) => JSON.parse(initial.split('\n').find((l) => l.startsWith(`{"${key}":`))!)[key] as Record<string, unknown>;
+			const ancestors = json('context').ancestors as { purpose?: string }[];
+			return { own: (json('subject').type as { purpose: string }).purpose, ancestors: ancestors.map((a) => a.purpose ?? '') };
+		};
+		const g3Design = G3_CLEAN_PURPOSES.find(([name]) => name === 'Member, Connection and Foundation Design')![1];
+		const rr02 = await shown('G3-RR-02.T01');
+		expect(rr02.own, 'G3-RR-02’s root, the catcher: it names no check, as its account does not').not.toMatch(/check/i);
+		const rr05 = await shown('G3-RR-05.T01');
+		expect(rr05.own, 'G3-RR-05’s root, the catcher: it names no comparison of options').not.toMatch(/compar|option/i);
+		expect(rr05.own, 'and says the form is fixed at the outset, as its account does').toContain('fixed at the outset as a cable-stayed deck');
+		const rr07 = await shown('G3-RR-07.T06');
+		expect(rr07.ancestors.join(' '), 'G3-RR-07’s check, the catcher: its root names no firm beside the self-check').not.toContain('took no part');
+		for (const id of ['G3-RR-06.T05', 'G3-RR-08.T05'])
+			expect((await shown(id)).own, `${id}: the design keeps G3-CLEAN’s purpose; the plant stays in the account`).toBe(g3Design);
 	});
 
 	it('⭐ THE ORACLES — version eight’s 76, unchanged, under version nine: every verdict, faulted criterion, catcher and standing', () => {

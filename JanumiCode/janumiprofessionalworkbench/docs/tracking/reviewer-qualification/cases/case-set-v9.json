@@ -7273,7 +7273,7 @@
 						"requiredInputs": [],
 						"requiredOutputs": [],
 						"executionBoundary": "INTERNAL",
-						"purpose": "Carry out the structural review of the 40 m single-span steel pedestrian bridge over the two-track rail line, each obligation of the instruction by a type of its own: the site and geotechnical survey, the selection of a structural form after comparing the viable options, the load analysis to the Eurocodes, the member, connection and foundation design, the independent design check by a firm that took no part in the design, and the permit submission to the rail authority.",
+						"purpose": "Carry out the structural review of the 40 m single-span steel pedestrian bridge over the two-track rail line, each obligation of the instruction by a type of its own: the site and geotechnical survey, the selection of a structural form after comparing the viable options, the load analysis to the Eurocodes, the member, connection and foundation design, and the permit submission to the rail authority.",
 						"requiredAssurancePolicyIds": [],
 						"permittedChildren": [],
 						"completionRule": "Execution succeeded AND required outputs exist AND assurance satisfied"
@@ -7996,7 +7996,7 @@
 						"requiredInputs": [],
 						"requiredOutputs": [],
 						"executionBoundary": "INTERNAL",
-						"purpose": "Carry out the structural review of the 40 m single-span steel pedestrian bridge over the two-track rail line, each obligation of the instruction by a type of its own: the site and geotechnical survey, the selection of a structural form after comparing the viable options, the load analysis to the Eurocodes, the member, connection and foundation design, the independent design check by a firm that took no part in the design, and the permit submission to the rail authority.",
+						"purpose": "Carry out the structural review of the 40 m single-span steel pedestrian bridge over the two-track rail line, each obligation of the instruction by a type of its own: the site and geotechnical survey, the selection of a structural form after comparing the viable options, the load analysis to the Eurocodes, the statement recording that the bridge complies with the comfort criteria for pedestrian-induced vibration, the member, connection and foundation design, the independent design check by a firm that took no part in the design, and the permit submission to the rail authority.",
 						"requiredAssurancePolicyIds": [],
 						"permittedChildren": [],
 						"completionRule": "Execution succeeded AND required outputs exist AND assurance satisfied"
@@ -8385,7 +8385,7 @@
 						"requiredInputs": [],
 						"requiredOutputs": [],
 						"executionBoundary": "INTERNAL",
-						"purpose": "Carry out the structural review of the 40 m single-span steel pedestrian bridge over the two-track rail line, each obligation of the instruction by a type of its own: the site and geotechnical survey, the selection of a structural form after comparing the viable options, the load analysis to the Eurocodes, the member, connection and foundation design, the independent design check by a firm that took no part in the design, and the permit submission to the rail authority.",
+						"purpose": "Carry out the structural review of the 40 m single-span steel pedestrian bridge over the two-track rail line, its structural form fixed at the outset as a cable-stayed deck, each obligation of the instruction by a type of its own: the site and geotechnical survey, the load analysis to the Eurocodes, the member, connection and foundation design, the independent design check by a firm that took no part in the design, and the permit submission to the rail authority.",
 						"requiredAssurancePolicyIds": [],
 						"permittedChildren": [],
 						"completionRule": "Execution succeeded AND required outputs exist AND assurance satisfied"
@@ -8815,7 +8815,7 @@
 							"general-arrangement-drawings"
 						],
 						"executionBoundary": "INTERNAL",
-						"purpose": "Design the bridge’s steel members, its connections and its foundations from the load model, producing the design calculations and the general arrangement drawings.",
+						"purpose": "Design the bridge’s steel members, its connections and its foundations from the load model and the geotechnical report, producing the design calculations and the general arrangement drawings.",
 						"requiredAssurancePolicyIds": [],
 						"permittedChildren": [],
 						"completionRule": "Execution succeeded AND required outputs exist AND assurance satisfied"
@@ -9113,7 +9113,7 @@
 						"requiredInputs": [],
 						"requiredOutputs": [],
 						"executionBoundary": "INTERNAL",
-						"purpose": "Carry out the structural review of the 40 m single-span steel pedestrian bridge over the two-track rail line, each obligation of the instruction by a type of its own: the site and geotechnical survey, the selection of a structural form after comparing the viable options, the load analysis to the Eurocodes, the member, connection and foundation design, the independent design check by a firm that took no part in the design, and the permit submission to the rail authority.",
+						"purpose": "Carry out the structural review of the 40 m single-span steel pedestrian bridge over the two-track rail line, each obligation of the instruction by a type of its own: the site and geotechnical survey, the selection of a structural form after comparing the viable options, the load analysis to the Eurocodes, the member, connection and foundation design, the design check within the design team by its senior design engineer, and the permit submission to the rail authority.",
 						"requiredAssurancePolicyIds": [],
 						"permittedChildren": [],
 						"completionRule": "Execution succeeded AND required outputs exist AND assurance satisfied"
@@ -9558,7 +9558,7 @@
 							"general-arrangement-drawings"
 						],
 						"executionBoundary": "INTERNAL",
-						"purpose": "Design the bridge’s steel members, its connections and its foundations from the load model, producing the design calculations and the general arrangement drawings.",
+						"purpose": "Design the bridge’s steel members, its connections and its foundations from the load model and the geotechnical report, producing the design calculations and the general arrangement drawings.",
 						"requiredAssurancePolicyIds": [],
 						"permittedChildren": [],
 						"completionRule": "Execution succeeded AND required outputs exist AND assurance satisfied"

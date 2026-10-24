@@ -13,8 +13,9 @@
 //     as production stores a type it defines (`definePwuType`; the cases test's `asStored`): a purpose for each type, no
 //     declared policy, no child rule, the completion rule a type defined without one is stored with, and a delegated type's
 //     boundary contract. G3-CLEAN's seven purposes match its own account and the request; the renamed copies carry them
-//     unchanged; each planted twin is G3-CLEAN restated but where its plant is, the planted type's purpose consistent with its
-//     plant and its oracle note (`RESTATED_PLANTS_V9`).
+//     unchanged; each planted twin is G3-CLEAN restated but where its plant is, under one rule for every twin: a type keeps
+//     G3-CLEAN's purpose while it is still true of it, and a type its plant gives other work, in the twin's graph and its
+//     account alike, says that work as the twin's account states it (`RESTATED_PLANTS_V9`).
 // ⛔ THE 35 PART CASES KEEP THEIR IDS, THEIR ORDER AND THEIR ORACLES: every expected verdict, faulted criterion, catcher and
 // standing is version eight's (`REG-D-126`). The restated bridge cases await the sponsor's confirmation of their restatement
 // before measurement (`oracles-v9.ts`). Their prompts are new, and owe a RUN.
@@ -251,9 +252,16 @@ const CLEAN_PURPOSES: ReadonlyMap<string, string> = new Map([
 
 /**
  * ⭐ THE PLANTED TYPES' PURPOSES (`REG-D-127`: "The planted type's purpose is consistent with its plant") — for each planted
- * twin, each type its plant changes, by its name in that twin, and the purpose its plant gives it: the work the twin's own
- * account says it does. Every other type of a twin carries G3-CLEAN's purpose for its id. Descriptive and used: `restated`
- * reads it, and the cases test holds each twin's every difference from G3-CLEAN to its plant.
+ * twin, each type whose purpose its plant changes, by its name in that twin, and the purpose it carries: the work the twin's
+ * own account says it does. ONE RULE FOR EVERY TWIN: a type keeps G3-CLEAN's purpose while that purpose is still true of it,
+ * and a type its plant gives other work — in the twin's graph and its account alike — carries that work as the account states
+ * it; a root's work is its children's, as its purpose lists them, so a root is here where its plant changes its children or
+ * the work of one its purpose lists. A plant that sets the account against the graph stays where version seven put it, and no
+ * purpose takes the account's side: G3-RR-06's and G3-RR-08's design, whose accounts say it works from the load model while
+ * their graphs give it the geotechnical report too, and G3-RR-09's check, whose account calls every type complete while its
+ * graph gives the check no output, are not here. Every type of a twin not here carries G3-CLEAN's purpose for its id.
+ * Descriptive and used: `restated` reads it, and the cases test holds it to the purposes the sponsor is shown and each twin's
+ * every difference from G3-CLEAN to its plant.
  */
 export const RESTATED_PLANTS_V9: readonly { readonly source: string; readonly type: string; readonly purpose: string }[] = [
 	// G-RR-01: a concept study in place of the structural review — its root and its three children are the plant.
@@ -275,7 +283,17 @@ export const RESTATED_PLANTS_V9: readonly { readonly source: string; readonly ty
 		type: 'Public Consultation',
 		purpose: 'Confirm with the public, from the renderings, that the bridge is acceptable, in a consultation report.'
 	},
-	// G3-RR-02: the independent check absent, and the permit submission made on the design directly.
+	// G3-RR-02: the independent check absent, and the permit submission made on the design directly — the root lists no check,
+	// as its account does not.
+	{
+		source: 'G3-RR-02',
+		type: 'Pedestrian Bridge Structural Review',
+		purpose:
+			'Carry out the structural review of the 40 m single-span steel pedestrian bridge over the two-track rail line, each ' +
+			'obligation of the instruction by a type of its own: the site and geotechnical survey, the selection of a structural ' +
+			'form after comparing the viable options, the load analysis to the Eurocodes, the member, connection and foundation ' +
+			'design, and the permit submission to the rail authority.'
+	},
 	{
 		source: 'G3-RR-02',
 		type: 'Rail Authority Permit Submission',
@@ -289,7 +307,19 @@ export const RESTATED_PLANTS_V9: readonly { readonly source: string; readonly ty
 		type: 'Load Analysis (static pedestrian load)',
 		purpose: 'Analyse the selected structural form to the Eurocodes for the static pedestrian load only, producing the load model.'
 	},
-	// G3-RR-04: the load analysis without vibration, and a compliance statement standing in for it.
+	// G3-RR-04: the load analysis without vibration, and a compliance statement standing in for it — the root lists the
+	// statement among its children's work, as its account does.
+	{
+		source: 'G3-RR-04',
+		type: 'Pedestrian Bridge Structural Review',
+		purpose:
+			'Carry out the structural review of the 40 m single-span steel pedestrian bridge over the two-track rail line, each ' +
+			'obligation of the instruction by a type of its own: the site and geotechnical survey, the selection of a structural ' +
+			'form after comparing the viable options, the load analysis to the Eurocodes, the statement recording that the bridge ' +
+			'complies with the comfort criteria for pedestrian-induced vibration, the member, connection and foundation design, ' +
+			'the independent design check by a firm that took no part in the design, and the permit submission to the rail ' +
+			'authority.'
+	},
 	{
 		source: 'G3-RR-04',
 		type: 'Load Analysis (pedestrian, wind)',
@@ -300,7 +330,18 @@ export const RESTATED_PLANTS_V9: readonly { readonly source: string; readonly ty
 		type: 'Vibration Compliance Statement',
 		purpose: 'Record that the bridge complies with the comfort criteria for pedestrian-induced vibration.'
 	},
-	// G3-RR-05: the form fixed at the outset, so the analysis is of the cable-stayed deck.
+	// G3-RR-05: the form fixed at the outset, so the root lists no comparison of options and the analysis is of the
+	// cable-stayed deck.
+	{
+		source: 'G3-RR-05',
+		type: 'Pedestrian Bridge Structural Review',
+		purpose:
+			'Carry out the structural review of the 40 m single-span steel pedestrian bridge over the two-track rail line, its ' +
+			'structural form fixed at the outset as a cable-stayed deck, each obligation of the instruction by a type of its own: ' +
+			'the site and geotechnical survey, the load analysis to the Eurocodes, the member, connection and foundation design, ' +
+			'the independent design check by a firm that took no part in the design, and the permit submission to the rail ' +
+			'authority.'
+	},
 	{
 		source: 'G3-RR-05',
 		type: 'Load Analysis (pedestrian, wind, vibration)',
@@ -308,30 +349,24 @@ export const RESTATED_PLANTS_V9: readonly { readonly source: string; readonly ty
 			'Analyse the cable-stayed deck to the Eurocodes for pedestrian, wind and pedestrian-induced vibration loading, with the ' +
 			'foundation stiffness the geotechnical report gives in its dynamic model, producing the load model.'
 	},
-	// G3-RR-06: the account says the design works from the load model, the foundations' adequacy inferred from the
-	// neighbouring buildings.
+	// G3-RR-07: the check carried out within the design team — and so the root, whose purpose lists each child's work, lists
+	// the check as its account describes it, no longer by a firm that took no part in the design.
 	{
-		source: 'G3-RR-06',
-		type: 'Member, Connection and Foundation Design',
+		source: 'G3-RR-07',
+		type: 'Pedestrian Bridge Structural Review',
 		purpose:
-			'Design the bridge’s steel members, its connections and its foundations from the load model, producing the design ' +
-			'calculations and the general arrangement drawings.'
+			'Carry out the structural review of the 40 m single-span steel pedestrian bridge over the two-track rail line, each ' +
+			'obligation of the instruction by a type of its own: the site and geotechnical survey, the selection of a structural ' +
+			'form after comparing the viable options, the load analysis to the Eurocodes, the member, connection and foundation ' +
+			'design, the design check within the design team by its senior design engineer, and the permit submission to the ' +
+			'rail authority.'
 	},
-	// G3-RR-07: the check carried out within the design team.
 	{
 		source: 'G3-RR-07',
 		type: 'Design Self-Check by the Senior Design Engineer',
 		purpose:
 			'Check the bridge’s design within the design team, by its senior design engineer, who knows the design best, ' +
 			'certifying the design calculations and drawings.'
-	},
-	// G3-RR-08: the account says the design works from the load model, the ground benign at both abutments.
-	{
-		source: 'G3-RR-08',
-		type: 'Member, Connection and Foundation Design',
-		purpose:
-			'Design the bridge’s steel members, its connections and its foundations from the load model, producing the design ' +
-			'calculations and the general arrangement drawings.'
 	}
 ];
 
