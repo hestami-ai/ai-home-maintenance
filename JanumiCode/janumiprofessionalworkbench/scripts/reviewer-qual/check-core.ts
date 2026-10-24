@@ -31,6 +31,8 @@
 // their author alone has judged measures the reviewer against the author's word, and must not turn the check green.
 // ⛔ It was a comment's promise only (`oracles-v5.ts`: "read by the check"): nothing here read the conferral, so a run over
 // version five made before the sponsor conferred its fourteen declared oracles would have been green.
+// ⭐ B8a (`REG-D-127`) — and one whose `conferral` carries `ORACLES_RESTATEMENT_UNCONFIRMED` is a CONFERRAL problem of its own
+// (`RESTATEMENT_NOT_CONFIRMED`): conferred verdicts on cases restated since, the sponsor's confirmation of the restatement owed.
 // ⭐ `JAN-SELREV` SR-4 — THE GATE HOLDS THE SELECTED REVIEWER TO TODAY'S DEFINITION (`REG-D-086`; DESIGN-the-selected-
 // reviewer.md §5 Q1). The LAST SELECTION line in the record is in force. With one in force, limb 1 asks its own
 // question — covered, in exactly its sense (`coveredBy`) — again of the selected candidate's runs alone, and a case no
@@ -44,8 +46,16 @@
 // ⚠ PURE: records, today's fingerprint, the cases, the oracles and the register's findings are handed in, and the one
 // operation that needs the product — re-scoring — is a function handed in (`rescore.ts` in the CLI). It reads no file.
 // ⚠ "CONTENT UNCHANGED" IS THE CASE ID: a case that changes gets a new id (`cases.ts`), so a case id still in today's set
-// is the same case. A case edited in place under its id reads here as a non-reproduction — which it is.
-import { ORACLES_PROPOSED, type Oracle, type OracleSet, type QualificationCase } from './cases.js';
+// is the same case. A case edited in place under its id reads here as a non-reproduction — which it is. ⚠ Version nine's 35
+// part cases are the exception `cases.ts` states: carried under their ids with their inputs moved (`REG-D-127`), so a
+// record of version eight's, under its earlier fingerprint, covers none of them — their prompts are not today's.
+import {
+	ORACLES_PROPOSED,
+	ORACLES_RESTATEMENT_UNCONFIRMED,
+	type Oracle,
+	type OracleSet,
+	type QualificationCase
+} from './cases.js';
 import { canonicalJson, reviewerFingerprintOf, type FingerprintComponents } from './digest.js';
 import {
 	MATERIAL_FAILURE_CLASSES,
@@ -138,6 +148,17 @@ export const ORACLES_NOT_CONFERRED =
 	'case set can qualify a reviewer against them — owed: the sponsor’s conferral, or, where the register already holds it, ' +
 	'its record in the current oracle file’s conferral statement (REG-D-073; the current oracle file’s conferral statement ' +
 	'names what is owed)';
+/**
+ * ⭐⭐ B8a (`REG-D-127`) — THE CONFERRAL PROBLEM OF A RESTATEMENT: today's oracle file records verdicts the sponsor conferred, on
+ * cases whose inputs were restated since, and the sponsor's confirmation of the restatement as owed
+ * (`ORACLES_RESTATEMENT_UNCONFIRMED`). ⛔ Never `ORACLES_NOT_CONFERRED`'s words, which would say the verdicts were never
+ * conferred: it says only what the check read — the verdicts recorded conferred, the restatement's confirmation owed.
+ */
+export const RESTATEMENT_NOT_CONFIRMED =
+	`today’s oracle file records verdicts the sponsor conferred, on cases restated since, as ${ORACLES_RESTATEMENT_UNCONFIRMED}, ` +
+	'so no run over today’s case set can qualify a reviewer against them — owed: the sponsor’s confirmation of the restated ' +
+	'cases, or, where the register already holds it, its record in the current oracle file’s conferral statement (REG-D-127; ' +
+	'the current oracle file’s conferral statement names the restated cases)';
 export interface CheckProblem {
 	readonly limb: CheckLimb;
 	readonly message: string;
@@ -1233,6 +1254,9 @@ export async function checkQualification(i: CheckInputs): Promise<CheckReport> {
 	const refuse: Refuse = (message) => problems.push({ limb: 'RECORD', message });
 	// ⭐ `E12F` F5 — CONFERRAL, asked whatever the record holds: oracles nobody conferred qualify no reviewer (`REG-D-073`).
 	if (i.conferral.includes(ORACLES_PROPOSED)) problems.push({ limb: 'CONFERRAL', message: ORACLES_NOT_CONFERRED });
+	// ⭐ B8a (`REG-D-127`) — and conferred verdicts on restated cases qualify no reviewer until the sponsor confirms the restatement.
+	if (i.conferral.includes(ORACLES_RESTATEMENT_UNCONFIRMED))
+		problems.push({ limb: 'CONFERRAL', message: RESTATEMENT_NOT_CONFIRMED });
 	const ctx: Ctx = {
 		i,
 		p,

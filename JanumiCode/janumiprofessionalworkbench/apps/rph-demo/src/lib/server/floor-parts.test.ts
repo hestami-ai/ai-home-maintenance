@@ -33,6 +33,7 @@ import {
 	type FloorView
 } from './floor.js';
 import { clearingJudgement, withLiveReviewerSeam } from './assurance/clearing-reviewer.testing.js';
+import { DEMO_POLICY_ID, DEMO_POLICY_PAYLOAD } from './assurance/demo-policy.js';
 import { registerStipulation } from './stipulations.js';
 import {
 	beginAuthoringTurn,
@@ -498,5 +499,59 @@ describe('⭐⭐ B4 — the turn: findings by type, the whole inventory again af
 		expect(() => markAuthoringTurnAssured(turn, reviewed)).toThrow(
 			`Assurance is stale: reviewer subject ${reviewed}, current candidate ${hashAuthoringSubject(turn)}.`
 		);
+	});
+});
+
+// ── ⭐⭐ D3a (`REG-D-127`; `REG-F-573`) — THE FLOOR HANDS EACH PART THE LIBRARY OF THE ENGINE IT REVIEWS ────────────────────
+const IMPLEMENT = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Q13';
+/** A part's line of JSON, as its prompt carries it inside the fence: the subject's, or the context's. */
+function partLine(prompt: string, key: 'subject' | 'context'): Record<string, unknown> {
+	const line = prompt.split('\n').find((l) => l.startsWith(`{"${key}":`));
+	expect(line, `the prompt carries the part's ${key} line`).toBeDefined();
+	return (JSON.parse(line!) as Record<string, Record<string, unknown>>)[key]!;
+}
+
+describe('⭐⭐ D3a (REG-D-127) — the floor hands each part the policy library of the engine it reviews: the declared policies named, and those the kind may take', () => {
+	it('⛔ RED FIRST — through the materialized prompt: a PRODUCT_IMPLEMENTATION type declaring Intent Preservation alone shows its declared policy named, and Test Adequacy’s id, name and purpose among those its kind may take; ⛔ CONTROLS: no floor policy, and not a suspended one; a policy naming no kind listed for every type', async () => {
+		// An inactive policy its kind names (Assumption Disclosure, suspended), and an ACTIVE one naming no kind (the demo's).
+		send('SuspendAssurancePolicy', 'ASSURANCE_POLICY', 'pol_assumption_disclosure', { policyId: 'pol_assumption_disclosure' });
+		send('CreateAssurancePolicy', 'ASSURANCE_POLICY', DEMO_POLICY_ID, DEMO_POLICY_PAYLOAD);
+		send('ActivateAssurancePolicy', 'ASSURANCE_POLICY', DEMO_POLICY_ID, { policyId: DEMO_POLICY_ID });
+		send('DefinePwuType', 'PWU_TYPE', IMPLEMENT, {
+			pwuTypeId: IMPLEMENT,
+			pwaId: PWA,
+			pwuKind: 'PRODUCT_IMPLEMENTATION',
+			name: 'Implementation',
+			purpose: 'Build wordfreq with its unit tests.',
+			isRoot: false,
+			permittedChildTypeIds: [],
+			requiredInputs: [],
+			requiredOutputs: [],
+			requiredAssurancePolicyIds: ['pol_intent_preservation']
+		});
+		const { prompts } = await runRound();
+		const implementation = prompts.find((p) => partOf(p) === IMPLEMENT)!;
+		expect(partLine(implementation, 'subject').declaredPolicies, 'its declared policy, named as the library holds it').toEqual([
+			{
+				id: 'pol_intent_preservation',
+				name: 'Intent Preservation',
+				purpose: 'Determine whether a transformation of professional work remains faithful to the authorized intent.'
+			}
+		]);
+		const applicable = partLine(implementation, 'context').applicablePolicies as { id: string }[];
+		expect(applicable, 'Test Adequacy, which it does not declare, among those its kind may take').toContainEqual({
+			id: 'pol_test_adequacy',
+			name: 'Test Adequacy',
+			purpose: 'Determine whether the available tests are sufficient to support the claims being made.'
+		});
+		expect(applicable.map((p) => p.id), 'the library’s ACTIVE non-floor policies its kind names, or that name none').toEqual([
+			'pol_intent_preservation',
+			'pol_test_adequacy',
+			DEMO_POLICY_ID
+		]);
+		// ⭑ CONTROL — a type of a kind no seeded policy names is shown the no-kind policy alone.
+		const build = prompts.find((p) => partOf(p) === BUILD)!;
+		expect((partLine(build, 'context').applicablePolicies as { id: string }[]).map((p) => p.id)).toEqual([DEMO_POLICY_ID]);
+		expect(partLine(build, 'subject').declaredPolicies, 'a type that declares none, named as none').toEqual([]);
 	});
 });

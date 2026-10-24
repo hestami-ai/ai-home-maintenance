@@ -10,6 +10,7 @@
 // composeAssuranceOutcome does the strictest-unresolved composition, and the PublishPwa gate (rph-application)
 // enforces it.
 import { analyzePwaGraph, pwaTypeParts, type PwaTypePart } from '@janumipwb/rph-projections';
+import { assurancePolicyViews } from '@janumipwb/rph-authoring';
 import {
 	aggregateDisposition,
 	assuranceRecordingPlan,
@@ -873,10 +874,12 @@ export async function runPwaFloor(
 	// ⭐ THE PARTS, ONE AFTER ANOTHER IN EXPORT ORDER (design D9), each through the one builder qualification replays
 	// (`pwaTypeReviewInput`), with the POLICY's criteria read from the store (`reasoningReviewCriteria`) and its subject the
 	// type at the version the store holds — read by its id from the same listing the export was built from.
+	// ⭐ D3a (`REG-D-127`) — each part cut with the policy library of the engine it reviews, so it names its type's declared
+	// policies and lists those its kind may take (`assurancePolicyViews`, the authoring surface's own view of it).
 	const criteria = reasoningReviewCriteria(engine);
 	const stored = storedTypes(engine, pwaId);
 	const reviewed: ReviewedPart[] = [];
-	for (const part of pwaTypeParts(graphExport)) {
+	for (const part of pwaTypeParts(graphExport, assurancePolicyViews(engine))) {
 		const partSubject: AssuranceSubject = {
 			subjectId: part.typeId,
 			objectType: 'PWU_TYPE',

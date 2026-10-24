@@ -124,6 +124,9 @@ export interface PwaTypeReviewSource {
  * content, in the key order it is returned in), and THE SUBJECT IS PROTECTED: a part over that budget has its children's
  * skeletons cut child by child, each cut declared (`declaredPartCut`, `childSkeletonsCut`), and the subject and context lines
  * never. ⚠ A part that cannot fit so is handed on whole, and the validator refuses it as incomplete — never head-cut.
+ * ⭐ D3a (`REG-D-127`) — a part cut with the policy library carries its declared policies named on its subject line and the
+ * policies its kind may take on its context line (`pwaTypeParts`): authored strings, inside the one fence, counted in the subject
+ * and the context this builder never cuts.
  */
 export function pwaTypeReviewInput(source: PwaTypeReviewSource): ReasoningReviewInput {
 	const head = {

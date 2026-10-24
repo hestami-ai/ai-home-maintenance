@@ -75,6 +75,7 @@ import {
 import { buildPwaGraphExport, pwaTypeParts, type PwaGraphNode } from '@janumipwb/rph-projections';
 import { createInMemoryArtifactStore } from '@janumipwb/rph-ports';
 import { listPwas, listPwuTypes, type AuthedEngineHandle } from '@janumipwb/rph-engine';
+import { assurancePolicyViews } from '@janumipwb/rph-authoring';
 import type { DomainCommand, ObservedToolCallReport } from '@janumipwb/rph-contracts';
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
@@ -219,12 +220,13 @@ const GRAPH_OPTIONS: readonly { readonly label: GraphLabel; readonly opts: Graph
  * ⭐ The review in parts, B3 (`REG-D-125`) — what the module builds for each part of the PWA's export, in export order: the
  * options as the floor is given them, and the prior findings — the route hands the floor each finding with its type —
  * attributed here to the FIRST part, so the others are shown none (`partOptions`).
+ * ⭐ D3a (`REG-D-127`) — each part cut with the engine's policy library, read through the authoring surface's own view of it.
  */
 function modulePartInputs(engine: AuthedEngineHandle, pwaId: string, opts: GraphOptions): ReasoningReviewInput[] {
 	const graph = buildPwaExport(pwaId, engine);
 	if (!graph) throw new Error(`no export for ${pwaId}`);
 	const { priorGaps, ...rest } = opts;
-	return pwaTypeParts(graph).map((part, i) =>
+	return pwaTypeParts(graph, assurancePolicyViews(engine)).map((part, i) =>
 		pwaTypeReviewInput({
 			criteria: reasoningReviewCriteria(engine),
 			part,
@@ -529,6 +531,30 @@ describe('JAN-CRITREAD J2-1 — ⭐ the review in parts, B3 (REG-D-125): pwaType
 			expect(lines[at - 1], 'a fence line before it').toMatch(/^<<<UNTRUSTED-\d\d>>>$/);
 			expect(lines[at + content.length], 'the same fence line after it').toBe(lines[at - 1]);
 		}
+		// ⭐⭐ D3a (`REG-D-127`) — AND THE POLICY MATERIAL IS AUTHORED CONTENT, INSIDE THAT FENCE: the declared policies named on
+		// the subject line, and those the kind may take on the context line, each with the library's name and purpose.
+		const named = production.map((b) => {
+			const [subject, context] = b.input.content.split('\n').map((l) => JSON.parse(l) as Record<string, Record<string, unknown>>);
+			return {
+				declared: (subject!.subject!.declaredPolicies as { name: string }[]).map((p) => p.name),
+				applicable: (context!.context!.applicablePolicies as { name: string }[]).map((p) => p.name)
+			};
+		});
+		expect(named, 'each part: its declared policies named, and those its kind may take').toEqual([
+			{
+				declared: ['Intent Preservation', 'Test Adequacy', 'Fitness For Purpose'],
+				applicable: ['Assumption Disclosure', 'Intent Preservation', 'Test Adequacy', 'Fitness For Purpose']
+			},
+			{
+				declared: ['Intent Preservation', 'Fitness For Purpose'],
+				applicable: ['Intent Fidelity', 'Decomposition Coverage', 'Intent Preservation', 'Fitness For Purpose']
+			}
+		]);
+		for (const b of production)
+			expect(
+				b.prompt.split('\n').filter((l) => !l.startsWith('{"')).join('\n'),
+				'no policy’s purpose on a line of the host’s'
+			).not.toContain('remains faithful to the authorized intent');
 	});
 
 	it('⛔ the PINS — graphReviewInput over the literal graph, written out (every branch of the assembly)', () => {

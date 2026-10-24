@@ -20,6 +20,7 @@ import {
 	CASE_SET_V6_FILE,
 	CASE_SET_V7_FILE,
 	CASE_SET_V8_FILE,
+	CASE_SET_V9_FILE,
 	ORACLES_V1_FILE,
 	ORACLES_V2_FILE,
 	ORACLES_V3_FILE,
@@ -28,6 +29,7 @@ import {
 	ORACLES_V6_FILE,
 	ORACLES_V7_FILE,
 	ORACLES_V8_FILE,
+	ORACLES_V9_FILE,
 	serializeGenerated,
 	type CaseSet
 } from '../scripts/reviewer-qual/cases.js';
@@ -39,6 +41,7 @@ import { CASE_SET_V5 } from '../scripts/reviewer-qual/case-set-v5.js';
 import { CASE_SET_V6 } from '../scripts/reviewer-qual/case-set-v6.js';
 import { CASE_SET_V7 } from '../scripts/reviewer-qual/case-set-v7.js';
 import { CASE_SET_V8 } from '../scripts/reviewer-qual/case-set-v8.js';
+import { CASE_SET_V9 } from '../scripts/reviewer-qual/case-set-v9.js';
 import { ORACLES_V1 } from '../scripts/reviewer-qual/oracles-v1.js';
 import { ORACLES_V2 } from '../scripts/reviewer-qual/oracles-v2.js';
 import { ORACLES_V3 } from '../scripts/reviewer-qual/oracles-v3.js';
@@ -47,6 +50,7 @@ import { ORACLES_V5 } from '../scripts/reviewer-qual/oracles-v5.js';
 import { ORACLES_V6 } from '../scripts/reviewer-qual/oracles-v6.js';
 import { ORACLES_V7 } from '../scripts/reviewer-qual/oracles-v7.js';
 import { ORACLES_V8 } from '../scripts/reviewer-qual/oracles-v8.js';
+import { ORACLES_V9 } from '../scripts/reviewer-qual/oracles-v9.js';
 
 const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url));
 const read = (file: string): string => readFileSync(`${REPO_ROOT}${file}`, 'utf8');
@@ -220,5 +224,27 @@ describe('JAN-EXEC Phase 7, the review in parts, B7 — reviewer-qualification c
 		// Versions one to seven stay committed as history, each still exactly what its own source generates (the limbs above).
 		expect((JSON.parse(cases) as CaseSet).caseSetVersion).toBe(8);
 		expect((JSON.parse(read(CASE_SET_V7_FILE)) as CaseSet).caseSetVersion).toBe(7);
+	});
+});
+
+// ⭐⭐ `JAN-EXEC` Phase 7, the review in parts, B8a — version nine (`REG-D-127`): version eight's 76 cases under their ids, each
+// part cut with the seeded policy library and the bridge sources restated, their oracles version eight's.
+describe('JAN-EXEC Phase 7, the review in parts, B8a — reviewer-qualification case set v9: version eight’s 76 cases, each part cut with the seeded policy library (REG-D-127)', () => {
+	it('⛔ the committed case set v9 and oracles v9 are exactly what the generator writes — never hand-edited', () => {
+		const cases = read(CASE_SET_V9_FILE);
+		const oracles = read(ORACLES_V9_FILE);
+		expect(cases, `${CASE_SET_V9_FILE} is stale — run \`bun run scripts/reviewer-qual/generate.ts\``).toBe(
+			serializeGenerated(CASE_SET_V9)
+		);
+		expect(oracles, `${ORACLES_V9_FILE} is stale — run \`bun run scripts/reviewer-qual/generate.ts\``).toBe(
+			serializeGenerated(ORACLES_V9)
+		);
+		for (const text of [cases, oracles]) {
+			expect(text.includes('\r'), 'LF only').toBe(false);
+			expect(text.charCodeAt(0), 'no BOM').not.toBe(0xfeff);
+		}
+		// Versions one to eight stay committed as history, each still exactly what its own source generates (the limbs above).
+		expect((JSON.parse(cases) as CaseSet).caseSetVersion).toBe(9);
+		expect((JSON.parse(read(CASE_SET_V8_FILE)) as CaseSet).caseSetVersion).toBe(8);
 	});
 });
