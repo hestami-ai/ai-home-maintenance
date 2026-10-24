@@ -12,8 +12,9 @@ import {
 	type ValidatorResult
 } from '@janumipwb/rph-assurance';
 import type { ObservedToolCallReport } from '@janumipwb/rph-contracts';
-import { buildPwaGraphExport, type PwaGraphNode } from '@janumipwb/rph-projections';
+import { buildPwaGraphExport, pwaTypeParts, type PwaGraphNode } from '@janumipwb/rph-projections';
 import { judgeStructurally } from './mock-reasoning-review-validator.js';
+import { pwaTypeReviewInput } from './review-input.js';
 import {
 	createStandinReasoningReviewValidator,
 	STANDIN_VALIDATOR_ID,
@@ -58,7 +59,7 @@ const always =
 		answer;
 
 async function review(
-	framing: 'PWA_GRAPH' | 'WORK_PRODUCT' | 'PROCESS_RESULT',
+	framing: 'PWA_GRAPH' | 'WORK_PRODUCT' | 'PROCESS_RESULT' | 'PWA_TYPE',
 	content: string,
 	lookup: StipulationLookup,
 	observedToolCalls?: ObservedToolCallReport
@@ -187,5 +188,49 @@ describe('⭐ the stand-in — the checker’s real answers plus the test’s st
 	it('⭐ it discloses itself in `limitations` — what was evaluated and what the test stipulated', async () => {
 		const r = await review('PWA_GRAPH', CLEAN_GRAPH, always('CLEAN'));
 		expect(r.limitations.join(' ')).toContain('2 criteria evaluated by the structural checker; 7 stipulated CLEAN by the test and NOT reviewed');
+	});
+});
+
+// ⭐⭐ `JAN-EXEC` Phase 7, the review in parts, B2 (`REG-D-125`; DESIGN-authoring-review-in-parts.md D4, D10) — THE PART ARM.
+// The stand-in's one exclusion is the process result's: a part is looked up as a graph is, under its own arm, and the checker's
+// part arm judges what it can. ⚠ What answers the lookup for a part (the PWA's registration, or the part's own) is the floor's
+// (design D10); here the lookup is the test's.
+describe('⭐ the stand-in on a PART — the checker’s part arm, then the test’s stipulated remainder', () => {
+	const PWA = { id: 'pwa_t', name: 'T', domain: 'software', version: '0.1.0', publicationStatus: 'DRAFT' } as never;
+	/** The one part of a lone root, as its review input carries it; `deadEnd`: the root produces an output nobody consumes. */
+	const partContent = (deadEnd: boolean) =>
+		pwaTypeReviewInput({
+			criteria: SEEDED_REASONING_REVIEW_CRITERIA,
+			prompt: 'x',
+			part: pwaTypeParts(buildPwaGraphExport(PWA, [node(deadEnd ? { requiredOutputs: ['report'] } : {})]))[0]!
+		}).content;
+
+	it('⭐ the lookup is ASKED about a part, under the part’s arm — the exclusion is the process result’s alone', async () => {
+		const asked: string[] = [];
+		await review('PWA_TYPE', partContent(false), (_subject, framing) => {
+			asked.push(framing);
+			return undefined;
+		});
+		expect(asked).toEqual(['PWA_TYPE']);
+	});
+
+	it('⭐ a clean part with a registration: RR-04 evaluated, the other 8 stipulated, SATISFIED in an admitting engine', async () => {
+		const r = await review('PWA_TYPE', partContent(false), always('CLEAN'));
+		expect(judgedRows(r)).toEqual(['RR-04-no-proxy-satisfaction=MET']);
+		expect(stipulatedRows(r)).toHaveLength(8);
+		expect(admittedDisposition(r)).toBe('SATISFIED');
+	});
+
+	it('⛔ a part whose type’s output feeds nobody stays REJECTED, RR-04 NOT_MET and unstipulated; unregistered, a clean part is INCONCLUSIVE', async () => {
+		const faulted = await review('PWA_TYPE', partContent(true), always('CLEAN'));
+		expect(faulted.criteria.find((c) => c.criterionId === 'RR-04-no-proxy-satisfaction')).toMatchObject({ outcome: 'NOT_MET' });
+		expect(admittedDisposition(faulted)).toBe('REJECTED');
+		expect(admittedDisposition(await review('PWA_TYPE', partContent(false), always(undefined)))).toBe('INCONCLUSIVE');
+	});
+
+	it('⛔ an UNREADABLE part is never stipulated over, even with a registration', async () => {
+		const r = await review('PWA_TYPE', 'not a part', always('CLEAN'));
+		expect(stipulatedRows(r)).toEqual([]);
+		expect(admittedDisposition(r)).toBe('INCONCLUSIVE');
 	});
 });

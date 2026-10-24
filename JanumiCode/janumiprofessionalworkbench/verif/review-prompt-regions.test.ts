@@ -34,6 +34,7 @@ import { NO_FENCE_STATEMENT } from '../apps/rph-demo/src/lib/server/assurance/re
 import {
 	graphReviewInput,
 	processResultReviewInput,
+	pwaTypeReviewInput,
 	workProductReviewInput,
 	type ProcessResultReviewSource
 } from '../apps/rph-demo/src/lib/server/assurance/review-input.js';
@@ -42,7 +43,7 @@ import { committedCaseSet } from '../scripts/reviewer-qual/fingerprint.js';
 import { caseReviewInput } from '../scripts/reviewer-qual/materialize.js';
 import { FINGERPRINT_PROBES, PROBE_SUBJECT } from '../scripts/reviewer-qual/probes.js';
 import { NO_PROGRAMS } from './reviewer-qualification-hermetic.js';
-import { buildPwaGraphExport } from '@janumipwb/rph-projections';
+import { buildPwaGraphExport, pwaTypeParts, type PwaGraphNode } from '@janumipwb/rph-projections';
 
 /** The three line breaks `JSON.stringify` leaves raw — built from their code points, so this file holds no escape. */
 const RAW_BREAKS = new RegExp(`[${String.fromCharCode(0x85, 0x2028, 0x2029)}]`, 'g');
@@ -196,6 +197,43 @@ const LONG: ProfessionalRationaleSummary = {
 const LIMITED: ProfessionalRationaleSummary = { ...ACCOUNT, limitations: [over(4_000, 'No intrusive investigation. ')] };
 const PWA = { id: 'pwa_01M4A7K2QH8X9Z3T5V6W1B0C7D', name: 'Footbridge', domain: 'civil-engineering', version: '1.0.0', publicationStatus: 'DRAFT' } as const;
 const GRAPH = buildPwaGraphExport(PWA as never, []);
+/** ⭐ The review in parts, B2 — a type of a PWA with a child, and a type with many children, each as a part. */
+const typeNode = (over: Partial<PwaGraphNode> & Pick<PwaGraphNode, 'id' | 'name'>): PwaGraphNode => ({
+	pwuKind: 'STRUCTURAL_REVIEW',
+	isRoot: false,
+	permittedChildTypeIds: [],
+	requiredInputs: [],
+	requiredOutputs: [],
+	executionBoundary: 'INTERNAL',
+	...over
+});
+const PART = pwaTypeParts(
+	buildPwaGraphExport(PWA as never, [
+		typeNode({
+			id: 'pwut_01M4A7K2QH8X9Z3T5V6W1B0C7E',
+			name: 'Review',
+			isRoot: true,
+			purpose: 'Review the footbridge.',
+			permittedChildTypeIds: ['pwut_01M4A7K2QH8X9Z3T5V6W1B0C7F'],
+			requiredInputs: ['site-survey'],
+			promptTemplate: { templateText: 'Review {title}.', outputContract: 'A review.', status: 'ACTIVE', templateVersion: 1 }
+		}),
+		typeNode({ id: 'pwut_01M4A7K2QH8X9Z3T5V6W1B0C7F', name: 'Survey', purpose: 'Survey the site.', requiredOutputs: ['site-survey'] })
+	])
+)[0]!;
+const WIDE = pwaTypeParts(
+	buildPwaGraphExport(PWA as never, [
+		typeNode({
+			id: 'pwut_01M4A7K2QH8X9Z3T5V6W1B0C70',
+			name: 'Wide Review',
+			isRoot: true,
+			permittedChildTypeIds: Array.from({ length: 6 }, (_, i) => `pwut_01M4A7K2QH8X9Z3T5V6W1B0C8${i}`)
+		}),
+		...Array.from({ length: 6 }, (_, i) =>
+			typeNode({ id: `pwut_01M4A7K2QH8X9Z3T5V6W1B0C8${i}`, name: `Check ${i}`, purpose: over(5_000, `Check ${i} of the deck. `) })
+		)
+	])
+)[0]!;
 const ONE_CALL: ObservedToolCallReport = {
 	observation: 'OBSERVED',
 	calls: [{ ordinal: 1, nameProvenance: 'MINTED_BY_HOST', toolName: 'run_command', outcome: 'COMPLETED' }],
@@ -248,6 +286,23 @@ const LITERALS: readonly { readonly what: string; readonly input: ReasoningRevie
 				})
 			}
 		]),
+		// ⭐ The review in parts, B2 — a part, under every account shape, and a part whose children's skeletons are cut.
+		...[ACCOUNT, SPARSE, LONG, undefined].map((account, i) => ({
+			what: `PWA_TYPE, account ${i}`,
+			input: pwaTypeReviewInput({
+				criteria,
+				prompt: i === 2 ? over(4_000, 'Design it. ') : 'Design the review.',
+				part: PART,
+				candidateSubjectHash: 'sha256:0f1e2d3c4b5a6978',
+				...(account ? { rationale: account } : {}),
+				narration: i === 2 ? over(2_000, 'Defined a type. ') : 'Defined the types.',
+				priorGaps: i === 2 ? [over(2_000, 'A gap. ')] : ['RR-02: the check is missing.']
+			})
+		})),
+		{
+			what: 'PWA_TYPE, its children’s skeletons cut child by child',
+			input: pwaTypeReviewInput({ criteria, prompt: 'Compose them.', part: WIDE, rationale: ACCOUNT })
+		},
 		pr('PROCESS_RESULT, whole', run()),
 		pr('PROCESS_RESULT, a sparse account, a narration and a prior', run(), { rationale: SPARSE, narration: 'Ran the suite.', priorGaps: ['RR-07'] }),
 		pr('PROCESS_RESULT, an oversize account', run(), { rationale: LONG }),
@@ -287,6 +342,9 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481) — no host text inside quoted mate
 			"[CUT FOR THIS REVIEW: the account's limitations — ",
 			"[CUT FOR THIS REVIEW: the account's residual uncertainty — ",
 			'[CUT FOR THIS REVIEW: the intent — ',
+			// ⭐ The review in parts, B2 — a part's request, and its children's skeletons, each cut child by child.
+			'[CUT FOR THIS REVIEW: the request — ',
+			'[CUT FOR THIS REVIEW: the skeleton of the child ',
 			'[CUT FOR THIS REVIEW: the work product — ',
 			'[CUT FOR THIS REVIEW: the narration — ',
 			'[CUT FOR THIS REVIEW: the prior findings — ',

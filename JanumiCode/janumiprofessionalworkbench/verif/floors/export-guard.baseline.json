@@ -1409,6 +1409,11 @@
 			],
 			"unattributedMutants": 0
 		},
+		"packages/rph-projections/src/pwa-parts.ts": {
+			"consumedExports": [],
+			"guardedExports": [],
+			"unattributedMutants": 4
+		},
 		"packages/rph-projections/src/pwu-behavior.ts": {
 			"consumedExports": [
 				"buildPwuBehaviorProjection"

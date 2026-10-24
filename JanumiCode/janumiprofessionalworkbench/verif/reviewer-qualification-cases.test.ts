@@ -201,11 +201,22 @@ const DECLARED_KEYS = [
  * stores a purpose, policy ids and child rules on every type, so a node whose literal carries none of them is exported with
  * what the commands below stored — its name for its purpose (the limb defines it so), no policy and no child rule.
  */
+/** ⭐ The review in parts, B1 — the completion rule `definePwuType` stores for a type defined with none, as every case
+ *  node is. */
+const DEFAULT_COMPLETION_RULE = 'Execution succeeded AND required outputs exist AND assurance satisfied';
+/** The boundary contract `expectProductionsGraph` defines a delegated node with. */
+const CASE_BOUNDARY_CONTRACT = { counterpartyLabel: 'An independent checking firm', attestedAssurancePolicyIds: [] };
+/** The description `expectProductionsGraph` creates each case's PWA with, which the export carries (B1). */
+const CASE_PWA_DESCRIPTION = 'A reviewer-qualification case.';
 const asStored = (n: PwaGraphNode): PwaGraphNode => ({
 	...n,
 	...(n.purpose === undefined ? { purpose: n.name } : {}),
 	...(n.requiredAssurancePolicyIds === undefined ? { requiredAssurancePolicyIds: [] } : {}),
-	...(n.permittedChildren === undefined ? { permittedChildren: [] } : {})
+	...(n.permittedChildren === undefined ? { permittedChildren: [] } : {}),
+	// ⭐ The review in parts, B1 (`REG-D-125`) — and, after those, the completion rule `definePwuType` stores for a type
+	// defined without one, then the boundary contract the limb defines a delegated node with.
+	completionRule: DEFAULT_COMPLETION_RULE,
+	...(n.executionBoundary === 'DELEGATED_EXTERNAL' ? { boundaryContract: CASE_BOUNDARY_CONTRACT } : {})
 });
 
 /**
@@ -216,6 +227,8 @@ const asStored = (n: PwaGraphNode): PwaGraphNode => ({
  * nodes carry those fields (case set v7's) is defined with them, its policies the catalog's, and exported byte for byte as
  * its literal; one whose nodes carry none of them (versions one to six) is exported as its literal with what the commands
  * stored for them (`asStored`), byte for byte — so since F1 such a case's literal is no longer what production exports of it.
+ * ⭐ The review in parts, B1 (`REG-D-125`) — and since B1 no case's literal is: every type is exported with the completion
+ * rule its command stored, a delegated one with its boundary contract, and the PWA with its description (`asStored`).
  */
 function expectProductionsGraph(c: GraphCase): void {
 	for (const n of c.input.nodes) {
@@ -258,7 +271,7 @@ function expectProductionsGraph(c: GraphCase): void {
 	send('CreatePwa', 'PROFESSIONAL_WORK_ARCHITECTURE', c.input.pwa.id, {
 		pwaId: c.input.pwa.id,
 		name: c.input.pwa.name,
-		description: 'A reviewer-qualification case.',
+		description: CASE_PWA_DESCRIPTION,
 		domain: c.input.pwa.domain,
 		version: c.input.pwa.version
 	});
@@ -275,7 +288,7 @@ function expectProductionsGraph(c: GraphCase): void {
 			requiredOutputs: [...n.requiredOutputs],
 			executionBoundary: n.executionBoundary,
 			...(n.executionBoundary === 'DELEGATED_EXTERNAL'
-				? { boundaryContract: { counterpartyLabel: 'An independent checking firm', attestedAssurancePolicyIds: [] } }
+				? { boundaryContract: CASE_BOUNDARY_CONTRACT }
 				: {}),
 			// ⭐ Package P F1 — what the node declares about its work, as its author's command carries it: a template with the
 			// placeholders its text uses, which the export does not carry.
@@ -287,7 +300,7 @@ function expectProductionsGraph(c: GraphCase): void {
 				: {})
 		});
 	expect(JSON.stringify(buildPwaExport(c.input.pwa.id, session)), c.id).toBe(
-		JSON.stringify(buildPwaGraphExport(c.input.pwa, c.input.nodes.map(asStored)))
+		JSON.stringify(buildPwaGraphExport({ ...c.input.pwa, description: CASE_PWA_DESCRIPTION }, c.input.nodes.map(asStored)))
 	);
 	session.close();
 }

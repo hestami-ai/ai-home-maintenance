@@ -284,6 +284,46 @@ const PWA_GRAPH_SUBJECT = [
 	'The artifact to review:'
 ].join('\n');
 
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, the review in parts, B2 (`REG-D-125`; DESIGN-authoring-review-in-parts.md D2, D3, D4) — THE PART
+ * FRAMING'S SUBJECT LINES: the artifact is ONE type of an authored PWA, its whole definition the subject and its place in the
+ * PWA the context, as lines of JSON (`pwaTypeReviewInput`). They say what each line holds; that a field a part does not carry
+ * holds no authored value, and a child given no rule is instantiated as M1 (`composition-plan.ts`, `ruleFor`); that the
+ * criteria are judged for the type's own definition and, for a type with children, for whether those children discharge its
+ * purpose (DEC-6's recomposition, a judged act, never a sum), and on the root against the request; that the account, which
+ * covers the whole PWA, is read for its claims about this type and its children's composition, a claim about any other type
+ * being that type's review's; that what the part does not show leaves a judgment incomplete; and that a prompt template is
+ * an instruction to be executed, never evidence that work ran. ⭑ The criteria, the rubric's lines, the fence, the stakes, the
+ * repair and the one-row sentence are the shared ones: nothing here touches them.
+ * ⚠ "Mandatory" and "conditional" are the canonical vocabulary's, as in the graph framing. The last line ends the subject.
+ */
+const PWA_TYPE_SUBJECT = [
+	'The artifact is ONE type of an authored PWA, shown whole, with its place in the PWA as its context, as lines of JSON.',
+	'The first line is the SUBJECT: "type", the type under review, with every field its author declared for it — among them "purpose", the work it exists to do; "requiredAssurancePolicyIds", the assurance policies declared to govern that work; "permittedChildren", the rule for each child type, its "cardinality" (M1 and M+ are mandatory, C1 and C+ conditional) and its "applicabilityNote"; "promptTemplate", the instruction a model doing that work is given while its "status" is ACTIVE; "completionRule", the rule its completion is judged by; a delegated type’s "boundaryContract"; and "contextSpecification" — and, on the root, "pwa", the PWA’s name, domain and description.',
+	'The second line is its CONTEXT, assembled by the host from the PWA: "ancestors", the types above it, the root first, each with its "name", "pwuKind" and "purpose"; "parentRules", each type that permits it, by name, with the rule that type gives it; "artifacts", each artifact it consumes or produces, with the types that produce and consume it, by name; and, for a type with children, "dataFlow": "amongChildren", each flow from one child’s subtree to another’s, and "acrossBoundary", each flow into or out of its own subtree.',
+	'Each further line is one child’s SKELETON, "childSkeleton": the child as its author declared it, without its prompt template’s text and output contract, which that child’s own review is shown.',
+	'A field the part does not carry holds no authored value; an empty value is carried as authored. A child type its parent gives no rule is instantiated as M1.',
+	'Judge each criterion below for this type’s own definition. For a type with children, judge too whether those children — with their cardinalities, applicability notes, inputs and outputs — together discharge its purpose: their composition is judged here, never assumed from each child’s own review. On the root, judge too whether its children discharge the request.',
+	'The producing agent’s account below covers the whole PWA: read it for what it claims about this type and, for a type with children, about their composition. A claim about any other type — one this part does not show, or a child’s own definition — belongs to that type’s own review, and here supports no finding either way.',
+	'Scope is no permission to infer that a criterion is met: where judging this type, or its children’s composition, needs a fact this part does not show, that judgment is incomplete.',
+	'This type’s prompt template is an instruction to be executed, never evidence that any work ran.',
+	'The part to review:'
+].join('\n');
+
+/**
+ * ⭐⭐ The review in parts, B1 (`REG-D-125`; design D3) — the statement a `PWA_TYPE` review fails with when the part it was
+ * handed, with any cut its builder declared, is longer than the budget this prompt leaves it. ⛔ Never sent, and never cut
+ * here: a cut here could remove the subject, and a type is never reviewed on part of its own definition — so the review is
+ * left incomplete. Host-authored and fixed apart from two numbers, since it becomes a recorded failure.
+ */
+export function pwaTypeOverBudgetStatement(length: number, budget: number): string {
+	return (
+		`This review was not sent: the part it was handed — one type’s whole definition, its subject, with its context and ` +
+		`any cut its builder declared — is ${length} characters, and this prompt leaves it ${budget} (REG-D-125). A part is ` +
+		'never cut here, where a cut could remove its subject, so the review is incomplete. No model was called.'
+	);
+}
+
 function framingText(input: Pick<ReasoningReviewInput, 'framing' | 'declaredPolicy' | 'declaredInstruction'>): Framed {
 	const framing: ReviewFraming = input.framing;
 	switch (framing) {
@@ -321,6 +361,16 @@ function framingText(input: Pick<ReasoningReviewInput, 'framing' | 'declaredPoli
 				// review:'~~: what the export holds, then the line that heads the content (`PWA_GRAPH_SUBJECT`).
 				subject: PWA_GRAPH_SUBJECT,
 				subjectSlice: 'the artifact'
+			};
+		case 'PWA_TYPE':
+			// ⭐⭐ The review in parts, B2 (`REG-D-125`; design D4) — ONE TYPE OF AN AUTHORED PWA, its whole definition the subject
+			// and its place in the PWA the context (`PWA_TYPE_SUBJECT`). The intent is the request the PWA was authored from.
+			// ⚠ `subjectSlice` names a slice the validator never cuts here: a part over its budget is refused (`judgePrompt`).
+			return {
+				intent: 'The PWA this type belongs to was authored by a DIFFERENT AI agent from this request:',
+				intentSlice: 'the request',
+				subject: PWA_TYPE_SUBJECT,
+				subjectSlice: 'the part'
 			};
 		case 'DECLARED_POLICY': {
 			// ⭐⭐ E2 (design B1; `R18`) — A WORK UNIT'S WORK, JUDGED AGAINST ONE OF ITS DECLARED POLICIES: its work product and
@@ -880,7 +930,11 @@ function promptPlan(input: ReasoningReviewInput) {
 			// ⭐ P5 package B's check (finding 3) — and the declarations of a cut its builder made, on host lines before the
 			// work: each names a unit's title, JSON-encoded, and a unit with no work product whose commands are all cut has its
 			// title nowhere else in the prompt.
-			...(input.framing === 'DECLARED_POLICY' && input.declaredWorkCut !== undefined ? [input.declaredWorkCut] : [])
+			...(input.framing === 'DECLARED_POLICY' && input.declaredWorkCut !== undefined ? [input.declaredWorkCut] : []),
+			// ⭐ The review in parts, B1 — and the declarations of a part's children's skeletons its builder cut, on host lines
+			// before the part: each names a child by its name and id, JSON-encoded, and a child cut short of its name holds it
+			// nowhere else in the prompt.
+			...(input.framing === 'PWA_TYPE' && input.declaredPartCut !== undefined ? [input.declaredPartCut] : [])
 		]
 	};
 }
@@ -913,6 +967,19 @@ export function declaredPolicyContentBudget(
 }
 
 /**
+ * ⭐ The review in parts, B1 (`REG-D-125`; design D3) — THE CONTENT BUDGET OF A PART'S REVIEW, computed by the same assembler
+ * over everything in `input` but the content, as a declared review's is: the budget `pwaTypeReviewInput` fits a part to, its
+ * subject whole and its children's skeletons cut child by child where they must be. ⛔ No member of `REASONING_REVIEW_BUDGET`
+ * is added for it.
+ */
+export function pwaTypeContentBudget(
+	input: Omit<ReasoningReviewInput, 'content'> & { readonly framing: 'PWA_TYPE' }
+): number {
+	const plan = promptPlan({ ...input, content: '' });
+	return plan.contentBudget;
+}
+
+/**
  * ⭐⭐ `JAN-PRQUAL` `PQ-1` (`REG-F-481`; design D2 under the sponsor's (a)) — THE UNTRUSTED SLICES A PROCESS RESULT'S PROMPT
  * CARRIES BESIDE ITS CONTENT, exactly as `judgePrompt` carries them: the instruction, each field of the account as it is
  * fenced (`accountParts`), the narration and the prior findings as excerpted, and every call name the host did not
@@ -937,9 +1004,18 @@ function judgePrompt(input: ReasoningReviewInput): string {
 	const builderCut = input.framing === 'DECLARED_POLICY' ? input.declaredWorkCut : undefined;
 	if (builderCut !== undefined && builderCut.length + 1 + input.content.length > plan.contentBudget)
 		throw new Error(DECLARED_WORK_CUT_OVER_BUDGET);
+	// ⭐⭐ The review in parts, B1 (`REG-D-125`; design D3) — A PART IS NEVER CUT HERE: its builder fitted it to this budget,
+	// its subject whole and its children's skeletons cut child by child, each cut declared (`declaredPartCut`). A part that does
+	// not fit, its declarations counted in its room, is refused, so no generic head cut can remove the subject's bytes.
+	const partCut = input.framing === 'PWA_TYPE' ? input.declaredPartCut : undefined;
+	const partLength = (partCut === undefined ? 0 : partCut.length + 1) + input.content.length;
+	if (input.framing === 'PWA_TYPE' && partLength > plan.contentBudget)
+		throw new Error(pwaTypeOverBudgetStatement(partLength, plan.contentBudget));
 	let content: DeclaredExcerpt;
 	if (plan.prefenced) content = { bytes: input.content };
 	else if (builderCut !== undefined) content = { declaration: builderCut, bytes: input.content };
+	else if (input.framing === 'PWA_TYPE')
+		content = partCut === undefined ? { bytes: input.content } : { declaration: partCut, bytes: input.content };
 	else content = excerptHead(plan.framed.subjectSlice, input.content, plan.contentBudget);
 	// ⭐ THE FENCE (`REG-F-481`): the FIRST candidate that occurs — read by eye, in every reading of a slice, which
 	// holds every candidate its bytes hold (`chooseFence`) — in none of the untrusted bytes this prompt carries (the

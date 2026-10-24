@@ -16,8 +16,9 @@
 import { describe, expect, it } from 'vitest';
 import type { ObservedToolCallReport } from '@janumipwb/rph-contracts';
 import { createMockReasoningReviewValidator } from './mock-reasoning-review-validator.js';
-import { REASONING_REVIEW_CRITERIA } from '@janumipwb/rph-assurance';
-import { buildPwaGraphExport, type PwaGraphNode } from '@janumipwb/rph-projections';
+import { REASONING_REVIEW_CRITERIA, SEEDED_REASONING_REVIEW_CRITERIA } from '@janumipwb/rph-assurance';
+import { buildPwaGraphExport, pwaTypeParts, type PwaGraphNode } from '@janumipwb/rph-projections';
+import { pwaTypeReviewInput } from './review-input.js';
 
 const SUBJECT = { id: 'pwa-1', semanticVersion: 1 };
 
@@ -303,3 +304,71 @@ describe('⛔ R26 — the deterministic fixture declares the criteria it examine
 function declaredByThisArm(id: string): boolean {
 	return id === 'RR-04-no-proxy-satisfaction' || id === 'RR-09-no-completeness-from-existence';
 }
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7, the review in parts, B2 (`REG-D-125`; DESIGN-authoring-review-in-parts.md D10) ─────────────────
+//
+// ⛔ A PART IS NOT A GRAPH, AND THE WHOLE-GRAPH CHECKER IS NEVER HANDED ONE: judged as a graph, one type of a PWA would be
+// misdescribed. So the checker has a part-aware arm, which judges the one structural fact a part holds whole — whether each
+// output its type produces feeds a consumer (`RR-04`) — declares that one of nine, and reads a part it cannot read as
+// unread, never as clean.
+describe('⭐⭐ the review in parts, B2 — the structural checker’s PART arm: one type, judged on what its part holds whole', () => {
+	const PWA = { id: 'pwa_t', name: 'T', domain: 'software', version: '0.1.0', publicationStatus: 'DRAFT' } as never;
+	const n = (over: Partial<PwaGraphNode> & Pick<PwaGraphNode, 'id' | 'name'>): PwaGraphNode =>
+		({ pwuKind: 'K', isRoot: false, permittedChildTypeIds: [], requiredInputs: [], requiredOutputs: [], ...over }) as PwaGraphNode;
+	/** The parts of a root that consumes its child's output, and of the child — or, with `deadEnd`, a root output nobody consumes. */
+	const partsOf = (deadEnd: boolean) =>
+		pwaTypeParts(
+			buildPwaGraphExport(PWA, [
+				n({ id: 'root', name: 'Root', isRoot: true, permittedChildTypeIds: ['kid'], requiredInputs: ['draft'], requiredOutputs: deadEnd ? ['report'] : [] }),
+				n({ id: 'kid', name: 'Kid', requiredOutputs: ['draft'] })
+			])
+		);
+	const contentOf = (part: ReturnType<typeof partsOf>[number]) =>
+		pwaTypeReviewInput({ criteria: SEEDED_REASONING_REVIEW_CRITERIA, prompt: 'x', part }).content;
+	async function judgePart(content: string) {
+		return createMockReasoningReviewValidator().evaluate(SUBJECT as never, {
+			reasoningReview: { content, criteria: REASONING_REVIEW_CRITERIA, framing: 'PWA_TYPE', prompt: 'x' }
+		} as never);
+	}
+	const judged = (r: Awaited<ReturnType<typeof judgePart>>) =>
+		r.criteria.filter((c) => c.outcome !== 'UNABLE_TO_DETERMINE').map((c) => `${c.criterionId}=${c.outcome}`);
+
+	it('⭐ a part whose every output feeds a consumer: RR-04 evaluated MET — one of nine, declared — and the eight others UNABLE_TO_DETERMINE', async () => {
+		for (const part of partsOf(false)) {
+			const r = await judgePart(contentOf(part));
+			expect(judged(r), part.typeId).toEqual(['RR-04-no-proxy-satisfaction=MET']);
+			expect(r.criteria.filter((c) => c.outcome === 'UNABLE_TO_DETERMINE'), part.typeId).toHaveLength(8);
+			expect(r.dispositionRecommendation, part.typeId).toBe('SATISFIED');
+		}
+	});
+
+	it('⛔ a type that produces an output no type consumes: RR-04 NOT_MET on ITS part, a MATERIAL finding, and its child’s part still clean', async () => {
+		const [root, kid] = partsOf(true);
+		const r = await judgePart(contentOf(root!));
+		expect(judged(r)).toEqual(['RR-04-no-proxy-satisfaction=NOT_MET']);
+		expect(r.observations.map((o) => [o.code, o.statement])).toEqual([
+			['RR-04-no-proxy-satisfaction', '1 output(s) this type produces feed no consumer (dead-end).']
+		]);
+		expect(r.dispositionRecommendation).toBe('CONDITIONALLY_SATISFIED');
+		expect(judged(await judgePart(contentOf(kid!))), 'the child’s output is consumed').toEqual(['RR-04-no-proxy-satisfaction=MET']);
+	});
+
+	it('⛔ FAIL CLOSED — a part it cannot read is INCONCLUSIVE with no criterion judged, never clean', async () => {
+		for (const content of ['not json at all', '{"subject":{}}\n{"context":{}}', '{"subject":{"type":{"requiredOutputs":["x"]}}}\n{"context":{"artifacts":[]}}']) {
+			const r = await judgePart(content);
+			expect(r.dispositionRecommendation, content).toBe('INCONCLUSIVE');
+			expect(judged(r), content).toEqual([]);
+			expect(r.limitations.join(' '), content).toMatch(/did not run/);
+		}
+	});
+
+	it('⭐ CONTROL — ROUTING, BOTH WAYS: a part under the graph framing is no graph, and a graph under the part framing is no part', async () => {
+		// ⛔ THE MUTANT: hand the part to the whole-graph checker. One type's lines are no export, so the graph arm cannot read
+		// them — and a graph handed to the part arm carries no subject line.
+		const asGraph = await judgeContent(contentOf(partsOf(false)[0]!));
+		expect(asGraph.dispositionRecommendation).toBe('INCONCLUSIVE');
+		const asPart = await judgePart(VALID_GRAPH);
+		expect(asPart.dispositionRecommendation).toBe('INCONCLUSIVE');
+		expect(judged(asPart)).toEqual([]);
+	});
+});

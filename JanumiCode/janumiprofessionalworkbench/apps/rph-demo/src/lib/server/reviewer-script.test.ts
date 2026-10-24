@@ -74,6 +74,16 @@ describe('⭐ /test-api/reviewer-script registers a stipulation — in test mode
 		expect(registry.stipulationFor(pwaId, 'WORK_PRODUCT')).toBeUndefined();
 	});
 
+	it('⭐ the review in parts, B2 (REG-D-125) — the part arm, PWA_TYPE, is accepted, and answers its own arm alone', async () => {
+		// THE MUTANT: leave the part arm out of the table the route checks a registration's arm against.
+		const { registry, post, seededPwa } = await load('test');
+		const pwaId = seededPwa();
+		const res = (await Promise.resolve(post({ pwaId, framing: 'PWA_TYPE', remaining: 'CLEAN' })).catch((refused: unknown) => refused)) as Response;
+		expect(res.status, 'accepted, not refused with a 422').toBe(200);
+		expect(await res.json()).toEqual({ registered: { pwaId, framing: 'PWA_TYPE', remaining: 'CLEAN' } });
+		expect([registry.stipulationFor(pwaId, 'PWA_TYPE'), registry.stipulationFor(pwaId, 'PWA_GRAPH')]).toEqual(['CLEAN', undefined]);
+	});
+
 	it('⛔ refuses a PWA the engine does not hold, a process-result arm, and any remainder but CLEAN — each a 422', async () => {
 		const { post, seededPwa } = await load('test');
 		const pwaId = seededPwa();

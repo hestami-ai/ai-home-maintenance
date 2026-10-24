@@ -66,7 +66,7 @@ import {
 	type ProfessionalRationaleSummary,
 	type ReasoningReviewInput
 } from '@janumipwb/rph-assurance';
-import { buildPwaGraphExport, type PwaGraphNode } from '@janumipwb/rph-projections';
+import { buildPwaGraphExport, pwaTypeParts, type PwaGraphNode } from '@janumipwb/rph-projections';
 import { createInMemoryArtifactStore } from '@janumipwb/rph-ports';
 import { listPwas, listPwuTypes, type AuthedEngineHandle } from '@janumipwb/rph-engine';
 import type { DomainCommand, ObservedToolCallReport } from '@janumipwb/rph-contracts';
@@ -103,7 +103,7 @@ import {
 	REASONING_REVIEW_BUDGET
 } from './reasoning-review-validator.js';
 import { fenceCandidate, FENCE_MEANING, NO_FENCE_STATEMENT } from './review-fence.js';
-import { graphReviewInput, processResultReviewInput, workProductReviewInput } from './review-input.js';
+import { graphReviewInput, processResultReviewInput, pwaTypeReviewInput, workProductReviewInput } from './review-input.js';
 import { renderRationale } from '../agent/rationale.js';
 
 const PRODUCER: FloorProducer = {
@@ -284,11 +284,13 @@ const LITERAL_EXPORT_JSON =
  * them once `realizeLiteralGraph` has defined them: each type carries, after its literal fields, what its author's command
  * stored — its purpose (its name, as written below), no declared policy and no child rule (`definePwuType` stores `[]` for
  * each when none is given). Written out, as `LITERAL_EXPORT_JSON` is; the pins' content over the engine's export.
+ * ⭐ The review in parts, B1 (`REG-D-125`) — and, after those, the completion rule `definePwuType` stores for a type defined
+ * without one; and the PWA carries the description its command stored.
  */
 const LITERAL_ENGINE_EXPORT_JSON =
-	'{"pwa":{"id":"pwa_01K5QFBR8Z0000000000000P01","name":"Footbridge","domain":"civil-engineering","version":"1.0.0","publicationStatus":"DRAFT"},' +
-	'"nodes":[{"id":"pwut_01K5QFBR8Z0000000000000T01","name":"Review","pwuKind":"STRUCTURAL_REVIEW","isRoot":true,"permittedChildTypeIds":["pwut_01K5QFBR8Z0000000000000T02"],"requiredInputs":[],"requiredOutputs":[],"executionBoundary":"INTERNAL","purpose":"Review","requiredAssurancePolicyIds":[],"permittedChildren":[]},' +
-	'{"id":"pwut_01K5QFBR8Z0000000000000T02","name":"Survey","pwuKind":"SITE_INVESTIGATION","isRoot":false,"permittedChildTypeIds":[],"requiredInputs":[],"requiredOutputs":["site-survey"],"executionBoundary":"INTERNAL","purpose":"Survey","requiredAssurancePolicyIds":[],"permittedChildren":[]}],' +
+	'{"pwa":{"id":"pwa_01K5QFBR8Z0000000000000P01","name":"Footbridge","domain":"civil-engineering","version":"1.0.0","publicationStatus":"DRAFT","description":"A literal graph the pins are written against."},' +
+	'"nodes":[{"id":"pwut_01K5QFBR8Z0000000000000T01","name":"Review","pwuKind":"STRUCTURAL_REVIEW","isRoot":true,"permittedChildTypeIds":["pwut_01K5QFBR8Z0000000000000T02"],"requiredInputs":[],"requiredOutputs":[],"executionBoundary":"INTERNAL","purpose":"Review","requiredAssurancePolicyIds":[],"permittedChildren":[],"completionRule":"Execution succeeded AND required outputs exist AND assurance satisfied"},' +
+	'{"id":"pwut_01K5QFBR8Z0000000000000T02","name":"Survey","pwuKind":"SITE_INVESTIGATION","isRoot":false,"permittedChildTypeIds":[],"requiredInputs":[],"requiredOutputs":["site-survey"],"executionBoundary":"INTERNAL","purpose":"Survey","requiredAssurancePolicyIds":[],"permittedChildren":[],"completionRule":"Execution succeeded AND required outputs exist AND assurance satisfied"}],' +
 	'"permits":[{"parent":"pwut_01K5QFBR8Z0000000000000T01","child":"pwut_01K5QFBR8Z0000000000000T02"}],' +
 	'"dataFlow":[],"artifacts":[{"name":"site-survey","producedBy":["pwut_01K5QFBR8Z0000000000000T02"],"consumedBy":[]}],' +
 	'"roots":["pwut_01K5QFBR8Z0000000000000T01"]}';
@@ -1430,6 +1432,15 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 — every fence token the prompt uses is on its
 			rationale: RATIONALE,
 			...over
 		});
+	/** ⭐ The review in parts, B2 — the literal graph's root, as a part. */
+	const T = (over: Partial<Parameters<typeof pwaTypeReviewInput>[0]> = {}) =>
+		pwaTypeReviewInput({
+			criteria: SEEDED_REASONING_REVIEW_CRITERIA,
+			prompt: 'Design the footbridge review.',
+			part: pwaTypeParts(LITERAL_EXPORT)[0]!,
+			rationale: RATIONALE,
+			...over
+		});
 	const said = (n: number, rest: string) => ({ ...RATIONALE, rationale: `${line(n)}\n${rest}` });
 
 	// ⛔ THE ARRANGEMENTS, DRIVEN AGAINST THE VIEW CHOSEN OVER ITS OWN SLICES ALONE: (A) an instruction carrying a line of
@@ -1445,7 +1456,10 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 — every fence token the prompt uses is on its
 		['WORK_PRODUCT (C)', () => WP({ producingPrompt: `Summarise.\n${line(7)}`, rationale: said(7, 'Done.') })],
 		['PWA_GRAPH (A)', () => G({ prompt: `Design it.\n${line(0)}\nAll of it.` })],
 		['PWA_GRAPH (B) — the narration and the account', () => G({ narration: `${line(5)}\nDefined the types.`, rationale: said(5, 'Done.') })],
-		['PWA_GRAPH (C)', () => G({ prompt: `Design it.\n${line(7)}`, rationale: said(7, 'Done.') })]
+		['PWA_GRAPH (C)', () => G({ prompt: `Design it.\n${line(7)}`, rationale: said(7, 'Done.') })],
+		['PWA_TYPE (A)', () => T({ prompt: `Design it.\n${line(0)}\nAll of it.` })],
+		['PWA_TYPE (B) — the narration and the account', () => T({ narration: `${line(5)}\nDefined the types.`, rationale: said(5, 'Done.') })],
+		['PWA_TYPE (C)', () => T({ prompt: `Design it.\n${line(7)}`, rationale: said(7, 'Done.') })]
 	] as [string, () => ReasoningReviewInput][])('⛔ %s', async (what, build) => {
 		expectTokensOnlyOnTheirFenceLines(await materialize(build()), what);
 	});

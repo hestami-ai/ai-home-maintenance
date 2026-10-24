@@ -34,6 +34,8 @@ import {
 	ONE_ROW_PER_CRITERION,
 	processResultContentBudget,
 	processResultUntrustedSlices,
+	pwaTypeContentBudget,
+	pwaTypeOverBudgetStatement,
 	REASONING_REVIEW_BUDGET,
 	type AgyPrint
 } from './reasoning-review-validator.js';
@@ -151,6 +153,13 @@ const ctx = (
 		...(over.rationale ? { rationale: over.rationale } : {})
 	}
 });
+
+/** ⭐ The review in parts, B2 — the name a framing's cut of its instruction declares (`framingText`'s `intentSlice`). */
+function intentSliceOf(framing: ReviewFraming): string {
+	if (framing === 'PWA_GRAPH') return 'the intent';
+	if (framing === 'PWA_TYPE') return 'the request';
+	return 'the instruction';
+}
 
 /** A store whose FIRST put rejects and whose later puts succeed. The once-only failure is what exposes the
  *  defect: an always-failing store throws from the catch block's own capture before the repair is reached, so
@@ -615,7 +624,8 @@ describe('JAN-LIVEEXEC LE-02 — the reviewer is told what it is actually lookin
 	// INCONCLUSIVE, which BLOCKS. ⭑ The framing is now DECLARED on the input and the switch is exhaustive, so
 	// these tests drive the DECLARATION. Each pins exactly the property it always pinned; what changed is that
 	// a THIRD framing exists and every loop below runs over all three rather than over "the two there were".
-	const FRAMINGS = ['WORK_PRODUCT', 'PWA_GRAPH', 'PROCESS_RESULT'] as const;
+	// ⭐ The review in parts, B2 (`REG-D-125`) — and over the part framing, `PWA_TYPE`, too.
+	const FRAMINGS = ['WORK_PRODUCT', 'PWA_GRAPH', 'PROCESS_RESULT', 'PWA_TYPE'] as const;
 
 	/** One `run_command` the host watched complete — the ordinary `PROCESS_RESULT` arrangement. */
 	const OBSERVED_ONE_COMMAND: ObservedToolCallReport = {
@@ -673,10 +683,10 @@ describe('JAN-LIVEEXEC LE-02 — the reviewer is told what it is actually lookin
 		).toMatch(/carries no reasoning of its own/);
 	});
 
-	it('⭐ CONTROL — and the OTHER two framings never say COMMAND RESULT, so the third arm is routing too', async () => {
+	it('⭐ CONTROL — and the OTHER framings never say COMMAND RESULT, so the third arm is routing too', async () => {
 		// Without this, "describe everything as a command result" passes the test above. This is the same
 		// discrimination the graph control performs, extended to the arm Phase 5 added.
-		for (const f of ['WORK_PRODUCT', 'PWA_GRAPH'] as const)
+		for (const f of ['WORK_PRODUCT', 'PWA_GRAPH', 'PWA_TYPE'] as const)
 			expect(await promptFor(ARTIFACT, f), f).not.toMatch(/COMMAND RESULT/);
 	});
 
@@ -742,13 +752,13 @@ describe('JAN-LIVEEXEC LE-02 — the reviewer is told what it is actually lookin
 		expect(p).toMatch(/40 calls were observed; only the first 32 are listed/);
 	});
 
-	it('⭐ CONTROL — and the other two framings carry NO observation section, so it is not unconditional', async () => {
+	it('⭐ CONTROL — and the other framings carry NO observation section, so it is not unconditional', async () => {
 		// ⭐ `PQ-1`: keyed on the heading as it now reads (it matched `/observed the session do this turn/`).
-		for (const f of ['WORK_PRODUCT', 'PWA_GRAPH'] as const)
+		for (const f of ['WORK_PRODUCT', 'PWA_GRAPH', 'PWA_TYPE'] as const)
 			expect(await promptFor(ARTIFACT, f), f).not.toContain(OBSERVATION_HEADING);
 	});
 
-	it('⚠ ALL THREE framings still render rationale and narration — §9.7: absence is never a signal', async () => {
+	it('⚠ EVERY framing listed still renders rationale and narration — §9.7: absence is never a signal', async () => {
 		// An executing model declares no rationale, so these sections render "(none recorded)". THE MUTANT: drop
 		// them for work products. The reviewer's INPUT SHAPE would then encode whether the producer said
 		// anything, which is exactly what §9.7 forbids the reviewer from being able to see.
@@ -759,7 +769,7 @@ describe('JAN-LIVEEXEC LE-02 — the reviewer is told what it is actually lookin
 		}
 	});
 
-	it('⭑ and the rubric ids come from the POLICY in ALL THREE framings, not from a second rubric', async () => {
+	it('⭑ and the rubric ids come from the POLICY in EVERY framing listed, not from a second rubric', async () => {
 		// `ASR-4`: policy meaning is stable across validator replacement — what varies with the subject is how
 		// the review is CONDUCTED, never what the policy means. THE MUTANT: invent a work-product rubric here.
 		// `coerceJudgement` would then drop every finding as unrecognised, and the review would silently pass.
@@ -814,10 +824,69 @@ describe('⭐⭐ package P F1 (REG-F-503 remedy 1) — the PWA_GRAPH framing say
 	});
 
 	it('⭐ CONTROL — the description is the graph framing’s alone: no other framing carries any line of it', async () => {
-		for (const framing of ['WORK_PRODUCT', 'PROCESS_RESULT'] as const) {
+		// ⭐ The review in parts, B2 — a part above all: one type is not the whole graph.
+		for (const framing of ['WORK_PRODUCT', 'PROCESS_RESULT', 'PWA_TYPE'] as const) {
 			const lines = (await promptOf(framing)).split('\n');
 			expect(DESCRIPTION.filter((line) => lines.includes(line)), framing).toEqual([]);
 		}
+	});
+});
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7, the review in parts, B2 (`REG-D-125`; DESIGN-authoring-review-in-parts.md D2, D3, D4) ──────────
+// THE PART FRAMING SAYS WHAT A PART IS AND HOW THE CRITERIA APPLY TO IT. A part is ONE type of an authored PWA, shown whole,
+// with its place in the PWA as context (`pwaTypeReviewInput`). Its host lines before the content say what each of the part's
+// lines holds; that a type with children is judged for whether they discharge its purpose (DEC-6), and the root against the
+// request; that the account is read for its claims about this type, a claim about any other type supporting no finding here
+// either way; that what a part does not show leaves a judgment incomplete; and that a prompt template is never evidence that
+// work ran. The criteria, the rubric's lines, the fence, the stakes, the repair and the one-row sentence are the shared ones.
+describe('⭐⭐ the review in parts, B2 (REG-D-125) — the PWA_TYPE framing: the subject is ONE type, shown whole, its place in the PWA the context, and how the criteria apply to it', () => {
+	/** The host's lines B2 puts in the part framing, written here, byte for byte. */
+	const PART_LINES = [
+		'The artifact is ONE type of an authored PWA, shown whole, with its place in the PWA as its context, as lines of JSON.',
+		'The first line is the SUBJECT: "type", the type under review, with every field its author declared for it — among them "purpose", the work it exists to do; "requiredAssurancePolicyIds", the assurance policies declared to govern that work; "permittedChildren", the rule for each child type, its "cardinality" (M1 and M+ are mandatory, C1 and C+ conditional) and its "applicabilityNote"; "promptTemplate", the instruction a model doing that work is given while its "status" is ACTIVE; "completionRule", the rule its completion is judged by; a delegated type’s "boundaryContract"; and "contextSpecification" — and, on the root, "pwa", the PWA’s name, domain and description.',
+		'The second line is its CONTEXT, assembled by the host from the PWA: "ancestors", the types above it, the root first, each with its "name", "pwuKind" and "purpose"; "parentRules", each type that permits it, by name, with the rule that type gives it; "artifacts", each artifact it consumes or produces, with the types that produce and consume it, by name; and, for a type with children, "dataFlow": "amongChildren", each flow from one child’s subtree to another’s, and "acrossBoundary", each flow into or out of its own subtree.',
+		'Each further line is one child’s SKELETON, "childSkeleton": the child as its author declared it, without its prompt template’s text and output contract, which that child’s own review is shown.',
+		'A field the part does not carry holds no authored value; an empty value is carried as authored. A child type its parent gives no rule is instantiated as M1.',
+		'Judge each criterion below for this type’s own definition. For a type with children, judge too whether those children — with their cardinalities, applicability notes, inputs and outputs — together discharge its purpose: their composition is judged here, never assumed from each child’s own review. On the root, judge too whether its children discharge the request.',
+		'The producing agent’s account below covers the whole PWA: read it for what it claims about this type and, for a type with children, about their composition. A claim about any other type — one this part does not show, or a child’s own definition — belongs to that type’s own review, and here supports no finding either way.',
+		'Scope is no permission to infer that a criterion is met: where judging this type, or its children’s composition, needs a fact this part does not show, that judgment is incomplete.',
+		'This type’s prompt template is an instruction to be executed, never evidence that any work ran.',
+		'The part to review:'
+	];
+	const INTENT = 'The PWA this type belongs to was authored by a DIFFERENT AI agent from this request:';
+	const promptOf = async (framing: ReviewFraming): Promise<string> => {
+		const { prompts, print } = capturing();
+		await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(SUBJECT, ctx({ framing, rationale: RATIONALE }));
+		expect(prompts, `${framing}: one prompt`).toHaveLength(1);
+		return prompts[0]!;
+	};
+
+	it('⭐ RED FIRST — a part is described as ONE type of an authored PWA, its subject whole and its place the context; a type with children is asked for their composition, the root for the request; a claim about another type supports no finding here; a prompt template is no evidence that work ran', async () => {
+		const lines = (await promptOf('PWA_TYPE')).split('\n');
+		const at = lines.indexOf(PART_LINES[0]!);
+		expect(at, 'the part framing’s first line').toBeGreaterThan(0);
+		expect(lines.slice(at, at + PART_LINES.length), 'the lines, in order, each on its own line').toEqual(PART_LINES);
+		expect(lines[at + PART_LINES.length], 'then the part’s fence').toMatch(/^<<<UNTRUSTED-\d\d>>>$/);
+		expect(lines, 'the intent: the request the PWA was authored from').toContain(INTENT);
+		expect(lines.indexOf(INTENT), 'before the part').toBeLessThan(at);
+	});
+
+	it('⭐ CONTROL — the part framing is PWA_TYPE’s alone: no other framing carries any line of it', async () => {
+		for (const framing of ['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT'] as const) {
+			const lines = (await promptOf(framing)).split('\n');
+			expect([...PART_LINES, INTENT].filter((l) => lines.includes(l)), framing).toEqual([]);
+		}
+	});
+
+	it('⭐ THE SHARED LINES STAY THE SHARED LINES: before the intent and after the part, a part’s prompt is the graph framing’s, byte for byte', async () => {
+		// ⭐ The preamble and the fence's meaning; then, after the content, the account, the narration, D8's lines with the
+		// policy's stakes, the one-row sentence and the output format — the same input, so the same fence.
+		const part = await promptOf('PWA_TYPE');
+		const graph = await promptOf('PWA_GRAPH');
+		const head = (p: string, intent: string) => p.slice(0, p.indexOf(intent));
+		expect(head(part, INTENT), 'the preamble').toBe(head(graph, 'The artifact was produced by a DIFFERENT AI agent from this intent:'));
+		const tail = (p: string) => p.slice(p.indexOf('{"pwuTypes":[{"id":"t1"}]}'));
+		expect(tail(part), 'everything after the content').toBe(tail(graph));
 	});
 });
 
@@ -1316,7 +1385,8 @@ describe('⚠ JAN-ESCREC — the prompt NAMES ESCALATED once and gives it no def
 	// the policy's stakes now (~~"no material failures", "only minor/advisory failures", "a BLOCKING/CRITICAL failure"~~),
 	// each held to `dispositionFromFindings` in the describe below. ESCALATED stays bare, last and named once, so
 	// `REG-D-090`'s recorded statement stays true, and every pin here holds the new sentence as it held the old.
-	const FRAMINGS = ['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT'] as const;
+	// ⭐ The review in parts, B2 (`REG-D-125`) — and in the part framing too: its lines name and define no disposition value.
+	const FRAMINGS = ['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT', 'PWA_TYPE'] as const;
 	/** ⭐ THE RECOMMENDATION SENTENCE, WHOLE: its ~~two~~ four lines exactly as the prompt joins them, the value bare at the end. */
 	const RECOMMENDATION_LINES = D8_RECOMMENDATION_LINES;
 	/** The MATERIALIZED prompt for one framing: what the reviewer reads, and what the statement is about. */
@@ -1382,7 +1452,7 @@ describe('⭐⭐ design §9.3 D8 — the prompt agrees with the policy: D8’s l
 	const policyWith = (stakes: readonly Severity[]) =>
 		SEEDED_REASONING_REVIEW_CRITERIA.map((c, i) => (i < stakes.length ? { ...c, severityIfNotMet: stakes[i]! } : c));
 
-	it.each(['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT'] as const)(
+	it.each(['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT', 'PWA_TYPE'] as const)(
 		'⭐ %s — the instruction, every rubric line with ITS criterion’s stakes, D8’s empty line and the sentence, exactly',
 		async (framing) => {
 			// ⭐ A POLICY WHOSE STAKES VARY, each of the five on a criterion of its own: a rubric that wrote one constant, or
@@ -1499,7 +1569,7 @@ const SYMMETRIC_CLAUSE =
 	'a concern that shows a criterion is not met is recorded failed=true, and never moved to residualUncertainty';
 
 describe('⭐⭐ P7-6 I6 — the prompt asks for ONE ROW PER CRITERION, met or not, in every framing, after D8’s lines and naming no disposition', () => {
-	it.each(['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT'] as const)(
+	it.each(['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT', 'PWA_TYPE'] as const)(
 		'⭐ %s — the sentence is one line of the prompt, once, after D8’s recommendation sentence and before the output format',
 		async (framing) => {
 			const { prompts, print } = capturing();
@@ -1906,7 +1976,7 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 — every untrusted slice, in every framing, si
 			: ([['the content', { ...base(framing), content: FORGE }]] as [string, ValidatorContext['reasoningReview']][]))
 	];
 
-	for (const framing of ['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT'] as const)
+	for (const framing of ['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT', 'PWA_TYPE'] as const)
 		for (const [slice, input] of forgedSlices(framing))
 			it(`⛔ ${framing} — ${slice}: every byte of it is fenced, the fence is not the planted one, and no forged host line stands`, async () => {
 				const p = await promptOf(input);
@@ -1983,14 +2053,14 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 — every cut, in every framing, is declared BE
 	// ⭐ `PQ-1` (`REG-F-481`): the account is fenced field by field, so its rationale is cut as ITS field, within the room
 	// the account's other lines leave it inside `RATIONALE_MAX` — that limit is the account's, held exactly below.
 	const slicesFor = (framing: ReviewFraming) => [
-		{ name: framing === 'PWA_GRAPH' ? 'the intent' : 'the instruction', limit: B.USER_INTENT_MAX, fenced: true, exact: true },
+		{ name: intentSliceOf(framing), limit: B.USER_INTENT_MAX, fenced: true, exact: true },
 		{ name: 'the rubric', limit: B.RUBRIC_MAX, fenced: false, exact: true },
 		{ name: "the account's rationale", limit: B.RATIONALE_MAX, fenced: true, exact: false },
 		{ name: 'the narration', limit: B.NARRATION_MAX, fenced: true, exact: true },
 		{ name: 'the prior findings', limit: B.PRIOR_MAX, fenced: true, exact: true }
 	];
 
-	for (const framing of ['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT'] as const)
+	for (const framing of ['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT', 'PWA_TYPE'] as const)
 		it(`⛔ ${framing} — each oversize slice: the declaration is the line BEFORE its bytes, its counts are the bytes', and it fits the limit`, async () => {
 			const p = await promptOf({
 				criteria: LONG_CRITERIA,
@@ -2053,7 +2123,7 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 — every cut, in every framing, is declared BE
 	// and the line feed after it count in `RATIONALE_MAX` as a field's do — so an account with one, two or all three lists
 	// empty is cut at EXACTLY `RATIONALE_MAX` too, every line of it, but for the digits its declaration did not need.
 	it.each(
-		(['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT'] as const).flatMap((framing) =>
+		(['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT', 'PWA_TYPE'] as const).flatMap((framing) =>
 			EMPTY_LIST_SETS.map((empty) => [framing, empty.join(' and '), empty] as const)
 		)
 	)('⛔ %s — the %s EMPTY: the account, each empty list’s host line and its line feed counted, is cut at EXACTLY RATIONALE_MAX', async (framing, _names, empty) => {
@@ -2092,6 +2162,18 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 — every cut, in every framing, is declared BE
 			const at = lines.findIndex((l) => l.startsWith(`[CUT FOR THIS REVIEW: ${name} — `));
 			expect(lines[at + 1], `${framing}: the declaration is not directly before the content's fence`).toMatch(/^<<<UNTRUSTED-\d\d>>>$/);
 		}
+	});
+
+	it('⛔ the review in parts, B1 (REG-D-125) — a PART over its budget is never cut: it is refused, the statement names its length and its room, and no prompt is sent', async () => {
+		// ⭐ ITS OWN FULL-SUBJECT REFUSAL: the same 60,000 characters a graph's content is cut at, handed as a part.
+		const { prompts, print } = capturing();
+		const input = { ...ctx({ framing: 'PWA_TYPE', content: 'z'.repeat(60_000) }).reasoningReview! };
+		const { content: _part, ...rest } = input;
+		const room = pwaTypeContentBudget({ ...rest, framing: 'PWA_TYPE' });
+		await expect(createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(SUBJECT, { reasoningReview: input })).rejects.toThrow(
+			pwaTypeOverBudgetStatement(60_000, room)
+		);
+		expect(prompts, 'no prompt is sent').toEqual([]);
 	});
 
 	it('⛔ a cut astride a surrogate pair drops the pair WHOLE — no lone surrogate, and the counts are code points', async () => {
@@ -2184,7 +2266,7 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-484) — the observation block says only
 	it('⭐ the host’s stand-ins for an ABSENT account and narration are host lines, never inside a fence', async () => {
 		// ⛔ `renderRationale(undefined)` and "(none recorded)" are the HOST saying nothing was supplied; inside a fence
 		// they would be labelled as the agent's own words. (Under HEAD both sat inside `"""`.)
-		for (const framing of ['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT'] as const) {
+		for (const framing of ['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT', 'PWA_TYPE'] as const) {
 			const { hostLines, regions } = readFences(await promptOf({ ...ctx({ framing }).reasoningReview! }));
 			expect(hostLines.some((l) => l.startsWith('(NOT DECLARED — the producer returned no professional rationale summary.')), framing).toBe(true);
 			expect(hostLines, framing).toContain('(none recorded)');
@@ -2218,7 +2300,7 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481) — no word of the host’s is quot
 	// before each item and the line feed that ends every item but the last are the only host bytes a region holds,
 	// formatting that states nothing. ~~"Its rationale:" and "…, as a JSON array of strings:" labels, a list as one line of
 	// JSON~~.
-	const FRAMINGS = ['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT'] as const;
+	const FRAMINGS = ['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT', 'PWA_TYPE'] as const;
 	const LABELS = ['Assumptions relied on:', 'Limitations the producer declares:', 'Residual uncertainty:'];
 	/** A list's region as D7 renders it: `renderRationale`'s serialization — each item on a line of its own after `  - `. */
 	const bullets = (xs: readonly string[]): string => xs.map((x) => `  - ${x}`).join('\n');
@@ -2333,7 +2415,7 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 — the fence is deterministic, escalates past 
 	});
 
 	it('⭐ ONE sentence of the preamble says what a fence means, names no disposition value, and is the same in every framing', async () => {
-		for (const framing of ['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT'] as const) {
+		for (const framing of ['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT', 'PWA_TYPE'] as const) {
 			const lines = (await promptOf({ ...ctx({ framing }).reasoningReview! })).split('\n');
 			expect(lines[4], framing).toBe(FENCE_MEANING);
 			expect(lines.filter((l) => l === FENCE_MEANING), framing).toHaveLength(1);
@@ -2519,7 +2601,7 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481) — a lookalike of the first candid
 					: undefined
 		]
 	];
-	const CASES = (['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT'] as const).flatMap((framing) =>
+	const CASES = (['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT', 'PWA_TYPE'] as const).flatMap((framing) =>
 		SLOTS.flatMap(([slot, make]) =>
 			LOOKALIKES.flatMap(([label, look]) => {
 				const input = make(framing, LOOKALIKE_FORGE(look));
@@ -2560,7 +2642,7 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481) — a lookalike of the first candid
 		// terminator as a break. `jsonLine`'s own doc says each is a break only "to some reader"; to one that does not break
 		// there the split candidate IS the line, and a forged host block split so stood outside every fence (driven). Over-
 		// reading is the safe direction: the chooser now reads each as a break AND as nothing.
-		for (const framing of ['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT'] as const) {
+		for (const framing of ['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT', 'PWA_TYPE'] as const) {
 			const p = await promptOf({ ...ctx({ framing, narration: LOOKALIKE_FORGE(`<<<UNTRUSTED-0${terminator}0>>>`) }).reasoningReview! });
 			const fences = new Set(readFences(p).regions.map((r) => r.fence));
 			expect(fences.size, `${framing}: arrangement: the prompt is fenced`).toBeGreaterThan(0);
@@ -2752,7 +2834,7 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481, REG-D-013) — in EVERY framing: ea
 	// each terminator a reader may not break at, and the runs-reversed reading's own rules (what joins a run, what breaks
 	// one, and that a line is laid out from its start). ⚠ Each rule is pinned at the points its rows stand: a change
 	// confined to other inputs of a rule, or to two rules together, is not seen here.
-	const FRAMINGS = ['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT'] as const;
+	const FRAMINGS = ['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT', 'PWA_TYPE'] as const;
 	/** Each bidi control the reader names (`review-fence.ts` `BIDI_CONTROLS`), by its own name. */
 	const CONTROLS: readonly (readonly [number, string])[] = [
 		[0x202a, 'LEFT-TO-RIGHT EMBEDDING'],
@@ -2917,7 +2999,7 @@ describe('⭐ JAN-PRQUAL PQ-1 (REG-F-481) — JSON on a host line or in a fence 
 			limitations: ['No intrusive\u2029investigation.'],
 			residualUncertainty: ['Whether the wind\u0085data is current.']
 		};
-		for (const framing of ['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT'] as const) {
+		for (const framing of ['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT', 'PWA_TYPE'] as const) {
 			const p = await promptOf({ ...ctx({ framing, rationale: account }).reasoningReview! });
 			const regions = readFences(p).regions;
 			const texts = regions.map((r) => r.text);
@@ -2970,7 +3052,7 @@ describe('⭐ JAN-PRQUAL PQ-1 (REG-F-481) — JSON on a host line or in a fence 
 // candidate and, after an exact first candidate, as the second), and three lookalikes: a lookalike or a layout no
 // plant here carries is held in the narration, by the describes above.
 describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481; design §9.3 D7) — the fence chooser reads each FIELD of the account as the prompt carries it, its prose and each list: a field carrying a fence-form line, a lookalike, a whole forged host block — split by a terminator or laid out by a bidi control — or a host label of its own is fenced by a token it cannot hold, in every framing', () => {
-	const FRAMINGS = ['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT'] as const;
+	const FRAMINGS = ['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT', 'PWA_TYPE'] as const;
 	/** The account's three lists, and the host's label above each (D7: HEAD's). */
 	const ACCOUNT_LISTS = [
 		['assumptions', 'Assumptions relied on:'],
@@ -3303,7 +3385,7 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481; design §9.3 D7) — the fence choo
 
 describe('⭐ JAN-PRQUAL PQ-1 (REG-F-480, REG-F-483) — the edges of a head-only cut', () => {
 	const B = REASONING_REVIEW_BUDGET;
-	const FRAMINGS = ['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT'] as const;
+	const FRAMINGS = ['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT', 'PWA_TYPE'] as const;
 
 	it('⛔ a slice EXACTLY at its limit is shown whole and undeclared — the instruction at USER_INTENT_MAX, the account at RATIONALE_MAX', async () => {
 		const instruction = 'Survey the wall. '.repeat(300).slice(0, B.USER_INTENT_MAX);
@@ -3377,6 +3459,37 @@ describe('⭐ JAN-PRQUAL PQ-1 (REG-F-480, REG-F-483) — the edges of a head-onl
 		}
 	});
 
+	it('⛔ the review in parts, B1 (REG-D-125) — a PART exactly at the room the assembler leaves it is sent whole, the prompt PROMPT_BUDGET exactly; one unit over is refused, never cut', async () => {
+		const { content: _part, ...rest } = { ...ctx({ framing: 'PWA_TYPE' }).reasoningReview! };
+		const room = pwaTypeContentBudget({ ...rest, framing: 'PWA_TYPE' });
+		const exact = await promptOf({ ...rest, content: 'z'.repeat(room) });
+		expect(exact.length, 'the part at its room: the prompt is the budget').toBe(B.PROMPT_BUDGET);
+		expect(exact, 'and nothing is cut').not.toContain('[CUT FOR THIS REVIEW: ');
+		const { prompts, print } = capturing();
+		await expect(
+			createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(SUBJECT, { reasoningReview: { ...rest, content: 'z'.repeat(room + 1) } })
+		).rejects.toThrow(pwaTypeOverBudgetStatement(room + 1, room));
+		expect(prompts, 'one unit over: no prompt').toEqual([]);
+	});
+
+	it('⛔ the review in parts, B1 (REG-D-125) — a PART CARRYING ITS BUILDER’S CUT DECLARATIONS is measured with them and their line feed: exactly at its room it is sent whole, the prompt PROMPT_BUDGET exactly; one unit over is refused', async () => {
+		const { content: _part, ...rest } = { ...ctx({ framing: 'PWA_TYPE' }).reasoningReview! };
+		const room = pwaTypeContentBudget({ ...rest, framing: 'PWA_TYPE' });
+		const declaredPartCut = headCutDeclaration('the skeleton of the child "Code" ("pwut_CODE")', 40, 90, 50);
+		const fits = 'z'.repeat(room - declaredPartCut.length - 1);
+		const exact = await promptOf({ ...rest, declaredPartCut, content: fits });
+		expect(exact.length, 'the part at its room, its declarations in it: the prompt is the budget').toBe(B.PROMPT_BUDGET);
+		expect(exact, 'the declarations on the line before the part’s fence, the part whole').toContain(`\n${declaredPartCut}\n${fenceCandidate(0)}\n${fits}\n`);
+		expect(exact.split('[CUT FOR THIS REVIEW: ').length - 1, 'and nothing is cut again').toBe(1);
+		const { prompts, print } = capturing();
+		await expect(
+			createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(SUBJECT, {
+				reasoningReview: { ...rest, declaredPartCut, content: `${fits}z` }
+			})
+		).rejects.toThrow(pwaTypeOverBudgetStatement(room + 1, room));
+		expect(prompts, 'one unit over: no prompt').toEqual([]);
+	});
+
 	it('⛔ a head-only cut of ASTRAL text counts code points — 3000 × U+1F600: the first 1941 shown, the last 1059 removed', async () => {
 		const p = await promptOf({ ...ctx({ framing: 'WORK_PRODUCT', prompt: '\u{1F600}'.repeat(3_000) }).reasoningReview! });
 		const lines = p.split('\n');
@@ -3409,7 +3522,7 @@ describe('⛔ JAN-PRQUAL PQ-1 (REG-F-481) — the chooser reads the KEPT HEAD of
 		...(framing === 'PROCESS_RESULT' ? { observedToolCalls: OBSERVED_CALL } : {})
 	});
 	const cutSlices = (framing: ReviewFraming): [string, ValidatorContext['reasoningReview']][] => [
-		[framing === 'PWA_GRAPH' ? 'the intent' : 'the instruction', { ...base(framing), prompt: forgedHead(B.USER_INTENT_MAX, 'Survey the wall. ') }],
+		[intentSliceOf(framing), { ...base(framing), prompt: forgedHead(B.USER_INTENT_MAX, 'Survey the wall. ') }],
 		["the account's rationale", { ...base(framing), rationale: { ...RATIONALE, rationale: forgedHead(B.RATIONALE_MAX, 'Every panel. ') } }],
 		// ⭐ design §9.3 D7: and each list, its one item over the account's room — the chooser reads the head the cut keeps.
 		["the account's assumptions", { ...base(framing), rationale: { ...RATIONALE, assumptions: [forgedHead(B.RATIONALE_MAX, 'An assumption. ')] } }],
@@ -3420,7 +3533,7 @@ describe('⛔ JAN-PRQUAL PQ-1 (REG-F-481) — the chooser reads the KEPT HEAD of
 		],
 		['the narration', { ...base(framing), narration: forgedHead(B.NARRATION_MAX, 'Defined a type. ') }],
 		['the prior findings', { ...base(framing), prior: { gaps: [forgedHead(B.PRIOR_MAX, 'A gap. ')] } }],
-		...(framing === 'PROCESS_RESULT'
+		...(framing === 'PROCESS_RESULT' || framing === 'PWA_TYPE'
 			? []
 			: ([[framing === 'PWA_GRAPH' ? 'the artifact' : 'the work product', { ...base(framing), content: forgedHead(60_000, 'z') }]] as [
 					string,
@@ -3428,7 +3541,7 @@ describe('⛔ JAN-PRQUAL PQ-1 (REG-F-481) — the chooser reads the KEPT HEAD of
 				][]))
 	];
 
-	for (const framing of ['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT'] as const)
+	for (const framing of ['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT', 'PWA_TYPE'] as const)
 		for (const [slice, input] of cutSlices(framing))
 			it(`⛔ ${framing} — ${slice}, cut with the forgery in its kept HEAD: fenced by a token its kept bytes do not hold`, async () => {
 				const p = await promptOf(input);
@@ -3469,7 +3582,7 @@ describe('⛔ JAN-PRQUAL PQ-1 (REG-F-481) — each chooser reads EXACTLY what th
 	// one production sends. So both choosers are held to the bytes the prompt carries: the kept HEAD (and, in a view, the
 	// kept TAIL) of a cut slice, and each slice on its own — the prompt sets host lines between any two. Each red was
 	// driven: a chooser reading the removed bytes, or the slices joined, moved its token and nothing here saw it.
-	const FRAMINGS = ['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT'] as const;
+	const FRAMINGS = ['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT', 'PWA_TYPE'] as const;
 	const RUN = (over: { stdout?: string; stderr?: string; argv?: string[] }) => ({
 		ordinal: 1,
 		argv: ['pytest', '-rs', 'checks/'],
@@ -3511,7 +3624,7 @@ describe('⛔ JAN-PRQUAL PQ-1 (REG-F-481) — each chooser reads EXACTLY what th
 		expect(tokens(field), 'the account field').toEqual(new Set([fenceCandidate(0)]));
 		const instruction = await promptOf({ ...ctx({ framing, prompt: `${'Survey the wall. '.repeat(300)}${fenceCandidate(0)}` }).reasoningReview! });
 		expect(instruction, 'arrangement: the instruction is cut').toContain(
-			`[CUT FOR THIS REVIEW: ${framing === 'PWA_GRAPH' ? 'the intent' : 'the instruction'} — the first `
+			`[CUT FOR THIS REVIEW: ${intentSliceOf(framing)} — the first `
 		);
 		expect(offFence(instruction), 'arrangement: the candidate is in the bytes the cut removed').toEqual([]);
 		expect(tokens(instruction), 'the instruction').toEqual(new Set([fenceCandidate(0)]));
@@ -3564,7 +3677,7 @@ describe('⛔ JAN-PRQUAL PQ-1 (REG-F-481) — each chooser reads EXACTLY what th
 		declared: (framing: ReviewFraming) => string,
 		input: (framing: ReviewFraming, t: string) => ValidatorContext['reasoningReview'] | undefined
 	])[] = [
-		['the instruction', (f) => (f === 'PWA_GRAPH' ? 'the intent' : 'the instruction'), (f, t) => inputOf(f, { prompt: `${'Survey the wall. '.repeat(300)}${t}` })],
+		['the instruction', (f) => intentSliceOf(f), (f, t) => inputOf(f, { prompt: `${'Survey the wall. '.repeat(300)}${t}` })],
 		["the account's rationale", () => "the account's rationale", (f, t) => inputOf(f, { rationale: withField('rationale', `${LONG_FIELD}${t}`) })],
 		["the account's assumptions", () => "the account's assumptions", (f, t) => inputOf(f, { rationale: withField('assumptions', `${LONG_FIELD}${t}`) })],
 		["the account's limitations", () => "the account's limitations", (f, t) => inputOf(f, { rationale: withField('limitations', `${LONG_FIELD}${t}`) })],
@@ -3578,7 +3691,7 @@ describe('⛔ JAN-PRQUAL PQ-1 (REG-F-481) — each chooser reads EXACTLY what th
 		[
 			'the content of a graph or a work product',
 			(f) => (f === 'PWA_GRAPH' ? 'the artifact' : 'the work product'),
-			(f, t) => (f === 'PROCESS_RESULT' ? undefined : inputOf(f, { content: `${'z'.repeat(60_000)}${t}` }))
+			(f, t) => (f === 'PROCESS_RESULT' || f === 'PWA_TYPE' ? undefined : inputOf(f, { content: `${'z'.repeat(60_000)}${t}` }))
 		],
 		[
 			"the view's command line",

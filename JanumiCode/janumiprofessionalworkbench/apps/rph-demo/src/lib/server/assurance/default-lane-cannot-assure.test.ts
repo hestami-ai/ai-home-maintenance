@@ -5,8 +5,8 @@
 // when thirteen e2e specs were accepted red for exactly that reason (`REG-D-067`). The lane now goes green on the
 // declared stand-in: the checker's real judgements plus a remainder each test STIPULATES, recorded as nobody's
 // judgement and disclosed on every surface (`DESIGN-what-the-tests-prove.md` §4). That changes nothing measured here.
-// The checker still judges TWO of the policy's NINE criteria per arm, and DECLARES so; under `R26` the other seven
-// arrive `UNABLE_TO_DETERMINE`, every one mandatory (`severityIfNotMet: 'BLOCKING'`), and `dispositionFromFindings`
+// The checker still judges TWO of the policy's NINE criteria per arm (⭐ ONE on a part, the review in parts' arm), and
+// DECLARES so; under `R26` the others arrive `UNABLE_TO_DETERMINE`, every one mandatory (`severityIfNotMet: 'BLOCKING'`), and `dispositionFromFindings`
 // returns `INCONCLUSIVE` for a PERFECTLY CLEAN subject. It is incapable, and it says so — which is also why each
 // stipulation on the lane is needed at all.
 //
@@ -26,7 +26,8 @@ import {
 	SEEDED_REASONING_REVIEW_CRITERIA,
 	BLOCKING_SEVERITIES
 } from '@janumipwb/rph-assurance';
-import { buildPwaGraphExport, type PwaGraphNode } from '@janumipwb/rph-projections';
+import { buildPwaGraphExport, pwaTypeParts, type PwaGraphNode } from '@janumipwb/rph-projections';
+import { pwaTypeReviewInput } from './review-input.js';
 
 const SUBJECT = { id: 'pwa-1', semanticVersion: 1 };
 
@@ -64,16 +65,31 @@ const OBSERVED: ObservedToolCallReport = {
 	recordedLimit: 32
 };
 
-async function judgeCleanly(framing: 'PWA_GRAPH' | 'WORK_PRODUCT' | 'PROCESS_RESULT') {
-	const content =
-		framing === 'PWA_GRAPH'
-			? JSON.stringify(
-					buildPwaGraphExport(
-						{ id: 'pwa_t', name: 'T', domain: 'software', version: '0.1.0', publicationStatus: 'DRAFT' } as never,
-						[ROOT]
-					)
+/** ⭐ The review in parts, B2 — the lone root's part, as its review input carries it. */
+const ROOT_PART = (): string =>
+	pwaTypeReviewInput({
+		criteria: SEEDED_REASONING_REVIEW_CRITERIA,
+		prompt: 'x',
+		part: pwaTypeParts(
+			buildPwaGraphExport({ id: 'pwa_t', name: 'T', domain: 'software', version: '0.1.0', publicationStatus: 'DRAFT' } as never, [ROOT])
+		)[0]!
+	}).content;
+
+/** The content a clean subject of `framing` is reviewed on. */
+function cleanContent(framing: 'PWA_GRAPH' | 'WORK_PRODUCT' | 'PROCESS_RESULT' | 'PWA_TYPE'): string {
+	if (framing === 'PWA_TYPE') return ROOT_PART();
+	return framing === 'PWA_GRAPH'
+		? JSON.stringify(
+				buildPwaGraphExport(
+					{ id: 'pwa_t', name: 'T', domain: 'software', version: '0.1.0', publicationStatus: 'DRAFT' } as never,
+					[ROOT]
 				)
-			: JSON.stringify({ finding: 'The route is viable.', basis: 'the whole instruction' });
+			)
+		: JSON.stringify({ finding: 'The route is viable.', basis: 'the whole instruction' });
+}
+
+async function judgeCleanly(framing: 'PWA_GRAPH' | 'WORK_PRODUCT' | 'PROCESS_RESULT' | 'PWA_TYPE') {
+	const content = cleanContent(framing);
 	return createMockReasoningReviewValidator().evaluate(SUBJECT as never, {
 		reasoningReview: {
 			content,
@@ -85,7 +101,7 @@ async function judgeCleanly(framing: 'PWA_GRAPH' | 'WORK_PRODUCT' | 'PROCESS_RES
 	} as never);
 }
 
-describe('⛔ the checker control — the structural checker judges two of nine per arm and CANNOT assure the reasoning-review floor alone, and says so (delete when the checker itself is replaced, or judges all nine)', () => {
+describe('⛔ the checker control — the structural checker judges two of nine per arm (one on a part) and CANNOT assure the reasoning-review floor alone, and says so (delete when the checker itself is replaced, or judges all nine)', () => {
 	it('⭐ precondition: EVERY reasoning-review criterion is mandatory, derived from the policy', () => {
 		// ⛔ THIS IS WHAT MAKES THE REST OF THE FILE MEAN ANYTHING, and it is the limb a severity downgrade
 		// attacks. If a criterion's `severityIfNotMet` drops below BLOCKING it stops being mandatory, an
@@ -97,7 +113,8 @@ describe('⛔ the checker control — the structural checker judges two of nine 
 		);
 	});
 
-	for (const framing of ['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT'] as const) {
+	// ⭐ The review in parts, B2 — and the part arm, which judges one of nine: a clean part leaves eight unjudged.
+	for (const framing of ['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT', 'PWA_TYPE'] as const) {
 		it(`⛔ ${framing}: a CLEAN subject still leaves mandatory criteria unjudged, so the floor is INCONCLUSIVE`, async () => {
 			// THE MUTANT THAT KILLS THIS: teach the checker to claim it evaluated all nine — `R26`'s option 3,
 			// which the sponsor did not choose (`REG-F-446`). This file then goes green-by-fabrication, which is why

@@ -321,7 +321,9 @@ describe('⭐⭐ package P F1 (REG-F-503 remedy 1) — buildPwaExport carries a 
 			'purpose',
 			'requiredAssurancePolicyIds',
 			'permittedChildren',
-			'promptTemplate'
+			'promptTemplate',
+			// ⭐ The review in parts, B1 (`REG-D-125`) — then the completion rule every defined type stores, after the four.
+			'completionRule'
 		]);
 		expect(Object.keys(node?.promptTemplate ?? {})).toEqual(['templateText', 'outputContract', 'status', 'templateVersion']);
 	});
@@ -398,5 +400,188 @@ describe('⭐⭐ package P F1 (REG-F-503 remedy 1) — buildPwaExport carries a 
 		// ⭑ CONTROL — the same type, read as stored: each of the three is there.
 		const stored = exported(CHILD_ID);
 		expect(PREDATES.filter((field) => stored !== undefined && field in stored), 'the define path stored all three').toEqual(PREDATES);
+	});
+});
+
+// ⭐⭐ `JAN-EXEC` Phase 7, the review in parts, B1 (`REG-D-125`; DESIGN-authoring-review-in-parts.md D3; `REG-F-503`'s
+// remainder) — THE REST OF WHAT A TYPE DECLARES, AND THE PWA'S DESCRIPTION, CARRIED.
+//
+// Each type of an authored PWA is reviewed as a part, its whole stored definition its subject, and the root's subject the
+// PWA's name, domain and description too. F1's export carried no `completionRule`, no delegated type's `boundaryContract`,
+// no `contextSpecification` and no PWA description, though the stored type and PWA hold them. These hold the live exporter
+// to carrying each as stored, under F1's two rules: a field the stored object does not hold is omitted, and an empty value
+// its author stored is carried as authored.
+describe('⭐⭐ the review in parts, B1 (REG-D-125; design D3) — buildPwaExport carries a type’s completion rule, a delegated type’s boundary contract, its context specification and the PWA’s description', () => {
+	const ROOT_ID = 'put_01ARZ3NDEKTSV4RRFFQ69G5P21';
+	const DELEGATED_ID = 'put_01ARZ3NDEKTSV4RRFFQ69G5P22';
+	let host: EngineHandle;
+	let engine: AuthedEngineHandle;
+	let sequence: number;
+
+	function dispatch(commandType: string, targetAggregateType: string, targetAggregateId: string, payload: unknown) {
+		sequence += 1;
+		const command: DomainCommand = {
+			commandId: `b1-${sequence}`,
+			commandType,
+			commandSchemaVersion: 1,
+			targetAggregateType,
+			targetAggregateId,
+			issuedAt: TS,
+			correlationId: 'b1',
+			idempotencyKey: `b1-idem-${sequence}`,
+			payload
+		};
+		const result = engine.dispatch(command);
+		expect(result.status, `${commandType} ${targetAggregateId}: ${JSON.stringify(result.error)}`).toBe('ACCEPTED');
+	}
+	const define = (id: string, payload: Record<string, unknown>) =>
+		dispatch('DefinePwuType', 'PWU_TYPE', id, { pwuTypeId: id, pwaId: PWA, isRoot: false, ...payload });
+	const exported = (id: string) => buildPwaExport(PWA, engine)?.nodes.find((n) => n.id === id);
+
+	/** `description` is the PWA's, created before each test; `''` is an authored empty description. */
+	function boot(description: string) {
+		sequence = 0;
+		host = createEngine({
+			authenticate: standaloneAuthenticator(),
+			ontology,
+			now: () => TS,
+			newEventId: () => `evt_${++sequence}`
+		});
+		engine = host.as(SESSION_CREDENTIAL);
+		seedAdditivePolicies(engine);
+		dispatch('CreatePwa', 'PROFESSIONAL_WORK_ARCHITECTURE', PWA, {
+			pwaId: PWA,
+			name: 'Export PWA',
+			description,
+			domain: 'software',
+			version: '1.0.0'
+		});
+	}
+
+	const CONTRACT = {
+		counterpartyLabel: 'An independent checking firm',
+		attestedAssurancePolicyIds: ['pol_intent_preservation'],
+		applicabilityNote: 'Applies to every structural check the firm signs.'
+	} as const;
+	const CONTEXT = {
+		requiredElements: ['the approved design', 'the site survey'],
+		constraintDispositions: [{ constraintId: 'CON-1', fate: 'PROPAGATED', rationale: 'The check binds every child.' }]
+	} as const;
+	/** The delegated child, defined first so the root's flat child list names a type that exists. */
+	const defineDelegated = (extra: Record<string, unknown> = {}) =>
+		define(DELEGATED_ID, {
+			pwuKind: 'INDEPENDENT_CHECK',
+			name: 'Independent Check',
+			purpose: 'Check the design independently of the team that made it.',
+			executionBoundary: 'DELEGATED_EXTERNAL',
+			boundaryContract: CONTRACT,
+			...extra
+		});
+	const defineRoot = (extra: Record<string, unknown> = {}) =>
+		define(ROOT_ID, {
+			pwuKind: 'STRUCTURAL_REVIEW',
+			name: 'Review',
+			purpose: 'Review the footbridge design.',
+			isRoot: true,
+			permittedChildTypeIds: [DELEGATED_ID],
+			completionRule: 'The independent check is signed and every finding is closed.',
+			contextSpecification: CONTEXT,
+			...extra
+		});
+
+	it('⭐ RED FIRST — a stored type’s completion rule, a delegated type’s boundary contract, a context specification and the PWA’s description reach the export unchanged', () => {
+		boot('A footbridge whose design is checked by an independent firm.');
+		defineDelegated();
+		defineRoot();
+		const graph = buildPwaExport(PWA, engine);
+		const root = graph?.nodes.find((n) => n.id === ROOT_ID);
+		expect(
+			{ completionRule: root?.completionRule, contextSpecification: root?.contextSpecification },
+			'what the stored root declares'
+		).toEqual({
+			completionRule: 'The independent check is signed and every finding is closed.',
+			contextSpecification: CONTEXT
+		});
+		expect(exported(DELEGATED_ID)?.boundaryContract, 'the delegated type’s contract, whole').toEqual(CONTRACT);
+		// ⭐ A type defined with no completion rule is stored with the command's own default, and carried so.
+		expect(exported(DELEGATED_ID)?.completionRule).toBe('Execution succeeded AND required outputs exist AND assurance satisfied');
+		expect(graph?.pwa.description, 'the PWA’s description').toBe('A footbridge whose design is checked by an independent firm.');
+	});
+
+	it('⭐ the three fields follow the four F1 carried, in this order, and the description follows the PWA’s publication status', () => {
+		boot('Ordered.');
+		defineDelegated({ contextSpecification: CONTEXT });
+		const node = exported(DELEGATED_ID);
+		expect(Object.keys(node ?? {}).slice(-6)).toEqual([
+			'purpose',
+			'requiredAssurancePolicyIds',
+			'permittedChildren',
+			'completionRule',
+			'boundaryContract',
+			'contextSpecification'
+		]);
+		expect(Object.keys(node?.boundaryContract ?? {})).toEqual(['counterpartyLabel', 'attestedAssurancePolicyIds', 'applicabilityNote']);
+		expect(Object.keys(node?.contextSpecification ?? {})).toEqual(['requiredElements', 'constraintDispositions']);
+		expect(Object.keys(node?.contextSpecification?.constraintDispositions[0] ?? {})).toEqual(['constraintId', 'fate', 'rationale']);
+		expect(Object.keys(buildPwaExport(PWA, engine)?.pwa ?? {})).toEqual(['id', 'name', 'domain', 'version', 'publicationStatus', 'description']);
+	});
+
+	it('⭐ AN AUTHORED EMPTY VALUE IS CARRIED AS AUTHORED — an empty completion rule, a contract attesting no policy with an empty note, a context specification with no element and no disposition, an empty description', () => {
+		boot('');
+		defineDelegated({ boundaryContract: { ...CONTRACT, attestedAssurancePolicyIds: [], applicabilityNote: '' } });
+		defineRoot({ completionRule: '', contextSpecification: { requiredElements: [], constraintDispositions: [] } });
+		const root = exported(ROOT_ID);
+		expect([root?.completionRule, root?.contextSpecification], 'the root’s empty values').toEqual(['', { requiredElements: [], constraintDispositions: [] }]);
+		expect(exported(DELEGATED_ID)?.boundaryContract, 'a contract attesting no policy, its note empty').toEqual({
+			counterpartyLabel: CONTRACT.counterpartyLabel,
+			attestedAssurancePolicyIds: [],
+			applicabilityNote: ''
+		});
+		expect(buildPwaExport(PWA, engine)?.pwa.description, 'an empty description').toBe('');
+	});
+
+	it('⛔ ABSENT STAYS ABSENT — an INTERNAL type carries no boundary contract, a type with no context specification carries none, a contract with no note carries none, a disposition with no rationale carries none', () => {
+		boot('Absences.');
+		const { applicabilityNote: _note, ...noNote } = CONTRACT;
+		defineDelegated({ boundaryContract: noNote, contextSpecification: { requiredElements: ['the design'], constraintDispositions: [{ constraintId: 'CON-2', fate: 'RETAINED_AT_PARENT' }] } });
+		defineRoot({ contextSpecification: undefined });
+		const root = exported(ROOT_ID);
+		expect(root, 'arrangement: the root is exported').toBeDefined();
+		expect(root !== undefined && 'boundaryContract' in root, 'an INTERNAL type carries no contract').toBe(false);
+		expect(root !== undefined && 'contextSpecification' in root, 'a type with none carries no context specification').toBe(false);
+		const delegated = exported(DELEGATED_ID);
+		expect(delegated?.boundaryContract, 'a contract with no note').toEqual(noNote);
+		expect(delegated?.contextSpecification?.constraintDispositions, 'a disposition with no rationale').toEqual([
+			{ constraintId: 'CON-2', fate: 'RETAINED_AT_PARENT' }
+		]);
+	});
+
+	it('⛔ ABSENT STAYS ABSENT — a stored type that predates the completion rule carries none, and a PWA whose stored state holds no description carries none', () => {
+		boot('Read through a handle whose stored states lack the fields.');
+		defineDelegated();
+		const predating = new Proxy(engine, {
+			get(target, key, receiver) {
+				if (key === 'loadObject')
+					return (id: string) => {
+						const stored = target.loadObject(id);
+						const state = stored?.state as Record<string, unknown> | undefined;
+						if (!stored || state === undefined) return stored;
+						const older = { ...state };
+						if (state.objectType === 'PWU_TYPE') delete older.completionRule;
+						if (state.objectType === 'PROFESSIONAL_WORK_ARCHITECTURE') delete older.description;
+						return { ...stored, state: older };
+					};
+				const value = Reflect.get(target, key, receiver) as unknown;
+				return typeof value === 'function' ? (value as (...a: unknown[]) => unknown).bind(target) : value;
+			}
+		});
+		const graph = buildPwaExport(PWA, predating);
+		const node = graph?.nodes.find((n) => n.id === DELEGATED_ID);
+		expect(node, 'arrangement: the type is exported').toBeDefined();
+		expect(node !== undefined && 'completionRule' in node, 'a completion rule manufactured for an absence').toBe(false);
+		expect(graph !== undefined && 'description' in graph.pwa, 'a description manufactured for an absence').toBe(false);
+		// ⭑ CONTROL — the same objects, read as stored: each is there.
+		expect(exported(DELEGATED_ID)?.completionRule, 'the define path stored a completion rule').toBeDefined();
+		expect(buildPwaExport(PWA, engine)?.pwa.description, 'and the PWA its description').toBe('Read through a handle whose stored states lack the fields.');
 	});
 });

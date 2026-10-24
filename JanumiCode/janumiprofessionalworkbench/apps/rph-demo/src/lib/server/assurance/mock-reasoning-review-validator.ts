@@ -97,6 +97,8 @@ const RR_COMPLETENESS = 'RR-09-no-completeness-from-existence';
 /** Per ARM, because coverage is a property of the check that ran, not of the fixture as a whole. */
 const GRAPH_ARM_EVALUATES = [RR_COMPLETENESS, RR_PROXY] as const;
 const PROCESS_ARM_EVALUATES = [RR_PROXY, RR_CONTRADICTION] as const;
+/** ⭐ The review in parts, B2 — the part arm's one: whether each output this type produces feeds a consumer. */
+const PART_ARM_EVALUATES = [RR_PROXY] as const;
 
 /**
  * ⭐⭐ THE CRITERIA THIS ARM ACTUALLY EVALUATED AND FOUND CLEAN (`JAN-EXEC` `R26`).
@@ -303,6 +305,61 @@ function judgeProcessResult(
 	};
 }
 
+/** The two lines of a part this arm reads: its subject's type and its context's artifacts (`pwaTypeReviewInput`). */
+interface PartLines {
+	readonly subject?: { readonly type?: { readonly requiredOutputs?: unknown } };
+	readonly context?: { readonly artifacts?: unknown };
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, the review in parts, B2 (`REG-D-125`; DESIGN-authoring-review-in-parts.md D10) — THE OFFLINE ARM FOR
+ * ONE TYPE OF A PWA, READ AS A PART. ⛔ It never hands a part to the whole-graph checker: a part is not a graph export, and
+ * judging one as a graph would misdescribe its subject.
+ *
+ * ⭑ IT JUDGES THE ONE STRUCTURAL FACT A PART HOLDS WHOLE: whether each output this type produces feeds a consumer. The part's
+ * context lists every type of the PWA that consumes each artifact the type produces, so an output no type consumes is the
+ * whole-graph arm's dead end, found on the part of the type that produces it (`RR-04`). ⚠ Well-formedness is the PWA's — a
+ * single root, no cycle, every type reachable — and no one part holds it, so this arm judges no `RR-09`: the whole-PWA
+ * deterministic check judges it. The children's skeleton lines, which a builder may cut, are not read.
+ */
+function judgePwaTypePart(content: string): ReasoningReviewJudgement {
+	const [subjectLine = '', contextLine = ''] = content.split('\n');
+	let subject: PartLines;
+	let context: PartLines;
+	try {
+		subject = JSON.parse(subjectLine) as PartLines;
+		context = JSON.parse(contextLine) as PartLines;
+	} catch (e) {
+		return unreadable(`the part's subject or context line is not parseable as JSON (${e instanceof Error ? e.message : String(e)})`);
+	}
+	const outputs = subject?.subject?.type?.requiredOutputs;
+	const artifacts = context?.context?.artifacts;
+	if (!Array.isArray(outputs) || !Array.isArray(artifacts))
+		return unreadable('the part parsed but carries no subject type with its outputs or no context artifacts, so it is not a part of a PWA');
+	const consumers = new Map(
+		(artifacts as { name?: unknown; consumedBy?: unknown }[]).map((a) => [a?.name, a?.consumedBy] as const)
+	);
+	if (outputs.some((o) => !Array.isArray(consumers.get(o))))
+		return unreadable('the part does not say which types consume each output its subject produces');
+	const deadEnds = outputs.filter((o) => (consumers.get(o) as unknown[]).length === 0);
+	const findings: ReasoningReviewFinding[] =
+		deadEnds.length > 0
+			? [
+					{
+						criterionId: RR_PROXY,
+						failed: true,
+						statement: `${deadEnds.length} output(s) this type produces feed no consumer (dead-end).`,
+						severity: 'MATERIAL'
+					}
+				]
+			: [];
+	// ⭐ ONE OF NINE, DECLARED — the dead-end check (`RR-04`); this arm examines nothing else.
+	return {
+		findings: [...findings, ...alsoEvaluated(PART_ARM_EVALUATES, findings)],
+		recommendation: findings.length > 0 ? 'CONDITIONALLY_SATISFIED' : 'SATISFIED'
+	};
+}
+
 /**
  * ⭐ THE STRUCTURAL CHECKER'S JUDGEMENT, BY THE FRAMING THE CALLER DECLARED (`R14`). Exported so the declared stand-in
  * (`standin-reasoning-review-validator.ts`, `JAN-CRITREAD` J1-2) runs exactly this, unchanged — §4.1 rule 1: the
@@ -317,6 +374,9 @@ export function judgeStructurally(input: ReasoningReviewInput): ReasoningReviewJ
 			return judgeProcessResult(input.content, input.observedToolCalls);
 		case 'PWA_GRAPH':
 			return judge(input.content);
+		case 'PWA_TYPE':
+			// ⭐ The review in parts, B2 — the part-aware arm, never the whole-graph checker over a partial graph.
+			return judgePwaTypePart(input.content);
 		case 'DECLARED_POLICY':
 			// ⭐ `JAN-EXEC` Phase 7 completion E2 (`REG-F-523`; design B1) — THE CHECKER JUDGES NO DECLARED CRITERION. It knows
 			// two structural failure classes of the floor's rubric, and a declared policy's criteria are not among them, so it
