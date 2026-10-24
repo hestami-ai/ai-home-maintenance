@@ -7,6 +7,9 @@
 // with children, the data flow among them and across its subtree's boundary (design D3). A type with children is judged for
 // their composition too (DEC-6), so a composite's part carries what that judgment needs, and its children's own definitions
 // are left to their own parts.
+// ⭐ A2 (2) — AND A COMPOSITE'S CONTEXT NAMES ITS CHILDREN, NEVER ITS GRANDCHILDREN: a type inside its subtree, on an
+// artifact or a flow, is named by the child whose subtree holds it (`peerNames`). Its grandchildren's composition is their
+// parent's part's to judge, and their definitions are in no skeleton it is shown.
 //
 // PURE AND BROWSER-SAFE, like the export it reads, so that one function can give the authoring floor and the reviewer
 // qualification the same parts (design D1); the review input is built from a part by one builder (`apps/rph-demo`
@@ -47,14 +50,17 @@ export interface PwaPartParentRule {
 	readonly applicabilityNote?: string;
 }
 
-/** An artifact the subject consumes or produces, with every type of the PWA that produces and consumes it, by name. */
+/**
+ * An artifact the subject consumes or produces, with every type of the PWA that produces and consumes it, by name.
+ * ⭐ A2 (2) — on a composite's part, a type inside its subtree is named by the child whose subtree holds it, each name once.
+ */
 export interface PwaPartArtifact {
 	readonly name: string;
 	readonly producedBy: readonly string[];
 	readonly consumedBy: readonly string[];
 }
 
-/** One data-flow edge, its producer and consumer by name. */
+/** One data-flow edge, its producer and consumer by name — ⭐ A2 (2) — each as the composite's part names it (`peerNames`). */
 export interface PwaPartFlow {
 	readonly producer: string;
 	readonly consumer: string;
@@ -65,6 +71,8 @@ export interface PwaPartFlow {
  * A composite's data flow: each edge from one child's subtree to another's, and each edge with one end inside its own subtree
  * and the other outside. ⚠ An edge within one child's subtree is that child's own composition's, and an edge between the type
  * itself and its subtree is in its own `artifacts` already, so neither is listed here.
+ * ⭐ A2 (2) — each listed BY CHILD: an end inside its subtree is named by the child whose subtree holds it, an end outside
+ * by its own name, so edges that name the same producer, consumer and artifact are listed once.
  */
 export interface PwaPartDataFlow {
 	readonly amongChildren: readonly PwaPartFlow[];
@@ -182,35 +190,61 @@ function pwaOf(ex: PwaGraphExport): PwaPartPwa {
 	};
 }
 
-/** A composite's data flow over the export's edges, in their order (`PwaPartDataFlow`). */
+/**
+ * ⭐ A2 (2) — HOW A TYPE'S PART NAMES ANOTHER TYPE: the type itself, and any type outside its subtree, by its own name; a type
+ * inside its subtree by each of its children whose subtree holds it, in the order it permits them. So a leaf names every type
+ * as itself, and a composite names its children, never its grandchildren.
+ */
+function peerNames(
+	id: string,
+	kids: readonly string[],
+	children: ReadonlyMap<string, readonly string[]>,
+	nameOf: (id: string) => string
+): (other: string) => string[] {
+	const childTrees = kids.map((c) => ({ name: nameOf(c), tree: subtreeOf(children, c) }));
+	return (other) => {
+		const holders = other === id ? [] : childTrees.filter((c) => c.tree.has(other)).map((c) => c.name);
+		return holders.length > 0 ? holders : [nameOf(other)];
+	};
+}
+
+/** `xs` with each repeat dropped, by its JSON, the first kept where it stood. */
+function once<T>(xs: readonly T[]): T[] {
+	const seen = new Set<string>();
+	return xs.filter((x) => {
+		const key = JSON.stringify(x);
+		if (seen.has(key)) return false;
+		seen.add(key);
+		return true;
+	});
+}
+
+/** A composite's data flow over the export's edges, in their order (`PwaPartDataFlow`), each end named by `peer`. */
 function dataFlowOf(
 	ex: PwaGraphExport,
 	id: string,
 	kids: readonly string[],
 	children: ReadonlyMap<string, readonly string[]>,
-	nameOf: (id: string) => string
+	peer: (other: string) => string[]
 ): PwaPartDataFlow {
 	const subtree = subtreeOf(children, id);
 	const childTrees = kids.map((c) => subtreeOf(children, c));
-	const named = (e: DataFlowEdge): PwaPartFlow => ({
-		producer: nameOf(e.producer),
-		consumer: nameOf(e.consumer),
-		artifact: e.artifact
-	});
+	const named = (e: DataFlowEdge): PwaPartFlow[] =>
+		peer(e.producer).flatMap((producer) => peer(e.consumer).map((consumer) => ({ producer, consumer, artifact: e.artifact })));
 	const amongChildren: PwaPartFlow[] = [];
 	const acrossBoundary: PwaPartFlow[] = [];
 	for (const e of ex.dataFlow) {
 		const inside = [subtree.has(e.producer), subtree.has(e.consumer)];
-		if (inside[0] !== inside[1]) acrossBoundary.push(named(e));
+		if (inside[0] !== inside[1]) acrossBoundary.push(...named(e));
 		else if (
 			inside[0] &&
 			!childTrees.some((t) => t.has(e.producer) && t.has(e.consumer)) &&
 			childTrees.some((t) => t.has(e.producer)) &&
 			childTrees.some((t) => t.has(e.consumer))
 		)
-			amongChildren.push(named(e));
+			amongChildren.push(...named(e));
 	}
-	return { amongChildren, acrossBoundary };
+	return { amongChildren: once(amongChildren), acrossBoundary: once(acrossBoundary) };
 }
 
 /**
@@ -228,6 +262,7 @@ export function pwaTypeParts(ex: PwaGraphExport): PwaTypePart[] {
 	const depth = depthsFromRoots(ex, children);
 	return ex.nodes.map((n) => {
 		const kids = children.get(n.id) ?? [];
+		const peer = peerNames(n.id, kids, children, nameOf);
 		const shared = new Set([...n.requiredInputs, ...n.requiredOutputs]);
 		const parentRules: PwaPartParentRule[] = ex.nodes
 			.filter((p) => (parents.get(n.id) ?? []).includes(p.id))
@@ -248,8 +283,8 @@ export function pwaTypeParts(ex: PwaGraphExport): PwaTypePart[] {
 			parentRules,
 			artifacts: ex.artifacts
 				.filter((a) => shared.has(a.name))
-				.map((a) => ({ name: a.name, producedBy: a.producedBy.map(nameOf), consumedBy: a.consumedBy.map(nameOf) })),
-			...(kids.length > 0 ? { dataFlow: dataFlowOf(ex, n.id, kids, children, nameOf) } : {})
+				.map((a) => ({ name: a.name, producedBy: once(a.producedBy.flatMap(peer)), consumedBy: once(a.consumedBy.flatMap(peer)) })),
+			...(kids.length > 0 ? { dataFlow: dataFlowOf(ex, n.id, kids, children, peer) } : {})
 		};
 		return {
 			typeId: n.id,

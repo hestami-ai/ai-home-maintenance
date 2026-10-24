@@ -344,7 +344,8 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481) — no host text inside quoted mate
 			'[CUT FOR THIS REVIEW: the intent — ',
 			// ⭐ The review in parts, B2 — a part's request, and its children's skeletons, each cut child by child.
 			'[CUT FOR THIS REVIEW: the request — ',
-			'[CUT FOR THIS REVIEW: the skeleton of the child ',
+			// ⭐ A2 (3) — ~~'the skeleton of the child '~~: a child by its ordinal and type id.
+			'[CUT FOR THIS REVIEW: the skeleton of child ',
 			'[CUT FOR THIS REVIEW: the work product — ',
 			'[CUT FOR THIS REVIEW: the narration — ',
 			'[CUT FOR THIS REVIEW: the prior findings — ',

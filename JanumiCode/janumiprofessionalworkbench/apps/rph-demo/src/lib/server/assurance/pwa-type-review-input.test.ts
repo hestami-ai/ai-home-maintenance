@@ -281,9 +281,18 @@ describe('⭐⭐ the review in parts, B1 — the bounds: the whole subject prote
 				expect(whole[i + 3]!.startsWith(shown) && shown.length < whole[i + 3]!.length, `${s.name}: its HEAD, cut`).toBe(true);
 				expect(shown, `${s.name}: its id and name kept`).toContain(`"id":${jsonLine(s.id)},"name":${jsonLine(s.name)}`);
 				const total = codePoints(whole[i + 3]!);
-				return headCutDeclaration(`the skeleton of the child ${jsonLine(s.name)} (${jsonLine(s.id)})`, codePoints(shown), total, total - codePoints(shown));
+				// ⭐ A2 (3) — ~~`the skeleton of the child ${jsonLine(s.name)} (${jsonLine(s.id)})`~~: by its ordinal among the
+				// children and its type id.
+				return headCutDeclaration(
+					`the skeleton of child ${i + 2} of ${part.childSkeletons.length} (type id ${jsonLine(s.id)})`,
+					codePoints(shown),
+					total,
+					total - codePoints(shown)
+				);
 			})
 		);
+		// ⭐ A2 (3) — no authored name is on a host line: each stays on its own fenced skeleton line.
+		for (const s of part.childSkeletons) expect(input.declaredPartCut, `${s.name}: on a declaration`).not.toContain(s.name);
 		expect(input.declaredPartCut!.length + 1 + input.content.length, 'the declarations counted in the part’s room').toBeLessThanOrEqual(budget);
 		// ⭐ And the review is sent: the declarations on host lines before the part's fence, the part as built.
 		const p = await promptFor(input);
@@ -308,18 +317,24 @@ describe('⭐⭐ the review in parts, B1 — the bounds: the whole subject prote
 		expect(await promptFor(input), 'and sent, its subject whole').toContain(subject);
 	});
 
-	it('⛔ the fence is chosen over the cut’s declarations too: a child cut short of its name, its name a fence candidate, takes the next token', async () => {
-		// The child's long id comes before its name, so its share keeps neither its name nor anything after it: its name is
-		// in the prompt only on the declaration's host line.
-		const planted = node({ id: `pwut_${over(3_000, 'X')}`, name: fenceCandidate(0), pwuKind: 'PLANTED', purpose: over(4_000, 'Planted. ') });
+	it('⛔ the fence is chosen over the cut’s declarations too: a child cut short of its id, its id ending in a fence candidate, takes the next token', async () => {
+		// ⭐ A2 (3) — a declaration names a child by its ordinal and its type id, never its authored name, so the plant is in
+		// the id (~~the name~~): its long id is cut from its own line, and the subject is made to permit it under no id of its
+		// own, so the id is in the prompt only on the declaration's host line. ⚠ An export's subject lists every child's id,
+		// so no export arranges that: the fence must not rest on the builder's shape.
+		const planted = node({ id: `pwut_${over(3_000, 'X')}${fenceCandidate(0)}`, name: 'Planted', pwuKind: 'PLANTED', purpose: over(4_000, 'Planted. ') });
 		const others = Array.from({ length: 5 }, (_, i) => node({ id: `pwut_01M6PLANT000000000000000${i}`, name: `Other ${i}`, purpose: over(4_000, 'Other. ') }));
 		const root = node({ id: 'pwut_01M6PLANT00000000000000RT', name: 'Planted Root', isRoot: true, permittedChildTypeIds: [planted.id, ...others.map((o) => o.id)] });
-		const part = pwaTypeParts(buildPwaGraphExport(PWA, [root, planted, ...others]))[0]!;
+		const exported = pwaTypeParts(buildPwaGraphExport(PWA, [root, planted, ...others]))[0]!;
+		const part = {
+			...exported,
+			subject: { ...exported.subject, type: { ...exported.subject.type, permittedChildTypeIds: others.map((o) => o.id) } }
+		};
 		const input = pwaTypeReviewInput({ criteria: CRITERIA, prompt: 'x', part });
 		const kept = input.content.split('\n')[2]!;
-		expect(kept.includes(fenceCandidate(0)), 'arrangement: the planted name is cut from its line').toBe(false);
+		expect(kept.includes(fenceCandidate(0)), 'arrangement: the planted id is cut from its line').toBe(false);
 		expect(input.content.includes(fenceCandidate(0)), 'arrangement: and is in no kept byte of the part').toBe(false);
-		expect(input.declaredPartCut, 'arrangement: it is named in the declarations').toContain(jsonLine(fenceCandidate(0)));
+		expect(input.declaredPartCut, 'arrangement: it is named in the declarations').toContain(jsonLine(planted.id));
 		const p = await promptFor(input);
 		const fences = new Set(p.split('\n').filter((l) => /^<<<UNTRUSTED-\d\d>>>$/.test(l)));
 		expect([...fences], 'the planted candidate is not the fence').not.toContain(fenceCandidate(0));

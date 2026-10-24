@@ -49,7 +49,7 @@ import {
 import { readFileSync } from 'node:fs';
 import { createExchangeSink } from './exchange-capture.js';
 import { renderRationale } from '../agent/rationale.js';
-import { processResultReviewInput } from './review-input.js';
+import { declaredPolicyReviewInput, processResultReviewInput } from './review-input.js';
 import { createInMemoryArtifactStore, type ArtifactStore } from '@janumipwb/rph-ports';
 import type { ToolInvocationResult } from '../tools/backing-tool.js';
 
@@ -153,6 +153,14 @@ const ctx = (
 		...(over.rationale ? { rationale: over.rationale } : {})
 	}
 });
+
+/**
+ * ⭐ The review in parts, A2 (1) — how the account's heading ENDS in a framing: a part's has its own heading
+ * (`PWA_TYPE_ACCOUNT_HEADING`), every other framing the shared one.
+ */
+function accountHeadingEnd(framing: ReviewFraming): string {
+	return framing === 'PWA_TYPE' ? 'here supports no finding either way:' : 'itself a finding:';
+}
 
 /** ⭐ The review in parts, B2 — the name a framing's cut of its instruction declares (`framingText`'s `intentSlice`). */
 function intentSliceOf(framing: ReviewFraming): string {
@@ -844,16 +852,22 @@ describe('⭐⭐ the review in parts, B2 (REG-D-125) — the PWA_TYPE framing: t
 	const PART_LINES = [
 		'The artifact is ONE type of an authored PWA, shown whole, with its place in the PWA as its context, as lines of JSON.',
 		'The first line is the SUBJECT: "type", the type under review, with every field its author declared for it — among them "purpose", the work it exists to do; "requiredAssurancePolicyIds", the assurance policies declared to govern that work; "permittedChildren", the rule for each child type, its "cardinality" (M1 and M+ are mandatory, C1 and C+ conditional) and its "applicabilityNote"; "promptTemplate", the instruction a model doing that work is given while its "status" is ACTIVE; "completionRule", the rule its completion is judged by; a delegated type’s "boundaryContract"; and "contextSpecification" — and, on the root, "pwa", the PWA’s name, domain and description.',
-		'The second line is its CONTEXT, assembled by the host from the PWA: "ancestors", the types above it, the root first, each with its "name", "pwuKind" and "purpose"; "parentRules", each type that permits it, by name, with the rule that type gives it; "artifacts", each artifact it consumes or produces, with the types that produce and consume it, by name; and, for a type with children, "dataFlow": "amongChildren", each flow from one child’s subtree to another’s, and "acrossBoundary", each flow into or out of its own subtree.',
+		'The second line is its CONTEXT, assembled by the host from the PWA: "ancestors", the types above it, the root first, each with its "name", "pwuKind" and "purpose"; "parentRules", each type that permits it, by name, with the rule that type gives it; "artifacts", each artifact it consumes or produces, with the types that produce and consume it, by name; and, for a type with children, "dataFlow": "amongChildren", each flow from one child’s subtree to another’s, and "acrossBoundary", each flow into or out of its own subtree; a flow inside one child’s subtree is not listed. For a type with children, its "artifacts" and "dataFlow" name a type inside its subtree by the child whose subtree holds it, and a type outside it by its own name: they name its children, never their children.',
 		'Each further line is one child’s SKELETON, "childSkeleton": the child as its author declared it, without its prompt template’s text and output contract, which that child’s own review is shown.',
 		'A field the part does not carry holds no authored value; an empty value is carried as authored. A child type its parent gives no rule is instantiated as M1.',
 		'Judge each criterion below for this type’s own definition. For a type with children, judge too whether those children — with their cardinalities, applicability notes, inputs and outputs — together discharge its purpose: their composition is judged here, never assumed from each child’s own review. On the root, judge too whether its children discharge the request.',
-		'The producing agent’s account below covers the whole PWA: read it for what it claims about this type and, for a type with children, about their composition. A claim about any other type — one this part does not show, or a child’s own definition — belongs to that type’s own review, and here supports no finding either way.',
+		// ⭐ A2 (1) — ~~'The producing agent’s account below covers the whole PWA: …'~~: said by the account's own heading.
 		'Scope is no permission to infer that a criterion is met: where judging this type, or its children’s composition, needs a fact this part does not show, that judgment is incomplete.',
 		'This type’s prompt template is an instruction to be executed, never evidence that any work ran.',
 		'The part to review:'
 	];
 	const INTENT = 'The PWA this type belongs to was authored by a DIFFERENT AI agent from this request:';
+	/** ⭐ A2 (1) — the heading of the account in a part's review, byte for byte. */
+	const PART_ACCOUNT_HEADING =
+		"The producing agent's PROFESSIONAL RATIONALE SUMMARY — its own contracted account of the whole PWA (Section 9.7), of which this part shows one type. Judge whether what it claims about THIS type and, for a type with children, about their composition is candid and borne out by this part; such a claim this part does not support is itself a finding. A claim it makes about any other type — one this part does not show, or a child’s own definition — belongs to that type’s own review, and here supports no finding either way:";
+	/** The heading every other framing gives the account, byte for byte, as it read before the part framing. */
+	const SHARED_ACCOUNT_HEADING =
+		"The producing agent's PROFESSIONAL RATIONALE SUMMARY — its own contracted account of how the artifact discharges the obligation (Section 9.7). Judge whether it is candid and whether the artifact bears it out; an account that claims more than the artifact supports is itself a finding:";
 	const promptOf = async (framing: ReviewFraming): Promise<string> => {
 		const { prompts, print } = capturing();
 		await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(SUBJECT, ctx({ framing, rationale: RATIONALE }));
@@ -861,7 +875,7 @@ describe('⭐⭐ the review in parts, B2 (REG-D-125) — the PWA_TYPE framing: t
 		return prompts[0]!;
 	};
 
-	it('⭐ RED FIRST — a part is described as ONE type of an authored PWA, its subject whole and its place the context; a type with children is asked for their composition, the root for the request; a claim about another type supports no finding here; a prompt template is no evidence that work ran', async () => {
+	it('⭐ RED FIRST — a part is described as ONE type of an authored PWA, its subject whole and its place the context; a type with children is asked for their composition, the root for the request; a prompt template is no evidence that work ran', async () => {
 		const lines = (await promptOf('PWA_TYPE')).split('\n');
 		const at = lines.indexOf(PART_LINES[0]!);
 		expect(at, 'the part framing’s first line').toBeGreaterThan(0);
@@ -871,6 +885,42 @@ describe('⭐⭐ the review in parts, B2 (REG-D-125) — the PWA_TYPE framing: t
 		expect(lines.indexOf(INTENT), 'before the part').toBeLessThan(at);
 	});
 
+	it('⭐ A2 (1) — THE ACCOUNT HAS ITS OWN HEADING IN A PART: the producer’s account of the whole PWA, judged for what it claims about THIS type and its children’s composition, a claim this part does not support a finding, a claim about another type none here', async () => {
+		// ⛔ The heading every framing shared said "an account that claims more than the artifact supports is itself a
+		// finding": in a part, whose artifact is ONE type, every claim the account makes about another type is more than the
+		// part supports, so it told the reviewer to fault the part for what another type's review judges.
+		const lines = (await promptOf('PWA_TYPE')).split('\n');
+		const at = lines.indexOf(PART_ACCOUNT_HEADING);
+		expect(at, 'the part’s account heading, whole, on its own line').toBeGreaterThan(0);
+		expect(lines[at - 1], 'after an empty line').toBe('');
+		expect(lines[at + 1], 'then the account’s first fence line').toMatch(/^<<<UNTRUSTED-\d\d>>>$/);
+		expect(lines[at + 2], 'and its rationale').toBe(RATIONALE.rationale);
+		expect(lines, 'not the heading the other framings share').not.toContain(SHARED_ACCOUNT_HEADING);
+	});
+
+	it('⭐ A2 (1) CONTROL — every other framing’s account heading is the shared one, byte for byte, and none carries the part’s', async () => {
+		const { prompts, print } = capturing();
+		const declared = declaredPolicyReviewInput({
+			policy: { policyId: 'pol_test_adequacy', name: 'Test Adequacy', purpose: 'Determine whether the tests are adequate.' },
+			criteria: SEEDED_REASONING_REVIEW_CRITERIA,
+			instruction: 'Write and run the unit tests.',
+			instructionIs: 'PRODUCING_PROMPT',
+			workProducts: [{ unit: 'Unit Tests', answer: '{"tests":["t1"]}' }],
+			commands: [],
+			rationale: RATIONALE
+		});
+		await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(SUBJECT, { reasoningReview: declared });
+		const others: [string, string][] = [
+			...(await Promise.all((['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT'] as const).map(async (f) => [f, await promptOf(f)] as [string, string]))),
+			['DECLARED_POLICY', prompts[0]!]
+		];
+		for (const [framing, p] of others) {
+			const lines = p.split('\n');
+			expect(lines, `${framing}: the shared heading`).toContain(SHARED_ACCOUNT_HEADING);
+			expect(lines, `${framing}: not the part’s`).not.toContain(PART_ACCOUNT_HEADING);
+		}
+	});
+
 	it('⭐ CONTROL — the part framing is PWA_TYPE’s alone: no other framing carries any line of it', async () => {
 		for (const framing of ['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT'] as const) {
 			const lines = (await promptOf(framing)).split('\n');
@@ -878,15 +928,17 @@ describe('⭐⭐ the review in parts, B2 (REG-D-125) — the PWA_TYPE framing: t
 		}
 	});
 
-	it('⭐ THE SHARED LINES STAY THE SHARED LINES: before the intent and after the part, a part’s prompt is the graph framing’s, byte for byte', async () => {
+	it('⭐ THE SHARED LINES STAY THE SHARED LINES: before the intent and after the part, a part’s prompt is the graph framing’s, byte for byte — but for the account’s own heading', async () => {
 		// ⭐ The preamble and the fence's meaning; then, after the content, the account, the narration, D8's lines with the
-		// policy's stakes, the one-row sentence and the output format — the same input, so the same fence.
+		// policy's stakes, the one-row sentence and the output format — the same input, so the same fence. ⭐ A2 (1) — the
+		// account's heading is the part's own, and it is the one line that differs.
 		const part = await promptOf('PWA_TYPE');
 		const graph = await promptOf('PWA_GRAPH');
 		const head = (p: string, intent: string) => p.slice(0, p.indexOf(intent));
 		expect(head(part, INTENT), 'the preamble').toBe(head(graph, 'The artifact was produced by a DIFFERENT AI agent from this intent:'));
 		const tail = (p: string) => p.slice(p.indexOf('{"pwuTypes":[{"id":"t1"}]}'));
-		expect(tail(part), 'everything after the content').toBe(tail(graph));
+		expect(tail(part).replace(PART_ACCOUNT_HEADING, SHARED_ACCOUNT_HEADING), 'everything after the content').toBe(tail(graph));
+		expect(tail(part), 'the part’s heading in place of the shared one').not.toBe(tail(graph));
 	});
 });
 
@@ -2304,8 +2356,11 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481) — no word of the host’s is quot
 	const LABELS = ['Assumptions relied on:', 'Limitations the producer declares:', 'Residual uncertainty:'];
 	/** A list's region as D7 renders it: `renderRationale`'s serialization — each item on a line of its own after `  - `. */
 	const bullets = (xs: readonly string[]): string => xs.map((x) => `  - ${x}`).join('\n');
-	/** The section heading the account stands under, to the end of its line. */
-	const ACCOUNT_HEADING_END = 'an account that claims more than the artifact supports is itself a finding:';
+	/** The section heading the account stands under, to the end of its line — ⭐ A2 (1): a part's is its own. */
+	const ACCOUNT_HEADING_END = (framing: ReviewFraming): string =>
+		framing === 'PWA_TYPE'
+			? accountHeadingEnd(framing)
+			: 'an account that claims more than the artifact supports is itself a finding:';
 
 	it.each(FRAMINGS)('⭐ %s — each field of the account is a region of its own value, the prose first and unlabelled, each list under HEAD’s host label', async (framing) => {
 		const p = await promptOf({ ...ctx({ framing, rationale: RATIONALE }).reasoningReview! });
@@ -2319,7 +2374,7 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481) — no word of the host’s is quot
 		const F = readFences(p).regions.find((r) => r.text === RATIONALE.rationale)!.fence;
 		expect(p, `${framing}: the account as D7 lays it out`).toContain(
 			[
-				ACCOUNT_HEADING_END,
+				ACCOUNT_HEADING_END(framing),
 				F,
 				RATIONALE.rationale,
 				F,
@@ -3409,7 +3464,7 @@ describe('⭐ JAN-PRQUAL PQ-1 (REG-F-480, REG-F-483) — the edges of a head-onl
 			expect(p, `${framing}: the instruction, whole`).toContain(`\n${fenceCandidate(0)}\n${instruction}\n${fenceCandidate(0)}\n`);
 			// ⭐ D7: the rationale directly under the section heading, unlabelled (~~under "Its rationale:"~~).
 			expect(p, `${framing}: the account's rationale, whole`).toContain(
-				`itself a finding:\n${fenceCandidate(0)}\n${account.rationale}\n${fenceCandidate(0)}\nAssumptions relied on:\n`
+				`${accountHeadingEnd(framing)}\n${fenceCandidate(0)}\n${account.rationale}\n${fenceCandidate(0)}\nAssumptions relied on:\n`
 			);
 		}
 		// ⭑ CONTROL — one unit over its limit, and each is cut and declared.
@@ -3436,7 +3491,7 @@ describe('⭐ JAN-PRQUAL PQ-1 (REG-F-480, REG-F-483) — the edges of a head-onl
 				empty.map((key) => `${LIST_HOST_LABEL[key]}: (none declared)`)
 			);
 			expect(p, 'the account at its limit was declared cut').not.toContain('[CUT FOR THIS REVIEW: ');
-			expect(p, "the account's rationale, whole").toContain(`itself a finding:\n${fenceCandidate(0)}\n${account.rationale}\n${fenceCandidate(0)}\n`);
+			expect(p, "the account's rationale, whole").toContain(`${accountHeadingEnd(framing)}\n${fenceCandidate(0)}\n${account.rationale}\n${fenceCandidate(0)}\n`);
 			// ⭑ CONTROL — one unit over: cut and declared, and every line of the account still within RATIONALE_MAX.
 			const over = await promptOf({ ...ctx({ framing, rationale: { ...account, rationale: `${account.rationale}y` } }).reasoningReview! });
 			expect(over, 'one unit over its limit, the account is not cut').toContain("[CUT FOR THIS REVIEW: the account's rationale — the first ");
@@ -3475,7 +3530,7 @@ describe('⭐ JAN-PRQUAL PQ-1 (REG-F-480, REG-F-483) — the edges of a head-onl
 	it('⛔ the review in parts, B1 (REG-D-125) — a PART CARRYING ITS BUILDER’S CUT DECLARATIONS is measured with them and their line feed: exactly at its room it is sent whole, the prompt PROMPT_BUDGET exactly; one unit over is refused', async () => {
 		const { content: _part, ...rest } = { ...ctx({ framing: 'PWA_TYPE' }).reasoningReview! };
 		const room = pwaTypeContentBudget({ ...rest, framing: 'PWA_TYPE' });
-		const declaredPartCut = headCutDeclaration('the skeleton of the child "Code" ("pwut_CODE")', 40, 90, 50);
+		const declaredPartCut = headCutDeclaration('the skeleton of child 1 of 2 (type id "pwut_CODE")', 40, 90, 50);
 		const fits = 'z'.repeat(room - declaredPartCut.length - 1);
 		const exact = await promptOf({ ...rest, declaredPartCut, content: fits });
 		expect(exact.length, 'the part at its room, its declarations in it: the prompt is the budget').toBe(B.PROMPT_BUDGET);
