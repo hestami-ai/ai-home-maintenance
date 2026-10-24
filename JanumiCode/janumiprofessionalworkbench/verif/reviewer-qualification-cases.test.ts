@@ -38,7 +38,7 @@ import {
 	SEEDED_REASONING_REVIEW_CRITERIA,
 	type ReasoningReviewInput
 } from '@janumipwb/rph-assurance';
-import { analyzePwaGraph, buildPwaGraphExport, type PwaGraphNode } from '@janumipwb/rph-projections';
+import { analyzePwaGraph, buildPwaGraphExport, pwaTypeParts, type PwaGraphNode } from '@janumipwb/rph-projections';
 import { createEngine, seedPolicyLibrary } from '@janumipwb/rph-engine';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { DEFAULT_CONTEXT_ASSEMBLY_POLICY, markersIn, prepareModelInvocation } from '@janumipwb/rph-application';
@@ -49,6 +49,7 @@ import { createAgyReasoningReviewValidator } from '../apps/rph-demo/src/lib/serv
 import {
 	graphReviewInput,
 	processResultReviewInput,
+	pwaTypeReviewInput,
 	workProductReviewInput,
 	type ProcessResultReviewSource
 } from '../apps/rph-demo/src/lib/server/assurance/review-input.js';
@@ -62,6 +63,7 @@ import {
 	CASE_SET_V2_FILE,
 	CASE_SET_V3_FILE,
 	CASE_SET_V6_FILE,
+	CASE_SET_V7_FILE,
 	CURRENT_CASE_SET_FILE,
 	CURRENT_ORACLES_FILE,
 	ORACLES_PROPOSED,
@@ -69,12 +71,14 @@ import {
 	ORACLES_V2_FILE,
 	ORACLES_V3_FILE,
 	ORACLES_V6_FILE,
+	ORACLES_V7_FILE,
 	serializeGenerated,
 	type CaseSet,
 	type GraphCase,
 	type OracleSet,
 	type OracleStanding,
 	type ProcessResultCase,
+	type PwaTypeCase,
 	type QualificationCase
 } from '../scripts/reviewer-qual/cases.js';
 import { checkQualification, ORACLES_NOT_CONFERRED, type CheckInputs } from '../scripts/reviewer-qual/check-core.js';
@@ -83,11 +87,15 @@ import { CASE_SET_V2, clayUncertainty, CORRECTED_IN_V2, RENAMES_V2 } from '../sc
 import { CASE_SET_V3, CHANGED_IN_V3, RENAMES_V3 } from '../scripts/reviewer-qual/case-set-v3.js';
 import { CASE_SET_V4, RENAMES_V4 } from '../scripts/reviewer-qual/case-set-v4.js';
 import { CASE_SET_V7 } from '../scripts/reviewer-qual/case-set-v7.js';
+import { CASE_SET_V8, CATCHERS_V8, G8_GRAPHS, partCaseId } from '../scripts/reviewer-qual/case-set-v8.js';
 import { ORACLES_V2 } from '../scripts/reviewer-qual/oracles-v2.js';
 import { ORACLES_V3 } from '../scripts/reviewer-qual/oracles-v3.js';
 import { ORACLES_V4 } from '../scripts/reviewer-qual/oracles-v4.js';
 import { ORACLES_V7 } from '../scripts/reviewer-qual/oracles-v7.js';
+import { ORACLES_V8 } from '../scripts/reviewer-qual/oracles-v8.js';
 import { caseReviewInput } from '../scripts/reviewer-qual/materialize.js';
+import type { CandidateIdentity } from '../scripts/reviewer-qual/record.js';
+import { evaluateCase } from '../scripts/reviewer-qual/runner.js';
 
 const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url));
 const read = (file: string): string => readFileSync(`${REPO_ROOT}${file}`, 'utf8');
@@ -428,14 +436,19 @@ describe('JAN-CRITREAD J2-1 — reviewer-qualification case set v1', () => {
 					: first.arm === 'PROCESS_RESULT'
 						? { ...first, input: { ...first.input, producingPrompt: over, run: { ...first.input.run, stdout: over } } }
 						: // ⭐ `JAN-EXEC` Phase 7 completion E2 — and the declared-policy arm (design B5): its instruction and its work.
-							{
-								...first,
-								input: {
-									...first.input,
-									instruction: over,
-									workProducts: first.input.workProducts.map((w) => ({ ...w, answer: over }))
+							first.arm === 'DECLARED_POLICY'
+							? {
+									...first,
+									input: {
+										...first.input,
+										instruction: over,
+										workProducts: first.input.workProducts.map((w) => ({ ...w, answer: over }))
+									}
 								}
-							};
+							: // ⭐ The review in parts, B7 — a part's content is never cut, only refused, so no part case is the control.
+								(() => {
+									throw new Error(`${first.id}: a ${first.arm} case cannot be the control`);
+								})();
 		const control = (await promptsFor(oversize)).initial;
 		expect(control.split(CUT_DECLARED).length - 1, 'CONTROL: an oversize instruction and content are each declared cut').toBe(2);
 	});
@@ -2255,9 +2268,10 @@ describe('JAN-PRQUAL PQ-2 — reviewer-qualification case set v4: version three,
 //
 // Since F1 the authoring reviewer is shown each type's declared policy ids, purpose, child rules and prompt template
 // (`REG-F-503` remedy 1), and no case of version six carries any of them. Version seven is version six's 54 cases, byte for
-// byte, then six graph cases that do (`case-set-v7.ts`), their oracles the lead's draft, PROPOSED for the sponsor's
-// conferral (`oracles-v7.ts`). Held here over version seven as the generator writes it — and, for its shape, over the
-// COMMITTED current files the runner and the check read (`cases.ts`), which the freshness limb holds equal to it:
+// byte, then six graph cases that do (`case-set-v7.ts`), their oracles the lead's draft, ~~PROPOSED for the sponsor's
+// conferral~~ ⭐ conferred as proposed (`REG-D-124`; `oracles-v7.ts`). Held here over version seven as the generator writes it
+// — and, for its shape, over the COMMITTED ~~current~~ files (⭐ version seven is history since version eight, `cases.ts`),
+// which the freshness limb holds equal to it:
 //   · THE SHAPE — version six first, unchanged; then G7-CLEAN and its five planted twins, in the design's order: 60 cases,
 //     19 of them graph cases;
 //   · THE NEW FIELDS, RETAINED — every type of the six declares MODEL with an ACTIVE prompt and an output contract, a purpose,
@@ -2268,11 +2282,14 @@ describe('JAN-PRQUAL PQ-2 — reviewer-qualification case set v4: version three,
 //     that names no policy, no rule and no prompt's content;
 //   · ONE NAMED PLANT PER PLANTED CASE — each twin is G7-CLEAN with its one named field changed, and nothing else;
 //   · PRODUCTION'S GRAPH, THE 28,000-CHARACTER LIMIT, SEEN WHOLE, THE ORACLES COMPOSE — as every graph case is held;
-//   · CONFERRAL BEFORE THEIR ANSWERS COUNT — the record says the six are PROPOSED, and the check refuses the set on it.
+//   · ~~CONFERRAL BEFORE THEIR ANSWERS COUNT — the record says the six are PROPOSED, and the check refuses the set on it.~~
+//     ⭐ CONFERRED AS PROPOSED (`REG-D-124`) — the record says so, in the sponsor's words, with the standings as the register
+//     records them, and the check finds no CONFERRAL problem in it.
 /** The six graph cases version seven adds, in the design's order — written here. */
 const NEW_V7 = ['G7-CLEAN', 'G7-RR-04', 'G7-RR-02', 'G7-RR-03-CHILD', 'G7-RR-03-PROMPT', 'G7-RR-08'];
-const currentV7 = (): CaseSet => JSON.parse(read(CURRENT_CASE_SET_FILE)) as CaseSet;
-const currentOraclesV7 = (): OracleSet => JSON.parse(read(CURRENT_ORACLES_FILE)) as OracleSet;
+/** ⭐ The review in parts, B7 — ~~the CURRENT files~~ version seven's committed files: version eight is current (`cases.ts`). */
+const currentV7 = (): CaseSet => JSON.parse(read(CASE_SET_V7_FILE)) as CaseSet;
+const currentOraclesV7 = (): OracleSet => JSON.parse(read(ORACLES_V7_FILE)) as OracleSet;
 const generatedV7 = (): CaseSet => JSON.parse(serializeGenerated(CASE_SET_V7)) as CaseSet;
 const generatedOraclesV7 = (): OracleSet => JSON.parse(serializeGenerated(ORACLES_V7)) as OracleSet;
 const committedV6 = (): CaseSet => JSON.parse(read(CASE_SET_V6_FILE)) as CaseSet;
@@ -2312,11 +2329,12 @@ function differingPaths(a: unknown, b: unknown, path: string): string[] {
 }
 
 describe('⭐⭐ package P F3 — reviewer-qualification case set v7: version six, and six graph cases whose types declare their work (REG-D-123 Q25)', () => {
-	it('⭐ THE SHAPE — the current set is version seven: version six’s 54 cases first, byte for byte, then the six graph cases in the design’s order; 60 cases, 19 of them graph cases', () => {
-		expect(currentV7().caseSetVersion, 'the current set is version seven').toBe(7);
+	it('⭐ THE SHAPE — ~~the current set is~~ version seven: version six’s 54 cases first, byte for byte, then the six graph cases in the design’s order; 60 cases, 19 of them graph cases', () => {
+		// ⭐ The review in parts, B7 — version seven is history: the committed version-seven file, not the current one.
+		expect(currentV7().caseSetVersion, 'the committed set is version seven').toBe(7);
 		const v6 = committedV6();
 		for (const [what, now] of [
-			['the committed current set', currentV7()],
+			['the committed version seven', currentV7()],
 			['version seven, as generated', generatedV7()]
 		] as const) {
 			expect(
@@ -2466,7 +2484,7 @@ describe('⭐⭐ package P F3 — reviewer-qualification case set v7: version si
 	});
 
 	it('⭐ THE ORACLES — version six’s carried unchanged, then one per new case: G7-CLEAN SATISFIED faulting nothing, each twin REJECTED faulting its plant’s criterion, every standing the author’s claim', () => {
-		expect([currentOraclesV7().oracleVersion, currentOraclesV7().caseSetVersion], 'the current oracles: seven, of case set seven').toEqual([
+		expect([currentOraclesV7().oracleVersion, currentOraclesV7().caseSetVersion], 'the committed oracles seven, of case set seven').toEqual([
 			7, 7
 		]);
 		const set = generatedOraclesV7();
@@ -2487,9 +2505,19 @@ describe('⭐⭐ package P F3 — reviewer-qualification case set v7: version si
 			if (o.caseId !== 'G7-CLEAN') expect(o.note, `${o.caseId}: its note names its criterion`).toContain(`(${o.faulted[0]!.slice(0, 5)})`);
 	});
 
-	it('⛔ CONFERRAL BEFORE THEIR ANSWERS COUNT — the record says the six are PROPOSED, AWAITING SPONSOR CONFERRAL, after version six’s statement whole; and reviewer:qual:check refuses the set on it', async () => {
+	// ⭐⭐ The review in parts, package D (B8's code record of `REG-D-124`) — ~~⛔ CONFERRAL BEFORE THEIR ANSWERS COUNT — the record
+	// says the six are PROPOSED, AWAITING SPONSOR CONFERRAL … and reviewer:qual:check refuses the set on it~~: the sponsor
+	// conferred the six as proposed (Q27), so the record says so, in the sponsor's words, and the check refuses it no more. The
+	// CONFERRAL limb stays held, by the control below: a statement that reads PROPOSED is refused.
+	it('⭐ CONFERRED AS PROPOSED (REG-D-124) — the record names the six, quotes Q27 and the sponsor’s answer, after version six’s statement whole, and records the standings as the register does: the builder’s proposal, not on the sponsor’s screen; reviewer:qual:check finds no CONFERRAL problem in it', async () => {
 		const { conferral } = generatedOraclesV7();
-		expect(conferral, 'the six are proposed').toContain(`(${NEW_V7.slice(0, -1).join(', ')} and ${NEW_V7.at(-1)}) are ${ORACLES_PROPOSED}`);
+		expect(conferral, 'the six, conferred as proposed').toContain(
+			`(${NEW_V7.slice(0, -1).join(', ')} and ${NEW_V7.at(-1)}) were conferred by the sponsor as proposed (REG-D-124, Q27: asked “Do you confirm these six expected verdicts for the new graph cases, so High's measurement on them counts? (1 clean SATISFIED; 5 planted, each REJECTED for its one named defect.)”, the sponsor chose “Confirm all six (Recommended)”)`
+		);
+		expect(conferral, 'the standings, as the register records them').toContain(
+			'The standings were not on the sponsor’s screen: each, the author’s claim, was the builder’s proposal, and is carried as proposed, beside the graph arm’s precedent, uncontested, for G-RR-01 and G3-RR-02 to G3-RR-09.'
+		);
+		expect(conferral, 'and not the proposal’s word').not.toContain(ORACLES_PROPOSED);
 		expect(conferral.startsWith(`${committedOraclesV6().conferral} `), 'after version six’s statement, whole').toBe(true);
 		const inputs = (statement: string): CheckInputs => ({
 			files: [],
@@ -2514,20 +2542,30 @@ describe('⭐⭐ package P F3 — reviewer-qualification case set v7: version si
 		});
 		const conferralProblems = async (statement: string) =>
 			(await checkQualification(inputs(statement))).problems.filter((p) => p.limb === 'CONFERRAL');
-		expect(await conferralProblems(conferral), 'the check refuses the set').toEqual([{ limb: 'CONFERRAL', message: ORACLES_NOT_CONFERRED }]);
-		// ⭑ CONTROL — version six's statement, conferred: no CONFERRAL problem.
-		expect(await conferralProblems(committedOraclesV6().conferral)).toEqual([]);
+		expect(await conferralProblems(conferral), 'the check finds no CONFERRAL problem in the record').toEqual([]);
+		// ⭑ CONTROL — the same set, its statement reading PROPOSED as it did before Q27's record: refused.
+		expect(await conferralProblems(`${committedOraclesV6().conferral} The six are ${ORACLES_PROPOSED}.`)).toEqual([
+			{ limb: 'CONFERRAL', message: ORACLES_NOT_CONFERRED }
+		]);
 	});
 
-	it('⛔ WHAT THE REFUSAL SAYS IS OWED — it fires on every set with oracles awaiting the sponsor, so it names no one version’s step: it sends the operator to the current oracle file’s conferral statement, which names the six', () => {
+	it('⛔ WHAT THE REFUSAL SAYS IS OWED — it fires on every set with oracles awaiting the sponsor’s record, so it names no one version’s step: it sends the operator to the current oracle file’s conferral statement', () => {
 		// Package P's check (N5): the refusal cited DESIGN-phase-7-completion.md §6 step 2 — the declared cases' conferral,
-		// owed by version five and given (REG-D-113) — while version seven owes the six graph cases' (§4c, F4).
+		// owed by version five and given (REG-D-113) — while version seven owed the six graph cases' (§4c, F4).
 		expect(ORACLES_NOT_CONFERRED, 'it cites no design step, which would name one version’s conferral').not.toMatch(/DESIGN-|§/);
 		expect(ORACLES_NOT_CONFERRED, 'it sends the operator to the current oracle file’s statement').toContain(
 			'the current oracle file’s conferral statement names what is owed'
 		);
-		expect(generatedOraclesV7().conferral, 'which names the six').toContain(
-			`(${NEW_V7.slice(0, -1).join(', ')} and ${NEW_V7.at(-1)}) are ${ORACLES_PROPOSED}`
+		// ~~which names the six~~ — the six are conferred (`REG-D-124`), so version seven's statement names none awaiting.
+	});
+
+	it('⛔ B8 (design §8, the conferral message) — THE REFUSAL SAYS WHAT THE CHECK KNOWS: that the oracle file records oracles PROPOSED, never that the sponsor has not conferred — a conferral can stand in the register while only its code record lags, as REG-D-124’s did until this record', () => {
+		// ⛔ It read "their author proposed them and the sponsor has not conferred them": the check reads the oracle file's
+		// statement, never the register, so it cannot know that — and from REG-D-124's ruling to its record here, it was false.
+		expect(ORACLES_NOT_CONFERRED, 'it claims nothing of the sponsor it cannot read').not.toMatch(/sponsor has not conferred/);
+		expect(ORACLES_NOT_CONFERRED, 'what the check read').toContain(`today’s oracle file records oracles as ${ORACLES_PROPOSED}`);
+		expect(ORACLES_NOT_CONFERRED, 'and the two things that can be owed').toContain(
+			'owed: the sponsor’s conferral, or, where the register already holds it, its record in the current oracle file’s conferral statement'
 		);
 	});
 
@@ -2559,3 +2597,429 @@ describe('⭐⭐ package P F3 — reviewer-qualification case set v7: version si
 		}
 	});
 });
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7, the review in parts, B7 — CASE SET VERSION EIGHT (`REG-D-125`, `REG-D-126`;
+// DESIGN-authoring-review-in-parts.md §5; ROADMAP-undertaking-execution-sandbox.md §9a.8) ─────────────────────────────────
+//
+// The authoring floor's reviewer is to be handed one type of an authored PWA at a time, in the `PWA_TYPE` framing
+// (`pwaTypeParts`, `pwaTypeReviewInput`), never the whole graph (`REG-F-571`). Version eight is version seven's 41 non-graph
+// cases, byte for byte, then 35 part cases in place of its 19 graph cases (`case-set-v8.ts`), their oracles the sponsor's
+// conferral (`REG-D-126` Q30 and Q31; `oracles-v8.ts`). Held here over version eight as the generator writes it — and, for its
+// shape, over the COMMITTED current files the runner and the check read (`cases.ts`):
+//   · MATERIALIZE, THROUGH THE PRODUCT'S BUILDERS — a part case is its source graph's export cut by `pwaTypeParts` and its
+//     part handed to `pwaTypeReviewInput`, and nothing else; a type its graph does not hold is refused;
+//   · THE SHAPE — the current set is version eight: the 41, then the 35, and no graph case; every id safe as a file name and
+//     as a substring filter, none holding another case's;
+//   · THE 35 ARE DESIGN §5'S — the 13 clean parts, the 14 catchers at the parts its table names, G8-CLEAN's seven parts and
+//     G8-RR-02's Verification; each its source's whole input, the type reviewed, its subject that type;
+//   · THE 3-LEVEL PAIR AS DESIGN §5 STATES IT — G8-CLEAN, and G8-RR-02 differing from it by the omission alone (diffed); the
+//     root's part names no grandchild; production's graph;
+//   · THE ORACLES — the 41 carried; the 35 as the sponsor conferred them; the conferral recorded in the sponsor's words;
+//   · THE 28,000-CHARACTER LIMIT, SEEN WHOLE, NO ID READS AS A WORD, THE ORACLES COMPOSE — as every case is held, the last
+//     through the runner's own scoring.
+const committedV7 = (): CaseSet => JSON.parse(read(CASE_SET_V7_FILE)) as CaseSet;
+/** The candidate the runner's scoring is asked of: one no case's producer is. */
+const EVALUATING_CANDIDATE: CandidateIdentity = {
+	transport: 'stub',
+	agentId: EVALUATOR.agentId,
+	provider: EVALUATOR.providerId,
+	modelLabel: EVALUATOR.modelId,
+	servedModelDigest: null,
+	servedTemplateSha256: null,
+	servedModelfileSha256: null,
+	templateInjectsDate: null,
+	serverVersion: null,
+	serverUtcOffset: null,
+	options: {},
+	bounds: { wallClockMs: 240_000, promptChars: null, printTimeout: null },
+	argv: null
+};
+const currentV8 = (): CaseSet => JSON.parse(read(CURRENT_CASE_SET_FILE)) as CaseSet;
+const currentOraclesV8 = (): OracleSet => JSON.parse(read(CURRENT_ORACLES_FILE)) as OracleSet;
+const generatedV8 = (): CaseSet => JSON.parse(serializeGenerated(CASE_SET_V8)) as CaseSet;
+const generatedOraclesV8 = (): OracleSet => JSON.parse(serializeGenerated(ORACLES_V8)) as OracleSet;
+/** Version seven's 41 non-graph cases, as committed. */
+const carriedV7 = (): QualificationCase[] => committedV7().cases.filter((c) => c.arm !== 'PWA_GRAPH');
+/** Version eight's part cases, as generated. */
+const partsV8 = (): PwaTypeCase[] => generatedV8().cases.filter((c): c is PwaTypeCase => c.arm === 'PWA_TYPE');
+const partV8 = (id: string): PwaTypeCase => {
+	const c = partsV8().find((x) => x.id === id);
+	expect(c, `${id} is a part case of version eight`).toBeDefined();
+	return c!;
+};
+/** A graph case of version seven, as committed, or one of the 3-level pair. */
+const sourceV8 = (id: string): GraphCase =>
+	[...committedV7().cases, ...G8_GRAPHS].find((c): c is GraphCase => c.id === id && c.arm === 'PWA_GRAPH')!;
+/** The name of a part case's type, in its source. */
+const typeNameOf = (c: PwaTypeCase): string => c.input.nodes.find((n) => n.id === c.input.typeId)!.name;
+
+/** ⭐ Design §5's table, written here: each catcher's source, the part that sees its plant whole, and the criterion. */
+const DESIGN_CATCHERS: readonly (readonly [source: string, part: string, criterion: string])[] = [
+	['G-RR-01', 'Pedestrian Bridge Concept Study', 'RR-01-no-problem-substitution'],
+	['G3-RR-02', 'Pedestrian Bridge Structural Review', 'RR-02-no-obligation-elision'],
+	['G3-RR-03', 'Load Analysis (static pedestrian load)', 'RR-03-no-unjustified-scope-reduction'],
+	['G3-RR-04', 'Vibration Compliance Statement', 'RR-04-no-proxy-satisfaction'],
+	['G3-RR-05', 'Pedestrian Bridge Structural Review', 'RR-05-no-premature-convergence'],
+	['G3-RR-06', 'Member, Connection and Foundation Design', 'RR-06-sound-inference'],
+	['G3-RR-07', 'Design Self-Check by the Senior Design Engineer', 'RR-07-no-contradiction'],
+	['G3-RR-08', 'Member, Connection and Foundation Design', 'RR-08-evidence-integrity'],
+	['G3-RR-09', 'Pedestrian Bridge Structural Review', 'RR-09-no-completeness-from-existence'],
+	['G7-RR-04', 'Verification', 'RR-04-no-proxy-satisfaction'],
+	['G7-RR-02', 'Implementation', 'RR-02-no-obligation-elision'],
+	['G7-RR-03-CHILD', 'Realization', 'RR-03-no-unjustified-scope-reduction'],
+	['G7-RR-03-PROMPT', 'Implementation', 'RR-03-no-unjustified-scope-reduction'],
+	['G7-RR-08', 'Implementation', 'RR-08-evidence-integrity'],
+	['G8-RR-02', 'Verification', 'RR-02-no-obligation-elision']
+];
+/** ⭐ The 3-level pair's seven types, in G8-CLEAN's order, with each one's kind and parent, written here from design §5. */
+const G8_TYPES: readonly (readonly [name: string, kind: string, parent: string | undefined])[] = [
+	['Realization', 'PRODUCT_REALIZATION', undefined],
+	['Implementation', 'PRODUCT_IMPLEMENTATION', 'Realization'],
+	['Tool Build', 'PRODUCT_IMPLEMENTATION', 'Implementation'],
+	['Unit Tests', 'PRODUCT_IMPLEMENTATION', 'Implementation'],
+	['Verification', 'INTEGRATED_PRODUCT_VALIDATION', 'Realization'],
+	['Verification Preparation', 'INTEGRATED_PRODUCT_VALIDATION', 'Verification'],
+	['End-to-End Verification', 'INTEGRATED_PRODUCT_VALIDATION', 'Verification']
+];
+
+describe('⭐⭐ the review in parts, B7 — reviewer-qualification case set v8: version seven’s 41 non-graph cases, and 35 PWA_TYPE part cases (REG-D-125, REG-D-126)', () => {
+	it('⭐ RED FIRST — MATERIALIZE, THROUGH THE PRODUCT’S BUILDERS: a part case is its source graph’s export cut by pwaTypeParts and handed to pwaTypeReviewInput, and nothing else, for every part case of the set', () => {
+		const criteria = SEEDED_REASONING_REVIEW_CRITERIA;
+		expect(partsV8(), 'the arrangement: the 35').toHaveLength(35);
+		for (const c of partsV8()) {
+			const { pwa, nodes, typeId, ...rest } = c.input;
+			const part = pwaTypeParts(buildPwaGraphExport(pwa, nodes)).find((p) => p.typeId === typeId);
+			expect(part, `${c.id}: its type has a part`).toBeDefined();
+			const expected = pwaTypeReviewInput({ criteria, part: part!, ...rest });
+			expect(expected.framing, `${c.id}: the builder frames it so`).toBe('PWA_TYPE');
+			expect(caseReviewInput(c, criteria), c.id).toEqual(expected);
+		}
+	});
+
+	it('⭐ CONTROL — a part case is not its source graph, and a type its graph does not hold is refused, never reviewed as another part', () => {
+		const c = partV8('G7-CLEAN.T01');
+		const { pwa, nodes, typeId: _typeId, ...rest } = c.input;
+		const asGraph = graphReviewInput({ criteria: SEEDED_REASONING_REVIEW_CRITERIA, graph: buildPwaGraphExport(pwa, nodes), ...rest });
+		const asPart = caseReviewInput(c, SEEDED_REASONING_REVIEW_CRITERIA);
+		expect([asGraph.framing, asPart.framing]).toEqual(['PWA_GRAPH', 'PWA_TYPE']);
+		expect(asPart.content).not.toBe(asGraph.content);
+		const stray: PwaTypeCase = { ...c, input: { ...c.input, typeId: 'pwut_01M5MJ000000000000000000' } };
+		expect(() => caseReviewInput(stray, SEEDED_REASONING_REVIEW_CRITERIA)).toThrow(
+			'G7-CLEAN.T01: a part case names the type pwut_01M5MJ000000000000000000, which its graph does not hold'
+		);
+	});
+
+	it('⭐ THE SHAPE — the current set is version eight: version seven’s 41 non-graph cases first, byte for byte, then the 35 part cases; 76 cases, none a graph case', () => {
+		expect(currentV8().caseSetVersion, 'the current set is version eight').toBe(8);
+		for (const [what, now] of [
+			['the committed current set', currentV8()],
+			['version eight, as generated', generatedV8()]
+		] as const) {
+			expect(now.cases.slice(0, 41).map((c) => JSON.stringify(c)), `${what}: version seven’s 41, byte for byte`).toEqual(
+				carriedV7().map((c) => JSON.stringify(c))
+			);
+			expect(now.cases.slice(41).map((c) => c.arm), `${what}: then the 35, each a part case`).toEqual(Array(35).fill('PWA_TYPE'));
+			expect(
+				[now.cases.length, now.cases.filter((c) => c.arm === 'PWA_GRAPH').length],
+				`${what}: cases, and no graph case`
+			).toEqual([76, 0]);
+		}
+	});
+
+	it('⛔ EVERY ID IS SAFE as a file name and as a substring filter: a part case’s is its source’s, a full stop, and its type’s position; none holds another case’s id', () => {
+		const ids = generatedV8().cases.map((c) => c.id);
+		expect(new Set(ids).size, 'unique').toBe(ids.length);
+		for (const c of partsV8()) {
+			expect(c.id, `${c.id}: safe as a file name`).toMatch(/^[A-Za-z0-9-]+\.T\d\d$/);
+			const at = c.input.nodes.findIndex((n) => n.id === c.input.typeId);
+			expect(c.id, `${c.id}: its source’s id and its type’s position`).toBe(`${c.sourceCaseId}.T${String(at + 1).padStart(2, '0')}`);
+			expect(partCaseId(sourceV8(c.sourceCaseId), c.input.typeId), `${c.id}: as partCaseId derives it`).toBe(c.id);
+			for (const other of ids) if (other !== c.id) expect(c.id.includes(other) || other.includes(c.id), `${c.id} and ${other}`).toBe(false);
+		}
+	});
+
+	it('⭐ THE 35 ARE DESIGN §5’S — the 13 clean parts (G3-CLEAN’s seven, the roots of G3-CLEAN-R1 to -R3, G7-CLEAN’s three), the 14 catchers at the parts its table names, G8-CLEAN’s seven and G8-RR-02’s Verification; each its source’s whole input and the type reviewed, its subject that type', () => {
+		const rootOf = (id: string) => sourceV8(id).input.nodes.find((n) => n.isRoot)!.name;
+		const expected = [
+			...sourceV8('G3-CLEAN').input.nodes.map((n) => ['G3-CLEAN', n.name]),
+			...['G3-CLEAN-R1', 'G3-CLEAN-R2', 'G3-CLEAN-R3'].map((id) => [id, rootOf(id)]),
+			...DESIGN_CATCHERS.slice(0, 9).map(([source, part]) => [source, part]),
+			...sourceV8('G7-CLEAN').input.nodes.map((n) => ['G7-CLEAN', n.name]),
+			...DESIGN_CATCHERS.slice(9, 14).map(([source, part]) => [source, part]),
+			...G8_TYPES.map(([name]) => ['G8-CLEAN', name]),
+			['G8-RR-02', 'Verification']
+		];
+		expect(partsV8().map((c) => [c.sourceCaseId, typeNameOf(c)])).toEqual(expected);
+		expect(
+			CATCHERS_V8.map((r) => [r.source, r.part, r.criterion]),
+			'the source’s catcher table is design §5’s, and Q31’s row'
+		).toEqual(DESIGN_CATCHERS);
+		for (const c of partsV8()) {
+			const source = sourceV8(c.sourceCaseId);
+			expect(JSON.stringify(c.input), `${c.id}: its source’s whole input, then nothing but its type`).toBe(
+				JSON.stringify({ typeId: c.input.typeId, ...source.input })
+			);
+			expect(
+				[c.subject.objectType, c.subject.subjectId, c.subject.semanticVersion, c.subject.isAiProduced, c.subject.producer],
+				`${c.id}: its subject is its type, by its source’s producer (REG-D-072 D13)`
+			).toEqual(['PWU_TYPE', c.input.typeId, 1, true, source.subject.producer]);
+			expect(c.subject.producer?.modelId, c.id).toBe(CASE_PRODUCER_MODEL_ID);
+		}
+	});
+
+	it('⭐ G8-CLEAN, AS DESIGN §5 STATES IT — seven INTERNAL MODEL types in three levels, each with an ACTIVE prompt from the one marker and an output contract, the catalog’s policies for its kind, six M1 child rules, the build wired into the unit tests and the verification, the preparation into the end-to-end run, the leaves’ results into their phases’ reports and the reports into Realization; G7’s request; an account that names no grandchild, no count, no policy, rule or prompt', () => {
+		const clean = sourceV8('G8-CLEAN');
+		const byName = new Map(clean.input.nodes.map((n) => [n.name, n]));
+		expect(clean.input.nodes.map((n) => [n.name, n.pwuKind]), 'the seven, in order, each its kind').toEqual(G8_TYPES.map(([name, kind]) => [name, kind]));
+		for (const [name, , parent] of G8_TYPES) {
+			const n = byName.get(name)!;
+			expect(n.isRoot, `${name}: the root is Realization alone`).toBe(parent === undefined);
+			const parents = clean.input.nodes.filter((p) => p.permittedChildTypeIds.includes(n.id)).map((p) => p.name);
+			expect(parents, `${name}: its parent`).toEqual(parent === undefined ? [] : [parent]);
+			expect([n.executionBoundary, n.workDischarge, n.promptStatus, n.promptTemplate?.status], name).toEqual(['INTERNAL', 'MODEL', 'ACTIVE', 'ACTIVE']);
+			expect(n.promptTemplate?.outputContract, `${name}: an output contract`).toMatch(/^One JSON object: /);
+			expect(markersIn(n.promptTemplate!.templateText), `${name}: the one marker a work unit supplies`).toEqual(['title']);
+			expect(n.promptTemplate!.templateText, `${name}: invented results forbidden`).toMatch(/never invent|report no test or run result that is not in them|claim no run of the tool/);
+			expect(
+				n.requiredAssurancePolicyIds,
+				`${name}: the catalog’s policies for its kind, in the catalog’s order`
+			).toEqual(ontology.seedPolicies.filter((p) => (p.appliesToPwuKinds as readonly string[]).includes(n.pwuKind)).map((p) => p.policyId));
+		}
+		const rules = clean.input.nodes.flatMap((n) => (n.permittedChildren ?? []).map((r) => [n.name, byNameOf(clean, r.typeId), r.cardinality]));
+		expect(rules, 'six child rules, each M1').toEqual([
+			['Realization', 'Implementation', 'M1'],
+			['Realization', 'Verification', 'M1'],
+			['Implementation', 'Tool Build', 'M1'],
+			['Implementation', 'Unit Tests', 'M1'],
+			['Verification', 'Verification Preparation', 'M1'],
+			['Verification', 'End-to-End Verification', 'M1']
+		]);
+		const flows = buildPwaGraphExport(clean.input.pwa, clean.input.nodes).dataFlow.map((e) => [byNameOf(clean, e.producer), byNameOf(clean, e.consumer), e.artifact]);
+		for (const flow of [
+			['Tool Build', 'Unit Tests', 'wordfreq-build'],
+			['Tool Build', 'End-to-End Verification', 'wordfreq-build'],
+			['Verification Preparation', 'End-to-End Verification', 'verification-cases'],
+			['Tool Build', 'Implementation', 'wordfreq-build'],
+			['Unit Tests', 'Implementation', 'unit-test-report'],
+			['Verification Preparation', 'Verification', 'verification-cases'],
+			['End-to-End Verification', 'Verification', 'end-to-end-runs'],
+			['Implementation', 'Realization', 'implementation-report'],
+			['Verification', 'Realization', 'verification-report']
+		])
+			expect(flows, `the wiring: ${flow.join(' → ')}`).toContainEqual(flow);
+		expect(clean.input.prompt, 'G7’s request, word for word').toBe(sourceV8('G7-CLEAN').input.prompt);
+		expect(JSON.stringify(clean.input.rationale), 'the account names no grandchild, no count, no policy, rule or prompt').not.toMatch(
+			/Tool Build|Unit Tests|Verification Preparation|End-to-End|\bseven\b|\bsix\b|\b[67]\b|pol_|Adequacy|Fitness|Preservation|Disclosure|\bM1\b|\bC1\b|mandatory|conditional|failure path/
+		);
+		expect(clean.input.rationale?.rationale).toContain('Each type declares MODEL and carries an ACTIVE prompt with an output contract.');
+	});
+
+	it('⭐ G8-RR-02 DIFFERS FROM G8-CLEAN BY THE OMISSION ALONE (diffed): End-to-End Verification gone, and Verification’s rule for it and its report’s input from it — Verification’s purpose, prompt and output contract unchanged, the account silent', () => {
+		const clean = sourceV8('G8-CLEAN');
+		const twin = sourceV8('G8-RR-02');
+		const e2e = clean.input.nodes.find((n) => n.name === 'End-to-End Verification')!;
+		expect(twin.input.nodes.map((n) => n.name), 'the twin’s types: G8-CLEAN’s, End-to-End Verification omitted').toEqual(
+			clean.input.nodes.filter((n) => n.id !== e2e.id).map((n) => n.name)
+		);
+		const withoutTheType = { ...clean, id: twin.id, input: { ...clean.input, nodes: clean.input.nodes.filter((n) => n.id !== e2e.id) } };
+		expect(differingPaths(withoutTheType, twin, ''), 'what else it changes: Verification’s references to the omitted type, and nothing else').toEqual([
+			'input.nodes.4.permittedChildTypeIds',
+			'input.nodes.4.requiredInputs',
+			'input.nodes.4.permittedChildren'
+		]);
+		const verify = (c: GraphCase) => c.input.nodes.find((n) => n.name === 'Verification')!;
+		expect(verify(clean).permittedChildTypeIds.filter((id) => id !== e2e.id), 'its children, the omitted one gone').toEqual(verify(twin).permittedChildTypeIds);
+		expect(verify(clean).permittedChildren!.filter((r) => r.typeId !== e2e.id), 'its rules, the omitted one’s gone').toEqual(verify(twin).permittedChildren);
+		expect(verify(clean).requiredInputs.filter((a) => a !== 'end-to-end-runs'), 'its inputs, the omitted one’s output gone').toEqual(verify(twin).requiredInputs);
+		expect([verify(twin).purpose, verify(twin).promptTemplate], 'its purpose, prompt and output contract, unchanged').toEqual([verify(clean).purpose, verify(clean).promptTemplate]);
+		expect(verify(twin).purpose, 'a purpose that still requires the end-to-end run').toMatch(/end to end/);
+		expect([twin.input.rationale, twin.input.narration, twin.input.prompt], 'the account, the narration and the request, unchanged').toEqual([
+			clean.input.rationale,
+			clean.input.narration,
+			clean.input.prompt
+		]);
+	});
+
+	it('⛔ THE ROOT’S PART NAMES NO GRANDCHILD — in G8-CLEAN and in G8-RR-02, the root is shown its children’s skeletons, and no grandchild’s name or purpose; only Verification’s part of the twin sees its purpose beside its incomplete child set', () => {
+		const grandchildren = G8_TYPES.filter(([, , parent]) => parent !== undefined && parent !== 'Realization').map(([name]) => name);
+		for (const id of ['G8-CLEAN', 'G8-RR-02']) {
+			const source = sourceV8(id);
+			const root = source.input.nodes.find((n) => n.isRoot)!;
+			const content = caseReviewInput(partOfSource(source, root.id), SEEDED_REASONING_REVIEW_CRITERIA).content;
+			for (const name of grandchildren) expect(content.includes(name), `${id}’s root part: ${name}`).toBe(false);
+			for (const n of source.input.nodes.filter((x) => grandchildren.includes(x.name)))
+				expect(content.includes(n.purpose!), `${id}’s root part: ${n.name}’s purpose`).toBe(false);
+		}
+		const twinVerification = caseReviewInput(partV8('G8-RR-02.T05'), SEEDED_REASONING_REVIEW_CRITERIA).content.split('\n');
+		expect(twinVerification, 'Verification’s part of the twin: its subject, its context and one child’s skeleton').toHaveLength(3);
+		expect(twinVerification[2], 'its one child, the preparation').toContain('"name":"Verification Preparation"');
+		expect(twinVerification[0], 'its purpose, requiring the end-to-end run').toContain('Verify the built wordfreq end to end');
+	});
+
+	it('⭐ PRODUCTION’S GRAPH — each of the 3-level pair, valid and coherent, defined in an engine by an author’s commands, its policies the catalog’s, exports exactly its literal nodes', () => {
+		expect(G8_GRAPHS.map((c) => c.id)).toEqual(['G8-CLEAN', 'G8-RR-02']);
+		for (const c of G8_GRAPHS) expectProductionsGraph(c);
+	});
+
+	it('⛔ THE 28,000-CHARACTER LIMIT, AND SEEN WHOLE — every prompt of the 35 fits agy’s argv budget, and no slice of any is cut', async () => {
+		expect(partsV8(), 'the arrangement: the 35').toHaveLength(35);
+		expect((await promptProblemsIn(partsV8())).join('\n')).toBe('');
+	});
+
+	it('⛔ NO ID READS AS A WORD — the 3-level pair carries one PWA and seven types, each a production-shaped ULID with no run of three letters', () => {
+		const ids = new Set<string>();
+		for (const c of G8_GRAPHS) for (const m of JSON.stringify(c).matchAll(/\b(?:pwa|pwut|art|evd)_[0-9A-Z]+\b/g)) ids.add(m[0]);
+		const readable = [...ids].filter(
+			(x) => !/^[a-z]+_[0-7][0-9A-HJKMNP-TV-Z]{25}$/.test(x) || /[A-HJKMNP-TV-Z]{3}/.test(x.slice(x.indexOf('_') + 1))
+		);
+		expect(readable.join(', '), 'ids that are not a ULID, or that a reviewer could read').toBe('');
+		expect([...ids].map((x) => x.slice(0, x.indexOf('_'))).sort(), 'one PWA, seven types').toEqual(['pwa', ...Array(7).fill('pwut')]);
+	});
+
+	it('⭐ THE ORACLES — version seven’s for the 41, carried unchanged; then one per part case: each clean part SATISFIED faulting nothing, each catcher REJECTED faulting its criterion; every standing the author’s claim', () => {
+		expect([currentOraclesV8().oracleVersion, currentOraclesV8().caseSetVersion], 'the current oracles: eight, of case set eight').toEqual([8, 8]);
+		const set = generatedOraclesV8();
+		expect([set.oracleVersion, set.caseSetVersion]).toEqual([8, 8]);
+		expect(set.oracles.map((o) => o.caseId), 'one per case, in the set’s order').toEqual(generatedV8().cases.map((c) => c.id));
+		const v7 = new Map((JSON.parse(read(ORACLES_V7_FILE)) as OracleSet).oracles.map((o) => [o.caseId, o]));
+		expect(set.oracles.slice(0, 41), 'version seven’s for the 41, unchanged').toEqual(carriedV7().map((c) => v7.get(c.id)));
+		const catchers = new Map(DESIGN_CATCHERS.map(([source, part, criterion]) => [`${source}/${part}`, criterion]));
+		expect(
+			set.oracles.slice(41).map((o) => [o.caseId, o.disposition, o.faulted, o.expectation]),
+			'the 35, as the sponsor conferred them'
+		).toEqual(
+			partsV8().map((c) => {
+				const criterion = catchers.get(`${c.sourceCaseId}/${typeNameOf(c)}`);
+				return criterion === undefined || c.sourceCaseId.includes('CLEAN')
+					? [c.id, 'SATISFIED', [], "the author's claim"]
+					: [c.id, 'REJECTED', [criterion], "the author's claim"];
+			})
+		);
+		for (const o of set.oracles.slice(41)) {
+			const source = o.caseId.slice(0, o.caseId.lastIndexOf('.'));
+			expect(o.note, `${o.caseId}: its note names its source`).toContain(source);
+			if (o.disposition === 'REJECTED') expect(o.note, `${o.caseId}: its note names its criterion`).toContain(`(${o.faulted[0]!.slice(0, 5)})`);
+		}
+		// ⭐ The clean parts carry their source oracles' standing.
+		for (const c of partsV8().filter((x) => x.sourceCaseId.includes('CLEAN') && !x.sourceCaseId.startsWith('G8')))
+			expect(set.oracles.find((o) => o.caseId === c.id)!.expectation, c.id).toBe(v7.get(c.sourceCaseId)!.expectation);
+	});
+
+	it('⭐ B7’s check (the second MINOR finding) — EACH NOTE SAYS WHERE ITS VERDICT AND ITS STANDING COME FROM: G8-CLEAN, which has no oracle, gives its parts none to carry — Q31 conferred them directly — and the pair’s standings, which no screen showed, are the builder’s proposal, carried as proposed (REG-D-124’s form); the 14 catchers’ alone are the lead’s designation; no note holds a doubled comma', () => {
+		// ⭐ THE ARRANGEMENT: G8-CLEAN and G8-RR-02 are no case of version eight, and no oracle of version seven or eight is theirs.
+		const sets = [JSON.parse(read(ORACLES_V7_FILE)) as OracleSet, generatedOraclesV8()];
+		expect(sets.flatMap((s) => s.oracles.filter((o) => o.caseId === 'G8-CLEAN' || o.caseId === 'G8-RR-02')), 'no oracle of the pair itself').toEqual([]);
+		expect(generatedV8().cases.filter((c) => c.id === 'G8-CLEAN' || c.id === 'G8-RR-02'), 'nor any case').toEqual([]);
+		const notes = new Map(generatedOraclesV8().oracles.map((o) => [o.caseId, o.note]));
+		const g8Clean = partsV8().filter((c) => c.sourceCaseId === 'G8-CLEAN').map((c) => c.id);
+		expect(g8Clean, 'arrangement: G8-CLEAN’s seven parts').toHaveLength(7);
+		for (const id of g8Clean) {
+			const note = notes.get(id)!;
+			expect(note, `${id}: no source oracle to carry`).not.toMatch(/whose oracle is|source oracle/);
+			expect(note, `${id}: conferred directly`).toContain('conferred directly by REG-D-126 Q31');
+			expect(note, `${id}: its standing the builder’s proposal`).toContain('is the builder’s proposal: Q31’s screen showed no standing, so it is carried as proposed');
+		}
+		const twin = notes.get('G8-RR-02.T05')!;
+		expect(twin, 'G8-RR-02’s catcher: its standing the builder’s proposal').toContain('is the builder’s proposal: Q31’s screen showed no standing, so it is carried as proposed');
+		expect(twin, 'never the lead’s designation').not.toContain('designation');
+		expect(twin, 'nor a row of design §5’s table').not.toContain('table');
+		// ⭑ CONTROL — the 14 catchers’ standing IS the lead’s designation, and the 13 clean parts carry their source oracles’.
+		const q30Catchers = DESIGN_CATCHERS.filter(([source]) => !source.startsWith('G8'));
+		expect(q30Catchers, 'arrangement: the 14 of Q30’s table').toHaveLength(14);
+		for (const [source, part] of q30Catchers) {
+			const c = partsV8().find((x) => x.sourceCaseId === source && typeNameOf(x) === part)!;
+			expect(notes.get(c.id), `${c.id}: the lead’s designation`).toContain('Its standing, the author’s claim, is the lead’s designation.');
+		}
+		for (const c of partsV8().filter((x) => x.sourceCaseId.includes('CLEAN') && !x.sourceCaseId.startsWith('G8')))
+			expect(notes.get(c.id), `${c.id}: its source oracle’s standing`).toContain('The source oracle’s standing, the author’s claim, is carried.');
+		expect([...notes].filter(([, n]) => /,\s*,/.test(n)).map(([id]) => id), 'notes with a doubled comma').toEqual([]);
+		const { conferral } = generatedOraclesV8();
+		expect(conferral, 'the catchers’ standing').toContain('Each of the 14 catchers’ standing, the author’s claim, is the lead’s designation.');
+		expect(conferral, 'the pair’s').toContain(
+			'The 3-level pair’s standings were not on the sponsor’s screen: Q31 showed none, and each of its eight, the author’s claim, is the builder’s proposal, carried as proposed, as REG-D-124’s record carries the six graph oracles’.'
+		);
+		expect(conferral, 'not the lead’s designation for the pair').not.toContain('each of the pair’s, is the author’s claim, the lead’s designation');
+	});
+
+	it('⭐ CONFERRED (REG-D-126 Q30, Q31) — the record quotes both questions and the sponsor’s answers, carries the 41’s conferral whole and no proposal’s word; reviewer:qual:check finds no CONFERRAL problem in it', async () => {
+		const { conferral } = generatedOraclesV8();
+		expect(conferral, 'the 41’s conferral, carried whole').toContain(`carried with every standing unchanged: ${committedOraclesV6().conferral} `);
+		expect(conferral, 'Q30, quoted').toContain(
+			'asked “Do you confer the 27 expected answers for the parts qualification: the 13 clean parts SATISFIED (carried from the clean PWAs you already conferred) and the 14 planted cases in the table, each REJECTED on its criterion at the part named?”, the sponsor chose “Confer all 27 (Recommended)”'
+		);
+		expect(conferral, 'Q31, quoted').toContain(
+			"asked “No qualification case has a type with children below the root, but 4 of the 5 such types in run-11's PWA are exactly that (its phases). Add one 3-level case pair?”, the sponsor chose “Add the 3-level pair (Recommended)”, whose text read “One clean 3-level PWA, every part expected SATISFIED, and a twin in which one middle phase's children leave out work that phase's own purpose requires, expected REJECTED on RR-02 at that phase's review. Choosing this confirms those expected verdicts. About 14 more calls (qualification about 70).”"
+		);
+		expect(conferral, 'G7-RR-03-CHILD caught at the root').toContain('G7-RR-03-CHILD’s at the root, Realization');
+		expect(conferral, 'and no proposal’s word').not.toContain(ORACLES_PROPOSED);
+		expect(conferral.includes(ORACLES_V7.conferral), 'version seven’s graph-case statement is not carried: its six are no case of version eight').toBe(false);
+		const problems = await checkQualification({
+			files: [],
+			current: {
+				reviewer: '0'.repeat(64),
+				scoring: '1'.repeat(64),
+				caseSet: '2'.repeat(64),
+				components: { probes: '3'.repeat(64), budget: '4'.repeat(64), criteria: '5'.repeat(64), scoring: '1'.repeat(64) },
+				casePrompts: new Map()
+			},
+			cases: generatedV8().cases,
+			oracles: generatedOraclesV8().oracles,
+			conferral,
+			oracleSets: [],
+			findings: new Set(),
+			struck: new Set(),
+			rulings: new Set(),
+			struckRulings: new Set(),
+			rescore: async () => {
+				throw new Error('an empty record re-scores nothing');
+			}
+		});
+		expect(problems.problems.filter((p) => p.limb === 'CONFERRAL'), 'no CONFERRAL problem').toEqual([]);
+	});
+
+	it('⭐ THE ORACLES COMPOSE, THROUGH THE RUNNER’S OWN SCORING — for every part case, a reply faulting exactly its oracle’s criteria is scored by evaluateCase to its oracle’s disposition, its own Reasoning Review disposition, with independence met; ⭑ CONTROL: a clean reply on a catcher scores SATISFIED', async () => {
+		const oracles = new Map(generatedOraclesV8().oracles.map((o) => [o.caseId, o]));
+		const replyFaulting = (faulted: readonly string[], recommendation: string): string =>
+			JSON.stringify({
+				findings: SEEDED_REASONING_REVIEW_CRITERIA.map((k) => ({
+					criterionId: k.id,
+					failed: faulted.includes(k.id),
+					statement: 'as the oracle expects',
+					severity: faulted.includes(k.id) ? 'BLOCKING' : 'INFORMATIONAL'
+				})),
+				recommendation
+			});
+		const scored = async (c: PwaTypeCase, reply: string) =>
+			(
+				await evaluateCase({
+					case: c,
+					criteria: SEEDED_REASONING_REVIEW_CRITERIA,
+					candidate: EVALUATING_CANDIDATE,
+					scoringDigest: '0'.repeat(64),
+					call: async () => ({ returned: reply, served: null })
+				})
+			).scored;
+		for (const c of partsV8()) {
+			const oracle = oracles.get(c.id)!;
+			const s = await scored(c, replyFaulting(oracle.faulted, oracle.disposition));
+			expect([s.disposition, s.resultClass, s.independenceOk], c.id).toEqual([oracle.disposition, 'VALID', true]);
+		}
+		const control = await scored(partV8('G8-RR-02.T05'), replyFaulting([], 'SATISFIED'));
+		expect(control.disposition, 'CONTROL: the catcher answered clean').toBe('SATISFIED');
+	});
+});
+
+/** A part of `source` as version eight writes one, for a type of it no part case need cut. */
+function partOfSource(source: GraphCase, typeId: string): PwaTypeCase {
+	return {
+		id: partCaseId(source, typeId),
+		arm: 'PWA_TYPE',
+		sourceCaseId: source.id,
+		subject: { ...source.subject, subjectId: typeId, objectType: 'PWU_TYPE' },
+		input: { typeId, ...source.input }
+	};
+}
+/** The name of the type `id` names in `source`. */
+function byNameOf(source: GraphCase, id: string): string {
+	return source.input.nodes.find((n) => n.id === id)!.name;
+}

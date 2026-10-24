@@ -39,6 +39,8 @@ import {
 	type ProcessResultReviewSource
 } from '../apps/rph-demo/src/lib/server/assurance/review-input.js';
 import type { ObservedProcessRun } from '../apps/rph-demo/src/lib/server/tools/process-run-observer.js';
+import { readFileSync } from 'node:fs';
+import { CASE_SET_V7_FILE, type CaseSet } from '../scripts/reviewer-qual/cases.js';
 import { committedCaseSet } from '../scripts/reviewer-qual/fingerprint.js';
 import { caseReviewInput } from '../scripts/reviewer-qual/materialize.js';
 import { FINGERPRINT_PROBES, PROBE_SUBJECT } from '../scripts/reviewer-qual/probes.js';
@@ -344,7 +346,8 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481) — no host text inside quoted mate
 			'[CUT FOR THIS REVIEW: the intent — ',
 			// ⭐ The review in parts, B2 — a part's request, and its children's skeletons, each cut child by child.
 			'[CUT FOR THIS REVIEW: the request — ',
-			'[CUT FOR THIS REVIEW: the skeleton of the child ',
+			// ⭐ A2 (3) — ~~'the skeleton of the child '~~: a child by its ordinal and type id.
+			'[CUT FOR THIS REVIEW: the skeleton of child ',
 			'[CUT FOR THIS REVIEW: the work product — ',
 			'[CUT FOR THIS REVIEW: the narration — ',
 			'[CUT FOR THIS REVIEW: the prior findings — ',
@@ -367,13 +370,21 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481) — no host text inside quoted mate
 	// D6-RC-04, D6-FP-CLEAN and D6-FP-03 (`REG-D-115` and its delegated extension) — fifty-four cases still.
 	// ⭐ `JAN-EXEC` Phase 7 after P6's third run, package P, F3 — ~~54~~ the 60 of case set v7, current since package P: and its
 	// six graph cases whose types declare their work, each graph its content's one region (`REG-D-123` Q25).
-	it('⭐ the 60 cases of the current case set — initial and repair prompt, each process result read against its run, each declared case its work one region', async () => {
+	// ⭐ The review in parts, B7 — ~~the 60 of case set v7~~ the 76 of case set v8, current since B7: version seven's 41
+	// non-graph cases and 35 part cases (`REG-D-126`), each part its subject, context and children's skeletons in one region;
+	// ⭐ and, as history, version seven's 19 graph cases, which still materialize through their builder.
+	it('⭐ the 76 cases of the current case set — initial and repair prompt, each process result read against its run, each declared case its work one region, each part case its part one region; and version seven’s graph cases', async () => {
 		const cases = committedCaseSet(new URL('../', import.meta.url)).cases;
-		expect(cases).toHaveLength(60);
-		expect(cases.filter((c) => c.arm === 'PWA_GRAPH'), 'the 19 graph cases').toHaveLength(19);
+		expect(cases).toHaveLength(76);
+		expect(cases.filter((c) => c.arm === 'PWA_TYPE'), 'the 35 part cases').toHaveLength(35);
+		expect(cases.filter((c) => c.arm === 'PWA_GRAPH'), 'no graph case').toHaveLength(0);
 		expect(cases.filter((c) => c.arm === 'PROCESS_RESULT'), 'the 14 process-result cases').toHaveLength(14);
 		expect(cases.filter((c) => c.arm === 'DECLARED_POLICY'), 'the 14 declared-policy cases').toHaveLength(14);
-		for (const c of cases) {
+		const v7Graphs = (JSON.parse(readFileSync(new URL(`../${CASE_SET_V7_FILE}`, import.meta.url), 'utf8')) as CaseSet).cases.filter(
+			(c) => c.arm === 'PWA_GRAPH'
+		);
+		expect(v7Graphs, 'version seven’s 19 graph cases').toHaveLength(19);
+		for (const c of [...cases, ...v7Graphs]) {
 			const input = caseReviewInput(c, SEEDED_REASONING_REVIEW_CRITERIA);
 			const run = c.arm === 'PROCESS_RESULT' ? c.input.run : undefined;
 			for (const p of await promptsOf(input)) expectNoHostTextQuoted(p, input, c.id, run);
@@ -390,11 +401,16 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481) — no host text inside quoted mate
 			expect(input.framing === 'PROCESS_RESULT', `${probe.id}: a process result was rendered through the builder`).toBe(
 				rendered !== undefined
 			);
-			// ⭐ `PQ-1` (`REG-F-481`) — `G-NO-FENCE`, `W-NO-FENCE` and `P-NO-FENCE` each print every fence candidate, one in each
-			// framing, so the validator refuses each before any prompt exists: there is no region to read, and the refusal is
-			// what is asserted (the fingerprint hashes it).
-			if (['G-NO-FENCE', 'W-NO-FENCE', 'P-NO-FENCE'].includes(probe.id)) {
+			// ⭐ `PQ-1` (`REG-F-481`) — ~~`G-NO-FENCE`~~ ⭐ B7: `T-NO-FENCE`, `W-NO-FENCE` and `P-NO-FENCE` each print every fence
+			// candidate, one in each framing, so the validator refuses each before any prompt exists: there is no region to read,
+			// and the refusal is what is asserted (the fingerprint hashes it).
+			if (['T-NO-FENCE', 'W-NO-FENCE', 'P-NO-FENCE'].includes(probe.id)) {
 				await expect(promptsOf(input), `${probe.id}: refused, no prompt sent`).rejects.toThrow(NO_FENCE_STATEMENT);
+				continue;
+			}
+			// ⭐ B7 — and `T-SUBJECT-REFUSED`, a subject no prompt can hold, refused whole before any prompt (design D3).
+			if (probe.id === 'T-SUBJECT-REFUSED') {
+				await expect(promptsOf(input), `${probe.id}: refused, no prompt sent`).rejects.toThrow('This review was not sent: the part it was handed');
 				continue;
 			}
 			for (const p of await promptsOf(input)) expectNoHostTextQuoted(p, input, probe.id, rendered);

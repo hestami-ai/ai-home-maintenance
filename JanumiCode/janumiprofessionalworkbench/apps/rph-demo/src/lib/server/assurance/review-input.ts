@@ -150,18 +150,22 @@ export function pwaTypeReviewInput(source: PwaTypeReviewSource): ReasoningReview
 		: { ...head, content: cut.content, declaredPartCut: cut.cut, ...tail };
 }
 
-/** A part as its review shows it: the subject's line, the context's line, and each child's line with its name and id. */
+/**
+ * A part as its review shows it: the subject's line, the context's line, and each child's line with its type id. ⭐ A2 (3) —
+ * ~~and its name~~: a cut's declaration names a child by its ordinal and its type id, so its authored name is on its own
+ * fenced line alone.
+ */
 interface PartLines {
 	readonly subject: string;
 	readonly context: string;
-	readonly children: readonly { readonly name: string; readonly id: string; readonly line: string }[];
+	readonly children: readonly { readonly id: string; readonly line: string }[];
 }
 
 function partLines(part: PwaTypePart): PartLines {
 	return {
 		subject: jsonLine({ subject: part.subject }),
 		context: jsonLine({ context: part.context }),
-		children: part.childSkeletons.map((s) => ({ name: s.name, id: s.id, line: jsonLine({ childSkeleton: s }) }))
+		children: part.childSkeletons.map((s) => ({ id: s.id, line: jsonLine({ childSkeleton: s }) }))
 	};
 }
 
@@ -499,9 +503,13 @@ function workCutUnitByUnit(
 	return undefined;
 }
 
-/** The slice a cut of one child's skeleton declares: that child's skeleton, its name and its id JSON-encoded. */
-const skeletonSlice = (child: { readonly name: string; readonly id: string }): string =>
-	`the skeleton of the child ${jsonLine(child.name)} (${jsonLine(child.id)})`;
+/**
+ * The slice a cut of one child's skeleton declares: that child's skeleton, by its ordinal among the part's `count` children and
+ * its type id, JSON-encoded. ⭐ A2 (3) — ~~its name and its id~~: the declaration is a host line, and the type id is the host's,
+ * so no authored name is written outside the fence; the name stays on the child's own skeleton line.
+ */
+const skeletonSlice = (ordinal: number, count: number, id: string): string =>
+	`the skeleton of child ${ordinal} of ${count} (type id ${jsonLine(id)})`;
 
 /**
  * ⭐⭐ The review in parts, B1 (design D3; `REG-F-564`'s general form, "cut unit by unit, with each cut declared") — A PART OVER
@@ -521,7 +529,7 @@ function childSkeletonsCut(lines: PartLines, limit: number): { readonly content:
 			if (c.line.length <= shares[i]!) return [];
 			const total = codePoints(c.line);
 			const shown = widest ? total : codePoints(headOf(c.line, shares[i]!));
-			return [headCutDeclaration(skeletonSlice(c), shown, total, widest ? total : total - shown)];
+			return [headCutDeclaration(skeletonSlice(i + 1, lines.children.length, c.id), shown, total, widest ? total : total - shown)];
 		});
 	let reserve = 0;
 	for (let round = 0; round <= lines.children.length + 1; round++) {

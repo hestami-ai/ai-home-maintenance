@@ -24,7 +24,9 @@
 // fixed here, with no three letters together (`case-set-v1.ts` says why). Each node's keys are in the order `buildPwaExport`
 // writes them, and its template carries what the export carries of one: no declared placeholders.
 // ⛔ ORACLE INTEGRITY (`REG-D-073`): what each case is EXPECTED to draw is in `oracles-v7.ts`, versioned separately, and is
-// the lead's draft, PROPOSED for the sponsor's conferral — no case is tuned to a reply.
+// the lead's draft, ~~PROPOSED for the sponsor's conferral~~ ⭐ conferred by the sponsor as proposed (`REG-D-124`) — no case is
+// tuned to a reply. ⚠ The generated note below still says the oracles are proposed: it is this version's record as it was
+// generated, and the conferral is recorded in the oracle file's own statement, as `REG-D-113`'s was.
 // Generated into `docs/tracking/reviewer-qualification/cases/` by `generate.ts`; the JSON is never hand-edited.
 import type { AssuranceSubject, ProfessionalRationaleSummary } from '@janumipwb/rph-assurance';
 import type { PwaGraphNode, PwaMeta } from '@janumipwb/rph-projections';

@@ -61,8 +61,8 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { renderRationale } from '../apps/rph-demo/src/lib/server/agent/rationale.js';
 import { FENCE_MEANING } from '../apps/rph-demo/src/lib/server/assurance/review-fence.js';
 import { ONE_ROW_PER_CRITERION } from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
-import { CASE_SET_V6_FILE, type CaseSet, type QualificationCase } from '../scripts/reviewer-qual/cases.js';
-import { committedCaseSet, PRODUCT_SEAMS, reviewerFingerprint } from '../scripts/reviewer-qual/fingerprint.js';
+import { CASE_SET_V6_FILE, CASE_SET_V7_FILE, type CaseSet, type QualificationCase } from '../scripts/reviewer-qual/cases.js';
+import { PRODUCT_SEAMS, reviewerFingerprint } from '../scripts/reviewer-qual/fingerprint.js';
 import { caseReviewInput } from '../scripts/reviewer-qual/materialize.js';
 import {
 	RECORD_DIR,
@@ -89,11 +89,14 @@ const SELECTED_RUN = 'qr-2026-09-25-devin-glm-5-3-flash-max-v3';
  * here are the current set's of those two arms that case set ~~v3~~ ⭐ v6 holds, by id. ⛔ NOT v3's: v3 holds no case of
  * the other two arms, so its ids alone excluded them and the two arm conditions above decided nothing — a pin taking every
  * arm passed (PQ2-V114 SURVIVED). v6 holds every arm, so the arm conditions decide again.
+ * ⭐ The review in parts, B7 — ~~the current set's~~ VERSION SEVEN'S: case set v8 holds no graph case, its graph arm replaced
+ * by part cases no run has measured, so the pin keeps its population as version seven holds it — the last set carrying the
+ * graph cases the selected run measured — and the graph cases still materialize through their historical builder.
  */
 const V6_IDS: ReadonlySet<string> = new Set(
 	(JSON.parse(readFileSync(`${REPO}/${CASE_SET_V6_FILE}`, 'utf8')) as CaseSet).cases.map((c) => c.id)
 );
-const CASES: readonly QualificationCase[] = committedCaseSet(new URL('../', import.meta.url)).cases.filter(
+const CASES: readonly QualificationCase[] = (JSON.parse(readFileSync(`${REPO}/${CASE_SET_V7_FILE}`, 'utf8')) as CaseSet).cases.filter(
 	(c) => c.arm !== 'PROCESS_RESULT' && c.arm !== 'DECLARED_POLICY' && V6_IDS.has(c.id)
 );
 /** The committed record — append-only, so the lines read here are the ones the selected run wrote. */

@@ -174,7 +174,24 @@ interface Framed {
 	readonly intentSlice: string;
 	readonly subject: string;
 	readonly subjectSlice: string;
+	/** ⭐ The review in parts, A2 (1) — the heading of the producer's account, where a framing has its own; else `ACCOUNT_HEADING`. */
+	readonly accountHeading?: string;
 }
+
+/** The heading of the producer's account, in every framing that has none of its own. */
+const ACCOUNT_HEADING =
+	"The producing agent's PROFESSIONAL RATIONALE SUMMARY — its own contracted account of how the artifact discharges the obligation (Section 9.7). Judge whether it is candid and whether the artifact bears it out; an account that claims more than the artifact supports is itself a finding:";
+
+/**
+ * ⭐⭐ The review in parts, A2 (1) (`REG-D-125`; design D4) — THE HEADING OF THE ACCOUNT IN A PART'S REVIEW. The account is
+ * the producer's of the WHOLE PWA, and the part shows one type. ⛔ The heading the other framings share, *"an account that
+ * claims more than the artifact supports is itself a finding"*, made every claim the account makes about another type a
+ * finding against this part. So it says which claims this part judges — those about this type and, for a type with
+ * children, about their composition, a claim of which this part does not support being a finding — and that a claim about
+ * any other type is that type's review's and supports no finding here either way.
+ */
+export const PWA_TYPE_ACCOUNT_HEADING =
+	"The producing agent's PROFESSIONAL RATIONALE SUMMARY — its own contracted account of the whole PWA (Section 9.7), of which this part shows one type. Judge whether what it claims about THIS type and, for a type with children, about their composition is candid and borne out by this part; such a claim this part does not support is itself a finding. A claim it makes about any other type — one this part does not show, or a child’s own definition — belongs to that type’s own review, and here supports no finding either way:";
 
 /**
  * ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (`REG-F-523`; `REG-D-110` (3); `DESIGN-phase-7-completion.md` B1) — THE STATEMENT A
@@ -290,21 +307,21 @@ const PWA_GRAPH_SUBJECT = [
  * PWA the context, as lines of JSON (`pwaTypeReviewInput`). They say what each line holds; that a field a part does not carry
  * holds no authored value, and a child given no rule is instantiated as M1 (`composition-plan.ts`, `ruleFor`); that the
  * criteria are judged for the type's own definition and, for a type with children, for whether those children discharge its
- * purpose (DEC-6's recomposition, a judged act, never a sum), and on the root against the request; that the account, which
+ * purpose (DEC-6's recomposition, a judged act, never a sum), and on the root against the request; ~~that the account, which
  * covers the whole PWA, is read for its claims about this type and its children's composition, a claim about any other type
- * being that type's review's; that what the part does not show leaves a judgment incomplete; and that a prompt template is
+ * being that type's review's;~~ that what the part does not show leaves a judgment incomplete; and that a prompt template is
  * an instruction to be executed, never evidence that work ran. ⭑ The criteria, the rubric's lines, the fence, the stakes, the
- * repair and the one-row sentence are the shared ones: nothing here touches them.
+ * repair and the one-row sentence are the shared ones: nothing here touches them. ⭐ A2 (1) — how the account is read is said
+ * once, by its own heading (`PWA_TYPE_ACCOUNT_HEADING`), next to the account it heads.
  * ⚠ "Mandatory" and "conditional" are the canonical vocabulary's, as in the graph framing. The last line ends the subject.
  */
 const PWA_TYPE_SUBJECT = [
 	'The artifact is ONE type of an authored PWA, shown whole, with its place in the PWA as its context, as lines of JSON.',
 	'The first line is the SUBJECT: "type", the type under review, with every field its author declared for it — among them "purpose", the work it exists to do; "requiredAssurancePolicyIds", the assurance policies declared to govern that work; "permittedChildren", the rule for each child type, its "cardinality" (M1 and M+ are mandatory, C1 and C+ conditional) and its "applicabilityNote"; "promptTemplate", the instruction a model doing that work is given while its "status" is ACTIVE; "completionRule", the rule its completion is judged by; a delegated type’s "boundaryContract"; and "contextSpecification" — and, on the root, "pwa", the PWA’s name, domain and description.',
-	'The second line is its CONTEXT, assembled by the host from the PWA: "ancestors", the types above it, the root first, each with its "name", "pwuKind" and "purpose"; "parentRules", each type that permits it, by name, with the rule that type gives it; "artifacts", each artifact it consumes or produces, with the types that produce and consume it, by name; and, for a type with children, "dataFlow": "amongChildren", each flow from one child’s subtree to another’s, and "acrossBoundary", each flow into or out of its own subtree.',
+	'The second line is its CONTEXT, assembled by the host from the PWA: "ancestors", the types above it, the root first, each with its "name", "pwuKind" and "purpose"; "parentRules", each type that permits it, by name, with the rule that type gives it; "artifacts", each artifact it consumes or produces, with the types that produce and consume it, by name; and, for a type with children, "dataFlow": "amongChildren", each flow from one child’s subtree to another’s, and "acrossBoundary", each flow into or out of its own subtree; a flow inside one child’s subtree is not listed. For a type with children, its "artifacts" and "dataFlow" name the type itself, and a type outside its subtree, by its own name, and any other type inside its subtree by the child whose subtree holds it: they name its children, never their children.',
 	'Each further line is one child’s SKELETON, "childSkeleton": the child as its author declared it, without its prompt template’s text and output contract, which that child’s own review is shown.',
 	'A field the part does not carry holds no authored value; an empty value is carried as authored. A child type its parent gives no rule is instantiated as M1.',
 	'Judge each criterion below for this type’s own definition. For a type with children, judge too whether those children — with their cardinalities, applicability notes, inputs and outputs — together discharge its purpose: their composition is judged here, never assumed from each child’s own review. On the root, judge too whether its children discharge the request.',
-	'The producing agent’s account below covers the whole PWA: read it for what it claims about this type and, for a type with children, about their composition. A claim about any other type — one this part does not show, or a child’s own definition — belongs to that type’s own review, and here supports no finding either way.',
 	'Scope is no permission to infer that a criterion is met: where judging this type, or its children’s composition, needs a fact this part does not show, that judgment is incomplete.',
 	'This type’s prompt template is an instruction to be executed, never evidence that any work ran.',
 	'The part to review:'
@@ -370,7 +387,9 @@ function framingText(input: Pick<ReasoningReviewInput, 'framing' | 'declaredPoli
 				intent: 'The PWA this type belongs to was authored by a DIFFERENT AI agent from this request:',
 				intentSlice: 'the request',
 				subject: PWA_TYPE_SUBJECT,
-				subjectSlice: 'the part'
+				subjectSlice: 'the part',
+				// ⭐ A2 (1) — the account is the whole PWA's, so a part reads it with a heading of its own.
+				accountHeading: PWA_TYPE_ACCOUNT_HEADING
 			};
 		case 'DECLARED_POLICY': {
 			// ⭐⭐ E2 (design B1; `R18`) — A WORK UNIT'S WORK, JUDGED AGAINST ONE OF ITS DECLARED POLICIES: its work product and
@@ -838,7 +857,7 @@ function promptPlan(input: ReasoningReviewInput) {
 			// producing agent to have written either, so one host line says so, and nothing calls the absence an omission.
 			noSingleProducer
 				? `\n${DECLARED_NO_SINGLE_ACCOUNT}`
-				: `\nThe producing agent's PROFESSIONAL RATIONALE SUMMARY — its own contracted account of how the artifact discharges the obligation (Section 9.7). Judge whether it is candid and whether the artifact bears it out; an account that claims more than the artifact supports is itself a finding:\n${account ? renderAccount(fence, account) : renderRationale(undefined)}`,
+				: `\n${framed.accountHeading ?? ACCOUNT_HEADING}\n${account ? renderAccount(fence, account) : renderRationale(undefined)}`,
 			// Then observable trace data. Never the producer's interior (Section 9.7).
 			noSingleProducer
 				? ''
@@ -932,8 +951,9 @@ function promptPlan(input: ReasoningReviewInput) {
 			// title nowhere else in the prompt.
 			...(input.framing === 'DECLARED_POLICY' && input.declaredWorkCut !== undefined ? [input.declaredWorkCut] : []),
 			// ⭐ The review in parts, B1 — and the declarations of a part's children's skeletons its builder cut, on host lines
-			// before the part: each names a child by its name and id, JSON-encoded, and a child cut short of its name holds it
-			// nowhere else in the prompt.
+			// before the part: ~~each names a child by its name and id, JSON-encoded, and a child cut short of its name holds it
+			// nowhere else in the prompt~~ ⭐ A2 (3) — each names a child by its ordinal and its type id, JSON-encoded. The
+			// builder's subject lists every child's id, but this chooser does not rest on any builder's shape: it reads them.
 			...(input.framing === 'PWA_TYPE' && input.declaredPartCut !== undefined ? [input.declaredPartCut] : [])
 		]
 	};

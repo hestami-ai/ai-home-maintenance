@@ -191,9 +191,11 @@ describe('⭐⭐ the review in parts, B1 — pwaTypeParts: one part per type, it
 			{ name: 'manual', producedBy: ['Docs'], consumedBy: ['Test'] },
 			{ name: 'source', producedBy: ['Code'], consumedBy: ['Docs', 'Test'] }
 		]);
+		// ⭐ A2 (2) — ~~'Realization', 'Check', 'Test'~~ and ~~'Realization', 'Build', 'Code'~~: the root names its children, never
+		// its grandchildren — Test by Check, whose subtree holds it, and Code by Build.
 		expect(partOf('pwut_ROOT').context.artifacts).toEqual([
-			{ name: 'report', producedBy: ['Realization', 'Check', 'Test'], consumedBy: [] },
-			{ name: 'requirements', producedBy: [], consumedBy: ['Realization', 'Build', 'Code'] }
+			{ name: 'report', producedBy: ['Realization', 'Check'], consumedBy: [] },
+			{ name: 'requirements', producedBy: [], consumedBy: ['Realization', 'Build'] }
 		]);
 	});
 
@@ -235,14 +237,71 @@ describe('⭐⭐ the review in parts, B1 — pwaTypeParts: one part per type, it
 			]
 		});
 		// The root's children are Build and Check: both flows run between their subtrees, and Code → Docs stays inside Build's.
+		// ⭐ A2 (2) — named by child: ~~Code → Test~~ and ~~Docs → Test~~ are Build → Check, each for its own artifact.
 		expect(partOf('pwut_ROOT').context.dataFlow).toEqual({
 			amongChildren: [
-				{ producer: 'Code', consumer: 'Test', artifact: 'source' },
-				{ producer: 'Docs', consumer: 'Test', artifact: 'manual' }
+				{ producer: 'Build', consumer: 'Check', artifact: 'source' },
+				{ producer: 'Build', consumer: 'Check', artifact: 'manual' }
 			],
 			acrossBoundary: []
 		});
 		expect('dataFlow' in partOf('pwut_CODE').context, 'a leaf carries no data flow').toBe(false);
+	});
+
+	it('⭐ A2 (2) — A COMPOSITE’S CONTEXT NAMES ITS CHILDREN, NEVER ITS GRANDCHILDREN: each data-flow and artifact peer inside its subtree is named by the child whose subtree holds it', () => {
+		// The root's grandchildren are Code and Docs (under Build) and Test (under Check). ⛔ Named as themselves, the root's
+		// part showed the reviewer types it is not shown and whose composition is their parent's to judge.
+		const root = partOf('pwut_ROOT').context;
+		const named = JSON.stringify({ artifacts: root.artifacts, dataFlow: root.dataFlow });
+		for (const grandchild of ['Code', 'Docs', 'Test']) expect(named, grandchild).not.toContain(`"${grandchild}"`);
+		expect(root.artifacts, 'each peer by the child whose subtree holds it, once, the root by its own name').toEqual([
+			{ name: 'report', producedBy: ['Realization', 'Check'], consumedBy: [] },
+			{ name: 'requirements', producedBy: [], consumedBy: ['Realization', 'Build'] }
+		]);
+		expect(root.dataFlow, 'Code → Test and Docs → Test, between Build’s subtree and Check’s, by child').toEqual({
+			amongChildren: [
+				{ producer: 'Build', consumer: 'Check', artifact: 'source' },
+				{ producer: 'Build', consumer: 'Check', artifact: 'manual' }
+			],
+			acrossBoundary: []
+		});
+	});
+
+	it('⭐ A2 (2) — a MIDDLE composite names its own children for the flows inside its subtree, and an outside endpoint by its own name; two flows that name the same pair are listed once', () => {
+		// Middle's children are Left and Right; Left's own children, Deep and Deeper, each produce the same draft that Right
+		// consumes, and Deep consumes the root's brief, from outside Middle's subtree.
+		const deep = node({ id: 'd', name: 'Deep', requiredInputs: ['brief'], requiredOutputs: ['draft'] });
+		const deeper = node({ id: 'e', name: 'Deeper', requiredOutputs: ['draft'] });
+		const left = node({ id: 'l', name: 'Left', permittedChildTypeIds: ['d', 'e'] });
+		const right = node({ id: 'g', name: 'Right', requiredInputs: ['draft'] });
+		const middle = node({ id: 'm', name: 'Middle', permittedChildTypeIds: ['l', 'g'] });
+		const root = node({ id: 'r', name: 'Root', isRoot: true, permittedChildTypeIds: ['m'], requiredOutputs: ['brief'] });
+		const ex = buildPwaGraphExport(PWA, [root, middle, left, right, deep, deeper]);
+		expect(ex.dataFlow, 'arrangement: brief from the root to Deep, and draft from each of Deep and Deeper to Right').toEqual([
+			{ producer: 'r', consumer: 'd', artifact: 'brief' },
+			{ producer: 'd', consumer: 'g', artifact: 'draft' },
+			{ producer: 'e', consumer: 'g', artifact: 'draft' }
+		]);
+		const contextOf = (id: string) => pwaTypeParts(ex).find((p) => p.typeId === id)!.context;
+		expect(contextOf('m').dataFlow).toEqual({
+			amongChildren: [{ producer: 'Left', consumer: 'Right', artifact: 'draft' }],
+			acrossBoundary: [{ producer: 'Root', consumer: 'Left', artifact: 'brief' }]
+		});
+		expect(contextOf('r').dataFlow, 'the root: every flow it holds is inside Middle’s subtree').toEqual({ amongChildren: [], acrossBoundary: [] });
+		expect(contextOf('r').artifacts, 'the root’s brief, its consumer by the root’s child').toEqual([
+			{ name: 'brief', producedBy: ['Root'], consumedBy: ['Middle'] }
+		]);
+		// ⭐ CONTROL — a LEAF names every peer as itself: it has no subtree to aggregate into.
+		expect(contextOf('g').artifacts).toEqual([{ name: 'draft', producedBy: ['Deep', 'Deeper'], consumedBy: ['Right'] }]);
+	});
+
+	it('⭐ A2 (2) — a type two of a composite’s children permit is named by EACH of them, in the order the composite permits them', () => {
+		const shared = node({ id: 's', name: 'Shared', requiredOutputs: ['part'] });
+		const first = node({ id: 'a', name: 'First', permittedChildTypeIds: ['s'] });
+		const second = node({ id: 'b', name: 'Second', permittedChildTypeIds: ['s'] });
+		const root = node({ id: 'r', name: 'Root', isRoot: true, permittedChildTypeIds: ['a', 'b'], requiredInputs: ['part'] });
+		const part = pwaTypeParts(buildPwaGraphExport(PWA, [root, first, second, shared]))[0]!;
+		expect(part.context.artifacts).toEqual([{ name: 'part', producedBy: ['First', 'Second'], consumedBy: ['Root'] }]);
 	});
 
 	it('⛔ a flow between a composite and its OWN child is in neither list of its data flow, and not among its parent’s children — the composite’s own artifacts carry it', () => {
@@ -278,8 +337,9 @@ describe('⭐⭐ the review in parts, B1 — pwaTypeParts: one part per type, it
 			{ name: 'draft', producedBy: ['Child'], consumedBy: ['Middle', 'Sibling'] },
 			{ name: 'plan', producedBy: ['Root'], consumedBy: ['Middle'] }
 		]);
+		// ⭐ A2 (2) — the draft's producer by the root's child whose subtree holds it: ~~Child~~ Middle.
 		expect(contextOf('r').dataFlow, 'the root: plan, from it to its child, is not among its children; draft, between two children’s subtrees, is').toEqual({
-			amongChildren: [{ producer: 'Child', consumer: 'Sibling', artifact: 'draft' }],
+			amongChildren: [{ producer: 'Middle', consumer: 'Sibling', artifact: 'draft' }],
 			acrossBoundary: []
 		});
 	});

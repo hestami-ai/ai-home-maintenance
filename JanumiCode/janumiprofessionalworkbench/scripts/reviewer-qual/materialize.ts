@@ -10,13 +10,18 @@
 // what the reviewer of a process result reads reaches the case's prompt and owes a RUN. ⛔ Every arm is a case of the
 // switch below, and an arm it does not name is refused — by the type checker, and at run time: before `PQ-2` a
 // process-result case went to the work-product builder, and no prompt could be built from it (design G5).
+// ⭐⭐ `JAN-EXEC` Phase 7, the review in parts, B7 (`REG-D-125`; DESIGN-authoring-review-in-parts.md §5) — AND THE PART ARM,
+// THROUGH THE PRODUCT'S TWO BUILDERS: a part case's graph is exported by `buildPwaGraphExport`, cut into its parts by
+// `pwaTypeParts` — the export-to-parts function the authoring floor is to cut a candidate with — and its part's review input
+// built by `pwaTypeReviewInput`, the one builder of a part's review. ⛔ Never a part literal, and never the graph's builder.
 import type { ReasoningReviewInput } from '@janumipwb/rph-assurance';
 import type { AssessmentCriterion } from '@janumipwb/rph-contracts';
-import { buildPwaGraphExport } from '@janumipwb/rph-projections';
+import { buildPwaGraphExport, pwaTypeParts } from '@janumipwb/rph-projections';
 import {
 	declaredPolicyReviewInput,
 	graphReviewInput,
 	processResultReviewInput,
+	pwaTypeReviewInput,
 	workProductReviewInput
 } from '../../apps/rph-demo/src/lib/server/assurance/review-input.js';
 import type { QualificationCase } from './cases.js';
@@ -56,6 +61,16 @@ export function caseReviewInput(
 				instructionIs: 'PRODUCING_PROMPT',
 				...work
 			});
+		}
+		case 'PWA_TYPE': {
+			// ⭐⭐ B7 — ONE TYPE OF THE GRAPH, AS ITS PART: the export cut by `pwaTypeParts`, the case's type's part handed to
+			// `pwaTypeReviewInput` with the request, the account and the narration, as the graph's builder is handed them.
+			// ⛔ A type the graph does not hold is refused: no other part is reviewed in its place.
+			const { pwa, nodes, typeId, ...rest } = c.input;
+			const part = pwaTypeParts(buildPwaGraphExport(pwa, nodes)).find((p) => p.typeId === typeId);
+			if (part === undefined)
+				throw new Error(`${c.id}: a part case names the type ${typeId}, which its graph does not hold`);
+			return pwaTypeReviewInput({ criteria, part, ...rest });
 		}
 		default: {
 			const none: never = c;

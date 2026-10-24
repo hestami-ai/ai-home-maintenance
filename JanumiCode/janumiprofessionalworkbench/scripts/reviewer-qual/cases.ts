@@ -76,6 +76,18 @@ export interface DeclaredPolicyCaseInput {
 	readonly rationale?: ProfessionalRationaleSummary;
 }
 
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, the review in parts, B7 (`REG-D-125`, `REG-D-126`; DESIGN-authoring-review-in-parts.md §5) — what the
+ * part arm hands `pwaTypeReviewInput`, less the criteria: a graph case's whole input — the request, the PWA, its literal
+ * nodes, the account, the narration — and the type whose part is reviewed. ⛔ NOT A PART LITERAL: the part is cut from the
+ * graph at materialize time by the product's own `pwaTypeParts`, over the export `buildPwaGraphExport` builds, so a change
+ * to how a part is assembled, or to what its review is handed, reaches the case's prompt (`materialize.ts`).
+ */
+export interface PwaTypeCaseInput extends GraphCaseInput {
+	/** The PWU Type whose part this case reviews — one of `nodes`. */
+	readonly typeId: string;
+}
+
 interface CaseCommon {
 	/** Stable across versions of the set: a case that changes gets a new id (version two's `G2-…`, `case-set-v2.ts`;
 	 *  version three's `G3-…`, `case-set-v3.ts`). */
@@ -101,7 +113,17 @@ export interface DeclaredPolicyCase extends CaseCommon {
 	readonly arm: 'DECLARED_POLICY';
 	readonly input: DeclaredPolicyCaseInput;
 }
-export type QualificationCase = GraphCase | WorkProductCase | ProcessResultCase | DeclaredPolicyCase;
+/**
+ * ⭐⭐ The review in parts, B7 (design §5) — the fifth arm: ONE TYPE of an authored PWA, reviewed as a part in the `PWA_TYPE`
+ * framing. Its subject is the type, at its version, by the source case's producer.
+ */
+export interface PwaTypeCase extends CaseCommon {
+	readonly arm: 'PWA_TYPE';
+	/** The graph case the part is cut from — its provenance (design §5: "stable part identities and source-case provenance"). */
+	readonly sourceCaseId: string;
+	readonly input: PwaTypeCaseInput;
+}
+export type QualificationCase = GraphCase | WorkProductCase | ProcessResultCase | DeclaredPolicyCase | PwaTypeCase;
 
 export interface CaseSet {
 	readonly note: string;
@@ -160,6 +182,10 @@ export const ORACLES_V6_FILE = 'docs/tracking/reviewer-qualification/oracles/ora
  *  stay as history. */
 export const CASE_SET_V7_FILE = 'docs/tracking/reviewer-qualification/cases/case-set-v7.json';
 export const ORACLES_V7_FILE = 'docs/tracking/reviewer-qualification/oracles/oracles-v7.json';
+/** ⭐ `JAN-EXEC` Phase 7, the review in parts, B7 — version eight (`REG-D-125`, `REG-D-126`), beside versions one to seven,
+ *  which stay as history. */
+export const CASE_SET_V8_FILE = 'docs/tracking/reviewer-qualification/cases/case-set-v8.json';
+export const ORACLES_V8_FILE = 'docs/tracking/reviewer-qualification/oracles/oracles-v8.json';
 
 /**
  * ⭐ `JAN-CRITREAD` J2-5 — THE CURRENT CASE SET AND ITS ORACLES: what `reviewer:qual:check` holds coverage and
@@ -184,10 +210,15 @@ export const ORACLES_V7_FILE = 'docs/tracking/reviewer-qualification/oracles/ora
  * child rules, prompt templates — their oracles PROPOSED, awaiting the sponsor's conferral, so `reviewer:qual:check` refuses
  * the set until it is recorded (`ORACLES_NOT_CONFERRED`). ⚠ F1's graph framing moves every graph case's prompt, so the check
  * owes a RUN of the selected reviewer over all nineteen graph cases; every other case keeps its prompt, and RESCORED lines may
- * discharge it.
+ * discharge it. ⭐ The six were conferred (`REG-D-124`), and version seven's record says so (`oracles-v7.ts`).
+ * ⭐⭐ Version eight since `JAN-EXEC` Phase 7, the review in parts, B7 (`REG-D-125`, `REG-D-126`; DESIGN-authoring-review-in-
+ * parts.md §5): version seven's 41 non-graph cases under their ids, byte for byte, and 35 `PWA_TYPE` part cases in place of its
+ * 19 graph cases — the 27 part oracles of `REG-D-126` Q30 and the eight of Q31's 3-level pair, conferred. It holds no
+ * `PWA_GRAPH` case, so the graph framing's probes leave the current fingerprint (`fingerprint.ts`). ⚠ The 35 are new prompts,
+ * so the check owes a RUN of the selected reviewer over them; the 41 keep their prompts, and RESCORED lines may discharge them.
  */
-export const CURRENT_CASE_SET_FILE = CASE_SET_V7_FILE;
-export const CURRENT_ORACLES_FILE = ORACLES_V7_FILE;
+export const CURRENT_CASE_SET_FILE = CASE_SET_V8_FILE;
+export const CURRENT_ORACLES_FILE = ORACLES_V8_FILE;
 
 /**
  * ⭐⭐ `E12F` F5 (the E12 package review's fifth finding; `REG-D-073`, oracle integrity) — THE WORDS AN ORACLE SET'S
