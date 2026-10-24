@@ -489,7 +489,15 @@ export function classifyFloorRemediation(floor: FloorView): FloorRemediation {
 	// EVERY PATH TO THE PRODUCER: its `findings` are `refineDirective`'s (below) and the authoring route's `priorFindings`,
 	// which `runPwaFloor` narrows to each part's own type (`routes/pwa/[id]/agent/+server.ts`), and `openPerTry`'s and
 	// `priorFindings`' (`routes/undertakings/[id]/+page.server.ts`), and `floorStatusLine` counts them.
-	const subjectFindings = review.observations.filter(
+	// ⭐ The review in parts, package E's check (`REG-D-059`; design D5) — AND OF A REVIEW IN PARTS, ONLY THE OBSERVATIONS OF THE
+	// PARTS WHOSE OWN DISPOSITION FEEDS BACK. The fold is the strictest part's, so beside one REJECTED part the rule below read
+	// every part's observations as findings: an INCONCLUSIVE part's, a boundary-rejected reply's fault among them, and a
+	// SATISFIED part's INFORMATIONAL one.
+	const judged =
+		floor.parts === undefined
+			? review.observations
+			: floor.parts.filter((p) => FEEDS_BACK_TO_PRODUCER.has(p.disposition)).flatMap((p) => p.observations);
+	const subjectFindings = judged.filter(
 		(o) => !OPERATIONAL_REVIEW_CODES.has(o.code) && !isReviewerRecommendation(o)
 	);
 	// ⛔ ONLY A DISPOSITION THAT ACTUALLY JUDGES THE SUBJECT MAY SEND WORK BACK TO ITS PRODUCER.
@@ -540,8 +548,9 @@ export function classifyFloorRemediation(floor: FloorView): FloorRemediation {
 }
 
 /** A part whose review failed operationally — no reply, the output limit, a reply that did not parse after its repair: each a
- *  thrown validator failure, recorded `VALIDATOR_EXECUTION_FAILED` (`rph-assurance` `failedResult`). */
-const failedOperationally = (part: FloorPartView): boolean =>
+ *  thrown validator failure, recorded `VALIDATOR_EXECUTION_FAILED` (`rph-assurance` `failedResult`). ⭑ Exported for the
+ *  waiver's target (`routes/pwa/[id]/+page.server.ts` `blockingPolicyOf`), which names such a part last. */
+export const failedOperationally = (part: FloorPartView): boolean =>
 	part.observations.some((o) => o.code === 'VALIDATOR_EXECUTION_FAILED');
 
 /**

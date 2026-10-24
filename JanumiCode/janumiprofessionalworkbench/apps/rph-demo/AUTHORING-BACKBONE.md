@@ -82,7 +82,10 @@ The following fixes address concrete failures observed during a large natural-la
   answers those findings, the failed parts named and reviewed again with every type when the floor re-runs (the
   review in parts, package E, E1). There the classifier answers `REFINE_SUBJECT`: the concluded parts' findings go
   back, the one automatic refinement runs, the failed parts are named beside them and never sent as a finding, and
-  the staged candidate's banner names them too. The hint renders first in the floor panel.
+  the staged candidate's banner names them too. In any round reviewed in parts, the findings that go back are only
+  the observations of the parts whose own review concluded REJECTED or CONDITIONALLY_SATISFIED: an INCONCLUSIVE
+  part's, a boundary-rejected reply's fault among them, and a SATISFIED part's are never sent as findings (package
+  E's check). The hint renders first in the floor panel.
   Where the reviewer also recommended escalation beside findings or an incomplete review, one informational line
   says so after the hint; the recommendation is never sent back to the producer as a finding.
 - ~~Before a host configuration that uses the real reviewer starts an isolated agent candidate, an app-local preflight

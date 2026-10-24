@@ -59,6 +59,7 @@ import { loadReviewerAnswer, type ReviewerAnswerView } from '$lib/server/assuran
 import { getArtifactStore } from '$lib/server/workbench';
 import {
 	escalationRecommendationNote,
+	failedOperationally,
 	floorBlockedHint,
 	floorChipLabel,
 	floorFailedReviews,
@@ -112,8 +113,9 @@ function toLogEntry(e: ConversationEntry): LogEntry {
  * review, and an incomplete one its reviewer escalated — the page offered "Record accepted risk" and the action refused it.
  * `waiver-target-recommendation.test.ts` holds the load's answer to the action's outcome.
  * ⭐ The review in parts, package E, E2 (DESIGN-authoring-review-in-parts.md D6; guide §8.15's "exact object and semantic
- * version") — beside a Reasoning Review in parts, the finding is the first of a part that BLOCKS (`blockingPolicyOf`), and it
- * carries that part's type (`FloorObservationView.typeId`): the object `recordWaiver` names.
+ * version") — beside a Reasoning Review in parts, the finding is the first of a part that BLOCKS (`blockingPolicyOf`) — a part
+ * whose review failed operationally only where no other blocking part records one — and it carries that part's type
+ * (`FloorObservationView.typeId`): the object `recordWaiver` names.
  */
 function waiverTargetOf(floor: FloorView | undefined): {
 	readonly blocking: FloorPolicyView | undefined;
@@ -133,16 +135,23 @@ function waiverTargetOf(floor: FloorView | undefined): {
 
 /**
  * ⭐ The review in parts, package E, E2 — THE POLICY A WAIVER WOULD NAME: the first that is not SATISFIED; and when that is the
- * Reasoning Review of a PWA reviewed in parts, with the observations of its blocking parts alone, in export order. ⛔ The fold
- * lists every part's observations (`floor.ts` `floorViewOf`), so the waiver took the first across all the parts — a
- * satisfied part's among them — and named the PWA.
+ * Reasoning Review of a PWA reviewed in parts, with the observations of its blocking parts alone, in export order (the failed
+ * ones last, below). ⛔ The fold lists every part's observations (`floor.ts` `floorViewOf`), so the waiver took the first
+ * across all the parts — a satisfied part's among them — and named the PWA.
+ * ⭐ Package E's check, the MINOR finding — THE PARTS WHOSE REVIEWS FAILED OPERATIONALLY COME LAST (`failedOperationally`). A
+ * failed part blocks too, so first in export order it was the part named, its `VALIDATOR_EXECUTION_FAILED` the criterion
+ * waived, beside a rejected part's finding, which the round is answered by revising for (E1). ⭑ Last, not left out: where no
+ * other blocking part records an observation a waiver may name, the failed part's is still the one named, as before.
  */
 function blockingPolicyOf(floor: FloorView | undefined): FloorPolicyView | undefined {
 	const blocking = floor?.policies.find((p) => p.disposition !== 'SATISFIED');
 	if (blocking?.policyId !== ASSURANCE_FLOOR_POLICY_IDS.REASONING_REVIEW || floor?.parts === undefined) return blocking;
+	const parts = floor.parts.filter((p) => p.disposition !== 'SATISFIED');
 	return {
 		...blocking,
-		observations: floor.parts.filter((p) => p.disposition !== 'SATISFIED').flatMap((p) => p.observations)
+		observations: [...parts.filter((p) => !failedOperationally(p)), ...parts.filter(failedOperationally)].flatMap(
+			(p) => p.observations
+		)
 	};
 }
 

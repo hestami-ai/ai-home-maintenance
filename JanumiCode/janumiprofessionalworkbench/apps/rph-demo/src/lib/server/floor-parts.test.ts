@@ -727,6 +727,116 @@ describe('⭐⭐ Package E, E1 — revision beside parts whose reviews failed op
 	});
 });
 
+// ⭐⭐ Package E's check, the MATERIAL finding (REG-D-059; design D5; the lead's E1: "the refine directive carries those parts'
+// findings") — ONLY A PART THAT ITSELF CONCLUDED REJECTED OR CONDITIONALLY_SATISFIED SENDS ITS OBSERVATIONS BACK. The classifier
+// read the disposition of the FOLD, and the fold is REJECTED beside one rejected part, so every part's observations went back
+// as findings: an INCONCLUSIVE part's — the boundary-rejected reply below, which recommends SATISFIED over a criterion it
+// faults — and a SATISFIED part's INFORMATIONAL one.
+describe('⭐⭐ Package E’s check — the findings sent back are the concluded parts’ own, never an INCONCLUSIVE or SATISFIED part’s', () => {
+	/** A reply that faults the policy's second criterion and still recommends SATISFIED: the boundary rejects it, so its part
+	 *  concludes INCONCLUSIVE with the fault recorded beside it. */
+	const boundaryRejected = (statement: string): string =>
+		JSON.stringify({
+			findings: reasoningReviewCriteria(session).map((c, i) => ({
+				criterionId: c.id,
+				failed: i === 1,
+				statement: i === 1 ? statement : 'evaluated; the failure class is absent'
+			})),
+			recommendation: 'SATISFIED',
+			residualUncertainty: []
+		});
+
+	it('⭐ RED — a boundary-rejected part beside a rejected one: the rejected part’s finding alone goes back', async () => {
+		const { floor } = await runRound({
+			[BUILD]: boundaryRejected('The build is said to pass a suite it never ran.'),
+			[CHECK]: rejecting('The check reports runs it never made.')
+		});
+		expect(floor?.parts?.map((p) => p.disposition), 'arrangement').toEqual(['INCONCLUSIVE', 'REJECTED', 'SATISFIED']);
+		expect(
+			floor?.parts?.[0]?.observations.map((o) => o.code),
+			'arrangement: Build’s INCONCLUSIVE review records something other than its one fault'
+		).toEqual([reasoningReviewCriteria(session)[1]!.id]);
+		const remediation = classifyFloorRemediation(floor!);
+		expect(remediation.action).toBe('REFINE_SUBJECT');
+		expect(
+			remediation.findings.map((f) => [f.typeId, f.code]),
+			'an INCONCLUSIVE part’s observation was sent back as a finding'
+		).toEqual([[CHECK, reasoningReviewCriteria(session)[0]!.id]]);
+		expect(refineDirective('Build wordfreq.', remediation.findings, remediation.failedParts)).not.toContain(
+			'The build is said to pass a suite it never ran.'
+		);
+	});
+
+	it('⭐ RED — and beside a part whose review failed operationally: the rejected part’s finding alone goes back, the failed part named', async () => {
+		const { floor } = await runRound({
+			[BUILD]: boundaryRejected('The build is said to pass a suite it never ran.'),
+			[CHECK]: rejecting('The check reports runs it never made.'),
+			[ROOT]: noResponse
+		});
+		expect(floor?.parts?.map((p) => p.disposition), 'arrangement').toEqual(['INCONCLUSIVE', 'REJECTED', 'INCONCLUSIVE']);
+		const remediation = classifyFloorRemediation(floor!);
+		expect([remediation.action, remediation.failedParts]).toEqual([
+			'REFINE_SUBJECT',
+			[{ typeId: ROOT, typeName: 'Realize' }]
+		]);
+		expect(
+			remediation.findings.map((f) => [f.typeId, f.code]),
+			'an INCONCLUSIVE part’s observation was sent back as a finding'
+		).toEqual([[CHECK, reasoningReviewCriteria(session)[0]!.id]]);
+	});
+
+	it('⭐ RED — the check’s round: an INCONCLUSIVE part’s MATERIAL observation and a SATISFIED part’s INFORMATIONAL one stay, with and without a failed part', () => {
+		const FOURTH = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Q13';
+		const concluded = [
+			partView(CHECK, 'Check', 'REJECTED', [
+				{ code: 'RR-01-no-problem-substitution', severity: 'BLOCKING', statement: 'Reports a run it never made.' }
+			]),
+			partView(ROOT, 'Realize', 'INCONCLUSIVE', [
+				{ code: 'RR-02-no-obligation-elision', severity: 'MATERIAL', statement: 'An obligation may be dropped.' }
+			]),
+			partView(FOURTH, 'Report', 'SATISFIED', [
+				{ code: 'RR-08-evidence-integrity', severity: 'INFORMATIONAL', statement: 'A note on the evidence.' }
+			])
+		];
+		const failed = partView(
+			BUILD,
+			'Build',
+			'INCONCLUSIVE',
+			[{ code: 'VALIDATOR_EXECUTION_FAILED', severity: 'MATERIAL', statement: 'No reply.' }],
+			false
+		);
+		for (const [label, parts] of [
+			['beside a failed part', [failed, ...concluded]],
+			['with no failed part', concluded]
+		] as const) {
+			const remediation = classifyFloorRemediation(roundOf(parts));
+			expect(remediation.action, label).toBe('REFINE_SUBJECT');
+			expect(
+				remediation.findings.map((f) => [f.typeId, f.code]),
+				`${label}: another part’s observation was sent back as a finding`
+			).toEqual([[CHECK, 'RR-01-no-problem-substitution']]);
+		}
+	});
+
+	it('⭑ CONTROL — two parts that each concluded with findings: both go back, in export order, each carrying its type', () => {
+		const remediation = classifyFloorRemediation(
+			roundOf([
+				partView(BUILD, 'Build', 'CONDITIONALLY_SATISFIED', [
+					{ code: 'RR-03-no-unjustified-scope-reduction', severity: 'MATERIAL', statement: 'Scope narrowed.' }
+				]),
+				partView(CHECK, 'Check', 'REJECTED', [
+					{ code: 'RR-01-no-problem-substitution', severity: 'BLOCKING', statement: 'Reports a run it never made.' }
+				]),
+				partView(ROOT, 'Realize', 'SATISFIED', [])
+			])
+		);
+		expect(remediation.findings.map((f) => [f.typeId, f.code])).toEqual([
+			[BUILD, 'RR-03-no-unjustified-scope-reduction'],
+			[CHECK, 'RR-01-no-problem-substitution']
+		]);
+	});
+});
+
 describe('⭐ Package E, E3 — a PWA with no type had nothing to review', () => {
 	const EMPTY = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5Q01';
 	/** The guidance, verbatim — restated, so a change to it reddens here. */

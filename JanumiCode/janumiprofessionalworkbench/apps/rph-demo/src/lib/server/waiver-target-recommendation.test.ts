@@ -28,7 +28,7 @@ vi.hoisted(() => {
 import { getObject, listDecisions } from '@janumipwb/rph-engine';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { actions, load } from '../../routes/pwa/[id]/+page.server.js';
-import { loadPwaFloor } from './floor.js';
+import { floorBlockedHint, loadPwaFloor } from './floor.js';
 import { dispatch, getEngine, resetEngine } from './workbench.js';
 
 type ActionEvent = Parameters<typeof actions.recordWaiver>[0];
@@ -266,7 +266,7 @@ describe('⭐⭐ package E, E2 — the waiver names the blocking part: its type 
 		typeId: string,
 		assessmentId: string,
 		observations: readonly (typeof SUBJECT_FINDING)[],
-		concludeAs: 'REJECTED' | 'SATISFIED'
+		concludeAs: 'REJECTED' | 'SATISFIED' | 'INCONCLUSIVE'
 	): void {
 		const version = Number(getObject(getEngine(), typeId)?.semanticVersion ?? 1);
 		const subject = { subjectObjectIds: [typeId], subjectSemanticVersions: { [typeId]: version } };
@@ -357,6 +357,60 @@ describe('⭐⭐ package E, E2 — the waiver names the blocking part: its type 
 		expect(decision?.waiver?.downstreamImpactObjectIds, 'the PWA is not the downstream impact').toEqual([PWA]);
 		// ⭐ AND THE PWA'S FLOOR READS IT AS THE PWA'S: the panel's "waiver recorded" badge keys on this.
 		expect(loadPwaFloor(PWA)?.waived, 'the PWA’s floor does not read a waiver of its part').toBe(true);
+	});
+
+	// ⭐ Package E's check, the MINOR finding — A PART WHOSE REVIEW FAILED OPERATIONALLY IS NOT THE PART A WAIVER NAMES BESIDE ONE
+	// THAT RECORDS A FINDING. The failed part blocks too, so the waiver named it, first in export order, and its
+	// VALIDATOR_EXECUTION_FAILED as the criterion waived, in the round E1 answers by revising for the other part's finding.
+	/** What a review that did not execute records, as `assurance-floor-review-failure-hint.e2e.ts` stages it. */
+	const EXECUTION_FAILED = {
+		findingCode: 'VALIDATOR_EXECUTION_FAILED',
+		severity: 'MATERIAL',
+		statement: 'The reviewing tool did not run (staged execution failure).'
+	};
+	/** The waived object and criterion of the waiver the action recorded. */
+	const waivedBy = (decisionId: string) => {
+		const decision = getObject(getEngine(), decisionId) as
+			| { readonly subjectObjectIds?: readonly string[]; readonly waiver?: { readonly waivedCriterionId?: string } }
+			| undefined;
+		return [decision?.subjectObjectIds, decision?.waiver?.waivedCriterionId];
+	};
+
+	it('⛔ RED — a failed part first, a rejected part second: the waiver names the rejected part and its finding', async () => {
+		stagePart(TYPE, 'assess_01ARZ3NDEKTSV4RRFFQ69G5W50', [EXECUTION_FAILED], 'INCONCLUSIVE');
+		stagePart(SECOND, 'assess_01ARZ3NDEKTSV4RRFFQ69G5W60', [SUBJECT_FINDING], 'REJECTED');
+		const floor = loadPwaFloor(PWA);
+		expect(
+			floor?.parts?.map((p) => [p.typeId, p.disposition, p.observations.map((o) => o.code)]),
+			'arrangement: the failed part is not first in the fold'
+		).toEqual([
+			[TYPE, 'INCONCLUSIVE', ['VALIDATOR_EXECUTION_FAILED']],
+			[SECOND, 'REJECTED', ['RR-04']]
+		]);
+		expect(floorBlockedHint(floor!), 'arrangement: the round is not answered by revision beside the failed part').toBe(
+			'REVISE_BESIDE_FAILED_REVIEWS'
+		);
+
+		const offered = await theLoadOffersTheForm();
+		const result = await recordWaiver();
+		expect(result.data?.error, 'arrangement: the waiver was refused').toBeUndefined();
+		expect(offered).toBe(true);
+		expect(waivedBy(result.waived!), 'the waiver named the part whose review failed, not the rejected part’s finding').toEqual([
+			[SECOND],
+			'RR-04'
+		]);
+	});
+
+	it('⭑ CONTROL — a failed part beside SATISFIED ones: no other part records a finding, and the waiver names the failed part, as before', async () => {
+		// The round `assurance-floor-review-failure-hint.e2e.ts` waives through the page's form: the root's review failed, the
+		// rest SATISFIED.
+		stagePart(TYPE, 'assess_01ARZ3NDEKTSV4RRFFQ69G5W70', [EXECUTION_FAILED], 'INCONCLUSIVE');
+		stagePart(SECOND, 'assess_01ARZ3NDEKTSV4RRFFQ69G5W80', [], 'SATISFIED');
+		const offered = await theLoadOffersTheForm();
+		const result = await recordWaiver();
+		expect(result.data?.error, 'the waiver beside a failed review was refused').toBeUndefined();
+		expect(offered, 'the page withholds the form beside a failed review').toBe(true);
+		expect(waivedBy(result.waived!)).toEqual([[TYPE], 'VALIDATOR_EXECUTION_FAILED']);
 	});
 
 	it('⭑ CONTROL — a finding of the PWA’s own policy is waived on the PWA, as before', async () => {
