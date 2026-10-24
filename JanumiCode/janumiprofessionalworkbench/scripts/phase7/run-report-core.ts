@@ -63,7 +63,13 @@ import {
 	type Phase7TypeDeclaration
 } from './pwa-content.js';
 // ⭐ E3 (C2, C5) — half B's units, read from the published PWA in the tree's order, and its authoring floor.
-import { floorDispositions, treeAgainstPlan, TURN_SETTLED, unitsInTreeOrder } from './half-b.js';
+import {
+	floorDispositions,
+	treeAgainstPlan,
+	TURN_SETTLED,
+	unitsInTreeOrder,
+	type FloorDisposition
+} from './half-b.js';
 import {
 	MANIFEST_VERSION,
 	manifestProblems,
@@ -152,11 +158,13 @@ export const NEGATIVE_CONTROL_RESERVE = PHASE7_NEGATIVE_CONTROL_RESERVE;
  * ⭐ P5 package C (F2) — ~~REG-D-110 (1)~~: the sponsor's limit is now the one `REG-D-117` Q10 chose, raising `REG-D-110` (1)'s.
  * ⭐ P6 package L (F1) — ~~REG-D-117 Q10~~: the sponsor's limit is now the one `REG-D-120` Q15 chose, raising `REG-D-110` (1)'s.
  * ⭐ Package Q (F5) — ~~REG-D-120 Q15~~: the sponsor's limit is now the one `REG-D-123` Q26 chose, raising `REG-D-110` (1)'s.
+ * ⭐ The review in parts, package C (B6) — ~~REG-D-123 Q26~~: the sponsor's limit is now the one `REG-D-126` Q32 chose, raising
+ * `REG-D-110` (1)'s.
  */
 export const LIMIT_CAVEAT =
 	`A phase’s own spend can carry the total past the limit: the lane checks the limit before each press, not during one, ` +
 	`and a model unit’s press may spend up to ${PHASE7_UNIT_REVIEWER_CALLS} reviewer calls after its check (REG-D-114 (14), as ` +
-	`amended 2026-10-16; the sponsor’s limit is "about ${PAID_LIMIT}", REG-D-123 Q26, raising REG-D-110 (1)).`;
+	`amended 2026-10-16; the sponsor’s limit is "about ${PAID_LIMIT}", REG-D-126 Q32, raising REG-D-110 (1)).`;
 /** The declared verdicts a complete run signs off: the five units' declared policies, 2 + 2 + 4 + 3 + 3 (§3.2). */
 export const DECLARED_VERDICTS_EXPECTED = 14;
 
@@ -706,8 +714,16 @@ export interface AuthoringSummary {
 	readonly pwaId: string | null;
 	/** The candidate as the lane last read it before acceptance. */
 	readonly candidate: { readonly status: string | null; readonly hash: string | null; readonly detail: string | null };
-	/** The authoring floor's dispositions of the PWA, as the STORE holds them once the commit replayed them. */
-	readonly floor: readonly { readonly policyId: string; readonly state: string }[];
+	/**
+	 * The authoring floor's dispositions of the PWA, as the STORE holds them once the commit replayed them. ⭐ The review in
+	 * parts, B6 — one round of them, the Reasoning Review's row the aggregate of `parts`: each of the PWA's types and its
+	 * review in the round, `MISSING` where the round holds none (`floorDispositions`).
+	 */
+	readonly floor: readonly {
+		readonly policyId: string;
+		readonly state: string;
+		readonly parts?: readonly { readonly typeId: string; readonly typeName: string; readonly state: string }[];
+	}[];
 	/**
 	 * ⭐ C3 — the author's model, as configured, and ~~as the floor recorded the producer it judged~~ ⭐ `REG-D-112` (finding 8)
 	 * as THE TURN'S OWN STREAM named it, its `producer` event (`phase7-operator.ts`, `producerOfStream`): the floor's
@@ -1005,7 +1021,7 @@ export interface LaneLimitCheck {
 	readonly unit: string;
 	/**
 	 * What it was read before: the unit's Begin & Execute, a re-run of it, its sign-off, or a re-run of its declared reviews —
-	 * or Send.
+	 * or Send ⭐ (the review in parts, B6), and Send counted again for the inventory its turn staged (`AUTHORING_INVENTORY_READ`).
 	 */
 	readonly before: string;
 	readonly prior: number;
@@ -1198,14 +1214,21 @@ const authoringOf = (lane: LaneRows): Record<string, unknown> => rec(rec(lane.ru
 
 /** ⛔ The merge's fix round, F3 — what half B's read of the limit before Send is listed as among the lane's reads. */
 const AUTHORING_READ = { unit: 'authoring', before: 'Send' } as const;
+/** ⭐ The review in parts, B6 — and what Send's check counted again for the inventory the turn staged is listed as. */
+const AUTHORING_INVENTORY_READ = 'Send, counted again for the inventory its turn staged';
 
 /**
  * ⛔ The merge's fix round, F3 — HALF B'S FIRST READ OF THE LIMIT, kept on the lane's authoring record (`AuthoringRecord.limitCheck`):
  * read before Send, the authoring floor's worst case counted. None in half A, and none in a dry run, which stops before Send.
+ * ⭐ The review in parts, B6 (design D11) — AND SEND'S CHECK COUNTED AGAIN for the inventory the turn staged, where it staged more
+ * than Send's check anticipated (`AuthoringRecord.inventoryCheck`): so a larger candidate's worst case is stated beside the
+ * smaller estimate, and where it passes the limit the read says so.
  */
 function authoringLimitChecks(lane: LaneRows): LaneLimitCheck[] {
-	const c = laneLimitCheck(AUTHORING_READ.unit, AUTHORING_READ.before, authoringOf(lane).limitCheck);
-	return c === null ? [] : [c];
+	return [
+		laneLimitCheck(AUTHORING_READ.unit, AUTHORING_READ.before, authoringOf(lane).limitCheck),
+		laneLimitCheck(AUTHORING_READ.unit, AUTHORING_INVENTORY_READ, authoringOf(lane).inventoryCheck)
+	].filter((c): c is LaneLimitCheck => c !== null);
 }
 
 /** The run's Undertaking: the one the lane's units belong to, else the store's only one. */
@@ -2627,6 +2650,16 @@ const limitFigures = (c: LaneLimitCheck): string => {
 };
 
 /**
+ * What a read the lane refused held back: the act it was read before. ⭐ The review in parts, B6 — save Send counted again for
+ * the inventory its turn staged, which is read once the turn has settled and holds nothing back: the floor's rounds ran
+ * inside the Send press (`AUTHORING_INVENTORY_READ`; `REG-D-114` (14)).
+ */
+const refusedReadOf = (c: LaneLimitCheck): string =>
+	c.before === AUTHORING_INVENTORY_READ
+		? ': nothing held back, its rounds having run inside the Send press'
+		: ': held back';
+
+/**
  * ⭐ E12's polish (fix2's F8; the lead's delegated decision of 2026-10-15, to be registered) — WHAT THE LANE HELD BACK OF A
  * UNIT'S SIGN-OFF, as stage 7 says it: before which act, why in the lane's own words, and the limit it read; else `otherwise`.
  * ⛔ A sign-off held back before Record Assurance read "its sign-off was never attempted", the words a run cut short reads, and
@@ -3116,7 +3149,7 @@ function stageOneHalfB(ix: Index, lane: LaneRows): MatrixCell {
 			`the request was never sent — the run ended ${str(rec(rec(lane.run).end).reason) || 'with no end recorded'} ` +
 				'before Send — so no candidate was authored for the floor to judge'
 		]);
-	const floor = floorDispositions(ix.ofType('ASSURANCE_ASSESSMENT'), pwaId);
+	const floor = authoringFloorOf(ix, pwaId);
 	const reviewer = floor.find((f) => f.policyId === REASONING_REVIEW)?.evaluator ?? null;
 	// ⭐ The check of 241158f4, finding 1 — ONE READING OF THE ACCEPTANCE (`acceptedHashIn`) for every line and fault below;
 	// and a refused one is said in the server's own words, as the lane kept them (`DesignerActRecord.refusal`).
@@ -3157,6 +3190,8 @@ function stageOneHalfB(ix: Index, lane: LaneRows): MatrixCell {
 			`the reviewer: ${reviewer ?? 'none recorded'}; ${authorRead} (configured: ${configured ?? 'unset'})`,
 			`the accepted hash: ${accepted ?? noHashAccepted(unansweredAcceptance(authoring))}; ` +
 				`the candidate as the lane last read it: ${str(candidate.status) || 'none'}`,
+			// ⭐ The review in parts, B6 — and the Reasoning Review above, by type: the round's complete part set.
+			`the authoring floor's reasoning review, by type: ${partsLineOf(floor)}`,
 			...faults,
 			...authorFaults.faults,
 			...HALF_B_CAVEATS.slice(0, 2).map((c) => `caveat ${c}`)
@@ -3165,6 +3200,31 @@ function stageOneHalfB(ix: Index, lane: LaneRows): MatrixCell {
 		// producer the lane could not read, which names none, and so is unregistered too (`cell`).
 		{ unregistered: faults.length > 0 }
 	);
+}
+
+/**
+ * ⭐ The review in parts, B6 (`REG-D-125`; roadmap 9a.7, "Run records") — THE AUTHORING FLOOR AS THE STORE HOLDS IT: one round
+ * and its complete part set (`floorDispositions`), over the PWA's types, each assessment's floor-run token its correlation
+ * (`correlationOf`). Stage 1 and the authoring summary read it alike. ⛔ Both read each policy's latest assessment of the
+ * PWA, so the Reasoning Review was one PWA-subject review, which a round in parts never records.
+ * ⛔ The PWA's LIVE types, as `resolveHalfBUnits` reads them and as the lane reads the candidate's (the introspection's
+ * `listPwuTypes`) — package C's check, the MATERIAL finding: a type the agent's broker removed stays in the store after the
+ * commit, its status REMOVED (`RemovePwuType`), and read as a part it was an unreviewed one — MISSING — so stage 1 broke on
+ * a SATISFIED floor.
+ */
+function authoringFloorOf(ix: Index, pwaId: string): FloorDisposition[] {
+	return floorDispositions(
+		ix.ofType('ASSURANCE_ASSESSMENT'),
+		pwaId,
+		ix.ofType('PWU_TYPE').filter((t) => str(t.state.pwaId) === pwaId && str(t.state.status) !== 'REMOVED'),
+		(id) => ix.correlationOf.get(id)
+	);
+}
+
+/** ⭐ B6 — the Reasoning Review's parts as one line: each type and its review in the round, in the order the store holds them. */
+function partsLineOf(floor: readonly FloorDisposition[]): string {
+	const parts = floor.find((f) => f.policyId === REASONING_REVIEW)?.parts ?? [];
+	return parts.length === 0 ? 'no type' : parts.map((p) => `${p.typeName} ${p.state}`).join(', ');
 }
 
 /**
@@ -3802,7 +3862,7 @@ function authoringSummary(ix: Index, lane: LaneRows, half: RunHalf): AuthoringSu
 	if (half !== 'B') return null;
 	const a = authoringOf(lane);
 	const pwaId = str(a.pwaId) || null;
-	const floor = pwaId === null ? [] : floorDispositions(ix.ofType('ASSURANCE_ASSESSMENT'), pwaId);
+	const floor = pwaId === null ? [] : authoringFloorOf(ix, pwaId);
 	const candidate = rec(a.candidate);
 	return {
 		pwaId,
@@ -3811,7 +3871,11 @@ function authoringSummary(ix: Index, lane: LaneRows, half: RunHalf): AuthoringSu
 			hash: str(candidate.candidateHash) || null,
 			detail: str(candidate.detail) || null
 		},
-		floor: floor.map((f) => ({ policyId: f.policyId, state: f.state })),
+		floor: floor.map((f) => ({
+			policyId: f.policyId,
+			state: f.state,
+			...(f.parts === undefined ? {} : { parts: f.parts.map((p) => ({ typeId: p.typeId, typeName: p.typeName, state: p.state })) })
+		})),
 		author: {
 			configured: str(rec(a.authorModel).configured) || null,
 			// ⭐ C3 — as the page's turn named it: the store records no author for a turn.
@@ -4067,7 +4131,7 @@ function unitLines(r: RunReport): string[] {
 		// ⭐ E12's polish (fix2's F8; the lead's delegated decision of 2026-10-15, to be registered) — and the lane's own reads.
 		`- **The lane's own reads of the limit, each before a paid act (design D8; E12F F2):** ${r.reviewerCalls.laneLimitChecks.length}.`,
 		...r.reviewerCalls.laneLimitChecks.map(
-			(c) => `  - ${c.unit}, before ${c.before}: ${limitFigures(c)}${c.allowed ? '' : ': held back'}.`
+			(c) => `  - ${c.unit}, before ${c.before}: ${limitFigures(c)}${c.allowed ? '' : refusedReadOf(c)}.`
 		),
 		// ⭐ `REG-D-114` (14), as amended 2026-10-16 — the reads' plain caveat (`LIMIT_CAVEAT`).
 		`- **Caveat:** ${r.reviewerCalls.limitCaveat}`
@@ -4101,6 +4165,8 @@ function authoringLines(r: RunReport): string[] {
 		`- **The PWA:** ${a.pwaId ?? 'none'}; the candidate as last read: ${a.candidate.status ?? 'none'}` +
 			`${inParens(a.candidate.detail)}, ${a.candidate.hash ?? 'no hash'}.`,
 		`- **The authoring floor, as the store holds it:** ${a.floor.map((f) => `${f.policyId} ${f.state}`).join(', ') || 'none'}.`,
+		// ⭐ The review in parts, B6 — and its Reasoning Review by type: the complete part set of the round.
+		`- **Its reasoning review, by type:** ${a.floor.find((f) => f.policyId === REASONING_REVIEW)?.parts?.map((p) => `${p.typeName} ${p.state}`).join(', ') || 'no type'}.`,
 		`- **The reviewer:** ${a.reviewer ?? 'none recorded'}. **The author:** ${a.author.resolved ?? 'none recorded'} ` +
 			`(configured: ${a.author.configured ?? 'unset'}).`,
 		// ⭐ R3-B F5 — ~~${a.acceptedHash ?? 'none'}~~: with no answer, none RECORDED, and the server may still have accepted one.

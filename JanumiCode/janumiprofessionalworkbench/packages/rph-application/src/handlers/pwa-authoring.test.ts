@@ -16,6 +16,8 @@ import {
 	PwuTypeRedefinedPayloadSchema
 } from '@janumipwb/rph-contracts';
 import type { AssuranceDispositionRecommendation } from '@janumipwb/rph-contracts';
+import { pwaPartsFloorBlock } from './floor-gate.js';
+import type { HandlerContext } from './kit.js';
 
 // Three of the four suites below act as ONE human and never assert who that is, so they take the shared
 // operator credential. The floor-gate suite is the exception — WHO authored the PWA is the variable its whole
@@ -674,7 +676,8 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 		commandType: string,
 		payload: unknown,
 		id: string,
-		type: string
+		type: string,
+		correlationId = 'gate'
 	) {
 		const n = ++seq;
 		const command: DomainCommand = {
@@ -684,7 +687,7 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 			targetAggregateType: type,
 			targetAggregateId: id,
 			issuedAt: TS,
-			correlationId: 'gate',
+			correlationId,
 			idempotencyKey: `k-${n}`,
 			payload
 		};
@@ -734,50 +737,71 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 	const pwaVersion = () =>
 		Number((store.loadObject(AI_PWA)?.state as { semanticVersion?: number }).semanticVersion ?? 1);
 
+	/** A type's CURRENT semanticVersion, read from engine state — the version its part's review must be bound to. */
+	const typeVersion = (typeId: string) =>
+		Number((store.loadObject(typeId)?.state as { semanticVersion?: number }).semanticVersion ?? 1);
+
+	/** Record ONE floor assessment of `subjectId` at `version`, CONCLUDED as given, in the round `correlationId` names. */
+	function recordAssessment(
+		policyId: string,
+		disposition: AssuranceDispositionRecommendation,
+		subjectId: string,
+		version: number,
+		correlationId = 'gate'
+	): string {
+		const assessmentId = ulid('asmt');
+		d(
+			SVC,
+			'RequestAssuranceAssessment',
+			{
+				assessmentId,
+				assurancePolicyId: policyId,
+				policyVersion: '1.0.0',
+				subjectObjectIds: [subjectId],
+				subjectSemanticVersions: { [subjectId]: version },
+				claimIds: []
+			},
+			assessmentId,
+			'ASSURANCE_ASSESSMENT',
+			correlationId
+		);
+		// THE READY -> ASSESSING ARROW (REG-F-021 increment 3): requestAssuranceAssessment now lands the
+		// assessment in READY, so it must be BEGUN before it can be assessed or completed.
+		d(SVC, 'BeginAssuranceAssessment', {}, assessmentId, 'ASSURANCE_ASSESSMENT', correlationId);
+		d(
+			SVC,
+			'CompleteAssuranceAssessment',
+			{
+				validatorResult: floorValidatorResult({
+					assessmentId,
+					policyId,
+					subjectId,
+					subjectSemanticVersion: version,
+					disposition
+				})
+			},
+			assessmentId,
+			'ASSURANCE_ASSESSMENT',
+			correlationId
+		);
+		return assessmentId;
+	}
+
 	// Record a floor assessment per policy at the given disposition (as the Assurance Service), against `version` —
 	// defaulting to whatever version the PWA is ACTUALLY at, i.e. the assurance run reviews the graph as it stands.
 	// Pass a different value to exercise version-binding.
+	// ⭐ The review in parts, B3 (`REG-D-125`): the Reasoning Review is recorded under the PWA's one type, its part, at the
+	// type's current version — the two deterministic policies under the PWA — all in one round.
 	function recordFloor(
 		dispositions: Record<string, AssuranceDispositionRecommendation>,
 		version = pwaVersion()
 	): Record<string, string> {
 		const assessmentIds: Record<string, string> = {};
-		for (const [policyId, disposition] of Object.entries(dispositions)) {
-			const assessmentId = ulid('asmt');
-			assessmentIds[policyId] = assessmentId;
-			d(
-				SVC,
-				'RequestAssuranceAssessment',
-				{
-					assessmentId,
-					assurancePolicyId: policyId,
-					policyVersion: '1.0.0',
-					subjectObjectIds: [AI_PWA],
-					subjectSemanticVersions: { [AI_PWA]: version },
-					claimIds: []
-				},
-				assessmentId,
-				'ASSURANCE_ASSESSMENT'
-			);
-			// THE READY -> ASSESSING ARROW (REG-F-021 increment 3): requestAssuranceAssessment now lands the
-			// assessment in READY, so it must be BEGUN before it can be assessed or completed.
-			d(SVC, 'BeginAssuranceAssessment', {}, assessmentId, 'ASSURANCE_ASSESSMENT');
-			d(
-				SVC,
-				'CompleteAssuranceAssessment',
-				{
-					validatorResult: floorValidatorResult({
-						assessmentId,
-						policyId,
-						subjectId: AI_PWA,
-						subjectSemanticVersion: version,
-						disposition
-					})
-				},
-				assessmentId,
-				'ASSURANCE_ASSESSMENT'
-			);
-		}
+		for (const [policyId, disposition] of Object.entries(dispositions))
+			assessmentIds[policyId] =
+				policyId === REVIEW
+					? recordAssessment(policyId, disposition, AI_ROOT, typeVersion(AI_ROOT))
+					: recordAssessment(policyId, disposition, AI_PWA, version);
 		return assessmentIds;
 	}
 
@@ -924,11 +948,13 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 				r.error?.code,
 				`${omitted}: the refusal must come from the floor gate, not from the state machine or the schema`
 			).toBe('RPH_INVARIANT_VIOLATION');
+			// ⭐ B3 — the Reasoning Review is the part's, named with its type.
+			const named = omitted === REVIEW ? `${REVIEW} of ${AI_ROOT}` : omitted;
 			expect(
 				r.error?.message,
 				`${omitted}: the refusal must NAME this policy as the one that is missing — every floor refusal ` +
 					`carries the same status and code, so the message is the only thing that tells the members apart`
-			).toContain(`${omitted}=MISSING`);
+			).toContain(`${named}=MISSING`);
 			expect(pub(), `${omitted}: a blocked publish must not have moved the PWA`).toBe('VALIDATED');
 		}
 	);
@@ -959,6 +985,135 @@ describe('PublishPwa protected-transition gate — the de minimis assurance floo
 			`a floor with every canonical policy SATISFIED at the current version must PERMIT publish: ${JSON.stringify(r.error)}`
 		).toBe('ACCEPTED');
 		expect(pub(), 'and the PWA must actually have been published').toBe('PUBLISHED');
+	});
+
+	// ── ⭐⭐ THE REVIEW IN PARTS, B3 (`REG-D-125`; DESIGN-authoring-review-in-parts.md D6, D13) ──────────────────────────────────
+	// The authoring floor reviews each type of a PWA as a part, under the type, and records one round under one floor-run
+	// token (the demo's `runPwaFloor`). So publication asks for the PWA's two deterministic assessments and EVERY live type's
+	// review, all SATISFIED at their current versions, in ONE round — a fold of the recorded assessments.
+	describe('⭐⭐ B3 — publication asks the complete part-review set of one round', () => {
+		const CHILD = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5R11';
+		/** An AGENT-produced PWA of a root and its one child, driven to VALIDATED. */
+		function authorValidatedTwoTypePwa() {
+			d(AGENT, 'CreatePwa', { pwaId: AI_PWA, name: 'Agent-authored', description: 'd', domain: 'software', version: '1.0.0' }, AI_PWA, 'PROFESSIONAL_WORK_ARCHITECTURE');
+			d(AGENT, 'DefinePwuType', { pwuTypeId: CHILD, pwaId: AI_PWA, pwuKind: 'PRODUCT_IMPLEMENTATION', name: 'C', purpose: 'child', isRoot: false }, CHILD, 'PWU_TYPE');
+			d(AGENT, 'DefinePwuType', { pwuTypeId: AI_ROOT, pwaId: AI_PWA, pwuKind: 'PRODUCT_REALIZATION', name: 'R', purpose: 'root', isRoot: true, permittedChildTypeIds: [CHILD] }, AI_ROOT, 'PWU_TYPE');
+			d(AGENT, 'SubmitPwaForReview', {}, AI_PWA, 'PROFESSIONAL_WORK_ARCHITECTURE');
+			expect(d(AGENT, 'ValidatePwa', {}, AI_PWA, 'PROFESSIONAL_WORK_ARCHITECTURE').status, 'arrangement: validated').toBe('ACCEPTED');
+		}
+		const deterministic = (correlationId = 'gate') => {
+			recordAssessment(SCHEMA, 'SATISFIED', AI_PWA, pwaVersion(), correlationId);
+			recordAssessment(IDENTITY, 'SATISFIED', AI_PWA, pwaVersion(), correlationId);
+		};
+		const part = (typeId: string, disposition: AssuranceDispositionRecommendation = 'SATISFIED', correlationId = 'gate') =>
+			recordAssessment(REVIEW, disposition, typeId, typeVersion(typeId), correlationId);
+
+		it('⭐ CONTROL — every type reviewed SATISFIED, beside the deterministic policies, in one round: published', () => {
+			authorValidatedTwoTypePwa();
+			deterministic();
+			part(AI_ROOT);
+			part(CHILD);
+			const r = publish();
+			expect(r.status, JSON.stringify(r.error)).toBe('ACCEPTED');
+			expect(pub()).toBe('PUBLISHED');
+		});
+
+		it('⛔ RED — a type no review was recorded for blocks publication, naming its part', () => {
+			// PREDICTED RED BEFORE B3: the gate asked for a review of the PWA itself; here no part's absence could be named.
+			authorValidatedTwoTypePwa();
+			deterministic();
+			part(AI_ROOT);
+			const r = publish();
+			expect(r.status).toBe('REJECTED');
+			expect(r.error?.message).toContain(`(${REVIEW} of ${CHILD}=MISSING)`);
+			expect(pub()).toBe('VALIDATED');
+		});
+
+		it('⛔ a part that is REJECTED blocks publication beside SATISFIED ones — the strictest part stands', () => {
+			authorValidatedTwoTypePwa();
+			deterministic();
+			part(AI_ROOT);
+			part(CHILD, 'REJECTED');
+			const r = publish();
+			expect(r.status).toBe('REJECTED');
+			expect(r.error?.message).toContain(`(${REVIEW} of ${CHILD}=REJECTED)`);
+		});
+
+		it('⛔ a part recorded in another round counts for nothing: a newer round of the deterministic policies does not borrow it', () => {
+			authorValidatedTwoTypePwa();
+			part(AI_ROOT, 'SATISFIED', 'round-1');
+			part(CHILD, 'SATISFIED', 'round-1');
+			deterministic('round-2');
+			part(AI_ROOT, 'SATISFIED', 'round-2');
+			const r = publish();
+			expect(r.status).toBe('REJECTED');
+			expect(r.error?.message, 'the older round’s review of the child was borrowed').toContain(
+				`(${REVIEW} of ${CHILD}=MISSING)`
+			);
+		});
+
+		it('⛔ and a newer part recorded outside the round of the deterministic policies blocks them, not they it', () => {
+			authorValidatedTwoTypePwa();
+			deterministic('round-1');
+			part(AI_ROOT, 'SATISFIED', 'round-1');
+			part(CHILD, 'SATISFIED', 'round-2');
+			const r = publish();
+			expect(r.status).toBe('REJECTED');
+			expect(r.error?.message).toContain(`${SCHEMA}=MISSING, ${IDENTITY}=MISSING, ${REVIEW} of ${AI_ROOT}=MISSING)`);
+		});
+
+		it('⛔ a part bound to another version of its type is stale, and blocks', () => {
+			authorValidatedTwoTypePwa();
+			deterministic();
+			part(AI_ROOT);
+			recordAssessment(REVIEW, 'SATISFIED', CHILD, typeVersion(CHILD) + 1);
+			const r = publish();
+			expect(r.status).toBe('REJECTED');
+			expect(r.error?.message).toContain(`(${REVIEW} of ${CHILD}=MISSING)`);
+		});
+
+		it('⛔ a review of the PWA as a whole graph counts for no part', () => {
+			authorValidatedTwoTypePwa();
+			deterministic();
+			recordAssessment(REVIEW, 'SATISFIED', AI_PWA, pwaVersion());
+			const r = publish();
+			expect(r.status).toBe('REJECTED');
+			// The parts in the store's order of the types: the child was defined first.
+			expect(r.error?.message).toContain(`(${REVIEW} of ${CHILD}=MISSING, ${REVIEW} of ${AI_ROOT}=MISSING)`);
+		});
+
+		it('⛔ a PWA no agent created, whose floor WAS recorded, is gated by it: a rejected part blocks it', () => {
+			// The floor applies to an AI-produced PWA AND to any PWA that has a recorded floor — the demo's PWAs are created
+			// by a person and authored by an agent's turn, whose floor is recorded.
+			d(HUMAN, 'CreatePwa', { pwaId: AI_PWA, name: 'Human-created', description: 'd', domain: 'software', version: '1.0.0' }, AI_PWA, 'PROFESSIONAL_WORK_ARCHITECTURE');
+			d(HUMAN, 'DefinePwuType', { pwuTypeId: AI_ROOT, pwaId: AI_PWA, pwuKind: 'PRODUCT_REALIZATION', name: 'R', purpose: 'root', isRoot: true }, AI_ROOT, 'PWU_TYPE');
+			d(HUMAN, 'SubmitPwaForReview', {}, AI_PWA, 'PROFESSIONAL_WORK_ARCHITECTURE');
+			expect(d(HUMAN, 'ValidatePwa', {}, AI_PWA, 'PROFESSIONAL_WORK_ARCHITECTURE').status, 'arrangement: validated').toBe('ACCEPTED');
+			deterministic();
+			part(AI_ROOT, 'REJECTED');
+			const r = d(HUMAN, 'PublishPwa', { rootPwuTypeId: AI_ROOT }, AI_PWA, 'PROFESSIONAL_WORK_ARCHITECTURE');
+			expect(r.status).toBe('REJECTED');
+			expect(r.error?.message).toContain(`(${REVIEW} of ${AI_ROOT}=REJECTED)`);
+		});
+
+		it('⛔ a PWA with no type has no review at all: its review is missing, never a vacuous pass', () => {
+			// ⚠ Not reachable through PublishPwa — validation requires a root — so the gate's own function is asked.
+			authorValidatedAiPwa();
+			deterministic();
+			const ctx = { store } as unknown as HandlerContext;
+			expect(pwaPartsFloorBlock(ctx, AI_PWA, { aiProduced: true, pwaVersion: pwaVersion(), parts: [] })).toEqual([
+				{ policyId: REVIEW, disposition: 'MISSING' }
+			]);
+			// CONTROL — the same deterministic round with its one part reviewed: nothing blocks.
+			part(AI_ROOT);
+			expect(
+				pwaPartsFloorBlock(ctx, AI_PWA, {
+					aiProduced: true,
+					pwaVersion: pwaVersion(),
+					parts: [{ subjectId: AI_ROOT, version: typeVersion(AI_ROOT) }]
+				})
+			).toBeNull();
+		});
 	});
 
 	it('a floor recorded against a STALE PWA version does not authorize publish (version-binding)', () => {

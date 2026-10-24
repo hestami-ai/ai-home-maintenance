@@ -15,7 +15,7 @@
 // only contracts/domain/ports, so the edge is acyclic). The edge is taken (see assurance.ts), so the copy is gone.
 import { FLOOR_POLICY_IDS } from '@janumipwb/rph-assurance';
 import type { ExecutionProvenance } from '@janumipwb/rph-contracts';
-import { latestAssessmentByPolicy } from './assessment-index.js';
+import { latestAssessmentByPolicy, type SubjectAssessmentRecord } from './assessment-index.js';
 import type { HandlerContext } from './kit.js';
 
 export const FLOOR_POLICY_IDS_REQUIRED = [
@@ -254,6 +254,8 @@ export function unassessableAiContentBlock(input: FloorSubjectAdmissibility): st
 
 export interface FloorBlock {
 	readonly policyId: string;
+	/** ⭐ The review in parts, B3 — the part a blocking review is of: its PWU Type. Absent on a policy over the subject. */
+	readonly subjectId?: string;
 	readonly disposition: string;
 }
 
@@ -291,5 +293,87 @@ export function floorGateBlock(
 	})
 		.filter((r) => r.disposition !== 'SATISFIED')
 		.map((r) => ({ policyId: r.policyId, disposition: r.disposition }));
+	return blocking.length === 0 ? null : blocking;
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, the review in parts, B3 (`REG-D-125`; DESIGN-authoring-review-in-parts.md D5, D6, D13) — THE FLOOR
+ * OF AN AUTHORED PWA WHOSE REASONING REVIEW IS IN PARTS, decided at its protected transition. Its two deterministic floor
+ * policies are the PWA's own assessments; its Reasoning Review is one assessment per live type of it (`parts`), every
+ * type reviewed. Each must be SATISFIED at its subject's current semantic version, and ALL IN ONE ROUND: the floor run of
+ * the latest of them, named by the correlation every assessment of that round was requested under (the demo's
+ * `runPwaFloor` records the round under one floor-run token). So a part that is missing, bound to another version,
+ * recorded in another round, or not SATISFIED blocks the transition, and so does a PWA with no type. ⛔ No aggregate
+ * assessment is recorded or consulted: this is a fold of the recorded assessments, and a Reasoning Review of the PWA as a
+ * whole graph counts for no part. Returns null when the transition is permitted — the floor does not apply (not
+ * AI-produced, and nothing assessed), or every row is SATISFIED. As unconditional as `floorGateBlock`: no waiver is
+ * consulted (ASR-3; `REG-F-202`).
+ */
+export function pwaPartsFloorBlock(
+	ctx: HandlerContext,
+	pwaId: string,
+	opts: {
+		readonly aiProduced: boolean;
+		readonly pwaVersion: number;
+		readonly parts: readonly FloorSubject[];
+	}
+): FloorBlock[] | null {
+	const latest = latestAssessmentByPolicy(ctx, pwaId);
+	const rows: {
+		policyId: string;
+		subjectId?: string;
+		rec?: SubjectAssessmentRecord;
+		version: number;
+	}[] = [
+		{
+			policyId: FLOOR_POLICY_IDS.SCHEMA_INVARIANT,
+			rec: latest.get(FLOOR_POLICY_IDS.SCHEMA_INVARIANT),
+			version: opts.pwaVersion
+		},
+		{
+			policyId: FLOOR_POLICY_IDS.IDENTITY_PROVENANCE,
+			rec: latest.get(FLOOR_POLICY_IDS.IDENTITY_PROVENANCE),
+			version: opts.pwaVersion
+		},
+		...opts.parts.map((part) => ({
+			policyId: FLOOR_POLICY_IDS.REASONING_REVIEW,
+			subjectId: part.subjectId,
+			rec: latestAssessmentByPolicy(ctx, part.subjectId).get(FLOOR_POLICY_IDS.REASONING_REVIEW),
+			version: part.version
+		}))
+	];
+	if (!opts.aiProduced && rows.every((r) => r.rec === undefined)) return null;
+	// Each assessment's round — the correlation its first event was recorded under — and that event's place in the log.
+	const roundOf = new Map<string, { readonly correlationId: string; readonly at: number }>();
+	ctx.store.readAllEvents().forEach((e, at) => {
+		if (e.aggregateType === 'ASSURANCE_ASSESSMENT' && !roundOf.has(e.aggregateId))
+			roundOf.set(e.aggregateId, { correlationId: e.correlationId, at });
+	});
+	// The latest of them, by `updatedAt`, a tie to the one recorded later. Every row's assessment was recorded, so the log
+	// holds its first event.
+	const order = (rec: SubjectAssessmentRecord) => roundOf.get(rec.assessmentId)!.at;
+	let newest: SubjectAssessmentRecord | undefined;
+	for (const { rec } of rows)
+		if (
+			rec &&
+			(!newest || rec.at > newest.at || (rec.at === newest.at && order(rec) > order(newest)))
+		)
+			newest = rec;
+	const round = newest === undefined ? undefined : roundOf.get(newest.assessmentId)?.correlationId;
+	const blocking: FloorBlock[] = rows
+		.map(({ policyId, subjectId, rec, version }) => ({
+			policyId,
+			...(subjectId === undefined ? {} : { subjectId }),
+			disposition:
+				rec &&
+				rec.subjectSemanticVersion === version &&
+				roundOf.get(rec.assessmentId)?.correlationId === round
+					? rec.assessmentState
+					: 'MISSING'
+		}))
+		.filter((r) => r.disposition !== 'SATISFIED');
+	// ⛔ A PWA WITH NO TYPE HAS NO REVIEW AT ALL: its review is missing, never a vacuous pass.
+	if (opts.parts.length === 0)
+		blocking.push({ policyId: FLOOR_POLICY_IDS.REASONING_REVIEW, disposition: 'MISSING' });
 	return blocking.length === 0 ? null : blocking;
 }

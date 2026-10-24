@@ -32,15 +32,29 @@ import { SESSION_CREDENTIAL } from './identity.js';
 import { dispatch, getEngine, resetEngine } from './workbench.js';
 
 const PWA = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5J00';
+/** ⭐ The review in parts, B3 (`REG-D-125`) — the PWA's one type: its review, and so its reviewer's answer, is the part's. */
+const ROOT = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5J10';
 const PRODUCER: FloorProducer = { agentId: 'jpwb-authoring-agent', modelId: 'pi-authoring', providerId: 'janumi' };
 
 /** `load` only ever reads `params.id`; the rest of the SvelteKit event is not touched. */
 const event = { params: { id: PWA } } as unknown as Parameters<typeof load>[0];
+type Answer = { readonly attemptOrdinal: number; readonly answer?: string };
 type Shown = {
 	readonly floor?: { readonly policies: readonly { readonly policyId: string; readonly disposition: string }[] };
-	readonly reviewerAnswer?: { readonly attemptOrdinal: number; readonly answer?: string };
+	readonly reviewerAnswer?: Answer;
+	readonly typeReviews: readonly { readonly typeId: string; readonly answer?: Answer }[];
 };
-const page = async (): Promise<Shown> => (await load(event)) as Shown;
+/**
+ * ⭐ B3 — the page's load, its one part's answer read where the review now is: under the part (~~`partAnswers`~~ ⭐ B5:
+ * `typeReviews`, each type's own review, its answer with it). ⛔ And the PWA's own answer is asked to be absent every time: a
+ * round in parts records no reviewer call under the PWA.
+ */
+const page = async (): Promise<Shown & { readonly reviewerAnswer?: Answer }> => {
+	const shown = (await load(event)) as Shown;
+	expect(shown.reviewerAnswer, 'the PWA itself has no reviewer answer once its review is in parts').toBeUndefined();
+	expect(shown.typeReviews.map((p) => p.typeId), 'the parts are not the round’s').toEqual([ROOT]);
+	return { ...shown, reviewerAnswer: shown.typeReviews[0]!.answer };
+};
 
 /** A reply answering every criterion of the seeded policy, met — told apart from another by `run`. */
 const answering = (run: string): string =>
@@ -76,6 +90,19 @@ beforeEach(() => {
 		version: '1.0.0'
 	});
 	expect(created.status, `arrangement: CreatePwa — ${created.error?.message ?? ''}`).toBe('ACCEPTED');
+	const typed = dispatch('DefinePwuType', 'PWU_TYPE', ROOT, {
+		pwuTypeId: ROOT,
+		pwaId: PWA,
+		pwuKind: 'PLAN',
+		name: 'Plan',
+		purpose: 'Plan the work',
+		isRoot: true,
+		permittedChildTypeIds: [],
+		requiredInputs: [],
+		requiredOutputs: [],
+		requiredAssurancePolicyIds: []
+	});
+	expect(typed.status, `arrangement: DefinePwuType — ${typed.error?.message ?? ''}`).toBe('ACCEPTED');
 });
 afterEach(() => {
 	clearAuthoringTurns();

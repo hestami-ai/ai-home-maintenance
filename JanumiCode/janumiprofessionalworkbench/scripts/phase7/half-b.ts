@@ -14,7 +14,8 @@
 //     `packages/rph-projections/src/composition-plan.ts`), read back from the store rather than from the store's listing;
 //   · each unit's SLUG, from its title, so the archive and the report name the agent's units as they name §3.2's;
 //   · ⭐ `REG-D-112` — the units HELD TO THE PLAN INSTANTIATION MAKES of the PWA, per (parent, type) (`treeAgainstPlan`);
-//   · the authoring floor's dispositions, read from the assessments of the PWA.
+//   · the authoring floor's dispositions, read from ~~the assessments of the PWA~~ ⭐ (the review in parts, B6) the latest
+//     round of the PWA's floor: its two deterministic assessments of the PWA, and each of its types' review a part.
 // ⭑ PURE: Playwright, bun and vitest load it alike, and the run report reads an archive with nothing of the server in
 // it. ~~It imports only the content module.~~ ⭐ `REG-D-112` (E3's review, finding 4): and the product's own planner,
 // `planComposition` — a pure function of the types, from the projections package (data only, never a write target) —
@@ -312,29 +313,114 @@ export function identityOf(actor: unknown): string | null {
 	return model || provider || str(a.displayName) || null;
 }
 
-/** One floor policy's latest assessment of the PWA: its state, who judged it, and whose work it judged. */
+/**
+ * ⭐ The review in parts, B6 (`REG-D-125`; design D6) — one type's Reasoning Review in the round: its state, `MISSING` where
+ * the round holds none, and who judged it.
+ */
+export interface FloorPartDisposition {
+	readonly typeId: string;
+	readonly typeName: string;
+	readonly state: string;
+	readonly evaluator: string | null;
+}
+
+/** One floor policy's assessment of the PWA in the round: its state, who judged it, and whose work it judged. */
 export interface FloorDisposition {
 	readonly policyId: string;
-	/** `MISSING` when the record holds no assessment of the PWA under this policy. */
+	/** `MISSING` when the round holds no assessment under this policy. */
 	readonly state: string;
 	readonly evaluator: string | null;
 	readonly producer: string | null;
+	/**
+	 * ⭐ The review in parts, B6 — on the Reasoning Review's row alone: every one of the PWA's types, in the order given, with
+	 * its review in the round. The row's `state` is their aggregate (`partsState`).
+	 */
+	readonly parts?: readonly FloorPartDisposition[];
 }
 
 /**
- * ⭐ C1 — THE FLOOR'S DISPOSITIONS of the PWA `pwaId`: each policy's LATEST assessment of it, in the plan's order — the
- * last in `assessments`' order, which is the record's. Read from a candidate's fork before acceptance, and from the store
- * after, where the commit replayed them unchanged.
+ * ⭐ C1 — THE FLOOR'S DISPOSITIONS of the PWA `pwaId`, in the plan's order. Read from a candidate's fork before acceptance,
+ * and from the store after, where the commit replayed them unchanged.
+ * ⭐⭐ The review in parts, B6 (`REG-D-125`; design D6; roadmap 9a.7, "Run records") — ONE ROUND, AND ITS COMPLETE PART SET.
+ * The floor reviews each type of the PWA as a part, under the type, and records a round under one floor-run token, the
+ * correlation each of its assessments carries (`tokenOf`). The round is the token of the LAST floor assessment in
+ * `assessments`' order, which is the record's, over the PWA's two deterministic policies or one of `types`' Reasoning
+ * Review. Each policy's row is its last assessment in that round, and the Reasoning Review's row is the aggregate of every
+ * one of `types` (`parts`), each its last review in the round or `MISSING` — its evaluator and producer the first type's.
+ * ⛔ ~~Without the types, the PWA's own review, as before.~~ A Reasoning Review of the PWA as a whole is in no round's
+ * inventory and names no round, so the row is never one PWA-subject review. ⚠ The version a review is bound to is not
+ * compared: the lane reads the candidate as its turn settled, and the report the store after the commit, and no type
+ * changes after the round in either.
  */
-export function floorDispositions(assessments: readonly Row[], pwaId: string): FloorDisposition[] {
-	const ofPwa = assessments.filter((a) => strs(a.state.subjectObjectIds)[0] === pwaId);
+export function floorDispositions(
+	assessments: readonly Row[],
+	pwaId: string,
+	types: readonly Row[],
+	tokenOf: (assessmentId: string) => string | undefined
+): FloorDisposition[] {
+	const typeIds = new Set(types.map((t) => t.id));
+	const subjectOf = (a: Row): string | undefined => strs(a.state.subjectObjectIds)[0];
+	const floorOf = assessments.filter((a) =>
+		str(a.state.assurancePolicyId) === 'floor.reasoning-review'
+			? typeIds.has(subjectOf(a) ?? '')
+			: subjectOf(a) === pwaId && (AUTHORING_FLOOR_POLICIES as readonly string[]).includes(str(a.state.assurancePolicyId))
+	);
+	const last = floorOf.at(-1);
+	const round = floorOf.filter((a) => last !== undefined && tokenOf(a.id) === tokenOf(last.id));
+	const latestOf = (subjectId: string, policyId: string) =>
+		round
+			.filter((a) => subjectOf(a) === subjectId && str(a.state.assurancePolicyId) === policyId)
+			.at(-1);
 	return AUTHORING_FLOOR_POLICIES.map((policyId) => {
-		const latest = ofPwa.filter((a) => str(a.state.assurancePolicyId) === policyId).at(-1);
+		if (policyId !== 'floor.reasoning-review') {
+			const latest = latestOf(pwaId, policyId);
+			return {
+				policyId,
+				state: latest === undefined ? 'MISSING' : str(latest.state.assessmentState),
+				evaluator: identityOf(latest?.state.evaluator),
+				producer: identityOf(latest?.state.producer)
+			};
+		}
+		const reviews = types.map((t) => latestOf(t.id, policyId));
+		const parts = types.map((t, i): FloorPartDisposition => {
+			const review = reviews[i];
+			return {
+				typeId: t.id,
+				typeName: str(t.state.name) || t.id,
+				state: review === undefined ? 'MISSING' : str(review.state.assessmentState),
+				evaluator: identityOf(review?.state.evaluator)
+			};
+		});
 		return {
 			policyId,
-			state: latest === undefined ? 'MISSING' : str(latest.state.assessmentState),
-			evaluator: identityOf(latest?.state.evaluator),
-			producer: identityOf(latest?.state.producer)
+			state: partsState(parts.map((p) => p.state)),
+			evaluator: identityOf(reviews[0]?.state.evaluator),
+			producer: identityOf(reviews[0]?.state.producer),
+			parts
 		};
 	});
+}
+
+/**
+ * ⭐ The review in parts, B6 — each assessment's floor-run token, as `floorDispositions` reads a round: the correlation of the
+ * first of `events` that names the assessment and carries one, as the run report reads its store (`correlationOf`). The lane
+ * hands it a staged candidate's own completions (`completionEvents`), each a plan's, under its round's token.
+ */
+export function correlationsOf(events: readonly Readonly<Record<string, unknown>>[]): (assessmentId: string) => string | undefined {
+	const tokens = new Map<string, string>();
+	for (const e of events) {
+		const id = str(e.aggregateId);
+		if (id !== '' && str(e.correlationId) !== '' && !tokens.has(id)) tokens.set(id, str(e.correlationId));
+	}
+	return (assessmentId) => tokens.get(assessmentId);
+}
+
+/**
+ * ⭐ B3 — the strictest of the parts' review states: REJECTED where one is, else MISSING where a type has none (or there is no
+ * type at all), else the first that is not SATISFIED, else SATISFIED.
+ */
+function partsState(states: readonly string[]): string {
+	if (states.includes('REJECTED')) return 'REJECTED';
+	if (states.length === 0 || states.includes('MISSING')) return 'MISSING';
+	return states.find((s) => s !== 'SATISFIED') ?? 'SATISFIED';
 }

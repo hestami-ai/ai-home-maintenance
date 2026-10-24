@@ -81,7 +81,8 @@ import { STORE_FILE } from './run-folder';
 //      fix round, F1)~~ ⭐ one try's reserve (`REG-D-114` (14), as amended 2026-10-16), AT MOST (the one rule, the lead's
 //      delegated decision of 2026-10-16, registered as REG-D-114 (14)) the sponsor's limit — ~~150~~ ~~200 (`REG-D-105`
 //      (1))~~ ~~⭐ 450 (`REG-D-110` (1))~~ ~~⭐ 600 (`REG-D-117` Q10, raising `REG-D-110` (1)'s)~~ ~~⭐ 650 (`REG-D-120` Q15,
-//      raising `REG-D-110` (1)'s)~~ ⭐ 800 (`REG-D-123` Q26, raising `REG-D-110` (1)'s), `lane-config.ts`'s
+//      raising `REG-D-110` (1)'s)~~ ~~⭐ 800 (`REG-D-123` Q26, raising `REG-D-110` (1)'s)~~ ⭐ 900 (`REG-D-126` Q32, raising
+//      `REG-D-110` (1)'s), `lane-config.ts`'s
 //      `PHASE7_PAID_LIMIT` — or the run ends `paid-limit`. Each press waits on its own
 //      response for up to one phase's allowance (D4); one with NO ANSWER — it outlasted that allowance, or its request
 //      failed in transit — ends the run there, `allowance-exceeded` or `request-failed`, the root's included, and
@@ -112,7 +113,8 @@ import { STORE_FILE } from './run-folder';
 // "Accept exact candidate" pressed; Submit, Validate and Publish; then the Undertaking, whose units are READ FROM THE
 // PUBLISHED PWA, root first, then the tree's order (C2), and run as in steps 3 to 5. The candidate checks run before
 // Submit and refuse nothing (C4). `JPWB_AGENT_MODEL` is required, and recorded (C3); the timeout is extended once the
-// units are read (`phase7HalfBTestTimeoutMs`). Dry, half B stops before Send: authoring is a model call (C6). The order
+// units are read (`phase7HalfBTestTimeoutMs`) ⭐ — and, the review in parts (B6), while the turn runs, each time the types it
+// stages derive a larger allowance (`phase7HalfBAuthoringTimeoutMs`). Dry, half B stops before Send: authoring is a model call (C6). The order
 // is the operator's (`authorThePwa`), on the `author` hands below. ⚠ Unset or blank, the half is A: everything above.
 // ⭐⭐ `REG-D-112` (E3's review): the LIMIT is checked before Send, the authoring floor's worst case counted, and before the
 // root's press, a MODEL root's ~~worst case~~ ⭐ one try's reserve (`REG-D-114` (14), as amended 2026-10-16) counted (finding

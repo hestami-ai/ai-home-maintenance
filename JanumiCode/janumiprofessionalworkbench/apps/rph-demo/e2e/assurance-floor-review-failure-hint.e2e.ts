@@ -5,7 +5,8 @@ import {
 	introspect,
 	gotoHydrated,
 	acceptAgentCandidate,
-	registerStipulation
+	registerStipulation,
+	theRootPartOfTheLatestRound
 } from './support/harness';
 import { expectTheHintOnScreen } from './support/floor-panel';
 
@@ -97,7 +98,7 @@ test.describe('Assurance floor — the blocked hint follows the floor’s own cl
 		const pwaId = (await introspect(request)).pwas[0]!.id;
 		// ⭐ THE TEST STIPULATES THE REVIEW'S REMAINDER (`JAN-CRITREAD` J1-3), in the body, after the reset, with the PWA's
 		// id READ FROM THE STORE — as the waiver spec does. The SATISFIED floor below is disclosed as stipulated.
-		await registerStipulation(request, pwaId, 'PWA_GRAPH');
+		await registerStipulation(request, pwaId, 'PWA_TYPE');
 
 		const res = await request.post(`/pwa/${pwaId}/agent`, {
 			data: {
@@ -135,6 +136,8 @@ test.describe('Assurance floor — the blocked hint follows the floor’s own cl
 	 * observation and CONCLUDED with the disposition given. The verdict is in DOC-007 §20's sixteen-field shape, without
 	 * the evaluator and criterion rows the floor's own recorder also sends (`rph-engine` `record-assurance.ts`); no
 	 * producer is named, so no independence is checked. The observation type is the recorder's for the policy.
+	 * ⭐ The review in parts, B3 (`REG-D-125`): a REASONING REVIEW is staged against the PWA's root type, its part, and every
+	 * assessment INTO the accepted floor's round (`theRootPartOfTheLatestRound`), so the rest of the round stays as recorded.
 	 */
 	async function stageAnAssessment(
 		request: APIRequestContext,
@@ -149,9 +152,12 @@ test.describe('Assurance floor — the blocked hint follows the floor’s own cl
 	): Promise<void> {
 		const { policyId, assessmentId, observationId, observation, concludeAs } = staged;
 		const pwa = (await introspect(request)).pwas.find((p) => p.id === pwaId)!;
-		const version = Number(pwa.state.semanticVersion ?? 1);
+		const part = await theRootPartOfTheLatestRound(request, pwaId);
+		const subjectId = policyId === POLICY ? part.typeId : pwaId;
+		const version = policyId === POLICY ? part.version : Number(pwa.state.semanticVersion ?? 1);
 		const res = await request.post('/test-api/dispatch', {
 			data: {
+				correlationId: part.correlationId,
 				steps: [
 					[
 						'RequestAssuranceAssessment',
@@ -161,8 +167,8 @@ test.describe('Assurance floor — the blocked hint follows the floor’s own cl
 							assessmentId,
 							assurancePolicyId: policyId,
 							policyVersion: POLICY_VERSION,
-							subjectObjectIds: [pwaId],
-							subjectSemanticVersions: { [pwaId]: version },
+							subjectObjectIds: [subjectId],
+							subjectSemanticVersions: { [subjectId]: version },
 							claimIds: []
 						}
 					],
@@ -188,12 +194,12 @@ test.describe('Assurance floor — the blocked hint follows the floor’s own cl
 								policyId,
 								policyVersion: POLICY_VERSION,
 								assessmentId,
-								subjectObjectIds: [pwaId],
-								subjectSemanticVersions: { [pwaId]: version },
+								subjectObjectIds: [subjectId],
+								subjectSemanticVersions: { [subjectId]: version },
 								claimResults: [],
 								evidenceConsideredIds: [],
 								evidenceRejected: [],
-								observations: [{ ...observation, subjectObjectIds: [pwaId] }],
+								observations: [{ ...observation, subjectObjectIds: [subjectId] }],
 								dispositionRecommendation: concludeAs,
 								recommendedControlActions: [],
 								residualUncertainty: [],

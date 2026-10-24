@@ -796,4 +796,31 @@ describe('⭐⭐ JAN-ESCREC D1 — a clean review its reviewer escalates is ESCA
 			expect(out.observations, 'nothing is added to the composition’s observations').toEqual([]);
 		}
 	);
+
+	// ⭐ The review in parts, B3 (`REG-D-125`; design D5) — A ROUND COMPOSED AS SEVERAL PLANS: the authoring floor composes a
+	// PWA's two deterministic policies over the PWA, and its Reasoning Review once over each type, each type's review in a
+	// plan of its own. Condition (iv) — "nothing else already blocks" — then reads what the plan does not hold, which only
+	// the caller knows (`ComposeOptions.blockedOutsideThePlan`).
+	it('⭐ RED — a part’s clean review its reviewer escalates, composed alone while something else in its round blocks, stays SATISFIED', () => {
+		// PREDICTED RED WITHOUT THE CONJUNCT: the plan holds the review alone, so (iv) holds vacuously and the review is
+		// ESCALATED — beside a rejected sibling, an escalation the ruling says is recorded beside the block, never in its place.
+		const s = subject({ subjectId: 'pwut_1', objectType: 'PWU_TYPE' });
+		const alone = deMinimisFloorPlan(s).filter((p) => p.policyId === REVIEW);
+		const blocked = composeAssuranceOutcome(s, alone, [escalating(s)], {
+			blockedOutsideThePlan: true
+		});
+		expect(blocked.perPolicy.map((p) => `${p.policyId}=${p.disposition}`)).toEqual([
+			'floor.reasoning-review=SATISFIED'
+		]);
+		expect(blocked.aggregate).toBe('SATISFIED');
+		// CONTROL — the same plan with nothing blocking outside it: the review is escalated, so the conjunct is the
+		// difference, and an unconditional "never escalate a part" fails here.
+		const clear = composeAssuranceOutcome(s, alone, [escalating(s)], {
+			blockedOutsideThePlan: false
+		});
+		expect(clear.perPolicy.map((p) => p.disposition)).toEqual(['ESCALATED']);
+		expect(
+			composeAssuranceOutcome(s, alone, [escalating(s)]).perPolicy.map((p) => p.disposition)
+		).toEqual(['ESCALATED']);
+	});
 });

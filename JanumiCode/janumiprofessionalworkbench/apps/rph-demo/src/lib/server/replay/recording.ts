@@ -23,7 +23,8 @@
 //
 // ⭐⭐ `REG-D-112` (c) — THE REPLAY COVERS THE EXECUTION HALF, FROM THE PUBLISHED PWA. The authoring turn is not replayed:
 // its own model calls leave no record (`agent/pi-agent.ts`), so the recorder LEAVES OUT the authoring floor's reviews (a
-// Reasoning Review whose subject is the PWA itself, `floor.ts`'s `runPwaFloor`) and records instead what the turn
+// Reasoning Review whose subject is the PWA itself, or — ⭐ since the review in parts, `REG-D-125` — one of its types,
+// `floor.ts`'s `runPwaFloor`) and records instead what the turn
 // PRODUCED — the published PWA's declared content (`RecordedPwa`: its types and prompts as `DefinePwuType` takes them,
 // and the policies they name, each by the hash of its content). The replay re-creates that PWA before the Undertaking
 // (`replay-pwa.ts`) and holds it to `pwaContentDigest` BEFORE THE FIRST CALL (`ReplayRun.checkPublishedPwa`): ~~a recording

@@ -376,12 +376,16 @@ function mutable(turn: AuthoringTurn): MutableAuthoringTurn {
 	return current;
 }
 
+/** The candidate's live types of its PWA, as its fork holds them — the set its subject hash folds and its floor reviews. */
+const candidateTypes = (current: MutableAuthoringTurn) =>
+	listPwuTypes(current.engine, current.pwaId);
+
 /** Exact hash of the complete PWA/PWU-Type semantic subject, including fields omitted by the render export. */
 export function hashAuthoringSubject(turn: AuthoringTurn): string {
 	const current = mutable(turn);
 	const pwa = current.engine.loadObject(current.pwaId);
 	if (!pwa) throw new Error(`Candidate PWA ${current.pwaId} does not exist.`);
-	const types = listPwuTypes(current.engine, current.pwaId)
+	const types = candidateTypes(current)
 		.map((type) => ({ id: type.id, object: current.engine.loadObject(type.id) }))
 		.sort((left, right) => left.id.localeCompare(right.id));
 	return contentHash({ pwa: { id: current.pwaId, object: pwa }, types });
@@ -595,8 +599,14 @@ function declaredPreconditions(current: MutableAuthoringTurn): GuardPrecondition
  * removal of the PWA's types, NOT resting on the PWA's version bump; G3 is the review records a canonical reader
  * ranks per floor policy, which this draft's commit writes into; G4 is a reviewer's exchange about the PWA — kept by
  * ruling (`REG-D-070` Q2) until `REG-F-433`'s join key lets it go.
+ * ⭐ The review in parts, B3 (`REG-D-125`; design D6) — AND G3 AND G4 FOR EACH TYPE OF THE CANDIDATE: the floor now reviews
+ * each type as a part, its review record and its exchanges under the type (`floor.ts`), and the round reader ranks those
+ * per type, so a review record of, or a reviewer exchange about, one of this draft's types is a change to it. ⚠ A type
+ * another writer adds is G2's; the turn's own records are admitted by identity, through its canonical witness.
  */
-function declaredGroups(pwaId: string): DependencyGroup[] {
+function declaredGroups(current: MutableAuthoringTurn): DependencyGroup[] {
+	const pwaId = current.pwaId;
+	const typeIds = candidateTypes(current).map((type) => type.id);
 	return [
 		{
 			name: 'your PWA’s conversation',
@@ -620,7 +630,22 @@ function declaredGroups(pwaId: string): DependencyGroup[] {
 			name: 'a reviewer exchange about your PWA',
 			aggregateType: 'MODEL_EXCHANGE',
 			key: [{ field: 'subjectObjectId', equals: pwaId }]
-		}
+		},
+		...typeIds.flatMap((typeId): DependencyGroup[] => [
+			{
+				name: 'the review record of a type of your PWA under a floor policy',
+				aggregateType: 'ASSURANCE_ASSESSMENT',
+				key: [
+					{ field: 'subjectObjectIds', contains: typeId },
+					{ field: 'assurancePolicyId', oneOf: FLOOR_POLICIES }
+				]
+			},
+			{
+				name: 'a reviewer exchange about a type of your PWA',
+				aggregateType: 'MODEL_EXCHANGE',
+				key: [{ field: 'subjectObjectId', equals: typeId }]
+			}
+		])
 	];
 }
 
@@ -644,7 +669,7 @@ export function declaredDependenciesOf(turn: AuthoringTurn): DeclaredDependencie
 			...pin,
 			role: roles.get(pin.aggregateId)!
 		})),
-		groups: declaredGroups(current.pwaId)
+		groups: declaredGroups(current)
 	};
 }
 
@@ -737,7 +762,7 @@ export function commitAuthoringTurn(
 			{
 				mark: current.forkBase.mark,
 				admittedEventIds: [...current.witnessedEventIds],
-				groups: declaredGroups(current.pwaId)
+				groups: declaredGroups(current)
 			},
 			affectedObjects.map(({ id: aggregateId, contentHash: expectedContentHash }) => ({
 				aggregateId,

@@ -48,6 +48,29 @@ beforeEach(() => {
 		}
 	};
 	expect(session.dispatch(command).status).toBe('ACCEPTED');
+	// ⭐ The review in parts, B3 (`REG-D-125`) — one type, so one part and one reviewer try: the floor reviews each type.
+	expect(
+		session.dispatch({
+			...command,
+			commandId: 'setup-2',
+			commandType: 'DefinePwuType',
+			targetAggregateType: 'PWU_TYPE',
+			targetAggregateId: 'pwut_01ARZ3NDEKTSV4RRFFQ69G5P10',
+			idempotencyKey: 'setup-idem-2',
+			payload: {
+				pwuTypeId: 'pwut_01ARZ3NDEKTSV4RRFFQ69G5P10',
+				pwaId: PWA,
+				pwuKind: 'PLAN',
+				name: 'Plan',
+				purpose: 'Plan the work',
+				isRoot: true,
+				permittedChildTypeIds: [],
+				requiredInputs: [],
+				requiredOutputs: [],
+				requiredAssurancePolicyIds: []
+			}
+		}).status
+	).toBe('ACCEPTED');
 });
 
 /** Runs the floor once with the canonical drain going through `canonical`; one clean try, so one exchange. */

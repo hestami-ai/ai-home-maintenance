@@ -3,12 +3,14 @@
 // recorded SATISFIED. This closes the loop the two package-local suites test in isolation.
 import {
 	SEEDED_REASONING_REVIEW_CRITERIA,
+	assuranceRecordingPlan,
 	createValidatorRegistry,
 	FLOOR_POLICY_IDS,
 	identityProvenanceValidatorInstance,
 	reasoningReviewResultFromJudgement,
-	runFloorAndPlanRecording,
+	runFloorPolicies,
 	schemaInvariantValidatorInstance,
+	type AssuranceRecordingPlan,
 	type AssuranceSubject,
 	type Identity,
 	type Validator,
@@ -179,6 +181,70 @@ function authorValidated(eng: EngineHandle) {
 const publish = (eng: EngineHandle) =>
 	send(eng, AGENT, 'PublishPwa', PWA, 'PROFESSIONAL_WORK_ARCHITECTURE', { rootPwuTypeId: ROOT });
 
+const GOOD_FACTS: ValidatorContext = {
+	schemaInvariant: { schemaValid: true, invariantViolations: [] },
+	identityProvenance: {
+		hasStableId: true,
+		hasSemanticVersion: true,
+		hasProvenance: true,
+		hasProducer: true,
+		traceComplete: true
+	}
+};
+
+/**
+ * ⭐ The review in parts, B3 (`REG-D-125`; DESIGN-authoring-review-in-parts.md D6) — ONE FLOOR ROUND AS THE AUTHORING FLOOR
+ * RECORDS IT (the demo's `runPwaFloor`): the two deterministic policies run once over the PWA, the Reasoning Review once over
+ * its one type, ROOT — each composed as a plan of its own — and both plans recorded under ONE correlation, the round's
+ * token, each with a command prefix of its own. Against the subjects' ACTUAL current versions: defining the root PWU Type
+ * materially edits the graph and raises the PWA's semanticVersion (from 1 to 2), so the floor must bind that version, not
+ * a hardcoded 1 (§10.1 L1379).
+ */
+async function recordRound(
+	eng: EngineHandle,
+	review: Validator,
+	prefix: string
+): Promise<{ readonly pwa: AssuranceRecordingPlan; readonly part: AssuranceRecordingPlan }> {
+	const version = (id: string) =>
+		Number((eng.loadObject(id)?.state as { semanticVersion: number }).semanticVersion);
+	const pwaSubject: AssuranceSubject = {
+		subjectId: PWA,
+		objectType: 'PROFESSIONAL_WORK_ARCHITECTURE',
+		semanticVersion: version(PWA),
+		isAiProduced: true,
+		producer: PRODUCER
+	};
+	const partSubject: AssuranceSubject = {
+		subjectId: ROOT,
+		objectType: 'PWU_TYPE',
+		semanticVersion: version(ROOT),
+		isAiProduced: true,
+		producer: PRODUCER
+	};
+	const registry = createValidatorRegistry();
+	registry.register(schemaInvariantValidatorInstance);
+	registry.register(identityProvenanceValidatorInstance);
+	registry.register(review);
+	const deterministic = await runFloorPolicies(pwaSubject, GOOD_FACTS, registry, [
+		FLOOR_POLICY_IDS.SCHEMA_INVARIANT,
+		FLOOR_POLICY_IDS.IDENTITY_PROVENANCE
+	]);
+	const reviewed = await runFloorPolicies(partSubject, {}, registry, [FLOOR_POLICY_IDS.REASONING_REVIEW]);
+	const plans = {
+		pwa: assuranceRecordingPlan(pwaSubject, deterministic.plan, deterministic.results),
+		part: assuranceRecordingPlan(partSubject, reviewed.plan, reviewed.results)
+	};
+	let idn = 0;
+	for (const [suffix, plan] of [['pwa', plans.pwa], ['part', plans.part]] as const)
+		recordAssuranceRecordingPlan(asActor(eng, SVC), plan, {
+			issuedAt: TS,
+			correlationId: 'floor',
+			idPrefix: `${prefix}-${suffix}`,
+			newId: (p) => `${p}_${String(++idn).padStart(26, '0')}`
+		});
+	return plans;
+}
+
 describe('floor gate + recorder compose (3b + 3c)', () => {
 	it('an AGENT PWA is blocked until the real recorded floor is SATISFIED, then publishes', async () => {
 		const eng = build();
@@ -192,44 +258,9 @@ describe('floor gate + recorder compose (3b + 3c)', () => {
 			'VALIDATED'
 		);
 
-		// Run the REAL floor and persist it via the recorder — against the PWA's ACTUAL current version. Defining
-		// the root PWU Type materially edits the graph and raises the PWA's semanticVersion (from 1 to 2), so the
-		// floor must bind that version, not a hardcoded 1: §10.1 L1379 binds Assessments to exact semantic
-		// versions, and floor-gate's version check now enforces it. This is the very stale-floor defect the check
-		// exists to catch, so the fixture must record the floor for the version it is actually publishing.
-		const currentVersion = Number(
-			(eng.loadObject(PWA)?.state as { semanticVersion: number }).semanticVersion
-		);
-		const subject: AssuranceSubject = {
-			subjectId: PWA,
-			objectType: 'PROFESSIONAL_WORK_ARCHITECTURE',
-			semanticVersion: currentVersion,
-			isAiProduced: true,
-			producer: PRODUCER
-		};
-		const registry = createValidatorRegistry();
-		registry.register(schemaInvariantValidatorInstance);
-		registry.register(identityProvenanceValidatorInstance);
-		registry.register(rrSatisfied);
-		const ctx: ValidatorContext = {
-			schemaInvariant: { schemaValid: true, invariantViolations: [] },
-			identityProvenance: {
-				hasStableId: true,
-				hasSemanticVersion: true,
-				hasProvenance: true,
-				hasProducer: true,
-				traceComplete: true
-			}
-		};
-		const plan = await runFloorAndPlanRecording(subject, ctx, registry);
-		expect(plan.gatePermitsTransition).toBe(true);
-		let idn = 0;
-		recordAssuranceRecordingPlan(asActor(eng, SVC), plan, {
-			issuedAt: TS,
-			correlationId: 'floor',
-			idPrefix: 'rec',
-			newId: (p) => `${p}_${String(++idn).padStart(26, '0')}`
-		});
+		// Run the REAL floor and persist it via the recorder, as one round (`recordRound`).
+		const round = await recordRound(eng, rrSatisfied, 'rec');
+		expect([round.pwa.gatePermitsTransition, round.part.gatePermitsTransition]).toEqual([true, true]);
 
 		// Gate now permits.
 		const r = publish(eng);
@@ -248,58 +279,29 @@ describe('floor gate + recorder compose (3b + 3c)', () => {
 // naming it. The CONTROL is the identical arrangement with the reviewer recommending SATISFIED, which publishes — so
 // the refusal is the escalation's, and not the version binding's or the author's.
 describe('⭐⭐ JAN-ESCREC D1 — PublishPwa is refused over a recorded ESCALATED review, and admitted over the same review SATISFIED', () => {
+	/** ⭐ B3 — the round's plan for the one part, its review recommending `recommendation` (`recordRound`). */
 	async function recordFloorRecommending(
 		eng: EngineHandle,
 		recommendation: 'ESCALATED' | 'SATISFIED'
 	) {
-		const semanticVersion = Number(
-			(eng.loadObject(PWA)?.state as { semanticVersion: number }).semanticVersion
-		);
-		const subject: AssuranceSubject = {
-			subjectId: PWA,
-			objectType: 'PROFESSIONAL_WORK_ARCHITECTURE',
-			semanticVersion,
-			isAiProduced: true,
-			producer: PRODUCER
-		};
-		const registry = createValidatorRegistry();
-		registry.register(schemaInvariantValidatorInstance);
-		registry.register(identityProvenanceValidatorInstance);
-		registry.register({
-			...rrSatisfied,
-			evaluate: (s) =>
-				Promise.resolve(
-					reasoningReviewResultFromJudgement(
-						s,
-						JUDGE,
-						'test.reasoning-review',
-						{ findings: allClean(), recommendation },
-						SEEDED_REASONING_REVIEW_CRITERIA
-					)
-				)
-		});
-		const plan = await runFloorAndPlanRecording(
-			subject,
+		const round = await recordRound(
+			eng,
 			{
-				schemaInvariant: { schemaValid: true, invariantViolations: [] },
-				identityProvenance: {
-					hasStableId: true,
-					hasSemanticVersion: true,
-					hasProvenance: true,
-					hasProducer: true,
-					traceComplete: true
-				}
+				...rrSatisfied,
+				evaluate: (s) =>
+					Promise.resolve(
+						reasoningReviewResultFromJudgement(
+							s,
+							JUDGE,
+							'test.reasoning-review',
+							{ findings: allClean(), recommendation },
+							SEEDED_REASONING_REVIEW_CRITERIA
+						)
+					)
 			},
-			registry
+			`rec-${recommendation.toLowerCase()}`
 		);
-		let idn = 0;
-		recordAssuranceRecordingPlan(asActor(eng, SVC), plan, {
-			issuedAt: TS,
-			correlationId: 'floor',
-			idPrefix: `rec-${recommendation.toLowerCase()}`,
-			newId: (p) => `${p}_${String(++idn).padStart(26, '0')}`
-		});
-		return plan;
+		return round.part;
 	}
 	const publicationStatus = (eng: EngineHandle) =>
 		(eng.loadObject(PWA)?.state as { publicationStatus: string }).publicationStatus;
@@ -317,8 +319,9 @@ describe('⭐⭐ JAN-ESCREC D1 — PublishPwa is refused over a recorded ESCALAT
 		const r = publish(eng);
 		expect(r.status, 'the engine’s floor gate refuses the protected transition').toBe('REJECTED');
 		// ⭐ THE MESSAGE NAMES THE ESCALATED REVIEW AND ONLY IT: the two deterministic policies are SATISFIED, so the
-		// block is the review's alone — `floorGateBlock` lists every non-SATISFIED required policy.
-		expect(r.error?.message).toContain('(floor.reasoning-review=ESCALATED)');
+		// block is the review's alone — ⭐ B3: its part's, named with its type (`pwaPartsFloorBlock` lists every row that is
+		// not SATISFIED).
+		expect(r.error?.message).toContain(`(floor.reasoning-review of ${ROOT}=ESCALATED)`);
 		expect(publicationStatus(eng), 'nothing was published').toBe('VALIDATED');
 		expect(plan.gatePermitsTransition, 'and the floor’s own answer agrees').toBe(false);
 	});

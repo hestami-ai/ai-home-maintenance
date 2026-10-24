@@ -251,6 +251,7 @@
 				"AI_ACTOR_TYPES",
 				"FLOOR_POLICY_IDS_REQUIRED",
 				"floorGateBlock",
+				"pwaPartsFloorBlock",
 				"stepOutputIsAiProduced",
 				"stepResultSubjects",
 				"structuredResultHasContent",
@@ -260,6 +261,7 @@
 				"AI_ACTOR_TYPES",
 				"FLOOR_POLICY_IDS_REQUIRED",
 				"floorGateBlock",
+				"pwaPartsFloorBlock",
 				"stepOutputIsAiProduced",
 				"stepResultSubjects",
 				"structuredResultHasContent",
@@ -434,7 +436,7 @@
 				"submitPwaForReview",
 				"validatePwa"
 			],
-			"unattributedMutants": 3
+			"unattributedMutants": 4
 		},
 		"packages/rph-application/src/handlers/pwu.ts": {
 			"consumedExports": [
@@ -616,7 +618,7 @@
 				"identityProvenanceValidator",
 				"schemaInvariantValidator"
 			],
-			"unattributedMutants": 26
+			"unattributedMutants": 27
 		},
 		"packages/rph-assurance/src/recording.ts": {
 			"consumedExports": [
@@ -636,6 +638,7 @@
 				"REASONING_REVIEW_CRITERIA",
 				"reasoningReviewResultFromJudgement",
 				"runFloorAndPlanRecording",
+				"runFloorPolicies",
 				"schemaInvariantValidatorInstance",
 				"VALIDATOR_FAILURE_CODES",
 				"VALIDATOR_MODEL_SUBSTITUTED",
@@ -652,7 +655,7 @@
 				"VALIDATOR_MODEL_SUBSTITUTED",
 				"validatorFailureError"
 			],
-			"unattributedMutants": 10
+			"unattributedMutants": 11
 		},
 		"packages/rph-authoring/src/broker.ts": {
 			"consumedExports": [
@@ -1410,9 +1413,13 @@
 			"unattributedMutants": 0
 		},
 		"packages/rph-projections/src/pwa-parts.ts": {
-			"consumedExports": [],
-			"guardedExports": [],
-			"unattributedMutants": 4
+			"consumedExports": [
+				"pwaTypeParts"
+			],
+			"guardedExports": [
+				"pwaTypeParts"
+			],
+			"unattributedMutants": 6
 		},
 		"packages/rph-projections/src/pwu-behavior.ts": {
 			"consumedExports": [

@@ -66,7 +66,7 @@ test.describe('PWA Designer — the inspector shows a staged candidate’s promp
 		// The declared stand-in answers the review's remainder, so the candidate reaches READY_TO_COMMIT and offers its
 		// exact hash for acceptance (`registerStipulation`'s rule: after the reset, the id read from the store).
 		const pwaId = (await introspect(request)).pwas.find((p) => p.state.name === 'Inspector Prompt PWA')!.id;
-		await registerStipulation(request, pwaId, 'PWA_GRAPH');
+		await registerStipulation(request, pwaId, 'PWA_TYPE');
 		await gotoHydrated(page, (await card.getAttribute('href'))!);
 
 		const plan = {

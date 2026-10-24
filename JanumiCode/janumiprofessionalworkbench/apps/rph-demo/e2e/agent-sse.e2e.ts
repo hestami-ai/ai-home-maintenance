@@ -28,7 +28,7 @@ test.describe('PWA Designer — authoring agent (mock) over SSE', () => {
 		// ⭐ THE TEST STIPULATES THE REVIEW'S REMAINDER (`JAN-CRITREAD` J1-3; `DESIGN-what-the-tests-prove.md` §4.5,
 		// §4.6): in the body, after the reset, with the PWA's id READ FROM THE STORE. The declared stand-in then answers
 		// what the structural checker cannot judge — recorded as not judged, and disclosed. No assertion here changes.
-		await registerStipulation(request, pwaId, 'PWA_GRAPH');
+		await registerStipulation(request, pwaId, 'PWA_TYPE');
 
 		// Drive the agent with one complete, linked, assurance-satisfiable candidate.
 		const plan = {
@@ -133,7 +133,7 @@ test.describe('PWA Designer — authoring agent (mock) over SSE', () => {
 		// ⭐ THE TEST STIPULATES THE REVIEW'S REMAINDER (`JAN-CRITREAD` J1-3; `DESIGN-what-the-tests-prove.md` §4.5,
 		// §4.6): in the body, after the reset, with the PWA's id READ FROM THE STORE. The declared stand-in then answers
 		// what the structural checker cannot judge — recorded as not judged, and disclosed. No assertion here changes.
-		await registerStipulation(request, pwaId, 'PWA_GRAPH');
+		await registerStipulation(request, pwaId, 'PWA_TYPE');
 
 		// A single scaffold_graph call defines a root + a child and wires the permits edge — all-or-nothing.
 		const plan = {

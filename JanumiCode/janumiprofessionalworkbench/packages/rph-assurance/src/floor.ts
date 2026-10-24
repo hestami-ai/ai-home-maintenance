@@ -291,6 +291,14 @@ export interface ComposeOptions {
 	 * same way — a ladder that admitted what Gate E refused would make the recorder throw.
 	 */
 	readonly admitStipulatedAnswers?: boolean;
+	/**
+	 * ⭐ The review in parts, B3 (`REG-D-125`; DESIGN-authoring-review-in-parts.md D5) — A FLOOR POLICY OF THE SAME ROUND,
+	 * OUTSIDE THIS PLAN, IS NOT SATISFIED. The authoring floor composes one round as several plans: the PWA's two
+	 * deterministic policies, and one Reasoning Review per type of it. So condition (iv) of `REG-D-089`'s rule (a),
+	 * *"nothing else already blocks"*, also reads what this plan does not hold: true, and a clean review its reviewer
+	 * escalates stays as the ladder computed it, its recommendation recorded beside it. Absent, the plan is the whole round.
+	 */
+	readonly blockedOutsideThePlan?: boolean;
 }
 
 /**
@@ -354,6 +362,8 @@ function countedCriteria(
  * the escalation recorded beside it: *"more actionable"* is the ruling's own reason, and a graph defect is that kind of
  * block. It reads the floor AS COMPUTED, before any row is escalated. In the qualification runner's plan the review
  * stands alone, so (iv) holds vacuously there — rightly: qualification asks what the reviewer's reply yields.
+ * ⭐ The review in parts (`REG-D-125`): where one round is composed as several plans — the authoring floor's PWA and each of
+ * its types — (iv) also reads the rest of the round, which its caller states (`ComposeOptions.blockedOutsideThePlan`).
  * ⭑ "ALREADY BLOCKS" MEANS WHAT THE ENGINE'S FLOOR GATE MEANS, NOT WHAT THIS PACKAGE'S AGGREGATE MEANS (the ER-1
  * verifier's finding [4], decided in its fix round). So (iv) asks EVERY other policy of the plan, required or not. The
  * engine's gate requires all three floor policies whatever a plan marks — `FLOOR_POLICY_IDS_REQUIRED` and
@@ -385,14 +395,16 @@ function countedCriteria(
 function escalatesOnTheRecommendation(
 	po: FloorPolicyOutcome,
 	r: ValidatorResult | undefined,
-	computed: readonly FloorPolicyOutcome[]
+	computed: readonly FloorPolicyOutcome[],
+	opts: ComposeOptions
 ): boolean {
 	return (
 		po.policyId === FLOOR_POLICY_IDS.REASONING_REVIEW &&
 		po.resultClass === 'VALID' &&
 		r?.dispositionRecommendation === 'ESCALATED' &&
 		po.disposition === 'SATISFIED' &&
-		computed.every((other) => other.policyId === po.policyId || other.disposition === 'SATISFIED')
+		computed.every((other) => other.policyId === po.policyId || other.disposition === 'SATISFIED') &&
+		opts.blockedOutsideThePlan !== true
 	);
 }
 
@@ -483,7 +495,7 @@ export function composeAssuranceOutcome(
 	// ruling, the qualification runner included (it composes with no options).
 	const computed = [...perPolicy];
 	computed.forEach((po, i) => {
-		if (!escalatesOnTheRecommendation(po, byPolicy.get(po.policyId), computed)) return;
+		if (!escalatesOnTheRecommendation(po, byPolicy.get(po.policyId), computed, opts)) return;
 		perPolicy[i] = { ...po, disposition: 'ESCALATED' };
 		policyAssessments[i] = { required: po.required, disposition: 'ESCALATED' };
 	});

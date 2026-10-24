@@ -587,11 +587,19 @@ function reviewerBound(rows: readonly StoredObject[], agent: string): number | n
  * PWA (`recordedPwaOf`).
  */
 export function recordsAsReviewerCall(row: StoredObject): boolean {
+	// ⭐ The review in parts, B3 (`REG-D-125`): the authoring floor now reviews each type of the PWA as a part, under the type.
+	if (row.state.subjectObjectType === AUTHORING_FLOOR_PART_SUBJECT) return false;
 	return row.state.plane === 'ASSURANCE' && row.state.subjectObjectType !== AUTHORING_FLOOR_SUBJECT;
 }
 
 /** The subject type of the authoring floor's review: the PWA itself (`floor.ts`, `runPwaFloor`). */
 export const AUTHORING_FLOOR_SUBJECT = 'PROFESSIONAL_WORK_ARCHITECTURE';
+/**
+ * ⭐ The review in parts, B3 (`REG-D-125`) — the subject type of the authoring floor's review of ONE TYPE of the PWA (`floor.ts`,
+ * `runPwaFloor`, one review per part). ⚠ No execution-plane review is of a PWU Type: its subjects are work products, command
+ * evidence and work units.
+ */
+export const AUTHORING_FLOOR_PART_SUBJECT = 'PWU_TYPE';
 
 /**
  * ⭐⭐ THE RECORDING, OR THE PROBLEMS THAT STOP IT. Every text is scrubbed of the run's directories (`scrubPairs`) and every

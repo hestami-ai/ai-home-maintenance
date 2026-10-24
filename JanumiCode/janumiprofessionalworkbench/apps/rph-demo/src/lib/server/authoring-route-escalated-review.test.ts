@@ -383,7 +383,9 @@ describe('⭐ JAN-ESCREC D3 — the authoring route and the page answer a clean 
 
 		await postInstruction(pwaId, TWO_ROOTS_PLAN);
 
-		expect(seam.calls.length, 'arrangement: the devin branch reviewed the candidate').toBe(1);
+		// ⭐ The review in parts, B3 (`REG-D-125`) — one call per part: each root is a type, reviewed as a part; and each
+		// part's clean review stays SATISFIED, the graph defect being "something else" that already blocks (`composeParts`).
+		expect(seam.calls.length, 'arrangement: the devin branch reviewed each of the two types').toBe(2);
 		expect(
 			getPendingAuthoringTurn(pwaId)?.status,
 			'a graph defect beside the recommendation was not staged for revision'
@@ -406,8 +408,8 @@ describe('⭐ JAN-ESCREC D3 — the authoring route and the page answer a clean 
 		const recorded = recordedRecommendations(pwaId);
 		expect(
 			recorded,
-			'the recommendation was not recorded beside the SATISFIED review'
-		).toHaveLength(1);
+			'the recommendation was not recorded beside each part’s SATISFIED review'
+		).toHaveLength(2);
 		expect(recorded[0]).toMatchObject({
 			findingCode: RECOMMENDATION_CODE,
 			observationType: 'RECOMMENDATION',
@@ -568,22 +570,32 @@ describe('⭐ JAN-ESCREC D3 — through the route: an unclassified block names n
 		expect(directive, 'the recommendation was sent to the producer as a finding').not.toContain(
 			RECOMMENDATION_FIRST_SENTENCE
 		);
-		expect(seam.prompts, 'arrangement: the refined candidate was not reviewed again').toHaveLength(
-			2
+		// ⭐ The review in parts, B4 (`REG-D-125`; design D8) — the refined candidate's WHOLE part inventory is reviewed again:
+		// one prompt for the first round's one type, then one per type of the refined candidate, the first its first.
+		const refined = listByType(getPendingAuthoringTurn(pwaId)!.engine, 'PWU_TYPE').filter(
+			(t) => t.state.pwaId === pwaId && t.state.status !== 'REMOVED'
+		).length;
+		expect(refined, 'arrangement: the refinement added types').toBeGreaterThan(1);
+		expect(seam.prompts, 'arrangement: the refined candidate was not reviewed again, part by part').toHaveLength(
+			1 + refined
 		);
 		expect(
 			seam.prompts[1],
 			'arrangement: the re-review was not given the finding as a prior gap'
 		).toContain(FAULT);
-		expect(
-			seam.prompts[1],
-			'the re-review was given the recommendation as a prior gap'
-		).not.toContain(RECOMMENDATION_FIRST_SENTENCE);
-		// ⭑ RECORDED, ONLY NOT SENT BACK: each review on the fork carries the recommendation beside its finding (D2).
+		// ⭐ B4 — and only the part the finding was about is given it: another type's review is shown none of its findings.
+		for (const other of seam.prompts.slice(2))
+			expect(other, 'another type’s re-review was given this type’s finding').not.toContain(FAULT);
+		for (const prompt of seam.prompts.slice(1))
+			expect(prompt, 'the re-review was given the recommendation as a prior gap').not.toContain(
+				RECOMMENDATION_FIRST_SENTENCE
+			);
+		// ⭑ RECORDED, ONLY NOT SENT BACK: each review on the fork carries the recommendation beside its finding (D2) — one
+		// per part of each round.
 		expect(
 			recordedRecommendations(pwaId),
 			'arrangement: the recommendation was not recorded'
-		).toHaveLength(2);
+		).toHaveLength(1 + refined);
 	});
 });
 

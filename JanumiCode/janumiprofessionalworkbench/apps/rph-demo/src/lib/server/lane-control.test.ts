@@ -15,6 +15,7 @@ import type { DomainCommand, DomainEvent } from '@janumipwb/rph-contracts';
 import type { StoredObject } from '@janumipwb/rph-ports';
 import { SESSION_CREDENTIAL } from './identity.js';
 import { laneFindings, type LaneSource } from './lane-control.js';
+import type { StipulationRegistration } from './stipulations.js';
 import { clearingJudgement, withLiveReviewerSeam } from './assurance/clearing-reviewer.testing.js';
 
 const RR = 'floor.reasoning-review';
@@ -43,7 +44,12 @@ const OBJECTS: Record<string, StoredObject> = {
 	'pwu-1': obj('PROFESSIONAL_WORK_UNIT', { undertakingId: 'und-1', pwuTypeId: 'pwut-1' }),
 	'pwut-1': obj('PWU_TYPE', { requiredAssurancePolicyIds: ['pol_declared'] }),
 	'und-1': obj('UNDERTAKING', { pwaId: 'pwa-1' }),
-	'evd-1': obj('EVIDENCE', {})
+	'evd-1': obj('EVIDENCE', {}),
+	// ⭐ The review in parts, B6 — two types of `pwa-1`, each reviewed as a part, and one of another PWA.
+	'pwut-a': obj('PWU_TYPE', { pwaId: 'pwa-1' }),
+	'pwut-b': obj('PWU_TYPE', { pwaId: 'pwa-1' }),
+	'pwa-2': obj('PROFESSIONAL_WORK_ARCHITECTURE', {}),
+	'pwut-x': obj('PWU_TYPE', { pwaId: 'pwa-2' })
 };
 
 let seq = 0;
@@ -85,7 +91,7 @@ const honest = (a: string, subject: string) => [
 	row(a, 'C-3', 'UNABLE_TO_DETERMINE', 'MET'),
 	completion(a, subject)
 ];
-const reasons = (events: DomainEvent[], regs: (typeof GRAPH | typeof WP)[]) =>
+const reasons = (events: DomainEvent[], regs: readonly StipulationRegistration[]) =>
 	laneFindings([src(events)], regs).map((f) => `${f.limb}: ${f.reason}`);
 
 describe('⭐ the check — limb 1: a stand-in pass rests on a stipulation, a real judgement, and a registration', () => {
@@ -146,7 +152,49 @@ describe('⭐ the check — limb 1: a stand-in pass rests on a stipulation, a re
 
 	it('⛔ a stand-in pass over a subject no registration can name (a process result) is never clean', () => {
 		expect(reasons(honest('a', 'evd-1'), [GRAPH, WP])).toEqual([
-			'1: its subject evd-1 is neither a PWA nor a work product with a PWA'
+			'1: its subject evd-1 is neither a PWA, a type of a PWA, nor a work product with a PWA'
+		]);
+	});
+});
+
+// ⭐⭐ The review in parts, B6 (`REG-D-125`; DESIGN-authoring-review-in-parts.md D10; roadmap 9a.7) — the authoring floor
+// reviews each type of a PWA as a part, so a stand-in pass over a PWU Type is classified by the PWA its `pwaId` names, on
+// the part arm, through the floor's own lookup: the part's registration, else its PWA's.
+describe('⭐ the check — limb 1 over a part: a type of a PWA, classified by its PWA', () => {
+	const PART = { pwaId: 'pwa-1', framing: 'PWA_TYPE', remaining: 'CLEAN' } as const;
+	const ONLY_A = { ...PART, typeId: 'pwut-a' } as const;
+
+	it('⭐ RED — a PWA’s registration on the part arm answers each of its parts', () => {
+		// PREDICTED RED BEFORE B6: a PWU Type subject named no arm, so an honest part pass was a finding.
+		expect(reasons(honest('a', 'pwut-a'), [PART])).toEqual([]);
+		expect(reasons(honest('b', 'pwut-b'), [PART])).toEqual([]);
+	});
+
+	it('⭐ a part’s own registration answers that part, and no other part of its PWA', () => {
+		expect(reasons(honest('a', 'pwut-a'), [ONLY_A])).toEqual([]);
+		expect(reasons(honest('b', 'pwut-b'), [ONLY_A])).toEqual([
+			'1: no test registered a stipulation for pwa-1 on PWA_TYPE (nor for its part pwut-b)'
+		]);
+	});
+
+	it('⛔ a registration on the graph arm, or for another PWA, answers no part', () => {
+		expect(reasons(honest('a', 'pwut-a'), [GRAPH])).toEqual([
+			'1: no test registered a stipulation for pwa-1 on PWA_TYPE (nor for its part pwut-a)'
+		]);
+		expect(reasons(honest('x', 'pwut-x'), [PART, ONLY_A])).toEqual([
+			'1: no test registered a stipulation for pwa-2 on PWA_TYPE (nor for its part pwut-x)'
+		]);
+	});
+
+	it('⛔ the refusal of a pass with no evaluated mandatory row holds for a part, registered or not', () => {
+		const events = [
+			row('a', 'C-1', 'UNABLE_TO_DETERMINE', 'MET'),
+			row('a', 'C-2', 'UNABLE_TO_DETERMINE', 'MET'),
+			row('a', 'C-3', 'UNABLE_TO_DETERMINE', 'MET'),
+			completion('a', 'pwut-a')
+		];
+		expect(reasons(events, [PART, ONLY_A])).toEqual([
+			'1: it rests on NO evaluated mandatory row — nobody read the subject'
 		]);
 	});
 });
@@ -532,9 +580,10 @@ describe('⭐ the server keeps the lane — each case a per-test fixture alone c
 		await h.announce('honest › registered');
 		await h.reset('empty');
 		h.createPwa(PWA);
+		// ⭐ The review in parts, B6 (`REG-D-125`) — the floor reviews the draft's type as a part, on the part arm.
 		h.registry.registerStipulation(h.wb.getEngine(), {
 			pwaId: PWA,
-			framing: 'PWA_GRAPH',
+			framing: 'PWA_TYPE',
 			remaining: 'CLEAN'
 		});
 		const { turn, subjectHash, view } = await h.reviewOnTurn(PWA);
@@ -557,7 +606,7 @@ describe('⭐ the server keeps the lane — each case a per-test fixture alone c
 				}[];
 			}[];
 		};
-		expect(snap.stipulations).toEqual([{ pwaId: PWA, framing: 'PWA_GRAPH', remaining: 'CLEAN' }]);
+		expect(snap.stipulations).toEqual([{ pwaId: PWA, framing: 'PWA_TYPE', remaining: 'CLEAN' }]);
 		expect(snap.lane.marks.map((m) => m.openedBy)).toEqual(['boot', 'reset']);
 		const [staged] = snap.authoringCandidates;
 		const review = staged!.completionEvents.filter((e) => e.payload.assurancePolicyId === RR);
@@ -570,11 +619,11 @@ describe('⭐ the server keeps the lane — each case a per-test fixture alone c
 		expect(
 			rows.filter((e) => e.payload.stipulated === 'MET'),
 			'the stipulated remainder'
-		).toHaveLength(7);
+		).toHaveLength(8);
 		expect(
 			rows.filter((e) => e.payload.stipulated === undefined && e.payload.result === 'MET'),
-			'the checker’s own'
-		).toHaveLength(2);
+			'the checker’s own — on a part, its one structural fact (RR-04)'
+		).toHaveLength(1);
 
 		expect(await h.check('honest › registered'), 'the staged candidate').toEqual([]);
 		const committed = h.turns.commitAuthoringTurn(

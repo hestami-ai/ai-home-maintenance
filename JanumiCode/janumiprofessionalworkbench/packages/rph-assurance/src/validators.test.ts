@@ -6,6 +6,7 @@ import {
 	identityProvenanceValidatorInstance,
 	reasoningReviewResultFromJudgement,
 	runDeMinimisFloor,
+	runFloorPolicies,
 	schemaInvariantValidatorInstance,
 	VALIDATOR_FAILURE_CODES,
 	VALIDATOR_MODEL_SUBSTITUTED,
@@ -233,6 +234,40 @@ describe('validator registry + runDeMinimisFloor', () => {
 		const out = await runDeMinimisFloor(nonAi, goodCtx, registry());
 		expect(out.aggregate).toBe('SATISFIED');
 		expect(out.gatePermitsTransition).toBe(true);
+	});
+
+	// ⭐ The review in parts, B3 (`REG-D-125`; design D1, D5) — the authoring floor runs a PWA's deterministic policies once
+	// over the PWA and its Reasoning Review once over each type, so it asks for the policies it means and composes each.
+	it('⭐ runFloorPolicies runs the named policies of the subject’s plan, and no other', async () => {
+		let reviewed = 0;
+		const counting: Validator = {
+			...mockReasoningReview(CLEAN),
+			evaluate: (s, c) => {
+				reviewed += 1;
+				return mockReasoningReview(CLEAN).evaluate(s, c);
+			}
+		};
+		const deterministic = await runFloorPolicies(subject, goodCtx, registry(counting), [
+			FLOOR_POLICY_IDS.SCHEMA_INVARIANT,
+			FLOOR_POLICY_IDS.IDENTITY_PROVENANCE
+		]);
+		expect(deterministic.plan.map((p) => p.policyId)).toEqual([
+			FLOOR_POLICY_IDS.SCHEMA_INVARIANT,
+			FLOOR_POLICY_IDS.IDENTITY_PROVENANCE
+		]);
+		expect(deterministic.results.map((r) => r.policyId)).toEqual(deterministic.plan.map((p) => p.policyId));
+		expect(reviewed, 'the reasoning review was not run for the deterministic plan').toBe(0);
+		const review = await runFloorPolicies(subject, goodCtx, registry(counting), [FLOOR_POLICY_IDS.REASONING_REVIEW]);
+		expect(review.plan.map((p) => `${p.policyId}:${p.independence}`)).toEqual([
+			'floor.reasoning-review:DIFFERENT_MODEL'
+		]);
+		expect(review.results.map((r) => r.policyId)).toEqual([FLOOR_POLICY_IDS.REASONING_REVIEW]);
+		expect(reviewed).toBe(1);
+		// ⚠ A policy the subject's own plan does not hold is not run: a subject no AI produced has no Reasoning Review.
+		const nonAi = await runFloorPolicies({ ...subject, isAiProduced: false }, goodCtx, registry(counting), [
+			FLOOR_POLICY_IDS.REASONING_REVIEW
+		]);
+		expect([nonAi.plan, nonAi.results, reviewed]).toEqual([[], [], 1]);
 	});
 });
 

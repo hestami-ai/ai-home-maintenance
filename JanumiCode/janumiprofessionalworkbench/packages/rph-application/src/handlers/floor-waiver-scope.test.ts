@@ -187,9 +187,10 @@ describe('de minimis floor waiver SCOPE at the PublishPwa call site', () => {
 	/**
 	 * Record the three floor policies over `pwaId` at its CURRENT version: schema + identity SATISFIED, the
 	 * Reasoning Review REJECTED with ONE open finding naming `FAILED_CRITERION`. That finding is what a waiver must
-	 * name to discharge — shield 3 was its absence.
+	 * name to discharge — shield 3 was its absence. ⭐ The review in parts, B3 (`REG-D-125`): the Reasoning Review is
+	 * recorded under the PWA's one type, its part, at the type's version.
 	 */
-	function recordFailingFloor(pwaId: string) {
+	function recordFailingFloor(pwaId: string, rootId = AI_ROOT) {
 		const version = pwaVersion(pwaId);
 		for (const policyId of [SCHEMA, IDENTITY]) {
 			recordFloorAssessment(engine, {
@@ -204,8 +205,8 @@ describe('de minimis floor waiver SCOPE at the PublishPwa call site', () => {
 		recordFloorAssessment(engine, {
 			assessmentId: ulid('asmt'),
 			policyId: REVIEW,
-			subjectId: pwaId,
-			subjectSemanticVersion: version,
+			subjectId: rootId,
+			subjectSemanticVersion: pwaVersion(rootId),
 			disposition: 'REJECTED',
 			openFindings: [{ observationId: ulid('obs'), findingCode: FAILED_CRITERION }],
 			now: TS
@@ -312,12 +313,14 @@ describe('de minimis floor waiver SCOPE at the PublishPwa call site', () => {
 	it('CONTROL: a SATISFIED floor still publishes, so the gate discriminates rather than refusing everything', () => {
 		authorValidatedAiPwa();
 		const version = pwaVersion(AI_PWA);
+		// ⭐ B3 — the Reasoning Review under the PWA's one type, its part; the deterministic policies under the PWA.
 		for (const policyId of [SCHEMA, IDENTITY, REVIEW]) {
+			const subjectId = policyId === REVIEW ? AI_ROOT : AI_PWA;
 			recordFloorAssessment(engine, {
 				assessmentId: ulid('asmt'),
 				policyId,
-				subjectId: AI_PWA,
-				subjectSemanticVersion: version,
+				subjectId,
+				subjectSemanticVersion: policyId === REVIEW ? pwaVersion(AI_ROOT) : version,
 				disposition: 'SATISFIED',
 				now: TS
 			});

@@ -23,7 +23,7 @@ test.describe('PWA Designer — agent chat history is retained', () => {
 		// §4.6): in the body, after the reset, with the PWA's id READ FROM THE STORE. The declared stand-in then answers
 		// what the structural checker cannot judge — recorded as not judged, and disclosed. No assertion here changes.
 		const pwaId = (await introspect(request)).pwas.find((p) => p.state.name === 'Memory PWA')!.id;
-		await registerStipulation(request, pwaId, 'PWA_GRAPH');
+		await registerStipulation(request, pwaId, 'PWA_TYPE');
 		const href = (await card.getAttribute('href'))!;
 		await gotoHydrated(page, href);
 

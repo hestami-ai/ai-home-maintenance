@@ -371,6 +371,12 @@ export interface UiCommandInput {
 	 *  §11.4.22 item 2). Omit it only where the caller genuinely never read the subject — never to
 	 *  avoid a conflict. */
 	readonly expectedRevision?: number;
+	/**
+	 * ⭐ The review in parts, B3 (`REG-D-125`) — the correlation to dispatch under, when the caller names one; otherwise
+	 * the UI's own. Named only by `/test-api/dispatch`, which stages a review record INTO a recorded floor round (the
+	 * round's records share its floor-run token, which the round's readers ask for).
+	 */
+	readonly correlationId?: string;
 }
 
 /** Build one UI-authored command with the same envelope policy used by single and atomic dispatch. */
@@ -390,7 +396,7 @@ function uiCommand(
 		// NO `issuedBy`. The engine stamps the authenticated principal (REG-D-027). This line used to
 		// hardcode `ui-user` — the SIXTH such site, and the one that would have refused every action in
 		// the running app once the session became `local-professional`.
-		correlationId,
+		correlationId: input.correlationId ?? correlationId,
 		idempotencyKey:
 			idempotencyKey ??
 			(TEST_MODE ? `ui-idem-${cmdSeq}` : `ui-idem-${cmdSeq}-${Math.floor(performance.now())}`),
@@ -434,9 +440,17 @@ export function dispatch(
 	targetAggregateType: string,
 	targetAggregateId: string,
 	payload: unknown,
-	expectedRevision?: number
+	expectedRevision?: number,
+	correlationId?: string
 ): CommandResult {
-	const input = { commandType, targetAggregateType, targetAggregateId, payload, expectedRevision };
+	const input = {
+		commandType,
+		targetAggregateType,
+		targetAggregateId,
+		payload,
+		expectedRevision,
+		...(correlationId === undefined ? {} : { correlationId })
+	};
 	const command = uiCommand(input);
 	return heldByOpenDraft([input], [command])?.refusal ?? uiSession().dispatch(command);
 }

@@ -258,7 +258,8 @@ function arrange(
 			}
 		}),
 		// ⭐ HALF B's AUTHORING FLOOR (`REG-D-112` (c)): the Reasoning Review of the authored PWA, requested BEFORE the
-		// Undertaking's first try — what `floor.ts` (`runPwaFloor`) records, its subject the PWA itself.
+		// Undertaking's first try — what `floor.ts` (`runPwaFloor`) recorded before the review in parts, its subject the PWA
+		// itself.
 		...(o.authoringFloor
 			? [
 					exchange('mex_authoring_review', {
@@ -272,6 +273,22 @@ function arrange(
 						resolvedModel: { value: 'fixture-reviewer-model' },
 						resolvedProvider: { value: 'devin' },
 						materializedInputRef: ref('Judge the authored graph of wordfreq.'),
+						rawOutputBeforeCoercionRef: ref(CLEAN),
+						parseOutcome: { outcome: 'PARSED' }
+					}),
+					// ⭐ The review in parts, B3 (`REG-D-125`) — and the authoring floor's review of ONE TYPE, as it records it now:
+					// one review per part, its subject the type.
+					exchange('mex_authoring_part_review', {
+						plane: 'ASSURANCE',
+						subjectObjectId: 'pwut_1',
+						subjectObjectType: 'PWU_TYPE',
+						exchangeRole: 'INITIAL',
+						disposition: 'ACCEPTED',
+						requestedAt: '2026-10-11T07:59:40.000Z',
+						respondedAt: '2026-10-11T07:59:50.000Z',
+						resolvedModel: { value: 'fixture-reviewer-model' },
+						resolvedProvider: { value: 'devin' },
+						materializedInputRef: ref('Judge one type of the authored PWA of wordfreq.'),
 						rawOutputBeforeCoercionRef: ref(CLEAN),
 						parseOutcome: { outcome: 'PARSED' }
 					})
@@ -633,7 +650,7 @@ describe('⭐ the recorder (D1) — a final archive into a replay recording, scr
 		expect(existsSync(out)).toBe(false);
 	});
 
-	it('⭐ REG-D-112 (c) — a half-B archive records the execution half only: the authoring floor’s review is left out', () => {
+	it('⭐ REG-D-112 (c) — a half-B archive records the execution half only: the authoring floor’s reviews are left out, ⭐ the whole graph’s and each type’s (REG-D-125)', () => {
 		const a = arrange({ authoringFloor: true });
 		const out = join(tempDir('out'), 'recording');
 		const r = record(a, out);

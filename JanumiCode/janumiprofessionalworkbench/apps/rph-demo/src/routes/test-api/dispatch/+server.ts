@@ -23,8 +23,12 @@ export const POST: RequestHandler = async ({ request }) => {
 	if (!harnessExposed()) throw error(404, 'Not found');
 	const refusal = durableStateRefusal();
 	if (refusal !== undefined) throw error(409, refusal);
-	const body = (await request.json().catch(() => ({}))) as { steps?: Step[] };
+	const body = (await request.json().catch(() => ({}))) as { steps?: Step[]; correlationId?: unknown };
 	const steps = Array.isArray(body.steps) ? body.steps : [];
+	// ⭐ The review in parts, B3 (`REG-D-125`) — a staged review may be put INTO a recorded floor round: its records share the
+	// round's floor-run token, which the round's readers ask for (`loadPwaFloor`; the publication gate). Absent, `ui`.
+	const correlationId =
+		typeof body.correlationId === 'string' && body.correlationId !== '' ? body.correlationId : undefined;
 	// ⛔ A TEST CANNOT HAND-WRITE A STIPULATION PAST THE STAND-IN (`REG-D-071` Q5; `JAN-CRITREAD` J1-1d). In an engine
 	// built for tests, `stipulated: 'MET'` beside an `UNABLE_TO_DETERMINE` row counts as met, so the only lawful
 	// writer on the lane is the declared stand-in. ⚠ THE WHOLE REQUEST, BEFORE ANYTHING RUNS: this route dispatches
@@ -40,7 +44,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			`/test-api/dispatch refused the whole request: step ${stipulating} (${String(steps[stipulating]?.[0])}) carries \`stipulated\`, which only the test-mode stand-in may write (REG-D-071 Q5). Nothing was dispatched.`
 		);
 	const results = steps.map(([ct, agg, id, pl]) => {
-		const r = dispatch(ct, agg, id, pl);
+		const r = dispatch(ct, agg, id, pl, undefined, correlationId);
 		return { commandType: ct, status: r.status, code: r.error?.code, message: r.error?.message };
 	});
 	const hasFailure = results.some((r) => r.status !== 'ACCEPTED' && r.status !== 'DUPLICATE');

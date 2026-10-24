@@ -36,7 +36,7 @@ import {
 	type HandlerContext
 } from './kit.js';
 import { fromStates, noOpEditPrecondition, predicate } from './command-precondition.js';
-import { AI_ACTOR_TYPES, FLOOR_POLICY_IDS_REQUIRED, floorGateBlock } from './floor-gate.js';
+import { AI_ACTOR_TYPES, FLOOR_POLICY_IDS_REQUIRED, pwaPartsFloorBlock } from './floor-gate.js';
 
 const PWA = 'PROFESSIONAL_WORK_ARCHITECTURE';
 const PWU_TYPE = 'PWU_TYPE';
@@ -1072,13 +1072,22 @@ function pwaFloorGate(
 	const aiProduced = createdBy ? AI_ACTOR_TYPES.has(String(createdBy.actorType)) : false;
 	const pwaId = command.targetAggregateId;
 	const version = Number(state.semanticVersion ?? 1);
-	const blocking = floorGateBlock(ctx, pwaId, {
-		aiProduced,
-		subjectVersion: version,
-		now: command.issuedAt
-	});
+	// ⭐ The review in parts, B3 (`REG-D-125`; design D6) — ITS REASONING REVIEW IS EACH LIVE TYPE'S, at the version the store
+	// holds now: the two deterministic assessments of the PWA and the complete part-review set of one round
+	// (`pwaPartsFloorBlock`). ⛔ The one-subject gate asked for a review of the PWA itself, which the floor no longer records.
+	const parts = pwuTypeNodesOf(ctx, pwaId).map((node) => ({
+		subjectId: node.id,
+		// A node is a type the store holds (`pwuTypeNodesOf` read it there).
+		version: ctx.store.loadObject(node.id)!.semanticVersion
+	}));
+	const blocking = pwaPartsFloorBlock(ctx, pwaId, { aiProduced, pwaVersion: version, parts });
 	if (!blocking) return null;
-	const detail = blocking.map((b) => `${b.policyId}=${b.disposition}`).join(', ');
+	const detail = blocking
+		.map(
+			(b) =>
+				`${b.policyId}${b.subjectId === undefined ? '' : ` of ${b.subjectId}`}=${b.disposition}`
+		)
+		.join(', ');
 	return reject(
 		command,
 		'RPH_INVARIANT_VIOLATION',

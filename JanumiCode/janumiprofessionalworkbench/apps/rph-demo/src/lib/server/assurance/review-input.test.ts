@@ -34,7 +34,13 @@ vi.mock('@janumipwb/rph-assurance', async (importOriginal) => {
 		seen.inputs.push(ctx.reasoningReview);
 		return actual.runFloorAndPlanRecording(subject, ctx, registry, opts);
 	};
-	return { ...actual, runFloorAndPlanRecording };
+	// ⭐ The review in parts, B3 — the authoring floor runs its policies through this one, once over the PWA's deterministic
+	// policies (no reasoning-review input, so nothing is recorded here) and once per part.
+	const runFloorPolicies: typeof actual.runFloorPolicies = (subject, ctx, registry, policyIds) => {
+		if (ctx.reasoningReview !== undefined) seen.inputs.push(ctx.reasoningReview);
+		return actual.runFloorPolicies(subject, ctx, registry, policyIds);
+	};
+	return { ...actual, runFloorAndPlanRecording, runFloorPolicies };
 });
 
 // ⛔ `JAN-PRQUAL` `PQ-1` — NO REAL REVIEW CAN RUN FROM THIS FILE. Every floor here runs on the live reviewer seam with an
@@ -209,14 +215,57 @@ const GRAPH_OPTIONS: readonly { readonly label: GraphLabel; readonly opts: Graph
 	}
 ];
 
-function moduleGraphInput(
-	engine: AuthedEngineHandle,
-	pwaId: string,
-	opts: GraphOptions
-): ReasoningReviewInput {
+/**
+ * ⭐ The review in parts, B3 (`REG-D-125`) — what the module builds for each part of the PWA's export, in export order: the
+ * options as the floor is given them, and the prior findings — the route hands the floor each finding with its type —
+ * attributed here to the FIRST part, so the others are shown none (`partOptions`).
+ */
+function modulePartInputs(engine: AuthedEngineHandle, pwaId: string, opts: GraphOptions): ReasoningReviewInput[] {
 	const graph = buildPwaExport(pwaId, engine);
 	if (!graph) throw new Error(`no export for ${pwaId}`);
-	return graphReviewInput({ criteria: reasoningReviewCriteria(engine), graph, ...opts });
+	const { priorGaps, ...rest } = opts;
+	return pwaTypeParts(graph).map((part, i) =>
+		pwaTypeReviewInput({
+			criteria: reasoningReviewCriteria(engine),
+			part,
+			...rest,
+			...(priorGaps === undefined ? {} : { priorGaps: i === 0 ? priorGaps : [] })
+		})
+	);
+}
+
+/** The floor's options for `opts`: its prior gaps as the findings the route hands it, each on the export's first type. */
+function partOptions(engine: AuthedEngineHandle, pwaId: string, opts: GraphOptions) {
+	const first = buildPwaExport(pwaId, engine)!.nodes[0]!;
+	const { priorGaps, ...rest } = opts;
+	return {
+		...rest,
+		...(priorGaps === undefined
+			? {}
+			: {
+					priorFindings: priorGaps.map((statement) => ({
+						code: 'RR-02-no-obligation-elision',
+						severity: 'BLOCKING',
+						statement,
+						typeId: first.id,
+						typeName: first.name
+					}))
+				})
+	};
+}
+
+/** Run the authoring floor on the live reviewer seam, capturing each part's input and the prompt it materialized. */
+async function captureParts(floor: (print: (p: string) => Promise<string>) => Promise<unknown>): Promise<Built[]> {
+	seen.inputs.length = 0;
+	const prompts: string[] = [];
+	await withLiveReviewerSeam(() =>
+		floor(async (prompt) => {
+			prompts.push(prompt);
+			return clearingJudgement((seen.inputs.at(-1) as ReasoningReviewInput).criteria);
+		})
+	);
+	expect(prompts, 'the floor sent exactly one prompt per part it handed the validator').toHaveLength(seen.inputs.length);
+	return seen.inputs.map((input, i) => ({ input: input as ReasoningReviewInput, prompt: prompts[i]! }));
 }
 
 let setupSeq = 0;
@@ -387,11 +436,14 @@ function realizeAuthoredGraph(engine: AuthedEngineHandle): void {
 	});
 }
 
-describe('JAN-CRITREAD J2-1 — the graph arm: graphReviewInput is what runPwaFloor builds', () => {
-	// ⚠ `REG-F-556` — AN EXPLICIT BUDGET, SIZED TO ITS WORK: it builds the reference graph and its prompt under every option set. Under `gate:fast`'s parallel test step it timed
+describe('JAN-CRITREAD J2-1 — ⭐ the review in parts, B3 (REG-D-125): pwaTypeReviewInput is what runPwaFloor builds, part by part', () => {
+	// ⚠ `REG-F-556` — AN EXPLICIT BUDGET, SIZED TO ITS WORK: it builds the reference graph and its prompts under every option set. Under `gate:fast`'s parallel test step it timed
 	// out at vitest's 5 s default, and it passes alone (`REG-F-169`'s safe default: a failure under load that passes
 	// alone is a diagnosis). The global default is not raised.
-	it('⭐ the REFERENCE workbench graph — the call site and the module agree, input and prompt, under every option set', async () => {
+	// ⭐ B3 — ONE INPUT PER TYPE, in export order, each the module's over that type's part (`pwaTypeParts`), and each prompt
+	// the one the validator materializes from it. ⛔ The floor handed the validator one input over the whole graph
+	// (`graphReviewInput`), which saw about half of a 16-type PWA (`REG-F-571`).
+	it('⭐ the REFERENCE workbench graph — the call site and the module agree, part by part, input and prompt, under every option set', async () => {
 		resetEngine('reference');
 		const session = getEngine().as(SESSION_CREDENTIAL);
 		// The largest seeded graph: the real subject a professional would first review.
@@ -400,16 +452,20 @@ describe('JAN-CRITREAD J2-1 — the graph arm: graphReviewInput is what runPwaFl
 			.sort((a, b) => listPwuTypes(session, b).length - listPwuTypes(session, a).length)[0]!;
 		expect(listPwuTypes(session, pwaId).length, 'a real graph, not a stub').toBeGreaterThan(3);
 		for (const { label, opts } of GRAPH_OPTIONS) {
-			const production = await captureProduction((print) =>
-				runPwaFloor(pwaId, { ...opts, producer: PRODUCER, print }, session)
+			const production = await captureParts((print) =>
+				runPwaFloor(pwaId, { ...partOptions(session, pwaId, opts), producer: PRODUCER, print }, session)
 			);
-			const module = moduleGraphInput(session, pwaId, opts);
-			expectSameInput(module, production.input, `the call site — ${label}`);
-			expect(await materialize(module), `the materialized prompt — ${label}`).toBe(production.prompt);
+			const module = modulePartInputs(session, pwaId, opts);
+			expect(production.length, `one input per type — ${label}`).toBe(listPwuTypes(session, pwaId).length);
+			expect(production.length).toBe(module.length);
+			for (const [k, built] of module.entries()) {
+				expectSameInput(built, production[k]!.input, `the call site, part ${k + 1} — ${label}`);
+				expect(await materialize(built), `the materialized prompt, part ${k + 1} — ${label}`).toBe(production[k]!.prompt);
+			}
 		}
-	}, 60_000);
+	}, 120_000);
 
-	it('⭐ a LITERAL graph put in an engine — the call site, the module and the pins agree', async () => {
+	it('⭐ a LITERAL graph put in an engine — the call site and the module agree, part by part; a part is shown only its own prior findings', async () => {
 		resetEngine('empty');
 		const session = getEngine().as(SESSION_CREDENTIAL);
 		realizeLiteralGraph(session);
@@ -419,47 +475,65 @@ describe('JAN-CRITREAD J2-1 — the graph arm: graphReviewInput is what runPwaFl
 			LITERAL_ENGINE_EXPORT_JSON
 		);
 		for (const { label, opts } of GRAPH_OPTIONS) {
-			const production = await captureProduction((print) =>
-				runPwaFloor(LITERAL_PWA, { ...opts, producer: PRODUCER, print }, session)
+			const production = await captureParts((print) =>
+				runPwaFloor(LITERAL_PWA, { ...partOptions(session, LITERAL_PWA, opts), producer: PRODUCER, print }, session)
 			);
-			const module = moduleGraphInput(session, LITERAL_PWA, opts);
-			expectSameInput(module, production.input, `the call site — ${label}`);
-			expect(await materialize(module), `the materialized prompt — ${label}`).toBe(production.prompt);
-			// ⭐ package P F1 — every key of the pin, its content the engine's export.
-			expectSameInput(module, { ...GRAPH_PINS[label], content: LITERAL_ENGINE_EXPORT_JSON }, `the pin — ${label}`);
+			const module = modulePartInputs(session, LITERAL_PWA, opts);
+			expect(production.map((b) => b.input.framing), `two parts — ${label}`).toEqual(['PWA_TYPE', 'PWA_TYPE']);
+			for (const [k, built] of module.entries()) {
+				expectSameInput(built, production[k]!.input, `the call site, part ${k + 1} — ${label}`);
+				expect(await materialize(built), `the materialized prompt, part ${k + 1} — ${label}`).toBe(production[k]!.prompt);
+			}
 		}
+		// ⭐ B4 — THE PRIOR FINDINGS ARE THE PART'S OWN: those on the first type reach its review, and the second's none.
+		const every = await captureParts((print) =>
+			runPwaFloor(LITERAL_PWA, { ...partOptions(session, LITERAL_PWA, GRAPH_OPTIONS[0]!.opts), producer: PRODUCER, print }, session)
+		);
+		expect(every.map((b) => b.input.prior?.gaps)).toEqual([GRAPH_OPTIONS[0]!.opts.priorGaps, undefined]);
 	});
 
-	it('⭐⭐ package P F1 (REG-F-503 remedy 1) — an AUTHORED graph put in an engine: each type’s declared policy ids, purpose, child rules and prompt template reach the reviewer’s content through the floor’s one route, inside its fence', async () => {
+	it('⭐⭐ package P F1 (REG-F-503 remedy 1) — an AUTHORED graph put in an engine: each type’s declared policy ids, purpose, child rules and prompt template reach its own part’s subject through the floor’s one route, inside its fence', async () => {
 		resetEngine('empty');
 		const session = getEngine().as(SESSION_CREDENTIAL);
 		realizeAuthoredGraph(session);
 		const opts: GraphOptions = { prompt: 'Construct and verify wordfreq from the supplied requirements and design.' };
-		const production = await captureProduction((print) =>
+		const production = await captureParts((print) =>
 			runPwaFloor(AUTHORED_PWA, { ...opts, producer: PRODUCER, print }, session)
 		);
-		const nodes = (JSON.parse(production.input.content) as { nodes: Record<string, unknown>[] }).nodes;
-		expect(nodes.map((n) => n.id), 'arrangement: the two types, in the order defined').toEqual([AUTHORED_CHECK, AUTHORED_ROOT]);
+		const subjects = production.map(
+			(b) => (JSON.parse(b.input.content.split('\n')[0]!) as { subject: { type: Record<string, unknown> } }).subject.type
+		);
+		expect(subjects.map((n) => n.id), 'arrangement: the two types, one part each, in the order defined').toEqual([
+			AUTHORED_CHECK,
+			AUTHORED_ROOT
+		]);
 		expect(
-			nodes.map((n) => ({
+			subjects.map((n) => ({
 				purpose: n.purpose,
 				requiredAssurancePolicyIds: n.requiredAssurancePolicyIds,
 				permittedChildren: n.permittedChildren,
 				promptTemplate: n.promptTemplate
 			})),
-			'what the reviewer is handed of each type’s declared work'
+			'what each part’s reviewer is handed of its type’s declared work'
 		).toEqual([AUTHORED_DECLARED[1], AUTHORED_DECLARED[0]]);
-		// ⭐ ONE ROUTE: the floor's input is the module's over `buildPwaExport` (`floor.ts` → `graphReviewInput` → `jsonLine`)…
-		expectSameInput(moduleGraphInput(session, AUTHORED_PWA, opts), production.input, 'the call site');
-		// …and the content stands whole on one line between two lines of the prompt's fence.
-		const lines = production.prompt.split('\n');
-		const at = lines.indexOf(production.input.content);
-		expect(at, 'the content, whole, on a line of its own').toBeGreaterThan(0);
-		expect(lines[at - 1], 'a fence line before it').toMatch(/^<<<UNTRUSTED-\d\d>>>$/);
-		expect(lines[at + 1], 'the same fence line after it').toBe(lines[at - 1]);
+		// ⭐ ONE ROUTE: each part's input is the module's over `buildPwaExport` (`floor.ts` → `pwaTypeReviewInput`)…
+		for (const [k, built] of modulePartInputs(session, AUTHORED_PWA, opts).entries())
+			expectSameInput(built, production[k]!.input, `the call site, part ${k + 1}`);
+		// …and each part's lines stand whole, in order, between two lines of its prompt's fence.
+		for (const b of production) {
+			const lines = b.prompt.split('\n');
+			const content = b.input.content.split('\n');
+			const at = lines.indexOf(content[0]!);
+			expect(at, 'the part, whole, on lines of its own').toBeGreaterThan(0);
+			expect(lines.slice(at, at + content.length)).toEqual(content);
+			expect(lines[at - 1], 'a fence line before it').toMatch(/^<<<UNTRUSTED-\d\d>>>$/);
+			expect(lines[at + content.length], 'the same fence line after it').toBe(lines[at - 1]);
+		}
 	});
 
 	it('⛔ the PINS — graphReviewInput over the literal graph, written out (every branch of the assembly)', () => {
+		// ⚠ The historical builder: no floor uses it since the review is in parts, and the case sets v1–v7 materialize
+		// through it (design D4).
 		for (const { label, opts } of GRAPH_OPTIONS) {
 			const built = graphReviewInput({ criteria: SEEDED_REASONING_REVIEW_CRITERIA, graph: LITERAL_EXPORT, ...opts });
 			expectSameInput(built, GRAPH_PINS[label], `the pin — ${label}`);
@@ -1076,10 +1150,13 @@ describe('⛔ JAN-PRQUAL PQ-1 — a review no fence can enclose is not sent, on 
 		expect(floor.satisfied).toBe(false);
 		const review = floor.policies.find((p) => p.policyId === 'floor.reasoning-review');
 		expect(review?.disposition).toBe('INCONCLUSIVE');
+		// ⭐ B3 — each part's review failed so, and its observation carries its type from the host.
 		expect(review?.observations).toContainEqual({
 			code: 'VALIDATOR_EXECUTION_FAILED',
 			severity: 'MATERIAL',
-			statement: NO_FENCE_STATEMENT
+			statement: NO_FENCE_STATEMENT,
+			typeId: LITERAL_NODES[0]!.id,
+			typeName: LITERAL_NODES[0]!.name
 		});
 		expect(classifyFloorRemediation(floor).action).toBe('RETRY_OR_CONFIGURE_REVIEWER');
 	});

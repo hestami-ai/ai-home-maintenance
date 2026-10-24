@@ -111,16 +111,16 @@ const WRITERS: Readonly<Record<string, { readonly why: string; readonly writes: 
 	},
 	// ── READ SIDE (J1-2b, the disclosure): each carries or counts a RECORDED claim; none builds a command. ──────
 	'apps/rph-demo/src/lib/server/floor.ts': {
-		why: 'the tally’s count, named `stipulated`, and the read-back copying each recorded row’s claim — no command is built',
-		writes: 2
+		why: 'the tally’s count, named `stipulated`, the read-back copying each recorded row’s claim, and ⭐ the review in parts’ sum of its parts’ tallies (`floorViewOf`) — no command is built',
+		writes: 3
 	},
 	'packages/rph-projections/src/assurance-view.ts': {
 		why: 'the §38 view folds each criterion’s recorded claim into criterionResults — a projection, no command',
 		writes: 1
 	},
 	'apps/rph-demo/src/lib/server/floor-disclosure.test.ts': {
-		why: 'the disclosure’s fixtures: tallies and rows handed to pure functions — nothing dispatched',
-		writes: 9
+		why: 'the disclosure’s fixtures: tallies and rows handed to pure functions — ⭐ a round of parts’ summed tally among them (the review in parts) — nothing dispatched',
+		writes: 10
 	},
 	'packages/rph-projections/src/assurance-view.test.ts': {
 		why: 'event fixtures for the pure §38 projection — nothing dispatched',

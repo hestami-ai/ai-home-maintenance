@@ -53,7 +53,51 @@ async function load(mode: string, harness = '') {
 		expect(wb.getEngine().loadObject(pwaId)?.objectType).toBe('PROFESSIONAL_WORK_ARCHITECTURE');
 		return pwaId;
 	};
-	return { wb, registry, post, seededPwa };
+	/** ⭐ B6 — a PWA of its own with two types, or one more type of a PWA: a part a registration may name. */
+	const seededType = (pwaId: string, typeId: string) => {
+		if (wb.getEngine().loadObject(pwaId) === undefined)
+			expect(
+				wb.getEngine().as(SESSION_CREDENTIAL).dispatch({
+					commandId: `setup-${pwaId}`,
+					commandType: 'CreatePwa',
+					commandSchemaVersion: 1,
+					targetAggregateType: 'PROFESSIONAL_WORK_ARCHITECTURE',
+					targetAggregateId: pwaId,
+					issuedAt: '2026-09-23T09:00:00Z',
+					correlationId: 'setup',
+					idempotencyKey: `setup-pwa-${Math.random()}`,
+					payload: { pwaId, name: 'Another', description: 'A DRAFT PWA.', domain: 'software', version: '1.0.0' }
+				}).status,
+				'arrangement: the PWA exists'
+			).toBe('ACCEPTED');
+		expect(
+			wb.getEngine().as(SESSION_CREDENTIAL).dispatch({
+				commandId: `setup-${typeId}`,
+				commandType: 'DefinePwuType',
+				commandSchemaVersion: 1,
+				targetAggregateType: 'PWU_TYPE',
+				targetAggregateId: typeId,
+				issuedAt: '2026-09-23T09:00:00Z',
+				correlationId: 'setup',
+				idempotencyKey: `setup-type-${Math.random()}`,
+				payload: {
+					pwuTypeId: typeId,
+					pwaId,
+					pwuKind: 'PLAN',
+					name: typeId,
+					purpose: 'a part',
+					isRoot: false,
+					permittedChildTypeIds: [],
+					requiredInputs: [],
+					requiredOutputs: [],
+					requiredAssurancePolicyIds: []
+				}
+			}).status,
+			`arrangement: the type ${typeId} exists`
+		).toBe('ACCEPTED');
+		return typeId;
+	};
+	return { wb, registry, post, seededPwa, seededType };
 }
 
 describe('⭐ /test-api/reviewer-script registers a stipulation — in test mode, for a PWA that exists, on one arm', () => {
@@ -107,6 +151,90 @@ describe('⭐ /test-api/reviewer-script registers a stipulation — in test mode
 		wb.resetEngine('bare');
 		expect(registry.stipulationFor(pwaId, 'PWA_GRAPH')).toBeUndefined();
 		expect(registry.registeredStipulations()).toEqual([]);
+	});
+});
+
+// ⭐⭐ The review in parts, B6 (`REG-D-125`; DESIGN-authoring-review-in-parts.md D10; roadmap 9a.7) — THE PART ARM'S TWO SCOPES.
+// The authoring floor reviews each type of a PWA as a part, and asks about each with its PWA (`floor.ts`). A registration
+// for the PWA answers every part of it; one naming a type answers that part alone, and is asked before the PWA's; a named
+// type must belong to the named PWA; and a reset discards both.
+describe('⭐⭐ B6 — a registration answers a PWA’s parts, or one part, and the part’s is asked first', () => {
+	const A = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5R0A';
+	const B = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5R0B';
+
+	it('⭐ RED — a PWA’s registration on the part arm answers each of its parts; a part’s own answers that part alone', async () => {
+		// PREDICTED RED BEFORE B6: the lookup took no part, so no registration could name one.
+		const { registry, post, seededPwa, seededType } = await load('test');
+		const pwaId = seededPwa();
+		seededType(pwaId, A);
+		seededType(pwaId, B);
+		const res = (await post({ pwaId, framing: 'PWA_TYPE', typeId: A, remaining: 'CLEAN' })) as Response;
+		expect(await res.json()).toEqual({ registered: { pwaId, framing: 'PWA_TYPE', typeId: A, remaining: 'CLEAN' } });
+		expect([registry.stipulationFor(pwaId, 'PWA_TYPE', A), registry.stipulationFor(pwaId, 'PWA_TYPE', B)]).toEqual([
+			'CLEAN',
+			undefined
+		]);
+		expect(registry.stipulationFor(pwaId, 'PWA_TYPE'), 'a part’s registration answers for the whole PWA').toBeUndefined();
+		await post({ pwaId, framing: 'PWA_TYPE', remaining: 'CLEAN' });
+		expect([registry.stipulationFor(pwaId, 'PWA_TYPE', A), registry.stipulationFor(pwaId, 'PWA_TYPE', B)]).toEqual([
+			'CLEAN',
+			'CLEAN'
+		]);
+	});
+
+	it('⭐ the part’s registration is asked before its PWA’s, and the PWA’s answers the rest — both kept side by side', async () => {
+		const { registry, post, seededPwa, seededType } = await load('test');
+		const pwaId = seededPwa();
+		seededType(pwaId, A);
+		seededType(pwaId, B);
+		await post({ pwaId, framing: 'PWA_TYPE', remaining: 'CLEAN' });
+		await post({ pwaId, framing: 'PWA_TYPE', typeId: A, remaining: 'CLEAN' });
+		expect(registry.registeredStipulations(), 'one registration replaced the other').toHaveLength(2);
+		const all = registry.registeredStipulations();
+		expect(registry.registrationFor(all, pwaId, 'PWA_TYPE', A)?.typeId, 'the PWA’s was asked first').toBe(A);
+		expect(registry.registrationFor(all, pwaId, 'PWA_TYPE', B)?.typeId, 'B has no registration of its own').toBeUndefined();
+		expect(registry.registrationFor(all, pwaId, 'PWA_TYPE', B)).toEqual({ pwaId, framing: 'PWA_TYPE', remaining: 'CLEAN' });
+		// ⭑ And a part's registration never answers another arm.
+		expect(registry.registrationFor(all, pwaId, 'PWA_GRAPH', A)).toBeUndefined();
+	});
+
+	it('⛔ a named type must be a type the named PWA holds, on the part arm — each refusal a 422 naming why', async () => {
+		const { registry, post, seededPwa, seededType } = await load('test');
+		const pwaId = seededPwa();
+		seededType(pwaId, A);
+		const other = seededType('pwa_01ARZ3NDEKTSV4RRFFQ69G5R01', 'pwut_01ARZ3NDEKTSV4RRFFQ69G5R0C');
+		const refused = async (body: unknown) =>
+			(await Promise.resolve(post(body)).catch((e: unknown) => e)) as { status?: number; body?: { message?: string } };
+		const ofAnother = await refused({ pwaId, framing: 'PWA_TYPE', typeId: other, remaining: 'CLEAN' });
+		expect([ofAnother.status, ofAnother.body?.message]).toEqual([
+			422,
+			`the current engine holds no PWU Type ${other} of PWA ${pwaId}: a part's registration names a type of the PWA it names`
+		]);
+		const unknown = await refused({ pwaId, framing: 'PWA_TYPE', typeId: 'pwut_01ARZ3NDEKTSV4RRFFQ69G5ZZZ', remaining: 'CLEAN' });
+		expect(unknown.status).toBe(422);
+		const onTheGraph = await refused({ pwaId, framing: 'PWA_GRAPH', typeId: A, remaining: 'CLEAN' });
+		expect([onTheGraph.status, onTheGraph.body?.message]).toEqual([
+			422,
+			'a stipulation names a type (`typeId`) only on the part arm, PWA_TYPE, not on PWA_GRAPH'
+		]);
+		const empty = await refused({ pwaId, framing: 'PWA_TYPE', typeId: '', remaining: 'CLEAN' });
+		expect(empty.status).toBe(422);
+		expect(registry.registeredStipulations(), 'a refused registration was kept').toEqual([]);
+		// CONTROL — the type the PWA holds is accepted.
+		const ok = (await post({ pwaId, framing: 'PWA_TYPE', typeId: A, remaining: 'CLEAN' })) as Response;
+		expect(ok.status).toBe(200);
+	});
+
+	it('⛔ a reset discards both scopes', async () => {
+		const { wb, registry, post, seededPwa, seededType } = await load('test');
+		const pwaId = seededPwa();
+		seededType(pwaId, A);
+		await post({ pwaId, framing: 'PWA_TYPE', remaining: 'CLEAN' });
+		await post({ pwaId, framing: 'PWA_TYPE', typeId: A, remaining: 'CLEAN' });
+		expect(registry.registeredStipulations(), 'arrangement: both scopes registered').toHaveLength(2);
+		wb.resetEngine('bare');
+		expect(registry.registeredStipulations()).toEqual([]);
+		expect(registry.stipulationFor(pwaId, 'PWA_TYPE', A)).toBeUndefined();
 	});
 });
 

@@ -16,6 +16,11 @@ import {
 	type RunRecord
 } from '../e2e-live-exec/phase7-operator';
 import { PHASE7_HALF_B_DRAFT } from '../../../scripts/phase7/half-b';
+import {
+	phase7AuthoringAllowanceMs,
+	phase7AuthoringReviewerCalls,
+	PHASE7_AUTHORING_ANTICIPATED_PARTS
+} from '../e2e-live-exec/lane-config';
 
 // ⭐⭐ `JAN-EXEC` Phase 7 completion programme, E3 (C6) — HALF B'S TURN, REHEARSED IN THE GATE WITH THE MOCK AGENT
 // (`docs/_working/DESIGN-phase-7-completion.md` §4 C6: *"The turn itself is rehearsed in the gate with the mock agent,
@@ -102,9 +107,9 @@ test.describe('Phase 7 half B — the turn, accepted, published and run, through
 		const author: AuthoringHands = {
 			createDraft: async () => {
 				pwaId = await createDraftPwa(page, request, PHASE7_HALF_B_DRAFT);
-				// ⭐ STIPULATED HERE, IN THE BODY, WITH THE ID READ FROM THE STORE (`JAN-CRITREAD` J1-3): the graph's review and
-				// the work products', so the declared stand-in answers what the structural checker cannot judge.
-				await registerStipulation(request, pwaId, 'PWA_GRAPH');
+				// ⭐ STIPULATED HERE, IN THE BODY, WITH THE ID READ FROM THE STORE (`JAN-CRITREAD` J1-3): the review of each type
+				// of the graph (⭐ the review in parts, `REG-D-125`) and the work products', so the declared stand-in answers what the structural checker cannot judge.
+				await registerStipulation(request, pwaId, 'PWA_TYPE');
 				await registerStipulation(request, pwaId, 'WORK_PRODUCT');
 				return pwaId;
 			},
@@ -144,13 +149,29 @@ test.describe('Phase 7 half B — the turn, accepted, published and run, through
 			true
 		]);
 		expect(a.accept?.acceptedHash, 'the hash accepted is not the candidate’s').toBe(a.candidate?.candidateHash);
-		// ⭐ `REG-D-112` (finding 2) — the limit was checked before Send, the authoring floor's worst case counted.
-		expect(a.limitCheck, 'the limit before Send').toMatchObject({ prior: 0, ahead: 8, allowed: true });
+		// ⭐ `REG-D-112` (finding 2) — the limit was checked before Send, the authoring floor's worst case counted ⭐ (the review in
+		// parts, B6) for the inventory anticipated, sixteen types.
+		expect(a.limitCheck, 'the limit before Send').toMatchObject({
+			prior: 0,
+			ahead: phase7AuthoringReviewerCalls(PHASE7_AUTHORING_ANTICIPATED_PARTS),
+			allowed: true
+		});
 		expect(a.floor.map((f) => f.state), 'the authoring floor, as the turn’s fork held it').toEqual([
 			'SATISFIED',
 			'SATISFIED',
 			'SATISFIED'
 		]);
+		// ⭐ B6 — and its Reasoning Review is one round's complete part set, read off the fork as the real page staged it: the plan's
+		// three types, each reviewed; the wait's allowance theirs; and, three being fewer than anticipated, no second count of Send's.
+		expect(
+			a.floor.find((f) => f.policyId === 'floor.reasoning-review')?.parts?.map((p) => [p.typeName, p.state]),
+			'the authoring floor’s parts, as the turn’s fork held them'
+		).toEqual([
+			['wordfreq Realization', 'SATISFIED'],
+			['Specify wordfreq', 'SATISFIED'],
+			['Verify wordfreq', 'SATISFIED']
+		]);
+		expect([a.parts, a.allowanceMs, a.inventoryCheck]).toEqual([3, phase7AuthoringAllowanceMs(3), null]);
 		// ⭐ C3 — THE AUTHOR, AS THE TURN'S OWN STREAM NAMED IT: the mock's declared identity. ⚠ The floor's assessments name no
 		// producer (found by this rehearsal's first run: each read null), and the page's log loses its status line when the
 		// turn ends (its second), so the stream is the one place it is said.

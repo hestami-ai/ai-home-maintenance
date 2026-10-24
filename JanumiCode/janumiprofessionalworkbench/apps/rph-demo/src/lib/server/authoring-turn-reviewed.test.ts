@@ -136,8 +136,35 @@ const seededPolicy = (index: number): string => {
 	return policyId!;
 };
 
+/**
+ * ⭐ The review in parts, B3 (`REG-D-125`) — a type of the PWA on canonical, before any draft: the floor reviews each type as
+ * a part, so a floor over a PWA with none records no reasoning review and no exchange.
+ */
+function canonicalType(name: string): string {
+	const typeId = mintUiId('pwut');
+	expect(
+		session.dispatch(
+			setupCommand('DefinePwuType', 'PWU_TYPE', typeId, {
+				pwuTypeId: typeId,
+				pwaId: PWA,
+				pwuKind: 'SURVEY',
+				name,
+				purpose: 'Survey the site',
+				isRoot: true,
+				permittedChildTypeIds: [],
+				requiredInputs: [],
+				requiredOutputs: [],
+				requiredAssurancePolicyIds: []
+			})
+		).status,
+		`arrangement: the canonical type ${name}`
+	).toBe('ACCEPTED');
+	return typeId;
+}
+
 /** A REAL `RecordModelExchange`, captured off a floor run straight on canonical — no turn, so nobody's witness. */
 async function capturedExchangeCommand(): Promise<DomainCommand> {
+	canonicalType('Survey');
 	const captured: DomainCommand[] = [];
 	const spy: AuthedEngineHandle = {
 		...session,
@@ -226,7 +253,8 @@ describe('an authoring turn reviewed by a real reviewer commits its exact candid
 	it('PR-1p — exchanges ALREADY on canonical before the turn began are part of its base, not of its acts', async () => {
 		// A review run straight on canonical (no turn), immediately before the turn begins: its records sit at the END
 		// of the base log — the position a fix that re-derived the base from "events that are not exchanges" would
-		// mis-slice.
+		// mis-slice. ⭐ B3: over a type of the PWA, the part a review is recorded under.
+		canonicalType('Survey');
 		await withLiveReviewerSeam(() =>
 			runPwaFloor(
 				PWA,
@@ -263,7 +291,8 @@ describe('an authoring turn reviewed by a real reviewer commits its exact candid
 		expect(resumed!.broker.defineType({ name: 'Build', pwuKind: 'BUILD' }).ok).toBe(true);
 		const second = markAuthoringTurnValid(resumed!);
 		await reviewOnTurn(resumed!, PWA, clearing, second);
-		expect(exchanges(), 'two floor runs, one try each').toBe(2);
+		// ⭐ B3 — one try per part: the first run reviewed one type, the second the two the resumed turn holds.
+		expect(exchanges(), 'two floor runs, one try per part each').toBe(3);
 
 		const result = commitAuthoringTurn(resumed!, markAuthoringTurnAssured(resumed!, second));
 		expect(result, JSON.stringify(result)).toMatchObject({ ok: true });
@@ -338,8 +367,35 @@ describe('the witness admits the turn’s own tries and nothing else', () => {
 		const result = commitAuthoringTurn(turn, markAuthoringTurnAssured(turn, subjectHash));
 
 		expect(result).toMatchObject({ ok: false, status: 'CONFLICTED' });
+		// ⭐ B3 — the other writer's try is about a type of the PWA, which the draft holds: the part's group refuses it.
 		expect(result.ok ? '' : result.detail).toBe(
-			disclosure(touched('a reviewer exchange about your PWA', theirs.targetAggregateId))
+			disclosure(touched('a reviewer exchange about a type of your PWA', theirs.targetAggregateId))
+		);
+	});
+
+	// ⭐ G4 ITSELF — the group of a reviewer's exchange about the PWA, kept by ruling (`REG-D-070` Q2). The floor now records each
+	// try under the part it reviewed (`floor.ts`), so another writer's try ABOUT THE PWA is arranged from a real one, its subject
+	// moved to the PWA.
+	it('W2g — another writer’s exchange about the PWA itself, after the fork, refuses the draft by G4', async () => {
+		const template = await capturedExchangeCommand();
+		const { turn, subjectHash } = validatedTurn();
+		const aboutThePwa = asNewTry({
+			...template,
+			payload: {
+				...(template.payload as Record<string, unknown>),
+				subjectObjectId: PWA,
+				subjectObjectType: 'PROFESSIONAL_WORK_ARCHITECTURE'
+			}
+		});
+		expect(session.dispatch(aboutThePwa).status, 'arrangement: another writer records a try about the PWA').toBe(
+			'ACCEPTED'
+		);
+
+		const result = commitAuthoringTurn(turn, markAuthoringTurnAssured(turn, subjectHash));
+
+		expect(result).toMatchObject({ ok: false, status: 'CONFLICTED' });
+		expect(result.ok ? '' : result.detail).toBe(
+			disclosure(touched('a reviewer exchange about your PWA', aboutThePwa.targetAggregateId))
 		);
 	});
 
@@ -363,7 +419,7 @@ describe('the witness admits the turn’s own tries and nothing else', () => {
 
 		expect(result).toMatchObject({ ok: false, status: 'CONFLICTED' });
 		expect(result.ok ? '' : result.detail).toBe(
-			disclosure(touched('a reviewer exchange about your PWA', lateTry.targetAggregateId))
+			disclosure(touched('a reviewer exchange about a type of your PWA', lateTry.targetAggregateId))
 		);
 	});
 
@@ -466,6 +522,43 @@ describe('what a draft depends on refuses it, by name (REG-D-070 §5.1)', () => 
 		expect(result.ok ? '' : result.detail).toBe(
 			disclosure(
 				...recorded.map((id) => touched('your PWA’s review record under a floor policy', id))
+			)
+		);
+	});
+
+	// ⭐⭐ The review in parts, B3 (`REG-D-125`; design D6) — AND THE REVIEW RECORDS OF EACH TYPE OF THE DRAFT: the floor records
+	// a type's reasoning review under the type, and the round reader ranks it there, so another run's review of one of the
+	// draft's types, recorded on canonical after the draft began, is a change to it. PREDICTED RED WITHOUT THE PART GROUPS:
+	// only the PWA's two deterministic records are named, and the part's is committed past unseen.
+	it('G3p — a review record of a type the draft holds, written on canonical after the draft began, refuses it by name', async () => {
+		const typeId = canonicalType('Survey');
+		const { turn, subjectHash } = validatedTurn();
+		const position = session.readAllEvents().length;
+		await runPwaFloor(PWA, { prompt: 'Assess the draft.', producer: PRODUCER }, session);
+		const recorded = (subject: string) => [
+			...new Set(
+				session
+					.readAllEvents()
+					.slice(position)
+					.filter(
+						(event) =>
+							event.aggregateType === 'ASSURANCE_ASSESSMENT' &&
+							((session.loadObject(event.aggregateId)?.state as { subjectObjectIds?: string[] } | undefined)?.subjectObjectIds ?? []).includes(subject)
+					)
+					.map((event) => event.aggregateId)
+			)
+		];
+		expect(recorded(typeId), 'arrangement: the part’s review record').toHaveLength(1);
+
+		const result = commitAuthoringTurn(turn, markAuthoringTurnAssured(turn, subjectHash));
+
+		expect(result).toMatchObject({ ok: false, status: 'CONFLICTED' });
+		expect(result.ok ? '' : result.detail).toBe(
+			disclosure(
+				...recorded(PWA).map((id) => touched('your PWA’s review record under a floor policy', id)),
+				...recorded(typeId).map((id) =>
+					touched('the review record of a type of your PWA under a floor policy', id)
+				)
 			)
 		);
 	});

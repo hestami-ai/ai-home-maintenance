@@ -2021,6 +2021,78 @@
 								>
 							{/if}
 						</div>
+						<!-- ⭐⭐ The review in parts, B5 (REG-D-125; design D7; roadmap 9a.6) — THIS TYPE'S OWN REVIEW, in the round the floor
+						     panel shows: its disposition, or that the round holds none of it; its criteria, with what a test stipulated, ⭐
+						     (package C's check) each criterion's own result by its id; its findings, each with its code (the criterion a
+						     finding faults); and its reviewer's answer — each from the type's own part, as the load answers it (`typeReviews`), and
+						     none composed here. The PWA's deterministic policies and their strictest aggregate stay in the floor panel. -->
+						{#each data.typeReviews.filter((r) => r.typeId === current.id) as review (review.typeId)}
+							<div class="field" data-testid="inspector-review">
+								<span class="flabel">This type’s reasoning review</span>
+								{#if review.reviewed}
+									<p>
+										<span
+											class="reviewbadge"
+											class:ok={review.disposition === 'SATISFIED'}
+											class:bad={review.disposition === 'REJECTED'}
+											data-testid="inspector-review-disposition">{review.disposition}</span
+										>
+										<span class="leafkind">v{review.semanticVersion} · in the round the floor panel shows</span>
+									</p>
+									{#if review.criteria}
+										<p class="fhelp" data-testid="inspector-review-criteria">
+											{review.criteria.evaluated} criteria evaluated{#if review.criteria.stipulated}
+												{' '}· {review.criteria.stipulated} stipulated by the test, not reviewed{/if}
+										</p>
+									{/if}
+									{#if review.criterionResults?.length}
+										<ul class="reviewcriteria" data-testid="inspector-review-criterion-results">
+											{#each review.criterionResults as c (c.criterionId)}
+												<li>
+													<code>{c.criterionId}</code>
+													{c.result ?? 'no result recorded'}{#if c.stipulated}{' '}· stipulated {c.stipulated} by the test, not reviewed{/if}
+												</li>
+											{/each}
+										</ul>
+									{/if}
+									{#if review.findings.length}
+										<ul class="reviewfindings" data-testid="inspector-review-findings">
+											{#each review.findings as finding, i (i)}<li><code>{finding.code}</code> {finding.statement}</li>{/each}
+										</ul>
+									{:else}
+										<p class="fhelp" data-testid="inspector-review-no-findings">No finding is recorded against this type.</p>
+									{/if}
+									{#if review.escalationRecommended}
+										<p class="fhelp" data-testid="inspector-review-escalation">
+											The reviewer also recommended escalation to a human reviewer (REG-D-089).
+										</p>
+									{/if}
+									<!-- The answer only, re-hashed before it is shown, as the floor panel's (MXREAD-03): its subject this type, its
+									     run the round's. -->
+									{#if review.answer}
+										<details class="revans" data-testid="inspector-review-answer">
+											<summary>What the reviewer returned for this type (try {review.answer.attemptOrdinal})</summary>
+											{#if review.answer.answer}
+												<pre class="revanstext">{review.answer.answer}</pre>
+											{/if}
+											<p class="revansnote">{review.answer.disclosure}</p>
+										</details>
+									{:else}
+										<p class="fhelp" data-testid="inspector-review-answer-none">
+											No reviewer answer is recorded for this type’s review in this round.
+										</p>
+									{/if}
+								{:else}
+									<p data-testid="inspector-review-missing">
+										<span class="reviewbadge none">NOT REVIEWED</span>
+										<span class="leafkind"
+											>the round the floor panel shows holds no review of this type at v{review.semanticVersion}, so the floor is not
+											satisfied</span
+										>
+									</p>
+								{/if}
+							</div>
+						{/each}
 						{#if editable}
 							<div class="inspactions">
 								<button
@@ -2270,6 +2342,25 @@
 									>Record accepted risk (floor still blocks)</button
 								>
 							</form>
+						{/if}
+						<!-- ⭐ The review in parts, B5 (REG-D-125; design D7) — THE REASONING REVIEW ABOVE, BY TYPE: each type's own review in the
+						     round shown, in the export's order, one the round holds none of said to be so. Selecting one opens it in the
+						     inspector, under the type, with its criteria, findings and answer. -->
+						{#if data.typeReviews.length}
+							<p class="floorgapshdr">Reasoning review, by type ({data.typeReviews.length})</p>
+							<ul class="floorparts" data-testid="floor-parts">
+								{#each data.typeReviews as review (review.typeId)}
+									<li
+										class:ok={review.disposition === 'SATISFIED'}
+										class:bad={review.disposition === 'REJECTED'}
+										data-testid="floor-part"
+										data-type-id={review.typeId}
+									>
+										<button type="button" class="linkbtn" onclick={() => selectNode(review.typeId)}>{review.typeName}</button>
+										<span class="pdisp">{review.reviewed ? review.disposition : 'NOT REVIEWED'}</span>
+									</li>
+								{/each}
+							</ul>
 						{/if}
 							</div>
 						{/if}
@@ -3488,6 +3579,49 @@
 		color: var(--muted, #667);
 		font-size: 0.72rem;
 	}
+	/* ⭐ The review in parts, B5 — a type's own review in the inspector, and the floor panel's list of them. */
+	.reviewbadge {
+		display: inline-block;
+		padding: 0.05rem 0.4rem;
+		border-radius: 3px;
+		font-size: 0.68rem;
+		font-weight: 700;
+		letter-spacing: 0.03em;
+		border: 1px solid currentColor;
+		color: var(--amber);
+	}
+	.reviewbadge.ok {
+		color: var(--tertiary);
+	}
+	.reviewbadge.bad {
+		color: var(--error);
+	}
+	.reviewbadge.none {
+		color: var(--muted, #6b7280);
+	}
+	.reviewfindings {
+		margin: 0.3rem 0 0;
+		padding-left: 16px;
+		display: flex;
+		flex-direction: column;
+		gap: 3px;
+		line-height: 1.35;
+	}
+	/* ⭐ Package C's check — each criterion's own result under the type's review. */
+	.reviewcriteria {
+		margin: 0.3rem 0 0;
+		padding-left: 16px;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		font-size: 0.72rem;
+		color: var(--on-variant);
+	}
+	.floorparts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+	.floorparts li { display: flex; gap: 6px; align-items: baseline; justify-content: space-between; color: var(--on-variant); }
+	.floorparts .pdisp { color: var(--amber); font-weight: 800; font-size: 10px; }
+	.floorparts li.ok .pdisp { color: var(--tertiary); }
+	.floorparts li.bad .pdisp { color: var(--error); }
 
 	.promptnote {
 		margin: 0.3rem 0 0;

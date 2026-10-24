@@ -77,7 +77,8 @@ describe('⭐ a registered clean draft is SATISFIED through the production compo
 		// THE MUTANTS THIS FILE OWNS: the recorder forwards `admitStipulatedAnswers: false`; the floor caller stops
 		// passing the flag to the ladder; the floor caller stops handing the stand-in the registry. Each turns this
 		// SATISFIED into INCONCLUSIVE.
-		registerStipulation(getEngine(), { pwaId: PWA, framing: 'PWA_GRAPH', remaining: 'CLEAN' });
+		// ⭐ The review in parts, B6 (`REG-D-125`) — the floor reviews the draft's one type as a part, on the part arm.
+		registerStipulation(getEngine(), { pwaId: PWA, framing: 'PWA_TYPE', remaining: 'CLEAN' });
 		const { turn, subjectHash, floor, review } = await reviewCleanDraft();
 
 		expect(floor.satisfied, JSON.stringify(floor.policies)).toBe(true);
