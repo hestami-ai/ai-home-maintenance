@@ -692,7 +692,7 @@ describe('⭐ R-1c — re-run the review (RD4, RD5, RD7): no producer runs, the 
 		expect(producing, 'arrangement: one EXECUTION exchange names the work product’s bytes').toHaveLength(1);
 		expect(
 			(producing[0]!.state.answerSpanRef as { status?: unknown }).status,
-			'arrangement: the producing exchange retained its answer span'
+			'arrangement: the producing exchange did not retain its answer span'
 		).not.toBe('STORED');
 		const exchangeId = producing[0]!.id;
 		const events = getEngine().readAllEvents().length;
