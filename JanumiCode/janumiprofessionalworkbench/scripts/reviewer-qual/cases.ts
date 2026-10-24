@@ -9,7 +9,7 @@
 // where `@janumipwb/*` would resolve to built `dist` (`REG-D-072` D11); nothing here needs a package at runtime.
 import type { AssuranceSubject, ProfessionalRationaleSummary } from '@janumipwb/rph-assurance';
 import type { ObservedToolCallReport } from '@janumipwb/rph-contracts';
-import type { PwaGraphNode, PwaMeta } from '@janumipwb/rph-projections';
+import type { PwaGraphNode, PwaMeta, PwaPartLibraryPolicy } from '@janumipwb/rph-projections';
 import type { ObservedProcessRun } from '../../apps/rph-demo/src/lib/server/tools/process-run-observer.js';
 import type { AssessmentCriterion } from '@janumipwb/rph-contracts';
 import type { DeclaredReviewCommand } from '../../apps/rph-demo/src/lib/server/assurance/review-input.js';
@@ -86,11 +86,20 @@ export interface DeclaredPolicyCaseInput {
 export interface PwaTypeCaseInput extends GraphCaseInput {
 	/** The PWU Type whose part this case reviews — one of `nodes`. */
 	readonly typeId: string;
+	/**
+	 * ⭐⭐ D3a (`REG-D-127`) — the policy library the part is cut with (`pwaTypeParts`), as the authoring surface's policy view
+	 * reads it: version nine's cases carry the library the workbench seeds, so the floor and the case read the same values.
+	 * ⚠ Absent on version eight's, which were measured on parts cut with none.
+	 */
+	readonly policyLibrary?: readonly PwaPartLibraryPolicy[];
 }
 
 interface CaseCommon {
 	/** Stable across versions of the set: a case that changes gets a new id (version two's `G2-…`, `case-set-v2.ts`;
-	 *  version three's `G3-…`, `case-set-v3.ts`). */
+	 *  version three's `G3-…`, `case-set-v3.ts`). ⚠ But version nine (`REG-D-127`) carries version eight's 35 part cases
+	 *  under their ids with their inputs moved — each cut with the seeded policy library, the 19 bridge ones from restated
+	 *  sources — their oracles unchanged: a measurement counts for a case only where its recorded prompt is today's
+	 *  (`check-core.ts` limb 1), so no record of version eight's covers them. */
 	readonly id: string;
 	/** The subject the floor composes over — its id, version and the producer independence is checked against. */
 	readonly subject: AssuranceSubject;
@@ -186,6 +195,10 @@ export const ORACLES_V7_FILE = 'docs/tracking/reviewer-qualification/oracles/ora
  *  which stay as history. */
 export const CASE_SET_V8_FILE = 'docs/tracking/reviewer-qualification/cases/case-set-v8.json';
 export const ORACLES_V8_FILE = 'docs/tracking/reviewer-qualification/oracles/oracles-v8.json';
+/** ⭐ `JAN-EXEC` Phase 7, the review in parts, B8a — version nine (`REG-D-127`), beside versions one to eight, which stay as
+ *  history. */
+export const CASE_SET_V9_FILE = 'docs/tracking/reviewer-qualification/cases/case-set-v9.json';
+export const ORACLES_V9_FILE = 'docs/tracking/reviewer-qualification/oracles/oracles-v9.json';
 
 /**
  * ⭐ `JAN-CRITREAD` J2-5 — THE CURRENT CASE SET AND ITS ORACLES: what `reviewer:qual:check` holds coverage and
@@ -216,9 +229,15 @@ export const ORACLES_V8_FILE = 'docs/tracking/reviewer-qualification/oracles/ora
  * 19 graph cases — the 27 part oracles of `REG-D-126` Q30 and the eight of Q31's 3-level pair, conferred. It holds no
  * `PWA_GRAPH` case, so the graph framing's probes leave the current fingerprint (`fingerprint.ts`). ⚠ The 35 are new prompts,
  * so the check owes a RUN of the selected reviewer over them; the 41 keep their prompts, and RESCORED lines may discharge them.
+ * ⭐⭐ Version nine since `JAN-EXEC` Phase 7, the review in parts, B8a (`REG-D-127`; design D3a and §5): version eight's 41
+ * non-part cases under their ids, byte for byte, and its 35 part cases under their ids, their oracles unchanged, each cut with the
+ * seeded policy library (D3a) — the 19 bridge part cases from their sources restated as production stores a type it defines,
+ * a purpose for each, awaiting the sponsor's confirmation of the restatement (`ORACLES_RESTATEMENT_UNCONFIRMED`). ⚠ The 35 are
+ * new prompts, so the check owes a RUN of the selected reviewer over them; the 41 keep their prompts, and RESCORED lines may
+ * discharge them.
  */
-export const CURRENT_CASE_SET_FILE = CASE_SET_V8_FILE;
-export const CURRENT_ORACLES_FILE = ORACLES_V8_FILE;
+export const CURRENT_CASE_SET_FILE = CASE_SET_V9_FILE;
+export const CURRENT_ORACLES_FILE = ORACLES_V9_FILE;
 
 /**
  * ⭐⭐ `E12F` F5 (the E12 package review's fifth finding; `REG-D-073`, oracle integrity) — THE WORDS AN ORACLE SET'S
@@ -228,6 +247,15 @@ export const CURRENT_ORACLES_FILE = ORACLES_V8_FILE;
  * carry them: conferral is recorded as the sponsor's, in the version that confers.
  */
 export const ORACLES_PROPOSED = 'PROPOSED, AWAITING SPONSOR CONFERRAL';
+
+/**
+ * ⭐⭐ B8a (`REG-D-127`) — THE WORDS AN ORACLE SET'S `conferral` CARRIES WHILE THE SPONSOR'S CONFIRMATION OF A RESTATEMENT IS OWED:
+ * cases whose verdicts the sponsor conferred, their inputs restated since, which the sponsor is to confirm before measurement.
+ * Written by the version that restates them (`oracles-v9.ts`), and READ BY `reviewer:qual:check`, which refuses a current set
+ * carrying them (`RESTATEMENT_NOT_CONFIRMED`) — saying that the restatement's confirmation is owed, never that the verdicts were
+ * not conferred. ⚠ A version that records the confirmation does not carry them.
+ */
+export const ORACLES_RESTATEMENT_UNCONFIRMED = 'RESTATED, AWAITING SPONSOR CONFIRMATION OF THE RESTATEMENT';
 
 /** The one serialization of a generated file: tab-indented JSON, LF, a final newline. */
 export function serializeGenerated(value: CaseSet | OracleSet): string {

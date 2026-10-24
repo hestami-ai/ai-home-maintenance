@@ -144,14 +144,27 @@
 // ⭐ THE OVERSIZE LENGTHS ARE DERIVED FROM THE PRODUCT'S OWN BUDGET, so a probe stays oversize when a limit is raised.
 // ⭐ `PQ-1` — A PROBE THAT CARRIES A CUT IS NAMED `…OVERSIZE…`, AND ONE NAMED SO CARRIES ONE: a cut is what only an input
 // over its budget reaches, and `verif/reviewer-qualification-fingerprint.test.ts` holds the name to the bytes both ways.
-import type { AssuranceSubject, ProfessionalRationaleSummary, ReasoningReviewInput } from '@janumipwb/rph-assurance';
+import {
+	FLOOR_POLICY_DEFINITIONS,
+	type AssuranceSubject,
+	type ProfessionalRationaleSummary,
+	type ReasoningReviewInput
+} from '@janumipwb/rph-assurance';
+import type { AssurancePolicyView } from '@janumipwb/rph-authoring';
 import {
 	AssuranceSeveritySchema,
 	type AssessmentCriterion,
 	type EvidenceRequirement,
 	type ObservedToolCallReport
 } from '@janumipwb/rph-contracts';
-import { buildPwaGraphExport, pwaTypeParts, type PwaGraphNode, type PwaMeta, type PwaTypePart } from '@janumipwb/rph-projections';
+import {
+	buildPwaGraphExport,
+	pwaTypeParts,
+	type PwaGraphNode,
+	type PwaMeta,
+	type PwaPartLibraryPolicy,
+	type PwaTypePart
+} from '@janumipwb/rph-projections';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { REASONING_REVIEW_BUDGET } from '../../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
 import {
@@ -199,6 +212,37 @@ export const CATALOG_DECLARED_POLICIES: readonly DeclaredProbePolicy[] = ontolog
 	independenceRequirement: p.independenceRequirement,
 	requiredEvidence: p.requiredEvidence as unknown as readonly EvidenceRequirement[]
 }));
+
+/**
+ * ⭐⭐ D3a (`REG-D-127`) — THE POLICY LIBRARY THE WORKBENCH SEEDS, as the authoring surface's policy view reads it
+ * (`rph-authoring` `assurancePolicyViews`, over `seedPolicyLibrary`): the three floor policies, flagged, then the catalog's,
+ * each ACTIVE at version 1.0.0, with the kinds its applicability names (`seedAdditivePolicies` copies `appliesToPwuKinds`, and
+ * a policy naming none names none). What every part probe is cut with, as the floor cuts a candidate with its engine's — so a
+ * change to a seeded policy's name, purpose, status or kinds moves the part probes it reaches. The fingerprint test holds it to
+ * the view over a seeded engine.
+ */
+export const SEEDED_PROBE_LIBRARY: readonly AssurancePolicyView[] = [
+	...FLOOR_POLICY_DEFINITIONS.map((p) => ({
+		id: p.policyId,
+		name: p.name,
+		purpose: p.purpose,
+		version: '1.0.0',
+		status: 'ACTIVE',
+		isFloor: true
+	})),
+	...ontology.seedPolicies.map((p) => {
+		const kinds = (p.appliesToPwuKinds ?? []) as readonly string[];
+		return {
+			id: p.policyId,
+			name: p.name,
+			purpose: p.purpose,
+			version: '1.0.0',
+			status: 'ACTIVE',
+			isFloor: false,
+			...(kinds.length > 0 ? { pwuKinds: [...kinds] } : {})
+		};
+	})
+];
 
 export interface FingerprintProbe {
 	readonly id: string;
@@ -284,9 +328,17 @@ const EMPTY_AND_ABSENT_NODES: readonly PwaGraphNode[] = [
 // ── ⭐⭐ `JAN-EXEC` Phase 7, the review in parts, B7 (`REG-D-125`; DESIGN-authoring-review-in-parts.md §5) — THE PARTS' GRAPHS ──
 /** The PWA of the part probes, with a description, which a root's subject carries (design D3). */
 const PWA_DESCRIBED: PwaMeta = { ...PWA, description: 'A condition survey of a 60 m masonry retaining wall, panel by panel.' };
-/** One part of the PWA `nodes` define: the type `typeId`'s, cut by the product's own `pwaTypeParts`. */
-function partOf(nodes: readonly PwaGraphNode[], typeId: string, pwa: PwaMeta = PWA): PwaTypePart {
-	const part = pwaTypeParts(buildPwaGraphExport(pwa, nodes)).find((x) => x.typeId === typeId);
+/**
+ * One part of the PWA `nodes` define: the type `typeId`'s, cut by the product's own `pwaTypeParts` — ⭐ D3a — with `library`,
+ * the seeded library unless said, as the floor cuts each part with its engine's.
+ */
+function partOf(
+	nodes: readonly PwaGraphNode[],
+	typeId: string,
+	pwa: PwaMeta = PWA,
+	library: readonly PwaPartLibraryPolicy[] = SEEDED_PROBE_LIBRARY
+): PwaTypePart {
+	const part = pwaTypeParts(buildPwaGraphExport(pwa, nodes), library).find((x) => x.typeId === typeId);
 	if (part === undefined) throw new Error(`no part of ${typeId}`);
 	return part;
 }
@@ -406,6 +458,52 @@ const WIDE_NODES: readonly PwaGraphNode[] = (() => {
 		)
 	];
 })();
+// ── ⭐⭐ D3a (`REG-D-127`; `REG-F-573`) — THE POLICY MATERIAL'S PARTS ─────────────────────────────────────────────────────
+const RULES_ID = 'pwut_01M4A7MP2R5T8W1Y4B7E0H3K';
+const REPAIR_ID = 'pwut_01M4A7MV5T8W1Y4B7E0H3K6N';
+/**
+ * ⭐ A TYPE DECLARING THREE POLICIES: two the seeded library holds, and one it does not — a kind no seeded policy names, so its
+ * declared policies are the part's whole policy material.
+ */
+const DECLARING_NODES: readonly PwaGraphNode[] = [
+	node(RULES_ID, 'Repair Rules', 'INSPECTION', {
+		isRoot: true,
+		purpose: 'Write the rules each panel repair follows.',
+		requiredAssurancePolicyIds: ['pol_intent_preservation', 'pol_assumption_disclosure', 'pol_wall_repair_rules']
+	})
+];
+/**
+ * ⭐ THE APPLICABLE LIST'S CONTROLS — a library holding, for the subject's kind: an ACTIVE policy naming it, one naming no kind
+ * and one an empty list of kinds (each listed); and a floor policy naming it, a DRAFT one, a SUSPENDED one and an ACTIVE one of
+ * another kind (none listed). The subject declares one listed policy, so another listed one is undeclared.
+ */
+const CONTROL_LIBRARY: readonly PwaPartLibraryPolicy[] = [
+	{ id: 'floor.reasoning-review', name: 'Reasoning Review', purpose: 'The floor’s own review.', status: 'ACTIVE', isFloor: true, pwuKinds: ['INSPECTION'] },
+	{ id: 'pol_panel_survey', name: 'Panel Survey', purpose: 'Every panel is inspected.', status: 'ACTIVE', isFloor: false, pwuKinds: ['INSPECTION'] },
+	{ id: 'pol_draft_rules', name: 'Draft Rules', purpose: 'Not in force yet.', status: 'DRAFT', isFloor: false, pwuKinds: ['INSPECTION'] },
+	{ id: 'pol_any_work', name: 'Any Work', purpose: 'Governs every kind of work.', status: 'ACTIVE', isFloor: false },
+	{ id: 'pol_suspended_rules', name: 'Suspended Rules', purpose: 'Out of force.', status: 'SUSPENDED', isFloor: false, pwuKinds: ['INSPECTION'] },
+	{ id: 'pol_no_kinds_listed', name: 'No Kinds Listed', purpose: 'An empty list of kinds.', status: 'ACTIVE', isFloor: false, pwuKinds: [] },
+	{ id: 'pol_baseline_only', name: 'Baseline Only', purpose: 'Another kind’s.', status: 'ACTIVE', isFloor: false, pwuKinds: ['PRODUCT_BASELINE_PROMOTION'] }
+];
+const CONTROLLED_NODES: readonly PwaGraphNode[] = [
+	node(RULES_ID, 'Repair Rules', 'INSPECTION', {
+		isRoot: true,
+		purpose: 'Write the rules each panel repair follows.',
+		requiredAssurancePolicyIds: ['pol_any_work']
+	})
+];
+/**
+ * ⭐ A TYPE THE SEEDED LIBRARY GOVERNS, A POLICY ITS KIND MAY TAKE NOT DECLARED (`G7-RR-02.T02`'s shape): an implementation,
+ * PRODUCT_IMPLEMENTATION, declaring Intent Preservation and not Test Adequacy.
+ */
+const REPAIR_NODES: readonly PwaGraphNode[] = [
+	node(REPAIR_ID, 'Repair Tooling', 'PRODUCT_IMPLEMENTATION', {
+		isRoot: true,
+		purpose: 'Build the repair-planning tool, with unit tests of each rule it applies.',
+		requiredAssurancePolicyIds: ['pol_intent_preservation']
+	})
+];
 /** ⭐ A TYPE WHOSE OWN DEFINITION IS LONGER THAN ANY PROMPT: its subject cannot be shown whole, so its review is refused. */
 const HUGE_NODES: readonly PwaGraphNode[] = [
 	node(ROOT_ID, 'Condition Survey', 'SURVEY', {
@@ -970,8 +1068,8 @@ const asProduction = (
  * `[id, sha256(prompt)]` pairs in this order, then the skeleton's digest, then the reader corpus's tokens). Since
  * `PQ-1` (design D3) it is: ~~G-BARE, G-DECLARED, G-PRIOR, G-OVERSIZE-CONTENT, G-OVERSIZE-ALL, G-OVERSIZE-FENCES,
  * G-OVERSIZE-LISTS, G-NO-FENCE, G-STAKES, G-ACCOUNT-BREAKS;~~ ⭐ B7: T-LEAF, T-COMPOSITE, T-ROOT, T-OVERSIZE-CHILDREN,
- * T-ABSENT-FIELDS, T-SUBJECT-REFUSED, T-OVERSIZE-ALL, T-OVERSIZE-FENCES, T-OVERSIZE-LISTS, T-NO-FENCE, T-STAKES,
- * T-ACCOUNT-BREAKS; W-BARE, W-DECLARED-PRIOR, W-OVERSIZE-CONTENT,
+ * T-ABSENT-FIELDS, ⭐ (D3a) T-DECLARED-POLICIES, T-APPLICABLE-POLICIES, T-SEEDED-LIBRARY, T-SUBJECT-REFUSED, T-OVERSIZE-ALL,
+ * T-OVERSIZE-FENCES, T-OVERSIZE-LISTS, T-NO-FENCE, T-STAKES, T-ACCOUNT-BREAKS; W-BARE, W-DECLARED-PRIOR, W-OVERSIZE-CONTENT,
  * W-OVERSIZE-ALL, W-OVERSIZE-EDGES, W-FENCES, W-OVERSIZE-LISTS, W-NO-FENCE, W-STAKES, W-ACCOUNT-BREAKS; P-CLEAN,
  * P-SIGNAL, P-TIMED-OUT, P-INCOMPLETE-CAPTURE, P-STDOUT-CAPTURE-CUT, P-STDERR-CAPTURE-CUT, P-OVERSIZE-CONTENT,
  * P-OVERSIZE-COMMAND, P-OVERSIZE-SURROGATE, P-OVERSIZE-ROOM-EDGES, P-OVERSIZE-STREAMS, P-OVERSIZE-AT-ITS-BUDGET,
@@ -982,8 +1080,8 @@ const asProduction = (
  * D-pol_constraint_propagation, D-pol_architecture_coverage, D-pol_historical_consistency, D-pol_intent_preservation,
  * D-pol_test_adequacy, D-pol_fitness_for_purpose, D-pol_baseline_promotion (one per catalog policy, in the catalog's
  * order), D-ROOT, D-OVERSIZE-CONTENT, D-ROOT-UNITS-WITHOUT-WORK, D-OVERSIZE-UNITS, D-OVERSIZE-UNIT-TITLE; NO-CRITERIA —
- * ~~forty-seven~~ sixty-six (B7's check: twelve T-, ten W-, twenty-six P-, seventeen D- and NO-CRITERIA), every
- * process-result one `P-`-prefixed.
+ * ~~forty-seven~~ ~~sixty-six (B7's check: twelve T-, ten W-, twenty-six P-, seventeen D- and NO-CRITERIA)~~ sixty-nine
+ * (D3a: fifteen T-, ten W-, twenty-six P-, seventeen D- and NO-CRITERIA), every process-result one `P-`-prefixed.
  * ~~⭐ Package P F1 (`REG-F-503` remedy 1) — and, after G-ACCOUNT-BREAKS, G-TYPE-DECLARATIONS, G-TYPE-DECLARATIONS-ABSENT and
  * G-OVERSIZE-TYPE-DECLARATIONS.~~ ⭐ B7 — the graph framing's probes left the fingerprint with case set v8; NO-CRITERIA is a
  * part's now.
@@ -1053,6 +1151,31 @@ export const FINGERPRINT_PROBES: readonly FingerprintProbe[] = [
 		covers:
 			'part framing; the ABSENT-FIELD CONTROL — a subject carrying each declared field empty, as authored (no purpose, no policy, no child rule, an empty output contract), beside a child carrying none of them, the PWA with no description',
 		input: (criteria) => pwaTypeReviewInput({ criteria, prompt: INTENT, part: partOf(EMPTY_AND_ABSENT_NODES, ROOT_ID) })
+	},
+	{
+		// ⭐⭐ D3a (`REG-D-127`) — THE DECLARED POLICIES NAMED: each with the seeded library's name and purpose, and an id the
+		// library does not hold by its id alone.
+		id: 'T-DECLARED-POLICIES',
+		covers:
+			'part framing; the DECLARED POLICIES NAMED — a type declaring two policies the seeded library holds, each with its id, name and purpose, and one it does not, by its id alone; a kind no seeded policy names',
+		input: (criteria) => pwaTypeReviewInput({ criteria, prompt: INTENT, part: partOf(DECLARING_NODES, RULES_ID) })
+	},
+	{
+		// ⭐⭐ D3a — THE APPLICABLE LIST AND ITS CONTROLS: an ACTIVE policy naming the kind, one naming none and one an empty list
+		// listed; a floor policy, a DRAFT one, a SUSPENDED one and another kind's not.
+		id: 'T-APPLICABLE-POLICIES',
+		covers:
+			'part framing; the APPLICABLE POLICIES — the ACTIVE non-floor policies whose kinds name the subject’s kind, name none, or are an empty list, one declared and two not; ⛔ a floor policy, a DRAFT one, a SUSPENDED one and another kind’s not listed',
+		input: (criteria) =>
+			pwaTypeReviewInput({ criteria, prompt: INTENT, part: partOf(CONTROLLED_NODES, RULES_ID, PWA, CONTROL_LIBRARY) })
+	},
+	{
+		// ⭐⭐ D3a — THE SEEDED LIBRARY'S MATERIALIZATION over a kind it governs: an implementation declaring Intent Preservation,
+		// shown the three policies its kind may take, Test Adequacy undeclared among them.
+		id: 'T-SEEDED-LIBRARY',
+		covers:
+			'part framing; the SEEDED LIBRARY over a kind it governs — a PRODUCT_IMPLEMENTATION type declaring Intent Preservation alone, shown Assumption Disclosure, Intent Preservation and Test Adequacy as the policies its kind may take',
+		input: (criteria) => pwaTypeReviewInput({ criteria, prompt: INTENT, part: partOf(REPAIR_NODES, REPAIR_ID) })
 	},
 	{
 		// ⭐ The full-subject refusal (design D3): a type whose own definition no prompt can hold is refused as incomplete, never

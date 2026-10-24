@@ -360,3 +360,90 @@ describe('⭐⭐ the review in parts, B1 — pwaTypeParts: one part per type, it
 		expect(parts.map((p) => p.context.ancestors.map((x) => x.name))).toEqual([['B'], ['A']]);
 	});
 });
+
+// ── ⭐⭐ D3a (`REG-D-127`; `REG-F-573`) — THE DECLARED POLICIES NAMED, AND THOSE THE KIND MAY TAKE ──────────────────────────
+// A part showed its declared policies as ids alone, and no list of the policies its kind may take, so it could not show that
+// a Test Adequacy policy exists and is missing (`G7-RR-02.T02`, SATISFIED twice). The library is the policy view the authoring
+// surface reads (`rph-authoring` `listPolicies`): each policy's id, name, purpose, status, floor membership and kinds.
+const TEST_ADEQUACY = {
+	id: 'pol_test_adequacy',
+	name: 'Test Adequacy',
+	purpose: 'Determine whether the available tests are sufficient to support the claims being made.',
+	version: '1.0.0',
+	status: 'ACTIVE',
+	isFloor: false,
+	pwuKinds: ['PRODUCT_IMPLEMENTATION', 'INTEGRATED_PRODUCT_VALIDATION']
+};
+const INTENT_PRESERVATION = {
+	id: 'pol_intent_preservation',
+	name: 'Intent Preservation',
+	purpose: 'Determine whether a transformation of professional work remains faithful to the authorized intent.',
+	version: '1.0.0',
+	status: 'ACTIVE',
+	isFloor: false,
+	pwuKinds: ['PRODUCT_IMPLEMENTATION', 'PRODUCT_REALIZATION']
+};
+/** The library: the two above; a floor policy and an inactive one, each naming the kind; one naming no kind; one another kind. */
+const LIBRARY = [
+	{ id: 'floor.reasoning-review', name: 'Reasoning Review', purpose: 'The floor’s review.', version: '1.0.0', status: 'ACTIVE', isFloor: true, pwuKinds: ['PRODUCT_IMPLEMENTATION'] },
+	INTENT_PRESERVATION,
+	{ id: 'pol_draft_style', name: 'Draft Style', purpose: 'Not yet in force.', version: '0.1.0', status: 'DRAFT', isFloor: false, pwuKinds: ['PRODUCT_IMPLEMENTATION'] },
+	TEST_ADEQUACY,
+	{ id: 'pol_any_kind', name: 'Any Kind', purpose: 'Governs every kind of work.', version: '1.0.0', status: 'ACTIVE', isFloor: false },
+	{ id: 'pol_baseline_promotion', name: 'Baseline Promotion', purpose: 'Another kind’s.', version: '1.0.0', status: 'ACTIVE', isFloor: false, pwuKinds: ['PRODUCT_BASELINE_PROMOTION'] }
+];
+const IMPLEMENTATION = node({
+	id: 'pwut_IMPL',
+	name: 'Implementation',
+	pwuKind: 'PRODUCT_IMPLEMENTATION',
+	isRoot: true,
+	requiredAssurancePolicyIds: ['pol_intent_preservation']
+});
+const shown = (p: { id: string; name: string; purpose: string }) => ({ id: p.id, name: p.name, purpose: p.purpose });
+
+describe('⭐⭐ D3a (REG-D-127) — a part names its declared policies, and lists the ACTIVE non-floor policies its kind may take', () => {
+	it('⛔ RED FIRST — a part whose kind may take Test Adequacy and which does not declare it SHOWS BOTH FACTS: its declared policies lack it, and its applicable list holds Test Adequacy’s id, name and purpose', () => {
+		const [part] = pwaTypeParts(buildPwaGraphExport(PWA, [IMPLEMENTATION]), LIBRARY);
+		expect(part!.subject.declaredPolicies, 'the declared one, named').toEqual([shown(INTENT_PRESERVATION)]);
+		expect(part!.subject.declaredPolicies!.map((p) => p.id), 'its declared policies lack Test Adequacy').not.toContain('pol_test_adequacy');
+		expect(part!.context.applicablePolicies, 'what its kind may take, Test Adequacy among them').toContainEqual(shown(TEST_ADEQUACY));
+	});
+
+	it('⭐ the applicable list: every ACTIVE non-floor policy whose kinds name the subject’s kind or name none, in the library’s order — ⛔ CONTROLS: a floor policy, an inactive one and another kind’s are not listed', () => {
+		const [part] = pwaTypeParts(buildPwaGraphExport(PWA, [IMPLEMENTATION]), LIBRARY);
+		expect(part!.context.applicablePolicies?.map((p) => p.id)).toEqual(['pol_intent_preservation', 'pol_test_adequacy', 'pol_any_kind']);
+		for (const id of ['floor.reasoning-review', 'pol_draft_style', 'pol_baseline_promotion'])
+			expect(JSON.stringify(part!.context), `${id} is not listed`).not.toContain(id);
+	});
+
+	it('⭐ a policy naming NO kind is listed for every kind — and one naming an empty list of kinds names none, as the kernel reads it', () => {
+		const kinds = ['PRODUCT_IMPLEMENTATION', 'STRUCTURAL_REVIEW', 'SITE_INVESTIGATION'];
+		const library = [...LIBRARY, { id: 'pol_empty_kinds', name: 'Empty Kinds', purpose: 'An empty list.', version: '1.0.0', status: 'ACTIVE', isFloor: false, pwuKinds: [] }];
+		for (const kind of kinds) {
+			const [part] = pwaTypeParts(buildPwaGraphExport(PWA, [{ ...IMPLEMENTATION, pwuKind: kind }]), library);
+			const ids = part!.context.applicablePolicies?.map((p) => p.id);
+			expect(ids, kind).toContain('pol_any_kind');
+			expect(ids, kind).toContain('pol_empty_kinds');
+		}
+		const [other] = pwaTypeParts(buildPwaGraphExport(PWA, [{ ...IMPLEMENTATION, pwuKind: 'STRUCTURAL_REVIEW' }]), LIBRARY);
+		expect(other!.context.applicablePolicies, 'a kind no policy names: the no-kind policy alone').toEqual([shown(LIBRARY[4]!)]);
+	});
+
+	it('⭐ each declared policy is shown with its id, name and purpose, in its declared order — ⚠ a declared id the library does not hold by its id alone; no declared list where the type declares none; an authored empty list as authored', () => {
+		const declaring = { ...IMPLEMENTATION, requiredAssurancePolicyIds: ['pol_test_adequacy', 'pol_retired_elsewhere', 'pol_intent_preservation'] };
+		const [part] = pwaTypeParts(buildPwaGraphExport(PWA, [declaring]), LIBRARY);
+		expect(part!.subject.declaredPolicies).toEqual([shown(TEST_ADEQUACY), { id: 'pol_retired_elsewhere' }, shown(INTENT_PRESERVATION)]);
+		const { requiredAssurancePolicyIds: _none, ...silent } = IMPLEMENTATION;
+		expect('declaredPolicies' in pwaTypeParts(buildPwaGraphExport(PWA, [silent]), LIBRARY)[0]!.subject, 'a type that declares none').toBe(false);
+		expect(pwaTypeParts(buildPwaGraphExport(PWA, [{ ...IMPLEMENTATION, requiredAssurancePolicyIds: [] }]), LIBRARY)[0]!.subject.declaredPolicies).toEqual([]);
+	});
+
+	it('⭐ the subject’s keys: its type, then its declared policies, then the PWA on a root; the context’s applicable policies last — and no library leaves both out, as case set v8 measured its parts', () => {
+		const [part] = pwaTypeParts(buildPwaGraphExport(PWA, [IMPLEMENTATION]), LIBRARY);
+		expect(Object.keys(part!.subject)).toEqual(['type', 'declaredPolicies', 'pwa']);
+		expect(Object.keys(part!.context)).toEqual(['ancestors', 'parentRules', 'artifacts', 'applicablePolicies']);
+		const [bare] = pwaTypeParts(buildPwaGraphExport(PWA, [IMPLEMENTATION]));
+		expect([Object.keys(bare!.subject), Object.keys(bare!.context)]).toEqual([['type', 'pwa'], ['ancestors', 'parentRules', 'artifacts']]);
+		expect(pwaTypeParts(buildPwaGraphExport(PWA, [IMPLEMENTATION]), [])[0]!.context.applicablePolicies, 'an empty library lists none').toEqual([]);
+	});
+});

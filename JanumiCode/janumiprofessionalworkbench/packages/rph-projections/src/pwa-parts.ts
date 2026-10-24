@@ -17,6 +17,10 @@
 //
 // ⚠ WHAT IT DOES NOT DECIDE: whether the graph is well formed. A PWA with several roots, a cycle or an orphan is still split
 // into exactly one part per type (no review is added for a whole), and its deterministic floor check refuses it (design D2).
+// ⭐⭐ D3a (`REG-D-127`; `REG-F-573`) — AND, HANDED THE POLICY LIBRARY, EACH PART NAMES ITS DECLARED POLICIES AND LISTS THOSE ITS
+// KIND MAY TAKE. ⛔ A part showed its declared policies as ids alone, and no list of the policies its kind may take, so it could
+// not show that a Test Adequacy policy exists and is missing (`G7-RR-02.T02`, SATISFIED twice). The library is read by the
+// caller — the floor from the engine it reviews, qualification from the seeded library its case carries — so this stays pure.
 import type { CardinalityCode } from '@janumipwb/rph-contracts';
 import type { DataFlowEdge, PwaGraphExport, PwaGraphNode, PwaGraphPromptTemplate } from './pwa-graph.js';
 
@@ -27,9 +31,35 @@ export interface PwaPartPwa {
 	readonly description?: string;
 }
 
-/** A part's SUBJECT: the type's whole declared definition as the export carries it, and, on a root, the PWA's own. */
+/**
+ * ⭐ D3a — ONE POLICY OF THE LIBRARY, as the authoring surface's policy view carries it (`rph-authoring` `AssurancePolicyView`,
+ * read by `listPolicies`): its id, name, purpose and status, whether it is a floor policy, and the PWU kinds its applicability
+ * names — absent, or empty, when it names none, which no kind excludes (the kernel's `pwuKindConditions`).
+ */
+export interface PwaPartLibraryPolicy {
+	readonly id: string;
+	readonly name: string;
+	readonly purpose: string;
+	readonly status: string;
+	readonly isFloor: boolean;
+	readonly pwuKinds?: readonly string[];
+}
+
+/** ⭐ D3a — a policy as a part shows it: its id, name and purpose. ⚠ A declared id the library does not hold, by its id alone. */
+export interface PwaPartPolicy {
+	readonly id: string;
+	readonly name?: string;
+	readonly purpose?: string;
+}
+
+/**
+ * A part's SUBJECT: the type's whole declared definition as the export carries it, and, on a root, the PWA's own.
+ * ⭐ D3a — and, beside the type's declared policy ids, each declared policy named (`declaredPolicies`), when the part was cut
+ * with a library and the type carries the ids.
+ */
 export interface PwaPartSubject {
 	readonly type: PwaGraphNode;
+	readonly declaredPolicies?: readonly PwaPartPolicy[];
 	readonly pwa?: PwaPartPwa;
 }
 
@@ -81,12 +111,17 @@ export interface PwaPartDataFlow {
 	readonly acrossBoundary: readonly PwaPartFlow[];
 }
 
-/** A part's CONTEXT, assembled from the export. `dataFlow` only for a type with children. */
+/**
+ * A part's CONTEXT, assembled from the export. `dataFlow` only for a type with children.
+ * ⭐ D3a — and `applicablePolicies`, when the part was cut with a library: each ACTIVE non-floor policy of it whose kinds name
+ * the type's kind or name none, in the library's order — declared by the type or not, so a missing one shows.
+ */
 export interface PwaPartContext {
 	readonly ancestors: readonly PwaPartAncestor[];
 	readonly parentRules: readonly PwaPartParentRule[];
 	readonly artifacts: readonly PwaPartArtifact[];
 	readonly dataFlow?: PwaPartDataFlow;
+	readonly applicablePolicies?: readonly PwaPartPolicy[];
 }
 
 /** A child's SKELETON: every field the export carries of it but its prompt template's text and output contract. */
@@ -249,12 +284,35 @@ function dataFlowOf(
 	return { amongChildren: once(amongChildren), acrossBoundary: once(acrossBoundary) };
 }
 
+/** ⭐ D3a — a library policy as a part shows it: its id, name and purpose. */
+const shownPolicy = (p: PwaPartLibraryPolicy): PwaPartPolicy => ({ id: p.id, name: p.name, purpose: p.purpose });
+
+/** ⭐ D3a — each id the type declares, in its order, named as the library holds it, or by its id alone where it holds none. */
+function declaredPoliciesOf(ids: readonly string[], library: readonly PwaPartLibraryPolicy[]): PwaPartPolicy[] {
+	return ids.map((id) => {
+		const p = library.find((x) => x.id === id);
+		return p === undefined ? { id } : shownPolicy(p);
+	});
+}
+
+/**
+ * ⭐ D3a — the library's policies a type of `kind` may take: ACTIVE, not a floor policy, and its kinds naming `kind` or naming
+ * none (the kernel's `pwuKindConditions`: absent or empty is unrestricted), in the library's order.
+ */
+function applicablePoliciesOf(kind: string, library: readonly PwaPartLibraryPolicy[]): PwaPartPolicy[] {
+	return library
+		.filter((p) => p.status === 'ACTIVE' && !p.isFloor && ((p.pwuKinds ?? []).length === 0 || p.pwuKinds!.includes(kind)))
+		.map(shownPolicy);
+}
+
 /**
  * ⭐⭐ THE PARTS OF AN AUTHORED PWA: one per type, in the export's order — a type's subject its whole definition as the export
  * carries it (and the PWA's name, domain and description on a root), its context assembled from the same export, and its
  * children's skeletons in the order it permits them. Pure: the same export always gives the same parts.
+ * ⭐ D3a (`REG-D-127`) — and, given the policy library (`library`), each subject names the policies its type declares, and each
+ * context lists those its kind may take. ⚠ Without one, a part carries neither: the parts as case set v8 measured them.
  */
-export function pwaTypeParts(ex: PwaGraphExport): PwaTypePart[] {
+export function pwaTypeParts(ex: PwaGraphExport, library?: readonly PwaPartLibraryPolicy[]): PwaTypePart[] {
 	const byId = new Map(ex.nodes.map((n) => [n.id, n]));
 	const nameOf = (id: string): string => byId.get(id)?.name ?? id;
 	const children = childrenByParent(ex);
@@ -286,11 +344,17 @@ export function pwaTypeParts(ex: PwaGraphExport): PwaTypePart[] {
 			artifacts: ex.artifacts
 				.filter((a) => shared.has(a.name))
 				.map((a) => ({ name: a.name, producedBy: once(a.producedBy.flatMap(peer)), consumedBy: once(a.consumedBy.flatMap(peer)) })),
-			...(kids.length > 0 ? { dataFlow: dataFlowOf(ex, n.id, kids, children, peer) } : {})
+			...(kids.length > 0 ? { dataFlow: dataFlowOf(ex, n.id, kids, children, peer) } : {}),
+			...(library === undefined ? {} : { applicablePolicies: applicablePoliciesOf(n.pwuKind, library) })
 		};
+		const declared = library !== undefined && n.requiredAssurancePolicyIds !== undefined;
 		return {
 			typeId: n.id,
-			subject: { type: n, ...(n.isRoot ? { pwa: pwaOf(ex) } : {}) },
+			subject: {
+				type: n,
+				...(declared ? { declaredPolicies: declaredPoliciesOf(n.requiredAssurancePolicyIds!, library!) } : {}),
+				...(n.isRoot ? { pwa: pwaOf(ex) } : {})
+			},
 			context,
 			childSkeletons: kids.map((k) => skeletonOf(byId.get(k)!))
 		};

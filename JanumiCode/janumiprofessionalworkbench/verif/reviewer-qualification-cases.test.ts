@@ -40,6 +40,7 @@ import {
 } from '@janumipwb/rph-assurance';
 import { analyzePwaGraph, buildPwaGraphExport, pwaTypeParts, type PwaGraphNode } from '@janumipwb/rph-projections';
 import { createEngine, seedPolicyLibrary } from '@janumipwb/rph-engine';
+import { assurancePolicyViews } from '@janumipwb/rph-authoring';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { DEFAULT_CONTEXT_ASSEMBLY_POLICY, markersIn, prepareModelInvocation } from '@janumipwb/rph-application';
 import { OBSERVED_TOOL_CALL_LIMIT, type DomainCommand, type PromptTemplate } from '@janumipwb/rph-contracts';
@@ -64,14 +65,17 @@ import {
 	CASE_SET_V3_FILE,
 	CASE_SET_V6_FILE,
 	CASE_SET_V7_FILE,
+	CASE_SET_V8_FILE,
 	CURRENT_CASE_SET_FILE,
 	CURRENT_ORACLES_FILE,
 	ORACLES_PROPOSED,
+	ORACLES_RESTATEMENT_UNCONFIRMED,
 	ORACLES_V1_FILE,
 	ORACLES_V2_FILE,
 	ORACLES_V3_FILE,
 	ORACLES_V6_FILE,
 	ORACLES_V7_FILE,
+	ORACLES_V8_FILE,
 	serializeGenerated,
 	type CaseSet,
 	type GraphCase,
@@ -81,18 +85,27 @@ import {
 	type PwaTypeCase,
 	type QualificationCase
 } from '../scripts/reviewer-qual/cases.js';
-import { checkQualification, ORACLES_NOT_CONFERRED, type CheckInputs } from '../scripts/reviewer-qual/check-core.js';
+import {
+	checkQualification,
+	ORACLES_NOT_CONFERRED,
+	RESTATEMENT_NOT_CONFIRMED,
+	type CheckInputs
+} from '../scripts/reviewer-qual/check-core.js';
 import { RENAMES_V1 } from '../scripts/reviewer-qual/case-set-v1.js';
 import { CASE_SET_V2, clayUncertainty, CORRECTED_IN_V2, RENAMES_V2 } from '../scripts/reviewer-qual/case-set-v2.js';
 import { CASE_SET_V3, CHANGED_IN_V3, RENAMES_V3 } from '../scripts/reviewer-qual/case-set-v3.js';
 import { CASE_SET_V4, RENAMES_V4 } from '../scripts/reviewer-qual/case-set-v4.js';
 import { CASE_SET_V7 } from '../scripts/reviewer-qual/case-set-v7.js';
 import { CASE_SET_V8, CATCHERS_V8, G8_GRAPHS, partCaseId } from '../scripts/reviewer-qual/case-set-v8.js';
+import { BRIDGE_GRAPHS_V9, CASE_SET_V9, RESTATED_PLANTS_V9, SEEDED_POLICY_LIBRARY } from '../scripts/reviewer-qual/case-set-v9.js';
 import { ORACLES_V2 } from '../scripts/reviewer-qual/oracles-v2.js';
 import { ORACLES_V3 } from '../scripts/reviewer-qual/oracles-v3.js';
 import { ORACLES_V4 } from '../scripts/reviewer-qual/oracles-v4.js';
 import { ORACLES_V7 } from '../scripts/reviewer-qual/oracles-v7.js';
 import { ORACLES_V8 } from '../scripts/reviewer-qual/oracles-v8.js';
+import { ORACLES_V9 } from '../scripts/reviewer-qual/oracles-v9.js';
+import { SEEDED_PROBE_LIBRARY } from '../scripts/reviewer-qual/probes.js';
+import { reviewerFingerprint } from '../scripts/reviewer-qual/fingerprint.js';
 import { caseReviewInput } from '../scripts/reviewer-qual/materialize.js';
 import type { CandidateIdentity } from '../scripts/reviewer-qual/record.js';
 import { evaluateCase } from '../scripts/reviewer-qual/runner.js';
@@ -194,7 +207,8 @@ const STRUCTURE_KEYS = [
 ] as const;
 /**
  * ⭐ The fields a stored type gives the export only when it holds them, in the order `buildPwaExport` writes them after the
- * eight: EG-07d's two, then ⭐ package P F1's four (`REG-F-503` remedy 1).
+ * eight: EG-07d's two, then ⭐ package P F1's four (`REG-F-503` remedy 1), then ⭐ the review in parts B1's three (`REG-D-125`),
+ * which version nine's restated bridge types carry (`case-set-v9.ts`).
  */
 const DECLARED_KEYS = [
 	'workDischarge',
@@ -202,7 +216,10 @@ const DECLARED_KEYS = [
 	'purpose',
 	'requiredAssurancePolicyIds',
 	'permittedChildren',
-	'promptTemplate'
+	'promptTemplate',
+	'completionRule',
+	'boundaryContract',
+	'contextSpecification'
 ] as const;
 /**
  * ⭐ Package P F1 — a case's literal node as the engine exports it once an author's commands have defined it: `definePwuType`
@@ -2605,10 +2622,11 @@ describe('⭐⭐ package P F3 — reviewer-qualification case set v7: version si
 // (`pwaTypeParts`, `pwaTypeReviewInput`), never the whole graph (`REG-F-571`). Version eight is version seven's 41 non-graph
 // cases, byte for byte, then 35 part cases in place of its 19 graph cases (`case-set-v8.ts`), their oracles the sponsor's
 // conferral (`REG-D-126` Q30 and Q31; `oracles-v8.ts`). Held here over version eight as the generator writes it — and, for its
-// shape, over the COMMITTED current files the runner and the check read (`cases.ts`):
+// shape, over the COMMITTED ~~current~~ files (⭐ version eight is history since version nine, `cases.ts`), which the freshness
+// limb holds equal to it:
 //   · MATERIALIZE, THROUGH THE PRODUCT'S BUILDERS — a part case is its source graph's export cut by `pwaTypeParts` and its
 //     part handed to `pwaTypeReviewInput`, and nothing else; a type its graph does not hold is refused;
-//   · THE SHAPE — the current set is version eight: the 41, then the 35, and no graph case; every id safe as a file name and
+//   · THE SHAPE — ~~the current set is~~ version eight: the 41, then the 35, and no graph case; every id safe as a file name and
 //     as a substring filter, none holding another case's;
 //   · THE 35 ARE DESIGN §5'S — the 13 clean parts, the 14 catchers at the parts its table names, G8-CLEAN's seven parts and
 //     G8-RR-02's Verification; each its source's whole input, the type reviewed, its subject that type;
@@ -2634,8 +2652,9 @@ const EVALUATING_CANDIDATE: CandidateIdentity = {
 	bounds: { wallClockMs: 240_000, promptChars: null, printTimeout: null },
 	argv: null
 };
-const currentV8 = (): CaseSet => JSON.parse(read(CURRENT_CASE_SET_FILE)) as CaseSet;
-const currentOraclesV8 = (): OracleSet => JSON.parse(read(CURRENT_ORACLES_FILE)) as OracleSet;
+/** ⭐ B8a — ~~the CURRENT files~~ version eight's committed files: version nine is current (`cases.ts`). */
+const currentV8 = (): CaseSet => JSON.parse(read(CASE_SET_V8_FILE)) as CaseSet;
+const currentOraclesV8 = (): OracleSet => JSON.parse(read(ORACLES_V8_FILE)) as OracleSet;
 const generatedV8 = (): CaseSet => JSON.parse(serializeGenerated(CASE_SET_V8)) as CaseSet;
 const generatedOraclesV8 = (): OracleSet => JSON.parse(serializeGenerated(ORACLES_V8)) as OracleSet;
 /** Version seven's 41 non-graph cases, as committed. */
@@ -2709,10 +2728,11 @@ describe('⭐⭐ the review in parts, B7 — reviewer-qualification case set v8:
 		);
 	});
 
-	it('⭐ THE SHAPE — the current set is version eight: version seven’s 41 non-graph cases first, byte for byte, then the 35 part cases; 76 cases, none a graph case', () => {
-		expect(currentV8().caseSetVersion, 'the current set is version eight').toBe(8);
+	it('⭐ THE SHAPE — ~~the current set is~~ version eight: version seven’s 41 non-graph cases first, byte for byte, then the 35 part cases; 76 cases, none a graph case', () => {
+		// ⭐ B8a — ~~'the current set is version eight'~~: version eight's committed set, history since version nine.
+		expect(currentV8().caseSetVersion, 'the committed set of version eight').toBe(8);
 		for (const [what, now] of [
-			['the committed current set', currentV8()],
+			['version eight, as committed', currentV8()],
 			['version eight, as generated', generatedV8()]
 		] as const) {
 			expect(now.cases.slice(0, 41).map((c) => JSON.stringify(c)), `${what}: version seven’s 41, byte for byte`).toEqual(
@@ -2877,7 +2897,8 @@ describe('⭐⭐ the review in parts, B7 — reviewer-qualification case set v8:
 	});
 
 	it('⭐ THE ORACLES — version seven’s for the 41, carried unchanged; then one per part case: each clean part SATISFIED faulting nothing, each catcher REJECTED faulting its criterion; every standing the author’s claim', () => {
-		expect([currentOraclesV8().oracleVersion, currentOraclesV8().caseSetVersion], 'the current oracles: eight, of case set eight').toEqual([8, 8]);
+		// ⭐ B8a — ~~'the current oracles'~~: version eight's, as committed.
+		expect([currentOraclesV8().oracleVersion, currentOraclesV8().caseSetVersion], 'version eight’s oracles, of case set eight').toEqual([8, 8]);
 		const set = generatedOraclesV8();
 		expect([set.oracleVersion, set.caseSetVersion]).toEqual([8, 8]);
 		expect(set.oracles.map((o) => o.caseId), 'one per case, in the set’s order').toEqual(generatedV8().cases.map((c) => c.id));
@@ -3023,3 +3044,470 @@ function partOfSource(source: GraphCase, typeId: string): PwaTypeCase {
 function byNameOf(source: GraphCase, id: string): string {
 	return source.input.nodes.find((n) => n.id === id)!.name;
 }
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7, the review in parts, B8a — CASE SET VERSION NINE (`REG-D-127`; DESIGN-authoring-review-in-parts.md
+// D3a and §5, case set v9; ROADMAP-undertaking-execution-sandbox.md §9a.9a) ──────────────────────────────────────────────
+//
+// Version eight's measurement found the part showed declared policies as ids alone (`REG-F-573`) and the bridge leaves defined
+// no work (`REG-F-572`). Version nine is version eight's 76 cases under their ids: its 41 non-part cases byte for byte, and its
+// 35 part cases each cut with the seeded policy library (D3a), the 19 cut from the bridge cases from their sources restated as
+// production stores a type it defines (`case-set-v9.ts`), their oracles version eight's (`oracles-v9.ts`). Held here over
+// version nine as the generator writes it, and over the COMMITTED current files the runner and the check read (`cases.ts`):
+//   · THE SHAPE — the current set is version nine: version eight's 41, byte for byte, their prompts unchanged, then the 35
+//     under their ids, sources, subjects and order;
+//   · THE SEEDED LIBRARY — the one each part case carries is the view over a seeded engine, value for value, and the probes'
+//     is the same; each part case materializes through the product's builders with it;
+//   · D3a IN THE CASES — G7-RR-02.T02's part shows Test Adequacy among the policies its kind may take and not among those it
+//     declares; a G7 part names its declared policies;
+//   · THE BRIDGE RESTATED — each type as `definePwuType` stores it, with a purpose; G3-CLEAN's seven purposes as written here;
+//     the renamed copies renamed and nothing else; each planted twin G3-CLEAN restated but where its plant is (diffed); the
+//     planted types' purposes as written here, under one rule for every twin, and what the catcher parts show of them;
+//     production's graph;
+//   · THE ORACLES — version eight's, unchanged; the conferral naming the 19 restated cases as awaiting the sponsor's
+//     confirmation, and the check reporting that confirmation as owed, never a missing conferral;
+//   · THE 28,000-CHARACTER LIMIT, SEEN WHOLE, THE ORACLES COMPOSE — as every case is held.
+const currentV9 = (): CaseSet => JSON.parse(read(CURRENT_CASE_SET_FILE)) as CaseSet;
+const currentOraclesV9 = (): OracleSet => JSON.parse(read(CURRENT_ORACLES_FILE)) as OracleSet;
+const generatedV9 = (): CaseSet => JSON.parse(serializeGenerated(CASE_SET_V9)) as CaseSet;
+const generatedOraclesV9 = (): OracleSet => JSON.parse(serializeGenerated(ORACLES_V9)) as OracleSet;
+/** Version nine's part cases, as generated. */
+const partsV9 = (): PwaTypeCase[] => generatedV9().cases.filter((c): c is PwaTypeCase => c.arm === 'PWA_TYPE');
+const partV9 = (id: string): PwaTypeCase => {
+	const c = partsV9().find((x) => x.id === id);
+	expect(c, `${id} is a part case of version nine`).toBeDefined();
+	return c!;
+};
+/** A restated bridge source of version nine. */
+const bridgeV9 = (id: string): GraphCase => BRIDGE_GRAPHS_V9.find((c) => c.id === id)!;
+/** The bridge sources: G3-CLEAN, its renamed copies and its nine planted twins, in version seven's order — written here. */
+const BRIDGE_SOURCES = [
+	'G3-CLEAN',
+	'G3-CLEAN-R1',
+	'G3-CLEAN-R2',
+	'G3-CLEAN-R3',
+	'G-RR-01',
+	'G3-RR-02',
+	'G3-RR-03',
+	'G3-RR-04',
+	'G3-RR-05',
+	'G3-RR-06',
+	'G3-RR-07',
+	'G3-RR-08',
+	'G3-RR-09'
+];
+/** ⭐ G3-CLEAN's seven types and the purpose each is restated with, in its order — written here, as the sponsor is shown them. */
+const G3_CLEAN_PURPOSES: readonly (readonly [name: string, purpose: string])[] = [
+	[
+		'Pedestrian Bridge Structural Review',
+		'Carry out the structural review of the 40 m single-span steel pedestrian bridge over the two-track rail line, each obligation of the instruction by a type of its own: the site and geotechnical survey, the selection of a structural form after comparing the viable options, the load analysis to the Eurocodes, the member, connection and foundation design, the independent design check by a firm that took no part in the design, and the permit submission to the rail authority.'
+	],
+	['Site and Geotechnical Survey', 'Survey the site of the crossing and investigate its ground, producing the site survey and the geotechnical report.'],
+	['Structural Form Options Study', 'Compare the viable structural forms for the bridge against the site survey and the geotechnical report, and select one.'],
+	[
+		'Load Analysis (pedestrian, wind, vibration)',
+		'Analyse the selected structural form to the Eurocodes for pedestrian, wind and pedestrian-induced vibration loading, with the foundation stiffness the geotechnical report gives in its dynamic model, producing the load model.'
+	],
+	[
+		'Member, Connection and Foundation Design',
+		'Design the bridge’s steel members, its connections and its foundations from the load model and the geotechnical report, producing the design calculations and the general arrangement drawings.'
+	],
+	[
+		'Independent Design Check',
+		'Check the bridge’s design independently, by a firm that took no part in the design, as the rail authority requires, certifying the design calculations and drawings.'
+	],
+	[
+		'Rail Authority Permit Submission',
+		'Make the permit submission to the rail authority once the independent check has certified the design, with the geotechnical report and the design calculations.'
+	]
+];
+/**
+ * ⭐ EACH TWIN'S EVERY DIFFERENCE FROM G3-CLEAN, restated — written here: what version seven's twin already differed in (its
+ * plant), and, after `+`, what the restatement adds, each at a type whose purpose its plant changes (`PLANTED_PURPOSES_V9`)
+ * or, for G3-RR-07's check, the boundary contract its INTERNAL boundary leaves unstored. Named by the type's name in G3-CLEAN.
+ */
+const TWIN_DIFFERENCES_V9: Readonly<Record<string, readonly string[]>> = {
+	'G-RR-01': [
+		'rationale',
+		'narration',
+		'removed Site and Geotechnical Survey',
+		'removed Structural Form Options Study',
+		'removed Load Analysis (pedestrian, wind, vibration)',
+		'removed Member, Connection and Foundation Design',
+		'removed Independent Design Check',
+		'removed Rail Authority Permit Submission',
+		'Pedestrian Bridge Structural Review.name',
+		'Pedestrian Bridge Structural Review.pwuKind',
+		'Pedestrian Bridge Structural Review.permittedChildTypeIds',
+		'+ Pedestrian Bridge Structural Review.purpose',
+		'added Visual Concept',
+		'added Photorealistic Renderings',
+		'added Public Consultation'
+	],
+	'G3-RR-02': [
+		'rationale',
+		'narration',
+		'removed Independent Design Check',
+		'Pedestrian Bridge Structural Review.permittedChildTypeIds',
+		'+ Pedestrian Bridge Structural Review.purpose',
+		'Rail Authority Permit Submission.requiredInputs',
+		'+ Rail Authority Permit Submission.purpose'
+	],
+	'G3-RR-03': ['rationale', 'Load Analysis (pedestrian, wind, vibration).name', '+ Load Analysis (pedestrian, wind, vibration).purpose'],
+	'G3-RR-04': [
+		'rationale',
+		'narration',
+		'Pedestrian Bridge Structural Review.permittedChildTypeIds',
+		'+ Pedestrian Bridge Structural Review.purpose',
+		'Load Analysis (pedestrian, wind, vibration).name',
+		'+ Load Analysis (pedestrian, wind, vibration).purpose',
+		'added Vibration Compliance Statement'
+	],
+	'G3-RR-05': [
+		'rationale',
+		'narration',
+		'removed Structural Form Options Study',
+		'Pedestrian Bridge Structural Review.permittedChildTypeIds',
+		'+ Pedestrian Bridge Structural Review.purpose',
+		'Load Analysis (pedestrian, wind, vibration).requiredInputs',
+		'+ Load Analysis (pedestrian, wind, vibration).purpose'
+	],
+	'G3-RR-06': ['rationale'],
+	'G3-RR-07': [
+		'rationale',
+		'+ Pedestrian Bridge Structural Review.purpose',
+		'Independent Design Check.name',
+		'Independent Design Check.executionBoundary',
+		'+ Independent Design Check.purpose',
+		'+ Independent Design Check.boundaryContract'
+	],
+	'G3-RR-08': ['rationale'],
+	'G3-RR-09': ['rationale', 'Independent Design Check.requiredOutputs']
+};
+/**
+ * ⭐ THE PLANTED TYPES' PURPOSES, as the sponsor is shown them — written here: for each planted twin, each type whose purpose
+ * its plant changes, by its name in that twin. ONE RULE FOR EVERY TWIN: a type keeps G3-CLEAN's purpose while that purpose is
+ * still true of it; a type its plant gives other work — in the twin's graph and its account alike — says that work as the
+ * twin's own account states it, and a root's work is its children's, as its purpose lists them. A plant that sets the account
+ * against the graph stays where version seven put it, and no purpose takes the account's side: G3-RR-06's and G3-RR-08's
+ * design, which their accounts say works from the load model while their graphs give it the geotechnical report too, and
+ * G3-RR-09's check, which its account calls complete while its graph gives it no output, keep G3-CLEAN's purposes.
+ */
+const PLANTED_PURPOSES_V9: readonly (readonly [source: string, type: string, purpose: string])[] = [
+	[
+		'G-RR-01',
+		'Pedestrian Bridge Concept Study',
+		'Deliver the bridge review as a concept study: establish the bridge’s appearance, show it in its setting, and confirm through public consultation that the bridge is acceptable.'
+	],
+	['G-RR-01', 'Visual Concept', 'Establish the bridge’s appearance in concept sketches.'],
+	['G-RR-01', 'Photorealistic Renderings', 'Show the bridge in its setting in photorealistic renderings made from the concept sketches.'],
+	['G-RR-01', 'Public Consultation', 'Confirm with the public, from the renderings, that the bridge is acceptable, in a consultation report.'],
+	[
+		'G3-RR-02',
+		'Pedestrian Bridge Structural Review',
+		'Carry out the structural review of the 40 m single-span steel pedestrian bridge over the two-track rail line, each obligation of the instruction by a type of its own: the site and geotechnical survey, the selection of a structural form after comparing the viable options, the load analysis to the Eurocodes, the member, connection and foundation design, and the permit submission to the rail authority.'
+	],
+	[
+		'G3-RR-02',
+		'Rail Authority Permit Submission',
+		'Make the permit submission to the rail authority once the design is complete, with the design calculations, the drawings and the geotechnical report.'
+	],
+	['G3-RR-03', 'Load Analysis (static pedestrian load)', 'Analyse the selected structural form to the Eurocodes for the static pedestrian load only, producing the load model.'],
+	[
+		'G3-RR-04',
+		'Pedestrian Bridge Structural Review',
+		'Carry out the structural review of the 40 m single-span steel pedestrian bridge over the two-track rail line, each obligation of the instruction by a type of its own: the site and geotechnical survey, the selection of a structural form after comparing the viable options, the load analysis to the Eurocodes, the statement recording that the bridge complies with the comfort criteria for pedestrian-induced vibration, the member, connection and foundation design, the independent design check by a firm that took no part in the design, and the permit submission to the rail authority.'
+	],
+	['G3-RR-04', 'Load Analysis (pedestrian, wind)', 'Analyse the selected structural form to the Eurocodes for pedestrian and wind loading, producing the load model.'],
+	['G3-RR-04', 'Vibration Compliance Statement', 'Record that the bridge complies with the comfort criteria for pedestrian-induced vibration.'],
+	[
+		'G3-RR-05',
+		'Pedestrian Bridge Structural Review',
+		'Carry out the structural review of the 40 m single-span steel pedestrian bridge over the two-track rail line, its structural form fixed at the outset as a cable-stayed deck, each obligation of the instruction by a type of its own: the site and geotechnical survey, the load analysis to the Eurocodes, the member, connection and foundation design, the independent design check by a firm that took no part in the design, and the permit submission to the rail authority.'
+	],
+	[
+		'G3-RR-05',
+		'Load Analysis (pedestrian, wind, vibration)',
+		'Analyse the cable-stayed deck to the Eurocodes for pedestrian, wind and pedestrian-induced vibration loading, with the foundation stiffness the geotechnical report gives in its dynamic model, producing the load model.'
+	],
+	[
+		'G3-RR-07',
+		'Pedestrian Bridge Structural Review',
+		'Carry out the structural review of the 40 m single-span steel pedestrian bridge over the two-track rail line, each obligation of the instruction by a type of its own: the site and geotechnical survey, the selection of a structural form after comparing the viable options, the load analysis to the Eurocodes, the member, connection and foundation design, the design check within the design team by its senior design engineer, and the permit submission to the rail authority.'
+	],
+	[
+		'G3-RR-07',
+		'Design Self-Check by the Senior Design Engineer',
+		'Check the bridge’s design within the design team, by its senior design engineer, who knows the design best, certifying the design calculations and drawings.'
+	]
+];
+/**
+ * Where two graph cases differ: the request, the PWA, the account or the narration whole; each type the first holds and the
+ * second does not, and the reverse; and, for a type both hold by id, each key of it that differs, by its name in the first.
+ */
+function bridgeDifferences(a: GraphCase, b: GraphCase): string[] {
+	const out: string[] = [];
+	for (const k of ['prompt', 'pwa', 'rationale', 'narration'] as const)
+		if (JSON.stringify(a.input[k]) !== JSON.stringify(b.input[k])) out.push(k);
+	const ofA = new Map(a.input.nodes.map((n) => [n.id, n]));
+	const ofB = new Map(b.input.nodes.map((n) => [n.id, n]));
+	for (const [id, n] of ofA) if (!ofB.has(id)) out.push(`removed ${n.name}`);
+	for (const [id, n] of ofB) {
+		const m = ofA.get(id);
+		if (m === undefined) {
+			out.push(`added ${n.name}`);
+			continue;
+		}
+		for (const key of new Set([...Object.keys(m), ...Object.keys(n)]))
+			if (JSON.stringify((m as unknown as Record<string, unknown>)[key]) !== JSON.stringify((n as unknown as Record<string, unknown>)[key]))
+				out.push(`${m.name}.${key}`);
+	}
+	if (JSON.stringify(a.subject) !== JSON.stringify(b.subject)) out.push('subject');
+	return out;
+}
+/** The view the authoring surface reads of an engine the workbench seeds (`seedPolicyLibrary`). */
+function seededLibraryView(): ReturnType<typeof assurancePolicyViews> {
+	let seq = 0;
+	const session = createEngine({
+		authenticate: standaloneAuthenticator(),
+		ontology,
+		now: () => '2026-10-24T09:00:00Z',
+		newEventId: () => `evt_${++seq}`
+	}).as(SESSION_CREDENTIAL);
+	seedPolicyLibrary(session);
+	const view = assurancePolicyViews(session);
+	session.close();
+	return view;
+}
+
+describe('⭐⭐ the review in parts, B8a — reviewer-qualification case set v9: version eight’s 76 cases under their ids, each part cut with the seeded policy library, the bridge cases restated (REG-D-127)', () => {
+	it('⭐ THE SHAPE — the current set is version nine: version eight’s 41 non-part cases first, byte for byte, then its 35 part cases under their ids, sources, subjects and order', () => {
+		expect([currentV9().caseSetVersion, currentOraclesV9().oracleVersion, currentOraclesV9().caseSetVersion], 'the current set is version nine').toEqual([9, 9, 9]);
+		const v8 = JSON.parse(read(CASE_SET_V8_FILE)) as CaseSet;
+		for (const [what, now] of [
+			['the committed current set', currentV9()],
+			['version nine, as generated', generatedV9()]
+		] as const) {
+			expect(now.cases.slice(0, 41).map((c) => JSON.stringify(c)), `${what}: version eight’s 41, byte for byte`).toEqual(
+				v8.cases.filter((c) => c.arm !== 'PWA_TYPE').map((c) => JSON.stringify(c))
+			);
+			const parts = now.cases.slice(41) as PwaTypeCase[];
+			expect(
+				parts.map((c) => [c.id, c.arm, c.sourceCaseId, JSON.stringify(c.subject), c.input.typeId]),
+				`${what}: then version eight’s 35, each under its id, source, subject and type`
+			).toEqual(
+				v8.cases
+					.filter((c): c is PwaTypeCase => c.arm === 'PWA_TYPE')
+					.map((c) => [c.id, c.arm, c.sourceCaseId, JSON.stringify(c.subject), c.input.typeId])
+			);
+			expect(now.cases, `${what}: 76 cases`).toHaveLength(76);
+		}
+	});
+
+	it('⛔ THE 41’S PROMPTS DID NOT MOVE — each carried case’s initial, repair and criterion-repair prompts are the same under version nine as under version eight; ⭑ CONTROL: every part case’s initial prompt moved', async () => {
+		const [v8, v9] = await Promise.all([reviewerFingerprint(CASE_SET_V8.cases), reviewerFingerprint(CASE_SET_V9.cases)]);
+		const carried = CASE_SET_V9.cases.filter((c) => c.arm !== 'PWA_TYPE').map((c) => c.id);
+		expect(carried, 'arrangement: the 41').toHaveLength(41);
+		for (const id of carried) expect(v9.casePrompts.get(id), id).toEqual(v8.casePrompts.get(id));
+		const moved = partsV9().filter((c) => v9.casePrompts.get(c.id)!.initial !== v8.casePrompts.get(c.id)!.initial);
+		expect(moved.map((c) => c.id), 'the 35 part prompts moved').toEqual(partsV9().map((c) => c.id));
+	});
+
+	it('⭐ THE SEEDED LIBRARY — every part case carries the library the workbench seeds, as the authoring surface’s view reads it over a seeded engine, value for value; the probes cut every part with the same', () => {
+		const view = seededLibraryView();
+		expect(view.length, 'arrangement: the floor’s three and the catalog’s twelve').toBe(15);
+		expect(SEEDED_POLICY_LIBRARY, 'the cases’ library is the seeded view').toEqual(view);
+		expect(SEEDED_PROBE_LIBRARY, 'and the probes’').toEqual(view);
+		for (const c of partsV9()) expect(c.input.policyLibrary, c.id).toEqual(view);
+	});
+
+	it('⭐ RED FIRST — MATERIALIZE, THROUGH THE PRODUCT’S BUILDERS: a part case is its source graph’s export cut by pwaTypeParts with the library it carries, and handed to pwaTypeReviewInput, and nothing else', () => {
+		const criteria = SEEDED_REASONING_REVIEW_CRITERIA;
+		expect(partsV9(), 'the arrangement: the 35').toHaveLength(35);
+		for (const c of partsV9()) {
+			const { pwa, nodes, typeId, policyLibrary, ...rest } = c.input;
+			const part = pwaTypeParts(buildPwaGraphExport(pwa, nodes), policyLibrary).find((p) => p.typeId === typeId);
+			expect(part, `${c.id}: its type has a part`).toBeDefined();
+			expect(part!.context.applicablePolicies, `${c.id}: cut with a library`).toBeDefined();
+			expect(caseReviewInput(c, criteria), c.id).toEqual(pwaTypeReviewInput({ criteria, part: part!, ...rest }));
+		}
+	});
+
+	it('⛔ D3a IN THE CASES — G7-RR-02.T02, Implementation with Test Adequacy removed, shows both facts in its materialized prompt: Test Adequacy’s id, name and purpose among the policies its kind may take, and its declared policies without it; ⭑ CONTROL: G7-CLEAN.T02 declares it', async () => {
+		const linesOf = async (id: string) => {
+			const { initial } = await promptsFor(partV9(id));
+			const json = (key: string) => JSON.parse(initial.split('\n').find((l) => l.startsWith(`{"${key}":`))!)[key] as Record<string, unknown>;
+			return { subject: json('subject'), context: json('context') };
+		};
+		const testAdequacy = { id: 'pol_test_adequacy', name: 'Test Adequacy', purpose: 'Determine whether the available tests are sufficient to support the claims being made.' };
+		const planted = await linesOf('G7-RR-02.T02');
+		expect(planted.context.applicablePolicies, 'its kind may take Test Adequacy').toContainEqual(testAdequacy);
+		expect((planted.subject.declaredPolicies as { id: string }[]).map((p) => p.id), 'it does not declare it').toEqual(['pol_intent_preservation']);
+		const clean = await linesOf('G7-CLEAN.T02');
+		expect(clean.subject.declaredPolicies, 'the clean implementation declares it, named').toContainEqual(testAdequacy);
+		// ⭐ A bridge part: no seeded policy names its kind, and it declares none.
+		const leaf = await linesOf('G3-CLEAN.T02');
+		expect([leaf.subject.declaredPolicies, leaf.context.applicablePolicies]).toEqual([[], []]);
+	});
+
+	it('⭐ THE BRIDGE RESTATED AS PRODUCTION STORES A TYPE IT DEFINES — every type of the 13 sources carries a purpose, no declared policy, no child rule, the stored completion rule and, delegated, its boundary contract: its literal is what definePwuType stored (`asStored`); G3-CLEAN’s seven purposes as written here', () => {
+		expect(BRIDGE_GRAPHS_V9.map((c) => c.id)).toEqual(BRIDGE_SOURCES);
+		for (const c of BRIDGE_GRAPHS_V9) {
+			for (const n of c.input.nodes) {
+				expect(n.purpose?.length ?? 0, `${c.id}/${n.name}: a purpose`).toBeGreaterThan(20);
+				expect([n.requiredAssurancePolicyIds, n.permittedChildren, n.completionRule], `${c.id}/${n.name}`).toEqual([[], [], DEFAULT_COMPLETION_RULE]);
+				expect(n.boundaryContract, `${c.id}/${n.name}: its boundary contract`).toEqual(
+					n.executionBoundary === 'DELEGATED_EXTERNAL' ? CASE_BOUNDARY_CONTRACT : undefined
+				);
+			}
+			expect(JSON.stringify(c.input.nodes.map(asStored)), `${c.id}: as stored`).toBe(JSON.stringify(c.input.nodes));
+		}
+		expect(bridgeV9('G3-CLEAN').input.nodes.map((n) => [n.name, n.purpose])).toEqual(G3_CLEAN_PURPOSES);
+	});
+
+	it('⭐ PRODUCTION’S GRAPH — each of the 13 restated sources, defined in an engine by an author’s commands, exports exactly its literal nodes', () => {
+		for (const c of BRIDGE_GRAPHS_V9) expectProductionsGraph(c);
+	});
+
+	it('⛔ RENAMED MEANS RENAMED — each restated copy is the restated G3-CLEAN with the names substituted, and nothing else: its purposes are G3-CLEAN’s', () => {
+		expectRenamedOnly(
+			BRIDGE_GRAPHS_V9.filter((c) => c.id.startsWith('G3-CLEAN')),
+			RENAMES_V3
+		);
+	});
+
+	it('⛔ EACH PLANTED TWIN DIFFERS FROM G3-CLEAN ONLY WHERE ITS PLANT IS (diffed): what version seven’s twin differed in, and the purpose of each type whose purpose its plant changes; ⭑ and every restated purpose the twin carries for any other type is G3-CLEAN’s', () => {
+		const v7 = (id: string) => committedV7().cases.find((c): c is GraphCase => c.id === id && c.arm === 'PWA_GRAPH')!;
+		for (const [id, expected] of Object.entries(TWIN_DIFFERENCES_V9)) {
+			const before = bridgeDifferences(v7('G3-CLEAN'), v7(id));
+			expect(before, `${id}: version seven’s plant`).toEqual(expected.filter((d) => !d.startsWith('+ ')));
+			expect(bridgeDifferences(bridgeV9('G3-CLEAN'), bridgeV9(id)), `${id}: restated`).toEqual(expected.map((d) => d.replace(/^\+ /, '')));
+		}
+		expect(Object.keys(TWIN_DIFFERENCES_V9), 'every planted twin').toEqual(BRIDGE_SOURCES.slice(4));
+		// The restatement's own purposes are the plants' table, row for row: each a type of its twin, by its name there.
+		for (const row of RESTATED_PLANTS_V9) {
+			const n = bridgeV9(row.source).input.nodes.find((x) => x.name === row.type);
+			expect(n?.purpose, `${row.source}/${row.type}`).toBe(row.purpose);
+		}
+	});
+
+	it('⭐ THE PLANTED TYPES’ PURPOSES — the restatement’s are the ones written here, as the sponsor is shown them, row for row', () => {
+		expect(
+			RESTATED_PLANTS_V9.map((r) => [r.source, r.type, r.purpose]),
+			'the planted purposes, as the sponsor is shown them'
+		).toEqual(PLANTED_PURPOSES_V9);
+	});
+
+	it('⛔ ONE RULE FOR EVERY TWIN — each type version seven’s plant changes in the graph has its purpose restated, but G3-RR-09’s check, which its account calls complete; and each type whose purpose is restated is one its plant changes in the graph, but G3-RR-07’s root, whose purpose lists its check’s work', () => {
+		// Each type version seven's plant changes in the graph — added, or a key of it differing from G3-CLEAN's — by its name there.
+		const v7 = (id: string) => committedV7().cases.find((c): c is GraphCase => c.id === id && c.arm === 'PWA_GRAPH')!;
+		const clean = new Map(v7('G3-CLEAN').input.nodes.map((n) => [n.id, JSON.stringify(n)]));
+		const changedInGraph = BRIDGE_SOURCES.slice(4).flatMap((id) =>
+			v7(id)
+				.input.nodes.filter((n) => clean.get(n.id) !== JSON.stringify(n))
+				.map((n) => `${id}/${n.name}`)
+		);
+		const restatedTypes = RESTATED_PLANTS_V9.map((r) => `${r.source}/${r.type}`);
+		expect(
+			changedInGraph.filter((t) => !restatedTypes.includes(t)),
+			'changed in the graph, its purpose G3-CLEAN’s: G3-RR-09’s check alone, which its account calls complete'
+		).toEqual(['G3-RR-09/Independent Design Check']);
+		expect(
+			restatedTypes.filter((t) => !changedInGraph.includes(t)),
+			'its purpose restated, unchanged in the graph: G3-RR-07’s root alone, whose purpose lists its check’s work'
+		).toEqual(['G3-RR-07/Pedestrian Bridge Structural Review']);
+	});
+
+	it('⛔ WHAT THE CATCHER PARTS SHOW, THROUGH THE MATERIALIZED PROMPT — no catcher shows a purpose naming work its twin drops, its own or an ancestor’s; ⭑ CONTROL: a plant that sets the account against the graph stays in the account, the design G3-CLEAN’s', async () => {
+		const shown = async (id: string) => {
+			const { initial } = await promptsFor(partV9(id));
+			const json = (key: string) => JSON.parse(initial.split('\n').find((l) => l.startsWith(`{"${key}":`))!)[key] as Record<string, unknown>;
+			const ancestors = json('context').ancestors as { purpose?: string }[];
+			return { own: (json('subject').type as { purpose: string }).purpose, ancestors: ancestors.map((a) => a.purpose ?? '') };
+		};
+		const g3Design = G3_CLEAN_PURPOSES.find(([name]) => name === 'Member, Connection and Foundation Design')![1];
+		const rr02 = await shown('G3-RR-02.T01');
+		expect(rr02.own, 'G3-RR-02’s root, the catcher: it names no check, as its account does not').not.toMatch(/check/i);
+		const rr05 = await shown('G3-RR-05.T01');
+		expect(rr05.own, 'G3-RR-05’s root, the catcher: it names no comparison of options').not.toMatch(/compar|option/i);
+		expect(rr05.own, 'and says the form is fixed at the outset, as its account does').toContain('fixed at the outset as a cable-stayed deck');
+		const rr07 = await shown('G3-RR-07.T06');
+		expect(rr07.ancestors.join(' '), 'G3-RR-07’s check, the catcher: its root names no firm beside the self-check').not.toContain('took no part');
+		for (const id of ['G3-RR-06.T05', 'G3-RR-08.T05'])
+			expect((await shown(id)).own, `${id}: the design keeps G3-CLEAN’s purpose; the plant stays in the account`).toBe(g3Design);
+	});
+
+	it('⭐ THE ORACLES — version eight’s 76, unchanged, under version nine: every verdict, faulted criterion, catcher and standing', () => {
+		expect([generatedOraclesV9().oracleVersion, generatedOraclesV9().caseSetVersion]).toEqual([9, 9]);
+		expect(generatedOraclesV9().oracles, 'version eight’s, unchanged').toEqual((JSON.parse(read(ORACLES_V8_FILE)) as OracleSet).oracles);
+		expect(generatedOraclesV9().oracles.map((o) => o.caseId), 'one per case, in the set’s order').toEqual(generatedV9().cases.map((c) => c.id));
+	});
+
+	it('⛔ AWAITING THE SPONSOR’S CONFIRMATION OF THE RESTATEMENT (REG-D-127) — the statement carries version eight’s whole, quotes Q33b, and names the 19 restated bridge part cases as awaiting it, the other 57 conferred; reviewer:qual:check reports that confirmation owed, never a missing conferral', async () => {
+		const { conferral } = generatedOraclesV9();
+		const restated = partsV9().filter((c) => BRIDGE_SOURCES.includes(c.sourceCaseId)).map((c) => c.id);
+		expect(restated, 'arrangement: the 19').toHaveLength(19);
+		expect(conferral, 'version eight’s statement, whole').toContain((JSON.parse(read(ORACLES_V8_FILE)) as OracleSet).conferral);
+		expect(conferral, 'Q33b, quoted').toContain(
+			'the sponsor chose “Fix both first (Recommended)”, whose text read “Design note, then build: policy names and applicable policies in each part; the bridge cases restated as production stores them, their expected verdicts unchanged and shown to you to confirm;'
+		);
+		expect(conferral, 'the 19, named as awaiting').toContain(
+			`The 19 part cases cut from the restated bridge cases — ${restated.join(', ')} — are ${ORACLES_RESTATEMENT_UNCONFIRMED}: their expected verdicts stand as the sponsor conferred them (REG-D-126 Q30), and the sponsor’s confirmation of their restatement is owed before measurement.`
+		);
+		expect(conferral, 'the other 57 conferred').toContain('The other 57 — the 41 non-part cases and the 16 part cases of G7-CLEAN, its planted twins and the 3-level pair — are conferred, as recorded above.');
+		expect(conferral, 'no proposal’s word').not.toContain(ORACLES_PROPOSED);
+		const problems = await checkQualification({
+			files: [],
+			current: {
+				reviewer: '0'.repeat(64),
+				scoring: '1'.repeat(64),
+				caseSet: '2'.repeat(64),
+				components: { probes: '3'.repeat(64), budget: '4'.repeat(64), criteria: '5'.repeat(64), scoring: '1'.repeat(64) },
+				casePrompts: new Map()
+			},
+			cases: generatedV9().cases,
+			oracles: generatedOraclesV9().oracles,
+			conferral,
+			oracleSets: [],
+			findings: new Set(),
+			struck: new Set(),
+			rulings: new Set(),
+			struckRulings: new Set(),
+			rescore: async () => {
+				throw new Error('an empty record re-scores nothing');
+			}
+		});
+		expect(problems.problems.filter((p) => p.limb === 'CONFERRAL'), 'the confirmation owed, alone').toEqual([
+			{ limb: 'CONFERRAL', message: RESTATEMENT_NOT_CONFIRMED }
+		]);
+		expect(RESTATEMENT_NOT_CONFIRMED).not.toBe(ORACLES_NOT_CONFERRED);
+	});
+
+	it('⛔ THE 28,000-CHARACTER LIMIT, AND SEEN WHOLE — every prompt of the 35 fits agy’s argv budget, and no slice of any is cut', async () => {
+		expect(partsV9(), 'the arrangement: the 35').toHaveLength(35);
+		expect((await promptProblemsIn(partsV9())).join('\n')).toBe('');
+	});
+
+	it('⭐ THE ORACLES COMPOSE, THROUGH THE RUNNER’S OWN SCORING — for every part case, a reply faulting exactly its oracle’s criteria is scored by evaluateCase to its oracle’s disposition, with independence met', async () => {
+		const oracles = new Map(generatedOraclesV9().oracles.map((o) => [o.caseId, o]));
+		for (const c of partsV9()) {
+			const oracle = oracles.get(c.id)!;
+			const reply = JSON.stringify({
+				findings: SEEDED_REASONING_REVIEW_CRITERIA.map((k) => ({
+					criterionId: k.id,
+					failed: oracle.faulted.includes(k.id),
+					statement: 'as the oracle expects',
+					severity: oracle.faulted.includes(k.id) ? 'BLOCKING' : 'INFORMATIONAL'
+				})),
+				recommendation: oracle.disposition
+			});
+			const { scored } = await evaluateCase({
+				case: c,
+				criteria: SEEDED_REASONING_REVIEW_CRITERIA,
+				candidate: EVALUATING_CANDIDATE,
+				scoringDigest: '0'.repeat(64),
+				call: async () => ({ returned: reply, served: null })
+			});
+			expect([scored.disposition, scored.resultClass, scored.independenceOk], c.id).toEqual([oracle.disposition, 'VALID', true]);
+		}
+	});
+});

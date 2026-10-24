@@ -148,6 +148,7 @@ import {
 	FINGERPRINT_PROBES,
 	PROBE_SUBJECT,
 	READER_CORPUS,
+	SEEDED_PROBE_LIBRARY,
 	type DeclaredProbePolicy
 } from '../scripts/reviewer-qual/probes.js';
 import type { CallLine, CandidateIdentity } from '../scripts/reviewer-qual/record.js';
@@ -4918,5 +4919,69 @@ describe('JAN-CRITREAD J2-3 — the fingerprint and the runner agree', () => {
 		expect(fp.components).toEqual(BASE.components);
 		expect(fp.casePrompts.get('W-CLEAN')).not.toEqual(BASE.casePrompts.get('W-CLEAN'));
 		expect(fp.casePrompts.get('G-CLEAN')).toEqual(BASE.casePrompts.get('G-CLEAN'));
+	});
+});
+
+// ── ⭐⭐ D3a (`REG-D-127`; `REG-F-573`) — THE PART PROBES CARRY THE POLICY MATERIAL ───────────────────────────────────────────
+// Each part probe is cut with the seeded library (`SEEDED_PROBE_LIBRARY`), as the floor cuts a candidate with its engine's, and
+// three probes stand for what D3a adds: the declared policies named, the applicable list with its controls, and the seeded
+// library over a kind it governs. A change to how a part names or lists a policy moves the probes that carry it.
+describe('⭐⭐ D3a (REG-D-127) — the part probes carry the policy material: the declared policies named, the applicable list and its controls, the seeded library', () => {
+	const linesOf = (id: string) => {
+		// The subject's line and the context's: a composite's children follow, and a builder's cut of one is no JSON.
+		const [subject, context] = inputOf(id)
+			.content.split('\n')
+			.slice(0, 2)
+			.map((l) => JSON.parse(l) as Record<string, Record<string, unknown>>);
+		return { subject: subject!.subject!, context: context!.context! };
+	};
+	const named = (id: string) => SEEDED_PROBE_LIBRARY.find((p) => p.id === id)!;
+	const shown = (id: string) => ({ id, name: named(id).name, purpose: named(id).purpose });
+
+	it('⭐ T-DECLARED-POLICIES — each declared policy with the seeded library’s id, name and purpose, in its declared order, and one the library does not hold by its id alone; its kind is no seeded policy’s, so it lists none', () => {
+		const { subject, context } = linesOf('T-DECLARED-POLICIES');
+		expect(subject.declaredPolicies).toEqual([
+			shown('pol_intent_preservation'),
+			shown('pol_assumption_disclosure'),
+			{ id: 'pol_wall_repair_rules' }
+		]);
+		expect(context.applicablePolicies).toEqual([]);
+	});
+
+	it('⭐ T-APPLICABLE-POLICIES — the ACTIVE non-floor policies whose kinds name the subject’s kind, name none or are an empty list, in the library’s order; ⛔ CONTROLS: a floor policy, a DRAFT one, a SUSPENDED one and another kind’s are in no line of its prompt', () => {
+		const { subject, context } = linesOf('T-APPLICABLE-POLICIES');
+		expect((context.applicablePolicies as { id: string }[]).map((p) => p.id)).toEqual([
+			'pol_panel_survey',
+			'pol_any_work',
+			'pol_no_kinds_listed'
+		]);
+		expect((subject.declaredPolicies as { id: string }[]).map((p) => p.id), 'one of them declared').toEqual(['pol_any_work']);
+		const prompt = BASE.probePrompts.get('T-APPLICABLE-POLICIES')!;
+		for (const id of ['pol_draft_rules', 'pol_suspended_rules', 'pol_baseline_only', 'The floor’s own review.'])
+			expect(prompt.includes(id), id).toBe(false);
+	});
+
+	it('⭐ T-SEEDED-LIBRARY — a PRODUCT_IMPLEMENTATION type declaring Intent Preservation alone is shown Test Adequacy’s id, name and purpose among the three policies its kind may take, in its prompt', () => {
+		const { subject, context } = linesOf('T-SEEDED-LIBRARY');
+		expect(subject.declaredPolicies).toEqual([shown('pol_intent_preservation')]);
+		expect(context.applicablePolicies).toEqual([
+			shown('pol_assumption_disclosure'),
+			shown('pol_intent_preservation'),
+			shown('pol_test_adequacy')
+		]);
+		expect(BASE.probePrompts.get('T-SEEDED-LIBRARY')).toContain(JSON.stringify(shown('pol_test_adequacy')));
+	});
+
+	it('⭐ EVERY PART PROBE IS CUT WITH A LIBRARY — each one sent carries an applicable list on its context line, and a declared list on its subject line wherever its type declares policy ids', () => {
+		const parts = FINGERPRINT_PROBES.filter((p) => p.id.startsWith('T-') && !BASE.probePrompts.get(p.id)!.startsWith(REFUSED));
+		expect(parts.length, 'arrangement: the part probes that are sent').toBeGreaterThan(10);
+		for (const { id } of parts) {
+			const { subject, context } = linesOf(id);
+			expect(Array.isArray(context.applicablePolicies), `${id}: an applicable list`).toBe(true);
+			const type = subject.type as { requiredAssurancePolicyIds?: readonly string[] };
+			expect((subject.declaredPolicies as { id: string }[] | undefined)?.map((p) => p.id), `${id}: its declared policies named`).toEqual(
+				type.requiredAssurancePolicyIds
+			);
+		}
 	});
 });

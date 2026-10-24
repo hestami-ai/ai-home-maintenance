@@ -659,10 +659,12 @@
 		},
 		"packages/rph-authoring/src/broker.ts": {
 			"consumedExports": [
+				"assurancePolicyViews",
 				"policyPwuKinds",
 				"PwaAuthoringBroker"
 			],
 			"guardedExports": [
+				"assurancePolicyViews",
 				"policyPwuKinds",
 				"PwaAuthoringBroker"
 			],
@@ -1419,7 +1421,7 @@
 			"guardedExports": [
 				"pwaTypeParts"
 			],
-			"unattributedMutants": 9
+			"unattributedMutants": 14
 		},
 		"packages/rph-projections/src/pwu-behavior.ts": {
 			"consumedExports": [

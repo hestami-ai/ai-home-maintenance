@@ -192,6 +192,26 @@ export function policyPwuKinds(state: Record<string, unknown>): readonly string[
 	return kinds.length > 0 ? kinds : undefined;
 }
 
+/**
+ * The workbench Assurance Policy library of `engine`, as the authoring surface sees it (`AssurancePolicyView`): every policy, the
+ * 3 floor policies flagged. ⭐ D3a (`REG-D-127`) — the one reading of it: `listPolicies` returns it, and the authoring floor hands
+ * it to each part it reviews (`apps/rph-demo` `floor.ts`).
+ */
+export function assurancePolicyViews(engine: AuthedEngineHandle): AssurancePolicyView[] {
+	return listAssurancePolicies(engine).map((r) => {
+		const pwuKinds = policyPwuKinds(r.state);
+		return {
+			id: r.id,
+			name: String((r.state.name ?? r.id) as string),
+			purpose: String((r.state.purpose ?? '') as string),
+			version: String((r.state.version ?? '') as string),
+			status: String((r.state.status ?? 'DRAFT') as string),
+			isFloor: FLOOR_POLICY_IDS.has(r.id),
+			...(pwuKinds ? { pwuKinds } : {})
+		};
+	});
+}
+
 /** Fields accepted when creating a new Assurance Policy (only name is required; the rest default sensibly). */
 export interface CreatePolicyInput {
 	readonly name: string;
@@ -359,18 +379,7 @@ export class PwaAuthoringBroker {
 	/** The workbench Assurance Policy library (real ASSURANCE_POLICY objects). The 3 floor policies are flagged. A
 	 *  PWU Type may declare any ACTIVE non-floor policy via requiredAssurancePolicyIds. */
 	listPolicies(): AssurancePolicyView[] {
-		return listAssurancePolicies(this.engine).map((r) => {
-			const pwuKinds = policyPwuKinds(r.state);
-			return {
-				id: r.id,
-				name: String((r.state.name ?? r.id) as string),
-				purpose: String((r.state.purpose ?? '') as string),
-				version: String((r.state.version ?? '') as string),
-				status: String((r.state.status ?? 'DRAFT') as string),
-				isFloor: FLOOR_POLICY_IDS.has(r.id),
-				...(pwuKinds ? { pwuKinds } : {})
-			};
-		});
+		return assurancePolicyViews(this.engine);
 	}
 
 	/** Per-field authoring help — the single source both the inspector form and the agent tool schemas surface. */

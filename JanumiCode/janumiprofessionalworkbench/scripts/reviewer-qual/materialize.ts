@@ -66,8 +66,10 @@ export function caseReviewInput(
 			// ⭐⭐ B7 — ONE TYPE OF THE GRAPH, AS ITS PART: the export cut by `pwaTypeParts`, the case's type's part handed to
 			// `pwaTypeReviewInput` with the request, the account and the narration, as the graph's builder is handed them.
 			// ⛔ A type the graph does not hold is refused: no other part is reviewed in its place.
-			const { pwa, nodes, typeId, ...rest } = c.input;
-			const part = pwaTypeParts(buildPwaGraphExport(pwa, nodes)).find((p) => p.typeId === typeId);
+			// ⭐⭐ D3a (`REG-D-127`) — cut with the policy library the case carries, as the floor cuts a candidate with its engine's
+			// (version nine's, the seeded library); a case carrying none is cut with none, as version eight's were.
+			const { pwa, nodes, typeId, policyLibrary, ...rest } = c.input;
+			const part = pwaTypeParts(buildPwaGraphExport(pwa, nodes), policyLibrary).find((p) => p.typeId === typeId);
 			if (part === undefined)
 				throw new Error(`${c.id}: a part case names the type ${typeId}, which its graph does not hold`);
 			return pwaTypeReviewInput({ criteria, part, ...rest });
