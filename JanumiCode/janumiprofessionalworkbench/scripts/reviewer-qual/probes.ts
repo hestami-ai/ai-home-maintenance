@@ -977,7 +977,13 @@ const asProduction = (
  * P-OVERSIZE-COMMAND, P-OVERSIZE-SURROGATE, P-OVERSIZE-ROOM-EDGES, P-OVERSIZE-STREAMS, P-OVERSIZE-AT-ITS-BUDGET,
  * P-OVERSIZE-FENCES, P-OVERSIZE-LISTS, P-FENCE-AT-THE-LAST, P-NO-FENCE, P-PRODUCTION, P-ABSENT-REPORT,
  * P-NOT-OBSERVABLE, P-NOT-OBSERVABLE-BARE, P-NONE-OBSERVED, P-OBSERVED, P-OVERSIZE-ALL, P-FENCES-OTHER-SLICES,
- * P-STAKES, P-ACCOUNT-BREAKS; NO-CRITERIA — forty-seven, every process-result one `P-`-prefixed.
+ * P-STAKES, P-ACCOUNT-BREAKS; ⭐ (`JAN-EXEC` Phase 7 completion E2, P5 package D) D-pol_intent_fidelity,
+ * D-pol_intent_completeness, D-pol_assumption_disclosure, D-pol_requirement_coverage, D-pol_decomposition_coverage,
+ * D-pol_constraint_propagation, D-pol_architecture_coverage, D-pol_historical_consistency, D-pol_intent_preservation,
+ * D-pol_test_adequacy, D-pol_fitness_for_purpose, D-pol_baseline_promotion (one per catalog policy, in the catalog's
+ * order), D-ROOT, D-OVERSIZE-CONTENT, D-ROOT-UNITS-WITHOUT-WORK, D-OVERSIZE-UNITS, D-OVERSIZE-UNIT-TITLE; NO-CRITERIA —
+ * ~~forty-seven~~ sixty-six (B7's check: twelve T-, ten W-, twenty-six P-, seventeen D- and NO-CRITERIA), every
+ * process-result one `P-`-prefixed.
  * ~~⭐ Package P F1 (`REG-F-503` remedy 1) — and, after G-ACCOUNT-BREAKS, G-TYPE-DECLARATIONS, G-TYPE-DECLARATIONS-ABSENT and
  * G-OVERSIZE-TYPE-DECLARATIONS.~~ ⭐ B7 — the graph framing's probes left the fingerprint with case set v8; NO-CRITERIA is a
  * part's now.

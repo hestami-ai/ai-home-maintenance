@@ -34334,5 +34334,23 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/reviewer-qualification-cases.test.ts"],
 		why: "PROMISE (B7's check, its second MINOR finding): version eight's conferral statement gives the lead's designation to the 14 catchers' standings alone, and records the 3-level pair's eight as the builder's proposal, not on the sponsor's screen, carried as proposed. WHO RELIES: reviewer:qual:check's reader of the statement, and every reader of oracles-v8.json. WHAT THE MUTATION DOES: the statement says the pair's standings are the lead's designation again. OBSERVED (bun run mutants -- ARP-B7-M6 ARP-B7-M27 ARP-B7-M28 ARP-B7-M29 ARP-B7-M30, 2026-10-24, in the package D worktree, the changes staged, each mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         ARP-B7-M30-the-conferral-gives-the-pair-the-lead-s-designation ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'.",
 		source: "JAN-EXEC Phase 7, the review in parts, package D, B7's check, the second MINOR finding (REG-D-126 Q30, Q31; REG-D-124's form; design §5) - each v8 part oracle's note says where its verdict and its standing come from: G8-CLEAN has no oracle, so its seven parts were conferred directly by Q31; the pair's standings, on no screen, are the builder's proposal, carried as proposed; the 14 catchers' alone are the lead's designation; no note doubles a comma"
+	},
+	{
+		id: "ARP-B7-M31-the-probe-set-comment-keeps-its-old-count",
+		file: "scripts/reviewer-qual/probes.ts",
+		find: "~~forty-seven~~ sixty-six (B7's check:",
+		replace: "forty-seven (B7's check:",
+		expectRed: ["verif/reviewer-qualification-fingerprint.test.ts"],
+		why: "PROMISE (B7's check, its fourth MINOR finding): the probe set's doc comment states the number of probes it names, the set's own. WHO RELIES: the reader of probes.ts, told what the fingerprint hashes. WHAT THE MUTATION DOES: the comment's count is 'forty-seven' again. OBSERVED (bun run mutants -- ARP-B7-M31 ARP-B7-M32, 2026-10-24, in the package D worktree, the changes staged, each mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         ARP-B7-M31-the-probe-set-comment-keeps-its-old-count ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'.",
+		source: "JAN-EXEC Phase 7, the review in parts, package D, B7's check, the fourth MINOR finding - FINGERPRINT_PROBES' doc comment, which says the probe set in its fixed order, names all 66 probes in that order (the declared framing's seventeen D- among them) and states their number, sixty-six, where B7 left 'forty-seven' over a list of 49"
+	},
+	{
+		id: "ARP-B7-M32-the-probe-set-comment-omits-the-declared-probes",
+		file: "scripts/reviewer-qual/probes.ts",
+		find: "D-ROOT, D-OVERSIZE-CONTENT, D-ROOT-UNITS-WITHOUT-WORK, D-OVERSIZE-UNITS, D-OVERSIZE-UNIT-TITLE; NO-CRITERIA —",
+		replace: "NO-CRITERIA —",
+		expectRed: ["verif/reviewer-qualification-fingerprint.test.ts"],
+		why: "PROMISE (B7's check, its fourth MINOR finding): the probe set's doc comment names every probe in the set's order, the declared framing's among them. WHO RELIES: the reader of probes.ts, told what the fingerprint hashes and in what order. WHAT THE MUTATION DOES: the comment's list leaves five of the declared framing's probes out. OBSERVED (bun run mutants -- ARP-B7-M31 ARP-B7-M32, 2026-10-24, in the package D worktree, the changes staged, each mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         ARP-B7-M32-the-probe-set-comment-omits-the-declared-probes ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'.",
+		source: "JAN-EXEC Phase 7, the review in parts, package D, B7's check, the fourth MINOR finding - FINGERPRINT_PROBES' doc comment, which says the probe set in its fixed order, names all 66 probes in that order (the declared framing's seventeen D- among them) and states their number, sixty-six, where B7 left 'forty-seven' over a list of 49"
 	}
 ];

@@ -839,6 +839,14 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint does NOT move on what d
 	}, 120_000);
 });
 
+/** `n` (below a hundred) as the probe set's comment writes a number: in words, the tens joined to the units by a hyphen. */
+function numberWord(n: number): string {
+	const units = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+	const tens = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+	if (n < 20) return units[n]!;
+	return n % 10 === 0 ? tens[Math.floor(n / 10)]! : `${tens[Math.floor(n / 10)]!}-${units[n % 10]!}`;
+}
+
 describe('JAN-CRITREAD J2-3 — the probe set reaches every branch of prompt assembly', () => {
 	const prompt = (id: string): string => {
 		const p = BASE.probePrompts.get(id);
@@ -846,6 +854,23 @@ describe('JAN-CRITREAD J2-3 — the probe set reaches every branch of prompt ass
 		return p!;
 	};
 	const any = (needle: string) => FINGERPRINT_PROBES.some((p) => prompt(p.id).includes(needle));
+
+	it('⭐ B7’s check (its fourth MINOR finding) — THE PROBE SET’S OWN COMMENT names every probe, in the set’s order, and states their number', () => {
+		// ⛔ B7 struck the G- ids from the list and wrote the T- ids in, and left its count, "forty-seven", which it had never
+		// matched: the list omitted the declared framing's seventeen D- probes. Read with each struck span (`~~…~~`) away.
+		const source = readFileSync(`${REPO}/scripts/reviewer-qual/probes.ts`, 'utf8');
+		const end = source.indexOf('export const FINGERPRINT_PROBES');
+		const doc = source.slice(source.lastIndexOf('/**', end), end);
+		const text = doc
+			.split('\n')
+			.map((l) => l.replace(/^\s*\/?\*+\/?\s?/, ''))
+			.join(' ')
+			.replace(/~~[\s\S]*?~~/g, '');
+		const close = text.indexOf('NO-CRITERIA —');
+		const named = text.slice(text.indexOf('it is:'), close + 'NO-CRITERIA'.length).match(/(?<![\w-])(?:[TWPD]-[\w-]*\w|NO-CRITERIA)(?![\w-])/g);
+		expect(named, 'the comment names every probe, in the set’s order').toEqual(FINGERPRINT_PROBES.map((p) => p.id));
+		expect(/^NO-CRITERIA —\s+([a-z]+(?:-[a-z]+)?)/.exec(text.slice(close))?.[1], 'and states their number').toBe(numberWord(FINGERPRINT_PROBES.length));
+	});
 
 	it('⭐ every framing, every observation kind and its absent report, the rationale both ways, narration, prior gaps, the subject hash', () => {
 		expect(BASE.probePrompts.size).toBe(FINGERPRINT_PROBES.length);
