@@ -36,6 +36,7 @@ import {
 	identityProvenanceFactsOf,
 	isOperationalRemediation,
 	loadPwaFloor,
+	loadSubjectFloor,
 	runPwaFloor
 } from './floor.js';
 import type {
@@ -1602,7 +1603,7 @@ describe('⭐ JAN-ESCREC D3 — the read-back says what the run concluded, and l
 		).toBe('floor conditionally satisfied');
 	});
 
-	it('⛔ the exclusion is of ONE CODE, not a severity: a finding the POLICY declares INFORMATIONAL is listed beside the BLOCKING one — run and read-back — and only the recommendation is not', async () => {
+	it('⛔ the exclusion is of ONE CODE, not a severity: a finding the POLICY declares INFORMATIONAL is listed beside the BLOCKING one — run, read-back and the per-subject reader — and only the recommendation is not', async () => {
 		// The ER-1 app verifier's finding [5] (its mutants `ER1-V52` and `ER1-V56`). A reply's finding is recorded at its
 		// criterion's DECLARED severity (`reasoningReviewResultFromJudgement`), and every seeded floor criterion declares
 		// BLOCKING — so a list that dropped every INFORMATIONAL observation along with the recommendation passed every case
@@ -1648,6 +1649,13 @@ describe('⭐ JAN-ESCREC D3 — the read-back says what the run concluded, and l
 		expect(
 			loadPwaFloor(PWA, session)?.reasoningGaps,
 			'the read-back dropped an informational finding along with the recommendation'
+		).toEqual(statements);
+		// ⭐ And the execution plane's reader of ONE subject's floor (`loadSubjectFloor`), asked of the type the review is
+		// recorded under. Since the review in parts the PWA's read-back builds its list through `floorViewOf`, whose filter
+		// the run's shares (`ER1-V52`), and this reader filters its own (`ER1-V56`).
+		expect(
+			loadSubjectFloor(ROOT_TYPE, session)?.reasoningGaps,
+			'the per-subject reader dropped an informational finding along with the recommendation'
 		).toEqual(statements);
 	});
 });

@@ -49,6 +49,8 @@ const seam = vi.hoisted(() => ({
 		  },
 	/** Set, the producing prompt re-renders under this fingerprint: the type's template is not the one that produced it. */
 	templateMovedTo: undefined as string | undefined,
+	/** Set, each turn of the producer's session answers this text, as a one-shot tool answers, in place of the stand-in's. */
+	producerReply: undefined as string | undefined,
 	/** ⭐ `P76F-A` A4 — the model devin's export says answered: the configured one unless a case arranges a substitute. */
 	reportedModel: 'fixture-assurance-model',
 	/**
@@ -118,7 +120,7 @@ vi.mock('../../../lib/server/execution/model.js', async (importOriginal) => {
 					...session,
 					turn: (text: string) => {
 						seam.turns.push({ session: n, text });
-						return session.turn(text);
+						return seam.producerReply === undefined ? session.turn(text) : Promise.resolve(seam.producerReply);
 					},
 					processRuns: () =>
 						seam.observed
@@ -393,6 +395,7 @@ beforeEach(() => {
 	seam.sessions = 0;
 	seam.observed = undefined;
 	seam.templateMovedTo = undefined;
+	seam.producerReply = undefined;
 	seam.reportedModel = 'fixture-assurance-model';
 	seam.refuseCompletion = undefined;
 	vi.stubEnv('PATH', noProgramsDirectory());
@@ -669,6 +672,34 @@ describe('⭐ R-1c — re-run the review (RD4, RD5, RD7): no producer runs, the 
 			new RegExp(
 				`^The review cannot be re-run, and the unit keeps waiting: the prompt re-renders under ${recorded.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-moved, and exchange \\S+ records ${recorded.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}: the template is not the one that produced the work product\\.$`
 			)
+		);
+		expect(getEngine().readAllEvents().length).toBe(events);
+		expect(seam.devin).toHaveLength(calls);
+		expect(axesOf(k.pwuId)).toEqual(['EXECUTING', 'WAITING']);
+	});
+
+	it('⛔ RD7 — a producing exchange whose answer span was not retained: refused in words that name that exchange, nothing recorded, no reviewer called, and the unit still waits', async () => {
+		// A reply with no JSON object in it: the work product is the whole reply, and no answer span can be told apart in it,
+		// so the exchange records its answer span as not retained, with the reason (`exchange-capture.ts`).
+		seam.producerReply = 'The assessment is complete, and its finding is stated in plain words.';
+		const k = await aWaitingUnit([transportFailure(), transportFailure()]);
+		const key = String(getObject(getEngine(), k.art)?.storageKey);
+		const producing = listByType(getEngine(), 'MODEL_EXCHANGE').filter(
+			(x) =>
+				x.state.plane === 'EXECUTION' &&
+				(x.state.workProductDerivation as { storageKey?: unknown } | undefined)?.storageKey === key
+		);
+		expect(producing, 'arrangement: one EXECUTION exchange names the work product’s bytes').toHaveLength(1);
+		expect(
+			(producing[0]!.state.answerSpanRef as { status?: unknown }).status,
+			'arrangement: the producing exchange retained its answer span'
+		).not.toBe('STORED');
+		const exchangeId = producing[0]!.id;
+		const events = getEngine().readAllEvents().length;
+		const calls = seam.devin.length;
+		const result = await act('rerunReview', { pwuId: k.pwuId, rationale: RATIONALE });
+		expect(result.data?.error).toBe(
+			`The review cannot be re-run, and the unit keeps waiting: exchange ${exchangeId}’s answer span cannot be read: The answer span was not retained for ${exchangeId}: No answer span could be located, so the answer and any volunteered reasoning cannot be separated losslessly. Guide §9.7: block the capability and resolve Section 16 item 23. Retaining the blob whole would classify reasoning as participating (PER-8, permanent) or the answer as purgeable (PER-12) — wrong in one direction or the other.`
 		);
 		expect(getEngine().readAllEvents().length).toBe(events);
 		expect(seam.devin).toHaveLength(calls);

@@ -763,8 +763,11 @@ export async function rebuildProducingTurn(
 	if (!instruction.ok) return instruction;
 	const mismatch = fingerprintRefusal(instruction.value.fingerprint, exchange);
 	if (mismatch) return refuse(mismatch);
-	// 4. THE RATIONALE: the exchange's retained answer span, verified, split as Begin & Execute split it.
-	const span = await readAnswerSpan(exchange as unknown as ResolvableExchange, store);
+	// 4. THE RATIONALE: the exchange's retained answer span, verified, split as Begin & Execute split it. ⭐ HANDED ITS
+	// `exchangeId`: the stored state has no such field (the handler takes it out and keeps the id as the state's `id`), and
+	// the reader names the exchange by it, so its refusal of an unretained span read "The answer span was not retained for
+	// undefined".
+	const span = await readAnswerSpan({ ...exchange, exchangeId } as unknown as ResolvableExchange, store);
 	if (!span.available)
 		return refuse(`exchange ${exchangeId}’s answer span cannot be read: ${span.refusedBecause}`);
 	const envelope = splitExecutionEnvelope(span.bytes);
