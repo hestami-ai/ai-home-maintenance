@@ -1464,7 +1464,10 @@ export interface AuthoringRecord {
 	candidate: CandidateReading | null;
 	/**
 	 * ⭐ The review in parts, B6 (`REG-D-125`; design D9, D11) — THE INVENTORY THE TURN STAGED: the most types any read of the
-	 * candidate held, which every review round of the turn reviews as parts. 0 until a type is staged.
+	 * candidate held, ~~which every review round of the turn reviews as parts~~ ⭐ (package C's check) the largest staged
+	 * inventory, the one the wait's allowance (`allowanceMs`), the units' timeout and Send's check counted again
+	 * (`inventoryCheck`) are derived from. ⚠ Not every round's inventory: where the refinement adds or removes a type, one of
+	 * the turn's two rounds reviewed fewer types. 0 until a type is staged.
 	 */
 	parts: number;
 	/**

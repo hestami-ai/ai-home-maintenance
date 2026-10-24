@@ -141,6 +141,22 @@ export interface FloorPartView {
 	/** The review's observations, each carrying this part's type (`FloorObservationView.typeId`). */
 	readonly observations: FloorObservationView[];
 	readonly criteria?: CriterionTally;
+	/**
+	 * ⭐ The review in parts, B5 (package C's check; roadmap 9a.6, "criterion results") — EACH CRITERION THE PART'S REVIEW
+	 * RECORDED, the rows `criteria` tallies: read back from the record (`loadPwaFloor`). Absent on a `MISSING` part, and on the
+	 * view a run returns (`runPwaFloor`).
+	 */
+	readonly criterionResults?: readonly CriterionResultView[];
+}
+
+/**
+ * ⭐ The review in parts, B5 (package C's check) — ONE CRITERION'S RECORDED RESULT: the latest `AssuranceCriterionEvaluated` of
+ * it (`latestCriterionRows`), and beside it what a TEST stipulated (`REG-D-071`), as the event carries it.
+ */
+export interface CriterionResultView {
+	readonly criterionId: string;
+	readonly result?: string;
+	readonly stipulated?: string;
 }
 
 export interface FloorPolicyView {
@@ -1276,19 +1292,20 @@ function floorAggregate(order: readonly string[], policies: readonly FloorPolicy
 
 /**
  * The latest recorded result of each criterion of each named assessment, from `AssuranceCriterionEvaluated` — the
- * judgement lives on the EVENT (no state delta), so this is a fold, latest wins, as Gate E folds it.
+ * judgement lives on the EVENT (no state delta), so this is a fold, latest wins, as Gate E folds it. ⭐ Each row names its
+ * criterion (package C's check), so a part's rows reach the inspector as they are (`FloorPartView.criterionResults`).
  */
 function latestCriterionRows(
 	engine: AuthedEngineHandle,
 	assessmentIds: ReadonlySet<string>
-): Map<string, { result?: string; stipulated?: string }[]> {
-	const byAssessment = new Map<string, Map<string, { result?: string; stipulated?: string }>>();
+): Map<string, CriterionResultView[]> {
+	const byAssessment = new Map<string, Map<string, CriterionResultView>>();
 	for (const e of engine.readAllEvents()) {
 		if (e.eventType !== 'AssuranceCriterionEvaluated' || !assessmentIds.has(e.aggregateId)) continue;
 		const p = e.payload as { criterionId?: string; result?: string; stipulated?: string };
 		if (typeof p.criterionId !== 'string') continue;
 		const rows = byAssessment.get(e.aggregateId) ?? new Map();
-		rows.set(p.criterionId, { result: p.result, stipulated: p.stipulated });
+		rows.set(p.criterionId, { criterionId: p.criterionId, result: p.result, stipulated: p.stipulated });
 		byAssessment.set(e.aggregateId, rows);
 	}
 	return new Map([...byAssessment].map(([id, rows]) => [id, [...rows.values()]]));
@@ -1349,6 +1366,8 @@ export function loadPwaFloor(
 			disposition: String((a.state.assessmentState ?? 'INCONCLUSIVE') as string),
 			independenceOk: !obs.some((o) => o.code === 'INDEPENDENCE_VIOLATION'),
 			observations: obs,
+			// ⭐ B5 (package C's check) — and the rows the tally below counts, each criterion's own.
+			criterionResults: criteriaByAssessment.get(a.id) ?? [],
 			criteria: tallyCriteria(criteriaByAssessment.get(a.id) ?? [])
 		};
 	});

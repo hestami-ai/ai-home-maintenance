@@ -3539,6 +3539,25 @@ describe('⭐⭐ The review in parts, B6 — the authoring’s spend reserve cou
 		expect(one.value, 'another PWA’s type was read as an unreviewed part').toBe('as intended');
 	});
 
+	// ⛔ PREDICTED RED, read from the code (package C's check, the MATERIAL finding): the report's part set was every type of the
+	// PWA in the store, and a type the agent's broker removed is still there after the commit, its status REMOVED
+	// (`RemovePwuType`), so it read as an unreviewed part — MISSING — and stage 1 broke on a SATISFIED floor.
+	it('⛔ the report’s part set is the PWA’s live types: a type of the PWA the turn REMOVED is no part of it, beside a round that reviewed every live type', () => {
+		const store = halfBStore();
+		const removed: StoredObject = {
+			id: 'pwutype_removed',
+			objectType: 'PWU_TYPE',
+			state: { pwaId: PWA_ID, name: 'A type the refinement removed', status: 'REMOVED' },
+			firstSequence: 1_000
+		};
+		const r = buildRunReport({ ...store, objects: [...store.objects, removed] }, halfBLaneRows(), { accountNames: NAMES }).report;
+		const review = r.authoring?.floor.find((f) => f.policyId === 'floor.reasoning-review');
+		expect(review?.state, 'the removed type was read as an unreviewed part').toBe('SATISFIED');
+		expect(review?.parts?.map((p) => p.typeId)).toEqual(AGENT_TYPES.map((t) => t.id));
+		expect(cellOf(r, '1', 'whole run').value, 'stage 1 broke on a removed type').toBe('as intended');
+		expect(renderMarkdown(r)).not.toContain('A type the refinement removed');
+	});
+
 	it('⭐ report.json’s authoring floor carries the round’s part set beside its aggregate, and report.md prints it', () => {
 		const r = buildRunReport(halfBStore({ parts: { pwutype_verify: 'INCONCLUSIVE' } }), halfBLaneRows(), { accountNames: NAMES }).report;
 		expect(r.authoring?.floor).toEqual([

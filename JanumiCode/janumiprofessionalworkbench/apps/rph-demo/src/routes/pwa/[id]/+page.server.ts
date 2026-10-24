@@ -59,6 +59,7 @@ import {
 	floorBlockedHint,
 	floorChipLabel,
 	loadPwaFloor,
+	type CriterionResultView,
 	type CriterionTally,
 	type FloorObservationView,
 	type FloorPartView,
@@ -133,8 +134,16 @@ interface TypeReviewView {
 	/** False for a `MISSING` part: the round holds no review of the type, so nothing below was recorded. */
 	readonly reviewed: boolean;
 	readonly criteria?: CriterionTally;
-	/** The statements of the part's observations, save the reviewer's recommendation, which `escalationRecommended` says. */
-	readonly findings: readonly string[];
+	/**
+	 * ⭐ Package C's check (roadmap 9a.6, "criterion results") — each criterion the part's review recorded, by its id: its result,
+	 * and what a test stipulated beside it. Absent for a `MISSING` part.
+	 */
+	readonly criterionResults?: readonly CriterionResultView[];
+	/**
+	 * The part's observations, save the reviewer's recommendation, which `escalationRecommended` says: each one's statement,
+	 * ⭐ (package C's check) and its code — the criterion a finding faults, or an observation's own code where it faults none.
+	 */
+	readonly findings: readonly { readonly code: string; readonly statement: string }[];
 	readonly escalationRecommended: boolean;
 	/** The reviewer's answer of this part's review, joined to its subject and the round's token; absent where none is recorded. */
 	readonly answer?: ReviewerAnswerView;
@@ -143,11 +152,11 @@ interface TypeReviewView {
 /**
  * ⭐⭐ The review in parts, B5 (`REG-D-125`; DESIGN-authoring-review-in-parts.md D7; roadmap 9a.6) — ONE TYPE'S OWN REVIEW, AS THE
  * INSPECTOR SHOWS IT UNDER THAT TYPE: the part the shown round holds of it (`FloorView.parts`) — its disposition, or `MISSING`
- * where the round holds no review of the type at its stored version; its criteria, evaluated and stipulated; its findings,
- * each observation its review recorded save the reviewer's recommendation, which is said beside them; and its reviewer's
- * answer (`loadReviewerAnswer`). ⛔ Each from the type's own part, whose observations carry the type their assessment was
- * recorded under — never from the floor's Reasoning Review row, which folds every part (`partsDisposition`), and never from
- * the reviewer's prose, which may name any type.
+ * where the round holds no review of the type at its stored version; its criteria, evaluated and stipulated ⭐ (package C's
+ * check) and each one's own result; its findings, each observation its review recorded, with its code, save the reviewer's
+ * recommendation, which is said beside them; and its reviewer's answer (`loadReviewerAnswer`). ⛔ Each from the type's own
+ * part, whose observations carry the type their assessment was recorded under — never from the floor's Reasoning Review row,
+ * which folds every part (`partsDisposition`), and never from the reviewer's prose, which may name any type.
  */
 function typeReviewOf(part: FloorPartView, answer: ReviewerAnswerView | undefined): TypeReviewView {
 	const recommendation = (o: FloorObservationView): boolean => o.code === REVIEWER_RECOMMENDED_ESCALATION;
@@ -158,7 +167,8 @@ function typeReviewOf(part: FloorPartView, answer: ReviewerAnswerView | undefine
 		disposition: part.disposition,
 		reviewed: part.disposition !== 'MISSING',
 		...(part.criteria === undefined ? {} : { criteria: part.criteria }),
-		findings: part.observations.filter((o) => !recommendation(o)).map((o) => o.statement),
+		...(part.criterionResults === undefined ? {} : { criterionResults: part.criterionResults }),
+		findings: part.observations.filter((o) => !recommendation(o)).map((o) => ({ code: o.code, statement: o.statement })),
 		escalationRecommended: part.observations.some(recommendation),
 		...(answer === undefined ? {} : { answer })
 	};

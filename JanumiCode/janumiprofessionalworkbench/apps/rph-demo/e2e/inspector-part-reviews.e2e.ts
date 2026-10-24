@@ -17,8 +17,10 @@ import { shot } from './support/gallery';
 // part — and under it the PWA's own reviewer answer, which a round in parts never records: the person accepting a candidate saw
 // that the review failed, and not which type failed, on which criterion, or what the reviewer said of it. Now the read-only
 // inspector shows, under the type it shows, that type's own review in the round the floor panel shows — its disposition, its
-// criteria and what a test stipulated of them, its findings and its reviewer's answer — beside F2's prompt display; and the
-// floor panel lists the types' reviews beside the PWA's two deterministic policies and their strictest aggregate.
+// criteria and what a test stipulated of them ⭐ (package C's check: each criterion by its id, its recorded result and any
+// stipulation beside it), its findings ⭐ (each with the criterion it faults) and its reviewer's answer — beside F2's prompt
+// display; and the floor panel lists the types' reviews beside the PWA's two deterministic policies and their strictest
+// aggregate.
 //
 // ⭑ CONTROLS: a failed part beside a satisfied sibling; an incomplete round, a type the round holds no review of; an
 // unavailable retained answer; a review whose round token joins no recorded call, beside an older round's call about the same
@@ -29,6 +31,10 @@ import { shot } from './support/gallery';
 const ROOT_TEXT = ['Synthesize the realized product from its parts.', '  Cite what each part produced.'].join('\n');
 /** The finding the structural checker records against a type whose output feeds no consumer (`judgePwaTypePart`). */
 const DEAD_END = '1 output(s) this type produces feed no consumer (dead-end).';
+/** ⭐ Package C's check — the one criterion that checker judges, the dead-end check (`RR_PROXY`); the test stipulates the rest. */
+const JUDGED = 'RR-04-no-proxy-satisfaction';
+/** What a criterion row the test stipulated says beside its id. */
+const STIPULATED_ROW = 'UNABLE_TO_DETERMINE · stipulated MET by the test, not reviewed';
 
 /** Select a node, and wait until the inspector shows that type. */
 async function inspect(page: Page, name: string): Promise<void> {
@@ -238,17 +244,26 @@ test.describe('PWA Designer — the inspector shows each type’s own review, an
 		await inspect(page, 'Product Realization');
 		await expect(review.getByTestId('inspector-review-disposition')).toHaveText('SATISFIED');
 		await expect(review.getByTestId('inspector-review-criteria')).toHaveText('1 criteria evaluated · 8 stipulated by the test, not reviewed');
+		// ⭐ Package C's check (roadmap 9a.6, "criterion results") — each criterion by its id: the one the checker judged, with its
+		// result, and each the test stipulated, said so beside its result.
+		const rows = review.getByTestId('inspector-review-criterion-results').locator('li');
+		await expect(rows).toHaveCount(9);
+		await expect(rows.filter({ hasText: JUDGED })).toHaveText(`${JUDGED} MET`);
+		await expect(rows.filter({ hasText: STIPULATED_ROW })).toHaveCount(8);
 		await expect(review.getByTestId('inspector-review-findings')).toHaveCount(0);
 		await expect(review.getByTestId('inspector-review-no-findings')).toBeVisible();
 		await expect(review.getByTestId('inspector-review-answer-none')).toBeVisible();
 		// ⭑ F2's prompt display kept, beside the review.
 		await expect(page.getByTestId('inspector-prompt-text')).toHaveJSProperty('textContent', ROOT_TEXT);
 
-		// ⭐ UNDER THE FAILED PART: its rejection, its finding, its criteria.
+		// ⭐ UNDER THE FAILED PART: its rejection, its finding ⭐ with the criterion it faults, its criteria ⭐ and the one it failed on.
 		await inspect(page, 'Architecture Definition');
 		await expect(review.getByTestId('inspector-review-disposition')).toHaveText('REJECTED');
-		await expect(review.getByTestId('inspector-review-findings').locator('li')).toHaveText([DEAD_END]);
+		await expect(review.getByTestId('inspector-review-findings').locator('li')).toHaveText([`${JUDGED} ${DEAD_END}`]);
 		await expect(review.getByTestId('inspector-review-criteria')).toHaveText('1 criteria evaluated · 8 stipulated by the test, not reviewed');
+		await expect(rows).toHaveCount(9);
+		await expect(rows.filter({ hasText: JUDGED }), 'the criterion it failed on is not said').toHaveText(`${JUDGED} NOT_MET`);
+		await expect(rows.filter({ hasText: STIPULATED_ROW })).toHaveCount(8);
 		await review.scrollIntoViewIfNeeded();
 		await shot(page, 'inspector shows a failed part’s own review');
 	});
@@ -337,7 +352,8 @@ test.describe('PWA Designer — the inspector shows each type’s own review, an
 		await gotoHydrated(page, `/pwa/${pwaId}`);
 		await inspect(page, 'Product Realization');
 		await expect(review.getByTestId('inspector-review-disposition'), 'arrangement: the round shown is the newer one').toHaveText('REJECTED');
-		await expect(review.getByTestId('inspector-review-findings').locator('li')).toHaveText(['Staged finding of round two.']);
+		// ⭐ Package C's check — the finding with the criterion it faults: the staged observation's code.
+		await expect(review.getByTestId('inspector-review-findings').locator('li')).toHaveText(['RR-04 Staged finding of round two.']);
 		await expect(review.getByTestId('inspector-review-answer-none'), 'the older round’s call was shown under the newer round’s review').toBeVisible();
 		await expect(review).not.toContainText(ROUND_ONE);
 

@@ -45,7 +45,8 @@ interface Review {
 	readonly disposition: string;
 	readonly reviewed: boolean;
 	readonly criteria?: { readonly evaluated: number; readonly stipulated: number };
-	readonly findings: readonly string[];
+	readonly criterionResults?: readonly { readonly criterionId: string; readonly result?: string; readonly stipulated?: string }[];
+	readonly findings: readonly { readonly code: string; readonly statement: string }[];
 	readonly escalationRecommended: boolean;
 	readonly answer?: { readonly attemptOrdinal: number; readonly answer?: string; readonly disclosure: string };
 }
@@ -177,6 +178,11 @@ describe('⭐⭐ B5 — the page’s load hands the inspector each type’s own 
 				false,
 				session.loadObject(typeId)!.semanticVersion
 			]);
+			// ⭐ Package C's check (roadmap 9a.6, "criterion results") — and each criterion's own result, by its id, as its review
+			// recorded it: which criterion a type failed on is read here, never only how many were evaluated.
+			expect(r.criterionResults?.map((c) => [c.criterionId, c.result, c.stipulated]), 'no criterion’s own result is handed').toEqual(
+				reasoningReviewCriteria(session).map((c) => [c.id, 'MET', undefined])
+			);
 		}
 		expect(reviewOf(s, BUILD).answer?.answer).toBe(answering('Build’s own reply'));
 		expect(reviewOf(s, ROOT).answer?.answer).toBe(answering('Realize’s own reply'));
@@ -186,9 +192,16 @@ describe('⭐⭐ B5 — the page’s load hands the inspector each type’s own 
 		await runRound({ [BUILD]: rejecting('Build drops the required failure paths.') });
 		const s = await shown();
 		expect(s.floor?.aggregate, 'the PWA’s aggregate is not the strictest part’s').toBe('REJECTED');
+		const [faulted, ...met] = reasoningReviewCriteria(session).map((c) => c.id);
+		// ⭐ Package C's check — each finding with the criterion it faults (its observation's code), and that criterion NOT_MET
+		// among the part's criterion results.
 		expect([reviewOf(s, BUILD).disposition, reviewOf(s, BUILD).findings]).toEqual([
 			'REJECTED',
-			['Build drops the required failure paths.']
+			[{ code: faulted, statement: 'Build drops the required failure paths.' }]
+		]);
+		expect(reviewOf(s, BUILD).criterionResults?.map((c) => [c.criterionId, c.result]), 'the criterion it failed on is not said').toEqual([
+			[faulted, 'NOT_MET'],
+			...met.map((id) => [id, 'MET'])
 		]);
 		expect(
 			[reviewOf(s, ROOT).disposition, reviewOf(s, ROOT).findings],
@@ -246,6 +259,25 @@ describe('⭐⭐ B5 — the page’s load hands the inspector each type’s own 
 			s.typeReviews.map((r) => r.answer),
 			'an answer of another round was handed beside the shown round’s review'
 		).toEqual([undefined, undefined]);
+	});
+
+	// ⭐ Package C's check (roadmap 9a.6, "criterion results", "stipulation disclosures") — under the stand-in, which judges one
+	// criterion of a part (`RR-04`, the dead-end check) and stipulates the rest where a test registered it.
+	it('⭐ each criterion’s own row: the one the checker judged with its result, each one the test stipulated with its result and the stipulation beside it', async () => {
+		registerStipulation(getEngine(), { pwaId: PWA, framing: 'PWA_TYPE', remaining: 'CLEAN' });
+		await runPwaFloor(PWA, { prompt: 'Author it.', producer: PRODUCER }, session);
+		const judged = 'RR-04-no-proxy-satisfaction';
+		const rows = reasoningReviewCriteria(session).map((c) =>
+			c.id === judged ? [c.id, 'MET', undefined] : [c.id, 'UNABLE_TO_DETERMINE', 'MET']
+		);
+		expect(
+			reasoningReviewCriteria(session).some((c) => c.id === judged),
+			'arrangement: the policy declares the criterion the checker judges'
+		).toBe(true);
+		expect(
+			(await shown()).typeReviews.map((r) => r.criterionResults?.map((c) => [c.criterionId, c.result, c.stipulated])),
+			'a stipulated row was handed as a reviewed one, or not at all'
+		).toEqual([rows, rows]);
 	});
 
 	it('⛔ an unavailable retained answer: the record names bytes the page cannot read, and the inspector is handed why — never an answer', async () => {

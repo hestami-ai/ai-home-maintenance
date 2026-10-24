@@ -2022,8 +2022,9 @@
 							{/if}
 						</div>
 						<!-- ⭐⭐ The review in parts, B5 (REG-D-125; design D7; roadmap 9a.6) — THIS TYPE'S OWN REVIEW, in the round the floor
-						     panel shows: its disposition, or that the round holds none of it; its criteria, with what a test stipulated; its
-						     findings; and its reviewer's answer — each from the type's own part, as the load answers it (`typeReviews`), and
+						     panel shows: its disposition, or that the round holds none of it; its criteria, with what a test stipulated, ⭐
+						     (package C's check) each criterion's own result by its id; its findings, each with its code (the criterion a
+						     finding faults); and its reviewer's answer — each from the type's own part, as the load answers it (`typeReviews`), and
 						     none composed here. The PWA's deterministic policies and their strictest aggregate stay in the floor panel. -->
 						{#each data.typeReviews.filter((r) => r.typeId === current.id) as review (review.typeId)}
 							<div class="field" data-testid="inspector-review">
@@ -2044,9 +2045,19 @@
 												{' '}· {review.criteria.stipulated} stipulated by the test, not reviewed{/if}
 										</p>
 									{/if}
+									{#if review.criterionResults?.length}
+										<ul class="reviewcriteria" data-testid="inspector-review-criterion-results">
+											{#each review.criterionResults as c (c.criterionId)}
+												<li>
+													<code>{c.criterionId}</code>
+													{c.result ?? 'no result recorded'}{#if c.stipulated}{' '}· stipulated {c.stipulated} by the test, not reviewed{/if}
+												</li>
+											{/each}
+										</ul>
+									{/if}
 									{#if review.findings.length}
 										<ul class="reviewfindings" data-testid="inspector-review-findings">
-											{#each review.findings as finding, i (i)}<li>{finding}</li>{/each}
+											{#each review.findings as finding, i (i)}<li><code>{finding.code}</code> {finding.statement}</li>{/each}
 										</ul>
 									{:else}
 										<p class="fhelp" data-testid="inspector-review-no-findings">No finding is recorded against this type.</p>
@@ -3595,6 +3606,16 @@
 		flex-direction: column;
 		gap: 3px;
 		line-height: 1.35;
+	}
+	/* ⭐ Package C's check — each criterion's own result under the type's review. */
+	.reviewcriteria {
+		margin: 0.3rem 0 0;
+		padding-left: 16px;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		font-size: 0.72rem;
+		color: var(--on-variant);
 	}
 	.floorparts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 	.floorparts li { display: flex; gap: 6px; align-items: baseline; justify-content: space-between; color: var(--on-variant); }

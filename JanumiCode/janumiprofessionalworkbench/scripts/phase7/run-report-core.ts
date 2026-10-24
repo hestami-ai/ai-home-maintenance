@@ -3207,12 +3207,16 @@ function stageOneHalfB(ix: Index, lane: LaneRows): MatrixCell {
  * and its complete part set (`floorDispositions`), over the PWA's types, each assessment's floor-run token its correlation
  * (`correlationOf`). Stage 1 and the authoring summary read it alike. ⛔ Both read each policy's latest assessment of the
  * PWA, so the Reasoning Review was one PWA-subject review, which a round in parts never records.
+ * ⛔ The PWA's LIVE types, as `resolveHalfBUnits` reads them and as the lane reads the candidate's (the introspection's
+ * `listPwuTypes`) — package C's check, the MATERIAL finding: a type the agent's broker removed stays in the store after the
+ * commit, its status REMOVED (`RemovePwuType`), and read as a part it was an unreviewed one — MISSING — so stage 1 broke on
+ * a SATISFIED floor.
  */
 function authoringFloorOf(ix: Index, pwaId: string): FloorDisposition[] {
 	return floorDispositions(
 		ix.ofType('ASSURANCE_ASSESSMENT'),
 		pwaId,
-		ix.ofType('PWU_TYPE').filter((t) => str(t.state.pwaId) === pwaId),
+		ix.ofType('PWU_TYPE').filter((t) => str(t.state.pwaId) === pwaId && str(t.state.status) !== 'REMOVED'),
 		(id) => ix.correlationOf.get(id)
 	);
 }

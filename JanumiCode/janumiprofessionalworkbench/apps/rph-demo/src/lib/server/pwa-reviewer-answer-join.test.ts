@@ -52,7 +52,7 @@ type Shown = {
 const page = async (): Promise<Shown & { readonly reviewerAnswer?: Answer }> => {
 	const shown = (await load(event)) as Shown;
 	expect(shown.reviewerAnswer, 'the PWA itself has no reviewer answer once its review is in parts').toBeUndefined();
-	expect(shown.typeReviews.map((p) => p.typeId), 'the answer is not under the part').toEqual([ROOT]);
+	expect(shown.typeReviews.map((p) => p.typeId), 'the parts are not the round’s').toEqual([ROOT]);
 	return { ...shown, reviewerAnswer: shown.typeReviews[0]!.answer };
 };
 
