@@ -3063,8 +3063,10 @@ function byNameOf(source: GraphCase, id: string): string {
 //     the renamed copies renamed and nothing else; each planted twin G3-CLEAN restated but where its plant is (diffed); the
 //     planted types' purposes as written here, under one rule for every twin, and what the catcher parts show of them;
 //     production's graph;
-//   · THE ORACLES — version eight's, unchanged; the conferral naming the 19 restated cases as awaiting the sponsor's
-//     confirmation, and the check reporting that confirmation as owed, never a missing conferral;
+//   · THE ORACLES — version eight's, unchanged; the conferral naming the 19 restated cases as ~~awaiting the sponsor's
+//     confirmation, and the check reporting that confirmation as owed, never a missing conferral~~ ⭐ confirmed by the
+//     sponsor as restated (`REG-D-129`), in the sponsor's words, and the check finding no CONFERRAL problem in it — a
+//     statement still carrying the marker reported as the confirmation owed, never a missing conferral;
 //   · THE 28,000-CHARACTER LIMIT, SEEN WHOLE, THE ORACLES COMPOSE — as every case is held.
 const currentV9 = (): CaseSet => JSON.parse(read(CURRENT_CASE_SET_FILE)) as CaseSet;
 const currentOraclesV9 = (): OracleSet => JSON.parse(read(CURRENT_ORACLES_FILE)) as OracleSet;
@@ -3442,20 +3444,25 @@ describe('⭐⭐ the review in parts, B8a — reviewer-qualification case set v9
 		expect(generatedOraclesV9().oracles.map((o) => o.caseId), 'one per case, in the set’s order').toEqual(generatedV9().cases.map((c) => c.id));
 	});
 
-	it('⛔ AWAITING THE SPONSOR’S CONFIRMATION OF THE RESTATEMENT (REG-D-127) — the statement carries version eight’s whole, quotes Q33b, and names the 19 restated bridge part cases as awaiting it, the other 57 conferred; reviewer:qual:check reports that confirmation owed, never a missing conferral', async () => {
+	// ⭐⭐ The code record of `REG-D-129` — ~~⛔ AWAITING THE SPONSOR'S CONFIRMATION OF THE RESTATEMENT … reviewer:qual:check
+	// reports that confirmation owed~~: the sponsor confirmed the restated cases (Q34), so the record names the 19 confirmed, in
+	// the sponsor's words, and the check refuses it no more. The RESTATEMENT_NOT_CONFIRMED limb stays held, by the control
+	// below: a statement that carries the marker is refused.
+	it('⭐ CONFIRMED AS RESTATED (REG-D-129) — the statement carries version eight’s whole, quotes Q33b, names the 19 restated bridge part cases confirmed as restated, quoting Q34 and the sponsor’s answer, and the other 57 conferred, and carries no marker; reviewer:qual:check finds no CONFERRAL problem in it', async () => {
 		const { conferral } = generatedOraclesV9();
 		const restated = partsV9().filter((c) => BRIDGE_SOURCES.includes(c.sourceCaseId)).map((c) => c.id);
 		expect(restated, 'arrangement: the 19').toHaveLength(19);
+		expect(conferral, 'the statement still carries the restatement’s marker').not.toContain(ORACLES_RESTATEMENT_UNCONFIRMED);
 		expect(conferral, 'version eight’s statement, whole').toContain((JSON.parse(read(ORACLES_V8_FILE)) as OracleSet).conferral);
 		expect(conferral, 'Q33b, quoted').toContain(
 			'the sponsor chose “Fix both first (Recommended)”, whose text read “Design note, then build: policy names and applicable policies in each part; the bridge cases restated as production stores them, their expected verdicts unchanged and shown to you to confirm;'
 		);
-		expect(conferral, 'the 19, named as awaiting').toContain(
-			`The 19 part cases cut from the restated bridge cases — ${restated.join(', ')} — are ${ORACLES_RESTATEMENT_UNCONFIRMED}: their expected verdicts stand as the sponsor conferred them (REG-D-126 Q30), and the sponsor’s confirmation of their restatement is owed before measurement.`
+		expect(conferral, 'the 19, named as confirmed, in the sponsor’s words').toContain(
+			`The 19 part cases cut from the restated bridge cases — ${restated.join(', ')} — were confirmed by the sponsor as restated (REG-D-129, Q34: asked “Do you confirm the restated bridge cases as shown (each type given a purpose as production stores it, each planted twin differing only where its defect is), with their expected verdicts unchanged, so High's re-measurement on them counts?”, the sponsor chose “Confirm as restated (Recommended)”): their expected verdicts, faulted criteria, catchers and standings stand as the sponsor conferred them (REG-D-126 Q30), and the confirmation changes none of them.`
 		);
 		expect(conferral, 'the other 57 conferred').toContain('The other 57 — the 41 non-part cases and the 16 part cases of G7-CLEAN, its planted twins and the 3-level pair — are conferred, as recorded above.');
 		expect(conferral, 'no proposal’s word').not.toContain(ORACLES_PROPOSED);
-		const problems = await checkQualification({
+		const inputs = (statement: string): CheckInputs => ({
 			files: [],
 			current: {
 				reviewer: '0'.repeat(64),
@@ -3466,7 +3473,7 @@ describe('⭐⭐ the review in parts, B8a — reviewer-qualification case set v9
 			},
 			cases: generatedV9().cases,
 			oracles: generatedOraclesV9().oracles,
-			conferral,
+			conferral: statement,
 			oracleSets: [],
 			findings: new Set(),
 			struck: new Set(),
@@ -3476,7 +3483,11 @@ describe('⭐⭐ the review in parts, B8a — reviewer-qualification case set v9
 				throw new Error('an empty record re-scores nothing');
 			}
 		});
-		expect(problems.problems.filter((p) => p.limb === 'CONFERRAL'), 'the confirmation owed, alone').toEqual([
+		const conferralProblems = async (statement: string) =>
+			(await checkQualification(inputs(statement))).problems.filter((p) => p.limb === 'CONFERRAL');
+		expect(await conferralProblems(conferral), 'the check finds no CONFERRAL problem in the record').toEqual([]);
+		// ⭑ CONTROL — the same set, its statement carrying the marker as it did before Q34's record: the confirmation owed, alone.
+		expect(await conferralProblems(`${conferral} The 19 are ${ORACLES_RESTATEMENT_UNCONFIRMED}.`)).toEqual([
 			{ limb: 'CONFERRAL', message: RESTATEMENT_NOT_CONFIRMED }
 		]);
 		expect(RESTATEMENT_NOT_CONFIRMED).not.toBe(ORACLES_NOT_CONFERRED);

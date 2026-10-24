@@ -1962,18 +1962,21 @@ describe('⭐⭐ the review in parts, B7 — under case set v8 and the fingerpri
 // Version nine is current, and D3a moved the reviewer fingerprint ON PURPOSE: each part probe is cut with the seeded policy
 // library, and three probes stand for the policy material. The record's shape — the selected candidate's run of version eight
 // under the fingerprint before D3a, every case answered as its oracle expects — owes a run of the selected candidate over the
-// 35 part cases, whose prompts moved, and RESCORED lines for the 41 carried cases, whose prompts did not; and the sponsor's
-// confirmation of the 19 restated bridge part cases, which the check names as owed — never a missing conferral.
-describe('⭐⭐ the review in parts, B8a — under case set v9 and the fingerprint D3a moved, the selected candidate’s run of v8 owes a run over exactly the 35 part cases, RESCORED lines for the other 41, and the sponsor’s confirmation of the restated bridge cases (REG-D-127, REG-D-086)', () => {
+// 35 part cases, whose prompts moved, and RESCORED lines for the 41 carried cases, whose prompts did not; ~~and the sponsor's
+// confirmation of the 19 restated bridge part cases, which the check names as owed — never a missing conferral.~~
+// ⭐ The code record of `REG-D-129` — the sponsor confirmed the 19 restated bridge part cases, and the committed statement
+// says so, so it owes no confirmation. A statement that still carries the marker (`AS_IF_UNCONFIRMED`, built here) owes it
+// besides, the check naming it as owed — never a missing conferral.
+describe('⭐⭐ the review in parts, B8a — under case set v9 and the fingerprint D3a moved, the selected candidate’s run of v8 owes a run over exactly the 35 part cases, RESCORED lines for the other 41, ~~and the sponsor’s confirmation of the restated bridge cases~~ and, the restatement confirmed, no confirmation (REG-D-127, REG-D-129, REG-D-086)', () => {
 	const GLM: SelectedCandidate = { transport: 'devin', modelLabel: 'glm-5-3-flash-max' };
 	const PARTS = (): string[] => CURRENT_CASES.filter((c) => c.arm === 'PWA_TYPE').map((c) => c.id);
 	const CARRIED = (): string[] => CURRENT_CASES.filter((c) => c.arm !== 'PWA_TYPE').map((c) => c.id);
 	/** Today's set — version nine — and its oracles, under `conferral` (their committed statement, unless said). */
 	const onVersionNine = (files: CheckInputs['files'], conferral = CURRENT_ORACLES.conferral) =>
 		check(files, { current: FP_NOW, cases: CURRENT_CASES, oracles: CURRENT_ORACLES.oracles, conferral });
-	/** ⭐ Today's statement as it will read once the sponsor confirms the restated cases: its marker gone. A fixture. */
-	const AS_IF_CONFIRMED = (): string =>
-		CURRENT_ORACLES.conferral.replace(ORACLES_RESTATEMENT_UNCONFIRMED, 'confirmed by the sponsor as restated (a fixture)');
+	/** ~~⭐ Today's statement as it will read once the sponsor confirms the restated cases: its marker gone. A fixture.~~ ⭐ The
+	 *  code record of `REG-D-129` — today's statement as it read while the sponsor's confirmation was owed: its marker. A fixture. */
+	const AS_IF_UNCONFIRMED = `A fixture: the 19 part cases cut from the restated bridge cases are ${ORACLES_RESTATEMENT_UNCONFIRMED}.`;
 	/** The definition before D3a: today's but for the probes, which D3a moved. */
 	const BEFORE_D3A = (): RunFingerprint => ({ ...moved('probes'), caseSet: FP_V8.caseSet });
 	/** The selected candidate's run of version eight under the definition before D3a, every case answered as its oracle expects. */
@@ -2017,28 +2020,36 @@ describe('⭐⭐ the review in parts, B8a — under case set v9 and the fingerpr
 			versions: { caseSet: 9, oracles: 9 }
 		});
 
-	it('⛔ RED, AND EXACTLY SO — the sponsor’s confirmation of the restated cases owed, never a missing conferral; and coverage of all 76, by any candidate and by the selected one, each naming the 41 carried cases, whose prompts did not move, as RESCORED lines discharge them; nothing else', async () => {
+	it('⛔ RED, AND EXACTLY SO — ~~the sponsor’s confirmation of the restated cases owed, never a missing conferral; and~~ coverage of all 76, by any candidate and by the selected one, each naming the 41 carried cases, whose prompts did not move, as RESCORED lines discharge them; nothing else, the restatement confirmed (REG-D-129); a statement still carrying the marker owes the confirmation besides, never a missing conferral', async () => {
 		expect([CURRENT_SET.caseSetVersion, CURRENT_ORACLES.oracleVersion], 'the current set is version nine').toEqual([9, 9]);
 		expect([PARTS().length, CARRIED().length], 'part cases, the others').toEqual([35, 41]);
 		expect(FP.reviewer, 'arrangement: the run’s fingerprint is not today’s').not.toBe(BEFORE_D3A().reviewer);
+		expect(CURRENT_ORACLES.conferral, 'arrangement: REG-D-129 confirmed the restatement').not.toContain(
+			ORACLES_RESTATEMENT_UNCONFIRMED
+		);
 		const lines = [...(await v8Run()), select(GLM)];
-		expect((await onVersionNine([file(lines)])).problems).toEqual([
-			{ limb: 'CONFERRAL', message: RESTATEMENT_NOT_CONFIRMED },
+		const coverage = [
 			{ limb: 'COVERAGE', message: [owed('any', lines), hint(CARRIED())].join('\n    ') },
 			{ limb: 'COVERAGE', message: [owed('selected', lines), hint(CARRIED())].join('\n    ') }
+		];
+		// ⭐ `REG-D-129` — ~~the confirmation owed first~~: the committed statement owes no confirmation.
+		expect((await onVersionNine([file(lines)])).problems).toEqual(coverage);
+		expect((await onVersionNine([file(lines)], AS_IF_UNCONFIRMED)).problems, 'the marker: the confirmation owed besides').toEqual([
+			{ limb: 'CONFERRAL', message: RESTATEMENT_NOT_CONFIRMED },
+			...coverage
 		]);
 	});
 
-	it('⭐ RESCORED lines of that run for the 41 and a run of the selected candidate over the 35 part cases under today’s fingerprint, each answered as its oracle expects, leave the confirmation alone owed; with it recorded, GREEN; without the run, the 35 alone besides, by any candidate and by the selected one', async () => {
+	it('⭐ RESCORED lines of that run for the 41 and a run of the selected candidate over the 35 part cases under today’s fingerprint, each answered as its oracle expects, ~~leave the confirmation alone owed; with it recorded, GREEN~~ are GREEN, the confirmation recorded (REG-D-129); a statement still carrying the marker owes the confirmation alone; without the run, the 35 alone, by any candidate and by the selected one', async () => {
 		const v8 = await v8Run();
 		const rescored = await restampToday(v8);
 		expect(rescored.map((l) => l.caseId), 'the 41, and no part case: their prompts moved').toEqual(CARRIED());
 		const lines = [...v8, ...rescored, ...(await partRun()), select(GLM)];
-		expect((await onVersionNine([file(lines)])).problems, 'the confirmation alone').toEqual([
+		expect((await onVersionNine([file(lines)])).problems, 'confirmed: nothing owed').toEqual([]);
+		expect((await onVersionNine([file(lines)], AS_IF_UNCONFIRMED)).problems, 'the marker: the confirmation alone').toEqual([
 			{ limb: 'CONFERRAL', message: RESTATEMENT_NOT_CONFIRMED }
 		]);
-		expect((await onVersionNine([file(lines)], AS_IF_CONFIRMED())).problems, 'confirmed: nothing owed').toEqual([]);
-		const withoutRun = (await onVersionNine([file([...v8, ...rescored, select(GLM)])], AS_IF_CONFIRMED())).problems;
+		const withoutRun = (await onVersionNine([file([...v8, ...rescored, select(GLM)])])).problems;
 		expect(withoutRun.map((p) => p.limb), 'coverage alone, by any candidate and by the selected one').toEqual(['COVERAGE', 'COVERAGE']);
 		for (const p of withoutRun) {
 			const first = p.message.split('\n')[0]!;
@@ -2713,15 +2724,21 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 	 */
 	const ONLY_THE_CONFERRAL = `reviewer:qual:check — RED — 1 problem(s):\n  [CONFERRAL] ${ORACLES_NOT_CONFERRED}\n`;
 	/**
-	 * ⭐⭐ B8a (`REG-D-127`) — WHAT THE CLI SAYS OF A RECORD WITH NOTHING ELSE OWED WHILE TODAY'S RESTATED CASES AWAIT THE SPONSOR'S
+	 * ~~⭐⭐ B8a (`REG-D-127`) — WHAT THE CLI SAYS OF A RECORD WITH NOTHING ELSE OWED WHILE TODAY'S RESTATED CASES AWAIT THE SPONSOR'S
 	 * CONFIRMATION: RED, ONE problem, the confirmation. Today's set is version nine, its 19 restated bridge part cases awaiting
 	 * it, so each case below that held the CLI GREEN holds it red on the confirmation alone — nothing else owed, which is what
 	 * GREEN said — and GREEN is driven, in the case that runs `main` on a disposable root, by a copy of the oracle file whose
 	 * statement records the confirmation. ⚠ When the sponsor confirms, the committed statement changes, and these return to
-	 * GREEN.
+	 * GREEN.~~
+	 * ⭐ The code record of `REG-D-129` — THEY RETURN TO GREEN: the sponsor confirmed the restated cases, and the committed
+	 * statement says so, so a record with nothing owed is GREEN again, as under B7. The confirmation limb stays held, through
+	 * the CLI's own reading of the oracle file, by the case that runs `main` on a disposable root whose version nine still
+	 * carries the marker (`ONLY_THE_CONFIRMATION`).
 	 */
 	const ONLY_THE_CONFIRMATION = `reviewer:qual:check — RED — 1 problem(s):\n  [CONFERRAL] ${RESTATEMENT_NOT_CONFIRMED}\n`;
-	// ⭐ B8a — ~~`GREEN_HEAD`~~: no case reads it while the confirmation is owed (`ONLY_THE_CONFIRMATION`).
+	// ⭐ B8a — ~~`GREEN_HEAD`~~: no case reads it while the confirmation is owed (`ONLY_THE_CONFIRMATION`). ⭐ `REG-D-129` — read
+	// again, the confirmation recorded.
+	const GREEN_HEAD = 'reviewer:qual:check — GREEN';
 
 	it('⛔ under bare bun the packages resolve to built dist, and the check refuses to run', () => {
 		const r = cli([], ['--records', gitRepo()]);
@@ -2757,11 +2774,12 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		// ⭐ B8a — ~~version eight~~ version nine: each part cut with the seeded library, the bridge restated (`REG-D-127`).
 		expect(r.out).toContain('; case set v9, oracles v9\n');
 		expect(r.out).toContain(`: ${CURRENT_CASES.map((c) => c.id).join(', ')} — owed`);
-		expect(r.out).toContain(`  [CONFERRAL] ${RESTATEMENT_NOT_CONFIRMED}\n`);
+		// ⭐ `REG-D-129` — ~~the confirmation owed (B8a)~~: the restatement confirmed, no CONFERRAL problem.
+		expect(r.out).not.toContain('[CONFERRAL]');
 		expect(CURRENT_SET.caseSetVersion).toBe(9);
 	});
 
-	it('⭐ on a TRACKED record that covers the committed set, reproduces, and holds no material failure: ~~nothing owed but the conferral of version seven’s six new oracles (package P F3)~~ ~~⭐ GREEN, its oracles conferred (REG-D-126, B7)~~ ⭐ B8a: nothing owed but the sponsor’s confirmation of the restated bridge cases (REG-D-127)', async () => {
+	it('⭐ on a TRACKED record that covers the committed set, reproduces, and holds no material failure: ~~nothing owed but the conferral of version seven’s six new oracles (package P F3)~~ ~~⭐ GREEN, its oracles conferred (REG-D-126, B7)~~ ~~⭐ B8a: nothing owed but the sponsor’s confirmation of the restated bridge cases (REG-D-127)~~ ⭐ GREEN, the restatement confirmed (REG-D-129)', async () => {
 		const dir = gitRepo();
 		writeFileSync(
 			join(dir, 'runs.ndjson'),
@@ -2769,9 +2787,9 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		);
 		git(dir, 'add', 'runs.ndjson');
 		const r = cli(['--conditions=source'], ['--records', dir]);
-		// ⭐ B8a — ~~GREEN~~: red on the confirmation alone (`ONLY_THE_CONFIRMATION`).
-		expect(r.out).toContain(ONLY_THE_CONFIRMATION);
-		expect(r.status, r.out).toBe(1);
+		// ⭐ B8a — ~~GREEN~~: red on the confirmation alone (`ONLY_THE_CONFIRMATION`). ⭐ `REG-D-129` — GREEN again.
+		expect(r.out).toContain(GREEN);
+		expect(r.status, r.out).toBe(0);
 	}, 120_000);
 
 	// ⭐ The merge of the completion programme (`E12F` F5, after `REG-D-113`) — THE CLI HANDS THE CHECK ITS ORACLE FILE'S
@@ -2785,7 +2803,10 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 	// ⭐ B8a (`REG-D-127`) — AND NOW THE CONFIRMATION: the committed version nine awaits the sponsor's confirmation of its restated
 	// cases, so the copy is RED on the confirmation alone; the same copy, its statement recording the confirmation, is GREEN; and
 	// made to read PROPOSED instead, it is RED on the conferral alone.
-	it('⛔ E12F F5 — the CLI reads the conferral off its oracle file: ~~the committed version seven, its six new oracles PROPOSED, nothing else owed, is RED on the conferral alone; the same file, its conferral recorded, is GREEN~~ ~~⭐ B7: the committed version eight, conferred, is GREEN; the same file made to read PROPOSED, nothing else owed, is RED on the conferral alone~~ ⭐ B8a: the committed version nine, its restatement unconfirmed, nothing else owed, is RED on the confirmation alone; the same file, the confirmation recorded, is GREEN; made to read PROPOSED, RED on the conferral alone', async () => {
+	// ⭐ The code record of `REG-D-129` — AND BACK AGAIN: the committed version nine records the sponsor's confirmation, so the copy
+	// is GREEN; the same copy, its statement still carrying the marker, is RED on the confirmation alone; and made to read
+	// PROPOSED instead, it is RED on the conferral alone.
+	it('⛔ E12F F5 — the CLI reads the conferral off its oracle file: ~~the committed version seven, its six new oracles PROPOSED, nothing else owed, is RED on the conferral alone; the same file, its conferral recorded, is GREEN~~ ~~⭐ B7: the committed version eight, conferred, is GREEN; the same file made to read PROPOSED, nothing else owed, is RED on the conferral alone~~ ~~⭐ B8a: the committed version nine, its restatement unconfirmed, nothing else owed, is RED on the confirmation alone; the same file, the confirmation recorded, is GREEN; made to read PROPOSED, RED on the conferral alone~~ ⭐ REG-D-129: the committed version nine, its restatement confirmed, is GREEN; the same file still carrying the marker, nothing else owed, is RED on the confirmation alone; made to read PROPOSED, RED on the conferral alone', async () => {
 		const dir = gitRepo();
 		writeFileSync(
 			join(dir, 'runs.ndjson'),
@@ -2818,17 +2839,19 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		};
 		const committed = await run();
 		// ⭐ B8a — ~~'arrangement: the committed oracles, copied, are GREEN'~~: red on the confirmation alone.
-		expect(committed.out, 'the committed oracles, copied: the confirmation owed').toContain(ONLY_THE_CONFIRMATION);
-		expect(committed.code, committed.out).toBe(1);
+		// ⭐ `REG-D-129` — ~~'the committed oracles, copied: the confirmation owed'~~: GREEN, the confirmation recorded.
+		expect(committed.out, 'arrangement: the committed oracles, copied, are GREEN').toContain(GREEN);
+		expect(committed.code, committed.out).toBe(0);
 		const current = join(root, CURRENT_ORACLES_FILE);
 		const set = JSON.parse(readFileSync(current, 'utf8')) as OracleSet;
 		expect(set.conferral, 'arrangement: the committed oracles, copied, are conferred').not.toContain(DECLARED_ORACLES_PROPOSED);
-		expect(set.conferral, 'arrangement: and await the confirmation').toContain(ORACLES_RESTATEMENT_UNCONFIRMED);
-		const confirmedStatement = set.conferral.replace(ORACLES_RESTATEMENT_UNCONFIRMED, 'confirmed by the sponsor as restated (a fixture)');
-		writeFileSync(current, JSON.stringify({ ...set, conferral: confirmedStatement }));
-		const confirmed = await run();
-		expect(confirmed.out, 'the confirmation recorded: GREEN').toContain(GREEN);
-		expect(confirmed.code, confirmed.out).toBe(0);
+		// ⭐ `REG-D-129` — ~~'arrangement: and await the confirmation'~~: confirmed, so the marker this case needs is written here.
+		expect(set.conferral, 'arrangement: and confirmed').not.toContain(ORACLES_RESTATEMENT_UNCONFIRMED);
+		const unconfirmedStatement = `${set.conferral} A fixture: the 19 part cases cut from the restated bridge cases are ${ORACLES_RESTATEMENT_UNCONFIRMED}.`;
+		writeFileSync(current, JSON.stringify({ ...set, conferral: unconfirmedStatement }));
+		const unconfirmed = await run();
+		expect(unconfirmed.out, 'the CLI read no marker off its oracle file').toContain(ONLY_THE_CONFIRMATION);
+		expect(unconfirmed.code, unconfirmed.out).toBe(1);
 		writeFileSync(current, JSON.stringify({ ...set, conferral: `A fixture: version nine’s part oracles are ${DECLARED_ORACLES_PROPOSED}.` }));
 		const proposed = await run();
 		expect(proposed.out, 'the CLI handed the check no conferral').toContain(ONLY_THE_CONFERRAL);
@@ -2874,8 +2897,9 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		const open = cli(['--conditions=source'], ['--records', dir, '--register', register]);
 		// ⭐ Package P F3 — ~~GREEN, its oracles conferred (REG-D-113)~~: nothing owed but the conferral of the six new oracles.
 		// ⭐ B7 — GREEN again, version eight's oracles conferred (`REG-D-126`). ⭐ B8a — ~~GREEN~~: the confirmation alone owed.
-		expect(open.out, 'CONTROL: the same finding, open — nothing owed but the confirmation').toContain(ONLY_THE_CONFIRMATION);
-		expect(open.status, open.out).toBe(1);
+		// ⭐ `REG-D-129` — GREEN again, the restatement confirmed.
+		expect(open.out, 'CONTROL: the same finding, open — GREEN').toContain(GREEN);
+		expect(open.status, open.out).toBe(0);
 	}, 120_000);
 
 	it('⭐ J2-6 — the CLI PRINTS the attribution report, and owes nothing for a record whose only miss is attribution (REG-D-080) — ~~nothing but the conferral (package P F3)~~ ⭐ GREEN (B7)', async () => {
@@ -2900,11 +2924,12 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 				'    W-RR-04#1 — REJECTED, the right verdict; RR-04 not faulted (it faulted RR-02)',
 				// ⭐ `REG-D-113` — GREEN again: ~~red on the conferral alone (`E12F` F5)~~.
 				// ⭐ Package P F3 — ~~GREEN~~: red on the conferral alone again (`ONLY_THE_CONFERRAL`). ⭐ B7 — GREEN again.
-				// ⭐ B8a — ~~GREEN~~: red on the confirmation alone (`ONLY_THE_CONFIRMATION`).
-				ONLY_THE_CONFIRMATION
+				// ⭐ B8a — ~~GREEN~~: red on the confirmation alone (`ONLY_THE_CONFIRMATION`). ⭐ `REG-D-129` — GREEN again.
+				GREEN_HEAD
 			].join('\n')
 		);
-		expect(r.status, r.out).toBe(1);
+		expect(r.out).toContain(GREEN);
+		expect(r.status, r.out).toBe(0);
 	}, 120_000);
 
 	it('⭐ J2-6 — the CLI counts a run’s planted evaluations outside today’s set OUT ALOUD, by every oracle version on file (REG-D-080)', async () => {
@@ -2926,11 +2951,12 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 				'  run qr-cli-6: the planted criterion named in 41 of 41 answered planted evaluation(s), against today’s oracles',
 				// ⭐ `REG-D-113` — GREEN again: ~~red on the conferral alone (`E12F` F5)~~.
 				// ⭐ Package P F3 — ~~GREEN~~: red on the conferral alone again (`ONLY_THE_CONFERRAL`). ⭐ B7 — GREEN again.
-				// ⭐ B8a — ~~GREEN~~: red on the confirmation alone (`ONLY_THE_CONFIRMATION`).
-				ONLY_THE_CONFIRMATION
+				// ⭐ B8a — ~~GREEN~~: red on the confirmation alone (`ONLY_THE_CONFIRMATION`). ⭐ `REG-D-129` — GREEN again.
+				GREEN_HEAD
 			].join('\n')
 		);
-		expect(r.status, r.out).toBe(1);
+		expect(r.out).toContain(GREEN);
+		expect(r.status, r.out).toBe(0);
 	}, 120_000);
 
 	it('⭐ SR-4 — the CLI names the SELECTION in force in its header and holds coverage to it: ~~nothing but the conferral owed (package P F3)~~ ⭐ GREEN (B7) on the selected candidate’s run, coverage owed for a candidate never run, naming all 76 cases (REG-D-086)', async () => {
@@ -2944,9 +2970,9 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		);
 		// ⭐ `REG-D-113` — GREEN again: ~~nothing owed but the conferral (`E12F` F5)~~.
 		// ⭐ Package P F3 — ~~GREEN~~: nothing owed but the conferral of the six new oracles. ⭐ B7 — GREEN again.
-		// ⭐ B8a — ~~GREEN~~: nothing owed but the confirmation.
-		expect(r.out).toContain(ONLY_THE_CONFIRMATION);
-		expect(r.status, r.out).toBe(1);
+		// ⭐ B8a — ~~GREEN~~: nothing owed but the confirmation. ⭐ `REG-D-129` — GREEN again.
+		expect(r.out).toContain(GREEN);
+		expect(r.status, r.out).toBe(0);
 		appendFileSync(join(dir, 'runs.ndjson'), serializeLine(select({ transport: 'devin', modelLabel: 'a-model-never-run' })));
 		git(dir, 'add', 'runs.ndjson');
 		const red = cli(['--conditions=source'], ['--records', dir]);
@@ -2987,8 +3013,8 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		);
 		// ⭐ `REG-D-113` — GREEN again: ~~nothing owed but the conferral (`E12F` F5)~~.
 		// ⭐ Package P F3 — ~~GREEN~~: nothing owed but the conferral of the six new oracles. ⭐ B7 — GREEN again.
-		// ⭐ B8a — ~~GREEN~~: nothing owed but the confirmation.
-		expect(control.out).toContain(ONLY_THE_CONFIRMATION);
-		expect(control.status, control.out).toBe(1);
+		// ⭐ B8a — ~~GREEN~~: nothing owed but the confirmation. ⭐ `REG-D-129` — GREEN again.
+		expect(control.out).toContain(GREEN);
+		expect(control.status, control.out).toBe(0);
 	}, 120_000);
 });

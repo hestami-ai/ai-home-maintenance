@@ -232,7 +232,8 @@ export const ORACLES_V9_FILE = 'docs/tracking/reviewer-qualification/oracles/ora
  * ⭐⭐ Version nine since `JAN-EXEC` Phase 7, the review in parts, B8a (`REG-D-127`; design D3a and §5): version eight's 41
  * non-part cases under their ids, byte for byte, and its 35 part cases under their ids, their oracles unchanged, each cut with the
  * seeded policy library (D3a) — the 19 bridge part cases from their sources restated as production stores a type it defines,
- * a purpose for each, awaiting the sponsor's confirmation of the restatement (`ORACLES_RESTATEMENT_UNCONFIRMED`). ⚠ The 35 are
+ * a purpose for each, ~~awaiting the sponsor's confirmation of the restatement (`ORACLES_RESTATEMENT_UNCONFIRMED`)~~ ⭐ confirmed
+ * by the sponsor as restated (`REG-D-129`), and version nine's record says so (`oracles-v9.ts`). ⚠ The 35 are
  * new prompts, so the check owes a RUN of the selected reviewer over them; the 41 keep their prompts, and RESCORED lines may
  * discharge them.
  */
@@ -253,7 +254,8 @@ export const ORACLES_PROPOSED = 'PROPOSED, AWAITING SPONSOR CONFERRAL';
  * cases whose verdicts the sponsor conferred, their inputs restated since, which the sponsor is to confirm before measurement.
  * Written by the version that restates them (`oracles-v9.ts`), and READ BY `reviewer:qual:check`, which refuses a current set
  * carrying them (`RESTATEMENT_NOT_CONFIRMED`) — saying that the restatement's confirmation is owed, never that the verdicts were
- * not conferred. ⚠ A version that records the confirmation does not carry them.
+ * not conferred. ⚠ A version that records the confirmation does not carry them. ⭐ `oracles-v9.ts` carried them until its
+ * record of the sponsor's confirmation (`REG-D-129`).
  */
 export const ORACLES_RESTATEMENT_UNCONFIRMED = 'RESTATED, AWAITING SPONSOR CONFIRMATION OF THE RESTATEMENT';
 

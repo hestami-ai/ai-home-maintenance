@@ -4,17 +4,24 @@
 // VERSION EIGHT'S 76 ORACLES, UNCHANGED. Version nine carries every case of version eight under its id (`case-set-v9.ts`): its 41
 // non-part cases byte for byte, and its 35 part cases each cut with the seeded policy library, so every expected verdict,
 // faulted criterion, catcher assignment and standing is version eight's (`REG-D-126`), each written out there.
-// ⛔ AND 19 OF THEM AWAIT THE SPONSOR'S CONFIRMATION OF THEIR RESTATEMENT (`REG-D-127` Q33b: "the bridge cases restated as
+// ~~⛔ AND 19 OF THEM AWAIT THE SPONSOR'S CONFIRMATION OF THEIR RESTATEMENT (`REG-D-127` Q33b: "the bridge cases restated as
 // production stores them, their expected verdicts unchanged and shown to you to confirm"): the part cases cut from the bridge
 // cases, whose sources are restated with a purpose for each type. Their verdicts stand conferred; what is owed is the sponsor's
 // confirmation of the restated cases, before measurement. Until it is recorded here, `conferral` carries
 // `ORACLES_RESTATEMENT_UNCONFIRMED` and names the 19, and `reviewer:qual:check` refuses the current set
-// (`RESTATEMENT_NOT_CONFIRMED`), so no run over them can turn it green. The other 57 are conferred as version eight records.
+// (`RESTATEMENT_NOT_CONFIRMED`), so no run over them can turn it green. The other 57 are conferred as version eight records.~~
+// ⭐ CONFIRMED (`REG-D-129`): the 19 part cases cut from the bridge cases, whose sources are restated with a purpose for each
+// type (`REG-D-127` Q33b). Asked *"Do you confirm the restated bridge cases as shown (each type given a purpose as production
+// stores it, each planted twin differing only where its defect is), with their expected verdicts unchanged, so High's
+// re-measurement on them counts?"*, the sponsor chose *"Confirm as restated (Recommended)"*. So `conferral` names the 19
+// confirmed as restated and carries `ORACLES_RESTATEMENT_UNCONFIRMED` no more, and the check holds a run to them as it holds
+// one to the other 57, conferred as version eight records. Every expected verdict, faulted criterion, catcher assignment and
+// standing is as `REG-D-126` conferred it; the confirmation changes none of them.
 // Correcting an oracle is a new oracle VERSION, never an edit, and moves no case digest.
 // Generated into `docs/tracking/reviewer-qualification/oracles/` by `generate.ts`; the JSON is never hand-edited.
 import { BRIDGE_GRAPHS_V9 } from './case-set-v9.js';
 import { CASE_SET_V8 } from './case-set-v8.js';
-import { ORACLES_RESTATEMENT_UNCONFIRMED, type OracleSet, type PwaTypeCase } from './cases.js';
+import type { OracleSet, PwaTypeCase } from './cases.js';
 import { ORACLES_V8 } from './oracles-v8.js';
 
 /** ⭐ The 19 part cases cut from a restated bridge source, in the case set's order. */
@@ -43,9 +50,12 @@ export const ORACLES_V9: OracleSet = {
 		'and applicable policies in each part; the bridge cases restated as production stores them, their expected verdicts ' +
 		'unchanged and shown to you to confirm; then re-measure the 35 part cases (about 72 calls) and run P6. About 855 of 900 ' +
 		"at the end; I'll raise the limit question again if P6 needs more.” " +
-		`The ${RESTATED_PART_CASES.length} part cases cut from the restated bridge cases — ${RESTATED_PART_CASES.join(', ')} — are ` +
-		`${ORACLES_RESTATEMENT_UNCONFIRMED}: their expected verdicts stand as the sponsor conferred them (REG-D-126 Q30), and ` +
-		'the sponsor’s confirmation of their restatement is owed before measurement. The other ' +
+		`The ${RESTATED_PART_CASES.length} part cases cut from the restated bridge cases — ${RESTATED_PART_CASES.join(', ')} — were ` +
+		'confirmed by the sponsor as restated (REG-D-129, Q34: asked “Do you confirm the restated bridge cases as shown (each ' +
+		'type given a purpose as production stores it, each planted twin differing only where its defect is), with their ' +
+		"expected verdicts unchanged, so High's re-measurement on them counts?”, the sponsor chose “Confirm as restated " +
+		'(Recommended)”): their expected verdicts, faulted criteria, catchers and standings stand as the sponsor conferred them ' +
+		'(REG-D-126 Q30), and the confirmation changes none of them. The other ' +
 		`${CASE_SET_V8.cases.length - RESTATED_PART_CASES.length} — the 41 non-part cases and the 16 part cases of G7-CLEAN, its ` +
 		'planted twins and the 3-level pair — are conferred, as recorded above.',
 	oracles: ORACLES_V8.oracles

@@ -17,8 +17,9 @@
 //     G3-CLEAN's purpose while it is still true of it, and a type its plant gives other work, in the twin's graph and its
 //     account alike, says that work as the twin's account states it (`RESTATED_PLANTS_V9`).
 // ⛔ THE 35 PART CASES KEEP THEIR IDS, THEIR ORDER AND THEIR ORACLES: every expected verdict, faulted criterion, catcher and
-// standing is version eight's (`REG-D-126`). The restated bridge cases await the sponsor's confirmation of their restatement
-// before measurement (`oracles-v9.ts`). Their prompts are new, and owe a RUN.
+// standing is version eight's (`REG-D-126`). ~~The restated bridge cases await the sponsor's confirmation of their restatement
+// before measurement (`oracles-v9.ts`).~~ ⭐ The sponsor confirmed the restated bridge cases (`REG-D-129`), recorded in
+// `oracles-v9.ts`. Their prompts are new, and owe a RUN.
 // ⛔ A CASE IS DATA: the library and every purpose below are literals, and no runtime import reaches a package (`cases.ts`).
 // Generated into `docs/tracking/reviewer-qualification/cases/` by `generate.ts`; the JSON is never hand-edited.
 import type { AssurancePolicyView } from '@janumipwb/rph-authoring';
