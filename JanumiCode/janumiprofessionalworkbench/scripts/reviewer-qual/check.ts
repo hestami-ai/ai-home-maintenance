@@ -7,7 +7,8 @@
  * A static check that runs no model: the limbs are `check-core.ts`'s; this reads the record's top-level `*.ndjson`
  * files that git tracks, exactly as staged (`trackedRecord`), today's case set and oracles, and the register's
  * findings, computes today's reviewer fingerprint with the one function the runner stamps with (`fingerprint.ts`), and
- * re-scores through the runner's own path (`rescore.ts`).
+ * re-scores through the runner's own path (`rescore.ts`). ⭐⭐ D3c (`REG-D-132`) — it reads every committed case set beside
+ * today's, from the same directory, as it reads every oracle set: an ACKNOWLEDGED line is held to one of them.
  * Exit 0 green, 1 red, 2 refused before checking anything.
  *
  * ⛔ IT READS SOURCE (`REG-D-072` D11), decided here as the runner decided it (`REG-D-074`): under bare `bun` every
@@ -143,6 +144,13 @@ export async function main(argv: readonly string[], deps: CheckCliDeps): Promise
 	const oracleSets = readdirSync(oracleDir)
 		.filter((name) => name.endsWith('.json'))
 		.map((name) => JSON.parse(readFileSync(join(oracleDir, name), 'utf8')) as import('./cases.js').OracleSet);
+	// ⭐⭐ D3c (`REG-D-132`; `REG-F-576`) — EVERY case set version on file, beside the current one, read from the committed case
+	// directory as the current one is: an ACKNOWLEDGED line's ids are held to one of them, today's included.
+	const caseDir = join(root, dirname(cases.CURRENT_CASE_SET_FILE));
+	const caseSets = readdirSync(caseDir)
+		.filter((file) => file.endsWith('.json'))
+		.map((file) => JSON.parse(readFileSync(join(caseDir, file), 'utf8')) as import('./cases.js').CaseSet)
+		.map((s) => ({ caseSetVersion: s.caseSetVersion, caseIds: s.cases.map((c) => c.id) }));
 	const today = await fingerprint.reviewerFingerprint(caseSet.cases);
 	const register = readFileSync(args.register ?? join(root, REGISTER_FILE), 'utf8');
 	const { findings, struck } = core.registerFindings(register);
@@ -156,6 +164,7 @@ export async function main(argv: readonly string[], deps: CheckCliDeps): Promise
 		// ⭐ `E12F` F5 — the current oracles' conferral, which the check refuses while it reads PROPOSED (`REG-D-073`).
 		conferral: oracles.conferral,
 		oracleSets,
+		caseSets,
 		findings,
 		struck,
 		rulings,

@@ -80,8 +80,8 @@ const VERSIONS = {
 	oracleVersion: CURRENT_ORACLE_SET.oracleVersion
 } as const;
 // ⭐ The review in parts, B7 — case set v8 holds no graph case: ~~G3-CLEAN and W-CLEAN~~, a work product and a part, in the
-// set's order.
-const TWO = CASES.filter((c) => c.id === 'W-CLEAN' || c.id === 'G3-CLEAN.T01');
+// set's order. ⭐ D3b (8) (`REG-D-132`) — ~~G3-CLEAN.T01~~: version ten's part, G10-CLEAN.T01, under its new id.
+const TWO = CASES.filter((c) => c.id === 'W-CLEAN' || c.id === 'G10-CLEAN.T01');
 const LABEL = 'gemini-3.1-pro-high';
 const FINGERPRINT: RunFingerprint = {
 	reviewer: 'a'.repeat(64),
@@ -177,6 +177,8 @@ describe('JAN-CRITREAD J2-2 — the product transports (REG-D-072 D12)', () => {
 		const transport = await loadTransport({ transport: 'agy', modelLabel: LABEL }, process.env, {
 			agyExec: capturing(spawned)
 		});
+		// ⭐ D3b (8) — arrangement: a case renamed in the current set must not shrink the fixture in silence.
+		expect(TWO.map((c) => c.id), 'arrangement: the two cases, both in the current set').toEqual(['W-CLEAN', 'G10-CLEAN.T01']);
 		const lines = await runQualification({
 			runId: 'qr-agy-1',
 			date: '2026-09-24T12:00:00.000Z',
@@ -957,7 +959,7 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 	it('⭐ the SERVER’s date changes mid-run: the CLI stops part-way (exit 4) — the first day’s lines stay and validate, and no call follows', async () => {
 		cleanEnv();
 		// identify's show is the first; each call's show the next. W-CLEAN is served at 03:59 GMT — 2026-09-23 on the
-		// server's UTC−4 — and G3-CLEAN.T01 at 04:00:30, the server's next day.
+		// server's UTC−4 — and G10-CLEAN.T01 (⭐ D3b (8): ~~G3-CLEAN.T01~~) at 04:00:30, the server's next day.
 		const clocks = ['Thu, 24 Sep 2026 03:58:00 GMT', 'Thu, 24 Sep 2026 03:59:00 GMT', 'Thu, 24 Sep 2026 04:00:30 GMT'];
 		const s = await ollamaStandIn('answer', { clock: (n) => clocks[Math.min(Math.max(n, 1), clocks.length) - 1]! });
 		try {
@@ -974,7 +976,7 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 					'--out',
 					out,
 					'--cases',
-					'W-CLEAN,G3-CLEAN.T01,G3-RR-04.T05',
+					'W-CLEAN,G10-CLEAN.T01,G10-RR-04.T05',
 					'--repetitions',
 					'1'
 				],
@@ -1057,7 +1059,7 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 				'--out',
 				out,
 				'--cases',
-				'W-CLEAN,G3-CLEAN.T01',
+				'W-CLEAN,G10-CLEAN.T01',
 				'--repetitions',
 				'1'
 			],
@@ -1187,7 +1189,7 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 			'--repetitions',
 			'1',
 			'--cases',
-			'W-CLEAN,G3-CLEAN.T01'
+			'W-CLEAN,G10-CLEAN.T01'
 		];
 		expect(await main(args, deps), written.join('')).toBe(0);
 		const text = readFileSync(out, 'utf8');
@@ -1199,7 +1201,7 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 		expect(lines.map((l) => `${l.kind}${l.caseId ? ` ${l.caseId}` : ''}`)).toEqual([
 			'RUN',
 			'CALL W-CLEAN',
-			'CALL G3-CLEAN.T01'
+			'CALL G10-CLEAN.T01'
 		]);
 		expect(spawned).toHaveLength(2);
 

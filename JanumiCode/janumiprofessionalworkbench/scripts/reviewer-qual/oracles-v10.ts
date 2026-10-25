@@ -1,10 +1,10 @@
 // ⭐⭐ `JAN-EXEC` Phase 7, the review in parts, B8b — THE ORACLES FOR CASE SET VERSION TEN, VERSIONED SEPARATELY FROM IT
-// (`REG-D-130`, `REG-D-131`, `REG-D-126`; DESIGN-authoring-review-in-parts.md D3b and §5, case set v10; DESIGN-what-the-tests-
-// prove.md §5.2, §5.4).
+// (`REG-D-130`, `REG-D-131`, ⭐ `REG-D-132`, `REG-D-126`; DESIGN-authoring-review-in-parts.md D3b, ⭐ D3b (8), and §5, case set
+// v10; DESIGN-what-the-tests-prove.md §5.2, §5.4).
 //
-// VERSION NINE'S 76 ORACLES, UNCHANGED. Version ten carries every case of version nine under its id (`case-set-v10.ts`): its 41
-// non-part cases and its 16 software part cases byte for byte, and its 19 bridge part cases cut from their sources restated by
-// D3b — who does the work, the practice's six kind-scoped policies declared, the check's attestation, four purposes and two
+// VERSION NINE'S 76 ORACLES, UNCHANGED. Version ten carries every case of version nine ~~under its id~~ (`case-set-v10.ts`): its
+// 41 non-part cases and its 16 software part cases byte for byte, and its 19 bridge part cases cut from their sources restated
+// by D3b — who does the work, the practice's six kind-scoped policies declared, the check's attestation, four purposes and two
 // hand-offs — so every expected verdict, faulted criterion, catcher assignment and standing is version nine's, as `REG-D-126`
 // conferred it (`REG-D-129`), each written out in version eight's.
 // ⭐ CONFIRMED (`REG-D-131` Q36): the 19 part cases cut from the bridge cases restated by D3b. Asked *"Do you confirm the
@@ -14,24 +14,66 @@
 // one to the other 57, conferred as version nine records. Their standings stand as `REG-D-126` conferred them — the clean
 // parts' carried from their source PWA oracles, each catcher's the lead's designation — and the confirmation changes none of
 // them: it confirms the restatement, never an oracle.
+// ⭐ D3b (8) (`REG-D-132` Q38b) — AND UNDER THEIR NEW IDS: the 19 changed, so they take new ids (`case-set-v10.ts`), and each
+// oracle of version nine's for one of them is carried to its new id (`carriedToItsNewId`) — its verdict, faulted criteria and
+// standing unchanged, and so the catcher assignment it records — its note naming its source by the source's new id, as version
+// nine's source restated by D3b. The 57 others' are version nine's, byte for byte. `conferral` records the confirmation under
+// the new ids, and the ruling that gave them, in the sponsor's words.
 // Correcting an oracle is a new oracle VERSION, never an edit, and moves no case digest.
 // Generated into `docs/tracking/reviewer-qualification/oracles/` by `generate.ts`; the JSON is never hand-edited.
-import { BRIDGE_GRAPHS_V10 } from './case-set-v10.js';
+import { BRIDGE_GRAPHS_V10, CASE_SET_V10 } from './case-set-v10.js';
 import { CASE_SET_V9 } from './case-set-v9.js';
-import type { OracleSet, PwaTypeCase } from './cases.js';
+import type { Oracle, OracleSet, PwaTypeCase } from './cases.js';
 import { ORACLES_V9 } from './oracles-v9.js';
 
-/** ⭐ The 19 part cases cut from a bridge source restated by D3b, in the case set's order. */
+/** ⭐ The 19 part cases cut from a bridge source restated by D3b, in the case set's order — ⭐ under their new ids (D3b (8)). */
 const BRIDGE_SOURCES: ReadonlySet<string> = new Set(BRIDGE_GRAPHS_V10.map((c) => c.id));
-const RESTATED_PART_CASES: readonly string[] = CASE_SET_V9.cases
-	.filter((c): c is PwaTypeCase => c.arm === 'PWA_TYPE' && BRIDGE_SOURCES.has(c.sourceCaseId))
+const partsOf = (cases: readonly { readonly arm: string }[]): PwaTypeCase[] =>
+	cases.filter((c): c is PwaTypeCase => c.arm === 'PWA_TYPE');
+const RESTATED_PART_CASES: readonly string[] = partsOf(CASE_SET_V10.cases)
+	.filter((c) => BRIDGE_SOURCES.has(c.sourceCaseId))
 	.map((c) => c.id);
+
+/**
+ * ⭐ D3b (8) — EACH OF THE 19, BY ITS VERSION-NINE ID: its new id and its source's, both ids of the source. Read off the two case
+ * sets, whose part cases are in one order (`case-set-v10.ts` carries version nine's, each in its place): a part case whose id
+ * moved is one of the 19.
+ */
+const PARTS_V10 = partsOf(CASE_SET_V10.cases);
+const RENAMED: ReadonlyMap<string, { readonly id: string; readonly source: string; readonly v9Source: string }> = new Map(
+	partsOf(CASE_SET_V9.cases).flatMap((nine, i) => {
+		const ten = PARTS_V10[i];
+		return ten === undefined || nine.id === ten.id
+			? []
+			: [[nine.id, { id: ten.id, source: ten.sourceCaseId, v9Source: nine.sourceCaseId }] as const];
+	})
+);
+
+/**
+ * ⭐ D3b (8) — a version-nine oracle as version ten holds it: one of the 57's, byte for byte; one of the 19's under its case's new
+ * id, its verdict, faulted criteria and standing unchanged, and its note naming its source by the source's new id, then saying
+ * what that source is and whose oracle this is.
+ */
+function carriedToItsNewId(o: Oracle): Oracle {
+	const to = RENAMED.get(o.caseId);
+	if (to === undefined) return o;
+	return {
+		caseId: to.id,
+		faulted: o.faulted,
+		disposition: o.disposition,
+		expectation: o.expectation,
+		note:
+			`${o.note.split(to.v9Source).join(to.source)} ${to.source} is version nine’s ${to.v9Source}, restated by D3b under a new ` +
+			`id (REG-D-132; design D3b (8)), and this oracle is version nine’s for ${o.caseId}, carried unchanged.`
+	};
+}
 
 export const ORACLES_V10: OracleSet = {
 	note:
 		'GENERATED by `bun run scripts/reviewer-qual/generate.ts` from scripts/reviewer-qual/oracles-v10.ts — never ' +
 		'hand-edited. Oracles for reviewer-qualification case set version ten (JAN-EXEC Phase 7, the review in parts, B8b; ' +
-		'REG-D-130, REG-D-131): version nine’s oracles for its 76 cases, unchanged, each case carried under its id. `faulted` ' +
+		'REG-D-130, REG-D-131, REG-D-132): version nine’s oracles for its 76 cases, unchanged — the 57 cases’ under their ids, ' +
+		'and the 19 bridge part cases’ each under its case’s new id. `faulted` ' +
 		'lists the criteria a case REQUIRES faulted; an empty list on a clean case means any fault fails clean acceptance. A ' +
 		'part case’s `disposition` is its own Reasoning Review disposition; for a declared case, the declared policy’s verdict ' +
 		'as the sign-off computes it (dispositionFromFindings over the policy’s own criteria); the pass bar is that disposition ' +
@@ -53,7 +95,17 @@ export const ORACLES_V10: OracleSet = {
 		'content (its prompts must match the checked prototype hash for hash), then the 19 bridge parts are measured: about 40 ' +
 		'calls.”): their expected verdicts, faulted criteria, catcher assignments and standings stand as REG-D-126 conferred ' +
 		'them, and the confirmation changes none of them. The other ' +
-		`${CASE_SET_V9.cases.length - RESTATED_PART_CASES.length} — the 41 non-part cases and the 16 part cases of G7-CLEAN, its ` +
-		'planted twins and the 3-level pair — are conferred, as recorded above.',
-	oracles: ORACLES_V9.oracles
+		`${CASE_SET_V10.cases.length - RESTATED_PART_CASES.length} — the 41 non-part cases and the 16 part cases of G7-CLEAN, its ` +
+		'planted twins and the 3-level pair — are conferred, as recorded above. ' +
+		`Package I built the 19 under version nine’s ids — ${[...RENAMED.keys()].join(', ')}, in that order — and the sponsor ` +
+		'ruled that they take new ids, their content unchanged (REG-D-132, Q38b: asked “Fix it at the root: new ids for the 19 ' +
+		'bridge cases (content unchanged), and the check judging each old acknowledgement line against its own case set rather ' +
+		"than today's?”, the sponsor chose “New ids + fix the check (Recommended)”, whose text read “Follows the repo's rule " +
+		'and fixes a check flaw that would block every future case correction. A design note, a check change with tests, your ' +
+		'confirmation re-recorded under the new ids; then about 40 calls (683 to about 723; P6 then about 895 of about ' +
+		'1,000).”): each is version nine’s case under its old id, restated by D3b and cut from its source under the source’s ' +
+		'new id (design D3b (8)), and REG-D-131’s confirmation is recorded under the new ids. Each of their oracles is version ' +
+		'nine’s for the old id, carried with its verdict, faulted criteria, catcher assignment and standing unchanged; the ' +
+		'ruling changes none of them.',
+	oracles: ORACLES_V9.oracles.map(carriedToItsNewId)
 };

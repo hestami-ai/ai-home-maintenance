@@ -253,8 +253,9 @@ describe('JAN-EXEC Phase 7, the review in parts, B8a — reviewer-qualification 
 	});
 });
 
-// ⭐⭐ `JAN-EXEC` Phase 7, the review in parts, B8b — version ten (`REG-D-130`, `REG-D-131`): version nine's 76 cases under their
-// ids, the 19 bridge part cases cut from their sources restated by D3b with the bridge library, their oracles version nine's.
+// ⭐⭐ `JAN-EXEC` Phase 7, the review in parts, B8b — version ten (`REG-D-130`, `REG-D-131`, ⭐ `REG-D-132`): version nine's 76
+// cases ~~under their ids~~, the 19 bridge part cases cut from their sources restated by D3b with the bridge library ⭐ and
+// under new ids (D3b (8)), the 57 others under theirs, their oracles version nine's.
 describe('JAN-EXEC Phase 7, the review in parts, B8b — reviewer-qualification case set v10: version nine’s 76 cases, the bridge part cases restated by D3b (REG-D-130, REG-D-131)', () => {
 	it('⛔ the committed case set v10 and oracles v10 are exactly what the generator writes — never hand-edited', () => {
 		const cases = read(CASE_SET_V10_FILE);

@@ -81,6 +81,7 @@ import { DECLARED_ORACLES_PROPOSED } from '../scripts/reviewer-qual/oracles-v5.j
 import { reviewerFingerprintOf, sha256 } from '../scripts/reviewer-qual/digest.js';
 import { reviewerFingerprint, type ReviewerFingerprint } from '../scripts/reviewer-qual/fingerprint.js';
 import {
+	RECORD_DIR,
 	SCORED_DISPOSITIONS,
 	serializeLine,
 	type CallLine,
@@ -175,6 +176,22 @@ const ORACLE_SETS: readonly OracleSet[] = [
 	V9_ORACLES,
 	CURRENT_ORACLES
 ];
+/**
+ * ⭐⭐ D3c (`REG-D-132`; `REG-F-576`) — EVERY CASE SET VERSION ON FILE, today's among them, as the CLI hands them to the check:
+ * each one's version and its cases' ids. An ACKNOWLEDGED line's `addedCaseIds` must all be held by one of them.
+ */
+const CASE_SETS: CheckInputs['caseSets'] = [
+	{ caseSetVersion: 1, cases: CASES },
+	{ caseSetVersion: 2, cases: V2_CASES },
+	V3_SET,
+	V4_SET,
+	V5_SET,
+	V6_SET,
+	V7_SET,
+	V8_SET,
+	V9_SET,
+	CURRENT_SET
+].map((s) => ({ caseSetVersion: s.caseSetVersion, caseIds: s.cases.map((c) => c.id) }));
 /** Every oracle any set holds: a case id two hold carries the same standing in each (the cases test holds that). */
 const ORACLE = new Map(
 	[
@@ -376,6 +393,8 @@ const check = (
 		cases: SUBSET,
 		oracles: ORACLES,
 		oracleSets: ORACLE_SETS,
+		// ⭐⭐ D3c — every committed case set, as the CLI reads them, unless said.
+		caseSets: CASE_SETS,
 		// ⭐ `E12F` F5 — the conferral of the oracles the check holds the record to: version one's, conferred, unless said.
 		conferral: V1_CONFERRAL,
 		findings: FINDINGS,
@@ -1230,11 +1249,107 @@ describe('JAN-CRITREAD J2-3 — the cross-file references REG-D-074 left to J2-3
 						{ kind: 'ACKNOWLEDGED', date: '2026-09-25T09:00:00.000Z', reviewerFingerprint: FP.reviewer, addedCaseIds: ['G-NEW'] }
 					])
 				],
-				'ACKNOWLEDGED adds G-NEW, which today’s case set does not hold'
+				// ⭐⭐ D3c (`REG-D-132`) — ~~'ACKNOWLEDGED adds G-NEW, which today’s case set does not hold'~~: held to every
+				// committed case set, today's included, and refused still, as no committed version holds it.
+				'ACKNOWLEDGED adds G-NEW, which no committed case set holds — today’s or any earlier version’s'
 			],
 			['a record file that is not a record', [file(run), { name: 'broken.ndjson', text: '{"kind":"NOTE"}\n' }], 'broken.ndjson: line 1: kind "NOTE" is not one of']
 		];
 		for (const [label, files, message] of cases) expect(limb(await check(files), 'RECORD'), label).toContain(message);
+	});
+});
+
+// ── ⭐⭐ D3c, an ACKNOWLEDGED line judged against its own case set (`REG-D-132`; `REG-F-576`; DESIGN-authoring-review-in-parts.md
+// D3c) ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+// An ACKNOWLEDGED line carries a date, a reviewer fingerprint and `addedCaseIds` or a reason, and no case set (`record.ts`). The
+// check held its ids to TODAY's case set, whatever set it was written under — so renaming or retiring a case once acknowledged
+// became a RECORD problem for ever: D3b (8)'s renaming of the 19 bridge part cases reads the record's lines 1013 and 1182, which
+// acknowledge version eight's and nine's 35 part cases, as 38 of them. D3c: ONE committed case set — some version's committed
+// JSON, today's included — must hold the line's whole list; an id no committed version holds is refused still; and ids collected
+// across versions, none holding them all, are no one case set.
+const D3C_UNHELD = (at: string, id: string) =>
+	`${at}: ACKNOWLEDGED adds ${id}, which no committed case set holds — today’s or any earlier version’s`;
+/** The 19 bridge part cases under version nine's ids, which D3b (8) renamed: in version nine's order, no case of today's set. */
+const D3C_RENAMED = (): string[] =>
+	V9_CASES.filter((c) => c.arm === 'PWA_TYPE' && !CURRENT_CASES.some((now) => now.id === c.id)).map((c) => c.id);
+describe('⭐⭐ D3c (REG-D-132; REG-F-576) — an ACKNOWLEDGED line is judged against its own case set: one committed case set, today’s included, must hold all its addedCaseIds; an id none holds is refused still', () => {
+	const RENAMED = D3C_RENAMED;
+	/** The committed record's first 1182 lines — history, which an append-only record never moves (§5.4). */
+	const HISTORY_TO = 1182;
+	const history = () => {
+		const rows = readFileSync(`${REPO}/${RECORD_DIR}/runs.ndjson`, 'utf8').split('\n');
+		return { name: 'runs.ndjson', text: `${rows.slice(0, HISTORY_TO).join('\n')}\n` };
+	};
+	/** An ACKNOWLEDGED line adding `ids`. */
+	const ack = (ids: readonly string[]): RecordLine => ({
+		kind: 'ACKNOWLEDGED',
+		date: '2026-10-25T09:00:00.000Z',
+		reviewerFingerprint: FP.reviewer,
+		addedCaseIds: [...ids]
+	});
+	/** The versions whose committed case set holds `id`. */
+	const holders = (id: string): number[] => CASE_SETS.filter((s) => s.caseIds.includes(id)).map((s) => s.caseSetVersion);
+
+	it('⛔ RED FIRST — the committed history to line 1182, under version ten, the 19 renamed: lines 1013 and 1182 acknowledge version eight’s and version nine’s 35 part cases, 19 of each no case of today’s set, and each list is held whole by one committed case set, so the check finds NO RECORD problem in the history, where it found 38. CONTROL: handed today’s set alone, it reads each of the 38 as an id no committed case set holds', async () => {
+		const h = history();
+		const rows = h.text
+			.slice(0, -1)
+			.split('\n')
+			.map((r) => JSON.parse(r) as RecordLine);
+		expect(rows, 'arrangement: the history’s lines').toHaveLength(HISTORY_TO);
+		const acks = rows.flatMap((l, n) => (l.kind === 'ACKNOWLEDGED' && l.addedCaseIds !== undefined ? [[n + 1, l.addedCaseIds] as const] : []));
+		expect(acks.map(([n]) => n), 'arrangement: the ACKNOWLEDGED lines that name cases (REG-F-576)').toEqual([1013, 1182]);
+		const parts = (set: readonly QualificationCase[]) => set.filter((c) => c.arm === 'PWA_TYPE').map((c) => c.id);
+		expect(acks.map(([, ids]) => ids), 'arrangement: version eight’s 35 part cases, then version nine’s').toEqual([parts(V8_CASES), parts(V9_CASES)]);
+		expect(RENAMED(), 'arrangement: the 19 renamed, as G3-CLEAN.T01 to G3-RR-09.T01').toHaveLength(19);
+		expect(
+			acks.map(([, ids]) => ids.filter((id) => !CURRENT_CASES.some((c) => c.id === id))),
+			'arrangement: of each, the 19 today’s set no longer holds'
+		).toEqual([RENAMED(), RENAMED()]);
+		// Version nine carried version eight's 35 part cases under their ids (`REG-D-127`), so each of the two committed sets holds
+		// each line's list whole — and version ten neither.
+		expect(acks.map(([, ids]) => [8, 9, 10].map((v) => ids.every((id) => holders(id).includes(v)))), 'arrangement: versions eight and nine each hold both lines’ lists whole; version ten neither').toEqual([
+			[true, true, false],
+			[true, true, false]
+		]);
+		const register = readFileSync(`${REPO}/${REGISTER_FILE}`, 'utf8');
+		const { findings, struck } = registerFindings(register);
+		const { rulings, struck: struckRulings } = registerRulings(register);
+		const onHistory = (caseSets: CheckInputs['caseSets']) =>
+			check([h], {
+				current: FP_NOW,
+				cases: CURRENT_CASES,
+				oracles: CURRENT_ORACLES.oracles,
+				conferral: CURRENT_ORACLES.conferral,
+				caseSets,
+				findings,
+				struck,
+				rulings,
+				struckRulings
+			});
+		expect(limb(await onHistory(CASE_SETS), 'RECORD'), 'no RECORD problem in the history: each line’s ids are one committed case set’s').toBe('');
+		// ⭑ CONTROL — handed today's set alone (no other committed set), the 38 are read as before D3c, each now saying no
+		// committed case set holds it: it is the committed sets the CLI hands in that clear them.
+		expect(limb(await onHistory([]), 'RECORD'), 'CONTROL: today’s set alone').toBe(
+			[1013, 1182].flatMap((n) => RENAMED().map((id) => D3C_UNHELD(`runs.ndjson:${n}`, id))).join('\n')
+		);
+	}, 120_000);
+
+	it('⭑ CONTROL — a line naming an id no committed version holds is refused still, the message saying so; an id today’s set holds beside it is not', async () => {
+		const run = await recorded({ runId: 'qr-d3c-unheld' });
+		expect(holders('G-NEW'), 'arrangement: no committed version holds G-NEW').toEqual([]);
+		expect(holders('G-CLEAN'), 'arrangement: today’s set — the fixture’s — holds G-CLEAN').toContain(1);
+		expect(limb(await check([file([...run, ack(['G-CLEAN', 'G-NEW'])])]), 'RECORD')).toBe(D3C_UNHELD(`runs.ndjson:${run.length + 1}`, 'G-NEW'));
+	});
+
+	it('⭑ CONTROL — a line whose ids are split across two versions, no one version holding them all, is refused: ids collected across versions are no one case set; each alone is accepted', async () => {
+		const run = await recorded({ runId: 'qr-d3c-split' });
+		expect([holders('G3-CLEAN.T01'), holders('G10-CLEAN.T01')], 'arrangement: versions eight and nine hold the one, version ten alone the other').toEqual([[8, 9], [10]]);
+		expect(limb(await check([file([...run, ack(['G3-CLEAN.T01', 'G10-CLEAN.T01'])])]), 'RECORD')).toBe(
+			`runs.ndjson:${run.length + 1}: ACKNOWLEDGED adds G3-CLEAN.T01, G10-CLEAN.T01, which no one committed case set holds together — each is held by some version, none by one alone, and an acknowledgement names one case set’s cases (design D3c)`
+		);
+		for (const id of ['G3-CLEAN.T01', 'G10-CLEAN.T01'])
+			expect(limb(await check([file([...run, ack([id])])]), 'RECORD'), `${id} alone: one version holds it`).toBe('');
 	});
 });
 
@@ -2075,20 +2190,51 @@ describe('⭐⭐ the review in parts, B8a — under case set v9 and the fingerpr
 
 // ── ⭐⭐ `JAN-EXEC` Phase 7, the review in parts, B8b (`REG-D-130`, `REG-D-131`; DESIGN-authoring-review-in-parts.md D3b and §5) ─
 // Version ten is current, and D3b moved NO fingerprint: the reviewer, its probes, budget, criteria and scoring are version
-// nine's, and only the 19 bridge part cases' inputs moved — under their ids (`cases.ts`). So the record's shape — the selected
-// candidate's run of version eight under the fingerprint before D3a, re-stamped for the 41 carried cases, and its run of
-// version nine's 35 part cases under TODAY'S fingerprint, two repetitions, every case answered as its oracle expects (the
-// committed record's shape since 14c141af) — owes coverage of exactly the 19; and limb 2, which compares every record carrying
-// today's fingerprint with today's prompts, reads version nine's part run as a NON-REPRODUCTION of each of the 19 in each
-// repetition: the prompt it recorded is not the one today's reviewer sends, though the fingerprint did not move.
-// ⛔ A RUN OVER THE 19 DOES NOT DISCHARGE THAT: only a SUPERSEDED line citing a register finding does, and it strikes the WHOLE
-// run, so the 16 software part cases it alone covered are owed again — a run over all 35, not the 19. Pinned as it stands
+// nine's, and only the 19 bridge part cases' inputs moved — ~~under their ids (`cases.ts`)~~ ⭐ under NEW ids (D3b (8),
+// `REG-D-132`; `REG-F-575`). So the record's shape — the selected candidate's run of version eight under the fingerprint before
+// D3a, re-stamped for the 41 carried cases, and its run of version nine's 35 part cases under TODAY'S fingerprint, two
+// repetitions, every case answered as its oracle expects (the committed record's shape since 14c141af) — owes coverage of
+// exactly the 19 ⭐ under their new ids; ~~and limb 2, which compares every record carrying today's fingerprint with today's
+// prompts, reads version nine's part run as a NON-REPRODUCTION of each of the 19 in each repetition: the prompt it recorded is
+// not the one today's reviewer sends, though the fingerprint did not move.~~ ⭐ and limb 2, which compares every record carrying
+// today's fingerprint with today's prompts for each case STILL IN THE SET, finds version nine's part run reproducing: its 16
+// software part cases send today's prompts, and its 19 bridge ones are under ids today's set no longer holds.
+// ~~⛔ A RUN OVER THE 19 DOES NOT DISCHARGE THAT: only a SUPERSEDED line citing a register finding does, and it strikes the
+// WHOLE run, so the 16 software part cases it alone covered are owed again — a run over all 35, not the 19. Pinned as it stands
 // (package I's check, finding 1): how limb 2 is discharged for version ten, and at what spend, is the lead's to settle; a
-// change to the check or the record changes these cases with it.
-describe('⭐⭐ the review in parts, B8b — under case set v10 and an UNMOVED fingerprint, v9’s record shape owes coverage of exactly the 19 bridge part cases, and limb 2 reads v9’s part run as a non-reproduction of each of them, which a run over the 19 does not discharge; a SUPERSEDED line strikes the whole run and owes the 16 software part cases again (REG-D-130, REG-D-131, REG-D-086)', () => {
+// change to the check or the record changes these cases with it.~~ ⭐ SETTLED BY `REG-D-132`: a run over the 19 under their new
+// ids discharges what is owed, and no SUPERSEDED line is — one striking version nine's part run is refused, the run
+// reproducing, under version ten as under version nine (its CONTROL). PREDICTED in the ruling ("V9's run records no current id
+// whose prompt moved, so the REPRODUCTION problem clears"), and measured here over the record's shape.
+describe('⭐⭐ the review in parts, B8b — under case set v10 and an UNMOVED fingerprint, v9’s record shape owes coverage of exactly the 19 bridge part cases ⭐ under their new ids (REG-D-132), ~~and limb 2 reads v9’s part run as a non-reproduction of each of them, which a run over the 19 does not discharge; a SUPERSEDED line strikes the whole run and owes the 16 software part cases again~~ ⭐ and limb 2 finds v9’s part run reproducing: a run over the 19 turns it GREEN, and a SUPERSEDED line striking v9’s run is refused (REG-D-130, REG-D-131, REG-D-086)', () => {
 	const GLM: SelectedCandidate = { transport: 'devin', modelLabel: 'glm-5-3-flash-max' };
-	/** The 19 D3b restated, as `reviewer:qual:check` names them on the committed record, in the set's order. */
+	/**
+	 * The 19 D3b restated, as `reviewer:qual:check` names them on the committed record, in the set's order — ⭐ D3b (8): under
+	 * their new ids, ~~'G3-CLEAN.T01' … 'G3-RR-09.T01'~~ (`BRIDGE_V9`) as G10-CLEAN.T01 … G10-RR-09.T01.
+	 */
 	const BRIDGE = [
+		'G10-CLEAN.T01',
+		'G10-CLEAN.T02',
+		'G10-CLEAN.T03',
+		'G10-CLEAN.T04',
+		'G10-CLEAN.T05',
+		'G10-CLEAN.T06',
+		'G10-CLEAN.T07',
+		'G10-CLEAN-R1.T01',
+		'G10-CLEAN-R2.T01',
+		'G10-CLEAN-R3.T01',
+		'G10-RR-01.T01',
+		'G10-RR-02.T01',
+		'G10-RR-03.T04',
+		'G10-RR-04.T05',
+		'G10-RR-05.T01',
+		'G10-RR-06.T05',
+		'G10-RR-07.T06',
+		'G10-RR-08.T05',
+		'G10-RR-09.T01'
+	];
+	/** ⭐ D3b (8) — the 19 under version nine's ids, as version nine's part run records them, in its order. */
+	const BRIDGE_V9 = [
 		'G3-CLEAN.T01',
 		'G3-CLEAN.T02',
 		'G3-CLEAN.T03',
@@ -2177,18 +2323,14 @@ describe('⭐⭐ the review in parts, B8b — under case set v10 and an UNMOVED 
 		who === 'any'
 			? `${ids.length} of 76 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer}: ${ids.join(', ')} — owed: a RUN over them, or RESCORED lines where no case prompt changed (§5.6 limb 1)`
 			: `${ids.length} of 76 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer} by the SELECTED candidate devin / glm-5-3-flash-max (REG-D-084; the SELECTION in force, runs.ndjson:${lines.length}): ${ids.join(', ')} — owed: a run of the selected candidate over them, or RESCORED lines of its runs where no case prompt changed (§5.6 limb 1; REG-D-086)`;
-	/** Limb 2's one problem for version nine's part run: each of the 19 in each repetition, then what discharges it. */
-	const V9_PARTS_DO_NOT_REPRODUCE = (): string =>
-		[
-			...[1, 2].flatMap((n) =>
-				BRIDGE.map(
-					(id) => `run qr-v9-parts: ${id}#${n} initial — the prompt it recorded is not the one today’s reviewer sends, though the fingerprint did not move`
-				)
-			),
-			'— does not reproduce: discharged only by a SUPERSEDED line citing a register finding (§5.6 limb 2)'
-		].join('\n    ');
+	// ~~Limb 2's one problem for version nine's part run: each of the 19 in each repetition, then what discharges it
+	// (`V9_PARTS_DO_NOT_REPRODUCE`)~~ ⭐ D3b (8): none — version nine's part run reproduces, its 19 bridge part cases under ids
+	// today's set does not hold.
+	/** ⭐ D3b (8) — limb 2's refusal of a SUPERSEDED line at `at` naming version nine's part run, which reproduces. */
+	const STRIKE_REFUSED = (at: number): string =>
+		`runs.ndjson:${at}: SUPERSEDED names qr-v9-parts, which reproduces — refused: a record is struck only when it really fails reproduction (§5.6 limb 2)`;
 
-	it('⛔ RED, AND EXACTLY SO — coverage of exactly the 19, by any candidate and by the selected one, and ONE reproduction problem, v9’s part run, naming each of the 19 in each repetition; nothing else — no CONFERRAL (REG-D-131 Q36), and the 57 others covered as they stand. CONTROL: under version nine the same record is GREEN', async () => {
+	it('⛔ RED, AND EXACTLY SO — coverage of exactly the 19 ⭐ under their new ids, by any candidate and by the selected one, ~~and ONE reproduction problem, v9’s part run, naming each of the 19 in each repetition~~ ⭐ and no REPRODUCTION problem (REG-D-132); nothing else — no CONFERRAL (REG-D-131 Q36), and the 57 others covered as they stand. CONTROL: under version nine the same record is GREEN', async () => {
 		expect([CURRENT_SET.caseSetVersion, CURRENT_ORACLES.oracleVersion], 'the current set is version ten').toEqual([10, 10]);
 		expect(FP_NOW.reviewer, 'arrangement: D3b moved no fingerprint').toBe(FP_V9.reviewer);
 		expect(FP_NOW.caseSet, 'arrangement: the case-set digest moved').not.toBe(FP_V9.caseSet);
@@ -2196,18 +2338,26 @@ describe('⭐⭐ the review in parts, B8b — under case set v10 and an UNMOVED 
 			(c) => c.id
 		);
 		expect(restated, 'arrangement: the 19, and only they, send prompts version nine did not').toEqual(BRIDGE);
+		// ⭐ D3b (8) — under an id version nine holds, today's set sends version nine's prompts, each of its three: nothing moved
+		// under an unmoved fingerprint, and version nine's 19 ids are no case of today's.
+		expect(
+			CURRENT_CASES.filter((c) => FP_V9.casePrompts.has(c.id) && JSON.stringify(FP_V9.casePrompts.get(c.id)) !== JSON.stringify(FP_NOW.casePrompts.get(c.id))).map((c) => c.id),
+			'arrangement: a case that moved under an id version nine holds'
+		).toEqual([]);
+		expect(CURRENT_CASES.filter((c) => BRIDGE_V9.includes(c.id)), 'arrangement: version nine’s 19 ids, no case of today’s set').toEqual([]);
+		expect(V9_CASES.filter((c) => c.arm === 'PWA_TYPE').map((c) => c.id).slice(0, 19), 'arrangement: version nine’s 19, as its run records them').toEqual(BRIDGE_V9);
 		expect(SOFTWARE().length, 'the software part cases').toBe(16);
 		const v8 = await v8Run();
 		const lines = [...v8, ...(await restamped(v8)), ...(await v9Parts()), select(GLM)];
 		expect((await onVersionNine([file(lines)])).problems, 'CONTROL: the record as it stood under version nine').toEqual([]);
 		expect((await onVersionTen([file(lines)])).problems).toEqual([
 			{ limb: 'COVERAGE', message: owed('any', BRIDGE, lines) },
-			{ limb: 'COVERAGE', message: owed('selected', BRIDGE, lines) },
-			{ limb: 'REPRODUCTION', message: V9_PARTS_DO_NOT_REPRODUCE() }
+			{ limb: 'COVERAGE', message: owed('selected', BRIDGE, lines) }
+			// ~~{ limb: 'REPRODUCTION', message: V9_PARTS_DO_NOT_REPRODUCE() }~~ ⭐ D3b (8): none.
 		]);
 	});
 
-	it('⛔ A RUN OVER THE 19 DOES NOT TURN IT GREEN — the selected candidate’s run of the 19 under today’s fingerprint, each as its oracle expects, discharges their coverage, and v9’s part run still does not reproduce: that problem alone, unchanged', async () => {
+	it('⭐ ~~⛔ A RUN OVER THE 19 DOES NOT TURN IT GREEN~~ ⭐ A RUN OVER THE 19 TURNS IT GREEN (REG-D-132) — the selected candidate’s run of the 19 ⭐ under their new ids, under today’s fingerprint, each as its oracle expects, discharges their coverage, and v9’s part run ~~still does not reproduce: that problem alone, unchanged~~ ⭐ reproduces: nothing owed. CONTROL: without the run, the 19’s coverage alone', async () => {
 		const v8 = await v8Run();
 		const lines = [
 			...v8,
@@ -2216,10 +2366,14 @@ describe('⭐⭐ the review in parts, B8b — under case set v10 and an UNMOVED 
 			...(await v10Run('qr-v10-bridge', BRIDGE, '2026-10-25T10:00:00.000Z')),
 			select(GLM)
 		];
-		expect((await onVersionTen([file(lines)])).problems).toEqual([{ limb: 'REPRODUCTION', message: V9_PARTS_DO_NOT_REPRODUCE() }]);
+		// ~~[{ limb: 'REPRODUCTION', message: V9_PARTS_DO_NOT_REPRODUCE() }]~~ ⭐ D3b (8): GREEN.
+		expect((await onVersionTen([file(lines)])).problems, 'the 19 run under their new ids: nothing owed').toEqual([]);
+		const v8Again = await v8Run();
+		const without = [...v8Again, ...(await restamped(v8Again)), ...(await v9Parts()), select(GLM)];
+		expect((await onVersionTen([file(without)])).problems.map((p) => p.limb), 'CONTROL: without the run, the 19’s coverage alone').toEqual(['COVERAGE', 'COVERAGE']);
 	});
 
-	it('⭐ A SUPERSEDED LINE STRIKES THE WHOLE RUN — citing a register finding, it discharges the reproduction problem, and the 16 software part cases v9’s part run alone covered are owed again, by any candidate and by the selected one; a run over them too is GREEN. CONTROL: under version nine the same line is refused, the run reproducing there', async () => {
+	it('⭐ ~~A SUPERSEDED LINE STRIKES THE WHOLE RUN — citing a register finding, it discharges the reproduction problem, and the 16 software part cases v9’s part run alone covered are owed again, by any candidate and by the selected one; a run over them too is GREEN.~~ ⭐ A SUPERSEDED LINE IS NOT OWED, AND REFUSED (REG-D-132) — v9’s part run reproduces under version ten, so a line striking it, citing a register finding, is refused, and the coverage it gives the 16 software part cases stands. CONTROL: under version nine the same line is refused, the run reproducing there', async () => {
 		const v8 = await v8Run();
 		const before = [
 			...v8,
@@ -2228,15 +2382,18 @@ describe('⭐⭐ the review in parts, B8b — under case set v10 and an UNMOVED 
 			...(await v10Run('qr-v10-bridge', BRIDGE, '2026-10-25T10:00:00.000Z'))
 		];
 		const struck = [...before, strikeV9Parts, select(GLM)];
-		expect((await onVersionTen([file(struck)])).problems).toEqual([
-			{ limb: 'COVERAGE', message: owed('any', SOFTWARE(), struck) },
-			{ limb: 'COVERAGE', message: owed('selected', SOFTWARE(), struck) }
-		]);
+		// ~~the 16 software part cases owed again, by any candidate and by the selected one~~ ⭐ D3b (8): the line refused, the
+		// run unstruck, the 16 covered by it still.
+		expect((await onVersionTen([file(struck)])).problems).toEqual([{ limb: 'REPRODUCTION', message: STRIKE_REFUSED(struck.length - 1) }]);
 		const all35 = [...before, strikeV9Parts, ...(await v10Run('qr-v10-software', SOFTWARE(), '2026-10-25T14:00:00.000Z')), select(GLM)];
-		expect((await onVersionTen([file(all35)])).problems, 'the 35 run under version ten: nothing owed').toEqual([]);
+		// ~~'the 35 run under version ten: nothing owed'~~ ⭐ D3b (8): a run over the 16 besides changes nothing — the line is
+		// refused still, as the run it names reproduces.
+		expect((await onVersionTen([file(all35)])).problems, 'the 35 run under version ten: the refusal alone').toEqual([
+			{ limb: 'REPRODUCTION', message: STRIKE_REFUSED(before.length + 1) }
+		]);
 		const underNine = [...v8, ...(await restamped(v8)), ...(await v9Parts()), strikeV9Parts, select(GLM)];
 		expect(limb(await onVersionNine([file(underNine)]), 'REPRODUCTION'), 'CONTROL: under version nine it reproduces').toBe(
-			`runs.ndjson:${underNine.length - 1}: SUPERSEDED names qr-v9-parts, which reproduces — refused: a record is struck only when it really fails reproduction (§5.6 limb 2)`
+			STRIKE_REFUSED(underNine.length - 1)
 		);
 	});
 });
@@ -3046,6 +3203,59 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		expect(proposed.code, proposed.out).toBe(1);
 	}, 120_000);
 
+	// ⭐⭐ D3c (`REG-D-132`; `REG-F-576`) — THE CLI HANDS THE CHECK EVERY COMMITTED CASE SET, read off the case directory as it reads
+	// today's: so an ACKNOWLEDGED line naming version nine's part cases, 19 of which version ten renamed, is held whole by version
+	// nine's committed set. Run on a disposable root, as the conferral case above runs `main`, its case directory holding version
+	// ten and version nine; then the same root without version nine's file.
+	it('⭐⭐ D3c — the CLI reads every committed case set off its case directory: on a root holding versions ten and nine, an ACKNOWLEDGED line naming version nine’s 35 part cases is held, GREEN; the same root without version nine’s file is RED on the 19 renamed alone, each an id no committed case set holds', async () => {
+		const dir = gitRepo();
+		const lines: RecordLine[] = [
+			...(await recorded({ runId: 'qr-cli-d3c', cases: CURRENT_CASES, versions: { caseSet: 10, oracles: 10 } })),
+			{
+				kind: 'ACKNOWLEDGED',
+				date: '2026-10-25T09:00:00.000Z',
+				reviewerFingerprint: FP.reviewer,
+				addedCaseIds: V9_CASES.filter((c) => c.arm === 'PWA_TYPE').map((c) => c.id)
+			}
+		];
+		writeFileSync(join(dir, 'runs.ndjson'), text(lines));
+		git(dir, 'add', 'runs.ndjson');
+		const root = tmp();
+		const oracleDir = dirname(CURRENT_ORACLES_FILE);
+		mkdirSync(join(root, dirname(CURRENT_CASE_SET_FILE)), { recursive: true });
+		mkdirSync(join(root, oracleDir), { recursive: true });
+		for (const f of [CURRENT_CASE_SET_FILE, CASE_SET_V9_FILE]) copyFileSync(join(REPO, f), join(root, f));
+		for (const name of readdirSync(join(REPO, oracleDir))) copyFileSync(join(REPO, oracleDir, name), join(root, oracleDir, name));
+		const register = join(tmp(), 'register.md');
+		writeFileSync(register, readFileSync(join(REPO, REGISTER_FILE), 'utf8'));
+		const run = async () => {
+			let out = '';
+			vi.stubEnv('PATH', hermeticEnv().PATH!);
+			try {
+				const code = await main(['--records', dir, '--register', register], {
+					resolve: () => join(REPO, 'packages/rph-assurance/src/index.ts'),
+					write: (s) => void (out += s),
+					root: pathToFileURL(`${root}/`)
+				});
+				return { code, out };
+			} finally {
+				vi.stubEnv('PATH', NO_PROGRAMS);
+			}
+		};
+		expect(D3C_RENAMED(), 'arrangement: 19 of version nine’s part cases are no case of version ten').toHaveLength(19);
+		const both = await run();
+		expect(both.out, 'versions ten and nine on file: the line is held whole by version nine’s').toContain(GREEN);
+		expect(both.code, both.out).toBe(0);
+		rmSync(join(root, CASE_SET_V9_FILE));
+		const tenAlone = await run();
+		expect(tenAlone.out, 'version ten alone on file: the 19 renamed, and nothing else').toContain(
+			`reviewer:qual:check — RED — 19 problem(s):\n${D3C_RENAMED()
+				.map((id) => `  [RECORD] ${D3C_UNHELD(`runs.ndjson:${lines.length}`, id)}\n`)
+				.join('')}`
+		);
+		expect(tenAlone.code, tenAlone.out).toBe(1);
+	}, 120_000);
+
 	it('⛔ a record file git does not track, or one changed since it was staged, is NOT READ — green here is green on the commit', async () => {
 		const lines = await recorded({ runId: 'qr-cli-2', cases: CURRENT_CASES, versions: { caseSet: 10, oracles: 10 } });
 		const untracked = gitRepo();
@@ -3058,7 +3268,8 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		const changed = gitRepo();
 		writeFileSync(join(changed, 'runs.ndjson'), text(lines));
 		git(changed, 'add', 'runs.ndjson');
-		appendFileSync(join(changed, 'runs.ndjson'), serializeLine(escalate('qr-cli-2', ['G3-CLEAN.T01'])));
+		// ⭐ D3b (8) — ~~'G3-CLEAN.T01'~~: a case of version ten's, under its new id.
+		appendFileSync(join(changed, 'runs.ndjson'), serializeLine(escalate('qr-cli-2', ['G10-CLEAN.T01'])));
 		const c = cli(['--conditions=source'], ['--records', changed]);
 		expect(c.status, c.out).toBe(1);
 		expect(c.out).toContain('runs.ndjson: not read — it differs from what git has staged');
@@ -3066,21 +3277,22 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 
 	it('⛔ an ESCALATION citing a finding the register STRIKES clears nothing, end to end — and one it holds open does', async () => {
 		const dir = gitRepo();
-		// ⭐ B7 — ~~G3-RR-04~~: its catcher part, G3-RR-04.T05, version eight's case for its plant.
+		// ⭐ B7 — ~~G3-RR-04~~: its catcher part, G3-RR-04.T05, version eight's case for its plant. ⭐ D3b (8) — ~~G3-RR-04.T05~~:
+		// version ten's, G10-RR-04.T05, under its new id.
 		const missed = await recorded({
 			runId: 'qr-cli-3',
 			cases: CURRENT_CASES,
 			versions: { caseSet: 10, oracles: 10 },
-			reply: (id) => (id === 'G3-RR-04.T05' ? judgement([]) : asOracle(id))
+			reply: (id) => (id === 'G10-RR-04.T05' ? judgement([]) : asOracle(id))
 		});
-		writeFileSync(join(dir, 'runs.ndjson'), text([...missed, escalate('qr-cli-3', ['G3-RR-04.T05'], 'REG-F-105')]));
+		writeFileSync(join(dir, 'runs.ndjson'), text([...missed, escalate('qr-cli-3', ['G10-RR-04.T05'], 'REG-F-105')]));
 		git(dir, 'add', 'runs.ndjson');
 		const register = join(tmp(), 'register.md');
 		writeFileSync(register, '### ~~REG-F-105~~ — RULED\n');
 		const r = cli(['--conditions=source'], ['--records', dir, '--register', register]);
 		expect(r.status, r.out).toBe(1);
 		expect(r.out).toContain('ESCALATION cites REG-F-105, whose register heading is struck');
-		expect(r.out).toContain('run qr-cli-3: G3-RR-04.T05 — PLANTED_DEFECT_NOT_REJECTED');
+		expect(r.out).toContain('run qr-cli-3: G10-RR-04.T05 — PLANTED_DEFECT_NOT_REJECTED');
 		writeFileSync(register, '### REG-F-105 — open, for the control\n');
 		const open = cli(['--conditions=source'], ['--records', dir, '--register', register]);
 		// ⭐ Package P F3 — ~~GREEN, its oracles conferred (REG-D-113)~~: nothing owed but the conferral of the six new oracles.

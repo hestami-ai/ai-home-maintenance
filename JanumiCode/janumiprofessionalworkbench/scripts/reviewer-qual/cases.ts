@@ -102,12 +102,19 @@ interface CaseCommon {
 	 *  version three's `G3-…`, `case-set-v3.ts`). ⚠ But version nine (`REG-D-127`) carries version eight's 35 part cases
 	 *  under their ids with their inputs moved — each cut with the seeded policy library, the 19 bridge ones from restated
 	 *  sources — their oracles unchanged: a measurement counts for a case only where its recorded prompt is today's
-	 *  (`check-core.ts` limb 1), so no record of version eight's covers them. ⭐ So does version ten (`REG-D-130`) with
+	 *  (`check-core.ts` limb 1), so no record of version eight's covers them. ⭐ ~~So does version ten (`REG-D-130`) with
 	 *  version nine's 19 bridge part cases, cut from their sources restated by D3b, under their ids, their oracles
 	 *  unchanged: no record of version nine's covers them. ⚠ (Package I's check, finding 1.) And unlike version nine's,
 	 *  UNDER AN UNMOVED FINGERPRINT: version nine's record of them carries today's, so limb 2 reads each as a prompt that
 	 *  moved while the fingerprint did not — a non-reproduction a re-run does not discharge (`check-core.ts`; the check
-	 *  test's B8b describe pins it, and its J2-5, J2-7 and round-5 CONTROLS say why a changed case otherwise gets a new id). */
+	 *  test's B8b describe pins it, and its J2-5, J2-7 and round-5 CONTROLS say why a changed case otherwise gets a new id).~~
+	 *  ⭐ Version ten (`REG-D-130`, ⭐ `REG-D-132`) keeps the rule: version nine's 19 bridge part cases, cut from their sources
+	 *  restated by D3b, take NEW ids — each source `G10-…`, each part case its source's (D3b (8)) — their content byte for
+	 *  byte and their oracles carried. Kept under their ids beside an unmoved fingerprint, as package I first built them,
+	 *  version nine's record of them carried today's fingerprint, and limb 2 read each as a prompt that moved while the
+	 *  fingerprint did not — a non-reproduction a re-run does not discharge (`REG-F-575`; the check test's J2-5, J2-7 and
+	 *  round-5 CONTROLS say why a changed case gets a new id). An id once acknowledged and since renamed stays held by the
+	 *  committed case set that holds it (`check-core.ts`, D3c). */
 	readonly id: string;
 	/** The subject the floor composes over — its id, version and the producer independence is checked against. */
 	readonly subject: AssuranceSubject;
@@ -207,8 +214,8 @@ export const ORACLES_V8_FILE = 'docs/tracking/reviewer-qualification/oracles/ora
  *  history. */
 export const CASE_SET_V9_FILE = 'docs/tracking/reviewer-qualification/cases/case-set-v9.json';
 export const ORACLES_V9_FILE = 'docs/tracking/reviewer-qualification/oracles/oracles-v9.json';
-/** ⭐ `JAN-EXEC` Phase 7, the review in parts, B8b — version ten (`REG-D-130`, `REG-D-131`), beside versions one to nine, which
- *  stay as history. */
+/** ⭐ `JAN-EXEC` Phase 7, the review in parts, B8b — version ten (`REG-D-130`, `REG-D-131`, ⭐ `REG-D-132`), beside versions one
+ *  to nine, which stay as history. */
 export const CASE_SET_V10_FILE = 'docs/tracking/reviewer-qualification/cases/case-set-v10.json';
 export const ORACLES_V10_FILE = 'docs/tracking/reviewer-qualification/oracles/oracles-v10.json';
 
@@ -259,8 +266,14 @@ export const ORACLES_V10_FILE = 'docs/tracking/reviewer-qualification/oracles/or
  * the selected reviewer over them (limb 1), AND reads version nine's run of the 35 part cases, which carries today's
  * fingerprint, as a non-reproduction of each of the 19 in each repetition (limb 2) — which a RUN does not discharge, only a
  * SUPERSEDED line citing a register finding, striking that whole run and the coverage of the 16 software part cases with it.
- * The 57 keep their prompts and stay covered as the record stands: nothing is owed for them. How limb 2 is discharged for
- * version ten is the lead's to settle (the check test's B8b describe pins what the check says meanwhile).
+ * The 57 keep their prompts and stay covered as the record stands: nothing is owed for them. ~~How limb 2 is discharged for
+ * version ten is the lead's to settle (the check test's B8b describe pins what the check says meanwhile).~~
+ * ⭐ D3b (8) (`REG-D-132`; `REG-F-575`) — SETTLED: THE 19 TAKE NEW IDS, their content byte for byte — `G3-CLEAN.T03` as
+ * `G10-CLEAN.T03` — their oracles carried and the confirmation recorded under them (`oracles-v10.ts`). So the check owes a
+ * RUN of the selected reviewer over the 19 alone (limb 1); version nine's part run reproduces (limb 2), recording no current
+ * id whose prompt moved; the 57 keep their prompts and stay covered as the record stands; and the record's ACKNOWLEDGED lines
+ * naming version nine's ids are held by the committed case sets that hold them (D3c; `REG-F-576`). The case set stays version
+ * ten: no record measured it.
  */
 export const CURRENT_CASE_SET_FILE = CASE_SET_V10_FILE;
 export const CURRENT_ORACLES_FILE = ORACLES_V10_FILE;

@@ -41,7 +41,8 @@
 // And the cross-file references `REG-D-074` left here: a run id is declared once across the record; a RESCORED line's
 // source evaluation, an ESCALATION's run and cases, a SUPERSEDED line's record, an ACKNOWLEDGED line's cases all exist;
 // every cited finding is an entry of the register, and every SELECTION's ruling. Two runs of one candidate on one date
-// are ordered by the record.
+// are ordered by the record. ⭐⭐ D3c (`REG-D-132`; `REG-F-576`) — an ACKNOWLEDGED line's cases ~~exist in today's case set~~
+// are all held by ONE committed case set, today's included (`acknowledgedRefs`): a line keeps the cases it was written over.
 //
 // ⚠ PURE: records, today's fingerprint, the cases, the oracles and the register's findings are handed in, and the one
 // operation that needs the product — re-scoring — is a function handed in (`rescore.ts` in the CLI). It reads no file.
@@ -49,10 +50,12 @@
 // is the same case. A case edited in place under its id reads here as a non-reproduction — which it is. ⚠ Version nine's 35
 // part cases are the exception `cases.ts` states: carried under their ids with their inputs moved (`REG-D-127`), so a
 // record of version eight's, under its earlier fingerprint, covers none of them — their prompts are not today's.
-// ⚠ ⭐ B8b (`REG-D-130`; package I's check, finding 1) — version ten carries version nine's 19 bridge part cases so too, but
-// under an UNMOVED fingerprint: version nine's run of them carries today's, so limb 2 reads each as a non-reproduction —
-// which, by this file's rule, it is — discharged only by a SUPERSEDED line, which strikes the whole run. The check test's B8b
-// describe pins it; how it is discharged is the lead's to settle.
+// ⚠ ⭐ B8b (`REG-D-130`; package I's check, finding 1) — version ten ~~carries~~ carried version nine's 19 bridge part cases so
+// too, but under an UNMOVED fingerprint: version nine's run of them carries today's, so limb 2 read each as a non-reproduction —
+// which, by this file's rule, it was — discharged only by a SUPERSEDED line, which strikes the whole run. ~~The check test's
+// B8b describe pins it; how it is discharged is the lead's to settle.~~ ⭐ Settled by `REG-D-132` (D3b (8); `REG-F-575`): the 19
+// take new ids, their content unchanged, so version nine's run records no current id whose prompt moved, and this rule holds
+// again with no exception for version ten. The check test's B8b describe pins the new state.
 import {
 	ORACLES_PROPOSED,
 	ORACLES_RESTATEMENT_UNCONFIRMED,
@@ -82,6 +85,12 @@ import {
 	type SelectionLine,
 	type SupersededLine
 } from './record.js';
+
+/** ⭐⭐ D3c (`REG-D-132`) — one committed case set, as the check reads it: its version and its cases' ids, in its order. */
+export interface CommittedCaseSet {
+	readonly caseSetVersion: number;
+	readonly caseIds: readonly string[];
+}
 
 /** Today's reviewer, as `fingerprint.ts` computes it. */
 export interface CurrentReviewer {
@@ -118,6 +127,14 @@ export interface CheckInputs {
 	 * counts those evaluations out aloud instead of shrinking in silence (`REG-D-080`).
 	 */
 	readonly oracleSets: readonly OracleSet[];
+	/**
+	 * ⭐⭐ D3c (`REG-D-132`; `REG-F-576`) — EVERY CASE SET VERSION ON FILE, today's among them, as the CLI reads them from the
+	 * committed case directory: each one's version and its cases' ids. An ACKNOWLEDGED line carries no case set (`record.ts`), so
+	 * its `addedCaseIds` are held to these — all of them to ONE — and to today's set (`cases`), which counts as one of them
+	 * whether it is listed here or not. Required, so a caller cannot leave the question unasked: handed none, the check holds a
+	 * line to today's set alone, as it did before D3c.
+	 */
+	readonly caseSets: readonly CommittedCaseSet[];
 	/** The register findings that have an entry (`### REG-F-NNN`, struck or not — `registerFindings`). */
 	readonly findings: ReadonlySet<string>;
 	/** ⭐ Those among them whose heading is STRUCK (`### ~~REG-F-NNN~~`) — closed. A struck finding escalates nothing. */
@@ -421,12 +438,31 @@ function references(p: Parsed, i: CheckInputs, problems: CheckProblem[]): Rescor
 		if (!measuredBy(line.record, p, rescores))
 			refuse(`${at}: SUPERSEDED names ${line.record}, which no RUN or RESCORED line declares`);
 	}
-	const caseIds = new Set(i.cases.map((c) => c.id));
-	for (const { line, at } of p.acknowledged)
-		for (const c of line.addedCaseIds ?? [])
-			if (!caseIds.has(c)) refuse(`${at}: ACKNOWLEDGED adds ${c}, which today’s case set does not hold`);
+	acknowledgedRefs(p, i, refuse);
 	selectionRefs(p, i, refuse);
 	return rescores;
+}
+
+/**
+ * ⭐⭐ D3c (`REG-D-132`; `REG-F-576`; DESIGN-authoring-review-in-parts.md D3c) — AN ACKNOWLEDGED LINE JUDGED AGAINST ITS OWN CASE
+ * SET: one committed case set — some version's committed JSON (`caseSets`), today's included (`cases`) — must hold the line's
+ * whole `addedCaseIds` list. ~~Each id held to today's case set~~: so a case renamed or retired since it was acknowledged — the
+ * 19 bridge part cases D3b (8) renamed, on the record's lines 1013 and 1182 — left a RECORD problem no later line could
+ * discharge. ⛔ The guard against a mistyped id stays: an id no committed version holds is refused, by name. ⛔ And ids collected
+ * across versions, none holding them all, are no one case set: refused too.
+ */
+function acknowledgedRefs(p: Parsed, i: CheckInputs, refuse: Refuse): void {
+	const sets: readonly ReadonlySet<string>[] = [new Set(i.cases.map((c) => c.id)), ...i.caseSets.map((s) => new Set(s.caseIds))];
+	for (const { line, at } of p.acknowledged) {
+		const ids = line.addedCaseIds ?? [];
+		const unheld = ids.filter((c) => !sets.some((s) => s.has(c)));
+		for (const c of unheld)
+			refuse(`${at}: ACKNOWLEDGED adds ${c}, which no committed case set holds — today’s or any earlier version’s`);
+		if (unheld.length === 0 && !sets.some((s) => ids.every((c) => s.has(c))))
+			refuse(
+				`${at}: ACKNOWLEDGED adds ${ids.join(', ')}, which no one committed case set holds together — each is held by some version, none by one alone, and an acknowledgement names one case set’s cases (design D3c)`
+			);
+	}
 }
 
 /** ⭐ `JAN-SELREV` SR-4 — THE SELECTION IN FORCE: the LAST in the record, its files by name and their lines in order. */
