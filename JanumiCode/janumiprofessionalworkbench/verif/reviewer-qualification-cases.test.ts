@@ -3570,9 +3570,10 @@ describe('⭐⭐ the review in parts, B8a — reviewer-qualification case set v9
 //     first, exports exactly its literal nodes;
 //   · THE ONE RULE — for every bridge source: the request ends with the sentence; HUMAN on every INTERNAL type, no discharge on
 //     the delegated check; each type declares exactly the practice's policies its kind takes; the check's firm attests what it
-//     declares; and the purposes and hand-offs change exactly where D3b says, the plants' load scopes and G3-RR-05's permit
-//     inputs untouched;
-//   · EACH PLANTED TWIN — differs from version ten's G3-CLEAN only where its plant is (diffed); the renamed copies renamed;
+//     declares; and the purposes and hand-offs change exactly where D3b says, the plants' load scopes and ~~G3-RR-05's~~ ⭐
+//     G10-RR-05's permit inputs untouched;
+//   · EACH PLANTED TWIN — differs from version ten's ~~G3-CLEAN~~ ⭐ G10-CLEAN only where its plant is (diffed); the renamed
+//     copies renamed;
 //   · THE PROMPTS — the 57 other cases' prompts are version nine's; the 19 moved, each to the bytes of the prototype the sponsor
 //     confirmed ⭐ (the prototype's by the old id, a prompt carrying no case id); the reviewer fingerprint unmoved, the case
 //     set's digest moved;
@@ -3838,8 +3839,8 @@ function expectProductionsGraphV10(c: GraphCase): void {
 /**
  * Where version ten's restatement of a bridge source differs from version nine's, but for what the one rule's other limbs hold
  * key by key — the request, each type's discharge, its declared policies and its contract: each key of a type that differs,
- * named by the type's name in G3-CLEAN where G3-CLEAN holds its id, else by its own. ⭐ D3b (8) — `id` is the source's new id,
- * and version nine's source is the one it renames (`v9SourceOf`).
+ * named by the type's name in version nine's G3-CLEAN where it holds its id, else by its own. ⭐ D3b (8) — `id` is the source's
+ * new id, and version nine's source is the one it renames (`v9SourceOf`).
  */
 function restatedFromV9(id: string): string[] {
 	const names = new Map(bridgeV9('G3-CLEAN').input.nodes.map((n) => [n.id, n.name]));
@@ -3858,7 +3859,8 @@ function restatedFromV9(id: string): string[] {
 	}
 	return out;
 }
-/** ⭐ D3b (4) — what G3-CLEAN's restatement changes beside the rule's other limbs: four purposes and two hand-offs, written here. */
+/** ⭐ D3b (4) — what ~~G3-CLEAN's restatement~~ ⭐ the restated G10-CLEAN changes beside the rule's other limbs: four
+ *  purposes and two hand-offs, written here. */
 const G3_CLEAN_HANDOFFS_V10 = [
 	'Site and Geotechnical Survey.purpose',
 	'Structural Form Options Study.requiredOutputs',
@@ -3871,10 +3873,11 @@ const G3_CLEAN_HANDOFFS_V10 = [
 ];
 /**
  * ⭐ D3b (4) and (5) — WHAT EACH BRIDGE SOURCE'S RESTATEMENT CHANGES beside the rule's other limbs, written here, by the type's
- * name in G3-CLEAN: G3-CLEAN's four purposes and two hand-offs wherever the source holds the type, its plant's words kept —
- * G3-RR-03's and G3-RR-04's narrowed load scopes are their plants, so their load analyses gain the site survey and keep their
- * purposes; G3-RR-05 holds no options study, so no comparison is produced and its permit consumes none; G-RR-01 holds none of
- * the types. ⭐ D3b (8) — by each source's new id: ~~'G3-CLEAN'~~ 'G10-CLEAN', ~~'G-RR-01'~~ 'G10-RR-01', and so on.
+ * name in version nine's G3-CLEAN: ~~G3-CLEAN's~~ ⭐ G10-CLEAN's four purposes and two hand-offs wherever the source holds the
+ * type, its plant's words kept — ~~G3-RR-03's and G3-RR-04's~~ ⭐ G10-RR-03's and G10-RR-04's narrowed load scopes are their
+ * plants, so their load analyses gain the site survey and keep their purposes; ~~G3-RR-05~~ ⭐ G10-RR-05 holds no options study,
+ * so no comparison is produced and its permit consumes none; ~~G-RR-01~~ ⭐ G10-RR-01 holds none of the types. ⭐ D3b (8) — by
+ * each source's new id: ~~'G3-CLEAN'~~ 'G10-CLEAN', ~~'G-RR-01'~~ 'G10-RR-01', and so on.
  */
 const HANDOFFS_V10: Readonly<Record<string, readonly string[]>> = {
 	'G10-CLEAN': G3_CLEAN_HANDOFFS_V10,
@@ -3896,8 +3899,9 @@ const HANDOFFS_V10: Readonly<Record<string, readonly string[]>> = {
 	'G10-RR-08': G3_CLEAN_HANDOFFS_V10,
 	'G10-RR-09': G3_CLEAN_HANDOFFS_V10
 };
-/** ⭐ G3-CLEAN's seven types and the purpose each carries in version ten, in its order — written here, as the sponsor is shown
- *  them: version nine's, the survey's, the options study's, the load analysis's and the permit submission's changed (D3b (4)). */
+/** ⭐ ~~G3-CLEAN's~~ ⭐ G10-CLEAN's seven types and the purpose each carries in version ten, in its order — written here, as
+ *  the sponsor is shown them: version nine's, the survey's, the options study's, the load analysis's and the permit submission's
+ *  changed (D3b (4)). */
 const G3_CLEAN_PURPOSES_V10: readonly (readonly [name: string, purpose: string])[] = [
 	G3_CLEAN_PURPOSES[0]!,
 	[
@@ -3919,9 +3923,9 @@ const G3_CLEAN_PURPOSES_V10: readonly (readonly [name: string, purpose: string])
 		'Make the permit submission to the rail authority once the independent check has certified the design, with the options comparison, the geotechnical report and the design calculations.'
 	]
 ];
-/** ⭐ The planted types' purposes D3b (4) reaches, as the sponsor is shown them — written here: G3-RR-02's permit list gains the
- *  comparison in its own words; G3-RR-05's cable-stayed analysis gains the inclusive scope. ⭐ D3b (8) — each by its source's
- *  new id: ~~'G3-RR-02'~~ 'G10-RR-02', ~~'G3-RR-05'~~ 'G10-RR-05'. */
+/** ⭐ The planted types' purposes D3b (4) reaches, as the sponsor is shown them — written here: ~~G3-RR-02's~~ ⭐ G10-RR-02's
+ *  permit list gains the comparison in its own words; ~~G3-RR-05's~~ ⭐ G10-RR-05's cable-stayed analysis gains the inclusive
+ *  scope. ⭐ D3b (8) — each by its source's new id: ~~'G3-RR-02'~~ 'G10-RR-02', ~~'G3-RR-05'~~ 'G10-RR-05'. */
 const PLANTED_PURPOSES_V10: readonly (readonly [source: string, type: string, purpose: string])[] = [
 	[
 		'G10-RR-02',
@@ -3935,11 +3939,12 @@ const PLANTED_PURPOSES_V10: readonly (readonly [source: string, type: string, pu
 	]
 ];
 /**
- * ⭐ EACH TWIN'S EVERY DIFFERENCE FROM VERSION TEN'S G3-CLEAN — written here: version nine's (`TWIN_DIFFERENCES_V9`, its `+`
- * marks kept), and, after `+D3b`, what D3b adds, each where the twin's plant is: G-RR-01's concept study declares no practice
- * policy, its kind named by none; G3-RR-05's permit, with no options study before it, submits no comparison; G3-RR-07's INTERNAL
- * self-check is HUMAN, where the delegated check declares no discharge. ⭐ D3b (8) — by each twin's new id, version nine's
- * differences read by its version-nine one: ~~'G-RR-01'~~ 'G10-RR-01', ~~'G3-RR-02'~~ 'G10-RR-02', and so on.
+ * ⭐ EACH TWIN'S EVERY DIFFERENCE FROM VERSION TEN'S ~~G3-CLEAN~~ ⭐ G10-CLEAN — written here: version nine's
+ * (`TWIN_DIFFERENCES_V9`, its `+` marks kept), and, after `+D3b`, what D3b adds, each where the twin's plant is: ~~G-RR-01's~~ ⭐
+ * G10-RR-01's concept study declares no practice policy, its kind named by none; ~~G3-RR-05's~~ ⭐ G10-RR-05's permit, with no
+ * options study before it, submits no comparison; ~~G3-RR-07's~~ ⭐ G10-RR-07's INTERNAL self-check is HUMAN, where the
+ * delegated check declares no discharge. ⭐ D3b (8) — by each twin's new id, version nine's differences read by its version-nine
+ * one: ~~'G-RR-01'~~ 'G10-RR-01', ~~'G3-RR-02'~~ 'G10-RR-02', and so on.
  */
 const TWIN_DIFFERENCES_V10: Readonly<Record<string, readonly string[]>> = {
 	'G10-RR-01': [
