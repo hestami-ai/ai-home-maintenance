@@ -3357,6 +3357,33 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		expect(changed.code, changed.out).toBe(1);
 	}, 120_000);
 
+	// ⭐ The independent check of package J's check, the MINOR finding — THE THIRD REFUSAL, HELD: a case-set file git tracks but
+	// the working tree has lost had words of its own (`CASE_SET_FILES.gone`) and no case, so nothing told them from a record
+	// file's, nor the file named from the file dropped in silence (`ARP-J-M20`, `ARP-J-M21`: each SURVIVED before this case).
+	// The D3c case above drops version nine with `git rm -f`, from what a commit carries too; this one deletes it from the
+	// working tree alone.
+	it('⛔ RED FIRST — a case-set file git tracks but the working tree has LOST is not read, and is a RECORD problem naming it: version nine’s file staged, then deleted from the working tree alone, holds no line — the check reads what a commit would carry. ⭑ CONTROL: the same file restored from what git staged holds its line, GREEN', async () => {
+		const root = gitRepo();
+		const f = await d3cRoot('qr-cli-d3c-gone', root);
+		copyFileSync(join(REPO, CASE_SET_V9_FILE), join(root, CASE_SET_V9_FILE));
+		git(root, 'add', '--', CASE_SET_V9_FILE);
+		rmSync(join(root, CASE_SET_V9_FILE));
+		expect(git(root, 'status', '--porcelain', '--', CASE_SET_V9_FILE), 'arrangement: version nine’s file, staged and gone from the working tree').toBe(`AD ${CASE_SET_V9_FILE}\n`);
+		const gone = await f.run();
+		expect(gone.out, 'a case set gone from the working tree holds no line').toContain(
+			f.refused(
+				'git tracks it, but it is gone from the working tree, and the check reads what a commit would carry — restore it, or `git rm` it'
+			)
+		);
+		expect(gone.code, gone.out).toBe(1);
+		// ⭑ CONTROL — the same file, restored from what git staged: it holds its line.
+		git(root, 'checkout', '--', CASE_SET_V9_FILE);
+		expect(git(root, 'status', '--porcelain', '--', CASE_SET_V9_FILE), 'arrangement: version nine’s file, restored as staged').toBe(`A  ${CASE_SET_V9_FILE}\n`);
+		const restored = await f.run();
+		expect(restored.out, 'CONTROL: version nine’s file restored holds the line whole').toContain(GREEN);
+		expect(restored.code, restored.out).toBe(0);
+	}, 120_000);
+
 	it('⛔ RED FIRST — a case directory outside any git work tree is refused, as a record directory is: there is no committed case set to speak for', async () => {
 		const root = tmp();
 		const f = await d3cRoot('qr-cli-d3c-outside', root);
@@ -3386,6 +3413,30 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		const c = cli(['--conditions=source'], ['--records', changed]);
 		expect(c.status, c.out).toBe(1);
 		expect(c.out).toContain('runs.ndjson: not read — it differs from what git has staged');
+	}, 120_000);
+
+	// ⭐ The independent check of package J's check, the MINOR finding — AND THE RECORD'S OWN: its words for a record file git
+	// tracks but the working tree has lost — struck, never deleted (§5.4) — stood untested since J2-3, and the one reader's
+	// branch with them (`ARP-J-M22`, `ARP-J-M21`: each SURVIVED before this case and the one above).
+	it('⛔ a record file git tracks but the working tree has LOST is NOT READ, and is named: a record file is struck, never deleted (§5.4). ⭑ CONTROL: the same file restored from what git staged is read and covers today’s set, GREEN', async () => {
+		const lines = await recorded({ runId: 'qr-cli-gone', cases: CURRENT_CASES, versions: { caseSet: 10, oracles: 10 } });
+		const dir = gitRepo();
+		writeFileSync(join(dir, 'runs.ndjson'), text(lines));
+		git(dir, 'add', 'runs.ndjson');
+		rmSync(join(dir, 'runs.ndjson'));
+		expect(git(dir, 'status', '--porcelain'), 'arrangement: the record file, staged and gone from the working tree').toBe('AD runs.ndjson\n');
+		const r = cli(['--conditions=source'], ['--records', dir]);
+		expect(r.out).toContain(
+			'  [RECORD] runs.ndjson: not read — git tracks it, but it is gone from the working tree — a record file is struck, never deleted (§5.4)\n'
+		);
+		expect(r.out, 'and so it covers nothing').toContain('76 of 76 current case(s) are not MEASURED');
+		expect(r.status, r.out).toBe(1);
+		// ⭑ CONTROL — the same file, restored from what git staged: read, it covers today's set.
+		git(dir, 'checkout', '--', 'runs.ndjson');
+		expect(git(dir, 'status', '--porcelain'), 'arrangement: the record file, restored as staged').toBe('A  runs.ndjson\n');
+		const restored = cli(['--conditions=source'], ['--records', dir]);
+		expect(restored.out, 'CONTROL: the record file restored is read').toContain(GREEN);
+		expect(restored.status, restored.out).toBe(0);
 	}, 120_000);
 
 	it('⛔ an ESCALATION citing a finding the register STRIKES clears nothing, end to end — and one it holds open does', async () => {
