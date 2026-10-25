@@ -29,7 +29,7 @@
 //   · SEEN WHOLE — no slice of any case is truncated to fit, so an oracle is never about bytes the reviewer did not see.
 //   · THE ORACLES COMPOSE — a reply faulting exactly a case's oracle criteria scores to the oracle's disposition,
 //     through the real validator and `composeAssuranceOutcome` over the Reasoning Review reference alone.
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
 	composeAssuranceOutcome,
@@ -3580,6 +3580,8 @@ describe('⭐⭐ the review in parts, B8a — reviewer-qualification case set v9
 //   · THE ORACLES — version nine's, unchanged ⭐ — the 57 under their ids, the 19 carried to their new ids, each note naming its
 //     source by its new id; the conferral recording the sponsor's confirmation in the sponsor's words ⭐ under the new ids, and
 //     the ruling that gave them (`REG-D-132` Q38b), the check finding no CONFERRAL problem in it;
+//   · ⭐ NO NOTE GIVES AN ORACLE TO AN ID NO COMMITTED ORACLE SET HOLDS AS A CASE (package J's check, item 1) — a clean bridge
+//     part's source oracle is version seven's case's, by its own id, and its new source id version seven's source restated;
 //   · THE 28,000-CHARACTER LIMIT, SEEN WHOLE, THE ORACLES COMPOSE — as every case is held.
 /**
  * ⭐ D3b (8) (`REG-D-132`; design D3b (8)) — THE NEW IDS, written here as the ruling lists them: each bridge source D3b restates,
@@ -3649,6 +3651,54 @@ const v9PartOf = (v10: string): string => {
 	expect(pair, `${v10} is a bridge part case of version ten`).toBeDefined();
 	return pair![0];
 };
+/**
+ * ⭐ Package J's check, item 1 (the lead's ruling, 2026-10-25) — EVERY ORACLE A NOTE SPEAKS OF, READ OFF ITS WORDS: the case an
+ * attribution gives the oracle to, and the version it says holds it, when it says one — *"version seven’s G3-CLEAN’s oracle"*,
+ * *"this oracle is version nine’s for G3-CLEAN.T01"*, *"G7-CLEAN, whose oracle is"*. Three forms speak of an oracle and give
+ * it to no case: the source oracle a note has just attributed, the oracle a case has none of, and a record's. ⛔ Any other
+ * mention of an oracle is returned UNREAD, so a note cannot pass by speaking of one in words this reader does not know.
+ */
+const ORACLE_NAMED_ID = String.raw`[A-Z][A-Za-z0-9.-]*[A-Za-z0-9]`;
+const ORACLE_ATTRIBUTIONS: readonly RegExp[] = [
+	new RegExp(String.raw`(?:version (\w+)’s )?(${ORACLE_NAMED_ID})’s oracle\b`, 'g'),
+	new RegExp(String.raw`(?:version (\w+)’s )?(${ORACLE_NAMED_ID}), whose oracle\b`, 'g'),
+	new RegExp(String.raw`\boracle is version (\w+)’s for (${ORACLE_NAMED_ID})`, 'g')
+];
+const ORACLE_GIVEN_TO_NO_CASE: readonly RegExp[] = [/The source oracle’s standing/g, /has no oracle of its own/g, /graph oracles’/g];
+const VERSION_WORDS = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+interface OracleAttribution {
+	readonly id: string;
+	/** The version the note says holds it — absent when it names none. */
+	readonly version?: number;
+}
+function oraclesNamedIn(note: string): { readonly attributed: OracleAttribution[]; readonly unread: string[] } {
+	const attributed: OracleAttribution[] = [];
+	const spans: (readonly [number, number])[] = [];
+	for (const form of ORACLE_ATTRIBUTIONS)
+		for (const m of note.matchAll(form)) {
+			spans.push([m.index, m.index + m[0].length]);
+			const word = m[1];
+			attributed.push(word === undefined ? { id: m[2]! } : { id: m[2]!, version: VERSION_WORDS.indexOf(word) + 1 });
+		}
+	for (const form of ORACLE_GIVEN_TO_NO_CASE) for (const m of note.matchAll(form)) spans.push([m.index, m.index + m[0].length]);
+	const unread = [...note.matchAll(/\boracles?\b/g)]
+		.filter((m) => !spans.some(([from, to]) => m.index >= from && m.index < to))
+		.map((m) => note.slice(Math.max(0, m.index - 40), m.index + 20));
+	return { attributed, unread };
+}
+/** Every committed oracle set, by its version: the cases it holds an oracle for. */
+const committedOracleCases = (): ReadonlyMap<number, ReadonlySet<string>> => {
+	const dir = CURRENT_ORACLES_FILE.slice(0, CURRENT_ORACLES_FILE.lastIndexOf('/'));
+	return new Map(
+		readdirSync(`${REPO_ROOT}${dir}`)
+			.filter((name) => name.endsWith('.json'))
+			.map((name) => JSON.parse(read(`${dir}/${name}`)) as OracleSet)
+			.map((s) => [s.oracleVersion, new Set(s.oracles.map((o) => o.caseId))] as const)
+	);
+};
+/** An attribution no committed oracle set holds as a case — by the version it names, when it names one. */
+const unheldAttribution = (a: OracleAttribution, sets: ReadonlyMap<number, ReadonlySet<string>>): boolean =>
+	a.version === undefined ? ![...sets.values()].some((s) => s.has(a.id)) : sets.get(a.version)?.has(a.id) !== true;
 const currentV10 = (): CaseSet => JSON.parse(read(CURRENT_CASE_SET_FILE)) as CaseSet;
 const currentOraclesV10 = (): OracleSet => JSON.parse(read(CURRENT_ORACLES_FILE)) as OracleSet;
 const generatedV10 = (): CaseSet => JSON.parse(serializeGenerated(CASE_SET_V10)) as CaseSet;
@@ -4306,7 +4356,7 @@ describe('⭐⭐ the review in parts, B8b — reviewer-qualification case set v1
 		expect(software.applicable.map((p) => p.id).filter((p) => PRACTICE_POLICIES_V10.some(([x]) => x === p)), 'a software part: no practice policy').toEqual([]);
 	});
 
-	it('⭐ THE ORACLES — version nine’s 76, unchanged, under version ten: the 19 bridge part cases’ verdicts, faulted criteria, catchers and standings among them ⭐ — the 57 under their ids, byte for byte, and the 19 carried to their new ids (D3b (8)), each its old id’s verdict, faulted criteria and standing, its note naming its source by its new id, as version nine’s source restated by D3b', () => {
+	it('⭐ THE ORACLES — version nine’s 76, unchanged, under version ten: the 19 bridge part cases’ verdicts, faulted criteria, catchers and standings among them ⭐ — the 57 under their ids, byte for byte, and the 19 carried to their new ids (D3b (8)), each its old id’s verdict, faulted criteria and standing, its note naming its source by its new id, as ~~version nine’s source restated by D3b~~ ⭐ version seven’s source restated by version nine and by D3b, and a clean part’s source oracle given to version seven’s case by its own id (package J’s check, item 1)', () => {
 		expect([generatedOraclesV10().oracleVersion, generatedOraclesV10().caseSetVersion]).toEqual([10, 10]);
 		const v9 = (JSON.parse(read(ORACLES_V9_FILE)) as OracleSet).oracles;
 		const now = generatedOraclesV10().oracles;
@@ -4323,6 +4373,7 @@ describe('⭐⭐ the review in parts, B8b — reviewer-qualification case set v1
 		).toEqual([]);
 		// ~~the 19 bridge part cases’ oracles, version nine’s~~ ⭐ and the 19, each version nine’s for its old id, carried:
 		const nine = new Map(v9.map((o) => [o.caseId, o]));
+		let gaveTheSourceOracle = 0;
 		for (const id of bridge) {
 			const o = now.find((x) => x.caseId === id);
 			const was = nine.get(v9PartOf(id));
@@ -4331,18 +4382,101 @@ describe('⭐⭐ the review in parts, B8b — reviewer-qualification case set v1
 				[o!.disposition, o!.faulted, o!.expectation],
 				`${id}: the verdict, faulted criteria and standing of version nine’s ${was!.caseId}`
 			).toEqual([was!.disposition, was!.faulted, was!.expectation]);
-			// Its note: version nine's, its source named by its new id, then what that source is — version nine's, restated by
-			// D3b, under a new id — and whose oracle this is.
+			// Its note: version nine's, its source named by its new id ⭐ and a clean part's source oracle given to version seven's
+			// case by its own id (package J's check, item 1), then what that source is — ~~version nine's, restated by D3b~~ ⭐
+			// version seven's, restated by version nine and by D3b — under a new id — and whose oracle this is.
 			const source = id.slice(0, id.indexOf('.'));
 			const old = v9SourceOf(source);
-			const restated = ` ${source} is version nine’s ${old}, restated by D3b under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for ${was!.caseId}, carried unchanged.`;
+			// ~~const restated = ` ${source} is version nine’s ${old}, restated by D3b under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for ${was!.caseId}, carried unchanged.`;~~
+			const restated = ` ${source} is version seven’s ${old}, restated by version nine (REG-D-127) and by D3b (REG-D-130), under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for ${was!.caseId}, carried unchanged.`;
 			expect(o!.note.endsWith(restated), `${id}: its note says what its source is, and whose oracle it carries:\n${o!.note}`).toBe(true);
 			const body = o!.note.slice(0, -restated.length);
 			expect(body, `${id}: arrangement — the note names its source`).toContain(source);
-			expect(body.includes(old), `${id}: its note names its source by version nine’s id`).toBe(false);
-			expect(body.replaceAll(source, old), `${id}: its note, but for its source’s id, version nine’s`).toBe(was!.note);
+			// ⭐ The source oracle, where version nine's note gave one to the source: version seven's case's, by its own id.
+			const gave = `, a part of ${old}, whose oracle is `;
+			const given = `, a part of ${source}; version seven’s ${old}’s oracle is `;
+			expect(body.includes(gave), `${id}: no oracle given to its source in version nine’s words`).toBe(false);
+			// ~~expect(body.includes(old), `${id}: its note names its source by version nine’s id`).toBe(false);~~
+			expect(
+				body.replaceAll(given, '').includes(old),
+				`${id}: its note names its source by version nine’s id, but for version seven’s case whose oracle it gives`
+			).toBe(false);
+			// ~~expect(body.replaceAll(source, old), `${id}: its note, but for its source’s id, version nine’s`).toBe(was!.note);~~
+			// ⭐ Exactly: version nine's note, its source oracle given to version seven's case and every other mention of its source
+			// renamed — so package J's "a part of G10-CLEAN, whose oracle is" cannot pass here either.
+			expect(
+				body,
+				`${id}: its note, version nine’s but for its source’s id and whose its source oracle is`
+			).toBe(
+				was!.note
+					.split(gave)
+					.map((piece) => piece.replaceAll(old, source))
+					.join(given)
+			);
+			gaveTheSourceOracle += was!.note.includes(gave) ? 1 : 0;
 		}
+		expect(gaveTheSourceOracle, 'arrangement: the ten clean bridge parts’ notes, each giving its source oracle').toBe(10);
 		expect(now.map((o) => o.caseId), 'one per case, in the set’s order').toEqual(generatedV10().cases.map((c) => c.id));
+	});
+
+	// ⭐ Package J's check, item 1 (the lead's ruling, 2026-10-25) — package J renamed the source in each note by substitution, and so
+	// gave the source's oracle to the source's new id: *"a part of G10-CLEAN, whose oracle is SATISFIED with nothing faulted"*.
+	// G10-CLEAN is a restated SOURCE: no version holds it as a case, and it has no oracle. The oracle the note means is version
+	// seven's G3-CLEAN's — the graph case the part was cut from, conferred (`REG-D-126`).
+	it('⛔ NO NOTE GIVES AN ORACLE TO AN ID NO COMMITTED ORACLE SET HOLDS AS A CASE — of version ten’s 76, each oracle a note names is a case’s of a committed oracle set, of the version the note names when it names one, and no note speaks of an oracle unread; each of the 19 gives this oracle to version nine’s case under its old id, and a clean part its source oracle to version seven’s graph case by its own id. CONTROL: package J’s note, “a part of G10-CLEAN, whose oracle is …”, is read as giving G10-CLEAN an oracle no committed set holds', () => {
+		const sets = committedOracleCases();
+		expect(
+			[...sets.keys()].sort((a, b) => a - b),
+			'arrangement: the ten committed oracle sets'
+		).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+		const named = generatedOraclesV10().oracles.map((o) => ({ caseId: o.caseId, ...oraclesNamedIn(o.note) }));
+		expect(named, 'arrangement: version ten’s 76 notes').toHaveLength(76);
+		expect(
+			named.flatMap((n) => n.unread.map((u) => `${n.caseId}: …${u}…`)),
+			'no note speaks of an oracle in words the reader cannot read'
+		).toEqual([]);
+		expect(
+			named.flatMap((n) =>
+				n.attributed
+					.filter((a) => unheldAttribution(a, sets))
+					.map(
+						(a) =>
+							`${n.caseId}: gives an oracle to ${a.version === undefined ? '' : `version ${VERSION_WORDS[a.version - 1] ?? a.version}’s `}${a.id}, which no committed oracle set holds as a case`
+					)
+			),
+			'no note gives an oracle to an id no committed oracle set holds as a case'
+		).toEqual([]);
+		// The 19: each gives this oracle to version nine's case under its old id, and a clean part its source oracle to version
+		// seven's graph case, by that case's own id.
+		const nine = new Map((JSON.parse(read(ORACLES_V9_FILE)) as OracleSet).oracles.map((o) => [o.caseId, o]));
+		let clean = 0;
+		for (const id of bridgePartIdsV10()) {
+			const old = v9SourceOf(id.slice(0, id.indexOf('.')));
+			const was = nine.get(v9PartOf(id))!;
+			const gaveTheSource = was.note.includes(`, a part of ${old}, whose oracle is `);
+			clean += gaveTheSource ? 1 : 0;
+			expect(named.find((n) => n.caseId === id)?.attributed, `${id}: the oracles its note names`).toEqual([
+				...(gaveTheSource ? [{ id: old, version: 7 }] : []),
+				{ id: was.caseId, version: 9 }
+			]);
+		}
+		expect(clean, 'arrangement: the ten clean bridge parts, each carrying its source’s oracle').toBe(10);
+		// ⭑ CONTROL — the reader reads package J's note as giving G10-CLEAN an oracle, which no committed oracle set holds.
+		const packageJ = oraclesNamedIn(
+			'The root, “Pedestrian Bridge Structural Review”, a part of G10-CLEAN, whose oracle is SATISFIED with nothing faulted: under ASR-10 each of its required parts is satisfied, so this part is too (REG-D-126 Q30). The source oracle’s standing, the author’s claim, is carried. G10-CLEAN is version nine’s G3-CLEAN, restated by D3b under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G3-CLEAN.T01, carried unchanged.'
+		);
+		expect([packageJ.attributed, packageJ.unread], 'CONTROL: package J’s note, read').toEqual([
+			[{ id: 'G10-CLEAN' }, { id: 'G3-CLEAN.T01', version: 9 }],
+			[]
+		]);
+		expect(packageJ.attributed.map((a) => unheldAttribution(a, sets)), 'CONTROL: G10-CLEAN’s oracle held by none').toEqual([true, false]);
+		// ⭑ CONTROL — an oracle given to a case the version it names does not hold as one: version nine holds no G3-CLEAN.
+		expect(
+			[unheldAttribution({ id: 'G3-CLEAN', version: 9 }, sets), unheldAttribution({ id: 'G3-CLEAN', version: 7 }, sets)],
+			'CONTROL: version nine’s G3-CLEAN, held by none; version seven’s, held'
+		).toEqual([true, false]);
+		// ⭑ CONTROL — an oracle spoken of in words the reader does not know is unread, never passed.
+		expect(oraclesNamedIn('G10-CLEAN carries an oracle SATISFIED.').unread, 'CONTROL: unknown words, unread').toHaveLength(1);
 	});
 
 	it('⭐ CONFIRMED AS PROPOSED (REG-D-131) — the statement carries version nine’s whole, names the 19 bridge part cases restated by D3b as confirmed, ⭐ under their new ids, quoting Q36 and the sponsor’s answer, their oracles standing as REG-D-126 conferred them, and the other 57 conferred, ⭐ and records the ruling that gave the new ids (REG-D-132 Q38b), its question, chosen label and text verbatim from the register, the oracles carried unchanged and no standing the sponsor’s answer; and carries no marker; reviewer:qual:check finds no CONFERRAL problem in it', async () => {

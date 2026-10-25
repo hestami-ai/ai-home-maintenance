@@ -27,6 +27,7 @@ import { spawnSync } from 'node:child_process';
 import {
 	appendFileSync,
 	copyFileSync,
+	existsSync,
 	mkdirSync,
 	mkdtempSync,
 	readdirSync,
@@ -3157,11 +3158,14 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 			text(await recorded({ runId: 'qr-cli-proposed', cases: CURRENT_CASES, versions: { caseSet: 10, oracles: 10 } }))
 		);
 		git(dir, 'add', 'runs.ndjson');
-		const root = tmp();
+		// ⭐ Package J's check, item 2 — ~~`tmp()`~~: a git repository of its own, its case set staged, since the CLI reads a case
+		// set only as git tracks it, as it reads the record (`check.ts` `trackedFiles`).
+		const root = gitRepo();
 		const oracleDir = dirname(CURRENT_ORACLES_FILE);
 		mkdirSync(join(root, dirname(CURRENT_CASE_SET_FILE)), { recursive: true });
 		mkdirSync(join(root, oracleDir), { recursive: true });
 		copyFileSync(join(REPO, CURRENT_CASE_SET_FILE), join(root, CURRENT_CASE_SET_FILE));
+		git(root, 'add', '--', CURRENT_CASE_SET_FILE);
 		for (const name of readdirSync(join(REPO, oracleDir)))
 			copyFileSync(join(REPO, oracleDir, name), join(root, oracleDir, name));
 		const register = join(tmp(), 'register.md');
@@ -3220,11 +3224,14 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		];
 		writeFileSync(join(dir, 'runs.ndjson'), text(lines));
 		git(dir, 'add', 'runs.ndjson');
-		const root = tmp();
+		// ⭐ Package J's check, item 2 — ~~`tmp()`~~: a git repository of its own, its two case sets staged — committed, as the CLI
+		// now reads a case set only as git tracks it (`check.ts` `trackedFiles`).
+		const root = gitRepo();
 		const oracleDir = dirname(CURRENT_ORACLES_FILE);
 		mkdirSync(join(root, dirname(CURRENT_CASE_SET_FILE)), { recursive: true });
 		mkdirSync(join(root, oracleDir), { recursive: true });
 		for (const f of [CURRENT_CASE_SET_FILE, CASE_SET_V9_FILE]) copyFileSync(join(REPO, f), join(root, f));
+		git(root, 'add', '--', CURRENT_CASE_SET_FILE, CASE_SET_V9_FILE);
 		for (const name of readdirSync(join(REPO, oracleDir))) copyFileSync(join(REPO, oracleDir, name), join(root, oracleDir, name));
 		const register = join(tmp(), 'register.md');
 		writeFileSync(register, readFileSync(join(REPO, REGISTER_FILE), 'utf8'));
@@ -3246,7 +3253,10 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		const both = await run();
 		expect(both.out, 'versions ten and nine on file: the line is held whole by version nine’s').toContain(GREEN);
 		expect(both.code, both.out).toBe(0);
-		rmSync(join(root, CASE_SET_V9_FILE));
+		// ⭐ Package J's check, item 2 — ~~`rmSync(join(root, CASE_SET_V9_FILE))`~~: version nine's file removed from the commit too,
+		// as a file git tracks but the working tree has lost is a RECORD problem of its own (`-f`: staged, never committed).
+		git(root, 'rm', '-q', '-f', '--', CASE_SET_V9_FILE);
+		expect(existsSync(join(root, CASE_SET_V9_FILE)), 'arrangement: version nine’s file gone from the working tree too').toBe(false);
 		const tenAlone = await run();
 		expect(tenAlone.out, 'version ten alone on file: the 19 renamed, and nothing else').toContain(
 			`reviewer:qual:check — RED — 19 problem(s):\n${D3C_RENAMED()
@@ -3254,6 +3264,109 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 				.join('')}`
 		);
 		expect(tenAlone.code, tenAlone.out).toBe(1);
+	}, 120_000);
+
+	// ⭐ Package J's check, item 2 (the lead's ruling, 2026-10-25) — THE COMMITTED CASE SETS, AS GIT TRACKS THEM. D3c's reader took
+	// every `*.json` in the case directory from the working tree, untracked files included, so an untracked or edited case-set
+	// file could make an ACKNOWLEDGED line pass, while the record itself is read only as git stages it ("green here is green on
+	// the commit"). The case sets are read as the record is — a file git tracks, exactly as staged — and a file the CLI will not
+	// read is a RECORD problem naming it, as an untracked record file is.
+	/** `main` as the CLI runs it, on `root`: git found as a harness child finds it (`hermeticEnv`), no other program, then PATH as it was. */
+	const mainOn = (root: string, dir: string, register: string) => async () => {
+		let out = '';
+		vi.stubEnv('PATH', hermeticEnv().PATH!);
+		try {
+			const code = await main(['--records', dir, '--register', register], {
+				resolve: () => join(REPO, 'packages/rph-assurance/src/index.ts'),
+				write: (s) => void (out += s),
+				root: pathToFileURL(`${root}/`)
+			});
+			return { code, out };
+		} finally {
+			vi.stubEnv('PATH', NO_PROGRAMS);
+		}
+	};
+	/**
+	 * A disposable root for `main`: its case directory holding version ten — staged, when the root is a git repository — and its
+	 * oracle directory every committed oracle file; a register copied; and a tracked record covering today's set, then an
+	 * ACKNOWLEDGED line naming version nine's 35 part cases, 19 of which version ten renamed, so only version nine's committed set
+	 * holds it whole.
+	 */
+	const d3cRoot = async (runId: string, root: string) => {
+		const dir = gitRepo();
+		const lines: RecordLine[] = [
+			...(await recorded({ runId, cases: CURRENT_CASES, versions: { caseSet: 10, oracles: 10 } })),
+			{
+				kind: 'ACKNOWLEDGED',
+				date: '2026-10-25T09:00:00.000Z',
+				reviewerFingerprint: FP.reviewer,
+				addedCaseIds: V9_CASES.filter((c) => c.arm === 'PWA_TYPE').map((c) => c.id)
+			}
+		];
+		writeFileSync(join(dir, 'runs.ndjson'), text(lines));
+		git(dir, 'add', 'runs.ndjson');
+		const oracleDir = dirname(CURRENT_ORACLES_FILE);
+		mkdirSync(join(root, dirname(CURRENT_CASE_SET_FILE)), { recursive: true });
+		mkdirSync(join(root, oracleDir), { recursive: true });
+		copyFileSync(join(REPO, CURRENT_CASE_SET_FILE), join(root, CURRENT_CASE_SET_FILE));
+		if (existsSync(join(root, '.git'))) git(root, 'add', '--', CURRENT_CASE_SET_FILE);
+		for (const name of readdirSync(join(REPO, oracleDir))) copyFileSync(join(REPO, oracleDir, name), join(root, oracleDir, name));
+		const register = join(tmp(), 'register.md');
+		writeFileSync(register, readFileSync(join(REPO, REGISTER_FILE), 'utf8'));
+		/** RED on version nine's file, refused, and so on the 19 renamed, each an id no committed case set holds. */
+		const refused = (why: string) =>
+			`reviewer:qual:check — RED — 20 problem(s):\n  [RECORD] ${CASE_SET_V9_FILE}: not read — ${why}\n${D3C_RENAMED()
+				.map((id) => `  [RECORD] ${D3C_UNHELD(`runs.ndjson:${lines.length}`, id)}\n`)
+				.join('')}`;
+		return { run: mainOn(root, dir, register), refused };
+	};
+
+	it('⛔ RED FIRST — a case-set file git does NOT TRACK is not read, and is a RECORD problem naming it: on a disposable git root whose version nine is untracked, the ACKNOWLEDGED line naming version nine’s 35 part cases is RED, the file named and the 19 renamed each held by no committed case set. ⭑ CONTROL: the same file tracked holds its line, GREEN', async () => {
+		const root = gitRepo();
+		const f = await d3cRoot('qr-cli-d3c-untracked', root);
+		copyFileSync(join(REPO, CASE_SET_V9_FILE), join(root, CASE_SET_V9_FILE));
+		expect(git(root, 'status', '--porcelain', '--', CASE_SET_V9_FILE), 'arrangement: version nine’s file, untracked').toBe(`?? ${CASE_SET_V9_FILE}\n`);
+		const untracked = await f.run();
+		expect(untracked.out, 'an untracked case set holds no line').toContain(
+			f.refused(
+				'git does not track it, so no commit holds this case set, and an ACKNOWLEDGED line is held only to a committed one (design D3c) — `git add` it, or remove it'
+			)
+		);
+		expect(untracked.code, untracked.out).toBe(1);
+		// ⭑ CONTROL — the same file, tracked: committed, it holds its line.
+		git(root, 'add', '--', CASE_SET_V9_FILE);
+		const tracked = await f.run();
+		expect(tracked.out, 'CONTROL: version nine’s file tracked holds the line whole').toContain(GREEN);
+		expect(tracked.code, tracked.out).toBe(0);
+	}, 120_000);
+
+	it('⛔ RED FIRST — a case-set file CHANGED SINCE IT WAS STAGED is not read, and is a RECORD problem naming it: version nine’s file staged without the 19 part cases version ten renamed, then written whole, holds no line — the check reads what a commit would carry', async () => {
+		const root = gitRepo();
+		const f = await d3cRoot('qr-cli-d3c-changed', root);
+		const nine = join(root, CASE_SET_V9_FILE);
+		writeFileSync(nine, JSON.stringify({ ...V9_SET, cases: V9_SET.cases.filter((c) => !D3C_RENAMED().includes(c.id)) }));
+		git(root, 'add', '--', CASE_SET_V9_FILE);
+		copyFileSync(join(REPO, CASE_SET_V9_FILE), nine);
+		expect(git(root, 'status', '--porcelain', '--', CASE_SET_V9_FILE), 'arrangement: version nine’s file, changed since it was staged').toBe(`AM ${CASE_SET_V9_FILE}\n`);
+		const changed = await f.run();
+		expect(changed.out, 'a case set changed since it was staged holds no line').toContain(
+			f.refused(
+				'it differs from what git has staged, and the check holds an ACKNOWLEDGED line only to what a commit would carry (design D3c) — `git add` it'
+			)
+		);
+		expect(changed.code, changed.out).toBe(1);
+	}, 120_000);
+
+	it('⛔ RED FIRST — a case directory outside any git work tree is refused, as a record directory is: there is no committed case set to speak for', async () => {
+		const root = tmp();
+		const f = await d3cRoot('qr-cli-d3c-outside', root);
+		copyFileSync(join(REPO, CASE_SET_V9_FILE), join(root, CASE_SET_V9_FILE));
+		const outside = await f.run();
+		expect(outside.out, 'refused before anything is checked').toContain(
+			`reviewer:qual:check — the case directory ${join(root, dirname(CURRENT_CASE_SET_FILE))} is not in a git work tree, and only a case set git tracks is committed: `
+		);
+		expect(outside.out, 'nothing checked').not.toContain('reviewer:qual:check — today’s reviewer fingerprint');
+		expect(outside.code, outside.out).toBe(2);
 	}, 120_000);
 
 	it('⛔ a record file git does not track, or one changed since it was staged, is NOT READ — green here is green on the commit', async () => {

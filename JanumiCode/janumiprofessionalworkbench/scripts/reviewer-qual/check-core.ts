@@ -108,7 +108,8 @@ export interface CheckInputs {
 	/**
 	 * ⭐ `JAN-CRITREAD` J2-3 — the record files the CLI would NOT read, and why: untracked, changed since they were
 	 * staged, or staged but gone. Each is a RECORD problem, so the check a person runs locally says what the committed
-	 * record would say (`check.ts`).
+	 * record would say (`check.ts`). ⭐ Package J's check, item 2 — and the committed case-set files it would not read, so
+	 * (D3c), each named by its path in the repository: an untracked or edited case set holds no ACKNOWLEDGED line.
 	 */
 	readonly refusedFiles?: readonly { readonly name: string; readonly why: string }[];
 	readonly current: CurrentReviewer;
@@ -129,7 +130,8 @@ export interface CheckInputs {
 	readonly oracleSets: readonly OracleSet[];
 	/**
 	 * ⭐⭐ D3c (`REG-D-132`; `REG-F-576`) — EVERY CASE SET VERSION ON FILE, today's among them, as the CLI reads them from the
-	 * committed case directory: each one's version and its cases' ids. An ACKNOWLEDGED line carries no case set (`record.ts`), so
+	 * committed case directory ⭐ as git tracks it, each file exactly as staged (package J's check, item 2): each one's version
+	 * and its cases' ids. An ACKNOWLEDGED line carries no case set (`record.ts`), so
 	 * its `addedCaseIds` are held to these — all of them to ONE — and to today's set (`cases`), which counts as one of them
 	 * whether it is listed here or not. Required, so a caller cannot leave the question unasked: handed none, the check holds a
 	 * line to today's set alone, as it did before D3c.

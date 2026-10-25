@@ -16,9 +16,10 @@
 // them: it confirms the restatement, never an oracle.
 // ⭐ D3b (8) (`REG-D-132` Q38b) — AND UNDER THEIR NEW IDS: the 19 changed, so they take new ids (`case-set-v10.ts`), and each
 // oracle of version nine's for one of them is carried to its new id (`carriedToItsNewId`) — its verdict, faulted criteria and
-// standing unchanged, and so the catcher assignment it records — its note naming its source by the source's new id, as version
-// nine's source restated by D3b. The 57 others' are version nine's, byte for byte. `conferral` records the confirmation under
-// the new ids, and the ruling that gave them, in the sponsor's words.
+// standing unchanged, and so the catcher assignment it records — its note naming its source by the source's new id, as ~~version
+// nine's source restated by D3b~~ ⭐ version seven's source restated by version nine and by D3b, and a clean part's source oracle
+// given to version seven's case by its own id (package J's check, item 1). The 57 others' are version nine's, byte for byte.
+// `conferral` records the confirmation under the new ids, and the ruling that gave them, in the sponsor's words.
 // Correcting an oracle is a new oracle VERSION, never an edit, and moves no case digest.
 // Generated into `docs/tracking/reviewer-qualification/oracles/` by `generate.ts`; the JSON is never hand-edited.
 import { BRIDGE_GRAPHS_V10, CASE_SET_V10 } from './case-set-v10.js';
@@ -50,9 +51,22 @@ const RENAMED: ReadonlyMap<string, { readonly id: string; readonly source: strin
 );
 
 /**
+ * ⭐ Package J's check, item 1 (the lead's ruling, 2026-10-25) — WHOSE ORACLE A CLEAN PART'S NOTE CARRIES. Version eight wrote
+ * *"a part of G3-CLEAN, whose oracle is SATISFIED with nothing faulted"*: G3-CLEAN, version seven's graph case, conferred, the part
+ * cut from it. ~~Each id of the source renamed~~, that read *"a part of G10-CLEAN, whose oracle is"* — an oracle given to a
+ * restated SOURCE no version holds as a case, which has none. So the attribution gives the oracle to version seven's case by its
+ * own id, and the rest of the note names the source by its new id. (A bridge source of version nine keeps version seven's id,
+ * `case-set-v9.ts`, so `v9Source` is version seven's case's.)
+ */
+const SOURCE_ORACLE = (source: string): string => `, a part of ${source}, whose oracle is `;
+const renamedIn = (text: string, to: { readonly source: string; readonly v9Source: string }): string =>
+	text.split(to.v9Source).join(to.source);
+
+/**
  * ⭐ D3b (8) — a version-nine oracle as version ten holds it: one of the 57's, byte for byte; one of the 19's under its case's new
- * id, its verdict, faulted criteria and standing unchanged, and its note naming its source by the source's new id, then saying
- * what that source is and whose oracle this is.
+ * id, its verdict, faulted criteria and standing unchanged, and its note naming its source by the source's new id ⭐ — the source
+ * oracle given to version seven's case by its own id — then saying what that source is ~~— version nine's, restated by D3b —~~
+ * ⭐ — version seven's, restated by version nine and by D3b — and whose oracle this is.
  */
 function carriedToItsNewId(o: Oracle): Oracle {
 	const to = RENAMED.get(o.caseId);
@@ -63,7 +77,11 @@ function carriedToItsNewId(o: Oracle): Oracle {
 		disposition: o.disposition,
 		expectation: o.expectation,
 		note:
-			`${o.note.split(to.v9Source).join(to.source)} ${to.source} is version nine’s ${to.v9Source}, restated by D3b under a new ` +
+			o.note
+				.split(SOURCE_ORACLE(to.v9Source))
+				.map((part) => renamedIn(part, to))
+				.join(`, a part of ${to.source}; version seven’s ${to.v9Source}’s oracle is `) +
+			` ${to.source} is version seven’s ${to.v9Source}, restated by version nine (REG-D-127) and by D3b (REG-D-130), under a new ` +
 			`id (REG-D-132; design D3b (8)), and this oracle is version nine’s for ${o.caseId}, carried unchanged.`
 	};
 }

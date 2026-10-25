@@ -5,10 +5,11 @@
  *   bun --conditions=source scripts/reviewer-qual/check.ts [--records <dir>] [--register <file>]
  *
  * A static check that runs no model: the limbs are `check-core.ts`'s; this reads the record's top-level `*.ndjson`
- * files that git tracks, exactly as staged (`trackedRecord`), today's case set and oracles, and the register's
- * findings, computes today's reviewer fingerprint with the one function the runner stamps with (`fingerprint.ts`), and
- * re-scores through the runner's own path (`rescore.ts`). ⭐⭐ D3c (`REG-D-132`) — it reads every committed case set beside
- * today's, from the same directory, as it reads every oracle set: an ACKNOWLEDGED line is held to one of them.
+ * files that git tracks, exactly as staged (~~`trackedRecord`~~ `trackedFiles`), today's case set and oracles, and the
+ * register's findings, computes today's reviewer fingerprint with the one function the runner stamps with (`fingerprint.ts`),
+ * and re-scores through the runner's own path (`rescore.ts`). ⭐⭐ D3c (`REG-D-132`) — it reads every committed case set beside
+ * today's, from the same directory, ~~as it reads every oracle set~~ ⭐ as it reads the record — a file git tracks, exactly as
+ * staged, one it will not read a RECORD problem naming it (package J's check, item 2): an ACKNOWLEDGED line is held to one of them.
  * Exit 0 green, 1 red, 2 refused before checking anything.
  *
  * ⛔ IT READS SOURCE (`REG-D-072` D11), decided here as the runner decided it (`REG-D-074`): under bare `bun` every
@@ -47,18 +48,45 @@ export interface CheckCliDeps {
 /** ⛔ CLOSED: a misspelt flag would otherwise be dropped in silence, and the committed record checked in its place. */
 const FLAGS: ReadonlySet<string> = new Set(['records', 'register']);
 
-type TrackedRecord = {
+type TrackedFiles = {
 	readonly files: { readonly name: string; readonly text: string }[];
 	readonly refused: { readonly name: string; readonly why: string }[];
 };
 
+/** ⭐ Package J's check, item 2 — what the check says of a committed file it will not read, by why it will not. */
+interface NotRead {
+	/** `dir` is outside any git work tree: what is refused, before git's own words. */
+	readonly outside: (dir: string) => string;
+	readonly untracked: string;
+	readonly gone: string;
+	readonly changed: string;
+}
+/** `JAN-CRITREAD` J2-3 — the record's top-level `*.ndjson` files. */
+const RECORD_FILES: NotRead = {
+	outside: (dir) => `the record directory ${dir} is not in a git work tree, and only what git tracks is the record`,
+	untracked: 'git does not track it, so the committed record would not hold it — `git add` it, or remove it',
+	gone: 'git tracks it, but it is gone from the working tree — a record file is struck, never deleted (§5.4)',
+	changed: 'it differs from what git has staged, and the check reads what a commit would carry — `git add` it'
+};
+/** ⭐⭐ D3c, package J's check item 2 — the committed case sets, each version's `*.json`: an ACKNOWLEDGED line is held to one. */
+const CASE_SET_FILES: NotRead = {
+	outside: (dir) => `the case directory ${dir} is not in a git work tree, and only a case set git tracks is committed`,
+	untracked:
+		'git does not track it, so no commit holds this case set, and an ACKNOWLEDGED line is held only to a committed one (design D3c) — `git add` it, or remove it',
+	gone: 'git tracks it, but it is gone from the working tree, and the check reads what a commit would carry — restore it, or `git rm` it',
+	changed:
+		'it differs from what git has staged, and the check holds an ACKNOWLEDGED line only to what a commit would carry (design D3c) — `git add` it'
+};
+
 /**
- * ⭐ `JAN-CRITREAD` J2-3 — THE RECORD IS WHAT GIT WOULD COMMIT. Each top-level `*.ndjson` in `dir` is read only when git
- * tracks it and it is exactly what git has staged; one untracked, changed since it was staged, or staged but gone is
- * named as a problem and not read — so a check that is green here is green on the commit that carries these files.
+ * ⭐ `JAN-CRITREAD` J2-3 — THE RECORD IS WHAT GIT WOULD COMMIT. Each top-level ~~`*.ndjson`~~ file of `extension` in `dir` is
+ * read only when git tracks it and it is exactly what git has staged; one untracked, changed since it was staged, or staged but
+ * gone is named as a problem and not read — so a check that is green here is green on the commit that carries these files.
  * A `dir` outside a git work tree is refused (a string): there is no committed record to speak for.
+ * ⭐ Package J's check, item 2 (the lead's ruling, 2026-10-25) — AND SO ARE THE COMMITTED CASE SETS (D3c): ~~every `*.json` in the
+ * case directory as it stands, untracked files included~~, read by this one reader, each told why it is not read (`NotRead`).
  */
-async function trackedRecord(dir: string): Promise<TrackedRecord | string> {
+async function trackedFiles(dir: string, extension: string, notRead: NotRead): Promise<TrackedFiles | string> {
 	const [{ spawnSync }, { existsSync, readdirSync, readFileSync }, { join }] = await Promise.all([
 		import('node:child_process'),
 		import('node:fs'),
@@ -68,29 +96,27 @@ async function trackedRecord(dir: string): Promise<TrackedRecord | string> {
 	const git = (args: readonly string[]) =>
 		spawnSync('git', ['-C', dir, ...args], { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, windowsHide: true });
 	const listed = git(['ls-files', '-z', '--', '.']);
-	if (listed.status !== 0)
-		return `the record directory ${dir} is not in a git work tree, and only what git tracks is the record: ${(listed.stderr ?? String(listed.error)).trim()}`;
-	const indexed = new Set(listed.stdout.split('\0').filter((f) => f.endsWith('.ndjson') && !f.includes('/')));
+	if (listed.status !== 0) return `${notRead.outside(dir)}: ${(listed.stderr ?? String(listed.error)).trim()}`;
+	const indexed = new Set(listed.stdout.split('\0').filter((f) => f.endsWith(extension) && !f.includes('/')));
 	const onDisk = new Set(
 		readdirSync(dir, { withFileTypes: true })
-			.filter((e) => e.isFile() && e.name.endsWith('.ndjson'))
+			.filter((e) => e.isFile() && e.name.endsWith(extension))
 			.map((e) => e.name)
 	);
-	const out: TrackedRecord = { files: [], refused: [] };
+	const out: TrackedFiles = { files: [], refused: [] };
 	const byCodeUnit = (a: string, b: string) => (a < b ? -1 : Number(a > b));
 	for (const name of [...new Set([...onDisk, ...indexed])].sort(byCodeUnit)) {
 		if (!indexed.has(name)) {
-			out.refused.push({ name, why: 'git does not track it, so the committed record would not hold it — `git add` it, or remove it' });
+			out.refused.push({ name, why: notRead.untracked });
 			continue;
 		}
 		if (!onDisk.has(name)) {
-			out.refused.push({ name, why: 'git tracks it, but it is gone from the working tree — a record file is struck, never deleted (§5.4)' });
+			out.refused.push({ name, why: notRead.gone });
 			continue;
 		}
 		const text = readFileSync(join(dir, name), 'utf8');
 		const staged = git(['show', `:./${name}`]);
-		if (staged.status !== 0 || staged.stdout !== text)
-			out.refused.push({ name, why: 'it differs from what git has staged, and the check reads what a commit would carry — `git add` it' });
+		if (staged.status !== 0 || staged.stdout !== text) out.refused.push({ name, why: notRead.changed });
 		else out.files.push({ name, text });
 	}
 	return out;
@@ -130,7 +156,7 @@ export async function main(argv: readonly string[], deps: CheckCliDeps): Promise
 	const { readdirSync, readFileSync } = await import('node:fs');
 	const root = fileURLToPath(deps.root);
 	const dir = args.records ?? join(root, record.RECORD_DIR);
-	const read = await trackedRecord(dir);
+	const read = await trackedFiles(dir, '.ndjson', RECORD_FILES);
 	if (typeof read === 'string') {
 		say(read);
 		return 2;
@@ -145,19 +171,31 @@ export async function main(argv: readonly string[], deps: CheckCliDeps): Promise
 		.filter((name) => name.endsWith('.json'))
 		.map((name) => JSON.parse(readFileSync(join(oracleDir, name), 'utf8')) as import('./cases.js').OracleSet);
 	// ⭐⭐ D3c (`REG-D-132`; `REG-F-576`) — EVERY case set version on file, beside the current one, read from the committed case
-	// directory as the current one is: an ACKNOWLEDGED line's ids are held to one of them, today's included.
+	// directory ~~as the current one is~~: an ACKNOWLEDGED line's ids are held to one of them, today's included.
+	// ⭐ Package J's check, item 2 (the lead's ruling, 2026-10-25) — ~~every `*.json` there as it stands, untracked files
+	// included~~ READ AS THE RECORD IS: a file git tracks, exactly as staged (`trackedFiles`), so an untracked or edited case-set
+	// file holds no line, and each the check will not read is a RECORD problem naming it, as an untracked record file is.
 	const caseDir = join(root, dirname(cases.CURRENT_CASE_SET_FILE));
-	const caseSets = readdirSync(caseDir)
-		.filter((file) => file.endsWith('.json'))
-		.map((file) => JSON.parse(readFileSync(join(caseDir, file), 'utf8')) as import('./cases.js').CaseSet)
+	const committedCaseSets = await trackedFiles(caseDir, '.json', CASE_SET_FILES);
+	if (typeof committedCaseSets === 'string') {
+		say(committedCaseSets);
+		return 2;
+	}
+	const caseSets = committedCaseSets.files
+		.map((file) => JSON.parse(file.text) as import('./cases.js').CaseSet)
 		.map((s) => ({ caseSetVersion: s.caseSetVersion, caseIds: s.cases.map((c) => c.id) }));
+	const refusedCaseSets = committedCaseSets.refused.map((f) => ({
+		name: `${dirname(cases.CURRENT_CASE_SET_FILE)}/${f.name}`,
+		why: f.why
+	}));
 	const today = await fingerprint.reviewerFingerprint(caseSet.cases);
 	const register = readFileSync(args.register ?? join(root, REGISTER_FILE), 'utf8');
 	const { findings, struck } = core.registerFindings(register);
 	const { rulings, struck: struckRulings } = core.registerRulings(register);
 	const report = await core.checkQualification({
 		files: read.files,
-		refusedFiles: read.refused,
+		// ⭐ Package J's check, item 2 — and the committed case-set files it would not read, each by its path in the repository.
+		refusedFiles: [...read.refused, ...refusedCaseSets],
 		current: today,
 		cases: caseSet.cases,
 		oracles: oracles.oracles,

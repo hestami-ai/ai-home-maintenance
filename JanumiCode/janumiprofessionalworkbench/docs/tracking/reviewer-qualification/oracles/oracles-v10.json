@@ -348,70 +348,70 @@
 			"faulted": [],
 			"disposition": "SATISFIED",
 			"expectation": "the author's claim",
-			"note": "The root, “Pedestrian Bridge Structural Review”, a part of G10-CLEAN, whose oracle is SATISFIED with nothing faulted: under ASR-10 each of its required parts is satisfied, so this part is too (REG-D-126 Q30). The source oracle’s standing, the author’s claim, is carried. G10-CLEAN is version nine’s G3-CLEAN, restated by D3b under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G3-CLEAN.T01, carried unchanged."
+			"note": "The root, “Pedestrian Bridge Structural Review”, a part of G10-CLEAN; version seven’s G3-CLEAN’s oracle is SATISFIED with nothing faulted: under ASR-10 each of its required parts is satisfied, so this part is too (REG-D-126 Q30). The source oracle’s standing, the author’s claim, is carried. G10-CLEAN is version seven’s G3-CLEAN, restated by version nine (REG-D-127) and by D3b (REG-D-130), under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G3-CLEAN.T01, carried unchanged."
 		},
 		{
 			"caseId": "G10-CLEAN.T02",
 			"faulted": [],
 			"disposition": "SATISFIED",
 			"expectation": "the author's claim",
-			"note": "“Site and Geotechnical Survey”, a part of G10-CLEAN, whose oracle is SATISFIED with nothing faulted: under ASR-10 each of its required parts is satisfied, so this part is too (REG-D-126 Q30). The source oracle’s standing, the author’s claim, is carried. G10-CLEAN is version nine’s G3-CLEAN, restated by D3b under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G3-CLEAN.T02, carried unchanged."
+			"note": "“Site and Geotechnical Survey”, a part of G10-CLEAN; version seven’s G3-CLEAN’s oracle is SATISFIED with nothing faulted: under ASR-10 each of its required parts is satisfied, so this part is too (REG-D-126 Q30). The source oracle’s standing, the author’s claim, is carried. G10-CLEAN is version seven’s G3-CLEAN, restated by version nine (REG-D-127) and by D3b (REG-D-130), under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G3-CLEAN.T02, carried unchanged."
 		},
 		{
 			"caseId": "G10-CLEAN.T03",
 			"faulted": [],
 			"disposition": "SATISFIED",
 			"expectation": "the author's claim",
-			"note": "“Structural Form Options Study”, a part of G10-CLEAN, whose oracle is SATISFIED with nothing faulted: under ASR-10 each of its required parts is satisfied, so this part is too (REG-D-126 Q30). The source oracle’s standing, the author’s claim, is carried. G10-CLEAN is version nine’s G3-CLEAN, restated by D3b under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G3-CLEAN.T03, carried unchanged."
+			"note": "“Structural Form Options Study”, a part of G10-CLEAN; version seven’s G3-CLEAN’s oracle is SATISFIED with nothing faulted: under ASR-10 each of its required parts is satisfied, so this part is too (REG-D-126 Q30). The source oracle’s standing, the author’s claim, is carried. G10-CLEAN is version seven’s G3-CLEAN, restated by version nine (REG-D-127) and by D3b (REG-D-130), under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G3-CLEAN.T03, carried unchanged."
 		},
 		{
 			"caseId": "G10-CLEAN.T04",
 			"faulted": [],
 			"disposition": "SATISFIED",
 			"expectation": "the author's claim",
-			"note": "“Load Analysis (pedestrian, wind, vibration)”, a part of G10-CLEAN, whose oracle is SATISFIED with nothing faulted: under ASR-10 each of its required parts is satisfied, so this part is too (REG-D-126 Q30). The source oracle’s standing, the author’s claim, is carried. G10-CLEAN is version nine’s G3-CLEAN, restated by D3b under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G3-CLEAN.T04, carried unchanged."
+			"note": "“Load Analysis (pedestrian, wind, vibration)”, a part of G10-CLEAN; version seven’s G3-CLEAN’s oracle is SATISFIED with nothing faulted: under ASR-10 each of its required parts is satisfied, so this part is too (REG-D-126 Q30). The source oracle’s standing, the author’s claim, is carried. G10-CLEAN is version seven’s G3-CLEAN, restated by version nine (REG-D-127) and by D3b (REG-D-130), under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G3-CLEAN.T04, carried unchanged."
 		},
 		{
 			"caseId": "G10-CLEAN.T05",
 			"faulted": [],
 			"disposition": "SATISFIED",
 			"expectation": "the author's claim",
-			"note": "“Member, Connection and Foundation Design”, a part of G10-CLEAN, whose oracle is SATISFIED with nothing faulted: under ASR-10 each of its required parts is satisfied, so this part is too (REG-D-126 Q30). The source oracle’s standing, the author’s claim, is carried. G10-CLEAN is version nine’s G3-CLEAN, restated by D3b under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G3-CLEAN.T05, carried unchanged."
+			"note": "“Member, Connection and Foundation Design”, a part of G10-CLEAN; version seven’s G3-CLEAN’s oracle is SATISFIED with nothing faulted: under ASR-10 each of its required parts is satisfied, so this part is too (REG-D-126 Q30). The source oracle’s standing, the author’s claim, is carried. G10-CLEAN is version seven’s G3-CLEAN, restated by version nine (REG-D-127) and by D3b (REG-D-130), under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G3-CLEAN.T05, carried unchanged."
 		},
 		{
 			"caseId": "G10-CLEAN.T06",
 			"faulted": [],
 			"disposition": "SATISFIED",
 			"expectation": "the author's claim",
-			"note": "“Independent Design Check”, a part of G10-CLEAN, whose oracle is SATISFIED with nothing faulted: under ASR-10 each of its required parts is satisfied, so this part is too (REG-D-126 Q30). The source oracle’s standing, the author’s claim, is carried. G10-CLEAN is version nine’s G3-CLEAN, restated by D3b under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G3-CLEAN.T06, carried unchanged."
+			"note": "“Independent Design Check”, a part of G10-CLEAN; version seven’s G3-CLEAN’s oracle is SATISFIED with nothing faulted: under ASR-10 each of its required parts is satisfied, so this part is too (REG-D-126 Q30). The source oracle’s standing, the author’s claim, is carried. G10-CLEAN is version seven’s G3-CLEAN, restated by version nine (REG-D-127) and by D3b (REG-D-130), under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G3-CLEAN.T06, carried unchanged."
 		},
 		{
 			"caseId": "G10-CLEAN.T07",
 			"faulted": [],
 			"disposition": "SATISFIED",
 			"expectation": "the author's claim",
-			"note": "“Rail Authority Permit Submission”, a part of G10-CLEAN, whose oracle is SATISFIED with nothing faulted: under ASR-10 each of its required parts is satisfied, so this part is too (REG-D-126 Q30). The source oracle’s standing, the author’s claim, is carried. G10-CLEAN is version nine’s G3-CLEAN, restated by D3b under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G3-CLEAN.T07, carried unchanged."
+			"note": "“Rail Authority Permit Submission”, a part of G10-CLEAN; version seven’s G3-CLEAN’s oracle is SATISFIED with nothing faulted: under ASR-10 each of its required parts is satisfied, so this part is too (REG-D-126 Q30). The source oracle’s standing, the author’s claim, is carried. G10-CLEAN is version seven’s G3-CLEAN, restated by version nine (REG-D-127) and by D3b (REG-D-130), under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G3-CLEAN.T07, carried unchanged."
 		},
 		{
 			"caseId": "G10-CLEAN-R1.T01",
 			"faulted": [],
 			"disposition": "SATISFIED",
 			"expectation": "the author's claim",
-			"note": "The root, “Rail Footbridge Engineering Assessment”, a part of G10-CLEAN-R1, whose oracle is SATISFIED with nothing faulted: under ASR-10 each of its required parts is satisfied, so this part is too (REG-D-126 Q30). The source oracle’s standing, the author’s claim, is carried. G10-CLEAN-R1 is version nine’s G3-CLEAN-R1, restated by D3b under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G3-CLEAN-R1.T01, carried unchanged."
+			"note": "The root, “Rail Footbridge Engineering Assessment”, a part of G10-CLEAN-R1; version seven’s G3-CLEAN-R1’s oracle is SATISFIED with nothing faulted: under ASR-10 each of its required parts is satisfied, so this part is too (REG-D-126 Q30). The source oracle’s standing, the author’s claim, is carried. G10-CLEAN-R1 is version seven’s G3-CLEAN-R1, restated by version nine (REG-D-127) and by D3b (REG-D-130), under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G3-CLEAN-R1.T01, carried unchanged."
 		},
 		{
 			"caseId": "G10-CLEAN-R2.T01",
 			"faulted": [],
 			"disposition": "SATISFIED",
 			"expectation": "the author's claim",
-			"note": "The root, “Station Road Footbridge Review”, a part of G10-CLEAN-R2, whose oracle is SATISFIED with nothing faulted: under ASR-10 each of its required parts is satisfied, so this part is too (REG-D-126 Q30). The source oracle’s standing, the author’s claim, is carried. G10-CLEAN-R2 is version nine’s G3-CLEAN-R2, restated by D3b under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G3-CLEAN-R2.T01, carried unchanged."
+			"note": "The root, “Station Road Footbridge Review”, a part of G10-CLEAN-R2; version seven’s G3-CLEAN-R2’s oracle is SATISFIED with nothing faulted: under ASR-10 each of its required parts is satisfied, so this part is too (REG-D-126 Q30). The source oracle’s standing, the author’s claim, is carried. G10-CLEAN-R2 is version seven’s G3-CLEAN-R2, restated by version nine (REG-D-127) and by D3b (REG-D-130), under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G3-CLEAN-R2.T01, carried unchanged."
 		},
 		{
 			"caseId": "G10-CLEAN-R3.T01",
 			"faulted": [],
 			"disposition": "SATISFIED",
 			"expectation": "the author's claim",
-			"note": "The root, “Crossing Structure Appraisal”, a part of G10-CLEAN-R3, whose oracle is SATISFIED with nothing faulted: under ASR-10 each of its required parts is satisfied, so this part is too (REG-D-126 Q30). The source oracle’s standing, the author’s claim, is carried. G10-CLEAN-R3 is version nine’s G3-CLEAN-R3, restated by D3b under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G3-CLEAN-R3.T01, carried unchanged."
+			"note": "The root, “Crossing Structure Appraisal”, a part of G10-CLEAN-R3; version seven’s G3-CLEAN-R3’s oracle is SATISFIED with nothing faulted: under ASR-10 each of its required parts is satisfied, so this part is too (REG-D-126 Q30). The source oracle’s standing, the author’s claim, is carried. G10-CLEAN-R3 is version seven’s G3-CLEAN-R3, restated by version nine (REG-D-127) and by D3b (REG-D-130), under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G3-CLEAN-R3.T01, carried unchanged."
 		},
 		{
 			"caseId": "G10-RR-01.T01",
@@ -420,7 +420,7 @@
 			],
 			"disposition": "REJECTED",
 			"expectation": "the author's claim",
-			"note": "The root, “Pedestrian Bridge Concept Study”, catches G10-RR-01’s plant — a concept study substitutes for the structural review — and faults it (RR-01): the request, the root’s definition, its children’s skeletons and the account show the substituted architecture (design §5’s table; REG-D-126 Q30). Its standing, the author’s claim, is the lead’s designation. G10-RR-01 is version nine’s G-RR-01, restated by D3b under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G-RR-01.T01, carried unchanged."
+			"note": "The root, “Pedestrian Bridge Concept Study”, catches G10-RR-01’s plant — a concept study substitutes for the structural review — and faults it (RR-01): the request, the root’s definition, its children’s skeletons and the account show the substituted architecture (design §5’s table; REG-D-126 Q30). Its standing, the author’s claim, is the lead’s designation. G10-RR-01 is version seven’s G-RR-01, restated by version nine (REG-D-127) and by D3b (REG-D-130), under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G-RR-01.T01, carried unchanged."
 		},
 		{
 			"caseId": "G10-RR-02.T01",
@@ -429,7 +429,7 @@
 			],
 			"disposition": "REJECTED",
 			"expectation": "the author's claim",
-			"note": "The root, “Pedestrian Bridge Structural Review”, catches G10-RR-02’s plant — the required independent check is absent — and faults it (RR-02): its child set and data flow expose the missing required work (design §5’s table; REG-D-126 Q30). Its standing, the author’s claim, is the lead’s designation. G10-RR-02 is version nine’s G3-RR-02, restated by D3b under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G3-RR-02.T01, carried unchanged."
+			"note": "The root, “Pedestrian Bridge Structural Review”, catches G10-RR-02’s plant — the required independent check is absent — and faults it (RR-02): its child set and data flow expose the missing required work (design §5’s table; REG-D-126 Q30). Its standing, the author’s claim, is the lead’s designation. G10-RR-02 is version seven’s G3-RR-02, restated by version nine (REG-D-127) and by D3b (REG-D-130), under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G3-RR-02.T01, carried unchanged."
 		},
 		{
 			"caseId": "G10-RR-03.T04",
@@ -438,7 +438,7 @@
 			],
 			"disposition": "REJECTED",
 			"expectation": "the author's claim",
-			"note": "“Load Analysis (static pedestrian load)” catches G10-RR-03’s plant — the load analysis is narrowed to the static pedestrian load — and faults it (RR-03): its own name and the account state the narrowing against the request’s wind and vibration requirements (design §5’s table; REG-D-126 Q30). Its standing, the author’s claim, is the lead’s designation. G10-RR-03 is version nine’s G3-RR-03, restated by D3b under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G3-RR-03.T04, carried unchanged."
+			"note": "“Load Analysis (static pedestrian load)” catches G10-RR-03’s plant — the load analysis is narrowed to the static pedestrian load — and faults it (RR-03): its own name and the account state the narrowing against the request’s wind and vibration requirements (design §5’s table; REG-D-126 Q30). Its standing, the author’s claim, is the lead’s designation. G10-RR-03 is version seven’s G3-RR-03, restated by version nine (REG-D-127) and by D3b (REG-D-130), under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G3-RR-03.T04, carried unchanged."
 		},
 		{
 			"caseId": "G10-RR-04.T05",
@@ -447,7 +447,7 @@
 			],
 			"disposition": "REJECTED",
 			"expectation": "the author's claim",
-			"note": "“Vibration Compliance Statement” catches G10-RR-04’s plant — a compliance statement substitutes for the vibration analysis — and faults it (RR-04): its definition consumes no analysis, while the account claims this statement covers the requested vibration work (design §5’s table; REG-D-126 Q30). Its standing, the author’s claim, is the lead’s designation. G10-RR-04 is version nine’s G3-RR-04, restated by D3b under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G3-RR-04.T05, carried unchanged."
+			"note": "“Vibration Compliance Statement” catches G10-RR-04’s plant — a compliance statement substitutes for the vibration analysis — and faults it (RR-04): its definition consumes no analysis, while the account claims this statement covers the requested vibration work (design §5’s table; REG-D-126 Q30). Its standing, the author’s claim, is the lead’s designation. G10-RR-04 is version seven’s G3-RR-04, restated by version nine (REG-D-127) and by D3b (REG-D-130), under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G3-RR-04.T05, carried unchanged."
 		},
 		{
 			"caseId": "G10-RR-05.T01",
@@ -456,7 +456,7 @@
 			],
 			"disposition": "REJECTED",
 			"expectation": "the author's claim",
-			"note": "The root, “Pedestrian Bridge Structural Review”, catches G10-RR-05’s plant — the structural form is fixed before the required comparison — and faults it (RR-05): its child set omits the options study, and the account fixes the form on preference (design §5’s table; REG-D-126 Q30). Its standing, the author’s claim, is the lead’s designation. G10-RR-05 is version nine’s G3-RR-05, restated by D3b under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G3-RR-05.T01, carried unchanged."
+			"note": "The root, “Pedestrian Bridge Structural Review”, catches G10-RR-05’s plant — the structural form is fixed before the required comparison — and faults it (RR-05): its child set omits the options study, and the account fixes the form on preference (design §5’s table; REG-D-126 Q30). Its standing, the author’s claim, is the lead’s designation. G10-RR-05 is version seven’s G3-RR-05, restated by version nine (REG-D-127) and by D3b (REG-D-130), under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G3-RR-05.T01, carried unchanged."
 		},
 		{
 			"caseId": "G10-RR-06.T05",
@@ -465,7 +465,7 @@
 			],
 			"disposition": "REJECTED",
 			"expectation": "the author's claim",
-			"note": "“Member, Connection and Foundation Design” catches G10-RR-06’s plant — the foundations’ adequacy is inferred from neighbouring buildings — and faults it (RR-06): the request’s soft-clay evidence and the account’s inference concern this type’s foundation design directly (design §5’s table; REG-D-126 Q30). Its standing, the author’s claim, is the lead’s designation. G10-RR-06 is version nine’s G3-RR-06, restated by D3b under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G3-RR-06.T05, carried unchanged."
+			"note": "“Member, Connection and Foundation Design” catches G10-RR-06’s plant — the foundations’ adequacy is inferred from neighbouring buildings — and faults it (RR-06): the request’s soft-clay evidence and the account’s inference concern this type’s foundation design directly (design §5’s table; REG-D-126 Q30). Its standing, the author’s claim, is the lead’s designation. G10-RR-06 is version seven’s G3-RR-06, restated by version nine (REG-D-127) and by D3b (REG-D-130), under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G3-RR-06.T05, carried unchanged."
 		},
 		{
 			"caseId": "G10-RR-07.T06",
@@ -474,7 +474,7 @@
 			],
 			"disposition": "REJECTED",
 			"expectation": "the author's claim",
-			"note": "“Design Self-Check by the Senior Design Engineer” catches G10-RR-07’s plant — the design team performs its own independent check — and faults it (RR-07): its name, its INTERNAL boundary and the account contradict the request’s independent-firm requirement (design §5’s table; REG-D-126 Q30). Its standing, the author’s claim, is the lead’s designation. G10-RR-07 is version nine’s G3-RR-07, restated by D3b under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G3-RR-07.T06, carried unchanged."
+			"note": "“Design Self-Check by the Senior Design Engineer” catches G10-RR-07’s plant — the design team performs its own independent check — and faults it (RR-07): its name, its INTERNAL boundary and the account contradict the request’s independent-firm requirement (design §5’s table; REG-D-126 Q30). Its standing, the author’s claim, is the lead’s designation. G10-RR-07 is version seven’s G3-RR-07, restated by version nine (REG-D-127) and by D3b (REG-D-130), under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G3-RR-07.T06, carried unchanged."
 		},
 		{
 			"caseId": "G10-RR-08.T05",
@@ -483,7 +483,7 @@
 			],
 			"disposition": "REJECTED",
 			"expectation": "the author's claim",
-			"note": "“Member, Connection and Foundation Design” catches G10-RR-08’s plant — the soft clay is omitted and the ground called benign — and faults it (RR-08): the request and the account’s claim about this type’s foundation work show the omission and the unsupported certainty (design §5’s table; REG-D-126 Q30). Its standing, the author’s claim, is the lead’s designation. G10-RR-08 is version nine’s G3-RR-08, restated by D3b under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G3-RR-08.T05, carried unchanged."
+			"note": "“Member, Connection and Foundation Design” catches G10-RR-08’s plant — the soft clay is omitted and the ground called benign — and faults it (RR-08): the request and the account’s claim about this type’s foundation work show the omission and the unsupported certainty (design §5’s table; REG-D-126 Q30). Its standing, the author’s claim, is the lead’s designation. G10-RR-08 is version seven’s G3-RR-08, restated by version nine (REG-D-127) and by D3b (REG-D-130), under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G3-RR-08.T05, carried unchanged."
 		},
 		{
 			"caseId": "G10-RR-09.T01",
@@ -492,7 +492,7 @@
 			],
 			"disposition": "REJECTED",
 			"expectation": "the author's claim",
-			"note": "The root, “Pedestrian Bridge Structural Review”, catches G10-RR-09’s plant — completeness is inferred from the connected types’ existence — and faults it (RR-09): the account’s whole-PWA completeness claim is shown beside its children’s outputs and the unproduced check certificate (design §5’s table; REG-D-126 Q30). Its standing, the author’s claim, is the lead’s designation. G10-RR-09 is version nine’s G3-RR-09, restated by D3b under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G3-RR-09.T01, carried unchanged."
+			"note": "The root, “Pedestrian Bridge Structural Review”, catches G10-RR-09’s plant — completeness is inferred from the connected types’ existence — and faults it (RR-09): the account’s whole-PWA completeness claim is shown beside its children’s outputs and the unproduced check certificate (design §5’s table; REG-D-126 Q30). Its standing, the author’s claim, is the lead’s designation. G10-RR-09 is version seven’s G3-RR-09, restated by version nine (REG-D-127) and by D3b (REG-D-130), under a new id (REG-D-132; design D3b (8)), and this oracle is version nine’s for G3-RR-09.T01, carried unchanged."
 		},
 		{
 			"caseId": "G7-CLEAN.T01",
