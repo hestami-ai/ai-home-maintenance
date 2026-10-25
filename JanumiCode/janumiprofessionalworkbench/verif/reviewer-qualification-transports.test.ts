@@ -81,7 +81,8 @@ const VERSIONS = {
 } as const;
 // ⭐ The review in parts, B7 — case set v8 holds no graph case: ~~G3-CLEAN and W-CLEAN~~, a work product and a part, in the
 // set's order. ⭐ D3b (8) (`REG-D-132`) — ~~G3-CLEAN.T01~~: version ten's part, G10-CLEAN.T01, under its new id.
-const TWO = CASES.filter((c) => c.id === 'W-CLEAN' || c.id === 'G10-CLEAN.T01');
+// ⭐ Package K (`REG-D-133`) — ~~G10-CLEAN.T01~~: version eleven's part, G11-CLEAN.T01, under its new id (D3d).
+const TWO = CASES.filter((c) => c.id === 'W-CLEAN' || c.id === 'G11-CLEAN.T01');
 const LABEL = 'gemini-3.1-pro-high';
 const FINGERPRINT: RunFingerprint = {
 	reviewer: 'a'.repeat(64),
@@ -178,7 +179,7 @@ describe('JAN-CRITREAD J2-2 — the product transports (REG-D-072 D12)', () => {
 			agyExec: capturing(spawned)
 		});
 		// ⭐ D3b (8) — arrangement: a case renamed in the current set must not shrink the fixture in silence.
-		expect(TWO.map((c) => c.id), 'arrangement: the two cases, both in the current set').toEqual(['W-CLEAN', 'G10-CLEAN.T01']);
+		expect(TWO.map((c) => c.id), 'arrangement: the two cases, both in the current set').toEqual(['W-CLEAN', 'G11-CLEAN.T01']);
 		const lines = await runQualification({
 			runId: 'qr-agy-1',
 			date: '2026-09-24T12:00:00.000Z',
@@ -959,7 +960,8 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 	it('⭐ the SERVER’s date changes mid-run: the CLI stops part-way (exit 4) — the first day’s lines stay and validate, and no call follows', async () => {
 		cleanEnv();
 		// identify's show is the first; each call's show the next. W-CLEAN is served at 03:59 GMT — 2026-09-23 on the
-		// server's UTC−4 — and G10-CLEAN.T01 (⭐ D3b (8): ~~G3-CLEAN.T01~~) at 04:00:30, the server's next day.
+		// server's UTC−4 — and G11-CLEAN.T01 (⭐ D3b (8): ~~G3-CLEAN.T01~~; ⭐ package K: ~~G10-CLEAN.T01~~) at 04:00:30, the
+		// server's next day.
 		const clocks = ['Thu, 24 Sep 2026 03:58:00 GMT', 'Thu, 24 Sep 2026 03:59:00 GMT', 'Thu, 24 Sep 2026 04:00:30 GMT'];
 		const s = await ollamaStandIn('answer', { clock: (n) => clocks[Math.min(Math.max(n, 1), clocks.length) - 1]! });
 		try {
@@ -976,7 +978,7 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 					'--out',
 					out,
 					'--cases',
-					'W-CLEAN,G10-CLEAN.T01,G10-RR-04.T05',
+					'W-CLEAN,G11-CLEAN.T01,G10-RR-04.T05',
 					'--repetitions',
 					'1'
 				],
@@ -1059,7 +1061,7 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 				'--out',
 				out,
 				'--cases',
-				'W-CLEAN,G10-CLEAN.T01',
+				'W-CLEAN,G11-CLEAN.T01',
 				'--repetitions',
 				'1'
 			],
@@ -1189,7 +1191,7 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 			'--repetitions',
 			'1',
 			'--cases',
-			'W-CLEAN,G10-CLEAN.T01'
+			'W-CLEAN,G11-CLEAN.T01'
 		];
 		expect(await main(args, deps), written.join('')).toBe(0);
 		const text = readFileSync(out, 'utf8');
@@ -1201,7 +1203,7 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 		expect(lines.map((l) => `${l.kind}${l.caseId ? ` ${l.caseId}` : ''}`)).toEqual([
 			'RUN',
 			'CALL W-CLEAN',
-			'CALL G10-CLEAN.T01'
+			'CALL G11-CLEAN.T01'
 		]);
 		expect(spawned).toHaveLength(2);
 
@@ -1253,13 +1255,14 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 			// ⭐ The review in parts, B7 — version eight, current since B7: 35 part cases for the graph cases (~~7, 7~~).
 			// ⭐ B8a — version nine, current since B8a: each part cut with the seeded library, the bridge restated (~~8, 8~~).
 			// ⭐ B8b — version ten, current since B8b: the bridge part cases restated by D3b (~~9, 9~~).
-		).toEqual({ caseSetVersion: 10, oracleVersion: 10 });
+			// ⭐ Package K — version eleven, current since package K: the 7 bridge part cases D3d moved, under new ids (~~10, 10~~).
+		).toEqual({ caseSetVersion: 11, oracleVersion: 11 });
 		// …which are the versions of the files `cases.ts` names current — the ones the check holds coverage to.
 		expect([
 			CURRENT_SET.caseSetVersion,
 			CURRENT_ORACLE_SET.oracleVersion,
 			CURRENT_ORACLE_SET.caseSetVersion
-		]).toEqual([10, 10, 10]);
+		]).toEqual([11, 11, 11]); // ⭐ package K — ~~[10, 10, 10]~~
 		expect(spawned, 'one call, captured').toHaveLength(1);
 	});
 

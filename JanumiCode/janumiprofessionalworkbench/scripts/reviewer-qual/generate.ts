@@ -25,6 +25,7 @@ import {
 	CASE_SET_V8_FILE,
 	CASE_SET_V9_FILE,
 	CASE_SET_V10_FILE,
+	CASE_SET_V11_FILE,
 	ORACLES_V1_FILE,
 	ORACLES_V2_FILE,
 	ORACLES_V3_FILE,
@@ -35,6 +36,7 @@ import {
 	ORACLES_V8_FILE,
 	ORACLES_V9_FILE,
 	ORACLES_V10_FILE,
+	ORACLES_V11_FILE,
 	serializeGenerated,
 	type CaseSet,
 	type OracleSet
@@ -49,6 +51,7 @@ import { CASE_SET_V7 } from './case-set-v7.js';
 import { CASE_SET_V8 } from './case-set-v8.js';
 import { CASE_SET_V9 } from './case-set-v9.js';
 import { CASE_SET_V10 } from './case-set-v10.js';
+import { CASE_SET_V11 } from './case-set-v11.js';
 import { ORACLES_V1 } from './oracles-v1.js';
 import { ORACLES_V2 } from './oracles-v2.js';
 import { ORACLES_V3 } from './oracles-v3.js';
@@ -59,6 +62,7 @@ import { ORACLES_V7 } from './oracles-v7.js';
 import { ORACLES_V8 } from './oracles-v8.js';
 import { ORACLES_V9 } from './oracles-v9.js';
 import { ORACLES_V10 } from './oracles-v10.js';
+import { ORACLES_V11 } from './oracles-v11.js';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -84,7 +88,11 @@ const VERSIONS: readonly (readonly [string, CaseSet, string, OracleSet])[] = [
 	// ⭐ `JAN-EXEC` Phase 7, the review in parts, B8b — version ten: version nine's 76 cases under their ids, the 19 bridge part
 	// cases cut from their sources restated by D3b with the bridge library (`REG-D-130`), their oracles version nine's, the
 	// restatement confirmed (`REG-D-131` Q36).
-	[CASE_SET_V10_FILE, CASE_SET_V10, ORACLES_V10_FILE, ORACLES_V10]
+	[CASE_SET_V10_FILE, CASE_SET_V10, ORACLES_V10_FILE, ORACLES_V10],
+	// ⭐ `JAN-EXEC` Phase 7, the review in parts, B8b, package K — version eleven: version ten's 76 cases, 69 under their ids,
+	// the 7 whose prompts D3d moved under new ids, cut from their sources restated by D3d (`REG-D-133`), their oracles
+	// version ten's.
+	[CASE_SET_V11_FILE, CASE_SET_V11, ORACLES_V11_FILE, ORACLES_V11]
 ];
 
 for (const [casesFile, cases, oraclesFile, oracles] of VERSIONS) {

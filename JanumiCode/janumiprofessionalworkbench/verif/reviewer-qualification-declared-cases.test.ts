@@ -114,7 +114,9 @@ describe('⭐⭐ E2 — the current case set (v5, and v6 since round 5): version
 		// for byte (`REG-D-127`).
 		// ⭐ B8b — ~~[9, 9, 9]~~: version ten, which carries version nine's 76 cases under their ids, its 41 non-part cases byte
 		// for byte (`REG-D-130`).
-		expect([CURRENT.caseSetVersion, ORACLES.oracleVersion, ORACLES.caseSetVersion]).toEqual([10, 10, 10]);
+		// ⭐ Package K — ~~[10, 10, 10]~~: version eleven, which carries version ten's 41 non-part cases byte for byte, under
+		// their ids (`REG-D-133`).
+		expect([CURRENT.caseSetVersion, ORACLES.oracleVersion, ORACLES.caseSetVersion]).toEqual([11, 11, 11]);
 		const v4NonGraph = V4.cases.filter((c) => c.arm !== 'PWA_GRAPH');
 		expect(v4NonGraph, 'the arrangement: version four’s 27 non-graph cases').toHaveLength(27);
 		expect(CURRENT.cases.slice(0, v4NonGraph.length).map((c) => JSON.stringify(c))).toEqual(v4NonGraph.map((c) => JSON.stringify(c)));

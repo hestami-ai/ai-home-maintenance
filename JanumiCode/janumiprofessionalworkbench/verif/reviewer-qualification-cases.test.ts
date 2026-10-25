@@ -69,6 +69,7 @@ import {
 	CASE_SET_V7_FILE,
 	CASE_SET_V8_FILE,
 	CASE_SET_V9_FILE,
+	CASE_SET_V10_FILE,
 	CURRENT_CASE_SET_FILE,
 	CURRENT_ORACLES_FILE,
 	ORACLES_PROPOSED,
@@ -80,6 +81,7 @@ import {
 	ORACLES_V7_FILE,
 	ORACLES_V8_FILE,
 	ORACLES_V9_FILE,
+	ORACLES_V10_FILE,
 	serializeGenerated,
 	type CaseSet,
 	type GraphCase,
@@ -117,6 +119,8 @@ import { ORACLES_V7 } from '../scripts/reviewer-qual/oracles-v7.js';
 import { ORACLES_V8 } from '../scripts/reviewer-qual/oracles-v8.js';
 import { ORACLES_V9 } from '../scripts/reviewer-qual/oracles-v9.js';
 import { ORACLES_V10 } from '../scripts/reviewer-qual/oracles-v10.js';
+import { BRIDGE_GRAPHS_V11, BRIDGE_IDS_V11, CASE_SET_V11, MOVED_V11, OPTIONS_STUDY_PURPOSE } from '../scripts/reviewer-qual/case-set-v11.js';
+import { ORACLES_V11 } from '../scripts/reviewer-qual/oracles-v11.js';
 import { SEEDED_PROBE_LIBRARY } from '../scripts/reviewer-qual/probes.js';
 import { reviewerFingerprint } from '../scripts/reviewer-qual/fingerprint.js';
 import { caseReviewInput } from '../scripts/reviewer-qual/materialize.js';
@@ -3556,8 +3560,9 @@ describe('⭐⭐ the review in parts, B8a — reviewer-qualification case set v9
 // ⭐ D3b (8) (`REG-D-132`; `REG-F-575`) — and the 19, changed, under NEW ids: each bridge source as `G10-…`
 // (`BRIDGE_IDS_V10`), each part case under its source's (`BRIDGE_PART_IDS_V10`), their content byte for byte, their oracles
 // carried to the new ids and the confirmation recorded under them. Held here over version ten as the generator writes it, and
-// over the COMMITTED current files the runner and the check read:
-//   · THE SHAPE — the current set is version ten: version nine's 41 and its 16 software part cases byte for byte, then the 35
+// over the COMMITTED ~~current~~ files (⭐ version ten is history since version eleven, `cases.ts`), which the freshness limb
+// holds equal to it:
+//   · THE SHAPE — ~~the current set is~~ version ten: version nine's 41 and its 16 software part cases byte for byte, then the 35
 //     under their ~~ids,~~ sources' places, subjects and order — ⭐ the 19 under their new ids (D3b (8)), the 16 under theirs;
 //   · ⭐ A CHANGED CASE TAKES A NEW ID (D3b (8)) — the 13 sources and the 19 part cases under the ids written here, no case of
 //     version ten under one of version nine's 19, no earlier version holding a new one, and no case sending other prompts
@@ -3699,8 +3704,9 @@ const committedOracleCases = (): ReadonlyMap<number, ReadonlySet<string>> => {
 /** An attribution no committed oracle set holds as a case — by the version it names, when it names one. */
 const unheldAttribution = (a: OracleAttribution, sets: ReadonlyMap<number, ReadonlySet<string>>): boolean =>
 	a.version === undefined ? ![...sets.values()].some((s) => s.has(a.id)) : sets.get(a.version)?.has(a.id) !== true;
-const currentV10 = (): CaseSet => JSON.parse(read(CURRENT_CASE_SET_FILE)) as CaseSet;
-const currentOraclesV10 = (): OracleSet => JSON.parse(read(CURRENT_ORACLES_FILE)) as OracleSet;
+/** ⭐ Package K — ~~the CURRENT files~~ version ten's committed files: version eleven is current (`cases.ts`). */
+const currentV10 = (): CaseSet => JSON.parse(read(CASE_SET_V10_FILE)) as CaseSet;
+const currentOraclesV10 = (): OracleSet => JSON.parse(read(ORACLES_V10_FILE)) as OracleSet;
 const generatedV10 = (): CaseSet => JSON.parse(serializeGenerated(CASE_SET_V10)) as CaseSet;
 const generatedOraclesV10 = (): OracleSet => JSON.parse(serializeGenerated(ORACLES_V10)) as OracleSet;
 /** Version ten's part cases, as generated. */
@@ -4073,12 +4079,13 @@ const PROTOTYPE_PROMPTS_V10: readonly (readonly [caseId: string, sha256: string]
 ];
 
 describe('⭐⭐ the review in parts, B8b — reviewer-qualification case set v10: version nine’s 76 cases ~~under their ids~~, ⭐ the 57 under their ids and the 19 bridge part cases under new ids (REG-D-132), cut from their sources restated as a competent author authors them, with the practice’s policies (REG-D-130, REG-D-131)', () => {
-	it('⭐ THE SHAPE — the current set is version ten: version nine’s 41 non-part cases first, byte for byte, then its 35 part cases under their ~~ids, sources,~~ sources’ places, subjects and order — ⭐ the 19 bridge ones under their new ids, cut from their sources under theirs (D3b (8)) — the 16 software ones byte for byte', () => {
-		expect([currentV10().caseSetVersion, currentOraclesV10().oracleVersion, currentOraclesV10().caseSetVersion], 'the current set is version ten').toEqual([10, 10, 10]);
+	it('⭐ THE SHAPE — ~~the current set is~~ version ten: version nine’s 41 non-part cases first, byte for byte, then its 35 part cases under their ~~ids, sources,~~ sources’ places, subjects and order — ⭐ the 19 bridge ones under their new ids, cut from their sources under theirs (D3b (8)) — the 16 software ones byte for byte', () => {
+		// ⭐ Package K — ~~'the current set is version ten'~~: version ten's committed set, history since version eleven.
+		expect([currentV10().caseSetVersion, currentOraclesV10().oracleVersion, currentOraclesV10().caseSetVersion], 'the committed set of version ten').toEqual([10, 10, 10]);
 		const v9 = JSON.parse(read(CASE_SET_V9_FILE)) as CaseSet;
 		const v9Parts = v9.cases.filter((c): c is PwaTypeCase => c.arm === 'PWA_TYPE');
 		for (const [what, now] of [
-			['the committed current set', currentV10()],
+			['version ten, as committed', currentV10()], // ⭐ package K — ~~'the committed current set'~~
 			['version ten, as generated', generatedV10()]
 		] as const) {
 			expect(now.cases.slice(0, 41).map((c) => JSON.stringify(c)), `${what}: version nine’s 41, byte for byte`).toEqual(
@@ -4125,7 +4132,7 @@ describe('⭐⭐ the review in parts, B8b — reviewer-qualification case set v1
 		const others = CASE_SET_V9.cases.map((c) => c.id).filter((id) => !nine.some((c) => c.id === id));
 		expect(others, 'arrangement: version nine’s 57 others').toHaveLength(57);
 		for (const [what, set] of [
-			['the committed current set', currentV10()],
+			['version ten, as committed', currentV10()], // ⭐ package K — ~~'the committed current set'~~
 			['version ten, as generated', generatedV10()]
 		] as const) {
 			const parts = set.cases.filter((c): c is PwaTypeCase => c.arm === 'PWA_TYPE');
@@ -4427,8 +4434,9 @@ describe('⭐⭐ the review in parts, B8b — reviewer-qualification case set v1
 		const sets = committedOracleCases();
 		expect(
 			[...sets.keys()].sort((a, b) => a - b),
-			'arrangement: the ten committed oracle sets'
-		).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+			// ⭐ Package K — ~~'the ten committed oracle sets'~~: version eleven's committed beside them.
+			'arrangement: the eleven committed oracle sets'
+		).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
 		const named = generatedOraclesV10().oracles.map((o) => ({ caseId: o.caseId, ...oraclesNamedIn(o.note) }));
 		expect(named, 'arrangement: version ten’s 76 notes').toHaveLength(76);
 		expect(
@@ -4543,6 +4551,486 @@ describe('⭐⭐ the review in parts, B8b — reviewer-qualification case set v1
 	it('⭐ THE ORACLES COMPOSE, THROUGH THE RUNNER’S OWN SCORING — for every part case, a reply faulting exactly its oracle’s criteria is scored by evaluateCase to its oracle’s disposition, with independence met', async () => {
 		const oracles = new Map(generatedOraclesV10().oracles.map((o) => [o.caseId, o]));
 		for (const c of partsV10()) {
+			const oracle = oracles.get(c.id)!;
+			const reply = JSON.stringify({
+				findings: SEEDED_REASONING_REVIEW_CRITERIA.map((k) => ({
+					criterionId: k.id,
+					failed: oracle.faulted.includes(k.id),
+					statement: 'as the oracle expects',
+					severity: oracle.faulted.includes(k.id) ? 'BLOCKING' : 'INFORMATIONAL'
+				})),
+				recommendation: oracle.disposition
+			});
+			const { scored } = await evaluateCase({
+				case: c,
+				criteria: SEEDED_REASONING_REVIEW_CRITERIA,
+				candidate: EVALUATING_CANDIDATE,
+				scoringDigest: '0'.repeat(64),
+				call: async () => ({ returned: reply, served: null })
+			});
+			expect([scored.disposition, scored.resultClass, scored.independenceOk], c.id).toEqual([oracle.disposition, 'VALID', true]);
+		}
+	});
+});
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7, the review in parts, B8b, package K — CASE SET VERSION ELEVEN (`REG-D-133`; DESIGN-authoring-review-
+// in-parts.md D3d and §5, case set v11; ROADMAP-undertaking-execution-sandbox.md §9a.9b, package K) ─────────────────────────────
+//
+// Version ten's measurement left one clean rejection, `G10-CLEAN.T03` #2, the options study, REJECTED on RR-01 for its HUMAN
+// instruction stating no comparison criteria, and the sponsor chose to state the criteria the request makes essential in its
+// purpose, as a new case version (`REG-D-133` Q39). Version eleven is version ten's 76 cases: 69 byte for byte under their ids,
+// and the 7 whose prompts D3d moves — the options study's part and the roots whose children include it — under new ids, cut from
+// their sources restated by D3d (`case-set-v11.ts`), their oracles version ten's, carried (`oracles-v11.ts`). Held here over
+// version eleven as the generator writes it, and over the COMMITTED current files the runner and the check read:
+//   · THE SHAPE — the current set is version eleven: version ten's 41 non-part cases, its 16 software part cases and 12 of its
+//     19 bridge part cases byte for byte, then the 7 in their places under new ids, their arm, subject, type and library
+//     version ten's;
+//   · D3d'S PURPOSE, EXACTLY WHERE IT SAYS — the purpose, as written here, states the request's three criteria in the request's
+//     words, and version ten's states none; it is the options study's in each bridge source that holds one, restated under the
+//     ids written here, each its version-ten source but for that purpose — 11 sources, ⚠ where the design counts 12: G10-RR-01
+//     holds no options study either; none in G10-RR-05's or G10-RR-01's; and among the cases, in the 7's inputs alone;
+//   · A CHANGED CASE TAKES A NEW ID, AND ONLY A CHANGED ONE — the 7 as D3d lists them, under the ids written here, no earlier
+//     version holding a new one; the 69 under theirs; and, the rule's general form, no case of version eleven sends other
+//     prompts than version ten's under an id version ten holds;
+//   · THE PROMPTS — the 69 others' prompts are version ten's; the 7 moved; the 19 bridge part cases' first prompts are the
+//     pre-checked prototype's, byte for byte; the reviewer fingerprint unmoved, the case set's digest moved; and, through the
+//     materialized prompt, the purpose is in the 7's and in none of the 12's;
+//   · EACH PLANTED TWIN — every planted bridge part case's source differs from its own version's clean source only where its
+//     plant is (diffed): version ten's differences, D3d adding none; the restated copies renamed and nothing else; production's
+//     graph for each restated source;
+//   · THE ORACLES — version ten's, the 69 byte for byte, the 7 carried to their new ids, each note true; no note gives an oracle
+//     to an id no committed oracle set holds as a case; the conferral carrying version ten's whole and recording `REG-D-133`
+//     Q39 in the sponsor's words, each standing as `REG-D-126` conferred it, no marker, the check finding no CONFERRAL problem;
+//   · THE 28,000-CHARACTER LIMIT, SEEN WHOLE, THE ORACLES COMPOSE — as every case is held.
+const currentV11 = (): CaseSet => JSON.parse(read(CURRENT_CASE_SET_FILE)) as CaseSet;
+const currentOraclesV11 = (): OracleSet => JSON.parse(read(CURRENT_ORACLES_FILE)) as OracleSet;
+const generatedV11 = (): CaseSet => JSON.parse(serializeGenerated(CASE_SET_V11)) as CaseSet;
+const generatedOraclesV11 = (): OracleSet => JSON.parse(serializeGenerated(ORACLES_V11)) as OracleSet;
+/** Version eleven's part cases, as generated. */
+const partsV11 = (): PwaTypeCase[] => generatedV11().cases.filter((c): c is PwaTypeCase => c.arm === 'PWA_TYPE');
+/** A part case of version eleven, by its id. */
+const partV11 = (id: string): PwaTypeCase => {
+	const c = partsV11().find((x) => x.id === id);
+	expect(c, `${id} is a part case of version eleven`).toBeDefined();
+	return c!;
+};
+/** A bridge source D3d restates, by its new id. */
+const bridgeV11 = (id: string): GraphCase => {
+	const c = BRIDGE_GRAPHS_V11.find((x) => x.id === id);
+	expect(c, `${id} is a bridge source of version eleven`).toBeDefined();
+	return c!;
+};
+
+/** ⭐ D3d — the options study's purpose, version ten's and version eleven's, written here as D3d states them. */
+const OPTIONS_PURPOSE_V10 =
+	'Compare the viable structural forms for the bridge against the site survey and the geotechnical report, and select one, producing the options comparison and the selected form.';
+const OPTIONS_PURPOSE_V11 =
+	'Compare the viable structural forms for the bridge against the site survey and the geotechnical report, judging each by criteria the comparison states, among them its clearance over the two-track rail line, its response to pedestrian-induced vibration and its foundations on the soft clay layer 3 m below ground on the north abutment, and select one, producing the options comparison and the selected form.';
+/** ⭐ D3d — the three criteria the purpose names, each in the words the request gives it ("The three named criteria come from
+ *  the request"): the rail line the bridge crosses, the vibration its load analysis must cover, the clay its survey found. */
+const REQUEST_CRITERIA = ['two-track rail line', 'pedestrian-induced vibration', 'soft clay layer 3 m below ground on the north abutment'];
+/** The request's criteria a purpose does not state as criteria its comparison judges each form by. */
+const unstatedCriteria = (purpose: string): string[] => {
+	const judged = purpose.indexOf('judging each by criteria the comparison states, among them ');
+	return REQUEST_CRITERIA.filter((k) => judged < 0 || !purpose.slice(judged).includes(k));
+};
+/**
+ * ⭐ D3d — THE SOURCES RESTATED, AND THEIR NEW IDS, written here: each bridge source of version ten that holds the options study,
+ * and the id it takes restated, in version ten's order. ⚠ Eleven: D3d counts 12 ("G10-RR-05 holds none"), but G10-RR-01's
+ * concept study, its plant, holds none either (`NO_OPTIONS_STUDY`).
+ */
+const BRIDGE_IDS_V11_WRITTEN: readonly (readonly [v10: string, v11: string])[] = [
+	['G10-CLEAN', 'G11-CLEAN'],
+	['G10-CLEAN-R1', 'G11-CLEAN-R1'],
+	['G10-CLEAN-R2', 'G11-CLEAN-R2'],
+	['G10-CLEAN-R3', 'G11-CLEAN-R3'],
+	['G10-RR-02', 'G11-RR-02'],
+	['G10-RR-03', 'G11-RR-03'],
+	['G10-RR-04', 'G11-RR-04'],
+	['G10-RR-06', 'G11-RR-06'],
+	['G10-RR-07', 'G11-RR-07'],
+	['G10-RR-08', 'G11-RR-08'],
+	['G10-RR-09', 'G11-RR-09']
+];
+/** The bridge sources of version ten that hold no options study — written here. */
+const NO_OPTIONS_STUDY = ['G10-RR-01', 'G10-RR-05'];
+/**
+ * ⭐ D3d — THE 7 CHANGED CASES AND THEIR NEW IDS, written here as D3d lists them, in its order: `G10-CLEAN.T03` →
+ * `G11-CLEAN.T03`, `G10-CLEAN.T01` → `G11-CLEAN.T01`, and so on.
+ */
+const MOVED_IDS_V11: readonly (readonly [v10: string, v11: string])[] = [
+	['G10-CLEAN.T03', 'G11-CLEAN.T03'],
+	['G10-CLEAN.T01', 'G11-CLEAN.T01'],
+	['G10-CLEAN-R1.T01', 'G11-CLEAN-R1.T01'],
+	['G10-CLEAN-R2.T01', 'G11-CLEAN-R2.T01'],
+	['G10-CLEAN-R3.T01', 'G11-CLEAN-R3.T01'],
+	['G10-RR-02.T01', 'G11-RR-02.T01'],
+	['G10-RR-09.T01', 'G11-RR-09.T01']
+];
+/** The 7, in the case set's order — version ten's. */
+const movedInSetOrder = (): (readonly [v10: string, v11: string])[] =>
+	CASE_SET_V10.cases.flatMap((c) => MOVED_IDS_V11.filter(([v10]) => v10 === c.id));
+/** The 19 part cases cut from a bridge source, version ten's or one D3d restates, in the set's order. */
+const bridgePartIdsV11 = (): string[] =>
+	partsV11()
+		.filter((c) => BRIDGE_SOURCES_V10.includes(c.sourceCaseId) || BRIDGE_IDS_V11_WRITTEN.some(([, v11]) => v11 === c.sourceCaseId))
+		.map((c) => c.id);
+/** ⭐ D3d — the restated copies' renames, by each copy's new id: version three's, as the copies are version nine's and ten's. */
+const renamesV11 = (): typeof RENAMES_V3 =>
+	Object.fromEntries(
+		BRIDGE_IDS_V11_WRITTEN.filter(([, v11]) => /-CLEAN-R\d$/.test(v11)).map(([v10, v11]) => [v11, RENAMES_V3[v9SourceOf(v10)]!])
+	);
+/**
+ * ⭐ THE PROTOTYPE'S PROMPTS (`REG-D-133`: "Build prompts must equal the prototype's byte for byte") — the sha256 of each of the
+ * 19 bridge part cases' first prompt as the lead's in-memory prototype of D3d rendered it through the product's part builder
+ * and validator (`scratchpad/bridge/proto-v11.ts`, `prompts-v11.sha256`), by version eleven's id, in the set's order — written
+ * here. The 12 that did not move are version ten's (`PROTOTYPE_PROMPTS_V10`).
+ */
+const PROTOTYPE_PROMPTS_V11: readonly (readonly [caseId: string, sha256: string])[] = [
+	['G11-CLEAN.T01', '5427f157c703087ed9756e2a42a47df20c850546d0ae906a79049bac6eb8cdb1'],
+	['G10-CLEAN.T02', '9653decf69f4213b80782ceda9cee4029b314fa7cef56ba7f3e26e9eff2d5669'],
+	['G11-CLEAN.T03', 'e02da26e365be9652140fc6d44f9e03fd0f40b9d4604a40a153457d63f2356e5'],
+	['G10-CLEAN.T04', 'f78dfcbabc2a7adcd488f276f8d302a79c76b4dcd0d84db520ba11c12d56346e'],
+	['G10-CLEAN.T05', 'e39c3bb653b0b114668c7d063e28c1537997318f05b8fd00ee8d1f0c4bac2e75'],
+	['G10-CLEAN.T06', '76a5df18b5e599dab66a11027d0123a17a10d13ff5f80f52d5e735e5288c1ec0'],
+	['G10-CLEAN.T07', '741f033cc96a6bf159806727d15a12cfe543babd5f2325ccb182a1de7a20ecff'],
+	['G11-CLEAN-R1.T01', '77cd95d3a8129492746cb7597df7ccf8e086d04224da01c6297fb818e65fd252'],
+	['G11-CLEAN-R2.T01', 'd44aaca6198b916a2dd0aa78a05abf65266115cedd55405235bfb82bdc6535d4'],
+	['G11-CLEAN-R3.T01', '0c948368ab1985ee2ac6a7f380de7deacf2c278bccf049c22434e6b630114d61'],
+	['G10-RR-01.T01', '9cddabb4fe543089e650bdc9dd99619ed8bf7808186832b33402d227e09b2c92'],
+	['G11-RR-02.T01', '5caee9e0de06bd74804f12664c65cc99eb0521f5188395224562adaaf70ba114'],
+	['G10-RR-03.T04', 'f44ca47b3eeba3c3bd53279cfe8d364671e2a60946ce64d60d7a256fad063c31'],
+	['G10-RR-04.T05', '8137f67a9f6c52878786c3e347222543407eb6482a2768b2817efa87f1085bec'],
+	['G10-RR-05.T01', '4834d49d9d25fe8d376f84f3a3c0f7676b7820854b726c1a1eef4a4bffbd3025'],
+	['G10-RR-06.T05', 'e6b913ad313af0eacf2988e3993b36832e5405a482b2e829759c35f55ca2261e'],
+	['G10-RR-07.T06', 'b62b181ef23b163b78718979bd7d189e6fce9841784c7b588247d610889a092b'],
+	['G10-RR-08.T05', '05bf386cadc4579354604a9ee1c019a7d9114d48805c44c3d3d6592713c6ec3c'],
+	['G11-RR-09.T01', '8e0a11bffe93a317f67cb6b16a644225237f070215e7a1708ac878a0a8a8ce22']
+];
+/**
+ * ⭐ D3d — `REG-D-133` Q39, written here as the register records it, its apostrophe the sponsor's screen's: the question, the
+ * label the sponsor chose, and its text. The restatement's code record quotes them (`oracles-v11.ts`).
+ */
+const Q39_ASKED =
+	"The fix worked: clean bridge parts 19 of 20 (v9's leaves were 8 of 12) and every planted defect caught and named (19 of 19). One reading of the options study, 1 of 3, rejected it because its HUMAN instruction states no comparison criteria. How should we settle it?";
+const Q39_CHOSE = 'Fix the options study, then P6 (Recommended)';
+const Q39_READ =
+	'State the comparison criteria the request makes essential in its purpose, as a new case version; pre-check offline, then re-measure the 7 parts that show it, about 16 calls (723 to about 739; P6 then about 911 of about 1,000). If a reading still rejects it, I escalate it and go to P6 rather than iterate again.';
+
+describe('⭐⭐ the review in parts, B8b, package K — reviewer-qualification case set v11: version ten’s 76 cases, 69 under their ids and the 7 whose prompts D3d moves under new ids, cut from their sources restated so that the options study’s purpose states its comparison criteria (REG-D-133)', () => {
+	it('⭐ THE SHAPE — the current set is version eleven: version ten’s 41 non-part cases first, then its 35 part cases in its order — 69 cases byte for byte under their ids, the 16 software part cases and 12 of the 19 bridge ones among them; the other 7 in their places under new ids, their arm, subject, type and library version ten’s', () => {
+		expect([currentV11().caseSetVersion, currentOraclesV11().oracleVersion, currentOraclesV11().caseSetVersion], 'the current set is version eleven').toEqual([11, 11, 11]);
+		const ten = (JSON.parse(read(CASE_SET_V10_FILE)) as CaseSet).cases;
+		const moved = new Map(MOVED_IDS_V11);
+		const kept = (c: QualificationCase): unknown[] => [c.arm, JSON.stringify(c.subject), ...(c.arm === 'PWA_TYPE' ? [c.input.typeId, JSON.stringify(c.input.policyLibrary)] : [])];
+		for (const [what, now] of [
+			['the committed current set', currentV11()],
+			['version eleven, as generated', generatedV11()]
+		] as const) {
+			expect(now.cases, `${what}: 76 cases`).toHaveLength(76);
+			expect(now.cases.map((c) => c.id), `${what}: version ten’s ids in its order, the 7 under their new ids`).toEqual(ten.map((c) => moved.get(c.id) ?? c.id));
+			expect(
+				now.cases.filter((_, i) => !moved.has(ten[i]!.id)).map((c) => JSON.stringify(c)),
+				`${what}: the 69 others, version ten’s, byte for byte`
+			).toEqual(ten.filter((c) => !moved.has(c.id)).map((c) => JSON.stringify(c)));
+			expect(
+				now.cases.filter((_, i) => moved.has(ten[i]!.id)).map(kept),
+				`${what}: the 7, their arm, subject, type and library version ten’s`
+			).toEqual(ten.filter((c) => moved.has(c.id)).map(kept));
+		}
+		expect(bridgePartIdsV11(), 'the 19 bridge part cases').toHaveLength(19);
+	});
+
+	it('⛔ D3d’S PURPOSE, EXACTLY WHERE IT SAYS (REG-D-133) — the purpose as written here states the three criteria the request makes essential, in the request’s words, and version ten’s none; it is the options study’s in each bridge source that holds one, each restated under the id written here and its version-ten source but for that purpose — 11 sources, ⚠ where the design counts 12, G10-RR-01 holding none either; G10-RR-05’s and G10-RR-01’s restated by none; and among the cases, in the 7’s inputs alone', () => {
+		expect(OPTIONS_STUDY_PURPOSE, 'the purposes, as D3d writes them').toEqual({ v10: OPTIONS_PURPOSE_V10, v11: OPTIONS_PURPOSE_V11 });
+		const request = bridgeV10('G10-CLEAN').input.prompt;
+		expect(REQUEST_CRITERIA.filter((k) => !request.includes(k)), 'arrangement: each criterion, in the request’s words').toEqual([]);
+		expect(unstatedCriteria(OPTIONS_PURPOSE_V10), 'version ten’s purpose states none of the request’s criteria').toEqual(REQUEST_CRITERIA);
+		expect(unstatedCriteria(OPTIONS_STUDY_PURPOSE.v11), 'version eleven’s purpose leaves one of the request’s criteria unstated').toEqual([]);
+		// The sources: each that holds the options study, restated.
+		const holding = BRIDGE_GRAPHS_V10.filter((c) => c.input.nodes.some((n) => n.pwuKind === 'OPTIONS_STUDY')).map((c) => c.id);
+		expect(holding, 'arrangement: the bridge sources of version ten that hold the options study').toEqual(BRIDGE_IDS_V11_WRITTEN.map(([v10]) => v10));
+		expect(BRIDGE_SOURCES_V10.filter((id) => !holding.includes(id)), 'arrangement: the two that hold none').toEqual(NO_OPTIONS_STUDY);
+		expect(BRIDGE_IDS_V11.map((r) => [r.v10, r.v11]), 'the sources D3d restates and their new ids, as written here').toEqual(BRIDGE_IDS_V11_WRITTEN);
+		expect(BRIDGE_GRAPHS_V11.map((c) => c.id), 'each restated, under its new id').toEqual(BRIDGE_IDS_V11_WRITTEN.map(([, v11]) => v11));
+		for (const [tenId, elevenId] of BRIDGE_IDS_V11_WRITTEN) {
+			const was = bridgeV10(tenId);
+			const now = bridgeV11(elevenId);
+			const study = was.input.nodes.find((n) => n.pwuKind === 'OPTIONS_STUDY')!;
+			expect([study.purpose, now.input.nodes.find((n) => n.id === study.id)?.purpose], `${elevenId}: its options study’s purpose, version ten’s, then version eleven’s`).toEqual([
+				OPTIONS_PURPOSE_V10,
+				OPTIONS_PURPOSE_V11
+			]);
+			expect(bridgeDifferences(was, now), `${elevenId}: ${tenId} but for that purpose`).toEqual([`${study.name}.purpose`]);
+			expect(JSON.stringify({ ...now, id: tenId, input: was.input }), `${elevenId}: and but for its id`).toBe(JSON.stringify(was));
+		}
+		// The cases: version eleven's purpose in the 7's inputs alone; version ten's in those of the 12 whose sources hold a study.
+		const carrying = (purpose: string) => CASE_SET_V11.cases.filter((c) => JSON.stringify(c).includes(JSON.stringify(purpose))).map((c) => c.id);
+		expect(carrying(OPTIONS_PURPOSE_V11), 'the cases that carry version eleven’s purpose: the 7, under their new ids').toEqual(movedInSetOrder().map(([, v11]) => v11));
+		const twelve = bridgePartIdsV11().filter((id) => !MOVED_IDS_V11.some(([, v11]) => v11 === id));
+		expect(twelve, 'arrangement: the 12').toHaveLength(12);
+		expect(carrying(OPTIONS_PURPOSE_V10), 'the cases that carry version ten’s: the 12 but those cut from a source with no study').toEqual(
+			twelve.filter((id) => !NO_OPTIONS_STUDY.includes(id.slice(0, id.indexOf('.'))))
+		);
+	});
+
+	it('⛔ A CHANGED CASE TAKES A NEW ID, AND ONLY A CHANGED ONE (REG-D-133; D3d) — the 7 D3d lists, under the G11- ids written here, each cut from its source restated under that source’s new id, as version eight named part cases; version eleven holds none of their version-ten ids, and the 69 others keep theirs, in their order; no earlier committed version holds a new id, as a case or a source; ⭑ and, the rule’s general form, no case of version eleven sends other prompts than version ten’s under an id version ten holds, and none of the 7 sends version ten’s', async () => {
+		// ⭑ A new id is one no earlier committed version holds, as a case or a source (package J's limb, D3c).
+		const fresh = [...BRIDGE_IDS_V11_WRITTEN.map(([, v11]) => v11), ...MOVED_IDS_V11.map(([, v11]) => v11)];
+		const earlier = [
+			CASE_SET_V1_FILE,
+			CASE_SET_V2_FILE,
+			CASE_SET_V3_FILE,
+			CASE_SET_V4_FILE,
+			CASE_SET_V5_FILE,
+			CASE_SET_V6_FILE,
+			CASE_SET_V7_FILE,
+			CASE_SET_V8_FILE,
+			CASE_SET_V9_FILE,
+			CASE_SET_V10_FILE
+		].flatMap((f) => (JSON.parse(read(f)) as CaseSet).cases.flatMap((c) => [c.id, ...(c.arm === 'PWA_TYPE' ? [c.sourceCaseId] : [])]));
+		expect(earlier, 'arrangement: versions one to ten’s 514 cases, and the source of each of their 105 part cases').toHaveLength(619);
+		expect(earlier.filter((id) => fresh.includes(id)), 'an id an earlier version holds, taken as new').toEqual([]);
+		expect(MOVED_V11, 'the 7, as D3d lists them').toEqual(MOVED_IDS_V11.map(([v10]) => v10));
+		const ten = CASE_SET_V10.cases.map((c) => c.id);
+		for (const [what, set] of [
+			['the committed current set', currentV11()],
+			['version eleven, as generated', generatedV11()]
+		] as const) {
+			const renamed = set.cases.filter((c): c is PwaTypeCase => c.arm === 'PWA_TYPE' && !ten.includes(c.id));
+			expect(
+				renamed.map((c) => [c.id, c.sourceCaseId]),
+				`${what}: the 7, each under its new id, cut from its source under that source’s new id`
+			).toEqual(movedInSetOrder().map(([, v11]) => [v11, v11.slice(0, v11.indexOf('.'))]));
+			for (const c of renamed) expect(c.id, `${c.id}: its source’s id, then its type’s place in the source`).toBe(partCaseId(bridgeV11(c.sourceCaseId), c.input.typeId));
+			expect(
+				set.cases.map((c) => c.id).filter((id) => MOVED_IDS_V11.some(([v10]) => v10 === id)),
+				`${what}: no case under one of the 7’s version-ten ids`
+			).toEqual([]);
+			expect(
+				set.cases.map((c) => c.id).filter((id) => ten.includes(id)),
+				`${what}: the 69 others under their ids, in their order`
+			).toEqual(ten.filter((id) => !MOVED_IDS_V11.some(([v10]) => v10 === id)));
+		}
+		// ⭑ The rule's general form (`cases.ts`: "a case that changes gets a new id"): under an id version ten holds, version eleven
+		// sends version ten's prompts — initial, repair and criterion repair; and each case under a new id sends prompts version
+		// ten's case under its old id did not, so no unchanged case took an id it did not need.
+		const [v10, v11] = await Promise.all([reviewerFingerprint(CASE_SET_V10.cases), reviewerFingerprint(CASE_SET_V11.cases)]);
+		expect(
+			CASE_SET_V11.cases
+				.map((c) => c.id)
+				.filter((id) => v10.casePrompts.has(id) && JSON.stringify(v10.casePrompts.get(id)) !== JSON.stringify(v11.casePrompts.get(id))),
+			'a case of version eleven that moved under an id version ten holds'
+		).toEqual([]);
+		expect(
+			MOVED_IDS_V11.filter(([old, id]) => JSON.stringify(v10.casePrompts.get(old)) === JSON.stringify(v11.casePrompts.get(id))).map(([, id]) => id),
+			'a case under a new id that sends version ten’s prompts'
+		).toEqual([]);
+	});
+
+	it('⛔ THE 69’S PROMPTS DID NOT MOVE, AND THE 7’S DID, EACH TO THE PROTOTYPE’S BYTES — every other case’s initial, repair and criterion-repair prompts are version ten’s; each of the 7’s first prompt moved from its version-ten case’s; the 19 bridge part cases’ first prompts are the pre-checked prototype’s, byte for byte; the reviewer fingerprint is unmoved, and the case set’s digest moved', async () => {
+		const [v10, v11] = await Promise.all([reviewerFingerprint(CASE_SET_V10.cases), reviewerFingerprint(CASE_SET_V11.cases)]);
+		const moved = MOVED_IDS_V11.map(([, id]) => id);
+		const others = CASE_SET_V11.cases.map((c) => c.id).filter((id) => !moved.includes(id));
+		expect(others, 'arrangement: the 69').toHaveLength(69);
+		for (const id of others) expect(v11.casePrompts.get(id), `${id}: its prompts are version ten’s`).toEqual(v10.casePrompts.get(id));
+		expect(
+			MOVED_IDS_V11.filter(([old, id]) => v11.casePrompts.get(id)?.initial === v10.casePrompts.get(old)?.initial).map(([, id]) => id),
+			'one of the 7 whose first prompt did not move: it owes no RUN, and D3d did not reach it'
+		).toEqual([]);
+		expect(
+			bridgePartIdsV11().map((id) => [id, v11.casePrompts.get(id)?.initial]),
+			'each bridge part case’s first prompt, the prototype’s, byte for byte'
+		).toEqual(PROTOTYPE_PROMPTS_V11);
+		expect([v10.reviewer, v11.reviewer], 'the reviewer fingerprint, unmoved').toEqual([REVIEWER_FINGERPRINT_V9, REVIEWER_FINGERPRINT_V9]);
+		expect(v11.caseSet, 'the case set’s digest moved').not.toBe(v10.caseSet);
+	});
+
+	it('⭐ WHERE THE PURPOSE REACHES, THROUGH THE MATERIALIZED PROMPT — each of the 7’s prompts carries version eleven’s purpose and not version ten’s: the options study’s in its subject, each root’s in its child skeleton for the study; and none of the 12’s prompts carries either', async () => {
+		const carries = async (id: string) => {
+			const { initial, repair } = await promptsFor(partV11(id));
+			return [OPTIONS_PURPOSE_V11, OPTIONS_PURPOSE_V10].map((p) => initial.includes(p) && repair.includes(p));
+		};
+		for (const [, id] of MOVED_IDS_V11) expect(await carries(id), `${id}: version eleven’s purpose, and not version ten’s`).toEqual([true, false]);
+		const twelve = bridgePartIdsV11().filter((id) => !MOVED_IDS_V11.some(([, v11]) => v11 === id));
+		expect(twelve, 'arrangement: the 12').toHaveLength(12);
+		for (const id of twelve) expect(await carries(id), `${id}: neither purpose`).toEqual([false, false]);
+		const study = JSON.parse((await promptsFor(partV11('G11-CLEAN.T03'))).initial.split('\n').find((l) => l.startsWith('{"subject":'))!) as {
+			subject: { type: PwaGraphNode };
+		};
+		expect([study.subject.type.pwuKind, study.subject.type.purpose], 'G11-CLEAN.T03: the options study, its purpose in its subject').toEqual(['OPTIONS_STUDY', OPTIONS_PURPOSE_V11]);
+	});
+
+	it('⛔ EACH PLANTED TWIN DIFFERS FROM ITS CLEAN SOURCE ONLY WHERE ITS PLANT IS (diffed) — every planted bridge part case of version eleven is cut from a twin that differs from its own version’s clean source — G11-CLEAN for a twin D3d restates, G10-CLEAN for one it does not — exactly as version ten’s twin differs from G10-CLEAN, D3d adding no difference at any plant; so does every twin D3d restates, and each it does not, beside G11-CLEAN; and each restated copy is G11-CLEAN with the names substituted, and nothing else', () => {
+		const sourceOf = (id: string): GraphCase => (id.startsWith('G11-') ? bridgeV11(id) : bridgeV10(id));
+		const cleanOf = (id: string): GraphCase => (id.startsWith('G11-') ? bridgeV11('G11-CLEAN') : bridgeV10('G10-CLEAN'));
+		const asTen = (id: string): string => id.replace(/^G11-/, 'G10-');
+		const differencesV10 = (id: string): string[] => TWIN_DIFFERENCES_V10[asTen(id)]!.map((d) => d.replace(/^\+(D3b)? /, ''));
+		const planted = partsV11().filter((c) => /^G1[01]-RR-/.test(c.sourceCaseId));
+		expect(planted.map((c) => c.sourceCaseId), 'arrangement: the 9 planted bridge part cases’ sources').toEqual([
+			'G10-RR-01',
+			'G11-RR-02',
+			'G10-RR-03',
+			'G10-RR-04',
+			'G10-RR-05',
+			'G10-RR-06',
+			'G10-RR-07',
+			'G10-RR-08',
+			'G11-RR-09'
+		]);
+		for (const c of planted)
+			expect(bridgeDifferences(cleanOf(c.sourceCaseId), sourceOf(c.sourceCaseId)), `${c.id}: its source, beside its own version’s clean source`).toEqual(
+				differencesV10(c.sourceCaseId)
+			);
+		// ⭑ Every twin D3d restates, whether or not version eleven cuts a case from it, and the two it does not, beside G11-CLEAN.
+		const twins = [...BRIDGE_GRAPHS_V11.filter((c) => c.id.includes('-RR-')), ...NO_OPTIONS_STUDY.map((id) => bridgeV10(id))];
+		expect(twins.map((c) => asTen(c.id)).sort(), 'arrangement: every planted twin').toEqual(Object.keys(TWIN_DIFFERENCES_V10).sort());
+		for (const twin of twins)
+			expect(bridgeDifferences(bridgeV11('G11-CLEAN'), twin), `${twin.id}: beside G11-CLEAN`).toEqual(differencesV10(twin.id));
+		expect(Object.keys(renamesV11()), 'arrangement: the three copies, under their new ids').toEqual(['G11-CLEAN-R1', 'G11-CLEAN-R2', 'G11-CLEAN-R3']);
+		expectRenamedOnly(
+			BRIDGE_GRAPHS_V11.filter((c) => c.id.startsWith('G11-CLEAN')),
+			renamesV11()
+		);
+	});
+
+	it('⭐ PRODUCTION’S GRAPH — each of the 11 sources D3d restates, defined in an engine by an author’s commands, the practice’s six active there first, exports exactly its literal nodes', () => {
+		expect(BRIDGE_GRAPHS_V11.map((c) => c.id)).toEqual(BRIDGE_IDS_V11_WRITTEN.map(([, v11]) => v11));
+		for (const c of BRIDGE_GRAPHS_V11) expectProductionsGraphV10(c);
+	});
+
+	it('⭐ THE ORACLES — version ten’s 76, under version eleven: the 69 under their ids, byte for byte; the 7 carried to their new ids, each its old id’s verdict, faulted criteria and standing, its note version ten’s — its body naming its source by its new id, the source oracle still version seven’s case’s by its own id, and what version ten’s note says its source is, kept — then what its new source is, version ten’s restated by D3d, and whose oracle it is', () => {
+		expect([generatedOraclesV11().oracleVersion, generatedOraclesV11().caseSetVersion]).toEqual([11, 11]);
+		const ten = (JSON.parse(read(ORACLES_V10_FILE)) as OracleSet).oracles;
+		const now = generatedOraclesV11().oracles;
+		const moved = MOVED_IDS_V11.map(([, id]) => id);
+		expect(now.filter((o) => !moved.includes(o.caseId)), 'the 69 others’ oracles, version ten’s, unchanged').toEqual(
+			ten.filter((o) => !MOVED_IDS_V11.some(([old]) => old === o.caseId))
+		);
+		expect(now.map((o) => o.caseId).filter((id) => MOVED_IDS_V11.some(([old]) => old === id)), 'no oracle under one of the 7’s version-ten ids').toEqual([]);
+		const byId = new Map(ten.map((o) => [o.caseId, o]));
+		for (const [old, id] of MOVED_IDS_V11) {
+			const o = now.find((x) => x.caseId === id);
+			const was = byId.get(old);
+			expect([o, was].every((x) => x !== undefined), `${id}: an oracle, and version ten’s for ${old}`).toBe(true);
+			expect([o!.disposition, o!.faulted, o!.expectation], `${id}: the verdict, faulted criteria and standing of version ten’s ${old}`).toEqual([
+				was!.disposition,
+				was!.faulted,
+				was!.expectation
+			]);
+			const source = id.slice(0, id.indexOf('.'));
+			const tenSource = old.slice(0, old.indexOf('.'));
+			const restated = ` ${source} is version ten’s ${tenSource}, restated by D3d (REG-D-133) under a new id (design D3d), and this oracle is version ten’s for ${old}, carried unchanged.`;
+			expect(o!.note.endsWith(restated), `${id}: its note says what its new source is, and whose oracle it carries:\n${o!.note}`).toBe(true);
+			const said = was!.note.indexOf(` ${tenSource} is version seven’s `);
+			expect(said, `${old}: arrangement — version ten’s note says what its source is`).toBeGreaterThan(0);
+			const body = was!.note.slice(0, said);
+			expect(body, `${old}: arrangement — version ten’s note names its source`).toContain(tenSource);
+			expect(o!.note.slice(0, -restated.length), `${id}: version ten’s note, its body naming its source by its new id, what it says its source is kept`).toBe(
+				body.replaceAll(tenSource, source) + was!.note.slice(said)
+			);
+		}
+		expect(now.map((o) => o.caseId), 'one per case, in the set’s order').toEqual(generatedV11().cases.map((c) => c.id));
+	});
+
+	it('⛔ NO NOTE GIVES AN ORACLE TO AN ID NO COMMITTED ORACLE SET HOLDS AS A CASE — of version eleven’s 76, each oracle a note names is a case’s of a committed oracle set, of the version the note names when it names one, and no note speaks of an oracle unread; each of the 7 gives this oracle to version ten’s case under its old id and to version nine’s before it, and a clean part its source oracle to version seven’s graph case by its own id. CONTROL: an oracle given to version ten’s G11-CLEAN.T03 is held by none', () => {
+		const sets = committedOracleCases();
+		expect(
+			[...sets.keys()].sort((a, b) => a - b),
+			'arrangement: the eleven committed oracle sets'
+		).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+		const named = generatedOraclesV11().oracles.map((o) => ({ caseId: o.caseId, ...oraclesNamedIn(o.note) }));
+		expect(named, 'arrangement: version eleven’s 76 notes').toHaveLength(76);
+		expect(
+			named.flatMap((n) => n.unread.map((u) => `${n.caseId}: …${u}…`)),
+			'no note speaks of an oracle in words the reader cannot read'
+		).toEqual([]);
+		expect(
+			named.flatMap((n) =>
+				n.attributed
+					.filter((a) => unheldAttribution(a, sets))
+					.map((a) => `${n.caseId}: gives an oracle to ${a.version === undefined ? '' : `version ${VERSION_WORDS[a.version - 1] ?? a.version}’s `}${a.id}, which no committed oracle set holds as a case`)
+			),
+			'no note gives an oracle to an id no committed oracle set holds as a case'
+		).toEqual([]);
+		const nine = new Map((JSON.parse(read(ORACLES_V9_FILE)) as OracleSet).oracles.map((o) => [o.caseId, o]));
+		let clean = 0;
+		for (const [old, id] of MOVED_IDS_V11) {
+			const v9Id = v9PartOf(old);
+			const seven = v9SourceOf(old.slice(0, old.indexOf('.')));
+			const gaveTheSource = nine.get(v9Id)!.note.includes(`, a part of ${seven}, whose oracle is `);
+			clean += gaveTheSource ? 1 : 0;
+			expect(named.find((n) => n.caseId === id)?.attributed, `${id}: the oracles its note names`).toEqual([
+				...(gaveTheSource ? [{ id: seven, version: 7 }] : []),
+				{ id: v9Id, version: 9 },
+				{ id: old, version: 10 }
+			]);
+		}
+		expect(clean, 'arrangement: the five clean parts among the 7, each carrying its source’s oracle').toBe(5);
+		// ⭑ CONTROL — version ten holds no G11-CLEAN.T03, and holds G10-CLEAN.T03.
+		expect(
+			[unheldAttribution({ id: 'G11-CLEAN.T03', version: 10 }, sets), unheldAttribution({ id: 'G10-CLEAN.T03', version: 10 }, sets)],
+			'CONTROL: version ten’s G11-CLEAN.T03, held by none; its G10-CLEAN.T03, held'
+		).toEqual([true, false]);
+	});
+
+	it('⭐ THE RESTATEMENT RECORDED (REG-D-133 Q39) — the statement carries version ten’s whole; names the 7, by their version-ten ids and their new ones, restated by D3d under new ids by the sponsor’s ruling, quoting Q39’s question, the label the sponsor chose and its text, verbatim from the register; their oracles carried unchanged, each standing as REG-D-126 conferred it, never as the sponsor’s answer; the other 69 version ten’s; and carries no marker; reviewer:qual:check finds no CONFERRAL problem in it', async () => {
+		const { conferral } = generatedOraclesV11();
+		const register = read(REGISTER_FILE);
+		const at = register.indexOf('\n### REG-D-133 ');
+		const next = register.indexOf('\n### ', at + 1);
+		const entry = register.slice(at, next < 0 ? undefined : next);
+		expect(at, 'arrangement: the register holds REG-D-133').toBeGreaterThan(0);
+		for (const q of [Q39_ASKED, Q39_CHOSE, Q39_READ]) expect(entry, `Q39's words, verbatim from the register: ${q}`).toContain(`*"${q}"*`);
+		expect(conferral, 'version ten’s statement, whole').toContain((JSON.parse(read(ORACLES_V10_FILE)) as OracleSet).conferral);
+		const order = movedInSetOrder();
+		expect(conferral, 'the 7 restated, in the sponsor’s words, their oracles carried, each standing as REG-D-126 conferred it, never as the sponsor’s answer').toContain(
+			`The 7 part cases whose prompts that purpose reaches — ${order.map(([old]) => old).join(', ')}, in that order — take new ids, ${order.map(([, id]) => id).join(', ')}, by the sponsor’s ruling (REG-D-133, Q39: asked “${Q39_ASKED}”, the sponsor chose “${Q39_CHOSE}”, whose text read “${Q39_READ}”): each is version ten’s case under its old id, restated by D3d and cut from its source under the source’s new id (design D3d). Each of their oracles is version ten’s for the old id, carried with its verdict, faulted criteria, catcher assignment and standing unchanged, each as REG-D-126 conferred it, never as the sponsor’s answer; the ruling changes none of them.`
+		);
+		expect(conferral, 'the other 69, version ten’s').toContain('The other 69 are version ten’s cases under their ids, their oracles version ten’s, conferred as recorded above.');
+		expect(conferral, 'the statement carries the restatement’s marker').not.toContain(ORACLES_RESTATEMENT_UNCONFIRMED);
+		expect(conferral, 'no proposal’s word').not.toContain(ORACLES_PROPOSED);
+		const conferralProblems = async (statement: string) =>
+			(
+				await checkQualification({
+					files: [],
+					current: {
+						reviewer: '0'.repeat(64),
+						scoring: '1'.repeat(64),
+						caseSet: '2'.repeat(64),
+						components: { probes: '3'.repeat(64), budget: '4'.repeat(64), criteria: '5'.repeat(64), scoring: '1'.repeat(64) },
+						casePrompts: new Map()
+					},
+					cases: generatedV11().cases,
+					oracles: generatedOraclesV11().oracles,
+					conferral: statement,
+					oracleSets: [],
+					caseSets: [],
+					findings: new Set(),
+					struck: new Set(),
+					rulings: new Set(),
+					struckRulings: new Set(),
+					rescore: async () => {
+						throw new Error('an empty record re-scores nothing');
+					}
+				})
+			).problems.filter((p) => p.limb === 'CONFERRAL');
+		expect(await conferralProblems(conferral), 'the check finds no CONFERRAL problem in the record').toEqual([]);
+		// ⭑ CONTROL — the same set, its statement carrying the marker: the confirmation owed, alone.
+		expect(await conferralProblems(`${conferral} The 7 are ${ORACLES_RESTATEMENT_UNCONFIRMED}.`)).toEqual([
+			{ limb: 'CONFERRAL', message: RESTATEMENT_NOT_CONFIRMED }
+		]);
+	});
+
+	it('⛔ THE 28,000-CHARACTER LIMIT, AND SEEN WHOLE — every prompt of the 35 fits agy’s argv budget, and no slice of any is cut', async () => {
+		expect(partsV11(), 'the arrangement: the 35').toHaveLength(35);
+		expect((await promptProblemsIn(partsV11())).join('\n')).toBe('');
+	});
+
+	it('⭐ THE ORACLES COMPOSE, THROUGH THE RUNNER’S OWN SCORING — for every part case, a reply faulting exactly its oracle’s criteria is scored by evaluateCase to its oracle’s disposition, with independence met', async () => {
+		const oracles = new Map(generatedOraclesV11().oracles.map((o) => [o.caseId, o]));
+		expect(partsV11().filter((c) => !oracles.has(c.id)).map((c) => c.id), 'a part case with no oracle').toEqual([]);
+		for (const c of partsV11()) {
 			const oracle = oracles.get(c.id)!;
 			const reply = JSON.stringify({
 				findings: SEEDED_REASONING_REVIEW_CRITERIA.map((k) => ({

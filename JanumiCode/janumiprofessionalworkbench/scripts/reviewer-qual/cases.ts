@@ -92,6 +92,7 @@ export interface PwaTypeCaseInput extends GraphCaseInput {
 	 * ⭐ D3b (`REG-D-130`) — version ten's 19 bridge part cases carry the bridge library: the seeded 15, then the practice's six,
 	 * as the policy view reads them over an engine where the kernel's create command made them; its 16 software part cases
 	 * still carry the seeded library alone.
+	 * ⭐ D3d (`REG-D-133`) — version eleven's 7 bridge part cases cut from sources D3d restates carry the bridge library too.
 	 * ⚠ Absent on version eight's, which were measured on parts cut with none.
 	 */
 	readonly policyLibrary?: readonly PwaPartLibraryPolicy[];
@@ -114,7 +115,10 @@ interface CaseCommon {
 	 *  version nine's record of them carried today's fingerprint, and limb 2 read each as a prompt that moved while the
 	 *  fingerprint did not — a non-reproduction a re-run does not discharge (`REG-F-575`; the check test's J2-5, J2-7 and
 	 *  round-5 CONTROLS say why a changed case gets a new id). An id once acknowledged and since renamed stays held by the
-	 *  committed case set that holds it (`check-core.ts`, D3c). */
+	 *  committed case set that holds it (`check-core.ts`, D3c).
+	 *  ⭐ Version eleven (`REG-D-133`) keeps it: the 7 bridge part cases whose prompts D3d moved take new ids — each cut from its
+	 *  source restated as `G11-…`, under that source's — and the 12 whose prompts it did not move keep version ten's ids, their
+	 *  content byte for byte. */
 	readonly id: string;
 	/** The subject the floor composes over — its id, version and the producer independence is checked against. */
 	readonly subject: AssuranceSubject;
@@ -218,6 +222,10 @@ export const ORACLES_V9_FILE = 'docs/tracking/reviewer-qualification/oracles/ora
  *  to nine, which stay as history. */
 export const CASE_SET_V10_FILE = 'docs/tracking/reviewer-qualification/cases/case-set-v10.json';
 export const ORACLES_V10_FILE = 'docs/tracking/reviewer-qualification/oracles/oracles-v10.json';
+/** ⭐ `JAN-EXEC` Phase 7, the review in parts, B8b, package K — version eleven (`REG-D-133`), beside versions one to ten, which
+ *  stay as history. */
+export const CASE_SET_V11_FILE = 'docs/tracking/reviewer-qualification/cases/case-set-v11.json';
+export const ORACLES_V11_FILE = 'docs/tracking/reviewer-qualification/oracles/oracles-v11.json';
 
 /**
  * ⭐ `JAN-CRITREAD` J2-5 — THE CURRENT CASE SET AND ITS ORACLES: what `reviewer:qual:check` holds coverage and
@@ -274,9 +282,17 @@ export const ORACLES_V10_FILE = 'docs/tracking/reviewer-qualification/oracles/or
  * id whose prompt moved; the 57 keep their prompts and stay covered as the record stands; and the record's ACKNOWLEDGED lines
  * naming version nine's ids are held by the committed case sets that hold them (D3c; `REG-F-576`). The case set stays version
  * ten: no record measured it.
+ * ⭐⭐ Version eleven since `JAN-EXEC` Phase 7, the review in parts, B8b, package K (`REG-D-133`; design D3d and §5): version
+ * ten's 41 non-part cases, its 16 software part cases and 12 of its 19 bridge part cases under their ids, byte for byte, and
+ * its other 7 — the options study's part, the four clean roots and the two planted roots whose children include it — under new
+ * ids, `G11-…`, cut from their sources restated by D3d: the options study's purpose states the comparison criteria the
+ * request makes essential. Their oracles are version ten's, carried to the new ids (`oracles-v11.ts`). ⚠ The 7 are new
+ * prompts, so the check owes a RUN of the selected reviewer over them alone (limb 1); version ten's run of the 19 reproduces
+ * (limb 2), recording no current id whose prompt moved; the 69 others keep their prompts and stay covered as the record
+ * stands.
  */
-export const CURRENT_CASE_SET_FILE = CASE_SET_V10_FILE;
-export const CURRENT_ORACLES_FILE = ORACLES_V10_FILE;
+export const CURRENT_CASE_SET_FILE = CASE_SET_V11_FILE;
+export const CURRENT_ORACLES_FILE = ORACLES_V11_FILE;
 
 /**
  * ⭐⭐ `E12F` F5 (the E12 package review's fifth finding; `REG-D-073`, oracle integrity) — THE WORDS AN ORACLE SET'S
