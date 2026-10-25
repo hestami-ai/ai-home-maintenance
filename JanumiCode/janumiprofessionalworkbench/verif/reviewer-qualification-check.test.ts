@@ -2539,14 +2539,20 @@ describe('⭐⭐ the review in parts, B8b, package K — under case set v11 and 
 		]);
 		expect((await onVersionTen([file(lines)])).problems, 'CONTROL: the record as it stood under version ten').toEqual([]);
 		// ⭑ CONTROL — the ESCALATION line is what answers for the options study's reading under version ten: without it, version
-		// ten owes one. ⚠ PRESENT BEHAVIOUR, PINNED AS IT STANDS (package K's report, for the lead): under version eleven the same
-		// reading is no material failure at all — limb 3 judges a record's evaluations against TODAY'S oracles (`check-core.ts`,
-		// `absolute`), which hold none for G10-CLEAN.T03, renamed since — so without the line version eleven owes nothing more.
+		// ten owes one. ⚠ PRESENT BEHAVIOUR, PINNED AS IT STANDS: ~~(package K's report, for the lead)~~ ⭐ package K's check — a
+		// residual the register already records and the sponsor confirmed, not one package K found: `REG-D-075`'s RESIDUALS,
+		// *"An un-cited failure vanishes when its case leaves the set, because failures are judged against today's oracles."*,
+		// ✅ CONFIRMED by `REG-D-078` (*"3 - Your delegated calls for REG-D-075, REG-D-076, and REG-D-077 are all approved."*).
+		// Under version eleven the same reading is no material failure at all — limb 3 judges a record's evaluations against
+		// TODAY'S oracles (`check-core.ts`, `absolute`), which hold none for G10-CLEAN.T03, renamed since — so without the line
+		// version eleven owes nothing more. Whether limb 3 should judge a past evaluation against the oracle set of the version
+		// its run measured, as D3c now holds an ACKNOWLEDGED line to every committed case set (`REG-F-576`), reopens that
+		// confirmed residual: the lead's, not package K's. A fix that does so reddens the assertion below, under its label.
 		const unescalated = lines.filter((l) => l !== escalated);
 		expect(limb(await onVersionTen([file(unescalated)]), 'ESCALATION'), 'CONTROL: under version ten, unescalated, the reading owes its ESCALATION').toContain(
 			'qr-v10-bridge: G10-CLEAN.T03 — CLEAN_NOT_SATISFIED'
 		);
-		expect((await onVersionEleven([file(unescalated)])).problems, 'present behaviour: under version eleven the renamed case’s reading is judged against no oracle').toEqual([
+		expect((await onVersionEleven([file(unescalated)])).problems, 'present behaviour, REG-D-075’s residual (confirmed, REG-D-078: “An un-cited failure vanishes when its case leaves the set”): under version eleven the renamed case’s reading is judged against no oracle').toEqual([
 			{ limb: 'COVERAGE', message: owed('any', SEVEN, unescalated) },
 			{ limb: 'COVERAGE', message: owed('selected', SEVEN, unescalated) }
 		]);
