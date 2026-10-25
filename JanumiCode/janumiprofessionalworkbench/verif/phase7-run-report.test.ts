@@ -2398,10 +2398,12 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 		// (`REG-D-126` Q32, raising `REG-D-110` (1)'s), and the caveat names that ruling.
 		// ⭐ The review in parts, package I (B8b) — ~~"about 900", REG-D-126 Q32~~: the sponsor raised it again, to about 1,000
 		// (`REG-D-131` Q37, raising `REG-D-110` (1)'s), held by the lane as 1000, and the caveat names that ruling.
+		// ⭐ Package I's check, finding 3 — ~~"about 1000"~~: the caveat QUOTES the sponsor, so it quotes the words Q37's chosen
+		// label and its meaning wrote, "about 1,000", with the thousands comma the constant is held without (`lane-config.ts`).
 		const caveat =
 			'A phase’s own spend can carry the total past the limit: the lane checks the limit before each press, not during one, ' +
 			'and a model unit’s press may spend up to 140 reviewer calls after its check (REG-D-114 (14), as amended ' +
-			'2026-10-16; the sponsor’s limit is "about 1000", REG-D-131 Q37, raising REG-D-110 (1)).';
+			'2026-10-16; the sponsor’s limit is "about 1,000", REG-D-131 Q37, raising REG-D-110 (1)).';
 		const r = reportOf(aRun({})).report;
 		expect(renderMarkdown(r), 'report.md carries no caveat that a press can spend past the limit').toContain(`- **Caveat:** ${caveat}`);
 		expect(r.reviewerCalls.limitCaveat, 'report.json carries no caveat that a press can spend past the limit').toBe(caveat);

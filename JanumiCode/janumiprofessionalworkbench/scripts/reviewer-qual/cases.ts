@@ -104,7 +104,10 @@ interface CaseCommon {
 	 *  sources — their oracles unchanged: a measurement counts for a case only where its recorded prompt is today's
 	 *  (`check-core.ts` limb 1), so no record of version eight's covers them. ⭐ So does version ten (`REG-D-130`) with
 	 *  version nine's 19 bridge part cases, cut from their sources restated by D3b, under their ids, their oracles
-	 *  unchanged: no record of version nine's covers them. */
+	 *  unchanged: no record of version nine's covers them. ⚠ (Package I's check, finding 1.) And unlike version nine's,
+	 *  UNDER AN UNMOVED FINGERPRINT: version nine's record of them carries today's, so limb 2 reads each as a prompt that
+	 *  moved while the fingerprint did not — a non-reproduction a re-run does not discharge (`check-core.ts`; the check
+	 *  test's B8b describe pins it, and its J2-5, J2-7 and round-5 CONTROLS say why a changed case otherwise gets a new id). */
 	readonly id: string;
 	/** The subject the floor composes over — its id, version and the producer independence is checked against. */
 	readonly subject: AssuranceSubject;
@@ -250,8 +253,14 @@ export const ORACLES_V10_FILE = 'docs/tracking/reviewer-qualification/oracles/or
  * 16 software part cases byte for byte, still cut with the seeded library, and the 19 bridge part cases cut from their sources
  * restated as a competent author authors them on today's surface (who does the work, the practice's six kind-scoped policies
  * declared, the check's attestation, four purposes and two hand-offs), each cut with the bridge library, confirmed by the
- * sponsor as proposed (`REG-D-131` Q36), and version ten's record says so (`oracles-v10.ts`). ⚠ The 19 are new prompts, so the
- * check owes a RUN of the selected reviewer over them; the 57 keep their prompts, and RESCORED lines may discharge them.
+ * sponsor as proposed (`REG-D-131` Q36), and version ten's record says so (`oracles-v10.ts`). ~~⚠ The 19 are new prompts, so the
+ * check owes a RUN of the selected reviewer over them; the 57 keep their prompts, and RESCORED lines may discharge them.~~
+ * ⭐ Package I's check, finding 1 — ⚠ THE 19 ARE NEW PROMPTS UNDER THEIR IDS AND AN UNMOVED FINGERPRINT: the check owes a RUN of
+ * the selected reviewer over them (limb 1), AND reads version nine's run of the 35 part cases, which carries today's
+ * fingerprint, as a non-reproduction of each of the 19 in each repetition (limb 2) — which a RUN does not discharge, only a
+ * SUPERSEDED line citing a register finding, striking that whole run and the coverage of the 16 software part cases with it.
+ * The 57 keep their prompts and stay covered as the record stands: nothing is owed for them. How limb 2 is discharged for
+ * version ten is the lead's to settle (the check test's B8b describe pins what the check says meanwhile).
  */
 export const CURRENT_CASE_SET_FILE = CASE_SET_V10_FILE;
 export const CURRENT_ORACLES_FILE = ORACLES_V10_FILE;

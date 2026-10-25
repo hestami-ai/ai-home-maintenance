@@ -49,6 +49,10 @@
 // is the same case. A case edited in place under its id reads here as a non-reproduction — which it is. ⚠ Version nine's 35
 // part cases are the exception `cases.ts` states: carried under their ids with their inputs moved (`REG-D-127`), so a
 // record of version eight's, under its earlier fingerprint, covers none of them — their prompts are not today's.
+// ⚠ ⭐ B8b (`REG-D-130`; package I's check, finding 1) — version ten carries version nine's 19 bridge part cases so too, but
+// under an UNMOVED fingerprint: version nine's run of them carries today's, so limb 2 reads each as a non-reproduction —
+// which, by this file's rule, it is — discharged only by a SUPERSEDED line, which strikes the whole run. The check test's B8b
+// describe pins it; how it is discharged is the lead's to settle.
 import {
 	ORACLES_PROPOSED,
 	ORACLES_RESTATEMENT_UNCONFIRMED,

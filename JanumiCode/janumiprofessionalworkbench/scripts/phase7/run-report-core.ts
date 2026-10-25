@@ -162,11 +162,14 @@ export const NEGATIVE_CONTROL_RESERVE = PHASE7_NEGATIVE_CONTROL_RESERVE;
  * `REG-D-110` (1)'s.
  * ⭐ The review in parts, package I (B8b) — ~~REG-D-126 Q32~~: the sponsor's limit is now the one `REG-D-131` Q37 chose, raising
  * `REG-D-110` (1)'s.
+ * ⭐ Package I's check, finding 3 — ~~"about ${PAID_LIMIT}"~~: THE CAVEAT QUOTES THE SPONSOR, so it writes the number as the
+ * sponsor's words wrote it — Q37's chosen label and its meaning, "about 1,000" — with the thousands comma the constant is held
+ * without (`lane-config.ts`). Every earlier limit quoted exactly, having no thousands.
  */
 export const LIMIT_CAVEAT =
 	`A phase’s own spend can carry the total past the limit: the lane checks the limit before each press, not during one, ` +
 	`and a model unit’s press may spend up to ${PHASE7_UNIT_REVIEWER_CALLS} reviewer calls after its check (REG-D-114 (14), as ` +
-	`amended 2026-10-16; the sponsor’s limit is "about ${PAID_LIMIT}", REG-D-131 Q37, raising REG-D-110 (1)).`;
+	`amended 2026-10-16; the sponsor’s limit is "about ${PAID_LIMIT.toLocaleString('en-US')}", REG-D-131 Q37, raising REG-D-110 (1)).`;
 /** The declared verdicts a complete run signs off: the five units' declared policies, 2 + 2 + 4 + 3 + 3 (§3.2). */
 export const DECLARED_VERDICTS_EXPECTED = 14;
 

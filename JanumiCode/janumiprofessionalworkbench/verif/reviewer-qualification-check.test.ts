@@ -2073,6 +2073,174 @@ describe('⭐⭐ the review in parts, B8a — under case set v9 and the fingerpr
 	});
 });
 
+// ── ⭐⭐ `JAN-EXEC` Phase 7, the review in parts, B8b (`REG-D-130`, `REG-D-131`; DESIGN-authoring-review-in-parts.md D3b and §5) ─
+// Version ten is current, and D3b moved NO fingerprint: the reviewer, its probes, budget, criteria and scoring are version
+// nine's, and only the 19 bridge part cases' inputs moved — under their ids (`cases.ts`). So the record's shape — the selected
+// candidate's run of version eight under the fingerprint before D3a, re-stamped for the 41 carried cases, and its run of
+// version nine's 35 part cases under TODAY'S fingerprint, two repetitions, every case answered as its oracle expects (the
+// committed record's shape since 14c141af) — owes coverage of exactly the 19; and limb 2, which compares every record carrying
+// today's fingerprint with today's prompts, reads version nine's part run as a NON-REPRODUCTION of each of the 19 in each
+// repetition: the prompt it recorded is not the one today's reviewer sends, though the fingerprint did not move.
+// ⛔ A RUN OVER THE 19 DOES NOT DISCHARGE THAT: only a SUPERSEDED line citing a register finding does, and it strikes the WHOLE
+// run, so the 16 software part cases it alone covered are owed again — a run over all 35, not the 19. Pinned as it stands
+// (package I's check, finding 1): how limb 2 is discharged for version ten, and at what spend, is the lead's to settle; a
+// change to the check or the record changes these cases with it.
+describe('⭐⭐ the review in parts, B8b — under case set v10 and an UNMOVED fingerprint, v9’s record shape owes coverage of exactly the 19 bridge part cases, and limb 2 reads v9’s part run as a non-reproduction of each of them, which a run over the 19 does not discharge; a SUPERSEDED line strikes the whole run and owes the 16 software part cases again (REG-D-130, REG-D-131, REG-D-086)', () => {
+	const GLM: SelectedCandidate = { transport: 'devin', modelLabel: 'glm-5-3-flash-max' };
+	/** The 19 D3b restated, as `reviewer:qual:check` names them on the committed record, in the set's order. */
+	const BRIDGE = [
+		'G3-CLEAN.T01',
+		'G3-CLEAN.T02',
+		'G3-CLEAN.T03',
+		'G3-CLEAN.T04',
+		'G3-CLEAN.T05',
+		'G3-CLEAN.T06',
+		'G3-CLEAN.T07',
+		'G3-CLEAN-R1.T01',
+		'G3-CLEAN-R2.T01',
+		'G3-CLEAN-R3.T01',
+		'G-RR-01.T01',
+		'G3-RR-02.T01',
+		'G3-RR-03.T04',
+		'G3-RR-04.T05',
+		'G3-RR-05.T01',
+		'G3-RR-06.T05',
+		'G3-RR-07.T06',
+		'G3-RR-08.T05',
+		'G3-RR-09.T01'
+	];
+	const SOFTWARE = (): string[] => CURRENT_CASES.filter((c) => c.arm === 'PWA_TYPE' && !BRIDGE.includes(c.id)).map((c) => c.id);
+	/** Today's set — version ten — and its oracles, under their committed statement. */
+	const onVersionTen = (files: CheckInputs['files']) =>
+		check(files, { current: FP_NOW, cases: CURRENT_CASES, oracles: CURRENT_ORACLES.oracles, conferral: CURRENT_ORACLES.conferral });
+	/** Version nine and its oracles, under their committed statement: the CONTROL, the same record under the set it was made for. */
+	const onVersionNine = (files: CheckInputs['files']) =>
+		check(files, { current: FP_V9, cases: V9_CASES, oracles: V9_ORACLES.oracles, conferral: V9_ORACLES.conferral });
+	/** The definition before D3a: today's but for the probes, which D3a moved. */
+	const BEFORE_D3A = (): RunFingerprint => ({ ...moved('probes'), caseSet: FP_V8.caseSet });
+	const v8Run = (): Promise<RecordLine[]> =>
+		recorded({
+			runId: 'qr-v8-before-d3a',
+			date: '2026-10-24T10:00:00.000Z',
+			candidate: DEVIN,
+			cases: V8_CASES,
+			fingerprint: BEFORE_D3A(),
+			versions: { caseSet: 8, oracles: 8 }
+		});
+	/** Its 41 carried cases re-stamped under today's fingerprint, as version nine's set stood. */
+	const restamped = (lines: readonly RecordLine[]) =>
+		rescoredLines(
+			lines.find((l): l is RunLine => l.kind === 'RUN')!,
+			lines.filter((l): l is CallLine => l.kind === 'CALL'),
+			V9_CASES,
+			FP_V9.casePrompts,
+			{
+				rescoreId: 'rs-v8-before-d3a',
+				date: '2026-10-24T12:00:00.000Z',
+				commit: 'b'.repeat(40),
+				reviewer: FP.reviewer,
+				scoring: FP.scoring,
+				caseSet: FP_V9.caseSet
+			}
+		);
+	/** The selected candidate's run of version nine's 35 part cases under today's fingerprint, two repetitions, as 14c141af's. */
+	const v9Parts = () =>
+		recorded({
+			runId: 'qr-v9-parts',
+			date: '2026-10-24T14:00:00.000Z',
+			candidate: DEVIN,
+			cases: V9_CASES.filter((c) => c.arm === 'PWA_TYPE'),
+			fingerprint: { ...CURRENT, caseSet: FP_V9.caseSet },
+			repetitions: 2,
+			versions: { caseSet: 9, oracles: 9 }
+		});
+	/** A run of the selected candidate over some of version ten's cases under today's fingerprint, as their oracles expect. */
+	const v10Run = (runId: string, ids: readonly string[], date: string) =>
+		recorded({
+			runId,
+			date,
+			candidate: DEVIN,
+			cases: CURRENT_CASES.filter((c) => ids.includes(c.id)),
+			fingerprint: { ...CURRENT, caseSet: FP_NOW.caseSet },
+			repetitions: 2,
+			versions: { caseSet: 10, oracles: 10 }
+		});
+	/** The SUPERSEDED line that strikes version nine's part run, citing a finding the register holds. */
+	const strikeV9Parts: RecordLine = {
+		kind: 'SUPERSEDED',
+		date: '2026-10-25T12:00:00.000Z',
+		record: 'qr-v9-parts',
+		finding: 'REG-F-429',
+		note: 'A fixture: version ten restated the 19 bridge part cases under their ids.'
+	};
+	const owed = (who: 'any' | 'selected', ids: readonly string[], lines: readonly RecordLine[]) =>
+		who === 'any'
+			? `${ids.length} of 76 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer}: ${ids.join(', ')} — owed: a RUN over them, or RESCORED lines where no case prompt changed (§5.6 limb 1)`
+			: `${ids.length} of 76 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer} by the SELECTED candidate devin / glm-5-3-flash-max (REG-D-084; the SELECTION in force, runs.ndjson:${lines.length}): ${ids.join(', ')} — owed: a run of the selected candidate over them, or RESCORED lines of its runs where no case prompt changed (§5.6 limb 1; REG-D-086)`;
+	/** Limb 2's one problem for version nine's part run: each of the 19 in each repetition, then what discharges it. */
+	const V9_PARTS_DO_NOT_REPRODUCE = (): string =>
+		[
+			...[1, 2].flatMap((n) =>
+				BRIDGE.map(
+					(id) => `run qr-v9-parts: ${id}#${n} initial — the prompt it recorded is not the one today’s reviewer sends, though the fingerprint did not move`
+				)
+			),
+			'— does not reproduce: discharged only by a SUPERSEDED line citing a register finding (§5.6 limb 2)'
+		].join('\n    ');
+
+	it('⛔ RED, AND EXACTLY SO — coverage of exactly the 19, by any candidate and by the selected one, and ONE reproduction problem, v9’s part run, naming each of the 19 in each repetition; nothing else — no CONFERRAL (REG-D-131 Q36), and the 57 others covered as they stand. CONTROL: under version nine the same record is GREEN', async () => {
+		expect([CURRENT_SET.caseSetVersion, CURRENT_ORACLES.oracleVersion], 'the current set is version ten').toEqual([10, 10]);
+		expect(FP_NOW.reviewer, 'arrangement: D3b moved no fingerprint').toBe(FP_V9.reviewer);
+		expect(FP_NOW.caseSet, 'arrangement: the case-set digest moved').not.toBe(FP_V9.caseSet);
+		const restated = CURRENT_CASES.filter((c) => FP_V9.casePrompts.get(c.id)?.initial !== FP_NOW.casePrompts.get(c.id)?.initial).map(
+			(c) => c.id
+		);
+		expect(restated, 'arrangement: the 19, and only they, send prompts version nine did not').toEqual(BRIDGE);
+		expect(SOFTWARE().length, 'the software part cases').toBe(16);
+		const v8 = await v8Run();
+		const lines = [...v8, ...(await restamped(v8)), ...(await v9Parts()), select(GLM)];
+		expect((await onVersionNine([file(lines)])).problems, 'CONTROL: the record as it stood under version nine').toEqual([]);
+		expect((await onVersionTen([file(lines)])).problems).toEqual([
+			{ limb: 'COVERAGE', message: owed('any', BRIDGE, lines) },
+			{ limb: 'COVERAGE', message: owed('selected', BRIDGE, lines) },
+			{ limb: 'REPRODUCTION', message: V9_PARTS_DO_NOT_REPRODUCE() }
+		]);
+	});
+
+	it('⛔ A RUN OVER THE 19 DOES NOT TURN IT GREEN — the selected candidate’s run of the 19 under today’s fingerprint, each as its oracle expects, discharges their coverage, and v9’s part run still does not reproduce: that problem alone, unchanged', async () => {
+		const v8 = await v8Run();
+		const lines = [
+			...v8,
+			...(await restamped(v8)),
+			...(await v9Parts()),
+			...(await v10Run('qr-v10-bridge', BRIDGE, '2026-10-25T10:00:00.000Z')),
+			select(GLM)
+		];
+		expect((await onVersionTen([file(lines)])).problems).toEqual([{ limb: 'REPRODUCTION', message: V9_PARTS_DO_NOT_REPRODUCE() }]);
+	});
+
+	it('⭐ A SUPERSEDED LINE STRIKES THE WHOLE RUN — citing a register finding, it discharges the reproduction problem, and the 16 software part cases v9’s part run alone covered are owed again, by any candidate and by the selected one; a run over them too is GREEN. CONTROL: under version nine the same line is refused, the run reproducing there', async () => {
+		const v8 = await v8Run();
+		const before = [
+			...v8,
+			...(await restamped(v8)),
+			...(await v9Parts()),
+			...(await v10Run('qr-v10-bridge', BRIDGE, '2026-10-25T10:00:00.000Z'))
+		];
+		const struck = [...before, strikeV9Parts, select(GLM)];
+		expect((await onVersionTen([file(struck)])).problems).toEqual([
+			{ limb: 'COVERAGE', message: owed('any', SOFTWARE(), struck) },
+			{ limb: 'COVERAGE', message: owed('selected', SOFTWARE(), struck) }
+		]);
+		const all35 = [...before, strikeV9Parts, ...(await v10Run('qr-v10-software', SOFTWARE(), '2026-10-25T14:00:00.000Z')), select(GLM)];
+		expect((await onVersionTen([file(all35)])).problems, 'the 35 run under version ten: nothing owed').toEqual([]);
+		const underNine = [...v8, ...(await restamped(v8)), ...(await v9Parts()), strikeV9Parts, select(GLM)];
+		expect(limb(await onVersionNine([file(underNine)]), 'REPRODUCTION'), 'CONTROL: under version nine it reproduces').toBe(
+			`runs.ndjson:${underNine.length - 1}: SUPERSEDED names qr-v9-parts, which reproduces — refused: a record is struck only when it really fails reproduction (§5.6 limb 2)`
+		);
+	});
+});
+
 // ── ⭐ `JAN-CRITREAD` J2-6 — the pass bar is the RIGHT VERDICT (`REG-D-080`; DESIGN §5.1 as amended) ────────────────────
 /** The Reasoning Review criterion ids the J2-6 limb plants, names and leaves out: RR-02, RR-04 (G-RR-04's planted one),
  *  RR-07, RR-08. */
@@ -2746,8 +2914,8 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 	 * GREEN.~~
 	 * ⭐ The code record of `REG-D-129` — THEY RETURN TO GREEN: the sponsor confirmed the restated cases, and the committed
 	 * statement says so, so a record with nothing owed is GREEN again, as under B7. The confirmation limb stays held, through
-	 * the CLI's own reading of the oracle file, by the case that runs `main` on a disposable root whose version nine still
-	 * carries the marker (`ONLY_THE_CONFIRMATION`).
+	 * the CLI's own reading of the oracle file, by the case that runs `main` on a disposable root whose ~~version nine~~ ⭐ B8b:
+	 * version ten, confirmed as proposed (`REG-D-131` Q36), still carries the marker (`ONLY_THE_CONFIRMATION`).
 	 */
 	const ONLY_THE_CONFIRMATION = `reviewer:qual:check — RED — 1 problem(s):\n  [CONFERRAL] ${RESTATEMENT_NOT_CONFIRMED}\n`;
 	// ⭐ B8a — ~~`GREEN_HEAD`~~: no case reads it while the confirmation is owed (`ONLY_THE_CONFIRMATION`). ⭐ `REG-D-129` — read
@@ -2795,11 +2963,11 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		expect(CURRENT_SET.caseSetVersion).toBe(10);
 	});
 
-	it('⭐ on a TRACKED record that covers the committed set, reproduces, and holds no material failure: ~~nothing owed but the conferral of version seven’s six new oracles (package P F3)~~ ~~⭐ GREEN, its oracles conferred (REG-D-126, B7)~~ ~~⭐ B8a: nothing owed but the sponsor’s confirmation of the restated bridge cases (REG-D-127)~~ ⭐ GREEN, the restatement confirmed (REG-D-129)', async () => {
+	it('⭐ on a TRACKED record that covers the committed set, reproduces, and holds no material failure: ~~nothing owed but the conferral of version seven’s six new oracles (package P F3)~~ ~~⭐ GREEN, its oracles conferred (REG-D-126, B7)~~ ~~⭐ B8a: nothing owed but the sponsor’s confirmation of the restated bridge cases (REG-D-127)~~ ⭐ GREEN, the restatement confirmed (REG-D-129) ⭐ B8b: and version ten’s, confirmed as proposed (REG-D-131 Q36)', async () => {
 		const dir = gitRepo();
 		writeFileSync(
 			join(dir, 'runs.ndjson'),
-			text(await recorded({ runId: 'qr-cli-1', cases: CURRENT_CASES, versions: { caseSet: 9, oracles: 9 } }))
+			text(await recorded({ runId: 'qr-cli-1', cases: CURRENT_CASES, versions: { caseSet: 10, oracles: 10 } }))
 		);
 		git(dir, 'add', 'runs.ndjson');
 		const r = cli(['--conditions=source'], ['--records', dir]);
@@ -2822,11 +2990,14 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 	// ⭐ The code record of `REG-D-129` — AND BACK AGAIN: the committed version nine records the sponsor's confirmation, so the copy
 	// is GREEN; the same copy, its statement still carrying the marker, is RED on the confirmation alone; and made to read
 	// PROPOSED instead, it is RED on the conferral alone.
-	it('⛔ E12F F5 — the CLI reads the conferral off its oracle file: ~~the committed version seven, its six new oracles PROPOSED, nothing else owed, is RED on the conferral alone; the same file, its conferral recorded, is GREEN~~ ~~⭐ B7: the committed version eight, conferred, is GREEN; the same file made to read PROPOSED, nothing else owed, is RED on the conferral alone~~ ~~⭐ B8a: the committed version nine, its restatement unconfirmed, nothing else owed, is RED on the confirmation alone; the same file, the confirmation recorded, is GREEN; made to read PROPOSED, RED on the conferral alone~~ ⭐ REG-D-129: the committed version nine, its restatement confirmed, is GREEN; the same file still carrying the marker, nothing else owed, is RED on the confirmation alone; made to read PROPOSED, RED on the conferral alone', async () => {
+	// ⭐ B8b (`REG-D-130`, `REG-D-131`) — ~~the committed version nine~~: the committed version ten, whose statement records the
+	// sponsor's confirmation of its restated bridge cases as proposed (`REG-D-131` Q36), so the copy is GREEN as before; the
+	// marker and PROPOSED cases run as before, the fixture statement now version ten's.
+	it('⛔ E12F F5 — the CLI reads the conferral off its oracle file: ~~the committed version seven, its six new oracles PROPOSED, nothing else owed, is RED on the conferral alone; the same file, its conferral recorded, is GREEN~~ ~~⭐ B7: the committed version eight, conferred, is GREEN; the same file made to read PROPOSED, nothing else owed, is RED on the conferral alone~~ ~~⭐ B8a: the committed version nine, its restatement unconfirmed, nothing else owed, is RED on the confirmation alone; the same file, the confirmation recorded, is GREEN; made to read PROPOSED, RED on the conferral alone~~ ⭐ REG-D-129: the committed ~~version nine~~ ⭐ B8b: version ten, its restatement confirmed (REG-D-131 Q36), is GREEN; the same file still carrying the marker, nothing else owed, is RED on the confirmation alone; made to read PROPOSED, RED on the conferral alone', async () => {
 		const dir = gitRepo();
 		writeFileSync(
 			join(dir, 'runs.ndjson'),
-			text(await recorded({ runId: 'qr-cli-proposed', cases: CURRENT_CASES, versions: { caseSet: 9, oracles: 9 } }))
+			text(await recorded({ runId: 'qr-cli-proposed', cases: CURRENT_CASES, versions: { caseSet: 10, oracles: 10 } }))
 		);
 		git(dir, 'add', 'runs.ndjson');
 		const root = tmp();
@@ -2868,14 +3039,15 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		const unconfirmed = await run();
 		expect(unconfirmed.out, 'the CLI read no marker off its oracle file').toContain(ONLY_THE_CONFIRMATION);
 		expect(unconfirmed.code, unconfirmed.out).toBe(1);
-		writeFileSync(current, JSON.stringify({ ...set, conferral: `A fixture: version nine’s part oracles are ${DECLARED_ORACLES_PROPOSED}.` }));
+		// ⭐ B8b — ~~version nine’s~~ version ten’s: the committed oracle file is version ten’s.
+		writeFileSync(current, JSON.stringify({ ...set, conferral: `A fixture: version ten’s part oracles are ${DECLARED_ORACLES_PROPOSED}.` }));
 		const proposed = await run();
 		expect(proposed.out, 'the CLI handed the check no conferral').toContain(ONLY_THE_CONFERRAL);
 		expect(proposed.code, proposed.out).toBe(1);
 	}, 120_000);
 
 	it('⛔ a record file git does not track, or one changed since it was staged, is NOT READ — green here is green on the commit', async () => {
-		const lines = await recorded({ runId: 'qr-cli-2', cases: CURRENT_CASES, versions: { caseSet: 9, oracles: 9 } });
+		const lines = await recorded({ runId: 'qr-cli-2', cases: CURRENT_CASES, versions: { caseSet: 10, oracles: 10 } });
 		const untracked = gitRepo();
 		writeFileSync(join(untracked, 'runs.ndjson'), text(lines));
 		const r = cli(['--conditions=source'], ['--records', untracked]);
@@ -2898,7 +3070,7 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		const missed = await recorded({
 			runId: 'qr-cli-3',
 			cases: CURRENT_CASES,
-			versions: { caseSet: 9, oracles: 9 },
+			versions: { caseSet: 10, oracles: 10 },
 			reply: (id) => (id === 'G3-RR-04.T05' ? judgement([]) : asOracle(id))
 		});
 		writeFileSync(join(dir, 'runs.ndjson'), text([...missed, escalate('qr-cli-3', ['G3-RR-04.T05'], 'REG-F-105')]));
@@ -2923,7 +3095,7 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		const lines = await recorded({
 			runId: 'qr-cli-4',
 			cases: CURRENT_CASES,
-			versions: { caseSet: 9, oracles: 9 },
+			versions: { caseSet: 10, oracles: 10 },
 			reply: (id) => (id === 'W-RR-04' ? judgement([RR02]) : asOracle(id))
 		});
 		writeFileSync(join(dir, 'runs.ndjson'), text(lines));
@@ -2952,7 +3124,7 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		// The committed record's shape: a run of version one under today's fingerprint, beside one over today's set.
 		const dir = gitRepo();
 		const v1 = await recorded({ runId: 'qr-cli-5', cases: CASES });
-		const now = await recorded({ runId: 'qr-cli-6', cases: CURRENT_CASES, versions: { caseSet: 9, oracles: 9 } });
+		const now = await recorded({ runId: 'qr-cli-6', cases: CURRENT_CASES, versions: { caseSet: 10, oracles: 10 } });
 		writeFileSync(join(dir, 'runs.ndjson'), text([...v1, ...now]));
 		git(dir, 'add', 'runs.ndjson');
 		const r = cli(['--conditions=source'], ['--records', dir]);
@@ -2977,7 +3149,7 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 
 	it('⭐ SR-4 — the CLI names the SELECTION in force in its header and holds coverage to it: ~~nothing but the conferral owed (package P F3)~~ ⭐ GREEN (B7) on the selected candidate’s run, coverage owed for a candidate never run, naming all 76 cases (REG-D-086)', async () => {
 		const dir = gitRepo();
-		const glm = await recorded({ runId: 'qr-cli-7', candidate: DEVIN, cases: CURRENT_CASES, versions: { caseSet: 9, oracles: 9 } });
+		const glm = await recorded({ runId: 'qr-cli-7', candidate: DEVIN, cases: CURRENT_CASES, versions: { caseSet: 10, oracles: 10 } });
 		writeFileSync(join(dir, 'runs.ndjson'), text([...glm, select({ transport: 'devin', modelLabel: 'glm-5-3-flash-max' })]));
 		git(dir, 'add', 'runs.ndjson');
 		const r = cli(['--conditions=source'], ['--records', dir]);
@@ -3003,7 +3175,7 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		// with the SELECTION appended.
 		const dir = gitRepo();
 		const v1 = await recorded({ runId: 'qr-cli-8', cases: CASES });
-		const glm = await recorded({ runId: 'qr-cli-9', candidate: DEVIN, cases: CURRENT_CASES, versions: { caseSet: 9, oracles: 9 } });
+		const glm = await recorded({ runId: 'qr-cli-9', candidate: DEVIN, cases: CURRENT_CASES, versions: { caseSet: 10, oracles: 10 } });
 		const lines = [...v1, ...glm, select({ transport: 'devin', modelLabel: 'glm-5-3-flash-max' })];
 		writeFileSync(join(dir, 'runs.ndjson'), text(lines));
 		git(dir, 'add', 'runs.ndjson');
