@@ -968,7 +968,13 @@ describe('⭐ P7-2 D4 — the Phase 7 lane waits an ALLOWANCE derived from the b
 	// the limit to about 800 (Recommended)"~~ — superseded: with the 3-level pair the plan was about 781 of its 800 before
 	// retries, and P6's authoring reviews alone could take up to 128 calls in the worst case (Q32's question). The promise is
 	// unchanged.
-	it('⭐ D8 — the paid limit is the sponsor’s, read from the ruling in force, REG-D-126 Q32, which raises REG-D-110 (1)’s', () => {
+	// ⭐ `JAN-EXEC` Phase 7, the review in parts, package I (B8b; 2026-10-24) — THE RULING IN FORCE IS NOW `REG-D-131` Q37, which
+	// raises `REG-D-110` (1)'s limit again: the sponsor chose *"Raise to about 1,000 (Recommended)"*, and its meaning says
+	// *"`REG-D-110` (1)'s limit becomes about 1,000."*. The number is read from the label the sponsor chose, written with its
+	// thousands comma, and the meaning from Q37's own MEANING; ~~REG-D-126 Q32's chosen label, "Raise to about 900
+	// (Recommended)"~~ — superseded: the bridge measurement and P6 again reached about 895 of its 900, leaving about 5 for
+	// retries (Q37's question). The promise is unchanged.
+	it('⭐ D8 — the paid limit is the sponsor’s, read from the ruling in force, ~~REG-D-126 Q32~~ REG-D-131 Q37, which raises REG-D-110 (1)’s', () => {
 		const register = readFileSync(REGISTER, 'utf8');
 		const entry = (id: string) => {
 			const at = register.indexOf(`### ${id} `);
@@ -977,18 +983,19 @@ describe('⭐ P7-2 D4 — the Phase 7 lane waits an ALLOWANCE derived from the b
 			return register.slice(at, next === -1 ? undefined : next);
 		};
 		expect(entry('REG-D-110'), 'REG-D-110 does not amend REG-D-102 (4)').toContain('(`REG-D-102` (4) amended)');
-		const q32 = entry('REG-D-126')
+		const q37 = entry('REG-D-131')
 			.split('\n- ')
-			.find((item) => item.startsWith('**Q32.**'));
-		expect(q32, 'REG-D-126 records no Q32').toBeDefined();
-		const chosen = /the sponsor chose \*"Raise to about (\d+) \(Recommended\)"\*/.exec(q32!)?.[1];
-		expect(chosen, 'the label the sponsor chose in REG-D-126 Q32 states no limit').toBeDefined();
-		const meaning = q32!.split('\n  - ').find((part) => part.startsWith('**MEANING.**'));
-		expect(meaning, 'REG-D-126 Q32 records no MEANING').toBeDefined();
-		expect(meaning, 'REG-D-126 Q32’s meaning does not raise REG-D-110 (1)’s limit to the number chosen').toContain(
+			.find((item) => item.startsWith('**Q37.**'));
+		expect(q37, 'REG-D-131 records no Q37').toBeDefined();
+		// ⭑ The label writes its number with a thousands comma, "1,000": read as written, then parsed without the comma.
+		const chosen = /the sponsor chose \*"Raise to about (\d{1,3}(?:,\d{3})*) \(Recommended\)"\*/.exec(q37!)?.[1];
+		expect(chosen, 'the label the sponsor chose in REG-D-131 Q37 states no limit').toBeDefined();
+		const meaning = q37!.split('\n  - ').find((part) => part.startsWith('**MEANING.**'));
+		expect(meaning, 'REG-D-131 Q37 records no MEANING').toBeDefined();
+		expect(meaning, 'REG-D-131 Q37’s meaning does not raise REG-D-110 (1)’s limit to the number chosen').toContain(
 			`\`REG-D-110\` (1)'s limit becomes about ${chosen}.`
 		);
-		expect(PHASE7_PAID_LIMIT, 'the lane’s limit is not the one the sponsor chose (REG-D-126 Q32)').toBe(Number(chosen));
+		expect(PHASE7_PAID_LIMIT, 'the lane’s limit is not the one the sponsor chose (REG-D-131 Q37)').toBe(Number(chosen!.replaceAll(',', '')));
 	});
 
 	it('⭐ D8 — the reserve is the negative control’s own cap on reviewer calls (P7-4e)', () => {

@@ -48,6 +48,7 @@ import {
 	CASE_SET_V6_FILE,
 	CASE_SET_V7_FILE,
 	CASE_SET_V8_FILE,
+	CASE_SET_V9_FILE,
 	CURRENT_CASE_SET_FILE,
 	CURRENT_ORACLES_FILE,
 	ORACLES_PROPOSED,
@@ -60,6 +61,7 @@ import {
 	ORACLES_V6_FILE,
 	ORACLES_V7_FILE,
 	ORACLES_V8_FILE,
+	ORACLES_V9_FILE,
 	type CaseSet,
 	type OracleSet,
 	type QualificationCase
@@ -143,6 +145,10 @@ const V7_ORACLES = JSON.parse(readFileSync(`${REPO}/${ORACLES_V7_FILE}`, 'utf8')
 const V8_SET = JSON.parse(readFileSync(`${REPO}/${CASE_SET_V8_FILE}`, 'utf8')) as CaseSet;
 const V8_CASES = V8_SET.cases;
 const V8_ORACLES = JSON.parse(readFileSync(`${REPO}/${ORACLES_V8_FILE}`, 'utf8')) as OracleSet;
+/** ⭐ B8b — version nine, current from B8a to B8b, a fixed fixture since: its limb checks a run of version eight. */
+const V9_SET = JSON.parse(readFileSync(`${REPO}/${CASE_SET_V9_FILE}`, 'utf8')) as CaseSet;
+const V9_CASES = V9_SET.cases;
+const V9_ORACLES = JSON.parse(readFileSync(`${REPO}/${ORACLES_V9_FILE}`, 'utf8')) as OracleSet;
 const CURRENT_SET = JSON.parse(readFileSync(`${REPO}/${CURRENT_CASE_SET_FILE}`, 'utf8')) as CaseSet;
 const CURRENT_ORACLES = JSON.parse(readFileSync(`${REPO}/${CURRENT_ORACLES_FILE}`, 'utf8')) as OracleSet;
 const CURRENT_CASES = CURRENT_SET.cases;
@@ -155,6 +161,7 @@ const CURRENT_CASES = CURRENT_SET.cases;
  * ⭐ Round 5 — and version five's, now version six is today's.
  * ⭐ Package P F3 — and version six's, now version seven is today's.
  * ⭐ B8a — and version eight's, now version nine is today's (version seven's since B7).
+ * ⭐ B8b — and version nine's, now version ten is today's.
  */
 const ORACLE_SETS: readonly OracleSet[] = [
 	JSON.parse(readFileSync(`${REPO}/${ORACLES_V1_FILE}`, 'utf8')) as OracleSet,
@@ -165,6 +172,7 @@ const ORACLE_SETS: readonly OracleSet[] = [
 	V6_ORACLES,
 	V7_ORACLES,
 	V8_ORACLES,
+	V9_ORACLES,
 	CURRENT_ORACLES
 ];
 /** Every oracle any set holds: a case id two hold carries the same standing in each (the cases test holds that). */
@@ -178,6 +186,7 @@ const ORACLE = new Map(
 		...V6_ORACLES.oracles,
 		...V7_ORACLES.oracles,
 		...V8_ORACLES.oracles,
+		...V9_ORACLES.oracles,
 		...CURRENT_ORACLES.oracles
 	].map((o) => [o.caseId, o])
 );
@@ -256,6 +265,8 @@ let FP_V6: ReviewerFingerprint;
 let FP_V7: ReviewerFingerprint;
 /** ⭐ B8a — version eight's, a fixed fixture now (`V8_SET`). */
 let FP_V8: ReviewerFingerprint;
+/** ⭐ B8b — version nine's, a fixed fixture now (`V9_SET`). */
+let FP_V9: ReviewerFingerprint;
 /** `JAN-CRITREAD` J2-7 — today's fingerprint over version two, the fixed fixture of the J2-5 limb. */
 let FP_V2: ReviewerFingerprint;
 /** `JAN-PRQUAL` `PQ-2` — today's fingerprint over version three, the fixed fixture of the J2-7 limb. */
@@ -272,11 +283,12 @@ beforeAll(async () => {
 	FP_V6 = await reviewerFingerprint(V6_CASES);
 	FP_V7 = await reviewerFingerprint(V7_CASES);
 	FP_V8 = await reviewerFingerprint(V8_CASES);
+	FP_V9 = await reviewerFingerprint(V9_CASES);
 	FP_V2 = await reviewerFingerprint(V2_CASES);
 	FP_V3 = await reviewerFingerprint(V3_CASES);
 	CURRENT = { reviewer: FP.reviewer, scoring: FP.scoring, caseSet: FP.caseSet };
 	CASE_OF = new Map(
-		[...FP.casePrompts, ...FP_V2.casePrompts, ...FP_V3.casePrompts, ...FP_V5.casePrompts, ...FP_V6.casePrompts, ...FP_V7.casePrompts, ...FP_V8.casePrompts, ...FP_NOW.casePrompts].flatMap(
+		[...FP.casePrompts, ...FP_V2.casePrompts, ...FP_V3.casePrompts, ...FP_V5.casePrompts, ...FP_V6.casePrompts, ...FP_V7.casePrompts, ...FP_V8.casePrompts, ...FP_V9.casePrompts, ...FP_NOW.casePrompts].flatMap(
 			([id, p]) => [[p.initial, id] as const, [p.repair, id] as const]
 		)
 	);
@@ -1959,7 +1971,8 @@ describe('⭐⭐ the review in parts, B7 — under case set v8 and the fingerpri
 });
 
 // ── ⭐⭐ `JAN-EXEC` Phase 7, the review in parts, B8a (`REG-D-127`; DESIGN-authoring-review-in-parts.md D3a and §5) ────────────
-// Version nine is current, and D3a moved the reviewer fingerprint ON PURPOSE: each part probe is cut with the seeded policy
+// Version nine ~~is current~~ (⭐ B8b: current from B8a to B8b, a fixed fixture since, `V9_SET`), and D3a moved the reviewer
+// fingerprint ON PURPOSE: each part probe is cut with the seeded policy
 // library, and three probes stand for the policy material. The record's shape — the selected candidate's run of version eight
 // under the fingerprint before D3a, every case answered as its oracle expects — owes a run of the selected candidate over the
 // 35 part cases, whose prompts moved, and RESCORED lines for the 41 carried cases, whose prompts did not; ~~and the sponsor's
@@ -1969,11 +1982,11 @@ describe('⭐⭐ the review in parts, B7 — under case set v8 and the fingerpri
 // besides, the check naming it as owed — never a missing conferral.
 describe('⭐⭐ the review in parts, B8a — under case set v9 and the fingerprint D3a moved, the selected candidate’s run of v8 owes a run over exactly the 35 part cases, RESCORED lines for the other 41, ~~and the sponsor’s confirmation of the restated bridge cases~~ and, the restatement confirmed, no confirmation (REG-D-127, REG-D-129, REG-D-086)', () => {
 	const GLM: SelectedCandidate = { transport: 'devin', modelLabel: 'glm-5-3-flash-max' };
-	const PARTS = (): string[] => CURRENT_CASES.filter((c) => c.arm === 'PWA_TYPE').map((c) => c.id);
-	const CARRIED = (): string[] => CURRENT_CASES.filter((c) => c.arm !== 'PWA_TYPE').map((c) => c.id);
-	/** Today's set — version nine — and its oracles, under `conferral` (their committed statement, unless said). */
-	const onVersionNine = (files: CheckInputs['files'], conferral = CURRENT_ORACLES.conferral) =>
-		check(files, { current: FP_NOW, cases: CURRENT_CASES, oracles: CURRENT_ORACLES.oracles, conferral });
+	const PARTS = (): string[] => V9_CASES.filter((c) => c.arm === 'PWA_TYPE').map((c) => c.id);
+	const CARRIED = (): string[] => V9_CASES.filter((c) => c.arm !== 'PWA_TYPE').map((c) => c.id);
+	/** ~~Today's set~~ Version nine and its oracles, under `conferral` (their committed statement, unless said). */
+	const onVersionNine = (files: CheckInputs['files'], conferral = V9_ORACLES.conferral) =>
+		check(files, { current: FP_V9, cases: V9_CASES, oracles: V9_ORACLES.oracles, conferral });
 	/** ~~⭐ Today's statement as it will read once the sponsor confirms the restated cases: its marker gone. A fixture.~~ ⭐ The
 	 *  code record of `REG-D-129` — today's statement as it read while the sponsor's confirmation was owed: its marker. A fixture. */
 	const AS_IF_UNCONFIRMED = `A fixture: the 19 part cases cut from the restated bridge cases are ${ORACLES_RESTATEMENT_UNCONFIRMED}.`;
@@ -1991,23 +2004,23 @@ describe('⭐⭐ the review in parts, B8a — under case set v9 and the fingerpr
 		});
 	const owed = (who: 'any' | 'selected', lines: readonly RecordLine[]) =>
 		who === 'any'
-			? `76 of 76 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer}: ${CURRENT_CASES.map((c) => c.id).join(', ')} — owed: a RUN over them, or RESCORED lines where no case prompt changed (§5.6 limb 1)`
-			: `76 of 76 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer} by the SELECTED candidate devin / glm-5-3-flash-max (REG-D-084; the SELECTION in force, runs.ndjson:${lines.length}): ${CURRENT_CASES.map((c) => c.id).join(', ')} — owed: a run of the selected candidate over them, or RESCORED lines of its runs where no case prompt changed (§5.6 limb 1; REG-D-086)`;
+			? `76 of 76 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer}: ${V9_CASES.map((c) => c.id).join(', ')} — owed: a RUN over them, or RESCORED lines where no case prompt changed (§5.6 limb 1)`
+			: `76 of 76 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer} by the SELECTED candidate devin / glm-5-3-flash-max (REG-D-084; the SELECTION in force, runs.ndjson:${lines.length}): ${V9_CASES.map((c) => c.id).join(', ')} — owed: a run of the selected candidate over them, or RESCORED lines of its runs where no case prompt changed (§5.6 limb 1; REG-D-086)`;
 	const hint = (ids: readonly string[]) =>
 		`same prompts under an earlier fingerprint in qr-v8-before-d3a: ${ids.join(', ')} — RESCORED lines discharge those where no case prompt changed (§5.6 limb 1)`;
 	const restampToday = (lines: readonly RecordLine[]) =>
 		rescoredLines(
 			lines.find((l): l is RunLine => l.kind === 'RUN')!,
 			lines.filter((l): l is CallLine => l.kind === 'CALL'),
-			CURRENT_CASES,
-			FP_NOW.casePrompts,
+			V9_CASES,
+			FP_V9.casePrompts,
 			{
 				rescoreId: 'rs-v8-before-d3a',
 				date: '2026-10-24T12:00:00.000Z',
 				commit: 'b'.repeat(40),
 				reviewer: FP.reviewer,
 				scoring: FP.scoring,
-				caseSet: FP_NOW.caseSet
+				caseSet: FP_V9.caseSet
 			}
 		);
 	const partRun = () =>
@@ -2015,16 +2028,17 @@ describe('⭐⭐ the review in parts, B8a — under case set v9 and the fingerpr
 			runId: 'qr-v9-parts',
 			date: '2026-10-24T14:00:00.000Z',
 			candidate: DEVIN,
-			cases: CURRENT_CASES.filter((c) => c.arm === 'PWA_TYPE'),
-			fingerprint: { ...CURRENT, caseSet: FP_NOW.caseSet },
+			cases: V9_CASES.filter((c) => c.arm === 'PWA_TYPE'),
+			fingerprint: { ...CURRENT, caseSet: FP_V9.caseSet },
 			versions: { caseSet: 9, oracles: 9 }
 		});
 
 	it('⛔ RED, AND EXACTLY SO — ~~the sponsor’s confirmation of the restated cases owed, never a missing conferral; and~~ coverage of all 76, by any candidate and by the selected one, each naming the 41 carried cases, whose prompts did not move, as RESCORED lines discharge them; nothing else, the restatement confirmed (REG-D-129); a statement still carrying the marker owes the confirmation besides, never a missing conferral', async () => {
-		expect([CURRENT_SET.caseSetVersion, CURRENT_ORACLES.oracleVersion], 'the current set is version nine').toEqual([9, 9]);
+		// ⭐ B8b — ~~'the current set is version nine'~~: version nine's committed set, history since version ten.
+		expect([V9_SET.caseSetVersion, V9_ORACLES.oracleVersion], 'version nine').toEqual([9, 9]);
 		expect([PARTS().length, CARRIED().length], 'part cases, the others').toEqual([35, 41]);
 		expect(FP.reviewer, 'arrangement: the run’s fingerprint is not today’s').not.toBe(BEFORE_D3A().reviewer);
-		expect(CURRENT_ORACLES.conferral, 'arrangement: REG-D-129 confirmed the restatement').not.toContain(
+		expect(V9_ORACLES.conferral, 'arrangement: REG-D-129 confirmed the restatement').not.toContain(
 			ORACLES_RESTATEMENT_UNCONFIRMED
 		);
 		const lines = [...(await v8Run()), select(GLM)];
@@ -2772,11 +2786,13 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		// ⭐ Package P F3 — ~~version six~~ version seven: six graph cases added, their oracles proposed (`REG-D-123` Q25).
 		// ⭐ B7 — ~~version seven~~ version eight: 35 part cases for the graph cases, their oracles conferred (`REG-D-126`).
 		// ⭐ B8a — ~~version eight~~ version nine: each part cut with the seeded library, the bridge restated (`REG-D-127`).
-		expect(r.out).toContain('; case set v9, oracles v9\n');
+		// ⭐ B8b — ~~version nine~~ version ten: the bridge part cases restated by D3b, confirmed (`REG-D-130`, `REG-D-131`).
+		expect(r.out).toContain('; case set v10, oracles v10\n');
 		expect(r.out).toContain(`: ${CURRENT_CASES.map((c) => c.id).join(', ')} — owed`);
-		// ⭐ `REG-D-129` — ~~the confirmation owed (B8a)~~: the restatement confirmed, no CONFERRAL problem.
+		// ⭐ `REG-D-129` — ~~the confirmation owed (B8a)~~: the restatement confirmed, no CONFERRAL problem. ⭐ B8b — and version
+		// ten's, confirmed as proposed (`REG-D-131` Q36), none either.
 		expect(r.out).not.toContain('[CONFERRAL]');
-		expect(CURRENT_SET.caseSetVersion).toBe(9);
+		expect(CURRENT_SET.caseSetVersion).toBe(10);
 	});
 
 	it('⭐ on a TRACKED record that covers the committed set, reproduces, and holds no material failure: ~~nothing owed but the conferral of version seven’s six new oracles (package P F3)~~ ~~⭐ GREEN, its oracles conferred (REG-D-126, B7)~~ ~~⭐ B8a: nothing owed but the sponsor’s confirmation of the restated bridge cases (REG-D-127)~~ ⭐ GREEN, the restatement confirmed (REG-D-129)', async () => {

@@ -1250,13 +1250,14 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 			// ⭐ Package P F3 — version seven, current since package P: six graph cases added (`REG-D-123` Q25) (~~6, 6~~).
 			// ⭐ The review in parts, B7 — version eight, current since B7: 35 part cases for the graph cases (~~7, 7~~).
 			// ⭐ B8a — version nine, current since B8a: each part cut with the seeded library, the bridge restated (~~8, 8~~).
-		).toEqual({ caseSetVersion: 9, oracleVersion: 9 });
+			// ⭐ B8b — version ten, current since B8b: the bridge part cases restated by D3b (~~9, 9~~).
+		).toEqual({ caseSetVersion: 10, oracleVersion: 10 });
 		// …which are the versions of the files `cases.ts` names current — the ones the check holds coverage to.
 		expect([
 			CURRENT_SET.caseSetVersion,
 			CURRENT_ORACLE_SET.oracleVersion,
 			CURRENT_ORACLE_SET.caseSetVersion
-		]).toEqual([9, 9, 9]);
+		]).toEqual([10, 10, 10]);
 		expect(spawned, 'one call, captured').toHaveLength(1);
 	});
 

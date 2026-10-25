@@ -625,8 +625,9 @@ export function unpressed(units: readonly ArchiveUnit[]): RunUnit[] {
  * later press. ⛔ Their whole worst case would refuse every phase once about 306 calls are spent ⭐ (at the limit of 450;
  * ~~at today's 600, once 456 are: 600, less the 4 held back and the phase's 140~~ ~~⭐ at today's 650, once 506 are: 650,
  * less the 4 held back and the phase's 140, P6 package L, F1; `REG-D-120` Q15~~ ~~⭐ at today's 800, once 656 are: 800, less
- * the 4 held back and the phase's 140, package Q, F5; `REG-D-123` Q26~~ ⭐ at today's 900, once 756 are: 900, less the 4 held
- * back and the phase's 140, the review in parts, package C, B6; `REG-D-126` Q32). ⚠ So a phase's own spend
+ * the 4 held back and the phase's 140, package Q, F5; `REG-D-123` Q26~~ ~~⭐ at today's 900, once 756 are: 900, less the 4
+ * held back and the phase's 140, the review in parts, package C, B6; `REG-D-126` Q32~~ ⭐ at today's 1000, once 856 are: 1000,
+ * less the 4 held back and the phase's 140, the review in parts, package I, B8b; `REG-D-131` Q37). ⚠ So a phase's own spend
  * can carry the total past the limit, for nothing checks it during the press; the run report says so. A sign-off and the
  * rule's re-run of its declared reviews still count their worst case, and Send the authoring floor's. ⭐ And the check
  * records what it counted, in words (`counted`, `COUNTED_AHEAD`).

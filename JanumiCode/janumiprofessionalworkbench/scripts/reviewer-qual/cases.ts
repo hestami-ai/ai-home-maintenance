@@ -89,6 +89,9 @@ export interface PwaTypeCaseInput extends GraphCaseInput {
 	/**
 	 * ⭐⭐ D3a (`REG-D-127`) — the policy library the part is cut with (`pwaTypeParts`), as the authoring surface's policy view
 	 * reads it: version nine's cases carry the library the workbench seeds, so the floor and the case read the same values.
+	 * ⭐ D3b (`REG-D-130`) — version ten's 19 bridge part cases carry the bridge library: the seeded 15, then the practice's six,
+	 * as the policy view reads them over an engine where the kernel's create command made them; its 16 software part cases
+	 * still carry the seeded library alone.
 	 * ⚠ Absent on version eight's, which were measured on parts cut with none.
 	 */
 	readonly policyLibrary?: readonly PwaPartLibraryPolicy[];
@@ -99,7 +102,9 @@ interface CaseCommon {
 	 *  version three's `G3-…`, `case-set-v3.ts`). ⚠ But version nine (`REG-D-127`) carries version eight's 35 part cases
 	 *  under their ids with their inputs moved — each cut with the seeded policy library, the 19 bridge ones from restated
 	 *  sources — their oracles unchanged: a measurement counts for a case only where its recorded prompt is today's
-	 *  (`check-core.ts` limb 1), so no record of version eight's covers them. */
+	 *  (`check-core.ts` limb 1), so no record of version eight's covers them. ⭐ So does version ten (`REG-D-130`) with
+	 *  version nine's 19 bridge part cases, cut from their sources restated by D3b, under their ids, their oracles
+	 *  unchanged: no record of version nine's covers them. */
 	readonly id: string;
 	/** The subject the floor composes over — its id, version and the producer independence is checked against. */
 	readonly subject: AssuranceSubject;
@@ -199,6 +204,10 @@ export const ORACLES_V8_FILE = 'docs/tracking/reviewer-qualification/oracles/ora
  *  history. */
 export const CASE_SET_V9_FILE = 'docs/tracking/reviewer-qualification/cases/case-set-v9.json';
 export const ORACLES_V9_FILE = 'docs/tracking/reviewer-qualification/oracles/oracles-v9.json';
+/** ⭐ `JAN-EXEC` Phase 7, the review in parts, B8b — version ten (`REG-D-130`, `REG-D-131`), beside versions one to nine, which
+ *  stay as history. */
+export const CASE_SET_V10_FILE = 'docs/tracking/reviewer-qualification/cases/case-set-v10.json';
+export const ORACLES_V10_FILE = 'docs/tracking/reviewer-qualification/oracles/oracles-v10.json';
 
 /**
  * ⭐ `JAN-CRITREAD` J2-5 — THE CURRENT CASE SET AND ITS ORACLES: what `reviewer:qual:check` holds coverage and
@@ -236,9 +245,16 @@ export const ORACLES_V9_FILE = 'docs/tracking/reviewer-qualification/oracles/ora
  * by the sponsor as restated (`REG-D-129`), and version nine's record says so (`oracles-v9.ts`). ⚠ The 35 are
  * new prompts, so the check owes a RUN of the selected reviewer over them; the 41 keep their prompts, and RESCORED lines may
  * discharge them.
+ * ⭐⭐ Version ten since `JAN-EXEC` Phase 7, the review in parts, B8b (`REG-D-130`, `REG-D-131`; design D3b and §5): version
+ * nine's 41 non-part cases under their ids, byte for byte, and its 35 part cases under their ids, their oracles unchanged — the
+ * 16 software part cases byte for byte, still cut with the seeded library, and the 19 bridge part cases cut from their sources
+ * restated as a competent author authors them on today's surface (who does the work, the practice's six kind-scoped policies
+ * declared, the check's attestation, four purposes and two hand-offs), each cut with the bridge library, confirmed by the
+ * sponsor as proposed (`REG-D-131` Q36), and version ten's record says so (`oracles-v10.ts`). ⚠ The 19 are new prompts, so the
+ * check owes a RUN of the selected reviewer over them; the 57 keep their prompts, and RESCORED lines may discharge them.
  */
-export const CURRENT_CASE_SET_FILE = CASE_SET_V9_FILE;
-export const CURRENT_ORACLES_FILE = ORACLES_V9_FILE;
+export const CURRENT_CASE_SET_FILE = CASE_SET_V10_FILE;
+export const CURRENT_ORACLES_FILE = ORACLES_V10_FILE;
 
 /**
  * ⭐⭐ `E12F` F5 (the E12 package review's fifth finding; `REG-D-073`, oracle integrity) — THE WORDS AN ORACLE SET'S

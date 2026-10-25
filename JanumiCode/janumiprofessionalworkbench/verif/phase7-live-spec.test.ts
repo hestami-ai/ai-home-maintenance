@@ -1201,8 +1201,9 @@ describe('⭐ the store, as the run reads it after every act (REG-F-540)', () =>
  * worst case would refuse every phase once about 306 calls are spent ⭐ (at the limit of 450; ~~at today's 600, once 456 are:
  * 600, less the 4 held back and the phase's 140~~ ~~⭐ at today's 650, once 506 are: 650, less the 4 held back and the
  * phase's 140, P6 package L, F1; `REG-D-120` Q15~~ ~~⭐ at today's 800, once 656 are: 800, less the 4 held back and the
- * phase's 140, package Q, F5; `REG-D-123` Q26~~ ⭐ at today's 900, once 756 are: 900, less the 4 held back and the phase's
- * 140, the review in parts, package C, B6; `REG-D-126` Q32).
+ * phase's 140, package Q, F5; `REG-D-123` Q26~~ ~~⭐ at today's 900, once 756 are: 900, less the 4 held back and the
+ * phase's 140, the review in parts, package C, B6; `REG-D-126` Q32~~ ⭐ at today's 1000, once 856 are: 1000, less the 4 held
+ * back and the phase's 140, the review in parts, package I, B8b; `REG-D-131` Q37).
  * ⭐ `REG-D-114` (14), as amended 2026-10-16 — WHAT THE ONE RULE COUNTS BEFORE A PHASE, BEFORE THE RULE'S RE-RUN OF ITS WORK OR
  * OF ITS REVIEW, AND BEFORE A MODEL ROOT'S PRESS: ONE TRY'S RESERVE, a review of up to `reviewerCallsPerTry` calls — 4, D8's
  * own rule: the lane checks the limit again before every later press. ⛔ Restated, never read from the lane, so a figure the
@@ -2373,7 +2374,8 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		// one try's reserve (`REG-D-114` (14), as amended 2026-10-16), so the prior lets requirements through exactly at the
 		// limit, and requirements spends that reserve: the run then stands at the limit, with the same ~~446~~ ⭐ calls spent as before: the limit less the 4 held back, ~~596 at
 		// today's 600 (P5 package C, F2)~~ ~~⭐ 646 at today's 650 (P6 package L, F1; `REG-D-120` Q15)~~ ~~⭐ 796 at today's 800
-		// (package Q, F5; `REG-D-123` Q26)~~ ⭐ 896 at today's 900 (the review in parts, package C, B6; `REG-D-126` Q32).
+		// (package Q, F5; `REG-D-123` Q26)~~ ~~⭐ 896 at today's 900 (the review in parts, package C, B6; `REG-D-126` Q32)~~
+		// ⭐ 996 at today's 1000 (the review in parts, package I, B8b; `REG-D-131` Q37).
 		const prior = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - TRY_RESERVE;
 		const l = laneOf({
 			paid: true,
@@ -2574,8 +2576,9 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		// would be once about 306 calls are spent ⭐ (at the limit of 450; ~~at today's 600, once 456 are: 600, less the 4 held back
 		// and the phase's 140~~ ~~⭐ at today's 650, once 506 are: 650, less the 4 held back and the phase's 140, P6 package L, F1;
 		// `REG-D-120` Q15~~ ~~⭐ at today's 800, once 656 are: 800, less the 4 held back and the phase's 140, package Q, F5;
-		// `REG-D-123` Q26~~ ⭐ at today's 900, once 756 are: 900, less the 4 held back and the phase's 140, the review in parts,
-		// package C, B6; `REG-D-126` Q32) (`REG-D-114` (14), as amended 2026-10-16). ⭑ Every phase is scripted, so a lane
+		// `REG-D-123` Q26~~ ~~⭐ at today's 900, once 756 are: 900, less the 4 held back and the phase's 140, the review in parts,
+		// package C, B6; `REG-D-126` Q32~~ ⭐ at today's 1000, once 856 are: 1000, less the 4 held back and the phase's 140, the
+		// review in parts, package I, B8b; `REG-D-131` Q37) (`REG-D-114` (14), as amended 2026-10-16). ⭑ Every phase is scripted, so a lane
 		// that presses one past the limit runs on and is caught here by the assertion, not by a script that has no press for it.
 		const prior = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - TRY_RESERVE;
 		const l = laneOf({

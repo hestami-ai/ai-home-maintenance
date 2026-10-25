@@ -39,8 +39,8 @@ import {
 	type ReasoningReviewInput
 } from '@janumipwb/rph-assurance';
 import { analyzePwaGraph, buildPwaGraphExport, pwaTypeParts, type PwaGraphNode } from '@janumipwb/rph-projections';
-import { createEngine, seedPolicyLibrary } from '@janumipwb/rph-engine';
-import { assurancePolicyViews } from '@janumipwb/rph-authoring';
+import { createEngine, seedPolicyLibrary, type AuthedEngineHandle } from '@janumipwb/rph-engine';
+import { assurancePolicyViews, PwaAuthoringBroker } from '@janumipwb/rph-authoring';
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { DEFAULT_CONTEXT_ASSEMBLY_POLICY, markersIn, prepareModelInvocation } from '@janumipwb/rph-application';
 import { OBSERVED_TOOL_CALL_LIMIT, type DomainCommand, type PromptTemplate } from '@janumipwb/rph-contracts';
@@ -55,7 +55,7 @@ import {
 	type ProcessResultReviewSource
 } from '../apps/rph-demo/src/lib/server/assurance/review-input.js';
 import { splitExecutionEnvelope } from '../apps/rph-demo/src/lib/server/execution/execution-contract.js';
-import { SESSION_CREDENTIAL, standaloneAuthenticator } from '../apps/rph-demo/src/lib/server/identity.js';
+import { AGENT_CREDENTIAL, SESSION_CREDENTIAL, standaloneAuthenticator } from '../apps/rph-demo/src/lib/server/identity.js';
 import { buildPwaExport } from '../apps/rph-demo/src/lib/server/workbench.js';
 import {
 	CASE_PRODUCER_MODEL_ID,
@@ -66,6 +66,7 @@ import {
 	CASE_SET_V6_FILE,
 	CASE_SET_V7_FILE,
 	CASE_SET_V8_FILE,
+	CASE_SET_V9_FILE,
 	CURRENT_CASE_SET_FILE,
 	CURRENT_ORACLES_FILE,
 	ORACLES_PROPOSED,
@@ -76,6 +77,7 @@ import {
 	ORACLES_V6_FILE,
 	ORACLES_V7_FILE,
 	ORACLES_V8_FILE,
+	ORACLES_V9_FILE,
 	serializeGenerated,
 	type CaseSet,
 	type GraphCase,
@@ -98,12 +100,20 @@ import { CASE_SET_V4, RENAMES_V4 } from '../scripts/reviewer-qual/case-set-v4.js
 import { CASE_SET_V7 } from '../scripts/reviewer-qual/case-set-v7.js';
 import { CASE_SET_V8, CATCHERS_V8, G8_GRAPHS, partCaseId } from '../scripts/reviewer-qual/case-set-v8.js';
 import { BRIDGE_GRAPHS_V9, CASE_SET_V9, RESTATED_PLANTS_V9, SEEDED_POLICY_LIBRARY } from '../scripts/reviewer-qual/case-set-v9.js';
+import {
+	BRIDGE_GRAPHS_V10,
+	BRIDGE_POLICY_LIBRARY,
+	CASE_SET_V10,
+	PRACTICE_POLICIES,
+	RESTATED_PURPOSES_V10
+} from '../scripts/reviewer-qual/case-set-v10.js';
 import { ORACLES_V2 } from '../scripts/reviewer-qual/oracles-v2.js';
 import { ORACLES_V3 } from '../scripts/reviewer-qual/oracles-v3.js';
 import { ORACLES_V4 } from '../scripts/reviewer-qual/oracles-v4.js';
 import { ORACLES_V7 } from '../scripts/reviewer-qual/oracles-v7.js';
 import { ORACLES_V8 } from '../scripts/reviewer-qual/oracles-v8.js';
 import { ORACLES_V9 } from '../scripts/reviewer-qual/oracles-v9.js';
+import { ORACLES_V10 } from '../scripts/reviewer-qual/oracles-v10.js';
 import { SEEDED_PROBE_LIBRARY } from '../scripts/reviewer-qual/probes.js';
 import { reviewerFingerprint } from '../scripts/reviewer-qual/fingerprint.js';
 import { caseReviewInput } from '../scripts/reviewer-qual/materialize.js';
@@ -3052,8 +3062,9 @@ function byNameOf(source: GraphCase, id: string): string {
 // no work (`REG-F-572`). Version nine is version eight's 76 cases under their ids: its 41 non-part cases byte for byte, and its
 // 35 part cases each cut with the seeded policy library (D3a), the 19 cut from the bridge cases from their sources restated as
 // production stores a type it defines (`case-set-v9.ts`), their oracles version eight's (`oracles-v9.ts`). Held here over
-// version nine as the generator writes it, and over the COMMITTED current files the runner and the check read (`cases.ts`):
-//   · THE SHAPE — the current set is version nine: version eight's 41, byte for byte, their prompts unchanged, then the 35
+// version nine as the generator writes it, and over the COMMITTED ~~current~~ files (⭐ version nine is history since version
+// ten, `cases.ts`), which the freshness limb holds equal to it:
+//   · THE SHAPE — ~~the current set is~~ version nine: version eight's 41, byte for byte, their prompts unchanged, then the 35
 //     under their ids, sources, subjects and order;
 //   · THE SEEDED LIBRARY — the one each part case carries is the view over a seeded engine, value for value, and the probes'
 //     is the same; each part case materializes through the product's builders with it;
@@ -3068,8 +3079,9 @@ function byNameOf(source: GraphCase, id: string): string {
 //     sponsor as restated (`REG-D-129`), in the sponsor's words, and the check finding no CONFERRAL problem in it — a
 //     statement still carrying the marker reported as the confirmation owed, never a missing conferral;
 //   · THE 28,000-CHARACTER LIMIT, SEEN WHOLE, THE ORACLES COMPOSE — as every case is held.
-const currentV9 = (): CaseSet => JSON.parse(read(CURRENT_CASE_SET_FILE)) as CaseSet;
-const currentOraclesV9 = (): OracleSet => JSON.parse(read(CURRENT_ORACLES_FILE)) as OracleSet;
+/** ⭐ B8b — ~~the CURRENT files~~ version nine's committed files: version ten is current (`cases.ts`). */
+const currentV9 = (): CaseSet => JSON.parse(read(CASE_SET_V9_FILE)) as CaseSet;
+const currentOraclesV9 = (): OracleSet => JSON.parse(read(ORACLES_V9_FILE)) as OracleSet;
 const generatedV9 = (): CaseSet => JSON.parse(serializeGenerated(CASE_SET_V9)) as CaseSet;
 const generatedOraclesV9 = (): OracleSet => JSON.parse(serializeGenerated(ORACLES_V9)) as OracleSet;
 /** Version nine's part cases, as generated. */
@@ -3282,11 +3294,12 @@ function seededLibraryView(): ReturnType<typeof assurancePolicyViews> {
 }
 
 describe('⭐⭐ the review in parts, B8a — reviewer-qualification case set v9: version eight’s 76 cases under their ids, each part cut with the seeded policy library, the bridge cases restated (REG-D-127)', () => {
-	it('⭐ THE SHAPE — the current set is version nine: version eight’s 41 non-part cases first, byte for byte, then its 35 part cases under their ids, sources, subjects and order', () => {
-		expect([currentV9().caseSetVersion, currentOraclesV9().oracleVersion, currentOraclesV9().caseSetVersion], 'the current set is version nine').toEqual([9, 9, 9]);
+	it('⭐ THE SHAPE — ~~the current set is~~ version nine: version eight’s 41 non-part cases first, byte for byte, then its 35 part cases under their ids, sources, subjects and order', () => {
+		// ⭐ B8b — ~~'the current set is version nine'~~: version nine's committed set, history since version ten.
+		expect([currentV9().caseSetVersion, currentOraclesV9().oracleVersion, currentOraclesV9().caseSetVersion], 'the committed set of version nine').toEqual([9, 9, 9]);
 		const v8 = JSON.parse(read(CASE_SET_V8_FILE)) as CaseSet;
 		for (const [what, now] of [
-			['the committed current set', currentV9()],
+			['version nine, as committed', currentV9()],
 			['version nine, as generated', generatedV9()]
 		] as const) {
 			expect(now.cases.slice(0, 41).map((c) => JSON.stringify(c)), `${what}: version eight’s 41, byte for byte`).toEqual(
@@ -3501,6 +3514,695 @@ describe('⭐⭐ the review in parts, B8a — reviewer-qualification case set v9
 	it('⭐ THE ORACLES COMPOSE, THROUGH THE RUNNER’S OWN SCORING — for every part case, a reply faulting exactly its oracle’s criteria is scored by evaluateCase to its oracle’s disposition, with independence met', async () => {
 		const oracles = new Map(generatedOraclesV9().oracles.map((o) => [o.caseId, o]));
 		for (const c of partsV9()) {
+			const oracle = oracles.get(c.id)!;
+			const reply = JSON.stringify({
+				findings: SEEDED_REASONING_REVIEW_CRITERIA.map((k) => ({
+					criterionId: k.id,
+					failed: oracle.faulted.includes(k.id),
+					statement: 'as the oracle expects',
+					severity: oracle.faulted.includes(k.id) ? 'BLOCKING' : 'INFORMATIONAL'
+				})),
+				recommendation: oracle.disposition
+			});
+			const { scored } = await evaluateCase({
+				case: c,
+				criteria: SEEDED_REASONING_REVIEW_CRITERIA,
+				candidate: EVALUATING_CANDIDATE,
+				scoringDigest: '0'.repeat(64),
+				call: async () => ({ returned: reply, served: null })
+			});
+			expect([scored.disposition, scored.resultClass, scored.independenceOk], c.id).toEqual([oracle.disposition, 'VALID', true]);
+		}
+	});
+});
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7, the review in parts, B8b — CASE SET VERSION TEN (`REG-D-130`, `REG-D-131`; DESIGN-authoring-review-
+// in-parts.md D3b and §5, case set v10; ROADMAP-undertaking-execution-sandbox.md §9a.9b) ───────────────────────────────────────
+//
+// Version nine's measurement left four clean bridge-leaf rejections, each faulting the bridge PWA's absence of assurance
+// (`REG-F-572`), and the sponsor ruled them settled before P6 again (`REG-D-130`). Version ten is version nine's 76 cases under
+// their ids: its 41 non-part cases and its 16 software part cases byte for byte, and its 19 bridge part cases cut, with the
+// bridge library, from their sources restated as a competent author authors them on today's surface (D3b; `case-set-v10.ts`),
+// their oracles version nine's, the restatement confirmed by the sponsor as proposed (`REG-D-131` Q36; `oracles-v10.ts`). Held
+// here over version ten as the generator writes it, and over the COMMITTED current files the runner and the check read:
+//   · THE SHAPE — the current set is version ten: version nine's 41 and its 16 software part cases byte for byte, then the 35
+//     under their ids, sources, subjects and order;
+//   · THE PRACTICE'S POLICIES — D3b's six, as written here, created in an engine by the kernel's create command with their kind
+//     conditions and activated, read back through `assurancePolicyViews`: the case set's six are that engine's values; the 19
+//     carry the seeded 15 then the six, the 16 the seeded 15 alone; ⭑ CONTROL (`REG-F-574`): a policy the authoring broker
+//     creates, the agent tool's path, carries no kinds in that view;
+//   · PRODUCTION'S GRAPH — each restated source, defined in an engine by an author's commands, the practice's six active there
+//     first, exports exactly its literal nodes;
+//   · THE ONE RULE — for every bridge source: the request ends with the sentence; HUMAN on every INTERNAL type, no discharge on
+//     the delegated check; each type declares exactly the practice's policies its kind takes; the check's firm attests what it
+//     declares; and the purposes and hand-offs change exactly where D3b says, the plants' load scopes and G3-RR-05's permit
+//     inputs untouched;
+//   · EACH PLANTED TWIN — differs from version ten's G3-CLEAN only where its plant is (diffed); the renamed copies renamed;
+//   · THE PROMPTS — the 57 other cases' prompts are version nine's; the 19 moved, each to the bytes of the prototype the sponsor
+//     confirmed; the reviewer fingerprint unmoved, the case set's digest moved;
+//   · THE ORACLES — version nine's, unchanged; the conferral recording the sponsor's confirmation in the sponsor's words, the
+//     check finding no CONFERRAL problem in it;
+//   · THE 28,000-CHARACTER LIMIT, SEEN WHOLE, THE ORACLES COMPOSE — as every case is held.
+const currentV10 = (): CaseSet => JSON.parse(read(CURRENT_CASE_SET_FILE)) as CaseSet;
+const currentOraclesV10 = (): OracleSet => JSON.parse(read(CURRENT_ORACLES_FILE)) as OracleSet;
+const generatedV10 = (): CaseSet => JSON.parse(serializeGenerated(CASE_SET_V10)) as CaseSet;
+const generatedOraclesV10 = (): OracleSet => JSON.parse(serializeGenerated(ORACLES_V10)) as OracleSet;
+/** Version ten's part cases, as generated. */
+const partsV10 = (): PwaTypeCase[] => generatedV10().cases.filter((c): c is PwaTypeCase => c.arm === 'PWA_TYPE');
+/** A bridge source of version ten, restated by D3b. */
+const bridgeV10 = (id: string): GraphCase => BRIDGE_GRAPHS_V10.find((c) => c.id === id)!;
+/** The 19 part cases cut from a bridge source, in the set's order. */
+const bridgePartIdsV10 = (): string[] => partsV10().filter((c) => BRIDGE_SOURCES.includes(c.sourceCaseId)).map((c) => c.id);
+
+/** ⭐ D3b (1) — the sentence each bridge request gains, written here as the sponsor is shown it, its apostrophe the case text's. */
+const WHO_DOES_THE_WORK_V10 = 'The practice’s own engineers carry out all of the work except the independent check.';
+/** ⭐ D3b (2) — THE PRACTICE'S SIX POLICIES, written here from D3b's table: each one's id, name, the kinds its conditions name,
+ *  and its purpose. ACTIVE, non-floor, version 1.0.0. */
+const PRACTICE_POLICIES_V10: readonly (readonly [id: string, name: string, kinds: readonly string[], purpose: string])[] = [
+	[
+		'pol_instruction_coverage',
+		'Instruction Coverage',
+		['STRUCTURAL_REVIEW'],
+		'Determine whether the parts of an engagement together discharge every obligation of the client’s instruction and every requirement of the authorities that must approve the work.'
+	],
+	[
+		'pol_site_investigation',
+		'Site Investigation Adequacy',
+		['SITE_INVESTIGATION'],
+		'Determine whether a site and ground investigation characterizes the site’s geometry, levels and the constraints of what it holds or adjoins, and the ground’s strata, groundwater and every hazard already known, well enough for the design decisions that rely on them.'
+	],
+	[
+		'pol_options_appraisal',
+		'Options Appraisal',
+		['OPTIONS_STUDY'],
+		'Determine whether each viable alternative was evaluated against stated criteria, and whether the alternative selected follows from that evaluation.'
+	],
+	[
+		'pol_design_basis',
+		'Design Basis Compliance',
+		['LOAD_ANALYSIS', 'DETAILED_DESIGN'],
+		'Determine whether an analysis or design applies every load case, combination and limit state its governing standards require, with the ground conditions the investigation established.'
+	],
+	[
+		'pol_check_independence',
+		'Check Independence',
+		['INDEPENDENT_CHECK'],
+		'Determine whether a design check is carried out by a party independent of the design, to the category the approving authority requires, and certifies what it checked.'
+	],
+	[
+		'pol_submission_completeness',
+		'Submission Completeness',
+		['PERMIT_SUBMISSION'],
+		'Determine whether a submission to an approving authority holds every document and certification that authority requires, each in the state the authority accepts.'
+	]
+];
+/** The practice's policies a type of `kind` takes, in the table's order: those whose kinds name it. */
+const practiceTakes = (kind: string): string[] => PRACTICE_POLICIES_V10.filter(([, , kinds]) => kinds.includes(kind)).map(([id]) => id);
+
+type Send = (commandType: string, type: string, target: string, payload: unknown) => void;
+/**
+ * An engine the workbench seeds, then the practice's six created in it by the kernel's create command, each with its kind
+ * conditions named, and activated — as the seed creates and activates the catalog's (`seedAdditivePolicies`). With its sender,
+ * which requires each command it is handed ACCEPTED.
+ */
+function practiceEngine(correlationId: string): { readonly session: AuthedEngineHandle; readonly send: Send } {
+	let seq = 0;
+	const session = createEngine({
+		authenticate: standaloneAuthenticator(),
+		ontology,
+		now: () => '2026-10-24T09:00:00Z',
+		newEventId: () => `evt_${++seq}`
+	}).as(SESSION_CREDENTIAL);
+	seedPolicyLibrary(session);
+	const send: Send = (commandType, type, target, payload) => {
+		seq += 1;
+		const command: DomainCommand = {
+			commandId: `cmd-${seq}`,
+			commandType,
+			commandSchemaVersion: 1,
+			targetAggregateType: type,
+			targetAggregateId: target,
+			issuedAt: '2026-10-24T09:00:00Z',
+			correlationId,
+			idempotencyKey: `idem-${seq}`,
+			payload
+		};
+		const r = session.dispatch(command);
+		expect(r.status, `${correlationId}: ${commandType} ${target} — ${JSON.stringify(r.error)}`).toBe('ACCEPTED');
+	};
+	for (const [id, name, kinds, purpose] of PRACTICE_POLICIES_V10) {
+		send('CreateAssurancePolicy', 'ASSURANCE_POLICY', id, {
+			policyId: id,
+			version: '1.0.0',
+			name,
+			purpose,
+			rationale: `The practice’s own policy for the work its kinds name (D3b): ${name}.`,
+			applicableObjectTypes: ['PROFESSIONAL_WORK_UNIT'],
+			applicability: { objectTypeConditions: ['PROFESSIONAL_WORK_UNIT'], pwuKindConditions: [...kinds] },
+			evaluatedClaimTypes: ['CORRECTNESS'],
+			criteria: [
+				{
+					id: 'C-01',
+					name: purpose,
+					description: purpose,
+					criterionType: 'BOOLEAN',
+					evaluationMethod: 'MODEL_JUDGMENT',
+					requiredEvidenceIds: [],
+					severityIfNotMet: 'BLOCKING',
+					mayBeNotApplicable: false
+				}
+			],
+			evaluatorRole: 'reviewer',
+			independenceRequirement: 'DIFFERENT_AGENT',
+			findingDefinitions: [],
+			permittedControlActions: ['ESCALATE']
+		});
+		send('ActivateAssurancePolicy', 'ASSURANCE_POLICY', id, { policyId: id });
+	}
+	return { session, send };
+}
+
+/**
+ * PRODUCTION'S GRAPH for one of version ten's bridge sources: production-shaped ids and key order; well formed and coherent by
+ * the product's own analyzer; and, defined in an engine through the commands an author uses — the practice's six created and
+ * activated there first — production's export is the literal one, byte for byte. ⭐ Unlike `expectProductionsGraph`, no
+ * `asStored`: each restated type's literal carries every field its command stores — its discharge, its policies, its child
+ * rules, its completion rule and, delegated, its firm's contract and attestation — so the export is the literal itself.
+ */
+function expectProductionsGraphV10(c: GraphCase): void {
+	for (const n of c.input.nodes) {
+		expect(n.id, `${c.id}: a production-shaped PWU-Type id`).toMatch(/^pwut_[0-9A-HJKMNP-TV-Z]{26}$/);
+		expect(Object.keys(n), `${c.id}/${n.name}: production's key order`).toEqual([
+			...STRUCTURE_KEYS,
+			...DECLARED_KEYS.filter((k) => k in n)
+		]);
+	}
+	expect(c.input.pwa.id).toMatch(/^pwa_[0-9A-HJKMNP-TV-Z]{26}$/);
+	const report = analyzePwaGraph(buildPwaGraphExport(c.input.pwa, c.input.nodes));
+	expect([report.valid, report.coherent], `${c.id}: well formed and coherent`).toEqual([true, true]);
+	const { session, send } = practiceEngine(c.id);
+	send('CreatePwa', 'PROFESSIONAL_WORK_ARCHITECTURE', c.input.pwa.id, {
+		pwaId: c.input.pwa.id,
+		name: c.input.pwa.name,
+		description: CASE_PWA_DESCRIPTION,
+		domain: c.input.pwa.domain,
+		version: c.input.pwa.version
+	});
+	for (const n of c.input.nodes)
+		send('DefinePwuType', 'PWU_TYPE', n.id, {
+			pwuTypeId: n.id,
+			pwaId: c.input.pwa.id,
+			pwuKind: n.pwuKind,
+			name: n.name,
+			purpose: n.purpose,
+			isRoot: n.isRoot,
+			permittedChildTypeIds: [...n.permittedChildTypeIds],
+			requiredInputs: [...n.requiredInputs],
+			requiredOutputs: [...n.requiredOutputs],
+			executionBoundary: n.executionBoundary,
+			...(n.boundaryContract !== undefined
+				? {
+						boundaryContract: {
+							counterpartyLabel: n.boundaryContract.counterpartyLabel,
+							attestedAssurancePolicyIds: [...n.boundaryContract.attestedAssurancePolicyIds]
+						}
+					}
+				: {}),
+			...(n.workDischarge !== undefined ? { workDischarge: n.workDischarge } : {}),
+			...(n.requiredAssurancePolicyIds !== undefined ? { requiredAssurancePolicyIds: [...n.requiredAssurancePolicyIds] } : {}),
+			...(n.permittedChildren !== undefined ? { permittedChildren: n.permittedChildren.map((r) => ({ ...r })) } : {})
+		});
+	expect(JSON.stringify(buildPwaExport(c.input.pwa.id, session)), c.id).toBe(
+		JSON.stringify(buildPwaGraphExport({ ...c.input.pwa, description: CASE_PWA_DESCRIPTION }, c.input.nodes))
+	);
+	session.close();
+}
+
+/**
+ * Where version ten's restatement of a bridge source differs from version nine's, but for what the one rule's other limbs hold
+ * key by key — the request, each type's discharge, its declared policies and its contract: each key of a type that differs,
+ * named by the type's name in G3-CLEAN where G3-CLEAN holds its id, else by its own.
+ */
+function restatedFromV9(id: string): string[] {
+	const names = new Map(bridgeV9('G3-CLEAN').input.nodes.map((n) => [n.id, n.name]));
+	const before = new Map(bridgeV9(id).input.nodes.map((n) => [n.id, n]));
+	const out: string[] = [];
+	for (const n of bridgeV10(id).input.nodes) {
+		const m = before.get(n.id);
+		if (m === undefined) {
+			out.push(`added ${n.name}`);
+			continue;
+		}
+		for (const key of new Set([...Object.keys(m), ...Object.keys(n)]))
+			if (!['workDischarge', 'requiredAssurancePolicyIds', 'boundaryContract'].includes(key))
+				if (JSON.stringify((m as unknown as Record<string, unknown>)[key]) !== JSON.stringify((n as unknown as Record<string, unknown>)[key]))
+					out.push(`${names.get(n.id) ?? n.name}.${key}`);
+	}
+	return out;
+}
+/** ⭐ D3b (4) — what G3-CLEAN's restatement changes beside the rule's other limbs: four purposes and two hand-offs, written here. */
+const G3_CLEAN_HANDOFFS_V10 = [
+	'Site and Geotechnical Survey.purpose',
+	'Structural Form Options Study.requiredOutputs',
+	'Structural Form Options Study.purpose',
+	'Load Analysis (pedestrian, wind, vibration).requiredInputs',
+	'Load Analysis (pedestrian, wind, vibration).purpose',
+	'Member, Connection and Foundation Design.requiredInputs',
+	'Rail Authority Permit Submission.requiredInputs',
+	'Rail Authority Permit Submission.purpose'
+];
+/**
+ * ⭐ D3b (4) and (5) — WHAT EACH BRIDGE SOURCE'S RESTATEMENT CHANGES beside the rule's other limbs, written here, by the type's
+ * name in G3-CLEAN: G3-CLEAN's four purposes and two hand-offs wherever the source holds the type, its plant's words kept —
+ * G3-RR-03's and G3-RR-04's narrowed load scopes are their plants, so their load analyses gain the site survey and keep their
+ * purposes; G3-RR-05 holds no options study, so no comparison is produced and its permit consumes none; G-RR-01 holds none of
+ * the types.
+ */
+const HANDOFFS_V10: Readonly<Record<string, readonly string[]>> = {
+	'G3-CLEAN': G3_CLEAN_HANDOFFS_V10,
+	'G3-CLEAN-R1': G3_CLEAN_HANDOFFS_V10,
+	'G3-CLEAN-R2': G3_CLEAN_HANDOFFS_V10,
+	'G3-CLEAN-R3': G3_CLEAN_HANDOFFS_V10,
+	'G-RR-01': [],
+	'G3-RR-02': G3_CLEAN_HANDOFFS_V10,
+	'G3-RR-03': G3_CLEAN_HANDOFFS_V10.filter((d) => d !== 'Load Analysis (pedestrian, wind, vibration).purpose'),
+	'G3-RR-04': G3_CLEAN_HANDOFFS_V10.filter((d) => d !== 'Load Analysis (pedestrian, wind, vibration).purpose'),
+	'G3-RR-05': [
+		'Site and Geotechnical Survey.purpose',
+		'Load Analysis (pedestrian, wind, vibration).requiredInputs',
+		'Load Analysis (pedestrian, wind, vibration).purpose',
+		'Member, Connection and Foundation Design.requiredInputs'
+	],
+	'G3-RR-06': G3_CLEAN_HANDOFFS_V10,
+	'G3-RR-07': G3_CLEAN_HANDOFFS_V10,
+	'G3-RR-08': G3_CLEAN_HANDOFFS_V10,
+	'G3-RR-09': G3_CLEAN_HANDOFFS_V10
+};
+/** ⭐ G3-CLEAN's seven types and the purpose each carries in version ten, in its order — written here, as the sponsor is shown
+ *  them: version nine's, the survey's, the options study's, the load analysis's and the permit submission's changed (D3b (4)). */
+const G3_CLEAN_PURPOSES_V10: readonly (readonly [name: string, purpose: string])[] = [
+	G3_CLEAN_PURPOSES[0]!,
+	[
+		'Site and Geotechnical Survey',
+		'Survey the site of the crossing and investigate its ground, including the soft clay layer 3 m below ground on the north abutment that the preliminary site investigation found, producing the site survey and the geotechnical report.'
+	],
+	[
+		'Structural Form Options Study',
+		'Compare the viable structural forms for the bridge against the site survey and the geotechnical report, and select one, producing the options comparison and the selected form.'
+	],
+	[
+		'Load Analysis (pedestrian, wind, vibration)',
+		'Analyse the selected structural form to the Eurocodes for every action they require of a footbridge over the railway, including pedestrian, wind and pedestrian-induced vibration loading, with the foundation stiffness the geotechnical report gives in its dynamic model, producing the load model.'
+	],
+	G3_CLEAN_PURPOSES[4]!,
+	G3_CLEAN_PURPOSES[5]!,
+	[
+		'Rail Authority Permit Submission',
+		'Make the permit submission to the rail authority once the independent check has certified the design, with the options comparison, the geotechnical report and the design calculations.'
+	]
+];
+/** ⭐ The planted types' purposes D3b (4) reaches, as the sponsor is shown them — written here: G3-RR-02's permit list gains the
+ *  comparison in its own words; G3-RR-05's cable-stayed analysis gains the inclusive scope. */
+const PLANTED_PURPOSES_V10: readonly (readonly [source: string, type: string, purpose: string])[] = [
+	[
+		'G3-RR-02',
+		'Rail Authority Permit Submission',
+		'Make the permit submission to the rail authority once the design is complete, with the options comparison, the design calculations, the drawings and the geotechnical report.'
+	],
+	[
+		'G3-RR-05',
+		'Load Analysis (pedestrian, wind, vibration)',
+		'Analyse the cable-stayed deck to the Eurocodes for every action they require of a footbridge over the railway, including pedestrian, wind and pedestrian-induced vibration loading, with the foundation stiffness the geotechnical report gives in its dynamic model, producing the load model.'
+	]
+];
+/**
+ * ⭐ EACH TWIN'S EVERY DIFFERENCE FROM VERSION TEN'S G3-CLEAN — written here: version nine's (`TWIN_DIFFERENCES_V9`, its `+`
+ * marks kept), and, after `+D3b`, what D3b adds, each where the twin's plant is: G-RR-01's concept study declares no practice
+ * policy, its kind named by none; G3-RR-05's permit, with no options study before it, submits no comparison; G3-RR-07's INTERNAL
+ * self-check is HUMAN, where the delegated check declares no discharge.
+ */
+const TWIN_DIFFERENCES_V10: Readonly<Record<string, readonly string[]>> = {
+	'G-RR-01': [
+		'rationale',
+		'narration',
+		'removed Site and Geotechnical Survey',
+		'removed Structural Form Options Study',
+		'removed Load Analysis (pedestrian, wind, vibration)',
+		'removed Member, Connection and Foundation Design',
+		'removed Independent Design Check',
+		'removed Rail Authority Permit Submission',
+		'Pedestrian Bridge Structural Review.name',
+		'Pedestrian Bridge Structural Review.pwuKind',
+		'Pedestrian Bridge Structural Review.permittedChildTypeIds',
+		'+ Pedestrian Bridge Structural Review.purpose',
+		'+D3b Pedestrian Bridge Structural Review.requiredAssurancePolicyIds',
+		'added Visual Concept',
+		'added Photorealistic Renderings',
+		'added Public Consultation'
+	],
+	'G3-RR-02': TWIN_DIFFERENCES_V9['G3-RR-02']!,
+	'G3-RR-03': TWIN_DIFFERENCES_V9['G3-RR-03']!,
+	'G3-RR-04': TWIN_DIFFERENCES_V9['G3-RR-04']!,
+	'G3-RR-05': [
+		'rationale',
+		'narration',
+		'removed Structural Form Options Study',
+		'Pedestrian Bridge Structural Review.permittedChildTypeIds',
+		'+ Pedestrian Bridge Structural Review.purpose',
+		'Load Analysis (pedestrian, wind, vibration).requiredInputs',
+		'+ Load Analysis (pedestrian, wind, vibration).purpose',
+		'+D3b Rail Authority Permit Submission.requiredInputs',
+		'+D3b Rail Authority Permit Submission.purpose'
+	],
+	'G3-RR-06': TWIN_DIFFERENCES_V9['G3-RR-06']!,
+	'G3-RR-07': [
+		'rationale',
+		'+ Pedestrian Bridge Structural Review.purpose',
+		'Independent Design Check.name',
+		'Independent Design Check.executionBoundary',
+		'+ Independent Design Check.purpose',
+		'+ Independent Design Check.boundaryContract',
+		'+D3b Independent Design Check.workDischarge'
+	],
+	'G3-RR-08': TWIN_DIFFERENCES_V9['G3-RR-08']!,
+	'G3-RR-09': TWIN_DIFFERENCES_V9['G3-RR-09']!
+};
+/** The reviewer fingerprint case set v9 was measured under (`REG-D-129`; `14c141af`), which version ten must not move. */
+const REVIEWER_FINGERPRINT_V9 = '5ab3d68643bffbbf700c622526b626f47d4c487690e1eb5e798d2d7f7d539cfc';
+/**
+ * ⭐ THE PROTOTYPE'S PROMPTS (`REG-D-131` Q36: *"its prompts must match the checked prototype hash for hash"*) — the sha256 of
+ * each of the 19 bridge part cases' first prompt as the lead's in-memory prototype of D3b rendered it through the product's
+ * part builder and validator, the prompts the panel judged and the sponsor confirmed (`d3b-facts.md`), in the set's order —
+ * written here.
+ */
+const PROTOTYPE_PROMPTS_V10: readonly (readonly [caseId: string, sha256: string])[] = [
+	['G3-CLEAN.T01', 'ed8127749f0e35564f1d3e4b4e7b4c79ac1fe717588e71ee07f89ff8cff684b2'],
+	['G3-CLEAN.T02', '9653decf69f4213b80782ceda9cee4029b314fa7cef56ba7f3e26e9eff2d5669'],
+	['G3-CLEAN.T03', '374908b0be2f017d1d22cd692878262fc12abbc598b9cf6628d21257259c4b34'],
+	['G3-CLEAN.T04', 'f78dfcbabc2a7adcd488f276f8d302a79c76b4dcd0d84db520ba11c12d56346e'],
+	['G3-CLEAN.T05', 'e39c3bb653b0b114668c7d063e28c1537997318f05b8fd00ee8d1f0c4bac2e75'],
+	['G3-CLEAN.T06', '76a5df18b5e599dab66a11027d0123a17a10d13ff5f80f52d5e735e5288c1ec0'],
+	['G3-CLEAN.T07', '741f033cc96a6bf159806727d15a12cfe543babd5f2325ccb182a1de7a20ecff'],
+	['G3-CLEAN-R1.T01', '28beca4b6f75d84db35fb3c5b7e75542795833fbe7f140e7d3a412d51def841a'],
+	['G3-CLEAN-R2.T01', 'a1683ea8772bc1ed04863c3269835776a87c7be8392c83c0d7912d79127efa51'],
+	['G3-CLEAN-R3.T01', '0294081e6972855ba8ad9a207074c805b31a623af7935204242c5b46acd63c1c'],
+	['G-RR-01.T01', '9cddabb4fe543089e650bdc9dd99619ed8bf7808186832b33402d227e09b2c92'],
+	['G3-RR-02.T01', '65b1d8ab9c5828e44864deef5c409ab759f6b91f8f2f18d6bf08ce5cebb05bb6'],
+	['G3-RR-03.T04', 'f44ca47b3eeba3c3bd53279cfe8d364671e2a60946ce64d60d7a256fad063c31'],
+	['G3-RR-04.T05', '8137f67a9f6c52878786c3e347222543407eb6482a2768b2817efa87f1085bec'],
+	['G3-RR-05.T01', '4834d49d9d25fe8d376f84f3a3c0f7676b7820854b726c1a1eef4a4bffbd3025'],
+	['G3-RR-06.T05', 'e6b913ad313af0eacf2988e3993b36832e5405a482b2e829759c35f55ca2261e'],
+	['G3-RR-07.T06', 'b62b181ef23b163b78718979bd7d189e6fce9841784c7b588247d610889a092b'],
+	['G3-RR-08.T05', '05bf386cadc4579354604a9ee1c019a7d9114d48805c44c3d3d6592713c6ec3c'],
+	['G3-RR-09.T01', '93b5df8b00e800413f492ce8dc1f4a6bc4df472ee57ced2db813035e0e0fb43e']
+];
+
+describe('⭐⭐ the review in parts, B8b — reviewer-qualification case set v10: version nine’s 76 cases under their ids, the 19 bridge part cases cut from their sources restated as a competent author authors them, with the practice’s policies (REG-D-130, REG-D-131)', () => {
+	it('⭐ THE SHAPE — the current set is version ten: version nine’s 41 non-part cases first, byte for byte, then its 35 part cases under their ids, sources, subjects and order, the 16 software ones byte for byte', () => {
+		expect([currentV10().caseSetVersion, currentOraclesV10().oracleVersion, currentOraclesV10().caseSetVersion], 'the current set is version ten').toEqual([10, 10, 10]);
+		const v9 = JSON.parse(read(CASE_SET_V9_FILE)) as CaseSet;
+		const v9Parts = v9.cases.filter((c): c is PwaTypeCase => c.arm === 'PWA_TYPE');
+		for (const [what, now] of [
+			['the committed current set', currentV10()],
+			['version ten, as generated', generatedV10()]
+		] as const) {
+			expect(now.cases.slice(0, 41).map((c) => JSON.stringify(c)), `${what}: version nine’s 41, byte for byte`).toEqual(
+				v9.cases.filter((c) => c.arm !== 'PWA_TYPE').map((c) => JSON.stringify(c))
+			);
+			const parts = now.cases.slice(41) as PwaTypeCase[];
+			expect(
+				parts.map((c) => [c.id, c.arm, c.sourceCaseId, JSON.stringify(c.subject), c.input.typeId]),
+				`${what}: then version nine’s 35, each under its id, source, subject and type`
+			).toEqual(v9Parts.map((c) => [c.id, c.arm, c.sourceCaseId, JSON.stringify(c.subject), c.input.typeId]));
+			expect(
+				parts.filter((c) => !BRIDGE_SOURCES.includes(c.sourceCaseId)).map((c) => JSON.stringify(c)),
+				`${what}: the 16 software part cases, byte for byte`
+			).toEqual(v9Parts.filter((c) => !BRIDGE_SOURCES.includes(c.sourceCaseId)).map((c) => JSON.stringify(c)));
+			expect(now.cases, `${what}: 76 cases`).toHaveLength(76);
+		}
+		expect(bridgePartIdsV10(), 'the 19 bridge part cases').toHaveLength(19);
+	});
+
+	it('⭐ THE PRACTICE’S SIX POLICIES, IN AN ENGINE (D3b (2)) — each created by the kernel’s create command with its kind conditions and activated, then read back through assurancePolicyViews: D3b’s table as written here, value for value, and the case set’s six are those values; the bridge part cases carry the seeded 15 then the six, the software part cases the seeded 15 alone', () => {
+		const { session } = practiceEngine('the practice’s six');
+		const view = assurancePolicyViews(session);
+		session.close();
+		const seeded = seededLibraryView();
+		expect(view.slice(0, 15), 'arrangement: the seeded library first').toEqual(seeded);
+		const six = view.slice(15);
+		expect(six, 'the six, as the engine holds them: D3b’s table, ACTIVE, non-floor, version 1.0.0, scoped by kind').toEqual(
+			PRACTICE_POLICIES_V10.map(([id, name, kinds, purpose]) => ({
+				id,
+				name,
+				purpose,
+				version: '1.0.0',
+				status: 'ACTIVE',
+				isFloor: false,
+				pwuKinds: kinds
+			}))
+		);
+		expect(JSON.stringify(PRACTICE_POLICIES), 'the case set’s six are the engine’s, value for value and key for key').toBe(JSON.stringify(six));
+		expect(JSON.stringify(BRIDGE_POLICY_LIBRARY), 'the bridge library: the seeded 15, then the six').toBe(JSON.stringify(view));
+		for (const c of partsV10())
+			expect(c.input.policyLibrary, `${c.id}: the library it is cut with`).toEqual(BRIDGE_SOURCES.includes(c.sourceCaseId) ? view : seeded);
+	});
+
+	it('⭑ CONTROL (REG-F-574) — a policy created through the authoring broker’s createPolicy, the agent tool’s path, carries no kinds in that view, so a part of every bridge kind lists it as one its kind may take: today’s create surface cannot scope a policy by kind', () => {
+		let seq = 0;
+		const core = createEngine({
+			authenticate: standaloneAuthenticator(),
+			ontology,
+			now: () => '2026-10-24T09:00:00Z',
+			newEventId: () => `evt_${++seq}`
+		});
+		const human = core.as(SESSION_CREDENTIAL);
+		seedPolicyLibrary(human);
+		const pwaId = 'pwa_01KAPQRS0000000000000000PA';
+		const dispatch = (commandType: string, type: string, target: string, payload: unknown) => {
+			seq += 1;
+			return human.dispatch({
+				commandId: `cmd-${seq}`,
+				commandType,
+				commandSchemaVersion: 1,
+				targetAggregateType: type,
+				targetAggregateId: target,
+				issuedAt: '2026-10-24T09:00:00Z',
+				correlationId: 'REG-F-574',
+				idempotencyKey: `idem-${seq}`,
+				payload
+			});
+		};
+		expect(
+			dispatch('CreatePwa', 'PROFESSIONAL_WORK_ARCHITECTURE', pwaId, {
+				pwaId,
+				name: 'A practice',
+				description: CASE_PWA_DESCRIPTION,
+				domain: 'structural engineering',
+				version: '1.0.0'
+			}).status,
+			'arrangement: the PWA the broker authors under'
+		).toBe('ACCEPTED');
+		const broker = new PwaAuthoringBroker({ engine: core.as(AGENT_CREDENTIAL), pwaId, mintId: (prefix) => `${prefix}_01KAPQRS0000000000000000S1` });
+		const [, name, , purpose] = PRACTICE_POLICIES_V10[1]!;
+		const created = broker.createPolicy({ name, purpose });
+		expect(created.ok, created.error).toBe(true);
+		expect(dispatch('ActivateAssurancePolicy', 'ASSURANCE_POLICY', created.id!, { policyId: created.id! }).status, 'arrangement: activated').toBe('ACCEPTED');
+		const policy = assurancePolicyViews(human).find((p) => p.id === created.id);
+		expect(policy, 'it is in the view, ACTIVE, non-floor').toMatchObject({ name, purpose, status: 'ACTIVE', isFloor: false });
+		expect(policy, 'the broker’s policy carries no kinds: REG-F-574’s present behaviour').not.toHaveProperty('pwuKinds');
+		const clean = bridgeV10('G3-CLEAN');
+		const parts = pwaTypeParts(buildPwaGraphExport(clean.input.pwa, clean.input.nodes), [...SEEDED_POLICY_LIBRARY, policy!]);
+		expect(
+			parts.filter((p) => !(p.context.applicablePolicies ?? []).some((x) => x.id === created.id)).map((p) => p.typeId),
+			'so every bridge part lists it as a policy its kind may take'
+		).toEqual([]);
+		core.close();
+	});
+
+	it('⭐ PRODUCTION’S GRAPH — each of the 13 restated sources, defined in an engine by an author’s commands, the practice’s six active there first, exports exactly its literal nodes', () => {
+		expect(BRIDGE_GRAPHS_V10.map((c) => c.id)).toEqual(BRIDGE_SOURCES);
+		for (const c of BRIDGE_GRAPHS_V10) expectProductionsGraphV10(c);
+	});
+
+	it('⛔ THE ONE RULE, FOR EVERY BRIDGE SOURCE (D3b (1)–(5)) — the request ends with the sentence; HUMAN on every INTERNAL type and no discharge on the delegated check; each type declares exactly the practice’s policies its kind takes; the check’s firm attests what it declares; and the purposes and hand-offs change exactly where D3b says, G3-RR-03’s and G3-RR-04’s load scopes and G3-RR-05’s permit inputs untouched', () => {
+		expect(BRIDGE_GRAPHS_V10.map((c) => c.id)).toEqual(BRIDGE_SOURCES);
+		for (const c of BRIDGE_GRAPHS_V10) {
+			const before = bridgeV9(c.id);
+			expect(c.input.prompt, `${c.id}: the request, the sentence added`).toBe(`${before.input.prompt} ${WHO_DOES_THE_WORK_V10}`);
+			for (const n of c.input.nodes) {
+				const delegated = n.executionBoundary === 'DELEGATED_EXTERNAL';
+				expect([('workDischarge' in n), n.workDischarge], `${c.id}/${n.name}: who does its work`).toEqual(delegated ? [false, undefined] : [true, 'HUMAN']);
+				expect(n.requiredAssurancePolicyIds, `${c.id}/${n.name}: the practice’s policies its kind takes`).toEqual(practiceTakes(n.pwuKind));
+				expect(n.boundaryContract, `${c.id}/${n.name}: the firm attests what the check declares`).toEqual(
+					delegated ? { counterpartyLabel: 'An independent checking firm', attestedAssurancePolicyIds: practiceTakes(n.pwuKind) } : undefined
+				);
+			}
+			expect(restatedFromV9(c.id), `${c.id}: the purposes and hand-offs changed`).toEqual(HANDOFFS_V10[c.id]);
+		}
+		expect(Object.keys(HANDOFFS_V10), 'every bridge source').toEqual(BRIDGE_SOURCES);
+		// The purposes and the artifacts, as D3b states them.
+		expect(bridgeV10('G3-CLEAN').input.nodes.map((n) => [n.name, n.purpose]), 'G3-CLEAN’s seven purposes').toEqual(G3_CLEAN_PURPOSES_V10);
+		for (const [source, type, purpose] of PLANTED_PURPOSES_V10)
+			expect(bridgeV10(source).input.nodes.find((n) => n.name === type)?.purpose, `${source}/${type}`).toBe(purpose);
+		// ⭑ Each purpose the source's table restates is one some bridge type carried in version nine and carries restated now:
+		// a row describing a type no source holds would restate nothing, and say it did.
+		for (const row of RESTATED_PURPOSES_V10)
+			expect(
+				[BRIDGE_GRAPHS_V9.some((c) => c.input.nodes.some((n) => n.purpose === row.v9)), BRIDGE_GRAPHS_V10.some((c) => c.input.nodes.some((n) => n.purpose === row.v10))],
+				`a restated purpose no bridge type carries: ${row.v9.slice(0, 60)}…`
+			).toEqual([true, true]);
+		for (const c of BRIDGE_GRAPHS_V10) {
+			const was = new Map(bridgeV9(c.id).input.nodes.map((n) => [n.id, n]));
+			const study = c.input.nodes.some((n) => n.pwuKind === 'OPTIONS_STUDY');
+			for (const n of c.input.nodes) {
+				const v9 = was.get(n.id)!;
+				if (n.pwuKind === 'LOAD_ANALYSIS' || n.pwuKind === 'DETAILED_DESIGN')
+					expect([v9.requiredInputs.includes('site-survey'), n.requiredInputs], `${c.id}/${n.name}: the site survey routed to it`).toEqual([false, [...v9.requiredInputs, 'site-survey']]);
+				if (n.pwuKind === 'OPTIONS_STUDY')
+					expect(n.requiredOutputs, `${c.id}/${n.name}: it produces the comparison`).toEqual(['options-comparison', ...v9.requiredOutputs]);
+				if (n.pwuKind === 'PERMIT_SUBMISSION')
+					expect(n.requiredInputs, `${c.id}/${n.name}: it submits the comparison where an options study produces one`).toEqual(
+						study ? [...v9.requiredInputs, 'options-comparison'] : v9.requiredInputs
+					);
+			}
+		}
+		const load = (source: string, name: string) => [bridgeV9(source), bridgeV10(source)].map((g) => g.input.nodes.find((n) => n.name === name)?.purpose);
+		const [rr03Before, rr03] = load('G3-RR-03', 'Load Analysis (static pedestrian load)');
+		expect(rr03, 'G3-RR-03’s narrowed scope, its plant, untouched').toBe(rr03Before);
+		expect(rr03, 'arrangement: it is the narrowed scope').toContain('for the static pedestrian load only');
+		const [rr04Before, rr04] = load('G3-RR-04', 'Load Analysis (pedestrian, wind)');
+		expect(rr04, 'G3-RR-04’s narrowed scope, its plant, untouched').toBe(rr04Before);
+		expect(rr04, 'arrangement: it is the narrowed scope').toContain('for pedestrian and wind loading');
+		const permit = (g: GraphCase) => g.input.nodes.find((n) => n.pwuKind === 'PERMIT_SUBMISSION')!;
+		expect(permit(bridgeV10('G3-RR-05')).requiredInputs, 'G3-RR-05’s permit inputs untouched: no study, no comparison').toEqual(permit(bridgeV9('G3-RR-05')).requiredInputs);
+		expect(permit(bridgeV10('G3-RR-05')).purpose, 'and its purpose G3-CLEAN’s of version nine').toBe(G3_CLEAN_PURPOSES[6]![1]);
+	});
+
+	it('⛔ RENAMED MEANS RENAMED — each restated copy is the restated G3-CLEAN with the names substituted, and nothing else', () => {
+		expectRenamedOnly(
+			BRIDGE_GRAPHS_V10.filter((c) => c.id.startsWith('G3-CLEAN')),
+			RENAMES_V3
+		);
+	});
+
+	it('⛔ EACH PLANTED TWIN DIFFERS FROM VERSION TEN’S G3-CLEAN ONLY WHERE ITS PLANT IS (diffed): version nine’s differences, and what D3b adds at the plant — G-RR-01’s concept study declares no practice policy, G3-RR-05’s permit submits no comparison, G3-RR-07’s self-check is HUMAN', () => {
+		for (const [id, expected] of Object.entries(TWIN_DIFFERENCES_V10)) {
+			expect(expected.filter((d) => !d.startsWith('+D3b ')), `${id}: version nine’s differences, carried`).toEqual(TWIN_DIFFERENCES_V9[id]);
+			expect(bridgeDifferences(bridgeV9('G3-CLEAN'), bridgeV9(id)), `${id}: version nine’s, as diffed`).toEqual(
+				TWIN_DIFFERENCES_V9[id]!.map((d) => d.replace(/^\+ /, ''))
+			);
+			expect(bridgeDifferences(bridgeV10('G3-CLEAN'), bridgeV10(id)), `${id}: restated by D3b`).toEqual(expected.map((d) => d.replace(/^\+(D3b)? /, '')));
+		}
+		expect(Object.keys(TWIN_DIFFERENCES_V10), 'every planted twin').toEqual(BRIDGE_SOURCES.slice(4));
+	});
+
+	it('⛔ THE 57’S PROMPTS DID NOT MOVE, AND THE 19’S DID, EACH TO THE PROTOTYPE’S BYTES — every other case’s initial, repair and criterion-repair prompts are version nine’s; each bridge part case’s initial prompt moved, to the one the sponsor confirmed (REG-D-131 Q36); the reviewer fingerprint is unmoved, and the case set’s digest moved', async () => {
+		const [v9, v10] = await Promise.all([reviewerFingerprint(CASE_SET_V9.cases), reviewerFingerprint(CASE_SET_V10.cases)]);
+		const bridge = bridgePartIdsV10();
+		expect(bridge, 'arrangement: the 19').toHaveLength(19);
+		const others = CASE_SET_V10.cases.map((c) => c.id).filter((id) => !bridge.includes(id));
+		expect(others, 'arrangement: the 57').toHaveLength(57);
+		for (const id of others) expect(v10.casePrompts.get(id), `${id}: its prompts are version nine’s`).toEqual(v9.casePrompts.get(id));
+		expect(
+			bridge.filter((id) => v10.casePrompts.get(id)!.initial === v9.casePrompts.get(id)!.initial),
+			'a bridge part case whose prompt did not move: it owes no RUN, and D3b did not reach it'
+		).toEqual([]);
+		expect(
+			bridge.map((id) => [id, v10.casePrompts.get(id)!.initial]),
+			'each bridge part case’s first prompt, the prototype’s, byte for byte'
+		).toEqual(PROTOTYPE_PROMPTS_V10);
+		expect([v9.reviewer, v10.reviewer], 'the reviewer fingerprint, unmoved').toEqual([REVIEWER_FINGERPRINT_V9, REVIEWER_FINGERPRINT_V9]);
+		expect(v10.caseSet, 'the case set’s digest moved').not.toBe(v9.caseSet);
+	});
+
+	it('⭐ WHAT THE PARTS SHOW, THROUGH THE MATERIALIZED PROMPT — a bridge part names the practice’s policies it declares and lists those its kind may take; G-RR-01’s concept study declares none and is shown none; a software part is shown the seeded library’s alone', async () => {
+		const linesOf = async (id: string) => {
+			const { initial } = await promptsFor(partsV10().find((c) => c.id === id)!);
+			const json = (key: string) => JSON.parse(initial.split('\n').find((l) => l.startsWith(`{"${key}":`))!)[key] as Record<string, unknown>;
+			const subject = json('subject');
+			return {
+				discharge: (subject.type as PwaGraphNode).workDischarge,
+				declared: subject.declaredPolicies as { id: string; name: string; purpose: string }[],
+				applicable: json('context').applicablePolicies as { id: string }[]
+			};
+		};
+		const survey = await linesOf('G3-CLEAN.T02');
+		const [id, name, , purpose] = PRACTICE_POLICIES_V10[1]!;
+		expect(survey, 'the survey: HUMAN, Site Investigation Adequacy declared, named, and the one its kind may take').toEqual({
+			discharge: 'HUMAN',
+			declared: [{ id, name, purpose }],
+			applicable: [{ id, name, purpose }]
+		});
+		const check = await linesOf('G3-CLEAN.T06');
+		expect([check.discharge, check.declared.map((p) => p.id)], 'the delegated check: no discharge, Check Independence declared').toEqual([undefined, ['pol_check_independence']]);
+		const concept = await linesOf('G-RR-01.T01');
+		expect([concept.declared, concept.applicable], 'G-RR-01’s concept study: no practice policy names its kind').toEqual([[], []]);
+		const software = await linesOf('G7-CLEAN.T02');
+		expect(software.applicable.map((p) => p.id).filter((p) => PRACTICE_POLICIES_V10.some(([x]) => x === p)), 'a software part: no practice policy').toEqual([]);
+	});
+
+	it('⭐ THE ORACLES — version nine’s 76, unchanged, under version ten: the 19 bridge part cases’ verdicts, faulted criteria, catchers and standings among them', () => {
+		expect([generatedOraclesV10().oracleVersion, generatedOraclesV10().caseSetVersion]).toEqual([10, 10]);
+		const v9 = (JSON.parse(read(ORACLES_V9_FILE)) as OracleSet).oracles;
+		expect(generatedOraclesV10().oracles, 'version nine’s, unchanged').toEqual(v9);
+		const bridge = bridgePartIdsV10();
+		expect(
+			generatedOraclesV10().oracles.filter((o) => bridge.includes(o.caseId)),
+			'the 19 bridge part cases’ oracles, version nine’s'
+		).toEqual(v9.filter((o) => bridge.includes(o.caseId)));
+		expect(generatedOraclesV10().oracles.map((o) => o.caseId), 'one per case, in the set’s order').toEqual(generatedV10().cases.map((c) => c.id));
+	});
+
+	it('⭐ CONFIRMED AS PROPOSED (REG-D-131) — the statement carries version nine’s whole, names the 19 bridge part cases restated by D3b as confirmed, quoting Q36 and the sponsor’s answer, their oracles standing as REG-D-126 conferred them, and the other 57 conferred, and carries no marker; reviewer:qual:check finds no CONFERRAL problem in it', async () => {
+		const { conferral } = generatedOraclesV10();
+		const restated = bridgePartIdsV10();
+		expect(restated, 'arrangement: the 19').toHaveLength(19);
+		expect(conferral, 'the statement carries the restatement’s marker').not.toContain(ORACLES_RESTATEMENT_UNCONFIRMED);
+		expect(conferral, 'version nine’s statement, whole').toContain((JSON.parse(read(ORACLES_V9_FILE)) as OracleSet).conferral);
+		expect(conferral, 'the 19, named as confirmed, in the sponsor’s words, their oracles standing as REG-D-126 conferred them, not as the sponsor’s answer').toContain(
+			`The 19 part cases cut from the bridge cases restated by D3b — ${restated.join(', ')} — were confirmed by the sponsor as proposed (REG-D-131, Q36: asked “Do you confirm the restated bridge cases (case set v10) as shown, with every planted defect and expected verdict unchanged, so High's re-measurement of the 19 bridge parts counts?”, the sponsor chose “Confirm as proposed (Recommended)”, whose text read “Package I builds exactly this content (its prompts must match the checked prototype hash for hash), then the 19 bridge parts are measured: about 40 calls.”): their expected verdicts, faulted criteria, catcher assignments and standings stand as REG-D-126 conferred them, and the confirmation changes none of them.`
+		);
+		expect(conferral, 'the other 57 conferred').toContain('The other 57 — the 41 non-part cases and the 16 part cases of G7-CLEAN, its planted twins and the 3-level pair — are conferred, as recorded above.');
+		expect(conferral, 'no proposal’s word').not.toContain(ORACLES_PROPOSED);
+		const conferralProblems = async (statement: string) =>
+			(
+				await checkQualification({
+					files: [],
+					current: {
+						reviewer: '0'.repeat(64),
+						scoring: '1'.repeat(64),
+						caseSet: '2'.repeat(64),
+						components: { probes: '3'.repeat(64), budget: '4'.repeat(64), criteria: '5'.repeat(64), scoring: '1'.repeat(64) },
+						casePrompts: new Map()
+					},
+					cases: generatedV10().cases,
+					oracles: generatedOraclesV10().oracles,
+					conferral: statement,
+					oracleSets: [],
+					findings: new Set(),
+					struck: new Set(),
+					rulings: new Set(),
+					struckRulings: new Set(),
+					rescore: async () => {
+						throw new Error('an empty record re-scores nothing');
+					}
+				})
+			).problems.filter((p) => p.limb === 'CONFERRAL');
+		expect(await conferralProblems(conferral), 'the check finds no CONFERRAL problem in the record').toEqual([]);
+		// ⭑ CONTROL — the same set, its statement carrying the marker: the confirmation owed, alone.
+		expect(await conferralProblems(`${conferral} The 19 are ${ORACLES_RESTATEMENT_UNCONFIRMED}.`)).toEqual([
+			{ limb: 'CONFERRAL', message: RESTATEMENT_NOT_CONFIRMED }
+		]);
+	});
+
+	it('⛔ THE 28,000-CHARACTER LIMIT, AND SEEN WHOLE — every prompt of the 35 fits agy’s argv budget, and no slice of any is cut', async () => {
+		expect(partsV10(), 'the arrangement: the 35').toHaveLength(35);
+		expect((await promptProblemsIn(partsV10())).join('\n')).toBe('');
+	});
+
+	it('⭐ THE ORACLES COMPOSE, THROUGH THE RUNNER’S OWN SCORING — for every part case, a reply faulting exactly its oracle’s criteria is scored by evaluateCase to its oracle’s disposition, with independence met', async () => {
+		const oracles = new Map(generatedOraclesV10().oracles.map((o) => [o.caseId, o]));
+		for (const c of partsV10()) {
 			const oracle = oracles.get(c.id)!;
 			const reply = JSON.stringify({
 				findings: SEEDED_REASONING_REVIEW_CRITERIA.map((k) => ({
