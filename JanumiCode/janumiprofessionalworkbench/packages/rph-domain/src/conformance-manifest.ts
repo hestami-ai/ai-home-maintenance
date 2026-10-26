@@ -134,7 +134,10 @@ const COVERED_BY_ID: Readonly<Record<string, string>> = {
 	// ⭐ `JAN-EXEC` Phase 7, package M (2026-10-25; `REG-D-135` (2), design D2) — the readiness rule, ENFORCED at `markPwuReady`
 	// and observed refusing through the bus by its probe in the file below. ⭑ 2026-10-26 (the package's check, finding 1): and at
 	// the step start too, for a plan made without MarkPwuReady (unitReadinessRefusal, execution.ts; its probes in
-	// pwu-start-readiness.test.ts, beside this cite's).
+	// pwu-start-readiness.test.ts, beside this cite's). ⭑ 2026-10-26 (`JAN-EXEC` Phase 7, package O; design D21; `REG-F-582`):
+	// ~~"or one of whose inputRequirements is unproduced"~~ is struck from the rule's statement — an input no unit of the
+	// Undertaking produces is expected from outside it and refuses neither seat (its cases in pwu-start-readiness.test.ts). The
+	// cite stands: its probe refuses for a producer, which still refuses.
 	'RPH-PWU-011': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	// ── THE RPH-PER CITES, ALL FOUR CORRECTED 2026-08-02 WHILE DISPOSITIONING THE FAMILY ─────────────────────
 	//

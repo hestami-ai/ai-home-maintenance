@@ -772,7 +772,8 @@ function stepAuthorityRefusal(
 /**
  * ⭐⭐ RPH-PWU-011 AT THE TWO ARROWS INTO RUNNING (`REG-D-135` (2); design D2; `JAN-EXEC` Phase 7, package M) — a step of a
  * plan whose work unit waits for a unit not yet ACCEPTED (SATISFIED, RECOMPOSED or BASELINED; CONDITIONALLY_SATISFIED does
- * not count, DEC-6), or for an input nothing produces, does not run: refused, each unit it waits for named, before any
+ * not count, DEC-6)~~, or for an input nothing produces~~ (⛔ struck 2026-10-26, package O, design D21: such an input is expected
+ * from outside the Undertaking and refuses nothing), does not run: refused, each unit it waits for named, before any
  * model or tool invocation. The SAME rule as `MarkPwuReady`'s (`startReadiness`, rph-projections), over the same record.
  *
  * ⛔ WHY MarkPwuReady ALONE WAS NOT ENOUGH, found by the package's independent check (2026-10-26) and driven through the bus

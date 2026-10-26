@@ -1464,17 +1464,20 @@
 		},
 		"packages/rph-projections/src/unit-dependencies.ts": {
 			"consumedExports": [
+				"expectedFromOutside",
+				"OUTSIDE_INPUT",
 				"readinessUnitOf",
 				"startReadiness",
 				"startRefusal",
-				"unitDependencies",
-				"UNPRODUCED_INPUT"
+				"unitDependencies"
 			],
 			"guardedExports": [
+				"expectedFromOutside",
+				"OUTSIDE_INPUT",
 				"startReadiness",
 				"unitDependencies"
 			],
-			"unattributedMutants": 0
+			"unattributedMutants": 1
 		},
 		"packages/rph-projections/src/work-projection.ts": {
 			"consumedExports": [

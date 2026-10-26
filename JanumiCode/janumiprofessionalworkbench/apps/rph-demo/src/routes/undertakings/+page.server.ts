@@ -10,7 +10,7 @@ import {
 	listPwuTypes,
 	listUndertakings
 } from '@janumipwb/rph-engine';
-import { planComposition, unitDependencies, UNPRODUCED_INPUT } from '@janumipwb/rph-projections';
+import { OUTSIDE_INPUT, planComposition, unitDependencies } from '@janumipwb/rph-projections';
 import type { PermittedChildRule, WorkRiskProfile } from '@janumipwb/rph-contracts';
 import { parseRiskProfile } from '$lib/authoring/riskProfile';
 import {
@@ -199,7 +199,8 @@ function instantiateComposition(
 	// ⭐⭐ `JAN-EXEC` Phase 7, package M — WHAT EACH UNIT WAITS FOR, RECORDED AS IT IS BUILT (`REG-D-135` (2); design D1;
 	// `REG-F-578`): from the bound types and the plan's instances, each unit's producers — every other instance whose type
 	// lists one of its required inputs as a required output — and its children; `originating-intent` is this Undertaking's
-	// Intent's; an input nothing here produces is recorded unproduced; and each decomposition's sibling dependencies (DEC-2).
+	// Intent's; an input nothing here produces is recorded ~~unproduced~~ ⭐ as expected from outside this Undertaking (package O,
+	// design D21; `REG-F-582`: it withholds nothing); and each decomposition's sibling dependencies (DEC-2).
 	// ⛔ Until package M every unit was proposed with `dependencyIds: []` and nothing held a consumer back from starting
 	// before its producers — so run-12's root ran first. The order is NOT decided here: the engine refuses a start until
 	// what a unit waits for is accepted (`MarkPwuReady`), and the page offers what the engine would admit.
@@ -259,11 +260,12 @@ function instantiateComposition(
 				assurancePolicyIds: Array.isArray(type.state.requiredAssurancePolicyIds)
 					? (type.state.requiredAssurancePolicyIds as string[])
 					: [],
-				// ⭐ Package M (D1) — its producers and its children, and the inputs nothing here produces.
+				// ⭐ Package M (D1) — its producers and its children, and the inputs nothing here produces. ⭐ Package O (D21) — each
+				// recorded ~~`UNPRODUCED`~~ as EXPECTED FROM OUTSIDE this Undertaking (`OUTSIDE_INPUT`), which withholds nothing.
 				dependencyIds: (dependencyOf.get(instance.key)?.dependencyIds ?? []).map((k) => pwuIdByKey.get(k)!),
 				inputRequirements: (dependencyOf.get(instance.key)?.unproduced ?? []).map((name) => ({
 					name,
-					status: UNPRODUCED_INPUT
+					status: OUTSIDE_INPUT
 				})),
 				// THE PROFESSIONAL'S JUDGEMENT, not a constant (DR-002 W-4 closing finding F-D). Every PWU this
 				// architecture instantiates carries the risk declared for the Undertaking, because they are all

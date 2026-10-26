@@ -63,7 +63,12 @@ const EXPORTED: Readonly<Record<string, string>> = {
 	JPWB_AGY_BIN: join(NO_PROGRAMS, 'agy-exported-override'),
 	// ⛔ A folder INSIDE the empty directory that holds no recording: were the switch to reach a selector, it would
 	// replay nothing.
-	JPWB_REPLAY: join(NO_PROGRAMS, 'replay-exported-recording')
+	JPWB_REPLAY: join(NO_PROGRAMS, 'replay-exported-recording'),
+	// ⭐⭐ `JAN-EXEC` Phase 7, package O — D26 (design revision 3; `l2-facts.md`) — AN ELEVENTH, THE AUTHORING REVIEW'S ALLOWANCE
+	// (`review-allowance.ts`): it selects no backend, but it keys on its absence exactly as the ten do — set, every authoring review
+	// round reserves its worst case against it, and `0` stops every round with a type before any reviewer call — so a shell that
+	// exported it for a paid half-B run would turn the gate's authoring reviews into stopped rounds.
+	JPWB_AUTHORING_REVIEW_ALLOWANCE: '0'
 };
 
 /**
@@ -130,7 +135,9 @@ describe('⭐ D8 — a gate entry point started with every live-backend variable
 		// ⭐ The review of E4, finding 11 — ~~eight~~ nine: the replay switch is the ninth. ⭐ The re-review of its fix
 		// round — ten: the authoring agent's model, which the replay refuses beside its switch. ⭑ The count is pinned
 		// here, once; the titles and messages name the variables, never their number (the E4 polish round).
-		expect(Object.keys(EXPORTED)).toHaveLength(10);
+		// ⛔ MOVED 2026-10-26 (`JAN-EXEC` Phase 7, package O; design D26, which names it) — ~~10~~ 11: the authoring review's
+		// allowance, `JPWB_AUTHORING_REVIEW_ALLOWANCE`, is stripped from the gate as the other live-backend variables are.
+		expect(Object.keys(EXPORTED)).toHaveLength(11);
 		for (const [k, v] of Object.entries(EXPORTED)) expect(env[k]).toBe(v);
 		expect(Object.keys(env).filter((k) => /^path$/i.test(k))).toEqual(['PATH']);
 		expect(env.PATH).toBe(NO_PROGRAMS);

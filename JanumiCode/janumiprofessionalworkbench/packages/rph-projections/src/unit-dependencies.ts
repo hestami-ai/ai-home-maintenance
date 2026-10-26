@@ -21,14 +21,25 @@
 //     input of a unit's type, EVERY other unit whose type lists that name as a required output; for a parent, each of its
 //     children; `originating-intent` supplied by the Undertaking's Intent; the inputs no unit produces, named; and the
 //     loops, named — from the data flow, and from a child that requires its parent's output while the parent waits for it.
-//   · D2, `startReadiness` — from what the store RECORDED (`dependencyIds`, and `inputRequirements` marked unproduced): a
-//     unit may start only when each unit it depends on is ACCEPTED — SATISFIED, RECOMPOSED or BASELINED (`ACCEPTED_UNIT_STATES`;
-//     `packages/rph-contracts/src/enums.ts`, the unit lifecycle) — and no input it requires is unproduced. ⛔
-//     CONDITIONALLY_SATISFIED does not count: its conditions are open, and *"'Assured required child results' excludes
-//     conditionally satisfied dispositions"* (DOC-003 :231, DEC-6).
+//   · D2, `startReadiness` — from what the store RECORDED (`dependencyIds`, and `inputRequirements` marked ~~unproduced~~ ⭐
+//     expected from outside, D21): a unit may start only when each unit it depends on is ACCEPTED — SATISFIED, RECOMPOSED or
+//     BASELINED (`ACCEPTED_UNIT_STATES`; `packages/rph-contracts/src/enums.ts`, the unit lifecycle) ~~— and no input it
+//     requires is unproduced~~. ⛔ CONDITIONALLY_SATISFIED does not count: its conditions are open, and *"'Assured required
+//     child results' excludes conditionally satisfied dispositions"* (DOC-003 :231, DEC-6).
+//
+// ⭐⭐ `JAN-EXEC` Phase 7, package O — D21, OUTSIDE INPUTS (design revision 3; `REG-F-582`; the lead's decision, flagged for the
+// sponsor) — ⛔ STRUCK 2026-10-26: ~~"and no input it requires is unproduced"~~. Package M refused a unit's start for a required
+// input no instantiated unit produces, and so the canon's own reference PWA, whose types declare inputs owed by no unit of the
+// Undertaking ("workspace and repository context", "organizational policy"), could start 0 of its 8 measured units. That block
+// was the lead's extension of the sponsor's Q42b, which concerns producers finishing and having their work accepted (`REG-D-135`
+// (2)); it gave no stronger guarantee. Such an input is now EXPECTED FROM OUTSIDE this Undertaking (`OUTSIDE_INPUT`): recorded
+// so at instantiation, named on the page (`expectedFromOutside`), and withholding nothing. Producers, children and loops still
+// withhold. ⚠ So a misspelt input reads as an outside input rather than blocking: the authoring prompt's start rule (D25) and
+// the review in parts are where that mistake is caught.
 //
 // ⚠ A UNIT IS NEVER ITS OWN PRODUCER, as the PWA graph never draws a self-edge (`pwa-graph.ts`, `collectDataFlow`): an input
-// only the unit's own type produces has no producer it could wait for, and is named unproduced.
+// only the unit's own type produces has no producer it could wait for, and is named ~~unproduced~~ ⭐ among the inputs no unit
+// of the Undertaking produces — expected from outside it (D21).
 //
 // Pure + browser-safe (no imports), like the rest of rph-projections.
 
@@ -41,8 +52,21 @@ export const SUPPLIED_BY_INTENT: ReadonlySet<string> = new Set(['originating-int
  */
 export const ACCEPTED_UNIT_STATES: readonly string[] = ['SATISFIED', 'RECOMPOSED', 'BASELINED'];
 
-/** The status an `inputRequirements` entry carries for a required input no unit of the Undertaking produces (D1). */
+/**
+ * ⭐⭐ D21 — THE STATUS AN `inputRequirements` ENTRY CARRIES FOR A REQUIRED INPUT NO UNIT OF THE UNDERTAKING PRODUCES: it is
+ * expected from outside this Undertaking, and withholds nothing (package O; `REG-F-582`).
+ */
+export const OUTSIDE_INPUT = 'EXPECTED_FROM_OUTSIDE';
+
+/**
+ * ~~The status an `inputRequirements` entry carries for a required input no unit of the Undertaking produces (D1).~~ ⛔ The
+ * status package M wrote for such an input, which then refused the unit's start (struck 2026-10-26, package O, D21:
+ * `OUTSIDE_INPUT` replaces it). ⭑ KEPT READABLE: a record made before D21 carries it, and it reads as `OUTSIDE_INPUT` does.
+ */
 export const UNPRODUCED_INPUT = 'UNPRODUCED';
+
+/** ⭐ D21 — the statuses read as an input expected from outside: D21's own, and the one a record made before it carries. */
+const OUTSIDE_INPUT_STATUSES: ReadonlySet<unknown> = new Set([OUTSIDE_INPUT, UNPRODUCED_INPUT]);
 
 /** The subset of a PWU Type this projection reads: its produced-input relation. */
 export interface DependencyType {
@@ -71,7 +95,10 @@ export interface UnitDependency {
 	readonly inputs: readonly InputProducers[];
 	/** The required inputs the Undertaking's Intent supplies (`SUPPLIED_BY_INTENT`). */
 	readonly suppliedByIntent: readonly string[];
-	/** The required inputs no other unit of the Undertaking produces, named. */
+	/**
+	 * The required inputs no other unit of the Undertaking produces, named. ⭐ D21 — each is expected from outside this
+	 * Undertaking: instantiation records it so (`OUTSIDE_INPUT`), and it withholds nothing.
+	 */
 	readonly unproduced: readonly string[];
 	/** The unit's children, in the units' order: a parent waits for each. */
 	readonly childIds: readonly string[];
@@ -241,14 +268,21 @@ export function dependencyLayers(
 
 // ── D2 — WHETHER A UNIT MAY START, FROM WHAT THE STORE RECORDED ─────────────────────────────────────────────────────────
 
-/** A unit as the readiness rule reads it from the store: who it waits for, and what it requires that nothing produces. */
+/**
+ * A unit as the readiness rule reads it from the store: who it waits for, and what it requires that nothing produces — ⭐ D21:
+ * which it expects from outside its Undertaking.
+ */
 export interface ReadinessUnit {
 	readonly id: string;
 	readonly title: string;
 	readonly workLifecycleState: string;
 	readonly undertakingId: string | undefined;
 	readonly dependencyIds: readonly string[];
-	readonly unproducedInputs: readonly string[];
+	/**
+	 * ~~`unproducedInputs`~~ ⭐ D21 (package O) — the required inputs recorded as expected from outside (`OUTSIDE_INPUT`, or
+	 * `UNPRODUCED_INPUT` in a record made before D21), in the record's order. ⛔ None withholds the unit.
+	 */
+	readonly outsideInputs: readonly string[];
 }
 
 const strOf = (v: unknown): string => (typeof v === 'string' ? v : '');
@@ -271,15 +305,20 @@ export function readinessUnitOf(
 		dependencyIds: Array.isArray(state.dependencyIds)
 			? (state.dependencyIds as unknown[]).filter((d): d is string => typeof d === 'string')
 			: [],
-		unproducedInputs: requirements
+		// ⭐ D21 — ~~`.filter((r) => r.status === UNPRODUCED_INPUT)`, each a reason to withhold~~: each an input expected from
+		// outside, under D21's status or under the one a record made before it carries.
+		outsideInputs: requirements
 			.map((r) => (typeof r === 'object' && r !== null ? (r as Record<string, unknown>) : {}))
-			.filter((r) => r.status === UNPRODUCED_INPUT)
+			.filter((r) => OUTSIDE_INPUT_STATUSES.has(r.status))
 			.map((r) => strOf(r.name))
 	};
 }
 
-/** Why a PROPOSED unit is withheld, by kind — the page shows each, and the lane reads a loop's (D3, D5). */
-export type WithheldKind = 'waiting' | 'abandoned' | 'unknown' | 'unproduced' | 'loop';
+/**
+ * Why a PROPOSED unit is withheld, by kind — the page shows each, and the lane reads a loop's (D3, D5). ⛔ ~~`'unproduced'`~~ —
+ * struck 2026-10-26 (package O, D21): an input no unit produces is expected from outside, and withholds nothing.
+ */
+export type WithheldKind = 'waiting' | 'abandoned' | 'unknown' | 'loop';
 
 /** ⭐ D2 — whether a unit may start, and if not, every reason, named. */
 export interface StartReadiness {
@@ -290,8 +329,12 @@ export interface StartReadiness {
 	readonly abandoned: readonly { readonly id: string; readonly title: string }[];
 	/** The dependency ids that name no unit of this unit's Undertaking. */
 	readonly unknown: readonly string[];
-	/** The required inputs no unit of the Undertaking produces. */
-	readonly unproduced: readonly string[];
+	/**
+	 * ~~`unproduced` — the required inputs no unit of the Undertaking produces~~ ⭐ D21 (package O) — the required inputs
+	 * expected from outside this Undertaking, each once, in the record's order: shown on the page (`expectedFromOutside`), and
+	 * ⛔ never a reason to withhold.
+	 */
+	readonly outside: readonly string[];
 	/** ⭐ D5 — the loop it sits in, from it round to the unit before it again; null when it sits in none. */
 	readonly loop: readonly { readonly id: string; readonly title: string }[] | null;
 	readonly kinds: readonly WithheldKind[];
@@ -328,7 +371,8 @@ function listed(items: readonly string[]): string {
 
 /**
  * ⭐⭐ D2 — MAY THIS UNIT START? Only when every unit it depends on is a unit of its own Undertaking and ACCEPTED
- * (`ACCEPTED_UNIT_STATES`), and no input it requires is unproduced. `lookup` reads a unit from the store
+ * (`ACCEPTED_UNIT_STATES`) ~~, and no input it requires is unproduced~~ (⛔ struck 2026-10-26, package O, D21: an input no unit
+ * produces is expected from outside, named in `outside`, and withholds nothing). `lookup` reads a unit from the store
  * (`readinessUnitOf`), so the engine's refusal (`MarkPwuReady`) and the page's offer read this one rule over one record.
  */
 export function startReadiness(
@@ -346,14 +390,15 @@ export function startReadiness(
 		else if (!ACCEPTED_UNIT_STATES.includes(d.workLifecycleState))
 			waitingFor.push({ id, title: d.title, state: d.workLifecycleState });
 	}
-	const unproduced = [...new Set(unit?.unproducedInputs ?? [])];
+	// ⭐ D21 — named, each once, and never a kind: an input expected from outside withholds nothing.
+	const outside = [...new Set(unit?.outsideInputs ?? [])];
 	const cycle = unit === undefined ? null : loopThrough(unitId, lookup);
 	const loop = cycle?.map((id) => ({ id, title: lookup(id)?.title ?? id })) ?? null;
 	const kinds: WithheldKind[] = [
 		...(waitingFor.length > 0 ? (['waiting'] as const) : []),
 		...(abandoned.length > 0 ? (['abandoned'] as const) : []),
 		...(unknown.length > 0 ? (['unknown'] as const) : []),
-		...(unproduced.length > 0 ? (['unproduced'] as const) : []),
+		// ~~...(unproduced.length > 0 ? (['unproduced'] as const) : []),~~ ⛔ D21.
 		...(loop !== null ? (['loop'] as const) : [])
 	];
 	const quoted = (title: string): string => `"${title}"`;
@@ -367,9 +412,7 @@ export function startReadiness(
 		...(unknown.length > 0
 			? [`${listed(unknown)} name${unknown.length > 1 ? '' : 's'} no unit of this Undertaking`]
 			: []),
-		...(unproduced.length > 0
-			? [`nothing in this Undertaking produces its input${unproduced.length > 1 ? 's' : ''} ${listed(unproduced.map(quoted))}`]
-			: []),
+		// ~~"nothing in this Undertaking produces its input(s) …"~~ ⛔ D21: no reason — the page names it apart (`expectedFromOutside`).
 		...(loop !== null
 			? [`it sits in a loop: ${[...loop, loop[0]!].map((l) => quoted(l.title)).join(' → ')}`]
 			: [])
@@ -379,11 +422,19 @@ export function startReadiness(
 		waitingFor,
 		abandoned,
 		unknown,
-		unproduced,
+		outside,
 		loop,
 		kinds,
 		reason: reasons.length === 0 ? null : reasons.join('; ')
 	};
+}
+
+/**
+ * ⭐⭐ D21 — THE PAGE'S WORDS FOR A UNIT'S OUTSIDE INPUTS (`StartReadiness.outside`), beside its offer or its reason: `expects
+ * "a" and "b" from outside this Undertaking`; null for a unit that expects nothing from outside.
+ */
+export function expectedFromOutside(outside: readonly string[]): string | null {
+	return outside.length === 0 ? null : `expects ${listed(outside.map((name) => `"${name}"`))} from outside this Undertaking`;
 }
 
 /**
@@ -393,10 +444,11 @@ export function startReadiness(
  */
 export const START_REFUSAL_MARKER = 'cannot start until each unit it depends on is accepted';
 
+// ⛔ STRUCK 2026-10-26 (package O, D21): the refusal's clause ~~"— and nothing it requires is unproduced"~~, false now: an input no
+// unit produces is expected from outside and refuses nothing.
 export function startRefusal(unitId: string, readiness: StartReadiness): string {
 	return (
 		`PWU ${unitId} ${START_REFUSAL_MARKER} — SATISFIED, RECOMPOSED or BASELINED; CONDITIONALLY_SATISFIED does not ` +
-		`count — and nothing it requires is unproduced: ${readiness.reason ?? 'nothing withholds it'} (REG-D-135 (2); ` +
-		'JPWB-DOC-003 STA-5)'
+		`count: ${readiness.reason ?? 'nothing withholds it'} (REG-D-135 (2); JPWB-DOC-003 STA-5)`
 	);
 }

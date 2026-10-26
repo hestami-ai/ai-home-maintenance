@@ -16,7 +16,11 @@ describe('buildSystemPrompt authoring-backbone boundaries', () => {
 		expect(prompt).toContain('get_pwu_lifecycle_topology');
 		expect(prompt).toContain('SIMULATE.PWU.* events are browser-local simulation events');
 		expect(prompt).toContain('cannot be fixed by moving nodes or changing layout');
-		expect(prompt).toMatch(/does NOT by itself establish execution order/);
+		// ⛔ MOVED 2026-10-26 (`JAN-EXEC` Phase 7, package O; design D25, revision 3) — ~~`toMatch(/does NOT by itself establish
+		// execution order/)`~~: the statement is reconciled, by striking it in place, with the start rule the engine enforces — a
+		// matching artifact name is a dependency the engine enforces for readiness, not a schedule.
+		expect(prompt).toContain('it is a dependency the engine enforces for readiness, not a schedule');
+		expect(prompt).not.toMatch(/does NOT by itself establish execution order/);
 		expect(prompt).toContain('Do not encode "then"');
 		expect(prompt).not.toContain('data-flow = "then"');
 		expect(prompt).not.toContain('for the ordering');
@@ -152,6 +156,32 @@ describe('buildSystemPrompt authoring-backbone boundaries', () => {
 		expect(howToWork, 'ordinary assurance reviews').toContain(
 			'Ordinary assurance reviews stay with the reviewer model: they are policies, not types.'
 		);
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package O — D25 (design revision 3; the lead's decision, flagged for the sponsor): THE AUTHOR IS TOLD THE
+	// START RULE THE ENGINE ENFORCES (`REG-D-135` (2), D21) — all four parts, together, in the data-flow section the agent reads
+	// when it declares requiredInputs and requiredOutputs. This informs the author of what the engine does; it dodges no defect
+	// (`REG-D-110` (4)).
+	it('⭐ D25 — WHAT YOU ARE AUTHORING states the start rule the engine enforces, all four parts: a producer’s unit accepted first, a parent after its children, only originating-intent from the Intent, and any other input nothing produces expected from outside', () => {
+		const prompt = buildSystemPrompt({
+			id: 'PWA-TEST',
+			name: 'Test PWA',
+			domain: 'testing',
+			publicationStatus: 'DRAFT'
+		});
+		const authoring = prompt.slice(prompt.indexOf('WHAT YOU ARE AUTHORING'), prompt.indexOf('GRAPH STRUCTURE'));
+		expect(authoring, 'arrangement: the WHAT YOU ARE AUTHORING section').toMatch(/^WHAT YOU ARE AUTHORING\n- /);
+
+		expect(authoring, 'the producer').toContain(
+			"a type whose required input matches another type's required output waits until that producer's unit is accepted (signed off)"
+		);
+		expect(authoring, 'the children').toContain('a parent waits for its children');
+		expect(authoring, 'the Intent').toContain("only originating-intent comes from the Undertaking's Intent");
+		expect(authoring, 'the outside input').toContain(
+			'any other required input that no unit of the Undertaking produces is expected from outside the Undertaking and does not hold its unit back'
+		);
+		// ⭑ And what follows from the fourth: a misspelt name is an outside input, never a hand-off, so the author spells each alike.
+		expect(authoring).toContain('a misspelt artifact name becomes an outside input, never a hand-off');
 	});
 
 	// JAN-PRPWA-DS-001 SPEC-1 / DR-001 DWP-01: the agnostic core states the STD-1 leaf criterion (both branches),

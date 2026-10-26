@@ -178,12 +178,15 @@ describe('⭐ D1 — instantiation RECORDS what each unit waits for', () => {
 		expect([root, specify, build].map((x) => x.state.inputRequirements)).toEqual([[], [], []]);
 	});
 
-	it('⭐ an input NOTHING produces is recorded on its unit, named unproduced', async () => {
+	// ⛔ MOVED 2026-10-26 (`JAN-EXEC` Phase 7, package O; design D21, revision 3; `REG-F-582`) — ~~"named unproduced"~~, which
+	// pinned ~~`{ name: 'market-study', status: 'UNPRODUCED' }`~~: such an input is expected from outside this Undertaking, and
+	// recorded so.
+	it('⭐ an input NOTHING produces is recorded on its unit, as EXPECTED FROM OUTSIDE this Undertaking (D21)', async () => {
 		const u = await instantiated([
 			{ name: 'Product', isRoot: true, children: ['Survey'] },
 			{ name: 'Survey', inputs: ['market-study'], outputs: ['survey'] }
 		]);
-		expect(u.unitOf('Survey').state.inputRequirements).toEqual([{ name: 'market-study', status: 'UNPRODUCED' }]);
+		expect(u.unitOf('Survey').state.inputRequirements).toEqual([{ name: 'market-study', status: 'EXPECTED_FROM_OUTSIDE' }]);
 	});
 
 	it('⭐ DEC-2 — the decomposition contract records its sibling dependencies: the children another child waits for', async () => {
@@ -336,7 +339,8 @@ type PageRow = {
 	id: string;
 	title: string;
 	workLifecycleState: string;
-	start: { offered: boolean; reason: string | null; kinds: readonly string[] } | null;
+	// ⭐ Package O (D21) — and what it expects from outside this Undertaking, in the page's words.
+	start: { offered: boolean; reason: string | null; kinds: readonly string[]; outside: string | null } | null;
 };
 const pageRows = (undertakingId: string): PageRow[] =>
 	(unitPageLoad({ params: { id: undertakingId } } as never) as unknown as { pwuList: PageRow[] }).pwuList;
@@ -364,22 +368,29 @@ function engineAdmits(pwuId: string): { readonly admitted: boolean; readonly mes
 }
 
 describe('⭐ D3 — the page OFFERS Begin & Execute exactly where the engine would admit it, and shows why elsewhere (SPEC-001 :3244)', () => {
+	// ⭐ Package O (D21) — each offer also carries what the unit expects from outside: here, nothing (`outside: null`).
 	it('⭐ THE PREDICTED RED — a consumer whose producer is PROPOSED is NOT offered, and its reason is shown', async () => {
 		const u = await instantiated(SPEC_BUILD);
 		const build = pageRows(u.undertakingId).find((r) => r.title === 'Build');
 		expect(build?.start, 'the page offered Build, which waits for Specify').toEqual({
 			offered: false,
 			reason: 'it waits for "Specify" (PROPOSED) to be accepted',
-			kinds: ['waiting']
+			kinds: ['waiting'],
+			outside: null
 		});
 		expect(pageRows(u.undertakingId).find((r) => r.title === 'Specify')?.start).toEqual({
 			offered: true,
 			reason: null,
-			kinds: []
+			kinds: [],
+			outside: null
 		});
 	});
 
-	it('⭐ BOTH DIRECTIONS, ON EVERY PROPOSED UNIT — offered ⇔ the engine admits; withheld ⇔ the engine refuses, in the same words; across waiting, accepted, abandoned (D4), a loop (D5) and an input nothing produces', async () => {
+	// ⛔ MOVED 2026-10-26 (`JAN-EXEC` Phase 7, package O; design D21, revision 3; `REG-F-582`) — ~~Survey withheld,
+	// `['Survey', false, ['unproduced']]`, its reason ~~"nothing in this Undertaking produces its input "market-study""~~~~: its
+	// one input is expected from outside this Undertaking now, so the page OFFERS it and the engine ADMITS it — the parity both
+	// ways still holds over every row, Survey's included — and the page says what it expects from outside.
+	it('⭐ BOTH DIRECTIONS, ON EVERY PROPOSED UNIT — offered ⇔ the engine admits; withheld ⇔ the engine refuses, in the same words; across waiting, accepted, abandoned (D4), a loop (D5) and ~~an input nothing produces~~ an input expected from outside, offered (D21)', async () => {
 		const u = await instantiated(MIXED);
 		const alpha = u.unitOf('Alpha');
 		expect((await beginExecute(u.undertakingId, alpha.id)).error, 'arrangement: Alpha starts').toBeUndefined();
@@ -400,7 +411,7 @@ describe('⭐ D3 — the page OFFERS Begin & Execute exactly where the engine wo
 			['Delta', false, ['abandoned']],
 			['Loop A', false, ['waiting', 'loop']],
 			['Loop B', false, ['waiting', 'loop']],
-			['Survey', false, ['unproduced']]
+			['Survey', true, []]
 		]);
 		for (const row of proposed) {
 			const engine = engineAdmits(row.id);
@@ -412,13 +423,60 @@ describe('⭐ D3 — the page OFFERS Begin & Execute exactly where the engine wo
 		const loopA = proposed.find((r) => r.title === 'Loop A')!;
 		expect(loopA.start?.reason).toContain('it sits in a loop: "Loop A" → "Loop B" → "Loop A"');
 		expect(proposed.find((r) => r.title === 'Delta')?.start?.reason).toBe('its producer "Gamma" was ABANDONED');
-		expect(proposed.find((r) => r.title === 'Survey')?.start?.reason).toBe(
-			'nothing in this Undertaking produces its input "market-study"'
-		);
+		// ⛔ MOVED (D21): ~~Survey's reason, "nothing in this Undertaking produces its input "market-study""~~ — none withholds it.
+		expect(proposed.find((r) => r.title === 'Survey')?.start).toEqual({
+			offered: true,
+			reason: null,
+			kinds: [],
+			outside: 'expects "market-study" from outside this Undertaking'
+		});
 		// ⭑ And the action follows: the offered unit is admitted by Begin & Execute, a withheld one refused in its words.
 		expect((await beginExecute(u.undertakingId, u.unitOf('Beta').id)).error, 'the offered Beta was refused').toBeUndefined();
 		const refusedDelta = await beginExecute(u.undertakingId, u.unitOf('Delta').id);
 		expect(refusedDelta.error).toContain('its producer "Gamma" was ABANDONED');
 		expect(getObject(getEngine(), u.unitOf('Delta').id)?.workLifecycleState, 'D4: the consumer started').toBe('PROPOSED');
+	});
+});
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7, package O — D21, OUTSIDE INPUTS (design revision 3; `REG-F-582`; `REG-D-135` (2)) ─────────────────
+// The canon's reference PWA declares inputs no unit of its Undertaking produces — "workspace and repository context",
+// "organizational policy" — and package M recorded each UNPRODUCED and withheld its unit: 0 of 8 could start. Such an input is
+// EXPECTED FROM OUTSIDE this Undertaking: recorded so, shown on the unit's row, and withholding nothing. Producers and children
+// still withhold, and so do loops.
+describe('⭐⭐ D21 — a unit whose only unmatched input is expected from OUTSIDE this Undertaking is OFFERED and ADMITTED; its producers still withhold', () => {
+	/** Specify needs a market study from outside; Build needs Specify's spec and the same study. */
+	const OUTSIDE: readonly FixtureType[] = [
+		{ name: 'Product', isRoot: true, children: ['Specify', 'Build'], inputs: ['originating-intent'] },
+		{ name: 'Specify', inputs: ['market-study'], outputs: ['specification'] },
+		{ name: 'Build', inputs: ['specification', 'market-study'], outputs: ['build-result'], model: true }
+	];
+
+	it('⭐ THE PREDICTED RED — the unit is offered, its row saying it expects the input from outside this Undertaking, and Begin & Execute admits it', async () => {
+		const u = await instantiated(OUTSIDE);
+		const specify = u.unitOf('Specify');
+		expect(pageRows(u.undertakingId).find((r) => r.title === 'Specify')?.start, 'the page withheld a unit for an outside input').toEqual({
+			offered: true,
+			reason: null,
+			kinds: [],
+			outside: 'expects "market-study" from outside this Undertaking'
+		});
+		expect((await beginExecute(u.undertakingId, specify.id)).error, 'Begin & Execute refused it').toBeUndefined();
+		expect(getObject(getEngine(), specify.id)?.workLifecycleState, 'the unit did not start').not.toBe('PROPOSED');
+	});
+
+	it('⭑ CONTROL — Build, whose producer Specify is not accepted, stays withheld for Specify alone, refused by the engine in the same words; the outside input it shares named apart', async () => {
+		const u = await instantiated(OUTSIDE);
+		const build = u.unitOf('Build');
+		expect(pageRows(u.undertakingId).find((r) => r.title === 'Build')?.start).toEqual({
+			offered: false,
+			reason: 'it waits for "Specify" (PROPOSED) to be accepted',
+			kinds: ['waiting'],
+			outside: 'expects "market-study" from outside this Undertaking'
+		});
+		const refused = await beginExecute(u.undertakingId, build.id);
+		expect(refused.error ?? '', 'the engine admitted a consumer whose producer is not accepted').toContain(START_REFUSAL_MARKER);
+		expect(refused.error).toContain('it waits for "Specify" (PROPOSED) to be accepted');
+		expect(refused.error, 'the outside input was given as a reason').not.toContain('market-study');
+		expect(getObject(getEngine(), build.id)?.workLifecycleState).toBe('PROPOSED');
 	});
 });

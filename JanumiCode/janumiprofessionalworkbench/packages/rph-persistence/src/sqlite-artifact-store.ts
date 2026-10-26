@@ -22,6 +22,7 @@ import type {
 	ArtifactContentInput,
 	ArtifactStore,
 	ContentDurability,
+	NameBindingOutcome,
 	PurgeOutcome,
 	StoredArtifactMeta,
 	StoredArtifactRef
@@ -42,6 +43,12 @@ CREATE TABLE IF NOT EXISTS artifact_content (
 	-- reader cannot tell "purged on schedule" from "never stored" from "lost" — the silent-omission defect
 	-- one layer down. Deleting the row would be the hard delete this table exists to avoid.
 	bytes         TEXT
+);
+-- ⭐ JAN-EXEC Phase 7, package O (design D22, D23): a NAME the host derives, bound ONCE to an entry above. A name holds no
+-- content and addresses none: it names the storage key whose bytes stay content-addressed. Never rebound, never deleted.
+CREATE TABLE IF NOT EXISTS artifact_name (
+	name          TEXT PRIMARY KEY,
+	storage_key   TEXT NOT NULL
 );
 `;
 
@@ -132,6 +139,39 @@ export class SqliteArtifactStore implements ArtifactStore {
 			.prepare('UPDATE artifact_content SET bytes = NULL, purged = 1 WHERE storage_key = ?')
 			.run(storageKey);
 		return { purged: true };
+	}
+
+	/** ⭐⭐ Package O (D22, D23) — a name bound ONCE, to an entry this store holds (the port says why). Durable, as its rows are. */
+	async bindName(name: string, storageKey: string): Promise<NameBindingOutcome> {
+		const held = this.db.prepare('SELECT 1 AS held FROM artifact_content WHERE storage_key = ?').get(storageKey);
+		if (held === undefined)
+			return {
+				bound: false,
+				refusedBecause: `no row exists for storageKey '${storageKey}', so the name '${name}' was not bound to it: a name never points at nothing.`
+			};
+		this.db
+			.prepare('INSERT INTO artifact_name(name, storage_key) VALUES(?, ?) ON CONFLICT(name) DO NOTHING')
+			.run(name, storageKey);
+		const named = (this.db.prepare('SELECT storage_key FROM artifact_name WHERE name = ?').get(name) as { storage_key: string })
+			.storage_key;
+		return named === storageKey
+			? { bound: true }
+			: {
+					bound: false,
+					refusedBecause: `the name '${name}' is bound to '${named}' already, and is never rebound — not to '${storageKey}': a reader must reach the entry its first binding named (PER-8).`
+				};
+	}
+
+	async resolveName(name: string): Promise<StoredArtifactRef | undefined> {
+		const row = this.db
+			.prepare(
+				`SELECT c.storage_key, c.content_hash, c.byte_size FROM artifact_name n
+				 JOIN artifact_content c ON c.storage_key = n.storage_key WHERE n.name = ?`
+			)
+			.get(name) as { storage_key: string; content_hash: string; byte_size: number } | undefined;
+		return row === undefined
+			? undefined
+			: { storageProvider: SQLITE_STORAGE_PROVIDER, storageKey: row.storage_key, contentHash: row.content_hash, byteSize: row.byte_size };
 	}
 
 	close(): void {

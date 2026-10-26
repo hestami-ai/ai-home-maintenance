@@ -1874,6 +1874,11 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 				// `verificationCriterionIds` still has none. And "required inputs" is no longer ADMITTED at this site for the
 				// case the record can name: an UNPRODUCED input refuses `MarkPwuReady` — but under RPH-PWU-011, its own row and
 				// marker, never this one's; this row's marker and its "expected outputs" anchor are unchanged.
+				// ⭑ 2026-10-26 (`JAN-EXEC` Phase 7, package O; design D21; `REG-F-582`) — THE SENTENCE ABOVE IS NO LONGER TRUE
+				// EITHER, recorded here rather than rewritten: ~~"an UNPRODUCED input refuses `MarkPwuReady`"~~ — instantiation
+				// records an input no unit produces as EXPECTED FROM OUTSIDE the Undertaking, and neither RPH-PWU-011 seat refuses
+				// it (a record made before carries UNPRODUCED, read alike). So "required inputs" is ADMITTED at this site again
+				// for an input no unit produces, as D21 decides; RPH-PWU-011 refuses for the producers a unit waits for alone.
 				'expected outputs',
 			note: 'JPWB-DOC-003 §5 STA-5 (readiness is a substantive shape gate) enumerates the admission requirements this rule names, including the expected-outputs limb the marker pins.'
 		},
@@ -4087,6 +4092,10 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			// the profile a PWU must satisfy to enter it. What canon does not say is the specific rule — that a dependency is
 			// satisfied only when ACCEPTED, and which states accept — so this is the general rule's instance, and the specific
 			// text's only home is the conformance specification (§8, RPH-PWU-011), as RPH-EXE-005's is (§12).
+			// ⭑ 2026-10-26 (`JAN-EXEC` Phase 7, package O; design D21, revision 3; `REG-F-582`) — "required inputs" is read by this
+			// rule through the units it waits for alone: an input no unit of the Undertaking produces is EXPECTED FROM OUTSIDE it,
+			// recorded so, and refuses nothing (~~an input recorded unproduced refused the unit~~, package M's extension of Q42b,
+			// which left the canon's own reference PWA able to start 0 of its 8 units).
 			kind: 'CARRIED_BY_GENERAL_RULE',
 			canonAnchor: 'A PWU enters readiness only when its shape readiness profile is satisfied',
 			note:
@@ -4110,7 +4119,9 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 			"add 'CONDITIONALLY_SATISFIED' to ACCEPTED_UNIT_STATES — an open condition counted as accepted (P6X-M-M2)",
 			'stop at the first accepted dependency in startReadiness — one producer of two counted as enough (P6X-M-M6)',
 			"drop the refusal unitReadinessRefusal returns in stepAuthorityRefusal — a plan made without MarkPwuReady runs a waiting unit's step (P6X-M-M19)",
-			"ask unitReadinessRefusal's refusal for StartExecutionStep alone — the second arrow into RUNNING, the resume, omitted (P6X-M-M20)"
+			"ask unitReadinessRefusal's refusal for StartExecutionStep alone — the second arrow into RUNNING, the resume, omitted (P6X-M-M20)",
+			// ⭐ Package O (D21) — and the refusal must not come back for an input expected from outside.
+			'restore the outside-input refusal in startReadiness — a unit whose only unmatched input is expected from outside refused again (P6X-O-M1)'
 		]
 	}
 };

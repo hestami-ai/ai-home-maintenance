@@ -42,7 +42,10 @@ const LIVE_BACKEND_VARIABLES = [
 	'JPWB_REPLAY',
 	// ⭐ The re-review of E4's fix round — the tenth: the authoring agent's model, which the replay refuses beside its
 	// switch (`replay/replay-switch.ts`, `LIVE_SELECTIONS_BESIDE_A_REPLAY`).
-	'JPWB_AGENT_MODEL'
+	'JPWB_AGENT_MODEL',
+	// ⭐ `JAN-EXEC` Phase 7, package O (design D26) — the eleventh: the authoring review's allowance (`review-allowance.ts`), which
+	// keys on its absence as the ten do: set, every authoring review round reserves its worst case against it.
+	'JPWB_AUTHORING_REVIEW_ALLOWANCE'
 ] as const;
 
 describe('⭐ D8 — a gate process inherits no live-backend selection', () => {

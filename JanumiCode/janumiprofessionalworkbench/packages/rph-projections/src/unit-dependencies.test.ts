@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
 	dependencyLayers,
+	expectedFromOutside,
+	OUTSIDE_INPUT,
 	readinessUnitOf,
 	startReadiness,
 	startRefusal,
@@ -260,7 +262,12 @@ describe('⭐ D2 — a unit may start only when every unit it depends on is ACCE
 		expect(r.reason).toBe('it waits for "B" (PROPOSED) to be accepted; it sits in a loop: "A" → "B" → "A"');
 	});
 
-	it('⭐ an input nothing produces, and a dependency naming no unit of this Undertaking, each refuse the start, named', () => {
+	// ⛔ MOVED 2026-10-26 (`JAN-EXEC` Phase 7, package O; design D21, revision 3; `REG-F-582`) — ~~"⭐ an input nothing produces,
+	// and a dependency naming no unit of this Undertaking, each refuse the start, named"~~, which pinned kinds
+	// ~~`['unknown', 'unproduced']`~~ and the reason's clause ~~"nothing in this Undertaking produces its input "market-study""~~:
+	// an input nothing produces is expected from OUTSIDE this Undertaking now, named apart and withholding nothing. The unknown
+	// dependency still refuses, alone.
+	it('⭐ a dependency naming no unit of this Undertaking refuses the start, named; an input nothing produces is expected from outside, named apart (D21)', () => {
 		const r = startReadiness(
 			'c',
 			lookupOf({
@@ -268,18 +275,14 @@ describe('⭐ D2 — a unit may start only when every unit it depends on is ACCE
 				c: pwuState('C', 'PROPOSED', ['other', 'pwu_gone'], [{ name: 'market-study', status: UNPRODUCED_INPUT }])
 			})
 		);
-		expect([r.startable, r.kinds, r.unknown, r.unproduced]).toEqual([
-			false,
-			['unknown', 'unproduced'],
-			['other', 'pwu_gone'],
-			['market-study']
-		]);
-		expect(r.reason).toBe(
-			'other and pwu_gone name no unit of this Undertaking; nothing in this Undertaking produces its input "market-study"'
-		);
+		expect([r.startable, r.kinds, r.unknown, r.outside]).toEqual([false, ['unknown'], ['other', 'pwu_gone'], ['market-study']]);
+		expect(r.reason).toBe('other and pwu_gone name no unit of this Undertaking');
 	});
 
-	it('the reason in the page’s words, each count as it falls: two ABANDONED producers, one unknown id, two inputs nothing produces', () => {
+	// ⛔ MOVED 2026-10-26 (package O; design D21; `REG-F-582`) — ~~"…, two inputs nothing produces"~~: the reason's last clause,
+	// ~~"nothing in this Undertaking produces its inputs "market-study" and "budget""~~, is gone from the reason, for neither input
+	// withholds the unit; the page names them apart (`expectedFromOutside`).
+	it('the reason in the page’s words, each count as it falls: two ABANDONED producers and one unknown id; two inputs nothing produces named apart, as expected from outside', () => {
 		const r = startReadiness(
 			'c',
 			lookupOf({
@@ -291,10 +294,8 @@ describe('⭐ D2 — a unit may start only when every unit it depends on is ACCE
 				])
 			})
 		);
-		expect(r.reason).toBe(
-			'its producers "Design" and "Plan" were ABANDONED; pwu_gone names no unit of this Undertaking; ' +
-				'nothing in this Undertaking produces its inputs "market-study" and "budget"'
-		);
+		expect(r.reason).toBe('its producers "Design" and "Plan" were ABANDONED; pwu_gone names no unit of this Undertaking');
+		expect(expectedFromOutside(r.outside)).toBe('expects "market-study" and "budget" from outside this Undertaking');
 	});
 
 	it('⭐ D5 — two loops are each named, in the units’ order', () => {
@@ -316,5 +317,47 @@ describe('⭐ D2 — a unit may start only when every unit it depends on is ACCE
 	it('a stored object that is not a work unit is read as none', () => {
 		expect(readinessUnitOf('x', { objectType: 'INTENT', title: 'x' })).toBeUndefined();
 		expect(readinessUnitOf('x', undefined)).toBeUndefined();
+	});
+});
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7, package O — D21, OUTSIDE INPUTS (design revision 3; `REG-F-582`; `REG-D-135` (2)) ─────────────────
+// Package M recorded a required input no instantiated unit produces as UNPRODUCED and refused the unit's start for it, so the
+// canon's own reference PWA, whose types declare "workspace and repository context" and "organizational policy" — inputs from
+// outside the Undertaking, owed by no unit of it — could start 0 of its 8 units. D21: such an input is EXPECTED FROM OUTSIDE
+// this Undertaking. It is recorded so and shown, and it withholds nothing; producers, children and loops still do.
+describe('⭐⭐ D21 — an input no unit produces is EXPECTED FROM OUTSIDE this Undertaking: recorded so, shown, and withholding nothing', () => {
+	it('⭐ THE PREDICTED RED — a unit whose only unmatched input is an outside one may start: a record made before D21 (UNPRODUCED) and the record D21 writes alike, the input named for the page', () => {
+		for (const status of [UNPRODUCED_INPUT, OUTSIDE_INPUT]) {
+			const r = startReadiness(
+				'survey',
+				lookupOf({ survey: pwuState('Survey', 'PROPOSED', [], [{ name: 'market-study', status }]) })
+			);
+			expect([r.startable, r.kinds, r.reason, r.outside], status).toEqual([true, [], null, ['market-study']]);
+			expect(startRefusal('survey', r), status).not.toContain('market-study');
+		}
+		expect(expectedFromOutside(['market-study'])).toBe('expects "market-study" from outside this Undertaking');
+		expect(expectedFromOutside([]), 'a unit expecting nothing from outside is said to').toBeNull();
+	});
+
+	it('⭑ CONTROL — beside an outside input, a producer not accepted still withholds the unit, named; the outside input named apart, never as its reason', () => {
+		const r = startReadiness(
+			'build',
+			lookupOf({
+				spec: pwuState('Specify', 'PROPOSED'),
+				build: pwuState('Build', 'PROPOSED', ['spec'], [{ name: 'market-study', status: OUTSIDE_INPUT }])
+			})
+		);
+		expect([r.startable, r.kinds, r.waitingFor.map((w) => w.id), r.outside]).toEqual([false, ['waiting'], ['spec'], ['market-study']]);
+		expect(r.reason).toBe('it waits for "Specify" (PROPOSED) to be accepted');
+	});
+
+	it('⭑ a requirement of any other status is not an outside input, and the page names each outside input once', () => {
+		const state = pwuState('C', 'PROPOSED', [], [
+			{ name: 'market-study', status: OUTSIDE_INPUT },
+			{ name: 'spec', status: 'BOUND' },
+			{ name: 'market-study', status: UNPRODUCED_INPUT }
+		]);
+		expect(readinessUnitOf('c', state)?.outsideInputs).toEqual(['market-study', 'market-study']);
+		expect(startReadiness('c', lookupOf({ c: state })).outside).toEqual(['market-study']);
 	});
 });

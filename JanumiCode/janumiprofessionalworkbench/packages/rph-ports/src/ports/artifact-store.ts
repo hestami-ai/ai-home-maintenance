@@ -90,12 +90,42 @@ export type PurgeOutcome =
  */
 export type ContentDurability = 'DURABLE' | 'PROCESS_LOCAL';
 
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package O (design D22, D23, revision 3) — WHETHER A NAME WAS BOUND, and a refusal always says why.
+ * ⚠ THERE IS NO SILENT ARM, as there is none for a purge: a binding that could fail without saying so would leave a reader
+ * resolving the name to nothing, or to the wrong entry, with no way to tell.
+ */
+export type NameBindingOutcome =
+	| { readonly bound: true }
+	| { readonly bound: false; readonly refusedBecause: string };
+
 export interface ArtifactStore {
 	/** Declared, so a record can disclose the durability of the content it references. */
 	readonly durability: ContentDurability;
 	put(input: ArtifactContentInput): Promise<StoredArtifactRef>;
 	get(storageKey: string): Promise<string | undefined>;
 	stat(storageKey: string): Promise<StoredArtifactMeta | undefined>;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package O — design D22, D23 (revision 3) — BIND A NAME THE HOST DERIVES TO AN ENTRY THIS STORE HOLDS,
+	 * ONCE.
+	 *
+	 * ⭑ WHY A CONTENT-ADDRESSED STORE NEEDS ONE. `put` derives every key from the bytes, so only a reader that already holds a
+	 * pointer can reach an entry — and some entries are owed to a reader no record points them at: a refused try that ran no
+	 * command leaves its view on no record (its work product's `RecordArtifact` and its wait's `EnterExecutionStepWait` take
+	 * strict payloads), and a work re-run must reach the baseline its unit's FIRST step took. A NAME is the key such a reader
+	 * can compute without the bytes — from the step and the try, or from the unit. ⛔ IT IS NOT CONTENT AND IT ADDRESSES NONE:
+	 * the bytes stay at their content-addressed key, and a reader re-hashes them against the ref the name resolves to.
+	 *
+	 * ⛔ BOUND ONCE, NEVER REBOUND — a second binding of a name to ANOTHER entry is REFUSED and the first stands: a reader must
+	 * reach the entry the first binding named, or nothing (PER-8: what has participated is never rewritten). Binding a name to
+	 * the entry it already names is admitted: the act repeated, nothing rewritten.
+	 * ⛔ AND NEVER TO NOTHING — a name binds only to an entry this store holds, so a resolved name always names a stored entry
+	 * (purged or not: the binding survives as the tombstone does, and `get` then answers `undefined`).
+	 * ⚠ §31.2 holds for names as for keys: the host derives each under its own opaque tenant prefix.
+	 */
+	bindName(name: string, storageKey: string): Promise<NameBindingOutcome>;
+	/** ⭐ Package O (D22, D23) — the entry `name` is bound to, as `put` returned it; `undefined` when no binding exists. */
+	resolveName(name: string): Promise<StoredArtifactRef | undefined>;
 	/**
 	 * Remove the BYTES and keep the ENTRY.
 	 *

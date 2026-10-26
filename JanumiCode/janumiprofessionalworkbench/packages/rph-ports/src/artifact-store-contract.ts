@@ -123,4 +123,57 @@ export function artifactStoreContract(make: () => ArtifactStore): void {
 		// claim content that a restart erased (REG-F-342) — so it is asserted, not assumed.
 		expect(['DURABLE', 'PROCESS_LOCAL']).toContain(make().durability);
 	});
+
+	// ── ⭐⭐ `JAN-EXEC` Phase 7, package O — A NAME THE HOST DERIVES, BOUND ONCE TO AN ENTRY (design D22, D23, revision 3) ──────
+	// The store stays content-addressed: `put` derives every key from the bytes. A NAME is the one key a host can compute
+	// without the bytes — from the step and the try whose view an entry holds, or from the unit whose first baseline it holds —
+	// so a later reader can reach an entry no record points at. ⛔ BOUND ONCE: what a name names is never rewritten (PER-8's
+	// participation is irreversible, and a reader must get the entry the first binding named, or nothing). ⛔ AND NEVER TO
+	// NOTHING: a name binds only to an entry the store holds.
+	const NAME = `${EVIDENCE.tenantPrefix}/deliverable-view/step_1#1/1`;
+
+	it('⭐ a NAME binds once to an entry this store holds, and resolves to that entry’s ref', async () => {
+		const store = make();
+		const ref = await store.put(EVIDENCE);
+		expect(await store.bindName(NAME, ref.storageKey)).toEqual({ bound: true });
+		expect(await store.resolveName(NAME)).toEqual(ref);
+		expect(await store.get((await store.resolveName(NAME))!.storageKey)).toBe(EVIDENCE.bytes);
+	});
+
+	it('⛔ a name is NEVER REBOUND: binding it to another entry is refused, naming both, and the first binding stands', async () => {
+		const store = make();
+		const first = await store.put(EVIDENCE);
+		const second = await store.put({ ...EVIDENCE, bytes: 'another view' });
+		await store.bindName(NAME, first.storageKey);
+		const again = await store.bindName(NAME, second.storageKey);
+		expect(again.bound, 'a name was rebound to another entry').toBe(false);
+		expect(again.bound === false && again.refusedBecause).toContain(first.storageKey);
+		expect(again.bound === false && again.refusedBecause).toContain(second.storageKey);
+		expect((await store.resolveName(NAME))?.storageKey, 'the first binding was rewritten').toBe(first.storageKey);
+	});
+
+	it('⭑ CONTROL — binding a name to the entry it already names is admitted: the act repeated, nothing rewritten', async () => {
+		const store = make();
+		const ref = await store.put(EVIDENCE);
+		await store.bindName(NAME, ref.storageKey);
+		expect(await store.bindName(NAME, ref.storageKey)).toEqual({ bound: true });
+		expect(await store.resolveName(NAME)).toEqual(ref);
+	});
+
+	it('⛔ a name never points at nothing: binding it to a key the store does not hold is refused, and nothing is bound', async () => {
+		const store = make();
+		const refused = await store.bindName(NAME, `${EVIDENCE.tenantPrefix}/RETAINED_BY_PARTICIPATION/never-written`);
+		expect(refused.bound, 'a name was bound to an entry the store does not hold').toBe(false);
+		expect(refused.bound === false && refused.refusedBecause.length).toBeGreaterThan(0);
+		expect(await store.resolveName(NAME)).toBeUndefined();
+	});
+
+	it('an unbound name resolves to nothing, and a name is no storage key: `get` and `stat` do not answer it', async () => {
+		const store = make();
+		const ref = await store.put(EVIDENCE);
+		expect(await store.resolveName(`${NAME}-unbound`)).toBeUndefined();
+		await store.bindName(NAME, ref.storageKey);
+		expect(await store.get(NAME)).toBeUndefined();
+		expect(await store.stat(NAME)).toBeUndefined();
+	});
 }

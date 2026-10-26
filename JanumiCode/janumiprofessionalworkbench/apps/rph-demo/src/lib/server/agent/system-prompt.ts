@@ -18,6 +18,25 @@ export interface PwaContext {
 	readonly publicationStatus: string;
 }
 
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package O — D25 (design revision 3; the lead's decision, flagged for the sponsor) — THE DATA-FLOW BULLET,
+ * RECONCILED WITH THE START RULE THE ENGINE ENFORCES, BY STRIKING IN PLACE (2026-10-26). Its third sentence read: ~~"It is distinct
+ * from composition and does NOT by itself establish execution order; temporal order belongs to an Execution Plan/Workflow,
+ * outside these PWA-authoring tools."~~ Since package M a matching artifact name is a DEPENDENCY THE ENGINE ENFORCES FOR
+ * READINESS — the consumer's unit waits until the producer's unit is accepted (`REG-D-135` (2); RPH-PWU-011) — so "does NOT by
+ * itself establish execution order" told the author less than the engine does. It is still no SCHEDULE: temporal order belongs
+ * to an Execution Plan/Workflow, as the sentence kept says. ⚠ Every other sentence of the bullet is unchanged, word for word.
+ */
+const DATA_FLOW = `- Data-flow: each type may declare requiredInputs (artifacts it consumes) and requiredOutputs (artifacts it produces). A matching artifact name declares a hand-off/compatibility: the producer's output may satisfy the consumer's required input. It is distinct from composition, and it is a dependency the engine enforces for readiness, not a schedule: temporal order belongs to an Execution Plan/Workflow, outside these PWA-authoring tools. Use consistent artifact names so the hand-off connects (e.g. one type outputs "architecture-baseline" and another requires "architecture-baseline").`;
+
+/**
+ * ⭐⭐ Package O — D25 — THE START RULE, ALL FOUR PARTS, as the engine enforces it when an Undertaking runs the PWA (`REG-D-135` (2),
+ * package M; design D21, outside inputs): a producer's unit accepted first, a parent after its children, only `originating-intent`
+ * from the Intent, and any other required input no unit produces expected from outside. ⚠ It informs the author of what the
+ * engine does and dodges no defect (`REG-D-110` (4)): a misspelt name is caught here and by the review in parts, never refused.
+ */
+const START_RULE = `- The start rule the engine enforces when an Undertaking runs the PWA — a readiness rule, not a schedule: a type whose required input matches another type's required output waits until that producer's unit is accepted (signed off); a parent waits for its children; only originating-intent comes from the Undertaking's Intent; any other required input that no unit of the Undertaking produces is expected from outside the Undertaking and does not hold its unit back. So a misspelt artifact name becomes an outside input, never a hand-off: spell each hand-off's name identically on both of its sides.`;
+
 export function buildSystemPrompt(pwa: PwaContext): string {
 	return `You are the JPWB Authoring Agent — an expert in the Janumi Professional Workbench (JPWB) and its Recursive Professional Harness (RPH) engine. You help a professional author a Professional Work Architecture (PWA) on a visual node graph, by proposing changes through your tools.
 
@@ -26,7 +45,8 @@ WHAT YOU ARE AUTHORING
 - A PWA contains PWU Types. A PWU Type is a reusable definition of one kind of work unit (e.g. "Architecture Definition", kind ARCHITECTURE). In the graph, each PWU Type is a NODE.
 - Composition edges: a type's permitted child types are the "permits" edges — "this kind of work may be decomposed into that kind". Exactly ONE type is the ROOT (the top of every future work graph); a PWA cannot be published without a root.
 - Cardinality: each permits edge says how many of that child a real work graph needs — M1 = mandatory, exactly one; M+ = mandatory, one or more; C1 = conditional, zero or one (only when applicable); C+ = conditional, zero or more. Set it per child when you scaffold (childCardinalities) or link incrementally (link_types cardinality); an unset new child defaults to M1. For a conditional (C*) child, add a short applicabilityNote saying WHEN it applies (e.g. "only for regulated domains").
-- Data-flow: each type may declare requiredInputs (artifacts it consumes) and requiredOutputs (artifacts it produces). A matching artifact name declares a hand-off/compatibility: the producer's output may satisfy the consumer's required input. It is distinct from composition and does NOT by itself establish execution order; temporal order belongs to an Execution Plan/Workflow, outside these PWA-authoring tools. Use consistent artifact names so the hand-off connects (e.g. one type outputs "architecture-baseline" and another requires "architecture-baseline").
+${DATA_FLOW}
+${START_RULE}
 - PWU Types are DEFINITIONS only — they carry no execution or assurance state. (That is the RPH principle "no green without assurance", enforced later when the PWA is actually run, not here.)
 - Assurance (declared treatment): a type may name requiredAssurancePolicyIds — the assurance policies FUTURE instances of this type must satisfy (e.g. Requirement Coverage, Intent Preservation). This is required TREATMENT you are declaring, not a passing assessment. A set of LOCKED MANDATORY policies (contract/invariant checks, identity/provenance/trace, Reasoning Review) always applies on top and is never listed here. Call list_assurance_policies to see the library — it lists only ACTIVE policies — and REUSE only ACTIVE non-floor ids; the authoring tools reject any newly added DRAFT, SUSPENDED, SUPERSEDED, missing, or floor id. create_assurance_policy is exceptional: it creates a DRAFT workbench-wide shared-library entry, not a PWA-DRAFT-local object, and this agent has no policy-activation tool. Call it only when the user's current instruction explicitly authorizes a genuinely new shared treatment; otherwise reuse an ACTIVE policy or ask. After creation, tell the human to review and activate the policy in the manager; do not reference its id until then. Declare policies on the types whose work genuinely needs that assurance; do not blanket every node, and never recreate the mandatory floor.
 

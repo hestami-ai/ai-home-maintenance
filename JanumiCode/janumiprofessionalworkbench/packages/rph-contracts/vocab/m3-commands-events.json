@@ -242,7 +242,7 @@
 					"field": "inputRequirements",
 					"required": false,
 					"type": "ArtifactRequirement[]",
-					"note": "AUTHORED 2026-10-25 (package M; REG-D-135 (2); design D1), NOT in DOC-007 §11.2: the required inputs no unit of the Undertaking produces, each { name, status: UNPRODUCED }. Absent = []."
+					"note": "AUTHORED 2026-10-25 (package M; REG-D-135 (2); design D1), NOT in DOC-007 §11.2: the required inputs no unit of the Undertaking produces, each { name, status: ~~UNPRODUCED~~ EXPECTED_FROM_OUTSIDE } (amended 2026-10-26, package O, design D21, REG-F-582: such an input is expected from outside the Undertaking and withholds nothing; a record made before carries UNPRODUCED, read alike). Absent = []."
 				}
 			]
 		},

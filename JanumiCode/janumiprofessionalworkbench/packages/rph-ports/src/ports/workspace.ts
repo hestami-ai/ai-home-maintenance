@@ -3,7 +3,9 @@
 //
 // ── WHY A SECOND CONTENT SEAM AND NOT A REUSE OF THE FIRST ──────────────────────────────────────────────────
 // An `ArtifactStore` is content-addressed: the same bytes under the same retention class ARE the same stored
-// object, and nothing has a name. A workspace is the opposite in the one respect that matters — it is
+// object, and ~~nothing has a name~~ ⭐ no bytes have a name (2026-10-26, `JAN-EXEC` Phase 7 package O, design D22, D23: a host
+// may bind a NAME it derives to an entry, once — `ArtifactStore.bindName` — which holds no content and addresses none, so a
+// reader no record points at an entry can still reach it). A workspace is the opposite in the one respect that matters — it is
 // PATH-NAMED and MUTABLE, because `src/index.ts` means the same thing across two steps while its bytes change.
 // A step that writes a file, builds over it and then rewrites it is doing something an address-by-hash store
 // cannot express at all.

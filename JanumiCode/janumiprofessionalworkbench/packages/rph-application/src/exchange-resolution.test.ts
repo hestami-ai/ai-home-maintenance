@@ -107,6 +107,9 @@ describe('MXREAD-01 — verifyExchangeContent', () => {
 			durability: 'DURABLE',
 			put: (i) => inner.put(i),
 			purge: (k) => inner.purge(k),
+			// ⭐ Package O (D22, D23) — the port's name binding, delegated: nothing here binds or resolves a name.
+			bindName: (n, k) => inner.bindName(n, k),
+			resolveName: (n) => inner.resolveName(n),
 			// The metadata still describes the ORIGINAL bytes...
 			stat: (k) => inner.stat(k),
 			// ...and the content plane has moved on underneath it.

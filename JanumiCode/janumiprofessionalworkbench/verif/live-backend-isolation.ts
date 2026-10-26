@@ -35,6 +35,11 @@
  * beside its switch (`LIVE_SELECTIONS_BESIDE_A_REPLAY`), so a shell that exported it for half B's authoring turned the
  * gate's replay tests into that refusal (driven red: the replay's tests, 4 failed; and `live-backend-isolation.test.ts`,
  * all four children, with it exported there and left off this list).
+ * ⭐⭐ AND AN ELEVENTH, `JPWB_AUTHORING_REVIEW_ALLOWANCE` (`JAN-EXEC` Phase 7, package O; design D26, revision 3; `l2-facts.md`): the
+ * authoring review's allowance (`apps/rph-demo/src/lib/server/assurance/review-allowance.ts`). It selects no backend, but it keys on
+ * its absence as the ten do: set, every authoring review round reserves its worst case against it, and `0` stops every round with a
+ * type before any reviewer call — so a shell that exported it for a paid half-B run turned the gate's authoring reviews into
+ * stopped rounds (driven red: `live-backend-isolation.test.ts`, all four children, with it exported there and left off this list).
  */
 export const LIVE_BACKEND_VARIABLES = [
 	'JPWB_ASSURANCE_TOOL',
@@ -46,7 +51,8 @@ export const LIVE_BACKEND_VARIABLES = [
 	'JPWB_AGENT_MODEL',
 	'JPWB_DEVIN_BIN',
 	'JPWB_AGY_BIN',
-	'JPWB_REPLAY'
+	'JPWB_REPLAY',
+	'JPWB_AUTHORING_REVIEW_ALLOWANCE'
 ] as const;
 
 /** Remove every live-backend selection from `env` — the process's own, at a gate entry point. */

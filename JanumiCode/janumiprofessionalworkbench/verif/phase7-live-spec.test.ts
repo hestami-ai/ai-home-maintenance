@@ -28,6 +28,7 @@ import ts from 'typescript';
 import { afterAll, describe, expect, it } from 'vitest';
 import type { EngineSnapshot } from '../apps/rph-demo/e2e/support/harness.js';
 import {
+	AUTHORING_REVIEW_ALLOWANCE_VARIABLE,
 	LANE_BUDGET,
 	LIVE_RUN_DIR_VARIABLE,
 	PHASE7_NEGATIVE_CONTROL_RESERVE,
@@ -101,6 +102,7 @@ import {
 } from '../apps/rph-demo/e2e-live-exec/phase7-operator.js';
 import { PHASE7_PWA, promptMarkers } from '../scripts/phase7/pwa-content.js';
 import { PHASE7_ARCHIVE_UNITS } from '../scripts/phase7/run-archive.js';
+import { withheldOf } from '../scripts/phase7/run-report-core.js';
 import { readinessUnitOf, startReadiness } from '@janumipwb/rph-projections';
 
 const APP = fileURLToPath(new URL('../apps/rph-demo/', import.meta.url));
@@ -892,7 +894,11 @@ describe('⭐ D3 — the boot record', () => {
 		expect(Object.entries(kept).filter(([, v]) => v !== 'value')).toEqual([]);
 	});
 
-	it('⭐ the overlay is the five keys the config lays over the shell for its server — ⭐ R3-C, PI_OFFLINE among them — read from the config’s source', () => {
+	// ⛔ MOVED 2026-10-26 (`JAN-EXEC` Phase 7, package O; design D26, revision 3) — ~~"the overlay is the five keys …"~~, read as the
+	// config's PROPERTY ASSIGNMENTS alone: the config also SPREADS the authoring review's allowance over its server
+	// (`...phase7AuthoringReviewAllowanceEnv(process.env)`, package L2), and the boot records it now, so the overlay is six — the five
+	// properties and that spread's one key, in the config's order. The lane keys it spreads (`...passthrough`) stay the operator's.
+	it('⭐ the overlay is the ~~five~~ six keys the config lays over the shell for its server — ⭐ R3-C, PI_OFFLINE among them; ⭐ D26, the allowance it spreads — read from the config’s source', () => {
 		const config = parsed(CONFIG);
 		const env = nodes(config, ts.isPropertyAssignment).find(
 			(p) =>
@@ -901,13 +907,25 @@ describe('⭐ D3 — the boot record', () => {
 				ts.isPropertyAssignment(p.parent.parent) &&
 				p.parent.parent.name.getText(config) === 'webServer'
 		);
+		/** ⭐ D26 — a spread of `phase7AuthoringReviewAllowanceEnv(…)` lays the one key that function hands over. */
+		const spreadsTheAllowance = (p: ts.ObjectLiteralElementLike): boolean =>
+			ts.isSpreadAssignment(p) &&
+			ts.isCallExpression(p.expression) &&
+			p.expression.expression.getText(config) === 'phase7AuthoringReviewAllowanceEnv';
 		const keys =
 			env && ts.isObjectLiteralExpression(env.initializer)
-				? env.initializer.properties
-						.filter(ts.isPropertyAssignment)
-						.map((p) => p.name.getText(config))
+				? env.initializer.properties.flatMap((p) =>
+						ts.isPropertyAssignment(p)
+							? [p.name.getText(config)]
+							: spreadsTheAllowance(p)
+								? [AUTHORING_REVIEW_ALLOWANCE_VARIABLE]
+								: []
+					)
 				: [];
 		expect([...OVERLAY_KEYS]).toEqual(keys);
+		expect(keys, 'the config no longer spreads the allowance where the overlay records it').toContain(
+			AUTHORING_REVIEW_ALLOWANCE_VARIABLE
+		);
 		expect(
 			overlayOf({
 				RPH_DEMO_MODE: 'server',
@@ -919,6 +937,7 @@ describe('⭐ D3 — the boot record', () => {
 			JPWB_HARNESS: null,
 			JPWB_SEED: null,
 			JPWB_DEMO_DB: 'D:/run/demo.sqlite',
+			[AUTHORING_REVIEW_ALLOWANCE_VARIABLE]: null,
 			PI_OFFLINE: null
 		});
 	});
@@ -2121,8 +2140,25 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 				]
 			]
 		]);
-		expect([record.end?.reason, l.written().end?.reason]).toEqual(['complete', 'complete']);
-		expect(laneVerdict(record)).toEqual([]);
+		// ⛔ MOVED 2026-10-26 (`JAN-EXEC` Phase 7, package O; design D24, revision 3) — ~~`['complete', 'complete']`~~ and ~~a verdict
+		// of none~~: the root was never pressed, and design was pressed and never signed off, so the run did not complete. It ends
+		// `withheld`, each named with the page's reason, and the spec's verdict says the run is not the one it was meant to be.
+		expect([record.end?.reason, l.written().end?.reason]).toEqual(['withheld', 'withheld']);
+		expect(record.end?.detail).toBe(
+			'CLI Product Realization — not started: it waits for "Design" (EXECUTING) and "Implementation and unit tests" ' +
+				'(EXECUTING) to be accepted; Design — pressed, and its sign-off never attempted: it stopped, and the lane presses no ' +
+				'sign-off of a unit that stopped'
+		);
+		expect(laneVerdict(record)).toEqual([`the run ended 'withheld', not 'complete': ${record.end?.detail}`]);
+		// ⭐ Package O (D24) — AND THE REPORT READS THE SAME LINES FROM THE RECORD THE LANE WROTE, A UNIT THAT STOPPED AMONG THEM: its
+		// list is restated, not imported (`withheldOf`; the lane's module loads Playwright), so it is held to the lane's here, where
+		// a unit stops — the half-B report test holds the two where none does.
+		expect(
+			withheldOf(l.written())
+				?.map((w) => `${w.title} — ${w.reason}`)
+				.join('; '),
+			'the report reads a stopped unit otherwise than the lane'
+		).toBe(record.end?.detail);
 	});
 
 	it('⭐ THE PREDICTED RED (D6), THROUGH THE LANE — a phase pressed after an UNRELATED phase stopped records `upstreamNotAssured` FALSE: §3.2’s phases wait for no other phase, so design’s stop is no upstream of implementation’s', async () => {
@@ -2317,7 +2353,11 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			'03-design-abandonPwu'
 		])
 			expect(l.action(file), `lane/actions/${file}.json`).toBe(true);
-		expect([record.end?.reason, laneVerdict(record)]).toEqual(['complete', []]);
+		// ⛔ MOVED 2026-10-26 (package O; design D24) — ~~`['complete', []]`~~: the root was never pressed — its producer Design
+		// ABANDONED — and Design was never signed off, so the run ends `withheld`, each named with the page's reason.
+		expect(record.end?.reason).toBe('withheld');
+		expect(record.end?.detail).toContain('CLI Product Realization — not started: its producer "Design" was ABANDONED');
+		expect(laneVerdict(record)).toEqual([`the run ended 'withheld', not 'complete': ${record.end?.detail}`]);
 	});
 
 	it('⛔ REG-D-105 (4), D8 — AT THE LIMIT a stopped phase is NOT re-run: the act is recorded unpressed, and the run ends `paid-limit`', async () => {
@@ -2433,7 +2473,10 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		const record = await l.run();
 		expect(l.only('recoveryOffers', 'recover')).toEqual(['recoveryOffers requirements']);
 		expect(record.units[1]!.recovery).toEqual([]);
-		expect(record.end?.reason).toBe('complete');
+		// ⛔ MOVED 2026-10-26 (package O; design D24) — ~~`toBe('complete')`~~: Requirements, left as found, was never signed off, and
+		// the root, waiting for it, never offered — so the run ends `withheld`, each named.
+		expect(record.end?.reason).toBe('withheld');
+		expect(record.end?.detail).toContain('Requirements — pressed, and its sign-off never attempted: it stopped');
 	});
 
 	// ── ⭐⭐ P7-6 B3 (the fix round) — THE RULE DECIDES FROM THE STORE, AFTER A RE-RUN, WHAT THE RE-RUN CAME TO ────────────────
@@ -2487,7 +2530,9 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			['rerunReview', 'not-made', REFUSAL]
 		]);
 		expect([requirements.stopped, requirements.after]).toEqual([true, WAITING]);
-		expect(record.end?.reason).toBe('complete');
+		// ⛔ MOVED 2026-10-26 (package O; design D24) — ~~`toBe('complete')`~~: the unit left as found was never signed off, and the
+		// root, waiting for it, never offered.
+		expect(record.end?.reason).toBe('withheld');
 	});
 
 	it('⛔ B3 — a re-run that leaves the unit NOT WAITING — RUNNING or FAILED, an R-2 stop — is left as found and recorded: no abandonment is pressed', async () => {
@@ -2516,7 +2561,9 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			expect(record.units[1]!.recovery.map((r) => [r.act, r.reading, r.after])).toEqual([
 				['rerunWork', 'stopped-otherwise', after]
 			]);
-			expect(record.end?.reason, after.executionState ?? '').toBe('complete');
+			// ⛔ MOVED 2026-10-26 (package O; design D24) — ~~`toBe('complete')`~~: the unit left as found was never signed off, and
+			// the root, waiting for it, never offered.
+			expect(record.end?.reason, after.executionState ?? '').toBe('withheld');
 		}
 	});
 
@@ -2545,7 +2592,9 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			['rerunReview', 'refused-again', 200, null],
 			['abandonPwu', null, null, 'the row, read again after the re-run, offers no abandonment']
 		]);
-		expect(record.end?.reason).toBe('complete');
+		// ⛔ MOVED 2026-10-26 (package O; design D24) — ~~`toBe('complete')`~~: the unit refused again and left as found was never
+		// signed off, and the root, waiting for it, never offered.
+		expect(record.end?.reason).toBe('withheld');
 	});
 
 	it('⭑ CONTROL — a WAITING unit whose row offers NO re-run at all is left as found, and never abandoned by the rule', async () => {

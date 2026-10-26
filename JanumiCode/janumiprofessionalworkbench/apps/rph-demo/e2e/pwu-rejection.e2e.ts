@@ -7,6 +7,7 @@ import {
 	declareRisk
 } from './support/harness';
 import { publishPwaThroughDesigner, unitRow } from './support/phase7-pwa';
+import { OUTSIDE_INPUT } from '@janumipwb/rph-projections';
 
 // S-1b of ROADMAP-decision-subject-scope (REG-F-104) — REJECTION, the third act JPWB-DOC-001 §5.2 reserves to
 // Governance, and the one that was unreachable for a reason worth stating.
@@ -39,28 +40,12 @@ test.describe('Undertaking Workbench — rejection cites a finding it did not ma
 		// unproduced and none is startable (measured 2026-10-26: 8 units, each with 5 to 10 unproduced inputs, and the root
 		// waiting for its 7 children). So the Undertaking is of a PWA of this test's own, as the CONTROL's is: a root a person
 		// does and one leaf, neither declaring an input or a policy, and the leaf the unit faulted.
-		const pwaId = await publishPwaThroughDesigner(page, request, {
-			name: 'Rejection Pilot PWA',
-			domain: 'software product',
-			types: [
-				{
-					name: 'Rejection Leaf',
-					pwuKind: 'REJECTION_LEAF',
-					purpose: 'Do the work a finding may name.',
-					workDischarge: 'HUMAN',
-					policyIds: []
-				},
-				{
-					name: 'Rejection Root',
-					pwuKind: 'REJECTION_ROOT',
-					purpose: 'Hold the work under one Undertaking.',
-					workDischarge: 'HUMAN',
-					isRoot: true,
-					children: ['Rejection Leaf'],
-					policyIds: []
-				}
-			]
-		});
+		// ⭐⭐ RESTORED 2026-10-26 (`JAN-EXEC` Phase 7, package O; design D21, revision 3; `REG-F-582`) — BACK ON THE REFERENCE SEED'S
+		// PWA, `selectOption({ index: 1 })` as before package M: M moved it off only for the block D21 removes. Those inputs are
+		// expected from outside the Undertaking now and withhold nothing, so the seven leaves under the root are startable. ~~The
+		// PWA of this test's own, "Rejection Pilot PWA" (a root a person does and one leaf, published through the designer), and
+		// `selectOption(pwaId)`.~~ The CONTROL below keeps its own PWA: its ground is `REG-F-569`'s and package M's root rule, not
+		// the block.
 		await gotoHydrated(page, '/undertakings');
 		await page.getByRole('button', { name: '+ New Undertaking' }).click();
 		await page.getByPlaceholder(/Undertaking name/i).fill('Rejection Pilot');
@@ -68,7 +53,7 @@ test.describe('Undertaking Workbench — rejection cites a finding it did not ma
 		await page.getByPlaceholder(/Intended product/i).fill('Rejection Pilot App');
 		await page
 			.getByRole('combobox', { name: 'Instantiate from published PWA' })
-			.selectOption(pwaId);
+			.selectOption({ index: 1 });
 		await declareRisk(page);
 		await page.getByRole('button', { name: 'Create Undertaking' }).click();
 
@@ -80,16 +65,22 @@ test.describe('Undertaking Workbench — rejection cites a finding it did not ma
 		const undertaking = snap.undertakings.find((u) => u.state.name === 'Rejection Pilot')!;
 		// ⛔ MOVED BY `JAN-EXEC` Phase 7, package M (`REG-D-135` (2); design D2, D3): ~~the first PROPOSED unit~~ — that was the
 		// root, which now waits for its children to be accepted, so its row offers no Begin & Execute. The unit faulted here
-		// is the first PROPOSED one the engine would start: it waits for no unit and requires nothing no unit produces.
+		// is the first PROPOSED one the engine would start: it waits for no unit ~~and requires nothing no unit produces~~ (⛔
+		// package O, D21: an input no unit produces is expected from outside and withholds nothing, so the
+		// ~~`empty(p.state.inputRequirements)`~~ limb goes).
 		const empty = (v: unknown) => !Array.isArray(v) || v.length === 0;
 		const target = snap.pwus.find(
 			(p) =>
 				p.state.undertakingId === undertaking.id &&
 				p.state.workLifecycleState === 'PROPOSED' &&
-				empty(p.state.dependencyIds) &&
-				empty(p.state.inputRequirements)
+				empty(p.state.dependencyIds)
 		)!;
 		expect(target, 'a PWU to fault').toBeTruthy();
+		// ⭐ Package O (D21) — and the unit faulted expects inputs from outside the Undertaking, recorded so: what package M refused.
+		expect(
+			(target.state.inputRequirements as { status?: string }[]).map((r) => r.status),
+			'the reference PWA’s leaf expects nothing from outside — D21 is not what this arrangement exercises'
+		).toContain(OUTSIDE_INPUT);
 		// ⛔ Package M (design D3) — ~~`new RegExp(title)` over each row's whole text~~: a waiting unit's row names the units it
 		// waits for (`start-withheld`), so the root's row now holds this unit's title too. The row is the one whose title CELL
 		// is this unit's (`unitRow`).
@@ -120,6 +111,8 @@ test.describe('Undertaking Workbench — rejection cites a finding it did not ma
 
 		// ── 2. THE SURFACE OFFERS NO REJECTION YET ──────────────────────────────────────────────────────────────
 		await page.getByRole('button', { name: 'overview' }).click();
+		// ⭐ Package O (D21) — THE PAGE SAYS WHAT THE UNIT EXPECTS FROM OUTSIDE THIS UNDERTAKING, and still offers Begin & Execute.
+		await expect(unitRow(page, title).getByTestId('start-outside')).toContainText('from outside this Undertaking');
 		await unitRow(page, title).getByRole('button', { name: 'Begin & Execute' }).click();
 		await expect(unitRow(page, title).getByTestId('record-finding')).toBeVisible();
 		await expect(

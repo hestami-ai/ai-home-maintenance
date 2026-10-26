@@ -6,7 +6,8 @@
 // product's review judged the model's answer, and each command's review one command's output. Here the host takes a
 // MANIFEST of the Undertaking's workspace through its own port (`Workspace.list` and `readFile`) — each path and the
 // SHA-256 of its text — before a step's first try and after each try, and compares the two: the files the unit ADDED,
-// CHANGED and REMOVED since its step began, each changed or added file's text as the host read it. Beside them, the step's
+// CHANGED and REMOVED since its step began (⭐ package O, D22: since the unit's FIRST step began — the D22 note below), each
+// changed or added file's text as the host read it. Beside them, the step's
 // ONE host sequence to date (package L's D8), sliced by try boundaries: each write's path and each run's command and exit,
 // with the try it was made in.
 //
@@ -23,8 +24,20 @@
 // — ⭐ package N's check, finding 2: and from the completion of the try it admits (`structuredResult.deliverableView`,
 // `admittedViewRef`) — so a re-review and a sign-off read it from the record (RD7), not from memory. ⚠ A try that ran no
 // command and was REFUSED leaves no pointer — no completion names it, it has no command evidence, and the other records a try
-// makes take strict payloads — so its re-review is shown the answer alone, and its sign-off is told the host holds no record
-// of it (`declaredUnitWithoutDeliverableLine`).
+// makes take strict payloads — ~~so its re-review is shown the answer alone, and its sign-off is told the host holds no record
+// of it (`declaredUnitWithoutDeliverableLine`)~~.
+// ⭐⭐ `JAN-EXEC` Phase 7, package O — D23 (design revision 3; the lead's decision, flagged for the sponsor) — SO EVERY VIEW IS ALSO
+// BOUND, ON THE CONTENT PLANE, TO A NAME DERIVED FROM ITS STEP'S ATTEMPT AND ITS TRY (`viewNameOf`; `ArtifactStore.bindName`),
+// WITHOUT A CONTRACT CHANGE: no record-plane payload changes, and the re-review of a refused try resolves that name
+// (`namedViewOf`) where no record points at the view. ⚠ The store is content-addressed (`put` keys each entry by its bytes'
+// hash), so a key derived from the step and the try alone could address no bytes; the name binds that derived key to the
+// entry, once, and the reader still re-hashes the bytes against the ref it resolves to. A view recorded before package O is
+// bound to no name: its re-review is shown the answer alone, and its sign-off is told the host holds no record of it
+// (`declaredUnitWithoutDeliverableLine`), as before.
+// ⭐⭐ Package O — D22 (design revision 3) — AND THE FILES A VIEW LISTS ARE COUNTED FROM THE UNIT'S FIRST STEP'S BASELINE, never a
+// work re-run's fresh one: that baseline — each path and its hash — is recorded on the content plane once, by the unit's first
+// step, under a name derived from the unit (`baselineNameOf`), and read back hash-checked by every later step (`unitBaselineOf`).
+// So a file a refused attempt wrote and the re-run left alone stays in view.
 // ⚠ Paths are the agent's (content plane, `R11`); the record plane carries only the pointer.
 import { createHash } from 'node:crypto';
 import type { Deliverable, DeliverableFile, HostSequence, HostSequenceAct } from '@janumipwb/rph-assurance';
@@ -55,8 +68,13 @@ export async function takeManifest(workspace: Pick<Workspace, 'list' | 'readFile
 /**
  * ⭐ D10 — THE FILES CHANGED BETWEEN TWO MANIFESTS, in path order: a path only `after` holds was ADDED, one whose hash moved
  * was CHANGED, and one only `before` holds was REMOVED — ⛔ never shown as unchanged, and never with a text (there is none).
+ * ⭐ Package O (D22) — `before` needs each path's hash alone: it may be the unit's first step's baseline as recorded
+ * (`unitBaselineOf`), which keeps no text.
  */
-export function changedFiles(before: WorkspaceManifest, after: WorkspaceManifest): DeliverableFile[] {
+export function changedFiles(
+	before: ReadonlyMap<string, { readonly hash: string }>,
+	after: WorkspaceManifest
+): DeliverableFile[] {
 	const paths = [...new Set([...before.keys(), ...after.keys()])].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 	return paths.flatMap((path): DeliverableFile[] => {
 		const was = before.get(path);
@@ -120,7 +138,11 @@ export interface DeliverableViewRecord {
 	/** The attempt (`<stepId>#<n>`, RD6) and the try of it whose end this view is. */
 	readonly attemptKey: string;
 	readonly try: number;
-	/** The files changed since the step began, and the step's sequence to date (`Deliverable.sequence`). */
+	/**
+	 * The files changed since ~~the step began~~ ⭐ the unit's first step began (package O, D22: a work re-run's view counts from the
+	 * unit's baseline, `unitBaselineOf`), and the step's sequence to date (`Deliverable.sequence`). ⚠ The reviewer's prompt still says
+	 * "since its step began" (`reasoning-review-validator.ts`): a reviewer prompt package O does not change.
+	 */
 	readonly deliverable: Deliverable;
 }
 
@@ -137,8 +159,20 @@ export interface DeliverableViewRef {
 }
 
 /**
- * ⭐ Package N — RECORD ONE TRY'S VIEW, as its reviews are shown it: the files changed since the step began and the step's
- * sequence to date. ⭑ `RETAINED_BY_PARTICIPATION`, as the evidence mint is: the reviews that read it participate.
+ * ⭐⭐ Package O — D23 — THE NAME A TRY'S VIEW IS BOUND TO on the content plane: derived from its step's attempt (`<stepId>#<n>`,
+ * RD6) and its try, under the host's tenant prefix (§31.2) — so a reader that knows only the step and the try reaches it.
+ */
+export function viewNameOf(tenantPrefix: string, attemptKey: string, attempt: number): string {
+	return `${tenantPrefix}/deliverable-view/${attemptKey}/${attempt}`;
+}
+
+/**
+ * ⭐ Package N — RECORD ONE TRY'S VIEW, as its reviews are shown it: the files changed since the ~~step~~ ⭐ unit (package O, D22)
+ * began and the step's sequence to date. ⭑ `RETAINED_BY_PARTICIPATION`, as the evidence mint is: the reviews that read it
+ * participate. ⭐⭐ Package O — D23 — AND BOUND TO ITS NAME (`viewNameOf`), so the re-review of a refused try that ran no command,
+ * which no record points at the view, still reaches it (`namedViewOf`). ⛔ A binding the store refuses throws, as a refused
+ * `put` does: the caller fails the step before its review (package N's check, finding 6), never reviews a try whose view no
+ * reader could reach.
  */
 export async function recordDeliverableView(
 	store: ArtifactStore,
@@ -152,6 +186,8 @@ export async function recordDeliverableView(
 		mediaType: 'application/json',
 		purgeability: 'RETAINED_BY_PARTICIPATION'
 	});
+	const named = await store.bindName(viewNameOf(tenantPrefix, view.attemptKey, view.try), ref.storageKey);
+	if (!named.bound) throw new Error(`the view of try ${view.try} of ${view.attemptKey} could not be named: ${named.refusedBecause}`);
 	return {
 		storageProvider: ref.storageProvider,
 		storageKey: ref.storageKey,
@@ -159,6 +195,103 @@ export async function recordDeliverableView(
 		byteSize: ref.byteSize,
 		try: view.try
 	};
+}
+
+/**
+ * ⭐⭐ Package O — D23 — WHERE A TRY'S VIEW IS, BY ITS NAME: the ref the content plane binds `viewNameOf` to, or undefined when no
+ * name is bound (a view recorded before package O, or a try that recorded none). ⚠ A pointer, never the view: the reader
+ * re-hashes the bytes against it (`readDeliverableView`).
+ */
+export async function namedViewOf(
+	store: Pick<ArtifactStore, 'resolveName'>,
+	tenantPrefix: string,
+	attemptKey: string,
+	attempt: number
+): Promise<DeliverableViewRef | undefined> {
+	const ref = await store.resolveName(viewNameOf(tenantPrefix, attemptKey, attempt));
+	return ref === undefined ? undefined : { ...ref, try: attempt };
+}
+
+// ── ⭐⭐ Package O — D22: THE UNIT'S FIRST STEP'S BASELINE ─────────────────────────────────────────────────────────────────────
+
+/** The baseline record's own tag, so a reader refuses bytes that are not one. */
+export const DELIVERABLE_BASELINE_SCHEMA = 'jpwb.deliverable-baseline/1';
+
+/** ⭐ D22 — the workspace's manifest as the unit's first step found it: each path and its hash, never its text. */
+export interface DeliverableBaselineRecord {
+	readonly schema: typeof DELIVERABLE_BASELINE_SCHEMA;
+	readonly pwuId: string;
+	/** The step that took it — the unit's first — and its attempt (RD6). */
+	readonly stepId: string;
+	readonly attemptKey: string;
+	/** Each path and the SHA-256 of its text, in path order. */
+	readonly files: readonly (readonly [path: string, hash: string])[];
+}
+
+/** ⭐ D22 — the name the unit's baseline is bound to on the content plane: derived from the unit, under the tenant prefix. */
+export function baselineNameOf(tenantPrefix: string, pwuId: string): string {
+	return `${tenantPrefix}/deliverable-baseline/${pwuId}`;
+}
+
+/** ⭐ D22 — a baseline record's bytes, re-hashed against the ref its name resolves to, parsed; refused, never guessed. */
+async function readBaseline(
+	store: Pick<ArtifactStore, 'get'>,
+	ref: { readonly storageKey: string; readonly contentHash: string },
+	pwuId: string
+): Promise<ReadonlyMap<string, { readonly hash: string }>> {
+	const bytes = await store.get(ref.storageKey);
+	if (bytes === undefined) throw new Error(`the baseline of work unit ${pwuId} at '${ref.storageKey}' is not in the content store.`);
+	if (sha256(bytes) !== ref.contentHash.replace(/^sha256:/, ''))
+		throw new Error(`the baseline of work unit ${pwuId} at '${ref.storageKey}' does not hash to the ${ref.contentHash} its name binds.`);
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(bytes);
+	} catch {
+		parsed = undefined;
+	}
+	const record = parsed as Partial<DeliverableBaselineRecord> | undefined;
+	if (record?.schema !== DELIVERABLE_BASELINE_SCHEMA || record.pwuId !== pwuId || !Array.isArray(record.files))
+		throw new Error(`the bytes at '${ref.storageKey}' are not the baseline of work unit ${pwuId}.`);
+	return new Map(record.files.map(([path, hash]) => [path, { hash }]));
+}
+
+/**
+ * ⭐⭐ D22 — THE BASELINE A STEP OF THE UNIT COUNTS ITS VIEWS' FILES FROM: the unit's FIRST step's. The first step takes the manifest
+ * through the port (`takeManifest`), records each path and hash on the content plane, and binds it to the unit's name
+ * (`baselineNameOf`); every later step of the unit — a work re-run — reads that record back, hash-checked. ⛔ So a file a refused
+ * attempt wrote and the re-run left alone stays in the re-run's view. ⛔ A baseline that is bound and cannot be read THROWS — the
+ * caller fails the step — never a fresh one taken in its place. ⚠ Disclosed: a unit whose first step ran before package O has
+ * no baseline bound, and its next step's becomes the unit's; and the shared workspace is the Undertaking's, so a file another
+ * unit wrote while this one waited counts as this unit's change in its re-run's view.
+ */
+export async function unitBaselineOf(
+	store: ArtifactStore,
+	tenantPrefix: string,
+	step: { readonly pwuId: string; readonly stepId: string; readonly attemptKey: string },
+	workspace: Pick<Workspace, 'list' | 'readFile'>
+): Promise<ReadonlyMap<string, { readonly hash: string }>> {
+	const name = baselineNameOf(tenantPrefix, step.pwuId);
+	const bound = await store.resolveName(name);
+	if (bound !== undefined) return readBaseline(store, bound, step.pwuId);
+	const manifest = await takeManifest(workspace);
+	const record: DeliverableBaselineRecord = {
+		schema: DELIVERABLE_BASELINE_SCHEMA,
+		pwuId: step.pwuId,
+		stepId: step.stepId,
+		attemptKey: step.attemptKey,
+		files: [...manifest].map(([path, f]) => [path, f.hash] as const)
+	};
+	const ref = await store.put({
+		tenantPrefix,
+		bytes: JSON.stringify(record),
+		mediaType: 'application/json',
+		purgeability: 'RETAINED_BY_PARTICIPATION'
+	});
+	// ⛔ A binding the store refuses throws, as an unreadable workspace does, and the step fails before its producer opens. No
+	// second step of the unit can have bound one meanwhile: a later step is a re-run, offered only once this one's unit waits.
+	const named = await store.bindName(name, ref.storageKey);
+	if (!named.bound) throw new Error(`the baseline of work unit ${step.pwuId} could not be named: ${named.refusedBecause}`);
+	return manifest;
 }
 
 /** A pointer read off the record, as it was written (`DeliverableViewRef`), or undefined when it is not one. */

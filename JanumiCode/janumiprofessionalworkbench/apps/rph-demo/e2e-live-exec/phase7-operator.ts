@@ -67,6 +67,7 @@ import {
 } from '../../../scripts/phase7/run-archive.js';
 import {
 	AUTHOR_MODEL_VARIABLE,
+	AUTHORING_REVIEW_ALLOWANCE_VARIABLE,
 	LANE_BUDGET,
 	laneKeysRefusal,
 	phase7Half,
@@ -152,12 +153,17 @@ export function inheritedVariables(
  * What the config lays over the operator's shell for the server (`playwright.live-exec.config.ts`, `webServer.env`).
  * ⭐ R3-C — `PI_OFFLINE` among it (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (19)), so the
  * boot records whether the config ran the server's Pi offline.
+ * ⭐⭐ `JAN-EXEC` Phase 7, package O — D26 (design revision 3; `l2-facts.md`) — AND THE AUTHORING REVIEW'S ALLOWANCE, which the
+ * config spreads over the server for a paid half-B run (`phase7AuthoringReviewAllowanceEnv`), in the config's own order, before
+ * `PI_OFFLINE`: so the boot records what the server was handed, and refuses a paid half-B boot handed another than the
+ * computed one (`bootOf`).
  */
 export const OVERLAY_KEYS = [
 	'RPH_DEMO_MODE',
 	'JPWB_HARNESS',
 	'JPWB_SEED',
 	'JPWB_DEMO_DB',
+	AUTHORING_REVIEW_ALLOWANCE_VARIABLE,
 	'PI_OFFLINE'
 ] as const;
 export type Overlay = Readonly<Record<(typeof OVERLAY_KEYS)[number], string | null>>;
@@ -338,6 +344,32 @@ export interface Boot {
 }
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package O — D26 (design revision 3; `l2-facts.md`; the lead's decision, flagged for the sponsor) — WHY A
+ * PAID HALF-B BOOT MAY NOT GO ON FOR THE ALLOWANCE ITS SERVER WAS HANDED: one that is not the allowance this run computes
+ * (`phase7AuthoringReviewAllowance`: the limit less the calls spent before the run and the negative control's reserve), none
+ * included. ⛔ Send's check counts the COMPUTED allowance (`authorThePwa`), so a server handed another — a config changed, or one
+ * that read the shell otherwise — would bound the authoring review by a figure the check never counted. ⚠ Half A, the dry run,
+ * and a paid run whose prior calls cannot be read (refused already, the config handing it none to count) are not asked here.
+ */
+function allowanceRefusal(
+	paid: boolean,
+	half: Phase7Half | undefined,
+	prior: number | string,
+	handed: string | null
+): string[] {
+	if (!paid || half !== 'B' || typeof prior !== 'number') return [];
+	const computed = String(phase7AuthoringReviewAllowance(prior));
+	if (handed === computed) return [];
+	return [
+		`the server was handed ${handed === null ? `no ${AUTHORING_REVIEW_ALLOWANCE_VARIABLE}` : `${AUTHORING_REVIEW_ALLOWANCE_VARIABLE}=${JSON.stringify(handed)}`}, ` +
+			`not the ${computed} this paid half-B run computes — the limit of ${PHASE7_PAID_LIMIT} less the ${prior} calls spent ` +
+			`before the run and the negative control’s ${PHASE7_NEGATIVE_CONTROL_RESERVE} (REG-F-580; design D20, D26): Send’s check ` +
+			'counts the computed allowance, so a server handed another would bound the authoring review by a figure that check ' +
+			'never counted'
+	];
+}
+
+/**
  * ⭐ D3 — THE BOOT: what the run starts from, and every reason it may not go on. ⛔ Each refusal is the run's, and
  * none is left to the run to find later: the lane's keys (`laneKeysRefusal`), the reviewer this spec readies, devin's
  * readiness, a paid run's prior calls (D8), a server whose store is not the run folder's, and a store the server did
@@ -363,6 +395,8 @@ export async function bootOf(b: {
 		...('refusal' in reviewer ? [reviewer.refusal] : []),
 		...(readiness === null ? [] : readinessRefusals(readiness)),
 		...(b.paid && typeof prior === 'string' ? [prior] : []),
+		// ⭐⭐ Package O — D26 — A PAID HALF-B SERVER HANDED ANOTHER AUTHORING-REVIEW ALLOWANCE THAN THE ONE THIS RUN COMPUTES.
+		...allowanceRefusal(b.paid, phase7Half(b.env), prior, overlay[AUTHORING_REVIEW_ALLOWANCE_VARIABLE]),
 		...(overlay.JPWB_DEMO_DB === b.store
 			? []
 			: [
@@ -594,7 +628,16 @@ export type EndReason =
 	 * can ever start, and the page names the loop. The run ends here, after the authoring archive and before ANY press. ⛔ It
 	 * never falls back to the tree's order. ⚠ A RESULT, recorded with the page's words.
 	 */
-	| 'order-unresolvable';
+	| 'order-unresolvable'
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package O (design D24, revision 3; the lead's decision, flagged for the sponsor) — the lane pressed
+	 * everything the page offered, and the run still holds a unit never pressed, the page having never offered it Begin & Execute,
+	 * or a unit pressed whose sign-off was never attempted (`withheldUnitsOf`). Each is named in the end's detail, with the page's
+	 * reason. ⛔ Package M's lane ended such a run `complete`: it broke out of its loop when the page offered nothing more, so a
+	 * paid run that never offered its root read as complete. ⚠ A RESULT, recorded with the page's words — and not the end a paid
+	 * run was meant to reach (`laneVerdict`).
+	 */
+	| 'withheld';
 
 /**
  * ⭐⭐ `JAN-EXEC` Phase 7, package M (`REG-D-135` (2); design D6) — THE ORDER, AS THE RUN RECORDS IT: what each unit waits for,
@@ -627,7 +670,8 @@ export interface RunRecord {
 
 /**
  * ⭐⭐ `JAN-EXEC` Phase 7, package M (`REG-D-135` (2); design D3, D6) — WHAT THE PAGE OFFERS ON A UNIT'S ROW: Begin & Execute, or
- * why not — the page's reason and its kinds (`waiting`, `abandoned`, `unknown`, `unproduced`, `loop`), which the load reads
+ * why not — the page's reason and its kinds (`waiting`, `abandoned`, `unknown`, ~~`unproduced`,~~ `loop`; ⛔ package O, D21: an
+ * input no unit produces is expected from outside and withholds nothing), which the load reads
  * from the rule the engine's refusal reads. A row of a unit that is not PROPOSED offers neither: not offered, no reason.
  */
 export interface StartOffer {
@@ -668,6 +712,25 @@ export const notStartedBecause = (o: StartOffer | undefined): string =>
 		: o?.offered === true
 			? 'not started: offered, and the run ended before it was pressed'
 			: 'not started: its row offered no Begin & Execute';
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package O — D24 (design revision 3) — WHAT A RUN THAT ENDED ITS PRESSES STILL HOLDS UNDONE, one line per
+ * unit, in the run's order: each unit never pressed, with the page's reason as the lane recorded it (`notStarted`); each pressed
+ * unit whose sign-off was never attempted — its Record Assurance never pressed — and why. Empty when every unit was pressed and
+ * its sign-off attempted: the one run `complete` may name. ⚠ An ATTEMPT, never an acceptance: a sign-off pressed and refused
+ * counts as attempted, and the units that wait for that unit are then never offered, and named here.
+ */
+export function withheldUnitsOf(record: Pick<RunRecord, 'units'>): string[] {
+	return record.units.flatMap((u) => {
+		if (u.beginExecute === null) return [`${u.title} — ${u.notStarted ?? 'not started: never pressed'}`];
+		if ((u.signOff?.recordAssurance ?? null) !== null) return [];
+		const why =
+			u.stopped === true
+				? 'it stopped, and the lane presses no sign-off of a unit that stopped'
+				: 'its row offered no Record Assurance';
+		return [`${u.title} — pressed, and its sign-off never attempted: ${why}`];
+	});
+}
 
 /** The run record's units before anything is pressed. */
 export function unpressed(units: readonly ArchiveUnit[]): RunUnit[] {
@@ -2343,7 +2406,9 @@ export interface LaneHands {
  *      AND RECOVERY AND BEFORE THE NEXT PRESS — so a unit that waits for it can be offered — the page loaded afresh, the
  *      store read after every act, every refusal recorded and none asserted; a unit still stopped offers none, its row read
  *      and nothing pressed. Then, when the page offers nothing more, the final archive, `06-final`, and the run ends
- *      `complete`. ⭐ `E12F` F2 — THE LIMIT BEFORE EACH SIGN-OFF, its own worst case counted (`signOffWorstCase`): one that
+ *      `complete` ⭐ — package O, D24: ONLY WHEN EVERY UNIT WAS PRESSED AND ITS SIGN-OFF ATTEMPTED; ~~`complete`~~ otherwise
+ *      `withheld`, each unit never pressed or never signed off named, with the page's reason (`withheldUnitsOf`). ⭐ `E12F` F2 —
+ *      THE LIMIT BEFORE EACH SIGN-OFF, its own worst case counted (`signOffWorstCase`): one that
  *      would cross it is not pressed, nor is anything after it, and the run ends `paid-limit`. ⭐ `E12F` F3 — A RECORD
  *      ASSURANCE ANSWERED WITH A REFUSAL, whose row, read afresh, then offers re-running the declared reviews that did not
  *      conclude, has them re-run ONCE by the rule (`REG-D-105` (4), `REG-D-112` (a)), the limit read first; accepted, Mark
@@ -2787,8 +2852,9 @@ export async function runTheLane(r: {
 		};
 		// ── 3. ⭐⭐ THE ORDER — ONLY WHAT THE PAGE OFFERS, ONE UNIT AT A TIME (`JAN-EXEC` Phase 7, package M; `REG-D-135` (2); design
 		// D4-D7) ──────────────────────────────────────────────────────────────────────────────────────────────────────────
-		// The page offers Begin & Execute where the engine would start the unit — every unit it waits for ACCEPTED, nothing it
-		// requires unproduced (`MarkPwuReady`; the page's offer reads the same rule). So the lane presses nothing the engine
+		// The page offers Begin & Execute where the engine would start the unit — every unit it waits for ACCEPTED~~, nothing it
+		// requires unproduced~~ (⛔ struck 2026-10-26, package O, D21: an input expected from outside withholds nothing)
+		// (`MarkPwuReady`; the page's offer reads the same rule). So the lane presses nothing the engine
 		// would refuse, and the root, which waits for its children, runs last. ⭑ The tree's order breaks ties only.
 		// ⛔ ~~P5 package B (F3) — a phase the store read ABANDONED held the root's sign-off (`rootHeldOverAbandoned`)~~: an
 		// abandoned producer now leaves its consumers unstarted, the root among them (D4), so no root is signed off over one.
@@ -2921,7 +2987,12 @@ export async function runTheLane(r: {
 		// counted (D11).
 		if (dry)
 			record.dryRun = { modelExchanges: (await hands.read()).snapshot.modelExchanges.length };
-		return reached.end === null ? end(reason) : end(reached.end.reason, reached.end.detail);
+		if (reached.end !== null) return end(reached.end.reason, reached.end.detail);
+		// ⭐⭐ `JAN-EXEC` Phase 7, package O — D24 (design revision 3) — `complete` ONLY WHEN EVERY UNIT WAS PRESSED AND ITS SIGN-OFF
+		// ATTEMPTED: a run whose presses ended with a unit the page never offered, or one pressed and never signed off, ends
+		// `withheld`, each unit named with the page's reason (`withheldUnitsOf`). ⛔ It ended `complete`, whatever it never pressed.
+		const withheld = reason === 'complete' ? withheldUnitsOf(record) : [];
+		return withheld.length > 0 ? end('withheld', withheld.join('; ')) : end(reason);
 	} catch (e) {
 		const why = e instanceof Error ? e.message : String(e);
 		if (record.end === null)

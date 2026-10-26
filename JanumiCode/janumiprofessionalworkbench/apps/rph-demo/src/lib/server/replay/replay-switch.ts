@@ -33,7 +33,10 @@ export function resolveReplayRecording(configured: string | undefined): string |
  * ⭐ `REG-D-112` (c) — EVERY LIVE-BACKEND SELECTION A REPLAY REFUSES BESIDE IT: the tools, the models they run and the
  * authoring agent with its model, read from the environment — ~~the gate's eight~~ ⭐ the gate's live-backend variables
  * (`verif/live-backend-isolation.ts`, `LIVE_BACKEND_VARIABLES`) less the two program overrides, which the adapters
- * CAPTURED when they loaded and the selectors are handed apart (`overrides`), and less this switch itself. Among them is
+ * CAPTURED when they loaded and the selectors are handed apart (`overrides`), and less this switch itself ⭐ — and less the
+ * authoring review's allowance (`JPWB_AUTHORING_REVIEW_ALLOWANCE`, stripped from the gate since package O, design D26): a server
+ * setting that selects no backend, so a replay beside it is no live selection, and its authoring turns are refused anyway
+ * (`authoringRefusedUnderReplay`). Among them is
  * `JPWB_AGENT_MODEL`, the authoring agent's model (`agent/pi-agent.ts`) — ⭐ which the gate's entry points remove too
  * since the re-review of E4's fix round, so one a shell exported never turns a gate replay test into this refusal.
  */

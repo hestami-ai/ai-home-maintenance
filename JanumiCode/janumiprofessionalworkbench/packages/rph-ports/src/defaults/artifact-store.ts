@@ -13,6 +13,7 @@ import { createHash } from 'node:crypto';
 import type {
 	ArtifactContentInput,
 	ArtifactStore,
+	NameBindingOutcome,
 	PurgeOutcome,
 	StoredArtifactMeta,
 	StoredArtifactRef
@@ -39,6 +40,8 @@ interface Entry {
 
 export function createInMemoryArtifactStore(): ArtifactStore {
 	const entries = new Map<string, Entry>();
+	/** ⭐ Package O (D22, D23) — each name the host bound, and the storage key it names, once (`bindName`). */
+	const names = new Map<string, string>();
 
 	return {
 		// The bytes live in a Map. Declaring this is what lets a record disclose that the content it names is
@@ -111,6 +114,32 @@ export function createInMemoryArtifactStore(): ArtifactStore {
 			entry.bytes = undefined;
 			entry.meta = { ...entry.meta, purged: true };
 			return { purged: true };
+		},
+
+		// ⭐⭐ Package O (D22, D23) — A NAME BOUND ONCE, to an entry this store holds; see the port. ⚠ Process-local like the
+		// entries it names: both are gone together at a restart, which `durability` already declares.
+		async bindName(name: string, storageKey: string): Promise<NameBindingOutcome> {
+			if (!entries.has(storageKey))
+				return {
+					bound: false,
+					refusedBecause: `no entry is present under storageKey '${storageKey}', so the name '${name}' was not bound to it: a name never points at nothing.`
+				};
+			const named = names.get(name);
+			if (named !== undefined && named !== storageKey)
+				return {
+					bound: false,
+					refusedBecause: `the name '${name}' is bound to '${named}' already, and is never rebound — not to '${storageKey}': a reader must reach the entry its first binding named (PER-8).`
+				};
+			names.set(name, storageKey);
+			return { bound: true };
+		},
+
+		async resolveName(name: string): Promise<StoredArtifactRef | undefined> {
+			const storageKey = names.get(name);
+			const meta = storageKey === undefined ? undefined : entries.get(storageKey)?.meta;
+			return meta === undefined
+				? undefined
+				: { storageProvider: IN_MEMORY_STORAGE_PROVIDER, storageKey: meta.storageKey, contentHash: meta.contentHash, byteSize: meta.byteSize };
 		}
 	};
 }

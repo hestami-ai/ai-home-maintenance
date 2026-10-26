@@ -45,7 +45,12 @@ const seam = vi.hoisted(() => ({
 	/** One in-memory workspace per Undertaking, held across requests. */
 	workspaces: new Map<string, unknown>(),
 	/** ⭐ Package N's check, finding 6 — the content plane refuses the next view the host records, with this message. */
-	viewRecordFails: undefined as string | undefined
+	viewRecordFails: undefined as string | undefined,
+	/**
+	 * ⭐ Package O (D23) — each view the host records is recorded as a host BEFORE package O recorded it: its bytes put, and no
+	 * name bound to them, so no name derived from its step and try reaches it.
+	 */
+	viewsUnnamed: false
 }));
 
 // ⭐ Package N's check, finding 6 — THE HOST'S OWN RECORD OF A TRY'S VIEW, refusable by a case: the real one otherwise.
@@ -53,9 +58,15 @@ vi.mock('./deliverable-view.js', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('./deliverable-view.js')>();
 	return {
 		...actual,
-		recordDeliverableView: vi.fn((...args: Parameters<typeof actual.recordDeliverableView>) =>
-			seam.viewRecordFails === undefined ? actual.recordDeliverableView(...args) : Promise.reject(new Error(seam.viewRecordFails))
-		)
+		recordDeliverableView: vi.fn((...args: Parameters<typeof actual.recordDeliverableView>) => {
+			if (seam.viewRecordFails !== undefined) return Promise.reject(new Error(seam.viewRecordFails));
+			// ⭐ Package O (D23) — a view recorded before package O: put on the content plane, and named by nothing.
+			if (seam.viewsUnnamed) {
+				const [store, ...rest] = args;
+				return actual.recordDeliverableView({ ...store, bindName: async () => ({ bound: true }) }, ...rest);
+			}
+			return actual.recordDeliverableView(...args);
+		})
 	};
 });
 
@@ -283,6 +294,7 @@ beforeEach(() => {
 	seam.script = () => ({ acts: [], account: 'An account.' });
 	seam.workspaces.clear();
 	seam.viewRecordFails = undefined;
+	seam.viewsUnnamed = false;
 	vi.stubEnv('PATH', noProgramsDirectory());
 	for (const v of LIVE_BACKEND_VARIABLES) vi.stubEnv(v, undefined);
 	vi.stubEnv('JPWB_ASSURANCE_TOOL', 'devin');
@@ -477,6 +489,55 @@ describe('⭐⭐ package N — D10: the work-product review is shown the finishe
 	});
 });
 
+// ── ⭐⭐ `JAN-EXEC` Phase 7, package O — D22, A WORK RE-RUN'S FINISHED WORK (design revision 3; `mn-facts.md`) ───────────────────
+// Package N took a fresh baseline at every step, a work re-run's included, so a file the refused attempt wrote and the re-run
+// left alone was in the re-run's baseline and out of its view: its review could read a mandated file as absent. D22: the
+// view's changed files are counted from the unit's FIRST step's baseline, recorded on the content plane under a name derived
+// from the unit (`baselineNameOf`), hash-checked on read.
+describe('⭐⭐ package O — D22: a work re-run’s view counts the unit’s changes from its FIRST step’s baseline', () => {
+	/** A model unit whose first attempt writes `docs/required.md` and is refused at its review; then its work re-run. */
+	const refusedThenRerun = async (rerunActs: readonly TurnAct[]) => {
+		const pwuId = await modelWorkUnit();
+		// A file the workspace holds before the unit's first step: no change of the unit's, in any view.
+		await workspaceOf(pwuId).writeFile('README.md', '# Present before the unit began\n');
+		seam.script = (turn) =>
+			turn === 1
+				? { acts: [write('docs/required.md', '# Required\n')], account: 'Wrote the required document.' }
+				: { acts: rerunActs, account: 'The required document is in place; nothing else was needed.' };
+		// The first attempt's review fails at the transport: it does not conclude, so the unit waits and its work re-run is
+		// offered (RD3).
+		let down = true;
+		seam.review = (p) => {
+			if (down && isWorkProductReview(p)) throw new Error('devin exited with code 1: connection reset by peer');
+			return undefined;
+		};
+		expect((await beginExecute(pwuId)).data?.error, 'arrangement: the first attempt’s review concluded').toMatch(
+			/VALIDATOR_EXECUTION_FAILED/
+		);
+		down = false;
+		seam.prompts.length = 0;
+		const rerun = (await actions.rerunWork(
+			actionEvent('rerunWork', { pwuId, rationale: 'The reviewer failed at the transport; run the work again.' }) as never
+		)) as { advanced?: string; data?: { error?: string } };
+		expect([rerun.advanced, rerun.data?.error], 'arrangement: the work re-run').toEqual(['work-rerun', undefined]);
+		const reviewed = seam.prompts.filter(isWorkProductReview);
+		expect(reviewed, 'arrangement: the re-run’s work product was not reviewed once').toHaveLength(1);
+		return reviewed[0]!;
+	};
+
+	it('⭐ THE PREDICTED RED — a refused attempt writes a required file and its work re-run leaves it alone: the re-run’s view still lists it, added since the unit began', async () => {
+		const prompt = await refusedThenRerun([]);
+		expect(prompt, 'the re-run’s view lost the file its refused attempt wrote').toContain('Added "docs/required.md":');
+		expect(prompt, 'the re-run’s view does not show the file’s text').toContain('# Required');
+	});
+
+	it('⭑ CONTROL — a file the workspace held before the unit’s FIRST step began is no change of the unit’s, in the re-run’s view either; a file the re-run itself writes is', async () => {
+		const prompt = await refusedThenRerun([write('docs/notes.md', '# Notes\n')]);
+		expect(prompt, 'a file present before the unit began was shown as its change').not.toContain('"README.md":');
+		expect(prompt, 'the re-run’s own file was not shown').toContain('Added "docs/notes.md":');
+	});
+});
+
 describe('⭐⭐ package N — D11: the declared reviews at sign-off are shown the finished work; a re-review is shown what the refused try was', () => {
 	/** A MODEL work unit of a type that declares `pol_requirement_coverage`, of a kind it governs — published, instantiated. */
 	async function declaringModelUnit(): Promise<string> {
@@ -604,10 +665,18 @@ describe('⭐⭐ package N — D11: the declared reviews at sign-off are shown t
 		expect(declared, 'the re-run declared review was not shown the sequence').toContain(WROTE_ONLY_SEQUENCE);
 	});
 
-	it('⭑ CONTROL, the residual — a write-only try REFUSED and re-reviewed: no record points at its view, so its re-review is shown the answer alone and its sign-off is told the host holds no record', async () => {
+	// ⛔ MOVED 2026-10-26 (`JAN-EXEC` Phase 7, package O; design D23, revision 3) — ~~"⭑ CONTROL, the residual — a write-only try
+	// REFUSED and re-reviewed: no record points at its view, so its re-review is shown the answer alone and its sign-off is told
+	// the host holds no record"~~, which pinned the residual N disclosed: ~~the re-review shown no file~~ and ~~the sign-off's
+	// `NO_RECORD` and `"files":[]`~~. D23 makes the view reachable WITHOUT A CONTRACT CHANGE: the host binds it, on the content
+	// plane, to a name derived from its step's attempt and its try (`viewNameOf`), and the re-review resolves that name; the
+	// re-review's completion points at the view it read, so the sign-off reads it there. The residual's shape stands below, as
+	// the CONTROL: a view recorded BEFORE package O, which no name reaches.
+	it('⭐ D23 (package O), THE PREDICTED RED — a write-only try REFUSED and re-reviewed: its re-review IS shown the view the refused try recorded, reached by its step and try; its sign-off reads it through the re-review’s completion', async () => {
 		// ⚠ DISCLOSED, NOT FIXED (package N's check, finding 2): a refused try is named by no completion, and a try that ran no
 		// command has no command evidence; every other record a try makes (`RecordArtifact`, `EnterExecutionStepWait`) takes a
-		// strict payload with no field for a pointer. The view is recorded; nothing points at it.
+		// strict payload with no field for a pointer. The view is recorded; nothing points at it. ⭐ Package O (D23): ~~nothing
+		// points at it~~ — a name derived from its step and try reaches it, and the pointer is carried from there.
 		const pwuId = await declaringModelUnit();
 		seam.script = () => ({ acts: [write('docs/requirements.md', '# Requirements\n')], account: 'Wrote the requirements.' });
 		let down = true;
@@ -622,9 +691,41 @@ describe('⭐⭐ package N — D11: the declared reviews at sign-off are shown t
 			actionEvent('rerunReview', { pwuId, rationale: 'The reviewer failed at the transport; review it again.' }) as never
 		)) as { data?: { error?: string } };
 		expect(rerun.data?.error, 'arrangement: the re-review did not complete').toBeUndefined();
-		expect(seam.prompts.find(isWorkProductReview), 'the residual moved: the re-review was shown files').not.toContain(
-			'docs/requirements.md'
+		// ⛔ MOVED (D23): ~~`.not.toContain('docs/requirements.md')`, "the residual moved: the re-review was shown files"~~.
+		const reReview = seam.prompts.find(isWorkProductReview);
+		expect(reReview, 'the re-review of a command-free refused try was not shown its recorded file').toContain(
+			'Added "docs/requirements.md":'
 		);
+		expect(reReview, 'the re-review was not shown the refused try’s sequence').toContain('  1. wrote "docs/requirements.md"');
+
+		await recordAssurance(pwuId);
+
+		// ⛔ MOVED (D23): ~~`toContain(NO_RECORD)`, `toContain('"files":[]')`~~ — the host holds the record, and says what it holds.
+		const declared = seam.prompts.find((p) => p.includes('declared assurance policy'))!;
+		expect(declared, 'the sign-off was not shown the re-reviewed try’s file').toContain(WROTE_ONLY);
+		expect(declared, 'the sign-off was not shown the re-reviewed try’s sequence').toContain(WROTE_ONLY_SEQUENCE);
+		expect(declared, 'a view on the record was said to be on none').not.toContain(NO_RECORD);
+	});
+
+	it('⭑ CONTROL (D23) — a write-only try refused and re-reviewed whose view was recorded BEFORE package O, named by nothing: its re-review is shown the answer alone, and its sign-off is told the host holds no record of it', async () => {
+		// The residual package N disclosed, kept true of the records it is still true of: a view put on the content plane and bound
+		// to no name is reached by no reader.
+		seam.viewsUnnamed = true;
+		const pwuId = await declaringModelUnit();
+		seam.script = () => ({ acts: [write('docs/requirements.md', '# Requirements\n')], account: 'Wrote the requirements.' });
+		let down = true;
+		seam.review = (p) => {
+			if (down && isWorkProductReview(p)) throw new Error('devin exited with code 1: connection reset by peer');
+			return undefined;
+		};
+		expect((await beginExecute(pwuId)).data?.error, 'arrangement: the work product’s review concluded').toMatch(/VALIDATOR_EXECUTION_FAILED/);
+		down = false;
+		seam.prompts.length = 0;
+		const rerun = (await actions.rerunReview(
+			actionEvent('rerunReview', { pwuId, rationale: 'The reviewer failed at the transport; review it again.' }) as never
+		)) as { data?: { error?: string } };
+		expect(rerun.data?.error, 'arrangement: the re-review did not complete').toBeUndefined();
+		expect(seam.prompts.find(isWorkProductReview), 'a view no name reaches was shown').not.toContain('docs/requirements.md');
 
 		await recordAssurance(pwuId);
 

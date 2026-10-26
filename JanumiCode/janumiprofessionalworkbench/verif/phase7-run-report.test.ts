@@ -94,6 +94,8 @@ import {
 	exchangeReading,
 	FLOOR_POLICIES,
 	K5_OWED,
+	LIMIT_CAVEAT,
+	LIMIT_CAVEAT_LOWER_BOUND,
 	manifestArgv,
 	MISSING_CRITERION_ROW,
 	MODEL_EXECUTOR_NAME,
@@ -2557,6 +2559,89 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 		// D20), whose count is the allowance it hands the authoring review.
 		expect(r.reviewerCalls.limitCaveat, 'the caveat still says a press can pass the limit').not.toContain('carry the total past the limit');
 		expect(r.reviewerCalls.limitCaveat, 'the caveat still says Send counts an estimate').not.toContain('an estimate');
+	});
+
+	// ── ⭐⭐ `JAN-EXEC` Phase 7, package O — D27, EACH RUN'S OWN LIMIT (design revision 3; `REG-F-581`; the lead's decision, flagged
+	// for the sponsor) ─────────────────────────────────────────────────────────────────────────────────────────────────────────
+	// ⛔ THE REPORT HELD EVERY RUN TO TODAY'S LIMIT AND CAVEAT: `buildReviewerCalls` set `limit: PAID_LIMIT`, so a regenerated report
+	// of run-12 — 739 calls before it, 262 recorded, each check read against 1000 and counting one try's reserve — compared its
+	// total with 2400 and called it under the limit, and its caveat described the whole-press rule its lane never ran. Run-12 spent
+	// 1,001 of about 1,000 (`REG-D-133`). The limit is the one its own checks used, and the caveat the one true of its lane.
+	/**
+	 * Run-12's shape: 739 before it, 262 recorded, its checks — one before each phase — against 1000, counting one try's reserve.
+	 * ⭑ `limits` sets one phase's read against another limit, for a record whose reads disagree.
+	 */
+	const run12Shaped = (limit: number, counted: string, ahead: number, limits: Readonly<Record<string, number>> = {}) => {
+		const many = Array.from({ length: 259 }, (_, i) => ({ role: i === 0 ? 'INITIAL' : 'RETRY', disposition: 'ACCEPTED', ordinal: i + 1 }));
+		const run = aRun({ requirements: { review: many } }, { run: { end: { reason: 'paid-limit' } } });
+		const laneRun = run.lane.run as { units: Record<string, unknown>[] };
+		const read = (recorded: number, own: number) => {
+			const total = 739 + recorded + 4 + ahead;
+			return { prior: 739, recorded, reserve: 4, ahead, counted, total, limit: own, allowed: total <= own };
+		};
+		const recordedBefore: Record<string, number> = { requirements: 0, design: 259, implementation: 260, 'end-to-end': 261 };
+		const units = laneRun.units.map((u) =>
+			recordedBefore[str(u.slug)] === undefined
+				? u
+				: { ...u, limitCheck: read(recordedBefore[str(u.slug)]!, limits[str(u.slug)] ?? limit) }
+		);
+		return buildRunReport(run.store, { ...run.lane, run: { ...laneRun, units } }, { accountNames: NAMES }).report;
+	};
+	const str = (v: unknown): string => (typeof v === 'string' ? v : '');
+	/** The caveat's first clause for a run recorded before package L, as the report says it of such a run. */
+	const ONE_TRY_CAVEAT =
+		'⚠ This run was recorded before the lane counted each press’s whole worst case (package L; REG-D-135 (4)): its checks ' +
+		'counted one try’s reserve ahead of each model press, so a phase’s own spend could carry the total past the limit — the ' +
+		'lane checked the limit before each press, not during one, and a model unit’s press could spend up to 140 reviewer calls ' +
+		'after its check, (3 tries + 32 command runs) × 4, the calls a review could make before package L (REG-D-114 (14), as ' +
+		'amended 2026-10-16). The limit its checks used is 1000, the sponsor’s "about 1,000" (REG-D-131 Q37, raising ' +
+		'REG-D-110 (1)). ';
+
+	it('⭐ D27, THE PREDICTED RED — a run-12-shaped record reports its total against its OWN limit, 1000, PAST it, with the one-try caveat its lane ran under', () => {
+		const r = run12Shaped(1000, 'one try’s reserve', 4);
+		expect(r.reviewerCalls.recorded, 'arrangement: run-12’s 262 recorded calls').toBe(262);
+		expect(r.reviewerCalls.limit, 'the run was held to today’s limit').toEqual({
+			prior: 739,
+			recorded: 262,
+			reserve: 4,
+			total: 1005,
+			limit: 1000,
+			under: false
+		});
+		const md = renderMarkdown(r);
+		// ⭑ 739 + 262 = 1,001 spent of about 1,000 (`REG-D-133`); the D8 line adds the negative control's 4 held back.
+		expect(md, 'the report compared the run with a limit its checks never used').toContain(
+			'- **The limit (design D8):** 739 + 262 + 4 = 1005 of 1000, PAST it.'
+		);
+		expect(r.reviewerCalls.limitCaveat, 'the caveat is not the one true of the run’s lane').toBe(ONE_TRY_CAVEAT + LIMIT_CAVEAT_LOWER_BOUND);
+		expect(r.reviewerCalls.limitCaveat).not.toContain('about 2,400');
+	});
+
+	it('⭑ CONTROL — a record of today’s lane, its checks against 2400 counting each press’s whole worst case, reports its own limit and today’s caveat', () => {
+		const r = run12Shaped(PAID_LIMIT, 'its whole press’s worst case, (3 tries + 32 command runs) × 6 calls', 210);
+		expect([r.reviewerCalls.limit.limit, r.reviewerCalls.limit.under]).toEqual([PAID_LIMIT, true]);
+		expect(renderMarkdown(r)).toContain(`- **The limit (design D8):** 739 + 262 + 4 = 1005 of ${PAID_LIMIT}, under it.`);
+		expect(r.reviewerCalls.limitCaveat).toBe(LIMIT_CAVEAT);
+	});
+
+	it('⭐ D27 — a run recorded before package L against ANOTHER limit, as the limit was before REG-D-131 Q37 (about 450 to about 900), reads that limit in its own caveat — and no ruling that did not set it', () => {
+		const r = run12Shaped(800, 'one try’s reserve', 4);
+		expect([r.reviewerCalls.limit.limit, r.reviewerCalls.limit.under]).toEqual([800, false]);
+		expect(renderMarkdown(r)).toContain('- **The limit (design D8):** 739 + 262 + 4 = 1005 of 800, PAST it.');
+		expect(r.reviewerCalls.limitCaveat, 'the caveat does not state the limit its checks used').toContain(
+			'The limit its checks used is 800. '
+		);
+		expect(r.reviewerCalls.limitCaveat, 'the caveat names a ruling that did not set this run’s limit').not.toContain('REG-D-131 Q37');
+	});
+
+	it('⛔ D27 — reads of the limit that DISAGREE are a record that disagrees with itself: the report states the LAST read’s limit and names every limit the reads used; ⭑ CONTROL: reads that agree name nothing', () => {
+		const r = run12Shaped(1000, 'one try’s reserve', 4, { 'end-to-end': PAID_LIMIT });
+		expect(r.reviewerCalls.limit.limit, 'the report did not state the last read’s limit').toBe(PAID_LIMIT);
+		expect(r.problems, 'reads that disagree went unreported').toContain(
+			`lane/run.json's reads of the limit used 2 limits (1000, ${PAID_LIMIT}): the report states the last read's`
+		);
+		const agreeing = run12Shaped(1000, 'one try’s reserve', 4);
+		expect(agreeing.problems.filter((p) => p.includes('reads of the limit used'))).toEqual([]);
 	});
 
 	it('⛔ stage 7’s sign-off: the lane’s dry run signs the root off (D11) — the root as intended, the run not reached; one never attempted, in a run cut short — not reached; one refused — broke', () => {

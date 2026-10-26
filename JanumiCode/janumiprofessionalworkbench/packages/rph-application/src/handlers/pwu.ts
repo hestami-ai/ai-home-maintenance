@@ -882,7 +882,9 @@ export const markPwuReady: CommandHandler = (ctx, command) => {
 	// Every unit it depends on — its producers and its children, recorded at instantiation (`dependencyIds`, design D1) —
 	// must be a unit of its Undertaking and ACCEPTED: SATISFIED, RECOMPOSED or BASELINED. ⛔ CONDITIONALLY_SATISFIED does not
 	// count: its conditions are open (DOC-003 :231, DEC-6: *"'Assured required child results' excludes conditionally
-	// satisfied dispositions"*). And no input it requires may be unproduced (`inputRequirements`). The refusal names every
+	// satisfied dispositions"*). ~~And no input it requires may be unproduced (`inputRequirements`).~~ (⛔ struck 2026-10-26,
+	// `JAN-EXEC` Phase 7 package O, design D21, `REG-F-582`: an input no unit of the Undertaking produces is expected from outside
+	// it, recorded so in `inputRequirements`, and refuses nothing; producers, children and loops still do.) The refusal names every
 	// unit it waits for; the page's offer reads the same rule (`startReadiness`, rph-projections), so it offers Begin &
 	// Execute exactly where this would admit it (SPEC-001 :3244).
 	//

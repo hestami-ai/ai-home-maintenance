@@ -369,6 +369,21 @@ function recordedRefusalOf(
 }
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package N — D9; package O — D23 — WHICH TRY OF ITS ATTEMPT MADE A WORK PRODUCT: its place, 1-based, among the
+ * work products that attempt recorded (each try records its own, RD6); 0 when the attempt recorded no such work product. ⭑ One
+ * reading, for the stopped unit's evidence (`stoppedUnitOf`) and for the name its refused try's view is bound to
+ * (`deliverable-view.ts`, `viewNameOf`), so the two can never count tries apart.
+ */
+export function tryOfWorkProduct(engine: EngineHandle, attemptKey: string, workProductId: string): number {
+	return (
+		listByType(engine, 'ARTIFACT')
+			.filter((a) => a.state.producingExecutionAttemptId === attemptKey)
+			.map((a) => a.id)
+			.indexOf(workProductId) + 1
+	);
+}
+
+/**
  * ⭐ THE STOPPED UNIT, FROM THE RECORD — or why it is not one a re-run can start from.
  *
  * ⛔ A REVIEW STEP NAMES ITS SUBJECT AS ITS INPUT: an `ASSURANCE_INVOCATION` step (a re-review's plan, RD5) runs no producer
@@ -418,10 +433,7 @@ export function stoppedUnitOf(
 	// last try's alone, beside the last try's work product. ⭑ The work product's try is its place among the attempt's work
 	// products (each try records its own, RD6), and each evidence names its try (`producingTry`). ⚠ An evidence naming no try
 	// was joined after the loop, before package N, and is the attempt's whole set as it always was.
-	const attemptsWorkProducts = listByType(engine, 'ARTIFACT')
-		.filter((a) => a.state.producingExecutionAttemptId === attemptKey)
-		.map((a) => a.id);
-	const workProductTry = attemptsWorkProducts.indexOf(workProductId) + 1;
+	const workProductTry = tryOfWorkProduct(engine, attemptKey, workProductId);
 	const evidenceIds = listByType(engine, 'EVIDENCE')
 		.filter((e) => {
 			const ref = e.state.contentReference as { producingExecutionAttemptId?: unknown; producingTry?: unknown } | undefined;

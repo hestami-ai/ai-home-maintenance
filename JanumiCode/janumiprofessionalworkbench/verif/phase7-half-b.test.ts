@@ -23,12 +23,13 @@ import { dirname, join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import { policyApplicability } from '@janumipwb/rph-domain';
-import { readinessUnitOf, startReadiness, unitDependencies, UNPRODUCED_INPUT } from '@janumipwb/rph-projections';
+import { OUTSIDE_INPUT, readinessUnitOf, startReadiness, unitDependencies } from '@janumipwb/rph-projections';
 import { createSqliteDriver, SCHEMA_SQL } from '@janumipwb/rph-persistence';
 import ts from 'typescript';
 import { afterAll, describe, expect, it } from 'vitest';
 import type { EngineSnapshot, ObjectRow } from '../apps/rph-demo/e2e/support/harness.js';
 import {
+	AUTHORING_REVIEW_ALLOWANCE_VARIABLE,
 	EXECUTE_TIMEOUT_MS,
 	LANE_BUDGET,
 	laneKeysRefusal,
@@ -67,6 +68,7 @@ import {
 	producerOfStream,
 	runTheLane,
 	typeUnreadableOf,
+	withheldUnitsOf,
 	type ActionOutcome,
 	type Boot,
 	type Dump,
@@ -530,7 +532,8 @@ function halfBLane(script: HalfBScript) {
 								pwuTypeId: u.typeId,
 								...(u.parent === null ? {} : { parentWorkUnitId: u.parent }),
 								dependencyIds: recordOf.get(u.id)?.dependencyIds ?? [],
-								inputRequirements: (recordOf.get(u.id)?.unproduced ?? []).map((name) => ({ name, status: UNPRODUCED_INPUT })),
+								// ⭐ Package O (D21) — as instantiation records them now: ~~`UNPRODUCED_INPUT`~~ expected from outside (`OUTSIDE_INPUT`).
+								inputRequirements: (recordOf.get(u.id)?.unproduced ?? []).map((name) => ({ name, status: OUTSIDE_INPUT })),
 								// ⭐ J1 — as instantiation copies them: the type's `requiredAssurancePolicyIds`, unless the unit says.
 								assurancePolicyIds:
 									u.policies ??
@@ -1214,8 +1217,17 @@ describe('⭐ C1, C3 — the lane’s half, and half B’s author, at boot', () 
 			stderr: '',
 			failure: null
 		});
+		// ⛔ MOVED 2026-10-26 (`JAN-EXEC` Phase 7, package O; design D26) — ~~`serverEnv: { JPWB_DEMO_DB: store }` for half B~~: the config
+		// hands a paid half-B run's server the authoring review's allowance (`phase7AuthoringReviewAllowanceEnv`), and the boot now
+		// refuses one handed otherwise — so the half-B boots here are handed what the config hands, 2,400 − 0 − 4 = 2,396.
 		const boot = (env: Record<string, string>) =>
-			bootOf({ paid: true, env: { ...ADMITTED, JPWB_PHASE7_PRIOR_REVIEWER_CALLS: '0', ...env }, serverEnv: { JPWB_DEMO_DB: store }, store, run: ready });
+			bootOf({
+				paid: true,
+				env: { ...ADMITTED, JPWB_PHASE7_PRIOR_REVIEWER_CALLS: '0', ...env },
+				serverEnv: { JPWB_DEMO_DB: store, ...(env.JPWB_PHASE7_HALF === 'B' ? { [AUTHORING_REVIEW_ALLOWANCE_VARIABLE]: '2396' } : {}) },
+				store,
+				run: ready
+			});
 		const b = await boot({ JPWB_PHASE7_HALF: 'B', JPWB_AGENT_MODEL: ' openai-codex/gpt-5.6-sol ' });
 		expect([b.refusals, b.record.half, b.record.authorModel]).toEqual([[], 'B', 'openai-codex/gpt-5.6-sol']);
 		const refused = await boot({ JPWB_PHASE7_HALF: 'B' });
@@ -1223,6 +1235,46 @@ describe('⭐ C1, C3 — the lane’s half, and half B’s author, at boot', () 
 		expect(refused.refusals.join('\n')).toContain('it is missing JPWB_AGENT_MODEL');
 		const a = await boot({});
 		expect([a.refusals, a.record.half]).toEqual([[], 'A']);
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package O — D26 (design revision 3; `l2-facts.md`; the lead's decision, flagged for the sponsor): THE
+	// ALLOWANCE THE LANE HANDS THE SERVER IS ON THE BOOT RECORD, AND A PAID HALF-B BOOT WHOSE SERVER WAS HANDED ANOTHER IS REFUSED.
+	// ⛔ Before D26 the boot recorded nothing of it, and Send's check counted the COMPUTED allowance whatever the server was handed:
+	// a config that handed another, or none, left Send's press bounded by a figure its check never counted.
+	it('⭐ D26, THE PREDICTED RED — a paid half-B boot RECORDS the allowance its server was handed, and REFUSES one that differs from the computed allowance, naming both; ⭑ CONTROL: the computed one boots clean', async () => {
+		const store = join(folder('boot-b-allowance'), 'demo.sqlite');
+		writeFileSync(store, '');
+		const ready = async (_program: string, args: readonly string[]) => ({
+			exitCode: 0,
+			stdout: args[0] === 'models' ? 'glm-5-3-flash-max\n' : 'devin 3000\n',
+			stderr: '',
+			failure: null
+		});
+		const handed = (allowance: string | undefined) =>
+			bootOf({
+				paid: true,
+				env: { ...ADMITTED, JPWB_PHASE7_PRIOR_REVIEWER_CALLS: '1117', JPWB_PHASE7_HALF: 'B', JPWB_AGENT_MODEL: 'openai-codex/gpt-5.6-sol' },
+				serverEnv: { JPWB_DEMO_DB: store, ...(allowance === undefined ? {} : { [AUTHORING_REVIEW_ALLOWANCE_VARIABLE]: allowance }) },
+				store,
+				run: ready
+			});
+		// ⭑ CONTROL — the computed allowance, 2,400 − 1,117 − 4 = 1,279: recorded, and nothing refused.
+		const clean = await handed('1279');
+		expect([clean.refusals, clean.record.overlay[AUTHORING_REVIEW_ALLOWANCE_VARIABLE]]).toEqual([[], '1279']);
+		const other = await handed('2396');
+		expect(other.record.overlay[AUTHORING_REVIEW_ALLOWANCE_VARIABLE], 'the boot record does not say what the server was handed').toBe('2396');
+		expect(other.refusals, 'a paid half-B server handed another allowance than the computed one was booted').toEqual([
+			`the server was handed ${AUTHORING_REVIEW_ALLOWANCE_VARIABLE}="2396", not the 1279 this paid half-B run computes — the ` +
+				`limit of ${PHASE7_PAID_LIMIT} less the 1117 calls spent before the run and the negative control’s 4 (REG-F-580; ` +
+				'design D20, D26): Send’s check counts the computed allowance, so a server handed another would bound the authoring ' +
+				'review by a figure that check never counted'
+		]);
+		expect((await handed(undefined)).refusals, 'a paid half-B server handed no allowance was booted').toEqual([
+			`the server was handed no ${AUTHORING_REVIEW_ALLOWANCE_VARIABLE}, not the 1279 this paid half-B run computes — the ` +
+				`limit of ${PHASE7_PAID_LIMIT} less the 1117 calls spent before the run and the negative control’s 4 (REG-F-580; ` +
+				'design D20, D26): Send’s check counts the computed allowance, so a server handed another would bound the authoring ' +
+				'review by a figure that check never counted'
+		]);
 	});
 });
 
@@ -1432,7 +1484,10 @@ describe('⭐ C1, C4, C6 — what the lane does, and records, in half B', () => 
 		]);
 		const order = l.only('author.accept', 'author.submitForReview', 'author.validate', 'author.publish');
 		expect(order).toEqual(['author.accept', 'author.submitForReview', 'author.validate', 'author.publish']);
-		expect(record.end?.reason).toBe('complete');
+		// ⛔ MOVED 2026-10-26 (`JAN-EXEC` Phase 7, package O; design D24) — ~~`toBe('complete')`~~: this run signs no unit off, so the
+		// root is never offered, and the run ends `withheld` — still past every check, which refused nothing (a refusal there ends
+		// it `authoring-stopped`).
+		expect(record.end?.reason).toBe('withheld');
 	});
 
 	it('⛔ C6 — DRY, the rehearsal makes the draft and stops BEFORE SEND: authoring is a model call; the verdict holds it to that', async () => {
@@ -2509,7 +2564,9 @@ describe('⭐⭐ The merge of E12 and E3 (J1, J2) — half B’s sign-offs count
 			'success',
 			null
 		]);
-		expect(record.end?.reason).toBe('complete');
+		// ⛔ MOVED 2026-10-26 (package O; design D24) — ~~`toBe('complete')`~~: only Build's row offers a sign-off here, so the other
+		// children are never accepted and the root never offered — the run ends `withheld`, each named.
+		expect(record.end?.reason).toBe('withheld');
 	});
 
 	// ── ⛔ R3-B F2 (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (15)) — HALF B'S SIGN-OFF TIME BOUNDS
@@ -2875,7 +2932,67 @@ describe('⭐⭐ package M (D4-D6) — the lane presses only what the page offer
 		expect(byslug.get('cli-contract')?.notStarted).toBe('not started: it waits for "Requirements" (EXECUTING) to be accepted');
 		expect(byslug.get('root')?.notStarted).toMatch(/^not started: it waits for "Requirements" \(EXECUTING\)/);
 		expect(l.only('recover'), 'the lane abandoned or re-ran beyond the run plan’s rule').toEqual([]);
-		expect(record.end?.reason).toBe('complete');
+		// ⛔ MOVED 2026-10-26 (`JAN-EXEC` Phase 7, package O; design D24, revision 3) — ~~`expect(record.end?.reason).toBe('complete')`~~:
+		// eleven units were never offered, and the one pressed was never signed off, so the run did not complete. It ends
+		// `withheld`, naming each with the page's reason (package M's check, finding 3, left this to the lead; D24 decides it).
+		expect(record.end?.reason).toBe('withheld');
+		expect(record.end?.detail).toContain('Requirements — pressed, and its sign-off never attempted: it stopped');
+		expect(record.end?.detail).toContain('CLI contract — not started: it waits for "Requirements" (EXECUTING) to be accepted');
+	});
+});
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7, package O — D24, THE RUN'S TRUE END (design revision 3; the lead's decision, flagged for the sponsor) ──
+// `complete` only when EVERY unit was pressed and its sign-off attempted. A run whose loop ends with units the page never offered
+// — or pressed and never signed off — ends `withheld`, naming each with the page's reason. ⛔ Before D24 such a run ended
+// `complete`: package M's lane broke out of its loop when the page offered nothing more, whatever it had never pressed.
+describe('⭐⭐ package O (D24) — a paid run ends `complete` only when every unit was pressed and its sign-off attempted; else `withheld`, each unit named', () => {
+	it('⭐ THE PREDICTED RED — a paid run whose ROOT is never offered ends `withheld`: Verify’s row offers no Record Assurance, so it is never accepted and the root never offered; each named with the page’s reason, and the lane’s verdict says so', async () => {
+		const l = halfBLane({ paid: true, signOffs: signedOff(['root', 'specify-wordfreq', 'build-wordfreq']) });
+		const record = await l.run();
+		expect(l.only('beginExecute'), 'arrangement: the children were pressed, the root never').toEqual(
+			['specify-wordfreq', 'build-wordfreq', 'verify-wordfreq-end-to-end'].map((s) => `beginExecute ${s}`)
+		);
+		expect(record.end?.reason, 'a run that never offered its root was said to complete').toBe('withheld');
+		expect(record.end?.detail).toBe(
+			'wordfreq Realization — not started: it waits for "Verify wordfreq end to end" (EXECUTING) to be accepted; ' +
+				'Verify wordfreq end to end — pressed, and its sign-off never attempted: its row offered no Record Assurance'
+		);
+		expect(laneVerdict(record)).toEqual([`the run ended 'withheld', not 'complete': ${record.end?.detail}`]);
+		// ⭑ The final archive is taken, as a complete run's is: the run is recorded, whatever it reached.
+		expect(l.only('archive 06-final')).toEqual(['archive 06-final']);
+	});
+
+	it('⭑ CONTROL — every unit pressed and signed off: the run ends `complete`, and its verdict holds nothing', async () => {
+		const record = await halfBLane({ paid: true, signOffs: ALL_SIGNED_OFF }).run();
+		expect([record.end?.reason, laneVerdict(record)]).toEqual(['complete', []]);
+	});
+
+	it('⭑ a DRY run still ends `dry-run-stop`: it presses nothing by design, and D24 asks nothing of it', async () => {
+		const record = await halfBLane({ paid: false, signOffs: ALL_SIGNED_OFF }).run();
+		expect(record.end?.reason).toBe('dry-run-stop');
+	});
+
+	it('⭐ THE REPORT LISTS EACH, with the page’s reason — read from the run’s own record, the lane’s own lines (`withheldUnitsOf`), in report.json and report.md', async () => {
+		const l = halfBLane({ paid: true, signOffs: signedOff(['root', 'specify-wordfreq', 'build-wordfreq']) });
+		const record = await l.run();
+		const r = buildRunReport(halfBStore(), { ...halfBLaneRows(), run: l.written() }, { accountNames: NAMES }).report;
+		expect(r.run.endReason).toBe('withheld');
+		expect(
+			r.run.withheld?.map((w) => `${w.title} — ${w.reason}`),
+			'the report does not list what the run withheld, in the lane’s words'
+		).toEqual(withheldUnitsOf(record));
+		expect(r.run.withheld?.map((w) => w.slug)).toEqual(['root', 'verify-wordfreq-end-to-end']);
+		expect(renderMarkdown(r)).toContain(
+			'- **Withheld (design D24):** wordfreq Realization — not started: it waits for "Verify wordfreq end to end" (EXECUTING) ' +
+				'to be accepted; Verify wordfreq end to end — pressed, and its sign-off never attempted: its row offered no Record ' +
+				'Assurance.'
+		);
+	});
+
+	it('⭑ CONTROL — a run that ended otherwise lists nothing withheld, its units unpressed though they may be', async () => {
+		const r = buildRunReport(halfBStore(), halfBLaneRows(), { accountNames: NAMES }).report;
+		expect(r.run.withheld).toBeNull();
+		expect(renderMarkdown(r)).not.toContain('**Withheld');
 	});
 });
 

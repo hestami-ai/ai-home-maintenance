@@ -261,11 +261,54 @@ function limitCaveatSendBeforeD20(sendCheck: Record<string, unknown>): string {
 	);
 }
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package O — D27 (design revision 3; `REG-F-581`) — THE WORDS A CHECK BEFORE PACKAGE L RECORDED FOR WHAT IT
+ * COUNTED AHEAD OF A MODEL PRESS: one try's reserve (`phase7-operator.ts`, `COUNTED_AHEAD.tryReserve`, struck by package L, D16).
+ * ⛔ RESTATED, NOT IMPORTED: that module loads Playwright, and package L struck the constant; a record carrying these words was
+ * made by a lane that counted one try's reserve, and its caveat is that lane's (`limitCaveatOf`).
+ */
+export const COUNTED_ONE_TRY_RESERVE = 'one try’s reserve';
+
+/**
+ * ⭐⭐ D27 — THE COUNT CLAUSE OF A RUN RECORDED BEFORE PACKAGE L, said of that run, in the past, as L2's check says a pre-D20 run's
+ * Send clause (`limitCaveatSendBeforeD20`): the caveat `LIMIT_CAVEAT` carried before package L — a phase's own spend can carry
+ * the total past the limit, the lane checking before each press and not during one, and a model unit's press spending up to
+ * (3 + 32) × 4 = 140 calls after its check — with the limit its own checks used. ⭑ The figures are that lane's, never today's:
+ * a review could make 4 calls before package L made it 6 (design D13), so a press's worst case was 140, not today's 210. The
+ * sponsor's ruling is named where the limit is the one known to be its: 1000, `REG-D-131` Q37's "about 1,000".
+ */
+function limitCaveatCountBeforeL(limit: number): string {
+	const ruling = limit === 1000 ? ', the sponsor’s "about 1,000" (REG-D-131 Q37, raising REG-D-110 (1))' : '';
+	return (
+		'⚠ This run was recorded before the lane counted each press’s whole worst case (package L; REG-D-135 (4)): its checks ' +
+		'counted one try’s reserve ahead of each model press, so a phase’s own spend could carry the total past the limit — the ' +
+		'lane checked the limit before each press, not during one, and a model unit’s press could spend up to 140 reviewer calls ' +
+		'after its check, (3 tries + 32 command runs) × 4, the calls a review could make before package L (REG-D-114 (14), as ' +
+		`amended 2026-10-16). The limit its checks used is ${limit}${ruling}. `
+	);
+}
+
+/**
  * ⭐⭐ Package L2's check, finding 1 — THE CAVEAT OF THIS RUN, BY ITS SEND CHECK (`AuthoringRecord.limitCheck`, as the lane recorded
  * it): `LIMIT_CAVEAT` where the run recorded none — half A, a dry run, a half-B run stopped before Send: no Send press to bound
  * — or where it counted the allowance (`SEND_COUNTED_THE_ALLOWANCE`); else the Send clause of a run recorded before D20.
+ * ⭐⭐ Package O — D27 (`REG-F-581`) — AND BY ITS OWN CHECKS (`checks`, every read of the limit the run recorded, and `limit`, the
+ * one they used): a run any of whose checks counted one try's reserve (`COUNTED_ONE_TRY_RESERVE`) was recorded before package L,
+ * and its caveat is that lane's — the count clause in the past, with its own limit (`limitCaveatCountBeforeL`); the Send clause
+ * its own Send check gives, and none where it recorded no Send check (no allowance bounded a Send press before D20); and the
+ * lower bound, true of every run. ⛔ It read today's clauses, so a regenerated report of run-12 described a whole-press rule its
+ * lane never ran.
  */
-export function limitCaveatOf(sendCheck: unknown): string {
+export function limitCaveatOf(
+	sendCheck: unknown,
+	checks: readonly Pick<LaneLimitCheck, 'counted'>[] = [],
+	limit: number = PAID_LIMIT
+): string {
+	if (checks.some((c) => c.counted === COUNTED_ONE_TRY_RESERVE))
+		return (
+			limitCaveatCountBeforeL(limit) +
+			(sendCheck === undefined || sendCheck === null ? '' : limitCaveatSendBeforeD20(rec(sendCheck))) +
+			LIMIT_CAVEAT_LOWER_BOUND
+		);
 	if (sendCheck === undefined || sendCheck === null) return LIMIT_CAVEAT;
 	if (str(rec(sendCheck).counted) === SEND_COUNTED_THE_ALLOWANCE) return LIMIT_CAVEAT;
 	return LIMIT_CAVEAT_COUNT + limitCaveatSendBeforeD20(rec(sendCheck)) + LIMIT_CAVEAT_LOWER_BOUND;
@@ -893,6 +936,11 @@ export interface RunReport {
 		readonly half: RunHalf;
 		readonly startedAt: string | null;
 		readonly endReason: string | null;
+		/**
+		 * ⭐⭐ `JAN-EXEC` Phase 7, package O — D24 (design revision 3) — WHAT A RUN THAT ENDED `withheld` NEVER PRESSED, OR NEVER SIGNED
+		 * OFF, each unit with the page's reason as the lane recorded it (`withheldOf`); null for a run that ended otherwise.
+		 */
+		readonly withheld: readonly WithheldUnit[] | null;
 		/** ⭐ Package M (D6) — the order the lane pressed in, as its record says it; null for a record made before package M. */
 		readonly pressOrder: readonly string[] | null;
 		readonly archiveRead: string;
@@ -1133,6 +1181,37 @@ interface LaneUnit {
 export function pressOrderOf(run: unknown): readonly string[] | null {
 	const pressed = rec(rec(run).order).pressed;
 	return Array.isArray(pressed) && pressed.every((x) => typeof x === 'string') ? (pressed as string[]) : null;
+}
+
+/** ⭐ Package O (D24) — one unit a run that ended `withheld` never pressed, or pressed and never signed off, and why. */
+export interface WithheldUnit {
+	readonly slug: string;
+	readonly title: string;
+	/** In the lane's words: the page's reason for a unit never pressed (`notStarted`), or why a pressed unit was never signed off. */
+	readonly reason: string;
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package O — D24 (design revision 3) — WHAT A RUN THAT ENDED `withheld` WITHHELD, read from its own record:
+ * each unit never pressed, with the page's reason as the lane recorded it (`notStarted`), and each pressed unit whose Record
+ * Assurance was never pressed, and why — in the run's order. Null for a run that ended otherwise: D24's list belongs to the end
+ * that names it. ⛔ RESTATED, NOT IMPORTED: the lane's `withheldUnitsOf` (`phase7-operator.ts`) loads Playwright;
+ * `verif/phase7-half-b.test.ts` holds the two to one reading.
+ */
+export function withheldOf(run: unknown): readonly WithheldUnit[] | null {
+	if (str(rec(rec(run).end).reason) !== 'withheld') return null;
+	const units = rec(run).units;
+	return (Array.isArray(units) ? units : []).map(rec).flatMap((u): WithheldUnit[] => {
+		const named = { slug: str(u.slug), title: str(u.title) || str(u.slug) };
+		if (u.beginExecute === null || u.beginExecute === undefined)
+			return [{ ...named, reason: str(u.notStarted) || 'not started: never pressed' }];
+		if ((rec(u.signOff).recordAssurance ?? null) !== null) return [];
+		const why =
+			bool(u.stopped) === true
+				? 'it stopped, and the lane presses no sign-off of a unit that stopped'
+				: 'its row offered no Record Assurance';
+		return [{ ...named, reason: `pressed, and its sign-off never attempted: ${why}` }];
+	});
 }
 
 /**
@@ -1880,7 +1959,20 @@ function priorSpend(lane: LaneRows): number | null {
 	return checked.at(-1) ?? (/^\d+$/.test(given) ? Number(given) : null);
 }
 
-function buildReviewerCalls(ix: Index, units: readonly Unit[], lane: LaneRows): ReviewerCalls {
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package O — D27 (design revision 3; `REG-F-581`) — THE LIMIT A RUN'S OWN CHECKS USED: the one limit its
+ * recorded reads of the limit hold. ⚠ A run that recorded no read — a dry run, a record made before the lane kept them — states
+ * today's limit (`PAID_LIMIT`), the only one it can: its record holds no other. ⛔ Reads that disagree are a record that
+ * disagrees with itself: the LAST one's limit is stated, and the report's problems name every limit the reads used.
+ */
+function runLimitOf(checks: readonly LaneLimitCheck[], problems: string[]): number {
+	const used = [...new Set(checks.map((c) => c.limit))];
+	if (used.length > 1)
+		problems.push(`lane/run.json's reads of the limit used ${used.length} limits (${used.join(', ')}): the report states the last read's`);
+	return checks.at(-1)?.limit ?? PAID_LIMIT;
+}
+
+function buildReviewerCalls(ix: Index, units: readonly Unit[], lane: LaneRows, problems: string[]): ReviewerCalls {
 	const calls = ix.ofType('MODEL_EXCHANGE').filter((x) => str(x.state.plane) === 'ASSURANCE');
 	const byUnit: Record<string, ReviewerCallCount> = {};
 	for (const slug of [...units.map((u) => u.slug), 'unattributed'])
@@ -1889,6 +1981,9 @@ function buildReviewerCalls(ix: Index, units: readonly Unit[], lane: LaneRows): 
 		);
 	const prior = priorSpend(lane);
 	const total = prior === null ? null : prior + calls.length + NEGATIVE_CONTROL_RESERVE;
+	const laneLimitChecks = [...authoringLimitChecks(lane), ...laneUnits(lane.run).flatMap((u) => u.limitChecks)];
+	// ⭐⭐ Package O — D27 (`REG-F-581`) — ~~`limit: PAID_LIMIT`~~, today's for every run: THE LIMIT THIS RUN'S OWN CHECKS USED.
+	const limit = runLimitOf(laneLimitChecks, problems);
 	return {
 		...countCalls(calls),
 		lowerBound: true,
@@ -1898,12 +1993,13 @@ function buildReviewerCalls(ix: Index, units: readonly Unit[], lane: LaneRows): 
 			recorded: calls.length,
 			reserve: NEGATIVE_CONTROL_RESERVE,
 			total,
-			limit: PAID_LIMIT,
-			under: total === null ? null : total < PAID_LIMIT
+			limit,
+			under: total === null ? null : total < limit
 		},
-		laneLimitChecks: [...authoringLimitChecks(lane), ...laneUnits(lane.run).flatMap((u) => u.limitChecks)],
-		// ⭐⭐ Package L2's check, finding 1 — ~~`LIMIT_CAVEAT`~~ the caveat of this run, by its Send check.
-		limitCaveat: limitCaveatOf(authoringOf(lane).limitCheck)
+		laneLimitChecks,
+		// ⭐⭐ Package L2's check, finding 1 — ~~`LIMIT_CAVEAT`~~ the caveat of this run, by its Send check ⭐ and, package O (D27), by its
+		// own checks and the limit they used: a run recorded before package L reads its own lane's caveat.
+		limitCaveat: limitCaveatOf(authoringOf(lane).limitCheck, laneLimitChecks, limit)
 	};
 }
 
@@ -4264,6 +4360,7 @@ export function buildRunReport(
 			half,
 			startedAt,
 			endReason,
+			withheld: withheldOf(lane.run),
 			pressOrder: pressOrderOf(lane.run),
 			archiveRead: lane.archiveRead,
 			archivesPresent: lane.archives.map((a) => a.name),
@@ -4284,7 +4381,7 @@ export function buildRunReport(
 		units: views.map((v) => unitSummary(v, findings)),
 		authoring: authoringSummary(ix, lane, half),
 		pairing,
-		reviewerCalls: buildReviewerCalls(ix, units, lane),
+		reviewerCalls: buildReviewerCalls(ix, units, lane, problems),
 		audit: buildAudit(ix, units, undertakingId, lane),
 		// ⭐ E3 — half B's declared verdicts are the agent's policies: each unit's, as instantiation copied them from its type.
 		// ⭐ R3-B F3 (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (16)) — ~~each unit's own list~~: THE
@@ -4344,6 +4441,10 @@ function headerLines(r: RunReport): string[] {
 		'',
 		`- **Basis:** ${r.basis}.`,
 		`- **Run:** ${r.run.mode ?? 'mode unrecorded'}${started}; ended: ${r.run.endReason ?? 'unrecorded'}.`,
+		// ⭐ Package O (D24) — and, a run that ended `withheld`, each unit it never pressed or never signed off, in the lane's words.
+		...(r.run.withheld === null
+			? []
+			: [`- **Withheld (design D24):** ${r.run.withheld.map((w) => `${w.title} — ${w.reason}`).join('; ')}.`]),
 		// ⭐ Package M (`REG-D-135` (2); design D6) — the order the lane pressed in, read from its record, never inferred.
 		r.run.pressOrder === null
 			? '- **Press order:** not recorded — a record made before package M, whose lane pressed the root first, then the phases in the tree’s order, and signed them off after.'

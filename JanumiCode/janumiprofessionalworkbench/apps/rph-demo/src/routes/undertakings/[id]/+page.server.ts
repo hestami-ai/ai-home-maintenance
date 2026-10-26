@@ -28,6 +28,7 @@ import {
 	conditionEvaluatorFor,
 	type ExecutionAttemptView,
 	executionAttempts,
+	expectedFromOutside,
 	type ExecutionPlanInput,
 	plansForPwus,
 	prunableStepIds,
@@ -111,11 +112,13 @@ import {
 	changedFiles,
 	deliverableViewRefOf,
 	hostSequenceOf,
+	namedViewOf,
 	readDeliverableView,
 	recordDeliverableView,
 	runsOfTry,
 	sequenceCount,
 	takeManifest,
+	unitBaselineOf,
 	type DeliverableViewRef,
 	type DeliverableViewRecord
 } from '$lib/server/execution/deliverable-view';
@@ -152,6 +155,7 @@ import {
 	stepActOnAwaitedChoice,
 	stopAtRefusal,
 	stoppedUnitOf,
+	tryOfWorkProduct,
 	waitingStepOf,
 	waitReasonFor,
 	type RebuiltProducingTurn,
@@ -233,13 +237,21 @@ function mapPwuRow(engine: ReturnType<typeof getEngine>, p: PwuRecord) {
  * PROPOSED row (`+page.svelte`), the root's included before its children had run (`REG-F-578`). ⚠ No fail-open is needed:
  * the record the engine reads is the record this reads, so the engine's disposition is always determinable here.
  * `kinds` names each reason for the lane (`phase7-operator.ts`), which ends a run on a loop before any press (D5).
+ * ⭐⭐ Package O — D21 (design revision 3; `REG-F-582`) — AND WHAT THE UNIT EXPECTS FROM OUTSIDE THIS UNDERTAKING (`outside`, the
+ * page's words, `expectedFromOutside`; null when nothing): an input no unit of it produces, shown on the unit's row beside its
+ * offer or its reason, and ⛔ never a reason to withhold Begin & Execute.
  */
 function startOfferOf(
 	engine: ReturnType<typeof getEngine>,
 	pwuId: string
-): { readonly offered: boolean; readonly reason: string | null; readonly kinds: readonly string[] } {
+): {
+	readonly offered: boolean;
+	readonly reason: string | null;
+	readonly kinds: readonly string[];
+	readonly outside: string | null;
+} {
 	const r = startReadiness(pwuId, (id) => readinessUnitOf(id, getObject(engine, id)));
-	return { offered: r.startable, reason: r.reason, kinds: r.kinds };
+	return { offered: r.startable, reason: r.reason, kinds: r.kinds, outside: expectedFromOutside(r.outside) };
 }
 
 /** §38 "applicable policies" per PWU — the required-but-unassessed join, kept only where non-empty. */
@@ -1172,8 +1184,13 @@ async function rebuildForReview(
 			readonly ok: true;
 			readonly turn: RebuiltProducingTurn;
 			readonly runs: ReadonlyMap<string, ObservedProcessRun>;
-			/** ⭐ Package N — the refused try's deliverable view, as recorded; absent where no evidence points at one. */
+			/**
+			 * ⭐ Package N — the refused try's deliverable view, as recorded; absent where no evidence points at one ⭐ and, package O
+			 * (D23), where no name derived from its step and try reaches one either.
+			 */
 			readonly view?: DeliverableViewRecord;
+			/** ⭐ Package O (D23) — where that view is: the pointer the re-review's completion carries, so its sign-off reads it. */
+			readonly viewRef?: DeliverableViewRef;
 	  }
 	| { readonly ok: false; readonly refusedBecause: string }
 > {
@@ -1208,9 +1225,26 @@ async function rebuildForReview(
 	// named by no completion, and the other records a try makes (`RecordArtifact`, `EnterExecutionStepWait`) take strict payloads,
 	// generated from the vocabulary, with no field for a pointer — so its view, recorded, is reached by nothing. Disclosed, never
 	// read from the workspace now: the files have moved on since, and the step's baseline is on no record.
-	const viewed = await recordedViewOf(s.evidenceIds);
+	// ⭐⭐ `JAN-EXEC` Phase 7, package O — D23 (design revision 3) — ~~reached by nothing~~: REACHED BY ITS NAME, derived from the
+	// refused try's step attempt and its try (`namedViewOf`, `viewNameOf`) — no contract change: the record plane's payloads are
+	// as they were, and the content plane binds the name to the view once, when the try records it. Held against any pointer the
+	// try's command evidence carries; still never read from the workspace. A view recorded before package O is named by nothing,
+	// and its re-review is shown the answer alone, as before.
+	const named = await namedViewOf(
+		getArtifactStore(),
+		EXECUTION_TENANT_PREFIX,
+		s.attemptKey,
+		tryOfWorkProduct(getEngine(), s.attemptKey, s.workProductId)
+	);
+	const viewed = await recordedViewOf(s.evidenceIds, undefined, named);
 	if (!viewed.ok) return viewed;
-	return { ok: true, turn: turn.value, runs, ...(viewed.view ? { view: viewed.view } : {}) };
+	return {
+		ok: true,
+		turn: turn.value,
+		runs,
+		...(viewed.view ? { view: viewed.view } : {}),
+		...(viewed.ref ? { viewRef: viewed.ref } : {})
+	};
 }
 
 // ── ⭐⭐ `JAN-EXEC` Phase 7 completion E2 — THE DECLARED POLICIES' REVIEWS, FROM THE RECORD (`REG-F-523`; `REG-D-110` (3);
@@ -1243,7 +1277,8 @@ interface UnitWork {
 	/**
 	 * ⭐ Package N — D11 — a model's work completed with no pointer to a view: ~~its admitted try ran no command whose evidence
 	 * carries one~~ ⭐ package N's check, finding 2: neither its completion nor its command evidence carries one — a re-review's
-	 * completion of a refused try that ran no command (`rebuildForReview`), or a record made before package N.
+	 * completion of a refused try that ran no command (`rebuildForReview`) ⭐ (package O, D23: whose view no name reaches — one
+	 * recorded before package O; a re-review's completion points at the view it read now), or a record made before package N.
 	 */
 	readonly viewNotRecorded?: true;
 }
@@ -1254,11 +1289,18 @@ interface UnitWork {
  * (`structuredResult`, passed for a completion), the try's command evidence's held against it, else the first of those —
  * `admittedViewRef` — its bytes re-hashed (`readDeliverableView`). ⛔ A pointer whose view cannot be read refuses, as every
  * other part of a rebuild does, and so do pointers that disagree; none at all is `view: undefined` — no record points at one.
+ * ⭐⭐ Package O — D23 — OR THE VIEW ITS NAME REACHES (`named`, the re-review's of a refused try: `namedViewOf`), where no record
+ * points at one; ⛔ held against a pointer the record does carry — disagreeing, the rebuild refuses, for the record and the
+ * content plane then disagree about what the try was shown. `ref` is where the view read is, for the re-review's completion.
  */
 async function recordedViewOf(
 	evidenceIds: readonly string[],
-	structuredResult?: unknown
-): Promise<{ readonly ok: true; readonly view?: DeliverableViewRecord } | { readonly ok: false; readonly refusedBecause: string }> {
+	structuredResult?: unknown,
+	named?: DeliverableViewRef
+): Promise<
+	| { readonly ok: true; readonly view?: DeliverableViewRecord; readonly ref?: DeliverableViewRef }
+	| { readonly ok: false; readonly refusedBecause: string }
+> {
 	const chosen = admittedViewRef(
 		structuredResult,
 		evidenceIds.map((id) =>
@@ -1266,9 +1308,15 @@ async function recordedViewOf(
 		)
 	);
 	if (!chosen.ok) return chosen;
-	if (!chosen.ref) return { ok: true };
-	const read = await readDeliverableView(getArtifactStore(), chosen.ref);
-	return read.ok ? { ok: true, view: read.view } : read;
+	if (chosen.ref && named && (chosen.ref.storageKey !== named.storageKey || chosen.ref.contentHash !== named.contentHash))
+		return {
+			ok: false,
+			refusedBecause: `the record points at the deliverable view at '${chosen.ref.storageKey}', and the name its step and try bind at '${named.storageKey}': the record and the content plane disagree about what the try's reviews were shown.`
+		};
+	const ref = chosen.ref ?? named;
+	if (!ref) return { ok: true };
+	const read = await readDeliverableView(getArtifactStore(), ref);
+	return read.ok ? { ok: true, view: read.view, ref } : read;
 }
 
 /** The unit's LAST step completion, in log order, with the plan it completed — or nothing, if no step of it succeeded. */
@@ -1932,11 +1980,16 @@ async function runModelUnit(u: ModelUnitRun) {
 	// each try's work-product review is shown. ⭑ Taken before the producer opens, so a workspace that cannot be read fails the
 	// step as a refused sandbox does, with nothing to release.
 	let sandbox: ReturnType<typeof resolveUndertakingSandbox>;
-	let baseline: Awaited<ReturnType<typeof takeManifest>>;
+	// ⭐⭐ `JAN-EXEC` Phase 7, package O — D22 (design revision 3) — ~~`Awaited<ReturnType<typeof takeManifest>>`, the manifest THIS step
+	// took~~: THE UNIT'S FIRST STEP'S BASELINE (`unitBaselineOf`), which that step records on the content plane under the unit's
+	// name and every later step — a work re-run — reads back, hash-checked. ⛔ A re-run's fresh baseline held the files its
+	// refused attempt wrote, so a file the re-run left alone fell out of its view, and its review could read a mandated file
+	// as absent. A baseline that is bound and cannot be read fails the step here, as an unreadable workspace does.
+	let baseline: ReadonlyMap<string, { readonly hash: string }>;
 	try {
 		const current = binding ? currentBinding(bindingId) : undefined;
 		sandbox = resolveUndertakingSandbox(String((pwu?.undertakingId ?? '') as string));
-		baseline = await takeManifest(sandbox.workspace);
+		baseline = await unitBaselineOf(getArtifactStore(), EXECUTION_TENANT_PREFIX, { pwuId, stepId, attemptKey }, sandbox.workspace);
 		producer = await getExecutionSession(executor)({
 			...sandbox,
 			grantedCapabilities: current?.capabilities ?? [],
@@ -3450,7 +3503,7 @@ export const actions: Actions = {
 			return fail(400, {
 				error: `The review cannot be re-run, and the unit keeps waiting: ${rebuilt.refusedBecause}`
 			});
-		const { turn, runs, view } = rebuilt;
+		const { turn, runs, view, viewRef } = rebuilt;
 
 		// ── RD4 + RD5 — THE PERSON'S DECISION AND THE PLAN REVISION, ONE BATCH ────────────────────────────────────────
 		const decisionId = mintUiId('dec');
@@ -3539,10 +3592,14 @@ export const actions: Actions = {
 					outputArtifactIds: [s.workProductId],
 					proposedEvidenceIds: [...s.evidenceIds],
 					detectedAssumptionIds: [],
-					// ⭑ Package N's check, finding 2 — no pointer of its own: the view a re-review reads is reached only through the
+					// ⭑ Package N's check, finding 2 — ~~no pointer of its own: the view a re-review reads is reached only through the
 					// re-reviewed try's command evidence (`rebuildForReview`), which this completion names, so the sign-off reads it
-					// there (`admittedViewRef`); a pointer here would restate it and be held by nothing.
-					structuredResult: {},
+					// there (`admittedViewRef`); a pointer here would restate it and be held by nothing.~~
+					// ⭐⭐ Package O — D23 (struck 2026-10-26): A POINTER OF ITS OWN, to the view the re-review read (`rebuilt.viewRef`). A
+					// refused try that ran no command has no command evidence to carry one, and its view is reached by its name alone
+					// (`namedViewOf`) — so without this the sign-off was told the host holds no record of a view the re-review was shown.
+					// Held, by `admittedViewRef`, against any pointer the named evidence carries; `{}` where the re-review read no view.
+					structuredResult: viewRef ? { deliverableView: viewRef } : {},
 					executionProvenance: {
 						originType: 'MODEL_GENERATION',
 						producingExecutionAttemptId: s.attemptKey,

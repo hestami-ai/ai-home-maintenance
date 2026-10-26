@@ -230,22 +230,30 @@
 									<div class="acts">
 										{#if p.workLifecycleState === 'PROPOSED' && p.start?.offered}
 											<!-- ⭐ JAN-EXEC Phase 7, package M (REG-D-135 (2); design D3; SPEC-001 :3244) — OFFERED ONLY WHERE THE ENGINE
-											     WOULD ADMIT IT: every unit this one waits for accepted, nothing it requires unproduced. The load reads the
-											     same rule the engine's refusal reads (`startOfferOf`, `startReadiness`). ⛔ It was offered on every PROPOSED
-											     row, so run-12's root could be started before the children whose work it was to reconcile (REG-F-578). -->
+											     WOULD ADMIT IT: every unit this one waits for accepted~~, nothing it requires unproduced~~ (⛔ struck
+											     2026-10-26, package O, D21: an input no unit produces is expected from outside, and withholds nothing). The
+											     load reads the same rule the engine's refusal reads (`startOfferOf`, `startReadiness`). ⛔ It was offered on
+											     every PROPOSED row, so run-12's root could be started before the children whose work it was to reconcile
+											     (REG-F-578). -->
 											<form method="POST" action="?/beginExecute" use:enhance>
 												<input type="hidden" name="pwuId" value={p.id} />
 												<button class="mini" type="submit">Begin &amp; Execute</button>
 											</form>
+											<!-- ⭐⭐ Package O (D21; REG-F-582) — WHAT IT EXPECTS FROM OUTSIDE THIS UNDERTAKING, beside the offer it does not
+											     withhold: the inputs no unit of the Undertaking produces (`startOfferOf`, `expectedFromOutside`). -->
+											{#if p.start?.outside}<span class="hint" data-testid="start-outside">It {p.start.outside}.</span>{/if}
 										{:else if p.workLifecycleState === 'PROPOSED'}
-											<!-- ⭐ Package M (D3, D4, D5) — WITHHELD, AND WHY: the units it waits for, a producer abandoned, a loop, an input
-											     nothing produces. `data-withheld` names each kind for the Phase 7 lane, which reads a loop's (D5). -->
+											<!-- ⭐ Package M (D3, D4, D5) — WITHHELD, AND WHY: the units it waits for, a producer abandoned, a loop~~, an input
+											     nothing produces~~ (⛔ D21, package O: an outside input is no reason, and is shown apart, below).
+											     `data-withheld` names each kind for the Phase 7 lane, which reads a loop's (D5). -->
 											<span
 												class="hint"
 												data-testid="start-withheld"
 												data-withheld={p.start?.kinds.join(' ') ?? ''}
 												>Not startable yet: {p.start?.reason ?? 'the engine would refuse its start'}.</span
 											>
+											<!-- ⭐ Package O (D21) — and what it expects from outside, apart from the reason it is withheld. -->
+											{#if p.start?.outside}<span class="hint" data-testid="start-outside">It {p.start.outside}.</span>{/if}
 										{:else if p.workLifecycleState === 'EXECUTING' && data.recoveryByPwu[p.id]}
 											<!-- ⭐ JAN-EXEC P7-6R R-1d (RD2, RD3; REG-D-104 (1); REG-D-105 (3)) — A UNIT WAITING FOR A PERSON.
 											     ~~Its review refused it~~ Its completion was refused (P76F-D D1: by its review, by a floor policy other

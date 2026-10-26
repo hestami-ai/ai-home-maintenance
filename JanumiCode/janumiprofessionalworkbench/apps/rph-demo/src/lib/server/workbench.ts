@@ -350,6 +350,12 @@ export function resetEngine(seed: 'reference' | 'empty' | 'bare'): void {
 	// ⭐ A TEST'S STIPULATIONS DIE WITH ITS ENGINE (`JAN-CRITREAD` J1-2): ids restart at every reset, so a registration
 	// that survived would answer a LATER test's PWA that happened to get the same id.
 	clearStipulations();
+	// ⭐⭐ `JAN-EXEC` Phase 7, package O (design D22, D23) — AND SO DOES ITS CONTENT PLANE, NAMES AND ALL: the host binds a name it
+	// derives from ids — a step and a try, a unit — ONCE (`ArtifactStore.bindName`), and ids restart at every reset, so a name
+	// bound by an earlier test would refuse a later test's binding of the same name, or answer that test's reader with the
+	// earlier test's entry. ⚠ Only the in-memory plane reaches here: a durable store refuses the reset above
+	// (`durableStateRefusal`), so no durable content is ever dropped. The next `getArtifactStore()` makes a fresh one.
+	artifacts = undefined;
 	handle = newEngine();
 	// SYSTEM, for the same reason as the boot seed: this runs with no user session in scope.
 	if (seed === 'reference') seedWorkbench(handle.as(REFERENCE_OWNER_CREDENTIAL));

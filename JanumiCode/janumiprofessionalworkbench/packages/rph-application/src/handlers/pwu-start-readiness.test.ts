@@ -7,7 +7,7 @@
 // paired with the same command ACCEPTED when only the producer's state differs, so a handler that refused every readiness
 // could not pass.
 import type { DomainCommand } from '@janumipwb/rph-contracts';
-import { START_REFUSAL_MARKER, UNPRODUCED_INPUT } from '@janumipwb/rph-projections';
+import { OUTSIDE_INPUT, START_REFUSAL_MARKER, UNPRODUCED_INPUT } from '@janumipwb/rph-projections';
 import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { describe, expect, it } from 'vitest';
@@ -165,21 +165,41 @@ describe('⭐ D2 — MarkPwuReady REFUSES a unit until every unit it waits for i
 		expect(refused.error?.message).toContain('"Requirements" (CONDITIONALLY_SATISFIED)');
 	});
 
-	it('⛔ an ABANDONED producer, and an input nothing produces, each refuse the consumer, named', () => {
+	// ⛔ MOVED 2026-10-26 (`JAN-EXEC` Phase 7, package O; design D21, revision 3; `REG-F-582`) — ~~"⛔ an ABANDONED producer, and an
+	// input nothing produces, each refuse the consumer, named"~~: its second half pinned ~~"nothing in this Undertaking produces its
+	// input "market-study""~~ in MarkPwuReady's refusal. An input nothing produces is expected from outside now and refuses nothing
+	// (the D21 case below); the abandoned producer still refuses, as here.
+	it('⛔ an ABANDONED producer refuses the consumer, named', () => {
 		const abandoned = harness();
 		abandoned.ok(abandoned.propose(PRODUCER), 'propose the producer');
 		abandoned.ok(abandoned.propose(CONSUMER, { dependencyIds: [PRODUCER] }), 'propose the consumer');
 		abandoned.seed(PRODUCER, 'ABANDONED');
 		expect(abandoned.markReady(CONSUMER).error?.message).toContain('its producer "Requirements" was ABANDONED');
+	});
 
-		const unproduced = harness();
-		unproduced.ok(
-			unproduced.propose(CONSUMER, { inputRequirements: [{ name: 'market-study', status: UNPRODUCED_INPUT }] }),
+	// ⭐⭐ D21 (package O; `REG-F-582`) — an input no unit of the Undertaking produces is EXPECTED FROM OUTSIDE it, and the engine
+	// readies the unit: under D21's status, and under the status a record made before D21 carries (package M's, which refused it).
+	it('⭐ D21, THE PREDICTED RED — MarkPwuReady READIES a unit whose only unmatched input is expected from outside, a record made before D21 and one D21 writes alike; ⭑ CONTROL: the same unit beside a PROPOSED producer is refused, the producer alone named', () => {
+		for (const status of [UNPRODUCED_INPUT, OUTSIDE_INPUT]) {
+			const h = harness();
+			h.ok(h.propose(CONSUMER, { inputRequirements: [{ name: 'market-study', status }] }), `propose the consumer (${status})`);
+			const admitted = h.markReady(CONSUMER);
+			expect(admitted.status, `${status}: ${admitted.error?.message ?? ''}`).toBe('ACCEPTED');
+			expect(h.stateOf(CONSUMER).workLifecycleState, status).toBe('READY');
+		}
+		const control = harness();
+		control.ok(control.propose(PRODUCER), 'propose the producer');
+		control.ok(
+			control.propose(CONSUMER, {
+				dependencyIds: [PRODUCER],
+				inputRequirements: [{ name: 'market-study', status: OUTSIDE_INPUT }]
+			}),
 			'propose the consumer'
 		);
-		expect(unproduced.markReady(CONSUMER).error?.message).toContain(
-			'nothing in this Undertaking produces its input "market-study"'
-		);
+		const refused = control.markReady(CONSUMER);
+		expect(refused.status).toBe('REJECTED');
+		expect(refused.error?.message).toContain('it waits for "Requirements" (PROPOSED) to be accepted');
+		expect(refused.error?.message, 'the outside input was given as a reason').not.toContain('market-study');
 	});
 
 	it('⭑ CONTROL — a unit that waits for nothing enters READY', () => {
@@ -275,6 +295,18 @@ describe('⭐ D2 — the step start refuses too: a plan on a waiting unit cannot
 		const admitted = plan('StartExecutionStep', { stepId: STEP });
 		expect(admitted.status, admitted.error?.message).toBe('ACCEPTED');
 		expect(stepState(h)).toBe('RUNNING');
+	});
+
+	// ⭐⭐ D21 (package O; `REG-F-582`) — THE STEP START'S SEAT READS THE SAME RULE: an input expected from outside refuses nothing.
+	it('⭐ D21 at the step start — a plan on a unit whose only unmatched input is expected from outside starts its step RUNNING, a record made before D21 and one D21 writes alike', () => {
+		for (const status of [UNPRODUCED_INPUT, OUTSIDE_INPUT]) {
+			const h = harness();
+			h.ok(h.propose(CONSUMER, { inputRequirements: [{ name: 'market-study', status }] }), `propose the consumer (${status})`);
+			const plan = planOnConsumer(h);
+			const admitted = plan('StartExecutionStep', { stepId: STEP });
+			expect(admitted.status, `${status}: ${admitted.error?.message ?? ''}`).toBe('ACCEPTED');
+			expect(stepState(h), status).toBe('RUNNING');
+		}
 	});
 
 	it('⭐ THE SECOND ARROW INTO RUNNING — a resume after the producer was INVALIDATED is refused, the producer named; the control resumes', () => {

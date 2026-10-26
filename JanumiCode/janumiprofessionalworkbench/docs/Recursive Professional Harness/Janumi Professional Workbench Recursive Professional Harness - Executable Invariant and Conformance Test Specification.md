@@ -729,9 +729,9 @@ A successor revision or successor PWU is required.
 
 a PWU whose `dependencyIds` — the units producing its required inputs, and its children, recorded at instantiation — name a unit that is not accepted (`SATISFIED`, `RECOMPOSED` or `BASELINED`; `CONDITIONALLY_SATISFIED` does not count), or name no unit of its Undertaking;
 
-**Or**
+~~**Or**~~
 
-a PWU one of whose `inputRequirements` is recorded as produced by no unit of its Undertaking.
+~~a PWU one of whose `inputRequirements` is recorded as produced by no unit of its Undertaking.~~
 
 **When**
 
@@ -748,6 +748,8 @@ a PWU one of whose `inputRequirements` is recorded as produced by no unit of its
 * no model or reviewer call is made.
 
 *Amended 2026-10-26 (package M's independent check, its finding 1): the step start was added. `READY` is the one door to the PWU's `PLANNED` and `EXECUTING`, but a plan's commands ask only that its PWU be open (RPH-PWU-010), so a host that never issued `MarkPwuReady` could otherwise start a waiting PWU's step.*
+
+*Amended 2026-10-26 (JAN-EXEC Phase 7, package O; DESIGN-data-flow-order-and-deliverable-review.md D21, revision 3; REG-F-582): the struck **Or** clause is withdrawn. A required input that no unit of the Undertaking produces is expected from outside the Undertaking: it is recorded so in `inputRequirements` (status `EXPECTED_FROM_OUTSIDE`; a record made before this amendment carries `UNPRODUCED`, read alike) and refuses neither seat. The units the PWU waits for, its producers and its children, still refuse it, as does a loop. The canon's own reference PWA declares such inputs, and under the struck clause 0 of its 8 units could start.*
 
 ---
 
