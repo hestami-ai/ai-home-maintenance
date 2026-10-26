@@ -735,13 +735,19 @@ a PWU one of whose `inputRequirements` is recorded as produced by no unit of its
 
 **When**
 
-`MarkPwuReady` is issued.
+`MarkPwuReady` is issued;
+
+**Or when**
+
+`StartExecutionStep` or `ResolveExecutionStepWait` is issued on a step of a plan whose work unit is that PWU, whether or not the PWU ever passed `MarkPwuReady`.
 
 **Then**
 
 * the command is rejected, naming each unit the PWU waits for;
-* the PWU does not enter `READY`;
+* the PWU does not enter `READY`, and the step does not enter `RUNNING`;
 * no model or reviewer call is made.
+
+*Amended 2026-10-26 (package M's independent check, its finding 1): the step start was added. `READY` is the one door to the PWU's `PLANNED` and `EXECUTING`, but a plan's commands ask only that its PWU be open (RPH-PWU-010), so a host that never issued `MarkPwuReady` could otherwise start a waiting PWU's step.*
 
 ---
 

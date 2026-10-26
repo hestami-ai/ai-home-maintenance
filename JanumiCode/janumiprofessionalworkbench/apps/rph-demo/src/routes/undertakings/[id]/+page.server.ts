@@ -2318,9 +2318,11 @@ export const actions: Actions = {
 		// ── ⭐⭐ `JAN-EXEC` Phase 7, package M — A UNIT WHOSE PRODUCERS ARE NOT ACCEPTED IS REFUSED BEFORE ANYTHING ELSE (`REG-D-135`
 		// (2); design D2, D3) ────────────────────────────────────────────────────────────────────────────────────────────
 		// ⚠ DEFENCE IN DEPTH, NOT THE AUTHORITY: the ENGINE refuses it, at `MarkPwuReady`, inside the batch below, which then
-		// rolls back whole — so a unit the page should not have offered is refused with or without this. Asked here so the
+		// rolls back whole — and again at the step start, for any plan however made (`unitReadinessRefusal`, execution.ts) — so
+		// a unit the page should not have offered is refused with or without this. Asked here so the
 		// refusal comes before the reviewer's preflight and the executor's selection, in the engine's own words
-		// (`startReadiness`, `startRefusal`): the rule the page's offer reads too.
+		// (`startReadiness`, `startRefusal`): the rule the page's offer reads too. ⭑ That ORDER is what only this gives, and
+		// it is pinned (`begin-execute-data-flow-order.test.ts`, both selectors refusing; P6X-M-M21).
 		const start = startReadiness(pwuId, (id) => readinessUnitOf(id, getObject(getEngine(), id)));
 		if (!start.startable) return fail(400, { error: `Execution failed: ${startRefusal(pwuId, start)}` });
 		const pwuTypeId = String((pwu?.pwuTypeId ?? '') as string);

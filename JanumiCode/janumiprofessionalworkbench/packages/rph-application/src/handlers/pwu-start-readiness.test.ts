@@ -189,6 +189,115 @@ describe('⭐ D2 — MarkPwuReady REFUSES a unit until every unit it waits for i
 	});
 });
 
+// ⭐⭐ THE PLAN-DIRECT PATH (2026-10-26, the independent check of package M, its finding 1). READY is NOT the one door to
+// execution for a STEP: a plan's commands ask only that its unit be OPEN (`pwuOpennessRefusal`, RPH-PWU-010), and PROPOSED is
+// open — so a host of the engine that never sends `MarkPwuReady` could propose, approve and activate a plan on a consumer whose
+// producer is PROPOSED, and start its step RUNNING. The check drove exactly that through the bus. So the rule is also asked at
+// the two arrows into RUNNING (`stepAuthorityRefusal`'s fourth declared limb, the `inputReadiness` column), over the plan's
+// work unit. Each refusal is paired with the same command ACCEPTED when only the producer's state differs.
+describe('⭐ D2 — the step start refuses too: a plan on a waiting unit cannot run, whoever skipped MarkPwuReady (RPH-PWU-011)', () => {
+	const PLAN = 'plan_01ARZ3NDEKTSV4RRFFQ69M0030';
+	const STEP = `${PLAN}-s1`;
+	/** A plan on the consumer, proposed, approved and activated WITHOUT the consumer ever passing MarkPwuReady. */
+	const planOnConsumer = (h: ReturnType<typeof harness>) => {
+		const plan = (commandType: string, payload: unknown) => h.d(commandType, PLAN, 'EXECUTION_PLAN', payload);
+		h.ok(
+			plan('ProposeExecutionPlan', {
+				executionPlanId: PLAN,
+				workUnitId: CONSUMER,
+				steps: [
+					{
+						id: STEP,
+						executionPlanId: PLAN,
+						stepType: 'HUMAN_INTERACTION',
+						purpose: 'the design',
+						inputBindings: [],
+						outputBindings: [],
+						preconditions: [],
+						postconditions: [],
+						stepState: 'QUEUED',
+						strength: 'ADVISORY'
+					}
+				],
+				transitions: [],
+				retryPolicy: {},
+				tacticalChangePolicy: {},
+				escalationPolicy: {},
+				terminationPolicy: {}
+			}),
+			'propose the plan (authoring is not executing, §20.2)'
+		);
+		h.ok(plan('ApproveExecutionPlan', {}), 'approve the plan');
+		h.ok(plan('ActivateExecutionPlan', { authorizedRuntimeBindingIds: [] }), 'activate the plan');
+		return plan;
+	};
+	const stepState = (h: ReturnType<typeof harness>) =>
+		(h.stateOf(PLAN).steps as Array<{ id: string; stepState: string }>).find((s) => s.id === STEP)?.stepState;
+	const arranged = () => {
+		const h = harness();
+		h.ok(h.propose(PRODUCER), 'propose the producer');
+		h.ok(h.propose(CONSUMER, { dependencyIds: [PRODUCER] }), 'propose the consumer');
+		return h;
+	};
+
+	it('⭐ THE PREDICTED RED — StartExecutionStep on a plan whose unit waits for a PROPOSED producer is refused, the producer named; the step stays QUEUED, the unit PROPOSED', () => {
+		const h = arranged();
+		const plan = planOnConsumer(h);
+		const refused = plan('StartExecutionStep', { stepId: STEP });
+		expect(refused.status).toBe('REJECTED');
+		expect(refused.error?.code).toBe('RPH_INVARIANT_VIOLATION');
+		expect(refused.error?.message).toContain(START_REFUSAL_MARKER);
+		expect(refused.error?.message).toContain('it waits for "Requirements" (PROPOSED) to be accepted');
+		expect(refused.error?.message).toContain(`StartExecutionStep blocked: step ${STEP}`);
+		expect(refused.error?.targetObjectIds, 'the refusal names the step, its unit and the unit it waits for').toEqual([
+			STEP,
+			CONSUMER,
+			PRODUCER
+		]);
+		expect([stepState(h), h.stateOf(CONSUMER).workLifecycleState]).toEqual(['QUEUED', 'PROPOSED']);
+	});
+
+	it('⛔ D4 at the step start — an ABANDONED producer refuses the step too, named, its producer among the targets', () => {
+		const h = arranged();
+		h.seed(PRODUCER, 'ABANDONED');
+		const plan = planOnConsumer(h);
+		const refused = plan('StartExecutionStep', { stepId: STEP });
+		expect(refused.status).toBe('REJECTED');
+		expect(refused.error?.message).toContain('its producer "Requirements" was ABANDONED');
+		expect(refused.error?.targetObjectIds).toEqual([STEP, CONSUMER, PRODUCER]);
+		expect(stepState(h)).toBe('QUEUED');
+	});
+
+	it("⭑ CONTROL — the same plan, its unit's producer SATISFIED, starts its step RUNNING", () => {
+		const h = arranged();
+		h.seed(PRODUCER, 'SATISFIED');
+		const plan = planOnConsumer(h);
+		const admitted = plan('StartExecutionStep', { stepId: STEP });
+		expect(admitted.status, admitted.error?.message).toBe('ACCEPTED');
+		expect(stepState(h)).toBe('RUNNING');
+	});
+
+	it('⭐ THE SECOND ARROW INTO RUNNING — a resume after the producer was INVALIDATED is refused, the producer named; the control resumes', () => {
+		const run = (producerAfterTheWait: string | null) => {
+			const h = arranged();
+			h.seed(PRODUCER, 'SATISFIED');
+			const plan = planOnConsumer(h);
+			h.ok(plan('StartExecutionStep', { stepId: STEP }), 'start, the producer accepted');
+			h.ok(plan('EnterExecutionStepWait', { stepId: STEP, waitReason: 'a person is asked' }), 'wait');
+			if (producerAfterTheWait) h.seed(PRODUCER, producerAfterTheWait);
+			return { resumed: plan('ResolveExecutionStepWait', { stepId: STEP }), state: stepState(h) };
+		};
+		const refused = run('INVALIDATED');
+		expect(refused.resumed.status).toBe('REJECTED');
+		expect(refused.resumed.error?.message).toContain(START_REFUSAL_MARKER);
+		expect(refused.resumed.error?.message).toContain('it waits for "Requirements" (INVALIDATED) to be accepted');
+		expect(refused.state).toBe('WAITING');
+		const control = run(null);
+		expect(control.resumed.status, control.resumed.error?.message).toBe('ACCEPTED');
+		expect(control.state).toBe('RUNNING');
+	});
+});
+
 describe('⭐ D1 — ProposePwu records what a unit waits for, and refuses what cannot be one', () => {
 	it('records dependencyIds and inputRequirements as given', () => {
 		const h = harness();

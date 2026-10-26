@@ -31,12 +31,25 @@ vi.mock('./model.js', async (importOriginal) => {
 	};
 });
 
+// ⭑ THE TWO SELECTORS Begin & Execute asks before its batch, passed through unchanged — so a test can see whether the route
+// asked them, and make them refuse (the route's own preflight, below: the package check's finding 2).
+vi.mock('../assurance/preflight.js', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('../assurance/preflight.js')>();
+	return { ...actual, assurancePreflight: vi.fn(actual.assurancePreflight) };
+});
+vi.mock('./executor-selection.js', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('./executor-selection.js')>();
+	return { ...actual, selectExecutor: vi.fn(actual.selectExecutor) };
+});
+
 import { getObject, listByType, listPwus } from '@janumipwb/rph-engine';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { START_REFUSAL_MARKER } from '@janumipwb/rph-projections';
 import { actions as undertakings } from '../../../routes/undertakings/+page.server.js';
 import { actions as unitPage, load as unitPageLoad } from '../../../routes/undertakings/[id]/+page.server.js';
+import { assurancePreflight } from '../assurance/preflight.js';
 import { dispatch, dispatchBatch, getEngine, mintUiId, resetEngine } from '../workbench.js';
+import { selectExecutor } from './executor-selection.js';
 import { getExecutionSession } from './model.js';
 
 const RISK = {
@@ -226,6 +239,67 @@ describe('⭐ D2 — the engine REFUSES a start until every unit it waits for is
 		);
 		expect(getObject(getEngine(), build.id)?.workLifecycleState, 'the consumer did not start').not.toBe('PROPOSED');
 		expect(plansOf(build.id).length).toBe(1);
+	});
+});
+
+// ⭐ THE ROUTE'S OWN PREFLIGHT (D3: "The route's own preflight in `beginExecute` refuses the same way before its batch";
+// package M's independent check, its finding 2). The engine refuses a waiting unit inside the batch with or without it, so
+// the tests above stay green without it — what only it gives is the ORDER: the dependency refusal comes before the
+// reviewer's preflight and the executor's selection, so a waiting MODEL unit is told what it waits for, not that a reviewer
+// or an executor is misconfigured. So both selectors are made to REFUSE here, and the route must neither ask them nor
+// return their words. The control proves the spies sit on the route's path: once the producer is accepted, each refusal
+// in turn is what the route returns.
+describe("⭐ D2, D3 — the route's own preflight refuses a waiting unit BEFORE the reviewer's preflight and the executor's selection", () => {
+	const real = async () => ({
+		preflight: await vi.importActual<typeof import('../assurance/preflight.js')>('../assurance/preflight.js'),
+		selection: await vi.importActual<typeof import('./executor-selection.js')>('./executor-selection.js')
+	});
+	afterEach(async () => {
+		const { preflight, selection } = await real();
+		vi.mocked(assurancePreflight).mockReset().mockImplementation(preflight.assurancePreflight);
+		vi.mocked(selectExecutor).mockReset().mockImplementation(selection.selectExecutor);
+	});
+	/** Both selectors refuse from now on, each with its own real refusal for a host that configures nothing. */
+	const bothRefuse = async () => {
+		const { preflight, selection } = await real();
+		const reviewer = preflight.assurancePreflight({ testMode: false, env: {} });
+		const executor = selection.selectExecutor({ testMode: false, env: {} });
+		if (reviewer.ready || executor.kind !== 'REFUSED') throw new Error('arrangement: a selector did not refuse');
+		vi.mocked(assurancePreflight).mockReset().mockImplementation(() => reviewer);
+		vi.mocked(selectExecutor).mockReset().mockImplementation(() => executor);
+		return { reviewer, executorWords: selection.executorRefusalMessage(executor), preflight };
+	};
+
+	it('⭐ a waiting MODEL unit is refused for what it waits for, though both selectors would refuse it, and neither is asked', async () => {
+		const u = await instantiated(SPEC_BUILD);
+		const build = u.unitOf('Build');
+		const { reviewer } = await bothRefuse();
+
+		const refused = await beginExecute(u.undertakingId, build.id);
+
+		expect(refused.error ?? '', 'the waiting unit got another refusal').toContain(START_REFUSAL_MARKER);
+		expect(refused.error).toContain('it waits for "Specify" (PROPOSED) to be accepted');
+		expect(refused.error, "the reviewer's refusal came first").not.toContain(reviewer.guidance);
+		expect(vi.mocked(assurancePreflight), "the reviewer's preflight was asked for a waiting unit").not.toHaveBeenCalled();
+		expect(vi.mocked(selectExecutor), "the executor's selection was asked for a waiting unit").not.toHaveBeenCalled();
+		expect(getObject(getEngine(), build.id)?.workLifecycleState).toBe('PROPOSED');
+	});
+
+	it('⭑ CONTROL — the same unit, its producer accepted: the reviewer refuses it in its words; the reviewer ready, the executor does', async () => {
+		const u = await instantiated(SPEC_BUILD);
+		const [specify, build] = [u.unitOf('Specify'), u.unitOf('Build')];
+		expect((await beginExecute(u.undertakingId, specify.id)).error, 'arrangement: Specify starts').toBeUndefined();
+		await signOff(u.undertakingId, specify.id);
+		const { reviewer, executorWords, preflight } = await bothRefuse();
+
+		expect((await beginExecute(u.undertakingId, build.id)).error, "the reviewer's refusal").toBe(reviewer.guidance);
+		expect(vi.mocked(assurancePreflight)).toHaveBeenCalledTimes(1);
+		expect(vi.mocked(selectExecutor), 'the executor was selected after the reviewer refused').not.toHaveBeenCalled();
+
+		vi.mocked(assurancePreflight).mockImplementation(preflight.assurancePreflight);
+		expect((await beginExecute(u.undertakingId, build.id)).error, "the executor's refusal").toBe(executorWords);
+		expect(vi.mocked(selectExecutor)).toHaveBeenCalledTimes(1);
+		expect(getObject(getEngine(), build.id)?.workLifecycleState, 'a refused start moved the unit').toBe('PROPOSED');
 	});
 });
 

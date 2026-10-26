@@ -132,7 +132,9 @@ const COVERED_BY_ID: Readonly<Record<string, string>> = {
 	'RPH-PWU-002': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	'RPH-PWU-004': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	// ⭐ `JAN-EXEC` Phase 7, package M (2026-10-25; `REG-D-135` (2), design D2) — the readiness rule, ENFORCED at `markPwuReady`
-	// and observed refusing through the bus by its probe in the file below.
+	// and observed refusing through the bus by its probe in the file below. ⭑ 2026-10-26 (the package's check, finding 1): and at
+	// the step start too, for a plan made without MarkPwuReady (unitReadinessRefusal, execution.ts; its probes in
+	// pwu-start-readiness.test.ts, beside this cite's).
 	'RPH-PWU-011': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	// ── THE RPH-PER CITES, ALL FOUR CORRECTED 2026-08-02 WHILE DISPOSITIONING THE FAMILY ─────────────────────
 	//

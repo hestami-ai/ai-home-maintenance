@@ -886,17 +886,28 @@ export const markPwuReady: CommandHandler = (ctx, command) => {
 	// unit it waits for; the page's offer reads the same rule (`startReadiness`, rph-projections), so it offers Begin &
 	// Execute exactly where this would admit it (SPEC-001 :3244).
 	//
-	// ⭐ WHY HERE, AND NOT AT THE STEP START (`StartExecutionStep`, beside `inputReadinessRefusal`). STA-5 reads *"A PWU
+	// ⭐ WHY HERE, ~~AND NOT AT THE STEP START~~ AND AT THE STEP START TOO (`StartExecutionStep`, beside `inputReadinessRefusal`;
+	// corrected 2026-10-26, below the struck sentence). STA-5 reads *"A PWU
 	// enters readiness only when its shape readiness profile is satisfied: … mandatory obligations, constraints, material
 	// assumptions, DEPENDENCIES, and responsible authority; REQUIRED INPUTS, expected outputs …"*, and its scope is *"governs
 	// the ready transition"* — demanding *"sufficiency for the next authorized activity"*, which for a unit about to execute
 	// is its producers' accepted work (DOC-003 :191, :193). Its subject is the PWU, and so is this rule's: a unit and the
 	// units it waits for. The step start's subject is an EXECUTION STEP and its input ARTIFACT — the RPH-EXE-005 row records
-	// why STA-5 is not that rule's carrier, and seating a unit-level rule there would be the same layer substitution
-	// turned round. And READY is the one door to execution: this command alone owns it (`PWU_LIFECYCLE_COMMAND_SPECS`,
+	// why STA-5 is not that rule's carrier, ~~and seating a unit-level rule there would be the same layer substitution
+	// turned round~~. ~~And READY is the one door to execution: this command alone owns it (`PWU_LIFECYCLE_COMMAND_SPECS`,
 	// SHAPING -> READY; REG-F-072 bars the generic setter from it), and a unit reaches PLANNED and EXECUTING only through
 	// READY — so every surface's start passes here: Begin & Execute's batch, which then rolls back whole, leaving the unit
-	// PROPOSED with no plan and no binding (SPEC-001-INV-14), before any model or reviewer call; and any other caller.
+	// PROPOSED with no plan and no binding (SPEC-001-INV-14), before any model or reviewer call; and any other caller.~~
+	// ⛔ STRUCK 2026-10-26 (the package's independent check, its finding 1; driven through the bus before the fix): READY is
+	// the one door to the UNIT's PLANNED and EXECUTING — this command alone owns SHAPING -> READY, and REG-F-072 bars the
+	// generic setter from it — but NOT to a STEP's execution. The plan commands ask only that the unit be OPEN (RPH-PWU-010),
+	// and PROPOSED is open, so a host that never sent this command could propose, approve and activate a plan on a waiting
+	// unit and start its step RUNNING; "and any other caller" was false. And seating the rule at the step start is no layer
+	// substitution: RPH-PWU-010 is a unit-level rule asked at the step commands over the plan's work unit, and this rule's
+	// step half is asked the same way (`unitReadinessRefusal` in execution.ts, the `inputReadiness` limb, both arrows into
+	// RUNNING). What stands: THIS is the rule's STA-5 seat, the ready transition; Begin & Execute's batch is refused here
+	// and rolls back whole, leaving the unit PROPOSED with no plan and no binding (SPEC-001-INV-14), before any model or
+	// reviewer call; and every step of any plan, whoever made it, is refused at the step start by the same rule.
 	// ⚠ READY/BLOCKED, CHECKED AGAINST STA-5 AS D2 ASKED: STA-5 gates the ready transition, which this refusal is, so READY
 	// carries the readiness. BLOCKED is not entered: its in-arrows are SHAPING, PLANNED and EXECUTING (BlockPwu), and a
 	// waiting unit has not begun — D2's interim holds, and a waiting unit stays PROPOSED (or SHAPING, for a caller that

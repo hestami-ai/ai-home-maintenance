@@ -4096,14 +4096,21 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 				"the states in which a dependency is accepted, so the instance survives retirement only in the conformance " +
 				'specification.'
 		},
+		// ⭑ TWO SEATS, ONE RULE (2026-10-26, the package's independent check, its finding 1). The row first named markPwuReady
+		// alone, on the ground that READY is the one door to execution. It is the one door to the UNIT's PLANNED and EXECUTING,
+		// not to a STEP's: a plan's commands ask only that its unit be open (RPH-PWU-010), so a host that never sent
+		// MarkPwuReady could start a waiting unit's step RUNNING — driven through the bus before the second seat was written.
+		// Both seats read startReadiness over the same record and say startRefusal's words, so this row's marker holds at each.
 		enforcedAt:
-			'packages/rph-application/src/handlers/pwu.ts — markPwuReady, the readiness limb after checkPwuShapeReadiness, asking startReadiness (packages/rph-projections/src/unit-dependencies.ts) over the stored units; the page reads the same rule for its offer (apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts, startOfferOf)',
+			"packages/rph-application/src/handlers/pwu.ts — markPwuReady, the readiness limb after checkPwuShapeReadiness, asking startReadiness (packages/rph-projections/src/unit-dependencies.ts) over the stored units; AND packages/rph-application/src/handlers/execution.ts — unitReadinessRefusal, invoked from stepAuthorityRefusal in the inputReadiness limb for both arrows into RUNNING (StartExecutionStep, ResolveExecutionStepWait), over the plan's work unit; the page reads the same rule for its offer (apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts, startOfferOf)",
 		refusalCode: 'RPH_INVARIANT_VIOLATION',
 		refusalMarker: 'cannot start until each unit it depends on is accepted',
 		declaredMutations: [
 			'return the shape-readiness advance without asking startReadiness in markPwuReady — the refusal dropped (P6X-M-M1)',
 			"add 'CONDITIONALLY_SATISFIED' to ACCEPTED_UNIT_STATES — an open condition counted as accepted (P6X-M-M2)",
-			'stop at the first accepted dependency in startReadiness — one producer of two counted as enough (P6X-M-M6)'
+			'stop at the first accepted dependency in startReadiness — one producer of two counted as enough (P6X-M-M6)',
+			"drop the refusal unitReadinessRefusal returns in stepAuthorityRefusal — a plan made without MarkPwuReady runs a waiting unit's step (P6X-M-M19)",
+			"ask unitReadinessRefusal's refusal for StartExecutionStep alone — the second arrow into RUNNING, the resume, omitted (P6X-M-M20)"
 		]
 	}
 };
