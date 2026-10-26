@@ -142,6 +142,11 @@ export interface DeliverableViewRecord {
 	 * The files changed since ~~the step began~~ ⭐ the unit's first step began (package O, D22: a work re-run's view counts from the
 	 * unit's baseline, `unitBaselineOf`), and the step's sequence to date (`Deliverable.sequence`). ⚠ The reviewer's prompt still says
 	 * "since its step began" (`reasoning-review-validator.ts`): a reviewer prompt package O does not change.
+	 * ⛔ Package O's check, finding 1 (OPEN, the lead's to decide before V measures; 2026-10-26) — SO THE PROMPT CONTRADICTS ITSELF on a
+	 * work re-run that inherits a file a refused attempt wrote: it lists that file as changed "since its step began", directly above
+	 * the step's sequence, which shows this step wrote nothing — "(none: the host completed no write and no run for the agent in this
+	 * step)". The sentence is in `WORK_PRODUCT_DELIVERABLE_SUBJECT`, `deliverableHeading` and the declared-policy subject; the
+	 * fingerprint's probes carry it (`scripts/reviewer-qual/probes.ts`, `W-DELIVERABLE`), so rewording it moves the fingerprint.
 	 */
 	readonly deliverable: Deliverable;
 }

@@ -100,6 +100,7 @@ import { PHASE7_INSTRUCTION_BUDGET, PHASE7_PWA, PRODUCT_BRIEF } from '../scripts
 import { archiveAuthoring, AUTHORING_ARCHIVE, CONTENT_STORE_SUFFIX, journalHeaderOf } from '../scripts/phase7/run-archive.js';
 import {
 	buildRunReport,
+	COUNTED_WHOLE_PRESS,
 	FLOOR_POLICIES,
 	HALF_B_CAVEATS,
 	renderMarkdown,
@@ -4052,10 +4053,27 @@ describe('⭐⭐ The review in parts, B6 — the authoring’s spend reserve cou
 		};
 		const ANTICIPATED = 'the authoring floor’s worst case, for 16 anticipated types';
 		const sendCheck = { ...inventoryCheck, ahead: FLOOR_WORST, counted: ANTICIPATED, total: PHASE7_PAID_LIMIT, allowed: true };
-		const run = lane.run as { authoring: Record<string, unknown> };
+		// ⛔ MOVED 2026-10-26 (`JAN-EXEC` Phase 7, package O's check, finding 4; design D27) — ~~no read of a unit's~~: the run's first
+		// unit carries its read before its Begin & Execute, in the words package L's lane recorded for it (`COUNTED_AHEAD.wholePress`),
+		// held back at the limit Send's read reached. A record whose only reads are Send's, in words the one-try lane recorded too,
+		// does not say which rule its lane counted by before a model unit's press, and its caveat says so now (its own case, below);
+		// the run recorded after package L and before D20 is this one. The assertions are unchanged.
+		const pressTotal = AT_SEND + FLOOR_WORST + PHASE7_NEGATIVE_CONTROL_RESERVE + 210;
+		const pressRead = {
+			prior: AT_SEND,
+			recorded: FLOOR_WORST,
+			reserve: PHASE7_NEGATIVE_CONTROL_RESERVE,
+			ahead: 210,
+			counted: COUNTED_AHEAD.wholePress,
+			total: pressTotal,
+			limit: PHASE7_PAID_LIMIT,
+			allowed: pressTotal <= PHASE7_PAID_LIMIT
+		};
+		const run = lane.run as { authoring: Record<string, unknown>; units: Record<string, unknown>[] };
+		const units = run.units.map((u, i) => (i === 0 ? { ...u, limitCheck: pressRead } : u));
 		const out = buildRunReport(
 			halfBStore(),
-			{ ...lane, run: { ...run, authoring: { ...run.authoring, limitCheck: sendCheck, inventoryCheck } } },
+			{ ...lane, run: { ...run, units, authoring: { ...run.authoring, limitCheck: sendCheck, inventoryCheck } } },
 			{ accountNames: NAMES }
 		).report;
 		expect(
@@ -4097,6 +4115,58 @@ describe('⭐⭐ The review in parts, B6 — the authoring’s spend reserve cou
 	// records (`COUNTED_AHEAD.authoringAllowance`) — so a D20 run's report can never read as a run recorded before D20.
 	it('⭑ the words a D20 Send check records are the ones the report chooses the D20 caveat by', () => {
 		expect(SEND_COUNTED_THE_ALLOWANCE).toBe(COUNTED_AHEAD.authoringAllowance);
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package O's check, finding 4 (design D27; `REG-F-581`) — A RECORD WHOSE ONLY READS ARE SEND'S, in the words
+	// the lane recorded from the review in parts (B6) to D20. ⛔ Those words were the one-try lane's too (`COUNTED_AHEAD` at 452e927d,
+	// before package L): nothing in the record says which rule its lane counted by before a model unit's press, so the report reads
+	// none — never today's whole-press rule — and keeps the Send clause its own Send check gives, and the lower bound.
+	// ⛔ PREDICTED RED, read from the code at 3b92ef05: every record whose reads did not count one try's reserve was read as today's
+	// lane's, so this caveat began "The lane counts each press’s whole worst case before it".
+	it('⛔ package O’s check, finding 4 — a run whose only reads are Send’s, in the words of the anticipated types: its caveat says no read names its lane’s rule before a model press, with its own limit, and keeps Send’s clause true of it', () => {
+		const lane = halfBLaneRows();
+		const inventoryCheck = {
+			prior: AT_SEND,
+			recorded: 0,
+			reserve: PHASE7_NEGATIVE_CONTROL_RESERVE,
+			ahead: phase7AuthoringReviewerCalls(20),
+			counted: STAGED_INVENTORY,
+			total: AT_SEND + PHASE7_NEGATIVE_CONTROL_RESERVE + phase7AuthoringReviewerCalls(20),
+			limit: PHASE7_PAID_LIMIT,
+			allowed: false
+		};
+		const ANTICIPATED = 'the authoring floor’s worst case, for 16 anticipated types';
+		const sendCheck = { ...inventoryCheck, ahead: FLOOR_WORST, counted: ANTICIPATED, total: PHASE7_PAID_LIMIT, allowed: true };
+		const run = lane.run as { authoring: Record<string, unknown> };
+		const out = buildRunReport(
+			halfBStore(),
+			{ ...lane, run: { ...run, authoring: { ...run.authoring, limitCheck: sendCheck, inventoryCheck } } },
+			{ accountNames: NAMES }
+		).report;
+		expect(out.reviewerCalls.laneLimitChecks.map((c) => c.before), 'arrangement: the record’s only reads are Send’s').toEqual([
+			'Send',
+			'Send, counted again for the inventory its turn staged'
+		]);
+		const caveat = out.reviewerCalls.limitCaveat;
+		expect(caveat, 'a record whose words name no model press was read as today’s lane’s').not.toContain(
+			'The lane counts each press’s whole worst case before it'
+		);
+		expect(caveat, 'the caveat does not say the record names no rule, with the limit its checks used').toContain(
+			'⚠ This run’s record does not say what its lane counted before a model unit’s press: none of its checks was made ' +
+				'before one in words this report knows — one try’s reserve, or a press’s whole worst case. So this report states no ' +
+				`rule the lane counted by there — only each read’s figures, as listed. The limit its checks used is ${PHASE7_PAID_LIMIT}. `
+		);
+		expect(caveat, 'the caveat lost the Send clause its own Send check gives').toContain(
+			`This run was recorded before the lane handed the authoring review an allowance (REG-F-580; design D20): no candidate existed before Send, so its check counted ${FLOOR_WORST} ahead (${ANTICIPATED}), an estimate and not a bound`
+		);
+		expect(caveat, 'the caveat does not keep the lower bound').toContain('⚠ The recorded count is a lower bound');
+		expect(renderMarkdown(out), 'report.md does not carry it').toContain(`- **Caveat:** ${caveat}`);
+	});
+
+	// ⭑ Package O's check, finding 4 — AND TODAY'S WORDS BEFORE A MODEL PRESS, by which the report tells today's lane positively:
+	// restated in the report (`COUNTED_WHOLE_PRESS`), held equal here to the words the lane's check records (`COUNTED_AHEAD.wholePress`).
+	it('⭑ package O’s check, finding 4 — the words today’s lane records before a model press are the ones the report tells today’s lane by', () => {
+		expect(COUNTED_WHOLE_PRESS).toBe(COUNTED_AHEAD.wholePress);
 	});
 
 	// ⛔ PREDICTED RED, read from the code: given the types, the lane took each type's latest review in the whole fork, so a

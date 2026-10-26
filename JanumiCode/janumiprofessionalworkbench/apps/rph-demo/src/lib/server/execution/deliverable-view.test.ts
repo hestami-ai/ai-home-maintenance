@@ -213,4 +213,40 @@ describe('⭐⭐ package O — D22: the unit’s FIRST step’s baseline, record
 		const tampered = { ...store, get: async (key: string) => (key === bound.storageKey ? '{"schema":"forged"}' : store.get(key)) };
 		await expect(unitBaselineOf(tampered, 'tnt-t', STEP_2, ws)).rejects.toThrow(/does not hash to the sha256:/);
 	});
+
+	// ── ⭐⭐ `JAN-EXEC` Phase 7, package O's check — THE GENERAL FORM OF ITS FINDING 2: EACH REFUSAL `unitBaselineOf` MAKES ──────────────
+	// ⛔ Three of its four refusals were reached by no case (the hash's is the case above): a name the store refuses to bind, a bound
+	// baseline whose bytes the store no longer holds, and bytes that hash true but are not this unit's baseline. Each fails the step
+	// closed, so no later step counts its view's files from a baseline it could not read, or from another unit's. The CONTROLS are
+	// the cases above, where a first step's baseline is bound and read back by a later step of its unit.
+	it('⛔ a first step whose baseline the store refuses to NAME fails, in its own words — never a baseline no later step could reach', async () => {
+		const store = createInMemoryArtifactStore();
+		const refusing = { ...store, bindName: async () => ({ bound: false as const, refusedBecause: 'the store refused the name' }) };
+		await expect(unitBaselineOf(refusing, 'tnt-t', STEP_1, workspace())).rejects.toThrow(
+			'the baseline of work unit pwu_1 could not be named: the store refused the name'
+		);
+	});
+
+	it('⛔ a bound baseline whose bytes the store no longer holds is REFUSED, in its own words — never read as an empty workspace', async () => {
+		const store = createInMemoryArtifactStore();
+		const ws = workspace();
+		await ws.writeFile('README.md', '# before\n');
+		await unitBaselineOf(store, 'tnt-t', STEP_1, ws);
+		const bound = (await store.resolveName(baselineNameOf('tnt-t', 'pwu_1')))!;
+		const emptied = { ...store, get: async (key: string) => (key === bound.storageKey ? undefined : store.get(key)) };
+		await expect(unitBaselineOf(emptied, 'tnt-t', STEP_2, ws)).rejects.toThrow(
+			`the baseline of work unit pwu_1 at '${bound.storageKey}' is not in the content store.`
+		);
+	});
+
+	it('⛔ a unit’s name bound to ANOTHER unit’s baseline — bytes that hash true — is REFUSED: a step never counts from another unit’s first step', async () => {
+		const store = createInMemoryArtifactStore();
+		const ws = workspace();
+		await unitBaselineOf(store, 'tnt-t', { pwuId: 'pwu_2', stepId: 'step_9', attemptKey: 'step_9#1' }, ws);
+		const theirs = (await store.resolveName(baselineNameOf('tnt-t', 'pwu_2')))!;
+		expect((await store.bindName(baselineNameOf('tnt-t', 'pwu_1'), theirs.storageKey)).bound, 'arrangement: the name bound').toBe(true);
+		await expect(unitBaselineOf(store, 'tnt-t', STEP_2, ws)).rejects.toThrow(
+			`the bytes at '${theirs.storageKey}' are not the baseline of work unit pwu_1.`
+		);
+	});
 });

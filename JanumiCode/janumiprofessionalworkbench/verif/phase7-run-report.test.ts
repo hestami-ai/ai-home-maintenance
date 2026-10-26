@@ -552,6 +552,29 @@ function aRun(
 
 const reportOf = (run: ReturnType<typeof aRun>) => buildRunReport(run.store, run.lane, { accountNames: NAMES });
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package O's check, finding 4 (design D27; `REG-F-581`) — THE RUN, ITS RECORD HOLDING ONE READ OF THE LIMIT AS
+ * TODAY'S LANE MAKES ONE: before design's Begin & Execute, `prior` spent before the run, against `limit`, counting the press's whole
+ * worst case in the lane's own words (`phase7-operator.ts` `COUNTED_AHEAD.wholePress`). ⭑ For a case that reads the limit or the
+ * caveat of a run of today's lane: a record holding no read of the limit states neither now, and one whose words are not today's
+ * lane's is not read as today's.
+ */
+function withTodaysRead(run: ReturnType<typeof aRun>, prior: number, limit = PAID_LIMIT): ReturnType<typeof aRun> {
+	const laneRun = run.lane.run as { units: Record<string, unknown>[] };
+	const total = prior + 0 + 4 + 210;
+	const read = {
+		prior,
+		recorded: 0,
+		reserve: 4,
+		ahead: 210,
+		counted: 'its whole press’s worst case, (3 tries + 32 command runs) × 6 calls',
+		total,
+		limit,
+		allowed: total <= limit
+	};
+	const units = laneRun.units.map((u) => (u.slug === 'design' ? { ...u, limitCheck: read } : u));
+	return { ...run, lane: { ...run.lane, run: { ...laneRun, units } } };
+}
+/**
  * ⭐ P5 package B (F5) — K5's four causes of a capture folder no evidence names, as an archive's `checks.json` records them
  * (`run-archive.ts` `causesOf`, worded by `k5-causes.ts`): the report takes a captured run's cause from the ones possible.
  */
@@ -1776,8 +1799,14 @@ describe('JAN-EXEC P7-2 D9 — the reviewer calls, a lower bound, and the paid l
 			reportOf(aRun({}, { lane: { boot: { inherited: { JPWB_PHASE7_PRIOR_REVIEWER_CALLS: String(prior) }, overlay: { JPWB_DEMO_DB: DEMO_DB } } } }))
 				.report.reviewerCalls.limit;
 		const L = PAID_LIMIT;
-		expect(at(L - 9)).toEqual({ prior: L - 9, recorded: 4, reserve: 4, total: L - 1, limit: L, under: true });
-		expect(at(L - 8)).toEqual({ prior: L - 8, recorded: 4, reserve: 4, total: L, limit: L, under: false });
+		// ⛔ MOVED 2026-10-26 (`JAN-EXEC` Phase 7, package O's check, finding 4; design D27) — ~~`limit: L, under: true`~~ and
+		// ~~`at(L - 8)`, `limit: L, under: false`~~: this run's record holds no read of the limit, so it states none, and neither
+		// does the report (`runLimitOf`) — today's limit was a copy no record of the run holds. The inherited prior and the total
+		// stand as before; the arithmetic against the limit is held over the same run with one read of it, against L (`atRead`).
+		expect(at(L - 9)).toEqual({ prior: L - 9, recorded: 4, reserve: 4, total: L - 1, limit: null, under: null });
+		const atRead = (prior: number) => reportOf(withTodaysRead(aRun({}), prior, L)).report.reviewerCalls.limit;
+		expect(atRead(L - 9)).toEqual({ prior: L - 9, recorded: 4, reserve: 4, total: L - 1, limit: L, under: true });
+		expect(atRead(L - 8)).toEqual({ prior: L - 8, recorded: 4, reserve: 4, total: L, limit: L, under: false });
 		const run = aRun();
 		const checked = { ...run.lane, run: { units: [{ slug: 'design', limitCheck: { prior: 7 } }] } };
 		expect(buildRunReport(run.store, checked, { accountNames: NAMES }).report.reviewerCalls.limit.prior).toBe(7);
@@ -2447,10 +2476,18 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 		// ⛔ PREDICTED RED, read from the code: a run whose total reached the limit exactly read "NOT under it", as though it had
 		// passed it.
 		const L = PAID_LIMIT;
+		// ⛔ MOVED 2026-10-26 (`JAN-EXEC` Phase 7, package O's check, finding 4; design D27) — the run's record holds one read of the
+		// limit, against L, in today's lane's words (`withTodaysRead`), ~~none~~: a record with no read of the limit states no limit
+		// now, so its total stands against none (its own case, under D27 below). The words below are unchanged.
 		const whole = (prior: number) =>
 			renderMarkdown(
-				reportOf(aRun({}, { lane: { boot: { inherited: { JPWB_PHASE7_PRIOR_REVIEWER_CALLS: String(prior) }, overlay: { JPWB_DEMO_DB: DEMO_DB } } } }))
-					.report
+				reportOf(
+					withTodaysRead(
+						aRun({}, { lane: { boot: { inherited: { JPWB_PHASE7_PRIOR_REVIEWER_CALLS: String(prior) }, overlay: { JPWB_DEMO_DB: DEMO_DB } } } }),
+						prior,
+						L
+					)
+				).report
 			);
 		expect(whole(L - 8)).toContain(`- **The limit (design D8):** ${L - 8} + 4 + 4 = ${L} of ${L}, at it, which the run may reach.`);
 		expect(whole(L - 7)).toContain(`- **The limit (design D8):** ${L - 7} + 4 + 4 = ${L + 1} of ${L}, PAST it.`);
@@ -2551,7 +2588,11 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 			'calls none (REG-F-580; design D20). So the rule bounds the reviewer exchanges the store records. ⚠ The recorded count ' +
 			'is a lower bound: a call whose capture faulted leaves no exchange, so the limit bounds what was recorded, and this ' +
 			'report claims no count of calls absent from the record.';
-		const r = reportOf(aRun({})).report;
+		// ⛔ MOVED 2026-10-26 (`JAN-EXEC` Phase 7, package O's check, finding 4; design D27) — ~~`reportOf(aRun({}))`~~, a record that
+		// holds no read of the limit: such a record says nothing of its lane's rule, and its caveat says so now (its own case, under
+		// D27 below). The run of today's lane is the one whose record holds a read in today's lane's words (`withTodaysRead`); the
+		// caveat asserted is unchanged.
+		const r = reportOf(withTodaysRead(aRun({}), 0)).report;
 		expect(renderMarkdown(r), 'report.md carries no caveat of what the limit bounds').toContain(`- **Caveat:** ${caveat}`);
 		expect(r.reviewerCalls.limitCaveat, 'report.json carries no caveat of what the limit bounds').toBe(caveat);
 		// ⛔ The struck claim is gone: no press can carry the total past the limit by what the lane counts ⭐ — ~~save Send's, whose
@@ -2569,15 +2610,23 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 	// 1,001 of about 1,000 (`REG-D-133`). The limit is the one its own checks used, and the caveat the one true of its lane.
 	/**
 	 * Run-12's shape: 739 before it, 262 recorded, its checks — one before each phase — against 1000, counting one try's reserve.
-	 * ⭑ `limits` sets one phase's read against another limit, for a record whose reads disagree.
+	 * ⭑ `limits` sets one phase's read against another limit, for a record whose reads disagree. ⭐ Package O's check, finding 4 —
+	 * `counted` undefined: each read says nothing of what it counted, as the lane's reads did before `REG-D-114` (14) was amended;
+	 * and `send`, a read before Send on the run's authoring record.
 	 */
-	const run12Shaped = (limit: number, counted: string, ahead: number, limits: Readonly<Record<string, number>> = {}) => {
+	const run12Shaped = (
+		limit: number,
+		counted: string | undefined,
+		ahead: number,
+		limits: Readonly<Record<string, number>> = {},
+		send?: Record<string, unknown>
+	) => {
 		const many = Array.from({ length: 259 }, (_, i) => ({ role: i === 0 ? 'INITIAL' : 'RETRY', disposition: 'ACCEPTED', ordinal: i + 1 }));
 		const run = aRun({ requirements: { review: many } }, { run: { end: { reason: 'paid-limit' } } });
 		const laneRun = run.lane.run as { units: Record<string, unknown>[] };
 		const read = (recorded: number, own: number) => {
 			const total = 739 + recorded + 4 + ahead;
-			return { prior: 739, recorded, reserve: 4, ahead, counted, total, limit: own, allowed: total <= own };
+			return { prior: 739, recorded, reserve: 4, ahead, ...(counted === undefined ? {} : { counted }), total, limit: own, allowed: total <= own };
 		};
 		const recordedBefore: Record<string, number> = { requirements: 0, design: 259, implementation: 260, 'end-to-end': 261 };
 		const units = laneRun.units.map((u) =>
@@ -2585,7 +2634,8 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 				? u
 				: { ...u, limitCheck: read(recordedBefore[str(u.slug)]!, limits[str(u.slug)] ?? limit) }
 		);
-		return buildRunReport(run.store, { ...run.lane, run: { ...laneRun, units } }, { accountNames: NAMES }).report;
+		const authoring = send === undefined ? {} : { authoring: { limitCheck: send } };
+		return buildRunReport(run.store, { ...run.lane, run: { ...laneRun, units, ...authoring } }, { accountNames: NAMES }).report;
 	};
 	const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 	/** The caveat's first clause for a run recorded before package L, as the report says it of such a run. */
@@ -2642,6 +2692,76 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 		);
 		const agreeing = run12Shaped(1000, 'one try’s reserve', 4);
 		expect(agreeing.problems.filter((p) => p.includes('reads of the limit used'))).toEqual([]);
+	});
+
+	// ── ⭐⭐ Package O's check, finding 4 (D27; `REG-F-581`) — TODAY'S LANE TOLD POSITIVELY, BY ITS OWN WORDS ─────────────────────────
+	// ⛔ D27 told only the one-try lane apart, by its words, and read every other record as today's lane's: a record whose checks
+	// say nothing of what they counted — the lane's reads from its first record (2026-10-10, `5d75c659`) until `REG-D-114` (14) was
+	// amended (2026-10-16, `131d3181`) — read today's whole-press rule and "about 2,400" beside its own limit, and a record holding
+	// no read of the limit was held to today's. Today's caveat is read now only where the record's own words are today's lane's;
+	// the CONTROL is the one above, a record of today's lane.
+	/** The count clause of a run whose checks say nothing of what they counted, as the report says it, with that run's limit. */
+	const UNSAID_CAVEAT = (limit: number) =>
+		'⚠ This run’s record does not say what its lane counted before each press: none of its checks says what it counted ' +
+		'ahead of its act, for the run was recorded before the lane said so (REG-D-114 (14), as amended 2026-10-16). So this ' +
+		`report states no rule the lane counted by — only each read’s figures, as listed. The limit its checks used is ${limit}. `;
+
+	it('⛔ package O’s check, finding 4 — a record whose checks say NOTHING of what they counted reads its own limit and a caveat that says its record names no rule — never today’s whole-press rule, never “about 2,400”', () => {
+		// ⛔ PREDICTED RED, read from the code at 3b92ef05: no check counted one try's reserve, so `limitCaveatOf` read today's lane
+		// — `LIMIT_CAVEAT`, the whole-press rule and the sponsor's "about 2,400" — beside the run's own limit of 900.
+		const r = run12Shaped(900, undefined, 0);
+		expect(r.reviewerCalls.laneLimitChecks.map((c) => c.counted), 'arrangement: no check says what it counted').toEqual([
+			null,
+			null,
+			null,
+			null
+		]);
+		expect([r.reviewerCalls.limit.limit, r.reviewerCalls.limit.under]).toEqual([900, false]);
+		expect(r.reviewerCalls.limitCaveat, 'a record that says nothing of what its checks counted was read as a lane it does not name').toBe(
+			UNSAID_CAVEAT(900) + LIMIT_CAVEAT_LOWER_BOUND
+		);
+	});
+
+	it('⛔ package O’s check, finding 4 — a record holding NO read of the limit states no limit: its total stands against none, and its caveat says the record holds no read — never today’s limit or rule', () => {
+		// ⛔ PREDICTED RED, read from the code at 3b92ef05: `runLimitOf` stated today's limit for a record holding no read of it
+		// (`PAID_LIMIT`), its total "under it", and the caveat was today's lane's.
+		const r = reportOf(aRun({}, { lane: { boot: { inherited: { JPWB_PHASE7_PRIOR_REVIEWER_CALLS: '739' }, overlay: { JPWB_DEMO_DB: DEMO_DB } } } })).report;
+		expect(r.reviewerCalls.laneLimitChecks, 'arrangement: the record holds no read of the limit').toEqual([]);
+		expect(r.reviewerCalls.limit, 'a record holding no read of the limit was held to one').toEqual({
+			prior: 739,
+			recorded: 4,
+			reserve: 4,
+			total: 747,
+			limit: null,
+			under: null
+		});
+		expect(renderMarkdown(r), 'report.md states a limit the record holds no read of').toContain(
+			'- **The limit (design D8):** 739 + 4 + 4 = 747, against no limit: this run’s record holds no read of one (design D27).'
+		);
+		expect(r.reviewerCalls.limitCaveat, 'a record holding no read of the limit was given a lane’s caveat').toBe(
+			'⚠ This run’s record holds no read of the limit: no act of it was checked against one, so this report states neither ' +
+				'the limit its lane held nor the rule it counted by. ' +
+				LIMIT_CAVEAT_LOWER_BOUND
+		);
+	});
+
+	// ⭐⭐ Package O's check, finding 4 — ITS GENERAL FORM, IN THE SEND CLAUSE: the clause written for the lane from the review in parts
+	// (B6, 452e927d) to D20 was given every Send check not D20's, so a one-try run's Send check made BEFORE B6 — in its own words, "the
+	// authoring floor’s worst case", the authoring turn's two floor runs (`PHASE7_AUTHORING_REVIEWER_CALLS` at 131d3181) — read that
+	// its count was an estimate of the types anticipated, and named the read of the inventory counted again, which that lane never
+	// made. ⛔ PREDICTED RED, read from the code at 3b92ef05: that clause, whole.
+	it('⛔ package O’s check, finding 4 — a Send check made before the review in parts reads its own figures alone: never the B6-to-D20 clause of an estimate and an inventory read its lane never made', () => {
+		const send = { prior: 739, recorded: 0, reserve: 4, ahead: 8, counted: 'the authoring floor’s worst case', total: 751, limit: 1000, allowed: true };
+		const r = run12Shaped(1000, 'one try’s reserve', 4, {}, send);
+		expect(r.reviewerCalls.laneLimitChecks.map((c) => c.before)[0], 'arrangement: the run’s read before Send').toBe('Send');
+		expect(r.reviewerCalls.limitCaveat, 'a Send check made before B6 read a clause written for B6 to D20').toBe(
+			ONE_TRY_CAVEAT +
+				'⚠ Save Send’s. This run was recorded before the review in parts (B6): its check before Send counted 8 ahead, the ' +
+				'authoring floor’s worst case, in that lane’s words, and this report states no rule its Send press was bounded by — ' +
+				'only that read’s figures, as listed. ' +
+				LIMIT_CAVEAT_LOWER_BOUND
+		);
+		expect(r.reviewerCalls.limitCaveat).not.toContain('counted again for the inventory');
 	});
 
 	it('⛔ stage 7’s sign-off: the lane’s dry run signs the root off (D11) — the root as intended, the run not reached; one never attempted, in a run cut short — not reached; one refused — broke', () => {

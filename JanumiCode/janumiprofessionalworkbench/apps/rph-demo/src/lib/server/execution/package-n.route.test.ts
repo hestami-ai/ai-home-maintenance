@@ -50,7 +50,13 @@ const seam = vi.hoisted(() => ({
 	 * ⭐ Package O (D23) — each view the host records is recorded as a host BEFORE package O recorded it: its bytes put, and no
 	 * name bound to them, so no name derived from its step and try reaches it.
 	 */
-	viewsUnnamed: false
+	viewsUnnamed: false,
+	/**
+	 * ⭐ Package O's check, finding 2 (D23) — each view the host records is put, and the record points at it, while the name its
+	 * step and try derive is bound to ANOTHER view's bytes: the record and the content plane then disagree about what the try's
+	 * reviews were shown.
+	 */
+	viewsMisnamed: false
 }));
 
 // ⭐ Package N's check, finding 6 — THE HOST'S OWN RECORD OF A TRY'S VIEW, refusable by a case: the real one otherwise.
@@ -64,6 +70,27 @@ vi.mock('./deliverable-view.js', async (importOriginal) => {
 			if (seam.viewsUnnamed) {
 				const [store, ...rest] = args;
 				return actual.recordDeliverableView({ ...store, bindName: async () => ({ bound: true }) }, ...rest);
+			}
+			// ⭐ Package O's check, finding 2 — the name bound to another view: the same try's view with no file, put beside it.
+			if (seam.viewsMisnamed) {
+				const [store, tenantPrefix, view] = args;
+				const misnaming = {
+					...store,
+					bindName: async (name: string) => {
+						const other = await store.put({
+							tenantPrefix,
+							bytes: JSON.stringify({
+								schema: actual.DELIVERABLE_VIEW_SCHEMA,
+								...view,
+								deliverable: { ...view.deliverable, files: [] }
+							}),
+							mediaType: 'application/json',
+							purgeability: 'RETAINED_BY_PARTICIPATION'
+						});
+						return store.bindName(name, other.storageKey);
+					}
+				};
+				return actual.recordDeliverableView(misnaming, tenantPrefix, view);
 			}
 			return actual.recordDeliverableView(...args);
 		})
@@ -295,6 +322,7 @@ beforeEach(() => {
 	seam.workspaces.clear();
 	seam.viewRecordFails = undefined;
 	seam.viewsUnnamed = false;
+	seam.viewsMisnamed = false;
 	vi.stubEnv('PATH', noProgramsDirectory());
 	for (const v of LIVE_BACKEND_VARIABLES) vi.stubEnv(v, undefined);
 	vi.stubEnv('JPWB_ASSURANCE_TOOL', 'devin');
@@ -799,5 +827,101 @@ describe('⭐⭐ package N — D11: the declared reviews at sign-off are shown t
 		const completions = completionsOf(pwuId);
 		expect(completions.at(-1)?.evidence, 'the re-review’s completion named another try’s evidence').toEqual([second!.id]);
 		expect(evidenceOf(pwuId)[0]?.reasoningReview, 'the first try’s refusal is gone from the record').toBe('REJECTED');
+	});
+});
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7, package O's check, findings 2 and 3 (design D23) — THE RE-REVIEW READS THE REFUSED TRY'S VIEW BY ITS
+// NAME, HELD AGAINST WHAT THE RECORD POINTS AT ──────────────────────────────────────────────────────────────────────────────────
+// ⛔ Finding 2: the refusal where a try's command evidence points at one view and the name its step and try bind resolves to
+// another (`recordedViewOf`) was reached by no case, so dropping it changed nothing any test saw. ⛔ Finding 3: no case had a
+// stopped attempt of two tries whose last, refused try ran no command — the one case where WHICH try's name is looked up decides
+// what the re-review is shown — so looking up the first try's view was caught only through that unguarded refusal.
+describe('⭐⭐ package O’s check — the re-review reads the REFUSED try’s view by its name, held against what the record points at', () => {
+	const rerunReview = async (pwuId: string) =>
+		(await actions.rerunReview(
+			actionEvent('rerunReview', { pwuId, rationale: 'The reviewer failed at the transport; review it again.' }) as never
+		)) as { advanced?: string; data?: { error?: string } };
+
+	/** A model unit whose one try wrote a file and ran a command, its work product's review failing at the transport: it waits. */
+	const stoppedAfterACommand = async (): Promise<string> => {
+		const pwuId = await modelWorkUnit();
+		seam.script = () => ({
+			acts: [write('src/report.md', '# The report\n'), run(['cat', 'src/report.md'], '# The report\n')],
+			account: 'Wrote the report.'
+		});
+		seam.review = (p) => {
+			if (isWorkProductReview(p)) throw new Error('devin exited with code 1: connection reset by peer');
+			return undefined;
+		};
+		expect((await beginExecute(pwuId)).data?.error, 'arrangement: the work product’s review concluded').toMatch(
+			/VALIDATOR_EXECUTION_FAILED/
+		);
+		seam.review = undefined;
+		seam.prompts.length = 0;
+		return pwuId;
+	};
+
+	it('⛔ finding 2 — a try whose command evidence points at one view and whose name binds ANOTHER: the re-review is REFUSED in words naming both, before any reviewer is asked, and the step stays uncompleted', async () => {
+		seam.viewsMisnamed = true;
+		const pwuId = await stoppedAfterACommand();
+		const [evidence] = evidenceOf(pwuId);
+		const pointer = (
+			getObject(getEngine(), evidence?.id ?? '')?.contentReference as { deliverableView?: { storageKey?: string } } | undefined
+		)?.deliverableView?.storageKey;
+		expect(pointer, 'arrangement: the try’s command evidence points at no view').toEqual(expect.any(String));
+
+		const rerun = await rerunReview(pwuId);
+
+		const refusal =
+			/^The review cannot be re-run, and the unit keeps waiting: the record points at the deliverable view at '([^']+)', and the name its step and try bind at '([^']+)': the record and the content plane disagree about what the try's reviews were shown\.$/.exec(
+				rerun.data?.error ?? ''
+			);
+		expect(refusal, `a re-review the record and the content plane disagree about was not refused: ${rerun.data?.error ?? 'no error'}`).not.toBeNull();
+		expect(refusal?.[1], 'the refusal does not name the view the record points at').toBe(pointer);
+		expect(refusal?.[2], 'the refusal names one view as both').not.toBe(pointer);
+		expect(seam.prompts, 'a reviewer was asked over a view the record and the content plane disagree about').toEqual([]);
+		expect(completionsOf(pwuId), 'the refused re-review completed the step').toEqual([]);
+	});
+
+	it('⭑ CONTROL — the same try, its name binding the view its evidence points at: the re-review is admitted, and shown that view', async () => {
+		const pwuId = await stoppedAfterACommand();
+		const rerun = await rerunReview(pwuId);
+		expect([rerun.advanced, rerun.data?.error], 'a re-review whose record and name agree was refused').toEqual(['review-rerun', undefined]);
+		expect(seam.prompts.find(isWorkProductReview), 'the admitted re-review was not shown the try’s view').toContain(
+			'Added "src/report.md":'
+		);
+	});
+
+	it('⭐ finding 3 — a stopped attempt of TWO tries, the refused one command-free: the re-review is shown THAT try’s view, reached by its own try’s name — never the first try’s', async () => {
+		const pwuId = await modelWorkUnit();
+		seam.script = (turn) =>
+			turn === 1
+				? { acts: [write('docs/a.md', '# A\n')], account: 'Wrote A.' }
+				: { acts: [write('docs/b.md', '# B\n')], account: 'Wrote B, as the finding asked.' };
+		// Try 1's work product is refused with a finding, so the loop runs try 2; try 2's review fails at the transport, so the
+		// unit waits on try 2 — a try that ran no command, whose view no record points at and only its name reaches.
+		let down = true;
+		seam.review = (p) => {
+			if (!isWorkProductReview(p)) return undefined;
+			if (p.includes('as the host read them after try 1.')) return floorReply({ statement: 'THE NOTES ARE INCOMPLETE: B IS MISSING.' });
+			if (down) throw new Error('devin exited with code 1: connection reset by peer');
+			return undefined;
+		};
+		expect((await beginExecute(pwuId)).data?.error, 'arrangement: the second try’s review concluded').toMatch(/VALIDATOR_EXECUTION_FAILED/);
+		expect(seam.turns, 'arrangement: no second try').toHaveLength(2);
+		expect(evidenceOf(pwuId), 'arrangement: a try ran a command').toEqual([]);
+		down = false;
+		seam.review = undefined;
+		seam.prompts.length = 0;
+
+		const rerun = await rerunReview(pwuId);
+
+		expect([rerun.advanced, rerun.data?.error], 'the refused try’s re-review was refused, or did not complete').toEqual([
+			'review-rerun',
+			undefined
+		]);
+		const reReview = seam.prompts.find(isWorkProductReview);
+		expect(reReview, 'the re-review was not shown the LAST try’s view').toContain('as the host read them after try 2.');
+		expect(reReview, 'the re-review was not shown the file the refused try wrote').toContain('Added "docs/b.md":');
 	});
 });

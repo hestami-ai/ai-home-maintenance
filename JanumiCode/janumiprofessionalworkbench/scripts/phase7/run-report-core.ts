@@ -242,8 +242,10 @@ export const SEND_COUNTED_THE_ALLOWANCE = 'the allowance the lane hands the auth
  * ⭐⭐ Package L2's check, finding 1 — THE SEND CLAUSE OF A RUN RECORDED BEFORE D20, from its own Send check: the clause package
  * L's check wrote (struck from `LIMIT_CAVEAT` by D20, above), said of that run, in the past, with the count its check recorded —
  * its figure and its words, where it holds them. ⚠ Written for the lane from the review in parts (B6) to D20, the one before D20
- * whose report can list the inventory counted again (`AUTHORING_INVENTORY_READ`); an older run is not told apart here (the
- * builder's report says what its caveat does not fit).
+ * whose report can list the inventory counted again (`AUTHORING_INVENTORY_READ`); ~~an older run is not told apart here (the
+ * builder's report says what its caveat does not fit)~~ ⭐ package O's check, finding 4 (2026-10-26): an older run's Send check is
+ * told apart by its own words (`sendClauseBeforeD20`) — one made before B6 reads its figures alone (`limitCaveatSendBeforeB6`), and
+ * one that says nothing of what it counted reads no Send clause.
  */
 function limitCaveatSendBeforeD20(sendCheck: Record<string, unknown>): string {
 	const ahead = int(sendCheck.ahead);
@@ -261,12 +263,77 @@ function limitCaveatSendBeforeD20(sendCheck: Record<string, unknown>): string {
 	);
 }
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package O's check, finding 4 (D27; `REG-F-581`) — THE WORDS SEND'S CHECK RECORDED BEFORE THE REVIEW IN PARTS
+ * (B6, `452e927d`): `COUNTED_AHEAD.authoringFloor` as the one-try lane first wrote it (`131d3181`), before B6 counted the floor for
+ * the types anticipated. ⛔ RESTATED, NOT IMPORTED: the lane struck the constant (package L2, D20).
+ */
+export const COUNTED_AUTHORING_FLOOR_BEFORE_B6 = 'the authoring floor’s worst case';
+/**
+ * ⭐⭐ Package O's check, finding 4 (D27) — THE SEND CLAUSE OF A RUN WHOSE SEND CHECK WAS MADE BEFORE THE REVIEW IN PARTS: its own
+ * figure and words, and no rule. ⛔ The clause written for B6 to D20 (`limitCaveatSendBeforeD20`) called its count an estimate of
+ * the types anticipated and named the read of the inventory counted again, which the lane began to make at B6 — so of such a run
+ * it named a read its record cannot hold.
+ */
+function limitCaveatSendBeforeB6(sendCheck: Record<string, unknown>): string {
+	const ahead = int(sendCheck.ahead);
+	return (
+		'⚠ Save Send’s. This run was recorded before the review in parts (B6): its check before Send counted ' +
+		`${ahead === null ? '' : `${ahead} ahead, `}${COUNTED_AUTHORING_FLOOR_BEFORE_B6}, in that lane’s words, and this report ` +
+		'states no rule its Send press was bounded by — only that read’s figures, as listed. '
+	);
+}
+/**
+ * ⭐⭐ Package O's check, finding 4 (D27) — THE SEND CLAUSE OF A RUN NOT OF TODAY'S LANE, by the words its own Send check recorded:
+ * none where it recorded no Send check, or one that says nothing of what it counted (`limitCaveatCountUntold` names it among the
+ * checks that say nothing); its figures alone for the words of the lane before the review in parts (`limitCaveatSendBeforeB6`);
+ * else the clause written for B6 to D20 (`limitCaveatSendBeforeD20`).
+ */
+function sendClauseBeforeD20(sendCheck: unknown): string {
+	const counted = str(rec(sendCheck).counted);
+	if (counted === '') return '';
+	return counted === COUNTED_AUTHORING_FLOOR_BEFORE_B6 ? limitCaveatSendBeforeB6(rec(sendCheck)) : limitCaveatSendBeforeD20(rec(sendCheck));
+}
+/**
  * ⭐⭐ `JAN-EXEC` Phase 7, package O — D27 (design revision 3; `REG-F-581`) — THE WORDS A CHECK BEFORE PACKAGE L RECORDED FOR WHAT IT
  * COUNTED AHEAD OF A MODEL PRESS: one try's reserve (`phase7-operator.ts`, `COUNTED_AHEAD.tryReserve`, struck by package L, D16).
  * ⛔ RESTATED, NOT IMPORTED: that module loads Playwright, and package L struck the constant; a record carrying these words was
  * made by a lane that counted one try's reserve, and its caveat is that lane's (`limitCaveatOf`).
  */
 export const COUNTED_ONE_TRY_RESERVE = 'one try’s reserve';
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package O's check, finding 4 (D27; `REG-F-581`) — THE WORDS TODAY'S LANE'S CHECK RECORDS BEFORE A MODEL
+ * UNIT'S PRESS: its whole press's worst case (`phase7-operator.ts`, `COUNTED_AHEAD.wholePress`; package L, D16), by which the report
+ * tells a run recorded under the whole-press rule POSITIVELY, as `SEND_COUNTED_THE_ALLOWANCE` tells one recorded under D20.
+ * ⛔ RESTATED, NOT IMPORTED, from the lane's own figures (`lane-config.ts`): that module loads Playwright; `verif/phase7-half-b.test.ts`
+ * holds the two equal. ⛔ D27 told only the one-try lane by its words and read every other record as today's lane's, so a record
+ * whose checks say nothing of what they counted, or whose only reads are Send's, read a rule its lane may never have run.
+ */
+export const COUNTED_WHOLE_PRESS = `its whole press’s worst case, (${LANE_BUDGET.tries} tries + ${PHASE7_REVIEWED_COMMANDS} command runs) × ${LANE_BUDGET.reviewerCallsPerTry} calls`;
+/**
+ * ⭐⭐ Package O's check, finding 4 (D27) — THE COUNT CLAUSE OF A RUN WHOSE RECORD DOES NOT SAY WHICH RULE ITS LANE COUNTED BY: no
+ * check of it names one try's reserve or a press's whole worst case. `unsaid` — no check says what it counted at all: the lane
+ * recorded no such words from its first record (2026-10-10, `5d75c659`) until `REG-D-114` (14) was amended (2026-10-16,
+ * `131d3181`). Otherwise its checks were made only before acts the lane counted in words both rules used — Send, a sign-off's
+ * declared reviews, a root that runs no model — so nothing in the record tells its lane apart. ⭑ The record's own limit is
+ * stated, and no ruling: the record names none.
+ */
+function limitCaveatCountUntold(limit: number, unsaid: boolean): string {
+	return unsaid
+		? '⚠ This run’s record does not say what its lane counted before each press: none of its checks says what it counted ' +
+				'ahead of its act, for the run was recorded before the lane said so (REG-D-114 (14), as amended 2026-10-16). So this ' +
+				`report states no rule the lane counted by — only each read’s figures, as listed. The limit its checks used is ${limit}. `
+		: '⚠ This run’s record does not say what its lane counted before a model unit’s press: none of its checks was made ' +
+				'before one in words this report knows — one try’s reserve, or a press’s whole worst case. So this report states no ' +
+				`rule the lane counted by there — only each read’s figures, as listed. The limit its checks used is ${limit}. `;
+}
+/**
+ * ⭐⭐ Package O's check, finding 4 (D27) — THE CAVEAT'S FIRST CLAUSE FOR A RUN WHOSE RECORD HOLDS NO READ OF THE LIMIT AT ALL: a dry
+ * run of today's lane, which presses nothing, and a run that ended before its first checked act. ⛔ It read today's limit and
+ * today's rule, which no record of such a run holds.
+ */
+export const LIMIT_CAVEAT_NO_READ =
+	'⚠ This run’s record holds no read of the limit: no act of it was checked against one, so this report states neither ' +
+	'the limit its lane held nor the rule it counted by. ';
 
 /**
  * ⭐⭐ D27 — THE COUNT CLAUSE OF A RUN RECORDED BEFORE PACKAGE L, said of that run, in the past, as L2's check says a pre-D20 run's
@@ -297,16 +364,28 @@ function limitCaveatCountBeforeL(limit: number): string {
  * its own Send check gives, and none where it recorded no Send check (no allowance bounded a Send press before D20); and the
  * lower bound, true of every run. ⛔ It read today's clauses, so a regenerated report of run-12 described a whole-press rule its
  * lane never ran.
+ * ⭐⭐ Package O's check, finding 4 — AND TODAY'S CLAUSES ONLY FOR A RECORD WHOSE OWN WORDS ARE TODAY'S LANE'S: a check that counted
+ * a press's whole worst case (`COUNTED_WHOLE_PRESS`), or Send's that counted the allowance (`SEND_COUNTED_THE_ALLOWANCE`). Any other
+ * record does not say which rule its lane counted by, and its caveat says so, with its own limit (`limitCaveatCountUntold`), the
+ * Send clause the words of its own Send check give, where they say any, and the lower bound; and a record holding no read of the
+ * limit (`limit` null) says nothing of its lane's limit or rule (`LIMIT_CAVEAT_NO_READ`). ⛔ Every record not of the one-try lane
+ * read today's, so a record whose checks say nothing of what they counted (the lane of 2026-10-10 to 2026-10-16) read today's
+ * whole-press rule and "about 2,400" beside its own limit.
+ * ⭐ And the Send clause of a record not of today's lane is the one its Send check's own words give (`sendClauseBeforeD20`): a Send
+ * check made before the review in parts (B6) reads its figures alone, never the clause written for B6 to D20.
  */
 export function limitCaveatOf(
 	sendCheck: unknown,
-	checks: readonly Pick<LaneLimitCheck, 'counted'>[] = [],
-	limit: number = PAID_LIMIT
+	checks: readonly Pick<LaneLimitCheck, 'counted'>[],
+	limit: number | null
 ): string {
+	if (limit === null) return LIMIT_CAVEAT_NO_READ + LIMIT_CAVEAT_LOWER_BOUND;
 	if (checks.some((c) => c.counted === COUNTED_ONE_TRY_RESERVE))
+		return limitCaveatCountBeforeL(limit) + sendClauseBeforeD20(sendCheck) + LIMIT_CAVEAT_LOWER_BOUND;
+	if (!checks.some((c) => c.counted === COUNTED_WHOLE_PRESS) && str(rec(sendCheck).counted) !== SEND_COUNTED_THE_ALLOWANCE)
 		return (
-			limitCaveatCountBeforeL(limit) +
-			(sendCheck === undefined || sendCheck === null ? '' : limitCaveatSendBeforeD20(rec(sendCheck))) +
+			limitCaveatCountUntold(limit, checks.every((c) => c.counted === null)) +
+			sendClauseBeforeD20(sendCheck) +
 			LIMIT_CAVEAT_LOWER_BOUND
 		);
 	if (sendCheck === undefined || sendCheck === null) return LIMIT_CAVEAT;
@@ -674,11 +753,16 @@ export interface ReviewerCalls extends ReviewerCallCount {
 		readonly recorded: number;
 		readonly reserve: number;
 		readonly total: number | null;
-		readonly limit: number;
+		/**
+		 * ⭐⭐ Package O — D27 — the limit this run's own reads of it used (`runLimitOf`). ⭐ Package O's check, finding 4 — null for a
+		 * record that holds no read of the limit: it states none, and neither does the report — ~~today's (`PAID_LIMIT`)~~, a copy no
+		 * record of the run holds.
+		 */
+		readonly limit: number | null;
 		/**
 		 * Whether the total is BELOW the limit — a fact, kept as it was. ⚠ Not the one rule's verdict (the lead's delegated
 		 * decision of 2026-10-16, registered as REG-D-114 (14)), under which a run may reach the limit: report.md words the
-		 * total by it (`runStanding`).
+		 * total by it (`runStanding`). ⭐ Null too where the record states no limit (package O's check, finding 4).
 		 */
 		readonly under: boolean | null;
 	};
@@ -1961,15 +2045,17 @@ function priorSpend(lane: LaneRows): number | null {
 
 /**
  * ⭐⭐ `JAN-EXEC` Phase 7, package O — D27 (design revision 3; `REG-F-581`) — THE LIMIT A RUN'S OWN CHECKS USED: the one limit its
- * recorded reads of the limit hold. ⚠ A run that recorded no read — a dry run, a record made before the lane kept them — states
- * today's limit (`PAID_LIMIT`), the only one it can: its record holds no other. ⛔ Reads that disagree are a record that
- * disagrees with itself: the LAST one's limit is stated, and the report's problems name every limit the reads used.
+ * recorded reads of the limit hold. ~~⚠ A run that recorded no read — a dry run, a record made before the lane kept them — states
+ * today's limit (`PAID_LIMIT`), the only one it can: its record holds no other.~~ ⭐⭐ Package O's check, finding 4 (2026-10-26):
+ * A RUN THAT RECORDED NO READ — a dry run of today's lane, a run that ended before its first checked act — STATES NO LIMIT (null):
+ * its record holds none, and today's was a copy no record of the run holds. ⛔ Reads that disagree are a record that disagrees
+ * with itself: the LAST one's limit is stated, and the report's problems name every limit the reads used.
  */
-function runLimitOf(checks: readonly LaneLimitCheck[], problems: string[]): number {
+function runLimitOf(checks: readonly LaneLimitCheck[], problems: string[]): number | null {
 	const used = [...new Set(checks.map((c) => c.limit))];
 	if (used.length > 1)
 		problems.push(`lane/run.json's reads of the limit used ${used.length} limits (${used.join(', ')}): the report states the last read's`);
-	return checks.at(-1)?.limit ?? PAID_LIMIT;
+	return checks.at(-1)?.limit ?? null;
 }
 
 function buildReviewerCalls(ix: Index, units: readonly Unit[], lane: LaneRows, problems: string[]): ReviewerCalls {
@@ -1994,7 +2080,8 @@ function buildReviewerCalls(ix: Index, units: readonly Unit[], lane: LaneRows, p
 			reserve: NEGATIVE_CONTROL_RESERVE,
 			total,
 			limit,
-			under: total === null ? null : total < limit
+			// ⭐ Package O's check, finding 4 — and no standing against a limit the record does not state.
+			under: total === null || limit === null ? null : total < limit
 		},
 		laneLimitChecks,
 		// ⭐⭐ Package L2's check, finding 1 — ~~`LIMIT_CAVEAT`~~ the caveat of this run, by its Send check ⭐ and, package O (D27), by its
@@ -4484,7 +4571,11 @@ function matrixLines(r: RunReport): string[] {
 function unitLines(r: RunReport): string[] {
 	const limit = r.reviewerCalls.limit;
 	// ⭐ By the one rule (`runStanding`): ~~limit.under ? ', under it' : ', NOT under it'~~.
-	const under = limit.total === null ? '' : `, ${runStanding(limit.total, limit.limit)}`;
+	// ⭐⭐ Package O's check, finding 4 (D27) — and against no limit where the record states none: ~~`of ${limit.limit}`~~, today's.
+	const against =
+		limit.limit === null
+			? ', against no limit: this run’s record holds no read of one (design D27)'
+			: ` of ${limit.limit}${limit.total === null ? '' : `, ${runStanding(limit.total, limit.limit)}`}`;
 	return [
 		'## The units',
 		'',
@@ -4506,7 +4597,7 @@ function unitLines(r: RunReport): string[] {
 		`- **Recorded:** ${r.reviewerCalls.recorded} (${r.reviewerCalls.noResponse} with no response, ` +
 			`${r.reviewerCalls.retries} retries, ${r.reviewerCalls.repairs} repairs).`,
 		`- **The limit (design D8):** ${limit.prior ?? 'prior spend not given'} + ${limit.recorded} + ${limit.reserve} = ` +
-			`${limit.total ?? '?'} of ${limit.limit}${under}.`,
+			`${limit.total ?? '?'}${against}.`,
 		// ⭐ E12's polish (fix2's F8; the lead's delegated decision of 2026-10-15, to be registered) — and the lane's own reads.
 		`- **The lane's own reads of the limit, each before a paid act (design D8; E12F F2):** ${r.reviewerCalls.laneLimitChecks.length}.`,
 		...r.reviewerCalls.laneLimitChecks.map(
