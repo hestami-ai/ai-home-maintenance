@@ -31,10 +31,13 @@ import {
 	type ExecutionPlanInput,
 	plansForPwus,
 	prunableStepIds,
+	readinessUnitOf,
 	rebuildProjection,
 	type SequenceInstance,
 	sequenceView,
 	startableStepIds,
+	startReadiness,
+	startRefusal,
 	traceabilityProjector,
 	transitionRows
 } from '@janumipwb/rph-projections';
@@ -192,15 +195,34 @@ function mapPwuRow(engine: ReturnType<typeof getEngine>, p: PwuRecord) {
 	} else {
 		typeName = '—';
 	}
+	const workLifecycleState = String((p.state.workLifecycleState ?? '') as string);
 	return {
 		id: p.id,
 		title: String((p.state.title ?? p.id) as string),
-		workLifecycleState: String((p.state.workLifecycleState ?? '') as string),
+		workLifecycleState,
 		executionState: String((p.state.executionState ?? '') as string),
 		assuranceState: String((p.state.assuranceState ?? '') as string),
 		typeName,
-		typePwaId: type ? String((type.pwaId ?? '') as string) : ''
+		typePwaId: type ? String((type.pwaId ?? '') as string) : '',
+		start: workLifecycleState === 'PROPOSED' ? startOfferOf(engine, p.id) : null
 	};
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package M — WHETHER THE PAGE OFFERS BEGIN & EXECUTE ON A PROPOSED UNIT, AND WHY NOT (`REG-D-135` (2);
+ * design D3, D4, D5; SPEC-001 :3244: the offered set *"SHALL equal the set the engine would admit"*). Read from the ONE rule
+ * the engine's refusal reads (`startReadiness`, the refusal at `MarkPwuReady`), over the same stored record — so the page
+ * never offers what the engine refuses, and never withholds what it admits. ⛔ The page offered Begin & Execute on every
+ * PROPOSED row (`+page.svelte`), the root's included before its children had run (`REG-F-578`). ⚠ No fail-open is needed:
+ * the record the engine reads is the record this reads, so the engine's disposition is always determinable here.
+ * `kinds` names each reason for the lane (`phase7-operator.ts`), which ends a run on a loop before any press (D5).
+ */
+function startOfferOf(
+	engine: ReturnType<typeof getEngine>,
+	pwuId: string
+): { readonly offered: boolean; readonly reason: string | null; readonly kinds: readonly string[] } {
+	const r = startReadiness(pwuId, (id) => readinessUnitOf(id, getObject(engine, id)));
+	return { offered: r.startable, reason: r.reason, kinds: r.kinds };
 }
 
 /** §38 "applicable policies" per PWU — the required-but-unassessed join, kept only where non-empty. */
@@ -2293,6 +2315,14 @@ export const actions: Actions = {
 		// an id that arrives from outside the system."* `pwuId` arrives from the request. `getObjectOfType` was
 		// already imported in this file and already used for the undertaking seven hundred lines up.
 		const pwu = getObjectOfType(getEngine(), 'PROFESSIONAL_WORK_UNIT', pwuId);
+		// ── ⭐⭐ `JAN-EXEC` Phase 7, package M — A UNIT WHOSE PRODUCERS ARE NOT ACCEPTED IS REFUSED BEFORE ANYTHING ELSE (`REG-D-135`
+		// (2); design D2, D3) ────────────────────────────────────────────────────────────────────────────────────────────
+		// ⚠ DEFENCE IN DEPTH, NOT THE AUTHORITY: the ENGINE refuses it, at `MarkPwuReady`, inside the batch below, which then
+		// rolls back whole — so a unit the page should not have offered is refused with or without this. Asked here so the
+		// refusal comes before the reviewer's preflight and the executor's selection, in the engine's own words
+		// (`startReadiness`, `startRefusal`): the rule the page's offer reads too.
+		const start = startReadiness(pwuId, (id) => readinessUnitOf(id, getObject(getEngine(), id)));
+		if (!start.startable) return fail(400, { error: `Execution failed: ${startRefusal(pwuId, start)}` });
 		const pwuTypeId = String((pwu?.pwuTypeId ?? '') as string);
 		const pwuType = pwuTypeId ? getObjectOfType(getEngine(), 'PWU_TYPE', pwuTypeId) : undefined;
 		// ⭐ PARSED, NOT ASSERTED (`REG-F-411`). This read `pwuType?.promptTemplate as PromptTemplate | undefined`

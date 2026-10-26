@@ -29,7 +29,8 @@
 // SCOPE, DERIVED RATHER THAN CHOSEN, AND CURRENT AS OF 2026-08-03. The register is TOTAL over FIFTEEN families of
 // the ratified catalog (`packages/rph-domain/vocab/m12-conformance.json`) — `RPH-EXE`, `RPH-EVD`, `RPH-ASR`,
 // `RPH-INT`, `RPH-PWU`, `RPH-CON`, `RPH-PER`, `RPH-PRJ`, `RPH-TRC`, `RPH-CMP`, `RPH-DEC`, `RPH-CNS`, `RPH-ASM`,
-// `RPH-BAS`, `RPH-GOV` — which is **112 of the catalog's 125 rules, and the CEILING of what this instrument can
+// `RPH-BAS`, `RPH-GOV` — which is ~~**112 of the catalog's 125 rules~~ ⭐ **113 of the catalog's 126 rules (2026-10-25:
+// `RPH-PWU-011`, package M, added to both), and the CEILING of what this instrument can
 // reach**. A new rule in any of the fifteen with no row is a FAILING TEST, not a discovery, and the families are
 // listed as DATA in `enforcement-register.test.ts` (`TOTAL_OVER_FAMILIES`) rather than hard-coded in a filter, so a
 // family cannot be silently dropped from the gate either. The number is derivable from this file and the catalog;
@@ -75,7 +76,7 @@
 //   instrument" is a claim about the register, which does not license a claim about the repository.
 //
 // WHAT "TOTAL OVER FIFTEEN FAMILIES" DOES NOT MEAN, stated because the number invites the wrong reading: it means
-// every rule in those families has a DISPOSITION, not that every rule is enforced. Of the 112 rows, 33 are
+// every rule in those families has a DISPOSITION, not that every rule is enforced. Of the 113 rows, 34 are
 // ENFORCED, 22 are UNENFORCED_DISCLOSED and 57 are NOT_A_COMMAND_REFUSAL — so barely a QUARTER of the disposed
 // catalog is a refusal the engine actually performs, and a MAJORITY states outcomes, permissions, or planes
 // that do not exist.
@@ -107,7 +108,11 @@
 // not a majority" — and this copy was never revisited. ⚠ AND THE GATE ADDED WITH THAT CORRECTION CANNOT
 // SEE IT: its regex stops at NOT_A_COMMAND_REFUSAL, four words short of the adjective, so it greened on a
 // sentence whose digits it had just verified and whose meaning it had just falsified. Including all fourteen read-model rules. The register's value is that those are now written down and
-// gated, not that they are closed; the honest headline is 33, not 112.
+// gated, not that they are closed; the honest headline is 34, not 113.
+// ⭑ 112 -> 113 AND 33 -> 34 (2026-10-25, `JAN-EXEC` Phase 7 package M): `RPH-PWU-011` joined the catalog and the register
+// together, ENFORCED — the first rule this register disposes that the conformance specification gained after its baseline
+// (`REG-D-135` (2)). Arm 3 is 57 of 113, still a MAJORITY. The sentence above stays machine-readable, as the note on
+// EG-03 below requires.
 //
 // EACH EXTENSION FOUND A DIFFERENT SHAPE, which is the argument for extending rather than generalising early:
 // RPH-EXE's gaps were dead predicates; RPH-EVD's and RPH-ASR's were refusals implemented at NEITHER layer, which
@@ -510,7 +515,11 @@ export type RegisteredRuleId =
 	| 'RPH-DEC-005'
 	| 'RPH-GOV-005'
 	// RPH-GOV CLOSED 7/7 (2026-08-03) — the last rule in reach of this instrument.
-	| 'RPH-GOV-006';
+	| 'RPH-GOV-006'
+	// ⭐ RPH-PWU-011 (2026-10-25, `JAN-EXEC` Phase 7 package M; `REG-D-135` (2), design D2) — A NEW RULE OF THE CATALOG,
+	// carried in the conformance specification (§8) as RPH-EXE-005's is (§12), and disposed the commit it was ratified in:
+	// RPH-PWU is in `TOTAL_OVER_FAMILIES`, so a §8 rule with no row is a failing test.
+	| 'RPH-PWU-011';
 
 export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, EnforcementDisposition>> = {
 	'RPH-EXE-001': {
@@ -1858,6 +1867,13 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 				// arrangement above for "required inputs" and for the assurance half of "the applicable risk/
 				// assurance profile" — which the anchor never quoted, and which RPH-PWU-007 already records as
 				// written and read by nothing.
+				// ⭑ 2026-10-25 (`JAN-EXEC` Phase 7, package M; `REG-D-135` (2)) — ONE FACT ABOVE IS NO LONGER TRUE, recorded
+				// here rather than rewritten: ~~both fields are hardcoded [] by `proposePwu`, `ProposePwuPayloadSchema` is a
+				// strictObject that refuses to carry either~~ — `inputRequirements` (and `dependencyIds`) now have a wire path:
+				// `ProposePwu` carries and records them, and instantiation writes each input no unit produces as UNPRODUCED.
+				// `verificationCriterionIds` still has none. And "required inputs" is no longer ADMITTED at this site for the
+				// case the record can name: an UNPRODUCED input refuses `MarkPwuReady` — but under RPH-PWU-011, its own row and
+				// marker, never this one's; this row's marker and its "expected outputs" anchor are unchanged.
 				'expected outputs',
 			note: 'JPWB-DOC-003 §5 STA-5 (readiness is a substantive shape gate) enumerates the admission requirements this rule names, including the expected-outputs limb the marker pins.'
 		},
@@ -4056,6 +4072,39 @@ export const ENFORCEMENT_REGISTER: Readonly<Record<RegisteredRuleId, Enforcement
 				'of the same name. The guard would look wired while the rule went unenforced — the same collision ' +
 				'RPH-DEC-004 records, which is why that row names a different symbol and this one observes instead.'
 		}
+	},
+	// ⭐⭐ `JAN-EXEC` Phase 7, package M — A UNIT ENTERS READINESS ONLY WHEN THE UNITS IT WAITS FOR ARE ACCEPTED (`REG-D-135`
+	// (2), Q42b: *"Its producers must have finished AND had their work reviewed and accepted (signed off). The workbench
+	// itself enforces this, so the root, which pulls everything together, always runs last."*; design D1-D2; `REG-F-578`).
+	// ⛔ BEFORE IT, nothing held a consumer back: `ProposePwu` forced `dependencyIds` and `inputRequirements` to [], and run-12's
+	// lane pressed the root and 4 of 4 composites before the children whose outputs they required.
+	'RPH-PWU-011': {
+		kind: 'ENFORCED',
+		canonCarriage: {
+			// ⭐ GENERAL, NOT CARRIED, AND NOT `NO_CANON_CARRIER` AS RPH-EXE-005 IS — the subjects decide it, by that row's own
+			// argument. RPH-EXE-005's subject is an execution step and its input artifact, so STA-5's PWU readiness profile is no
+			// carrier there; THIS rule's subject IS the PWU's readiness, and STA-5 lists "dependencies" and "required inputs" in
+			// the profile a PWU must satisfy to enter it. What canon does not say is the specific rule — that a dependency is
+			// satisfied only when ACCEPTED, and which states accept — so this is the general rule's instance, and the specific
+			// text's only home is the conformance specification (§8, RPH-PWU-011), as RPH-EXE-005's is (§12).
+			kind: 'CARRIED_BY_GENERAL_RULE',
+			canonAnchor: 'A PWU enters readiness only when its shape readiness profile is satisfied',
+			note:
+				'JPWB-DOC-003 §5 STA-5 (DOC-003 :191, its scope "governs the ready transition", :193): the profile names ' +
+				'"dependencies" and "required inputs". Why CONDITIONALLY_SATISFIED does not count is DOC-003 DEC-6 (:231): ' +
+				"\"'Assured required child results' excludes conditionally satisfied dispositions\". Neither sentence names " +
+				"the states in which a dependency is accepted, so the instance survives retirement only in the conformance " +
+				'specification.'
+		},
+		enforcedAt:
+			'packages/rph-application/src/handlers/pwu.ts — markPwuReady, the readiness limb after checkPwuShapeReadiness, asking startReadiness (packages/rph-projections/src/unit-dependencies.ts) over the stored units; the page reads the same rule for its offer (apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts, startOfferOf)',
+		refusalCode: 'RPH_INVARIANT_VIOLATION',
+		refusalMarker: 'cannot start until each unit it depends on is accepted',
+		declaredMutations: [
+			'return the shape-readiness advance without asking startReadiness in markPwuReady — the refusal dropped (P6X-M-M1)',
+			"add 'CONDITIONALLY_SATISFIED' to ACCEPTED_UNIT_STATES — an open condition counted as accepted (P6X-M-M2)",
+			'stop at the first accepted dependency in startReadiness — one producer of two counted as enough (P6X-M-M6)'
+		]
 	}
 };
 

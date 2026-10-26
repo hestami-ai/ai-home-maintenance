@@ -16,7 +16,7 @@
 		},
 		"packages/rph-application/src/exchange-resolution.ts": {
 			"statements": 2,
-			"branches": 6,
+			"branches": 5,
 			"functions": 0,
 			"lines": 2
 		},
@@ -690,6 +690,12 @@
 			"statements": 0,
 			"branches": 0,
 			"functions": 0,
+			"lines": 0
+		},
+		"packages/rph-projections/src/unit-dependencies.ts": {
+			"statements": 2,
+			"branches": 25,
+			"functions": 1,
 			"lines": 0
 		},
 		"packages/rph-projections/src/work-projection.ts": {

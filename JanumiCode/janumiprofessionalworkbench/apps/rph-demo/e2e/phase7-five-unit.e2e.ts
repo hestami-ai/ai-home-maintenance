@@ -66,6 +66,10 @@ import {
 //   (a) Can the root be signed off while a child is stuck? PREDICTED: ALLOWED. Nothing gates a parent's sign-off on its
 //       children: recomposition is undispatched in production (`REG-F-041`), and the design accounts the missing order
 //       as by design (§7.4, B31). So a SATISFIED root is not a finished Undertaking (`REG-F-533`).
+//       ⭐ RESTATED BY `JAN-EXEC` Phase 7, package M (`REG-D-135` (2); design D2, D7) — ITS RECORD: a unit starts only after
+//       each unit it depends on is accepted, and a parent depends on each of its children, so the root cannot START while a
+//       child is stuck, and so is never signed off beside one: its row withholds Begin & Execute and names the child it
+//       waits for. PREDICTED now: WITHHELD. ⚠ The sign-off itself is still not gated on the children; what moved is the start.
 //   (b) Does a root whose TRANSFORMATION produced nothing turn green? PREDICTED: YES, GREEN (`REG-F-523`: *"A unit that
 //       did nothing is signed off the same way"*). Its declared policies are signed off with no criterion answered.
 //   (c) Does `completeStep` with no output close a step? PREDICTED: ADMITTED — for a model step whose structured result
@@ -116,7 +120,8 @@ import {
 
 /** The answers this spec predicted before it first ran (the header's section). ⛔ Changed only beside a new record. */
 const PREDICTED = {
-	a: 'ALLOWED',
+	// ~~a: 'ALLOWED'~~ ⭐ beside its new record, `REG-D-135` (2) (the header's (a)): the root waits for its stuck child.
+	a: 'WITHHELD',
 	b: 'GREEN',
 	c: 'ADMITTED'
 } as const;
@@ -533,9 +538,21 @@ test.describe('JAN-EXEC Phase 7 P7-1b — the five-unit rehearsal, in the gate l
 			);
 		expect(created.get(PHASE7_ROOT.name)!.state.parentWorkUnitId ?? '').toBe('');
 
-		// ── 3. BEGIN & EXECUTE — the root first (no model, no output), then each phase, each only after the one before
-		//    has returned (`REG-F-535`: nothing else stops two running at once) ────────────────────────────────────────
-		for (const t of [PHASE7_ROOT, ...PHASE7_PHASES]) {
+		// ── 3. BEGIN & EXECUTE — ~~the root first (no model, no output), then each phase~~ ⭐ each phase, each only after the one
+		//    before has returned (`REG-F-535`: nothing else stops two running at once) ─────────────────────────────────────
+		// ⛔ MOVED BY `JAN-EXEC` Phase 7, package M (`REG-D-135` (2); design D2, D7): a unit starts only after each unit it depends
+		// on is accepted, and a parent depends on each of its children — so the root, which ran first here, is not startable
+		// until the four phases are signed off, and its row says so. §3.2's PWA declares no data flow, so the phases wait for
+		// nothing and are pressed in the tree's order as before.
+		await expect(
+			unitRow(page, PHASE7_ROOT.name).getByRole('button', { name: 'Begin & Execute', exact: true }),
+			'D3: the page offered the root before its children were accepted'
+		).toHaveCount(0);
+		const rootWithheld = unitRow(page, PHASE7_ROOT.name).getByTestId('start-withheld');
+		await expect(rootWithheld).toHaveAttribute('data-withheld', 'waiting');
+		for (const t of PHASE7_PHASES)
+			await expect(rootWithheld, `the root's reason does not name ${t.name}`).toContainText(`"${t.name}" (PROPOSED)`);
+		for (const t of PHASE7_PHASES) {
 			const ran = await beginExecute(page, t.name);
 			expect(ran.type, `Begin & Execute on ${t.name} was refused: ${refusalOf(ran)}`).toBe(
 				'success'
@@ -544,6 +561,19 @@ test.describe('JAN-EXEC Phase 7 P7-1b — the five-unit rehearsal, in the gate l
 				unitRow(page, t.name).getByRole('button', { name: 'Record Assurance', exact: true })
 			).toBeVisible();
 		}
+
+		// ── 4. SIGN-OFF — Record Assurance and Mark Satisfied on each phase, and on the root LAST (§3.2) ──────────────
+		// ⛔ THE MUTANT, DRIVEN: conclude every declared verdict INCONCLUSIVE — this test reddens here, at the first phase's
+		// Record Assurance, before the root is reached.
+		for (const t of PHASE7_PHASES) await signOff(page, t.name);
+		// ⭐ Package M (D2, D7) — THE ROOT RUNS ONLY NOW, its four children accepted: no model, no output.
+		const rootRan = await beginExecute(page, PHASE7_ROOT.name);
+		expect(rootRan.type, `Begin & Execute on the root was refused: ${refusalOf(rootRan)}`).toBe(
+			'success'
+		);
+		await expect(
+			unitRow(page, PHASE7_ROOT.name).getByRole('button', { name: 'Record Assurance', exact: true })
+		).toBeVisible();
 		// ⭐ PREDICTION (b)'S ARRANGEMENT, READ BEFORE THE ROOT IS SIGNED OFF: its run was a TRANSFORMATION that produced
 		// nothing — no output, no evidence, no work product, no exchange — and is recorded as the operator's.
 		const executed = await introspect(request);
@@ -565,10 +595,6 @@ test.describe('JAN-EXEC Phase 7 P7-1b — the five-unit rehearsal, in the gate l
 			'the root’s TRANSFORMATION is recorded as the operator’s'
 		).toBe(OPERATOR);
 
-		// ── 4. SIGN-OFF — Record Assurance and Mark Satisfied on each phase, and on the root LAST (§3.2) ──────────────
-		// ⛔ THE MUTANT, DRIVEN: conclude every declared verdict INCONCLUSIVE — this test reddens here, at the first phase's
-		// Record Assurance, before the root is reached.
-		for (const t of PHASE7_PHASES) await signOff(page, t.name);
 		// ⭐ PREDICTION (b): A ROOT WHOSE TRANSFORMATION PRODUCED NOTHING TURNS GREEN (`REG-F-523`) — observed before
 		// anything is asserted: the root's sign-off asserts neither act, and its observation is recorded first.
 		// ⛔ THE MUTANT, DRIVEN: refuse the sign-off of a unit whose type a model does not run — this prediction reddens, and
@@ -742,7 +768,7 @@ test.describe('JAN-EXEC Phase 7 P7-1b — the five-unit rehearsal, in the gate l
 		}
 	});
 
-	test('⭐ K1, RESTATED BY P7-6R R-1 — a phase whose review is INCONCLUSIVE WAITS for a person (REG-D-104 (1)): the root signs off beside it (prediction a), no step act runs anything, the page offers the person’s three choices, and Abandon takes their rationale and cancels the waiting step', async ({
+	test('⭐ K1, RESTATED BY P7-6R R-1 — a phase whose review is INCONCLUSIVE WAITS for a person (REG-D-104 (1)): the root waits for it, never started (prediction a, restated by package M), no step act runs anything, the page offers the person’s three choices, and Abandon takes their rationale and cancels the waiting step', async ({
 		page,
 		request
 	}) => {
@@ -754,8 +780,9 @@ test.describe('JAN-EXEC Phase 7 P7-1b — the five-unit rehearsal, in the gate l
 		// ── 1. THE PWA AND ITS UNDERTAKING — ⛔ NOTHING REGISTERED, so the stand-in leaves the review INCONCLUSIVE
 		//    (`REG-D-071`), as a reviewer that answers no verdict would ────────────────────────────────────────────────
 		const pwaId = await createDraftPwa(page, request, STUCK_PWA);
-		// ⭐ E2 — the DECLARED policies' stipulation only, so the root's sign-off can conclude beside the stuck phase
-		// (prediction (a)); ⛔ the phase's WORK_PRODUCT review stays unstipulated, as the arm this test drives needs — the
+		// ⭐ E2 — the DECLARED policies' stipulation only, so ~~the root's sign-off can conclude beside the stuck phase
+		// (prediction (a))~~ ⭐ package M: the design's sign-off can conclude, leaving the stuck phase the one unit the root
+		// waits for (prediction (a), step 5); ⛔ the phase's WORK_PRODUCT review stays unstipulated, as the arm this test drives needs — the
 		// stipulation the design phase runs under comes after the phase has stopped (step 5).
 		await registerStipulation(request, pwaId, 'DECLARED_POLICY');
 		await typePwuTypes(page, request, STUCK_PWA.types);
@@ -843,7 +870,7 @@ test.describe('JAN-EXEC Phase 7 P7-1b — the five-unit rehearsal, in the gate l
 		await expect(phaseRow.getByTestId('rerun-work-no-findings')).toBeVisible();
 		await expect(phaseRow.getByTestId('abandon-rationale')).toBeVisible();
 
-		// ── 5. ⭐ PREDICTION (a): THE ROOT IS SIGNED OFF WHILE ITS CHILD WAITS ───────────────────────────────────────────
+		// ── 5. ⭐ PREDICTION (a): ~~THE ROOT IS SIGNED OFF WHILE ITS CHILD WAITS~~ ⭐ package M: THE ROOT WAITS FOR ITS CHILD ────
 		// ⛔ The merge's fix round, F1 — ITS OTHER CHILD, THE DESIGN, COMPLETES FIRST, its review stipulated now: the root is
 		// judged over ~~its children's work~~ ⭐ R3-A F1: the work it and every unit below it produced (REG-D-111 (2)'s general
 		// form), and with only the waiting phase beneath it, its Record Assurance is
@@ -862,31 +889,30 @@ test.describe('JAN-EXEC Phase 7 P7-1b — the five-unit rehearsal, in the gate l
 			designRow.getByRole('button', { name: 'Begin & Execute', exact: true }),
 			'Begin & Execute is offered only on a PROPOSED unit'
 		).toHaveCount(0);
-		const rootRan = await beginExecute(page, ROOT);
-		expect(rootRan.type, `Begin & Execute on the root was refused: ${refusalOf(rootRan)}`).toBe(
-			'success'
-		);
-		await expect(
-			unitRow(page, ROOT).getByRole('button', { name: 'Record Assurance', exact: true })
-		).toBeVisible();
-		// ⭐ OBSERVED BEFORE ANYTHING IS ASSERTED, as (b) is: the root's sign-off asserts neither act, and its observation —
-		// a refusal included — is recorded before it is held to the prediction.
-		// ⛔ THE MUTANT, DRIVEN: refuse a unit's sign-off while a child of it is unsatisfied — this prediction reddens, its
-		// annotation the refusal, and the five-unit test, which signs its root off last, stays green.
-		const rootSignOff = await attemptSignOff(page, ROOT);
+		// ~~const rootRan = await beginExecute(page, ROOT); … attemptSignOff(page, ROOT) … observed 'ALLOWED'~~
+		// ⛔ MOVED BY `JAN-EXEC` Phase 7, package M (`REG-D-135` (2); design D2, D3, D7) — THE ROOT CANNOT START WHILE ITS CHILD
+		// WAITS, so it is never signed off beside it. The design is signed off now, so the one unit the root waits for is the
+		// stuck phase, and the root's row names it. ⭐ OBSERVED BEFORE ANYTHING IS ASSERTED, as (b) is: the row's offer, its
+		// reason and the root's state are read, recorded, and only then held to the prediction.
+		// ⛔ THE MUTANT (P6X-M-M4): the page offers Begin & Execute on every PROPOSED row — this prediction reddens.
+		await signOff(page, DESIGN);
+		const rootRow = unitRow(page, ROOT);
+		const rootOffered = await rootRow.getByRole('button', { name: 'Begin & Execute', exact: true }).count();
+		const rootReason =
+			(await rootRow.getByTestId('start-withheld').count()) > 0
+				? (await rootRow.getByTestId('start-withheld').innerText()).trim()
+				: '';
 		const signed = unitsOf(await introspect(request), STUCK_UNDERTAKING.name);
+		const rootAxes = axes(signed.get(ROOT)!);
 		recordPrediction(
 			'a',
-			observedSignOff(
-				ROOT,
-				rootSignOff,
-				signed.get(ROOT)!,
-				['SATISFIED', 'SATISFIED', 'SUCCEEDED'],
-				'ALLOWED'
-			),
-			'nothing gates a parent’s sign-off on its children — recomposition is undispatched in production (REG-F-041) — so a SATISFIED root is not a finished Undertaking (REG-F-533)'
+			rootOffered === 0 &&
+				rootReason === `Not startable yet: it waits for "${PHASE}" (EXECUTING) to be accepted.` &&
+				rootAxes[0] === 'PROPOSED'
+				? 'WITHHELD'
+				: `${rootOffered} Begin & Execute offered on the root, its reason "${rootReason}", the root ${rootAxes.join('/')}`,
+			'REG-D-135 (2): a parent waits for each of its children to be accepted before it starts, so a root is never signed off beside a stuck child; ⚠ the sign-off itself is still ungated (REG-F-041), so a SATISFIED root is still not a finished Undertaking (REG-F-533)'
 		);
-		await expect(unitRow(page, ROOT).getByText('✓ satisfied')).toBeVisible();
 		expect(axes(signed.get(PHASE)!), 'arrangement: the child no longer waits').toEqual([
 			'EXECUTING',
 			'UNASSESSED',
@@ -939,6 +965,13 @@ test.describe('JAN-EXEC Phase 7 P7-1b — the five-unit rehearsal, in the gate l
 		expect(ids(decision!.state.subjectObjectIds)).toEqual([phase.id, planId, product!.id]);
 		expect(recordCounts(closed), 'abandoning ran something').toEqual(beforeAbandon);
 		expect(step.id).toBeTruthy();
+		// ⭐ Package M (`REG-D-135` (2); design D4) — AND THE ROOT, WAITING FOR IT, NOW NEVER STARTS: its row names the producer
+		// and its ABANDONED state, and the root stays PROPOSED.
+		await expect(unitRow(page, ROOT).getByTestId('start-withheld')).toContainText(
+			`its producer "${PHASE}" was ABANDONED`
+		);
+		await expect(unitRow(page, ROOT).getByTestId('start-withheld')).toHaveAttribute('data-withheld', 'abandoned');
+		expect(axes(unitsOf(closed, STUCK_UNDERTAKING.name).get(ROOT)!)[0]).toBe('PROPOSED');
 	});
 
 	// ── ⭐⭐ `JAN-EXEC` P7-6R R-1e (`DESIGN-the-stopped-unit-recovery.md` §7 item 5; RD3-RD5; `REG-D-104` (1)) ──────────────────
@@ -967,11 +1000,9 @@ test.describe('JAN-EXEC Phase 7 P7-1b — the five-unit rehearsal, in the gate l
 		await publishThroughDesigner(page, request, pwaId);
 		await createUndertakingThroughForm(page, RECOVERY_UNDERTAKING);
 
-		// ── 2. THE ROOT RUNS; THE FIRST TWO PHASES STOP, AND WAIT ───────────────────────────────────────────────────
-		const rootRan = await beginExecute(page, PHASE7_ROOT.name);
-		expect(rootRan.type, `Begin & Execute on the root was refused: ${refusalOf(rootRan)}`).toBe(
-			'success'
-		);
+		// ── 2. ~~THE ROOT RUNS;~~ THE FIRST TWO PHASES STOP, AND WAIT ───────────────────────────────────────────────
+		// ⛔ MOVED BY `JAN-EXEC` Phase 7, package M (`REG-D-135` (2); design D2, D7): the root, which ran first here, waits for
+		// its four children to be accepted, so it runs in step 4, after their sign-off.
 		for (const t of [REQUIREMENTS, DESIGN]) {
 			// ⚠ The page reloads only after a success, so after the first refusal the row is stale: load it afresh.
 			await gotoHydrated(page, new URL(page.url()).pathname);
@@ -1032,6 +1063,11 @@ test.describe('JAN-EXEC Phase 7 P7-1b — the five-unit rehearsal, in the gate l
 			);
 		}
 		for (const t of PHASE7_PHASES) await signOff(page, t.name);
+		// ⭐ Package M (D2, D7) — the root runs only now, its four children accepted, and is signed off last.
+		const rootRan = await beginExecute(page, PHASE7_ROOT.name);
+		expect(rootRan.type, `Begin & Execute on the root was refused: ${refusalOf(rootRan)}`).toBe(
+			'success'
+		);
 		await signOff(page, PHASE7_ROOT.name);
 		await shot(page, 'five units SATISFIED, two of them recovered by a person');
 

@@ -477,7 +477,7 @@
 				"supersedePwu",
 				"unblockPwu"
 			],
-			"unattributedMutants": 3
+			"unattributedMutants": 4
 		},
 		"packages/rph-application/src/handlers/registry.ts": {
 			"consumedExports": [
@@ -1460,6 +1460,20 @@
 				"uncertaintyDisclosures"
 			],
 			"unattributedMutants": 1
+		},
+		"packages/rph-projections/src/unit-dependencies.ts": {
+			"consumedExports": [
+				"readinessUnitOf",
+				"startReadiness",
+				"startRefusal",
+				"unitDependencies",
+				"UNPRODUCED_INPUT"
+			],
+			"guardedExports": [
+				"startReadiness",
+				"unitDependencies"
+			],
+			"unattributedMutants": 0
 		},
 		"packages/rph-projections/src/work-projection.ts": {
 			"consumedExports": [

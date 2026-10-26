@@ -39,6 +39,46 @@ import { fromStates } from './command-precondition.js';
 const DECOMP = 'DECOMPOSITION_CONTRACT';
 const RECOMP = 'RECOMPOSITION_CONTRACT';
 
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package M — A DECOMPOSITION'S UNITS WAIT ONLY FOR UNITS OF THEIR UNDERTAKING (`REG-D-135` (2); design
+ * D1; DOC-003 :215, DEC-2: a decomposition records *"sibling identities, dependencies, and coordination rules"*). Refused:
+ *   · a `siblingDependencyIds` entry that is not one of the contract's children — a sibling dependency is a child another
+ *     child of the same parent waits for;
+ *   · a parent or child whose `dependencyIds` names an id that is not a work unit of the parent's Undertaking.
+ * ⚠ THE SECOND LIMB IS WHERE `ProposePwu`'s FORWARD REFERENCE IS CLOSED: a parent is proposed before the children it waits
+ * for, so `ProposePwu` admits an id not yet stored (`rejectInvalidDependencies`, pwu.ts); instantiation's batch proposes
+ * every unit before any contract, so here each named unit exists — or the whole batch is refused and nothing is left.
+ */
+function rejectDanglingDependencies(
+	ctx: HandlerContext,
+	command: DomainCommand,
+	p: ProposeDecompositionPayload
+): CommandResult | undefined {
+	const refuse = (why: string): CommandResult =>
+		reject(command, 'RPH_VALIDATION_SEMANTIC_FAILED', `ProposeDecomposition: ${why} (REG-D-135 (2); design D1).`, [
+			command.targetAggregateId
+		]);
+	const outside = (p.siblingDependencyIds ?? []).filter((s) => !p.childWorkUnitIds.includes(s));
+	if (outside.length > 0)
+		return refuse(`siblingDependencyIds names ${outside.join(', ')}, which is no child of this decomposition`);
+	const undertakingId = str(loadState(ctx, p.parentWorkUnitId)?.undertakingId);
+	for (const member of [p.parentWorkUnitId, ...p.childWorkUnitIds]) {
+		const state = loadState(ctx, member);
+		const named = Array.isArray(state?.dependencyIds) ? (state.dependencyIds as unknown[]) : [];
+		for (const d of named) {
+			const dependency = typeof d === 'string' ? loadState(ctx, d) : undefined;
+			if (
+				dependency === undefined ||
+				dependency.objectType !== 'PROFESSIONAL_WORK_UNIT' ||
+				str(dependency.undertakingId) !== undertakingId ||
+				undertakingId === ''
+			)
+				return refuse(`${member} waits for ${String(d)}, which is no work unit of its Undertaking`);
+		}
+	}
+	return undefined;
+}
+
 /** ProposeDecomposition — create a DecompositionContract (submitted for review, UNDER_REVIEW). */
 export const proposeDecomposition: CommandHandler = (ctx, command, payload) => {
 	const p = payload as ProposeDecompositionPayload;
@@ -51,6 +91,8 @@ export const proposeDecomposition: CommandHandler = (ctx, command, payload) => {
 			[id]
 		);
 	}
+	const dangling = rejectDanglingDependencies(ctx, command, p);
+	if (dangling) return dangling;
 	const state: Record<string, unknown> = {
 		...newEnvelope(command, DECOMP, id, {
 			lifecycleStatus: 'UNDER_REVIEW',

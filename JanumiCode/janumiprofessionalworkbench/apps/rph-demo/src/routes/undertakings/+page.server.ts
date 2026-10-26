@@ -10,7 +10,7 @@ import {
 	listPwuTypes,
 	listUndertakings
 } from '@janumipwb/rph-engine';
-import { planComposition } from '@janumipwb/rph-projections';
+import { planComposition, unitDependencies, UNPRODUCED_INPUT } from '@janumipwb/rph-projections';
 import type { PermittedChildRule, WorkRiskProfile } from '@janumipwb/rph-contracts';
 import { parseRiskProfile } from '$lib/authoring/riskProfile';
 import {
@@ -196,6 +196,31 @@ function instantiateComposition(
 
 	const typeById = new Map(types.map((t) => [t.id, t]));
 	const pwuIdByKey = new Map(plan.instances.map((i) => [i.key, mintUiId('pwu')]));
+	// ⭐⭐ `JAN-EXEC` Phase 7, package M — WHAT EACH UNIT WAITS FOR, RECORDED AS IT IS BUILT (`REG-D-135` (2); design D1;
+	// `REG-F-578`): from the bound types and the plan's instances, each unit's producers — every other instance whose type
+	// lists one of its required inputs as a required output — and its children; `originating-intent` is this Undertaking's
+	// Intent's; an input nothing here produces is recorded unproduced; and each decomposition's sibling dependencies (DEC-2).
+	// ⛔ Until package M every unit was proposed with `dependencyIds: []` and nothing held a consumer back from starting
+	// before its producers — so run-12's root ran first. The order is NOT decided here: the engine refuses a start until
+	// what a unit waits for is accepted (`MarkPwuReady`), and the page offers what the engine would admit.
+	const strings = (v: unknown): string[] =>
+		Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+	const dependencies = unitDependencies(
+		types.map((t) => ({
+			id: t.id,
+			requiredInputs: strings(t.state.requiredInputs),
+			requiredOutputs: strings(t.state.requiredOutputs)
+		})),
+		plan.instances.map((i) =>
+			i.parentKey === undefined
+				? { id: i.key, typeId: i.typeId }
+				: { id: i.key, typeId: i.typeId, parentId: i.parentKey }
+		)
+	);
+	const dependencyOf = new Map(dependencies.units.map((d) => [d.unitId, d]));
+	const siblingDependenciesOf = new Map(
+		dependencies.siblingDependencies.map((s) => [s.parentId, s.siblingDependencyIds])
+	);
 	// Typed explicitly: inferring the element type from the first `map` narrows it to the ProposePwu payload
 	// shape, and the decomposition commands below then fail to push.
 	const commands: UiCommandInput[] = plan.instances.map((instance) => {
@@ -234,6 +259,12 @@ function instantiateComposition(
 				assurancePolicyIds: Array.isArray(type.state.requiredAssurancePolicyIds)
 					? (type.state.requiredAssurancePolicyIds as string[])
 					: [],
+				// ⭐ Package M (D1) — its producers and its children, and the inputs nothing here produces.
+				dependencyIds: (dependencyOf.get(instance.key)?.dependencyIds ?? []).map((k) => pwuIdByKey.get(k)!),
+				inputRequirements: (dependencyOf.get(instance.key)?.unproduced ?? []).map((name) => ({
+					name,
+					status: UNPRODUCED_INPUT
+				})),
 				// THE PROFESSIONAL'S JUDGEMENT, not a constant (DR-002 W-4 closing finding F-D). Every PWU this
 				// architecture instantiates carries the risk declared for the Undertaking, because they are all
 				// the same body of work; a per-PWU judgement is a real refinement and belongs to whoever shapes
@@ -255,7 +286,11 @@ function instantiateComposition(
 					parentWorkUnitId: parentPwuId,
 					childWorkUnitIds: decomposition.childKeys.map((k) => pwuIdByKey.get(k)!),
 					rationale:
-						'Instantiated from the bound Professional Work Architecture: every mandatory permitted child of this type.'
+						'Instantiated from the bound Professional Work Architecture: every mandatory permitted child of this type.',
+					// ⭐ Package M (D1; DEC-2) — the children another child of this parent waits for.
+					siblingDependencyIds: (siblingDependenciesOf.get(decomposition.parentKey) ?? []).map(
+						(k) => pwuIdByKey.get(k)!
+					)
 				}
 			},
 			{

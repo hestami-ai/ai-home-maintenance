@@ -12,6 +12,7 @@ export * from './pwa-parts.js';
 export * from './pwa-graph-report.js';
 export * from './leaf.js';
 export * from './handoff-order.js';
+export * from './unit-dependencies.js';
 export * from './execution-view.js';
 export * from './execution-attempts.js';
 export * from './calibration.js';

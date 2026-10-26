@@ -78,7 +78,12 @@ export interface ArchiveUnit {
 	readonly title: string;
 }
 
-/** The five units, in the order the run starts them: the root, then §3.2's four phases (design §6 P7-2 D5). */
+/**
+ * The five units, ~~in the order the run starts them~~ by their NUMBER: the root, then §3.2's four phases (design §6 P7-2 D5).
+ * ⭐ `JAN-EXEC` Phase 7, package M (`REG-D-135` (2); design D6, D7) — the number is the unit's IDENTITY, its archive's name
+ * (`01-root`): the run now STARTS the four phases first, as the page offers them, and the root, which waits for them, last —
+ * so `01-root` is the last unit's archive, and the order pressed is the run record's (`order.pressed`).
+ */
 export const PHASE7_ARCHIVE_UNITS: readonly ArchiveUnit[] = [
 	{ order: 1, slug: 'root', title: PHASE7_ROOT.name },
 	{ order: 2, slug: 'requirements', title: PHASE7_REQUIREMENTS.name },

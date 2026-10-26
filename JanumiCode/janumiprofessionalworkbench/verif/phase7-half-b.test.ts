@@ -23,6 +23,7 @@ import { dirname, join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import { policyApplicability } from '@janumipwb/rph-domain';
+import { readinessUnitOf, startReadiness, unitDependencies, UNPRODUCED_INPUT } from '@janumipwb/rph-projections';
 import { createSqliteDriver, SCHEMA_SQL } from '@janumipwb/rph-persistence';
 import ts from 'typescript';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -71,7 +72,8 @@ import {
 	type LaneHands,
 	type LanePaths,
 	type RecoveryOffers,
-	type RunRecord
+	type RunRecord,
+	type StartOffer
 } from '../apps/rph-demo/e2e-live-exec/phase7-operator.js';
 import {
 	candidateChecks,
@@ -371,6 +373,9 @@ const ACCEPTED: ActionOutcome = {
 	decoded: { acceptedCandidate: CANDIDATE_HASH }
 };
 const COMPLETED = { lifecycleState: 'EXECUTING', executionState: 'SUCCEEDED', assuranceState: 'UNASSESSED', planStepState: 'SUCCEEDED' };
+/** ⭐ Package M (D6) — a unit whose Record Assurance was accepted, and one then Marked Satisfied: ACCEPTED, so its consumers start. */
+const ASSURED_B = { lifecycleState: 'UNDER_ASSURANCE', executionState: 'SUCCEEDED', assuranceState: 'SATISFIED', planStepState: 'SUCCEEDED' };
+const SATISFIED_B = { lifecycleState: 'SATISFIED', executionState: 'SUCCEEDED', assuranceState: 'SATISFIED', planStepState: 'SUCCEEDED' };
 /** ⭐ R4 (the lead's round-4 item 6) — a unit whose press was refused, as the store reads it: waiting for a person (RD2). */
 const WAITING = { lifecycleState: 'EXECUTING', executionState: 'WAITING', assuranceState: 'UNASSESSED', planStepState: 'WAITING' };
 
@@ -430,9 +435,27 @@ interface HalfBScript {
 	 * not named here offers no Record Assurance, as before.
 	 */
 	readonly signOffs?: Readonly<
-		Record<string, { readonly ra: ActionOutcome; readonly rerun?: { readonly offered: boolean; readonly outcome?: ActionOutcome } }>
+		Record<
+			string,
+			{
+				readonly ra: ActionOutcome;
+				readonly rerun?: { readonly offered: boolean; readonly outcome?: ActionOutcome };
+				/** ⭐ Package M (D6) — the ASSURANCE exchanges its Record Assurance records; none unless said. */
+				readonly calls?: number;
+			}
+		>
 	>;
 }
+
+/**
+ * ⭐ `JAN-EXEC` Phase 7, package M (`REG-D-135` (2); design D6) — EVERY UNIT'S SIGN-OFF ACCEPTED, by slug: each child is then
+ * ACCEPTED, so the units that wait for it — the root last — are offered. ⛔ Before package M the root was pressed first, whatever
+ * its children came to, so no case needed its children signed off to reach it.
+ */
+const signedOff = (slugs: readonly string[]): HalfBScript['signOffs'] =>
+	Object.fromEntries(slugs.map((slug) => [slug, { ra: answered('success') }]));
+/** The agent's four units, every one signed off. */
+const ALL_SIGNED_OFF = signedOff(['root', 'specify-wordfreq', 'build-wordfreq', 'verify-wordfreq-end-to-end']);
 
 /** A run folder of its own, a store made here, and the half-B hands, each call logged in order. */
 function halfBLane(script: HalfBScript) {
@@ -459,6 +482,24 @@ function halfBLane(script: HalfBScript) {
 		const list = script.staged ?? [types];
 		return list[Math.min(n, list.length) - 1] ?? types;
 	};
+	// ⭐ Package M (`REG-D-135` (2); design D1) — WHAT INSTANTIATION RECORDS of the agent's PWA, by the product's own projection
+	// (`unitDependencies`): each unit's producers and children, and the inputs nothing produces — over the units in the order
+	// instantiation's plan makes them, the tree's (`unitsInTreeOrder`), never the store's listing.
+	const strs = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+	const planned = unitsInTreeOrder(
+		units.map((u) => ({
+			id: u.id,
+			state: { title: u.title, pwuTypeId: u.typeId, ...(u.parent === null ? {} : { parentWorkUnitId: u.parent }) }
+		})),
+		types
+	).units;
+	const recorded = unitDependencies(
+		types.map((t) => ({ id: t.id, requiredInputs: strs(t.state.requiredInputs), requiredOutputs: strs(t.state.requiredOutputs) })),
+		planned.map((u) =>
+			u.parentUnitId === null ? { id: u.unitId, typeId: u.typeId } : { id: u.unitId, typeId: u.typeId, parentId: u.parentUnitId }
+		)
+	);
+	const recordOf = new Map(recorded.units.map((r) => [r.unitId, r]));
 	const snapshot = (): EngineSnapshot => {
 		const candidateStatus = sent && !accepted && script.noCandidate !== true ? statusAt(readsAfterSend) : null;
 		return {
@@ -473,10 +514,13 @@ function halfBLane(script: HalfBScript) {
 						return {
 							id: u.id,
 							state: {
+								objectType: 'PROFESSIONAL_WORK_UNIT',
 								title: u.title,
 								undertakingId: 'und_1',
 								pwuTypeId: u.typeId,
 								...(u.parent === null ? {} : { parentWorkUnitId: u.parent }),
+								dependencyIds: recordOf.get(u.id)?.dependencyIds ?? [],
+								inputRequirements: (recordOf.get(u.id)?.unproduced ?? []).map((name) => ({ name, status: UNPRODUCED_INPUT })),
 								// ⭐ J1 — as instantiation copies them: the type's `requiredAssurancePolicyIds`, unless the unit says.
 								assurancePolicyIds:
 									u.policies ??
@@ -543,10 +587,28 @@ function halfBLane(script: HalfBScript) {
 			return answered(stopped ? 'failure' : 'success');
 		},
 		showOverview: async () => void calls.push('showOverview'),
+		// ⭐ Package M (`REG-D-135` (2); design D3, D6) — THE PAGE'S OFFER, read from the rule the engine's refusal reads
+		// (`startReadiness`) over this store, as the page's load reads it.
+		startOffers: async (asked) => {
+			calls.push('startOffers');
+			const snap = snapshot();
+			const lookup = (id: string) => readinessUnitOf(id, snap.pwus.find((p) => p.id === id)?.state);
+			return new Map(
+				asked.map((u): [string, StartOffer] => {
+					if (lookup(u.unitId!)?.workLifecycleState !== 'PROPOSED') return [u.unitId!, { offered: false, reason: null, kinds: [] }];
+					const r = startReadiness(u.unitId!, lookup);
+					return [u.unitId!, { offered: r.startable, reason: r.reason, kinds: r.kinds }];
+				})
+			);
+		},
 		recordAssurance: async (unit, timeoutMs) => {
 			calls.push(`recordAssurance ${unit.slug}`);
 			bounds.push([`recordAssurance ${unit.slug}`, timeoutMs]);
-			return script.signOffs?.[unit.slug]?.ra ?? null;
+			const ra = script.signOffs?.[unit.slug]?.ra ?? null;
+			// ⭐ Package M (D6) — an accepted Record Assurance moves the unit under assurance, as the store would read it.
+			if (ra?.envelopeType === 'success') pressed.set(unit.unitId!, ASSURED_B);
+			unitCallCount += ra === null ? 0 : (script.signOffs?.[unit.slug]?.calls ?? 0);
+			return ra;
 		},
 		// ⭐ The merge of E12 and E3 — E12's sign-off hands, which the lane calls since a sign-off asks the reviewer: a row
 		// offers Record Assurance only where the script signs its unit off (`recordAssurance` above), and a re-run of its
@@ -568,6 +630,8 @@ function halfBLane(script: HalfBScript) {
 		},
 		markSatisfied: async (unit) => {
 			calls.push(`markSatisfied ${unit.slug}`);
+			// ⭐ Package M (D6) — and Mark Satisfied ACCEPTS it: the units that wait for it are offered next.
+			pressed.set(unit.unitId!, SATISFIED_B);
 			return answered('success');
 		},
 		recoveryOffers: async (unit) => script.stops?.[unit.unitId!] ?? { rerunReview: false, rerunWork: false, abandon: false },
@@ -670,10 +734,14 @@ describe('⭐⭐ C1, C2 — HALF B, IN ITS ORDER: `runTheLane` on hands made her
 	// unit titles proceeds (today refused)"*): the lane held a run to §3.2's five hand-typed titles
 	// (`phase7-operator.ts`, *"instantiation did not build one unit per type"*), so an agent-authored PWA — whose types
 	// are the agent's — could never be pressed.
-	it('⭐ C2 — a half-B run whose units are the AGENT’s, not §3.2’s five, proceeds: each pressed, the root first, then the tree’s order', async () => {
-		const l = halfBLane({ paid: true });
+	// ⛔ MOVED 2026-10-25 (`JAN-EXEC` Phase 7, package M; `REG-D-135` (2); design D6, which names it) — ~~"each pressed, the root
+	// first, then the tree's order"~~ (`TREE_ORDER`: root, specify, build, verify): the lane presses what the page offers, and
+	// the agent's root waits for its three children, so it is pressed LAST, once each is signed off.
+	it('⭐ C2 — a half-B run whose units are the AGENT’s, not §3.2’s five, proceeds: each pressed in the order the page offers — the children in the tree’s order, each signed off, then the ROOT LAST', async () => {
+		const l = halfBLane({ paid: true, signOffs: ALL_SIGNED_OFF });
 		const record = await l.run();
-		expect(l.only('beginExecute')).toEqual(TREE_ORDER.map((s) => `beginExecute ${s}`));
+		expect(l.only('beginExecute')).toEqual([...TREE_ORDER.slice(1), 'root'].map((s) => `beginExecute ${s}`));
+		expect(record.order?.pressed).toEqual([...TREE_ORDER.slice(1), 'root']);
 		expect(record.units.map((u) => [u.order, u.slug, u.title, u.unitId])).toEqual([
 			[1, 'root', 'wordfreq Realization', 'pwu_r'],
 			[2, 'specify-wordfreq', 'Specify wordfreq', 'pwu_s'],
@@ -711,12 +779,18 @@ describe('⭐⭐ C1, C2 — HALF B, IN ITS ORDER: `runTheLane` on hands made her
 			'read',
 			'author.createUndertaking',
 			'read',
-			// ⭐ `REG-D-112` — the store read for the authoring's ARCHIVE (finding 1), then for the LIMIT before the root (2).
+			// ⭐ `REG-D-112` — the store read for the authoring's ARCHIVE (finding 1), ~~then for the LIMIT before the root (2)~~.
+			'read',
+			// ⛔ MOVED (package M; `REG-D-135` (2); design D6, which names it): ~~'read' (the root's limit), 'beginExecute root',
+			// 'read'~~ — then the store read for the ORDER, what each unit waits for (D6), and the reads before the first unit the
+			// page offers: its LIMIT and its upstream. The root, waiting for its children, is pressed last (C2 above).
 			'read',
 			'read',
-			'beginExecute root',
 			'read'
 		]);
+		expect(l.only('beginExecute').at(0), 'the first press was not the first child in the tree’s order').toBe(
+			'beginExecute specify-wordfreq'
+		);
 	});
 });
 
@@ -1985,12 +2059,17 @@ describe('⛔ REG-D-112 (E3’s review, 1) — a run that stops during authoring
 		expect(l.written().end).toMatchObject({ reason: 'lane-error', detail: 'locator.click: Timeout 120000ms exceeded.' });
 	});
 
-	it('⭐ an authoring that reached its units is archived once, before the root’s press: what the published PWA was, before anything ran', async () => {
-		const l = halfBLane({ paid: true });
+	// ⛔ MOVED (package M; `REG-D-135` (2); design D6, D7): ~~"archived once, before the root's press"~~ — the root's press is
+	// the last now; the archive comes before the FIRST press, which is what "before anything ran" always meant.
+	it('⭐ an authoring that reached its units is archived once, before the first press: what the published PWA was, before anything ran', async () => {
+		const l = halfBLane({ paid: true, signOffs: ALL_SIGNED_OFF });
 		await l.run();
-		expect(l.only('archiveAuthoring', 'author.createUndertaking', 'beginExecute root')).toEqual([
+		expect(l.only('archiveAuthoring', 'author.createUndertaking', 'beginExecute')).toEqual([
 			'author.createUndertaking',
 			'archiveAuthoring',
+			'beginExecute specify-wordfreq',
+			'beginExecute build-wordfreq',
+			'beginExecute verify-wordfreq-end-to-end',
 			'beginExecute root'
 		]);
 	});
@@ -2105,15 +2184,26 @@ describe('⛔ REG-D-112 (E3’s review, 2) — the LIMIT is checked before Send 
 		// ⭐ `REG-D-114` (14), as amended 2026-10-16 — ~~prior: the limit less the reserve and a model unit's 140, plus one~~: the
 		// floor spends its worst case after Send, and the root's ~~one try's reserve~~ ⭐ whole press (D16) then passes the limit by
 		// one call.
-		const prior = rootReaching(FLOOR_WORST) + 1;
-		const model = halfBLane({ paid: true, prior, types: MODEL_ROOT_TYPES, floorCalls: FLOOR_WORST });
+		// ⛔ MOVED (package M; `REG-D-135` (2); design D6, D7): ~~`prior: rootReaching(FLOOR_WORST) + 1`, no unit pressed~~ — the
+		// root is pressed LAST now, after its three children, each of whose checks counts a whole press too: so each child's
+		// check reaches the limit exactly, the last child spends one call, and the MODEL root's then passes it by one.
+		const prior = rootReaching(FLOOR_WORST);
+		const model = halfBLane({
+			paid: true,
+			prior,
+			types: MODEL_ROOT_TYPES,
+			floorCalls: FLOOR_WORST,
+			unitCalls: { pwu_v: 1 },
+			signOffs: ALL_SIGNED_OFF
+		});
 		const refused = await model.run();
-		expect([model.only('author.send'), model.only('beginExecute')]).toEqual([['author.send'], []]);
+		expect([model.only('author.send'), model.only('beginExecute root')]).toEqual([['author.send'], []]);
+		expect(model.only('beginExecute'), 'arrangement: the three children are pressed').toHaveLength(3);
 		expect([refused.end?.reason, refused.units[0]?.limitCheck]).toEqual([
 			'paid-limit',
 			{
 				prior,
-				recorded: FLOOR_WORST,
+				recorded: FLOOR_WORST + 1,
 				reserve: PHASE7_NEGATIVE_CONTROL_RESERVE,
 				ahead: WHOLE_PRESS,
 				counted: COUNTED_PRESS,
@@ -2129,7 +2219,7 @@ describe('⛔ REG-D-112 (E3’s review, 2) — the LIMIT is checked before Send 
 			`the limit, before the root’s press: ${PHASE7_PAID_LIMIT + 1} of ${PHASE7_PAID_LIMIT} reviewer calls, ${WHOLE_PRESS} ` +
 				`ahead (${COUNTED_PRESS}) counted (D8; REG-D-112; REG-D-135 (4))`
 		);
-		const human = halfBLane({ paid: true, prior, floorCalls: FLOOR_WORST });
+		const human = halfBLane({ paid: true, prior, floorCalls: FLOOR_WORST, unitCalls: { pwu_v: 1 }, signOffs: ALL_SIGNED_OFF });
 		const pressed = await human.run();
 		expect(human.only('beginExecute root')).toEqual(['beginExecute root']);
 		expect(pressed.units[0]?.limitCheck).toMatchObject({ ahead: 0, counted: 'none: it runs no model', allowed: true });
@@ -2139,8 +2229,17 @@ describe('⛔ REG-D-112 (E3’s review, 2) — the LIMIT is checked before Send 
 		// Arrangement: Send's check let the run through, so the root's, counting none, is refused only when the store records
 		// more reviewer calls after Send than the floor's worst case — here 4 more, past the limit by one.
 		// ⭐ Package L — D16: ~~4 more~~ — the root's whole press more than the floor's worst case (the arrangement's own arithmetic).
-		const prior = rootReaching(FLOOR_WORST) + 1;
-		const l = halfBLane({ paid: true, prior, floorCalls: FLOOR_WORST + WHOLE_PRESS });
+		// ⛔ MOVED (package M; `REG-D-135` (2); design D6, D7): ~~`prior: rootReaching(FLOOR_WORST) + 1`, the floor spending its
+		// worst case and a whole press more~~ — the root is pressed after its children, each check counting a whole press, so
+		// they pass exactly at the limit and the calls that refuse the root come after them: the last child's Record Assurance
+		// spends a whole press and one more, and the root, counting none, is then one call past it.
+		const prior = rootReaching(FLOOR_WORST);
+		const l = halfBLane({
+			paid: true,
+			prior,
+			floorCalls: FLOOR_WORST,
+			signOffs: { ...ALL_SIGNED_OFF, 'verify-wordfreq-end-to-end': { ra: answered('success'), calls: WHOLE_PRESS + 1 } }
+		});
 		const record = await l.run();
 		expect(l.only('beginExecute root'), 'arrangement: the root that runs no model is held back').toEqual([]);
 		expect(record.units[0]?.limitCheck).toMatchObject({ ahead: 0, counted: 'none: it runs no model', allowed: false });
@@ -2156,8 +2255,9 @@ describe('⛔ REG-D-112 (E3’s review, 2) — the LIMIT is checked before Send 
 		// ⛔ PREDICTED RED, read from the code: before a MODEL root's press the one rule counted a model unit's WORST CASE, 140
 		// (`REG-D-112`, finding 2), so a root whose one try's reserve reaches the limit exactly was never pressed. ⭐ Package L:
 		// now it counts one try's reserve, 4, so its record says 4 ahead where the whole press, 210, reaches the limit.
+		// ⭑ Package M (D6, D7) — its children first, each at the limit exactly, spending nothing, each signed off.
 		const prior = rootReaching(FLOOR_WORST);
-		const l = halfBLane({ paid: true, prior, types: MODEL_ROOT_TYPES, floorCalls: FLOOR_WORST });
+		const l = halfBLane({ paid: true, prior, types: MODEL_ROOT_TYPES, floorCalls: FLOOR_WORST, signOffs: ALL_SIGNED_OFF });
 		const record = await l.run();
 		expect(l.only('beginExecute root'), 'a MODEL root whose whole press reaches the limit was held back').toEqual([
 			'beginExecute root'
@@ -2190,7 +2290,8 @@ describe('⛔ the merge’s fix round, F2 and F3 — the run report reads half B
 	 */
 	const atTheLimit = async () => {
 		const prior = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - WHOLE_PRESS - FLOOR_WORST;
-		const l = halfBLane({ paid: true, prior, types: MODEL_ROOT_TYPES, floorCalls: FLOOR_WORST });
+		// ⭑ Package M (D6, D7) — the children signed off, so the root, pressed last, is reached.
+		const l = halfBLane({ paid: true, prior, types: MODEL_ROOT_TYPES, floorCalls: FLOOR_WORST, signOffs: ALL_SIGNED_OFF });
 		await l.run();
 		const record = l.written();
 		const report = buildRunReport(
@@ -2268,9 +2369,12 @@ describe('⭐⭐ The merge of E12 and E3 (J1, J2) — half B’s sign-offs count
 		// ⭐ Package L — D16 (`REG-D-135` (4)): each phase's check counts its whole press, (3 + 32) × 6 = 210, so the prior is what
 		// lets each phase reach the limit at most, and the LAST phase, Verify, spends the rest (`spentBySignOff`'s arrangement in
 		// half A): Send's read, the floor spending nothing, stays under it.
+		// ⛔ MOVED (package M; `REG-D-135` (2); design D6): ~~the LAST phase, Verify, spending the rest, every phase pressed before
+		// the sign-off~~ — Specify's sign-off follows its own press, so Specify spends the rest, and nothing is pressed after
+		// the limit holds its sign-off back.
 		const WHOLE_PRESS = (3 + 32) * 6;
 		const prior = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - WHOLE_PRESS;
-		const verifyCalls = spent - prior;
+		const specifyCalls = spent - prior;
 		expect(
 			spent + PHASE7_NEGATIVE_CONTROL_RESERVE + 4 * PER_POLICY,
 			'arrangement: four policies’ worst case would fit'
@@ -2279,20 +2383,20 @@ describe('⭐⭐ The merge of E12 and E3 (J1, J2) — half B’s sign-offs count
 			paid: true,
 			prior,
 			floorCalls: 0,
-			unitCalls: { pwu_v: verifyCalls },
+			unitCalls: { pwu_s: specifyCalls },
 			types: FIVE_POLICY_TYPES,
 			signOffs: { 'specify-wordfreq': { ra: answered('success') } }
 		});
 		const record = await l.run();
-		expect(l.only('beginExecute'), 'arrangement: every phase is pressed').toEqual(
-			TREE_ORDER.map((slug) => `beginExecute ${slug}`)
-		);
+		expect(l.only('beginExecute'), 'arrangement: Specify is pressed, and nothing after the limit stops the lane').toEqual([
+			'beginExecute specify-wordfreq'
+		]);
 		expect(l.only('recordAssurance', 'offersRecordAssurance'), 'a sign-off was pressed past the limit').toEqual([
 			'offersRecordAssurance specify-wordfreq'
 		]);
 		expect(record.units[1]!.signOff?.limitCheck).toEqual({
 			prior,
-			recorded: verifyCalls,
+			recorded: specifyCalls,
 			reserve: PHASE7_NEGATIVE_CONTROL_RESERVE,
 			ahead: FIVE.length * PER_POLICY,
 			counted: 'its declared reviews’ worst case',
@@ -2304,11 +2408,13 @@ describe('⭐⭐ The merge of E12 and E3 (J1, J2) — half B’s sign-offs count
 	});
 
 	it('⭐ J1 — the store’s count is the kernel’s DECLARED set (`declaredAssurancePolicyIds`): the unit’s own policies and its type’s, each counted once', async () => {
+		// ⭑ Package M (D6, D7) — each signed off, so the root, pressed last, is reached and its sign-off read too.
 		const l = halfBLane({
 			paid: true,
 			units: AGENT_UNITS.map((u) =>
 				u.id === 'pwu_s' ? { ...u, policies: ['pol_requirement_coverage', 'pol_extra'] } : u
-			)
+			),
+			signOffs: ALL_SIGNED_OFF
 		});
 		const record = await l.run();
 		// ⭑ Specify: its own two and its type's two share one — three. Every other unit's own are its type's — one each.
@@ -2365,7 +2471,9 @@ describe('⭐⭐ The merge of E12 and E3 (J1, J2) — half B’s sign-offs count
 					ra: refusal('pol_test_adequacy did not conclude: the reviewer’s call failed'),
 					rerun: { offered: true, outcome: answered('success') }
 				},
-				'build-wordfreq': { ra: answered('success') }
+				'build-wordfreq': { ra: answered('success') },
+				// ⭑ Package M (D6, D7) — Verify signed off too, so the root, pressed last, is reached.
+				'verify-wordfreq-end-to-end': { ra: answered('success') }
 			}
 		});
 		await l.run();
@@ -2559,14 +2667,186 @@ describe('⭐ REG-D-112 (E3’s review, 4) — stage 2 counts per (parent, type)
 	});
 });
 
+// ── ⭐⭐ `JAN-EXEC` Phase 7, package M — THE LANE PRESSES ONLY WHAT THE PAGE OFFERS (`REG-D-135` (2); design D4-D6; `REG-F-578`) ──
+// Run-12's shape (`fixes-facts.md` §3): twelve types, four composites requiring what their own children produce, every input
+// but `originating-intent` another type's output, no loop. The lane pressed it in the tree's pre-order — the root first, and
+// 4 of 4 composites before the children whose outputs they required. Each type below is run-12's, its name shortened; the
+// leaves' inputs are supplied as in `unit-dependencies.test.ts`.
+const R12_TYPE = (id: string, name: string, isRoot: boolean, children: string[], inputs: string[], outputs: string[]): ObjectRow => ({
+	id,
+	state: {
+		pwaId: PWA_ID,
+		name,
+		pwuKind: 'PRODUCT_IMPLEMENTATION',
+		purpose: `${name}.`,
+		workDischarge: children.length > 0 ? 'HUMAN' : 'MODEL',
+		...(children.length > 0 ? {} : { promptTemplate: prompt('Do {subject}: {purpose}') }),
+		isRoot,
+		permittedChildTypeIds: children,
+		permittedChildren: children.map((typeId) => ({ typeId, cardinality: 'M1' })),
+		requiredInputs: inputs,
+		requiredOutputs: outputs,
+		requiredAssurancePolicyIds: ['pol_intent_preservation'],
+		status: 'ACTIVE'
+	}
+});
+const RUN12_TYPES: ObjectRow[] = [
+	R12_TYPE('t_root', 'Realization', true, ['t_req', 't_design', 't_impl', 't_e2e'], ['originating-intent', 'verification-evidence'], ['summary']),
+	R12_TYPE('t_req', 'Requirements', false, [], ['originating-intent'], ['requirements-specification']),
+	R12_TYPE('t_design', 'Technical design', false, ['t_cli', 't_words'], ['cli-design-contribution', 'processing-design-contribution'], ['architecture-baseline']),
+	R12_TYPE('t_cli', 'CLI contract', false, [], ['requirements-specification'], ['cli-design-contribution']),
+	R12_TYPE('t_words', 'Word processing', false, [], ['requirements-specification'], ['processing-design-contribution']),
+	R12_TYPE('t_impl', 'Implementation', false, ['t_entry', 't_core', 't_unit'], ['cli-runtime-code', 'processing-module-code', 'unit-test-evidence', 'architecture-baseline'], ['implemented-wordfreq-candidate']),
+	R12_TYPE('t_entry', 'CLI entry', false, [], ['architecture-baseline'], ['cli-runtime-code']),
+	R12_TYPE('t_core', 'Core', false, [], ['architecture-baseline'], ['processing-module-code']),
+	R12_TYPE('t_unit', 'Unit tests', false, [], ['cli-runtime-code', 'processing-module-code'], ['unit-test-evidence']),
+	R12_TYPE('t_e2e', 'End-to-end verification', false, ['t_suite', 't_exec'], ['e2e-test-suite', 'e2e-results', 'implemented-wordfreq-candidate'], ['verification-evidence']),
+	R12_TYPE('t_suite', 'E2e suite', false, [], ['implemented-wordfreq-candidate'], ['e2e-test-suite']),
+	R12_TYPE('t_exec', 'E2e execution', false, [], ['e2e-test-suite', 'implemented-wordfreq-candidate'], ['e2e-results'])
+];
+/** Run-12's units, as the store lists them — scrambled, so only the tree can number them. */
+const RUN12_UNITS: readonly AgentUnit[] = [
+	['u_exec', 't_exec', 'E2e execution', 'u_e2e'],
+	['u_root', 't_root', 'Realization', null],
+	['u_core', 't_core', 'Core', 'u_impl'],
+	['u_req', 't_req', 'Requirements', 'u_root'],
+	['u_design', 't_design', 'Technical design', 'u_root'],
+	['u_cli', 't_cli', 'CLI contract', 'u_design'],
+	['u_words', 't_words', 'Word processing', 'u_design'],
+	['u_impl', 't_impl', 'Implementation', 'u_root'],
+	['u_entry', 't_entry', 'CLI entry', 'u_impl'],
+	['u_unit', 't_unit', 'Unit tests', 'u_impl'],
+	['u_e2e', 't_e2e', 'End-to-end verification', 'u_root'],
+	['u_suite', 't_suite', 'E2e suite', 'u_e2e']
+].map(([id, typeId, title, parent]) => ({ id: id!, typeId: typeId!, title: title!, parent: parent ?? null }));
+/** Each of run-12's units, by its slug, signed off. */
+const RUN12_SIGNED_OFF = signedOff(
+	['realization', 'requirements', 'technical-design', 'cli-contract', 'word-processing', 'implementation', 'cli-entry', 'core', 'unit-tests', 'end-to-end-verification', 'e2e-suite', 'e2e-execution'].map((s) =>
+		s === 'realization' ? 'root' : s
+	)
+);
+
+describe('⭐⭐ package M (D4-D6) — the lane presses only what the page offers, one unit at a time, the tree’s order breaking ties', () => {
+	it('⭐ THE PREDICTED RED — run-12’s shape is pressed in the DESIGN’S DATA-FLOW ORDER, the root LAST; each unit signed off before the next press; the order and what each unit waits for recorded in run.json', async () => {
+		const l = halfBLane({ paid: true, types: RUN12_TYPES, units: RUN12_UNITS, signOffs: RUN12_SIGNED_OFF });
+		const record = await l.run();
+		// The design's order (§3): requirements; CLI contract and word processing; technical design; CLI entry and core; unit
+		// tests; implementation; e2e suite; e2e execution; end-to-end verification; the root — one at a time, ties by the tree.
+		const dataFlow = [
+			'requirements',
+			'cli-contract',
+			'word-processing',
+			'technical-design',
+			'cli-entry',
+			'core',
+			'unit-tests',
+			'implementation',
+			'e2e-suite',
+			'e2e-execution',
+			'end-to-end-verification',
+			'root'
+		];
+		expect(l.only('beginExecute'), 'the presses are not run-12’s data-flow order, the root last').toEqual(
+			dataFlow.map((slug) => `beginExecute ${slug}`)
+		);
+		expect(l.only('beginExecute', 'markSatisfied'), 'a unit was pressed before the one before it was signed off').toEqual(
+			dataFlow.flatMap((slug) => [`beginExecute ${slug}`, `markSatisfied ${slug}`])
+		);
+		// ⭑ The units keep their identity in the tree's order: the root is still 01-root.
+		expect(record.units.map((u) => [u.order, u.slug]).slice(0, 3)).toEqual([
+			[1, 'root'],
+			[2, 'requirements'],
+			[3, 'technical-design']
+		]);
+		const written = l.written();
+		expect(written.order?.pressed, 'run.json does not record the press order').toEqual(dataFlow);
+		expect(written.order?.dependencies, 'run.json does not record what each unit waits for').toMatchObject({
+			root: ['requirements', 'technical-design', 'implementation', 'end-to-end-verification'],
+			'technical-design': ['cli-contract', 'word-processing'],
+			implementation: ['technical-design', 'cli-entry', 'core', 'unit-tests'],
+			'end-to-end-verification': ['implementation', 'e2e-suite', 'e2e-execution'],
+			'unit-tests': ['cli-entry', 'core'],
+			requirements: []
+		});
+		expect(written.units.every((u) => u.upstreamNotAssured === false), 'a unit was pressed over an unassured producer').toBe(true);
+		expect([record.end?.reason, laneVerdict(record)]).toEqual(['complete', []]);
+	});
+
+	it('⭐ THE PREDICTED RED (D5) — a LOOP ends the run `order-unresolvable` after the authoring archive, with ZERO presses and no fallback to the tree’s order; each unit recorded not started, the loop named in the page’s words', async () => {
+		// The agent's PWA with Specify and Build each requiring the other's output.
+		const LOOP_TYPES = AGENT_TYPES.map((t) =>
+			t.id === 'pwutype_specify'
+				? { id: t.id, state: { ...t.state, requiredInputs: ['build-notes'], requiredOutputs: ['spec'] } }
+				: t.id === 'pwutype_build'
+					? { id: t.id, state: { ...t.state, requiredInputs: ['spec'], requiredOutputs: ['build-notes'] } }
+					: t
+		);
+		const l = halfBLane({ paid: true, types: LOOP_TYPES, signOffs: ALL_SIGNED_OFF });
+		const record = await l.run();
+		expect(l.only('beginExecute'), 'a unit was pressed beside a loop').toEqual([]);
+		expect(l.only('archiveAuthoring', 'startOffers')).toEqual(['archiveAuthoring', 'startOffers']);
+		expect(record.end?.reason).toBe('order-unresolvable');
+		expect(record.end?.detail).toContain('Specify wordfreq — it waits for "Build wordfreq" (PROPOSED) to be accepted; it sits in a loop: "Specify wordfreq" → "Build wordfreq" → "Specify wordfreq"');
+		expect(record.end?.detail).toContain('the tree’s order is never used instead (D5; REG-D-135 (2))');
+		expect(record.units.map((u) => [u.slug, u.notStarted])).toEqual([
+			['root', 'not started: it waits for "Specify wordfreq" (PROPOSED), "Build wordfreq" (PROPOSED) and "Verify wordfreq end to end" (PROPOSED) to be accepted'],
+			['specify-wordfreq', 'not started: it waits for "Build wordfreq" (PROPOSED) to be accepted; it sits in a loop: "Specify wordfreq" → "Build wordfreq" → "Specify wordfreq"'],
+			['build-wordfreq', 'not started: it waits for "Specify wordfreq" (PROPOSED) to be accepted; it sits in a loop: "Build wordfreq" → "Specify wordfreq" → "Build wordfreq"'],
+			// ⭑ A unit outside the loop is offered — and still never pressed: no press beside a loop.
+			['verify-wordfreq-end-to-end', 'not started: offered, and the run ended before it was pressed']
+		]);
+		expect(laneVerdict(record)).toEqual([`the run ended 'order-unresolvable', not 'complete': ${record.end?.detail}`]);
+		// ⭑ THE CONTROL — the same PWA without the loop proceeds.
+		const acyclic = await halfBLane({ paid: true, signOffs: ALL_SIGNED_OFF }).run();
+		expect(acyclic.end?.reason).toBe('complete');
+	});
+
+	it('⭐ D4 — a producer that STOPS, left as found by the rule, leaves every unit that waits for it UNSTARTED, the producer named in its state; the lane abandons nothing beyond the run plan’s rule (half A’s REG-D-105 (4) case holds an ABANDONED producer, named so)', async () => {
+		// Run-12's shape, Requirements stopping, its row offering no re-run: the rule leaves it as found, abandoning nothing, and
+		// every unit that waits for it — the two design contributions, and through them the rest — is never offered.
+		const l = halfBLane({
+			paid: true,
+			types: RUN12_TYPES,
+			units: RUN12_UNITS,
+			signOffs: RUN12_SIGNED_OFF,
+			stops: { u_req: { rerunReview: false, rerunWork: false, abandon: true } }
+		});
+		const record = await l.run();
+		expect(l.only('beginExecute'), 'a unit that waits for the stopped producer was pressed').toEqual(['beginExecute requirements']);
+		const byslug = new Map(record.units.map((u) => [u.slug, u]));
+		expect(byslug.get('cli-contract')?.notStarted).toBe('not started: it waits for "Requirements" (EXECUTING) to be accepted');
+		expect(byslug.get('root')?.notStarted).toMatch(/^not started: it waits for "Requirements" \(EXECUTING\)/);
+		expect(l.only('recover'), 'the lane abandoned or re-ran beyond the run plan’s rule').toEqual([]);
+		expect(record.end?.reason).toBe('complete');
+	});
+});
+
 describe('⭐ REG-D-112 (E3’s review, 5) — units are identified by ID: two of one title are both run, and the repeat is reported', () => {
 	// ⭐ THE PREDICTED RED: two units of one title were refused as a lane error once the PWA was published — a paid run
 	// ended `lane-error` after its authoring's spend.
-	it('⭐ a shared child’s two units of one title: the run COMPLETES, each pressed once, by its own id, and the repeat recorded', async () => {
-		const l = halfBLane({ paid: true, types: SHARED_TYPES, units: SHARED_UNITS });
+	// ⛔ MOVED (package M; `REG-D-135` (2); design D6, which names it): ~~presses in `SHARED_ORDER`, the root first~~ — the page
+	// offers each review first (each waits for nothing), and a composite once its review is accepted; the tree's order breaks
+	// the ties, so the first review, then its parent, then the second review, its parent, and the root LAST. The units keep
+	// their identity — number, slug, id — in the tree's order.
+	it('⭐ a shared child’s two units of one title: the run COMPLETES, each pressed once, by its own id, in the order the page offers — each review before its parent, the root last — and the repeat recorded', async () => {
+		const l = halfBLane({
+			paid: true,
+			types: SHARED_TYPES,
+			units: SHARED_UNITS,
+			signOffs: signedOff(SHARED_ORDER.map(([slug]) => slug))
+		});
 		const record = await l.run();
 		expect(record.end?.reason).toBe('complete');
-		expect(l.only('beginExecute')).toEqual(SHARED_ORDER.map(([slug]) => `beginExecute ${slug}`));
+		const pressed = ['review-wordfreq', 'design-wordfreq', 'review-wordfreq-2', 'build-wordfreq', 'root'];
+		expect(l.only('beginExecute')).toEqual(pressed.map((slug) => `beginExecute ${slug}`));
+		expect(record.order?.pressed).toEqual(pressed);
+		expect(record.order?.dependencies, 'each composite waits for its review, the root for both composites').toEqual({
+			root: ['design-wordfreq', 'build-wordfreq'],
+			'design-wordfreq': ['review-wordfreq'],
+			'review-wordfreq': [],
+			'build-wordfreq': ['review-wordfreq-2'],
+			'review-wordfreq-2': []
+		});
 		expect(record.units.map((u) => [u.slug, u.unitId])).toEqual(SHARED_ORDER);
 		expect(record.authoring?.unitProblems).toEqual([
 			'2 units are titled "Review wordfreq" — a type more than one parent permits is built once under each, and two types may share a name — so the lane tells them apart by id, never by the title their rows show (REG-D-112)'
@@ -2866,21 +3146,33 @@ describe('⛔ REG-D-112 (E3’s re-review, 4) — the limit before the root coun
 	 * anticipated parts, ~~8~~ 128: so Send's read, before it, stays under the limit.
 	 */
 	const FLOOR_CALLS = phase7AuthoringReviewerCalls(PHASE7_AUTHORING_ANTICIPATED_PARTS);
-	/** One call past the limit with the floor's recorded calls counted, and within it without them. */
-	const PRIOR = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - WHOLE_PRESS - FLOOR_CALLS + 1;
+	/**
+	 * ~~One call past the limit with the floor's recorded calls counted, and within it without them.~~ ⛔ MOVED (package M;
+	 * `REG-D-135` (2); design D6, D7) — the root is pressed after its children, whose checks count a whole press too: so the
+	 * prior lets each child's check reach the limit exactly WITH the floor's recorded calls counted, the last child spends one
+	 * call, and the MODEL root's check is one call past the limit with every recorded call counted — and far within it without.
+	 */
+	const PRIOR = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - WHOLE_PRESS - FLOOR_CALLS;
 
 	// ⭐ THE MUTANT THAT SURVIVED (E3-M75): no test's store held an exchange at the root's check, so the calls recorded were a
 	// term no test could kill — dropped, a MODEL root was pressed with the floor's calls uncounted.
 	// ⭐ Package L — D16 (`REG-D-135` (4)): MOVED DELIBERATELY — ~~one try's reserve~~ the whole press.
 	it('⭐ a MODEL root whose ~~worst case~~ ~~one try’s reserve~~ ⭐ whole press fits only WITHOUT the floor’s recorded calls is never pressed: the run ends paid-limit, the calls counted', async () => {
-		const l = halfBLane({ paid: true, prior: PRIOR, types: MODEL_ROOT_TYPES, floorCalls: FLOOR_CALLS });
+		const l = halfBLane({
+			paid: true,
+			prior: PRIOR,
+			types: MODEL_ROOT_TYPES,
+			floorCalls: FLOOR_CALLS,
+			unitCalls: { pwu_v: 1 },
+			signOffs: ALL_SIGNED_OFF
+		});
 		const record = await l.run();
-		expect([l.only('beginExecute'), record.end?.reason, record.units[0]?.limitCheck]).toEqual([
+		expect([l.only('beginExecute root'), record.end?.reason, record.units[0]?.limitCheck]).toEqual([
 			[],
 			'paid-limit',
 			{
 				prior: PRIOR,
-				recorded: FLOOR_CALLS,
+				recorded: FLOOR_CALLS + 1,
 				reserve: PHASE7_NEGATIVE_CONTROL_RESERVE,
 				ahead: WHOLE_PRESS,
 				counted: 'its whole press’s worst case, (3 tries + 32 command runs) × 6 calls',
@@ -2892,10 +3184,11 @@ describe('⛔ REG-D-112 (E3’s re-review, 4) — the limit before the root coun
 	});
 
 	it('⭐ CONTROL — one floor call fewer, ~~the worst case~~ ~~one try’s reserve~~ ⭐ the whole press fits exactly: the MODEL root is pressed', async () => {
-		const l = halfBLane({ paid: true, prior: PRIOR, types: MODEL_ROOT_TYPES, floorCalls: FLOOR_CALLS - 1 });
+		// ⭑ Package M (D6, D7) — ~~one floor call fewer~~: the last child spends none, and the whole press fits exactly.
+		const l = halfBLane({ paid: true, prior: PRIOR, types: MODEL_ROOT_TYPES, floorCalls: FLOOR_CALLS, signOffs: ALL_SIGNED_OFF });
 		const record = await l.run();
 		expect(l.only('beginExecute root')).toEqual(['beginExecute root']);
-		expect(record.units[0]?.limitCheck).toMatchObject({ recorded: FLOOR_CALLS - 1, total: PHASE7_PAID_LIMIT, allowed: true });
+		expect(record.units[0]?.limitCheck).toMatchObject({ recorded: FLOOR_CALLS, total: PHASE7_PAID_LIMIT, allowed: true });
 	});
 });
 
@@ -2934,18 +3227,24 @@ describe('⛔ R4 (the lead’s round-4 item 6) — a re-run the limit stopped en
 			unitCalls: { pwu_s: 13 }
 		});
 		const record = await l.run();
+		// ⛔ MOVED (package M; `REG-D-135` (2); design D6, D7): ~~'beginExecute root' first, and the root's sign-off, counting none,
+		// read after and fitting (197 under)~~ — the root waits for its children, and the lane presses and checks nothing after
+		// the limit holds a re-run back: the run ends there, `paid-limit`, never `complete`.
 		expect(l.only('beginExecute'), 'arrangement: Specify stops, and no later phase is pressed').toEqual([
-			'beginExecute root',
 			'beginExecute specify-wordfreq'
 		]);
 		expect(record.units[1]?.recovery.map((r) => [r.act, r.limitCheck?.total, r.limitCheck?.allowed, r.notPressed])).toEqual([
 			['rerunReview', PHASE7_PAID_LIMIT + 1, false, `the limit: ${PHASE7_PAID_LIMIT + 1} of ${PHASE7_PAID_LIMIT} reviewer calls (D8)`]
 		]);
-		expect(record.units[0]?.signOff?.limitCheck, 'arrangement: the root’s sign-off, counting none, fits').toMatchObject({
-			ahead: 0,
-			total: PHASE7_PAID_LIMIT - 197,
-			allowed: true
-		});
+		expect(
+			record.units.map((u) => [u.slug, u.limitCheck === null, u.signOff]),
+			'something was checked or signed off after the limit held the re-run back'
+		).toEqual([
+			['root', true, null],
+			['specify-wordfreq', false, null],
+			['build-wordfreq', true, null],
+			['verify-wordfreq-end-to-end', true, null]
+		]);
 		expect(record.end?.reason, 'a run whose re-run the limit stopped ended as though it had completed').toBe('paid-limit');
 	});
 });
@@ -2970,9 +3269,12 @@ describe('⛔ R4 (the lead’s round-4 item 2) — the lane FAILS CLOSED on a ro
 	it('⛔ a root whose type is NOT IN THE STORE is never pressed: the run ends root-type-unreadable, saying why', async () => {
 		// ⛔ PREDICTED RED, read from the code: `dischargeOf` read a type it could not find as UNDECLARED, so the root counted
 		// none ahead and was pressed.
-		const l = halfBLane({ paid: true, types: AGENT_TYPES.filter((t) => t.state.isRoot !== true) });
+		// ⛔ MOVED (package M; `REG-D-135` (2); design D6, D7): ~~nothing pressed~~ — the root is pressed last, so its children run
+		// and are signed off first; the root, when the page offers it, is never pressed.
+		const l = halfBLane({ paid: true, types: AGENT_TYPES.filter((t) => t.state.isRoot !== true), signOffs: ALL_SIGNED_OFF });
 		const record = await l.run();
-		expect(l.only('beginExecute'), 'a root whose type the lane cannot find was pressed').toEqual([]);
+		expect(l.only('beginExecute root'), 'a root whose type the lane cannot find was pressed').toEqual([]);
+		expect(l.only('beginExecute'), 'arrangement: its three children ran first').toHaveLength(3);
 		expect([record.end?.reason, record.end?.detail]).toEqual(['root-type-unreadable', unread('pwutype_root is not in the store')]);
 		expect([record.units[0]?.limitCheck, l.written().end?.reason]).toEqual([null, 'root-type-unreadable']);
 		expect(laneVerdict(record)).toEqual([
@@ -2982,11 +3284,16 @@ describe('⛔ R4 (the lead’s round-4 item 2) — the lane FAILS CLOSED on a ro
 
 	it('⛔ and so is a root that names NO TYPE, and one whose type declares a discharge that is NO WORD', async () => {
 		// ⛔ PREDICTED RED, read from the code: each was read as UNDECLARED, counted none ahead, and pressed.
-		const noType = halfBLane({ paid: true, units: AGENT_UNITS.map((u) => (u.id === 'pwu_r' ? { ...u, typeId: '' } : u)) });
+		// ⭑ Package M (D6, D7) — each child signed off, so the root is offered last and its type read then.
+		const noType = halfBLane({
+			paid: true,
+			units: AGENT_UNITS.map((u) => (u.id === 'pwu_r' ? { ...u, typeId: '' } : u)),
+			signOffs: ALL_SIGNED_OFF
+		});
 		const noTypeRecord = await noType.run();
-		const garbled = halfBLane({ paid: true, types: withRootType((s) => ({ ...s, workDischarge: 7 })) });
+		const garbled = halfBLane({ paid: true, types: withRootType((s) => ({ ...s, workDischarge: 7 })), signOffs: ALL_SIGNED_OFF });
 		const garbledRecord = await garbled.run();
-		expect([noType.only('beginExecute'), garbled.only('beginExecute')], 'a root whose type the lane cannot read was pressed').toEqual([[], []]);
+		expect([noType.only('beginExecute root'), garbled.only('beginExecute root')], 'a root whose type the lane cannot read was pressed').toEqual([[], []]);
 		expect([noTypeRecord.end?.reason, noTypeRecord.end?.detail, garbledRecord.end?.reason, garbledRecord.end?.detail]).toEqual([
 			'root-type-unreadable',
 			unread('the unit pwu_r names no type'),
@@ -3021,7 +3328,8 @@ describe('⛔ R4 (the lead’s round-4 item 2) — the lane FAILS CLOSED on a ro
 	it('⭑ CONTROL — a root whose type names NO discharge is READ, UNDECLARED: it runs no model, counts none ahead, and is pressed', async () => {
 		const l = halfBLane({
 			paid: true,
-			types: withRootType((s) => Object.fromEntries(Object.entries(s).filter(([key]) => key !== 'workDischarge')))
+			types: withRootType((s) => Object.fromEntries(Object.entries(s).filter(([key]) => key !== 'workDischarge'))),
+			signOffs: ALL_SIGNED_OFF
 		});
 		const record = await l.run();
 		expect(l.only('beginExecute root')).toEqual(['beginExecute root']);

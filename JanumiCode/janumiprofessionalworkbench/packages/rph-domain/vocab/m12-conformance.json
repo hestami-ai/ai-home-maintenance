@@ -5,7 +5,7 @@
     "purpose": "Ground the M12 executable conformance suite + property tests (P1-P8) by extracting the authoritative test taxonomy (§3 seven layers), the full RPH-* rule catalog (§6-24), the property-based catalog (§25 P1-P8), and the mutation-testing requirements (§26). Verbatim ids/spellings. This is the vocab source-of-truth the M12 suite is generated against.",
     "specStatus": "Initial test baseline",
     "specAppliesTo": "Product Realization PWA intent-to-architecture vertical slice",
-    "totalRphRules": 125,
+    "totalRphRules": 126,
     "totalProperties": 8,
     "totalMutations": 9,
     "layerModel": "The spec offers TWO orthogonal seven-way organizations: §3 Test Taxonomy (the seven LAYERS this file uses, the ones the roadmap calls the '7-layer suite') and §30 CI Test Stages (seven STAGES, a pipeline ordering). Layers are used here as the authoritative structure; CI stages are recorded per-layer as ciStage for cross-reference.",
@@ -97,6 +97,7 @@
     { "id": "RPH-PWU-008", "statement": "A PWU in INVALIDATED cannot be promoted to baseline.", "layer": 3, "sourceRef": "§8" },
     { "id": "RPH-PWU-009", "statement": "A PWU in SUPERSEDED cannot start an execution step.", "layer": 3, "sourceRef": "§8" },
     { "id": "RPH-PWU-010", "statement": "A BASELINED PWU cannot resume execution against the same semantic version; a successor revision or successor PWU is required.", "layer": 3, "sourceRef": "§8" },
+    { "id": "RPH-PWU-011", "statement": "MarkPwuReady on a PWU any unit of whose dependencyIds is not accepted - SATISFIED, RECOMPOSED or BASELINED; CONDITIONALLY_SATISFIED does not count - or names no unit of its Undertaking, or one of whose inputRequirements is unproduced, is rejected, naming the units it waits for, and no model or reviewer call is made.", "layer": 3, "sourceRef": "§8 (added 2026-10-25, JAN-EXEC Phase 7 package M, under REG-D-135 (2); DESIGN-data-flow-order-and-deliverable-review.md D2)" },
 
     { "id": "RPH-DEC-001", "statement": "A decomposition whose children allocate all mandatory obligations, propagate/retain all applicable constraints, and has a recomposition contract may become VALID.", "layer": 2, "sourceRef": "§9" },
     { "id": "RPH-DEC-002", "statement": "A mandatory parent obligation not allocated, retained, satisfied, or waived emits finding MISSING_OBLIGATION_ALLOCATION, makes the decomposition INVALID, and blocks child execution.", "layer": 2, "sourceRef": "§9" },
@@ -215,7 +216,7 @@
   "ruleCountsByPrefix": {
     "RPH-CON": 8,
     "RPH-INT": 7,
-    "RPH-PWU": 10,
+    "RPH-PWU": 11,
     "RPH-DEC": 7,
     "RPH-CNS": 4,
     "RPH-ASM": 6,
@@ -230,7 +231,7 @@
     "RPH-CMP": 4,
     "RPH-FIX": 6,
     "RPH-E2E": 7,
-    "_total": 125
+    "_total": 126
   },
   "properties": [
     {

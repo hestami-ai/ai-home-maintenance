@@ -334,7 +334,10 @@ describe('⭐ K1 (REG-F-511; R-1, REG-D-104 (1)) — a model-run unit whose revi
 		expect(shown.plan.status).toBe('ACTIVE');
 		expect(shown.step).toMatchObject({ stepState: 'WAITING', advanceCommands: [] });
 		// ⛔ Begin & Execute is offered on a PROPOSED row alone (`+page.svelte`), so it is not offered on this one again.
-		expect(branchOf('beginExecute')).toBe("{#if p.workLifecycleState === 'PROPOSED'}");
+		// ⭑ MOVED 2026-10-25 (`JAN-EXEC` Phase 7 package M; `REG-D-135` (2), design D3, which names this condition): ~~`{#if
+		// p.workLifecycleState === 'PROPOSED'}`~~ — a PROPOSED row is offered it only where the engine would start it
+		// (`start.offered`). Still on a PROPOSED row alone, so this EXECUTING one is still not offered it again.
+		expect(branchOf('beginExecute')).toBe("{#if p.workLifecycleState === 'PROPOSED' && p.start?.offered}");
 		const { id: planId } = shown.plan;
 		const { id: stepId } = shown.step;
 

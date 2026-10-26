@@ -12,6 +12,10 @@
 //   · THE ORDER RULE (C2) — the root first, then the tree's order: each unit's children in the order its TYPE permits them
 //     (`permittedChildTypeIds`), depth first — the order instantiation itself walks (`planComposition`,
 //     `packages/rph-projections/src/composition-plan.ts`), read back from the store rather than from the store's listing;
+//     ⭐⭐ `JAN-EXEC` Phase 7, package M (`REG-D-135` (2); design D6) — ~~the order the lane presses them in~~: the tree's order
+//     is now each unit's IDENTITY — its number and slug, its archive's name — and the lane's TIE-BREAK only. The lane presses
+//     only what the page offers, which is what the engine would start (each unit it waits for accepted), so the root, which
+//     waits for its children, runs last (`runTheLane`); what each unit waits for is read here (`dependenciesOf`);
 //   · each unit's SLUG, from its title, so the archive and the report name the agent's units as they name §3.2's;
 //   · ⭐ `REG-D-112` — the units HELD TO THE PLAN INSTANTIATION MAKES of the PWA, per (parent, type) (`treeAgainstPlan`);
 //   · the authoring floor's dispositions, read from ~~the assessments of the PWA~~ ⭐ (the review in parts, B6) the latest
@@ -20,7 +24,7 @@
 // it. ~~It imports only the content module.~~ ⭐ `REG-D-112` (E3's review, finding 4): and the product's own planner,
 // `planComposition` — a pure function of the types, from the projections package (data only, never a write target) —
 // so stage 2 holds the units to what instantiation builds, never to a restatement of it.
-import { planComposition } from '@janumipwb/rph-projections';
+import { ACCEPTED_UNIT_STATES, planComposition } from '@janumipwb/rph-projections';
 import { PRODUCT_BRIEF } from './pwa-content.js';
 
 // ── THE REQUEST (C1; `REG-D-110` (4)) ───────────────────────────────────────────────────────────────────────────────
@@ -117,8 +121,12 @@ const parentOf = (u: Row): string | null => str(u.state.parentWorkUnitId) || nul
 /**
  * ⭐⭐ C2 — THE RUN'S UNITS IN ITS ORDER: THE ROOT FIRST, THEN THE TREE'S ORDER. From the root, depth first, each unit's
  * children in the order its TYPE permits theirs (`permittedChildTypeIds`) — the walk instantiation made
- * (`planComposition`), so a phase runs only after the phases its tree puts before it, as §3.2's did. Ties, and a child
+ * (`planComposition`) ~~, so a phase runs only after the phases its tree puts before it, as §3.2's did~~. Ties, and a child
  * whose type its parent's does not list, keep the store's order.
+ * ⭐⭐ `JAN-EXEC` Phase 7, package M (`REG-D-135` (2); design D6; `REG-F-578`) — THIS IS NO LONGER THE ORDER THE LANE PRESSES. It
+ * is each unit's IDENTITY (its number, its slug, its archive's name) and the lane's TIE-BREAK among the units the page offers
+ * at once. ⛔ Pressed as it was, this pre-order walk put each parent before the children whose outputs it required — run-12's
+ * root first, and 4 of 4 composites before their children (`fixes-facts.md` §3).
  * ⚠ WHAT DOES NOT FIT IS SAID, NEVER DROPPED: a store with no root, or more than one, or a unit the root's tree does not
  * reach, gives a problem line, and every unit is still listed — the store's order after the tree's.
  */
@@ -164,6 +172,22 @@ export function unitsInTreeOrder(
 		problems
 	};
 }
+
+// ── ⭐ PACKAGE M — WHAT EACH UNIT WAITS FOR, AS THE STORE RECORDED IT (`REG-D-135` (2); design D1, D6) ───────────────────
+
+/**
+ * Each unit's dependency units, by id, as instantiation recorded them (`dependencyIds`: its producers and its children) —
+ * what the engine reads before it lets the unit start, and so what the lane records beside the order it pressed in.
+ */
+export function dependenciesOf(units: readonly Row[]): ReadonlyMap<string, readonly string[]> {
+	return new Map(units.map((u) => [u.id, strs(u.state.dependencyIds)]));
+}
+
+/**
+ * Whether a unit in `lifecycleState` is ACCEPTED, so a unit that waits for it may start: SATISFIED, RECOMPOSED or BASELINED —
+ * the engine's own set (`ACCEPTED_UNIT_STATES`, rph-projections), never a restatement. ⛔ CONDITIONALLY_SATISFIED is not.
+ */
+export const acceptedState = (lifecycleState: string): boolean => ACCEPTED_UNIT_STATES.includes(lifecycleState);
 
 /** ⭐ `REG-D-112` — what holding an Undertaking's units to the plan instantiation makes of its PWA found (`treeAgainstPlan`). */
 export interface TreeAgainstPlan {

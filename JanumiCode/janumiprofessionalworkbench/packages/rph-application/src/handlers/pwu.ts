@@ -87,6 +87,8 @@ import {
 	unsupportedSatisfactionMessage
 } from './declared-assurance.js';
 import { policyGovernance } from './policy-governs.js';
+// ⭐ `JAN-EXEC` Phase 7, package M (`REG-D-135` (2); design D2) — the ONE readiness rule the page's offer reads too.
+import { readinessUnitOf, startReadiness, startRefusal } from '@janumipwb/rph-projections';
 import { resolveAbandonAuthorization } from './abandon-authorization.js';
 import { hasBlockingObservationFor, resolveRejectAuthorization } from './reject-authorization.js';
 import { resolveWaiverAuthorization } from './waiver-authorization.js';
@@ -224,6 +226,47 @@ function rejectInvalidOwnershipBinding(
 	return rejectInvalidNonLocalPwuType(ctx, command, p, undertaking);
 }
 
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package M — THE UNITS A PROPOSED UNIT WAITS FOR, VALIDATED (`REG-D-135` (2); design D1). ⛔ Until
+ * package M this handler forced `dependencyIds` and `inputRequirements` to `[]`, so instantiation could record no producer
+ * and nothing could hold a consumer back (`REG-F-578`). It now records what it is given, refusing:
+ *   · a unit named twice, or the unit itself — a unit is never its own dependency;
+ *   · dependencies on a unit that belongs to no Undertaking — they are units of the SAME Undertaking, or nothing;
+ *   · a dependency id the store holds that is not a work unit of this unit's Undertaking.
+ * ⚠ AN ID THE STORE DOES NOT HOLD YET IS ADMITTED HERE, AND ONLY HERE: a parent is proposed before the children it waits for
+ * (PWU-003 refuses a child whose parent does not exist), so instantiation's one batch names them before they are stored —
+ * and a producer may be a later sibling's descendant. `ProposeDecomposition` refuses a contract any member of which names
+ * an id that never became a unit of its Undertaking (`rejectDanglingDependencies`, decomposition.ts), and the readiness
+ * rule refuses a start while any dependency names no unit of the Undertaking (`startReadiness`, its `unknown` limb), so a
+ * dangling id fails closed, never open.
+ */
+function rejectInvalidDependencies(
+	ctx: HandlerContext,
+	command: DomainCommand,
+	p: ProposePwuPayload
+): CommandResult | undefined {
+	const ids = p.dependencyIds ?? [];
+	if (ids.length === 0) return undefined;
+	const refuse = (why: string): CommandResult =>
+		reject(command, 'RPH_VALIDATION_SEMANTIC_FAILED', `ProposePwu: ${why} (REG-D-135 (2); design D1).`, [
+			p.pwuId,
+			...ids
+		]);
+	if (new Set(ids).size !== ids.length) return refuse(`dependencyIds names a unit more than once: ${ids.join(', ')}`);
+	if (ids.includes(p.pwuId)) return refuse(`a unit is never its own dependency, and ${p.pwuId} names itself`);
+	if (!p.undertakingId)
+		return refuse('dependencyIds are units of the same Undertaking, and this unit names no undertakingId');
+	for (const id of ids) {
+		const stored = ctx.store.loadObject(id)?.state as
+			| { objectType?: unknown; undertakingId?: unknown }
+			| undefined;
+		if (stored === undefined) continue;
+		if (stored.objectType !== PWU || stored.undertakingId !== p.undertakingId)
+			return refuse(`dependency ${id} is not a work unit of Undertaking ${p.undertakingId}`);
+	}
+	return undefined;
+}
+
 /** ProposePwu — (initial) -> PROPOSED. Creates the PWU. Requires the intent (PWU-002) and, if non-root, the
  * parent PWU (PWU-003) to exist. Initial axes: PROPOSED / NOT_PLANNED / UNASSESSED / UNKNOWN (PWU-001). */
 export const proposePwu: CommandHandler = (ctx, command, payload) => {
@@ -293,6 +336,8 @@ export const proposePwu: CommandHandler = (ctx, command, payload) => {
 	// undertakingId is exempt.
 	const ownershipRejection = rejectInvalidOwnershipBinding(ctx, command, p);
 	if (ownershipRejection) return ownershipRejection;
+	const dependencyRejection = rejectInvalidDependencies(ctx, command, p);
+	if (dependencyRejection) return dependencyRejection;
 	const ts = command.issuedAt;
 	const actor = command.issuedBy;
 	// PWU-001 seeded axes — one source for both the object state and the §11.3 event payload, so they cannot drift.
@@ -332,8 +377,9 @@ export const proposePwu: CommandHandler = (ctx, command, payload) => {
 		obligationIds: p.obligationIds,
 		constraintIds: p.constraintIds,
 		assumptionIds: p.assumptionIds,
-		dependencyIds: [],
-		inputRequirements: [],
+		// ⭐ Package M (D1) — recorded as given, validated above; absent is none. ⛔ Both were forced to [] (`REG-F-578`).
+		dependencyIds: p.dependencyIds ?? [],
+		inputRequirements: p.inputRequirements ?? [],
 		expectedOutputs: p.expectedOutputs,
 		evidenceRequirementIds: [],
 		verificationCriterionIds: [],
@@ -830,6 +876,40 @@ export const markPwuReady: CommandHandler = (ctx, command) => {
 			`MarkPwuReady: PWU ${command.targetAggregateId} does not satisfy the shape readiness contract (DOC-002 §9): ${readiness.unmet.join('; ')}`
 		);
 	}
+	// ── ⭐⭐ `JAN-EXEC` Phase 7, package M — A UNIT ENTERS READINESS ONLY WHEN WHAT IT WAITS FOR IS ACCEPTED (`REG-D-135` (2);
+	// design D2; `REG-F-578`; enforcement register `RPH-PWU-011`) ──────────────────────────────────────────────────────
+	//
+	// Every unit it depends on — its producers and its children, recorded at instantiation (`dependencyIds`, design D1) —
+	// must be a unit of its Undertaking and ACCEPTED: SATISFIED, RECOMPOSED or BASELINED. ⛔ CONDITIONALLY_SATISFIED does not
+	// count: its conditions are open (DOC-003 :231, DEC-6: *"'Assured required child results' excludes conditionally
+	// satisfied dispositions"*). And no input it requires may be unproduced (`inputRequirements`). The refusal names every
+	// unit it waits for; the page's offer reads the same rule (`startReadiness`, rph-projections), so it offers Begin &
+	// Execute exactly where this would admit it (SPEC-001 :3244).
+	//
+	// ⭐ WHY HERE, AND NOT AT THE STEP START (`StartExecutionStep`, beside `inputReadinessRefusal`). STA-5 reads *"A PWU
+	// enters readiness only when its shape readiness profile is satisfied: … mandatory obligations, constraints, material
+	// assumptions, DEPENDENCIES, and responsible authority; REQUIRED INPUTS, expected outputs …"*, and its scope is *"governs
+	// the ready transition"* — demanding *"sufficiency for the next authorized activity"*, which for a unit about to execute
+	// is its producers' accepted work (DOC-003 :191, :193). Its subject is the PWU, and so is this rule's: a unit and the
+	// units it waits for. The step start's subject is an EXECUTION STEP and its input ARTIFACT — the RPH-EXE-005 row records
+	// why STA-5 is not that rule's carrier, and seating a unit-level rule there would be the same layer substitution
+	// turned round. And READY is the one door to execution: this command alone owns it (`PWU_LIFECYCLE_COMMAND_SPECS`,
+	// SHAPING -> READY; REG-F-072 bars the generic setter from it), and a unit reaches PLANNED and EXECUTING only through
+	// READY — so every surface's start passes here: Begin & Execute's batch, which then rolls back whole, leaving the unit
+	// PROPOSED with no plan and no binding (SPEC-001-INV-14), before any model or reviewer call; and any other caller.
+	// ⚠ READY/BLOCKED, CHECKED AGAINST STA-5 AS D2 ASKED: STA-5 gates the ready transition, which this refusal is, so READY
+	// carries the readiness. BLOCKED is not entered: its in-arrows are SHAPING, PLANNED and EXECUTING (BlockPwu), and a
+	// waiting unit has not begun — D2's interim holds, and a waiting unit stays PROPOSED (or SHAPING, for a caller that
+	// shaped it), its reason shown on the page.
+	const start = startReadiness(command.targetAggregateId, (id) =>
+		readinessUnitOf(id, ctx.store.loadObject(id)?.state as Readonly<Record<string, unknown>> | undefined)
+	);
+	if (!start.startable)
+		return reject(command, 'RPH_INVARIANT_VIOLATION', `MarkPwuReady: ${startRefusal(command.targetAggregateId, start)}`, [
+			command.targetAggregateId,
+			...start.waitingFor.map((w) => w.id),
+			...start.abandoned.map((a) => a.id)
+		]);
 	return advancePwuLifecycle(ctx, command, {
 		spec: PWU_LIFECYCLE_COMMAND_SPECS.MarkPwuReady,
 		// DOC-007 §11.4 names it shapeReadinessAssessmentId; DOC-002 §34.1 names it shapeReadinessAttestationId.

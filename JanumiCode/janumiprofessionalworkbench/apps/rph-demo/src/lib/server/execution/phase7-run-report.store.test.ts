@@ -60,6 +60,33 @@ const seam = vi.hoisted(() => ({
 		  }
 }));
 
+// ⚠ `JAN-EXEC` Phase 7, package M (`REG-D-135` (2); design D1, D6, D7) — THIS STORE IS A RUN OF THE LANE BEFORE PACKAGE M, AND
+// IS INSTANTIATED AS ONE: its units record no dependency (`unitDependencies` of nothing), as every store made before package M
+// holds them — P5's run-7 and run-12 among them — so its root runs first and is signed off last, over phases that stopped,
+// exactly as that lane drove it, and its `lane/run.json` records no press order (`order`), as that lane's did. An
+// Undertaking instantiated now waits for each producer and child to be accepted, and the lane presses in that order and
+// records it; the report reads that order from the record and, where a record holds none, the record's own unit order,
+// which was the press order of the lane that wrote it (`run-report-core.ts`, `pressOrderOf`; verif/phase7-run-report.test.ts).
+// The arrangement and every assertion below are unchanged.
+vi.mock('@janumipwb/rph-projections', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('@janumipwb/rph-projections')>();
+	return {
+		...actual,
+		unitDependencies: (...args: Parameters<typeof actual.unitDependencies>) => ({
+			units: args[1].map((u) => ({
+				unitId: u.id,
+				inputs: [],
+				suppliedByIntent: [],
+				unproduced: [],
+				childIds: [],
+				dependencyIds: []
+			})),
+			loops: [],
+			siblingDependencies: []
+		})
+	};
+});
+
 vi.mock('./model.js', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('./model.js')>();
 	return {

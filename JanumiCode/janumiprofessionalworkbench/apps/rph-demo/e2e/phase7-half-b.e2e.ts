@@ -1,5 +1,5 @@
 import { expect } from '@playwright/test';
-import { test, resetEngine, introspect, registerStipulation } from './support/harness';
+import { test, resetEngine, introspect, registerStipulation, gotoHydrated } from './support/harness';
 import { actionFields, createDraftPwa, createUndertakingThroughForm, unitRowById } from './support/phase7-pwa';
 import {
 	acceptCandidate,
@@ -8,7 +8,10 @@ import {
 	beginExecute,
 	designerAct,
 	agentTurnOn,
+	markSatisfied,
 	openLane,
+	recordAssurance,
+	startOfferOf,
 	turnRunning,
 	unitStateOf,
 	PHASE7_UNDERTAKING,
@@ -19,6 +22,7 @@ import { PHASE7_HALF_B_DRAFT } from '../../../scripts/phase7/half-b';
 import {
 	phase7AuthoringAllowanceMs,
 	phase7AuthoringReviewerCalls,
+	phase7RecordAssuranceMs,
 	PHASE7_AUTHORING_ANTICIPATED_PARTS
 } from '../e2e-live-exec/lane-config';
 
@@ -87,7 +91,7 @@ test.describe('Phase 7 half B — the turn, accepted, published and run, through
 		await resetEngine(request, 'empty');
 	});
 
-	test('⭐ draft → Send → the candidate’s status → Accept → Submit, Validate, Publish → the units from the published PWA, each run in tree order', async ({
+	test('⭐ draft → Send → the candidate’s status → Accept → Submit, Validate, Publish → the units from the published PWA, each the page offers run and signed off in turn, the root waiting for its children (package M)', async ({
 		page,
 		request
 	}) => {
@@ -111,6 +115,8 @@ test.describe('Phase 7 half B — the turn, accepted, published and run, through
 				// of the graph (⭐ the review in parts, `REG-D-125`) and the work products', so the declared stand-in answers what the structural checker cannot judge.
 				await registerStipulation(request, pwaId, 'PWA_TYPE');
 				await registerStipulation(request, pwaId, 'WORK_PRODUCT');
+				// ⭐ Package M (D6) — and each unit's declared policies, since each pressed unit is now signed off before the next press.
+				await registerStipulation(request, pwaId, 'DECLARED_POLICY');
 				return pwaId;
 			},
 			send: (instruction) => turn.send(instruction),
@@ -204,14 +210,57 @@ test.describe('Phase 7 half B — the turn, accepted, published and run, through
 		for (const unit of record.units)
 			await expect(unitRowById(page, unit.unitId!), `the overview’s row for ${unit.title}, by its id`).toHaveCount(1);
 
-		// ── Each unit run in that order: Begin & Execute pressed by the operator's own act ON ITS ROW BY ID — the overview's
-		// row carries its unit's id (`data-pwu-id`) — the store read after ──────────────────────────────────────────────
-		for (const unit of record.units) {
-			const ran = await beginExecute(page, unitRowById(page, unit.unitId!), actionFields);
-			expect(ran.envelopeType, `Begin & Execute on ${unit.title}: ${ran.rawBody ?? ''}`).toBe('success');
-			const after = unitStateOf(await introspect(request), unit.unitId!);
-			expect([after.executionState, after.planStepState], unit.title).toEqual(['SUCCEEDED', 'SUCCEEDED']);
-		}
+		// ── ~~Each unit run in that order~~ ⭐ Each unit THE PAGE OFFERS run, the tree's order breaking ties: Begin & Execute pressed
+		// by the operator's own act ON ITS ROW BY ID — the overview's row carries its unit's id (`data-pwu-id`) — the store read
+		// after ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+		// ⛔ MOVED BY `JAN-EXEC` Phase 7, package M (`REG-D-135` (2); design D2, D3, D6, D7): the root, pressed first here, waits for
+		// its two children to be ACCEPTED; each pressed unit is signed off — Record Assurance, then Mark Satisfied — before the
+		// next press (D6). The plan declares no data flow, so the leaves wait for nothing.
+		const rowOf = (title: string) => unitRowById(page, idOf(title));
+		const offers = async () =>
+			Object.fromEntries(
+				await Promise.all(record.units.map(async (u) => [u.title, await startOfferOf(rowOf(u.title))] as const))
+			);
+		expect(await offers(), 'D3: before any press, the page offers each leaf and withholds the root').toEqual({
+			'wordfreq Realization': {
+				offered: false,
+				reason: 'it waits for "Specify wordfreq" (PROPOSED) and "Verify wordfreq" (PROPOSED) to be accepted',
+				kinds: ['waiting']
+			},
+			'Specify wordfreq': { offered: true, reason: null, kinds: [] },
+			'Verify wordfreq': { offered: true, reason: null, kinds: [] }
+		});
+		const run = async (title: string) => {
+			const ran = await beginExecute(page, rowOf(title), actionFields);
+			expect(ran.envelopeType, `Begin & Execute on ${title}: ${ran.rawBody ?? ''}`).toBe('success');
+			const after = unitStateOf(await introspect(request), idOf(title));
+			expect([after.executionState, after.planStepState], title).toEqual(['SUCCEEDED', 'SUCCEEDED']);
+		};
+		const assure = (title: string) => recordAssurance(page, rowOf(title), actionFields, phase7RecordAssuranceMs(1));
+		// The MODEL leaf, its work product's review and its declared policy stipulated: signed off.
+		await run('Specify wordfreq');
+		const specifyAssured = await assure('Specify wordfreq');
+		expect(specifyAssured?.envelopeType, `Record Assurance on Specify wordfreq: ${specifyAssured?.rawBody ?? ''}`).toBe('success');
+		const specifyGreen = await markSatisfied(page, rowOf('Specify wordfreq'), actionFields);
+		expect(specifyGreen.envelopeType, `Mark Satisfied on Specify wordfreq: ${specifyGreen.rawBody ?? ''}`).toBe('success');
+		// ⭐ THE TRAPS' LEAF: it ran a TRANSFORMATION with no model (`REG-F-505`), and its one declared policy is scoped to
+		// another kind (`REG-F-524`), so the kernel's fold composes UNASSESSED over it and refuses SATISFIED — observed, the
+		// first run of this rehearsal (2026-10-26). It is never accepted.
+		await run('Verify wordfreq');
+		const verifyAssured = await assure('Verify wordfreq');
+		expect(verifyAssured?.envelopeType, 'the trap leaf’s sign-off was accepted').toBe('failure');
+		expect(String(verifyAssured?.decoded?.error ?? verifyAssured?.rawBody)).toContain(
+			'yields composed disposition UNASSESSED, which does not support SATISFIED'
+		);
+		// ⭐ AND SO THE ROOT, WAITING FOR IT, IS NEVER OFFERED (D2, D4): the page, loaded afresh, names the leaf it waits for.
+		await gotoHydrated(page, new URL(page.url()).pathname);
+		await page.getByRole('button', { name: 'overview', exact: true }).click();
+		expect(await startOfferOf(rowOf('wordfreq Realization')), 'D3: the root was offered beside an unaccepted child').toEqual({
+			offered: false,
+			reason: 'it waits for "Verify wordfreq" (EXECUTING) to be accepted',
+			kinds: ['waiting']
+		});
+		expect(unitStateOf(await introspect(request), idOf('wordfreq Realization')).lifecycleState).toBe('PROPOSED');
 		// ⭐ THE TRAP PLAYED OUT LIVE (REG-D-110 (4)): the UNDECLARED leaf completed with NO model run — the false "Yes" the
 		// run report now reads as a break (C5) — while the MODEL leaf's try is recorded.
 		const exchanges = (await introspect(request)).modelExchanges.filter((x) => x.state.plane === 'EXECUTION');

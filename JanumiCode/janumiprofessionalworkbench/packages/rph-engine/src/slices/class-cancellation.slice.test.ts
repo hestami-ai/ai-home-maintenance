@@ -878,7 +878,9 @@ describe('SLICE CLS-CANCELLATION — a job under way is called off, deliberately
 	// world. It asserts ONE named hit, and that hit's antecedent.
 	it('O-8 — the ratified catalog reaches the act of cancelling twice, both times obliquely, and never in an antecedent', () => {
 		const rules = catalog();
-		expect(rules.length, 'the catalog really was read — 125 ratified rules').toBe(125);
+		// ⭑ 125 -> 126 (2026-10-25, `JAN-EXEC` Phase 7 package M): RPH-PWU-011 joined the catalog (`REG-D-135` (2)). It names no
+		// act of cancelling, so both sweeps below return what they did; only the count moves.
+		expect(rules.length, 'the catalog really was read — 126 ratified rules').toBe(126);
 
 		const namesTheAct = rules
 			.filter((r) => /cancel|abandon|skip|prune|terminat|withdraw/i.test(r.statement))
@@ -896,7 +898,7 @@ describe('SLICE CLS-CANCELLATION — a job under way is called off, deliberately
 			.map((r) => r.id);
 		expect(
 			reachesTheConcept,
-			'the concept sweep returns TWO of 125 — RPH-EXE-008 and RPH-GOV-007 — not the one this file used to report'
+			'the concept sweep returns TWO of 126 — RPH-EXE-008 and RPH-GOV-007 — not the one this file used to report'
 		).toEqual(['RPH-EXE-008', 'RPH-GOV-007']);
 
 		// AND NEITHER ANTECEDENT IS A CALL-OFF, which is what keeps both mentions oblique rather than governing.
@@ -975,7 +977,8 @@ describe('SLICE CLS-CANCELLATION — a job under way is called off, deliberately
 			SKIPPED: 0,
 			// The other five. THESE ARE THE PROOF OF LIFE AND NOTHING STRONGER — see the sharp census below for what
 			// they actually are; two of them are English past participles and error codes, not state names.
-			BASELINED: 2,
+			// ⭑ 2 -> 3 (2026-10-25, package M): RPH-PWU-011 names BASELINED among the states that accept a dependency.
+			BASELINED: 3,
 			COMPLETED: 2,
 			FAILED: 2,
 			SUCCEEDED: 6,
@@ -992,7 +995,8 @@ describe('SLICE CLS-CANCELLATION — a job under way is called off, deliberately
 			'the sharp census is the like-for-like question: five of the eight terminals are named by no rule AS A STATE, not three'
 		).toEqual({
 			ABANDONED: 0,
-			BASELINED: 1,
+			// ⭑ 1 -> 2 (2026-10-25, package M): RPH-PWU-011 names BASELINED as a state, one of the three that accept.
+			BASELINED: 2,
 			CANCELLED: 0,
 			COMPLETED: 0,
 			FAILED: 0,

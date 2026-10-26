@@ -9,10 +9,16 @@
 //   · THE ACTS on the Undertaking page — Begin & Execute, Record Assurance, Mark Satisfied — the gate's
 //     (`e2e/phase7-five-unit.e2e.ts`) restated for a lane where a press can take hours and a refusal must not end the run:
 //     each waits on its own action's response, BOUNDED, and keeps its status and raw body (D5);
-//   · THE RUN'S ORDER (`runTheLane`; D4, D5, D8, D11) — the root, then each phase only after the one before has
+//   · THE RUN'S ORDER (`runTheLane`; D4, D5, D8, D11) — ~~the root, then each phase only after the one before has
 //     answered, the limit before each phase ⭐ and each sign-off (`E12F` F2), a press with no answer ending the run, then
 //     the sign-offs, the root last, and the final archive; dry, no phase at all, and the root's sign-off alone (D11), ⭐
-//     rehearsed up to the reviewer call and never pressed (`E12F` F1, `REG-D-112` (b)). ⭑ It lived in the spec until
+//     rehearsed up to the reviewer call and never pressed (`E12F` F1, `REG-D-112` (b)).~~ ⭐⭐ `JAN-EXEC` Phase 7, package M
+//     (`REG-D-135` (2); design D6, D7): ONLY WHAT THE PAGE OFFERS, ONE UNIT AT A TIME — the page offers Begin & Execute where
+//     the engine would start the unit, every unit it waits for accepted — the first in the tree's order when it offers
+//     several; each unit's execution, its recovery by the run plan's rule, then its sign-off, BEFORE the next press; a unit
+//     never offered recorded not started, with the page's reason; a loop ending the run before any press
+//     (`order-unresolvable`); the limit before every press; the final archive. So the root, which waits for its children,
+//     runs LAST. Dry, nothing is pressed: the first unit the page offers is a model's. ⭑ It lived in the spec until
 //     round 2's fix pass, where nothing could drive it: a dry run that never pressed the root, and a phase past its
 //     allowance that started the next beside it, both passed every test. It runs here on HANDS the spec builds from
 //     the page, so verif drives it on hands of its own;
@@ -41,8 +47,10 @@ import { PHASE7_PWA, promptMarkers, type Phase7TypeDeclaration } from '../../../
 // ⭐ E3 — half B's request, the order its units are read in, the floor's dispositions, and the candidate checks (C1-C4).
 import { candidateChecks, type CandidateChecks } from '../../../scripts/phase7/candidate-checks.js';
 import {
+	acceptedState,
 	AUTHORING_FLOOR_POLICIES,
 	correlationsOf,
+	dependenciesOf,
 	floorDispositions,
 	PHASE7_HALF_B_REQUEST,
 	TURN_SETTLED,
@@ -505,6 +513,11 @@ export interface RunUnit extends ArchiveUnit {
 	 */
 	recovery: RecoveryRecord[];
 	signOff: SignOffRecord | null;
+	/**
+	 * ⭐ `JAN-EXEC` Phase 7, package M (`REG-D-135` (2); design D4, D6) — WHY THE LANE NEVER PRESSED IT, in the page's own words
+	 * where the page withheld it (`not started: …`), or the run's where the run ended first; null for a unit pressed.
+	 */
+	notStarted: string | null;
 }
 
 /** ⭐ P7-6R R-1f — one act the run plan's rule made on a stopped phase, and the unit as the STORE read it after. */
@@ -576,7 +589,24 @@ export type EndReason =
 	 * whether its press runs a model, and so what the limit must count before it, cannot be decided, so it is never pressed.
 	 * ⚠ A RESULT, recorded with why — and not the end a paid run was meant to reach.
 	 */
-	| 'root-type-unreadable';
+	| 'root-type-unreadable'
+	/**
+	 * ⭐ `JAN-EXEC` Phase 7, package M (`REG-D-135` (2); design D5) — a unit sits in a LOOP of what units wait for: no unit of it
+	 * can ever start, and the page names the loop. The run ends here, after the authoring archive and before ANY press. ⛔ It
+	 * never falls back to the tree's order. ⚠ A RESULT, recorded with the page's words.
+	 */
+	| 'order-unresolvable';
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package M (`REG-D-135` (2); design D6) — THE ORDER, AS THE RUN RECORDS IT: what each unit waits for,
+ * as instantiation recorded it, and the order the lane pressed in. The run report reads the press order from here.
+ */
+export interface LaneOrder {
+	/** Each unit's dependency units, by slug — by id where the run holds no unit of that id — read from the store. */
+	readonly dependencies: Readonly<Record<string, readonly string[]>>;
+	/** The units pressed, by slug, in the order the lane pressed them. */
+	readonly pressed: string[];
+}
 
 export interface RunRecord {
 	readonly mode: 'dry' | 'paid';
@@ -592,7 +622,53 @@ export interface RunRecord {
 	end: { readonly reason: EndReason; readonly at: string; readonly detail?: string } | null;
 	/** What the lane could not do and went on without — a screenshot, say — one line each. */
 	readonly problems: string[];
+	/** ⭐ Package M (D6) — the order: null until the units are read; absent from a record written before package M. */
+	order?: LaneOrder | null;
 }
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package M (`REG-D-135` (2); design D3, D6) — WHAT THE PAGE OFFERS ON A UNIT'S ROW: Begin & Execute, or
+ * why not — the page's reason and its kinds (`waiting`, `abandoned`, `unknown`, `unproduced`, `loop`), which the load reads
+ * from the rule the engine's refusal reads. A row of a unit that is not PROPOSED offers neither: not offered, no reason.
+ */
+export interface StartOffer {
+	readonly offered: boolean;
+	readonly reason: string | null;
+	readonly kinds: readonly string[];
+}
+
+/** The page's words before a withheld unit's reason (`+page.svelte`, `start-withheld`). */
+const WITHHELD_PREFIX = 'Not startable yet: ';
+
+/** ⭐ Package M (D6) — what the row in `row` offers, read and never pressed. */
+export async function startOfferOf(row: Locator): Promise<StartOffer> {
+	await row.waitFor({ timeout: PHASE7_UI_MS });
+	if ((await row.getByRole('button', { name: 'Begin & Execute', exact: true }).count()) > 0)
+		return { offered: true, reason: null, kinds: [] };
+	const withheld = row.getByTestId('start-withheld');
+	if ((await withheld.count()) === 0) return { offered: false, reason: null, kinds: [] };
+	const text = (await withheld.innerText({ timeout: PHASE7_UI_MS })).trim();
+	const kinds = ((await withheld.getAttribute('data-withheld', { timeout: PHASE7_UI_MS })) ?? '')
+		.split(' ')
+		.filter((k) => k !== '');
+	const reason = (text.startsWith(WITHHELD_PREFIX) ? text.slice(WITHHELD_PREFIX.length) : text).replace(/\.$/, '');
+	return { offered: false, reason, kinds };
+}
+
+/**
+ * ⭐ Package M (D6) — WHY A UNIT THE PAGE OFFERS IS NOT PRESSED IN A DRY RUN. Under D7 the root, which runs no model, waits for
+ * its children and runs last, and every unit the page offers before it is a model's — so a dry run presses no unit at all.
+ */
+export const DRY_PRESS_NOT_REACHED =
+	'not pressed in a dry run: a dry run calls no model, and the first unit the page offers runs one — the root, which runs none, waits for its children (REG-D-112 (b); REG-D-135 (2)); the page was loaded afresh, the row read and Begin & Execute found on it';
+
+/** ⭐ Package M (D4, D6) — a unit the page never offered: not started, with the page's own reason. */
+export const notStartedBecause = (o: StartOffer | undefined): string =>
+	o?.reason !== null && o?.reason !== undefined
+		? `not started: ${o.reason}`
+		: o?.offered === true
+			? 'not started: offered, and the run ended before it was pressed'
+			: 'not started: its row offered no Begin & Execute';
 
 /** The run record's units before anything is pressed. */
 export function unpressed(units: readonly ArchiveUnit[]): RunUnit[] {
@@ -606,7 +682,8 @@ export function unpressed(units: readonly ArchiveUnit[]): RunUnit[] {
 		upstreamNotAssured: null,
 		limitCheck: null,
 		recovery: [],
-		signOff: null
+		signOff: null,
+		notStarted: null
 	}));
 }
 
@@ -740,9 +817,27 @@ export function stoppedAfter(envelopeType: EnvelopeType | null, state: UnitState
 	);
 }
 
-/** ⭐ D5 — did a phase before `order` stop? The root is the phases' parent, not their upstream. */
-export function upstreamNotAssured(units: readonly RunUnit[], order: number): boolean {
-	return units.some((u) => u.order > 1 && u.order < order && u.stopped === true);
+/**
+ * ⭐ D5 — ~~did a phase before `order` stop? The root is the phases' parent, not their upstream.~~ ⭐⭐ `JAN-EXEC` Phase 7, package
+ * M (`REG-D-135` (2); design D6): IS ANY UNIT THIS ONE WAITS FOR NOT ACCEPTED, as the store reads it now — its own producers and
+ * children, as instantiation recorded them (`dependencyIds`), each SATISFIED, RECOMPOSED or BASELINED or not (`acceptedState`).
+ * ⛔ It read whether an EARLIER phase had stopped, any phase, so an unrelated stop marked a unit whose own producers were
+ * accepted. ⚠ The engine starts a unit only when this is false, so a unit the lane pressed reads false; it is read before the
+ * press, from the store, never inferred from that.
+ */
+export function upstreamNotAssured(snap: EngineSnapshot, unitId: string): boolean {
+	const lifecycleOf = (id: string): string => str(snap.pwus.find((p) => p.id === id)?.state.workLifecycleState);
+	const waitsFor = dependenciesOf(snap.pwus.filter((p) => p.id === unitId)).get(unitId) ?? [];
+	return waitsFor.some((id) => !acceptedState(lifecycleOf(id)));
+}
+
+/** ⭐ Package M (D6) — what each unit waits for, by slug (by id for one the run holds no unit of), as the store recorded it. */
+export function dependenciesBySlug(snap: EngineSnapshot, units: readonly RunUnit[]): Record<string, string[]> {
+	const slugOf = new Map(units.map((u) => [u.unitId, u.slug]));
+	const recorded = dependenciesOf(snap.pwus);
+	return Object.fromEntries(
+		units.map((u) => [u.slug, (recorded.get(u.unitId ?? '') ?? []).map((id) => slugOf.get(id) ?? id)])
+	);
 }
 
 // ── THE STORE'S READS (`REG-F-540`) ──────────────────────────────────────────────────────────────────────────────────
@@ -1421,6 +1516,8 @@ export interface SignOffRecord {
  * it to review each of the root's two — paid calls, which `laneVerdict`'s *"the dry run recorded N model exchange(s)"*
  * would then have counted. Everything before the press is rehearsed: the page loaded afresh, the root's row waited for,
  * and Record Assurance found on it — never pressed.
+ * ⛔ `JAN-EXEC` Phase 7, package M (`REG-D-135` (2); design D7) — NO LONGER RECORDED: a dry run presses no unit, the root
+ * waiting for its children, so it reaches no sign-off to hold back. Kept as the words a record written before package M holds.
  */
 export const DRY_SIGN_OFF_NOT_REACHED =
 	'not reached in a dry run: Record Assurance asks the reviewer to judge each of the unit’s declared policies, and a dry run calls no model (REG-D-112 (b)); the page was loaded afresh, the row waited for and Record Assurance found on it, and nothing was pressed';
@@ -1434,6 +1531,9 @@ export const DRY_SIGN_OFF_NOT_REACHED =
  * (`e2e/phase7-five-unit.e2e.ts`, prediction (a)). A phase that stopped and was left as found, never abandoned, holds nothing.
  * ⭐ P5 package C (F6) — the record names the ruling beside the sponsor's words: ~~(the sponsor, 2026-10-18: "Yes, hold the
  * root")~~.
+ * ⛔ `JAN-EXEC` Phase 7, package M (`REG-D-135` (2); design D4) — NO LONGER RECORDED: the workbench itself now leaves a unit
+ * unstarted while a unit it waits for is ABANDONED, the root among them, so the lane never reaches a root to hold — it is
+ * recorded not started, with the page's reason. Kept as the words a record written before package M holds.
  */
 export const rootHeldOverAbandoned = (titles: readonly string[]): string =>
 	`the root is held, not signed off: ${titles.join(', ')} ${titles.length === 1 ? 'is' : 'are'} ABANDONED, and the lane ` +
@@ -2144,6 +2244,11 @@ export interface LaneHands {
 	/** Load the Undertaking page afresh and show its overview, whose rows carry the acts. */
 	readonly showOverview: () => Promise<void>;
 	/**
+	 * ⭐ `JAN-EXEC` Phase 7, package M (`REG-D-135` (2); design D6) — what the overview's row of each of `units` offers, by unit id:
+	 * Begin & Execute, or the page's reason for withholding it (`startOfferOf`), read and never pressed.
+	 */
+	readonly startOffers: (units: readonly RunUnit[]) => Promise<ReadonlyMap<string, StartOffer>>;
+	/**
 	 * Record Assurance on the unit's row, or null when the row offers none (`recordAssurance`) — ⭐ waited for up to
 	 * `timeoutMs`, the bound the lane gives it for the unit's declared policies (the lead's delegated decision of
 	 * 2026-10-16, registered as REG-D-114 (15)).
@@ -2195,33 +2300,37 @@ export interface LaneHands {
  *      a MODEL root's ~~worst case~~ ⭐ one try's reserve counted (`rootLimitCheck`; `REG-D-114` (14), as amended 2026-10-16),
  *      ⭐ and a root whose type the lane cannot find or read never pressed: the run ends `root-type-unreadable`, why in its
  *      detail (`typeUnreadableOf`; the lead's round-4 item 2);
- *   3. Begin & Execute on the ROOT, then on each PHASE in order, each only after the one before has answered
- *      (`REG-F-535`), each answer kept raw, the unit's state READ FROM THE STORE (`REG-F-540`), and the run archived and
- *      checked. ⛔ A press with NO ANSWER — the root's included — ends the run there (`unansweredEnd`, D4). Before each
- *      phase, the LIMIT (D8), or the run ends `paid-limit`. A phase that stops is left as found, and the later ones
- *      still run, each recorded as having an upstream nothing assured (D5). ⛔ DRY, NO PHASE IS PRESSED (D1): each is a
- *      unit a model runs, so the run goes from the root's archive straight to 4;
- *   3b. ⭐ P7-6R R-1f — A PHASE THAT STOPPED AT ITS REVIEW IS RECOVERED BY THE RUN PLAN'S RULE, AS THE OPERATOR, before the
- *      next starts (`REG-D-105` (4); `recoverByRule`): re-run the review if the row offers it, else re-run the work, the
- *      LIMIT checked first as between phases (D8); and a re-run refused again is abandoned. ⛔ A re-run with no answer
+ *   3. ~~Begin & Execute on the ROOT, then on each PHASE in order, each only after the one before has answered~~ ⭐⭐
+ *      `JAN-EXEC` Phase 7, package M (`REG-D-135` (2); design D4-D7) — THE ORDER THE PAGE OFFERS: what each unit waits for is
+ *      read from the store into the record (`order.dependencies`); a unit the page withholds for a LOOP ends the run
+ *      `order-unresolvable` before any press, never a fallback to the tree's order (D5); then, ONE UNIT AT A TIME, the first
+ *      in the tree's order of those the page OFFERS — the engine would start it: every unit it waits for accepted — is
+ *      pressed (`order.pressed`), its answer kept raw, its state READ FROM THE STORE (`REG-F-540`), the run archived and
+ *      checked. ⛔ A press with NO ANSWER ends the run there (`unansweredEnd`, D4). Before each press, the LIMIT, its whole
+ *      worst case counted (D8, D16), or the run ends `paid-limit`; half B's root's type unreadable, `root-type-unreadable`.
+ *      A unit the page never offers is recorded not started, with the page's reason (`notStarted`; D4). ⛔ DRY, NOTHING IS
+ *      PRESSED (D1): the root, which runs no model, waits for its children, and every unit the page offers before it is a
+ *      model's — each offered row read and recorded not reached in a dry run (`DRY_PRESS_NOT_REACHED`);
+ *   3b. ⭐ P7-6R R-1f — A UNIT THAT STOPPED AT ITS REVIEW IS RECOVERED BY THE RUN PLAN'S RULE, AS THE OPERATOR, before
+ *      anything else is pressed (`REG-D-105` (4); `recoverByRule`): re-run the review if the row offers it, else re-run the
+ *      work, the LIMIT checked first (D8); and a re-run refused again is abandoned. ⛔ A re-run with no answer
  *      ends the run as a Begin & Execute with none does (D4); ⭐ P7-6 B3 — "refused again" is the STORE's reading (a new
  *      plan whose step waits), and a re-run never made, or one that left the unit RUNNING or FAILED, is left as found;
- *   4. SIGN-OFF: each phase that completed, then the root LAST, the page loaded afresh for each, the store read after
- *      every act, every refusal recorded and none asserted; then the final archive, `06-final`. ⭐ `E12F` F2 — THE LIMIT
- *      BEFORE EACH SIGN-OFF, its own worst case counted (`signOffWorstCase`): one that would cross it is not pressed, nor is
- *      any later sign-off, and the run ends `paid-limit`. ⭐ `E12F` F3 — A RECORD ASSURANCE ANSWERED WITH A REFUSAL, whose
- *      row, read afresh, then offers re-running the declared reviews that did not conclude, has them re-run ONCE by the rule
- *      (`REG-D-105` (4), `REG-D-112` (a)), the limit read first; accepted, Mark Satisfied follows; refused, the unit is left
- *      as found. ⛔ E12's re-review F1 — A SIGN-OFF ACT WITH NO ANSWER ENDS THE RUN THERE, as a Begin & Execute with none
- *      does (`unansweredEnd`, D4): its unit's declared reviews may still be running, so nothing is pressed beside them, and
- *      the final archive is taken. ~~DRY TOO, BY THE SAME ACTS (design §6 P7-2 D11): no phase completed, so the root is signed off alone.
- *      Signing off calls no model~~ ⛔ `E12F` F1: FALSE SINCE E2 — Record Assurance asks the reviewer for one review per
- *      declared policy. ⭐ DRY, THE ROOT'S SIGN-OFF STOPS BEFORE THE REVIEWER CALL, SO SIGNING OFF CALLS NO MODEL
- *      (`REG-D-112` (b)): everything before the press rehearsed — the page loaded afresh, the root's row waited for, Record
- *      Assurance found on it — and nothing pressed, the sign-off recorded `DRY_SIGN_OFF_NOT_REACHED`; then the final
- *      archive, so it still first runs here and not in the paid run;
- *   5. DRY, the model exchanges the store holds — read only now, AFTER the sign-off and the final archive, so that a model
- *      call anything here made is counted — and the run ends `dry-run-stop` (D1, D11).
+ *   4. SIGN-OFF: ~~each phase that completed, then the root LAST~~ ⭐ (package M, D6) EACH UNIT'S, RIGHT AFTER ITS EXECUTION
+ *      AND RECOVERY AND BEFORE THE NEXT PRESS — so a unit that waits for it can be offered — the page loaded afresh, the
+ *      store read after every act, every refusal recorded and none asserted; a unit still stopped offers none, its row read
+ *      and nothing pressed. Then, when the page offers nothing more, the final archive, `06-final`, and the run ends
+ *      `complete`. ⭐ `E12F` F2 — THE LIMIT BEFORE EACH SIGN-OFF, its own worst case counted (`signOffWorstCase`): one that
+ *      would cross it is not pressed, nor is anything after it, and the run ends `paid-limit`. ⭐ `E12F` F3 — A RECORD
+ *      ASSURANCE ANSWERED WITH A REFUSAL, whose row, read afresh, then offers re-running the declared reviews that did not
+ *      conclude, has them re-run ONCE by the rule (`REG-D-105` (4), `REG-D-112` (a)), the limit read first; accepted, Mark
+ *      Satisfied follows; refused, the unit is left as found. ⛔ E12's re-review F1 — A SIGN-OFF ACT WITH NO ANSWER ENDS THE
+ *      RUN THERE, as a Begin & Execute with none does (`unansweredEnd`, D4): its unit's declared reviews may still be running,
+ *      so nothing is pressed beside them, and the final archive is taken. ~~DRY, THE ROOT'S SIGN-OFF STOPS BEFORE THE
+ *      REVIEWER CALL (`REG-D-112` (b)) … the sign-off recorded `DRY_SIGN_OFF_NOT_REACHED`~~ ⛔ Package M (D7): a dry run
+ *      presses no unit, so it reaches no sign-off;
+ *   5. DRY, the model exchanges the store holds — read only now, AFTER the final archive, so that a model call anything
+ *      here made is counted — and the run ends `dry-run-stop` (D1, D11).
  * ⛔ A throw ends the run `lane-error`, its record written before it is rethrown — save after a press with no answer,
  * whose end it keeps: the archive of a unit still running can fail, and must not relabel why the run ended.
  */
@@ -2307,7 +2416,6 @@ export async function runTheLane(r: {
 		}
 		for (const u of record.units) u.unitId = rowOf(u)!.id;
 		const root = record.units[0]!;
-		const phases = record.units.slice(1);
 		const undertakingId = str(rowOf(root)!.state.undertakingId);
 		writeRunRecord(lane, record);
 
@@ -2487,80 +2595,18 @@ export async function runTheLane(r: {
 			return reached.end;
 		};
 
-		// ⭐⭐ `REG-D-112` (finding 2) — HALF B'S ROOT IS THE AGENT'S, AND MAY RUN A MODEL: paid, the limit is checked before
-		// its press, a MODEL root's ~~worst case~~ ⭐ one try's reserve counted (`rootLimitCheck`; `REG-D-114` (14), as amended
-		// 2026-10-16). §3.2's root runs none, and half A's is unchecked.
-		if (half === 'B' && boot.record.mode === 'paid') {
-			const { snapshot } = await hands.read();
-			// ⛔ R4 (the lead's round-4 item 2) — A ROOT WHOSE TYPE THE LANE CANNOT FIND OR READ IS NEVER PRESSED: whether its press
-			// runs a model, and so what the limit must count before it, cannot be decided. The run ends by name, why in its detail.
-			// ⛔ The type was read as UNDECLARED (`dischargeOf`), none counted ahead, and the root pressed.
-			const unreadable = typeUnreadableOf(snapshot, root.unitId!);
-			if (unreadable !== null)
-				return end(
-					'root-type-unreadable',
-					`the root’s type cannot be read (${unreadable}): whether its press runs a model, and so what the limit must ` +
-						'count before it, cannot be decided, so it is not pressed (D8; REG-D-112, finding 2)'
-				);
-			const rootCheck = rootLimitCheck(boot.prior as number, snapshot, root.unitId!);
-			root.limitCheck = rootCheck;
-			writeRunRecord(lane, record);
-			// ⛔ Round 4's check, F2 — the end's words say what the check counted (`counted`): ~~one try's reserve~~ ⭐ (package L,
-			// D16) its whole press's worst case for a MODEL root, none for a root that runs no model. ⛔ They said "its worst case",
-			// which this check no longer counts. ⭐ D16 — and they cite the ruling the count is, `REG-D-135` (4).
-			if (!rootCheck.allowed)
-				return end(
-					'paid-limit',
-					`the limit, before the root’s press: ${rootCheck.total} of ${rootCheck.limit} reviewer calls, ` +
-						`${rootCheck.ahead} ahead (${rootCheck.counted}) counted (D8; REG-D-112; REG-D-135 (4))`
-				);
-		}
-		// ⛔ THE ROOT'S PRESS IS BOUNDED AS EVERY PRESS IS (D4): with no answer, the run ends here, dry or paid.
-		const rootEnd = await run(root);
-		if (rootEnd !== null) return end(rootEnd.reason, rootEnd.detail);
-		// ⛔ DRY, NO PHASE IS PRESSED — each is a unit a model runs (D1, D5) — and the run goes from the root's archive to
-		// the sign-off below, the root's alone, and the final archive: ~~the paid run's own acts (design §6 P7-2 D11)~~ ⭐
-		// `E12F` F1: the sign-off rehearsed up to the reviewer call and never pressed (`REG-D-112` (b)).
+		// ⛔ `JAN-EXEC` Phase 7, package M (`REG-D-135` (2); design D6, D7) — ~~THE ROOT FIRST, THEN EACH PHASE IN THE TREE'S
+		// ORDER, THE SIGN-OFFS AT THE END~~: the press-and-sign-off loop below, after the sign-off's acts it uses. ⛔ Pressed in
+		// the tree's order, run-12's root ran before the phases whose work it was to reconcile (`REG-F-578`).
 		const dry = boot.record.mode === 'dry';
 		let reason: EndReason = dry ? 'dry-run-stop' : 'complete';
-		for (const unit of dry ? [] : phases) {
-			// ⭐ The one rule (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (14), as amended 2026-10-16): ~~the phase's first
-			// call~~ ~~⭐ R3-B's fix round (F1): the phase's worst case, a model unit's~~ ⭐ `REG-D-114` (14), as amended
-			// 2026-10-16: one try's reserve, D8's own rule — the lane checks again before every later press, so a phase's own
-			// spend can carry the total past the limit.
-			// ⭐⭐ Package L — D16 (`REG-D-135` (4)): ~~one try's reserve~~ — the press's WHOLE worst case, (3 tries + 32 command
-			// runs) × 6, so the phase cannot carry the total past the limit.
-			unit.limitCheck = limitCheck(
-				boot.prior as number,
-				recordedReviewerCalls((await hands.read()).snapshot),
-				PHASE7_UNIT_REVIEWER_CALLS,
-				COUNTED_AHEAD.wholePress
-			);
-			if (!unit.limitCheck.allowed) {
-				reason = 'paid-limit';
-				writeRunRecord(lane, record);
-				break;
-			}
-			unit.upstreamNotAssured = upstreamNotAssured(record.units, unit.order);
-			const ended = await run(unit);
-			// ⛔ THE SERVER MAY STILL BE RUNNING IT, so nothing is started beside it (D4; `REG-F-535`). When the test ends,
-			// Playwright kills the server mid-unit (`REG-F-527`): its record is the archive just taken.
-			if (ended !== null) return end(ended.reason, ended.detail);
-			// ⭐ P7-6R R-1f — a phase that stopped is recovered by the run plan's rule before the next starts.
-			if (unit.stopped === true) {
-				const recovered = await recoverByRule(unit);
-				if (recovered === 'paid-limit') {
-					reason = 'paid-limit';
-					break;
-				}
-				if (recovered !== null) return end(recovered.reason, recovered.detail);
-			}
-		}
 
-		// ── 4. SIGN-OFF: each phase that completed, then the root, LAST — every refusal recorded ─────────────────────
+		// ── 4. SIGN-OFF: ~~each phase that completed, then the root, LAST~~ ⭐ (package M, D6) each unit's, right after its
+		// execution and its recovery, before the next press — every refusal recorded ─────────────────────────────────────
 		// ~~⭐ DRY TOO, BY THESE SAME ACTS (D11): no phase was pressed, so none completed, and the root is signed off alone.~~
-		// ⛔ `E12F` F1 (`REG-D-112` (b)) — DRY, THE ROOT'S SIGN-OFF IS REHEARSED UP TO THE REVIEWER CALL AND NO FURTHER: since E2
-		// Record Assurance asks the reviewer for one review per declared policy, and a dry run calls no model.
+		// ~~⛔ `E12F` F1 (`REG-D-112` (b)) — DRY, THE ROOT'S SIGN-OFF IS REHEARSED UP TO THE REVIEWER CALL AND NO FURTHER: since E2
+		// Record Assurance asks the reviewer for one review per declared policy, and a dry run calls no model.~~ ⛔ Package M (D7):
+		// a dry run presses no unit — the root waits for its children, each a model's — so it reaches no sign-off at all.
 		/**
 		 * The act's status and envelope, or that no answer came, and ⭐ its refusal in the server's words (E12's re-review F4) —
 		 * ⭐ E12's polish — the store not read yet (`after` null).
@@ -2653,10 +2699,6 @@ export async function runTheLane(r: {
 		 * (`reached`) before the store is read, and nothing more is pressed (the loop below then ends the run).
 		 */
 		const signOff = async (unit: RunUnit): Promise<SignOffRecord> => {
-			if (dry) {
-				const offered = await hands.recordAssuranceOffered(unit);
-				return { ...none, offered, notPressed: offered ? DRY_SIGN_OFF_NOT_REACHED : null };
-			}
 			const { check, pressMs } = await signOffLimit(unit);
 			if (!check.allowed) {
 				const offered = await hands.recordAssuranceOffered(unit);
@@ -2720,30 +2762,135 @@ export async function runTheLane(r: {
 				refused: green.refused
 			};
 		};
-		// ⭐ P5 package B (F3) — the phases the store reads ABANDONED, read after each one's last act (`unit.after`): any holds the
-		// root, its row read and nothing pressed (`rootHeldOverAbandoned`).
-		const abandoned = phases.filter((u) => u.after?.lifecycleState === 'ABANDONED').map((u) => u.title);
-		const held = async (unit: RunUnit): Promise<SignOffRecord> => ({
-			...none,
-			offered: await hands.recordAssuranceOffered(unit),
-			notPressed: rootHeldOverAbandoned(abandoned)
-		});
-		for (const unit of [...phases.filter((u) => u.stopped === false), root]) {
-			// ⚠ LOADED AFRESH FOR EACH UNIT: after an `error` envelope the page is the error page, and after a redirect it is
-			// another page, so this unit's row would be gone, and read as offering nothing (round 2's fix pass).
+		// ── 3. ⭐⭐ THE ORDER — ONLY WHAT THE PAGE OFFERS, ONE UNIT AT A TIME (`JAN-EXEC` Phase 7, package M; `REG-D-135` (2); design
+		// D4-D7) ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+		// The page offers Begin & Execute where the engine would start the unit — every unit it waits for ACCEPTED, nothing it
+		// requires unproduced (`MarkPwuReady`; the page's offer reads the same rule). So the lane presses nothing the engine
+		// would refuse, and the root, which waits for its children, runs last. ⭑ The tree's order breaks ties only.
+		// ⛔ ~~P5 package B (F3) — a phase the store read ABANDONED held the root's sign-off (`rootHeldOverAbandoned`)~~: an
+		// abandoned producer now leaves its consumers unstarted, the root among them (D4), so no root is signed off over one.
+		record.order = { dependencies: dependenciesBySlug((await hands.read()).snapshot, record.units), pressed: [] };
+		writeRunRecord(lane, record);
+		/** What the page offers now: loaded afresh, so no row shows a state from before the last act. */
+		const offersNow = async (): Promise<ReadonlyMap<string, StartOffer>> => {
 			await hands.showOverview();
-			unit.signOff = unit === root && abandoned.length > 0 ? await held(unit) : await signOff(unit);
+			return hands.startOffers(record.units);
+		};
+		/** ⭐ D4, D6 — every unit the lane did not press, recorded not started, with what the page last showed of it. */
+		const notStartedFrom = (offers: ReadonlyMap<string, StartOffer>): void => {
+			for (const u of record.units)
+				if (u.beginExecute === null && u.notStarted === null) {
+					const offer = offers.get(u.unitId!);
+					u.notStarted = dry && offer?.offered === true ? DRY_PRESS_NOT_REACHED : notStartedBecause(offer);
+				}
 			writeRunRecord(lane, record);
-			// ⛔ E12's re-review F1 (D4; `REG-F-535`) — A SIGN-OFF ACT WITH NO ANSWER: no later sign-off is pressed beside it, and
-			// the run ends for it once the final archive is taken.
-			if (reached.end !== null) break;
-			// ⛔ `E12F` F2 — THE LIMIT REFUSED THIS SIGN-OFF, OR THE RULE'S RE-RUN IN IT: the run ends `paid-limit`, and no later
-			// sign-off is pressed, as no later phase is once the limit stops one (D8).
-			if (unit.signOff.limitCheck?.allowed === false || unit.signOff.rerunLimitCheck?.allowed === false) {
+		};
+		let offers = await offersNow();
+		// ⛔ D5 — A LOOP ENDS THE RUN BEFORE ANY PRESS: no unit of it can ever start, and the page names it. ⛔ NEVER A FALLBACK
+		// TO THE TREE'S ORDER, which would start a unit whose producers the loop holds unaccepted forever.
+		const looped = record.units.filter((u) => offers.get(u.unitId!)?.kinds.includes('loop') === true);
+		if (looped.length > 0) {
+			notStartedFrom(offers);
+			return end(
+				'order-unresolvable',
+				`${looped.map((u) => `${u.title} — ${offers.get(u.unitId!)?.reason ?? 'in a loop'}`).join('; ')}: no unit of a ` +
+					'loop can ever start, so nothing is pressed and the tree’s order is never used instead (D5; REG-D-135 (2))'
+			);
+		}
+		/**
+		 * ⭐ D8, D16 (`REG-D-135` (4)) — THE CHECK BEFORE A PRESS: a phase counts its whole press's worst case; half B's root, the
+		 * agent's, a MODEL root's whole press or none (`rootLimitCheck`), and a root whose type the lane cannot read is never
+		 * pressed (`root-type-unreadable`; the lead's round-4 item 2); §3.2's root runs no model, and half A's is unchecked.
+		 */
+		const pressCheck = async (unit: RunUnit): Promise<LimitCheck | null | RunEnd> => {
+			const { snapshot } = await hands.read();
+			if (unit !== root)
+				return limitCheck(
+					boot.prior as number,
+					recordedReviewerCalls(snapshot),
+					PHASE7_UNIT_REVIEWER_CALLS,
+					COUNTED_AHEAD.wholePress
+				);
+			if (half !== 'B') return null;
+			const unreadable = typeUnreadableOf(snapshot, root.unitId!);
+			if (unreadable !== null)
+				return {
+					reason: 'root-type-unreadable',
+					detail:
+						`the root’s type cannot be read (${unreadable}): whether its press runs a model, and so what the limit must ` +
+						'count before it, cannot be decided, so it is not pressed (D8; REG-D-112, finding 2)'
+				};
+			return rootLimitCheck(boot.prior as number, snapshot, root.unitId!);
+		};
+		for (;;) {
+			// ⛔ DRY, NOTHING IS PRESSED (D1): every unit the page offers first is a model's, and the root waits for them (D7).
+			if (dry) break;
+			// ⭐ D6 — THE NEXT PRESS: of the units the page offers and the lane has not pressed, the first in the tree's order.
+			const next = record.units.find(
+				(u) => u.beginExecute === null && u.notStarted === null && offers.get(u.unitId!)?.offered === true
+			);
+			if (next === undefined) break;
+			const checked = await pressCheck(next);
+			if (checked !== null && 'reason' in checked) {
+				notStartedFrom(offers);
+				return end(checked.reason, checked.detail);
+			}
+			next.limitCheck = checked;
+			writeRunRecord(lane, record);
+			if (checked !== null && !checked.allowed) {
+				// ⛔ Round 4's check, F2 — for the root, the end's words say what the check counted (`counted`), and cite the
+				// ruling the count is, `REG-D-135` (4).
+				if (next === root) {
+					notStartedFrom(offers);
+					return end(
+						'paid-limit',
+						`the limit, before the root’s press: ${checked.total} of ${checked.limit} reviewer calls, ` +
+							`${checked.ahead} ahead (${checked.counted}) counted (D8; REG-D-112; REG-D-135 (4))`
+					);
+				}
 				reason = 'paid-limit';
 				break;
 			}
+			next.upstreamNotAssured = upstreamNotAssured((await hands.read()).snapshot, next.unitId!);
+			record.order.pressed.push(next.slug);
+			// ⛔ D4 — A PRESS WITH NO ANSWER ENDS THE RUN THERE: the server may still be running the unit (`REG-F-535`).
+			const ended = await run(next);
+			if (ended !== null) {
+				notStartedFrom(offers);
+				return end(ended.reason, ended.detail);
+			}
+			// ⭐ P7-6R R-1f — a unit that stopped is recovered by the run plan's rule before anything else is pressed.
+			if (next.stopped === true) {
+				const recovered = await recoverByRule(next);
+				if (recovered === 'paid-limit') {
+					reason = 'paid-limit';
+					break;
+				}
+				if (recovered !== null) {
+					notStartedFrom(offers);
+					return end(recovered.reason, recovered.detail);
+				}
+			}
+			// ⭐⭐ D6 — ITS SIGN-OFF, BEFORE THE NEXT PRESS (the lead's decision, flagged in `REG-D-135`): Record Assurance, then Mark
+			// Satisfied, each with the limit read first (package L) — a unit that waits for this one is offered only once it is
+			// accepted. A unit still stopped offers none: its row is read, and nothing pressed. ⚠ LOADED AFRESH: after an `error`
+			// envelope the page is the error page, and after a redirect it is another page (round 2's fix pass).
+			await hands.showOverview();
+			next.signOff =
+				next.stopped === false ? await signOff(next) : { ...none, offered: await hands.recordAssuranceOffered(next) };
+			writeRunRecord(lane, record);
+			// ⛔ E12's re-review F1 (D4; `REG-F-535`) — A SIGN-OFF ACT WITH NO ANSWER: nothing is pressed beside it, and the run ends
+			// for it once the final archive is taken.
+			if (reached.end !== null) break;
+			// ⛔ `E12F` F2 — THE LIMIT REFUSED THIS SIGN-OFF, OR THE RULE'S RE-RUN IN IT: the run ends `paid-limit`, and nothing
+			// later is pressed (D8).
+			if (next.signOff.limitCheck?.allowed === false || next.signOff.rerunLimitCheck?.allowed === false) {
+				reason = 'paid-limit';
+				break;
+			}
+			offers = await offersNow();
 		}
+		notStartedFrom(offers);
 		note(await hands.screenshot(FINAL_ARCHIVE));
 		await archive(FINAL_ARCHIVE, null, null, await hands.read());
 		// ⛔ DRY, WHAT `laneVerdict` HOLDS IT TO (D1): the model exchanges the store holds, read only now — after the
@@ -2763,41 +2910,34 @@ export async function runTheLane(r: {
 	}
 }
 
-/** What one sign-off act came to, for a verdict's line: what it answered, or that it was never pressed. */
-const answerOf = (act: SignOffAct | null): string =>
-	act === null ? 'was never pressed' : `answered ${act.envelopeType ?? 'nothing'}`;
-
 /**
- * ~~⭐ D11 — why the dry run's sign-off of the root is not PROVED … Record Assurance and Mark Satisfied each answered
- * `success`; and the store, read after Mark Satisfied, reads the root SATISFIED in lifecycle and in assurance.~~
- * ⛔⛔ `E12F` F1 (`REG-D-112` (b): a dry run calls no model) — SINCE E2 RECORD ASSURANCE ASKS THE REVIEWER, so a dry run that
- * proved the root's sign-off by pressing it would make paid calls. Why the dry run's REHEARSAL of the root's sign-off is not
- * what a dry run's must be, one line per requirement, each with what was read; none when it is: its row offered Record
- * Assurance; NOTHING was pressed — no Record Assurance, no re-run, no Mark Satisfied; and the sign-off is recorded not
- * reached in a dry run (`DRY_SIGN_OFF_NOT_REACHED`). ⚠ The root's SATISFIED is no longer a dry run's to prove: it is the
- * gate's prediction (b) (`e2e/phase7-five-unit.e2e.ts`), on the declared stand-in, and the paid run's.
+ * ~~⭐ D11 — why the dry run's sign-off of the root is not PROVED …~~ ~~⛔⛔ `E12F` F1 (`REG-D-112` (b)) — why the dry run's
+ * REHEARSAL of the root's sign-off is not what a dry run's must be (`rootSignOffShortfalls`)~~ ⛔⛔ `JAN-EXEC` Phase 7,
+ * package M (`REG-D-135` (2); design D6, D7) — A DRY RUN NO LONGER PRESSES THE ROOT, OR SIGNS IT OFF: the root waits for its
+ * children, and each of half A's is a model's, so a dry run presses nothing. What it rehearses instead is THE ORDER: why it
+ * is not the one it was meant to be, one line each; none when it is — the order recorded (what each unit waits for); NOTHING
+ * pressed; the units the page offered read and recorded not reached in a dry run (`DRY_PRESS_NOT_REACHED`), one at least; and
+ * the root withheld, the page's reason recorded (`notStarted`), as D7 moves it last.
  */
-function rootSignOffShortfalls(root: RunUnit): string[] {
-	const signed = root.signOff;
-	const pressed =
-		signed !== null &&
-		(signed.recordAssurance !== null || signed.rerunDeclared !== null || signed.markSatisfied !== null);
+function dryOrderShortfalls(record: RunRecord): string[] {
+	const root = record.units[0];
+	const pressed = record.units.filter((u) => u.beginExecute !== null).map((u) => u.title);
+	const rehearsed = record.units.filter((u) => u.notStarted === DRY_PRESS_NOT_REACHED);
 	return [
-		...(signed?.offered === true
+		...(record.order === null || record.order === undefined
+			? ['the dry run recorded no order: what each unit waits for was not read from the store']
+			: []),
+		...(pressed.length === 0
+			? []
+			: [`the dry run pressed ${pressed.join(', ')}: a dry run presses no unit, each it would press running a model (D1)`]),
+		...(rehearsed.length > 0
+			? []
+			: ['the dry run rehearsed no press: no unit the page offered was read and recorded not reached in a dry run']),
+		...(root?.beginExecute === null && root.notStarted?.startsWith('not started: ') === true
 			? []
 			: [
-					'the dry run did not rehearse the root’s sign-off: ' +
-						(signed === null ? 'no sign-off was attempted' : 'its row offered no Record Assurance')
-				]),
-		...(pressed
-			? [
-					`the dry run pressed the root’s sign-off, which asks the reviewer for each declared policy (REG-D-112 (b)): ` +
-						`Record Assurance ${answerOf(signed.recordAssurance)}, and Mark Satisfied ${answerOf(signed.markSatisfied)}`
-				]
-			: []),
-		...(signed?.offered === true && !pressed && signed.notPressed !== DRY_SIGN_OFF_NOT_REACHED
-			? [`the dry run’s sign-off of the root is not recorded as not reached in a dry run: ${signed.notPressed ?? 'nothing recorded'}`]
-			: [])
+					`the dry run did not show the root withheld for the units it waits for (D7): ${root?.notStarted ?? 'nothing recorded'}`
+				])
 	];
 }
 
@@ -2847,16 +2987,10 @@ export function laneVerdict(record: RunRecord): string[] {
 	if (record.mode === 'paid') return [];
 	// ⭐ E3 (C6) — HALF B'S DRY REHEARSAL STOPS BEFORE SEND, so what it proves is the draft, and that nothing was sent.
 	if (record.half === 'B') return halfBDryShortfalls(record);
-	const root = record.units[0]!;
+	// ⛔ Package M (`REG-D-135` (2); design D7) — ~~the root's press proved, and its sign-off rehearsed up to the reviewer call~~:
+	// the root runs last, after its children, so a dry run proves THE ORDER instead (`dryOrderShortfalls`).
 	return [
-		...(root.beginExecute?.envelopeType === 'success' && root.stopped === false
-			? []
-			: [
-					`the dry run did not prove the root's press: it answered ${root.beginExecute?.envelopeType ?? 'nothing'}, ` +
-						`and the store reads its execution ${root.after?.executionState ?? 'unread'} and its step ` +
-						(root.after?.planStepState ?? 'unread')
-				]),
-		...rootSignOffShortfalls(root),
+		...dryOrderShortfalls(record),
 		...(record.dryRun?.modelExchanges === 0
 			? []
 			: [

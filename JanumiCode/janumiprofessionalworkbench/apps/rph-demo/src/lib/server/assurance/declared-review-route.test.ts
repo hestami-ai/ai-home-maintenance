@@ -38,8 +38,40 @@ const seam = vi.hoisted(() => ({
 				readonly runs: readonly unknown[];
 				readonly observedCount: number;
 				readonly recordedLimit: number;
-		  }
+		  },
+	/**
+	 * ⭐ `JAN-EXEC` Phase 7, package M (`REG-D-135` (2); design D1, D4) — AN UNDERTAKING INSTANTIATED AS BEFORE PACKAGE M: its
+	 * units record no dependency, as every store made before package M holds them, so a parent may be begun before its
+	 * children and a root signed off over a phase that never completed. Set only by the two cases whose subject is a state
+	 * the readiness rule now forbids an instantiated Undertaking to reach (D4: an abandoned producer leaves its consumers
+	 * unstarted) — the declared review's account of it stays for such Undertakings. Every other case runs as instantiation
+	 * now records it: each child accepted before its parent starts.
+	 */
+	preM: false
 }));
+
+// ⭐ Package M — `seam.preM` instantiates as before package M recorded what a unit waits for (`unitDependencies` of nothing).
+vi.mock('@janumipwb/rph-projections', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('@janumipwb/rph-projections')>();
+	return {
+		...actual,
+		unitDependencies: (...args: Parameters<typeof actual.unitDependencies>) =>
+			seam.preM
+				? {
+						units: args[1].map((u) => ({
+							unitId: u.id,
+							inputs: [],
+							suppliedByIntent: [],
+							unproduced: [],
+							childIds: [],
+							dependencyIds: []
+						})),
+						loops: [],
+						siblingDependencies: []
+					}
+				: actual.unitDependencies(...args)
+	};
+});
 
 vi.mock('../execution/model.js', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('../execution/model.js')>();
@@ -214,6 +246,18 @@ const recordAssurance = async (pwuId: string) =>
 		data?: { error?: string };
 	};
 
+/**
+ * ⭐ `JAN-EXEC` Phase 7, package M (`REG-D-135` (2); design D2) — a unit ACCEPTED: Record Assurance, then Mark Satisfied, each
+ * through the page's own action. A parent instantiated now waits for each child to be accepted before it may start.
+ */
+async function accepted(pwuId: string, what: string): Promise<void> {
+	expect((await recordAssurance(pwuId)).advanced, `arrangement: ${what} assured`).toBe('assured');
+	const satisfied = (await actions.markSatisfied(actionEvent('markSatisfied', { pwuId }) as never)) as {
+		data?: { error?: string };
+	};
+	expect(satisfied.data?.error, `arrangement: ${what} satisfied`).toBeUndefined();
+}
+
 /** The unit's assessments under the declared policy, and the criterion results and findings recorded against each. */
 function declaredRecord(pwuId: string) {
 	const events = getEngine().readAllEvents();
@@ -242,6 +286,7 @@ beforeEach(() => {
 	seam.failing.clear();
 	seam.floorRefuses = undefined;
 	seam.observed = undefined;
+	seam.preM = false;
 	vi.stubEnv('PATH', noProgramsDirectory());
 	for (const v of LIVE_BACKEND_VARIABLES) vi.stubEnv(v, undefined);
 	vi.stubEnv('JPWB_ASSURANCE_TOOL', 'devin');
@@ -408,9 +453,11 @@ describe('⛔ E12F F4 — the root’s declared review is told only what is true
 		// composed of others, by the agents that did its children's work), which was given exactly this instruction:" — above
 		// the ROOT's purpose, an instruction no agent was given.
 		const { root, child } = await rootOverAChild();
-		expect((await beginExecute(root)).data?.error, 'arrangement: the root’s Begin & Execute').toBeUndefined();
+		// ⭑ Package M (`REG-D-135` (2)) — THE ARRANGEMENT'S ORDER MOVED, ITS SUBJECT DID NOT: the root waits for its child, so the
+		// child runs and is accepted first. ~~The root's Begin & Execute, then the child's, then the child's sign-off.~~
 		expect((await beginExecute(child)).data?.error, 'arrangement: the child’s Begin & Execute').toBeUndefined();
-		expect((await recordAssurance(child)).advanced, 'arrangement: the child signed off').toBe('assured');
+		await accepted(child, 'the child');
+		expect((await beginExecute(root)).data?.error, 'arrangement: the root’s Begin & Execute').toBeUndefined();
 		seam.declared.length = 0;
 		await recordAssurance(root);
 		expect(seam.declared, 'one declared review of the root').toHaveLength(1);
@@ -824,19 +871,29 @@ describe('⭐⭐ R3-A F1 — a unit composed of others is judged over the work i
 		// others, whose TRANSFORMATIONs completed with no output — and refused the root (`nothingToJudge`): the work its declared
 		// policies are about, its model units', was never shown to any review of it.
 		const t = await threeLevelTree();
-		for (const pwuId of [t.root, t.middle, t.otherMiddle])
-			expect((await beginExecute(pwuId)).data?.error, 'arrangement: Begin & Execute').toBeUndefined();
+		// ⭑ Package M (`REG-D-135` (2)) — THE ARRANGEMENT'S ORDER MOVED, ITS SUBJECT DID NOT: each unit runs only once the units
+		// below it are accepted, so the leaves run first, then the units above them, the root last. ~~The root and the two
+		// units above the leaves first, then the leaves.~~
 		// ⭑ The requirements unit runs one command, two levels below the root.
 		seam.observed = observedRuns([aRun(['node', '--test', 'test/requirements.test.js'])]);
 		expect((await beginExecute(t.leaf)).data?.error, 'arrangement: the requirements unit ran, and one command').toBeUndefined();
 		seam.observed = undefined;
 		expect((await beginExecute(t.otherLeaf)).data?.error, 'arrangement: Begin & Execute').toBeUndefined();
-		expect((await recordAssurance(t.leaf)).advanced, 'arrangement: the model unit signed off').toBe('assured');
+		await accepted(t.leaf, 'the model unit');
+		await accepted(t.otherLeaf, 'the acceptance tests');
+		for (const pwuId of [t.middle, t.otherMiddle])
+			expect((await beginExecute(pwuId)).data?.error, 'arrangement: Begin & Execute').toBeUndefined();
 		// ⭑ THE CONTROL: a unit above a model unit, reviewed over its child's work product, as before.
 		seam.declared.length = 0;
 		expect((await recordAssurance(t.middle)).advanced, 'the middle unit, over its child’s work product, was not signed off').toBe('assured');
 		expect(seam.declared, 'one review of the middle unit’s one declared policy').toHaveLength(1);
 		expect(workOf(seam.declared[0]!).workProducts.map((w) => w.workUnit)).toEqual(['Requirements']);
+		const satisfiedMiddle = (await actions.markSatisfied(actionEvent('markSatisfied', { pwuId: t.middle }) as never)) as {
+			data?: { error?: string };
+		};
+		expect(satisfiedMiddle.data?.error, 'arrangement: the middle unit satisfied').toBeUndefined();
+		await accepted(t.otherMiddle, 'the verification unit');
+		expect((await beginExecute(t.root)).data?.error, 'arrangement: the root’s Begin & Execute').toBeUndefined();
 
 		seam.declared.length = 0;
 		const r = await recordAssurance(t.root);
@@ -866,11 +923,13 @@ describe('⭐⭐ R3-A F1 — a unit composed of others is judged over the work i
 		// ⛔ RED BEFORE R3-A, read from the code: a unit with children was judged over its CHILDREN's work alone, so a root that ran
 		// a model of its own — half B's agent may declare one — had its declared reviews asked without the work it produced.
 		const { root, child } = await rootOverAChild('MODEL');
+		// ⭑ Package M (`REG-D-135` (2)) — THE ARRANGEMENT'S ORDER MOVED, ITS SUBJECT DID NOT: the child runs and is accepted, then
+		// the MODEL root runs its own model and command. ~~The root first, then the child, then the child's sign-off.~~
+		expect((await beginExecute(child)).data?.error, 'arrangement: the child’s Begin & Execute').toBeUndefined();
+		await accepted(child, 'the child');
 		seam.observed = observedRuns([aRun(['node', '--test', 'test/acceptance.test.js'])]);
 		expect((await beginExecute(root)).data?.error, 'arrangement: the root ran its model, and one command').toBeUndefined();
 		seam.observed = undefined;
-		expect((await beginExecute(child)).data?.error, 'arrangement: the child’s Begin & Execute').toBeUndefined();
-		expect((await recordAssurance(child)).advanced, 'arrangement: the child signed off').toBe('assured');
 		seam.declared.length = 0;
 		expect((await recordAssurance(root)).advanced, 'the MODEL root was not signed off').toBe('assured');
 		expect(seam.declared, 'one declared review of the root').toHaveLength(1);
@@ -903,6 +962,11 @@ describe('⭐⭐ R3-A F1 — a unit composed of others is judged over the work i
 	it('⛔ (c) a unit composed of others with NOTHING in it or anywhere below it is refused before any review is asked, nothing dispatched — and the root above it, whose other branch holds work, is reviewed over that work alone (the control)', async () => {
 		// ⭑ Before R3-A this unit was refused too — its one child held nothing — so its refusal's red is its mutant's
 		// (`P7MF-M1`: the refusal dropped); the control was red there, the root refused for its children's nothing.
+		// ⚠ Package M (`REG-D-135` (2)) — INSTANTIATED AS BEFORE PACKAGE M (`seam.preM`): instantiation now records that a unit
+		// waits for its children, so the unit above the acceptance tests could not start before they had run, and no unit of an
+		// Undertaking instantiated now reaches this state. One instantiated before package M can, and this refusal still holds
+		// for it; the arrangement and every assertion are unchanged.
+		seam.preM = true;
 		const t = await threeLevelTree();
 		// The acceptance tests never run: the unit above them, a TRANSFORMATION, holds nothing, and nothing below it does.
 		for (const pwuId of [t.root, t.middle, t.otherMiddle, t.leaf])
@@ -1009,6 +1073,11 @@ describe('⭐⭐ P5 package B (F1) — a root over five units, its end-to-end ph
 	it('⛔ the root’s declared review names the abandoned phase, its lifecycle and assurance states — and is shown the other three phases’ work', async () => {
 		// ⛔ RED BEFORE F1, driven: the root's prompt was shown Requirements, Design and Implementation, and said nothing of
 		// the end-to-end phase — P5's two root prompts held "abandon" 0 times.
+		// ⚠ Package M (`REG-D-135` (2); design D4) — INSTANTIATED AS BEFORE PACKAGE M (`seam.preM`), as P5's run-7 was: an
+		// abandoned producer now leaves its consumers unstarted, so the root of an Undertaking instantiated now never starts over
+		// an abandoned phase, and the page shows why. One instantiated before package M can reach this state, and the declared
+		// review's account of it still holds for it; the arrangement and every assertion are unchanged.
+		seam.preM = true;
 		const t = await fiveUnitTree();
 		const [requirements, design, implementation, e2e] = t.phases as [string, string, string, string];
 		for (const pwuId of [t.root, requirements, design, implementation])
@@ -1041,8 +1110,13 @@ describe('⭐⭐ P5 package B (F1) — a root over five units, its end-to-end ph
 
 	it('⭑ CONTROL — every phase completed: no such line, and the work of all four', async () => {
 		const t = await fiveUnitTree();
-		for (const pwuId of [t.root, ...t.phases])
+		// ⭑ Package M (`REG-D-135` (2)) — THE ARRANGEMENT'S ORDER MOVED, ITS SUBJECT DID NOT: each phase runs and is accepted, then
+		// the root, last. ~~The root first, then the four phases.~~
+		for (const pwuId of t.phases) {
 			expect((await beginExecute(pwuId)).data?.error, 'arrangement: Begin & Execute').toBeUndefined();
+			await accepted(pwuId, 'a phase');
+		}
+		expect((await beginExecute(t.root)).data?.error, 'arrangement: the root’s Begin & Execute').toBeUndefined();
 		seam.declared.length = 0;
 		await recordAssurance(t.root);
 		expect(seam.declared[0], 'a unit that completed is named as contributing nothing').not.toContain('holds no completed step');

@@ -228,11 +228,24 @@
 								</td>
 								<td>
 									<div class="acts">
-										{#if p.workLifecycleState === 'PROPOSED'}
+										{#if p.workLifecycleState === 'PROPOSED' && p.start?.offered}
+											<!-- ⭐ JAN-EXEC Phase 7, package M (REG-D-135 (2); design D3; SPEC-001 :3244) — OFFERED ONLY WHERE THE ENGINE
+											     WOULD ADMIT IT: every unit this one waits for accepted, nothing it requires unproduced. The load reads the
+											     same rule the engine's refusal reads (`startOfferOf`, `startReadiness`). ⛔ It was offered on every PROPOSED
+											     row, so run-12's root could be started before the children whose work it was to reconcile (REG-F-578). -->
 											<form method="POST" action="?/beginExecute" use:enhance>
 												<input type="hidden" name="pwuId" value={p.id} />
 												<button class="mini" type="submit">Begin &amp; Execute</button>
 											</form>
+										{:else if p.workLifecycleState === 'PROPOSED'}
+											<!-- ⭐ Package M (D3, D4, D5) — WITHHELD, AND WHY: the units it waits for, a producer abandoned, a loop, an input
+											     nothing produces. `data-withheld` names each kind for the Phase 7 lane, which reads a loop's (D5). -->
+											<span
+												class="hint"
+												data-testid="start-withheld"
+												data-withheld={p.start?.kinds.join(' ') ?? ''}
+												>Not startable yet: {p.start?.reason ?? 'the engine would refuse its start'}.</span
+											>
 										{:else if p.workLifecycleState === 'EXECUTING' && data.recoveryByPwu[p.id]}
 											<!-- ⭐ JAN-EXEC P7-6R R-1d (RD2, RD3; REG-D-104 (1); REG-D-105 (3)) — A UNIT WAITING FOR A PERSON.
 											     ~~Its review refused it~~ Its completion was refused (P76F-D D1: by its review, by a floor policy other
