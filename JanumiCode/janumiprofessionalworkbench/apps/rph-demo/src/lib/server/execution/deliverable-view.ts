@@ -19,7 +19,9 @@
 // It is not `REG-F-522`'s remedy candidate 1: no governed object names the manifest, and no command's evidence names the
 // manifest it ran against — that object and its ratification remain OWED. The view a try's reviews were shown is RECORDED
 // on the content plane (`recordDeliverableView`, `RETAINED_BY_PARTICIPATION`) and pointed at from that try's command
-// evidence and from the step's completion, so a re-review and a sign-off read it from the record (RD7), not from memory.
+// evidence ~~and from the step's completion~~ — which the step's completion names; the completion itself carries no pointer
+// — so a re-review and a sign-off read it from the record (RD7), not from memory. ⚠ A try that ran no command leaves no
+// pointer, and its sign-off is told the host holds no record of it (`declaredUnitWithoutDeliverableLine`).
 // ⚠ Paths are the agent's (content plane, `R11`); the record plane carries only the pointer.
 import { createHash } from 'node:crypto';
 import type { Deliverable, DeliverableFile, HostSequence, HostSequenceAct } from '@janumipwb/rph-assurance';
