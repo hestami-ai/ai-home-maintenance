@@ -84,6 +84,7 @@ import {
 	ORACLES_V9_FILE,
 	ORACLES_V10_FILE,
 	ORACLES_V11_FILE,
+	ORACLES_V12_FILE,
 	serializeGenerated,
 	type CaseSet,
 	type GraphCase,
@@ -5120,9 +5121,10 @@ describe('⭐⭐ the review in parts, B8b, package K — reviewer-qualification 
 //     written here; each re-cast twin's differences its version-eleven twin's, the view adding one only where its own run or
 //     its unit's files differ;
 //   · THE ORACLES — the 35 version eleven's; 38 carried, 3 moved with version eleven's beside, 15 new, each status as computed;
-//     each note true where this can read it; no note gives an oracle to an id no committed oracle set holds; the conferral
-//     carrying version eleven's whole and recording Q45 in the sponsor's words, no standing given to the sponsor's answer,
-//     no marker, the check finding no CONFERRAL problem;
+//     each note true where this can read it, and each the confirmed one, hash for hash, but P12-RR-07-CUT's, the confirmed
+//     one with its one cited line written as its prompts carry it; no note gives an oracle to an id no committed oracle set
+//     holds; the conferral carrying version eleven's whole and recording Q45 in the sponsor's words, no standing given to the
+//     sponsor's answer, no marker, the check finding no CONFERRAL problem;
 //   · THE 28,000-CHARACTER LIMIT, SEEN WHOLE but for the one case cut by design, THE ORACLES COMPOSE — as every case is held.
 const currentV12 = (): CaseSet => JSON.parse(read(CURRENT_CASE_SET_FILE)) as CaseSet;
 const currentOraclesV12 = (): OracleSet => JSON.parse(read(CURRENT_ORACLES_FILE)) as OracleSet;
@@ -5131,6 +5133,8 @@ const generatedOraclesV12 = (): OracleSet => JSON.parse(serializeGenerated(ORACL
 /** Version eleven's committed files — history since version twelve. */
 const committedSetV11 = (): CaseSet => JSON.parse(read(CASE_SET_V11_FILE)) as CaseSet;
 const committedOraclesV11 = (): OracleSet => JSON.parse(read(ORACLES_V11_FILE)) as OracleSet;
+/** Version twelve's committed oracles, read from its own file — what the check and the runner read while it is current. */
+const committedOraclesV12 = (): OracleSet => JSON.parse(read(ORACLES_V12_FILE)) as OracleSet;
 /** A case of version twelve, as generated, by its id. */
 const caseV12 = (id: string): QualificationCase => {
 	const c = generatedV12().cases.find((x) => x.id === id);
@@ -5533,6 +5537,76 @@ const NEW_ORACLES_V12_WRITTEN: Readonly<Record<string, readonly [string, readonl
 const EMPTY_VIEW_SENTENCE_V12 =
 	'Version twelve shows the reviewer what production hands the sign-off of a unit that changed no file and ran nothing: "files":[] and "sequence":[] on the work’s line (design D11); nothing else changes.';
 /**
+ * ⭐ THE NOTES AS CONFIRMED (`REG-D-136` Q45) — the sha256 of each of the 56's note as the sponsor confirmed it, by id, in the
+ * set's order — written here, as the prototype's prompts are above. The other limbs hold whole only the 23 notes carried from
+ * version eleven; of the 27 written for version twelve and the 6 renamed copies' they hold fragments at most, so without this a
+ * regenerated note could drift from the confirmed content with every limb green (package V's check, finding 2). ONE NOTE IS
+ * CORRECTED, NOT CARRIED BLIND: P12-RR-07-CUT's cites its sequence line with a hyphen where both its prompts carry an em dash
+ * (`oracles-v12.ts`, `PROMPT_LINE_CORRECTION`), and is committed citing it as they carry it — the confirmed note but for that
+ * one character, as the limb holds.
+ */
+const CONFIRMED_NOTES_V12: readonly (readonly [caseId: string, sha256: string])[] = [
+	['W12-CLEAN', 'da31b48a9ee885d824465cf7f007265498b2b5a47d2dd1d29e28ee89f02c098c'],
+	['W12-CLEAN-R1', '26dc2cceb3a4cac35df4b4e2713d4c760466a011d7c1f4638f6917ad1af26482'],
+	['W12-CLEAN-R2', '26dc2cceb3a4cac35df4b4e2713d4c760466a011d7c1f4638f6917ad1af26482'],
+	['W12-CLEAN-R3', '26dc2cceb3a4cac35df4b4e2713d4c760466a011d7c1f4638f6917ad1af26482'],
+	['W12-RR-01', 'ae32bd9d521ac2301d3a300e4677a30e9c195b8480e82c07b79bcc5e1a18c85e'],
+	['W12-RR-02', 'cf0684ef30464646761a0d286fcdeb7ab5fa38bdb28baa9f2c504b0db1533a23'],
+	['W12-RR-03', '16ec51debc419be3b3ebb9506a27d0c414784b208608b7dc224866223b80cae2'],
+	['W12-RR-04', 'ec8bc049702fc550f78eebee4a175d80bc8d63f3b302615b2b6532f2afefca2e'],
+	['W12-RR-05', '3d47b119e7eff1f23b0d69e04083954282e64e3763c58b5034fde479a9e6dada'],
+	['W12-RR-06', '734c7f6627aaa74dd3f0c08d9650457bbee152f0cd82e1ff5b10bc61c0f8f216'],
+	['W12-RR-07', 'd65a68ee4c495ea24f2e57776fca7932c3f0820bd2f355cea4007f2f1e900acd'],
+	['W12-RR-08', '330b1fd8820d3449759bbb1e4a460a93aa9ad864fb0713c5696910e7c0a07709'],
+	['W12-RR-09', 'e2734952530c020db2d439fd17b8e2cfa340512e0978b5743fee8ec6ba97b5e5'],
+	['W12-CSV-CLEAN', '00f86227abe900e5f7e83bd456ce2de21bd7c846f1965856e322c3d7c71a3723'],
+	['W12-CSV-CLEAN-R1', 'f4f4e2070aa10966d7238c03d454d43929fa953d305191e96caa950239976554'],
+	['W12-CSV-CLEAN-R2', 'f4f4e2070aa10966d7238c03d454d43929fa953d305191e96caa950239976554'],
+	['W12-CSV-CLEAN-R3', 'f4f4e2070aa10966d7238c03d454d43929fa953d305191e96caa950239976554'],
+	['W12-CSV-CLEAN-T2', '8dca8f16b167d6298f1883e7d58264f60e2ebb896e8259c742b371ec6f760424'],
+	['W12-CSV-STALE-READ', 'f1d68fe54a4e152c74de7541d41854046720bac9cec79394498c6a7673b72afb'],
+	['W12-CSV-RR-02', 'ce9db60f122eec06c061bf199cf1e2b92e254fc5f36d9272ad4df2363c797a63'],
+	['W12-CSV-RR-03', '9187a217d86454a54282ea66ec8061a9a5d410b7db9f7205f0059e6792d2c0bb'],
+	['W12-CSV-RR-07', '15b50dbe31f5cff061b926c02362ea6e9f2030016bd27ab00f7fb401a69b0d74'],
+	['W12-CSV-RR-08', '6b4ffa5cd06ecfd297f87162a1c0ab318af012e9cd87949bbd059debb59cd51e'],
+	['W12-CSV-RR-09', '1bb02b20f0c19f4a39bacd1a8db360210e78a93a17ae5604922c3bbf8b46112a'],
+	['P12-CLEAN', 'd77008b7a3c252119fb11c6f026a53e55a0c24216c134e29486dd5f0d29c9f95'],
+	['P12-CLEAN-R1', '4b6babc3b392594d0514abef21eabd9fa833d860d3a4bac3f3ba767a344842cb'],
+	['P12-CLEAN-R2', '4b6babc3b392594d0514abef21eabd9fa833d860d3a4bac3f3ba767a344842cb'],
+	['P12-CLEAN-R3', '4b6babc3b392594d0514abef21eabd9fa833d860d3a4bac3f3ba767a344842cb'],
+	['P12-RR-01', '4dc64aef5e2d5069d1b6f25d1dcc6315f1ba4ea09e8cfc3835b3ae719369fe28'],
+	['P12-RR-02', '4cc7071a517fad9fe2f79fd2de764e287d869c974f775559da31af6316abca1e'],
+	['P12-RR-03', 'dc3bfff1e111166605e80a65f7a9f5f95ea4f3f33576591433f3c68df32794ab'],
+	['P12-RR-04', '1052d60f5162742b1c5cbd2892b55d2fb538f86a5f2ba2cb93b00bfcaad4757d'],
+	['P12-RR-05', '01a2c731505f81003e5501486efeffad339d56604a5abfb8dd98b4be510dd744'],
+	['P12-RR-06', 'cf5f176ecb16dbbc068db33c75f618f3d7e58c9b51246d5a64bbe3671f660019'],
+	['P12-RR-07', '23d3a7c6070ac3ab77eaf1a1f011543d56753079a98ddacc6288e97683405ee9'],
+	['P12-RR-07-CUT', 'f64fb3daead0cef9af2752c543f4902dca3301c7bc93d696fb4da45f053d2165'],
+	['P12-RR-08', '90b9c65b19652bba11fb47de063294e384fd547e82f282f0d99bc2a3c15c33e1'],
+	['P12-RR-09', '6fcb3cc575d3079032df50957ce10ecbaeabe3bfb132647b9f94abaaa9db73c0'],
+	['P12-CSV-LS', '584b3ea9c95f3178eee05f28aad91bdf9a0fecc4187ee7ededb8d1600e36af9b'],
+	['P12-CSV-READ', '6f9f406bd0abf9bda71eb0fe5489a640c7f619efe00eee35f232d9e5fef4c309'],
+	['P12-CSV-COUNT', '3a6ff574b40dd4cdf69696068d94a0561406c6dab536feb8bf099faec821f311'],
+	['P12-CSV-COUNT-RR-07', '88d106c02b99272f21e43f164cff784804d606358925ba6ae9b315f2714bdadc'],
+	['D12-RC-CLEAN', 'b6b498a53d040009556d4cb4814865a4b7efef883097c913736709a8a4ce3db5'],
+	['D12-RC-04', 'fe5feaedc5910baf23b83cd8123c062a9c5e0e64e19bde14b1dd3c5811116801'],
+	['D12-IP-CLEAN', '8d404108abbd0109c079b177652a4b7459f60c3933888aaff830b618e4ee0ff3'],
+	['D12-IP-02', 'e3cbb4ebca8ec4fc166f29683bf49b995e9b0da783935d82c1d6e113cced5d6d'],
+	['D12-AD-CLEAN', 'c930e9266fdb55cf951b27108f2b849728639f5e70db4297e6b445d0ff952d3b'],
+	['D12-AD-01', '5f111f4ef4d40a609ec90b5a5417df35531afc073b82fcbad4b62b0117564ce7'],
+	['D12-DC-CLEAN', 'd1c36feea1a41deb38e735f883e67d8c1ad858fe4be0f0abac3220234516cdee'],
+	['D12-DC-01', '5f008db2b5ddddb315be5a8406ec1a69ab78026d681dc722497915ad492266b4'],
+	['D12-AC-CLEAN', 'ea67bae1931511b426fd11f36fbaf674c24af31b043faf8b0b8c815814e06e84'],
+	['D12-AC-01', '5c31c92d067bcee8991c878cbbb5597fbb41daf422cd19db1302192d3ec6a216'],
+	['D12-TA-CLEAN-B', '7f74a9ec9d6a39c0ea0bf241c0023386f82b96b5d4b20d3c0a29919f9414dc8d'],
+	['D12-TA-08', 'dd36b4d652ffe28b5a0e496d447c56eb46d2c6b44851794969976e1a57705413'],
+	['D12-FP-CLEAN', 'f793c8bdd0d50e09b3c7b60cc4563bf8a4ff42a84b913149bf9111f505deb2f4'],
+	['D12-FP-03', 'fee38ba1919e94594a6c9bc2fcb6006378204398b840ce71be9df21286fb1f5b']
+];
+/** ⭐ The sequence line P12-RR-07-CUT's note cites, as the confirmed note wrote it and as both its prompts carry it — written here. */
+const CUT_LINE_CONFIRMED_V12 = '`1. ran ["pytest","-rs","checks/"] - exit 1`';
+const CUT_LINE_CITED_V12 = '`1. ran ["pytest","-rs","checks/"] — exit 1`';
+/**
  * ⭐ `REG-D-136` Q45, written here as the register records it, its apostrophe the sponsor's screen's: the question, the label
  * the sponsor chose, and its text. The confirmation's code record quotes them (`oracles-v12.ts`).
  */
@@ -5881,6 +5955,27 @@ describe('⭐⭐ package V — reviewer-qualification case set v12: version elev
 			['repair', repair]
 		] as const)
 			for (const line of cited) expect(prompt.split('\n').some((l) => l.includes(line)), `${role}: the note cites “${line}”, a line of its prompt`).toBe(true);
+	});
+
+	it('⛔ THE NOTES ARE THE CONFIRMED ONES (REG-D-136 Q45) — each of the 56’s note, in version twelve’s committed oracles and as generated, is the note the sponsor confirmed, hash for hash; but P12-RR-07-CUT’s, which is the confirmed note with the one sequence line it cites written as its prompts carry it, an em dash for a hyphen, and nothing else', () => {
+		expect(CONFIRMED_NOTES_V12.map(([id]) => id), 'arrangement: the confirmed 56, in the set’s order').toEqual(ORDER_56);
+		for (const [what, set] of [
+			['version twelve’s committed oracles', committedOraclesV12()],
+			['version twelve’s oracles, as generated', generatedOraclesV12()]
+		] as const) {
+			const notes = new Map(set.oracles.map((o) => [o.caseId, o.note]));
+			const cut = notes.get('P12-RR-07-CUT') ?? '';
+			expect(
+				[cut.split(CUT_LINE_CITED_V12).length - 1, cut.split(CUT_LINE_CONFIRMED_V12).length - 1],
+				`${what}: P12-RR-07-CUT’s note cites its sequence line once as its prompts carry it, and never as the confirmed note wrote it`
+			).toEqual([1, 0]);
+			// The one correction undone — so the confirmed note is what remains, byte for byte, or the correction was more.
+			const asConfirmed = (id: string) => (id === 'P12-RR-07-CUT' ? cut.split(CUT_LINE_CITED_V12).join(CUT_LINE_CONFIRMED_V12) : (notes.get(id) ?? ''));
+			expect(
+				ORDER_56.map((id) => [id, sha256(asConfirmed(id))]),
+				`${what}: each of the 56’s note, the confirmed one, hash for hash — P12-RR-07-CUT’s with its one correction undone`
+			).toEqual(CONFIRMED_NOTES_V12);
+		}
 	});
 
 	it('⛔ NO NOTE GIVES AN ORACLE TO AN ID NO COMMITTED ORACLE SET HOLDS AS A CASE — of version twelve’s 91, each oracle a note names is a case’s of a committed oracle set, of the version it names when it names one, and no note speaks of an oracle unread', () => {
