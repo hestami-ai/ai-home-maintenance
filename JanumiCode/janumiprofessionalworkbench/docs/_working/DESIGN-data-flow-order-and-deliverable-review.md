@@ -1,7 +1,7 @@
 # DESIGN — Data-flow order enforced by the workbench, and review of finished work beside each command's review
 
 **Programme:** `JAN-EXEC` Phase 7, before P6 again; `REG-D-134`, `REG-D-135`, `REG-F-578`, `REG-F-579`, `REG-F-566`.
-**Status:** ~~DESIGN, revision 1, 2026-10-25. D1–D19 are DECIDED under the sponsor's `REG-D-135` and the lead's decisions identified below. Their build is OWED. No fix described here is built or measured. Case set v12's new cases and oracles await the sponsor's confirmation before any paid measurement.~~ DESIGN, revision 2, 2026-10-25 (`REG-F-580`). Package L is built and merged (`2c46dfa6`). D20 is added, the lead's decision, flagged for the sponsor. Packages M and N are being built. Case set v12's new cases and oracles await the sponsor's confirmation before any paid measurement.
+**Status:** ~~DESIGN, revision 1, 2026-10-25. D1–D19 are DECIDED under the sponsor's `REG-D-135` and the lead's decisions identified below. Their build is OWED. No fix described here is built or measured. Case set v12's new cases and oracles await the sponsor's confirmation before any paid measurement.~~ ~~DESIGN, revision 2, 2026-10-25 (`REG-F-580`). Package L is built and merged (`2c46dfa6`). D20 is added, the lead's decision, flagged for the sponsor. Packages M and N are being built. Case set v12's new cases and oracles await the sponsor's confirmation before any paid measurement.~~ DESIGN, revision 3, 2026-10-26 (`REG-F-581`, `REG-F-582`). Packages L, L2, M and N are built and checked; L is merged (`2c46dfa6`); L2, M and N are being integrated. D21-D27 are added, the lead's decisions, flagged for the sponsor. Case set v12's new cases and oracles await the sponsor's confirmation before any paid measurement.
 **Sources:**
 
 - `sponsor-words-2026-10-18.md`, Q40a–Q44, Q41b and Q42b.
@@ -54,9 +54,15 @@ The lane used a pre-order walk: it pushed a unit before visiting its children (`
 
 1. **D1, DECIDED — record dependencies at instantiation.** For each required input of a unit's type, record all instantiated units whose types list that name as a required output. A parent also depends on each of its children. Store the unit dependencies in `dependencyIds`, and sibling dependencies on the decomposition contract in `siblingDependencyIds`, as DEC-2 requires. The unit and contract schemas already carry these fields (`packages/rph-contracts/src/objects.ts:554-555`, `:758`), but the PWU handler forces `dependencyIds` and `inputRequirements` to empty lists (`packages/rph-application/src/handlers/pwu.ts:335-336`). Treat `originating-intent` as supplied by the Undertaking's Intent. Record any other input with no instantiated producer in the unit's `inputRequirements`, identified as unproduced.
 
+⭑ **Corrected (revision 3), 2026-10-26** (`REG-F-582`). D21 supersedes the input treatment in D1's last two sentences and the blocking consequence in §8's Input spelling bullet. `originating-intent` stays supplied by the Intent. Another input without an instantiated producer is recorded and shown as expected from outside the Undertaking; it does not block the unit.
+
 2. **D2, DECIDED — the engine enforces acceptance before start.** A unit can start only when each dependency is ACCEPTED: its unit state is SATISFIED, RECOMPOSED or BASELINED. CONDITIONALLY_SATISFIED leaves conditions open and cannot count. These lifecycle members are present in `packages/rph-contracts/src/enums.ts:845-866`. Refuse before any model or reviewer call, stating which units the consumer waits for. Add an enforcement-register row and kill its declared mutants under `JAN-VERIF`. Carry the rule in the conformance specification, as RPH-EXE-005 is carried (`packages/rph-domain/src/enforcement-register.ts:744-756`). At the build, check whether READY/BLOCKED should carry this readiness against STA-5. Until that check settles the lifecycle treatment, a waiting unit stays PROPOSED.
 
+⭑ **As built (revision 3), 2026-10-26** (`72362a12`, `60a08831`; `mn-facts.md`). `RPH-PWU-011` has two seats. `MarkPwuReady` refuses unmet dependencies before Begin & Execute can commit its plan or binding. `StartExecutionStep` and `ResolveExecutionStepWait` also refuse entry into RUNNING, including a resume whose producer ceased to be accepted while the step waited. A waiting unit stays PROPOSED; BLOCKED is never entered. M also built the unproduced-input refusal corrected by D21 below; that correction's build is OWED.
+
 3. **D3, DECIDED — the page follows the engine.** Offer Begin & Execute only on a unit the engine would start. On another PROPOSED unit, show the reason: waiting for named units; a producer abandoned; a named loop; or a named input with no producer. Derive both the offer and the refusal from the same authority and test both directions of SPEC-001's parity requirement. Today's page offers the action on a PROPOSED row without this condition (`apps/rph-demo/src/routes/undertakings/[id]/+page.svelte:231-235`).
+
+⭑ **Corrected (revision 3), 2026-10-26** (`REG-F-582`). D21 removes a named input without a producer as a reason to withhold Begin & Execute. The page shows that input as expected from outside the Undertaking. Producers, children and loops retain their start conditions. The correction is DECIDED; its build is OWED.
 
 4. **D4, DECIDED — an abandoned producer leaves its consumer unstarted.** Show the producer and its ABANDONED state. The consumer cannot run on unaccepted input. The lane records the consumer as not started and abandons nothing beyond the run plan's rule.
 
@@ -92,6 +98,8 @@ Run-12 had 47 non-passing command reviews: 29 REJECTED and 18 INCONCLUSIVE. The 
 ⭑ **Revision 2, 2026-10-25.** Keep one process-run observer per step across its tries (`l-facts.md`). The 32-run bound is per step, so a model unit's press still has a whole worst case of `(3 + 32) × 6 = 210` reviewer calls. A join needing one try's runs slices the step's one host sequence by try boundaries. Package N must preserve this bound; its build is in progress.
 
 10. **D10, DECIDED — review the finished work against the obligation.** Give the work-product review a host manifest of the unit's changed files: each path and its hash before the first try and after each try, identifying added, changed and removed files. Show their contents as the host reads them. Include the step's writes and runs to date in host order, with try boundaries: ordinal and write path, or ordinal, command and exit. Keep today's prompt budget. Cut composite material unit by unit, declaring each cut before its bytes and counting the declaration inside its allowance (`REG-F-480`, `REG-F-483`, `REG-F-564`; `apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts:119-128`). Judge RR-01 to RR-03 against this deliverable. This adopts `REG-F-522` remedy candidate 2. Candidate 1, a governed manifest object and its ratification, remains OWED.
+
+⭑ **As built (revision 3), 2026-10-26** (`37455638`, `a98867e9`, `b69855db`; `mn-facts.md`). N records the view on the content plane as `jpwb.deliverable-view/1`. Each command evidence points to it through `contentReference.deliverableView`; the step's completion also points to it. The view is re-read and re-hashed on use. Work-product review receives changed files and the ordered sequence within its allowance, with cuts declared. Without a deliverable, the work-product prompt is byte-identical to before. D22 below retains a refused attempt's files across a work re-run; D23 makes a command-free refused try's recorded view reachable for re-review. Both builds are OWED.
 
 11. **D11, DECIDED — show the deliverable at declared-policy sign-off too.** This is the lead's decision, flagged for the sponsor. Give the declared-policy reviews the same deliverable view, using the unit's changed files and sequence recorded at its completion. Preserve the existing composition of subtree work and its declared cuts (`apps/rph-demo/src/lib/server/assurance/review-input.ts:316-360`). Those prompts move with D8's sequence in any case. Judging a declared policy without the delivered files would retain `REG-F-522`'s gap on that plane. Re-measuring its 14 cases adds about 28 qualification calls (`fixes-facts.md`, section 6).
 
@@ -139,6 +147,8 @@ Today `coerceJudgement` drops a row whose id the policy has not declared (`apps/
 
 14. **D14, DECIDED — one fingerprint move covers F2 and F3.** Build case set v12 after the prompt and repair changes. The counted v11 inventory is 76 cases: 13 WORK_PRODUCT, 14 PROCESS_RESULT, 14 DECLARED_POLICY and 35 PWA_TYPE (`docs/tracking/reviewer-qualification/cases/case-set-v11.json`). Re-materialize the first three arms at their changed prompts. Keep the 35 PWA_TYPE prompts unchanged and re-stamp their records after checking prompt equality. Re-run paid any recorded evaluation the new repair makes unrescorable; a changed call count cannot be discharged by re-scoring (`scripts/reviewer-qual/rescore.ts:8-11`).
 
+⭑ **Revision 3 — the realism gap, 2026-10-26** (`mn-facts.md`). The 13 W- cases carry no deliverable and the 14 D- cases carry no files. They therefore do not show the reviewer what production now renders for a unit that changed files; only probes exercise that view. Case set v12 gives each W- and D- case the finished-work view its scenario implies. This is new case content, with new ids where its prompt changes (`REG-D-132`), for the sponsor's confirmation with the rest before paid measurement.
+
    Give new run-12-shaped cases new ids under `REG-D-132`:
 
    | Review | New case shape |
@@ -179,6 +189,20 @@ Today `coerceJudgement` drops a row whose id the policy has not declared (`apps/
 
    **Predicted reds, OWED.** A staged candidate whose round's worst case exceeds the allowance stops with 0 reviewer calls. A round at exactly the allowance is reviewed. With no allowance set, the candidate is reviewed as today. The lane's Send check counts the allowance it hands over.
 
+21. **D21, DECIDED (revision 3) — outside inputs.** This is the lead's decision, flagged for the sponsor (2026-10-26; `REG-F-582`). The build is OWED. A required input without an instantiated producer does not block its unit. Record it and show it as expected from outside this Undertaking. Only producers and children block under the input and composition rule (`REG-D-135` (2)); the loop rule remains. `originating-intent` stays supplied by the Intent. A misspelt input then appears as an outside input instead of blocking. D25's authoring guidance and the review in parts are where that mistake is caught.
+
+22. **D22, DECIDED (revision 3) — a work re-run's finished work.** This is the lead's decision, flagged for the sponsor (2026-10-26; `mn-facts.md`). The build is OWED. Count the view's changed files from the unit's first step's baseline, rather than the re-run's baseline. Files a refused attempt wrote and the re-run left alone stay in view. N's fresh re-run baseline can omit those files and lead the review to treat a mandated file as absent.
+
+23. **D23, DECIDED (revision 3) — a refused try that ran no command.** This is the lead's decision, flagged for the sponsor (2026-10-26; `mn-facts.md`). The build is OWED. Make the refused try's recorded view reachable for its work-product re-review without a contract change, for example through a content key derived from the step and try. The re-review sees the finished work even when that try produced no command evidence and no completion pointer.
+
+24. **D24, DECIDED (revision 3) — the paid run's end.** This is the lead's decision, flagged for the sponsor (2026-10-26; `mn-facts.md`). The build is OWED. A run ends `complete` only when each unit was pressed and its sign-off attempted. A run ending with units never offered ends `withheld`, naming those units. The report lists each with the page's reason. Record the true value.
+
+25. **D25, DECIDED (revision 3) — the author is told the start rule.** This is the lead's decision, flagged for the sponsor (2026-10-26; `mn-facts.md`). The build is OWED. The authoring agent's system prompt states the rule: a type whose required input matches another type's output waits until that producer's unit is accepted; a parent waits for its children; only `originating-intent` comes from the Intent; another input without an instantiated producer is expected from outside. This informs the author of what the engine enforces and dodges no defect (`REG-D-110` (4)).
+
+26. **D26, DECIDED (revision 3) — the allowance on the record and outside the gate.** This is the lead's decision, flagged for the sponsor (2026-10-26; `l2-facts.md`). The build is OWED. Record the allowance the lane hands the server in the run's boot record. Refuse a paid half-B boot whose allowance differs from the computed allowance. Strip `JPWB_AUTHORING_REVIEW_ALLOWANCE` from the gate's environment as the other live-backend variables are stripped.
+
+27. **D27, DECIDED (revision 3) — each run's own limit.** This is the lead's decision, flagged for the sponsor (2026-10-26; `REG-F-581`; `l2-facts.md`). The build is OWED. The run report states the run's limit and caveat from its own record: the limit each check used and the caveat true of that lane. An older run's one-try reserve and about 1,000 limit remain visible when its report is regenerated after the move to a whole-press reserve and about 2,400. Keep the disclosure that recorded calls are a lower bound when capture faults.
+
 **The model.** These are the lead's estimates from `fixes-facts.md` section 6 and `run12-costs.md`. Future figures are unmeasured.
 
 | Item | Reviewer calls | Programme total from 1,001 spent |
@@ -210,6 +234,7 @@ The sponsor was told about 90 qualification calls before D11 added about 28 for 
 
 - **`REG-F-510`.** The unit's instruction still lacks the general Undertaking-objective carriage that finding records. Treating `originating-intent` as supplied for dependency resolution supplies no prompt-carriage remedy.
 - **`REG-F-580`.** Send's limit check counts an estimate until D20 is built.
+- **M and N's residuals outside revision 3.** `mn-facts.md` records that a unit proposed by hand without `dependencyIds` is unconstrained; the manifest and recorded view have no declared bound; and a child that can never be signed off keeps the root from starting (`REG-F-524`), the dependency rule working. These residuals remain outside this revision. `REG-F-516`'s conditional-child offers remain owed.
 - **`REG-F-516`.** Conditional-child offers, additional M+ instances and refused-instantiation residue remain outside this build. An uninstantiated producer can leave a required input unproduced under D1.
 - **`REG-F-535`.** The product's concurrent-unit exposure remains open. D6 preserves the lane's one-unit-at-a-time rule.
 - **`REG-F-522`, candidate 1.** The governed manifest object, each command's binding to the manifest it ran against, and the roadmap's ratification remain OWED. D10 and D11 provide a host-read deliverable view.
@@ -229,6 +254,7 @@ The sponsor was told about 90 qualification calls before D11 added about 28 for 
    | 1a | L2 — D20, the authoring review's allowance | Red-first checks, own review, merge after `bun run gate:fast` |
    | 2 | M — F1's store, engine, page and lane order | Red-first checks, enforcement mutants killed, own review, merge after `bun run gate:fast` |
    | 3 | N — F2, D9–D12 | Red-first checks, own review, merge after `bun run gate:fast` |
+   | 3a | O — D21-D27 | Red-first checks, own review, merge after `bun run gate:fast` |
    | 4 | Case set v12 and its oracles | Built cases, offline pre-check, then sponsor confirmation |
    | 5 | Paid qualification | Selected reviewer measured; `reviewer:qual:check` GREEN; gate green; pushed |
    | 6 | P6 again, from the main checkout | Dry run, then paid half B |
