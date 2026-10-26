@@ -134,11 +134,15 @@ vi.mock('../tools/devin-reviewer.js', async (importOriginal) => {
 						JSON.stringify({ steps: [{ extra: { generation_model: 'fixture-assurance-model' } }] }),
 						'utf8'
 					);
+				// ⭐ `JAN-EXEC` Phase 7, package N — D10, D12: ~~a prompt naming the marker~~ the review OF the marked command. Since
+				// package N a work product's review and every command's review are shown the step's writes and runs, the marked
+				// command's line among them, so the stub reads the command a review is of — its act, marked "← this command" —
+				// which is what "a REJECTED review for a command marked so" always meant.
+				const own = prompt.includes('The COMMAND RESULT to review')
+					? prompt.split('\n').find((line) => line.endsWith('← this command'))
+					: undefined;
 				return {
-					stdout: judgement(
-						prompt.includes('marker-reject') ? 'RR-08-evidence-integrity' : undefined,
-						rubricOf(prompt)
-					)
+					stdout: judgement(own?.includes('marker-reject') ? 'RR-08-evidence-integrity' : undefined, rubricOf(prompt))
 				};
 			})
 		)
@@ -531,8 +535,13 @@ beforeAll(async () => {
 		};
 		const refused = await press('beginExecute', implementation, { pwuId: unitId(implementation) });
 		expect(seam.duringReview, 'arrangement: no review was in flight to wait the step during').toBeUndefined();
-		expect(refused.error, 'arrangement: the command review did not refuse the completion').toMatch(
-			/the command evidence did not pass its own floor/
+		// ⭐⭐ `JAN-EXEC` Phase 7, package N — D9 (`REG-D-135` (1); `REG-F-520` remedy 1) — MOVED DELIBERATELY: ~~the command review
+		// refused the completion~~. A command's review now runs inside its try, and its subject finding goes back to the producer:
+		// the REJECTED review of the first try's second command sent the model a second try, which ran no command (this fixture
+		// reports its runs once), so that try's completion names no command evidence — and the engine refuses it because the
+		// operator waited the step by hand mid-review. ⭑ The first try's REJECTED review stays on the record, as D9 requires.
+		expect(refused.error, 'arrangement: the second try was not refused for the step the operator waited').toMatch(
+			/^The model ran, its work product is recorded, and the assurance floor is satisfied — but the step still did not complete\. CompleteExecutionStep: .* WAITING/
 		);
 		// ⭐ The step was no longer RUNNING when the completion was refused, so the route recorded no wait of its own
 		// (`waitForAPerson`): the unit's execution is still RUNNING, never WAITING for a person's choice.
@@ -739,7 +748,9 @@ describe('JAN-EXEC P7-2 D9 — the run report over stores the product wrote, rea
 			['answered', 'REJECTED']
 		]);
 		expect(report().pairing.counts).toEqual({
-			answered: 37,
+			// ⭐ `JAN-EXEC` Phase 7, package N — D9 — MOVED DELIBERATELY, ~~37~~ 38: the REJECTED command review's finding now goes
+			// back to the producer, so the implementation phase takes a second try, and its work product a second review.
+			answered: 38,
 			'no-criterion-answered': 0,
 			// ⭐ Package L — D13 (`REG-D-135` (3)) — a review that concluded on a reply leaving a declared criterion without a row: none here.
 			'criterion-left-without-row': 0,
@@ -764,14 +775,17 @@ describe('JAN-EXEC P7-2 D9 — the run report over stores the product wrote, rea
 				Object.entries(report().pairing.noModelAnswerByDesign).map(([k, ids]) => [k, ids.length])
 			)
 		).toEqual({
-			'deterministic floor policy': 76,
+			// ⭐ Package N — D9 — MOVED DELIBERATELY, ~~76~~ 78: the implementation phase's second try, its work product's two
+			// deterministic floor policies.
+			'deterministic floor policy': 78,
 			'declared-policy sign-off': 0,
 			'demo sign-off': 3,
 			other: 0
 		});
 		expect(report().reviewerCalls).toMatchObject({
 			// ⭐ E2 — ~~39~~: the floor's 39, and one call for each of the 7 declared reviews.
-			recorded: 46,
+			// ⭐ Package N — D9 — MOVED DELIBERATELY, ~~46~~ 47: and the implementation phase's second try's work-product review.
+			recorded: 47,
 			noResponse: 2,
 			retries: 1,
 			repairs: 0

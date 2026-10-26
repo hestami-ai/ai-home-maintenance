@@ -30,6 +30,10 @@ import type {
 	DeclaredInstruction,
 	DeclaredPolicyFraming,
 	DeclaredUnitWithoutWork,
+	Deliverable,
+	DeliverableFile,
+	HostSequence,
+	HostSequenceAct,
 	ProfessionalRationaleSummary,
 	ReasoningReviewInput
 } from '@janumipwb/rph-assurance';
@@ -184,6 +188,13 @@ export interface WorkProductReviewSource {
 	readonly rationale?: ProfessionalRationaleSummary;
 	/** ⚠ OFF BY DEFAULT — see `reviewSeesPriorFindings`. */
 	readonly priorGaps?: readonly string[];
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package N — D10 (`REG-D-135` (1); `REG-F-522` remedy candidate 2) — THE FILES THE UNIT CHANGED
+	 * IN ITS WORKSPACE SINCE ITS STEP BEGAN, as the host read them after the try that made this answer (`deliverableAfterTry`,
+	 * `execution/deliverable-view.ts`). ⭑ Production always hands it — none changed is a measurement too; a historical case
+	 * hands none, and is reviewed as before.
+	 */
+	readonly deliverable?: Deliverable;
 }
 
 /** The reasoning-review input for a WORK PRODUCT — what `runWorkProductFloor` hands the reviewer. */
@@ -209,7 +220,11 @@ export function workProductReviewInput(source: WorkProductReviewSource): Reasoni
 		// is meant to know. It defaults to unset because the sponsor's model puts that state on the
 		// PRODUCER, and the paper's deployed pipeline does the same: the judge's reason goes to the
 		// GENERATOR's prompt, and the judge re-scores each draft cold.
-		prior: source.priorGaps?.length ? { gaps: [...source.priorGaps] } : undefined
+		prior: source.priorGaps?.length ? { gaps: [...source.priorGaps] } : undefined,
+		// ⭐⭐ Package N — D10 — the finished work beside the answer: the files the unit changed and the step's writes and runs,
+		// only when handed, so a historical case's input is unchanged. The validator lays them out within today's budget, cut
+		// unit by unit, each cut declared before its bytes (`deliverableLayout`, `sequenceBlock`).
+		...(source.deliverable ? { deliverable: source.deliverable } : {})
 	};
 }
 
@@ -229,6 +244,11 @@ export interface ProcessResultReviewSource {
 	readonly narration?: string;
 	/** ⚠ NEVER SUPPLIED BY PRODUCTION either, for the same reason. */
 	readonly priorGaps?: readonly string[];
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package N — D12 (`REG-D-135` (1); `REG-F-579`) — THE STEP'S WRITES AND RUNS TO DATE, this
+	 * command's act among them (`subjectOrdinal`): its place in the step's sequence, which its narrowed question asks of.
+	 */
+	readonly hostSequence?: HostSequence;
 }
 
 /**
@@ -263,7 +283,11 @@ export function processResultReviewInput(source: ProcessResultReviewSource): Rea
 		rationale: source.rationale,
 		...(source.observedToolCalls ? { observedToolCalls: source.observedToolCalls } : {}),
 		narration: source.narration,
-		...(source.priorGaps?.length ? { prior: { gaps: [...source.priorGaps] } } : {})
+		...(source.priorGaps?.length ? { prior: { gaps: [...source.priorGaps] } } : {}),
+		// ⭐ Package N — D12 — the step's sequence, on the validator's host lines after the view: its share comes out of the
+		// view's budget (`processResultContentBudget`), and its commands and paths are among the slices the view's fence
+		// avoids (`processResultUntrustedSlices`) — both the validator's own plan, so the view fits what the prompt leaves it.
+		...(source.hostSequence ? { hostSequence: source.hostSequence } : {})
 	};
 	const budget = processResultContentBudget({ ...shape, ...halves });
 	const otherUntrusted = processResultUntrustedSlices({ ...shape, ...halves });
@@ -282,6 +306,21 @@ export interface DeclaredReviewCommand {
 	readonly exitCode: number | null;
 	readonly timedOut: boolean;
 }
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package N — D11 (`REG-D-135` (1), the lead's D11; design D11) — ONE FILE A UNIT CHANGED IN ITS
+ * WORKSPACE SINCE ITS STEP BEGAN, as the host recorded it at the unit's completion (`execution/deliverable-view.ts`): its
+ * path, what changed, and its text as the host read it — none for a removed file.
+ */
+export interface DeclaredReviewFile {
+	readonly unit: string;
+	readonly path: string;
+	readonly change: DeliverableFile['change'];
+	readonly content?: string;
+}
+
+/** ⭐ Package N — D11 — one act of a unit's step's host sequence, as recorded at its completion, with the unit that made it. */
+export type DeclaredReviewAct = HostSequenceAct & { readonly unit: string };
 
 /** ⭐ E2 — what a declared-policy review knows about the work it judges. */
 export interface DeclaredPolicyReviewSource {
@@ -304,6 +343,20 @@ export interface DeclaredPolicyReviewSource {
 	readonly workProducts: readonly { readonly unit: string; readonly answer: string }[];
 	/** The commands those units ran, as the host recorded them. */
 	readonly commands: readonly DeclaredReviewCommand[];
+	/**
+	 * ⭐⭐ Package N — D11 — THE FILES THOSE UNITS CHANGED, as recorded at each one's completion, in the same composition as
+	 * their work products (the unit's own, then its subtree's, depth first). ⭑ Production always hands it, empty where none
+	 * changed; a historical case hands none, and its line is built as before.
+	 */
+	readonly files?: readonly DeclaredReviewFile[];
+	/** ⭐ Package N — D11 — those units' steps' writes and runs, try by try, as recorded at each one's completion. */
+	readonly sequence?: readonly DeclaredReviewAct[];
+	/**
+	 * ⭐ Package N — D11 — each unit whose model's work completed with no deliverable view on the record (its admitted try ran no
+	 * command whose evidence carries the pointer): named to the reviewer on a host line of its own, so its absence from
+	 * `files` and `sequence` is never read as "it changed nothing".
+	 */
+	readonly unitsWithoutDeliverable?: readonly string[];
 	/** ⭑ §9.7 — the producer's CONTRACTED account, when one unit's work is judged and it returned one. */
 	readonly rationale?: ProfessionalRationaleSummary;
 	/**
@@ -336,6 +389,13 @@ export interface DeclaredPolicyReviewSource {
  * UNIT (`workCutUnitByUnit`), each unit's part to its own share, never head-only across units. ⛔ The head-only cut of
  * P5's root kept the first 21684 of 50586 code points: Requirements whole, Design to its §5, and nothing of
  * Implementation or of any command. ⭑ Work of one unit, or work that fits, is built exactly as before.
+ * ⭐⭐ `JAN-EXEC` Phase 7, package N — D11 (`REG-D-135` (1), the lead's D11) — AND THE DELIVERABLE, AS THE WORK-PRODUCT REVIEW
+ * IS SHOWN IT: the files each unit changed (`files`: its unit, path, what changed and its text) and each unit's step's writes
+ * and runs (`sequence`: its unit, try, act number, and the path written or the command run with its exit), as recorded at
+ * each one's completion, on the same line in the same composition. ⛔ Judging a declared policy without the delivered files
+ * kept `REG-F-522`'s gap on this plane. ⭐ Work carrying them that is over its budget is cut unit by unit even when it is one
+ * unit's — a head-only cut of the line would lose its files and sequence first — each file's text to its head and each
+ * unit's acts from the last, each cut declared (`workCutUnitByUnit`). ⚠ Work carrying neither is built exactly as before.
  */
 export function declaredPolicyReviewInput(source: DeclaredPolicyReviewSource): ReasoningReviewInput {
 	const unitsWithoutWork = source.unitsWithoutWork ?? [];
@@ -347,27 +407,56 @@ export function declaredPolicyReviewInput(source: DeclaredPolicyReviewSource): R
 		// ⭐ `E12F` F4 — what the instruction IS, so the reviewer is told only what is true of it.
 		declaredInstruction: source.instructionIs,
 		...(unitsWithoutWork.length > 0 ? { declaredUnitsWithoutWork: unitsWithoutWork } : {}),
+		...(source.unitsWithoutDeliverable?.length ? { declaredUnitsWithoutDeliverable: source.unitsWithoutDeliverable } : {}),
 		prompt: source.instruction
 	};
 	// ⚠ PASSED UNCONDITIONALLY, as the work-product floor passes it: §9.7 — presence or absence is never a signal.
 	const tail = { rationale: source.rationale, narration: undefined };
-	const whole = workLine(source.workProducts, source.commands);
-	const units = new Set([...source.workProducts.map((w) => w.unit), ...source.commands.map((c) => c.unit)]);
+	const work: DeclaredWork = {
+		workProducts: source.workProducts,
+		commands: source.commands,
+		...(source.files ? { files: source.files } : {}),
+		...(source.sequence ? { sequence: source.sequence } : {})
+	};
+	const whole = workLine(work);
+	const units = unitsOf(work);
+	const carriesDeliverable = work.files !== undefined || work.sequence !== undefined;
 	const budget = declaredPolicyContentBudget({ ...head, ...tail });
-	const shared = units.size > 1 && whole.length > budget ? workCutUnitByUnit(source.workProducts, source.commands, budget) : undefined;
+	const shared =
+		(units.length > 1 || carriesDeliverable) && whole.length > budget ? workCutUnitByUnit(work, budget) : undefined;
 	return shared === undefined
 		? { ...head, content: whole, ...tail }
 		: { ...head, content: shared.content, declaredWorkCut: shared.cut, ...tail };
 }
 
-/** A declared review's work as ONE line of JSON: each work product under its unit's title, then each command it ran. */
-function workLine(
-	workProducts: readonly { readonly unit: string; readonly answer: string }[],
-	commands: readonly DeclaredReviewCommand[]
-): string {
+/** ⭐ Package N — what a declared review's line holds: work products and commands, and — when handed — files and acts. */
+interface DeclaredWork {
+	readonly workProducts: readonly { readonly unit: string; readonly answer: string }[];
+	readonly commands: readonly DeclaredReviewCommand[];
+	readonly files?: readonly DeclaredReviewFile[];
+	readonly sequence?: readonly DeclaredReviewAct[];
+}
+
+/** Every unit the work names, in the order it first names them: work products, commands, files, then acts. */
+const unitsOf = (w: DeclaredWork): string[] => [
+	...new Set([
+		...w.workProducts.map((x) => x.unit),
+		...w.commands.map((x) => x.unit),
+		...(w.files ?? []).map((x) => x.unit),
+		...(w.sequence ?? []).map((x) => x.unit)
+	])
+];
+
+/**
+ * A declared review's work as ONE line of JSON: each work product under its unit's title, then each command it ran — ⭐ and,
+ * package N (D11), when handed: each file a unit changed, then each act of its step's sequence.
+ */
+function workLine(w: DeclaredWork): string {
 	return jsonLine({
-		workProducts: workProducts.map((w) => ({ workUnit: w.unit, workProduct: w.answer })),
-		commands: commands.map(commandEntry)
+		workProducts: w.workProducts.map((x) => ({ workUnit: x.unit, workProduct: x.answer })),
+		commands: w.commands.map(commandEntry),
+		...(w.files ? { files: w.files.map(fileEntry) } : {}),
+		...(w.sequence ? { sequence: w.sequence.map(actEntry) } : {})
 	});
 }
 
@@ -378,6 +467,20 @@ const commandEntry = (c: DeclaredReviewCommand) => ({
 	exitCode: c.exitCode,
 	timedOut: c.timedOut
 });
+
+/** ⭐ Package N — one changed file's entry: its unit, its path, what changed, and — unless removed — its text. */
+const fileEntry = (f: DeclaredReviewFile) => ({
+	workUnit: f.unit,
+	path: f.path,
+	change: f.change,
+	...(f.change === 'REMOVED' ? {} : { text: f.content ?? '' })
+});
+
+/** ⭐ Package N — one act's entry: its unit, its try, its number, and the path written or the command run with its exit. */
+const actEntry = (a: DeclaredReviewAct) =>
+	a.kind === 'WRITE'
+		? { workUnit: a.unit, try: a.try, act: a.ordinal, wrote: a.path }
+		: { workUnit: a.unit, try: a.try, act: a.ordinal, ran: a.argv, exitCode: a.exitCode, timedOut: a.timedOut };
 
 /** How long `text` is written inside a string on a JSON line (`jsonLine`): each code point's own escape, summed. */
 const encodedLength = (text: string): number => jsonLine(text).length - 2;
@@ -420,8 +523,28 @@ function fairShares(needs: readonly number[], total: number): number[] {
 export const commandsCutDeclaration = (unit: string, kept: number, total: number, removed: number): string =>
 	`[CUT FOR THIS REVIEW: the commands of ${jsonLine(unit)} — the first ${kept} of its ${total} are shown; the last ${removed} are removed.]`;
 
+/** ⭐ Package N — D11 — the declaration of a cut that kept a unit's first `kept` acts of `total`, as its commands' cut reads. */
+export const sequenceCutOfUnitDeclaration = (unit: string, kept: number, total: number, removed: number): string =>
+	`[CUT FOR THIS REVIEW: the sequence of ${jsonLine(unit)} — the first ${kept} of its ${total} acts are shown; the last ${removed} are removed.]`;
+
 /** The slice name a cut of one unit's work product declares: the work product of that unit, its title JSON-encoded. */
 const productSlice = (unit: string): string => `the work product of ${jsonLine(unit)}`;
+
+/** ⭐ Package N — D11 — the slice name a cut of one changed file's text declares: its path and its unit, JSON-encoded. */
+const fileSlice = (unit: string, path: string): string => `the text of ${jsonLine(path)} of ${jsonLine(unit)}`;
+
+/** A text the cut shares a unit's room among: a work product's answer, or a changed file's text, with its cut's slice name. */
+interface CutText {
+	readonly unit: string;
+	readonly text: string;
+	readonly slice: string;
+}
+
+/** A unit's ordered entries the cut keeps from the first while they fit: its commands, then its acts. */
+interface CutList {
+	readonly unit: string;
+	readonly cost: number;
+}
 
 /**
  * ⭐⭐ P5 package B (F2) — THE WORK OF MANY UNITS, CUT UNIT BY UNIT to fit `limit` (the declaration lines, a line feed, then
@@ -431,65 +554,83 @@ const productSlice = (unit: string): string => `the work product of ${jsonLine(u
  * its own line, and the line stays valid JSON in the same shape. ⚠ The declarations' room is reserved at the widest
  * numbers each could state, and recomputed until the cuts it leaves need no more. ⚠ Undefined when even the frame does
  * not fit: the validator's head-only cut then stands, as before.
+ * ⭐ Package N — D11 — AND A UNIT'S FILES AND ACTS WITH THEM: the frame keeps every file's entry with its text emptied, the
+ * unit's acts are kept after its commands, in order, and its files' texts share the rest with its work products, each cut
+ * to its head and declared (`fileSlice`, `sequenceCutOfUnitDeclaration`).
  */
-function workCutUnitByUnit(
-	workProducts: readonly { readonly unit: string; readonly answer: string }[],
-	commands: readonly DeclaredReviewCommand[],
-	limit: number
-): { readonly content: string; readonly cut: string } | undefined {
-	const units = [...new Set([...workProducts.map((w) => w.unit), ...commands.map((c) => c.unit)])];
-	// ⚠ A comma counted with every command, the first's included: an overcount of one, never an undercount.
-	const commandCost = commands.map((c) => jsonLine(commandEntry(c)).length + 1);
-	const productCost = workProducts.map((w) => encodedLength(w.answer));
-	const frame = workLine(
-		workProducts.map((w) => ({ unit: w.unit, answer: '' })),
-		[]
-	).length;
+function workCutUnitByUnit(work: DeclaredWork, limit: number): { readonly content: string; readonly cut: string } | undefined {
+	const units = unitsOf(work);
+	const files = work.files ?? [];
+	const sequence = work.sequence ?? [];
+	// ⭐ The texts, in the line's order: every work product's, then every changed file's that is not removed.
+	const texts: CutText[] = [
+		...work.workProducts.map((w) => ({ unit: w.unit, text: w.answer, slice: productSlice(w.unit) })),
+		...files.flatMap((f) => (f.change === 'REMOVED' ? [] : [{ unit: f.unit, text: f.content ?? '', slice: fileSlice(f.unit, f.path) }]))
+	];
+	// ⚠ A comma counted with every command and act, the first's included: an overcount of one, never an undercount.
+	const commands: CutList[] = work.commands.map((c) => ({ unit: c.unit, cost: jsonLine(commandEntry(c)).length + 1 }));
+	const acts: CutList[] = sequence.map((a) => ({ unit: a.unit, cost: jsonLine(actEntry(a)).length + 1 }));
+	const textCost = texts.map((t) => encodedLength(t.text));
+	const frame = workLine({
+		workProducts: work.workProducts.map((w) => ({ unit: w.unit, answer: '' })),
+		commands: [],
+		...(work.files ? { files: files.map((f) => ({ ...f, content: '' })) } : {}),
+		...(work.sequence ? { sequence: [] } : {})
+	}).length;
 	const indices = <T extends { readonly unit: string }>(xs: readonly T[], unit: string) =>
 		xs.flatMap((x, i) => (x.unit === unit ? [i] : []));
+	const keepWhileFits = (list: readonly CutList[], unit: string, room: { left: number }, kept: Set<number>) => {
+		for (const i of indices(list, unit)) {
+			if (list[i]!.cost > room.left) break;
+			kept.add(i);
+			room.left -= list[i]!.cost;
+		}
+	};
 	const plan = (reserve: number) => {
 		const needs = units.map(
 			(u) =>
-				indices(commands, u).reduce((n, i) => n + commandCost[i]!, 0) +
-				indices(workProducts, u).reduce((n, i) => n + productCost[i]!, 0)
+				indices(commands, u).reduce((n, i) => n + commands[i]!.cost, 0) +
+				indices(acts, u).reduce((n, i) => n + acts[i]!.cost, 0) +
+				indices(texts, u).reduce((n, i) => n + textCost[i]!, 0)
 		);
 		const shares = fairShares(needs, limit - frame - reserve);
-		const kept = new Set<number>();
-		const allowance = workProducts.map(() => 0);
+		const keptCommands = new Set<number>();
+		const keptActs = new Set<number>();
+		const allowance = texts.map(() => 0);
 		units.forEach((u, k) => {
-			let room = shares[k]!;
-			for (const i of indices(commands, u)) {
-				if (commandCost[i]! > room) break;
-				kept.add(i);
-				room -= commandCost[i]!;
-			}
-			const products = indices(workProducts, u);
+			const room = { left: shares[k]! };
+			keepWhileFits(commands, u, room, keptCommands);
+			keepWhileFits(acts, u, room, keptActs);
+			const mine = indices(texts, u);
 			fairShares(
-				products.map((i) => productCost[i]!),
-				room
+				mine.map((i) => textCost[i]!),
+				room.left
 			).forEach((a, j) => {
-				allowance[products[j]!] = a;
+				allowance[mine[j]!] = a;
 			});
 		});
-		return { kept, allowance };
+		return { keptCommands, keptActs, allowance };
 	};
-	const declarations = (p: ReturnType<typeof plan>, widest: boolean): string[] => [
-		...workProducts.flatMap((w, i) => {
-			if (p.allowance[i]! >= productCost[i]!) return [];
-			const total = codePoints(w.answer);
-			const shown = widest ? total : codePoints(encodedPrefix(w.answer, p.allowance[i]!));
-			return [headCutDeclaration(productSlice(w.unit), shown, total, widest ? total : total - shown)];
-		}),
-		...units.flatMap((u) => {
-			const mine = indices(commands, u);
-			const shown = mine.filter((i) => p.kept.has(i)).length;
+	const listCuts = (list: readonly CutList[], kept: ReadonlySet<number>, widest: boolean, declare: typeof commandsCutDeclaration) =>
+		units.flatMap((u) => {
+			const mine = indices(list, u);
+			const shown = mine.filter((i) => kept.has(i)).length;
 			if (shown === mine.length) return [];
 			const total = mine.length;
-			return [commandsCutDeclaration(u, widest ? total : shown, total, widest ? total : total - shown)];
-		})
+			return [declare(u, widest ? total : shown, total, widest ? total : total - shown)];
+		});
+	const declarations = (p: ReturnType<typeof plan>, widest: boolean): string[] => [
+		...texts.flatMap((t, i) => {
+			if (p.allowance[i]! >= textCost[i]!) return [];
+			const total = codePoints(t.text);
+			const shown = widest ? total : codePoints(encodedPrefix(t.text, p.allowance[i]!));
+			return [headCutDeclaration(t.slice, shown, total, widest ? total : total - shown)];
+		}),
+		...listCuts(commands, p.keptCommands, widest, commandsCutDeclaration),
+		...listCuts(acts, p.keptActs, widest, sequenceCutOfUnitDeclaration)
 	];
 	let reserve = 0;
-	for (let round = 0; round <= workProducts.length + units.length + 1; round++) {
+	for (let round = 0; round <= texts.length + 2 * units.length + 1; round++) {
 		const p = plan(reserve);
 		const needed = declarations(p, true).reduce((n, d) => n + d.length + 1, 0);
 		if (needed > reserve) {
@@ -497,10 +638,15 @@ function workCutUnitByUnit(
 			continue;
 		}
 		const cut = declarations(p, false).join('\n');
-		const content = workLine(
-			workProducts.map((w, i) => ({ unit: w.unit, answer: encodedPrefix(w.answer, p.allowance[i]!) })),
-			commands.filter((_, i) => p.kept.has(i))
-		);
+		// ⭑ Each text's kept head, by its index among `texts`: the work products first, then each file not removed.
+		const shown = (i: number): string => encodedPrefix(texts[i]!.text, p.allowance[i]!);
+		let next = work.workProducts.length;
+		const content = workLine({
+			workProducts: work.workProducts.map((w, i) => ({ unit: w.unit, answer: shown(i) })),
+			commands: work.commands.filter((_, i) => p.keptCommands.has(i)),
+			...(work.files ? { files: files.map((f) => (f.change === 'REMOVED' ? f : { ...f, content: shown(next++) })) } : {}),
+			...(work.sequence ? { sequence: sequence.filter((_, i) => p.keptActs.has(i)) } : {})
+		});
 		return cut.length + 1 + content.length <= limit ? { content, cut } : undefined;
 	}
 	return undefined;

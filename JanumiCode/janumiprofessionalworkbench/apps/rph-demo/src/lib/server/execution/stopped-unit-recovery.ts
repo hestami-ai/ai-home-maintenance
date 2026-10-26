@@ -413,12 +413,21 @@ export function stoppedUnitOf(
 			ok: false,
 			refusedBecause: `the record names no work product of the refused attempt on step ${waiting.stepId} (RD6: a work product names the attempt that made it), so there is nothing to re-review and no findings to carry.`
 		};
+	// ⭐⭐ `JAN-EXEC` Phase 7, package N — D9 (`REG-D-135` (1)) — THE REFUSED TRY'S EVIDENCE, NEVER AN EARLIER TRY'S. Each try's
+	// runs are joined inside the try now, so an attempt holds every try's command evidence; the refused completion named the
+	// last try's alone, beside the last try's work product. ⭑ The work product's try is its place among the attempt's work
+	// products (each try records its own, RD6), and each evidence names its try (`producingTry`). ⚠ An evidence naming no try
+	// was joined after the loop, before package N, and is the attempt's whole set as it always was.
+	const attemptsWorkProducts = listByType(engine, 'ARTIFACT')
+		.filter((a) => a.state.producingExecutionAttemptId === attemptKey)
+		.map((a) => a.id);
+	const workProductTry = attemptsWorkProducts.indexOf(workProductId) + 1;
 	const evidenceIds = listByType(engine, 'EVIDENCE')
-		.filter(
-			(e) =>
-				(e.state.contentReference as { producingExecutionAttemptId?: unknown } | undefined)
-					?.producingExecutionAttemptId === attemptKey
-		)
+		.filter((e) => {
+			const ref = e.state.contentReference as { producingExecutionAttemptId?: unknown; producingTry?: unknown } | undefined;
+			if (ref?.producingExecutionAttemptId !== attemptKey) return false;
+			return typeof ref.producingTry !== 'number' || ref.producingTry === workProductTry;
+		})
 		.map((e) => e.id);
 	const refusals = [
 		recordedRefusalOf(engine, workProductId, 'ARTIFACT'),
@@ -940,9 +949,12 @@ export function producerOf(
  * holds the stderr heading's line could split two ways that render identically, and which one ran cannot be told.
  * ⭑ Both are `processRunFromEvidence`'s, in the renderer's own module, since that read binds the error stream (`REG-Q-066`;
  * moved there after the gate's `verif/agy-stderr-unbound.test.ts` named this file's two bindings).
- * ⚠ TWO FIELDS ARE NOT IN THE EVIDENCE, AND NO FLOOR READS EITHER (grep, 2026-10-10: neither `process-result-render.ts`,
+ * ⚠ ~~TWO FIELDS ARE NOT IN THE EVIDENCE, AND NO FLOOR READS EITHER (grep, 2026-10-10: neither `process-result-render.ts`,
  * `review-input.ts` nor `process-result-floor.ts` reads `ordinal` or an omission's `reason`): `ordinal` is the run's place
- * among the attempt's evidence, and each cut's `reason` says it is not in the evidence rather than inventing one.
+ * among the attempt's evidence, and~~ each cut's `reason` says it is not in the evidence rather than inventing one.
+ * ⭐ `JAN-EXEC` Phase 7, package N — D12: `ordinal` IS in the evidence since package L (D8, its content reference), and a
+ * command's narrowed review names its act by it; the caller (`rebuildForReview`) passes the recorded one, and the run's
+ * place among the attempt's evidence only for evidence recorded before package L.
  */
 export async function rebuildProcessRun(
 	evidence: Record<string, unknown>,

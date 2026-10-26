@@ -42,8 +42,10 @@ import {
 import type { ResolvableExchange } from '@janumipwb/rph-application';
 import type { ArtifactStore } from '@janumipwb/rph-ports';
 import type { AuthedEngineHandle } from '@janumipwb/rph-engine';
+import type { HostSequence } from '@janumipwb/rph-assurance';
 import type { ObservedProcessRun } from '../tools/process-run-observer.js';
 import type { FloorRemediationAction } from '../floor.js';
+import type { DeliverableViewRef } from './deliverable-view.js';
 import { commandLine, renderProcessResultEvidence } from '../assurance/process-result-render.js';
 import { escalatedReviewNote } from './floor-over-subject.js';
 import { processResultLimitations, runProcessResultFloor } from './process-result-floor.js';
@@ -70,6 +72,14 @@ export interface JoinedProcessEvidence {
 	 * escalation sentence on (`describeRefusedEvidence`), never the observations' prose.
 	 */
 	readonly remediationAction: FloorRemediationAction;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package N — D9 (`REG-D-135` (1); `REG-F-520` remedy 1; `REG-D-059`) — THE SUBJECT FINDINGS this
+	 * result's floor returns to the producer, the classifier's own (never an operational code, never the escalation), and
+	 * whether they may be sent back at all (`autoRefine`): a command's review now runs inside the try, so its findings go
+	 * back to the model with the work product's.
+	 */
+	readonly findings: readonly { readonly code: string; readonly statement: string }[];
+	readonly autoRefine: boolean;
 }
 
 export interface EvidenceJoinInput {
@@ -91,6 +101,18 @@ export interface EvidenceJoinInput {
 	 * the content reference, whose schema is an open record (`ArtifactReferenceSchema`), beside the run's other facts.
 	 */
 	readonly producingExecutionAttemptId?: string;
+	/**
+	 * ⭐⭐ Package N — D9, D12 (`REG-D-135` (1)) — THE STEP'S HOST SEQUENCE TO DATE, through the try these runs were made in:
+	 * each run's review is shown its place in it (the run's own number, `subjectOrdinal`).
+	 */
+	readonly hostSequence?: HostSequence;
+	/**
+	 * ⭐ Package N — D9 — the try of the attempt these runs were made in, carried into each evidence's content reference, so a
+	 * re-review re-runs the refused try's command floors and no earlier try's (their assessments stay on the record).
+	 */
+	readonly producingTry?: number;
+	/** ⭐ Package N — D10, D11 — where that try's deliverable view is recorded (`recordDeliverableView`), on each reference. */
+	readonly deliverableView?: DeliverableViewRef;
 }
 
 /**
@@ -140,6 +162,10 @@ export interface ProcessEvidenceContentReference {
 	readonly ordinal: number;
 	/** ⭐ P7-6R RD6 — the attempt that ran the command (`EvidenceJoinInput.producingExecutionAttemptId`). */
 	readonly producingExecutionAttemptId?: string;
+	/** ⭐ Package N — D9 — the try of that attempt the command ran in (`EvidenceJoinInput.producingTry`). */
+	readonly producingTry?: number;
+	/** ⭐ Package N — D10, D11 — the pointer to that try's recorded deliverable view (`EvidenceJoinInput.deliverableView`). */
+	readonly deliverableView?: DeliverableViewRef;
 }
 
 /**
@@ -231,7 +257,9 @@ export async function joinProcessEvidence(
 			ordinal: run.ordinal,
 			...(input.producingExecutionAttemptId
 				? { producingExecutionAttemptId: input.producingExecutionAttemptId }
-				: {})
+				: {}),
+			...(input.producingTry !== undefined ? { producingTry: input.producingTry } : {}),
+			...(input.deliverableView ? { deliverableView: input.deliverableView } : {})
 		};
 
 		// 2. THE GOVERNED OBJECT.
@@ -275,7 +303,9 @@ export async function joinProcessEvidence(
 				producerModelId: input.producerModelId,
 				producerProviderId: input.producerProviderId,
 				...(input.observedToolCalls ? { observedToolCalls: input.observedToolCalls } : {}),
-				...(input.rationale ? { rationale: input.rationale } : {})
+				...(input.rationale ? { rationale: input.rationale } : {}),
+				// ⭐ Package N — D12 — and its place in the step's sequence: this run's own number among the step's acts.
+				...(input.hostSequence ? { hostSequence: { ...input.hostSequence, subjectOrdinal: run.ordinal } } : {})
 			},
 			engine,
 			opts
@@ -286,7 +316,9 @@ export async function joinProcessEvidence(
 			satisfied: floor.satisfied,
 			observations: floor.observations,
 			unsatisfiedPolicies: floor.dispositions.filter((d) => d.disposition !== 'SATISFIED'),
-			remediationAction: floor.remediation.action
+			remediationAction: floor.remediation.action,
+			findings: floor.remediation.findings.map((f) => ({ code: f.code, statement: f.statement })),
+			autoRefine: floor.remediation.autoRefine
 		});
 	}
 	return { joined };

@@ -110,7 +110,10 @@ function untrustedValues(input: ReasoningReviewInput, run?: ObservedProcessRun):
 			: []),
 		...(input.narration ? [input.narration] : []),
 		...(input.prior?.gaps.length ? [oneLineOfJson(input.prior.gaps)] : []),
-		...(run ? [oneLineOfJson(run.argv), run.stdout, run.stderr] : [])
+		...(run ? [oneLineOfJson(run.argv), run.stdout, run.stderr] : []),
+		// ⭐ `JAN-EXEC` Phase 7, package N — D10 (`REG-D-135` (1)) — MOVED DELIBERATELY: and, in a review of the finished work, each
+		// changed file's text, as the host read it — one value of its own, each between fence lines (its path is on a host line).
+		...(input.framing === 'WORK_PRODUCT' ? (input.deliverable?.files ?? []).flatMap((f) => (f.content === undefined ? [] : [f.content])) : [])
 	];
 }
 
@@ -341,7 +344,59 @@ const LITERALS: readonly { readonly what: string; readonly input: ReasoningRevie
 				omittedRegions: [{ stream: 'STDOUT', reason: 'capture bound', byteOffset: 65_536, byteSize: 9_000 }]
 			})
 		),
-		pr('PROCESS_RESULT, a long command line', run({ argv: ['pytest', ...Array.from({ length: 4_000 }, (_, i) => `checks/test_${i}.py`)] }))
+		pr('PROCESS_RESULT, a long command line', run({ argv: ['pytest', ...Array.from({ length: 4_000 }, (_, i) => `checks/test_${i}.py`)] })),
+			// ⭐⭐ `JAN-EXEC` Phase 7, package N — D10, D12 (`REG-D-135` (1)) — MOVED DELIBERATELY: the finished work beside the answer,
+			// whole and cut unit by unit, and a command's place in the step's sequence, whose lines are the host's and quote nothing.
+			{
+				what: 'WORK_PRODUCT, the finished work: a changed file, an added one and a removed one, and the sequence',
+				input: workProductReviewInput({
+					criteria,
+					producingPrompt: 'Summarise the load analysis.',
+					answer: 'The deck carries the load.',
+					rationale: ACCOUNT,
+					deliverable: {
+						afterTry: 2,
+						files: [
+							{ path: 'docs/load.md', change: 'CHANGED', content: '# Load\n5.0 kN/m².\n' },
+							{ path: 'docs/vibration.md', change: 'ADDED', content: '# Vibration\n2.1 Hz.\n' },
+							{ path: 'docs/draft.md', change: 'REMOVED' }
+						],
+						sequence: {
+							acts: [
+								{ try: 1, ordinal: 1, kind: 'RUN', argv: ['cat', 'docs/load.md'], exitCode: 0, timedOut: false },
+								{ try: 2, ordinal: 2, kind: 'WRITE', path: 'docs/vibration.md' }
+							],
+							droppedRuns: 0,
+							recordedLimit: 32
+						}
+					}
+				})
+			},
+			{
+				what: 'WORK_PRODUCT, the finished work over its budget: each file’s text cut unit by unit, each cut declared',
+				input: workProductReviewInput({
+					criteria,
+					producingPrompt: 'Summarise the load analysis.',
+					answer: 'The deck carries the load.',
+					rationale: ACCOUNT,
+					deliverable: {
+						afterTry: 1,
+						files: Array.from({ length: 4 }, (_, i) => ({ path: `docs/p${i}.md`, change: 'ADDED' as const, content: over(9_000, `Panel ${i} checked. `) })),
+						sequence: { acts: [], droppedRuns: 0, recordedLimit: 32 }
+					}
+				})
+			},
+			pr('PROCESS_RESULT, its place in the step’s sequence', run({ ordinal: 2 }), {
+				hostSequence: {
+					acts: [
+						{ try: 1, ordinal: 1, kind: 'WRITE', path: 'checks/test_deck.py' },
+						{ try: 1, ordinal: 2, kind: 'RUN', argv: ['pytest', '-rs', 'checks/'], exitCode: 1, timedOut: false }
+					],
+					droppedRuns: 0,
+					recordedLimit: 32,
+					subjectOrdinal: 2
+				}
+			})
 	];
 })();
 
@@ -363,6 +418,8 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481) — no host text inside quoted mate
 			// ⭐ A2 (3) — ~~'the skeleton of the child '~~: a child by its ordinal and type id.
 			'[CUT FOR THIS REVIEW: the skeleton of child ',
 			'[CUT FOR THIS REVIEW: the work product — ',
+			// ⭐ Package N — D10: a changed file's text, cut unit by unit beside the answer.
+			'[CUT FOR THIS REVIEW: the text of "docs/p0.md" — ',
 			'[CUT FOR THIS REVIEW: the narration — ',
 			'[CUT FOR THIS REVIEW: the prior findings — ',
 			'[CUT FOR THIS REVIEW: stdout — the first ',

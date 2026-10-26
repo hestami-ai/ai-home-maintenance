@@ -29,6 +29,10 @@ import {
 	type ReasoningReviewJudgement,
 	type DeclaredPolicyFraming,
 	type DeclaredUnitWithoutWork,
+	type Deliverable,
+	type DeliverableFile,
+	type HostSequence,
+	type HostSequenceAct,
 	type ReviewFraming,
 	type Severity,
 	type Validator,
@@ -59,12 +63,15 @@ import type { ObservedToolCallReport } from '@janumipwb/rph-contracts';
 import { allocate } from './process-result-render.js';
 import {
 	chooseFence,
+	codePoints,
 	declared,
 	excerptHead,
 	fenceCandidate,
 	fenced,
 	FENCE_LENGTH,
 	FENCE_MEANING,
+	headCutDeclaration,
+	headOf,
 	jsonLine,
 	NO_FENCE_STATEMENT,
 	quoted,
@@ -197,6 +204,59 @@ export const PWA_TYPE_ACCOUNT_HEADING =
 	"The producing agent's PROFESSIONAL RATIONALE SUMMARY — its own contracted account of the whole PWA (Section 9.7), of which this part shows one type. Judge whether what it claims about THIS type and, for a type with children, about their composition is candid and borne out by this part; such a claim this part does not support is itself a finding. A claim it makes about any other type — one this part does not show, or a child’s own definition — belongs to that type’s own review, and here supports no finding either way:";
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package N — D12 (`REG-D-135` (1), Q41b; `REG-F-579`; `REG-F-486`; design D12) — THE INTENT OF A
+ * COMMAND'S REVIEW, NARROWED. ⛔ It read *"… You are reviewing one command result and the account the agent gave of its
+ * work:"* — the obligation question (`DESIGN-process-result-qualification.md`, D2: *"the obligation question stays"*), so a
+ * directory listing or a read of an earlier file was judged against the unit's whole obligation and account, and refused
+ * (run-12: 24 of 47 non-passing command reviews read FRAMING_FALSE in the draft adjudication). Q41b supersedes it: the
+ * command's review asks only whether what the account says about THIS command's result, and what it means, is borne out,
+ * given its place among the step's writes and runs. ⭑ The preamble and the rubric's labels stay the policy's (`R14`,
+ * `ASR-4`): only the framing, the account's heading and the host lines change.
+ */
+export const PROCESS_RESULT_INTENT =
+	'A DIFFERENT AI agent was given the instruction below, and in carrying it out it chose to RUN COMMANDS in its ' +
+	"workspace. You are reviewing ONE of them: whether what the agent's account says about THIS command's result, and what it " +
+	"means, is borne out by the result and its place among the step's writes and runs:";
+
+/**
+ * ⭐⭐ Package N — D12 — THE SCOPING SENTENCE: where the unit's obligation is judged, that a statement about it supports no
+ * finding here either way, and that a command the account says nothing about passes this question (`REG-D-135` (1)'s
+ * MEANING; Q41b's *"A command the model said nothing about passes."*). ⭑ It asks the reviewer to find nothing
+ * (`REG-D-105` (2)) and names no disposition value (`REG-D-090`).
+ */
+export const PROCESS_RESULT_SCOPE =
+	"Judge each criterion below on that question alone. Whether the unit's work discharges the instruction is judged by " +
+	"the review of its finished work, not here: a statement about the unit's obligation, another command or a file supports " +
+	'no finding here either way, and a command the account says nothing about meets each criterion here.';
+
+/**
+ * ⭐⭐ Package N — D12 — THE HEADING OF THE ACCOUNT IN A COMMAND'S REVIEW, beside the part's (`PWA_TYPE_ACCOUNT_HEADING`, its
+ * precedent: an account of more than the review shows, scoped to what it does show). ⛔ The heading every other framing
+ * shares, *"an account that claims more than the artifact supports is itself a finding"*, made every claim the account
+ * makes about the unit's work a finding against one command's output.
+ */
+export const PROCESS_RESULT_ACCOUNT_HEADING =
+	"The producing agent's PROFESSIONAL RATIONALE SUMMARY — its own contracted account of the unit's whole work (Section " +
+	"9.7). Judge whether what it says about THIS command's result is candid and borne out by the result above and its place " +
+	"in the step's sequence; such a statement the result does not bear out is itself a finding. What it says of anything " +
+	'else here supports no finding either way:';
+
+/**
+ * ⭐⭐ Package N — D10 (`REG-D-135` (1); `REG-F-522` remedy candidate 2; design D10) — THE SUBJECT LINE OF A WORK PRODUCT'S
+ * REVIEW THAT IS SHOWN THE FINISHED WORK: the answer, then the files the unit changed as the host read them, then the step's
+ * writes and runs; and the obligation the instruction delegates — the criteria that ask whether it is discharged, whether
+ * any of it is dropped and whether its scope is narrowed among them — judged against that whole deliverable, the files as
+ * they now stand. ⛔ A command's read of a file the unit later rewrote is no measure of the file (run-12 cases 18-23).
+ */
+export const WORK_PRODUCT_DELIVERABLE_SUBJECT =
+	'The WORK PRODUCT to review — what a professional work unit produced by running the instruction above: the ' +
+	"agent's answer, then the files the unit changed in its workspace since its step began, as the host read them after " +
+	"its last try, then the step's writes and runs in the host's order. Judge each criterion below — whether the " +
+	'obligation the instruction delegates is discharged, whether any of it is dropped, whether its scope is narrowed, ' +
+	'among them — against this whole deliverable: the files as they now stand, never as an earlier command read them. ' +
+	'The answer:';
+
+/**
  * ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (`REG-F-523`; `REG-D-110` (3); `DESIGN-phase-7-completion.md` B1) — THE STATEMENT A
  * `DECLARED_POLICY` REVIEW FAILS WITH WHEN IT NAMES NO POLICY. ⛔ It is never sent: a reviewer told it judges "against a
  * policy" it cannot name would be misdescribed to (`R14`'s *"a review conducted on a false account of its own subject is
@@ -274,6 +334,16 @@ export const declaredUnitWithoutWorkLine = (u: DeclaredUnitWithoutWork): string 
 	`assurance ${u.assuranceState} — so it contributed no work: nothing of it is in the WORK above.`;
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package N — D11 — THE HOST'S LINE NAMING A UNIT WHOSE MODEL'S WORK COMPLETED WITH NO DELIVERABLE VIEW
+ * ON THE RECORD (`declaredUnitsWithoutDeliverable`): its admitted try ran no command, and the view's pointer rides on a
+ * command's evidence alone (`REG-F-522` candidate 1, the governed manifest, OWED). ⛔ So its absence from "files" and
+ * "sequence" is never read as a unit that changed nothing. ⚠ The title is JSON-encoded, and the fence chooser reads it.
+ */
+export const declaredUnitWithoutDeliverableLine = (unit: string): string =>
+	`The host holds no record of the files the work unit ${jsonLine(unit)} changed, or of its step's writes and runs: its ` +
+	'last try ran no command, so no command evidence carries that record, and nothing of it is in "files" or "sequence" above.';
+
+/**
  * ⭐ P5 package B (F2) — the statement a `DECLARED_POLICY` review fails with when the work its builder cut unit by unit
  * (`declaredWorkCut`) does not fit the budget this prompt leaves it: cut again here, the builder's declarations would no
  * longer say what was shown. ⛔ Never sent. Host-authored and fixed, since it becomes a recorded failure.
@@ -348,7 +418,9 @@ export function pwaTypeOverBudgetStatement(length: number, budget: number): stri
 	);
 }
 
-function framingText(input: Pick<ReasoningReviewInput, 'framing' | 'declaredPolicy' | 'declaredInstruction'>): Framed {
+function framingText(
+	input: Pick<ReasoningReviewInput, 'framing' | 'declaredPolicy' | 'declaredInstruction' | 'deliverable'>
+): Framed {
 	const framing: ReviewFraming = input.framing;
 	switch (framing) {
 		case 'WORK_PRODUCT':
@@ -358,24 +430,32 @@ function framingText(input: Pick<ReasoningReviewInput, 'framing' | 'declaredPoli
 				intentSlice: 'the instruction',
 				// ⭑ NAMED FOR WHAT IT IS, AND FOR WHAT JUDGING IT MEANS. The reviewer's question is whether the
 				// instruction was DISCHARGED — not whether a graph is well-formed.
-				subject:
-					'The WORK PRODUCT to review — the output a professional work unit produced by running the instruction above:',
-				subjectSlice: 'the work product'
+				// ⭐⭐ Package N — D10: and, shown the finished work, it judges that question against the whole deliverable —
+				// the answer and the files the unit changed (`WORK_PRODUCT_DELIVERABLE_SUBJECT`). ⚠ A review handed no
+				// deliverable (a historical case) reads as before.
+				subject: input.deliverable
+					? WORK_PRODUCT_DELIVERABLE_SUBJECT
+					: 'The WORK PRODUCT to review — the output a professional work unit produced by running the instruction above:',
+				subjectSlice: input.deliverable ? 'the answer' : 'the work product'
 			};
 		case 'PROCESS_RESULT':
 			return {
-				intent:
-					'A DIFFERENT AI agent was given the instruction below, and in carrying it out it chose to RUN COMMANDS ' +
-					'in its workspace. You are reviewing one command result and the account the agent gave of its work:',
+				// ⭐⭐ Package N — D12 — ~~"… You are reviewing one command result and the account the agent gave of its
+				// work:"~~ — the question narrowed to what the account says of THIS command's result (`PROCESS_RESULT_INTENT`),
+				// and its scope said before the result (`PROCESS_RESULT_SCOPE`).
+				intent: PROCESS_RESULT_INTENT,
 				intentSlice: 'the instruction',
 				// ⛔ THE SUBJECT IS NOT THE EXIT CODE, AND SAYING SO IS THE WHOLE OF `R15`. A child process has no
 				// reasoning to review; what is reviewable is whether the agent's own account is borne out by what the
 				// HOST observed it do. The reviewer is told which half is whose, because a reviewer that cannot tell
 				// the agent's word from the host's observation cannot perform the only check available here.
 				subject:
+					`${PROCESS_RESULT_SCOPE}\n` +
 					'The COMMAND RESULT to review — what the host observed the command produce (its exit status and output). ' +
 					'It was produced by a child process, NOT by the agent, so it carries no reasoning of its own:',
-				subjectSlice: 'the command result'
+				subjectSlice: 'the command result',
+				// ⭐ Package N — D12 — the account is the unit's whole work's, and this review is of one command.
+				accountHeading: PROCESS_RESULT_ACCOUNT_HEADING
 			};
 		case 'PWA_GRAPH':
 			return {
@@ -416,11 +496,17 @@ function framingText(input: Pick<ReasoningReviewInput, 'framing' | 'declaredPoli
 				intentSlice: ownPurpose ? 'the purpose' : 'the instruction',
 				// ⭐ The work is ONE line of JSON (`declaredPolicyReviewInput`), and this host line states its serialization —
 				// and that the exit codes in it are the host's record, quoted beside the agent's arguments (`REG-F-481`).
+				// ⭐⭐ Package N — D11 (`REG-D-135` (1), the lead's D11) — and, where the host recorded them at a unit's completion,
+				// "files" and "sequence": the deliverable the unit's own work-product review is shown (`declaredPolicyReviewInput`).
 				subject:
 					`${declaredPolicyLine(policy)}\n` +
 					'The WORK to judge against that policy, as one line of JSON: "workProducts" holds each work product with the ' +
 					'title of the work unit that produced it, and "commands" each command the producing agents ran — its ' +
-					'arguments as the agent gave them, and the exit code and timeout the host recorded for it:',
+					'arguments as the agent gave them, and the exit code and timeout the host recorded for it; and, where the ' +
+					'host recorded them at a unit’s completion, "files" holds each file a work unit changed in its workspace ' +
+					'since its step began — its path, what changed, and its text as the host read it — and "sequence" each ' +
+					'write and run of its step in the host’s order — its try, its act number, and the path written or the ' +
+					'command run with the exit the host recorded:',
 				subjectSlice: 'the work'
 			};
 		}
@@ -454,8 +540,10 @@ function framingText(input: Pick<ReasoningReviewInput, 'framing' | 'declaredPoli
  *   · OBSERVED — *"The command own verdict is in the result above"* was said of every call, and is true of one at most:
  *     now *"This command's verdict is in the result above. The other calls' verdicts are not shown."*
  *   · the truncation line counts the calls of that turn — true as written, unchanged.
- * ⛔ WHAT THE REVIEWER IS ASKED DOES NOT CHANGE (design D2): RR-01's label is the policy's own text, and the obligation
- * question stays. Only what the host claims to know is narrowed to what it knows.
+ * ⛔ WHAT THE REVIEWER IS ASKED DOES NOT CHANGE (design D2): RR-01's label is the policy's own text~~, and the obligation
+ * question stays~~. Only what the host claims to know is narrowed to what it knows. ⭐ `JAN-EXEC` Phase 7, package N — D12
+ * (`REG-D-135` (1), Q41b): the obligation question is superseded — a command's review asks what the account says of THIS
+ * command's result (`PROCESS_RESULT_INTENT`, `PROCESS_RESULT_SCOPE`); RR-01's label stays the policy's.
  */
 function renderObservedCalls(report: ObservedToolCallReport | undefined): string {
 	if (!report)
@@ -510,6 +598,281 @@ function untrustedCallNames(report: ObservedToolCallReport | undefined): string[
  */
 export const OBSERVATION_HEADING =
 	"What the host observed the session's LAST turn do. This command may have run in an earlier turn, and the host does not record which observed call produced it.";
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7, package N — D10, D12 (`REG-D-135` (1); `REG-F-579`) — THE STEP'S HOST SEQUENCE, ON HOST LINES ─────
+//
+// Package L gave `write_file` and `run_command` one host ordinal per step (D8). A command's review and the review of the
+// finished work are shown that sequence to date, try by try: the act's number, its try and a run's exit are the host's
+// record and stand on host lines; a path and a command are the agent's, written there as JSON (`jsonLine`, so no byte of
+// theirs can break the line), and each fence chooser reads each as the prompt carries it. ⭐ WITHIN TODAY'S BUDGET: no member
+// of `REASONING_REVIEW_BUDGET` is added for it — the block shares the content's budget with what it stands beside (the
+// answer and the files in a finished work's review, `deliverableLayout`; the command's view in its own,
+// `processResultReviewInput`), and over its share its acts' JSON is cut act by act, by the allocation rule the other slices
+// share their room by (`allocate`), each cut declared on its own line before its act and counted in its share
+// (`REG-F-480`, `REG-F-483`); when even that cannot fit, one contiguous run of acts is kept and the cut declared.
+
+/**
+ * ⭐ Package N — D12 — THE ROOM A COMMAND'S SEQUENCE MAY TAKE OF ITS VIEW'S: at most half of what the prompt leaves the view
+ * without it — so the view keeps at least as much as the sequence — never a constant of its own (no member of
+ * `REASONING_REVIEW_BUDGET` is added). ⭑ A short sequence takes only what it needs: the rest stays the view's.
+ */
+export const sequenceRoom = (viewRoom: number): number => Math.floor(viewRoom / 2);
+
+/** The heading of the sequence: in a command's review, naming the act under review when the input does. */
+export function sequenceHeading(framing: 'WORK_PRODUCT' | 'PROCESS_RESULT', subjectOrdinal: number | undefined): string {
+	const whose =
+		framing === 'PROCESS_RESULT' && subjectOrdinal !== undefined ? ` — this command is act ${subjectOrdinal}` : '';
+	return (
+		`The step's writes and runs to date, in the host's order${whose}. Each act's number, its try and a run's exit are ` +
+		"the host's record; a path and a command are the agent's, each written as JSON:"
+	);
+}
+
+/** The exit a run's act line states: the code, a signal, and a deadline the host enforced, as the review view says them. */
+function actExit(exitCode: number | null, timedOut: boolean): string {
+	const code = exitCode === null ? 'null (terminated by a signal)' : String(exitCode);
+	return `exit ${code}${timedOut ? ', TIMED OUT' : ''}`;
+}
+
+/** One act as the block writes it: the host's words before and after its agent text, and that text as JSON. */
+interface ActParts {
+	readonly act: HostSequenceAct;
+	readonly before: string;
+	readonly json: string;
+	readonly after: string;
+	readonly what: 'path' | 'command';
+}
+
+function actParts(act: HostSequenceAct, subjectOrdinal: number | undefined): ActParts {
+	const mark = act.ordinal === subjectOrdinal ? ' ← this command' : '';
+	return act.kind === 'WRITE'
+		? { act, before: `  ${act.ordinal}. wrote `, json: jsonLine(act.path), after: mark, what: 'path' }
+		: {
+				act,
+				before: `  ${act.ordinal}. ran `,
+				json: jsonLine(act.argv),
+				after: ` — ${actExit(act.exitCode, act.timedOut)}${mark}`,
+				what: 'command'
+			};
+}
+
+/** The declaration of a cut of one act's agent text, on its own line before the act. */
+const actCutDeclaration = (p: ActParts, kept: number, total: number, removed: number): string =>
+	`  ${headCutDeclaration(`the ${p.what} of act ${p.act.ordinal}`, kept, total, removed)}`;
+
+/** The acts' lines in order, each try's acts under a line naming it, each act's agent text as `shown` gives it. */
+function sequenceBody(acts: readonly ActParts[], shown: (p: ActParts, i: number) => { declaration?: string; json: string }): string {
+	const out: string[] = [];
+	let lastTry: number | undefined;
+	acts.forEach((p, i) => {
+		if (p.act.try !== lastTry) out.push(`Try ${p.act.try}:`);
+		lastTry = p.act.try;
+		const s = shown(p, i);
+		if (s.declaration !== undefined) out.push(s.declaration);
+		out.push(`${p.before}${s.json}${p.after}`);
+	});
+	return out.join('\n');
+}
+
+/** The declaration of a cut that kept a contiguous run of `shown` acts of `total`, from act `first` to act `last`. */
+export const sequenceCutDeclaration = (shown: number, total: number, first: number, last: number): string =>
+	`[CUT FOR THIS REVIEW: the step's sequence — the ${shown} acts from act ${first} to act ${last} of its ${total} are shown; the ${total - shown} others are removed.]`;
+
+/**
+ * `acts` within `room` UTF-16 units of body: whole if they fit, else each act's JSON cut to its share of what the host's words
+ * leave, its declaration counted — with the JSON each act shows (for the fence choosers) — or `undefined` where a cut act's
+ * share would hold no code point of it.
+ */
+function fitActs(acts: readonly ActParts[], room: number): { readonly body: string; readonly agent: readonly string[] } | undefined {
+	const whole = sequenceBody(acts, (p) => ({ json: p.json }));
+	if (whole.length <= room) return { body: whole, agent: acts.map((p) => p.json) };
+	const frame = sequenceBody(acts, () => ({ json: '' })).length;
+	let reserve = 0;
+	for (let round = 0; round <= acts.length + 1; round++) {
+		const shares = allocate(
+			acts.map((p) => p.json.length),
+			room - frame - reserve
+		);
+		const cut = acts.map((p, i) => shares[i]! < p.json.length);
+		// ⚠ Reserved at the WIDEST numbers each could state — every count at most the act's total — as every cut here is.
+		const needed = acts.reduce((n, p, i) => {
+			const total = codePoints(p.json);
+			return n + (cut[i] ? actCutDeclaration(p, total, total, total).length + 1 : 0);
+		}, 0);
+		if (needed > reserve) {
+			reserve = needed;
+			continue;
+		}
+		const shownJson = acts.map((p, i) => (cut[i] ? headOf(p.json, shares[i]!) : p.json));
+		if (shownJson.some((j) => j === '')) return undefined;
+		const body = sequenceBody(acts, (p, i) =>
+			cut[i]
+				? {
+						declaration: actCutDeclaration(
+							p,
+							codePoints(shownJson[i]!),
+							codePoints(p.json),
+							codePoints(p.json) - codePoints(shownJson[i]!)
+						),
+						json: shownJson[i]!
+					}
+				: { json: p.json }
+		);
+		return body.length <= room ? { body, agent: shownJson } : undefined;
+	}
+	return undefined;
+}
+
+/**
+ * ⭐ Package N — D10, D12 — THE SEQUENCE BLOCK within `limit`: its heading, its acts by try, the runs past the bound
+ * declared. ⚠ Over `limit` its acts' JSON is cut act by act (`fitActs`); where that cannot fit, ONE contiguous run of acts is
+ * kept, declared before them — ending at the last act in a finished work's review, and around the act under review in a
+ * command's, so that act and its neighbours are always shown. Returns the block and the agent text it shows (for the fence
+ * choosers), or `undefined` when not even the act under review fits with its heading.
+ */
+export function sequenceBlock(
+	framing: 'WORK_PRODUCT' | 'PROCESS_RESULT',
+	sequence: HostSequence,
+	limit: number
+): { readonly text: string; readonly agent: readonly string[] } | undefined {
+	const heading = sequenceHeading(framing, sequence.subjectOrdinal);
+	const dropped =
+		sequence.droppedRuns > 0
+			? `\n(${counted(sequence.droppedRuns, 'run', 'runs')} past the step's bound of ${sequence.recordedLimit} took numbers missing above: none is retained, and none is reviewed.)`
+			: '';
+	if (sequence.acts.length === 0) {
+		const none = `${heading}\n(none: the host completed no write and no run for the agent in this step)${dropped}`;
+		return none.length <= limit ? { text: none, agent: [] } : undefined;
+	}
+	const all = sequence.acts.map((act) => actParts(act, sequence.subjectOrdinal));
+	const whole = fitActs(all, limit - heading.length - 1 - dropped.length);
+	if (whole !== undefined) return { text: `${heading}\n${whole.body}${dropped}`, agent: whole.agent };
+	const anchor = Math.max(
+		0,
+		framing === 'PROCESS_RESULT' ? all.findIndex((p) => p.act.ordinal === sequence.subjectOrdinal) : all.length - 1
+	);
+	const last = all.at(-1)!.act.ordinal;
+	const widest = sequenceCutDeclaration(all.length, all.length, last, last).length;
+	const room = limit - heading.length - 1 - widest - 1 - dropped.length;
+	const fits = (from: number, to: number) => fitActs(all.slice(from, to), room) !== undefined;
+	if (!fits(anchor, anchor + 1)) return undefined;
+	let [from, to] = [anchor, anchor + 1];
+	for (let grew = true; grew; ) {
+		grew = false;
+		if (to < all.length && fits(from, to + 1)) [to, grew] = [to + 1, true];
+		if (from > 0 && fits(from - 1, to)) [from, grew] = [from - 1, true];
+	}
+	const shown = all.slice(from, to);
+	const kept = fitActs(shown, room)!;
+	const cut = sequenceCutDeclaration(shown.length, all.length, shown[0]!.act.ordinal, shown.at(-1)!.act.ordinal);
+	return { text: `${heading}\n${cut}\n${kept.body}${dropped}`, agent: kept.agent };
+}
+
+// ── ⭐⭐ Package N — D10 (`REG-F-522` remedy candidate 2) — THE FILES THE UNIT CHANGED, IN A WORK PRODUCT'S REVIEW ──────────
+//
+// The answer, each changed file's text and the step's sequence share the content's budget unit by unit, by the allocation
+// rule a process result's slices share theirs by (`allocate`): a unit that needs less than its share leaves the rest to the
+// others, and one over its share keeps its HEAD, the cut declared on its own line before its fence and counted in its
+// allowance (`excerptHead`; `REG-F-480`, `REG-F-483`, `REG-F-564`). ⚠ Files that cannot each be shown with room for a declared
+// cut are cut from the list, the last first, declared after the heading. Each path stands on a host line as JSON; each text
+// is the file's own, between fence lines.
+
+/** The heading of the files a work product's review is shown, after `afterTry`, or the line saying none changed. */
+export function deliverableHeading(deliverable: Deliverable): string {
+	return deliverable.files.length === 0
+		? `The unit changed no file in its workspace since its step began, as the host read it after try ${deliverable.afterTry}.`
+		: `The files the unit changed in its workspace since its step began, as the host read them after try ${deliverable.afterTry}. ` +
+				"Each path, as JSON, and what changed are the host's record; each file's text, between fence lines, is the file's own:";
+}
+
+/** The host line naming one changed file. */
+export function deliverableFileLine(file: DeliverableFile): string {
+	const path = jsonLine(file.path);
+	if (file.change === 'REMOVED') return `Removed ${path}: it is no longer in the workspace.`;
+	return `${file.change === 'ADDED' ? 'Added' : 'Changed'} ${path}:`;
+}
+
+/** The declaration of a cut of the changed files' LIST, keeping the first `shown` of `total`. */
+export const deliverableFilesCutDeclaration = (shown: number, total: number): string =>
+	`[CUT FOR THIS REVIEW: the changed files — the first ${shown} of the ${total} are shown; the last ${total - shown} are removed.]`;
+
+/** The finished work as the review lays it out, before a fence is chosen: the answer, each file's line and text, the sequence. */
+interface DeliverableLayout {
+	readonly answer: DeclaredExcerpt;
+	readonly heading: string;
+	readonly listCut?: string;
+	readonly files: readonly { readonly line: string; readonly text?: DeclaredExcerpt }[];
+	readonly sequence: { readonly text: string; readonly agent: readonly string[] };
+}
+
+/** The finished work, rendered with `fence`. */
+function renderDeliverable(fence: string, l: DeliverableLayout): string {
+	const files = l.files.map((f) => (f.text === undefined ? f.line : `${f.line}\n${quoted(fence, f.text)}`));
+	return [quoted(fence, l.answer), '', l.heading, ...(l.listCut ? [l.listCut] : []), ...files, '', l.sequence.text].join('\n');
+}
+
+/** What a head-only cut of `text` named `slice` reserves for its declaration: its widest form and its line feed. */
+function excerptReserve(slice: string, text: string): number {
+	const total = codePoints(text);
+	return headCutDeclaration(slice, total, total, total).length + 1;
+}
+
+/** One shown arrangement of the finished work within `budget`, or `undefined` when a unit's share is below its cut's floor. */
+function deliverableWithin(
+	answer: string,
+	deliverable: Deliverable,
+	files: readonly DeliverableFile[],
+	budget: number,
+	answerSlice: string
+): DeliverableLayout | undefined {
+	const heading = deliverableHeading(deliverable);
+	const frame = FENCE_LENGTH * 2 + 2;
+	const listCut = files.length < deliverable.files.length ? deliverableFilesCutDeclaration(files.length, deliverable.files.length) : undefined;
+	const texts = files.map((f) => (f.change === 'REMOVED' ? undefined : (f.content ?? '')));
+	const seqWhole = sequenceBlock('WORK_PRODUCT', deliverable.sequence, Number.MAX_SAFE_INTEGER)!;
+	// ⭑ The host's own lines: the answer's fence lines, the blank line and heading, the list's cut, each file's line (and,
+	// for a file with a text, its fence lines), and the blank line before the sequence.
+	const fixed =
+		frame + 2 + heading.length + (listCut ? listCut.length + 1 : 0) +
+		files.reduce((n, f, i) => n + 1 + deliverableFileLine(f).length + (texts[i] === undefined ? 0 : 1 + frame), 0) +
+		2;
+	const units = [answer, ...texts.flatMap((t) => (t === undefined ? [] : [t]))];
+	const names = [answerSlice, ...files.flatMap((f, i) => (texts[i] === undefined ? [] : [`the text of ${jsonLine(f.path)}`]))];
+	const rooms = allocate([...units.map((u) => u.length), seqWhole.text.length], budget - fixed);
+	// ⛔ A unit cut to a room its own declaration does not fit in is no declared cut: the caller cuts the list instead.
+	if (!units.every((u, k) => u.length <= rooms[k]! || rooms[k]! > excerptReserve(names[k]!, u))) return undefined;
+	const sequence = sequenceBlock('WORK_PRODUCT', deliverable.sequence, rooms[units.length]!);
+	if (sequence === undefined) return undefined;
+	const excerpts = units.map((u, k) => excerptHead(names[k]!, u, rooms[k]!));
+	let next = 1;
+	return {
+		answer: excerpts[0]!,
+		heading,
+		...(listCut ? { listCut } : {}),
+		files: files.map((f, i) => ({ line: deliverableFileLine(f), ...(texts[i] === undefined ? {} : { text: excerpts[next++]! }) })),
+		sequence
+	};
+}
+
+/**
+ * The finished work within `budget`: every unit whole if it fits, else cut unit by unit, else files cut from the list, the
+ * last first. ⚠ With no file shown and still no fit, the answer and the sequence alone are cut to the budget.
+ */
+function deliverableLayout(answer: string, deliverable: Deliverable, budget: number, answerSlice: string): DeliverableLayout {
+	for (let shown = deliverable.files.length; shown >= 0; shown -= 1) {
+		const laid = deliverableWithin(answer, deliverable, deliverable.files.slice(0, shown), budget, answerSlice);
+		if (laid !== undefined) return laid;
+	}
+	// ⛔ Unreachable at the content's floor (`CONTENT_MIN`) for any sequence the act-level cut can fit: kept total, declared.
+	const heading = deliverableHeading(deliverable);
+	return {
+		answer: excerptHead(answerSlice, answer, Math.max(0, Math.floor(budget / 2) - FENCE_LENGTH * 2 - 2)),
+		heading,
+		listCut: deliverableFilesCutDeclaration(0, deliverable.files.length),
+		files: [],
+		sequence: sequenceBlock('WORK_PRODUCT', deliverable.sequence, Math.floor(budget / 2) - heading.length - 4) ?? { text: '', agent: [] }
+	};
+}
 
 /**
  * The statement recorded when a `PROCESS_RESULT` content is longer than the budget this prompt leaves it.
@@ -956,10 +1319,19 @@ function promptPlan(input: ReasoningReviewInput) {
 	const narration = input.narration ? excerptHead('the narration', input.narration, NARRATION_MAX) : undefined;
 	const userIntent = excerptHead(framed.intentSlice, input.prompt, USER_INTENT_MAX);
 	const prefenced = input.framing === 'PROCESS_RESULT';
+	// ⭐⭐ Package N — D10 — in a finished work's review, the content area is the answer, the files the unit changed and the
+	// step's sequence, sharing the content's budget unit by unit (`deliverableLayout`), so its budget is measured over the
+	// whole area.
+	const deliverable = input.framing === 'WORK_PRODUCT' ? input.deliverable : undefined;
+	// ⭐⭐ Package N — D12 — and in a command's review, the step's sequence on host lines after the view, planned below once the
+	// view's room without it is known: it takes no more than half of that room, and the view the rest (`sequenceRoom`).
+	let commandSequence: { readonly text: string; readonly agent: readonly string[] } | undefined;
 	// ⭐ `E12F` F4 — a declared review of a unit's own PURPOSE with no account and no narration has no one producing agent.
 	const noSingleProducer = withNoSingleProducer(input);
 	// ⭐ P5 package B (F1) — each unit below that holds no completion, on a host line of its own after the work; none, no line.
 	const withoutWork = input.framing === 'DECLARED_POLICY' ? (input.declaredUnitsWithoutWork ?? []) : [];
+	// ⭐ Package N — D11 — each unit whose model's work completed with no deliverable view on the record, on a host line of its own.
+	const withoutView = input.framing === 'DECLARED_POLICY' ? (input.declaredUnitsWithoutDeliverable ?? []) : [];
 	const assemble = (fence: string, content: string): string =>
 		[
 			'You are an independent assurance reviewer performing a REASONING REVIEW of an AI-produced professional artifact.',
@@ -974,7 +1346,10 @@ function promptPlan(input: ReasoningReviewInput) {
 			framed.subject,
 			'',
 			content,
+			// ⭐ Package N — D12 — a command's place among the step's writes and runs, the host's lines (`sequenceBlock`).
+			commandSequence ? `\n${commandSequence.text}` : '',
 			withoutWork.length > 0 ? `\n${withoutWork.map(declaredUnitWithoutWorkLine).join('\n')}` : '',
+			withoutView.length > 0 ? `\n${withoutView.map(declaredUnitWithoutDeliverableLine).join('\n')}` : '',
 			// ⭐ `PQ-1` (`REG-F-481`): the host's own computation, on its own line — never inside the fenced content.
 			subjectHashLine(input.candidateSubjectHash),
 			// ⭐ `R15` — THE HOST'S OWN OBSERVATION, AND ONLY FOR THE FRAMING IT ANSWERS A QUESTION IN. §22.1 makes
@@ -1052,12 +1427,19 @@ function promptPlan(input: ReasoningReviewInput) {
 	// are scaffolding, and the content's limit holds its cut declaration and its bytes.
 	const SENTINEL = '\u0000';
 	const measuringFence = fenceCandidate(0);
-	const scaffoldingLen =
-		assemble(measuringFence, prefenced ? SENTINEL : fenced(measuringFence, SENTINEL)).length - SENTINEL.length;
-	const contentBudget = Math.max(
-		CONTENT_MIN,
-		Math.min(CONTENT_MAX, PROMPT_BUDGET - scaffoldingLen)
-	);
+	// ⭐ Package N — D10: a finished work's content area is laid out whole by `deliverableLayout`, its fences included, as a
+	// process result's view is by its builder — so its budget is measured with the sentinel alone.
+	const measure = (): number =>
+		assemble(measuringFence, prefenced || deliverable ? SENTINEL : fenced(measuringFence, SENTINEL)).length -
+		SENTINEL.length;
+	let contentBudget = Math.max(CONTENT_MIN, Math.min(CONTENT_MAX, PROMPT_BUDGET - measure()));
+	// ⭐⭐ Package N — D12 — A COMMAND'S SEQUENCE COMES OUT OF ITS VIEW'S ROOM, never out of a member of the budget: planned
+	// within its share of the room the prompt leaves the view without it (`sequenceRoom`), then the view's budget is what is
+	// left. ⚠ So `processResultContentBudget` and `processResultUntrustedSlices` — the builder's two seams — count it.
+	if (input.framing === 'PROCESS_RESULT' && input.hostSequence) {
+		commandSequence = sequenceBlock('PROCESS_RESULT', input.hostSequence, sequenceRoom(contentBudget));
+		if (commandSequence) contentBudget -= commandSequence.text.length + 1;
+	}
 	/** The untrusted slices this prompt carries OTHER than its content, as the prompt carries them — each field of the
 	 *  account its own slice, as it is fenced. */
 	const untrusted: readonly (DeclaredExcerpt | undefined)[] = [
@@ -1069,13 +1451,17 @@ function promptPlan(input: ReasoningReviewInput) {
 	return {
 		framed,
 		prefenced,
+		deliverable,
 		assemble,
 		contentBudget,
 		untrustedBytes: [
 			...untrusted.flatMap((e) => (e ? [e.bytes] : [])),
 			...(prefenced ? untrustedCallNames(input.observedToolCalls) : []),
+			// ⭐ Package N — D12 — each act's path or command a command's sequence shows, JSON on its host line.
+			...(commandSequence?.agent ?? []),
 			// ⭐ P5 package B (F1) — a unit's title on the host's line, JSON-encoded as it is written there.
 			...withoutWork.map((u) => jsonLine(u.unit)),
+			...withoutView.map((u) => jsonLine(u)),
 			// ⭐ P5 package B's check (finding 3) — and the declarations of a cut its builder made, on host lines before the
 			// work: each names a unit's title, JSON-encoded, and a unit with no work product whose commands are all cut has its
 			// title nowhere else in the prompt.
@@ -1145,8 +1531,26 @@ export function processResultUntrustedSlices(
 	return promptPlan({ ...input, content: '' }).untrustedBytes;
 }
 
+/**
+ * ⭐⭐ Package N — D10 — A FINISHED WORK'S PROMPT: the answer and each changed file's text, cut unit by unit within the content's
+ * budget, each cut declared before its bytes (`deliverableLayout`); the fence chosen over every byte they keep and every path
+ * their host lines carry, beside the prompt's other untrusted slices. ⛔ Fails closed, as every framing does, when no fence can.
+ */
+function deliverablePrompt(input: ReasoningReviewInput, plan: ReturnType<typeof promptPlan>, deliverable: Deliverable): string {
+	const layout = deliverableLayout(input.content, deliverable, plan.contentBudget, plan.framed.subjectSlice);
+	const fence = chooseFence([
+		...plan.untrustedBytes,
+		layout.answer.bytes,
+		...layout.files.flatMap((f) => [f.line, ...(f.text ? [f.text.bytes] : [])]),
+		...layout.sequence.agent
+	]);
+	if (fence === undefined) throw new Error(NO_FENCE_STATEMENT);
+	return plan.assemble(fence, renderDeliverable(fence, layout));
+}
+
 function judgePrompt(input: ReasoningReviewInput): string {
 	const plan = promptPlan(input);
+	if (plan.deliverable) return deliverablePrompt(input, plan, plan.deliverable);
 	// A graph or a work product: its content is UNTRUSTED, cut to the budget with its cut declared, then fenced.
 	// A process result: its content is the builder's REVIEW view, already fenced — read whole by the chooser, never cut.
 	// ⭐ P5 package B (F2) — a declared review's work its builder cut unit by unit: shown as cut, its declaration the
