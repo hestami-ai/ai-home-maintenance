@@ -387,7 +387,7 @@ describe('JAN-EXECSESS — a repair is a TURN on a HELD session, not a re-render
 				dispose: () => undefined,
 				// ⭐ PHASE 5 — this fake ran no commands, and for a fake that is a MEASUREMENT rather than
 				// a refusal to answer: no `ProcessRunner` was ever handed to anything here.
-				processRuns: () => ({ runs: [], observedCount: 0, recordedLimit: 32 }),
+				processRuns: () => ({ runs: [], observedCount: 0, recordedLimit: 32, writes: [] }),
 				lastTurnObservation: () => UNOBSERVED,
 				turn: async (text: string) => {
 					turns.push(text);
@@ -506,7 +506,7 @@ describe('⭐ P7-6R RD8 — a re-run’s first turn is the instruction AND the c
 			session: {
 				retainsHistory: true,
 				dispose: () => undefined,
-				processRuns: () => ({ runs: [], observedCount: 0, recordedLimit: 32 }),
+				processRuns: () => ({ runs: [], observedCount: 0, recordedLimit: 32, writes: [] }),
 				lastTurnObservation: () => UNOBSERVED,
 				turn: async (text: string) => {
 					turns.push(text);
@@ -1151,7 +1151,7 @@ describe('JAN-EXEC P0 — the exchange record must not disclose an absence the S
 				// on a surface this adapter minted and can name.
 				// ⭐ PHASE 5 — this fake ran no commands, and for a fake that is a MEASUREMENT rather than
 				// a refusal to answer: no `ProcessRunner` was ever handed to anything here.
-				processRuns: () => ({ runs: [], observedCount: 0, recordedLimit: 32 }),
+				processRuns: () => ({ runs: [], observedCount: 0, recordedLimit: 32, writes: [] }),
 				lastTurnObservation: () => ({
 					canObserve: true as const,
 					mintedToolNames: ['write_file', 'run_command'],
@@ -1191,7 +1191,7 @@ describe('JAN-EXEC P0 — the exchange record must not disclose an absence the S
 				dispose: () => undefined,
 				// ⭐ PHASE 5 — this fake ran no commands, and for a fake that is a MEASUREMENT rather than
 				// a refusal to answer: no `ProcessRunner` was ever handed to anything here.
-				processRuns: () => ({ runs: [], observedCount: 0, recordedLimit: 32 }),
+				processRuns: () => ({ runs: [], observedCount: 0, recordedLimit: 32, writes: [] }),
 				lastTurnObservation: () => ({
 					canObserve: true as const,
 					mintedToolNames: ['write_file'],

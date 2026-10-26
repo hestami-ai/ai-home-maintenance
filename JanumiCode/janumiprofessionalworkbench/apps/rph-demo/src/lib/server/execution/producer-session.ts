@@ -221,7 +221,8 @@ export function oneShotSession(
 		// not inconsistency: a tool CALL would be dispatched by a session this adapter does not have and could
 		// not watch, while a process RUN would go through this host's own port — and this adapter never hands
 		// that port to anyone. Zero here is what happened, not what could not be seen.
-		processRuns: () => ({ runs: [], observedCount: 0, recordedLimit: OBSERVED_PROCESS_RUN_LIMIT }),
+		// ⭐ Package L — D8: and it wrote nothing, which is a measurement too (`ProcessRunObservation.writes`).
+		processRuns: () => ({ runs: [], observedCount: 0, recordedLimit: OBSERVED_PROCESS_RUN_LIMIT, writes: [] }),
 		dispose: () => undefined,
 		retainsHistory: false
 	};

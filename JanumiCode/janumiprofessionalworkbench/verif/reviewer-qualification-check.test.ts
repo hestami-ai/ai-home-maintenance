@@ -79,6 +79,10 @@ import {
 	type CheckReport
 } from '../scripts/reviewer-qual/check-core.js';
 import { OutputLimitReached } from '../apps/rph-demo/src/lib/server/tools/output-limit.js';
+import {
+	CRITERION_REPAIR_INSTRUCTION,
+	MISSING_CRITERION_REPAIR_OPENING
+} from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
 import { main, REGISTER_FILE } from '../scripts/reviewer-qual/check.js';
 import { DECLARED_ORACLES_PROPOSED } from '../scripts/reviewer-qual/oracles-v5.js';
 import { reviewerFingerprintOf, sha256 } from '../scripts/reviewer-qual/digest.js';
@@ -329,6 +333,21 @@ afterAll(() => {
 	vi.unstubAllEnvs();
 });
 
+/**
+ * ⭐ Package L — D13 (`REG-D-135` (3)) — the case a prompt belongs to: by its hash, initial or repair, or — a criterion
+ * repair, which ends with I5's line or D13's — by the review prompt it extends. ⛔ D13's line names the declared criteria the
+ * reply before it left without a row, so its prompt is no case's one hash, and a stand-in that knew cases by hash alone
+ * refused it as "a prompt no case sends".
+ */
+const caseOfPrompt = (prompt: string): string | undefined => {
+	const byHash = CASE_OF.get(sha256(prompt));
+	if (byHash !== undefined) return byHash;
+	const at = prompt.lastIndexOf('\n\n');
+	const line = prompt.slice(at + 2);
+	if (at < 0 || (line !== CRITERION_REPAIR_INSTRUCTION && !line.startsWith(MISSING_CRITERION_REPAIR_OPENING))) return undefined;
+	return CASE_OF.get(sha256(prompt.slice(0, at)));
+};
+
 /** A reply faulting exactly `faulted`, as a reviewer would write it. */
 const judgement = (
 	faulted: readonly string[],
@@ -382,7 +401,7 @@ async function recorded(o: {
 			name: o.candidate?.transport ?? 'agy',
 			identify: async () => o.candidate ?? AGY,
 			call: async (prompt) => {
-				const caseId = CASE_OF.get(sha256(prompt));
+				const caseId = caseOfPrompt(prompt);
 				if (!caseId) throw new Error('a prompt no case sends');
 				const k = n++;
 				const answer = (o.reply ?? asOracle)(caseId, k);
@@ -451,6 +470,45 @@ describe('JAN-CRITREAD J2-3 — the check, GREEN on a covered, reproduced, fully
 	it('⭐ CONTROL — a run under today’s fingerprint, answering every case as its oracle expects, is green', async () => {
 		const r = await check([file(await recorded({ runId: 'qr-good-1' }))]);
 		expect(r.problems).toEqual([]);
+	});
+});
+
+// ⭐⭐ `JAN-EXEC` Phase 7, package L — D13 (`REG-D-135` (3); design D13): a reply that faults nothing and leaves a declared
+// criterion without a row draws ONE criterion repair whose line names that criterion — so its prompt depends on the reply before
+// it, and no one per-case hash is today's. ⛔ Held to I5's hash alone, such an evaluation under today's fingerprint read as a
+// prompt that moved though the fingerprint did not (limb 2), and its case as unmeasured (limb 1): the paid re-qualification would
+// be refused for the reviewer's own repair.
+describe('⭐⭐ package L — D13: a run whose evaluation drew the missing-criterion repair is reproduced, its repair held to the prompt today’s reviewer sends after the reply it followed', () => {
+	/** `caseId`'s oracle reply with its LAST criterion's row filed under an id the policy does not declare (run-12's shape). */
+	const slipped = (caseId: string): string => {
+		const j = JSON.parse(asOracle(caseId)) as { findings: { criterionId: string }[] };
+		j.findings.at(-1)!.criterionId = `${j.findings.at(-1)!.criterionId}-scope`;
+		return JSON.stringify(j);
+	};
+	const sliceOf = async (runId: string) => {
+		let cleanCalls = 0;
+		const lines = await recorded({ runId, reply: (id) => (id === 'G-CLEAN' && cleanCalls++ === 0 ? slipped(id) : asOracle(id)) });
+		const calls = lines.filter((l): l is CallLine => l.kind === 'CALL' && l.caseId === 'G-CLEAN');
+		expect(calls.map((c) => c.role), 'the arrangement: G-CLEAN drew the missing-criterion repair').toEqual(['initial', 'criterion-repair']);
+		return lines;
+	};
+
+	it('⭐ GREEN — covered and reproduced: the repair’s recorded prompt is the one today’s reviewer sends after the recorded first reply', async () => {
+		expect((await check([file(await sliceOf('qr-d13-1'))])).problems).toEqual([]);
+	});
+
+	it('⛔ its hash tampered, the run is a non-reproduction — the rule holds the prompt, it does not wave a criterion repair through', async () => {
+		const lines = tamper(await sliceOf('qr-d13-2'), 'G-CLEAN', (c) => (c.role === 'criterion-repair' ? { ...c, promptSha256: HEX('d') } : c));
+		expect(limb(await check([file(lines)]), 'REPRODUCTION')).toContain(
+			'G-CLEAN#1 criterion-repair — the prompt it recorded is not the one today’s reviewer sends'
+		);
+	});
+
+	it('⭑ CONTROL — without today’s rule (a spread copy of the fingerprint carries none), the same run reads as a prompt that moved: the rule is what admits it', async () => {
+		const lines = await sliceOf('qr-d13-3');
+		expect(limb(await check([file(lines)], { current: { ...FP } }), 'REPRODUCTION')).toContain(
+			'G-CLEAN#1 criterion-repair — the prompt it recorded is not the one today’s reviewer sends'
+		);
 	});
 });
 

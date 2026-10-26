@@ -70,6 +70,7 @@ import {
 	recordAssuranceOffered,
 	recordedReviewerCalls,
 	refusalOf,
+	refusedReviewsOf,
 	rerunDeclared,
 	reviewerReadiness,
 	reviewerUnderTest,
@@ -1204,15 +1205,110 @@ describe('⭐ the store, as the run reads it after every act (REG-F-540)', () =>
  * phase's 140, package Q, F5; `REG-D-123` Q26~~ ~~⭐ at today's 900, once 756 are: 900, less the 4 held back and the
  * phase's 140, the review in parts, package C, B6; `REG-D-126` Q32~~ ⭐ at today's 1000, once 856 are: 1000, less the 4 held
  * back and the phase's 140, the review in parts, package I, B8b; `REG-D-131` Q37).
- * ⭐ `REG-D-114` (14), as amended 2026-10-16 — WHAT THE ONE RULE COUNTS BEFORE A PHASE, BEFORE THE RULE'S RE-RUN OF ITS WORK OR
+ * ~~⭐ `REG-D-114` (14), as amended 2026-10-16 — WHAT THE ONE RULE COUNTS BEFORE A PHASE, BEFORE THE RULE'S RE-RUN OF ITS WORK OR
  * OF ITS REVIEW, AND BEFORE A MODEL ROOT'S PRESS: ONE TRY'S RESERVE, a review of up to `reviewerCallsPerTry` calls — 4, D8's
- * own rule: the lane checks the limit again before every later press. ⛔ Restated, never read from the lane, so a figure the
- * lane moved fails here.
+ * own rule: the lane checks the limit again before every later press.~~ ⛔ SUPERSEDED BY THE SPONSOR'S RULING (`REG-D-135` (4),
+ * Q44; design D16): a press's own spend carried the total past the limit, for nothing checked it during the press.
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L — D16 — WHAT THE ONE RULE COUNTS BEFORE EACH PRESS: THE PRESS'S WHOLE WORST CASE. Before a
+ * phase's Begin & Execute, the rule's re-run of its work and a MODEL root's press, (3 tries + 32 retained command runs) × 6
+ * calls = 210; before the rule's re-run of a stopped phase's review, its refused reviews × 6 — and where the store names none
+ * (these hands' store holds no review), every review the stopped attempt holds, (1 work product + 32 command runs) × 6 = 198.
+ * ⛔ Restated, never read from the lane, so a figure the lane moved fails here.
  */
-const TRY_RESERVE = LANE_BUDGET.reviewerCallsPerTry;
-/** ⭐ `REG-D-114` (14), as amended — what a check says it counted ahead of its act (`LimitCheck.counted`), restated. */
-const COUNTED_TRY = 'one try’s reserve';
+const WHOLE_PRESS = (3 + 32) * 6;
+/** ⭐ D16 — a re-run of a stopped phase's review whose refused reviews the store cannot name: the attempt's every review. */
+const REREVIEW_UNREAD = (1 + 32) * 6;
+/** ⭐ D16 — what a check says it counted ahead of its act (`LimitCheck.counted`), restated. ~~'one try’s reserve'~~ */
+const COUNTED_PRESS = 'its whole press’s worst case, (3 tries + 32 command runs) × 6 calls';
+const COUNTED_REREVIEW_UNREAD =
+	'its refused reviews’ worst case — the store names none, so every review the attempt holds, (1 work product + 32 command runs) × 6 calls';
 const COUNTED_SIGN_OFF = 'its declared reviews’ worst case';
+
+// ⭐⭐ `JAN-EXEC` Phase 7, package L — D16 (`REG-D-135` (4); design D16): before the rule's re-run of a stopped phase's REVIEW the
+// lane counts the refused reviews it re-runs × 6 — the server re-runs only those (`rerunReview`, `stoppedUnitOf`'s refusals):
+// the stopped attempt's work product and each of its command evidence whose floor is not SATISFIED. Read from the dump as the
+// server reads the store; where it names no stopped attempt, NONE — the caller then counts every review the attempt can hold.
+describe('⭐⭐ package L — D16: the refused reviews a re-run of a stopped phase’s review re-runs, read from the store', () => {
+	const FLOOR = ['floor.schema-invariant', 'floor.identity-provenance', 'floor.reasoning-review'];
+	/** The three floor policies' assessments over `subject`, every one SATISFIED but `refusedBy`'s, at `at`. */
+	const floorOver = (subject: string, at: string, refusedBy?: string) =>
+		FLOOR.map((policy, i) => ({
+			id: `asmt_${subject}_${i}_${at}`,
+			state: {
+				subjectObjectIds: [subject],
+				assurancePolicyId: policy,
+				assessmentState: policy === refusedBy ? 'INCONCLUSIVE' : 'SATISFIED',
+				updatedAt: at
+			}
+		}));
+	/** A unit whose plan's step waits on attempt `step_1#2`, an earlier attempt's work product beside it. */
+	const stopped = (stepType = 'MODEL_GENERATION', over: { assessments?: unknown[] } = {}) =>
+		({
+			executionPlans: [
+				{
+					id: 'pln_1',
+					state: {
+						workUnitId: 'pwu_r',
+						status: 'ACTIVE',
+						steps: [
+							{
+								id: 'step_1',
+								stepType,
+								stepState: 'WAITING',
+								inputBindings: stepType === 'ASSURANCE_INVOCATION' ? [{ artifactId: 'art_2', required: true }] : []
+							}
+						]
+					}
+				}
+			],
+			artifacts: [
+				{ id: 'art_1', state: { producingExecutionAttemptId: 'step_1#1' } },
+				{ id: 'art_2', state: { producingExecutionAttemptId: 'step_1#2' } }
+			],
+			evidence: [
+				{ id: 'evd_old', state: { contentReference: { producingExecutionAttemptId: 'step_1#1' } } },
+				{ id: 'evd_a', state: { contentReference: { producingExecutionAttemptId: 'step_1#2' } } },
+				{ id: 'evd_b', state: { contentReference: { producingExecutionAttemptId: 'step_1#2' } } }
+			],
+			assessments: over.assessments ?? [
+				...floorOver('art_1', '2026-10-25T10:00:00.000Z', 'floor.reasoning-review'),
+				...floorOver('evd_old', '2026-10-25T10:00:00.000Z', 'floor.reasoning-review'),
+				// The stopped attempt: its work product refused, one command clean, one refused and then — later — still refused.
+				...floorOver('art_2', '2026-10-25T11:00:00.000Z', 'floor.reasoning-review'),
+				...floorOver('evd_a', '2026-10-25T11:00:00.000Z'),
+				...floorOver('evd_b', '2026-10-25T11:00:00.000Z'),
+				...floorOver('evd_b', '2026-10-25T11:30:00.000Z', 'floor.reasoning-review')
+			]
+		}) as unknown as EngineSnapshot;
+
+	it('⭐ the stopped attempt’s work product and command evidence whose LATEST floor is not SATISFIED — never an earlier attempt’s, never a satisfied one', () => {
+		// art_2 (refused) and evd_b (its latest assessment refused); evd_a is SATISFIED; art_1 and evd_old are attempt 1's.
+		expect(refusedReviewsOf(stopped(), 'pwu_r')).toBe(2);
+	});
+
+	it('⭐ a re-review’s waiting step names its work product as its input: the same attempt, the same refusals', () => {
+		expect(refusedReviewsOf(stopped('ASSURANCE_INVOCATION'), 'pwu_r')).toBe(2);
+	});
+
+	it('⛔ a floor policy with NO assessment leaves the subject refused: MISSING is not SATISFIED', () => {
+		const partial = stopped('MODEL_GENERATION', {
+			assessments: [
+				...floorOver('art_2', '2026-10-25T11:00:00.000Z'),
+				...floorOver('evd_a', '2026-10-25T11:00:00.000Z'),
+				...floorOver('evd_b', '2026-10-25T11:00:00.000Z').filter((a) => a.state.assurancePolicyId !== 'floor.identity-provenance')
+			]
+		});
+		expect(refusedReviewsOf(partial, 'pwu_r')).toBe(1);
+	});
+
+	it('⛔ no stopped attempt in the store — no waiting step, or no work product of it — and it names NONE (undefined), never zero', () => {
+		const none = { ...stopped(), executionPlans: [] } as unknown as EngineSnapshot;
+		expect(refusedReviewsOf(none, 'pwu_r')).toBeUndefined();
+		const noWork = { ...stopped(), artifacts: [] } as unknown as EngineSnapshot;
+		expect(refusedReviewsOf(noWork, 'pwu_r')).toBeUndefined();
+		expect(refusedReviewsOf(stopped(), 'pwu_other')).toBeUndefined();
+	});
+});
 
 describe('⭐ D8 — the limit, and D5 — what the run records of each unit', () => {
 	// ⭐ P7-6R — the limit is 200 since `REG-D-105` (1), which amends `REG-D-102` (4)'s 150.
@@ -1226,21 +1322,22 @@ describe('⭐ D8 — the limit, and D5 — what the run records of each unit', (
 	// the act counts its worst case, a model unit's, so a phase starts only with that many calls left under the limit.~~
 	// ⭐ `REG-D-114` (14), as amended 2026-10-16: before a phase the act counts one try's reserve, so a phase starts while one
 	// try's review still fits — and the record says what it counted.
-	it('⛔ ONE RULE — prior + recorded + the reserve + what the act counts must total AT MOST the sponsor’s limit: a phase starts with one try’s reserve reaching it, not past it', () => {
+	// ⭐ Package L — D16 (`REG-D-135` (4)): ~~a phase starts with one try’s reserve reaching it~~ — with its WHOLE PRESS reaching it.
+	it('⛔ ONE RULE — prior + recorded + the reserve + what the act counts must total AT MOST the sponsor’s limit: a phase starts with its whole press reaching it, not past it', () => {
 		const L = PHASE7_PAID_LIMIT;
 		expect(PHASE7_NEGATIVE_CONTROL_RESERVE).toBe(4);
-		expect(limitCheck(L - 4 - TRY_RESERVE - 45, 45, TRY_RESERVE, COUNTED_TRY)).toEqual({
-			prior: L - 4 - TRY_RESERVE - 45,
+		expect(limitCheck(L - 4 - WHOLE_PRESS - 45, 45, WHOLE_PRESS, COUNTED_PRESS)).toEqual({
+			prior: L - 4 - WHOLE_PRESS - 45,
 			recorded: 45,
 			reserve: 4,
-			ahead: TRY_RESERVE,
-			counted: COUNTED_TRY,
+			ahead: WHOLE_PRESS,
+			counted: COUNTED_PRESS,
 			total: L,
 			limit: L,
 			allowed: true
 		});
-		expect(limitCheck(L - 4 - TRY_RESERVE - 45, 46, TRY_RESERVE, COUNTED_TRY).allowed).toBe(false);
-		expect(limitCheck(0, L - 4 - TRY_RESERVE + 1, TRY_RESERVE, COUNTED_TRY).allowed).toBe(false);
+		expect(limitCheck(L - 4 - WHOLE_PRESS - 45, 46, WHOLE_PRESS, COUNTED_PRESS).allowed).toBe(false);
+		expect(limitCheck(0, L - 4 - WHOLE_PRESS + 1, WHOLE_PRESS, COUNTED_PRESS).allowed).toBe(false);
 		// ⭑ The rule is the same for every act, whatever it counts: at the limit let through, one past it held back.
 		expect([limitCheck(L - 20, 0, 16, COUNTED_SIGN_OFF).allowed, limitCheck(L - 20, 1, 16, COUNTED_SIGN_OFF).allowed, limitCheck(L - 4, 0, 0, 'none: it runs no model').allowed]).toEqual([
 			true,
@@ -1368,6 +1465,13 @@ interface Script {
 	>;
 	/** The model exchanges the store holds besides reviews: a dry run's must be none. */
 	readonly executorExchanges?: number;
+	/**
+	 * ⭐ Package L — D16 (`REG-D-135` (4)) — the units, by slug, whose store NAMES their stopped attempt's refused reviews, and how
+	 * many: the unit's last plan ACTIVE with its step's id and type, the attempt's work product and `n − 1` command evidence, and
+	 * each one's floor recorded INCONCLUSIVE (`refusedReviewsOf` reads them as the server does). A unit not named holds none, as
+	 * these hands' store always did — so the lane counts every review the attempt could hold.
+	 */
+	readonly refusedReviews?: Readonly<Record<string, number>>;
 	/** The unit titles the setup reads: the five, unless said. */
 	readonly titles?: readonly string[];
 	/** The read, counted from 1, that throws as a server gone would. */
@@ -1407,6 +1511,36 @@ interface Script {
 	>;
 }
 
+/**
+ * ⭐ Package L — D16 — the store a named unit's stopped attempt leaves (`Script.refusedReviews`): attempt `step_pwu_<slug>_1#1`'s
+ * work product, `n − 1` command evidence, and each one's three floor policies recorded, the review INCONCLUSIVE — the refusals
+ * the server's `rerunReview` re-runs (`stoppedUnitOf`).
+ */
+function refusedStore(named: Readonly<Record<string, number>>) {
+	const artifacts: ObjectRowLike[] = [];
+	const evidence: ObjectRowLike[] = [];
+	const assessments: ObjectRowLike[] = [];
+	for (const [slug, n] of Object.entries(named)) {
+		const attempt = `step_pwu_${slug}_1#1`;
+		const subjects = [`art_${slug}`, ...Array.from({ length: n - 1 }, (_, k) => `evd_${slug}_${k + 1}`)];
+		artifacts.push({ id: subjects[0]!, state: { producingExecutionAttemptId: attempt } });
+		for (const id of subjects.slice(1)) evidence.push({ id, state: { contentReference: { producingExecutionAttemptId: attempt } } });
+		for (const subject of subjects)
+			for (const policy of ['floor.schema-invariant', 'floor.identity-provenance', 'floor.reasoning-review'])
+				assessments.push({
+					id: `asmt_${subject}_${policy}`,
+					state: {
+						subjectObjectIds: [subject],
+						assurancePolicyId: policy,
+						assessmentState: policy === 'floor.reasoning-review' ? 'INCONCLUSIVE' : 'SATISFIED',
+						updatedAt: '2026-10-25T11:00:00.000Z'
+					}
+				});
+	}
+	return { artifacts, evidence, assessments };
+}
+type ObjectRowLike = { readonly id: string; readonly state: Record<string, unknown> };
+
 /** A run folder of its own, a store made here, and the hands the run uses, each call logged in order. */
 function laneOf(script: Script) {
 	const lane = openLane(folder('lane'));
@@ -1442,14 +1576,25 @@ function laneOf(script: Script) {
 			executionPlans: [...store].flatMap(([id, s]) =>
 				s.planStepState === null
 					? []
-					: Array.from({ length: plans.get(id) ?? 1 }, (_, i) => ({
-							id: i === 0 ? `pln_${id}` : `pln_${id}_${i + 1}`,
-							// A superseded plan's step was cancelled with it; the last plan's is the unit's.
-							state: {
-								workUnitId: id,
-								steps: [{ stepState: i === (plans.get(id) ?? 1) - 1 ? s.planStepState : 'CANCELLED' }]
-							}
-						}))
+					: Array.from({ length: plans.get(id) ?? 1 }, (_, i) => {
+							const last = i === (plans.get(id) ?? 1) - 1;
+							// ⭐ D16 — a unit whose store names its refused reviews: its plans as the server's store holds them.
+							const named = script.refusedReviews?.[id.slice('pwu_'.length)] !== undefined;
+							return {
+								id: i === 0 ? `pln_${id}` : `pln_${id}_${i + 1}`,
+								// A superseded plan's step was cancelled with it; the last plan's is the unit's.
+								state: {
+									workUnitId: id,
+									...(named ? { status: last ? 'ACTIVE' : 'SUPERSEDED' } : {}),
+									steps: [
+										{
+											stepState: last ? s.planStepState : 'CANCELLED',
+											...(named ? { id: `step_${id}_${i + 1}`, stepType: 'MODEL_GENERATION' } : {})
+										}
+									]
+								}
+							};
+						})
 			),
 			modelExchanges: [
 				...Array.from({ length: reviewerCallCount }, (_, i) => ({
@@ -1461,8 +1606,8 @@ function laneOf(script: Script) {
 					state: { plane: 'EXECUTION' }
 				}))
 			],
-			evidence: [],
-			artifacts: []
+			// ⭐ D16 — each named unit's stopped attempt: its work product, its command evidence, and their floors, refused.
+			...refusedStore(script.refusedReviews ?? {})
 		}) as unknown as EngineSnapshot;
 	const signOffOf = (unit: RunUnit) => script.signOffs?.[unit.slug] ?? { ra: null };
 	const hands: LaneHands = {
@@ -1618,14 +1763,14 @@ const GREEN = {
 
 /**
  * ⭐ R3-B's fix round, F1 — A PAID RUN THAT REACHES ITS SIGN-OFFS WITH `spent` CALLS, the prior's and the recorded together.
- * Each phase counts ~~its worst case (`UNIT_WORST`)~~ ⭐ one try's reserve (`TRY_RESERVE`; `REG-D-114` (14), as amended
- * 2026-10-16) before its press, so a prior near the limit stops the FIRST phase: the run starts from `spent`, or — past the
+ * Each phase counts ~~its worst case (`UNIT_WORST`)~~ ~~⭐ one try's reserve (`TRY_RESERVE`; `REG-D-114` (14), as amended
+ * 2026-10-16)~~ ⭐ its whole press's worst case (`WHOLE_PRESS`; package L, D16; `REG-D-135` (4)) before its press, so a prior near the limit stops the FIRST phase: the run starts from `spent`, or — past the
  * prior that lets each phase through exactly at the limit — from that prior, every phase recording nothing but the LAST,
  * which records the rest: no phase's check comes after it. So each sign-off reads the totals it read when the prior alone
  * was `spent`, the recorded calls in place of part of it.
  */
 function spentBySignOff(spent: number) {
-	const prior = Math.min(spent, PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - TRY_RESERVE);
+	const prior = Math.min(spent, PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - WHOLE_PRESS);
 	return {
 		prior,
 		recorded: spent - prior,
@@ -1850,8 +1995,8 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		];
 		expect(requirements.signOff, 'each act’s state is not the store’s, read after it').toEqual({
 			offered: true,
-			// ⭐ `E12F` F2 — the limit read before it: 10 before, 10 recorded, 4 held back, its own 2 × 4 counted.
-			limitCheck: { prior: 10, recorded: 10, reserve: 4, ahead: 8, counted: COUNTED_SIGN_OFF, total: 32, limit: PHASE7_PAID_LIMIT, allowed: true },
+			// ⭐ `E12F` F2 — the limit read before it: 10 before, 10 recorded, 4 held back, its own ~~2 × 4~~ 2 × 6 counted (⭐ Package L — D13 (`REG-D-135` (3)): each declared review up to SIX calls (`LANE_BUDGET.reviewerCallsPerTry`), so a sign-off counts its declared policies × 6).
+			limitCheck: { prior: 10, recorded: 10, reserve: 4, ahead: 12, counted: COUNTED_SIGN_OFF, total: 36, limit: PHASE7_PAID_LIMIT, allowed: true },
 			recordAssurance: actAnswered('success', ASSURED),
 			rerunDeclared: null,
 			rerunLimitCheck: null,
@@ -1861,7 +2006,8 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		});
 		expect(implementation.signOff).toEqual({
 			offered: true,
-			limitCheck: { prior: 10, recorded: 10, reserve: 4, ahead: 12, counted: COUNTED_SIGN_OFF, total: 36, limit: PHASE7_PAID_LIMIT, allowed: true },
+			// ⭐ Package L — D13: ~~3 × 4 = 12, total 36~~ 3 × 6 = 18, total 42.
+			limitCheck: { prior: 10, recorded: 10, reserve: 4, ahead: 18, counted: COUNTED_SIGN_OFF, total: 42, limit: PHASE7_PAID_LIMIT, allowed: true },
 			recordAssurance: actAnswered('failure', COMPLETED),
 			rerunDeclared: null,
 			rerunLimitCheck: null,
@@ -2070,10 +2216,11 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		// ⛔ PREDICTED RED, read from the code (R3-B's check, F1): the re-run of the review counted its first call only, so with
 		// 131 calls left under the limit, one short of a re-review's worst case, it was pressed. ⭑ The re-run and every phase are
 		// scripted, so a lane that presses past the limit is caught by the assertion, not by a script with no press for it.
-		// ⭐ `REG-D-114` (14), as amended 2026-10-16 — ~~one call past a re-review's worst case~~: the re-run counts one try's
-		// reserve, and the stopped phase's own press spends one call more than leaves room for it.
+		// ⭐ `REG-D-114` (14), as amended 2026-10-16 — ~~one call past a re-review's worst case~~: the re-run counts ~~one try's
+		// reserve~~ ⭐ (package L, D16; `REG-D-135` (4)) its refused reviews' worst case — these hands' store names none, so every
+		// review the attempt holds — and the stopped phase's own press spends one call more than leaves room for it.
 		const prior = 0;
-		const spent = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - TRY_RESERVE + 1;
+		const spent = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - REREVIEW_UNREAD + 1;
 		const l = laneOf({
 			paid: true,
 			prior,
@@ -2103,8 +2250,8 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 					prior,
 					recorded: spent,
 					reserve: PHASE7_NEGATIVE_CONTROL_RESERVE,
-					ahead: TRY_RESERVE,
-					counted: COUNTED_TRY,
+					ahead: REREVIEW_UNREAD,
+					counted: COUNTED_REREVIEW_UNREAD,
 					total: PHASE7_PAID_LIMIT + 1,
 					limit: PHASE7_PAID_LIMIT,
 					allowed: false
@@ -2376,13 +2523,14 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		// today's 600 (P5 package C, F2)~~ ~~⭐ 646 at today's 650 (P6 package L, F1; `REG-D-120` Q15)~~ ~~⭐ 796 at today's 800
 		// (package Q, F5; `REG-D-123` Q26)~~ ~~⭐ 896 at today's 900 (the review in parts, package C, B6; `REG-D-126` Q32)~~
 		// ⭐ 996 at today's 1000 (the review in parts, package I, B8b; `REG-D-131` Q37).
-		const prior = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - TRY_RESERVE;
+		// ⭐ Package L — D16 (`REG-D-135` (4)): ~~TRY_RESERVE~~ the whole press, counted before requirements and spent by it.
+		const prior = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - WHOLE_PRESS;
 		const l = laneOf({
 			paid: true,
 			prior,
 			presses: {
 				root: ALL_COMPLETE.root!,
-				requirements: { outcome: answered('success'), after: COMPLETED, calls: TRY_RESERVE }
+				requirements: { outcome: answered('success'), after: COMPLETED, calls: WHOLE_PRESS }
 			},
 			signOffs: { root: GREEN, requirements: GREEN }
 		});
@@ -2403,11 +2551,11 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		// PHASE7_PAID_LIMIT~~.
 		expect(record.units[2]!.limitCheck).toEqual({
 			prior,
-			recorded: TRY_RESERVE,
+			recorded: WHOLE_PRESS,
 			reserve: 4,
-			ahead: TRY_RESERVE,
-			counted: COUNTED_TRY,
-			total: PHASE7_PAID_LIMIT + TRY_RESERVE,
+			ahead: WHOLE_PRESS,
+			counted: COUNTED_PRESS,
+			total: PHASE7_PAID_LIMIT + WHOLE_PRESS,
 			limit: PHASE7_PAID_LIMIT,
 			allowed: false
 		});
@@ -2460,17 +2608,17 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		// P5 package C, F2)~~ ~~⭐ 650 (`REG-D-120` Q15; P6 package L, F1)~~ ⭐ 800 (`REG-D-123` Q26; package Q, F5): ~~210 + 3 + 4 = 217,
 		// under 230~~.
 		expect(record.units[4]!.limitCheck?.allowed, 'arrangement: the last phase passes its check').toBe(true);
-		// ⭐ requirements (2 policies): prior + ~~4~~ ~~128~~ 0 + 4 + 8, 4 under the limit, pressed; design (4): 4 over it, held
-		// back — and the lane stops there: implementation's and end-to-end's (the limit itself, each) and the root's (4 under,
-		// which alone would fit) are never attempted.
+		// ⭐ requirements (2 policies): prior + ~~4~~ ~~128~~ 0 + 4 + ~~8, 4 under the limit~~ 12 (package L, D13: × 6), at the
+		// limit, pressed; design (4): ~~4~~ 12 over it, held back — and the lane stops there: implementation's and end-to-end's and
+		// the root's are never attempted.
 		expect(l.only('recordAssurance', 'offersRecordAssurance'), 'a sign-off was pressed past the limit, or after it').toEqual([
 			'recordAssurance requirements',
 			'offersRecordAssurance design'
 		]);
 		expect(record.units.map((u) => [u.slug, u.signOff?.limitCheck?.ahead, u.signOff?.limitCheck?.total, u.signOff?.limitCheck?.allowed])).toEqual([
 			['root', undefined, undefined, undefined],
-			['requirements', 8, PHASE7_PAID_LIMIT - 4, true],
-			['design', 16, PHASE7_PAID_LIMIT + 4, false],
+			['requirements', 12, PHASE7_PAID_LIMIT, true],
+			['design', 24, PHASE7_PAID_LIMIT + 12, false],
 			['implementation', undefined, undefined, undefined],
 			['end-to-end', undefined, undefined, undefined]
 		]);
@@ -2480,15 +2628,16 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		).toEqual([null, null, null]);
 		expect(record.units[2]!.signOff).toEqual({
 			offered: true,
-			limitCheck: { prior, recorded, reserve: 4, ahead: 16, counted: COUNTED_SIGN_OFF, total: PHASE7_PAID_LIMIT + 4, limit: PHASE7_PAID_LIMIT, allowed: false },
+			limitCheck: { prior, recorded, reserve: 4, ahead: 24, counted: COUNTED_SIGN_OFF, total: PHASE7_PAID_LIMIT + 12, limit: PHASE7_PAID_LIMIT, allowed: false },
 			recordAssurance: null,
 			rerunDeclared: null,
 			rerunLimitCheck: null,
 			markSatisfied: null,
 			refused: null,
-			notPressed: `the limit: ${PHASE7_PAID_LIMIT + 4} of ${PHASE7_PAID_LIMIT} reviewer calls, the sign-off's own 16 counted (D8; E12F F2)`
+			notPressed: `the limit: ${PHASE7_PAID_LIMIT + 12} of ${PHASE7_PAID_LIMIT} reviewer calls, the sign-off's own 24 counted (D8; E12F F2)`
 		});
-		expect(PHASE7_ARCHIVE_UNITS.map((u) => signOffWorstCase(u)), 'each unit’s declared policies × reviewerCallsPerTry').toEqual([8, 8, 16, 12, 12]);
+		// ⭐ Package L — D13: ~~[8, 8, 16, 12, 12]~~ — each unit's declared policies × 6.
+		expect(PHASE7_ARCHIVE_UNITS.map((u) => signOffWorstCase(u)), 'each unit’s declared policies × reviewerCallsPerTry').toEqual([12, 12, 24, 18, 18]);
 		expect([record.end?.reason, laneVerdict(record)]).toEqual(['paid-limit', ["the run ended 'paid-limit', not 'complete'"]]);
 	});
 
@@ -2523,8 +2672,9 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			'offersRecordAssurance design'
 		]);
 		expect([record.units[1]!.signOff?.limitCheck, record.units[2]!.signOff?.limitCheck]).toEqual([
-			{ prior, recorded, reserve: 4, ahead: 8, counted: COUNTED_SIGN_OFF, total: PHASE7_PAID_LIMIT, limit: PHASE7_PAID_LIMIT, allowed: true },
-			{ prior, recorded, reserve: 4, ahead: 16, counted: COUNTED_SIGN_OFF, total: PHASE7_PAID_LIMIT + 8, limit: PHASE7_PAID_LIMIT, allowed: false }
+			// ⭐ Package L — D13: ~~8, 16, + 8~~ — requirements' 2 × 6 and design's 4 × 6.
+			{ prior, recorded, reserve: 4, ahead: 12, counted: COUNTED_SIGN_OFF, total: PHASE7_PAID_LIMIT, limit: PHASE7_PAID_LIMIT, allowed: true },
+			{ prior, recorded, reserve: 4, ahead: 24, counted: COUNTED_SIGN_OFF, total: PHASE7_PAID_LIMIT + 12, limit: PHASE7_PAID_LIMIT, allowed: false }
 		]);
 		expect(record.end?.reason).toBe('paid-limit');
 	});
@@ -2534,7 +2684,8 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		// four policies' 16 calls bringing the total to the limit exactly after Record Assurance spent 12, was held back.
 		// ⭐ R3-B's fix round (F1) — ~~prior: the limit less the reserve, 16 and 12~~: each phase counts ~~its worst case~~ ⭐ one
 		// try's reserve, so the calls before the sign-offs are spent before the run (`spentBySignOff`), the same total.
-		const { prior, recorded, presses } = spentBySignOff(PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - 16 - 12);
+		// ⭐ Package L — D13: ~~16~~ design's re-run counts 4 × 6 = 24.
+		const { prior, recorded, presses } = spentBySignOff(PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - 24 - 12);
 		const l = laneOf({
 			paid: true,
 			prior,
@@ -2561,7 +2712,7 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			prior,
 			recorded: recorded + 12,
 			reserve: 4,
-			ahead: 16,
+			ahead: 24,
 			counted: COUNTED_SIGN_OFF,
 			total: PHASE7_PAID_LIMIT,
 			limit: PHASE7_PAID_LIMIT,
@@ -2570,7 +2721,10 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		expect(record.end?.reason).toBe('complete');
 	});
 
-	it('⛔ REG-D-114 (14), AS AMENDED — before a phase it counts ONE TRY’S RESERVE: a phase is pressed with it reaching the limit exactly, and the next, one call past it, is not', async () => {
+	// ~~⛔ REG-D-114 (14), AS AMENDED — before a phase it counts ONE TRY’S RESERVE~~ ⛔ SUPERSEDED (`REG-D-135` (4); design D16).
+	it('⛔ D16 (REG-D-135 (4)) — before a phase it counts the press’s WHOLE worst case, (3 tries + 32 command runs) × 6 = 210: a phase is pressed with it reaching the limit exactly, and the next, one call past it, is not', async () => {
+		// ⛔ PREDICTED RED (package L), read from the code: before a phase the one rule counted ONE TRY'S RESERVE, 4, so a phase
+		// whose whole press passes the limit was pressed, and its own spend could carry the total past the limit (D16).
 		// ⛔ PREDICTED RED, read from the code: before a phase the one rule counted the phase's WORST CASE, a model unit's 140
 		// (R3-B's fix round, F1), so a phase whose one try's reserve reaches the limit exactly was held back — as every phase
 		// would be once about 306 calls are spent ⭐ (at the limit of 450; ~~at today's 600, once 456 are: 600, less the 4 held back
@@ -2580,7 +2734,7 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		// package C, B6; `REG-D-126` Q32~~ ⭐ at today's 1000, once 856 are: 1000, less the 4 held back and the phase's 140, the
 		// review in parts, package I, B8b; `REG-D-131` Q37) (`REG-D-114` (14), as amended 2026-10-16). ⭑ Every phase is scripted, so a lane
 		// that presses one past the limit runs on and is caught here by the assertion, not by a script that has no press for it.
-		const prior = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - TRY_RESERVE;
+		const prior = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - WHOLE_PRESS;
 		const l = laneOf({
 			paid: true,
 			prior,
@@ -2588,20 +2742,21 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			signOffs: { root: GREEN, requirements: GREEN }
 		});
 		const record = await l.run();
-		expect(l.only('beginExecute'), 'a phase whose one try’s reserve reaches the limit was held back, or the next, past it, pressed').toEqual([
+		expect(l.only('beginExecute'), 'a phase whose whole press reaches the limit was held back, or the next, past it, pressed').toEqual([
 			'beginExecute root',
 			'beginExecute requirements'
 		]);
 		expect([record.units[1]!.limitCheck, record.units[2]!.limitCheck]).toEqual([
-			{ prior, recorded: 0, reserve: 4, ahead: TRY_RESERVE, counted: COUNTED_TRY, total: PHASE7_PAID_LIMIT, limit: PHASE7_PAID_LIMIT, allowed: true },
-			{ prior, recorded: 1, reserve: 4, ahead: TRY_RESERVE, counted: COUNTED_TRY, total: PHASE7_PAID_LIMIT + 1, limit: PHASE7_PAID_LIMIT, allowed: false }
+			{ prior, recorded: 0, reserve: 4, ahead: WHOLE_PRESS, counted: COUNTED_PRESS, total: PHASE7_PAID_LIMIT, limit: PHASE7_PAID_LIMIT, allowed: true },
+			{ prior, recorded: 1, reserve: 4, ahead: WHOLE_PRESS, counted: COUNTED_PRESS, total: PHASE7_PAID_LIMIT + 1, limit: PHASE7_PAID_LIMIT, allowed: false }
 		]);
 		expect(record.end?.reason).toBe('paid-limit');
 	});
 
 	/**
 	 * A paid run whose requirements phase stops, its row offering `rerun`, its own press having spent `spent` calls from none
-	 * before the run: the rule's re-run of it is checked against what that press spent, one try's reserve ahead.
+	 * before the run: the rule's re-run of it is checked against what that press spent, ~~one try's reserve~~ ⭐ (package L,
+	 * D16) the re-run's whole worst case ahead — a re-run of the work's whole press, a re-run of the review's refused reviews.
 	 */
 	const stoppedHaving = (rerun: 'rerunReview' | 'rerunWork', spent: number) =>
 		laneOf({
@@ -2616,64 +2771,104 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			},
 			signOffs: { root: GREEN, requirements: GREEN }
 		});
-	/** The calls a stopped phase's press may spend for one try's reserve to bring the re-run's check exactly to the limit. */
-	const REACHING = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - TRY_RESERVE;
+	/** ⭐ D16 — the calls a stopped phase's press may spend for the re-run's worst case `ahead` to reach the limit exactly. */
+	const reaching = (ahead: number) => PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - ahead;
 
-	it('⛔ REG-D-114 (14), AS AMENDED — before the rule’s re-run of a stopped phase’s REVIEW it counts ONE TRY’S RESERVE: one reaching the limit exactly is pressed, and one a call past it is not', async () => {
-		// ⛔ PREDICTED RED, read from the code: before the re-run of a review the one rule counted a re-review's WORST CASE, 132
-		// (R3-B's fix round, F1), so a re-run whose one try's reserve reaches the limit exactly was held back. ⭑ The phase's own
-		// check passes under either count, so the red is the re-run's. The re-run and every phase are scripted.
-		const at = stoppedHaving('rerunReview', REACHING);
+	// ~~⛔ REG-D-114 (14), AS AMENDED — before the rule’s re-run of a stopped phase’s REVIEW it counts ONE TRY’S RESERVE~~ ⛔ SUPERSEDED.
+	it('⛔ D16 (REG-D-135 (4)) — before the rule’s re-run of a stopped phase’s REVIEW it counts its refused reviews × 6 — here every review the attempt holds, the store naming none: one reaching the limit exactly is pressed, and one a call past it is not', async () => {
+		// ⛔ PREDICTED RED (package L), read from the code: the re-run counted ONE TRY'S RESERVE, 4, so a re-run whose refused
+		// reviews pass the limit was pressed. ⭑ The phase's own check passes under either count (its press is the whole of the
+		// spend before it), so the red is the re-run's. The re-run and every phase are scripted.
+		const at = stoppedHaving('rerunReview', reaching(REREVIEW_UNREAD));
 		const pressed = await at.run();
-		expect(at.only('recover '), 'a re-run of the review whose one try’s reserve reaches the limit was held back').toEqual([
+		expect(at.only('recover '), 'a re-run of the review whose refused reviews reach the limit was held back').toEqual([
 			'recover requirements rerunReview'
 		]);
 		expect(pressed.units[1]!.recovery[0]?.limitCheck).toEqual({
 			prior: 0,
-			recorded: REACHING,
+			recorded: reaching(REREVIEW_UNREAD),
 			reserve: 4,
-			ahead: TRY_RESERVE,
-			counted: COUNTED_TRY,
+			ahead: REREVIEW_UNREAD,
+			counted: COUNTED_REREVIEW_UNREAD,
 			total: PHASE7_PAID_LIMIT,
 			limit: PHASE7_PAID_LIMIT,
 			allowed: true
 		});
-		// ⭑ Pressed, it spends a call, and the next phase is held back one call past the limit.
+		// ⭑ Pressed, it spends a call, and the next phase is held back past the limit.
 		expect([at.only('beginExecute'), pressed.end?.reason]).toEqual([['beginExecute root', 'beginExecute requirements'], 'paid-limit']);
-		const past = stoppedHaving('rerunReview', REACHING + 1);
+		const past = stoppedHaving('rerunReview', reaching(REREVIEW_UNREAD) + 1);
 		const held = await past.run();
-		expect(past.only('recover '), 'a re-run of the review whose one try’s reserve passes the limit was pressed').toEqual([]);
+		expect(past.only('recover '), 'a re-run of the review whose refused reviews pass the limit was pressed').toEqual([]);
 		expect(held.units[1]!.recovery.map((r) => [r.act, r.limitCheck?.total, r.limitCheck?.allowed, r.notPressed])).toEqual([
 			['rerunReview', PHASE7_PAID_LIMIT + 1, false, `the limit: ${PHASE7_PAID_LIMIT + 1} of ${PHASE7_PAID_LIMIT} reviewer calls (D8)`]
 		]);
 	});
 
-	it('⛔ REG-D-114 (14), AS AMENDED — before the rule’s re-run of a stopped phase’s WORK it counts ONE TRY’S RESERVE: one reaching the limit exactly is pressed, and one a call past it is not', async () => {
-		// ⛔ PREDICTED RED, read from the code: before the re-run of the work the one rule counted a model unit's WORST CASE,
-		// 140 (R3-B's fix round, F1), so a re-run whose one try's reserve reaches the limit exactly was held back. ⭑ The phase's
-		// own check passes under either count, so the red is the re-run's. The re-run and every phase are scripted.
-		const at = stoppedHaving('rerunWork', REACHING);
+	it('⭐ D16 (REG-D-135 (4)) — where the store NAMES the stopped attempt’s refused reviews, the re-run of the review counts those × 6, never every review the attempt could hold: two named, 12 — at the limit exactly, pressed; a call past it, not', async () => {
+		// ⛔ PREDICTED RED (package L): the re-run counted ONE TRY'S RESERVE, 4, whatever the store named. ⭑ The server re-runs the
+		// refused reviews alone (`rerunReview`), so counting every review the attempt could hold (198) would refuse a re-run that
+		// fits — the count the store names is the press's whole worst case.
+		const named = (spent: number) =>
+			laneOf({
+				paid: true,
+				prior: 0,
+				refusedReviews: { requirements: 2 },
+				presses: { ...ALL_COMPLETE, requirements: { outcome: answered('failure'), after: WAITING, calls: spent } },
+				recoveries: {
+					requirements: {
+						offers: { rerunReview: true, rerunWork: true, abandon: true },
+						acts: { rerunReview: { outcome: answered('success'), after: COMPLETED, calls: 1 } }
+					}
+				},
+				signOffs: { root: GREEN, requirements: GREEN }
+			});
+		const at = named(reaching(2 * 6));
 		const pressed = await at.run();
-		expect(at.only('recover '), 'a re-run of the work whose one try’s reserve reaches the limit was held back').toEqual([
-			'recover requirements rerunWork'
+		expect(at.only('recover '), 'a re-run of the review whose two refused reviews reach the limit was held back').toEqual([
+			'recover requirements rerunReview'
 		]);
 		expect(pressed.units[1]!.recovery[0]?.limitCheck).toEqual({
 			prior: 0,
-			recorded: REACHING,
+			recorded: reaching(2 * 6),
 			reserve: 4,
-			ahead: TRY_RESERVE,
-			counted: COUNTED_TRY,
+			ahead: 2 * 6,
+			counted: 'its refused reviews’ worst case, 2 × 6 calls',
 			total: PHASE7_PAID_LIMIT,
 			limit: PHASE7_PAID_LIMIT,
 			allowed: true
 		});
-		const past = stoppedHaving('rerunWork', REACHING + 1);
+		const past = named(reaching(2 * 6) + 1);
+		await past.run();
+		expect(past.only('recover '), 'a re-run of the review whose two refused reviews pass the limit was pressed').toEqual([]);
+	});
+
+	// ~~⛔ REG-D-114 (14), AS AMENDED — before the rule’s re-run of a stopped phase’s WORK it counts ONE TRY’S RESERVE~~ ⛔ SUPERSEDED.
+	it('⛔ D16 (REG-D-135 (4)) — before the rule’s re-run of a stopped phase’s WORK it counts the press’s WHOLE worst case, 210: one reaching the limit exactly is pressed, and one a call past it is not', async () => {
+		// ⛔ PREDICTED RED (package L), read from the code: the re-run of the work counted ONE TRY'S RESERVE, 4, so a re-run
+		// whose whole press passes the limit was pressed. ⭑ The phase's own check passes under either count, so the red is the
+		// re-run's. The re-run and every phase are scripted.
+		const at = stoppedHaving('rerunWork', reaching(WHOLE_PRESS));
+		const pressed = await at.run();
+		expect(at.only('recover '), 'a re-run of the work whose whole press reaches the limit was held back').toEqual([
+			'recover requirements rerunWork'
+		]);
+		expect(pressed.units[1]!.recovery[0]?.limitCheck).toEqual({
+			prior: 0,
+			recorded: reaching(WHOLE_PRESS),
+			reserve: 4,
+			ahead: WHOLE_PRESS,
+			counted: COUNTED_PRESS,
+			total: PHASE7_PAID_LIMIT,
+			limit: PHASE7_PAID_LIMIT,
+			allowed: true
+		});
+		const past = stoppedHaving('rerunWork', reaching(WHOLE_PRESS) + 1);
 		const held = await past.run();
-		expect(past.only('recover '), 'a re-run of the work whose one try’s reserve passes the limit was pressed').toEqual([]);
+		expect(past.only('recover '), 'a re-run of the work whose whole press passes the limit was pressed').toEqual([]);
 		expect(held.units[1]!.recovery.map((r) => [r.act, r.limitCheck, r.notPressed])).toEqual([
 			[
 				'rerunWork',
-				{ prior: 0, recorded: REACHING + 1, reserve: 4, ahead: TRY_RESERVE, counted: COUNTED_TRY, total: PHASE7_PAID_LIMIT + 1, limit: PHASE7_PAID_LIMIT, allowed: false },
+				{ prior: 0, recorded: reaching(WHOLE_PRESS) + 1, reserve: 4, ahead: WHOLE_PRESS, counted: COUNTED_PRESS, total: PHASE7_PAID_LIMIT + 1, limit: PHASE7_PAID_LIMIT, allowed: false },
 				`the limit: ${PHASE7_PAID_LIMIT + 1} of ${PHASE7_PAID_LIMIT} reviewer calls (D8)`
 			]
 		]);
@@ -2744,7 +2939,8 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		const design = record.units[2]!.signOff!;
 		expect([design.rerunDeclared, design.rerunLimitCheck?.ahead, design.rerunLimitCheck?.allowed, design.markSatisfied?.after, design.refused]).toEqual([
 			actAnswered('success', ASSURED),
-			16,
+			// ⭐ Package L — D13: ~~16~~ 4 × 6.
+			24,
 			true,
 			SATISFIED,
 			null
@@ -2811,7 +3007,8 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			'paid-limit'
 		]);
 		expect([atTheLimit.notPressed, stopped.units[0]!.signOff, limited.only('recordAssurance root')]).toEqual([
-			`the limit: ${PHASE7_PAID_LIMIT + 2} of ${PHASE7_PAID_LIMIT} reviewer calls, the sign-off's own 16 counted (D8; E12F F2)`,
+			// ⭐ Package L — D13: ~~+ 2, 16~~ — 30 under, design's 12 spent, 4 held back and its re-run's 4 × 6: 10 over.
+			`the limit: ${PHASE7_PAID_LIMIT + 10} of ${PHASE7_PAID_LIMIT} reviewer calls, the sign-off's own 24 counted (D8; E12F F2)`,
 			null,
 			[]
 		]);
@@ -3159,8 +3356,8 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		const record = await l.run();
 		expect(record.units[1]!.signOff).toEqual({
 			offered: false,
-			// ⭐ `E12F` F2 — read before the row was: it would have allowed the press.
-			limitCheck: { prior: 0, recorded: 0, reserve: 4, ahead: 8, counted: COUNTED_SIGN_OFF, total: 12, limit: PHASE7_PAID_LIMIT, allowed: true },
+			// ⭐ `E12F` F2 — read before the row was: it would have allowed the press. ⭐ Package L — D13: ~~8, 12~~ 2 × 6, 16.
+			limitCheck: { prior: 0, recorded: 0, reserve: 4, ahead: 12, counted: COUNTED_SIGN_OFF, total: 16, limit: PHASE7_PAID_LIMIT, allowed: true },
 			recordAssurance: null,
 			rerunDeclared: null,
 			rerunLimitCheck: null,

@@ -280,12 +280,18 @@ describe('⭐⭐ JAN-EXEC Phase 5 — R18: every completed run becomes one gover
 		// ⛔ NOT ON THE RECORD PLANE. `ObservedToolCall` has no field that could hold an argv or an exit code, by
 		// construction (`R11`), and widening it would undo that guarantee. The content plane is where this
 		// belongs, and it is where `PER-9`'s removal path exists.
-		const { joined, h } = await join([aRun(['npm', 'test'])]);
+		// ⭐ Package L — D8 (`REG-D-135`; design D8): ~~one run~~ two, the second the step's third host act (a write between
+		// them took the second number), so the ordinal on its reference is the HOST's sequence number, never its index here.
+		const { joined, h } = await join([aRun(['npm', 'test']), aRun(['npm', 'run', 'lint'], { ordinal: 3 })]);
 		const ref = (h.getObject(joined[0]!.evidenceId) ?? {})
 			.contentReference as ProcessEvidenceContentReference;
 		expect(ref.command).toEqual(['npm', 'test']);
 		expect(ref.exitCode).toBe(0);
 		expect(ref.timedOut).toBe(false);
+		// ⭐ D8 — and the run's place in the step's host sequence, beside the command facts (⛔ AT HEAD: absent).
+		expect(ref.ordinal, 'the run’s host ordinal').toBe(1);
+		const third = (h.getObject(joined[1]!.evidenceId) ?? {}).contentReference as ProcessEvidenceContentReference;
+		expect(third.ordinal, 'the host’s number, never the run’s index in the join').toBe(3);
 	});
 
 	it('⛔ a run with NO VERDICT is STILL minted, and then REFUSES its own floor', async () => {

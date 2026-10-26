@@ -4051,6 +4051,15 @@ const TWIN_DIFFERENCES_V10: Readonly<Record<string, readonly string[]>> = {
 /** The reviewer fingerprint case set v9 was measured under (`REG-D-129`; `14c141af`), which version ten must not move. */
 const REVIEWER_FINGERPRINT_V9 = '5ab3d68643bffbbf700c622526b626f47d4c487690e1eb5e798d2d7f7d539cfc';
 /**
+ * ⭐ `JAN-EXEC` Phase 7, package L — D13 (`REG-D-135` (3); design D13): TODAY'S REVIEWER FINGERPRINT, which no case-set version
+ * moves. The criterion repair after any parsed reply moved the scoring digest — four corpus entries now draw it, and two new
+ * ones hold its used and after-JSON-repair paths — so the reviewer moved off `REVIEWER_FINGERPRINT_V9`, the one v9 to v11 were
+ * measured under: their coverage under it is owed (`reviewer:qual:check`, COVERAGE), the sponsor-confirmed measurement V owes.
+ * ⭑ The pins below asked two things of one constant: that a case-set version moves no reviewer component, and that today's
+ * reviewer is the measured one. The first is unchanged; the second is `reviewer:qual:check`'s to say, and it says no.
+ */
+const REVIEWER_FINGERPRINT_TODAY = '9a310102cbe308b60f3e7f49c2b2e86f5ab76a2b94d4142eeecef61908872e0d';
+/**
  * ⭐ THE PROTOTYPE'S PROMPTS (`REG-D-131` Q36: *"its prompts must match the checked prototype hash for hash"*) — the sha256 of
  * each of the 19 bridge part cases' first prompt as the lead's in-memory prototype of D3b rendered it through the product's
  * part builder and validator, the prompts the panel judged and the sponsor confirmed (`d3b-facts.md`), in the set's order —
@@ -4333,7 +4342,9 @@ describe('⭐⭐ the review in parts, B8b — reviewer-qualification case set v1
 			bridge.map((id) => [v9PartOf(id), v10.casePrompts.get(id)!.initial]),
 			'each bridge part case’s first prompt, the prototype’s, byte for byte'
 		).toEqual(PROTOTYPE_PROMPTS_V10);
-		expect([v9.reviewer, v10.reviewer], 'the reviewer fingerprint, unmoved').toEqual([REVIEWER_FINGERPRINT_V9, REVIEWER_FINGERPRINT_V9]);
+		// ⭐ Package L — D13: ~~[REVIEWER_FINGERPRINT_V9, REVIEWER_FINGERPRINT_V9]~~ today's, which the scoring digest moved.
+		expect([v9.reviewer, v10.reviewer], 'the reviewer fingerprint, unmoved').toEqual([REVIEWER_FINGERPRINT_TODAY, REVIEWER_FINGERPRINT_TODAY]);
+		expect(REVIEWER_FINGERPRINT_TODAY, 'today’s reviewer is no longer the one v9 was measured under').not.toBe(REVIEWER_FINGERPRINT_V9);
 		expect(v10.caseSet, 'the case set’s digest moved').not.toBe(v9.caseSet);
 	});
 
@@ -4842,7 +4853,8 @@ describe('⭐⭐ the review in parts, B8b, package K — reviewer-qualification 
 			bridgePartIdsV11().map((id) => [id, v11.casePrompts.get(id)?.initial]),
 			'each bridge part case’s first prompt, the prototype’s, byte for byte'
 		).toEqual(PROTOTYPE_PROMPTS_V11);
-		expect([v10.reviewer, v11.reviewer], 'the reviewer fingerprint, unmoved').toEqual([REVIEWER_FINGERPRINT_V9, REVIEWER_FINGERPRINT_V9]);
+		// ⭐ Package L — D13: ~~[REVIEWER_FINGERPRINT_V9, REVIEWER_FINGERPRINT_V9]~~ today's, which the scoring digest moved.
+		expect([v10.reviewer, v11.reviewer], 'the reviewer fingerprint, unmoved').toEqual([REVIEWER_FINGERPRINT_TODAY, REVIEWER_FINGERPRINT_TODAY]);
 		expect(v11.caseSet, 'the case set’s digest moved').not.toBe(v10.caseSet);
 	});
 

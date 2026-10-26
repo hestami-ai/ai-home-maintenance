@@ -29,7 +29,10 @@
 import { SEEDED_REASONING_REVIEW_CRITERIA, type ProfessionalRationaleSummary, type ReasoningReviewInput } from '@janumipwb/rph-assurance';
 import type { ObservedToolCallReport } from '@janumipwb/rph-contracts';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { createAgyReasoningReviewValidator } from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
+import {
+	createAgyReasoningReviewValidator,
+	CRITERION_REPAIR_INSTRUCTION
+} from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
 import { NO_FENCE_STATEMENT } from '../apps/rph-demo/src/lib/server/assurance/review-fence.js';
 import {
 	graphReviewInput,
@@ -148,7 +151,13 @@ function expectNoHostTextQuoted(prompt: string, input: ReasoningReviewInput, wha
 	}
 }
 
-/** The prompts the real validator sends for `input` — the initial, and the repair an unusable first reply draws. */
+/**
+ * The prompts the real validator sends for `input` — the initial, and the repair an unusable first reply draws.
+ * ⭐ Package L — D13 (`REG-D-135` (3)): MOVED DELIBERATELY. A criterion repair now follows the JSON repair's parsed
+ * reply as it follows a first one, so where the policy declares NO criterion (`NO-CRITERIA`), the clean repair
+ * reply below answers none and draws I5's repair, unchanged: a third prompt, ending with I5's line, its regions read too.
+ * ~~Exactly two prompts, an initial and a repair, for every input.~~ Every other input still sends exactly two.
+ */
 async function promptsOf(input: ReasoningReviewInput): Promise<string[]> {
 	const sent: string[] = [];
 	const validator = createAgyReasoningReviewValidator({
@@ -167,6 +176,11 @@ async function promptsOf(input: ReasoningReviewInput): Promise<string[]> {
 		}
 	});
 	await validator.evaluate(PROBE_SUBJECT, { reasoningReview: input });
+	if (input.criteria.length === 0) {
+		expect(sent, 'no criterion declared: an initial prompt, a repair and I5’s criterion repair').toHaveLength(3);
+		expect(sent[2]!.endsWith(CRITERION_REPAIR_INSTRUCTION), 'the third prompt is I5’s repair').toBe(true);
+		return sent;
+	}
 	expect(sent, 'an initial prompt and a repair').toHaveLength(2);
 	return sent;
 }

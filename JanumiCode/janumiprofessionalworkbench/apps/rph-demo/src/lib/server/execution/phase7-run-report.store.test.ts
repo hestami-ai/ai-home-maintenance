@@ -741,6 +741,8 @@ describe('JAN-EXEC P7-2 D9 — the run report over stores the product wrote, rea
 		expect(report().pairing.counts).toEqual({
 			answered: 37,
 			'no-criterion-answered': 0,
+			// ⭐ Package L — D13 (`REG-D-135` (3)) — a review that concluded on a reply leaving a declared criterion without a row: none here.
+			'criterion-left-without-row': 0,
 			'no-response': 1,
 			// ⭐ P5 package A (F1) — a review that ended on a reply the tool cut at the model's output-token limit: none here.
 			'output-limit': 0,

@@ -590,8 +590,36 @@ describe('JAN-CRITREAD J2-2 — the reviewer-qualification record', () => {
 		// ⛔ AT HEAD: refused as a role the record does not know.
 		expect(at([RUN, initial, criterionRepair]), 'an initial, then its criterion repair, scored on the last').toBe('');
 		expect(at([RUN, criterionRepair])).toContain('line 2: CALL G-CLEAN#1 criterion-repair does not follow an initial call');
-		expect(at([RUN, initial, { ...CALL_ANSWERED, role: 'repair', scored: null }, criterionRepair])).toContain(
-			'line 4: CALL G-CLEAN#1 criterion-repair: the evaluation already has initial and repair'
+		// ~~expect(at([RUN, initial, { ...CALL_ANSWERED, role: 'repair', scored: null }, criterionRepair])).toContain(
+		// 'line 4: CALL G-CLEAN#1 criterion-repair: the evaluation already has initial and repair');~~ ⛔ STRUCK BY THE SPONSOR'S
+		// RULING (`REG-D-135` (3), Q43 *"Yes, after any reply (Recommended)"*; design D13): the record twin of the validator's
+		// one-repair-total pin (`reasoning-review-validator.test.ts`), replaced by the decided bound below.
+	});
+
+	it('⭐⭐ package L — D13 (REG-D-135 (3)) — the decided bound: one JSON repair, then one criterion repair, is a lawful evaluation; nothing more is', () => {
+		// ⭐ Design D13: a review makes at most one JSON repair and one criterion repair — so the JSON repair's parsed reply may
+		// draw a criterion repair, the evaluation's third call, scored on it. ⛔ AT HEAD: refused, "already has initial and repair".
+		const at = (lines: readonly unknown[]) => recordProblems(text(lines), { tracked: true }).join('\n');
+		const initial = { ...CALL_ANSWERED, scored: null };
+		const repair = { ...CALL_ANSWERED, role: 'repair', promptSha256: HEX('e'), scored: null };
+		const criterionRepair = { ...CALL_ANSWERED, role: 'criterion-repair', promptSha256: HEX('f') };
+		expect(at([RUN, initial, repair, criterionRepair]), 'the first, the JSON repair, the criterion repair, scored on the last').toBe('');
+		// ⛔ THE LIMBS THAT KEEP THE BOUND: never a JSON repair after a criterion repair, never two of either, never a fourth call.
+		expect(at([RUN, initial, { ...criterionRepair, scored: null }, { ...repair, scored: SCORED }])).toContain(
+			'line 4: CALL G-CLEAN#1 repair: the evaluation already has initial and criterion-repair'
+		);
+		expect(at([RUN, initial, { ...criterionRepair, scored: null }, criterionRepair])).toContain(
+			'line 4: CALL G-CLEAN#1 criterion-repair: the evaluation already has initial and criterion-repair'
+		);
+		expect(at([RUN, initial, { ...repair }, { ...repair, scored: SCORED }])).toContain(
+			'line 4: CALL G-CLEAN#1 repair: the evaluation already has initial and repair'
+		);
+		expect(at([RUN, initial, repair, { ...criterionRepair, scored: null }, criterionRepair])).toContain(
+			'line 5: CALL G-CLEAN#1 criterion-repair: the evaluation already has initial and repair and criterion-repair'
+		);
+		// ⛔ And scored on its last call only: the JSON repair a criterion repair follows carries no outcome.
+		expect(at([RUN, initial, { ...repair, scored: SCORED }, criterionRepair])).toContain(
+			'CALL G-CLEAN#1 repair is scored, but a later call follows it'
 		);
 	});
 

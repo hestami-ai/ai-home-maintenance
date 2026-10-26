@@ -26,6 +26,7 @@ import {
 	mintExecutionTools,
 	type ExecutionToolTemplate
 } from './execution-tool-surface.js';
+import { createProcessRunObserver } from './process-run-observer.js';
 
 let container = '';
 let dir = '';
@@ -470,3 +471,64 @@ describe('run_command — the cwd is the workspace’s, and it cannot be chosen'
 function PORTS() {
 	return { workspace: deliverable(), runner: recordingRunner() };
 }
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7, package L — D8, ONE HOST SEQUENCE PER STEP (`REG-D-135`; `REG-F-579`;
+// `DESIGN-data-flow-order-and-deliverable-review.md` D8) ──────────────────────────────────────────────────────────────
+//
+// A command's review judged one result without its place among the step's writes (`REG-F-579`), and nothing could say it:
+// the observer numbered runs alone, and a write left no host record. Now `write_file` and `run_command` share ONE host
+// ordinal per step — a completed write and a completed run each take the next number; a refused call takes none — and each
+// write's workspace-relative path is observed beside the runs, for the step's host to render (package N). ⛔ Nothing reaches
+// the record plane: `ObservedToolCall` still carries no argument (`R11`).
+describe('⭐⭐ package L — D8: write_file and run_command share ONE host ordinal per step', () => {
+	const both = (runner: ProcessRunner = recordingRunner()) => {
+		const processRuns = createProcessRunObserver();
+		const tools = mintExecutionTools({
+			ports: { workspace: deliverable(), runner, processRuns },
+			grantedCapabilities: ['file-system', 'process-execution'],
+			bindingAuthorizationStatus: AUTHORIZED
+		});
+		const tool = (name: string) => tools.find((t) => t.name === name)!;
+		return { processRuns, write: tool('write_file'), run: tool('run_command') };
+	};
+
+	it('⭐ a step that runs, writes, then runs again records ordinals 1, 2 and 3 — the write 2, its workspace-relative path observed', async () => {
+		const { processRuns, write, run } = both();
+		await run.run({ argv: ['node', '--version'] });
+		await write.run({ path: 'src/index.js', contents: 'export {};' });
+		await run.run({ argv: ['npm', 'test'] });
+		const seen = processRuns.observed();
+		// ⛔ AT HEAD: [1, 2] — the observer numbered runs alone, and the write took no number.
+		expect(seen.runs.map((r) => [r.ordinal, r.argv[0]])).toEqual([
+			[1, 'node'],
+			[3, 'npm']
+		]);
+		expect(seen.writes, 'the write, its ordinal and its path').toEqual([{ ordinal: 2, path: 'src/index.js' }]);
+		// ⭐ The 32-run bound's declaration counts RUNS, as before: a write is not a run.
+		expect([seen.observedCount, seen.recordedLimit]).toEqual([2, 32]);
+	});
+
+	it('⛔ a REFUSED call takes no ordinal — a write the workspace refuses, an argument refused, a run the runner refuses', async () => {
+		const refusing: ProcessRunner = { kind: 'REAL', run: async () => ({ ran: false, refusedBecause: 'fixture: refused' }) };
+		const { processRuns, write, run } = both(refusing);
+		expect((await write.run({ path: '../escape.txt', contents: 'x' })).ok, 'arrangement: the escape is refused').toBe(false);
+		expect((await write.run({ contents: 'x' })).ok, 'arrangement: a missing path is refused').toBe(false);
+		expect((await run.run({ argv: [] })).ok, 'arrangement: an empty argv is refused').toBe(false);
+		expect((await run.run({ argv: ['node'] })).ok, 'arrangement: the runner refused it').toBe(false);
+		expect((await write.run({ path: 'a.txt', contents: '' })).ok).toBe(true);
+		const seen = processRuns.observed();
+		expect(seen.writes, 'the first completed act is number one').toEqual([{ ordinal: 1, path: 'a.txt' }]);
+		expect([seen.runs, seen.observedCount]).toEqual([[], 0]);
+	});
+
+	it('⭑ CONTROL — runs alone are numbered 1 and 2, as before, and a write alone is number one', async () => {
+		const runs = both();
+		await runs.run.run({ argv: ['a'] });
+		await runs.run.run({ argv: ['b'] });
+		expect(runs.processRuns.observed().runs.map((r) => r.ordinal)).toEqual([1, 2]);
+		expect(runs.processRuns.observed().writes).toEqual([]);
+		const writes = both();
+		await writes.write.run({ path: 'one.txt', contents: '1' });
+		expect(writes.processRuns.observed().writes).toEqual([{ ordinal: 1, path: 'one.txt' }]);
+	});
+});

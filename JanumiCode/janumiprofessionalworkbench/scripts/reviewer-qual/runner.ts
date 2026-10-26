@@ -44,7 +44,10 @@ import { createModelDeclaredPolicyReviewer } from '../../apps/rph-demo/src/lib/s
 import { declaredVerdict, evidenceCeiling } from '../../apps/rph-demo/src/lib/server/assurance/declared-policy-signoff.js';
 import {
 	createAgyReasoningReviewValidator,
-	CRITERION_REPAIR_INSTRUCTION
+	CRITERION_REPAIR_INSTRUCTION,
+	MISSING_CRITERION_REPAIR_CLOSING,
+	MISSING_CRITERION_REPAIR_OPENING,
+	missingCriterionRepairInstruction
 } from '../../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
 import {
 	isToolInvocationResult,
@@ -104,11 +107,29 @@ const sha256 = (s: string): string => createHash('sha256').update(s, 'utf8').dig
  * validator writes after a reply that PARSED and answered no criterion (`CRITERION_REPAIR_INSTRUCTION`, the product's own
  * constant), else `repair`, the repair of a reply that did not parse. ⛔ A plain `repair` for both would hold the
  * criterion repair's hash to the JSON repair's, and the check would read today's own repair as a prompt that changed.
+ * ⭐ Package L — D13 (`REG-D-135` (3)): AND the missing-criterion repair, whose prompt ends with D13's line
+ * (`endsWithMissingCriterionLine`), is a criterion repair too; ~~the validator's one repair~~ a review makes at most one
+ * JSON repair and one criterion repair, so a criterion repair may be the second call or the third.
  */
 const callRole = (made: number, prompt: string): CallRole => {
 	if (made === 0) return 'initial';
-	return prompt.endsWith(`\n\n${CRITERION_REPAIR_INSTRUCTION}`) ? 'criterion-repair' : 'repair';
+	return prompt.endsWith(`\n\n${CRITERION_REPAIR_INSTRUCTION}`) || endsWithMissingCriterionLine(prompt)
+		? 'criterion-repair'
+		: 'repair';
 };
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L — D13 (`REG-D-135` (3); design D13) — WHETHER A PROMPT ENDS WITH THE MISSING-CRITERION
+ * REPAIR'S LINE: its last paragraph the product's own line (`missingCriterionRepairInstruction`) for the ids between its two
+ * fixed parts. ⛔ That repair is a criterion repair too, recorded `criterion-repair`: read as a plain `repair`, its hash would
+ * be held to the JSON repair's. ⭑ Told by the product's own builder, never by a pattern restated here.
+ */
+function endsWithMissingCriterionLine(prompt: string): boolean {
+	const line = prompt.slice(prompt.lastIndexOf('\n\n') + 2);
+	if (!line.startsWith(MISSING_CRITERION_REPAIR_OPENING) || !line.endsWith(MISSING_CRITERION_REPAIR_CLOSING)) return false;
+	const ids = line.slice(MISSING_CRITERION_REPAIR_OPENING.length, line.length - MISSING_CRITERION_REPAIR_CLOSING.length);
+	return ids !== '' && missingCriterionRepairInstruction(ids.split(', ')) === line;
+}
 /** The validator's exchange clock. Its stamps reach no line, so a fixed value keeps a re-scoring identical. */
 const EXCHANGE_CLOCK = () => '1970-01-01T00:00:00.000Z';
 

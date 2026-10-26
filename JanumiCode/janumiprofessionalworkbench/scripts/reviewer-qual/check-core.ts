@@ -65,6 +65,7 @@ import {
 } from './cases.js';
 import { canonicalJson, reviewerFingerprintOf, type FingerprintComponents } from './digest.js';
 import {
+	callPromptIsToday,
 	MATERIAL_FAILURE_CLASSES,
 	noReplyToScore,
 	promptsAreToday,
@@ -74,6 +75,7 @@ import {
 	type AcknowledgedLine,
 	type CallLine,
 	type CasePromptHashes,
+	type CriterionRepairPromptOf,
 	type EscalationLine,
 	type HeldOutLine,
 	type MaterialFailureClass,
@@ -101,6 +103,12 @@ export interface CurrentReviewer {
 	// ⭐ P7-6 I5 — each call role's hash, the criterion repair's among them (`record.ts` `CALL_ROLES`), so a recorded call is
 	// held to the prompt today's reviewer sends for the repair it was.
 	readonly casePrompts: CasePromptHashes;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package L — D13 (`REG-D-135` (3)) — the criterion repair today's reviewer sends after a recorded
+	 * reply (`fingerprint.ts` `criterionRepairAfter`): D13's repair prompt depends on the reply before it. ⚠ Absent, only the
+	 * per-case hashes are today's, and a recorded missing-criterion repair owes a model call — the safe side.
+	 */
+	readonly criterionRepairAfter?: CriterionRepairPromptOf;
 }
 export interface CheckInputs {
 	/** The record's top-level `*.ndjson` files git tracks, by name, as they stand. */
@@ -831,7 +839,8 @@ interface Ctx {
 /** Whether each call of `e` recorded the prompt today's reviewer sends — none does for a case gone from the set. The ONE
  *  predicate (`record.ts` `promptsAreToday`) that `restampable` reads too, for the writer of RESCORED lines and the check
  *  that demands them whole (`restampsWhole`). */
-const promptsMatch = (ctx: Ctx, e: Evaluation) => promptsAreToday(e.calls, ctx.i.current.casePrompts);
+const promptsMatch = (ctx: Ctx, e: Evaluation) =>
+	promptsAreToday(e.calls, ctx.i.current.casePrompts, ctx.i.current.criterionRepairAfter);
 
 // ── limb 2 ──
 type Fail = (id: string, message: string) => void;
@@ -863,8 +872,9 @@ async function reproduceRun(ctx: Ctx, r: Run, fail: Fail): Promise<void> {
 	const id = r.run.runId;
 	for (const e of r.evaluations.values()) {
 		if (!ctx.caseIds.has(e.caseId) || !complete(e)) continue;
-		for (const c of e.calls)
-			if (ctx.i.current.casePrompts.get(c.caseId)?.[c.role] !== c.promptSha256)
+		// ⭐ Package L — D13: each call by the one predicate (`callPromptIsToday`), a criterion repair against the reply before it.
+		for (const [i, c] of e.calls.entries())
+			if (!callPromptIsToday(e.calls, i, ctx.i.current.casePrompts, ctx.i.current.criterionRepairAfter))
 				fail(
 					id,
 					`run ${id}: ${e.caseId}#${e.repetition} ${c.role} — the prompt it recorded is not the one today’s reviewer sends, though the fingerprint did not move`
@@ -1028,7 +1038,8 @@ function weighSupersessions(
 /** Whether a re-scoring of `run` re-stamps `e`: `restampable` (`record.ts`) — its prompts today's among its legs, limb 2's
  *  first question (`promptsMatch`) — then re-scorable as limb 2 asks it. */
 async function owedARestamp(ctx: Ctx, run: RunLine, e: Evaluation): Promise<boolean> {
-	if (!restampable(e.calls, (caseId) => ctx.caseIds.has(caseId), ctx.i.current.casePrompts)) return false;
+	if (!restampable(e.calls, (caseId) => ctx.caseIds.has(caseId), ctx.i.current.casePrompts, ctx.i.current.criterionRepairAfter))
+		return false;
 	try {
 		await ctx.i.rescore(run, ctx.caseById.get(e.caseId)!, e.calls, ctx.S);
 	} catch {
@@ -1152,7 +1163,13 @@ function acknowledgementOwed(ctx: Ctx, counted: readonly Run[], struck: Readonly
 	const reachedACasePrompt = (fingerprint: string) =>
 		moved
 			.filter((s) => s.fingerprint === fingerprint)
-			.some((s) => s.calls.some((c) => ctx.caseIds.has(c.caseId) && ctx.i.current.casePrompts.get(c.caseId)?.[c.role] !== c.promptSha256));
+			.some((s) =>
+				s.calls.some(
+					(c, i) =>
+						ctx.caseIds.has(c.caseId) &&
+						!callPromptIsToday(s.calls, i, ctx.i.current.casePrompts, ctx.i.current.criterionRepairAfter)
+				)
+			);
 	return moved.find((s) => !reachedACasePrompt(s.fingerprint))?.what;
 }
 

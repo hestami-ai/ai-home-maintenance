@@ -84,8 +84,11 @@ export type MalformationClass = (typeof MALFORMATION_CLASSES)[number];
 /**
  * The call roles a CALL line records. ⭐ `JAN-EXEC` Phase 7 P7-6 I5 (`DESIGN-the-reviewer-isolated.md` §4d; `REG-F-552`) —
  * and `criterion-repair`: the validator's one repair of a reply that PARSED and answered no criterion, a prompt of its own
- * (`CRITERION_REPAIR_INSTRUCTION`). It is the second call of an evaluation, as `repair` is, and never beside it — the
- * validator makes at most one repair. ⛔ Recorded as a plain `repair`, its hash would be held to the JSON repair's
+ * (`CRITERION_REPAIR_INSTRUCTION`). ~~It is the second call of an evaluation, as `repair` is, and never beside it — the
+ * validator makes at most one repair.~~ ⭐ Package L — D13 (`REG-D-135` (3); design D13): and the missing-criterion repair of
+ * a reply that faulted nothing and left a declared criterion without a row, its line D13's. A review makes at most ONE JSON
+ * repair and ONE criterion repair, so a `criterion-repair` is the second call of an evaluation, or the third after a
+ * `repair` — never before one, and never two of either. ⛔ Recorded as a plain `repair`, its hash would be held to the JSON repair's
  * (`promptsAreToday`), and the paid re-qualification refused for the reviewer's own repair. ⭑ Added within record
  * version 1, as malformation classes have been: no line written before it holds it, so every one of them still reads.
  */
@@ -496,8 +499,58 @@ export type CasePromptHashes = ReadonlyMap<string, Readonly<Record<CallRole, str
  * ONE predicate, read there, by limb 1's coverage, and — through `restampable` — by the writer of the lines and by the
  * check that demands every one of them, so none of them can disagree about it.
  */
-export function promptsAreToday(calls: readonly CallLine[], casePrompts: CasePromptHashes): boolean {
-	return calls.every((k) => casePrompts.get(k.caseId)?.[k.role] === k.promptSha256);
+export function promptsAreToday(
+	calls: readonly CallLine[],
+	casePrompts: CasePromptHashes,
+	criterionRepairAfter?: CriterionRepairPromptOf
+): boolean {
+	return calls.every((_, i) => callPromptIsToday(calls, i, casePrompts, criterionRepairAfter));
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L — D13 (`REG-D-135` (3); design D13) — THE HASH OF THE CRITERION REPAIR TODAY'S REVIEWER
+ * SENDS for case `caseId` after a reply parsed as `answer` (the retained form a CALL line keeps), or `undefined` when it
+ * sends none after it (`fingerprint.ts` `criterionRepairAfter`, by the product's own rule). ⭑ A FUNCTION, NOT A HASH: D13's
+ * repair names the declared criteria the reply before it left without a row, so its prompt depends on that reply, and no
+ * one per-case hash is today's. Handed in beside `casePrompts`, never inside them, which are compared as data.
+ */
+export type CriterionRepairPromptOf = (caseId: string, answer: unknown) => string | undefined;
+
+/** ⭐ D13 — the call before `calls[i]` in its own evaluation (the same run, case and repetition), or undefined. */
+function evaluationPredecessor(calls: readonly CallLine[], i: number): CallLine | undefined {
+	const k = calls[i]!;
+	for (let j = i - 1; j >= 0; j--) {
+		const c = calls[j]!;
+		if (c.runId === k.runId && c.caseId === k.caseId && c.repetition === k.repetition) return c;
+	}
+	return undefined;
+}
+
+/**
+ * ⭐⭐ Package L — D13 — WHETHER `calls[i]` RECORDED THE PROMPT TODAY'S REVIEWER SENDS: its case's hash for its role, as ever;
+ * or — a `criterion-repair` — the hash of the criterion repair today's reviewer sends after the reply before it in its own
+ * evaluation, read as that reply's line keeps it (`criterionRepairAfter`). ⛔ Absent `criterionRepairAfter`, or after a reply
+ * the line kept no answer of, only the per-case hash is today's: a missing-criterion repair then reads as a prompt that
+ * changed, which owes a model call — the safe side, never a re-scoring of a prompt nobody checked.
+ */
+export function callPromptIsToday(
+	calls: readonly CallLine[],
+	i: number,
+	casePrompts: CasePromptHashes,
+	criterionRepairAfter?: CriterionRepairPromptOf
+): boolean {
+	const k = calls[i]!;
+	if (casePrompts.get(k.caseId)?.[k.role] === k.promptSha256) return true;
+	if (k.role !== 'criterion-repair' || criterionRepairAfter === undefined || !casePrompts.has(k.caseId)) return false;
+	const before = evaluationPredecessor(calls, i);
+	if (before?.reply.status !== 'ANSWERED') return false;
+	let answer: unknown;
+	try {
+		answer = JSON.parse(before.reply.answer);
+	} catch {
+		return false;
+	}
+	return criterionRepairAfter(k.caseId, answer) === k.promptSha256;
 }
 
 /**
@@ -514,7 +567,9 @@ export function promptsAreToday(calls: readonly CallLine[], casePrompts: CasePro
 export function restampable(
 	calls: readonly CallLine[],
 	isCurrent: (caseId: string) => boolean,
-	casePrompts: CasePromptHashes
+	casePrompts: CasePromptHashes,
+	/** ⭐ Package L — D13: the criterion repair today's reviewer sends after a recorded reply (`CriterionRepairPromptOf`). */
+	criterionRepairAfter?: CriterionRepairPromptOf
 ): boolean {
 	const last = calls.at(-1);
 	return (
@@ -523,7 +578,7 @@ export function restampable(
 		!calls.some((k) => k.reply.status === 'TRANSPORT_FAILURE') &&
 		// ⭐ P5 package A (F2) — nor cut at the model's output-token limit: nothing of the reply was kept to replay.
 		!calls.some((k) => k.reply.status === 'OUTPUT_LIMIT') &&
-		promptsAreToday(calls, casePrompts) &&
+		promptsAreToday(calls, casePrompts, criterionRepairAfter) &&
 		isCurrent(last.caseId)
 	);
 }
@@ -957,6 +1012,9 @@ function callProblems(
 	const key = `${line.runId}|${line.caseId}|${line.repetition}`;
 	const e = evaluations.get(key) ?? { label, roles: [], scoredAt: [], lastLine: 0 };
 	evaluations.set(key, e);
+	// ⭐ Package L — D13 (`REG-D-135` (3); design D13): at most one JSON repair and one criterion repair — so a criterion repair
+	// may follow the JSON repair, the evaluation's third call; never a JSON repair after a criterion repair, nor two of either.
+	const third = e.roles.length === 2 && e.roles[1] === 'repair' && line.role === 'criterion-repair';
 	if (e.roles.length === 0) {
 		if (line.role !== 'initial') problems.push(`${at} does not follow an initial call`);
 		// ⭐ P7-6 I5 — either repair is a lawful second call (`CALL_ROLES`); an initial there is the evaluation's second initial.
@@ -965,6 +1023,10 @@ function callProblems(
 			problems.push(
 				`line ${e.scoredAt[0]}: CALL ${label} initial is scored, but a later call follows it`
 			);
+	} else if (third) {
+		// The JSON repair this criterion repair follows carries no outcome (the initial's was asked when the repair came).
+		if (e.scoredAt.includes(e.lastLine))
+			problems.push(`line ${e.lastLine}: CALL ${label} repair is scored, but a later call follows it`);
 	} else problems.push(`${at}: the evaluation already has ${e.roles.join(' and ')}`);
 	e.roles.push(line.role);
 	e.lastLine = n;

@@ -78,11 +78,13 @@ import { STORE_FILE } from './run-folder';
 //   3. Begin & Execute on the ROOT, then on each PHASE in order, each started only after the one before has answered
 //      (`REG-F-535`). Before each phase, the LIMIT (D8): the calls spent before, those this store records, and four held
 //      for the negative control must total ~~under~~ ⭐ with the phase's ~~first call~~ ~~⭐ worst case, a model unit's (R3-B's
-//      fix round, F1)~~ ⭐ one try's reserve (`REG-D-114` (14), as amended 2026-10-16), AT MOST (the one rule, the lead's
+//      fix round, F1)~~ ~~⭐ one try's reserve (`REG-D-114` (14), as amended 2026-10-16)~~ ⭐ whole press's worst case, (3 tries
+//      + 32 command runs) × 6 (package L, D16; `REG-D-135` (4)), AT MOST (the one rule, the lead's
 //      delegated decision of 2026-10-16, registered as REG-D-114 (14)) the sponsor's limit — ~~150~~ ~~200 (`REG-D-105`
 //      (1))~~ ~~⭐ 450 (`REG-D-110` (1))~~ ~~⭐ 600 (`REG-D-117` Q10, raising `REG-D-110` (1)'s)~~ ~~⭐ 650 (`REG-D-120` Q15,
 //      raising `REG-D-110` (1)'s)~~ ~~⭐ 800 (`REG-D-123` Q26, raising `REG-D-110` (1)'s)~~ ~~⭐ 900 (`REG-D-126` Q32, raising
-//      `REG-D-110` (1)'s)~~ ⭐ 1000 (`REG-D-131` Q37, raising `REG-D-110` (1)'s), `lane-config.ts`'s
+//      `REG-D-110` (1)'s)~~ ~~⭐ 1000 (`REG-D-131` Q37, raising `REG-D-110` (1)'s)~~ ⭐ 2400 (`REG-D-135` (4), raising
+//      `REG-D-131`'s; package L, D17), `lane-config.ts`'s
 //      `PHASE7_PAID_LIMIT` — or the run ends `paid-limit`. Each press waits on its own
 //      response for up to one phase's allowance (D4); one with NO ANSWER — it outlasted that allowance, or its request
 //      failed in transit — ends the run there, `allowance-exceeded` or `request-failed`, the root's included, and
@@ -117,7 +119,8 @@ import { STORE_FILE } from './run-folder';
 // stages derive a larger allowance (`phase7HalfBAuthoringTimeoutMs`). Dry, half B stops before Send: authoring is a model call (C6). The order
 // is the operator's (`authorThePwa`), on the `author` hands below. ⚠ Unset or blank, the half is A: everything above.
 // ⭐⭐ `REG-D-112` (E3's review): the LIMIT is checked before Send, the authoring floor's worst case counted, and before the
-// root's press, a MODEL root's ~~worst case~~ ⭐ one try's reserve (`REG-D-114` (14), as amended 2026-10-16) counted (finding
+// root's press, a MODEL root's ~~worst case~~ ~~⭐ one try's reserve (`REG-D-114` (14), as amended 2026-10-16)~~ ⭐ whole press
+// (package L, D16; `REG-D-135` (4)) counted (finding
 // 2), ⭐ and a root whose type the lane cannot find or read never pressed (`root-type-unreadable`; the lead's round-4 item 2); the store is ARCHIVED into `lane/archive/00-authoring` however the authoring ends, so even a run that stopped there
 // is reported (finding 1); and every unit's row is found BY ITS ID, since a title may repeat (finding 5).
 //

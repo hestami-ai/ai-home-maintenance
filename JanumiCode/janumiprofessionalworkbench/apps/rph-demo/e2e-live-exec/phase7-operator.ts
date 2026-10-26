@@ -41,6 +41,7 @@ import { PHASE7_PWA, promptMarkers, type Phase7TypeDeclaration } from '../../../
 // ⭐ E3 — half B's request, the order its units are read in, the floor's dispositions, and the candidate checks (C1-C4).
 import { candidateChecks, type CandidateChecks } from '../../../scripts/phase7/candidate-checks.js';
 import {
+	AUTHORING_FLOOR_POLICIES,
 	correlationsOf,
 	floorDispositions,
 	PHASE7_HALF_B_REQUEST,
@@ -75,9 +76,11 @@ import {
 	PHASE7_RECORD_ASSURANCE_MS,
 	phase7RecordAssuranceMs,
 	PHASE7_SIGN_OFF_MS,
-	PHASE7_TRY_RESERVE,
 	PHASE7_UI_MS,
 	PHASE7_UNIT_ALLOWANCE_MS,
+	PHASE7_UNIT_REVIEWER_CALLS,
+	PHASE7_REVIEWED_COMMANDS,
+	phase7RereviewReviewerCalls,
 	REVIEWER_MODEL_VARIABLE,
 	wiredReviewer,
 	type Phase7Half
@@ -460,13 +463,16 @@ export interface LimitCheck {
 	 * root a MODEL root's (none for a root that runs no model), and before a phase and the rule's re-run of one ~~their first
 	 * call (`PHASE7_PHASE_FIRST_CALL`)~~ ~~⭐ their worst case (R3-B's fix round, F1): a model unit's before a phase and before
 	 * the rule's re-run of its work (`PHASE7_UNIT_REVIEWER_CALLS`), a re-review's before the rule's re-run of its review
-	 * (`PHASE7_REREVIEW_REVIEWER_CALLS`).~~ ⭐ `REG-D-114` (14), as amended 2026-10-16: before a phase, the rule's re-run of its
-	 * work or of its review, and a MODEL root's press, one try's reserve (`PHASE7_TRY_RESERVE`).
+	 * (`PHASE7_REREVIEW_REVIEWER_CALLS`).~~ ~~⭐ `REG-D-114` (14), as amended 2026-10-16: before a phase, the rule's re-run of its
+	 * work or of its review, and a MODEL root's press, one try's reserve (`PHASE7_TRY_RESERVE`).~~ ⭐⭐ Package L — D16
+	 * (`REG-D-135` (4)): before EVERY press, its whole worst case — a phase's, the rule's re-run of its work and a MODEL root's,
+	 * (3 tries + 32 command runs) × 6 (`PHASE7_UNIT_REVIEWER_CALLS`); the rule's re-run of a review, its refused reviews × 6
+	 * (`phase7RereviewReviewerCalls`).
 	 */
 	readonly ahead: number;
 	/**
 	 * ⭐ `REG-D-114` (14), as amended 2026-10-16 — WHAT `ahead` COUNTED, in words (`COUNTED_AHEAD`), so the run report says what
-	 * each check counted: one try's reserve, an act's worst case, or none.
+	 * each check counted: ~~one try's reserve~~ ⭐ (package L, D16) a press's whole worst case, an act's worst case, or none.
 	 */
 	readonly counted: string;
 	readonly total: number;
@@ -620,7 +626,7 @@ export function unpressed(units: readonly ArchiveUnit[]): RunUnit[] {
  * counts its WORST CASE too, as every other check does: a model unit's before a phase and before a re-run of its work
  * (`PHASE7_UNIT_REVIEWER_CALLS`), a re-review's before a re-run of its review (`PHASE7_REREVIEW_REVIEWER_CALLS`). ⛔ It
  * counted their first call only, so a phase let through with one call left could spend up to 139 past the limit.~~
- * ⭐⭐ `REG-D-114` (14), AS AMENDED 2026-10-16 — before a phase, the rule's re-run of its work or of its review, and a MODEL
+ * ~~⭐⭐ `REG-D-114` (14), AS AMENDED 2026-10-16 — before a phase, the rule's re-run of its work or of its review, and a MODEL
  * root's press, the act counts ONE TRY'S RESERVE (`PHASE7_TRY_RESERVE`), D8's own rule: the lane checks again before every
  * later press. ⛔ Their whole worst case would refuse every phase once about 306 calls are spent ⭐ (at the limit of 450;
  * ~~at today's 600, once 456 are: 600, less the 4 held back and the phase's 140~~ ~~⭐ at today's 650, once 506 are: 650,
@@ -629,8 +635,15 @@ export function unpressed(units: readonly ArchiveUnit[]): RunUnit[] {
  * held back and the phase's 140, the review in parts, package C, B6; `REG-D-126` Q32~~ ⭐ at today's 1000, once 856 are: 1000,
  * less the 4 held back and the phase's 140, the review in parts, package I, B8b; `REG-D-131` Q37). ⚠ So a phase's own spend
  * can carry the total past the limit, for nothing checks it during the press; the run report says so. A sign-off and the
- * rule's re-run of its declared reviews still count their worst case, and Send the authoring floor's. ⭐ And the check
+ * rule's re-run of its declared reviews still count their worst case, and Send the authoring floor's.~~ ⭐ And the check
  * records what it counted, in words (`counted`, `COUNTED_AHEAD`).
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L — D16 (`REG-D-135` (4), Q44; design D16) — THE SPONSOR'S RULING REPLACES THE ONE TRY'S RESERVE:
+ * before EACH press the lane counts that press's WHOLE worst case — a phase's Begin & Execute, the rule's re-run of its work and
+ * a MODEL root's press, (3 tries + 32 command runs) × 6 = 210; the rule's re-run of a review, the refused reviews it re-runs × 6;
+ * a sign-off and the rule's re-run of its declared reviews, the declared reviews × 6; Send, the authoring floor's worst case at
+ * 6 calls a review — with the negative control's 4 held back in each. Reaching the limit is allowed; passing it is refused, so
+ * the recorded exchanges cannot pass it. ⛔ The struck sentences above, that a phase's own spend can carry the total past the
+ * limit, held of the one try's reserve, and hold no longer.
  */
 export function limitCheck(prior: number, recorded: number, ahead: number, counted: string): LimitCheck {
 	const total = prior + recorded + PHASE7_NEGATIVE_CONTROL_RESERVE + ahead;
@@ -648,14 +661,23 @@ export function limitCheck(prior: number, recorded: number, ahead: number, count
 
 /**
  * ⭐ `REG-D-114` (14), as amended 2026-10-16 — WHAT EACH CHECK COUNTED AHEAD OF ITS ACT, as the record says it
- * (`LimitCheck.counted`) and the run report prints it: one try's reserve before a phase, the rule's re-run of its work or of
- * its review, and a MODEL root's press; none before a root that runs no model; an act's worst case before a sign-off and
+ * (`LimitCheck.counted`) and the run report prints it: ~~one try's reserve before a phase, the rule's re-run of its work or of
+ * its review, and a MODEL root's press~~ ⭐ (package L, D16; `REG-D-135` (4)) the press's whole worst case before a phase, the
+ * rule's re-run of its work and a MODEL root's press, and the refused reviews before the rule's re-run of a review; none before
+ * a root that runs no model; an act's worst case before a sign-off and
  * the rule's re-run of its declared reviews (`signOffWorstCase`), and before Send (~~`PHASE7_AUTHORING_REVIEWER_CALLS`~~ ⭐ the
  * review in parts, B6: `phase7AuthoringReviewerCalls`, for the inventory anticipated — and, once the turn has settled, for
  * the inventory it staged, Send's check counted again, `AuthoringRecord.inventoryCheck`).
  */
 export const COUNTED_AHEAD = {
-	tryReserve: 'one try’s reserve',
+	// ~~tryReserve: 'one try’s reserve',~~ ⛔ Package L — D16 (`REG-D-135` (4)): no check counts one try's reserve.
+	/** ⭐ D16 — a phase's Begin & Execute, the rule's re-run of its work, a MODEL root's press: `PHASE7_UNIT_REVIEWER_CALLS`. */
+	wholePress: `its whole press’s worst case, (${LANE_BUDGET.tries} tries + ${PHASE7_REVIEWED_COMMANDS} command runs) × ${LANE_BUDGET.reviewerCallsPerTry} calls`,
+	/** ⭐ D16 — the rule's re-run of a stopped phase's review, its refused reviews read from the store (`refusedReviewsOf`). */
+	refusedReviews: (refused: number) =>
+		`its refused reviews’ worst case, ${refused} × ${LANE_BUDGET.reviewerCallsPerTry} calls`,
+	/** ⭐ D16 — the same, where the store names none: every review the stopped attempt could hold (`phase7RereviewReviewerCalls`). */
+	refusedReviewsUnread: `its refused reviews’ worst case — the store names none, so every review the attempt holds, (1 work product + ${PHASE7_REVIEWED_COMMANDS} command runs) × ${LANE_BUDGET.reviewerCallsPerTry} calls`,
 	noModel: 'none: it runs no model',
 	declaredReviews: 'its declared reviews’ worst case',
 	authoringFloor: `the authoring floor’s worst case, for ${PHASE7_AUTHORING_ANTICIPATED_PARTS} anticipated types`,
@@ -802,6 +824,54 @@ export function rerunReading(planBefore: string | null, snap: EngineSnapshot, un
 	if (s.executionState === 'SUCCEEDED' && s.planStepState === 'SUCCEEDED') return 'recovered';
 	if (s.executionState === 'WAITING' && s.planStepState === 'WAITING') return 'refused-again';
 	return 'stopped-otherwise';
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L — D16 (`REG-D-135` (4); design D16) — THE REFUSED REVIEWS A RE-RUN OF A STOPPED UNIT'S REVIEW
+ * RE-RUNS, read from the store as the server reads it (`stopped-unit-recovery.ts` `stoppedUnitOf`, whose refusals `rerunReview`
+ * re-runs): the unit's ACTIVE plan's WAITING step; its attempt — a re-review's step names its work product as its input, a
+ * producer step's attempt is the one its last work product names; that attempt's work product and its command evidence; each
+ * of them refused unless its latest assessment under every floor policy is SATISFIED (latest by `updatedAt`, a tie to the last
+ * seen — the floor gate's rule). ⛔ `undefined` — never zero — when the store names no stopped attempt (no waiting step, or no
+ * work product of it): the caller then counts every review the attempt could hold (`phase7RereviewReviewerCalls`).
+ * ⚠ RESTATED, because this module imports no package of the engine, as `declaredPolicyIdsOf` restates the kernel's union; the
+ * floor's policies are the authoring floor's three (`AUTHORING_FLOOR_POLICIES`), which `verif/phase7-half-b.test.ts` holds to
+ * the product.
+ */
+export function refusedReviewsOf(snap: EngineSnapshot, unitId: string): number | undefined {
+	const step = snap.executionPlans
+		.filter((p) => p.state.workUnitId === unitId && p.state.status === 'ACTIVE')
+		.flatMap((p) => (p.state.steps as Record<string, unknown>[] | undefined) ?? [])
+		.find((x) => x.stepState === 'WAITING');
+	if (step === undefined) return undefined;
+	const attemptOf = (artifactId: string): string => str(snap.artifacts.find((a) => a.id === artifactId)?.state.producingExecutionAttemptId);
+	let workProductId: string;
+	if (step.stepType === 'ASSURANCE_INVOCATION')
+		workProductId = str((step.inputBindings as { artifactId?: unknown }[] | undefined)?.[0]?.artifactId);
+	else {
+		const ofStep = snap.artifacts.filter((a) => str(a.state.producingExecutionAttemptId).startsWith(`${str(step.id)}#`));
+		workProductId = ofStep.at(-1)?.id ?? '';
+	}
+	const attempt = workProductId === '' ? '' : attemptOf(workProductId);
+	if (attempt === '') return undefined;
+	const subjects = [
+		workProductId,
+		...snap.evidence
+			.filter((e) => (e.state.contentReference as { producingExecutionAttemptId?: unknown } | undefined)?.producingExecutionAttemptId === attempt)
+			.map((e) => e.id)
+	];
+	const satisfied = (subject: string): boolean =>
+		AUTHORING_FLOOR_POLICIES.every((policy) => {
+			let latest: { at: string; state: string } | undefined;
+			for (const a of snap.assessments) {
+				const over = (a.state.subjectObjectIds as unknown[] | undefined) ?? [];
+				if (!over.includes(subject) || a.state.assurancePolicyId !== policy) continue;
+				const at = str(a.state.updatedAt);
+				if (latest === undefined || at >= latest.at) latest = { at, state: str(a.state.assessmentState) };
+			}
+			return latest?.state === 'SATISFIED';
+		});
+	return subjects.filter((subject) => !satisfied(subject)).length;
 }
 
 /** ⭐ D8 — the reviewer calls this run's store records: every ASSURANCE exchange, a lower bound (`run-archive.ts`). */
@@ -1139,7 +1209,9 @@ export const RULE_RATIONALE: Readonly<Record<RecoveryAct, string>> = {
 // re-review's (`PHASE7_REREVIEW_REVIEWER_CALLS`), the floors run again over the refused work with no producer; and a model
 // unit's for the work run again, the whole unit (`PHASE7_UNIT_REVIEWER_CALLS`).~~ ⛔ Removed by `REG-D-114` (14), as amended
 // 2026-10-16: the rule's re-run of either counts one try's reserve (`PHASE7_TRY_RESERVE`), as a phase does
-// (`recoverByRule`). An abandonment calls no model, and is not checked.
+// (`recoverByRule`). An abandonment calls no model, and is not checked. ⭐ Package L — D16 (`REG-D-135` (4)): that reserve is
+// gone — the re-run of the work counts the unit's whole press (`PHASE7_UNIT_REVIEWER_CALLS`), the re-run of the review the refused
+// reviews it re-runs (`refusedReviewsOf`, `phase7RereviewReviewerCalls`).
 
 /** ⭐ P7-6R R-1f — the choices the row offers, once it is drawn. ⚠ Waited for first, as `recordAssurance` waits. */
 export async function recoveryOffers(row: Locator): Promise<RecoveryOffers> {
@@ -1994,14 +2066,15 @@ export function typeUnreadableOf(snap: EngineSnapshot, unitId: string): string |
 /**
  * ⭐⭐ `REG-D-112` (E3's review, finding 2) — D8 BEFORE HALF B'S ROOT IS PRESSED: the agent's root may declare MODEL — §3.2's
  * runs none — and then its press runs a model and its reviews, so ~~a MODEL root's worst case is counted
- * (`PHASE7_UNIT_REVIEWER_CALLS`)~~ ⭐ `REG-D-114` (14), as amended 2026-10-16: a MODEL root counts one try's reserve
- * (`PHASE7_TRY_RESERVE`), as a phase does; a root that declares anything else runs no model, and counts none. ⭐ By the one
- * rule (`limitCheck`; the lead's delegated decision of 2026-10-16, registered as REG-D-114 (14), as amended 2026-10-16).
+ * (`PHASE7_UNIT_REVIEWER_CALLS`)~~ ~~⭐ `REG-D-114` (14), as amended 2026-10-16: a MODEL root counts one try's reserve
+ * (`PHASE7_TRY_RESERVE`), as a phase does~~ ⭐⭐ package L, D16 (`REG-D-135` (4)): a MODEL root counts its whole press's worst
+ * case (`PHASE7_UNIT_REVIEWER_CALLS`), as a phase does; a root that declares anything else runs no model, and counts none. ⭐ By
+ * the one rule (`limitCheck`; the lead's delegated decision of 2026-10-16, registered as REG-D-114 (14), as amended 2026-10-16).
  */
 export function rootLimitCheck(prior: number, snap: EngineSnapshot, rootId: string): LimitCheck {
 	const recorded = recordedReviewerCalls(snap);
 	return dischargeOf(snap, rootId) === 'MODEL'
-		? limitCheck(prior, recorded, PHASE7_TRY_RESERVE, COUNTED_AHEAD.tryReserve)
+		? limitCheck(prior, recorded, PHASE7_UNIT_REVIEWER_CALLS, COUNTED_AHEAD.wholePress)
 		: limitCheck(prior, recorded, 0, COUNTED_AHEAD.noModel);
 }
 
@@ -2346,12 +2419,19 @@ export async function runTheLane(r: {
 			// ⭐ The one rule (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (14), as amended 2026-10-16): ~~the re-run's first
 			// call~~ ~~⭐ R3-B's fix round (F1): the re-run's worst case (`RERUN_WORST_CASE`)~~ ⭐ `REG-D-114` (14), as amended
 			// 2026-10-16: one try's reserve, as before a phase — the lane checks again before every later press.
-			const check = limitCheck(
-				boot.prior as number,
-				recordedReviewerCalls(snapshot),
-				PHASE7_TRY_RESERVE,
-				COUNTED_AHEAD.tryReserve
-			);
+			// ⭐⭐ Package L — D16 (`REG-D-135` (4)): ~~one try's reserve~~ — the re-run's WHOLE worst case: a re-run of the work runs the
+			// unit again, its whole press; a re-run of the review re-runs the refused reviews alone, each up to 6 calls, read from
+			// the store as the server reads them — and where the store names none, every review the stopped attempt could hold.
+			const recorded = recordedReviewerCalls(snapshot);
+			const refused = rerun === 'rerunReview' ? refusedReviewsOf(snapshot, unit.unitId!) : undefined;
+			const reRunAhead = rerun === 'rerunWork' ? PHASE7_UNIT_REVIEWER_CALLS : phase7RereviewReviewerCalls(refused);
+			const reRunCounted =
+				rerun === 'rerunWork'
+					? COUNTED_AHEAD.wholePress
+					: refused === undefined
+						? COUNTED_AHEAD.refusedReviewsUnread
+						: COUNTED_AHEAD.refusedReviews(refused);
+			const check = limitCheck(boot.prior as number, recorded, reRunAhead, reRunCounted);
 			if (!check.allowed) {
 				notPressed(unit, rerun, check, `the limit: ${check.total} of ${check.limit} reviewer calls (D8)`);
 				return 'paid-limit';
@@ -2422,13 +2502,14 @@ export async function runTheLane(r: {
 			const rootCheck = rootLimitCheck(boot.prior as number, snapshot, root.unitId!);
 			root.limitCheck = rootCheck;
 			writeRunRecord(lane, record);
-			// ⛔ Round 4's check, F2 — the end's words say what the check counted (`counted`): one try's reserve for a MODEL
-			// root, none for a root that runs no model. ⛔ They said "its worst case", which this check no longer counts.
+			// ⛔ Round 4's check, F2 — the end's words say what the check counted (`counted`): ~~one try's reserve~~ ⭐ (package L,
+			// D16) its whole press's worst case for a MODEL root, none for a root that runs no model. ⛔ They said "its worst case",
+			// which this check no longer counts. ⭐ D16 — and they cite the ruling the count is, `REG-D-135` (4).
 			if (!rootCheck.allowed)
 				return end(
 					'paid-limit',
 					`the limit, before the root’s press: ${rootCheck.total} of ${rootCheck.limit} reviewer calls, ` +
-						`${rootCheck.ahead} ahead (${rootCheck.counted}) counted (D8; REG-D-112; REG-D-114 (14), as amended 2026-10-16)`
+						`${rootCheck.ahead} ahead (${rootCheck.counted}) counted (D8; REG-D-112; REG-D-135 (4))`
 				);
 		}
 		// ⛔ THE ROOT'S PRESS IS BOUNDED AS EVERY PRESS IS (D4): with no answer, the run ends here, dry or paid.
@@ -2444,11 +2525,13 @@ export async function runTheLane(r: {
 			// call~~ ~~⭐ R3-B's fix round (F1): the phase's worst case, a model unit's~~ ⭐ `REG-D-114` (14), as amended
 			// 2026-10-16: one try's reserve, D8's own rule — the lane checks again before every later press, so a phase's own
 			// spend can carry the total past the limit.
+			// ⭐⭐ Package L — D16 (`REG-D-135` (4)): ~~one try's reserve~~ — the press's WHOLE worst case, (3 tries + 32 command
+			// runs) × 6, so the phase cannot carry the total past the limit.
 			unit.limitCheck = limitCheck(
 				boot.prior as number,
 				recordedReviewerCalls((await hands.read()).snapshot),
-				PHASE7_TRY_RESERVE,
-				COUNTED_AHEAD.tryReserve
+				PHASE7_UNIT_REVIEWER_CALLS,
+				COUNTED_AHEAD.wholePress
 			);
 			if (!unit.limitCheck.allowed) {
 				reason = 'paid-limit';

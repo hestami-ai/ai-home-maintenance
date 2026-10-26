@@ -126,9 +126,14 @@ export function scoringCorpus(criteria: readonly AssessmentCriterion[]): readonl
 			covers: 'REG-F-428: a finding under an id the policy does not declare, beside a full set',
 			replies: [reply([...ids.map((id) => row(id)), row('RR-10-no-such-failure-class', true, 'BLOCKING')])]
 		},
+		// ⭐ Package L — D13 (`REG-D-135` (3); design D13): each of the next two — `corrupted-id` and `skipped-row` — faults
+		// nothing and leaves a declared criterion without a row, so each now draws ONE criterion repair (2 calls), its line
+		// naming that criterion; its one reply repeating, the repair leaves it without a row again, and the first judgement
+		// stands, as before the repair existed. So the calls they draw, and D13's line, are hashed (`fingerprint.ts`).
 		{
 			id: 'corrupted-id',
-			covers: 'REG-F-428 (2): an id written with a space for a hyphen, so its criterion goes unjudged',
+			covers:
+				'REG-F-428 (2): an id written with a space for a hyphen, so its criterion has no row — and (package L, D13) the criterion repair naming it, answered alike, leaves the first judgement standing, unjudged',
 			replies: [reply(ids.map((id) => row(id === third ? id.replace(/-(?=[^-]*$)/, ' ') : id)))]
 		},
 		{
@@ -159,8 +164,26 @@ export function scoringCorpus(criteria: readonly AssessmentCriterion[]): readonl
 		},
 		{
 			id: 'skipped-row',
-			covers: 'one criterion never answered',
+			covers:
+				'one criterion never answered — and (package L, D13) the criterion repair naming it, answered alike, leaves the first judgement standing',
 			replies: [reply(ids.slice(1).map((id) => row(id)))]
+		},
+		// ⭐⭐ Package L — D13 (`REG-D-135` (3)): run-12's shape, a declared criterion's row filed under an id the policy does not
+		// declare, nothing faulted — here the criterion repair answers every criterion, and its judgement is the one scored;
+		// and the same reply as the JSON repair's parsed answer, which D13 judges as a first reply is (run-12's case 43), three
+		// calls. So dropping the repair, using one that left a criterion without a row, keeping the first judgement after one
+		// that answered, or skipping it after a JSON repair moves the digest (the calls drawn, and the outcome).
+		{
+			id: 'missing-row-repaired',
+			covers:
+				'REG-F-566: eight clean rows and one under an id the policy does not declare; the criterion repair (D13) answers every criterion clean, and its judgement is used',
+			replies: [reply(ids.map((id) => row(id === third ? `${id}-scope` : id))), clean]
+		},
+		{
+			id: 'json-repair-then-missing-row',
+			covers:
+				'REG-F-566, case 43: the first reply fails to parse, the JSON repair answers with a row under an undeclared id; the criterion repair (D13) follows it and answers every criterion clean — three calls',
+			replies: ['I could not decide which failure classes apply.', reply(ids.map((id) => row(id === third ? `${id}-scope` : id))), clean]
 		},
 		// ⭐ P7-6 I5 — each of these two answers no criterion, so each now draws the criterion repair, which (its one reply
 		// repeating) answers none again: the first judgement stands, as before the repair existed.
@@ -211,7 +234,8 @@ export function scoringCorpus(criteria: readonly AssessmentCriterion[]): readonl
 		},
 		{
 			id: 'escalated-skipped-row',
-			covers: 'one criterion never answered, the recommendation ESCALATED — INCONCLUSIVE stays: rule (a) is keyed on a computed SATISFIED, never on "no criterion failed" (REG-D-090)',
+			covers:
+				'one criterion never answered, the recommendation ESCALATED — INCONCLUSIVE stays: rule (a) is keyed on a computed SATISFIED, never on "no criterion failed" (REG-D-090); ⭐ package L, D13: it draws the criterion repair, answered alike, so 2 calls',
 			replies: [reply(ids.slice(1).map((id) => row(id)), 'ESCALATED')]
 		},
 		{
@@ -325,7 +349,8 @@ export function declaredScoringCorpus(declared: readonly DeclaredProbePolicy[]):
 		},
 		{
 			id: 'declared-skipped-row',
-			covers: 'a mandatory criterion never answered: INCONCLUSIVE',
+			covers:
+				'a mandatory criterion never answered: INCONCLUSIVE — ⭐ package L, D13: it draws the criterion repair, answered alike, so 2 calls',
 			case: coverage,
 			replies: [reply(rc.slice(1).map((id) => row(id)))]
 		},

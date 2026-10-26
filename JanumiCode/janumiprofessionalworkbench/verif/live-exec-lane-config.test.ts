@@ -69,6 +69,7 @@ import {
 	PHASE7_TEST_TIMEOUT_MS,
 	PHASE7_UI_MS,
 	PHASE7_UNIT_ALLOWANCE_MS,
+	PHASE7_UNIT_REVIEWER_CALLS,
 	PHASE7_UNIT_RUN_MS,
 	REVIEWER_IDENTITY_EVIDENCE,
 	REVIEWER_MODEL_VARIABLE,
@@ -669,40 +670,53 @@ describe('⭐ the lane waits for the reviewer’s bounded worst case — the rev
 		expect(prompts.length).toBeLessThanOrEqual(LANE_BUDGET.reviewerCallsPerTry);
 	});
 
-	it('⭐ P7-2b — a review is at most FOUR calls: each of its two calls, thrown short of devin’s bound, is run once more — measured by driving the product’s devin branch with a program that fails, answers in no JSON, fails, and answers in no JSON again', async () => {
+	// ~~⭐ P7-2b — a review is at most FOUR calls: each of its two calls, thrown short of devin’s bound, is run once more~~ ⛔
+	// MOVED DELIBERATELY by package L — D13 (`REG-D-135` (3); design D13): a review makes at most one JSON repair AND one
+	// criterion repair, so THREE calls, each run once more after a throw: SIX. The program now answers once in no JSON and then
+	// twice with a criterion's row under an id the policy does not declare (run-12's case 43), so every call the bound counts is
+	// made: the JSON repair's parsed reply draws the criterion repair, which slips again.
+	it('⭐ package L — D13 — a review is at most SIX calls: each of its three calls — the first, the JSON repair and the criterion repair — thrown short of devin’s bound, is run once more — measured by driving the product’s devin branch with a program that fails, answers in no JSON, fails, answers with a criterion’s row misfiled, fails, and answers so again', async () => {
 		// ⭑ THE PRODUCT'S OWN BRANCH (`createFloorRegistry`), NOT A VALIDATOR BUILT HERE: whether a thrown call is run again
 		// depends on the bound the validator knows for its tool, and the devin branch is where the product gives it one.
 		vi.stubEnv('JPWB_ASSURANCE_TOOL', 'devin');
 		vi.stubEnv('JPWB_ASSURANCE_MODEL', 'fixture-assurance');
 		const calls: number[] = [];
+		// ⭐ D13 — a reply that parses, faults nothing, and files the last criterion's row under an id the policy does not declare.
+		const last = SEEDED_REASONING_REVIEW_CRITERIA.at(-1)!.id;
+		const misfiled = JSON.stringify({
+			findings: SEEDED_REASONING_REVIEW_CRITERIA.map((k) => ({ criterionId: k.id === last ? `${k.id}-scope` : k.id, failed: false, statement: 'absent' })),
+			recommendation: 'SATISFIED'
+		});
 		const devin = async (_file: string, args: readonly string[]) => {
 			calls.push(calls.length + 1);
-			// Odd calls fail with no reply, short of the bound; even calls answer, never in JSON.
+			// Odd calls fail with no reply, short of the bound; the 2nd answers in no JSON, the 4th and 6th misfile a row.
 			if (calls.length % 2 === 1) throw new Error('devin exited with code 1: connection reset');
 			const exportPath = args[args.indexOf('--export') + 1]!;
 			writeFileSync(
 				exportPath,
 				JSON.stringify({ steps: [{ extra: { generation_model: 'fixture-assurance' } }] })
 			);
-			return { stdout: 'not JSON, and never will be' };
+			return { stdout: calls.length === 2 ? 'not JSON, and never will be' : misfiled };
 		};
 		const registry = createFloorRegistry({ testMode: false, devinExec: devin });
 		const plan = await runFloorAndPlanRecording(REVIEW_SUBJECT, REVIEW_CONTEXT, registry);
 		const review = plan.assessments.find((a) => a.policyId === FLOOR_POLICY_IDS.REASONING_REVIEW);
-		expect(review?.disposition, 'a reply malformed after its repair still fails the review').toBe(
+		expect(review?.disposition, 'a criterion left without a row after its criterion repair leaves the review incomplete').toBe(
 			'INCONCLUSIVE'
 		);
 		expect(calls, 'the calls one review made').toHaveLength(LANE_BUDGET.reviewerCallsPerTry);
-		expect(LANE_BUDGET.reviewerCallsPerTry).toBe(4);
+		// ⭐ Package L — D13: ~~4~~ 3 × 2.
+		expect(LANE_BUDGET.reviewerCallsPerTry).toBe(6);
 	});
 
-	it('the Begin & Execute wait covers every try’s executor allowance and ~~both of its reviewer calls~~ ⭐ all four of its reviewer calls; the test adds its setup', () => {
+	it('the Begin & Execute wait covers every try’s executor allowance and ~~both of its reviewer calls~~ ~~⭐ all four of its reviewer calls~~ ⭐ all six of its reviewer calls (package L, D13); the test adds its setup', () => {
 		const { tries, executorCallMs, reviewerCallsPerTry, reviewerCallMs, setupMs } = LANE_BUDGET;
 		expect(EXECUTE_TIMEOUT_MS).toBe(
 			tries * (executorCallMs + reviewerCallsPerTry * reviewerCallMs)
 		);
-		// ⭐ `P7-2b` — 3 × (240 s + 4 × 240 s) = 3,600 s. It was 3 × (240 s + 2 × 240 s) = 2,160 s.
-		expect(EXECUTE_TIMEOUT_MS).toBe(3_600_000);
+		// ⭐ Package L — D13 — 3 × (240 s + 6 × 240 s) = 5,040 s. ~~⭐ `P7-2b` — 3 × (240 s + 4 × 240 s) = 3,600 s.~~ It was
+		// 3 × (240 s + 2 × 240 s) = 2,160 s.
+		expect(EXECUTE_TIMEOUT_MS).toBe(5_040_000);
 		expect(TEST_TIMEOUT_MS).toBe(EXECUTE_TIMEOUT_MS + setupMs);
 	});
 
@@ -742,9 +756,10 @@ describe('⭐ P7-2 D4 — the Phase 7 lane waits an ALLOWANCE derived from the b
 		expect(PHASE7_COMMAND_MS).toBe(EXECUTION_COMMAND_TIMEOUT_MS);
 	});
 
-	it('one phase’s allowance: the Begin & Execute wait, 32 reviews of four 240 s calls, 32 commands of 120 s — 38,160 s', () => {
-		// 3,600 s + 32 × 4 × 240 s + 32 × 120 s = 3,600 s + 30,720 s + 3,840 s.
-		expect(PHASE7_UNIT_ALLOWANCE_MS).toBe(38_160_000);
+	it('one phase’s allowance: the Begin & Execute wait, 32 reviews of ~~four~~ six 240 s calls, 32 commands of 120 s — ~~38,160 s~~ 54,960 s', () => {
+		// ⭐ Package L — D13: 5,040 s + 32 × 6 × 240 s + 32 × 120 s = 5,040 s + 46,080 s + 3,840 s. ~~3,600 s + 32 × 4 × 240 s +
+		// 32 × 120 s = 3,600 s + 30,720 s + 3,840 s.~~
+		expect(PHASE7_UNIT_ALLOWANCE_MS).toBe(54_960_000);
 	});
 
 	it('⛔ BY REFERENCE: the allowance and the test timeout read the budget’s own figures, and state no number', () => {
@@ -816,24 +831,29 @@ describe('⭐ P7-2 D4 — the Phase 7 lane waits an ALLOWANCE derived from the b
 	// ⭐⭐ `E12F` F2, F3 — AND WAS *"391,440 s"*: each sign-off now reads the store for the limit before Record Assurance (300 s,
 	// F2), and may take the rule's one re-run of the declared reviews that did not conclude (`PHASE7_DECLARED_RERUN_MS`,
 	// 5,340 s, F3) — a paid act the timeout must count: 391,440 s + 5 × 5,640 s = 419,640 s.
-	it('⛔ the spec’s test timeout — every phase and recovery act at its bound, plus the setup’s allowance, 419,640 s — stays under Node’s timer ceiling', () => {
+	// ⭐⭐ Package L — D13 (`REG-D-135` (3)) — AND WAS *"419,640 s"*: each review is now up to six calls, so each phase's allowance,
+	// each re-run's and each sign-off's declared reviews grow with it: 1,800 + 5 × 55,740 + 1,200 + 4 × 58,080 + 5 × 15,120 + 420
+	// = 590,040 s.
+	it('⛔ the spec’s test timeout — every phase and recovery act at its bound, plus the setup’s allowance, ~~419,640 s~~ 590,040 s — stays under Node’s timer ceiling', () => {
 		// ⚠ FIRST, so a figure pushed past the ceiling reddens here by this message, not by the arithmetic below it.
 		expect(
 			PHASE7_TEST_TIMEOUT_MS,
 			'past 2,147,483,647 ms a Node timer fires at once, and Playwright would time the test out at its start'
 		).toBeLessThanOrEqual(2_147_483_647);
-		// 1,800 s + 5 × 38,940 s + 4 × 300 s + 4 × 1 × 41,280 s + 5 × 11,280 s + 120 s + 300 s
-		// = 1,800 s + 194,700 s + 1,200 s + 165,120 s + 56,400 s + 420 s = 419,640 s (116.6 hours).
+		// ⭐ Package L — D13: 1,800 s + 5 × 55,740 s + 4 × 300 s + 4 × 1 × 58,080 s + 5 × 15,120 s + 120 s + 300 s
+		// = 1,800 s + 278,700 s + 1,200 s + 232,320 s + 75,600 s + 420 s = 590,040 s (163.9 hours).
+		// ~~1,800 s + 5 × 38,940 s + 4 × 300 s + 4 × 1 × 41,280 s + 5 × 11,280 s + 120 s + 300 s
+		// = 1,800 s + 194,700 s + 1,200 s + 165,120 s + 56,400 s + 420 s = 419,640 s (116.6 hours).~~
 		// ~~5 × 5,640 s … = 391,440 s (108.7 hours)~~ — `E12F` F2, F3: each sign-off's limit read, and the rule's one declared re-run.
 		// ~~5 × 1,800 s … = 372,240 s (103.4 hours)~~ — E2: each sign-off's Record Assurance now runs its unit's declared reviews.
 		expect(
 			PHASE7_TEST_TIMEOUT_MS,
 			'the timeout is not every phase and recovery act at its bound plus the setup’s allowance: 1,800 s setup (an ' +
-				'allowance, its own acts NOT counted by their bounds) + 5 × 38,940 s (the root’s run and each phase’s) + 4 × 300 s ' +
-				'(the limit’s reads) + 4 × 1 × 41,280 s (a re-run, an abandonment and the rule’s UI acts for each phase) + ' +
-				'5 × 11,280 s (the sign-offs, each Record Assurance its unit’s declared reviews, the limit’s read before it and ' +
+				'allowance, its own acts NOT counted by their bounds) + 5 × 55,740 s (the root’s run and each phase’s) + 4 × 300 s ' +
+				'(the limit’s reads) + 4 × 1 × 58,080 s (a re-run, an abandonment and the rule’s UI acts for each phase) + ' +
+				'5 × 15,120 s (the sign-offs, each Record Assurance its unit’s declared reviews, the limit’s read before it and ' +
 				'the rule’s one re-run of the declared reviews) + 120 s + 300 s (the final screenshot and read)'
-		).toBe(419_640_000);
+		).toBe(590_040_000);
 	});
 
 	// ⭐⭐ `P76F-C` C8 — EACH TERM, AT ITS BOUNDS: the arithmetic the timeout's comment states, held term by term, so a bound
@@ -843,20 +863,22 @@ describe('⭐ P7-2 D4 — the Phase 7 lane waits an ALLOWANCE derived from the b
 		expect(PHASE7_SHOW_OVERVIEW_MS).toBe(3 * PHASE7_UI_MS);
 		// One Begin & Execute and what follows it: the press, the overview again, the store read, the screenshot.
 		expect(PHASE7_UNIT_RUN_MS).toBe(PHASE7_UNIT_ALLOWANCE_MS + 360_000 + 300_000 + 120_000);
-		expect(PHASE7_UNIT_RUN_MS).toBe(38_940_000);
-		// The rule on one stopped phase: the re-run (39,720 s) and the abandonment that may follow it (1,560 s).
-		expect(PHASE7_RECOVERY_MS).toBe(39_720_000 + 1_560_000);
+		// ⭐ Package L — D13: ~~38,940 s~~ 55,740 s; the re-run ~~39,720 s~~ 56,520 s.
+		expect(PHASE7_UNIT_RUN_MS).toBe(55_740_000);
+		// The rule on one stopped phase: the re-run (56,520 s) and the abandonment that may follow it (1,560 s).
+		expect(PHASE7_RECOVERY_MS).toBe(56_520_000 + 1_560_000);
 		// One unit's sign-off: the overview, then two acts, each its row's wait, its press and the store read after —
 		// ⭐ E2 (design B8): and Record Assurance's declared reviews, four policies' of four 240 s calls each.
 		// ⭐⭐ `E12F` F2, F3 — and the store read for the limit before it, and the rule's one re-run of the declared reviews that
 		// did not conclude: the overview again, the row's offer, the limit's read, the fill, the press (Record Assurance's
-		// bound) and the store read after — 360 + 120 + 300 + 120 + 4,140 + 300 = 5,340 s.
-		expect(PHASE7_DECLARED_RERUN_MS).toBe(360_000 + 120_000 + 300_000 + 120_000 + 4_140_000 + 300_000);
-		expect(PHASE7_DECLARED_RERUN_MS).toBe(5_340_000);
+		// bound) and the store read after — 360 + 120 + 300 + 120 + ~~4,140~~ 6,060 + 300 = ~~5,340 s~~ 7,260 s (package L, D13:
+		// each declared review up to six 240 s calls).
+		expect(PHASE7_DECLARED_RERUN_MS).toBe(360_000 + 120_000 + 300_000 + 120_000 + 6_060_000 + 300_000);
+		expect(PHASE7_DECLARED_RERUN_MS).toBe(7_260_000);
 		expect(PHASE7_SIGN_OFF_UNIT_MS).toBe(
-			360_000 + 2 * (120_000 + 300_000 + 300_000) + 4 * 4 * 240_000 + 300_000 + PHASE7_DECLARED_RERUN_MS
+			360_000 + 2 * (120_000 + 300_000 + 300_000) + 4 * 6 * 240_000 + 300_000 + PHASE7_DECLARED_RERUN_MS
 		);
-		expect(PHASE7_SIGN_OFF_UNIT_MS).toBe(11_280_000);
+		expect(PHASE7_SIGN_OFF_UNIT_MS).toBe(15_120_000);
 		// The units pressed and signed off: the root, and §3.2's four phases.
 		expect(PHASE7_PRESSED_UNITS).toBe(PHASE7_PHASES.length + 1);
 		// ⛔ The bounds the acts wait are these very figures: the operator names lane-config's, never a copy of its own.
@@ -874,15 +896,15 @@ describe('⭐ P7-2 D4 — the Phase 7 lane waits an ALLOWANCE derived from the b
 	// press was bounded as a sign-off act (300 s); it now runs a declared review of each of the unit's policies, one after
 	// another, each up to `reviewerCallsPerTry` calls of `reviewerCallMs`, so a sign-off whose reviews each stayed inside
 	// their bound would have been abandoned at 300 s — the paid run's first unit's sign-off ending as unanswered.
-	it('⭐⭐ E2 — Record Assurance is waited for up to its own act and a declared review of each of the most policies one §3.2 unit declares: 300 s + 4 × 4 × 240 s = 4,140 s', () => {
+	it('⭐⭐ E2 — Record Assurance is waited for up to its own act and a declared review of each of the most policies one §3.2 unit declares: 300 s + 4 × ~~4~~ 6 × 240 s = ~~4,140 s~~ 6,060 s (package L, D13)', () => {
 		// The most declared policies one unit carries, restated (this module imports nothing) and held to §3.2's PWA.
 		expect(PHASE7_DECLARED_POLICIES_PER_UNIT).toBe(
 			Math.max(...[...PHASE7_PHASES, PHASE7_ROOT].map((t) => t.policyIds.length))
 		);
 		expect(PHASE7_DECLARED_POLICIES_PER_UNIT, 'the design’s four (§3.2)').toBe(4);
-		expect(PHASE7_DECLARED_REVIEWS_MS).toBe(4 * 4 * 240_000);
+		expect(PHASE7_DECLARED_REVIEWS_MS).toBe(4 * 6 * 240_000);
 		expect(PHASE7_RECORD_ASSURANCE_MS).toBe(PHASE7_SIGN_OFF_MS + PHASE7_DECLARED_REVIEWS_MS);
-		expect(PHASE7_RECORD_ASSURANCE_MS).toBe(4_140_000);
+		expect(PHASE7_RECORD_ASSURANCE_MS).toBe(6_060_000);
 		// ⛔ BY REFERENCE: the reviews read the budget's own figures, and the sign-off counts them; no number is stated.
 		const sf = parsed(LANE);
 		expect(madeOf(sf, 'PHASE7_DECLARED_REVIEWS_MS')).toEqual({
@@ -936,7 +958,8 @@ describe('⭐ P7-2 D4 — the Phase 7 lane waits an ALLOWANCE derived from the b
 		]);
 		// ⭑ A sign-off waits on its reviews twice: Record Assurance's, and the rule's one re-run of them.
 		expect(at(5).map((ms, i) => ms - at(4)[i]!)).toEqual([review, review, review, 2 * review]);
-		expect([phase7RecordAssuranceMs(0), phase7RecordAssuranceMs(5)]).toEqual([PHASE7_SIGN_OFF_MS, 5_100_000]);
+		// ⭐ Package L — D13: ~~5,100,000~~ 300 s + 5 × 6 × 240 s.
+		expect([phase7RecordAssuranceMs(0), phase7RecordAssuranceMs(5)]).toEqual([PHASE7_SIGN_OFF_MS, 7_500_000]);
 	});
 
 	// ⭐ `JAN-EXEC` P7-6R — THE LIMIT IS NOW `REG-D-105` (1)'s, which amends `REG-D-102` (4): *"Raise limit to 200"*. The test
@@ -974,7 +997,13 @@ describe('⭐ P7-2 D4 — the Phase 7 lane waits an ALLOWANCE derived from the b
 	// thousands comma, and the meaning from Q37's own MEANING; ~~REG-D-126 Q32's chosen label, "Raise to about 900
 	// (Recommended)"~~ — superseded: the bridge measurement and P6 again reached about 895 of its 900, leaving about 5 for
 	// retries (Q37's question). The promise is unchanged.
-	it('⭐ D8 — the paid limit is the sponsor’s, read from the ruling in force, ~~REG-D-126 Q32~~ REG-D-131 Q37, which raises REG-D-110 (1)’s', () => {
+	// ⭐ `JAN-EXEC` Phase 7, package L — D16, D17 (2026-10-25) — THE RULING IN FORCE IS NOW `REG-D-135` (4), which raises
+	// `REG-D-131`'s limit: the sponsor chose *"About 2,400 (Recommended)"* (Q44), and the ruling's MEANING item (4) says *"The
+	// limit becomes about 2,400, raising `REG-D-131`'s about 1,000."* The number is read from that MEANING item, and the chosen
+	// label must name the same; ~~REG-D-131 Q37's chosen label, "Raise to about 1,000 (Recommended)"~~ — superseded: 1,001 of its
+	// about 1,000 were spent at run-12 (Q44's question). ⭑ And the same item states what each press now counts: a model unit's
+	// press 210, `(3 tries + 32 kept command runs) reviews × 6 calls` — the lane's `PHASE7_UNIT_REVIEWER_CALLS`, held to it here.
+	it('⭐ D8 — the paid limit is the sponsor’s, read from the ruling in force, ~~REG-D-131 Q37~~ REG-D-135 (4), which raises REG-D-131’s; and the whole press it counts, 210, is the ruling’s', () => {
 		const register = readFileSync(REGISTER, 'utf8');
 		const entry = (id: string) => {
 			const at = register.indexOf(`### ${id} `);
@@ -983,19 +1012,25 @@ describe('⭐ P7-2 D4 — the Phase 7 lane waits an ALLOWANCE derived from the b
 			return register.slice(at, next === -1 ? undefined : next);
 		};
 		expect(entry('REG-D-110'), 'REG-D-110 does not amend REG-D-102 (4)').toContain('(`REG-D-102` (4) amended)');
-		const q37 = entry('REG-D-131')
-			.split('\n- ')
-			.find((item) => item.startsWith('**Q37.**'));
-		expect(q37, 'REG-D-131 records no Q37').toBeDefined();
-		// ⭑ The label writes its number with a thousands comma, "1,000": read as written, then parsed without the comma.
-		const chosen = /the sponsor chose \*"Raise to about (\d{1,3}(?:,\d{3})*) \(Recommended\)"\*/.exec(q37!)?.[1];
-		expect(chosen, 'the label the sponsor chose in REG-D-131 Q37 states no limit').toBeDefined();
-		const meaning = q37!.split('\n  - ').find((part) => part.startsWith('**MEANING.**'));
-		expect(meaning, 'REG-D-131 Q37 records no MEANING').toBeDefined();
-		expect(meaning, 'REG-D-131 Q37’s meaning does not raise REG-D-110 (1)’s limit to the number chosen').toContain(
-			`\`REG-D-110\` (1)'s limit becomes about ${chosen}.`
+		const ruling = entry('REG-D-135');
+		const meaning = ruling.split('\n- ').find((item) => item.startsWith('**MEANING.**'));
+		expect(meaning, 'REG-D-135 records no MEANING').toBeDefined();
+		const four = meaning!.split('\n  ').find((line) => line.startsWith('4. '));
+		expect(four, 'REG-D-135’s MEANING has no item (4)').toBeDefined();
+		// ⭑ The item writes its number with a thousands comma, "2,400": read as written, then parsed without the comma.
+		const stated = /^4\. The limit becomes about (\d{1,3}(?:,\d{3})*), raising `REG-D-131`'s about 1,000\./.exec(four!)?.[1];
+		expect(stated, 'REG-D-135 (4) states no limit raising REG-D-131’s').toBeDefined();
+		expect(PHASE7_PAID_LIMIT, 'the lane’s limit is not the one REG-D-135 (4) states').toBe(Number(stated!.replaceAll(',', '')));
+		// ⭐ And the label the sponsor chose (Q44) names the same number.
+		expect(ruling, 'the label the sponsor chose in REG-D-135 Q44 does not name that limit').toContain(
+			`The sponsor chose *"About ${stated} (Recommended)"*`
 		);
-		expect(PHASE7_PAID_LIMIT, 'the lane’s limit is not the one the sponsor chose (REG-D-131 Q37)').toBe(Number(chosen!.replaceAll(',', '')));
+		// ⭐ D16 — the whole press the item says a model unit's press counts is the lane's.
+		const press = /A model unit's press counts (\d+): \((\d+) tries \+ (\d+) kept command runs\) reviews × (\d+) calls\./.exec(four!);
+		expect(press, 'REG-D-135 (4) states no whole press').not.toBeNull();
+		expect([PHASE7_UNIT_REVIEWER_CALLS, LANE_BUDGET.tries, PHASE7_REVIEWED_COMMANDS, LANE_BUDGET.reviewerCallsPerTry]).toEqual(
+			press!.slice(1).map(Number)
+		);
 	});
 
 	it('⭐ D8 — the reserve is the negative control’s own cap on reviewer calls (P7-4e)', () => {

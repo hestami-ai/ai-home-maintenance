@@ -523,6 +523,45 @@ describe('⭐ P7-2b (v) — a malformed reply still takes the repair path, and a
 			'retry:rejected'
 		]);
 	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L — D13 (`REG-D-135` (3); design D13): a review makes at most one JSON repair AND one
+	// criterion repair, each call run once more after a throw — three calls, six with retries (`LANE_BUDGET.reviewerCallsPerTry`).
+	it('⭑ D13 — the worst case is SIX calls: the first, the JSON repair and the criterion repair, each thrown once and run once more — and never a seventh', async () => {
+		// The JSON repair's reply parses, faults nothing and files RR-03's row under an id the policy does not declare
+		// (run-12's case 43): it draws the criterion repair, whose reply slips again — so the JSON repair's judgement stands.
+		const slipped = JSON.stringify({
+			findings: SEEDED_REASONING_REVIEW_CRITERIA.map((c) => ({
+				criterionId: c.id === 'RR-03-no-unjustified-scope-reduction' ? 'RR-03-no-obligation-elision-scope' : c.id,
+				failed: false,
+				statement: 'absent'
+			})),
+			recommendation: 'SATISFIED'
+		});
+		// ⛔ `tool` throws for a call it was not scripted for, so a seventh call shows in `prompts` and in the records.
+		const { prompts, print } = tool(
+			new Error(TRANSPORT),
+			'not JSON',
+			new Error(TRANSPORT),
+			slipped,
+			new Error(TRANSPORT),
+			slipped
+		);
+		const { validator, exchanges } = reviewer(print, clockAt(0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130));
+
+		const result = await settle(validator.evaluate(SUBJECT, CTX));
+
+		// ⛔ AT HEAD: FOUR calls — the JSON repair's parsed reply was taken as it stood.
+		expect(prompts, 'six calls, and no seventh').toHaveLength(6);
+		expect(result, 'a criterion repair that adds nothing leaves the earlier judgement: the review completes').not.toBeInstanceOf(Error);
+		expect(shape(exchanges.drain()).map((r) => `${r.role}:${r.disposition}`)).toEqual([
+			'initial:no-response',
+			'retry:repair-requested',
+			'repair:no-response',
+			'retry:repair-requested',
+			'repair:no-response',
+			'retry:rejected'
+		]);
+	});
 });
 
 /** Each try's role and disposition, in the order the tries were recorded. */

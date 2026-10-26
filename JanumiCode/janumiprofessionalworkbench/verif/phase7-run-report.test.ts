@@ -68,6 +68,7 @@ import { manifestProblems } from '../scripts/phase7/rerun-commands.js';
 // and the validator, its sink and the floor's recorder, which write the I5 records these cases read (`i5Chain`).
 import {
 	createAgyReasoningReviewValidator,
+	MISSING_CRITERION_ROW as VALIDATOR_D13_MARKER,
 	NO_CRITERION_ANSWERED as VALIDATOR_I5_MARKER,
 	type AgyPrint
 } from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
@@ -94,6 +95,7 @@ import {
 	FLOOR_POLICIES,
 	K5_OWED,
 	manifestArgv,
+	MISSING_CRITERION_ROW,
 	MODEL_EXECUTOR_NAME,
 	NO_CRITERION_ANSWERED,
 	OPERATOR_ACTOR_ID,
@@ -1075,6 +1077,111 @@ describe('JAN-EXEC P7-2 D9 — the pairing of a review with the call that conclu
 		expect(four.value).toBe('broke');
 		expect(four.registerIds).toContain('REG-F-552');
 		for (const id of ['REG-F-489', 'REG-F-428', 'REG-F-479', 'REG-F-499']) expect(four.registerIds, id).not.toContain(id);
+	});
+
+	// ── ⭐⭐ `JAN-EXEC` Phase 7, package L — D13 (`REG-D-135` (3); design D13): a reply that faults nothing and leaves a declared
+	// criterion without a row draws ONE criterion repair, after the first reply or the JSON repair's — told by its own marker
+	// (`MISSING_CRITERION_ROW`), never by I5's, and never read as a JSON repair's chain. ─────────────────────────────────────
+	/** Run-12's shape: every seeded criterion clean, the last's row filed under an id the policy does not declare. */
+	const SLIPPED = JSON.stringify({
+		findings: SEEDED_REASONING_REVIEW_CRITERIA.map((c, i, all) => ({
+			criterionId: i === all.length - 1 ? `${c.id}-scope` : c.id,
+			failed: false,
+			statement: 'met'
+		})),
+		recommendation: 'SATISFIED'
+	});
+
+	it('⭐ D13 — the marker the report tells a missing-criterion chain by is the validator’s own export, beside I5’s and distinct from it', async () => {
+		expect(MISSING_CRITERION_ROW).toBe(VALIDATOR_D13_MARKER);
+		const [asked, again] = await i5Chain(SLIPPED, SLIPPED);
+		expect(detailOf(asked).startsWith(MISSING_CRITERION_ROW), 'the request’s record').toBe(true);
+		expect(detailOf(again).startsWith(MISSING_CRITERION_ROW), 'a repair that left one without a row again').toBe(true);
+		expect(detailOf(asked), 'I5’s marker on a reply that answered eight criteria').not.toContain(NO_CRITERION_ANSWERED);
+	});
+
+	it('⭐ D13 — a criterion repair that ANSWERS every criterion concludes the review: answered, by the repair — said as D13’s, never I5’s', async () => {
+		const chain = await i5Chain(SLIPPED, ANSWERS);
+		expect(chain.map((x) => `${x.state.exchangeRole}:${x.state.disposition}`), 'arrangement: a D13 chain').toEqual(['INITIAL:REPAIR_REQUESTED', 'REPAIR:ACCEPTED']);
+		const p = pairReview('art_1', 1, chain);
+		// ⛔ AT HEAD: "concluded by its REPAIR call" — the general reading, the chain unread.
+		expect([p.label, p.concludedBy, p.detail]).toEqual([
+			'answered',
+			'mex_REPAIR_2_run_1',
+			'concluded by its REPAIR call, the criterion repair of a reply that left a declared criterion without a row (REG-F-566)'
+		]);
+	});
+
+	it('⛔ D13 — a criterion repair that leaves a criterion without a row AGAIN: concluded by the FIRST reply, REG-F-566’s case — never a failed repair, never I5’s label', async () => {
+		const chain = await i5Chain(SLIPPED, SLIPPED);
+		expect(chain.map((x) => `${x.state.exchangeRole}:${x.state.disposition}`), 'arrangement: a D13 chain').toEqual(['INITIAL:REPAIR_REQUESTED', 'REPAIR:REJECTED']);
+		const p = pairReview('art_1', 1, chain);
+		// ⛔ AT HEAD: refused, failed-repair — the last call's reading.
+		expect([p.label, p.refusal ?? null, p.concludedBy]).toEqual(['criterion-left-without-row', null, 'mex_INITIAL_1_run_1']);
+		expect(p.detail).toBe(
+			'its INITIAL reply left a declared criterion without a row, and its criterion repair left one without a row again ' +
+				"(REG-F-566): the review kept that reply's judgement, its recommendation recorded (REG-D-090)"
+		);
+		const unparsed = pairReview('art_1', 1, await i5Chain(SLIPPED, PROSE));
+		expect([unparsed.label, unparsed.detail]).toEqual([
+			'criterion-left-without-row',
+			'its INITIAL reply left a declared criterion without a row, and its criterion repair did not parse ' +
+				"(REG-F-566): the review kept that reply's judgement, its recommendation recorded (REG-D-090)"
+		]);
+	});
+
+	it('⭐ D13 — AFTER A JSON REPAIR: the JSON repair’s reply asked for the criterion repair, and the chain is read from it — answered by the repair, or concluded by the JSON repair’s reply', async () => {
+		const answered = await i5Chain(PROSE, SLIPPED, ANSWERS);
+		expect(answered.map((x) => `${x.state.exchangeRole}:${x.state.disposition}`), 'arrangement: first, JSON repair, criterion repair').toEqual([
+			'INITIAL:REPAIR_REQUESTED',
+			'REPAIR:REPAIR_REQUESTED',
+			'REPAIR:ACCEPTED'
+		]);
+		const a = pairReview('art_1', 1, answered);
+		expect([a.label, a.concludedBy, a.detail]).toEqual([
+			'answered',
+			'mex_REPAIR_3_run_1',
+			'concluded by its REPAIR call, the criterion repair of a reply that left a declared criterion without a row (REG-F-566)'
+		]);
+		const again = pairReview('art_1', 1, await i5Chain(PROSE, SLIPPED, SLIPPED));
+		// ⛔ The review kept the JSON REPAIR's reply's judgement: it, not the first reply (which did not parse), concluded it.
+		expect([again.label, again.concludedBy]).toEqual(['criterion-left-without-row', 'mex_REPAIR_2_run_1']);
+		expect(again.detail).toContain('its REPAIR reply left a declared criterion without a row');
+		// ⭐ And I5's after a JSON repair, told by I5's marker on the JSON repair's reply.
+		const none = pairReview('art_1', 1, await i5Chain(PROSE, NO_ROWS, NONE_AGAIN));
+		expect([none.label, none.concludedBy]).toEqual(['no-criterion-answered', 'mex_REPAIR_2_run_1']);
+		expect(none.detail).toContain('its REPAIR reply answered no criterion, and its criterion repair answered none either (REG-F-552)');
+	});
+
+	it('⭑ CONTROL — a JSON repair whose reply is ACCEPTED, or refused, is still a JSON repair’s chain: the general reading stands', async () => {
+		const ok = pairReview('art_1', 1, await i5Chain(PROSE, ANSWERS));
+		expect([ok.label, ok.concludedBy, ok.detail]).toEqual(['answered', 'mex_REPAIR_2_run_1', 'concluded by its REPAIR call']);
+		const refused = pairReview('art_1', 1, [
+			call('INITIAL', 'REPAIR_REQUESTED', 1, { parse: 'JSON_EXTRACTION_FAILED' }),
+			call('REPAIR', 'REJECTED', 2, { parse: 'JSON_PARSE_FAILED' })
+		]);
+		expect([refused.label, refused.refusal]).toEqual(['refused', 'failed-repair']);
+	});
+
+	it('⛔ D13 — the stage-4 cell names REG-F-566 for a review that concluded on a reply leaving a declared criterion without a row, and none of a failed repair’s ids', async () => {
+		const [first] = await i5Chain(SLIPPED, new Error('devin invocation failed: connection reset'));
+		const r = reportOf(
+			aRun({
+				design: {
+					workProductFloor: ['SATISFIED', 'SATISFIED', 'INCONCLUSIVE'],
+					stepState: 'WAITING',
+					unit: { lifecycle: 'EXECUTING', execution: 'WAITING', assurance: 'UNASSESSED' },
+					review: [
+						{ role: 'INITIAL', disposition: 'REPAIR_REQUESTED', ordinal: 1, parse: 'SCHEMA_COERCION_FAILED', detail: detailOf(first) },
+						{ role: 'REPAIR', disposition: 'NO_RESPONSE', ordinal: 2, parse: 'NOT_ATTEMPTED' }
+					]
+				}
+			})
+		).report;
+		const four = cellOf(r, '4', 'design');
+		expect(four.value).toBe('broke');
+		expect(four.registerIds).toContain('REG-F-566');
+		for (const id of ['REG-F-552', 'REG-F-489', 'REG-F-428', 'REG-F-479', 'REG-F-499']) expect(four.registerIds, id).not.toContain(id);
 	});
 
 	it('⭐ the MARKER the report tells an I5 chain by is the validator’s own export, and opens the request’s record and a repair’s that answered none — and no other', async () => {
@@ -2385,7 +2492,11 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 		]);
 	});
 
-	it('⛔ REG-D-114 (14), as amended — the reviewer calls carry a plain caveat, in report.json and report.md: a phase’s own spend can carry the total past the limit, because the lane checks before each press, not during one', () => {
+	// ⭐⭐ Package L — D16 (`REG-D-135` (4); design D16) — MOVED DELIBERATELY: ~~"a phase’s own spend can carry the total past the
+	// limit"~~ — the lane counts each press's WHOLE worst case before it now, so the recorded exchanges cannot pass the limit; and
+	// the caveat says what that bound does not reach: the recorded count is a lower bound when a capture faults, and no count of
+	// calls absent from the record is claimed. The struck caveat, and its rulings' history, below.
+	it('⛔ D16 (REG-D-135 (4)) — ~~a phase’s own spend can carry the total past the limit~~ the reviewer calls carry a plain caveat, in report.json and report.md: the lane counts each press’s whole worst case before it, so the recorded exchanges cannot pass the limit — and the recorded count is a lower bound', () => {
 		// ⛔ PREDICTED RED, read from the code: the report said nothing of it, so a run whose reads each let a press through read
 		// as a run held to the limit throughout.
 		// ⭐ P5 package C (F2) — ~~the sponsor’s limit is "about 450", REG-D-110 (1)~~: the sponsor raised it to about 600
@@ -2400,13 +2511,20 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 		// (`REG-D-131` Q37, raising `REG-D-110` (1)'s), held by the lane as 1000, and the caveat names that ruling.
 		// ⭐ Package I's check, finding 3 — ~~"about 1000"~~: the caveat QUOTES the sponsor, so it quotes the words Q37's chosen
 		// label and its meaning wrote, "about 1,000", with the thousands comma the constant is held without (`lane-config.ts`).
+		// ~~const caveat = 'A phase’s own spend can carry the total past the limit: the lane checks the limit before each press, not
+		// during one, and a model unit’s press may spend up to 140 reviewer calls after its check (REG-D-114 (14), as amended
+		// 2026-10-16; the sponsor’s limit is "about 1,000", REG-D-131 Q37, raising REG-D-110 (1)).';~~ ⛔ Package L — D16.
 		const caveat =
-			'A phase’s own spend can carry the total past the limit: the lane checks the limit before each press, not during one, ' +
-			'and a model unit’s press may spend up to 140 reviewer calls after its check (REG-D-114 (14), as amended ' +
-			'2026-10-16; the sponsor’s limit is "about 1,000", REG-D-131 Q37, raising REG-D-110 (1)).';
+			'The lane counts each press’s whole worst case before it — a model unit’s press 210 reviewer calls, (3 tries + 32 ' +
+			'command runs) × 6, its other presses each theirs — with the negative control’s 4 held back, and presses nothing that ' +
+			'would pass the limit, so the reviewer exchanges the store records cannot pass it (REG-D-135 (4); the sponsor’s limit ' +
+			'is "about 2,400", raising REG-D-131’s). ⚠ The recorded count is a lower bound: a call whose capture faulted leaves no ' +
+			'exchange, so the limit bounds what was recorded, and this report claims no count of calls absent from the record.';
 		const r = reportOf(aRun({})).report;
-		expect(renderMarkdown(r), 'report.md carries no caveat that a press can spend past the limit').toContain(`- **Caveat:** ${caveat}`);
-		expect(r.reviewerCalls.limitCaveat, 'report.json carries no caveat that a press can spend past the limit').toBe(caveat);
+		expect(renderMarkdown(r), 'report.md carries no caveat of what the limit bounds').toContain(`- **Caveat:** ${caveat}`);
+		expect(r.reviewerCalls.limitCaveat, 'report.json carries no caveat of what the limit bounds').toBe(caveat);
+		// ⛔ The struck claim is gone: no press can carry the total past the limit by what the lane counts.
+		expect(r.reviewerCalls.limitCaveat, 'the caveat still says a press can pass the limit').not.toContain('carry the total past the limit');
 	});
 
 	it('⛔ stage 7’s sign-off: the lane’s dry run signs the root off (D11) — the root as intended, the run not reached; one never attempted, in a run cut short — not reached; one refused — broke', () => {

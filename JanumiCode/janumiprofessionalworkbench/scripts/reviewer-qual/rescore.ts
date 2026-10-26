@@ -17,6 +17,7 @@ import {
 	restampable,
 	type CallLine,
 	type CasePromptHashes,
+	type CriterionRepairPromptOf,
 	type RescoredLine,
 	type RunLine,
 	type ScoredOutcome
@@ -96,7 +97,13 @@ export async function rescoredLines(
 	cases: readonly QualificationCase[],
 	casePrompts: CasePromptHashes,
 	stamp: RescoreStamp,
-	criteria: readonly AssessmentCriterion[] = SEEDED_REASONING_REVIEW_CRITERIA
+	criteria: readonly AssessmentCriterion[] = SEEDED_REASONING_REVIEW_CRITERIA,
+	/**
+	 * ⭐ Package L — D13 (`REG-D-135` (3)): the criterion repair today's reviewer sends after a recorded reply
+	 * (`fingerprint.ts` `criterionRepairAfter`) — the check's own (`CurrentReviewer.criterionRepairAfter`), so the writer and
+	 * the check that demands its lines read one predicate (`restampable`).
+	 */
+	criterionRepairAfter?: CriterionRepairPromptOf
 ): Promise<RescoredLine[]> {
 	const byEvaluation = new Map<string, CallLine[]>();
 	for (const call of calls.filter((k) => k.runId === source.runId)) {
@@ -105,7 +112,7 @@ export async function rescoredLines(
 	}
 	const out: RescoredLine[] = [];
 	for (const evaluation of byEvaluation.values()) {
-		if (!restampable(evaluation, (id) => cases.some((k) => k.id === id), casePrompts)) continue;
+		if (!restampable(evaluation, (id) => cases.some((k) => k.id === id), casePrompts, criterionRepairAfter)) continue;
 		const last = evaluation.at(-1)!;
 		const c = cases.find((k) => k.id === last.caseId)!;
 		let scored: ScoredOutcome;

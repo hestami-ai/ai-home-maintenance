@@ -94,6 +94,7 @@ import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import ts from 'typescript';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
+	missingCriterionRepairInstruction,
 	OBSERVATION_HEADING,
 	processResultContentBudget,
 	processResultUntrustedSlices,
@@ -4595,7 +4596,9 @@ describe('JAN-CRITREAD J2-3 — the scoring corpus', () => {
 		for (const [id, disposition, resultClass] of pinned) {
 			const entry = corpus.find((e) => e.id === id);
 			expect(entry, `${id}: a corpus entry`).toBeDefined();
-			expect(entry!.replies, `${id}: one reply, and no repair`).toHaveLength(1);
+			// ⭐ Package L — D13: ~~"one reply, and no repair"~~ one reply — `escalated-skipped-row`'s now draws the criterion
+			// repair, answered by the same reply (its own pin, below), so the arrangement still recommends ESCALATED throughout.
+			expect(entry!.replies, `${id}: one reply`).toHaveLength(1);
 			const reply = entry!.replies[0]!;
 			const text = typeof reply === 'string' ? reply : reply.answer.arrived ? reply.answer.text : '';
 			expect((JSON.parse(text) as { recommendation?: unknown }).recommendation, `${id}: the reply recommends ESCALATED`).toBe(
@@ -4678,6 +4681,68 @@ describe('⭐⭐ P7-6 I5 — the scoring corpus holds the measured run’s reply
 		expect(e.calls.map((c) => c.role), 'two calls: the initial, then the criterion repair').toEqual(['initial', 'criterion-repair']);
 		expect(sent[1], 'the repair carries the line naming the cause').toBe(`${sent[0]}\n\n${CRITERION_REPAIR_LINE}`);
 		expect([e.scored.disposition, e.scored.resultClass], 'the repair’s answer is the one scored').toEqual(['SATISFIED', 'VALID']);
+	});
+});
+
+describe('⭐⭐ package L — D13 — the scoring corpus’s entries that draw the missing-criterion repair, PINNED BY ID (REG-D-135 (3))', () => {
+	/** An entry's calls through the runner, and the prompts it drew. */
+	const drive = async (id: string) => {
+		const entry = [...scoringCorpus(SEEDED_REASONING_REVIEW_CRITERIA), ...declaredScoringCorpus(PRODUCT_SEAMS.declaredPolicies)].find(
+			(e) => e.id === id
+		);
+		expect(entry, `${id}: a corpus entry`).toBeDefined();
+		const sent: string[] = [];
+		let n = 0;
+		const e = await evaluateCase({
+			case: 'case' in entry! ? (entry as { case: QualificationCase }).case : CORPUS_CASE,
+			criteria: SEEDED_REASONING_REVIEW_CRITERIA,
+			candidate: FIXTURE,
+			scoringDigest: '0'.repeat(64),
+			requiredEvidenceOf: (policyId) => PRODUCT_SEAMS.declaredPolicies.find((p) => p.policyId === policyId)?.requiredEvidence,
+			call: async (p) => {
+				sent.push(p);
+				return { returned: entry!.replies[Math.min(n++, entry!.replies.length - 1)]!, served: null };
+			}
+		});
+		return { e, sent };
+	};
+	const ids = SEEDED_REASONING_REVIEW_CRITERIA.map((c) => c.id);
+	const line = (missing: readonly string[]) => `\n\n${missingCriterionRepairInstruction(missing)}`;
+
+	it.each([
+		// ⭐ The brief's two, and the two more whose calls D13 moves: each faults nothing and leaves a declared criterion without
+		// a row, so each draws ONE criterion repair, answered alike — the first judgement stands, INCONCLUSIVE.
+		['corrupted-id', [ids[2]!]],
+		['skipped-row', [ids[0]!]],
+		['escalated-skipped-row', [ids[0]!]]
+	] as const)('⭐ `%s` now draws the criterion repair: two calls, its line naming %j, and the first judgement stands', async (id, missing) => {
+		const { e, sent } = await drive(id);
+		// ⛔ AT HEAD: ONE call.
+		expect(e.calls.map((c) => c.role)).toEqual(['initial', 'criterion-repair']);
+		expect(sent[1]!.slice(sent[0]!.length)).toBe(line(missing));
+		expect([e.scored.disposition, e.scored.resultClass]).toEqual(['INCONCLUSIVE', 'VALID']);
+	});
+
+	it('⭐ `declared-skipped-row` now draws the criterion repair too, its line naming its policy’s criterion: two calls, INCONCLUSIVE', async () => {
+		const { e, sent } = await drive('declared-skipped-row');
+		const rc = PRODUCT_SEAMS.declaredPolicies.find((p) => p.policyId === 'pol_requirement_coverage')!.criteria.map((k) => k.id);
+		expect(e.calls.map((c) => c.role)).toEqual(['initial', 'criterion-repair']);
+		expect(sent[1]!.slice(sent[0]!.length)).toBe(line([rc[0]!]));
+		expect([e.scored.disposition, e.scored.resultClass]).toEqual(['INCONCLUSIVE', 'VALID']);
+	});
+
+	it('⭐ `missing-row-repaired` — run-12’s shape, its criterion repair answering every criterion: two calls, the repair’s judgement scored SATISFIED', async () => {
+		const { e, sent } = await drive('missing-row-repaired');
+		expect(e.calls.map((c) => c.role)).toEqual(['initial', 'criterion-repair']);
+		expect(sent[1]!.slice(sent[0]!.length), 'the line names the declared id, never the reviewer’s').toBe(line([ids[2]!]));
+		expect([e.scored.disposition, e.scored.resultClass]).toEqual(['SATISFIED', 'VALID']);
+	});
+
+	it('⭐ `json-repair-then-missing-row` — case 43’s shape: three calls, the criterion repair after the JSON repair, on the review’s prompt', async () => {
+		const { e, sent } = await drive('json-repair-then-missing-row');
+		expect(e.calls.map((c) => c.role)).toEqual(['initial', 'repair', 'criterion-repair']);
+		expect(sent[2]!.slice(sent[0]!.length), 'the review’s prompt and the line').toBe(line([ids[2]!]));
+		expect([e.scored.disposition, e.scored.resultClass]).toEqual(['SATISFIED', 'VALID']);
 	});
 });
 
@@ -4908,6 +4973,68 @@ describe('JAN-CRITREAD J2-3 — the fingerprint and the runner agree', () => {
 		// ⭐ And the two repairs are two prompts: the record can tell them apart only because their hashes differ.
 		const prompts = BASE_NOW.casePrompts.get('W-CLEAN')!;
 		expect(prompts['criterion-repair']).not.toBe(prompts.repair);
+	});
+
+	it('⭐⭐ package L — D13 — the MISSING-criterion repair is recorded `criterion-repair`, never `repair`, and its hash is the one today’s reviewer sends after that recorded reply', async () => {
+		// ⭐ `REG-D-135` (3); design D13: a reply that faults nothing and leaves a declared criterion without a row draws ONE
+		// criterion repair, its line naming the declared ids without a row — so its prompt depends on the reply before it, and
+		// no one per-case hash can be today's. ⛔ Recorded as a plain `repair`, it would be held to the JSON repair's hash; and
+		// held to I5's alone, a run under today's fingerprint would read it as a prompt that moved (limb 2), its case unmeasured.
+		const one: QualificationCase[] = CURRENT_CASES.filter((c) => c.id === 'W-CLEAN');
+		const last = SEEDED_REASONING_REVIEW_CRITERIA.at(-1)!.id;
+		const slipped = JSON.stringify({
+			findings: SEEDED_REASONING_REVIEW_CRITERIA.map((k) => ({ criterionId: k.id === last ? `${k.id}-placeholder` : k.id, failed: false, statement: 'absent' })),
+			recommendation: 'SATISFIED'
+		});
+		let n = 0;
+		const lines = await runQualification({
+			runId: 'qr-agree-4',
+			date: '2026-10-25T12:00:00.000Z',
+			commit: 'e5f9358b'.repeat(5),
+			fingerprint: { reviewer: BASE_NOW.reviewer, scoring: BASE_NOW.scoring, caseSet: BASE_NOW.caseSet },
+			cases: one,
+			caseSetVersion: 11,
+			oracleVersion: 11,
+			criteria: SEEDED_REASONING_REVIEW_CRITERIA,
+			transport: {
+				name: 'stub',
+				identify: async () => FIXTURE,
+				call: async () => ({
+					returned:
+						(n += 1) === 1
+							? slipped
+							: JSON.stringify({
+									findings: SEEDED_REASONING_REVIEW_CRITERIA.map((k) => ({ criterionId: k.id, failed: false, statement: 'absent' })),
+									recommendation: 'SATISFIED'
+								}),
+					served: null
+				})
+			},
+			repetitions: 1,
+			env: {}
+		});
+		const calls = lines.filter((l): l is CallLine => l.kind === 'CALL');
+		// ⛔ AT HEAD (D13 built, the runner not yet): recorded `repair` — its prompt ends with no line `callRole` knew.
+		expect(calls.map((c) => c.role)).toEqual(['initial', 'criterion-repair']);
+		expect(calls[0]!.promptSha256).toBe(BASE_NOW.casePrompts.get('W-CLEAN')!.initial);
+		// ⭐ The criterion repair's hash: not I5's, which names no criterion, but the one today's reviewer sends after the
+		// recorded first reply, read as the record keeps it.
+		expect(calls[1]!.promptSha256, 'the missing-criterion repair is not I5’s prompt').not.toBe(BASE_NOW.casePrompts.get('W-CLEAN')!['criterion-repair']);
+		const recordedFirst = calls[0]!.reply.status === 'ANSWERED' ? JSON.parse(calls[0]!.reply.answer) : undefined;
+		expect(BASE_NOW.criterionRepairAfter('W-CLEAN', recordedFirst), 'today’s criterion repair after that reply').toBe(calls[1]!.promptSha256);
+		// ⭑ CONTROLS: after a reply that faults a row, or answers every criterion, today's reviewer sends no criterion repair.
+		const faulted = JSON.parse(slipped) as { findings: { failed: boolean }[] };
+		faulted.findings[0]!.failed = true;
+		expect(BASE_NOW.criterionRepairAfter('W-CLEAN', faulted)).toBeUndefined();
+		const answeredAll = {
+			findings: SEEDED_REASONING_REVIEW_CRITERIA.map((k) => ({ criterionId: k.id, failed: false, statement: 'absent' })),
+			recommendation: 'SATISFIED'
+		};
+		expect(BASE_NOW.criterionRepairAfter('W-CLEAN', answeredAll)).toBeUndefined();
+		// ⭑ And after a reply answering NO criterion, I5's: the per-case hash the record has always held.
+		expect(BASE_NOW.criterionRepairAfter('W-CLEAN', { findings: [], recommendation: 'SATISFIED' })).toBe(
+			BASE_NOW.casePrompts.get('W-CLEAN')!['criterion-repair']
+		);
 	});
 
 	it('⭐ the case-set digest is over the cases’ inputs: an input edit moves it and moves no reviewer component', async () => {

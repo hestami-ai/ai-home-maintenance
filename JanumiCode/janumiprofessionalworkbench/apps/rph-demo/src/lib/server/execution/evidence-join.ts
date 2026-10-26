@@ -132,6 +132,12 @@ export interface ProcessEvidenceContentReference {
 	readonly exitCode: number | null;
 	readonly timedOut: boolean;
 	readonly durationMs: number;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package L — D8 (`REG-D-135`; design D8) — THE RUN'S PLACE IN ITS STEP'S ONE HOST SEQUENCE, which its
+	 * writes share (`ObservedProcessRun.ordinal`): the host's number, beside the command facts, never an index of this join.
+	 * ⛔ Content plane, as `command` is; the record plane carries no argument (`R11`).
+	 */
+	readonly ordinal: number;
 	/** ⭐ P7-6R RD6 — the attempt that ran the command (`EvidenceJoinInput.producingExecutionAttemptId`). */
 	readonly producingExecutionAttemptId?: string;
 }
@@ -222,6 +228,7 @@ export async function joinProcessEvidence(
 			exitCode: run.exitCode,
 			timedOut: run.timedOut,
 			durationMs: run.durationMs,
+			ordinal: run.ordinal,
 			...(input.producingExecutionAttemptId
 				? { producingExecutionAttemptId: input.producingExecutionAttemptId }
 				: {})

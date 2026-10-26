@@ -72,7 +72,12 @@ import type { ProcessOutputOmission, ProcessOutputRetention } from '@janumipwb/r
  * question and gets a content-plane answer.
  */
 export interface ObservedProcessRun {
-	/** 1-based, in the order the host STARTED the runs. */
+	/**
+	 * ~~1-based, in the order the host STARTED the runs.~~ ⭐⭐ `JAN-EXEC` Phase 7, package L — D8 (`REG-D-135`; design D8):
+	 * THE STEP'S HOST ORDINAL, SHARED WITH ITS WRITES — 1-based, in the order the host completed its acts on the model's
+	 * behalf, a completed write and a completed run each taking the next number (`ProcessRunObserver`). Pi runs a turn's
+	 * calls one at a time (`REG-F-518`), so the order they started in is the order they completed in.
+	 */
 	readonly ordinal: number;
 	/** The program and its arguments, as the model chose them and the runner received them. */
 	readonly argv: readonly string[];
@@ -105,17 +110,41 @@ export interface ObservedProcessRun {
  */
 export const OBSERVED_PROCESS_RUN_LIMIT = 32;
 
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L — D8 (`REG-D-135`; `REG-F-579`; design D8) — ONE WRITE THE HOST COMPLETED FOR THE MODEL:
+ * the path as the workspace HOLDS it — workspace-relative, the spelling `write_file`'s outcome names — and its host ordinal,
+ * shared with the runs. ⛔ CONTENT-PLANE, AS A RUN'S `argv` IS: a path the model chose, held in host memory for the step's
+ * host to render (the finished-work and command reviews' host sequence, package N), never written to a `MODEL_EXCHANGE` —
+ * `ObservedToolCall` has no argument field by construction (`R11`), and this adds none.
+ */
+export interface ObservedWrite {
+	readonly ordinal: number;
+	readonly path: string;
+}
+
 export interface ProcessRunObservation {
 	/** The runs retained, in start order. */
 	readonly runs: readonly ObservedProcessRun[];
 	/** How many ran in total. ⛔ Greater than `runs.length` means the rest were DROPPED, and this is where it says so. */
 	readonly observedCount: number;
 	readonly recordedLimit: number;
+	/**
+	 * ⭐ D8 — every write the host completed this step, in host order, each with the host ordinal it shares with the runs.
+	 * ⚠ ALL OF THEM, UNBOUNDED, AND SAID TO BE: each holds a path and a number, never the bytes written, so it is not what
+	 * the 32-run bound exists for (a run holds both of its streams); `W-2` still records that nothing bounds a step's tool
+	 * calls. ⛔ REQUIRED, as `runs` is: an adapter that wrote nothing says so with an empty list.
+	 */
+	readonly writes: readonly ObservedWrite[];
 }
 
 export interface ProcessRunObserver {
 	/** A run the host completed. ⚠ A REFUSED run is never reported here: nothing was produced to evidence. */
 	ran(run: Omit<ObservedProcessRun, 'ordinal'>): void;
+	/**
+	 * ⭐ D8 — a write the host completed (`write_file`'s `written` arm). ⚠ A REFUSED write is never reported here, as a
+	 * refused run is not: nothing was written.
+	 */
+	wrote(write: Omit<ObservedWrite, 'ordinal'>): void;
 	/** Everything retained so far, with the bound declared. */
 	observed(): ProcessRunObservation;
 }
@@ -124,15 +153,28 @@ export function createProcessRunObserver(
 	limit: number = OBSERVED_PROCESS_RUN_LIMIT
 ): ProcessRunObserver {
 	const runs: ObservedProcessRun[] = [];
+	const writes: ObservedWrite[] = [];
 	let total = 0;
+	// ⭐⭐ Package L — D8 (`REG-D-135`; design D8) — ONE HOST SEQUENCE PER STEP: a completed write and a completed run each take
+	// the next number; a REFUSED call takes none — the tool reports only what it completed (`ran`, `wrote`), so a refusal never
+	// reaches this counter. ⛔ It numbered runs alone, so a command's place among the step's writes existed nowhere — a
+	// listing before a write and one after it read alike (`REG-F-579`). ⚠ IT IS NOT THE RECORD PLANE'S ORDINAL: `ObservedToolCall`
+	// numbers every call the session dispatched, refused ones included (`R11`); this numbers the acts the host completed.
+	let sequence = 0;
 	return {
 		ran(run) {
 			total += 1;
+			sequence += 1;
 			// ⛔ THE FIRST N ARE KEPT, NOT THE LAST N, AND THE CHOICE IS NOT ARBITRARY. `R11`'s record-plane list
 			// keeps the first N so an ordinal in one instrument means the same act as the same ordinal in the
 			// other. Keeping the last N here would silently re-number the same turn two different ways.
-			if (runs.length < limit) runs.push({ ordinal: total, ...run });
+			// ⭐ D8 — a run past the bound still takes its number, so every later act keeps its true place in the sequence.
+			if (runs.length < limit) runs.push({ ordinal: sequence, ...run });
 		},
-		observed: () => ({ runs: [...runs], observedCount: total, recordedLimit: limit })
+		wrote(write) {
+			sequence += 1;
+			writes.push({ ordinal: sequence, ...write });
+		},
+		observed: () => ({ runs: [...runs], observedCount: total, recordedLimit: limit, writes: [...writes] })
 	};
 }

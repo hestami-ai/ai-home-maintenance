@@ -41,6 +41,7 @@ import { BLOCKING_SEVERITIES, dispositionFromFindings } from '@janumipwb/rph-ass
 // ⭐ R3-B F3 — the kernel's own reading of the policies a unit declares, for half B's count of declared verdicts. Pure.
 import { declaredAssurancePolicyIds } from '@janumipwb/rph-domain';
 import {
+	LANE_BUDGET,
 	PHASE7_NEGATIVE_CONTROL_RESERVE,
 	PHASE7_PAID_LIMIT,
 	PHASE7_PRIOR_CALLS_VARIABLE,
@@ -143,6 +144,14 @@ export const EVIDENCE_SCOPE_PREFIX = 'commands run by the executing model for wo
  * model, so no stored record carries it.
  */
 export const NO_CRITERION_ANSWERED = 'The reply answered no criterion (REG-F-552).';
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L — D13 (`REG-D-135` (3); design D13) — THE MARKER E-5's detail OPENS WITH on every reply that
+ * faulted no kept row and left a declared criterion without one, the try that requested D13's criterion repair, and on a repair
+ * that left one without a row again (`reasoning-review-validator.ts` `MISSING_CRITERION_ROW`; held equal to this by
+ * `verif/phase7-run-report.test.ts`). ⛔ RESTATED, NOT IMPORTED, for the reason I5's is. ⭑ The report tells D13's chain from
+ * I5's, and both from a JSON repair's, by the two markers beside `SCHEMA_COERCION_FAILED` — never by the outcome alone.
+ */
+export const MISSING_CRITERION_ROW = 'The reply left a declared criterion without a row (REG-F-566).';
 // ⛔ THE LANE'S OWN FIGURES, DERIVED BY REFERENCE, NEVER RESTATED: the limit the report states is the one the lane checked
 // before each phase, so the two can never part (`e2e-live-exec/lane-config.ts`, which imports nothing).
 /** The runs one unit's observer keeps (`tools/process-run-observer.ts` `OBSERVED_PROCESS_RUN_LIMIT`; `REG-F-517`). */
@@ -165,11 +174,23 @@ export const NEGATIVE_CONTROL_RESERVE = PHASE7_NEGATIVE_CONTROL_RESERVE;
  * ⭐ Package I's check, finding 3 — ~~"about ${PAID_LIMIT}"~~: THE CAVEAT QUOTES THE SPONSOR, so it writes the number as the
  * sponsor's words wrote it — Q37's chosen label and its meaning, "about 1,000" — with the thousands comma the constant is held
  * without (`lane-config.ts`). Every earlier limit quoted exactly, having no thousands.
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L — D16, D17 (`REG-D-135` (4); design D16) — RESTATED. ~~"A phase’s own spend can carry the total
+ * past the limit: the lane checks the limit before each press, not during one, and a model unit’s press may spend up to 140
+ * reviewer calls after its check (REG-D-114 (14), as amended 2026-10-16; the sponsor’s limit is "about 1,000", REG-D-131 Q37,
+ * raising REG-D-110 (1))."~~ — the lane now counts each press's WHOLE worst case before it, the negative control's reserve
+ * held back, and presses nothing that would pass the limit, so the recorded reviewer exchanges cannot pass it. ⚠ What that bound
+ * does not reach, said with it: the recorded count is a LOWER BOUND when a capture faults (`run-archive.ts` `reviewerCalls`;
+ * `phase7-operator.ts` `recordedReviewerCalls`), so the limit bounds what was recorded, and the report claims no count of calls
+ * absent from the record. The sponsor's limit is quoted as `REG-D-135` (4)'s meaning writes it, "about 2,400".
  */
 export const LIMIT_CAVEAT =
-	`A phase’s own spend can carry the total past the limit: the lane checks the limit before each press, not during one, ` +
-	`and a model unit’s press may spend up to ${PHASE7_UNIT_REVIEWER_CALLS} reviewer calls after its check (REG-D-114 (14), as ` +
-	`amended 2026-10-16; the sponsor’s limit is "about ${PAID_LIMIT.toLocaleString('en-US')}", REG-D-131 Q37, raising REG-D-110 (1)).`;
+	`The lane counts each press’s whole worst case before it — a model unit’s press ${PHASE7_UNIT_REVIEWER_CALLS} reviewer calls, ` +
+	`(${LANE_BUDGET.tries} tries + ${PHASE7_REVIEWED_COMMANDS} command runs) × ${LANE_BUDGET.reviewerCallsPerTry}, its other presses each ` +
+	`theirs — with the negative control’s ${NEGATIVE_CONTROL_RESERVE} held back, and presses nothing that would pass the limit, so the ` +
+	`reviewer exchanges the store records cannot pass it (REG-D-135 (4); the sponsor’s limit is ` +
+	`"about ${PAID_LIMIT.toLocaleString('en-US')}", raising REG-D-131’s). ⚠ The recorded count is a lower bound: a call whose ` +
+	`capture faulted leaves no exchange, so the limit bounds what was recorded, and this report claims no count of calls absent ` +
+	`from the record.`;
 /** The declared verdicts a complete run signs off: the five units' declared policies, 2 + 2 + 4 + 3 + 3 (§3.2). */
 export const DECLARED_VERDICTS_EXPECTED = 14;
 
@@ -451,6 +472,8 @@ export interface MatrixCell {
 export type PairingLabel =
 	| 'answered'
 	| 'no-criterion-answered'
+	// ⭐ Package L — D13: the review concluded on a reply that left a declared criterion without a row (`REG-F-566`).
+	| 'criterion-left-without-row'
 	| 'no-response'
 	| 'output-limit'
 	| 'refused'
@@ -459,6 +482,7 @@ export type PairingLabel =
 export const PAIRING_LABELS: readonly PairingLabel[] = [
 	'answered',
 	'no-criterion-answered',
+	'criterion-left-without-row',
 	'no-response',
 	'output-limit',
 	'refused',
@@ -543,8 +567,10 @@ export interface ReviewerCalls extends ReviewerCallCount {
 	 */
 	readonly laneLimitChecks: readonly LaneLimitCheck[];
 	/**
-	 * ⭐ `REG-D-114` (14), as amended 2026-10-16 — the plain caveat those reads carry (`LIMIT_CAVEAT`): a phase's own spend can
-	 * carry the total past the limit, for the lane checks before each press, not during one.
+	 * ⭐ `REG-D-114` (14), as amended 2026-10-16 — the plain caveat those reads carry (`LIMIT_CAVEAT`): ~~a phase's own spend can
+	 * carry the total past the limit, for the lane checks before each press, not during one~~ ⭐ (package L, D16; `REG-D-135` (4))
+	 * the lane counts each press's whole worst case before it, so the recorded exchanges cannot pass the limit; and the recorded
+	 * count is a lower bound when a capture faults.
 	 */
 	readonly limitCaveat: string;
 }
@@ -1017,7 +1043,8 @@ interface LaneUnit {
  * ⭐ ONE RULE since (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (14)): every check lets an act
  * through with its total AT MOST the limit, what it counts of the act always recorded (`ahead`: ~~a phase's and a re-run's
  * first call~~ ~~⭐ R3-B's fix round, F1: the act's worst case, a phase's and a re-run's too~~ ⭐ `REG-D-114` (14), as amended
- * 2026-10-16: one try's reserve before a phase, a re-run of its work or of its review, and a MODEL root's press; an act's
+ * 2026-10-16: ~~one try's reserve~~ ⭐ (package L, D16; `REG-D-135` (4)) the press's whole worst case before a phase, a re-run of
+ * its work or of its review (its refused reviews), and a MODEL root's press; an act's
  * worst case before a sign-off, a re-run of its declared reviews and Send — and, since, what it counted, in words,
  * `counted`). ⚠ A record made before it may hold a total AT the limit held back, by the first rule.
  */
@@ -1411,7 +1438,9 @@ export const PAIRING_RULE =
 	'its own floor run made, joined by that run’s token: the review’s assessment carries it as its correlation, and each ' +
 	'call as its runToken (REG-F-433). The call with the highest attemptOrdinal among them concluded the review — save a ' +
 	'P7-6 I5 chain, a reply that parsed and answered no criterion, whose one criterion repair answered none, did not parse ' +
-	'or got no reply: that first reply concluded it (REG-F-552). A record that carries no token, a run’s before the key, ' +
+	'or got no reply: that first reply concluded it (REG-F-552); and a D13 chain, a reply that faulted nothing and left a ' +
+	'declared criterion without a row, whose criterion repair left one without a row again, did not parse or got no reply: ' +
+	'that reply concluded it (REG-F-566) — after a JSON repair, the JSON repair’s reply. A record that carries no token, a run’s before the key, ' +
 	'is paired by its subject, and only while that subject had exactly one floor run no token names: its ordinals restart ' +
 	'at 1 in each run. A deterministic floor policy and every sign-off make no model call, by design.';
 
@@ -1482,18 +1511,29 @@ function concludedBy(top: StoredObject): Conclusion {
  */
 function criterionRepairConclusion(sorted: readonly StoredObject[]): Conclusion | undefined {
 	// ⭐ C1 — the I5 pair, both halves: the outcome AND the marker opening the detail (the validator writes both, together).
-	const i5Marked = (x: StoredObject | undefined): boolean =>
+	// ⭐⭐ Package L — D13 (`REG-D-135` (3)): and D13's pair, its own marker beside the same outcome (`MISSING_CRITERION_ROW`).
+	const marked = (x: StoredObject | undefined, marker: string): boolean =>
 		str(rec(x?.state.parseOutcome).outcome) === 'SCHEMA_COERCION_FAILED' &&
-		str(rec(x?.state.parseOutcome).detail).startsWith(NO_CRITERION_ANSWERED);
-	// ⭐ P5 package A (F1) — the first reply the review READ: past a call that threw, and past a reply the tool cut.
-	const asked = sorted.find((x) => str(x.state.disposition) !== 'NO_RESPONSE' && outputLimitOf(x.state) === undefined);
-	if (asked === undefined || str(asked.state.disposition) !== 'REPAIR_REQUESTED' || !i5Marked(asked)) return undefined;
+		str(rec(x?.state.parseOutcome).detail).startsWith(marker);
+	const kindOf = (x: StoredObject | undefined): CriterionRepairKind | undefined =>
+		CRITERION_REPAIR_KINDS.find((k) => marked(x, k.marker));
+	// ⭐ P5 package A (F1) — the replies the review READ: past a call that threw, and past a reply the tool cut.
+	const read = sorted.filter((x) => str(x.state.disposition) !== 'NO_RESPONSE' && outputLimitOf(x.state) === undefined);
+	const requested = (x: StoredObject | undefined): boolean => str(x?.state.disposition) === 'REPAIR_REQUESTED';
+	// ⭐⭐ D13 — the reply that asked for the criterion repair: the first reply read, or — a first reply that drew the JSON repair
+	// (a request with neither marker) — the JSON repair's reply, which D13 judges as a first reply is. ⛔ Read from the first
+	// reply alone, a JSON repair's chain whose parsed reply drew the criterion repair was read by its last call.
+	const [first, second] = read;
+	if (!requested(first)) return undefined;
+	const asked = kindOf(first) !== undefined ? first : requested(second) && kindOf(second) !== undefined ? second : undefined;
+	if (asked === undefined) return undefined;
+	const kind = kindOf(asked)!;
 	const after = sorted.filter((x) => ordinalOf(x) > ordinalOf(asked));
 	const answered = after.find((x) => str(x.state.disposition) === 'ACCEPTED');
 	if (answered !== undefined)
 		return {
 			label: 'answered',
-			detail: `concluded by its ${str(answered.state.exchangeRole)} call, the criterion repair of a reply that answered no criterion (REG-F-552)`,
+			detail: `concluded by its ${str(answered.state.exchangeRole)} call, the criterion repair of a reply that ${kind.reply} (${kind.finding})`,
 			concludedBy: answered.id
 		};
 	const last = after.at(-1);
@@ -1503,16 +1543,39 @@ function criterionRepairConclusion(sorted: readonly StoredObject[]): Conclusion 
 	// ⭐ P5 package A (F1) — a repair the tool cut at the model's output-token limit ended without concluding, too.
 	else if (outputLimitOf(last?.state) !== undefined) how = 'was cut at the model’s output-token limit';
 	else if (repairEnded === 'REJECTED' && str(rec(last?.state.parseOutcome).outcome) !== 'NOT_ATTEMPTED')
-		how = i5Marked(last) ? 'answered none either' : 'did not parse';
+		how = marked(last, kind.marker) ? kind.again : 'did not parse';
 	else return undefined;
 	return {
-		label: 'no-criterion-answered',
+		label: kind.label,
 		detail:
-			`its ${str(asked.state.exchangeRole)} reply answered no criterion, and its criterion repair ${how} (REG-F-552): ` +
+			`its ${str(asked.state.exchangeRole)} reply ${kind.reply}, and its criterion repair ${how} (${kind.finding}): ` +
 			"the review kept that reply's judgement, its recommendation recorded (REG-D-090)",
 		concludedBy: asked.id
 	};
 }
+
+/**
+ * ⭐⭐ Package L — D13 — THE TWO CRITERION REPAIRS, AS THE REPORT READS THEM: I5's, of a reply that answered no criterion
+ * (`REG-F-552`), and D13's, of a reply that faulted nothing and left a declared criterion without a row (`REG-F-566`) — each by
+ * its marker, its label, and what its words say of the reply and of a repair that did as the reply had.
+ */
+interface CriterionRepairKind {
+	readonly marker: string;
+	readonly label: Extract<PairingLabel, 'no-criterion-answered' | 'criterion-left-without-row'>;
+	readonly finding: 'REG-F-552' | 'REG-F-566';
+	readonly reply: string;
+	readonly again: string;
+}
+const CRITERION_REPAIR_KINDS: readonly CriterionRepairKind[] = [
+	{ marker: NO_CRITERION_ANSWERED, label: 'no-criterion-answered', finding: 'REG-F-552', reply: 'answered no criterion', again: 'answered none either' },
+	{
+		marker: MISSING_CRITERION_ROW,
+		label: 'criterion-left-without-row',
+		finding: 'REG-F-566',
+		reply: 'left a declared criterion without a row',
+		again: 'left one without a row again'
+	}
+];
 
 /** ⭐ The pairing of calls already known to be ONE run's: the call that concluded the review (see `PAIRING_RULE`). */
 function concludedFrom(
@@ -2858,6 +2921,8 @@ function idsOfUnconcluded(r: PairingRow): string[] {
 	const ids: string[] = [];
 	// ⭐ P7-6 B2 — a review that concluded on a reply answering no criterion is `REG-F-552`'s, whatever its repair came to.
 	if (r.label === 'no-criterion-answered') ids.push('REG-F-552');
+	// ⭐ Package L — D13 — and one that concluded on a reply leaving a declared criterion without a row is `REG-F-566`'s.
+	if (r.label === 'criterion-left-without-row') ids.push('REG-F-566');
 	if (r.label === 'no-response') ids.push('REG-F-499');
 	// ⭐ P5 package C (F1; `REG-D-118` (4)) — a review that ended on a reply the tool cut at the model's output-token limit is
 	// `REG-F-563`'s, the entry that records the cap: never a break no register entry names.

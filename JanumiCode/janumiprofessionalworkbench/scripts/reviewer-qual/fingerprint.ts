@@ -94,6 +94,8 @@ import {
 import type { AssessmentCriterion } from '@janumipwb/rph-contracts';
 import {
 	createAgyReasoningReviewValidator,
+	CRITERION_REPAIR_INSTRUCTION,
+	criterionRepairLineFor,
 	REASONING_REVIEW_BUDGET,
 	type AgyPrint
 } from '../../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
@@ -115,7 +117,7 @@ import {
 	type DeclaredProbePolicy,
 	type ProcessResultBuilder
 } from './probes.js';
-import type { CandidateIdentity } from './record.js';
+import type { CandidateIdentity, CriterionRepairPromptOf } from './record.js';
 import { evaluateCase } from './runner.js';
 import { CORPUS_CASE, declaredScoringCorpus, scoringCorpus, type CorpusEntry } from './scoring-corpus.js';
 
@@ -140,6 +142,16 @@ export interface ReviewerFingerprint {
 	readonly components: FingerprintComponents;
 	/** Each case's prompt hashes, by case id. */
 	readonly casePrompts: ReadonlyMap<string, CasePrompts>;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package L — D13 (`REG-D-135` (3); design D13) — THE HASH OF THE CRITERION REPAIR TODAY'S REVIEWER
+	 * SENDS for a case after a reply parsed as `answer`, or `undefined` when it sends none after it (`record.ts`
+	 * `CriterionRepairPromptOf`). D13's repair names the declared criteria that reply left without a row, so its prompt is a
+	 * function of the reply, and no one per-case hash is today's. ⭑ By the product's own rule (`criterionRepairLineFor`), over
+	 * the case's initial prompt as the seams' validator materialized it (`casePromptsOf`): I5's the hash captured through the
+	 * seams (`criterion-repair`), D13's that prompt and D13's line. ⚠ DISCLOSED: D13's composition — the prompt, a blank line,
+	 * the line — is the product's (`criterionRepair`), and a seam that composed it otherwise is not measured by it.
+	 */
+	readonly criterionRepairAfter: CriterionRepairPromptOf;
 	/**
 	 * Each probe's materialized prompt — or, for a probe the validator refuses, its refusal (`probePrompt`) — by probe id,
 	 * kept whole so a test can say what it reaches. ⚠ The probes alone: the skeleton's digest and the reader corpus's
@@ -362,14 +374,25 @@ const TRANSPORT_PREAMBLE = 'DEVIN-PREAMBLE';
 async function casePromptsOf(
 	seams: FingerprintSeams,
 	cases: readonly QualificationCase[]
-): Promise<Map<string, CasePrompts>> {
+): Promise<{ readonly casePrompts: Map<string, CasePrompts>; readonly criterionRepairAfter: CriterionRepairPromptOf }> {
 	const out = new Map<string, CasePrompts>();
+	/** ⭐ Package L — D13: each case's initial prompt and the criteria a reply to it is read against, for `criterionRepairAfter`. */
+	const asked = new Map<string, { readonly initial: string; readonly criteria: readonly AssessmentCriterion[] }>();
+	/** ⭐ Package L — the criteria a reply to case `c` is read against, as the runner reads it (`runner.ts` `caseCriteria`). */
+	const criteriaOf = (c: QualificationCase): readonly AssessmentCriterion[] =>
+		c.arm === 'DECLARED_POLICY' ? c.input.policy.criteria : seams.criteria;
 	/** The prompts the seams' validator sends for `c` when its first reply is `first` and its second answers clean. */
 	const capture = async (c: QualificationCase, first: string): Promise<string[]> => {
 		const sent: string[] = [];
+		// ⭐ Package L — D13 (`REG-D-135` (3)): "answers clean" over the CASE's own criteria, as the runner reads a reply
+		// (`runner.ts` `caseCriteria`): a declared case's are its policy's. ⛔ It answered the floor's for every case, which
+		// for a declared case answers none of its criteria; while the JSON repair's reply was taken as it stood that cost
+		// nothing, and since D13 judges that reply as a first one is, it drew I5's repair — a third prompt. The prompts
+		// captured are the same bytes either way: a reply decides only whether a later call is made.
+		const answered = criteriaOf(c);
 		const validator = seams.validator(async (p) => {
 			sent.push(p);
-			return sent.length === 1 ? first : cleanJudgement(seams.criteria);
+			return sent.length === 1 ? first : cleanJudgement(answered);
 		});
 		await validator.evaluate(c.subject, { reasoningReview: caseReviewInput(c, seams.criteria, seams.processResult) });
 		return sent;
@@ -385,8 +408,18 @@ async function casePromptsOf(
 		if (criterion.length !== 2 || criterionRepair === undefined)
 			throw new Error(`${c.id}: the capture drew ${criterion.length} prompt(s), not an initial and a criterion repair`);
 		out.set(c.id, { initial: sha256(initial), repair: sha256(repair), 'criterion-repair': sha256(criterionRepair) });
+		asked.set(c.id, { initial, criteria: criteriaOf(c) });
 	}
-	return out;
+	// ⭐ Package L — D13 — the criterion repair today's reviewer sends after a reply parsed as `answer`: I5's as captured; D13's
+	// the initial prompt and D13's line, by the product's rule; none where the rule draws none.
+	const criterionRepairAfter: CriterionRepairPromptOf = (caseId, answer) => {
+		const c = asked.get(caseId);
+		const line = c === undefined ? undefined : criterionRepairLineFor(answer, c.criteria);
+		if (c === undefined || line === undefined) return undefined;
+		const prompts = out.get(caseId)!;
+		return line === CRITERION_REPAIR_INSTRUCTION ? prompts['criterion-repair'] : sha256(`${c.initial}\n\n${line}`);
+	};
+	return { casePrompts: out, criterionRepairAfter };
 }
 
 /**
@@ -426,11 +459,16 @@ async function scoringDigestOf(seams: FingerprintSeams): Promise<string> {
 		});
 		const { scoringDigest: _stamp, ...scored } = e.scored;
 		outcomes.push([entry.id, scored, e.calls.length, e.calls.map((c) => c.malformations)]);
-		const [first, repair] = sent;
-		if (first !== undefined && repair !== undefined)
+		// ⭐ Package L — D13 (`REG-D-135` (3)): ~~the second prompt~~ EVERY repair's — a review makes at most one JSON repair and
+		// one criterion repair, so an entry may draw two, and a criterion repair after a JSON repair must be hashed too. ⭑ An
+		// entry drawing one is hashed as before, `[id, its repair]`, so this moves no entry that draws one.
+		const [first, ...later] = sent;
+		if (first !== undefined && later.length > 0)
 			repairs.push([
 				entry.id,
-				repair.startsWith(first) ? { appended: repair.slice(first.length) } : { prompt: sha256(repair) }
+				...later.map((repair) =>
+					repair.startsWith(first) ? { appended: repair.slice(first.length) } : { prompt: sha256(repair) }
+				)
 			]);
 	}
 	return sha256(JSON.stringify({ outcomes, repairs }));
@@ -479,14 +517,20 @@ export async function reviewerFingerprint(
 		...floorComponents,
 		criteria: sha256(canonicalJson({ floor: floorComponents.criteria, declared: seams.declaredPolicies }))
 	};
-	return {
+	const { casePrompts, criterionRepairAfter } = await casePromptsOf(seams, cases);
+	const fingerprint: Omit<ReviewerFingerprint, 'criterionRepairAfter'> = {
 		reviewer: reviewerFingerprintOf(components),
 		scoring: components.scoring,
 		caseSet: caseSetDigest(cases),
 		components,
-		casePrompts: await casePromptsOf(seams, cases),
+		casePrompts,
 		probePrompts: prompts
 	};
+	// ⭐ Package L — D13: `criterionRepairAfter` is a FUNCTION OF THE DATA ABOVE, not data — so it is kept off the object's
+	// enumerable keys: two computations of one tree still compare equal ("a function of the tree",
+	// `verif/reviewer-qualification-fingerprint.test.ts`), and a copy made by spreading carries none — the safe side, where a
+	// recorded missing-criterion repair owes a model call (`record.ts` `callPromptIsToday`).
+	return Object.defineProperty(fingerprint, 'criterionRepairAfter', { value: criterionRepairAfter, enumerable: false }) as ReviewerFingerprint;
 }
 
 /** The committed CURRENT case set (`cases.ts`), read from the tree `root` names (a `file:` URL ending in `/`). */

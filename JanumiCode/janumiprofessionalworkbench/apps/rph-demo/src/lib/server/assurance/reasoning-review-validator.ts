@@ -88,7 +88,10 @@ const SEVERITIES = new Set<Severity>([
 /** The admissible criterion ids for a judgement — derived PER REVIEW from the POLICY's own criteria. This was a
  *  module-level Set built from the `REASONING_REVIEW_CRITERIA` constant, so any policy criterion the constant did
  *  not know about would have had its findings silently discarded at line ~92. */
-const criterionIds = (input: ReasoningReviewInput): ReadonlySet<string> =>
+/** ⭐ Package L — what the criterion rules read of a review's input: its policy's criteria, and nothing else. */
+type PolicyCriteria = Pick<ReasoningReviewInput, 'criteria'>;
+
+const criterionIds = (input: PolicyCriteria): ReadonlySet<string> =>
 	new Set(input.criteria.map((c) => c.id));
 
 // ~~/** Render a bounded excerpt with truncation DECLARED (§9.7: any declared truncation is recorded, never silent). */~~
@@ -694,6 +697,27 @@ export const CRITERION_REPAIR_INSTRUCTION =
 	'IMPORTANT: your reply gave no row for any criterion. Reply with ONLY the minified JSON object, with one row in findings for each criterion, failed=false where it is met.';
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L — D13 (`REG-D-135` (3); `REG-F-566`; `DESIGN-data-flow-order-and-deliverable-review.md`
+ * D13) — THE LINE A CRITERION REPAIR CARRIES WHEN A PARSED REPLY FAULTED NO KEPT ROW AND LEFT A DECLARED CRITERION WITHOUT
+ * ONE: run-12's shape, eight clean declared rows and RR-03's filed under an id the policy does not declare (18 of 47
+ * non-passing command reviews INCONCLUSIVE through it). Its fixed parts are exported, and the line is built from them by
+ * `missingCriterionRepairInstruction` alone, so a reader (the qualification runner's `callRole`) can tell it by its parts.
+ * ⛔ IT NAMES ONLY THE HOST'S DECLARED IDS THAT HAVE NO ROW — never an id the reviewer wrote: that is untrusted text, and
+ * echoed back it would ask the reviewer to answer under it again (design D13; `REG-F-428`: id drift is fixed UPSTREAM, never
+ * by a fuzzy matcher downstream — so this line names the declared id, and nothing maps the reviewer's to it).
+ * ⭐ IT ASKS FOR NO FAILURE (`REG-D-105` (2)): it says how a met criterion and an unmet one are marked, as
+ * `ONE_ROW_PER_CRITERION` does, names no disposition value, and never asks the reviewer to look for a failure.
+ */
+export const MISSING_CRITERION_REPAIR_OPENING = 'IMPORTANT: your reply gave no row under these criterion ids: ';
+export const MISSING_CRITERION_REPAIR_CLOSING =
+	'. Reply with ONLY the whole minified JSON object, with one row in findings for every criterion listed above, each row ' +
+	'under its criterionId exactly as listed: failed=false where the criterion is met, failed=true where it is not.';
+/** ⭐ D13 — the missing-criterion repair's line, for the declared ids `missingDeclaredIds` the reply left without a row. */
+export function missingCriterionRepairInstruction(missingDeclaredIds: readonly string[]): string {
+	return `${MISSING_CRITERION_REPAIR_OPENING}${missingDeclaredIds.join(', ')}${MISSING_CRITERION_REPAIR_CLOSING}`;
+}
+
+/**
  * ⭐⭐ `P76F-A` A2 (`REG-F-552`; PER-9) — THE MARKER EVERY I5 RECORD'S DETAIL BEGINS WITH: the `SCHEMA_COERCION_FAILED` E-5 of
  * a reply that PARSED and answered no criterion — the try that requested the criterion repair (`repair-requested`), and a
  * repair that answered none again (`rejected`). ⭑ EXPORTED SO A READER KEYS ON IT, NOT ON PROSE: the run report tells an I5
@@ -703,6 +727,18 @@ export const CRITERION_REPAIR_INSTRUCTION =
  * (*"None of the policy's N criteria was answered: …"*), and only the cause sentence after it may grow.
  */
 export const NO_CRITERION_ANSWERED = 'The reply answered no criterion (REG-F-552).';
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L — D13 (`REG-D-135` (3); design D13) — THE MARKER EVERY MISSING-CRITERION RECORD'S DETAIL
+ * BEGINS WITH, beside I5's: the `SCHEMA_COERCION_FAILED` E-5 of a parsed reply that faulted no kept row and left a declared
+ * criterion without one — the try that requested the criterion repair (`repair-requested`) — and of a repair that still left
+ * one without a row (`rejected`). ⭑ EXPORTED SO A READER KEYS ON IT, as on I5's: the run report tells this repair from I5's
+ * and from a JSON repair by the two markers (`scripts/phase7/run-report-core.ts`). ⛔ A STABLE STRING, as I5's is.
+ * ⭐ THE LEAD'S READING OF D13, KEPT (package L's brief): I5 — a parsed reply answering NO criterion — keeps its marker
+ * (`NO_CRITERION_ANSWERED`), its line (`CRITERION_REPAIR_INSTRUCTION`) and its use rule (a repair answering at least one
+ * criterion is used), unchanged. This marker is the case I5 does not cover: a reply that answers SOME criteria, faults none,
+ * and leaves a declared one without a row; its repair is used only if it gives a row for every declared criterion.
+ */
+export const MISSING_CRITERION_ROW = 'The reply left a declared criterion without a row (REG-F-566).';
 // ⛔ `p76-fix-c` C1 — B2's `NO_CRITERION_ANSWERED_NOTE` (the request's CLOSING sentence, exported for the run report to key
 // on) is gone: `P76F-A` A2 removed that sentence from a refused repair's record on purpose, so a reader keying on it told
 // "the repair answered none" as "it did not parse". The report keys on the marker above, which opens both records.
@@ -742,12 +778,14 @@ export function noCriterionCause(parsed: unknown, declared: ReadonlySet<string>)
 
 /**
  * ⭐ P7-6 I5 — the cause, when a parsed reply answers NO criterion, or `undefined` when it answers at least one: a reply
- * answering SOME is never this (`REG-F-489`: the floor's reading of an unanswered criterion holds).
+ * answering SOME is never this ~~(`REG-F-489`: the floor's reading of an unanswered criterion holds)~~ ⭐ — package L, D13
+ * (`REG-D-135` (3)): such a reply is D13's (`missingCriterionRepairDue`), and `REG-F-489`'s reading holds only beside a
+ * failed row.
  */
 function unansweredCause(
 	parsed: unknown,
 	judgement: ReasoningReviewJudgement,
-	input: ReasoningReviewInput
+	input: PolicyCriteria
 ): string | undefined {
 	if (judgement.findings.length > 0) return undefined;
 	return noCriterionCause(parsed, criterionIds(input));
@@ -764,9 +802,90 @@ const criterionRepairRequested = (cause: string, input: ReasoningReviewInput): s
  * validator then does. ⛔ It used to append the request's detail, which says of the reply it describes that "this reply’s
  * judgement is the one the review keeps" — false of the repair, whose judgement is discarded: the FIRST stands.
  */
-const criterionRepairRefused = (cause: string, input: ReasoningReviewInput): string =>
+const criterionRepairRefused = (cause: string, input: ReasoningReviewInput, earlier: EarlierReply = 'first reply'): string =>
 	`${NO_CRITERION_ANSWERED} The repair parsed, but none of the policy's ${input.criteria.length} criteria has a row in it ` +
-	`either: ${cause}. The first reply’s judgement stands, its recommendation recorded (REG-D-090).`;
+	`either: ${cause}. The ${earlier}’s judgement stands, its recommendation recorded (REG-D-090).`;
+
+/**
+ * ⭐ Package L, D13 — WHICH REPLY'S JUDGEMENT A CRITERION REPAIR WOULD LEAVE STANDING: the first reply's, or — since D13 judges
+ * the JSON repair's parsed reply as a first one is — the JSON repair's. ⛔ A record saying "the first reply's judgement
+ * stands" after a first reply that did not parse would name a judgement there never was (PER-9).
+ */
+type EarlierReply = 'first reply' | 'JSON repair';
+
+/**
+ * ⭐⭐ Package L — D13 (`REG-D-135` (3); `REG-F-566`; design D13) — THE POLICY'S DECLARED CRITERIA A PARSED REPLY LEFT WITHOUT
+ * A ROW, in the policy's order: read off the HOST's declared ids (`input.criteria`), never off an id the reply wrote.
+ */
+function declaredWithoutRow(judgement: ReasoningReviewJudgement, input: PolicyCriteria): string[] {
+	const answered = new Set(judgement.findings.map((f) => f.criterionId));
+	return input.criteria.map((c) => c.id).filter((id) => !answered.has(id));
+}
+
+/**
+ * ⭐⭐ D13 — THE DECLARED IDS A MISSING-CRITERION REPAIR NAMES, or none when no repair is due: a reply that ANSWERS SOME
+ * criteria (I5's — none answered — is `unansweredCause`'s, checked first), faults NO kept row, and leaves a declared one
+ * without a row. ⛔ A KEPT ROW THAT IS FAILED FORECLOSES THE REPAIR (`REG-D-105` (3); design D13, "Not chosen"): a later
+ * answer could clear a refusal — so a reply with a failed row is taken as it stands, and the floor's reading of a criterion
+ * it left without a row holds (`REG-F-489`).
+ */
+function missingCriterionRepairDue(judgement: ReasoningReviewJudgement, input: PolicyCriteria): readonly string[] {
+	// ⛔ D13's control: a failed declared row is never repaired (`REG-F-489`; `REG-D-105` (3)).
+	if (judgement.findings.some((f) => f.failed === true)) return [];
+	return declaredWithoutRow(judgement, input);
+}
+
+/** `n` with its noun, singular at one. */
+const counted = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
+
+/**
+ * ⭐ D13 — the E-5 detail of the try that REQUESTS the missing-criterion repair: the marker, then the declared ids without a
+ * row and how many of the reply's rows named no declared criterion — counted, never quoted (an id the reviewer wrote is
+ * untrusted text, and never echoed).
+ */
+function missingCriterionRequested(
+	missing: readonly string[],
+	parsed: unknown,
+	judgement: ReasoningReviewJudgement,
+	input: ReasoningReviewInput
+): string {
+	const rows = (parsed as { findings?: unknown } | null)?.findings;
+	const dropped = (Array.isArray(rows) ? rows.length : 0) - judgement.findings.length;
+	const unheld =
+		dropped > 0
+			? ` (${counted(dropped, 'of its rows names', 'of its rows name')} no criterion the policy declares)`
+			: '';
+	return (
+		`${MISSING_CRITERION_ROW} It parsed, and no row under a declared id is failed, but ` +
+		`${missing.length} of the policy's ${input.criteria.length} criteria ${missing.length === 1 ? 'has' : 'have'} no row${unheld}: ` +
+		`${missing.join(', ')}. One criterion repair was requested, naming only ${missing.length === 1 ? 'that declared id' : 'those declared ids'}; ` +
+		'it is used only if it gives a row for every criterion, else this reply’s judgement is the one the review keeps, its ' +
+		'recommendation recorded (REG-D-090; REG-D-135 (3)).'
+	);
+}
+
+/** ⭐ D13 — the E-5 detail of a missing-criterion REPAIR that left a declared criterion without a row: the earlier reply's judgement stands. */
+const missingCriterionRefused = (still: readonly string[], input: ReasoningReviewInput, earlier: EarlierReply): string =>
+	`${MISSING_CRITERION_ROW} The repair parsed, but ${still.length} of the policy's ${input.criteria.length} criteria ` +
+	`${still.length === 1 ? 'has' : 'have'} no row in it: ${still.join(', ')}. The ${earlier}’s judgement stands, its ` +
+	'recommendation recorded (REG-D-090; REG-D-135 (3)).';
+
+/**
+ * ⭐⭐ Package L — D13 (`REG-D-135` (3); design D13) — THE LINE THE ONE CRITERION REPAIR APPENDS AFTER A PARSED REPLY, by the
+ * rule `judgeParsed` applies, read off the same helpers: I5's line when the reply answers no criterion of `criteria`; D13's,
+ * naming the declared ids without a row, when it answers some, faults none and leaves a declared one without a row; else
+ * `undefined` — no criterion repair follows that reply. ⭑ EXPORTED FOR THE QUALIFICATION RECORD'S CHECK
+ * (`scripts/reviewer-qual/fingerprint.ts` `criterionRepairAfter`): D13's repair prompt depends on the reply before it, so no
+ * one per-case hash is today's, and a recorded criterion repair is held to the prompt today's reviewer sends after the
+ * reply it followed — by this rule, never by a restated copy of it.
+ */
+export function criterionRepairLineFor(parsed: unknown, criteria: ReasoningReviewInput['criteria']): string | undefined {
+	const policy: PolicyCriteria = { criteria };
+	const judgement = coerceJudgement(parsed, policy);
+	if (unansweredCause(parsed, judgement, policy) !== undefined) return CRITERION_REPAIR_INSTRUCTION;
+	const missing = missingCriterionRepairDue(judgement, policy);
+	return missing.length > 0 ? missingCriterionRepairInstruction(missing) : undefined;
+}
 
 /**
  * ⭐⭐ `JAN-PRQUAL` `PQ-1` (design D2; the sponsor's answer (a) of 2026-10-03) — THE PROMPT'S PLAN: every slice measured
@@ -1061,7 +1180,7 @@ function judgePrompt(input: ReasoningReviewInput): string {
 /** `input` is threaded in for its POLICY CRITERIA: the admissible criterion ids are the policy's, not a
  *  constant's. A finding naming an id outside the policy is dropped — which is only correct if the id set
  *  comes from the same place the rubric did. */
-function coerceJudgement(parsed: unknown, input: ReasoningReviewInput): ReasoningReviewJudgement {
+function coerceJudgement(parsed: unknown, input: PolicyCriteria): ReasoningReviewJudgement {
 	const o = (parsed ?? {}) as Record<string, unknown>;
 	const findings: ReasoningReviewFinding[] = Array.isArray(o.findings)
 		? (o.findings as Record<string, unknown>[])
@@ -1735,12 +1854,26 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 			 * judgement stands; one that gets no reply recorded `no-response` by `attempt` (and run once more where its bound
 			 * says so, `P7-2b`). ⛔ Only a call that got NO REPLY is absorbed here (`noReply`); a substituted model's refusal
 			 * and a retention fault propagate, as everywhere in this validator.
+			 * ⭐⭐ Package L — D13 (`REG-D-135` (3); design D13): AND THE MISSING-CRITERION REPAIR, by the same path. `repair` says
+			 * which: its line, the cause a repair is refused for (`undefined`: its judgement is used), and the finding a repair
+			 * that did not parse cites. ⭐ I5's is unchanged — its line, and its use rule (a repair answering at least one
+			 * criterion is used). D13's is used ONLY if it gives a row for every declared criterion. Either leaves the EARLIER
+			 * reply's judgement standing otherwise (`earlier`): the first reply's, or the JSON repair's.
 			 */
-			const criterionRepair = async (first: ExchangeRecord): Promise<ReasoningReviewJudgement | undefined> => {
-				const repairPrompt = `${prompt}\n\n${CRITERION_REPAIR_INSTRUCTION}`;
+			const criterionRepair = async (
+				asked: ExchangeRecord,
+				repair: {
+					readonly line: string;
+					readonly refusedFor: (value: unknown, judged: ReasoningReviewJudgement) => string | undefined;
+					readonly finding: 'REG-F-552' | 'REG-F-566';
+				},
+				earlier: EarlierReply
+			): Promise<ReasoningReviewJudgement | undefined> => {
+				// ⭐ The REVIEW's prompt and the repair's line — after a JSON repair too, never the JSON repair's prompt.
+				const repairPrompt = `${prompt}\n\n${repair.line}`;
 				let repaired: Awaited<ReturnType<typeof timed>>;
 				try {
-					repaired = await timed(repairPrompt, 'repair', first);
+					repaired = await timed(repairPrompt, 'repair', asked);
 				} catch (e) {
 					if (e instanceof Error && noReply.has(e)) return undefined;
 					throw e;
@@ -1754,19 +1887,93 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 				} catch (e) {
 					error = e;
 				}
-				const stillNone = judged ? unansweredCause(value, judged, input) : undefined;
-				if (judged && stillNone === undefined) {
+				const refusal = judged ? repair.refusedFor(value, judged) : undefined;
+				if (judged && refusal === undefined) {
 					await capture(repaired.role, repairPrompt, repaired.text, 'accepted', repaired.times, PARSED, repaired.predecessor);
 					return judged;
 				}
 				// ⭐ `P76F-A` A2 — a repair that answered none again records the marker and ITS OWN cause (`criterionRepairRefused`);
-				// one that did not parse, its parse's own outcome. Each says the first judgement stands — which is what is done.
-				const unparsed = stillNone === undefined ? classifyParse(repaired.text, error) : undefined;
+				// one that did not parse, its parse's own outcome. Each says the ~~first~~ ⭐ earlier judgement stands — which is
+				// what is done. ⭐ D13: and a missing-criterion repair that left a declared criterion without a row, its own marker
+				// and the declared ids it left (`missingCriterionRefused`).
+				const unparsed = refusal === undefined ? classifyParse(repaired.text, error) : undefined;
 				const failed: ExchangeParseOutcome = unparsed
-					? { ...unparsed, detail: `${unparsed.detail} The first reply’s judgement stands (REG-F-552; REG-D-090).` }
-					: { outcome: 'SCHEMA_COERCION_FAILED', detail: criterionRepairRefused(stillNone!, input) };
+					? { ...unparsed, detail: `${unparsed.detail} The ${earlier}’s judgement stands (${repair.finding}; REG-D-090).` }
+					: { outcome: 'SCHEMA_COERCION_FAILED', detail: refusal! };
 				await capture(repaired.role, repairPrompt, repaired.text, 'rejected', repaired.times, failed, repaired.predecessor);
 				return undefined;
+			};
+
+			/** ⭐ P7-6 I5 — the no-criterion repair, unchanged: used when it answers at least one criterion. */
+			const noCriterionRepair = (earlier: EarlierReply) => ({
+				line: CRITERION_REPAIR_INSTRUCTION,
+				refusedFor: (value: unknown, judged: ReasoningReviewJudgement) => {
+					const stillNone = unansweredCause(value, judged, input);
+					return stillNone === undefined ? undefined : criterionRepairRefused(stillNone, input, earlier);
+				},
+				finding: 'REG-F-552' as const
+			});
+
+			/**
+			 * ⭐⭐ D13 — the missing-criterion repair: its line names `missing`, the host's declared ids without a row, and it is
+			 * used ONLY if it gives a row for every declared criterion (`REG-D-135` (3): *"The answer counts only if it covers
+			 * every criterion"*).
+			 */
+			const missingCriterionRepair = (missing: readonly string[], earlier: EarlierReply) => ({
+				line: missingCriterionRepairInstruction(missing),
+				refusedFor: (_value: unknown, judged: ReasoningReviewJudgement) => {
+					const still = declaredWithoutRow(judged, input);
+					return still.length === 0 ? undefined : missingCriterionRefused(still, input, earlier);
+				},
+				finding: 'REG-F-566' as const
+			});
+
+			/**
+			 * ⭐⭐ Package L — D13 (`REG-D-135` (3); `REG-F-566`; design D13) — A PARSED REPLY, JUDGED AS IT CONCLUDES THE REVIEW: the
+			 * first reply's, or the JSON repair's, which D13 judges alike (*"after any parsed reply"*). In this order:
+			 *   · it answers NO criterion: I5's repair (`noCriterionRepair`), its marker, line and use rule unchanged;
+			 *   · it faults no kept row and leaves a declared criterion without one: D13's missing-criterion repair, its own marker
+			 *     (`MISSING_CRITERION_ROW`), naming only the host's declared ids without a row;
+			 *   · else it is accepted as it stands — a reply with a failed row among them (`REG-F-489`; `REG-D-105` (3)).
+			 * ⭐ THE BOUND: a review makes at most one JSON repair and one criterion repair — three calls, each run once more after a
+			 * throw (`timed`): six (`LANE_BUDGET.reviewerCallsPerTry`). A criterion repair's own reply is never judged again here.
+			 */
+			const judgeParsed = async (
+				asked: Awaited<ReturnType<typeof timed>>,
+				sent: string,
+				value: unknown,
+				parsed: ReasoningReviewJudgement,
+				earlier: EarlierReply
+			): Promise<ReasoningReviewJudgement> => {
+				const unanswered = unansweredCause(value, parsed, input);
+				if (unanswered !== undefined) {
+					const requested = await capture(
+						asked.role,
+						sent,
+						asked.text,
+						'repair-requested',
+						asked.times,
+						// ⭐ `P76F-A` A2 — the marker, then the TRUE cause (`criterionRepairRequested`): a reader keys on the first.
+						{ outcome: 'SCHEMA_COERCION_FAILED', detail: criterionRepairRequested(unanswered, input) },
+						asked.predecessor
+					);
+					return (await criterionRepair(requested, noCriterionRepair(earlier), earlier)) ?? parsed;
+				}
+				const missing = missingCriterionRepairDue(parsed, input);
+				if (missing.length > 0) {
+					const requested = await capture(
+						asked.role,
+						sent,
+						asked.text,
+						'repair-requested',
+						asked.times,
+						{ outcome: 'SCHEMA_COERCION_FAILED', detail: missingCriterionRequested(missing, value, parsed, input) },
+						asked.predecessor
+					);
+					return (await criterionRepair(requested, missingCriterionRepair(missing, earlier), earlier)) ?? parsed;
+				}
+				await capture(asked.role, sent, asked.text, 'accepted', asked.times, PARSED, asked.predecessor);
+				return parsed;
 			};
 
 			const firstTry = await timed(prompt, 'initial');
@@ -1807,11 +2014,9 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 				firstParsed = undefined;
 				firstError = e;
 			}
-			// ⭐ P7-6 I5 — `undefined` when the parsed reply answers at least one criterion (or did not parse at all).
-			const unanswered = firstParsed ? unansweredCause(firstValue, firstParsed, input) : undefined;
 			// ⭐ `JAN-EXEC` `P7-2b` — EACH ANSWERED TRY IS RECORDED UNDER THE ROLE AND PREDECESSOR `timed` RETURNS: the call
 			// asked for, or its `retry` after a call that threw, so the chain reads as the calls were made.
-			if (firstParsed && unanswered !== undefined) {
+			if (firstParsed) {
 				// ⭐⭐ P7-6 I5 (`DESIGN-the-reviewer-isolated.md` §4d; `REG-F-552` remedy 1; `REG-D-105` (2)) — A REPLY THAT
 				// PARSED AND ANSWERED NO CRITERION IS REPAIRED ONCE. ⛔ It used to be taken as it stood — no repair follows a
 				// reply that parses — and the floor recorded it INCONCLUSIVE (ASR-2; `REG-D-090`), so its phase stopped: the
@@ -1821,32 +2026,15 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 				//   · ⛔ THE REPAIR MAY ONLY ADD A CONCLUSION. Answering at least one criterion, its judgement is used; answering
 				//     none again, not parsing, or getting no reply, the FIRST judgement stands, exactly as before — never a
 				//     throw, which would turn a VALID INCONCLUSIVE with its recommendation kept into an execution failure;
-				//   · ONCE, and never after the JSON repair below: a reply that did not parse draws that one instead, and its
-				//     answer is taken as it stands, so a review makes at most one repair;
+				//   · ~~ONCE, and never after the JSON repair below: a reply that did not parse draws that one instead, and its
+				//     answer is taken as it stands, so a review makes at most one repair;~~ ⛔ STRUCK by the sponsor's ruling
+				//     (`REG-D-135` (3), Q43 *"Yes, after any reply (Recommended)"*; design D13): ONCE, after the first reply OR
+				//     the JSON repair's parsed reply below, so a review makes at most one JSON repair and one criterion repair;
 				//   · ⚠ DISCLOSED: a repair answered by a SUBSTITUTED model is still refused (`requireReportedModel`, D6), as a
 				//     substitute is wherever it answers — a refusal of who answered, never "no answer", so it propagates.
-				const first = await capture(
-					firstTry.role,
-					prompt,
-					firstRaw,
-					'repair-requested',
-					firstTry.times,
-					// ⭐ `P76F-A` A2 — the marker, then the TRUE cause (`criterionRepairRequested`): a reader keys on the first.
-					{ outcome: 'SCHEMA_COERCION_FAILED', detail: criterionRepairRequested(unanswered, input) },
-					firstTry.predecessor
-				);
-				judgement = (await criterionRepair(first)) ?? firstParsed;
-			} else if (firstParsed) {
-				judgement = firstParsed;
-				await capture(
-					firstTry.role,
-					prompt,
-					firstRaw,
-					'accepted',
-					firstTry.times,
-					PARSED,
-					firstTry.predecessor
-				);
+				// ⭐⭐ Package L — D13: AND A REPLY THAT ANSWERS SOME CRITERIA, FAULTS NONE, AND LEAVES A DECLARED ONE WITHOUT A ROW
+				// draws D13's missing-criterion repair (`judgeParsed`), I5's case untouched.
+				judgement = await judgeParsed(firstTry, prompt, firstValue, firstParsed, 'first reply');
 			} else {
 				// E-5 recorded for the FAILING try before the repair is attempted — finding #62 is precisely that
 				// this outcome was swallowed by a bare catch and recorded nowhere.
@@ -1865,8 +2053,12 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 				const repairPrompt = `${prompt}\n\nIMPORTANT: reply with ONLY the minified JSON object.`;
 				const repairTry = await timed(repairPrompt, 'repair', first);
 				const repairRaw = repairTry.text;
+				// ⭐ D13 — the JSON repair's reply as parsed, before coercion, as the first reply's is kept (`firstValue`).
+				let repairValue: unknown;
+				let repaired: ReasoningReviewJudgement;
 				try {
-					judgement = coerceJudgement(JSON.parse(extractJson(repairRaw)), input);
+					repairValue = JSON.parse(extractJson(repairRaw));
+					repaired = coerceJudgement(repairValue, input);
 				} catch (e) {
 					// The repair failed too. Record it as REJECTED before rethrowing — otherwise the try that
 					// finally broke the run would be the one try with no record, which is the defect inverted.
@@ -1881,15 +2073,10 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 					);
 					throw e;
 				}
-				await capture(
-					repairTry.role,
-					repairPrompt,
-					repairRaw,
-					'accepted',
-					repairTry.times,
-					PARSED,
-					repairTry.predecessor
-				);
+				// ~~its answer is taken as it stands~~ ⭐⭐ Package L — D13 (`REG-D-135` (3); design D13): THE JSON REPAIR'S PARSED
+				// REPLY IS JUDGED AS A FIRST REPLY IS — one answering no criterion draws I5's repair, one that faults nothing and
+				// leaves a declared criterion without a row D13's (run-12's case 43, `REG-F-566`). ⛔ It was accepted as it stood.
+				judgement = await judgeParsed(repairTry, repairPrompt, repairValue, repaired, 'JSON repair');
 			}
 			// The policy's criteria score the result, exactly as they rendered the rubric. Passing the same
 			// `input.criteria` to both is what makes the two unable to diverge — the rubric asking about one set

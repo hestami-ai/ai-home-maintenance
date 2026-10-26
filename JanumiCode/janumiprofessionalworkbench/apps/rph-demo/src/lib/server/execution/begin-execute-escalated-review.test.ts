@@ -39,6 +39,8 @@ const seam = vi.hoisted(() => ({
 	agy: [] as { readonly file: string; readonly args: readonly string[] }[],
 	pi: [] as string[],
 	devin: [] as { readonly file: string; readonly args: readonly string[] }[],
+	/** ⭐ Package L — every prompt the validator handed devin, in order: a criterion repair is told by its line (D13). */
+	prompts: [] as string[],
 	/** What devin answers every review. */
 	answer: '',
 	/** What devin answers review N, in the order the reviews run — the work product's, then each command result's — and
@@ -81,7 +83,8 @@ vi.mock('./model.js', async (importOriginal) => {
 							? {
 									runs: [...seam.runs] as ReturnType<typeof session.processRuns>['runs'],
 									observedCount: seam.runs.length,
-									recordedLimit: 32
+									recordedLimit: 32,
+									writes: []
 								}
 							: session.processRuns()
 				};
@@ -100,6 +103,7 @@ vi.mock('../tools/devin-reviewer.js', async (importOriginal) => {
 		devinPrint: vi.fn((prompt: string) =>
 			actual.devinPrint(prompt, async (file, args) => {
 				seam.devin.push({ file, args: [...args] });
+				seam.prompts.push(prompt);
 				seam.duringReview?.(seam.devin.length);
 				const exportPath = args[args.indexOf('--export') + 1];
 				if (exportPath !== undefined)
@@ -116,6 +120,7 @@ vi.mock('../tools/devin-reviewer.js', async (importOriginal) => {
 
 import { SEEDED_REASONING_REVIEW_CRITERIA } from '@janumipwb/rph-assurance';
 import { listByType } from '@janumipwb/rph-engine';
+import { missingCriterionRepairInstruction } from '../assurance/reasoning-review-validator.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { noProgramsDirectory } from '../assurance/no-programs.testing.js';
 import { dispatch, getEngine, resetEngine } from '../workbench.js';
@@ -188,6 +193,14 @@ const skipped = (recommendation: 'SATISFIED' | 'ESCALATED'): string =>
 		residualUncertainty: []
 	});
 
+/**
+ * ⭐ Package L — D13 (`REG-D-135` (3); design D13): a reply that faults nothing and leaves a declared criterion without a row
+ * draws ONE criterion repair, naming the criterion it left — `skipped`'s, the last. ⭑ These cases' reviews stay INCOMPLETE
+ * only because the repair slips again: each scripts the repair's reply as `skipped` once more, and asserts that the extra
+ * call IS that repair, so a review run again shows as a call beyond it.
+ */
+const SKIPPED_REPAIR_LINE = missingCriterionRepairInstruction([SEEDED_REASONING_REVIEW_CRITERIA.at(-1)!.id]);
+
 /** devin's reply with the FIRST criterion failed, recommending REJECTED: a review that judged its subject and found a fault —
  *  no escalation anywhere in it. */
 const COMMAND_FAULT = 'The command result substitutes an easier problem.';
@@ -241,6 +254,7 @@ beforeEach(() => {
 	seam.agy.length = 0;
 	seam.pi.length = 0;
 	seam.devin.length = 0;
+	seam.prompts.length = 0;
 	seam.turns.length = 0;
 	seam.runs.length = 0;
 	seam.answer = escalated();
@@ -418,17 +432,23 @@ describe('⭐ JAN-ESCREC D3 — the execution plane says what an escalated revie
 		// every route test — and beside this result printed "did not pass its own floor:" and then nothing before the
 		// engine's text: `REG-F-415`'s empty colon, the shape MAJOR 1 named. The command result's reviewer skipped the last
 		// criterion and recommended SATISFIED, so the review is INCONCLUSIVE and records no observation at all.
-		seam.answers.push(CLEAN_SATISFIED, skipped('SATISFIED'));
+		// ⭐ Package L — D13: ~~two answers~~ three — the command result's criterion repair slips again (`SKIPPED_REPAIR_LINE`).
+		seam.answers.push(CLEAN_SATISFIED, skipped('SATISFIED'), skipped('SATISFIED'));
 		seam.runs.push(A_RUN);
 		const pwuId = await modelWorkUnit();
 
 		const result = await beginExecute(pwuId);
 		const message = result.data?.error ?? '';
 
+		// ⭐ Package L — D13 (`REG-D-135` (3)): ~~2~~ 3 — the work product's review, the command result's, and the command
+		// result's one criterion repair, which slips again, so its review stays INCOMPLETE.
 		expect(
 			seam.devin.length,
-			'arrangement: the work product and the command result were not both reviewed'
-		).toBe(2);
+			'arrangement: the work product and the command result were not both reviewed, the command result’s with its criterion repair (D13)'
+		).toBe(3);
+		expect(seam.prompts[2], 'arrangement: the third call is not the command result’s criterion repair').toBe(
+			`${seam.prompts[1]}\n\n${SKIPPED_REPAIR_LINE}`
+		);
 		const [workProduct, evidence] = message.split(COMMAND_EVIDENCE);
 		expect(workProduct, 'arrangement: the work product’s floor did not pass').toBe(
 			'The model ran, its work product is recorded, and the assurance floor is satisfied — but the step still did not complete'
@@ -453,7 +473,11 @@ describe('⭐ JAN-ESCREC D3 — the execution plane says what an escalated revie
 		const result = await beginExecute(pwuId);
 		const message = result.data?.error ?? '';
 
-		expect(seam.devin.length, 'arrangement: an incomplete review was reviewed again').toBe(1);
+		// ⭐ Package L — D13 (`REG-D-135` (3)): ~~1~~ 2 — the review and its one criterion repair, which slips again.
+		expect(seam.devin.length, 'arrangement: an incomplete review was reviewed again').toBe(2);
+		expect(seam.prompts[1], 'arrangement: the second call is not the review’s criterion repair').toBe(
+			`${seam.prompts[0]}\n\n${SKIPPED_REPAIR_LINE}`
+		);
 		expect(message).toBe(
 			`The model ran, its work product was reviewed over 1 try, and the assurance floor is NOT satisfied: ${RECOMMENDATION_CODE}: ${RECOMMENDATION_STATEMENT}${NO_FINDING_INCONCLUSIVE} — The review did not produce findings that may be sent back to the producer (RETRY_OR_CONFIGURE_REVIEWER).`
 		);
@@ -470,7 +494,11 @@ describe('⭐ JAN-ESCREC D3 — the execution plane says what an escalated revie
 		const result = await beginExecute(pwuId);
 		const message = result.data?.error ?? '';
 
-		expect(seam.devin.length, 'arrangement: an incomplete review was reviewed again').toBe(1);
+		// ⭐ Package L — D13 (`REG-D-135` (3)): ~~1~~ 2 — the review and its one criterion repair, which slips again.
+		expect(seam.devin.length, 'arrangement: an incomplete review was reviewed again').toBe(2);
+		expect(seam.prompts[1], 'arrangement: the second call is not the review’s criterion repair').toBe(
+			`${seam.prompts[0]}\n\n${SKIPPED_REPAIR_LINE}`
+		);
 		expect(
 			message,
 			'arrangement: the work product’s floor recorded an observation, or its arm printed something else'
@@ -490,17 +518,22 @@ describe('⭐ JAN-ESCREC D3 — the execution plane says what an escalated revie
 		// criterion and recommended ESCALATED. Beside the work product's human sentence, its refusal read as an escalation —
 		// the recommendation and nothing else, INCONCLUSIVE named nowhere — while its remedy is to re-run or reconfigure
 		// the reviewer. ⭑ Each half now names its own disposition, and only the escalated one says what escalation asks.
-		seam.answers.push(escalated(), skipped('ESCALATED'));
+		// ⭐ Package L — D13: ~~two answers~~ three — the command result's criterion repair slips again (`SKIPPED_REPAIR_LINE`).
+		seam.answers.push(escalated(), skipped('ESCALATED'), skipped('ESCALATED'));
 		seam.runs.push(A_RUN);
 		const pwuId = await modelWorkUnit();
 
 		const result = await beginExecute(pwuId);
 		const message = result.data?.error ?? '';
 
+		// ⭐ Package L — D13 (`REG-D-135` (3)): ~~2~~ 3 — the command result's review draws its one criterion repair.
 		expect(
 			seam.devin.length,
-			'arrangement: the work product and the command result were not both reviewed'
-		).toBe(2);
+			'arrangement: the work product and the command result were not both reviewed, the command result’s with its criterion repair (D13)'
+		).toBe(3);
+		expect(seam.prompts[2], 'arrangement: the third call is not the command result’s criterion repair').toBe(
+			`${seam.prompts[1]}\n\n${SKIPPED_REPAIR_LINE}`
+		);
 		expect(message, 'arrangement: the work product was not escalated').toContain(
 			'(ESCALATE_REVIEW)'
 		);

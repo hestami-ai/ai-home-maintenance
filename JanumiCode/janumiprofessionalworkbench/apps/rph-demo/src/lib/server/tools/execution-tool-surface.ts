@@ -238,7 +238,7 @@ const WRITE_FILE: ExecutionToolTemplate = {
 		contents: { type: 'string', description: 'The complete UTF-8 text to write.', required: true }
 	},
 	mint:
-		({ workspace }) =>
+		({ workspace, processRuns }) =>
 		async (args) => {
 			const path = requiredString(args, 'path');
 			const contents = typeof args.contents === 'string' ? args.contents : undefined;
@@ -251,6 +251,11 @@ const WRITE_FILE: ExecutionToolTemplate = {
 						'refused rather than coerced, because a coerced path names a file nobody chose.'
 				};
 			const outcome = await workspace.writeFile(path, contents);
+			// ⭐⭐ `JAN-EXEC` Phase 7, package L — D8 (`REG-D-135`; design D8) — THE HOST RECORDS THE WRITE IT COMPLETED, its
+			// path as the workspace HOLDS it, taking the next number of the step's ONE host sequence, which `run_command` shares
+			// (`process-run-observer.ts`). ⛔ ONLY THE `written` ARM: a refused write wrote nothing, and takes no number. ⛔ On
+			// the content plane only, never the record plane (`R11`): the step's host renders it (package N).
+			if (outcome.written) processRuns?.wrote({ path: outcome.path });
 			return outcome.written
 				? {
 						ok: true,

@@ -28,6 +28,10 @@ import type { ObservedToolCallReport } from '@janumipwb/rph-contracts';
 import { MAX_AGY_PROMPT_CHARS } from './agy-cli.js';
 import {
 	createAgyReasoningReviewValidator,
+	MISSING_CRITERION_REPAIR_CLOSING,
+	MISSING_CRITERION_REPAIR_OPENING,
+	MISSING_CRITERION_ROW,
+	missingCriterionRepairInstruction,
 	NO_CRITERION_ANSWERED,
 	noCriterionCause,
 	OBSERVATION_HEADING,
@@ -1829,11 +1833,247 @@ describe('⭐⭐ P7-6 I5 — a reply that answers NO criterion is repaired ONCE,
 		expect(prose.prompts[1]).toBe(`${prose.prompts[0]}\n\nIMPORTANT: reply with ONLY the minified JSON object.`);
 	});
 
-	it('⛔ a repair after a reply that did not parse is never followed by this one: at most one repair, ever', async () => {
-		// The JSON repair answers no criterion: it is used as it stands (today's rule), and no third call is made.
+	// ~~⛔ a repair after a reply that did not parse is never followed by this one: at most one repair, ever~~ — ⛔ STRUCK BY
+	// THE SPONSOR'S RULING (`REG-D-135` (3), Q43 *"Yes, after any reply (Recommended)"*; design D13): the pin read *"The JSON
+	// repair answers no criterion: it is used as it stands (today's rule), and no third call is made"*, `PROSE, NO_ROWS, CLEAN`
+	// two calls, never three. ⭐ THE DECIDED BOUND REPLACES IT: a review makes at most ONE JSON repair and ONE criterion
+	// repair, so the JSON repair's parsed reply is judged as a first reply is — here it answers no criterion and draws I5's
+	// repair, its line unchanged — three calls, and never a fourth.
+	it('⛔ D13 (REG-D-135 (3)) — the decided bound: at most one JSON repair and one criterion repair — a JSON repair that answers no criterion draws I5’s repair, three calls, never a fourth', async () => {
 		const { prompts, print } = replying(PROSE, NO_ROWS, CLEAN);
-		await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(SUBJECT, ctx());
-		expect(prompts, 'two calls, never three').toHaveLength(2);
+		const exchanges = createExchangeSink();
+		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+		expect(prompts, 'three calls: the first, the JSON repair, the criterion repair').toHaveLength(3);
+		expect(prompts[1]).toBe(`${prompts[0]}\n\nIMPORTANT: reply with ONLY the minified JSON object.`);
+		expect(prompts[2], 'the review’s prompt and I5’s line, never the JSON repair’s prompt').toBe(`${prompts[0]}\n\n${CRITERION_REPAIR_LINE}`);
+		expect(result.criteria.map((c) => c.outcome), 'the criterion repair answered, and is used').toEqual(
+			SEEDED_REASONING_REVIEW_CRITERIA.map(() => 'MET')
+		);
+		// ⭐ THE CHAIN READS AS THE CALLS WERE MADE: first -> JSON repair -> criterion repair, each naming the one before.
+		const records = exchanges.drain();
+		expect(records.map((e) => `${e.exchangeRole}:${e.disposition}`)).toEqual([
+			'initial:repair-requested',
+			'repair:repair-requested',
+			'repair:accepted'
+		]);
+		expect(records[1]!.predecessorExchangeId).toBe(records[0]!.exchangeId);
+		expect(records[2]!.predecessorExchangeId).toBe(records[1]!.exchangeId);
+		expect(records[1]!.parseOutcome.detail.startsWith(NO_CRITERION_ANSWERED), 'the JSON repair’s reply carries I5’s marker').toBe(true);
+		// ⛔ THE LIMB THAT KEEPS THE BOUND: a criterion repair that answers none again is never repaired again — no fourth call.
+		const again = replying(PROSE, NO_ROWS, NO_ROWS, CLEAN);
+		await createAgyReasoningReviewValidator({ print: again.print, modelId: JUDGE }).evaluate(SUBJECT, ctx());
+		expect(again.prompts, 'never a fourth call').toHaveLength(3);
+	});
+});
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7, package L — D13, THE CRITERION REPAIR AFTER ANY PARSED REPLY (`REG-D-135` (3); `REG-F-566`;
+// `DESIGN-data-flow-order-and-deliverable-review.md` D13) ─────────────────────────────────────────────────────────────────
+//
+// Run-12's command reviews: 18 of 47 non-passing ones were INCONCLUSIVE because a reply that faulted nothing filed RR-03's
+// row under an id the policy does not declare; `coerceJudgement` dropped the row, the declared criterion had none, and the
+// floor read it UNABLE_TO_DETERMINE. I5 repaired only a reply answering NO criterion, and the JSON repair's parsed reply was
+// taken as it stood. ⭐ NOW, after the first parsed reply or the JSON repair's, a reply that faults no kept row and leaves a
+// declared criterion without one draws ONE criterion repair, its line naming ONLY the host's declared ids that have no row
+// (never the reviewer's id, which is untrusted text); the repair is used only if it gives a row for every declared
+// criterion. ⛔ A reply with a failed row is never repaired: a later answer could clear a refusal (`REG-D-105` (3)).
+
+/** RR-03, as the policy declares it — and the id run-12's reviewer filed its row under, which it does not. */
+const DECLARED_RR03 = 'RR-03-no-unjustified-scope-reduction';
+const UNDECLARED_RR03 = 'RR-03-no-obligation-elision-scope';
+/** One clean row under `id`. */
+const cleanRow = (id: string) => ({ criterionId: id, failed: false, statement: 'evaluated; the failure class is absent' });
+/** ⭐ RUN-12'S SHAPE (`REG-F-566`): eight clean declared rows and RR-03's row under an id the policy does not declare, SATISFIED. */
+const SLIPPED = JSON.stringify({
+	findings: SEEDED_REASONING_REVIEW_CRITERIA.map((c) => cleanRow(c.id === DECLARED_RR03 ? UNDECLARED_RR03 : c.id)),
+	recommendation: 'SATISFIED',
+	residualUncertainty: []
+});
+/** ⭐ D13 — THE MISSING-CRITERION REPAIR'S LINE, BYTE FOR BYTE: restated, and held equal to the export below. */
+const MISSING_CRITERION_LINE = (ids: readonly string[]): string =>
+	`IMPORTANT: your reply gave no row under these criterion ids: ${ids.join(', ')}. Reply with ONLY the whole minified JSON ` +
+	'object, with one row in findings for every criterion listed above, each row under its criterionId exactly as listed: ' +
+	'failed=false where the criterion is met, failed=true where it is not.';
+/** ⭐ D13 — THE MARKER every missing-criterion record's detail opens with: restated, and held equal to the export below. */
+const MISSING_CRITERION_MARKER = 'The reply left a declared criterion without a row (REG-F-566).';
+/** The disposition the floor composes from a result (`dispositionFromFindings`), as the floor reads it. */
+const composed = (result: Awaited<ReturnType<ReturnType<typeof createAgyReasoningReviewValidator>['evaluate']>>) =>
+	dispositionFromFindings({ findings: result.observations.map((o) => ({ severity: o.severity, open: o.open })), criteria: result.criteria });
+const outcomeOf = (result: Awaited<ReturnType<ReturnType<typeof createAgyReasoningReviewValidator>['evaluate']>>, id: string) =>
+	result.criteria.find((c) => c.criterionId === id)?.outcome;
+
+describe('⭐⭐ package L — D13: one criterion repair after any parsed reply that faults nothing and leaves a declared criterion without a row (REG-D-135 (3))', () => {
+	it('⭑ the arrangement: RR-03 is declared under the id the line names, and run-12’s id is not one the policy declares', () => {
+		const ids = SEEDED_REASONING_REVIEW_CRITERIA.map((c) => c.id);
+		expect(ids).toContain(DECLARED_RR03);
+		expect(ids).not.toContain(UNDECLARED_RR03);
+		expect((JSON.parse(SLIPPED) as { findings: unknown[] }).findings, 'nine rows, one under the undeclared id').toHaveLength(ids.length);
+	});
+
+	it('⭐ the line and the marker are the exported ones, byte for byte, and the line is built from its two fixed parts', () => {
+		expect(missingCriterionRepairInstruction([DECLARED_RR03])).toBe(MISSING_CRITERION_LINE([DECLARED_RR03]));
+		expect(missingCriterionRepairInstruction(['A', 'B'])).toBe(`${MISSING_CRITERION_REPAIR_OPENING}A, B${MISSING_CRITERION_REPAIR_CLOSING}`);
+		expect(MISSING_CRITERION_ROW).toBe(MISSING_CRITERION_MARKER);
+		// ⭐ Two markers, neither a prefix of the other, so a reader keying on one never reads the other's record.
+		expect(MISSING_CRITERION_ROW.startsWith(NO_CRITERION_ANSWERED) || NO_CRITERION_ANSWERED.startsWith(MISSING_CRITERION_ROW)).toBe(false);
+	});
+
+	it('⭐ the sponsor’s condition, as text (REG-D-105 (2)): the line names no disposition value, asks for no failure, and says how met and unmet are marked', () => {
+		const line = missingCriterionRepairInstruction([DECLARED_RR03]);
+		for (const d of ['SATISFIED', 'CONDITIONALLY_SATISFIED', 'REJECTED', 'INCONCLUSIVE', 'ESCALATED'])
+			expect(line.toUpperCase(), `names no ${d}`).not.toContain(d);
+		expect(line, 'it speaks of looking for a failure at all').not.toMatch(/\b(look|search|hunt)\b[^.;]*\bfor\b[^.;]*\bfailure/i);
+		expect(line, 'it asks the reviewer to find a failure').not.toMatch(/\bfind\b/i);
+		expect(line).toContain('failed=false where the criterion is met, failed=true where it is not');
+		expect(line, 'it asks for the whole object').toContain('the whole minified JSON object');
+		expect(line).toContain('one row in findings for every criterion listed above');
+	});
+
+	it('⭐ run-12’s shape draws exactly ONE criterion repair, its line naming only the declared id with no row — never the reviewer’s', async () => {
+		const { prompts, print } = replying(SLIPPED, CLEAN);
+		const exchanges = createExchangeSink();
+		await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+		// ⛔ AT HEAD: ONE call — the criterion repair stops being eligible once any declared row is kept.
+		expect(prompts, 'one criterion repair is sent').toHaveLength(2);
+		expect(prompts[1], 'the review’s prompt, then the line').toBe(`${prompts[0]}\n\n${MISSING_CRITERION_LINE([DECLARED_RR03])}`);
+		const line = prompts[1]!.slice(prompts[0]!.length);
+		expect(line, 'the line names the declared id that has no row').toContain(DECLARED_RR03);
+		// ⛔ NEVER THE REVIEWER'S ID: it is untrusted text, and echoed it would ask the reviewer to answer under it again.
+		expect(line, 'the line echoes the reviewer’s undeclared id').not.toContain(UNDECLARED_RR03);
+		const [first, repair] = exchanges.drain();
+		expect(first!.disposition).toBe('repair-requested');
+		expect(first!.parseOutcome.outcome).toBe('SCHEMA_COERCION_FAILED');
+		expect(first!.parseOutcome.detail.startsWith(MISSING_CRITERION_MARKER), `the marker does not open the detail: ${first!.parseOutcome.detail}`).toBe(true);
+		expect(first!.parseOutcome.detail).toContain(DECLARED_RR03);
+		expect(first!.parseOutcome.detail, 'the record echoes the reviewer’s undeclared id').not.toContain(UNDECLARED_RR03);
+		// ⭐ I5's marker is I5's alone: this reply answered eight criteria.
+		expect(first!.parseOutcome.detail).not.toContain(NO_CRITERION_ANSWERED);
+		expect(repair!.exchangeRole).toBe('repair');
+		expect(repair!.predecessorExchangeId).toBe(first!.exchangeId);
+	});
+
+	it('⭐ a JSON repair whose parsed answer has that shape draws the criterion repair: three calls, the chain as made', async () => {
+		const { prompts, print } = replying(PROSE, SLIPPED, CLEAN);
+		const exchanges = createExchangeSink();
+		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+		// ⛔ AT HEAD: TWO calls — the JSON repair's parsed answer was taken as it stood (case 43's shape, `REG-F-566`).
+		expect(prompts, 'the first, the JSON repair, the criterion repair').toHaveLength(3);
+		expect(prompts[2], 'the review’s prompt and the line — never the JSON repair’s prompt').toBe(
+			`${prompts[0]}\n\n${MISSING_CRITERION_LINE([DECLARED_RR03])}`
+		);
+		const records = exchanges.drain();
+		expect(records.map((e) => `${e.exchangeRole}:${e.disposition}`)).toEqual([
+			'initial:repair-requested',
+			'repair:repair-requested',
+			'repair:accepted'
+		]);
+		expect(records[1]!.predecessorExchangeId).toBe(records[0]!.exchangeId);
+		expect(records[2]!.predecessorExchangeId).toBe(records[1]!.exchangeId);
+		expect(records[1]!.parseOutcome.detail.startsWith(MISSING_CRITERION_MARKER)).toBe(true);
+		expect(composed(result), 'the repair covered every criterion, and is used').toBe('SATISFIED');
+	});
+
+	it('⭐ a repair that gives a row for every declared criterion is USED: the review concludes SATISFIED', async () => {
+		const { print } = replying(SLIPPED, CLEAN);
+		const exchanges = createExchangeSink();
+		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+		// ⛔ AT HEAD: INCONCLUSIVE — RR-03 UNABLE_TO_DETERMINE, the declared criterion with no row.
+		expect(result.criteria.map((c) => c.outcome)).toEqual(SEEDED_REASONING_REVIEW_CRITERIA.map(() => 'MET'));
+		expect(composed(result)).toBe('SATISFIED');
+		expect(exchanges.drain().map((e) => e.disposition)).toEqual(['repair-requested', 'accepted']);
+	});
+
+	it('⛔ a repair that slips again leaves the FIRST judgement standing — INCONCLUSIVE — the repair recorded rejected, with its cause', async () => {
+		const { prompts, print } = replying(SLIPPED, SLIPPED);
+		const exchanges = createExchangeSink();
+		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+		expect(prompts, 'once, never twice').toHaveLength(2);
+		expect(result.executionFailed).toBe(false);
+		expect(outcomeOf(result, DECLARED_RR03)).toBe('UNABLE_TO_DETERMINE');
+		expect(composed(result)).toBe('INCONCLUSIVE');
+		expect(result.dispositionRecommendation).toBe('SATISFIED');
+		const [, repair] = exchanges.drain();
+		expect(repair!.disposition, 'the repair is recorded, refused').toBe('rejected');
+		expect(repair!.parseOutcome.outcome).toBe('SCHEMA_COERCION_FAILED');
+		const detail = repair!.parseOutcome.detail;
+		expect(detail.startsWith(MISSING_CRITERION_MARKER), `the marker does not open the detail: ${detail}`).toBe(true);
+		expect(detail).toContain('The repair parsed, but');
+		expect(detail, 'it names the declared id still without a row').toContain(DECLARED_RR03);
+		expect(detail).toContain('The first reply’s judgement stands');
+		expect(detail).not.toContain(UNDECLARED_RR03);
+	});
+
+	it('⛔ a PARTIAL repair is never used: one that answers RR-03 but leaves another declared criterion without a row leaves the first judgement standing', async () => {
+		const RR05 = SEEDED_REASONING_REVIEW_CRITERIA.find((c) => c.id.startsWith('RR-05'))!.id;
+		const partial = JSON.stringify({
+			findings: SEEDED_REASONING_REVIEW_CRITERIA.filter((c) => c.id !== RR05).map((c) => cleanRow(c.id)),
+			recommendation: 'SATISFIED'
+		});
+		const { prompts, print } = replying(SLIPPED, partial);
+		const exchanges = createExchangeSink();
+		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+		expect(prompts, 'one criterion repair is sent').toHaveLength(2);
+		// ⭐ DISCRIMINATING: the first reply left RR-03 without a row and answered RR-05; the partial repair the reverse. Used, it
+		// would read RR-03 MET and RR-05 UNABLE_TO_DETERMINE.
+		expect([outcomeOf(result, DECLARED_RR03), outcomeOf(result, RR05)], 'the FIRST judgement stands').toEqual(['UNABLE_TO_DETERMINE', 'MET']);
+		const [, repair] = exchanges.drain();
+		expect(repair!.disposition).toBe('rejected');
+		expect(repair!.parseOutcome.detail, 'it names the criterion the repair left without a row').toContain(RR05);
+	});
+
+	it('⛔ a repair that does not parse, or gets no reply, leaves the first judgement standing — never a throw', async () => {
+		const prose = replying(SLIPPED, PROSE);
+		const proseSink = createExchangeSink();
+		const unparsed = await createAgyReasoningReviewValidator({ print: prose.print, modelId: JUDGE, exchanges: proseSink }).evaluate(SUBJECT, ctx());
+		expect(prose.prompts, 'one criterion repair is sent').toHaveLength(2);
+		expect(unparsed.executionFailed).toBe(false);
+		expect(outcomeOf(unparsed, DECLARED_RR03)).toBe('UNABLE_TO_DETERMINE');
+		const [, notParsed] = proseSink.drain();
+		expect([notParsed!.disposition, notParsed!.parseOutcome.outcome]).toEqual(['rejected', 'JSON_EXTRACTION_FAILED']);
+		expect(notParsed!.parseOutcome.detail).toContain('The first reply’s judgement stands');
+		let n = 0;
+		const throwing: AgyPrint = async () => {
+			n += 1;
+			if (n === 2) throw new Error('devin invocation failed: connection reset');
+			return SLIPPED;
+		};
+		const sink = createExchangeSink();
+		const noReply = await createAgyReasoningReviewValidator({ print: throwing, modelId: JUDGE, exchanges: sink }).evaluate(SUBJECT, ctx());
+		expect(noReply.executionFailed).toBe(false);
+		expect(outcomeOf(noReply, DECLARED_RR03)).toBe('UNABLE_TO_DETERMINE');
+		expect(sink.drain().map((e) => e.disposition)).toEqual(['repair-requested', 'no-response']);
+	});
+
+	it('⛔ after a JSON repair, a criterion repair that slips again leaves the JSON repair’s judgement standing, and its record says so', async () => {
+		const { prompts, print } = replying(PROSE, SLIPPED, SLIPPED, CLEAN);
+		const exchanges = createExchangeSink();
+		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+		expect(prompts, 'three calls, never a fourth').toHaveLength(3);
+		expect(composed(result)).toBe('INCONCLUSIVE');
+		const records = exchanges.drain();
+		expect(records.map((e) => e.disposition)).toEqual(['repair-requested', 'repair-requested', 'rejected']);
+		expect(records[2]!.parseOutcome.detail).toContain('The JSON repair’s judgement stands');
+		expect(records[2]!.parseOutcome.detail, 'it names the first reply, which did not parse').not.toContain('The first reply’s judgement stands');
+	});
+
+	it('⭑ CONTROL — case 02’s shape, two FAILED declared rows beside an undeclared RR-03 id, draws no criterion repair: one call, REJECTED', async () => {
+		// ⛔ `REG-D-105` (3): a reply that faults the work is never re-asked — a later answer could clear the refusal. Run-12's
+		// case 02 (requirements specification) held two failed rows and RR-03's row under an undeclared id.
+		const [a, b] = SEEDED_REASONING_REVIEW_CRITERIA.filter((c) => c.id !== DECLARED_RR03).map((c) => c.id);
+		const case02 = JSON.stringify({
+			findings: SEEDED_REASONING_REVIEW_CRITERIA.map((c) =>
+				c.id === a || c.id === b
+					? { criterionId: c.id, failed: true, statement: 'not met', severity: 'BLOCKING' }
+					: cleanRow(c.id === DECLARED_RR03 ? UNDECLARED_RR03 : c.id)
+			),
+			recommendation: 'REJECTED'
+		});
+		const { prompts, print } = replying(case02, CLEAN);
+		const exchanges = createExchangeSink();
+		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+		expect(prompts, 'a reply with a failed row is taken as it stands').toHaveLength(1);
+		expect(exchanges.drain().map((e) => e.disposition)).toEqual(['accepted']);
+		expect([outcomeOf(result, a!), outcomeOf(result, b!)]).toEqual(['NOT_MET', 'NOT_MET']);
+		expect(composed(result)).toBe('REJECTED');
 	});
 });
 

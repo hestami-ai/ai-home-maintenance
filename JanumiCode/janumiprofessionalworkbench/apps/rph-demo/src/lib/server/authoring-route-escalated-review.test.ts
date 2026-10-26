@@ -119,6 +119,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { POST } from '../../routes/pwa/[id]/agent/+server.js';
 import { load } from '../../routes/pwa/[id]/+page.server.js';
 import { noProgramsDirectory } from './assurance/no-programs.testing.js';
+import { missingCriterionRepairInstruction } from './assurance/reasoning-review-validator.js';
 import {
 	beginAuthoringTurn,
 	clearAuthoringTurns,
@@ -471,7 +472,13 @@ describe('⭐ JAN-ESCREC D3 — over the fork, the load answers which sentence t
 
 		await postInstruction(pwaId, ROOT_ONLY_PLAN);
 
-		expect(seam.calls.length, 'arrangement: the devin branch reviewed the candidate').toBe(1);
+		// ⭐ Package L — D13 (`REG-D-135` (3); design D13): ~~1~~ 2 — a reply that faults nothing and leaves a declared criterion
+		// without a row draws ONE criterion repair, naming that criterion; this seam answers it alike, so the review stays
+		// INCOMPLETE, the first judgement standing. ⭑ The second call is that repair, so a review run again still shows.
+		expect(seam.calls.length, 'arrangement: the devin branch reviewed the candidate, with its criterion repair (D13)').toBe(2);
+		expect(seam.prompts[1], 'arrangement: the second call is not the review’s criterion repair').toBe(
+			`${seam.prompts[0]}\n\n${missingCriterionRepairInstruction([SEEDED_REASONING_REVIEW_CRITERIA.at(-1)!.id])}`
+		);
 		const turn = getPendingAuthoringTurn(pwaId);
 		expect(
 			turn?.status,
