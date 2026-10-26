@@ -1,7 +1,7 @@
 # DESIGN — Data-flow order enforced by the workbench, and review of finished work beside each command's review
 
 **Programme:** `JAN-EXEC` Phase 7, before P6 again; `REG-D-134`, `REG-D-135`, `REG-F-578`, `REG-F-579`, `REG-F-566`.
-**Status:** DESIGN, revision 1, 2026-10-25. D1–D19 are DECIDED under the sponsor's `REG-D-135` and the lead's decisions identified below. Their build is OWED. No fix described here is built or measured. Case set v12's new cases and oracles await the sponsor's confirmation before any paid measurement.
+**Status:** ~~DESIGN, revision 1, 2026-10-25. D1–D19 are DECIDED under the sponsor's `REG-D-135` and the lead's decisions identified below. Their build is OWED. No fix described here is built or measured. Case set v12's new cases and oracles await the sponsor's confirmation before any paid measurement.~~ DESIGN, revision 2, 2026-10-25 (`REG-F-580`). Package L is built and merged (`2c46dfa6`). D20 is added, the lead's decision, flagged for the sponsor. Packages M and N are being built. Case set v12's new cases and oracles await the sponsor's confirmation before any paid measurement.
 **Sources:**
 
 - `sponsor-words-2026-10-18.md`, Q40a–Q44, Q41b and Q42b.
@@ -89,6 +89,8 @@ Run-12 had 47 non-passing command reviews: 29 REJECTED and 18 INCONCLUSIVE. The 
 
 9. **D9, DECIDED — join and review within each try.** Join that try's runs with that try's own account inside the loop. Run their reviews there and return their subject findings to the producer with the work product's findings. This adopts `REG-F-520` remedy 1 and addresses `REG-F-485`'s cross-try join. Today's work-product review runs in the loop, and the command join follows the producer's disposal (`apps/rph-demo/src/routes/undertakings/[id]/+page.server.ts:1992-2105`). Completion names the admitted try's work product and its command evidence. Earlier tries' assessments remain on the record, as DOC-001's durable-findings rule requires and as the work-product loop already does (`REG-D-059`).
 
+⭑ **Revision 2, 2026-10-25.** Keep one process-run observer per step across its tries (`l-facts.md`). The 32-run bound is per step, so a model unit's press still has a whole worst case of `(3 + 32) × 6 = 210` reviewer calls. A join needing one try's runs slices the step's one host sequence by try boundaries. Package N must preserve this bound; its build is in progress.
+
 10. **D10, DECIDED — review the finished work against the obligation.** Give the work-product review a host manifest of the unit's changed files: each path and its hash before the first try and after each try, identifying added, changed and removed files. Show their contents as the host reads them. Include the step's writes and runs to date in host order, with try boundaries: ordinal and write path, or ordinal, command and exit. Keep today's prompt budget. Cut composite material unit by unit, declaring each cut before its bytes and counting the declaration inside its allowance (`REG-F-480`, `REG-F-483`, `REG-F-564`; `apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts:119-128`). Judge RR-01 to RR-03 against this deliverable. This adopts `REG-F-522` remedy candidate 2. Candidate 1, a governed manifest object and its ratification, remains OWED.
 
 11. **D11, DECIDED — show the deliverable at declared-policy sign-off too.** This is the lead's decision, flagged for the sponsor. Give the declared-policy reviews the same deliverable view, using the unit's changed files and sequence recorded at its completion. Preserve the existing composition of subtree work and its declared cuts (`apps/rph-demo/src/lib/server/assurance/review-input.ts:316-360`). Those prompts move with D8's sequence in any case. Judging a declared policy without the delivered files would retain `REG-F-522`'s gap on that plane. Re-measuring its 14 cases adds about 28 qualification calls (`fixes-facts.md`, section 6).
@@ -114,6 +116,8 @@ Run-12 had 47 non-passing command reviews: 29 REJECTED and 18 INCONCLUSIVE. The 
 Today `coerceJudgement` drops a row whose id the policy has not declared (`apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.ts:1064-1086`). A declared criterion without a row maps to UNABLE_TO_DETERMINE (`packages/rph-assurance/src/validators.ts:441`). An unresolved mandatory criterion composes INCONCLUSIVE (`packages/rph-assurance/src/assurance-rules.ts:55-58`). The criterion repair stops being eligible once any declared row is kept (`reasoning-review-validator.ts:747-753`); the JSON repair's parsed answer is taken as it stands (`:1806-1893`).
 
 13. **D13, DECIDED — repair missing criteria after any parsed reply.** After the first parsed reply, or the JSON repair's parsed reply, draw one criterion repair when no kept row is failed and at least one declared criterion has no row. Name only the host's missing declared ids in the repair line. Never echo the reviewer's undeclared id into that line. Use the repair's judgement only if it supplies a row for each declared criterion. Otherwise retain the earlier judgement and record the repair rejected. A reply with a failed row receives no criterion repair. The repair can add a conclusion and cannot clear a refusal, preserving `REG-D-105` (3). Its line asks for no failure, preserving (2). This subsumes I5's no-criterion repair, retaining its marker and adding a missing-criterion marker. A review has at most one JSON repair and one criterion repair: 3 calls, each eligible for one retry after a throw, or 6 calls. Change `LANE_BUDGET.reviewerCallsPerTry` from 4 to 6 (`apps/rph-demo/e2e-live-exec/lane-config.ts:297-317`).
+
+⭑ **As built (revision 2), 2026-10-25** (`cb29dced`, `2c46dfa6`; `l-facts.md`). The new repair's marker is `MISSING_CRITERION_ROW`: *"The reply left a declared criterion without a row (REG-F-566)."* Its line names only the host's declared ids without a row and asks for *"one row in findings for every criterion listed above, the ones named here and all the others"*. Full declared coverage is the use rule for this new repair only. Under the lead's reading, I5 keeps `NO_CRITERION_ANSWERED`, `CRITERION_REPAIR_INSTRUCTION` byte for byte, and its rule that a repair answering at least one criterion is used. A new test and `P6X-L-M28` pin that rule. I5 now also follows a JSON repair's parsed reply answering no criterion. A policy declaring no criterion therefore draws one more unsatisfiable call, with no outcome change. The new line's effect on the reviewer is untested. V's case set v12 measurement will report how often the repair is drawn, used and refused for incomplete coverage.
 
 **Not chosen.**
 
@@ -165,7 +169,15 @@ Today `coerceJudgement` drops a row whose id the policy has not declared (`apps/
 
    Keep the negative control's reserve in the pre-press arithmetic. Reaching the limit is allowed; passing it is refused. Today's comparison already uses `<=` (`apps/rph-demo/e2e-live-exec/phase7-operator.ts:635-646`), but the phase check counts `PHASE7_TRY_RESERVE` (`:2447-2452`). The new whole-press rule replaces that reserve. Restate the report's `LIMIT_CAVEAT` (`scripts/phase7/run-report-core.ts:169-172`): the rule bounds recorded reviewer exchanges, while the recorded count is a lower bound when capture faults (`apps/rph-demo/e2e-live-exec/phase7-operator.ts:807-809`). It cannot claim a complete count of calls absent from the record.
 
+⭑ **Corrected (revision 2), 2026-10-25** (`REG-F-580`; `l-facts.md`; `2c46dfa6`). D16's Send row has no whole worst case before Send. Package L counts `2 × 16 × 6 = 192` for the 16 anticipated types, an estimate. The agent may author more, and the floor reviews those parts inside Send. The report's `LIMIT_CAVEAT` states that a larger candidate can pass the limit in that press. D20 is the decided remedy that will make Send's press bounded; its build is OWED.
+
 17. **D17, DECIDED — the limit is about 2,400.** Q44 raises `REG-D-131`'s about 1,000 (`sponsor-words-2026-10-18.md`; `REG-D-135` (4)). Set `PHASE7_PAID_LIMIT` to 2400 and make its guard read that ruling. The current guard reads `REG-D-131` Q37 (`verif/live-exec-lane-config.test.ts:977-998`).
+
+20. **D20, DECIDED (revision 2) — the authoring review's allowance.** This is the lead's decision under `REG-D-135` (4), flagged for the sponsor (`REG-F-580`; 2026-10-25). The build is OWED. The paid lane gives the authoring turn's review a reviewer-call allowance: what the limit leaves when Send is pressed, less the calls spent before the run, those recorded, and the negative control's 4. Before each review round, the review in parts computes that round's worst case, its parts × 6. If that would exceed what remains of the allowance after earlier rounds' calls, the round stops before any reviewer call. Its stated reason names the parts, the worst case and the remaining allowance, and the candidate is not accepted. With no allowance set, the product's default, nothing changes. Send counts the allowance it hands over, so its press is bounded by construction.
+
+   At P6 again's planned spend, the allowance is about `2,400 − 1,117 − 4 = 1,279` calls. `1,279 / 6 = 213.1666…`, about 213.2 parts for one round. A 213-part round needs 1,278 calls and fits that initial allowance; a 214-part round needs 1,284 and stops. A later round uses the remaining allowance. These are planning figures. The ground is the host's ownership of the bound: `process-run-observer.ts:106-108` argues that a bound must exist and must *"belong to the HOST"*.
+
+   **Predicted reds, OWED.** A staged candidate whose round's worst case exceeds the allowance stops with 0 reviewer calls. A round at exactly the allowance is reviewed. With no allowance set, the candidate is reviewed as today. The lane's Send check counts the allowance it hands over.
 
 **The model.** These are the lead's estimates from `fixes-facts.md` section 6 and `run12-costs.md`. Future figures are unmeasured.
 
@@ -197,6 +209,7 @@ The sponsor was told about 90 qualification calls before D11 added about 28 for 
 ## 8. What this design does not fix
 
 - **`REG-F-510`.** The unit's instruction still lacks the general Undertaking-objective carriage that finding records. Treating `originating-intent` as supplied for dependency resolution supplies no prompt-carriage remedy.
+- **`REG-F-580`.** Send's limit check counts an estimate until D20 is built.
 - **`REG-F-516`.** Conditional-child offers, additional M+ instances and refused-instantiation residue remain outside this build. An uninstantiated producer can leave a required input unproduced under D1.
 - **`REG-F-535`.** The product's concurrent-unit exposure remains open. D6 preserves the lane's one-unit-at-a-time rule.
 - **`REG-F-522`, candidate 1.** The governed manifest object, each command's binding to the manifest it ran against, and the roadmap's ratification remain OWED. D10 and D11 provide a host-read deliverable view.
@@ -213,6 +226,7 @@ The sponsor was told about 90 qualification calls before D11 added about 28 for 
    | Order | Package or step | Required result before proceeding |
    |---|---|---|
    | 1 | L — F3's criterion repair and D8's shared host sequence | Red-first checks, own review, merge after `bun run gate:fast` |
+   | 1a | L2 — D20, the authoring review's allowance | Red-first checks, own review, merge after `bun run gate:fast` |
    | 2 | M — F1's store, engine, page and lane order | Red-first checks, enforcement mutants killed, own review, merge after `bun run gate:fast` |
    | 3 | N — F2, D9–D12 | Red-first checks, own review, merge after `bun run gate:fast` |
    | 4 | Case set v12 and its oracles | Built cases, offline pre-check, then sponsor confirmation |

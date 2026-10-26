@@ -2160,7 +2160,7 @@ Phase 0** — a recording of the wrong bytes replays a different run.
 
 **Programme:** `JAN-EXEC` Phase 7, after run-12.
 **Design:** `DESIGN-data-flow-order-and-deliverable-review.md`, revision 1, 2026-10-25.
-**Status:** revision 1, 2026-10-25. L, M, N, V and P are the build, qualification and run order (design D18). No step below is built. Case set v12's new cases and expected verdicts await the sponsor's confirmation before any paid measurement.
+**Status:** ~~revision 1, 2026-10-25. L, M, N, V and P are the build, qualification and run order (design D18). No step below is built. Case set v12's new cases and expected verdicts await the sponsor's confirmation before any paid measurement.~~ revision 2, 2026-10-25 (`REG-F-580`). L is built and merged (`2c46dfa6`); L2 (D20) follows; M and N are being built. Case set v12's new cases and expected verdicts await the sponsor's confirmation before any paid measurement.
 
 ### 9b.1 The build rule
 
@@ -2184,6 +2184,22 @@ Phase 0** — a recording of the wrong bytes replays a different run.
 - **Limit checks and controls.** Replace `PHASE7_TRY_RESERVE` at `apps/rph-demo/e2e-live-exec/phase7-operator.ts:2447-2452`. Test a model-unit press with `(3 tries + 32 retained command runs) × 6 = 210` calls counted ahead; a review re-run counts the refused reviews being re-run × 6; sign-off or a declared-review re-run counts the declared reviews × 6; Send counts the authoring floor's whole worst case at 6 calls per review. Pair refusal above the limit with admission exactly at it, preserving the comparison at `apps/rph-demo/e2e-live-exec/phase7-operator.ts:635-646`.
 - **`LIMIT_CAVEAT`.** Restate `scripts/phase7/run-report-core.ts:169-172`: the rule bounds recorded reviewer exchanges, while the recorded count remains a lower bound when capture faults (`apps/rph-demo/e2e-live-exec/phase7-operator.ts:807-809`). It cannot claim a complete count of calls absent from the record.
 - **Proposed mutants.** Widen the repair condition to any missing row despite a failed row; drop the repair condition; echo the reviewer's undeclared id into the repair line; use a partial repair; or count a press at one try's reserve.
+- ⭑ **2026-10-25 — L built and merged** (`cb29dced`, `2c46dfa6`; `l-facts.md`).
+  - **Criterion repair.** D13's new repair follows the first parsed reply or the JSON repair's parsed reply when no kept declared row is failed and a declared criterion has no row. It names only missing declared ids, asks for the full declared set and is used only with full coverage. I5's marker, line and rule that a repair answering at least one criterion is used are kept, pinned by a new test and `P6X-L-M28`. A zero-criterion policy draws one more unsatisfiable I5 call after the JSON repair, with no outcome change.
+  - **Qualification machinery.** The runner records `criterion-repair` and admits the third call. Four scoring entries now draw 2 calls. `missing-row-repaired` and `json-repair-then-missing-row` are added at 2 and 3 calls, both SATISFIED. No case set, oracle or committed record line changed.
+  - **Host sequence.** Writes and runs share one host ordinal per step; a refused call takes none. A run past the 32-run bound still takes its number, pinned by `P6X-L-M29`. `processRuns()` carries writes, and command-evidence references carry ordinals.
+  - **Limit.** The review bound is 6 calls, `PHASE7_PAID_LIMIT` is 2400 and `PHASE7_TRY_RESERVE` is removed. Model-unit and work re-run presses count 210; review re-runs count refused reviews × 6, with a 198-call fallback; sign-off and declared re-runs count declared reviews × 6. Send counts 192 for 16 anticipated types. Checks retain the negative control's 4 and allow equality.
+  - **Mutants.** The build measured 59 KILLED: 27 new `P6X-L-M1` through `P6X-L-M27` and 32 re-anchored. It also measured 2 RETIRED, 3 ABOLISHED and 0 SURVIVED. The fix round measured 41 KILLED, including `P6X-L-M28` through `P6X-L-M31`.
+  - **Gate.** At the fix, root Vitest reported 9722 passed and 4 skipped of 9726; Playwright reported 114 passed. The other `gate:fast` steps passed. `reviewer:qual:check` was RED with 2 COVERAGE problems: 76 of 76 current cases unmeasured under the moved fingerprint, overall and for devin / `glm-5-3-flash-high`. It reported 0 REPRODUCTION, RECORD or CONFERRAL problems.
+  - **Fingerprint.** It moved from `5ab3d68643bffbbf700c622526b626f47d4c487690e1eb5e798d2d7f7d539cfc`, through the build's `9a310102…`, to `78c6ce51fa8bd3b1719371d5d647b85d4a03371c80fd5ec4e56ebd4897a42047` after the repair line's rewording. Case set v11's digest stayed unchanged. V's measurement remains owed.
+  - **The check's finding.** Send's anticipated inventory is an estimate; its floor can pass the limit inside that press (`REG-F-580`). The fix states that caveat, pinned by `P6X-L-M31`. D20 is the lead's decided remedy under `REG-D-135` (4), flagged for the sponsor; L2's build is OWED.
+
+### 9b.2a L2 — the authoring review's allowance (D20; `REG-F-580`)
+
+- **Red first.** A staged candidate whose round's worst case exceeds the allowance must stop with 0 reviewer calls and a reason naming its parts, worst case and remaining allowance. A round at exactly the allowance must be reviewed. With no allowance set, review must proceed as today. The lane's Send check must count the allowance it hands over. These are predicted reds; L2 is DECIDED and OWED as of 2026-10-25.
+- **D20.** Under `REG-D-135` (4), the lead decides, flagged for the sponsor, that the paid lane hands the authoring review the calls left after prior spend, recorded spend and the negative control's 4, and that each round checks parts × 6 against the remaining allowance before any reviewer call, stopping an over-budget round and leaving its candidate unaccepted.
+- **Pins that move.** Change the lane's Send check to count the allowance it hands over. Change `LIMIT_CAVEAT` in `scripts/phase7/run-report-core.ts` to state that Send's press is bounded by that allowance. Keep the disclosure that recorded calls are a lower bound when capture faults.
+- **Proposed mutants.** Ignore the allowance; count a round's worst case at one call per part; stop only after the first reviewer call; or make Send count 16 types instead of the allowance.
 
 ### 9b.3 M — the order
 
