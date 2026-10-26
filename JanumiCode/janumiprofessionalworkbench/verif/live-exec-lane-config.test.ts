@@ -1232,9 +1232,16 @@ describe('⛔ the config and the spec take every one of these from the helper', 
 
 	it('the config refuses and passes keys through by the helper, and its test timeout is the helper’s', () => {
 		const sf = parsed(CONFIG);
+		// ⭐ MOVED DELIBERATELY by package L2 — D20 (`REG-F-580`; the brief's step 2, "the lane hands it over"): the config also
+		// takes the authoring review's allowance from the helper, asked of the whole environment as the refusal is
+		// (`verif/phase7-authoring-allowance.test.ts` holds where it is laid over the server).
 		expect(importsFrom(sf, './e2e-live-exec/lane-config').sort()).toEqual(
-			['TEST_TIMEOUT_MS', 'laneKeysRefusal', 'requiredLaneKeys'].sort()
+			['TEST_TIMEOUT_MS', 'laneKeysRefusal', 'phase7AuthoringReviewAllowanceEnv', 'requiredLaneKeys'].sort()
 		);
+		expect(
+			callsTo(sf, 'phase7AuthoringReviewAllowanceEnv'),
+			'the allowance is asked of the whole environment'
+		).toEqual([['process.env']]);
 		expect(callsTo(sf, 'laneKeysRefusal'), 'the refusal is asked of the whole environment').toEqual(
 			[['process.env']]
 		);

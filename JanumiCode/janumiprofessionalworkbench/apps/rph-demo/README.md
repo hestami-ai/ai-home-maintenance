@@ -133,8 +133,20 @@ bun run --filter @janumipwb/rph-demo dev
   `RS-1`). Pi resolves its model only when the step opens it, so a model Pi cannot resolve still fails the step after
   it has started. The paid execution lane (`e2e:live-exec`) refuses an agy executor at boot: its spec asserts a
   provider-reported producer, which agy cannot give.
+- **The authoring review's allowance.** `JPWB_AUTHORING_REVIEW_ALLOWANCE` gives the authoring floor's review in parts a
+  reviewer-call allowance for the server process (`REG-F-580`, design D20). Unset or blank, the default, there is none and
+  nothing changes. Set to a whole number of calls, each review round of an authoring turn, the first and the refinement's,
+  reserves its worst case before its first reviewer call: its types × 6, the most calls one review makes (the first call, one
+  JSON repair and one criterion repair, each run once more after a throw). A round runs only while the worst cases already
+  reserved and its own stay within the allowance, so reaching it is allowed. A round that would pass it calls no reviewer:
+  each type's review is recorded as one that did not execute (`VALIDATOR_EXECUTION_FAILED`, under the validator id
+  `reasoning-review.allowance-stopped`), with the reason (the round's types, its worst case and what is left), and the
+  candidate is staged blocked, not accepted. A value that is not a whole number of calls stops every round that has a type.
+  The variable is read once, at the first round, and the reservations are held in memory: restarting the server starts
+  afresh. The paid execution lane (`e2e:live-exec`) sets it for a paid half-B run and refuses one exported in the shell.
 - **The gate ignores all of this.** The gate's tests and its e2e server start with these variables removed:
   `JPWB_ASSURANCE_TOOL`, `JPWB_ASSURANCE_MODEL`, `JPWB_JUDGE_MODEL`, `JPWB_EXECUTOR`, `JPWB_EXECUTOR_MODEL`,
   `JPWB_AGENT`, `JPWB_DEVIN_BIN` and `JPWB_AGY_BIN`. So exporting the configuration in your shell does not change
   `bun run test` or `bun run e2e`, and the e2e server's reviewer stays the declared test stand-in. The paid live lanes
-  (`e2e:live`, `e2e:live-exec`) do inherit them.
+  (`e2e:live`, `e2e:live-exec`) do inherit them. ⚠ `JPWB_AUTHORING_REVIEW_ALLOWANCE` is not removed: exported in the
+  shell, it bounds the gate's authoring floors too, so leave it unset where you run the gate.

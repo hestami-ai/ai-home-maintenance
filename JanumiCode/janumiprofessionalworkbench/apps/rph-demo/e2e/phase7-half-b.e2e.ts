@@ -16,11 +16,7 @@ import {
 	type RunRecord
 } from '../e2e-live-exec/phase7-operator';
 import { PHASE7_HALF_B_DRAFT } from '../../../scripts/phase7/half-b';
-import {
-	phase7AuthoringAllowanceMs,
-	phase7AuthoringReviewerCalls,
-	PHASE7_AUTHORING_ANTICIPATED_PARTS
-} from '../e2e-live-exec/lane-config';
+import { phase7AuthoringAllowanceMs, phase7AuthoringReviewAllowance } from '../e2e-live-exec/lane-config';
 
 // ⭐⭐ `JAN-EXEC` Phase 7 completion programme, E3 (C6) — HALF B'S TURN, REHEARSED IN THE GATE WITH THE MOCK AGENT
 // (`docs/_working/DESIGN-phase-7-completion.md` §4 C6: *"The turn itself is rehearsed in the gate with the mock agent,
@@ -149,11 +145,15 @@ test.describe('Phase 7 half B — the turn, accepted, published and run, through
 			true
 		]);
 		expect(a.accept?.acceptedHash, 'the hash accepted is not the candidate’s').toBe(a.candidate?.candidateHash);
-		// ⭐ `REG-D-112` (finding 2) — the limit was checked before Send, the authoring floor's worst case counted ⭐ (the review in
-		// parts, B6) for the inventory anticipated, sixteen types.
+		// ⭐ `REG-D-112` (finding 2) — the limit was checked before Send, ~~the authoring floor's worst case counted ⭐ (the review in
+		// parts, B6) for the inventory anticipated, sixteen types~~ ⭐ MOVED DELIBERATELY by package L2 — D20 (`REG-F-580`): the
+		// allowance the lane hands the authoring review counted — the limit less none spent before and the negative control's 4,
+		// so the check reaches the limit. ⚠ This gate's server is handed no allowance (`playwright.config.ts`): the lane's count is
+		// rehearsed here, the server's bound in `floor-allowance.test.ts` and `authoring-route-allowance.test.ts`.
 		expect(a.limitCheck, 'the limit before Send').toMatchObject({
 			prior: 0,
-			ahead: phase7AuthoringReviewerCalls(PHASE7_AUTHORING_ANTICIPATED_PARTS),
+			ahead: phase7AuthoringReviewAllowance(0),
+			total: 2400,
 			allowed: true
 		});
 		expect(a.floor.map((f) => f.state), 'the authoring floor, as the turn’s fork held it').toEqual([
@@ -162,7 +162,8 @@ test.describe('Phase 7 half B — the turn, accepted, published and run, through
 			'SATISFIED'
 		]);
 		// ⭐ B6 — and its Reasoning Review is one round's complete part set, read off the fork as the real page staged it: the plan's
-		// three types, each reviewed; the wait's allowance theirs; and, three being fewer than anticipated, no second count of Send's.
+		// three types, each reviewed; the wait's allowance theirs; and ~~, three being fewer than anticipated,~~ no second count of
+		// Send's (⛔ package L2, D20: Send counts the allowance, and no inventory is counted again).
 		expect(
 			a.floor.find((f) => f.policyId === 'floor.reasoning-review')?.parts?.map((p) => [p.typeName, p.state]),
 			'the authoring floor’s parts, as the turn’s fork held them'

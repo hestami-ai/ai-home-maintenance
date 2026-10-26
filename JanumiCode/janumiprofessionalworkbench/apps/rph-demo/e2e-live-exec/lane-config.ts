@@ -217,7 +217,8 @@ export function requiredLaneKeys(tool: string | undefined): readonly string[] {
  * (`executorLaneFaults`). ⭐ `JAN-EXEC` Phase 7 `P7-2` (D3) — and two more of the lane's own, labelled the same way: a set
  * `JPWB_REVIEW_SEES_PRIOR` or `JPWB_AGENT` (`readAtCallTimeFaults`). ⭐ (D1) — and a Phase 7 variable set with no run
  * folder (`phase7RequestFaults`). ⭐ E3 (C1, C3) — and the half: one this lane does not know, or half B with no author's
- * model (`halfFaults`).
+ * model (`halfFaults`). ⭐ L2 — D20 — and the authoring review's allowance exported in the shell, which the lane alone hands
+ * the server (`allowanceLaneFaults`).
  */
 export function laneKeysRefusal(
 	env: Readonly<Record<string, string | undefined>>
@@ -239,6 +240,8 @@ export function laneKeysRefusal(
 	const requestFaults = phase7RequestFaults(env);
 	// ⭐ E3 (C1, C3) — THE HALF, AND HALF B'S AUTHOR: the lane's own rule.
 	const halfLaneFaults = halfFaults(env);
+	// ⭐ L2 — D20 — THE AUTHORING REVIEW'S ALLOWANCE, which the lane alone hands over: the lane's own rule.
+	const allowanceFaults = allowanceLaneFaults(env);
 	if (
 		missing.length === 0 &&
 		unwired === undefined &&
@@ -246,7 +249,8 @@ export function laneKeysRefusal(
 		executorFaults.length === 0 &&
 		callTimeFaults.length === 0 &&
 		requestFaults.length === 0 &&
-		halfLaneFaults.length === 0
+		halfLaneFaults.length === 0 &&
+		allowanceFaults.length === 0
 	)
 		return undefined;
 	return [
@@ -273,6 +277,7 @@ export function laneKeysRefusal(
 		...callTimeFaults,
 		...requestFaults,
 		...halfLaneFaults,
+		...allowanceFaults,
 		'The keys:',
 		'  JPWB_EXECUTOR / JPWB_EXECUTOR_MODEL — the tool and model that PRODUCE the work product: pi, with a model Pi ' +
 			'resolves (this lane refuses agy; devin has no executor adapter), and no program override for it',
@@ -669,10 +674,15 @@ export const PHASE7_TEST_TIMEOUT_MS =
  * (3 tries + 32 command runs) × 6 = 210 (`PHASE7_UNIT_REVIEWER_CALLS`); the rule's re-run of a stopped phase's review, its
  * refused reviews × 6 (`phase7RereviewReviewerCalls`); a sign-off and the rule's re-run of its declared reviews, the declared
  * reviews × 6; Send, the authoring floor's worst case at 6 calls a review. ~~So the recorded exchanges cannot pass the limit.~~
- * ⛔ Package L's check, finding 1: not of Send's press — before Send no candidate exists, so its check counts the floor for the
+ * ~~⛔ Package L's check, finding 1: not of Send's press — before Send no candidate exists, so its check counts the floor for the
  * types ANTICIPATED (`PHASE7_AUTHORING_ANTICIPATED_PARTS`), an estimate and not a bound, and a turn that stages more spends its
  * floor's reviews inside that press, where nothing is checked. The other presses' counts are their whole worst case; the run
- * report's caveat says which press is the exception (`scripts/phase7/run-report-core.ts`, `LIMIT_CAVEAT`).
+ * report's caveat says which press is the exception (`scripts/phase7/run-report-core.ts`, `LIMIT_CAVEAT`).~~
+ * ⭐⭐ Package L2 — D20 (`REG-F-580`): and Send's is a bound too — its check counts the allowance the lane hands the authoring
+ * review (`phase7AuthoringReviewAllowance`), which every round of the floor reserves its worst case against before its first
+ * reviewer call (`src/lib/server/assurance/review-allowance.ts`), so its press cannot spend past what was counted. So the rule
+ * bounds the recorded reviewer exchanges, a lower bound when a capture faults (`scripts/phase7/run-report-core.ts`,
+ * `LIMIT_CAVEAT`).
  */
 export const PHASE7_PAID_LIMIT = 2400;
 
@@ -780,13 +790,17 @@ export function phase7AuthoringAllowanceMs(parts: number): number {
 }
 
 /**
- * ⭐⭐ The review in parts, B6 (`REG-D-125`; design D11; roadmap 9a.7, "Spend reserve") — THE INVENTORY ANTICIPATED BEFORE SEND:
+ * ~~⭐⭐ The review in parts, B6 (`REG-D-125`; design D11; roadmap 9a.7, "Spend reserve") — THE INVENTORY ANTICIPATED BEFORE SEND:
  * no candidate exists before the request is sent, so the reserve the limit counts there is stated for the types it is
  * expected to make — sixteen, run-11's candidate (`REG-F-571`; design §3's measurement and D11's arithmetic). ⚠ An estimate,
  * never a bound: the agent may author more, and the lane reads the inventory its turn actually stages
- * (`phase7-operator.ts`, `waitForTheCandidate`).
+ * (`phase7-operator.ts`, `waitForTheCandidate`).~~
+ * ⛔ REMOVED by package L2 — D20 (`REG-F-580`; `REG-D-135` (4); the brief's step 3: kept *"only where an allowance in time (ms)
+ * still needs an estimate"*): `PHASE7_AUTHORING_ANTICIPATED_PARTS`, sixteen. Send's check counts the allowance the lane hands
+ * the authoring review (`phase7AuthoringReviewAllowance`, below), the inventory's count again is gone with the estimate, and no
+ * allowance in time read it — the authoring's wait and the spec's timeout are derived from the parts the turn STAGES, at least
+ * one (`phase7AuthoringAllowanceMs`, `phase7HalfBAuthoringTimeoutMs`), so nothing reads the figure after.
  */
-export const PHASE7_AUTHORING_ANTICIPATED_PARTS = 16;
 
 /**
  * ⭐⭐ `REG-D-112` (E3's review, finding 2) — THE AUTHORING TURN'S WORST CASE IN REVIEWER CALLS: ~~each of its floor runs one
@@ -794,12 +808,83 @@ export const PHASE7_AUTHORING_ANTICIPATED_PARTS = 16;
  * parts, B6 (design D11) — FOR `parts` TYPES: each of its floor runs a review of each part, each of up to
  * `reviewerCallsPerTry` calls — 2 × parts × 4: 128 for sixteen ⭐ — package L, D16 (`REG-D-135` (4): Send counts the authoring
  * floor's worst case at 6 calls a review): 2 × parts × 6, 192 for sixteen — the calls the allowance above counts in time. ⛔ It was a
- * constant, 8, and a candidate of sixteen types inherited it. ⛔ Half B checks it against the limit BEFORE SEND (D8), for the
- * anticipated inventory (`PHASE7_AUTHORING_ANTICIPATED_PARTS`): the lane's first check had been before the first PHASE, so
- * the authoring floor's reviews, and a model root's, were spent before the limit was ever asked.
+ * constant, 8, and a candidate of sixteen types inherited it. ⛔ ~~Half B checks it against the limit BEFORE SEND (D8), for the
+ * anticipated inventory (`PHASE7_AUTHORING_ANTICIPATED_PARTS`)~~ ⭐ Half B checks the limit BEFORE SEND (D8) — ⛔ package L2, D20:
+ * counting the allowance it hands the authoring review (`phase7AuthoringReviewAllowance`), never this figure, which no check
+ * reads now: the lane's first check had been before the first PHASE, so the authoring floor's reviews, and a model root's,
+ * were spent before the limit was ever asked.
  */
 export function phase7AuthoringReviewerCalls(parts: number): number {
 	return PHASE7_AUTHORING_FLOOR_RUNS * parts * LANE_BUDGET.reviewerCallsPerTry;
+}
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7, package L2 — D20 (`REG-F-580`; `REG-D-135` (4); DESIGN-data-flow-order-and-deliverable-review.md D20,
+// revision 2) — THE AUTHORING REVIEW'S ALLOWANCE, HANDED TO THE SERVER ────────────────────────────────────────────────────
+// Before Send no candidate exists, and the agent may author any number of types, so no count made before Send can be the
+// authoring floor's whole worst case (`REG-F-580`). The bound is the server's: each review round reserves its worst case —
+// its parts × 6 — against `JPWB_AUTHORING_REVIEW_ALLOWANCE` before its first reviewer call, and a round that would pass what
+// is left calls no reviewer (`src/lib/server/assurance/review-allowance.ts`). The config hands a paid half-B run's server that
+// allowance (`phase7AuthoringReviewAllowanceEnv`), and Send's check counts what it handed (`phase7-operator.ts`,
+// `authorThePwa`), so Send's press is bounded by construction.
+
+/**
+ * The server setting the lane hands over: the product's `AUTHORING_REVIEW_ALLOWANCE_VARIABLE` (`review-allowance.ts`),
+ * restated because this module imports nothing, and held to it by `verif/phase7-authoring-allowance.test.ts`.
+ */
+export const AUTHORING_REVIEW_ALLOWANCE_VARIABLE = 'JPWB_AUTHORING_REVIEW_ALLOWANCE';
+
+/**
+ * ⭐ D20 — THE ALLOWANCE A PAID HALF-B RUN HANDS ITS AUTHORING REVIEW: what the limit leaves after the calls spent before the run
+ * and the negative control's reserve — 2,400 − 1,117 − 4 = 1,279 at P6 again's planned spend — and never below none. Nothing is
+ * recorded in the run before Send, which half B presses first, so the calls recorded are counted by Send's check itself.
+ */
+export function phase7AuthoringReviewAllowance(prior: number): number {
+	return Math.max(0, PHASE7_PAID_LIMIT - prior - PHASE7_NEGATIVE_CONTROL_RESERVE);
+}
+
+/**
+ * The calls spent before the run as the spec reads them (`phase7-operator.ts`, `priorReviewerCalls`): a non-negative integer in
+ * decimal, trimmed, with no leading zero — restated here, and held to the spec's reading by verif — else `undefined`.
+ */
+function priorCallsOf(env: Readonly<Record<string, string | undefined>>): number | undefined {
+	const trimmed = env[PHASE7_PRIOR_CALLS_VARIABLE]?.trim() ?? '';
+	return /^(?:0|[1-9]\d*)$/.test(trimmed) && Number.isSafeInteger(Number(trimmed)) ? Number(trimmed) : undefined;
+}
+
+/**
+ * ⭐⭐ D20 — WHAT THE CONFIG LAYS OVER THE SERVER FOR THE AUTHORING REVIEW (`playwright.live-exec.config.ts`, `webServer.env`): for
+ * a PAID HALF-B run of the Phase 7 lane, the allowance (`phase7AuthoringReviewAllowance`); for the dry run, half A and the
+ * one-unit lane, NOTHING. ⚠ Paid as the spec reads it, exactly `1` (`phase7.live.ts`); the half as `phase7Half` reads it.
+ * ⛔ A prior the spec cannot read hands an allowance of none — fail-closed, every authoring round with a type stopped — and the
+ * spec's boot refuses such a run before any press (`bootOf`).
+ */
+export function phase7AuthoringReviewAllowanceEnv(
+	env: Readonly<Record<string, string | undefined>>
+): Readonly<Record<string, string>> {
+	if (env[LIVE_RUN_DIR_VARIABLE] === undefined) return {};
+	if (env[PHASE7_PAID_VARIABLE] !== '1') return {};
+	if (phase7Half(env) !== 'B') return {};
+	const prior = priorCallsOf(env);
+	return {
+		[AUTHORING_REVIEW_ALLOWANCE_VARIABLE]: String(prior === undefined ? 0 : phase7AuthoringReviewAllowance(prior))
+	};
+}
+
+/**
+ * ⭐ D20 — AN ALLOWANCE EXPORTED IN THE SHELL, refused by a rule of THIS LANE: the config passes the operator's whole shell to
+ * the server, so it would reach the dry run and half A, and stand beside the one the lane hands a paid half-B run and counts.
+ * ⚠ SET MEANS A VALUE, after trimming: the server reads `''` and `'   '` as no allowance, as `readAtCallTimeFaults` reads its
+ * variables.
+ */
+function allowanceLaneFaults(env: Readonly<Record<string, string | undefined>>): string[] {
+	const shell = env[AUTHORING_REVIEW_ALLOWANCE_VARIABLE];
+	if (!shell?.trim()) return [];
+	return [
+		`  · ${AUTHORING_REVIEW_ALLOWANCE_VARIABLE}=${JSON.stringify(shell)} is refused by a rule of THIS LANE, not of the product: ` +
+			'the lane hands the server the authoring review’s allowance itself — for a paid half-B run, the limit less the calls ' +
+			'spent before the run and the negative control’s 4, and none otherwise (REG-F-580; design D20) — and one exported in ' +
+			'the shell would reach the dry run and half A, and stand beside the one the lane counts. Unset it.'
+	];
 }
 
 /**

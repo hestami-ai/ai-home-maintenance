@@ -35,10 +35,10 @@ import {
 	phase7Half,
 	phase7AuthoringAllowanceMs,
 	phase7AuthoringMs,
+	phase7AuthoringReviewAllowance,
 	phase7AuthoringReviewerCalls,
 	phase7HalfBAuthoringTimeoutMs,
 	phase7HalfBTestTimeoutMs,
-	PHASE7_AUTHORING_ANTICIPATED_PARTS,
 	PHASE7_AUTHORING_FLOOR_RUNS,
 	PHASE7_CANDIDATE_POLL_MS,
 	PHASE7_DESIGNER_ACTS,
@@ -318,9 +318,12 @@ const MODEL_ROOT_TYPES: ObjectRow[] = AGENT_TYPES.map((t) =>
 		: t
 );
 /**
- * ⭐ The review in parts, B6 — a candidate of SIXTEEN types, run-11's count (`REG-F-571`) and the inventory the lane anticipates
- * before Send (`PHASE7_AUTHORING_ANTICIPATED_PARTS`): the shape of each is immaterial to the wait, which counts them.
+ * ⭐ The review in parts, B6 — a candidate of SIXTEEN types, run-11's count (`REG-F-571`) ~~and the inventory the lane anticipates
+ * before Send (`PHASE7_AUTHORING_ANTICIPATED_PARTS`)~~ ⛔ (package L2, D20: Send counts the allowance it hands the authoring
+ * review, and no inventory is anticipated): the shape of each is immaterial to the wait, which counts them.
  */
+/** Sixteen parts, run-11's count — what these arrangements have the authoring floor's worst case be, where they stage it. */
+const SIXTEEN = 16;
 const SIXTEEN_TYPES: ObjectRow[] = Array.from({ length: 16 }, (_, i) => ({
 	id: `pwutype_part_${i + 1}`,
 	state: { pwaId: PWA_ID, name: `Part ${i + 1}`, pwuKind: 'PRODUCT_IMPLEMENTATION', isRoot: i === 0, permittedChildTypeIds: [], status: 'ACTIVE' }
@@ -399,6 +402,11 @@ interface HalfBScript {
 	readonly acceptThrows?: boolean;
 	/** ⭐ `REG-D-112` (E3's re-review, finding 4) — the ASSURANCE exchanges the authoring floor records once Send is pressed. */
 	readonly floorCalls?: number;
+	/**
+	 * ⭐ Package L2 — D20 — ASSURANCE exchanges the store records from the start, before Send: none in a real half B, which presses
+	 * Send first; here, so Send's check is seen to count the calls already recorded beside the allowance it hands over.
+	 */
+	readonly recordedBeforeSend?: number;
 	/**
 	 * ⭐ The review in parts, B6 — the types the candidate holds at each read after Send, the last repeated: the inventory
 	 * the turn has staged so far. `types` at every read unless said.
@@ -496,6 +504,11 @@ function halfBLane(script: HalfBScript) {
 			// ⭐ `REG-D-112` (E3's re-review, finding 4) — the authoring floor's calls, recorded once Send is pressed. ⭐ R3-B's
 			// fix round (F1) — and each pressed unit's (`unitCalls`).
 			modelExchanges: [
+				// ⭐ Package L2 — D20 — calls the store records before Send (`recordedBeforeSend`), which Send's check counts.
+				...Array.from({ length: script.recordedBeforeSend ?? 0 }, (_, i) => ({
+					id: `mex_before_${i}`,
+					state: { plane: 'ASSURANCE' }
+				})),
 				...(sent
 					? Array.from({ length: script.floorCalls ?? 0 }, (_, i) => ({
 							id: `mex_floor_${i}`,
@@ -2056,9 +2069,15 @@ describe('⛔ REG-D-112 (E3’s review, 1) — a run that stops during authoring
 describe('⛔ REG-D-112 (E3’s review, 2) — the LIMIT is checked before Send and before the root’s press, ~~each act’s worst case counted~~ ⭐ what each act counts by the one rule as amended (REG-D-114 (14))', () => {
 	/**
 	 * The authoring floor's worst case: two floor runs, each ~~one review~~ ⭐ (the review in parts, B6) a review of each part, of up
-	 * to `reviewerCallsPerTry` calls — ~~8~~ ⭐ 128, counted before Send for the inventory anticipated, sixteen types.
+	 * to `reviewerCallsPerTry` calls — ~~8~~ ⭐ 128, ~~counted before Send for the inventory anticipated, sixteen types~~ ⛔ package
+	 * L2, D20: Send counts the allowance it hands the authoring review — so here the floor's spend after Send in the root's
+	 * arrangements, sixteen parts' worst case, 192.
 	 */
-	const FLOOR_WORST = phase7AuthoringReviewerCalls(PHASE7_AUTHORING_ANTICIPATED_PARTS);
+	const FLOOR_WORST = phase7AuthoringReviewerCalls(SIXTEEN);
+	/** ⭐ Package L2 — D20 — what Send's check says it counted, restated: the allowance the lane hands the authoring review. */
+	const COUNTED_ALLOWANCE = 'the allowance the lane hands the authoring review, which no round of its floor may pass';
+	/** ⭐ D20 — the calls spent before P6 again, as planned (design D20): 2,400 − 1,117 − 4 = 1,279 handed over. */
+	const PLANNED_PRIOR = 1117;
 	/**
 	 * ~~A model unit's worst case, as its allowance counts it: each try's review, and each reviewed command's — 140.~~ ~~⭐
 	 * `REG-D-114` (14), as amended 2026-10-16 — what a MODEL root counts before its press: ONE TRY'S RESERVE, a review of up to
@@ -2073,31 +2092,59 @@ describe('⛔ REG-D-112 (E3’s review, 2) — the LIMIT is checked before Send 
 
 	// ⭐ THE PREDICTED RED: half B pressed Send with no check — the first was before the first PHASE, after the authoring
 	// floor's reviews and a model root's had been spent.
-	it('⭐ the authoring floor’s worst case past the limit: half B refuses BEFORE SEND — nothing sent, the run ends paid-limit, the check kept', async () => {
-		const prior = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - FLOOR_WORST + 1;
-		const l = halfBLane({ paid: true, prior });
+	// ⭐⭐ MOVED DELIBERATELY by package L2 — D20 (`REG-F-580`; the brief's step 3): ~~"the authoring floor's worst case past the
+	// limit"~~ — Send's check counts THE ALLOWANCE THE LANE HANDS THE AUTHORING REVIEW (`phase7AuthoringReviewAllowance`), with the
+	// calls already recorded and the negative control's 4, never `phase7AuthoringReviewerCalls(PHASE7_AUTHORING_ANTICIPATED_PARTS)`,
+	// the estimate for sixteen anticipated types. The allowance is the limit less the prior calls and the 4, so with nothing
+	// recorded the check reaches the limit exactly; past it, the calls already recorded carry it — and it presses nothing.
+	// ⛔ PREDICTED RED, read from the code at 59135143: the check counted 192, so 1,117 + 1 + 4 + 192 = 1,314 let Send through.
+	it('⭐ the allowance it hands over, with the calls already recorded, past the limit: half B refuses BEFORE SEND — nothing sent, the run ends paid-limit, the check kept', async () => {
+		const allowance = phase7AuthoringReviewAllowance(PLANNED_PRIOR);
+		expect(allowance, 'arrangement: the allowance handed over at P6 again’s planned spend').toBe(1279);
+		const l = halfBLane({ paid: true, prior: PLANNED_PRIOR, recordedBeforeSend: 1 });
 		const record = await l.run();
-		expect(l.only('author.send', 'beginExecute')).toEqual([]);
+		expect(l.only('author.send', 'beginExecute'), 'Send was pressed past the limit').toEqual([]);
 		expect([record.end?.reason, record.authoring?.sent]).toEqual(['paid-limit', false]);
 		expect(record.authoring?.limitCheck).toEqual({
-			prior,
-			recorded: 0,
+			prior: PLANNED_PRIOR,
+			recorded: 1,
 			reserve: PHASE7_NEGATIVE_CONTROL_RESERVE,
-			ahead: FLOOR_WORST,
-			counted: 'the authoring floor’s worst case, for 16 anticipated types',
+			ahead: allowance,
+			counted: COUNTED_ALLOWANCE,
 			total: PHASE7_PAID_LIMIT + 1,
 			limit: PHASE7_PAID_LIMIT,
 			allowed: false
 		});
-		expect(record.end?.detail).toContain(`before Send: ${PHASE7_PAID_LIMIT + 1} of ${PHASE7_PAID_LIMIT} reviewer calls`);
+		expect(record.end?.detail).toBe(
+			`the limit, before Send: ${PHASE7_PAID_LIMIT + 1} of ${PHASE7_PAID_LIMIT} reviewer calls, the allowance of ${allowance} ` +
+				'the lane hands the authoring review counted (D8; REG-D-112; design D20)'
+		);
 	});
 
-	it('⭐ CONTROL — one call fewer spent, the worst case fits the limit exactly: Send is pressed, and the run goes on', async () => {
-		const prior = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - FLOOR_WORST;
+	it('⭐ ⛔ D20 — calls spent before the run past the limit less the reserve: the allowance is none, and Send is refused', async () => {
+		const prior = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE + 1;
 		const l = halfBLane({ paid: true, prior });
 		const record = await l.run();
+		expect(l.only('author.send')).toEqual([]);
+		expect(record.authoring?.limitCheck).toMatchObject({ ahead: 0, total: PHASE7_PAID_LIMIT + 1, allowed: false });
+	});
+
+	// ⭐ MOVED DELIBERATELY with the case above (package L2 — D20): ~~"one call fewer spent, the worst case fits the limit
+	// exactly"~~ — nothing recorded, the allowance brings the check to the limit exactly, and Send is pressed.
+	it('⭐ CONTROL — nothing recorded before Send: the allowance it hands over brings the check to the limit exactly, Send is pressed, and the run goes on', async () => {
+		const l = halfBLane({ paid: true, prior: PLANNED_PRIOR });
+		const record = await l.run();
 		expect(l.only('author.send')).toEqual(['author.send']);
-		expect(record.authoring?.limitCheck).toMatchObject({ total: PHASE7_PAID_LIMIT, allowed: true });
+		expect(record.authoring?.limitCheck).toEqual({
+			prior: PLANNED_PRIOR,
+			recorded: 0,
+			reserve: PHASE7_NEGATIVE_CONTROL_RESERVE,
+			ahead: phase7AuthoringReviewAllowance(PLANNED_PRIOR),
+			counted: COUNTED_ALLOWANCE,
+			total: PHASE7_PAID_LIMIT,
+			limit: PHASE7_PAID_LIMIT,
+			allowed: true
+		});
 	});
 
 	// ⭐ Package L — D16 (`REG-D-135` (4)): MOVED DELIBERATELY to the whole-press count — ~~one try's reserve~~, 4 → 210.
@@ -2176,8 +2223,12 @@ describe('⛔ REG-D-112 (E3’s review, 2) — the LIMIT is checked before Send 
 });
 
 describe('⛔ the merge’s fix round, F2 and F3 — the run report reads half B’s reads of the limit as the lane made them', () => {
-	/** The authoring floor's worst case, counted before Send: ~~8~~ ⭐ (the review in parts, B6) 128, for sixteen anticipated types. */
-	const FLOOR_WORST = phase7AuthoringReviewerCalls(PHASE7_AUTHORING_ANTICIPATED_PARTS);
+	/**
+	 * The authoring floor's worst case, ~~counted before Send~~: ~~8~~ ⭐ (the review in parts, B6) 128, for sixteen ~~anticipated~~
+	 * types ⛔ — package L2, D20: Send counts the allowance it hands the authoring review; this is the floor's spend after Send
+	 * that the arrangement stages, 192.
+	 */
+	const FLOOR_WORST = phase7AuthoringReviewerCalls(SIXTEEN);
 	/**
 	 * ~~A MODEL root's worst case, counted before its press: 140.~~ ~~⭐ `REG-D-114` (14), as amended 2026-10-16 — what a MODEL
 	 * root counts before its press: one try's reserve, 4.~~ ⭐ Package L — D16 (`REG-D-135` (4)): its whole press, 210, restated.
@@ -2219,16 +2270,21 @@ describe('⛔ the merge’s fix round, F2 and F3 — the run report reads half B
 	it('⛔ F3 — the authoring’s read before Send, half B’s first read of the limit, is listed among the lane’s reads, first', async () => {
 		// ⛔ PREDICTED RED, read from the code: `laneLimitChecks` was built from the units' records alone, and nothing in the
 		// report read `authoring.limitCheck`, so the read that guards half B's first paid act was in no list.
+		// ⭐ MOVED DELIBERATELY by package L2 — D20: ~~the floor's worst case for 16 anticipated types, under the limit~~ — Send's read
+		// counts the allowance the lane hands the authoring review, so with nothing recorded it reads at the limit, which Send may
+		// reach.
 		const { prior, record, report, md } = await atTheLimit();
-		const total = prior + PHASE7_NEGATIVE_CONTROL_RESERVE + FLOOR_WORST;
+		const allowance = phase7AuthoringReviewAllowance(prior);
+		const total = prior + PHASE7_NEGATIVE_CONTROL_RESERVE + allowance;
+		expect(total, 'arrangement: Send’s read reaches the limit').toBe(PHASE7_PAID_LIMIT);
 		expect(record.authoring?.limitCheck, 'arrangement: the lane read the limit before Send').toMatchObject({ total, allowed: true });
 		expect(
 			report.reviewerCalls.laneLimitChecks.map((c) => [c.unit, c.before, c.total, c.allowed])[0],
 			'the authoring’s read before Send is not the first of the lane’s reads'
 		).toEqual(['authoring', 'Send', total, true]);
 		expect(md).toContain(
-			`  - authoring, before Send: ${prior} + 0 + ${PHASE7_NEGATIVE_CONTROL_RESERVE} + ${FLOOR_WORST} ahead (the authoring floor’s worst ` +
-				`case, for 16 anticipated types) = ${total} of ${PHASE7_PAID_LIMIT}, under it.`
+			`  - authoring, before Send: ${prior} + 0 + ${PHASE7_NEGATIVE_CONTROL_RESERVE} + ${allowance} ahead (the allowance the lane ` +
+				`hands the authoring review, which no round of its floor may pass) = ${total} of ${PHASE7_PAID_LIMIT}, at it, which this act may reach.`
 		);
 	});
 });
@@ -2863,9 +2919,10 @@ describe('⛔ REG-D-112 (E3’s re-review, 4) — the limit before the root coun
 	const WHOLE_PRESS = (3 + 32) * 6;
 	/**
 	 * ⭐ The floor's worst case, its two runs' reviews of up to four calls each ⭐ (the review in parts, B6) of each of sixteen
-	 * anticipated parts, ~~8~~ 128: so Send's read, before it, stays under the limit.
+	 * ~~anticipated~~ parts, ~~8~~ 128 ⭐ (six calls each, 192): ~~so Send's read, before it, stays under the limit~~ ⛔ package L2,
+	 * D20 — the calls the arrangement has the floor record after Send, whose read counts the allowance and reaches the limit.
 	 */
-	const FLOOR_CALLS = phase7AuthoringReviewerCalls(PHASE7_AUTHORING_ANTICIPATED_PARTS);
+	const FLOOR_CALLS = phase7AuthoringReviewerCalls(SIXTEEN);
 	/** One call past the limit with the floor's recorded calls counted, and within it without them. */
 	const PRIOR = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - WHOLE_PRESS - FLOOR_CALLS + 1;
 
@@ -3397,10 +3454,16 @@ describe('⛔ The check of 241158f4, 1 — only an acceptance answered SUCCESS n
 // and its complete part set — never one Reasoning Review of the PWA as a whole, which a round in parts never records.
 
 describe('⭐⭐ The review in parts, B6 — the authoring’s spend reserve counts parts, and the lane and the report record one round’s complete part set', () => {
-	/** The authoring floor's worst case for the inventory anticipated before Send: 2 × 16 × 4. */
-	const FLOOR_WORST = phase7AuthoringReviewerCalls(PHASE7_AUTHORING_ANTICIPATED_PARTS);
-	/** The prior that brings Send's read to the limit exactly. */
+	/**
+	 * The authoring floor's worst case for ~~the inventory anticipated before Send~~ sixteen parts: 2 × 16 × ~~4~~ 6 — ⛔ package L2,
+	 * D20: what Send's check counted in a run recorded before D20, the 16 anticipated types (the report's cases below read such a
+	 * record); Send now counts the allowance it hands the authoring review.
+	 */
+	const FLOOR_WORST = phase7AuthoringReviewerCalls(SIXTEEN);
+	/** The prior that brought Send's read to the limit exactly, before D20. */
 	const AT_SEND = PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - FLOOR_WORST;
+	/** ⭐ D20 — the calls spent before P6 again, as planned: the allowance handed over, 1,279, is not sixteen types' 192. */
+	const PLANNED_PRIOR = 1117;
 	/** A candidate of TWENTY types: four more than anticipated. */
 	const TWENTY_TYPES: ObjectRow[] = Array.from({ length: 20 }, (_, i) => ({
 		id: `pwutype_more_${i + 1}`,
@@ -3409,35 +3472,39 @@ describe('⭐⭐ The review in parts, B6 — the authoring’s spend reserve cou
 	const STAGED_INVENTORY = 'the authoring floor’s worst case, for the types its turn staged';
 
 	// ⭐ Package L — D16 (`REG-D-135` (4)): Send counts the authoring floor's worst case at SIX calls a review.
-	it('⭐ the authoring’s worst case counts each part in each of its two rounds, ~~four~~ six calls a review: ~~8~~ 12 for one part, ~~128~~ 192 for the sixteen anticipated before Send', () => {
+	// ⭐ MOVED DELIBERATELY by package L2 — D20 (the brief's step 3): ~~"192 for the sixteen anticipated before Send"~~ — Send
+	// counts the allowance it hands the authoring review, and `PHASE7_AUTHORING_ANTICIPATED_PARTS` is removed, no allowance in
+	// time needing the estimate; the two-round worst case of an inventory stands, read by no check.
+	it('⭐ the authoring’s worst case counts each part in each of its two rounds, ~~four~~ six calls a review: ~~8~~ 12 for one part, ~~128~~ 192 for sixteen ~~anticipated before Send~~', () => {
 		expect([1, 4, 16, 20].map(phase7AuthoringReviewerCalls)).toEqual(
 			[1, 4, 16, 20].map((parts) => PHASE7_AUTHORING_FLOOR_RUNS * parts * LANE_BUDGET.reviewerCallsPerTry)
 		);
-		expect([PHASE7_AUTHORING_ANTICIPATED_PARTS, FLOOR_WORST, phase7AuthoringReviewerCalls(1)]).toEqual([16, 192, 12]);
+		expect([FLOOR_WORST, phase7AuthoringReviewerCalls(1)]).toEqual([192, 12]);
 	});
 
 	// ⛔ PREDICTED RED, read from the code: no read counted the inventory the turn staged, so a candidate larger than the reserve
 	// counted before Send inherited that reserve unsaid.
-	it('⛔ a candidate staging MORE types than anticipated: Send’s check is counted again for the inventory it staged, its passing the limit recorded — and nothing refused', async () => {
-		const l = halfBLane({ paid: true, prior: AT_SEND, staged: [TWENTY_TYPES] });
+	// ⭐⭐ MOVED DELIBERATELY by package L2 — D20 (`REG-F-580`; the brief's step 3): ~~"Send's check is counted again for the
+	// inventory it staged, its passing the limit recorded"~~ — Send's check counts the allowance the lane hands the authoring
+	// review, which every round of its floor reserves against before its first reviewer call: a bound whatever the inventory, so
+	// no inventory is anticipated, none is counted again (`inventoryCheck` stays null), and a larger candidate inherits no
+	// estimate. ⛔ PREDICTED RED, read from the code at 59135143: the check counted 192, the 16 anticipated types', and the twenty
+	// staged were counted again.
+	it('⛔ a candidate staging twenty types: Send’s check counted the allowance it handed over — the bound every round keeps to, whatever the inventory — so nothing is counted again, and the candidate is accepted', async () => {
+		const l = halfBLane({ paid: true, prior: PLANNED_PRIOR, staged: [TWENTY_TYPES] });
 		const record = await l.run();
-		expect([record.authoring?.limitCheck?.total, record.authoring?.limitCheck?.allowed], 'arrangement: Send reaches the limit').toEqual([
-			PHASE7_PAID_LIMIT,
-			true
-		]);
-		expect(record.authoring?.parts).toBe(20);
-		expect(record.authoring?.inventoryCheck, 'the inventory the turn staged was never counted').toEqual({
-			prior: AT_SEND,
+		expect(record.authoring?.limitCheck, 'Send’s check did not count the allowance it hands over').toEqual({
+			prior: PLANNED_PRIOR,
 			recorded: 0,
 			reserve: PHASE7_NEGATIVE_CONTROL_RESERVE,
-			ahead: phase7AuthoringReviewerCalls(20),
-			counted: STAGED_INVENTORY,
-			total: PHASE7_PAID_LIMIT + phase7AuthoringReviewerCalls(20) - FLOOR_WORST,
+			ahead: phase7AuthoringReviewAllowance(PLANNED_PRIOR),
+			counted: 'the allowance the lane hands the authoring review, which no round of its floor may pass',
+			total: PHASE7_PAID_LIMIT,
 			limit: PHASE7_PAID_LIMIT,
-			allowed: false
+			allowed: true
 		});
-		// ⚠ IT REFUSES NOTHING: the floor's rounds ran inside the Send press, which no check stops (`REG-D-114` (14)); the candidate
-		// is accepted, and the root's check counts the calls the store records.
+		expect(record.authoring?.parts).toBe(20);
+		expect(record.authoring?.inventoryCheck, 'an inventory was counted again beside the allowance').toBeNull();
 		expect(l.only('author.accept')).toEqual(['author.accept']);
 	});
 
@@ -3447,6 +3514,8 @@ describe('⭐⭐ The review in parts, B6 — the authoring’s spend reserve cou
 		expect([record.authoring?.parts, record.authoring?.inventoryCheck]).toEqual([16, null]);
 	});
 
+	// ⭑ A RUN RECORDED BEFORE D20 (package L2): its Send check counted the 16 anticipated types and its inventory was counted again.
+	// The lane makes neither now; the report still reads such a record as it was made.
 	it('⭐ the report lists Send’s check counted again among the lane’s reads, after Send’s own, past the limit where it is', () => {
 		const lane = halfBLaneRows();
 		const inventoryCheck = {
@@ -3484,33 +3553,52 @@ describe('⭐⭐ The review in parts, B6 — the authoring’s spend reserve cou
 	// that stages more spends its floor's reviews inside the Send press, where nothing is checked (`inventoryCheck` refuses
 	// nothing). D16's Send row asks for the floor's WHOLE worst case, which no count before Send can be while nothing bounds
 	// the inventory an agent authors; so the caveat states the true value, and says which reads show it.
-	it('⛔ the caveat beside a staged read past the limit says Send can pass it: Send counts the 16 anticipated types, an estimate and not a bound', () => {
+	// ⭐⭐ MOVED DELIBERATELY by package L2 — D20 (`REG-F-580`; the brief's step 4; `P6X-L-M31`'s pin, which moves with it to
+	// `P6X-L2-M8`): ~~"the caveat beside a staged read past the limit says Send can pass it: Send counts the 16 anticipated
+	// types, an estimate and not a bound"~~ — the clause package L's check added is false now, and goes: Send's check counts the
+	// allowance the lane hands the authoring review, which every round of its floor reserves its worst case against before its
+	// first reviewer call, so Send's press is bounded by it; no inventory is counted again, so no read names one. The caveat says
+	// so, beside the Send read of a run the lane records under D20, and keeps the two things the bound does not reach.
+	// ⛔ PREDICTED RED, read from the code at 59135143: the caveat said Send's count was an estimate that a larger candidate's
+	// floor could pass in that press.
+	it('⛔ the caveat beside Send’s read says Send’s press is bounded by the allowance the lane hands the authoring review — the rule bounding the recorded exchanges, a lower bound when a capture faults', () => {
 		const lane = halfBLaneRows();
-		const inventoryCheck = {
-			prior: AT_SEND,
+		const sendCheck = {
+			prior: PLANNED_PRIOR,
 			recorded: 0,
 			reserve: PHASE7_NEGATIVE_CONTROL_RESERVE,
-			ahead: phase7AuthoringReviewerCalls(20),
-			counted: STAGED_INVENTORY,
-			total: AT_SEND + PHASE7_NEGATIVE_CONTROL_RESERVE + phase7AuthoringReviewerCalls(20),
+			ahead: phase7AuthoringReviewAllowance(PLANNED_PRIOR),
+			counted: 'the allowance the lane hands the authoring review, which no round of its floor may pass',
+			total: PHASE7_PAID_LIMIT,
 			limit: PHASE7_PAID_LIMIT,
-			allowed: false
+			allowed: true
 		};
-		const sendCheck = { ...inventoryCheck, ahead: FLOOR_WORST, counted: 'the authoring floor’s worst case, for 16 anticipated types', total: PHASE7_PAID_LIMIT, allowed: true };
 		const run = lane.run as { authoring: Record<string, unknown> };
 		const out = buildRunReport(
 			halfBStore(),
-			{ ...lane, run: { ...run, authoring: { ...run.authoring, limitCheck: sendCheck, inventoryCheck } } },
+			{ ...lane, run: { ...run, authoring: { ...run.authoring, limitCheck: sendCheck, inventoryCheck: null } } },
 			{ accountNames: NAMES }
 		).report;
-		expect(out.reviewerCalls.laneLimitChecks[1]?.allowed, 'arrangement: the staged read is past the limit').toBe(false);
+		expect(
+			out.reviewerCalls.laneLimitChecks.map((c) => [c.unit, c.before, c.total, c.allowed])[0],
+			'arrangement: Send’s read reaches the limit'
+		).toEqual(['authoring', 'Send', PHASE7_PAID_LIMIT, true]);
+		expect(
+			out.reviewerCalls.laneLimitChecks.map((c) => c.before),
+			'arrangement: no inventory is read again'
+		).not.toContain('Send, counted again for the inventory its turn staged');
 		const caveat = out.reviewerCalls.limitCaveat;
-		expect(caveat, 'the caveat says no recorded exchange can pass the limit, beside a read past it').not.toContain('cannot pass it');
-		expect(caveat, 'the caveat does not say what Send counts').toContain(
-			`for ${PHASE7_AUTHORING_ANTICIPATED_PARTS} anticipated types, an estimate and not a bound`
+		expect(caveat, 'the caveat does not say Send’s press is bounded by the allowance').toContain(
+			'Send’s press is bounded by the allowance the lane hands the authoring review'
 		);
-		expect(caveat, 'the caveat does not say Send’s press can pass the limit').toContain('can pass the limit in that press');
-		expect(caveat, 'the caveat does not name the read that shows it').toContain('“Send, counted again for the inventory its turn staged”');
+		expect(caveat, 'the caveat does not say the rule bounds the recorded exchanges').toContain(
+			'So the rule bounds the reviewer exchanges the store records.'
+		);
+		expect(caveat, 'the caveat does not keep the lower bound').toContain('⚠ The recorded count is a lower bound');
+		// ⛔ The estimate's clause is gone: it is false of a press the allowance bounds.
+		expect(caveat, 'the caveat still says Send counts an estimate').not.toContain('an estimate and not a bound');
+		expect(caveat, 'the caveat still says Send’s press can pass the limit').not.toContain('can pass the limit in that press');
+		expect(caveat, 'the caveat still names a read the lane no longer makes').not.toContain('counted again for the inventory');
 		expect(renderMarkdown(out), 'report.md does not carry it').toContain(`- **Caveat:** ${caveat}`);
 	});
 

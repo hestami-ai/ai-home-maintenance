@@ -14,6 +14,7 @@ import { assurancePolicyViews } from '@janumipwb/rph-authoring';
 import {
 	aggregateDisposition,
 	assuranceRecordingPlan,
+	createValidatorRegistry,
 	FLOOR_POLICY_IDS,
 	REVIEWER_RECOMMENDED_ESCALATION,
 	runFloorPolicies,
@@ -25,7 +26,8 @@ import {
 	type IdentityProvenanceFacts,
 	type PolicyAssessment,
 	type ProfessionalRationaleSummary,
-	type ValidatorContext
+	type ValidatorContext,
+	type ValidatorRegistry
 } from '@janumipwb/rph-assurance';
 import {
 	getObject,
@@ -45,7 +47,13 @@ import type { ArtifactStore } from '@janumipwb/rph-ports';
 import { createFloorRegistry } from './assurance/index.js';
 import { pwaTypeReviewInput } from './assurance/review-input.js';
 import { stipulationFor } from './stipulations.js';
-import type { AgyPrint } from './assurance/reasoning-review-validator.js';
+import { REVIEWER_CALLS_PER_REVIEW, type AgyPrint } from './assurance/reasoning-review-validator.js';
+import {
+	allowanceStoppedStatement,
+	processAuthoringReviewAllowance,
+	type AuthoringReviewAllowance,
+	type RoundStop
+} from './assurance/review-allowance.js';
 import { createExchangeSink } from './assurance/exchange-capture.js';
 import { recordExchanges } from './assurance/exchange-recorder.js';
 import type { ExchangeRecord } from './agent/exchange-record.js';
@@ -933,6 +941,12 @@ export async function runPwaFloor(
 		 * about another type belongs to that type's review.
 		 */
 		priorFindings?: readonly FloorObservationView[];
+		/**
+		 * ⭐⭐ Package L2 — D20 (`REG-F-580`; `REG-D-135` (4)) — THE ALLOWANCE THIS ROUND RESERVES ITS WORST CASE AGAINST, injectable
+		 * so a gate can hold one it made. Production omits it: the round reserves against the server process's own
+		 * (`processAuthoringReviewAllowance`, `JPWB_AUTHORING_REVIEW_ALLOWANCE`), which is none unless configured.
+		 */
+		allowance?: AuthoringReviewAllowance;
 	},
 	// This path RECORDS an assurance floor, so it needs a session. SESSION rather than SYSTEM: the floor
 	// is run because a professional asked for it, and the record should say so.
@@ -1001,7 +1015,17 @@ export async function runPwaFloor(
 	const criteria = reasoningReviewCriteria(engine);
 	const stored = storedTypes(engine, pwaId);
 	const reviewed: ReviewedPart[] = [];
-	for (const part of pwaTypeParts(graphExport, assurancePolicyViews(engine))) {
+	const parts = pwaTypeParts(graphExport, assurancePolicyViews(engine));
+	// ⭐⭐ Package L2 — D20 (`REG-F-580`; `REG-D-135` (4)) — THE ROUND'S WORST CASE, RESERVED BEFORE ITS FIRST REVIEWER CALL: its
+	// parts × the validator's calls a review (`REVIEWER_CALLS_PER_REVIEW`), against the allowance (`review-allowance.ts`). A round
+	// that would pass it runs every part through a validator that calls no reviewer and fails with the stated reason — the floor's
+	// own record of a review that did not execute, never a throw (`allowanceStoppedRegistry`). With no allowance, the product's
+	// default, every round is admitted and reviews as before.
+	const admission = (opts.allowance ?? processAuthoringReviewAllowance()).reserve(
+		parts.length * REVIEWER_CALLS_PER_REVIEW
+	);
+	const reviewing = admission.admitted ? registry : allowanceStoppedRegistry(admission, parts);
+	for (const part of parts) {
 		const partSubject: AssuranceSubject = {
 			subjectId: part.typeId,
 			objectType: 'PWU_TYPE',
@@ -1022,7 +1046,7 @@ export async function runPwaFloor(
 		});
 		// The sink keeps every try of the round in order, so this part's are the ones its own review added.
 		const before = exchanges.drain().length;
-		const run = await runFloorPolicies(partSubject, { reasoningReview }, registry, [
+		const run = await runFloorPolicies(partSubject, { reasoningReview }, reviewing, [
 			FLOOR_POLICY_IDS.REASONING_REVIEW
 		]);
 		reviewed.push({ part, subject: partSubject, run, tries: exchanges.drain().slice(before) });
@@ -1110,6 +1134,36 @@ interface ReviewedPart {
 	readonly subject: AssuranceSubject;
 	readonly run: Awaited<ReturnType<typeof runFloorPolicies>>;
 	readonly tries: readonly ExchangeRecord[];
+}
+
+/** ⭐ Package L2 — D20 — the id a review the allowance stopped is recorded under: never a reviewer's, since none was called. */
+export const ALLOWANCE_STOPPED_REVIEWER_ID = 'reasoning-review.allowance-stopped';
+
+/**
+ * ⭐⭐ Package L2 — D20 (`REG-F-580`) — THE REGISTRY A STOPPED ROUND REVIEWS ITS PARTS WITH: its Reasoning Review a validator that
+ * calls no reviewer and fails with the stated reason, naming the part it was asked of (`allowanceStoppedStatement`). The runner
+ * records that failure as it records any — `VALIDATOR_EXECUTION_FAILED`, the review INCONCLUSIVE (`rph-assurance`
+ * `runFloorPolicies`), as a refused selection's is (`assurance/index.ts`, `unconfiguredReviewer`) — so the stop is legible in the
+ * record and on the page, the review is not SATISFIED, and the candidate is not accepted; nothing is thrown out of the floor.
+ */
+function allowanceStoppedRegistry(stop: RoundStop, parts: readonly PwaTypePart[]): ValidatorRegistry {
+	const named = new Map(parts.map((p) => [p.typeId, p.subject.type.name]));
+	const registry = createValidatorRegistry();
+	registry.register({
+		policyId: FLOOR_POLICY_IDS.REASONING_REVIEW,
+		validatorId: ALLOWANCE_STOPPED_REVIEWER_ID,
+		evaluate: (subject) =>
+			Promise.reject(
+				new Error(
+					allowanceStoppedStatement(
+						stop,
+						{ parts: parts.length, callsPerReview: REVIEWER_CALLS_PER_REVIEW },
+						{ typeId: subject.subjectId, typeName: named.get(subject.subjectId) ?? subject.subjectId }
+					)
+				)
+			)
+	});
+	return registry;
 }
 
 /** The disposition of a part the round holds no review of, at the version the store holds. */

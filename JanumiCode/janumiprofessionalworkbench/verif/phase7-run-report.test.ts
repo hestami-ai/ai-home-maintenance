@@ -2500,7 +2500,12 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 	// exchanges cannot pass the limit"~~ — not of Send's press, whose check counts the 16 anticipated types, an estimate and not
 	// a bound, while a larger candidate's floor spends inside that press. The caveat says so, and names the read that shows it
 	// (`verif/phase7-half-b.test.ts`, the caveat beside a staged read past the limit).
-	it('⛔ D16 (REG-D-135 (4)) — ~~a phase’s own spend can carry the total past the limit~~ the reviewer calls carry a plain caveat, in report.json and report.md: the lane counts each press’s whole worst case before it, ~~so the recorded exchanges cannot pass the limit~~ save Send’s, an estimate — and the recorded count is a lower bound', () => {
+	// ⭐⭐ Package L2 — D20 (`REG-F-580`; the brief's step 4) — MOVED A THIRD TIME, DELIBERATELY: ~~"save Send's, an estimate"~~ —
+	// the estimate's clause is false now and goes: Send's press is bounded by the allowance the lane hands the authoring review,
+	// which Send's check counts and every round of the authoring floor reserves its worst case against before its first reviewer
+	// call; so the rule bounds the recorded reviewer exchanges, and the lower bound stays (`verif/phase7-half-b.test.ts`, the
+	// caveat beside Send's read).
+	it('⛔ D16 (REG-D-135 (4)) — ~~a phase’s own spend can carry the total past the limit~~ the reviewer calls carry a plain caveat, in report.json and report.md: the lane counts each press’s whole worst case before it, ~~so the recorded exchanges cannot pass the limit~~ ~~save Send’s, an estimate~~ ⭐ Send’s press bounded by the allowance it hands the authoring review (D20) — and the recorded count is a lower bound', () => {
 		// ⛔ PREDICTED RED, read from the code: the report said nothing of it, so a run whose reads each let a press through read
 		// as a run held to the limit throughout.
 		// ⭐ P5 package C (F2) — ~~the sponsor’s limit is "about 450", REG-D-110 (1)~~: the sponsor raised it to about 600
@@ -2524,22 +2529,34 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 		// is "about 2,400", raising REG-D-131’s). ⚠ The recorded count is a lower bound: a call whose capture faulted leaves no
 		// exchange, so the limit bounds what was recorded, and this report claims no count of calls absent from the record.';~~
 		// ⛔ Package L's check, finding 1.
+		// ~~const caveat = 'The lane counts each press’s whole worst case before it — a model unit’s press 210 reviewer calls, (3
+		// tries + 32 command runs) × 6, its other presses each theirs — with the negative control’s 4 held back, and presses nothing
+		// that would pass the limit by that count (REG-D-135 (4); the sponsor’s limit is "about 2,400", raising REG-D-131’s). ⚠ Save
+		// Send’s: no candidate exists before Send, so its check counts the authoring floor’s worst case for 16 anticipated types,
+		// an estimate and not a bound, and a turn that stages more spends its floor’s reviews inside the Send press, where nothing
+		// is checked — so the reviewer exchanges the store records can pass the limit in that press; where the turn settled, the
+		// read “Send, counted again for the inventory its turn staged” states the larger candidate’s worst case, and the limit
+		// line states the total recorded. ⚠ The recorded count is a lower bound: a call whose capture faulted leaves no exchange,
+		// so the limit bounds what was recorded, and this report claims no count of calls absent from the record.';~~
+		// ⛔ Package L2 — D20.
 		const caveat =
 			'The lane counts each press’s whole worst case before it — a model unit’s press 210 reviewer calls, (3 tries + 32 ' +
 			'command runs) × 6, its other presses each theirs — with the negative control’s 4 held back, and presses nothing that ' +
-			'would pass the limit by that count (REG-D-135 (4); the sponsor’s limit is "about 2,400", raising REG-D-131’s). ⚠ Save ' +
-			'Send’s: no candidate exists before Send, so its check counts the authoring floor’s worst case for 16 anticipated types, ' +
-			'an estimate and not a bound, and a turn that stages more spends its floor’s reviews inside the Send press, where nothing ' +
-			'is checked — so the reviewer exchanges the store records can pass the limit in that press; where the turn settled, the ' +
-			'read “Send, counted again for the inventory its turn staged” states the larger candidate’s worst case, and the limit ' +
-			'line states the total recorded. ⚠ The recorded count is a lower bound: a call whose capture faulted leaves no exchange, ' +
-			'so the limit bounds what was recorded, and this report claims no count of calls absent from the record.';
+			'would pass the limit by that count (REG-D-135 (4); the sponsor’s limit is "about 2,400", raising REG-D-131’s). Send’s ' +
+			'press is bounded by the allowance the lane hands the authoring review — the limit less the calls spent before the run ' +
+			'and the negative control’s 4, which Send’s check counts — for every round of the authoring floor reserves its worst ' +
+			'case, its types × 6, against that allowance before its first reviewer call, and a round that would pass what is left ' +
+			'calls none (REG-F-580; design D20). So the rule bounds the reviewer exchanges the store records. ⚠ The recorded count ' +
+			'is a lower bound: a call whose capture faulted leaves no exchange, so the limit bounds what was recorded, and this ' +
+			'report claims no count of calls absent from the record.';
 		const r = reportOf(aRun({})).report;
 		expect(renderMarkdown(r), 'report.md carries no caveat of what the limit bounds').toContain(`- **Caveat:** ${caveat}`);
 		expect(r.reviewerCalls.limitCaveat, 'report.json carries no caveat of what the limit bounds').toBe(caveat);
-		// ⛔ The struck claim is gone: no press can carry the total past the limit by what the lane counts ⭐ — save Send's, whose
-		// count is an estimate (package L's check, finding 1), and which the caveat names as such.
+		// ⛔ The struck claim is gone: no press can carry the total past the limit by what the lane counts ⭐ — ~~save Send's, whose
+		// count is an estimate (package L's check, finding 1), and which the caveat names as such~~ ⭐ Send's included (package L2,
+		// D20), whose count is the allowance it hands the authoring review.
 		expect(r.reviewerCalls.limitCaveat, 'the caveat still says a press can pass the limit').not.toContain('carry the total past the limit');
+		expect(r.reviewerCalls.limitCaveat, 'the caveat still says Send counts an estimate').not.toContain('an estimate');
 	});
 
 	it('⛔ stage 7’s sign-off: the lane’s dry run signs the root off (D11) — the root as intended, the run not reached; one never attempted, in a run cut short — not reached; one refused — broke', () => {

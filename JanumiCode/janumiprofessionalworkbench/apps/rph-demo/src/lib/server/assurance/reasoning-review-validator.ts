@@ -1305,6 +1305,18 @@ export const REVIEWER_CALL_BOUND_MS = Object.freeze({
 	agy: 180_000
 });
 
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L2 — D20 (`REG-F-580`; `REG-D-135` (4)) — THE MOST REVIEWER CALLS ONE REVIEW BY THIS
+ * VALIDATOR MAKES: the first call, one JSON repair and one criterion repair (package L, D13; `judgeParsed`), each run once
+ * more when it throws short of its tool's bound (`thrownCallDisposal`): 3 × 2 = 6. The authoring floor reserves a round's
+ * worst case at this many calls a part against its allowance (`floor.ts`, `runPwaFloor`; `review-allowance.ts`).
+ * ⚠ STATED, NOT DERIVED: the bound is the shape of `evaluate`, which holds no count of its own. `thrown-reviewer-call.test.ts`
+ * drives a review to it, six calls and no seventh, and the lane's restatement (`LANE_BUDGET.reviewerCallsPerTry`,
+ * `e2e-live-exec/lane-config.ts`, which imports nothing) is held to this by `verif/live-exec-lane-config.test.ts`, where the
+ * product's devin branch is driven to the same six.
+ */
+export const REVIEWER_CALLS_PER_REVIEW = 3 * 2;
+
 /** The roles this validator records a try under. ⭐ `P7-2b` — `retry` is a thrown call's one further call. */
 type TryRole = 'initial' | 'repair' | 'retry';
 

@@ -1,5 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
-import { laneKeysRefusal, requiredLaneKeys, TEST_TIMEOUT_MS } from './e2e-live-exec/lane-config';
+import {
+	laneKeysRefusal,
+	phase7AuthoringReviewAllowanceEnv,
+	requiredLaneKeys,
+	TEST_TIMEOUT_MS
+} from './e2e-live-exec/lane-config';
 import { liveExecStore, liveExecTestMatch } from './e2e-live-exec/run-folder';
 
 // JAN-LIVEEXEC — the LIVE EXECUTION lane: a work unit runs on a REAL model and is reviewed by a REAL, DIFFERENT
@@ -136,6 +141,12 @@ export default defineConfig({
 			// runner's folder instead of minting a second (`run-folder.ts`).
 			JPWB_DEMO_DB: liveExecStore(process.env),
 			...passthrough,
+			// ⭐⭐ `JAN-EXEC` Phase 7, package L2 — D20 (`REG-F-580`; `REG-D-135` (4)) — THE AUTHORING REVIEW'S ALLOWANCE, for a paid
+			// half-B run alone: the limit less the calls spent before the run and the negative control's 4, which every authoring
+			// review round reserves its worst case against before its first reviewer call (`review-allowance.ts`). The dry run, half
+			// A and the one-unit lane are handed none, and one exported in the shell is refused above (`laneKeysRefusal`). Send's
+			// check counts what this hands over (`phase7-operator.ts`, `authorThePwa`).
+			...phase7AuthoringReviewAllowanceEnv(process.env),
 			// ⭐ R3-C (`REG-F-512` candidate 1's fifth part; the lead's delegated decision of 2026-10-16, registered as
 			// REG-D-114 (19)) — THE SERVER RUNS PI OFFLINE, SET LAST SO NOTHING SPREAD ABOVE SETS IT AGAIN. Read in the installed
 			// Pi (`@earendil-works/pi-coding-agent` 0.80.6), it is read by the package manager, the fd and rg download, the

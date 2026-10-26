@@ -63,10 +63,9 @@ import {
 	laneKeysRefusal,
 	phase7Half,
 	phase7AuthoringAllowanceMs,
-	phase7AuthoringReviewerCalls,
+	phase7AuthoringReviewAllowance,
 	phase7HalfBAuthoringTimeoutMs,
 	phase7HalfBTestTimeoutMs,
-	PHASE7_AUTHORING_ANTICIPATED_PARTS,
 	PHASE7_CANDIDATE_POLL_MS,
 	PHASE7_DECLARED_POLICIES_PER_UNIT,
 	PHASE7_NEGATIVE_CONTROL_RESERVE,
@@ -643,10 +642,13 @@ export function unpressed(units: readonly ArchiveUnit[]): RunUnit[] {
  * a sign-off and the rule's re-run of its declared reviews, the declared reviews × 6; Send, the authoring floor's worst case at
  * 6 calls a review — with the negative control's 4 held back in each. Reaching the limit is allowed; passing it is refused~~, so
  * the recorded exchanges cannot pass it~~ ⭐ by what is counted. ⛔ The struck sentences above, that a phase's own spend can carry
- * the total past the limit, held of the one try's reserve, and hold no longer. ⚠ Package L's check, finding 1 — SAVE SEND'S
+ * the total past the limit, held of the one try's reserve, and hold no longer. ~~⚠ Package L's check, finding 1 — SAVE SEND'S
  * COUNT, WHICH IS NOT A BOUND: before Send no candidate exists, so `authorThePwa` counts the floor for the types anticipated
  * (`PHASE7_AUTHORING_ANTICIPATED_PARTS`), and a turn that stages more spends its floor's reviews inside the Send press, where
- * nothing is checked — `AuthoringRecord.inventoryCheck` says so after, and refuses nothing. The report's caveat states it.
+ * nothing is checked — `AuthoringRecord.inventoryCheck` says so after, and refuses nothing. The report's caveat states it.~~
+ * ⭐⭐ Package L2 — D20 (`REG-F-580`; `REG-D-135` (4)) — AND SEND'S COUNT IS A BOUND NOW: `authorThePwa` counts the allowance the
+ * lane hands the authoring review (`phase7AuthoringReviewAllowance`), which every round of the authoring floor reserves its
+ * worst case against before its first reviewer call, so the Send press cannot spend past what its check counted.
  */
 export function limitCheck(prior: number, recorded: number, ahead: number, counted: string): LimitCheck {
 	const total = prior + recorded + PHASE7_NEGATIVE_CONTROL_RESERVE + ahead;
@@ -668,9 +670,10 @@ export function limitCheck(prior: number, recorded: number, ahead: number, count
  * its review, and a MODEL root's press~~ ⭐ (package L, D16; `REG-D-135` (4)) the press's whole worst case before a phase, the
  * rule's re-run of its work and a MODEL root's press, and the refused reviews before the rule's re-run of a review; none before
  * a root that runs no model; an act's worst case before a sign-off and
- * the rule's re-run of its declared reviews (`signOffWorstCase`), and before Send (~~`PHASE7_AUTHORING_REVIEWER_CALLS`~~ ⭐ the
+ * the rule's re-run of its declared reviews (`signOffWorstCase`), and before Send (~~`PHASE7_AUTHORING_REVIEWER_CALLS`~~ ~~⭐ the
  * review in parts, B6: `phase7AuthoringReviewerCalls`, for the inventory anticipated — and, once the turn has settled, for
- * the inventory it staged, Send's check counted again, `AuthoringRecord.inventoryCheck`).
+ * the inventory it staged, Send's check counted again, `AuthoringRecord.inventoryCheck`~~ ⭐ package L2, D20: the allowance the
+ * lane hands the authoring review, `phase7AuthoringReviewAllowance`; no inventory is counted again).
  */
 export const COUNTED_AHEAD = {
 	// ~~tryReserve: 'one try’s reserve',~~ ⛔ Package L — D16 (`REG-D-135` (4)): no check counts one try's reserve.
@@ -683,8 +686,11 @@ export const COUNTED_AHEAD = {
 	refusedReviewsUnread: `its refused reviews’ worst case — the store names none, so every review the attempt holds, (1 work product + ${PHASE7_REVIEWED_COMMANDS} command runs) × ${LANE_BUDGET.reviewerCallsPerTry} calls`,
 	noModel: 'none: it runs no model',
 	declaredReviews: 'its declared reviews’ worst case',
-	authoringFloor: `the authoring floor’s worst case, for ${PHASE7_AUTHORING_ANTICIPATED_PARTS} anticipated types`,
-	stagedInventory: 'the authoring floor’s worst case, for the types its turn staged'
+	// ~~authoringFloor: `the authoring floor’s worst case, for ${PHASE7_AUTHORING_ANTICIPATED_PARTS} anticipated types`,~~
+	// ~~stagedInventory: 'the authoring floor’s worst case, for the types its turn staged'~~ ⛔ Package L2 — D20 (`REG-F-580`):
+	// Send counts the allowance it hands over, and no inventory is counted again; a record made before says them as it was made.
+	/** ⭐ D20 — Send: the allowance the lane hands the authoring review (`phase7AuthoringReviewAllowance`). */
+	authoringAllowance: 'the allowance the lane hands the authoring review, which no round of its floor may pass'
 } as const;
 
 /**
@@ -1529,9 +1535,10 @@ export interface AuthoringRecord {
 	/** Whether Send was pressed: never, in the dry rehearsal (C6). */
 	sent: boolean;
 	/**
-	 * ⭐ `REG-D-112` (finding 2) — the limit, checked BEFORE SEND with the authoring floor's worst case counted
+	 * ⭐ `REG-D-112` (finding 2) — the limit, checked BEFORE SEND with ~~the authoring floor's worst case counted
 	 * (~~`PHASE7_AUTHORING_REVIEWER_CALLS`~~ ⭐ the review in parts, B6: `phase7AuthoringReviewerCalls`, for the inventory
-	 * anticipated, `PHASE7_AUTHORING_ANTICIPATED_PARTS`); null when nothing was to be sent — the dry rehearsal stops before it.
+	 * anticipated, `PHASE7_AUTHORING_ANTICIPATED_PARTS`)~~ ⭐ (package L2, D20) the allowance the lane hands the authoring review
+	 * counted (`phase7AuthoringReviewAllowance`); null when nothing was to be sent — the dry rehearsal stops before it.
 	 */
 	limitCheck: LimitCheck | null;
 	/** The store's reads of the candidate while the turn ran. */
@@ -1541,9 +1548,9 @@ export interface AuthoringRecord {
 	/**
 	 * ⭐ The review in parts, B6 (`REG-D-125`; design D9, D11) — THE INVENTORY THE TURN STAGED: the most types any read of the
 	 * candidate held, ~~which every review round of the turn reviews as parts~~ ⭐ (package C's check) the largest staged
-	 * inventory, the one the wait's allowance (`allowanceMs`), the units' timeout and Send's check counted again
-	 * (`inventoryCheck`) are derived from. ⚠ Not every round's inventory: where the refinement adds or removes a type, one of
-	 * the turn's two rounds reviewed fewer types. 0 until a type is staged.
+	 * inventory, the one the wait's allowance (`allowanceMs`) ~~, the units' timeout and Send's check counted again
+	 * (`inventoryCheck`) are~~ ⭐ and the units' timeout are (package L2, D20) derived from. ⚠ Not every round's inventory: where
+	 * the refinement adds or removes a type, one of the turn's two rounds reviewed fewer types. 0 until a type is staged.
 	 */
 	parts: number;
 	/**
@@ -1552,12 +1559,15 @@ export interface AuthoringRecord {
 	 */
 	allowanceMs: number | null;
 	/**
-	 * ⭐ B6 (design D11; roadmap 9a.7, "Spend reserve") — SEND'S CHECK, COUNTED AGAIN FOR THE INVENTORY THE TURN STAGED, made
+	 * ~~⭐ B6 (design D11; roadmap 9a.7, "Spend reserve") — SEND'S CHECK, COUNTED AGAIN FOR THE INVENTORY THE TURN STAGED, made
 	 * once the turn settled: the calls spent before the run and those recorded before Send, the reserve, and the authoring
 	 * floor's worst case for `parts` (`COUNTED_AHEAD.stagedInventory`); null where the turn staged no more than was anticipated,
 	 * or did not settle. ⚠ It refuses nothing: the floor's rounds run inside the Send press, where the lane checks nothing
 	 * (`REG-D-114` (14)), so this says whether the reserve held — a larger candidate never inherits the smaller estimate
-	 * unsaid — and the next check, before the root's press, counts the calls the store records.
+	 * unsaid — and the next check, before the root's press, counts the calls the store records.~~
+	 * ⛔ NEVER SET NOW (package L2, D20; `REG-F-580`): Send's check counts the allowance the lane hands the authoring review, which
+	 * every round of its floor reserves against, so no estimate stands to be counted again for a larger candidate. Kept, null, so
+	 * the record keeps its shape and the run report reads a run recorded before D20 as it was made.
 	 */
 	inventoryCheck: LimitCheck | null;
 	/**
@@ -1828,12 +1838,14 @@ function designerEnd(o: ActionOutcome, act: string): RunEnd | null {
  * ⭐⭐ C1 — HALF B'S AUTHORING, IN ITS ORDER (design §4 C1; `REG-F-506`'s remedy 1):
  *   1. the draft, created through the page — and ⛔ DRY, THE REHEARSAL STOPS HERE, BEFORE SEND: authoring is a model call
  *      (C6). The turn itself is rehearsed in the gate, with the mock agent (`e2e/phase7-half-b.e2e.ts`);
- *   1b. ⭐ `REG-D-112` (E3's review, finding 2) — THE LIMIT, BEFORE SEND (D8), the authoring floor's worst case counted
- *      (~~`limitCheckAhead`~~ ⭐ `limitCheck`, the one rule; ~~`PHASE7_AUTHORING_REVIEWER_CALLS`~~ ⭐ the review in parts, B6:
- *      `phase7AuthoringReviewerCalls`, for the inventory anticipated): past it the run ends `paid-limit`, nothing sent;
+ *   1b. ⭐ `REG-D-112` (E3's review, finding 2) — THE LIMIT, BEFORE SEND (D8), ~~the authoring floor's worst case counted~~
+ *      (~~`limitCheckAhead`~~ ⭐ `limitCheck`, the one rule; ~~`PHASE7_AUTHORING_REVIEWER_CALLS`~~ ~~⭐ the review in parts, B6:
+ *      `phase7AuthoringReviewerCalls`, for the inventory anticipated~~ ⭐ package L2, D20: the allowance the lane hands the
+ *      authoring review, `phase7AuthoringReviewAllowance`, with the calls already recorded): past it the run ends
+ *      `paid-limit`, nothing sent;
  *   2. the request, sent from the designer's chat, the page held where it is;
  *   3. the candidate's status, waited on through the store (`waitForTheCandidate`), ⭐ B6 its allowance the staged
- *      inventory's, and, where it staged more than was anticipated, Send's check counted again for it; the floor's dispositions and its
+ *      inventory's ~~, and, where it staged more than was anticipated, Send's check counted again for it~~ (⛔ D20); the floor's dispositions and its
  *      reviewer recorded, ~~the producer the floor judged (the author's model)~~ ⭐ `REG-D-112` (finding 8) — and the
  *      author's model as THE TURN'S OWN STREAM named it (`producerLine`): the floor's assessments name no producer. A
  *      candidate not READY_TO_COMMIT is accepted by no one: the run ends `authoring-stopped`, with the floor's own words;
@@ -1874,13 +1886,18 @@ export async function authorThePwa(r: {
 			}
 		};
 	// ⭐ `REG-D-112` (finding 2) — THE LIMIT BEFORE SEND: the authoring floor's reviews are the first calls half B spends.
-	// ⭐ The review in parts, B6 (design D11) — counted for the inventory anticipated: before Send, no candidate exists.
+	// ~~⭐ The review in parts, B6 (design D11) — counted for the inventory anticipated: before Send, no candidate exists.~~
+	// ⭐⭐ Package L2 — D20 (`REG-F-580`; `REG-D-135` (4)) — COUNTED FOR THE ALLOWANCE THE LANE HANDS THE AUTHORING REVIEW: the limit
+	// less the calls spent before the run and the negative control's 4, which the config lays over the server for a paid half-B
+	// run (`phase7AuthoringReviewAllowanceEnv`) and which every round of the floor reserves its worst case against before its
+	// first reviewer call. So the Send press cannot spend past what this counts, whatever the inventory the agent authors; with
+	// the calls already recorded counted too, a check that would pass the limit presses nothing.
 	const before = (await read()).snapshot;
 	authoring.limitCheck = limitCheck(
 		r.prior,
 		recordedReviewerCalls(before),
-		phase7AuthoringReviewerCalls(PHASE7_AUTHORING_ANTICIPATED_PARTS),
-		COUNTED_AHEAD.authoringFloor
+		phase7AuthoringReviewAllowance(r.prior),
+		COUNTED_AHEAD.authoringAllowance
 	);
 	save();
 	if (!authoring.limitCheck.allowed)
@@ -1889,23 +1906,17 @@ export async function authorThePwa(r: {
 				reason: 'paid-limit',
 				detail:
 					`the limit, before Send: ${authoring.limitCheck.total} of ${authoring.limitCheck.limit} reviewer calls, the ` +
-					`authoring floor's worst case of ${authoring.limitCheck.ahead} counted (D8; REG-D-112)`
+					`allowance of ${authoring.limitCheck.ahead} the lane hands the authoring review counted (D8; REG-D-112; design D20)`
 			}
 		};
 	await author.send(authoring.request);
 	authoring.sent = true;
 	const waited = await waitForTheCandidate(author, read, authoring, pwaId, save, r.extendTimeout);
 	if ('end' in waited) return waited;
-	// ⭐ The review in parts, B6 (design D11; roadmap 9a.7, "Spend reserve") — A LARGER CANDIDATE NEVER INHERITS THE SMALLER
+	// ~~⭐ The review in parts, B6 (design D11; roadmap 9a.7, "Spend reserve") — A LARGER CANDIDATE NEVER INHERITS THE SMALLER
 	// ESTIMATE UNSAID: where the turn staged more types than Send's check counted, that check is counted again for the
-	// inventory it staged, and recorded (`AuthoringRecord.inventoryCheck`).
-	if (authoring.parts > PHASE7_AUTHORING_ANTICIPATED_PARTS)
-		authoring.inventoryCheck = limitCheck(
-			r.prior,
-			authoring.limitCheck.recorded,
-			phase7AuthoringReviewerCalls(authoring.parts),
-			COUNTED_AHEAD.stagedInventory
-		);
+	// inventory it staged, and recorded (`AuthoringRecord.inventoryCheck`).~~ ⛔ Package L2 — D20: Send counted the allowance, the
+	// bound every round keeps to, so no estimate stands to be counted again (`AuthoringRecord.inventoryCheck` stays null).
 	await recordTheFloor(authoring, waited.snapshot, pwaId, author);
 	save();
 	const staged = authoring.candidate!;

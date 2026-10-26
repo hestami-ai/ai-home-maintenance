@@ -42,7 +42,6 @@ import { BLOCKING_SEVERITIES, dispositionFromFindings } from '@janumipwb/rph-ass
 import { declaredAssurancePolicyIds } from '@janumipwb/rph-domain';
 import {
 	LANE_BUDGET,
-	PHASE7_AUTHORING_ANTICIPATED_PARTS,
 	PHASE7_NEGATIVE_CONTROL_RESERVE,
 	PHASE7_PAID_LIMIT,
 	PHASE7_PRIOR_CALLS_VARIABLE,
@@ -194,17 +193,28 @@ export const NEGATIVE_CONTROL_RESERVE = PHASE7_NEGATIVE_CONTROL_RESERVE;
  * absent from the record. The sponsor's limit is quoted as `REG-D-135` (4)'s meaning writes it, "about 2,400".
  * ~~"…and presses nothing that would pass the limit, so the reviewer exchanges the store records cannot pass it (REG-D-135 (4);
  * the sponsor’s limit is "about 2,400", raising REG-D-131’s). ⚠ The recorded count is a lower bound: …"~~ ⛔ Package L's check.
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L2 — D20 (`REG-F-580`; `REG-D-135` (4); design D20, revision 2) — RESTATED AGAIN: ~~"⚠ Save
+ * Send’s: no candidate exists before Send, so its check counts the authoring floor’s worst case for 16 anticipated types, an
+ * estimate and not a bound, and a turn that stages more spends its floor’s reviews inside the Send press, where nothing is
+ * checked — so the reviewer exchanges the store records can pass the limit in that press; where the turn settled, the read
+ * “Send, counted again for the inventory its turn staged” states the larger candidate’s worst case, and the limit line states
+ * the total recorded."~~ — the clause package L's check added is false now, and goes. Send's press is BOUNDED BY THE ALLOWANCE
+ * THE LANE HANDS THE AUTHORING REVIEW (`lane-config.ts`, `phase7AuthoringReviewAllowance`): Send's check counts it, and every
+ * round of the authoring floor reserves its worst case, its types × 6, against it before its first reviewer call, a round that
+ * would pass what is left calling none (`src/lib/server/assurance/review-allowance.ts`). So the rule bounds the reviewer
+ * exchanges the store records — and the recorded count is still a lower bound when a capture faults. ⚠ A run recorded before
+ * D20 carries the struck read; the report still lists it as it was made (`AUTHORING_INVENTORY_READ`), and its caveat is this one.
  */
 export const LIMIT_CAVEAT =
 	`The lane counts each press’s whole worst case before it — a model unit’s press ${PHASE7_UNIT_REVIEWER_CALLS} reviewer calls, ` +
 	`(${LANE_BUDGET.tries} tries + ${PHASE7_REVIEWED_COMMANDS} command runs) × ${LANE_BUDGET.reviewerCallsPerTry}, its other presses each ` +
 	`theirs — with the negative control’s ${NEGATIVE_CONTROL_RESERVE} held back, and presses nothing that would pass the limit by that ` +
 	`count (REG-D-135 (4); the sponsor’s limit is ` +
-	`"about ${PAID_LIMIT.toLocaleString('en-US')}", raising REG-D-131’s). ⚠ Save Send’s: no candidate exists before Send, so its ` +
-	`check counts the authoring floor’s worst case for ${PHASE7_AUTHORING_ANTICIPATED_PARTS} anticipated types, an estimate and not ` +
-	`a bound, and a turn that stages more spends its floor’s reviews inside the Send press, where nothing is checked — so the ` +
-	`reviewer exchanges the store records can pass the limit in that press; where the turn settled, the read “Send, counted again ` +
-	`for the inventory its turn staged” states the larger candidate’s worst case, and the limit line states the total recorded. ` +
+	`"about ${PAID_LIMIT.toLocaleString('en-US')}", raising REG-D-131’s). Send’s press is bounded by the allowance the lane hands ` +
+	`the authoring review — the limit less the calls spent before the run and the negative control’s ${NEGATIVE_CONTROL_RESERVE}, ` +
+	`which Send’s check counts — for every round of the authoring floor reserves its worst case, its types × ` +
+	`${LANE_BUDGET.reviewerCallsPerTry}, against that allowance before its first reviewer call, and a round that would pass what is ` +
+	`left calls none (REG-F-580; design D20). So the rule bounds the reviewer exchanges the store records. ` +
 	`⚠ The recorded count is a lower bound: a call whose ` +
 	`capture faulted leaves no exchange, so the limit bounds what was recorded, and this report claims no count of calls absent ` +
 	`from the record.`;
@@ -1273,7 +1283,8 @@ const AUTHORING_INVENTORY_READ = 'Send, counted again for the inventory its turn
  * read before Send, the authoring floor's worst case counted. None in half A, and none in a dry run, which stops before Send.
  * ⭐ The review in parts, B6 (design D11) — AND SEND'S CHECK COUNTED AGAIN for the inventory the turn staged, where it staged more
  * than Send's check anticipated (`AuthoringRecord.inventoryCheck`): so a larger candidate's worst case is stated beside the
- * smaller estimate, and where it passes the limit the read says so.
+ * smaller estimate, and where it passes the limit the read says so. ⛔ Package L2, D20: the lane makes that read no more — Send
+ * counts the allowance it hands the authoring review, a bound for any inventory — so only a run recorded before D20 lists it.
  */
 function authoringLimitChecks(lane: LaneRows): LaneLimitCheck[] {
 	return [
