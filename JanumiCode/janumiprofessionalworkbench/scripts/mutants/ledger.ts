@@ -4889,6 +4889,56 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		why: '`export const a = 1, b = 2;` is ONE statement, so both names own the same lines and both are equally entitled to a guard anchored there. Taking the first silently leaves the second bare while the census reports it guarded — a false credit, which is worse than a missing one because nothing will ever look again.',
 		source: 'JAN-PFA R3 S3.2 per-export attribution'
 	},
+	// ── REG-F-470 — the census RECORD limb (`censusStale`), added 2026-10-26 ───────────────────────────────────
+	// The check compared only lost guards and the consumed-export set, so a guard GAINED and a count of mutants
+	// crediting no export could each go stale with every gate green: `handlers/execution.ts` recorded 18 through
+	// seven commits while the measured value was 20. These entries guard the limb, its separation from the
+	// population limb, and its reaching the gate.
+	{
+		id: 'MU-PFA-R3-H-a-gained-guard-is-not-reported',
+		file: 'scripts/export-guard-core.ts',
+		find: 'if (wasConsumed.has(exported) && !wasGuarded.has(exported))',
+		replace: 'if (false && wasConsumed.has(exported) && !wasGuarded.has(exported))',
+		expectRed: ['verif/export-guard.test.ts'],
+		why: "PROMISE (compareGuardCensus's `censusStale` doc): an export guarded now that the baseline records as bare is refused until the census is regenerated, because GUARD_LOST asks only about what the baseline RECORDS as guarded — a gain it does not record is a guard the ratchet is not holding. WHO RELIES: `guards:export:check`, gate:fast step 2, and every later commit whose loss of that guard GUARD_LOST must see. WHAT THE MUTATION DOES: drops the gain comparison, so a new mutant credited to a bare export passes the gate without the census learning of it, and the same guard can later be removed with nothing said. OBSERVED (bun run scripts/mutants/run.ts MU-PFA-R3-, 2026-10-26, the candidate staged): the runner's verdict, verbatim: 'KILLED         MU-PFA-R3-H-a-gained-guard-is-not-reported ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'. Applied and restored from the index to name them, 2 failed | 21 passed: 'never reports a GAINED guard as a LOST one — the ratchet limb is one-directional' (AssertionError: the gain is a stale record until regenerated: expected 'packages/b/src/y.ts: mutants creditin…' to contain 'packages/b/src/y.ts#gamma') and 'CENSUS_STALE fires alone when an export GAINS a guard the baseline does not record, and NAMES it' (AssertionError: expected [] to have a length of 1 but got +0).",
+		source: "REG-F-470 (filed 2026-09-28, JAN-SELRES RS-2); JAN-EXEC Phase 7, the integration of packages L2, M and N: its independent check's finding on scripts/export-guard-core.ts:71"
+	},
+	{
+		id: 'MU-PFA-R3-I-the-unattributed-count-is-not-compared',
+		file: 'scripts/export-guard-core.ts',
+		find: "censusStale.push(\n\t\t\t\t`${file}: mutants crediting no export moved (${before.unattributedMutants} -> ${now.unattributedMutants})`\n\t\t\t);",
+		replace: 'void file; // MUTANT: a moved count of mutants crediting no export is not reported',
+		expectRed: ['verif/export-guard.test.ts'],
+		why: "PROMISE (GuardEntry.unattributedMutants: 'AND THE RECORD IS CHECKED'): a file's recorded count of mutants crediting no export is the measured count, or the check refuses. WHO RELIES: the committed census, a DERIVED record that a reader takes as true, and the rule that it is regenerated in the same commit as the change that moved it. WHAT THE MUTATION DOES: restores REG-F-470 exactly — the comparison still runs and reports nothing, so package M's check commit could add P6X-M-M19 and P6X-M-M20 to execution.ts, leave the census at 18 where the measured value is 20, and pass every gate. ⚠ THE CONSEQUENCE IS MUTATED, NOT THE CONDITION, and that was measured rather than assumed: first declared as `if (false && now.unattributedMutants !== before.unattributedMutants)`, it reported `NO_COMPILE ... scripts/export-guard-core.ts(115,44): error TS18048: 'before' is possibly 'undefined'.` — this ledger header's V-2c trap, TypeScript not narrowing inside dead code, so `before` lost the narrowing its `continue` gives it. OBSERVED, re-formulated (bun run scripts/mutants/run.ts MU-PFA-R3-, 2026-10-26, the candidate staged): the runner's verdict, verbatim: 'KILLED         MU-PFA-R3-I-the-unattributed-count-is-not-compared ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯'. Applied and restored from the index to name them, 2 failed | 21 passed: 'CENSUS_STALE fires alone when a count of mutants crediting no export moves, EITHER way' (AssertionError: expected [] to have a length of 2 but got +0) and the CLI case 'exits 1 and names the file whose recorded count the measurement does not give', whose message is the defect itself — the CLI handed a census recording -1 printed 'guards:export — 106 files, no export lost its guard, surface unchanged, census current. …' and exited 0.",
+		source: "REG-F-470 (filed 2026-09-28, JAN-SELRES RS-2); JAN-EXEC Phase 7, the integration of packages L2, M and N: its independent check's finding on scripts/export-guard-core.ts:71"
+	},
+	{
+		id: 'MU-PFA-R3-J-a-new-export-reports-as-a-gained-guard',
+		file: 'scripts/export-guard-core.ts',
+		find: 'if (wasConsumed.has(exported) && !wasGuarded.has(exported))',
+		replace: 'if (!wasGuarded.has(exported))',
+		expectRed: ['verif/export-guard.test.ts'],
+		why: "PROMISE (compareGuardCensus: 'THE THIRD LIMB ... KEEPS THE SAME SEPARATION'): the record limb asks about a gain only for an export the baseline already consumed, so a NEW export — the population limb's finding — cannot also report as a gained guard. WHO RELIES: the reader of a red gate, who must be told WHICH happened; two limbs that trip together on one arrangement are one check wearing two names. WHAT THE MUTATION DOES: drops the `wasConsumed` conjunct, so a renamed guarded export (`beta` -> `epsilon`) reports as a population move AND a gain. OBSERVED (bun run scripts/mutants/run.ts MU-PFA-R3-, 2026-10-26, the candidate staged): the runner's verdict, verbatim: 'KILLED         MU-PFA-R3-J-a-new-export-reports-as-a-gained-guard ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'. Applied and restored from the index to name it, 1 failed | 22 passed: 'POPULATION_CHANGED fires alone when a file’s consumed-export SET moves' (AssertionError: expected [ Array(1) ] to deeply equal []); both CENSUS_STALE cases stayed green, so the mutation separates the limbs rather than disabling one.",
+		source: "REG-F-470 (filed 2026-09-28, JAN-SELRES RS-2); JAN-EXEC Phase 7, the integration of packages L2, M and N: its independent check's finding on scripts/export-guard-core.ts:71"
+	},
+	{
+		id: 'MU-PFA-R3-K-the-unattributed-count-is-compared-for-a-rise-alone',
+		file: 'scripts/export-guard-core.ts',
+		find: 'if (now.unattributedMutants !== before.unattributedMutants)',
+		replace: 'if (now.unattributedMutants > before.unattributedMutants)',
+		expectRed: ['verif/export-guard.test.ts'],
+		why: "PROMISE (compareGuardCensus: 'Its count comparison is an EQUALITY in both directions, because the count is a record, not a floor'): a FALL in a file's count of mutants crediting no export is as stale as a rise. WHO RELIES: the committed census as a record — a mutant retired, or re-anchored into an export, lowers the true count. WHAT THE MUTATION DOES: compares for a rise alone — the 'ratchet, not an equality' instinct applied to a figure that is no ratchet — so a lowered count stays recorded high and the gate passes. OBSERVED (bun run scripts/mutants/run.ts MU-PFA-R3-, 2026-10-26, the candidate staged): the runner's verdict, verbatim: 'KILLED         MU-PFA-R3-K-the-unattributed-count-is-compared-for-a-rise-alone ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'. Applied and restored from the index to name it, 1 failed | 22 passed: 'CENSUS_STALE fires alone when a count of mutants crediting no export moves, EITHER way' (AssertionError: expected [ Array(1) ] to have a length of 2 but got 1) — the fall on y.ts unreported; the CLI case, a rise from -1, stayed green, as it must.",
+		source: "REG-F-470 (filed 2026-09-28, JAN-SELRES RS-2); JAN-EXEC Phase 7, the integration of packages L2, M and N: its independent check's finding on scripts/export-guard-core.ts:71"
+	},
+	{
+		id: 'MU-PFA-R3-L-the-cli-never-reports-a-stale-census',
+		file: 'scripts/export-guard.ts',
+		find: 'if (censusStale.length > 0)',
+		replace: 'if (false && censusStale.length > 0)',
+		expectRed: ['verif/export-guard.test.ts'],
+		why: "PROMISE (export-guard.ts: 'a limb computed and never reported is a gate that stays green on a stale census'): `guards:export:check` exits 1 and names the file whenever the record limb has a line. WHO RELIES: gate:fast step 2 — the pure comparison cannot redden a gate on its own, and the finding was precisely that every package's gate passed a stale census. WHAT THE MUTATION DOES: the CLI computes the limb and never reports it, so the gate passes the census the limb refuses; every pure-function test stays green under it, which is why its victim is the CLI case driven on a stale copy of the committed census. OBSERVED (bun run scripts/mutants/run.ts MU-PFA-R3-, 2026-10-26, the candidate staged): the runner's verdict, verbatim: 'KILLED         MU-PFA-R3-L-the-cli-never-reports-a-stale-census ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'. Applied and restored from the index to name it, 1 failed | 22 passed: 'exits 1 and names the file whose recorded count the measurement does not give' — the CLI printed 'guards:export — 106 files, no export lost its guard, surface unchanged, census current. …' over a census recording -1; every pure-function case stayed green.",
+		source: "REG-F-470 (filed 2026-09-28, JAN-SELRES RS-2); JAN-EXEC Phase 7, the integration of packages L2, M and N: its independent check's finding on scripts/export-guard-core.ts:71"
+	},
 	{
 		id: "MU-PFA-BD3-07-evaluator-selected-after-the-begin",
 		file: "packages/rph-engine/src/assessment-drive.ts",

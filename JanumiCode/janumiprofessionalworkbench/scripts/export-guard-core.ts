@@ -3,8 +3,9 @@
  * that decides what counts as a finding.
  *
  * ⭑ SEPARATE FROM THE IO FOR THE REASON `scope-core.ts` IS: the CLI's answer is one pass/fail over the whole
- * repository, which cannot show that the two limbs — *a guard was LOST* and *the population MOVED* — fail
- * independently. Two limbs that always fail together are one check wearing two names.
+ * repository, which cannot show that the limbs — *a guard was LOST*, *the population MOVED* and, since
+ * `REG-F-470`, *the record went STALE* — fail independently. Two limbs that always fail together are one check
+ * wearing two names.
  *
  * ── ⭐ THE UNIT IS THE EXPORT, AND IT TOOK A SECOND PASS TO ACTUALLY BE THE EXPORT ──────────────────────────
  * The first version recorded a per-FILE mutant COUNT and computed the obligation as
@@ -31,6 +32,10 @@ export interface GuardEntry {
 	 * over real behaviour, but nothing says WHICH promise it defends, and crediting it to an arbitrary export
 	 * would re-open exactly the fungibility this field exists to end. They are RECORDED so the work is not
 	 * invisible, and excluded from the credit so the obligation stays honest.
+	 *
+	 * ⛔ AND THE RECORD IS CHECKED (`REG-F-470`). Until 2026-10-26 no comparison read this field, so it drifted
+	 * silently: `handlers/execution.ts` recorded 18 through seven commits while the measured value was 20, every
+	 * gate green. A recorded value no check reads is a claim nobody verifies.
 	 */
 	readonly unattributedMutants: number;
 }
@@ -54,6 +59,17 @@ export interface GuardComparison {
 	readonly guardLost: readonly string[];
 	/** Files added, removed, or whose consumed-export set moved without the baseline being regenerated. */
 	readonly populationChanged: readonly string[];
+	/**
+	 * What the baseline records that the measurement no longer gives, on the files and exports BOTH sides know: an
+	 * export guarded now that the baseline records as bare, or a count of mutants crediting no export that moved.
+	 * The record limb (`REG-F-470`).
+	 *
+	 * ⛔ NEITHER IS A REGRESSION, AND EACH IS STILL REFUSED. GUARD_LOST asks only about what the baseline RECORDS as
+	 * guarded, so a gain the baseline does not record is a guard the ratchet is not holding — it could be lost
+	 * again and nothing would say so. The census is DERIVED and is regenerated in the same commit as the change
+	 * that moved it; this limb is what makes that rule a check rather than a hope.
+	 */
+	readonly censusStale: readonly string[];
 }
 
 /**
@@ -67,10 +83,16 @@ export interface GuardComparison {
  * ⭑ IT NAMES THE EXPORT, NOT JUST THE FILE. "This file has one fewer mutant" does not say what stopped being
  * defended; "`governance.ts#canPromoteBaseline` lost its guard" does, and it is the difference between a number
  * and a finding.
+ *
+ * ⭑ THE THIRD LIMB, `censusStale`, KEEPS THE SAME SEPARATION (`REG-F-470`). It asks about a GAIN only for an
+ * export the baseline already consumed, so a new export — the population limb's — cannot report as one; and it
+ * never asks about a loss, which is GUARD_LOST's. Its count comparison is an EQUALITY in both directions, because
+ * the count is a record, not a floor: a fall is as stale as a rise.
  */
 export function compareGuardCensus(recorded: GuardCensus, measured: GuardCensus): GuardComparison {
 	const guardLost: string[] = [];
 	const populationChanged: string[] = [];
+	const censusStale: string[] = [];
 
 	for (const file of Object.keys(measured).sort()) {
 		const before = recorded[file];
@@ -85,6 +107,16 @@ export function compareGuardCensus(recorded: GuardCensus, measured: GuardCensus)
 			if (stillPresent.has(exported) && !nowGuarded.has(exported))
 				guardLost.push(`${file}#${exported} was guarded at baseline and is not guarded now`);
 
+		const wasConsumed = new Set(before.consumedExports);
+		const wasGuarded = new Set(before.guardedExports);
+		for (const exported of [...now.guardedExports].sort((a, b) => a.localeCompare(b)))
+			if (wasConsumed.has(exported) && !wasGuarded.has(exported))
+				censusStale.push(`${file}#${exported} is guarded now and the baseline records it as bare`);
+		if (now.unattributedMutants !== before.unattributedMutants)
+			censusStale.push(
+				`${file}: mutants crediting no export moved (${before.unattributedMutants} -> ${now.unattributedMutants})`
+			);
+
 		const was = [...before.consumedExports].sort().join(',');
 		const is = [...now.consumedExports].sort().join(',');
 		if (was !== is)
@@ -97,7 +129,7 @@ export function compareGuardCensus(recorded: GuardCensus, measured: GuardCensus)
 		if (measured[file] === undefined)
 			populationChanged.push(`${file} is in the baseline but is no longer measured`);
 
-	return { guardLost, populationChanged };
+	return { guardLost, populationChanged, censusStale };
 }
 
 /** How much of the obligation is outstanding, as a derived figure — never a constant quoted from a document. */

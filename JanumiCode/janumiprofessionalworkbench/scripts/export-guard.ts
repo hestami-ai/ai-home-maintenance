@@ -33,6 +33,9 @@
  * ⛔ The check does NOT demand the outstanding obligation on the day it lands. It refuses REGRESSION: a file may
  * not lose a guard it had, and the population may not move without the census being regenerated. Introducing a
  * ratchet and demanding the work in one act makes a failure attributable to neither.
+ * ⭑ AND SINCE `REG-F-470` IT REFUSES A STALE CENSUS: a guard GAINED, or a count of mutants crediting no export
+ * MOVED, without the census being regenerated. Neither is a regression, but a gain the census does not record is
+ * a guard the ratchet is not holding, and a count no check read had drifted (18 recorded, 20 measured).
  *
  * ⚠ `--check` NEVER WRITES, and the census is DERIVED — regenerate with `--write` in the same commit as the
  * change that moved it. Editing a number here is indistinguishable, afterwards, from the work that earned it.
@@ -59,7 +62,7 @@ import { anchorRange } from './mutants/scope-core.js';
 // the SAME FILE SPELLED TWO WAYS. The map lookup then misses silently and the file reports ZERO consumed
 // exports. Observed: `governance.ts` showed an empty surface while nine production modules import from it.
 const ROOT = fileURLToPath(new URL('../', import.meta.url)).split('\\').join('/');
-const BASELINE = `${ROOT}verif/floors/export-guard.baseline.json`;
+const DEFAULT_BASELINE = `${ROOT}verif/floors/export-guard.baseline.json`;
 
 const flags = process.argv.slice(2);
 const mode = flags.filter((f) => f === '--write' || f === '--check');
@@ -67,9 +70,18 @@ if (mode.length !== 1) {
 	process.stderr.write('guards:export — use exactly one of --write or --check.\n');
 	process.exit(2);
 }
+const valueOf = (name: string): string | undefined => {
+	const hit = flags.find((f) => f.startsWith(`${name}=`));
+	return hit === undefined ? undefined : hit.slice(name.length + 1);
+};
+// ⭑ `--baseline=<path>` names another census, as `coverage:floor`'s flag of the same name does, so a test can hand
+// `--check` a STALE copy and watch the gate redden without editing the committed file (`REG-F-470`;
+// `verif/export-guard.test.ts`). The measured side is always this repository.
+const BASELINE = valueOf('--baseline') ?? DEFAULT_BASELINE;
 
 const fwd = (p: string) => p.split('\\').join('/');
-const rel = (p: string) => fwd(p).slice(fwd(ROOT).length);
+// A path outside the repository (a test's temporary census) is shown whole rather than cut at ROOT's length.
+const rel = (p: string) => (fwd(p).startsWith(fwd(ROOT)) ? fwd(p).slice(fwd(ROOT).length) : fwd(p));
 
 function walk(dir: string, out: string[] = []): string[] {
 	if (!existsSync(dir)) return out;
@@ -325,7 +337,7 @@ if (Object.keys(sorted).length === 0) {
 }
 
 const recorded = (JSON.parse(readFileSync(BASELINE, 'utf8')) as { files: GuardCensus }).files;
-const { guardLost, populationChanged } = compareGuardCensus(recorded, sorted);
+const { guardLost, populationChanged, censusStale } = compareGuardCensus(recorded, sorted);
 
 const problems: string[] = [];
 if (guardLost.length > 0)
@@ -339,6 +351,14 @@ if (populationChanged.length > 0)
 		...populationChanged.map((p) => `  POPULATION_CHANGED  ${p}`),
 		'  Regenerate with `bun run guards:export` in the SAME COMMIT as the change that moved it.'
 	);
+// ⛔ `REG-F-470`: a limb computed and never reported is a gate that stays green on a stale census.
+if (censusStale.length > 0)
+	problems.push(
+		`guards:export — CENSUS_STALE: the baseline records what the measurement no longer gives.`,
+		...censusStale.map((s) => `  CENSUS_STALE  ${s}`),
+		'  Regenerate with `bun run guards:export` in the SAME COMMIT as the change that moved it — a gain the',
+		'  baseline does not record is a guard the ratchet is not holding.'
+	);
 
 if (problems.length > 0) {
 	process.stderr.write(`${problems.join('\n')}\n`);
@@ -349,8 +369,9 @@ const o = outstandingObligation(sorted);
 process.stdout.write(
 	// ⚠ THE WORDING IS PART OF THE GUARANTEE. "no guard lost" described the per-FILE count this check no longer
 	// performs; what it now verifies is that no EXPORT lost the guard it had. A message that outlives the
-	// semantics it described is how a reader comes to believe a weaker claim than the one being made.
-	`guards:export — ${o.files} files, no export lost its guard, surface unchanged. ` +
+	// semantics it described is how a reader comes to believe a weaker claim than the one being made. ⭑ "census
+	// current" since `REG-F-470`: no guard gained and no count moved without the census being regenerated.
+	`guards:export — ${o.files} files, no export lost its guard, surface unchanged, census current. ` +
 		`Outstanding obligation: ${o.owed} bare export(s); ${o.guardedExports} of ${o.consumedExports} guarded; ` +
 		`${o.filesWithNoGuard} file(s) with no guarded export; ${o.unattributedMutants} mutant(s) crediting none.\n`
 );

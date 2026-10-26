@@ -8,7 +8,17 @@
  *   · what counts as a FINDING   — a lost guard and a moved population must not trip together.
  * A census whose predicates are untested is a number nobody can defend, and this programme has already had to
  * withdraw two.
+ *
+ * ⭑ AND A THIRD FINDING SINCE `REG-F-470`: a STALE RECORD — a guard gained, or a count of mutants crediting no export
+ * moved, with the census not regenerated. It trips with neither of the other two, and the CLI refuses it, because a
+ * field no check reads drifts silently: `handlers/execution.ts` recorded 18 through seven commits while the measured
+ * value was 20, every gate green.
  */
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
 	attributeGuard,
@@ -69,15 +79,29 @@ describe('JAN-PFA R3 — compareGuardCensus keeps a LOST GUARD apart from a MOVE
 	};
 
 	it('passes when nothing moved', () => {
-		expect(compareGuardCensus(BASE, BASE)).toEqual({ guardLost: [], populationChanged: [] });
+		expect(compareGuardCensus(BASE, BASE)).toEqual({
+			guardLost: [],
+			populationChanged: [],
+			censusStale: []
+		});
 	});
 
-	it('passes when an export GAINS a guard — it is a ratchet, not an equality', () => {
+	// ⚠ RETITLED 2026-10-26 (`REG-F-470`, at the integration of packages L2, M and N). It read *"passes when an
+	// export GAINS a guard — it is a ratchet, not an equality"*, and the CHECK no longer passes on it: a gain the
+	// baseline does not record is a guard the ratchet is not holding, so it is refused as a STALE RECORD until the
+	// census is regenerated (the CENSUS_STALE tests below). What the old title pinned, and its assertion still pins,
+	// is the RATCHET LIMB's direction: a gain is never reported as a lost guard.
+	it('never reports a GAINED guard as a LOST one — the ratchet limb is one-directional', () => {
 		const better: GuardCensus = {
 			...BASE,
 			'packages/b/src/y.ts': { consumedExports: ['gamma'], guardedExports: ['gamma'], unattributedMutants: 0 }
 		};
-		expect(compareGuardCensus(BASE, better).guardLost).toEqual([]);
+		const r = compareGuardCensus(BASE, better);
+		expect(r.guardLost).toEqual([]);
+		expect(r.populationChanged).toEqual([]);
+		expect(r.censusStale.join(' '), 'the gain is a stale record until regenerated').toContain(
+			'packages/b/src/y.ts#gamma'
+		);
 	});
 
 	// ── LIMB 1, ALONE — AND IT NAMES THE EXPORT ─────────────────────────────────────────────────────────────
@@ -95,6 +119,7 @@ describe('JAN-PFA R3 — compareGuardCensus keeps a LOST GUARD apart from a MOVE
 		expect(r.guardLost).toHaveLength(1);
 		expect(r.guardLost[0]).toContain('packages/a/src/x.ts#beta');
 		expect(r.populationChanged, 'a lost guard must not also report as a moved population').toEqual([]);
+		expect(r.censusStale, 'a lost guard must not also report as a stale record').toEqual([]);
 	});
 
 	// ⛔ THE DEFECT THIS WHOLE REWORK EXISTS TO CATCH. Under the old per-FILE count, moving a guard from `beta`
@@ -121,6 +146,7 @@ describe('JAN-PFA R3 — compareGuardCensus keeps a LOST GUARD apart from a MOVE
 		const r = compareGuardCensus(BASE, added);
 		expect(r.populationChanged.join(' ')).toContain('packages/c/src/z.ts');
 		expect(r.guardLost).toEqual([]);
+		expect(r.censusStale).toEqual([]);
 	});
 
 	it('POPULATION_CHANGED fires alone for a REMOVED file', () => {
@@ -128,6 +154,7 @@ describe('JAN-PFA R3 — compareGuardCensus keeps a LOST GUARD apart from a MOVE
 		const r = compareGuardCensus(BASE, fewer);
 		expect(r.populationChanged.join(' ')).toContain('no longer measured');
 		expect(r.guardLost).toEqual([]);
+		expect(r.censusStale).toEqual([]);
 	});
 
 	it('POPULATION_CHANGED fires alone when a file’s consumed-export SET moves', () => {
@@ -144,7 +171,84 @@ describe('JAN-PFA R3 — compareGuardCensus keeps a LOST GUARD apart from a MOVE
 		// ⭑ A RENAMED EXPORT IS NOT A LOST GUARD. `beta` no longer exists, so claiming its guard was lost would
 		// report a defect where there is only a rename — which is why limb 1 only considers exports still present.
 		expect(r.guardLost).toEqual([]);
+		// ⭑ NOR IS IT A GAINED ONE. `epsilon` is guarded now and the baseline never had it — a NEW export, so the
+		// population limb's finding; the record limb asks only about exports the baseline already consumed.
+		expect(r.censusStale).toEqual([]);
 	});
+
+	// ── LIMB 3, ALONE, IN ITS TWO SHAPES (`REG-F-470`) ─────────────────────────────────────────────────────
+	// ⛔ NEITHER IS A REGRESSION, AND EACH IS REFUSED. GUARD_LOST asks only about what the baseline RECORDS as
+	// guarded, so a gain it does not record could be lost again and nothing would say so; and a count no check
+	// reads drifts silently.
+	it('CENSUS_STALE fires alone when an export GAINS a guard the baseline does not record, and NAMES it', () => {
+		const gained: GuardCensus = {
+			...BASE,
+			'packages/b/src/y.ts': { consumedExports: ['gamma'], guardedExports: ['gamma'], unattributedMutants: 1 }
+		};
+		const r = compareGuardCensus(BASE, gained);
+		expect(r.censusStale).toHaveLength(1);
+		expect(r.censusStale[0]).toContain('packages/b/src/y.ts#gamma');
+		expect(r.censusStale[0]).toContain('the baseline records it as bare');
+		expect(r.guardLost).toEqual([]);
+		expect(r.populationChanged).toEqual([]);
+	});
+
+	it('CENSUS_STALE fires alone when a count of mutants crediting no export moves, EITHER way', () => {
+		const drifted: GuardCensus = {
+			'packages/a/src/x.ts': {
+				consumedExports: ['alpha', 'beta'],
+				guardedExports: ['alpha', 'beta'],
+				unattributedMutants: 2
+			},
+			'packages/b/src/y.ts': { consumedExports: ['gamma'], guardedExports: [], unattributedMutants: 0 }
+		};
+		const r = compareGuardCensus(BASE, drifted);
+		expect(r.censusStale).toHaveLength(2);
+		// ⚠ BOTH DIRECTIONS. A count compared only for a RISE would pass the fall on `y.ts` — the
+		// "ratchet, not an equality" instinct applied to a figure that is a record, not a floor.
+		expect(r.censusStale[0]).toContain('packages/a/src/x.ts');
+		expect(r.censusStale[0]).toContain('(0 -> 2)');
+		expect(r.censusStale[1]).toContain('packages/b/src/y.ts');
+		expect(r.censusStale[1]).toContain('(1 -> 0)');
+		expect(r.guardLost).toEqual([]);
+		expect(r.populationChanged).toEqual([]);
+	});
+});
+
+// ── `REG-F-470` AT THE GATE: the CLI, not only the pure comparison ───────────────────────────────────────────
+// ⛔ THE PURE FUNCTION CANNOT SHOW THE GATE REDDENS. `guards:export:check` is `gate:fast` step 2, and a limb the CLI
+// computes and never reports is a gate that stays green on a stale census — the defect this limb closes.
+// ⚠ THE FIXTURE IS THE COMMITTED BASELINE WITH ONE COUNT NO MEASUREMENT CAN GIVE (-1), and the assertion is that
+// file's own line, so the case holds whatever else the measured tree differs in — a mutant applied elsewhere by the
+// mutation runner included — and never asks the real repository to be clean.
+describe('REG-F-470 — guards:export:check refuses a stale census', () => {
+	const ROOT = fileURLToPath(new URL('..', import.meta.url));
+	const SCRIPT = `${ROOT}scripts/export-guard.ts`;
+
+	it('exits 1 and names the file whose recorded count the measurement does not give', () => {
+		const baseline = JSON.parse(
+			readFileSync(`${ROOT}verif/floors/export-guard.baseline.json`, 'utf8')
+		) as { files: GuardCensus };
+		const file = Object.keys(baseline.files).sort()[0]!;
+		const stale = {
+			...baseline,
+			files: { ...baseline.files, [file]: { ...baseline.files[file]!, unattributedMutants: -1 } }
+		};
+		const dir = mkdtempSync(join(tmpdir(), 'jan-pfa-guard-'));
+		const path = join(dir, 'export-guard.baseline.json');
+		writeFileSync(path, JSON.stringify(stale));
+		// ⚠ NO `shell: true`, as `tracker-census-freshness.test.ts` spawns `bun`: a shell spawn with an argument
+		// array is deprecated in Node and concatenates rather than escapes.
+		const r = spawnSync('bun', ['run', SCRIPT, '--check', `--baseline=${path}`], {
+			cwd: ROOT,
+			encoding: 'utf8',
+			timeout: 120_000
+		});
+		const out = `${r.stdout ?? ''}${r.stderr ?? ''}`;
+		expect(r.status, out).toBe(1);
+		expect(out).toContain('guards:export — CENSUS_STALE');
+		expect(out).toContain(`CENSUS_STALE  ${file}: mutants crediting no export moved (-1 -> `);
+	}, 120_000);
 });
 
 describe('JAN-PFA R3 — outstandingObligation counts BARE EXPORTS, never a signed difference', () => {
