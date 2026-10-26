@@ -640,6 +640,7 @@
 				"runFloorAndPlanRecording",
 				"runFloorPolicies",
 				"schemaInvariantValidatorInstance",
+				"VALIDATOR_ALLOWANCE_STOPPED",
 				"VALIDATOR_FAILURE_CODES",
 				"VALIDATOR_MODEL_SUBSTITUTED",
 				"validatorFailureError"

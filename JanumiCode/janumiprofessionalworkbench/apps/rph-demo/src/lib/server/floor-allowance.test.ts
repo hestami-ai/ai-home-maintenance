@@ -24,6 +24,7 @@ import { SESSION_CREDENTIAL } from './identity.js';
 import { getEngine, resetEngine } from './workbench.js';
 import {
 	classifyFloorRemediation,
+	floorBlockedHint,
 	isOperationalRemediation,
 	loadPwaFloor,
 	reasoningReviewCriteria,
@@ -120,6 +121,21 @@ const stopped = (part: string, name: string, round: { allowance: number; left: n
 	`among them; its worst case is 3 × 6 = 18 reviewer calls, and the allowance of ${round.allowance} has ${round.left} ` +
 	`left, ${round.reserved} reserved by earlier rounds. A round runs only while its worst case fits what is left, so ` +
 	'this type is not reviewed and the candidate is not accepted.';
+/**
+ * ⭐⭐ Package L2's check, finding 2 — what the stop carries beside the reason, under its own code (`VALIDATOR_ALLOWANCE_STOPPED`):
+ * no reviewer failed. Restated here, so a change reddens.
+ */
+const NO_REVIEWER_FAILED =
+	`No reviewer failed: the authoring review’s allowance (${AUTHORING_REVIEW_ALLOWANCE_VARIABLE}) stopped this review before any ` +
+	'reviewer call, so retrying, configuring or changing the reviewer does not change it (REG-F-580; design D20).';
+/** ⭐⭐ Package L2's check, finding 2 — the floor's guidance for a stopped round, whole: what clears it, and what does not. */
+const FIT_GUIDANCE =
+	`PublishPwa remains blocked because the authoring review’s allowance (${AUTHORING_REVIEW_ALLOWANCE_VARIABLE}) stopped the ` +
+	'Reasoning Review’s round before its first reviewer call: the round’s worst case, its types × the calls a review may make, ' +
+	'did not fit what the allowance has left. No reviewer failed, so retrying, configuring or changing the reviewer does not ' +
+	'fix this, and a stopped round reserves nothing: the same candidate is stopped again while this server runs. The round ' +
+	'runs once its worst case fits — under an allowance that holds it, which the server reads when it starts, or for a ' +
+	'candidate with fewer types, where what is left holds their round. Do not record a waiver in response to this stop.';
 
 const review = (f: FloorView | undefined) => f?.policies.find((p) => p.policyId === REVIEW);
 const exchanges = () => listByType(session, 'MODEL_EXCHANGE');
@@ -163,9 +179,12 @@ describe('⭐⭐ L2 — D20: before each round the floor reserves its worst case
 		// ⭐ THE STATED REASON, ON EACH PART, BY THE HOST'S NAME FOR IT: its parts, the worst case and what is left — FIRST, as the
 		// floor records any review that did not execute; beside it the `INDEPENDENCE_VIOLATION` the recording adds to every failed
 		// review, no evaluator having run (`REG-F-463`; `assurance/floor-registry.test.ts`, RS-2's real shape).
+		// ⭐⭐ MOVED DELIBERATELY by package L2's check, finding 2: AND SECOND, ITS OWN CODE (`VALIDATOR_ALLOWANCE_STOPPED`), carried
+		// by the stop as a refused substitute carries its own (`rph-assurance` D6) — no reviewer failed.
 		const left = { allowance: WORST - 1, left: WORST - 1, reserved: 0 };
 		const failed = (part: string, name: string) => [
 			['VALIDATOR_EXECUTION_FAILED', stopped(part, name, left)],
+			['VALIDATOR_ALLOWANCE_STOPPED', NO_REVIEWER_FAILED],
 			['INDEPENDENCE_VIOLATION', 'validator execution failed']
 		];
 		expect(
@@ -178,23 +197,35 @@ describe('⭐⭐ L2 — D20: before each round the floor reserves its worst case
 		]);
 		// ⭐ NEVER A THROW, AND NEVER A FINDING: the floor answers it as a review that did not execute — an operational block,
 		// so the authoring route stages the candidate BLOCKED_EXTERNAL and no one can accept it.
+		// ⭐⭐ MOVED DELIBERATELY by package L2's check, finding 2: ~~`'RETRY_OR_CONFIGURE_REVIEWER'`~~ — its own action, with
+		// guidance that names what clears it. ⛔ PREDICTED RED, read from the code at de18c9e0: the stop carried no code, so the
+		// execution-failure branch answered "Configure or retry the reviewer", and the page's hint said revising does not
+		// address it — neither can clear it, and a candidate with fewer types can.
 		const remediation = classifyFloorRemediation(floor!);
 		expect([remediation.action, remediation.findings, isOperationalRemediation(remediation.action)]).toEqual([
-			'RETRY_OR_CONFIGURE_REVIEWER',
+			'FIT_THE_REVIEW_ALLOWANCE',
 			[],
 			true
 		]);
+		expect(remediation.guidance, 'the stop’s guidance').toBe(FIT_GUIDANCE);
+		expect(remediation.guidance, 'the stop is told to retry the reviewer').not.toContain('Configure or retry the reviewer');
+		expect(floorBlockedHint(floor!), 'the page’s hint for the stop').toBe('FIT_THE_ALLOWANCE');
 		// ⭐ LEGIBLE IN THE RECORD AND ON THE PAGE: the page's read of the round carries each part's reason.
 		const page = loadPwaFloor(PWA, session);
 		expect(page?.satisfied).toBe(false);
 		expect(page?.reasoningGaps, 'the page’s read of the round does not carry the reason').toEqual([
 			stopped(BUILD, 'Build', left),
+			NO_REVIEWER_FAILED,
 			'validator execution failed',
 			stopped(CHECK, 'Check', left),
+			NO_REVIEWER_FAILED,
 			'validator execution failed',
 			stopped(ROOT, 'Realize', left),
+			NO_REVIEWER_FAILED,
 			'validator execution failed'
 		]);
+		// ⭐ And the page's read answers it the same way: its hint, from the recorded codes alone.
+		expect(floorBlockedHint(page!), 'the page’s hint, read from the record').toBe('FIT_THE_ALLOWANCE');
 	});
 
 	// ⭑ CONTROL — the boundary, from the other side: reaching the allowance is allowed.
@@ -217,10 +248,13 @@ describe('⭐⭐ L2 — D20: before each round the floor reserves its worst case
 
 		expect(second.prompts, 'the second round made reviewer calls past what the first left').toEqual([]);
 		expect(second.floor?.satisfied).toBe(false);
+		// ⭐⭐ Package L2's check, finding 2 — and its own code beside the reason (`NO_REVIEWER_FAILED`), moved deliberately.
 		expect(second.floor?.parts?.[0]?.observations.map((o) => o.statement)).toEqual([
 			stopped(BUILD, 'Build', { allowance: WORST + WORST - 6, left: WORST - 6, reserved: WORST }),
+			NO_REVIEWER_FAILED,
 			'validator execution failed'
 		]);
+		expect(classifyFloorRemediation(second.floor!).action).toBe('FIT_THE_REVIEW_ALLOWANCE');
 	});
 
 	it('⭑ CONTROL — an allowance holding both rounds’ worst cases reviews both', async () => {
@@ -243,8 +277,11 @@ describe('⭐⭐ L2 — D20: before each round the floor reserves its worst case
 				'case can be reserved against it and no round with a type in it runs (REG-F-580; design D20). The round reviews ' +
 				`3 type(s), "Build" (${BUILD}) among them; its worst case is 3 × 6 = 18 reviewer calls. This type is not ` +
 				'reviewed and the candidate is not accepted.',
+			// ⭐⭐ Package L2's check, finding 2 — its own code beside the reason, moved deliberately.
+			NO_REVIEWER_FAILED,
 			'validator execution failed'
 		]);
+		expect(classifyFloorRemediation(floor!).action).toBe('FIT_THE_REVIEW_ALLOWANCE');
 	});
 });
 

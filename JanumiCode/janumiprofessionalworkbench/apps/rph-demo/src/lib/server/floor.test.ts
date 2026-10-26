@@ -341,7 +341,10 @@ describe('isOperationalRemediation — every action answered, the operational on
 		REQUALIFY_OR_RESELECT_REVIEWER: true,
 		CHANGE_REVIEWER: true,
 		ESCALATE_REVIEW: true,
-		RESOLVE_OTHER_FLOOR_FINDINGS: false
+		RESOLVE_OTHER_FLOOR_FINDINGS: false,
+		// ⭐⭐ `JAN-EXEC` Phase 7, package L2's check, finding 2 — a round the authoring review's allowance stopped: no reviewer
+		// judged the subject, so the candidate is staged BLOCKED_EXTERNAL.
+		FIT_THE_REVIEW_ALLOWANCE: true
 	};
 	for (const [action, operational] of Object.entries(OPERATIONAL) as [
 		FloorRemediationAction,
@@ -418,6 +421,19 @@ describe('floorBlockedHint — "revise the graph" where revising answers the blo
 		disposition: 'SATISFIED',
 		independenceOk: false,
 		observations: [independenceViolation]
+	});
+	/** ⭐⭐ Package L2's check, finding 2 — the RECORDED shape of a round the authoring review's allowance stopped. */
+	const allowanceStopped = reviewPolicy({
+		independenceOk: false,
+		observations: [
+			executionFailed,
+			{
+				code: 'VALIDATOR_ALLOWANCE_STOPPED',
+				severity: 'MATERIAL',
+				statement: 'No reviewer failed: the authoring review’s allowance stopped this review before any reviewer call.'
+			},
+			independenceViolation
+		]
 	});
 
 	const BY_ACTION: Readonly<
@@ -528,6 +544,21 @@ describe('floorBlockedHint — "revise the graph" where revising answers the blo
 					policies: [identityRejected, reviewPolicy({ disposition: 'SATISFIED' })]
 				}),
 				hint: 'REVISE'
+			}
+		],
+		// ⭐⭐ `JAN-EXEC` Phase 7, package L2's check, finding 2 — ITS OWN SENTENCE, alone and beside a graph defect: it says no
+		// reviewer failed, to revise for any findings the floor records, and what lets the review run — true of both shapes.
+		// ⛔ It read NOT_BY_REVISION alone, "revising it does not address this", false of a candidate with fewer types.
+		FIT_THE_REVIEW_ALLOWANCE: [
+			{
+				shape: 'a round the authoring review’s allowance stopped, as recorded',
+				floor: floorView({ policies: [allowanceStopped] }),
+				hint: 'FIT_THE_ALLOWANCE'
+			},
+			{
+				shape: 'the same, beside a graph that is not well formed',
+				floor: floorView({ policies: [schemaRejected, allowanceStopped] }),
+				hint: 'FIT_THE_ALLOWANCE'
 			}
 		]
 	};
@@ -1185,6 +1216,28 @@ describe('⭐ JAN-ESCREC D3 — escalationRecommendationNote: which sentence the
 					});
 				})(),
 				note: 'BESIDE_FINDINGS'
+			}
+		],
+		// ⭐⭐ `JAN-EXEC` Phase 7, package L2's check, finding 2 — a round the allowance stopped calls no reviewer, so the product
+		// records no recommendation beside it; staged with one, the review it sits with reached no usable verdict.
+		FIT_THE_ALLOWANCE: [
+			{
+				shape: 'a stopped round carrying a recommendation (staged), its neighbours SATISFIED',
+				floor: floorView({
+					policies: [
+						policy('floor.schema-invariant', 'SATISFIED'),
+						policy('floor.identity-provenance', 'SATISFIED'),
+						reviewPolicy({
+							independenceOk: false,
+							observations: [
+								{ code: 'VALIDATOR_EXECUTION_FAILED', severity: 'MATERIAL', statement: 'No reviewer call was made.' },
+								{ code: 'VALIDATOR_ALLOWANCE_STOPPED', severity: 'MATERIAL', statement: 'No reviewer failed.' },
+								recommendation
+							]
+						})
+					]
+				}),
+				note: 'WITH_AN_INCOMPLETE_REVIEW'
 			}
 		]
 	};

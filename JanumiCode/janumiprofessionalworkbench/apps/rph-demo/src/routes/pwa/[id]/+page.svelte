@@ -2225,6 +2225,14 @@
 								<p class="floorhint" data-testid="floor-blocked-hint">
 									Publishing is blocked until the floor is SATISFIED — revise the graph for the findings the floor records against it and re-run. The Reasoning Review of {data.floorFailedReviews} failed operationally and recorded no finding; every type, the failed ones included, is reviewed again when the floor re-runs.
 								</p>
+							<!-- ⭐⭐ JAN-EXEC Phase 7, package L2's check, finding 2 (REG-F-580; design D20) — the authoring review's allowance
+							     stopped the round before any reviewer call (`FIT_THE_ALLOWANCE`): no reviewer failed, so retrying or changing
+							     it does not address this, and the review runs once its round fits the allowance. ⛔ It read NOT_BY_REVISION's
+							     "revising it does not address this", false of a candidate with fewer types. -->
+							{:else if data.floorBlockedHint === 'FIT_THE_ALLOWANCE'}
+								<p class="floorhint" data-testid="floor-blocked-hint">
+									Publishing is blocked until the floor is SATISFIED — the authoring review’s allowance stopped the Reasoning Review before its first reviewer call, so no type was reviewed; retrying or changing the reviewer does not address this. Revise the graph for any findings the floor records against it. The review runs once its round fits the allowance: an allowance that holds it, set when the server starts, or a candidate with fewer types.
+								</p>
 							{:else}
 								<p class="floorhint" data-testid="floor-blocked-hint">
 									Publishing is blocked until the floor is SATISFIED — revise the graph and re-run.

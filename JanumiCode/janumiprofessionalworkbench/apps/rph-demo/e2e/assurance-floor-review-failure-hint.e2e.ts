@@ -66,6 +66,28 @@ const EXECUTION_FAILED = {
 	statement: EXECUTION_FAILED_STATEMENT
 };
 
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L2's check, finding 2 (`REG-F-580`; design D20) — what a round the authoring review's
+ * allowance stopped records for each of its parts (`floor.ts` `allowanceStoppedRegistry`): the stated reason under the
+ * execution failure, FIRST, and beside it its own code (`VALIDATOR_ALLOWANCE_STOPPED`, `rph-assurance` D6), whose statement
+ * is the product's (`assurance/review-allowance.ts` `ALLOWANCE_STOPPED_NO_REVIEWER_FAILED`).
+ */
+const ALLOWANCE_STOP_REASON = {
+	findingCode: 'VALIDATOR_EXECUTION_FAILED',
+	severity: 'MATERIAL',
+	statement:
+		'No reviewer call was made for this type: the authoring review’s allowance stopped its round before the round’s first call (staged allowance stop).'
+};
+const ALLOWANCE_STOPPED = {
+	findingCode: 'VALIDATOR_ALLOWANCE_STOPPED',
+	severity: 'MATERIAL',
+	statement:
+		'No reviewer failed: the authoring review’s allowance (JPWB_AUTHORING_REVIEW_ALLOWANCE) stopped this review before any reviewer call, so retrying, configuring or changing the reviewer does not change it (REG-F-580; design D20).'
+};
+/** ⭐⭐ The hint beside a round the allowance stopped (`floorBlockedHint`, `'FIT_THE_ALLOWANCE'`), whole. */
+const FIT_THE_ALLOWANCE_HINT =
+	'Publishing is blocked until the floor is SATISFIED — the authoring review’s allowance stopped the Reasoning Review before its first reviewer call, so no type was reviewed; retrying or changing the reviewer does not address this. Revise the graph for any findings the floor records against it. The review runs once its round fits the allowance: an allowance that holds it, set when the server starts, or a candidate with fewer types.';
+
 /** What the schema/invariant policy records against a graph that is not well formed (`floor.ts` `runPwaFloor`). */
 const NOT_WELL_FORMED = {
 	findingCode: 'PWA_GRAPH_NOT_WELL_FORMED',
@@ -150,9 +172,15 @@ test.describe('Assurance floor — the blocked hint follows the floor’s own cl
 			readonly concludeAs: 'REJECTED' | 'INCONCLUSIVE';
 			/** ⭐ Package E, E1 — a reasoning review of this type, named, in place of the root's. */
 			readonly onType?: string;
+			/** ⭐⭐ Package L2's check, finding 2 — a second observation, recorded after the first, as a carried failure is. */
+			readonly also?: { readonly observationId: string; readonly observation: typeof EXECUTION_FAILED };
 		}
 	): Promise<void> {
 		const { policyId, assessmentId, observationId, observation, concludeAs } = staged;
+		const observed = [
+			{ observationId, observation },
+			...(staged.also === undefined ? [] : [staged.also])
+		];
 		const snapshot = await introspect(request);
 		const pwa = snapshot.pwas.find((p) => p.id === pwaId)!;
 		const part = await theRootPartOfTheLatestRound(request, pwaId);
@@ -178,16 +206,17 @@ test.describe('Assurance floor — the blocked hint follows the floor’s own cl
 						}
 					],
 					['BeginAssuranceAssessment', 'ASSURANCE_ASSESSMENT', assessmentId, {}],
-					[
+					// ⭐⭐ Package L2's check, finding 2 — each observation in order: the first, then any `also`.
+					...observed.map((o) => [
 						'RecordAssuranceObservation',
 						'ASSURANCE_OBSERVATION',
-						observationId,
+						o.observationId,
 						{
 							assessmentId,
 							observationType: policyId === POLICY ? 'FINDING' : 'POLICY_VIOLATION',
-							...observation
+							...o.observation
 						}
-					],
+					]),
 					[
 						'CompleteAssuranceAssessment',
 						'ASSURANCE_ASSESSMENT',
@@ -204,7 +233,7 @@ test.describe('Assurance floor — the blocked hint follows the floor’s own cl
 								claimResults: [],
 								evidenceConsideredIds: [],
 								evidenceRejected: [],
-								observations: [{ ...observation, subjectObjectIds: [subjectId] }],
+								observations: observed.map((o) => ({ ...o.observation, subjectObjectIds: [subjectId] })),
 								dispositionRecommendation: concludeAs,
 								recommendedControlActions: [],
 								residualUncertainty: [],
@@ -269,6 +298,47 @@ test.describe('Assurance floor — the blocked hint follows the floor’s own cl
 		await expect(hint).not.toContainText('revise the graph and re-run');
 		await expect(hint).not.toContainText(/waiv/i);
 		// ⭐ AND ON SCREEN, though the review's finding is listed too.
+		await expectTheHintOnScreen(page);
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L2's check, finding 2 (`REG-F-580`; design D20) — A ROUND THE AUTHORING REVIEW'S ALLOWANCE
+	// STOPPED. ⛔ It read the sentence above, "revising it does not address this. Run assurance again once the review's own cause
+	// is addressed": false — a candidate with fewer types can fit what is left — and the review's cause is no reviewer's, so a
+	// re-run under the same allowance is stopped again. ⭑ Staged as the product records it: EVERY part of the round stopped,
+	// each with the stated reason first and its own code beside it. ⛔ PREDICTED RED, read from the code at de18c9e0: the
+	// classifier had no branch for the code, so this floor read NOT_BY_REVISION's sentence.
+	test('⭐⭐ a round the authoring review’s allowance stopped: the hint says no reviewer failed and what lets the review run, whole — never that revising does not address it', async ({
+		page,
+		request
+	}) => {
+		const pwaId = await draftWithSatisfiedFloor(page, request, 'Floor Allowance Stop Hint');
+		for (const [n, onType] of [
+			[1, undefined],
+			[2, 'Architecture Definition']
+		] as const)
+			await stageAnAssessment(request, pwaId, {
+				policyId: POLICY,
+				assessmentId: `assess_01ARZ3NDEKTSV4RRFFQ69G5FE${n}`,
+				observationId: `obs_01ARZ3NDEKTSV4RRFFQ69G5FF${n}`,
+				observation: ALLOWANCE_STOP_REASON,
+				also: { observationId: `obs_01ARZ3NDEKTSV4RRFFQ69G5FG${n}`, observation: ALLOWANCE_STOPPED },
+				concludeAs: 'INCONCLUSIVE',
+				...(onType === undefined ? {} : { onType })
+			});
+
+		await gotoHydrated(page, `/pwa/${pwaId}`);
+		// Arrangement: the floor on screen is the stopped one, and each part's reason and code are on the panel.
+		await expect(page.getByTestId('assurance-disposition')).not.toContainText('SATISFIED');
+		await expect(page.locator('ul.floorgaps')).toContainText(ALLOWANCE_STOP_REASON.statement);
+		await expect(page.locator('ul.floorgaps')).toContainText(ALLOWANCE_STOPPED.statement);
+
+		const hint = page.getByTestId('floor-blocked-hint');
+		await expect(hint).toHaveCount(1);
+		// ⭐ THE CLAIM, POSITIVELY AND WHOLE.
+		await expect(hint).toHaveText(FIT_THE_ALLOWANCE_HINT);
+		// ⛔ Not the sentence that is false of it, and no route past the floor (ASR-3).
+		await expect(hint).not.toContainText('revising it does not address this');
+		await expect(hint).not.toContainText(/waiv/i);
 		await expectTheHintOnScreen(page);
 	});
 

@@ -652,7 +652,9 @@ describe('⭐ JAN-ESCREC D3 — escalatedReviewNote: the human sentence for ESCA
 		REQUALIFY_OR_RESELECT_REVIEWER: '',
 		CHANGE_REVIEWER: '',
 		ESCALATE_REVIEW: ` — ${HUMAN_SENTENCE}`,
-		RESOLVE_OTHER_FLOOR_FINDINGS: ''
+		RESOLVE_OTHER_FLOOR_FINDINGS: '',
+		// ⭐⭐ `JAN-EXEC` Phase 7, package L2's check, finding 2 — the authoring review's allowance: no escalation.
+		FIT_THE_REVIEW_ALLOWANCE: ''
 	} as const satisfies Record<FloorRemediationAction, string>;
 
 	it.each(Object.entries(NOTE_FOR) as [FloorRemediationAction, string][])(

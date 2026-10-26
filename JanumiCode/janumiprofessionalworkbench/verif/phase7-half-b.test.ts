@@ -58,6 +58,7 @@ import {
 	acceptedHashOf,
 	bootOf,
 	candidateOf,
+	COUNTED_AHEAD,
 	DESIGNER_ACTS,
 	laneVerdict,
 	openLane,
@@ -98,6 +99,7 @@ import {
 	FLOOR_POLICIES,
 	HALF_B_CAVEATS,
 	renderMarkdown,
+	SEND_COUNTED_THE_ALLOWANCE,
 	type LaneRows,
 	type MatrixCell,
 	type RunReport,
@@ -3600,6 +3602,76 @@ describe('⭐⭐ The review in parts, B6 — the authoring’s spend reserve cou
 		expect(caveat, 'the caveat still says Send’s press can pass the limit').not.toContain('can pass the limit in that press');
 		expect(caveat, 'the caveat still names a read the lane no longer makes').not.toContain('counted again for the inventory');
 		expect(renderMarkdown(out), 'report.md does not carry it').toContain(`- **Caveat:** ${caveat}`);
+	});
+
+	// ⭐⭐ Package L2's check, finding 1 — THE CAVEAT OF A RUN RECORDED BEFORE D20 IS TRUE OF THAT RUN. ⛔ The caveat was one
+	// constant for every report, D20's: the report of a run whose Send check counted the 16 anticipated types — its staged
+	// inventory counted again, past the limit, and read "nothing held back, its rounds having run inside the Send press" (the
+	// report's case above) — said beside that read that Send's press is bounded by the allowance the lane hands the authoring
+	// review, "So the rule bounds the reviewer exchanges the store records": false of a run whose server had no allowance, and
+	// the contradiction `P6X-L-M31` was added to remove. The record says which lane made it: Send's check names what it counted
+	// (`counted`), so the report chooses the caveat's Send clause from it, and states that run's own count.
+	// ⛔ PREDICTED RED, read from the code at de18c9e0: `buildReviewerCalls` sets `limitCaveat: LIMIT_CAVEAT` for every record,
+	// so this caveat says the rule bounds the recorded exchanges.
+	it('⛔ the caveat of a run recorded before D20 — its Send check counted the anticipated types, its inventory past the limit — says Send’s count was an estimate its press could pass, never that the allowance bounds it', () => {
+		const lane = halfBLaneRows();
+		const inventoryCheck = {
+			prior: AT_SEND,
+			recorded: 0,
+			reserve: PHASE7_NEGATIVE_CONTROL_RESERVE,
+			ahead: phase7AuthoringReviewerCalls(20),
+			counted: STAGED_INVENTORY,
+			total: AT_SEND + PHASE7_NEGATIVE_CONTROL_RESERVE + phase7AuthoringReviewerCalls(20),
+			limit: PHASE7_PAID_LIMIT,
+			allowed: false
+		};
+		const ANTICIPATED = 'the authoring floor’s worst case, for 16 anticipated types';
+		const sendCheck = { ...inventoryCheck, ahead: FLOOR_WORST, counted: ANTICIPATED, total: PHASE7_PAID_LIMIT, allowed: true };
+		const run = lane.run as { authoring: Record<string, unknown> };
+		const out = buildRunReport(
+			halfBStore(),
+			{ ...lane, run: { ...run, authoring: { ...run.authoring, limitCheck: sendCheck, inventoryCheck } } },
+			{ accountNames: NAMES }
+		).report;
+		expect(
+			out.reviewerCalls.laneLimitChecks.map((c) => [c.before, c.allowed]).slice(0, 2),
+			'arrangement: Send’s read, and the inventory counted again past the limit'
+		).toEqual([
+			['Send', true],
+			['Send, counted again for the inventory its turn staged', false]
+		]);
+		const caveat = out.reviewerCalls.limitCaveat;
+		// ⛔ Neither of D20's claims: this run's server had no allowance.
+		expect(caveat, 'the caveat says the rule bounds the exchanges of a run past the limit').not.toContain(
+			'So the rule bounds the reviewer exchanges the store records.'
+		);
+		expect(caveat, 'the caveat says an allowance bounded a run recorded before D20').not.toContain(
+			'Send’s press is bounded by the allowance'
+		);
+		// ⭐ The true value, the record's own: what Send's check counted, an estimate, which the Send press could pass.
+		expect(caveat, 'the caveat does not say the run was recorded before D20').toContain(
+			'This run was recorded before the lane handed the authoring review an allowance (REG-F-580; design D20)'
+		);
+		expect(caveat, 'the caveat does not state the run’s own count before Send').toContain(
+			`its check counted ${FLOOR_WORST} ahead (${ANTICIPATED}), an estimate and not a bound`
+		);
+		expect(caveat, 'the caveat does not say the Send press could pass the limit').toContain(
+			'so the reviewer exchanges the store records can pass the limit in that press'
+		);
+		expect(caveat, 'the caveat does not name the read that shows it').toContain(
+			'the read “Send, counted again for the inventory its turn staged” states the larger candidate’s worst case'
+		);
+		// ⭑ What every caveat keeps: the lane's count before each other press, and the lower bound.
+		expect(caveat).toContain('The lane counts each press’s whole worst case before it');
+		expect(caveat, 'the caveat does not keep the lower bound').toContain('⚠ The recorded count is a lower bound');
+		expect(renderMarkdown(out), 'report.md does not carry it').toContain(`- **Caveat:** ${caveat}`);
+	});
+
+	// ⭑ THE WORDS THE REPORT CHOOSES THE CAVEAT BY ARE THE LANE'S: restated in the report (`run-report-core.ts`
+	// `SEND_COUNTED_THE_ALLOWANCE`, for `phase7-operator.ts` loads Playwright), and held equal here to the words Send's check
+	// records (`COUNTED_AHEAD.authoringAllowance`) — so a D20 run's report can never read as a run recorded before D20.
+	it('⭑ the words a D20 Send check records are the ones the report chooses the D20 caveat by', () => {
+		expect(SEND_COUNTED_THE_ALLOWANCE).toBe(COUNTED_AHEAD.authoringAllowance);
 	});
 
 	// ⛔ PREDICTED RED, read from the code: given the types, the lane took each type's latest review in the whole fork, so a

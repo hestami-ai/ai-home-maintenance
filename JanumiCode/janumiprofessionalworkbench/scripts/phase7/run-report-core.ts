@@ -202,22 +202,74 @@ export const NEGATIVE_CONTROL_RESERVE = PHASE7_NEGATIVE_CONTROL_RESERVE;
  * THE LANE HANDS THE AUTHORING REVIEW (`lane-config.ts`, `phase7AuthoringReviewAllowance`): Send's check counts it, and every
  * round of the authoring floor reserves its worst case, its types × 6, against it before its first reviewer call, a round that
  * would pass what is left calling none (`src/lib/server/assurance/review-allowance.ts`). So the rule bounds the reviewer
- * exchanges the store records — and the recorded count is still a lower bound when a capture faults. ⚠ A run recorded before
- * D20 carries the struck read; the report still lists it as it was made (`AUTHORING_INVENTORY_READ`), and its caveat is this one.
+ * exchanges the store records — and the recorded count is still a lower bound when a capture faults. ~~⚠ A run recorded before
+ * D20 carries the struck read; the report still lists it as it was made (`AUTHORING_INVENTORY_READ`), and its caveat is this
+ * one.~~ ⭐⭐ Package L2's check, finding 1 — ⛔ THAT WAS FALSE OF SUCH A RUN: its server had no allowance, and its report printed
+ * "So the rule bounds the reviewer exchanges the store records" beside its own inventory read past the limit, "nothing held back,
+ * its rounds having run inside the Send press" — the contradiction `P6X-L-M31` was added to remove. ⭐ SO THE CAVEAT IS THE
+ * RECORD'S (`limitCaveatOf`): this one where the run's Send check counted the allowance, or the run recorded no Send check; else
+ * the Send clause the lane made before D20 was true of, stated with that run's own count. The parts below are the caveat's three:
+ * the count before each press (`LIMIT_CAVEAT_COUNT`), Send's (`LIMIT_CAVEAT_SEND`), and the lower bound
+ * (`LIMIT_CAVEAT_LOWER_BOUND`).
  */
-export const LIMIT_CAVEAT =
+export const LIMIT_CAVEAT_COUNT =
 	`The lane counts each press’s whole worst case before it — a model unit’s press ${PHASE7_UNIT_REVIEWER_CALLS} reviewer calls, ` +
 	`(${LANE_BUDGET.tries} tries + ${PHASE7_REVIEWED_COMMANDS} command runs) × ${LANE_BUDGET.reviewerCallsPerTry}, its other presses each ` +
 	`theirs — with the negative control’s ${NEGATIVE_CONTROL_RESERVE} held back, and presses nothing that would pass the limit by that ` +
 	`count (REG-D-135 (4); the sponsor’s limit is ` +
-	`"about ${PAID_LIMIT.toLocaleString('en-US')}", raising REG-D-131’s). Send’s press is bounded by the allowance the lane hands ` +
+	`"about ${PAID_LIMIT.toLocaleString('en-US')}", raising REG-D-131’s). `;
+/** ⭐ D20 — Send's press, bounded by the allowance the lane hands the authoring review: a run's whose Send check counted it. */
+export const LIMIT_CAVEAT_SEND =
+	`Send’s press is bounded by the allowance the lane hands ` +
 	`the authoring review — the limit less the calls spent before the run and the negative control’s ${NEGATIVE_CONTROL_RESERVE}, ` +
 	`which Send’s check counts — for every round of the authoring floor reserves its worst case, its types × ` +
 	`${LANE_BUDGET.reviewerCallsPerTry}, against that allowance before its first reviewer call, and a round that would pass what is ` +
-	`left calls none (REG-F-580; design D20). So the rule bounds the reviewer exchanges the store records. ` +
+	`left calls none (REG-F-580; design D20). So the rule bounds the reviewer exchanges the store records. `;
+/** What no count before a press reaches, every run's: the recorded count is a lower bound when a capture faults. */
+export const LIMIT_CAVEAT_LOWER_BOUND =
 	`⚠ The recorded count is a lower bound: a call whose ` +
 	`capture faulted leaves no exchange, so the limit bounds what was recorded, and this report claims no count of calls absent ` +
 	`from the record.`;
+/** The caveat of a run the lane records under D20 — and of one that recorded no Send check (`limitCaveatOf`). */
+export const LIMIT_CAVEAT = LIMIT_CAVEAT_COUNT + LIMIT_CAVEAT_SEND + LIMIT_CAVEAT_LOWER_BOUND;
+/**
+ * ⭐⭐ Package L2's check, finding 1 — THE WORDS SEND'S CHECK RECORDS WHEN IT COUNTED THE ALLOWANCE (`phase7-operator.ts`
+ * `COUNTED_AHEAD.authoringAllowance`), by which the report tells a run the lane recorded under D20. ⛔ RESTATED, NOT IMPORTED:
+ * that module loads Playwright; `verif/phase7-half-b.test.ts` holds the two equal.
+ */
+export const SEND_COUNTED_THE_ALLOWANCE = 'the allowance the lane hands the authoring review, which no round of its floor may pass';
+/**
+ * ⭐⭐ Package L2's check, finding 1 — THE SEND CLAUSE OF A RUN RECORDED BEFORE D20, from its own Send check: the clause package
+ * L's check wrote (struck from `LIMIT_CAVEAT` by D20, above), said of that run, in the past, with the count its check recorded —
+ * its figure and its words, where it holds them. ⚠ Written for the lane from the review in parts (B6) to D20, the one before D20
+ * whose report can list the inventory counted again (`AUTHORING_INVENTORY_READ`); an older run is not told apart here (the
+ * builder's report says what its caveat does not fit).
+ */
+function limitCaveatSendBeforeD20(sendCheck: Record<string, unknown>): string {
+	const ahead = int(sendCheck.ahead);
+	const counted = str(sendCheck.counted);
+	const count =
+		ahead === null
+			? 'its check counted the authoring floor’s worst case'
+			: `its check counted ${ahead} ahead${counted === '' ? '' : ` (${counted})`}`;
+	return (
+		'⚠ Save Send’s. This run was recorded before the lane handed the authoring review an allowance (REG-F-580; design D20): ' +
+		`no candidate existed before Send, so ${count}, an estimate and not a bound, and a turn that staged more spent its ` +
+		'floor’s reviews inside the Send press, where nothing was checked — so the reviewer exchanges the store records can pass ' +
+		'the limit in that press; where the turn settled, the read “Send, counted again for the inventory its turn staged” ' +
+		'states the larger candidate’s worst case, and the limit line states the total recorded. '
+	);
+}
+/**
+ * ⭐⭐ Package L2's check, finding 1 — THE CAVEAT OF THIS RUN, BY ITS SEND CHECK (`AuthoringRecord.limitCheck`, as the lane recorded
+ * it): `LIMIT_CAVEAT` where the run recorded none — half A, a dry run, a half-B run stopped before Send: no Send press to bound
+ * — or where it counted the allowance (`SEND_COUNTED_THE_ALLOWANCE`); else the Send clause of a run recorded before D20.
+ */
+export function limitCaveatOf(sendCheck: unknown): string {
+	if (sendCheck === undefined || sendCheck === null) return LIMIT_CAVEAT;
+	if (str(rec(sendCheck).counted) === SEND_COUNTED_THE_ALLOWANCE) return LIMIT_CAVEAT;
+	return LIMIT_CAVEAT_COUNT + limitCaveatSendBeforeD20(rec(sendCheck)) + LIMIT_CAVEAT_LOWER_BOUND;
+}
 /** The declared verdicts a complete run signs off: the five units' declared policies, 2 + 2 + 4 + 3 + 3 (§3.2). */
 export const DECLARED_VERDICTS_EXPECTED = 14;
 
@@ -597,9 +649,11 @@ export interface ReviewerCalls extends ReviewerCallCount {
 	 * ⭐ `REG-D-114` (14), as amended 2026-10-16 — the plain caveat those reads carry (`LIMIT_CAVEAT`): ~~a phase's own spend can
 	 * carry the total past the limit, for the lane checks before each press, not during one~~ ⭐ (package L, D16; `REG-D-135` (4))
 	 * the lane counts each press's whole worst case before it~~, so the recorded exchanges cannot pass the limit~~ ⭐ (package L's
-	 * check, finding 1) and presses nothing past the limit by that count, save Send's, which counts the anticipated inventory, an
-	 * estimate: a larger candidate's floor can pass the limit in that press; and the recorded count is a lower bound when a
-	 * capture faults.
+	 * check, finding 1) and presses nothing past the limit by that count, ~~save Send's, which counts the anticipated inventory, an
+	 * estimate: a larger candidate's floor can pass the limit in that press~~ ⭐ (package L2, D20) Send's press bounded by the
+	 * allowance the lane hands the authoring review; and the recorded count is a lower bound when a capture faults.
+	 * ⭐⭐ Package L2's check, finding 1 — THE RUN'S OWN (`limitCaveatOf`): a run recorded before D20, its Send check counting the
+	 * anticipated inventory, reads the Send clause true of it — its count an estimate its press could pass.
 	 */
 	readonly limitCaveat: string;
 }
@@ -1818,7 +1872,8 @@ function buildReviewerCalls(ix: Index, units: readonly Unit[], lane: LaneRows): 
 			under: total === null ? null : total < PAID_LIMIT
 		},
 		laneLimitChecks: [...authoringLimitChecks(lane), ...laneUnits(lane.run).flatMap((u) => u.limitChecks)],
-		limitCaveat: LIMIT_CAVEAT
+		// ⭐⭐ Package L2's check, finding 1 — ~~`LIMIT_CAVEAT`~~ the caveat of this run, by its Send check.
+		limitCaveat: limitCaveatOf(authoringOf(lane).limitCheck)
 	};
 }
 

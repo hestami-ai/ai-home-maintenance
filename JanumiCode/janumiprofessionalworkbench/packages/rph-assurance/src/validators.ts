@@ -500,19 +500,28 @@ export function reasoningReviewResultFromJudgement(
 // follows it as a refinement: `observations[0]` — what the waiver form targets and what a reader sees first — is
 // unchanged, and every predicate keyed on the old code still fires.
 
-/** The one failure this package records under its own code: the reviewing tool reported that a model other than the
- *  configured and selected one answered, and the review was refused for it. */
+/** ~~The one failure~~ ⭐ A failure this package records under its own code: the reviewing tool reported that a model
+ *  other than the configured and selected one answered, and the review was refused for it. */
 export const VALIDATOR_MODEL_SUBSTITUTED = 'VALIDATOR_MODEL_SUBSTITUTED';
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L2's check, finding 2 (`REG-F-580`; DESIGN-data-flow-order-and-deliverable-review.md D20) —
+ * THE SECOND: the host's allowance of reviewer calls stopped the review before any call, so no reviewer ran. ⛔ Carried by
+ * nothing, the stop was recorded as a reviewer that did not execute, and the app answered it "Configure or retry the
+ * reviewer": no reviewer caused it, and a retry under the same allowance is stopped again (the app's
+ * `assurance/review-allowance.ts`; its classifier, `floor.ts`).
+ */
+export const VALIDATOR_ALLOWANCE_STOPPED = 'VALIDATOR_ALLOWANCE_STOPPED';
 
 /**
  * ⭐ THE CLOSED SET OF CODES A THROWN VALIDATOR FAILURE MAY CARRY. A code outside it is dropped, never recorded:
  * this package's observation vocabulary is not extended by whatever a Validator happens to throw.
  *
- * ⭑ The member is ALSO exported by name so the app IMPORTS it rather than restating the literal — the classifier's
- * `o.code === …` is a string comparison no compiler checks, so a restated literal that drifted would silently route
- * a refused review back to "retry the reviewer" (`REG-F-460`, reopened).
+ * ⭑ ~~The member is~~ ⭐ Each member is ALSO exported by name so the app IMPORTS it rather than restating the literal — the
+ * classifier's `o.code === …` is a string comparison no compiler checks, so a restated literal that drifted would silently
+ * route a refused review back to "retry the reviewer" (`REG-F-460`, reopened).
  */
-export const VALIDATOR_FAILURE_CODES = [VALIDATOR_MODEL_SUBSTITUTED] as const;
+export const VALIDATOR_FAILURE_CODES = [VALIDATOR_MODEL_SUBSTITUTED, VALIDATOR_ALLOWANCE_STOPPED] as const;
 export type ValidatorFailureCode = (typeof VALIDATOR_FAILURE_CODES)[number];
 
 /** What a thrown error may carry: a code in `VALIDATOR_FAILURE_CODES`, and the statement to record under it. */

@@ -140,8 +140,11 @@ bun run --filter @janumipwb/rph-demo dev
   JSON repair and one criterion repair, each run once more after a throw). A round runs only while the worst cases already
   reserved and its own stay within the allowance, so reaching it is allowed. A round that would pass it calls no reviewer:
   each type's review is recorded as one that did not execute (`VALIDATOR_EXECUTION_FAILED`, under the validator id
-  `reasoning-review.allowance-stopped`), with the reason (the round's types, its worst case and what is left), and the
-  candidate is staged blocked, not accepted. A value that is not a whole number of calls stops every round that has a type.
+  `reasoning-review.allowance-stopped`), with the reason (the round's types, its worst case and what is left) and, beside it,
+  `VALIDATOR_ALLOWANCE_STOPPED`, and the candidate is staged blocked, not accepted. The floor's guidance and the page's hint
+  say no reviewer failed, so retrying or changing the reviewer does not clear it; the round runs once its worst case fits:
+  under an allowance that holds it, read when the server starts, or for a candidate with fewer types. A value that is not a
+  whole number of calls stops every round that has a type.
   The variable is read once, at the first round, and the reservations are held in memory: restarting the server starts
   afresh. The paid execution lane (`e2e:live-exec`) sets it for a paid half-B run and refuses one exported in the shell.
 - **The gate ignores all of this.** The gate's tests and its e2e server start with these variables removed:

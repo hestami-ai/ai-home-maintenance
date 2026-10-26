@@ -136,3 +136,12 @@ export function allowanceStoppedStatement(
 		'case fits what is left, so this type is not reviewed and the candidate is not accepted.'
 	);
 }
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L2's check, finding 2 — WHAT A STOPPED PART CARRIES UNDER ITS OWN CODE, beside the stated reason
+ * (`VALIDATOR_ALLOWANCE_STOPPED`, `rph-assurance` D6; `floor.ts` `allowanceStoppedRegistry`): no reviewer failed. ⛔ Recorded as
+ * a bare execution failure, the stop was answered "Configure or retry the reviewer" — which cannot clear it.
+ */
+export const ALLOWANCE_STOPPED_NO_REVIEWER_FAILED =
+	`No reviewer failed: the authoring review’s allowance (${AUTHORING_REVIEW_ALLOWANCE_VARIABLE}) stopped this review before any ` +
+	'reviewer call, so retrying, configuring or changing the reviewer does not change it (REG-F-580; design D20).';

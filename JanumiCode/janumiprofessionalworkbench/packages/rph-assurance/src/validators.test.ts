@@ -8,6 +8,7 @@ import {
 	runDeMinimisFloor,
 	runFloorPolicies,
 	schemaInvariantValidatorInstance,
+	VALIDATOR_ALLOWANCE_STOPPED,
 	VALIDATOR_FAILURE_CODES,
 	VALIDATOR_MODEL_SUBSTITUTED,
 	validatorFailureError,
@@ -309,8 +310,9 @@ describe('⭐ D6 — a throw records VALIDATOR_EXECUTION_FAILED first, then a ca
 	});
 
 	it('⭐ an IN-SET failure adds exactly one observation, SECOND — its code and statement, MATERIAL and open', async () => {
-		// ⭑ THE CLOSED SET, PINNED: one member, by value.
-		expect(VALIDATOR_FAILURE_CODES).toEqual(['VALIDATOR_MODEL_SUBSTITUTED']);
+		// ⭑ THE CLOSED SET, PINNED: ~~one member~~ ⭐ two members (`JAN-EXEC` Phase 7, package L2's check, finding 2 — the
+		// authoring review's allowance stopping a review, `VALIDATOR_ALLOWANCE_STOPPED`), by value. MOVED DELIBERATELY.
+		expect(VALIDATOR_FAILURE_CODES).toEqual(['VALIDATOR_MODEL_SUBSTITUTED', 'VALIDATOR_ALLOWANCE_STOPPED']);
 		const recorded = [
 			executionFailed('the review was refused'),
 			{
@@ -346,6 +348,31 @@ describe('⭐ D6 — a throw records VALIDATOR_EXECUTION_FAILED first, then a ca
 			),
 			'a duck-typed carrier was not read'
 		).toEqual(recorded);
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L2's check, finding 2 (`REG-F-580`; design D20) — A REVIEW THE HOST'S ALLOWANCE STOPPED HAS
+	// A CODE OF ITS OWN. ⛔ Recorded as a causeless throw, the stop read as a reviewer that did not execute, and the app's
+	// classifier answered it "Configure or retry the reviewer" — a remedy that cannot clear it: no reviewer ran, and a stopped
+	// round reserves nothing, so a retry is stopped again. ⛔ PREDICTED RED, read from the code at de18c9e0: no such member.
+	it('⭐ the allowance’s stop is an IN-SET failure too: recorded SECOND, beside the execution failure, MATERIAL and open', async () => {
+		expect(VALIDATOR_ALLOWANCE_STOPPED).toBe('VALIDATOR_ALLOWANCE_STOPPED');
+		expect(
+			await observationsOfThrowing(
+				validatorFailureError('No reviewer call was made for this type.', {
+					code: VALIDATOR_ALLOWANCE_STOPPED,
+					statement: 'The host’s allowance stopped this review before any reviewer call.'
+				})
+			),
+			'the allowance’s stop was not recorded second, beside the execution failure'
+		).toEqual([
+			executionFailed('No reviewer call was made for this type.'),
+			{
+				code: 'VALIDATOR_ALLOWANCE_STOPPED',
+				severity: 'MATERIAL',
+				statement: 'The host’s allowance stopped this review before any reviewer call.',
+				open: true
+			}
+		]);
 	});
 
 	it('⛔ a code OUTSIDE the closed set adds nothing — a throw does not extend this package’s vocabulary', async () => {

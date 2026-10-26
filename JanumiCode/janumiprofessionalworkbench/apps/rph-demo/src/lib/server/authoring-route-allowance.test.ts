@@ -167,6 +167,8 @@ async function postInstruction(pwaId: string, instruction: string): Promise<{ ki
 interface PageData {
 	readonly floor?: { readonly satisfied: boolean; readonly reasoningGaps: readonly string[] };
 	readonly typeReviews?: readonly { readonly typeName: string; readonly disposition?: string }[];
+	/** ⭐⭐ Package L2's check, finding 2 — which sentence the page's blocked hint reads (`floorBlockedHint`). */
+	readonly floorBlockedHint?: string;
 }
 const loadThePage = async (pwaId: string): Promise<PageData> =>
 	(await load({ params: { id: pwaId } } as unknown as LoadEvent)) as PageData;
@@ -176,6 +178,16 @@ const reviews = (timeline: readonly string[]) => timeline.filter((t) => t.starts
 /** The page's reasoning-review lines that state a stop — beside each, the floor's own `validator execution failed`. */
 const stoppedGaps = (data: PageData) =>
 	(data.floor?.reasoningGaps ?? []).filter((g) => g.startsWith('No reviewer call was made for this type'));
+/** ⭐⭐ Package L2's check, finding 2 — the route's `⚠` lines: the floor's guidance, as the transcript records it. */
+const warnings = (events: readonly { kind: string; text?: string }[]) =>
+	events.filter((e) => e.kind === 'status' && e.text?.startsWith('⚠ ')).map((e) => e.text!);
+/** What the stop's guidance says clears it, and what does not — two of its sentences, whole (`floor-allowance.test.ts` holds it all). */
+const NO_REVIEWER_FAILED_FIX =
+	'No reviewer failed, so retrying, configuring or changing the reviewer does not fix this, and a stopped round reserves ' +
+	'nothing: the same candidate is stopped again while this server runs.';
+const WHAT_CLEARS_IT =
+	'The round runs once its worst case fits — under an allowance that holds it, which the server reads when it starts, or ' +
+	'for a candidate with fewer types, where what is left holds their round.';
 
 beforeEach(() => {
 	clearAuthoringTurns();
@@ -209,8 +221,22 @@ describe('⭐⭐ L2 — D20, through the route: the process’s allowance bounds
 		expect(turn.status, 'a candidate whose round the allowance stopped was accepted or sent for revision').toBe(
 			'BLOCKED_EXTERNAL'
 		);
-		expect(summarizeAuthoringTurn(turn).remediationAction).toBe('RETRY_OR_CONFIGURE_REVIEWER');
+		// ⭐⭐ MOVED DELIBERATELY by package L2's check, finding 2: ~~`'RETRY_OR_CONFIGURE_REVIEWER'`~~ — the stop's own action,
+		// and the transcript's line its own guidance. ⛔ PREDICTED RED, read from the code at de18c9e0: the route sent and
+		// recorded "Configure or retry the reviewer" for a stop no reviewer caused, and the page said revising does not address
+		// it, where a candidate with fewer types does.
+		expect(summarizeAuthoringTurn(turn).remediationAction).toBe('FIT_THE_REVIEW_ALLOWANCE');
+		const warned = warnings(events);
+		expect(warned, 'the route did not send the floor’s guidance once').toHaveLength(1);
+		expect(warned[0], 'the transcript tells the stop to retry the reviewer').not.toContain('Configure or retry the reviewer');
+		expect(warned[0]).toContain(NO_REVIEWER_FAILED_FIX);
+		expect(warned[0]).toContain(WHAT_CLEARS_IT);
+		// ⭑ And the turn records the same guidance as its detail, which the page's resume banner reads.
+		expect(`⚠ ${summarizeAuthoringTurn(turn).detail}`, 'the turn’s recorded detail is not the line the route sent').toBe(
+			warned[0]
+		);
 		const data = await loadThePage(pwaId);
+		expect(data.floorBlockedHint, 'the page’s hint for the stop').toBe('FIT_THE_ALLOWANCE');
 		expect(data.floor?.satisfied).toBe(false);
 		const stated = stoppedGaps(data);
 		expect(stated, 'the page does not say, for each type, why the round made no call').toHaveLength(2);
@@ -244,7 +270,10 @@ describe('⭐⭐ L2 — D20, through the route: the process’s allowance bounds
 		]);
 		expect(reviews(second), 'the refinement’s round made reviewer calls past what the first left').toEqual([]);
 		expect(getPendingAuthoringTurn(pwaId)?.status).toBe('BLOCKED_EXTERNAL');
+		// ⭐⭐ Package L2's check, finding 2 — the refinement's stop is answered as the first round's would be.
+		expect(summarizeAuthoringTurn(getPendingAuthoringTurn(pwaId)!).remediationAction).toBe('FIT_THE_REVIEW_ALLOWANCE');
 		const data = await loadThePage(pwaId);
+		expect(data.floorBlockedHint).toBe('FIT_THE_ALLOWANCE');
 		const stated = stoppedGaps(data);
 		expect(stated, 'the page does not read the refinement round’s reason, for each of its types').toHaveLength(4);
 		expect(stated[0]).toContain(

@@ -18,8 +18,10 @@ import {
 	FLOOR_POLICY_IDS,
 	REVIEWER_RECOMMENDED_ESCALATION,
 	runFloorPolicies,
+	VALIDATOR_ALLOWANCE_STOPPED,
 	VALIDATOR_FAILURE_CODES,
 	VALIDATOR_MODEL_SUBSTITUTED,
+	validatorFailureError,
 	type AssuranceRecordingPlan,
 	type AssuranceSubject,
 	type ComposeOptions,
@@ -49,7 +51,9 @@ import { pwaTypeReviewInput } from './assurance/review-input.js';
 import { stipulationFor } from './stipulations.js';
 import { REVIEWER_CALLS_PER_REVIEW, type AgyPrint } from './assurance/reasoning-review-validator.js';
 import {
+	ALLOWANCE_STOPPED_NO_REVIEWER_FAILED,
 	allowanceStoppedStatement,
+	AUTHORING_REVIEW_ALLOWANCE_VARIABLE,
 	processAuthoringReviewAllowance,
 	type AuthoringReviewAllowance,
 	type RoundStop
@@ -299,7 +303,11 @@ export interface FloorView {
  *  the graph in response would hide the failed control behind unrelated semantic mutation.
  *
  *  ⛔ A NEW MEMBER IS ALSO A NEW CASE IN `isOperationalRemediation`, below, whose `never` default refuses to compile
- *  without one — the authoring route's disposition keys on it. */
+ *  without one — the authoring route's disposition keys on it.
+ *  ⭐⭐ `JAN-EXEC` Phase 7, package L2's check, finding 2 (`REG-F-580`; design D20) — `FIT_THE_REVIEW_ALLOWANCE`: the authoring
+ *  review's allowance stopped the round before any reviewer call (`VALIDATOR_ALLOWANCE_STOPPED`). Operational — no reviewer
+ *  judged the subject, so nothing goes back as a finding and the candidate is staged `BLOCKED_EXTERNAL` — but answered by a
+ *  round that fits the allowance, never by the reviewer. */
 export type FloorRemediationAction =
 	| 'NONE'
 	| 'REFINE_SUBJECT'
@@ -307,7 +315,8 @@ export type FloorRemediationAction =
 	| 'REQUALIFY_OR_RESELECT_REVIEWER'
 	| 'CHANGE_REVIEWER'
 	| 'ESCALATE_REVIEW'
-	| 'RESOLVE_OTHER_FLOOR_FINDINGS';
+	| 'RESOLVE_OTHER_FLOOR_FINDINGS'
+	| 'FIT_THE_REVIEW_ALLOWANCE';
 
 /**
  * ⭐ `JAN-SELRES` D7 — IS THIS A PROBLEM WITH THE REVIEW, NOT WITH THE SUBJECT? The authoring route marks a staged
@@ -319,6 +328,8 @@ export type FloorRemediationAction =
  */
 export function isOperationalRemediation(action: FloorRemediationAction): boolean {
 	switch (action) {
+		// ⭐⭐ Package L2's check, finding 2 — a round the allowance stopped: no reviewer judged the subject.
+		case 'FIT_THE_REVIEW_ALLOWANCE':
 		case 'RETRY_OR_CONFIGURE_REVIEWER':
 		case 'REQUALIFY_OR_RESELECT_REVIEWER':
 		case 'CHANGE_REVIEWER':
@@ -367,7 +378,8 @@ export interface FloorRemediation {
  * execution failure (beside which any future member of `VALIDATOR_FAILURE_CODES` is recorded) and the independence
  * violation — so no observation the filter reads carries one, and a mutant of the membership is EQUIVALENT today. The
  * filter is defence in depth: a reordered or dropped branch still cannot send a failure of the review to the producer
- * as a finding about the subject.
+ * as a finding about the subject. ⭐ Package L2's check, finding 2 — the allowance's stop (`VALIDATOR_ALLOWANCE_STOPPED`) is a
+ * member too, with its own branch ahead of the filter.
  */
 const OPERATIONAL_REVIEW_CODES: ReadonlySet<string> = new Set([
 	'VALIDATOR_EXECUTION_FAILED',
@@ -410,6 +422,9 @@ const FEEDS_BACK_TO_PRODUCER: ReadonlySet<string> = new Set(['REJECTED', 'CONDIT
  * configured and selected one, recorded as `VALIDATOR_MODEL_SUBSTITUTED` beside it (`rph-assurance` D6). Retrying or
  * reconfiguring would bill another call to the same substitute, so it is answered by re-qualification or re-selection;
  * every other execution failure is still answered by repairing, retrying or changing the independent Validator.
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L2's check, finding 2 — AND A SECOND: a round the authoring review's allowance stopped before
+ * any reviewer call, recorded as `VALIDATOR_ALLOWANCE_STOPPED` beside it. No reviewer ran, so it is answered by a round that
+ * fits the allowance (`FIT_THE_REVIEW_ALLOWANCE`), never by retrying or changing the reviewer.
  */
 export function classifyFloorRemediation(floor: FloorView): FloorRemediation {
 	if (floor.satisfied) {
@@ -444,6 +459,28 @@ export function classifyFloorRemediation(floor: FloorView): FloorRemediation {
 	// ⭐ E1 — a round in parts whose concluded parts ask for revision, beside parts whose reviews failed operationally.
 	const revision = revisionBesideFailedParts(floor);
 	if (revision !== undefined) return revision;
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L2's check, finding 2 (`REG-F-580`; design D20) — A ROUND THE AUTHORING REVIEW'S ALLOWANCE
+	// STOPPED, BEFORE ANY OTHER FAILED REVIEW. ⭑ Before the substitution's branch or after it is one: a stopped round calls no
+	// reviewer, so it never carries a substitution. ⛔ BEFORE THE EXECUTION FAILURE, AND IT MUST BE: the stop is recorded
+	// beside `VALIDATOR_EXECUTION_FAILED` too (`allowanceStoppedRegistry`, below), and answered there it read "Configure or
+	// retry the reviewer" — no reviewer ran, and a stopped round reserves nothing, so a retry is stopped again; and the page
+	// said revising does not address it, where a candidate with fewer types can fit. ⚠ The guidance is the agent's wording,
+	// flagged for the lead, as `REG-D-087`'s was.
+	if (review.observations.some((o) => o.code === VALIDATOR_ALLOWANCE_STOPPED)) {
+		return {
+			action: 'FIT_THE_REVIEW_ALLOWANCE',
+			autoRefine: false,
+			findings: [],
+			guidance:
+				`PublishPwa remains blocked because the authoring review’s allowance (${AUTHORING_REVIEW_ALLOWANCE_VARIABLE}) stopped the ` +
+				'Reasoning Review’s round before its first reviewer call: the round’s worst case, its types × the calls a review may ' +
+				'make, did not fit what the allowance has left. No reviewer failed, so retrying, configuring or changing the reviewer ' +
+				'does not fix this, and a stopped round reserves nothing: the same candidate is stopped again while this server runs. ' +
+				'The round runs once its worst case fits — under an allowance that holds it, which the server reads when it starts, or ' +
+				'for a candidate with fewer types, where what is left holds their round. Do not record a waiver in response to this stop.'
+		};
+	}
 
 	// ⭐ `JAN-SELRES` D7 — A SUBSTITUTED MODEL, BEFORE ANY OTHER FAILED REVIEW. ⛔ BEFORE, AND IT MUST BE: the substitution
 	// is always recorded BESIDE `VALIDATOR_EXECUTION_FAILED` (it refines it, `rph-assurance` D6), so the execution-failure
@@ -656,10 +693,16 @@ export function refineDirective(
 	].join('\n');
 }
 
-/** Which of ~~three~~ ~~four~~ five sentences the PWA page's blocked hint reads — see `floorBlockedHint`. ⭐ `JAN-ESCREC` D3
- *  added `'ROUTE_TO_HUMAN'`; ⭐ the review in parts, package E, E1, `'REVISE_BESIDE_FAILED_REVIEWS'`. */
+/** Which of ~~three~~ ~~four~~ ~~five~~ six sentences the PWA page's blocked hint reads — see `floorBlockedHint`. ⭐ `JAN-ESCREC` D3
+ *  added `'ROUTE_TO_HUMAN'`; ⭐ the review in parts, package E, E1, `'REVISE_BESIDE_FAILED_REVIEWS'`; ⭐ `JAN-EXEC` Phase 7, package
+ *  L2's check, finding 2, `'FIT_THE_ALLOWANCE'`. */
 export type FloorBlockedHint =
-	'REVISE' | 'NOT_BY_REVISION' | 'REVISE_AND_REVIEW' | 'ROUTE_TO_HUMAN' | 'REVISE_BESIDE_FAILED_REVIEWS';
+	| 'REVISE'
+	| 'NOT_BY_REVISION'
+	| 'REVISE_AND_REVIEW'
+	| 'ROUTE_TO_HUMAN'
+	| 'REVISE_BESIDE_FAILED_REVIEWS'
+	| 'FIT_THE_ALLOWANCE';
 
 /**
  * ⭐ `JAN-ESCREC` D3 — DOES A FLOOR POLICY OTHER THAN THE REVIEW RECORD A FINDING AGAINST THE GRAPH? The question the last
@@ -702,6 +745,13 @@ function rejectsTheGraph(floor: FloorView): boolean {
  *     failed parts are reviewed again, with every part, when the floor re-runs. The page names them beside the sentence
  *     (`floorFailedReviews`, `routes/pwa/[id]/+page.server.ts`). ⛔ Asked one line BEFORE the `'REVISE'` line, which would
  *     take it first, so that line stays byte-identical.
+ *   · ⭐⭐ `'FIT_THE_ALLOWANCE'` (`JAN-EXEC` Phase 7, package L2's check, finding 2; `REG-F-580`; design D20) — the classifier
+ *     answers `FIT_THE_REVIEW_ALLOWANCE`: the authoring review's allowance stopped the round before any reviewer call. ⛔ It
+ *     read `'NOT_BY_REVISION'`, "revising it does not address this" — false: a candidate with fewer types can fit what is
+ *     left — and retrying the reviewer, which its sentence's "the review's own cause" invites, cannot clear it. So the page
+ *     says what stopped it, that retrying or changing the reviewer does not address it, to revise the graph for any findings
+ *     the floor records against it (so it is true beside a REJECTED non-review policy too, and answers both shapes), and what
+ *     lets the review run. ⛔ Asked one line AFTER the `'ROUTE_TO_HUMAN'` line, so every line above stays byte-identical.
  *
  * ⛔ THE FLOOR'S OWN CLASSIFIER DECIDES WHETHER THE REVIEW IS THE PROBLEM, so the hint and the guidance cannot disagree
  * about the review. This function adds only what the classifier does not ask when it answers an operational review:
@@ -739,6 +789,7 @@ export function floorBlockedHint(floor: FloorView): FloorBlockedHint | undefined
 	if (classifyFloorRemediation(floor).failedParts !== undefined) return 'REVISE_BESIDE_FAILED_REVIEWS';
 	if (!isOperationalRemediation(classifyFloorRemediation(floor).action)) return 'REVISE';
 	if (classifyFloorRemediation(floor).action === 'ESCALATE_REVIEW' && !rejectsTheGraph(floor)) return 'ROUTE_TO_HUMAN';
+	if (classifyFloorRemediation(floor).action === 'FIT_THE_REVIEW_ALLOWANCE') return 'FIT_THE_ALLOWANCE';
 	return floor.policies.some(
 		(p) => p.policyId !== FLOOR_POLICY_IDS.REASONING_REVIEW && p.disposition === 'REJECTED'
 	)
@@ -803,6 +854,9 @@ export function escalationRecommendationNote(
 		// ⭐ Package E, E1 — the findings of the parts whose reviews concluded are addressed first, beside those that failed.
 		case 'REVISE_BESIDE_FAILED_REVIEWS':
 			return 'BESIDE_FINDINGS';
+		// ⭐⭐ Package L2's check, finding 2 — a round the allowance stopped called no reviewer, so no recommendation is recorded
+		// beside it in the product; where one is (a staged record), the review it sits with reached no usable verdict.
+		case 'FIT_THE_ALLOWANCE':
 		case 'NOT_BY_REVISION':
 			return 'WITH_AN_INCOMPLETE_REVIEW';
 		// ⭑ ROUTE_TO_HUMAN says the escalation itself. And a SATISFIED floor's hint is `undefined` (`floorBlockedHint`'s first
@@ -1145,6 +1199,9 @@ export const ALLOWANCE_STOPPED_REVIEWER_ID = 'reasoning-review.allowance-stopped
  * records that failure as it records any — `VALIDATOR_EXECUTION_FAILED`, the review INCONCLUSIVE (`rph-assurance`
  * `runFloorPolicies`), as a refused selection's is (`assurance/index.ts`, `unconfiguredReviewer`) — so the stop is legible in the
  * record and on the page, the review is not SATISFIED, and the candidate is not accepted; nothing is thrown out of the floor.
+ * ⭐⭐ Package L2's check, finding 2 — AND THE FAILURE CARRIES ITS OWN CODE (`VALIDATOR_ALLOWANCE_STOPPED`, `rph-assurance` D6), recorded
+ * second, beside the stated reason, as a refused substitute's is: so the classifier answers the stop by what clears it
+ * (`FIT_THE_REVIEW_ALLOWANCE`), never "Configure or retry the reviewer". ⛔ A plain `Error` carried nothing, and was answered so.
  */
 function allowanceStoppedRegistry(stop: RoundStop, parts: readonly PwaTypePart[]): ValidatorRegistry {
 	const named = new Map(parts.map((p) => [p.typeId, p.subject.type.name]));
@@ -1154,12 +1211,13 @@ function allowanceStoppedRegistry(stop: RoundStop, parts: readonly PwaTypePart[]
 		validatorId: ALLOWANCE_STOPPED_REVIEWER_ID,
 		evaluate: (subject) =>
 			Promise.reject(
-				new Error(
+				validatorFailureError(
 					allowanceStoppedStatement(
 						stop,
 						{ parts: parts.length, callsPerReview: REVIEWER_CALLS_PER_REVIEW },
 						{ typeId: subject.subjectId, typeName: named.get(subject.subjectId) ?? subject.subjectId }
-					)
+					),
+					{ code: VALIDATOR_ALLOWANCE_STOPPED, statement: ALLOWANCE_STOPPED_NO_REVIEWER_FAILED }
 				)
 			)
 	});

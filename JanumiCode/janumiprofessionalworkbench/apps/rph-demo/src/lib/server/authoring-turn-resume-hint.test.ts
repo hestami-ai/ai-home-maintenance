@@ -37,7 +37,10 @@ const NOT_AN_ESCALATION = {
 	RETRY_OR_CONFIGURE_REVIEWER: true,
 	REQUALIFY_OR_RESELECT_REVIEWER: true,
 	CHANGE_REVIEWER: true,
-	RESOLVE_OTHER_FLOOR_FINDINGS: true
+	RESOLVE_OTHER_FLOOR_FINDINGS: true,
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L2's check, finding 2 — a round the authoring review's allowance stopped: no verdict, and
+	// no escalation named; its detail is its own guidance.
+	FIT_THE_REVIEW_ALLOWANCE: true
 } as const satisfies Record<Exclude<FloorRemediationAction, 'ESCALATE_REVIEW'>, true>;
 
 /** ⛔ EVERY STATUS THE PAGE DOES NOT OFFER TO RESUME — exhaustive by construction, as above. */

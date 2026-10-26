@@ -167,6 +167,25 @@ const CASES: Readonly<
 	ESCALATE_REVIEW: {
 		view: unsatisfied(review({ disposition: 'ESCALATED' })),
 		status: 'BLOCKED_EXTERNAL'
+	},
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L2's check, finding 2 — a round the authoring review's allowance stopped: the review's
+	// problem, never the subject's, so the candidate is staged BLOCKED_EXTERNAL (its recorded shape, `floor-allowance.test.ts`).
+	FIT_THE_REVIEW_ALLOWANCE: {
+		view: unsatisfied(
+			review({
+				disposition: 'INCONCLUSIVE',
+				independenceOk: false,
+				observations: [
+					executionFailed,
+					{
+						code: 'VALIDATOR_ALLOWANCE_STOPPED',
+						severity: 'MATERIAL',
+						statement: 'No reviewer failed: the authoring review’s allowance stopped this review before any reviewer call.'
+					}
+				]
+			})
+		),
+		status: 'BLOCKED_EXTERNAL'
 	}
 };
 
