@@ -2160,7 +2160,7 @@ Phase 0** — a recording of the wrong bytes replays a different run.
 
 **Programme:** `JAN-EXEC` Phase 7, after run-12.
 **Design:** `DESIGN-data-flow-order-and-deliverable-review.md`, revision 1, 2026-10-25.
-**Status:** ~~revision 1, 2026-10-25. L, M, N, V and P are the build, qualification and run order (design D18). No step below is built. Case set v12's new cases and expected verdicts await the sponsor's confirmation before any paid measurement.~~ ~~revision 2, 2026-10-25 (`REG-F-580`). L is built and merged (`2c46dfa6`); L2 (D20) follows; M and N are being built. Case set v12's new cases and expected verdicts await the sponsor's confirmation before any paid measurement.~~ revision 3, 2026-10-26 (`REG-F-581`, `REG-F-582`). L is merged; L2, M and N are built and checked and being integrated; O (D21-D27) follows; then V.
+**Status:** ~~revision 1, 2026-10-25. L, M, N, V and P are the build, qualification and run order (design D18). No step below is built. Case set v12's new cases and expected verdicts await the sponsor's confirmation before any paid measurement.~~ ~~revision 2, 2026-10-25 (`REG-F-580`). L is built and merged (`2c46dfa6`); L2 (D20) follows; M and N are being built. Case set v12's new cases and expected verdicts await the sponsor's confirmation before any paid measurement.~~ ~~revision 3, 2026-10-26 (`REG-F-581`, `REG-F-582`). L is merged; L2, M and N are built and checked and being integrated; O (D21-D27) follows; then V.~~ revision 3, 2026-10-26 (`REG-D-136`). L, L2, M and N are integrated (`1a2270f6`); O is being built; case set v12's content and oracles are confirmed; V builds and measures it next; then P.
 
 ### 9b.1 The build rule
 
@@ -2275,6 +2275,10 @@ Phase 0** — a recording of the wrong bytes replays a different run.
 - **Planned measurement.** About 116 reviewer calls (`fixes-facts.md`, §6): 26 for WORK_PRODUCT, 28 for PROCESS_RESULT, 28 for DECLARED_POLICY, about 20 for new cases, 2 for the canary and up to about 12 for recorded evaluations needing paid re-runs. The lead's earlier estimate was about 90 before the declared-policy deliverable view added about 28. These are planning figures.
 - **Record and gate.** Record the confirmed oracles, measured evaluations, prompt and repair fingerprints, and required qualification lines. Require `reviewer:qual:check` GREEN, `bun run gate:fast` green and the integrated changes pushed before P.
 - **Report before P (D19).** Report actual qualification calls, programme spend and remaining allowance to the sponsor before P6 again.
+- ⭑ **2026-10-26 — case set v12 confirmed as proposed** (`REG-D-136`).
+  - **Content.** 91 cases: 35 unchanged PWA_TYPE; 13 re-cast and 11 new WORK_PRODUCT; 14 re-cast and 4 new PROCESS_RESULT; 14 re-cast DECLARED_POLICY. The 13 text-only W12 cases and 10 text-only D12 cases carry production's empty view; the 4 file-judging D12 cases carry their files and sequence.
+  - **Moved oracles.** P12-RR-01 stays REJECTED, moving RR-01 to RR-04. P12-RR-02 stays REJECTED, moving RR-02 to RR-08. P12-RR-03 moves from REJECTED to SATISFIED; its defect is judged in W12-CSV-RR-03, REJECTED on RR-03. Other carried oracles stay unchanged; the 15 new cases have new oracles.
+  - **Build and measurement owed.** Reproduce the prototype's prompts hash for hash. Measure 56 new or changed cases at 2 repetitions, 112 calls, plus a 2-call canary. Add paid re-runs of any recorded evaluation of the 35 unchanged PWA_TYPE cases that the criterion repair makes unrescorable, up to about 12 after checking the record. Plan about 114-126 calls from 1,001 spent, under about 2,400. The offline panel's agreement on 56 of 56 checks the cases; it supplies no paid measurement of the reviewer.
 
 ### 9b.6 P — P6 again, its report, then P7
 
