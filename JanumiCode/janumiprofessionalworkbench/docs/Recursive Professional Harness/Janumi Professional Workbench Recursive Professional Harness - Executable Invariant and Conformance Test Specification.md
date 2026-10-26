@@ -721,6 +721,36 @@ A successor revision or successor PWU is required.
 
 ---
 
+## RPH-PWU-011 — A PWU enters readiness only when the units it waits for are accepted
+
+*Added 2026-10-25 (JAN-EXEC Phase 7, package M), under the sponsor's ruling REG-D-135 (2) and DESIGN-data-flow-order-and-deliverable-review.md D1-D2; not in this specification's initial baseline.*
+
+**Given**
+
+a PWU whose `dependencyIds` — the units producing its required inputs, and its children, recorded at instantiation — name a unit that is not accepted (`SATISFIED`, `RECOMPOSED` or `BASELINED`; `CONDITIONALLY_SATISFIED` does not count), or name no unit of its Undertaking;
+
+**Or**
+
+a PWU one of whose `inputRequirements` is recorded as produced by no unit of its Undertaking.
+
+**When**
+
+`MarkPwuReady` is issued;
+
+**Or when**
+
+`StartExecutionStep` or `ResolveExecutionStepWait` is issued on a step of a plan whose work unit is that PWU, whether or not the PWU ever passed `MarkPwuReady`.
+
+**Then**
+
+* the command is rejected, naming each unit the PWU waits for;
+* the PWU does not enter `READY`, and the step does not enter `RUNNING`;
+* no model or reviewer call is made.
+
+*Amended 2026-10-26 (package M's independent check, its finding 1): the step start was added. `READY` is the one door to the PWU's `PLANNED` and `EXECUTING`, but a plan's commands ask only that its PWU be open (RPH-PWU-010), so a host that never issued `MarkPwuReady` could otherwise start a waiting PWU's step.*
+
+---
+
 # 9. Decomposition Tests
 
 ## RPH-DEC-001 — Valid decomposition

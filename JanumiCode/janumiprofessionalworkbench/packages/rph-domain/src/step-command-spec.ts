@@ -158,7 +158,11 @@ export type BindingAuthority = 'REQUIRES_AUTHORIZED_BINDING' | 'NOT_EXECUTING';
 /** REQUIRES_PRESENT_INPUTS: drives the step into RUNNING, where its declared inputs are actually consumed, so a
  *  required input artifact that does not resolve must leave it not ready (RPH-EXE-005). NOT_CONSUMING: the command
  *  settles, suspends, abandons or waives the step without reading its inputs, so their presence cannot bear on it —
- *  and gating them would STRAND a step whose missing input is precisely why it is being cancelled or skipped. */
+ *  and gating them would STRAND a step whose missing input is precisely why it is being cancelled or skipped.
+ *  ⭐ 2026-10-26 (`JAN-EXEC` Phase 7, package M; `REG-D-135` (2)): the column now carries a SECOND rule over the same
+ *  arrows — RPH-PWU-011's step half. A unit's inputs at its own grain are the accepted work of the units it waits for, so
+ *  REQUIRES_PRESENT_INPUTS also refuses a step whose plan's work unit waits for a unit not accepted or for an input nothing
+ *  produces (`unitReadinessRefusal`, execution.ts) — which `MarkPwuReady` alone could not, for a plan made without it. */
 export type InputReadiness = 'REQUIRES_PRESENT_INPUTS' | 'NOT_CONSUMING';
 
 /** CONSUMES_RETRY_BUDGET: this command spends one of the plan's finite re-attempts, so RPH-EXE-008's cap governs

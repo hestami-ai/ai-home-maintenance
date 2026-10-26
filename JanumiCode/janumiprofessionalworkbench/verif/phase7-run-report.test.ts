@@ -3386,6 +3386,83 @@ describe('JAN-EXEC P7-2 D6 — finalize-run: the whole run folder, copied once, 
 	});
 });
 
+// ── ⭐⭐ `JAN-EXEC` Phase 7, package M — THE REPORT READS THE PRESS ORDER FROM THE RECORD (`REG-D-135` (2); design D6) ────────
+// The lane now presses only what the page offers, the root last, and records the order it pressed in (`order.pressed`) and
+// what each unit waits for (`order.dependencies`). An archive is taken after each press, in that order, so the capture
+// folders each archive GAINED (K5) are over the archive pressed before it, never the one numbered before it.
+
+/** `aRun`'s rows as the lane records a run now: the root pressed LAST — its archive taken after every phase's, holding what they captured — and the order in run.json. */
+function pressedLast(run: ReturnType<typeof aRun>): ReturnType<typeof aRun> {
+	const phases = run.lane.archives.filter((a) => a.name !== '01-root');
+	const root = { name: '01-root', workspaceTree: null, captures: [...(phases.at(-1)?.captures ?? [])] };
+	const record = run.lane.run as Record<string, unknown>;
+	return {
+		store: run.store,
+		lane: {
+			...run.lane,
+			archives: [...phases, root],
+			run: {
+				...record,
+				order: {
+					pressed: ['requirements', 'design', 'implementation', 'end-to-end', 'root'],
+					dependencies: { root: ['requirements', 'design', 'implementation', 'end-to-end'], requirements: [], design: [], implementation: [], 'end-to-end': [] }
+				}
+			}
+		}
+	};
+}
+
+describe('⭐⭐ package M (D6) — the run report reads the PRESS ORDER from the lane’s record', () => {
+	it('⭐ THE PREDICTED RED — K5 is read over the archive pressed BEFORE each unit’s: the first press, requirements, keeps its unrecorded run; the root, pressed last, gained none', () => {
+		const r = reportOf(pressedLast(aRun({ requirements: { commands: 1, captures: 2, k5: causes('own') } }))).report;
+		const runs = (slug: string) => r.units.find((u) => u.slug === slug)?.runs;
+		expect(runs('requirements'), 'the first press was diffed with an archive taken after it').toMatchObject({
+			recorded: 1,
+			captured: 2,
+			unrecorded: 1
+		});
+		expect(runs('root'), 'the root, pressed last, was charged the runs of the phases before it').toMatchObject({
+			recorded: 0,
+			captured: 0,
+			unrecorded: 0
+		});
+		expect(r.manifest.unrecordedRuns.requirements).toBe(1);
+	});
+
+	it('⭐ the press order is the record’s, stated in report.json and in the summary', () => {
+		const r = reportOf(pressedLast(aRun()));
+		expect(r.report.run.pressOrder).toEqual(['requirements', 'design', 'implementation', 'end-to-end', 'root']);
+		expect(renderMarkdown(r.report)).toContain(
+			'- **Press order:** requirements, design, implementation, end-to-end, root — as the lane recorded it (lane/run.json `order.pressed`).'
+		);
+	});
+
+	it('⭑ CONTROL — a record made before package M holds no press order: none is invented, and the summary says whose order the lane then kept', () => {
+		const r = reportOf(aRun());
+		expect(r.report.run.pressOrder).toBeNull();
+		expect(renderMarkdown(r.report)).toContain(
+			'- **Press order:** not recorded — a record made before package M, whose lane pressed the root first, then the phases in the tree’s order, and signed them off after.'
+		);
+		// ⭑ And its K5 reads as it always did: each archive over the one numbered before it, the root's holding nothing.
+		const old = r.report.units.find((u) => u.slug === 'requirements')?.runs;
+		expect(old).toMatchObject({ captured: 0, unrecorded: 0 });
+	});
+
+	it('⭐ D4 — a unit the lane never pressed is reported NOT REACHED, in the page’s own words from the record', () => {
+		const run = pressedLast(aRun({ 'end-to-end': { begun: false } }));
+		const record = run.lane.run as { units: Record<string, unknown>[] };
+		const units = record.units.map((u) =>
+			u.slug === 'end-to-end' ? { ...u, notStarted: 'not started: it waits for "Implementation and unit tests" (EXECUTING) to be accepted' } : u
+		);
+		const r = reportOf({ store: run.store, lane: { ...run.lane, run: { ...record, units } } }).report;
+		const c = cellOf(r, '3', 'end-to-end');
+		expect(c.value).toBe('not reached');
+		expect(c.basis).toEqual([
+			'Begin & Execute was never pressed on this phase — the lane’s record: not started: it waits for "Implementation and unit tests" (EXECUTING) to be accepted'
+		]);
+	});
+});
+
 // ── ⭐⭐ `JAN-EXEC` Phase 7 P5, package B — THE REPORT READS A RUN AS P5 WENT ───────────────────────────────────────────────────
 //
 // P5's report read design's floor (5a) "broke" over a superseded plan's refused reviews; counted design's re-run's three runs

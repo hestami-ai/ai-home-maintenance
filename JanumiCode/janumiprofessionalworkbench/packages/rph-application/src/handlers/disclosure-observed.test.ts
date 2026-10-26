@@ -1528,6 +1528,7 @@ describe('the register\'s RPH-EVD disclosures are OBSERVED, not asserted', () =>
 		'RPH-EXE-009': null,
 		'RPH-PWU-009': null,
 		'RPH-PWU-010': null,
+		'RPH-PWU-011': null, // ENFORCED (package M) — its refusal is probed in execrem-wp16-enforcement-observed.test.ts
 		'RPH-EVD-002': null,
 		'RPH-EVD-005': null,
 		'RPH-EVD-006': null,

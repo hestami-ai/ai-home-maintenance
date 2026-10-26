@@ -62,6 +62,7 @@ import {
 	type GatePlan,
 	type StepCommandSpec
 } from '@janumipwb/rph-domain';
+import { readinessUnitOf, startReadiness, startRefusal } from '@janumipwb/rph-projections';
 import {
 	advanceStatus,
 	checkTransition,
@@ -759,8 +760,57 @@ function stepAuthorityRefusal(
 	if (spec.inputReadiness === 'REQUIRES_PRESENT_INPUTS') {
 		const refusal = inputReadinessRefusal(ctx, command, step, stepId);
 		if (refusal) return refusal;
+		// ⭐ RPH-PWU-011's STEP HALF (`JAN-EXEC` Phase 7, package M, after its independent check, 2026-10-26). The same two
+		// arrows consume the UNIT's inputs too — the accepted work of the units it waits for — so the readiness rule is asked
+		// here, over the plan's work unit, as well as at `MarkPwuReady`. See `unitReadinessRefusal` for why both.
+		const waiting = unitReadinessRefusal(ctx, command, String(plan.workUnitId), stepId);
+		if (waiting) return waiting;
 	}
 	return null;
+}
+
+/**
+ * ⭐⭐ RPH-PWU-011 AT THE TWO ARROWS INTO RUNNING (`REG-D-135` (2); design D2; `JAN-EXEC` Phase 7, package M) — a step of a
+ * plan whose work unit waits for a unit not yet ACCEPTED (SATISFIED, RECOMPOSED or BASELINED; CONDITIONALLY_SATISFIED does
+ * not count, DEC-6), or for an input nothing produces, does not run: refused, each unit it waits for named, before any
+ * model or tool invocation. The SAME rule as `MarkPwuReady`'s (`startReadiness`, rph-projections), over the same record.
+ *
+ * ⛔ WHY MarkPwuReady ALONE WAS NOT ENOUGH, found by the package's independent check (2026-10-26) and driven through the bus
+ * before this was written (`pwu-start-readiness.test.ts`, "the step start refuses too"): READY is the one door to the unit's
+ * PLANNED and EXECUTING states, but NOT to a step's execution. The plan commands ask only that the unit be OPEN
+ * (`pwuOpennessRefusal`, RPH-PWU-010), and a PROPOSED unit is open — so a host that never sent `MarkPwuReady` could propose,
+ * approve and activate a plan on a consumer whose producer was PROPOSED and start its step RUNNING. The demo was not exposed
+ * (its plans are made by Begin & Execute's batch, which passes `MarkPwuReady`, or for a unit already EXECUTING); any other
+ * host of the engine was.
+ *
+ * ⭐ WHY HERE, IN THE `inputReadiness` LIMB, AND NOT AT ACTIVATION. This limb is declared for exactly the commands that drive
+ * a step into RUNNING — Start, and the resume (`ResolveExecutionStepWait`) — because those are where inputs are consumed and
+ * attempts execute; seating a RUNNING-arrow rule at one of them is the omission that made the binding limb a BLOCKER. A
+ * unit's producers' accepted work IS its input at the unit's grain, so the column's question is this rule's question. So a
+ * resume is refused too when a producer stopped being accepted while the step waited (INVALIDATED, say): the step would
+ * otherwise go on consuming work that is no longer assured. Activation opens no attempt and invokes nothing, and a plan
+ * activated while its unit's producers were accepted can outlive their acceptance — so a seat there alone would not hold,
+ * and beside this one it would add a refusal and no guarantee.
+ */
+function unitReadinessRefusal(
+	ctx: HandlerContext,
+	command: DomainCommand,
+	workUnitId: string,
+	stepId: string
+): ReturnType<typeof reject> | null {
+	const start = startReadiness(workUnitId, (id) =>
+		readinessUnitOf(
+			id,
+			ctx.store.loadObject(id)?.state as Readonly<Record<string, unknown>> | undefined
+		)
+	);
+	if (start.startable) return null;
+	return reject(
+		command,
+		'RPH_INVARIANT_VIOLATION',
+		`${command.commandType} blocked: step ${stepId} is work of a unit that may not run yet — ${startRefusal(workUnitId, start)}; it stays where it is and no model or tool is invoked (RPH-PWU-011).`,
+		[stepId, workUnitId, ...start.waitingFor.map((w) => w.id), ...start.abandoned.map((a) => a.id)]
+	);
 }
 
 /**

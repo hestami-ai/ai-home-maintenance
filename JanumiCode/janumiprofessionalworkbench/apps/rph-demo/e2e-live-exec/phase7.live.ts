@@ -39,6 +39,7 @@ import {
 	rerunDeclared,
 	runTheLane,
 	screenshot,
+	startOfferOf,
 	agentTurnOn,
 	turnRunning,
 	typesAsTyped,
@@ -59,8 +60,13 @@ import { STORE_FILE } from './run-folder';
 //
 // ── ⛔ DRY UNLESS PAID (D1) ──────────────────────────────────────────────────────────────────────────────────────────
 // A model is called only when `JPWB_PHASE7_PAID=1`, and then the reviewer calls spent before the run (P7-3a's) must be
-// given in `JPWB_PHASE7_PRIOR_REVIEWER_CALLS`. Dry, the spec runs everything that calls no model — the boot record, the
-// readiness check, typing and publishing the PWA, the Undertaking, the ROOT's Begin & Execute (no model), its saved
+// given in `JPWB_PHASE7_PRIOR_REVIEWER_CALLS`. ⭐⭐ `JAN-EXEC` Phase 7, package M (`REG-D-135` (2); design D7): ~~Dry, the spec
+// runs … the ROOT's Begin & Execute …~~ — the root now waits for its four phases, each a model's, so a dry run presses NO
+// unit: it runs the boot record, the readiness check, typing and publishing the PWA, the Undertaking, THE ORDER — what each
+// unit waits for, recorded; each row's offer read, the phases offered and recorded not reached in a dry run, the root
+// withheld with the page's reason — and the final archive, then stops and proves exactly that, with no model exchange
+// recorded (`laneVerdict`). ⛔ What follows was the dry run before package M. Dry, the spec runs everything that calls no
+// model — the boot record, the readiness check, typing and publishing the PWA, the Undertaking, the ROOT's Begin & Execute (no model), its saved
 // response and one archive-and-check cycle, ~~then the ROOT's sign-off by the paid run's own acts and the final archive
 // (no model either; D11)~~ ⛔ `E12F` F1: FALSE SINCE E2, whose Record Assurance asks the reviewer once per declared policy —
 // then the ROOT's sign-off REHEARSED UP TO THE REVIEWER CALL (`REG-D-112` (b): a dry run calls no model): the page loaded
@@ -75,7 +81,11 @@ import { STORE_FILE } from './run-folder';
 //      devin's readiness — its version, and the configured model in its model list, no model called — into
 //      `lane/boot.json`. Refused at boot, with every reason at once, as `refused-at-boot`.
 //   2. The PWA, typed and read back from the store, then published; the Undertaking created; its five units read.
-//   3. Begin & Execute on the ROOT, then on each PHASE in order, each started only after the one before has answered
+//   3. ~~Begin & Execute on the ROOT, then on each PHASE in order~~ ⭐⭐ Package M (`REG-D-135` (2); design D6) — Begin &
+//      Execute only on what the page OFFERS, one unit at a time, the first in the tree's order of those it offers — so each
+//      phase in turn (half A's declare no data flow, so all four are offered at once), and the ROOT LAST, once its four are
+//      accepted; a loop ends the run `order-unresolvable` before any press; a unit never offered is recorded not started,
+//      with the page's reason; each started only after the one before has answered
 //      (`REG-F-535`). Before each phase, the LIMIT (D8): the calls spent before, those this store records, and four held
 //      for the negative control must total ~~under~~ ⭐ with the phase's ~~first call~~ ~~⭐ worst case, a model unit's (R3-B's
 //      fix round, F1)~~ ~~⭐ one try's reserve (`REG-D-114` (14), as amended 2026-10-16)~~ ⭐ whole press's worst case, (3 tries
@@ -97,7 +107,9 @@ import { STORE_FILE } from './run-folder';
 //      rule's rationale typed, so each choice is the operator's Decision, never the engine's. A stop the row offers no
 //      re-run for is left as found. The later phases still run, each recorded as having an upstream nothing assured — a
 //      field the store does not have (D5).
-//   5. SIGN-OFF: Record Assurance, then Mark Satisfied, on each phase that completed, and the root's attempted LAST, the
+//   5. SIGN-OFF: Record Assurance, then Mark Satisfied, on each ~~phase that completed, and the root's attempted LAST~~ ⭐
+//      (package M, D6) unit that completed, RIGHT AFTER ITS EXECUTION AND RECOVERY, BEFORE THE NEXT PRESS — so the units that
+//      wait for it are offered — the
 //      page loaded afresh for each and the store read after every act, each refusal recorded, never asserted; then the
 //      final archive, `06-final`. ⭐ `E12F` F2 — the LIMIT before each, the sign-off's own declared reviews counted at
 //      their bound: a sign-off that would cross it is not pressed, nor is any later one, and the run ends `paid-limit`.
@@ -137,7 +149,7 @@ import { STORE_FILE } from './run-folder';
 // the store is durable, and the reviewer is real.
 
 test.describe('LIVE — JAN-EXEC Phase 7: §3.2’s PWA, published, run as an Undertaking on the real executor and reviewer', () => {
-	test('the run’s lane: boot, publish, the root then each phase, sign-off — archived and checked after each unit', async ({
+	test('the run’s lane: boot, publish, each unit the page offers and its sign-off, the root last — archived and checked after each unit', async ({
 		page,
 		baseURL
 	}) => {
@@ -199,6 +211,14 @@ test.describe('LIVE — JAN-EXEC Phase 7: §3.2’s PWA, published, run as an Un
 				showOverview: async () => {
 					await gotoHydrated(page, undertakingPath);
 					await page.getByRole('button', { name: 'overview', exact: true }).click({ timeout: PHASE7_UI_MS });
+				},
+				// ⭐⭐ `JAN-EXEC` Phase 7, package M (`REG-D-135` (2); design D6) — WHAT EACH UNIT'S ROW OFFERS, read and never pressed:
+				// Begin & Execute where the engine would start the unit, else the page's reason (`startOfferOf`). The lane presses
+				// only what this says is offered.
+				startOffers: async (units) => {
+					const offers = new Map<string, Awaited<ReturnType<typeof startOfferOf>>>();
+					for (const u of units) offers.set(u.unitId!, await startOfferOf(unitRowById(page, u.unitId!)));
+					return offers;
 				},
 				// ⭐ Waited for up to the bound the lane gives it, for the unit's declared policies (the lead's delegated decision of
 				// 2026-10-16, registered as REG-D-114 (15)).

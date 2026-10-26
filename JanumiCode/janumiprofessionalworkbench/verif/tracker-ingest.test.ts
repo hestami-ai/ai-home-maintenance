@@ -204,7 +204,8 @@ describe('capability census, code-side (W-2) — the second reader is module EXE
 			"SELECT id FROM items WHERE id LIKE 'cap:rule:%' ORDER BY id"
 		).map((r) => r.id);
 		expect(ingested).toEqual(independent);
-		expect(ingested).toHaveLength(125);
+		// ⭑ 125 -> 126 (2026-10-25, package M): RPH-PWU-011 joined the catalog (`REG-D-135` (2)).
+		expect(ingested).toHaveLength(126);
 	});
 
 	it('policies: the ingest matches the distinct POL ids of the seeded ontology', () => {
@@ -285,7 +286,10 @@ describe('capability census, code-side (W-2) — the second reader is module EXE
 		// events had started counting, and +0 that the census could not see the command — which for this
 		// increment was never in doubt, because `command-dispatch-census` forces the driving test into the same
 		// commit as the declaration, so the scanner can always find the name.
-		expect(rows).toEqual([{ verdict: 'DECLARED', n: 278 }]);
+		// 278 -> 279: RPH-PWU-011 (`JAN-EXEC` Phase 7 package M; `REG-D-135` (2)). +1 for ONE RULE of the catalog, the
+		// rules being one of the four populations — the first move of this number by a RULE rather than a command. No
+		// command and no event was added: `ProposePwu` gained two optional payload fields, which this count cannot see.
+		expect(rows).toEqual([{ verdict: 'DECLARED', n: 279 }]);
 	});
 });
 
@@ -317,7 +321,8 @@ describe('measured verdicts (W-3) — measurements cross-checked, absences contr
 		expect(enforced).toBe(independent.ENFORCED);
 		expect(disclosed).toBe(independent.UNENFORCED_DISCLOSED);
 		expect(classified).toBe(independent.NOT_A_COMMAND_REFUSAL);
-		expect(enforced + disclosed + classified).toBe(112);
+		// ⭑ 112 -> 113 (2026-10-25, package M): the RPH-PWU-011 row, ENFORCED (`REG-D-135` (2)).
+		expect(enforced + disclosed + classified).toBe(113);
 	});
 
 	it('every consumer-walk ABSENT states its search and its fired positive control', () => {

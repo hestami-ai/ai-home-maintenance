@@ -231,6 +231,18 @@
 					"required": false,
 					"type": "boolean",
 					"note": "CON-009: Undertaking-local extension instance"
+				},
+				{
+					"field": "dependencyIds",
+					"required": false,
+					"type": "string[]",
+					"note": "id-ref[]; AUTHORED 2026-10-25 (JAN-EXEC Phase 7, package M; REG-D-135 (2); DESIGN-data-flow-order-and-deliverable-review.md D1), NOT in DOC-007 §11.2: the units this unit waits for, its producers and its children. The PWU object has carried dependencyIds since DOC-007; ProposePwu forced it to [] for want of a wire path. Absent = []."
+				},
+				{
+					"field": "inputRequirements",
+					"required": false,
+					"type": "ArtifactRequirement[]",
+					"note": "AUTHORED 2026-10-25 (package M; REG-D-135 (2); design D1), NOT in DOC-007 §11.2: the required inputs no unit of the Undertaking produces, each { name, status: UNPRODUCED }. Absent = []."
 				}
 			]
 		},

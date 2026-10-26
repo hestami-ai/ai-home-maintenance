@@ -6,7 +6,7 @@ import {
 	gotoHydrated,
 	declareRisk
 } from './support/harness';
-import { publishPwaThroughDesigner } from './support/phase7-pwa';
+import { publishPwaThroughDesigner, unitRow } from './support/phase7-pwa';
 
 // S-1b of ROADMAP-decision-subject-scope (REG-F-104) — REJECTION, the third act JPWB-DOC-001 §5.2 reserves to
 // Governance, and the one that was unreachable for a reason worth stating.
@@ -33,6 +33,34 @@ test.describe('Undertaking Workbench — rejection cites a finding it did not ma
 		page,
 		request
 	}) => {
+		// ⛔ MOVED BY `JAN-EXEC` Phase 7, package M (`REG-D-135` (2); design D1, D2, D3): ~~the reference seed's PWA
+		// (`selectOption({ index: 1 })`)~~. Each of its types declares its inputs in prose — "requirements", "originating
+		// expression" — that no instantiated type lists as an output, so every unit its Undertaking instantiates records them
+		// unproduced and none is startable (measured 2026-10-26: 8 units, each with 5 to 10 unproduced inputs, and the root
+		// waiting for its 7 children). So the Undertaking is of a PWA of this test's own, as the CONTROL's is: a root a person
+		// does and one leaf, neither declaring an input or a policy, and the leaf the unit faulted.
+		const pwaId = await publishPwaThroughDesigner(page, request, {
+			name: 'Rejection Pilot PWA',
+			domain: 'software product',
+			types: [
+				{
+					name: 'Rejection Leaf',
+					pwuKind: 'REJECTION_LEAF',
+					purpose: 'Do the work a finding may name.',
+					workDischarge: 'HUMAN',
+					policyIds: []
+				},
+				{
+					name: 'Rejection Root',
+					pwuKind: 'REJECTION_ROOT',
+					purpose: 'Hold the work under one Undertaking.',
+					workDischarge: 'HUMAN',
+					isRoot: true,
+					children: ['Rejection Leaf'],
+					policyIds: []
+				}
+			]
+		});
 		await gotoHydrated(page, '/undertakings');
 		await page.getByRole('button', { name: '+ New Undertaking' }).click();
 		await page.getByPlaceholder(/Undertaking name/i).fill('Rejection Pilot');
@@ -40,7 +68,7 @@ test.describe('Undertaking Workbench — rejection cites a finding it did not ma
 		await page.getByPlaceholder(/Intended product/i).fill('Rejection Pilot App');
 		await page
 			.getByRole('combobox', { name: 'Instantiate from published PWA' })
-			.selectOption({ index: 1 });
+			.selectOption(pwaId);
 		await declareRisk(page);
 		await page.getByRole('button', { name: 'Create Undertaking' }).click();
 
@@ -50,11 +78,22 @@ test.describe('Undertaking Workbench — rejection cites a finding it did not ma
 
 		let snap = await introspect(request);
 		const undertaking = snap.undertakings.find((u) => u.state.name === 'Rejection Pilot')!;
+		// ⛔ MOVED BY `JAN-EXEC` Phase 7, package M (`REG-D-135` (2); design D2, D3): ~~the first PROPOSED unit~~ — that was the
+		// root, which now waits for its children to be accepted, so its row offers no Begin & Execute. The unit faulted here
+		// is the first PROPOSED one the engine would start: it waits for no unit and requires nothing no unit produces.
+		const empty = (v: unknown) => !Array.isArray(v) || v.length === 0;
 		const target = snap.pwus.find(
-			(p) => p.state.undertakingId === undertaking.id && p.state.workLifecycleState === 'PROPOSED'
+			(p) =>
+				p.state.undertakingId === undertaking.id &&
+				p.state.workLifecycleState === 'PROPOSED' &&
+				empty(p.state.dependencyIds) &&
+				empty(p.state.inputRequirements)
 		)!;
 		expect(target, 'a PWU to fault').toBeTruthy();
-		const title = new RegExp(String(target.state.title));
+		// ⛔ Package M (design D3) — ~~`new RegExp(title)` over each row's whole text~~: a waiting unit's row names the units it
+		// waits for (`start-withheld`), so the root's row now holds this unit's title too. The row is the one whose title CELL
+		// is this unit's (`unitRow`).
+		const title = String(target.state.title);
 
 		// ── 1. THE ENGINE REFUSES A REJECTION WITH NO FINDING, and says which limb failed ───────────────────────
 		// Posted at the command bus — the SAME bus the UI uses — because the surface (correctly) never offers this
@@ -81,19 +120,18 @@ test.describe('Undertaking Workbench — rejection cites a finding it did not ma
 
 		// ── 2. THE SURFACE OFFERS NO REJECTION YET ──────────────────────────────────────────────────────────────
 		await page.getByRole('button', { name: 'overview' }).click();
-		await page.getByRole('row', { name: title }).getByRole('button', { name: 'Begin & Execute' }).click();
-		await expect(page.getByRole('row', { name: title }).getByTestId('record-finding')).toBeVisible();
+		await unitRow(page, title).getByRole('button', { name: 'Begin & Execute' }).click();
+		await expect(unitRow(page, title).getByTestId('record-finding')).toBeVisible();
 		await expect(
-			page.getByRole('row', { name: title }).getByTestId('reject-pwu'),
+			unitRow(page, title).getByTestId('reject-pwu'),
 			'no finding stands, so the act is not offered'
 		).toHaveCount(0);
 
 		// ── 3. THE ASSURANCE ACT: record the blocking finding ───────────────────────────────────────────────────
-		await page
-			.getByRole('row', { name: title })
+		await unitRow(page, title)
 			.getByTestId('finding-statement')
 			.fill('The expected output is absent.');
-		await page.getByRole('row', { name: title }).getByTestId('record-finding').click();
+		await unitRow(page, title).getByTestId('record-finding').click();
 
 		// TRUTH: a real ASSURANCE_OBSERVATION exists, BLOCKING, naming this PWU — and the PWU has NOT been
 		// rejected by recording it. The assurance act and the governance act are separate, which is the point.
@@ -111,7 +149,7 @@ test.describe('Undertaking Workbench — rejection cites a finding it did not ma
 		).toBe('UNDER_ASSURANCE');
 
 		// ── 4. THE GOVERNANCE ACT: reject, citing the finding that already stands ───────────────────────────────
-		await page.getByRole('row', { name: title }).getByTestId('reject-pwu').click();
+		await unitRow(page, title).getByTestId('reject-pwu').click();
 
 		snap = await introspect(request);
 		expect(snap.pwus.find((p) => p.id === target.id)!.state.workLifecycleState).toBe('REJECTED');
@@ -147,8 +185,12 @@ test.describe('Undertaking Workbench — rejection cites a finding it did not ma
 		// review is asked, and its row stays EXECUTING. ⚠ Suspending its policies is no way around it, driven: its row still
 		// did not reach UNDER_ASSURANCE, and in S-01's S-e the same arrangement's sign-off was refused by the kernel's fold,
 		// which composes UNASSESSED over declared policies none of which governs (`unsupportedSatisfaction`; `REG-F-524`). The
-		// declared review is not this control's subject; the reject affordance's subject scope is. A root a person does and
-		// one mandatory child, so the Undertaking instantiates two.
+		// declared review is not this control's subject; the reject affordance's subject scope is. ~~A root a person does and
+		// one mandatory child, so the Undertaking instantiates two.~~
+		// ⛔ MOVED BY `JAN-EXEC` Phase 7, package M (`REG-D-135` (2); design D2): a root now waits for its children to be
+		// ACCEPTED before it starts, so a root and its one child can never both be UNDER_ASSURANCE — the child must be
+		// SATISFIED first. So the two units this control compares are two SIBLING leaves, neither waiting for the other: a root
+		// a person does and two mandatory children, so the Undertaking instantiates three, and the two compared are the leaves.
 		const pwaId = await publishPwaThroughDesigner(page, request, {
 			name: 'Scope Pilot PWA',
 			domain: 'software product',
@@ -161,12 +203,19 @@ test.describe('Undertaking Workbench — rejection cites a finding it did not ma
 					policyIds: []
 				},
 				{
+					name: 'Sibling Leaf',
+					pwuKind: 'SIBLING_LEAF',
+					purpose: 'Do the work beside it that no finding names.',
+					workDischarge: 'HUMAN',
+					policyIds: []
+				},
+				{
 					name: 'Scoped Root',
 					pwuKind: 'SCOPED_ROOT',
 					purpose: 'Hold the scoped work under one Undertaking.',
 					workDischarge: 'HUMAN',
 					isRoot: true,
-					children: ['Scoped Leaf'],
+					children: ['Scoped Leaf', 'Sibling Leaf'],
 					policyIds: []
 				}
 			]
@@ -191,16 +240,21 @@ test.describe('Undertaking Workbench — rejection cites a finding it did not ma
 			(p) => p.state.undertakingId === undertaking.id && p.state.workLifecycleState === 'PROPOSED'
 		);
 		expect(pwus.length, 'this control needs two PWUs to distinguish').toBeGreaterThan(1);
-		const faulted = new RegExp(String(pwus[0]!.state.title));
-		const innocent = new RegExp(String(pwus[1]!.state.title));
+		// ⛔ Package M — ~~`pwus[0]` and `pwus[1]`~~, the first of which was the root: the two leaves, by their titles.
+		const leaves = pwus.filter((p) => ['Scoped Leaf', 'Sibling Leaf'].includes(String(p.state.title)));
+		expect(leaves.map((p) => p.state.title).sort(), 'this control compares the two leaves').toEqual([
+			'Scoped Leaf',
+			'Sibling Leaf'
+		]);
+		const faulted = 'Scoped Leaf';
+		const innocent = 'Sibling Leaf';
 
 		await page.getByRole('button', { name: 'overview' }).click();
-		await page.getByRole('row', { name: faulted }).getByRole('button', { name: 'Begin & Execute' }).click();
-		await page
-			.getByRole('row', { name: faulted })
+		await unitRow(page, faulted).getByRole('button', { name: 'Begin & Execute' }).click();
+		await unitRow(page, faulted)
 			.getByTestId('finding-statement')
 			.fill('This one is broken.');
-		await page.getByRole('row', { name: faulted }).getByTestId('record-finding').click();
+		await unitRow(page, faulted).getByTestId('record-finding').click();
 
 		// ⚠ THE INNOCENT PWU MUST REACH THE SAME LIFECYCLE STATE, AND MY FIRST VERSION OF THIS CONTROL DID NOT
 		// BOTHER. It left the other PWU at PROPOSED — where the reject affordance is not rendered AT ALL, because
@@ -211,9 +265,8 @@ test.describe('Undertaking Workbench — rejection cites a finding it did not ma
 		//
 		// Signing this one off puts it at UNDER_ASSURANCE with NO blocking finding — the same branch, the same
 		// buttons, differing ONLY in whether a finding names it.
-		await page.getByRole('row', { name: innocent }).getByRole('button', { name: 'Begin & Execute' }).click();
-		await page
-			.getByRole('row', { name: innocent })
+		await unitRow(page, innocent).getByRole('button', { name: 'Begin & Execute' }).click();
+		await unitRow(page, innocent)
 			.getByRole('button', { name: 'Record Assurance' })
 			.click();
 
@@ -227,16 +280,16 @@ test.describe('Undertaking Workbench — rejection cites a finding it did not ma
 		// UNDER_ASSURANCE and moved on — and it DID, while the row still rendered EXECUTING. The affordance
 		// is a function of what the PAGE shows, so a server-side truth-check cannot establish that the branch
 		// under test is even on screen. `B3-rejection-stops-checking-the-subject` SURVIVED twice on that gap.
-		await expect(page.getByRole('row', { name: faulted })).toContainText('UNDER_ASSURANCE');
+		await expect(unitRow(page, faulted)).toContainText('UNDER_ASSURANCE');
 		await expect(
-			page.getByRole('row', { name: innocent }),
+			unitRow(page, innocent),
 			'the innocent PWU must reach the SAME branch, or this control proves nothing about subject scope'
 		).toContainText('UNDER_ASSURANCE');
 
 		// Both are UNDER_ASSURANCE. A blocking finding exists in this undertaking. Only one of them is its subject.
-		await expect(page.getByRole('row', { name: faulted }).getByTestId('reject-pwu')).toHaveCount(1);
+		await expect(unitRow(page, faulted).getByTestId('reject-pwu')).toHaveCount(1);
 		await expect(
-			page.getByRole('row', { name: innocent }).getByTestId('reject-pwu'),
+			unitRow(page, innocent).getByTestId('reject-pwu'),
 			'a finding against another PWU must not license rejecting this one'
 		).toHaveCount(0);
 	});

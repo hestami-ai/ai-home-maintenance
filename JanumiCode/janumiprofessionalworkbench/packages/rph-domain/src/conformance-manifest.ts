@@ -131,6 +131,11 @@ const COVERED_BY_ID: Readonly<Record<string, string>> = {
 	// The tranche-scoped first clause is left standing: it is correct about that tranche.
 	'RPH-PWU-002': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	'RPH-PWU-004': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
+	// ⭐ `JAN-EXEC` Phase 7, package M (2026-10-25; `REG-D-135` (2), design D2) — the readiness rule, ENFORCED at `markPwuReady`
+	// and observed refusing through the bus by its probe in the file below. ⭑ 2026-10-26 (the package's check, finding 1): and at
+	// the step start too, for a plan made without MarkPwuReady (unitReadinessRefusal, execution.ts; its probes in
+	// pwu-start-readiness.test.ts, beside this cite's).
+	'RPH-PWU-011': 'packages/rph-application/src/handlers/execrem-wp16-enforcement-observed.test.ts',
 	// ── THE RPH-PER CITES, ALL FOUR CORRECTED 2026-08-02 WHILE DISPOSITIONING THE FAMILY ─────────────────────
 	//
 	// Every one of the four was wrong, in four different ways, and none was caught by any gate that reads this
@@ -363,7 +368,7 @@ const COVERAGE_BY_PREFIX: Readonly<Record<string, Coverage>> = {
 	'RPH-PWU': {
 		status: 'PARTIAL',
 		testFile: 'packages/rph-domain/src/pwuGuards.test.ts',
-		note: 'four-axis guards + P1/INV-5 + PWU-005/007/010 (by id); the command guards PWU-002/003/004 pending (rph-application)'
+		note: 'four-axis guards + P1/INV-5 + PWU-005/007/010 (by id); the command guards PWU-002/003/004 pending (rph-application); PWU-011 ENFORCED and cited by id above (2026-10-25, package M)'
 	},
 	'RPH-ASR': {
 		status: 'PARTIAL',

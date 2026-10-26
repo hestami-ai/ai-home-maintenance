@@ -329,6 +329,7 @@
 {"type":"verdict","item_id":"cap:rule:RPH-PWU-008","verdict":"DIVERGENT_FILED","evidence":"enforcement-register: UNENFORCED_DISCLOSED — nothing in production enforces it, and the gated register says so","method":"enforcement-register:w3","measured_at":"2026-08-20"}
 {"type":"verdict","item_id":"cap:rule:RPH-PWU-009","verdict":"ENFORCED","evidence":"enforcement-register: a named production site refuses, observed through Engine.dispatch","method":"enforcement-register:w3","measured_at":"2026-08-20"}
 {"type":"verdict","item_id":"cap:rule:RPH-PWU-010","verdict":"ENFORCED","evidence":"enforcement-register: a named production site refuses, observed through Engine.dispatch","method":"enforcement-register:w3","measured_at":"2026-08-20"}
+{"type":"verdict","item_id":"cap:rule:RPH-PWU-011","verdict":"ENFORCED","evidence":"enforcement-register: a named production site refuses, observed through Engine.dispatch","method":"enforcement-register:w3","measured_at":"2026-08-20"}
 {"type":"attr","item_id":"cap:rule:RPH-TRC-001","key":"enforcement_class","value":"NOT_A_COMMAND_REFUSAL"}
 {"type":"attr","item_id":"cap:rule:RPH-TRC-002","key":"enforcement_class","value":"NOT_A_COMMAND_REFUSAL"}
 {"type":"attr","item_id":"cap:rule:RPH-TRC-003","key":"enforcement_class","value":"NOT_A_COMMAND_REFUSAL"}

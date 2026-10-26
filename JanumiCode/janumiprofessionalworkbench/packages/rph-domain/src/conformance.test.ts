@@ -34,9 +34,11 @@ const catalog = JSON.parse(
 ) as Catalog;
 
 describe('M12 conformance catalog structure (§3 taxonomy)', () => {
-	it('defines the 7 test layers, 125 rules, 8 properties, and a mutation catalog', () => {
+	// ⭐ 125 -> 126 (2026-10-25, `JAN-EXEC` Phase 7 package M): RPH-PWU-011, the readiness rule `REG-D-135` (2) ruled, added to
+	// the catalog with its §8 text (design D2) — the first rule since the catalog's extraction. Both counts here move with it.
+	it('defines the 7 test layers, 126 rules, 8 properties, and a mutation catalog', () => {
 		expect(catalog.layers).toHaveLength(7);
-		expect(catalog.ruleCatalog).toHaveLength(125);
+		expect(catalog.ruleCatalog).toHaveLength(126);
 		expect(catalog.properties.map((p) => p.id).sort()).toEqual([
 			'P1',
 			'P2',
@@ -54,7 +56,7 @@ describe('M12 conformance catalog structure (§3 taxonomy)', () => {
 		const declared = Object.entries(catalog.ruleCountsByPrefix)
 			.filter(([k]) => k !== '_total')
 			.reduce((s, [, n]) => s + n, 0);
-		expect(declared).toBe(125);
+		expect(declared).toBe(126);
 		// and the catalog rows agree with the declared per-prefix counts
 		for (const [prefix, n] of Object.entries(catalog.ruleCountsByPrefix)) {
 			if (prefix === '_total') continue;
@@ -209,10 +211,15 @@ describe('M12 conformance coverage GATE — no rule is silently unaccounted', ()
 		//                         overclaim (it pointed at `pwuGuards.test.ts`, PURE_KERNEL evidence for a rule
 		//                         the engine never asked). It returns to a DISPATCH, which is the only cite the
 		//                         layer gate now admits for it.
+		//   2026-10-25  44 -> 45  RPH-PWU-011 alone, and it is a NEW rule rather than a moved one: `REG-D-135` (2) ruled
+		//                         that a unit starts only after its producers are accepted, enforced by the workbench,
+		//                         and package M carried it into the catalog (§8) and the register together. Its cite is
+		//                         its COMMAND-layer probe in execrem-wp16-enforcement-observed.test.ts, which drives
+		//                         `MarkPwuReady` through the bus beside its control (the producer SATISFIED, admitted).
 		expect(
 			byStatus.COVERED,
 			'the COVERED count changed — add a line to the ledger above saying which rules moved and why, before editing the number'
-		).toBe(44);
+		).toBe(45);
 		expect(byStatus.DEFERRED).toBeLessThan(byStatus.COVERED);
 	});
 

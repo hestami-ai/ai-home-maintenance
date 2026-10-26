@@ -51,7 +51,7 @@ import {
 	bootOf,
 	DECLARED_RERUN_RATIONALE,
 	declaredRerunOffered,
-	DRY_SIGN_OFF_NOT_REACHED,
+	DRY_PRESS_NOT_REACHED,
 	execFileRunner,
 	inheritedVariables,
 	lanePaths,
@@ -96,11 +96,12 @@ import {
 	type RunRecord,
 	type RunUnit,
 	type SignOffAct,
-	type SignOffRecord,
+	type StartOffer,
 	type UnitState
 } from '../apps/rph-demo/e2e-live-exec/phase7-operator.js';
 import { PHASE7_PWA, promptMarkers } from '../scripts/phase7/pwa-content.js';
 import { PHASE7_ARCHIVE_UNITS } from '../scripts/phase7/run-archive.js';
+import { readinessUnitOf, startReadiness } from '@janumipwb/rph-projections';
 
 const APP = fileURLToPath(new URL('../apps/rph-demo/', import.meta.url));
 const SPEC = 'e2e-live-exec/phase7.live.ts';
@@ -1366,17 +1367,33 @@ describe('⭐ D8 — the limit, and D5 — what the run records of each unit', (
 		);
 	});
 
-	it('⛔ D5 — a phase ran on an unassured upstream when an EARLIER PHASE stopped; the root is their parent, not their upstream', () => {
-		const units = unpressed(PHASE7_ARCHIVE_UNITS);
-		const [root, requirements, design] = units as [RunUnit, RunUnit, RunUnit];
-		root.stopped = true;
-		expect(upstreamNotAssured(units, 2)).toBe(false);
-		requirements.stopped = false;
-		expect(upstreamNotAssured(units, 3)).toBe(false);
-		design.stopped = true;
-		expect(upstreamNotAssured(units, 3), 'a phase is not its own upstream').toBe(false);
-		expect(upstreamNotAssured(units, 4)).toBe(true);
-		expect(upstreamNotAssured(units, 5)).toBe(true);
+	// ⛔ MOVED 2026-10-25 (`JAN-EXEC` Phase 7, package M; `REG-D-135` (2); design D6, which names it) — ~~"D5 — a phase ran on an
+	// unassured upstream when an EARLIER PHASE stopped; the root is their parent, not their upstream"~~: the old rule read ANY
+	// earlier phase's stop (`upstreamNotAssured(units, order)`), so an unrelated stop marked a unit whose own producers were
+	// accepted. Its expectations, struck: root stopped -> requirements false; requirements fine -> design false; design
+	// stopped -> design false (not its own upstream), implementation and end-to-end TRUE. Restated below on the unit's OWN
+	// producers, read from the store.
+	it('⭐ THE PREDICTED RED (D6) — `upstreamNotAssured` reads the unit’s OWN producers: false when they are accepted and an UNRELATED unit stopped; true when one of its own is not accepted', () => {
+		const snap = (states: Readonly<Record<string, string>>, waits: Readonly<Record<string, string[]>>): EngineSnapshot =>
+			({
+				pwus: Object.entries(states).map(([id, workLifecycleState]) => ({
+					id,
+					state: { objectType: 'PROFESSIONAL_WORK_UNIT', workLifecycleState, dependencyIds: waits[id] ?? [] }
+				}))
+			}) as unknown as EngineSnapshot;
+		// The consumer's producer is SATISFIED; an unrelated phase STOPPED (still EXECUTING, waiting).
+		const s = snap({ producer: 'SATISFIED', unrelated: 'EXECUTING', consumer: 'PROPOSED' }, { consumer: ['producer'] });
+		expect(upstreamNotAssured(s, 'consumer'), 'an unrelated stop marked a unit whose own producer is accepted').toBe(false);
+		// ⭑ THE PAIR: its own producer not accepted — EXECUTING, CONDITIONALLY_SATISFIED, ABANDONED — reads true.
+		for (const state of ['EXECUTING', 'CONDITIONALLY_SATISFIED', 'ABANDONED'])
+			expect(
+				upstreamNotAssured(snap({ producer: state, consumer: 'PROPOSED' }, { consumer: ['producer'] }), 'consumer'),
+				`its own producer ${state}`
+			).toBe(true);
+		// ⭑ RECOMPOSED and BASELINED are accepted, as SATISFIED is; a unit that waits for nothing has no upstream to fault.
+		for (const state of ['RECOMPOSED', 'BASELINED'])
+			expect(upstreamNotAssured(snap({ producer: state, consumer: 'PROPOSED' }, { consumer: ['producer'] }), 'consumer')).toBe(false);
+		expect(upstreamNotAssured(snap({ alone: 'PROPOSED' }, {}), 'alone')).toBe(false);
 	});
 
 	it('⭐ each unit starts unpressed: no id, no press, no state — `null`, never a `false` that reads as “it ran”', () => {
@@ -1392,7 +1409,9 @@ describe('⭐ D8 — the limit, and D5 — what the run records of each unit', (
 			upstreamNotAssured: null,
 			limitCheck: null,
 			recovery: [],
-			signOff: null
+			signOff: null,
+			// ⭐ Package M (D4, D6) — and why it was never pressed, null until the run says.
+			notStarted: null
 		});
 	});
 });
@@ -1565,8 +1584,13 @@ function laneOf(script: Script) {
 				return {
 					id: idOf(u.slug),
 					state: {
+						// ⭐ Package M (`REG-D-135` (2); design D1, D7) — what instantiation records of §3.2's PWA, which declares no
+						// data flow: the root waits for its four phases, and each phase for nothing.
+						objectType: 'PROFESSIONAL_WORK_UNIT',
 						title: u.title,
 						undertakingId: 'und_1',
+						dependencyIds: u.slug === 'root' ? PHASE7_ARCHIVE_UNITS.slice(1).map((p) => idOf(p.slug)) : [],
+						inputRequirements: [],
 						workLifecycleState: s?.lifecycleState ?? 'PROPOSED',
 						executionState: s?.executionState ?? 'NOT_STARTED',
 						assuranceState: s?.assuranceState ?? 'UNASSESSED'
@@ -1634,6 +1658,20 @@ function laneOf(script: Script) {
 			return press.outcome;
 		},
 		showOverview: async () => void calls.push('showOverview'),
+		// ⭐ Package M (`REG-D-135` (2); design D3, D6) — THE PAGE'S OFFER, read from the rule the engine's refusal reads
+		// (`startReadiness`) over this store, as the page's load reads it: offered where the engine would start the unit.
+		startOffers: async (units) => {
+			calls.push('startOffers');
+			const snap = snapshot();
+			const lookup = (id: string) => readinessUnitOf(id, snap.pwus.find((p) => p.id === id)?.state);
+			return new Map(
+				units.map((u): [string, StartOffer] => {
+					if (lookup(u.unitId!)?.workLifecycleState !== 'PROPOSED') return [u.unitId!, { offered: false, reason: null, kinds: [] }];
+					const r = startReadiness(u.unitId!, lookup);
+					return [u.unitId!, { offered: r.startable, reason: r.reason, kinds: r.kinds }];
+				})
+			);
+		},
 		recoveryOffers: async (unit) => {
 			calls.push(`recoveryOffers ${unit.slug}`);
 			const read = (recoveryReads.get(unit.slug) ?? 0) + 1;
@@ -1768,13 +1806,23 @@ const GREEN = {
  * prior that lets each phase through exactly at the limit — from that prior, every phase recording nothing but the LAST,
  * which records the rest: no phase's check comes after it. So each sign-off reads the totals it read when the prior alone
  * was `spent`, the recorded calls in place of part of it.
+ * ⛔ RETIRED (package M; `REG-D-135` (2); design D6) — ~~`spentBySignOff(spent)`: the calls spent in the 'end-to-end' press~~:
+ * every sign-off no longer comes after every press, so its four users moved to `spentBefore`, below, which spends them in the
+ * press the sign-off under test follows.
  */
-function spentBySignOff(spent: number) {
+
+/**
+ * ⭐ `JAN-EXEC` Phase 7, package M (`REG-D-135` (2); design D6) — A PAID RUN WHOSE `slug` PHASE'S SIGN-OFF IS READ WITH `spent`
+ * CALLS, the prior's and the recorded together. ⛔ `spentBySignOff` spent them in the LAST phase, because every sign-off came
+ * after every press; each unit's sign-off now follows its own press, so the calls are spent before the run, or in `slug`'s own
+ * press — and every phase before it passes its own check exactly at the limit, spending nothing.
+ */
+function spentBefore(slug: string, spent: number) {
 	const prior = Math.min(spent, PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - WHOLE_PRESS);
 	return {
 		prior,
 		recorded: spent - prior,
-		presses: { ...ALL_COMPLETE, 'end-to-end': { outcome: answered('success'), after: COMPLETED, calls: spent - prior } }
+		presses: { ...ALL_COMPLETE, [slug]: { outcome: answered('success'), after: COMPLETED, calls: spent - prior } }
 	};
 }
 
@@ -1794,146 +1842,114 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		]);
 	});
 
-	it('⛔ DRY: the root is pressed, its answer kept, its state read from the store and the run archived — then the run stops, before any phase, and the verdict holds the press PROVED (D1, D5)', async () => {
+	// ── ⛔ MOVED 2026-10-25 (`JAN-EXEC` Phase 7, package M; `REG-D-135` (2); design D7, which names the first of them) ────────
+	// HALF A'S DRY REHEARSAL PRESSED THE ROOT FIRST, and these four held it: ~~"⛔ DRY: the root is pressed, its answer kept, its
+	// state read from the store and the run archived — then the run stops, before any phase, and the verdict holds the press
+	// PROVED (D1, D5)"~~ (`setUp`, `beginExecute root`, `read`, `screenshot 01-root`, `archive 01-root`; the root not stopped;
+	// `dry-run-stop`); ~~"⛔ DRY: a root whose press was REFUSED, or a store holding a model exchange, fails the verdict"~~ (the
+	// line "the dry run did not prove the root's press: …"); ~~"⛔ DRY, D11 — after the root's archive the ROOT's sign-off is
+	// REHEARSED … up to the reviewer call"~~ (the root's row read for Record Assurance, `DRY_SIGN_OFF_NOT_REACHED`, the final
+	// archive diffed with `01-root`'s); and ~~"⛔ DRY, D11 — the verdict holds the root's sign-off REHEARSED UP TO THE REVIEWER
+	// CALL"~~ (its three shortfall lines). ⛔ Under D7 the root waits for its four phases, each a model's, so a dry run can press
+	// NO unit and reach no sign-off. What it rehearses now is THE ORDER — and the same four questions are asked of it below.
+	it('⭐ D7 — DRY: NOTHING IS PRESSED. The order is recorded; each row’s offer is read — the four phases offered and recorded not reached in a dry run, the ROOT WITHHELD for its children, in the page’s words; the final archive taken; and the verdict holds the order PROVED (D1, D6, D7)', async () => {
 		const l = laneOf({
 			paid: false,
-			presses: { root: ALL_COMPLETE.root! },
+			presses: ALL_COMPLETE,
 			signOffs: { root: GREEN }
 		});
 		const record = await l.run();
-		// ⭑ Between the root's archive and the stop come its sign-off, rehearsed (`E12F` F1), and the final archive (D11): the
-		// next test's.
-		expect(l.calls.slice(0, 5)).toEqual([
+		expect(l.calls, 'the dry run’s order (D1, D6, D7)').toEqual([
 			'setUp',
-			'beginExecute root',
+			// what each unit waits for, read from the store into the record
 			'read',
-			'screenshot 01-root',
-			'archive 01-root'
-		]);
-		expect(l.only('beginExecute'), 'the dry run pressed a phase').toEqual(['beginExecute root']);
-		expect(l.action('01-root-beginExecute'), 'the root’s answer was not kept').toBe(true);
-		expect([record.end?.reason, record.dryRun, record.units[0]!.stopped]).toEqual([
-			'dry-run-stop',
-			{ modelExchanges: 0 },
-			false
-		]);
-		expect(l.written().end?.reason).toBe('dry-run-stop');
-		expect(laneVerdict(record)).toEqual([]);
-	});
-
-	it('⛔ DRY: a root whose press was REFUSED, or a store holding a model exchange, fails the verdict — the dry run proves the press, or nothing', async () => {
-		// ⭑ Each root's sign-off is rehearsed as a dry run's must be (`E12F` F1), so each line here stands alone: the sign-off's
-		// are the D11 tests' below.
-		const refused = await laneOf({
-			paid: false,
-			presses: { root: { outcome: answered('failure'), after: STOPPED } },
-			signOffs: { root: GREEN }
-		}).run();
-		expect(laneVerdict(refused)).toEqual([
-			"the dry run did not prove the root's press: it answered failure, and the store reads its execution RUNNING and its step RUNNING"
-		]);
-		const called = await laneOf({
-			paid: false,
-			presses: { root: ALL_COMPLETE.root! },
-			signOffs: { root: GREEN },
-			executorExchanges: 2
-		}).run();
-		expect(laneVerdict(called)).toEqual(['the dry run recorded 2 model exchange(s)']);
-	});
-
-	it('⛔ DRY, D11 — after the root’s archive the ROOT’s sign-off is REHEARSED — ~~by the paid run’s own acts~~ up to the reviewer call (E12F F1, REG-D-112 (b)): the page loaded afresh and the row read; then the final archive is taken, and only then are the model exchanges counted', async () => {
-		const l = laneOf({
-			paid: false,
-			presses: { root: ALL_COMPLETE.root! },
-			signOffs: { root: GREEN }
-		});
-		const record = await l.run();
-		expect(l.calls, 'the dry run’s order after the root’s archive (design §6 P7-2 D11; E12F F1)').toEqual([
-			'setUp',
-			'beginExecute root',
-			'read',
-			'screenshot 01-root',
-			'archive 01-root',
+			// the page loaded afresh, and each row's offer read — never pressed
 			'showOverview',
-			// ⛔ `E12F` F1 — ~~'recordAssurance root', 'read', 'markSatisfied root', 'read'~~: Record Assurance asks a reviewer.
-			'offersRecordAssurance root',
+			'startOffers',
 			'screenshot 06-final',
 			'read',
 			'archive 06-final',
 			'read',
 			'flushPosts'
 		]);
-		const root = record.units[0]!;
-		expect(root.signOff, 'the root’s sign-off is not recorded as not reached in a dry run').toEqual({
-			offered: true,
-			limitCheck: null,
-			recordAssurance: null,
-			rerunDeclared: null,
-			rerunLimitCheck: null,
-			markSatisfied: null,
-			refused: null,
-			notPressed: DRY_SIGN_OFF_NOT_REACHED
+		expect(l.only('beginExecute', 'recordAssurance', 'offersRecordAssurance'), 'the dry run pressed, or read for a sign-off').toEqual([]);
+		expect(record.order, 'the order the run recorded').toEqual({
+			dependencies: {
+				root: ['requirements', 'design', 'implementation', 'end-to-end'],
+				requirements: [],
+				design: [],
+				implementation: [],
+				'end-to-end': []
+			},
+			pressed: []
 		});
-		expect(l.written().units[0]!.signOff, 'the run record written lacks the sign-off').toEqual(
-			root.signOff
+		expect(record.units.map((u) => [u.slug, u.beginExecute, u.notStarted])).toEqual([
+			[
+				'root',
+				null,
+				'not started: it waits for "Requirements" (PROPOSED), "Design" (PROPOSED), "Implementation and unit tests" (PROPOSED) and "End-to-end verification" (PROPOSED) to be accepted'
+			],
+			['requirements', null, DRY_PRESS_NOT_REACHED],
+			['design', null, DRY_PRESS_NOT_REACHED],
+			['implementation', null, DRY_PRESS_NOT_REACHED],
+			['end-to-end', null, DRY_PRESS_NOT_REACHED]
+		]);
+		expect(l.written().units.map((u) => u.notStarted), 'the record written lacks why each was not pressed').toEqual(
+			record.units.map((u) => u.notStarted)
 		);
-		expect([l.action('01-root-recordAssurance'), l.action('01-root-markSatisfied')]).toEqual([
-			false,
-			false
+		expect(l.archives.map((a) => [a.name, a.unitId, a.capturesBefore]), 'the one archive-and-check cycle').toEqual([
+			['06-final', null, []]
 		]);
-		expect(
-			l.archives.map((a) => [a.name, a.unitId, a.capturesBefore]),
-			'the final archive was not taken, or not diffed with the root’s (K5)'
-		).toEqual([
-			['01-root', 'pwu_root', []],
-			['06-final', null, ['capture-of-01-root']]
+		expect([record.end?.reason, record.dryRun, l.written().end?.reason]).toEqual([
+			'dry-run-stop',
+			{ modelExchanges: 0 },
+			'dry-run-stop'
 		]);
-		expect([record.end?.reason, record.dryRun]).toEqual(['dry-run-stop', { modelExchanges: 0 }]);
 		expect(laneVerdict(record)).toEqual([]);
 	});
 
-	// ~~⛔ DRY, D11 — a model call the sign-off made is COUNTED~~ ⛔ `E12F` F1: a dry sign-off presses nothing, so it can make no
-	// model call — the case is `E12F F1`'s above, whose hands would record two and record none. The count itself is read after
-	// the final archive (the order above), and a model exchange the store holds then fails the verdict (the REFUSED case).
-
-	it('⛔ DRY, D11 — the verdict holds the root’s sign-off REHEARSED UP TO THE REVIEWER CALL (E12F F1, REG-D-112 (b)): its row offered Record Assurance, nothing pressed, the sign-off recorded not reached in a dry run — each shortfall its own line, with what was read', async () => {
-		// ~~both acts answered success, and the store read after Mark Satisfied reads the root SATISFIED (prediction b)~~ — the
-		// root's SATISFIED is the gate's prediction (b) and the paid run's: a dry run that proved it pressed paid calls.
-		expect(
-			laneVerdict(await laneOf({ paid: false, presses: { root: ALL_COMPLETE.root! }, signOffs: { root: { ra: null } } }).run()),
-			'a row that offered no Record Assurance'
-		).toEqual(['the dry run did not rehearse the root’s sign-off: its row offered no Record Assurance']);
-		// ⛔ AND RECORDS NO LANE OF TODAY WRITES, WHICH A BROKEN ONE WOULD: a sign-off PRESSED in a dry run — each act a reviewer
-		// call since E2 — a rehearsal that did not record why it stopped, and a sign-off never attempted.
-		const green = await laneOf({ paid: false, presses: { root: ALL_COMPLETE.root! }, signOffs: { root: GREEN } }).run();
-		const withRootSignOff = (signOff: SignOffRecord | null): RunRecord => ({
+	it('⛔ D7 — DRY: a store holding a model exchange, or a dry run that pressed a unit, fails the verdict — the dry run proves the order, and calls no model', async () => {
+		const called = await laneOf({ paid: false, presses: ALL_COMPLETE, executorExchanges: 2 }).run();
+		expect(laneVerdict(called)).toEqual(['the dry run recorded 2 model exchange(s)']);
+		const green = await laneOf({ paid: false, presses: ALL_COMPLETE }).run();
+		const pressed: RunRecord = {
 			...green,
-			units: [{ ...green.units[0]!, signOff }, ...green.units.slice(1)]
-		});
-		const rehearsed = green.units[0]!.signOff!;
-		expect(laneVerdict(green), 'CONTROL: the rehearsal as the lane records it').toEqual([]);
-		expect(
-			laneVerdict(
-				withRootSignOff({
-					...rehearsed,
-					recordAssurance: actAnswered('success', ASSURED),
-					markSatisfied: actAnswered('success', SATISFIED),
-					notPressed: null
-				})
-			),
-			'a dry run that pressed the root’s sign-off'
-		).toEqual([
-			'the dry run pressed the root’s sign-off, which asks the reviewer for each declared policy (REG-D-112 (b)): Record Assurance answered success, and Mark Satisfied answered success'
-		]);
-		expect(laneVerdict(withRootSignOff({ ...rehearsed, notPressed: null })), 'a rehearsal that says nothing of why it stopped').toEqual([
-			'the dry run’s sign-off of the root is not recorded as not reached in a dry run: nothing recorded'
-		]);
-		expect(laneVerdict(withRootSignOff(null)), 'a sign-off never attempted').toEqual([
-			'the dry run did not rehearse the root’s sign-off: no sign-off was attempted'
+			units: green.units.map((u) =>
+				u.slug === 'requirements'
+					? { ...u, notStarted: null, beginExecute: { status: 200, envelopeType: 'success', timedOutAfterMs: null, requestFailure: null } }
+					: u
+			)
+		};
+		expect(laneVerdict(pressed), 'a dry run that pressed a phase').toEqual([
+			'the dry run pressed Requirements: a dry run presses no unit, each it would press running a model (D1)'
 		]);
 	});
 
-	it('⭐ PAID: each phase in order, the limit read before each; a phase that stops is left as found and the later ones run with an unassured upstream; the sign-off takes each completed phase and the root LAST, the page loaded afresh for each and the store read after every act', async () => {
+	it('⛔ D7 — DRY: the verdict holds the order REHEARSED, each shortfall its own line, with what was read: the order recorded, an offered unit read and not reached, and the root withheld in the page’s words', async () => {
+		const green = await laneOf({ paid: false, presses: ALL_COMPLETE }).run();
+		expect(laneVerdict(green), 'CONTROL: the rehearsal as the lane records it').toEqual([]);
+		expect(laneVerdict({ ...green, order: null }), 'no order recorded').toEqual([
+			'the dry run recorded no order: what each unit waits for was not read from the store'
+		]);
+		expect(
+			laneVerdict({ ...green, units: green.units.map((u) => (u.slug === 'root' ? u : { ...u, notStarted: null })) }),
+			'no offered unit read and recorded not reached'
+		).toEqual(['the dry run rehearsed no press: no unit the page offered was read and recorded not reached in a dry run']);
+		expect(
+			laneVerdict({ ...green, units: green.units.map((u) => (u.slug === 'root' ? { ...u, notStarted: null } : u)) }),
+			'the root not shown withheld'
+		).toEqual(['the dry run did not show the root withheld for the units it waits for (D7): nothing recorded']);
+	});
+
+	// ⛔ MOVED 2026-10-25 (`JAN-EXEC` Phase 7, package M; `REG-D-135` (2); design D6, D7, which name it) — ~~"⭐ PAID: each phase in
+	// order, the limit read before each; a phase that stops is left as found and the later ones run with an unassured
+	// upstream; the sign-off takes each completed phase and the root LAST"~~. Its struck expectations: the presses root,
+	// requirements, design, implementation, end-to-end; implementation and end-to-end `upstreamNotAssured` TRUE for design's
+	// stop; the sign-offs after every press (requirements, implementation, end-to-end, then the root), requirements' read at
+	// 10 recorded (total 36) and implementation's at 10 (total 42); the root signed off; the archives 01-root first, each
+	// diffed with all before it. ⭐ Restated on the same script: the root waits for its four phases, so it is pressed only
+	// once all four are accepted — here never, design having stopped; each phase is signed off right after it ran.
+	it('⭐ D6, D7 — PAID: each phase the page offers, one at a time in the tree’s order, the limit read before each; each signed off RIGHT AFTER it ran, before the next press; a phase that stops is left as found, and the phases that do not wait for it still run; the ROOT, waiting for a phase still stopped, is NEVER pressed — recorded not started, in the page’s words', async () => {
 		const l = laneOf({
 			paid: true,
 			prior: 10,
@@ -1952,51 +1968,70 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			}
 		});
 		const record = await l.run();
-		expect(l.only('beginExecute')).toEqual(
-			PHASE7_ARCHIVE_UNITS.map((u) => `beginExecute ${u.slug}`)
-		);
+		expect(l.only('beginExecute'), 'the presses: only what the page offered, the root never').toEqual([
+			'beginExecute requirements',
+			'beginExecute design',
+			'beginExecute implementation',
+			'beginExecute end-to-end'
+		]);
+		expect(record.order?.pressed, 'the press order, as the run records it').toEqual([
+			'requirements',
+			'design',
+			'implementation',
+			'end-to-end'
+		]);
+		// ⭐ D6 — `upstreamNotAssured` reads each phase's OWN producers, and §3.2's phases wait for none: design's stop marks
+		// nothing it does not produce for.
 		expect(record.units.map((u) => [u.slug, u.stopped, u.upstreamNotAssured])).toEqual([
-			['root', false, null],
+			['root', null, null],
 			['requirements', false, false],
 			['design', true, false],
-			['implementation', false, true],
-			['end-to-end', false, true]
+			['implementation', false, false],
+			['end-to-end', false, false]
 		]);
 		expect(
 			record.units.slice(1).map((u) => u.limitCheck?.recorded),
 			'the limit did not read what the store recorded before each phase'
 		).toEqual([0, 3, 5, 9]);
 		expect(
-			l.only('showOverview', 'recordAssurance', 'markSatisfied'),
-			'the sign-off’s order, its reloads, or Mark Satisfied after a refused Record Assurance'
+			l.only('beginExecute', 'showOverview', 'recordAssurance', 'markSatisfied', 'startOffers'),
+			'each phase signed off before the next press, the page loaded afresh before every reading of it'
 		).toEqual([
-			// ⭐ P7-6R R-1f — the stopped design phase's row, read for the run plan's rule; it offers no re-run here.
 			'showOverview',
+			'startOffers',
+			'beginExecute requirements',
 			'showOverview',
 			'recordAssurance requirements',
 			'markSatisfied requirements',
+			'showOverview',
+			'startOffers',
+			'beginExecute design',
+			// ⭐ P7-6R R-1f — the stopped design phase's row, read for the run plan's rule; it offers no re-run here; then its
+			// row read for a sign-off it does not offer.
+			'showOverview',
+			'showOverview',
+			'showOverview',
+			'startOffers',
+			'beginExecute implementation',
 			'showOverview',
 			'recordAssurance implementation',
 			// ⭐ `E12F` F3 — a refused Record Assurance: the page loaded afresh, the row read for a declared re-run (it offers none).
 			'showOverview',
 			'showOverview',
+			'startOffers',
+			'beginExecute end-to-end',
+			'showOverview',
 			'recordAssurance end-to-end',
 			'markSatisfied end-to-end',
 			'showOverview',
-			// ⭑ P5 package B (F3) — THE CONTROL: a phase that stopped and was LEFT AS FOUND, never abandoned, holds no root.
-			'recordAssurance root',
-			'markSatisfied root'
+			'startOffers'
 		]);
-		const [root, requirements, design, implementation] = record.units as [
-			RunUnit,
-			RunUnit,
-			RunUnit,
-			RunUnit
-		];
+		const [root, requirements, design, implementation] = record.units as [RunUnit, RunUnit, RunUnit, RunUnit];
 		expect(requirements.signOff, 'each act’s state is not the store’s, read after it').toEqual({
 			offered: true,
-			// ⭐ `E12F` F2 — the limit read before it: 10 before, 10 recorded, 4 held back, its own ~~2 × 4~~ 2 × 6 counted (⭐ Package L — D13 (`REG-D-135` (3)): each declared review up to SIX calls (`LANE_BUDGET.reviewerCallsPerTry`), so a sign-off counts its declared policies × 6).
-			limitCheck: { prior: 10, recorded: 10, reserve: 4, ahead: 12, counted: COUNTED_SIGN_OFF, total: 36, limit: PHASE7_PAID_LIMIT, allowed: true },
+			// ⭐ `E12F` F2 — the limit read before it: 10 before, ⭐ (D6) 3 recorded — its own press, the only one before it — 4
+			// held back, its own 2 × 6 counted (package L, D13: each declared review up to SIX calls).
+			limitCheck: { prior: 10, recorded: 3, reserve: 4, ahead: 12, counted: COUNTED_SIGN_OFF, total: 29, limit: PHASE7_PAID_LIMIT, allowed: true },
 			recordAssurance: actAnswered('success', ASSURED),
 			rerunDeclared: null,
 			rerunLimitCheck: null,
@@ -2006,8 +2041,8 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		});
 		expect(implementation.signOff).toEqual({
 			offered: true,
-			// ⭐ Package L — D13: ~~3 × 4 = 12, total 36~~ 3 × 6 = 18, total 42.
-			limitCheck: { prior: 10, recorded: 10, reserve: 4, ahead: 18, counted: COUNTED_SIGN_OFF, total: 42, limit: PHASE7_PAID_LIMIT, allowed: true },
+			// ⭐ D6 — 9 recorded before it (requirements' 3, design's 2, its own 4); 3 × 6 = 18 counted, total 41.
+			limitCheck: { prior: 10, recorded: 9, reserve: 4, ahead: 18, counted: COUNTED_SIGN_OFF, total: 41, limit: PHASE7_PAID_LIMIT, allowed: true },
 			recordAssurance: actAnswered('failure', COMPLETED),
 			rerunDeclared: null,
 			rerunLimitCheck: null,
@@ -2015,43 +2050,31 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			refused: { act: 'Record Assurance', reason: '{"type":"failure"}' },
 			notPressed: null
 		});
-		expect([design.signOff, root.signOff?.refused]).toEqual([null, null]);
+		// ⭐ D6 — the stopped phase's row read, and nothing pressed; the root, never pressed, has no sign-off.
+		expect([design.signOff?.offered, design.signOff?.recordAssurance, root.signOff]).toEqual([false, null, null]);
+		expect(root.notStarted, 'the root is not recorded not started, in the page’s words').toBe(
+			'not started: it waits for "Design" (EXECUTING) and "Implementation and unit tests" (EXECUTING) to be accepted'
+		);
 		expect(l.action('04-implementation-markSatisfied')).toBe(false);
+		expect(l.action('01-root-beginExecute'), 'the root was pressed').toBe(false);
 		expect(
 			l.archives.map((a) => [a.name, a.unitId, a.refusal, a.capturesBefore]),
-			'an archive was not diffed with the one before it (K5)'
+			'an archive was not diffed with the one before it, in the order pressed (K5)'
 		).toEqual([
-			['01-root', 'pwu_root', null, []],
-			['02-requirements', 'pwu_requirements', null, ['capture-of-01-root']],
-			[
-				'03-design',
-				'pwu_design',
-				'{"type":"failure"}',
-				['capture-of-01-root', 'capture-of-02-requirements']
-			],
-			[
-				'04-implementation',
-				'pwu_implementation',
-				null,
-				['capture-of-01-root', 'capture-of-02-requirements', 'capture-of-03-design']
-			],
+			['02-requirements', 'pwu_requirements', null, []],
+			['03-design', 'pwu_design', '{"type":"failure"}', ['capture-of-02-requirements']],
+			['04-implementation', 'pwu_implementation', null, ['capture-of-02-requirements', 'capture-of-03-design']],
 			[
 				'05-end-to-end',
 				'pwu_end-to-end',
 				null,
-				[
-					'capture-of-01-root',
-					'capture-of-02-requirements',
-					'capture-of-03-design',
-					'capture-of-04-implementation'
-				]
+				['capture-of-02-requirements', 'capture-of-03-design', 'capture-of-04-implementation']
 			],
 			[
 				'06-final',
 				null,
 				null,
 				[
-					'capture-of-01-root',
 					'capture-of-02-requirements',
 					'capture-of-03-design',
 					'capture-of-04-implementation',
@@ -2061,6 +2084,53 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		]);
 		expect([record.end?.reason, l.written().end?.reason]).toEqual(['complete', 'complete']);
 		expect(laneVerdict(record)).toEqual([]);
+	});
+
+	it('⭐ THE PREDICTED RED (D6), THROUGH THE LANE — a phase pressed after an UNRELATED phase stopped records `upstreamNotAssured` FALSE: §3.2’s phases wait for no other phase, so design’s stop is no upstream of implementation’s', async () => {
+		const l = laneOf({
+			paid: true,
+			presses: { ...ALL_COMPLETE, design: { outcome: answered('failure'), after: STOPPED } },
+			signOffs: { requirements: GREEN, implementation: GREEN, 'end-to-end': GREEN }
+		});
+		const record = await l.run();
+		const of = (slug: string) => record.units.find((u) => u.slug === slug)!;
+		expect([of('design').stopped, of('implementation').beginExecute?.envelopeType], 'arrangement: design stopped, implementation ran after it').toEqual([
+			true,
+			'success'
+		]);
+		expect(of('implementation').upstreamNotAssured, 'an unrelated stop marked a phase whose own producers are accepted').toBe(false);
+		expect(of('end-to-end').upstreamNotAssured).toBe(false);
+	});
+
+	it('⭐ D7 — PAID: every phase accepted, so the ROOT is offered LAST and pressed, then signed off: the press order the four phases in the tree’s order, the root fifth', async () => {
+		const l = laneOf({
+			paid: true,
+			presses: ALL_COMPLETE,
+			signOffs: { root: GREEN, requirements: GREEN, design: GREEN, implementation: GREEN, 'end-to-end': GREEN }
+		});
+		const record = await l.run();
+		const last = ['requirements', 'design', 'implementation', 'end-to-end', 'root'];
+		expect(l.only('beginExecute'), 'the root was not pressed last').toEqual(last.map((u) => `beginExecute ${u}`));
+		expect(record.order?.pressed).toEqual(last);
+		expect(l.only('beginExecute', 'markSatisfied'), 'a unit was pressed before the one before it was signed off').toEqual(
+			last.flatMap((u) => [`beginExecute ${u}`, `markSatisfied ${u}`])
+		);
+		expect(record.units.map((u) => [u.slug, u.upstreamNotAssured, u.notStarted])).toEqual([
+			['root', false, null],
+			['requirements', false, null],
+			['design', false, null],
+			['implementation', false, null],
+			['end-to-end', false, null]
+		]);
+		expect(l.archives.map((a) => a.name)).toEqual([
+			'02-requirements',
+			'03-design',
+			'04-implementation',
+			'05-end-to-end',
+			'01-root',
+			'06-final'
+		]);
+		expect([record.end?.reason, laneVerdict(record)]).toEqual(['complete', []]);
 	});
 
 	// ── ⭐⭐ `JAN-EXEC` P7-6R R-1f — THE RUN PLAN'S RULE, ACTED AS THE OPERATOR (`REG-D-105` (4)), REHEARSED WITH NO MODEL ───────
@@ -2104,7 +2174,8 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			l.only('beginExecute', 'recoveryOffers', 'recover'),
 			'the rule did not act on each stopped phase, in order, before the next started'
 		).toEqual([
-			'beginExecute root',
+			// ⛔ MOVED (package M; `REG-D-135` (2); design D7): ~~'beginExecute root'~~ first — the root waits for its phases, and
+			// here never starts (D4, below).
 			'beginExecute requirements',
 			'recoveryOffers requirements',
 			'recover requirements rerunReview',
@@ -2163,20 +2234,24 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		]);
 		for (const rationale of Object.values(RULE_RATIONALE))
 			expect(rationale).toMatch(/^The run plan’s rule, REG-D-105 \(4\): /);
+		// ⛔ MOVED (package M; design D6): ~~root [false, null]; implementation and end-to-end `upstreamNotAssured` TRUE~~ — the
+		// root is never pressed, and the flag reads each phase's OWN producers, of which §3.2's phases have none.
 		expect(record.units.map((u) => [u.slug, u.stopped, u.upstreamNotAssured])).toEqual([
-			['root', false, null],
+			['root', null, null],
 			['requirements', false, false],
 			['design', true, false],
-			['implementation', false, true],
-			['end-to-end', false, true]
+			['implementation', false, false],
+			['end-to-end', false, false]
 		]);
 		expect(
 			implementation.limitCheck?.recorded,
 			'the limit before a phase did not count the re-runs'
 		).toBe(2 + 1 + 2 + 3);
 		// ⭐⭐ P5 package B (F3; the sponsor, 2026-10-18: "Yes, hold the root", REG-D-117 Q7) — AND THE ROOT IS HELD while a phase is
-		// ABANDONED: its row read, nothing pressed, and its sign-off recorded not pressed, naming the abandoned phase. ⛔ RED
-		// BEFORE F3, driven: the root's Record Assurance and Mark Satisfied were pressed after the abandonment, as in P5.
+		// ABANDONED: ~~its row read, nothing pressed, and its sign-off recorded not pressed, naming the abandoned phase~~ ⭐⭐ (package
+		// M; `REG-D-135` (2); design D4) — the WORKBENCH now holds it: the root waits for the abandoned phase, the page withholds
+		// its Begin & Execute and says why, and the lane records it NOT STARTED, in the page's words — never pressed, never signed
+		// off. ⛔ RED BEFORE F3, driven: the root's Record Assurance and Mark Satisfied were pressed after the abandonment, as in P5.
 		expect(
 			l.only('recordAssurance', 'markSatisfied'),
 			'the recovered phase was not signed off, the abandoned one was, or the root was signed off beside it'
@@ -2189,19 +2264,13 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			'markSatisfied end-to-end'
 		]);
 		const root = record.units[0]!;
-		expect(root.signOff, 'the root’s sign-off is not recorded held, naming the abandoned phase').toEqual({
-			offered: true,
-			limitCheck: null,
-			recordAssurance: null,
-			rerunDeclared: null,
-			rerunLimitCheck: null,
-			markSatisfied: null,
-			refused: null,
-			notPressed:
-				'the root is held, not signed off: Design is ABANDONED, and the lane signs no root off while a phase is (the ' +
-				'sponsor, 2026-10-18: "Yes, hold the root", REG-D-117 Q7)'
-		});
-		expect(l.written().units[0]!.signOff, 'the run record written lacks the hold').toEqual(root.signOff);
+		// ⛔ MOVED (package M; design D4): ~~the root's sign-off recorded held, `notPressed` naming Design ABANDONED and REG-D-117
+		// Q7~~ — the root is never pressed, so it has no sign-off; it is recorded not started, its producer named abandoned.
+		expect([root.beginExecute, root.signOff], 'the root was pressed, or signed off, over an abandoned phase').toEqual([null, null]);
+		expect(root.notStarted, 'the root is not recorded not started, naming the abandoned phase').toBe(
+			'not started: its producer "Design" was ABANDONED'
+		);
+		expect(l.written().units[0]!.notStarted, 'the run record written lacks why the root never started').toBe(root.notStarted);
 		expect([l.action('01-root-recordAssurance'), l.action('01-root-markSatisfied')]).toEqual([false, false]);
 		for (const file of [
 			'02-requirements-rerunReview',
@@ -2238,7 +2307,9 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		});
 		const record = await l.run();
 		expect(l.only('recover '), 'a re-run was pressed past the limit').toEqual([]);
-		expect(l.only('beginExecute')).toEqual(['beginExecute root', 'beginExecute requirements']);
+		// ⛔ MOVED (package M; `REG-D-135` (2); design D7): ~~['beginExecute root', 'beginExecute requirements']~~ — the root waits
+		// for its phases, so requirements is the first press, and the limit stops the run before any other.
+		expect(l.only('beginExecute')).toEqual(['beginExecute requirements']);
 		expect(record.units[1]!.recovery).toEqual([
 			{
 				act: 'rerunReview',
@@ -2286,7 +2357,7 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		});
 		const record = await l.run();
 		expect(l.only('beginExecute', 'recover')).toEqual([
-			'beginExecute root',
+			// ⛔ MOVED (package M; `REG-D-135` (2); design D7): ~~'beginExecute root'~~ first — the root waits for its phases.
 			'beginExecute requirements',
 			'recoveryOffers requirements',
 			'recover requirements rerunWork'
@@ -2294,6 +2365,16 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		expect([record.end?.reason, record.end?.detail]).toEqual([
 			'allowance-exceeded',
 			`Requirements's rerunWork outlasted its allowance of ${PHASE7_UNIT_ALLOWANCE_MS} ms`
+		]);
+		// ⭐ Package M (`REG-D-135` (2); design D6) — AND THE LANE ENDS THERE, AT ONCE: the store read once after the act, and the
+		// run ended. ⛔ Since the sign-off follows each press in the one loop, an end the recovery reached and the loop ignored
+		// no longer led to a later PRESS — the sign-off's own `reached` check stops the loop — but the lane still read the
+		// unit's row beside the re-run the server may still be running, and took the final archive of a unit still running
+		// (P76R-M40, measured SURVIVED by this package's first run, 2026-10-26, before this pin).
+		expect(l.calls.slice(l.calls.indexOf('recover requirements rerunWork')), 'the lane acted after a re-run with no answer').toEqual([
+			'recover requirements rerunWork',
+			'read',
+			'flushPosts'
 		]);
 	});
 
@@ -2446,16 +2527,26 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		expect([record.units[1]!.recovery, record.units[1]!.after]).toEqual([[], WAITING]);
 	});
 
-	it('⛔ D4 — a phase PAST ITS ALLOWANCE ends the run there: it is archived, and the next is never pressed beside it, nothing signed off (REG-F-535)', async () => {
+	it('⛔ D4 — a phase PAST ITS ALLOWANCE ends the run there: it is archived, and the next is never pressed beside it, ~~nothing signed off~~ nor its own sign-off (REG-F-535)', async () => {
 		const l = laneOf({
 			paid: true,
 			presses: { ...ALL_COMPLETE, implementation: { outcome: OUTLASTED, after: STOPPED } }
 		});
 		const record = await l.run();
+		// ⛔ MOVED (package M; `REG-D-135` (2); design D6, D7): ~~root, requirements, design, implementation pressed, and no
+		// showOverview or Record Assurance after them~~ — the root waits for its phases, and each phase's sign-off follows its
+		// own press (these rows offer no Record Assurance: the hand is asked, and nothing pressed). After the press with no
+		// answer, nothing: not its sign-off, not the next phase, not a reload.
 		expect(l.only('beginExecute', 'recordAssurance', 'showOverview')).toEqual([
-			'beginExecute root',
+			'showOverview',
 			'beginExecute requirements',
+			'showOverview',
+			'recordAssurance requirements',
+			'showOverview',
 			'beginExecute design',
+			'showOverview',
+			'recordAssurance design',
+			'showOverview',
 			'beginExecute implementation'
 		]);
 		expect(l.archives.map((a) => a.name).at(-1)).toBe('04-implementation');
@@ -2475,11 +2566,8 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			presses: { ...ALL_COMPLETE, design: { outcome: LOST_IN_TRANSIT, after: STOPPED } }
 		});
 		const record = await l.run();
-		expect(l.only('beginExecute')).toEqual([
-			'beginExecute root',
-			'beginExecute requirements',
-			'beginExecute design'
-		]);
+		// ⛔ MOVED (package M; design D7): ~~'beginExecute root'~~ first.
+		expect(l.only('beginExecute')).toEqual(['beginExecute requirements', 'beginExecute design']);
 		expect(record.units[2]!.beginExecute?.requestFailure).toBe('net::ERR_EMPTY_RESPONSE');
 		expect([record.end?.reason, record.end?.detail]).toEqual([
 			'request-failed',
@@ -2487,26 +2575,37 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		]);
 	});
 
-	it('⛔ D4 — the ROOT’s press with no answer ends the run before any phase, dry or paid', async () => {
-		const dry = laneOf({ paid: false, presses: { root: { outcome: OUTLASTED, after: STOPPED } } });
+	// ⛔ MOVED (package M; `REG-D-135` (2); design D7) — ~~"the ROOT's press with no answer ends the run before any phase, dry or
+	// paid"~~ (dry: `allowance-exceeded`, no dry count; paid: `beginExecute root` alone, `request-failed`): the root is pressed
+	// LAST now, once its phases are accepted, and never in a dry run. The rule it held — a press with no answer ends the run,
+	// the root's included — is restated where the root's press now is.
+	it('⛔ D4 — the ROOT’s press with no answer, LAST, ends the run there: nothing is pressed or signed off after it; dry, the root is never pressed', async () => {
+		const dry = laneOf({ paid: false, presses: { ...ALL_COMPLETE, root: { outcome: OUTLASTED, after: STOPPED } } });
 		const dryRecord = await dry.run();
-		expect([dryRecord.end?.reason, dryRecord.dryRun]).toEqual(['allowance-exceeded', null]);
+		expect([dryRecord.end?.reason, dry.only('beginExecute')]).toEqual(['dry-run-stop', []]);
 		const paid = laneOf({
 			paid: true,
-			presses: { ...ALL_COMPLETE, root: { outcome: LOST_IN_TRANSIT, after: STOPPED } }
+			presses: { ...ALL_COMPLETE, root: { outcome: LOST_IN_TRANSIT, after: STOPPED } },
+			signOffs: { root: GREEN, requirements: GREEN, design: GREEN, implementation: GREEN, 'end-to-end': GREEN }
 		});
 		const paidRecord = await paid.run();
-		expect(paid.only('beginExecute', 'recordAssurance')).toEqual(['beginExecute root']);
+		expect(paid.only('beginExecute').at(-1), 'the root was not the last press').toBe('beginExecute root');
+		expect(paid.only('beginExecute', 'recordAssurance').slice(-2), 'something was pressed after the root’s lost press').toEqual([
+			'recordAssurance end-to-end',
+			'beginExecute root'
+		]);
 		expect(paidRecord.end?.reason).toBe('request-failed');
 	});
 
 	it('⛔ a throw AFTER a press with no answer keeps why the run ended — the archive of a unit still running must not relabel it a lane error', async () => {
-		// Reads: after the root; before requirements and after it; before design and after it; before implementation, and
-		// — the seventh — after it, as the server gone would leave it.
+		// ~~Reads: after the root; before requirements and after it; before design and after it; before implementation, and
+		// — the seventh — after it~~ ⭐ (package M, D6): the order's read; for requirements and design each, its limit, its
+		// upstream, after its press and its sign-off's limit (four each); then implementation's limit and upstream, and — the
+		// twelfth — after it, as the server gone would leave it.
 		const l = laneOf({
 			paid: true,
 			presses: { ...ALL_COMPLETE, implementation: { outcome: OUTLASTED, after: STOPPED } },
-			readThrowsAt: 7
+			readThrowsAt: 12
 		});
 		await expect(l.run()).rejects.toThrow('connect ECONNREFUSED 127.0.0.1:4322');
 		expect([l.written().end?.reason, l.written().end?.detail]).toEqual([
@@ -2538,54 +2637,39 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		// ⛔ `E12F` F2 — ~~'recordAssurance requirements', 'recordAssurance root'~~: a limit a phase may not cross, a sign-off's
 		// worst case added, is crossed by the first sign-off — recorded unpressed, its row read and nothing pressed — and the
 		// lane stops there: the root's is never attempted.
+		// ⛔ MOVED (package M; `REG-D-135` (2); design D6, D7): ~~'beginExecute root' first; then design's own check read past the
+		// limit before any sign-off~~ — the root waits for its phases, and requirements' sign-off follows its own press, so it is
+		// the FIRST act the limit stops: design is never checked, nor pressed. (A phase held back by its own check past the limit
+		// is the D16 case below.)
 		expect(l.only('beginExecute', 'recordAssurance', 'offersRecordAssurance')).toEqual([
-			'beginExecute root',
 			'beginExecute requirements',
 			'offersRecordAssurance requirements'
 		]);
 		expect(record.units.filter((u) => u.signOff !== null).map((u) => [u.slug, u.signOff?.limitCheck?.allowed, u.signOff?.notPressed?.startsWith('the limit: ')])).toEqual([
 			['requirements', false, true]
 		]);
-		// ⭐ The one rule (`REG-D-114` (14)): ~~the phase's first call counted~~ ~~⭐ R3-B's fix round (F1): the phase's worst
-		// case counted~~ ⭐ as amended 2026-10-16: one try's reserve counted, which would pass the limit — ~~total:
-		// PHASE7_PAID_LIMIT~~.
-		expect(record.units[2]!.limitCheck).toEqual({
-			prior,
-			recorded: WHOLE_PRESS,
-			reserve: 4,
-			ahead: WHOLE_PRESS,
-			counted: COUNTED_PRESS,
-			total: PHASE7_PAID_LIMIT + WHOLE_PRESS,
-			limit: PHASE7_PAID_LIMIT,
-			allowed: false
-		});
-		expect(record.units[2]!.beginExecute).toBeNull();
+		expect([record.units[2]!.limitCheck, record.units[2]!.beginExecute], 'design was checked or pressed after the limit stopped the run').toEqual([null, null]);
+		expect(record.units[2]!.notStarted).toBe('not started: offered, and the run ended before it was pressed');
 		expect(laneVerdict(record)).toEqual(["the run ended 'paid-limit', not 'complete'"]);
 	});
 
 	// ── ⛔⛔ `E12F` — THE SIGN-OFF ASKS A REVIEWER SINCE E2: A DRY RUN STOPS BEFORE IT (F1), THE LIMIT SEES IT (F2), AND A REVIEW
 	// THAT DID NOT CONCLUDE IS RE-RUN ONCE BY THE RULE (F3) ─────────────────────────────────────────────────────────────────
-	it('⛔ E12F F1 (REG-D-112 (b)) — DRY: the root’s sign-off stops BEFORE the reviewer call — Record Assurance found on its row and NOT pressed, recorded not reached in a dry run — so a sign-off that would ask a reviewer asks none', async () => {
+	// ⛔ MOVED (package M; `REG-D-135` (2); design D7) — ~~"E12F F1 (REG-D-112 (b)) — DRY: the root's sign-off stops BEFORE the
+	// reviewer call — Record Assurance found on its row and NOT pressed, recorded not reached in a dry run"~~ (the root's row
+	// read, `offersRecordAssurance root`, its sign-off recorded `DRY_SIGN_OFF_NOT_REACHED`): a dry run now presses no unit, so it
+	// reaches no sign-off at all. What the case held — a dry sign-off asks no reviewer — holds the more strongly, and is held so.
+	it('⛔ E12F F1 (REG-D-112 (b)) — DRY: no sign-off is reached at all, so none asks a reviewer: no Record Assurance read or pressed, no Mark Satisfied, no re-run, no model exchange — the order rehearsed instead (D7)', async () => {
 		// ⛔ PREDICTED RED, read from the code: the dry run signed the root off by the paid run's own acts (D11) — Record
 		// Assurance pressed, which since E2 asks the reviewer once per declared policy — and the verdict then said "the dry
 		// run recorded 2 model exchange(s)": two paid calls, made by the run that may call no model.
-		const l = laneOf({ paid: false, presses: { root: ALL_COMPLETE.root! }, signOffs: { root: { ...GREEN, calls: 2 } } });
+		const l = laneOf({ paid: false, presses: ALL_COMPLETE, signOffs: { root: { ...GREEN, calls: 2 }, requirements: { ...GREEN, calls: 2 } } });
 		const record = await l.run();
-		expect(l.only('recordAssurance', 'markSatisfied', 'rerunDeclared'), 'the dry run pressed a sign-off act').toEqual([]);
-		expect(l.only('offersRecordAssurance'), 'the rehearsal did not read the root’s row').toEqual(['offersRecordAssurance root']);
-		expect(record.units[0]!.signOff).toEqual({
-			offered: true,
-			limitCheck: null,
-			recordAssurance: null,
-			rerunDeclared: null,
-			rerunLimitCheck: null,
-			markSatisfied: null,
-			refused: null,
-			notPressed: DRY_SIGN_OFF_NOT_REACHED
-		});
-		expect([l.action('01-root-recordAssurance'), l.action('01-root-markSatisfied')]).toEqual([false, false]);
+		expect(l.only('recordAssurance', 'markSatisfied', 'rerunDeclared', 'offersRecordAssurance'), 'the dry run reached a sign-off').toEqual([]);
+		expect(record.units.map((u) => u.signOff)).toEqual([null, null, null, null, null]);
+		expect([l.action('01-root-recordAssurance'), l.action('02-requirements-recordAssurance')]).toEqual([false, false]);
 		expect(record.dryRun).toEqual({ modelExchanges: 0 });
-		expect(laneVerdict(record), 'a dry run whose sign-off was rehearsed, nothing pressed, failed its verdict').toEqual([]);
+		expect(laneVerdict(record), 'a dry run that reached no sign-off failed its verdict').toEqual([]);
 	});
 
 	it('⛔ E12F F2 — PAID: the limit is read before EACH SIGN-OFF, its own declared reviews counted at their bound: the last phase passes its check, and a sign-off that would cross the limit is NOT pressed — recorded, no later sign-off pressed, and the run ends `paid-limit`', async () => {
@@ -2594,7 +2678,11 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		// ⭐ R3-B's fix round (F1) — ~~prior: PHASE7_PAID_LIMIT - 20, each phase recording 1~~: each phase counts ~~its worst
 		// case~~ ⭐ one try's reserve (`REG-D-114` (14), as amended 2026-10-16), so the run's calls are spent before it, or in its
 		// last phase (`spentBySignOff`), and each sign-off reads the totals it did.
-		const { prior, recorded, presses } = spentBySignOff(PHASE7_PAID_LIMIT - 16);
+		// ⛔ MOVED (package M; `REG-D-135` (2); design D6): ~~`spentBySignOff(PHASE7_PAID_LIMIT - 16)`, the calls spent in the last
+		// phase; the last phase's own check passed; requirements' sign-off at the limit exactly (prior + 0 + 4 + 12), design's
+		// 12 over it~~ — each sign-off now follows its own press, so the calls are spent in DESIGN's press (`spentBefore`): its own
+		// check passes at the limit exactly, and its sign-off, its 4 × 6 counted, is the act that would cross it.
+		const { prior, recorded, presses } = spentBefore('design', PHASE7_PAID_LIMIT - 16);
 		const l = laneOf({
 			paid: true,
 			prior,
@@ -2602,22 +2690,20 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			signOffs: { root: GREEN, requirements: GREEN, design: GREEN, implementation: GREEN, 'end-to-end': GREEN }
 		});
 		const record = await l.run();
-		// ⭑ The last phase passed its check: ~~prior + 3 + 4, 13 under the limit~~ ~~⭐ R3-B's fix round (F1): prior + 0 + 4 + its
-		// worst case, at the limit~~ ⭐ `REG-D-114` (14), as amended: prior + 0 + 4 + one try's reserve, 8 under the limit. ⭐ The
-		// merge of E12 and E3 — each figure is stated against `PHASE7_PAID_LIMIT`, now ~~450 (`REG-D-110` (1))~~ ~~⭐ 600 (`REG-D-117` Q10;
-		// P5 package C, F2)~~ ~~⭐ 650 (`REG-D-120` Q15; P6 package L, F1)~~ ⭐ 800 (`REG-D-123` Q26; package Q, F5): ~~210 + 3 + 4 = 217,
-		// under 230~~.
-		expect(record.units[4]!.limitCheck?.allowed, 'arrangement: the last phase passes its check').toBe(true);
-		// ⭐ requirements (2 policies): prior + ~~4~~ ~~128~~ 0 + 4 + ~~8, 4 under the limit~~ 12 (package L, D13: × 6), at the
-		// limit, pressed; design (4): ~~4~~ 12 over it, held back — and the lane stops there: implementation's and end-to-end's and
-		// the root's are never attempted.
+		expect(record.units[2]!.limitCheck?.allowed, 'arrangement: design passes its own check').toBe(true);
+		// ⭐ requirements (2 policies): prior + 0 + 4 + 12, under the limit, pressed; design (4): prior + 198 + 4 + 24, 12 over it,
+		// held back — and the lane stops there: implementation and end-to-end are never pressed, and the root never offered.
 		expect(l.only('recordAssurance', 'offersRecordAssurance'), 'a sign-off was pressed past the limit, or after it').toEqual([
 			'recordAssurance requirements',
 			'offersRecordAssurance design'
 		]);
+		expect(l.only('beginExecute'), 'a phase was pressed after the limit stopped the lane').toEqual([
+			'beginExecute requirements',
+			'beginExecute design'
+		]);
 		expect(record.units.map((u) => [u.slug, u.signOff?.limitCheck?.ahead, u.signOff?.limitCheck?.total, u.signOff?.limitCheck?.allowed])).toEqual([
 			['root', undefined, undefined, undefined],
-			['requirements', 12, PHASE7_PAID_LIMIT, true],
+			['requirements', 12, prior + 16, true],
 			['design', 24, PHASE7_PAID_LIMIT + 12, false],
 			['implementation', undefined, undefined, undefined],
 			['end-to-end', undefined, undefined, undefined]
@@ -2657,7 +2743,12 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		// requirements unit's, its two declared policies' 8 calls bringing the total to the limit exactly, was held back.
 		// ⭐ R3-B's fix round (F1) — ~~prior: the limit less the reserve and requirements' 8~~: each phase counts ~~its worst case~~
 		// ⭐ one try's reserve, so the calls before the sign-offs are spent before the run (`spentBySignOff`), the same total.
-		const { prior, recorded, presses } = spentBySignOff(
+		// ⛔ MOVED (package M; `REG-D-135` (2); design D6): ~~`spentBySignOff`, the calls spent in the last phase; the next, past the
+		// limit, design's SIGN-OFF, held back (+ 12)~~ — requirements' sign-off follows its own press, which spends the calls
+		// (`spentBefore`); the act after it, past the limit, is design's PRESS, held back; and one call more, requirements' own
+		// sign-off is held back.
+		const { prior, recorded, presses } = spentBefore(
+			'requirements',
 			PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - signOffWorstCase(PHASE7_ARCHIVE_UNITS[1]!)
 		);
 		const l = laneOf({
@@ -2667,16 +2758,26 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			signOffs: { root: GREEN, requirements: GREEN, design: GREEN, implementation: GREEN, 'end-to-end': GREEN }
 		});
 		const record = await l.run();
-		expect(l.only('recordAssurance', 'offersRecordAssurance'), 'a sign-off that reaches the limit was held back').toEqual([
+		expect(l.only('recordAssurance', 'markSatisfied', 'beginExecute'), 'a sign-off that reaches the limit was held back').toEqual([
+			'beginExecute requirements',
 			'recordAssurance requirements',
-			'offersRecordAssurance design'
+			'markSatisfied requirements'
 		]);
-		expect([record.units[1]!.signOff?.limitCheck, record.units[2]!.signOff?.limitCheck]).toEqual([
-			// ⭐ Package L — D13: ~~8, 16, + 8~~ — requirements' 2 × 6 and design's 4 × 6.
+		expect([record.units[1]!.signOff?.limitCheck, record.units[2]!.limitCheck]).toEqual([
+			// ⭐ Package L — D13: requirements' 2 × 6.
 			{ prior, recorded, reserve: 4, ahead: 12, counted: COUNTED_SIGN_OFF, total: PHASE7_PAID_LIMIT, limit: PHASE7_PAID_LIMIT, allowed: true },
-			{ prior, recorded, reserve: 4, ahead: 24, counted: COUNTED_SIGN_OFF, total: PHASE7_PAID_LIMIT + 12, limit: PHASE7_PAID_LIMIT, allowed: false }
+			{ prior, recorded, reserve: 4, ahead: WHOLE_PRESS, counted: COUNTED_PRESS, total: PHASE7_PAID_LIMIT - 12 + WHOLE_PRESS, limit: PHASE7_PAID_LIMIT, allowed: false }
 		]);
 		expect(record.end?.reason).toBe('paid-limit');
+		// ⭑ One call more, and the sign-off itself is past the limit: held back, its row read, nothing pressed.
+		const past = spentBefore('requirements', PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - signOffWorstCase(PHASE7_ARCHIVE_UNITS[1]!) + 1);
+		const pastLane = laneOf({ paid: true, prior: past.prior, presses: past.presses, signOffs: { requirements: GREEN } });
+		const held = await pastLane.run();
+		expect([pastLane.only('recordAssurance'), held.units[1]!.signOff?.limitCheck?.total, held.units[1]!.signOff?.limitCheck?.allowed]).toEqual([
+			[],
+			PHASE7_PAID_LIMIT + 1,
+			false
+		]);
 	});
 
 	it('⛔ ONE RULE — the rule’s re-run of the declared reviews, its worst case bringing the total EXACTLY to the limit, is pressed', async () => {
@@ -2685,7 +2786,10 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		// ⭐ R3-B's fix round (F1) — ~~prior: the limit less the reserve, 16 and 12~~: each phase counts ~~its worst case~~ ⭐ one
 		// try's reserve, so the calls before the sign-offs are spent before the run (`spentBySignOff`), the same total.
 		// ⭐ Package L — D13: ~~16~~ design's re-run counts 4 × 6 = 24.
-		const { prior, recorded, presses } = spentBySignOff(PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - 24 - 12);
+		// ⛔ MOVED (package M; design D6): ~~`spentBySignOff`, the calls spent in the last phase, and the run `complete`~~ — the
+		// calls are spent in design's own press (`spentBefore`), its sign-off following it; after its re-run the total stands at
+		// the limit, so the next phase's press is held back and the run ends `paid-limit`.
+		const { prior, recorded, presses } = spentBefore('design', PHASE7_PAID_LIMIT - PHASE7_NEGATIVE_CONTROL_RESERVE - 24 - 12);
 		const l = laneOf({
 			paid: true,
 			prior,
@@ -2718,7 +2822,7 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			limit: PHASE7_PAID_LIMIT,
 			allowed: true
 		});
-		expect(record.end?.reason).toBe('complete');
+		expect(record.end?.reason).toBe('paid-limit');
 	});
 
 	// ~~⛔ REG-D-114 (14), AS AMENDED — before a phase it counts ONE TRY’S RESERVE~~ ⛔ SUPERSEDED (`REG-D-135` (4); design D16).
@@ -2742,8 +2846,8 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			signOffs: { root: GREEN, requirements: GREEN }
 		});
 		const record = await l.run();
+		// ⛔ MOVED (package M; design D7): ~~'beginExecute root'~~ first — the root waits for its phases.
 		expect(l.only('beginExecute'), 'a phase whose whole press reaches the limit was held back, or the next, past it, pressed').toEqual([
-			'beginExecute root',
 			'beginExecute requirements'
 		]);
 		expect([record.units[1]!.limitCheck, record.units[2]!.limitCheck]).toEqual([
@@ -2795,7 +2899,8 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			allowed: true
 		});
 		// ⭑ Pressed, it spends a call, and the next phase is held back past the limit.
-		expect([at.only('beginExecute'), pressed.end?.reason]).toEqual([['beginExecute root', 'beginExecute requirements'], 'paid-limit']);
+		// ⛔ MOVED (package M; design D7): ~~'beginExecute root'~~ first.
+		expect([at.only('beginExecute'), pressed.end?.reason]).toEqual([['beginExecute requirements'], 'paid-limit']);
 		const past = stoppedHaving('rerunReview', reaching(REREVIEW_UNREAD) + 1);
 		const held = await past.run();
 		expect(past.only('recover '), 'a re-run of the review whose refused reviews pass the limit was pressed').toEqual([]);
@@ -2988,7 +3093,8 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 		// ~~prior: PHASE7_PAID_LIMIT - 30~~: each phase counts ~~its worst case~~ ⭐ one try's reserve (`REG-D-114` (14), as
 		// amended 2026-10-16), so the calls before the sign-offs are spent before the run, or in its last phase
 		// (`spentBySignOff`), and "prior" above is those calls, the same total.
-		const near = spentBySignOff(PHASE7_PAID_LIMIT - 30);
+		// ⛔ MOVED (package M; design D6): ~~`spentBySignOff`~~ — spent in design's own press, its sign-off following it.
+		const near = spentBefore('design', PHASE7_PAID_LIMIT - 30);
 		const limited = laneOf({
 			paid: true,
 			prior: near.prior,
@@ -3012,6 +3118,14 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			null,
 			[]
 		]);
+		// ⭐ Package M (`REG-D-135` (2); design D6) — AND THE LANE STOPS THERE: no later unit's press is checked, the page's offers
+		// are not read again. ⛔ Since the sign-off follows each press in the one loop, a lane that ignored the re-run's limit
+		// still ended `paid-limit` — at the NEXT unit's own check, its whole press past the limit — so the run's end alone no
+		// longer told the two apart (E12-M64, measured SURVIVED by this package's first run, 2026-10-26, before this pin).
+		expect(
+			[stopped.units[3]!.limitCheck, stopped.units[4]!.limitCheck],
+			'the lane went on to check a later press after the limit stopped the re-run'
+		).toEqual([null, null]);
 	});
 
 	it('⛔ E12F F3 — a Record Assurance with NO ANSWER is left as found: the rule re-runs nothing beside a press the server may still be running (D4), whatever the row then offers', async () => {
@@ -3126,9 +3240,11 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 	});
 
 	it('⛔ E12’s re-review F1 — a throw AFTER a sign-off act with no answer keeps why the run ended: the store read beside reviews still running must not relabel it a lane error', async () => {
-		// ⭑ Reads: the root's; two per phase (its limit, its store); requirements' limit, then the store after its Record
+		// ⭑ Reads: ~~the root's; two per phase (its limit, its store); requirements' limit, then the store after its Record
 		// Assurance and after its Mark Satisfied; design's limit — and, the fourteenth, the store after design's Record
-		// Assurance, as a server gone would leave it.
+		// Assurance~~ ⭐ (package M, D6): the order's; requirements' limit, upstream and store, its sign-off's limit, and the store
+		// after its Record Assurance and after its Mark Satisfied (2 to 7); design's limit, upstream and store, its sign-off's
+		// limit — and, the twelfth, the store after design's Record Assurance, as a server gone would leave it.
 		const l = laneOf({
 			paid: true,
 			presses: ALL_COMPLETE,
@@ -3137,7 +3253,7 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 				requirements: GREEN,
 				design: { ra: { ...OUTLASTED, timedOutAfterMs: PHASE7_RECORD_ASSURANCE_MS }, raAfter: ASSESSING }
 			},
-			readThrowsAt: 14
+			readThrowsAt: 12
 		});
 		await expect(l.run()).rejects.toThrow('connect ECONNREFUSED 127.0.0.1:4322');
 		expect([l.written().end?.reason, l.written().end?.detail]).toEqual([
@@ -3167,8 +3283,9 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 	it('⛔ E12’s polish (the confirm’s F1 residue, its general form) — whatever the store read after it does, an act the lane pressed stays in lane/run.json with its bound: the rule’s re-run of the declared reviews, a Mark Satisfied, and a recovery act', async () => {
 		const outlasted = (ms: number): ActionOutcome => ({ ...OUTLASTED, timedOutAfterMs: ms });
 		const gone = 'connect ECONNREFUSED 127.0.0.1:4322';
-		// ⭑ Reads, as above, to design's limit (13); then the store after its refused Record Assurance (14), the re-run's limit
-		// (15) and — the sixteenth — the store after the re-run, which got no answer.
+		// ⭑ Reads, as above, to design's sign-off's limit (~~13~~ 11, package M); then the store after its refused Record
+		// Assurance (~~14~~ 12), the re-run's limit (~~15~~ 13) and — the ~~sixteenth~~ fourteenth — the store after the re-run,
+		// which got no answer.
 		const rerun = laneOf({
 			paid: true,
 			presses: ALL_COMPLETE,
@@ -3177,7 +3294,7 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 				requirements: GREEN,
 				design: { ra: answered('failure'), raAfter: ASSESSING, rerun: { offered: true, outcome: outlasted(PHASE7_RECORD_ASSURANCE_MS), after: ASSESSING } }
 			},
-			readThrowsAt: 16
+			readThrowsAt: 14
 		});
 		await expect(rerun.run()).rejects.toThrow(gone);
 		const reran = rerun.written().units[2]!.signOff;
@@ -3187,13 +3304,13 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			{ status: null, envelopeType: null, timedOutAfterMs: PHASE7_RECORD_ASSURANCE_MS, requestFailure: null, refusal: null, after: null },
 			{ act: 'Re-run the declared reviews', reason: `no answer within ${PHASE7_RECORD_ASSURANCE_MS} ms` }
 		]);
-		// ⭑ Design's limit (13), the store after its accepted Record Assurance (14), and — the fifteenth — after Mark Satisfied,
-		// whose request failed in transit.
+		// ⭑ Design's sign-off's limit (~~13~~ 11, package M), the store after its accepted Record Assurance (~~14~~ 12), and — the
+		// ~~fifteenth~~ thirteenth — after Mark Satisfied, whose request failed in transit.
 		const satisfied = laneOf({
 			paid: true,
 			presses: ALL_COMPLETE,
 			signOffs: { root: GREEN, requirements: GREEN, design: { ...GREEN, ms: LOST_IN_TRANSIT } },
-			readThrowsAt: 15
+			readThrowsAt: 13
 		});
 		await expect(satisfied.run()).rejects.toThrow(gone);
 		const marked = satisfied.written().units[2]!.signOff;
@@ -3203,14 +3320,14 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 			{ status: null, envelopeType: null, timedOutAfterMs: null, requestFailure: 'net::ERR_EMPTY_RESPONSE', refusal: null, after: null },
 			{ act: 'Mark Satisfied', reason: 'no answer: the request failed in transit (net::ERR_EMPTY_RESPONSE)' }
 		]);
-		// ⭑ D4's general form, the run plan's rule — reads: the root's; requirements' limit and store; the re-run's limit; and
-		// — the fifth — the store after the re-run of its review, which got no answer.
+		// ⭑ D4's general form, the run plan's rule — reads: ~~the root's~~ the order's (package M); requirements' limit, upstream
+		// and store; the re-run's limit; and — the ~~fifth~~ sixth — the store after the re-run of its review, which got no answer.
 		const recovered = laneOf({
 			paid: true,
 			presses: { ...OTHERS_COMPLETE, requirements: { outcome: answered('failure'), after: WAITING } },
 			recoveries: { requirements: { offers: EVERY_OFFER, acts: { rerunReview: { outcome: outlasted(PHASE7_UNIT_ALLOWANCE_MS), after: WAITING } } } },
 			signOffs: OTHERS_GREEN,
-			readThrowsAt: 5
+			readThrowsAt: 6
 		});
 		await expect(recovered.run()).rejects.toThrow(gone);
 		expect(
@@ -3254,13 +3371,14 @@ describe('⭐⭐ THE RUN, IN ITS ORDER — `runTheLane` on hands made here (D1, 
 	});
 
 	it('⛔ E12’s polish (fix3’s F1, its general form) — and after a REFUSED Record Assurance: a throw before the rule’s re-run of the declared reviews leaves lane/run.json the state read', async () => {
-		// ⭑ Reads to requirements' limit (10); the store after its refused Record Assurance (11); and — the twelfth — the limit
-		// before the rule's re-run, which throws as a server gone would. The re-run is never pressed.
+		// ⭑ Reads to requirements' sign-off's limit (~~10~~ 5, package M: the order's, then its limit, upstream and store); the
+		// store after its refused Record Assurance (~~11~~ 6); and — the ~~twelfth~~ seventh — the limit before the rule's re-run,
+		// which throws as a server gone would. The re-run is never pressed.
 		const l = laneOf({
 			paid: true,
 			presses: ALL_COMPLETE,
 			signOffs: { root: GREEN, requirements: { ra: answered('failure'), raAfter: ASSESSING, rerun: { offered: true } } },
-			readThrowsAt: 12
+			readThrowsAt: 7
 		});
 		await expect(l.run()).rejects.toThrow('connect ECONNREFUSED 127.0.0.1:4322');
 		expect(l.calls.slice(l.calls.indexOf('recordAssurance requirements')), 'the throw came after the read').toEqual([

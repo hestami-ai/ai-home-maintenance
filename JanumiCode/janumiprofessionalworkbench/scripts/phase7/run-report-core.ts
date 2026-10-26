@@ -392,7 +392,8 @@ export interface DeclaredUnitSpec extends UnitSpec {
 }
 
 /**
- * HALF A's units, in the order the run starts them (`pwa-content.ts`: the root, then the four phases). ⭐ E3 (C2): half
+ * HALF A's units, ~~in the order the run starts them~~ by their number (`pwa-content.ts`: the root, then the four phases) —
+ * ⭐ package M (`REG-D-135` (2); design D6): their identity; the order pressed is the record's (`pressOrderOf`). ⭐ E3 (C2): half
  * B's are READ FROM THE PUBLISHED PWA instead (`halfBUnitSpecs`), the agent's own, root first, then the tree's order.
  */
 export const PHASE7_UNITS: readonly DeclaredUnitSpec[] = [
@@ -892,6 +893,8 @@ export interface RunReport {
 		readonly half: RunHalf;
 		readonly startedAt: string | null;
 		readonly endReason: string | null;
+		/** ⭐ Package M (D6) — the order the lane pressed in, as its record says it; null for a record made before package M. */
+		readonly pressOrder: readonly string[] | null;
 		readonly archiveRead: string;
 		readonly archivesPresent: readonly string[];
 		readonly events: number;
@@ -1114,6 +1117,22 @@ interface LaneUnit {
 		| { readonly slug: string; readonly before: string }
 		| { readonly slug: string; readonly unanswered: string }
 		| null;
+	/**
+	 * ⭐ `JAN-EXEC` Phase 7, package M (`REG-D-135` (2); design D4, D6) — why the lane never pressed it, in the page's words where
+	 * the page withheld it (`not started: …`); null for a unit pressed, and for a record made before package M.
+	 */
+	readonly notStarted: string | null;
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package M (`REG-D-135` (2); design D6) — THE ORDER THE LANE PRESSED IN, as its record says it
+ * (`order.pressed`, by slug); null for a record made before package M, whose lane pressed the root first, then the phases in
+ * the tree's order — its units' order — and signed them off after. ⛔ The report read every order off the units' NUMBERS,
+ * which are the tree's: since package M the root is pressed last, and its archive, `01-root`, is taken after all the others.
+ */
+export function pressOrderOf(run: unknown): readonly string[] | null {
+	const pressed = rec(rec(run).order).pressed;
+	return Array.isArray(pressed) && pressed.every((x) => typeof x === 'string') ? (pressed as string[]) : null;
 }
 
 /**
@@ -1197,7 +1216,10 @@ function signOffOutlasted(signOff: Record<string, unknown>): LaneUnit['signOffOu
  * an act the server may still be running) — past its bound, or lost in transit, whichever act it was (`SIGN_OFF_ACTS`) — so
  * every later unit whose record holds no sign-off was skipped after it. ⛔ Each read "its sign-off was never attempted".
  */
-function signOffsSkipped(rows: readonly Record<string, unknown>[]): Map<Record<string, unknown>, LaneUnit['signOffSkippedAt']> {
+function signOffsSkipped(
+	rows: readonly Record<string, unknown>[],
+	pressed: readonly string[] | null
+): Map<Record<string, unknown>, LaneUnit['signOffSkippedAt']> {
 	const heldBefore = (r: Record<string, unknown>): string | null => {
 		const signOff = rec(r.signOff);
 		if (bool(rec(signOff.limitCheck).allowed) === false) return BEFORE_RECORD_ASSURANCE;
@@ -1214,7 +1236,13 @@ function signOffsSkipped(rows: readonly Record<string, unknown>[]): Map<Record<s
 	};
 	const skipped = new Map<Record<string, unknown>, LaneUnit['signOffSkippedAt']>();
 	let stop: LaneUnit['signOffSkippedAt'] = null;
-	for (const r of [...rows.slice(1).filter((x) => bool(x.stopped) !== true), ...rows.slice(0, 1)]) {
+	// ⭐ Package M (D6) — the lane's sign-offs, in the order it made them: each pressed unit's right after its press, in the
+	// order the record says it pressed (`pressOrderOf`); ⛔ before package M, the phases that did not stop, then the root.
+	const order =
+		pressed === null
+			? [...rows.slice(1).filter((x) => bool(x.stopped) !== true), ...rows.slice(0, 1)]
+			: pressed.map((slug) => rows.find((x) => str(x.slug) === slug)).filter((x): x is Record<string, unknown> => x !== undefined);
+	for (const r of order) {
 		if (stop !== null) {
 			if (r.signOff === null || r.signOff === undefined) skipped.set(r, stop);
 			continue;
@@ -1231,7 +1259,7 @@ function laneUnits(run: unknown): LaneUnit[] {
 	const units = rec(run).units;
 	const rows = (Array.isArray(units) ? (units as unknown[]) : []).map(rec);
 	// ⭐ R3-B F4 — where the lane stopped its sign-offs, for each unit it skipped after.
-	const skipped = signOffsSkipped(rows);
+	const skipped = signOffsSkipped(rows, pressOrderOf(run));
 	return rows.map((r) => {
 		const pressed = r.beginExecute !== null && r.beginExecute !== undefined;
 		const be = rec(r.beginExecute);
@@ -1260,7 +1288,8 @@ function laneUnits(run: unknown): LaneUnit[] {
 			),
 			signOffHeldBack: heldBackOf(str(r.slug), signOff),
 			limitChecks: limitChecksOf(str(r.slug), r, signOff),
-			signOffSkippedAt: skipped.get(r) ?? null
+			signOffSkippedAt: skipped.get(r) ?? null,
+			notStarted: str(r.notStarted) || null
 		};
 	});
 }
@@ -1438,7 +1467,8 @@ function resolveUnits(
 
 /**
  * ⭐⭐ E3 (C2) — HALF B'S UNITS, READ FROM THE PUBLISHED PWA, never from §3.2's five: the Undertaking's units in the tree's
- * order, the root first (`half-b.ts`, `unitsInTreeOrder` — the order the lane pressed them in), each found by its own id.
+ * order, the root first (`half-b.ts`, `unitsInTreeOrder` — ~~the order the lane pressed them in~~ ⭐ package M: their identity;
+ * the lane presses what the page offers, the root last, and records it, `pressOrderOf`), each found by its own id.
  * Stage 2 then holds them to ~~the PWA's MANDATORY tree (`mandatoryTypes`)~~ ⭐ `REG-D-112` (E3's review, finding 4) THE
  * PLAN INSTANTIATION MAKES OF IT, PER (PARENT, TYPE) (`treeAgainstPlan`, the product's `planComposition`): a planned unit
  * none was built for is missing, a second under one parent a duplicate, a unit with no parent in the Undertaking an
@@ -2563,7 +2593,18 @@ function capturesAdded(
 			: `the archive ${archiveNameOf(o.order, o.slug)} holds no capture listing, and no checks.json says the run had none`;
 	const mine = capturesIn(archiveFacts(lane, u));
 	if (mine === null) return { added: null, unknownBecause: listing(u) };
-	const before = units.filter((o) => o.order < u.order).at(-1);
+	// ⭐⭐ Package M (`REG-D-135` (2); design D6) — THE ARCHIVE BEFORE IS THE ONE PRESSED BEFORE, as the record orders the presses
+	// (`pressOrderOf`): an archive is taken after each press, and the root is pressed last now. ⛔ It was the unit NUMBERED before,
+	// so the first press read its gain over the root's archive, taken last and holding every run of the run. ⚠ A record made
+	// before package M holds no order, and its lane pressed in the units' order, which is then read.
+	const pressed = pressOrderOf(lane.run);
+	const at = pressed?.indexOf(u.slug) ?? -1;
+	const before =
+		pressed === null
+			? units.filter((o) => o.order < u.order).at(-1)
+			: at > 0
+				? units.find((o) => o.slug === pressed[at - 1])
+				: undefined;
 	// The root's archive holds no process-output: the first model unit's predecessor left no capture.
 	let prior: readonly string[] | null = [];
 	if (before !== undefined) prior = capturesIn(archiveFacts(lane, before)) ?? (before.order === 1 ? [] : null);
@@ -2954,7 +2995,13 @@ function stageThree(v: UnitView, ix: Index): MatrixCell {
 			"nothing bounds a unit's wall-clock time (REG-F-521, W-2), and the server is killed mid-unit (REG-F-527)"
 		]);
 	if (u.plan === null) {
-		if (!v.pressed) return cell('3', row, 'not reached', [], ['Begin & Execute was never pressed on this phase']);
+		// ⭐ Package M (D4, D6) — and why, in the page's words, where the lane recorded them.
+		if (!v.pressed)
+			return cell('3', row, 'not reached', [], [
+				u.lane?.notStarted
+					? `Begin & Execute was never pressed on this phase — the lane’s record: ${u.lane.notStarted}`
+					: 'Begin & Execute was never pressed on this phase'
+			]);
 		const envelope = u.lane?.beginExecute?.envelopeType ?? 'no envelope';
 		return cell('3', row, 'broke', [], [`Begin & Execute was refused before its plan started (${envelope})`]);
 	}
@@ -4146,6 +4193,7 @@ export function buildRunReport(
 			half,
 			startedAt,
 			endReason,
+			pressOrder: pressOrderOf(lane.run),
 			archiveRead: lane.archiveRead,
 			archivesPresent: lane.archives.map((a) => a.name),
 			events: store.events.length,
@@ -4225,6 +4273,10 @@ function headerLines(r: RunReport): string[] {
 		'',
 		`- **Basis:** ${r.basis}.`,
 		`- **Run:** ${r.run.mode ?? 'mode unrecorded'}${started}; ended: ${r.run.endReason ?? 'unrecorded'}.`,
+		// ⭐ Package M (`REG-D-135` (2); design D6) — the order the lane pressed in, read from its record, never inferred.
+		r.run.pressOrder === null
+			? '- **Press order:** not recorded — a record made before package M, whose lane pressed the root first, then the phases in the tree’s order, and signed them off after.'
+			: `- **Press order:** ${r.run.pressOrder.join(', ')} — as the lane recorded it (lane/run.json \`order.pressed\`).`,
 		`- **Read from:** lane/archive/${r.run.archiveRead} (${r.run.events} events, ${r.run.objects} objects, ` +
 			`${r.run.contentRows ?? 'no'} content rows).`,
 		'- **A "Yes" always states:**',

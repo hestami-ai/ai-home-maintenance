@@ -2280,6 +2280,116 @@ describe('JAN-EXECREM WP-16 (c) — the enforcement register is OBSERVED, not as
 				return { control: markReady(OK_PWU), observed: markReady(BAD_PWU) };
 			}
 		},
+		// ⭐ `JAN-EXEC` Phase 7, package M (2026-10-25; `REG-D-135` (2); design D2). TWO UNDERTAKINGS' WORTH OF ARRANGEMENT, ONE
+		// DELTA: each consumer records its own producer in `dependencyIds`; the control's producer is seeded SATISFIED (the
+		// assurance chain to it is not this rule's), the observation's left PROPOSED. Everything else — the PWA, the
+		// Undertaking, the Intent, the shape readiness limbs, the SHAPING arrival — is the same, so only the producer's
+		// acceptance can flip MarkPwuReady's answer.
+		'RPH-PWU-011': {
+			arrangement:
+				'MarkPwuReady on a SHAPING unit whose recorded producer is still PROPOSED — a consumer readied before the work it requires',
+			run: () => {
+				const id = (prefix: string, n: string) => `${prefix}_01ARZ3NDEKTSV4RRFFQ69M5${n}`;
+				const [pwa, type, und, intent] = [id('pwa', '000'), id('pwut', '001'), id('und', '002'), id('int', '003')];
+				ok(
+					dispatch(
+						'CreatePwa',
+						{ pwaId: pwa, name: 'Readiness PWA', description: 'd', domain: 'software', version: '1.0.0' },
+						pwa,
+						'PROFESSIONAL_WORK_ARCHITECTURE'
+					),
+					'create the PWA'
+				);
+				ok(
+					dispatch(
+						'DefinePwuType',
+						{ pwuTypeId: type, pwaId: pwa, pwuKind: 'ROOT', name: 'Root', purpose: 'the root', isRoot: true },
+						type,
+						'PWU_TYPE'
+					),
+					'define its root'
+				);
+				for (const step of ['SubmitPwaForReview', 'ValidatePwa'])
+					ok(dispatch(step, {}, pwa, 'PROFESSIONAL_WORK_ARCHITECTURE'), step);
+				ok(dispatch('PublishPwa', { rootPwuTypeId: type }, pwa, 'PROFESSIONAL_WORK_ARCHITECTURE'), 'publish');
+				ok(
+					dispatch(
+						'CreateUndertaking',
+						{
+							undertakingId: und,
+							name: 'Readiness',
+							description: 'd',
+							pwaId: pwa,
+							pwaVersion: '1.0.0',
+							instantiationProfile: 'Standard',
+							objective: 'o',
+							intendedOutputProduct: 'p'
+						},
+						und,
+						'UNDERTAKING'
+					),
+					'create the Undertaking'
+				);
+				// Both units are roots of the Undertaking, so the root-intent readiness limb needs PROVISIONAL.
+				captureIntent(intent);
+				ok(dispatch('BeginIntentDiscovery', {}, intent, 'INTENT'), 'discover');
+				ok(dispatch('ProvisionIntent', { ambiguityIds: [] }, intent, 'INTENT'), 'provision');
+				const propose = (pwuId: string, dependencyIds: string[]) =>
+					ok(
+						dispatch(
+							'ProposePwu',
+							{
+								pwuId,
+								pwuKind: 'WORK',
+								title: pwuId,
+								description: 'd',
+								intentId: intent,
+								undertakingId: und,
+								isLocalExtension: true,
+								boundaries: {
+									inScope: ['the work'],
+									outOfScope: ['not yet known'],
+									permittedChanges: [],
+									prohibitedChanges: []
+								},
+								obligationIds: [],
+								constraintIds: [],
+								assumptionIds: [],
+								expectedOutputs: [{ outputId: `out_${pwuId}`, kind: 'DOCUMENT' }],
+								assurancePolicyIds: [],
+								riskProfile: {
+									consequence: 'LOW',
+									uncertainty: 'LOW',
+									irreversibility: 'LOW',
+									securitySensitivity: 'LOW',
+									regulatoryExposure: 'LOW'
+								},
+								dependencyIds
+							},
+							pwuId,
+							'PROFESSIONAL_WORK_UNIT'
+						),
+						`propose ${pwuId}`
+					);
+				const readied = (pwuId: string) => {
+					ok(dispatch('BeginPwuShaping', {}, pwuId, 'PROFESSIONAL_WORK_UNIT'), `shape ${pwuId}`);
+					return dispatch(
+						'MarkPwuReady',
+						{ shapeReadinessAssessmentId: 'asm_01ARZ3NDEKTSV4RRFFQ69M5099', expectedSemanticVersion: 1 },
+						pwuId,
+						'PROFESSIONAL_WORK_UNIT'
+					);
+				};
+				const [okProducer, okConsumer] = [id('pwu', '010'), id('pwu', '011')];
+				const [waitingProducer, waitingConsumer] = [id('pwu', '020'), id('pwu', '021')];
+				propose(okProducer, []);
+				propose(okConsumer, [okProducer]);
+				propose(waitingProducer, []);
+				propose(waitingConsumer, [waitingProducer]);
+				seedPwuWorkLifecycleState_FIXTURE(store, okProducer, 'SATISFIED');
+				return { control: readied(okConsumer), observed: readied(waitingConsumer) };
+			}
+		},
 
 		'RPH-INT-003': {
 			arrangement: 'ApproveIntent dispatched against a RAW intent — before it has been formalized',

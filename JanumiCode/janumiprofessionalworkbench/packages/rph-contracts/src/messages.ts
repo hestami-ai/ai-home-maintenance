@@ -54,6 +54,7 @@ import {
 	AggregationRuleSchema,
 	ApplicabilityRuleSchema,
 	ArtifactReferenceSchema,
+	ArtifactRequirementSchema,
 	AssessmentCriterionSchema,
 	AssumptionPropagationSchema,
 	AuthorityReferenceSchema,
@@ -145,7 +146,9 @@ export const ProposePwuPayloadSchema = z.strictObject({
 	riskProfile: WorkRiskProfileSchema,
 	undertakingId: z.string().optional(),
 	pwuTypeId: z.string().optional(),
-	isLocalExtension: z.boolean().optional()
+	isLocalExtension: z.boolean().optional(),
+	dependencyIds: z.array(z.string()).optional(),
+	inputRequirements: z.array(ArtifactRequirementSchema).optional()
 });
 export type ProposePwuPayload = z.infer<typeof ProposePwuPayloadSchema>;
 export const MarkPwuReadyPayloadSchema = z.strictObject({
