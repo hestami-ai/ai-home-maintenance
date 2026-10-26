@@ -1308,6 +1308,45 @@ describe('⭐⭐ package L — D16: the refused reviews a re-run of a stopped ph
 		expect(refusedReviewsOf(noWork, 'pwu_r')).toBeUndefined();
 		expect(refusedReviewsOf(stopped(), 'pwu_other')).toBeUndefined();
 	});
+
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package N's check, finding 4 (design D9, D16) — ONE ATTEMPT, TWO TRIES: each try records its own work
+	 * product (RD6) and each try's runs are joined in the try, each evidence naming its try (`producingTry`). The stop is the
+	 * refused try's — the try that made the attempt's last work product — as `stoppedUnitOf` reads it, and `rerunReview`
+	 * re-runs that try's refused floors alone. `tryOne` is how try 1's command names its try: by number, or not at all.
+	 */
+	const twoTries = (tryOne: 'named' | 'unnamed' = 'named') =>
+		({
+			...stopped(),
+			artifacts: [
+				{ id: 'art_t1', state: { producingExecutionAttemptId: 'step_1#1' } },
+				{ id: 'art_t2', state: { producingExecutionAttemptId: 'step_1#1' } }
+			],
+			evidence: [
+				{
+					id: 'evd_t1',
+					state: { contentReference: { producingExecutionAttemptId: 'step_1#1', ...(tryOne === 'named' ? { producingTry: 1 } : {}) } }
+				},
+				{ id: 'evd_t2', state: { contentReference: { producingExecutionAttemptId: 'step_1#1', producingTry: 2 } } }
+			],
+			assessments: [
+				// Try 1: its command refused (its finding went back to the model); try 2: its work product and its command refused.
+				...floorOver('art_t1', '2026-10-25T10:00:00.000Z'),
+				...floorOver('evd_t1', '2026-10-25T10:00:00.000Z', 'floor.reasoning-review'),
+				...floorOver('art_t2', '2026-10-25T11:00:00.000Z', 'floor.reasoning-review'),
+				...floorOver('evd_t2', '2026-10-25T11:00:00.000Z', 'floor.reasoning-review')
+			]
+		}) as unknown as EngineSnapshot;
+
+	it('⛔ package N’s check, finding 4 — a two-try attempt: the REFUSED TRY’s reviews alone, as the server re-runs them — never an earlier try’s', () => {
+		// ⛔ RED BEFORE, driven: 3 — every refused command evidence of the attempt, try 1's among them, which `stoppedUnitOf`
+		// leaves out and `rerunReview` never re-runs: D16's "refused reviews being re-run × 6" over-counted by one review.
+		expect(refusedReviewsOf(twoTries(), 'pwu_r'), 'try 1’s refused command was counted as one the re-run re-runs').toBe(2);
+	});
+
+	it('⭑ package N’s check, finding 4 CONTROL — a command naming no try (joined after the loop, before package N) is the attempt’s, as the server reads it', () => {
+		expect(refusedReviewsOf(twoTries('unnamed'), 'pwu_r')).toBe(3);
+	});
 });
 
 describe('⭐ D8 — the limit, and D5 — what the run records of each unit', () => {

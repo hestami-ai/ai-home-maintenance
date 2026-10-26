@@ -5,6 +5,7 @@ import { createInMemoryArtifactStore, createInMemoryWorkspace } from '@janumipwb
 import { describe, expect, it } from 'vitest';
 import { createProcessRunObserver } from '../tools/process-run-observer.js';
 import {
+	admittedViewRef,
 	changedFiles,
 	hostSequenceOf,
 	readDeliverableView,
@@ -103,5 +104,28 @@ describe('⭐⭐ package N — the view a try was shown, recorded on the content
 		expect(forged.ok, 'a view whose bytes do not hash to its pointer was read').toBe(false);
 		const missing = await readDeliverableView(store, { ...ref, storageKey: 'tnt-t/RETAINED_BY_PARTICIPATION/sha256:ff' });
 		expect(missing.ok, 'a view not in the store was read').toBe(false);
+	});
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package N's check, finding 2 (design D11) — THE VIEW A COMPLETION ADMITTED: its own pointer, the
+	 * pointers of the command evidence it names held against it; else, a completion carrying none, the evidence's first.
+	 */
+	it('⭐ package N’s check, finding 2 — the completion’s own pointer; ⛔ refused when its command evidence points elsewhere; its evidence’s when it carries none', () => {
+		const ref = (storageKey: string, contentHash = `sha256:${storageKey}`) =>
+			({ storageProvider: 'jpwb:content-plane', storageKey, contentHash, byteSize: 9, try: 2 }) as const;
+		// A write-only try: the completion points, and no evidence does.
+		expect(admittedViewRef({ deliverableView: ref('k_2') }, [])).toEqual({ ok: true, ref: ref('k_2') });
+		// The try's commands point at the same view: agreed.
+		expect(admittedViewRef({ deliverableView: ref('k_2') }, [ref('k_2'), undefined, ref('k_2')])).toEqual({ ok: true, ref: ref('k_2') });
+		// ⛔ One points elsewhere — by key, or by hash: the record disagrees with itself, and nothing is read.
+		for (const other of [ref('k_1'), ref('k_2', 'sha256:other')]) {
+			const r = admittedViewRef({ deliverableView: ref('k_2') }, [ref('k_2'), other]);
+			expect(r.ok, `a completion and its evidence disagreeing about the view was read: ${other.storageKey}`).toBe(false);
+			expect(r).toMatchObject({ refusedBecause: expect.stringContaining("the record disagrees about what the admitted try's reviews were shown") });
+		}
+		// A completion carrying none — {} as before, or no pointer a reader can parse — is read through its evidence's.
+		expect(admittedViewRef({}, [undefined, ref('k_1')])).toEqual({ ok: true, ref: ref('k_1') });
+		expect(admittedViewRef({ deliverableView: { storageKey: 'k_9' } }, [ref('k_1')])).toEqual({ ok: true, ref: ref('k_1') });
+		// …and with none there either, no record points at a view.
+		expect(admittedViewRef(undefined, [undefined])).toEqual({ ok: true });
 	});
 });

@@ -830,9 +830,16 @@ describe('JAN-EXEC P7-2 D9 — the run report over stores the product wrote, rea
 		]);
 	});
 
-	// ⭐ `P76F-C` C6 — as before `P76F-A` A5: the hand completion broke the implementation phase's floor (stage 5a), and its
+	// ⭐ `P76F-C` C6 — as before `P76F-A` A5: ~~the hand completion broke the implementation phase's floor (stage 5a), and~~ its
 	// unit, whose own execution never SUCCEEDED, is still a stop (stage 7) — the reading PQ7-M168 attacks.
-	it('⭐ the matrix reads the run as it went: the stops broke, the 33rd run broke stage 4, the hand completion broke the floor', () => {
+	// ⭐⭐ `JAN-EXEC` Phase 7, package N's check, finding 1 (design D9) — MOVED DELIBERATELY: the hand completion names the SECOND
+	// try's work product, whose floor is satisfied, and that try ran no command (the fixture reports its runs once); the first
+	// try's REJECTED command review sent the model that try (the `REG-D-059` loop), and stays on the record named by no
+	// completion. So stage 5a reads the try the completion admitted: AS INTENDED, over its one work product. ⛔ It read "broke"
+	// after package N over the first try's command — finding 1's defect, pinned here as though it were the hand completion's.
+	// ⭑ A hand completion over its OWN try's refused command still breaks 5a: `P5B-M12`'s victim holds it, on rows
+	// (`verif/phase7-run-report.test.ts`, "F4 CONTROL").
+	it('⭐ the matrix reads the run as it went: the stops broke, the 33rd run broke stage 4, ~~the hand completion broke the floor~~ the hand completion is read over the try it admitted', () => {
 		expect(at('1', 'whole run')?.value).toBe('not measured in this half');
 		expect(at('2', 'whole run')?.value).toBe('as intended');
 		expect([at('7', 'whole run')?.value, at('7', 'whole run')?.registerIds]).toEqual([
@@ -857,7 +864,10 @@ describe('JAN-EXEC P7-2 D9 — the run report over stores the product wrote, rea
 			null,
 			'P7-4f, the adjudication table'
 		]);
-		expect(at('5a', 'implementation')?.value, 'the hand completion did not break the floor').toBe('broke');
+		expect(
+			[at('5a', 'implementation')?.value, at('5a', 'implementation')?.basis],
+			'the completed step’s floor was read over an earlier try’s command, which no completion names'
+		).toEqual(['as intended', ['the step SUCCEEDED and all 3 floor assessments are SATISFIED']]);
 		// ⭐⭐ E2 (`REG-F-523`; design B8) — ~~vacuous by construction~~: the declared policies of the two phases signed off were
 		// JUDGED, by devin on its seam, and 5b reads each from what it recorded — every criterion answered, each verdict the one
 		// its answers give.

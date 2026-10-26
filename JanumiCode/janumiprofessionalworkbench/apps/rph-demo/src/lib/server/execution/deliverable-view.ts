@@ -20,8 +20,11 @@
 // manifest it ran against — that object and its ratification remain OWED. The view a try's reviews were shown is RECORDED
 // on the content plane (`recordDeliverableView`, `RETAINED_BY_PARTICIPATION`) and pointed at from that try's command
 // evidence ~~and from the step's completion~~ — which the step's completion names; the completion itself carries no pointer
-// — so a re-review and a sign-off read it from the record (RD7), not from memory. ⚠ A try that ran no command leaves no
-// pointer, and its sign-off is told the host holds no record of it (`declaredUnitWithoutDeliverableLine`).
+// — ⭐ package N's check, finding 2: and from the completion of the try it admits (`structuredResult.deliverableView`,
+// `admittedViewRef`) — so a re-review and a sign-off read it from the record (RD7), not from memory. ⚠ A try that ran no
+// command and was REFUSED leaves no pointer — no completion names it, it has no command evidence, and the other records a try
+// makes take strict payloads — so its re-review is shown the answer alone, and its sign-off is told the host holds no record
+// of it (`declaredUnitWithoutDeliverableLine`).
 // ⚠ Paths are the agent's (content plane, `R11`); the record plane carries only the pointer.
 import { createHash } from 'node:crypto';
 import type { Deliverable, DeliverableFile, HostSequence, HostSequenceAct } from '@janumipwb/rph-assurance';
@@ -170,6 +173,30 @@ export function deliverableViewRefOf(value: unknown): DeliverableViewRef | undef
 	)
 		return undefined;
 	return { storageProvider: v.storageProvider, storageKey: v.storageKey, contentHash: v.contentHash, byteSize: v.byteSize, try: v.try };
+}
+
+/**
+ * ⭐⭐ Package N's check, finding 2 (design D11: "the unit's changed files and sequence recorded at its completion") — WHERE THE
+ * VIEW A COMPLETION ADMITTED IS: the completion's own pointer (`structuredResult.deliverableView`), each pointer the command
+ * evidence it names carries held against it (each of a try's carries the same) — ⛔ one pointing elsewhere refuses, for the
+ * record then disagrees with itself about what the try's reviews were shown. ⚠ A completion carrying none — recorded before it
+ * carried one, or a re-review's of a refused try no record points at — is read through its evidence's, as before; neither is
+ * `{ ok: true }` with no `ref`: no record points at a view.
+ */
+export function admittedViewRef(
+	structuredResult: unknown,
+	evidencePointers: readonly (DeliverableViewRef | undefined)[]
+): { readonly ok: true; readonly ref?: DeliverableViewRef } | { readonly ok: false; readonly refusedBecause: string } {
+	const own = deliverableViewRefOf((structuredResult as { deliverableView?: unknown } | null | undefined)?.deliverableView);
+	const pointed = evidencePointers.filter((r): r is DeliverableViewRef => r !== undefined);
+	if (own === undefined) return pointed[0] ? { ok: true, ref: pointed[0] } : { ok: true };
+	const other = pointed.find((r) => r.storageKey !== own.storageKey || r.contentHash !== own.contentHash);
+	if (other)
+		return {
+			ok: false,
+			refusedBecause: `the completion points at the deliverable view at '${own.storageKey}', and command evidence it names at '${other.storageKey}': the record disagrees about what the admitted try's reviews were shown.`
+		};
+	return { ok: true, ref: own };
 }
 
 /**

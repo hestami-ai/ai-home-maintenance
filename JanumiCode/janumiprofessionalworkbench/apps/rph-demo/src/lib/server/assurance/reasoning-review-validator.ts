@@ -1438,7 +1438,9 @@ function promptPlan(input: ReasoningReviewInput) {
 	// left. ⚠ So `processResultContentBudget` and `processResultUntrustedSlices` — the builder's two seams — count it.
 	if (input.framing === 'PROCESS_RESULT' && input.hostSequence) {
 		commandSequence = sequenceBlock('PROCESS_RESULT', input.hostSequence, sequenceRoom(contentBudget));
-		if (commandSequence) contentBudget -= commandSequence.text.length + 1;
+		// ⭐ Package N's check, finding 5 — ~~its text and one~~ its text and TWO: the assembler's element is `\n${text}`, and the
+		// join puts a line feed before it. ⛔ Cut by one, a view filling its budget passed the prompt's by one.
+		if (commandSequence) contentBudget -= commandSequence.text.length + 2;
 	}
 	/** The untrusted slices this prompt carries OTHER than its content, as the prompt carries them — each field of the
 	 *  account its own slice, as it is fenced. */

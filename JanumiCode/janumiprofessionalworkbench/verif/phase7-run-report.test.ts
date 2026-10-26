@@ -3516,6 +3516,121 @@ describe('⭐⭐ P5 package B — the report reads a run as P5 went', () => {
 		]);
 	});
 
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package N's check, finding 1 (design D9) — IMPLEMENTATION SUCCEEDED ON ITS SECOND TRY: try 1's
+	 * work product and its command were refused in try 1 — the command's review REJECTED — and the model, sent the findings,
+	 * made try 2's, which passed. Each try's runs are joined in the try now, so the attempt holds both tries' command evidence,
+	 * each naming its try (`producingTry`); the completion names try 2's work product and command evidence alone. ⭑ Try 1's
+	 * objects are recorded before try 2's, as the route records them; each exchange names the bytes its try's work product holds.
+	 * `tryOne` is how try 1's command evidence names its try: by number, or not at all (a record made before package N).
+	 */
+	function aSecondTrySuccess(o: { readonly tryOne?: 'named' | 'unnamed'; readonly tryOneParse?: { outcome: string; detail: string } } = {}) {
+		const run = aRun({
+			implementation: {
+				commands: 1,
+				tries: [{ disposition: 'ACCEPTED', ...(o.tryOneParse ? { parse: o.tryOneParse } : {}) }, { disposition: 'ACCEPTED' }]
+			}
+		});
+		const at = (id: string): number => run.store.objects.find((x) => x.id === id)!.firstSequence;
+		const before = (id: string, k: number) => at(id) - 1 + k / 10;
+		const attempt = 'step_implementation#1';
+		const added: StoredObject[] = [
+			{
+				id: 'art_implementation_t1',
+				objectType: 'ARTIFACT',
+				state: {
+					producingPwuId: 'pwu_implementation',
+					producingExecutionAttemptId: attempt,
+					storageKey: 'k_art_implementation_t1',
+					contentHash: `sha256:${sha('art_implementation_t1')}`
+				},
+				firstSequence: before('art_implementation', 5)
+			},
+			{
+				id: 'evd_implementation_t1',
+				objectType: 'EVIDENCE',
+				state: {
+					scope: `${EVIDENCE_SCOPE_PREFIX}pwu_implementation`,
+					contentReference: {
+						command: ['node', '--test', 'test/implementation-t1.test.js'],
+						exitCode: 1,
+						timedOut: false,
+						durationMs: 5,
+						producingExecutionAttemptId: attempt,
+						...(o.tryOne === 'unnamed' ? {} : { producingTry: 1 }),
+						capture: { retained: true, stdoutPath: 'captures/implementation-t1/stdout.txt', stderrPath: 'captures/implementation-t1/stderr.txt' }
+					}
+				},
+				firstSequence: before('evd_implementation_1', 5)
+			},
+			...['art_implementation_t1', 'evd_implementation_t1'].flatMap((subject, j) =>
+				FLOOR_POLICIES.map(
+					(p, i): StoredObject => ({
+						id: `asmt_${subject}_${i}`,
+						objectType: 'ASSURANCE_ASSESSMENT',
+						state: { assurancePolicyId: p, subjectObjectIds: [subject], assessmentState: p === 'floor.reasoning-review' ? 'REJECTED' : 'SATISFIED' },
+						firstSequence: Number.MAX_SAFE_INTEGER - 100 + j * 3 + i
+					})
+				)
+			)
+		];
+		const objects = run.store.objects.map((x): StoredObject => {
+			// Try 1's exchange names the bytes try 1's work product holds; try 2's, the completion's.
+			if (x.id === 'mex_implementation_try0')
+				return { ...x, state: { ...x.state, workProductDerivation: { storageKey: 'k_art_implementation_t1' } } };
+			// Try 2's command evidence names its try, as the route records it.
+			if (x.id === 'evd_implementation_1')
+				return { ...x, state: { ...x.state, contentReference: { ...(x.state.contentReference as object), producingTry: 2 } } };
+			return x;
+		});
+		return { store: { ...run.store, objects: [...objects, ...added] }, lane: run.lane };
+	}
+
+	it('⛔ package N’s check, finding 1 (5a) — a step that SUCCEEDED on try 2, after try 1’s command was refused: its floor is the admitted try’s, AS INTENDED — never try 1’s refusal read beside it', () => {
+		// ⛔ RED BEFORE, driven: broke (unregistered) — "the step SUCCEEDED with its floor not satisfied", "command
+		// evd_implementation_t1: floor.reasoning-review REJECTED": every command the attempt ran was read, and every try shares
+		// the attempt, so try 1's refused command — kept on the record, named by no completion — broke the step try 2 completed.
+		const r = reportOf(aSecondTrySuccess()).report;
+		const c = cellOf(r, '5a', 'implementation');
+		expect([c.value, c.registerIds, c.basis], 'an earlier try’s refused command was read as the completed step’s floor').toEqual([
+			'as intended',
+			[],
+			['the step SUCCEEDED and all 6 floor assessments are SATISFIED']
+		]);
+	});
+
+	it('⭑ package N’s check, finding 1 CONTROL — a command of the attempt that names no try (a record before package N) is still read: the floor broke', () => {
+		const r = reportOf(aSecondTrySuccess({ tryOne: 'unnamed' })).report;
+		const c = cellOf(r, '5a', 'implementation');
+		expect([c.value, c.basis]).toEqual([
+			'broke',
+			['the step SUCCEEDED with its floor not satisfied', 'command evd_implementation_t1: floor.reasoning-review REJECTED']
+		]);
+	});
+
+	it('⛔ package N’s check, finding 1 (P7-4f) — a command’s adjudication row points at the account of ITS OWN try, the one its review was handed', () => {
+		// ⛔ RED BEFORE, driven: try 1's command pointed at the unit's last answered try, mex_implementation_try1 — the account
+		// of the join after the loop, which package N's join inside the try no longer hands a try-1 command.
+		const r = reportOf(aSecondTrySuccess()).report;
+		const row = r.adjudication.rows.find((a) => a.subject.id === 'evd_implementation_t1');
+		expect(row?.account?.exchangeId, 'try 1’s command was pointed at another try’s account').toBe('mex_implementation_try0');
+		expect(r.adjudication.rows.find((a) => a.subject.id === 'evd_implementation_1')?.account?.exchangeId).toBe('mex_implementation_try1');
+		// ⭑ CONTROL — a command naming no try keeps the old rule: the unit's last answered try.
+		const old = reportOf(aSecondTrySuccess({ tryOne: 'unnamed' })).report;
+		expect(old.adjudication.rows.find((a) => a.subject.id === 'evd_implementation_t1')?.account?.exchangeId).toBe('mex_implementation_try1');
+	});
+
+	it('⛔ package N’s check, finding 1 (K9) — an unparsed try’s account reached its OWN commands’ reviews, and is said to have', () => {
+		// ⛔ RED BEFORE, driven: "try 1's answer did not parse (…): its account reached its work product's review as not declared"
+		// — only the LAST answered try's account was said to reach a command's review.
+		const narrated = { outcome: 'SCHEMA_COERCION_FAILED', detail: 'The answer is not a JSON object.' };
+		const r = reportOf(aSecondTrySuccess({ tryOneParse: narrated })).report;
+		expect(cellOf(r, '4', 'implementation').basis).toContain(
+			"try 1's answer did not parse (SCHEMA_COERCION_FAILED:not-an-object): its account reached its work product's review " +
+				'and the review of the 1 command it ran as not declared'
+		);
+	});
+
 	it('⛔ F5 (4) — a phase’s re-run captured after its archive: the folders are ITS, by the evidence that names them — never the next phase’s unrecorded runs', () => {
 		// ⛔ RED BEFORE F5, driven: implementation {recorded 1, captured 4, unrecorded 3}, its stage 4 broke (REG-F-511), and
 		// design {recorded 5, captured 2} — the folders attributed by diffing each archive with the one before (P5's design re-run).

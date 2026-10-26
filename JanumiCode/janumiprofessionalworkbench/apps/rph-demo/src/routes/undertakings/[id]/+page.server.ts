@@ -104,6 +104,7 @@ import {
 	type JoinedProcessEvidence
 } from '$lib/server/execution/evidence-join';
 import {
+	admittedViewRef,
 	changedFiles,
 	deliverableViewRefOf,
 	hostSequenceOf,
@@ -1181,7 +1182,10 @@ async function rebuildForReview(
 	// ⭐⭐ Package N — D9-D12 (RD7) — THE VIEW THE REFUSED TRY'S REVIEWS WERE SHOWN, READ BACK FROM THE RECORD: the pointer its
 	// command evidence carries, its bytes re-hashed. ⛔ A pointer whose view cannot be read refuses the whole, as every other
 	// part does. ⚠ A try that ran no command left no pointer: its re-review is shown the answer alone, as before package N
-	// (`REG-F-522` candidate 1, the governed manifest, OWED).
+	// (`REG-F-522` candidate 1, the governed manifest, OWED). ⭐ Package N's check, finding 2 — STILL TRUE, AND WHY: a refused try is
+	// named by no completion, and the other records a try makes (`RecordArtifact`, `EnterExecutionStepWait`) take strict payloads,
+	// generated from the vocabulary, with no field for a pointer — so its view, recorded, is reached by nothing. Disclosed, never
+	// read from the workspace now: the files have moved on since, and the step's baseline is on no record.
 	const viewed = await recordedViewOf(s.evidenceIds);
 	if (!viewed.ok) return viewed;
 	return { ok: true, turn: turn.value, runs, ...(viewed.view ? { view: viewed.view } : {}) };
@@ -1209,29 +1213,39 @@ interface UnitWork {
 	readonly heldNoCompletion?: true;
 	/**
 	 * ⭐⭐ `JAN-EXEC` Phase 7, package N — D11 (`REG-D-135` (1), the lead's D11) — THE DELIVERABLE VIEW RECORDED AT THE UNIT'S
-	 * COMPLETION: the files its admitted try's reviews were shown and the step's sequence, read back through the pointer its
-	 * command evidence carries (`recordedViewOf`).
+	 * COMPLETION: the files its admitted try's reviews were shown and the step's sequence, read back through ~~the pointer its
+	 * command evidence carries~~ ⭐ package N's check, finding 2: the pointer its completion carries, its command evidence's held
+	 * against it (`recordedViewOf`, `admittedViewRef`).
 	 */
 	readonly view?: DeliverableViewRecord;
-	/** ⭐ Package N — D11 — a model's work completed with no pointer to a view: its admitted try ran no command whose evidence carries one. */
+	/**
+	 * ⭐ Package N — D11 — a model's work completed with no pointer to a view: ~~its admitted try ran no command whose evidence
+	 * carries one~~ ⭐ package N's check, finding 2: neither its completion nor its command evidence carries one — a re-review's
+	 * completion of a refused try that ran no command (`rebuildForReview`), or a record made before package N.
+	 */
 	readonly viewNotRecorded?: true;
 }
 
 /**
- * ⭐⭐ Package N — D9-D11 (RD7) — THE DELIVERABLE VIEW A TRY'S REVIEWS WERE SHOWN, FROM THE RECORD: the first pointer the
- * try's command evidence carries (each carries the same), its bytes re-hashed (`readDeliverableView`). ⛔ A pointer whose view
- * cannot be read refuses, as every other part of a rebuild does; none at all is `view: undefined` — a try that ran no command.
+ * ⭐⭐ Package N — D9-D11 (RD7) — THE DELIVERABLE VIEW A TRY'S REVIEWS WERE SHOWN, FROM THE RECORD: ~~the first pointer the
+ * try's command evidence carries (each carries the same)~~ ⭐ package N's check, finding 2: the pointer a completion carries
+ * (`structuredResult`, passed for a completion), the try's command evidence's held against it, else the first of those —
+ * `admittedViewRef` — its bytes re-hashed (`readDeliverableView`). ⛔ A pointer whose view cannot be read refuses, as every
+ * other part of a rebuild does, and so do pointers that disagree; none at all is `view: undefined` — no record points at one.
  */
 async function recordedViewOf(
-	evidenceIds: readonly string[]
+	evidenceIds: readonly string[],
+	structuredResult?: unknown
 ): Promise<{ readonly ok: true; readonly view?: DeliverableViewRecord } | { readonly ok: false; readonly refusedBecause: string }> {
-	const pointer = evidenceIds
-		.map((id) =>
+	const chosen = admittedViewRef(
+		structuredResult,
+		evidenceIds.map((id) =>
 			deliverableViewRefOf((getObject(getEngine(), id)?.contentReference as { deliverableView?: unknown } | undefined)?.deliverableView)
 		)
-		.find((ref): ref is DeliverableViewRef => ref !== undefined);
-	if (!pointer) return { ok: true };
-	const read = await readDeliverableView(getArtifactStore(), pointer);
+	);
+	if (!chosen.ok) return chosen;
+	if (!chosen.ref) return { ok: true };
+	const read = await readDeliverableView(getArtifactStore(), chosen.ref);
 	return read.ok ? { ok: true, view: read.view } : read;
 }
 
@@ -1305,8 +1319,9 @@ async function unitWorkOf(
 		: undefined;
 	const evidenceIds = Array.isArray(p.proposedEvidenceIds) ? p.proposedEvidenceIds.map(String) : [];
 	const commands = commandsOf(title, evidenceIds);
-	// ⭐ Package N — D11 — and the deliverable view recorded at the completion, read back from the record (RD7).
-	const viewed = await recordedViewOf(evidenceIds);
+	// ⭐ Package N — D11 — and the deliverable view recorded at the completion, read back from the record (RD7). ⭐ Package N's
+	// check, finding 2 — through the pointer the completion itself carries, so a try that ran no command is read too.
+	const viewed = await recordedViewOf(evidenceIds, p.structuredResult);
 	if (!viewed.ok) return { ok: false, refusedBecause: `the work of ${title} cannot be rebuilt from the record: ${viewed.refusedBecause}` };
 	const view = viewed.view ? { view: viewed.view } : {};
 	const outputs = Array.isArray(p.outputArtifactIds) ? p.outputArtifactIds.map(String) : [];
@@ -1722,6 +1737,18 @@ function modelExecutedBy(modelId: string) {
 	return { actorId: `model:${modelId}`, actorType: 'AGENT' as const, displayName: 'Execution model' };
 }
 
+/**
+ * ⭐ `JAN-EXEC` Phase 7, package N's check, finding 6 — A TRY WHOSE FINISHED WORK THE HOST COULD NOT READ OR RECORD FAILS THE
+ * STEP, AND SAYS WHY: the step has STARTED, so a try that cannot reach its review is a failure with a reason, never an
+ * escape (the context-policy and sandbox refusals' rule). The work product already recorded stays on the record (PER-9).
+ */
+function failTheStepBeforeItsReview(planId: string, stepId: string, why: string) {
+	const failed = runSteps([['FailExecutionStep', 'EXECUTION_PLAN', planId, { stepId, failureReason: why }]]);
+	return fail(400, {
+		error: `The model invocation did not run to its review: ${why}${failed ? ` — and the failure could not be recorded: ${failed}` : ''}`
+	});
+}
+
 /** What one model unit's run needs: the started plan and step, its binding, its executor, and its type's facts. */
 interface ModelUnitRun {
 	readonly pwuId: string;
@@ -1922,6 +1949,8 @@ async function runModelUnit(u: ModelUnitRun) {
 	// (`PHASE7_UNIT_REVIEWER_CALLS` = (3 tries + 32 runs) × 6) counts it once.
 	const tryStarts: number[] = [];
 	let joined: JoinedProcessEvidence[] = [];
+	// ⭐ Package N's check, finding 2 — where the last try's view is recorded: the try the completion admits.
+	let admittedView: DeliverableViewRef | undefined;
 	try {
 		for (let attempt = 1; ; attempt++) {
 			// ⭐ D9 — the boundary this try begins after: the step's sequence begins at none (its session, and so its one observer,
@@ -2098,21 +2127,49 @@ async function runModelUnit(u: ModelUnitRun) {
 			// The host reads the workspace through its port after the try (`takeManifest`): the files the unit changed since its
 			// step began — added, changed, removed — with their text as the host reads it, beside the step's writes and runs to
 			// date, try by try, from the step's ONE observation. ⭑ RECORDED on the content plane (`recordDeliverableView`) and
-			// pointed at from this try's command evidence, so a re-review and a sign-off read the view this try was shown from
-			// the record, never from memory (RD7). ⚠ A try that ran no command leaves no pointer: `REG-F-522`'s governed manifest
-			// (its candidate 1) remains OWED.
+			// pointed at from this try's command evidence ⭐ package N's check, finding 2: and, for the try a completion admits, from
+			// that completion (`structuredResult.deliverableView`), so a re-review and a sign-off read the view this try was shown
+			// from the record, never from memory (RD7). ⚠ A try that ran no command and was REFUSED leaves no pointer on any
+			// record: its re-review is shown the answer alone (`rebuildForReview`). `REG-F-522`'s governed manifest (its
+			// candidate 1) remains OWED.
 			const observation = producer.processRuns();
 			const hostSequence = hostSequenceOf(observation, tryStarts);
+			// ⭐⭐ Package N's check, finding 6 — A WORKSPACE THE HOST CANNOT READ, OR A VIEW IT CANNOT RECORD, FAILS THE STEP WITH ITS
+			// REASON, as the baseline's does above. ⛔ Neither was caught: the port's `list()` is the one method that still throws (a
+			// file removed between the walk and its stat, `filesystem-workspace.ts`), so the action escaped as a 500 with its work
+			// product recorded, its step left RUNNING and no failure recorded. ⭑ No review is asked of a try whose finished work the
+			// host could not read: it would be judged without the deliverable its review exists to be shown.
+			let manifestAfter: Awaited<ReturnType<typeof takeManifest>>;
+			try {
+				manifestAfter = await takeManifest(sandbox.workspace);
+			} catch (e) {
+				return failTheStepBeforeItsReview(
+					planId,
+					stepId,
+					`the host could not read the unit's workspace after try ${attempt}: ${e instanceof Error ? e.message : String(e)}`
+				);
+			}
 			const deliverable = {
 				afterTry: attempt,
-				files: changedFiles(baseline, await takeManifest(sandbox.workspace)),
+				files: changedFiles(baseline, manifestAfter),
 				sequence: hostSequence
 			};
-			const deliverableView = await recordDeliverableView(getArtifactStore(), EXECUTION_TENANT_PREFIX, {
-				attemptKey,
-				try: attempt,
-				deliverable
-			});
+			let deliverableView: DeliverableViewRef;
+			try {
+				deliverableView = await recordDeliverableView(getArtifactStore(), EXECUTION_TENANT_PREFIX, {
+					attemptKey,
+					try: attempt,
+					deliverable
+				});
+			} catch (e) {
+				return failTheStepBeforeItsReview(
+					planId,
+					stepId,
+					`the host could not record the files the unit changed after try ${attempt}: ${e instanceof Error ? e.message : String(e)}`
+				);
+			}
+			// ⭐ Package N's check, finding 2 — the view of the try the loop last made, which the completion below admits.
+			admittedView = deliverableView;
 
 			// ── ⭑⭑ THE FLOOR RUNS OVER THE WORK PRODUCT, SO IT CAN BE SATISFIED AND NOT ONLY REFUSE ────────
 			//
@@ -2295,7 +2352,13 @@ async function runModelUnit(u: ModelUnitRun) {
 				// their assessments stay on the record, named by no completion.
 				proposedEvidenceIds: joined.map((j) => j.evidenceId),
 				detectedAssumptionIds: [],
-				structuredResult: {},
+				// ⭐⭐ Package N's check, finding 2 (design D11: "the unit's changed files and sequence recorded at its completion") —
+				// THE COMPLETION POINTS AT THE ADMITTED TRY'S VIEW, so its sign-off reads what that try's reviews were shown whether
+				// or not the try ran a command. ⛔ `{}`: only a try's command evidence pointed at it, and a write-only try's
+				// declared reviews were told the host held no record of its files. ⭑ The host's pointer, never the model's content:
+				// the completion names its work product, so the floor's zero-subject rule (`unassessableAiContentBlock`) is not
+				// what admits it, and the plans Begin & Execute and a re-run build hold no transition, so no branch condition reads it.
+				structuredResult: admittedView ? { deliverableView: admittedView } : {},
 				// ⛔ THE MODEL IS THE EXECUTOR. The TRANSFORMATION path below records the human who
 				// clicked, correctly — a human drove it. Recording a human here would be a fiction, and
 				// the assurance floor is entitled to know which it was.
@@ -3444,6 +3507,9 @@ export const actions: Actions = {
 					outputArtifactIds: [s.workProductId],
 					proposedEvidenceIds: [...s.evidenceIds],
 					detectedAssumptionIds: [],
+					// ⭑ Package N's check, finding 2 — no pointer of its own: the view a re-review reads is reached only through the
+					// re-reviewed try's command evidence (`rebuildForReview`), which this completion names, so the sign-off reads it
+					// there (`admittedViewRef`); a pointer here would restate it and be held by nothing.
 					structuredResult: {},
 					executionProvenance: {
 						originType: 'MODEL_GENERATION',

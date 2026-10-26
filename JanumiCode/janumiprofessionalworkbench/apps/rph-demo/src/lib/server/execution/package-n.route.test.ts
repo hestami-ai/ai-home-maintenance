@@ -43,8 +43,21 @@ const seam = vi.hoisted(() => ({
 		readonly account: string;
 	},
 	/** One in-memory workspace per Undertaking, held across requests. */
-	workspaces: new Map<string, unknown>()
+	workspaces: new Map<string, unknown>(),
+	/** ⭐ Package N's check, finding 6 — the content plane refuses the next view the host records, with this message. */
+	viewRecordFails: undefined as string | undefined
 }));
+
+// ⭐ Package N's check, finding 6 — THE HOST'S OWN RECORD OF A TRY'S VIEW, refusable by a case: the real one otherwise.
+vi.mock('./deliverable-view.js', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('./deliverable-view.js')>();
+	return {
+		...actual,
+		recordDeliverableView: vi.fn((...args: Parameters<typeof actual.recordDeliverableView>) =>
+			seam.viewRecordFails === undefined ? actual.recordDeliverableView(...args) : Promise.reject(new Error(seam.viewRecordFails))
+		)
+	};
+});
 
 vi.mock('./workspace-host.js', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('./workspace-host.js')>();
@@ -269,6 +282,7 @@ beforeEach(() => {
 	seam.review = undefined;
 	seam.script = () => ({ acts: [], account: 'An account.' });
 	seam.workspaces.clear();
+	seam.viewRecordFails = undefined;
 	vi.stubEnv('PATH', noProgramsDirectory());
 	for (const v of LIVE_BACKEND_VARIABLES) vi.stubEnv(v, undefined);
 	vi.stubEnv('JPWB_ASSURANCE_TOOL', 'devin');
@@ -413,6 +427,54 @@ describe('⭐⭐ package N — D10: the work-product review is shown the finishe
 		expect(workProduct).toContain('The unit changed no file in its workspace since its step began, as the host read it after try 1.');
 		expect(workProduct, 'an untouched file was shown as changed').not.toContain('"README.md":');
 	});
+
+	it('⛔ package N’s check, finding 6 — a workspace whose listing throws after a try FAILS THE STEP with its reason: never an escape, never a step left RUNNING', async () => {
+		// ⛔ RED BEFORE, driven: the action threw — the port's `list()` is the one method that still throws (a file removed between
+		// the walk and its stat) — so the work product was recorded and the step left RUNNING, with no failure recorded.
+		const pwuId = await modelWorkUnit();
+		seam.script = () => ({ acts: [write('src/report.md', '# The report\n')], account: 'Wrote the report.' });
+		const workspace = workspaceOf(pwuId) as { list: Workspace['list'] };
+		const listed = workspace.list.bind(workspace);
+		let lists = 0;
+		// The baseline, before the first try, is read; the manifest after the try is not.
+		workspace.list = async () => {
+			lists += 1;
+			if (lists > 1) throw new Error("ENOENT: no such file or directory, lstat 'src/gone.md'");
+			return listed();
+		};
+
+		const result = await beginExecute(pwuId);
+
+		expect(result.data?.error, 'the failure was not reported with its reason').toMatch(
+			/^The model invocation did not run to its review: the host could not read the unit's workspace after try 1: ENOENT/
+		);
+		const plan = listByType(getEngine(), 'EXECUTION_PLAN').find((p) => p.state.workUnitId === pwuId)!;
+		const step = (plan.state.steps as { stepState?: string }[])[0]!;
+		const failed = getEngine()
+			.readAllEvents()
+			.filter((e) => e.eventType === 'ExecutionStepFailed' && e.aggregateId === plan.id)
+			.map((e) => (e.payload as { failureReason?: string }).failureReason);
+		expect([step.stepState, failed], 'the step was left RUNNING, or failed with no reason').toEqual([
+			'FAILED',
+			["the host could not read the unit's workspace after try 1: ENOENT: no such file or directory, lstat 'src/gone.md'"]
+		]);
+		expect(seam.prompts, 'a review was asked without the finished work').toEqual([]);
+	});
+
+	it('⛔ package N’s check, finding 6 — a view the content plane will not record FAILS THE STEP with its reason, as an unreadable workspace does', async () => {
+		const pwuId = await modelWorkUnit();
+		seam.script = () => ({ acts: [write('src/report.md', '# The report\n')], account: 'Wrote the report.' });
+		seam.viewRecordFails = 'the content store is read-only';
+
+		const result = await beginExecute(pwuId);
+
+		expect(result.data?.error).toBe(
+			'The model invocation did not run to its review: the host could not record the files the unit changed after try 1: the content store is read-only'
+		);
+		const plan = listByType(getEngine(), 'EXECUTION_PLAN').find((p) => p.state.workUnitId === pwuId)!;
+		expect((plan.state.steps as { stepState?: string }[])[0]?.stepState, 'the step was left RUNNING').toBe('FAILED');
+		expect(seam.prompts, 'a review was asked of a try whose view is on no record').toEqual([]);
+	});
 });
 
 describe('⭐⭐ package N — D11: the declared reviews at sign-off are shown the finished work; a re-review is shown what the refused try was', () => {
@@ -493,7 +555,18 @@ describe('⭐⭐ package N — D11: the declared reviews at sign-off are shown t
 		);
 	});
 
-	it('⭐ CONTROL — a unit whose admitted try ran no command has no view on the record: its declared review is told so, never shown "no file changed"', async () => {
+	// ⭐⭐ `JAN-EXEC` Phase 7, package N's check, finding 2 (design D11) — MOVED DELIBERATELY: ~~CONTROL — a unit whose admitted try
+	// ran no command has no view on the record: its declared review is told so~~. That pinned the gap: only a try's command
+	// evidence pointed at its view, so a write-only try's declared reviews were shown no file. The completion points at the
+	// admitted try's view now (`structuredResult.deliverableView`), and the sign-off reads it from there.
+	const WROTE_ONLY = '"files":[{"workUnit":"Requirements","path":"docs/requirements.md","change":"ADDED","text":"# Requirements\\n"}]';
+	const WROTE_ONLY_SEQUENCE = '"sequence":[{"workUnit":"Requirements","try":1,"act":1,"wrote":"docs/requirements.md"}]';
+	const NO_RECORD =
+		'The host holds no record of the files the work unit "Requirements" changed, or of its step\'s writes and runs: its last try ran no command, so no command evidence carries that record, and nothing of it is in "files" or "sequence" above.';
+
+	it('⭐ package N’s check, finding 2 — a unit whose admitted try ran NO command: its declared review is shown its changed files and its sequence, read from its completion', async () => {
+		// ⛔ RED BEFORE, driven: '"files":[]' and the host's line that it holds no record — the view was recorded, and nothing
+		// on the record a sign-off reads pointed at it.
 		const pwuId = await declaringModelUnit();
 		seam.script = () => ({ acts: [write('docs/requirements.md', '# Requirements\n')], account: 'Wrote the requirements.' });
 		expect((await beginExecute(pwuId)).data?.error, 'arrangement: Begin & Execute').toBeUndefined();
@@ -501,9 +574,62 @@ describe('⭐⭐ package N — D11: the declared reviews at sign-off are shown t
 		await recordAssurance(pwuId);
 
 		const declared = seam.prompts.find((p) => p.includes('declared assurance policy'))!;
-		expect(declared).toContain(
-			'The host holds no record of the files the work unit "Requirements" changed, or of its step\'s writes and runs: its last try ran no command, so no command evidence carries that record, and nothing of it is in "files" or "sequence" above.'
+		expect(declared, 'the declared review was not shown the write-only try’s changed file').toContain(WROTE_ONLY);
+		expect(declared, 'the declared review was not shown the write-only try’s sequence').toContain(WROTE_ONLY_SEQUENCE);
+		expect(declared, 'a view on the record was said to be on none').not.toContain(NO_RECORD);
+	});
+
+	it('⭐ package N’s check, finding 2 — and the RE-RUN of that unit’s declared review is shown them too', async () => {
+		const pwuId = await declaringModelUnit();
+		seam.script = () => ({ acts: [write('docs/requirements.md', '# Requirements\n')], account: 'Wrote the requirements.' });
+		expect((await beginExecute(pwuId)).data?.error, 'arrangement: Begin & Execute').toBeUndefined();
+		// The declared review fails at the transport: it does not conclude, so its re-run is offered (`REG-D-112` (a)).
+		let down = true;
+		seam.review = (p) => {
+			if (down && p.includes('declared assurance policy')) throw new Error('devin exited with code 1: connection reset by peer');
+			return undefined;
+		};
+		await recordAssurance(pwuId);
+		down = false;
+		seam.prompts.length = 0;
+
+		const rerun = (await actions.rerunDeclaredReviews(
+			actionEvent('rerunDeclaredReviews', { pwuId, rationale: 'The declared review failed at the transport; run it again.' }) as never
+		)) as { advanced?: string; data?: { error?: string } };
+
+		expect([rerun.advanced, rerun.data?.error], 'arrangement: the declared re-run').toEqual(['declared-reviews-rerun', undefined]);
+		const declared = seam.prompts.find((p) => p.includes('declared assurance policy'));
+		expect(declared, 'arrangement: no declared review was re-run').toBeDefined();
+		expect(declared, 'the re-run declared review was not shown the changed file').toContain(WROTE_ONLY);
+		expect(declared, 'the re-run declared review was not shown the sequence').toContain(WROTE_ONLY_SEQUENCE);
+	});
+
+	it('⭑ CONTROL, the residual — a write-only try REFUSED and re-reviewed: no record points at its view, so its re-review is shown the answer alone and its sign-off is told the host holds no record', async () => {
+		// ⚠ DISCLOSED, NOT FIXED (package N's check, finding 2): a refused try is named by no completion, and a try that ran no
+		// command has no command evidence; every other record a try makes (`RecordArtifact`, `EnterExecutionStepWait`) takes a
+		// strict payload with no field for a pointer. The view is recorded; nothing points at it.
+		const pwuId = await declaringModelUnit();
+		seam.script = () => ({ acts: [write('docs/requirements.md', '# Requirements\n')], account: 'Wrote the requirements.' });
+		let down = true;
+		seam.review = (p) => {
+			if (down && isWorkProductReview(p)) throw new Error('devin exited with code 1: connection reset by peer');
+			return undefined;
+		};
+		expect((await beginExecute(pwuId)).data?.error, 'arrangement: the work product’s review concluded').toMatch(/VALIDATOR_EXECUTION_FAILED/);
+		down = false;
+		seam.prompts.length = 0;
+		const rerun = (await actions.rerunReview(
+			actionEvent('rerunReview', { pwuId, rationale: 'The reviewer failed at the transport; review it again.' }) as never
+		)) as { data?: { error?: string } };
+		expect(rerun.data?.error, 'arrangement: the re-review did not complete').toBeUndefined();
+		expect(seam.prompts.find(isWorkProductReview), 'the residual moved: the re-review was shown files').not.toContain(
+			'docs/requirements.md'
 		);
+
+		await recordAssurance(pwuId);
+
+		const declared = seam.prompts.find((p) => p.includes('declared assurance policy'))!;
+		expect(declared, 'a view on no record was not named').toContain(NO_RECORD);
 		expect(declared, 'an unrecorded view was shown as no file changed').toContain('"files":[]');
 	});
 

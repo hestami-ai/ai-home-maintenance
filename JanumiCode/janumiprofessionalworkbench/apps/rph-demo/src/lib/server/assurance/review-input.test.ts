@@ -1371,6 +1371,27 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 — a 64 KiB process result, read whole by noth
 		expect(budget).toBeLessThan(REASONING_REVIEW_BUDGET.CONTENT_MAX);
 		expect(prompt.length - content.length + budget).toBe(REASONING_REVIEW_BUDGET.PROMPT_BUDGET);
 		expect(content.length).toBeLessThanOrEqual(budget);
+		// ⭐⭐ `JAN-EXEC` Phase 7, package N's check, finding 5 (design D12) — AND WITH THE STEP'S SEQUENCE ON ITS HOST LINES: the
+		// seam is the room the assembler leaves the view beside the sequence, to the character. ⛔ The sequence's element is
+		// `\n${text}`, which the join adds a second line feed before, and the budget was cut by its text and ONE: the identity
+		// read PROMPT_BUDGET + 1, and a view that filled its budget passed the prompt's — the renderer happened to leave 2 spare.
+		const sequenced = processResultReviewInput({
+			criteria: SEEDED_REASONING_REVIEW_CRITERIA,
+			producingPrompt: PR_PROMPT,
+			run: aRun({ ...BIG_RUN, ordinal: 2 }),
+			rationale: RATIONALE,
+			observedToolCalls: ONE_CALL,
+			hostSequence: PR_SEQUENCE
+		});
+		const { content: view, ...around } = sequenced;
+		const room = processResultContentBudget({ ...around, framing: 'PROCESS_RESULT' });
+		const withSequence = await materialize(sequenced);
+		expect(withSequence, 'arrangement: no sequence on the host lines').toContain('  2. ran ["pytest","-rs","checks/"] — exit 0');
+		expect(withSequence.length - view.length + room, 'the seam beside a sequence').toBe(REASONING_REVIEW_BUDGET.PROMPT_BUDGET);
+		// ⭑ A view exactly at its room — the builder's own view, padded after its last fence to the character — is sent whole,
+		// and the prompt is the budget, never past it.
+		const full = await materialize({ ...sequenced, content: view.padEnd(room, ' ') });
+		expect(full.length, 'a view at its room passed PROMPT_BUDGET beside a sequence').toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.PROMPT_BUDGET);
 		// ⛔ AND NO MEMBER WAS ADDED TO THE BUDGET OBJECT: the reviewer fingerprint hashes it as its `budget` component.
 		expect(Object.keys(REASONING_REVIEW_BUDGET)).toEqual([
 			'PROMPT_BUDGET',
