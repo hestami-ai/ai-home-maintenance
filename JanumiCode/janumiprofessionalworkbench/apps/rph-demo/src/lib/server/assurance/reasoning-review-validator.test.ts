@@ -1888,11 +1888,15 @@ const SLIPPED = JSON.stringify({
 	recommendation: 'SATISFIED',
 	residualUncertainty: []
 });
-/** ⭐ D13 — THE MISSING-CRITERION REPAIR'S LINE, BYTE FOR BYTE: restated, and held equal to the export below. */
+/**
+ * ⭐ D13 — THE MISSING-CRITERION REPAIR'S LINE, BYTE FOR BYTE: restated, and held equal to the export below. ⭐ Package L's check,
+ * finding 4 — MOVED DELIBERATELY: ~~"…for every criterion listed above, each row under…"~~, the line now names the others too
+ * (the test below says why).
+ */
 const MISSING_CRITERION_LINE = (ids: readonly string[]): string =>
 	`IMPORTANT: your reply gave no row under these criterion ids: ${ids.join(', ')}. Reply with ONLY the whole minified JSON ` +
-	'object, with one row in findings for every criterion listed above, each row under its criterionId exactly as listed: ' +
-	'failed=false where the criterion is met, failed=true where it is not.';
+	'object, with one row in findings for every criterion listed above, the ones named here and all the others, each row ' +
+	'under its criterionId exactly as listed: failed=false where the criterion is met, failed=true where it is not.';
 /** ⭐ D13 — THE MARKER every missing-criterion record's detail opens with: restated, and held equal to the export below. */
 const MISSING_CRITERION_MARKER = 'The reply left a declared criterion without a row (REG-F-566).';
 /** The disposition the floor composes from a result (`dispositionFromFindings`), as the floor reads it. */
@@ -1926,6 +1930,21 @@ describe('⭐⭐ package L — D13: one criterion repair after any parsed reply 
 		expect(line).toContain('failed=false where the criterion is met, failed=true where it is not');
 		expect(line, 'it asks for the whole object').toContain('the whole minified JSON object');
 		expect(line).toContain('one row in findings for every criterion listed above');
+	});
+
+	// ⭐⭐ Package L's check, finding 4 — *"EVERY CRITERION LISTED ABOVE"* HAD TWO READINGS. The list nearest above that phrase is
+	// the line's own list of the ids without a row, so a reviewer could read it as asking for those rows alone — and a repair
+	// that gave them alone is refused by D13's use rule (a row for EVERY declared criterion), leaving the review INCONCLUSIVE,
+	// run-12's outcome. ⚠ UNMEASURED: the line's effect on a reviewer is a hypothesis until the re-qualification draws it; this
+	// only removes the reading the use rule would refuse. It still names only the declared ids without a row, and asks for no
+	// failure (`REG-D-105` (2)).
+	it('⭐ the line asks for a row under EVERY criterion — the ones it names and all the others — never the named ids alone, which the use rule refuses', () => {
+		const line = missingCriterionRepairInstruction([DECLARED_RR03]);
+		expect(line, 'the line reads as asking for the named ids alone').toContain(
+			'one row in findings for every criterion listed above, the ones named here and all the others,'
+		);
+		// ⭑ The only ids it names are still the declared ones without a row.
+		expect(line.slice(MISSING_CRITERION_REPAIR_OPENING.length, line.length - MISSING_CRITERION_REPAIR_CLOSING.length)).toBe(DECLARED_RR03);
 	});
 
 	it('⭐ run-12’s shape draws exactly ONE criterion repair, its line naming only the declared id with no row — never the reviewer’s', async () => {
@@ -2018,6 +2037,37 @@ describe('⭐⭐ package L — D13: one criterion repair after any parsed reply 
 		const [, repair] = exchanges.drain();
 		expect(repair!.disposition).toBe('rejected');
 		expect(repair!.parseOutcome.detail, 'it names the criterion the repair left without a row').toContain(RR05);
+	});
+
+	// ⭐⭐ Package L's check, finding 2 — I5'S KEPT USE RULE, HELD BESIDE D13'S (the lead's reading; `REG-D-135` (3); design D13):
+	// a no-criterion repair that answers AT LEAST ONE criterion is used, even when it leaves another without a row — D13's
+	// full-coverage rule is the missing-criterion repair's alone. And it is the review's one criterion repair: no third call
+	// follows it, though its reply now has D13's shape. ⛔ No test held it: every I5 repair above answers every criterion or none,
+	// so a mutant giving I5's repair D13's rule survived every assurance test.
+	it('⭐ I5’s use rule is kept: a no-criterion repair answering SOME criteria is USED — the rest unassessed — and no third call follows it', async () => {
+		const RR03_ABSENT = JSON.stringify({
+			findings: SEEDED_REASONING_REVIEW_CRITERIA.filter((c) => c.id !== DECLARED_RR03).map((c) => cleanRow(c.id)),
+			recommendation: 'SATISFIED',
+			residualUncertainty: []
+		});
+		// The repair leaves RR-03 without a row two ways: no row at all, and run-12's row under an undeclared id.
+		for (const [shape, repairReply] of [
+			['RR-03 absent', RR03_ABSENT],
+			['RR-03 under an undeclared id', SLIPPED]
+		] as const) {
+			const { prompts, print } = replying(NO_ROWS, repairReply, CLEAN);
+			const exchanges = createExchangeSink();
+			const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+			expect(prompts, `${shape}: the review’s one criterion repair, and no third call`).toHaveLength(2);
+			expect(prompts[1], `${shape}: I5’s line, unchanged`).toBe(`${prompts[0]}\n\n${CRITERION_REPAIR_LINE}`);
+			expect(exchanges.drain().map((e) => e.disposition), `${shape}: the repair is recorded used`).toEqual(['repair-requested', 'accepted']);
+			// ⭐ DISCRIMINATING: the first reply answered none, so the first judgement stood would read all nine unassessed.
+			expect(
+				SEEDED_REASONING_REVIEW_CRITERIA.map((c) => [c.id, outcomeOf(result, c.id)]),
+				`${shape}: the repair’s eight rows are used, RR-03 unassessed`
+			).toEqual(SEEDED_REASONING_REVIEW_CRITERIA.map((c) => [c.id, c.id === DECLARED_RR03 ? 'UNABLE_TO_DETERMINE' : 'MET']));
+			expect(composed(result), `${shape}: a criterion unassessed`).toBe('INCONCLUSIVE');
+		}
 	});
 
 	it('⛔ a repair that does not parse, or gets no reply, leaves the first judgement standing — never a throw', async () => {

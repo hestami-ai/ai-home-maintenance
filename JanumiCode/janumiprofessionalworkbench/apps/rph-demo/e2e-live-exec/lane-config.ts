@@ -668,7 +668,11 @@ export const PHASE7_TEST_TIMEOUT_MS =
  * `REG-D-114` (14)'s one try's reserve: a model unit's Begin & Execute, the rule's re-run of its work and a MODEL root's press,
  * (3 tries + 32 command runs) × 6 = 210 (`PHASE7_UNIT_REVIEWER_CALLS`); the rule's re-run of a stopped phase's review, its
  * refused reviews × 6 (`phase7RereviewReviewerCalls`); a sign-off and the rule's re-run of its declared reviews, the declared
- * reviews × 6; Send, the authoring floor's worst case at 6 calls a review. So the recorded exchanges cannot pass the limit.
+ * reviews × 6; Send, the authoring floor's worst case at 6 calls a review. ~~So the recorded exchanges cannot pass the limit.~~
+ * ⛔ Package L's check, finding 1: not of Send's press — before Send no candidate exists, so its check counts the floor for the
+ * types ANTICIPATED (`PHASE7_AUTHORING_ANTICIPATED_PARTS`), an estimate and not a bound, and a turn that stages more spends its
+ * floor's reviews inside that press, where nothing is checked. The other presses' counts are their whole worst case; the run
+ * report's caveat says which press is the exception (`scripts/phase7/run-report-core.ts`, `LIMIT_CAVEAT`).
  */
 export const PHASE7_PAID_LIMIT = 2400;
 

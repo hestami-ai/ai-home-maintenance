@@ -4057,8 +4057,12 @@ const REVIEWER_FINGERPRINT_V9 = '5ab3d68643bffbbf700c622526b626f47d4c487690e1eb5
  * measured under: their coverage under it is owed (`reviewer:qual:check`, COVERAGE), the sponsor-confirmed measurement V owes.
  * ⭑ The pins below asked two things of one constant: that a case-set version moves no reviewer component, and that today's
  * reviewer is the measured one. The first is unchanged; the second is `reviewer:qual:check`'s to say, and it says no.
+ * ⭐ Package L's check, finding 4 — MOVED AGAIN, DELIBERATELY: ~~'9a310102cbe308b60f3e7f49c2b2e86f5ab76a2b94d4142eeecef61908872e0d'~~
+ * — the missing-criterion repair's line now asks for every criterion, the ones it names and all the others
+ * (`MISSING_CRITERION_REPAIR_CLOSING`), and the scoring digest hashes every repair prompt an entry draws. No case prompt moved:
+ * the line rides on a repair alone. Still unmeasured, as before; V owes it.
  */
-const REVIEWER_FINGERPRINT_TODAY = '9a310102cbe308b60f3e7f49c2b2e86f5ab76a2b94d4142eeecef61908872e0d';
+const REVIEWER_FINGERPRINT_TODAY = '78c6ce51fa8bd3b1719371d5d647b85d4a03371c80fd5ec4e56ebd4897a42047';
 /**
  * ⭐ THE PROTOTYPE'S PROMPTS (`REG-D-131` Q36: *"its prompts must match the checked prototype hash for hash"*) — the sha256 of
  * each of the 19 bridge part cases' first prompt as the lead's in-memory prototype of D3b rendered it through the product's

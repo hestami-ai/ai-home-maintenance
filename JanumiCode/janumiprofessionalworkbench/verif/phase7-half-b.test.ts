@@ -3477,6 +3477,43 @@ describe('⭐⭐ The review in parts, B6 — the authoring’s spend reserve cou
 		);
 	});
 
+	// ⭐⭐ Package L's check, finding 1 (`REG-D-135` (4); design D16) — THE CAVEAT BESIDE THAT READ IS TRUE OF IT. ⛔ It said the
+	// lane presses nothing that would pass the limit, *"so the reviewer exchanges the store records cannot pass it"*, printed
+	// beside the read above, past the limit: Send's check counts the authoring floor's worst case for the 16 types anticipated —
+	// an estimate, never a bound (`PHASE7_AUTHORING_ANTICIPATED_PARTS`), for no candidate exists before Send — and a candidate
+	// that stages more spends its floor's reviews inside the Send press, where nothing is checked (`inventoryCheck` refuses
+	// nothing). D16's Send row asks for the floor's WHOLE worst case, which no count before Send can be while nothing bounds
+	// the inventory an agent authors; so the caveat states the true value, and says which reads show it.
+	it('⛔ the caveat beside a staged read past the limit says Send can pass it: Send counts the 16 anticipated types, an estimate and not a bound', () => {
+		const lane = halfBLaneRows();
+		const inventoryCheck = {
+			prior: AT_SEND,
+			recorded: 0,
+			reserve: PHASE7_NEGATIVE_CONTROL_RESERVE,
+			ahead: phase7AuthoringReviewerCalls(20),
+			counted: STAGED_INVENTORY,
+			total: AT_SEND + PHASE7_NEGATIVE_CONTROL_RESERVE + phase7AuthoringReviewerCalls(20),
+			limit: PHASE7_PAID_LIMIT,
+			allowed: false
+		};
+		const sendCheck = { ...inventoryCheck, ahead: FLOOR_WORST, counted: 'the authoring floor’s worst case, for 16 anticipated types', total: PHASE7_PAID_LIMIT, allowed: true };
+		const run = lane.run as { authoring: Record<string, unknown> };
+		const out = buildRunReport(
+			halfBStore(),
+			{ ...lane, run: { ...run, authoring: { ...run.authoring, limitCheck: sendCheck, inventoryCheck } } },
+			{ accountNames: NAMES }
+		).report;
+		expect(out.reviewerCalls.laneLimitChecks[1]?.allowed, 'arrangement: the staged read is past the limit').toBe(false);
+		const caveat = out.reviewerCalls.limitCaveat;
+		expect(caveat, 'the caveat says no recorded exchange can pass the limit, beside a read past it').not.toContain('cannot pass it');
+		expect(caveat, 'the caveat does not say what Send counts').toContain(
+			`for ${PHASE7_AUTHORING_ANTICIPATED_PARTS} anticipated types, an estimate and not a bound`
+		);
+		expect(caveat, 'the caveat does not say Send’s press can pass the limit').toContain('can pass the limit in that press');
+		expect(caveat, 'the caveat does not name the read that shows it').toContain('“Send, counted again for the inventory its turn staged”');
+		expect(renderMarkdown(out), 'report.md does not carry it').toContain(`- **Caveat:** ${caveat}`);
+	});
+
 	// ⛔ PREDICTED RED, read from the code: given the types, the lane took each type's latest review in the whole fork, so a
 	// refinement's round that held no review of a type borrowed the first round's.
 	it('⛔ the lane records ONE round of the fork, its complete part set: a refinement’s round that holds no review of a type borrows none from the first round', async () => {

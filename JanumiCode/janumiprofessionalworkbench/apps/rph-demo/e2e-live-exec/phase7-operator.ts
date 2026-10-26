@@ -641,9 +641,12 @@ export function unpressed(units: readonly ArchiveUnit[]): RunUnit[] {
  * before EACH press the lane counts that press's WHOLE worst case — a phase's Begin & Execute, the rule's re-run of its work and
  * a MODEL root's press, (3 tries + 32 command runs) × 6 = 210; the rule's re-run of a review, the refused reviews it re-runs × 6;
  * a sign-off and the rule's re-run of its declared reviews, the declared reviews × 6; Send, the authoring floor's worst case at
- * 6 calls a review — with the negative control's 4 held back in each. Reaching the limit is allowed; passing it is refused, so
- * the recorded exchanges cannot pass it. ⛔ The struck sentences above, that a phase's own spend can carry the total past the
- * limit, held of the one try's reserve, and hold no longer.
+ * 6 calls a review — with the negative control's 4 held back in each. Reaching the limit is allowed; passing it is refused~~, so
+ * the recorded exchanges cannot pass it~~ ⭐ by what is counted. ⛔ The struck sentences above, that a phase's own spend can carry
+ * the total past the limit, held of the one try's reserve, and hold no longer. ⚠ Package L's check, finding 1 — SAVE SEND'S
+ * COUNT, WHICH IS NOT A BOUND: before Send no candidate exists, so `authorThePwa` counts the floor for the types anticipated
+ * (`PHASE7_AUTHORING_ANTICIPATED_PARTS`), and a turn that stages more spends its floor's reviews inside the Send press, where
+ * nothing is checked — `AuthoringRecord.inventoryCheck` says so after, and refuses nothing. The report's caveat states it.
  */
 export function limitCheck(prior: number, recorded: number, ahead: number, counted: string): LimitCheck {
 	const total = prior + recorded + PHASE7_NEGATIVE_CONTROL_RESERVE + ahead;

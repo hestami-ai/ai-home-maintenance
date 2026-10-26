@@ -42,6 +42,7 @@ import { BLOCKING_SEVERITIES, dispositionFromFindings } from '@janumipwb/rph-ass
 import { declaredAssurancePolicyIds } from '@janumipwb/rph-domain';
 import {
 	LANE_BUDGET,
+	PHASE7_AUTHORING_ANTICIPATED_PARTS,
 	PHASE7_NEGATIVE_CONTROL_RESERVE,
 	PHASE7_PAID_LIMIT,
 	PHASE7_PRIOR_CALLS_VARIABLE,
@@ -178,17 +179,33 @@ export const NEGATIVE_CONTROL_RESERVE = PHASE7_NEGATIVE_CONTROL_RESERVE;
  * past the limit: the lane checks the limit before each press, not during one, and a model unit’s press may spend up to 140
  * reviewer calls after its check (REG-D-114 (14), as amended 2026-10-16; the sponsor’s limit is "about 1,000", REG-D-131 Q37,
  * raising REG-D-110 (1))."~~ — the lane now counts each press's WHOLE worst case before it, the negative control's reserve
- * held back, and presses nothing that would pass the limit, so the recorded reviewer exchanges cannot pass it. ⚠ What that bound
- * does not reach, said with it: the recorded count is a LOWER BOUND when a capture faults (`run-archive.ts` `reviewerCalls`;
+ * held back, and presses nothing that would pass the limit ~~, so the recorded reviewer exchanges cannot pass it~~ ⭐ by that
+ * count. ⭐⭐ Package L's check, finding 1 — SAVE SEND'S, SAID WITH IT: no candidate exists before Send, so Send's check counts
+ * the authoring floor's worst case for the inventory ANTICIPATED (`PHASE7_AUTHORING_ANTICIPATED_PARTS`, sixteen) — an
+ * estimate, never a bound: nothing bounds the types an agent authors, and the floor reviews each staged type inside the Send
+ * press, where nothing is checked (`phase7-operator.ts` `authorThePwa`; `AuthoringRecord.inventoryCheck` refuses nothing). So
+ * a larger candidate's floor can carry the recorded exchanges past the limit in that press; the read "Send, counted again for
+ * the inventory its turn staged" (`AUTHORING_INVENTORY_READ`) states its worst case where the turn settled, and the report's
+ * limit line the total recorded in every run. ⛔ The struck clause claimed of every press what Send's count cannot give: D16's
+ * Send row (*"the authoring floor's whole worst case"*) has no whole worst case before Send while the inventory is unbounded —
+ * a bound on it is the lead's to decide, and until one is built the caveat states the true value. ⚠ What the bound does not
+ * reach either, said with it: the recorded count is a LOWER BOUND when a capture faults (`run-archive.ts` `reviewerCalls`;
  * `phase7-operator.ts` `recordedReviewerCalls`), so the limit bounds what was recorded, and the report claims no count of calls
  * absent from the record. The sponsor's limit is quoted as `REG-D-135` (4)'s meaning writes it, "about 2,400".
+ * ~~"…and presses nothing that would pass the limit, so the reviewer exchanges the store records cannot pass it (REG-D-135 (4);
+ * the sponsor’s limit is "about 2,400", raising REG-D-131’s). ⚠ The recorded count is a lower bound: …"~~ ⛔ Package L's check.
  */
 export const LIMIT_CAVEAT =
 	`The lane counts each press’s whole worst case before it — a model unit’s press ${PHASE7_UNIT_REVIEWER_CALLS} reviewer calls, ` +
 	`(${LANE_BUDGET.tries} tries + ${PHASE7_REVIEWED_COMMANDS} command runs) × ${LANE_BUDGET.reviewerCallsPerTry}, its other presses each ` +
-	`theirs — with the negative control’s ${NEGATIVE_CONTROL_RESERVE} held back, and presses nothing that would pass the limit, so the ` +
-	`reviewer exchanges the store records cannot pass it (REG-D-135 (4); the sponsor’s limit is ` +
-	`"about ${PAID_LIMIT.toLocaleString('en-US')}", raising REG-D-131’s). ⚠ The recorded count is a lower bound: a call whose ` +
+	`theirs — with the negative control’s ${NEGATIVE_CONTROL_RESERVE} held back, and presses nothing that would pass the limit by that ` +
+	`count (REG-D-135 (4); the sponsor’s limit is ` +
+	`"about ${PAID_LIMIT.toLocaleString('en-US')}", raising REG-D-131’s). ⚠ Save Send’s: no candidate exists before Send, so its ` +
+	`check counts the authoring floor’s worst case for ${PHASE7_AUTHORING_ANTICIPATED_PARTS} anticipated types, an estimate and not ` +
+	`a bound, and a turn that stages more spends its floor’s reviews inside the Send press, where nothing is checked — so the ` +
+	`reviewer exchanges the store records can pass the limit in that press; where the turn settled, the read “Send, counted again ` +
+	`for the inventory its turn staged” states the larger candidate’s worst case, and the limit line states the total recorded. ` +
+	`⚠ The recorded count is a lower bound: a call whose ` +
 	`capture faulted leaves no exchange, so the limit bounds what was recorded, and this report claims no count of calls absent ` +
 	`from the record.`;
 /** The declared verdicts a complete run signs off: the five units' declared policies, 2 + 2 + 4 + 3 + 3 (§3.2). */
@@ -569,8 +586,10 @@ export interface ReviewerCalls extends ReviewerCallCount {
 	/**
 	 * ⭐ `REG-D-114` (14), as amended 2026-10-16 — the plain caveat those reads carry (`LIMIT_CAVEAT`): ~~a phase's own spend can
 	 * carry the total past the limit, for the lane checks before each press, not during one~~ ⭐ (package L, D16; `REG-D-135` (4))
-	 * the lane counts each press's whole worst case before it, so the recorded exchanges cannot pass the limit; and the recorded
-	 * count is a lower bound when a capture faults.
+	 * the lane counts each press's whole worst case before it~~, so the recorded exchanges cannot pass the limit~~ ⭐ (package L's
+	 * check, finding 1) and presses nothing past the limit by that count, save Send's, which counts the anticipated inventory, an
+	 * estimate: a larger candidate's floor can pass the limit in that press; and the recorded count is a lower bound when a
+	 * capture faults.
 	 */
 	readonly limitCaveat: string;
 }

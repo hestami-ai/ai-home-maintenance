@@ -65,6 +65,23 @@ describe('⭐ JAN-EXEC Phase 5 — the process-run observer', () => {
 		expect(seen.recordedLimit).toBe(2);
 	});
 
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L's check, finding 3 — D8's PROMISE, HELD (`REG-D-135`; design D8): *"a run past the bound
+	// still takes its number, so every later act keeps its true place in the sequence"*. ⛔ No test held it: a mutant numbering
+	// only the runs it keeps survived every test under `tools/` and `execution/`, and a write after the bound took the place of a
+	// dropped run — package N renders that number. Writes are unbounded and numbered, so they are where it shows.
+	it('⭐ D8 — a run past the bound is dropped yet still takes its number: a later write keeps its true place in the step’s one sequence', () => {
+		const o = createProcessRunObserver(2);
+		o.ran(aRun(['a']));
+		o.ran(aRun(['b']));
+		o.ran(aRun(['c'])); // past the bound: dropped, numbered 3
+		o.wrote({ path: 'src/after-the-bound.ts' });
+		o.ran(aRun(['d'])); // dropped too, numbered 5
+		const seen = o.observed();
+		expect(seen.runs.map((r) => r.ordinal), 'the runs kept are the first two').toEqual([1, 2]);
+		expect(seen.writes, 'the write took a dropped run’s place in the sequence').toEqual([{ ordinal: 4, path: 'src/after-the-bound.ts' }]);
+		expect(seen.observedCount, 'the count is of what ran').toBe(4);
+	});
+
 	it('⭐ the FIRST runs are kept, not the LAST — so an ordinal means the same act in both instruments', () => {
 		// ⛔ THE MUTANT IS THE PLAUSIBLE ONE: keep the most recent N, which is what a log would do. `R11`'s
 		// record-plane call list keeps the FIRST N, so a turn whose ordinals were assigned by two different rules

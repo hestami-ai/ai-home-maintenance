@@ -707,11 +707,18 @@ export const CRITERION_REPAIR_INSTRUCTION =
  * by a fuzzy matcher downstream — so this line names the declared id, and nothing maps the reviewer's to it).
  * ⭐ IT ASKS FOR NO FAILURE (`REG-D-105` (2)): it says how a met criterion and an unmet one are marked, as
  * `ONE_ROW_PER_CRITERION` does, names no disposition value, and never asks the reviewer to look for a failure.
+ * ⭐ Package L's check, finding 4 — IT ASKS FOR EVERY CRITERION, AND SAYS SO: ~~"with one row in findings for every criterion
+ * listed above, each row under…"~~ had two readings, for the list nearest above that phrase is this line's own list of the ids
+ * without a row — and a repair that gave those rows alone is refused by D13's use rule (a row for every declared criterion),
+ * leaving the review INCONCLUSIVE, run-12's outcome. So the line names the others too: *"the ones named here and all the
+ * others"*. ⚠ UNMEASURED: what a reviewer does with either wording is a hypothesis until the re-qualification draws the repair;
+ * this removes only the reading the use rule would refuse. It still names no id but the declared ones without a row.
  */
 export const MISSING_CRITERION_REPAIR_OPENING = 'IMPORTANT: your reply gave no row under these criterion ids: ';
 export const MISSING_CRITERION_REPAIR_CLOSING =
-	'. Reply with ONLY the whole minified JSON object, with one row in findings for every criterion listed above, each row ' +
-	'under its criterionId exactly as listed: failed=false where the criterion is met, failed=true where it is not.';
+	'. Reply with ONLY the whole minified JSON object, with one row in findings for every criterion listed above, the ones ' +
+	'named here and all the others, each row under its criterionId exactly as listed: failed=false where the criterion is met, ' +
+	'failed=true where it is not.';
 /** ⭐ D13 — the missing-criterion repair's line, for the declared ids `missingDeclaredIds` the reply left without a row. */
 export function missingCriterionRepairInstruction(missingDeclaredIds: readonly string[]): string {
 	return `${MISSING_CRITERION_REPAIR_OPENING}${missingDeclaredIds.join(', ')}${MISSING_CRITERION_REPAIR_CLOSING}`;
