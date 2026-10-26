@@ -444,12 +444,17 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481) — no host text inside quoted mate
 	// ⭐ The review in parts, B7 — ~~the 60 of case set v7~~ the 76 of case set v8, current since B7: version seven's 41
 	// non-graph cases and 35 part cases (`REG-D-126`), each part its subject, context and children's skeletons in one region;
 	// ⭐ and, as history, version seven's 19 graph cases, which still materialize through their builder.
-	it('⭐ the 76 cases of the current case set — initial and repair prompt, each process result read against its run, each declared case its work one region, each part case its part one region; and version seven’s graph cases', async () => {
+	// ⭐⭐ `JAN-EXEC` Phase 7, before P6 again, package V (`REG-D-136`) — ~~the 76 of case set v8~~ the 91 of case set v12, current
+	// since package V: version eleven's 35 part cases, and 56 shown what production now hands each review (design D14) — the 24
+	// work products their finished-work view, the 18 process results their places in their steps' sequences, the 14 sign-offs
+	// their files and sequence.
+	it('⭐ the ~~76~~ 91 cases of the current case set — initial and repair prompt, each process result read against its run, each declared case its work one region, each part case its part one region; and version seven’s graph cases', async () => {
 		const cases = committedCaseSet(new URL('../', import.meta.url)).cases;
-		expect(cases).toHaveLength(76);
+		expect(cases).toHaveLength(91);
 		expect(cases.filter((c) => c.arm === 'PWA_TYPE'), 'the 35 part cases').toHaveLength(35);
 		expect(cases.filter((c) => c.arm === 'PWA_GRAPH'), 'no graph case').toHaveLength(0);
-		expect(cases.filter((c) => c.arm === 'PROCESS_RESULT'), 'the 14 process-result cases').toHaveLength(14);
+		expect(cases.filter((c) => c.arm === 'WORK_PRODUCT'), 'the 24 work-product cases').toHaveLength(24);
+		expect(cases.filter((c) => c.arm === 'PROCESS_RESULT'), 'the ~~14~~ 18 process-result cases').toHaveLength(18);
 		expect(cases.filter((c) => c.arm === 'DECLARED_POLICY'), 'the 14 declared-policy cases').toHaveLength(14);
 		const v7Graphs = (JSON.parse(readFileSync(new URL(`../${CASE_SET_V7_FILE}`, import.meta.url), 'utf8')) as CaseSet).cases.filter(
 			(c) => c.arm === 'PWA_GRAPH'

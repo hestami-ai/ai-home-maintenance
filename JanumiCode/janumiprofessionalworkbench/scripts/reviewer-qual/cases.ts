@@ -118,7 +118,10 @@ interface CaseCommon {
 	 *  committed case set that holds it (`check-core.ts`, D3c).
 	 *  ⭐ Version eleven (`REG-D-133`) keeps it: the 7 bridge part cases whose prompts D3d moved take new ids — each cut from its
 	 *  source restated as `G11-…`, under that source's — and the 12 whose prompts it did not move keep version ten's ids, their
-	 *  content byte for byte. */
+	 *  content byte for byte.
+	 *  ⭐ Version twelve (`REG-D-136`) keeps it: version eleven's 41 non-part cases, re-cast with what production now hands each
+	 *  review, take new ids — `W12-…`, `P12-…` and `D12-…` — and so do its 15 new cases (`W12-CSV-…`, `P12-CSV-…`); the 35 part
+	 *  cases keep version eleven's ids, their content byte for byte. */
 	readonly id: string;
 	/** The subject the floor composes over — its id, version and the producer independence is checked against. */
 	readonly subject: AssuranceSubject;
@@ -226,6 +229,10 @@ export const ORACLES_V10_FILE = 'docs/tracking/reviewer-qualification/oracles/or
  *  stay as history. */
 export const CASE_SET_V11_FILE = 'docs/tracking/reviewer-qualification/cases/case-set-v11.json';
 export const ORACLES_V11_FILE = 'docs/tracking/reviewer-qualification/oracles/oracles-v11.json';
+/** ⭐ `JAN-EXEC` Phase 7, before P6 again, package V — version twelve (`REG-D-136`), beside versions one to eleven, which stay
+ *  as history. */
+export const CASE_SET_V12_FILE = 'docs/tracking/reviewer-qualification/cases/case-set-v12.json';
+export const ORACLES_V12_FILE = 'docs/tracking/reviewer-qualification/oracles/oracles-v12.json';
 
 /**
  * ⭐ `JAN-CRITREAD` J2-5 — THE CURRENT CASE SET AND ITS ORACLES: what `reviewer:qual:check` holds coverage and
@@ -290,9 +297,16 @@ export const ORACLES_V11_FILE = 'docs/tracking/reviewer-qualification/oracles/or
  * prompts, so the check owes a RUN of the selected reviewer over them alone (limb 1); version ten's run of the 19 reproduces
  * (limb 2), recording no current id whose prompt moved; the 69 others keep their prompts and stay covered as the record
  * stands.
+ * ⭐⭐ Version twelve since `JAN-EXEC` Phase 7, before P6 again, package V (`REG-D-136` Q45; design D14): version eleven's 35 part
+ * cases under their ids, byte for byte, and 56 cases shown what production now hands each review, each under a new id —
+ * version eleven's 41 non-part cases re-cast (the work-product review's finished-work view, a command's place in its step's
+ * sequence, a sign-off's files and sequence) and 15 new over steps built for real (`case-set-v12.ts`). Their oracles are as
+ * the sponsor confirmed them, three moved under the narrower command question (`oracles-v12.ts`). ⚠ The 56 are new prompts,
+ * so the check owes a RUN of the selected reviewer over them (limb 1); and since packages L and N moved the reviewer
+ * fingerprint, the 35 owe RESCORED lines where no case prompt changed, or a run (limb 1).
  */
-export const CURRENT_CASE_SET_FILE = CASE_SET_V11_FILE;
-export const CURRENT_ORACLES_FILE = ORACLES_V11_FILE;
+export const CURRENT_CASE_SET_FILE = CASE_SET_V12_FILE;
+export const CURRENT_ORACLES_FILE = ORACLES_V12_FILE;
 
 /**
  * ⭐⭐ `E12F` F5 (the E12 package review's fifth finding; `REG-D-073`, oracle integrity) — THE WORDS AN ORACLE SET'S
