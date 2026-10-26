@@ -94,13 +94,16 @@ import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import ts from 'typescript';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
+	deliverableFileLine,
 	missingCriterionRepairInstruction,
 	OBSERVATION_HEADING,
 	processResultContentBudget,
 	processResultUntrustedSlices,
 	pwaTypeContentBudget,
 	pwaTypeOverBudgetStatement,
-	REASONING_REVIEW_BUDGET
+	REASONING_REVIEW_BUDGET,
+	sequenceBlock,
+	sequenceRoom
 } from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
 import { renderProcessResultReview } from '../apps/rph-demo/src/lib/server/assurance/process-result-render.js';
 import { DELETED, MAPPED } from '../apps/rph-demo/src/lib/server/assurance/fence-skeleton-table.js';
@@ -1738,10 +1741,23 @@ function otherUntrustedNames(input: ReasoningReviewInput): string[] {
 			: []),
 		...(input.narration ? ['the narration'] : []),
 		...(input.prior?.gaps.length ? ['the prior findings'] : []),
-		...unmintedNamesOf(input).map(() => 'a call name the host did not mint')
+		...unmintedNamesOf(input).map(() => 'a call name the host did not mint'),
+		// ⭐ `JAN-EXEC` Phase 7, package N — D12: each act a command's sequence shows, its path or command as JSON on its host
+		// line — as many as the validator's plan shows, within the room it gives the sequence (`sequenceRoom`).
+		...commandActsOf(input).map(() => 'an act of the step’s sequence')
 	];
 	expect(names.length, 'every other untrusted slice of the plan, named').toBe(otherUntrustedOf(input).length);
 	return names;
+}
+/**
+ * ⭐ Package N — D12 — the acts' JSON a command's prompt shows on its host lines after the view, as the validator's plan lays
+ * them out: within half the room the prompt leaves the view without them (`sequenceRoom`).
+ */
+function commandActsOf(input: ReasoningReviewInput): readonly string[] {
+	if (input.framing !== 'PROCESS_RESULT' || !input.hostSequence) return [];
+	const { content: _content, hostSequence, ...rest } = input;
+	const room = processResultContentBudget({ ...rest, framing: 'PROCESS_RESULT' });
+	return sequenceBlock('PROCESS_RESULT', hostSequence, sequenceRoom(room))?.agent ?? [];
 }
 /** The prompt's other untrusted slices, but the one named `slice`. */
 const otherUntrustedBut =
@@ -1752,8 +1768,9 @@ const otherUntrustedBut =
 	};
 const CHOOSER_RULES: Readonly<Record<string, ChooserRule>> = {
 	// ⭐ AS THE RENDERER ITSELF IS CALLED: `renderProcessResultReview` handed no other untrusted slice at all.
+	// ⭐ Package N — D12 — and `P-SEQUENCE`, whose act's command holds `00`, which the view's chooser reads among them.
 	'the prompt’s other untrusted slices — the instruction, the account, the narration, the prior findings, every unminted name': {
-		moves: ['P-OVERSIZE-FENCES', 'P-OVERSIZE-ALL', 'P-FENCES-OTHER-SLICES', 'P-ACCOUNT-BREAKS'],
+		moves: ['P-OVERSIZE-FENCES', 'P-OVERSIZE-ALL', 'P-FENCES-OTHER-SLICES', 'P-ACCOUNT-BREAKS', 'P-SEQUENCE'],
 		builder: (source) => {
 			const input = PRODUCT_SEAMS.processResult(source);
 			return { ...input, content: renderProcessResultReview(source.run, viewBudget(input), []) };
@@ -1793,6 +1810,8 @@ const CHOOSER_RULES: Readonly<Record<string, ChooserRule>> = {
 		builder: choosing(() => true, otherUntrustedBut("the account's residual uncertainty"))
 	},
 	'the narration': { moves: ['P-FENCES-OTHER-SLICES'], builder: choosing(() => true, otherUntrustedBut('the narration')) },
+	// ⭐ Package N — D12 — each act of a command's sequence, its command or path on its host line (`P-SEQUENCE` plants `00`).
+	'an act of the step’s sequence': { moves: ['P-SEQUENCE'], builder: choosing(() => true, otherUntrustedBut('an act of the step’s sequence')) },
 	'the prior findings': { moves: ['P-FENCES-OTHER-SLICES'], builder: choosing(() => true, otherUntrustedBut('the prior findings')) },
 	'the command line': { moves: ['P-OVERSIZE-FENCES'], builder: choosing((p) => p.slice !== 'the command line') },
 	// ⭐ stdout WHOLE AND CUT: `P-FENCE-AT-THE-LAST`'s whole stdout prints every candidate but the last two, and
@@ -1973,12 +1992,31 @@ const declaredHostSlicesOf = (input: ReasoningReviewInput): readonly (readonly [
 	input.framing === 'DECLARED_POLICY'
 		? [
 				...(input.declaredUnitsWithoutWork ?? []).map((u) => ['the title of a unit without work', jsonLine(u.unit)] as const),
+				// ⭐ Package N — D11 — and each unit whose view is not on the record, on its line after the work.
+				...(input.declaredUnitsWithoutDeliverable ?? []).map((u) => ['the title of a unit with no view on the record', jsonLine(u)] as const),
 				...(input.declaredWorkCut === undefined ? [] : [["the builder's cut declarations", input.declaredWorkCut] as const])
 			]
 		: // ⭐ The review in parts, B7 — and a part's: the declarations of the children's skeletons its builder cut.
 			input.framing === 'PWA_TYPE' && input.declaredPartCut !== undefined
 			? [["the builder's cut declarations", input.declaredPartCut] as const]
 			: [];
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package N — D10, D12 — what the validator's chooser reads on the HOST lines a finished work's review
+ * and a command's carry, by the name of a slice: each changed file's line (`deliverableFileLine`), its path JSON-encoded, and
+ * each act's line of the step's sequence, its path or command JSON-encoded — read off the prompt as it shows them. ⭑ Read
+ * whole, a line holds the candidates its JSON holds: the host's words around it hold none.
+ */
+function sequenceHostSlicesOf(lines: readonly string[], input: ReasoningReviewInput): readonly (readonly [slice: string, text: string])[] {
+	const files =
+		input.framing === 'WORK_PRODUCT'
+			? (input.deliverable?.files ?? []).map(deliverableFileLine).filter((l) => lines.includes(l)).map((l) => ['a changed file’s line', l] as const)
+			: [];
+	const acts =
+		(input.framing === 'WORK_PRODUCT' && input.deliverable) || (input.framing === 'PROCESS_RESULT' && input.hostSequence)
+			? lines.filter((l) => /^ {2}\d+\. (?:wrote|ran) /.test(l)).map((l) => ['an act of the step’s sequence', l] as const)
+			: [];
+	return [...files, ...acts];
+}
 /**
  * `prompt` re-fenced with the token a validator chooser would choose that read only the regions `kept` keeps — and,
  * for a process result, the view whole and each unminted call name, ⭐ and for a declared review the slices on its host
@@ -1989,6 +2027,9 @@ function revalidated(prompt: string, input: ReasoningReviewInput, kept: (slice: 
 	const chosen = chooseFence([
 		...regions.filter((r) => kept(r.slice, r.cut)).map((r) => regionText(lines, r)),
 		...declaredHostSlicesOf(input).flatMap(([slice, text]) => (kept(slice, false) ? [text] : [])),
+		// ⭐ Package N — D10, D12 — and the host lines a finished work's and a command's review carry: each changed file's line,
+		// its path as JSON, and each act's line, its path or command as JSON (`sequenceHostSlicesOf`).
+		...sequenceHostSlicesOf(lines, input).flatMap(([slice, text]) => (kept(slice, false) ? [text] : [])),
 		// ⭐ The view of a process result, read whole, is a slice of its own here (`'the view'`), as the product's reads it.
 		...(input.framing === 'PROCESS_RESULT' ? [...(kept('the view', false) ? [input.content] : []), ...unmintedNamesOf(input)] : [])
 	]);
@@ -2039,8 +2080,10 @@ const VALIDATOR_CHOOSER_RULES: Readonly<Record<string, ValidatorChooserRule>> = 
 		kept: (s, f) => !(s === 'the content' && f === 'PWA_TYPE'),
 		framings: ['T']
 	},
+	// ⭐ Package N — D10 — and each changed file's text, a region of the content beside the answer: `W-DELIVERABLE` plants `00`
+	// in its changed file's, `W-OVERSIZE-DELIVERABLE` in the kept HEAD of its first file's.
 	'the content of a work product': {
-		moves: ['W-OVERSIZE-CONTENT', 'W-FENCES'],
+		moves: ['W-OVERSIZE-CONTENT', 'W-FENCES', 'W-DELIVERABLE', 'W-OVERSIZE-DELIVERABLE'],
 		kept: (s, f) => !(s === 'the content' && f === 'WORK_PRODUCT'),
 		framings: ['W']
 	},
@@ -2055,7 +2098,7 @@ const VALIDATOR_CHOOSER_RULES: Readonly<Record<string, ValidatorChooserRule>> = 
 	// (`declaredPartCut`), the part arm's `D-OVERSIZE-UNITS`: `T-OVERSIZE-CHILDREN` holds `00` in the kept HEAD of one, so a
 	// chooser that skipped a part its builder cut, the forged-region path `REG-F-481` closed, moves it too.
 	'the content of a graph or a work product, when it is cut': {
-		moves: ['T-OVERSIZE-CHILDREN', 'W-OVERSIZE-CONTENT', 'D-OVERSIZE-CONTENT', 'D-OVERSIZE-UNITS'],
+		moves: ['T-OVERSIZE-CHILDREN', 'W-OVERSIZE-CONTENT', 'W-OVERSIZE-DELIVERABLE', 'D-OVERSIZE-CONTENT', 'D-OVERSIZE-UNITS'],
 		kept: (s, _f, cut) => !(s === 'the content' && cut),
 		framings: ['T', 'W', 'D']
 	},
@@ -2071,6 +2114,26 @@ const VALIDATOR_CHOOSER_RULES: Readonly<Record<string, ValidatorChooserRule>> = 
 	"the builder's cut declarations of a declared review's work": {
 		moves: ['D-OVERSIZE-UNIT-TITLE'],
 		kept: (s) => s !== "the builder's cut declarations",
+		framings: ['D']
+	},
+	// ⭐⭐ `JAN-EXEC` Phase 7, package N — D10-D12 (`REG-F-553`'s class) — AND THE HOST LINES PACKAGE N ADDS, each read by the
+	// chooser where it sits: a changed file's line, its path as JSON (`W-DELIVERABLE` plants `01` in an added file's path); an
+	// act's line of the step's sequence, its path or command as JSON (`W-DELIVERABLE` plants `02` in one, `P-SEQUENCE` `00`);
+	// and a declared review's line naming a unit whose view is not on the record (`D-DELIVERABLE` plants `00` in its title).
+	// ⛔ Without these, a chooser that skipped any one moved no fingerprint.
+	'a changed file’s line, its path as JSON': {
+		moves: ['W-DELIVERABLE'],
+		kept: (s) => s !== 'a changed file’s line',
+		framings: ['W']
+	},
+	'an act of the step’s sequence, on its host line': {
+		moves: ['W-DELIVERABLE', 'P-SEQUENCE'],
+		kept: (s) => s !== 'an act of the step’s sequence',
+		framings: ['W', 'P']
+	},
+	'the title of a unit with no view on the record, on its host line': {
+		moves: ['D-DELIVERABLE'],
+		kept: (s) => s !== 'the title of a unit with no view on the record',
 		framings: ['D']
 	},
 	// ⭐ `PQ-1` (`REG-F-481`) — EACH FIELD OF THE ACCOUNT, THE NARRATION AND THE PRIOR FINDINGS, IN EVERY FRAMING THAT CARRIES
@@ -2342,7 +2405,9 @@ function reread(prompt: string, input: ReasoningReviewInput, field: string, read
 	const chosen = chooseFence([
 		...regions.map((r) => (r.slice === field ? read(regionText(lines, r)) : regionText(lines, r))),
 		...besides,
-		...declaredHostSlicesOf(input).map(([, text]) => text)
+		...declaredHostSlicesOf(input).map(([, text]) => text),
+		// ⭐ `JAN-EXEC` Phase 7, package N — D10, D12: and the host lines a finished work's and a command's review carry.
+		...sequenceHostSlicesOf(lines, input).map(([, text]) => text)
 	]);
 	expect(chosen, 'a token is chosen').toBeDefined();
 	return prompt.split(token).join(chosen!);
@@ -3761,8 +3826,12 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 					continue;
 				}
 				cuts += 1;
-				const value = whole[r.slice]!(input);
 				const kept = regionText(lines, r);
+				// ⭐ Package N — D10 — a finished work's content is the answer AND each changed file's text: a cut one is the file's.
+				const value =
+					r.slice === 'the content' && input.framing === 'WORK_PRODUCT' && input.deliverable
+						? ([input.content, ...input.deliverable.files.map((f) => f.content ?? '')].find((v) => v.startsWith(kept) && v !== kept) ?? '')
+						: whole[r.slice]!(input);
 				expect(value.startsWith(kept), `${probe.id}: ${r.slice} keeps its HEAD`).toBe(true);
 				for (const [t, whose] of [[token, 'the validator’s'], ...(viewToken ? [[viewToken, 'the view’s'] as const] : [])] as const)
 					if (!value.slice(kept.length).includes(t)) plantless.push(`${probe.id}: ${r.slice} (${whose})`);
@@ -3790,10 +3859,12 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 			'P-OVERSIZE-AT-ITS-BUDGET: stderr (the view’s)',
 			'P-OVERSIZE-ALL: stdout (the view’s)'
 		]);
+		// ⭐ Package N — D11 — MOVED DELIBERATELY: and `D-OVERSIZE-DELIVERABLE`, one unit's finished work its builder cut.
 		expect(builderCuts, 'the declared reviews whose work their builder cut, ⭐ and the part whose children its builder cut').toEqual([
 			'T-OVERSIZE-CHILDREN',
 			'D-OVERSIZE-UNITS',
-			'D-OVERSIZE-UNIT-TITLE'
+			'D-OVERSIZE-UNIT-TITLE',
+			'D-OVERSIZE-DELIVERABLE'
 		]);
 	});
 

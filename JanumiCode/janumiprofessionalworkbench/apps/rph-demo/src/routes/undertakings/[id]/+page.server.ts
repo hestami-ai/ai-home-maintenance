@@ -81,7 +81,9 @@ import { createDeclaredPolicyReviewer } from '$lib/server/assurance/index';
 import type { DeclaredPolicyAnswer } from '$lib/server/assurance/declared-policy-review';
 import {
 	declaredPolicyReviewInput,
-	type DeclaredReviewCommand
+	type DeclaredReviewAct,
+	type DeclaredReviewCommand,
+	type DeclaredReviewFile
 } from '$lib/server/assurance/review-input';
 import { createExchangeSink } from '$lib/server/assurance/exchange-capture';
 import { recordExchanges } from '$lib/server/assurance/exchange-recorder';
@@ -101,8 +103,23 @@ import { escalatedReviewNote } from '$lib/server/execution/floor-over-subject';
 import {
 	describeRefusedEvidence,
 	joinProcessEvidence,
-	noFindingNote
+	noFindingNote,
+	type JoinedProcessEvidence
 } from '$lib/server/execution/evidence-join';
+import {
+	admittedViewRef,
+	changedFiles,
+	deliverableViewRefOf,
+	hostSequenceOf,
+	readDeliverableView,
+	recordDeliverableView,
+	runsOfTry,
+	sequenceCount,
+	takeManifest,
+	type DeliverableViewRef,
+	type DeliverableViewRecord
+} from '$lib/server/execution/deliverable-view';
+import { commandLine } from '$lib/server/assurance/process-result-render';
 import { governedToolCallReport } from '$lib/server/tools/observed-tool-calls';
 import {
 	classifyTrend,
@@ -1155,6 +1172,8 @@ async function rebuildForReview(
 			readonly ok: true;
 			readonly turn: RebuiltProducingTurn;
 			readonly runs: ReadonlyMap<string, ObservedProcessRun>;
+			/** ⭐ Package N — the refused try's deliverable view, as recorded; absent where no evidence points at one. */
+			readonly view?: DeliverableViewRecord;
 	  }
 	| { readonly ok: false; readonly refusedBecause: string }
 > {
@@ -1174,15 +1193,24 @@ async function rebuildForReview(
 	const runs = new Map<string, ObservedProcessRun>();
 	for (const [i, evidenceId] of s.evidenceIds.entries()) {
 		if (!s.refusals.some((r) => r.subjectId === evidenceId)) continue;
-		const run = await rebuildProcessRun(
-			getObject(getEngine(), evidenceId) ?? {},
-			getArtifactStore(),
-			i + 1
-		);
+		const evidence = getObject(getEngine(), evidenceId) ?? {};
+		// ⭐ Package N — D12: the run's number in the step's one sequence, as its evidence records it (package L), since its
+		// review now names its place there; else, for evidence recorded before package L, its place among the attempt's.
+		const recorded = (evidence.contentReference as { ordinal?: unknown } | undefined)?.ordinal;
+		const run = await rebuildProcessRun(evidence, getArtifactStore(), typeof recorded === 'number' ? recorded : i + 1);
 		if (!run.ok) return run;
 		runs.set(evidenceId, run.value);
 	}
-	return { ok: true, turn: turn.value, runs };
+	// ⭐⭐ Package N — D9-D12 (RD7) — THE VIEW THE REFUSED TRY'S REVIEWS WERE SHOWN, READ BACK FROM THE RECORD: the pointer its
+	// command evidence carries, its bytes re-hashed. ⛔ A pointer whose view cannot be read refuses the whole, as every other
+	// part does. ⚠ A try that ran no command left no pointer: its re-review is shown the answer alone, as before package N
+	// (`REG-F-522` candidate 1, the governed manifest, OWED). ⭐ Package N's check, finding 2 — STILL TRUE, AND WHY: a refused try is
+	// named by no completion, and the other records a try makes (`RecordArtifact`, `EnterExecutionStepWait`) take strict payloads,
+	// generated from the vocabulary, with no field for a pointer — so its view, recorded, is reached by nothing. Disclosed, never
+	// read from the workspace now: the files have moved on since, and the step's baseline is on no record.
+	const viewed = await recordedViewOf(s.evidenceIds);
+	if (!viewed.ok) return viewed;
+	return { ok: true, turn: turn.value, runs, ...(viewed.view ? { view: viewed.view } : {}) };
 }
 
 // ── ⭐⭐ `JAN-EXEC` Phase 7 completion E2 — THE DECLARED POLICIES' REVIEWS, FROM THE RECORD (`REG-F-523`; `REG-D-110` (3);
@@ -1205,6 +1233,42 @@ interface UnitWork {
 	readonly executedBy?: ActorReference;
 	/** ⭐ P5 package B (F1) — no step of the unit succeeded, so the record holds no completion of it. */
 	readonly heldNoCompletion?: true;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package N — D11 (`REG-D-135` (1), the lead's D11) — THE DELIVERABLE VIEW RECORDED AT THE UNIT'S
+	 * COMPLETION: the files its admitted try's reviews were shown and the step's sequence, read back through ~~the pointer its
+	 * command evidence carries~~ ⭐ package N's check, finding 2: the pointer its completion carries, its command evidence's held
+	 * against it (`recordedViewOf`, `admittedViewRef`).
+	 */
+	readonly view?: DeliverableViewRecord;
+	/**
+	 * ⭐ Package N — D11 — a model's work completed with no pointer to a view: ~~its admitted try ran no command whose evidence
+	 * carries one~~ ⭐ package N's check, finding 2: neither its completion nor its command evidence carries one — a re-review's
+	 * completion of a refused try that ran no command (`rebuildForReview`), or a record made before package N.
+	 */
+	readonly viewNotRecorded?: true;
+}
+
+/**
+ * ⭐⭐ Package N — D9-D11 (RD7) — THE DELIVERABLE VIEW A TRY'S REVIEWS WERE SHOWN, FROM THE RECORD: ~~the first pointer the
+ * try's command evidence carries (each carries the same)~~ ⭐ package N's check, finding 2: the pointer a completion carries
+ * (`structuredResult`, passed for a completion), the try's command evidence's held against it, else the first of those —
+ * `admittedViewRef` — its bytes re-hashed (`readDeliverableView`). ⛔ A pointer whose view cannot be read refuses, as every
+ * other part of a rebuild does, and so do pointers that disagree; none at all is `view: undefined` — no record points at one.
+ */
+async function recordedViewOf(
+	evidenceIds: readonly string[],
+	structuredResult?: unknown
+): Promise<{ readonly ok: true; readonly view?: DeliverableViewRecord } | { readonly ok: false; readonly refusedBecause: string }> {
+	const chosen = admittedViewRef(
+		structuredResult,
+		evidenceIds.map((id) =>
+			deliverableViewRefOf((getObject(getEngine(), id)?.contentReference as { deliverableView?: unknown } | undefined)?.deliverableView)
+		)
+	);
+	if (!chosen.ok) return chosen;
+	if (!chosen.ref) return { ok: true };
+	const read = await readDeliverableView(getArtifactStore(), chosen.ref);
+	return read.ok ? { ok: true, view: read.view } : read;
 }
 
 /** The unit's LAST step completion, in log order, with the plan it completed — or nothing, if no step of it succeeded. */
@@ -1275,12 +1339,18 @@ async function unitWorkOf(
 				...(provenance.executedBy.executionInstanceId || !attemptId ? {} : { executionInstanceId: attemptId })
 			}
 		: undefined;
-	const commands = commandsOf(title, Array.isArray(p.proposedEvidenceIds) ? p.proposedEvidenceIds.map(String) : []);
+	const evidenceIds = Array.isArray(p.proposedEvidenceIds) ? p.proposedEvidenceIds.map(String) : [];
+	const commands = commandsOf(title, evidenceIds);
+	// ⭐ Package N — D11 — and the deliverable view recorded at the completion, read back from the record (RD7). ⭐ Package N's
+	// check, finding 2 — through the pointer the completion itself carries, so a try that ran no command is read too.
+	const viewed = await recordedViewOf(evidenceIds, p.structuredResult);
+	if (!viewed.ok) return { ok: false, refusedBecause: `the work of ${title} cannot be rebuilt from the record: ${viewed.refusedBecause}` };
+	const view = viewed.view ? { view: viewed.view } : {};
 	const outputs = Array.isArray(p.outputArtifactIds) ? p.outputArtifactIds.map(String) : [];
 	if (outputs.length === 0)
 		return {
 			ok: true,
-			work: { title, instruction: purpose, instructionIs: 'UNIT_PURPOSE', purpose, commands, ...(executedBy ? { executedBy } : {}) }
+			work: { title, instruction: purpose, instructionIs: 'UNIT_PURPOSE', purpose, commands, ...(executedBy ? { executedBy } : {}), ...view }
 		};
 	const stepId = String((p.executionStepId ?? '') as string);
 	const turn = await rebuildProducingTurn(uiSession(), getArtifactStore(), {
@@ -1308,7 +1378,9 @@ async function unitWorkOf(
 			answer: turn.value.answer,
 			...(turn.value.rationale ? { rationale: turn.value.rationale } : {}),
 			commands,
-			...(executedBy ? { executedBy } : {})
+			...(executedBy ? { executedBy } : {}),
+			// ⭐ Package N — D11 — a model's work: its view, or that none is on the record.
+			...(viewed.view ? view : { viewNotRecorded: true as const })
 		}
 	};
 }
@@ -1323,6 +1395,11 @@ interface DeclaredReviewWork {
 	readonly instructionIs: DeclaredInstruction;
 	readonly workProducts: readonly { readonly unit: string; readonly answer: string }[];
 	readonly commands: readonly DeclaredReviewCommand[];
+	/** ⭐ Package N — D11 — the files each unit changed and its step's sequence, as recorded at its completion. */
+	readonly files: readonly DeclaredReviewFile[];
+	readonly sequence: readonly DeclaredReviewAct[];
+	/** ⭐ Package N — D11 — each unit whose model's work completed with no view on the record (`viewNotRecorded`). */
+	readonly unitsWithoutDeliverable?: readonly string[];
 	readonly rationale?: ProfessionalRationaleSummary;
 	/**
 	 * ⭐ P5 package B (F1) — each unit below a unit composed of others that holds no completion, with its lifecycle and
@@ -1372,12 +1449,21 @@ async function declaredReviewWorkOf(
 	const composite = childrenOf(pwuId).length > 0;
 	const workProducts: { unit: string; answer: string }[] = [];
 	const commands: DeclaredReviewCommand[] = [];
+	// ⭐ Package N — D11 — the deliverable, in the same composition: each unit's own, then its subtree's, depth first.
+	const files: DeclaredReviewFile[] = [];
+	const sequence: DeclaredReviewAct[] = [];
+	const unitsWithoutDeliverable: string[] = [];
 	const unitsWithoutWork: DeclaredUnitWithoutWork[] = [];
 	// ⭐ R3-A F1 — one unit's own work, then each of its children's subtrees in turn: depth first, the store's order.
 	// ⛔ A work product below it that the record cannot rebuild refuses the whole (RD7), as a child's always did.
 	const gather = async (id: string, work: UnitWork): Promise<{ readonly ok: false; readonly refusedBecause: string } | undefined> => {
 		if (work.answer !== undefined) workProducts.push({ unit: work.title, answer: work.answer });
 		commands.push(...work.commands);
+		if (work.view) {
+			files.push(...work.view.deliverable.files.map((f) => ({ unit: work.title, ...f })));
+			sequence.push(...work.view.deliverable.sequence.acts.map((a) => ({ ...a, unit: work.title })));
+		}
+		if (work.viewNotRecorded) unitsWithoutDeliverable.push(work.title);
 		for (const child of childrenOf(id)) {
 			const w = await unitWorkOf(child.id);
 			if (!w.ok) return w;
@@ -1403,6 +1489,9 @@ async function declaredReviewWorkOf(
 				instructionIs: own.work.instructionIs,
 				workProducts,
 				commands,
+				files,
+				sequence,
+				...(unitsWithoutDeliverable.length > 0 ? { unitsWithoutDeliverable } : {}),
 				...(own.work.rationale ? { rationale: own.work.rationale } : {}),
 				producer
 			}
@@ -1410,7 +1499,16 @@ async function declaredReviewWorkOf(
 	// ⛔ `E12F` F4 — ITS OWN PURPOSE, never a prompt of its own, and the reviewer is told so: the work judged is ~~its children's~~
 	// many units', each made under its own unit's instruction (~~`own.work.instruction`~~, which for a unit that ran a prompt of
 	// its own would have been shown as the instruction the units below it were given).
-	const work: DeclaredReviewWork = { instruction: own.work.purpose, instructionIs: 'UNIT_PURPOSE', workProducts, commands, producer };
+	const work: DeclaredReviewWork = {
+		instruction: own.work.purpose,
+		instructionIs: 'UNIT_PURPOSE',
+		workProducts,
+		commands,
+		files,
+		sequence,
+		...(unitsWithoutDeliverable.length > 0 ? { unitsWithoutDeliverable } : {}),
+		producer
+	};
 	return { ok: true, work: unitsWithoutWork.length > 0 ? { ...work, unitsWithoutWork } : work };
 }
 
@@ -1477,6 +1575,10 @@ async function reviewDeclaredPolicies(
 				instructionIs: work.instructionIs,
 				workProducts: work.workProducts,
 				commands: work.commands,
+				// ⭐ Package N — D11 — the deliverable the units' own work-product reviews were shown.
+				files: work.files,
+				sequence: work.sequence,
+				...(work.unitsWithoutDeliverable ? { unitsWithoutDeliverable: work.unitsWithoutDeliverable } : {}),
 				...(work.rationale ? { rationale: work.rationale } : {}),
 				...(work.unitsWithoutWork ? { unitsWithoutWork: work.unitsWithoutWork } : {})
 			})
@@ -1657,6 +1759,18 @@ function modelExecutedBy(modelId: string) {
 	return { actorId: `model:${modelId}`, actorType: 'AGENT' as const, displayName: 'Execution model' };
 }
 
+/**
+ * ⭐ `JAN-EXEC` Phase 7, package N's check, finding 6 — A TRY WHOSE FINISHED WORK THE HOST COULD NOT READ OR RECORD FAILS THE
+ * STEP, AND SAYS WHY: the step has STARTED, so a try that cannot reach its review is a failure with a reason, never an
+ * escape (the context-policy and sandbox refusals' rule). The work product already recorded stays on the record (PER-9).
+ */
+function failTheStepBeforeItsReview(planId: string, stepId: string, why: string) {
+	const failed = runSteps([['FailExecutionStep', 'EXECUTION_PLAN', planId, { stepId, failureReason: why }]]);
+	return fail(400, {
+		error: `The model invocation did not run to its review: ${why}${failed ? ` — and the failure could not be recorded: ${failed}` : ''}`
+	});
+}
+
 /** What one model unit's run needs: the started plan and step, its binding, its executor, and its type's facts. */
 interface ModelUnitRun {
 	readonly pwuId: string;
@@ -1812,10 +1926,19 @@ async function runModelUnit(u: ModelUnitRun) {
 	// NARROW a registry this host already built — that is the seam a later increment would use, and
 	// naming it keeps this a disclosed bound rather than an unknown one.
 	let producer: Awaited<ReturnType<ReturnType<typeof getExecutionSession>>>;
+	// ⭐⭐ `JAN-EXEC` Phase 7, package N — D10 (`REG-D-135` (1); `REG-F-522` remedy candidate 2) — THE SANDBOX IS RESOLVED ONCE,
+	// so the host reads the SAME workspace the producer works in: its manifest before the step's first try (`baseline`) and
+	// after each try (`takeManifest`), through the workspace port, and the files changed between them are the deliverable
+	// each try's work-product review is shown. ⭑ Taken before the producer opens, so a workspace that cannot be read fails the
+	// step as a refused sandbox does, with nothing to release.
+	let sandbox: ReturnType<typeof resolveUndertakingSandbox>;
+	let baseline: Awaited<ReturnType<typeof takeManifest>>;
 	try {
 		const current = binding ? currentBinding(bindingId) : undefined;
+		sandbox = resolveUndertakingSandbox(String((pwu?.undertakingId ?? '') as string));
+		baseline = await takeManifest(sandbox.workspace);
 		producer = await getExecutionSession(executor)({
-			...resolveUndertakingSandbox(String((pwu?.undertakingId ?? '') as string)),
+			...sandbox,
 			grantedCapabilities: current?.capabilities ?? [],
 			// ⚠ `''` FOR A STEP THAT NAMES NO BINDING, AND WHAT MAKES THAT SAFE IS THE **LIST**, NOT THIS
 			// FIELD — said because the plausible reading is the other way round. `canReuseBindingForNewAttempt`
@@ -1835,8 +1958,26 @@ async function runModelUnit(u: ModelUnitRun) {
 	}
 	// ⭐ `JAN-SELRES` RS-1 (D4) — the record's fallback identity, from the selection that just opened the producer.
 	const fallbackIdentity = executorRecordIdentity(executor);
+	// ── ⭐⭐ `JAN-EXEC` Phase 7, package N — D9 (`REG-D-135` (1); `REG-F-485`; `REG-F-520` remedy 1; `REG-D-059`) ──────────
+	//
+	// ⛔ THE JOIN FOLLOWED THE LOOP AND THE PRODUCER'S DISPOSAL: every run of every try was joined against the LAST try's
+	// account and the LAST turn's observation (`REG-F-485`), and a command's review ran once, after the producer was
+	// released, so its findings never reached the producer and one refused command review refused the step (`REG-F-520`).
+	// ⭐ NOW EACH TRY'S RUNS ARE JOINED INSIDE THE LOOP, with THAT try's account and observation, their reviews run in the
+	// try, and their subject findings go back to the model with the work product's (the `REG-D-059` loop). The completion
+	// names the admitted try's work product and that try's command evidence; earlier tries' assessments stay on the record.
+	// ⛔ ONE OBSERVER PER STEP, NEVER ONE PER TRY: a try's runs are a SLICE of the step's one host sequence, by the number it
+	// began after (`tryStarts`), so the 32-run bound stays the step's and the lane's whole-press worst case
+	// (`PHASE7_UNIT_REVIEWER_CALLS` = (3 tries + 32 runs) × 6) counts it once.
+	const tryStarts: number[] = [];
+	let joined: JoinedProcessEvidence[] = [];
+	// ⭐ Package N's check, finding 2 — where the last try's view is recorded: the try the completion admits.
+	let admittedView: DeliverableViewRef | undefined;
 	try {
 		for (let attempt = 1; ; attempt++) {
+			// ⭐ D9 — the boundary this try begins after: the step's sequence begins at none (its session, and so its one observer,
+			// is the step's own), and each later try begins after every number the step's one sequence has given so far.
+			tryStarts.push(attempt === 1 ? 0 : sequenceCount(producer.processRuns()));
 			// ⛔ ONE READ PER TRY, HELD IN ONE VALUE. Reading the status and the grant through two calls
 			// would reinstate, at the call site, the very split `currentBinding` exists to close.
 			const onThisTry = binding ? currentBinding(bindingId) : undefined;
@@ -2003,6 +2144,55 @@ async function runModelUnit(u: ModelUnitRun) {
 			if (recorded)
 				return fail(400, { error: `Recording the work product failed: ${recorded}` });
 
+			// ── ⭐⭐ Package N — D9, D10 — THIS TRY'S FINISHED WORK AND ITS PLACE IN THE STEP'S SEQUENCE ──────────────────────
+			//
+			// The host reads the workspace through its port after the try (`takeManifest`): the files the unit changed since its
+			// step began — added, changed, removed — with their text as the host reads it, beside the step's writes and runs to
+			// date, try by try, from the step's ONE observation. ⭑ RECORDED on the content plane (`recordDeliverableView`) and
+			// pointed at from this try's command evidence ⭐ package N's check, finding 2: and, for the try a completion admits, from
+			// that completion (`structuredResult.deliverableView`), so a re-review and a sign-off read the view this try was shown
+			// from the record, never from memory (RD7). ⚠ A try that ran no command and was REFUSED leaves no pointer on any
+			// record: its re-review is shown the answer alone (`rebuildForReview`). `REG-F-522`'s governed manifest (its
+			// candidate 1) remains OWED.
+			const observation = producer.processRuns();
+			const hostSequence = hostSequenceOf(observation, tryStarts);
+			// ⭐⭐ Package N's check, finding 6 — A WORKSPACE THE HOST CANNOT READ, OR A VIEW IT CANNOT RECORD, FAILS THE STEP WITH ITS
+			// REASON, as the baseline's does above. ⛔ Neither was caught: the port's `list()` is the one method that still throws (a
+			// file removed between the walk and its stat, `filesystem-workspace.ts`), so the action escaped as a 500 with its work
+			// product recorded, its step left RUNNING and no failure recorded. ⭑ No review is asked of a try whose finished work the
+			// host could not read: it would be judged without the deliverable its review exists to be shown.
+			let manifestAfter: Awaited<ReturnType<typeof takeManifest>>;
+			try {
+				manifestAfter = await takeManifest(sandbox.workspace);
+			} catch (e) {
+				return failTheStepBeforeItsReview(
+					planId,
+					stepId,
+					`the host could not read the unit's workspace after try ${attempt}: ${e instanceof Error ? e.message : String(e)}`
+				);
+			}
+			const deliverable = {
+				afterTry: attempt,
+				files: changedFiles(baseline, manifestAfter),
+				sequence: hostSequence
+			};
+			let deliverableView: DeliverableViewRef;
+			try {
+				deliverableView = await recordDeliverableView(getArtifactStore(), EXECUTION_TENANT_PREFIX, {
+					attemptKey,
+					try: attempt,
+					deliverable
+				});
+			} catch (e) {
+				return failTheStepBeforeItsReview(
+					planId,
+					stepId,
+					`the host could not record the files the unit changed after try ${attempt}: ${e instanceof Error ? e.message : String(e)}`
+				);
+			}
+			// ⭐ Package N's check, finding 2 — the view of the try the loop last made, which the completion below admits.
+			admittedView = deliverableView;
+
 			// ── ⭑⭑ THE FLOOR RUNS OVER THE WORK PRODUCT, SO IT CAN BE SATISFIED AND NOT ONLY REFUSE ────────
 			//
 			// `REG-F-352` left this step able to run, produce a work product, and never complete: the floor
@@ -2011,6 +2201,8 @@ async function runModelUnit(u: ModelUnitRun) {
 			// ⭑ THE SUBJECT IS THE ARTIFACT, because that is what `floorGateBlock` looks for. And the criteria
 			// come from the SAME policy object the authoring review reads — restating the rubric here is how
 			// four descriptions of one criterion came to disagree.
+			// ⭐ Package N — D10 — AND IT IS SHOWN THE FINISHED WORK: the answer, the files the unit changed and the step's writes
+			// and runs, judged against the obligation as the files now stand (`workProductReviewInput`).
 			review = await runWorkProductFloor(
 				{
 					artifactId,
@@ -2036,7 +2228,8 @@ async function runModelUnit(u: ModelUnitRun) {
 					// here only when a deployment has explicitly chosen otherwise.
 					...(reviewSeesPriorFindings() && priorFindings.length
 						? { priorGaps: priorFindings.map((f) => `${f.code}: ${f.statement}`) }
-						: {})
+						: {}),
+					deliverable
 				},
 				uiSession(),
 				{
@@ -2046,85 +2239,108 @@ async function runModelUnit(u: ModelUnitRun) {
 					criteria: reasoningReviewCriteria(uiSession())
 				}
 			);
-			if (review.satisfied) break;
+
+			// ── ⭐⭐ JAN-EXEC PHASE 5 — THE EVIDENCE JOIN: every command the host ran becomes a governed object ──
+			//
+			// ⛔ UNTIL THIS BLOCK, `proposedEvidenceIds` WAS THE LITERAL `[]` ON EVERY PATH IN THIS FILE, and the
+			// exit code of a model-run test suite existed NOWHERE after the turn ended — `ProcessRunOutcome.
+			// retention` had no production consumer and the tool-call observer drops everything but a name and an
+			// outcome. So a step could run a test suite and complete with no governed trace that it had.
+			//
+			// ⭐ `R18`: EVERY COMPLETED RUN, TYPED `OBSERVATION`. This host cannot tell `npm test` from `ls` —
+			// `run_command` is one tool name for every command and the argv was chosen by an untrusted party — so
+			// it records what it CAN say. ⛔ Including runs `R17` will BLOCK: minting only the ones that would
+			// pass would let a step complete as though a killed command never happened.
+			//
+			// ⚠ THE JOIN RUNS EVEN WHEN THE WORK-PRODUCT FLOOR REFUSED, and that is deliberate. A command that
+			// ran is a FACT about the world; whether the step may COMPLETE is a judgement about that fact. It is
+			// the same argument `PER-9` makes for not rolling the artifact back when the floor refuses it.
+			// ⭐⭐ Package N — D9 — ~~after the loop, over every run of every try~~: INSIDE THE TRY, over THIS try's runs alone
+			// (`runsOfTry`), against THIS try's exchange, prompt, account and last-turn observation — so a run of try 1 is never
+			// judged against try 2's account (`REG-F-485`) — each review shown the run's place in the step's sequence (D12).
+			const join = await joinProcessEvidence(
+				{
+					runs: runsOfTry(observation, tryStarts.at(-1)!),
+					// ⭑ THE PRODUCING MODEL'S EXCHANGE (`R15`). A child process has no exchange; what
+					// `traceComplete` verifies is the record of the turn in which the model DECIDED to run this.
+					exchange: (getObject(getEngine(), tryOutcome.exchangeId) ?? {}) as never,
+					producingPrompt: tryOutcome.prompt,
+					producerModelId: tryOutcome.producer.modelId,
+					producerProviderId: tryOutcome.producer.providerId,
+					// ⭐ `R15`'s INDEPENDENT HALF — the adapter's own observation, not the model's word (§22.1): THIS try's turn.
+					observedToolCalls: governedToolCallReport(producer.lastTurnObservation()),
+					...(tryOutcome.rationale ? { rationale: tryOutcome.rationale } : {}),
+					scope: `commands run by the executing model for work unit ${pwuId}`,
+					tenantPrefix: EXECUTION_TENANT_PREFIX,
+					// ⭐ P7-6R RD6 — and each command's evidence names the same attempt, in its content reference.
+					producingExecutionAttemptId: attemptKey,
+					// ⭐ Package N — D9, D10, D12 — and the try, the step's sequence to date, and where this try's view is recorded.
+					producingTry: attempt,
+					hostSequence,
+					deliverableView
+				},
+				uiSession(),
+				{
+					artifacts: getArtifactStore(),
+					now: hostNow,
+					newId: mintUiId,
+					criteria: reasoningReviewCriteria(uiSession()),
+					// ⚠ ONE COMMAND PER CALL, THROUGH THE SAME `runSteps` THE REST OF THIS ACTION USES, so a
+					// refusal anywhere rolls the whole action back (`SPEC-001-INV-14`). A module reaching for the
+					// engine directly would commit evidence this path's own failure arm could not undo.
+					propose: (evidenceId, payload) =>
+						runSteps([['ProposeEvidence', 'EVIDENCE', evidenceId, payload]]),
+					getObject: (id) => getObject(getEngine(), id) as Record<string, unknown> | undefined
+				}
+			);
+			if (join.refusedBecause)
+				return fail(400, {
+					error: `The model ran ${observation.observedCount} command(s) and one could not be recorded as evidence: ${join.refusedBecause}`
+				});
+			joined = join.joined;
+			const refusedRuns = joined.filter((j) => !j.satisfied);
+			if (review.satisfied && refusedRuns.length === 0) break;
 
 			// ⭑ THE OPEN-FINDING COUNT IS THE REMEDIATION'S OWN, not a severity cut I invented here. That set
 			// is already filtered to valid SUBJECT findings, never operational failures.
-			openPerTry.push(review.remediation.findings.length);
+			// ⭐ Package N — D9 — the work product's AND this try's refused commands', each command's named by its command and
+			// its act in the step's sequence, so the producer knows which result a finding is about.
+			const findings = [
+				...(review.satisfied ? [] : review.remediation.findings.map((f) => ({ code: f.code, statement: f.statement }))),
+				...refusedRuns.flatMap((j) =>
+					j.findings.map((f) => ({
+						code: f.code,
+						statement: `On the command ${commandLine(j.run.argv)} (act ${j.run.ordinal}): ${f.statement}`
+					}))
+				)
+			];
+			openPerTry.push(findings.length);
 			const trend = classifyTrend(openPerTry);
 			const gate = mayRetry(attempt, trend);
 
 			// ⛔ `autoRefine` IS THE GUARD THAT DECIDES WHETHER THERE IS ANYTHING TO SEND BACK AT ALL. An
 			// INCONCLUSIVE review — *the reviewer could not tell* — sets it false, because feeding that back
 			// as though it were a critique would MANUFACTURE WORK FROM SILENCE (`REG-D-059`, `ASR-11` limb 1).
-			if (!review.remediation.autoRefine || !gate.retry) {
-				loopEnded = review.remediation.autoRefine
-					? `${gate.reason} Trend after ${attempt} ${attempt === 1 ? 'try' : 'tries'}: ${trend}.`
-					: `The review did not produce findings that may be sent back to the producer (${review.remediation.action}).`;
+			// ⭐ Package N — D9 — FOR EVERY REFUSED REVIEW OF THE TRY, the work product's first: one that may not be answered by
+			// the producer (a review that did not conclude, an escalation) ends the loop, so a retry never steps past it — the
+			// person's choice follows (RD3), as it always did for the work product's.
+			const unanswerable = [
+				...(review.satisfied ? [] : [review.remediation]),
+				...refusedRuns.map((j) => ({ autoRefine: j.autoRefine, action: j.remediationAction }))
+			].find((r) => !r.autoRefine);
+			if (unanswerable || !gate.retry) {
+				loopEnded = unanswerable
+					? `The review did not produce findings that may be sent back to the producer (${unanswerable.action}).`
+					: `${gate.reason} Trend after ${attempt} ${attempt === 1 ? 'try' : 'tries'}: ${trend}.`;
 				break;
 			}
-			priorFindings = review.remediation.findings.map((f) => ({
-				code: f.code,
-				statement: f.statement
-			}));
+			priorFindings = findings;
 		}
 	} finally {
 		// ⚠ RELEASED WHEN THE UNIT STOPS BEING WORKED ON — satisfied, escalated, or out of tries — and in
 		// a `finally` so a refusal mid-loop cannot strand a live session.
 		producer.dispose();
 	}
-
-	// ── ⭐⭐ JAN-EXEC PHASE 5 — THE EVIDENCE JOIN: every command the host ran becomes a governed object ──
-	//
-	// ⛔ UNTIL THIS BLOCK, `proposedEvidenceIds` WAS THE LITERAL `[]` ON EVERY PATH IN THIS FILE, and the
-	// exit code of a model-run test suite existed NOWHERE after the turn ended — `ProcessRunOutcome.
-	// retention` had no production consumer and the tool-call observer drops everything but a name and an
-	// outcome. So a step could run a test suite and complete with no governed trace that it had.
-	//
-	// ⭐ `R18`: EVERY COMPLETED RUN, TYPED `OBSERVATION`. This host cannot tell `npm test` from `ls` —
-	// `run_command` is one tool name for every command and the argv was chosen by an untrusted party — so
-	// it records what it CAN say. ⛔ Including runs `R17` will BLOCK: minting only the ones that would
-	// pass would let a step complete as though a killed command never happened.
-	//
-	// ⚠ THE JOIN RUNS EVEN WHEN THE WORK-PRODUCT FLOOR REFUSED, and that is deliberate. A command that
-	// ran is a FACT about the world; whether the step may COMPLETE is a judgement about that fact. It is
-	// the same argument `PER-9` makes for not rolling the artifact back when the floor refuses it.
-	const observedRuns = producer.processRuns();
-	const join = await joinProcessEvidence(
-		{
-			runs: observedRuns.runs,
-			// ⭑ THE PRODUCING MODEL'S EXCHANGE (`R15`). A child process has no exchange; what
-			// `traceComplete` verifies is the record of the turn in which the model DECIDED to run this.
-			exchange: (getObject(getEngine(), outcome.exchangeId) ?? {}) as never,
-			producingPrompt: outcome.prompt,
-			producerModelId: outcome.producer.modelId,
-			producerProviderId: outcome.producer.providerId,
-			// ⭐ `R15`'s INDEPENDENT HALF — the adapter's own observation, not the model's word (§22.1).
-			observedToolCalls: governedToolCallReport(producer.lastTurnObservation()),
-			...(outcome.rationale ? { rationale: outcome.rationale } : {}),
-			scope: `commands run by the executing model for work unit ${pwuId}`,
-			tenantPrefix: EXECUTION_TENANT_PREFIX,
-			// ⭐ P7-6R RD6 — and each command's evidence names the same attempt, in its content reference.
-			producingExecutionAttemptId: attemptKey
-		},
-		uiSession(),
-		{
-			artifacts: getArtifactStore(),
-			now: hostNow,
-			newId: mintUiId,
-			criteria: reasoningReviewCriteria(uiSession()),
-			// ⚠ ONE COMMAND PER CALL, THROUGH THE SAME `runSteps` THE REST OF THIS ACTION USES, so a
-			// refusal anywhere rolls the whole action back (`SPEC-001-INV-14`). A module reaching for the
-			// engine directly would commit evidence this path's own failure arm could not undo.
-			propose: (evidenceId, payload) =>
-				runSteps([['ProposeEvidence', 'EVIDENCE', evidenceId, payload]]),
-			getObject: (id) => getObject(getEngine(), id) as Record<string, unknown> | undefined
-		}
-	);
-	if (join.refusedBecause)
-		return fail(400, {
-			error: `The model ran ${observedRuns.observedCount} command(s) and one could not be recorded as evidence: ${join.refusedBecause}`
-		});
 
 	// ── ⛔ AND NOW THE FLOOR DECIDES, WHICH IS THE WHOLE POINT ─────────────────────────────────────
 	//
@@ -2154,9 +2370,17 @@ async function runModelUnit(u: ModelUnitRun) {
 				// RECORDED. `completeExecutionStep` unions this with `outputArtifactIds` and loops the floor
 				// gate over EVERY member at its own store-derived version — so naming an id whose floor is
 				// missing does not weaken the gate, it REFUSES the completion. That is why the join runs first.
-				proposedEvidenceIds: join.joined.map((j) => j.evidenceId),
+				// ⭐ Package N — D9 — the ADMITTED try's command evidence, beside its work product: earlier tries' evidence and
+				// their assessments stay on the record, named by no completion.
+				proposedEvidenceIds: joined.map((j) => j.evidenceId),
 				detectedAssumptionIds: [],
-				structuredResult: {},
+				// ⭐⭐ Package N's check, finding 2 (design D11: "the unit's changed files and sequence recorded at its completion") —
+				// THE COMPLETION POINTS AT THE ADMITTED TRY'S VIEW, so its sign-off reads what that try's reviews were shown whether
+				// or not the try ran a command. ⛔ `{}`: only a try's command evidence pointed at it, and a write-only try's
+				// declared reviews were told the host held no record of its files. ⭑ The host's pointer, never the model's content:
+				// the completion names its work product, so the floor's zero-subject rule (`unassessableAiContentBlock`) is not
+				// what admits it, and the plans Begin & Execute and a re-run build hold no transition, so no branch condition reads it.
+				structuredResult: admittedView ? { deliverableView: admittedView } : {},
 				// ⛔ THE MODEL IS THE EXECUTOR. The TRANSFORMATION path below records the human who
 				// clicked, correctly — a human drove it. Recording a human here would be a fiction, and
 				// the assurance floor is entitled to know which it was.
@@ -2186,7 +2410,7 @@ async function runModelUnit(u: ModelUnitRun) {
 								unsatisfied: review.dispositions.filter((d) => d.disposition !== 'SATISFIED')
 							}
 						]),
-				...join.joined
+				...joined
 					.filter((j) => !j.satisfied)
 					.map((j) => ({ subjectId: j.evidenceId, unsatisfied: j.unsatisfiedPolicies }))
 			],
@@ -2200,7 +2424,8 @@ async function runModelUnit(u: ModelUnitRun) {
 					// the engine's text, whose fallback is `policyId=disposition` (design G5) — no observation, and beside an
 					// escalation no sentence saying what it asks (the ER-1 app verifier's MAJOR 1, its probe `ER1-VP1`). ⭑ The
 					// same hand-over as the arm below, so one reader splits both; with nothing refused this message is unchanged.
-					`The model ran, its work product is recorded, and the assurance floor is satisfied — but the step still did not complete${describeRefusedEvidence(join.joined) ? ` — and the command evidence did not pass its own floor: ${describeRefusedEvidence(join.joined)}` : '.'} ${completed}`
+					// ⭐ Package N — D9 — and, a command's review now able to send the producer back, why the loop stopped.
+					`The model ran, its work product is recorded, and the assurance floor is satisfied — but the step still did not complete${describeRefusedEvidence(joined) ? ` — and the command evidence did not pass its own floor: ${describeRefusedEvidence(joined)}` : '.'} ${completed}${loopEnded ? ` — ${loopEnded}` : ''}`
 				: // ⭑ THE REVIEW RAN AND DID NOT PASS. That is a JUDGEMENT about the work, not a missing
 					// check, and the two must not read the same. The findings are surfaced; feeding them back
 					// to the producing model is REG-D-059's ruling and needs the loop bound, which is the
@@ -2222,7 +2447,7 @@ async function runModelUnit(u: ModelUnitRun) {
 					// on the codes): the recommendation alone was all this arm printed of a review left INCONCLUSIVE by an
 					// unanswered criterion, and INCONCLUSIVE was named nowhere (the second fix round's re-verifier's finding [0]).
 					// ⛔ Never an ESCALATED review's: the sentence after it explains that one, so the note is keyed on the action too.
-					`The model ran, its work product was reviewed over ${openPerTry.length} ${openPerTry.length === 1 ? 'try' : 'tries'}, and the assurance floor is NOT satisfied: ${review.observations.map((o) => `${o.code}: ${o.statement}`).join(' | ') || completed}${noFindingNote(review.observations, review.dispositions, review.remediation.action)}${escalatedReviewNote(review.remediation.action)}${loopEnded ? ` — ${loopEnded}` : ''}${describeRefusedEvidence(join.joined) ? ` — and the command evidence did not pass its own floor: ${describeRefusedEvidence(join.joined)}` : ''}`) +
+					`The model ran, its work product was reviewed over ${openPerTry.length} ${openPerTry.length === 1 ? 'try' : 'tries'}, and the assurance floor is NOT satisfied: ${review.observations.map((o) => `${o.code}: ${o.statement}`).join(' | ') || completed}${noFindingNote(review.observations, review.dispositions, review.remediation.action)}${escalatedReviewNote(review.remediation.action)}${loopEnded ? ` — ${loopEnded}` : ''}${describeRefusedEvidence(joined) ? ` — and the command evidence did not pass its own floor: ${describeRefusedEvidence(joined)}` : ''}`) +
 				// ⚠ A WAIT THAT COULD NOT BE RECORDED IS SAID, never swallowed: the unit is then left as K1 left it.
 				(waited ? ` — and the wait for a person’s choice could not be recorded: ${waited}` : '')
 		});
@@ -3225,7 +3450,7 @@ export const actions: Actions = {
 			return fail(400, {
 				error: `The review cannot be re-run, and the unit keeps waiting: ${rebuilt.refusedBecause}`
 			});
-		const { turn, runs } = rebuilt;
+		const { turn, runs, view } = rebuilt;
 
 		// ── RD4 + RD5 — THE PERSON'S DECISION AND THE PLAN REVISION, ONE BATCH ────────────────────────────────────────
 		const decisionId = mintUiId('dec');
@@ -3269,10 +3494,18 @@ export const actions: Actions = {
 				producerProviderId: turn.producerProviderId,
 				...(turn.rationale ? { rationale: turn.rationale } : {})
 			};
+			// ⭐⭐ Package N — D10, D12 — THROUGH THE SAME BUILDERS, with what the refused try's reviews were shown: the finished
+			// work and the step's sequence (the work product's), each command's place in that sequence (each command's).
 			const floor =
 				r.objectType === 'ARTIFACT'
 					? await runWorkProductFloor(
-							{ artifactId: r.subjectId, artifact: turn.artifact, answer: turn.answer, ...producing },
+							{
+								artifactId: r.subjectId,
+								artifact: turn.artifact,
+								answer: turn.answer,
+								...producing,
+								...(view ? { deliverable: view.deliverable } : {})
+							},
 							uiSession(),
 							opts
 						)
@@ -3282,7 +3515,8 @@ export const actions: Actions = {
 								evidence: getObject(getEngine(), r.subjectId) ?? {},
 								run: runs.get(r.subjectId)!,
 								...(turn.observedToolCalls ? { observedToolCalls: turn.observedToolCalls } : {}),
-								...producing
+								...producing,
+								...(view ? { hostSequence: { ...view.deliverable.sequence, subjectOrdinal: runs.get(r.subjectId)!.ordinal } } : {})
 							},
 							uiSession(),
 							opts
@@ -3305,6 +3539,9 @@ export const actions: Actions = {
 					outputArtifactIds: [s.workProductId],
 					proposedEvidenceIds: [...s.evidenceIds],
 					detectedAssumptionIds: [],
+					// ⭑ Package N's check, finding 2 — no pointer of its own: the view a re-review reads is reached only through the
+					// re-reviewed try's command evidence (`rebuildForReview`), which this completion names, so the sign-off reads it
+					// there (`admittedViewRef`); a pointer here would restate it and be held by nothing.
 					structuredResult: {},
 					executionProvenance: {
 						originType: 'MODEL_GENERATION',

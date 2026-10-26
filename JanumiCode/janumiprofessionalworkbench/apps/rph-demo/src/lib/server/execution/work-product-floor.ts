@@ -20,7 +20,7 @@
 // ⭑ Three times in one session the system turned out to have been designed for this and never used that way.
 // ⚠ AND ONCE IT TURNED OUT NOT TO HAVE BEEN, WHICH IS WHY ITEM 1 IS STRUCK RATHER THAN DELETED.
 import type { AssessmentCriterion } from '@janumipwb/rph-contracts';
-import type { ProfessionalRationaleSummary } from '@janumipwb/rph-assurance';
+import type { Deliverable, ProfessionalRationaleSummary } from '@janumipwb/rph-assurance';
 import { verifyExchangeContent, type ResolvableExchange } from '@janumipwb/rph-application';
 import type { ArtifactStore } from '@janumipwb/rph-ports';
 import type { AuthedEngineHandle } from '@janumipwb/rph-engine';
@@ -56,6 +56,12 @@ export interface WorkProductSubject {
 	/** ⚠ OFF BY DEFAULT — see `reviewSeesPriorFindings`. Supplied only when the deployment has chosen to
 	 *  give the reviewer state it was not designed to have. */
 	readonly priorGaps?: readonly string[];
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package N — D10 (`REG-D-135` (1); `REG-F-522` remedy candidate 2) — THE FINISHED WORK BESIDE
+	 * THE ANSWER: the files the unit changed since its step began, as the host read them after this try
+	 * (`deliverable-view.ts`), and the step's writes and runs to date. ⭑ Production hands both on every try.
+	 */
+	readonly deliverable?: Deliverable;
 }
 
 /** Does this text parse as JSON? The located span runs from a `{` to a `}`, so a span that parses is one object. */
@@ -183,7 +189,8 @@ export async function runWorkProductFloor(
 				producingPrompt: subject.producingPrompt,
 				answer: subject.answer,
 				rationale: subject.rationale,
-				priorGaps: subject.priorGaps
+				priorGaps: subject.priorGaps,
+				...(subject.deliverable ? { deliverable: subject.deliverable } : {})
 			})
 		},
 		engine,

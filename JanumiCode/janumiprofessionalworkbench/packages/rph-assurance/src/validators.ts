@@ -195,6 +195,11 @@ export interface ReasoningReviewInput {
 	 */
 	readonly declaredUnitsWithoutWork?: readonly DeclaredUnitWithoutWork[];
 	/**
+	 * ⭐ `JAN-EXEC` Phase 7, package N — D11 — the titles of the units whose model's work completed with no deliverable view on
+	 * the record, each named on a host line of its own. ⛔ READ BY THE `DECLARED_POLICY` FRAMING ONLY; absent or empty, no line.
+	 */
+	readonly declaredUnitsWithoutDeliverable?: readonly string[];
+	/**
 	 * ⭐ P5 package B (F2) — the host's declaration of the cut its BUILDER made of a declared review's work, one line per
 	 * cut (`declaredPolicyReviewInput`): each unit's part cut to its own share of the budget. The reviewer is shown it before
 	 * the work, as a head-only cut's declaration is, and the content is then never cut again. ⛔ READ BY THE
@@ -242,6 +247,67 @@ export interface ReasoningReviewInput {
 	 */
 	readonly observedToolCalls?: ObservedToolCallReport;
 	readonly prior?: { readonly gaps: readonly string[] };
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package N — D10 (`REG-D-135` (1); `REG-F-522` remedy candidate 2; design D10) — THE FINISHED
+	 * WORK BESIDE THE ANSWER: the files the unit changed in its workspace since its step began, as the host read them after a
+	 * try, and the step's ONE host sequence to date (package L's D8), try by try. ⛔ READ BY THE `WORK_PRODUCT` FRAMING ONLY.
+	 * Absent, the review is of the answer alone, as before.
+	 */
+	readonly deliverable?: Deliverable;
+	/**
+	 * ⭐⭐ Package N — D12 (`REG-D-135` (1); `REG-F-579`; design D12) — A COMMAND'S PLACE IN THE STEP'S SEQUENCE: the step's
+	 * writes and runs to date, this command's act named (`subjectOrdinal`), shown on host lines after the command's view.
+	 * ⛔ READ BY THE `PROCESS_RESULT` FRAMING ONLY. Absent, no line, as before.
+	 */
+	readonly hostSequence?: HostSequence;
+}
+
+/**
+ * ⭐⭐ Package N — D8, D10, D12 — ONE ACT OF A STEP'S HOST SEQUENCE: a write the host completed (`write_file`'s `written`
+ * arm), or a run it completed and retained, each with the number of the step's ONE sequence it took (package L) and the
+ * try it was made in. ⛔ The path and `argv` are the agent's (content plane, `R11`); the number, the try and the exit are the
+ * host's.
+ */
+export type HostSequenceAct =
+	| { readonly try: number; readonly ordinal: number; readonly kind: 'WRITE'; readonly path: string }
+	| {
+			readonly try: number;
+			readonly ordinal: number;
+			readonly kind: 'RUN';
+			readonly argv: readonly string[];
+			readonly exitCode: number | null;
+			readonly timedOut: boolean;
+	  };
+
+/** ⭐ Package N — a step's host sequence to date, as a review is shown it (`Deliverable.sequence`; a command's view). */
+export interface HostSequence {
+	readonly acts: readonly HostSequenceAct[];
+	/**
+	 * How many runs past the step's bound (`recordedLimit`) the host completed: each took its number, so the numbers above
+	 * skip them, and none is retained or reviewed (package L's D8: a disclosed residual).
+	 */
+	readonly droppedRuns: number;
+	readonly recordedLimit: number;
+	/** The act a `PROCESS_RESULT` review is of, by its number in the sequence. */
+	readonly subjectOrdinal?: number;
+}
+
+/** ⭐ Package N — D10 — one file the unit changed since its step began: its path, what changed, and the text the host read. */
+export interface DeliverableFile {
+	readonly path: string;
+	readonly change: 'ADDED' | 'CHANGED' | 'REMOVED';
+	/** The text the host read after the try. ⛔ Absent for a REMOVED file: there is nothing to read. */
+	readonly content?: string;
+}
+
+/**
+ * ⭐ Package N — D10 — what a work-product review judges beside the answer: the files changed through `afterTry`, and the
+ * step's writes and runs to date.
+ */
+export interface Deliverable {
+	readonly afterTry: number;
+	readonly files: readonly DeliverableFile[];
+	readonly sequence: HostSequence;
 }
 export interface ValidatorContext {
 	readonly schemaInvariant?: SchemaInvariantFacts;

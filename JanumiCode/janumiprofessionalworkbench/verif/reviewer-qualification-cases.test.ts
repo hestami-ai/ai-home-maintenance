@@ -4061,8 +4061,14 @@ const REVIEWER_FINGERPRINT_V9 = '5ab3d68643bffbbf700c622526b626f47d4c487690e1eb5
  * — the missing-criterion repair's line now asks for every criterion, the ones it names and all the others
  * (`MISSING_CRITERION_REPAIR_CLOSING`), and the scoring digest hashes every repair prompt an entry draws. No case prompt moved:
  * the line rides on a repair alone. Still unmeasured, as before; V owes it.
+ * ⭐⭐ `JAN-EXEC` Phase 7, package N — D10-D12 (`REG-D-135` (1)) — MOVED AGAIN, DELIBERATELY:
+ * ~~'78c6ce51fa8bd3b1719371d5d647b85d4a03371c80fd5ec4e56ebd4897a42047'~~ — the probes move: a command's review asks the
+ * narrowed question (its intent, its scoping sentence and its account's heading), a work product's is shown the finished work,
+ * and the seven new probes reach what package N adds (W-DELIVERABLE, W-OVERSIZE-DELIVERABLE, W-OVERSIZE-FILE-LIST, P-SEQUENCE,
+ * P-OVERSIZE-SEQUENCE, D-DELIVERABLE, D-OVERSIZE-DELIVERABLE). The case prompts of the process-result and declared arms move
+ * with the framing; still unmeasured — V owes it (case set v12).
  */
-const REVIEWER_FINGERPRINT_TODAY = '78c6ce51fa8bd3b1719371d5d647b85d4a03371c80fd5ec4e56ebd4897a42047';
+const REVIEWER_FINGERPRINT_TODAY = '44307c721bd4a512efd07b747e15b72bada679580817b316ff98781d60be18ae';
 /**
  * ⭐ THE PROTOTYPE'S PROMPTS (`REG-D-131` Q36: *"its prompts must match the checked prototype hash for hash"*) — the sha256 of
  * each of the 19 bridge part cases' first prompt as the lead's in-memory prototype of D3b rendered it through the product's

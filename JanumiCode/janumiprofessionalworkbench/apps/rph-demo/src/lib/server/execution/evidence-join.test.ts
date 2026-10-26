@@ -109,15 +109,18 @@ function harness() {
 async function join(
 	runs: readonly ObservedProcessRun[],
 	h = harness(),
-	review?: (prompt: string) => Promise<string>
+	review?: (prompt: string) => Promise<string>,
+	/** ⭐ Package N — D9: the try these runs were made in, the step's sequence to date, and where the try's view is recorded. */
+	inTry?: Pick<Parameters<typeof joinProcessEvidence>[0], 'producingTry' | 'hostSequence' | 'deliverableView'>
 ) {
-	return withLiveReviewerSeam(() => joinUnderSeam(runs, h, review));
+	return withLiveReviewerSeam(() => joinUnderSeam(runs, h, review, inTry));
 }
 
 async function joinUnderSeam(
 	runs: readonly ObservedProcessRun[],
 	h: ReturnType<typeof harness>,
-	review?: (prompt: string) => Promise<string>
+	review?: (prompt: string) => Promise<string>,
+	inTry?: Pick<Parameters<typeof joinProcessEvidence>[0], 'producingTry' | 'hostSequence' | 'deliverableView'>
 ) {
 	const ref = await h.artifacts.put({
 		tenantPrefix: 'tnt-t',
@@ -148,7 +151,8 @@ async function joinUnderSeam(
 			producerProviderId: 'test-provider',
 			observedToolCalls: OBSERVED,
 			scope: 'commands run by the executing model for work unit pwu_1',
-			tenantPrefix: 'tnt-t'
+			tenantPrefix: 'tnt-t',
+			...(inTry ?? {})
 		},
 		h.session,
 		{
@@ -201,6 +205,58 @@ describe('⭐⭐ JAN-EXEC Phase 5 — R18: every completed run becomes one gover
 			.map((e) => (e.payload as { subjectObjectIds: string[] }).subjectObjectIds[0]);
 		for (const j of joined)
 			expect(requested.filter((id) => id === j.evidenceId), j.evidenceId).toHaveLength(3);
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package N — D9 (`REG-D-135` (1); design D9, "Existing pins to change deliberately":
+	// `evidence-join.test.ts:182`) — MOVED DELIBERATELY: EACH COMMAND STILL ITS OWN EVIDENCE WITH ITS OWN FLOOR, NOW JOINED IN ITS
+	// TRY. The route joins each try's runs inside the loop; each evidence names its try and the try's recorded view, and each
+	// run's review is shown its own place in the step's sequence — its act, and no other, marked as the one under review.
+	it('⭐ D9 — joined in its try: each command still its own evidence with its own floor, naming its try, and its review shown ITS act', async () => {
+		const prompts: string[] = [];
+		const clear = clearingReviewerFor('The COMMAND RESULT to review', reasoningReviewCriteria(harness().session));
+		const view = { storageProvider: 'test', storageKey: 'tnt-t/RETAINED_BY_PARTICIPATION/sha256:00', contentHash: 'sha256:00', byteSize: 2, try: 2 };
+		const { joined, refusedBecause, h } = await join(
+			[aRun(['npm', 'ci'], { ordinal: 3 }), aRun(['npm', 'test'], { ordinal: 5 })],
+			harness(),
+			async (p) => {
+				prompts.push(p);
+				return clear(p);
+			},
+			{
+				producingTry: 2,
+				deliverableView: view,
+				hostSequence: {
+					acts: [
+						{ try: 1, ordinal: 1, kind: 'RUN', argv: ['ls'], exitCode: 0, timedOut: false },
+						{ try: 1, ordinal: 2, kind: 'WRITE', path: 'package.json' },
+						{ try: 2, ordinal: 3, kind: 'RUN', argv: ['npm', 'ci'], exitCode: 0, timedOut: false },
+						{ try: 2, ordinal: 4, kind: 'WRITE', path: 'src/index.js' },
+						{ try: 2, ordinal: 5, kind: 'RUN', argv: ['npm', 'test'], exitCode: 0, timedOut: false }
+					],
+					droppedRuns: 0,
+					recordedLimit: 32
+				}
+			}
+		);
+		expect(refusedBecause).toBeUndefined();
+		expect(joined.map((j) => j.satisfied), 'each command’s own floor').toEqual([true, true]);
+		const requested = h.session
+			.readAllEvents()
+			.filter((e) => e.eventType === 'AssuranceAssessmentRequested')
+			.map((e) => (e.payload as { subjectObjectIds: string[] }).subjectObjectIds[0]);
+		for (const j of joined) expect(requested.filter((id) => id === j.evidenceId), j.evidenceId).toHaveLength(3);
+		// ⭐ Each evidence names its try and the try's recorded view, beside the command facts (⛔ AT HEAD: absent).
+		for (const j of joined) {
+			const ref = (h.getObject(j.evidenceId) ?? {}).contentReference as ProcessEvidenceContentReference;
+			expect(ref.producingTry, `${j.evidenceId}: its try`).toBe(2);
+			expect(ref.deliverableView, `${j.evidenceId}: its try’s view`).toEqual(view);
+		}
+		// ⭐ And each run's review is shown its OWN act in the step's sequence (⛔ AT HEAD: no sequence at all).
+		expect(prompts, 'one review per command').toHaveLength(2);
+		expect(prompts[0]).toContain('  3. ran ["npm","ci"] — exit 0 ← this command\n  4. wrote "src/index.js"');
+		expect(prompts[0], 'the first review marked another act').not.toContain('["npm","test"] — exit 0 ← this command');
+		expect(prompts[1]).toContain('  5. ran ["npm","test"] — exit 0 ← this command');
+		expect(prompts[1], 'the second review marked another act').not.toContain('["npm","ci"] — exit 0 ← this command');
 	});
 
 	it('⭐ the type is OBSERVATION, not TEST_RESULT — `ls` is not a test and this host cannot tell', async () => {

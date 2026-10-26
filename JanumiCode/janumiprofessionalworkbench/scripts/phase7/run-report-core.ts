@@ -3085,12 +3085,21 @@ function runsDropped(v: UnitView): { readonly ids: string[]; readonly owed: stri
 }
 
 /** K9 (`REG-F-519`): each answered try whose account reached a review as not declared — its basis, one line a try. */
-function undeclaredAccounts(u: Unit): string[] {
+function undeclaredAccounts(u: Unit, ix: Index): string[] {
 	const answered = answeredTries(u);
+	// ⭐⭐ `JAN-EXEC` Phase 7, package N's check, finding 1 (design D9) — EACH TRY'S ACCOUNT REACHED ITS OWN COMMANDS' REVIEWS: the
+	// join runs in each try now (`accountOfCommand`). ⛔ Only the last answered try's account was said to reach a command's
+	// review. ⚠ Evidence naming no try was joined after the loop, before package N, and handed the last try's account, as before.
+	const handedTo = (t: StoredObject, last: boolean): number =>
+		u.evidence.filter((e) => (tryOfCommand(e) === undefined ? last : accountOfCommand(ix, u, e) === t)).length;
 	return answered.flatMap((t, i) => {
 		const parse = parseClass(t.state.parseOutcome);
 		if (parse === 'PARSED') return [];
-		const commands = i === answered.length - 1 && u.evidence.length > 0 ? ' and every command’s review' : '';
+		const handed = handedTo(t, i === answered.length - 1);
+		let commands = '';
+		if (handed > 0)
+			commands =
+				handed === u.evidence.length ? ' and every command’s review' : ` and the review of the ${plural(handed, 'command', 'commands')} it ran`;
 		return [`try ${u.tries.indexOf(t) + 1}'s answer did not parse (${parse}): its account reached its work product's review${commands} as not declared`];
 	});
 }
@@ -3112,7 +3121,7 @@ function stageFour(v: UnitView, ix: Index): MatrixCell {
 	const ids: string[] = [...dropped.ids];
 	const owed: string[] = [...dropped.owed];
 	const basis: string[] = [`${plural(u.evidence.length, 'command', 'commands')} became evidence`, ...dropped.basis];
-	const undeclared = undeclaredAccounts(u);
+	const undeclared = undeclaredAccounts(u, ix);
 	if (undeclared.length > 0) ids.push('REG-F-519');
 	basis.push(...undeclared);
 	if (u.artifacts.length === 0) basis.push('no work product was recorded, so nothing was reviewed');
@@ -3155,10 +3164,23 @@ function completedSubjects(ix: Index, u: Unit): StoredObject[] | undefined {
 	if (done === undefined) return undefined;
 	const steps = plan.state.steps;
 	const stepId = str(rec(Array.isArray(steps) ? steps[0] : undefined).id);
-	const attempted = u.evidence.filter(
-		(e) => stepId !== '' && str(rec(e.state.contentReference).producingExecutionAttemptId).startsWith(`${stepId}#`)
-	);
 	const named = strs(done.payload.outputArtifactIds);
+	// ⭐⭐ `JAN-EXEC` Phase 7, package N's check, finding 1 (design D9) — THE TRY THE COMPLETION ADMITTED, per attempt: the try of
+	// each work product it names. Each try's runs are joined in the try now, and every try shares its attempt, so the attempt
+	// holds every try's command evidence; the completion names the admitted try's alone, and an earlier try's — its assessments
+	// kept on the record (DOC-001's durable findings) — is no floor subject of the step it completed. ⛔ Read whole, try 1's
+	// refused command broke a step try 2 completed: the very case D9 exists for. ⚠ Evidence naming no try was joined after the
+	// loop, before package N, and stays the attempt's whole set.
+	const admitted = new Map<string, number>();
+	for (const id of named) {
+		const made = tryOfWorkProduct(ix, ix.byId.get(id));
+		if (made !== undefined) admitted.set(made.attempt, made.try);
+	}
+	const attempted = u.evidence.filter((e) => {
+		if (stepId === '' || !str(rec(e.state.contentReference).producingExecutionAttemptId).startsWith(`${stepId}#`)) return false;
+		const ran = tryOfCommand(e);
+		return ran === undefined || !admitted.has(ran.attempt) || admitted.get(ran.attempt) === ran.try;
+	});
 	const made =
 		named.length > 0
 			? []
@@ -3168,6 +3190,49 @@ function completedSubjects(ix: Index, u: Unit): StoredObject[] | undefined {
 		const subject = ix.byId.get(id);
 		return subject === undefined ? [] : [subject];
 	});
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package N's check, finding 1 (design D9) — A TRY, AS THE RECORD NAMES IT: an attempt (RD6, `<stepId>#<n>`)
+ * and the try of it. Each try records its own work product (RD6), so a work product's try is its place among its attempt's
+ * work products, in record order — as `stoppedUnitOf` reads it — and each command evidence names its try (`producingTry`).
+ * ⚠ Undefined for a work product naming no attempt, and for evidence naming no try (joined after the loop, before package N).
+ */
+interface RecordedTry {
+	readonly attempt: string;
+	readonly try: number;
+}
+function tryOfWorkProduct(ix: Index, artifact: StoredObject | undefined): RecordedTry | undefined {
+	if (artifact?.objectType !== 'ARTIFACT') return undefined;
+	const attempt = str(artifact.state.producingExecutionAttemptId);
+	if (attempt === '') return undefined;
+	const place = ix
+		.ofType('ARTIFACT')
+		.filter((a) => str(a.state.producingExecutionAttemptId) === attempt)
+		.findIndex((a) => a.id === artifact.id);
+	return place < 0 ? undefined : { attempt, try: place + 1 };
+}
+function tryOfCommand(evidence: StoredObject): RecordedTry | undefined {
+	const ref = rec(evidence.state.contentReference);
+	const attempt = str(ref.producingExecutionAttemptId);
+	const n = ref.producingTry;
+	return attempt === '' || typeof n !== 'number' ? undefined : { attempt, try: n };
+}
+/**
+ * ⭐ Package N's check, finding 1 — THE TRY WHOSE ACCOUNT A COMMAND'S REVIEW WAS HANDED: the try's exchange, the one that names
+ * the bytes of the work product the command's try made (`workProductDerivation`, as a work product's own row finds its
+ * account). ⚠ Undefined for evidence naming no try: before package N every command's review was handed the last try's
+ * account, and the caller keeps that rule for it.
+ */
+function accountOfCommand(ix: Index, u: Unit, evidence: StoredObject): StoredObject | undefined {
+	const ran = tryOfCommand(evidence);
+	if (ran === undefined) return undefined;
+	const made = u.artifacts.find((a) => {
+		const t = tryOfWorkProduct(ix, a);
+		return t !== undefined && t.attempt === ran.attempt && t.try === ran.try;
+	});
+	const key = made === undefined ? '' : str(made.state.storageKey);
+	return key === '' ? undefined : u.tries.find((t) => str(rec(t.state.workProductDerivation).storageKey) === key);
 }
 
 /** Why stage 5a reads a SUCCEEDED step not reached: its completion names nothing, and nothing is recorded as its attempts'. */
@@ -3985,9 +4050,15 @@ function adjudicationRow(
 			output: pointerOf(ref.mint),
 			capture: capture.retained === true ? { stdout: str(capture.stdoutPath), stderr: str(capture.stderrPath) } : null
 		};
-		// The join hands every command's review the account of the unit's last try that ran (`+page.server.ts`): a try that
-		// got no answer returns before the join, so no command of it was ever reviewed.
-		accountTry = unit === undefined ? undefined : answeredTries(unit).at(-1);
+		// ~~The join hands every command's review the account of the unit's last try that ran (`+page.server.ts`): a try that
+		// got no answer returns before the join, so no command of it was ever reviewed.~~ ⭐⭐ `JAN-EXEC` Phase 7, package N's
+		// check, finding 1 (design D9) — the join runs IN each try now, and hands each command's review THAT try's account: the
+		// row points at the try the command names (`accountOfCommand`). ⛔ It pointed every command at the last answered try, so
+		// a person classifying try 1's refused command was shown try 2's account. ⚠ Evidence naming no try was joined after the
+		// loop, before package N — handed the last try's account, as this read before; a try that got no answer returns before
+		// any join, so no command of it was ever reviewed.
+		accountTry =
+			unit === undefined ? undefined : (accountOfCommand(ix, unit, subject) ?? (tryOfCommand(subject) ? undefined : answeredTries(unit).at(-1)));
 	} else if (subject?.objectType === 'ARTIFACT') {
 		groundTruth = { kind: 'work product', artifactId: subject.id, bytes: pointerOf(subject.state) };
 		const key = str(subject.state.storageKey);

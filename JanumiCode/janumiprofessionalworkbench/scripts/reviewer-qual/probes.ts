@@ -147,6 +147,8 @@
 import {
 	FLOOR_POLICY_DEFINITIONS,
 	type AssuranceSubject,
+	type Deliverable,
+	type HostSequence,
 	type ProfessionalRationaleSummary,
 	type ReasoningReviewInput
 } from '@janumipwb/rph-assurance';
@@ -1046,6 +1048,8 @@ const CALLS_AT_CONTENT_MIN: ObservedToolCallReport = {
 interface R15Halves {
 	readonly rationale?: ProfessionalRationaleSummary;
 	readonly observedToolCalls?: ObservedToolCallReport;
+	/** ⭐ Package N — D12: the step's sequence to date, which production now hands every command's review. */
+	readonly hostSequence?: HostSequence;
 }
 /** What production's branch probes carry: the account declared, and the one call its host observed. */
 const PRODUCTION_HALVES: R15Halves = { rationale: RATIONALE, observedToolCalls: ONE_CALL };
@@ -1063,6 +1067,85 @@ const asProduction = (
 	halves: R15Halves = PRODUCTION_HALVES
 ): ReasoningReviewInput => build({ criteria, producingPrompt: SURVEY_INSTRUCTION, run: observed, ...halves });
 
+// ── ⭐⭐ `JAN-EXEC` Phase 7, package N — D10-D12's inputs: a step's finished work and its host sequence ───────────────────
+/** A step's sequence over two tries: a write, the act under review, then a failing, a timed-out and a signalled run; one dropped. */
+const SEQUENCE: HostSequence = {
+	acts: [
+		{ try: 1, ordinal: 1, kind: 'RUN', argv: ['cat', 'survey/report.md'], exitCode: 0, timedOut: false },
+		{ try: 1, ordinal: 2, kind: 'WRITE', path: 'survey/report.md' },
+		{ try: 2, ordinal: 3, kind: 'RUN', argv: ['python', '-m', 'pytest', '-rs', 'survey/checks/'], exitCode: 0, timedOut: false },
+		{ try: 2, ordinal: 4, kind: 'RUN', argv: ['pytest', 'survey/checks/test_panels.py'], exitCode: 1, timedOut: false },
+		{ try: 2, ordinal: 5, kind: 'RUN', argv: ['pytest', 'survey/slow/'], exitCode: 1, timedOut: true },
+		{ try: 2, ordinal: 7, kind: 'RUN', argv: ['pytest', 'survey/flaky/'], exitCode: null, timedOut: false }
+	],
+	droppedRuns: 1,
+	recordedLimit: 32,
+	subjectOrdinal: 3
+};
+/**
+ * ⭐ `P-SEQUENCE`'s own: the sequence, its fourth act's command holding the first fence candidate (on its host line) — so the
+ * view's token is `01`, the prompt's `02`, and a chooser of either that did not read the acts takes another.
+ */
+const PLANTED_SEQUENCE: HostSequence = {
+	...SEQUENCE,
+	acts: SEQUENCE.acts.map((a) => (a.ordinal === 4 && a.kind === 'RUN' ? { ...a, argv: ['pytest', '-k', candidate(0)] } : a))
+};
+/** Thirty long commands — over any share of a view's budget — the act under review the seventeenth. */
+const OVERSIZE_SEQUENCE: HostSequence = {
+	acts: Array.from({ length: 30 }, (_, i) => ({
+		try: 1,
+		ordinal: i + 1,
+		kind: 'RUN' as const,
+		argv: ['python', '-m', 'pytest', '-k', over(1_500, `panel_${i + 1} or bulge `)],
+		exitCode: 0,
+		timedOut: false
+	})),
+	droppedRuns: 0,
+	recordedLimit: 32,
+	subjectOrdinal: 17
+};
+/**
+ * The finished work of a two-try step: a changed file whose text holds the first fence candidate, an added file whose path
+ * holds the second (on its host line), a removed one; and its sequence, its third act's command holding the third candidate
+ * (on its host line). So the prompt is fenced by `03`, and a chooser that did not read any one of the three takes another.
+ */
+const DELIVERABLE: Deliverable = {
+	afterTry: 2,
+	files: [
+		{ path: 'survey/report.md', change: 'CHANGED', content: `# Survey\n${candidate(0)}\nPanels 4 and 9 bulge.\n` },
+		{ path: `survey/${candidate(1)}.csv`, change: 'ADDED', content: 'panel,bulge_mm\n4,27\n9,31\n' },
+		{ path: 'survey/draft.md', change: 'REMOVED' }
+	],
+	sequence: {
+		...SEQUENCE,
+		acts: SEQUENCE.acts.map((a) =>
+			a.ordinal === 3 && a.kind === 'RUN' ? { ...a, argv: ['python', '-m', 'pytest', '-k', candidate(2)] } : a
+		),
+		droppedRuns: 2,
+		subjectOrdinal: undefined
+	}
+};
+/**
+ * Four files' texts and a long sequence, over the content's budget beside the answer: each text and each act cut. The first
+ * text's kept HEAD holds the first fence candidate, so the prompt's token is `01` — and each text ends with `01`, in the
+ * bytes its cut removes, so a chooser that read a cut text's removed bytes would take another.
+ */
+const OVERSIZE_DELIVERABLE: Deliverable = {
+	afterTry: 1,
+	files: Array.from({ length: 4 }, (_, i) => ({
+		path: `survey/panel_${i + 1}.md`,
+		change: 'ADDED' as const,
+		content: `${i === 0 ? `${candidate(0)}\n` : ''}${over(9_000, `Panel ${i + 1} surveyed; bulging within tolerance. `)}\n${candidate(1)}`
+	})),
+	sequence: { ...OVERSIZE_SEQUENCE, subjectOrdinal: undefined }
+};
+/** Four hundred small changed files: too many to show each with room for a declared cut. */
+const FILE_LIST_DELIVERABLE: Deliverable = {
+	afterTry: 1,
+	files: Array.from({ length: 400 }, (_, i) => ({ path: `survey/p${String(i).padStart(3, '0')}.md`, change: 'ADDED' as const, content: '# P\n' })),
+	sequence: { acts: [], droppedRuns: 0, recordedLimit: 32 }
+};
+
 /**
  * ⭐ THE PROBE SET, in a fixed order — the order, like each prompt, is part of what is hashed (`probes` hashes the list of
  * `[id, sha256(prompt)]` pairs in this order, then the skeleton's digest, then the reader corpus's tokens). Since
@@ -1070,18 +1153,22 @@ const asProduction = (
  * G-OVERSIZE-LISTS, G-NO-FENCE, G-STAKES, G-ACCOUNT-BREAKS;~~ ⭐ B7: T-LEAF, T-COMPOSITE, T-ROOT, T-OVERSIZE-CHILDREN,
  * T-ABSENT-FIELDS, ⭐ (D3a) T-DECLARED-POLICIES, T-APPLICABLE-POLICIES, T-SEEDED-LIBRARY, T-SUBJECT-REFUSED, T-OVERSIZE-ALL,
  * T-OVERSIZE-FENCES, T-OVERSIZE-LISTS, T-NO-FENCE, T-STAKES, T-ACCOUNT-BREAKS; W-BARE, W-DECLARED-PRIOR, W-OVERSIZE-CONTENT,
- * W-OVERSIZE-ALL, W-OVERSIZE-EDGES, W-FENCES, W-OVERSIZE-LISTS, W-NO-FENCE, W-STAKES, W-ACCOUNT-BREAKS; P-CLEAN,
+ * W-OVERSIZE-ALL, W-OVERSIZE-EDGES, W-FENCES, W-OVERSIZE-LISTS, W-NO-FENCE, W-STAKES, W-ACCOUNT-BREAKS, ⭐ (package N)
+ * W-DELIVERABLE, W-OVERSIZE-DELIVERABLE, W-OVERSIZE-FILE-LIST; P-CLEAN,
  * P-SIGNAL, P-TIMED-OUT, P-INCOMPLETE-CAPTURE, P-STDOUT-CAPTURE-CUT, P-STDERR-CAPTURE-CUT, P-OVERSIZE-CONTENT,
  * P-OVERSIZE-COMMAND, P-OVERSIZE-SURROGATE, P-OVERSIZE-ROOM-EDGES, P-OVERSIZE-STREAMS, P-OVERSIZE-AT-ITS-BUDGET,
  * P-OVERSIZE-FENCES, P-OVERSIZE-LISTS, P-FENCE-AT-THE-LAST, P-NO-FENCE, P-PRODUCTION, P-ABSENT-REPORT,
  * P-NOT-OBSERVABLE, P-NOT-OBSERVABLE-BARE, P-NONE-OBSERVED, P-OBSERVED, P-OVERSIZE-ALL, P-FENCES-OTHER-SLICES,
- * P-STAKES, P-ACCOUNT-BREAKS; ⭐ (`JAN-EXEC` Phase 7 completion E2, P5 package D) D-pol_intent_fidelity,
+ * P-STAKES, P-ACCOUNT-BREAKS, ⭐ (package N) P-SEQUENCE, P-OVERSIZE-SEQUENCE; ⭐ (`JAN-EXEC` Phase 7 completion E2, P5 package D)
+ * D-pol_intent_fidelity,
  * D-pol_intent_completeness, D-pol_assumption_disclosure, D-pol_requirement_coverage, D-pol_decomposition_coverage,
  * D-pol_constraint_propagation, D-pol_architecture_coverage, D-pol_historical_consistency, D-pol_intent_preservation,
  * D-pol_test_adequacy, D-pol_fitness_for_purpose, D-pol_baseline_promotion (one per catalog policy, in the catalog's
- * order), D-ROOT, D-OVERSIZE-CONTENT, D-ROOT-UNITS-WITHOUT-WORK, D-OVERSIZE-UNITS, D-OVERSIZE-UNIT-TITLE; NO-CRITERIA —
- * ~~forty-seven~~ ~~sixty-six (B7's check: twelve T-, ten W-, twenty-six P-, seventeen D- and NO-CRITERIA)~~ sixty-nine
- * (D3a: fifteen T-, ten W-, twenty-six P-, seventeen D- and NO-CRITERIA), every process-result one `P-`-prefixed.
+ * order), D-ROOT, D-OVERSIZE-CONTENT, D-ROOT-UNITS-WITHOUT-WORK, D-OVERSIZE-UNITS, D-OVERSIZE-UNIT-TITLE, ⭐ (package N)
+ * D-DELIVERABLE, D-OVERSIZE-DELIVERABLE; NO-CRITERIA —
+ * ~~forty-seven~~ ~~sixty-six (B7's check: twelve T-, ten W-, twenty-six P-, seventeen D- and NO-CRITERIA)~~ ~~sixty-nine
+ * (D3a: fifteen T-, ten W-, twenty-six P-, seventeen D- and NO-CRITERIA)~~ seventy-six (package N: fifteen T-, thirteen W-,
+ * twenty-eight P-, nineteen D- and NO-CRITERIA), every process-result one `P-`-prefixed.
  * ~~⭐ Package P F1 (`REG-F-503` remedy 1) — and, after G-ACCOUNT-BREAKS, G-TYPE-DECLARATIONS, G-TYPE-DECLARATIONS-ABSENT and
  * G-OVERSIZE-TYPE-DECLARATIONS.~~ ⭐ B7 — the graph framing's probes left the fingerprint with case set v8; NO-CRITERIA is a
  * part's now.
@@ -1362,6 +1449,29 @@ export const FINGERPRINT_PROBES: readonly FingerprintProbe[] = [
 			'work-product framing; the VALIDATOR’S FENCE CHOOSER over each field of the account as the prompt carries it — in each, a candidate split by each line terminator a reader may not break at, a candidate on a line of each layout the reader states (an override, an embedding, an isolate), the field’s last lines, and the prompt’s own token split by a line feed (in a list, an item holding one), written backwards below a line a bidi control lays out, and astride two items',
 		input: (criteria) =>
 			workProductReviewInput({ criteria, producingPrompt: PRODUCING_PROMPT, answer: ANSWER, rationale: BREAKS_ACCOUNT })
+	},
+	// ── ⭐⭐ `JAN-EXEC` Phase 7, package N — D10 (`REG-D-135` (1); `REG-F-522` remedy candidate 2; `REG-F-553`'s class) — THE
+	// FINISHED WORK, beside the answer ─────────────────────────────────────────────────────────────────────────────────────
+	// ⛔ Without these, no probe reached what package N adds to a work product's review: its subject line, the files the unit
+	// changed (added, changed, removed) with their text, the step's sequence on host lines, and the cuts each is given — so a
+	// change to any of it moved no fingerprint. Each is built through the product's builder.
+	{
+		id: 'W-DELIVERABLE',
+		covers:
+			'work-product framing shown the FINISHED WORK (package N D10): a changed file, an added one and a removed one, each on its host line, the changed file’s text holding the first fence candidate and the added file’s path the second; the step’s sequence over two tries — a read, writes, a failing run, a timed-out run, one ended by a signal, its third run’s command holding the third candidate — and two runs past the bound, declared; nothing cut',
+		input: (criteria) => workProductReviewInput({ criteria, producingPrompt: PRODUCING_PROMPT, answer: ANSWER, rationale: RATIONALE, deliverable: DELIVERABLE })
+	},
+	{
+		id: 'W-OVERSIZE-DELIVERABLE',
+		covers:
+			'work-product framing shown the finished work over its budget (package N D10): four files’ texts cut unit by unit beside the answer, each cut declared on its own line before its fence, the first’s kept HEAD holding the first fence candidate; and a sequence of thirty long commands cut act by act, each cut declared before its act',
+		input: (criteria) => workProductReviewInput({ criteria, producingPrompt: PRODUCING_PROMPT, answer: ANSWER, rationale: RATIONALE, deliverable: OVERSIZE_DELIVERABLE })
+	},
+	{
+		id: 'W-OVERSIZE-FILE-LIST',
+		covers:
+			'work-product framing shown the finished work over its budget (package N D10): four hundred changed files, too many to show each with room for a declared cut, so the LIST is cut, its cut declared after the heading',
+		input: (criteria) => workProductReviewInput({ criteria, producingPrompt: PRODUCING_PROMPT, answer: ANSWER, rationale: RATIONALE, deliverable: FILE_LIST_DELIVERABLE })
 	},
 	// ── ⭐⭐ the process-result arm, through the builder the process-result floor uses (`JAN-PRQUAL` `PQ-1`, design D3) ──
 	// ~~no builder is factored for it (`REG-D-072` D17), so its input is literal~~ — each probe below is a RUN literal,
@@ -1758,6 +1868,24 @@ export const FINGERPRINT_PROBES: readonly FingerprintProbe[] = [
 		input: (criteria, build) =>
 			asProduction(criteria, build, run(), { rationale: BREAKS_ACCOUNT, observedToolCalls: ONE_CALL })
 	},
+	// ── ⭐⭐ `JAN-EXEC` Phase 7, package N — D12 (`REG-D-135` (1); `REG-F-579`; `REG-F-553`'s class) — A COMMAND'S PLACE IN THE
+	// STEP'S SEQUENCE ───────────────────────────────────────────────────────────────────────────────────────────────────
+	// ⛔ Without these, no probe reached the sequence a command's view now carries after it — its heading naming the act under
+	// review, the try lines, a write's path and each run's command and exit, the runs past the bound, and the act-by-act cut.
+	{
+		id: 'P-SEQUENCE',
+		covers:
+			'process-result framing, production’s shape, with the step’s sequence after the view (package N D12): the act under review marked, a write before it, runs after it — a failing one, its command holding the first fence candidate, which BOTH choosers read; a timed-out one; one ended by a signal — over two tries, and a run past the bound, declared; nothing cut',
+		input: (criteria, build) =>
+			asProduction(criteria, build, run({ ordinal: 3 }), { rationale: RATIONALE, observedToolCalls: ONE_CALL, hostSequence: PLANTED_SEQUENCE })
+	},
+	{
+		id: 'P-OVERSIZE-SEQUENCE',
+		covers:
+			'process-result framing, production’s shape, with a sequence over its share of the view’s budget (package N D12): thirty long commands, each cut act by act, each cut declared before its act, and the act under review shown',
+		input: (criteria, build) =>
+			asProduction(criteria, build, run({ ordinal: 17 }), { rationale: RATIONALE, observedToolCalls: ONE_CALL, hostSequence: OVERSIZE_SEQUENCE })
+	},
 	// ── ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (design B4; `REG-F-553`'s class) — THE DECLARED-POLICY FRAMING ──────────────
 	// ⛔ Without these, no probe reached the `DECLARED_POLICY` framing, so a change to what a declared review's reviewer reads
 	// — its framing text, the policy line, a catalog policy's purpose or criteria — moved no fingerprint, and
@@ -1903,6 +2031,66 @@ export const FINGERPRINT_PROBES: readonly FingerprintProbe[] = [
 						timedOut: false
 					}
 				]
+			});
+		}
+	},
+	// ── ⭐⭐ `JAN-EXEC` Phase 7, package N — D11 (`REG-D-135` (1), the lead's D11; `REG-F-553`'s class) — THE FINISHED WORK AT
+	// SIGN-OFF ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+	{
+		id: 'D-DELIVERABLE',
+		covers:
+			'declared-policy framing shown the finished work (package N D11): a unit’s changed files — a changed one, a removed one — and its step’s sequence on the work’s line, beside its work product and command; and a unit whose view is not on the record, named on a host line of its own, its title holding the first fence candidate',
+		input: (_criteria, _build, declared = CATALOG_DECLARED_POLICIES) => {
+			const policy = declared[0]!;
+			return declaredPolicyReviewInput({
+				policy: { policyId: policy.policyId, name: policy.name, purpose: policy.purpose },
+				criteria: policy.criteria,
+				instruction: INTENT,
+				instructionIs: 'UNIT_PURPOSE',
+				workProducts: [{ unit: 'Condition Survey', answer: ANSWER }],
+				commands: [{ unit: 'Condition Survey', argv: ['pytest', '-rs', 'survey/checks/'], exitCode: 0, timedOut: false }],
+				files: [
+					{ unit: 'Condition Survey', path: 'survey/report.md', change: 'CHANGED', content: '# Survey\nPanels 4 and 9 bulge.\n' },
+					{ unit: 'Condition Survey', path: 'survey/draft.md', change: 'REMOVED' }
+				],
+				sequence: [
+					{ unit: 'Condition Survey', try: 1, ordinal: 1, kind: 'WRITE', path: 'survey/report.md' },
+					{ unit: 'Condition Survey', try: 1, ordinal: 2, kind: 'RUN', argv: ['pytest', '-rs', 'survey/checks/'], exitCode: 0, timedOut: false }
+				],
+				// ⭐ The title stands on its host line alone, so the prompt is fenced by `01`, and a chooser that did not read it takes `00`.
+				unitsWithoutDeliverable: [`Inspection ${candidate(0)}`]
+			});
+		}
+	},
+	{
+		id: 'D-OVERSIZE-DELIVERABLE',
+		covers:
+			'declared-policy framing shown one unit’s finished work over its budget (package N D11): cut unit by unit though it is one unit’s, its files’ texts each cut to its head and its acts past its first, each cut declared on a host line of its own before the work',
+		input: (_criteria, _build, declared = CATALOG_DECLARED_POLICIES) => {
+			const policy = declared[0]!;
+			return declaredPolicyReviewInput({
+				policy: { policyId: policy.policyId, name: policy.name, purpose: policy.purpose },
+				criteria: policy.criteria,
+				instruction: PRODUCING_PROMPT,
+				instructionIs: 'PRODUCING_PROMPT',
+				workProducts: [{ unit: 'Condition Survey', answer: ANSWER }],
+				commands: [],
+				files: Array.from({ length: 3 }, (_, i) => ({
+					unit: 'Condition Survey',
+					path: `survey/panel_${i + 1}.md`,
+					change: 'ADDED' as const,
+					content: over(B.CONTENT_MAX / 2, `Panel ${i + 1} surveyed; bulging within tolerance. `)
+				})),
+				sequence: Array.from({ length: 40 }, (_, i) => ({
+					unit: 'Condition Survey',
+					try: 1,
+					ordinal: i + 1,
+					kind: 'RUN' as const,
+					argv: ['pytest', `survey/panel_${i + 1}/`, '-k', over(400, 'bulge or weep ')],
+					exitCode: 0,
+					timedOut: false
+				})),
+				rationale: RATIONALE
 			});
 		}
 	},

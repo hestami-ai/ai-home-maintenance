@@ -69,6 +69,8 @@ vi.mock('../tools/devin-reviewer.js', async (importOriginal) => {
 import {
 	SEEDED_REASONING_REVIEW_CRITERIA,
 	type AssuranceSubject,
+	type Deliverable,
+	type HostSequence,
 	type ProfessionalRationaleSummary,
 	type ReasoningReviewInput
 } from '@janumipwb/rph-assurance';
@@ -613,6 +615,8 @@ interface WorkProductSource {
 	readonly answer: string;
 	readonly rationale?: ProfessionalRationaleSummary;
 	readonly priorGaps?: readonly string[];
+	/** ⭐ `JAN-EXEC` Phase 7, package N — D10: the finished work production hands beside the answer. */
+	readonly deliverable?: Deliverable;
 }
 type WorkProductLabel = 'rationale and prior gaps' | 'neither' | 'empty prior gaps';
 
@@ -654,7 +658,8 @@ async function runWorkProduct(
 			producerModelId: 'test-producer-model',
 			producerProviderId: 'test-provider',
 			...(source.rationale ? { rationale: source.rationale } : {}),
-			...(source.priorGaps ? { priorGaps: source.priorGaps } : {})
+			...(source.priorGaps ? { priorGaps: source.priorGaps } : {}),
+			...(source.deliverable ? { deliverable: source.deliverable } : {})
 		},
 		engine,
 		{
@@ -666,6 +671,26 @@ async function runWorkProduct(
 		}
 	);
 }
+
+/** ⭐ Package N — D10: the finished work of a two-try step — a file changed, a file added, one removed, and its sequence. */
+const WP_DELIVERABLE: Deliverable = {
+	afterTry: 2,
+	files: [
+		{ path: 'docs/load.md', change: 'CHANGED', content: '# Load analysis\n5.0 kN/m² pedestrian load.\n' },
+		{ path: 'docs/vibration.md', change: 'ADDED', content: '# Vibration\n2.1 Hz.\n' },
+		{ path: 'docs/draft.md', change: 'REMOVED' }
+	],
+	sequence: {
+		acts: [
+			{ try: 1, ordinal: 1, kind: 'RUN', argv: ['cat', 'docs/load.md'], exitCode: 0, timedOut: false },
+			{ try: 1, ordinal: 2, kind: 'WRITE', path: 'docs/load.md' },
+			{ try: 2, ordinal: 3, kind: 'WRITE', path: 'docs/vibration.md' },
+			{ try: 2, ordinal: 4, kind: 'RUN', argv: ['rm', 'docs/draft.md'], exitCode: 0, timedOut: false }
+		],
+		droppedRuns: 0,
+		recordedLimit: 32
+	}
+};
 
 const WP_LITERAL = {
 	producingPrompt: 'Summarise the load analysis for the footbridge.',
@@ -684,6 +709,13 @@ const WP_OPTIONS: readonly { readonly label: WorkProductLabel; readonly source: 
 	{ label: 'neither', source: { ...WP_LITERAL } },
 	{ label: 'empty prior gaps', source: { ...WP_LITERAL, rationale: RATIONALE, priorGaps: [] } }
 ];
+/**
+ * ⭐ `JAN-EXEC` Phase 7, package N — D10 (`REG-D-135` (1); design D10, "Move the equality and literal pins at
+ * `review-input.test.ts:688-722`") — MOVED DELIBERATELY: ~~three option sets~~ and the finished work production now hands on
+ * every try, beside them. ⚠ Not among `WP_OPTIONS`: those are HEAD 8bb23c96's inputs, which the inverse transform below
+ * holds to HEAD's prompts, and HEAD took no deliverable.
+ */
+const WP_FINISHED_WORK: WorkProductSource = { ...WP_LITERAL, rationale: RATIONALE, deliverable: WP_DELIVERABLE };
 
 describe('JAN-CRITREAD J2-1 — the work-product arm: workProductReviewInput is what runWorkProductFloor builds', () => {
 	it('⭐ the demo backend’s OWN work product — the call site and the module agree, input and prompt', async () => {
@@ -725,6 +757,25 @@ describe('JAN-CRITREAD J2-1 — the work-product arm: workProductReviewInput is 
 			expectSameInput(built, WP_PINS[label], `the pin — ${label}`);
 		}
 	});
+
+	// ⭐⭐ Package N — D10 — THE WORK-PRODUCT INPUT CONTAINS THE CHANGED FILES AND THE SEQUENCE: the call site, the module and the
+	// pin agree, input and prompt, over the finished work production hands (⛔ AT HEAD: the answer alone in `content`).
+	it('⭐ D10 — the FINISHED WORK — the call site, the module and the pin agree, and the prompt carries each changed file and the sequence', async () => {
+		resetEngine('empty');
+		const session = getEngine().as(SESSION_CREDENTIAL);
+		const production = await captureProduction((print) => runWorkProduct(session, WP_FINISHED_WORK, print));
+		const module = workProductReviewInput({ criteria: reasoningReviewCriteria(session), ...WP_FINISHED_WORK });
+		expectSameInput(module, production.input, 'the call site — the finished work');
+		expect(await materialize(module), 'the materialized prompt — the finished work').toBe(production.prompt);
+		expectSameInput(
+			workProductReviewInput({ criteria: SEEDED_REASONING_REVIEW_CRITERIA, ...WP_FINISHED_WORK }),
+			WP_FINISHED_WORK_PIN,
+			'the pin — the finished work'
+		);
+		for (const line of ['Changed "docs/load.md":', 'Added "docs/vibration.md":', 'Removed "docs/draft.md": it is no longer in the workspace.'])
+			expect(production.prompt.split('\n'), line).toContain(line);
+		expect(production.prompt).toContain('Try 1:\n  1. ran ["cat","docs/load.md"] — exit 0\n  2. wrote "docs/load.md"\nTry 2:\n  3. wrote "docs/vibration.md"\n  4. ran ["rm","docs/draft.md"] — exit 0');
+	});
 });
 
 /** The work-product builder's output, per option set — written out. Note the OWN `undefined`s: the work-product arm
@@ -756,7 +807,19 @@ const WP_PINS: Record<WorkProductLabel, ReasoningReviewInput> = {
 		rationale: RATIONALE,
 		narration: undefined,
 		prior: undefined
-	}
+	},
+};
+
+/** ⭐ Package N — D10 — THE INPUT CONTAINS THE CHANGED FILES AND THE SEQUENCE, beside the answer — written out. */
+const WP_FINISHED_WORK_PIN: ReasoningReviewInput = {
+	criteria: SEEDED_REASONING_REVIEW_CRITERIA,
+	framing: 'WORK_PRODUCT',
+	prompt: 'Summarise the load analysis for the footbridge.',
+	content: '{"pedestrianLoad":"5.0 kN/m²","vibration":"2.1 Hz — checked; 0.52 m/s² below 0.7 m/s²"}',
+	rationale: RATIONALE,
+	narration: undefined,
+	prior: undefined,
+	deliverable: WP_DELIVERABLE
 };
 
 // ── the process-result arm (`JAN-PRQUAL` `PQ-1`, design D1 — roadmap PQ-1 step 2) ─────────────────────────────────────
@@ -791,16 +854,34 @@ interface ProcessResultSource {
 	readonly run: ObservedProcessRun;
 	readonly rationale?: ProfessionalRationaleSummary;
 	readonly observedToolCalls?: ObservedToolCallReport;
+	/** ⭐ Package N — D12: the step's writes and runs to date, this command's act among them. */
+	readonly hostSequence?: HostSequence;
 }
-type ProcessResultLabel = 'production shape' | 'no account and no observation';
+// ⭐ Package N — D12 (design D12, "Move … `review-input.test.ts:856-860`") — MOVED DELIBERATELY: and the production shape
+// with the step's sequence, which production now hands every command's review.
+type ProcessResultLabel = 'production shape' | 'no account and no observation' | 'production shape, with its sequence';
 
 const PR_PROMPT = 'Verify the deck design by running the design check suite (pytest -rs checks/), and report the result.';
+/** ⭐ Package N — D12: the step's sequence to date — a write, then this run, its act the second. */
+const PR_SEQUENCE: HostSequence = {
+	acts: [
+		{ try: 1, ordinal: 1, kind: 'WRITE', path: 'checks/test_deck.py' },
+		{ try: 1, ordinal: 2, kind: 'RUN', argv: ['pytest', '-rs', 'checks/'], exitCode: 0, timedOut: false }
+	],
+	droppedRuns: 0,
+	recordedLimit: 32,
+	subjectOrdinal: 2
+};
 const PR_OPTIONS: readonly { readonly label: ProcessResultLabel; readonly source: ProcessResultSource }[] = [
 	{
 		label: 'production shape',
 		source: { producingPrompt: PR_PROMPT, run: aRun(), rationale: RATIONALE, observedToolCalls: ONE_CALL }
 	},
-	{ label: 'no account and no observation', source: { producingPrompt: PR_PROMPT, run: aRun({ exitCode: null }) } }
+	{ label: 'no account and no observation', source: { producingPrompt: PR_PROMPT, run: aRun({ exitCode: null }) } },
+	{
+		label: 'production shape, with its sequence',
+		source: { producingPrompt: PR_PROMPT, run: aRun({ ordinal: 2 }), rationale: RATIONALE, observedToolCalls: ONE_CALL, hostSequence: PR_SEQUENCE }
+	}
 ];
 
 /** A command result through the real process-result floor, with the retained-exchange plumbing it verifies. */
@@ -840,7 +921,8 @@ async function runProcessResult(
 			producerModelId: 'test-producer-model',
 			producerProviderId: 'test-provider',
 			...(source.rationale ? { rationale: source.rationale } : {}),
-			...(source.observedToolCalls ? { observedToolCalls: source.observedToolCalls } : {})
+			...(source.observedToolCalls ? { observedToolCalls: source.observedToolCalls } : {}),
+			...(source.hostSequence ? { hostSequence: source.hostSequence } : {})
 		},
 		engine,
 		{
@@ -911,6 +993,20 @@ const PR_PINS: Record<ProcessResultLabel, ReasoningReviewInput> = {
 			'stdout:\n<<<UNTRUSTED-00>>>\n48 passed in 1.52s\n\n<<<UNTRUSTED-00>>>\nstderr:\n<<<UNTRUSTED-00>>>\n\n<<<UNTRUSTED-00>>>',
 		rationale: undefined,
 		narration: undefined
+	},
+	// ⭐ Package N — D12 — the view as before, and beside it the step's sequence, this command's act named: the validator
+	// shows it on host lines after the view, its room out of the view's (⛔ AT HEAD: no sequence on the input).
+	'production shape, with its sequence': {
+		criteria: SEEDED_REASONING_REVIEW_CRITERIA,
+		framing: 'PROCESS_RESULT',
+		prompt: PR_PROMPT,
+		content:
+			'exit 0 in 1532ms\nthe command line, as a JSON array of its arguments:\n<<<UNTRUSTED-00>>>\n["pytest","-rs","checks/"]\n<<<UNTRUSTED-00>>>\n' +
+			'stdout:\n<<<UNTRUSTED-00>>>\n48 passed in 1.52s\n\n<<<UNTRUSTED-00>>>\nstderr:\n<<<UNTRUSTED-00>>>\n\n<<<UNTRUSTED-00>>>',
+		rationale: RATIONALE,
+		observedToolCalls: ONE_CALL,
+		narration: undefined,
+		hostSequence: PR_SEQUENCE
 	}
 };
 
@@ -1275,6 +1371,27 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 — a 64 KiB process result, read whole by noth
 		expect(budget).toBeLessThan(REASONING_REVIEW_BUDGET.CONTENT_MAX);
 		expect(prompt.length - content.length + budget).toBe(REASONING_REVIEW_BUDGET.PROMPT_BUDGET);
 		expect(content.length).toBeLessThanOrEqual(budget);
+		// ⭐⭐ `JAN-EXEC` Phase 7, package N's check, finding 5 (design D12) — AND WITH THE STEP'S SEQUENCE ON ITS HOST LINES: the
+		// seam is the room the assembler leaves the view beside the sequence, to the character. ⛔ The sequence's element is
+		// `\n${text}`, which the join adds a second line feed before, and the budget was cut by its text and ONE: the identity
+		// read PROMPT_BUDGET + 1, and a view that filled its budget passed the prompt's — the renderer happened to leave 2 spare.
+		const sequenced = processResultReviewInput({
+			criteria: SEEDED_REASONING_REVIEW_CRITERIA,
+			producingPrompt: PR_PROMPT,
+			run: aRun({ ...BIG_RUN, ordinal: 2 }),
+			rationale: RATIONALE,
+			observedToolCalls: ONE_CALL,
+			hostSequence: PR_SEQUENCE
+		});
+		const { content: view, ...around } = sequenced;
+		const room = processResultContentBudget({ ...around, framing: 'PROCESS_RESULT' });
+		const withSequence = await materialize(sequenced);
+		expect(withSequence, 'arrangement: no sequence on the host lines').toContain('  2. ran ["pytest","-rs","checks/"] — exit 0');
+		expect(withSequence.length - view.length + room, 'the seam beside a sequence').toBe(REASONING_REVIEW_BUDGET.PROMPT_BUDGET);
+		// ⭑ A view exactly at its room — the builder's own view, padded after its last fence to the character — is sent whole,
+		// and the prompt is the budget, never past it.
+		const full = await materialize({ ...sequenced, content: view.padEnd(room, ' ') });
+		expect(full.length, 'a view at its room passed PROMPT_BUDGET beside a sequence').toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.PROMPT_BUDGET);
 		// ⛔ AND NO MEMBER WAS ADDED TO THE BUDGET OBJECT: the reviewer fingerprint hashes it as its `budget` component.
 		expect(Object.keys(REASONING_REVIEW_BUDGET)).toEqual([
 			'PROMPT_BUDGET',

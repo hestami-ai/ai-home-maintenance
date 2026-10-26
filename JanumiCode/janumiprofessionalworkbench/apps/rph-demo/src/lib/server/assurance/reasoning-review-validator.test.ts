@@ -161,9 +161,12 @@ const ctx = (
 /**
  * ⭐ The review in parts, A2 (1) — how the account's heading ENDS in a framing: a part's has its own heading
  * (`PWA_TYPE_ACCOUNT_HEADING`), every other framing the shared one.
+ * ⭐ `JAN-EXEC` Phase 7, package N — D12 (`REG-D-135` (1); design D12) — MOVED DELIBERATELY: ~~every other framing the shared
+ * one~~ — and a command's review its own too (`PROCESS_RESULT_ACCOUNT_HEADING`), beside the part's, as the design names it
+ * ("a PROCESS_RESULT account heading beside the PWA_TYPE one"); both end on the sentence scoping what supports no finding.
  */
 function accountHeadingEnd(framing: ReviewFraming): string {
-	return framing === 'PWA_TYPE' ? 'here supports no finding either way:' : 'itself a finding:';
+	return framing === 'PWA_TYPE' || framing === 'PROCESS_RESULT' ? 'here supports no finding either way:' : 'itself a finding:';
 }
 
 /** ⭐ The review in parts, B2 — the name a framing's cut of its instruction declares (`framingText`'s `intentSlice`). */
@@ -869,6 +872,13 @@ describe('⭐⭐ the review in parts, B2 (REG-D-125) — the PWA_TYPE framing: t
 	/** ⭐ A2 (1) — the heading of the account in a part's review, byte for byte. */
 	const PART_ACCOUNT_HEADING =
 		"The producing agent's PROFESSIONAL RATIONALE SUMMARY — its own contracted account of the whole PWA (Section 9.7), of which this part shows one type. Judge whether what it claims about THIS type and, for a type with children, about their composition is candid and borne out by this part; such a claim this part does not support is itself a finding. A claim it makes about any other type — one this part does not show, or a child’s own definition — belongs to that type’s own review, and here supports no finding either way:";
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package N — D12 (`REG-D-135` (1); `REG-F-579`) — A COMMAND'S REVIEW'S HEADING OF THE ACCOUNT, byte
+	 * for byte, restated here and held equal to the export (`PROCESS_RESULT_ACCOUNT_HEADING`) below: the account is the unit's
+	 * whole work's, and what it says of THIS command's result is what this review judges.
+	 */
+	const PROCESS_RESULT_HEADING =
+		"The producing agent's PROFESSIONAL RATIONALE SUMMARY — its own contracted account of the unit's whole work (Section 9.7). Judge whether what it says about THIS command's result is candid and borne out by the result above and its place in the step's sequence; such a statement the result does not bear out is itself a finding. What it says of anything else here supports no finding either way:";
 	/** The heading every other framing gives the account, byte for byte, as it read before the part framing. */
 	const SHARED_ACCOUNT_HEADING =
 		"The producing agent's PROFESSIONAL RATIONALE SUMMARY — its own contracted account of how the artifact discharges the obligation (Section 9.7). Judge whether it is candid and whether the artifact bears it out; an account that claims more than the artifact supports is itself a finding:";
@@ -917,6 +927,9 @@ describe('⭐⭐ the review in parts, B2 (REG-D-125) — the PWA_TYPE framing: t
 		expect(lines, 'not the heading the other framings share').not.toContain(SHARED_ACCOUNT_HEADING);
 	});
 
+	// ⭐ `JAN-EXEC` Phase 7, package N — D12 (`REG-D-135` (1); design D12, "a PROCESS_RESULT account heading beside the PWA_TYPE
+	// one") — MOVED DELIBERATELY: ~~every other framing~~ every framing but the part's and a command's shares the heading; a
+	// command's review carries its own (asserted below, `PROCESS_RESULT_HEADING`), and neither the shared one nor the part's.
 	it('⭐ A2 (1) CONTROL — every other framing’s account heading is the shared one, byte for byte, and none carries the part’s', async () => {
 		const { prompts, print } = capturing();
 		const declared = declaredPolicyReviewInput({
@@ -930,7 +943,7 @@ describe('⭐⭐ the review in parts, B2 (REG-D-125) — the PWA_TYPE framing: t
 		});
 		await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(SUBJECT, { reasoningReview: declared });
 		const others: [string, string][] = [
-			...(await Promise.all((['PWA_GRAPH', 'WORK_PRODUCT', 'PROCESS_RESULT'] as const).map(async (f) => [f, await promptOf(f)] as [string, string]))),
+			...(await Promise.all((['PWA_GRAPH', 'WORK_PRODUCT'] as const).map(async (f) => [f, await promptOf(f)] as [string, string]))),
 			['DECLARED_POLICY', prompts[0]!]
 		];
 		for (const [framing, p] of others) {
@@ -938,6 +951,11 @@ describe('⭐⭐ the review in parts, B2 (REG-D-125) — the PWA_TYPE framing: t
 			expect(lines, `${framing}: the shared heading`).toContain(SHARED_ACCOUNT_HEADING);
 			expect(lines, `${framing}: not the part’s`).not.toContain(PART_ACCOUNT_HEADING);
 		}
+		// ⭐ Package N — D12 — a command's review: its own heading, byte for byte, and neither of the others.
+		const command = (await promptOf('PROCESS_RESULT')).split('\n');
+		expect(command, 'PROCESS_RESULT: its own heading').toContain(PROCESS_RESULT_HEADING);
+		expect(command, 'PROCESS_RESULT: not the shared heading').not.toContain(SHARED_ACCOUNT_HEADING);
+		expect(command, 'PROCESS_RESULT: not the part’s').not.toContain(PART_ACCOUNT_HEADING);
 	});
 
 	it('⭐ CONTROL — the part framing is PWA_TYPE’s alone: no other framing carries any line of it', async () => {
@@ -2661,9 +2679,12 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481) — no word of the host’s is quot
 	const LABELS = ['Assumptions relied on:', 'Limitations the producer declares:', 'Residual uncertainty:'];
 	/** A list's region as D7 renders it: `renderRationale`'s serialization — each item on a line of its own after `  - `. */
 	const bullets = (xs: readonly string[]): string => xs.map((x) => `  - ${x}`).join('\n');
-	/** The section heading the account stands under, to the end of its line — ⭐ A2 (1): a part's is its own. */
+	/**
+	 * The section heading the account stands under, to the end of its line — ⭐ A2 (1): a part's is its own. ⭐ Package N — D12:
+	 * MOVED DELIBERATELY, and so is a command's review's (`PROCESS_RESULT_ACCOUNT_HEADING`, the design's D12).
+	 */
 	const ACCOUNT_HEADING_END = (framing: ReviewFraming): string =>
-		framing === 'PWA_TYPE'
+		framing === 'PWA_TYPE' || framing === 'PROCESS_RESULT'
 			? accountHeadingEnd(framing)
 			: 'an account that claims more than the artifact supports is itself a finding:';
 

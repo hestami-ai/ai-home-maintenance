@@ -938,6 +938,12 @@ export function rerunReading(planBefore: string | null, snap: EngineSnapshot, un
  * of them refused unless its latest assessment under every floor policy is SATISFIED (latest by `updatedAt`, a tie to the last
  * seen — the floor gate's rule). ⛔ `undefined` — never zero — when the store names no stopped attempt (no waiting step, or no
  * work product of it): the caller then counts every review the attempt could hold (`phase7RereviewReviewerCalls`).
+ * ⭐⭐ `JAN-EXEC` Phase 7, package N's check, finding 4 (design D9, D16) — ~~that attempt's work product and its command
+ * evidence~~ that attempt's work product and THE COMMAND EVIDENCE OF ITS TRY, as `stoppedUnitOf` reads it since package N: each
+ * try records its own work product (RD6), so the work product's try is its place among its attempt's, and each command's
+ * evidence names its try (`producingTry`); evidence naming none was joined after the loop, before package N, and is the
+ * attempt's. ⛔ Every refused command evidence of the attempt was counted, an earlier try's among them, which `rerunReview`
+ * never re-runs: more than D16's "refused reviews being re-run × 6".
  * ⚠ RESTATED, because this module imports no package of the engine, as `declaredPolicyIdsOf` restates the kernel's union; the
  * floor's policies are the authoring floor's three (`AUTHORING_FLOOR_POLICIES`), which `verif/phase7-half-b.test.ts` holds to
  * the product.
@@ -958,10 +964,16 @@ export function refusedReviewsOf(snap: EngineSnapshot, unitId: string): number |
 	}
 	const attempt = workProductId === '' ? '' : attemptOf(workProductId);
 	if (attempt === '') return undefined;
+	const workProductTry =
+		snap.artifacts.filter((a) => str(a.state.producingExecutionAttemptId) === attempt).findIndex((a) => a.id === workProductId) + 1;
 	const subjects = [
 		workProductId,
 		...snap.evidence
-			.filter((e) => (e.state.contentReference as { producingExecutionAttemptId?: unknown } | undefined)?.producingExecutionAttemptId === attempt)
+			.filter((e) => {
+				const ref = e.state.contentReference as { producingExecutionAttemptId?: unknown; producingTry?: unknown } | undefined;
+				if (ref?.producingExecutionAttemptId !== attempt) return false;
+				return typeof ref.producingTry !== 'number' || ref.producingTry === workProductTry;
+			})
 			.map((e) => e.id)
 	];
 	const satisfied = (subject: string): boolean =>

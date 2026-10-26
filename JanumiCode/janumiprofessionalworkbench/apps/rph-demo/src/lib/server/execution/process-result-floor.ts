@@ -55,7 +55,7 @@
 //
 // ⛔ AND THE REVIEW INPUT IS BUILT IN ONE PLACE: `processResultReviewInput` (`assurance/review-input.ts`), with no
 // narration and no prior — `review-input.test.ts` holds `runProcessResultFloor` to it byte for byte.
-import type { ProfessionalRationaleSummary, ValidatorContext } from '@janumipwb/rph-assurance';
+import type { HostSequence, ProfessionalRationaleSummary, ValidatorContext } from '@janumipwb/rph-assurance';
 import type { AssessmentCriterion, ObservedToolCallReport } from '@janumipwb/rph-contracts';
 import { verifyExchangeContent, type ResolvableExchange } from '@janumipwb/rph-application';
 import type { ArtifactStore } from '@janumipwb/rph-ports';
@@ -95,6 +95,11 @@ export interface ProcessResultSubject {
 	readonly observedToolCalls?: ObservedToolCallReport;
 	/** §9.7 — the producer's CONTRACTED account. Under `R15` this is the reasoning the review is OF. */
 	readonly rationale?: ProfessionalRationaleSummary;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package N — D12 (`REG-D-135` (1)) — the step's writes and runs to date, this run's act named
+	 * (`subjectOrdinal`): the place the narrowed question asks of (`processResultReviewInput`).
+	 */
+	readonly hostSequence?: HostSequence;
 }
 
 /**
@@ -228,7 +233,9 @@ export async function runProcessResultFloor(
 			// it actually did. Neither alone is a review: §22.1 makes the first untrusted, and the second carries
 			// no reasoning at all.
 			rationale: subject.rationale,
-			...(subject.observedToolCalls ? { observedToolCalls: subject.observedToolCalls } : {})
+			...(subject.observedToolCalls ? { observedToolCalls: subject.observedToolCalls } : {}),
+			// ⭐ Package N — D12 — its place among the step's writes and runs.
+			...(subject.hostSequence ? { hostSequence: subject.hostSequence } : {})
 		})
 	};
 	return runFloorOverSubject(

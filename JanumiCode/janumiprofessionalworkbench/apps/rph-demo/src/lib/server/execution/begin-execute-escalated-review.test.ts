@@ -78,15 +78,20 @@ vi.mock('./model.js', async (importOriginal) => {
 						seam.turns.push(text);
 						return session.turn(text);
 					},
-					processRuns: () =>
-						seam.runs.length > 0
-							? {
-									runs: [...seam.runs] as ReturnType<typeof session.processRuns>['runs'],
-									observedCount: seam.runs.length,
-									recordedLimit: 32,
-									writes: []
-								}
-							: session.processRuns()
+					// ⭐ `JAN-EXEC` Phase 7, package N — D9 (`REG-D-135` (1)) — THE SCRIPTED RUNS ARE MADE ON EACH TURN, numbered on in
+					// the step's one sequence (the host's own observer, its bound applied), as a real session reports them: a
+					// command's review now runs inside its try, so a try's runs are those made since it began. ⛔ Reported before
+					// any turn, as this fixture did, they would be no try's.
+					processRuns: () => {
+						if (seam.runs.length === 0) return session.processRuns();
+						const observer = createProcessRunObserver();
+						for (let turn = 0; turn < seam.turns.length; turn++)
+							for (const run of seam.runs as ObservedProcessRun[]) {
+								const { ordinal: _ordinal, ...made } = run;
+								observer.ran(made);
+							}
+						return observer.observed();
+					}
 				};
 			};
 		})
@@ -124,7 +129,7 @@ import { missingCriterionRepairInstruction } from '../assurance/reasoning-review
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { noProgramsDirectory } from '../assurance/no-programs.testing.js';
 import { dispatch, getEngine, resetEngine } from '../workbench.js';
-import type { ObservedProcessRun } from '../tools/process-run-observer.js';
+import { createProcessRunObserver, type ObservedProcessRun } from '../tools/process-run-observer.js';
 import { beginExecute, modelWorkUnit } from './begin-execute.testing.js';
 
 /** D8's live-backend variables — each case sets only what it names. */
@@ -361,7 +366,11 @@ describe('⭐ JAN-ESCREC D3 — the execution plane says what an escalated revie
 		// ESCALATED command result, so an arm that described only the escalated results passed every test — and printed
 		// "did not pass its own floor:" followed by nothing beside a REJECTED one, the shape MAJOR 1 named. A failed test
 		// suite the reviewer rejects is the commoner case. ⭑ No escalation here: no sentence says one.
-		seam.answers.push(CLEAN_SATISFIED, REJECTED_FIRST);
+		// ⭐⭐ `JAN-EXEC` Phase 7, package N — D9 (`REG-D-135` (1); `REG-F-520` remedy 1) — MOVED DELIBERATELY: ~~two reviews, one
+		// try~~. A command's review now runs inside its try and its finding goes back to the producer, so the first try's
+		// REJECTED command sends a second try; that try's command is REJECTED again, the open findings STALL (1, 1), and the loop
+		// stops there — the refusal this test is about, the satisfied arm beside a REJECTED command result.
+		seam.answers.push(CLEAN_SATISFIED, REJECTED_FIRST, CLEAN_SATISFIED, REJECTED_FIRST);
 		seam.runs.push(A_RUN);
 		const pwuId = await modelWorkUnit();
 
@@ -370,8 +379,11 @@ describe('⭐ JAN-ESCREC D3 — the execution plane says what an escalated revie
 
 		expect(
 			seam.devin.length,
-			'arrangement: the work product and the command result were not both reviewed'
-		).toBe(2);
+			'arrangement: the work product and the command result were not both reviewed, on each of two tries'
+		).toBe(4);
+		// ⭐ D9 — the command's finding reached the producer: its second turn carries it.
+		expect(seam.turns, 'arrangement: the REJECTED command sent no second try').toHaveLength(2);
+		expect(seam.turns[1], 'the command result’s finding never reached the producer').toContain(COMMAND_FAULT);
 		const [workProduct, evidence] = message.split(COMMAND_EVIDENCE);
 		expect(workProduct, 'arrangement: the work product’s floor did not pass').toBe(
 			'The model ran, its work product is recorded, and the assurance floor is satisfied — but the step still did not complete'
