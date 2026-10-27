@@ -44,10 +44,12 @@ import {
 	CASE_PRODUCER_PROVIDER_ID,
 	CASE_SET_V4_FILE,
 	CASE_SET_V5_FILE,
+	CASE_SET_V11_FILE,
 	CURRENT_CASE_SET_FILE,
 	CURRENT_ORACLES_FILE,
 	ORACLES_V5_FILE,
 	ORACLES_V6_FILE,
+	ORACLES_V11_FILE,
 	serializeGenerated,
 	type CaseSet,
 	type DeclaredPolicyCase,
@@ -73,10 +75,20 @@ const V4 = read<CaseSet>(CASE_SET_V4_FILE);
  */
 const V5 = read<CaseSet>(CASE_SET_V5_FILE);
 const V5_ORACLES = read<OracleSet>(ORACLES_V5_FILE);
+/**
+ * ⭐ Package V — version eleven, current from package K to package V: the last set to carry version four's non-graph cases and
+ * the fourteen byte for byte, so the limbs that say so read it, history now. Version twelve re-casts all 41 under new ids, each
+ * with what production now hands its review (`REG-D-136`; the cases test's package V block holds each to its source).
+ */
+const V11 = read<CaseSet>(CASE_SET_V11_FILE);
+const V11_ORACLES = read<OracleSet>(ORACLES_V11_FILE);
 const DECLARED = CURRENT.cases.filter((c): c is DeclaredPolicyCase => c.arm === 'DECLARED_POLICY');
 const ORACLE = new Map(ORACLES.oracles.map((o) => [o.caseId, o]));
-/** The ids, in design B's order: each policy's clean case, then its planted one. Written here. */
-const IDS = [
+/**
+ * The ids, in design B's order: each policy's clean case, then its planted one. Written here. ⭐ Package V — ~~the current
+ * set's~~: version six's to version eleven's, history since version twelve (`IDS` below).
+ */
+const IDS_V11 = [
 	// ⭐ Round 5 — ~~'D-RC-CLEAN', 'D-RC-04'~~: version six repairs both, under new ids (`REG-D-115`, its delegated extension).
 	'D6-RC-CLEAN',
 	'D6-RC-04',
@@ -95,12 +107,40 @@ const IDS = [
 	'D6-FP-CLEAN',
 	'D6-FP-03'
 ];
+/**
+ * ⭐ Package V — THE CURRENT SET'S FOURTEEN, version twelve's (`REG-D-136`): ~~`IDS_V11`~~ each re-cast under a `D12-` id, in
+ * design B's order, Test Adequacy's clean case revised after the offline pre-check as D12-TA-CLEAN-B. Written here.
+ */
+const IDS = [
+	'D12-RC-CLEAN',
+	'D12-RC-04',
+	'D12-IP-CLEAN',
+	'D12-IP-02',
+	'D12-AD-CLEAN',
+	'D12-AD-01',
+	'D12-DC-CLEAN',
+	'D12-DC-01',
+	'D12-AC-CLEAN',
+	'D12-AC-01',
+	'D12-TA-CLEAN-B',
+	'D12-TA-08',
+	'D12-FP-CLEAN',
+	'D12-FP-03'
+];
+/**
+ * ⭐ Package V — A CLEAN CASE, by its id: ~~`id.endsWith('-CLEAN')`~~ one ending `-CLEAN`, or `-CLEAN-B`, the revised case's —
+ * keyed on the old suffix alone, D12-TA-CLEAN-B would be read as planted, and drop out of every clean limb in silence.
+ */
+const isClean = (id: string): boolean => /-CLEAN(-B)?$/.test(id);
 /** Each declared policy's clean case, by the short prefix its case ids carry. */
-const cleanOf = (short: string): string => IDS.find((id) => id.endsWith(`-${short}-CLEAN`))!;
+// ⭐ Package V — ~~`id.endsWith(`-${short}-CLEAN`)`~~: D12-TA-CLEAN-B's revised id.
+const cleanOf = (short: string): string => IDS.find((id) => new RegExp(`-${short}-CLEAN(-B)?$`).test(id))!;
 /** ⭐ Round 5 — each declared policy's planted case: the other id carrying its short prefix, `D-` or, repaired, `D6-`. */
-const plantedOf = (short: string): string => IDS.find((id) => new RegExp(`^D6?-${short}-`).test(id) && id !== cleanOf(short))!;
+// ⭐ Package V — ~~`^D6?-`~~: and `D12-`, version twelve's.
+const plantedOf = (short: string): string => IDS.find((id) => new RegExp(`^D(?:6|12)?-${short}-`).test(id) && id !== cleanOf(short))!;
 /** ⭐ Round 5 — the criterion a planted case's id names: `D-AC-01`'s and `D6-RC-04`'s alike. */
-const criterionOf = (id: string): string => id.replace(/^D6?-/, '');
+// ⭐ Package V — ~~`/^D6?-/`~~: and `D12-`.
+const criterionOf = (id: string): string => id.replace(/^D(?:6|12)?-/, '');
 
 describe('⭐⭐ E2 — the current case set (v5, and v6 since round 5): version four, then the fourteen declared-policy cases (design B5)', () => {
 	it('⭐ THE SHAPE — version four’s ~~forty~~ non-graph cases first, byte for byte; then the fourteen, in design B’s order — the last arm through version six, ~~version seven’s six graph cases~~ ⭐ version eight’s 35 part cases after them', () => {
@@ -116,14 +156,29 @@ describe('⭐⭐ E2 — the current case set (v5, and v6 since round 5): version
 		// for byte (`REG-D-130`).
 		// ⭐ Package K — ~~[10, 10, 10]~~: version eleven, which carries version ten's 41 non-part cases byte for byte, under
 		// their ids (`REG-D-133`).
-		expect([CURRENT.caseSetVersion, ORACLES.oracleVersion, ORACLES.caseSetVersion]).toEqual([11, 11, 11]);
+		// ⭐ Package V — ~~[11, 11, 11]~~: version twelve, which re-casts version eleven's 41 non-part cases under new ids, each
+		// with what production now hands its review, and adds 15 (`REG-D-136`).
+		expect([CURRENT.caseSetVersion, ORACLES.oracleVersion, ORACLES.caseSetVersion]).toEqual([12, 12, 12]);
 		const v4NonGraph = V4.cases.filter((c) => c.arm !== 'PWA_GRAPH');
 		expect(v4NonGraph, 'the arrangement: version four’s 27 non-graph cases').toHaveLength(27);
-		expect(CURRENT.cases.slice(0, v4NonGraph.length).map((c) => JSON.stringify(c))).toEqual(v4NonGraph.map((c) => JSON.stringify(c)));
-		expect(CURRENT.cases.slice(v4NonGraph.length, v4NonGraph.length + IDS.length).map((c) => c.id)).toEqual(IDS);
+		// ⭐ Package V — ~~`CURRENT`~~: version eleven, the last set to carry version four's 27 and the fourteen byte for byte; version
+		// twelve re-casts each, its source but for its view (the cases test's package V block).
+		expect(V11.cases.slice(0, v4NonGraph.length).map((c) => JSON.stringify(c))).toEqual(v4NonGraph.map((c) => JSON.stringify(c)));
+		expect(V11.cases.slice(v4NonGraph.length, v4NonGraph.length + IDS_V11.length).map((c) => c.id)).toEqual(IDS_V11);
 		expect(
-			CURRENT.cases.slice(v4NonGraph.length + IDS.length).map((c) => c.arm),
+			V11.cases.slice(v4NonGraph.length + IDS_V11.length).map((c) => c.arm),
 			'⭐ B7: only part cases after them'
+		).toEqual(Array(35).fill('PWA_TYPE'));
+		// ⭐ Package V — and the current set, version twelve: its 42 work-product and command cases first, then the fourteen, in
+		// design B's order, then the 35 part cases.
+		expect(CURRENT.cases.slice(0, 42).map((c) => c.arm), 'version twelve: the work-product and command cases first').toEqual([
+			...Array(24).fill('WORK_PRODUCT'),
+			...Array(18).fill('PROCESS_RESULT')
+		]);
+		expect(CURRENT.cases.slice(42, 42 + IDS.length).map((c) => c.id), 'version twelve: then the fourteen').toEqual(IDS);
+		expect(
+			CURRENT.cases.slice(42 + IDS.length).map((c) => c.arm),
+			'version twelve: only part cases after them'
 		).toEqual(Array(35).fill('PWA_TYPE'));
 		expect(DECLARED.map((c) => c.id)).toEqual(IDS);
 		expect(DECLARED_CASE_POLICIES.map(([policyId]) => policyId)).toEqual([
@@ -198,7 +253,8 @@ describe('⭐⭐ E2 — the declared oracles: ~~PROPOSED, AWAITING SPONSOR CONFE
 			const o = ORACLE.get(c.id)!;
 			expect(o, c.id).toBeDefined();
 			expect(o.expectation, c.id).toBe("the author's claim");
-			if (c.id.endsWith('-CLEAN')) {
+			// ⭐ Package V — ~~`c.id.endsWith('-CLEAN')`~~: D12-TA-CLEAN-B's revised id too.
+			if (isClean(c.id)) {
 				expect([o.faulted, o.disposition], c.id).toEqual([[], 'SATISFIED']);
 				continue;
 			}
@@ -248,8 +304,11 @@ describe('⭐⭐ E2 — the declared oracles: ~~PROPOSED, AWAITING SPONSOR CONFE
 		// ⭐ Package P F3 — ~~`slice(V4.cases.length)`~~: the declared oracles, before version seven's six graph-case ones.
 		// ⭐ The review in parts, B7 — ~~`slice(V4.cases.length, …)`~~: by their ids, version eight holding none of version four's
 		// graph cases before them.
-		const declaredNow = ORACLES.oracles.filter((o) => IDS.includes(o.caseId));
-		expect(declaredNow.map((o) => o.caseId), 'the arrangement: the fourteen, in order').toEqual(IDS);
+		// ⭐ Package V — ~~`ORACLES`, `IDS`~~: version eleven's oracles, the last to carry version five's whole and version four's
+		// before them; version twelve's carry each one's verdict, faulted criteria and standing to its re-cast case (below, and the
+		// cases test's package V block).
+		const declaredNow = V11_ORACLES.oracles.filter((o) => IDS_V11.includes(o.caseId));
+		expect(declaredNow.map((o) => o.caseId), 'the arrangement: the fourteen, in order').toEqual(IDS_V11);
 		expect(declaredNow.filter((o) => v5Declared.get(o.caseId) === JSON.stringify(o)).length, 'version five’s, whole').toBe(10);
 		expect(declaredNow.filter((o) => !v5Declared.has(o.caseId)).map((o) => o.caseId), 'carried to a repaired case').toEqual([
 			'D6-RC-CLEAN',
@@ -262,8 +321,17 @@ describe('⭐⭐ E2 — the declared oracles: ~~PROPOSED, AWAITING SPONSOR CONFE
 		// version eight holding none of its graph cases.
 		const v4NonGraph = v4.oracles.filter((o) => !o.caseId.startsWith('G'));
 		expect(v4NonGraph, 'the arrangement: version four’s 27 non-graph oracles').toHaveLength(27);
-		expect(ORACLES.oracles.slice(0, v4NonGraph.length)).toEqual(v4NonGraph);
-		expect(ORACLES.oracles.slice(v4NonGraph.length, v4NonGraph.length + IDS.length).map((o) => o.caseId)).toEqual(IDS);
+		// ⭐ Package V — ~~`ORACLES`, `IDS`~~: version eleven's, as above.
+		expect(V11_ORACLES.oracles.slice(0, v4NonGraph.length)).toEqual(v4NonGraph);
+		expect(V11_ORACLES.oracles.slice(v4NonGraph.length, v4NonGraph.length + IDS_V11.length).map((o) => o.caseId)).toEqual(IDS_V11);
+		// ⭐ Package V — and today's: version twelve's fourteen declared oracles, each its version-eleven case's verdict, faulted
+		// criteria and standing, carried (`REG-D-136`), in design B's order.
+		const eleven = new Map(V11_ORACLES.oracles.map((o) => [o.caseId, o]));
+		const verdict = (o: { disposition: string; faulted: readonly string[]; expectation: string } | undefined) => [o?.disposition, o?.faulted, o?.expectation];
+		expect(
+			IDS.map((id) => verdict(ORACLE.get(id))),
+			'version twelve’s fourteen, each its version-eleven case’s verdict, faulted criteria and standing'
+		).toEqual(IDS_V11.map((id) => verdict(eleven.get(id))));
 	});
 });
 
@@ -325,7 +393,8 @@ describe('⭐⭐ E2 — measurable by the existing runner, NO MODEL CALLED (desi
 	});
 
 	it('⛔ a planted case answered ALL CLEAN is scored SATISFIED — the plant is the verdict’s, never the scorer’s', async () => {
-		for (const c of DECLARED.filter((x) => !x.id.endsWith('-CLEAN')))
+		// ⭐ Package V — ~~`!x.id.endsWith('-CLEAN')`~~: D12-TA-CLEAN-B is clean.
+		for (const c of DECLARED.filter((x) => !isClean(x.id)))
 			expect((await score(c, reply(c, []))).scored.disposition, c.id).toBe('SATISFIED');
 	});
 
@@ -350,14 +419,16 @@ describe('⭐⭐ E2 — measurable by the existing runner, NO MODEL CALLED (desi
 	it('⛔ E12’s polish — a reply that faults a planted case’s criterion and RECOMMENDS SATISFIED is scored REJECTED, as the sign-off records it — never the floor’s BOUNDARY_REJECTED', async () => {
 		// ⛔ PREDICTED RED, read from the code: BOUNDARY_REJECTED — `classifyValidatorResult` refuses a SATISFIED beside an unmet
 		// mandatory criterion, while `verdictOf` never reads the recommendation and records REJECTED, which meets the bar.
-		for (const c of DECLARED.filter((x) => !x.id.endsWith('-CLEAN')))
+		// ⭐ Package V — ~~`!x.id.endsWith('-CLEAN')`~~: D12-TA-CLEAN-B is clean.
+		for (const c of DECLARED.filter((x) => !isClean(x.id)))
 			expect((await score(c, recommending(c, ORACLE.get(c.id)!.faulted, 'SATISFIED'))).scored.disposition, c.id).toBe('REJECTED');
 	});
 
 	it('⛔ E12’s polish — a clean reply RECOMMENDING ESCALATED is scored SATISFIED, as the sign-off records it — REG-D-089’s rule (a) is the floor’s, never the declared verdict’s', async () => {
 		// ⛔ PREDICTED RED, read from the code: ESCALATED — `composeAssuranceOutcome`'s second pass escalates a clean review its
 		// reviewer recommends ESCALATED, and the sign-off records SATISFIED, the recommendation noted beside it.
-		for (const c of DECLARED.filter((x) => x.id.endsWith('-CLEAN')))
+		// ⭐ Package V — ~~`x.id.endsWith('-CLEAN')`~~: D12-TA-CLEAN-B is clean, and would drop out in silence.
+		for (const c of DECLARED.filter((x) => isClean(x.id)))
 			expect((await score(c, recommending(c, [], 'ESCALATED'))).scored.disposition, c.id).toBe('SATISFIED');
 	});
 

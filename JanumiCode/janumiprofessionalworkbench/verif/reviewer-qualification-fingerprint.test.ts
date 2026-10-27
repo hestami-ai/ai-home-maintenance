@@ -234,7 +234,7 @@ function onlyMoved(fp: ReviewerFingerprint, moved: readonly (keyof ReviewerFinge
 }
 
 describe('JAN-CRITREAD J2-3 — the reviewer fingerprint MOVES on each component', () => {
-	it('⭐ a PROMPT BRANCH — the process-result framing: the probes move, and of the case prompts exactly the process-result cases’ — none of v1’s, and the current set’s fourteen (PQ-2)', async () => {
+	it('⭐ a PROMPT BRANCH — the process-result framing: the probes move, and of the case prompts exactly the process-result cases’ — none of v1’s, and the current set’s ~~fourteen~~ ⭐ eighteen (PQ-2; package V)', async () => {
 		const seams: FingerprintSeams = {
 			...PRODUCT_SEAMS,
 			validator: (print) =>
@@ -251,7 +251,9 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint MOVES on each component
 		// ~~⭐ `PQ-1` — and still true of the CURRENT set (case set v3): no case of it is a process result either.~~
 		// ⭐ `JAN-PRQUAL` `PQ-2` (design D4) — the CURRENT set, case set v4, holds fourteen: exactly their prompts move, each
 		// its initial and its repair, and no other case's does.
-		expect(CURRENT_PROCESS_RESULTS, 'the arrangement: the current set holds the fourteen').toHaveLength(14);
+		// ⭐ Package V (`REG-D-136`) — ~~fourteen~~: the current set, case set v12, holds eighteen — the fourteen re-cast as P12-…
+		// and four new (P12-CSV-…).
+		expect(CURRENT_PROCESS_RESULTS, 'the arrangement: the current set holds the eighteen').toHaveLength(18);
 		const now = await reviewerFingerprint(CURRENT_CASES, seams);
 		expect(movedCasePrompts(now, BASE_NOW), 'the case prompts of the current set that move').toEqual(CURRENT_PROCESS_RESULTS);
 		for (const id of CURRENT_PROCESS_RESULTS)
@@ -299,8 +301,9 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint MOVES on each component
 		expect(fp.casePrompts, 'every case is seen whole, so no case prompt carries a cut').toEqual(BASE.casePrompts);
 		// ⭐ `JAN-PRQUAL` `PQ-2` (design D4) — nor any of the current set but P-RR-07-CUT, the one case cut by design: its review
 		// keeps a HEAD and a TAIL under a declaration (`reviewer-qualification-cases.test.ts` pins it by id).
+		// ⭐ Package V (`REG-D-136`) — ~~P-RR-07-CUT~~: re-cast as P12-RR-07-CUT, cut by design still.
 		expect(movedCasePrompts(await reviewerFingerprint(CURRENT_CASES, seams), BASE_NOW), 'nor any of the current set but the one cut by design').toEqual(
-			['P-RR-07-CUT']
+			['P12-RR-07-CUT']
 		);
 		// ⭐ `PQ-1` — AND THE NAME IS HELD TO THE BYTES BOTH WAYS: the probes a cut declaration reaches are exactly the ones
 		// named OVERSIZE — the validator's cuts and the process-result builder's alike — so a probe that carries a cut
@@ -2620,7 +2623,8 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 		// `processResult`, so these halves MEASURE what a renderer change does to a case prompt — none of v1's moves, and of
 		// the current set, case set v4, exactly its fourteen process-result cases' do.
 		expect(fp.casePrompts, 'no case of v1 is a process result: none moves').toEqual(BASE.casePrompts);
-		expect(CURRENT_PROCESS_RESULTS, 'the arrangement: the current set holds the fourteen').toHaveLength(14);
+		// ⭐ Package V (`REG-D-136`) — ~~fourteen~~: case set v12's eighteen.
+		expect(CURRENT_PROCESS_RESULTS, 'the arrangement: the current set holds the eighteen').toHaveLength(18);
 		expect(movedCasePrompts(await reviewerFingerprint(CURRENT_CASES, seams), BASE_NOW), 'the current set’s process-result cases, and only those').toEqual(
 			CURRENT_PROCESS_RESULTS
 		);
@@ -5009,7 +5013,8 @@ describe('JAN-CRITREAD J2-3 — the fingerprint and the runner agree', () => {
 	});
 
 	it('⭐ …and on the process-result arm (PQ-2, design D4): a process-result case’s prompts are the hashes a run records — its run literal rendered by the one builder on both sides', async () => {
-		const two: QualificationCase[] = CURRENT_CASES.filter((c) => c.id === 'P-CLEAN' || c.id === 'P-RR-07-CUT');
+		// ⭐ Package V (`REG-D-136`) — ~~P-CLEAN, P-RR-07-CUT~~: the current set's, re-cast as P12-CLEAN and P12-RR-07-CUT.
+		const two: QualificationCase[] = CURRENT_CASES.filter((c) => c.id === 'P12-CLEAN' || c.id === 'P12-RR-07-CUT');
 		expect(two.map((c) => c.arm), 'the arrangement: two process results, one of them cut by design').toEqual([
 			'PROCESS_RESULT',
 			'PROCESS_RESULT'
@@ -5021,8 +5026,8 @@ describe('JAN-CRITREAD J2-3 — the fingerprint and the runner agree', () => {
 			commit: 'e5f9358b'.repeat(5),
 			fingerprint: { reviewer: BASE_NOW.reviewer, scoring: BASE_NOW.scoring, caseSet: BASE_NOW.caseSet },
 			cases: two,
-			caseSetVersion: 4,
-			oracleVersion: 4,
+			caseSetVersion: 12, // ⭐ package V — ~~4~~: the cases' own version
+			oracleVersion: 12, // ⭐ package V — ~~4~~
 			criteria: SEEDED_REASONING_REVIEW_CRITERIA,
 			transport: {
 				name: 'stub',
@@ -5056,7 +5061,8 @@ describe('JAN-CRITREAD J2-3 — the fingerprint and the runner agree', () => {
 		// (`CRITERION_REPAIR_INSTRUCTION`). ⛔ Recorded as a plain `repair`, its hash would be compared with the JSON repair's:
 		// a run under today's fingerprint would read as a prompt that changed though the fingerprint did not (limb 2), and
 		// its case as unmeasured (limb 1) — the paid re-qualification refused for the reviewer's own repair.
-		const one: QualificationCase[] = CURRENT_CASES.filter((c) => c.id === 'W-CLEAN');
+		// ⭐ Package V (`REG-D-136`) — ~~W-CLEAN~~: the current set's, re-cast as W12-CLEAN with the empty finished-work view.
+		const one: QualificationCase[] = CURRENT_CASES.filter((c) => c.id === 'W12-CLEAN');
 		let n = 0;
 		const lines = await runQualification({
 			runId: 'qr-agree-3',
@@ -5064,8 +5070,8 @@ describe('JAN-CRITREAD J2-3 — the fingerprint and the runner agree', () => {
 			commit: 'e5f9358b'.repeat(5),
 			fingerprint: { reviewer: BASE_NOW.reviewer, scoring: BASE_NOW.scoring, caseSet: BASE_NOW.caseSet },
 			cases: one,
-			caseSetVersion: 4,
-			oracleVersion: 4,
+			caseSetVersion: 12, // ⭐ package V — ~~4~~: the case's own version
+			oracleVersion: 12, // ⭐ package V — ~~4~~
 			criteria: SEEDED_REASONING_REVIEW_CRITERIA,
 			transport: {
 				name: 'stub',
@@ -5089,7 +5095,7 @@ describe('JAN-CRITREAD J2-3 — the fingerprint and the runner agree', () => {
 		for (const call of calls)
 			expect(call.promptSha256, `${call.caseId} ${call.role}`).toBe(BASE_NOW.casePrompts.get(call.caseId)![call.role]);
 		// ⭐ And the two repairs are two prompts: the record can tell them apart only because their hashes differ.
-		const prompts = BASE_NOW.casePrompts.get('W-CLEAN')!;
+		const prompts = BASE_NOW.casePrompts.get('W12-CLEAN')!; // ⭐ package V — ~~'W-CLEAN'~~
 		expect(prompts['criterion-repair']).not.toBe(prompts.repair);
 	});
 
@@ -5098,7 +5104,8 @@ describe('JAN-CRITREAD J2-3 — the fingerprint and the runner agree', () => {
 		// criterion repair, its line naming the declared ids without a row — so its prompt depends on the reply before it, and
 		// no one per-case hash can be today's. ⛔ Recorded as a plain `repair`, it would be held to the JSON repair's hash; and
 		// held to I5's alone, a run under today's fingerprint would read it as a prompt that moved (limb 2), its case unmeasured.
-		const one: QualificationCase[] = CURRENT_CASES.filter((c) => c.id === 'W-CLEAN');
+		// ⭐ Package V (`REG-D-136`) — ~~W-CLEAN~~: the current set's, re-cast as W12-CLEAN with the empty finished-work view.
+		const one: QualificationCase[] = CURRENT_CASES.filter((c) => c.id === 'W12-CLEAN');
 		const last = SEEDED_REASONING_REVIEW_CRITERIA.at(-1)!.id;
 		const slipped = JSON.stringify({
 			findings: SEEDED_REASONING_REVIEW_CRITERIA.map((k) => ({ criterionId: k.id === last ? `${k.id}-placeholder` : k.id, failed: false, statement: 'absent' })),
@@ -5111,8 +5118,8 @@ describe('JAN-CRITREAD J2-3 — the fingerprint and the runner agree', () => {
 			commit: 'e5f9358b'.repeat(5),
 			fingerprint: { reviewer: BASE_NOW.reviewer, scoring: BASE_NOW.scoring, caseSet: BASE_NOW.caseSet },
 			cases: one,
-			caseSetVersion: 11,
-			oracleVersion: 11,
+			caseSetVersion: 12, // ⭐ package V — ~~11~~
+			oracleVersion: 12, // ⭐ package V — ~~11~~
 			criteria: SEEDED_REASONING_REVIEW_CRITERIA,
 			transport: {
 				name: 'stub',
@@ -5134,24 +5141,25 @@ describe('JAN-CRITREAD J2-3 — the fingerprint and the runner agree', () => {
 		const calls = lines.filter((l): l is CallLine => l.kind === 'CALL');
 		// ⛔ AT HEAD (D13 built, the runner not yet): recorded `repair` — its prompt ends with no line `callRole` knew.
 		expect(calls.map((c) => c.role)).toEqual(['initial', 'criterion-repair']);
-		expect(calls[0]!.promptSha256).toBe(BASE_NOW.casePrompts.get('W-CLEAN')!.initial);
+		expect(calls[0]!.promptSha256).toBe(BASE_NOW.casePrompts.get('W12-CLEAN')!.initial); // ⭐ package V — ~~'W-CLEAN'~~
 		// ⭐ The criterion repair's hash: not I5's, which names no criterion, but the one today's reviewer sends after the
 		// recorded first reply, read as the record keeps it.
-		expect(calls[1]!.promptSha256, 'the missing-criterion repair is not I5’s prompt').not.toBe(BASE_NOW.casePrompts.get('W-CLEAN')!['criterion-repair']);
+		expect(calls[1]!.promptSha256, 'the missing-criterion repair is not I5’s prompt').not.toBe(BASE_NOW.casePrompts.get('W12-CLEAN')!['criterion-repair']); // ⭐ package V — ~~'W-CLEAN'~~
 		const recordedFirst = calls[0]!.reply.status === 'ANSWERED' ? JSON.parse(calls[0]!.reply.answer) : undefined;
-		expect(BASE_NOW.criterionRepairAfter('W-CLEAN', recordedFirst), 'today’s criterion repair after that reply').toBe(calls[1]!.promptSha256);
+		// ⭐ Package V — ~~'W-CLEAN'~~ in each below: W12-CLEAN.
+		expect(BASE_NOW.criterionRepairAfter('W12-CLEAN', recordedFirst), 'today’s criterion repair after that reply').toBe(calls[1]!.promptSha256);
 		// ⭑ CONTROLS: after a reply that faults a row, or answers every criterion, today's reviewer sends no criterion repair.
 		const faulted = JSON.parse(slipped) as { findings: { failed: boolean }[] };
 		faulted.findings[0]!.failed = true;
-		expect(BASE_NOW.criterionRepairAfter('W-CLEAN', faulted)).toBeUndefined();
+		expect(BASE_NOW.criterionRepairAfter('W12-CLEAN', faulted)).toBeUndefined();
 		const answeredAll = {
 			findings: SEEDED_REASONING_REVIEW_CRITERIA.map((k) => ({ criterionId: k.id, failed: false, statement: 'absent' })),
 			recommendation: 'SATISFIED'
 		};
-		expect(BASE_NOW.criterionRepairAfter('W-CLEAN', answeredAll)).toBeUndefined();
+		expect(BASE_NOW.criterionRepairAfter('W12-CLEAN', answeredAll)).toBeUndefined();
 		// ⭑ And after a reply answering NO criterion, I5's: the per-case hash the record has always held.
-		expect(BASE_NOW.criterionRepairAfter('W-CLEAN', { findings: [], recommendation: 'SATISFIED' })).toBe(
-			BASE_NOW.casePrompts.get('W-CLEAN')!['criterion-repair']
+		expect(BASE_NOW.criterionRepairAfter('W12-CLEAN', { findings: [], recommendation: 'SATISFIED' })).toBe(
+			BASE_NOW.casePrompts.get('W12-CLEAN')!['criterion-repair']
 		);
 	});
 
