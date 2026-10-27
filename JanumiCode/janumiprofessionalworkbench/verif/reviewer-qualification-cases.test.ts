@@ -4093,6 +4093,13 @@ const REVIEWER_FINGERPRINT_V9 = '5ab3d68643bffbbf700c622526b626f47d4c487690e1eb5
  * — the three re-run probes move, and only they: a re-run's words say a file an earlier step changed CAN be among its files
  * (~~"is among them"~~, false of a marked view that lists none, or whose every file its step changed). The 76 other probe
  * prompts, every case prompt, the budget, criteria, scoring and case-set digest are as they were. Still unmeasured; V owes it.
+ * ⭐⭐ The integration of packages O, O-2 and V — 2026-10-26: package V (case set v12, `REG-D-136`) was built and measured
+ * against ~~'44307c721bd4a512efd07b747e15b72bada679580817b316ff98781d60be18ae'~~, and holds today's fingerprint through this
+ * constant alone (its package V block: version eleven's and version twelve's reviewer fingerprints are today's). On the merged
+ * tree today's is O-2's value, the one `reviewer:qual:check` prints: V moved no reviewer component — the probes, budget,
+ * criteria and scoring are O-2's — and O-2 moved no case, so version twelve's digest is still `CASE_SET_DIGEST_V12`. With V's
+ * value here, exactly the three limbs that read this constant fail, each on 'the reviewer fingerprint, unmoved'. Still
+ * unmeasured: version twelve's measurement, and the ACKNOWLEDGED line the check owes, are under this value.
  */
 const REVIEWER_FINGERPRINT_TODAY = '9cf9b9f54bf79013e13b21db675a08645b36d6c1b260b3533fe5f0957064b93d';
 /**
@@ -5709,6 +5716,9 @@ describe('⭐⭐ package V — reviewer-qualification case set v12: version elev
 		const parts = CASE_SET_V12.cases.filter((c) => c.arm === 'PWA_TYPE').map((c) => c.id);
 		expect(parts, 'arrangement: the 35').toHaveLength(35);
 		for (const id of parts) expect(twelve.casePrompts.get(id), `${id}: its prompts are version eleven’s`).toEqual(eleven.casePrompts.get(id));
+		// ⭐ The integration of packages O, O-2 and V, 2026-10-26: written against package V's today,
+		// ~~'44307c721bd4a512efd07b747e15b72bada679580817b316ff98781d60be18ae'~~; on the merged tree, O-2's (the constant's notes).
+		// The claim is unchanged: version twelve moves no reviewer component.
 		expect([eleven.reviewer, twelve.reviewer], 'the reviewer fingerprint, unmoved').toEqual([REVIEWER_FINGERPRINT_TODAY, REVIEWER_FINGERPRINT_TODAY]);
 		expect(twelve.caseSet, 'the case set’s digest moved').not.toBe(eleven.caseSet);
 		expect(twelve.caseSet, 'the case set’s digest, as measured at the build').toBe(CASE_SET_DIGEST_V12);
