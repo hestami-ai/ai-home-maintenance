@@ -259,16 +259,25 @@ export const WORK_PRODUCT_DELIVERABLE_SUBJECT =
 /**
  * ⭐⭐ `JAN-EXEC` Phase 7, package O-2 — D28 (`REG-D-137`, Q46; `REG-F-583`; design D28, revision 4) — THE SUBJECT LINE OF A WORK
  * RE-RUN'S REVIEW (`Deliverable.workRerun`): its files are counted from the unit's FIRST step's baseline (package O's D22), so a
- * file an earlier step changed is among them, while its sequence is this step's alone. ⛔ The first step's line above, shown a
- * re-run, said the files changed "since its step began", directly above a sequence that showed no write of a file an earlier
- * step wrote: the host's record contradicted itself in front of the reviewer, which risks a false refusal. ⭑ ONLY a marked view
- * reads this; a first step's — every case of v12 as confirmed among them — reads the line above, byte for byte. ⭑ It asks the
+ * file an earlier step changed ~~is~~ ⭐ CAN BE among them, while its sequence is this step's alone. ⛔ The first step's line above,
+ * shown a re-run, said the files changed "since its step began", directly above a sequence that showed no write of a file an
+ * earlier step wrote: the host's record contradicted itself in front of the reviewer, which risks a false refusal. ⭑ ONLY a marked
+ * view reads this; a first step's — every case of v12 as confirmed among them — reads the line above, byte for byte. ⭑ It asks the
  * reviewer to find nothing (`REG-D-105` (2)) and names no disposition value (`REG-D-090`); the judging sentence is the one above.
+ * ⛔ Package O-2's check, finding 1 (2026-10-26) — ~~"— so a file an earlier step changed is among them —"~~: the mark alone picks
+ * this line, so it was said of every marked view, whatever its record held — above "The unit changed no file …" on a view that
+ * lists none (a unit that changes no file is production's common shape), and of a view whose every file this step wrote. The mark
+ * says where the files are counted FROM, never which step changed which: the baseline keeps hashes alone and a re-run takes no
+ * manifest at its own start (`unitBaselineOf`), so the host cannot know. "Can be" is true of every marked view.
+ * ⚠ Disclosed, and not fixed by any wording here (package O's D22 residual; package O-2's check, finding 3): the workspace is the
+ * Undertaking's, so a file another unit wrote while this one waited is counted too, and this line calls it the unit's. The paid
+ * lane does not reach it — its rule re-runs a stopped unit before it presses another (`recoverByRule`, `phase7-operator.ts`) — and a
+ * person who presses another unit first does; per-unit path ownership is not designed.
  */
 export const WORK_PRODUCT_RERUN_DELIVERABLE_SUBJECT =
 	'The WORK PRODUCT to review — what a professional work unit produced by running the instruction above, in a step that ' +
 	"re-runs its work: the agent's answer, then the files the unit changed in its workspace since its first step began, as " +
-	"the host read them after this step's last try — so a file an earlier step changed is among them — then this step's " +
+	"the host read them after this step's last try — so a file an earlier step changed can be among them — then this step's " +
 	"writes and runs in the host's order, which are this step's alone. Judge each criterion below — whether the " +
 	'obligation the instruction delegates is discharged, whether any of it is dropped, whether its scope is narrowed, ' +
 	'among them — against this whole deliverable: the files as they now stand, never as an earlier command read them. ' +
@@ -439,13 +448,16 @@ export function pwaTypeOverBudgetStatement(length: number, budget: number): stri
 /**
  * ⭐⭐ `JAN-EXEC` Phase 7, package O-2 — D28 (`REG-D-137`, Q46; `REG-F-583`; design D28, revision 4) — THE CLAUSE A DECLARED REVIEW'S
  * SUBJECT GAINS WHEN SOME UNIT OF ITS WORK IS MARKED A WORK RE-RUN (`declaredWorkRerun`): what the mark on that unit's work
- * product means — its files counted from the unit's first step, an earlier step's among them, its sequence that step's alone.
+ * product means — its files counted from the unit's first step, an earlier step's ~~among them~~ ⭐ possibly among them, its
+ * sequence that step's alone.
  * ⛔ Said once, before the subject's colon, and only then: a work with no unit marked — every confirmed case of v12 — reads its
  * subject byte for byte as before. ⭑ It asks the reviewer to find nothing and names no disposition value.
+ * ⛔ Package O-2's check, finding 1 (2026-10-26) — ~~", so a file an earlier step changed is among them,"~~: said of every marked
+ * unit, a unit that changed no file among them (`WORK_PRODUCT_RERUN_DELIVERABLE_SUBJECT` says why the host cannot know); "can be".
  */
 export const DECLARED_WORK_RERUN_CLAUSE =
 	'; and a work product marked "workRerun" was made by a step that re-ran its unit’s work: that unit’s "files" are counted ' +
-	'from its first step, so a file an earlier step changed is among them, and its "sequence" is that step’s alone';
+	'from its first step, so a file an earlier step changed can be among them, and its "sequence" is that step’s alone';
 
 function framingText(
 	input: Pick<ReasoningReviewInput, 'framing' | 'declaredPolicy' | 'declaredInstruction' | 'deliverable' | 'declaredWorkRerun'>
@@ -815,15 +827,18 @@ export function sequenceBlock(
 /**
  * The heading of the files a work product's review is shown, after `afterTry`, or the line saying none changed.
  * ⭐⭐ Package O-2 — D28 (`REG-D-137`; `REG-F-583`) — and a work re-run's (`Deliverable.workRerun`): the files counted from the
- * unit's FIRST step, so a file an earlier step changed is among them, and the writes and runs below this step's alone — the line
- * for no file changed, "since its first step began". ⛔ Unmarked, each branch is a first step's, byte for byte.
+ * unit's FIRST step, so a file an earlier step changed ~~is~~ ⭐ can be among them, and the writes and runs below this step's
+ * alone — the line for no file changed, "since its first step began". ⛔ Unmarked, each branch is a first step's, byte for byte.
+ * ⛔ Package O-2's check, finding 1 (2026-10-26) — ~~"so a file an earlier step changed is among them"~~: false of a view whose
+ * every file this step changed, and the host cannot tell which listed file an earlier step changed
+ * (`WORK_PRODUCT_RERUN_DELIVERABLE_SUBJECT`); "can be" is true of every view it heads.
  */
 export function deliverableHeading(deliverable: Deliverable): string {
 	if (deliverable.workRerun === true)
 		return deliverable.files.length === 0
 			? `The unit changed no file in its workspace since its first step began, as the host read it after try ${deliverable.afterTry} of this step; the writes and runs below are this step's alone.`
 			: `The files the unit changed in its workspace since its first step began, as the host read them after try ${deliverable.afterTry} of this step — ` +
-					"so a file an earlier step changed is among them, and the writes and runs below are this step's alone. " +
+					"so a file an earlier step changed can be among them, and the writes and runs below are this step's alone. " +
 					"Each path, as JSON, and what changed are the host's record; each file's text, between fence lines, is the file's own:";
 	return deliverable.files.length === 0
 		? `The unit changed no file in its workspace since its step began, as the host read it after try ${deliverable.afterTry}.`

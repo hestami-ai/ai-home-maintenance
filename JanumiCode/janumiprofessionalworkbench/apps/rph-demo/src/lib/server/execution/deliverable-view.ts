@@ -149,8 +149,10 @@ export interface DeliverableViewRecord {
 	 * fingerprint's probes carry it (`scripts/reviewer-qual/probes.ts`, `W-DELIVERABLE`), so rewording it moves the fingerprint.~~
 	 * ⭐⭐ Package O-2 — D28 (2026-10-26; `REG-F-583`, the check's finding 1; the sponsor's `REG-D-137`, Q46) — RESOLVED FOR A RE-RUN
 	 * ONLY: a view whose files are counted from an EARLIER step's baseline is marked (`Deliverable.workRerun`), and its review says the
-	 * files are counted from the unit's first step, that a file an earlier step changed is among them and that the sequence is this
-	 * step's alone; the declared review marks such a unit's work product and says what the mark means. A first step's view carries no
+	 * files are counted from the unit's first step, that a file an earlier step changed ~~is~~ ⭐ can be among them (package O-2's
+	 * check, finding 1: the baseline keeps hashes alone, so the host cannot know which listed file an earlier step changed, and a
+	 * marked view can list none) and that the sequence is this step's alone; the declared review marks such a unit's work product
+	 * and says what the mark means. A first step's view carries no
 	 * mark, so its prompts — the 91 confirmed cases of v12 among them — stay byte for byte as they were. Probes take each re-run
 	 * branch (`W-RERUN-DELIVERABLE`, `W-RERUN-NO-FILE`, `D-RERUN-DELIVERABLE`), so the fingerprint moved.
 	 */

@@ -4072,8 +4072,12 @@ const REVIEWER_FINGERPRINT_V9 = '5ab3d68643bffbbf700c622526b626f47d4c487690e1eb5
  * probes take a work re-run's branches (W-RERUN-DELIVERABLE, W-RERUN-NO-FILE, D-RERUN-DELIVERABLE). No probe prompt of the 76
  * before them moved, nor any case prompt, nor the budget, criteria, scoring or case-set digest: a unit's first step — every case
  * — reads as before, byte for byte. Still unmeasured; V owes it, with D29's three re-run cases.
+ * ⭐⭐ Package O-2's check, finding 1 — MOVED AGAIN, DELIBERATELY, 2026-10-26: ~~'9c071c11f96daaca5cd8b3accafb88d517c71c1c65125a1909187b382403972a'~~
+ * — the three re-run probes move, and only they: a re-run's words say a file an earlier step changed CAN be among its files
+ * (~~"is among them"~~, false of a marked view that lists none, or whose every file its step changed). The 76 other probe
+ * prompts, every case prompt, the budget, criteria, scoring and case-set digest are as they were. Still unmeasured; V owes it.
  */
-const REVIEWER_FINGERPRINT_TODAY = '9c071c11f96daaca5cd8b3accafb88d517c71c1c65125a1909187b382403972a';
+const REVIEWER_FINGERPRINT_TODAY = '9cf9b9f54bf79013e13b21db675a08645b36d6c1b260b3533fe5f0957064b93d';
 /**
  * ⭐ THE PROTOTYPE'S PROMPTS (`REG-D-131` Q36: *"its prompts must match the checked prototype hash for hash"*) — the sha256 of
  * each of the 19 bridge part cases' first prompt as the lead's in-memory prototype of D3b rendered it through the product's

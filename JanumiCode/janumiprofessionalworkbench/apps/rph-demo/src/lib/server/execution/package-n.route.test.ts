@@ -628,11 +628,14 @@ describe('⭐⭐ package O-2 — D28: the try loop marks a work re-run’s view 
 
 	it('⭐ the re-run’s review is told so — its files counted from the unit’s first step, an earlier step’s among them, its sequence this step’s alone; the first step’s review reads today’s words', async () => {
 		const { first, rerun } = await refusedThenRerun([run(['node', '--test'], '1 passed\n')]);
+		// ⛔ MOVED 2026-10-26 (package O-2's check, finding 1): ~~"— so a file an earlier step changed is among them —"~~ in both
+		// sentences: an earlier step's file CAN be among them — the host cannot know that an earlier step changed a file it lists,
+		// and a marked view can list none.
 		expect(rerun, 'the re-run’s subject does not say its files are counted from the unit’s first step').toContain(
-			"then the files the unit changed in its workspace since its first step began, as the host read them after this step's last try — so a file an earlier step changed is among them — then this step's writes and runs in the host's order, which are this step's alone."
+			"then the files the unit changed in its workspace since its first step began, as the host read them after this step's last try — so a file an earlier step changed can be among them — then this step's writes and runs in the host's order, which are this step's alone."
 		);
 		expect(rerun.split('\n'), 'the re-run’s heading over its inherited file does not say so').toContain(
-			"The files the unit changed in its workspace since its first step began, as the host read them after try 1 of this step — so a file an earlier step changed is among them, and the writes and runs below are this step's alone. Each path, as JSON, and what changed are the host's record; each file's text, between fence lines, is the file's own:"
+			"The files the unit changed in its workspace since its first step began, as the host read them after try 1 of this step — so a file an earlier step changed can be among them, and the writes and runs below are this step's alone. Each path, as JSON, and what changed are the host's record; each file's text, between fence lines, is the file's own:"
 		);
 		expect(rerun, 'arrangement: the re-run’s view lists the inherited file').toContain('Added "docs/required.md":');
 		expect(rerun, 'the re-run’s review still reads the first step’s words').not.toContain('since its step began');
@@ -778,9 +781,12 @@ describe('⭐⭐ package N — D11: the declared reviews at sign-off are shown t
 		expect(lines, 'arrangement: the declared review shows its work on one line').toHaveLength(1);
 		return (JSON.parse(lines[0]!) as { workProducts: { workUnit: string; workRerun?: unknown }[] }).workProducts.map((w) => [w.workUnit, w.workRerun]);
 	};
-	/** ⭐ D28 — the clause a declared subject gains when a unit of its work is marked, restated byte for byte. */
+	/**
+	 * ⭐ D28 — the clause a declared subject gains when a unit of its work is marked, restated byte for byte. ⛔ MOVED 2026-10-26
+	 * (package O-2's check, finding 1): ~~", so a file an earlier step changed is among them,"~~ — "can be among them".
+	 */
 	const RERUN_CLAUSE =
-		'with the exit the host recorded; and a work product marked "workRerun" was made by a step that re-ran its unit’s work: that unit’s "files" are counted from its first step, so a file an earlier step changed is among them, and its "sequence" is that step’s alone:';
+		'with the exit the host recorded; and a work product marked "workRerun" was made by a step that re-ran its unit’s work: that unit’s "files" are counted from its first step, so a file an earlier step changed can be among them, and its "sequence" is that step’s alone:';
 
 	it('⭐ package O-2 (D28) — a unit signed off after its WORK RE-RUN: its declared review reads the view back marked, so the unit’s work product carries the mark and the subject says what it means', async () => {
 		const pwuId = await declaringModelUnit();
@@ -1053,5 +1059,91 @@ describe('⭐⭐ package O’s check — the re-review reads the REFUSED try’s
 		const reReview = seam.prompts.find(isWorkProductReview);
 		expect(reReview, 'the re-review was not shown the LAST try’s view').toContain('as the host read them after try 2.');
 		expect(reReview, 'the re-review was not shown the file the refused try wrote').toContain('Added "docs/b.md":');
+	});
+});
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7, package O-2's check, finding 2 (design D28, revision 4; `REG-D-137`) — THE RE-REVIEW OF A WORK RE-RUN'S
+// REFUSED TRY ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+// ⛔ The re-review is a production path for the re-run's words: it reads the refused try's view back from the record (RD7) and hands
+// its deliverable to the work product's builder (`rerunReview`'s `{ deliverable: view.deliverable }`), so the mark reaches the prompt
+// only because the recorded view is passed on whole. No case ran a work re-run and then re-reviewed it, so a re-review that rebuilt
+// the deliverable from its parts, the mark dropped, reddened nothing the check ran (89 of 89 passed).
+describe('⭐⭐ package O-2’s check, finding 2 — the re-review of a WORK RE-RUN’s refused try reads the re-run’s words; a first step’s re-review reads today’s', () => {
+	/** ⭐ D28 — a work re-run's subject, from its files to its sequence, restated byte for byte. */
+	const RERUN_SUBJECT_FILES =
+		"then the files the unit changed in its workspace since its first step began, as the host read them after this step's last try — so a file an earlier step changed can be among them — then this step's writes and runs in the host's order, which are this step's alone.";
+	/** ⭐ D28 — a work re-run's heading over its files, after try `n` of its step, restated byte for byte. */
+	const rerunHeading = (n: number): string =>
+		`The files the unit changed in its workspace since its first step began, as the host read them after try ${n} of this step — so a file an earlier step changed can be among them, and the writes and runs below are this step's alone. Each path, as JSON, and what changed are the host's record; each file's text, between fence lines, is the file's own:`;
+	/** ⛔ A first step's subject, from its files to its sequence, and its heading, byte for byte as today. */
+	const FIRST_STEP_SUBJECT_FILES =
+		"then the files the unit changed in its workspace since its step began, as the host read them after its last try, then the step's writes and runs in the host's order.";
+	const firstStepHeading = (n: number): string =>
+		`The files the unit changed in its workspace since its step began, as the host read them after try ${n}. Each path, as JSON, and what changed are the host's record; each file's text, between fence lines, is the file's own:`;
+	/** The words only a re-run's prompt holds. */
+	const RERUN_WORDS = ['since its first step began', 'an earlier step changed', "this step's alone", 'in a step that re-runs its work'] as const;
+	const rerunReview = async (pwuId: string) =>
+		(await actions.rerunReview(
+			actionEvent('rerunReview', { pwuId, rationale: 'The reviewer failed at the transport; review it again.' }) as never
+		)) as { advanced?: string; data?: { error?: string } };
+
+	it('⭐ a work re-run whose try inherits a file and is REFUSED, then re-reviewed: the re-review reads the recorded view back marked — the re-run’s subject and heading, no first step’s word', async () => {
+		const pwuId = await modelWorkUnit();
+		seam.script = (turn) =>
+			turn === 1
+				? { acts: [write('docs/required.md', '# Required\n')], account: 'Wrote the required document.' }
+				: { acts: [run(['node', '--test'], '1 passed\n')], account: 'The required document is in place; this step ran the check.' };
+		// Every work product's review fails at the transport until the re-review — the first step's, then its work re-run's: neither
+		// concludes, so the unit waits after each, and a re-review of the re-run's refused try is offered (RD3).
+		let down = true;
+		seam.review = (p) => {
+			if (down && isWorkProductReview(p)) throw new Error('devin exited with code 1: connection reset by peer');
+			return undefined;
+		};
+		expect((await beginExecute(pwuId)).data?.error, 'arrangement: the first step’s review concluded').toMatch(/VALIDATOR_EXECUTION_FAILED/);
+		const rerun = (await actions.rerunWork(
+			actionEvent('rerunWork', { pwuId, rationale: 'The reviewer failed at the transport; run the work again.' }) as never
+		)) as { advanced?: string; data?: { error?: string } };
+		expect(rerun.data?.error, 'arrangement: the work re-run’s review concluded').toMatch(/VALIDATOR_EXECUTION_FAILED/);
+		expect(seam.prompts.filter(isWorkProductReview).at(-1), 'arrangement: the work re-run’s refused try was not told the re-run’s words').toContain(
+			RERUN_SUBJECT_FILES
+		);
+		down = false;
+		seam.prompts.length = 0;
+
+		const reReviewed = await rerunReview(pwuId);
+
+		expect([reReviewed.advanced, reReviewed.data?.error], 'arrangement: the re-review').toEqual(['review-rerun', undefined]);
+		const reReview = seam.prompts.find(isWorkProductReview);
+		expect(reReview, 'arrangement: the re-review was not shown the file the unit’s first step wrote').toContain('Added "docs/required.md":');
+		expect(reReview, 'the re-review of a work re-run’s try is not told its files are counted from the unit’s first step').toContain(
+			RERUN_SUBJECT_FILES
+		);
+		expect(reReview!.split('\n'), 'the re-review of a work re-run’s try does not read the re-run’s heading over its files').toContain(
+			rerunHeading(1)
+		);
+		expect(reReview, 'the re-review of a work re-run’s try reads a first step’s words').not.toContain('since its step began');
+	});
+
+	it('⭑ CONTROL — a FIRST step’s try refused and re-reviewed: the re-review reads today’s subject and heading, and none of the re-run’s words', async () => {
+		const pwuId = await modelWorkUnit();
+		seam.script = () => ({ acts: [write('docs/required.md', '# Required\n')], account: 'Wrote the required document.' });
+		let down = true;
+		seam.review = (p) => {
+			if (down && isWorkProductReview(p)) throw new Error('devin exited with code 1: connection reset by peer');
+			return undefined;
+		};
+		expect((await beginExecute(pwuId)).data?.error, 'arrangement: the first step’s review concluded').toMatch(/VALIDATOR_EXECUTION_FAILED/);
+		down = false;
+		seam.prompts.length = 0;
+
+		const reReviewed = await rerunReview(pwuId);
+
+		expect([reReviewed.advanced, reReviewed.data?.error], 'arrangement: the re-review').toEqual(['review-rerun', undefined]);
+		const reReview = seam.prompts.find(isWorkProductReview);
+		expect(reReview, 'arrangement: the re-review was not shown the file the first step wrote').toContain('Added "docs/required.md":');
+		expect(reReview, 'a first step’s re-review moved from today’s subject').toContain(FIRST_STEP_SUBJECT_FILES);
+		expect(reReview!.split('\n'), 'a first step’s re-review moved from today’s heading').toContain(firstStepHeading(1));
+		for (const words of RERUN_WORDS) expect(reReview, `a first step’s re-review reads the re-run’s words: ${words}`).not.toContain(words);
 	});
 });

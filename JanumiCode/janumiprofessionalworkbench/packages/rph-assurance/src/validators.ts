@@ -318,9 +318,10 @@ export interface Deliverable {
 	/**
 	 * ⭐⭐ `JAN-EXEC` Phase 7, package O-2 — D28 (`REG-D-137`; `REG-F-583`; design D28, revision 4) — A WORK RE-RUN'S VIEW: its
 	 * step counts `files` from an EARLIER step's baseline, the unit's first (package O's D22), so a file an earlier step changed
-	 * is among them, while `sequence` is this step's alone. The work-product review then says so, and so does a declared review
-	 * whose work holds it (`reasoning-review-validator.ts`). ⛔ ABSENT on a unit's first step — never `false` — so a first step's
-	 * view, every view recorded before package O-2, and every case read as before, byte for byte.
+	 * ~~is~~ ⭐ can be among them (package O-2's check, finding 1: a marked view can list none, and the host cannot tell which listed
+	 * file an earlier step changed), while `sequence` is this step's alone. The work-product review then says so, and so does a
+	 * declared review whose work holds it (`reasoning-review-validator.ts`). ⛔ ABSENT on a unit's first step — never `false` — so a
+	 * first step's view, every view recorded before package O-2, and every case read as before, byte for byte.
 	 */
 	readonly workRerun?: true;
 }

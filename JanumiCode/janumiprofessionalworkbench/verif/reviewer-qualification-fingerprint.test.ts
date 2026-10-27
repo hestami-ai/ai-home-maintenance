@@ -885,10 +885,14 @@ describe('JAN-CRITREAD J2-3 — the probe set reaches every branch of prompt ass
 	 * change to any of those words moved no fingerprint. ⭑ And every other probe is a first step's: none reads a re-run's words.
 	 */
 	it('⭐⭐ package O-2 (D28) — each re-run branch is taken by its own probe, and every other probe reads none of a re-run’s words', () => {
+		// ⛔ MOVED 2026-10-26 (package O-2's check, finding 1): ~~"of this step — so a file an earlier step changed is among them, and
+		// the writes and runs below are this step's alone. Each path"~~ — an earlier step's file CAN be among them, the one sentence
+		// true of every marked view; ⭐ and the probe that lists no file is held to that word in its subject, the case the finding named.
 		const branches: readonly (readonly [probe: string, needle: string])[] = [
 			['W-RERUN-DELIVERABLE', "in a step that re-runs its work: the agent's answer, then the files the unit changed in its workspace since its first step began"],
-			['W-RERUN-DELIVERABLE', "of this step — so a file an earlier step changed is among them, and the writes and runs below are this step's alone. Each path"],
+			['W-RERUN-DELIVERABLE', "of this step — so a file an earlier step changed can be among them, and the writes and runs below are this step's alone. Each path"],
 			['W-RERUN-NO-FILE', "in a step that re-runs its work: the agent's answer, then the files the unit changed in its workspace since its first step began"],
+			['W-RERUN-NO-FILE', "as the host read them after this step's last try — so a file an earlier step changed can be among them — then this step's writes"],
 			['W-RERUN-NO-FILE', "The unit changed no file in its workspace since its first step began, as the host read it after try 2 of this step; the writes and runs below are this step's alone."],
 			['D-RERUN-DELIVERABLE', '"workRerun":true'],
 			['D-RERUN-DELIVERABLE', '; and a work product marked "workRerun" was made by a step that re-ran its unit’s work: that unit’s "files" are counted from its first step']

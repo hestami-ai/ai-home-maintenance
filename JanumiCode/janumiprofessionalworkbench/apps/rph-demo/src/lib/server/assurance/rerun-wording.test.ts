@@ -4,8 +4,9 @@
 // ⭑ WHAT MUST HOLD, read off the prompt the real validator sends at its print seam (the stub answers every criterion met):
 //   · a work-product review whose deliverable is marked a work re-run (`Deliverable.workRerun`: its files are counted from an
 //     EARLIER step's baseline, the unit's first) says, in its subject and in its changed-files heading, that the files are
-//     counted from the unit's first step, that a file an earlier step changed is among them, and that the sequence shown is
-//     this step's alone — and, with no file changed, "since its first step began";
+//     counted from the unit's first step, that a file an earlier step changed ~~is~~ ⭐ CAN BE among them (package O-2's check,
+//     finding 1, below), and that the sequence shown is this step's alone — and, with no file changed, "since its first step
+//     began";
 //   · a declared review whose work holds a unit so marked shows the mark on that unit's work product, and its subject gains one
 //     clause saying what the mark means — only then;
 //   · ⛔ UNMARKED, EACH PROMPT IS TODAY'S, BYTE FOR BYTE (every confirmed case of v12 is a first step's): each control below
@@ -48,15 +49,22 @@ async function promptOf(input: ReasoningReviewInput): Promise<string> {
 /** ⛔ TODAY'S SUBJECT, BYTE FOR BYTE (`WORK_PRODUCT_DELIVERABLE_SUBJECT`) — a first step's, which D28 leaves as it is. */
 const FIRST_STEP_SUBJECT =
 	"The WORK PRODUCT to review — what a professional work unit produced by running the instruction above: the agent's answer, then the files the unit changed in its workspace since its step began, as the host read them after its last try, then the step's writes and runs in the host's order. Judge each criterion below — whether the obligation the instruction delegates is discharged, whether any of it is dropped, whether its scope is narrowed, among them — against this whole deliverable: the files as they now stand, never as an earlier command read them. The answer:";
-/** ⭐ D28 — A WORK RE-RUN'S SUBJECT: the files counted from the unit's first step, an earlier step's among them, the sequence this step's alone. */
+/**
+ * ⭐ D28 — A WORK RE-RUN'S SUBJECT: the files counted from the unit's first step, ~~an earlier step's among them~~ ⭐ an earlier
+ * step's CAN be among them, the sequence this step's alone. ⛔ MOVED 2026-10-26 (package O-2's check, finding 1): ~~"— so a file an
+ * earlier step changed is among them —"~~, false of a marked view that lists no file, or whose every file this step changed.
+ */
 const RERUN_SUBJECT =
-	"The WORK PRODUCT to review — what a professional work unit produced by running the instruction above, in a step that re-runs its work: the agent's answer, then the files the unit changed in its workspace since its first step began, as the host read them after this step's last try — so a file an earlier step changed is among them — then this step's writes and runs in the host's order, which are this step's alone. Judge each criterion below — whether the obligation the instruction delegates is discharged, whether any of it is dropped, whether its scope is narrowed, among them — against this whole deliverable: the files as they now stand, never as an earlier command read them. The answer:";
+	"The WORK PRODUCT to review — what a professional work unit produced by running the instruction above, in a step that re-runs its work: the agent's answer, then the files the unit changed in its workspace since its first step began, as the host read them after this step's last try — so a file an earlier step changed can be among them — then this step's writes and runs in the host's order, which are this step's alone. Judge each criterion below — whether the obligation the instruction delegates is discharged, whether any of it is dropped, whether its scope is narrowed, among them — against this whole deliverable: the files as they now stand, never as an earlier command read them. The answer:";
 /** ⛔ Today's changed-files heading, byte for byte (`deliverableHeading`), after try `n`. */
 const firstStepHeading = (n: number): string =>
 	`The files the unit changed in its workspace since its step began, as the host read them after try ${n}. Each path, as JSON, and what changed are the host's record; each file's text, between fence lines, is the file's own:`;
-/** ⭐ D28 — a work re-run's changed-files heading, after try `n` of this step. */
+/**
+ * ⭐ D28 — a work re-run's changed-files heading, after try `n` of this step. ⛔ MOVED 2026-10-26 (package O-2's check, finding 1):
+ * ~~"— so a file an earlier step changed is among them,"~~, false of a marked view whose every file this step changed.
+ */
 const rerunHeading = (n: number): string =>
-	`The files the unit changed in its workspace since its first step began, as the host read them after try ${n} of this step — so a file an earlier step changed is among them, and the writes and runs below are this step's alone. Each path, as JSON, and what changed are the host's record; each file's text, between fence lines, is the file's own:`;
+	`The files the unit changed in its workspace since its first step began, as the host read them after try ${n} of this step — so a file an earlier step changed can be among them, and the writes and runs below are this step's alone. Each path, as JSON, and what changed are the host's record; each file's text, between fence lines, is the file's own:`;
 /** ⛔ Today's line for a view in which no file changed, byte for byte. */
 const firstStepNoFile = (n: number): string =>
 	`The unit changed no file in its workspace since its step began, as the host read it after try ${n}.`;
@@ -156,9 +164,13 @@ const POLICY = {
 };
 /** ⛔ The end of today's declared subject, byte for byte: the files' description closes on the exit, then the colon. */
 const FIRST_STEP_SUBJECT_END = 'and the path written or the command run with the exit the host recorded:';
-/** ⭐ D28 — the clause a declared subject gains when some unit of its work is marked a work re-run, before its colon. */
+/**
+ * ⭐ D28 — the clause a declared subject gains when some unit of its work is marked a work re-run, before its colon. ⛔ MOVED
+ * 2026-10-26 (package O-2's check, finding 1): ~~", so a file an earlier step changed is among them,"~~, false of a marked unit
+ * that changed no file, or whose every file its re-run changed.
+ */
 const RERUN_CLAUSE =
-	'; and a work product marked "workRerun" was made by a step that re-ran its unit’s work: that unit’s "files" are counted from its first step, so a file an earlier step changed is among them, and its "sequence" is that step’s alone';
+	'; and a work product marked "workRerun" was made by a step that re-ran its unit’s work: that unit’s "files" are counted from its first step, so a file an earlier step changed can be among them, and its "sequence" is that step’s alone';
 /** ⭐ D28 — the mark, on the marked unit's work product, as the work's line of JSON carries it. */
 const MARK = ',"workRerun":true';
 
@@ -227,5 +239,50 @@ describe('⭐⭐ package O-2 — D28: a declared review marks a work re-run’s 
 		]);
 		expect(p, 'the cut work’s subject does not say what the mark means').toContain(`with the exit the host recorded${RERUN_CLAUSE}:`);
 		expect(p.length, 'the prompt passed its budget').toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.PROMPT_BUDGET);
+	});
+});
+
+// ── ⛔ package O-2's check, finding 1 (2026-10-26) — A MARKED VIEW IS NEVER TOLD THAT A FILE AN EARLIER STEP CHANGED *IS* AMONG ITS FILES ──
+// The mark says where a view's files are counted FROM — the unit's first step — never which step changed which of them: the host
+// keeps that baseline's hashes alone, and a re-run takes no manifest at its own start (`unitBaselineOf`), so it cannot know
+// whether an earlier step changed any file the view lists. ⛔ The re-run's words said one IS among them, whatever the record held:
+// a marked view listing no file read "— so a file an earlier step changed is among them —" above "The unit changed no file in its
+// workspace since its first step began", the host's record contradicting itself in front of the reviewer (`REG-F-583`'s class),
+// and a view whose every file this step wrote was told an earlier step's was among them. ⭑ A unit that changes no file is
+// production's common shape: 13 of v12's 24 W12 cases and 10 of its 14 D12 cases change none.
+describe('⛔ package O-2’s check, finding 1 — a marked view is told a file an earlier step changed CAN be among its files, never that one IS', () => {
+	/** The words that say an earlier step's file stands in the list, whatever the record holds. */
+	const IS_AMONG = 'an earlier step changed is among them';
+	/** A re-run's view whose one file THIS step wrote: no earlier step changed a file it lists. */
+	const OWN_FILE: Deliverable = {
+		afterTry: 1,
+		files: [{ path: 'docs/required.md', change: 'ADDED', content: '# Required\nR1. Count each word.\n' }],
+		sequence: { acts: [{ try: 1, ordinal: 1, kind: 'WRITE', path: 'docs/required.md' }], droppedRuns: 0, recordedLimit: 32 }
+	};
+
+	it('⛔ a marked view that lists NO file: its subject says an earlier step’s file can be among them, above the line that none changed', async () => {
+		const p = await promptOf(workProduct({ ...NO_FILE, workRerun: true }));
+		expect(p, 'a marked view listing no file is told a file an earlier step changed is among them').not.toContain(IS_AMONG);
+		expect(p, 'arrangement: the subject is the re-run’s').toContain(RERUN_SUBJECT);
+		expect(p.split('\n'), 'arrangement: the line for no file changed').toContain(rerunNoFile(2));
+	});
+
+	it('⛔ a marked view whose every file THIS step wrote: neither its subject nor its heading says an earlier step’s file is among them', async () => {
+		const p = await promptOf(workProduct({ ...OWN_FILE, workRerun: true }));
+		expect(p, 'a marked view whose every file this step wrote is told a file an earlier step changed is among them').not.toContain(IS_AMONG);
+		expect(p, 'arrangement: the subject is the re-run’s').toContain(RERUN_SUBJECT);
+		expect(p.split('\n'), 'arrangement: the heading is the re-run’s').toContain(rerunHeading(1));
+		expect(p, 'arrangement: this step’s sequence holds the write of the one file it lists').toContain('Try 1:\n  1. wrote "docs/required.md"');
+	});
+
+	it('⛔ a declared work whose marked unit changed NO file: the clause says an earlier step’s file can be among that unit’s, never that one is', async () => {
+		const p = await promptOf(declared(['Design']));
+		expect(productsShown(p), 'arrangement: the unit that changed no file is the marked one').toEqual([
+			['Requirements', undefined],
+			['Design', true]
+		]);
+		expect(p, 'arrangement: the marked unit changed no file').not.toContain('"workUnit":"Design","path"');
+		expect(p, 'a marked unit that changed no file is told a file an earlier step changed is among its files').not.toContain(IS_AMONG);
+		expect(p, 'arrangement: the subject says what the mark means').toContain(`with the exit the host recorded${RERUN_CLAUSE}:`);
 	});
 });
