@@ -877,6 +877,49 @@ describe('JAN-CRITREAD J2-3 — the probe set reaches every branch of prompt ass
 		expect(/^NO-CRITERIA —\s+([a-z]+(?:-[a-z]+)?)/.exec(text.slice(close))?.[1], 'and states their number').toBe(numberWord(FINGERPRINT_PROBES.length));
 	});
 
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package O-2 — D28 (`REG-D-137`; `REG-F-583`; design D28, revision 4: *"New probes exercise each re-run
+	 * branch, moving the reviewer fingerprint without changing a confirmed case prompt"*) — EACH RE-RUN BRANCH IS TAKEN BY ITS OWN
+	 * PROBE, AND BY NO OTHER: a work re-run's subject and its heading over an inherited file (`W-RERUN-DELIVERABLE`), its line for
+	 * no file changed (`W-RERUN-NO-FILE`), and a declared work's mark with its clause (`D-RERUN-DELIVERABLE`). ⛔ Without them a
+	 * change to any of those words moved no fingerprint. ⭑ And every other probe is a first step's: none reads a re-run's words.
+	 */
+	it('⭐⭐ package O-2 (D28) — each re-run branch is taken by its own probe, and every other probe reads none of a re-run’s words', () => {
+		const branches: readonly (readonly [probe: string, needle: string])[] = [
+			['W-RERUN-DELIVERABLE', "in a step that re-runs its work: the agent's answer, then the files the unit changed in its workspace since its first step began"],
+			['W-RERUN-DELIVERABLE', "of this step — so a file an earlier step changed is among them, and the writes and runs below are this step's alone. Each path"],
+			['W-RERUN-NO-FILE', "in a step that re-runs its work: the agent's answer, then the files the unit changed in its workspace since its first step began"],
+			['W-RERUN-NO-FILE', "The unit changed no file in its workspace since its first step began, as the host read it after try 2 of this step; the writes and runs below are this step's alone."],
+			['D-RERUN-DELIVERABLE', '"workRerun":true'],
+			['D-RERUN-DELIVERABLE', '; and a work product marked "workRerun" was made by a step that re-ran its unit’s work: that unit’s "files" are counted from its first step']
+		];
+		for (const [probe, needle] of branches) expect(prompt(probe), `${probe} does not take its re-run branch: ${needle}`).toContain(needle);
+		const reruns = new Set(branches.map(([probe]) => probe));
+		const firstSteps = FINGERPRINT_PROBES.map((p) => p.id).filter((id) => !reruns.has(id));
+		expect(
+			firstSteps.filter((id) => ['since its first step began', 'an earlier step changed', 'workRerun'].some((w) => prompt(id).includes(w))),
+			'a first step’s probe reads a re-run’s words'
+		).toEqual([]);
+	});
+
+	/**
+	 * ⭑ CONTROL (package O-2, D28) — BESIDE THEM, THE FIRST STEP'S BYTES: package N's five finished-work probes, each a first step's,
+	 * hash for hash as they were before D28 (measured 2026-10-26 at the merge of design revision 4, `98e24cec`, before any O-2 code).
+	 * ⛔ A re-run's branch that leaked into a first step's prompt moves one of these, though no word of a re-run's is named above.
+	 */
+	it('⭑ CONTROL (D28) — package N’s five finished-work probes, each a first step’s, read as they did before D28, hash for hash', () => {
+		expect(
+			['W-DELIVERABLE', 'W-OVERSIZE-DELIVERABLE', 'W-OVERSIZE-FILE-LIST', 'D-DELIVERABLE', 'D-OVERSIZE-DELIVERABLE'].map((id) => [id, sha256(prompt(id))]),
+			'a first step’s finished-work probe moved'
+		).toEqual([
+			['W-DELIVERABLE', '3ea214bb2f39c659d8a0ffeeccf983511e48f1636c11937d788e8b9d61375d65'],
+			['W-OVERSIZE-DELIVERABLE', '71e91d694f95ca3564df98f22703ec94adb846521473a42b3f2e7f72de76438a'],
+			['W-OVERSIZE-FILE-LIST', 'a6261a4f894573b96c37b1b6f68a225fd72afe0c289968e8a6f95b56ada9b9af'],
+			['D-DELIVERABLE', 'b5670f4a303c9f73d62b00abdf3286c2350dca6e5c7a33b417407cc20cb48d06'],
+			['D-OVERSIZE-DELIVERABLE', 'b86d78d94b4edae846d12000c5972641f136c9834c1f780f66923d1d1cc7499c']
+		]);
+	});
+
 	it('⭐ every framing, every observation kind and its absent report, the rationale both ways, narration, prior gaps, the subject hash', () => {
 		expect(BASE.probePrompts.size).toBe(FINGERPRINT_PROBES.length);
 		for (const needle of [

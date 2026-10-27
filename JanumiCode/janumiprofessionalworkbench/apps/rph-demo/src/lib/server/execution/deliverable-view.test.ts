@@ -250,3 +250,49 @@ describe('⭐⭐ package O — D22: the unit’s FIRST step’s baseline, record
 		);
 	});
 });
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7, package O-2 — D28 (design revision 4; `REG-D-137`; `REG-F-583`) — THE STEP A UNIT'S BASELINE WAS TAKEN BY ──────
+// D22 counts a work re-run's files from the unit's FIRST step's baseline, while its sequence is the re-run's alone, so the view
+// must say which it is: the baseline names the step that took it (`takenBy`, its record's own `stepId`), and a step's view is a
+// work re-run's exactly when that step is not this one (the try loop, `+page.server.ts`).
+describe('⭐⭐ package O-2 — D28: the unit’s baseline names the step that took it — the unit’s first — for every later step to read', () => {
+	const STEP_1 = { pwuId: 'pwu_1', stepId: 'step_1', attemptKey: 'step_1#1' } as const;
+	const STEP_2 = { pwuId: 'pwu_1', stepId: 'step_2', attemptKey: 'step_2#1' } as const;
+
+	it('⭐ THE PREDICTED RED — the first step’s baseline is taken by that step; a later step’s, read back, is still the FIRST step’s, never its own', async () => {
+		const store = createInMemoryArtifactStore();
+		const ws = workspace();
+		await ws.writeFile('README.md', '# before\n');
+		const first = await unitBaselineOf(store, 'tnt-t', STEP_1, ws);
+		expect(first.takenBy, 'the first step’s baseline does not name the step that took it').toBe('step_1');
+		await ws.writeFile('docs/required.md', '# Required\n');
+		const later = await unitBaselineOf(store, 'tnt-t', STEP_2, ws);
+		expect(later.takenBy, 'a later step’s baseline does not name the unit’s first step').toBe('step_1');
+		// ⭑ And it is still D22's baseline: the paths the first step found, so the refused attempt's file stays a change.
+		expect([...later.keys()]).toEqual(['README.md']);
+	});
+
+	it('⭐ another attempt of the SAME step reads back that step’s baseline: the step that took it is this one, so no earlier step’s', async () => {
+		const store = createInMemoryArtifactStore();
+		const ws = workspace();
+		await unitBaselineOf(store, 'tnt-t', STEP_1, ws);
+		const again = await unitBaselineOf(store, 'tnt-t', { ...STEP_1, attemptKey: 'step_1#2' }, ws);
+		expect(again.takenBy, 'a second attempt of the first step was told another step took its baseline').toBe('step_1');
+	});
+
+	it('⛔ a bound baseline whose record names no step that took it is REFUSED, in its own words — never read as this step’s, nor as an earlier one’s', async () => {
+		// Bytes that hash true and carry this unit's tag and id, but no step: the host's own writer always names one, so these are
+		// not a baseline the host recorded.
+		const store = createInMemoryArtifactStore();
+		const stepless = await store.put({
+			tenantPrefix: 'tnt-t',
+			bytes: JSON.stringify({ schema: DELIVERABLE_BASELINE_SCHEMA, pwuId: 'pwu_1', attemptKey: 'step_1#1', files: [] }),
+			mediaType: 'application/json',
+			purgeability: 'RETAINED_BY_PARTICIPATION'
+		});
+		expect((await store.bindName(baselineNameOf('tnt-t', 'pwu_1'), stepless.storageKey)).bound, 'arrangement: the name bound').toBe(true);
+		await expect(unitBaselineOf(store, 'tnt-t', STEP_2, workspace())).rejects.toThrow(
+			`the baseline of work unit pwu_1 at '${stepless.storageKey}' names no step that took it.`
+		);
+	});
+});

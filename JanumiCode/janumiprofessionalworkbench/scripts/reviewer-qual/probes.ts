@@ -1145,6 +1145,23 @@ const FILE_LIST_DELIVERABLE: Deliverable = {
 	files: Array.from({ length: 400 }, (_, i) => ({ path: `survey/p${String(i).padStart(3, '0')}.md`, change: 'ADDED' as const, content: '# P\n' })),
 	sequence: { acts: [], droppedRuns: 0, recordedLimit: 32 }
 };
+/** ⭐ Package O-2 — D28 — the report an earlier, refused attempt wrote, which a work re-run's view counts from the unit's first step. */
+const INHERITED_REPORT = { path: 'survey/report.md', change: 'ADDED' as const, content: '# Survey\nPanels 4 and 9 bulge; weep holes blocked at 7.\n' };
+/** ⭐ Package O-2 — D28 — the one act of that re-run's step: a run of the checks, which writes nothing. */
+const RERUN_CHECKS = { try: 1, ordinal: 1, kind: 'RUN' as const, argv: ['python', '-m', 'pytest', 'survey/checks/'], exitCode: 0, timedOut: false };
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package O-2 — D28 (`REG-D-137`; `REG-F-583`) — A WORK RE-RUN'S FINISHED WORK (`workRerun`): its files
+ * counted from the unit's first step's baseline (package O's D22), the report an earlier, refused attempt wrote among them, while
+ * this step's sequence — a run of the checks — holds no write of it. Nothing cut, and no fence candidate planted.
+ */
+const RERUN_DELIVERABLE: Deliverable = {
+	afterTry: 1,
+	files: [INHERITED_REPORT],
+	sequence: { acts: [RERUN_CHECKS], droppedRuns: 0, recordedLimit: 32 },
+	workRerun: true
+};
+/** ⭐ Package O-2 — D28 — a work re-run's view in which no file changed, after its second try, its sequence holding no act. */
+const RERUN_NO_FILE_DELIVERABLE: Deliverable = { afterTry: 2, files: [], sequence: { acts: [], droppedRuns: 0, recordedLimit: 32 }, workRerun: true };
 
 /**
  * ⭐ THE PROBE SET, in a fixed order — the order, like each prompt, is part of what is hashed (`probes` hashes the list of
@@ -1154,7 +1171,7 @@ const FILE_LIST_DELIVERABLE: Deliverable = {
  * T-ABSENT-FIELDS, ⭐ (D3a) T-DECLARED-POLICIES, T-APPLICABLE-POLICIES, T-SEEDED-LIBRARY, T-SUBJECT-REFUSED, T-OVERSIZE-ALL,
  * T-OVERSIZE-FENCES, T-OVERSIZE-LISTS, T-NO-FENCE, T-STAKES, T-ACCOUNT-BREAKS; W-BARE, W-DECLARED-PRIOR, W-OVERSIZE-CONTENT,
  * W-OVERSIZE-ALL, W-OVERSIZE-EDGES, W-FENCES, W-OVERSIZE-LISTS, W-NO-FENCE, W-STAKES, W-ACCOUNT-BREAKS, ⭐ (package N)
- * W-DELIVERABLE, W-OVERSIZE-DELIVERABLE, W-OVERSIZE-FILE-LIST; P-CLEAN,
+ * W-DELIVERABLE, W-OVERSIZE-DELIVERABLE, W-OVERSIZE-FILE-LIST, ⭐ (package O-2) W-RERUN-DELIVERABLE, W-RERUN-NO-FILE; P-CLEAN,
  * P-SIGNAL, P-TIMED-OUT, P-INCOMPLETE-CAPTURE, P-STDOUT-CAPTURE-CUT, P-STDERR-CAPTURE-CUT, P-OVERSIZE-CONTENT,
  * P-OVERSIZE-COMMAND, P-OVERSIZE-SURROGATE, P-OVERSIZE-ROOM-EDGES, P-OVERSIZE-STREAMS, P-OVERSIZE-AT-ITS-BUDGET,
  * P-OVERSIZE-FENCES, P-OVERSIZE-LISTS, P-FENCE-AT-THE-LAST, P-NO-FENCE, P-PRODUCTION, P-ABSENT-REPORT,
@@ -1165,10 +1182,11 @@ const FILE_LIST_DELIVERABLE: Deliverable = {
  * D-pol_constraint_propagation, D-pol_architecture_coverage, D-pol_historical_consistency, D-pol_intent_preservation,
  * D-pol_test_adequacy, D-pol_fitness_for_purpose, D-pol_baseline_promotion (one per catalog policy, in the catalog's
  * order), D-ROOT, D-OVERSIZE-CONTENT, D-ROOT-UNITS-WITHOUT-WORK, D-OVERSIZE-UNITS, D-OVERSIZE-UNIT-TITLE, ⭐ (package N)
- * D-DELIVERABLE, D-OVERSIZE-DELIVERABLE; NO-CRITERIA —
+ * D-DELIVERABLE, D-OVERSIZE-DELIVERABLE, ⭐ (package O-2) D-RERUN-DELIVERABLE; NO-CRITERIA —
  * ~~forty-seven~~ ~~sixty-six (B7's check: twelve T-, ten W-, twenty-six P-, seventeen D- and NO-CRITERIA)~~ ~~sixty-nine
- * (D3a: fifteen T-, ten W-, twenty-six P-, seventeen D- and NO-CRITERIA)~~ seventy-six (package N: fifteen T-, thirteen W-,
- * twenty-eight P-, nineteen D- and NO-CRITERIA), every process-result one `P-`-prefixed.
+ * (D3a: fifteen T-, ten W-, twenty-six P-, seventeen D- and NO-CRITERIA)~~ ~~seventy-six (package N: fifteen T-, thirteen W-,
+ * twenty-eight P-, nineteen D- and NO-CRITERIA)~~ seventy-nine (package O-2, D28: fifteen T-, fifteen W-, twenty-eight P-,
+ * twenty D- and NO-CRITERIA), every process-result one `P-`-prefixed.
  * ~~⭐ Package P F1 (`REG-F-503` remedy 1) — and, after G-ACCOUNT-BREAKS, G-TYPE-DECLARATIONS, G-TYPE-DECLARATIONS-ABSENT and
  * G-OVERSIZE-TYPE-DECLARATIONS.~~ ⭐ B7 — the graph framing's probes left the fingerprint with case set v8; NO-CRITERIA is a
  * part's now.
@@ -1472,6 +1490,23 @@ export const FINGERPRINT_PROBES: readonly FingerprintProbe[] = [
 		covers:
 			'work-product framing shown the finished work over its budget (package N D10): four hundred changed files, too many to show each with room for a declared cut, so the LIST is cut, its cut declared after the heading',
 		input: (criteria) => workProductReviewInput({ criteria, producingPrompt: PRODUCING_PROMPT, answer: ANSWER, rationale: RATIONALE, deliverable: FILE_LIST_DELIVERABLE })
+	},
+	// ── ⭐⭐ `JAN-EXEC` Phase 7, package O-2 — D28 (`REG-D-137`; `REG-F-583`) — A WORK RE-RUN'S WORDING ──────────────────────────────
+	// ⛔ Without these, no probe reached a work re-run's subject, its heading over a file it inherited, or its line for no file
+	// changed, so a change to any of them moved no fingerprint. Each is built through the product's builder; every other probe is a
+	// first step's, and reads none of their words.
+	{
+		id: 'W-RERUN-DELIVERABLE',
+		covers:
+			'work-product framing shown a WORK RE-RUN’s finished work (package O-2 D28): its files counted from the unit’s first step — an added report an earlier step wrote, of which this step’s sequence, one run of the checks, holds no write — its subject and its heading saying so, and that the sequence is this step’s alone; nothing cut',
+		input: (criteria) => workProductReviewInput({ criteria, producingPrompt: PRODUCING_PROMPT, answer: ANSWER, rationale: RATIONALE, deliverable: RERUN_DELIVERABLE })
+	},
+	{
+		id: 'W-RERUN-NO-FILE',
+		covers:
+			'work-product framing shown a WORK RE-RUN’s finished work in which no file changed (package O-2 D28): its subject, and its line for no file changed “since its first step began” after its second try, its sequence holding no act',
+		input: (criteria) =>
+			workProductReviewInput({ criteria, producingPrompt: PRODUCING_PROMPT, answer: ANSWER, rationale: RATIONALE, deliverable: RERUN_NO_FILE_DELIVERABLE })
 	},
 	// ── ⭐⭐ the process-result arm, through the builder the process-result floor uses (`JAN-PRQUAL` `PQ-1`, design D3) ──
 	// ~~no builder is factored for it (`REG-D-072` D17), so its input is literal~~ — each probe below is a RUN literal,
@@ -2091,6 +2126,28 @@ export const FINGERPRINT_PROBES: readonly FingerprintProbe[] = [
 					timedOut: false
 				})),
 				rationale: RATIONALE
+			});
+		}
+	},
+	// ── ⭐⭐ `JAN-EXEC` Phase 7, package O-2 — D28 (`REG-D-137`) — THE SIGN-OFF OF A UNIT WHOSE WORK WAS RE-RUN ─────────────────────────
+	{
+		id: 'D-RERUN-DELIVERABLE',
+		covers:
+			'declared-policy framing shown the finished work of a unit whose work was RE-RUN (package O-2 D28): its work product marked "workRerun" on the work’s line beside an unmarked unit’s, its files — an added report an earlier step wrote — and its re-run’s sequence, one run of the checks; and the one clause of the subject saying what the mark means',
+		input: (_criteria, _build, declared = CATALOG_DECLARED_POLICIES) => {
+			const policy = declared[0]!;
+			return declaredPolicyReviewInput({
+				policy: { policyId: policy.policyId, name: policy.name, purpose: policy.purpose },
+				criteria: policy.criteria,
+				instruction: INTENT,
+				instructionIs: 'UNIT_PURPOSE',
+				workProducts: [
+					{ unit: 'Condition Survey', answer: ANSWER, workRerun: true },
+					{ unit: 'Repair Design', answer: 'Rebuild panels 4 and 9; clear the weep holes at 7.' }
+				],
+				commands: [{ unit: 'Condition Survey', argv: RERUN_CHECKS.argv, exitCode: 0, timedOut: false }],
+				files: [{ unit: 'Condition Survey', ...INHERITED_REPORT }],
+				sequence: [{ unit: 'Condition Survey', ...RERUN_CHECKS }]
 			});
 		}
 	},

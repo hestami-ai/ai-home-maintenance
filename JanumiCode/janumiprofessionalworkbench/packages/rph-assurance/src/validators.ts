@@ -200,6 +200,13 @@ export interface ReasoningReviewInput {
 	 */
 	readonly declaredUnitsWithoutDeliverable?: readonly string[];
 	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package O-2 — D28 (`REG-D-137`; `REG-F-583`) — SOME UNIT OF THE WORK IS MARKED A WORK RE-RUN: the work's
+	 * line marks that unit's work product (`"workRerun"`, set by `declaredPolicyReviewInput` from the view recorded at its completion),
+	 * and the subject sentence gains the one clause that says what the mark means. ⛔ READ BY THE `DECLARED_POLICY` FRAMING ONLY;
+	 * absent where no unit is marked, so that subject reads as before, byte for byte.
+	 */
+	readonly declaredWorkRerun?: true;
+	/**
 	 * ⭐ P5 package B (F2) — the host's declaration of the cut its BUILDER made of a declared review's work, one line per
 	 * cut (`declaredPolicyReviewInput`): each unit's part cut to its own share of the budget. The reviewer is shown it before
 	 * the work, as a head-only cut's declaration is, and the content is then never cut again. ⛔ READ BY THE
@@ -308,6 +315,14 @@ export interface Deliverable {
 	readonly afterTry: number;
 	readonly files: readonly DeliverableFile[];
 	readonly sequence: HostSequence;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package O-2 — D28 (`REG-D-137`; `REG-F-583`; design D28, revision 4) — A WORK RE-RUN'S VIEW: its
+	 * step counts `files` from an EARLIER step's baseline, the unit's first (package O's D22), so a file an earlier step changed
+	 * is among them, while `sequence` is this step's alone. The work-product review then says so, and so does a declared review
+	 * whose work holds it (`reasoning-review-validator.ts`). ⛔ ABSENT on a unit's first step — never `false` — so a first step's
+	 * view, every view recorded before package O-2, and every case read as before, byte for byte.
+	 */
+	readonly workRerun?: true;
 }
 export interface ValidatorContext {
 	readonly schemaInvariant?: SchemaInvariantFacts;

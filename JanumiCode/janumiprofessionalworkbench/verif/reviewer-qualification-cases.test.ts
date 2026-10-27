@@ -4067,8 +4067,13 @@ const REVIEWER_FINGERPRINT_V9 = '5ab3d68643bffbbf700c622526b626f47d4c487690e1eb5
  * and the seven new probes reach what package N adds (W-DELIVERABLE, W-OVERSIZE-DELIVERABLE, W-OVERSIZE-FILE-LIST, P-SEQUENCE,
  * P-OVERSIZE-SEQUENCE, D-DELIVERABLE, D-OVERSIZE-DELIVERABLE). The case prompts of the process-result and declared arms move
  * with the framing; still unmeasured — V owes it (case set v12).
+ * ⭐⭐ `JAN-EXEC` Phase 7, package O-2 — D28 (`REG-D-137`; `REG-F-583`; design D28, revision 4) — MOVED AGAIN, DELIBERATELY,
+ * 2026-10-26: ~~'44307c721bd4a512efd07b747e15b72bada679580817b316ff98781d60be18ae'~~ — the probes move, and only they: three new
+ * probes take a work re-run's branches (W-RERUN-DELIVERABLE, W-RERUN-NO-FILE, D-RERUN-DELIVERABLE). No probe prompt of the 76
+ * before them moved, nor any case prompt, nor the budget, criteria, scoring or case-set digest: a unit's first step — every case
+ * — reads as before, byte for byte. Still unmeasured; V owes it, with D29's three re-run cases.
  */
-const REVIEWER_FINGERPRINT_TODAY = '44307c721bd4a512efd07b747e15b72bada679580817b316ff98781d60be18ae';
+const REVIEWER_FINGERPRINT_TODAY = '9c071c11f96daaca5cd8b3accafb88d517c71c1c65125a1909187b382403972a';
 /**
  * ⭐ THE PROTOTYPE'S PROMPTS (`REG-D-131` Q36: *"its prompts must match the checked prototype hash for hash"*) — the sha256 of
  * each of the 19 bridge part cases' first prompt as the lead's in-memory prototype of D3b rendered it through the product's

@@ -193,6 +193,8 @@ export interface WorkProductReviewSource {
 	 * IN ITS WORKSPACE SINCE ITS STEP BEGAN, as the host read them after the try that made this answer (`deliverableAfterTry`,
 	 * `execution/deliverable-view.ts`). ⭑ Production always hands it — none changed is a measurement too; a historical case
 	 * hands none, and is reviewed as before.
+	 * ⭐⭐ Package O-2 — D28 — ~~since its step began~~ since the unit's FIRST step began, on a work re-run (`Deliverable.workRerun`),
+	 * which its review is told; on a first step the two are one, and the review reads as before.
 	 */
 	readonly deliverable?: Deliverable;
 }
@@ -311,6 +313,7 @@ export interface DeclaredReviewCommand {
  * ⭐⭐ `JAN-EXEC` Phase 7, package N — D11 (`REG-D-135` (1), the lead's D11; design D11) — ONE FILE A UNIT CHANGED IN ITS
  * WORKSPACE SINCE ITS STEP BEGAN, as the host recorded it at the unit's completion (`execution/deliverable-view.ts`): its
  * path, what changed, and its text as the host read it — none for a removed file.
+ * ⭐ Package O-2 — D28 — since the unit's FIRST step began where its work product is marked a work re-run's (`workRerun`).
  */
 export interface DeclaredReviewFile {
 	readonly unit: string;
@@ -321,6 +324,16 @@ export interface DeclaredReviewFile {
 
 /** ⭐ Package N — D11 — one act of a unit's step's host sequence, as recorded at its completion, with the unit that made it. */
 export type DeclaredReviewAct = HostSequenceAct & { readonly unit: string };
+
+/**
+ * ⭐ E2 — one work product a declared review judges, with the title of the unit that produced it — ⭐⭐ package O-2 (D28): and
+ * whether that unit's recorded view is a work re-run's (`Deliverable.workRerun`), absent where it is a first step's.
+ */
+export interface DeclaredReviewWorkProduct {
+	readonly unit: string;
+	readonly answer: string;
+	readonly workRerun?: true;
+}
 
 /** ⭐ E2 — what a declared-policy review knows about the work it judges. */
 export interface DeclaredPolicyReviewSource {
@@ -339,8 +352,13 @@ export interface DeclaredPolicyReviewSource {
 	/**
 	 * The work products judged, each with the title of the unit that produced it — the unit's own, or ~~its children's~~ ⭐ R3-A
 	 * F1: for a unit composed of others, its whole subtree's.
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package O-2 — D28 (`REG-D-137`; `REG-F-583`) — and `workRerun`, where the view recorded at that unit's
+	 * completion is a work re-run's (`Deliverable.workRerun`): its files are counted from the unit's first step, and its sequence is
+	 * that step's alone. ⛔ Absent on a unit whose view is a first step's, so every existing input reads as before. ⭑ On the work
+	 * product, the one entry a unit has on the work's line: every unit with a recorded view has one (a model step's completion
+	 * names its work product).
 	 */
-	readonly workProducts: readonly { readonly unit: string; readonly answer: string }[];
+	readonly workProducts: readonly DeclaredReviewWorkProduct[];
 	/** The commands those units ran, as the host recorded them. */
 	readonly commands: readonly DeclaredReviewCommand[];
 	/**
@@ -408,6 +426,9 @@ export function declaredPolicyReviewInput(source: DeclaredPolicyReviewSource): R
 		declaredInstruction: source.instructionIs,
 		...(unitsWithoutWork.length > 0 ? { declaredUnitsWithoutWork: unitsWithoutWork } : {}),
 		...(source.unitsWithoutDeliverable?.length ? { declaredUnitsWithoutDeliverable: source.unitsWithoutDeliverable } : {}),
+		// ⭐⭐ Package O-2 — D28 — and, where some unit's work product is marked a work re-run's, the subject says what the mark
+		// means (`declaredWorkRerun`), counted in the budget below; ⛔ none marked, no key, and the subject reads as before.
+		...(source.workProducts.some((w) => w.workRerun === true) ? { declaredWorkRerun: true as const } : {}),
 		prompt: source.instruction
 	};
 	// ⚠ PASSED UNCONDITIONALLY, as the work-product floor passes it: §9.7 — presence or absence is never a signal.
@@ -431,7 +452,7 @@ export function declaredPolicyReviewInput(source: DeclaredPolicyReviewSource): R
 
 /** ⭐ Package N — what a declared review's line holds: work products and commands, and — when handed — files and acts. */
 interface DeclaredWork {
-	readonly workProducts: readonly { readonly unit: string; readonly answer: string }[];
+	readonly workProducts: readonly DeclaredReviewWorkProduct[];
 	readonly commands: readonly DeclaredReviewCommand[];
 	readonly files?: readonly DeclaredReviewFile[];
 	readonly sequence?: readonly DeclaredReviewAct[];
@@ -450,10 +471,12 @@ const unitsOf = (w: DeclaredWork): string[] => [
 /**
  * A declared review's work as ONE line of JSON: each work product under its unit's title, then each command it ran — ⭐ and,
  * package N (D11), when handed: each file a unit changed, then each act of its step's sequence.
+ * ⭐⭐ Package O-2 — D28 — a work product whose unit's recorded view is a work re-run's carries `"workRerun": true` after its text;
+ * ⛔ an unmarked one carries no such key, so its entry reads as before.
  */
 function workLine(w: DeclaredWork): string {
 	return jsonLine({
-		workProducts: w.workProducts.map((x) => ({ workUnit: x.unit, workProduct: x.answer })),
+		workProducts: w.workProducts.map((x) => ({ workUnit: x.unit, workProduct: x.answer, ...(x.workRerun === true ? { workRerun: true } : {}) })),
 		commands: w.commands.map(commandEntry),
 		...(w.files ? { files: w.files.map(fileEntry) } : {}),
 		...(w.sequence ? { sequence: w.sequence.map(actEntry) } : {})
@@ -571,8 +594,9 @@ function workCutUnitByUnit(work: DeclaredWork, limit: number): { readonly conten
 	const commands: CutList[] = work.commands.map((c) => ({ unit: c.unit, cost: jsonLine(commandEntry(c)).length + 1 }));
 	const acts: CutList[] = sequence.map((a) => ({ unit: a.unit, cost: jsonLine(actEntry(a)).length + 1 }));
 	const textCost = texts.map((t) => encodedLength(t.text));
+	// ⭐ Package O-2 — D28 — each work product's entry whole but its text, so a work re-run's mark is in the frame and the cut line.
 	const frame = workLine({
-		workProducts: work.workProducts.map((w) => ({ unit: w.unit, answer: '' })),
+		workProducts: work.workProducts.map((w) => ({ ...w, answer: '' })),
 		commands: [],
 		...(work.files ? { files: files.map((f) => ({ ...f, content: '' })) } : {}),
 		...(work.sequence ? { sequence: [] } : {})
@@ -642,7 +666,7 @@ function workCutUnitByUnit(work: DeclaredWork, limit: number): { readonly conten
 		const shown = (i: number): string => encodedPrefix(texts[i]!.text, p.allowance[i]!);
 		let next = work.workProducts.length;
 		const content = workLine({
-			workProducts: work.workProducts.map((w, i) => ({ unit: w.unit, answer: shown(i) })),
+			workProducts: work.workProducts.map((w, i) => ({ ...w, answer: shown(i) })),
 			commands: work.commands.filter((_, i) => p.keptCommands.has(i)),
 			...(work.files ? { files: files.map((f) => (f.change === 'REMOVED' ? f : { ...f, content: shown(next++) })) } : {}),
 			...(work.sequence ? { sequence: sequence.filter((_, i) => p.keptActs.has(i)) } : {})

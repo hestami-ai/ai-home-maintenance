@@ -140,13 +140,19 @@ export interface DeliverableViewRecord {
 	readonly try: number;
 	/**
 	 * The files changed since ~~the step began~~ ⭐ the unit's first step began (package O, D22: a work re-run's view counts from the
-	 * unit's baseline, `unitBaselineOf`), and the step's sequence to date (`Deliverable.sequence`). ⚠ The reviewer's prompt still says
-	 * "since its step began" (`reasoning-review-validator.ts`): a reviewer prompt package O does not change.
-	 * ⛔ Package O's check, finding 1 (OPEN, the lead's to decide before V measures; 2026-10-26) — SO THE PROMPT CONTRADICTS ITSELF on a
+	 * unit's baseline, `unitBaselineOf`), and the step's sequence to date (`Deliverable.sequence`). ~~⚠ The reviewer's prompt still says
+	 * "since its step began" (`reasoning-review-validator.ts`): a reviewer prompt package O does not change.~~
+	 * ~~⛔ Package O's check, finding 1 (OPEN, the lead's to decide before V measures; 2026-10-26) — SO THE PROMPT CONTRADICTS ITSELF on a
 	 * work re-run that inherits a file a refused attempt wrote: it lists that file as changed "since its step began", directly above
 	 * the step's sequence, which shows this step wrote nothing — "(none: the host completed no write and no run for the agent in this
 	 * step)". The sentence is in `WORK_PRODUCT_DELIVERABLE_SUBJECT`, `deliverableHeading` and the declared-policy subject; the
-	 * fingerprint's probes carry it (`scripts/reviewer-qual/probes.ts`, `W-DELIVERABLE`), so rewording it moves the fingerprint.
+	 * fingerprint's probes carry it (`scripts/reviewer-qual/probes.ts`, `W-DELIVERABLE`), so rewording it moves the fingerprint.~~
+	 * ⭐⭐ Package O-2 — D28 (2026-10-26; `REG-F-583`, the check's finding 1; the sponsor's `REG-D-137`, Q46) — RESOLVED FOR A RE-RUN
+	 * ONLY: a view whose files are counted from an EARLIER step's baseline is marked (`Deliverable.workRerun`), and its review says the
+	 * files are counted from the unit's first step, that a file an earlier step changed is among them and that the sequence is this
+	 * step's alone; the declared review marks such a unit's work product and says what the mark means. A first step's view carries no
+	 * mark, so its prompts — the 91 confirmed cases of v12 among them — stay byte for byte as they were. Probes take each re-run
+	 * branch (`W-RERUN-DELIVERABLE`, `W-RERUN-NO-FILE`, `D-RERUN-DELIVERABLE`), so the fingerprint moved.
 	 */
 	readonly deliverable: Deliverable;
 }
@@ -238,12 +244,22 @@ export function baselineNameOf(tenantPrefix: string, pwuId: string): string {
 	return `${tenantPrefix}/deliverable-baseline/${pwuId}`;
 }
 
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package O-2 — D28 (design revision 4; `REG-D-137`; `REG-F-583`) — THE BASELINE A STEP COUNTS ITS VIEWS'
+ * FILES FROM, AND THE STEP THAT TOOK IT: each path and its hash (D22), and `takenBy`, the step whose manifest it is — the unit's
+ * first, as its record names it (`DeliverableBaselineRecord.stepId`). ⭑ So the try loop tells a work re-run's view from a first
+ * step's: a step whose baseline another step took counts its files from an EARLIER step's baseline (`Deliverable.workRerun`).
+ */
+export interface UnitBaseline extends ReadonlyMap<string, { readonly hash: string }> {
+	readonly takenBy: string;
+}
+
 /** ⭐ D22 — a baseline record's bytes, re-hashed against the ref its name resolves to, parsed; refused, never guessed. */
 async function readBaseline(
 	store: Pick<ArtifactStore, 'get'>,
 	ref: { readonly storageKey: string; readonly contentHash: string },
 	pwuId: string
-): Promise<ReadonlyMap<string, { readonly hash: string }>> {
+): Promise<UnitBaseline> {
 	const bytes = await store.get(ref.storageKey);
 	if (bytes === undefined) throw new Error(`the baseline of work unit ${pwuId} at '${ref.storageKey}' is not in the content store.`);
 	if (sha256(bytes) !== ref.contentHash.replace(/^sha256:/, ''))
@@ -257,7 +273,12 @@ async function readBaseline(
 	const record = parsed as Partial<DeliverableBaselineRecord> | undefined;
 	if (record?.schema !== DELIVERABLE_BASELINE_SCHEMA || record.pwuId !== pwuId || !Array.isArray(record.files))
 		throw new Error(`the bytes at '${ref.storageKey}' are not the baseline of work unit ${pwuId}.`);
-	return new Map(record.files.map(([path, hash]) => [path, { hash }]));
+	// ⭐⭐ Package O-2 — D28 — and the step that took it, which the host's writer always names: a record naming none is no baseline
+	// the host recorded, so whether a later step is a work re-run would be a guess. ⛔ Refused, as every other doubt here is.
+	const files = new Map(record.files.map(([path, hash]) => [path, { hash }]));
+	if (typeof record.stepId !== 'string')
+		throw new Error(`the baseline of work unit ${pwuId} at '${ref.storageKey}' names no step that took it.`);
+	return Object.assign(files, { takenBy: record.stepId });
 }
 
 /**
@@ -268,13 +289,16 @@ async function readBaseline(
  * caller fails the step — never a fresh one taken in its place. ⚠ Disclosed: a unit whose first step ran before package O has
  * no baseline bound, and its next step's becomes the unit's; and the shared workspace is the Undertaking's, so a file another
  * unit wrote while this one waited counts as this unit's change in its re-run's view.
+ * ⭐⭐ Package O-2 — D28 — AND IT NAMES THE STEP THAT TOOK IT (`takenBy`): the step asking, on the unit's first step; the first step,
+ * read back from its record, on every later one. ⚠ So the disclosed case above — a unit whose first step ran before package O —
+ * reads its next step as the taker, which is true: that step's files are counted from its own baseline.
  */
 export async function unitBaselineOf(
 	store: ArtifactStore,
 	tenantPrefix: string,
 	step: { readonly pwuId: string; readonly stepId: string; readonly attemptKey: string },
 	workspace: Pick<Workspace, 'list' | 'readFile'>
-): Promise<ReadonlyMap<string, { readonly hash: string }>> {
+): Promise<UnitBaseline> {
 	const name = baselineNameOf(tenantPrefix, step.pwuId);
 	const bound = await store.resolveName(name);
 	if (bound !== undefined) return readBaseline(store, bound, step.pwuId);
@@ -296,7 +320,7 @@ export async function unitBaselineOf(
 	// second step of the unit can have bound one meanwhile: a later step is a re-run, offered only once this one's unit waits.
 	const named = await store.bindName(name, ref.storageKey);
 	if (!named.bound) throw new Error(`the baseline of work unit ${step.pwuId} could not be named: ${named.refusedBecause}`);
-	return manifest;
+	return Object.assign(manifest, { takenBy: step.stepId });
 }
 
 /** A pointer read off the record, as it was written (`DeliverableViewRef`), or undefined when it is not one. */

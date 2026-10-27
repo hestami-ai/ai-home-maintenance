@@ -257,6 +257,24 @@ export const WORK_PRODUCT_DELIVERABLE_SUBJECT =
 	'The answer:';
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package O-2 — D28 (`REG-D-137`, Q46; `REG-F-583`; design D28, revision 4) — THE SUBJECT LINE OF A WORK
+ * RE-RUN'S REVIEW (`Deliverable.workRerun`): its files are counted from the unit's FIRST step's baseline (package O's D22), so a
+ * file an earlier step changed is among them, while its sequence is this step's alone. ⛔ The first step's line above, shown a
+ * re-run, said the files changed "since its step began", directly above a sequence that showed no write of a file an earlier
+ * step wrote: the host's record contradicted itself in front of the reviewer, which risks a false refusal. ⭑ ONLY a marked view
+ * reads this; a first step's — every case of v12 as confirmed among them — reads the line above, byte for byte. ⭑ It asks the
+ * reviewer to find nothing (`REG-D-105` (2)) and names no disposition value (`REG-D-090`); the judging sentence is the one above.
+ */
+export const WORK_PRODUCT_RERUN_DELIVERABLE_SUBJECT =
+	'The WORK PRODUCT to review — what a professional work unit produced by running the instruction above, in a step that ' +
+	"re-runs its work: the agent's answer, then the files the unit changed in its workspace since its first step began, as " +
+	"the host read them after this step's last try — so a file an earlier step changed is among them — then this step's " +
+	"writes and runs in the host's order, which are this step's alone. Judge each criterion below — whether the " +
+	'obligation the instruction delegates is discharged, whether any of it is dropped, whether its scope is narrowed, ' +
+	'among them — against this whole deliverable: the files as they now stand, never as an earlier command read them. ' +
+	'The answer:';
+
+/**
  * ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (`REG-F-523`; `REG-D-110` (3); `DESIGN-phase-7-completion.md` B1) — THE STATEMENT A
  * `DECLARED_POLICY` REVIEW FAILS WITH WHEN IT NAMES NO POLICY. ⛔ It is never sent: a reviewer told it judges "against a
  * policy" it cannot name would be misdescribed to (`R14`'s *"a review conducted on a false account of its own subject is
@@ -418,8 +436,19 @@ export function pwaTypeOverBudgetStatement(length: number, budget: number): stri
 	);
 }
 
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package O-2 — D28 (`REG-D-137`, Q46; `REG-F-583`; design D28, revision 4) — THE CLAUSE A DECLARED REVIEW'S
+ * SUBJECT GAINS WHEN SOME UNIT OF ITS WORK IS MARKED A WORK RE-RUN (`declaredWorkRerun`): what the mark on that unit's work
+ * product means — its files counted from the unit's first step, an earlier step's among them, its sequence that step's alone.
+ * ⛔ Said once, before the subject's colon, and only then: a work with no unit marked — every confirmed case of v12 — reads its
+ * subject byte for byte as before. ⭑ It asks the reviewer to find nothing and names no disposition value.
+ */
+export const DECLARED_WORK_RERUN_CLAUSE =
+	'; and a work product marked "workRerun" was made by a step that re-ran its unit’s work: that unit’s "files" are counted ' +
+	'from its first step, so a file an earlier step changed is among them, and its "sequence" is that step’s alone';
+
 function framingText(
-	input: Pick<ReasoningReviewInput, 'framing' | 'declaredPolicy' | 'declaredInstruction' | 'deliverable'>
+	input: Pick<ReasoningReviewInput, 'framing' | 'declaredPolicy' | 'declaredInstruction' | 'deliverable' | 'declaredWorkRerun'>
 ): Framed {
 	const framing: ReviewFraming = input.framing;
 	switch (framing) {
@@ -433,8 +462,12 @@ function framingText(
 				// ⭐⭐ Package N — D10: and, shown the finished work, it judges that question against the whole deliverable —
 				// the answer and the files the unit changed (`WORK_PRODUCT_DELIVERABLE_SUBJECT`). ⚠ A review handed no
 				// deliverable (a historical case) reads as before.
+				// ⭐⭐ Package O-2 — D28 — and a work re-run's, its files counted from the unit's first step and its sequence this
+				// step's alone, says so (`WORK_PRODUCT_RERUN_DELIVERABLE_SUBJECT`); a first step's reads as before.
 				subject: input.deliverable
-					? WORK_PRODUCT_DELIVERABLE_SUBJECT
+					? input.deliverable.workRerun === true
+						? WORK_PRODUCT_RERUN_DELIVERABLE_SUBJECT
+						: WORK_PRODUCT_DELIVERABLE_SUBJECT
 					: 'The WORK PRODUCT to review — the output a professional work unit produced by running the instruction above:',
 				subjectSlice: input.deliverable ? 'the answer' : 'the work product'
 			};
@@ -498,6 +531,8 @@ function framingText(
 				// and that the exit codes in it are the host's record, quoted beside the agent's arguments (`REG-F-481`).
 				// ⭐⭐ Package N — D11 (`REG-D-135` (1), the lead's D11) — and, where the host recorded them at a unit's completion,
 				// "files" and "sequence": the deliverable the unit's own work-product review is shown (`declaredPolicyReviewInput`).
+				// ⭐⭐ Package O-2 — D28 (`REG-D-137`) — and, where some unit of the work is marked a work re-run's, ONE clause before the
+				// colon saying what the mark means (`DECLARED_WORK_RERUN_CLAUSE`); ⛔ none marked, the subject reads as before.
 				subject:
 					`${declaredPolicyLine(policy)}\n` +
 					'The WORK to judge against that policy, as one line of JSON: "workProducts" holds each work product with the ' +
@@ -506,7 +541,7 @@ function framingText(
 					'host recorded them at a unit’s completion, "files" holds each file a work unit changed in its workspace ' +
 					'since its step began — its path, what changed, and its text as the host read it — and "sequence" each ' +
 					'write and run of its step in the host’s order — its try, its act number, and the path written or the ' +
-					'command run with the exit the host recorded:',
+					`command run with the exit the host recorded${input.declaredWorkRerun === true ? DECLARED_WORK_RERUN_CLAUSE : ''}:`,
 				subjectSlice: 'the work'
 			};
 		}
@@ -777,8 +812,19 @@ export function sequenceBlock(
 // cut are cut from the list, the last first, declared after the heading. Each path stands on a host line as JSON; each text
 // is the file's own, between fence lines.
 
-/** The heading of the files a work product's review is shown, after `afterTry`, or the line saying none changed. */
+/**
+ * The heading of the files a work product's review is shown, after `afterTry`, or the line saying none changed.
+ * ⭐⭐ Package O-2 — D28 (`REG-D-137`; `REG-F-583`) — and a work re-run's (`Deliverable.workRerun`): the files counted from the
+ * unit's FIRST step, so a file an earlier step changed is among them, and the writes and runs below this step's alone — the line
+ * for no file changed, "since its first step began". ⛔ Unmarked, each branch is a first step's, byte for byte.
+ */
 export function deliverableHeading(deliverable: Deliverable): string {
+	if (deliverable.workRerun === true)
+		return deliverable.files.length === 0
+			? `The unit changed no file in its workspace since its first step began, as the host read it after try ${deliverable.afterTry} of this step; the writes and runs below are this step's alone.`
+			: `The files the unit changed in its workspace since its first step began, as the host read them after try ${deliverable.afterTry} of this step — ` +
+					"so a file an earlier step changed is among them, and the writes and runs below are this step's alone. " +
+					"Each path, as JSON, and what changed are the host's record; each file's text, between fence lines, is the file's own:";
 	return deliverable.files.length === 0
 		? `The unit changed no file in its workspace since its step began, as the host read it after try ${deliverable.afterTry}.`
 		: `The files the unit changed in its workspace since its step began, as the host read them after try ${deliverable.afterTry}. ` +

@@ -84,7 +84,8 @@ import {
 	declaredPolicyReviewInput,
 	type DeclaredReviewAct,
 	type DeclaredReviewCommand,
-	type DeclaredReviewFile
+	type DeclaredReviewFile,
+	type DeclaredReviewWorkProduct
 } from '$lib/server/assurance/review-input';
 import { createExchangeSink } from '$lib/server/assurance/exchange-capture';
 import { recordExchanges } from '$lib/server/assurance/exchange-recorder';
@@ -120,7 +121,8 @@ import {
 	takeManifest,
 	unitBaselineOf,
 	type DeliverableViewRef,
-	type DeliverableViewRecord
+	type DeliverableViewRecord,
+	type UnitBaseline
 } from '$lib/server/execution/deliverable-view';
 import { commandLine } from '$lib/server/assurance/process-result-render';
 import { governedToolCallReport } from '$lib/server/tools/observed-tool-calls';
@@ -1441,7 +1443,8 @@ interface DeclaredReviewWork {
 	readonly instruction: string;
 	/** ⭐ `E12F` F4 — what `instruction` is, which the reviewer is told (`DeclaredInstruction`). */
 	readonly instructionIs: DeclaredInstruction;
-	readonly workProducts: readonly { readonly unit: string; readonly answer: string }[];
+	/** ⭐ Package O-2 — D28 — each marked a work re-run's where its unit's recorded view is one (`DeclaredReviewWorkProduct`). */
+	readonly workProducts: readonly DeclaredReviewWorkProduct[];
 	readonly commands: readonly DeclaredReviewCommand[];
 	/** ⭐ Package N — D11 — the files each unit changed and its step's sequence, as recorded at its completion. */
 	readonly files: readonly DeclaredReviewFile[];
@@ -1495,7 +1498,7 @@ async function declaredReviewWorkOf(
 	// ⭐ `REG-F-569` (`REG-D-121` Q18) — A LEAF IS GATHERED AS A UNIT COMPOSED OF OTHERS IS, its own work and no unit below it,
 	// so the one refusal below reaches it too: it returned its own work before that check, and was reviewed over nothing.
 	const composite = childrenOf(pwuId).length > 0;
-	const workProducts: { unit: string; answer: string }[] = [];
+	const workProducts: DeclaredReviewWorkProduct[] = [];
 	const commands: DeclaredReviewCommand[] = [];
 	// ⭐ Package N — D11 — the deliverable, in the same composition: each unit's own, then its subtree's, depth first.
 	const files: DeclaredReviewFile[] = [];
@@ -1505,7 +1508,10 @@ async function declaredReviewWorkOf(
 	// ⭐ R3-A F1 — one unit's own work, then each of its children's subtrees in turn: depth first, the store's order.
 	// ⛔ A work product below it that the record cannot rebuild refuses the whole (RD7), as a child's always did.
 	const gather = async (id: string, work: UnitWork): Promise<{ readonly ok: false; readonly refusedBecause: string } | undefined> => {
-		if (work.answer !== undefined) workProducts.push({ unit: work.title, answer: work.answer });
+		// ⭐⭐ Package O-2 — D28 (`REG-D-137`) — a unit whose view recorded at its completion is a work re-run's carries the mark on its
+		// work product's entry, so its files, counted from its first step, and its sequence, that step's alone, are read as such.
+		const marked = work.view?.deliverable.workRerun === true ? { workRerun: true as const } : {};
+		if (work.answer !== undefined) workProducts.push({ unit: work.title, answer: work.answer, ...marked });
 		commands.push(...work.commands);
 		if (work.view) {
 			files.push(...work.view.deliverable.files.map((f) => ({ unit: work.title, ...f })));
@@ -1985,7 +1991,9 @@ async function runModelUnit(u: ModelUnitRun) {
 	// name and every later step — a work re-run — reads back, hash-checked. ⛔ A re-run's fresh baseline held the files its
 	// refused attempt wrote, so a file the re-run left alone fell out of its view, and its review could read a mandated file
 	// as absent. A baseline that is bound and cannot be read fails the step here, as an unreadable workspace does.
-	let baseline: ReadonlyMap<string, { readonly hash: string }>;
+	// ⭐⭐ Package O-2 — D28 (design revision 4; `REG-D-137`) — and it names the step that took it (`takenBy`), so each try's view
+	// below says whether its files are counted from an EARLIER step's baseline: a work re-run.
+	let baseline: UnitBaseline;
 	try {
 		const current = binding ? currentBinding(bindingId) : undefined;
 		sandbox = resolveUndertakingSandbox(String((pwu?.undertakingId ?? '') as string));
@@ -2227,7 +2235,11 @@ async function runModelUnit(u: ModelUnitRun) {
 			const deliverable = {
 				afterTry: attempt,
 				files: changedFiles(baseline, manifestAfter),
-				sequence: hostSequence
+				sequence: hostSequence,
+				// ⭐⭐ Package O-2 — D28 (`REG-D-137`; `REG-F-583`) — A WORK RE-RUN'S VIEW SAYS SO: its files are counted from the baseline
+				// another step took — the unit's first — while its sequence is this step's alone, and its review is told both. ⛔ No key
+				// at all on the unit's first step, so that step's view, and every prompt made from it, reads as before.
+				...(baseline.takenBy === stepId ? {} : { workRerun: true as const })
 			};
 			let deliverableView: DeliverableViewRef;
 			try {

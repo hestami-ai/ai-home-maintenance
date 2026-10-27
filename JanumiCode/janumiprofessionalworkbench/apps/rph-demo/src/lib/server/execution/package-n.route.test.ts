@@ -214,8 +214,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { actions } from '../../../routes/undertakings/[id]/+page.server.js';
 import { actions as undertakings } from '../../../routes/undertakings/+page.server.js';
 import { noProgramsDirectory } from '../assurance/no-programs.testing.js';
-import { dispatch, getEngine, mintUiId, resetEngine } from '../workbench.js';
+import { dispatch, getArtifactStore, getEngine, mintUiId, resetEngine } from '../workbench.js';
 import { actionEvent, beginExecute, modelWorkUnit } from './begin-execute.testing.js';
+import { namedViewOf, readDeliverableView } from './deliverable-view.js';
 import { resolveUndertakingSandbox } from './workspace-host.js';
 
 const LIVE_BACKEND_VARIABLES = [
@@ -566,6 +567,83 @@ describe('⭐⭐ package O — D22: a work re-run’s view counts the unit’s c
 	});
 });
 
+// ── ⭐⭐ `JAN-EXEC` Phase 7, package O-2 — D28, A RE-RUN'S WORDING (design revision 4; `REG-D-137`; `REG-F-583`) ─────────────────────
+// After D22 a work re-run's view lists the files counted from the unit's FIRST step, while its sequence is the re-run's alone —
+// and the review read "since its step began" above it. D28: the view of a step whose files are counted from an EARLIER step's
+// baseline is marked a work re-run (`Deliverable.workRerun`), so the review, and the sign-off reading the view back, say so; a
+// unit's first step is never marked, so its prompts stay byte for byte as they were.
+describe('⭐⭐ package O-2 — D28: the try loop marks a work re-run’s view — counted from an EARLIER step’s baseline — and never a first step’s', () => {
+	/** The host's tenant prefix on the content plane (`EXECUTION_TENANT_PREFIX`, the route's own). */
+	const TENANT = 'tnt-local';
+	/** A model unit whose first attempt writes `docs/required.md` and is refused at its review; then its work re-run, clean. */
+	const refusedThenRerun = async (rerunActs: readonly TurnAct[]) => {
+		const pwuId = await modelWorkUnit();
+		seam.script = (turn) =>
+			turn === 1
+				? { acts: [write('docs/required.md', '# Required\n')], account: 'Wrote the required document.' }
+				: { acts: rerunActs, account: 'The required document is in place; this step ran the check.' };
+		let down = true;
+		seam.review = (p) => {
+			if (down && isWorkProductReview(p)) throw new Error('devin exited with code 1: connection reset by peer');
+			return undefined;
+		};
+		expect((await beginExecute(pwuId)).data?.error, 'arrangement: the first attempt’s review concluded').toMatch(/VALIDATOR_EXECUTION_FAILED/);
+		const first = seam.prompts.find(isWorkProductReview);
+		down = false;
+		seam.prompts.length = 0;
+		const rerun = (await actions.rerunWork(
+			actionEvent('rerunWork', { pwuId, rationale: 'The reviewer failed at the transport; run the work again.' }) as never
+		)) as { advanced?: string; data?: { error?: string } };
+		expect([rerun.advanced, rerun.data?.error], 'arrangement: the work re-run').toEqual(['work-rerun', undefined]);
+		const reviewed = seam.prompts.filter(isWorkProductReview);
+		expect([first, reviewed.length], 'arrangement: the first step’s review, and the re-run’s, once').toEqual([expect.any(String), 1]);
+		return { pwuId, first: first!, rerun: reviewed[0]! };
+	};
+	/** Each try's view the unit's steps recorded, read back by the name it is bound to (D23), in the order of their attempts. */
+	const recordedViewsOf = async (pwuId: string) => {
+		const attempts = [
+			...new Set(
+				listByType(getEngine(), 'ARTIFACT')
+					.filter((a) => a.state.producingPwuId === pwuId)
+					.map((a) => String(a.state.producingExecutionAttemptId))
+			)
+		];
+		return Promise.all(
+			attempts.map(async (attemptKey) => {
+				const ref = await namedViewOf(getArtifactStore(), TENANT, attemptKey, 1);
+				const read = ref ? await readDeliverableView(getArtifactStore(), ref) : undefined;
+				return read?.ok ? read.view.deliverable : undefined;
+			})
+		);
+	};
+
+	it('⭐ THE PREDICTED RED — a refused attempt writes a file and its work re-run leaves it alone: the re-run’s recorded view is marked a work re-run; the first step’s view is not', async () => {
+		const { pwuId } = await refusedThenRerun([run(['node', '--test'], '1 passed\n')]);
+		const [first, rerun] = await recordedViewsOf(pwuId);
+		expect([first !== undefined, rerun !== undefined], 'arrangement: each step’s view, recorded and read back').toEqual([true, true]);
+		expect(rerun!.files.map((f) => f.path), 'arrangement: the re-run’s view inherits the refused attempt’s file (D22)').toEqual(['docs/required.md']);
+		expect(rerun!.workRerun, 'the re-run’s view, counted from the unit’s first step, is not marked a work re-run').toBe(true);
+		expect(Object.keys(first!), 'the unit’s first step’s view carries a mark — its record no longer reads as before').toEqual(['afterTry', 'files', 'sequence']);
+	});
+
+	it('⭐ the re-run’s review is told so — its files counted from the unit’s first step, an earlier step’s among them, its sequence this step’s alone; the first step’s review reads today’s words', async () => {
+		const { first, rerun } = await refusedThenRerun([run(['node', '--test'], '1 passed\n')]);
+		expect(rerun, 'the re-run’s subject does not say its files are counted from the unit’s first step').toContain(
+			"then the files the unit changed in its workspace since its first step began, as the host read them after this step's last try — so a file an earlier step changed is among them — then this step's writes and runs in the host's order, which are this step's alone."
+		);
+		expect(rerun.split('\n'), 'the re-run’s heading over its inherited file does not say so').toContain(
+			"The files the unit changed in its workspace since its first step began, as the host read them after try 1 of this step — so a file an earlier step changed is among them, and the writes and runs below are this step's alone. Each path, as JSON, and what changed are the host's record; each file's text, between fence lines, is the file's own:"
+		);
+		expect(rerun, 'arrangement: the re-run’s view lists the inherited file').toContain('Added "docs/required.md":');
+		expect(rerun, 'the re-run’s review still reads the first step’s words').not.toContain('since its step began');
+		// ⭑ CONTROL, the unit's first step: today's words, and none of the re-run's.
+		expect(first, 'the first step’s review moved').toContain(
+			"then the files the unit changed in its workspace since its step began, as the host read them after its last try, then the step's writes and runs in the host's order."
+		);
+		expect(first, 'the first step’s review reads a re-run’s words').not.toContain('since its first step began');
+	});
+});
+
 describe('⭐⭐ package N — D11: the declared reviews at sign-off are shown the finished work; a re-review is shown what the refused try was', () => {
 	/** A MODEL work unit of a type that declares `pol_requirement_coverage`, of a kind it governs — published, instantiated. */
 	async function declaringModelUnit(): Promise<string> {
@@ -691,6 +769,58 @@ describe('⭐⭐ package N — D11: the declared reviews at sign-off are shown t
 		expect(declared, 'arrangement: no declared review was re-run').toBeDefined();
 		expect(declared, 'the re-run declared review was not shown the changed file').toContain(WROTE_ONLY);
 		expect(declared, 'the re-run declared review was not shown the sequence').toContain(WROTE_ONLY_SEQUENCE);
+	});
+
+	// ── ⭐⭐ `JAN-EXEC` Phase 7, package O-2 — D28 (design revision 4; `REG-D-137`) — THE SIGN-OFF OF A UNIT WHOSE WORK WAS RE-RUN ─────
+	/** The work products a declared review's line shows, each with its unit and its mark, parsed from the prompt. */
+	const declaredProductsOf = (prompt: string) => {
+		const lines = prompt.split('\n').filter((l) => l.startsWith('{"workProducts":'));
+		expect(lines, 'arrangement: the declared review shows its work on one line').toHaveLength(1);
+		return (JSON.parse(lines[0]!) as { workProducts: { workUnit: string; workRerun?: unknown }[] }).workProducts.map((w) => [w.workUnit, w.workRerun]);
+	};
+	/** ⭐ D28 — the clause a declared subject gains when a unit of its work is marked, restated byte for byte. */
+	const RERUN_CLAUSE =
+		'with the exit the host recorded; and a work product marked "workRerun" was made by a step that re-ran its unit’s work: that unit’s "files" are counted from its first step, so a file an earlier step changed is among them, and its "sequence" is that step’s alone:';
+
+	it('⭐ package O-2 (D28) — a unit signed off after its WORK RE-RUN: its declared review reads the view back marked, so the unit’s work product carries the mark and the subject says what it means', async () => {
+		const pwuId = await declaringModelUnit();
+		seam.script = (turn) =>
+			turn === 1
+				? { acts: [write('docs/requirements.md', '# Requirements\n')], account: 'Wrote the requirements.' }
+				: { acts: [run(['cat', 'docs/requirements.md'], '# Requirements\n')], account: 'The requirements are in place; read them back.' };
+		let down = true;
+		seam.review = (p) => {
+			if (down && isWorkProductReview(p)) throw new Error('devin exited with code 1: connection reset by peer');
+			return undefined;
+		};
+		expect((await beginExecute(pwuId)).data?.error, 'arrangement: the first attempt’s review concluded').toMatch(/VALIDATOR_EXECUTION_FAILED/);
+		down = false;
+		const rerun = (await actions.rerunWork(
+			actionEvent('rerunWork', { pwuId, rationale: 'The reviewer failed at the transport; run the work again.' }) as never
+		)) as { advanced?: string; data?: { error?: string } };
+		expect([rerun.advanced, rerun.data?.error], 'arrangement: the work re-run').toEqual(['work-rerun', undefined]);
+		seam.prompts.length = 0;
+
+		await recordAssurance(pwuId);
+
+		const declared = seam.prompts.find((p) => p.includes('declared assurance policy'));
+		expect(declared, 'arrangement: no declared review was asked').toBeDefined();
+		expect(declared, 'arrangement: the sign-off was not shown the file the refused attempt wrote').toContain(WROTE_ONLY);
+		expect(declaredProductsOf(declared!), 'the re-run unit’s work product is not marked a work re-run’s').toEqual([['Requirements', true]]);
+		expect(declared, 'the declared subject does not say what the mark means').toContain(RERUN_CLAUSE);
+	});
+
+	it('⭑ CONTROL (D28) — a unit signed off after its FIRST step: no mark on its work product, and no clause — its subject reads as before', async () => {
+		const pwuId = await declaringModelUnit();
+		seam.script = () => ({ acts: [write('docs/requirements.md', '# Requirements\n')], account: 'Wrote the requirements.' });
+		expect((await beginExecute(pwuId)).data?.error, 'arrangement: Begin & Execute').toBeUndefined();
+
+		await recordAssurance(pwuId);
+
+		const declared = seam.prompts.find((p) => p.includes('declared assurance policy'))!;
+		expect(declaredProductsOf(declared), 'a first step’s work product was marked a work re-run’s').toEqual([['Requirements', undefined]]);
+		expect(declared, 'a first step’s declared subject moved').toContain('and the path written or the command run with the exit the host recorded:');
+		expect(declared, 'a first step’s declared review reads the re-run’s clause').not.toContain('workRerun');
 	});
 
 	// ⛔ MOVED 2026-10-26 (`JAN-EXEC` Phase 7, package O; design D23, revision 3) — ~~"⭑ CONTROL, the residual — a write-only try
