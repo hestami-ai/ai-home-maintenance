@@ -483,8 +483,8 @@
 			"lines": 1
 		},
 		"packages/rph-persistence/src/sqlite-artifact-store.ts": {
-			"statements": 1,
-			"branches": 1,
+			"statements": 0,
+			"branches": 0,
 			"functions": 0,
 			"lines": 0
 		},
@@ -693,9 +693,9 @@
 			"lines": 0
 		},
 		"packages/rph-projections/src/unit-dependencies.ts": {
-			"statements": 2,
-			"branches": 25,
-			"functions": 1,
+			"statements": 1,
+			"branches": 18,
+			"functions": 0,
 			"lines": 0
 		},
 		"packages/rph-projections/src/work-projection.ts": {
