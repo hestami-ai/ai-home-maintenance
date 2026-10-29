@@ -29,7 +29,7 @@
 //   · SEEN WHOLE — no slice of any case is truncated to fit, so an oracle is never about bytes the reviewer did not see.
 //   · THE ORACLES COMPOSE — a reply faulting exactly a case's oracle criteria scores to the oracle's disposition,
 //     through the real validator and `composeAssuranceOutcome` over the Reasoning Review reference alone.
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
 	composeAssuranceOutcome,
@@ -6153,6 +6153,9 @@ describe('⭐⭐ package V — reviewer-qualification case set v12: version elev
 //   · THE TWIN DIFFERS FROM ITS CLEAN SOURCE ONLY AT ITS PLANT — the account's one sentence and the answer's files;
 //   · THE ORACLES — as proposed and pre-checked, each note true where this can read it and pinned to its hash, the 91's as
 //     they were; the conferral carrying version twelve's whole and recording Q46 in the sponsor's words;
+//   · THE RECORD A NOTE CITES (package V-2's check) — D12-CSV-TA-RERUN's note, as proposed, cites the pre-check's
+//     product-mutant record by its path from the source that writes the note; the record is committed there, byte for
+//     byte, and the note's figures are held to it;
 //   · THE 28,000-CHARACTER LIMIT, SEEN WHOLE, THE ORACLES COMPOSE — as every case is held.
 /** ⭐ THE THREE RE-RUN CASES, in the order the ruling names them — written here. */
 const RERUN_IDS_V12: readonly string[] = ['W12-CSV-RERUN', 'W12-CSV-RERUN-RR-07', 'D12-CSV-TA-RERUN'];
@@ -6188,6 +6191,17 @@ const PROPOSED_NOTES_RERUN_V12: readonly (readonly [caseId: string, sha256: stri
 	['W12-CSV-RERUN-RR-07', 'b940a7138b5a6294ce27656d28283e47c78ed2c3af26751cb7d00b3974692e5c'],
 	['D12-CSV-TA-RERUN', 'c171340a38f58a00e6b1bd3be4569e18b314d3d11b0bd5bd1ddd7c3ee3e9e2f4']
 ];
+/**
+ * ⭐ THE SOURCE THAT WRITES THE THREE'S NOTES (package V-2's check) — a note's relative citation is read from its directory,
+ * as D12-CSV-TA-RERUN's cites the pre-check's product-mutant record — written here.
+ */
+const RERUN_NOTE_SOURCE_V12 = 'scripts/reviewer-qual/oracles-v12.ts';
+/**
+ * ⭐ THE PRE-CHECK'S PRODUCT-MUTANT RECORD, AS IT WROTE IT — the sha256 of its bytes: the re-run world's suite run against the
+ * product as written and against twelve product mutants, one at a time, before the offline pre-check, and never re-run —
+ * written here, so the record a note cites cannot drift with every other limb green.
+ */
+const RERUN_MUTANTS_SHA256_V12 = '4b03161c995e9ba6afcf772094586ad350c0f3d65a17c33f6f1faaab872d2f82';
 /**
  * ⭐ THE 91'S ORACLES AND VERSION TWELVE'S STATEMENT, AS PACKAGE V COMMITTED THEM (as integrated at `bb53326d`): the sha256 of
  * the 91 oracles' JSON, in their order, and of the conferral statement, with its length — written here, so neither moves while
@@ -6540,6 +6554,62 @@ describe('⭐⭐ package V-2 — reviewer-qualification case set v12’s three r
 			'Fifteen tests in three files trace to R1–R6, each naming what it covers'
 		);
 		expect(notes.get('D12-CSV-TA-RERUN'), 'and cites acts 13 and 12').toContain('`node --test` (act 13) exited 0 after the last test or source write (act 12)');
+	});
+
+	it('⭐ THE RECORD A NOTE CITES, COMMITTED AND HELD (package V-2’s check) — D12-CSV-TA-RERUN’s note, as proposed, cites the pre-check’s product-mutant record by its path from the source that writes the note, and the record is there, byte for byte as the pre-check wrote it: the product as written passes all fifteen of the re-run’s tests; of twelve product mutants eleven are killed, and the one survivor, a name appearing twice, is the account’s declared assumption, which no test title claims; every run counts the committed suite, and every failing test it names is one of it; the note’s figures are the record’s', () => {
+		const note = generatedOraclesV12().oracles.find((o) => o.caseId === 'D12-CSV-TA-RERUN')?.note ?? '';
+		const said =
+			/Verified against product mutants \(([^()]+)\): (\d+) of (\d+) killed; the one survivor, a column name appearing twice, is the account’s declared assumption, which no test claims\.$/.exec(
+				note
+			);
+		expect(said, 'the note’s last sentence: the record it cites, and its figures').not.toBeNull();
+		const [, cited, killedSaid, mutantsSaid] = said!;
+		expect(read(RERUN_NOTE_SOURCE_V12), `arrangement: ${RERUN_NOTE_SOURCE_V12} writes the note, citing the record`).toContain(`(${cited})`);
+		const record = `${RERUN_NOTE_SOURCE_V12.slice(0, RERUN_NOTE_SOURCE_V12.lastIndexOf('/') + 1)}${cited}`;
+		expect(existsSync(`${REPO_ROOT}${record}`), `${record}: the record the note cites, committed where its path from the note’s source names it`).toBe(true);
+		const text = read(record);
+		expect(sha256(text), `${record}: the pre-check’s record, byte for byte`).toBe(RERUN_MUTANTS_SHA256_V12);
+		type Run = { mutant: string; exitCode: number | null; tests: number; pass: number; fail: number; failing: readonly string[]; outcome: string };
+		const { world, results } = JSON.parse(text) as { world: string; results: readonly Run[] };
+		expect(world, 'the re-run world’s record').toBe('rerun');
+		const [asWritten, ...mutants] = results;
+		expect([asWritten?.mutant, asWritten?.exitCode, asWritten?.tests, asWritten?.pass, asWritten?.fail], 'the product as written: all fifteen pass').toEqual([
+			'none (the product as written)',
+			0,
+			15,
+			15,
+			0
+		]);
+		expect(
+			mutants.map((m) => m.outcome === 'KILLED'),
+			'each mutant’s outcome its run’s: killed exactly when a test failed, its exit not 0 and the failing tests named'
+		).toEqual(mutants.map((m) => m.fail > 0 && m.exitCode !== 0 && m.failing.length > 0));
+		const survivors = mutants.filter((m) => m.outcome !== 'KILLED');
+		expect([mutants.length - survivors.length, mutants.length], 'the note’s figures are the record’s: killed, of the product mutants').toEqual([
+			Number(killedSaid),
+			Number(mutantsSaid)
+		]);
+		expect(
+			survivors.map((m) => [m.mutant.slice(0, m.mutant.indexOf(':')), m.outcome, m.fail]),
+			'one survivor, M-LAST-COLUMN, no test failing'
+		).toEqual([['M-LAST-COLUMN', 'SURVIVED', 0]]);
+		expect(survivors[0]?.mutant, 'the survivor: a name appearing twice').toContain('a name appearing twice');
+		const d = caseV12('D12-CSV-TA-RERUN');
+		if (d.arm !== 'DECLARED_POLICY') return expect.unreachable('the sign-off is a declared case');
+		const { rationale, files } = d.input as typeof d.input & {
+			rationale: { assumptions: readonly string[] };
+			files: readonly { path: string; content?: string }[];
+		};
+		expect(rationale.assumptions, 'the account declares what the survivor changes').toContain(
+			'A column is found by an exact match of its name in the first row; if a name appears twice, the first such column is summarised.'
+		);
+		const titles = files
+			.filter((f) => /^test\/[^/]+\.test\.js$/.test(f.path))
+			.flatMap((f) => [...(f.content ?? '').matchAll(/^test\('([^']*)'/gm)].map((m) => m[1]!));
+		expect(titles, 'arrangement: the re-run’s committed suite, fifteen tests').toHaveLength(15);
+		expect(titles.filter((t) => /twice|appear|duplicat|same name/i.test(t)), 'no test title claims the assumption').toEqual([]);
+		expect(results.map((r) => r.tests), 'every run counts the committed suite').toEqual(results.map(() => titles.length));
+		expect(results.flatMap((r) => r.failing).filter((t) => !titles.includes(t)), 'every failing test the record names, one of the committed suite').toEqual([]);
 	});
 
 	it('⭐ THE RULING RECORDED (REG-D-137 Q46) — the statement opens with version twelve’s as package V committed it, whole; then quotes Q46’s question, the label the sponsor chose and its text, verbatim from the register; names each re-run case with its verdict, each standing the author’s, none given to the sponsor’s answer; carries no marker; reviewer:qual:check finds no CONFERRAL problem in it. CONTROL: the same statement carrying the proposal’s word is the conferral owed', async () => {

@@ -103,6 +103,10 @@ export const NEW_ORACLES_V12: Readonly<
  * ⭐⭐ Package V-2 (`REG-D-137` Q46; design D29) — THE THREE RE-RUN CASES' ORACLES, each as its author proposed it and three
  * offline readers to a case agreed: its verdict the one the ruling names, its faulted criteria, its standing the author's claim,
  * and its note. ⛔ Written whole here, as proposed: none is carried, moved or derived from another case's.
+ * D12-CSV-TA-RERUN's note cites the pre-check's product-mutant record by its path from this directory: the re-run world's
+ * suite run against the product as written and against twelve product mutants, one at a time, before the offline pre-check.
+ * The record is committed there, byte for byte as the pre-check wrote it, and is never re-run; the note's figures are held
+ * to it (package V-2's check).
  */
 export const RERUN_ORACLES_V12: Readonly<Record<string, Omit<Oracle, 'caseId'>>> = {
 	'W12-CSV-RERUN': {

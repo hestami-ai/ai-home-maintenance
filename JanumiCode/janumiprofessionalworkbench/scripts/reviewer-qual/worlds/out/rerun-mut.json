@@ -1,0 +1,162 @@
+{
+ "world": "rerun",
+ "node": "v24.11.1",
+ "results": [
+  {
+   "mutant": "none (the product as written)",
+   "expect": "pass",
+   "exitCode": 0,
+   "tests": 15,
+   "pass": 15,
+   "fail": 0,
+   "failing": [],
+   "outcome": "SURVIVED"
+  },
+  {
+   "mutant": "M-NEGATIVE: a value with a minus sign is not a number",
+   "expect": "killed (the command R1 test reads -3)",
+   "exitCode": 1,
+   "tests": 15,
+   "pass": 14,
+   "fail": 1,
+   "failing": [
+    "prints the five lines for a column of the fixture, a negative value among them (R1)"
+   ],
+   "outcome": "KILLED"
+  },
+  {
+   "mutant": "M-VALUE-EXIT: a bad value exits 2, not 1",
+   "expect": "killed (the command R6 value test)",
+   "exitCode": 1,
+   "tests": 15,
+   "pass": 14,
+   "fail": 1,
+   "failing": [
+    "a value that is not a number exits 1 with a message naming its row and prints nothing (R6)"
+   ],
+   "outcome": "KILLED"
+  },
+  {
+   "mutant": "M-VALUE-STDOUT: a bad value prints a partial summary",
+   "expect": "killed (the command R6 value test)",
+   "exitCode": 1,
+   "tests": 15,
+   "pass": 14,
+   "fail": 1,
+   "failing": [
+    "a value that is not a number exits 1 with a message naming its row and prints nothing (R6)"
+   ],
+   "outcome": "KILLED"
+  },
+  {
+   "mutant": "M-UNROUNDED: the mean is not rounded",
+   "expect": "killed",
+   "exitCode": 1,
+   "tests": 15,
+   "pass": 13,
+   "fail": 2,
+   "failing": [
+    "prints the five lines for a column of the fixture, a negative value among them (R1)",
+    "the mean is rounded to two decimal places (R1)"
+   ],
+   "outcome": "KILLED"
+  },
+  {
+   "mutant": "M-NO-NONE: no none when no cell holds a value (R4)",
+   "expect": "killed",
+   "exitCode": 1,
+   "tests": 15,
+   "pass": 14,
+   "fail": 1,
+   "failing": [
+    "min, max and mean are none when no cell holds a value (R4)"
+   ],
+   "outcome": "KILLED"
+  },
+  {
+   "mutant": "M-NO-TRIM: a cell of spaces is a value",
+   "expect": "killed",
+   "exitCode": 1,
+   "tests": 15,
+   "pass": 14,
+   "fail": 1,
+   "failing": [
+    "min, max and mean are none when no cell holds a value (R4)"
+   ],
+   "outcome": "KILLED"
+  },
+  {
+   "mutant": "M-ROW: the row a bad value is reported at omits the header row",
+   "expect": "killed",
+   "exitCode": 1,
+   "tests": 15,
+   "pass": 13,
+   "fail": 2,
+   "failing": [
+    "a value that is not a number exits 1 with a message naming its row and prints nothing (R6)",
+    "a cell that is not a decimal number is refused, naming its row (R6)"
+   ],
+   "outcome": "KILLED"
+  },
+  {
+   "mutant": "M-QUOTES: a quote opens no quoted field",
+   "expect": "killed",
+   "exitCode": 1,
+   "tests": 15,
+   "pass": 12,
+   "fail": 3,
+   "failing": [
+    "a quoted field may hold commas (R2)",
+    "a doubled quote inside a quoted field is one quote (R2)",
+    "an unterminated quoted field is refused (R2)"
+   ],
+   "outcome": "KILLED"
+  },
+  {
+   "mutant": "M-UNREADABLE-EXIT: an unreadable file exits 1, not 2",
+   "expect": "killed",
+   "exitCode": 1,
+   "tests": 15,
+   "pass": 14,
+   "fail": 1,
+   "failing": [
+    "an unreadable file exits 2 with a message and prints nothing (R5)"
+   ],
+   "outcome": "KILLED"
+  },
+  {
+   "mutant": "M-USAGE: a bad argument prints no usage line",
+   "expect": "killed",
+   "exitCode": 1,
+   "tests": 15,
+   "pass": 14,
+   "fail": 1,
+   "failing": [
+    "a bad argument exits 1 with the usage line and prints nothing (R6)"
+   ],
+   "outcome": "KILLED"
+  },
+  {
+   "mutant": "M-LAST-COLUMN: a name appearing twice selects the last such column (the account’s assumption: the first)",
+   "expect": "informational (an assumption, declared, no test claims it)",
+   "exitCode": 0,
+   "tests": 15,
+   "pass": 15,
+   "fail": 0,
+   "failing": [],
+   "outcome": "SURVIVED"
+  },
+  {
+   "mutant": "M-ONE-DECIMAL: a value with two decimal places is not a number",
+   "expect": "informational (no test value has two decimals)",
+   "exitCode": 1,
+   "tests": 15,
+   "pass": 14,
+   "fail": 1,
+   "failing": [
+    "prints the five lines for a column of the fixture, a negative value among them (R1)"
+   ],
+   "outcome": "KILLED"
+  }
+ ]
+}
