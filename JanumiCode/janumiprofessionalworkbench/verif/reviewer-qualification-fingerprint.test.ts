@@ -470,7 +470,7 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint MOVES on each component
 	const movedProbes = (fp: ReviewerFingerprint): string[] =>
 		[...fp.probePrompts].filter(([id, p]) => p !== BASE.probePrompts.get(id)).map(([id]) => id);
 
-	it('⭐⭐ E2 — the DECLARED FRAMING’S TEXT: the probes move, and of the case prompts exactly the current set’s fourteen declared cases’ — none of v1’s', async () => {
+	it('⭐⭐ E2 — the DECLARED FRAMING’S TEXT: the probes move, and of the case prompts exactly the current set’s ~~fourteen~~ ⭐ fifteen (package V-2) declared cases’ — none of v1’s', async () => {
 		const seams: FingerprintSeams = {
 			...PRODUCT_SEAMS,
 			validator: (print) =>
@@ -481,7 +481,9 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint MOVES on each component
 		const fp = await reviewerFingerprint(CASES, seams);
 		onlyMoved(fp, ['probes']);
 		expect(fp.casePrompts, 'no case of v1 is a declared review').toEqual(BASE.casePrompts);
-		expect(CURRENT_DECLARED, 'the arrangement: the current set holds the fourteen').toHaveLength(14);
+		// ~~expect(CURRENT_DECLARED, 'the arrangement: the current set holds the fourteen').toHaveLength(14);~~ ⭐ Package V-2,
+		// 2026-10-29 (`REG-D-137`): and the sign-off after the re-run, D12-CSV-TA-RERUN.
+		expect(CURRENT_DECLARED, 'the arrangement: the current set holds the fifteen').toHaveLength(15);
 		expect(await movedNow(seams), 'the case prompts of the current set that move').toEqual(CURRENT_DECLARED);
 	});
 

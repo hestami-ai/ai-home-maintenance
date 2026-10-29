@@ -2663,13 +2663,19 @@ describe('⭐⭐ the review in parts, B8b, package K — under case set v11 and 
 // move — so the check asks for the line naming today's fingerprint, with the cases added to exercise the change: the 56. And
 // nothing else: no REPRODUCTION, RECORD or CONFERRAL problem. ⭑ What turns it GREEN is what `REG-D-136` (4) plans — a run of the
 // selected candidate over the 56, and RESCORED lines for the 35 — AND that line, which the ruling's plan does not name.
+// ⭐ Package V-2, 2026-10-29 (`REG-D-137` Q46; design D29) — AND THE THREE RE-RUN CASES AFTER THE 91: version twelve holds 94, the three new prompts no
+// run has measured, so coverage of all 94 is owed, and what turns it GREEN is the run over the 56 and a run over the three
+// (`REG-D-137` (3): "Measure them with v12"), the RESCORED lines for the 35, and the line, naming the 56 and the three added.
 // ⚠ PRESENT BEHAVIOUR, PINNED FOR THE LEAD: on the committed record the run the check names is version one's first
 // (`qr-2026-09-24-agy-gemini-3.1-pro-high`), none of whose cases version twelve holds: the move since a fingerprint none of
 // whose recorded cases is still in the set is shown to reach no case prompt. The last limb holds that, beside its CONTROL.
-describe('⭐⭐ package V — under case set v12 and the fingerprint L and N moved, the selected candidate’s run of v11 owes coverage of all 91 — RESCORED lines for the 35 part cases, a run over the 56 new or changed — and an ACKNOWLEDGED line; nothing else (REG-D-136, REG-D-086)', () => {
+describe('⭐⭐ package V — under case set v12 and the fingerprint L and N moved, the selected candidate’s run of v11 owes coverage of all ~~91~~ ⭐ 94 (package V-2) — RESCORED lines for the 35 part cases, a run over the 56 new or changed ⭐ and one over the three re-run cases — and an ACKNOWLEDGED line; nothing else (REG-D-136, REG-D-086, ⭐ REG-D-137)', () => {
 	const GLM: SelectedCandidate = { transport: 'devin', modelLabel: 'glm-5-3-flash-max' };
 	const PARTS = (): string[] => CURRENT_CASES.filter((c) => c.arm === 'PWA_TYPE').map((c) => c.id);
-	const FIFTY_SIX = (): string[] => CURRENT_CASES.filter((c) => c.arm !== 'PWA_TYPE').map((c) => c.id);
+	/** ⭐ Package V-2 — the three re-run cases, after the 91 — written here. */
+	const RERUN_THREE: readonly string[] = ['W12-CSV-RERUN', 'W12-CSV-RERUN-RR-07', 'D12-CSV-TA-RERUN'];
+	// ⭐ Package V-2, 2026-10-29 — ~~`c.arm !== 'PWA_TYPE'`~~: and none of the three re-run cases, so the 56 are the 56.
+	const FIFTY_SIX = (): string[] => CURRENT_CASES.filter((c) => c.arm !== 'PWA_TYPE' && !RERUN_THREE.includes(c.id)).map((c) => c.id);
 	/** Today's set — version twelve — and its oracles, under their committed statement. */
 	const onVersionTwelve = (files: CheckInputs['files']) =>
 		check(files, { current: FP_NOW, cases: CURRENT_CASES, oracles: CURRENT_ORACLES.oracles, conferral: CURRENT_ORACLES.conferral });
@@ -2685,10 +2691,11 @@ describe('⭐⭐ package V — under case set v12 and the fingerprint L and N mo
 			fingerprint: BEFORE_L_AND_N(),
 			versions: { caseSet: 11, oracles: 11 }
 		});
+	// ⭐ Package V-2, 2026-10-29 (`REG-D-137` Q46; design D29) — MOVED, DELIBERATELY: ~~`of 91`~~ — version twelve holds 94.
 	const owed = (who: 'any' | 'selected', ids: readonly string[], lines: readonly RecordLine[]) =>
 		who === 'any'
-			? `${ids.length} of 91 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer}: ${ids.join(', ')} — owed: a RUN over them, or RESCORED lines where no case prompt changed (§5.6 limb 1)`
-			: `${ids.length} of 91 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer} by the SELECTED candidate devin / glm-5-3-flash-max (REG-D-084; the SELECTION in force, runs.ndjson:${lines.length}): ${ids.join(', ')} — owed: a run of the selected candidate over them, or RESCORED lines of its runs where no case prompt changed (§5.6 limb 1; REG-D-086)`;
+			? `${ids.length} of 94 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer}: ${ids.join(', ')} — owed: a RUN over them, or RESCORED lines where no case prompt changed (§5.6 limb 1)`
+			: `${ids.length} of 94 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer} by the SELECTED candidate devin / glm-5-3-flash-max (REG-D-084; the SELECTION in force, runs.ndjson:${lines.length}): ${ids.join(', ')} — owed: a run of the selected candidate over them, or RESCORED lines of its runs where no case prompt changed (§5.6 limb 1; REG-D-086)`;
 	const hint = (ids: readonly string[]) =>
 		`same prompts under an earlier fingerprint in qr-v11-before-l-n: ${ids.join(', ')} — RESCORED lines discharge those where no case prompt changed (§5.6 limb 1)`;
 	/** The ACKNOWLEDGED line §5.6 limb 1 asks for, as the check words it. */
@@ -2696,12 +2703,13 @@ describe('⭐⭐ package V — under case set v12 and the fingerprint L and N mo
 		`the reviewer fingerprint moved outside every case prompt since ${since} — the probe set, the budget or the ` +
 		`criteria moved, and no case prompt recorded under it differs from today’s: an ACKNOWLEDGED line naming ${FP.reviewer} ` +
 		'is owed, with the case added to exercise the change or the reason none is needed, whatever runs exist under it (§5.6 limb 1)';
-	/** That line: today's fingerprint, the 56 the cases added to exercise the move. */
+	/** That line: today's fingerprint, the 56 the cases added to exercise the move ⭐ — and the three re-run cases (package V-2). */
 	const acknowledged = (): RecordLine => ({
 		kind: 'ACKNOWLEDGED',
 		date: '2026-10-26T13:00:00.000Z',
 		reviewerFingerprint: FP.reviewer,
-		addedCaseIds: FIFTY_SIX()
+		// ⭐ Package V-2, 2026-10-29 — ~~`FIFTY_SIX()`~~: and the three re-run cases, which exercise package O-2's re-run words.
+		addedCaseIds: [...FIFTY_SIX(), ...RERUN_THREE]
 	});
 	/** RESCORED lines of that run under today's fingerprint: each of its evaluations of a current case whose prompts are today's. */
 	const restampToday = (lines: readonly RecordLine[]) =>
@@ -2725,15 +2733,29 @@ describe('⭐⭐ package V — under case set v12 and the fingerprint L and N mo
 			runId: 'qr-v12-new',
 			date: '2026-10-26T14:00:00.000Z',
 			candidate: DEVIN,
-			cases: CURRENT_CASES.filter((c) => c.arm !== 'PWA_TYPE'),
+			// ⭐ Package V-2, 2026-10-29 — ~~`c.arm !== 'PWA_TYPE'`~~: the 56, the three re-run cases measured by a run of their own.
+			cases: CURRENT_CASES.filter((c) => FIFTY_SIX().includes(c.id)),
+			fingerprint: { ...CURRENT, caseSet: FP_NOW.caseSet },
+			repetitions: 2,
+			versions: { caseSet: 12, oracles: 12 }
+		});
+	/** ⭐ Package V-2 — the selected candidate's run of the three re-run cases under today's fingerprint, two repetitions. */
+	const runRerun = () =>
+		recorded({
+			runId: 'qr-v12-rerun',
+			date: '2026-10-26T15:00:00.000Z',
+			candidate: DEVIN,
+			cases: CURRENT_CASES.filter((c) => RERUN_THREE.includes(c.id)),
 			fingerprint: { ...CURRENT, caseSet: FP_NOW.caseSet },
 			repetitions: 2,
 			versions: { caseSet: 12, oracles: 12 }
 		});
 
-	it('⛔ RED, AND EXACTLY SO — an ACKNOWLEDGED line owed, the move reaching no recorded case prompt; coverage of all 91, by any candidate and by the selected one, each naming the 35 part cases, whose prompts did not move, as RESCORED lines discharge them; no REPRODUCTION, RECORD or CONFERRAL problem, nothing else', async () => {
+	it('⛔ RED, AND EXACTLY SO — an ACKNOWLEDGED line owed, the move reaching no recorded case prompt; coverage of all ~~91~~ ⭐ 94 (package V-2), by any candidate and by the selected one, each naming the 35 part cases, whose prompts did not move, as RESCORED lines discharge them; no REPRODUCTION, RECORD or CONFERRAL problem, nothing else', async () => {
 		expect([CURRENT_SET.caseSetVersion, CURRENT_ORACLES.oracleVersion], 'the current set is version twelve').toEqual([12, 12]);
 		expect([PARTS().length, FIFTY_SIX().length], 'part cases, the others').toEqual([35, 56]);
+		// ⭐ Package V-2, 2026-10-29 — and the three re-run cases, after the 91.
+		expect(CURRENT_CASES.slice(91).map((c) => c.id), 'arrangement: the three re-run cases, after the 91').toEqual(RERUN_THREE);
 		expect(FP.reviewer, 'arrangement: the run’s fingerprint is not today’s').not.toBe(BEFORE_L_AND_N().reviewer);
 		expect(FIFTY_SIX().filter((id) => V11_CASES.some((c) => c.id === id)), 'arrangement: version eleven holds none of the 56').toEqual([]);
 		const lines = [...(await v11Run()), select(GLM)];
@@ -2745,23 +2767,33 @@ describe('⭐⭐ package V — under case set v12 and the fingerprint L and N mo
 		]);
 	});
 
-	it('⭐ RESCORED lines of that run for the 35, the ACKNOWLEDGED line naming the 56 added, and a run of the selected candidate over the 56 under today’s fingerprint, each answered as its oracle expects: GREEN; without the line, it alone is owed; without the run, the 56 alone, by any candidate and by the selected one; without the RESCORED lines, the 35 alone', async () => {
+	it('⭐ RESCORED lines of that run for the 35, the ACKNOWLEDGED line naming the 56 ⭐ and the three re-run cases added, and a run of the selected candidate over the 56 ⭐ and one over the three under today’s fingerprint, each answered as its oracle expects: GREEN; without the line, it alone is owed; without the ⭐ runs, the 56 ⭐ and the three alone, by any candidate and by the selected one; ⭐ without the three’s run, the three alone; without the RESCORED lines, the 35 alone', async () => {
 		const v11 = await v11Run();
 		const rescored = await restampToday(v11);
 		expect(rescored.map((l) => l.caseId), 'the 35, and none of the 56: no record holds one of their prompts').toEqual(PARTS());
 		const fiftySix = await run56();
-		const whole = [...v11, ...rescored, acknowledged(), ...fiftySix, select(GLM)];
+		// ⭐ Package V-2, 2026-10-29 — ~~`[...v11, ...rescored, acknowledged(), ...fiftySix, select(GLM)]`~~: and the three's run.
+		const three = await runRerun();
+		const whole = [...v11, ...rescored, acknowledged(), ...fiftySix, ...three, select(GLM)];
 		expect((await onVersionTwelve([file(whole)])).problems, 'nothing owed').toEqual([]);
-		const withoutLine = [...v11, ...rescored, ...fiftySix, select(GLM)];
+		const withoutLine = [...v11, ...rescored, ...fiftySix, ...three, select(GLM)];
 		expect((await onVersionTwelve([file(withoutLine)])).problems, 'without the line, it alone').toEqual([
 			{ limb: 'COVERAGE', message: acknowledgementOwed('run qr-v11-before-l-n') }
 		]);
 		const withoutRun = [...v11, ...rescored, acknowledged(), select(GLM)];
-		expect((await onVersionTwelve([file(withoutRun)])).problems, 'without the run, the 56 alone, by any candidate and by the selected one').toEqual([
-			{ limb: 'COVERAGE', message: owed('any', FIFTY_SIX(), withoutRun) },
-			{ limb: 'COVERAGE', message: owed('selected', FIFTY_SIX(), withoutRun) }
+		// ⭐ Package V-2, 2026-10-29 — ~~'without the run, the 56 alone'~~: without the runs, the 56 and the three alone.
+		expect((await onVersionTwelve([file(withoutRun)])).problems, 'without the runs, the 56 and the three alone, by any candidate and by the selected one').toEqual([
+			{ limb: 'COVERAGE', message: owed('any', [...FIFTY_SIX(), ...RERUN_THREE], withoutRun) },
+			{ limb: 'COVERAGE', message: owed('selected', [...FIFTY_SIX(), ...RERUN_THREE], withoutRun) }
 		]);
-		const withoutRescores = [...v11, acknowledged(), ...fiftySix, select(GLM)];
+		// ⭐ Package V-2, 2026-10-29 — and without the three's run, the three alone: the 56's run measures none of them.
+		const withoutRerun = [...v11, ...rescored, acknowledged(), ...fiftySix, select(GLM)];
+		expect((await onVersionTwelve([file(withoutRerun)])).problems, 'without the three’s run, the three alone, by any candidate and by the selected one').toEqual([
+			{ limb: 'COVERAGE', message: owed('any', RERUN_THREE, withoutRerun) },
+			{ limb: 'COVERAGE', message: owed('selected', RERUN_THREE, withoutRerun) }
+		]);
+		// ⭐ Package V-2, 2026-10-29 — ~~`[...v11, acknowledged(), ...fiftySix, select(GLM)]`~~: and the three's run.
+		const withoutRescores = [...v11, acknowledged(), ...fiftySix, ...three, select(GLM)];
 		expect((await onVersionTwelve([file(withoutRescores)])).problems, 'without the RESCORED lines, the 35 alone, the run naming them').toEqual([
 			{ limb: 'COVERAGE', message: [owed('any', PARTS(), withoutRescores), hint(PARTS())].join('\n    ') },
 			{ limb: 'COVERAGE', message: [owed('selected', PARTS(), withoutRescores), hint(PARTS())].join('\n    ') }
@@ -3499,12 +3531,12 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		expect(r.out).toContain('is not in a git work tree');
 	});
 
-	it('⛔ RED on an empty record — all ~~76~~ ⭐ 91 cases of the committed set are owed', () => {
+	it('⛔ RED on an empty record — all ~~76~~ ~~⭐ 91~~ ⭐ 94 cases of the committed set are owed', () => {
 		const r = cli(['--conditions=source'], ['--records', gitRepo()]);
 		expect(r.status, r.out).toBe(1);
 		// ⭐ Package P F3 — ~~54 of 54~~: version seven's sixty. ⭐ B7 — ~~60 of 60~~: version eight's 76. ⭐ Package V — ~~76 of
-		// 76~~: version twelve's 91.
-		expect(r.out).toContain('91 of 91 current case(s) are not MEASURED under today’s reviewer fingerprint');
+		// 76~~: version twelve's 91. ⭐ Package V-2, 2026-10-29 (`REG-D-137`) — ~~91 of 91~~: and its three re-run cases, 94.
+		expect(r.out).toContain('94 of 94 current case(s) are not MEASURED under today’s reviewer fingerprint');
 		expect(r.out).toContain(FP.reviewer);
 		// ⭐ `JAN-CRITREAD` J2-5 — the committed set it holds coverage to is the CURRENT one, with its oracles: version three
 		// from J2-7, version four since `JAN-PRQUAL` `PQ-2` (DESIGN-process-result-qualification.md D4).
@@ -3811,7 +3843,8 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		const r = cli(['--conditions=source'], ['--records', untracked]);
 		expect(r.status, r.out).toBe(1);
 		expect(r.out).toContain('runs.ndjson: not read — git does not track it');
-		expect(r.out, 'and so it covers nothing').toContain('91 of 91 current case(s) are not MEASURED'); // ⭐ package V — ~~76 of 76~~
+		// ⭐ package V — ~~76 of 76~~; ⭐ package V-2, 2026-10-29 — ~~91 of 91~~: and the three re-run cases.
+		expect(r.out, 'and so it covers nothing').toContain('94 of 94 current case(s) are not MEASURED');
 
 		const changed = gitRepo();
 		writeFileSync(join(changed, 'runs.ndjson'), text(lines));
@@ -3838,7 +3871,8 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		expect(r.out).toContain(
 			'  [RECORD] runs.ndjson: not read — git tracks it, but it is gone from the working tree — a record file is struck, never deleted (§5.4)\n'
 		);
-		expect(r.out, 'and so it covers nothing').toContain('91 of 91 current case(s) are not MEASURED'); // ⭐ package V — ~~76 of 76~~
+		// ⭐ package V — ~~76 of 76~~; ⭐ package V-2, 2026-10-29 — ~~91 of 91~~: and the three re-run cases.
+		expect(r.out, 'and so it covers nothing').toContain('94 of 94 current case(s) are not MEASURED');
 		expect(r.status, r.out).toBe(1);
 		// ⭑ CONTROL — the same file, restored from what git staged: read, it covers today's set.
 		git(dir, 'checkout', '--', 'runs.ndjson');
@@ -3896,7 +3930,8 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 				// ⭐ B7 — ~~39 of 40~~: case set v8's 26 planted carried cases and its 15 catchers.
 				// ⭐ Package V — ~~40 of 41~~: case set v12's 31 planted re-cast and new cases — P12-RR-03 SATISFIED now — and the 15
 				// catchers; ~~W-RR-04#1~~ W12-RR-04#1.
-				'  run qr-cli-4: the planted criterion named in 45 of 46 answered planted evaluation(s), against today’s oracles',
+				// ⭐ Package V-2, 2026-10-29 (`REG-D-137`) — ~~45 of 46~~: and the planted re-run twin, W12-CSV-RERUN-RR-07.
+				'  run qr-cli-4: the planted criterion named in 46 of 47 answered planted evaluation(s), against today’s oracles',
 				'    W12-RR-04#1 — REJECTED, the right verdict; RR-04 not faulted (it faulted RR-02)',
 				// ⭐ `REG-D-113` — GREEN again: ~~red on the conferral alone (`E12F` F5)~~.
 				// ⭐ Package P F3 — ~~GREEN~~: red on the conferral alone again (`ONLY_THE_CONFERRAL`). ⭐ B7 — GREEN again.
@@ -3928,7 +3963,8 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 				// ⭐ Package P F3 — ~~35 of 35~~: and case set v7's five planted graph cases.
 				// ⭐ B7 — ~~40 of 40~~: case set v8's 26 planted carried cases and its 15 catchers.
 				// ⭐ Package V — ~~41 of 41~~: case set v12's 31 planted re-cast and new cases and the 15 catchers.
-				'  run qr-cli-6: the planted criterion named in 46 of 46 answered planted evaluation(s), against today’s oracles',
+				// ⭐ Package V-2, 2026-10-29 (`REG-D-137`) — ~~46 of 46~~: and the planted re-run twin, W12-CSV-RERUN-RR-07.
+				'  run qr-cli-6: the planted criterion named in 47 of 47 answered planted evaluation(s), against today’s oracles',
 				// ⭐ `REG-D-113` — GREEN again: ~~red on the conferral alone (`E12F` F5)~~.
 				// ⭐ Package P F3 — ~~GREEN~~: red on the conferral alone again (`ONLY_THE_CONFERRAL`). ⭐ B7 — GREEN again.
 				// ⭐ B8a — ~~GREEN~~: red on the confirmation alone (`ONLY_THE_CONFIRMATION`). ⭐ `REG-D-129` — GREEN again.
@@ -3958,8 +3994,8 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		const red = cli(['--conditions=source'], ['--records', dir]);
 		expect(red.status, red.out).toBe(1);
 		expect(red.out).toContain(
-			// ⭐ Package V — ~~76 of 76~~: version twelve's 91.
-			`  [COVERAGE] 91 of 91 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer} by the SELECTED candidate devin / a-model-never-run (REG-D-084; the SELECTION in force, runs.ndjson:${glm.length + 2}): ${CURRENT_CASES.map((c) => c.id).join(', ')} — owed: a run of the selected candidate over them`
+			// ⭐ Package V — ~~76 of 76~~: version twelve's 91. ⭐ Package V-2, 2026-10-29 — ~~91 of 91~~: and its three re-run cases.
+			`  [COVERAGE] 94 of 94 current case(s) are not MEASURED under today’s reviewer fingerprint ${FP.reviewer} by the SELECTED candidate devin / a-model-never-run (REG-D-084; the SELECTION in force, runs.ndjson:${glm.length + 2}): ${CURRENT_CASES.map((c) => c.id).join(', ')} — owed: a run of the selected candidate over them`
 		);
 	}, 120_000);
 
