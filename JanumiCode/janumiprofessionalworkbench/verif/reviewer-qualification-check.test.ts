@@ -2776,6 +2776,7 @@ describe('⭐⭐ package V — under case set v12 and the fingerprint L and N mo
 		const three = await runRerun();
 		const whole = [...v11, ...rescored, acknowledged(), ...fiftySix, ...three, select(GLM)];
 		expect((await onVersionTwelve([file(whole)])).problems, 'nothing owed').toEqual([]);
+		// ⭐ Package V-2, 2026-10-29 — ~~`[...v11, ...rescored, ...fiftySix, select(GLM)]`~~: and the three's run.
 		const withoutLine = [...v11, ...rescored, ...fiftySix, ...three, select(GLM)];
 		expect((await onVersionTwelve([file(withoutLine)])).problems, 'without the line, it alone').toEqual([
 			{ limb: 'COVERAGE', message: acknowledgementOwed('run qr-v11-before-l-n') }

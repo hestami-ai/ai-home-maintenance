@@ -99,6 +99,8 @@ const VERSIONS: readonly (readonly [string, CaseSet, string, OracleSet])[] = [
 	[CASE_SET_V11_FILE, CASE_SET_V11, ORACLES_V11_FILE, ORACLES_V11],
 	// ⭐ `JAN-EXEC` Phase 7, before P6 again, package V — version twelve: version eleven's 35 part cases under their ids, and 56
 	// cases shown what production now hands each review under new ids (`REG-D-136`), their oracles as the sponsor confirmed them.
+	// ⭐ Package V-2 — and three re-run cases after the 91, under new ids, shown what production hands a work re-run's review
+	// (`REG-D-137` Q46), their oracles as their author proposed them.
 	[CASE_SET_V12_FILE, CASE_SET_V12, ORACLES_V12_FILE, ORACLES_V12]
 ];
 

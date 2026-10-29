@@ -304,6 +304,11 @@ export const ORACLES_V12_FILE = 'docs/tracking/reviewer-qualification/oracles/or
  * the sponsor confirmed them, three moved under the narrower command question (`oracles-v12.ts`). ⚠ The 56 are new prompts,
  * so the check owes a RUN of the selected reviewer over them (limb 1); and since packages L and N moved the reviewer
  * fingerprint, the 35 owe RESCORED lines where no case prompt changed, or a run (limb 1).
+ * ⭐ Package V-2 (`REG-D-137` Q46; design D28, D29, revision 4), 2026-10-29 — and three re-run cases after the 91, under new
+ * ids: the colsummary unit's clean work re-run (`W12-CSV-RERUN`), its twin planted on RR-07 (`W12-CSV-RERUN-RR-07`) and the
+ * unit's clean Test Adequacy sign-off after the re-run (`D12-CSV-TA-RERUN`), each shown what production hands a re-run's
+ * review (`case-set-v12.ts`), their oracles as their author proposed them (`oracles-v12.ts`). ⚠ The three are new prompts
+ * too, so the RUN owed covers them as well: the 56 and the three (limb 1).
  */
 export const CURRENT_CASE_SET_FILE = CASE_SET_V12_FILE;
 export const CURRENT_ORACLES_FILE = ORACLES_V12_FILE;

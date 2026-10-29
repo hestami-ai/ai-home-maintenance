@@ -128,14 +128,14 @@ const IDS = [
 	'D12-FP-03'
 ];
 /**
- * ⭐ Package V — A CLEAN CASE, by its id: ~~`id.endsWith('-CLEAN')`~~ one ending `-CLEAN`, or `-CLEAN-B`, the revised case's —
- * keyed on the old suffix alone, D12-TA-CLEAN-B would be read as planted, and drop out of every clean limb in silence.
- */
-/**
  * ⭐ Package V-2 (`REG-D-137` Q46; design D29) — THE SIGN-OFF AFTER THE RE-RUN: the colsummary unit's clean Test Adequacy review
  * after its work re-run, version twelve's fifteenth declared case, after the 91 — written here. Its id names no `-CLEAN`.
  */
 const RERUN_SIGN_OFF = 'D12-CSV-TA-RERUN';
+/**
+ * ⭐ Package V — A CLEAN CASE, by its id: ~~`id.endsWith('-CLEAN')`~~ one ending `-CLEAN`, or `-CLEAN-B`, the revised case's —
+ * keyed on the old suffix alone, D12-TA-CLEAN-B would be read as planted, and drop out of every clean limb in silence.
+ */
 // ⭐ Package V-2, 2026-10-29 — ~~`/-CLEAN(-B)?$/.test(id)`~~: and the sign-off after the re-run, clean, which would otherwise be
 // read as planted — its oracle held to a criterion its id does not name, and dropped from every clean limb.
 const isClean = (id: string): boolean => /-CLEAN(-B)?$/.test(id) || id === RERUN_SIGN_OFF;
