@@ -1,5 +1,5 @@
 {
-	"note": "The frozen worlds case set version twelve is built over (scripts/reviewer-qual/case-set-v12.ts; REG-D-136; design D14): each unit step its new and file-judging cases show, built once, for real, before the sponsor confirmed the cases - each write made and each run executed with Node v24.11.1, no model or agent-CLI call - and recorded as it ran: its acts in order, each run with its command, exit and output, and the files the step changed against its workspace’s baseline, each with the text read after it. Never re-run: a re-run moves the measured durations and outputs, and so the prompts. The nine colsummary worlds record each run’s duration, and their output names the workspace by the sandbox root W:\\colsummary, the root each step ran in rewritten to it; the four wordfreq worlds (ta-clean-b, ta-08, fp-clean, fp-03) record no duration, and no case shows one. Never hand-edited.",
+	"note": "The frozen worlds case set version twelve is built over (scripts/reviewer-qual/case-set-v12.ts; REG-D-136; design D14): each unit step its new and file-judging cases show, built once, for real, before the sponsor confirmed the cases - each write made and each run executed with Node v24.11.1, no model or agent-CLI call - and recorded as it ran: its acts in order, each run with its command, exit and output, and the files the step changed against its workspace’s baseline, each with the text read after it. Never re-run: a re-run moves the measured durations and outputs, and so the prompts. The nine colsummary worlds record each run’s duration, and their output names the workspace by the sandbox root W:\\colsummary, the root each step ran in rewritten to it; the four wordfreq worlds (ta-clean-b, ta-08, fp-clean, fp-03) record no duration, and no case shows one. Never hand-edited. Since package V-2 (REG-D-137, Q46; design D29) a tenth colsummary world, rerun, which the three re-run cases show: the unit’s work re-run, built once, for real, in one workspace, after the sponsor’s ruling and before the offline pre-check of the three - a first step of two tries, each refused, then the re-run step, one try - and recorded whole as it ran: its baseline is the unit’s first step’s, as paths and hashes; its acts and files are the re-run step’s own acts and the files changed since that baseline as the host read them after its try, the view marked workRerun (design D28); its manifests are hashes; its firstStep is the refused step it inherits from, which no prompt shows. Its runs record their durations, and its output names the workspace by the same sandbox root.",
 	"environment": {
 		"node": "v24.11.1",
 		"colsummaryWorkspace": "W:\\colsummary"
@@ -1865,6 +1865,674 @@
 					"content": "A cat sat on the mat. The Dog sat on a rug.\nThe CAT ran to the dog. A dog ran to the cat.\nA rug, a mat, the sun, the end.\n"
 				}
 			]
+		},
+		"rerun": {
+			"world": "rerun",
+			"note": "The colsummary unit’s WORK RE-RUN, built for real in one workspace (scratch; design D29, REG-D-137). `baseline` is the unit’s FIRST step’s manifest before its first try (D22), as paths; `acts` and `files` are the RE-RUN step’s: its own acts (ordinals from 1, one try) and the files changed since that baseline as the host read them after its try 1, marked `workRerun` (D28). `firstStep` records the refused first step (two tries) the re-run inherits from; no prompt shows it.",
+			"environment": {
+				"node": "v24.11.1",
+				"colsummaryWorkspace": "W:\\colsummary"
+			},
+			"baseline": [
+				"README.md",
+				"docs/design.md",
+				"docs/requirements.md"
+			],
+			"baselineHashes": [
+				[
+					"README.md",
+					"4ce208d586f65282840d0e269ba1b6f400e1cbd4a455106335eac43983685b4d"
+				],
+				[
+					"docs/design.md",
+					"6ae4bbad9adb9dd8d0af1589e6644487de3cce0982a857655e27dbe6e95a619f"
+				],
+				[
+					"docs/requirements.md",
+					"3dad392da62d629c174f45e64c046cb478be41257a1c61ba43a5e5fa6fa6eed2"
+				]
+			],
+			"acts": [
+				{
+					"try": 1,
+					"ordinal": 1,
+					"kind": "RUN",
+					"argv": [
+						"ls"
+					],
+					"exitCode": 0,
+					"timedOut": false,
+					"durationMs": 21,
+					"stdout": "README.md\nbin\ndocs\npackage.json\nsrc\ntest\n",
+					"stderr": ""
+				},
+				{
+					"try": 1,
+					"ordinal": 2,
+					"kind": "RUN",
+					"argv": [
+						"ls",
+						"test"
+					],
+					"exitCode": 0,
+					"timedOut": false,
+					"durationMs": 24,
+					"stdout": "csv.test.js\nsummarise.test.js\n",
+					"stderr": ""
+				},
+				{
+					"try": 1,
+					"ordinal": 3,
+					"kind": "RUN",
+					"argv": [
+						"cat",
+						"package.json"
+					],
+					"exitCode": 0,
+					"timedOut": false,
+					"durationMs": 23,
+					"stdout": "{\n  \"name\": \"colsummary\",\n  \"version\": \"1.0.0\",\n  \"description\": \"Summarise one numeric column of a CSV file.\",\n  \"type\": \"module\",\n  \"bin\": { \"colsummary\": \"bin/colsummary.js\" },\n  \"scripts\": { \"test\": \"node --test\" },\n  \"engines\": { \"node\": \">=22\" },\n  \"private\": true\n}\n",
+					"stderr": ""
+				},
+				{
+					"try": 1,
+					"ordinal": 4,
+					"kind": "RUN",
+					"argv": [
+						"cat",
+						"src/csv.js"
+					],
+					"exitCode": 0,
+					"timedOut": false,
+					"durationMs": 23,
+					"stdout": "// RFC 4180: fields are separated by commas and records by CRLF or LF; a field may be enclosed in double quotes,\n// and inside one a comma or a line break is part of the field and a doubled quote is one quote.\nexport function parseCsv(text) {\n  const rows = [];\n  let row = [];\n  let field = '';\n  let quoted = false;\n  for (let i = 0; i < text.length; i += 1) {\n    const ch = text[i];\n    if (quoted) {\n      if (ch !== '\"') field += ch;\n      else if (text[i + 1] === '\"') { field += '\"'; i += 1; }\n      else quoted = false;\n    } else if (ch === '\"' && field === '') quoted = true;\n    else if (ch === ',') { row.push(field); field = ''; }\n    else if (ch === '\\n' || ch === '\\r') {\n      if (ch === '\\r' && text[i + 1] === '\\n') i += 1;\n      row.push(field); rows.push(row); row = []; field = '';\n    } else field += ch;\n  }\n  if (quoted) throw new Error('unterminated quoted field');\n  if (field !== '' || row.length > 0) { row.push(field); rows.push(row); }\n  return rows;\n}\n",
+					"stderr": ""
+				},
+				{
+					"try": 1,
+					"ordinal": 5,
+					"kind": "RUN",
+					"argv": [
+						"cat",
+						"src/summarise.js"
+					],
+					"exitCode": 0,
+					"timedOut": false,
+					"durationMs": 22,
+					"stdout": "const NUMBER = /^-?\\d+(\\.\\d+)?$/;\n\n// The summary of the column the first row names `column`: a blank cell is missing, any other must be a decimal number.\nexport function summarise(rows, column) {\n  const [header = [], ...records] = rows;\n  const index = header.indexOf(column);\n  if (index === -1) throw new Error(`no column named \"${column}\"`);\n  const values = [];\n  let missing = 0;\n  records.forEach((record, i) => {\n    const cell = (record[index] ?? '').trim();\n    if (cell === '') { missing += 1; return; }\n    if (!NUMBER.test(cell)) throw new Error(`row ${i + 2}: \"${cell}\" in column \"${column}\" is not a number`);\n    values.push(Number(cell));\n  });\n  if (values.length === 0) return { count: 0, missing, min: 'none', max: 'none', mean: 'none' };\n  const sum = values.reduce((a, b) => a + b, 0);\n  return { count: values.length, missing, min: Math.min(...values), max: Math.max(...values), mean: (sum / values.length).toFixed(2) };\n}\n\nexport function formatSummary(s) {\n  return ['count', 'missing', 'min', 'max', 'mean'].map((k) => `${k} ${s[k]}`).join('\\n') + '\\n';\n}\n",
+					"stderr": ""
+				},
+				{
+					"try": 1,
+					"ordinal": 6,
+					"kind": "RUN",
+					"argv": [
+						"cat",
+						"bin/colsummary.js"
+					],
+					"exitCode": 0,
+					"timedOut": false,
+					"durationMs": 23,
+					"stdout": "#!/usr/bin/env node\nimport { readFile } from 'node:fs/promises';\nimport { parseCsv } from '../src/csv.js';\nimport { formatSummary, summarise } from '../src/summarise.js';\n\nconst USAGE = 'usage: colsummary <file.csv> --column <name>';\n\nfunction parseArgs(args) {\n  let file;\n  let column;\n  for (let i = 0; i < args.length; i += 1) {\n    if (args[i] === '--column') {\n      column = args[i + 1];\n      if (column === undefined) throw new Error('--column needs a name');\n      i += 1;\n    } else if (args[i].startsWith('--')) throw new Error(`unknown option ${args[i]}`);\n    else if (file === undefined) file = args[i];\n    else throw new Error(`unexpected argument ${args[i]}`);\n  }\n  if (file === undefined) throw new Error('no file named');\n  if (column === undefined) throw new Error('no --column given');\n  return { file, column };\n}\n\nasync function main(args) {\n  let options;\n  try {\n    options = parseArgs(args);\n  } catch (e) {\n    process.stderr.write(`colsummary: ${e.message}\\n${USAGE}\\n`);\n    return 1;\n  }\n  let text;\n  try {\n    text = await readFile(options.file, 'utf8');\n  } catch (e) {\n    process.stderr.write(`colsummary: cannot read ${options.file}: ${e.code === 'ENOENT' ? 'no such file' : e.message}\\n`);\n    return 2;\n  }\n  try {\n    process.stdout.write(formatSummary(summarise(parseCsv(text), options.column)));\n    return 0;\n  } catch (e) {\n    process.stderr.write(`colsummary: ${e.message}\\n`);\n    return 1;\n  }\n}\n\nprocess.exitCode = await main(process.argv.slice(2));\n",
+					"stderr": ""
+				},
+				{
+					"try": 1,
+					"ordinal": 7,
+					"kind": "RUN",
+					"argv": [
+						"cat",
+						"test/csv.test.js"
+					],
+					"exitCode": 0,
+					"timedOut": false,
+					"durationMs": 23,
+					"stdout": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport { parseCsv } from '../src/csv.js';\n\ntest('splits fields on commas and records on LF and CRLF (R2)', () => {\n  assert.deepEqual(parseCsv('a,b\\n1,2\\r\\n3,4\\n'), [['a', 'b'], ['1', '2'], ['3', '4']]);\n});\n\ntest('a quoted field may hold commas (R2)', () => {\n  assert.deepEqual(parseCsv('site,note\\nSouth,\"pump off, no reading\"\\n'), [['site', 'note'], ['South', 'pump off, no reading']]);\n});\n\ntest('a doubled quote inside a quoted field is one quote (R2)', () => {\n  assert.deepEqual(parseCsv('note\\n\"checked \"\"twice\"\"\"\\n'), [['note'], ['checked \"twice\"']]);\n});\n\ntest('an unterminated quoted field is refused (R2)', () => {\n  assert.throws(() => parseCsv('note\\n\"open\\n'), /unterminated quoted field/);\n});\n",
+					"stderr": ""
+				},
+				{
+					"try": 1,
+					"ordinal": 8,
+					"kind": "RUN",
+					"argv": [
+						"cat",
+						"test/summarise.test.js"
+					],
+					"exitCode": 0,
+					"timedOut": false,
+					"durationMs": 40,
+					"stdout": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport { formatSummary, summarise } from '../src/summarise.js';\n\nconst rows = [['site', 'reading'], ['North', '12.5'], ['South', ''], ['East', '7'], ['West', '17.5']];\n\ntest('count, min and max of a numeric column (R1)', () => {\n  const s = summarise(rows, 'reading');\n  assert.equal(s.count, 3);\n  assert.equal(s.min, 7);\n  assert.equal(s.max, 17.5);\n});\n\ntest('the mean is rounded to two decimal places (R1)', () => {\n  assert.equal(summarise(rows, 'reading').mean, '12.33');\n});\n\ntest('blank cells are counted as missing (R3)', () => {\n  assert.equal(summarise(rows, 'reading').missing, 1);\n});\n\ntest('min, max and mean are none when no cell holds a value (R4)', () => {\n  assert.equal(formatSummary(summarise([['reading'], [''], ['  ']], 'reading')), 'count 0\\nmissing 2\\nmin none\\nmax none\\nmean none\\n');\n});\n\ntest('a column not in the first row is refused (R6)', () => {\n  assert.throws(() => summarise(rows, 'depth'), /no column named \"depth\"/);\n});\n\ntest('a cell that is not a decimal number is refused, naming its row (R6)', () => {\n  assert.throws(() => summarise([['reading'], ['12'], ['n/a']], 'reading'), /row 3: \"n\\/a\" in column \"reading\" is not a number/);\n});\n",
+					"stderr": ""
+				},
+				{
+					"try": 1,
+					"ordinal": 9,
+					"kind": "RUN",
+					"argv": [
+						"cat",
+						"docs/test-report.md"
+					],
+					"exitCode": 0,
+					"timedOut": false,
+					"durationMs": 25,
+					"stdout": "# colsummary test report\n\nCommand: node --test\nResult: 10 tests, 10 passed, 0 failed\nRuntime: Node v24.11.1 on Windows\n",
+					"stderr": ""
+				},
+				{
+					"try": 1,
+					"ordinal": 10,
+					"kind": "WRITE",
+					"path": "test/fixtures/readings.csv"
+				},
+				{
+					"try": 1,
+					"ordinal": 11,
+					"kind": "WRITE",
+					"path": "test/fixtures/not-a-number.csv"
+				},
+				{
+					"try": 1,
+					"ordinal": 12,
+					"kind": "WRITE",
+					"path": "test/cli.test.js"
+				},
+				{
+					"try": 1,
+					"ordinal": 13,
+					"kind": "RUN",
+					"argv": [
+						"node",
+						"--test"
+					],
+					"exitCode": 0,
+					"timedOut": false,
+					"durationMs": 525,
+					"stdout": "✔ prints the five lines for a column of the fixture, a negative value among them (R1) (87.0652ms)\n✔ an unreadable file exits 2 with a message and prints nothing (R5) (65.9143ms)\n✔ a column not in the file exits 1 with a message and prints nothing (R6) (77.4321ms)\n✔ a value that is not a number exits 1 with a message naming its row and prints nothing (R6) (66.8857ms)\n✔ a bad argument exits 1 with the usage line and prints nothing (R6) (65.9448ms)\n✔ splits fields on commas and records on LF and CRLF (R2) (1.3288ms)\n✔ a quoted field may hold commas (R2) (0.1561ms)\n✔ a doubled quote inside a quoted field is one quote (R2) (0.1189ms)\n✔ an unterminated quoted field is refused (R2) (1.0921ms)\n✔ count, min and max of a numeric column (R1) (1.0707ms)\n✔ the mean is rounded to two decimal places (R1) (0.151ms)\n✔ blank cells are counted as missing (R3) (1.0296ms)\n✔ min, max and mean are none when no cell holds a value (R4) (0.2234ms)\n✔ a column not in the first row is refused (R6) (0.4908ms)\n✔ a cell that is not a decimal number is refused, naming its row (R6) (0.1653ms)\nℹ tests 15\nℹ suites 0\nℹ pass 15\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 465.0021\n",
+					"stderr": ""
+				},
+				{
+					"try": 1,
+					"ordinal": 14,
+					"kind": "WRITE",
+					"path": "docs/test-report.md"
+				}
+			],
+			"files": [
+				{
+					"path": "bin/colsummary.js",
+					"change": "ADDED",
+					"content": "#!/usr/bin/env node\nimport { readFile } from 'node:fs/promises';\nimport { parseCsv } from '../src/csv.js';\nimport { formatSummary, summarise } from '../src/summarise.js';\n\nconst USAGE = 'usage: colsummary <file.csv> --column <name>';\n\nfunction parseArgs(args) {\n  let file;\n  let column;\n  for (let i = 0; i < args.length; i += 1) {\n    if (args[i] === '--column') {\n      column = args[i + 1];\n      if (column === undefined) throw new Error('--column needs a name');\n      i += 1;\n    } else if (args[i].startsWith('--')) throw new Error(`unknown option ${args[i]}`);\n    else if (file === undefined) file = args[i];\n    else throw new Error(`unexpected argument ${args[i]}`);\n  }\n  if (file === undefined) throw new Error('no file named');\n  if (column === undefined) throw new Error('no --column given');\n  return { file, column };\n}\n\nasync function main(args) {\n  let options;\n  try {\n    options = parseArgs(args);\n  } catch (e) {\n    process.stderr.write(`colsummary: ${e.message}\\n${USAGE}\\n`);\n    return 1;\n  }\n  let text;\n  try {\n    text = await readFile(options.file, 'utf8');\n  } catch (e) {\n    process.stderr.write(`colsummary: cannot read ${options.file}: ${e.code === 'ENOENT' ? 'no such file' : e.message}\\n`);\n    return 2;\n  }\n  try {\n    process.stdout.write(formatSummary(summarise(parseCsv(text), options.column)));\n    return 0;\n  } catch (e) {\n    process.stderr.write(`colsummary: ${e.message}\\n`);\n    return 1;\n  }\n}\n\nprocess.exitCode = await main(process.argv.slice(2));\n"
+				},
+				{
+					"path": "docs/test-report.md",
+					"change": "ADDED",
+					"content": "# colsummary test report\n\nCommand: node --test\nResult: 15 tests, 15 passed, 0 failed\nRuntime: Node v24.11.1 on Windows\n"
+				},
+				{
+					"path": "package.json",
+					"change": "ADDED",
+					"content": "{\n  \"name\": \"colsummary\",\n  \"version\": \"1.0.0\",\n  \"description\": \"Summarise one numeric column of a CSV file.\",\n  \"type\": \"module\",\n  \"bin\": { \"colsummary\": \"bin/colsummary.js\" },\n  \"scripts\": { \"test\": \"node --test\" },\n  \"engines\": { \"node\": \">=22\" },\n  \"private\": true\n}\n"
+				},
+				{
+					"path": "src/csv.js",
+					"change": "ADDED",
+					"content": "// RFC 4180: fields are separated by commas and records by CRLF or LF; a field may be enclosed in double quotes,\n// and inside one a comma or a line break is part of the field and a doubled quote is one quote.\nexport function parseCsv(text) {\n  const rows = [];\n  let row = [];\n  let field = '';\n  let quoted = false;\n  for (let i = 0; i < text.length; i += 1) {\n    const ch = text[i];\n    if (quoted) {\n      if (ch !== '\"') field += ch;\n      else if (text[i + 1] === '\"') { field += '\"'; i += 1; }\n      else quoted = false;\n    } else if (ch === '\"' && field === '') quoted = true;\n    else if (ch === ',') { row.push(field); field = ''; }\n    else if (ch === '\\n' || ch === '\\r') {\n      if (ch === '\\r' && text[i + 1] === '\\n') i += 1;\n      row.push(field); rows.push(row); row = []; field = '';\n    } else field += ch;\n  }\n  if (quoted) throw new Error('unterminated quoted field');\n  if (field !== '' || row.length > 0) { row.push(field); rows.push(row); }\n  return rows;\n}\n"
+				},
+				{
+					"path": "src/summarise.js",
+					"change": "ADDED",
+					"content": "const NUMBER = /^-?\\d+(\\.\\d+)?$/;\n\n// The summary of the column the first row names `column`: a blank cell is missing, any other must be a decimal number.\nexport function summarise(rows, column) {\n  const [header = [], ...records] = rows;\n  const index = header.indexOf(column);\n  if (index === -1) throw new Error(`no column named \"${column}\"`);\n  const values = [];\n  let missing = 0;\n  records.forEach((record, i) => {\n    const cell = (record[index] ?? '').trim();\n    if (cell === '') { missing += 1; return; }\n    if (!NUMBER.test(cell)) throw new Error(`row ${i + 2}: \"${cell}\" in column \"${column}\" is not a number`);\n    values.push(Number(cell));\n  });\n  if (values.length === 0) return { count: 0, missing, min: 'none', max: 'none', mean: 'none' };\n  const sum = values.reduce((a, b) => a + b, 0);\n  return { count: values.length, missing, min: Math.min(...values), max: Math.max(...values), mean: (sum / values.length).toFixed(2) };\n}\n\nexport function formatSummary(s) {\n  return ['count', 'missing', 'min', 'max', 'mean'].map((k) => `${k} ${s[k]}`).join('\\n') + '\\n';\n}\n"
+				},
+				{
+					"path": "test/cli.test.js",
+					"change": "ADDED",
+					"content": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport { spawnSync } from 'node:child_process';\n\nconst run = (...args) => spawnSync(process.execPath, ['bin/colsummary.js', ...args], { encoding: 'utf8' });\n\ntest('prints the five lines for a column of the fixture, a negative value among them (R1)', () => {\n  const r = run('test/fixtures/readings.csv', '--column', 'reading');\n  assert.equal(r.status, 0);\n  assert.equal(r.stdout, 'count 3\\nmissing 1\\nmin -3\\nmax 17.5\\nmean 8.92\\n');\n  assert.equal(r.stderr, '');\n});\n\ntest('an unreadable file exits 2 with a message and prints nothing (R5)', () => {\n  const r = run('test/fixtures/absent.csv', '--column', 'reading');\n  assert.equal(r.status, 2);\n  assert.equal(r.stdout, '');\n  assert.match(r.stderr, /^colsummary: cannot read test\\/fixtures\\/absent\\.csv/);\n});\n\ntest('a column not in the file exits 1 with a message and prints nothing (R6)', () => {\n  const r = run('test/fixtures/readings.csv', '--column', 'depth');\n  assert.equal(r.status, 1);\n  assert.equal(r.stdout, '');\n  assert.match(r.stderr, /no column named \"depth\"/);\n});\n\ntest('a value that is not a number exits 1 with a message naming its row and prints nothing (R6)', () => {\n  const r = run('test/fixtures/not-a-number.csv', '--column', 'reading');\n  assert.equal(r.status, 1);\n  assert.equal(r.stdout, '');\n  assert.match(r.stderr, /row 3: \"n\\/a\" in column \"reading\" is not a number/);\n});\n\ntest('a bad argument exits 1 with the usage line and prints nothing (R6)', () => {\n  const r = run('test/fixtures/readings.csv');\n  assert.equal(r.status, 1);\n  assert.equal(r.stdout, '');\n  assert.match(r.stderr, /usage: colsummary <file\\.csv> --column <name>/);\n});\n"
+				},
+				{
+					"path": "test/csv.test.js",
+					"change": "ADDED",
+					"content": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport { parseCsv } from '../src/csv.js';\n\ntest('splits fields on commas and records on LF and CRLF (R2)', () => {\n  assert.deepEqual(parseCsv('a,b\\n1,2\\r\\n3,4\\n'), [['a', 'b'], ['1', '2'], ['3', '4']]);\n});\n\ntest('a quoted field may hold commas (R2)', () => {\n  assert.deepEqual(parseCsv('site,note\\nSouth,\"pump off, no reading\"\\n'), [['site', 'note'], ['South', 'pump off, no reading']]);\n});\n\ntest('a doubled quote inside a quoted field is one quote (R2)', () => {\n  assert.deepEqual(parseCsv('note\\n\"checked \"\"twice\"\"\"\\n'), [['note'], ['checked \"twice\"']]);\n});\n\ntest('an unterminated quoted field is refused (R2)', () => {\n  assert.throws(() => parseCsv('note\\n\"open\\n'), /unterminated quoted field/);\n});\n"
+				},
+				{
+					"path": "test/fixtures/not-a-number.csv",
+					"change": "ADDED",
+					"content": "site,reading\nNorth,12.5\nSouth,n/a\n"
+				},
+				{
+					"path": "test/fixtures/readings.csv",
+					"change": "ADDED",
+					"content": "site,reading,note\nNorth,12.25,\nSouth,,\"pump off, no reading\"\nEast,-3,\"checked \"\"twice\"\"\"\nWest,17.5,\n"
+				},
+				{
+					"path": "test/summarise.test.js",
+					"change": "ADDED",
+					"content": "import test from 'node:test';\nimport assert from 'node:assert/strict';\nimport { formatSummary, summarise } from '../src/summarise.js';\n\nconst rows = [['site', 'reading'], ['North', '12.5'], ['South', ''], ['East', '7'], ['West', '17.5']];\n\ntest('count, min and max of a numeric column (R1)', () => {\n  const s = summarise(rows, 'reading');\n  assert.equal(s.count, 3);\n  assert.equal(s.min, 7);\n  assert.equal(s.max, 17.5);\n});\n\ntest('the mean is rounded to two decimal places (R1)', () => {\n  assert.equal(summarise(rows, 'reading').mean, '12.33');\n});\n\ntest('blank cells are counted as missing (R3)', () => {\n  assert.equal(summarise(rows, 'reading').missing, 1);\n});\n\ntest('min, max and mean are none when no cell holds a value (R4)', () => {\n  assert.equal(formatSummary(summarise([['reading'], [''], ['  ']], 'reading')), 'count 0\\nmissing 2\\nmin none\\nmax none\\nmean none\\n');\n});\n\ntest('a column not in the first row is refused (R6)', () => {\n  assert.throws(() => summarise(rows, 'depth'), /no column named \"depth\"/);\n});\n\ntest('a cell that is not a decimal number is refused, naming its row (R6)', () => {\n  assert.throws(() => summarise([['reading'], ['12'], ['n/a']], 'reading'), /row 3: \"n\\/a\" in column \"reading\" is not a number/);\n});\n"
+				}
+			],
+			"workRerun": true,
+			"afterTry": 1,
+			"finalManifest": [
+				[
+					"README.md",
+					"4ce208d586f65282840d0e269ba1b6f400e1cbd4a455106335eac43983685b4d"
+				],
+				[
+					"bin/colsummary.js",
+					"70bc5f5ac473c66f414df77c148393afdcc07aa8fe1157098fd5d80660d93d95"
+				],
+				[
+					"docs/design.md",
+					"6ae4bbad9adb9dd8d0af1589e6644487de3cce0982a857655e27dbe6e95a619f"
+				],
+				[
+					"docs/requirements.md",
+					"3dad392da62d629c174f45e64c046cb478be41257a1c61ba43a5e5fa6fa6eed2"
+				],
+				[
+					"docs/test-report.md",
+					"c6e1cd26dcf7e010b5dc48cb15f8b547afa5b80bbb29e8831d9db4c72eef5391"
+				],
+				[
+					"package.json",
+					"e94e6babdd2713aae4f83d31d6be8edfdf98982627445cc2637bc427d1a44f21"
+				],
+				[
+					"src/csv.js",
+					"440290b1aebde352014e4e5d5939ca40638f9d146e082a63291bde772f671b4f"
+				],
+				[
+					"src/summarise.js",
+					"cd964d59c3e3e15f52c82667fb71561af62c94698937c58a5c1f58c68cce02d3"
+				],
+				[
+					"test/cli.test.js",
+					"0978cb445dc0a3941a9f78c5dd19c08c25afc2d5f136deaae0024e38bee5c562"
+				],
+				[
+					"test/csv.test.js",
+					"a3ee8bf2a4dcddc55fd49f538c6350e05bde3e5d73220dfd53c528e9e0f240cb"
+				],
+				[
+					"test/fixtures/not-a-number.csv",
+					"abfca6a679b33608ca49a0c8c9d2f14b28269434a6a872d1a00bfc7371dc6412"
+				],
+				[
+					"test/fixtures/readings.csv",
+					"59af303100582003d2459878edae5016b90cbcd0cab82dda251ff6d7607e983e"
+				],
+				[
+					"test/summarise.test.js",
+					"d83c886e9d7a9043e64fe2a012776427f49990d404d42af50121c50b88964a38"
+				]
+			],
+			"inheritedFromTheFirstStep": [
+				"bin/colsummary.js",
+				"package.json",
+				"src/csv.js",
+				"src/summarise.js",
+				"test/csv.test.js",
+				"test/summarise.test.js"
+			],
+			"writtenByTheRerun": [
+				"docs/test-report.md",
+				"test/cli.test.js",
+				"test/fixtures/not-a-number.csv",
+				"test/fixtures/readings.csv"
+			],
+			"rerunOwnStart": [
+				[
+					"README.md",
+					"4ce208d586f65282840d0e269ba1b6f400e1cbd4a455106335eac43983685b4d"
+				],
+				[
+					"bin/colsummary.js",
+					"70bc5f5ac473c66f414df77c148393afdcc07aa8fe1157098fd5d80660d93d95"
+				],
+				[
+					"docs/design.md",
+					"6ae4bbad9adb9dd8d0af1589e6644487de3cce0982a857655e27dbe6e95a619f"
+				],
+				[
+					"docs/requirements.md",
+					"3dad392da62d629c174f45e64c046cb478be41257a1c61ba43a5e5fa6fa6eed2"
+				],
+				[
+					"docs/test-report.md",
+					"faa961ed5e5e99aa72eebee6b1b40402a8d2bee302cc49350617533c9928363b"
+				],
+				[
+					"package.json",
+					"e94e6babdd2713aae4f83d31d6be8edfdf98982627445cc2637bc427d1a44f21"
+				],
+				[
+					"src/csv.js",
+					"440290b1aebde352014e4e5d5939ca40638f9d146e082a63291bde772f671b4f"
+				],
+				[
+					"src/summarise.js",
+					"cd964d59c3e3e15f52c82667fb71561af62c94698937c58a5c1f58c68cce02d3"
+				],
+				[
+					"test/csv.test.js",
+					"a3ee8bf2a4dcddc55fd49f538c6350e05bde3e5d73220dfd53c528e9e0f240cb"
+				],
+				[
+					"test/summarise.test.js",
+					"d83c886e9d7a9043e64fe2a012776427f49990d404d42af50121c50b88964a38"
+				]
+			],
+			"rerunTries": [
+				{
+					"try": 1,
+					"view": {
+						"afterTry": 1,
+						"files": [
+							{
+								"path": "bin/colsummary.js",
+								"change": "ADDED"
+							},
+							{
+								"path": "docs/test-report.md",
+								"change": "ADDED"
+							},
+							{
+								"path": "package.json",
+								"change": "ADDED"
+							},
+							{
+								"path": "src/csv.js",
+								"change": "ADDED"
+							},
+							{
+								"path": "src/summarise.js",
+								"change": "ADDED"
+							},
+							{
+								"path": "test/cli.test.js",
+								"change": "ADDED"
+							},
+							{
+								"path": "test/csv.test.js",
+								"change": "ADDED"
+							},
+							{
+								"path": "test/fixtures/not-a-number.csv",
+								"change": "ADDED"
+							},
+							{
+								"path": "test/fixtures/readings.csv",
+								"change": "ADDED"
+							},
+							{
+								"path": "test/summarise.test.js",
+								"change": "ADDED"
+							}
+						],
+						"workRerun": true
+					},
+					"changedSinceThisStepBegan": [
+						{
+							"path": "docs/test-report.md",
+							"change": "CHANGED"
+						},
+						{
+							"path": "test/cli.test.js",
+							"change": "ADDED"
+						},
+						{
+							"path": "test/fixtures/not-a-number.csv",
+							"change": "ADDED"
+						},
+						{
+							"path": "test/fixtures/readings.csv",
+							"change": "ADDED"
+						}
+					]
+				}
+			],
+			"firstStep": {
+				"attempt": 1,
+				"acts": [
+					{
+						"try": 1,
+						"ordinal": 1,
+						"kind": "RUN",
+						"argv": [
+							"ls"
+						],
+						"exitCode": 0,
+						"timedOut": false,
+						"durationMs": 26,
+						"stdout": "README.md\ndocs\n",
+						"stderr": ""
+					},
+					{
+						"try": 1,
+						"ordinal": 2,
+						"kind": "WRITE",
+						"path": "package.json"
+					},
+					{
+						"try": 1,
+						"ordinal": 3,
+						"kind": "WRITE",
+						"path": "src/csv.js"
+					},
+					{
+						"try": 1,
+						"ordinal": 4,
+						"kind": "WRITE",
+						"path": "src/summarise.js"
+					},
+					{
+						"try": 1,
+						"ordinal": 5,
+						"kind": "WRITE",
+						"path": "bin/colsummary.js"
+					},
+					{
+						"try": 1,
+						"ordinal": 6,
+						"kind": "WRITE",
+						"path": "test/csv.test.js"
+					},
+					{
+						"try": 1,
+						"ordinal": 7,
+						"kind": "WRITE",
+						"path": "test/summarise.test.js"
+					},
+					{
+						"try": 1,
+						"ordinal": 8,
+						"kind": "RUN",
+						"argv": [
+							"node",
+							"--test"
+						],
+						"exitCode": 1,
+						"timedOut": false,
+						"durationMs": 231,
+						"stdout": "✔ splits fields on commas and records on LF and CRLF (R2) (1.4502ms)\n✔ a quoted field may hold commas (R2) (0.1948ms)\n✔ a doubled quote inside a quoted field is one quote (R2) (0.1289ms)\n✔ an unterminated quoted field is refused (R2) (1.0785ms)\n✔ count, min and max of a numeric column (R1) (1.4482ms)\n✖ the mean is rounded to two decimal places (R1) (1.097ms)\n✔ blank cells are counted as missing (R3) (0.1721ms)\n✔ min, max and mean are none when no cell holds a value (R4) (0.2828ms)\n✔ a column not in the first row is refused (R6) (0.5161ms)\n✔ a cell that is not a decimal number is refused, naming its row (R6) (0.1675ms)\nℹ tests 10\nℹ suites 0\nℹ pass 9\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 149.9991\n\n✖ failing tests:\n\ntest at test\\summarise.test.js:14:1\n✖ the mean is rounded to two decimal places (R1) (1.097ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n  + actual - expected\n  \n  + 12.333333333333334\n  - '12.33'\n  \n      at TestContext.<anonymous> (file:///W:/colsummary/test/summarise.test.js:15:10)\n      at Test.runInAsyncScope (node:async_hooks:214:14)\n      at Test.run (node:internal/test_runner/test:1106:25)\n      at Test.processPendingSubtests (node:internal/test_runner/test:788:18)\n      at Test.postRun (node:internal/test_runner/test:1235:19)\n      at Test.run (node:internal/test_runner/test:1163:12)\n      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 12.333333333333334,\n    expected: '12.33',\n    operator: 'strictEqual',\n    diff: 'simple'\n  }\n",
+						"stderr": ""
+					},
+					{
+						"try": 1,
+						"ordinal": 9,
+						"kind": "WRITE",
+						"path": "src/summarise.js"
+					},
+					{
+						"try": 1,
+						"ordinal": 10,
+						"kind": "RUN",
+						"argv": [
+							"node",
+							"--test"
+						],
+						"exitCode": 0,
+						"timedOut": false,
+						"durationMs": 180,
+						"stdout": "✔ splits fields on commas and records on LF and CRLF (R2) (1.3223ms)\n✔ a quoted field may hold commas (R2) (0.1622ms)\n✔ a doubled quote inside a quoted field is one quote (R2) (0.1237ms)\n✔ an unterminated quoted field is refused (R2) (1.1838ms)\n✔ count, min and max of a numeric column (R1) (0.9893ms)\n✔ the mean is rounded to two decimal places (R1) (0.1259ms)\n✔ blank cells are counted as missing (R3) (1.1732ms)\n✔ min, max and mean are none when no cell holds a value (R4) (0.2917ms)\n✔ a column not in the first row is refused (R6) (0.6016ms)\n✔ a cell that is not a decimal number is refused, naming its row (R6) (0.2368ms)\nℹ tests 10\nℹ suites 0\nℹ pass 10\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 115.3562\n",
+						"stderr": ""
+					},
+					{
+						"try": 1,
+						"ordinal": 11,
+						"kind": "WRITE",
+						"path": "docs/test-report.md"
+					},
+					{
+						"try": 2,
+						"ordinal": 12,
+						"kind": "RUN",
+						"argv": [
+							"node",
+							"--test"
+						],
+						"exitCode": 0,
+						"timedOut": false,
+						"durationMs": 178,
+						"stdout": "✔ splits fields on commas and records on LF and CRLF (R2) (1.3428ms)\n✔ a quoted field may hold commas (R2) (0.1956ms)\n✔ a doubled quote inside a quoted field is one quote (R2) (0.12ms)\n✔ an unterminated quoted field is refused (R2) (1.0919ms)\n✔ count, min and max of a numeric column (R1) (1.134ms)\n✔ the mean is rounded to two decimal places (R1) (0.1276ms)\n✔ blank cells are counted as missing (R3) (0.8915ms)\n✔ min, max and mean are none when no cell holds a value (R4) (0.1864ms)\n✔ a column not in the first row is refused (R6) (0.4143ms)\n✔ a cell that is not a decimal number is refused, naming its row (R6) (0.1463ms)\nℹ tests 10\nℹ suites 0\nℹ pass 10\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 118.7375\n",
+						"stderr": ""
+					}
+				],
+				"tries": [
+					{
+						"try": 1,
+						"view": {
+							"afterTry": 1,
+							"files": [
+								{
+									"path": "bin/colsummary.js",
+									"change": "ADDED"
+								},
+								{
+									"path": "docs/test-report.md",
+									"change": "ADDED"
+								},
+								{
+									"path": "package.json",
+									"change": "ADDED"
+								},
+								{
+									"path": "src/csv.js",
+									"change": "ADDED"
+								},
+								{
+									"path": "src/summarise.js",
+									"change": "ADDED"
+								},
+								{
+									"path": "test/csv.test.js",
+									"change": "ADDED"
+								},
+								{
+									"path": "test/summarise.test.js",
+									"change": "ADDED"
+								}
+							]
+						},
+						"changedSinceThisStepBegan": [
+							{
+								"path": "bin/colsummary.js",
+								"change": "ADDED"
+							},
+							{
+								"path": "docs/test-report.md",
+								"change": "ADDED"
+							},
+							{
+								"path": "package.json",
+								"change": "ADDED"
+							},
+							{
+								"path": "src/csv.js",
+								"change": "ADDED"
+							},
+							{
+								"path": "src/summarise.js",
+								"change": "ADDED"
+							},
+							{
+								"path": "test/csv.test.js",
+								"change": "ADDED"
+							},
+							{
+								"path": "test/summarise.test.js",
+								"change": "ADDED"
+							}
+						]
+					},
+					{
+						"try": 2,
+						"view": {
+							"afterTry": 2,
+							"files": [
+								{
+									"path": "bin/colsummary.js",
+									"change": "ADDED"
+								},
+								{
+									"path": "docs/test-report.md",
+									"change": "ADDED"
+								},
+								{
+									"path": "package.json",
+									"change": "ADDED"
+								},
+								{
+									"path": "src/csv.js",
+									"change": "ADDED"
+								},
+								{
+									"path": "src/summarise.js",
+									"change": "ADDED"
+								},
+								{
+									"path": "test/csv.test.js",
+									"change": "ADDED"
+								},
+								{
+									"path": "test/summarise.test.js",
+									"change": "ADDED"
+								}
+							]
+						},
+						"changedSinceThisStepBegan": [
+							{
+								"path": "bin/colsummary.js",
+								"change": "ADDED"
+							},
+							{
+								"path": "docs/test-report.md",
+								"change": "ADDED"
+							},
+							{
+								"path": "package.json",
+								"change": "ADDED"
+							},
+							{
+								"path": "src/csv.js",
+								"change": "ADDED"
+							},
+							{
+								"path": "src/summarise.js",
+								"change": "ADDED"
+							},
+							{
+								"path": "test/csv.test.js",
+								"change": "ADDED"
+							},
+							{
+								"path": "test/summarise.test.js",
+								"change": "ADDED"
+							}
+						]
+					}
+				],
+				"refusedBecause": "Try 1’s work-product review REJECTED it on RR-02-no-obligation-elision: the instruction requires tests of the command itself in test/cli.test.js, and none was written, so R5’s exit 2 and R6’s exit 1 were tested through the command nowhere. Try 2 (the repair turn) re-ran the suite and wrote nothing; its review REJECTED it on the same ground. One open finding after each try: STALLED, so the loop stopped and the unit waited for a person, who re-ran the work."
+			}
 		}
 	}
 }

@@ -448,14 +448,19 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481) — no host text inside quoted mate
 	// since package V: version eleven's 35 part cases, and 56 shown what production now hands each review (design D14) — the 24
 	// work products their finished-work view, the 18 process results their places in their steps' sequences, the 14 sign-offs
 	// their files and sequence.
-	it('⭐ the ~~76~~ 91 cases of the current case set — initial and repair prompt, each process result read against its run, each declared case its work one region, each part case its part one region; and version seven’s graph cases', async () => {
+	// ⭐⭐ Package V-2, 2026-10-29 (`REG-D-137` Q46; design D29) — ~~the 91 of case set v12~~ the 94: and its three re-run cases
+	// after the 91, two work products their re-run's finished-work view and a sign-off its files and sequence, each marked.
+	it('⭐ the ~~76~~ ~~91~~ ⭐ 94 cases of the current case set — initial and repair prompt, each process result read against its run, each declared case its work one region, each part case its part one region; and version seven’s graph cases', async () => {
 		const cases = committedCaseSet(new URL('../', import.meta.url)).cases;
-		expect(cases).toHaveLength(91);
+		// ~~expect(cases).toHaveLength(91);~~ ⭐ Package V-2, 2026-10-29: and the three re-run cases.
+		expect(cases).toHaveLength(94);
 		expect(cases.filter((c) => c.arm === 'PWA_TYPE'), 'the 35 part cases').toHaveLength(35);
 		expect(cases.filter((c) => c.arm === 'PWA_GRAPH'), 'no graph case').toHaveLength(0);
-		expect(cases.filter((c) => c.arm === 'WORK_PRODUCT'), 'the 24 work-product cases').toHaveLength(24);
+		// ~~'the 24 work-product cases'~~ ⭐ Package V-2, 2026-10-29: and the two re-run work cases.
+		expect(cases.filter((c) => c.arm === 'WORK_PRODUCT'), 'the 26 work-product cases').toHaveLength(26);
 		expect(cases.filter((c) => c.arm === 'PROCESS_RESULT'), 'the ~~14~~ 18 process-result cases').toHaveLength(18);
-		expect(cases.filter((c) => c.arm === 'DECLARED_POLICY'), 'the 14 declared-policy cases').toHaveLength(14);
+		// ~~'the 14 declared-policy cases'~~ ⭐ Package V-2, 2026-10-29: and the sign-off after the re-run.
+		expect(cases.filter((c) => c.arm === 'DECLARED_POLICY'), 'the 15 declared-policy cases').toHaveLength(15);
 		const v7Graphs = (JSON.parse(readFileSync(new URL(`../${CASE_SET_V7_FILE}`, import.meta.url), 'utf8')) as CaseSet).cases.filter(
 			(c) => c.arm === 'PWA_GRAPH'
 		);

@@ -131,7 +131,14 @@ const IDS = [
  * ⭐ Package V — A CLEAN CASE, by its id: ~~`id.endsWith('-CLEAN')`~~ one ending `-CLEAN`, or `-CLEAN-B`, the revised case's —
  * keyed on the old suffix alone, D12-TA-CLEAN-B would be read as planted, and drop out of every clean limb in silence.
  */
-const isClean = (id: string): boolean => /-CLEAN(-B)?$/.test(id);
+/**
+ * ⭐ Package V-2 (`REG-D-137` Q46; design D29) — THE SIGN-OFF AFTER THE RE-RUN: the colsummary unit's clean Test Adequacy review
+ * after its work re-run, version twelve's fifteenth declared case, after the 91 — written here. Its id names no `-CLEAN`.
+ */
+const RERUN_SIGN_OFF = 'D12-CSV-TA-RERUN';
+// ⭐ Package V-2, 2026-10-29 — ~~`/-CLEAN(-B)?$/.test(id)`~~: and the sign-off after the re-run, clean, which would otherwise be
+// read as planted — its oracle held to a criterion its id does not name, and dropped from every clean limb.
+const isClean = (id: string): boolean => /-CLEAN(-B)?$/.test(id) || id === RERUN_SIGN_OFF;
 /** Each declared policy's clean case, by the short prefix its case ids carry. */
 // ⭐ Package V — ~~`id.endsWith(`-${short}-CLEAN`)`~~: D12-TA-CLEAN-B's revised id.
 const cleanOf = (short: string): string => IDS.find((id) => new RegExp(`-${short}-CLEAN(-B)?$`).test(id))!;
@@ -176,11 +183,19 @@ describe('⭐⭐ E2 — the current case set (v5, and v6 since round 5): version
 			...Array(18).fill('PROCESS_RESULT')
 		]);
 		expect(CURRENT.cases.slice(42, 42 + IDS.length).map((c) => c.id), 'version twelve: then the fourteen').toEqual(IDS);
+		// ~~expect(CURRENT.cases.slice(42 + IDS.length).map((c) => c.arm), 'version twelve: only part cases after them')…~~ ⭐ Package
+		// V-2, 2026-10-29 (`REG-D-137`): the 35 part cases after them, then the three re-run cases, the sign-off after the re-run last.
 		expect(
-			CURRENT.cases.slice(42 + IDS.length).map((c) => c.arm),
-			'version twelve: only part cases after them'
+			CURRENT.cases.slice(42 + IDS.length, 91).map((c) => c.arm),
+			'version twelve: then the 35 part cases'
 		).toEqual(Array(35).fill('PWA_TYPE'));
-		expect(DECLARED.map((c) => c.id)).toEqual(IDS);
+		expect(CURRENT.cases.slice(91).map((c) => [c.id, c.arm]), 'version twelve: then the three re-run cases').toEqual([
+			['W12-CSV-RERUN', 'WORK_PRODUCT'],
+			['W12-CSV-RERUN-RR-07', 'WORK_PRODUCT'],
+			[RERUN_SIGN_OFF, 'DECLARED_POLICY']
+		]);
+		// ~~expect(DECLARED.map((c) => c.id)).toEqual(IDS);~~ ⭐ Package V-2, 2026-10-29: the fourteen, then the sign-off after the re-run.
+		expect(DECLARED.map((c) => c.id)).toEqual([...IDS, RERUN_SIGN_OFF]);
 		expect(DECLARED_CASE_POLICIES.map(([policyId]) => policyId)).toEqual([
 			'pol_requirement_coverage',
 			'pol_intent_preservation',

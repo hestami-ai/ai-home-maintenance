@@ -29,13 +29,14 @@
 //   · SEEN WHOLE — no slice of any case is truncated to fit, so an oracle is never about bytes the reviewer did not see.
 //   · THE ORACLES COMPOSE — a reply faulting exactly a case's oracle criteria scores to the oracle's disposition,
 //     through the real validator and `composeAssuranceOutcome` over the Reasoning Review reference alone.
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
 	composeAssuranceOutcome,
 	deMinimisFloorPlan,
 	FLOOR_POLICY_IDS,
 	SEEDED_REASONING_REVIEW_CRITERIA,
+	type Deliverable,
 	type ReasoningReviewInput
 } from '@janumipwb/rph-assurance';
 import { analyzePwaGraph, buildPwaGraphExport, pwaTypeParts, type PwaGraphNode } from '@janumipwb/rph-projections';
@@ -46,12 +47,19 @@ import { DEFAULT_CONTEXT_ASSEMBLY_POLICY, markersIn, prepareModelInvocation } fr
 import { OBSERVED_TOOL_CALL_LIMIT, type DomainCommand, type PromptTemplate } from '@janumipwb/rph-contracts';
 import { describe, expect, it } from 'vitest';
 import { MAX_AGY_PROMPT_CHARS } from '../apps/rph-demo/src/lib/server/assurance/agy-cli.js';
-import { createAgyReasoningReviewValidator } from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
+import {
+	createAgyReasoningReviewValidator,
+	DECLARED_WORK_RERUN_CLAUSE,
+	deliverableHeading,
+	WORK_PRODUCT_DELIVERABLE_SUBJECT,
+	WORK_PRODUCT_RERUN_DELIVERABLE_SUBJECT
+} from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
 import {
 	graphReviewInput,
 	processResultReviewInput,
 	pwaTypeReviewInput,
 	workProductReviewInput,
+	type DeclaredReviewWorkProduct,
 	type ProcessResultReviewSource
 } from '../apps/rph-demo/src/lib/server/assurance/review-input.js';
 import { splitExecutionEnvelope } from '../apps/rph-demo/src/lib/server/execution/execution-contract.js';
@@ -129,9 +137,11 @@ import {
 	EMPTY_VIEW,
 	NEW_V12,
 	RECAST_V12,
+	RERUN_V12,
 	TA_COMMAND,
 	V12_WORLDS,
 	WORLDS_FILE,
+	type RerunWorld,
 	type World
 } from '../scripts/reviewer-qual/case-set-v12.js';
 import { ORACLES_V12 } from '../scripts/reviewer-qual/oracles-v12.js';
@@ -139,7 +149,7 @@ import { changedFiles, hostSequenceOf } from '../apps/rph-demo/src/lib/server/ex
 import { OBSERVED_PROCESS_RUN_LIMIT, type ProcessRunObservation } from '../apps/rph-demo/src/lib/server/tools/process-run-observer.js';
 import { sha256 } from '../scripts/reviewer-qual/digest.js';
 import { SEEDED_PROBE_LIBRARY } from '../scripts/reviewer-qual/probes.js';
-import { reviewerFingerprint } from '../scripts/reviewer-qual/fingerprint.js';
+import { caseSetDigest, PRODUCT_SEAMS, reviewerFingerprint } from '../scripts/reviewer-qual/fingerprint.js';
 import { caseReviewInput } from '../scripts/reviewer-qual/materialize.js';
 import type { CandidateIdentity } from '../scripts/reviewer-qual/record.js';
 import { evaluateCase } from '../scripts/reviewer-qual/runner.js';
@@ -5124,7 +5134,7 @@ describe('⭐⭐ the review in parts, B8b, package K — reviewer-qualification 
 // (`case-set-v12.ts`, `case-set-v12-worlds.json`) — their oracles as confirmed (`oracles-v12.ts`). Held here over version
 // twelve as the generator writes it, and over the COMMITTED current files the runner and the check read:
 //   · THE SHAPE — the current set is version twelve: the 56 in the order the sponsor was shown them, then version eleven's 35
-//     part cases byte for byte;
+//     part cases byte for byte; ⭐ then, since package V-2 (`REG-D-137`), the three re-run cases its block holds;
 //   · A CHANGED CASE TAKES A NEW ID — the 56 under ids no earlier committed version holds, as a case or a source; and, the
 //     rule's general form, under an id an earlier version holds, version twelve sends the prompts of the latest that holds it;
 //   · THE PROMPTS — the 56's first prompts are the pre-checked prototype's, hash for hash (`REG-D-136` (4)); the 35's are
@@ -5643,16 +5653,23 @@ describe('⭐⭐ package V — reviewer-qualification case set v12: version elev
 			['the committed current set', currentV12()],
 			['version twelve, as generated', generatedV12()]
 		] as const) {
-			expect(now.cases, `${what}: 91 cases`).toHaveLength(91);
+			// ~~expect(now.cases, `${what}: 91 cases`).toHaveLength(91);~~ ⭐ Package V-2, 2026-10-29 (`REG-D-137` Q46; design D29) — MOVED, DELIBERATELY: version
+			// twelve gains three re-run cases after the 91, which the package V-2 block holds; the 91 are as below, in their places.
+			expect(now.cases, `${what}: 94 cases`).toHaveLength(94);
 			expect(now.cases.slice(0, 56).map((c) => c.id), `${what}: the 56, in the order shown`).toEqual(ORDER_56);
-			expect(now.cases.slice(56).map((c) => JSON.stringify(c)), `${what}: version eleven’s 35 part cases, byte for byte`).toEqual(
+			// ~~expect(now.cases.slice(56).map((c) => JSON.stringify(c)), …)~~ ⭐ Package V-2, 2026-10-29: the 35 at their places, 56
+			// to 90, byte for byte, and the three re-run cases after them.
+			expect(now.cases.slice(56, 91).map((c) => JSON.stringify(c)), `${what}: version eleven’s 35 part cases, byte for byte`).toEqual(
 				parts11.map((c) => JSON.stringify(c))
 			);
+			expect(now.cases.slice(91).map((c) => c.id), `${what}: then the three re-run cases`).toEqual(RERUN_IDS_V12);
 			const arms = [...new Set(now.cases.map((c) => c.arm))].map((arm) => [arm, now.cases.filter((c) => c.arm === arm).length]);
+			// ⭐ Package V-2, 2026-10-29 — ~~['WORK_PRODUCT', 24]~~, ~~['DECLARED_POLICY', 14]~~: and the two re-run work cases,
+			// and the sign-off after the re-run.
 			expect(arms, `${what}: by arm`).toEqual([
-				['WORK_PRODUCT', 24],
+				['WORK_PRODUCT', 26],
 				['PROCESS_RESULT', 18],
-				['DECLARED_POLICY', 14],
+				['DECLARED_POLICY', 15],
 				['PWA_TYPE', 35]
 			]);
 		}
@@ -5721,7 +5738,11 @@ describe('⭐⭐ package V — reviewer-qualification case set v12: version elev
 		// The claim is unchanged: version twelve moves no reviewer component.
 		expect([eleven.reviewer, twelve.reviewer], 'the reviewer fingerprint, unmoved').toEqual([REVIEWER_FINGERPRINT_TODAY, REVIEWER_FINGERPRINT_TODAY]);
 		expect(twelve.caseSet, 'the case set’s digest moved').not.toBe(eleven.caseSet);
-		expect(twelve.caseSet, 'the case set’s digest, as measured at the build').toBe(CASE_SET_DIGEST_V12);
+		// ~~expect(twelve.caseSet, 'the case set’s digest, as measured at the build').toBe(CASE_SET_DIGEST_V12);~~ ⭐ Package V-2, 2026-10-29 (`REG-D-137` Q46; design D29) —
+		// MOVED, DELIBERATELY: the three re-run cases after the 91 move the set’s digest; the 91’s is still the one measured at
+		// package V’s build, and the set’s is the one measured at package V-2’s (its block).
+		expect(caseSetDigest(CASE_SET_V12.cases.slice(0, 91)), 'the 91’s digest, as measured at the build').toBe(CASE_SET_DIGEST_V12);
+		expect(twelve.caseSet, 'the case set’s digest, as measured at package V-2’s build').toBe(CASE_SET_DIGEST_V12_RERUN);
 	});
 
 	it('⛔ EACH RE-CAST CASE IS ITS VERSION-ELEVEN SOURCE BUT FOR WHAT THE CONFIRMED CONTENT GIVES IT (diffed) — a work-product case the empty finished-work view production hands a unit that changed no file; a command case its run’s place in the step’s sequence, P12-RR-05’s after the whole suite’s failing run, as production sequences them; a text-only declared case the empty files and sequence; a file-judging one its unit’s files and sequence, and the Test Adequacy pair the test command Node 24 runs, in its instruction, its arguments and its account; and nothing else', () => {
@@ -5914,15 +5935,18 @@ describe('⭐⭐ package V — reviewer-qualification case set v12: version elev
 		}
 	});
 
-	it('⭐ THE ORACLES (REG-D-136 (2)) — version twelve’s 91, one per case in its order: the 35 part cases’ version eleven’s, byte for byte; the 3 moved, each beside version eleven’s as written here; the 15 new as written here; the 38 others carried, each its version-eleven source’s verdict, faulted criteria and standing — and each status as computed from them, MOVED for the 3 alone', () => {
+	it('⭐ THE ORACLES (REG-D-136 (2)) — version twelve’s ~~91~~ ⭐ 94 (package V-2), one per case in its order: the 35 part cases’ version eleven’s, byte for byte; the 3 moved, each beside version eleven’s as written here; the 15 new as written here; the 38 others carried, each its version-eleven source’s verdict, faulted criteria and standing — and each status as computed from them, MOVED for the 3 alone', () => {
 		const now = generatedOraclesV12();
 		expect([now.oracleVersion, now.caseSetVersion]).toEqual([12, 12]);
 		expect(now.oracles.map((o) => o.caseId), 'one per case, in the set’s order').toEqual(generatedV12().cases.map((c) => c.id));
 		const eleven = new Map(committedOraclesV11().oracles.map((o) => [o.caseId, o]));
 		const parts = generatedV12().cases.filter((c) => c.arm === 'PWA_TYPE').map((c) => c.id);
-		expect(now.oracles.slice(56).map((o) => JSON.stringify(o)), 'the 35 part cases’ oracles, version eleven’s, byte for byte').toEqual(
+		// ~~expect(now.oracles.slice(56).map((o) => JSON.stringify(o)), …)~~ ⭐ Package V-2, 2026-10-29 (`REG-D-137` Q46; design D29): the 35 at their places, 56 to 90,
+		// byte for byte, and the three re-run cases’ oracles after them (the package V-2 block holds them).
+		expect(now.oracles.slice(56, 91).map((o) => JSON.stringify(o)), 'the 35 part cases’ oracles, version eleven’s, byte for byte').toEqual(
 			parts.map((id) => JSON.stringify(eleven.get(id)))
 		);
+		expect(now.oracles.slice(91).map((o) => o.caseId), 'then the three re-run cases’').toEqual(RERUN_IDS_V12);
 		const byId = new Map(now.oracles.map((o) => [o.caseId, o]));
 		const source = new Map(RECAST_IDS_V12.map(([v11, v12]) => [v12, v11]));
 		const status = (id: string): string => {
@@ -5997,14 +6021,16 @@ describe('⭐⭐ package V — reviewer-qualification case set v12: version elev
 		}
 	});
 
-	it('⛔ NO NOTE GIVES AN ORACLE TO AN ID NO COMMITTED ORACLE SET HOLDS AS A CASE — of version twelve’s 91, each oracle a note names is a case’s of a committed oracle set, of the version it names when it names one, and no note speaks of an oracle unread', () => {
+	it('⛔ NO NOTE GIVES AN ORACLE TO AN ID NO COMMITTED ORACLE SET HOLDS AS A CASE — of version twelve’s ~~91~~ ⭐ 94 (package V-2), each oracle a note names is a case’s of a committed oracle set, of the version it names when it names one, and no note speaks of an oracle unread', () => {
 		const sets = committedOracleCases();
 		expect(
 			[...sets.keys()].sort((a, b) => a - b),
 			'arrangement: the twelve committed oracle sets'
 		).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
 		const named = generatedOraclesV12().oracles.map((o) => ({ caseId: o.caseId, ...oraclesNamedIn(o.note) }));
-		expect(named, 'arrangement: version twelve’s 91 notes').toHaveLength(91);
+		// ~~expect(named, 'arrangement: version twelve’s 91 notes').toHaveLength(91);~~ ⭐ Package V-2, 2026-10-29 (`REG-D-137` Q46; design D29): and the three
+		// re-run cases’ notes.
+		expect(named, 'arrangement: version twelve’s 94 notes').toHaveLength(94);
 		expect(named.flatMap((n) => n.unread.map((u) => `${n.caseId}: …${u}…`)), 'no note speaks of an oracle in words the reader cannot read').toEqual([]);
 		expect(
 			named.flatMap((n) => n.attributed.filter((a) => unheldAttribution(a, sets)).map((a) => `${n.caseId}: gives an oracle to ${a.id}, which no committed oracle set holds as a case`)),
@@ -6102,6 +6128,580 @@ describe('⭐⭐ package V — reviewer-qualification case set v12: version elev
 				call: async () => ({ returned: reply, served: null })
 			});
 			expect([scored.disposition, scored.resultClass, scored.independenceOk], c.id).toEqual([oracle.disposition, 'VALID', true]);
+		}
+	});
+});
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7, before P6 again, package V-2 — CASE SET VERSION TWELVE'S THREE RE-RUN CASES (`REG-D-137` Q46;
+// DESIGN-data-flow-order-and-deliverable-review.md D29, revision 4; ROADMAP-undertaking-execution-sandbox.md §9b.5) ──────────
+//
+// Package O-2 gave a work re-run its own words (design D28): its files are counted from the unit's FIRST step, so a file an
+// earlier step changed can be among them, and its writes and runs are this step's alone; a first step — each of the 91 cases
+// the sponsor confirmed (`REG-D-136`) — reads as before, byte for byte. The sponsor ruled that version twelve gains three re-run
+// cases, pre-checked offline like the rest (`REG-D-137` Q46): a clean work re-run, SATISFIED; a re-run whose account says it
+// fixed a file this step never touched, REJECTED on RR-07; a clean sign-off after a re-run, SATISFIED — over one unit's work
+// re-run, built for real and frozen (`case-set-v12-worlds.json`, `rerun`). Held here over version twelve as the generator
+// writes it, and over the COMMITTED current files the runner and the check read:
+//   · THE SHAPE — version twelve holds 94: the 91 as confirmed, in their order and byte for byte, then the three;
+//   · A NEW CASE TAKES A NEW ID — the three under ids no earlier committed version holds, as a case or a source;
+//   · THE PROMPTS — the three's first prompts are the pre-checked prototype's, hash for hash; the reviewer fingerprint
+//     unmoved; the case set's digest moved, by the three alone;
+//   · THE MARK AND THE WORDS — the three are marked as production marks a work re-run, and no other case is; each prompt
+//     reads the re-run's words, and the same case unmarked reads the first step's and none of the re-run's (the CONTROL);
+//   · THE VIEW IS PRODUCTION'S — the files `changedFiles` finds between the unit's FIRST step's baseline and the manifest
+//     after the re-run's try, never its own start's; the sequence `hostSequenceOf` builds from the re-run step's acts alone;
+//   · THE TWIN DIFFERS FROM ITS CLEAN SOURCE ONLY AT ITS PLANT — the account's one sentence and the answer's files;
+//   · THE ORACLES — as proposed and pre-checked, each note true where this can read it and pinned to its hash, the 91's as
+//     they were; the conferral carrying version twelve's whole and recording Q46 in the sponsor's words;
+//   · THE RECORD A NOTE CITES (package V-2's check) — D12-CSV-TA-RERUN's note, as proposed, cites the pre-check's
+//     product-mutant record by its path from the source that writes the note; the record is committed there, byte for
+//     byte, and the note's figures are held to it;
+//   · THE 28,000-CHARACTER LIMIT, SEEN WHOLE, THE ORACLES COMPOSE — as every case is held.
+/** ⭐ THE THREE RE-RUN CASES, in the order the ruling names them — written here. */
+const RERUN_IDS_V12: readonly string[] = ['W12-CSV-RERUN', 'W12-CSV-RERUN-RR-07', 'D12-CSV-TA-RERUN'];
+/**
+ * ⭐ THE PROTOTYPE'S PROMPTS (`REG-D-137` (3): pre-checked offline like the rest, then measured) — the sha256 of each of the
+ * three's first prompt as the lead's prototype rendered it through the product's builders and validator, the prompts the
+ * offline readers read, by id — written here.
+ */
+const PROTOTYPE_PROMPTS_RERUN_V12: readonly (readonly [caseId: string, sha256: string])[] = [
+	['W12-CSV-RERUN', 'c1c0116f14f2a2558c7b811f34eac9607f389b6625036a521bf85d10c8d4ef82'],
+	['W12-CSV-RERUN-RR-07', '1c0d308ede1f790346ab41117c0cf3811b8842789610895fd546f715f80e9dae'],
+	['D12-CSV-TA-RERUN', '427ea64ef5653e5c0dca753abb9a06978ab7161399051260cb7ec02787b5ee38']
+];
+/**
+ * ⭐ THE CASE SET'S DIGEST, AS MEASURED AT THIS BUILD — the 91 as confirmed, then the three, each deep-equal to the content
+ * pre-checked — the digest a paid run of version twelve stamps on its RUN lines (`caseSetDigest`). Written here: before the
+ * build it was computed apart from the source, over the 91 committed at `bb53326d` and the prototype's three after them, and
+ * the build's is that one.
+ */
+const CASE_SET_DIGEST_V12_RERUN = '4db7f2054518fc22399e0af51a680616a3e8c5d8ef0d7fb9ff40019b25c81c21';
+/** ⭐ The three's oracles as proposed and pre-checked: verdict, faulted criteria, standing — written here. */
+const RERUN_ORACLES_WRITTEN_V12: Readonly<Record<string, readonly [string, readonly string[], OracleStanding]>> = {
+	'W12-CSV-RERUN': ['SATISFIED', [], "the author's claim"],
+	'W12-CSV-RERUN-RR-07': ['REJECTED', ['RR-07-no-contradiction'], "the author's claim"],
+	'D12-CSV-TA-RERUN': ['SATISFIED', [], "the author's claim"]
+};
+/**
+ * ⭐ THE NOTES AS PROPOSED AND PRE-CHECKED — the sha256 of each of the three's note, by id — written here, as package V pinned
+ * the 56's (`CONFIRMED_NOTES_V12`), so no regenerated note can drift from the proposed content with every other limb green.
+ */
+const PROPOSED_NOTES_RERUN_V12: readonly (readonly [caseId: string, sha256: string])[] = [
+	['W12-CSV-RERUN', 'f5825924d8b84e39cfca10d8ccc04a5d7de1e87d5291902d95e7ad5c42102f40'],
+	['W12-CSV-RERUN-RR-07', 'b940a7138b5a6294ce27656d28283e47c78ed2c3af26751cb7d00b3974692e5c'],
+	['D12-CSV-TA-RERUN', 'c171340a38f58a00e6b1bd3be4569e18b314d3d11b0bd5bd1ddd7c3ee3e9e2f4']
+];
+/**
+ * ⭐ THE SOURCE THAT WRITES THE THREE'S NOTES (package V-2's check) — a note's relative citation is read from its directory,
+ * as D12-CSV-TA-RERUN's cites the pre-check's product-mutant record — written here.
+ */
+const RERUN_NOTE_SOURCE_V12 = 'scripts/reviewer-qual/oracles-v12.ts';
+/**
+ * ⭐ THE PRE-CHECK'S PRODUCT-MUTANT RECORD, AS IT WROTE IT — the sha256 of its bytes: the re-run world's suite run against the
+ * product as written and against twelve product mutants, one at a time, before the offline pre-check, and never re-run —
+ * written here, so the record a note cites cannot drift with every other limb green.
+ */
+const RERUN_MUTANTS_SHA256_V12 = '4b03161c995e9ba6afcf772094586ad350c0f3d65a17c33f6f1faaab872d2f82';
+/**
+ * ⭐ THE 91'S ORACLES AND VERSION TWELVE'S STATEMENT, AS PACKAGE V COMMITTED THEM (as integrated at `bb53326d`): the sha256 of
+ * the 91 oracles' JSON, in their order, and of the conferral statement, with its length — written here, so neither moves while
+ * the three are added.
+ */
+const ORACLES_91_SHA256_V12 = '0fadf1894375e209d9535737d57461cb228ec0e98545f617c45f5b9e30dea69d';
+const CONFERRAL_SHA256_V12 = '1ae940fa70e0431f58fc6f1e02a4ae397f14ec532f861f4826f8a22f099d0597';
+const CONFERRAL_LENGTH_V12 = 14054;
+/** ⭐ `REG-D-137` Q46, written here as the register records it: the question, the label the sponsor chose, and its text. */
+const Q46_ASKED =
+	"Package O's check found a contradiction on work re-runs (run-12 had six): a re-run's review now lists the files the unit's earlier attempt wrote, but the prompt says they changed \"since its step began\", directly above a sequence showing this step wrote nothing. Fix it before measuring?";
+const Q46_CHOSE = 'Fix first, add 3 cases (Recommended)';
+const Q46_READ =
+	'Re-runs get their own true wording; every prompt you confirmed stays byte-identical. Case set v12 gains three re-run cases, pre-checked offline like the rest: a clean work re-run (SATISFIED); a re-run whose account says it fixed a file this step never touched (REJECTED, RR-07); a clean sign-off after a re-run (SATISFIED). About 6 more calls.';
+/** ⭐ THE TWIN'S PLANT — the clean account's sentence, and the one the twin's account says in its place — written here. */
+const RERUN_KEPT_SENTENCE_V12 = 'I read each of them and changed none but the report.';
+const RERUN_FIXED_SENTENCE_V12 =
+	'I read each of them, fixed src/summarise.js so that a negative value such as -3 is read as a number, and changed none of the others but the report.';
+/** ⭐ The re-run's view: the ten files changed since the unit's first step began, each added — written here. */
+const RERUN_FILES_V12 = [
+	'bin/colsummary.js',
+	'docs/test-report.md',
+	'package.json',
+	'src/csv.js',
+	'src/summarise.js',
+	'test/cli.test.js',
+	'test/csv.test.js',
+	'test/fixtures/not-a-number.csv',
+	'test/fixtures/readings.csv',
+	'test/summarise.test.js'
+].map((path) => [path, 'ADDED'] as const);
+/** ⭐ The six the refused first step left, which the re-run reads and never writes — written here. */
+const RERUN_INHERITED_V12 = ['bin/colsummary.js', 'package.json', 'src/csv.js', 'src/summarise.js', 'test/csv.test.js', 'test/summarise.test.js'];
+/** ⭐ The re-run step, act by act — written here: two listings, a read of each file the first step left, three writes, the suite, the report. */
+const RERUN_STEP_V12 = [
+	R(['ls'], 0),
+	R(['ls', 'test'], 0),
+	...['package.json', 'src/csv.js', 'src/summarise.js', 'bin/colsummary.js', 'test/csv.test.js', 'test/summarise.test.js', 'docs/test-report.md'].map((path) =>
+		R(['cat', path], 0)
+	),
+	W('test/fixtures/readings.csv'),
+	W('test/fixtures/not-a-number.csv'),
+	W('test/cli.test.js'),
+	R(TEST_V12, 0),
+	W('docs/test-report.md')
+];
+/** ⭐ The sign-off's unit, as it names the work's: the Test Adequacy cases' own title — written here. */
+const RERUN_UNIT_V12 = 'Implementation';
+/** A re-run work case's view, as its input carries it. */
+const viewOfV12 = (c: QualificationCase): Deliverable => {
+	const view = (c.input as { deliverable?: Deliverable }).deliverable;
+	expect(view, `${c.id}: a finished-work view`).toBeDefined();
+	return view!;
+};
+/** The first prompt the product's validator sends for a case — its transport a stub — as the fingerprint captures it. */
+async function firstPromptV12(c: QualificationCase): Promise<string> {
+	const sent: string[] = [];
+	const validator = PRODUCT_SEAMS.validator(async (p: string) => {
+		sent.push(p);
+		return JSON.stringify({ findings: [], recommendation: 'SATISFIED' });
+	});
+	await validator.evaluate(c.subject, { reasoningReview: caseReviewInput(c, PRODUCT_SEAMS.criteria, PRODUCT_SEAMS.processResult) });
+	expect(sent.length, `${c.id}: a prompt was sent`).toBeGreaterThan(0);
+	return sent[0]!;
+}
+
+describe('⭐⭐ package V-2 — reviewer-qualification case set v12’s three re-run cases: a clean work re-run, its twin whose account claims a fix the step never made, and a clean sign-off after the re-run, each over the unit’s work re-run as production shows it (REG-D-137 Q46; design D28, D29)', () => {
+	it('⭐ THE SHAPE — version twelve holds 94: the 91 the sponsor confirmed, in their order and byte for byte — their digest the one package V measured — then the three re-run cases, in the order the ruling names them', () => {
+		for (const [what, set] of [
+			['the committed current set', currentV12()],
+			['version twelve, as generated', generatedV12()]
+		] as const) {
+			expect(set.cases, `${what}: 94 cases`).toHaveLength(94);
+			expect(caseSetDigest(set.cases.slice(0, 91)), `${what}: the 91 as confirmed, in their order, byte for byte`).toBe(CASE_SET_DIGEST_V12);
+			expect(
+				set.cases.slice(91).map((c) => [c.id, c.arm]),
+				`${what}: then the three re-run cases`
+			).toEqual([
+				['W12-CSV-RERUN', 'WORK_PRODUCT'],
+				['W12-CSV-RERUN-RR-07', 'WORK_PRODUCT'],
+				['D12-CSV-TA-RERUN', 'DECLARED_POLICY']
+			]);
+		}
+		expect(RERUN_V12, 'the re-run cases, as written here').toEqual(RERUN_IDS_V12);
+	});
+
+	it('⛔ A NEW CASE TAKES A NEW ID (REG-D-132; REG-D-137 (2)) — each of the three is a case of version twelve, under an id no earlier committed version holds, as a case or a source, and none of the 91 holds', () => {
+		const earlier = [
+			CASE_SET_V1_FILE,
+			CASE_SET_V2_FILE,
+			CASE_SET_V3_FILE,
+			CASE_SET_V4_FILE,
+			CASE_SET_V5_FILE,
+			CASE_SET_V6_FILE,
+			CASE_SET_V7_FILE,
+			CASE_SET_V8_FILE,
+			CASE_SET_V9_FILE,
+			CASE_SET_V10_FILE,
+			CASE_SET_V11_FILE
+		].map((f) => JSON.parse(read(f)) as CaseSet);
+		const held = new Set(earlier.flatMap((s) => s.cases.flatMap((c) => [c.id, ...(c.arm === 'PWA_TYPE' ? [c.sourceCaseId] : [])])));
+		expect(held.size, 'arrangement: the 170 ids versions one to eleven hold, as a case or a source, in their 730 holdings').toBe(170);
+		for (const id of RERUN_IDS_V12) expect(caseV12(id).id, `${id}: a case of version twelve`).toBe(id);
+		expect(RERUN_IDS_V12.filter((id) => held.has(id)), 'an id an earlier version holds, taken as new').toEqual([]);
+		expect(
+			generatedV12()
+				.cases.slice(0, 91)
+				.filter((c) => RERUN_IDS_V12.includes(c.id))
+				.map((c) => c.id),
+			'an id one of the 91 holds'
+		).toEqual([]);
+	});
+
+	it('⛔ THE PROMPTS ARE THE PRE-CHECKED PROTOTYPE’S (REG-D-137 (3)) — each of the three’s first prompt is the prototype’s, hash for hash; the reviewer fingerprint is unmoved; the case set’s digest moved, by the three alone, to the one measured at this build', async () => {
+		const twelve = await fpV12();
+		expect(
+			RERUN_IDS_V12.map((id) => [id, twelve.casePrompts.get(id)?.initial]),
+			'each of the three’s first prompt, the prototype’s, hash for hash'
+		).toEqual(PROTOTYPE_PROMPTS_RERUN_V12);
+		expect(twelve.reviewer, 'the reviewer fingerprint, unmoved').toBe(REVIEWER_FINGERPRINT_TODAY);
+		expect(caseSetDigest(CASE_SET_V12.cases.slice(0, 91)), 'the 91’s digest, package V’s').toBe(CASE_SET_DIGEST_V12);
+		expect(twelve.caseSet, 'the case set’s digest moved').not.toBe(CASE_SET_DIGEST_V12);
+		expect(twelve.caseSet, 'the case set’s digest, as measured at this build').toBe(CASE_SET_DIGEST_V12_RERUN);
+	});
+
+	it('⭐ THE MARK AND THE RE-RUN’S WORDS (design D28) — the three are re-run cases, marked as production marks them — a work case’s view, the sign-off’s one work product — and no other case of version twelve is; each prompt reads the re-run’s words; ⛔ CONTROL: the same case unmarked renders another prompt, which reads the first step’s words and none of the re-run’s', async () => {
+		expect(
+			generatedV12()
+				.cases.filter((c) => JSON.stringify(c.input).includes('"workRerun"'))
+				.map((c) => c.id),
+			'the cases marked a work re-run’s'
+		).toEqual(RERUN_IDS_V12);
+		for (const id of RERUN_IDS_V12) {
+			const c = caseV12(id);
+			const prompt = await firstPromptV12(c);
+			if (c.arm === 'WORK_PRODUCT') {
+				const view = viewOfV12(c);
+				expect(view.workRerun, `${id}: its view, marked a work re-run’s`).toBe(true);
+				expect(prompt, `${id}: the re-run’s subject`).toContain(WORK_PRODUCT_RERUN_DELIVERABLE_SUBJECT);
+				expect(prompt, `${id}: the re-run’s heading over its files`).toContain(deliverableHeading(view));
+				expect(
+					[prompt.includes(WORK_PRODUCT_DELIVERABLE_SUBJECT), prompt.includes('since its step began')],
+					`${id}: the first step’s words`
+				).toEqual([false, false]);
+				const { workRerun: _mark, ...unmarked } = view;
+				const control = await firstPromptV12({ ...c, input: { ...c.input, deliverable: unmarked } } as QualificationCase);
+				expect(sha256(control), `CONTROL ${id}: unmarked, another prompt`).not.toBe(sha256(prompt));
+				expect(
+					[control.includes(WORK_PRODUCT_DELIVERABLE_SUBJECT), control.includes('since its step began')],
+					`CONTROL ${id}: unmarked, the first step’s words`
+				).toEqual([true, true]);
+				expect(
+					[control.includes(WORK_PRODUCT_RERUN_DELIVERABLE_SUBJECT), control.includes('since its first step began')],
+					`CONTROL ${id}: unmarked, none of the re-run’s`
+				).toEqual([false, false]);
+			} else if (c.arm === 'DECLARED_POLICY') {
+				const work = c.input.workProducts as readonly DeclaredReviewWorkProduct[];
+				expect(work.map((w) => [w.unit, w.workRerun]), `${id}: its one work product, marked a work re-run’s`).toEqual([[RERUN_UNIT_V12, true]]);
+				expect(prompt, `${id}: the subject says what the mark means`).toContain(DECLARED_WORK_RERUN_CLAUSE);
+				expect(prompt, `${id}: the work’s line marks the work product`).toContain(`"workUnit":${JSON.stringify(RERUN_UNIT_V12)},"workProduct":`);
+				expect(prompt.split('"workRerun":true').length - 1, `${id}: the mark, once, on the work’s line`).toBe(1);
+				const control = await firstPromptV12({ ...c, input: { ...c.input, workProducts: work.map(({ unit, answer }) => ({ unit, answer })) } });
+				expect(sha256(control), `CONTROL ${id}: unmarked, another prompt`).not.toBe(sha256(prompt));
+				expect(
+					[control.includes(DECLARED_WORK_RERUN_CLAUSE), control.includes('"workRerun"')],
+					`CONTROL ${id}: unmarked, none of the re-run’s words`
+				).toEqual([false, false]);
+				expect(control, `CONTROL ${id}: unmarked, the first step’s files description`).toContain(
+					'since its step began — its path, what changed, and its text as the host read it'
+				);
+			} else expect.unreachable(`${id}: a re-run case of the ${c.arm} arm`);
+		}
+	});
+
+	it('⭐ THE VIEW IS PRODUCTION’S (package O’s D22; package N’s D10, D11) — the re-run world as recorded: its files are what `changedFiles` finds between the unit’s FIRST step’s baseline and the manifest after the re-run’s try, each text the one that manifest hashes, six of them the first step’s, which the re-run reads and never writes — never the four its own start’s baseline would leave; its sequence is what `hostSequenceOf` builds from the re-run step’s acts alone, one try; the two work cases show it marked, after that try; the sign-off shows it under its unit, its commands the re-run try’s runs', () => {
+		const w = worldV12('rerun') as RerunWorld;
+		const text = (path: string) => w.files.find((f) => f.path === path)?.content;
+		const manifest = (pairs: RerunWorld['finalManifest']) => new Map(pairs.map(([path, hash]) => [path, { hash, text: text(path) ?? '' }] as const));
+		const after = manifest(w.finalManifest);
+		for (const f of w.files) expect(sha256(f.content ?? ''), `${f.path}: its text, the one the manifest after the try hashes`).toBe(after.get(f.path)?.hash);
+		const files = changedFiles(new Map(w.baselineHashes.map(([path, hash]) => [path, { hash }] as const)), after);
+		expect(files, 'its files, as production’s changedFiles finds them from the unit’s first step').toEqual(w.files);
+		expect(files.map((f) => [f.path, f.change]), 'ten files, each added since the unit’s first step began').toEqual(RERUN_FILES_V12);
+		expect(
+			changedFiles(manifest(w.rerunOwnStart), after).map((f) => [f.path, f.change]),
+			'CONTROL: counted from the re-run’s own start, four — the six it inherits gone'
+		).toEqual([
+			['docs/test-report.md', 'CHANGED'],
+			['test/cli.test.js', 'ADDED'],
+			['test/fixtures/not-a-number.csv', 'ADDED'],
+			['test/fixtures/readings.csv', 'ADDED']
+		]);
+		expect(outlineOf(w.acts), 'the re-run step, act by act').toEqual(RERUN_STEP_V12);
+		const firstWrites = new Set(w.firstStep.acts.filter((a) => a.kind === 'WRITE').map((a) => a.path));
+		for (const path of RERUN_INHERITED_V12)
+			expect(
+				[firstWrites.has(path), w.acts.some((a) => a.kind === 'WRITE' && a.path === path), w.acts.some((a) => a.argv?.[0] === 'cat' && a.argv[1] === path)],
+				`${path}: written by the first step, never by the re-run, which reads it`
+			).toEqual([true, false, true]);
+		const runs = w.acts.filter((a) => a.kind === 'RUN');
+		const sequence = hostSequenceOf(
+			{
+				runs: runs.map((a) => ({
+					ordinal: a.ordinal,
+					argv: a.argv!,
+					exitCode: a.exitCode ?? null,
+					timedOut: a.timedOut ?? false,
+					durationMs: a.durationMs ?? 0,
+					outputComplete: true,
+					omittedRegions: [],
+					retention: { retained: false, notRetainedBecause: 'a frozen world' },
+					stdout: a.stdout ?? '',
+					stderr: a.stderr ?? ''
+				})),
+				observedCount: runs.length,
+				recordedLimit: OBSERVED_PROCESS_RUN_LIMIT,
+				writes: w.acts.filter((a) => a.kind === 'WRITE').map((a) => ({ ordinal: a.ordinal, path: a.path! }))
+			},
+			[0]
+		);
+		for (const id of ['W12-CSV-RERUN', 'W12-CSV-RERUN-RR-07'])
+			expect(viewOfV12(caseV12(id)), `${id}: the re-run’s view, after its one try, marked`).toEqual({ afterTry: 1, files, sequence, workRerun: true });
+		const d = caseV12('D12-CSV-TA-RERUN');
+		expect(d.arm, 'arrangement: the sign-off is a declared case').toBe('DECLARED_POLICY');
+		if (d.arm !== 'DECLARED_POLICY') return;
+		const { files: shown, sequence: acts } = d.input as typeof d.input & { files?: unknown; sequence?: unknown };
+		expect(shown, 'the sign-off’s files, the view’s, each under its unit').toEqual(files.map((f) => ({ unit: RERUN_UNIT_V12, ...f })));
+		expect(acts, 'the sign-off’s acts, the view’s, each under its unit').toEqual(sequence.acts.map((a) => ({ ...a, unit: RERUN_UNIT_V12 })));
+		expect(
+			d.input.commands.map((k) => [k.unit, k.argv, k.exitCode, k.timedOut]),
+			'the commands its record names, the re-run try’s runs'
+		).toEqual(sequence.acts.filter((a) => a.kind === 'RUN').map((a) => [RERUN_UNIT_V12, a.argv, a.exitCode, a.timedOut]));
+	});
+
+	it('⛔ THE TWIN DIFFERS FROM ITS CLEAN SOURCE ONLY AT ITS PLANT (diffed; REG-D-137 (2)) — W12-CSV-RERUN-RR-07 is W12-CSV-RERUN but for its account’s one sentence and its answer’s files: the account says this step fixed src/summarise.js, the answer lists it changed and kept no more; the file is in the view, read by the step and never written; its prompt differs from its clean source’s at two lines alone, the answer’s and the account’s', async () => {
+		const [clean, twin] = [caseV12('W12-CSV-RERUN'), caseV12('W12-CSV-RERUN-RR-07')];
+		expect(differingPaths({ ...clean, id: twin.id }, twin, ''), 'beside its clean source, only where its plant is').toEqual([
+			'input.answer',
+			'input.rationale.rationale'
+		]);
+		if (clean.arm !== 'WORK_PRODUCT' || twin.arm !== 'WORK_PRODUCT') return expect.unreachable('the twins are work-product cases');
+		const [account, planted] = [clean.input.rationale!.rationale, twin.input.rationale!.rationale];
+		expect(
+			[account.split(RERUN_KEPT_SENTENCE_V12).length - 1, planted.split(RERUN_FIXED_SENTENCE_V12).length - 1, account.includes('fixed ')],
+			'the clean account’s sentence once, the plant once in the twin’s, and no fix claimed in the clean one'
+		).toEqual([1, 1, false]);
+		expect(planted.replace(RERUN_FIXED_SENTENCE_V12, RERUN_KEPT_SENTENCE_V12), 'the twin’s account but its plant').toBe(account);
+		type Answer = { files: { path: string; change: string }[]; keptFromEarlierAttempt: string[] };
+		const [a, b] = [JSON.parse(clean.input.answer) as Answer, JSON.parse(twin.input.answer) as Answer];
+		expect(differingPaths(a, b, ''), 'the answers differ in their files alone').toEqual(['files', 'keptFromEarlierAttempt']);
+		expect([b.files[0], b.files.slice(1)], 'the twin’s answer: the fixed file first, then the clean one’s').toEqual([
+			{ path: 'src/summarise.js', change: 'changed' },
+			a.files
+		]);
+		expect(
+			[a.keptFromEarlierAttempt.filter((p) => !b.keptFromEarlierAttempt.includes(p)), b.keptFromEarlierAttempt.filter((p) => !a.keptFromEarlierAttempt.includes(p))],
+			'the file it claims to have fixed, kept no more'
+		).toEqual([['src/summarise.js'], []]);
+		const view = viewOfV12(twin);
+		expect(view.files.find((f) => f.path === 'src/summarise.js')?.change, 'the file the plant names, in the view').toBe('ADDED');
+		expect(view.sequence.acts.filter((x) => x.kind === 'WRITE' && x.path === 'src/summarise.js'), 'no write of it in this step’s sequence').toEqual([]);
+		expect(view.sequence.acts.find((x) => x.ordinal === 5), 'act 5, a read of it').toEqual({
+			try: 1,
+			ordinal: 5,
+			kind: 'RUN',
+			argv: ['cat', 'src/summarise.js'],
+			exitCode: 0,
+			timedOut: false
+		});
+		const [p, q] = (await Promise.all([firstPromptV12(clean), firstPromptV12(twin)])).map((x) => x.split('\n'));
+		expect(q!.length, 'the twin’s prompt, as many lines as its clean source’s').toBe(p!.length);
+		expect(
+			p!.flatMap((line, i) => (line === q![i] ? [] : [[line, q![i]]])),
+			'the lines the twin’s prompt differs at: the answer’s and the account’s'
+		).toEqual([
+			[clean.input.answer, twin.input.answer],
+			[account, planted]
+		]);
+	});
+
+	it('⭐ THE ORACLES (REG-D-137 (2)) — version twelve’s 94, one per case in its order; the 91’s as package V committed them, byte for byte; the three’s as proposed and pre-checked, each verdict, faulted criteria and standing as written here, each faulted criterion its rubric’s, and each note the proposed one, hash for hash', () => {
+		for (const [what, set] of [
+			['version twelve’s committed oracles', committedOraclesV12()],
+			['version twelve’s oracles, as generated', generatedOraclesV12()]
+		] as const) {
+			expect(set.oracles.map((o) => o.caseId), `${what}: one per case, in the set’s order`).toEqual(generatedV12().cases.map((c) => c.id));
+			expect(sha256(JSON.stringify(set.oracles.slice(0, 91))), `${what}: the 91, as package V committed them`).toBe(ORACLES_91_SHA256_V12);
+			const byId = new Map(set.oracles.map((o) => [o.caseId, o]));
+			expect(
+				RERUN_IDS_V12.map((id) => (byId.has(id) ? verdictV12(byId.get(id)!) : undefined)),
+				`${what}: each verdict, faulted criteria and standing, as proposed`
+			).toEqual(RERUN_IDS_V12.map((id) => RERUN_ORACLES_WRITTEN_V12[id]));
+			expect(
+				RERUN_IDS_V12.map((id) => [id, sha256(byId.get(id)?.note ?? '')]),
+				`${what}: each note, the proposed one, hash for hash`
+			).toEqual(PROPOSED_NOTES_RERUN_V12);
+			expect(
+				set.oracles.slice(91).map((o) => Object.keys(o)),
+				`${what}: each oracle’s fields, an oracle’s, in an oracle’s order`
+			).toEqual(RERUN_IDS_V12.map(() => ['caseId', 'faulted', 'disposition', 'expectation', 'note']));
+		}
+		for (const id of RERUN_IDS_V12) {
+			const c = caseV12(id);
+			const rubric = c.arm === 'DECLARED_POLICY' ? c.input.policy.criteria.map((k) => k.id) : CRITERION_IDS;
+			const faulted = generatedOraclesV12().oracles.find((o) => o.caseId === id)?.faulted ?? [];
+			expect(faulted.filter((k) => !rubric.includes(k)), `${id}: a faulted criterion its rubric does not declare`).toEqual([]);
+		}
+	});
+
+	it('⭐ THE NOTES, TRUE WHERE THIS CAN READ THEM — W12-CSV-RERUN’s ten files, six of them the first step’s, read and never written by its fourteen acts; the twin’s plant quoted as its account carries it, act 5 a read of the file it names, no act a write of it, the file Added in its prompt; the sign-off’s fifteen tests in three files, each naming the requirement it covers, its suite run at act 13 after the last write before it, act 12, and passing; the planted note naming its criterion', async () => {
+		const notes = new Map(generatedOraclesV12().oracles.map((o) => [o.caseId, o.note]));
+		const clean = viewOfV12(caseV12('W12-CSV-RERUN'));
+		expect(notes.get('W12-CSV-RERUN'), 'W12-CSV-RERUN: its ten files, counted from the first step').toContain(
+			'the ten files changed since the unit’s first step began, six of them (package.json, src/csv.js, src/summarise.js, bin/colsummary.js and the two unit-test files) the refused first step’s, which this step’s fourteen acts'
+		);
+		expect([clean.files.length, clean.sequence.acts.length], 'its files and acts, counted').toEqual([10, 14]);
+		expect(
+			RERUN_INHERITED_V12.map((path) => [
+				clean.sequence.acts.some((a) => a.kind === 'RUN' && a.argv[0] === 'cat' && a.argv[1] === path),
+				clean.sequence.acts.some((a) => a.kind === 'WRITE' && a.path === path)
+			]),
+			'the six: each read, none written'
+		).toEqual(RERUN_INHERITED_V12.map(() => [true, false]));
+		const twinNote = notes.get('W12-CSV-RERUN-RR-07') ?? '';
+		expect(twinNote, 'the twin’s note quotes its plant as its account carries it').toContain(`The account says "${RERUN_FIXED_SENTENCE_V12}"`);
+		expect(twinNote, 'and cites act 5').toContain('(act 5, `cat src/summarise.js`) and no write');
+		expect(twinNote, 'and names its criterion').toContain('(RR-07)');
+		const twinPrompt = await firstPromptV12(caseV12('W12-CSV-RERUN-RR-07'));
+		expect(twinPrompt.split('\n'), 'the file is Added in its prompt').toContain('Added "src/summarise.js":');
+		expect(
+			twinPrompt.split('\n').filter((l) => l.trim() === '5. ran ["cat","src/summarise.js"] — exit 0'),
+			'and act 5, on its sequence line, a read of it'
+		).toHaveLength(1);
+		const d = caseV12('D12-CSV-TA-RERUN');
+		if (d.arm !== 'DECLARED_POLICY') return expect.unreachable('the sign-off is a declared case');
+		const { files, sequence } = d.input as typeof d.input & { files: { path: string; content?: string }[]; sequence: { ordinal: number; kind: string; path?: string; argv?: string[]; exitCode?: number | null }[] };
+		const tests = files.filter((f) => /^test\/[^/]+\.test\.js$/.test(f.path));
+		const titles = tests.map((f) => [...(f.content ?? '').matchAll(/^test\('([^']*)'/gm)].map((m) => m[1]!));
+		expect(
+			[tests.map((f) => f.path), titles.map((t) => t.length), titles.flat().filter((t) => !/\(R[1-6]\)$/.test(t))],
+			'fifteen tests in three files, each naming the requirement it covers'
+		).toEqual([['test/cli.test.js', 'test/csv.test.js', 'test/summarise.test.js'], [5, 4, 6], []]);
+		const suite = sequence.find((a) => a.ordinal === 13);
+		const lastWriteBefore = sequence.filter((a) => a.kind === 'WRITE' && a.ordinal < 13).at(-1);
+		expect(
+			[suite?.kind, suite?.argv, suite?.exitCode, lastWriteBefore?.ordinal, lastWriteBefore?.path],
+			'`node --test` (act 13) exited 0 after the last write before it (act 12)'
+		).toEqual(['RUN', ['node', '--test'], 0, 12, 'test/cli.test.js']);
+		expect(notes.get('D12-CSV-TA-RERUN'), 'the sign-off’s note says so').toContain(
+			'Fifteen tests in three files trace to R1–R6, each naming what it covers'
+		);
+		expect(notes.get('D12-CSV-TA-RERUN'), 'and cites acts 13 and 12').toContain('`node --test` (act 13) exited 0 after the last test or source write (act 12)');
+	});
+
+	it('⭐ THE RECORD A NOTE CITES, COMMITTED AND HELD (package V-2’s check) — D12-CSV-TA-RERUN’s note, as proposed, cites the pre-check’s product-mutant record by its path from the source that writes the note, and the record is there, byte for byte as the pre-check wrote it: the product as written passes all fifteen of the re-run’s tests; of twelve product mutants eleven are killed, and the one survivor, a name appearing twice, is the account’s declared assumption, which no test title claims; every run counts the committed suite, and every failing test it names is one of it; the note’s figures are the record’s', () => {
+		const note = generatedOraclesV12().oracles.find((o) => o.caseId === 'D12-CSV-TA-RERUN')?.note ?? '';
+		const said =
+			/Verified against product mutants \(([^()]+)\): (\d+) of (\d+) killed; the one survivor, a column name appearing twice, is the account’s declared assumption, which no test claims\.$/.exec(
+				note
+			);
+		expect(said, 'the note’s last sentence: the record it cites, and its figures').not.toBeNull();
+		const [, cited, killedSaid, mutantsSaid] = said!;
+		expect(read(RERUN_NOTE_SOURCE_V12), `arrangement: ${RERUN_NOTE_SOURCE_V12} writes the note, citing the record`).toContain(`(${cited})`);
+		const record = `${RERUN_NOTE_SOURCE_V12.slice(0, RERUN_NOTE_SOURCE_V12.lastIndexOf('/') + 1)}${cited}`;
+		expect(existsSync(`${REPO_ROOT}${record}`), `${record}: the record the note cites, committed where its path from the note’s source names it`).toBe(true);
+		const text = read(record);
+		expect(sha256(text), `${record}: the pre-check’s record, byte for byte`).toBe(RERUN_MUTANTS_SHA256_V12);
+		type Run = { mutant: string; exitCode: number | null; tests: number; pass: number; fail: number; failing: readonly string[]; outcome: string };
+		const { world, results } = JSON.parse(text) as { world: string; results: readonly Run[] };
+		expect(world, 'the re-run world’s record').toBe('rerun');
+		const [asWritten, ...mutants] = results;
+		expect([asWritten?.mutant, asWritten?.exitCode, asWritten?.tests, asWritten?.pass, asWritten?.fail], 'the product as written: all fifteen pass').toEqual([
+			'none (the product as written)',
+			0,
+			15,
+			15,
+			0
+		]);
+		expect(
+			mutants.map((m) => m.outcome === 'KILLED'),
+			'each mutant’s outcome its run’s: killed exactly when a test failed, its exit not 0 and the failing tests named'
+		).toEqual(mutants.map((m) => m.fail > 0 && m.exitCode !== 0 && m.failing.length > 0));
+		const survivors = mutants.filter((m) => m.outcome !== 'KILLED');
+		expect([mutants.length - survivors.length, mutants.length], 'the note’s figures are the record’s: killed, of the product mutants').toEqual([
+			Number(killedSaid),
+			Number(mutantsSaid)
+		]);
+		expect(
+			survivors.map((m) => [m.mutant.slice(0, m.mutant.indexOf(':')), m.outcome, m.fail]),
+			'one survivor, M-LAST-COLUMN, no test failing'
+		).toEqual([['M-LAST-COLUMN', 'SURVIVED', 0]]);
+		expect(survivors[0]?.mutant, 'the survivor: a name appearing twice').toContain('a name appearing twice');
+		const d = caseV12('D12-CSV-TA-RERUN');
+		if (d.arm !== 'DECLARED_POLICY') return expect.unreachable('the sign-off is a declared case');
+		const { rationale, files } = d.input as typeof d.input & {
+			rationale: { assumptions: readonly string[] };
+			files: readonly { path: string; content?: string }[];
+		};
+		expect(rationale.assumptions, 'the account declares what the survivor changes').toContain(
+			'A column is found by an exact match of its name in the first row; if a name appears twice, the first such column is summarised.'
+		);
+		const titles = files
+			.filter((f) => /^test\/[^/]+\.test\.js$/.test(f.path))
+			.flatMap((f) => [...(f.content ?? '').matchAll(/^test\('([^']*)'/gm)].map((m) => m[1]!));
+		expect(titles, 'arrangement: the re-run’s committed suite, fifteen tests').toHaveLength(15);
+		expect(titles.filter((t) => /twice|appear|duplicat|same name/i.test(t)), 'no test title claims the assumption').toEqual([]);
+		expect(results.map((r) => r.tests), 'every run counts the committed suite').toEqual(results.map(() => titles.length));
+		expect(results.flatMap((r) => r.failing).filter((t) => !titles.includes(t)), 'every failing test the record names, one of the committed suite').toEqual([]);
+	});
+
+	it('⭐ THE RULING RECORDED (REG-D-137 Q46) — the statement opens with version twelve’s as package V committed it, whole; then quotes Q46’s question, the label the sponsor chose and its text, verbatim from the register; names each re-run case with its verdict, each standing the author’s, none given to the sponsor’s answer; carries no marker; reviewer:qual:check finds no CONFERRAL problem in it. CONTROL: the same statement carrying the proposal’s word is the conferral owed', async () => {
+		const register = read(REGISTER_FILE);
+		const at = register.indexOf('\n### REG-D-137 ');
+		const next = register.indexOf('\n### ', at + 1);
+		const entry = register.slice(at, next < 0 ? undefined : next);
+		expect(at, 'arrangement: the register holds REG-D-137').toBeGreaterThan(0);
+		for (const q of [Q46_ASKED, Q46_CHOSE, Q46_READ]) expect(entry, `Q46's words, verbatim from the register: ${q}`).toContain(`*"${q}"*`);
+		const said = (v: readonly [string, readonly string[], string]) =>
+			`${v[0]}${v[1].length === 0 ? ', faulting nothing' : `, faulting ${v[1].join(', ')}`}, ${v[2]}`;
+		for (const [what, set] of [
+			['version twelve’s committed oracles', committedOraclesV12()],
+			['version twelve’s oracles, as generated', generatedOraclesV12()]
+		] as const) {
+			const { conferral } = set;
+			expect(
+				[conferral.length > CONFERRAL_LENGTH_V12, sha256(conferral.slice(0, CONFERRAL_LENGTH_V12)), conferral.slice(CONFERRAL_LENGTH_V12, CONFERRAL_LENGTH_V12 + 1)],
+				`${what}: version twelve’s statement, whole, first, then more`
+			).toEqual([true, CONFERRAL_SHA256_V12, ' ']);
+			const added = conferral.slice(CONFERRAL_LENGTH_V12 + 1);
+			expect(added, `${what}: Q46, in the sponsor’s words`).toContain(
+				`(REG-D-137, Q46: asked “${Q46_ASKED}”, the sponsor chose “${Q46_CHOSE}”, whose text read “${Q46_READ}”)`
+			);
+			expect(added, `${what}: each re-run case, its verdict`).toContain(
+				RERUN_IDS_V12.map((id) => `${id}, ${said(RERUN_ORACLES_WRITTEN_V12[id]!)}`).join('; ')
+			);
+			expect(added, `${what}: no standing given to the sponsor’s answer`).toContain('the ruling attributes no standing to the sponsor’s answer');
+			expect([added.includes(ORACLES_PROPOSED), added.includes(ORACLES_RESTATEMENT_UNCONFIRMED)], `${what}: no marker`).toEqual([false, false]);
+		}
+		const conferralProblems = async (statement: string) =>
+			(
+				await checkQualification({
+					files: [],
+					current: {
+						reviewer: '0'.repeat(64),
+						scoring: '1'.repeat(64),
+						caseSet: '2'.repeat(64),
+						components: { probes: '3'.repeat(64), budget: '4'.repeat(64), criteria: '5'.repeat(64), scoring: '1'.repeat(64) },
+						casePrompts: new Map()
+					},
+					cases: generatedV12().cases,
+					oracles: generatedOraclesV12().oracles,
+					conferral: statement,
+					oracleSets: [],
+					caseSets: [],
+					findings: new Set(),
+					struck: new Set(),
+					rulings: new Set(),
+					struckRulings: new Set(),
+					rescore: async () => {
+						throw new Error('an empty record re-scores nothing');
+					}
+				})
+			).problems.filter((p) => p.limb === 'CONFERRAL');
+		const { conferral } = generatedOraclesV12();
+		expect(await conferralProblems(conferral), 'the check finds no CONFERRAL problem in the record').toEqual([]);
+		expect(await conferralProblems(`${conferral} The three re-run oracles are ${ORACLES_PROPOSED}.`), 'CONTROL: the proposal’s word').toEqual([
+			{ limb: 'CONFERRAL', message: ORACLES_NOT_CONFERRED }
+		]);
+	});
+
+	it('⛔ THE 28,000-CHARACTER LIMIT, AND SEEN WHOLE — every prompt of the three fits agy’s argv budget, and no slice of any is cut', async () => {
+		const three = RERUN_IDS_V12.map(caseV12);
+		expect(three.map((c) => c.id), 'arrangement: the three').toEqual(RERUN_IDS_V12);
+		expect(await promptProblemsIn(three), 'a prompt over the limit, or a slice cut').toEqual([]);
+	});
+
+	it('⭐ THE ORACLES COMPOSE, THROUGH THE RUNNER’S OWN SCORING — for each of the three, a reply faulting exactly its oracle’s criteria, over its own rubric, is scored by evaluateCase to its oracle’s disposition, valid, with independence met', async () => {
+		const oracles = new Map(generatedOraclesV12().oracles.map((o) => [o.caseId, o]));
+		for (const id of RERUN_IDS_V12) {
+			const c = caseV12(id);
+			const oracle = oracles.get(id);
+			expect(oracle, `${id}: an oracle`).toBeDefined();
+			const rubric = c.arm === 'DECLARED_POLICY' ? c.input.policy.criteria : SEEDED_REASONING_REVIEW_CRITERIA;
+			const reply = JSON.stringify({
+				findings: rubric.map((k) => ({
+					criterionId: k.id,
+					failed: oracle!.faulted.includes(k.id),
+					statement: 'as the oracle expects',
+					severity: oracle!.faulted.includes(k.id) ? 'BLOCKING' : 'INFORMATIONAL'
+				})),
+				recommendation: oracle!.disposition
+			});
+			const { scored } = await evaluateCase({
+				case: c,
+				criteria: SEEDED_REASONING_REVIEW_CRITERIA,
+				candidate: EVALUATING_CANDIDATE,
+				scoringDigest: '0'.repeat(64),
+				call: async () => ({ returned: reply, served: null })
+			});
+			expect([scored.disposition, scored.resultClass, scored.independenceOk], id).toEqual([oracle!.disposition, 'VALID', true]);
 		}
 	});
 });
