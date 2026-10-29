@@ -171,6 +171,8 @@ ceiling says the thing actually wanted: **you may not add uncovered code.**
 
 ⚠ If one mutation trips both, they are one check wearing two names — `REG-F-099`'s shape, checked in S1.4.
 
+- ⭑ **2026-10-29 — the coverage floor's record holds a fall: `REG-F-586`** (`floor-facts.md`; `c1-facts.md`). The pinned check accepts an improvement without regeneration. `c603fb69` tightens five figures in two files from one coverage run; whether the check should also refuse a stale record remains a sponsor question, unscheduled, and does not bear on P6.
+
 ### S1.3 · Wire into `gate:fast`
 
 `coverage:floor:check` joins `gate:fast` immediately after `test:coverage`. **11 → 12 steps.**
@@ -272,6 +274,8 @@ watching*. Collapsing them reproduces the defect this programme exists to remove
 something shared in `A` so a guard over **`B`** goes slack — not selected. Catching that needs per-test coverage
 attribution JPWB does not collect. ⛔ **The command must SAY this every run.** A guarantee described as catching
 what it cannot catch is worse than an absent one.
+
+- ⭑ **2026-10-29 — the remote case measured: `REG-F-584`; the whole ledger's measurement and a reach limb approved: `REG-D-139`** (`int2-facts.md`; `c1-facts.md`; `sponsor-words-2026-10-18.md`). B7's `ddd75ae9` removed probes reached by a victim and left four validator-anchored guards slack. The whole ledger's final-tree measurement is running. The reach limb for `mutants:changed` and a merge's scope still owes its design in `DESIGN-per-file-assurance-floor.md`, then its steps on this roadmap, then its build; this pointer supplies none of them. P6 again does not wait on that separate programme.
 
 ### S2.6 · ⚠ THREE INSTRUMENT TRAPS, ALL HIT DURING THIS PROGRAMME, ALL RECORDED SO R2 CANNOT REPEAT THEM
 
@@ -686,6 +690,8 @@ production-consumed exports and the mutants naming it. ⛔ Derived from the barr
 Fails when a file's guarded-export count FALLS, or when the population changes without regeneration.
 ⛔ **It does NOT demand the 194 on the day it lands.** Introducing a ratchet and demanding new work in one act
 makes a failure attributable to neither. It freezes; S3.3 reduces.
+
+- ⭑ **2026-10-26 — a third limb, `CENSUS_STALE`, `43342bea`: `REG-F-470`** (`floor-facts.md`; `REG-D-138` (3)). Alongside lost guards and a changed population, the check now refuses a gained guard absent from the record and an `unattributedMutants` count that moved in either direction. The CLI names the stale record and exits 1. The moved pin was ratified, and `REG-F-470` recorded closed, on 2026-10-29 (`REG-D-138` (3)). The coverage floor's separate record-limb question is `REG-F-586`.
 
 ### S3.3 · The burn-down, ordered by S3.0's answer
 
