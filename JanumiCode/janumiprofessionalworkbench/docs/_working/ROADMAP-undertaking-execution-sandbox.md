@@ -2295,6 +2295,7 @@ Phase 0** — a recording of the wrong bytes replays a different run.
   - The narrower integration measurement found four survivors, now retired with part-framing successors (`REG-F-584`), and a KILLED verdict without a test result, now void and included for re-measurement (`REG-F-585`). `REG-D-139` replaces that scope with the whole ledger at `c603fb69`: 4,119 entries, 4,035 measurable.
   - After the canary, the runner's own guards go first, then the reviewer's victims, then the rest; Playwright victims run alone after the other lanes. The lead's queue dispositions and the independent check's exclusive-claim remedy are recorded in `REG-D-138`. The whole-ledger measurement remains running.
   - The paid measurement remains OWED (`v2-facts.md`): 59 new prompts × 2 under `9cf9b9f5...`, plus a canary; an ACKNOWLEDGED line naming the 59 as `addedCaseIds`; RESCORED lines for the 35 unchanged part cases. It waits for amended class R's 1,724 entries to be measured clean (`REG-D-139` (3)). P6 again and P7 remain OWED. The separately approved scope rule's design, roadmap and build remain owed.
+- ⭑ **2026-10-30 — the scope rule's design and roadmap are written; the build is owed** (`DESIGN-per-file-assurance-floor.md` `§10`; `ROADMAP-per-file-assurance-floor.md` `§7`; `REG-D-139` (3)). P6 again does not wait on it.
 
 ### 9b.6 P — P6 again, its report, then P7
 

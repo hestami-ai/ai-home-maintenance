@@ -1,7 +1,7 @@
 # ROADMAP — JAN-PFA: three ratchets, and three live defects that come before all of them
 
 **Programme:** `JAN-PFA` · **Status:** ROADMAP · **Opened:** 2026-09-12 ·
-**Design:** `docs/_working/DESIGN-per-file-assurance-floor.md` (rev 2) ·
+**Design:** `docs/_working/DESIGN-per-file-assurance-floor.md` (~~rev 2~~ rev 3) ·
 **Subsumes:** `ROADMAP-per-file-coverage-floor.md` (`JAN-PFCOV`, struck — its `S1`–`S5` survive intact as Phase 1).
 
 **SPONSOR AUTHORITY.** Three rulings, each of which changed the shape rather than the detail:
@@ -276,6 +276,7 @@ attribution JPWB does not collect. ⛔ **The command must SAY this every run.** 
 what it cannot catch is worse than an absent one.
 
 - ⭑ **2026-10-29 — the remote case measured: `REG-F-584`; the whole ledger's measurement and a reach limb approved: `REG-D-139`** (`int2-facts.md`; `c1-facts.md`; `sponsor-words-2026-10-18.md`). B7's `ddd75ae9` removed probes reached by a victim and left four validator-anchored guards slack. The whole ledger's final-tree measurement is running. The reach limb for `mutants:changed` and a merge's scope still owes its design in `DESIGN-per-file-assurance-floor.md`, then its steps on this roadmap, then its build; this pointer supplies none of them. P6 again does not wait on that separate programme.
+- ⭑ **2026-10-30 — the reach limb's design and steps are written; the build is owed** (`DESIGN-per-file-assurance-floor.md` `§10`, rev 3; `§7` of this roadmap, Phase 4, `S4.0` to `S4.10`). Until `S4.2` lands, this section's disclosure still does not print on B7's path: `scope.ts:133` exits before the banner (`DESIGN-per-file-assurance-floor.md` `§10.1`). `S4.8` strikes this disclosure when the new banner replaces it.
 
 ### S2.6 · ⚠ THREE INSTRUMENT TRAPS, ALL HIT DURING THIS PROGRAMME, ALL RECORDED SO R2 CANNOT REPEAT THEM
 
@@ -734,3 +735,737 @@ THIRD consecutive time it has done so (`JAN-CSAADEC`, `JAN-CSAAEXT`, and now thi
   that its instrument and the mutation ledger are aimed at **nearly disjoint populations** — 1,439 of 1,663
   branches in unmutated files are COVERED — so a coverage-only roadmap could not have reached them. It is one
   design with three phases so that `R3` cannot quietly drop once `R1` lands and the coverage number looks better.
+
+---
+
+## 7. ◐ PHASE 4 (R2's remote case) — S4.0 IS RUNNING; S4.1 TO S4.10 ARE PLANNED, NOT BUILT
+
+**Design:** `DESIGN-per-file-assurance-floor.md` `§10` (rev 3). **Findings:** `REG-F-584` (the remote case: B7's
+four, whose cause its heading states before the transition is measured, `S4.0`), `REG-F-585` (a KILLED with no test
+result), `REG-F-391` (the remote case left open).
+
+**SPONSOR AUTHORITY** (`REG-D-139`). The lead offered *"a one-time measurement of all 4,015 ledger entries, plus a
+scope rule that catches this kind of change automatically"*, as a separate programme. The sponsor: *"The one-time
+measurement and the scope rule are approved."* The approval is for ONE whole-ledger run. Whether it recurs is
+`DESIGN §10.11` Q1, not a step here.
+
+⛔ **LANDING.** This section and `DESIGN §10` land on `f6b78109` or a descendant, which wrote `REG-D-138`, `REG-D-139`,
+`REG-F-584`, `REG-F-585` and `REG-F-586`: `verif/register-citations.test.ts` requires each cited `REG-` id to resolve to
+a canon heading. The landing also moves `DESIGN`'s Status line (`:3`) and this roadmap's Design line (`:4`) from
+rev 2 to rev 3, each struck and replaced; marks `DESIGN §6` Q3 answered by `REG-D-139` and `§10`; and appends dated
+pointers: under `REG-F-584`, that its cause is attributed, not measured (`S4.0`); and, where the corpus says the
+design and roadmap are owed, *written; the build owed*, under `REG-F-391`, `REG-F-584` and `REG-D-139` (the Status
+lines of `REG-F-584`, `:41414`, and `REG-D-139`, `:41466`, struck and replaced), under `ROADMAP §3` S2.5 (`:278`) and
+under `ROADMAP-undertaking-execution-sandbox.md:2297`.
+
+⛔ **`W` IS NOT YET ON THIS LINE.** `W` (`c603fb69`, `p7c-p6-int2`) is not an ancestor of `f6b78109`: their merge base
+is `d7a363b0`. 132 of `W`'s 4,119 ledger ids, all live, are absent from `f6b78109`'s ledger. `W`'s register holds none
+of `REG-F-584` to `REG-F-586`, `REG-D-138` or `REG-D-139`, and `verif/register-citations.test.ts` resolves the citations
+in the `.ts`, `.svelte` and `.md` files under `packages/`, `verif/`, `scripts/`, `apps/` and `docs/` (`:49`, `:65`). So
+`S4.1` to `S4.7` land on `f6b78109`'s line or after the merge below, never on `p7c-p6-int2` before it: each records its
+exit in this section, which names `REG-F-584`; the B7 test that `S4.1` writes and `S4.6` lands names it too; and `S4.2`
+to `S4.4` write dated pointers under the records of `DESIGN §10.1`'s defects, which `W`'s register lacks. `S4.8`, and
+any range from `W`, wait for that merge: the main line merged into `p7c-p6-int2`, `p7c-p6-int2`'s line the first parent,
+as `1a2270f6` merged the main line into the integration of L2, M and N. No step of this phase makes that merge, and no
+other roadmap schedules it: at `f6b78109`, `ROADMAP-undertaking-execution-sandbox.md` records O, O-2, V and V-2 merged
+on the integration branch (`:2294`) and runs P6 again *"From the main checkout at the integrated head"* (`:2301`),
+naming neither this merge nor its first parent. It is named here as owed. Until it lands, `S4.8` cannot commit `W`'s
+receipt, the first measured base, which each later range reads (`S4.8`'s RULE 2); `S4.10` waits with it, and this
+heading cannot read COMPLETE.
+
+---
+
+### The rules this phase runs under
+
+`§0`'s five rules hold. Five more, each from this phase's own measurements:
+
+6. ⛔ **EACH INSTRUMENT FIX LANDS WITH ITS OWN RED BEFORE ANY STEP ENLARGES A SELECTION** (`D20`). Today's classifier
+   would report a remote victim's red as *"The suite is green and the protection is gone"*, and today's shell call
+   splits each of the 60 ids that hold whitespace (0 of 60 arrive whole) and obeys the `>` in 3 of them. So `S4.3`
+   (LOCAL on any path: 1,502 more selectable entries at `W`) and `S4.6` (the new limbs) may be built beside `S4.2` and
+   `S4.4`, and land only after both.
+7. ⛔ **THE RUNNER STAYS FIXED WHILE `S4.0` IS IN FLIGHT.** `run.ts` and the modules it grades with (`verdict.ts`,
+   `apply.ts`, `measured.ts`, `tree-baseline.ts`: `D8`'s runner closure) do not change until its queue, its void
+   re-measures and its survivor confirmations are done. The lanes are detached at `W` and load nothing from another
+   tree, so `S4.1` (`reach-core.ts`, `scope.ts`, its own `ledger.ts` entries) and `S4.2` (`scope.ts`, `scope-core.ts`,
+   the new `scope-run.ts`, its own `ledger.ts` entries) may land while `S4.0` runs. Nothing touches a lane.
+   Development work runs in its own worktree, and its test runs stay to single files: CPU contention near the 60 s
+   test timeout can turn a mutated run red and read KILLED.
+8. ⭑ **A PREDICTED RED NAMES ITS TEST AND ITS OBSERVED MESSAGE** before the code that turns it green, and a mutant
+   that reddens tests of two limbs is split; where no split can part them, because the code it mutates is the closure
+   that red 13's reach pins and its BLIND pin also walk (`6L`, `6M`), or another rule of the static reach those pins
+   walk on the real tree (in a scratch model `5F` and `5P`, `S4.5`), its kill is read through its named tests, by name,
+   from one run of the victim under the mutation.
+9. ⛔ **NO TEXT CALLS THE SCOPE RULE BUILT BEFORE ITS STEP'S EXIT IS MET.** Claims the design corrects are struck in
+   place and dated in the step that lands the correction.
+10. ⛔ **NO TEST DRIVES THE `mutants:changed` CLI OR SPAWNS THE RUNNER** (`verif/mutants-scope.test.ts:4`: *"WHY NOT
+    DRIVE THE CLI."*). Inside the runner, the tree holds the mutation being measured (`run.ts:751-753`). So the CLI
+    meets LEDGER ROT in the edit loop, and in a range until `S4.3` reads anchors at the end: at `W`, 3,927 of the
+    4,035 live mutations leave some anchor not exactly once (`scope-core.ts:54-60`). It also meets RANGE END IS NOT
+    THE TREE under `--range --run`, whatever the mutation. The runner grades the victim file, not the test
+    (`verdict.ts:76-92`), so such a test reddens under each mutant of its file, as the anchor census did
+    (`REG-F-110`). An admitted `--run` starts a second runner on the tree under test. On a clean tree (`gate:fast`'s
+    vitest steps, or the runner's victim baseline, `run.ts:747-749`), it measures its selection there. In the edit
+    loop, under the other 108 mutations, it first restores the measured file from git by the journal
+    (`run.ts:1048-1058`). So the flag set (`2K`, `2L`), the range check (`3F`, `3G`, `3K`) and the base check (`7A`,
+    `7B`, `7G`, `7M`, `7N`, `7O`) are pure functions in `scope-core.ts` beside `renderReport` (`DESIGN` `D18`), handed
+    the argv, `HEAD`, the end, the tracked changes and the receipts that `scope.ts` reads. Their reds and guards call
+    them in an arrangement that only the half under test can refuse, and they assert the message, never the exit code
+    alone. The runner call is `scope-run.ts`'s `runChunks`, which a test hands an argv-echo child and a fresh temp
+    folder (`2P`, `2U`). A git call, or the text a range reads, is tested through an exported function, its argv or a
+    temporary repository (`DESIGN §10.9`: `3C`, `3E`, `3H`, `3J`). A reach build's failure is converted by a function
+    `reach-core.ts` exports, which a test hands a build that throws (`6N`).
+
+---
+
+### Order, and what can run in parallel
+
+| step | lands after | may be built beside |
+| --- | --- | --- |
+| `S4.0` the whole ledger (running) | V-2 merged into `p7c-p6-int2` (`3edfeac1`) | `S4.1`, `S4.2`, `S4.3`, `S4.5`, in their own worktree, while the main queue runs; nothing beside the e2e queue (`DESIGN §10.10`, step 5) |
+| `S4.1` the selector and the B7 red | — | `S4.0` |
+| `S4.2` the classifier, signals, banner, and the runner call | `S4.1` (its advisory trigger, and the default if `--strict` becomes it, move in the commit that records the sponsor's answer to `DESIGN §10.11` Q3, before or after this step; no step waits for that answer); `DESIGN §10.1`'s 11 defects recorded in the register (`S4.0`'s exit) | `S4.0`, `S4.3`, `S4.5`, `S4.6` |
+| `S4.3` the change set, LOCAL, ranges | `S4.1`, `S4.2`, `S4.4` (rule 6) | `S4.0`, `S4.2`, `S4.4`, `S4.5` |
+| `S4.4` exact ids, the empty call refused, the verdict line | `S4.0`'s measurements (rule 7), `S4.2` | `S4.3`, `S4.5`, `S4.6` |
+| `S4.5` the static reach | `S4.1`, `S4.3` (its `runGit`, through which `reach.ts` reads git) | `S4.0`, `S4.2`, `S4.3`, `S4.4` |
+| `S4.6` the limbs; B7 turns green | `S4.2`, `S4.3`, `S4.4`, `S4.5` (rule 6), `S4.0`'s survivor classes and its NONE findings | `S4.2`, `S4.4`, `S4.9` |
+| `S4.7` receipts, the measured base, OWED | `S4.6` | `S4.9` |
+| `S4.8` real history, figures, `W`'s receipt | `S4.0`, `S4.7`, `S4.9`, and the merge that puts `W` on this line's first-parent history: the main line merged into `p7c-p6-int2` with `p7c-p6-int2`'s line as the first parent (as `1a2270f6` merged the main line into the integration of L2, M and N), this line continuing from that merge, so that `W`'s 4,119 ids are ledger ids at `HEAD` (`DESIGN §10.7`'s check) and `measured` can name `W` (`DESIGN` `D15`, `§10.6`) | — |
+| `S4.9` the capture audit | `S4.0`'s lanes free, `S4.5`, `S4.6` (its build of a range end's reach, which builds `W`'s) | `S4.6`, `S4.7` |
+| `S4.10` the record | `S4.8`, `S4.9` | — |
+
+⭑ **WHY `S4.3` WAITS FOR `S4.4` TOO.** Without `S4.2`, its 1,502 newly selectable entries (at `W`) reach today's
+classifier and shell; `S4.4` makes the runner honour the `MUTANTS_EXACT=1` that `S4.2`'s spawn already passes, so the
+runner's own refusals stand behind `S4.2`'s chunker: exact matching and a call with no id refused. Waiting costs only
+the days until `S4.0`'s measurements end, and keeps rule 6 without an exception.
+
+`S4.0`'s void re-measures and survivor attribution (bisects in disposable worktrees) need cores too, so they run after
+both queues are empty. Class R's result is recorded on its own when its chunks end: clean, it releases the paid
+measurement under the lead's order (`REG-D-138` (9)) without waiting for the rest of the main queue, though never
+beside the e2e queue (`DESIGN §10.10`, steps 5 and 8); a class R survivor or void holds it until it is re-measured
+or disposed of.
+
+---
+
+### S4.0 · ◐ RUNNING (2026-10-29/30) — the one-time measurement of the whole ledger
+
+- **Red first. ✅ OBSERVED, THEN TURNED GREEN, 2026-10-30** (`c1-facts.md`, *The tally's three rules*). The tally
+  (`collect.py`) was run on four arrangements before it counted the lanes, because `PQ1-V1802`'s line trips both void
+  rules (`DESIGN §10.9`, red 8): built by `make_fixtures.py` (the batch logs copied, never edited in place) and run by
+  `reds.py` through a byte copy of the collector as it stood (`collect_v1.py`, sha256 `2d9bda71…`; `reds-v1.out`).
+  (1) The integration's seven batch logs, the control: `PQ1-V1802` (`batch-07.log:135`) void and 67 ids owed,
+  `PQ2-M19` (`ABORTED_DIRTY`) among them; *"PASS - got PQ1-V1802 VOID, PQ2-M19 ABORTED_DIRTY, owed 67 of 944, KILLED
+  863"*. (2) A copy of `batch-07.log` whose line 135 carries `Failed Tests 1`: `PQ1-V1802` must still be void, as the
+  line just ahead of `ABORTED_DIRTY`; *"FAIL - got PQ1-V1802 KILLED, PQ2-M19 ABORTED_DIRTY, owed 66 of 944, KILLED
+  864"*. (3) An id voided in `queue2-lane-4` and re-measured later in `queue2-lane-1` must keep the later verdict;
+  *"FAIL - got MU-FRESH-18-A-neutralise-revision-check VOID"*, the lexically last lane's (`collect_v1.py:88`, `:95`,
+  `:145`). (4) A stopped chunk with no summary holding a vitest KILLED with a test result: that id must be NO VERDICT;
+  *"FAIL - got MU-FRESH-18-B-refuse-any-declared-revision KILLED,
+  MU-FRESH-18-E-a-new-mutating-action-appears-unnoticed MISSING"*. *"1 of 4 cases pass"*. The fixed collector
+  (`collect.py`, sha256 `da626278…`): *"4 of 4 cases pass"* (`reds-v2.out`), case (1) unchanged. No arrangement voids
+  an id twice, so the tally's list of ids voided twice has no red. A tally that counts a void as KILLED fails exactly
+  like its subject. The survivor canary is done (`c1-facts.md`; `DESIGN §10.10`, step 6).
+- **The work.** `DESIGN §10.10`, steps 1-10, at `W` = `c603fb69` (`c1-facts.md`, `run_lane4.sh`, `make_queue2.py`; the
+  queue's amendments, the claim, the stop rules and the void rule are `REG-D-138` (2) and (8), the sponsor's review
+  owed), with `gate:fast`'s result on `5323ed4f` recorded verbatim. Then the survivor procedure: confirm alone,
+  attribute by a measured transition, classify provisionally with the scratch reach (`S4.8` re-checks each class with
+  the rule's REPLAY, which lands in `S4.3` and builds the end's reach from `S4.6`), dispose under the ledger's rules.
+- **RULE 2.** Read first by the paid measurement, held until class R's 1,724 entries are measured clean (`REG-D-139`
+  (3); above); then by `REG-F-584` and `REG-F-585`, by the ledger's dispositions, by `S4.8` (`W`'s receipt is the
+  first measured base) and by the scope rule's survivor tests. If it is wrong, a false KILLED — `PQ1-V1802`'s shape, a
+  port collision, a split id — hides a slack guard: in class R it leaves the paid measurement's record unproven, and
+  elsewhere the count of "others" answers `REG-F-584`'s general form wrongly. A lost claim that hands the runner no id
+  costs a second whole-ledger run, about 47 h.
+- **Pins that move.** None while it runs: the lanes are detached worktrees at `W`, and nothing is committed from them.
+  Afterwards the dispositions move `scripts/mutants/ledger.ts` on a line that holds the entry (a disposition of one of
+  the 132 entries `f6b78109`'s ledger lacks lands on `p7c-p6-int2`'s line, citing no id its register lacks, or after
+  the merge the order table names for `S4.8`), each changed field struck in place and dated; the
+  anchor census (`verif/mutant-ledger.test.ts`) if an anchor is re-pointed; the export census, regenerated in the same
+  commit, which `REG-F-470`'s third limb checks for an unrecorded gain or a moved unattributed count; and the per-file
+  coverage floor, regenerated in the same commit when a strengthened victim moves it: its check holds a fall
+  unrecorded (`REG-F-586`), so nothing reddens if that is missed. ⛔ A retirement or abolition that leaves an export
+  with no guard trips GUARD_LOST (`S3.2`: *a file may not SHED a guard*); regeneration alone would erase that
+  refusal, so it lands with a successor guard on that export or the bare export argued in the same commit.
+- **Proposed mutants.** None: it changes no code. A disposition that strengthens a test is measured KILLED by the
+  runner before it lands.
+- **Exit.** Each live id at `W` has exactly one non-void verdict, its latest, or is named owed: those two number
+  4,035, and the history rows 84 (45 RETIRED, 10 DUPLICATE, 29 ABOLISHED). Each survivor is confirmed alone,
+  attributed, classified and disposed of, in the survivor table. Before the survivor procedure's report
+  (`DESIGN §10.10`) quotes its counts, a finding against `DESIGN §10` is written for each survivor of class NONE, its
+  class labelled scratch until `S4.8`, and each survivor born slack is filed as a records defect. That report (the
+  survivor procedure's step 4: each class, `<a'> of <a>`, and the remote case's and the general form's counts) is a
+  dated pointer under `REG-F-584` with its step 5's limits, each class the scratch reach gave labelled scratch until
+  `S4.8`. The four's transition (KILLED at `ddd75ae9^`, SURVIVED at `ddd75ae9`) and M7 and M8's (at `7e8725ba^` and
+  `7e8725ba`) are measured, each result a dated pointer under `REG-F-584`; one that contradicts the cause its heading
+  states is a superseding entry (the register's front matter, `:19`). Under `REG-F-585`, a dated pointer lists each void
+  id with its re-measured verdict, or as owed (`DESIGN §10.10`). Before any count taken from the chunk logs is
+  quoted in the corpus, each of the 11 defects in `DESIGN §10.1`'s table is written in the register, as a finding or a
+  dated pointer under `REG-F-584`, as `DESIGN §10.10`'s *WHAT IS RECORDED* lists them: the shell's length limit; ids
+  split, and a `>` obeyed, by a shell; the substring filter; the classifier reading the exit status; anchors read from
+  the working tree; the `++ ` header, and a deleted file and a rename's old path dropped; the change set read through
+  `spawnSync`'s default buffer; the call with no id; the exit order; the flags. The chunk logs, and beside them each log
+  renamed `<chunk>.log.stopped-<n>` (`DESIGN §10.10`, step 8), which neither the tally (`collect.py:117-122`) nor the
+  receipt writer reads (`DESIGN §10.7`), are kept out of git and named here by base name and SHA-256; the `R0`, `R1` and
+  `R2` in their names are the queue's groups of class R (`make_queue2.py`), not the ratchets. Recorded here verbatim:
+  both canaries' lines, and what they do not show (no control, and no kill through a workspace alias); the tally's four
+  arrangements before and after the fix (`reds-v1.out`, `reds-v2.out`); the summed rows; the lanes; and the measured
+  wall time, which replaces `DESIGN §10.10`'s two cost estimates before `DESIGN §10.11` Q1 is put. `DESIGN §10.11` Q1's
+  other figures are `DESIGN §10.5`'s scratch model until `S4.8` re-measures them: the question is put in `S4.8` with the
+  re-measured figures, or sooner with each of them marked as scratch and then put again in
+  `S4.8` with the re-measured figures beside them.
+
+### S4.1 · The pure selector holding today's rule, and the B7 red written first
+
+- **Red first.** `verif/mutants-reach.test.ts` › *"REG-F-584 — B7 (ddd75ae9): a change to the probes alone selects
+  PQ1-M1751, PQ1-M1752, PQ1-M1759 and PQ1-M1760 by REACH via scripts/reviewer-qual/probes.ts"* (`DESIGN §10.9`).
+  Run against this step's `selectChange`, it must fail with the four absent — *expected the four selected by REACH;
+  got none* — not with an import error. The message is recorded here verbatim. Beside it, five guards, not transitions:
+  green from the move on, appended to `verif/mutants-scope.test.ts` after its last line (`:155`), so the line citations
+  of rule 10, `S4.2`, `S4.3` and `S4.8` into that file hold. Each asserts one limb on a fixture
+  and is shown able to fail by its own mutant (`DESIGN §10.9`, red 25): a production hunk inside an anchor selects
+  that entry by LOCAL (`1A`); a production hunk in the anchor's file, outside its lines, does not select it by LOCAL
+  (`1B`); a production hunk in a file no anchor names is UNGUARDED (`1C`); a production hunk inside an anchor is not
+  UNGUARDED (`1D`); a `scripts/` hunk in a file no anchor names is not UNGUARDED (`1E`, the filter `D6` and `D11` keep
+  for UNGUARDED). Today's filter on LOCAL, which `S4.3` removes, is not pinned here: `S4.3`'s red observes it against
+  this step's `selectChange`.
+- **The work.** `scripts/mutants/reach-core.ts`, pure, exporting `selectChange(input)`. It holds today's LOCAL rule
+  unchanged, the production filter included, and returns one record per entry with room for limbs and vias. `scope.ts`
+  calls it. No other code changes beyond the five guards and their `ledger.ts` entries.
+- **RULE 2.** Read by `scope.ts` and the tests. If it is wrong, today's selection changes with no message. The 17
+  existing cases in `verif/mutants-scope.test.ts` (`parseUnifiedDiff` 3, `anchorRange` 3, `overlaps` 4,
+  `isProductionPath` 2 and `classifyRunnerTranscript` 5) cannot see that: the file imports only those five functions
+  from `scope-core.ts` (`:16-22`), and the composition this step moves sits inline in `scope.ts` (`:97`, `:109-113`),
+  which nothing imports (`DESIGN` `D18`). So the five guards under Red first pin it, and the 17 stay green beside them.
+- **Pins that move.** None. `MU-PFA-R2-A` to `-E` keep their anchors, because their text in `scope-core.ts` is
+  unchanged.
+- **Proposed mutants.** `MU-PFA-R2R-1A` to `-1E` (`DESIGN §10.9`), each reddening its own guard and no other: `1A`
+  LOCAL selects from no hunk; `1B` the overlap `selectChange` applies read as same-file, its line range ignored; `1C`
+  UNGUARDED taken from no hunk; `1D` UNGUARDED taken from each production hunk, anchored or not; `1E` the production
+  filter dropped. `MU-PFA-R2-A` to `-E` stay KILLED.
+- **Exit.** The runner's own line for that file, `Tests  22 passed (22)` (the 17 existing cases and the five guards),
+  quoted here from the run; `1A` to `1E` KILLED, each reddening its own guard with the file's other 21 cases green, read
+  from a run of the file under it and quoted here (the KILLED line names no test, `S4.2`); the B7 red observed
+  and recorded. The B7 test lands with `S4.6`, which turns it green.
+
+### S4.2 · The classifier, the signals, the banner, and the runner call
+
+- **Red first.** In `verif/mutants-scope.test.ts`, each with its observed message; `scope.ts` line numbers are at
+  `f6b78109`. Against today's exported `classifyRunnerTranscript`: an INCONCLUSIVE-only transcript with status 1
+  returns `'BROKEN_GUARANTEE'` (must be NO VERDICT), and a SURVIVED row with status 0 returns `'OK'` (must be
+  BROKEN GUARANTEE). Against today's report, first moved from `scope.ts:115-206` into a pure `renderReport(result)` in
+  `scope-core.ts` that returns today's lines and exit code, the spawn at `:162-166` going to `runChunks` below and its
+  transcript and status handed in (as `S4.1` does for `selectChange`; rule 10): an empty change set, and one whose hunks
+  all lie outside production source (B7's, `scope-b7.out`), each return exit 0 with no LIMIT among their lines (today's
+  `scope.ts:133` path), and under `--strict` no line names the signals raised and the exit taken. Against today's flags,
+  first moved unchanged from `scope.ts:58-62` into `parseFlags(argv)` there: an unknown flag is ignored, and
+  `--range A..B` sets no range, so the tool diffs `HEAD` (`:88`); each must be refused with
+  `mutants:changed — unknown flag <f>.` (red 11, `2K`). The runner call (red 14), against today's spawn, first moved
+  unchanged from `scope.ts:162-166` into `scope-run.ts`'s `runChunks` with its command and folder made parameters (as
+  `S4.4` moves the id filter), called with an argv-echo child in a fresh temp folder: `WP11-M1 restore the tautology:
+  explicitNoOutput: !hasOutput` reaches the child as six arguments, `WP11-M7 zero-subject floor never fires (aiProduced
+  -> false)` writes a file named `false)` (`shellmeta.out`), and, with the test's own `MUTANTS_EXACT` set to `0`, the
+  child reads no `MUTANTS_EXACT=1`; each id must arrive whole, with no file written, and the child must read
+  `MUTANTS_EXACT=1`. The rest are new guards, not transitions, each shown able to fail by its own mutant (`2A` to `2U`):
+  `classifyChunk`'s void and missing-row rules and the CONTROL BROKEN and TYPE wordings (`DESIGN §10.9`, red 8),
+  `renderReport` on each exit and on a listing (`2J`, red 17), B7's shape never worded NOTHING CHANGED (`2T`, red 9), a
+  REMOTE row naming the changed path and its edge (`2M`, red 9), the known flags accepted by `parseFlags` (the admitting
+  half, green before and after, `2L`, red 17), and the chunker.
+- **The work.** Line numbers are at `f6b78109`. In `scope-core.ts`: `classifyChunk` (reads rows matched against the
+  ids sent; the chunk test; both void rules; NO VERDICT), the row parser, the chunker (at most 200 ids and 20,000
+  characters, grouped by victim, never an empty chunk), a pure `renderReport(result)` (the banner on each exit path;
+  the BROKEN GUARANTEE wordings; LISTED, NOT RUN; SIGNALS RAISED with the exit taken; the exit order 1, 2, 3), and a
+  strict `parseFlags(argv)`: an unknown flag, and `--range` without `=`, return the refusal
+  `mutants:changed — unknown flag <f>.`, on which `renderReport` exits 2 (rule 10). ⛔ The banner names only what is
+  built when it lands (rule 9). Here it reads, word for word: `⚠ LIMIT: a guard is selected only when a changed line
+  touches its anchor (LOCAL) in a .ts, .tsx or .svelte file under packages/ or apps/ other than *.test.ts and
+  *.spec.ts (Playwright's *.e2e.ts specs are examined). A change to any other file selects nothing, even inside an
+  anchor, and a guard anchored elsewhere is not selected when its test reaches the change. Not seen at all: untracked
+  files, gitignored build output (dist/, .svelte-kit/), the environment and the host, and guards the ledger does not
+  declare. UNGUARDED CHANGE examines the same files: a change to any other file is never called unguarded. A clean run
+  says the measured entries still discriminate. It does not say nothing downstream broke.` (the filter: `DESIGN §10.1`;
+  the remote case: `S2.5`). `S4.3` (LOCAL on any path), `S4.6` (ENTRY, ALWAYS, GLOBAL, REACH, WIDE, BLIND) and `S4.7`
+  (OWED) each re-word it in the commit that lands the limb, to `DESIGN §10.4`'s text less the limbs not yet built;
+  from `S4.7` on it is that text. The count line `scope.ts:116` prints is kept until `S4.3` lands the provenance line.
+  An empty change set prints NOTHING CHANGED; until `S4.3`, a change set whose hunks all lie outside production source
+  (B7's) prints today's `mutants:changed — NO PRODUCTION CHANGES EXAMINED. This is not a pass: there was nothing to
+  decide.` (`scope.ts:131`) with the banner, never NOTHING CHANGED. In a new `scripts/mutants/scope-run.ts`, which
+  `scope.ts` imports and the runner never loads: `runChunks(command, chunks, { cwd, logDir })`, which spawns `command`
+  with no shell, one argv element per id and `MUTANTS_EXACT=1` in the spawn's explicit `env`
+  (`{ ...process.env, MUTANTS_EXACT: '1' }`, never set on `process.env` and left to inheritance: `run.ts:118-123`),
+  inert until `S4.4`, each call's stdout and stderr written to its own log file as they arrive (`DESIGN` `D19`).
+  `scope.ts` passes today's command (`bun run ${ROOT}scripts/mutants/run.ts`) and `ROOT`, classifies each chunk from
+  its log with `classifyChunk`, then only prints `renderReport`'s lines and exits with its code. The tests import
+  `scope-core.ts` and `scope-run.ts`, hand `runChunks` an argv-echo child and a fresh temp folder, and never import or
+  spawn `scope.ts`, which exports nothing and runs at load (`scope.ts:56-208`).
+- ⛔ **UNTIL THIS STEP LANDS:** run `mutants:changed` without `--run` first and read its `GUARD` lines. If one names an
+  id that holds whitespace (49 live at `W`), do not add `--run`: the shell would split that id into fragments that
+  select other entries (2,536 to 3,987 of 3,987 for the 4 measured), and `WP11-M7`'s `>` sends the transcript into a
+  stray file in the package root. Measure that selection with `bun run mutants -- <ids>`, each id one argument: `"$@"`
+  or an argv array from a script, each id in single quotes at a prompt (no id holds one; `shellmeta.out`: 60 of 60
+  whole). This interim rule is struck, dated, when the step lands.
+- **RULE 2.** Read by the agent in the edit loop and by the integrator. If it is wrong, a slack guard reads as a pass,
+  a red the change caused reads as a broken guarantee, or one id becomes a whole-ledger run whose transcript lands in
+  a stray file.
+- **Pins that move.** `MU-PFA-R2-D` and `-E` are re-anchored on the new classifier in the same commit, or the anchor
+  census reddens. `verif/mutants-scope.test.ts`'s five classifier cases (`:121-154` at `f6b78109`) move to
+  `classifyChunk`. Struck in place and replaced in `scope.ts`, line numbers at `f6b78109`: its header on the exit
+  codes (`:17-23`); its advisory paragraph's stale counts (`:26-27`), *"75 of 106 production files carry no guard"*
+  and *"~192 declared guards"*; its LIMIT paragraph (`:33-37`), re-worded to the banner this step prints, never to
+  `DESIGN §10.4`'s; and its banner (`:202-206`), by that banner. Its trigger (`:29-31` at `f6b78109`) is
+  `DESIGN §10.11` Q3's. It is struck and replaced in the commit that records the sponsor's answer, before or after this
+  step lands, together with the same trigger in `ROADMAP §3` (`:224-225` at `f6b78109`). If the answer makes `--strict`
+  the default, that commit carries its own red (on `parseFlags` and `renderReport`: with no flag, an unguarded change
+  alone exits 0 and must exit 3, its message observed) and its own mutant in `DESIGN §10.9`'s table; landing before this
+  step, it first moves today's flags (`scope.ts:58-62` at `f6b78109`) and report (`:115-206`) into those two functions
+  as this step's Red first does, because no test imports or spawns `scope.ts` (rule 10) and the red and the mutant would
+  have no path there. It also moves the default in the code (`scope.ts:60` and `:153-157` at `f6b78109`, in `parseFlags`
+  and `renderReport` once moved), the rest of both advisory paragraphs, which state that default (`scope.ts:25-31`,
+  which its trigger says is deleted, and `ROADMAP:222-225` at `f6b78109`, *"WHY THE ABSENCE SIGNAL IS ADVISORY BY
+  DEFAULT"*), `DESIGN` `D17`'s *"3, UNGUARDED CHANGE under `--strict`"*, `§10.6`'s `[--strict]` and *"without
+  `--strict`, UNGUARDED CHANGE is advisory and leaves it 0"*, `§10.8`'s last row, and `ROADMAP §3`'s exit-3 row,
+  *"UNGUARDED CHANGE (`--strict`)"* (`:210` at `f6b78109`). In `ROADMAP §3` (`:205-211` at `f6b78109`), *"THREE
+  OUTCOMES, THREE EXIT CODES"* and row 1's *"the suite is green and the protection is gone"* are struck in place and
+  replaced beside them by `D17`'s four classes. In the register, under each record of `DESIGN §10.1`'s
+  table this step fixes (the shell's length limit; ids split, and a `>` obeyed, by a shell; the classifier reading the
+  exit status; the exit order; the flags: 6 of 11), a dated pointer to this commit; where a record is a finding, its
+  Status struck and replaced.
+- **Proposed mutants.** `MU-PFA-R2R-2A` to `-2U` (`DESIGN §10.9`).
+- **Exit.** `2A` to `2U` KILLED. For each, the tests that redden under it, read from a run of its victim under it (the
+  runner's KILLED line names no test: its detail is the run's last line holding `Tests `, `run.ts:1027-1035`), quoted
+  here: the test or tests its row in `DESIGN §10.9` names among them (`2A` names two), and none of another limb
+  (rule 8); and each predicted red's test and observed message quoted here. By the design's own arrangements three
+  cases redden under two mutants each: the INCONCLUSIVE-only case (`2C`, `2A`), the `MUTANTS_ADVISORY=1` case, a
+  SURVIVED row at status 0 (`2B`, `2A`), and red 8's third case, which asserts both of `PQ1-V1802`'s reasons (`2D`,
+  `2F`). `MU-PFA-R2-A` to `-E` KILLED. The 60 ids that hold whitespace, 11 of them history, each reach an argv-echo
+  child whole through `runChunks`, called directly in a fresh temp folder, with no file written, and the child reads
+  `MUTANTS_EXACT=1`; and `W`'s 4,035 live ids, chunked, reach it with no `ENAMETOOLONG`, their entries imported from a
+  temporary copy of `W`'s `ledger.ts` (`c603fb69`; the file imports nothing), never from `HEAD`'s, which on `f6b78109`'s
+  line, until the merge `S4.8` waits for, lacks 132 of them. Neither set can arrive through `scope.ts`'s own selection
+  at this step: it skips history (`scope.ts:65` at `f6b78109`), and the production filter it keeps until `S4.3` leaves
+  1,502 of the 4,035 unselectable.
+
+### S4.3 · The change set, LOCAL on any path, and ranges read at their end
+
+- **Red first.** Observed against today's code: an added line `++ x` moves the next hunk to a file named after it, and
+  so does a line `-- x` replaced by `++ y`; a deleted file and a rename's old path are absent from the change set; a
+  changed line inside a `scripts/` anchor selects nothing, where it must select the entry by LOCAL (`DESIGN §10.9`,
+  red 22); a `--range` locates anchors in the working tree (11 of 13 recent production commits differed), observed in a
+  temporary repository whose end commit `T` holds anchor text the working tree does not, on today's read (`locate`,
+  `scope.ts:75-81` at `f6b78109`), first moved unchanged into `scope-run.ts` with its folder and the range's end made
+  parameters and the end ignored (rule 10), where it must locate each anchor in `T`'s text (red 11, `3E`); the range
+  check, first written in `scope-core.ts` holding today's rule, which refuses nothing (rule 10), admits
+  `--range=K..T --run` with `HEAD` not at `T` and no tracked change, so the runner would measure the working tree, and
+  must instead return `⛔ RANGE END IS NOT THE TREE — …`, naming `<HEAD12>` and 0 tracked changes, asserted by its
+  message (red 11, `3F`); it admits the same range with `HEAD` at `T` and one tracked change, so once that change is
+  staged the runner would measure a tree that is not `T`'s (`run.ts:192` at `f6b78109`: *"This deliberately admits a
+  fully staged candidate"*), and must instead return the same refusal, naming `<HEAD12>` and 1 tracked change, asserted
+  by its message (red 11, `3K`); in the edit loop an untracked file is absent from the change set, observed in a
+  temporary repository on a replica of today's call (`git diff --unified=0 --no-color --relative HEAD`, `scope.ts:86-89`
+  at `f6b78109`) returned by `scope-core.ts` as the edit loop's argv list, where it must be in it as added (red 17,
+  `3H`); and a diff over 1,048,576 bytes is not read whole: in a temporary repository, today's change-set call
+  (`spawnSync` with its default buffer, `scope.ts:89` at `f6b78109`), first moved unchanged into `scope-run.ts`'s
+  `runGit`, fails with `ENOBUFS` on a commit whose diff is larger, as `--range=91ec502d..8a703e2a` exits 2 today
+  (`DESIGN §10.1`), where it must return the whole diff (red 17, `3J`). The admitting case, the range check handed
+  `--range --run` with `HEAD` at the end and no tracked change, is a guard, green before and after, shown able to fail
+  by `3G` (red 17).
+- **The work.** `parseNameStatus` over `git diff --name-status -z --no-renames`; the header rule (headers read only
+  after a `diff --git` line, and each hunk's body consumed by its `@@` counts, `DESIGN` `D12`); untracked files in the
+  edit loop; LOCAL without the production filter, which stays for UNGUARDED only; the change set's provenance line
+  (`DESIGN §10.4`), which replaces the count line (`scope.ts:116` at `f6b78109`); `--range` reading the ledger and the
+  anchors at the end: `locate` (`scope.ts:75-81` at `f6b78109`), moved into `scope-run.ts` with its folder and the
+  range's end as parameters, locates each anchor by `anchorRange` in its file's text at the end, never in the working
+  tree's, and the end's `ledger.ts`, which imports nothing, is imported from a temporary copy of its bytes;
+  `--range --run` refused unless `HEAD` is the end and the tracked tree is clean, by the range check, a pure function in
+  `scope-core.ts` handed `HEAD`, the end and the tracked changes that `scope.ts` reads (rule 10); a REPLAY that lists
+  from the end's git objects when `HEAD` is elsewhere. Each mode's git calls (`git diff --name-status -z --no-renames`,
+  the hunks' `--unified=0 --no-renames`, in the edit loop `git ls-files -z --others --exclude-standard`, and in a range
+  the read of the end's `ledger.ts` and anchor files from its objects, `git cat-file --batch` handed one `<T>:<path>`
+  line per file on its stdin) are returned as argv lists, with that input, by a function `scope-core.ts` exports, and
+  run by `scope-run.ts`'s `runGit(argv, { cwd, input })`, which reads each call's output whole (`DESIGN` `D12`; the
+  end's `ledger.ts` alone is 7,918,231 bytes at `f6b78109` and 6,957,920 at B7's `ddd75ae9`, by `git cat-file -s`, each
+  past `spawnSync`'s 1,048,576-byte default); `scope.ts` only calls it in `ROOT` and passes the output in. `3C`, `3E`,
+  `3F`, `3G`, `3H`, `3J` and `3K` mutate those functions, the range check and `locate`: `scope.ts` exports nothing, and
+  a mutation run never leaves `ROOT`'s tracked tree clean for `3G`'s admitting case (`run.ts:192` at `f6b78109`).
+- **RULE 2.** Read by each limb. If it is wrong, a deletion escapes the change set, or a range measures text that is
+  not the commit's.
+- **Pins that move.** `verif/mutants-scope.test.ts`'s three `parseUnifiedDiff` cases, in the same commit, line numbers
+  at `f6b78109`. The pure-deletion case (`:47-52`) and the `/dev/null` case (`:54-57`) gain the `diff --git` and
+  `--- ` lines a real diff prints: without them the first reddens and the second passes with no header read. The
+  cross-file case (`:25-43`) gets a first hunk whose body matches `@@ -10,2 +10,3 @@`. The `isProductionPath` pins
+  (`:103-115`) stand. `MU-PFA-R2-A`'s anchor stays while the `hunks.push(...)` line keeps its text, and the
+  pure-deletion case, its killer, must still redden under it. `MU-PFA-R2R-1A` to `-1E` are anchored in `selectChange`:
+  `1A`, on LOCAL's expression, which this step changes, is re-anchored in the same commit, and `1B` to `1E` are
+  re-anchored if their lines change; each guard must still redden under its own mutant. `S4.1`'s five guards stand: none
+  asks whether LOCAL reads a `scripts/` hunk. The banner and `scope.ts`'s LIMIT paragraph drop the production filter
+  from the LOCAL clause and untracked files from *Not seen at all*, and the provenance line replaces the count line,
+  with `DESIGN §10.9` red 9's banner case re-pinned in the same commit. The NO PRODUCTION CHANGES EXAMINED exit goes,
+  and `2T` is re-anchored in the same commit, or the anchor census reddens, on the condition that prints NOTHING
+  CHANGED, which it makes read the production hunks instead of the change set (`scope.ts:128` at `f6b78109`), so the
+  B7-shape case, kept, must still redden under it. `3D` cannot succeed it: its case (red 22) asserts a limb of
+  `selectChange`, never a wording, so it stays green when B7's shape is worded NOTHING CHANGED. In the register, under
+  the records of `DESIGN §10.1`'s table this step fixes (anchors read from the working tree; the `++ ` header, and a
+  deleted file and a rename's old path dropped; the change set read through `spawnSync`'s default buffer: 3 of 11), a
+  dated pointer to this commit; where a record is a finding, its Status struck and replaced.
+- **Proposed mutants.** `MU-PFA-R2R-3A` to `-3K`.
+- **Exit.** `3A` to `3K` KILLED; `2T` KILLED on its new anchor, with the B7-shape case among the tests that redden under
+  it; and `MU-PFA-R2-A` and `MU-PFA-R2R-1A` to `-1E` still KILLED. For each of `3A` to `3K`, the tests that redden under
+  it, read from a run of its victim under it as in `S4.2`, quoted here: its named test among them, and none of another
+  limb (rule 8); and each predicted red's test and observed message quoted here. Each other earlier entry this step
+  re-anchors, or whose named test it edits, still KILLED, read the same way (`DESIGN §10.9`).
+  The entries anchored where `isProductionPath` discards hunks (1,502 at `W`, recounted here at this step's tree) are
+  selectable by LOCAL, shown by a fixture with a `scripts/` anchor.
+
+### S4.4 · The runner's exact mode, the empty call refused, and the verdict line — after `S4.0`'s measurements end
+
+- **Red first.** Observed against the id filter, first moved unchanged from `run.ts:1077-1081` into `verdict.ts` (as
+  `S4.1` does for `selectChange`; `DESIGN §10.9`, red 15): `MU-PFA-AF3-DEFAULT_CONTEXT_ASSEMBLY_POLICY` selects
+  `..._POLICY_ID` too, and an empty id list returns the whole ledger. Today's runner is never called with no id to
+  observe it: that call is a whole-ledger run. The round trip is a new guard, not a transition:
+  today the line is formatted inline at `run.ts:1117`, apart from the parser `S4.2` wrote, and the mutant `4C` shows
+  the new case can fail. Against `S4.2`'s `classifyChunk`: a chunk that sent
+  `WP11-M4 admit TIMEOUT as success-compatible` alone and reads `Running 1 declared mutant(s)` and `1 entries -> ` (an
+  exact call) is INSTRUMENT DID NOT RUN, because its count adds the history twin; it must count.
+- **The work.** In `verdict.ts`, which `run.ts` already imports: the id filter, exact under `MUTANTS_EXACT=1` and
+  refusing an empty id list, which `run.ts` turns into exit 2; and the verdict line's formatter, which `run.ts:1117`
+  (at `f6b78109`) then calls, with `S4.2`'s row parser moved beside it and a round-trip test over each verdict kind
+  and the 60 ids that hold whitespace. The tests import `verdict.ts`, never `run.ts`, which executes on import
+  (`verdict.ts:5`), and never spawn the runner: under `4B` a spawned call would be a whole-ledger run. In
+  `scope-core.ts`, in the same commit: `classifyChunk`'s count drops its substring-twin allowance (`DESIGN §10.8`),
+  because from this commit the runner honours the `MUTANTS_EXACT=1` that `runChunks` has passed since `S4.2`; the
+  exact-chunk case lands in `verif/mutants-scope.test.ts`.
+- **RULE 2.** Read by each `--run` and by later lanes. If it is wrong, an id selects others, an empty call measures
+  the whole ledger, or the parser drifts from the line it reads (which `S4.2` makes NO VERDICT, never a held row).
+- **Pins that move.** `verdict.ts` holds 4 anchored entries, re-anchored in the same commit if their lines change;
+  `run.ts` holds 0. `S4.2`'s parser mutant `2Q` is re-anchored on `verdict.ts` in the same commit.
+  `verif/mutant-verdict.test.ts` gains the exact-id, empty-call and round-trip cases. ⚠ `run.ts` and `verdict.ts`
+  are in GLOBAL (`DESIGN` `D8`), so a range from `W` across this step selects each live entry: the first such range
+  is a whole-ledger run. In the register, under the records of `DESIGN §10.1`'s table this step fixes (the substring
+  filter; the call with no id: 2 of 11), a dated pointer to this commit; where a record is a finding, its Status
+  struck and replaced. Both are fixed under `MUTANTS_EXACT=1` only.
+- **Proposed mutants.** `MU-PFA-R2R-4A` to `-4D`.
+- **Exit.** `4A` to `4D` KILLED, and `2Q` KILLED on its new anchor in `verdict.ts`, as is each of `verdict.ts`'s 4
+  entries (`SR1-M43` to `-M46`) this commit re-anchors. For each of `4A` to `4D`, the tests that redden under it, read
+  from a run of its victim under it as in `S4.2`, quoted here: its named test among them, and none of another limb
+  (rule 8); and each predicted red's test and observed message quoted here. Each other earlier entry this commit
+  re-anchors, or whose named test it edits, still KILLED, read the same way (`DESIGN §10.9`). Under `MUTANTS_EXACT=1` a
+  call with no id exits 2 and measures nothing, observed once in a disposable worktree.
+
+### S4.5 · The static reach: the walk, the fold, WIDE and BLIND
+
+- **Red first.** The fixtures of `DESIGN §10.9` red 7, each observed red before its rule exists. The first is a
+  measured failure of the scratch scanner itself: it folds `` `${ROOT}scripts/coverage-floor.ts` `` (with `ROOT =
+  fileURLToPath(new URL('..', import.meta.url))`) to `verif/..scripts/coverage-floor.ts`; the built fold must give
+  `scripts/coverage-floor.ts`. The live pin *"`verif/coverage-floor.test.ts` reaches `scripts/coverage-floor.ts`"*
+  fails on the scratch scanner today. The other live pins of red 13 are guards, not transitions, each shown able to fail
+  by its own mutant (`5A`, `5B`, `5D`, `5P`, `5R`, `5S`, `5V`, `5W`, and `6L` in `S4.6`). RP6's control case (`5Q`,
+  red 18) is a new guard too, shown able to fail by `5Q`.
+- **The work.** `scripts/mutants/reach-core.ts` (pure: import edges in any form, path sites, the fold, site
+  classification, closure, reach, WIDE, BLIND) and `scripts/mutants/reach.ts` (I/O over the working tree:
+  `git ls-files`, run through `scope-run.ts`'s `runGit`, which reads its output whole (`DESIGN` `D12`; `3J`), file
+  reads, the TypeScript 5.9.3 parse, the resolution read from `vitest.config.ts`'s default export
+  and `projectsFor(true)`, neither GLOBAL file edited, `DESIGN` `D2`; a range end's tree is built in `S4.6`). Each
+  build prints files parsed, opaque sites, WIDE victims and their entries, each WIDE victim's first site, and the
+  BLIND count.
+- **RULE 2.** Read by REACH, WIDE, BLIND and the banner's counts. If it is wrong, a guard's remote break is not
+  selected and no red shows it: `DESIGN §10.2` records that happening in scratch.
+- **Pins that move.** New live pins in `verif/mutants-reach.test.ts`, about 4 s over the real tree (`DESIGN §10.9`,
+  red 13). ⚠ This step first lands that file, so it raises `VERIF_TEST_FLOOR` (`verif/assurance-surface.test.ts:127`,
+  79 today) to the population of top-level `verif/*.test.ts` files counted on disk in this commit, with a dated line
+  in the floor's note, which reads *"RAISE THIS DELIBERATELY when tests are added"* (`:80`).
+- **Proposed mutants.** `MU-PFA-R2R-5A` to `-5W`, and the mutants `DESIGN` `D5` and `DESIGN §10.9`
+  red 7 list as owed, their ids not yet assigned. `S4.6` proposes `6L`, `6M` and `6K`, the mutants of the import edges,
+  of the closure's depth and of the BLIND widening: the B7 test, the transitive test and the BLIND widening case land
+  there, and so does the widening. `6L`'s other test, red 13's `probes.ts` import-edge pin, lands here as a guard, shown
+  able to fail by `6L` in `S4.6`. Here `6L` and `6M` would still redden `verif/mutants-reach.test.ts` through other pins
+  (the `pwuType.ts` pin's target lies two imports from its victim), and neither the B7 test nor the transitive test is
+  here yet, so a KILLED here would not be their kill.
+- **Exit.** `5A` to `5W`, and each mutant `DESIGN` `D5` and `DESIGN §10.9` red 7 list as owed, KILLED. For
+  each, the tests that redden under it, read from a run of its victim under it as in `S4.2`, quoted here: its named test
+  or tests among them, and none of another limb (rule 8), save red 13's live pins: they share that victim, and the reach
+  pins and the BLIND pin among them walk the real tree through each fold and WIDE rule it exercises, so such a rule's
+  mutant can redden another rule's pin, and its kill is then read through its named tests, by name (rule 8). `5D`,
+  leaving no victim WIDE, reddens the
+  BLIND pin's count, one of its named tests, with each BLIND entry of a WIDE victim (in a scratch model at `d7a363b0`,
+  20 outside GLOBAL, over 10 victims: `vf_blind21.out`). `5F`, taking each path built on the package root for a
+  temp path, drops
+  `${ROOT}scripts/coverage-floor.ts` (`verif/coverage-floor.test.ts:22`), `${REPO}/scripts/reviewer-qual/probes.ts` and
+  the setup file's `${ROOT}apps/rph-demo/src/lib/server/authoring-turn.ts`, so it reddens the `coverage-floor.ts` pin,
+  the `probes.ts` read-edge pin and the `authoring-turn.ts` pin, and the BLIND pin through `MU-PFA-R1-A` to `-E` and
+  `MU-PFA-R3-L`, whose victims, not WIDE, spawn their scripts by such paths. In a scratch model that drops, with the app
+  folders, the closures of the code under them, `5P` leaves the 24 Playwright victims that are WIDE only through 4
+  production modules (`DESIGN §10.2`) not WIDE, with 123 of their entries BLIND (`model_5d_5r.out`). And each
+  predicted red's test and observed message quoted here. Each earlier entry this step re-anchors, or whose named test
+  it edits, still KILLED, read the same way (`DESIGN §10.9`). Each live pin green; BLIND entries of tests that are not
+  WIDE number 0 on the real tree, over the whole named-victim population; the build's counts recorded here.
+
+### S4.6 · The limbs — and the B7 red turns green
+
+- **Red first.** The B7 test from `S4.1`, still red. Beside it, each red before its limb: `7e8725ba`'s M7 and M8; the
+  transitive case; ENTRY (`63ef7bc1`'s shape, and an entry whose `supersededBy` the end removes, `6D`); GLOBAL (a
+  `strictNullChecks` override in `packages/rph-application/tsconfig.json` selects each live entry,
+  `B6-unresolvable-fails-open` among them, by GLOBAL; and a change to `verdict.ts` alone selects each live entry
+  through the runner's closure, `6I`); ALWAYS (a docs-only change selects the 5 type-prevented entries by ALWAYS);
+  RP0, the entry's own anchor file (`DESIGN` `D3`); WIDE (`DESIGN §10.9`, red 23); the BLIND widening (red 16: a
+  change to one file outside a non-WIDE victim's reach and outside GLOBAL, not its BLIND entry's anchor file, selects
+  each of that victim's entries with WIDE among its limbs, and the report's banner counts the BLIND entry); a reach
+  build that throws, handed to `reach-core.ts`'s conversion, first written reading the throw as an empty reach, which
+  must render through `renderReport` as exit 2 with REACH COULD NOT BE BUILT, asserted by its message, and no `REACH 0`
+  (red 21; it is observed with the message absent, not with an import error); and the reach at a range end (red 24),
+  never through the CLI (rule 10), in a temporary repository whose commit `T` differs from the working tree, with `HEAD`
+  elsewhere and the working tree clean at `HEAD`, observed once REACH lands and before the end's build does:
+  `reach.ts`'s build, its repository and `T` made parameters and `T` first ignored, as `S4.5` builds the working tree's
+  reach, is handed that repository and `T`, and `selectChange`, called on the reach it returns, must select the entry by
+  REACH via a file its victim imports only at `T` (`6O`, `6Q`), and the entry's record, as `renderReport` prints it for
+  `--explain=<id>`, must show in RP2 the setup file that only `T`'s `vitest.projects.ts` declares, not
+  the working tree's (`6P`); with the working tree's reach, neither holds. And each `S4.0` survivor of class LOCAL,
+  ENTRY, VICTIM, REACH-IMPORT, REACH-PATH or GLOBAL must be selected by a seen limb in `S4.3`'s REPLAY over its cause
+  commit `C`; one that is not is a fixture red, fixed before this step lands (`DESIGN §10.10`). Each `S4.0` survivor
+  of class NONE, a scratch class, is replayed the same way: one the REPLAY selects is re-classed in `S4.8`; one it
+  selects by no limb is a miss, its fixture red observed against this step's rule and its message recorded verbatim
+  under its `S4.0` finding before this step lands, the fixture committed only with a fix (a red in `verif/` reddens
+  `gate:fast`). The admitting half is a guard, green before and after, shown able to fail by `6B`; so is UNGUARDED
+  beside REACH (a production hunk in a reached file, overlapping no anchor, stays UNGUARDED CHANGE), shown able to
+  fail by `6J`.
+- **The work.** `selectChange` gains REACH, ENTRY, GLOBAL, ALWAYS, WIDE and the BLIND widening. Each entry's record
+  lists each limb that fires, and under each limb every changed path in the entry's reach as a via, each with its
+  edge. UNGUARDED counts LOCAL anchors only. `--run`, `--run=reach` and `--run=all` choose what runs; the rest is
+  LISTED, NOT RUN. `--explain=<id>` prints an entry's record: its victim's reach, each via with its edge, its WIDE
+  site; the known-flag case (`2L`) gains it. A range's reach is built at its end (`DESIGN` `D14`): with `HEAD`
+  elsewhere, from the end's objects (`git ls-tree -r -z <T>`, each file's bytes by `git cat-file --batch`, both run
+  through `scope-run.ts`'s `runGit`, which reads each output whole: `DESIGN` `D12`; `3J`), and with the resolution read
+  from the end's own `vitest.config.ts` default export and `projectsFor(true)`, never the working tree's. Those two
+  cannot be imported from their bytes: `projectsFor(true)` lists the `packages/` and `apps/` folders beside its own file
+  (`vitest.projects.ts:17`, `:62-63`, `:75-77`), and `vitest.config.ts:57` imports `vitest/config`. So the end's tree is
+  written to a temporary folder from which `vitest/config` resolves, the two are imported there, and their absolute
+  paths are mapped back to repository paths. This is untested: the scratch builds of past trees wrote each tree to disk
+  but held the resolution as constants (`reach.mjs`, `scan.mjs`). ENTRY's base ledger (`DESIGN` `D7`) is read from the
+  base's objects in the same way. A reach build that throws, in a git read, a file read or the configs' import, becomes
+  a failure value carrying REACH COULD NOT BE BUILT and its reason, never an empty reach. The conversion is a function
+  in `reach-core.ts` that the tests import, handed the build to call (a test hands it one that throws), never a catch in
+  `scope.ts`, which no test reaches (`DESIGN` `D18`; rule 10). `renderReport` prints that failure with no REACH or WIDE
+  count and the LIMIT's WIDE and BLIND values as `unknown`, and exits 2 (`DESIGN §10.9`, red 21). `6N` mutates that
+  conversion, which is first written reading the throw as an empty reach, so red 21 is observed with the message absent,
+  not with an import error.
+- **RULE 2.** Read by `--run` and by the report. If it under-selects, *"an agent is told "nothing guards this" when
+  something does — a false all-clear, which is worse than no signal"* (`S2.1`).
+- **Pins that move.** `MU-PFA-R2R-1A` to `-1E`, anchored in `selectChange`, are re-anchored in the same commit
+  wherever this step changes their lines, or the anchor census reddens. `S4.1`'s five guards stand: each asserts its own
+  limb, so REACH through RP0, which selects an entry when its anchor file changes, does not falsify the
+  out-of-span guard (`1B`). The banner's selection sentence and `scope.ts`'s LIMIT paragraph gain ENTRY, ALWAYS,
+  GLOBAL, REACH, WIDE and BLIND, with `DESIGN §10.9` red 9's banner case re-pinned, in the same commit.
+- **Proposed mutants.** `MU-PFA-R2R-6A` to `-6Q`, and the control `MU-PFA-R2R-6Z`.
+- **Exit.** The B7 test green, and `6A` and `6L` each turn it red again; `6A` to `6Q` KILLED, and `MU-PFA-R2R-1A` to
+  `-1E` still KILLED. For each of `6A` to `6Q`, the tests that redden under it, read from a run of its victim under it
+  as in `S4.2`, quoted here: its named test or tests among them, and none of another limb (rule 8), except that `6L` and
+  `6M` are read through their named tests, by name, from one run of the victim under the mutation, because other tests
+  of that file redden too, among them red 13's `hash.ts` and `pwuType.ts` pins and its `process-run-observer.ts` edge
+  pin under `6L` (an `import type`, which `DESIGN` `D3` keeps as an import edge), its `pwuType.ts` pin under `6M`, and
+  in a scratch model its BLIND pin under both (`mutated_reach.out`); and each predicted red's test and observed message
+  quoted here. Each other earlier entry this step re-anchors, or whose named test it edits, still KILLED, read the same
+  way (`DESIGN §10.9`). `6Z` CONTROL_HELD; each `S4.0` survivor of class LOCAL, ENTRY, VICTIM, REACH-IMPORT, REACH-PATH
+  or GLOBAL selected at its `C` by a REPLAY whose reach is built at `C`, `k of n` recorded; each NONE survivor selected
+  at its `C`, or its red's message recorded under its finding; each REPLAY this step runs at a survivor's `C` written in
+  that survivor's row of the survivor table, beside the scratch one (`DESIGN §10.10`).
+
+### S4.7 · Receipts, the measured-base check, and OWED
+
+- **Red first.** `S4.6`'s flag set refuses `--record` as an unknown flag, so `--record` first joins it, and the base
+  check is first written in `scope-core.ts` admitting each base (rule 10). Handed `--range=K..T --run=all --record`
+  with `HEAD` at `T`, no tracked change and a base with no receipt, it admits the run, and so it does for a base whose
+  receipt chain ends at a range receipt (`7G`); each must instead return `⛔ BASE NOT MEASURED — …`, asserted by its
+  message, never by the exit code alone. Handed the same range with `--run --record` from a base whose chain reaches a
+  whole-ledger receipt, it admits the run, and must instead return `mutants:changed — --record requires --run=all.`,
+  asserted by its message (`7N`). A survivor recorded at the base must be selected by OWED, and it is not yet; one
+  SURVIVED at the base whose anchor the change also touched must print the OWED wording, not LOCAL (`DESIGN §10.8`).
+  Without `--record`, a range whose base has no measured first-parent ancestor, and an edit loop whose `HEAD` has none,
+  must print OWED UNKNOWN, asserted by its message, where an OWED that reads no chain prints nothing owed
+  (`DESIGN §10.9`, red 21). The rest are new guards, not transitions, each shown able to fail by its own mutant: a
+  measured base accepted (the admitting half, green before and after, `7B`); the same range without `--record`, from a
+  base with no receipt, not refused with BASE NOT MEASURED (green before and after, `7M`, red 12); and, because no
+  writer, receipt check, rule digest or keyword `measured` exists before this step, the banner-less chunk case (`7D`),
+  the journal case (`7E`), the older-rule case (`7F`), the append-only case (`7H`), each KILLED row kept with its detail
+  (`7J`), the receipt check's population (`7K`) and `--range=measured..HEAD` with no measured commit refused with
+  BASE NOT MEASURED, never read as an empty base (`7O`), which `DESIGN §10.9` reds 12 and 20 define.
+- **The work.** `scripts/mutants/record.ts`, which writes each verdict line, KILLED included, with the runner's
+  detail; its writer and its refusals in a module the tests import, never only in its CLI entry (`DESIGN §10.7`:
+  `--logs=<dir> --scope=whole --tree=<sha>`), so `7D`, `7E` and `7J` reach them; the journal family
+  `docs/tracking/mutants/`; `--record`, which the base check refuses without `--run=all` (`DESIGN` `D16`, `7N`); the
+  measured-base check over the receipt chain, and with it the keyword `measured` (`DESIGN §10.6`, A MERGE), which names
+  the latest commit on `HEAD`'s first-parent line that the check calls measured (`DESIGN` `D16`), the commit
+  BASE NOT MEASURED prints as `<M12>` (`none` when there is none); with none, `--range=measured..HEAD` exits 2 with
+  BASE NOT MEASURED, `<K12>` printed `measured`, with or without `--record`, and is never read as an empty base
+  (`DESIGN §10.9`, red 12, `7O`); each a pure function in `scope-core.ts` handed the receipts `scope.ts` reads
+  (rule 10); OWED and its wording, and the rule digest over `DESIGN` `D16`'s five files and the re-computation it
+  triggers, likewise importable, never in `scope.ts`; `verif/mutants-record.test.ts`, which holds each receipt from the
+  commit that adds it (`DESIGN §10.7`).
+- **RULE 2.** Read by each range, each merge, and the register entries that quote counts. If it is wrong, a range
+  claims to cover a change from a base nobody measured: the silent under-selection the receipt exists to end.
+- **Pins that move.** The banner and `scope.ts`'s LIMIT paragraph gain OWED, with `DESIGN §10.9` red 9's banner case
+  re-pinned, in the same commit; from here the banner is `DESIGN §10.4`'s word for word. `docs/tracking/README.md`'s
+  Layout gains the family, in the same commit. No `gate:fast` step is added: the test runs inside `bun run test`. ⚠
+  This step first lands `verif/mutants-record.test.ts`, so it raises `VERIF_TEST_FLOOR` again, to the population
+  counted on disk in this commit, with a dated line in the floor's note.
+- **Proposed mutants.** `MU-PFA-R2R-7A` to `-7O`.
+- **Exit.** `7A` to `7O` KILLED. For each, the tests that redden under it, read from a run of its victim under it as in
+  `S4.2`, quoted here: its named test or tests among them (for `7K`, the fixture-folder case; its `W`-receipt case lands
+  in `S4.8`), and none of another limb (rule 8); and each predicted red's test and observed message quoted here. Each
+  earlier entry this step re-anchors, or whose named test it edits, still KILLED, read the same way (`DESIGN §10.9`). On
+  fixture receipt folders, the base check refuses `--record` from a base with no receipt with `⛔ BASE NOT MEASURED — …`,
+  asserted by its message (`7A`), and admits it from a base whose chain reaches a whole-ledger receipt (`7B`), and
+  refuses `--run --record` from that base with `mutants:changed — --record requires --run=all.` (`7N`); a range without
+  `--record` from a base with no receipt, a REPLAY among them, is not refused with BASE NOT MEASURED (`7M`), and from a
+  base with no measured first-parent ancestor it prints OWED UNKNOWN (`DESIGN §10.6`, `7L`). No real base is measured
+  until `S4.8` commits `W`'s receipt on `HEAD`'s first-parent line: until then each edit loop, and each range without
+  `--record`, exits 2 with OWED UNKNOWN (with `--record`, and for `--range=measured..HEAD` with or without it, BASE NOT
+  MEASURED, `7O`), a class-2 refusal (`DESIGN` `D17`), so no package is offered on exit 0 (`DESIGN §10.6`); and an
+  admitted `--run=all --record` measures what it selects (at
+  least 2,743 entries for any one commit in `DESIGN §10.5`'s model).
+
+### S4.8 · Real history, the figures re-measured, and `W`'s receipt
+
+- **Red first.** The three REPLAYs' befores are measured read-only with the tool as it stands before `S4.1` (`scope.ts`
+  and `scope-core.ts` at `f6b78109`, unchanged since `d7a363b0`), and quoted here. `--range=ddd75ae9^..ddd75ae9` prints
+  the two lines `DESIGN §10.1` quotes and exits 0 (`scope-b7.out`). `--range=7e8725ba^..7e8725ba` prints
+  *"mutants:changed — 209 changed hunk(s), 188 in production source."* and exits 0 with 4 GUARD lines, none of them M7
+  or M8 (none of the 4 is in `7e8725ba`'s ledger: today's anchors, located in the working tree, `DESIGN §10.1`), 186
+  unguarded regions and the LIMIT (`scope-7e8725ba.out`). `--range=91ec502d..8a703e2a` exits 2 at `scope.ts:92` with
+  `mutants:changed — git diff failed: ` and no reason (`scope-91ec502d-8a703e2a.err`, `.exit`): its diff is 1,753,193
+  bytes, past `spawnSync`'s 1,048,576-byte default buffer (`ENOBUFS`; `spawn-replica.out`, `diffbytes.out`). So two are
+  reds, absent before and listed after: B7's four, and M7 and M8. The third before claims nothing, so
+  `91ec502d..8a703e2a` is recorded as a selection, not a red. The built tool, as a REPLAY from its own commit (`DESIGN`
+  `D14`), must list the four under REACH with `scripts/reviewer-qual/probes.ts` among their vias. It reads the via list,
+  not the first via: 12 of B7's 22 changed paths lie in the victim's scratch reach (`b7-vias.out`), so a correct rule
+  may print another first. The via checks alone cannot show the end's reach: at `f6b78109` the fingerprint test still
+  imports `probes.js` (`:157`) and M7 and M8's victim `./enforcement-register.js` (`:36`). So in the M7 and M8 REPLAY,
+  `--explain=M8-wire-dead-predicate` must show `7e8725ba`'s resolution: its RP2 holds neither
+  `verif/live-backend-isolation-setup.ts` nor `verif/draft-dependency-premises.ts`, both absent at `7e8725ba`. There the
+  root config declares no setup file and each package and app project two (`vitest.projects.ts:96`, `:131`), where the
+  working tree declares one and three (`vitest.config.ts:97`; `vitest.projects.ts:111`, `:148`); the `verif` project
+  declares none at either.
+- **The work.** Recorded once, here, not as gate tests: B7 at `ddd75ae9`; M7 and M8 at `7e8725ba`; the four in
+  `--range=91ec502d..8a703e2a`; each of the three REPLAYs timed, which is a receipt re-check's cost (`DESIGN` `D16`).
+  After `S4.9`'s fold fixes and opaque sites have landed, `DESIGN §10.5`'s figures re-measured with the built tool on
+  the window they were taken over: the 60 first-parent commits of `p7c-p6r` ending at `d7a363b0`. `W` is not on that
+  line. Each of the 51 single-parent commits and the 9 merges runs as `--range=C^1..C`. Each of the 12 windows of 5
+  and the 6 windows of 10 runs as `--range=K..T`, with `K` the first parent of its oldest commit and `T` its newest.
+  Each is a REPLAY judged with its end's own ledger and reach (`DESIGN` `D14`), with the hours at `DESIGN §10.5`'s
+  serial rates. The imports-only figures belong to another rule and stay as the TypeScript walk's. `DESIGN §10.2`'s
+  static-reach table and BLIND counts (files parsed, opaque sites and unresolved specifiers, WIDE victims and their
+  entries with the Playwright and test-side splits, the reach sizes, BLIND and its non-WIDE part) are read from the
+  REPLAY at `d7a363b0`, the tree they were taken at, and again at `W`, recorded as `W`'s own, and from this step's own
+  tree, recorded as its own: neither `d7a363b0` nor `W` holds `scope-run.ts`, whose parameters make each victim that
+  reaches it WIDE, `verif/mutants-scope.test.ts` among them (`DESIGN` `D19`). No run prints two of those figures, so
+  each reading counts them from its build: the test-side split, which `DESIGN` `D4` does not compute, with the opaque
+  sites in production modules (`packages/*/src` and `apps/*/src`, tests apart) set aside, as the scratch scanner's
+  `reach.mjs` did in its `testonly` variant; and the unresolved specifiers, which the scanner kept out of its sites and
+  never made WIDE (`scan.mjs`), as the opaque sites `DESIGN` `D4`(e) makes of all but `./$types`. Each re-measured
+  figure is recorded beside its scratch one, with each difference of method named, among them: the scratch model judged
+  each commit with `d7a363b0`'s ledger and reach, modelled no ENTRY, selected the 5 type-prevented entries by their
+  compile reach, where `DESIGN` `D9`'s ALWAYS takes them on any change, took the app a Playwright spec serves as the
+  closure of its route modules (the app has no hooks file), where RP5 takes the folder `apps/rph-demo/src/`, left
+  type-only imports out, folded paths with the scratch scanner, and took a window's change set as the union of its
+  commits' files
+  (`window.mjs`), where a range reads the diff from `K` to `T` (`DESIGN` `D12`). `W`'s receipt written from the retained
+  chunk logs, their SHA-256 checked. `S4.0`'s provisional survivor classes re-checked with the built rule, `S4.9`'s
+  fixes included, the split between REACH-IMPORT and REACH-PATH read as the survivor procedure's step 3 reads it
+  (`DESIGN §10.10`).
+- **RULE 2.** Read by the sponsor's `DESIGN §10.11` Q1 and Q2 and by each later range, because `W`'s receipt is the
+  first measured base. If it is wrong, the cost the sponsor decided on is not the cost, and `DESIGN §10.11` Q2's phase
+  starts with modules chosen for opaque sites the built tool does not find.
+- **Pins that move.** The stale claims, each struck in place and dated, line numbers at `f6b78109`: *"238 of 238"*
+  (`scope.ts:13-15`, `DESIGN:119-120`, `ROADMAP:235-236`); *"~4s per mutant"* (`DESIGN:122`, `DESIGN:213`,
+  `ROADMAP:203`, `ROADMAP:248-249`) and *"~4s per selected mutant"* (`verif/mutants-scope.test.ts:5`), where the
+  integration's batch logs averaged 13.3 to 224.4 s per targeted vitest call, batch by batch (`batch-01.log` to
+  `batch-06.log`); the *"~13 minutes"* derived from that rate (`scope.ts:5`, `DESIGN:213-214`, `DESIGN:352`,
+  `ROADMAP:648`); *"75 of 106 production files carry no guard"* (`ROADMAP:222`; `scope.ts:26-27` is `S4.2`'s);
+  *"`gate:fast` stays at 12 steps"* (`ROADMAP:228`; it has 13, `package.json:27`); `S2.5`'s disclosure
+  (`ROADMAP:271-276`), which the new banner replaces, with its pointers; and the premise that disclosure shares with
+  the design, that catching the remote case needs per-test coverage attribution (`ROADMAP:274-275`), in its two design
+  copies: *"Catching that needs a test→code map (which tests execute the changed lines), which JPWB does not collect
+  today."* (`DESIGN:133-134`, in `DESIGN §4`) and *"needs per-test coverage attribution JPWB does not collect"*
+  (`DESIGN:263-264`, under the `DESIGN §6` Q3 the landing marks answered). Each copy is replaced beside it as
+  `DESIGN §10.4` words the remote case: SELECTABLE without that attribution, by REACH and GLOBAL through a seen edge
+  and by WIDE where a path cannot be folded; where only those limbs select it, MEASURED by the rule only under
+  `--run=reach` or `--run=all`, by default LISTED, NOT RUN; MEASURED by a whole-ledger run; unselectable, what the
+  banner names (`REG-F-584`; this step's B7 replay). `verif/mutants-record.test.ts` names `W`'s
+  receipt in the same commit, so a check that reads no receipt fails (`DESIGN §10.7`, `7K`).
+- **Proposed mutants.** None new: two are recorded transitions and one a recorded selection, none a gate test.
+- **Exit.** The three REPLAYs quoted here verbatim, each beside its before and with its time: B7's and `7e8725ba`'s as
+  recorded reds, `91ec502d..8a703e2a`'s as a recorded selection whose before did not run; their times written into
+  `DESIGN §10.5` in place of its COST OF A RECEIPT'S RE-CHECK, struck in place and dated; each re-measured figure beside
+  its scratch one in `DESIGN §10.2` and `§10.5`, with the differences of method named, and `W`'s figures and this step's
+  tree's beside them, each labelled with its tree; each scratch figure that moved struck in place and dated, together
+  with its restatements (`DESIGN` `D13`'s medians, `DESIGN §10.4`'s scratch values, `DESIGN §10.11` Q1's merge and
+  window figures, and `DESIGN §10.11` Q2's counts of opaque sites, of WIDE entries and of victims, its 24 of the 25
+  Playwright victims and its 247 among them); `DESIGN §10.11` Q1 put with the re-measured figures, or, if it was put
+  sooner, put again with them beside the scratch ones it cited; `W`'s receipt committed at a commit whose first-parent
+  line holds `W`, with `verif/mutants-record.test.ts` green over it, and `7K` KILLED again with the `W`-receipt case
+  among the tests that redden under it, quoted here; each survivor's class confirmed, the built rule's REPLAY at its `C`
+  written in its row of the survivor table, and `k of n` restated from the confirmed classes, `S4.6`'s count and each
+  earlier replay struck in place and dated where it moved; `S4.0`'s survivor report restated from the confirmed classes
+  in a dated pointer under `REG-F-584` (each class, `<a'> of <a>`, and the remote case's and the general form's counts),
+  each count that moved named beside its scratch one; each NONE finding given a dated pointer that confirms it or names
+  the limb that now selects it; a survivor the built rule first finds selected by no limb filed as NONE, its red
+  recorded as in `S4.6`.
+
+### S4.9 · One capture audit of the static reach
+
+- **Red first.** The audit's own control: the fingerprint test's capture must record its read of `probes.ts`'s text
+  (line 871 at `W`), and a capture that passes tests while recording no module must be refused as blind. A
+  capture that cannot fail returns the same answer as a reach with no gap.
+- **The work.** In a disposable lane at `W`, after `S4.0`'s lanes are free and `S4.6` has landed: each vitest victim
+  that is not WIDE, run once, unmutated, under a capture of the modules its worker loads and the files it reads
+  (`DESIGN §10.3`, `D22`). `W` holds neither `reach-core.ts` nor `reach.ts`, which `S4.1` and `S4.5` write on this line,
+  so which victims are WIDE, and each other victim's static reach, are read from `W`'s reach as this line's `reach.ts`
+  builds a range end's (`S4.6`): from `W`'s objects, with `W`'s own resolution (`DESIGN` `D1`, `D2`, `D14`), handed this
+  repository and `T` = `W` by a scratch script at a commit named here, the build behind `S4.8`'s figures at `W`. The
+  scratch scanner, whose fold `DESIGN §10.2` records as wrong, is not used, and nothing is copied into the lane, so each
+  capture runs on `W`'s tree with a clean `git status`. Each observed tracked path outside its static reach becomes a
+  fixture red in `verif/mutants-reach.test.ts` and a fix to the fold, or makes its site opaque. The capture code stays
+  in scratch; it is not shipped. Cost: under 2 h serial, derived from the runner's measured victim baselines; not
+  measured.
+- **RULE 2.** Read by `S4.5`'s rules, and through them by `S4.8`'s figures and survivor classes, so `S4.8` lands after
+  it. If the capture is blind, the audit passes with nothing found, so its control comes first.
+- **Pins that move.** The fixture reds it adds to `S4.5`'s file. Each fix lands in `reach-core.ts`, where `S4.5` puts
+  the fold and site classification, so each entry anchored there on a line a fix changes is re-anchored in the same
+  commit, or the anchor census reddens: `S4.5`'s on the fold and site rules, `1A` to `1E` in `selectChange`, and any
+  entry `S4.3`, `S4.6`, `S4.7` or an earlier fix has anchored there by then.
+- **Proposed mutants.** One per fix the audit causes, `MU-PFA-R2R-9A` onward, whether it corrects the fold or makes a
+  site opaque, each naming the fixture red that must redden under it (`DESIGN` `D5`: *"Each rule has its own fixture
+  test and its own mutant."*). The capture itself is a scratch instrument and adds none.
+- **Exit.** The audit's counts recorded here: victims captured, paths observed outside the static reach, each one's
+  fixture red and fix; and each mutant `9A` onward KILLED, none when no path lies outside the reach. For each, the
+  tests that redden under it, read from a run of its victim under it as in `S4.2`, quoted here: its fixture red among
+  them, and none of another limb (rule 8); and each predicted red's test and observed message quoted here, the audit's
+  control among them. Each entry anchored in a function a fix changes still KILLED, a re-anchored one on its new anchor,
+  read the same way: its own named test or tests among those that redden.
+
+### S4.10 · The record
+
+- **Red first.** None, and that is stated: `verif/register-append-only.test.ts` holds only entries present at its pin
+  `95d0b3ae` (`:38`; up to `REG-F-273`), so it cannot see `REG-F-391`, and it permits a strike (`:242-255`). The
+  correction follows the front matter (`:19`): *"a correction is a superseding entry citing the entry it
+  supersedes"*; it must pass `verif/register-citations.test.ts`.
+- **The work.** A register entry superseding `REG-F-391`'s REMOTE item, worded as `DESIGN §10.4` words it, never as
+  "closed": SELECTABLE by REACH and GLOBAL through a seen edge and by WIDE where a path cannot be folded; where only
+  those limbs select it, MEASURED by the rule only under `--run=reach` or `--run=all`, by default LISTED, NOT RUN, and
+  a package offered on exit 0; MEASURED by a whole-ledger run with each other entry (whether one is required after
+  `S4.0` is `DESIGN §10.11` Q1); unselectable, what the banner names. In `REG-F-391`, struck in place and dated, each
+  pointing to the new entry: its Status line (`:35068` at `f6b78109`), replaced beside it, and the three open items
+  later records discharged, the three holes (`ROADMAP §1`, Phase 0 COMPLETE), the missing `gen` freshness gate
+  (`gen:check`, `gate:fast`'s third step) and the 194 export guards (`S3.3` COMPLETE, obligation 0). In `REG-F-584` and
+  `REG-D-139`, each Status line as the landing replaced it (*written; the build owed*), struck in place and dated and
+  replaced beside it by what this phase met, pointing to the new entry. Under `ROADMAP §3` S2.5 and in
+  `ROADMAP-undertaking-execution-sandbox.md`, below the pointers the landing wrote there (*the build owed*), a dated
+  pointer to the new entry saying what this phase met. In the four debts of `ROADMAP §5` (`:717-718` at `f6b78109`) and
+  of `DESIGN §6` Q4 (`:267-269` at `f6b78109`), the 194 is struck and replaced by the obligation the export census then
+  reads, and *"R2's remote case"* is struck and replaced beside it by that residual, with a pointer here. The sponsor's
+  answers to `DESIGN §10.11`, when given, are recorded verbatim. `DESIGN §10.11` Q3's answer is recorded in its own
+  commit, which moves `S4.2`'s trigger pins, so this step's pins stay none. If `DESIGN §10.11` Q3 is still unanswered
+  when this step lands, that move is named here as owed.
+- **RULE 2.** Read by the next programme that meets the remote case. If it is wrong, the register calls the remote
+  case closed, or calls measured what is only listed.
+- **Pins that move.** None. `SL-L4` stays at 55: this is a phase of an existing roadmap, not a new file.
+- **Proposed mutants.** None.
+- **Exit.** The superseding entry passes the register's tests; this heading reads COMPLETE only when `S4.0` to `S4.9`
+  have met their exits and each NONE survivor has its finding and its recorded fixture red (`DESIGN §10.10`).
