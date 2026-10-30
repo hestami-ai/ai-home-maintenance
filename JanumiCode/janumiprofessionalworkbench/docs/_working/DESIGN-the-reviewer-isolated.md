@@ -113,7 +113,7 @@ The sponsor chose *"Prompt + isolate, test first"*: keep devin and GLM, run the 
   - **The repair** is the prompt, plus a line naming that cause: *"IMPORTANT: your reply gave no row for any criterion. Reply with ONLY the minified JSON object, with one row in findings for each criterion, failed=false where it is met."* A repair names what was wrong, not a generic try-again (DOC-001:227).
   - **If the repair answers at least one criterion,** its judgement is used.
   - **If it answers none again, or does not parse,** the first reply's judgement stands, recorded as today. The floor then records INCONCLUSIVE, with the recommendation kept (`REG-D-090`). So the repair can only add a conclusion. It never makes an outcome worse than today's.
-  - **Not repaired:** a reply that answers some criteria but not all (`REG-F-489`). The floor's reading of an unanswered criterion holds.
+  - ~~**Not repaired:** a reply that answers some criteria but not all (`REG-F-489`). The floor's reading of an unanswered criterion holds.~~ ⭑ **2026-10-30 — narrowed by D13** (`DESIGN-data-flow-order-and-deliverable-review.md` D13; `REG-D-135` (3); `REG-F-588`): such a reply is never given I5's repair. With a failed row it is taken as it stands (`REG-F-489`); with none it is D13's missing-criterion repair.
   - **Cost:** at most one more call per such reply.
   - **Predicted red:** a validator test fed the measured run's exact reply, `{"findings":[],"recommendation":"SATISFIED",…}`, asserting a second call carrying the repair line. At HEAD there is one call.
 - **I6, the prompt asks for one row per criterion, met or not** (`REG-F-552`, remedy 2, with the sponsor's condition).

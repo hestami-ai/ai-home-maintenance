@@ -913,6 +913,15 @@ or disposed of.
   other figures are `DESIGN §10.5`'s scratch model until `S4.8` re-measures them: the question is put in `S4.8` with the
   re-measured figures, or sooner with each of them marked as scratch and then put again in
   `S4.8` with the re-measured figures beside them.
+- ⭑ **2026-10-30 — class R's result is recorded on its own; S4.0 stays RUNNING** (`surv-facts.md`, §1, §3, §4, §6, §8;
+  `REG-F-587`; `REG-F-588`; `REG-D-139` (3)). Class R at `W` = `c603fb69` counted 1,724 ids: 1,699 KILLED, 13 RETIRED, 5
+  ABOLISHED, 1 CONTROL_HELD, 6 SURVIVED. Each of the six is attributed by a measured transition, five to `3c3a34d1` and
+  one to `3ab448e1`. Their class, VICTIM, is read from git and provisional until `S4.8`; their survivor-table rows, with
+  the scratch reach's replay at each `C`, remain owed. This commit disposes of the six, five re-stated and one
+  re-formulated, each measured KILLED at `W` with the changes staged. The paid measurement is released and remains owed;
+  it never runs beside the e2e queue (above; `DESIGN §10.10`, steps 5 and 8). The e2e queue's 140 entries and the
+  survivor procedure remain owed. The rest of the main queue's survivors and NO_COMPILE rows are not class R's; their
+  dispositions and the survivor report under `REG-F-584` remain owed.
 
 ### S4.1 · The pure selector holding today's rule, and the B7 red written first
 
