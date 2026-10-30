@@ -738,7 +738,7 @@ THIRD consecutive time it has done so (`JAN-CSAADEC`, `JAN-CSAAEXT`, and now thi
 
 ---
 
-## 7. ◐ PHASE 4 (R2's remote case) — S4.0 IS RUNNING; S4.1 TO S4.10 ARE PLANNED, NOT BUILT
+## 7. ◐ PHASE 4 (R2's remote case) — ~~S4.0 IS RUNNING~~ S4.0 IS MEASURED, ITS EXIT OWED; S4.1 TO S4.10 ARE PLANNED, NOT BUILT
 
 **Design:** `DESIGN-per-file-assurance-floor.md` `§10` (rev 3). **Findings:** `REG-F-584` (the remote case: B7's
 four, whose cause its heading states before the transition is measured, `S4.0`), `REG-F-585` (a KILLED with no test
@@ -822,7 +822,7 @@ heading cannot read COMPLETE.
 
 | step | lands after | may be built beside |
 | --- | --- | --- |
-| `S4.0` the whole ledger (running) | V-2 merged into `p7c-p6-int2` (`3edfeac1`) | `S4.1`, `S4.2`, `S4.3`, `S4.5`, in their own worktree, while the main queue runs; nothing beside the e2e queue (`DESIGN §10.10`, step 5) |
+| `S4.0` the whole ledger ~~(running)~~ (measured; its exit owed) | V-2 merged into `p7c-p6-int2` (`3edfeac1`) | `S4.1`, `S4.2`, `S4.3`, `S4.5`, in their own worktree, while the main queue runs; nothing beside the e2e queue (`DESIGN §10.10`, step 5) |
 | `S4.1` the selector and the B7 red | — | `S4.0` |
 | `S4.2` the classifier, signals, banner, and the runner call | `S4.1` (its advisory trigger, and the default if `--strict` becomes it, move in the commit that records the sponsor's answer to `DESIGN §10.11` Q3, before or after this step; no step waits for that answer); `DESIGN §10.1`'s 11 defects recorded in the register (`S4.0`'s exit) | `S4.0`, `S4.3`, `S4.5`, `S4.6` |
 | `S4.3` the change set, LOCAL, ranges | `S4.1`, `S4.2`, `S4.4` (rule 6) | `S4.0`, `S4.2`, `S4.4`, `S4.5` |
@@ -847,7 +847,7 @@ or disposed of.
 
 ---
 
-### S4.0 · ◐ RUNNING (2026-10-29/30) — the one-time measurement of the whole ledger
+### S4.0 · ◐ ~~RUNNING (2026-10-29/30)~~ MEASURED 2026-10-29/30; ITS EXIT OWED — the one-time measurement of the whole ledger
 
 - **Red first. ✅ OBSERVED, THEN TURNED GREEN, 2026-10-30** (`c1-facts.md`, *The tally's three rules*). The tally
   (`collect.py`) was run on four arrangements before it counted the lanes, because `PQ1-V1802`'s line trips both void
@@ -922,6 +922,118 @@ or disposed of.
   it never runs beside the e2e queue (above; `DESIGN §10.10`, steps 5 and 8). The e2e queue's 140 entries and the
   survivor procedure remain owed. The rest of the main queue's survivors and NO_COMPILE rows are not class R's; their
   dispositions and the survivor report under `REG-F-584` remain owed.
+- ⭑ **2026-10-30 — the whole ledger is measured; seven entries disposed of, four SURVIVED and three NO_COMPILE; the exit is owed** (`s40-facts.md`; `collect-final.json`; `c1-facts.md`; `canary3`; `surv-facts.md`; `surv-rest-facts.md`; `REG-F-584`; `REG-F-585`; `REG-F-587`; `REG-F-588`; `REG-F-591` to `REG-F-593`; `DESIGN-per-file-assurance-floor.md` `§10.10`).
+  - **SUMMED ROWS AT `W` = `c603fb69`.** 4,119 of 4,119 entries are in scope. Live 4,035 = 4,001 KILLED + 12 SURVIVED + 5 TYPE_PREVENTED + 14 CONTROL_HELD + 3 NO_COMPILE. History 84 = 45 RETIRED + 10 DUPLICATE + 29 ABOLISHED. The tally names the 3 NO_COMPILE rows owed. VOID, NO_VERDICT, MISSING, INCONCLUSIVE, UNANCHORED, KILLED_UNNAMED and ABORTED_DIRTY each count 0. No id was voided; 0 were voided twice. This live/history split is `s40-facts.md`'s, by status (RETIRED, DUPLICATE and ABOLISHED are history), and agrees with `c1-facts.md`'s measurement set.
+  - **LANES.** `queue2-lane-1`: 18 chunks, 1,061 ids, first start 2026-10-29T22:06:54Z, last end 2026-10-30T12:54:14Z. `queue2-lane-2`: 19 chunks, 1,232 ids, first start 2026-10-29T22:06:54Z, last end 2026-10-30T12:34:38Z. `queue2-lane-3`: 17 chunks, 834 ids, first start 2026-10-29T22:06:55Z, last end 2026-10-30T12:58:35Z. `queue2-lane-4`: 17 chunks, 852 ids, first start 2026-10-29T22:06:54Z, last end 2026-10-30T13:00:56Z. `queue2-e2e-lane-1`: 5 chunks, 140 ids, first start 2026-10-30T16:43:02Z, last end 2026-10-30T18:58:47Z.
+  - **THE MEASURED WALL TIME.** Main queue, four lanes: 2026-10-29T22:06:54Z to 2026-10-30T13:00:56Z = 14 h 54 min 02 s, 53,642 s. E2e queue: 2026-10-30T16:43:02Z to 2026-10-30T18:58:47Z = 2 h 15 min 45 s, 8,145 s (`s40-facts.md`). These measured queue wall times replace `DESIGN-per-file-assurance-floor.md` `§10.10`'s two cost estimates before `§10.11` Q1 is put. They exclude the gap between queues and the later survivor work. Q1's other figures remain scratch until `S4.8`; put sooner, they are labelled scratch and the question is put again with the re-measured figures.
+  - **FIRST CANARY — KILLS ALONE.** The integration tree and lane 1, 2 of 2 trees at `W`, gave identical verdicts and counts (`c1-facts.md`; `canary-main.log`; `canary-l1.log`):
+    - *"KILLED         ER1-M254-the-line-is-rendered-before-the-hint "*
+    - *"KILLED         P6X-INT2-M3-in-a-part-review-the-chooser-reads-the-prose-with-its-bidi-controls-read-away-which-the-fingerprint-sees ⎯⎯⎯⎯⎯⎯ Failed Tests 24 ⎯⎯⎯⎯⎯⎯⎯"*
+    - *"KILLED         P6X-INT2-M4-in-a-part-review-the-chooser-reads-each-list-with-its-bidi-controls-read-away-which-the-fingerprint-sees ⎯⎯⎯⎯⎯⎯ Failed Tests 20 ⎯⎯⎯⎯⎯⎯⎯"*
+    - *"KILLED         P6X-INT2-M1-in-a-graph-review-the-chooser-reads-the-prose-with-its-embeddings-read-away ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯"*
+    - *"KILLED         P6X-O2-M13-the-read-back-baseline-names-an-attempt ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯"*
+    - *"KILLED         P6X-V2-M16-a-sign-off-file-names-its-unit-last ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯"*
+    - *"KILLED      6"*
+    - *"6 entries -> 6 distinct mutations measured (0 duplicate, 0 retired, 0 abolished)."*
+    - This shows agreement on those six kills. It holds no survivor and no control, and shows no kill through a workspace alias. Its Playwright KILLED line has no detail.
+  - **SECOND CANARY — A LANE REPORTS A SURVIVOR.** The integration tree and lanes 2, 3 and 4, 4 of 4 trees, gave the same verdict block (`c1-facts.md`; `canary2-main.log`; `canary2-2.log`; `canary2-3.log`; `canary2-4.log`):
+    - *"SURVIVED       M8-wire-dead-predicate             Tests  61 passed (61)"*
+    - *"KILLED         P6X-O2-M13-the-read-back-baseline-names-an-attempt ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯"*
+    - *"KILLED      1"*
+    - *"SURVIVED    1"*
+    - *"2 entries -> 2 distinct mutations measured (0 duplicate, 0 retired, 0 abolished)."*
+    - This shows that lanes 2, 3 and 4, 3 of the 4 lanes, report a survivor as the integration tree does; lane 1 was not in it, and printed SURVIVED rows in the run itself (`q039`, `q063`, `q067`). It holds no control and shows no kill through a workspace alias: M8's survival would also occur if its alias resolved to dist. M8's disposition remains owed.
+  - **THIRD CANARY — A KILL THROUGH A WORKSPACE ALIAS, AND A CONTROL HELD.** It ran after every main lane was DONE and before the e2e queue started, 2026-10-30T16:11:12Z to 16:42:33Z, each tree at `W` and clean before and after; so it was measured after the main queue, not before it. In the integration tree and lanes 1 to 4, 5 of 5 trees at `W`, `canary3a-main.log` and `canary3a-1.log` to `canary3a-4.log` printed:
+    - *"KILLED         X2-an-absent-grant-is-read-as-an-empty-one ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯"*
+    - *"KILLED         MU-PFA-BD2-04-rename-the-canonical-floor-policy-id ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯"*
+    - *"KILLED      2"*
+    - *"2 entries -> 2 distinct mutations measured (0 duplicate, 0 retired, 0 abolished)."*
+    - The floor-policy mutant changes `floor.ts`; its `catalog.floor-consistency.test.ts` victim imports the authority through `@janumipwb/rph-assurance`. This supplies the kill through a workspace alias that the first two canaries lacked.
+    - In 5 of 5 trees, `canary3b-main.log` and `canary3b-1.log` to `canary3b-4.log` printed *"CONTROL_HELD   MU-PFA-AF1-01-governing-policy-from-validator ⭐⭐ SUPERSEDED BY A STRONGER RULE, 2026-09-18 (`JAN-EXEC` Phase 6b, design §4.15.5) — AND"*, *"CONTROL_HELD 1"* and *"1 entries -> 1 distinct mutations measured (0 duplicate, 0 retired, 0 abolished)."* The control therefore held in those five trees. This canary measures the named alias path and control; it supplies no census of alias resolution or of controls.
+  - **CHUNK LOGS.** 76 of 76 chunk logs, none renamed `.stopped` (`s40-facts.md`), kept out of git. Base names and SHA-256 follow, grouped by lane. The inventory is copied from that facts file.
+  - **`queue2-e2e-lane-1` — 5 logs.**
+    - `q072-E1-e2e.txt.log` — `0ffda82f8b4c36ce9d59cc30db7948c4ee579e7a62e59a67791f12e47115f6b0`
+    - `q073-E1-e2e.txt.log` — `fef507c8fb51ddb14541a3a66d392d8529bf0f6a9b4476b1f22b27acbd45fff1`
+    - `q074-E1-e2e.txt.log` — `a67ff1ff298d562884c8822a07925ebdcb84aaa2a9a468d776b1bef3046d3bed`
+    - `q075-E1-e2e.txt.log` — `6719148c1448740b687fd42a7ad118a0eedf869aefa00cb7577ff1ea7e67a573`
+    - `q076-E2-e2e-controls.txt.log` — `f7b25a100384d06d99f74da402b7828196a8703cb97559c49ab5c4d574fdae93`
+  - **`queue2-lane-1` — 18 logs.**
+    - `q002-R1-fingerprint.txt.log` — `09086db0db5d420234981e9ce0deaf461da11088fd29140e244a166a0bf39eda`
+    - `q006-R1-fingerprint.txt.log` — `17cfe858df0bbb497c02bfbb35a57f750f3dec7b9b811ed9670a669bfd9f65fd`
+    - `q010-R1-fingerprint.txt.log` — `06c18797808c3cd48b4ebb2540a6ec19880ae35a6b4626cc12de80fa23a69676`
+    - `q014-R1-fingerprint.txt.log` — `45fbe6a76fcde7694811dce8d4de6c270e7c63584d2cddff73d9f4af476fb198`
+    - `q019-R1-fingerprint.txt.log` — `66521749c89bbdbfb6ce27f4478c6cc9cf37842f057b81ffd23629471bd426e9`
+    - `q023-R1-fingerprint.txt.log` — `f1b780a9bac7b3222f2b04352937d75b5cd5eda2af97fb74f6581e5af9bd10f4`
+    - `q027-R1-fingerprint.txt.log` — `0e1c7bfffeb0bd594ad6398a9c4ee1a611e675733b1b61c97887c1138cac637c`
+    - `q031-R1-fingerprint.txt.log` — `576aaa3e6a971a25e4f79d6fad6e46ee7cb281db652aa286bcfd1381456bbcc0`
+    - `q035-R1-fingerprint.txt.log` — `8d9e2a5a7779175d294b0cdca65eeb01a45dc8799d885191a5083a88d21a5658`
+    - `q039-R1-fingerprint.txt.log` — `93dadd5e077f960654b96e26724d429d2097fd16e4137f63caee31629c29586d`
+    - `q043-R1-fingerprint.txt.log` — `148163beb7c4862ba4ebf6a63b739b196d03a608e296018d6d233ed85e70ebd3`
+    - `q048-R2-reviewer.txt.log` — `f7d1858d9f495c65defab9a05d40fa56266e767e40828ac32bab34e7a27d6d96`
+    - `q051-R2-reviewer.txt.log` — `b52f05b3a00d0f80128d1e9e7211202b1bb402678e897863d1c4689549b564e2`
+    - `q055-R2-reviewer.txt.log` — `d21461a674c94681590f131811814d848d2fabf10ce9b1adbc945daaeb1c7d96`
+    - `q060-O1-other.txt.log` — `da8e601e3e2823a4f1459fa171d7335c3cfde27a2d6e9aec062228390e1841a9`
+    - `q063-O1-other.txt.log` — `4cba334d4a408fe4336ab262f26cabb27e7445b1e76053892f3f9b8cfb926bec`
+    - `q067-O1-other.txt.log` — `813d6bafeae3ab367a99b9356783e5f65c75c47037118b24c8e59fcb22e279e5`
+    - `q071-O2-controls.txt.log` — `811cf8c360ad497698ad30187cb1272b2b7b25f293ebcfd70924e5e2ddf215a1`
+  - **`queue2-lane-2` — 19 logs.**
+    - `q001-R0-instrument.txt.log` — `4be836aaf2dba5c89933db9f1b4d524517feffe728972661d6e187dd55da6e4f`
+    - `q005-R1-fingerprint.txt.log` — `7e44772c4ceba841281f5469d6b1074dae9254ede2c4ecc27a485f24a6caea67`
+    - `q009-R1-fingerprint.txt.log` — `328cdad30ca018d99613bf30c913a555889ce9116cf79f6db0dd6ab2daf1b5af`
+    - `q013-R1-fingerprint.txt.log` — `90b1bfaec92d6b88cac7960efdcf483d8c90f081172bfde6bd10f4f034a6bbb4`
+    - `q017-R1-fingerprint.txt.log` — `bcfcd89103086b84d6f7517f38506698191d6b27367c1d9b54dd5533c5b43777`
+    - `q021-R1-fingerprint.txt.log` — `b1adb11e7cf8d8b41762acbdb9993432686925da4dd3451ad78cc0bbd9094171`
+    - `q025-R1-fingerprint.txt.log` — `a74bfc98d66536b1f47ef67362afadebc568fa7b2894ac000a87df9617fd23cd`
+    - `q029-R1-fingerprint.txt.log` — `b6bbd1c92634a3aed464d4f59e6d1d2830a097f62c278f3c40c621cc87148a6b`
+    - `q033-R1-fingerprint.txt.log` — `3bff6940801e7bb7f5bc1bd050996d863023d7acb12a1f6f05549f9788bf6ba6`
+    - `q037-R1-fingerprint.txt.log` — `1d8dd3ce9dd459b470092ca1a6cfd934ffcd0748a5c92582cdecffd11838ec5f`
+    - `q041-R1-fingerprint.txt.log` — `a7473a3c4ea3139b0658a50e95a5676f09ba0e58f576d6c0336244fa409e9a95`
+    - `q045-R1-fingerprint.txt.log` — `5ffed50043deb04b0565880ef042f72bc2a1074a65281dbeafc7824dc6a5b86c`
+    - `q046-R2-reviewer.txt.log` — `cc5d8d0ba18e0de9519cbf4f18bb70172bf037972116a23a7ba12301ae273ab6`
+    - `q050-R2-reviewer.txt.log` — `083862aad99666e243f236f52ac8d880e76ddbd98719fa66ba26e459c0a53f4d`
+    - `q054-R2-reviewer.txt.log` — `32f268907799231eeebf237d74e095c8e2ba0f3453bfc587aa8fabe1b5ad545a`
+    - `q058-O1-other.txt.log` — `509d7afc276fa2ac653182c7e2e71b5b5b16b847d990bbbab474438c40c9014e`
+    - `q062-O1-other.txt.log` — `366530381e2ac803e57eb2b653281c0562bee49f4f24b2723646504e79f4e64a`
+    - `q064-O1-other.txt.log` — `9d174930bc969b754431cb1111cf3ef584c3ba9ebb6b6e64ccdcacdbe23a8938`
+    - `q068-O1-other.txt.log` — `822615526d05f1d898a6873319c3a932a616b741c0ea6a23c26b510d92988abf`
+  - **`queue2-lane-3` — 17 logs.**
+    - `q004-R1-fingerprint.txt.log` — `b7cf7df4f458f2cf901878658a10f566e55ef9c4c10d470f1e33ce529c4ed767`
+    - `q007-R1-fingerprint.txt.log` — `60c680ebdfebcd24f944f091efe9d6ba702ad9cd609ecea620e01b590afa83b0`
+    - `q011-R1-fingerprint.txt.log` — `a09dbf743a7457799fd51114495d46ec8be43f0163007bdefa912c9f7faac995`
+    - `q015-R1-fingerprint.txt.log` — `9320c526e71be1b32ebe6f9d7491098d3ea7f399db0492bb39ea101d3f57856f`
+    - `q020-R1-fingerprint.txt.log` — `15ebef858b6ab54a3e1483057c257cb3c2af918b9f2bbcf7b51f99153c8d9898`
+    - `q024-R1-fingerprint.txt.log` — `fb662f466b6183a7f0ae2b1c83d13a4587059b0a9781c052d9042feb0d6019a0`
+    - `q028-R1-fingerprint.txt.log` — `f06b5ad20b053c5dc10fb194d2077a23e618729e43f353f8cf6dd3124fa5b34c`
+    - `q032-R1-fingerprint.txt.log` — `1a7e478ef74b0eb03d5a6bcb1751bd51afcb1f7a940899d8d6e48971abb94e4b`
+    - `q036-R1-fingerprint.txt.log` — `9af6336385734ab8bab19cc1b3494165c16721b0f7e12fc1a8bd941bd0b59a41`
+    - `q040-R1-fingerprint.txt.log` — `097290339c298eef0d8ca040cbe3aa5c824da1df11a310ea50d19f36776a4042`
+    - `q044-R1-fingerprint.txt.log` — `6956efe3a4691e50e83ba95dd82b3cb8fb677a36907113d73b870d173bb25d72`
+    - `q049-R2-reviewer.txt.log` — `524c5a738b2cd78981362f5ba73933d004653afbc6415ba888fcea0dec92f005`
+    - `q052-R2-reviewer.txt.log` — `bdb006597b7b9e3dcba1a8e1288c8841998c3938b96e0d1d83d4002ce3f129fd`
+    - `q056-R2-reviewer.txt.log` — `de696878e392337f4821b97e75946e7c305abc43bece1fb3268c79ee182e88c9`
+    - `q059-O1-other.txt.log` — `569df23c5538345c6f8bb0af0e40e92465f257231948edd2034c9f13be390692`
+    - `q065-O1-other.txt.log` — `f987e5684f18a199b5d97c82dd5b92761844a408206110aa31832aeae02990ed`
+    - `q069-O1-other.txt.log` — `182af723234e3af35a2c2acaefb50c38bc00163c6a68952354cae8833b8db34c`
+  - **`queue2-lane-4` — 17 logs.**
+    - `q003-R1-fingerprint.txt.log` — `cc2bc6ee6822280d3dc81985d8f709d08ceda91fb30fe31f6d1a332eeedcb6d0`
+    - `q008-R1-fingerprint.txt.log` — `3e8e3c7e2d22da2f15789c4076954162d9081261f3e50365ac010cf27b9b1ca6`
+    - `q012-R1-fingerprint.txt.log` — `3ad82d005f6b19cf3997d2d0909154d57fa398ed87d91bb35d33cdbdc6ecf76c`
+    - `q016-R1-fingerprint.txt.log` — `6cafec1722aee67941cf8d2c6d77c804b21e94a58f4f8d59b60db2c567fa103f`
+    - `q018-R1-fingerprint.txt.log` — `6f836bd9a17a3845d49d4c610b5446debd47850bffc707b26debe7e650b45ca7`
+    - `q022-R1-fingerprint.txt.log` — `e3536f13300bac66884c789b70147f2f26572e537f030c2ef49ff503d9053e7d`
+    - `q026-R1-fingerprint.txt.log` — `169d8e94a7dcb4ccc5f19749e68fe238387ffb2db2101b0fb6b08a4a2e670119`
+    - `q030-R1-fingerprint.txt.log` — `fd1fdfd90236eaa616ea0fab79c53606f588e7715c32e6547bb5af654d28bd80`
+    - `q034-R1-fingerprint.txt.log` — `5b6e257e8e12c50681de19963cad42fd2aa84347f06a74c6eb58c7c436c4d29d`
+    - `q038-R1-fingerprint.txt.log` — `1260907c5f943d3af821df2b4e80d4fc6bdc08ef74fcda9113ff3dae8a54cb61`
+    - `q042-R1-fingerprint.txt.log` — `c9d0e5b6a689d349bd09ec9ad72d638ada77f65a4f4df6965e40e7ce838a255e`
+    - `q047-R2-reviewer.txt.log` — `451a570096a167e76c7c509c09c8bfd644cbc32073ee22b34209a15fde504c4b`
+    - `q053-R2-reviewer.txt.log` — `72d7dae98a1d0265b3f764da930dd63ed064663e5d0e63efd6bb2e8a90035642`
+    - `q057-R2-reviewer.txt.log` — `521a23aac6660eb116fe67925e5c2d2f1ad62445269e5355fe05943e75d152c4`
+    - `q061-O1-other.txt.log` — `4096da3c0f30a1a1c3cc64e6888cf375de1f20c7740a289d8cd2de474870ed7f`
+    - `q066-O1-other.txt.log` — `e12a3d5554aa550f892ec412b825ab8025d4fc90305ab1ad51650025ed1c7843`
+    - `q070-O2-controls.txt.log` — `bc4a66a49007b4b25adb2261937c63e088f9bda0f6cd63c1b1bc885dc6a6abf8`
+  - **THE SEVEN DISPOSED ENTRIES.** `REG-F-591` records package B's two: `MU-PFA-AF3-FLOOR_POLICY_IDS_REQUIRED` re-stated and J13-M4 re-formulated, both KILLED. `REG-F-592` records package M's two: P5C-M11 ABOLISHED, PQ7-M103 RETIRED with its successor KILLED. `REG-F-593` records the three NO_COMPILE replacements, P1-f, R4-M8 and R4-M9, re-formulated and KILLED. Each was confirmed alone at `W` and attributed by a measured transition; each class is read from git, provisional until `S4.8`, the scratch reach's provisional class at each `C` owed. On `W`'s code at `e5cf12c2`, 5 of the 7 and PQ7-M103's successor were measured KILLED and the runner reported P5C-M11 ABOLISHED and PQ7-M103 RETIRED; the independent checker reproduced them. With class R's six (`REG-F-587`, `REG-F-588`), 13 entries are disposed of. This records dispositions, rather than the survivor procedure's owed report.
+  - **EXIT STILL OWED.** The survivor procedure's report (`DESIGN-per-file-assurance-floor.md` `§10.10`, step 4) and survivor table wait for the scratch reach's replay at each `C`, being measured. The four's transition at `ddd75ae9^` and `ddd75ae9`, and M7 and M8's at `7e8725ba^` and `7e8725ba`, are being measured and remain owed. M7 and M8 are untouched: their confirmation alone, classification and dispositions remain owed. `S4.8` must re-check the provisional classes with the built rule. `S4.0`'s exit is not met. Outside this exit, the scope rule's build (`S4.1` to `S4.10`), the four reviewer fixes' build and re-measurement (`REG-D-140`), P6 again and P7 remain owed.
 
 ### S4.1 · The pure selector holding today's rule, and the B7 red written first
 

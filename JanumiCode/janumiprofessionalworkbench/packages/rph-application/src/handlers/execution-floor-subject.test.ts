@@ -10,8 +10,10 @@
 //    floor for the same reason, which §8.4 L854 forbids" ("A missing, STALE, malformed, failed, unavailable, or
 //    independence-invalid required review cannot satisfy assurance or permit its protected transition").
 // 2. THE UNRECORDED-OUTPUT BYPASS — a step naming an output that is not a recorded object.
+// 3. ⭐ 2026-10-30 — EACH REQUIRED FLOOR POLICY BLOCKS ON ITS OWN, swept from the canonical source (the last test here).
 import type { DomainCommand } from '@janumipwb/rph-contracts';
 import type { AuthedEngine } from '@janumipwb/rph-application';
+import { FLOOR_POLICY_IDS } from '@janumipwb/rph-assurance';
 import { TEST_CRED, testAuthenticator } from '@janumipwb/rph-ports/testing';
 import { SqliteStorageAdapter } from '@janumipwb/rph-persistence';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -74,13 +76,17 @@ describe('Execution floor subject: the result, at its exact version — not the 
 	}
 
 	let asmt = 0;
-	/** A full SATISFIED floor over `subject`, recorded against `atVersion`. */
-	function recordSatisfiedFloor(subject: string, atVersion: number) {
-		for (const policyId of [
+	/** A full SATISFIED floor over `subject`, recorded against `atVersion` — or only `policies`, each SATISFIED. */
+	function recordSatisfiedFloor(
+		subject: string,
+		atVersion: number,
+		policies: readonly string[] = [
 			'floor.schema-invariant',
 			'floor.identity-provenance',
 			'floor.reasoning-review'
-		]) {
+		]
+	) {
+		for (const policyId of policies) {
 			const id = `asmt_${String(++asmt).padStart(26, '0')}`;
 			d(
 				'RequestAssuranceAssessment',
@@ -298,4 +304,45 @@ describe('Execution floor subject: the result, at its exact version — not the 
 		expect(r.error?.message).toContain(SECOND);
 		expect(stepState()).toBe('RUNNING');
 	});
+
+	// ── ⭐ 2026-10-30 — EACH REQUIRED FLOOR POLICY BLOCKS ON ITS OWN (`MU-PFA-AF3-FLOOR_POLICY_IDS_REQUIRED`, its victim re-pointed
+	// here by the whole ledger's one-time measurement at c603fb69) ────────────────────────────────────────────────────────────
+	// THE PROMISE is `floorGateBlock`'s (floor-gate.ts): the transition is permitted only when every required policy is
+	// SATISFIED at the bound version — over the SET `FLOOR_POLICY_IDS_REQUIRED`, each member enough on its own to block (ASR-3:
+	// the floor is unconditional). ⛔ Since the review in parts (B3, `REG-D-125`; 86d87fe1) PublishPwa asks `pwaPartsFloorBlock`,
+	// which reads `FLOOR_POLICY_IDS` itself, so the publish sweep in pwa-authoring.test.ts no longer reads that set: this gate
+	// does. MEASURED, the set narrowed to the Reasoning Review alone: this file, all of rph-application and all of rph-engine
+	// stayed green — every floor arranged here is all SATISFIED or never recorded.
+	// ⛔ DERIVED FROM `FLOOR_POLICY_IDS`, THE CANONICAL SOURCE, never from the set under test, which would shrink with any
+	// narrowing of it and pass. ⭑ The control is this file's first test: every policy SATISFIED at the result's current version
+	// completes (the gate that blocks everything reddens it, `ARP-B3-M31`).
+	it.each(Object.values(FLOOR_POLICY_IDS))(
+		'a floor with %s the ONLY floor policy not recorded SATISFIED does NOT permit completion — each is required on its own',
+		(omitted) => {
+			const others = Object.values(FLOOR_POLICY_IDS).filter((policyId) => policyId !== omitted);
+			expect(
+				others.length,
+				'the row is vacuous unless some OTHER floor policy is satisfied beside the omitted one'
+			).toBeGreaterThan(0);
+			recordArtifact(ART);
+			recordSatisfiedFloor(ART, 1, others);
+			const r = d('CompleteExecutionStep', completePayload([ART]), PLAN, 'EXECUTION_PLAN');
+			expect(
+				r.status,
+				`${omitted} was the only floor policy not recorded SATISFIED and CompleteExecutionStep was PERMITTED — that ` +
+					'policy is not required on its own, so an AI-produced step completes without it'
+			).toBe('REJECTED');
+			expect(r.error?.code, `${omitted}: the refusal must come from the floor gate`).toBe(
+				'RPH_INVARIANT_VIOLATION'
+			);
+			expect(
+				r.error?.message,
+				`${omitted}: the refusal must NAME this policy as the one missing — every floor refusal carries the same ` +
+					'status and code, so the message is the only thing that tells the members apart'
+			).toContain(`${omitted}=MISSING`);
+			expect(stepState(), `${omitted}: a refused completion must not have moved the step`).toBe(
+				'RUNNING'
+			);
+		}
+	);
 });
