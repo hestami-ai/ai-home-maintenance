@@ -487,6 +487,68 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint MOVES on each component
 		expect(await movedNow(seams), 'the case prompts of the current set that move').toEqual(CURRENT_DECLARED);
 	});
 
+	// ⭐⭐ `JAN-EXEC` Phase 7, package X — D30 and D32 (`REG-D-140`; `REG-D-141` (1); design §10.2, §10.4 and §10.6, revision 5: "A
+	// CONTROL holds that each new text is reached by a probe") — TWO NEW PROMPT BRANCHES, each held to the probes that take it and
+	// to the case prompts it reaches, as design D38 predicts them. ⛔ RED BEFORE THE BUILD: neither text was in any prompt, so a
+	// change to it moved no fingerprint.
+	/** The current set's work-product cases — every one shown a deliverable since case set v12, the re-run pair among them. */
+	const CURRENT_WORK_PRODUCTS = CURRENT_CASES.filter((c) => c.arm === 'WORK_PRODUCT').map((c) => c.id);
+
+	it('⭐⭐ package X (D30) — a PROMPT BRANCH, the line at a command’s rubric: the probes move — exactly the 27 process-result probes the validator sends a prompt for, P-NO-FENCE refused before any — and of the case prompts exactly the current set’s 18 process-result cases’; no W-, D- or T- probe', async () => {
+		const seams: FingerprintSeams = {
+			...PRODUCT_SEAMS,
+			validator: (print) =>
+				PRODUCT_SEAMS.validator((p) =>
+					print(
+						p.replace(
+							'each criterion below is judged of what the account says about THIS command',
+							'each criterion below is judged of what the account says about THIS COMMAND'
+						)
+					)
+				)
+		};
+		const fp = await reviewerFingerprint(CASES, seams);
+		onlyMoved(fp, ['probes']);
+		// ⭑ As the row for the view of a process result, read whole, names them: `P-NO-FENCE` is refused before any prompt exists.
+		expect(movedProbes(fp), 'the probes that move').toEqual(P_PROBES().filter((id) => id !== 'P-NO-FENCE'));
+		expect(movedProbes(fp), 'arrangement: 27 of the 28 process-result probes').toHaveLength(27);
+		expect(fp.casePrompts, 'no case of v1 is a process result').toEqual(BASE.casePrompts);
+		expect(CURRENT_PROCESS_RESULTS, 'the arrangement: the current set holds the eighteen').toHaveLength(18);
+		expect(await movedNow(seams), 'the case prompts of the current set that move').toEqual(CURRENT_PROCESS_RESULTS);
+	});
+
+	it('⭐⭐ package X (D32) — a PROMPT BRANCH, the account’s heading in a finished work’s review: the probes move — exactly the five work-product probes shown a deliverable, empty or not — and of the case prompts exactly the current set’s 26 work-product cases’; no P-, D- or T- probe', async () => {
+		const seams: FingerprintSeams = {
+			...PRODUCT_SEAMS,
+			validator: (print) =>
+				PRODUCT_SEAMS.validator((p) =>
+					print(
+						p.replace(
+							"the host's record of what this step did. What it says this step wrote",
+							"the host's record of what this step did. What it says this step WROTE"
+						)
+					)
+				)
+		};
+		const fp = await reviewerFingerprint(CASES, seams);
+		onlyMoved(fp, ['probes']);
+		const shownADeliverable = FINGERPRINT_PROBES.filter((x) => {
+			const input = x.input(PRODUCT_SEAMS.criteria, PRODUCT_SEAMS.processResult);
+			return input.framing === 'WORK_PRODUCT' && input.deliverable !== undefined;
+		}).map((x) => x.id);
+		expect(shownADeliverable, 'arrangement: the five work-product probes shown a deliverable').toEqual([
+			'W-DELIVERABLE',
+			'W-OVERSIZE-DELIVERABLE',
+			'W-OVERSIZE-FILE-LIST',
+			'W-RERUN-DELIVERABLE',
+			'W-RERUN-NO-FILE'
+		]);
+		expect(movedProbes(fp), 'the probes that move').toEqual(shownADeliverable);
+		expect(fp.casePrompts, 'no case of v1 is shown a deliverable').toEqual(BASE.casePrompts);
+		expect(CURRENT_WORK_PRODUCTS, 'the arrangement: the current set holds the 26').toHaveLength(26);
+		expect(await movedNow(seams), 'the case prompts of the current set that move').toEqual(CURRENT_WORK_PRODUCTS);
+	});
+
 	// ⭐⭐ The review in parts, B7 (`REG-D-125`; DESIGN-authoring-review-in-parts.md §5: "A change confined to that framing must
 	// move the fingerprint, and the selected reviewer must owe measurement on its new prompts") — THE PART FRAMING'S TEXT.
 	// ⛔ No probe and no case was in the `PWA_TYPE` framing, so a change to what the reviewer of a part reads moved nothing.
@@ -915,15 +977,22 @@ describe('JAN-CRITREAD J2-3 — the probe set reaches every branch of prompt ass
 	 * ⭑ CONTROL (package O-2, D28) — BESIDE THEM, THE FIRST STEP'S BYTES: package N's five finished-work probes, each a first step's,
 	 * hash for hash as they were before D28 (measured 2026-10-26 at the merge of design revision 4, `98e24cec`, before any O-2 code).
 	 * ⛔ A re-run's branch that leaked into a first step's prompt moves one of these, though no word of a re-run's is named above.
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package X — D32 (`REG-D-140`; design §10.4, predicted red 2, revision 5) — ITS THREE W- ROWS MOVED,
+	 * DELIBERATELY, 2026-10-31, each struck in place beside the hash the build renders: each work product shown its finished work
+	 * reads D32's heading of the account in place of the shared one — W-DELIVERABLE at that line alone; W-OVERSIZE-DELIVERABLE and
+	 * W-OVERSIZE-FILE-LIST cut the shorter for the longer heading too (measured: each of the four texts' kept head 89 or 90 code
+	 * points fewer, 3842 or 3841 not 3931, and the sequence's acts 24 of 30, not 25; the list 295 of the 400 files, not 301). Its two
+	 * D- rows did not move: a declared review keeps the shared heading. The rows are a first step's still, and the CONTROL still
+	 * guards that no re-run word or mark reaches one.
 	 */
-	it('⭑ CONTROL (D28) — package N’s five finished-work probes, each a first step’s, read as they did before D28, hash for hash', () => {
+	it('⭑ CONTROL (D28) — package N’s five finished-work probes, each a first step’s, read as they did before D28 ⭐ (package X: the three work-product ones as D32 moves them), hash for hash', () => {
 		expect(
 			['W-DELIVERABLE', 'W-OVERSIZE-DELIVERABLE', 'W-OVERSIZE-FILE-LIST', 'D-DELIVERABLE', 'D-OVERSIZE-DELIVERABLE'].map((id) => [id, sha256(prompt(id))]),
 			'a first step’s finished-work probe moved'
 		).toEqual([
-			['W-DELIVERABLE', '3ea214bb2f39c659d8a0ffeeccf983511e48f1636c11937d788e8b9d61375d65'],
-			['W-OVERSIZE-DELIVERABLE', '71e91d694f95ca3564df98f22703ec94adb846521473a42b3f2e7f72de76438a'],
-			['W-OVERSIZE-FILE-LIST', 'a6261a4f894573b96c37b1b6f68a225fd72afe0c289968e8a6f95b56ada9b9af'],
+			['W-DELIVERABLE', 'bf2a80d789465f82deb6a87398f0ff2b9a550588a31860bdaa54cb3dcfba94af'], // ~~'3ea214bb2f39c659d8a0ffeeccf983511e48f1636c11937d788e8b9d61375d65'~~
+			['W-OVERSIZE-DELIVERABLE', 'a029da32447f8fc32ae066c1fcec756d1541c30b2240c430f82371e791b22e06'], // ~~'71e91d694f95ca3564df98f22703ec94adb846521473a42b3f2e7f72de76438a'~~
+			['W-OVERSIZE-FILE-LIST', '312b146b51b9f66c84b143a7a917de055155cc15001112b6ce16d5153cd9da0a'], // ~~'a6261a4f894573b96c37b1b6f68a225fd72afe0c289968e8a6f95b56ada9b9af'~~
 			['D-DELIVERABLE', 'b5670f4a303c9f73d62b00abdf3286c2350dca6e5c7a33b417407cc20cb48d06'],
 			['D-OVERSIZE-DELIVERABLE', 'b86d78d94b4edae846d12000c5972641f136c9834c1f780f66923d1d1cc7499c']
 		]);

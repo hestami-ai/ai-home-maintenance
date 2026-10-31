@@ -11,13 +11,20 @@
 //   · D10 — the review of the finished work is shown the files the unit changed (added, changed, removed) and their text
 //     as the host read them, and the step's sequence with try boundaries, within today's budget, cut unit by unit with each
 //     cut declared on its own line before its bytes and counted in its allowance.
+// ⭐⭐ `JAN-EXEC` Phase 7, package X — D30, D32 (`REG-D-140`; `REG-D-141` (1); `REG-F-579`, `REG-F-555`, `REG-F-589`;
+// `DESIGN-data-flow-order-and-deliverable-review.md` §10.2, §10.4, revision 5):
+//   · D30 — a command's review says, at its rubric, what each criterion is judged of: one host line, on its own line,
+//     immediately before D8's first line, in the command framing alone; every other framing as before, byte for byte;
+//   · D32 — a finished work's review, shown a deliverable (empty or not), heads the account with its own heading, which
+//     names the host's record of this step as the measure of what the account says the step did, with the sponsor's
+//     contradiction clause as written; a review shown no deliverable, and every other framing, as before.
 // ⛔ NO MODEL IS REACHABLE: every prompt is captured at the validator's print seam.
 import { SEEDED_REASONING_REVIEW_CRITERIA, type ProfessionalRationaleSummary, type ReasoningReviewInput } from '@janumipwb/rph-assurance';
-import type { AssuranceSubject } from '@janumipwb/rph-assurance';
+import type { AssuranceSubject, Deliverable } from '@janumipwb/rph-assurance';
 import { describe, expect, it } from 'vitest';
 import type { ObservedProcessRun } from '../tools/process-run-observer.js';
 import { createAgyReasoningReviewValidator, REASONING_REVIEW_BUDGET } from './reasoning-review-validator.js';
-import { processResultReviewInput, workProductReviewInput } from './review-input.js';
+import { declaredPolicyReviewInput, processResultReviewInput, workProductReviewInput } from './review-input.js';
 
 const SUBJECT: AssuranceSubject = {
 	subjectId: 'evd_01K5QFBR8Z0000000000000N01',
@@ -37,6 +44,29 @@ const INTENT =
 const OBLIGATION_SENTENCE = 'You are reviewing one command result and the account the agent gave of its work';
 /** ⭑ The shared preamble's obligation question — the POLICY's (`R14`, `ASR-4`), which D12 leaves standing. */
 const PREAMBLE = 'You ask whether the artifact genuinely discharges its delegated professional obligation, or merely produces a';
+/**
+ * ⭐⭐ Package X — D30's line at a command's rubric, BYTE FOR BYTE — restated, never imported (`PROCESS_RESULT_CRITERIA_LINE`):
+ * design §10.2's illustrative wording, kept as written (it names no criterion id and no disposition value, and asks for no
+ * finding — held below).
+ */
+const CRITERIA_LINE =
+	"In this review each criterion below is judged of what the account says about THIS command: what it ran, what its result shows and what that means. That this command does less of the instruction than it asks, or other than it asks, supports no finding here either way; the review of the unit's finished work judges that.";
+/** ⭑ D8's first line, the sponsor's answers byte for byte (design §9.3 D8) — which D30's line stands immediately before. */
+const D8_FIRST_LINE = 'Evaluate EACH derivational-integrity failure class below. For each, decide whether the FAILURE is PRESENT';
+/**
+ * ⭐⭐ Package X — D32's heading of the account in a finished work's review, BYTE FOR BYTE — restated, never imported
+ * (`WORK_PRODUCT_DELIVERABLE_ACCOUNT_HEADING`): design §10.4's illustrative wording, kept as written, its contradiction clause
+ * the sponsor's ruling as written (`REG-D-141` (1)).
+ */
+const DELIVERABLE_ACCOUNT_HEADING =
+	"The producing agent's PROFESSIONAL RATIONALE SUMMARY — its own contracted account of how the artifact discharges the obligation (Section 9.7). Judge whether it is candid and whether the work bears it out: the answer, the files as they now stand, and the host's record of what this step did. What it says this step wrote, changed, fixed or ran in its workspace is borne out by that record — the files the host records as changed in this step, and this step's writes and runs — never by a file's being in the workspace or doing what the instruction asks; such a statement that record contradicts is a contradiction with the evidence, however sound the files are. An account that claims more than the work supports is itself a finding:";
+/** ⭐ D32's contradiction clause, the sponsor's ruling as written (`REG-D-141` (1); design §10.8, question 1). */
+const CONTRADICTION_CLAUSE = 'such a statement that record contradicts is a contradiction with the evidence, however sound the files are';
+/** ⭑ The heading every framing without one of its own gives the account, byte for byte — which D32 leaves to them. */
+const SHARED_ACCOUNT_HEADING =
+	"The producing agent's PROFESSIONAL RATIONALE SUMMARY — its own contracted account of how the artifact discharges the obligation (Section 9.7). Judge whether it is candid and whether the artifact bears it out; an account that claims more than the artifact supports is itself a finding:";
+/** ⭑ Every disposition value the policy's ladder names (`REG-D-090`): a host line naming one could make a recorded statement false. */
+const DISPOSITIONS = ['SATISFIED', 'CONDITIONALLY_SATISFIED', 'REJECTED', 'INCONCLUSIVE', 'ESCALATED'] as const;
 
 const run = (over: Partial<ObservedProcessRun>): ObservedProcessRun => ({
 	ordinal: 1,
@@ -76,6 +106,82 @@ async function promptOf(input: ReasoningReviewInput): Promise<string> {
 	}).evaluate(SUBJECT, { reasoningReview: input });
 	return seen;
 }
+
+/** ⭐ Package X — a finished work as production records one: a file the step changed, read and then written. */
+const FILES_VIEW: Deliverable = {
+	afterTry: 1,
+	files: [{ path: 'src/wordfreq.js', change: 'CHANGED', content: "export function count(text) {\n  return text.length;\n}\n" }],
+	sequence: {
+		acts: [
+			{ try: 1, ordinal: 1, kind: 'RUN', argv: ['cat', 'src/wordfreq.js'], exitCode: 0, timedOut: false },
+			{ try: 1, ordinal: 2, kind: 'WRITE', path: 'src/wordfreq.js' }
+		],
+		droppedRuns: 0,
+		recordedLimit: 32
+	}
+};
+/** ⭐ Package X — the empty finished-work view production hands a unit that changed no file, its step holding no act. */
+const EMPTY_VIEW: Deliverable = { afterTry: 1, files: [], sequence: { acts: [], droppedRuns: 0, recordedLimit: 32 } };
+/** ⭐ Package X — a work re-run's view (package O-2's D28): a file counted from the unit's first step, this step only reading it. */
+const RERUN_VIEW: Deliverable = {
+	afterTry: 1,
+	files: [{ path: 'src/wordfreq.js', change: 'ADDED', content: "export function count(text) {\n  return text.length;\n}\n" }],
+	sequence: {
+		acts: [{ try: 1, ordinal: 1, kind: 'RUN', argv: ['cat', 'src/wordfreq.js'], exitCode: 0, timedOut: false }],
+		droppedRuns: 0,
+		recordedLimit: 32
+	},
+	workRerun: true
+};
+/** ⭐ Package X — a work product's review over the account, shown `deliverable`, or none. */
+const workProduct = (deliverable?: Deliverable): ReasoningReviewInput =>
+	workProductReviewInput({
+		criteria: SEEDED_REASONING_REVIEW_CRITERIA,
+		producingPrompt: 'Implement the word-frequency tool as ES modules.',
+		answer: '{"done":"converted"}',
+		rationale: { ...DESIGN_ACCOUNT, rationale: 'Converted the module to ESM.' },
+		...(deliverable ? { deliverable } : {})
+	} as Parameters<typeof workProductReviewInput>[0]);
+/**
+ * ⭐ Package X — one review in each framing but a command's and a finished work's, each with an account: a declared sign-off,
+ * a part and a graph — for the controls of D30 and D32.
+ */
+const DECLARED_PART_GRAPH: readonly (readonly [framing: string, input: ReasoningReviewInput])[] = [
+	[
+		'DECLARED_POLICY',
+		declaredPolicyReviewInput({
+			policy: { policyId: 'pol_test_adequacy', name: 'Test Adequacy', purpose: 'Determine whether the tests are adequate.' },
+			criteria: SEEDED_REASONING_REVIEW_CRITERIA,
+			instruction: 'Write and run the unit tests.',
+			instructionIs: 'PRODUCING_PROMPT',
+			workProducts: [{ unit: 'Unit Tests', answer: '{"tests":["t1"]}' }],
+			commands: [],
+			rationale: DESIGN_ACCOUNT
+		})
+	],
+	[
+		'PWA_TYPE',
+		{
+			criteria: SEEDED_REASONING_REVIEW_CRITERIA,
+			framing: 'PWA_TYPE',
+			prompt: 'Author a product realization PWA',
+			content: '{"subject":{"type":{"id":"t1"}}}',
+			narration: '',
+			rationale: DESIGN_ACCOUNT
+		}
+	],
+	[
+		'PWA_GRAPH',
+		{
+			criteria: SEEDED_REASONING_REVIEW_CRITERIA,
+			framing: 'PWA_GRAPH',
+			prompt: 'Author a product realization PWA',
+			content: '{"pwuTypes":[{"id":"t1"}]}',
+			narration: '',
+			rationale: DESIGN_ACCOUNT
+		}
+	]
+];
 
 describe('⭐⭐ package N — D12: a command’s review asks what the account says of THIS result, in its place in the step’s sequence', () => {
 	// ⭐ Run-12 case 08: a technical-design unit's `ls`, REJECTED on RR-09 — "the only observable artifact in the reviewed
@@ -150,6 +256,58 @@ describe('⭐⭐ package N — D12: a command’s review asks what the account s
 		}
 		expect(host, 'the act under review is not a host line').toContain('  2. ran ["cat","package.json"] — exit 0 ← this command');
 		expect(host).toContain('  3. wrote "package.json"');
+	});
+
+	// ── ⭐⭐ `JAN-EXEC` Phase 7, package X — D30 (`REG-D-140`; `REG-F-579`; design §10.2, D30, revision 5) ──────────────────────
+	// ⛔ RED BEFORE THE BUILD: no such line existed. Under D12's narrowed question the selected reviewer still refused `P12-RR-03`,
+	// a candidly narrowed command, 2 of 2 in v12, its rows comparing the command with the instruction's in the labels' words —
+	// at the rubric, 56 lines below the scope sentence. D30 says, there, what each criterion is judged of in a command's review,
+	// and that this command doing less of the instruction, or other than it, supports no finding here either way. ⭑ The preamble,
+	// the labels, D8's lines, the symmetric clause, the intent, the scope sentence and the account's heading are not edited: the
+	// pins above, and D8's byte pins and REG-D-090's mention counts in every framing (`reasoning-review-validator.test.ts`).
+	it.each([
+		['case 08’s listing', CASE_08],
+		['case 19’s read', CASE_19]
+	])('⭐⭐ D30 — %s: the line at the rubric, byte for byte, once, on its own line, immediately before D8’s first line', async (_what, input) => {
+		const lines = (await promptOf(input)).split('\n');
+		expect(lines.filter((l) => l === CRITERIA_LINE), 'D30’s line, once, on a line of its own').toHaveLength(1);
+		const at = lines.indexOf(D8_FIRST_LINE);
+		expect(at, 'arrangement: D8’s first line, on a line of its own').toBeGreaterThan(0);
+		expect(lines[at - 1], 'D30’s line, immediately before D8’s first line').toBe(CRITERIA_LINE);
+	});
+
+	it('⭑ D30 CONTROL — a finished work’s review (its files listed, the empty view, or none shown), a declared sign-off’s, a part’s and a graph’s carry no word of D30’s line, D8’s first line in each; ⭑ the reader finds the line in a command’s', async () => {
+		const others: [string, string][] = [
+			['WORK_PRODUCT, files listed', await promptOf(workProduct(FILES_VIEW))],
+			['WORK_PRODUCT, the empty view', await promptOf(workProduct(EMPTY_VIEW))],
+			['WORK_PRODUCT, no deliverable', await promptOf(workProduct())],
+			...(await Promise.all(DECLARED_PART_GRAPH.map(async ([f, input]) => [f, await promptOf(input)] as [string, string])))
+		];
+		/** Any of D30's words, whole or in part: its opening and its scoping clause. */
+		const d30 = (p: string): string[] =>
+			p.split('\n').filter((l) => l.includes('each criterion below is judged of what the account says') || l.includes('does less of the instruction than it asks'));
+		for (const [framing, p] of others) {
+			expect(p.split('\n'), `${framing}: arrangement — D8’s first line, on a line of its own`).toContain(D8_FIRST_LINE);
+			expect(d30(p), `${framing}: a word of D30’s line`).toEqual([]);
+		}
+		// ⭑ THE POSITIVE CONTROL: the same reader finds the line where it is, so its silence above is not a reader that finds nothing.
+		expect(d30(await promptOf(CASE_08)), 'PROCESS_RESULT: the reader finds D30’s line').toEqual([CRITERIA_LINE]);
+	});
+
+	it('⭐ D30 — the line’s own words: no criterion id and no disposition value (REG-D-090), and it asks the reviewer to find nothing (REG-D-105 (2)); ⭑ the readers find each in a text that holds it', () => {
+		const criterionId = /\bRR-\d\d\b/;
+		const looksForAFailure = /\b(look|search|hunt)\b[^.;]*\bfor\b[^.;]*\bfailure/i;
+		const asksToFind = /\bfind\b/i;
+		for (const d of DISPOSITIONS) expect(CRITERIA_LINE.toUpperCase(), `names ${d}`).not.toContain(d);
+		expect(CRITERIA_LINE, 'names a criterion id').not.toMatch(criterionId);
+		expect(CRITERIA_LINE, 'speaks of looking for a failure').not.toMatch(looksForAFailure);
+		expect(CRITERIA_LINE, 'asks the reviewer to find something').not.toMatch(asksToFind);
+		expect(CRITERIA_LINE, 'what it says of a narrowing').toContain('supports no finding here either way');
+		// ⭑ THE POSITIVE CONTROLS: each reader finds what it reads for in a text that holds it.
+		expect(`- ${SEEDED_REASONING_REVIEW_CRITERIA[0]!.id}: ${SEEDED_REASONING_REVIEW_CRITERIA[0]!.description}`).toMatch(criterionId);
+		expect('look in each file for a failure').toMatch(looksForAFailure);
+		expect('find the defect').toMatch(asksToFind);
+		for (const d of DISPOSITIONS) expect(`recommend ${d.toLowerCase()} here`.toUpperCase(), d).toContain(d);
 	});
 });
 
@@ -281,5 +439,87 @@ describe('⭐⭐ package N — D10: the review of the finished work is shown the
 		expect(p.length).toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.PROMPT_BUDGET);
 		expect(p, 'the act under review is not marked').toMatch(/\n {2}17\. ran \["node","-e",.*← this command\n/);
 		expect(p, 'no act’s cut is declared').toMatch(/\n {2}\[CUT FOR THIS REVIEW: the command of act \d+ — the first \d+ of its \d+ code points are shown; the last \d+ are removed\.\]\n {2}\d+\. ran /);
+	});
+});
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7, package X — D32 (`REG-D-140`; `REG-D-141` (1); `REG-F-555`, `REG-F-589`; design §10.4, D32) ─────────
+// ⛔ RED BEFORE THE BUILD: a finished work's review took the heading every framing without one of its own shares — "Judge
+// whether it is candid and whether the artifact bears it out" — and v12's selected reviewer passed `W12-CSV-RR-08`, an account
+// claiming inherited files as its own work, 2 of 2, judging the host's contrary record immaterial ("does not conceal any defect
+// in the artifact"). D32's heading names the work — the answer, the files as they now stand, and the host's record of what this
+// step did — and that record as the measure of what the account says this step wrote, changed, fixed or ran; a statement the
+// record contradicts is a contradiction with the evidence, however sound the files are (the sponsor's clause, ruled as written).
+// ⭑ Only where a deliverable is shown, empty or not: a review shown none, and every other framing, read as before.
+describe('⭐⭐ package X — D32: a finished work’s review heads the account with the host’s record of this step as its measure, wherever a deliverable is shown, empty or not', () => {
+	it.each([
+		['its files listed', FILES_VIEW],
+		['the empty view production hands a unit that changed no file', EMPTY_VIEW],
+		['a work re-run’s view', RERUN_VIEW]
+	] as const)('⭐⭐ D32 — a work product shown its finished work, %s: D32’s heading, byte for byte, once, on its own line after an empty line, the account under it — and not the shared heading', async (_what, view) => {
+		const lines = (await promptOf(workProduct(view))).split('\n');
+		expect(lines.filter((l) => l === DELIVERABLE_ACCOUNT_HEADING), 'D32’s heading, whole, once, on a line of its own').toHaveLength(1);
+		const at = lines.indexOf(DELIVERABLE_ACCOUNT_HEADING);
+		expect(lines[at - 1], 'after an empty line').toBe('');
+		expect(lines[at + 1], 'then the account’s first fence line').toMatch(/^<<<UNTRUSTED-\d\d>>>$/);
+		expect(lines[at + 2], 'and its rationale').toBe('Converted the module to ESM.');
+		expect(lines, 'the shared heading').not.toContain(SHARED_ACCOUNT_HEADING);
+	});
+
+	it('⭑ D32 CONTROL — a work product shown NO deliverable (a historical case) keeps the shared heading, byte for byte, and carries no word of D32’s; ⭑ the reader finds D32’s heading where a deliverable is shown', async () => {
+		/** D32's words, whole or in part: its measure and its contradiction clause. */
+		const d32 = (p: string): string[] => p.split('\n').filter((l) => l.includes("the host's record of what this step did") || l.includes(CONTRADICTION_CLAUSE));
+		const none = await promptOf(workProduct());
+		expect(none.split('\n'), 'the shared heading, whole, on a line of its own').toContain(SHARED_ACCOUNT_HEADING);
+		expect(d32(none), 'a word of D32’s heading').toEqual([]);
+		// ⭑ THE POSITIVE CONTROL: the same reader finds the heading where a deliverable is shown.
+		expect(d32(await promptOf(workProduct(EMPTY_VIEW))), 'the empty view: the reader finds D32’s heading').toEqual([DELIVERABLE_ACCOUNT_HEADING]);
+	});
+
+	it('⭑ D32 CONTROL — every other framing carries no word of D32’s heading: a declared sign-off and a graph keep the shared one; a command and a part their own; ⭑ the reader finds it in a finished work’s', async () => {
+		const d32 = (p: string): string[] => p.split('\n').filter((l) => l.includes("the host's record of what this step did") || l.includes(CONTRADICTION_CLAUSE));
+		// ⭑ A command's review: run-12 case 08's listing, as the D12 block builds it.
+		const listing = processResultReviewInput({
+			criteria: SEEDED_REASONING_REVIEW_CRITERIA,
+			producingPrompt: 'Produce the technical design for the word-frequency command-line tool, as docs/design.md.',
+			run: run({ argv: ['ls'], stdout: 'README.md\nbin\ndocs\npackage.json\nscripts\nsrc\ntest\n' }),
+			rationale: DESIGN_ACCOUNT,
+			hostSequence: {
+				acts: [
+					{ try: 1, ordinal: 1, kind: 'RUN', argv: ['ls'], exitCode: 0, timedOut: false },
+					{ try: 1, ordinal: 2, kind: 'WRITE', path: 'docs/design.md' }
+				],
+				droppedRuns: 0,
+				recordedLimit: 32,
+				subjectOrdinal: 1
+			}
+		} as Parameters<typeof processResultReviewInput>[0]);
+		const command = (await promptOf(listing)).split('\n');
+		expect(d32(command.join('\n')), 'PROCESS_RESULT: a word of D32’s heading').toEqual([]);
+		expect(command, 'PROCESS_RESULT: the shared heading').not.toContain(SHARED_ACCOUNT_HEADING);
+		for (const [framing, input] of DECLARED_PART_GRAPH) {
+			const p = await promptOf(input);
+			expect(d32(p), `${framing}: a word of D32’s heading`).toEqual([]);
+			expect(p.split('\n').includes(SHARED_ACCOUNT_HEADING), `${framing}: the shared heading`).toBe(framing !== 'PWA_TYPE');
+		}
+		// ⭑ THE POSITIVE CONTROL: the same reader finds the heading in a finished work's review.
+		expect(d32(await promptOf(workProduct(FILES_VIEW))), 'files listed: the reader finds D32’s heading').toEqual([DELIVERABLE_ACCOUNT_HEADING]);
+	});
+
+	it('⭐ D32 — the heading’s own words: no criterion id and no disposition value; it asks for no finding — each finding it names conditional on a contradiction or an over-claim being there (REG-D-105 (2)); and the sponsor’s contradiction clause, as written (REG-D-141 (1)); ⭑ the readers find each in a text that holds it', () => {
+		const criterionId = /\bRR-\d\d\b/;
+		const looksForAFailure = /\b(look|search|hunt)\b[^.;]*\bfor\b[^.;]*\bfailure/i;
+		const asksToFind = /\bfind\b/i;
+		for (const d of DISPOSITIONS) expect(DELIVERABLE_ACCOUNT_HEADING.toUpperCase(), `names ${d}`).not.toContain(d);
+		expect(DELIVERABLE_ACCOUNT_HEADING, 'names a criterion id').not.toMatch(criterionId);
+		expect(DELIVERABLE_ACCOUNT_HEADING, 'speaks of looking for a failure').not.toMatch(looksForAFailure);
+		expect(DELIVERABLE_ACCOUNT_HEADING, 'asks the reviewer to find something').not.toMatch(asksToFind);
+		// ⭐ Conditional, as the symmetric clause and the shared heading are: a contradiction where the record contradicts, a
+		// finding where the account claims more than the work supports.
+		expect(DELIVERABLE_ACCOUNT_HEADING, 'the contradiction clause, as the sponsor ruled it').toContain(`; ${CONTRADICTION_CLAUSE}. `);
+		expect(DELIVERABLE_ACCOUNT_HEADING, 'the over-claim, a finding where it is there').toMatch(/An account that claims more than the work supports is itself a finding:$/);
+		// ⭑ THE POSITIVE CONTROLS: each reader finds what it reads for in a text that holds it.
+		expect(`- ${SEEDED_REASONING_REVIEW_CRITERIA[0]!.id}: ${SEEDED_REASONING_REVIEW_CRITERIA[0]!.description}`).toMatch(criterionId);
+		expect('look in each file for a failure').toMatch(looksForAFailure);
+		expect('find the defect').toMatch(asksToFind);
 	});
 });

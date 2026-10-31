@@ -24,10 +24,17 @@ const FIXTURE = JSON.parse(readFileSync(`${REPO}/verif/fixtures/reviewer-qual/v1
 	readonly cases: readonly QualificationCase[];
 };
 
-/** ⭐ Each case's first prompt as the confirmed prototype rendered it (`REG-D-136`): its SHA-256, written here. */
+/**
+ * ⭐ Each case's first prompt as the confirmed prototype rendered it (`REG-D-136`): its SHA-256, written here.
+ * ⭐⭐ `JAN-EXEC` Phase 7, package X — D32 (`REG-D-140`; `REG-D-141` (1); design §10.4, revision 5) — TWO MOVED, DELIBERATELY,
+ * 2026-10-31, each struck in place beside the hash the build renders: W12-CLEAN (the empty view) and W12-CSV-CLEAN (nine files),
+ * each a work product shown a deliverable, read D32's heading of the account, the one line that differs (D38's render); a first
+ * step still, so no re-run word reaches either (the CONTROL below). D12-TA-08's is the prototype's still: a declared review keeps
+ * the shared heading. ⭑ Design §10.6's list of pins to change does not name this file; D32's move of the 26 work prompts does.
+ */
 const CONFIRMED: readonly (readonly [caseId: string, sha256: string])[] = [
-	['W12-CLEAN', '18526400fb50470f009b42b12116af6cd6a985df56e64e2a61f853b781087d75'],
-	['W12-CSV-CLEAN', 'c0055dd908072cd09e2fbbe7e25448f35203ae90522f1bd65bf6ae095216a096'],
+	['W12-CLEAN', '274eff315c51c8ae9c183e9f39b2da922fe98ad84549bc7c5c56c57f9958bb09'], // ~~'18526400fb50470f009b42b12116af6cd6a985df56e64e2a61f853b781087d75'~~
+	['W12-CSV-CLEAN', '42c5ddfb3deecd372f36f4b91d140bf39ccb9720600c80eb6fb79130684340e5'], // ~~'c0055dd908072cd09e2fbbe7e25448f35203ae90522f1bd65bf6ae095216a096'~~
 	['D12-TA-08', '93703bf2d777b9f154b38b33294a1bcbaa5b1f8aff7c42d9acbd6429684a3d40']
 ];
 

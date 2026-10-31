@@ -4110,8 +4110,16 @@ const REVIEWER_FINGERPRINT_V9 = '5ab3d68643bffbbf700c622526b626f47d4c487690e1eb5
  * criteria and scoring are O-2's — and O-2 moved no case, so version twelve's digest is still `CASE_SET_DIGEST_V12`. With V's
  * value here, exactly the three limbs that read this constant fail, each on 'the reviewer fingerprint, unmoved'. Still
  * unmeasured: version twelve's measurement, and the ACKNOWLEDGED line the check owes, are under this value.
+ * ⭐⭐ `JAN-EXEC` Phase 7, package X — D30 and D32 (`REG-D-140`; `REG-D-141` (1); design §10.2, §10.4 and §10.6, revision 5) — MOVED
+ * AGAIN, DELIBERATELY, 2026-10-31: ~~'9cf9b9f54bf79013e13b21db675a08645b36d6c1b260b3533fe5f0957064b93d'~~ — the one case set v12's
+ * paid run measured (`qr-2026-10-30-devin-glm-5-3-flash-high-v12`) — the probes move, and only they: 27 of the 28 P- probes read
+ * D30's line at a command's rubric (P-NO-FENCE is refused before any prompt exists), and the five W- probes shown a deliverable
+ * read D32's heading of the account. No other probe prompt moved, nor the budget, criteria, scoring or case-set digest (measured
+ * on a copy of the tree at `762eba20` and on package X's). The 18 command and 26 work case prompts move with the reviewer's
+ * definition and keep their ids (D37). Unmeasured: `reviewer:qual:check` reads RED on COVERAGE until case set v13's paid run and
+ * its ACKNOWLEDGED line (D38) — a predicted red, not a green result.
  */
-const REVIEWER_FINGERPRINT_TODAY = '9cf9b9f54bf79013e13b21db675a08645b36d6c1b260b3533fe5f0957064b93d';
+const REVIEWER_FINGERPRINT_TODAY = '91e685d86537010edd7ab69a109ee0e9a3a0e7e8efb8daafffb5978ac9e65134';
 /**
  * ⭐ THE PROTOTYPE'S PROMPTS (`REG-D-131` Q36: *"its prompts must match the checked prototype hash for hash"*) — the sha256 of
  * each of the 19 bridge part cases' first prompt as the lead's in-memory prototype of D3b rendered it through the product's
@@ -5249,50 +5257,56 @@ const ORDER_56: readonly string[] = [
  * ⭐ THE PROTOTYPE'S PROMPTS (`REG-D-136` (4): "its prompts must match the prototype's, hash for hash") — the sha256 of each of
  * the 56's first prompt as the lead's pre-checked prototype rendered it through the product's builders and validator, the
  * prompts the offline readers read and the sponsor confirmed, by id, in the set's order — written here.
+ * ⭐⭐ `JAN-EXEC` Phase 7, package X — D30 and D32 (`REG-D-140`; `REG-D-141` (1); design §10.2, §10.4 and §10.6, revision 5) — 42
+ * OF THE 56 MOVED, DELIBERATELY, 2026-10-31, each struck in place, the prototype's hash kept beside the one the build renders: the
+ * 24 work cases at D32's heading of the account, the one line that differs; the 18 command cases at D30's line, inserted
+ * immediately before D8's first line, and — in P12-RR-07-CUT alone — at its cut too, its HEAD and TAIL each 8968 code points, not
+ * 9128 (D38's render of every case on package X's tree against its recorded hash: 44 differ, 50 equal, each differing prompt at
+ * those lines alone). The 14 declared rows are the prototype's still. No case's content moved, so each keeps its id (D37).
  */
 const PROTOTYPE_PROMPTS_V12: readonly (readonly [caseId: string, sha256: string])[] = [
-	['W12-CLEAN', '18526400fb50470f009b42b12116af6cd6a985df56e64e2a61f853b781087d75'],
-	['W12-CLEAN-R1', 'da5abc0ac9b8df0c66acfdda20693e728ed38c437950efb618428b8f2da05fbc'],
-	['W12-CLEAN-R2', 'a8f5f1221741c993ea4514c02b64fcc0f15b6134b3d5b92d6c21c7cb52b4751c'],
-	['W12-CLEAN-R3', '23785fdea82bb2b82ba978b72600e93a4f1ee3b09d266d43e2d94ac2ade2e24f'],
-	['W12-RR-01', '653fcc0367b1948664b4cee4af99f2fef1864e1fd791c8aca5f7c7b2ffb356b7'],
-	['W12-RR-02', 'a363b457b7a8f93bf17b36e3ed935d5c277d31101573659d9c777c10e96b847f'],
-	['W12-RR-03', '994c5c832c31423edea0156833c871707776739f76a42c3e066339293220f061'],
-	['W12-RR-04', 'cd92a627dc58084967340638ecb066f26f3dcf8434f1007d0a8e798248639e12'],
-	['W12-RR-05', '536ddf1152e50f007308792eecc52ff0f85c9fc181321d3b2a1862a476f7b464'],
-	['W12-RR-06', 'b9bff48f1a71e930925e42fff0ea6e60f560fb63955caf0c20d24626e6adfc74'],
-	['W12-RR-07', '57c5d7e93f27b5ad7e8a47a98047c4388b2ff6bf622da7a5621be1f8270e993a'],
-	['W12-RR-08', '50aa6d89ef7b8e037ab6082cc204f85919f2eaba1a08c8d54f600fdaded5c64a'],
-	['W12-RR-09', '9967b3e52527c3343a6179e6c65dfa6e154490e00b670c59374921feaa47f012'],
-	['W12-CSV-CLEAN', 'c0055dd908072cd09e2fbbe7e25448f35203ae90522f1bd65bf6ae095216a096'],
-	['W12-CSV-CLEAN-R1', 'dfc1afbb4fc4c395965b5462b293ac79b2b20e7cfbb70f891b24e0fa43c00cd4'],
-	['W12-CSV-CLEAN-R2', '0b3d6541f85d819d5d518b9a38bc46f350d723dc4e6c68f41cde4303d731a4b0'],
-	['W12-CSV-CLEAN-R3', '0338d91c43e9a4045f658c85236448b5edde6ca81d61371a7ad61ccf9b8ca0c5'],
-	['W12-CSV-CLEAN-T2', '736d21a15c51a78d929ea49e8e7ca7f8870f2ea8e6b34e7e4805fed2bdb2f982'],
-	['W12-CSV-STALE-READ', '3c8b0c02be9bf5c3f35c8cedec6cb6a1540c680218a1a6244245a0ccc64c83e9'],
-	['W12-CSV-RR-02', '64fb745f3fd9e9d5e8bfa183b68f7f57ac785b2bf6ccd680e3d886901282fb10'],
-	['W12-CSV-RR-03', '15785e3a23c58b6e79448b4676b49dfb1b9a79ef3a8811173b390f01e531a2b1'],
-	['W12-CSV-RR-07', 'bbfe6361ecf2408804f1147fc0e087a0dc815da858d30465e30a4a7e16f12369'],
-	['W12-CSV-RR-08', '6ca4147686f5b576b2b7040a0ad61a0086ca70d158ebc049f4bdab70114a13e7'],
-	['W12-CSV-RR-09', 'e41c555fa7224a75970a7bd5e0030e92bb6d5207f3aa6113142fd98f71c1fbdd'],
-	['P12-CLEAN', '33fd9db369e27f8fc00ea4249349e695b69300426d9ace5d7ae4f9e23fecb130'],
-	['P12-CLEAN-R1', '1cd63dd40d07a5875628114b65c3963ee5ae9db8b74e704847855c538676119f'],
-	['P12-CLEAN-R2', 'aaac002eedd5296c66c73e5f7794c0a012428a547fbba181da426eb3fe8efdf7'],
-	['P12-CLEAN-R3', '37717cfafa5316818a876382e6cf0eb28fe64180ba660cc926ab1a701e34e2f3'],
-	['P12-RR-01', 'e96c77b9e783f7bffb644cf7ccf67ebe4f2414d2a1d2f8a61a09086362d1f34a'],
-	['P12-RR-02', '56a938585cb26ecec6975e4f1f1743eb313974cfd3485fd91e8c39a3fa09d101'],
-	['P12-RR-03', '398c2e150ff86c24e10169b63396a66c4431dd6fd83589b9655a9880151f10a4'],
-	['P12-RR-04', '7eb2350b497dbcd3dd2fca51dedab4ff1de4420d243e4ecb383d6f9fa35b9500'],
-	['P12-RR-05', '8a38381d9d216c7ba9700e6d509d77ad70396439f5bd354313f0d22f1f1ee545'],
-	['P12-RR-06', '3dcae44f1e4135b425c33f115ccc7e58b8ca62e95d4031ee4dff0026bcb1a6d2'],
-	['P12-RR-07', '50a0ec0fa505c614d22f2c253b1979de6769d6fd781b5368009e8d4d66bbf1e1'],
-	['P12-RR-07-CUT', '98b785fc6a9f4aea10f0d239af0cba9c09c3e1946ed72ecdcc087540c83933d5'],
-	['P12-RR-08', 'f75d39f78401b56f1625cf1da4cb205c16569e431a5fa36c41effe347a09d00c'],
-	['P12-RR-09', 'b4db55740b7c0fa7b4e9a297feab4d6f2f6488fb7c8f86651de1bbd88f0302c8'],
-	['P12-CSV-LS', '34e35990140cd82d7c447eb5a4a5d094494bfb843ab1305a7179804f2c1b22cf'],
-	['P12-CSV-READ', '7bbda17e215dd5cdfc1a10677377f22a6b38f8bc88f3f1a6b5e371ef8560a980'],
-	['P12-CSV-COUNT', 'c4c9881d6d1d0ff06adc0b5440fe94392ee9b0b575118a9b10a897c50b9ca4fc'],
-	['P12-CSV-COUNT-RR-07', '076377fd8bb5e384be3c5196b23d937315560cf79ea306bd03412d1d6e6ff60c'],
+	['W12-CLEAN', '274eff315c51c8ae9c183e9f39b2da922fe98ad84549bc7c5c56c57f9958bb09'], // ~~'18526400fb50470f009b42b12116af6cd6a985df56e64e2a61f853b781087d75'~~
+	['W12-CLEAN-R1', 'a1b316b963f1081ef50ad2c804e3471bf58a11317285c08cf9b4f7f8a0aa93fc'], // ~~'da5abc0ac9b8df0c66acfdda20693e728ed38c437950efb618428b8f2da05fbc'~~
+	['W12-CLEAN-R2', 'b06cf3cfd213b07d3928f2779156a1fb2bf39d07b6c7fc374f665d3c57a732b1'], // ~~'a8f5f1221741c993ea4514c02b64fcc0f15b6134b3d5b92d6c21c7cb52b4751c'~~
+	['W12-CLEAN-R3', 'c9670456dbe11c2b958e2281b24ec641586ecdec55a82b55bdc49da0e9151d9b'], // ~~'23785fdea82bb2b82ba978b72600e93a4f1ee3b09d266d43e2d94ac2ade2e24f'~~
+	['W12-RR-01', '2c50ec6d14c120527a3b100347bced69433315f21fc719aed66ebf244585fd06'], // ~~'653fcc0367b1948664b4cee4af99f2fef1864e1fd791c8aca5f7c7b2ffb356b7'~~
+	['W12-RR-02', '2dc93bf834718135728a6dd4e33b3776472b6d16735e2046934a8581d23bdff8'], // ~~'a363b457b7a8f93bf17b36e3ed935d5c277d31101573659d9c777c10e96b847f'~~
+	['W12-RR-03', '39e3a06d982d51dcf560fe018e1051456195198f0d7a56004bcb1722a98ab583'], // ~~'994c5c832c31423edea0156833c871707776739f76a42c3e066339293220f061'~~
+	['W12-RR-04', '8dd34f5cd929f7230efb63bca7b4996a0223f9951e047b7650782bfb0e7c2e2b'], // ~~'cd92a627dc58084967340638ecb066f26f3dcf8434f1007d0a8e798248639e12'~~
+	['W12-RR-05', '97fe7bb9f6a52c451a24ff907261ab1fcec39064a8f3aa93d8382ecec5a522ab'], // ~~'536ddf1152e50f007308792eecc52ff0f85c9fc181321d3b2a1862a476f7b464'~~
+	['W12-RR-06', '32d1ed0398b5873a2260871e4688164ea17a69dea099a7974574d3ab29f1451d'], // ~~'b9bff48f1a71e930925e42fff0ea6e60f560fb63955caf0c20d24626e6adfc74'~~
+	['W12-RR-07', '7bfe7bc26affeb62f6af3e20048cf17aa9c48a70f68d41e251e0a9ac403ee5be'], // ~~'57c5d7e93f27b5ad7e8a47a98047c4388b2ff6bf622da7a5621be1f8270e993a'~~
+	['W12-RR-08', '820cb99084e1d5cb31858b2af1504017b287f70b58af7df8e034ca26c2b19de8'], // ~~'50aa6d89ef7b8e037ab6082cc204f85919f2eaba1a08c8d54f600fdaded5c64a'~~
+	['W12-RR-09', 'a4246ddffa8c0c16d415dba0fa264306e45765d415cbaaa63e3f2adf434730e4'], // ~~'9967b3e52527c3343a6179e6c65dfa6e154490e00b670c59374921feaa47f012'~~
+	['W12-CSV-CLEAN', '42c5ddfb3deecd372f36f4b91d140bf39ccb9720600c80eb6fb79130684340e5'], // ~~'c0055dd908072cd09e2fbbe7e25448f35203ae90522f1bd65bf6ae095216a096'~~
+	['W12-CSV-CLEAN-R1', 'a0b522df3215a8f686eaf347f5cb89feb7197d95e474a50a50952ef3c84fefcd'], // ~~'dfc1afbb4fc4c395965b5462b293ac79b2b20e7cfbb70f891b24e0fa43c00cd4'~~
+	['W12-CSV-CLEAN-R2', 'fbbe23210f502d410f549b36b630e828566d9d58d39402ab4ca53ff97acaf52e'], // ~~'0b3d6541f85d819d5d518b9a38bc46f350d723dc4e6c68f41cde4303d731a4b0'~~
+	['W12-CSV-CLEAN-R3', '07c459615145ca2e18a6d9cd8ff22b3885c4e9f6f72282393f6662c93ccf526d'], // ~~'0338d91c43e9a4045f658c85236448b5edde6ca81d61371a7ad61ccf9b8ca0c5'~~
+	['W12-CSV-CLEAN-T2', '58b4fd9ad51dbd34305967f2ff7ce5bae55acf252a09ccf3dc5145025ad4bddf'], // ~~'736d21a15c51a78d929ea49e8e7ca7f8870f2ea8e6b34e7e4805fed2bdb2f982'~~
+	['W12-CSV-STALE-READ', 'c157c8fa8c99a2487ff9100f0a7cab84557dacf005dc51405047362ea61f71b3'], // ~~'3c8b0c02be9bf5c3f35c8cedec6cb6a1540c680218a1a6244245a0ccc64c83e9'~~
+	['W12-CSV-RR-02', '20e8a0d914e33972cb3dc9fd7f6d9b4da1defefd5c691c7207e527385c15a688'], // ~~'64fb745f3fd9e9d5e8bfa183b68f7f57ac785b2bf6ccd680e3d886901282fb10'~~
+	['W12-CSV-RR-03', '5fe5e80964558b365a90ce0aad1d903691d8c895a92c22b8983402cb6b24321d'], // ~~'15785e3a23c58b6e79448b4676b49dfb1b9a79ef3a8811173b390f01e531a2b1'~~
+	['W12-CSV-RR-07', '1231c3c2c7f3bca871472cd190a9d6a6d2383e1e5269583b19a7f2798a617d78'], // ~~'bbfe6361ecf2408804f1147fc0e087a0dc815da858d30465e30a4a7e16f12369'~~
+	['W12-CSV-RR-08', '28d5721e20072141d0587485df19ae0051b175a591bc5da00e5f720d43186369'], // ~~'6ca4147686f5b576b2b7040a0ad61a0086ca70d158ebc049f4bdab70114a13e7'~~
+	['W12-CSV-RR-09', 'fe837f9594dce2fa4cac4acbae9ecf6f90c17826ea44859275a8b0c859dd7b09'], // ~~'e41c555fa7224a75970a7bd5e0030e92bb6d5207f3aa6113142fd98f71c1fbdd'~~
+	['P12-CLEAN', '66b4f2f0e17059ff2869c5c53dbf34de0f2408f529bb23bb6901cccbbb4a9ce5'], // ~~'33fd9db369e27f8fc00ea4249349e695b69300426d9ace5d7ae4f9e23fecb130'~~
+	['P12-CLEAN-R1', '5b682d0cf0cdeac767eaccb9062d746fb28c2246dfce4437887e9a78bf75cd4a'], // ~~'1cd63dd40d07a5875628114b65c3963ee5ae9db8b74e704847855c538676119f'~~
+	['P12-CLEAN-R2', 'ee86f34aed2d60dc62aa69c54d0ea3429ec7f6c21beabc3dfd2e467a57ab355e'], // ~~'aaac002eedd5296c66c73e5f7794c0a012428a547fbba181da426eb3fe8efdf7'~~
+	['P12-CLEAN-R3', '0e08a268e090afe0f1ac8efb579e6a9be8c8c0b0a4b38cc8b1793e4a80de82f3'], // ~~'37717cfafa5316818a876382e6cf0eb28fe64180ba660cc926ab1a701e34e2f3'~~
+	['P12-RR-01', 'aa8481b2e698e9c2205b21ecef12f64b2513076ecf7058c474da957f39d5f349'], // ~~'e96c77b9e783f7bffb644cf7ccf67ebe4f2414d2a1d2f8a61a09086362d1f34a'~~
+	['P12-RR-02', '321592f5377c75b1181d760e1584c3c17b5a939753db82223cac0eb2092cae32'], // ~~'56a938585cb26ecec6975e4f1f1743eb313974cfd3485fd91e8c39a3fa09d101'~~
+	['P12-RR-03', '521ad81d77fc94e7e4d57d9b3fd2e87b900931dc919bdbab9ce54e866a2c2f45'], // ~~'398c2e150ff86c24e10169b63396a66c4431dd6fd83589b9655a9880151f10a4'~~
+	['P12-RR-04', '3b2ecc3b304f263b898a70cd8e8c291e3a4b8894df6b79b4870acbce1091b716'], // ~~'7eb2350b497dbcd3dd2fca51dedab4ff1de4420d243e4ecb383d6f9fa35b9500'~~
+	['P12-RR-05', '3270f62a87a13ec1669b2b412bff499bc8288fdad598238f991d7548b7433029'], // ~~'8a38381d9d216c7ba9700e6d509d77ad70396439f5bd354313f0d22f1f1ee545'~~
+	['P12-RR-06', 'e7c54e4b3176d93807b83f70bc020c64bcbcdcdab8c4ef356e8a39cc8401ee3a'], // ~~'3dcae44f1e4135b425c33f115ccc7e58b8ca62e95d4031ee4dff0026bcb1a6d2'~~
+	['P12-RR-07', 'f3d85fc160f924867c41f7b40df5d0228e5fb04dcfed3b8e06d87807eb8b38d4'], // ~~'50a0ec0fa505c614d22f2c253b1979de6769d6fd781b5368009e8d4d66bbf1e1'~~
+	['P12-RR-07-CUT', '370c61559dec4221a96588a69f9be2d1c673611134910c4789ed4f2f519d2d13'], // ~~'98b785fc6a9f4aea10f0d239af0cba9c09c3e1946ed72ecdcc087540c83933d5'~~
+	['P12-RR-08', 'e2bda999b474714fbc3d4a2abc71e90304779caf1a49bc98743930e8dfa25e56'], // ~~'f75d39f78401b56f1625cf1da4cb205c16569e431a5fa36c41effe347a09d00c'~~
+	['P12-RR-09', 'b319ad76de3756ee5fbdf06b05811507191adb95c9439ae1125db3daa23fb62d'], // ~~'b4db55740b7c0fa7b4e9a297feab4d6f2f6488fb7c8f86651de1bbd88f0302c8'~~
+	['P12-CSV-LS', 'f672f69554a9d5eec727b1d7fc2222ebbbd4c5c1a446f4d7176756494c857a5a'], // ~~'34e35990140cd82d7c447eb5a4a5d094494bfb843ab1305a7179804f2c1b22cf'~~
+	['P12-CSV-READ', '010860b53ddd483b76e422ddcff1bcce09780b08f38759f09eb383bf07ca11ff'], // ~~'7bbda17e215dd5cdfc1a10677377f22a6b38f8bc88f3f1a6b5e371ef8560a980'~~
+	['P12-CSV-COUNT', 'eb4fff584f812a231b004f54e3d0fca9c4b363a70853f48f0e251b013282a275'], // ~~'c4c9881d6d1d0ff06adc0b5440fe94392ee9b0b575118a9b10a897c50b9ca4fc'~~
+	['P12-CSV-COUNT-RR-07', 'c824dde5ea649739578eae14d27eee1b6431086301f74ba0cb8e0d4fc73bc222'], // ~~'076377fd8bb5e384be3c5196b23d937315560cf79ea306bd03412d1d6e6ff60c'~~
 	['D12-RC-CLEAN', 'd41e38c1a94d43782898a54f231f70bda6151e8eb3e90f5b02efb2eedc3730d2'],
 	['D12-RC-04', '1ef00bd5e9d345963c8d3e4efba0ccbea534bb0908b108363216db58f8ea2c90'],
 	['D12-IP-CLEAN', 'a5a11fddcf2bb676e929156d6397051e554f49009febd8050ca059a4a69448dc'],
@@ -5723,12 +5737,14 @@ describe('⭐⭐ package V — reviewer-qualification case set v12: version elev
 		).toEqual([]);
 	});
 
-	it('⛔ THE PROMPTS ARE THE PRE-CHECKED PROTOTYPE’S (REG-D-136 (4)) — each of the 56’s first prompt is the prototype’s, hash for hash; each of the 35’s initial, repair and criterion-repair prompts is version eleven’s; the reviewer fingerprint is unmoved, and the case set’s digest moved, to the one measured at the build', async () => {
+	it('⛔ THE PROMPTS ARE THE PRE-CHECKED PROTOTYPE’S (REG-D-136 (4)) — each of the 56’s first prompt is the prototype’s ⭐ (package X: or, for the 42 that D30 and D32 move, the build’s), hash for hash; each of the 35’s initial, repair and criterion-repair prompts is version eleven’s; the reviewer fingerprint is unmoved, and the case set’s digest moved, to the one measured at the build', async () => {
 		const [eleven, twelve] = await Promise.all([fpV11(), fpV12()]);
 		expect(PROTOTYPE_PROMPTS_V12.map(([id]) => id), 'arrangement: the prototype’s 56, in the set’s order').toEqual(ORDER_56);
+		// ⭐ Package X, 2026-10-31 (design §10.6): ~~'each of the 56’s first prompt, the prototype’s, hash for hash'~~ — 42 rows restated
+		// as the build renders them, the prototype's struck beside each; the 14 declared rows the prototype's (the constant's notes).
 		expect(
 			ORDER_56.map((id) => [id, twelve.casePrompts.get(id)?.initial]),
-			'each of the 56’s first prompt, the prototype’s, hash for hash'
+			'each of the 56’s first prompt — the prototype’s, or, where package X’s D30 or D32 moves it, the build’s — hash for hash'
 		).toEqual(PROTOTYPE_PROMPTS_V12);
 		const parts = CASE_SET_V12.cases.filter((c) => c.arm === 'PWA_TYPE').map((c) => c.id);
 		expect(parts, 'arrangement: the 35').toHaveLength(35);
@@ -6163,10 +6179,15 @@ const RERUN_IDS_V12: readonly string[] = ['W12-CSV-RERUN', 'W12-CSV-RERUN-RR-07'
  * ⭐ THE PROTOTYPE'S PROMPTS (`REG-D-137` (3): pre-checked offline like the rest, then measured) — the sha256 of each of the
  * three's first prompt as the lead's prototype rendered it through the product's builders and validator, the prompts the
  * offline readers read, by id — written here.
+ * ⭐⭐ `JAN-EXEC` Phase 7, package X — D32 (`REG-D-140`; `REG-D-141` (1); design §10.4 and §10.6, revision 5) — TWO OF THE THREE
+ * MOVED, DELIBERATELY, 2026-10-31, each struck in place, the prototype's hash kept beside the one the build renders: the two work
+ * re-runs, shown a deliverable, read D32's heading of the account, the one line that differs (D38's render). The sign-off's is the
+ * prototype's still: a declared review keeps the shared heading. Their content is unchanged here; D31's marks, and the new ids
+ * they bring (D37), are case set v13's.
  */
 const PROTOTYPE_PROMPTS_RERUN_V12: readonly (readonly [caseId: string, sha256: string])[] = [
-	['W12-CSV-RERUN', 'c1c0116f14f2a2558c7b811f34eac9607f389b6625036a521bf85d10c8d4ef82'],
-	['W12-CSV-RERUN-RR-07', '1c0d308ede1f790346ab41117c0cf3811b8842789610895fd546f715f80e9dae'],
+	['W12-CSV-RERUN', '30e8ee42edc934fedf8a3bc9adc4f9ea6be9654459b8e56e3efc94fc2c33537a'], // ~~'c1c0116f14f2a2558c7b811f34eac9607f389b6625036a521bf85d10c8d4ef82'~~
+	['W12-CSV-RERUN-RR-07', '79e36aea4a1bf5c53366e3055fe03a8ba95df5c921d8e66bbda3d7866464e029'], // ~~'1c0d308ede1f790346ab41117c0cf3811b8842789610895fd546f715f80e9dae'~~
 	['D12-CSV-TA-RERUN', '427ea64ef5653e5c0dca753abb9a06978ab7161399051260cb7ec02787b5ee38']
 ];
 /**
@@ -6315,11 +6336,13 @@ describe('⭐⭐ package V-2 — reviewer-qualification case set v12’s three r
 		).toEqual([]);
 	});
 
-	it('⛔ THE PROMPTS ARE THE PRE-CHECKED PROTOTYPE’S (REG-D-137 (3)) — each of the three’s first prompt is the prototype’s, hash for hash; the reviewer fingerprint is unmoved; the case set’s digest moved, by the three alone, to the one measured at this build', async () => {
+	it('⛔ THE PROMPTS ARE THE PRE-CHECKED PROTOTYPE’S (REG-D-137 (3)) — each of the three’s first prompt is the prototype’s ⭐ (package X: or, for the two work re-runs D32 moves, the build’s), hash for hash; the reviewer fingerprint is unmoved; the case set’s digest moved, by the three alone, to the one measured at this build', async () => {
 		const twelve = await fpV12();
+		// ⭐ Package X, 2026-10-31 (design §10.6): ~~'each of the three’s first prompt, the prototype’s, hash for hash'~~ — two rows
+		// restated as the build renders them, the prototype's struck beside each; the sign-off's row the prototype's (the constant's notes).
 		expect(
 			RERUN_IDS_V12.map((id) => [id, twelve.casePrompts.get(id)?.initial]),
-			'each of the three’s first prompt, the prototype’s, hash for hash'
+			'each of the three’s first prompt — the prototype’s, or, where package X’s D32 moves it, the build’s — hash for hash'
 		).toEqual(PROTOTYPE_PROMPTS_RERUN_V12);
 		expect(twelve.reviewer, 'the reviewer fingerprint, unmoved').toBe(REVIEWER_FINGERPRINT_TODAY);
 		expect(caseSetDigest(CASE_SET_V12.cases.slice(0, 91)), 'the 91’s digest, package V’s').toBe(CASE_SET_DIGEST_V12);
