@@ -264,7 +264,10 @@ describe('⭐⭐ P7-6 I1 — the reviewer runs isolated: its own fresh folder, e
 			'--respect-workspace-trust',
 			'false'
 		]);
-		// The bounds are unchanged (`REVIEWER_CALL_BOUND_MS.devin`, `thrown-reviewer-call.test.ts`).
+		// ~~The bounds are unchanged (`REVIEWER_CALL_BOUND_MS.devin`, `thrown-reviewer-call.test.ts`).~~ ⛔ MOVED 2026-10-31 (package X
+		// fix — the independent check's problem 1; design D35, revision 5): true when P7-6 B1 wrote it, stale since D35 — the kill
+		// moved, 240 s to 480 s, with `REVIEWER_CALL_BOUND_MS.devin`, which `thrown-reviewer-call.test.ts` holds to the kill read at
+		// this exec seam; the buffer and the window did not move.
 		// ⛔ MOVED 2026-10-31 (`JAN-EXEC` Phase 7, package X; design D35, revision 5; `REG-F-590`) — ~~`timeout: 240_000`~~: devin's
 		// kill is raised to 480 s, a planning figure (about twice the longest answered call, 231,362 ms); the buffer and the
 		// window are unchanged.
