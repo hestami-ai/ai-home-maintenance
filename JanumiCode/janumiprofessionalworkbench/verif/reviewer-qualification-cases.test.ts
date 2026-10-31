@@ -4118,8 +4118,13 @@ const REVIEWER_FINGERPRINT_V9 = '5ab3d68643bffbbf700c622526b626f47d4c487690e1eb5
  * on a copy of the tree at `762eba20` and on package X's). The 18 command and 26 work case prompts move with the reviewer's
  * definition and keep their ids (D37). Unmeasured: `reviewer:qual:check` reads RED on COVERAGE until case set v13's paid run and
  * its ACKNOWLEDGED line (D38) — a predicted red, not a green result.
+ * ⭐⭐ The X1 fix (the lead's ruling on X1's item 6) — MOVED AGAIN, DELIBERATELY, 2026-10-31:
+ * ~~'91e685d86537010edd7ab69a109ee0e9a3a0e7e8efb8daafffb5978ac9e65134'~~ — the probes move, and only they: D30's line is
+ * shortened to at most 245 UTF-16 code units (242), so the 27 P- probes that read it move again (P-NO-FENCE, refused before any
+ * prompt exists, does not). No other probe prompt moved, nor the budget, criteria, scoring or case-set digest. The 18 command
+ * case prompts move again with it, each under its id. Unmeasured, as before: RED on COVERAGE until case set v13's paid run.
  */
-const REVIEWER_FINGERPRINT_TODAY = '91e685d86537010edd7ab69a109ee0e9a3a0e7e8efb8daafffb5978ac9e65134';
+const REVIEWER_FINGERPRINT_TODAY = '133441f1b397a788ba42f7e8ec4c1697ee56d720869677db8f71271d89d83f26';
 /**
  * ⭐ THE PROTOTYPE'S PROMPTS (`REG-D-131` Q36: *"its prompts must match the checked prototype hash for hash"*) — the sha256 of
  * each of the 19 bridge part cases' first prompt as the lead's in-memory prototype of D3b rendered it through the product's
@@ -5263,6 +5268,12 @@ const ORDER_56: readonly string[] = [
  * immediately before D8's first line, and — in P12-RR-07-CUT alone — at its cut too, its HEAD and TAIL each 8968 code points, not
  * 9128 (D38's render of every case on package X's tree against its recorded hash: 44 differ, 50 equal, each differing prompt at
  * those lines alone). The 14 declared rows are the prototype's still. No case's content moved, so each keeps its id (D37).
+ * ⭐⭐ The X1 fix (the lead's ruling on X1's item 6, 2026-10-31) — THE 18 COMMAND ROWS MOVED AGAIN, DELIBERATELY, each X1 value
+ * struck beside the prototype's: D30's line is shortened to at most 245 UTF-16 code units (242), so that the worst command
+ * review in production's shape leaves its view more than CONTENT_MIN (the fingerprint test's guard stands; PROMPT_BUDGET does
+ * not move). Each differs from X1's at D30's line alone, and P12-RR-07-CUT at its cut too: its HEAD and TAIL ~~each 8968 code
+ * points~~ 9007 and 9006 (D38's render on this tree: 44 differ, 50 equal, as on X1's). The 24 work rows and the 14 declared
+ * rows did not move.
  */
 const PROTOTYPE_PROMPTS_V12: readonly (readonly [caseId: string, sha256: string])[] = [
 	['W12-CLEAN', '274eff315c51c8ae9c183e9f39b2da922fe98ad84549bc7c5c56c57f9958bb09'], // ~~'18526400fb50470f009b42b12116af6cd6a985df56e64e2a61f853b781087d75'~~
@@ -5289,24 +5300,24 @@ const PROTOTYPE_PROMPTS_V12: readonly (readonly [caseId: string, sha256: string]
 	['W12-CSV-RR-07', '1231c3c2c7f3bca871472cd190a9d6a6d2383e1e5269583b19a7f2798a617d78'], // ~~'bbfe6361ecf2408804f1147fc0e087a0dc815da858d30465e30a4a7e16f12369'~~
 	['W12-CSV-RR-08', '28d5721e20072141d0587485df19ae0051b175a591bc5da00e5f720d43186369'], // ~~'6ca4147686f5b576b2b7040a0ad61a0086ca70d158ebc049f4bdab70114a13e7'~~
 	['W12-CSV-RR-09', 'fe837f9594dce2fa4cac4acbae9ecf6f90c17826ea44859275a8b0c859dd7b09'], // ~~'e41c555fa7224a75970a7bd5e0030e92bb6d5207f3aa6113142fd98f71c1fbdd'~~
-	['P12-CLEAN', '66b4f2f0e17059ff2869c5c53dbf34de0f2408f529bb23bb6901cccbbb4a9ce5'], // ~~'33fd9db369e27f8fc00ea4249349e695b69300426d9ace5d7ae4f9e23fecb130'~~
-	['P12-CLEAN-R1', '5b682d0cf0cdeac767eaccb9062d746fb28c2246dfce4437887e9a78bf75cd4a'], // ~~'1cd63dd40d07a5875628114b65c3963ee5ae9db8b74e704847855c538676119f'~~
-	['P12-CLEAN-R2', 'ee86f34aed2d60dc62aa69c54d0ea3429ec7f6c21beabc3dfd2e467a57ab355e'], // ~~'aaac002eedd5296c66c73e5f7794c0a012428a547fbba181da426eb3fe8efdf7'~~
-	['P12-CLEAN-R3', '0e08a268e090afe0f1ac8efb579e6a9be8c8c0b0a4b38cc8b1793e4a80de82f3'], // ~~'37717cfafa5316818a876382e6cf0eb28fe64180ba660cc926ab1a701e34e2f3'~~
-	['P12-RR-01', 'aa8481b2e698e9c2205b21ecef12f64b2513076ecf7058c474da957f39d5f349'], // ~~'e96c77b9e783f7bffb644cf7ccf67ebe4f2414d2a1d2f8a61a09086362d1f34a'~~
-	['P12-RR-02', '321592f5377c75b1181d760e1584c3c17b5a939753db82223cac0eb2092cae32'], // ~~'56a938585cb26ecec6975e4f1f1743eb313974cfd3485fd91e8c39a3fa09d101'~~
-	['P12-RR-03', '521ad81d77fc94e7e4d57d9b3fd2e87b900931dc919bdbab9ce54e866a2c2f45'], // ~~'398c2e150ff86c24e10169b63396a66c4431dd6fd83589b9655a9880151f10a4'~~
-	['P12-RR-04', '3b2ecc3b304f263b898a70cd8e8c291e3a4b8894df6b79b4870acbce1091b716'], // ~~'7eb2350b497dbcd3dd2fca51dedab4ff1de4420d243e4ecb383d6f9fa35b9500'~~
-	['P12-RR-05', '3270f62a87a13ec1669b2b412bff499bc8288fdad598238f991d7548b7433029'], // ~~'8a38381d9d216c7ba9700e6d509d77ad70396439f5bd354313f0d22f1f1ee545'~~
-	['P12-RR-06', 'e7c54e4b3176d93807b83f70bc020c64bcbcdcdab8c4ef356e8a39cc8401ee3a'], // ~~'3dcae44f1e4135b425c33f115ccc7e58b8ca62e95d4031ee4dff0026bcb1a6d2'~~
-	['P12-RR-07', 'f3d85fc160f924867c41f7b40df5d0228e5fb04dcfed3b8e06d87807eb8b38d4'], // ~~'50a0ec0fa505c614d22f2c253b1979de6769d6fd781b5368009e8d4d66bbf1e1'~~
-	['P12-RR-07-CUT', '370c61559dec4221a96588a69f9be2d1c673611134910c4789ed4f2f519d2d13'], // ~~'98b785fc6a9f4aea10f0d239af0cba9c09c3e1946ed72ecdcc087540c83933d5'~~
-	['P12-RR-08', 'e2bda999b474714fbc3d4a2abc71e90304779caf1a49bc98743930e8dfa25e56'], // ~~'f75d39f78401b56f1625cf1da4cb205c16569e431a5fa36c41effe347a09d00c'~~
-	['P12-RR-09', 'b319ad76de3756ee5fbdf06b05811507191adb95c9439ae1125db3daa23fb62d'], // ~~'b4db55740b7c0fa7b4e9a297feab4d6f2f6488fb7c8f86651de1bbd88f0302c8'~~
-	['P12-CSV-LS', 'f672f69554a9d5eec727b1d7fc2222ebbbd4c5c1a446f4d7176756494c857a5a'], // ~~'34e35990140cd82d7c447eb5a4a5d094494bfb843ab1305a7179804f2c1b22cf'~~
-	['P12-CSV-READ', '010860b53ddd483b76e422ddcff1bcce09780b08f38759f09eb383bf07ca11ff'], // ~~'7bbda17e215dd5cdfc1a10677377f22a6b38f8bc88f3f1a6b5e371ef8560a980'~~
-	['P12-CSV-COUNT', 'eb4fff584f812a231b004f54e3d0fca9c4b363a70853f48f0e251b013282a275'], // ~~'c4c9881d6d1d0ff06adc0b5440fe94392ee9b0b575118a9b10a897c50b9ca4fc'~~
-	['P12-CSV-COUNT-RR-07', 'c824dde5ea649739578eae14d27eee1b6431086301f74ba0cb8e0d4fc73bc222'], // ~~'076377fd8bb5e384be3c5196b23d937315560cf79ea306bd03412d1d6e6ff60c'~~
+	['P12-CLEAN', 'cad7dcbbdf0ca711d106ac62f9f34e29f78db9d25bdb4fc2a3b77dfb8c7ad075'], // ~~'66b4f2f0e17059ff2869c5c53dbf34de0f2408f529bb23bb6901cccbbb4a9ce5'~~ ~~'33fd9db369e27f8fc00ea4249349e695b69300426d9ace5d7ae4f9e23fecb130'~~
+	['P12-CLEAN-R1', '2ce557d0cf9c3912c3543c65d40deeebc723cfc70d2c57eb6783bca3c27ba22d'], // ~~'5b682d0cf0cdeac767eaccb9062d746fb28c2246dfce4437887e9a78bf75cd4a'~~ ~~'1cd63dd40d07a5875628114b65c3963ee5ae9db8b74e704847855c538676119f'~~
+	['P12-CLEAN-R2', '76b8db97bcb85cb6a7768396495dc4dce02bcfa0b1ca22cadaf61e66abf433b5'], // ~~'ee86f34aed2d60dc62aa69c54d0ea3429ec7f6c21beabc3dfd2e467a57ab355e'~~ ~~'aaac002eedd5296c66c73e5f7794c0a012428a547fbba181da426eb3fe8efdf7'~~
+	['P12-CLEAN-R3', 'd8c3afc1d56ecee53ab261757e039f95a04b07fc120e9442d1aaa2fe6bc93fa1'], // ~~'0e08a268e090afe0f1ac8efb579e6a9be8c8c0b0a4b38cc8b1793e4a80de82f3'~~ ~~'37717cfafa5316818a876382e6cf0eb28fe64180ba660cc926ab1a701e34e2f3'~~
+	['P12-RR-01', 'c53b84042140a478d626003191b7358071d392d1d1e592557f006285da3c53fe'], // ~~'aa8481b2e698e9c2205b21ecef12f64b2513076ecf7058c474da957f39d5f349'~~ ~~'e96c77b9e783f7bffb644cf7ccf67ebe4f2414d2a1d2f8a61a09086362d1f34a'~~
+	['P12-RR-02', '025163e12b518a6100dd47613e1e39ca3370d5221abab1409c0380102405ae7e'], // ~~'321592f5377c75b1181d760e1584c3c17b5a939753db82223cac0eb2092cae32'~~ ~~'56a938585cb26ecec6975e4f1f1743eb313974cfd3485fd91e8c39a3fa09d101'~~
+	['P12-RR-03', '662cf54c90db9b351b0f63e6c311905def295497465fcae0a8b77a561d70c70a'], // ~~'521ad81d77fc94e7e4d57d9b3fd2e87b900931dc919bdbab9ce54e866a2c2f45'~~ ~~'398c2e150ff86c24e10169b63396a66c4431dd6fd83589b9655a9880151f10a4'~~
+	['P12-RR-04', '7a605e8ab3865b79d38fb040e834e31d653135560086ce1364f8e77f3a75e432'], // ~~'3b2ecc3b304f263b898a70cd8e8c291e3a4b8894df6b79b4870acbce1091b716'~~ ~~'7eb2350b497dbcd3dd2fca51dedab4ff1de4420d243e4ecb383d6f9fa35b9500'~~
+	['P12-RR-05', '271943693d7f845cb2346a0105159604e65d1197f4daed2fae6d3128250984bd'], // ~~'3270f62a87a13ec1669b2b412bff499bc8288fdad598238f991d7548b7433029'~~ ~~'8a38381d9d216c7ba9700e6d509d77ad70396439f5bd354313f0d22f1f1ee545'~~
+	['P12-RR-06', 'fbeb9c60e4df30f942e3f33142b93f59c6e7c7b32fa622932d206e74267fadc5'], // ~~'e7c54e4b3176d93807b83f70bc020c64bcbcdcdab8c4ef356e8a39cc8401ee3a'~~ ~~'3dcae44f1e4135b425c33f115ccc7e58b8ca62e95d4031ee4dff0026bcb1a6d2'~~
+	['P12-RR-07', 'fc0ea137b81174b49162b238b71cb67ae818fc307093e16cc36c5afb301fa6b0'], // ~~'f3d85fc160f924867c41f7b40df5d0228e5fb04dcfed3b8e06d87807eb8b38d4'~~ ~~'50a0ec0fa505c614d22f2c253b1979de6769d6fd781b5368009e8d4d66bbf1e1'~~
+	['P12-RR-07-CUT', 'd13f4a51dc2b2b9c8dedecdaa880d46ce572c0906cca583727b03b5e9e3f8e7e'], // ~~'370c61559dec4221a96588a69f9be2d1c673611134910c4789ed4f2f519d2d13'~~ ~~'98b785fc6a9f4aea10f0d239af0cba9c09c3e1946ed72ecdcc087540c83933d5'~~
+	['P12-RR-08', '5de13246e24452848ac98e47356148a9fad3d5a26b1010b2a2bf21bcb07170ab'], // ~~'e2bda999b474714fbc3d4a2abc71e90304779caf1a49bc98743930e8dfa25e56'~~ ~~'f75d39f78401b56f1625cf1da4cb205c16569e431a5fa36c41effe347a09d00c'~~
+	['P12-RR-09', '0ab0bc535897c65b35b2893b98132d24ff87631630b09d476e0bf44b2aaa765a'], // ~~'b319ad76de3756ee5fbdf06b05811507191adb95c9439ae1125db3daa23fb62d'~~ ~~'b4db55740b7c0fa7b4e9a297feab4d6f2f6488fb7c8f86651de1bbd88f0302c8'~~
+	['P12-CSV-LS', 'c248105ad58e7b3b9ae9e0089162fa0b767522fdb86ef7775581d69f21ddcf1b'], // ~~'f672f69554a9d5eec727b1d7fc2222ebbbd4c5c1a446f4d7176756494c857a5a'~~ ~~'34e35990140cd82d7c447eb5a4a5d094494bfb843ab1305a7179804f2c1b22cf'~~
+	['P12-CSV-READ', 'e2ce6915b6e62fcc0872b608107cd5ef351b7fecd12008242e7c27fc41292c13'], // ~~'010860b53ddd483b76e422ddcff1bcce09780b08f38759f09eb383bf07ca11ff'~~ ~~'7bbda17e215dd5cdfc1a10677377f22a6b38f8bc88f3f1a6b5e371ef8560a980'~~
+	['P12-CSV-COUNT', '5aaa4ab8e8ba4a9849ee825973b5e6f6be11add934b2b120a9c62d06eff4abed'], // ~~'eb4fff584f812a231b004f54e3d0fca9c4b363a70853f48f0e251b013282a275'~~ ~~'c4c9881d6d1d0ff06adc0b5440fe94392ee9b0b575118a9b10a897c50b9ca4fc'~~
+	['P12-CSV-COUNT-RR-07', '67158c13b57c9d3edda65ed59bdd2216a83f487307e1b4cfae7fc186caf250cf'], // ~~'c824dde5ea649739578eae14d27eee1b6431086301f74ba0cb8e0d4fc73bc222'~~ ~~'076377fd8bb5e384be3c5196b23d937315560cf79ea306bd03412d1d6e6ff60c'~~
 	['D12-RC-CLEAN', 'd41e38c1a94d43782898a54f231f70bda6151e8eb3e90f5b02efb2eedc3730d2'],
 	['D12-RC-04', '1ef00bd5e9d345963c8d3e4efba0ccbea534bb0908b108363216db58f8ea2c90'],
 	['D12-IP-CLEAN', 'a5a11fddcf2bb676e929156d6397051e554f49009febd8050ca059a4a69448dc'],

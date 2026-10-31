@@ -500,9 +500,12 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint MOVES on each component
 			validator: (print) =>
 				PRODUCT_SEAMS.validator((p) =>
 					print(
+						// ⛔ MOVED 2026-10-31 (the lead's ruling on X1's item 6, D30's line shortened to at most 245 code units) —
+						// ~~'each criterion below is judged of what the account says about THIS command'~~ -> ~~'… about THIS
+						// COMMAND'~~, the first wording's: the changed text is the shortened line's own.
 						p.replace(
-							'each criterion below is judged of what the account says about THIS command',
-							'each criterion below is judged of what the account says about THIS COMMAND'
+							'Each criterion below is judged of what the account says of THIS command',
+							'Each criterion below is judged of what the account says of THIS COMMAND'
 						)
 					)
 				)

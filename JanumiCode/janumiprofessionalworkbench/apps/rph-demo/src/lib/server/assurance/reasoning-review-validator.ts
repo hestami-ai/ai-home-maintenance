@@ -255,19 +255,32 @@ export const PROCESS_RESULT_ACCOUNT_HEADING =
  * below the scope sentence, and the narrowed question reached one row and not the next. So the command framing says, on its
  * own line immediately before D8's first line, what each criterion below is judged of here — what the account says about THIS
  * command — and that this command doing less of the instruction than it asks, or other than it asks, supports no finding here
- * either way; the review of the unit's finished work judges that (`REG-D-136` (2)).
+ * ~~either way~~; the review of the unit's finished work judges that (`REG-D-136` (2)).
  * ⭑ It edits no label, so RR-01's label still cannot change per framing (`REG-F-486`; ASR-4: a framing changes how the review
  * is CONDUCTED, never what the policy means); its precedent is `declaredPolicyLine`, a host line saying how D8's lines are read
  * in one framing without editing them. ⭑ Not edited: the preamble, the labels, D8's lines, the symmetric clause, the intent, the
  * scope sentence and the account's heading, whose "such a statement the result does not bear out is itself a finding" stays in
  * force for whichever criterion a false statement fails. ⭑ It names no criterion id and no disposition value (`REG-D-090`), and
- * asks for no finding (`REG-D-105` (2)). ⚠ The design's illustrative wording, kept as written; untested until the paid
+ * asks for no finding (`REG-D-105` (2)). ⚠ ~~The design's illustrative wording, kept as written~~; untested until the paid
  * measurement (D38).
+ * ⛔ MOVED 2026-10-31 (the lead's ruling on X1's item 6) — ~~"In this review each criterion below is judged of what the account
+ * says about THIS command: what it ran, what its result shows and what that means. That this command does less of the
+ * instruction than it asks, or other than it asks, supports no finding here either way; the review of the unit's finished work
+ * judges that."~~ — the design's illustrative wording, 319 UTF-16 code units. With its line feed it left the worst command
+ * review in production's shape (32 calls the host did not mint, the instruction, rubric and account past their limits) 3,927
+ * of room for its view, under `CONTENT_MIN`, so that review's prompt passed `PROMPT_BUDGET` by 73. The guard that no input in
+ * production's shape reaches `CONTENT_MIN` stands (`verif/reviewer-qualification-fingerprint.test.ts`), and `PROMPT_BUDGET`
+ * does not move; design §10.2 left the wording "for the build and the pre-check to settle". ⭐ So the line is at most 245 code
+ * units, its line feed excluded (this one, 242), and keeps its three parts: each criterion below is judged of what the account
+ * says of THIS command — what it ran, what its result shows, what that means; that it does less or other than the instruction
+ * asks supports no finding here; the finished-work review judges that. ⭑ Still no criterion id, no disposition value, and no
+ * finding asked for. ⭑ The lead's candidate ("Judge each criterion below only by what the account says of THIS command …",
+ * 243) was measured and not taken: it makes the account's words the measure ("by"), where the ruling's first part makes them
+ * what is judged ("of"), and "only" could be read to set aside the result the account is judged against.
  */
 export const PROCESS_RESULT_CRITERIA_LINE =
-	'In this review each criterion below is judged of what the account says about THIS command: what it ran, what its result ' +
-	'shows and what that means. That this command does less of the instruction than it asks, or other than it asks, supports ' +
-	"no finding here either way; the review of the unit's finished work judges that.";
+	'Each criterion below is judged of what the account says of THIS command: what it ran, what its result shows, what that ' +
+	'means. That it does less or other than the instruction asks supports no finding here; the finished-work review judges that.';
 
 /**
  * ⭐⭐ `JAN-EXEC` Phase 7, package X — D32 (`REG-D-140`; `REG-F-555`, `REG-F-589`; design §10.4, D32, revision 5: the lead's
