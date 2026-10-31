@@ -740,8 +740,12 @@ export interface PairingRow {
  * 5: *"P6 again's report counts each at-bound no-response under D34's label, and whether its retry answered"*) — THE CALLS THAT
  * TIMED OUT: how many threw with no reply at or past their tool's bound, as their records say (`thrownAgainstTheBound`) — D34's
  * label, `timed-out` (`REG-F-590`) — and how many of those were run once more by a call that ANSWERED: their `RETRY`, the call
- * after them, whose reply arrived and was read (no `NO_RESPONSE`, and no reply the tool cut at the output-token limit, from
- * which nothing is judged). ⭐ THE LEAD'S RULING (2026-10-31): the report reads a review by how it ENDED, and still counts here
+ * after them, whose reply arrived and was read ~~(no `NO_RESPONSE`, and no reply the tool cut at the output-token limit, from
+ * which nothing is judged)~~ ⛔ MOVED 2026-10-31 (the X-2 fix; the independent check of X-2: a retry a model other than the one
+ * configured answered, its reply refused unread, passed both of those tests and was counted as one that answered): its parse
+ * was ATTEMPTED — never `NOT_ATTEMPTED`, the outcome the validator writes on a call with no reply, on a reply the tool cut at
+ * the output-token limit and on one refused unread for the model that gave it (a substitute): from none of them is anything
+ * judged. ⭐ THE LEAD'S RULING (2026-10-31): the report reads a review by how it ENDED, and still counts here
  * a timeout its retry recovered, which no label of its review shows. ⚠ A timed-out call that was itself the retry has no
  * further call, nor has one a run made before X-2 let stand: each is counted, its retry not answered.
  */
@@ -1815,13 +1819,12 @@ function thrownOf(sorted: readonly StoredObject[]): NonNullable<Conclusion['thro
 function timedOutOf(sorted: readonly StoredObject[]): TimedOutCalls | undefined {
 	const timeouts = sorted.filter((x) => str(x.state.disposition) === 'NO_RESPONSE' && thrownAgainstTheBound(sorted, x) === 'at');
 	if (timeouts.length === 0) return undefined;
+	// ⛔ MOVED 2026-10-31 (the X-2 fix) — ~~`str(retry?.state.disposition) !== 'NO_RESPONSE' && outputLimitOf(retry?.state) ===
+	// undefined`~~: a substitute's reply, refused unread (`REJECTED`, `NOT_ATTEMPTED`), passed both. A reply that was READ is one
+	// whose parse was attempted (`TimedOutCalls`): the one test answers for a call with no reply, a cut and a substitute alike.
 	const answeredRetry = (x: StoredObject): boolean => {
 		const retry = sorted[sorted.indexOf(x) + 1];
-		return (
-			str(retry?.state.exchangeRole) === 'RETRY' &&
-			str(retry?.state.disposition) !== 'NO_RESPONSE' &&
-			outputLimitOf(retry?.state) === undefined
-		);
+		return str(retry?.state.exchangeRole) === 'RETRY' && str(rec(retry?.state.parseOutcome).outcome) !== 'NOT_ATTEMPTED';
 	};
 	return { calls: timeouts.length, retryAnswered: timeouts.filter(answeredRetry).length };
 }
@@ -3378,7 +3381,16 @@ function idsOfUnconcluded(r: PairingRow): string[] {
 	// ⭐⭐ Package X-2 — D36 (`REG-D-141` (2); THE LEAD'S RULING OF 2026-10-31: the report reads a review by how it ENDED, and cites
 	// every kind of failure among its calls) — a review that ended on a retry thrown SHORT of the bound, after a call thrown at or
 	// past it, reads no-response and cites `REG-F-499` — and `REG-F-590` too, for a call of it timed out.
-	if (r.label === 'no-response' && (r.thrown?.atTheBound ?? 0) > 0) ids.push('REG-F-590');
+	// ⛔ MOVED 2026-10-31 (the X-2 fix; the independent check of X-2, problem 1) — ~~`if (r.label === 'no-response' &&
+	// (r.thrown?.atTheBound ?? 0) > 0)`~~: keyed on the no-response ending alone, so a review that timed out, was run once more and
+	// then ended any OTHER way — its retry cut at the output limit, answered by a substitute, unreadable after its repair,
+	// answering no criterion or leaving one without a row, or its record ending on a call that concludes nothing — cited that
+	// ending's finding alone. Now every ending but `timed-out`, which cites `REG-F-590` as its own (below), cites it wherever a
+	// call of the review timed out (`TimedOutCalls`); a no-response review reads as it did. ⚠ NOT BUILT: whether "every kind"
+	// reaches a failure of ANOTHER kind the review did not end on — a cut before a timeout (`REG-F-563`), a throw short of the
+	// bound before a cut or a refusal (`REG-F-499`) — is the lead's to rule (the check's S2); each is cited where the review ended
+	// on it, and a short throw where the review ended timed-out (below).
+	if (r.label !== 'timed-out' && (r.timedOut?.calls ?? 0) > 0) ids.push('REG-F-590');
 	// ⭐⭐ Package X — D34 (`REG-F-590`; design §10.5) — a review that ended on a call thrown at or past its tool's bound is
 	// `REG-F-590`'s, the timeout's own finding: never `REG-F-499`, the finding for a failure short of the bound — save where
 	// another of its calls threw short of it (the call its retry repeated), which keeps `REG-F-499` beside it. ~~⚠ Under today's

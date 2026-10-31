@@ -77,8 +77,9 @@ import {
 } from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
 import { createExchangeSink } from '../apps/rph-demo/src/lib/server/assurance/exchange-capture.js';
 import { mintIdsFor, toRecordModelExchange } from '../apps/rph-demo/src/lib/server/assurance/exchange-recorder.js';
-// ⭐ P5 package A (F1) — the detail the validator writes on a reply the tool ended at the model's output-token limit.
-import { outputLimitDetail } from '../apps/rph-demo/src/lib/server/tools/output-limit.js';
+// ⭐ P5 package A (F1) — the detail the validator writes on a reply the tool ended at the model's output-token limit;
+// ⭐ (the X-2 fix) and the class the adapter throws for one, which the D34 cases' `print` throws to make such a record.
+import { outputLimitDetail, OutputLimitReached } from '../apps/rph-demo/src/lib/server/tools/output-limit.js';
 // ⭐ P5 package B's check (finding 2) — the builder of a declared review's input, whose prompts the report's reader reads.
 import { declaredPolicyReviewInput } from '../apps/rph-demo/src/lib/server/assurance/review-input.js';
 import {
@@ -3014,25 +3015,45 @@ describe('⭐⭐ package X — D34 — a review that ended on a call thrown at o
 			return new Date(T0 + at).toISOString();
 		};
 	/**
+	 * ⭐ The X-2 fix (the independent check of X-2, 2026-10-31) — a reply a model OTHER than the one configured gave, as devin's
+	 * export names it: the product's devin branch refuses it unread (`requireReportedModel`; `JAN-SELREV` D6).
+	 */
+	interface Substituted {
+		readonly substitutedBy: string;
+		readonly text: string;
+	}
+	/**
 	 * One review's calls as the validator records them under `bound` (none when undefined), its clock at `offsets`, its `print`
-	 * giving each of `replies` in turn — an `Error` is a call that got no reply — each record projected as the floor stores it.
+	 * giving each of `replies` in turn — an `Error` is a call that got no reply (⭐ an `OutputLimitReached`, a reply the tool cut
+	 * at the model's output-token limit) — each record projected as the floor stores it. ⭐ The X-2 fix: a `Substituted` reply is
+	 * one a substitute gave, and a chain holding one is made under the devin branch's identity check; every other chain is made
+	 * as before.
 	 */
 	const chainOf = async (
 		bound: number | undefined,
 		offsets: readonly number[],
-		...replies: (string | Error)[]
+		...replies: (string | Error | Substituted)[]
 	): Promise<StoredObject[]> => {
 		reads = 0;
 		let n = 0;
 		const print: AgyPrint = async () => {
 			const r = replies[n++] ?? '';
 			if (r instanceof Error) throw r;
-			return r;
+			if (typeof r === 'string') return r;
+			return {
+				answer: { arrived: true, text: r.text },
+				rawOutput: r.text,
+				producer: { agentId: 'devin', modelId: r.substitutedBy, providerId: 'devin' },
+				identityEvidence: 'PROVIDER_REPORTED',
+				observedToolCalls: { canObserve: false, reason: 'fixture' }
+			};
 		};
+		const identity = replies.some((r) => typeof r !== 'string' && !(r instanceof Error));
 		const exchanges = createExchangeSink();
 		await createAgyReasoningReviewValidator({
 			print,
 			modelId: 'fixture-judge',
+			...(identity ? { agentId: 'devin', providerId: 'devin', requireReportedModel: true } : {}),
 			exchanges,
 			clock: clockAt(...offsets),
 			...(bound === undefined ? {} : { callBoundMs: bound })
@@ -3074,11 +3095,23 @@ describe('⭐⭐ package X — D34 — a review that ended on a call thrown at o
 				},
 				ids
 			);
-			const state = { exchangeRole: p.exchangeRole, disposition: p.disposition, attemptOrdinal: p.attemptOrdinal, runToken: p.runToken, parseOutcome: p.parseOutcome };
+			// ⭐ The X-2 fix — and E-4's output truncation, as the floor stores it (`outputLimitOf` reads it beside E-5's marker):
+			// ⛔ dropped here before, so no chain could hold a reply the tool cut (the check of X-2, problem 2).
+			const state = {
+				exchangeRole: p.exchangeRole,
+				disposition: p.disposition,
+				attemptOrdinal: p.attemptOrdinal,
+				runToken: p.runToken,
+				parseOutcome: p.parseOutcome,
+				...(p.outputTruncation === undefined ? {} : { outputTruncation: p.outputTruncation })
+			};
 			return exchange(state, `mex_${p.exchangeRole}_${p.attemptOrdinal}_run_1`);
 		});
 	};
-	/** A chain's records as `aRun` takes a review's calls: each its role, disposition, ordinal, parse outcome and E-5 detail. */
+	/**
+	 * A chain's records as `aRun` takes a review's calls: each its role, disposition, ordinal, parse outcome and E-5 detail —
+	 * ⭐ (the X-2 fix) and its output truncation, where its record carries one.
+	 */
 	const asCalls = (chain: readonly StoredObject[]): Call[] =>
 		chain.map((x) => {
 			const parse = x.state.parseOutcome as { outcome?: unknown; detail?: unknown };
@@ -3087,7 +3120,8 @@ describe('⭐⭐ package X — D34 — a review that ended on a call thrown at o
 				disposition: String(x.state.disposition),
 				ordinal: Number(x.state.attemptOrdinal),
 				parse: String(parse.outcome),
-				detail: String(parse.detail)
+				detail: String(parse.detail),
+				...(x.state.outputTruncation === undefined ? {} : { outputTruncation: String(x.state.outputTruncation) })
 			};
 		});
 	const FAILURE = new Error('devin invocation failed: Command failed: devin --print (fixture)');
@@ -3289,6 +3323,192 @@ describe('⭐⭐ package X — D34 — a review that ended on a call thrown at o
 			'no-response',
 			'its INITIAL call threw short of its tool’s bound, and its one further call is not in the record'
 		]);
+	});
+
+	// ── ⭐⭐ `JAN-EXEC` Phase 7, package X-2 — THE X-2 FIX (the independent check of package X-2, 2026-10-31) ──────────────────
+	// PROBLEM 1. The lead's ruling — the report reads a review by how it ENDED, and cites every kind of failure among its calls —
+	// was built for the no-response ending alone: a review whose call timed out, was run once more and then ended any OTHER way
+	// cited that ending's finding alone, REG-F-590 nowhere, though the run's count line counted its timeout. Each shape below is
+	// the validator's own, made under the product's devin bound, as the cases above are; each was red before the fix.
+	// ⚠ NOT RULED, SO NOT PINNED: a failure of ANOTHER kind the review did not end on — a cut at the output limit before a
+	// timeout (`REG-F-563`), a throw short of the bound before a cut or a refusal (`REG-F-499`) — is the lead's to rule (the
+	// check's S2); no test here holds it either way.
+	// PROBLEM 2. The run's count of timeouts, D36's only measurement in P6 again, had no test that could tell its two figures
+	// apart: its only run-level pins were {1, 1} and {0, 0}. ⭐ And a retry answered by a substitute, its reply refused unread,
+	// was counted as one that ANSWERED, against `TimedOutCalls`' own words, "whose reply arrived and was read" (the check's
+	// scratch 2). ──
+	/** A reply the tool cut at the model's output-token limit, as devin's adapter throws one. */
+	const cutAtTheLimit = () =>
+		new OutputLimitReached('devin invocation failed: output limit (fixture)', {
+			facts: { outputTokens: 25_000 },
+			partialReply: '{"findings": [',
+			observedToolCalls: { canObserve: false, reason: 'fixture' }
+		});
+	/** A reply no JSON can be read from. */
+	const UNREADABLE = 'I will read the work product first.';
+	/** A reply that parses and answers no criterion — `REG-F-552`'s shape, which draws I5's repair. */
+	const NO_CRITERION = '{"findings":[],"recommendation":"SATISFIED"}';
+	/** A reply that faults nothing and files its last criterion's row under an id the policy does not declare — D13's repair. */
+	const ROW_LEFT_OUT = JSON.stringify({
+		findings: SEEDED_REASONING_REVIEW_CRITERIA.map((c, i, all) => ({
+			criterionId: i === all.length - 1 ? `${c.id}-scope` : c.id,
+			failed: false,
+			statement: 'met'
+		})),
+		recommendation: 'SATISFIED'
+	});
+	/** A reply answering every criterion, met — given by a model other than the one configured. */
+	const SUBSTITUTED: Substituted = { substitutedBy: 'substituted-model', text: ANSWERED };
+	/** A review whose first call threw after `firstMs` and was run once more, each later call 100 ms long. */
+	const chainAfter = (firstMs: number, ...replies: (string | Error | Substituted)[]) =>
+		chainOf(BOUND, [0, firstMs, firstMs + 100, firstMs + 200, firstMs + 300, firstMs + 400], ...replies);
+	const shapeOf = (chain: readonly StoredObject[]) => chain.map((x) => `${x.state.exchangeRole}:${x.state.disposition}`);
+	const stageFourOf = (chain: readonly StoredObject[]) => shown(cellOf(reportOf(aRun({ design: { review: asCalls(chain) } })).report, '4', 'design'));
+
+	it('⛔ PREDICTED RED (the X-2 fix, problem 1) — a call thrown AT the bound whose retry was CUT at the output limit: output-limit, citing REG-F-563 — and REG-F-590 too', async () => {
+		const chain = await chainAfter(BOUND, FAILURE, cutAtTheLimit());
+		expect(shapeOf(chain), 'arrangement: thrown at the bound, run once more, cut').toEqual(['INITIAL:NO_RESPONSE', 'RETRY:REJECTED']);
+		const p = pairReview('art_1', 1, chain);
+		expect([p.label, p.timedOut]).toEqual(['output-limit', { calls: 1, retryAnswered: 0 }]);
+		// ⛔ THE MUTANT: REG-F-590 keyed on the no-response ending again — the cut's finding alone.
+		expect(stageFourOf(chain), 'a review that timed out, then was cut').toEqual(['broke', ['REG-F-563', 'REG-F-590']]);
+		const command = reportOf(aRun({ implementation: { commands: 1, commandReview: asCalls(chain) } })).report;
+		expect(shown(cellOf(command, '4', 'implementation')), 'a command review that timed out, then was cut').toEqual([
+			'broke',
+			['REG-F-520', 'REG-F-563', 'REG-F-590']
+		]);
+	});
+
+	it('⛔ PREDICTED RED (the X-2 fix, problem 1) — a call thrown AT the bound whose retry’s reply could not be read, nor its repair’s: refused, citing the failed repair’s three — and REG-F-590 too', async () => {
+		const chain = await chainAfter(BOUND, FAILURE, UNREADABLE, UNREADABLE);
+		expect(shapeOf(chain), 'arrangement: thrown at the bound, run once more, unreadable, its JSON repair unreadable').toEqual([
+			'INITIAL:NO_RESPONSE',
+			'RETRY:REPAIR_REQUESTED',
+			'REPAIR:REJECTED'
+		]);
+		const p = pairReview('art_1', 1, chain);
+		expect([p.label, p.refusal, p.timedOut]).toEqual(['refused', 'failed-repair', { calls: 1, retryAnswered: 1 }]);
+		expect(stageFourOf(chain), 'a review that timed out, then failed its repair').toEqual(['broke', ['REG-F-428', 'REG-F-479', 'REG-F-489', 'REG-F-590']]);
+	});
+
+	it('⛔ PREDICTED RED (the X-2 fix, problem 1) — a call thrown AT the bound whose retry answered no criterion, nor its repair: no-criterion-answered, citing REG-F-552 — and REG-F-590 too', async () => {
+		const chain = await chainAfter(BOUND, FAILURE, NO_CRITERION, NO_CRITERION);
+		expect(shapeOf(chain), 'arrangement: thrown at the bound, run once more, no criterion, its I5 repair none').toEqual([
+			'INITIAL:NO_RESPONSE',
+			'RETRY:REPAIR_REQUESTED',
+			'REPAIR:REJECTED'
+		]);
+		const p = pairReview('art_1', 1, chain);
+		expect([p.label, p.concludedBy, p.timedOut]).toEqual(['no-criterion-answered', 'mex_RETRY_2_run_1', { calls: 1, retryAnswered: 1 }]);
+		expect(stageFourOf(chain), 'a review that timed out, then answered no criterion').toEqual(['broke', ['REG-F-552', 'REG-F-590']]);
+	});
+
+	it('⛔ PREDICTED RED (the X-2 fix, problem 1) — a call thrown AT the bound whose retry left a criterion without a row, and its repair again: criterion-left-without-row, citing REG-F-566 — and REG-F-590 too', async () => {
+		const chain = await chainAfter(BOUND, FAILURE, ROW_LEFT_OUT, ROW_LEFT_OUT);
+		expect(shapeOf(chain), 'arrangement: thrown at the bound, run once more, a row left out, its D13 repair again').toEqual([
+			'INITIAL:NO_RESPONSE',
+			'RETRY:REPAIR_REQUESTED',
+			'REPAIR:REJECTED'
+		]);
+		const p = pairReview('art_1', 1, chain);
+		expect([p.label, p.concludedBy, p.timedOut]).toEqual(['criterion-left-without-row', 'mex_RETRY_2_run_1', { calls: 1, retryAnswered: 1 }]);
+		expect(stageFourOf(chain), 'a review that timed out, then left a criterion without a row').toEqual(['broke', ['REG-F-566', 'REG-F-590']]);
+	});
+
+	it('⛔ PREDICTED RED (the X-2 fix, problem 1) — a call thrown AT the bound whose retry a SUBSTITUTE answered: refused, and REG-F-590 cited — ⛔ before, a break no register entry named', async () => {
+		const chain = await chainAfter(BOUND, FAILURE, SUBSTITUTED);
+		expect(shapeOf(chain), 'arrangement: thrown at the bound, run once more, answered by a substitute').toEqual(['INITIAL:NO_RESPONSE', 'RETRY:REJECTED']);
+		const p = pairReview('art_1', 1, chain);
+		expect([p.label, p.refusal, p.concludedBy]).toEqual(['refused', 'substitute', 'mex_RETRY_2_run_1']);
+		expect(stageFourOf(chain), 'a review that timed out, then was answered by a substitute').toEqual(['broke', ['REG-F-590']]);
+	});
+
+	it('⛔ PREDICTED RED (the X-2 fix, problem 1) — a call thrown AT the bound whose retry asked for a repair the record does not hold: no answer recorded, citing REG-F-525 — and REG-F-590 too', async () => {
+		const [timeout, retry] = await chainAfter(BOUND, FAILURE, UNREADABLE, UNREADABLE);
+		// The JSON repair's own record not in the store (`REG-F-338`'s rule): the record ends on the reply that asked for it.
+		const chain = [timeout!, retry!];
+		expect(shapeOf(chain), 'arrangement: thrown at the bound, run once more, the repair’s record missing').toEqual(['INITIAL:NO_RESPONSE', 'RETRY:REPAIR_REQUESTED']);
+		const p = pairReview('art_1', 1, chain);
+		expect([p.label, p.timedOut]).toEqual(['no-answer-recorded', { calls: 1, retryAnswered: 1 }]);
+		expect(stageFourOf(chain), 'a review that timed out, its record ending on a call that concludes nothing').toEqual(['broke', ['REG-F-525', 'REG-F-590']]);
+	});
+
+	it('⭑ CONTROL (the X-2 fix, problem 1) — each of those endings after a call thrown SHORT of the bound, its twin: the same label, no timeout counted, and no REG-F-590', async () => {
+		const twins: readonly (readonly [string, readonly (string | Error | Substituted)[], string, number?])[] = [
+			['a retry cut at the output limit', [FAILURE, cutAtTheLimit()], 'output-limit'],
+			['a retry unreadable, and its repair', [FAILURE, UNREADABLE, UNREADABLE], 'refused'],
+			['a retry answering no criterion, and its repair none', [FAILURE, NO_CRITERION, NO_CRITERION], 'no-criterion-answered'],
+			['a retry leaving a criterion without a row, and its repair again', [FAILURE, ROW_LEFT_OUT, ROW_LEFT_OUT], 'criterion-left-without-row'],
+			['a retry answered by a substitute', [FAILURE, SUBSTITUTED], 'refused'],
+			['a retry whose repair’s record is missing', [FAILURE, UNREADABLE, UNREADABLE], 'no-answer-recorded', 2]
+		];
+		for (const [ending, replies, label, kept] of twins) {
+			const chain = (await chainAfter(5_000, ...replies)).slice(0, kept);
+			const p = pairReview('art_1', 1, chain);
+			expect([p.label, p.timedOut], ending).toEqual([label, undefined]);
+			expect(stageFourOf(chain)[1], ending).not.toContain('REG-F-590');
+		}
+	});
+
+	it('⛔ PREDICTED RED (the X-2 fix, problem 2) — a timeout whose retry a SUBSTITUTE answered is counted, its retry NOT answered: its reply was refused unread', async () => {
+		const chain = await chainAfter(BOUND, FAILURE, SUBSTITUTED);
+		expect(String((chain[1]!.state.parseOutcome as { outcome?: unknown }).outcome), 'arrangement: the substitute’s reply was not read').toBe('NOT_ATTEMPTED');
+		// ⛔ THE MUTANT: the rule before the fix — a reply that arrived counted as answered, whoever gave it.
+		expect(pairReview('art_1', 1, chain).timedOut, 'a reply refused unread counted as a retry that answered').toEqual({ calls: 1, retryAnswered: 0 });
+		const r = reportOf(aRun({ design: { review: asCalls(chain) } })).report;
+		expect(r.pairing.timedOut).toEqual({ calls: 1, retryAnswered: 0 });
+		expect(renderMarkdown(r)).toContain(
+			'- Calls timed out — thrown with no reply at or past their tool’s bound (D34; REG-F-590): 1, of which run once more by a ' +
+				'call that answered (REG-D-141 (2)): 0.'
+		);
+	});
+
+	it('⛔ PREDICTED RED (the X-2 fix, problem 2; red by its own mutants) — the run’s count: each review’s timeouts and its retries that answered, summed over the run, and both figures printed', async () => {
+		// Three reviews in one run, each the validator's own: the design's work product timed out and its retry answered; the
+		// design's command timed out and its retry was cut at the output limit (a reply arrived, and was not read); the
+		// implementation's work product timed out twice — its retry, itself the one further call, has none.
+		const answered = await chainAfter(BOUND, FAILURE, ANSWERED);
+		const cut = await chainAfter(BOUND, FAILURE, cutAtTheLimit());
+		const twice = await chainOf(BOUND, [0, BOUND, BOUND + 100, 2 * BOUND + 100], FAILURE, FAILURE);
+		expect([shapeOf(answered), shapeOf(cut), shapeOf(twice)], 'arrangement').toEqual([
+			['INITIAL:NO_RESPONSE', 'RETRY:ACCEPTED'],
+			['INITIAL:NO_RESPONSE', 'RETRY:REJECTED'],
+			['INITIAL:NO_RESPONSE', 'RETRY:NO_RESPONSE']
+		]);
+		const r = reportOf(
+			aRun({
+				design: { review: asCalls(answered), commands: 1, commandReview: asCalls(cut) },
+				implementation: { review: asCalls(twice) }
+			})
+		).report;
+		const countOf = (subject: string) => r.pairing.rows.find((x) => x.subjectId === subject)?.timedOut;
+		// ⛔ THE MUTANTS: a retry whose reply was not read counted as one that answered; a timed-out retry, which has no further
+		// call, read as answered.
+		expect([countOf('art_design'), countOf('evd_design_1'), countOf('art_implementation')], 'each review’s own count').toEqual([
+			{ calls: 1, retryAnswered: 1 },
+			{ calls: 1, retryAnswered: 0 },
+			{ calls: 2, retryAnswered: 0 }
+		]);
+		// ⛔ THE MUTANTS: the run's answered retries summed from its timeouts, or its timeouts from its answered retries.
+		expect(r.pairing.timedOut, 'the run’s count').toEqual({ calls: 4, retryAnswered: 1 });
+		// ⛔ THE MUTANTS: either figure printed where the other belongs.
+		expect(renderMarkdown(r)).toContain(
+			'- Calls timed out — thrown with no reply at or past their tool’s bound (D34; REG-F-590): 4, of which run once more by a ' +
+				'call that answered (REG-D-141 (2)): 1.'
+		);
+		// ⭐ And a run recorded before X-2, whose timeout the run let stand: counted, its retry not answered (`TimedOutCalls`).
+		const beforeX2 = [
+			call('INITIAL', 'NO_RESPONSE', 1, {
+				parse: 'NOT_ATTEMPTED',
+				detail:
+					`The reviewing tool’s call failed after ${BOUND} ms with no reply, at or past the tool’s ${BOUND} ms bound — a timeout, ` +
+					'which is not run again. What the tool reported, sanitised: reasoning-review backing tool invocation failed: (fixture)'
+			})
+		];
+		expect(reportOf(aRun({ design: { review: asCalls(beforeX2) } })).report.pairing.timedOut, 'a run made before X-2').toEqual({
+			calls: 1,
+			retryAnswered: 0
+		});
 	});
 });
 
