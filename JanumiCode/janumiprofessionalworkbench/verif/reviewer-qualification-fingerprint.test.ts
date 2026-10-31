@@ -95,6 +95,7 @@ import ts from 'typescript';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
 	deliverableFileLine,
+	deliverableMarked,
 	missingCriterionRepairInstruction,
 	OBSERVATION_HEADING,
 	processResultContentBudget,
@@ -520,7 +521,7 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint MOVES on each component
 		expect(await movedNow(seams), 'the case prompts of the current set that move').toEqual(CURRENT_PROCESS_RESULTS);
 	});
 
-	it('⭐⭐ package X (D32) — a PROMPT BRANCH, the account’s heading in a finished work’s review: the probes move — exactly the five work-product probes shown a deliverable, empty or not — and of the case prompts exactly the current set’s 26 work-product cases’; no P-, D- or T- probe', async () => {
+	it('⭐⭐ package X (D32) — a PROMPT BRANCH, the account’s heading in a finished work’s review: the probes move — exactly the ~~five~~ ⭐ six (D31: W-RERUN-MARKED) work-product probes shown a deliverable, empty or not — and of the case prompts exactly the current set’s 26 work-product cases’; no P-, D- or T- probe', async () => {
 		const seams: FingerprintSeams = {
 			...PRODUCT_SEAMS,
 			validator: (print) =>
@@ -539,18 +540,47 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint MOVES on each component
 			const input = x.input(PRODUCT_SEAMS.criteria, PRODUCT_SEAMS.processResult);
 			return input.framing === 'WORK_PRODUCT' && input.deliverable !== undefined;
 		}).map((x) => x.id);
-		expect(shownADeliverable, 'arrangement: the five work-product probes shown a deliverable').toEqual([
+		// ⛔ MOVED 2026-10-31 (`JAN-EXEC` Phase 7, package X, stage X2 — D31; design §10.3: "a new `W-RERUN-MARKED` takes the marked
+		// branch") — ~~'the five work-product probes shown a deliverable' … 'W-RERUN-NO-FILE']~~: the marked re-run's probe is shown
+		// one too, so D32's heading reaches six; the five are as they were.
+		expect(shownADeliverable, 'arrangement: the six work-product probes shown a deliverable').toEqual([
 			'W-DELIVERABLE',
 			'W-OVERSIZE-DELIVERABLE',
 			'W-OVERSIZE-FILE-LIST',
 			'W-RERUN-DELIVERABLE',
-			'W-RERUN-NO-FILE'
+			'W-RERUN-NO-FILE',
+			'W-RERUN-MARKED'
 		]);
 		expect(movedProbes(fp), 'the probes that move').toEqual(shownADeliverable);
 		expect(fp.casePrompts, 'no case of v1 is shown a deliverable').toEqual(BASE.casePrompts);
 		expect(CURRENT_WORK_PRODUCTS, 'the arrangement: the current set holds the 26').toHaveLength(26);
 		expect(await movedNow(seams), 'the case prompts of the current set that move').toEqual(CURRENT_WORK_PRODUCTS);
 	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package X — D31 (`REG-D-140`; `REG-F-589`; design §10.3 and §10.6, revision 5: "a new `W-RERUN-MARKED`
+	// takes the marked branch, a file of each mark among its files, so the fingerprint hashes the marks") — A THIRD NEW PROMPT
+	// BRANCH, the marks of a work re-run's view: the clause its heading gains and the mark on each file's line, each held to the
+	// one probe that takes it and to the case prompts it reaches — none, since no case of case set v12 carries a mark (D38: the
+	// re-cast pair takes its marks in case set v13). ⛔ RED BEFORE THE BUILD: no prompt held a mark, so a change to one moved nothing.
+	for (const [what, from, to] of [
+		[
+			'the clause the marked heading gains',
+			'Beside each path, the host says what this step did to that file',
+			'Beside each path, the host says what THIS step did to that file'
+		],
+		['the mark on a file’s line', ' — the same as when this step began:', ' — the same as when THIS step began:']
+	] as const)
+		it(`⭐⭐ package X (D31) — a PROMPT BRANCH, ${what}: the probes move — exactly W-RERUN-MARKED, the one probe whose view carries marks — and no case prompt, of v1 or of the current set`, async () => {
+			const seams: FingerprintSeams = {
+				...PRODUCT_SEAMS,
+				validator: (print) => PRODUCT_SEAMS.validator((p) => print(p.replace(from, to)))
+			};
+			const fp = await reviewerFingerprint(CASES, seams);
+			onlyMoved(fp, ['probes']);
+			expect(movedProbes(fp), 'the probes that move').toEqual(['W-RERUN-MARKED']);
+			expect(fp.casePrompts, 'no case of v1 carries a mark').toEqual(BASE.casePrompts);
+			expect(await movedNow(seams), 'the case prompts of the current set that move').toEqual([]);
+		});
 
 	// ⭐⭐ The review in parts, B7 (`REG-D-125`; DESIGN-authoring-review-in-parts.md §5: "A change confined to that framing must
 	// move the fingerprint, and the selected reviewer must owe measurement on its new prompts") — THE PART FRAMING'S TEXT.
@@ -965,7 +995,11 @@ describe('JAN-CRITREAD J2-3 — the probe set reaches every branch of prompt ass
 			['W-RERUN-NO-FILE', "as the host read them after this step's last try — so a file an earlier step changed can be among them — then this step's writes"],
 			['W-RERUN-NO-FILE', "The unit changed no file in its workspace since its first step began, as the host read it after try 2 of this step; the writes and runs below are this step's alone."],
 			['D-RERUN-DELIVERABLE', '"workRerun":true'],
-			['D-RERUN-DELIVERABLE', '; and a work product marked "workRerun" was made by a step that re-ran its unit’s work: that unit’s "files" are counted from its first step']
+			['D-RERUN-DELIVERABLE', '; and a work product marked "workRerun" was made by a step that re-ran its unit’s work: that unit’s "files" are counted from its first step'],
+			// ⭐⭐ Package X, stage X2 — D31 (2026-10-31) — and the marked re-run's probe, which takes the re-run's subject and heading too,
+			// its heading carrying the marks' clause before its last sentence (its marks are held in their own row, below).
+			['W-RERUN-MARKED', "in a step that re-runs its work: the agent's answer, then the files the unit changed in its workspace since its first step began"],
+			['W-RERUN-MARKED', "of this step — so a file an earlier step changed can be among them, and the writes and runs below are this step's alone. Beside each path"]
 		];
 		for (const [probe, needle] of branches) expect(prompt(probe), `${probe} does not take its re-run branch: ${needle}`).toContain(needle);
 		const reruns = new Set(branches.map(([probe]) => probe));
@@ -973,6 +1007,27 @@ describe('JAN-CRITREAD J2-3 — the probe set reaches every branch of prompt ass
 		expect(
 			firstSteps.filter((id) => ['since its first step began', 'an earlier step changed', 'workRerun'].some((w) => prompt(id).includes(w))),
 			'a first step’s probe reads a re-run’s words'
+		).toEqual([]);
+	});
+
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package X — D31 (`REG-D-140`; `REG-F-589`; design §10.3, revision 5: "a new `W-RERUN-MARKED` takes the
+	 * marked branch, a file of each mark among its files ... `W-RERUN-DELIVERABLE` stays unmarked: a view recorded before the build
+	 * still takes that branch on re-review") — THE MARKED BRANCH IS TAKEN BY ITS OWN PROBE, AND BY NO OTHER: the clause the marked
+	 * heading gains, and a file of each mark on its host line. ⛔ RED BEFORE THE BUILD: there was no such probe.
+	 */
+	it('⭐⭐ package X (D31) — the marked branch is taken by W-RERUN-MARKED, a file of each mark among its files, and no other probe reads a mark', () => {
+		const marks = [
+			'Beside each path, the host says what this step did to that file, against the workspace as the host read it when this step began.',
+			' — added in this step:',
+			' — changed in this step:',
+			' — removed in this step: it is no longer in the workspace.',
+			' — the same as when this step began:'
+		] as const;
+		for (const needle of marks) expect(prompt('W-RERUN-MARKED'), `W-RERUN-MARKED does not take the marked branch: ${needle}`).toContain(needle);
+		expect(
+			FINGERPRINT_PROBES.map((p) => p.id).filter((id) => id !== 'W-RERUN-MARKED' && marks.some((w) => prompt(id).includes(w))),
+			'another probe reads a mark — W-RERUN-DELIVERABLE among them, which keeps the unmarked branch'
 		).toEqual([]);
 	});
 
@@ -2131,9 +2186,15 @@ const declaredHostSlicesOf = (input: ReasoningReviewInput): readonly (readonly [
  * whole, a line holds the candidates its JSON holds: the host's words around it hold none.
  */
 function sequenceHostSlicesOf(lines: readonly string[], input: ReasoningReviewInput): readonly (readonly [slice: string, text: string])[] {
+	// ⭐⭐ Package X — D31 — each line as the view writes it: with its mark where the view shows its marks (`deliverableMarked`).
+	// ~~`(input.deliverable?.files ?? []).map(deliverableFileLine)`~~ — the line now takes whether the view is marked.
+	const marked = input.deliverable !== undefined && deliverableMarked(input.deliverable);
 	const files =
 		input.framing === 'WORK_PRODUCT'
-			? (input.deliverable?.files ?? []).map(deliverableFileLine).filter((l) => lines.includes(l)).map((l) => ['a changed file’s line', l] as const)
+			? (input.deliverable?.files ?? [])
+					.map((f) => deliverableFileLine(f, marked))
+					.filter((l) => lines.includes(l))
+					.map((l) => ['a changed file’s line', l] as const)
 			: [];
 	const acts =
 		(input.framing === 'WORK_PRODUCT' && input.deliverable) || (input.framing === 'PROCESS_RESULT' && input.hostSequence)

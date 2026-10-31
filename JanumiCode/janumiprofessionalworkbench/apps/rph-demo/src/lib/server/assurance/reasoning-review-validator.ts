@@ -337,6 +337,11 @@ export const WORK_PRODUCT_DELIVERABLE_SUBJECT =
  * lists none (a unit that changes no file is production's common shape), and of a view whose every file this step wrote. The mark
  * says where the files are counted FROM, never which step changed which: the baseline keeps hashes alone and a re-run takes no
  * manifest at its own start (`unitBaselineOf`), so the host cannot know. "Can be" is true of every marked view.
+ * ⭐⭐ `JAN-EXEC` Phase 7, package X — D31 (`REG-D-140`; `REG-F-589`; design §10.3, 2026-10-31) — ~~a re-run takes no manifest at
+ * its own start~~: it takes one now, before its producer opens, and each file its view lists carries what THIS step did to it, on
+ * the file's own line, with one clause in its heading saying what the marks mean (`deliverableMarked`, `deliverableFileLine`,
+ * `DELIVERABLE_MARKS_CLAUSE`). This subject line is not edited: "can be" is still true of every marked view. ⚠ A re-run's view
+ * recorded before package X carries no mark, and the host still cannot know there.
  * ⚠ Disclosed, and not fixed by any wording here (package O's D22 residual; package O-2's check, finding 3): the workspace is the
  * Undertaking's, so a file another unit wrote while this one waited is counted too, and this line calls it the unit's. The paid
  * lane does not reach it — its rule re-runs a stopped unit before it presses another (`recoverByRule`, `phase7-operator.ts`) — and a
@@ -906,6 +911,9 @@ export function sequenceBlock(
  * ⛔ Package O-2's check, finding 1 (2026-10-26) — ~~"so a file an earlier step changed is among them"~~: false of a view whose
  * every file this step changed, and the host cannot tell which listed file an earlier step changed
  * (`WORK_PRODUCT_RERUN_DELIVERABLE_SUBJECT`); "can be" is true of every view it heads.
+ * ⭐⭐ `JAN-EXEC` Phase 7, package X — D31 (`REG-D-140`; design §10.3) — and a re-run's view whose files carry marks
+ * (`deliverableMarked`) gains one clause, before its last sentence, saying what the marks mean (`DELIVERABLE_MARKS_CLAUSE`). ⛔ A view
+ * that shows none — a first step's, a re-run's recorded before package X — reads as before, byte for byte.
  */
 export function deliverableHeading(deliverable: Deliverable): string {
 	if (deliverable.workRerun === true)
@@ -913,6 +921,8 @@ export function deliverableHeading(deliverable: Deliverable): string {
 			? `The unit changed no file in its workspace since its first step began, as the host read it after try ${deliverable.afterTry} of this step; the writes and runs below are this step's alone.`
 			: `The files the unit changed in its workspace since its first step began, as the host read them after try ${deliverable.afterTry} of this step — ` +
 					"so a file an earlier step changed can be among them, and the writes and runs below are this step's alone. " +
+					// ⭐⭐ Package X — D31 — and, where its files carry marks, the one clause saying what the marks mean.
+					(deliverableMarked(deliverable) ? `${DELIVERABLE_MARKS_CLAUSE} ` : '') +
 					"Each path, as JSON, and what changed are the host's record; each file's text, between fence lines, is the file's own:";
 	return deliverable.files.length === 0
 		? `The unit changed no file in its workspace since its step began, as the host read it after try ${deliverable.afterTry}.`
@@ -920,11 +930,45 @@ export function deliverableHeading(deliverable: Deliverable): string {
 				"Each path, as JSON, and what changed are the host's record; each file's text, between fence lines, is the file's own:";
 }
 
-/** The host line naming one changed file. */
-export function deliverableFileLine(file: DeliverableFile): string {
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package X — D31 (`REG-D-140`; `REG-F-589`; design §10.3, D31, revision 5: the lead's decision, flagged for
+ * the sponsor) — THE CLAUSE A MARKED RE-RUN'S HEADING GAINS: what the mark beside each path is — the host's record of what THIS step
+ * did to that file, against the workspace as the host read it when the step began (`DeliverableFile.inThisStep`). ⭑ It asks the
+ * reviewer to find nothing (`REG-D-105` (2)) and names no disposition value (`REG-D-090`). ⚠ The design's illustrative wording, kept
+ * as written; untested until the paid measurement (D38).
+ */
+export const DELIVERABLE_MARKS_CLAUSE =
+	'Beside each path, the host says what this step did to that file, against the workspace as the host read it when this step began.';
+
+/**
+ * ⭐⭐ Package X — D31 — WHETHER A VIEW SHOWS ITS MARKS: a work re-run's (`Deliverable.workRerun`) whose every listed file carries
+ * one — the view production records for every try of a re-run since package X. ⛔ Anything else reads as before, byte for byte: a
+ * first step's view (its files are its own step's changes by construction, and the host never marks them), a re-run's view
+ * recorded before package X (no mark), and a view marked in part — which the host never writes, and of whose unmarked paths the
+ * clause ("Beside each path, …") would be false.
+ */
+export function deliverableMarked(deliverable: Deliverable): boolean {
+	return deliverable.workRerun === true && deliverable.files.length > 0 && deliverable.files.every((f) => f.inThisStep !== undefined);
+}
+
+/** ⭐⭐ Package X — D31 — the words a file's mark reads in, after its change since the unit's first step (design §10.3). */
+const IN_THIS_STEP: Readonly<Record<NonNullable<DeliverableFile['inThisStep']>, string>> = {
+	ADDED: 'added in this step',
+	CHANGED: 'changed in this step',
+	REMOVED: 'removed in this step',
+	UNCHANGED: 'the same as when this step began'
+};
+
+/**
+ * The host line naming one changed file.
+ * ⭐⭐ Package X — D31 — and, in a view that shows its marks (`marked`, `deliverableMarked`), what THIS step did to it, after its
+ * path: `Added "src/summarise.js" — the same as when this step began:`. ⛔ Unmarked, the line is as before, byte for byte.
+ */
+export function deliverableFileLine(file: DeliverableFile, marked: boolean): string {
 	const path = jsonLine(file.path);
-	if (file.change === 'REMOVED') return `Removed ${path}: it is no longer in the workspace.`;
-	return `${file.change === 'ADDED' ? 'Added' : 'Changed'} ${path}:`;
+	const mark = marked && file.inThisStep !== undefined ? ` — ${IN_THIS_STEP[file.inThisStep]}` : '';
+	if (file.change === 'REMOVED') return `Removed ${path}${mark}: it is no longer in the workspace.`;
+	return `${file.change === 'ADDED' ? 'Added' : 'Changed'} ${path}${mark}:`;
 }
 
 /** The declaration of a cut of the changed files' LIST, keeping the first `shown` of `total`. */
@@ -961,6 +1005,8 @@ function deliverableWithin(
 	answerSlice: string
 ): DeliverableLayout | undefined {
 	const heading = deliverableHeading(deliverable);
+	// ⭐⭐ Package X — D31 — whether each file's line carries its mark: decided of the whole view, never of the files a cut leaves.
+	const marked = deliverableMarked(deliverable);
 	const frame = FENCE_LENGTH * 2 + 2;
 	const listCut = files.length < deliverable.files.length ? deliverableFilesCutDeclaration(files.length, deliverable.files.length) : undefined;
 	const texts = files.map((f) => (f.change === 'REMOVED' ? undefined : (f.content ?? '')));
@@ -969,7 +1015,7 @@ function deliverableWithin(
 	// for a file with a text, its fence lines), and the blank line before the sequence.
 	const fixed =
 		frame + 2 + heading.length + (listCut ? listCut.length + 1 : 0) +
-		files.reduce((n, f, i) => n + 1 + deliverableFileLine(f).length + (texts[i] === undefined ? 0 : 1 + frame), 0) +
+		files.reduce((n, f, i) => n + 1 + deliverableFileLine(f, marked).length + (texts[i] === undefined ? 0 : 1 + frame), 0) +
 		2;
 	const units = [answer, ...texts.flatMap((t) => (t === undefined ? [] : [t]))];
 	const names = [answerSlice, ...files.flatMap((f, i) => (texts[i] === undefined ? [] : [`the text of ${jsonLine(f.path)}`]))];
@@ -984,7 +1030,7 @@ function deliverableWithin(
 		answer: excerpts[0]!,
 		heading,
 		...(listCut ? { listCut } : {}),
-		files: files.map((f, i) => ({ line: deliverableFileLine(f), ...(texts[i] === undefined ? {} : { text: excerpts[next++]! }) })),
+		files: files.map((f, i) => ({ line: deliverableFileLine(f, marked), ...(texts[i] === undefined ? {} : { text: excerpts[next++]! }) })),
 		sequence
 	};
 }

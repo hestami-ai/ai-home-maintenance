@@ -110,7 +110,7 @@ import {
 } from '$lib/server/execution/evidence-join';
 import {
 	admittedViewRef,
-	changedFiles,
+	deliverableFiles,
 	deliverableViewRefOf,
 	hostSequenceOf,
 	namedViewOf,
@@ -1994,10 +1994,23 @@ async function runModelUnit(u: ModelUnitRun) {
 	// ⭐⭐ Package O-2 — D28 (design revision 4; `REG-D-137`) — and it names the step that took it (`takenBy`), so each try's view
 	// below says whether its files are counted from an EARLIER step's baseline: a work re-run.
 	let baseline: UnitBaseline;
+	// ⭐⭐ `JAN-EXEC` Phase 7, package X — D31 (`REG-D-140`; `REG-F-589`; design §10.3, D31, revision 5) — AND A WORK RE-RUN TAKES A
+	// MANIFEST AT ITS OWN START, beside the unit's baseline and BEFORE ITS PRODUCER OPENS, so each try's view below says, file by
+	// file, what THIS step did (`deliverableFiles`): a file the re-run only read is marked the same as when it began. ⛔ A workspace
+	// that cannot be read then fails the step here, as an unreadable baseline does, with nothing to release. ⛔ A unit's first step
+	// takes none: its baseline is its start, so its views carry no mark and read as before.
+	let stepStart: Awaited<ReturnType<typeof takeManifest>> | undefined;
 	try {
 		const current = binding ? currentBinding(bindingId) : undefined;
 		sandbox = resolveUndertakingSandbox(String((pwu?.undertakingId ?? '') as string));
 		baseline = await unitBaselineOf(getArtifactStore(), EXECUTION_TENANT_PREFIX, { pwuId, stepId, attemptKey }, sandbox.workspace);
+		if (baseline.takenBy !== stepId) {
+			try {
+				stepStart = await takeManifest(sandbox.workspace);
+			} catch (e) {
+				throw new Error(`the host could not read the unit's workspace at this step's start: ${e instanceof Error ? e.message : String(e)}`);
+			}
+		}
 		producer = await getExecutionSession(executor)({
 			...sandbox,
 			grantedCapabilities: current?.capabilities ?? [],
@@ -2234,7 +2247,9 @@ async function runModelUnit(u: ModelUnitRun) {
 			}
 			const deliverable = {
 				afterTry: attempt,
-				files: changedFiles(baseline, manifestAfter),
+				// ⭐⭐ Package X — D31 — D22's list, and on a work re-run, beside each file, what THIS step did to it, by hash, against
+				// the manifest the step took at its own start (`stepStart`). ⛔ A first step hands none, so its files carry no mark.
+				files: deliverableFiles(baseline, manifestAfter, stepStart),
 				sequence: hostSequence,
 				// ⭐⭐ Package O-2 — D28 (`REG-D-137`; `REG-F-583`) — A WORK RE-RUN'S VIEW SAYS SO: its files are counted from the baseline
 				// another step took — the unit's first — while its sequence is this step's alone, and its review is told both. ⛔ No key

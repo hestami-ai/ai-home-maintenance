@@ -286,3 +286,148 @@ describe('⛔ package O-2’s check, finding 1 — a marked view is told a file 
 		expect(p, 'arrangement: the subject says what the mark means').toContain(`with the exit the host recorded${RERUN_CLAUSE}:`);
 	});
 });
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7, package X — D31 (`REG-D-140`; `REG-F-589`; design §10.3, D31, revision 5) — THE MARKS, RENDERED ─────────────
+// ⛔ RED BEFORE THE BUILD: a work re-run's view could say only where its files are counted from (D28), so a file this step only read
+// stood on the same line as one it wrote, and v12's selected reviewer passed a claimed fix to a file only read 3 of 3. ⭐ D31: in a
+// work re-run's view whose files carry marks (`DeliverableFile.inThisStep`, the host's record of what this step did to each), the mark
+// stands on the file's host line, and one clause in the re-run's heading says what the marks mean (design §10.3's illustrative
+// wording). ⛔ A first step's view, and a re-run's view recorded before package X — which carries no mark — read as before, byte for
+// byte: the unmarked controls above stay as they are.
+describe('⭐⭐ package X — D31: a work re-run’s view whose files carry marks shows each on its file’s host line, and its heading says what they mean — only there', () => {
+	/** ⭐ D31 — the clause the marked re-run's heading gains, restated byte for byte (design §10.3's illustrative wording). */
+	const MARKS_CLAUSE =
+		'Beside each path, the host says what this step did to that file, against the workspace as the host read it when this step began.';
+	/** ⭐ D31 — a marked re-run's changed-files heading, after try `n` of this step: D28's, the clause before its last sentence. */
+	const markedHeading = (n: number): string =>
+		`The files the unit changed in its workspace since its first step began, as the host read them after try ${n} of this step — so a file an earlier step changed can be among them, and the writes and runs below are this step's alone. ${MARKS_CLAUSE} Each path, as JSON, and what changed are the host's record; each file's text, between fence lines, is the file's own:`;
+	/**
+	 * A work re-run's view after its first try, a file of each mark: the draft its refused attempt wrote, rewritten here; a file the
+	 * unit's first step found, removed here; the notes added here; and the required document its refused attempt wrote, which this
+	 * step only read. Each is counted from the unit's first step (D22), so each is listed as added or removed.
+	 */
+	const MARKED: Deliverable = {
+		afterTry: 1,
+		files: [
+			{ path: 'docs/draft.md', change: 'ADDED', content: '# Final\n', inThisStep: 'CHANGED' },
+			{ path: 'docs/gone.md', change: 'REMOVED', inThisStep: 'REMOVED' },
+			{ path: 'docs/notes.md', change: 'ADDED', content: '# Notes\n', inThisStep: 'ADDED' },
+			{ path: 'docs/required.md', change: 'ADDED', content: '# Required\nR1. Count each word.\n', inThisStep: 'UNCHANGED' }
+		],
+		sequence: {
+			acts: [
+				{ try: 1, ordinal: 1, kind: 'RUN', argv: ['cat', 'docs/required.md'], exitCode: 0, timedOut: false },
+				{ try: 1, ordinal: 2, kind: 'WRITE', path: 'docs/draft.md' },
+				{ try: 1, ordinal: 3, kind: 'WRITE', path: 'docs/notes.md' },
+				{ try: 1, ordinal: 4, kind: 'RUN', argv: ['rm', 'docs/gone.md'], exitCode: 0, timedOut: false }
+			],
+			droppedRuns: 0,
+			recordedLimit: 32
+		},
+		workRerun: true
+	};
+	/** Each file's host line in the marked view, restated byte for byte: its change since the unit began, then this step's mark. */
+	const MARKED_LINES = [
+		'Added "docs/draft.md" — changed in this step:',
+		'Removed "docs/gone.md" — removed in this step: it is no longer in the workspace.',
+		'Added "docs/notes.md" — added in this step:',
+		'Added "docs/required.md" — the same as when this step began:'
+	] as const;
+	/** The same lines as an unmarked view writes them (`deliverableFileLine`, as before). */
+	const UNMARKED_LINES = ['Added "docs/draft.md":', 'Removed "docs/gone.md": it is no longer in the workspace.', 'Added "docs/notes.md":', 'Added "docs/required.md":'] as const;
+	/** `view` with every mark taken off its files: a view as the host recorded one before package X. */
+	const unmarked = (view: Deliverable): Deliverable => ({ ...view, files: view.files.map(({ inThisStep: _mark, ...f }) => f) });
+	/** The words only a marked view's prompt holds. */
+	const MARK_WORDS = ['in this step:', 'the same as when this step began', MARKS_CLAUSE] as const;
+
+	it('⭐ THE PREDICTED RED — a marked re-run’s view: each file’s line carries its mark, byte for byte, and the heading says what the marks mean', async () => {
+		const lines = (await promptOf(workProduct(MARKED))).split('\n');
+		for (const line of MARKED_LINES) expect(lines, `a file’s line does not carry its mark: ${line}`).toContain(line);
+		expect(lines, 'the marked heading does not say what the marks mean').toContain(markedHeading(1));
+	});
+
+	it('⭑ CONTROL — the same view, its marks taken off (a view recorded before package X), is the re-run’s prompt as before; the marked prompt differs from it at the heading’s clause and the four file lines alone', async () => {
+		const before = await promptOf(workProduct(unmarked(MARKED)));
+		expect(before.split('\n'), 'an unmarked re-run’s heading moved').toContain(rerunHeading(1));
+		for (const line of UNMARKED_LINES) expect(before.split('\n'), `an unmarked re-run’s file line moved: ${line}`).toContain(line);
+		for (const words of MARK_WORDS) expect(before, `an unmarked re-run’s review reads a mark: ${words}`).not.toContain(words);
+		let marked = (await promptOf(workProduct(MARKED))).replace(markedHeading(1), rerunHeading(1));
+		MARKED_LINES.forEach((line, i) => (marked = marked.replace(`\n${line}\n`, `\n${UNMARKED_LINES[i]}\n`)));
+		expect(marked, 'the marked prompt differs from the unmarked one in more than its marks and its clause').toBe(before);
+	});
+
+	it('⭑ CONTROL — a FIRST step’s view whose files carry marks (a record the host never writes): today’s first-step prompt, byte for byte — no mark, no clause', async () => {
+		const { workRerun: _rerun, ...firstStep } = MARKED;
+		const p = await promptOf(workProduct(firstStep));
+		expect(p, 'a first step’s view shows a mark').toBe(await promptOf(workProduct(unmarked(firstStep))));
+		expect(p.split('\n'), 'arrangement: the first step’s heading').toContain(firstStepHeading(1));
+		for (const words of MARK_WORDS) expect(p, `a first step’s review reads a mark: ${words}`).not.toContain(words);
+	});
+
+	it('⭑ CONTROL — a re-run’s view in which only SOME files carry a mark (a record the host never writes): read as unmarked — the clause, of every path, would be false of the others', async () => {
+		const some: Deliverable = { ...MARKED, files: MARKED.files.map(({ inThisStep, ...f }, i) => (i === 0 ? { ...f, inThisStep } : f)) };
+		expect(some.files.filter((f) => f.inThisStep !== undefined), 'arrangement: one file of four carries a mark').toHaveLength(1);
+		expect(await promptOf(workProduct(some)), 'a view marked in part shows its marks').toBe(await promptOf(workProduct(unmarked(MARKED))));
+	});
+
+	it('⭑ CONTROL — the declared review is not extended (design D31): a sign-off whose unit’s files carry the marks its re-run’s view recorded reads as the same work unmarked, byte for byte', async () => {
+		// The files as the route builds a sign-off's from the recorded view (`{ unit, ...f }`, `+page.server.ts`): marks and all.
+		const signOff = (files: readonly { readonly unit: string; readonly path: string; readonly change: Deliverable['files'][number]['change']; readonly content?: string }[]) =>
+			declaredPolicyReviewInput({
+				policy: POLICY,
+				criteria: CRITERIA,
+				instruction: 'Realize the word-frequency tool from its requirements through its design.',
+				instructionIs: 'UNIT_PURPOSE',
+				workProducts: [{ unit: 'Requirements', answer: 'Requirements: done', workRerun: true }],
+				commands: [],
+				files,
+				sequence: MARKED.sequence.acts.map((a) => ({ unit: 'Requirements', ...a }))
+			});
+		const marked = MARKED.files.map((f) => ({ unit: 'Requirements', ...f }));
+		expect(marked.filter((f) => f.inThisStep !== undefined), 'arrangement: each file carries its mark').toHaveLength(4);
+		const p = await promptOf(signOff(marked));
+		expect(p, 'arrangement: the sign-off shows the files').toContain('"workUnit":"Requirements","path":"docs/draft.md","change":"ADDED"');
+		expect(p, 'a sign-off’s prompt carries a re-run’s mark').toBe(await promptOf(signOff(marked.map(({ inThisStep: _mark, ...f }) => f))));
+		for (const words of MARK_WORDS) expect(p, `a sign-off reads a mark: ${words}`).not.toContain(words);
+	});
+
+	it('⭐ a marked list too long to show whole: the list is cut, declared after the marked heading, each shown line carries its mark — and the prompt stays within its budget', async () => {
+		const files = Array.from({ length: 400 }, (_, i) => ({
+			path: `docs/m${String(i).padStart(3, '0')}.md`,
+			change: 'ADDED' as const,
+			content: '# M\n',
+			inThisStep: i % 2 === 0 ? ('UNCHANGED' as const) : ('ADDED' as const)
+		}));
+		const p = await promptOf(workProduct({ ...MARKED, files }));
+		expect(p.length, 'the marked prompt passed its budget').toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.PROMPT_BUDGET);
+		const lines = p.split('\n');
+		const at = lines.indexOf(markedHeading(1));
+		expect(at, 'the marked heading').toBeGreaterThan(-1);
+		const cut = /^\[CUT FOR THIS REVIEW: the changed files — the first (\d+) of the 400 are shown; the last (\d+) are removed\.\]$/.exec(lines[at + 1] ?? '');
+		expect(cut, 'the list’s cut is not declared after the marked heading').not.toBeNull();
+		const shown = Number(cut![1]);
+		const fileLines = lines.filter((l) => /^Added "docs\/m\d{3}\.md"/.test(l));
+		expect(fileLines, 'the shown files are not those the cut declares').toHaveLength(shown);
+		fileLines.forEach((l, i) =>
+			expect(l, `a shown file’s line lost its mark: ${l}`).toBe(`Added "docs/m${String(i).padStart(3, '0')}.md" — ${i % 2 === 0 ? 'the same as when this step began' : 'added in this step'}:`)
+		);
+	});
+
+	it('⭐ the clause’s and the marks’ own words: no criterion id and no disposition value (REG-D-090); they ask the reviewer to find nothing (REG-D-105 (2)); ⭑ the readers find each in a text that holds it', () => {
+		const criterionId = /\b[A-Z]{2,3}-\d\d\b/;
+		const looksForAFailure = /\b(look|search|hunt)\b[^.;]*\bfor\b[^.;]*\bfailure/i;
+		const asksToFind = /\bfind\b/i;
+		const dispositions = ['SATISFIED', 'CONDITIONALLY_SATISFIED', 'REJECTED', 'INCONCLUSIVE', 'ESCALATED'];
+		for (const text of [MARKS_CLAUSE, ...MARKED_LINES]) {
+			for (const d of dispositions) expect(text.toUpperCase(), `${text}: names ${d}`).not.toContain(d);
+			expect(text, `${text}: names a criterion id`).not.toMatch(criterionId);
+			expect(text, `${text}: speaks of looking for a failure`).not.toMatch(looksForAFailure);
+			expect(text, `${text}: asks the reviewer to find something`).not.toMatch(asksToFind);
+		}
+		// ⭑ THE POSITIVE CONTROLS: each reader finds what it reads for in a text that holds it.
+		expect(`- ${SEEDED_REASONING_REVIEW_CRITERIA[0]!.id}: ${SEEDED_REASONING_REVIEW_CRITERIA[0]!.description}`).toMatch(criterionId);
+		expect('look in each file for a failure').toMatch(looksForAFailure);
+		expect('find the defect').toMatch(asksToFind);
+		for (const d of dispositions) expect(`recommend ${d.toLowerCase()} here`.toUpperCase(), d).toContain(d);
+	});
+});

@@ -56,7 +56,16 @@ const seam = vi.hoisted(() => ({
 	 * step and try derive is bound to ANOTHER view's bytes: the record and the content plane then disagree about what the try's
 	 * reviews were shown.
 	 */
-	viewsMisnamed: false
+	viewsMisnamed: false,
+	/**
+	 * ⭐⭐ Package X — D31 — the next manifest the ROUTE takes through `takeManifest` (never the baseline's own, which the module
+	 * takes inside `unitBaselineOf`) is refused with this message, once: a workspace the host cannot read at that moment.
+	 */
+	manifestFailsNext: undefined as string | undefined,
+	/** ⭐⭐ Package X — D31 — how many producer sessions the route opened. */
+	opens: 0,
+	/** ⭐⭐ Package X — D31 — what a producer's session does to its workspace as it opens, before any turn: nothing, unless a case says. */
+	onOpen: undefined as undefined | ((workspace: import('@janumipwb/rph-ports').Workspace) => Promise<void>)
 }));
 
 // ⭐ Package N's check, finding 6 — THE HOST'S OWN RECORD OF A TRY'S VIEW, refusable by a case: the real one otherwise.
@@ -64,6 +73,15 @@ vi.mock('./deliverable-view.js', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('./deliverable-view.js')>();
 	return {
 		...actual,
+		// ⭐⭐ Package X — D31 — the manifests the route takes, refusable once by a case: the real one otherwise.
+		takeManifest: vi.fn((...args: Parameters<typeof actual.takeManifest>) => {
+			const refused = seam.manifestFailsNext;
+			if (refused !== undefined) {
+				seam.manifestFailsNext = undefined;
+				return Promise.reject(new Error(refused));
+			}
+			return actual.takeManifest(...args);
+		}),
 		recordDeliverableView: vi.fn((...args: Parameters<typeof actual.recordDeliverableView>) => {
 			if (seam.viewRecordFails !== undefined) return Promise.reject(new Error(seam.viewRecordFails));
 			// ⭐ Package O (D23) — a view recorded before package O: put on the content plane, and named by nothing.
@@ -132,6 +150,9 @@ vi.mock('./model.js', async (importOriginal) => {
 		// answers the execution contract's envelope, its account the script's.
 		getExecutionSession: vi.fn(() => async (context: { readonly workspace: import('@janumipwb/rph-ports').Workspace }) => {
 			const observer = createProcessRunObserver();
+			// ⭐⭐ Package X — D31 — the session opens: counted, and what a case says it does to the workspace as it opens, done.
+			seam.opens += 1;
+			await seam.onOpen?.(context.workspace);
 			return {
 				turn: async (text: string) => {
 					seam.turns.push(text);
@@ -324,6 +345,9 @@ beforeEach(() => {
 	seam.viewRecordFails = undefined;
 	seam.viewsUnnamed = false;
 	seam.viewsMisnamed = false;
+	seam.manifestFailsNext = undefined;
+	seam.opens = 0;
+	seam.onOpen = undefined;
 	vi.stubEnv('PATH', noProgramsDirectory());
 	for (const v of LIVE_BACKEND_VARIABLES) vi.stubEnv(v, undefined);
 	vi.stubEnv('JPWB_ASSURANCE_TOOL', 'devin');
@@ -556,14 +580,17 @@ describe('⭐⭐ package O — D22: a work re-run’s view counts the unit’s c
 
 	it('⭐ THE PREDICTED RED — a refused attempt writes a required file and its work re-run leaves it alone: the re-run’s view still lists it, added since the unit began', async () => {
 		const prompt = await refusedThenRerun([]);
-		expect(prompt, 'the re-run’s view lost the file its refused attempt wrote').toContain('Added "docs/required.md":');
+		// ⛔ MOVED 2026-10-31 (`JAN-EXEC` Phase 7, package X; design D31, revision 5) — ~~`toContain('Added "docs/required.md":')`~~: a
+		// work re-run's view now carries, beside each file it lists, what THIS step did to it — this one it left alone.
+		expect(prompt, 'the re-run’s view lost the file its refused attempt wrote').toContain('Added "docs/required.md" — the same as when this step began:');
 		expect(prompt, 'the re-run’s view does not show the file’s text').toContain('# Required');
 	});
 
 	it('⭑ CONTROL — a file the workspace held before the unit’s FIRST step began is no change of the unit’s, in the re-run’s view either; a file the re-run itself writes is', async () => {
 		const prompt = await refusedThenRerun([write('docs/notes.md', '# Notes\n')]);
 		expect(prompt, 'a file present before the unit began was shown as its change').not.toContain('"README.md":');
-		expect(prompt, 'the re-run’s own file was not shown').toContain('Added "docs/notes.md":');
+		// ⛔ MOVED 2026-10-31 (package X; design D31) — ~~`toContain('Added "docs/notes.md":')`~~: marked, this step added it.
+		expect(prompt, 'the re-run’s own file was not shown').toContain('Added "docs/notes.md" — added in this step:');
 	});
 });
 
@@ -634,16 +661,186 @@ describe('⭐⭐ package O-2 — D28: the try loop marks a work re-run’s view 
 		expect(rerun, 'the re-run’s subject does not say its files are counted from the unit’s first step').toContain(
 			"then the files the unit changed in its workspace since its first step began, as the host read them after this step's last try — so a file an earlier step changed can be among them — then this step's writes and runs in the host's order, which are this step's alone."
 		);
+		// ⛔ MOVED 2026-10-31 (`JAN-EXEC` Phase 7, package X; design D31, revision 5) — ~~"… and the writes and runs below are this
+		// step's alone. Each path, as JSON, …"~~ and ~~`toContain('Added "docs/required.md":')`~~: the re-run's view now carries, beside
+		// each file it lists, what THIS step did to it, and its heading the one clause saying what the marks mean (D31's own tests
+		// below); D28's words stand around them unchanged.
 		expect(rerun.split('\n'), 'the re-run’s heading over its inherited file does not say so').toContain(
-			"The files the unit changed in its workspace since its first step began, as the host read them after try 1 of this step — so a file an earlier step changed can be among them, and the writes and runs below are this step's alone. Each path, as JSON, and what changed are the host's record; each file's text, between fence lines, is the file's own:"
+			"The files the unit changed in its workspace since its first step began, as the host read them after try 1 of this step — so a file an earlier step changed can be among them, and the writes and runs below are this step's alone. Beside each path, the host says what this step did to that file, against the workspace as the host read it when this step began. Each path, as JSON, and what changed are the host's record; each file's text, between fence lines, is the file's own:"
 		);
-		expect(rerun, 'arrangement: the re-run’s view lists the inherited file').toContain('Added "docs/required.md":');
+		expect(rerun, 'arrangement: the re-run’s view lists the inherited file').toContain('Added "docs/required.md" — the same as when this step began:');
 		expect(rerun, 'the re-run’s review still reads the first step’s words').not.toContain('since its step began');
 		// ⭑ CONTROL, the unit's first step: today's words, and none of the re-run's.
 		expect(first, 'the first step’s review moved').toContain(
 			"then the files the unit changed in its workspace since its step began, as the host read them after its last try, then the step's writes and runs in the host's order."
 		);
 		expect(first, 'the first step’s review reads a re-run’s words').not.toContain('since its first step began');
+	});
+});
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7, package X — D31 (`REG-D-140`; `REG-F-589`; design §10.3, D31, revision 5) — WHAT THIS STEP DID, FILE BY FILE ──
+// ⛔ RED BEFORE THE BUILD: a work re-run took no manifest at its own start, so its view could say only where its files are counted
+// from (D28), never which of them this step changed: a file it only read had the form of one it wrote (v12's `W12-CSV-RERUN-RR-07`,
+// a claimed fix to a file only read, SATISFIED 3 of 3). ⭐ D31: the re-run takes a manifest at its own start, before its producer
+// opens, beside the unit's baseline; a workspace that cannot be read then fails the step; each file its view lists carries what this
+// step did to it, recorded in the view, shown on the file's line, and read back on a re-review. ⛔ A unit's first step carries none.
+describe('⭐⭐ package X — D31: a work re-run takes a manifest at its own start, before its producer opens, and each file its view lists says what this step did to it', () => {
+	/** The host's tenant prefix on the content plane (`EXECUTION_TENANT_PREFIX`, the route's own). */
+	const TENANT = 'tnt-local';
+	/**
+	 * A model unit whose first attempt writes `docs/required.md` and `docs/draft.md` and is refused at its review (the transport
+	 * fails, so it waits); then its work re-run, which does `rerunActs`, its review clean.
+	 */
+	const refusedThenRerun = async (rerunActs: readonly TurnAct[], beforeRerun?: () => void) => {
+		const pwuId = await modelWorkUnit();
+		seam.script = (turn) =>
+			turn === 1
+				? { acts: [write('docs/required.md', '# Required\n'), write('docs/draft.md', '# Draft\n')], account: 'Wrote the required document and a draft.' }
+				: { acts: rerunActs, account: 'The required document is in place; this step finished the draft and added the notes.' };
+		let down = true;
+		seam.review = (p) => {
+			if (down && isWorkProductReview(p)) throw new Error('devin exited with code 1: connection reset by peer');
+			return undefined;
+		};
+		expect((await beginExecute(pwuId)).data?.error, 'arrangement: the first step’s review concluded').toMatch(/VALIDATOR_EXECUTION_FAILED/);
+		const first = seam.prompts.find(isWorkProductReview);
+		expect([seam.opens, seam.turns.length], 'arrangement: the first step opened one session and took one turn').toEqual([1, 1]);
+		down = false;
+		seam.prompts.length = 0;
+		beforeRerun?.();
+		const rerun = (await actions.rerunWork(
+			actionEvent('rerunWork', { pwuId, rationale: 'The reviewer failed at the transport; run the work again.' }) as never
+		)) as { advanced?: string; data?: { error?: string } };
+		return { pwuId, first: first!, rerun, reviewed: seam.prompts.filter(isWorkProductReview) };
+	};
+	/** Each try-1 view the unit's attempts recorded, read back by the name it is bound to (D23), in the order of their attempts. */
+	const recordedViewsOf = async (pwuId: string) => {
+		const attempts = [
+			...new Set(
+				listByType(getEngine(), 'ARTIFACT')
+					.filter((a) => a.state.producingPwuId === pwuId)
+					.map((a) => String(a.state.producingExecutionAttemptId))
+			)
+		];
+		return Promise.all(
+			attempts.map(async (attemptKey) => {
+				const ref = await namedViewOf(getArtifactStore(), TENANT, attemptKey, 1);
+				const read = ref ? await readDeliverableView(getArtifactStore(), ref) : undefined;
+				return read?.ok ? read.view.deliverable : undefined;
+			})
+		);
+	};
+	/** ⭐ D31 — the clause a marked re-run's heading gains, restated byte for byte (design §10.3's illustrative wording). */
+	const MARKS_CLAUSE =
+		'Beside each path, the host says what this step did to that file, against the workspace as the host read it when this step began.';
+	/** The re-run's acts below: it reads the required document, finishes the draft and adds the notes. */
+	const RERUN_ACTS = [run(['cat', 'docs/required.md'], '# Required\n'), write('docs/draft.md', '# Final\n'), write('docs/notes.md', '# Notes\n')];
+
+	it('⭐ THE PREDICTED RED — the re-run’s recorded view: each file it lists carries what THIS step did to it — the one it only read the same as when it began, the one it rewrote changed, the one it wrote added; the first step’s view carries no mark', async () => {
+		const { pwuId, rerun } = await refusedThenRerun(RERUN_ACTS);
+		expect([rerun.advanced, rerun.data?.error], 'arrangement: the work re-run').toEqual(['work-rerun', undefined]);
+		const [first, rerunView] = await recordedViewsOf(pwuId);
+		expect([first !== undefined, rerunView !== undefined], 'arrangement: each step’s view, recorded and read back').toEqual([true, true]);
+		expect(rerunView!.workRerun, 'arrangement: the re-run’s view is marked a work re-run (D28)').toBe(true);
+		expect(
+			rerunView!.files.map((f) => [f.path, f.change, f.inThisStep]),
+			'a file the re-run’s view lists does not carry what this step did to it'
+		).toEqual([
+			['docs/draft.md', 'ADDED', 'CHANGED'],
+			['docs/notes.md', 'ADDED', 'ADDED'],
+			['docs/required.md', 'ADDED', 'UNCHANGED']
+		]);
+		// ⭑ CONTROL — the unit's first step: its files are its own step's changes by construction, so none carries a mark.
+		expect(first!.files.map((f) => Object.keys(f)), 'the first step’s view carries a mark — its record no longer reads as before').toEqual([
+			['path', 'change', 'content'],
+			['path', 'change', 'content']
+		]);
+	});
+
+	it('⭐ the re-run’s review is shown each mark on its file’s line, and its heading says what the marks mean; the first step’s review none of it', async () => {
+		const { first, rerun, reviewed } = await refusedThenRerun(RERUN_ACTS);
+		expect([rerun.advanced, reviewed.length], 'arrangement: the work re-run, its work product reviewed once').toEqual(['work-rerun', 1]);
+		const lines = reviewed[0]!.split('\n');
+		for (const line of [
+			'Added "docs/draft.md" — changed in this step:',
+			'Added "docs/notes.md" — added in this step:',
+			'Added "docs/required.md" — the same as when this step began:'
+		])
+			expect(lines, `the re-run’s review does not show the mark: ${line}`).toContain(line);
+		expect(
+			lines,
+			'the re-run’s heading does not say what the marks mean'
+		).toContain(
+			`The files the unit changed in its workspace since its first step began, as the host read them after try 1 of this step — so a file an earlier step changed can be among them, and the writes and runs below are this step's alone. ${MARKS_CLAUSE} Each path, as JSON, and what changed are the host's record; each file's text, between fence lines, is the file's own:`
+		);
+		// ⭑ CONTROL — the unit's first step: no mark, no clause.
+		for (const words of ['in this step:', 'the same as when this step began', MARKS_CLAUSE])
+			expect(first, `the first step’s review reads a re-run’s mark: ${words}`).not.toContain(words);
+		expect(first.split('\n'), 'arrangement: the first step’s review lists its files, unmarked').toContain('Added "docs/required.md":');
+	});
+
+	it('⭐ the start manifest is taken BEFORE the producer opens: a file the producer’s session leaves as it opens is marked added in this step', async () => {
+		const { pwuId, rerun } = await refusedThenRerun(RERUN_ACTS, () => {
+			seam.onOpen = async (ws) => {
+				await ws.writeFile('docs/opened.md', '# Left by the session as it opened\n');
+			};
+		});
+		expect([rerun.advanced, rerun.data?.error], 'arrangement: the work re-run').toEqual(['work-rerun', undefined]);
+		const [, rerunView] = await recordedViewsOf(pwuId);
+		expect(
+			rerunView!.files.find((f) => f.path === 'docs/opened.md')?.inThisStep,
+			'the re-run’s start manifest was taken after its producer opened: what the session did reads as the same as when the step began'
+		).toBe('ADDED');
+	});
+
+	it('⛔ a workspace the host cannot read at the re-run’s start FAILS the step, in its own words, before its producer opens — never a re-run reviewed with no mark', async () => {
+		const { pwuId, rerun } = await refusedThenRerun(RERUN_ACTS, () => {
+			seam.manifestFailsNext = 'EIO: the workspace could not be listed';
+		});
+		expect(rerun.data?.error, 'an unreadable workspace at the re-run’s start did not fail the step in its own words').toBe(
+			"The model invocation did not run: the host could not read the unit's workspace at this step's start: EIO: the workspace could not be listed"
+		);
+		expect([seam.opens, seam.turns.length], 'the re-run’s producer opened, or took a turn, over a workspace the host could not read').toEqual([1, 1]);
+		expect(completionsOf(pwuId), 'the failed re-run completed a step').toEqual([]);
+	});
+
+	// ⭐ Design §10.3, predicted red 2's last limb (extending package O-2's check, finding 2, below): the re-review reads the refused
+	// try's view back from the record (RD7) and hands its deliverable on whole, so the marks the try was shown are shown again.
+	it('⭐ the re-review of the re-run’s REFUSED try reads its marks back from the record: each on its file’s line, and the heading’s clause', async () => {
+		const pwuId = await modelWorkUnit();
+		seam.script = (turn) =>
+			turn === 1
+				? { acts: [write('docs/required.md', '# Required\n'), write('docs/draft.md', '# Draft\n')], account: 'Wrote the required document and a draft.' }
+				: { acts: RERUN_ACTS, account: 'The required document is in place; this step finished the draft and added the notes.' };
+		// Every work product's review fails at the transport until the re-review: the first step's, then its work re-run's.
+		let down = true;
+		seam.review = (p) => {
+			if (down && isWorkProductReview(p)) throw new Error('devin exited with code 1: connection reset by peer');
+			return undefined;
+		};
+		expect((await beginExecute(pwuId)).data?.error, 'arrangement: the first step’s review concluded').toMatch(/VALIDATOR_EXECUTION_FAILED/);
+		const rerun = (await actions.rerunWork(
+			actionEvent('rerunWork', { pwuId, rationale: 'The reviewer failed at the transport; run the work again.' }) as never
+		)) as { advanced?: string; data?: { error?: string } };
+		expect(rerun.data?.error, 'arrangement: the work re-run’s review concluded').toMatch(/VALIDATOR_EXECUTION_FAILED/);
+		down = false;
+		seam.prompts.length = 0;
+
+		const reReviewed = (await actions.rerunReview(
+			actionEvent('rerunReview', { pwuId, rationale: 'The reviewer failed at the transport; review it again.' }) as never
+		)) as { advanced?: string; data?: { error?: string } };
+
+		expect([reReviewed.advanced, reReviewed.data?.error], 'arrangement: the re-review').toEqual(['review-rerun', undefined]);
+		const reReview = seam.prompts.find(isWorkProductReview)?.split('\n') ?? [];
+		for (const line of [
+			'Added "docs/draft.md" — changed in this step:',
+			'Added "docs/notes.md" — added in this step:',
+			'Added "docs/required.md" — the same as when this step began:'
+		])
+			expect(reReview, `the re-review does not show the mark the refused try was shown: ${line}`).toContain(line);
+		expect(reReview, 'the re-review’s heading does not say what the marks mean').toContain(
+			`The files the unit changed in its workspace since its first step began, as the host read them after try 1 of this step — so a file an earlier step changed can be among them, and the writes and runs below are this step's alone. ${MARKS_CLAUSE} Each path, as JSON, and what changed are the host's record; each file's text, between fence lines, is the file's own:`
+		);
 	});
 });
 
@@ -1072,9 +1269,14 @@ describe('⭐⭐ package O-2’s check, finding 2 — the re-review of a WORK RE
 	/** ⭐ D28 — a work re-run's subject, from its files to its sequence, restated byte for byte. */
 	const RERUN_SUBJECT_FILES =
 		"then the files the unit changed in its workspace since its first step began, as the host read them after this step's last try — so a file an earlier step changed can be among them — then this step's writes and runs in the host's order, which are this step's alone.";
-	/** ⭐ D28 — a work re-run's heading over its files, after try `n` of its step, restated byte for byte. */
+	/**
+	 * ⭐ D28 — a work re-run's heading over its files, after try `n` of its step, restated byte for byte. ⛔ MOVED 2026-10-31
+	 * (`JAN-EXEC` Phase 7, package X; design D31, revision 5) — ~~"… and the writes and runs below are this step's alone. Each path,
+	 * as JSON, …"~~: the view a re-run records since package X carries, beside each file, what THIS step did to it, and its heading
+	 * the one clause saying what the marks mean, before its last sentence; the rest is D28's, unchanged.
+	 */
 	const rerunHeading = (n: number): string =>
-		`The files the unit changed in its workspace since its first step began, as the host read them after try ${n} of this step — so a file an earlier step changed can be among them, and the writes and runs below are this step's alone. Each path, as JSON, and what changed are the host's record; each file's text, between fence lines, is the file's own:`;
+		`The files the unit changed in its workspace since its first step began, as the host read them after try ${n} of this step — so a file an earlier step changed can be among them, and the writes and runs below are this step's alone. Beside each path, the host says what this step did to that file, against the workspace as the host read it when this step began. Each path, as JSON, and what changed are the host's record; each file's text, between fence lines, is the file's own:`;
 	/** ⛔ A first step's subject, from its files to its sequence, and its heading, byte for byte as today. */
 	const FIRST_STEP_SUBJECT_FILES =
 		"then the files the unit changed in its workspace since its step began, as the host read them after its last try, then the step's writes and runs in the host's order.";
@@ -1115,7 +1317,11 @@ describe('⭐⭐ package O-2’s check, finding 2 — the re-review of a WORK RE
 
 		expect([reReviewed.advanced, reReviewed.data?.error], 'arrangement: the re-review').toEqual(['review-rerun', undefined]);
 		const reReview = seam.prompts.find(isWorkProductReview);
-		expect(reReview, 'arrangement: the re-review was not shown the file the unit’s first step wrote').toContain('Added "docs/required.md":');
+		// ⛔ MOVED 2026-10-31 (package X; design D31) — ~~`toContain('Added "docs/required.md":')`~~: the recorded view is read back
+		// whole, its marks among it, so the re-review is shown the one its refused try was — this file the same as when the step began.
+		expect(reReview, 'arrangement: the re-review was not shown the file the unit’s first step wrote').toContain(
+			'Added "docs/required.md" — the same as when this step began:'
+		);
 		expect(reReview, 'the re-review of a work re-run’s try is not told its files are counted from the unit’s first step').toContain(
 			RERUN_SUBJECT_FILES
 		);

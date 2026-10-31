@@ -86,6 +86,33 @@ export function changedFiles(
 }
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package X — D31 (`REG-D-140`; `REG-F-589`; design §10.3, D31, revision 5: the lead's decision, flagged for
+ * the sponsor) — THE FILES A TRY'S VIEW LISTS, AND, ON A WORK RE-RUN, WHAT THIS STEP DID TO EACH. The list is D22's, kept: the files
+ * changed between the unit's baseline — its FIRST step's — and the manifest after the try. ⭐ A work re-run also hands the manifest
+ * it took at its own start, before its producer opened (`stepStart`, the try loop in `+page.server.ts`), and each listed file then
+ * carries what THIS step did to it (`inThisStep`): production's own `changedFiles` between that start manifest and the manifest
+ * after the try gives ADDED, CHANGED or REMOVED in this step, and any other listed file is UNCHANGED — the same as when this step
+ * began. ⭑ By hash, so it stays true when a run, not a write, changes a file, and when the step's sequence is cut or drops runs
+ * past its bound: the sequence is not read here at all. ⛔ So the host no longer cannot say which listed file this step changed
+ * (`WORK_PRODUCT_RERUN_DELIVERABLE_SUBJECT`): a file a re-run only read is marked so on its own line.
+ * ⛔ A unit's FIRST step hands no start manifest — its baseline IS its start, and every file it lists is its own step's change by
+ * construction — so no file of its view carries a mark, and its prompts read as before, byte for byte.
+ * ⚠ Disclosed (D22's residual, narrowed): a file another unit wrote BEFORE this step began is marked the same as at its start; one
+ * another unit writes DURING the step is still marked this step's — the one-unit lane does not reach it (`REG-F-535`). And a file
+ * this step changed back to its baseline's bytes is not in D22's list, so it carries no line to mark.
+ */
+export function deliverableFiles(
+	baseline: ReadonlyMap<string, { readonly hash: string }>,
+	after: WorkspaceManifest,
+	stepStart?: ReadonlyMap<string, { readonly hash: string }>
+): DeliverableFile[] {
+	const listed = changedFiles(baseline, after);
+	if (stepStart === undefined) return listed;
+	const inThisStep = new Map(changedFiles(stepStart, after).map((f) => [f.path, f.change] as const));
+	return listed.map((f) => ({ ...f, inThisStep: inThisStep.get(f.path) ?? 'UNCHANGED' }));
+}
+
+/**
  * ⭐ D9 — HOW MANY NUMBERS THE STEP'S ONE SEQUENCE HAS GIVEN SO FAR: every completed run (a run past the bound takes its
  * number too) and every completed write (package L). ⭑ The number a try begins after — its boundary.
  */
@@ -155,6 +182,10 @@ export interface DeliverableViewRecord {
 	 * and says what the mark means. A first step's view carries no
 	 * mark, so its prompts — the 91 confirmed cases of v12 among them — stay byte for byte as they were. Probes take each re-run
 	 * branch (`W-RERUN-DELIVERABLE`, `W-RERUN-NO-FILE`, `D-RERUN-DELIVERABLE`), so the fingerprint moved.
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package X — D31 (`REG-D-140`; `REG-F-589`; design §10.3, revision 5) — AND A WORK RE-RUN'S FILES EACH
+	 * CARRY WHAT THIS STEP DID TO THEM (`DeliverableFile.inThisStep`; `deliverableFiles`), recorded here as an OPTIONAL field of the
+	 * same record, `jpwb.deliverable-view/1`: a record without it — a first step's, or any recorded before package X — reads as
+	 * before, and its re-review is shown no mark (`deliverableMarked`). The probe `W-RERUN-MARKED` takes the marked branch.
 	 */
 	readonly deliverable: Deliverable;
 }

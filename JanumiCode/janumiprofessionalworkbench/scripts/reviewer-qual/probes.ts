@@ -1162,6 +1162,36 @@ const RERUN_DELIVERABLE: Deliverable = {
 };
 /** ⭐ Package O-2 — D28 — a work re-run's view in which no file changed, after its second try, its sequence holding no act. */
 const RERUN_NO_FILE_DELIVERABLE: Deliverable = { afterTry: 2, files: [], sequence: { acts: [], droppedRuns: 0, recordedLimit: 32 }, workRerun: true };
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package X — D31 (`REG-D-140`; `REG-F-589`; design §10.3, revision 5) — A WORK RE-RUN'S FINISHED WORK WHOSE
+ * FILES CARRY MARKS (`DeliverableFile.inThisStep`): each counted from the unit's first step (package O's D22), and each with what
+ * THIS step did to it — a file of each mark, in path order: the checks this step added, the draft the unit's first step found and
+ * this step removed, the notes an earlier, refused attempt wrote and this step rewrote, and that attempt's report, which this step
+ * only read (the same as when this step began). The sequence is this step's: the read, the two writes, the removal (a run) and the
+ * checks. Nothing cut, and no fence candidate planted. ⭑ `RERUN_DELIVERABLE` above stays unmarked: a view recorded before package
+ * X still takes that branch on re-review.
+ */
+const RERUN_MARKED_DELIVERABLE: Deliverable = {
+	afterTry: 1,
+	files: [
+		{ path: 'survey/checks/test_panels.py', change: 'ADDED', content: 'def test_panels():\n    assert True\n', inThisStep: 'ADDED' },
+		{ path: 'survey/draft.md', change: 'REMOVED', inThisStep: 'REMOVED' },
+		{ path: 'survey/notes.md', change: 'ADDED', content: '# Notes\nPanels 4 and 9 re-measured.\n', inThisStep: 'CHANGED' },
+		{ ...INHERITED_REPORT, inThisStep: 'UNCHANGED' }
+	],
+	sequence: {
+		acts: [
+			{ try: 1, ordinal: 1, kind: 'RUN', argv: ['cat', INHERITED_REPORT.path], exitCode: 0, timedOut: false },
+			{ try: 1, ordinal: 2, kind: 'WRITE', path: 'survey/notes.md' },
+			{ try: 1, ordinal: 3, kind: 'WRITE', path: 'survey/checks/test_panels.py' },
+			{ try: 1, ordinal: 4, kind: 'RUN', argv: ['rm', 'survey/draft.md'], exitCode: 0, timedOut: false },
+			{ ...RERUN_CHECKS, ordinal: 5 }
+		],
+		droppedRuns: 0,
+		recordedLimit: 32
+	},
+	workRerun: true
+};
 
 /**
  * ⭐ THE PROBE SET, in a fixed order — the order, like each prompt, is part of what is hashed (`probes` hashes the list of
@@ -1171,7 +1201,7 @@ const RERUN_NO_FILE_DELIVERABLE: Deliverable = { afterTry: 2, files: [], sequenc
  * T-ABSENT-FIELDS, ⭐ (D3a) T-DECLARED-POLICIES, T-APPLICABLE-POLICIES, T-SEEDED-LIBRARY, T-SUBJECT-REFUSED, T-OVERSIZE-ALL,
  * T-OVERSIZE-FENCES, T-OVERSIZE-LISTS, T-NO-FENCE, T-STAKES, T-ACCOUNT-BREAKS; W-BARE, W-DECLARED-PRIOR, W-OVERSIZE-CONTENT,
  * W-OVERSIZE-ALL, W-OVERSIZE-EDGES, W-FENCES, W-OVERSIZE-LISTS, W-NO-FENCE, W-STAKES, W-ACCOUNT-BREAKS, ⭐ (package N)
- * W-DELIVERABLE, W-OVERSIZE-DELIVERABLE, W-OVERSIZE-FILE-LIST, ⭐ (package O-2) W-RERUN-DELIVERABLE, W-RERUN-NO-FILE; P-CLEAN,
+ * W-DELIVERABLE, W-OVERSIZE-DELIVERABLE, W-OVERSIZE-FILE-LIST, ⭐ (package O-2) W-RERUN-DELIVERABLE, W-RERUN-NO-FILE, ⭐ (package X) W-RERUN-MARKED; P-CLEAN,
  * P-SIGNAL, P-TIMED-OUT, P-INCOMPLETE-CAPTURE, P-STDOUT-CAPTURE-CUT, P-STDERR-CAPTURE-CUT, P-OVERSIZE-CONTENT,
  * P-OVERSIZE-COMMAND, P-OVERSIZE-SURROGATE, P-OVERSIZE-ROOM-EDGES, P-OVERSIZE-STREAMS, P-OVERSIZE-AT-ITS-BUDGET,
  * P-OVERSIZE-FENCES, P-OVERSIZE-LISTS, P-FENCE-AT-THE-LAST, P-NO-FENCE, P-PRODUCTION, P-ABSENT-REPORT,
@@ -1185,8 +1215,9 @@ const RERUN_NO_FILE_DELIVERABLE: Deliverable = { afterTry: 2, files: [], sequenc
  * D-DELIVERABLE, D-OVERSIZE-DELIVERABLE, ⭐ (package O-2) D-RERUN-DELIVERABLE; NO-CRITERIA —
  * ~~forty-seven~~ ~~sixty-six (B7's check: twelve T-, ten W-, twenty-six P-, seventeen D- and NO-CRITERIA)~~ ~~sixty-nine
  * (D3a: fifteen T-, ten W-, twenty-six P-, seventeen D- and NO-CRITERIA)~~ ~~seventy-six (package N: fifteen T-, thirteen W-,
- * twenty-eight P-, nineteen D- and NO-CRITERIA)~~ seventy-nine (package O-2, D28: fifteen T-, fifteen W-, twenty-eight P-,
- * twenty D- and NO-CRITERIA), every process-result one `P-`-prefixed.
+ * twenty-eight P-, nineteen D- and NO-CRITERIA)~~ ~~seventy-nine (package O-2, D28: fifteen T-, fifteen W-, twenty-eight P-,
+ * twenty D- and NO-CRITERIA)~~ eighty (package X, D31: fifteen T-, sixteen W-, twenty-eight P-, twenty D- and NO-CRITERIA), every
+ * process-result one `P-`-prefixed.
  * ~~⭐ Package P F1 (`REG-F-503` remedy 1) — and, after G-ACCOUNT-BREAKS, G-TYPE-DECLARATIONS, G-TYPE-DECLARATIONS-ABSENT and
  * G-OVERSIZE-TYPE-DECLARATIONS.~~ ⭐ B7 — the graph framing's probes left the fingerprint with case set v8; NO-CRITERIA is a
  * part's now.
@@ -1507,6 +1538,16 @@ export const FINGERPRINT_PROBES: readonly FingerprintProbe[] = [
 			'work-product framing shown a WORK RE-RUN’s finished work in which no file changed (package O-2 D28): its subject, and its line for no file changed “since its first step began” after its second try, its sequence holding no act',
 		input: (criteria) =>
 			workProductReviewInput({ criteria, producingPrompt: PRODUCING_PROMPT, answer: ANSWER, rationale: RATIONALE, deliverable: RERUN_NO_FILE_DELIVERABLE })
+	},
+	// ── ⭐⭐ `JAN-EXEC` Phase 7, package X — D31 (`REG-D-140`; `REG-F-589`) — A WORK RE-RUN'S MARKS ──────────────────────────────────────
+	// ⛔ Without it, no probe reached the mark on a file's line or the clause a marked heading gains, so a change to either moved no
+	// fingerprint. Built through the product's builder; every other probe's view carries no mark.
+	{
+		id: 'W-RERUN-MARKED',
+		covers:
+			'work-product framing shown a WORK RE-RUN’s finished work whose files carry MARKS (package X D31): each file counted from the unit’s first step, and a file of each mark on its host line — added in this step, removed in this step, changed in this step, and the same as when this step began (a report an earlier step wrote, which this step only read) — with the one clause of its heading saying what the marks mean; nothing cut',
+		input: (criteria) =>
+			workProductReviewInput({ criteria, producingPrompt: PRODUCING_PROMPT, answer: ANSWER, rationale: RATIONALE, deliverable: RERUN_MARKED_DELIVERABLE })
 	},
 	// ── ⭐⭐ the process-result arm, through the builder the process-result floor uses (`JAN-PRQUAL` `PQ-1`, design D3) ──
 	// ~~no builder is factored for it (`REG-D-072` D17), so its input is literal~~ — each probe below is a RUN literal,

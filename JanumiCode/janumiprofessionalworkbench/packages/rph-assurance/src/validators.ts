@@ -305,6 +305,17 @@ export interface DeliverableFile {
 	readonly change: 'ADDED' | 'CHANGED' | 'REMOVED';
 	/** The text the host read after the try. ⛔ Absent for a REMOVED file: there is nothing to read. */
 	readonly content?: string;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package X — D31 (`REG-D-140`; `REG-F-589`; design §10.3, D31, revision 5) — WHAT THIS STEP DID TO THE
+	 * FILE, in a work re-run's view (`Deliverable.workRerun`), whose `change` is counted from the unit's FIRST step (package O's
+	 * D22): ADDED, CHANGED or REMOVED in this step, or UNCHANGED — the same as when this step began — by hash, between the manifest
+	 * the host took at this step's own start, before its producer opened, and the one after the try (`deliverableFiles`,
+	 * `deliverable-view.ts`). ⭑ By hash, so it stays true when a run, not a write, changes a file, and when the sequence is cut or
+	 * drops runs past its bound. ⛔ ABSENT on a unit's first step — every file it lists is its own step's change by construction —
+	 * and on every view recorded before package X, so each reads as before, byte for byte; the view record
+	 * (`jpwb.deliverable-view/1`) carries it as an optional field. ⭑ The declared review copies no mark (`review-input.ts`).
+	 */
+	readonly inThisStep?: 'ADDED' | 'CHANGED' | 'REMOVED' | 'UNCHANGED';
 }
 
 /**

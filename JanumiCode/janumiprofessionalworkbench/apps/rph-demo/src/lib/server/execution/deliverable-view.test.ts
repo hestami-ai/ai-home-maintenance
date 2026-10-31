@@ -8,6 +8,7 @@ import {
 	admittedViewRef,
 	baselineNameOf,
 	changedFiles,
+	deliverableFiles,
 	DELIVERABLE_BASELINE_SCHEMA,
 	hostSequenceOf,
 	namedViewOf,
@@ -294,5 +295,109 @@ describe('⭐⭐ package O-2 — D28: the unit’s baseline names the step that 
 		await expect(unitBaselineOf(store, 'tnt-t', STEP_2, workspace())).rejects.toThrow(
 			`the baseline of work unit pwu_1 at '${stepless.storageKey}' names no step that took it.`
 		);
+	});
+});
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7, package X — D31 (`REG-D-140`; `REG-F-589`; design §10.3, D31, revision 5) — WHAT THIS STEP DID, FILE BY FILE ──
+// ⛔ RED BEFORE THE BUILD: a work re-run's view lists its files counted from the unit's FIRST step (D22), so a file this step only
+// read had the form of one it wrote, and v12's selected reviewer passed `W12-CSV-RERUN-RR-07` — an account claiming a fix to a file
+// its step only read — 3 of 3. The host could not say which step changed a file: the baseline keeps hashes alone and a re-run took
+// no manifest at its own start. ⭐ D31: a re-run takes a manifest at its own start, before its producer opens (the try loop,
+// `+page.server.ts`), and each file its view lists also carries what THIS step did to it — production's own `changedFiles` between
+// that start manifest and the manifest after the try: added, changed or removed in this step; any other listed file the same as
+// when this step began. D22's list is kept, counted from the unit's first step. ⛔ A unit's first step carries no mark.
+describe('⭐⭐ package X — D31: each file a work re-run’s view lists carries what THIS step did to it, by hash, against the manifest the host took at the step’s own start', () => {
+	const STEP_1 = { pwuId: 'pwu_1', stepId: 'step_1', attemptKey: 'step_1#1' } as const;
+	const STEP_2 = { pwuId: 'pwu_1', stepId: 'step_2', attemptKey: 'step_2#1' } as const;
+	/**
+	 * A unit's first step over a workspace holding README.md, its refused attempt writing `docs/required.md`, then its work re-run:
+	 * the re-run's baseline as production reads it back (`unitBaselineOf`, the first step's) and the manifest the re-run takes at
+	 * its own start, before anything it does.
+	 */
+	const rerunStart = async () => {
+		const store = createInMemoryArtifactStore();
+		const ws = workspace();
+		await ws.writeFile('README.md', '# before\n');
+		await unitBaselineOf(store, 'tnt-t', STEP_1, ws);
+		await ws.writeFile('docs/required.md', '# Required\n');
+		const baseline = await unitBaselineOf(store, 'tnt-t', STEP_2, ws);
+		expect(baseline.takenBy, 'arrangement: the re-run counts from the unit’s first step').toBe('step_1');
+		return { ws, baseline, stepStart: await takeManifest(ws) };
+	};
+
+	it('⭐ THE PREDICTED RED — a re-run that only READS the file its refused attempt wrote: listed, added since the unit began (D22), and marked the same as when this step began', async () => {
+		const { ws, baseline, stepStart } = await rerunStart();
+		expect(await ws.readFile('docs/required.md'), 'arrangement: the re-run reads the inherited file').toBe('# Required\n');
+		expect(deliverableFiles(baseline, await takeManifest(ws), stepStart), 'an inherited file this step only read is not marked the same as when the step began').toEqual([
+			{ path: 'docs/required.md', change: 'ADDED', content: '# Required\n', inThisStep: 'UNCHANGED' }
+		]);
+	});
+
+	it('⭐ a re-run whose RUN, not a write, rewrites an inherited file: marked changed in this step — the mark is read off the two manifests by hash, never off the sequence', async () => {
+		const { ws, baseline, stepStart } = await rerunStart();
+		// ⭑ The bytes a run left (a formatter, a generator): the port is the only way to place them here, and the mark is not handed
+		// the sequence at all — so no write act is what it reads.
+		await ws.writeFile('docs/required.md', '# Required\nR1. Count each word.\n');
+		expect(deliverableFiles(baseline, await takeManifest(ws), stepStart), 'an inherited file whose bytes this step changed is not marked changed in this step').toEqual([
+			{ path: 'docs/required.md', change: 'ADDED', content: '# Required\nR1. Count each word.\n', inThisStep: 'CHANGED' }
+		]);
+	});
+
+	it('⭐ a file ANOTHER unit wrote before this step began: listed (D22 counts the shared workspace’s files as the unit’s), and marked the same as when this step began', async () => {
+		const store = createInMemoryArtifactStore();
+		const ws = workspace();
+		await unitBaselineOf(store, 'tnt-t', STEP_1, ws);
+		// Another unit of the Undertaking writes into the shared workspace while this one waits (package O's D22 residual).
+		await ws.writeFile('other/notes.md', '# Another unit’s notes\n');
+		const baseline = await unitBaselineOf(store, 'tnt-t', STEP_2, ws);
+		const stepStart = await takeManifest(ws);
+		expect(deliverableFiles(baseline, await takeManifest(ws), stepStart), 'a file another unit wrote before this step began is not marked the same').toEqual([
+			{ path: 'other/notes.md', change: 'ADDED', content: '# Another unit’s notes\n', inThisStep: 'UNCHANGED' }
+		]);
+	});
+
+	it('⭐ a file of each mark — added, changed and removed IN THIS STEP, and the same as when it began, among them one D22 lists removed that was already gone — in path order, D22’s list kept whole beside the marks', async () => {
+		const store = createInMemoryArtifactStore();
+		const ws = workspace();
+		await ws.writeFile('README.md', '# before\n');
+		await ws.writeFile('old/gone-before.md', '# removed by the refused attempt\n');
+		await ws.writeFile('old/gone-now.md', '# removed by the re-run\n');
+		await unitBaselineOf(store, 'tnt-t', STEP_1, ws);
+		// The refused attempt writes two files and removes one (⚠ the port cannot delete a participating file, so a removal is
+		// arranged on the manifest, as above).
+		await ws.writeFile('docs/inherited.md', '# Inherited\n');
+		await ws.writeFile('docs/rewritten.md', '# Draft\n');
+		const baseline = await unitBaselineOf(store, 'tnt-t', STEP_2, ws);
+		const stepStart = new Map(await takeManifest(ws));
+		stepStart.delete('old/gone-before.md');
+		// The re-run adds one, rewrites one, removes one and leaves one as it was.
+		await ws.writeFile('docs/new.md', '# New\n');
+		await ws.writeFile('docs/rewritten.md', '# Final\n');
+		const after = new Map(await takeManifest(ws));
+		after.delete('old/gone-before.md');
+		after.delete('old/gone-now.md');
+		const marked = deliverableFiles(baseline, after, stepStart);
+		expect(marked.map((f) => [f.path, f.change, f.inThisStep]), 'a listed file does not carry what this step did to it').toEqual([
+			['docs/inherited.md', 'ADDED', 'UNCHANGED'],
+			['docs/new.md', 'ADDED', 'ADDED'],
+			['docs/rewritten.md', 'ADDED', 'CHANGED'],
+			['old/gone-before.md', 'REMOVED', 'UNCHANGED'],
+			['old/gone-now.md', 'REMOVED', 'REMOVED']
+		]);
+		// ⭑ CONTROL — D22's list is kept: the same paths, changes and texts, a mark beside each, and nothing else.
+		expect(marked.map(({ inThisStep: _mark, ...f }) => f), 'the marks moved D22’s list').toEqual(changedFiles(baseline, after));
+	});
+
+	it('⭑ CONTROL — a unit’s FIRST step, handed no start manifest of its own: no file carries a mark, and its list is D22’s, byte for byte', async () => {
+		const store = createInMemoryArtifactStore();
+		const ws = workspace();
+		await ws.writeFile('README.md', '# before\n');
+		const baseline = await unitBaselineOf(store, 'tnt-t', STEP_1, ws);
+		expect(baseline.takenBy, 'arrangement: the first step took its own baseline').toBe('step_1');
+		await ws.writeFile('docs/required.md', '# Required\n');
+		const after = await takeManifest(ws);
+		const files = deliverableFiles(baseline, after);
+		expect(files, 'a first step’s list moved').toEqual(changedFiles(baseline, after));
+		expect(files.map((f) => Object.keys(f)), 'a first step’s file carries a mark — its view no longer reads as before').toEqual([['path', 'change', 'content']]);
 	});
 });

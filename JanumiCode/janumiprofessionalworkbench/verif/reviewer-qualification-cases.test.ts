@@ -4123,8 +4123,14 @@ const REVIEWER_FINGERPRINT_V9 = '5ab3d68643bffbbf700c622526b626f47d4c487690e1eb5
  * shortened to at most 245 UTF-16 code units (242), so the 27 P- probes that read it move again (P-NO-FENCE, refused before any
  * prompt exists, does not). No other probe prompt moved, nor the budget, criteria, scoring or case-set digest. The 18 command
  * case prompts move again with it, each under its id. Unmeasured, as before: RED on COVERAGE until case set v13's paid run.
+ * ⭐⭐ `JAN-EXEC` Phase 7, package X, stage X2 — D31 (`REG-D-140`; `REG-F-589`; design §10.3 and §10.6, revision 5) — MOVED AGAIN,
+ * DELIBERATELY, 2026-10-31: ~~'133441f1b397a788ba42f7e8ec4c1697ee56d720869677db8f71271d89d83f26'~~ — the probes move, and only
+ * they: one new probe, W-RERUN-MARKED, takes the marked branch of a work re-run's view (a file of each mark on its host line, and
+ * the clause its heading gains). No probe prompt of the 79 before it moved, nor any case prompt, nor the budget, criteria,
+ * scoring or case-set digest: no case of case set v12 carries a mark (the re-cast pair takes its marks in case set v13, package
+ * Y). Unmeasured, as before: RED on COVERAGE until case set v13's paid run.
  */
-const REVIEWER_FINGERPRINT_TODAY = '133441f1b397a788ba42f7e8ec4c1697ee56d720869677db8f71271d89d83f26';
+const REVIEWER_FINGERPRINT_TODAY = '106cf8e93abb840aaef72c6edb2675a57104d74ac8fcb12decb3b9e53048f4b7';
 /**
  * ⭐ THE PROTOTYPE'S PROMPTS (`REG-D-131` Q36: *"its prompts must match the checked prototype hash for hash"*) — the sha256 of
  * each of the 19 bridge part cases' first prompt as the lead's in-memory prototype of D3b rendered it through the product's
