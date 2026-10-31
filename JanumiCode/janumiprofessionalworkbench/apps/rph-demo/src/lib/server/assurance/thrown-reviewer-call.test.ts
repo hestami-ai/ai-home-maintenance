@@ -75,6 +75,8 @@ import { writeFile } from 'node:fs/promises';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ExchangeRecord } from '../agent/exchange-record.js';
 import { devinPrint } from '../tools/devin-reviewer.js';
+// ⭐⭐ Package X — D34 (`REG-F-590`) — the class a call killed during its run is thrown as.
+import { ToolCallKilled, type KilledCallFacts } from '../tools/killed-call.js';
 import { agyPrint } from './agy-cli.js';
 import { clearingJudgement } from './clearing-reviewer.testing.js';
 import { createExchangeSink } from './exchange-capture.js';
@@ -118,8 +120,10 @@ const REPAIR_TAIL = 'IMPORTANT: reply with ONLY the minified JSON object.';
 /**
  * devin's bound, as the product's devin branch is given it — written here as a number so these cases measure the RULE
  * with a bound they declare. ⭑ That the product's own bound IS this number, and is devin's own kill, is held below.
+ * ⛔ MOVED 2026-10-31 (`JAN-EXEC` Phase 7, package X; design D35, revision 5; `REG-F-590`) — ~~`240_000`~~: devin's kill is
+ * raised to 480 s, and this number with it, as the relation below holds (`REVIEWER_CALL_BOUND_MS.devin`).
  */
-const BOUND = 240_000;
+const BOUND = 480_000;
 
 /** What a transport failure looks like when it leaves `devinPrint` (`tools/devin-reviewer.ts`): no reply, a cause. */
 const TRANSPORT =
@@ -352,6 +356,67 @@ describe('⭐ P7-2b (iii) — a throw at or past the bound is a timeout, and is 
 		const outcome = await settle(validator.evaluate(SUBJECT, CTX));
 		expect(prompts, 'a throw short of the bound was not run again').toHaveLength(2);
 		expect(outcome).not.toBeInstanceOf(Error);
+	});
+});
+
+// ⭐⭐ `JAN-EXEC` Phase 7, package X — D34 (`REG-F-590`; `DESIGN-data-flow-order-and-deliverable-review.md` §10.5, revision 5) — THE
+// NO-RESPONSE RECORD OF A CALL KILLED DURING ITS RUN STATES WHAT THE KILL LEFT: whether the tool had written its export, what that
+// export's last agent step counted, how many characters it printed before the kill, and the signal (`tools/killed-call.ts`).
+// ⛔ Before X the record kept the time and the sanitised diagnostic alone, so v12's three timeouts (`REG-F-590`) could not be told
+// apart: a call that was answering, or one that printed nothing.
+/** What the kill left in these cases: an export whose last agent step counted 812 tokens and stopped, 13 characters printed. */
+const KILLED: KilledCallFacts = {
+	signal: 'SIGTERM',
+	printedChars: 13,
+	exportWritten: true,
+	lastStep: { finishReason: 'stop', outputTokens: 812 }
+};
+
+describe('⭐⭐ package X — D34 — a killed call’s no-response record states what the kill left, beside its time and its cause', () => {
+	it('⛔ PREDICTED RED — killed AT the bound: one call, its record naming the bound, the kill’s facts, and the sanitised cause', async () => {
+		const { prompts, print } = tool(new ToolCallKilled('devin invocation failed: Command failed: devin --print', KILLED), CLEAN);
+		const { validator, exchanges } = reviewer(print, clockAt(0, BOUND));
+
+		const thrown = await settle(validator.evaluate(SUBJECT, CTX));
+
+		expect(prompts, 'arrangement: a timeout, not run again').toHaveLength(1);
+		expect((thrown as Error).message, 'the seam still rethrows the sanitised cause alone').toBe(
+			'reasoning-review backing tool invocation failed: devin invocation failed: Command failed: devin --print'
+		);
+		const records = exchanges.drain();
+		expect(shape(records).map((r) => `${r.role}:${r.disposition}`)).toEqual(['initial:no-response']);
+		// ⛔ THE MUTANT: the facts dropped from the detail — the record keeps the time and the cause alone, as before X.
+		expect(records[0]!.parseOutcome.detail).toBe(
+			`The reviewing tool’s call failed after ${BOUND} ms with no reply, at or past the tool’s ${BOUND} ms bound — a timeout, ` +
+				'which is not run again. What the tool left when it was killed: killed by SIGTERM, 13 characters printed on stdout ' +
+				'before the kill, its export written, whose last agent step counted output_tokens 812, finish_reason stop. What the ' +
+				'tool reported, sanitised: reasoning-review backing tool invocation failed: devin invocation failed: Command failed: ' +
+				'devin --print'
+		);
+	});
+
+	it('⛔ PREDICTED RED — killed short of the bound (an outside kill): run once more, and the failed call’s record states the facts too', async () => {
+		const { prompts, print } = tool(
+			new ToolCallKilled('devin invocation failed: Command failed: devin --print', { ...KILLED, exportWritten: false, lastStep: {} }),
+			CLEAN
+		);
+		const { validator, exchanges } = reviewer(print, clockAt(0, 5_000, 5_100, 9_000));
+		await settle(validator.evaluate(SUBJECT, CTX));
+		expect(prompts).toHaveLength(2);
+		expect(exchanges.drain()[0]!.parseOutcome.detail).toContain(
+			'What the tool left when it was killed: killed by SIGTERM, 13 characters printed on stdout before the kill, no export written. '
+		);
+	});
+
+	it('⭑ CONTROL — a call that threw any other way states no kill: its detail is the time, the clause and the cause, as before', async () => {
+		const { print } = tool(new Error('Command failed: devin --print'), CLEAN);
+		const { validator, exchanges } = reviewer(print, clockAt(0, BOUND));
+		await settle(validator.evaluate(SUBJECT, CTX));
+		expect(exchanges.drain()[0]!.parseOutcome.detail).toBe(
+			`The reviewing tool’s call failed after ${BOUND} ms with no reply, at or past the tool’s ${BOUND} ms bound — a timeout, ` +
+				'which is not run again. What the tool reported, sanitised: reasoning-review backing tool invocation failed: Command ' +
+				'failed: devin --print'
+		);
 	});
 });
 
@@ -801,6 +866,52 @@ describe('⭐ P7-2b — where the rule applies: the product’s own reviewers, a
 		);
 		expect(records[0]!.parseOutcome.detail).toContain(
 			`short of the tool’s ${REVIEWER_CALL_BOUND_MS.devin} ms bound`
+		);
+	});
+
+	it('⭐⭐ package X — D34 — PREDICTED RED — the product’s devin branch: devin writes its export and prints, then is KILLED — the failed call’s record states what the kill left, read by devinPrint before its folder went', async () => {
+		vi.stubEnv('JPWB_ASSURANCE_TOOL', 'devin');
+		vi.stubEnv('JPWB_ASSURANCE_MODEL', 'fixture-devin-model');
+		const calls: string[][] = [];
+		const exec = async (_file: string, args: readonly string[]) => {
+			calls.push([...args]);
+			const exportPath = args[args.indexOf('--export') + 1]!;
+			if (calls.length === 1) {
+				// What devin had written when the kill came: its export, the last agent step counting 812 tokens.
+				await writeFile(
+					exportPath,
+					JSON.stringify({ steps: [{ source: 'agent', metrics: { completion_tokens: 812 }, extra: { generation_model: 'fixture-devin-model' } }] }),
+					'utf8'
+				);
+				// What node's `execFile` rejects with when its `timeout` kills the program: a signal and no exit code.
+				throw Object.assign(new Error('Command failed: devin --print'), {
+					code: null,
+					killed: true,
+					signal: 'SIGTERM',
+					stdout: '{"findings":[',
+					stderr: ''
+				});
+			}
+			await writeFile(exportPath, JSON.stringify({ steps: [{ extra: { generation_model: 'fixture-devin-model' } }] }), 'utf8');
+			return { stdout: CLEAN };
+		};
+		const exchanges = createExchangeSink();
+		const registry = createFloorRegistry({ testMode: false, devinExec: exec, exchanges });
+		const plan = await runFloorAndPlanRecording(SUBJECT, CTX, registry);
+		const review = plan.assessments.find((a) => a.policyId === FLOOR_POLICY_IDS.REASONING_REVIEW);
+
+		// ⚠ The real clock: the kill here comes at once, short of devin's bound, so the call is run once more and answers.
+		expect(calls, 'arrangement: killed once, then answered').toHaveLength(2);
+		expect(review?.disposition).toBe('SATISFIED');
+		const records = exchanges.drain();
+		expect(records.map((r) => `${r.exchangeRole}:${r.disposition}`)).toEqual(['initial:no-response', 'retry:accepted']);
+		// ⛔ THE MUTANT: the facts dropped, by the adapter or by the validator — the record states the time and the cause alone.
+		expect(records[0]!.parseOutcome.detail).toContain(
+			'What the tool left when it was killed: killed by SIGTERM, 13 characters printed on stdout before the kill, its export ' +
+				'written, whose last agent step counted output_tokens 812, finish_reason not reported. '
+		);
+		expect(records[0]!.parseOutcome.detail).toContain(
+			'What the tool reported, sanitised: reasoning-review backing tool invocation failed: devin invocation failed: Command failed: devin --print'
 		);
 	});
 

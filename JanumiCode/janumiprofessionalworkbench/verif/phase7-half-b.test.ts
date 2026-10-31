@@ -1287,7 +1287,7 @@ describe('⭐ C3 — the authoring allowance, folded into the timeout', () => {
 	// candidate as a part, so the allowance is the inventory's — 2,400 s at one part, as before, and 31,200 s at sixteen.
 	// ⭐ Package L — D13 (`REG-D-135` (3)): each review up to SIX calls of 240 s, so ~~2,400 s / 31,200 s~~ 3,360 s at one part
 	// and 46,560 s at sixteen.
-	it('⭐ two floor runs — the floor, and the one auto-refinement pass the agent route makes — each the agent’s run and one review of each part: ~~2,400 s~~ 3,360 s at one part, ~~31,200 s~~ 46,560 s at sixteen', () => {
+	it('⭐ two floor runs — the floor, and the one auto-refinement pass the agent route makes — each the agent’s run and one review of each part: ~~2,400 s~~ ~~3,360 s~~ 6,240 s at one part, ~~31,200 s~~ ~~46,560 s~~ 92,640 s at sixteen (package X, D35)', () => {
 		const route = readFileSync(join(REPO, 'apps/rph-demo/src/routes/pwa/[id]/agent/+server.ts'), 'utf8');
 		expect(route).toContain('auto-refine at most once');
 		expect(route.split('await runPwaFloor(').length - 1, 'the route runs the floor once, and once more to refine').toBe(
@@ -1296,14 +1296,17 @@ describe('⭐ C3 — the authoring allowance, folded into the timeout', () => {
 		expect([1, 2, 16].map(phase7AuthoringAllowanceMs)).toEqual(
 			[1, 2, 16].map((parts) => PHASE7_AUTHORING_FLOOR_RUNS * (LANE_BUDGET.executorCallMs + parts * REVIEW_MS))
 		);
+		// ⛔ MOVED 2026-10-31 (package X; design D35, revision 5; devin’s bound 480 s) — ~~`3_360_000, 46_560_000, 1_680_000`~~: 2 × (240 s + 6 × 480 s) = 6,240 s, 2 × (240 s +
+		// 16 × 6 × 480 s) = 92,640 s, and one try's share of the Begin & Execute wait 3,120 s.
 		expect([phase7AuthoringAllowanceMs(1), phase7AuthoringAllowanceMs(16), EXECUTE_TIMEOUT_MS / LANE_BUDGET.tries]).toEqual([
-			3_360_000, 46_560_000, 1_680_000
+			6_240_000, 92_640_000, 3_120_000
 		]);
-		// ⭑ AT LEAST ONE PART: a turn that has staged no type yet is given one part's, ~~the 2,400 s every turn had~~ 3,360 s.
-		expect(phase7AuthoringAllowanceMs(0)).toBe(3_360_000);
+		// ⭑ AT LEAST ONE PART: a turn that has staged no type yet is given one part's, ~~the 2,400 s every turn had~~ ~~3,360 s~~
+		// 6,240 s (package X, D35).
+		expect(phase7AuthoringAllowanceMs(0)).toBe(6_240_000);
 	});
 
-	it('⭐ the authoring’s share: the allowance, one overrunning poll, and four designer acts each at its bound — ~~5,585 s~~ 6,545 s at one part, ~~34,385 s~~ 49,745 s at sixteen (package L, D13)', () => {
+	it('⭐ the authoring’s share: the allowance, one overrunning poll, and four designer acts each at its bound — ~~5,585 s~~ ~~6,545 s~~ 9,425 s at one part, ~~34,385 s~~ ~~49,745 s (package L, D13)~~ 95,825 s at sixteen (package X, D35)', () => {
 		expect([PHASE7_CANDIDATE_POLL_MS, PHASE7_DESIGNER_ACTS, DESIGNER_ACTS.length + 1]).toEqual([5_000, 4, 4]);
 		for (const parts of [1, 16])
 			expect(phase7AuthoringMs(parts)).toBe(
@@ -1312,7 +1315,8 @@ describe('⭐ C3 — the authoring allowance, folded into the timeout', () => {
 					PHASE7_INTROSPECT_MS +
 					4 * (PHASE7_UI_MS + PHASE7_SIGN_OFF_MS + PHASE7_INTROSPECT_MS)
 			);
-		expect([phase7AuthoringMs(1), phase7AuthoringMs(16)]).toEqual([6_545_000, 49_745_000]);
+		// ⛔ MOVED 2026-10-31 (package X; design D35, revision 5; devin’s bound 480 s) — ~~`[6_545_000, 49_745_000]`~~: 6,240 s + 3,185 s and 92,640 s + 3,185 s.
+		expect([phase7AuthoringMs(1), phase7AuthoringMs(16)]).toEqual([9_425_000, 95_825_000]);
 	});
 
 	it('⭐ half B’s timeout: half A’s re-counted for the agent’s phases, plus the authoring for its parts; capped at Node’s timer ceiling', () => {
@@ -1321,7 +1325,8 @@ describe('⭐ C3 — the authoring allowance, folded into the timeout', () => {
 		// — a sign-off now counts its declared reviews, the limit's read before it and the rule's re-run of them
 		// (`PHASE7_SIGN_OFF_UNIT_MS`, 11,280 s, not 1,800 s), so the share is ~~82,320 s~~ ~~91,800 s~~ ⭐ (package L, D13: each
 		// review six calls) 55,740 + 300 + 58,080 + 15,120 = 129,240 s.
-		expect(PHASE7_PER_PHASE_MS).toBe(129_240_000);
+		// ⛔ MOVED 2026-10-31 (package X; design D35, revision 5; devin’s bound 480 s) — ~~`toBe(129_240_000)`~~: 106,140 + 300 + 108,480 + 26,640 = 241,560 s.
+		expect(PHASE7_PER_PHASE_MS).toBe(241_560_000);
 		expect(
 			PHASE7_TEST_TIMEOUT_MS -
 				PHASE7_SETUP_MS -
@@ -1335,15 +1340,17 @@ describe('⭐ C3 — the authoring allowance, folded into the timeout', () => {
 		const units = (phases: number): number[] => Array.from({ length: phases + 1 }, () => 4);
 		expect(phase7HalfBTestTimeoutMs(units(4), 1)).toBe(PHASE7_TEST_TIMEOUT_MS + phase7AuthoringMs(1));
 		// ⭐ Package L — D13: ~~425,225 s~~ 590,040 s + 6,545 s.
-		expect(phase7HalfBTestTimeoutMs(units(4), 1)).toBe(596_585_000);
+		// ⛔ MOVED 2026-10-31 (package X; design D35, revision 5; devin’s bound 480 s) — ~~`toBe(596_585_000)`~~: 1,101,240 s + 9,425 s.
+		expect(phase7HalfBTestTimeoutMs(units(4), 1)).toBe(1_110_665_000);
 		// ⭐ The review in parts, B6 — the authoring's share is the inventory's: sixteen parts, ~~454,025 s~~ ⭐ 639,785 s for four
-		// phases.
-		expect(phase7HalfBTestTimeoutMs(units(4), 16)).toBe(639_785_000);
+		// phases. ⛔ MOVED 2026-10-31 (package X; design D35, revision 5; devin’s bound 480 s) — ~~`toBe(639_785_000)`~~: 1,101,240 s + 95,825 s.
+		expect(phase7HalfBTestTimeoutMs(units(4), 16)).toBe(1_197_065_000);
 		// ⭐ And the ceiling's first phase count, as lane-config.ts states it: ~~23, at one part and at sixteen alike~~ ⭐ package
 		// L, D13: 17 at one part, 16 at sixteen — the larger allowance now reaches the ceiling a phase sooner.
+		// ⛔ MOVED 2026-10-31 (package X; design D35, revision 5; devin’s bound 480 s) — ~~`[1, 17]`, `[16, 16]`~~: 9 at one part, 8 at sixteen, as lane-config.ts now states them.
 		for (const [parts, first] of [
-			[1, 17],
-			[16, 16]
+			[1, 9],
+			[16, 8]
 		] as const)
 			expect([
 				phase7HalfBTestTimeoutMs(units(first - 1), parts) < NODE_TIMER_CEILING_MS,
@@ -1356,7 +1363,7 @@ describe('⭐ C3 — the authoring allowance, folded into the timeout', () => {
 		expect(phase7HalfBTestTimeoutMs(units(40), 1)).toBe(NODE_TIMER_CEILING_MS);
 		expect(NODE_TIMER_CEILING_MS).toBe(2_147_483_647);
 		// ⭐ Each unit's sign-off re-counted for its own policies: one more policy, two more reviews — Record Assurance's, and the
-		// rule's one re-run of them — at ~~four~~ six calls of 240 s each (package L, D13).
+		// rule's one re-run of them — at ~~four~~ six calls of ~~240 s~~ 480 s each (package L, D13; package X, D35).
 		expect(phase7HalfBTestTimeoutMs([4, 5, 4, 4, 4], 1) - phase7HalfBTestTimeoutMs(units(4), 1)).toBe(2 * REVIEW_MS);
 		// ⭐ B6 — while the turn runs: half A's, which half B starts under, and the authoring's share for the parts staged.
 		expect([phase7HalfBAuthoringTimeoutMs(1), phase7HalfBAuthoringTimeoutMs(16)]).toEqual([
@@ -2573,7 +2580,10 @@ describe('⭐⭐ The merge of E12 and E3 (J1, J2) — half B’s sign-offs count
 	// ── ⛔ R3-B F2 (the lead's delegated decision of 2026-10-16, registered as REG-D-114 (15)) — HALF B'S SIGN-OFF TIME BOUNDS
 	// COME FROM THE UNIT'S DECLARED POLICIES AS THE STORE HOLDS THEM (`declaredPolicyIdsOf`), as J1's limit does: Record
 	// Assurance's, the rule's re-run of the declared reviews, and the test's timeout. Half A's stay §3.2's.
-	/** One declared review at its bound: its call, retry and repair, each `reviewerCallMs` — 960 s. */
+	/**
+	 * One declared review at its bound: its call, retry and repair, each `reviewerCallMs` — ~~960 s~~ 2,880 s (six calls of 480 s;
+	 * package X, D35 — the figure had not been restated for package L's six calls of 240 s, 1,440 s).
+	 */
 	const REVIEW_MS = PER_POLICY * LANE_BUDGET.reviewerCallMs;
 
 	it('⛔ R3-B F2 — an agent’s unit declaring FIVE policies has its Record Assurance, and the rule’s re-run of its declared reviews, given a bound that covers FIVE reviews; one declaring one, one review', async () => {

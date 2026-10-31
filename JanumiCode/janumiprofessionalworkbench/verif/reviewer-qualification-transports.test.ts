@@ -29,7 +29,8 @@ import { fileURLToPath } from 'node:url';
 import { SEEDED_REASONING_REVIEW_CRITERIA } from '@janumipwb/rph-assurance';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as agyCli from '../apps/rph-demo/src/lib/server/assurance/agy-cli.js';
-import { assuranceModel } from '../apps/rph-demo/src/lib/server/tools/devin-reviewer.js';
+// ⭐⭐ Package X — D35 — and `devinPrint`, driven through its exec seam for the kill it hands its program (no program is started).
+import { assuranceModel, devinPrint } from '../apps/rph-demo/src/lib/server/tools/devin-reviewer.js';
 import {
 	CURRENT_CASE_SET_FILE,
 	CURRENT_ORACLES_FILE,
@@ -46,6 +47,8 @@ import {
 	sourceResolutionProblem
 } from '../scripts/reviewer-qual/preflight.js';
 import { OutputLimitReached } from '../apps/rph-demo/src/lib/server/tools/output-limit.js';
+// ⭐⭐ Package X — D34 (`REG-F-590`) — the product's class for a call killed during its run. ⚠ A pure module.
+import { ToolCallKilled, type KilledCallFacts } from '../apps/rph-demo/src/lib/server/tools/killed-call.js';
 import { recordProblems, type CallLine, type RunLine } from '../scripts/reviewer-qual/record.js';
 import { reviewerFingerprint } from '../scripts/reviewer-qual/fingerprint.js';
 import { main, runSummary } from '../scripts/reviewer-qual/run.js';
@@ -54,6 +57,7 @@ import {
 	AGY_PRINT_TIMEOUT_MS,
 	createAgyTransport,
 	createDevinTransport,
+	DEVIN_KILL_MS,
 	loadTransport,
 	TransportFailure,
 	type Transport
@@ -352,7 +356,11 @@ describe('JAN-CRITREAD J2-2 — the product transports (REG-D-072 D12)', () => {
 			);
 		const cls = async (t: ReturnType<typeof refusing>) =>
 			((await t.call('p').catch((e: unknown) => e)) as TransportFailure).failureClass;
-		expect(await cls(refusing(240_000)), 'failed at the 240 s bound').toBe('TIMEOUT');
+		// ⛔ MOVED 2026-10-31 (`JAN-EXEC` Phase 7, package X; design D35, revision 5; `REG-F-590`) — ~~`expect(await
+		// cls(refusing(240_000)), 'failed at the 240 s bound').toBe('TIMEOUT')`~~: devin's kill is raised to 480 s, so v12's own
+		// timeout, 240,038 ms (`runs.ndjson:1404`), is a REFUSAL short of the bound now, and 480,000 ms a TIMEOUT.
+		expect(await cls(refusing(240_038)), 'v12’s 240,038 ms, short of the 480 s bound').toBe('REFUSAL');
+		expect(await cls(refusing(480_000)), 'failed at the 480 s bound').toBe('TIMEOUT');
 		expect(await cls(refusing(5)), 'failed at once').toBe('REFUSAL');
 		const identity = await refusing(5).identify();
 		expect(identity).toMatchObject({
@@ -364,6 +372,77 @@ describe('JAN-CRITREAD J2-2 — the product transports (REG-D-072 D12)', () => {
 		});
 	});
 
+	// ⭐⭐ `JAN-EXEC` Phase 7, package X — D35 (`REG-F-590`; `DESIGN-data-flow-order-and-deliverable-review.md` §10.5, revision 5) —
+	// THE RELATION THAT WAS MISSING: the bound at which the devin transport classes a TIMEOUT, and the bound its RUN line records,
+	// are the `timeout` the product's `devinPrint` hands its program — measured at its exec seam, never restated. ⛔ Before X three
+	// relations held the product's copies to that kill or to each other (`thrown-reviewer-call.test.ts`,
+	// `verif/live-exec-lane-config.test.ts`, `verif/phase7-record-replay.test.ts`), and none held `DEVIN_KILL_MS`: only this file's
+	// literal pin saw it. A copy that lagged would leave the record calling later failures TIMEOUTs at a bound that did not fire,
+	// and writing on the RUN line a bound the run was not held to.
+	it('⭐⭐ package X D35 — DEVIN_KILL_MS, the TIMEOUT line and the RUN line’s bound are the timeout devinPrint hands its program, measured at its exec seam', async () => {
+		cleanEnv();
+		vi.stubEnv('JPWB_ASSURANCE_MODEL', 'glm-5-2');
+		let kill = 0;
+		await devinPrint('p', async (_file, _args, options) => {
+			kill = options.timeout;
+			return { stdout: '{}' };
+		});
+		expect(kill, 'arrangement: devinPrint handed its program a kill').toBeGreaterThan(0);
+		// ⛔ THE MUTANT: DEVIN_KILL_MS moved alone — the transport classes, and records, a bound the kill does not use.
+		expect(DEVIN_KILL_MS, 'the bound the transport classes a TIMEOUT at is not the kill devinPrint hands its program').toBe(kill);
+		const failingAt = (at: number) =>
+			createDevinTransport(
+				{
+					devinPrint: async () => {
+						throw new Error('devin invocation failed: exit 1');
+					},
+					resolveAssuranceModel: () => 'glm-5-2'
+				},
+				'glm-5-2',
+				{ now: ticking(at) }
+			);
+		expect((await failingAt(kill).identify()).bounds.wallClockMs, 'the RUN line’s bound is not the kill').toBe(kill);
+		const cls = async (at: number) => ((await failingAt(at).call('p').catch((e: unknown) => e)) as TransportFailure).failureClass;
+		expect([await cls(kill - 1), await cls(kill)], 'the TIMEOUT line is not the kill itself').toEqual(['REFUSAL', 'TIMEOUT']);
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package X — D34 (`REG-F-590`; `DESIGN-data-flow-order-and-deliverable-review.md` §10.5, revision 5) —
+	// a call devin's program was KILLED during is thrown by the product as its own class (`ToolCallKilled`), carrying what the
+	// kill left; the transport's TIMEOUT reason states those facts — counts and facts only, the harness's words, never the
+	// diagnostic. ⛔ Before X the reason was the time and the bound alone: v12's three TIMEOUT lines (`REG-F-590`) could not say
+	// whether devin had been answering or had printed nothing.
+	it('⛔ PREDICTED RED — package X D34 — devin killed at the bound: a TIMEOUT whose reason states what the kill left', async () => {
+		const facts: KilledCallFacts = { signal: 'SIGTERM', printedChars: 13, exportWritten: true, lastStep: { outputTokens: 812 } };
+		const killedAt = (at: number, thrown: Error) =>
+			createDevinTransport(
+				{
+					devinPrint: async () => {
+						throw thrown;
+					},
+					resolveAssuranceModel: () => 'glm-5-2'
+				},
+				'glm-5-2',
+				{ now: ticking(at) }
+			);
+		const failure = async (t: ReturnType<typeof killedAt>) => (await t.call('p').catch((e: unknown) => e)) as TransportFailure;
+		const kill = new ToolCallKilled('devin invocation failed: Command failed: devin --print <THE PROMPT FILE>', facts);
+		const timedOut = await failure(killedAt(DEVIN_KILL_MS, kill));
+		expect(timedOut.failureClass, 'arrangement: at the bound').toBe('TIMEOUT');
+		// ⛔ THE MUTANT: the facts dropped from the reason — the time and the bound alone, as before X.
+		expect(timedOut.reason).toBe(
+			`failed after ${DEVIN_KILL_MS} ms, at the ${DEVIN_KILL_MS} ms bound; killed by SIGTERM, 13 characters printed on stdout ` +
+				'before the kill, its export written, whose last agent step counted output_tokens 812, finish_reason not reported'
+		);
+		expect(timedOut.reason, 'the reason is the harness’s, never the diagnostic').not.toContain('PROMPT');
+		// ⭑ CONTROL — a failure at the bound that is no kill keeps the reason it had: the time and the bound.
+		expect((await failure(killedAt(DEVIN_KILL_MS, new Error('devin invocation failed: exit 1')))).reason).toBe(
+			`failed after ${DEVIN_KILL_MS} ms, at the ${DEVIN_KILL_MS} ms bound`
+		);
+		// ⭑ CONTROL — and a kill short of the bound is a REFUSAL, its reason the time alone, as before (an outside kill).
+		const short = await failure(killedAt(5, kill));
+		expect([short.failureClass, short.reason]).toEqual(['REFUSAL', 'devin failed after 5 ms']);
+	});
+
 	// ⭐⭐ `JAN-EXEC` Phase 7 P5, package A (F2) — devin's reply cut at the model's output-token limit is passed on as the
 	// product's own class, for the runner to record as one (`runner.ts`): never classified TIMEOUT or REFUSAL by the clock.
 	it('⛔ P5 A — devin’s reply cut at the output-token limit is passed on as its own class — never a TRANSPORT_FAILURE, whatever the clock says', async () => {
@@ -372,7 +451,9 @@ describe('JAN-CRITREAD J2-2 — the product transports (REG-D-072 D12)', () => {
 			partialReply: '',
 			observedToolCalls: { canObserve: false, reason: 'The devin adapter cannot observe tool calls (fixture).' }
 		});
-		for (const at of [90_453, 240_000]) {
+		// ⛔ MOVED 2026-10-31 (package X; design D35) — ~~`[90_453, 240_000]`~~: 240,000 ms was the bound, and is short of it since
+		// devin's kill was raised; the case asks the clock AT the bound, so it names the bound itself.
+		for (const at of [90_453, 240_000, DEVIN_KILL_MS]) {
 			const t = createDevinTransport(
 				{
 					devinPrint: async () => {

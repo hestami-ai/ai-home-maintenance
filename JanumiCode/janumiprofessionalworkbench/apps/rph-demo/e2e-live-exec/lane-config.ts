@@ -294,11 +294,24 @@ export function laneKeysRefusal(
 }
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package X — D35 (`REG-F-590`; design §10.5, revision 5) — EACH REVIEWER ADAPTER'S BOUND, BY TOOL: the
+ * `timeout` each hands its program — devin's execFile kill, raised from 240 s to 480 s (`devinPrint`), and agy's own execFile
+ * kill, unmoved (`agyPrint`). `verif/live-exec-lane-config.test.ts` drives both adapters through their exec seams and holds
+ * each figure to what its adapter hands its program. ⚠ 480 s is a planning figure, not a measured one (design D35).
+ */
+const REVIEWER_CALL_MS_BY_TOOL = Object.freeze({ devin: 480_000, agy: 240_000 });
+
+/**
  * ⭐ THE WAIT, FROM THE REVIEWER'S BOUND. The spec's one "Begin & Execute" POST runs the whole repair loop before it
  * answers: each try is one executor call and one work-product review, and each review is at most ~~two~~ ~~⭐ four~~ ⭐ six
  * reviewer calls (package L, D13).
  *   · `tries` — the loop's repair bound (`DEFAULT_REPAIR_BOUND`, `src/lib/server/execution/loop-detection.ts`).
- *   · `reviewerCallMs` — the `timeout` both reviewer adapters hand their program (`agyPrint`, `devinPrint`).
+ *   · `reviewerCallMs` — ~~the `timeout` both reviewer adapters hand their program (`agyPrint`, `devinPrint`)~~ ⛔ MOVED
+ *     2026-10-31 (`JAN-EXEC` Phase 7, package X — D35; `REG-F-590`; `DESIGN-data-flow-order-and-deliverable-review.md` §10.5,
+ *     revision 5): the two adapters no longer share one bound — devin's kill is raised to 480 s and agy keeps its own 240 s —
+ *     so the figure is PER TOOL (`reviewerCallMsByTool`, each the `timeout` its adapter hands its program, measured at its exec
+ *     seam), and `reviewerCallMs` is the LONGEST of them, derived, the one every wait below counts by reference: an allowance
+ *     holds whichever reviewer runs.
  *   · `reviewerCallsPerTry` — the initial call and one repair (`reasoning-review-validator.ts`, `evaluate`), ~~which the
  *     verif test measures by driving the validator with a reviewer that never answers in JSON~~ ⭐ each of them run once
  *     more when it throws short of its tool's bound (`JAN-EXEC` Phase 7 `P7-2b`, `REG-D-102` (2); the validator's
@@ -320,7 +333,11 @@ export function laneKeysRefusal(
  */
 export const LANE_BUDGET = Object.freeze({
 	tries: 3,
-	reviewerCallMs: 240_000,
+	// ⛔ MOVED 2026-10-31 (package X — D35) — ~~`reviewerCallMs: 240_000,`~~ one figure held to both adapters' bounds: the LONGEST
+	// of the per-tool bounds now, derived, never restated — the figure every wait counts.
+	reviewerCallMs: Math.max(REVIEWER_CALL_MS_BY_TOOL.devin, REVIEWER_CALL_MS_BY_TOOL.agy),
+	// ⭐⭐ Package X — D35 — the per-tool bounds themselves, each held to its adapter (above).
+	reviewerCallMsByTool: REVIEWER_CALL_MS_BY_TOOL,
 	// ⭐ Package L — D13 (`REG-D-135` (3)): ~~4~~ — the initial call, the JSON repair and the criterion repair, each once more
 	// after a throw: 3 × 2 = 6.
 	reviewerCallsPerTry: 6,
@@ -330,14 +347,14 @@ export const LANE_BUDGET = Object.freeze({
 
 /**
  * How long the spec waits for "Begin & Execute" to answer: ~~3 × (240 s + 2 × 240 s) = 2,160 s (36 minutes)~~ ~~⭐ `P7-2b`:
- * 3 × (240 s + 4 × 240 s) = 3,600 s (60 minutes)~~ ⭐ package L, D13: 3 × (240 s + 6 × 240 s) = 5,040 s (84 minutes).
+ * 3 × (240 s + 4 × 240 s) = 3,600 s (60 minutes)~~ ~~⭐ package L, D13: 3 × (240 s + 6 × 240 s) = 5,040 s (84 minutes)~~ ⭐ package X, D35 (devin’s bound 480 s): 3 × (240 s + 6 × 480 s) = 9,360 s (156 minutes).
  */
 export const EXECUTE_TIMEOUT_MS =
 	LANE_BUDGET.tries *
 	(LANE_BUDGET.executorCallMs + LANE_BUDGET.reviewerCallsPerTry * LANE_BUDGET.reviewerCallMs);
 
 /** The lane's per-test timeout: the POST's wait plus the setup before it — ~~2,280 s (38 minutes)~~ ~~⭐ 3,720 s (62 minutes)~~
- *  ⭐ package L, D13: 5,160 s (86 minutes). */
+ *  ~~⭐ package L, D13: 5,160 s (86 minutes)~~ ⭐ package X, D35 (devin’s bound 480 s): 9,480 s (158 minutes). */
 export const TEST_TIMEOUT_MS = EXECUTE_TIMEOUT_MS + LANE_BUDGET.setupMs;
 
 // ── ⭐ `JAN-EXEC` Phase 7 `P7-2` (D4, D8) — THE PHASE 7 LANE'S WAIT AND LIMIT ──────────────────────────────────────────
@@ -367,8 +384,8 @@ export const PHASE7_COMMAND_MS = 120_000;
 
 /**
  * ⭐ ONE PHASE'S ALLOWANCE: the Begin & Execute wait, 32 command reviews of up to ~~four~~ ⭐ six (package L, D13) calls of
- * 240 s, and 32 commands of 120 s — ~~3,600 s + 30,720 s + 3,840 s = 38,160 s (10.6 hours)~~ ⭐ 5,040 s + 46,080 s + 3,840 s =
- * 54,960 s (15.3 hours). D4 rules that a phase which outlasts it ends the run there, so the next is never started beside it
+ * 240 s, and 32 commands of 120 s — ~~3,600 s + 30,720 s + 3,840 s = 38,160 s (10.6 hours)~~ ~~⭐ 5,040 s + 46,080 s + 3,840 s =
+ * 54,960 s (15.3 hours)~~ ⭐ package X, D35 (devin’s bound 480 s): 9,360 s + 92,160 s + 3,840 s = 105,360 s (29.3 hours). D4 rules that a phase which outlasts it ends the run there, so the next is never started beside it
  * (`REG-F-535`, `REG-F-527`).
  */
 export const PHASE7_UNIT_ALLOWANCE_MS =
@@ -429,15 +446,15 @@ export const PHASE7_DECLARED_POLICIES_PER_UNIT = 4;
 /**
  * ⭐⭐ E2 — A UNIT'S DECLARED REVIEWS, AT THEIR BOUND: Record Assurance runs one review per declared policy, one after
  * another, each the reasoning-review validator's own call, retry and repair — up to `reviewerCallsPerTry` calls of
- * `reviewerCallMs` (`LANE_BUDGET`, by reference) — ~~4 × 4 × 240 s = 3,840 s~~ ⭐ package L, D13: 4 × 6 × 240 s = 5,760 s.
+ * `reviewerCallMs` (`LANE_BUDGET`, by reference) — ~~4 × 4 × 240 s = 3,840 s~~ ~~⭐ package L, D13: 4 × 6 × 240 s = 5,760 s~~ ⭐ package X, D35 (devin’s bound 480 s): 4 × 6 × 480 s = 11,520 s.
  */
 export const PHASE7_DECLARED_REVIEWS_MS =
 	PHASE7_DECLARED_POLICIES_PER_UNIT * LANE_BUDGET.reviewerCallsPerTry * LANE_BUDGET.reviewerCallMs;
 
 /**
  * ⭐⭐ E2 (design B8: *"The sign-off's time bound grows to cover the reviews"*) — RECORD ASSURANCE'S OWN BOUND: the act's
- * (`PHASE7_SIGN_OFF_MS`) and its declared reviews — ~~300 s + 3,840 s = 4,140 s~~ ⭐ package L, D13: 300 s + 5,760 s =
- * 6,060 s. ⛔ Before E2 it called no model and was
+ * (`PHASE7_SIGN_OFF_MS`) and its declared reviews — ~~300 s + 3,840 s = 4,140 s~~ ~~⭐ package L, D13: 300 s + 5,760 s =
+ * 6,060 s~~ ⭐ package X, D35 (devin’s bound 480 s): 300 s + 11,520 s = 11,820 s. ⛔ Before E2 it called no model and was
  * bounded as a sign-off act, so a sign-off whose reviews each stayed inside their bound would have been abandoned at 300 s.
  * Mark Satisfied and an abandonment call no model, and keep `PHASE7_SIGN_OFF_MS`.
  */
@@ -452,7 +469,7 @@ export const PHASE7_SHOW_OVERVIEW_MS = 3 * PHASE7_UI_MS;
 /**
  * ⭐ `P76F-C` C8 — ONE BEGIN & EXECUTE AND WHAT THE LANE DOES AFTER IT (`runTheLane`, `run`): the press, waited for up to one
  * phase's allowance; the overview shown afresh after an envelope that leaves the page; the store read; the screenshot —
- * ~~38,160 s + 360 s + 300 s + 120 s = 38,940 s~~ ⭐ package L, D13: 54,960 s + 360 s + 300 s + 120 s = 55,740 s. ⚠ The
+ * ~~38,160 s + 360 s + 300 s + 120 s = 38,940 s~~ ~~⭐ package L, D13: 54,960 s + 360 s + 300 s + 120 s = 55,740 s~~ ⭐ package X, D35 (devin’s bound 480 s): 105,360 s + 360 s + 300 s + 120 s = 106,140 s. ⚠ The
  * archive's copying is the setup allowance's.
  */
 export const PHASE7_UNIT_RUN_MS =
@@ -462,11 +479,11 @@ export const PHASE7_UNIT_RUN_MS =
  * ⭐ `P76F-C` C8 — THE RUN PLAN'S RULE ON ONE STOPPED PHASE, EVERY ACT AT ITS BOUND (`recoverByRule`, `recoveryAct`):
  *   · the re-run: the overview shown, the row's offers waited for, the store read for the limit, the rationale filled,
  *     the press waited for up to one phase's allowance (⭐ the RE-RUN's allowance, `REG-D-105` (4)), the overview shown
- *     again after an envelope that leaves the page, the store read — 360 + 120 + 300 + 120 + ~~38,160~~ ⭐ 54,960 (package
- *     L, D13) + 360 + 300 = ~~39,720 s~~ ⭐ 56,520 s;
+ *     again after an envelope that leaves the page, the store read — 360 + 120 + 300 + 120 + ~~38,160~~ ~~⭐ 54,960 (package
+ *     L, D13)~~ ⭐ 105,360 (package X, D35) + 360 + 300 = ~~39,720 s~~ ~~⭐ 56,520 s~~ ⭐ 106,920 s;
  *   · the abandonment of a re-run refused again: the overview shown, the row's offers, the rationale filled, the press
  *     (a sign-off act's bound), the overview again, the store read — 360 + 120 + 120 + 300 + 360 + 300 = 1,560 s;
- * together ~~41,280 s~~ ⭐ 58,080 s.
+ * together ~~41,280 s~~ ~~⭐ 58,080 s~~ ⭐ 108,480 s (package X, D35).
  */
 export const PHASE7_RECOVERY_MS =
 	PHASE7_SHOW_OVERVIEW_MS +
@@ -494,7 +511,7 @@ export const PHASE7_SIGN_OFF_ACTS = 2;
  * NOT CONCLUDE, EVERY ACT AT ITS BOUND (`signOff`): the overview shown afresh after the refused Record Assurance, the row's
  * offer read, the store read for the limit, the rationale filled, the press — its act and a review of each declared policy,
  * as Record Assurance's (`PHASE7_RECORD_ASSURANCE_MS`) — and the store read after: 360 + 120 + 300 + 120 + ~~4,140~~ ⭐ 6,060
- * (package L, D13) + 300 = ~~5,340 s~~ ⭐ 7,260 s. ⛔ A paid act: counted, or the timeout could kill the server inside its
+ * (package L, D13) + 300 = ~~5,340 s~~ ~~⭐ 7,260 s~~ ⭐ 13,020 s (package X, D35: Record Assurance’s bound 11,820 s). ⛔ A paid act: counted, or the timeout could kill the server inside its
  * bound (`REG-F-527`; E12-M27's class).
  */
 export const PHASE7_DECLARED_RERUN_MS =
@@ -512,7 +529,8 @@ export const PHASE7_DECLARED_RERUN_MS =
  * (`PHASE7_DECLARED_REVIEWS_MS`, 3,840 s), which its press now waits for: 5,640 s. ~~= 1,800 s~~ ⭐⭐ `E12F` F2, F3 — and the
  * store read for the limit before Record Assurance (300 s), and the rule's one re-run of the declared reviews that did not
  * conclude (`PHASE7_DECLARED_RERUN_MS`, 5,340 s): 11,280 s. ~~= 5,640 s~~ ⭐ package L, D13 — each review six calls, so the
- * declared reviews 5,760 s and their re-run 7,260 s: 360 + 1,440 + 5,760 + 300 + 7,260 = 15,120 s. ~~= 11,280 s~~
+ * declared reviews 5,760 s and their re-run 7,260 s: 360 + 1,440 + 5,760 + 300 + 7,260 = 15,120 s. ~~= 11,280 s~~ ⭐ package X, D35 (devin’s bound 480 s) — the
+ * declared reviews 11,520 s and their re-run 13,020 s: 360 + 1,440 + 11,520 + 300 + 13,020 = 26,640 s. ~~= 15,120 s~~
  */
 export const PHASE7_SIGN_OFF_UNIT_MS =
 	PHASE7_SHOW_OVERVIEW_MS +
@@ -583,7 +601,8 @@ export function phase7SignOffUnitMs(policies: number): number {
  *     abandoned is never signed off, and as four policies' though the root declares two: an upper bound;
  *   · the final screenshot and the final archive's read — 120 s + 300 s = 420 s;
  * = 419,640 s (116.6 hours). ⭐ Package L, D13 — each review six calls, so 1,800 + 5 × 55,740 + 1,200 + 4 × 58,080 +
- * 5 × 15,120 + 420 = 590,040 s (163.9 hours), under Node's timer ceiling. ~~= 419,640 s~~ ~~= 391,440 s (108.7 hours)~~
+ * 5 × 15,120 + 420 = 590,040 s (163.9 hours), under Node's timer ceiling. ⭐ package X, D35 (devin’s bound 480 s): 1,800 + 5 × 106,140 +
+ * 1,200 + 4 × 108,480 + 5 × 26,640 + 420 = 1,101,240 s (305.9 hours), still under Node's timer ceiling. ~~= 590,040 s~~ ~~= 419,640 s~~ ~~= 391,440 s (108.7 hours)~~
  * before `E12F`'s limit read and re-run. ~~= 372,240 s (103.4
  * hours)~~ before E2's declared reviews. ~~1,800 s + 4 × 38,160 s +
  * 4 × 1 × 38,160 s = 307,080 s (85.3 hours)~~ ⛔ counted the five
@@ -774,7 +793,9 @@ export const PHASE7_AUTHORING_FLOOR_RUNS = 2;
  * FOR `parts` TYPES: each floor run the agent's run, at the executor's allowance, and ONE REVIEW OF EACH PART of up to
  * `reviewerCallsPerTry` calls at the reviewer's bound, derived from the one-unit lane's budget by reference — 2 × (240 s +
  * parts × 4 × 240 s): 2,400 s (40 minutes) for one part, 31,200 s (520 minutes) for run-11's sixteen ⭐ — package L, D13 (each
- * review six calls): 2 × (240 s + parts × 6 × 240 s), 3,360 s (56 minutes) for one part, 46,560 s (776 minutes) for sixteen. ⛔ The figure was
+ * review six calls): 2 × (240 s + parts × 6 × 240 s), 3,360 s (56 minutes) for one part, 46,560 s (776 minutes) for sixteen.
+ * ⭐ package X, D35 (devin’s bound 480 s): 2 × (240 s + parts × 6 × 480 s), 6,240 s (104 minutes) for one part, 92,640 s (1,544 minutes) for
+ * sixteen. ⛔ The figure was
  * one part's for every turn: it counted two reviews in all, and the floor now reviews each type of the candidate in each of
  * its two possible rounds (design D9). ⚠ AT LEAST ONE PART: the turn stages its types as the agent authors them, so a count
  * read before the first is staged says nothing of the candidate to come, and is given one part's, the 2,400 s every turn was
@@ -950,7 +971,7 @@ export const PHASE7_DESIGNER_ACTS = 4;
  * the Undertaking are the setup allowance's, as half A's typing is (`PHASE7_SETUP_MS`).
  * ⭐ The review in parts, B6 (design D9) — FOR `parts` TYPES, the allowance theirs (`phase7AuthoringAllowanceMs`): 5,585 s at
  * one part, as before, and 34,385 s at sixteen. ⭐ Package L, D13 — each review six calls: 6,545 s at one part, 49,745 s at
- * sixteen.
+ * sixteen. ⭐ package X, D35 (devin’s bound 480 s): 9,425 s at one part, 95,825 s at sixteen.
  */
 export function phase7AuthoringMs(parts: number): number {
 	return (
@@ -966,7 +987,7 @@ export function phase7AuthoringMs(parts: number): number {
  * limit's read before it, the run plan's rule on it, and its sign-off — ~~38,940 s + 300 s + 41,280 s + 1,800 s = 82,320 s~~
  * ⭐ with E12's sign-off (`PHASE7_SIGN_OFF_UNIT_MS`: its declared reviews, the limit's read before it and the rule's one
  * re-run of them), 38,940 s + 300 s + 41,280 s + 11,280 s = 91,800 s ⭐ — package L, D13 (each review six calls): 55,740 s +
- * 300 s + 58,080 s + 15,120 s = 129,240 s — the terms `PHASE7_TEST_TIMEOUT_MS` counts once for
+ * 300 s + 58,080 s + 15,120 s = 129,240 s — ⭐ package X, D35 (devin’s bound 480 s): 106,140 s + 300 s + 108,480 s + 26,640 s = 241,560 s — the terms `PHASE7_TEST_TIMEOUT_MS` counts once for
  * each of §3.2's four phases. ⚠ Its sign-off is bounded as one of four declared policies, §3.2's most
  * (`PHASE7_DECLARED_POLICIES_PER_UNIT`): ~~an agent's unit that declares more is bounded short~~ ⭐ half B's timeout
  * re-counts each unit's sign-off for the policies it declares (`phase7HalfBTestTimeoutMs`; the lead's delegated decision
@@ -984,9 +1005,9 @@ export const NODE_TIMER_CEILING_MS = 2_147_483_647;
 /**
  * ⭐⭐ C3 — HALF B'S TIMEOUT, ONCE ITS UNITS ARE READ (C2: the PWA is the agent's, so its phases are as many as it made):
  * half A's, re-counted for `phases` phases in place of §3.2's four, plus the authoring's share — for four phases,
- * ~~372,240 s + 5,585 s = 377,825 s~~ ~~⭐ 419,640 s + 5,585 s = 425,225 s~~ ⭐ package L, D13: 590,040 s + 6,545 s = 596,585 s,
+ * ~~372,240 s + 5,585 s = 377,825 s~~ ~~⭐ 419,640 s + 5,585 s = 425,225 s~~ ~~⭐ package L, D13: 590,040 s + 6,545 s = 596,585 s~~ ⭐ package X, D35 (devin’s bound 480 s): 1,101,240 s + 9,425 s = 1,110,665 s,
  * half A's counting E12's sign-offs. ⛔ CAPPED AT NODE'S TIMER CEILING, past which Playwright would time the test out at once: a
- * PWA of ~~26~~ ~~⭐ 23~~ ⭐ 17 phases or more (16 at sixteen parts; package L, D13) is given the ceiling, about 596 hours, not
+ * PWA of ~~26~~ ~~⭐ 23~~ ~~⭐ 17~~ ⭐ 9 phases or more (8 at sixteen parts; package X, D35) is given the ceiling, about 596 hours, not
  * its arithmetic. ⚠ Half B STARTS under half
  * A's timeout, which covers ~~the authoring~~ ⭐ one part's authoring many times over, and the lane extends it ⭐ while its
  * turn runs, for the parts it stages (`phase7HalfBAuthoringTimeoutMs`), and here when the units are read.
@@ -995,14 +1016,16 @@ export const NODE_TIMER_CEILING_MS = 2_147_483_647;
  * EACH UNIT'S SIGN-OFF IS RE-COUNTED FOR ITS OWN POLICIES (`phase7SignOffUnitMs`) in place of §3.2's four
  * (`PHASE7_SIGN_OFF_UNIT_MS`), which half A's arithmetic counts once per unit. ⛔ A unit declaring five was counted as
  * four: the timeout could kill the server inside a sign-off whose every review stayed within its bound (`REG-F-527`). For
- * five units each declaring four, the figure above. ⚠ And the ceiling's ~~23~~ ⭐ 17 phases (package L, D13) are for units each
- * declaring four, at one part: units declaring more reach it with as many phases or fewer (eight each, ~~21~~ ⭐ 15), units
- * declaring fewer need as many or more (one each, ~~25~~ ⭐ 18).
+ * five units each declaring four, the figure above. ⚠ And the ceiling's ~~23~~ ~~⭐ 17~~ ⭐ 9 phases (package X, D35) are for units each
+ * declaring four, at one part: units declaring more reach it with as many phases or fewer (eight each, ~~21~~ ~~⭐ 15~~ ⭐ 8), units
+ * declaring fewer need as many or more (one each, ~~25~~ ~~⭐ 18~~ ⭐ 10).
  * ⭐ The review in parts, B6 (design D9) — AND THE AUTHORING'S SHARE FOR THE `parts` ITS TURN STAGED (`phase7AuthoringMs`), the
  * largest count the lane read: the figures above are one part's, 5,585 s, and at sixteen parts the share is 34,385 s, so for
  * four phases 454,025 s. ~~⚠ The ceiling's three phase counts above hold at one part and at sixteen alike.~~ ⭐ Package L, D13 —
  * each review six calls: one part's share 6,545 s, sixteen's 49,745 s, so for four phases 639,785 s; and the ceiling comes a
- * phase sooner at sixteen parts than at one (16 phases, not 17; eight policies each, 15 at either).
+ * phase sooner at sixteen parts than at one (16 phases, not 17; eight policies each, 15 at either). ⭐ Package X, D35 (devin’s
+ * bound 480 s): one part's share 9,425 s, sixteen's 95,825 s, so for four phases 1,197,065 s; the ceiling still comes a phase
+ * sooner at sixteen parts (8 phases, not 9; eight policies each, 8 at either; one each, 10 at one part and 9 at sixteen).
  */
 export function phase7HalfBTestTimeoutMs(declared: readonly number[], parts: number): number {
 	const phases = declared.length - 1;
@@ -1017,7 +1040,8 @@ export function phase7HalfBTestTimeoutMs(declared: readonly number[], parts: num
  * ⭐ The review in parts, B6 (design D9: *"carry the allowance into the spec timeout"*) — HALF B'S TIMEOUT WHILE ITS TURN RUNS:
  * half A's, which half B starts under, and the authoring's share for the `parts` its turn has staged — capped at Node's
  * timer ceiling. The lane sets it each time it derives a larger allowance (`waitForTheCandidate`), so a turn the allowance
- * still holds is not cut off by the test's own timeout: from 217 parts on, the authoring's share alone is longer than half
+ * still holds is not cut off by the test's own timeout: from ~~217~~ ⭐ 191 parts on (package X, D35; 204 at package L’s figures, which this sentence had not restated),
+ * the authoring's share alone is longer than half
  * A's timeout.
  */
 export function phase7HalfBAuthoringTimeoutMs(parts: number): number {

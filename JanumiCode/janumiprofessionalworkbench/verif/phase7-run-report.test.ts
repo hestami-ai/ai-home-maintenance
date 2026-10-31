@@ -66,10 +66,13 @@ import { main as finalize, RESULTS_NAME } from '../scripts/phase7/finalize-run.j
 import { manifestProblems } from '../scripts/phase7/rerun-commands.js';
 // ⭐ P7-6 I5 (`p76-fix-c` C1) — the marker the validator OPENS every I5 record's detail with, which the report restates;
 // and the validator, its sink and the floor's recorder, which write the I5 records these cases read (`i5Chain`).
+// ⭐⭐ Package X — D34 (`REG-F-590`) — and the bound the product's devin branch holds a thrown call to, which the D34 cases'
+// records are made under.
 import {
 	createAgyReasoningReviewValidator,
 	MISSING_CRITERION_ROW as VALIDATOR_D13_MARKER,
 	NO_CRITERION_ANSWERED as VALIDATOR_I5_MARKER,
+	REVIEWER_CALL_BOUND_MS,
 	type AgyPrint
 } from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
 import { createExchangeSink } from '../apps/rph-demo/src/lib/server/assurance/exchange-capture.js';
@@ -2985,6 +2988,186 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 		};
 		const one = cellOf(buildRunReport(draft, run.lane, { accountNames: NAMES }).report, '1', 'whole run');
 		expect([one.value, one.basis]).toEqual(['broke', ['the PWA "CLI Product Realization" is DRAFT']]);
+	});
+});
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7, package X — D34 (`REG-F-590`; `DESIGN-data-flow-order-and-deliverable-review.md` §10.5, revision 5) ──
+// A review that ended on a call thrown with no reply AT OR PAST its tool's bound reads TIMED OUT, citing `REG-F-590`, the
+// timeout's own finding; a failure short of the bound keeps `REG-F-499`. ⛔ Before X the report called both no-response and
+// cited `REG-F-499`, the finding for failures SHORT of the bound — so v12's three timeouts at devin's 240 s kill would have been
+// filed under the wrong finding. ⭐ Every record below is the VALIDATOR's own, as the I5 cases' are (`i5Chain`): the real
+// validator under a declared bound, its clock scripted, each try projected by the floor's recorder — so a rewording of the
+// validator's detail reddens these cases rather than leaving them reading prose no validator writes.
+describe('⭐⭐ package X — D34 — a review that ended on a call thrown at or past its tool’s bound reads TIMED OUT, citing REG-F-590', () => {
+	const BOUND = REVIEWER_CALL_BOUND_MS.devin;
+	const T0 = Date.parse('2026-10-30T12:00:00.000Z');
+	/** How many times the scripted clock has been read in the chain being made. */
+	let reads = 0;
+	/** A clock reading `T0 + offsets[i]` at its i-th reading, the last repeating: the validator reads it before and after each call. */
+	const clockAt =
+		(...offsets: readonly number[]) =>
+		(): string => {
+			const at = offsets[Math.min(reads++, offsets.length - 1)]!;
+			return new Date(T0 + at).toISOString();
+		};
+	/**
+	 * One review's calls as the validator records them under `bound` (none when undefined), its clock at `offsets`, its `print`
+	 * giving each of `replies` in turn — an `Error` is a call that got no reply — each record projected as the floor stores it.
+	 */
+	const chainOf = async (
+		bound: number | undefined,
+		offsets: readonly number[],
+		...replies: (string | Error)[]
+	): Promise<StoredObject[]> => {
+		reads = 0;
+		let n = 0;
+		const print: AgyPrint = async () => {
+			const r = replies[n++] ?? '';
+			if (r instanceof Error) throw r;
+			return r;
+		};
+		const exchanges = createExchangeSink();
+		await createAgyReasoningReviewValidator({
+			print,
+			modelId: 'fixture-judge',
+			exchanges,
+			clock: clockAt(...offsets),
+			...(bound === undefined ? {} : { callBoundMs: bound })
+		})
+			.evaluate(
+				{
+					subjectId: 'art_1',
+					objectType: 'ARTIFACT',
+					semanticVersion: 1,
+					isAiProduced: true,
+					producer: { actorType: 'AGENT', agentId: 'executor', modelId: 'executor-model', providerId: 'executor-provider' }
+				},
+				{
+					reasoningReview: {
+						criteria: SEEDED_REASONING_REVIEW_CRITERIA,
+						framing: 'WORK_PRODUCT',
+						prompt: 'Write the design',
+						content: '# Design',
+						narration: ''
+					}
+				}
+			)
+			.catch(() => undefined);
+		const records = exchanges.drain();
+		let minted = 0;
+		const ids = mintIdsFor(records, () => `mex_${++minted}`);
+		return records.map((rec) => {
+			const p = toRecordModelExchange(
+				rec,
+				{
+					runToken: 'run_1',
+					plane: 'ASSURANCE',
+					invokerId: 'floor.reasoning-review',
+					assurancePolicyId: 'floor.reasoning-review',
+					subjectObjectId: 'art_1',
+					subjectObjectType: 'ARTIFACT',
+					subjectSemanticVersion: 1,
+					newId: (prefix) => `${prefix}_unused`
+				},
+				ids
+			);
+			const state = { exchangeRole: p.exchangeRole, disposition: p.disposition, attemptOrdinal: p.attemptOrdinal, runToken: p.runToken, parseOutcome: p.parseOutcome };
+			return exchange(state, `mex_${p.exchangeRole}_${p.attemptOrdinal}_run_1`);
+		});
+	};
+	/** A chain's records as `aRun` takes a review's calls: each its role, disposition, ordinal, parse outcome and E-5 detail. */
+	const asCalls = (chain: readonly StoredObject[]): Call[] =>
+		chain.map((x) => {
+			const parse = x.state.parseOutcome as { outcome?: unknown; detail?: unknown };
+			return {
+				role: String(x.state.exchangeRole),
+				disposition: String(x.state.disposition),
+				ordinal: Number(x.state.attemptOrdinal),
+				parse: String(parse.outcome),
+				detail: String(parse.detail)
+			};
+		});
+	const FAILURE = new Error('devin invocation failed: Command failed: devin --print (fixture)');
+
+	it('⛔ PREDICTED RED — a call thrown AT its tool’s bound and not run again: TIMED OUT, the bound and the time in its detail', async () => {
+		const chain = await chainOf(BOUND, [0, BOUND], FAILURE);
+		expect(chain.map((x) => `${x.state.exchangeRole}:${x.state.disposition}`), 'arrangement: one call, thrown at the bound').toEqual([
+			'INITIAL:NO_RESPONSE'
+		]);
+		expect(String((chain[0]!.state.parseOutcome as { detail?: unknown }).detail), 'arrangement: the validator’s own at-bound clause').toContain(
+			`at or past the tool’s ${BOUND} ms bound`
+		);
+		const p = pairReview('art_1', 1, chain);
+		// ⛔ THE MUTANT: the label reversed — the at-bound call read as a failure short of the bound, `REG-F-499`'s.
+		expect(p.label, 'a review that ended on a timeout').toBe('timed-out');
+		expect(p.detail).toBe(`its INITIAL call threw with no reply after ${BOUND} ms, at or past its tool’s ${BOUND} ms bound: timed out (REG-F-590)`);
+		expect(p.concludedBy).toBe('mex_INITIAL_1_run_1');
+		expect(p.thrown, 'what its calls that threw show of the bound').toEqual({ short: 0, atTheBound: 1 });
+		// ⭐ Past the bound too: a kill that landed late is a timeout as well.
+		expect(pairReview('art_1', 1, await chainOf(BOUND, [0, BOUND + 38], FAILURE)).label).toBe('timed-out');
+	});
+
+	it('⛔ PREDICTED RED — stage 4 cites REG-F-590 for it, never REG-F-499 — a work product’s review and a command’s', async () => {
+		const timedOut = asCalls(await chainOf(BOUND, [0, BOUND + 38], FAILURE));
+		const workProduct = cellOf(reportOf(aRun({ design: { review: timedOut } })).report, '4', 'design');
+		expect(workProduct.basis, 'the review reads as D34 labels it').toContain('the review of work product art_design is timed-out');
+		expect(shown(workProduct), 'a timed-out review’s break').toEqual(['broke', ['REG-F-590']]);
+		const command = reportOf(aRun({ implementation: { commands: 1, commandReview: timedOut } })).report;
+		expect(shown(cellOf(command, '4', 'implementation')), 'a timed-out command review').toEqual(['broke', ['REG-F-520', 'REG-F-590']]);
+	});
+
+	it('⛔ PREDICTED RED — a retry thrown at the bound, after a call thrown short of it: TIMED OUT, citing REG-F-590 for the retry and REG-F-499 for the call it repeated', async () => {
+		const chain = await chainOf(BOUND, [0, 97_674, 97_700, 97_700 + BOUND + 38], FAILURE, FAILURE);
+		expect(chain.map((x) => `${x.state.exchangeRole}:${x.state.disposition}`), 'arrangement: thrown short, run once more, thrown past the bound').toEqual([
+			'INITIAL:NO_RESPONSE',
+			'RETRY:NO_RESPONSE'
+		]);
+		const p = pairReview('art_1', 1, chain);
+		// ⛔ A retry's own clause names no bound ("it was itself the one further call…"): the bound is the one the call it repeats was held to.
+		expect([p.label, p.detail, p.thrown]).toEqual([
+			'timed-out',
+			`its RETRY call threw with no reply after ${BOUND + 38} ms, at or past its tool’s ${BOUND} ms bound: timed out (REG-F-590)`,
+			{ short: 1, atTheBound: 1 }
+		]);
+		const cell = cellOf(reportOf(aRun({ design: { review: asCalls(chain) } })).report, '4', 'design');
+		expect(shown(cell)).toEqual(['broke', ['REG-F-499', 'REG-F-590']]);
+	});
+
+	it('⭑ CONTROL — two calls thrown short of the bound, as the validator records them: NO RESPONSE, citing REG-F-499 alone', async () => {
+		const chain = await chainOf(BOUND, [0, 5_000, 5_100, 9_000], FAILURE, FAILURE);
+		const p = pairReview('art_1', 1, chain);
+		expect([p.label, p.detail, p.thrown]).toEqual(['no-response', 'both calls threw: the call and its one retry (REG-D-102)', { short: 2, atTheBound: 0 }]);
+		expect(shown(cellOf(reportOf(aRun({ design: { review: asCalls(chain) } })).report, '4', 'design'))).toEqual(['broke', ['REG-F-499']]);
+	});
+
+	it('⭑ CONTROL — one millisecond short of the bound is short of it: run once more, and two such throws read NO RESPONSE', async () => {
+		const chain = await chainOf(BOUND, [0, BOUND - 1, BOUND, 2 * BOUND - 1], FAILURE, FAILURE);
+		expect(pairReview('art_1', 1, chain).label).toBe('no-response');
+	});
+
+	it('⭑ CONTROL — a call under a tool that declares no bound, and one the clock cannot place, are not shown at a bound: NO RESPONSE, REG-F-499', async () => {
+		// The fingerprint's and the runner's shape: no bound, so a throw stands at once, whatever its time.
+		const unbounded = await chainOf(undefined, [0, 10 * BOUND], FAILURE);
+		expect(String((unbounded[0]!.state.parseOutcome as { detail?: unknown }).detail), 'arrangement').toContain('declares no bound');
+		expect([pairReview('art_1', 1, unbounded).label, pairReview('art_1', 1, unbounded).thrown]).toEqual(['no-response', { short: 0, atTheBound: 0 }]);
+		// A response stamped before its request: no time, so not shown short of the bound — nor at it.
+		const unplaced = await chainOf(BOUND, [0, -5], FAILURE);
+		expect(String((unplaced[0]!.state.parseOutcome as { detail?: unknown }).detail), 'arrangement').toContain('its time cannot be read off the clock');
+		expect(pairReview('art_1', 1, unplaced).label).toBe('no-response');
+		expect(shown(cellOf(reportOf(aRun({ design: { review: asCalls(unplaced) } })).report, '4', 'design'))).toEqual(['broke', ['REG-F-499']]);
+	});
+
+	it('⭑ CONTROL — a call thrown at the bound whose retry ANSWERED concluded the review: answered — no timed-out review, whatever its first call', () => {
+		// ⚠ Not reachable under today's rule (a throw at the bound is not run again), so written as X-2's shape would record it
+		// (design D36): the report reads what concluded the review, and a reply concluded this one.
+		const chain = [
+			call('INITIAL', 'NO_RESPONSE', 1, {
+				parse: 'NOT_ATTEMPTED',
+				detail: `The reviewing tool’s call failed after ${BOUND} ms with no reply, at or past the tool’s ${BOUND} ms bound — a timeout. What the tool reported, sanitised: (fixture)`
+			}),
+			call('RETRY', 'ACCEPTED', 2)
+		];
+		expect([pairReview('art_1', 1, chain).label, pairReview('art_1', 1, chain).concludedBy]).toEqual(['answered', 'mex_RETRY_2_run_1']);
 	});
 });
 

@@ -24,7 +24,11 @@ import { HarnessRefusal } from './preflight.js';
 import type { CandidateIdentity, ServedFacts } from './record.js';
 import { TransportFailure, type Transport } from './transports.js';
 
-/** The product's kill — `agyPrint`'s and `devinPrint`'s execFile timeout — re-imposed on every Ollama call. */
+/**
+ * The product's kill — `agyPrint`'s ~~and `devinPrint`'s~~ execFile timeout — re-imposed on every Ollama call. ⛔ MOVED
+ * 2026-10-31 (`JAN-EXEC` Phase 7, package X; design D35, revision 5): `devinPrint`'s kill is raised to 480 s; this harness keeps
+ * agy's 240 s, as its header says it cuts the connection "as `agyPrint`'s execFile kill cuts agy". Unchanged in value.
+ */
 export const OLLAMA_BOUND_MS = 240_000;
 
 export interface OllamaTransportOptions {

@@ -930,13 +930,25 @@ function previousRun(r: Run, sameCandidate: readonly Run[]): Run | undefined {
 		.at(-1);
 }
 
-/** §5.1: changes of served template, server version or options are reported as confounds, not as a new candidate. */
+/**
+ * §5.1: changes of served template, server version or options are reported as confounds, not as a new candidate. ⭐⭐ Package X
+ * — D35 — and changes of a bound.
+ */
 function confounds(r: Run, prev: Run, notes: string[]): void {
 	const differs = (what: string) =>
 		notes.push(`confound: run ${r.run.runId} differs from ${prev.run.runId}, the same candidate’s previous run, in ${what}`);
 	if (prev.run.candidate.servedTemplateSha256 !== r.run.candidate.servedTemplateSha256) differs('servedTemplateSha256');
 	if (prev.run.candidate.serverVersion !== r.run.candidate.serverVersion) differs('serverVersion');
 	if (canonicalJson(prev.run.candidate.options) !== canonicalJson(r.run.candidate.options)) differs('its options');
+	// ⭐⭐ `JAN-EXEC` Phase 7, package X — D35 (`REG-F-590`; `DESIGN-data-flow-order-and-deliverable-review.md` §10.5, revision 5) —
+	// A CHANGED BOUND IS A CONFOUND TOO: each bound the RUN line records (`CandidateIdentity.bounds`) that differs from the same
+	// candidate's previous run's is named, with both figures — a run at devin's raised 480 s kill beside one at 240 s. ⚠ Reported,
+	// never a new candidate: bounds are in no candidate key (`record.ts`), so the earlier run's lines still cover their cases.
+	for (const bound of ['wallClockMs', 'promptChars', 'printTimeout'] as const) {
+		const was = prev.run.candidate.bounds[bound];
+		const now = r.run.candidate.bounds[bound];
+		if (was !== now) differs(`its bound ${bound}, ${String(was)} then ${String(now)}`);
+	}
 }
 
 function runFailures(ctx: Ctx, r: Run, sameCandidate: readonly Run[]): RecordFailures {

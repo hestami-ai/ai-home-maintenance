@@ -22,6 +22,8 @@ import {
 // property, and TS-06 made it the seam's.
 import { diagnosticCarriesPrompt } from './diagnostic-safety.js';
 import { OutputLimitReached } from './output-limit.js';
+// ⭐⭐ Package X — D34 (`REG-F-590`) — the class a killed call is thrown as, its one reading and its one statement.
+import { killedCallFacts, killedCallOf, ToolCallKilled } from './killed-call.js';
 
 const LONG = 'Assess the northern delivery route against the safety rubric. '.repeat(8);
 
@@ -263,7 +265,10 @@ describe('⭐⭐ P7-6 I1 — the reviewer runs isolated: its own fresh folder, e
 			'false'
 		]);
 		// The bounds are unchanged (`REVIEWER_CALL_BOUND_MS.devin`, `thrown-reviewer-call.test.ts`).
-		expect(call.options).toMatchObject({ timeout: 240_000, maxBuffer: 16 * 1024 * 1024, windowsHide: true });
+		// ⛔ MOVED 2026-10-31 (`JAN-EXEC` Phase 7, package X; design D35, revision 5; `REG-F-590`) — ~~`timeout: 240_000`~~: devin's
+		// kill is raised to 480 s, a planning figure (about twice the longest answered call, 231,362 ms); the buffer and the
+		// window are unchanged.
+		expect(call.options).toMatchObject({ timeout: 480_000, maxBuffer: 16 * 1024 * 1024, windowsHide: true });
 	});
 });
 
@@ -483,6 +488,133 @@ describe('⭐⭐ P5 package A (F1) — a reply devin ended at the model’s outp
 		const thrown = await thrownBy(devinPrint(LONG, devin.exec));
 		expect(thrown).toBeInstanceOf(OutputLimitReached);
 		// ⛔ THE MUTANT: the class's message built from the raw rejection — the prompt would reach E-5's detail (PER-12).
+		expect((thrown as Error).message).toMatch(/^devin invocation failed\. Its diagnostic is WITHHELD/);
+		expect(diagnosticCarriesPrompt((thrown as Error).message, LONG)).toBe(false);
+	});
+});
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7, package X — D34 (`REG-F-590`; `DESIGN-data-flow-order-and-deliverable-review.md` §10.5, revision 5) ──
+// A call devin's program was KILLED during — a signal and no exit code, as `execFile` rejects at its `timeout` — is thrown as its
+// own class, carrying what the kill left: whether devin had written its export, what that export's last agent step counted, how
+// many characters devin printed before the kill, and the signal. ⛔ Before X the catch read the export only for an output-limit
+// exit (`devinOutputLimit` returns nothing without a numeric exit code), so a kill was thrown with its diagnostic alone and the
+// `finally` removed the folder with the export in it (`REG-F-554`). ⚠ Whether devin leaves either before a kill is untested
+// (design D34): these cases hold what the catch reads of what it finds, whatever it finds.
+
+/** What devin printed before the kill in the first case: 13 characters of a reply it never finished. */
+const PRINTED = '{"findings":[';
+
+describe('⭐⭐ package X — D34 — a call killed during its run is thrown with what it left: its export, its last step’s counts, what it printed, the signal', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs();
+	});
+
+	it('⛔ PREDICTED RED — devin wrote an export and printed, then was killed: ToolCallKilled, its facts carried, its diagnostic unchanged, the folder still removed', async () => {
+		vi.stubEnv('JPWB_ASSURANCE_MODEL', 'glm-5-3-flash-high');
+		const devin = failingDevin(exportOf(812, { finish_reason: 'stop' }), { code: null, signal: 'SIGTERM', stdout: PRINTED, stderr: '' });
+		const thrown = await thrownBy(devinPrint('Judge the work product.', devin.exec));
+		// ⛔ THE MUTANT: the facts dropped — the kill thrown with its diagnostic alone, as before X.
+		expect(thrown, 'a kill was thrown with its diagnostic alone').toBeInstanceOf(ToolCallKilled);
+		expect(killedCallOf(thrown), 'what the kill left').toEqual({
+			signal: 'SIGTERM',
+			printedChars: 13,
+			exportWritten: true,
+			lastStep: { finishReason: 'stop', outputTokens: 812 }
+		});
+		// ⭐ The diagnostic is the one every failure carries, unchanged: the facts ride beside it, never in it.
+		expect((thrown as Error).message).toMatch(/^devin invocation failed: Command failed: devin --print --model glm-5-3-flash-high /);
+		expect((thrown as Error).message, 'the printed reply reached the diagnostic').not.toContain(PRINTED);
+		expect(thrown, 'a kill is no cut at the output-token limit').not.toBeInstanceOf(OutputLimitReached);
+		expect(existsSync(devin.folder()), 'arrangement: the folder, export and all, is removed').toBe(false);
+	});
+
+	it('⛔ PREDICTED RED — a kill before devin wrote any export or printed anything: the class, saying so', async () => {
+		vi.stubEnv('JPWB_ASSURANCE_MODEL', 'glm-5-3-flash-high');
+		const devin = failingDevin(undefined, { code: null, signal: 'SIGTERM', stdout: '', stderr: '' });
+		const thrown = await thrownBy(devinPrint('Judge the work product.', devin.exec));
+		expect(killedCallOf(thrown), 'a kill that left nothing').toEqual({ signal: 'SIGTERM', printedChars: 0, exportWritten: false, lastStep: {} });
+	});
+
+	it('⛔ a kill while the export was half written: written, and nothing counted from it — never a parse failure thrown in its place', async () => {
+		vi.stubEnv('JPWB_ASSURANCE_MODEL', 'glm-5-3-flash-high');
+		const devin = failingDevin('{"schema_version":"ATIF-v1.7","steps":[{"step_id":1,', { code: null, signal: 'SIGKILL', stdout: '', stderr: '' });
+		const thrown = await thrownBy(devinPrint('Judge the work product.', devin.exec));
+		expect(killedCallOf(thrown)).toEqual({ signal: 'SIGKILL', printedChars: 0, exportWritten: true, lastStep: {} });
+	});
+
+	it('⛔ a finish reason that is not a bounded token, and a signal that is not a signal’s name, are not carried as such', async () => {
+		vi.stubEnv('JPWB_ASSURANCE_MODEL', 'glm-5-3-flash-high');
+		const devin = failingDevin(exportOf(9, { finish_reason: 'stopped; and the prompt was: Judge' }), {
+			code: null,
+			signal: 'SIGTERM',
+			stdout: '',
+			stderr: ''
+		});
+		const thrown = await thrownBy(devinPrint('Judge the work product.', devin.exec));
+		// ⛔ THE MUTANT: any string taken — tool-written free text would reach the record plane in the validator's detail.
+		expect(killedCallOf(thrown)?.lastStep, 'free text carried as a finish reason').toEqual({ outputTokens: 9 });
+		// ⭐ And the statement names a signal only in its shape, whatever the class was handed.
+		expect(killedCallFacts({ signal: 'SIGTERM; and more', printedChars: 0, exportWritten: false, lastStep: {} })).toBe(
+			'killed by a signal not named, 0 characters printed on stdout before the kill, no export written'
+		);
+	});
+
+	it('⭐ the one statement of the facts, as the validator’s detail and the transport’s TIMEOUT reason write it', () => {
+		expect(killedCallFacts({ signal: 'SIGTERM', printedChars: 13, exportWritten: true, lastStep: { finishReason: 'stop', outputTokens: 812 } })).toBe(
+			'killed by SIGTERM, 13 characters printed on stdout before the kill, its export written, whose last agent step counted output_tokens 812, finish_reason stop'
+		);
+		expect(killedCallFacts({ signal: 'SIGTERM', printedChars: 0, exportWritten: true, lastStep: {} })).toBe(
+			'killed by SIGTERM, 0 characters printed on stdout before the kill, its export written, whose last agent step counted output_tokens not reported, finish_reason not reported'
+		);
+		expect(killedCallFacts({ signal: 'SIGTERM', printedChars: 0, exportWritten: false, lastStep: {} })).toBe(
+			'killed by SIGTERM, 0 characters printed on stdout before the kill, no export written'
+		);
+		// ⛔ A finish reason the statement is handed is stated only in its shape, whatever the class carries.
+		expect(
+			killedCallFacts({ signal: 'SIGTERM', printedChars: 0, exportWritten: true, lastStep: { finishReason: 'stop; and the prompt was: Judge', outputTokens: 1 } })
+		).toBe(
+			'killed by SIGTERM, 0 characters printed on stdout before the kill, its export written, whose last agent step counted output_tokens 1, finish_reason not reported'
+		);
+	});
+
+	it('⭑ CONTROL — a non-zero exit is no kill: a plain Error, or the output-limit class for a cut, as before — never ToolCallKilled', async () => {
+		vi.stubEnv('JPWB_ASSURANCE_MODEL', 'glm-5-3-flash-high');
+		const plain = await thrownBy(
+			devinPrint('Judge the work product.', failingDevin(exportOf(812), { code: 1, stdout: '', stderr: 'Error: connection reset\n' }).exec)
+		);
+		expect(plain, 'an exit was read as a kill').not.toBeInstanceOf(ToolCallKilled);
+		expect(plain).toBeInstanceOf(Error);
+		const cut = await thrownBy(
+			devinPrint('Judge the work product.', failingDevin(exportOf(25_000), { code: 1, stdout: '', stderr: DEVIN_TRUNCATED_STDERR }).exec)
+		);
+		expect(cut).toBeInstanceOf(OutputLimitReached);
+		expect(killedCallOf(cut)).toBeUndefined();
+	});
+
+	it('⭑ CONTROL — a rejection whose signal is not a signal’s name is no kill: never carried onto the record as one', async () => {
+		vi.stubEnv('JPWB_ASSURANCE_MODEL', 'glm-5-3-flash-high');
+		const devin = failingDevin(exportOf(812), { code: null, signal: 'not a signal; the prompt was: Judge', stdout: '', stderr: '' });
+		const thrown = await thrownBy(devinPrint('Judge the work product.', devin.exec));
+		// ⛔ THE MUTANT: the signal's shape not asked — free text would reach the record as a kill's signal.
+		expect(thrown, 'a rejection with no signal’s name was read as a kill').not.toBeInstanceOf(ToolCallKilled);
+		expect(thrown).toBeInstanceOf(Error);
+	});
+
+	it('⭑ CONTROL — a spawn that failed, a string code and no signal, is no kill', async () => {
+		vi.stubEnv('JPWB_ASSURANCE_MODEL', 'glm-5-3-flash-high');
+		const devin: DevinExec = async () => {
+			throw Object.assign(new Error('spawn devin ENOENT'), { code: 'ENOENT' });
+		};
+		const thrown = await thrownBy(devinPrint('Judge the work product.', devin));
+		expect(thrown).not.toBeInstanceOf(ToolCallKilled);
+		expect((thrown as Error).message).toBe('devin invocation failed: spawn devin ENOENT');
+	});
+
+	it('⛔ the prompt is still measured out of the diagnostic: a kill whose rejection echoes the prompt is the class, its diagnostic WITHHELD', async () => {
+		vi.stubEnv('JPWB_ASSURANCE_MODEL', 'glm-5-3-flash-high');
+		const devin = failingDevin(undefined, { code: null, signal: 'SIGTERM', stdout: '', stderr: `${LONG}\n` });
+		const thrown = await thrownBy(devinPrint(LONG, devin.exec));
+		expect(thrown).toBeInstanceOf(ToolCallKilled);
 		expect((thrown as Error).message).toMatch(/^devin invocation failed\. Its diagnostic is WITHHELD/);
 		expect(diagnosticCarriesPrompt((thrown as Error).message, LONG)).toBe(false);
 	});

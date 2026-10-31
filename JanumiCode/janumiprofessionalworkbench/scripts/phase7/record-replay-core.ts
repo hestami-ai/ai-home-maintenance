@@ -67,9 +67,10 @@ import type { StoredObject, StoreRows } from './run-report-core.js';
  * ⭑ EACH REVIEWING TOOL'S BOUND, BY ITS AGENT ID — restated from the validator (`reasoning-review-validator.ts`,
  * `REVIEWER_CALL_BOUND_MS`), which this script does not load: `verif/phase7-record-replay.test.ts` holds the two equal.
  * The recording carries the bound so the replay's validator holds a thrown call to the bound the run held it to.
+ * ⭐⭐ `JAN-EXEC` Phase 7, package X — D35 (`REG-F-590`; design §10.5, revision 5): devin's ~~240_000~~ 480 s, the validator's.
  */
 export const RECORDED_CALL_BOUND_MS: Readonly<Record<string, number>> = Object.freeze({
-	devin: 240_000,
+	devin: 480_000,
 	agy: 180_000
 });
 

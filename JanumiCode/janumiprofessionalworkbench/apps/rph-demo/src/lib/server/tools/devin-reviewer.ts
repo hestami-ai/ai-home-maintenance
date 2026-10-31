@@ -15,6 +15,8 @@ import { diagnosticCarriesPrompt } from './diagnostic-safety.js';
 import { answerFromText } from './backing-tool.js';
 import type { AdapterToolObservation, ToolInvocationResult } from './backing-tool.js';
 import { FINISH_REASON_SHAPE, OutputLimitReached, type OutputLimitFacts } from './output-limit.js';
+// ⭐⭐ Package X — D34 (`REG-F-590`) — the class a call killed during its run is thrown as, with what the kill left.
+import { SIGNAL_SHAPE, ToolCallKilled, type KilledCallFacts } from './killed-call.js';
 
 const run = promisify(execFile);
 
@@ -178,6 +180,30 @@ async function devinOutputLimit(
 }
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package X — D34 (`REG-F-590`; `REG-F-554`'s remedy, applied to the kill;
+ * `DESIGN-data-flow-order-and-deliverable-review.md` §10.5, revision 5) — WHAT A CALL DEVIN'S PROGRAM WAS KILLED DURING LEFT
+ * BEHIND, or `undefined` for any other failure. ⛔ A KILL ONLY: a signal (in `SIGNAL_SHAPE`) and no exit code — what `execFile`
+ * rejects with when its `timeout` kills the program — never an exit, which `devinOutputLimit` reads, nor a spawn that failed
+ * (a string code and no signal).
+ * ⭐ READ HERE, BEFORE THE `finally` REMOVES THE FOLDER: whether devin had written its export, what that export's last agent step
+ * counted (`exportFacts`), how many characters devin had printed on stdout (`execFile` keeps them beside the message), and the
+ * signal. Counts and facts only: no byte of the export or of what devin printed is kept. ⚠ Whether devin leaves either before a
+ * kill is untested (design D34): a kill that left nothing says so — no export written, no character printed.
+ */
+async function devinKilled(e: unknown, exportPath: string): Promise<KilledCallFacts | undefined> {
+	const failed = (e ?? {}) as { code?: unknown; signal?: unknown; stdout?: unknown };
+	if (typeof failed.code === 'number' || typeof failed.signal !== 'string' || !SIGNAL_SHAPE.test(failed.signal))
+		return undefined;
+	const written = await readFile(exportPath, 'utf8').catch(() => undefined);
+	return {
+		signal: failed.signal,
+		printedChars: typeof failed.stdout === 'string' ? failed.stdout.length : 0,
+		exportWritten: written !== undefined,
+		lastStep: exportFacts(written)
+	};
+}
+
+/**
  * The exec seam — `AgyExec`'s shape (`assurance/agy-cli.ts`), for the same reason: without it the devin branch could be
  * exercised only by driving a real devin, so no test had ever reached it (`JAN-SELREV` SR-1). A stand-in script cannot
  * take its place either: node refuses a batch target with `shell: false` (EINVAL, measured in
@@ -262,7 +288,12 @@ export async function devinPrint(
 				'false'
 			],
 			// ⭐ I1 — `cwd`: devin's working folder is this one, never the server's (`REG-F-548`).
-			{ cwd: dir, timeout: 240_000, maxBuffer: 16 * 1024 * 1024, windowsHide: true }
+			// ⭐⭐ `JAN-EXEC` Phase 7, package X — D35 (`REG-F-590`; design §10.5, revision 5) — the kill, ~~240_000~~ 480 s: a planning
+			// figure, about twice the longest answered call (231,362 ms); v12's three calls failed at the 240 s kill. ⛔ EVERY COPY IS
+			// HELD TO THIS ONE, measured at the exec seam: `REVIEWER_CALL_BOUND_MS.devin` (`thrown-reviewer-call.test.ts`), the lane's
+			// `LANE_BUDGET.reviewerCallMsByTool.devin` (`verif/live-exec-lane-config.test.ts`) and the qualification's `DEVIN_KILL_MS`
+			// (`verif/reviewer-qualification-transports.test.ts`); the recorder's `RECORDED_CALL_BOUND_MS` to the validator's.
+			{ cwd: dir, timeout: 480_000, maxBuffer: 16 * 1024 * 1024, windowsHide: true }
 		);
 		// ⭑⭑ THE READ HAPPENS HERE, AND THE PLACEMENT IS THE WHOLE FIX. `readReportedModel` was written with
 		// `devinPrint` and could never be called by anyone: the `finally` below deletes `dir` before this
@@ -320,6 +351,12 @@ export async function devinPrint(
 		// diagnostic its message, its partial reply, what the export counted and the export itself beside it
 		// (`devinOutputLimit`). Every other failure is thrown as before.
 		const cut = await devinOutputLimit(e, raw, exportPath);
+		// ⭐⭐ Package X — D34 (`REG-F-590`) — A CALL KILLED DURING ITS RUN IS THROWN AS ITS OWN CLASS, the same diagnostic its
+		// message and what the kill left beside it (`devinKilled`), read before the `finally` removes the folder. ⛔ Before X a
+		// kill was thrown with its diagnostic alone: the record could not tell a call that was answering from one that printed
+		// nothing.
+		const killed = cut === undefined ? await devinKilled(e, exportPath) : undefined;
+		if (killed !== undefined) throw new ToolCallKilled(diagnostic, killed);
 		throw cut === undefined ? new Error(diagnostic) : new OutputLimitReached(diagnostic, cut);
 	} finally {
 		await rm(dir, { recursive: true, force: true }).catch(() => undefined);

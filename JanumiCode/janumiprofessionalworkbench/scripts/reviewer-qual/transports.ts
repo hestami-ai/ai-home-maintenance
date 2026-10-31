@@ -22,6 +22,8 @@ import type { ToolInvocationResult } from '../../apps/rph-demo/src/lib/server/to
 // ⭐ P5 package A (F2) — the product's class for a reply its tool cut at the model's output-token limit. ⚠ A pure module,
 // which reads nothing at load (`REG-D-072` D12): not either product transport.
 import { OutputLimitReached } from '../../apps/rph-demo/src/lib/server/tools/output-limit.js';
+// ⭐⭐ Package X — D34 (`REG-F-590`) — what a call the product's adapter saw killed left behind. ⚠ A pure module too.
+import { killedCallFacts, killedCallOf } from '../../apps/rph-demo/src/lib/server/tools/killed-call.js';
 import { HarnessRefusal, modelLabelProblem, refuseProgramOverrides } from './preflight.js';
 import type {
 	CandidateIdentity,
@@ -90,8 +92,12 @@ export const MODEL_VARIABLE = { agy: 'JPWB_JUDGE_MODEL', devin: 'JPWB_ASSURANCE_
 /** `agyPrint`'s own bounds, as its exec seam receives them: the execFile kill, and agy's `--print-timeout 3m`. */
 export const AGY_KILL_MS = 240_000;
 export const AGY_PRINT_TIMEOUT_MS = 180_000;
-/** `devinPrint`'s execFile kill. */
-export const DEVIN_KILL_MS = 240_000;
+/**
+ * `devinPrint`'s execFile kill. ⭐⭐ `JAN-EXEC` Phase 7, package X — D35 (`REG-F-590`; design §10.5, revision 5): ~~240_000~~
+ * 480 s, the kill raised with it — and HELD TO IT: `verif/reviewer-qualification-transports.test.ts` drives `devinPrint` through
+ * its exec seam and holds this, the TIMEOUT line and the RUN line's bound to the `timeout` it hands its program.
+ */
+export const DEVIN_KILL_MS = 480_000;
 
 /**
  * The transport a candidate stands behind. ⛔ In this order, and the order is the guarantee (`REG-D-072` D12): refuse a
@@ -301,7 +307,9 @@ export interface DevinModule {
  * The product's `devinPrint`. ⚠ Its argv is not asserted here: it has an exec seam (`DevinExec`, `JAN-SELREV` SR-1),
  * but this harness calls it with the default exec, the real program. The label reaches it through
  * `JPWB_ASSURANCE_MODEL`, and what devin REPORTS having run is recorded as the resolved evaluator. Its failure carries
- * no kill flag through the sanitised message, so a failure at the 240 s bound is classified a TIMEOUT by the clock.
+ * no kill flag through the sanitised message, so a failure at the ~~240 s~~ bound (480 s since package X, D35) is classified a
+ * TIMEOUT by the clock. ⭐ Package X — D34: a kill the product saw is thrown as `ToolCallKilled`, and a TIMEOUT's reason states
+ * what it left; the class is still told by the clock.
  * ⛔ SO THE LABEL IS HELD TO WHAT THE PRODUCT RESOLVES, before every call: a model that no longer resolves, or resolves to
  * another label, is the harness's fault and is refused before devin is invoked — never recorded as the candidate's.
  */
@@ -339,10 +347,15 @@ export function createDevinTransport(
 				// on for the runner to record as one: never a TIMEOUT or a REFUSAL read off the clock.
 				if (e instanceof OutputLimitReached) throw e;
 				const elapsed = Math.round(now() - started);
+				// ⭐⭐ Package X — D34 (`REG-F-590`; design §10.5, revision 5) — a TIMEOUT whose call the product's adapter saw killed
+				// states what the kill left (`killedCallFacts`): counts and facts, the harness's words beside the time and the bound,
+				// never the diagnostic. ⛔ Before X the reason was the time and the bound alone.
+				const killed = killedCallOf(e);
+				const left = killed === undefined ? '' : `; ${killedCallFacts(killed)}`;
 				throw elapsed >= DEVIN_KILL_MS
 					? new TransportFailure(
 							'TIMEOUT',
-							`failed after ${elapsed} ms, at the ${DEVIN_KILL_MS} ms bound`
+							`failed after ${elapsed} ms, at the ${DEVIN_KILL_MS} ms bound${left}`
 						)
 					: new TransportFailure('REFUSAL', `devin failed after ${elapsed} ms`);
 			}

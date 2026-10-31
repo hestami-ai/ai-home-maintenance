@@ -58,6 +58,8 @@ import {
 } from '../tools/backing-tool.js';
 import { governedToolCallReport } from '../tools/observed-tool-calls.js';
 import { OutputLimitReached, outputLimitDetail } from '../tools/output-limit.js';
+// ⭐⭐ Package X — D34 (`REG-F-590`) — what a call killed during its run left, as its adapter read it. ⚠ A pure module.
+import { killedCallFacts, killedCallOf, type KilledCallFacts } from '../tools/killed-call.js';
 import type { ExchangeParseOutcome } from '../agent/exchange-record.js';
 import type { ObservedToolCallReport } from '@janumipwb/rph-contracts';
 import { allocate } from './process-result-render.js';
@@ -1884,15 +1886,17 @@ function substitutedModelStatement(
 /**
  * ⭐⭐ `JAN-EXEC` Phase 7 `P7-2b` (`REG-D-102` (2); `docs/_working/DESIGN-the-live-end-to-end-run.md` §6) — EACH REVIEWING
  * TOOL'S OWN BOUND, which decides whether a call that threw is run once more.
- *   · `devin` — `devinPrint`'s execFile kill (`tools/devin-reviewer.ts`).
+ *   · `devin` — `devinPrint`'s execFile kill (`tools/devin-reviewer.ts`). ⭐⭐ `JAN-EXEC` Phase 7, package X — D35 (`REG-F-590`;
+ *     `DESIGN-data-flow-order-and-deliverable-review.md` §10.5, revision 5): ~~240_000~~ 480 s, the kill raised with it.
  *   · `agy` — its own `--print-timeout 3m`, the EARLIER of its two bounds (`agy-cli.ts`, `agyCall`: that argv, and the
  *     execFile kill at 240 s). agy stops itself at three minutes and exits non-zero, so a throw at or past 180 s is its
  *     timeout — the reading the qualification already makes (`scripts/reviewer-qual/transports.ts`, `classifyAgyFailure`).
+ *     ⭑ Unmoved by D35: agy keeps its own.
  * ⚠ RESTATED, NOT IMPORTED: each adapter writes its bound as a literal in the call it makes and exports none, so
  * `thrown-reviewer-call.test.ts` drives both through their exec seams and holds these to what each hands its program.
  */
 export const REVIEWER_CALL_BOUND_MS = Object.freeze({
-	devin: 240_000,
+	devin: 480_000,
 	agy: 180_000
 });
 
@@ -2009,10 +2013,15 @@ function thrownCallDisposal(
  * the cause the tool printed — the SANITISED form only (`sanitiseToolFailure`), never the raw rejection, which may carry
  * the prompt (finding #60).
  */
-function thrownCallDetail(failure: Error, elapsedMs: number, clause: string): string {
+function thrownCallDetail(failure: Error, elapsedMs: number, clause: string, killed?: KilledCallFacts): string {
 	const when = Number.isFinite(elapsedMs) && elapsedMs >= 0 ? ` after ${elapsedMs} ms` : '';
+	// ⭐⭐ `JAN-EXEC` Phase 7, package X — D34 (`REG-F-590`; design §10.5, revision 5) — AND WHAT A CALL KILLED DURING ITS RUN LEFT,
+	// as its tool's adapter read it (`ToolCallKilled`; `killedCallFacts`): counts and facts only, between the clause and the
+	// cause, so the time and the bound open the detail as before. ⛔ Before X a kill's record kept the time and the cause alone.
+	const left = killed === undefined ? '' : `What the tool left when it was killed: ${killedCallFacts(killed)}. `;
 	return (
 		`The reviewing tool’s call failed${when} with no reply, ${clause}. ` +
+		left +
 		`What the tool reported, sanitised: ${failure.message}`
 	);
 }
@@ -2382,7 +2391,8 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 						times,
 						{
 							outcome: 'NOT_ATTEMPTED',
-							detail: thrownCallDetail(failure, elapsedMs, disposal.clause)
+							// ⭐⭐ Package X — D34 — the kill's facts, read off the throw before the seam's sanitised copy dropped them.
+							detail: thrownCallDetail(failure, elapsedMs, disposal.clause, killedCallOf(e))
 						},
 						predecessor,
 						// ⭐ WHAT IT REPORTED: nothing — the identity the host configured, ungraded, and an observation claiming none.

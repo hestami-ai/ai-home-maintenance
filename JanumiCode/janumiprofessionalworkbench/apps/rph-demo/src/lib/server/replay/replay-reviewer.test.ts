@@ -91,7 +91,12 @@ const REVIEWER = {
 	modelId: 'fixture-reviewer-model',
 	providerId: 'devin'
 } as const;
-const BOUND = 240_000;
+/**
+ * devin's bound, as the recordings here declare it and the product holds their throws to. ⛔ MOVED 2026-10-31 (`JAN-EXEC`
+ * Phase 7, package X; design D35, revision 5; `REG-F-590`) — ~~`240_000`~~: devin's kill is raised to 480 s, and the replay
+ * holds each recorded throw to the PRODUCT's present bound (`replayRunFor`), so a throw recorded "at the bound" is at 480 s now.
+ */
+const BOUND = 480_000;
 /** What devin's program threw, before the validator's seam sanitised it (`sanitiseToolFailure`). */
 const TRANSPORT = 'devin exited with code 1: connection reset by peer';
 
@@ -471,14 +476,18 @@ describe('⭐ the floor registry’s REPLAY arm (D2)', () => {
 		const prompt = await promptOf();
 		delete process.env.JPWB_ASSURANCE_TOOL;
 		process.env.PATH = noProgramsDirectory();
-		// ⭑ Two recordings that say their bound was other than devin's 240 000 ms: one ran a 300 000 ms throw once more
-		// (a bound of 500 000), one let a 200 000 ms throw stand (a bound of 120 000). Under the product's bound the first
-		// is a timeout and the second is retried, so neither is the run this code would make.
+		// ⭑ Two recordings that say their bound was other than devin's ~~240 000 ms~~ 480 000 ms: one ran a ~~300 000 ms~~ 500 000 ms
+		// throw once more (a bound of ~~500 000~~ 600 000), one let a 200 000 ms throw stand (a bound of 120 000). Under the product's
+		// bound the first is a timeout and the second is retried, so neither is the run this code would make.
+		// ⛔ MOVED 2026-10-31 (`JAN-EXEC` Phase 7, package X; design D35, revision 5; `REG-F-590`) — ~~`{ bound: 500_000, calls: [a
+		// 300_000 ms throw, then its retry] }`~~: at devin's raised 480 000 ms bound a 300 000 ms throw is SHORT of the bound, so the
+		// product runs it once more too — that recording is no longer one this code would not make, and replays. The arrangement is
+		// restated past the new bound, and the figure the refusal names moves with it (below).
 		const arrangements = [
 			{
-				bound: 500_000,
+				bound: 600_000,
 				calls: [
-					call(prompt, { status: 'THROWN', message: TRANSPORT }, 300_000),
+					call(prompt, { status: 'THROWN', message: TRANSPORT }, 500_000),
 					call(prompt, { status: 'ANSWERED', text: CLEAN }, 5, { role: 'retry' })
 				]
 			},
@@ -504,7 +513,8 @@ describe('⭐ the floor registry’s REPLAY arm (D2)', () => {
 			const said = JSON.stringify(review);
 			expect(said).toContain('REPLAY_RECORDING_REFUSED');
 			expect(said).toContain('reviewer call 1');
-			expect(said).toContain('240000 ms');
+			// ⛔ MOVED 2026-10-31 (package X; design D35) — ~~`'240000 ms'`~~: the product's devin bound the refusal names.
+			expect(said).toContain('480000 ms');
 		}
 	});
 
@@ -531,7 +541,8 @@ describe('⭐ the floor registry’s REPLAY arm (D2)', () => {
 	it('(ix) ⭐ the validator’s bound is the PRODUCT’s even where the recording names another, and the throws agree', async () => {
 		const prompt = await promptOf();
 		// ⭑ The recording says its reviewer declared NO bound, and holds a 1 000 ms throw the run retried — as the product's
-		// devin bound (240 000 ms) disposes it. Held to the recording's bound, the throw would stand and the review fail.
+		// devin bound (~~240 000 ms~~ 480 000 ms since package X, D35) disposes it. Held to the recording's bound, the throw would
+		// stand and the review fail.
 		dir = mkdtempSync(join(tmpdir(), 'jpwb-replay-product-bound-'));
 		for (const [file, text] of Object.entries(
 			recordingFiles(

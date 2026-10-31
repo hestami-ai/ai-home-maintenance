@@ -782,6 +782,10 @@ describe('JAN-EXEC P7-2 D9 — the run report over stores the product wrote, rea
 			// ⭐ Package L — D13 (`REG-D-135` (3)) — a review that concluded on a reply leaving a declared criterion without a row: none here.
 			'criterion-left-without-row': 0,
 			'no-response': 1,
+			// ⛔ MOVED 2026-10-31 (`JAN-EXEC` Phase 7, package X; design D34, revision 5) — a label more: a review that ended on a call
+			// thrown at or past its tool's bound (`REG-F-590`). None here: the design review's two calls threw short of the bound,
+			// so it still reads no response, as the row above says.
+			'timed-out': 0,
 			// ⭐ P5 package A (F1) — a review that ended on a reply the tool cut at the model's output-token limit: none here.
 			'output-limit': 0,
 			refused: 0,

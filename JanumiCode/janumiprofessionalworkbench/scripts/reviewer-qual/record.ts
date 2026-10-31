@@ -335,7 +335,9 @@ export interface HeldOutLine {
  *     candidate key (provider, model label, served-model digest) is a function of these two for a deployable run;
  *   · of the rest, a change of options between two runs of one candidate is reported as a confound (§5.1; `confounds`
  *     in `check-core.ts`, which reports a changed served template or server version too — null for a deployable run),
- *     never a new candidate; bounds and argv are not in the candidate key, and the check does not read them.
+ *     never a new candidate; bounds and argv are not in the candidate key, and ~~the check does not read them~~ ⛔ MOVED
+ *     2026-10-31 (package X; design D35, revision 5): the check reads the bounds for that one purpose — a bound that differs
+ *     from the same candidate's previous run's is a confound too, named with both figures; argv it still does not read.
  */
 export interface SelectedCandidate {
 	readonly transport: TransportName;

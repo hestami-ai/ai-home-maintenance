@@ -670,6 +670,9 @@ export interface MatrixCell {
  * `REG-F-552`'s case, never a failed repair nor a no response, which the record's last call would otherwise say.
  * ⭐ P5 package A (F1) — `output-limit`: the review ended on a reply the tool cut at the model's output-token limit
  * (`outputLimitOf`), never a refused substitute, whose REJECTED and NOT_ATTEMPTED it shares, nor a call with no reply.
+ * ⭐⭐ Package X — D34 (`REG-F-590`; `DESIGN-data-flow-order-and-deliverable-review.md` §10.5, revision 5) — `timed-out`: the review
+ * ended on a call that threw with no reply AT OR PAST its tool's bound, as its record says (`thrownAgainstTheBound`) — a timeout,
+ * never `no-response`, which is a failure short of the bound (`REG-F-499`) or one its record does not place against one.
  */
 export type PairingLabel =
 	| 'answered'
@@ -677,6 +680,8 @@ export type PairingLabel =
 	// ⭐ Package L — D13: the review concluded on a reply that left a declared criterion without a row (`REG-F-566`).
 	| 'criterion-left-without-row'
 	| 'no-response'
+	// ⭐⭐ Package X — D34: the review concluded on a call thrown at or past its tool's bound (`REG-F-590`).
+	| 'timed-out'
 	| 'output-limit'
 	| 'refused'
 	| 'no-answer-recorded'
@@ -686,6 +691,7 @@ export const PAIRING_LABELS: readonly PairingLabel[] = [
 	'no-criterion-answered',
 	'criterion-left-without-row',
 	'no-response',
+	'timed-out',
 	'output-limit',
 	'refused',
 	'no-answer-recorded',
@@ -716,6 +722,12 @@ export interface PairingRow {
 	readonly concludedBy: string | null;
 	/** Each recorded call, `<ROLE>:<DISPOSITION>`, in ordinal order. */
 	readonly calls: readonly string[];
+	/**
+	 * ⭐⭐ Package X — D34 (`REG-F-590`) — set on a review that ended on a call that threw with no reply (`no-response`,
+	 * `timed-out`): of its calls that threw so, how many their records show SHORT of their tool's bound (`REG-F-499`'s), and how
+	 * many AT OR PAST it (`REG-F-590`'s) — a call its record does not place against a bound is neither (`thrownAgainstTheBound`).
+	 */
+	readonly thrown?: { readonly short: number; readonly atTheBound: number };
 }
 
 export type NoModelAnswerKind =
@@ -1725,22 +1737,79 @@ const callOf = (x: StoredObject): string => `${str(x.state.exchangeRole)}:${str(
 const ordinalOf = (x: StoredObject): number => int(x.state.attemptOrdinal) ?? 0;
 const runOf = (x: StoredObject): string => str(x.state.runToken);
 
-type Pairing = Pick<PairingRow, 'label' | 'refusal' | 'detail' | 'joinedBy' | 'floorRuns' | 'concludedBy' | 'calls'>;
-type Conclusion = Pick<Pairing, 'label' | 'refusal' | 'detail' | 'concludedBy'>;
+type Pairing = Pick<PairingRow, 'label' | 'refusal' | 'detail' | 'joinedBy' | 'floorRuns' | 'concludedBy' | 'calls' | 'thrown'>;
+type Conclusion = Pick<Pairing, 'label' | 'refusal' | 'detail' | 'concludedBy' | 'thrown'>;
+
+/** The time a thrown call's record says it failed after — the validator's own sentence (`thrownCallDetail`) — or none. */
+const FAILED_AFTER = /^The reviewing tool’s call failed after (\d+) ms with no reply, /;
+/** The bound a thrown call's record says it was held to — the validator's clause (`thrownCallDisposal`) — or none. */
+const NAMED_BOUND = /the tool’s (\d+) ms bound/;
+
+/** What a call that threw with no reply says of its tool's bound: its time and the bound, each read off its record, or null. */
+interface AgainstTheBound {
+	readonly afterMs: number | null;
+	readonly boundMs: number | null;
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package X — D34 (`REG-F-590`; `DESIGN-data-flow-order-and-deliverable-review.md` §10.5, revision 5) — WHAT
+ * A CALL THAT THREW WITH NO REPLY SAYS OF ITS TOOL'S BOUND, read off the record the validator wrote of it
+ * (`reasoning-review-validator.ts`, `thrownCallDetail` and `thrownCallDisposal`): the time E-5's detail says it failed after,
+ * and the bound named in its own clause — or, for a RETRY, whose clause names none (*"it was itself the one further call…"*),
+ * the bound named by the call it repeats, the call before it. ⭑ The record's own words, never today's bound: a run held to
+ * 240 s and read after the bound moved still reads as the bound it was held to. ⛔ A record that names no time (the clock
+ * could not place it) or no bound (a tool that declares none, or a record from before `P7-2b`) is not shown against one.
+ */
+function againstTheBound(sorted: readonly StoredObject[], x: StoredObject): AgainstTheBound {
+	const detailOf = (y: StoredObject | undefined): string => str(rec(y?.state.parseOutcome).detail);
+	const after = FAILED_AFTER.exec(detailOf(x));
+	const own = NAMED_BOUND.exec(detailOf(x));
+	const repeated = str(x.state.exchangeRole) === 'RETRY' ? NAMED_BOUND.exec(detailOf(sorted[sorted.indexOf(x) - 1])) : null;
+	const bound = own ?? repeated;
+	return { afterMs: after === null ? null : Number(after[1]), boundMs: bound === null ? null : Number(bound[1]) };
+}
+
+/** Whether a call that threw with no reply did so at or past its tool's bound (`REG-F-590`), short of it (`REG-F-499`), or neither. */
+function thrownAgainstTheBound(sorted: readonly StoredObject[], x: StoredObject): 'at' | 'short' | 'unplaced' {
+	const { afterMs, boundMs } = againstTheBound(sorted, x);
+	if (afterMs === null || boundMs === null) return 'unplaced';
+	return afterMs >= boundMs ? 'at' : 'short';
+}
+
+/** ⭐ D34 — of a review's calls that threw with no reply, how many their records show short of the bound and at or past it. */
+function thrownOf(sorted: readonly StoredObject[]): NonNullable<Conclusion['thrown']> {
+	const readings = sorted.filter((x) => str(x.state.disposition) === 'NO_RESPONSE').map((x) => thrownAgainstTheBound(sorted, x));
+	return { short: readings.filter((r) => r === 'short').length, atTheBound: readings.filter((r) => r === 'at').length };
+}
 
 /** What the call that concluded a review says of it, by its disposition. */
-function concludedBy(top: StoredObject): Conclusion {
+function concludedBy(top: StoredObject, sorted: readonly StoredObject[]): Conclusion {
 	const role = str(top.state.exchangeRole);
 	const disposition = str(top.state.disposition);
 	if (disposition === 'ACCEPTED') return { label: 'answered', detail: `concluded by its ${role} call`, concludedBy: top.id };
+	// ⭐⭐ Package X — D34 (`REG-F-590`) — a call that threw at or past its tool's bound is a TIMEOUT, with the time and the bound
+	// its record names: `timed-out`, never the `no-response` of a failure short of the bound (`REG-F-499`).
+	if (disposition === 'NO_RESPONSE' && thrownAgainstTheBound(sorted, top) === 'at') {
+		const { afterMs, boundMs } = againstTheBound(sorted, top);
+		return {
+			label: 'timed-out',
+			detail: `its ${role} call threw with no reply after ${afterMs} ms, at or past its tool’s ${boundMs} ms bound: timed out (REG-F-590)`,
+			concludedBy: top.id,
+			thrown: thrownOf(sorted)
+		};
+	}
+	// ⛔ MOVED 2026-10-31 (package X; design D34) — ~~`its ${role} call threw and was not run again — at or past its tool's bound,
+	// or under a tool that declares none`~~: a call its record shows at or past the bound reads `timed-out` (above), so one that
+	// reaches here was not shown there.
 	if (disposition === 'NO_RESPONSE')
 		return {
 			label: 'no-response',
 			detail:
 				role === 'RETRY'
 					? 'both calls threw: the call and its one retry (REG-D-102)'
-					: `its ${role} call threw and was not run again — at or past its tool's bound, or under a tool that declares none`,
-			concludedBy: top.id
+					: `its ${role} call threw and was not run again, and its record does not show it at or past its tool's bound`,
+			concludedBy: top.id,
+			thrown: thrownOf(sorted)
 		};
 	// ⭐ P5 package A (F1) — a reply the tool cut at the model's output-token limit is REJECTED and NOT_ATTEMPTED, a
 	// substitute's pair, and is none: told by the class's own pair (`outputLimitOf`), before the pair below reads it.
@@ -1864,7 +1933,7 @@ function concludedFrom(
 	if (top === undefined) return unpaired('no-answer-recorded', 'no ASSURANCE-plane exchange names the subject (REG-F-525)');
 	if (sorted.filter((x) => ordinalOf(x) === ordinalOf(top)).length > 1)
 		return unpaired('not-pairable', `two of the subject's calls share its highest ordinal, ${ordinalOf(top)}`);
-	return { ...(criterionRepairConclusion(sorted) ?? concludedBy(top)), ...o };
+	return { ...(criterionRepairConclusion(sorted) ?? concludedBy(top, sorted)), ...o };
 }
 
 /**
@@ -3239,6 +3308,12 @@ function idsOfUnconcluded(r: PairingRow): string[] {
 	// ⭐ Package L — D13 — and one that concluded on a reply leaving a declared criterion without a row is `REG-F-566`'s.
 	if (r.label === 'criterion-left-without-row') ids.push('REG-F-566');
 	if (r.label === 'no-response') ids.push('REG-F-499');
+	// ⭐⭐ Package X — D34 (`REG-F-590`; design §10.5) — a review that ended on a call thrown at or past its tool's bound is
+	// `REG-F-590`'s, the timeout's own finding: never `REG-F-499`, the finding for a failure short of the bound — save where
+	// another of its calls threw short of it (the call its retry repeated), which keeps `REG-F-499` beside it. ⚠ Under today's
+	// rule a call thrown at the bound is not run again, so no review ends short of the bound after one; X-2 (design D36) owes
+	// that shape its reading.
+	if (r.label === 'timed-out') ids.push('REG-F-590', ...((r.thrown?.short ?? 0) > 0 ? ['REG-F-499'] : []));
 	// ⭐ P5 package C (F1; `REG-D-118` (4)) — a review that ended on a reply the tool cut at the model's output-token limit is
 	// `REG-F-563`'s, the entry that records the cap: never a break no register entry names.
 	if (r.label === 'output-limit') ids.push('REG-F-563');

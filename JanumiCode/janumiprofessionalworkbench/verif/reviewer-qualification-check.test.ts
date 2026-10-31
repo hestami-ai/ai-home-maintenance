@@ -487,6 +487,35 @@ describe('JAN-CRITREAD J2-3 — the check, GREEN on a covered, reproduced, fully
 	});
 });
 
+// ⭐⭐ `JAN-EXEC` Phase 7, package X — D35 (`REG-F-590`; `DESIGN-data-flow-order-and-deliverable-review.md` §10.5, revision 5) — A
+// CHANGED BOUND IS A CONFOUND: the check names it between two runs of one candidate it compares, beside the served template, the
+// server version and the options (§5.1; `confounds`). ⛔ Before X the check read the bounds nowhere (`record.ts`: *"bounds and argv
+// are not in the candidate key, and the check does not read them"*), so a run at devin's raised 480 s bound, compared with the
+// same candidate's run at 240 s, carried no note. ⚠ A confound is reported, never a new candidate and never a red: the RESCORED
+// lines of the 240 s runs still cover their cases.
+describe('⭐⭐ package X — D35 — a changed bound between two runs of one candidate is a confound the check names', () => {
+	const at = (wallClockMs: number): CandidateIdentity => ({ ...DEVIN, bounds: { ...DEVIN.bounds, wallClockMs } });
+	const confoundsOf = (r: CheckReport): string[] => r.notes.filter((n) => n.startsWith('confound:'));
+
+	it('⛔ PREDICTED RED — two runs of one candidate at 240 000 and 480 000 ms: the later run’s note names its bound, both figures', async () => {
+		const before = await recorded({ runId: 'qr-bound-240', date: '2026-10-29T12:00:00.000Z', candidate: at(240_000) });
+		const after = await recorded({ runId: 'qr-bound-480', date: '2026-10-31T12:00:00.000Z', candidate: at(480_000) });
+		const r = await check([file([...before, ...after])]);
+		// ⛔ THE MUTANT: the bounds not compared — the later run carries no note, as before X.
+		expect(confoundsOf(r)).toEqual([
+			'confound: run qr-bound-480 differs from qr-bound-240, the same candidate’s previous run, in its bound wallClockMs, 240000 then 480000'
+		]);
+		// ⭑ Reported, never a red: both runs answered as their oracles expect.
+		expect(r.problems).toEqual([]);
+	});
+
+	it('⭑ CONTROL — two runs of one candidate at one bound carry no confound', async () => {
+		const first = await recorded({ runId: 'qr-bound-a', date: '2026-10-29T12:00:00.000Z', candidate: at(480_000) });
+		const second = await recorded({ runId: 'qr-bound-b', date: '2026-10-31T12:00:00.000Z', candidate: at(480_000) });
+		expect(confoundsOf(await check([file([...first, ...second])]))).toEqual([]);
+	});
+});
+
 // ⭐⭐ `JAN-EXEC` Phase 7, package L — D13 (`REG-D-135` (3); design D13): a reply that faults nothing and leaves a declared
 // criterion without a row draws ONE criterion repair whose line names that criterion — so its prompt depends on the reply before
 // it, and no one per-case hash is today's. ⛔ Held to I5's hash alone, such an evaluation under today's fingerprint read as a
