@@ -1903,7 +1903,8 @@ export const REVIEWER_CALL_BOUND_MS = Object.freeze({
 /**
  * ⭐⭐ `JAN-EXEC` Phase 7, package L2 — D20 (`REG-F-580`; `REG-D-135` (4)) — THE MOST REVIEWER CALLS ONE REVIEW BY THIS
  * VALIDATOR MAKES: the first call, one JSON repair and one criterion repair (package L, D13; `judgeParsed`), each run once
- * more when it throws short of its tool's bound (`thrownCallDisposal`): 3 × 2 = 6. The authoring floor reserves a round's
+ * more when it throws short of its tool's bound (`thrownCallDisposal`) ⭐ — and, since package X-2 (design D36; `REG-D-141`
+ * (2)), at or past it too, still once: 3 × 2 = 6. The authoring floor reserves a round's
  * worst case at this many calls a part against its allowance (`floor.ts`, `runPwaFloor`; `review-allowance.ts`).
  * ⚠ STATED, NOT DERIVED: the bound is the shape of `evaluate`, which holds no count of its own. `thrown-reviewer-call.test.ts`
  * drives a review to it, six calls and no seventh, and the lane's restatement (`LANE_BUDGET.reviewerCallsPerTry`,
@@ -1972,9 +1973,17 @@ type Attempt =
  *   · a tool whose bound this validator does not know is not run again (`AgyValidatorOptions.callBoundMs`);
  *   · a time the clock cannot place — unreadable, or a response before its request — is not shown to be short of the
  *     bound, so it is not run again;
- *   · at or past the bound is a TIMEOUT, and a timeout is not run again;
+ *   · ~~at or past the bound is a TIMEOUT, and a timeout is not run again;~~ ⛔ MOVED 2026-10-31 (`JAN-EXEC` Phase 7, package
+ *     X-2 — `DESIGN-data-flow-order-and-deliverable-review.md` §10.5, D36, revision 5; the sponsor's `REG-D-141` (2), *"Yes,
+ *     once (Recommended)"*, which widens `REG-D-102` (2) and reverses `REG-F-525`'s closing rule, *"A throw at the tool's bound
+ *     is a timeout: recorded and not retried"*): at or past the bound is a TIMEOUT, and its record still names it one — and it
+ *     is given the one further call a call that threw sooner is given;
  *   · short of it — a failure with no reply, before the tool's own limit — the call is run once more.
- * ⛔ THE BOUND ITSELF IS A TIMEOUT: the kill fires AT it, so a throw measured at exactly the bound is the kill's.
+ * ⛔ THE BOUND ITSELF IS A TIMEOUT: the kill fires AT it, so a throw measured at exactly the bound is the kill's — ⭐ (X-2) and
+ * its clause says so, though it is run once more as a throw short of the bound is.
+ * ⭐ X-2 — A REPLY CUT AT THE OUTPUT LIMIT SHARES THIS DISPOSAL (`attempt`'s `OutputLimitReached` arm), so a cut at or past the
+ * bound is run once more too, extending `REG-D-118` (2), which kept the retry for a cut *"when it ends short of the tool's
+ * bound"*. The worst case does not move: one further call per call, so `REVIEWER_CALLS_PER_REVIEW` stays 3 × 2.
  */
 function thrownCallDisposal(
 	role: TryRole,
@@ -1997,14 +2006,15 @@ function thrownCallDisposal(
 			runOnceMore: false,
 			clause: `its time cannot be read off the clock, so it is not shown to be short of the tool’s ${bound} ms bound and is not run again`
 		};
-	if (elapsedMs >= bound)
-		return {
-			runOnceMore: false,
-			clause: `at or past the tool’s ${bound} ms bound — a timeout, which is not run again`
-		};
+	// ⛔ MOVED 2026-10-31 (X-2; design D36; `REG-D-141` (2)) — ~~a throw at or past the bound returned `runOnceMore` false, its clause
+	// "at or past the tool’s … ms bound — a timeout, which is not run again"~~: one disposal for every throw the clock places against
+	// a known bound — run once more — and two clauses, the timeout's naming it one. The bound now decides the CLAUSE alone.
+	const timedOut = elapsedMs >= bound;
 	return {
 		runOnceMore: true,
-		clause: `short of the tool’s ${bound} ms bound, so it is run once more (REG-D-102)`
+		clause: timedOut
+			? `at or past the tool’s ${bound} ms bound — a timeout, so it is run once more (REG-D-141 (2))`
+			: `short of the tool’s ${bound} ms bound, so it is run once more (REG-D-102)`
 	};
 }
 
@@ -2072,8 +2082,9 @@ export interface AgyValidatorOptions {
 	/**
 	 * ⭐⭐ `JAN-EXEC` Phase 7 `P7-2b` (`REG-D-102` (2)) — THE BOUND OF THE TOOL BEHIND `print`, where the caller knows it.
 	 * A call whose `print` throws short of it, with no reply, is run ONCE more, and both calls are recorded: the failed
-	 * one `no-response` under its own role, its successor `retry`. A throw at or past it is a timeout, and stands; so does
-	 * a second throw.
+	 * one `no-response` under its own role, its successor `retry`. ~~A throw at or past it is a timeout, and stands;~~ ⛔ MOVED
+	 * 2026-10-31 (`JAN-EXEC` Phase 7, package X-2 — design D36; `REG-D-141` (2)): a throw at or past it is a timeout, its record
+	 * naming it one, and is run ONCE more as well; a second throw stands.
 	 *
 	 * ⭑ ABSENT, THE VALIDATOR KNOWS THE BOUND ONLY OF THE TWO PROGRAMS THE PRODUCT RUNS THROUGH IT (`callBoundOf`): agy, its
 	 * own default `print` (`REVIEWER_CALL_BOUND_MS.agy`), and devin through the product's devin branch, the one caller
@@ -2353,7 +2364,8 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 					// diagnosis and its output declared cut (`cutAtOutputLimit`), E-5 opening with the class's marker
 					// (`outputLimitDetail`), and what its tool reported of it: the model its export named, graded so, its
 					// observation and its export. ⭐ The thrown call's rule is unchanged (`disposal`): run once more short of the
-					// bound, and its sanitised error is the one `timed` rethrows.
+					// bound — ⭐⭐ and, since package X-2 (design D36; `REG-D-141` (2), extending `REG-D-118` (2)), at or past it too, the
+					// cut's clause naming the timeout — and its sanitised error is the one `timed` rethrows.
 					if (e instanceof OutputLimitReached) {
 						const cut = await capture(
 							role,
@@ -2406,7 +2418,8 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 			/** Run one bounded try, timing it. The clock is injectable so the gate is not wall-clock dependent.
 			 *  ⭐ SR-2 — `role` and `predecessor` are what a try REFUSED here is recorded with (D6, below).
 			 *  ⭐ `P7-2b` — and what the try that ANSWERED is recorded with, returned beside its answer: the call asked for, or
-			 *  — when that call threw short of its tool's bound — its one further call, `retry`, naming the failed call's
+			 *  — when that call threw short of its tool's bound (⭐ or, since package X-2, at or past it: design D36) — its one
+			 *  further call, `retry`, naming the failed call's
 			 *  record as its predecessor. ⛔ ONCE, AND STRUCTURALLY: one further call and never a loop, so a tool that keeps
 			 *  failing costs two calls and no more, and the second failure is the one rethrown. */
 			const timed = async (p: string, asked: 'initial' | 'repair', after?: ExchangeRecord) => {

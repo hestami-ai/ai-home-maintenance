@@ -732,7 +732,10 @@ describe('JAN-EXEC P7-2 D9 — the pairing of a review with the call that conclu
 		expect([restarted.label, restarted.floorRuns]).toEqual(['not-pairable', 2]);
 	});
 
-	it('⛔ the highest call NO_RESPONSE: NO RESPONSE — both calls threw, or one at its bound that was not run again', () => {
+	// ⛔ MOVED 2026-10-31 (`JAN-EXEC` Phase 7, package X-2 — design D36; `REG-D-141` (2)) — ~~"or one at its bound that was not run
+	// again"~~: since package X (D34) a call its record shows at its bound reads timed-out, and since X-2 such a call is run once
+	// more; the one call here carries no detail, so its record places it against no bound. Its assertions are unchanged.
+	it('⛔ the highest call NO_RESPONSE: NO RESPONSE — both calls threw, or ⛔ (X-2) one not run again whose record places it against no bound', () => {
 		const both = pairReview('art_1', 1, [call('INITIAL', 'NO_RESPONSE', 1), call('RETRY', 'NO_RESPONSE', 2)]);
 		expect([both.label, both.detail, both.calls]).toEqual([
 			'no-response',
@@ -3089,26 +3092,55 @@ describe('⭐⭐ package X — D34 — a review that ended on a call thrown at o
 		});
 	const FAILURE = new Error('devin invocation failed: Command failed: devin --print (fixture)');
 
-	it('⛔ PREDICTED RED — a call thrown AT its tool’s bound and not run again: TIMED OUT, the bound and the time in its detail', async () => {
-		const chain = await chainOf(BOUND, [0, BOUND], FAILURE);
-		expect(chain.map((x) => `${x.state.exchangeRole}:${x.state.disposition}`), 'arrangement: one call, thrown at the bound').toEqual([
-			'INITIAL:NO_RESPONSE'
-		]);
-		expect(String((chain[0]!.state.parseOutcome as { detail?: unknown }).detail), 'arrangement: the validator’s own at-bound clause').toContain(
-			`at or past the tool’s ${BOUND} ms bound`
-		);
-		const p = pairReview('art_1', 1, chain);
+	// ⛔ MOVED 2026-10-31 (`JAN-EXEC` Phase 7, package X-2 — design D36, revision 5; `REG-D-141` (2)) — ~~"a call thrown AT its tool’s
+	// bound and not run again"~~, made by the validator (`chainOf(BOUND, [0, BOUND], FAILURE)`, its arrangement `['INITIAL:NO_RESPONSE']`):
+	// since X-2 the validator runs that call once more, so it makes that record no longer. A run recorded BEFORE X-2 holds it, and
+	// reads as it did (the first half, its record written in the pre-X-2 validator's own words, every assertion kept); the record
+	// the validator makes now of a call thrown at the bound twice reads timed-out too (the second half, the lead's ruling's second
+	// case: a retry thrown at or past the bound is timed-out, citing REG-F-590).
+	it('⛔ PREDICTED RED — a call thrown AT its tool’s bound and not run again — ⛔ since X-2 a record made before it — TIMED OUT, the bound and the time in its detail; and the record the validator makes now, thrown at the bound twice, TIMED OUT on its retry', async () => {
+		const beforeX2 = [
+			call('INITIAL', 'NO_RESPONSE', 1, {
+				parse: 'NOT_ATTEMPTED',
+				detail:
+					`The reviewing tool’s call failed after ${BOUND} ms with no reply, at or past the tool’s ${BOUND} ms bound — a timeout, ` +
+					'which is not run again. What the tool reported, sanitised: reasoning-review backing tool invocation failed: (fixture)'
+			})
+		];
+		const p = pairReview('art_1', 1, beforeX2);
 		// ⛔ THE MUTANT: the label reversed — the at-bound call read as a failure short of the bound, `REG-F-499`'s.
 		expect(p.label, 'a review that ended on a timeout').toBe('timed-out');
 		expect(p.detail).toBe(`its INITIAL call threw with no reply after ${BOUND} ms, at or past its tool’s ${BOUND} ms bound: timed out (REG-F-590)`);
 		expect(p.concludedBy).toBe('mex_INITIAL_1_run_1');
 		expect(p.thrown, 'what its calls that threw show of the bound').toEqual({ short: 0, atTheBound: 1 });
-		// ⭐ Past the bound too: a kill that landed late is a timeout as well.
-		expect(pairReview('art_1', 1, await chainOf(BOUND, [0, BOUND + 38], FAILURE)).label).toBe('timed-out');
+		// ⭐ X-2 — the validator's own record of a call thrown at the bound, run once more and thrown at the bound again.
+		const chain = await chainOf(BOUND, [0, BOUND, BOUND + 100, 2 * BOUND + 100], FAILURE, FAILURE);
+		expect(chain.map((x) => `${x.state.exchangeRole}:${x.state.disposition}`), 'arrangement: thrown at the bound, run once more, thrown at it again').toEqual([
+			'INITIAL:NO_RESPONSE',
+			'RETRY:NO_RESPONSE'
+		]);
+		expect(String((chain[0]!.state.parseOutcome as { detail?: unknown }).detail), 'arrangement: the validator’s own at-bound clause').toContain(
+			`at or past the tool’s ${BOUND} ms bound — a timeout, so it is run once more (REG-D-141 (2))`
+		);
+		const twice = pairReview('art_1', 1, chain);
+		expect([twice.label, twice.detail, twice.concludedBy, twice.thrown]).toEqual([
+			'timed-out',
+			`its RETRY call threw with no reply after ${BOUND} ms, at or past its tool’s ${BOUND} ms bound: timed out (REG-F-590)`,
+			'mex_RETRY_2_run_1',
+			{ short: 0, atTheBound: 2 }
+		]);
+		expect(shown(cellOf(reportOf(aRun({ design: { review: asCalls(chain) } })).report, '4', 'design'))).toEqual(['broke', ['REG-F-590']]);
+		// ⭐ Past the bound too: a kill that landed late is a timeout as well — ⛔ (X-2) and so is its retry's.
+		expect(
+			pairReview('art_1', 1, await chainOf(BOUND, [0, BOUND + 38, BOUND + 100, 2 * BOUND + 138], FAILURE, FAILURE)).label
+		).toBe('timed-out');
 	});
 
+	// ⛔ MOVED 2026-10-31 (X-2; design D36) — ~~`asCalls(await chainOf(BOUND, [0, BOUND + 38], FAILURE))`~~, one call thrown past the
+	// bound and let stand: since X-2 the validator runs it once more (and the empty reply the fixture's `print` then gives draws a
+	// repair), so the record of a review that timed out is made with its retry thrown past the bound too. Every assertion kept.
 	it('⛔ PREDICTED RED — stage 4 cites REG-F-590 for it, never REG-F-499 — a work product’s review and a command’s', async () => {
-		const timedOut = asCalls(await chainOf(BOUND, [0, BOUND + 38], FAILURE));
+		const timedOut = asCalls(await chainOf(BOUND, [0, BOUND + 38, BOUND + 100, 2 * BOUND + 138], FAILURE, FAILURE));
 		const workProduct = cellOf(reportOf(aRun({ design: { review: timedOut } })).report, '4', 'design');
 		expect(workProduct.basis, 'the review reads as D34 labels it').toContain('the review of work product art_design is timed-out');
 		expect(shown(workProduct), 'a timed-out review’s break').toEqual(['broke', ['REG-F-590']]);
@@ -3158,8 +3190,9 @@ describe('⭐⭐ package X — D34 — a review that ended on a call thrown at o
 	});
 
 	it('⭑ CONTROL — a call thrown at the bound whose retry ANSWERED concluded the review: answered — no timed-out review, whatever its first call', () => {
-		// ⚠ Not reachable under today's rule (a throw at the bound is not run again), so written as X-2's shape would record it
-		// (design D36): the report reads what concluded the review, and a reply concluded this one.
+		// ⚠ ~~Not reachable under today's rule (a throw at the bound is not run again), so written as X-2's shape would record it
+		// (design D36)~~ ⛔ MOVED 2026-10-31 (X-2 built, design D36): reachable now, and made by the validator itself below (the lead's
+		// ruling's first case). Kept as written: the report reads what concluded the review, and a reply concluded this one.
 		const chain = [
 			call('INITIAL', 'NO_RESPONSE', 1, {
 				parse: 'NOT_ATTEMPTED',
@@ -3168,6 +3201,94 @@ describe('⭐⭐ package X — D34 — a review that ended on a call thrown at o
 			call('RETRY', 'ACCEPTED', 2)
 		];
 		expect([pairReview('art_1', 1, chain).label, pairReview('art_1', 1, chain).concludedBy]).toEqual(['answered', 'mex_RETRY_2_run_1']);
+	});
+
+	// ── ⭐⭐ `JAN-EXEC` Phase 7, package X-2 — D36 (`REG-D-141` (2); design §10.5, revision 5: *"P6 again's report counts each at-bound
+	// no-response under D34's label, and whether its retry answered"*) — THE LEAD'S RULING OF 2026-10-31, on the question package
+	// X's builder left to X-2: the report reads a review by how it ENDED, and cites every kind of failure among its calls.
+	//   · A retry that answered: the review concluded on it — no no-response label — and the report still counts the at-bound
+	//     throw under D34's label, and that its retry answered.
+	//   · A retry that threw at or past the bound: timed-out, citing REG-F-590 (the restated case above).
+	//   · A retry that threw short of the bound: no-response, citing REG-F-499 — and REG-F-590 too, for a call of it timed out.
+	// Every record is the validator's own, made under the product's devin bound, as the D34 cases' are. ──
+	/** A reply answering every seeded criterion, met. */
+	const ANSWERED = JSON.stringify({
+		findings: SEEDED_REASONING_REVIEW_CRITERIA.map((c) => ({ criterionId: c.id, failed: false, statement: 'met' })),
+		recommendation: 'SATISFIED'
+	});
+
+	it('⛔ PREDICTED RED (X-2; the lead’s ruling, its first case) — a call thrown AT the bound whose retry ANSWERED: the review answered on its retry — and the report counts the timeout under D34’s label, and that its retry answered', async () => {
+		const chain = await chainOf(BOUND, [0, BOUND, BOUND + 100, BOUND + 26_700], FAILURE, ANSWERED);
+		expect(chain.map((x) => `${x.state.exchangeRole}:${x.state.disposition}`), 'arrangement: thrown at the bound, run once more, answered').toEqual([
+			'INITIAL:NO_RESPONSE',
+			'RETRY:ACCEPTED'
+		]);
+		const p = pairReview('art_1', 1, chain);
+		expect([p.label, p.concludedBy], 'the review is read by how it ENDED: on its retry’s answer').toEqual(['answered', 'mex_RETRY_2_run_1']);
+		// ⛔ THE MUTANT: a timeout counted only where it ended its review — the one its retry recovered goes uncounted.
+		expect(p.timedOut, 'the timeout its retry recovered is not counted').toEqual({ calls: 1, retryAnswered: 1 });
+		const r = reportOf(aRun({ design: { review: asCalls(chain) } })).report;
+		expect(r.pairing.counts['timed-out'], 'a review its retry concluded read as timed out').toBe(0);
+		expect(r.pairing.timedOut, 'the run’s timeouts, and their retries that answered').toEqual({ calls: 1, retryAnswered: 1 });
+		expect(cellOf(r, '4', 'design').value, 'a review its retry concluded broke stage 4').not.toBe('broke');
+		expect(renderMarkdown(r)).toContain(
+			'- Calls timed out — thrown with no reply at or past their tool’s bound (D34; REG-F-590): 1, of which run once more by a ' +
+				'call that answered (REG-D-141 (2)): 1.'
+		);
+	});
+
+	it('⛔ PREDICTED RED (X-2; the lead’s ruling, its third case) — a call thrown AT the bound whose retry threw SHORT of it: NO RESPONSE, citing REG-F-499 — and REG-F-590 too', async () => {
+		const chain = await chainOf(BOUND, [0, BOUND, BOUND + 100, BOUND + 5_100], FAILURE, FAILURE);
+		expect(chain.map((x) => `${x.state.exchangeRole}:${x.state.disposition}`), 'arrangement: thrown at the bound, run once more, thrown short of it').toEqual([
+			'INITIAL:NO_RESPONSE',
+			'RETRY:NO_RESPONSE'
+		]);
+		const p = pairReview('art_1', 1, chain);
+		expect([p.label, p.detail, p.thrown, p.timedOut]).toEqual([
+			'no-response',
+			'both calls threw: the call and its one retry (REG-D-102)',
+			{ short: 1, atTheBound: 1 },
+			{ calls: 1, retryAnswered: 0 }
+		]);
+		// ⛔ THE MUTANT: such a review cites REG-F-499 alone, as if no call of it had timed out.
+		expect(shown(cellOf(reportOf(aRun({ design: { review: asCalls(chain) } })).report, '4', 'design'))).toEqual(['broke', ['REG-F-499', 'REG-F-590']]);
+		const command = reportOf(aRun({ implementation: { commands: 1, commandReview: asCalls(chain) } })).report;
+		expect(shown(cellOf(command, '4', 'implementation'))).toEqual(['broke', ['REG-F-499', 'REG-F-520', 'REG-F-590']]);
+	});
+
+	it('⭑ CONTROL (X-2) — no call at the bound, no timeout counted: two throws short of it count none, and a review with no thrown call carries no count', async () => {
+		const short = pairReview('art_1', 1, await chainOf(BOUND, [0, 5_000, 5_100, 9_000], FAILURE, FAILURE));
+		expect([short.label, short.timedOut]).toEqual(['no-response', undefined]);
+		const answered = pairReview('art_1', 1, await chainOf(BOUND, [0, 5_000], ANSWERED));
+		expect([answered.label, answered.timedOut]).toEqual(['answered', undefined]);
+		expect(reportOf(aRun()).report.pairing.timedOut).toEqual({ calls: 0, retryAnswered: 0 });
+	});
+
+	// ⭐⭐ X-2 — D36 (design §10.5: *"The run report's detail for a call not run again (`run-report-core.ts:1742`) loses 'at or past
+	// its tool's bound'"*) — a call at or past its bound is run once more since X-2, so one NOT run again was not held to a bound
+	// its record names (a tool that declares none, or a time the clock could not place) — or, where its record says it was run
+	// once more, its further call is missing from the record.
+	it('⛔ PREDICTED RED (X-2) — a call not run again: its detail no longer names "at or past its tool’s bound"; one whose record says it was run once more, but whose retry is not in the record, says so', async () => {
+		const unbounded = pairReview('art_1', 1, await chainOf(undefined, [0, 10 * BOUND], FAILURE));
+		expect([unbounded.label, unbounded.detail]).toEqual([
+			'no-response',
+			'its INITIAL call threw and was not run again, and its record does not place it against its tool’s bound'
+		]);
+		const unplaced = pairReview('art_1', 1, await chainOf(BOUND, [0, -5], FAILURE));
+		expect(unplaced.detail).toBe('its INITIAL call threw and was not run again, and its record does not place it against its tool’s bound');
+		// A call thrown short of the bound, whose record says it is run once more, and no retry after it (its record not kept).
+		const lost = pairReview('art_1', 1, [
+			call('INITIAL', 'NO_RESPONSE', 1, {
+				parse: 'NOT_ATTEMPTED',
+				detail:
+					`The reviewing tool’s call failed after 5000 ms with no reply, short of the tool’s ${BOUND} ms bound, so it is run ` +
+					'once more (REG-D-102). What the tool reported, sanitised: (fixture)'
+			})
+		]);
+		expect([lost.label, lost.detail]).toEqual([
+			'no-response',
+			'its INITIAL call threw short of its tool’s bound, and its one further call is not in the record'
+		]);
 	});
 });
 
