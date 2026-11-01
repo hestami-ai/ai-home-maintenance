@@ -165,7 +165,8 @@ describe('⭐⭐ E2 — the current case set (v5, and v6 since round 5): version
 		// their ids (`REG-D-133`).
 		// ⭐ Package V — ~~[11, 11, 11]~~: version twelve, which re-casts version eleven's 41 non-part cases under new ids, each
 		// with what production now hands its review, and adds 15 (`REG-D-136`).
-		expect([CURRENT.caseSetVersion, ORACLES.oracleVersion, ORACLES.caseSetVersion]).toEqual([12, 12, 12]);
+		// ~~expect([CURRENT.caseSetVersion, ORACLES.oracleVersion, ORACLES.caseSetVersion]).toEqual([12, 12, 12]);~~ — 2026-10-31, package Y: v13 keeps all fifteen declared cases unchanged.
+		expect([CURRENT.caseSetVersion, ORACLES.oracleVersion, ORACLES.caseSetVersion]).toEqual([13, 13, 13]);
 		const v4NonGraph = V4.cases.filter((c) => c.arm !== 'PWA_GRAPH');
 		expect(v4NonGraph, 'the arrangement: version four’s 27 non-graph cases').toHaveLength(27);
 		// ⭐ Package V — ~~`CURRENT`~~: version eleven, the last set to carry version four's 27 and the fourteen byte for byte; version
@@ -189,11 +190,15 @@ describe('⭐⭐ E2 — the current case set (v5, and v6 since round 5): version
 			CURRENT.cases.slice(42 + IDS.length, 91).map((c) => c.arm),
 			'version twelve: then the 35 part cases'
 		).toEqual(Array(35).fill('PWA_TYPE'));
-		expect(CURRENT.cases.slice(91).map((c) => [c.id, c.arm]), 'version twelve: then the three re-run cases').toEqual([
-			['W12-CSV-RERUN', 'WORK_PRODUCT'],
-			['W12-CSV-RERUN-RR-07', 'WORK_PRODUCT'],
+		// ~~expect(CURRENT.cases.slice(91).map((c) => [c.id, c.arm]), 'version twelve: then the three re-run cases').toEqual([~~ — 2026-10-31, package Y: the rerun trio remains at 91–93; three additions follow.
+		expect(CURRENT.cases.slice(91, 94).map((c) => [c.id, c.arm]), 'version thirteen: then the three re-run cases').toEqual([
+			// ~~W12-CSV-RERUN~~ — 2026-10-31, package Y: the recast case takes a new id.
+			['W13-CSV-RERUN', 'WORK_PRODUCT'],
+			// ~~W12-CSV-RERUN-RR-07~~ — 2026-10-31, package Y: the recast case takes a new id.
+			['W13-CSV-RERUN-RR-07', 'WORK_PRODUCT'],
 			[RERUN_SIGN_OFF, 'DECLARED_POLICY']
 		]);
+		expect(CURRENT.cases.slice(94).map(c => c.id), 'package Y: three additions after the rerun trio').toEqual(['W13-CSV-INHERITED','P13-CSV-NARROWED','P13-CSV-NARROWED-WHOLE']);
 		// ~~expect(DECLARED.map((c) => c.id)).toEqual(IDS);~~ ⭐ Package V-2, 2026-10-29: the fourteen, then the sign-off after the re-run.
 		expect(DECLARED.map((c) => c.id)).toEqual([...IDS, RERUN_SIGN_OFF]);
 		expect(DECLARED_CASE_POLICIES.map(([policyId]) => policyId)).toEqual([

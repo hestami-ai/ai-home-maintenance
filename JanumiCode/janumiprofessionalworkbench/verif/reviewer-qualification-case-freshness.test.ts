@@ -8,7 +8,7 @@
 // to a case's data — a harmless one exactly as a plant removed — and a change aimed at a content limb read KILLED there
 // whether or not that limb still stood. A mutation is judged by the file it names as its victim; with this limb here, a
 // change to a case's data is answered in the cases file by the content limb it breaks, or by none, and HERE by staleness.
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
@@ -63,9 +63,28 @@ import { ORACLES_V9 } from '../scripts/reviewer-qual/oracles-v9.js';
 import { ORACLES_V10 } from '../scripts/reviewer-qual/oracles-v10.js';
 import { ORACLES_V11 } from '../scripts/reviewer-qual/oracles-v11.js';
 import { ORACLES_V12 } from '../scripts/reviewer-qual/oracles-v12.js';
+import { CASE_SET_V13 } from '../scripts/reviewer-qual/case-set-v13.js';
+import { ORACLES_V13 } from '../scripts/reviewer-qual/oracles-v13.js';
 
 const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url));
 const read = (file: string): string => readFileSync(`${REPO_ROOT}${file}`, 'utf8');
+
+describe('package Y — version thirteen freshness', () => {
+	it('v13 cases and oracles are generated, LF only with no BOM; versions 1–12 stay history', () => {
+		for (const [file,value] of [
+			['docs/tracking/reviewer-qualification/cases/case-set-v13.json',CASE_SET_V13],
+			['docs/tracking/reviewer-qualification/oracles/oracles-v13.json',ORACLES_V13]
+		] as const) {
+			expect(existsSync(`${REPO_ROOT}${file}`), `${file} is generated`).toBe(true);
+			const text = read(file);
+			expect(text).toBe(serializeGenerated(value));
+			expect(text.includes('\r')).toBe(false);
+			expect(text.charCodeAt(0)).not.toBe(0xfeff);
+		}
+		expect(CASE_SET_V13.caseSetVersion).toBe(13);
+		expect(CASE_SET_V12.caseSetVersion).toBe(12);
+	});
+});
 
 /** The committed files, as the runner will read them — never the generator's in-memory values. */
 const committedCases = (): CaseSet => JSON.parse(read(CASE_SET_V1_FILE)) as CaseSet;

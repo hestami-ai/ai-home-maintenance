@@ -79,6 +79,7 @@ import {
 	CASE_SET_V9_FILE,
 	CASE_SET_V10_FILE,
 	CASE_SET_V11_FILE,
+	CASE_SET_V12_FILE,
 	CURRENT_CASE_SET_FILE,
 	CURRENT_ORACLES_FILE,
 	ORACLES_PROPOSED,
@@ -145,6 +146,10 @@ import {
 	type World
 } from '../scripts/reviewer-qual/case-set-v12.js';
 import { ORACLES_V12 } from '../scripts/reviewer-qual/oracles-v12.js';
+import { CASE_SET_V13 } from '../scripts/reviewer-qual/case-set-v13.js';
+import { ORACLES_V13 } from '../scripts/reviewer-qual/oracles-v13.js';
+import { deliverableFiles } from '../apps/rph-demo/src/lib/server/execution/deliverable-view.js';
+import type { WorkProductCaseV12, ProcessResultCaseV12 } from '../scripts/reviewer-qual/case-set-v12.js';
 import { changedFiles, hostSequenceOf } from '../apps/rph-demo/src/lib/server/execution/deliverable-view.js';
 import { OBSERVED_PROCESS_RUN_LIMIT, type ProcessRunObservation } from '../apps/rph-demo/src/lib/server/tools/process-run-observer.js';
 import { sha256 } from '../scripts/reviewer-qual/digest.js';
@@ -4522,8 +4527,9 @@ describe('⭐⭐ the review in parts, B8b — reviewer-qualification case set v1
 			[...sets.keys()].sort((a, b) => a - b),
 			// ⭐ Package K — ~~'the ten committed oracle sets'~~: version eleven's committed beside them.
 			// ⭐ Package V — ~~'the eleven committed oracle sets'~~: version twelve's committed beside them.
-			'arrangement: the twelve committed oracle sets'
-		).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+			// ⭐ Package Y — ~~'the twelve committed oracle sets'~~: version thirteen's committed beside them (2026-10-31).
+			'arrangement: the thirteen committed oracle sets'
+		).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
 		const named = generatedOraclesV10().oracles.map((o) => ({ caseId: o.caseId, ...oraclesNamedIn(o.note) }));
 		expect(named, 'arrangement: version ten’s 76 notes').toHaveLength(76);
 		expect(
@@ -5029,8 +5035,9 @@ describe('⭐⭐ the review in parts, B8b, package K — reviewer-qualification 
 		expect(
 			[...sets.keys()].sort((a, b) => a - b),
 			// ⭐ Package V — ~~'the eleven committed oracle sets'~~: version twelve's committed beside them.
-			'arrangement: the twelve committed oracle sets'
-		).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+			// ⭐ Package Y — ~~'the twelve committed oracle sets'~~: version thirteen's committed beside them (2026-10-31).
+			'arrangement: the thirteen committed oracle sets'
+		).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
 		const named = generatedOraclesV11().oracles.map((o) => ({ caseId: o.caseId, ...oraclesNamedIn(o.note) }));
 		expect(named, 'arrangement: version eleven’s 76 notes').toHaveLength(76);
 		expect(
@@ -5174,8 +5181,10 @@ describe('⭐⭐ the review in parts, B8b, package K — reviewer-qualification 
 //     holds; the conferral carrying version eleven's whole and recording Q45 in the sponsor's words, no standing given to the
 //     sponsor's answer, no marker, the check finding no CONFERRAL problem;
 //   · THE 28,000-CHARACTER LIMIT, SEEN WHOLE but for the one case cut by design, THE ORACLES COMPOSE — as every case is held.
-const currentV12 = (): CaseSet => JSON.parse(read(CURRENT_CASE_SET_FILE)) as CaseSet;
-const currentOraclesV12 = (): OracleSet => JSON.parse(read(CURRENT_ORACLES_FILE)) as OracleSet;
+// ~~read(CURRENT_CASE_SET_FILE)~~; ~~read(CURRENT_ORACLES_FILE)~~ — restated 2026-10-31:
+// package V's assertions read its historical v12 fixture now that package Y makes v13 current.
+const currentV12 = (): CaseSet => JSON.parse(read(CASE_SET_V12_FILE)) as CaseSet;
+const currentOraclesV12 = (): OracleSet => JSON.parse(read(ORACLES_V12_FILE)) as OracleSet;
 const generatedV12 = (): CaseSet => JSON.parse(serializeGenerated(CASE_SET_V12)) as CaseSet;
 const generatedOraclesV12 = (): OracleSet => JSON.parse(serializeGenerated(ORACLES_V12)) as OracleSet;
 /** Version eleven's committed files — history since version twelve. */
@@ -6065,8 +6074,9 @@ describe('⭐⭐ package V — reviewer-qualification case set v12: version elev
 		const sets = committedOracleCases();
 		expect(
 			[...sets.keys()].sort((a, b) => a - b),
-			'arrangement: the twelve committed oracle sets'
-		).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+			// ⭐ Package Y — ~~'the twelve committed oracle sets'~~: version thirteen's committed beside them (2026-10-31).
+			'arrangement: the thirteen committed oracle sets'
+		).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
 		const named = generatedOraclesV12().oracles.map((o) => ({ caseId: o.caseId, ...oraclesNamedIn(o.note) }));
 		// ~~expect(named, 'arrangement: version twelve’s 91 notes').toHaveLength(91);~~ ⭐ Package V-2, 2026-10-29 (`REG-D-137` Q46; design D29): and the three
 		// re-run cases’ notes.
@@ -6749,6 +6759,734 @@ describe('⭐⭐ package V-2 — reviewer-qualification case set v12’s three r
 				call: async () => ({ returned: reply, served: null })
 			});
 			expect([scored.disposition, scored.resultClass, scored.independenceOk], id).toEqual([oracle!.disposition, 'VALID', true]);
+		}
+	});
+});
+
+// Package Y (D37; REG-D-141 (4), REG-D-142), 2026-10-31. Independent prototype pins,
+// rendered anew with C5. Historical v12 data and note pins above remain historical.
+const Y_ORDER = [
+	"W12-CLEAN",
+	"W12-CLEAN-R1",
+	"W12-CLEAN-R2",
+	"W12-CLEAN-R3",
+	"W12-RR-01",
+	"W12-RR-02",
+	"W12-RR-03",
+	"W12-RR-04",
+	"W12-RR-05",
+	"W12-RR-06",
+	"W12-RR-07",
+	"W12-RR-08",
+	"W12-RR-09",
+	"W12-CSV-CLEAN",
+	"W12-CSV-CLEAN-R1",
+	"W12-CSV-CLEAN-R2",
+	"W12-CSV-CLEAN-R3",
+	"W12-CSV-CLEAN-T2",
+	"W12-CSV-STALE-READ",
+	"W12-CSV-RR-02",
+	"W12-CSV-RR-03",
+	"W12-CSV-RR-07",
+	"W12-CSV-RR-08",
+	"W12-CSV-RR-09",
+	"P12-CLEAN",
+	"P12-CLEAN-R1",
+	"P12-CLEAN-R2",
+	"P12-CLEAN-R3",
+	"P12-RR-01",
+	"P12-RR-02",
+	"P12-RR-03",
+	"P12-RR-04",
+	"P12-RR-05",
+	"P12-RR-06",
+	"P12-RR-07",
+	"P12-RR-07-CUT",
+	"P12-RR-08",
+	"P12-RR-09",
+	"P12-CSV-LS",
+	"P12-CSV-READ",
+	"P12-CSV-COUNT",
+	"P12-CSV-COUNT-RR-07",
+	"D12-RC-CLEAN",
+	"D12-RC-04",
+	"D12-IP-CLEAN",
+	"D12-IP-02",
+	"D12-AD-CLEAN",
+	"D12-AD-01",
+	"D12-DC-CLEAN",
+	"D12-DC-01",
+	"D12-AC-CLEAN",
+	"D12-AC-01",
+	"D12-TA-CLEAN-B",
+	"D12-TA-08",
+	"D12-FP-CLEAN",
+	"D12-FP-03",
+	"G11-CLEAN.T01",
+	"G10-CLEAN.T02",
+	"G11-CLEAN.T03",
+	"G10-CLEAN.T04",
+	"G10-CLEAN.T05",
+	"G10-CLEAN.T06",
+	"G10-CLEAN.T07",
+	"G11-CLEAN-R1.T01",
+	"G11-CLEAN-R2.T01",
+	"G11-CLEAN-R3.T01",
+	"G10-RR-01.T01",
+	"G11-RR-02.T01",
+	"G10-RR-03.T04",
+	"G10-RR-04.T05",
+	"G10-RR-05.T01",
+	"G10-RR-06.T05",
+	"G10-RR-07.T06",
+	"G10-RR-08.T05",
+	"G11-RR-09.T01",
+	"G7-CLEAN.T01",
+	"G7-CLEAN.T02",
+	"G7-CLEAN.T03",
+	"G7-RR-04.T03",
+	"G7-RR-02.T02",
+	"G7-RR-03-CHILD.T01",
+	"G7-RR-03-PROMPT.T02",
+	"G7-RR-08.T02",
+	"G8-CLEAN.T01",
+	"G8-CLEAN.T02",
+	"G8-CLEAN.T03",
+	"G8-CLEAN.T04",
+	"G8-CLEAN.T05",
+	"G8-CLEAN.T06",
+	"G8-CLEAN.T07",
+	"G8-RR-02.T05",
+	"W13-CSV-RERUN",
+	"W13-CSV-RERUN-RR-07",
+	"D12-CSV-TA-RERUN",
+	"W13-CSV-INHERITED",
+	"P13-CSV-NARROWED",
+	"P13-CSV-NARROWED-WHOLE"
+] as const;
+const Y_FIRST_PROMPTS = [
+	[
+		"W12-CLEAN",
+		"274eff315c51c8ae9c183e9f39b2da922fe98ad84549bc7c5c56c57f9958bb09"
+	],
+	[
+		"W12-CLEAN-R1",
+		"a1b316b963f1081ef50ad2c804e3471bf58a11317285c08cf9b4f7f8a0aa93fc"
+	],
+	[
+		"W12-CLEAN-R2",
+		"b06cf3cfd213b07d3928f2779156a1fb2bf39d07b6c7fc374f665d3c57a732b1"
+	],
+	[
+		"W12-CLEAN-R3",
+		"c9670456dbe11c2b958e2281b24ec641586ecdec55a82b55bdc49da0e9151d9b"
+	],
+	[
+		"W12-RR-01",
+		"2c50ec6d14c120527a3b100347bced69433315f21fc719aed66ebf244585fd06"
+	],
+	[
+		"W12-RR-02",
+		"2dc93bf834718135728a6dd4e33b3776472b6d16735e2046934a8581d23bdff8"
+	],
+	[
+		"W12-RR-03",
+		"39e3a06d982d51dcf560fe018e1051456195198f0d7a56004bcb1722a98ab583"
+	],
+	[
+		"W12-RR-04",
+		"8dd34f5cd929f7230efb63bca7b4996a0223f9951e047b7650782bfb0e7c2e2b"
+	],
+	[
+		"W12-RR-05",
+		"97fe7bb9f6a52c451a24ff907261ab1fcec39064a8f3aa93d8382ecec5a522ab"
+	],
+	[
+		"W12-RR-06",
+		"32d1ed0398b5873a2260871e4688164ea17a69dea099a7974574d3ab29f1451d"
+	],
+	[
+		"W12-RR-07",
+		"7bfe7bc26affeb62f6af3e20048cf17aa9c48a70f68d41e251e0a9ac403ee5be"
+	],
+	[
+		"W12-RR-08",
+		"820cb99084e1d5cb31858b2af1504017b287f70b58af7df8e034ca26c2b19de8"
+	],
+	[
+		"W12-RR-09",
+		"a4246ddffa8c0c16d415dba0fa264306e45765d415cbaaa63e3f2adf434730e4"
+	],
+	[
+		"W12-CSV-CLEAN",
+		"42c5ddfb3deecd372f36f4b91d140bf39ccb9720600c80eb6fb79130684340e5"
+	],
+	[
+		"W12-CSV-CLEAN-R1",
+		"a0b522df3215a8f686eaf347f5cb89feb7197d95e474a50a50952ef3c84fefcd"
+	],
+	[
+		"W12-CSV-CLEAN-R2",
+		"fbbe23210f502d410f549b36b630e828566d9d58d39402ab4ca53ff97acaf52e"
+	],
+	[
+		"W12-CSV-CLEAN-R3",
+		"07c459615145ca2e18a6d9cd8ff22b3885c4e9f6f72282393f6662c93ccf526d"
+	],
+	[
+		"W12-CSV-CLEAN-T2",
+		"58b4fd9ad51dbd34305967f2ff7ce5bae55acf252a09ccf3dc5145025ad4bddf"
+	],
+	[
+		"W12-CSV-STALE-READ",
+		"c157c8fa8c99a2487ff9100f0a7cab84557dacf005dc51405047362ea61f71b3"
+	],
+	[
+		"W12-CSV-RR-02",
+		"20e8a0d914e33972cb3dc9fd7f6d9b4da1defefd5c691c7207e527385c15a688"
+	],
+	[
+		"W12-CSV-RR-03",
+		"5fe5e80964558b365a90ce0aad1d903691d8c895a92c22b8983402cb6b24321d"
+	],
+	[
+		"W12-CSV-RR-07",
+		"1231c3c2c7f3bca871472cd190a9d6a6d2383e1e5269583b19a7f2798a617d78"
+	],
+	[
+		"W12-CSV-RR-08",
+		"28d5721e20072141d0587485df19ae0051b175a591bc5da00e5f720d43186369"
+	],
+	[
+		"W12-CSV-RR-09",
+		"fe837f9594dce2fa4cac4acbae9ecf6f90c17826ea44859275a8b0c859dd7b09"
+	],
+	[
+		"P12-CLEAN",
+		"209dcd87353ee91f04a35a05e09bce20a9f8c436a5144c299d4b210aa10c821e"
+	],
+	[
+		"P12-CLEAN-R1",
+		"d3615e3412882c132bc713f4c1c3b08975aec826b93688a96357620ced70f046"
+	],
+	[
+		"P12-CLEAN-R2",
+		"27ff288c8170c25809f1ec175eb323a135bcceb054f73fcee4616c9416575f71"
+	],
+	[
+		"P12-CLEAN-R3",
+		"37386b09d31e439dca03fa5263d926f4ff88892248d611f03c4db94bce930d06"
+	],
+	[
+		"P12-RR-01",
+		"dac0c1645f1e135af106012588ae6ae498edd49fac5e4a990f59be3599984a8d"
+	],
+	[
+		"P12-RR-02",
+		"1b30b832d65f3b338fcb8f2a1ffe48165bb030032ae06d2ab4f8d300c6e0c0f3"
+	],
+	[
+		"P12-RR-03",
+		"761d456703da7fbd6905af6b8c13634a7583af9645a8a9a7292f9aa4fa880349"
+	],
+	[
+		"P12-RR-04",
+		"bf9b09102b4f19e646660b8bf8c586926007599419f21dc2f07576bd5b24220c"
+	],
+	[
+		"P12-RR-05",
+		"a1830cce3b8e8b3120ae640d34bc5d96ed49ffc83f90d42a15fbd13a577a5fb1"
+	],
+	[
+		"P12-RR-06",
+		"d48f1fa4bcf6c1c7a7e6ee231adf7c95cbe1efb62200e472dd700e561b93dc57"
+	],
+	[
+		"P12-RR-07",
+		"58a9bea08268bdc2bda156b3f9cc36c108953a232a557e1750b23c1535c54e8c"
+	],
+	[
+		"P12-RR-07-CUT",
+		"3f2f9ee00d23c01bd2b085effa6931fb646dda3f9e92f32b9c118d7332897083"
+	],
+	[
+		"P12-RR-08",
+		"d6d2a2af756407fed67decaeb2e104930872750198c4e8fe862f4a6e78bf713f"
+	],
+	[
+		"P12-RR-09",
+		"571567175630f18510f43e7b7bc9b051710907d22c4b4639766e4e5d2619dd52"
+	],
+	[
+		"P12-CSV-LS",
+		"f89fbcf9e2305d8880022ca5e022dd66de9e5534aa6f52c080a07adb8a14d1a4"
+	],
+	[
+		"P12-CSV-READ",
+		"fe775f39e826963a5b91678b3416df2d6a956d9e883ae69efd2099e8b8886db7"
+	],
+	[
+		"P12-CSV-COUNT",
+		"5885b938ce4af5d27a80980a2e72fc4c0d9b7c243c5799b61bc7f56bc03035ab"
+	],
+	[
+		"P12-CSV-COUNT-RR-07",
+		"aa282273f1c552dc0b3b936d1b10fdea2beffea50e3723a5f77fbfb924bae79b"
+	],
+	[
+		"D12-RC-CLEAN",
+		"d41e38c1a94d43782898a54f231f70bda6151e8eb3e90f5b02efb2eedc3730d2"
+	],
+	[
+		"D12-RC-04",
+		"1ef00bd5e9d345963c8d3e4efba0ccbea534bb0908b108363216db58f8ea2c90"
+	],
+	[
+		"D12-IP-CLEAN",
+		"a5a11fddcf2bb676e929156d6397051e554f49009febd8050ca059a4a69448dc"
+	],
+	[
+		"D12-IP-02",
+		"975d1f1fc86721dfa9b5a3147a3e2cc9521062b427973f4d00cb9bc061aa049e"
+	],
+	[
+		"D12-AD-CLEAN",
+		"e56f603b0bec7e111f92302bc3394e1783bc3e189ca93a61099a34449b4a8ddd"
+	],
+	[
+		"D12-AD-01",
+		"7739eb0ff88f26a3e15079e571e154a0259d5ccfcd0518ed08d61459b3d1bd4a"
+	],
+	[
+		"D12-DC-CLEAN",
+		"8feabe7ee04d3bd663d33e76a824398cce521df79c06b14f363bc8aa2267e455"
+	],
+	[
+		"D12-DC-01",
+		"774b4ce145aaf8c7700c17cc4f380ed6ca7b677b23a809d5e493dd7c26c05de2"
+	],
+	[
+		"D12-AC-CLEAN",
+		"caa037b4fb76a553416ff46ef799b620a6f491ca9fff4e0ea0747d387d1d37bd"
+	],
+	[
+		"D12-AC-01",
+		"6365a1a2d7364842c44653877739b458c86a08bc55de02d08f4b70103c6be4aa"
+	],
+	[
+		"D12-TA-CLEAN-B",
+		"7ba98b37082986edf5dd08707487853bacb5d81496e107920deb09c8c2866053"
+	],
+	[
+		"D12-TA-08",
+		"93703bf2d777b9f154b38b33294a1bcbaa5b1f8aff7c42d9acbd6429684a3d40"
+	],
+	[
+		"D12-FP-CLEAN",
+		"805a012a8fa50ca09c3eb18cbb94df03ae4516ebe47024ec48b80c4dd21dc039"
+	],
+	[
+		"D12-FP-03",
+		"6d674b3e8d66a4e17242f9bcc0126ea11d716ee28248eb7ab46ffce155e65edd"
+	],
+	[
+		"G11-CLEAN.T01",
+		"5427f157c703087ed9756e2a42a47df20c850546d0ae906a79049bac6eb8cdb1"
+	],
+	[
+		"G10-CLEAN.T02",
+		"9653decf69f4213b80782ceda9cee4029b314fa7cef56ba7f3e26e9eff2d5669"
+	],
+	[
+		"G11-CLEAN.T03",
+		"e02da26e365be9652140fc6d44f9e03fd0f40b9d4604a40a153457d63f2356e5"
+	],
+	[
+		"G10-CLEAN.T04",
+		"f78dfcbabc2a7adcd488f276f8d302a79c76b4dcd0d84db520ba11c12d56346e"
+	],
+	[
+		"G10-CLEAN.T05",
+		"e39c3bb653b0b114668c7d063e28c1537997318f05b8fd00ee8d1f0c4bac2e75"
+	],
+	[
+		"G10-CLEAN.T06",
+		"76a5df18b5e599dab66a11027d0123a17a10d13ff5f80f52d5e735e5288c1ec0"
+	],
+	[
+		"G10-CLEAN.T07",
+		"741f033cc96a6bf159806727d15a12cfe543babd5f2325ccb182a1de7a20ecff"
+	],
+	[
+		"G11-CLEAN-R1.T01",
+		"77cd95d3a8129492746cb7597df7ccf8e086d04224da01c6297fb818e65fd252"
+	],
+	[
+		"G11-CLEAN-R2.T01",
+		"d44aaca6198b916a2dd0aa78a05abf65266115cedd55405235bfb82bdc6535d4"
+	],
+	[
+		"G11-CLEAN-R3.T01",
+		"0c948368ab1985ee2ac6a7f380de7deacf2c278bccf049c22434e6b630114d61"
+	],
+	[
+		"G10-RR-01.T01",
+		"9cddabb4fe543089e650bdc9dd99619ed8bf7808186832b33402d227e09b2c92"
+	],
+	[
+		"G11-RR-02.T01",
+		"5caee9e0de06bd74804f12664c65cc99eb0521f5188395224562adaaf70ba114"
+	],
+	[
+		"G10-RR-03.T04",
+		"f44ca47b3eeba3c3bd53279cfe8d364671e2a60946ce64d60d7a256fad063c31"
+	],
+	[
+		"G10-RR-04.T05",
+		"8137f67a9f6c52878786c3e347222543407eb6482a2768b2817efa87f1085bec"
+	],
+	[
+		"G10-RR-05.T01",
+		"4834d49d9d25fe8d376f84f3a3c0f7676b7820854b726c1a1eef4a4bffbd3025"
+	],
+	[
+		"G10-RR-06.T05",
+		"e6b913ad313af0eacf2988e3993b36832e5405a482b2e829759c35f55ca2261e"
+	],
+	[
+		"G10-RR-07.T06",
+		"b62b181ef23b163b78718979bd7d189e6fce9841784c7b588247d610889a092b"
+	],
+	[
+		"G10-RR-08.T05",
+		"05bf386cadc4579354604a9ee1c019a7d9114d48805c44c3d3d6592713c6ec3c"
+	],
+	[
+		"G11-RR-09.T01",
+		"8e0a11bffe93a317f67cb6b16a644225237f070215e7a1708ac878a0a8a8ce22"
+	],
+	[
+		"G7-CLEAN.T01",
+		"524270dfca0d4b9dbd5ad22b0117ca76ad669374c403863527fc3f5eb2c1f5c7"
+	],
+	[
+		"G7-CLEAN.T02",
+		"77c637dbd9db414bb000368101f436da33be48fda922c381e439d96a8deaccfd"
+	],
+	[
+		"G7-CLEAN.T03",
+		"9b85944b7924210dd6a61e47436e451c92a46cc6aab6368c14d8f71e5d51ccbc"
+	],
+	[
+		"G7-RR-04.T03",
+		"13a2df6925e7385802656decfd91d571fa230c4c100ad572c9e2611210542abf"
+	],
+	[
+		"G7-RR-02.T02",
+		"0b83fb753b0a78a4c7eb974ec5d7330ef04883e2293157eab2d6cd38449c1fa4"
+	],
+	[
+		"G7-RR-03-CHILD.T01",
+		"607ed46f172de72197d5b7b3da0cef41de2970fc5375e091a7458bccda504ee2"
+	],
+	[
+		"G7-RR-03-PROMPT.T02",
+		"ee22485e8f372e94a4d235004083bcbddfae4ea10e317b1fcd61d242216757f1"
+	],
+	[
+		"G7-RR-08.T02",
+		"cc018e87075d1e829f8110e294b60e5308d3075ba2075b196ee254837fc94b49"
+	],
+	[
+		"G8-CLEAN.T01",
+		"97c2f5bc3d06ae5e630dd606b3a87575250efc124f439078d470f0dbad981845"
+	],
+	[
+		"G8-CLEAN.T02",
+		"18abff3e2a226aaead80270a1e40a934586459b4f566a3692bd36b9733f7595a"
+	],
+	[
+		"G8-CLEAN.T03",
+		"8f4b4a1867b9ba54fb66db8c61d1246a1bf5041bf5e13aa850657569fb54b848"
+	],
+	[
+		"G8-CLEAN.T04",
+		"95e3562d7f37c1ba6c1154bf76bbae0056ebb5481beb17ab0a1609d1a50c0cb8"
+	],
+	[
+		"G8-CLEAN.T05",
+		"6e5a62643c14b0a9c19eb46cbbc7d3f374d6abecadbf61ae597e1abab4dfceb1"
+	],
+	[
+		"G8-CLEAN.T06",
+		"07e19bf2625605632c93f9e9f2d00ad71c68266b6d1c666b0e8a90ed38524c31"
+	],
+	[
+		"G8-CLEAN.T07",
+		"55082babe3050d891f160b49c0cda115173f1bf8ec84a619c95c0b163127604c"
+	],
+	[
+		"G8-RR-02.T05",
+		"2e3f4fc10b12dd9f573cfc34b66675a3a10d54771125c106384c6e0326fdb9df"
+	],
+	[
+		"W13-CSV-RERUN",
+		"176224bf987efe613367ba3033b1ece9b00190d014b42776923ce6468497efe1"
+	],
+	[
+		"W13-CSV-RERUN-RR-07",
+		"5908a7f8c629309133bf6a4c2d57bcc97f67c0f936e465170bcd8d201efcc8d0"
+	],
+	[
+		"D12-CSV-TA-RERUN",
+		"427ea64ef5653e5c0dca753abb9a06978ab7161399051260cb7ec02787b5ee38"
+	],
+	[
+		"W13-CSV-INHERITED",
+		"c4878253f4aff3fe46e0e0484b7284272c4b59053140386340595eddb227bdb2"
+	],
+	[
+		"P13-CSV-NARROWED",
+		"9fac213945e68b2bc386a8ae491e7ff4350fe53e4de894a936ce4d62eae7d12d"
+	],
+	[
+		"P13-CSV-NARROWED-WHOLE",
+		"1fd105d1cf4883cb227ba8c20da96e3cfae2c23eec4a81bdb0f11bcf48287511"
+	]
+] as const;
+const Y_NOTE_PINS = [
+	[
+		"P12-RR-01",
+		"4ab23f09d46a22a6d7d6c58e59cfacf317b6bfe0dbcfa252de695f765d42c884"
+	],
+	[
+		"P12-RR-02",
+		"2371dcec5317a3200531a4131e41e83db4331e5ffb95b9d30c5a4ad2c4117184"
+	],
+	[
+		"P12-RR-07-CUT",
+		"3c2d58a1434808de6054938cfa008fa3334d6ac5e01054c55ad2404a1648c03b"
+	],
+	[
+		"P12-RR-08",
+		"abb5340dd14580b27818c04ca98c956f42802337af187deb4d2a7ff0827df95c"
+	],
+	[
+		"W13-CSV-RERUN",
+		"fbcd13439bdca68a10b8d4fbde004b0d802816c973d10d395a38cdd5435265af"
+	],
+	[
+		"W13-CSV-RERUN-RR-07",
+		"ba4c2ab3a62a9a6a55434a3a6951dcc62779e5dcfb7fcb5cf2bddf2e6a29fa9c"
+	],
+	[
+		"W13-CSV-INHERITED",
+		"3cca4c7579aa7e356aff478b0852840e17afe335cafa891beff7590eabafd335"
+	],
+	[
+		"P13-CSV-NARROWED",
+		"39c894d15f51dc38354913022a0fce91eb3887847d5a384ee5e8f0e43d515cd5"
+	],
+	[
+		"P13-CSV-NARROWED-WHOLE",
+		"239493bde649236bb7b2030928347d9709613a4f240015697457fe010f907d62"
+	]
+] as const;
+const Y_CONFERRAL_PIN = 'f59398bfcdec0569f08e5fe9442ae326c4cd2159f581dcb270367b8b25209063';
+
+const Y_RECAST = { 'W12-CSV-RERUN': 'W13-CSV-RERUN', 'W12-CSV-RERUN-RR-07': 'W13-CSV-RERUN-RR-07' } as const;
+const Y_NEW = ['W13-CSV-INHERITED', 'P13-CSV-NARROWED', 'P13-CSV-NARROWED-WHOLE'] as const;
+const Y_FIVE = [...Object.values(Y_RECAST), ...Y_NEW];
+const Y_RESTATED = ['P12-RR-01', 'P12-RR-02', 'P12-RR-07-CUT', 'P12-RR-08'];
+const ySets = (): readonly CaseSet[] => [CASE_SET_V13, ...(existsSync(`${REPO_ROOT}docs/tracking/reviewer-qualification/cases/case-set-v13.json`) ? [JSON.parse(read('docs/tracking/reviewer-qualification/cases/case-set-v13.json')) as CaseSet] : [])];
+const yOracles = (): readonly OracleSet[] => [ORACLES_V13, ...(existsSync(`${REPO_ROOT}docs/tracking/reviewer-qualification/oracles/oracles-v13.json`) ? [JSON.parse(read('docs/tracking/reviewer-qualification/oracles/oracles-v13.json')) as OracleSet] : [])];
+const yCase = (id: string, set = CASE_SET_V13): QualificationCase => {
+	const c = set.cases.find(c => c.id === id);
+	expect(c, `${id}: package Y supplies the case`).toBeDefined();
+	return c!;
+};
+const yWork = (id: string, set = CASE_SET_V13) => yCase(id, set) as WorkProductCaseV12;
+const yProcess = (id: string, set = CASE_SET_V13) => yCase(id, set) as ProcessResultCaseV12;
+const yOld = (id: string) => CASE_SET_V12.cases.find(c => c.id === id)!;
+const yRerun = V12_WORLDS.rerun as RerunWorld;
+const yBaseline = new Map(yRerun.baselineHashes.map(([p, hash]) => [p, { hash }]));
+const yStart = new Map(yRerun.rerunOwnStart.map(([p, hash]) => [p, { hash }]));
+const yFinal = new Map(yRerun.finalManifest.map(([p, hash]) => [p, { hash, text: yRerun.files.find(f => f.path === p)?.content ?? '' }]));
+
+describe('package Y — case set v13 and oracles v13 (D37)', () => {
+	it('Y01 shape and order: 97, the pair in place, then the three additions; v13 current', () => {
+		for (const set of ySets()) {
+			expect([set.caseSetVersion, set.cases.length]).toEqual([13, 97]);
+			expect(set.cases.map(c => c.id)).toEqual(Y_ORDER);
+			expect(new Set(set.cases.map(c => c.id)).size).toBe(97);
+			expect(Object.fromEntries(['WORK_PRODUCT', 'PROCESS_RESULT', 'DECLARED_POLICY', 'PWA_TYPE'].map(arm => [arm, set.cases.filter(c => c.arm === arm).length]))).toEqual({WORK_PRODUCT: 27, PROCESS_RESULT: 20, DECLARED_POLICY: 15, PWA_TYPE: 35});
+		}
+		expect([CURRENT_CASE_SET_FILE, CURRENT_ORACLES_FILE]).toEqual(['docs/tracking/reviewer-qualification/cases/case-set-v13.json', 'docs/tracking/reviewer-qualification/oracles/oracles-v13.json']);
+	});
+	it('Y02 a changed case takes a new id: all five absent from versions 1–12', () => {
+		const oldIds = new Set(Array.from({length: 12}, (_, i) => JSON.parse(read(`docs/tracking/reviewer-qualification/cases/case-set-v${i + 1}.json`)) as CaseSet).flatMap(s => s.cases.map(c => c.id)));
+		for (const set of ySets()) {
+			expect(set.cases.filter(c => !oldIds.has(c.id)).map(c => c.id)).toEqual(Y_FIVE);
+			for (const id of Y_FIVE) expect(oldIds.has(id), id).toBe(false);
+		}
+	});
+	it('Y03 the 92 kept cases are version twelve’s data byte for byte', () => {
+		const kept = CASE_SET_V12.cases.filter(c => !(c.id in Y_RECAST));
+		for (const set of ySets()) {
+			expect(set.cases.filter(c => !(Y_FIVE as readonly string[]).includes(c.id))).toHaveLength(92);
+			for (const c of kept) expect(JSON.stringify(yCase(c.id, set)), c.id).toBe(JSON.stringify(c));
+		}
+	});
+	it('Y04 every first prompt pinned: 50 recorded v12, 42 current X rows, and the five C5 build pins', async () => {
+		const recorded = read('docs/tracking/reviewer-qualification/runs.ndjson').split('\n').filter(Boolean).map(l => JSON.parse(l) as {kind: string; role?: string; caseId?: string; promptSha256?: string});
+		const moved = new Map(PROTOTYPE_PROMPTS_V12.filter(([id]) => /^[WP]12-/.test(id)));
+		const unmoved = CASE_SET_V12.cases.filter(c => !/^[WP]12-/.test(c.id));
+		expect([moved.size, unmoved.length]).toEqual([42, 50]);
+		for (const set of ySets()) {
+			const rendered = await Promise.all(set.cases.map(async c => [c.id, sha256((await promptsFor(c)).initial)] as const));
+			expect(rendered).toEqual(Y_FIRST_PROMPTS);
+			const hashes = new Map(rendered);
+			const fingerprint = await reviewerFingerprint(set.cases);
+			expect(fingerprint.caseSet).toBe('f4fc815d13d14a58cbd5f4f4a9c69a9d0ed376e6a9840a6f5afe768aeba92cfc');
+			expect(fingerprint.reviewer).toBe('479121cf7e6af2c91331855d50e140ac1f7ceb323c5b0abd01f22e2ac8992945');
+			for (const [id, pin] of moved) expect(hashes.get(id), id).toBe(pin);
+			for (const c of unmoved) expect(hashes.get(c.id), c.id).toBe(recorded.filter(l => l.kind === 'CALL' && l.role === 'initial' && l.caseId === c.id).at(-1)!.promptSha256);
+		}
+	});
+	it('Y05 the recast pair differs only at its id, production marks, and the marked heading clause', async () => {
+		for (const set of ySets()) for (const [oldId, id] of Object.entries(Y_RECAST)) {
+			const c = yWork(id, set);
+			const old = yOld(oldId) as WorkProductCaseV12;
+			const unmarked = {...c, id: oldId, input: {...c.input, deliverable: {...c.input.deliverable, files: c.input.deliverable.files.map(({inThisStep: _mark, ...f}) => f)}}};
+			expect(JSON.stringify(unmarked), id).toBe(JSON.stringify(old));
+			const a = (await promptsFor(old)).initial.split('\n');
+			const b = (await promptsFor(c)).initial.split('\n');
+			expect(b.length, id).toBe(a.length);
+			const changed = a.flatMap((line, i) => line === b[i] ? [] : [i]);
+			expect(changed.length, id).toBe(11);
+			expect(changed.filter(i => a[i]!.startsWith('Added '))).toHaveLength(10);
+			expect(changed.filter(i => a[i]!.startsWith(deliverableHeading(old.input.deliverable)))).toHaveLength(1);
+		}
+	});
+	it('Y06 D12-CSV-TA-RERUN stays version twelve’s whole data; no mark leaks into sign-off', () => {
+		for (const set of ySets()) {
+			const c = yCase('D12-CSV-TA-RERUN', set);
+			expect(JSON.stringify(c)).toBe(JSON.stringify(yOld(c.id)));
+			expect(JSON.stringify(c)).not.toContain('inThisStep');
+		}
+	});
+	it('Y07 the views are production’s: marks from the rerun start, four written and six inherited; baseline control differs', () => {
+		const marks = deliverableFiles(yBaseline, yFinal, yStart);
+		expect(marks.filter(f => f.inThisStep !== 'UNCHANGED').map(f => f.path)).toEqual(yRerun.writtenByTheRerun);
+		expect(marks.filter(f => f.inThisStep === 'UNCHANGED').map(f => f.path)).toEqual(yRerun.inheritedFromTheFirstStep);
+		expect(deliverableFiles(yBaseline, yFinal, yBaseline)).not.toEqual(marks);
+		for (const set of ySets()) for (const id of Object.values(Y_RECAST)) expect(yWork(id, set).input.deliverable.files, id).toEqual(marks);
+	});
+	it('Y08 the three new cases differ from their twins only where the prototype says; frozen whole world retained', () => {
+		for (const set of ySets()) {
+			const inherited = yWork('W13-CSV-INHERITED', set);
+			expect(differingPaths(yOld('W12-CSV-RR-08'), inherited, '').sort()).toEqual(['id', 'input.answer', 'input.rationale.rationale']);
+			const narrowed = yProcess('P13-CSV-NARROWED', set);
+			const oldWork = yOld('W12-CSV-RR-03') as WorkProductCaseV12;
+			expect(narrowed.input.rationale).toEqual(oldWork.input.rationale);
+			expect(narrowed.input.producingPrompt).toBe(oldWork.input.producingPrompt);
+			expect(narrowed.input.hostSequence.acts).toEqual(oldWork.input.deliverable.sequence.acts);
+			expect(narrowed.input.run.argv).toEqual(['node', '--test', 'test/csv.test.js', 'test/summarise.test.js']);
+			const whole = yProcess('P13-CSV-NARROWED-WHOLE', set);
+			const frozen = JSON.parse(read('scripts/reviewer-qual/case-set-v13-worlds.json')) as {worlds: Record<string, World>};
+			const w = frozen.worlds['narrowed-whole']!;
+			expect(sha256(JSON.stringify(w))).toBe('98568b5219a4e00ca46116cdb5f2cb1debceafe21699cf387c9ae189d52d3905');
+			expect(whole.input.run.durationMs).toBe(w.acts[11]!.durationMs);
+			expect(whole.input.run.stdout).toBe(w.acts[11]!.stdout);
+			expect(whole.input.hostSequence.acts).toEqual(w.acts.map(a => a.kind === 'WRITE' ? {try:a.try,ordinal:a.ordinal,kind:a.kind,path:a.path} : {try:a.try,ordinal:a.ordinal,kind:a.kind,argv:a.argv,exitCode:a.exitCode,timedOut:a.timedOut}));
+			expect(whole.input.rationale?.assumptions).toEqual((yOld('W12-CSV-CLEAN') as WorkProductCaseV12).input.rationale?.assumptions);
+			expect(whole.input.hostSequence.acts.slice(-2).map(a => a.ordinal)).toEqual([13, 14]);
+			const allowed = ['id', 'subject.subjectId', 'subject.producer.agentId', 'input.run.durationMs', 'input.run.stdout', 'input.run.retention.stdoutPath', 'input.run.retention.stderrPath', 'input.run.retention.omissionsPath', 'input.rationale.rationale', 'input.rationale.limitations', 'input.observedToolCalls.calls', 'input.observedToolCalls.observedCount', 'input.hostSequence.acts'];
+			expect(differingPaths(narrowed, whole, '').filter(p => !allowed.some(a => p === a || p.startsWith(`${a}.`)))).toEqual([]);
+		}
+	});
+	it('Y09 oracles: 88 byte carried, four notes restated only, pair verdicts carried, three SATISFIED author claims', () => {
+		for (const set of yOracles()) {
+			expect([set.oracleVersion, set.caseSetVersion, set.oracles.length]).toEqual([13, 13, 97]);
+			expect(set.oracles.map(o => o.caseId)).toEqual(Y_ORDER);
+			const carried = ORACLES_V12.oracles.filter(o => !(o.caseId in Y_RECAST) && !Y_RESTATED.includes(o.caseId));
+			expect(carried).toHaveLength(88);
+			for (const o of carried) expect(JSON.stringify(set.oracles.find(n => n.caseId === o.caseId)), o.caseId).toBe(JSON.stringify(o));
+			for (const o of ORACLES_V12.oracles.filter(o => Y_RESTATED.includes(o.caseId) || o.caseId in Y_RECAST)) {
+				const id = Y_RECAST[o.caseId as keyof typeof Y_RECAST] ?? o.caseId;
+				const n = set.oracles.find(n => n.caseId === id)!;
+				expect({...n, caseId:o.caseId, note:o.note}, id).toEqual(o);
+				expect(n.note, id).not.toBe(o.note);
+			}
+			for (const id of Y_NEW) expect(set.oracles.find(o => o.caseId === id)).toMatchObject({disposition:'SATISFIED',faulted:[],expectation:"the author's claim"});
+		}
+	});
+	it('Y10 every changed or new note pinned independently; marks named and withdrawn alternative filings explained', () => {
+		for (const set of yOracles()) {
+			expect(set.oracles.filter(o => Y_NOTE_PINS.some(([id]) => id === o.caseId)).map(o => [o.caseId,sha256(o.note)])).toEqual(Y_NOTE_PINS);
+			for (const [id, withdrawn] of [['P12-RR-01','RR-01'],['P12-RR-02','RR-03'],['P12-RR-08','RR-02']]) {
+				const note = set.oracles.find(o => o.caseId === id)!.note;
+				expect(note).toContain(withdrawn);
+				expect(note).toContain('D30');
+			}
+			for (const id of Object.values(Y_RECAST)) expect(set.oracles.find(o => o.caseId === id)!.note).toContain('mark');
+		}
+	});
+	it('Y11 conferral recorded: exact checked draft under C5; carried confirmations and Q51 verbatim; no awaiting marker', async () => {
+		const register = read(REGISTER_FILE);
+		for (const set of yOracles()) {
+			expect(sha256(set.conferral)).toBe(Y_CONFERRAL_PIN);
+			expect(set.conferral.startsWith(`Version twelve’s oracles, carried whole: ${ORACLES_V12.conferral} `)).toBe(true);
+			for (const id of ['REG-D-136','REG-D-137','REG-D-132','REG-D-141']) expect(set.conferral).toContain(id);
+			const typed = 'Confirm as proposed; however, show me the cases before proceeding.';
+			expect(register).toContain(`*"${typed}"*`);
+			expect(set.conferral).toContain(`the sponsor typed “${typed}”; the record names no selected option`);
+			for (const marker of [ORACLES_PROPOSED,ORACLES_RESTATEMENT_UNCONFIRMED]) expect(set.conferral).not.toContain(marker);
+			const check = async (conferral: string) => (await checkQualification({files:[], current:await reviewerFingerprint(CASE_SET_V13.cases), cases:CASE_SET_V13.cases, oracles:set.oracles, conferral, oracleSets:[],caseSets:[],findings:new Set(),struck:new Set(),rulings:new Set(),struckRulings:new Set(),rescore:async () => {throw new Error('empty record');}})).problems.filter(p => p.limb === 'CONFERRAL');
+			expect(await check(set.conferral)).toEqual([]);
+			expect(await check(`${set.conferral} ${ORACLES_PROPOSED}`)).toEqual([{limb:'CONFERRAL',message:ORACLES_NOT_CONFERRED}]);
+		}
+	});
+	it('Y12 every prompt under 28000 characters; only P12-RR-07-CUT declares a review cut', async () => {
+		for (const set of ySets()) {
+			expect(set.cases).toHaveLength(97);
+			for (const c of set.cases) {
+				const p = await promptsFor(c);
+				for (const text of [p.initial,p.repair]) expect(text.length,c.id).toBeLessThan(28000);
+				expect(p.initial.includes('[CUT FOR THIS REVIEW:'),c.id).toBe(c.id === 'P12-RR-07-CUT');
+			}
+		}
+	});
+	it('Y13 the oracles compose through the runner’s scoring, valid and independent', async () => {
+		for (const set of ySets()) {
+			expect(set.cases).toHaveLength(97);
+			for (const c of set.cases) {
+				const oracle = ORACLES_V13.oracles.find(o => o.caseId === c.id)!;
+				const rubric = c.arm === 'DECLARED_POLICY' ? c.input.policy.criteria : SEEDED_REASONING_REVIEW_CRITERIA;
+				const reply = JSON.stringify({findings:rubric.map(k => ({criterionId:k.id,failed:oracle.faulted.includes(k.id),statement:'as the oracle expects',severity:oracle.faulted.includes(k.id)?'BLOCKING':'INFORMATIONAL'})),recommendation:oracle.disposition});
+				const {scored} = await evaluateCase({case:c,criteria:SEEDED_REASONING_REVIEW_CRITERIA,candidate:EVALUATING_CANDIDATE,scoringDigest:'0'.repeat(64),call:async () => ({returned:reply,served:null})});
+				expect([scored.disposition,scored.resultClass,scored.independenceOk],c.id).toEqual([oracle.disposition,'VALID',true]);
+			}
+		}
+	});
+	it('Y14 cut figures measured from the C5 prompt: HEAD and TAIL code points and UTF-16 units, note and conferral agree', async () => {
+		for (const set of ySets()) {
+			const c = yProcess('P12-RR-07-CUT',set);
+			const p = (await promptsFor(c)).initial;
+			const declaration = /\[CUT FOR THIS REVIEW: stdout — the first (\d+) \(HEAD\) and the last (\d+) \(TAIL\)[^\]]*\]/.exec(p)!;
+			expect(declaration).not.toBeNull();
+			const [head,tail] = declaration.slice(1).map(Number);
+			expect([head,tail]).toEqual([9020,9019]);
+			const captured = [...c.input.run.stdout];
+			const h = captured.slice(0,head).join('');
+			const t = captured.slice(-tail!).join('');
+			expect([[...h].length,h.length,[...t].length,t.length]).toEqual([9020,9020,9019,9019]);
+			expect(p).toContain(h);
+			expect(p).toContain(t);
+			for (const oracles of yOracles()) {
+				expect(oracles.oracles.find(o => o.caseId === c.id)!.note).toContain(`now ${head} code points (HEAD) and ${tail} (TAIL)`);
+				expect(oracles.conferral).toContain(`now ${head} code points of its HEAD and ${tail} of its TAIL`);
+			}
 		}
 	});
 });

@@ -27,6 +27,7 @@ import {
 	CASE_SET_V10_FILE,
 	CASE_SET_V11_FILE,
 	CASE_SET_V12_FILE,
+	CASE_SET_V13_FILE,
 	ORACLES_V1_FILE,
 	ORACLES_V2_FILE,
 	ORACLES_V3_FILE,
@@ -39,6 +40,7 @@ import {
 	ORACLES_V10_FILE,
 	ORACLES_V11_FILE,
 	ORACLES_V12_FILE,
+	ORACLES_V13_FILE,
 	serializeGenerated,
 	type CaseSet,
 	type OracleSet
@@ -55,6 +57,7 @@ import { CASE_SET_V9 } from './case-set-v9.js';
 import { CASE_SET_V10 } from './case-set-v10.js';
 import { CASE_SET_V11 } from './case-set-v11.js';
 import { CASE_SET_V12 } from './case-set-v12.js';
+import { CASE_SET_V13 } from './case-set-v13.js';
 import { ORACLES_V1 } from './oracles-v1.js';
 import { ORACLES_V2 } from './oracles-v2.js';
 import { ORACLES_V3 } from './oracles-v3.js';
@@ -67,6 +70,7 @@ import { ORACLES_V9 } from './oracles-v9.js';
 import { ORACLES_V10 } from './oracles-v10.js';
 import { ORACLES_V11 } from './oracles-v11.js';
 import { ORACLES_V12 } from './oracles-v12.js';
+import { ORACLES_V13 } from './oracles-v13.js';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -101,7 +105,9 @@ const VERSIONS: readonly (readonly [string, CaseSet, string, OracleSet])[] = [
 	// cases shown what production now hands each review under new ids (`REG-D-136`), their oracles as the sponsor confirmed them.
 	// ⭐ Package V-2 — and three re-run cases after the 91, under new ids, shown what production hands a work re-run's review
 	// (`REG-D-137` Q46), their oracles as their author proposed them.
-	[CASE_SET_V12_FILE, CASE_SET_V12, ORACLES_V12_FILE, ORACLES_V12]
+	[CASE_SET_V12_FILE, CASE_SET_V12, ORACLES_V12_FILE, ORACLES_V12],
+	// Package Y — v13 follows the historical versions; no earlier source or generated data changes.
+	[CASE_SET_V13_FILE, CASE_SET_V13, ORACLES_V13_FILE, ORACLES_V13]
 ];
 
 for (const [casesFile, cases, oraclesFile, oracles] of VERSIONS) {

@@ -254,7 +254,8 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint MOVES on each component
 		// its initial and its repair, and no other case's does.
 		// ⭐ Package V (`REG-D-136`) — ~~fourteen~~: the current set, case set v12, holds eighteen — the fourteen re-cast as P12-…
 		// and four new (P12-CSV-…).
-		expect(CURRENT_PROCESS_RESULTS, 'the arrangement: the current set holds the eighteen').toHaveLength(18);
+		// ~~expect(CURRENT_PROCESS_RESULTS, 'the arrangement: the current set holds the eighteen').toHaveLength(18);~~ — 2026-10-31, package Y: v13 adds two commands and one work case; its records name version thirteen; reviewer definition unchanged.
+		expect(CURRENT_PROCESS_RESULTS, 'the arrangement: the current set holds the twenty').toHaveLength(20);
 		const now = await reviewerFingerprint(CURRENT_CASES, seams);
 		expect(movedCasePrompts(now, BASE_NOW), 'the case prompts of the current set that move').toEqual(CURRENT_PROCESS_RESULTS);
 		for (const id of CURRENT_PROCESS_RESULTS)
@@ -520,7 +521,8 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint MOVES on each component
 		expect(movedProbes(fp), 'the probes that move').toEqual(P_PROBES().filter((id) => id !== 'P-NO-FENCE'));
 		expect(movedProbes(fp), 'arrangement: 27 of the 28 process-result probes').toHaveLength(27);
 		expect(fp.casePrompts, 'no case of v1 is a process result').toEqual(BASE.casePrompts);
-		expect(CURRENT_PROCESS_RESULTS, 'the arrangement: the current set holds the eighteen').toHaveLength(18);
+		// ~~expect(CURRENT_PROCESS_RESULTS, 'the arrangement: the current set holds the eighteen').toHaveLength(18);~~ — 2026-10-31, package Y: v13 adds two commands and one work case; its records name version thirteen; reviewer definition unchanged.
+		expect(CURRENT_PROCESS_RESULTS, 'the arrangement: the current set holds the twenty').toHaveLength(20);
 		expect(await movedNow(seams), 'the case prompts of the current set that move').toEqual(CURRENT_PROCESS_RESULTS);
 	});
 
@@ -556,15 +558,17 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint MOVES on each component
 		]);
 		expect(movedProbes(fp), 'the probes that move').toEqual(shownADeliverable);
 		expect(fp.casePrompts, 'no case of v1 is shown a deliverable').toEqual(BASE.casePrompts);
-		expect(CURRENT_WORK_PRODUCTS, 'the arrangement: the current set holds the 26').toHaveLength(26);
+		// ~~expect(CURRENT_WORK_PRODUCTS, 'the arrangement: the current set holds the 26').toHaveLength(26);~~ — 2026-10-31, package Y: v13 adds two commands and one work case; its records name version thirteen; reviewer definition unchanged.
+		expect(CURRENT_WORK_PRODUCTS, 'the arrangement: the current set holds the 27').toHaveLength(27);
 		expect(await movedNow(seams), 'the case prompts of the current set that move').toEqual(CURRENT_WORK_PRODUCTS);
 	});
 
 	// ⭐⭐ `JAN-EXEC` Phase 7, package X — D31 (`REG-D-140`; `REG-F-589`; design §10.3 and §10.6, revision 5: "a new `W-RERUN-MARKED`
 	// takes the marked branch, a file of each mark among its files, so the fingerprint hashes the marks") — A THIRD NEW PROMPT
 	// BRANCH, the marks of a work re-run's view: the clause its heading gains and the mark on each file's line, each held to the
-	// one probe that takes it and to the case prompts it reaches — none, since no case of case set v12 carries a mark (D38: the
-	// re-cast pair takes its marks in case set v13). ⛔ RED BEFORE THE BUILD: no prompt held a mark, so a change to one moved nothing.
+	// one probe that takes it and to the case prompts it reaches — ~~none, since no case of case set v12 carries a mark~~.
+	// 2026-10-31, package Y: v13 is current; its recast pair carries D31's marks, so exactly those two prompts move, and none of v1.
+	// ⛔ RED BEFORE THE BUILD: no prompt held a mark, so a change to one moved nothing.
 	for (const [what, from, to] of [
 		[
 			'the clause the marked heading gains',
@@ -573,7 +577,7 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint MOVES on each component
 		],
 		['the mark on a file’s line', ' — the same as when this step began:', ' — the same as when THIS step began:']
 	] as const)
-		it(`⭐⭐ package X (D31) — a PROMPT BRANCH, ${what}: the probes move — exactly W-RERUN-MARKED, the one probe whose view carries marks — and no case prompt, of v1 or of the current set`, async () => {
+		it(`⭐⭐ package X (D31) — a PROMPT BRANCH, ${what}: the probes move — exactly W-RERUN-MARKED, the one probe whose view carries marks — ~~and no case prompt, of v1 or of the current set~~; package Y, 2026-10-31: exactly W13-CSV-RERUN and W13-CSV-RERUN-RR-07 of the current set move, since they carry D31 marks; none of v1`, async () => {
 			const seams: FingerprintSeams = {
 				...PRODUCT_SEAMS,
 				validator: (print) => PRODUCT_SEAMS.validator((p) => print(p.replace(from, to)))
@@ -582,7 +586,9 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint MOVES on each component
 			onlyMoved(fp, ['probes']);
 			expect(movedProbes(fp), 'the probes that move').toEqual(['W-RERUN-MARKED']);
 			expect(fp.casePrompts, 'no case of v1 carries a mark').toEqual(BASE.casePrompts);
-			expect(await movedNow(seams), 'the case prompts of the current set that move').toEqual([]);
+			// ~~expect(await movedNow(seams), 'the case prompts of the current set that move').toEqual([]);~~ — 2026-10-31,
+			// package Y: both marked current-set cases must move, and every other current-set case must stay equal.
+			expect(await movedNow(seams), 'the case prompts of the current set that move').toEqual(['W13-CSV-RERUN', 'W13-CSV-RERUN-RR-07']);
 		});
 
 	// ⭐⭐ The review in parts, B7 (`REG-D-125`; DESIGN-authoring-review-in-parts.md §5: "A change confined to that framing must
@@ -2762,7 +2768,8 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 		// the current set, case set v4, exactly its fourteen process-result cases' do.
 		expect(fp.casePrompts, 'no case of v1 is a process result: none moves').toEqual(BASE.casePrompts);
 		// ⭐ Package V (`REG-D-136`) — ~~fourteen~~: case set v12's eighteen.
-		expect(CURRENT_PROCESS_RESULTS, 'the arrangement: the current set holds the eighteen').toHaveLength(18);
+		// ~~expect(CURRENT_PROCESS_RESULTS, 'the arrangement: the current set holds the eighteen').toHaveLength(18);~~ — 2026-10-31, package Y: v13 adds two commands and one work case; its records name version thirteen; reviewer definition unchanged.
+		expect(CURRENT_PROCESS_RESULTS, 'the arrangement: the current set holds the twenty').toHaveLength(20);
 		expect(movedCasePrompts(await reviewerFingerprint(CURRENT_CASES, seams), BASE_NOW), 'the current set’s process-result cases, and only those').toEqual(
 			CURRENT_PROCESS_RESULTS
 		);
@@ -5164,8 +5171,10 @@ describe('JAN-CRITREAD J2-3 — the fingerprint and the runner agree', () => {
 			commit: 'e5f9358b'.repeat(5),
 			fingerprint: { reviewer: BASE_NOW.reviewer, scoring: BASE_NOW.scoring, caseSet: BASE_NOW.caseSet },
 			cases: two,
-			caseSetVersion: 12, // ⭐ package V — ~~4~~: the cases' own version
-			oracleVersion: 12, // ⭐ package V — ~~4~~
+			// ~~caseSetVersion: 12, // ⭐ package V — ~~4~~: the cases' own version~~ — 2026-10-31, package Y: v13 adds two commands and one work case; its records name version thirteen; reviewer definition unchanged.
+			caseSetVersion: 13, // ⭐ package V — ~~4~~: the cases' own version
+			// ~~oracleVersion: 12, // ⭐ package V — ~~4~~~~ — 2026-10-31, package Y: v13 adds two commands and one work case; its records name version thirteen; reviewer definition unchanged.
+			oracleVersion: 13, // ⭐ package V — ~~4~~
 			criteria: SEEDED_REASONING_REVIEW_CRITERIA,
 			transport: {
 				name: 'stub',
@@ -5208,8 +5217,10 @@ describe('JAN-CRITREAD J2-3 — the fingerprint and the runner agree', () => {
 			commit: 'e5f9358b'.repeat(5),
 			fingerprint: { reviewer: BASE_NOW.reviewer, scoring: BASE_NOW.scoring, caseSet: BASE_NOW.caseSet },
 			cases: one,
-			caseSetVersion: 12, // ⭐ package V — ~~4~~: the case's own version
-			oracleVersion: 12, // ⭐ package V — ~~4~~
+			// ~~caseSetVersion: 12, // ⭐ package V — ~~4~~: the case's own version~~ — 2026-10-31, package Y: v13 adds two commands and one work case; its records name version thirteen; reviewer definition unchanged.
+			caseSetVersion: 13, // ⭐ package V — ~~4~~: the case's own version
+			// ~~oracleVersion: 12, // ⭐ package V — ~~4~~~~ — 2026-10-31, package Y: v13 adds two commands and one work case; its records name version thirteen; reviewer definition unchanged.
+			oracleVersion: 13, // ⭐ package V — ~~4~~
 			criteria: SEEDED_REASONING_REVIEW_CRITERIA,
 			transport: {
 				name: 'stub',
@@ -5256,8 +5267,10 @@ describe('JAN-CRITREAD J2-3 — the fingerprint and the runner agree', () => {
 			commit: 'e5f9358b'.repeat(5),
 			fingerprint: { reviewer: BASE_NOW.reviewer, scoring: BASE_NOW.scoring, caseSet: BASE_NOW.caseSet },
 			cases: one,
-			caseSetVersion: 12, // ⭐ package V — ~~11~~
-			oracleVersion: 12, // ⭐ package V — ~~11~~
+			// ~~caseSetVersion: 12, // ⭐ package V — ~~11~~~~ — 2026-10-31, package Y: v13 adds two commands and one work case; its records name version thirteen; reviewer definition unchanged.
+			caseSetVersion: 13, // ⭐ package V — ~~11~~
+			// ~~oracleVersion: 12, // ⭐ package V — ~~11~~~~ — 2026-10-31, package Y: v13 adds two commands and one work case; its records name version thirteen; reviewer definition unchanged.
+			oracleVersion: 13, // ⭐ package V — ~~11~~
 			criteria: SEEDED_REASONING_REVIEW_CRITERIA,
 			transport: {
 				name: 'stub',

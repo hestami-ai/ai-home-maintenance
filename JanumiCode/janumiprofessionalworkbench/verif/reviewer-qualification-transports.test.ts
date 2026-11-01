@@ -1341,13 +1341,15 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 			// ⭐ Package K — version eleven, current since package K: the 7 bridge part cases D3d moved, under new ids (~~10, 10~~).
 			// ⭐ Package V — version twelve, current since package V: 56 cases new or changed, shown what production now hands each
 			// review (`REG-D-136`) (~~11, 11~~).
-		).toEqual({ caseSetVersion: 12, oracleVersion: 12 });
+			// ~~{ caseSetVersion: 12, oracleVersion: 12 }~~ — 2026-10-31, package Y: version thirteen's 97 cases and oracles are current.
+		).toEqual({ caseSetVersion: 13, oracleVersion: 13 });
 		// …which are the versions of the files `cases.ts` names current — the ones the check holds coverage to.
 		expect([
 			CURRENT_SET.caseSetVersion,
 			CURRENT_ORACLE_SET.oracleVersion,
 			CURRENT_ORACLE_SET.caseSetVersion
-		]).toEqual([12, 12, 12]); // ⭐ package K — ~~[10, 10, 10]~~; ⭐ package V — ~~[11, 11, 11]~~
+			// ~~[12, 12, 12]~~ — 2026-10-31, package Y: the files the CLI reads now name version thirteen.
+		]).toEqual([13, 13, 13]); // ⭐ package K — ~~[10, 10, 10]~~; ⭐ package V — ~~[11, 11, 11]~~
 		expect(spawned, 'one call, captured').toHaveLength(1);
 	});
 

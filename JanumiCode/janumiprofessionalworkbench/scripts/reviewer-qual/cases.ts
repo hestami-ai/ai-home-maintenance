@@ -233,6 +233,9 @@ export const ORACLES_V11_FILE = 'docs/tracking/reviewer-qualification/oracles/or
  *  as history. */
 export const CASE_SET_V12_FILE = 'docs/tracking/reviewer-qualification/cases/case-set-v12.json';
 export const ORACLES_V12_FILE = 'docs/tracking/reviewer-qualification/oracles/oracles-v12.json';
+/** Package Y (D37; REG-D-141 (4), REG-D-142), beside the unchanged versions 1–12. */
+export const CASE_SET_V13_FILE = 'docs/tracking/reviewer-qualification/cases/case-set-v13.json';
+export const ORACLES_V13_FILE = 'docs/tracking/reviewer-qualification/oracles/oracles-v13.json';
 
 /**
  * ⭐ `JAN-CRITREAD` J2-5 — THE CURRENT CASE SET AND ITS ORACLES: what `reviewer:qual:check` holds coverage and
@@ -310,8 +313,11 @@ export const ORACLES_V12_FILE = 'docs/tracking/reviewer-qualification/oracles/or
  * review (`case-set-v12.ts`), their oracles as their author proposed them (`oracles-v12.ts`). ⚠ The three are new prompts
  * too, so the RUN owed covers them as well: the 56 and the three (limb 1).
  */
-export const CURRENT_CASE_SET_FILE = CASE_SET_V12_FILE;
-export const CURRENT_ORACLES_FILE = ORACLES_V12_FILE;
+// ~~CURRENT_CASE_SET_FILE = CASE_SET_V12_FILE~~; ~~CURRENT_ORACLES_FILE = ORACLES_V12_FILE~~.
+// Restated 2026-10-31, package Y (D37): 92 kept byte for byte, the pair recast with D31 marks,
+// then three additions. Conferral records REG-D-141 (4); offline readers and paid measurement remain owed.
+export const CURRENT_CASE_SET_FILE = CASE_SET_V13_FILE;
+export const CURRENT_ORACLES_FILE = ORACLES_V13_FILE;
 
 /**
  * ⭐⭐ `E12F` F5 (the E12 package review's fifth finding; `REG-D-073`, oracle integrity) — THE WORDS AN ORACLE SET'S
