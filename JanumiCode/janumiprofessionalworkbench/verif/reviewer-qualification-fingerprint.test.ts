@@ -504,9 +504,12 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint MOVES on each component
 						// ⛔ MOVED 2026-10-31 (the lead's ruling on X1's item 6, D30's line shortened to at most 245 code units) —
 						// ~~'each criterion below is judged of what the account says about THIS command'~~ -> ~~'… about THIS
 						// COMMAND'~~, the first wording's: the changed text is the shortened line's own.
+						// MOVED 2026-10-31 — D30's wording settled on the reviewer as C5 (REG-F-594; design §10.2, revision 7).
+						// ~~'Each criterion below is judged of what the account says of THIS command'~~ ->
+						// ~~'Each criterion below is judged of what the account says of THIS COMMAND'~~; C5's own phrase below.
 						p.replace(
-							'Each criterion below is judged of what the account says of THIS command',
-							'Each criterion below is judged of what the account says of THIS COMMAND'
+							'That this command does less of the instruction than it asks',
+							'That this COMMAND does less of the instruction than it asks'
 						)
 					)
 				)

@@ -54,13 +54,18 @@ const PREAMBLE = 'You ask whether the artifact genuinely discharges its delegate
  * judges that."~~ — the design's illustrative wording, 319 UTF-16 code units: with its line feed it left the worst command
  * review in production's shape 3,927 of room for its view, under CONTENT_MIN (4,000), so that review's prompt passed
  * PROMPT_BUDGET by 73 (the fingerprint test's guard, "no input in production's shape reaches CONTENT_MIN", red). ⭐ The guard
- * stands and PROMPT_BUDGET does not move: the line is shortened to at most 245 code units, its line feed excluded (this one, 242),
+ * stands and PROMPT_BUDGET does not move: ~~the line is shortened to at most 245 code units, its line feed excluded (this one, 242),
  * keeping the ruling's three parts — each criterion below is judged of what the account says of THIS command (what it ran,
  * what its result shows, what that means); that it does less or other than the instruction asks supports no finding here; the
- * finished-work review judges that.
+ * finished-work review judges that.~~
+ * MOVED 2026-10-31 — D30's wording settled on the reviewer as C5 (REG-F-594; design §10.2, revision 7).
+ * The line is the exclusion and one sentence keeping what the account says the result means in this review; 216 UTF-16
+ * code units, line feed excluded, under the unchanged 245-unit bound. The scope sentence already states the dropped first
+ * part; on the reviewer, that part left the narrowed command refused (REG-F-594).
+ * ~~Each criterion below is judged of what the account says of THIS command: what it ran, what its result shows, what that means. That it does less or other than the instruction asks supports no finding here; the finished-work review judges that.~~
  */
 const CRITERIA_LINE =
-	'Each criterion below is judged of what the account says of THIS command: what it ran, what its result shows, what that means. That it does less or other than the instruction asks supports no finding here; the finished-work review judges that.';
+	"That this command does less of the instruction than it asks, or other than it asks, supports no finding here; the review of the unit's finished work judges that. What the account says the result means is judged here.";
 /** ⭑ D8's first line, the sponsor's answers byte for byte (design §9.3 D8) — which D30's line stands immediately before. */
 const D8_FIRST_LINE = 'Evaluate EACH derivational-integrity failure class below. For each, decide whether the FAILURE is PRESENT';
 /**
@@ -297,10 +302,13 @@ describe('⭐⭐ package N — D12: a command’s review asks what the account s
 		/**
 		 * Any of D30's words, whole or in part: its opening and its scoping clause. ⛔ MOVED 2026-10-31 (the lead's ruling on X1's
 		 * item 6, the line shortened) — ~~'each criterion below is judged of what the account says'~~ and ~~'does less of the
-		 * instruction than it asks'~~, the first wording's; the opening read below matches the first wording's too.
+		 * instruction than it asks'~~, the first wording's; ~~the opening read below matches the first wording's too.~~
+		 * MOVED 2026-10-31 — D30's wording settled on the reviewer as C5 (REG-F-594; design §10.2, revision 7).
+		 * ~~'criterion below is judged of what the account says'~~ and ~~'does less or other than the instruction asks'~~:
+		 * read C5's exclusion and its sentence keeping the account's inference in this review.
 		 */
 		const d30 = (p: string): string[] =>
-			p.split('\n').filter((l) => l.includes('criterion below is judged of what the account says') || l.includes('does less or other than the instruction asks'));
+			p.split('\n').filter((l) => l.includes("supports no finding here; the review of the unit's finished work judges that") || l.includes('What the account says the result means is judged here.'));
 		for (const [framing, p] of others) {
 			expect(p.split('\n'), `${framing}: arrangement — D8’s first line, on a line of its own`).toContain(D8_FIRST_LINE);
 			expect(d30(p), `${framing}: a word of D30’s line`).toEqual([]);
@@ -320,13 +328,17 @@ describe('⭐⭐ package N — D12: a command’s review asks what the account s
 		// ⛔ MOVED 2026-10-31 (the lead's ruling on X1's item 6) — ~~`expect(CRITERIA_LINE, 'what it says of a narrowing').toContain('supports no finding here either way')`~~:
 		// the line is shortened to at most 245 UTF-16 code units, its line feed excluded, so that the worst command review in
 		// production's shape leaves its view more than CONTENT_MIN (the fingerprint test's guard, which stands, as PROMPT_BUDGET
-		// does); it keeps the ruling's three parts, each held here.
+		// does); ~~it keeps the ruling's three parts, each held here.~~
+		// MOVED 2026-10-31 — D30's wording settled on the reviewer as C5 (REG-F-594; design §10.2, revision 7).
+		// ~~'criterion below is judged of what the account says of THIS command: what it ran, what its result shows, what that means.'~~
+		// ~~'That it does less or other than the instruction asks supports no finding here;'~~
+		// ~~/ the finished-work review judges that\.$/~~ — C5's two sentences restated below, with the same length bound.
 		expect(CRITERIA_LINE.length, 'the lead’s ruling: at most 245 UTF-16 code units, its line feed excluded').toBeLessThanOrEqual(245);
-		expect(CRITERIA_LINE, 'its first part: what each criterion below is judged of').toContain(
-			'criterion below is judged of what the account says of THIS command: what it ran, what its result shows, what that means.'
+		expect(CRITERIA_LINE.length, 'C5: 216 UTF-16 code units, its line feed excluded').toBe(216);
+		expect(CRITERIA_LINE, 'its first sentence: the exclusion, and where a narrowing is judged').toContain(
+			"That this command does less of the instruction than it asks, or other than it asks, supports no finding here; the review of the unit's finished work judges that."
 		);
-		expect(CRITERIA_LINE, 'its second part: what it says of a narrowing').toContain('That it does less or other than the instruction asks supports no finding here;');
-		expect(CRITERIA_LINE, 'its third part: where that is judged').toMatch(/ the finished-work review judges that\.$/);
+		expect(CRITERIA_LINE, 'its second sentence: the account’s inference stays in this review').toMatch(/ What the account says the result means is judged here\.$/);
 		// ⭑ THE POSITIVE CONTROLS: each reader finds what it reads for in a text that holds it.
 		expect(`- ${SEEDED_REASONING_REVIEW_CRITERIA[0]!.id}: ${SEEDED_REASONING_REVIEW_CRITERIA[0]!.description}`).toMatch(criterionId);
 		expect('look in each file for a failure').toMatch(looksForAFailure);

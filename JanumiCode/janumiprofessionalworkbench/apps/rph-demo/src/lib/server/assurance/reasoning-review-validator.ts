@@ -272,17 +272,22 @@ export const PROCESS_RESULT_ACCOUNT_HEADING =
  * review in production's shape (32 calls the host did not mint, the instruction, rubric and account past their limits) 3,927
  * of room for its view, under `CONTENT_MIN`, so that review's prompt passed `PROMPT_BUDGET` by 73. The guard that no input in
  * production's shape reaches `CONTENT_MIN` stands (`verif/reviewer-qualification-fingerprint.test.ts`), and `PROMPT_BUDGET`
- * does not move; design §10.2 left the wording "for the build and the pre-check to settle". ⭐ So the line is at most 245 code
+ * does not move; design §10.2 left the wording "for the build and the pre-check to settle". ⭐ ~~So the line is at most 245 code
  * units, its line feed excluded (this one, 242), and keeps its three parts: each criterion below is judged of what the account
  * says of THIS command — what it ran, what its result shows, what that means; that it does less or other than the instruction
- * asks supports no finding here; the finished-work review judges that. ⭑ Still no criterion id, no disposition value, and no
+ * asks supports no finding here; the finished-work review judges that.~~ ⭑ Still no criterion id, no disposition value, and no
  * finding asked for. ⭑ The lead's candidate ("Judge each criterion below only by what the account says of THIS command …",
  * 243) was measured and not taken: it makes the account's words the measure ("by"), where the ruling's first part makes them
  * what is judged ("of"), and "only" could be read to set aside the result the account is judged against.
+ * MOVED 2026-10-31 — D30's wording settled on the reviewer as C5 (REG-F-594; design §10.2, revision 7).
+ * ~~Each criterion below is judged of what the account says of THIS command: what it ran, what its result shows, what that means. That it does less or other than the instruction asks supports no finding here; the finished-work review judges that.~~
+ * C5 is 216 UTF-16 code units, line feed excluded, under the unchanged 245-unit bound: the exclusion and one sentence
+ * keeping what the account says the result means in this review. The built line's first part ("Each criterion below is
+ * judged of what the account says of THIS command: what it ran, what its result shows, what that means") is dropped: the
+ * scope sentence states it and, on the reviewer, it left the narrowed command refused (REG-F-594). D38's measurement is owed.
  */
 export const PROCESS_RESULT_CRITERIA_LINE =
-	'Each criterion below is judged of what the account says of THIS command: what it ran, what its result shows, what that ' +
-	'means. That it does less or other than the instruction asks supports no finding here; the finished-work review judges that.';
+	"That this command does less of the instruction than it asks, or other than it asks, supports no finding here; the review of the unit's finished work judges that. What the account says the result means is judged here.";
 
 /**
  * ⭐⭐ `JAN-EXEC` Phase 7, package X — D32 (`REG-D-140`; `REG-F-555`, `REG-F-589`; design §10.4, D32, revision 5: the lead's
