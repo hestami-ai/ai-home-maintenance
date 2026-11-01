@@ -3330,9 +3330,9 @@ describe('⭐⭐ package X — D34 — a review that ended on a call thrown at o
 	// was built for the no-response ending alone: a review whose call timed out, was run once more and then ended any OTHER way
 	// cited that ending's finding alone, REG-F-590 nowhere, though the run's count line counted its timeout. Each shape below is
 	// the validator's own, made under the product's devin bound, as the cases above are; each was red before the fix.
-	// ⚠ NOT RULED, SO NOT PINNED: a failure of ANOTHER kind the review did not end on — a cut at the output limit before a
-	// timeout (`REG-F-563`), a throw short of the bound before a cut or a refusal (`REG-F-499`) — is the lead's to rule (the
-	// check's S2); no test here holds it either way.
+	// MOVED 2026-10-31 (the lead's S2 ruling; D36) — ~~NOT RULED, SO NOT PINNED: a cut at the output limit before a
+	// timeout (`REG-F-563`)~~: a cut counts across the paired review and is cited for every ending without an answer, below.
+	// A throw short of the bound before a cut or a refusal (`REG-F-499`) remains outside this ruling.
 	// PROBLEM 2. The run's count of timeouts, D36's only measurement in P6 again, had no test that could tell its two figures
 	// apart: its only run-level pins were {1, 1} and {0, 0}. ⭐ And a retry answered by a substitute, its reply refused unread,
 	// was counted as one that ANSWERED, against `TimedOutCalls`' own words, "whose reply arrived and was read" (the check's
@@ -3364,6 +3364,70 @@ describe('⭐⭐ package X — D34 — a review that ended on a call thrown at o
 		chainOf(BOUND, [0, firstMs, firstMs + 100, firstMs + 200, firstMs + 300, firstMs + 400], ...replies);
 	const shapeOf = (chain: readonly StoredObject[]) => chain.map((x) => `${x.state.exchangeRole}:${x.state.disposition}`);
 	const stageFourOf = (chain: readonly StoredObject[]) => shown(cellOf(reportOf(aRun({ design: { review: asCalls(chain) } })).report, '4', 'design'));
+
+	// S2, ruled 2026-10-31 (X-2; design §10.5, D36): every paired review counts its output-limit cuts,
+	// and every ending without an answer cites those cuts beside the ending's own findings.
+	it('S2 — a cut at the bound then a timeout cites REG-F-563 beside REG-F-590', async () => {
+		const chain = await chainOf(BOUND, [0, BOUND, BOUND + 100, 2 * BOUND + 100], cutAtTheLimit(), FAILURE);
+		expect(shapeOf(chain), 'arrangement: cut at the bound, run once more, timed out at the bound').toEqual([
+			'INITIAL:REJECTED', 'RETRY:NO_RESPONSE'
+		]);
+		expect(stageFourOf(chain)).toEqual(['broke', ['REG-F-563', 'REG-F-590']]);
+		const p = pairReview('art_1', 1, chain);
+		expect([p.label, p.concludedBy, p.outputLimitCalls, p.timedOut]).toEqual([
+			'timed-out', 'mex_RETRY_2_run_1', 1, { calls: 1, retryAnswered: 0 }
+		]);
+		const command = reportOf(aRun({ implementation: { commands: 1, commandReview: asCalls(chain) } })).report;
+		expect(shown(cellOf(command, '4', 'implementation'))).toEqual(['broke', ['REG-F-520', 'REG-F-563', 'REG-F-590']]);
+	});
+
+	it('S2 — an answered retry concludes the review and keeps its cut count without a failure citation', async () => {
+		const chain = await chainAfter(BOUND, cutAtTheLimit(), ANSWERED);
+		expect(shapeOf(chain)).toEqual(['INITIAL:REJECTED', 'RETRY:ACCEPTED']);
+		const p = pairReview('art_1', 1, chain);
+		expect([p.label, p.concludedBy, p.outputLimitCalls]).toEqual(['answered', 'mex_RETRY_2_run_1', 1]);
+		const r = reportOf(aRun({ design: { review: asCalls(chain) } })).report;
+		expect(r.pairing.rows.find((row) => row.subjectId === 'art_design')?.outputLimitCalls).toBe(1);
+		// Existing stage-4 rule: only labels other than answered go through idsOfUnconcluded.
+		expect(shown(cellOf(r, '4', 'design'))).toEqual(['as intended', []]);
+	});
+
+	it('S2 CONTROL — a review ending on its cut keeps its output-limit reading and counts both cuts', async () => {
+		const chain = await chainAfter(BOUND, cutAtTheLimit(), cutAtTheLimit());
+		expect(shapeOf(chain)).toEqual(['INITIAL:REJECTED', 'RETRY:REJECTED']);
+		expect(stageFourOf(chain)).toEqual(['broke', ['REG-F-563']]);
+		const p = pairReview('art_1', 1, chain);
+		expect([p.label, p.concludedBy, p.detail]).toEqual([
+			'output-limit', 'mex_RETRY_2_run_1',
+			"its RETRY call's reply was cut at the model's output-token limit, and nothing was judged from it"
+		]);
+		expect(p.outputLimitCalls).toBe(2);
+	});
+
+	it('S2 CONTROL — a review with no cut counts zero and cites no REG-F-563', async () => {
+		const chain = await chainAfter(BOUND, FAILURE, SUBSTITUTED);
+		expect(shapeOf(chain)).toEqual(['INITIAL:NO_RESPONSE', 'RETRY:REJECTED']);
+		expect(stageFourOf(chain)).toEqual(['broke', ['REG-F-590']]);
+		expect(pairReview('art_1', 1, chain).outputLimitCalls).toBe(0);
+		const r = reportOf(aRun({ design: { review: asCalls(chain) } })).report;
+		expect(r.pairing.rows.find((row) => row.subjectId === 'art_design')?.outputLimitCalls).toBe(0);
+	});
+
+	it('S2 — every other ending without an answer cites the earlier cut beside its own findings', async () => {
+		const endings: readonly (readonly [readonly (string | Error | Substituted)[], string, readonly string[], number?])[] = [
+			[[UNREADABLE, UNREADABLE], 'refused', ['REG-F-428', 'REG-F-479', 'REG-F-489', 'REG-F-563']],
+			[[NO_CRITERION, NO_CRITERION], 'no-criterion-answered', ['REG-F-552', 'REG-F-563']],
+			[[ROW_LEFT_OUT, ROW_LEFT_OUT], 'criterion-left-without-row', ['REG-F-563', 'REG-F-566']],
+			[[SUBSTITUTED], 'refused', ['REG-F-563']],
+			[[UNREADABLE, UNREADABLE], 'no-answer-recorded', ['REG-F-525', 'REG-F-563'], 2]
+		];
+		for (const [replies, label, ids, kept] of endings) {
+			const chain = (await chainAfter(BOUND, cutAtTheLimit(), ...replies)).slice(0, kept);
+			expect(stageFourOf(chain), label).toEqual(['broke', ids]);
+			const p = pairReview('art_1', 1, chain);
+			expect([p.label, p.outputLimitCalls], label).toEqual([label, 1]);
+		}
+	});
 
 	it('⛔ PREDICTED RED (the X-2 fix, problem 1) — a call thrown AT the bound whose retry was CUT at the output limit: output-limit, citing REG-F-563 — and REG-F-590 too', async () => {
 		const chain = await chainAfter(BOUND, FAILURE, cutAtTheLimit());

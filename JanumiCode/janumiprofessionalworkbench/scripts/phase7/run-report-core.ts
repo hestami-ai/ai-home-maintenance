@@ -733,6 +733,8 @@ export interface PairingRow {
 	 * whatever the review came to — an answered one among them (`TimedOutCalls`).
 	 */
 	readonly timedOut?: TimedOutCalls;
+	/** S2, ruled 2026-10-31 (X-2; D36): recorded output-limit cuts across a paired review, whatever its ending; zero if none. */
+	readonly outputLimitCalls?: number;
 }
 
 /**
@@ -1765,7 +1767,7 @@ const runOf = (x: StoredObject): string => str(x.state.runToken);
 
 type Pairing = Pick<
 	PairingRow,
-	'label' | 'refusal' | 'detail' | 'joinedBy' | 'floorRuns' | 'concludedBy' | 'calls' | 'thrown' | 'timedOut'
+	'label' | 'refusal' | 'detail' | 'joinedBy' | 'floorRuns' | 'concludedBy' | 'calls' | 'thrown' | 'timedOut' | 'outputLimitCalls'
 >;
 type Conclusion = Pick<Pairing, 'label' | 'refusal' | 'detail' | 'concludedBy' | 'thrown'>;
 
@@ -1993,7 +1995,11 @@ function concludedFrom(
 	if (top === undefined) return unpaired('no-answer-recorded', 'no ASSURANCE-plane exchange names the subject (REG-F-525)');
 	if (sorted.filter((x) => ordinalOf(x) === ordinalOf(top)).length > 1)
 		return unpaired('not-pairable', `two of the subject's calls share its highest ordinal, ${ordinalOf(top)}`);
-	const concluded: Pairing = { ...(criterionRepairConclusion(sorted) ?? concludedBy(top, sorted)), ...o };
+	const concluded: Pairing = {
+		...(criterionRepairConclusion(sorted) ?? concludedBy(top, sorted)),
+		...o,
+		outputLimitCalls: sorted.filter((x) => outputLimitOf(x.state) !== undefined).length
+	};
 	// ⭐⭐ X-2 — D36 (the lead's ruling of 2026-10-31) — and its calls that timed out, whatever it came to: only a PAIRED review's,
 	// so no call is counted for two reviews (`TimedOutCalls`).
 	const timedOut = timedOutOf(sorted);
@@ -3386,11 +3392,12 @@ function idsOfUnconcluded(r: PairingRow): string[] {
 	// then ended any OTHER way — its retry cut at the output limit, answered by a substitute, unreadable after its repair,
 	// answering no criterion or leaving one without a row, or its record ending on a call that concludes nothing — cited that
 	// ending's finding alone. Now every ending but `timed-out`, which cites `REG-F-590` as its own (below), cites it wherever a
-	// call of the review timed out (`TimedOutCalls`); a no-response review reads as it did. ⚠ NOT BUILT: whether "every kind"
-	// reaches a failure of ANOTHER kind the review did not end on — a cut before a timeout (`REG-F-563`), a throw short of the
-	// bound before a cut or a refusal (`REG-F-499`) — is the lead's to rule (the check's S2); each is cited where the review ended
-	// on it, and a short throw where the review ended timed-out (below).
+	// call of the review timed out (`TimedOutCalls`); a no-response review reads as it did.
+	// MOVED 2026-10-31 (the lead's S2 ruling; D36) — ~~a cut before a timeout (`REG-F-563`) is the lead's to rule~~:
+	// every ending without an answer cites a recorded cut too, counted across the paired review below. The separate question
+	// of a short throw before a cut or a refusal (`REG-F-499`) remains as it was.
 	if (r.label !== 'timed-out' && (r.timedOut?.calls ?? 0) > 0) ids.push('REG-F-590');
+	if (r.label !== 'output-limit' && (r.outputLimitCalls ?? 0) > 0) ids.push('REG-F-563');
 	// ⭐⭐ Package X — D34 (`REG-F-590`; design §10.5) — a review that ended on a call thrown at or past its tool's bound is
 	// `REG-F-590`'s, the timeout's own finding: never `REG-F-499`, the finding for a failure short of the bound — save where
 	// another of its calls threw short of it (the call its retry repeated), which keeps `REG-F-499` beside it. ~~⚠ Under today's
