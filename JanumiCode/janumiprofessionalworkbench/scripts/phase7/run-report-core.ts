@@ -728,6 +728,32 @@ export interface PairingRow {
 	 * many AT OR PAST it (`REG-F-590`'s) — a call its record does not place against a bound is neither (`thrownAgainstTheBound`).
 	 */
 	readonly thrown?: { readonly short: number; readonly atTheBound: number };
+	/**
+	 * ⭐⭐ Package X-2 — D36 (`REG-D-141` (2); the lead's ruling of 2026-10-31) — set on a review ANY of whose calls timed out,
+	 * whatever the review came to — an answered one among them (`TimedOutCalls`).
+	 */
+	readonly timedOut?: TimedOutCalls;
+	/** S2, ruled 2026-10-31 (X-2; D36): recorded output-limit cuts across a paired review, whatever its ending; zero if none. */
+	readonly outputLimitCalls?: number;
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package X-2 — D36 (`REG-D-141` (2); `DESIGN-data-flow-order-and-deliverable-review.md` §10.5, revision
+ * 5: *"P6 again's report counts each at-bound no-response under D34's label, and whether its retry answered"*) — THE CALLS THAT
+ * TIMED OUT: how many threw with no reply at or past their tool's bound, as their records say (`thrownAgainstTheBound`) — D34's
+ * label, `timed-out` (`REG-F-590`) — and how many of those were run once more by a call that ANSWERED: their `RETRY`, the call
+ * after them, whose reply arrived and was read ~~(no `NO_RESPONSE`, and no reply the tool cut at the output-token limit, from
+ * which nothing is judged)~~ ⛔ MOVED 2026-10-31 (the X-2 fix; the independent check of X-2: a retry a model other than the one
+ * configured answered, its reply refused unread, passed both of those tests and was counted as one that answered): its parse
+ * was ATTEMPTED — never `NOT_ATTEMPTED`, the outcome the validator writes on a call with no reply, on a reply the tool cut at
+ * the output-token limit and on one refused unread for the model that gave it (a substitute): from none of them is anything
+ * judged. ⭐ THE LEAD'S RULING (2026-10-31): the report reads a review by how it ENDED, and still counts here
+ * a timeout its retry recovered, which no label of its review shows. ⚠ A timed-out call that was itself the retry has no
+ * further call, nor has one a run made before X-2 let stand: each is counted, its retry not answered.
+ */
+export interface TimedOutCalls {
+	readonly calls: number;
+	readonly retryAnswered: number;
 }
 
 export type NoModelAnswerKind =
@@ -740,6 +766,8 @@ export interface PairingReport {
 	readonly rule: string;
 	readonly rows: readonly PairingRow[];
 	readonly counts: Readonly<Record<PairingLabel, number>>;
+	/** ⭐⭐ Package X-2 — D36 — every paired review's calls that timed out, and how many their retries answered (`TimedOutCalls`). */
+	readonly timedOut: TimedOutCalls;
 	/** Every other assessment: no model call by design, by kind — never "no answer recorded". */
 	readonly noModelAnswerByDesign: Readonly<Record<NoModelAnswerKind, readonly string[]>>;
 	/** Reasoning Reviews of a subject that is neither a work product nor a command — another plane's, not paired here. */
@@ -1737,7 +1765,10 @@ const callOf = (x: StoredObject): string => `${str(x.state.exchangeRole)}:${str(
 const ordinalOf = (x: StoredObject): number => int(x.state.attemptOrdinal) ?? 0;
 const runOf = (x: StoredObject): string => str(x.state.runToken);
 
-type Pairing = Pick<PairingRow, 'label' | 'refusal' | 'detail' | 'joinedBy' | 'floorRuns' | 'concludedBy' | 'calls' | 'thrown'>;
+type Pairing = Pick<
+	PairingRow,
+	'label' | 'refusal' | 'detail' | 'joinedBy' | 'floorRuns' | 'concludedBy' | 'calls' | 'thrown' | 'timedOut' | 'outputLimitCalls'
+>;
 type Conclusion = Pick<Pairing, 'label' | 'refusal' | 'detail' | 'concludedBy' | 'thrown'>;
 
 /** The time a thrown call's record says it failed after — the validator's own sentence (`thrownCallDetail`) — or none. */
@@ -1782,6 +1813,35 @@ function thrownOf(sorted: readonly StoredObject[]): NonNullable<Conclusion['thro
 	return { short: readings.filter((r) => r === 'short').length, atTheBound: readings.filter((r) => r === 'at').length };
 }
 
+/**
+ * ⭐⭐ X-2 — D36 (`TimedOutCalls`) — a review's calls that timed out, and how many of them a retry that answered followed; or
+ * undefined for a review none of whose calls did. The call after a thrown one, recorded `RETRY`, is its one further call
+ * (`reasoning-review-validator.ts`, `timed`).
+ */
+function timedOutOf(sorted: readonly StoredObject[]): TimedOutCalls | undefined {
+	const timeouts = sorted.filter((x) => str(x.state.disposition) === 'NO_RESPONSE' && thrownAgainstTheBound(sorted, x) === 'at');
+	if (timeouts.length === 0) return undefined;
+	// ⛔ MOVED 2026-10-31 (the X-2 fix) — ~~`str(retry?.state.disposition) !== 'NO_RESPONSE' && outputLimitOf(retry?.state) ===
+	// undefined`~~: a substitute's reply, refused unread (`REJECTED`, `NOT_ATTEMPTED`), passed both. A reply that was READ is one
+	// whose parse was attempted (`TimedOutCalls`): the one test answers for a call with no reply, a cut and a substitute alike.
+	const answeredRetry = (x: StoredObject): boolean => {
+		const retry = sorted[sorted.indexOf(x) + 1];
+		return str(retry?.state.exchangeRole) === 'RETRY' && str(rec(retry?.state.parseOutcome).outcome) !== 'NOT_ATTEMPTED';
+	};
+	return { calls: timeouts.length, retryAnswered: timeouts.filter(answeredRetry).length };
+}
+
+/**
+ * ⭐⭐ X-2 — D36 — what a review that ended on a call with no reply short of, or against no, bound says of that call: both calls
+ * threw (the call and its one retry, `REG-D-102`); or one whose record places it against no bound, not run again; or one its
+ * record shows short of the bound — run once more by the rule — whose further call the record does not hold.
+ */
+function noResponseDetail(role: string, against: 'at' | 'short' | 'unplaced'): string {
+	if (role === 'RETRY') return 'both calls threw: the call and its one retry (REG-D-102)';
+	if (against === 'short') return `its ${role} call threw short of its tool’s bound, and its one further call is not in the record`;
+	return `its ${role} call threw and was not run again, and its record does not place it against its tool’s bound`;
+}
+
 /** What the call that concluded a review says of it, by its disposition. */
 function concludedBy(top: StoredObject, sorted: readonly StoredObject[]): Conclusion {
 	const role = str(top.state.exchangeRole);
@@ -1801,13 +1861,15 @@ function concludedBy(top: StoredObject, sorted: readonly StoredObject[]): Conclu
 	// ⛔ MOVED 2026-10-31 (package X; design D34) — ~~`its ${role} call threw and was not run again — at or past its tool's bound,
 	// or under a tool that declares none`~~: a call its record shows at or past the bound reads `timed-out` (above), so one that
 	// reaches here was not shown there.
+	// ⛔ MOVED 2026-10-31 (package X-2; design D36: *"The run report's detail for a call not run again ... loses 'at or past its
+	// tool's bound'"*) — ~~`its ${role} call threw and was not run again, and its record does not show it at or past its tool's
+	// bound`~~: since X-2 a call at or past its bound is run once more, so a call NOT run again is one its record places against no
+	// bound (a tool that declares none, or a time the clock could not place) — or one its record shows short of the bound, and so
+	// given its one further call, whose own record is not here (the store refused it: `REG-F-338`'s rule, `timed`).
 	if (disposition === 'NO_RESPONSE')
 		return {
 			label: 'no-response',
-			detail:
-				role === 'RETRY'
-					? 'both calls threw: the call and its one retry (REG-D-102)'
-					: `its ${role} call threw and was not run again, and its record does not show it at or past its tool's bound`,
+			detail: noResponseDetail(role, thrownAgainstTheBound(sorted, top)),
 			concludedBy: top.id,
 			thrown: thrownOf(sorted)
 		};
@@ -1933,7 +1995,15 @@ function concludedFrom(
 	if (top === undefined) return unpaired('no-answer-recorded', 'no ASSURANCE-plane exchange names the subject (REG-F-525)');
 	if (sorted.filter((x) => ordinalOf(x) === ordinalOf(top)).length > 1)
 		return unpaired('not-pairable', `two of the subject's calls share its highest ordinal, ${ordinalOf(top)}`);
-	return { ...(criterionRepairConclusion(sorted) ?? concludedBy(top, sorted)), ...o };
+	const concluded: Pairing = {
+		...(criterionRepairConclusion(sorted) ?? concludedBy(top, sorted)),
+		...o,
+		outputLimitCalls: sorted.filter((x) => outputLimitOf(x.state) !== undefined).length
+	};
+	// ⭐⭐ X-2 — D36 (the lead's ruling of 2026-10-31) — and its calls that timed out, whatever it came to: only a PAIRED review's,
+	// so no call is counted for two reviews (`TimedOutCalls`).
+	const timedOut = timedOutOf(sorted);
+	return timedOut === undefined ? concluded : { ...concluded, timedOut };
 }
 
 /**
@@ -2083,10 +2153,16 @@ function buildPairing(ix: Index, units: readonly Unit[]): PairingReport {
 			noModel[noModelKind(str(a.state.assurancePolicyId), validatorId)].push(a.id);
 	}
 	const counts = Object.fromEntries(PAIRING_LABELS.map((l) => [l, rows.filter((r) => r.label === l).length]));
+	// ⭐⭐ X-2 — D36 — the run's calls that timed out, every paired review's, and how many of them a retry that answered followed.
+	const timedOut: TimedOutCalls = {
+		calls: rows.reduce((n, r) => n + (r.timedOut?.calls ?? 0), 0),
+		retryAnswered: rows.reduce((n, r) => n + (r.timedOut?.retryAnswered ?? 0), 0)
+	};
 	return {
 		rule: PAIRING_RULE,
 		rows,
 		counts: counts as Record<PairingLabel, number>,
+		timedOut,
 		noModelAnswerByDesign: noModel,
 		outsideTheExecutionPlane: outside
 	};
@@ -3308,11 +3384,25 @@ function idsOfUnconcluded(r: PairingRow): string[] {
 	// ⭐ Package L — D13 — and one that concluded on a reply leaving a declared criterion without a row is `REG-F-566`'s.
 	if (r.label === 'criterion-left-without-row') ids.push('REG-F-566');
 	if (r.label === 'no-response') ids.push('REG-F-499');
+	// ⭐⭐ Package X-2 — D36 (`REG-D-141` (2); THE LEAD'S RULING OF 2026-10-31: the report reads a review by how it ENDED, and cites
+	// every kind of failure among its calls) — a review that ended on a retry thrown SHORT of the bound, after a call thrown at or
+	// past it, reads no-response and cites `REG-F-499` — and `REG-F-590` too, for a call of it timed out.
+	// ⛔ MOVED 2026-10-31 (the X-2 fix; the independent check of X-2, problem 1) — ~~`if (r.label === 'no-response' &&
+	// (r.thrown?.atTheBound ?? 0) > 0)`~~: keyed on the no-response ending alone, so a review that timed out, was run once more and
+	// then ended any OTHER way — its retry cut at the output limit, answered by a substitute, unreadable after its repair,
+	// answering no criterion or leaving one without a row, or its record ending on a call that concludes nothing — cited that
+	// ending's finding alone. Now every ending but `timed-out`, which cites `REG-F-590` as its own (below), cites it wherever a
+	// call of the review timed out (`TimedOutCalls`); a no-response review reads as it did.
+	// MOVED 2026-10-31 (the lead's S2 ruling; D36) — ~~a cut before a timeout (`REG-F-563`) is the lead's to rule~~:
+	// every ending without an answer cites a recorded cut too, counted across the paired review below. The separate question
+	// of a short throw before a cut or a refusal (`REG-F-499`) remains as it was.
+	if (r.label !== 'timed-out' && (r.timedOut?.calls ?? 0) > 0) ids.push('REG-F-590');
+	if (r.label !== 'output-limit' && (r.outputLimitCalls ?? 0) > 0) ids.push('REG-F-563');
 	// ⭐⭐ Package X — D34 (`REG-F-590`; design §10.5) — a review that ended on a call thrown at or past its tool's bound is
 	// `REG-F-590`'s, the timeout's own finding: never `REG-F-499`, the finding for a failure short of the bound — save where
-	// another of its calls threw short of it (the call its retry repeated), which keeps `REG-F-499` beside it. ⚠ Under today's
+	// another of its calls threw short of it (the call its retry repeated), which keeps `REG-F-499` beside it. ~~⚠ Under today's
 	// rule a call thrown at the bound is not run again, so no review ends short of the bound after one; X-2 (design D36) owes
-	// that shape its reading.
+	// that shape its reading.~~ ⛔ MOVED 2026-10-31 (X-2): X-2 runs a timeout once more, and gives that shape its reading (above).
 	if (r.label === 'timed-out') ids.push('REG-F-590', ...((r.thrown?.short ?? 0) > 0 ? ['REG-F-499'] : []));
 	// ⭐ P5 package C (F1; `REG-D-118` (4)) — a review that ended on a reply the tool cut at the model's output-token limit is
 	// `REG-F-563`'s, the entry that records the cap: never a break no register entry names.
@@ -4737,6 +4827,9 @@ function pairingLines(r: RunReport): string[] {
 		r.pairing.rule,
 		'',
 		`- ${counts}.`,
+		// ⭐⭐ X-2 — D36 — each call that timed out, whatever its review came to, and whether its retry answered (`TimedOutCalls`).
+		`- Calls timed out — thrown with no reply at or past their tool’s bound (D34; REG-F-590): ${r.pairing.timedOut.calls}, of ` +
+			`which run once more by a call that answered (REG-D-141 (2)): ${r.pairing.timedOut.retryAnswered}.`,
 		`- No model answer by design: ${byDesign}.`,
 		'',
 		// ⭐ P7-6 B7 — and what joined each review to its calls: its run's token, or its subject alone.

@@ -3,9 +3,13 @@
 // replay's virtual time. It FAILS CLOSED, and never answers by order alone (`REG-D-067`).
 //
 // ⭑ WHAT MUST HOLD:
-//   (i)   a recorded THROWN reply is thrown again, and the RECORDED elapsed time decides whether it is run once more —
-//         short of the tool's bound, the retry takes the next recorded reply, exactly as the run's did;
-//   (ii)  at or past the bound, it is not run again, and the review fails as the run's did;
+//   (i)   a recorded THROWN reply is thrown again, and the RECORDED elapsed time decides ~~whether it is run once more~~ ⭐
+//         what its record says of the bound (⛔ MOVED 2026-10-31, `JAN-EXEC` Phase 7, package X-2 — design D36; `REG-D-141`
+//         (2): under a known bound a thrown call is run once more wherever it threw) — short of the tool's bound, the retry
+//         takes the next recorded reply, exactly as the run's did;
+//   (ii)  ~~at or past the bound, it is not run again, and the review fails as the run's did;~~ ⛔ MOVED 2026-10-31 (X-2, D36):
+//         at or past the bound, it is a timeout, named so, and is run once more too — the retry takes the next recorded
+//         reply, as a run made since X-2 recorded it;
 //   (iii) a prompt whose hash is not the recorded one is REPLAY_STALE, naming the call and both hashes; the floor reads
 //         it as a failed review; and the retry the validator gives that throw is refused too — it never takes the next
 //         recorded reply;
@@ -309,12 +313,17 @@ describe('⭐ the replay reviewer — the product’s validator on recorded repl
 		).toEqual([]);
 	});
 
-	it('(ii) at the bound the recorded throw is a timeout: not run again, and the review fails as the run’s did', async () => {
+	// ⛔ MOVED 2026-10-31 (`JAN-EXEC` Phase 7, package X-2 — design D36, revision 5; `REG-D-141` (2)) — ~~"(ii) at the bound the
+	// recorded throw is a timeout: not run again, and the review fails as the run’s did"~~: its recording, a throw at the bound and an
+	// `initial` reply after it, held the review an Error carrying the throw's cause, one record `initial:no-response`, and
+	// `expect(run.consumed().reviewer, 'the recorded reply after a timeout was taken').toBe(1)`. The validator runs a timeout once
+	// more now, so the run it replays recorded the timeout's `retry`; restated so.
+	it('(ii) ⛔ restated by X-2 (D36) — at the bound the recorded throw is a timeout, named so, and run once more: its retry takes the next recorded reply, as the run’s did', async () => {
 		const prompt = await promptOf();
 		const run = createReplayRun(
 			recordingOf([
 				call(prompt, { status: 'THROWN', message: TRANSPORT }, BOUND),
-				call(prompt, { status: 'ANSWERED', text: CLEAN }, 1)
+				call(prompt, { status: 'ANSWERED', text: CLEAN }, 1, { role: 'retry' })
 			]),
 			() => '/unused'
 		);
@@ -322,12 +331,17 @@ describe('⭐ the replay reviewer — the product’s validator on recorded repl
 
 		const outcome = await settle(validator.evaluate(SUBJECT, CTX));
 
-		expect(outcome).toBeInstanceOf(Error);
-		expect((outcome as Error).message).toContain(TRANSPORT);
-		expect(shape(exchanges.drain())).toEqual([
-			{ role: 'initial', disposition: 'no-response', outcome: 'NOT_ATTEMPTED' }
+		expect(outcome, 'the replayed timeout was not run once more').not.toBeInstanceOf(Error);
+		expect((outcome as { dispositionRecommendation: string }).dispositionRecommendation).toBe('SATISFIED');
+		const records = exchanges.drain();
+		expect(shape(records)).toEqual([
+			{ role: 'initial', disposition: 'no-response', outcome: 'NOT_ATTEMPTED' },
+			{ role: 'retry', disposition: 'accepted', outcome: 'PARSED' }
 		]);
-		expect(run.consumed().reviewer, 'the recorded reply after a timeout was taken').toBe(1);
+		expect(records[0]!.parseOutcome.detail).toContain(
+			`after ${BOUND} ms with no reply, at or past the tool’s ${BOUND} ms bound — a timeout, so it is run once more (REG-D-141 (2))`
+		);
+		expect(run.consumed().reviewer, 'the timeout’s recorded retry was not taken').toBe(2);
 	});
 
 	it('(iii) ⛔ a stale prompt is REPLAY_STALE, naming the call and both hashes — and its retry never takes the next reply', async () => {
@@ -476,19 +490,26 @@ describe('⭐ the floor registry’s REPLAY arm (D2)', () => {
 		const prompt = await promptOf();
 		delete process.env.JPWB_ASSURANCE_TOOL;
 		process.env.PATH = noProgramsDirectory();
-		// ⭑ Two recordings that say their bound was other than devin's ~~240 000 ms~~ 480 000 ms: one ran a ~~300 000 ms~~ 500 000 ms
+		// ⭑ AS PACKAGE X LEFT IT (its first arrangement restated by X-2, below): two recordings that say their bound was other than
+		// devin's ~~240 000 ms~~ 480 000 ms: one ran a ~~300 000 ms~~ 500 000 ms
 		// throw once more (a bound of ~~500 000~~ 600 000), one let a 200 000 ms throw stand (a bound of 120 000). Under the product's
 		// bound the first is a timeout and the second is retried, so neither is the run this code would make.
 		// ⛔ MOVED 2026-10-31 (`JAN-EXEC` Phase 7, package X; design D35, revision 5; `REG-F-590`) — ~~`{ bound: 500_000, calls: [a
 		// 300_000 ms throw, then its retry] }`~~: at devin's raised 480 000 ms bound a 300 000 ms throw is SHORT of the bound, so the
 		// product runs it once more too — that recording is no longer one this code would not make, and replays. The arrangement is
 		// restated past the new bound, and the figure the refusal names moves with it (below).
+		// ⛔ MOVED 2026-10-31 (`JAN-EXEC` Phase 7, package X-2 — design D36, revision 5; `REG-D-141` (2)) — ~~`{ bound: 600_000,
+		// calls: [a 500_000 ms throw, then its retry] }`~~ and ~~"Under the product's bound the first is a timeout"~~: since X-2 the
+		// product runs a timeout once more too, so a throw past the bound and its retry is a run this code would make, and replays
+		// (the X-2 case below). Restated as the recording D36 says the changed rule refuses at open: one made before X-2, under
+		// devin's own bound, whose throw AT the bound the run let stand — the product runs it once more now. The second arrangement,
+		// a throw short of the bound let stand, is unchanged: the product runs it once more, as before.
 		const arrangements = [
 			{
-				bound: 600_000,
+				bound: 480_000,
 				calls: [
-					call(prompt, { status: 'THROWN', message: TRANSPORT }, 500_000),
-					call(prompt, { status: 'ANSWERED', text: CLEAN }, 5, { role: 'retry' })
+					call(prompt, { status: 'THROWN', message: TRANSPORT }, 480_000),
+					call(prompt, { status: 'ANSWERED', text: CLEAN }, 5)
 				]
 			},
 			{
@@ -598,10 +619,18 @@ describe('⭐ the floor registry’s REPLAY arm (D2)', () => {
 	// ⛔ THE PREDICTED RED (J3): E12's declared reviewer names who answered a call that threw by the host's configured tool —
 	// devin only when the selection is DEVIN, else agy — and under the replay the selection is REPLAY, so a replayed throw was
 	// recorded as agy's, a reviewer that never ran, where the floor's own replayed review names the recording's.
-	it('(xi) ⛔ the merge (J3) — a declared review whose recorded call THREW at the bound names the RECORDING’s reviewer as who answered it, never the host’s agy', async () => {
+	// ⛔ MOVED 2026-10-31 (`JAN-EXEC` Phase 7, package X-2 — design D36, revision 5; `REG-D-141` (2)) — ~~`[call(prompt, { status:
+	// 'THROWN', message: TRANSPORT }, BOUND, { framing: 'declared-policy' })]`~~, one throw at the bound that the run let stand: the
+	// product runs a timeout once more now, so that recording is refused at open (`boundDisagreements`) and its review fails on the
+	// refusal, not on the throw. Restated as the run X-2's product makes of it — the timeout and its one retry, thrown at the bound
+	// again — and every assertion kept.
+	it('(xi) ⛔ the merge (J3) — a declared review whose recorded call THREW at the bound ⛔ (and, since X-2, its retry too) names the RECORDING’s reviewer as who answered it, never the host’s agy', async () => {
 		const prompt = await promptOf({ reasoningReview: declaredInput() }, DECLARED_SUBJECT);
 		replayingOver(
-			[call(prompt, { status: 'THROWN', message: TRANSPORT }, BOUND, { framing: 'declared-policy' })],
+			[
+				call(prompt, { status: 'THROWN', message: TRANSPORT }, BOUND, { framing: 'declared-policy' }),
+				call(prompt, { status: 'THROWN', message: TRANSPORT }, BOUND, { framing: 'declared-policy', role: 'retry' })
+			],
 			'jpwb-replay-declared-thrown-'
 		);
 		const answer = await declaredReview();
@@ -610,6 +639,7 @@ describe('⭐ the floor registry’s REPLAY arm (D2)', () => {
 			actorType: 'AGENT',
 			...REVIEWER
 		});
+		expect(replayRunFor(dir).consumed().reviewer, 'the timeout’s recorded retry was not asked for').toBe(2);
 	});
 
 	it('(xii) ⭐ the merge (J4; REG-D-111 (5)) — a recording made before E1’s symmetric clause is STALE at its first reviewer call: the replay asks with the prompt as it reads now', async () => {
@@ -646,10 +676,15 @@ describe('⭐ the floor registry’s REPLAY arm (D2)', () => {
 	// live one — where the floor's replayed review is recorded under an id of its own ((viii)).
 	it('(xiv) ⭐ R3-A F2 — a REPLAYED declared review is marked as one: the declared reviewer, and every answer it gives — served or thrown — carries the replay’s own validator id, never the live reviewer’s', async () => {
 		const prompt = await promptOf({ reasoningReview: declaredInput() }, DECLARED_SUBJECT);
+		// ⛔ MOVED 2026-10-31 (`JAN-EXEC` Phase 7, package X-2 — design D36, revision 5; `REG-D-141` (2)) — ~~the second review's one
+		// throw at the bound, let stand~~: refused at open since X-2 (the product runs a timeout once more), so both reviews would
+		// fail on the refusal. Restated with the timeout's one retry, thrown at the bound again; every assertion kept, the count of
+		// calls served three.
 		replayingOver(
 			[
 				call(prompt, { status: 'ANSWERED', text: clearingJudgement(DECLARED_CRITERIA) }, 5, { framing: 'declared-policy' }),
-				call(prompt, { status: 'THROWN', message: TRANSPORT }, BOUND, { framing: 'declared-policy' })
+				call(prompt, { status: 'THROWN', message: TRANSPORT }, BOUND, { framing: 'declared-policy' }),
+				call(prompt, { status: 'THROWN', message: TRANSPORT }, BOUND, { framing: 'declared-policy', role: 'retry' })
 			],
 			'jpwb-replay-declared-id-'
 		);
@@ -665,6 +700,63 @@ describe('⭐ the floor registry’s REPLAY arm (D2)', () => {
 			true,
 			'replay.declared-policy'
 		]);
-		expect(replayRunFor(dir).consumed().reviewer, 'both reviews were served from the recording').toBe(2);
+		// ⛔ MOVED 2026-10-31 (X-2; design D36) — ~~`.toBe(2)`~~: the second review's timeout and its one retry are two calls.
+		expect(replayRunFor(dir).consumed().reviewer, 'both reviews were served from the recording').toBe(3);
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package X-2 — D36 (`REG-D-141` (2); design §10.5, revision 5: *"A replay recording with an at-bound
+	// throw and its retry is refused at HEAD and replays after"*) — THE RECORDING OF THE NEW BEHAVIOUR REPLAYS. Before X-2,
+	// `boundDisagreements` held that the product lets a throw at its bound stand (`productRetries = bound !== undefined &&
+	// call.elapsedMs < bound`), so a run that ran its timeout once more was refused at open as one made under another bound. Through
+	// the floor registry's REPLAY arm (`replayRunFor`), as (vi) and (vii) are.
+	it('(xv) ⭐⭐ X-2 — D36 — PREDICTED RED — a recording whose throw AT the product’s bound was run once more opens and replays: the retry takes the recorded reply, and the review stands on it', async () => {
+		const prompt = await promptOf();
+		const recorded = recordingOf([
+			call(prompt, { status: 'THROWN', message: TRANSPORT }, BOUND),
+			call(prompt, { status: 'ANSWERED', text: CLEAN }, 26_600, { role: 'retry' })
+		]);
+		// ⛔ THE MUTANT: replay's rule kept to the old one — a timeout the product lets stand, so this recording disagrees.
+		expect(boundDisagreements(recorded, BOUND), 'the timeout and its retry disagree with the product’s bound').toEqual([]);
+		dir = mkdtempSync(join(tmpdir(), 'jpwb-replay-timeout-retried-'));
+		for (const [file, text] of Object.entries(recordingFiles(recorded))) writeFileSync(join(dir, file), text);
+		delete process.env.JPWB_ASSURANCE_TOOL;
+		process.env.PATH = noProgramsDirectory();
+		process.env.JPWB_REPLAY = dir;
+
+		const { review, exchanges } = await floorOver();
+
+		expect(JSON.stringify(review), 'the recording of a timeout run once more was refused at open').not.toContain(
+			'REPLAY_RECORDING_REFUSED'
+		);
+		expect(review?.disposition).toBe('SATISFIED');
+		const records = exchanges.drain();
+		expect(records.map((r) => [r.exchangeRole, r.disposition, r.requestedAt, r.respondedAt])).toEqual([
+			['initial', 'no-response', at(0), at(BOUND)],
+			['retry', 'accepted', at(BOUND), at(BOUND + 26_600)]
+		]);
+		expect(records[0]!.parseOutcome.detail).toContain(
+			`after ${BOUND} ms with no reply, at or past the tool’s ${BOUND} ms bound — a timeout, so it is run once more (REG-D-141 (2))`
+		);
+		expect(replayRunFor(dir).consumed().reviewer).toBe(2);
+		// ⭑ AND BOTH SIDES OF THE NEW RULE (each red before X-2 too): a throw recorded PAST the bound and run once more agrees; one
+		// the run let stand AT the bound — a recording made before X-2 — disagrees, naming the call, its time and the product's bound.
+		expect(
+			boundDisagreements(
+				recordingOf([
+					call(prompt, { status: 'THROWN', message: TRANSPORT }, BOUND + 38),
+					call(prompt, { status: 'ANSWERED', text: CLEAN }, 5, { role: 'retry' })
+				]),
+				BOUND
+			)
+		).toEqual([]);
+		expect(
+			boundDisagreements(
+				recordingOf([call(prompt, { status: 'THROWN', message: TRANSPORT }, BOUND), call(prompt, { status: 'ANSWERED', text: CLEAN }, 5)]),
+				BOUND
+			)
+		).toEqual([
+			`reviewer call 1 (unit requirements, work-product, initial) threw after ${BOUND} ms and the recorded run let it stand, where ` +
+				`the product's bound for 'devin' — ${BOUND} ms — would run it once more`
+		]);
 	});
 });

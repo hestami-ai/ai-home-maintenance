@@ -26,7 +26,10 @@
 // question (the design's §8, still to come); this replays it, binds it, and grades it HOST_CONFIGURED, never as a report.
 //
 // ── ⭐ THE CLOCK (`reasoning-review-validator.ts`, `thrownCallDisposal`) ──────────────────────────────────────────────
-// Whether a call that threw is run once more depends on its elapsed time against the tool's bound. The replay hands the
+// ~~Whether a call that threw is run once more depends on its elapsed time against the tool's bound.~~ ⛔ MOVED 2026-10-31
+// (`JAN-EXEC` Phase 7, package X-2 — `DESIGN-data-flow-order-and-deliverable-review.md` §10.5, D36; `REG-D-141` (2)): under a
+// known bound a call that threw is run once more wherever it threw, so its elapsed time against the tool's bound decides what
+// its record says — a timeout at or past it — and no longer whether it is run again. The replay hands the
 // validator `clock`, a virtual time that only `reviewerPrint` advances — by each call's RECORDED elapsed time — so the
 // validator measures exactly the time the run measured, and a retry happens exactly where it happened.
 // ⭐ AND THE BOUND IS THE PRODUCT's (the review of E4, finding 8): ~~the recording's~~ `REVIEWER_CALL_BOUND_MS` for the
@@ -444,11 +447,18 @@ export function productCallBoundFor(agentId: string): number | undefined {
 
 /**
  * ⭐⭐ FINDING 8 — WHERE THE PRODUCT'S BOUND WOULD DISPOSE A RECORDED THROW OTHERWISE THAN THE RUN DID, one sentence each.
- * The validator runs a thrown call once more when it threw short of the bound, and lets it stand at or past it, or when
- * it was itself the retry (`thrownCallDisposal`); the recording says what the run did by its NEXT call, a `retry` or not.
+ * ~~The validator runs a thrown call once more when it threw short of the bound, and lets it stand at or past it, or when
+ * it was itself the retry (`thrownCallDisposal`)~~ ⛔ MOVED 2026-10-31 (`JAN-EXEC` Phase 7, package X-2 — design D36, revision
+ * 5; `REG-D-141` (2)): the validator runs a thrown call once more wherever it knows the tool's bound — short of it, or at or
+ * past it, a timeout — and lets it stand when it was itself the retry, or under a tool it knows no bound for
+ * (`thrownCallDisposal`); a recorded time is a count, so its clock always places it. The recording says what the run did by
+ * its NEXT call, a `retry` or not.
  * A disagreement means the recording was made under another bound — the review's case among them, a throw that elapsed
- * beyond the product's bound and was retried — and a replay of it would ask for a call the recording does not hold, or
- * skip one it does. ⚠ A throw past the bound that the run let stand AGREES (a timeout, killed at the bound): it replays.
+ * beyond the product's bound and was retried — ⭐ or, since X-2, under the rule before it — and a replay of it would ask for a
+ * call the recording does not hold, or skip one it does. ~~⚠ A throw past the bound that the run let stand AGREES (a timeout,
+ * killed at the bound): it replays.~~ ⛔ (X-2) A throw at or past the bound that the run let stand now DISAGREES: a recording
+ * made before X-2 that holds one is refused when the replay opens (`replayRunFor`), as D36 says; one whose timeout was run once
+ * more replays.
  */
 export function boundDisagreements(recording: Recording, bound: number | undefined): string[] {
 	const out: string[] = [];
@@ -456,7 +466,10 @@ export function boundDisagreements(recording: Recording, bound: number | undefin
 		// ⭐ P5 package A (F1) — a recorded cut is a thrown call too, disposed by the same bound.
 		if ((call.reply.status !== 'THROWN' && call.reply.status !== 'OUTPUT_LIMIT') || call.role === 'retry') return;
 		const recordedRetry = recording.reviewer[index + 1]?.role === 'retry';
-		const productRetries = bound !== undefined && call.elapsedMs < bound;
+		// ⛔ MOVED 2026-10-31 (X-2; design D36: *"whose `const productRetries = bound !== undefined && call.elapsedMs < bound;` would
+		// refuse a recording of the new behaviour"*) — ~~the elapsed time held short of the bound~~: the product runs a thrown call
+		// once more under any bound it knows.
+		const productRetries = bound !== undefined;
 		if (recordedRetry === productRetries) return;
 		out.push(
 			`${describeCall(index, call)} threw after ${call.elapsedMs} ms and the recorded run ` +

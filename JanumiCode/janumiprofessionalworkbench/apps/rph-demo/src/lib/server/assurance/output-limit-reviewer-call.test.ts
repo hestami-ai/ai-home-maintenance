@@ -11,7 +11,10 @@
 //   (ii)  its partial reply is kept WHOLE, PURGEABLE_AT_EXPIRY, for diagnosis — even where a span can be located in it —
 //         and never in E-5's detail; its export is kept and pointed at; its identity is the one the export reported;
 //   (iii) the thrown call's rule is unchanged: short of the bound it is run once more, a second cut stands, and the floor
-//         reads VALIDATOR_EXECUTION_FAILED, INCONCLUSIVE;
+//         reads VALIDATOR_EXECUTION_FAILED, INCONCLUSIVE; ⭐ and (`JAN-EXEC` Phase 7, package X-2 — design D36, revision 5;
+//         `REG-D-141` (2), extending `REG-D-118` (2)) the cut shares the thrown call's disposal AT or past the bound too: a
+//         cut there is a timeout, named so, and is run once more — ~~`REG-D-118` (2) kept the retry for a cut "when it ends
+//         short of the tool's bound"~~;
 //   (iv)  the floor's projection carries the class: `outputTruncation: DECLARED`, and `outputLimitOf` reads it back.
 // No model is called: the tool is a function.
 import {
@@ -176,6 +179,34 @@ describe('⭐⭐ P5 package A (F1) — a call cut at the model’s output-token 
 		expect(detail, 'the class’s detail claims no reply').not.toContain('with no reply');
 		// ⛔ NO BYTE OF THE PARTIAL REPLY ON THE RECORD PLANE: it is model-written, and kept on the content plane alone.
 		expect(detail).not.toContain('the verification doc');
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package X-2 — D36 (design §10.5, revision 5: *"A reply cut at the output limit at or past the bound
+	// shares this disposal ... so the sponsor's yes (`REG-D-141` (2)) gives it the one retry too. That extends `REG-D-118` (2)"*) —
+	// A CUT AT THE BOUND IS RUN ONCE MORE, as a cut short of it is (the CONTROL above), its record naming the timeout.
+	it('⛔ PREDICTED RED (X-2, D36) — cut AT the bound, then answered: run once more, SATISFIED by the retry; the cut try still the class, its clause naming the timeout', async () => {
+		const { prompts, print } = tool(cut(), CLEAN);
+		const { validator, exchanges } = reviewer(print, clockAt(0, BOUND, BOUND + 100, BOUND + 30_000));
+
+		const outcome = await settle(validator.evaluate(SUBJECT, CTX));
+
+		// ⛔ THE MUTANT: the cut kept to `REG-D-118` (2)'s old rule — let stand at the bound, its review INCONCLUSIVE.
+		expect(prompts, 'a cut at the bound was not run once more').toHaveLength(2);
+		expect((outcome as { dispositionRecommendation?: string }).dispositionRecommendation).toBe('SATISFIED');
+		const [first, retried] = exchanges.drain();
+		expect([first!.exchangeRole, first!.disposition, first!.outputTruncationState, retried!.exchangeRole, retried!.disposition]).toEqual([
+			'initial',
+			'rejected',
+			'declared',
+			'retry',
+			'accepted'
+		]);
+		expect(retried!.predecessorExchangeId).toBe(first!.exchangeId);
+		const detail = first!.parseOutcome.detail;
+		expect(detail.startsWith(OUTPUT_LIMIT), 'E-5 does not open with the class’s marker').toBe(true);
+		expect(detail).toContain(`The reviewing tool ended the model’s reply after ${BOUND} ms: finish_reason not reported, output_tokens 25000.`);
+		expect(detail).toContain(`at or past the tool’s ${BOUND} ms bound — a timeout, so it is run once more (REG-D-141 (2))`);
+		expect(detail, 'a cut at the bound named short of it').not.toContain('short of the tool’s');
 	});
 
 	it('⛔ the partial reply is kept WHOLE, purgeable, though a span can be located in it — the span refs pending, saying why', async () => {

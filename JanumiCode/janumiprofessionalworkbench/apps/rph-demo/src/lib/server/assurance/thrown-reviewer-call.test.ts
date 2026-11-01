@@ -14,7 +14,11 @@
 //         its successor is recorded RETRY, naming it as predecessor.
 //   (ii)  a second throw counts: both are NO_RESPONSE, the second is rethrown sanitised exactly as before, and the floor
 //         reads VALIDATOR_EXECUTION_FAILED, INCONCLUSIVE.
-//   (iii) a throw AT or past the bound is a timeout and is not run again — and is still recorded.
+//   (iii) ~~a throw AT or past the bound is a timeout and is not run again — and is still recorded.~~ ⛔ MOVED 2026-10-31
+//         (`JAN-EXEC` Phase 7, package X-2 — `DESIGN-data-flow-order-and-deliverable-review.md` §10.5, D36, revision 5; the
+//         sponsor's `REG-D-141` (2), *"Yes, once (Recommended)"*, which widens `REG-D-102` (2) and reverses `REG-F-525`'s closing
+//         rule): a throw AT or past the bound is a timeout, and its record still names it one — and it is given the one further
+//         call a throw short of the bound is given. A call that was itself the retry still stands.
 //   (iv)  a substituted model is not run again: its refusal is not a throw from `print` (`JAN-SELREV` D6).
 //   (v)   a malformed reply still takes the REPAIR path, and a repair call that throws is run once more too.
 // ⭐ AND THREE MORE, FROM THE LANDING'S ADVERSARIAL VERIFICATION:
@@ -27,8 +31,9 @@
 //          error, and the call is not run again (`REG-F-338`'s rule). ⚠ `REG-F-525`'s remedy proposed the reverse,
 //          untested; this pins which rule the code follows.
 // ⭑ AND WHERE IT APPLIES: only where the validator knows the bound of the tool it runs — the product's devin branch
-// (240 s, `devinPrint`'s kill) and its agy default (180 s, agy's own print timeout). An injected `print` that declares no
-// bound — the reviewer fingerprint's, the qualification runner's — throws as it did, once, and is recorded.
+// (~~240 s~~ 480 s, `devinPrint`'s kill — ⛔ MOVED 2026-10-31 with package X's D35, whose BOUND below moved and left this figure;
+// struck here by X-2) and its agy default (180 s, agy's own print timeout). An injected `print` that declares no bound — the
+// reviewer fingerprint's, the qualification runner's — throws as it did, once, and is recorded.
 //
 // ⛔ HERMETIC. Every tool here is a function or an adapter's exec seam, and PATH names an empty directory wherever an
 // adapter is reached — both layers, as `no-programs.testing.ts` asks. ⚠ agy's own adapter, which the validator's default
@@ -71,6 +76,7 @@ import {
 	type ValidatorContext
 } from '@janumipwb/rph-assurance';
 import type { ArtifactStore } from '@janumipwb/rph-ports';
+import { readFileSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ExchangeRecord } from '../agent/exchange-record.js';
@@ -124,6 +130,31 @@ const REPAIR_TAIL = 'IMPORTANT: reply with ONLY the minified JSON object.';
  * raised to 480 s, and this number with it, as the relation below holds (`REVIEWER_CALL_BOUND_MS.devin`).
  */
 const BOUND = 480_000;
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package X-2 — D36 (`REG-D-141` (2); design §10.5, revision 5, its predicted reds: *"a recorded reply,
+ * `runs.ndjson:1445`, so it reads REJECTED"*) — A REPLY THE SELECTED REVIEWER GAVE: devin / `glm-5-3-flash-high`'s answer to the
+ * §7.3 retry of `W12-CSV-RR-02` #2, the call v12's paid run lost at devin's 240 s kill (`runs.ndjson:1404`; `REG-F-590`) —
+ * answered in 82 436 ms, and REJECTED on RR-02. ⭑ READ FROM THE COMMITTED RECORD by its line and held to that call's identity
+ * first, so the record is the source and no copy of it can drift.
+ */
+const RECORD = new URL('../../../../../../docs/tracking/reviewer-qualification/runs.ndjson', import.meta.url);
+function recordedRetryReply(): string {
+	const call = JSON.parse(readFileSync(RECORD, 'utf8').split('\n')[1444] ?? '') as {
+		kind: string;
+		runId: string;
+		caseId: string;
+		repetition: number;
+		role: string;
+		elapsedMs: number;
+		reply: { status: string; answer: string };
+	};
+	expect(
+		[call.kind, call.runId, call.caseId, call.repetition, call.role, call.elapsedMs, call.reply.status],
+		'arrangement: runs.ndjson:1445 is not the retry v12 recorded'
+	).toEqual(['CALL', 'qr-2026-10-30-devin-glm-5-3-flash-high-v12-retry', 'W12-CSV-RR-02', 1, 'initial', 82_436, 'ANSWERED']);
+	return call.reply.answer;
+}
 
 /** What a transport failure looks like when it leaves `devinPrint` (`tools/devin-reviewer.ts`): no reply, a cause. */
 const TRANSPORT =
@@ -317,16 +348,26 @@ describe('⭐ P7-2b (ii) — a second throw counts', () => {
 	});
 });
 
-describe('⭐ P7-2b (iii) — a throw at or past the bound is a timeout, and is not run again', () => {
-	it('⛔ a throw AT the bound: one call, one NO_RESPONSE record naming the bound, and the throw stands', async () => {
+// ⛔ MOVED 2026-10-31 (`JAN-EXEC` Phase 7, package X-2 — design D36, revision 5; `REG-D-141` (2)) — ~~"⭐ P7-2b (iii) — a throw at
+// or past the bound is a timeout, and is not run again"~~: its promise reverses. The two pins below are struck in place and
+// restated; the CONTROL after them, one millisecond short, is unchanged.
+describe('⭐ P7-2b (iii), ⛔ restated by X-2 (D36) — a throw at or past the bound is a timeout, named so, and is run once more', () => {
+	// ⛔ MOVED 2026-10-31 (X-2; design D36; `REG-D-141` (2)) — ~~"⛔ a throw AT the bound: one call, one NO_RESPONSE record naming the
+	// bound, and the throw stands"~~, which held `expect(prompts, 'a timeout was run again').toHaveLength(1)`, the throw rethrown
+	// (`'reasoning-review backing tool invocation failed: Command failed: devin --print'`), one record `initial:no-response`, and
+	// its clause *"at or past the tool’s ${BOUND} ms bound — a timeout, which is not run again"*.
+	it('⛔ PREDICTED RED (X-2, D36) — a throw AT the bound: two calls, the first NO_RESPONSE naming the bound and the timeout, the second RETRY after it, and the review stands on it', async () => {
 		const { prompts, print } = tool(new Error('Command failed: devin --print'), CLEAN);
-		const { validator, exchanges } = reviewer(print, clockAt(0, BOUND));
+		const { validator, exchanges } = reviewer(print, clockAt(0, BOUND, BOUND + 100, BOUND + 26_700));
 
-		const thrown = await settle(validator.evaluate(SUBJECT, CTX));
+		const outcome = await settle(validator.evaluate(SUBJECT, CTX));
 
-		expect(prompts, 'a timeout was run again').toHaveLength(1);
-		expect((thrown as Error).message).toBe(
-			'reasoning-review backing tool invocation failed: Command failed: devin --print'
+		// ⛔ THE MUTANT: the old rule back — a timeout let stand, its review INCONCLUSIVE.
+		expect(prompts, 'a timeout was not run once more').toHaveLength(2);
+		expect(prompts[1], 'the second call is the SAME call, not a repair').toBe(prompts[0]);
+		expect(outcome, 'the review did not stand on the timeout’s retry').not.toBeInstanceOf(Error);
+		expect((outcome as { dispositionRecommendation: string }).dispositionRecommendation).toBe(
+			'SATISFIED'
 		);
 		const records = exchanges.drain();
 		expect(shape(records)).toEqual([
@@ -336,18 +377,35 @@ describe('⭐ P7-2b (iii) — a throw at or past the bound is a timeout, and is 
 				disposition: 'no-response',
 				predecessor: undefined,
 				outcome: 'NOT_ATTEMPTED'
+			},
+			{
+				exchangeId: 'exch-2',
+				role: 'retry',
+				disposition: 'accepted',
+				predecessor: 'exch-1',
+				outcome: 'PARSED'
 			}
 		]);
+		// ⛔ THE MUTANT: the clause names the at-bound throw SHORT of the bound — the kill fires AT it, so a throw there is the kill's.
 		expect(records[0]!.parseOutcome.detail).toContain(
-			`after ${BOUND} ms with no reply, at or past the tool’s ${BOUND} ms bound — a timeout, which is not run again`
+			`after ${BOUND} ms with no reply, at or past the tool’s ${BOUND} ms bound — a timeout, so it is run once more (REG-D-141 (2))`
 		);
+		expect(records[0]!.parseOutcome.detail, 'a timeout named short of its bound').not.toContain('short of the tool’s');
 	});
 
-	it('⛔ a throw past the bound is not run again either', async () => {
+	// ⛔ MOVED 2026-10-31 (X-2; design D36) — ~~"⛔ a throw past the bound is not run again either"~~, which held
+	// `expect(prompts).toHaveLength(1)` for a throw at `BOUND + 412`.
+	it('⛔ PREDICTED RED (X-2, D36) — a throw PAST the bound is a timeout too: run once more as well, its record naming the timeout', async () => {
 		const { prompts, print } = tool(new Error('Command failed: devin --print'), CLEAN);
-		const { validator } = reviewer(print, clockAt(0, BOUND + 412));
+		const { validator, exchanges } = reviewer(print, clockAt(0, BOUND + 412, BOUND + 500, BOUND + 20_000));
 		await settle(validator.evaluate(SUBJECT, CTX));
-		expect(prompts).toHaveLength(1);
+		expect(prompts, 'a throw past the bound was not run once more').toHaveLength(2);
+		const records = exchanges.drain();
+		expect(records.map((r) => `${r.exchangeRole}:${r.disposition}`)).toEqual(['initial:no-response', 'retry:accepted']);
+		// ⛔ THE MUTANT: only the exact bound named a timeout — a kill that landed late named short of the bound.
+		expect(records[0]!.parseOutcome.detail).toContain(
+			`after ${BOUND + 412} ms with no reply, at or past the tool’s ${BOUND} ms bound — a timeout, so it is run once more (REG-D-141 (2))`
+		);
 	});
 
 	it('⭑ CONTROL — one millisecond short of the bound IS run again: the line is the bound itself', async () => {
@@ -373,25 +431,32 @@ const KILLED: KilledCallFacts = {
 };
 
 describe('⭐⭐ package X — D34 — a killed call’s no-response record states what the kill left, beside its time and its cause', () => {
-	it('⛔ PREDICTED RED — killed AT the bound: one call, its record naming the bound, the kill’s facts, and the sanitised cause', async () => {
-		const { prompts, print } = tool(new ToolCallKilled('devin invocation failed: Command failed: devin --print', KILLED), CLEAN);
-		const { validator, exchanges } = reviewer(print, clockAt(0, BOUND));
+	// ⛔ MOVED 2026-10-31 (`JAN-EXEC` Phase 7, package X-2 — design D36, revision 5; `REG-D-141` (2)) — ~~"killed AT the bound: one
+	// call, its record naming the bound, the kill’s facts, and the sanitised cause"~~: its arrangement, one kill at the bound and
+	// a reply after it (`tool(kill, CLEAN)`, `clockAt(0, BOUND)`), held `expect(prompts, 'arrangement: a timeout, not run
+	// again').toHaveLength(1)` and the clause *"— a timeout, which is not run again."*. A timeout is run once more now, so the
+	// arrangement is restated as two kills at the bound — the second the one the seam rethrows — and every assertion kept.
+	it('⛔ PREDICTED RED — killed AT the bound, ⛔ restated by X-2: a timeout, run once more and killed again — the first record naming the bound, the kill’s facts and the sanitised cause, and the seam rethrowing the cause alone', async () => {
+		const kill = () => new ToolCallKilled('devin invocation failed: Command failed: devin --print', KILLED);
+		const { prompts, print } = tool(kill(), kill());
+		const { validator, exchanges } = reviewer(print, clockAt(0, BOUND, BOUND + 100, 2 * BOUND + 100));
 
 		const thrown = await settle(validator.evaluate(SUBJECT, CTX));
 
-		expect(prompts, 'arrangement: a timeout, not run again').toHaveLength(1);
+		expect(prompts, 'arrangement: a timeout, run once more, and killed again').toHaveLength(2);
 		expect((thrown as Error).message, 'the seam still rethrows the sanitised cause alone').toBe(
 			'reasoning-review backing tool invocation failed: devin invocation failed: Command failed: devin --print'
 		);
 		const records = exchanges.drain();
-		expect(shape(records).map((r) => `${r.role}:${r.disposition}`)).toEqual(['initial:no-response']);
+		expect(shape(records).map((r) => `${r.role}:${r.disposition}`)).toEqual(['initial:no-response', 'retry:no-response']);
 		// ⛔ THE MUTANT: the facts dropped from the detail — the record keeps the time and the cause alone, as before X.
+		// ⛔ MOVED 2026-10-31 (X-2; D36) — ~~"— a timeout, ' + 'which is not run again."~~: the clause names the timeout and its retry.
 		expect(records[0]!.parseOutcome.detail).toBe(
 			`The reviewing tool’s call failed after ${BOUND} ms with no reply, at or past the tool’s ${BOUND} ms bound — a timeout, ` +
-				'which is not run again. What the tool left when it was killed: killed by SIGTERM, 13 characters printed on stdout ' +
-				'before the kill, its export written, whose last agent step counted output_tokens 812, finish_reason stop. What the ' +
-				'tool reported, sanitised: reasoning-review backing tool invocation failed: devin invocation failed: Command failed: ' +
-				'devin --print'
+				'so it is run once more (REG-D-141 (2)). What the tool left when it was killed: killed by SIGTERM, 13 characters printed ' +
+				'on stdout before the kill, its export written, whose last agent step counted output_tokens 812, finish_reason stop. ' +
+				'What the tool reported, sanitised: reasoning-review backing tool invocation failed: devin invocation failed: Command ' +
+				'failed: devin --print'
 		);
 	});
 
@@ -412,10 +477,12 @@ describe('⭐⭐ package X — D34 — a killed call’s no-response record stat
 		const { print } = tool(new Error('Command failed: devin --print'), CLEAN);
 		const { validator, exchanges } = reviewer(print, clockAt(0, BOUND));
 		await settle(validator.evaluate(SUBJECT, CTX));
+		// ⛔ MOVED 2026-10-31 (`JAN-EXEC` Phase 7, package X-2 — design D36; `REG-D-141` (2)) — ~~"— a timeout, ' + 'which is not run
+		// again."~~: the clause of a call at the bound names the timeout and its retry; the detail's three parts are unchanged.
 		expect(exchanges.drain()[0]!.parseOutcome.detail).toBe(
 			`The reviewing tool’s call failed after ${BOUND} ms with no reply, at or past the tool’s ${BOUND} ms bound — a timeout, ` +
-				'which is not run again. What the tool reported, sanitised: reasoning-review backing tool invocation failed: Command ' +
-				'failed: devin --print'
+				'so it is run once more (REG-D-141 (2)). What the tool reported, sanitised: reasoning-review backing tool invocation ' +
+				'failed: Command failed: devin --print'
 		);
 	});
 });
@@ -915,6 +982,91 @@ describe('⭐ P7-2b — where the rule applies: the product’s own reviewers, a
 		);
 	});
 
+	// ⭐⭐ `JAN-EXEC` Phase 7, package X-2 — D36 (`REG-D-141` (2), *"Yes, once (Recommended)"*; design §10.5, revision 5: *"New pins
+	// are driven through the product's devin branch"*) — A CALL KILLED AT DEVIN'S BOUND IS GIVEN THE ONE FURTHER CALL A CALL THAT
+	// THREW SOONER IS GIVEN, its record still naming the timeout. The clock is scripted through `createFloorRegistry`, so the kill
+	// lands AT `REVIEWER_CALL_BOUND_MS.devin`, the bound `devinPrint` hands its program; the kill is the shape node's `execFile`
+	// rejects with at its `timeout` (a signal, no exit code), so `devinPrint` throws it as `ToolCallKilled` (D34).
+	/** What node's `execFile` rejects with when its `timeout` kills devin's program: a signal and no exit code. */
+	const killedAtItsTimeout = () =>
+		Object.assign(new Error('Command failed: devin --print'), { code: null, killed: true, signal: 'SIGTERM', stdout: '', stderr: '' });
+
+	it('⭐⭐ X-2 — D36 — PREDICTED RED — the product’s devin branch: killed AT devin’s bound, then answered with a recorded reply (runs.ndjson:1445): NO_RESPONSE then RETRY, and the review concludes on the retry’s reply — REJECTED', async () => {
+		vi.stubEnv('JPWB_ASSURANCE_TOOL', 'devin');
+		vi.stubEnv('JPWB_ASSURANCE_MODEL', 'fixture-devin-model');
+		const reply = recordedRetryReply();
+		const calls: string[][] = [];
+		const exec = async (_file: string, args: readonly string[]) => {
+			calls.push([...args]);
+			if (calls.length === 1) throw killedAtItsTimeout();
+			// The export devin writes, naming the CONFIGURED model, so the identity check passes.
+			await writeFile(
+				args[args.indexOf('--export') + 1]!,
+				JSON.stringify({ steps: [{ extra: { generation_model: 'fixture-devin-model' } }] }),
+				'utf8'
+			);
+			return { stdout: reply };
+		};
+		const devinBound = REVIEWER_CALL_BOUND_MS.devin;
+		const exchanges = createExchangeSink();
+		const registry = createFloorRegistry({
+			testMode: false,
+			devinExec: exec,
+			exchanges,
+			// The kill lands AT the bound; the retry answers 82 436 ms after it is sent — the recorded call's own time.
+			clock: clockAt(0, devinBound, devinBound + 100, devinBound + 100 + 82_436)
+		});
+
+		const plan = await runFloorAndPlanRecording(SUBJECT, CTX, registry);
+		const review = plan.assessments.find((a) => a.policyId === FLOOR_POLICY_IDS.REASONING_REVIEW);
+
+		// ⛔ THE MUTANT: the old rule back — the timeout let stand, and the review INCONCLUSIVE on its one call.
+		expect(calls, 'devin’s program was not run once more after its kill at the bound').toHaveLength(2);
+		expect(review?.disposition, 'the review did not conclude on the retry’s recorded reply').toBe('REJECTED');
+		const records = exchanges.drain();
+		expect(records.map((r) => `${r.exchangeRole}:${r.disposition}`)).toEqual(['initial:no-response', 'retry:accepted']);
+		expect(records[1]!.predecessorExchangeId, 'the retry does not name the timeout as its predecessor').toBe(records[0]!.exchangeId);
+		expect(records[0]!.parseOutcome.detail).toContain(
+			`after ${devinBound} ms with no reply, at or past the tool’s ${devinBound} ms bound — a timeout, so it is run once more (REG-D-141 (2))`
+		);
+		// ⭑ And D34's facts still reach the timeout's record.
+		expect(records[0]!.parseOutcome.detail).toContain('What the tool left when it was killed: killed by SIGTERM, 0 characters printed');
+	});
+
+	it('⭐⭐ X-2 — D36 — PREDICTED RED — the product’s devin branch: killed AT devin’s bound twice — INCONCLUSIVE, the second record’s clause naming the one further call, and never a third call', async () => {
+		vi.stubEnv('JPWB_ASSURANCE_TOOL', 'devin');
+		vi.stubEnv('JPWB_ASSURANCE_MODEL', 'fixture-devin-model');
+		const calls: string[][] = [];
+		const exec = async (_file: string, args: readonly string[]): Promise<{ stdout: string }> => {
+			calls.push([...args]);
+			throw killedAtItsTimeout();
+		};
+		const devinBound = REVIEWER_CALL_BOUND_MS.devin;
+		const exchanges = createExchangeSink();
+		const registry = createFloorRegistry({
+			testMode: false,
+			devinExec: exec,
+			exchanges,
+			clock: clockAt(0, devinBound, devinBound + 100, 2 * devinBound + 100)
+		});
+
+		const plan = await runFloorAndPlanRecording(SUBJECT, CTX, registry);
+		const review = plan.assessments.find((a) => a.policyId === FLOOR_POLICY_IDS.REASONING_REVIEW);
+
+		expect(calls, 'a timeout is run once more, and its retry never again').toHaveLength(2);
+		expect(review?.disposition).toBe('INCONCLUSIVE');
+		const records = exchanges.drain();
+		expect(records.map((r) => `${r.exchangeRole}:${r.disposition}`)).toEqual(['initial:no-response', 'retry:no-response']);
+		expect(records[0]!.parseOutcome.detail).toContain(
+			`at or past the tool’s ${devinBound} ms bound — a timeout, so it is run once more (REG-D-141 (2))`
+		);
+		// ⭑ The retry was the one further call: its clause says so, and that its failure stands — never a third call.
+		expect(records[1]!.parseOutcome.detail).toContain(
+			`after ${devinBound} ms with no reply, it was itself the one further call a thrown call is given (REG-D-102), so this failure stands`
+		);
+		expect(records[1]!.parseOutcome.detail, 'the failed retry claims a call that never came').not.toContain('run once more');
+	});
+
 	it('⭐ the agy default — no `print` — runs agy’s own adapter, which finds no program: thrown short of agy’s 180 s bound, run once more, INCONCLUSIVE', async () => {
 		vi.stubEnv('JPWB_JUDGE_MODEL', 'fixture-judge');
 		const exchanges = createExchangeSink();
@@ -945,26 +1097,38 @@ describe('⭐ P7-2b — where the rule applies: the product’s own reviewers, a
 		);
 	});
 
-	it('⭑ and agy’s bound is ITS OWN: a throw at 180 s from agy is a timeout, where devin’s bound would run it again', async () => {
+	// ⛔ MOVED 2026-10-31 (`JAN-EXEC` Phase 7, package X-2 — design D36, revision 5: *"agy at its own 180 s is run once more, so
+	// `:837` flips"*; `REG-D-141` (2)) — ~~"⭑ and agy’s bound is ITS OWN: a throw at 180 s from agy is a timeout, where devin’s bound
+	// would run it again"~~, which held `expect(agyProgram.calls, 'agy’s program was asked for again after its own
+	// timeout').toHaveLength(1)` and one record, `initial:no-response`. Its clock read 180 000 ms and then repeated; it is given a
+	// reading for the retry here. The bound is still agy's OWN: the clause names agy's 180 s timeout, where devin's bound would
+	// name the same throw short of 480 s.
+	it('⭑ and agy’s bound is ITS OWN, ⛔ restated by X-2 (D36): a throw at 180 s from agy is agy’s timeout, named so, and run once more — where devin’s bound would name it short of 480 s', async () => {
 		vi.stubEnv('JPWB_JUDGE_MODEL', 'fixture-judge');
 		const exchanges = createExchangeSink();
 		const validator = createAgyReasoningReviewValidator({
 			modelId: 'fixture-judge',
 			exchanges,
-			clock: clockAt(0, 180_000)
+			clock: clockAt(0, 180_000, 180_100, 180_200)
 		});
 
 		await settle(validator.evaluate(SUBJECT, CTX));
 
 		expect(
 			agyProgram.calls,
-			'agy’s program was asked for again after its own timeout'
-		).toHaveLength(1);
+			'agy’s program was not asked for once more after its own timeout'
+		).toHaveLength(2);
 		const records = exchanges.drain();
 		expect(records.map((r) => `${r.exchangeRole}:${r.disposition}`)).toEqual([
-			'initial:no-response'
+			'initial:no-response',
+			'retry:no-response'
 		]);
-		expect(records[0]!.parseOutcome.detail).toContain('180000 ms bound — a timeout');
+		expect(records[0]!.parseOutcome.detail).toContain(
+			'180000 ms bound — a timeout, so it is run once more (REG-D-141 (2))'
+		);
+		expect(records[0]!.parseOutcome.detail, 'agy’s throw at 180 s was held to devin’s bound').not.toContain(
+			`${REVIEWER_CALL_BOUND_MS.devin} ms bound`
+		);
 	});
 
 	it('⛔ an injected print that declares no bound — the fingerprint’s and the qualification runner’s shape — throws once, as before, and is recorded', async () => {
