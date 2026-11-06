@@ -16,6 +16,7 @@ import { createAgyReasoningReviewValidator, type AgyPrint } from './reasoning-re
 import { concludedTry, type Try } from './reviewer-answer.js';
 import { pairRun, type StoredObject } from '../../../../../../scripts/phase7/run-report-core.js';
 import { OutputLimitReached } from '../tools/output-limit.js';
+import { TEST_INDICATIONS } from './indications.testing.js';
 
 /** A reply that PARSES and answers no criterion — the measured run's own shape (`REG-F-552`). */
 const NO_ROWS = '{"findings":[],"recommendation":"SATISFIED","residualUncertainty":["x"]}';
@@ -60,7 +61,7 @@ async function tries(...replies: (string | Error)[]): Promise<Try[]> {
 		return r;
 	};
 	const exchanges = createExchangeSink();
-	await createAgyReasoningReviewValidator({ print, modelId: 'fixture-judge', exchanges })
+	await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: 'fixture-judge', exchanges })
 		.evaluate(
 			{
 				subjectId: 'art_1',

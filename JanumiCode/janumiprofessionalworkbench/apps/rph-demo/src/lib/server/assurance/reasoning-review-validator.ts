@@ -79,6 +79,17 @@ import {
 	quoted,
 	type DeclaredExcerpt
 } from './review-fence.js';
+// ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D50, D52 (`REG-D-146`; design §12.2, §12.4) — the measured review section, and the
+// checks and statements its indications block lists, cut as the screen of the sponsor's construct cut them.
+import { checksOf, PyJsonTooDeep, statementsOf, type CutCheck, type CutStatement } from './review-cuts.js';
+import {
+	indicationsBlock,
+	measuredSection,
+	REVIEW_SECTION_TEXT,
+	SECTION_LAYOUT_REFUSAL,
+	type ReviewSectionText,
+	type TodaySection
+} from './review-section.js';
 
 const DISPOSITIONS = new Set<Disposition>([
 	'SATISFIED',
@@ -128,6 +139,22 @@ const criterionIds = (input: PolicyCriteria): ReadonlySet<string> =>
  * fingerprint hashes cannot state one budget while the prompt obeys another (`verif/reviewer-qualification-fingerprint
  * .test.ts` holds that structurally, and each limit a probe can reach behaviourally).
  */
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D52 (`REG-D-146`; design §12.4, revision 9) — AND THE ADOPTED SECTION'S OWN ROOM, three
+ * members more. ⛔ None of them gives the material any room: its room is still computed against TODAY's review section for the
+ * same input (`promptPlan`'s `section`), so its cuts land where they land today, and a process result's or a part's builder view
+ * is refused at today's point. ⭑ What they bound is what the measured section adds:
+ *   · `SECTION_GROWTH_MAX` — the prompt sent may be at most this much longer than today's prompt for the same input (the
+ *     measured maximum on case set v13 is 8,488, `W13-CSV-RERUN-RR-07`; 79 of 97 v13 prompts pass revision 8's 5,500);
+ *   · `QUOTED_STATEMENT_MAX` — a statement the block quotes, its cut's declaration counted (the measured longest is 552): a
+ *     longer one is asked of the decision model whole and quoted head-only under a declaration — a case the screen did not
+ *     measure, disclosed so;
+ *   · `WHOLE_PROMPT_MAX` — the whole prompt sent (the measured maximum is 31,755 on v13, `P12-RR-07-CUT`).
+ * A prompt past a bound is refused (`VALIDATOR_EXECUTION_FAILED`, its reason), and no indication is dropped to fit. ⚠ In UTF-16
+ * units, as every limit here: the design's figures were measured in code points, which UTF-16 counts no fewer of. ⚠ agy keeps
+ * its own ceiling (`MAX_AGY_PROMPT_CHARS`, 28,000; 3 of 97 v13 prompts pass it): an agy review of a prompt past it fails at its
+ * call. The selected transport is devin, which reads the prompt from a file (D44).
+ */
 export const REASONING_REVIEW_BUDGET = Object.freeze({
 	PROMPT_BUDGET: MAX_AGY_PROMPT_CHARS - 2_000,
 	USER_INTENT_MAX: 4_000,
@@ -136,7 +163,10 @@ export const REASONING_REVIEW_BUDGET = Object.freeze({
 	RATIONALE_MAX: 4_000,
 	NARRATION_MAX: 2_000,
 	CONTENT_MAX: 24_000, // never render MORE graph than this even when there is room (the original cap)
-	CONTENT_MIN: 4_000 // always give the reviewer at least this much graph
+	CONTENT_MIN: 4_000, // always give the reviewer at least this much graph
+	SECTION_GROWTH_MAX: 9_500,
+	QUOTED_STATEMENT_MAX: 700,
+	WHOLE_PROMPT_MAX: 33_000
 });
 const {
 	PROMPT_BUDGET,
@@ -145,6 +175,9 @@ const {
 	PRIOR_MAX,
 	RATIONALE_MAX,
 	NARRATION_MAX,
+	SECTION_GROWTH_MAX,
+	QUOTED_STATEMENT_MAX,
+	WHOLE_PROMPT_MAX,
 	CONTENT_MAX,
 	CONTENT_MIN
 } = REASONING_REVIEW_BUDGET;
@@ -1475,7 +1508,23 @@ export function criterionRepairLineFor(parsed: unknown, criteria: ReasoningRevie
 const withNoSingleProducer = (input: ReasoningReviewInput): boolean =>
 	input.framing === 'DECLARED_POLICY' && input.declaredInstruction === 'UNIT_PURPOSE' && !input.rationale && !input.narration;
 
-function promptPlan(input: ReasoningReviewInput) {
+/**
+ * ⭐⭐ DESIGN §9.3 D8, BYTE FOR BYTE (the sponsor's answers of 2026-10-05) — D8'S FIVE LINES, WHICH OPEN TODAY'S REVIEW SECTION:
+ * what a failure IS (the criterion is not met), what it costs (the policy's stakes, beside each criterion, whatever severity the
+ * reviewer gives), and where a concern that leaves the criterion met goes (the residual uncertainty, never a failed finding).
+ * ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D42, kept by D50 (`REG-D-146`; design §11.3, §12.2) — written ONCE, here, and read by both
+ * sections: today's (`promptPlan`'s `section`, which the room is measured with) and the measured one, where they follow the
+ * method and its rubric heading and precede the rubric, byte for byte and in this order (`measuredSection`).
+ */
+const D8_INSTRUCTION = [
+	'Evaluate EACH derivational-integrity failure class below. For each, decide whether the FAILURE is PRESENT',
+	'(failed=true): present means the artifact does NOT MEET that criterion. What an unmet criterion costs is the',
+	"policy's, shown in brackets beside it, whatever severity you give; a concern that leaves the criterion met",
+	'is not a failure, so put it in residualUncertainty, not in a failed finding. For each failure give a',
+	'one-sentence statement citing specifics, and a severity (INFORMATIONAL|ADVISORY|MATERIAL|BLOCKING|CRITICAL):'
+] as const;
+
+function promptPlan(input: ReasoningReviewInput, quotedAlso: readonly string[] = []) {
 	const framed = framingText(input);
 	// THE RUBRIC IS THE POLICY'S OWN. This rendered from the REASONING_REVIEW_CRITERIA constant, which is what made
 	// the seeded ASSURANCE_POLICY object a projection of this file — written at seed time and never read again.
@@ -1520,7 +1569,12 @@ function promptPlan(input: ReasoningReviewInput) {
 	const withoutWork = input.framing === 'DECLARED_POLICY' ? (input.declaredUnitsWithoutWork ?? []) : [];
 	// ⭐ Package N — D11 — each unit whose model's work completed with no deliverable view on the record, on a host line of its own.
 	const withoutView = input.framing === 'DECLARED_POLICY' ? (input.declaredUnitsWithoutDeliverable ?? []) : [];
-	const assemble = (fence: string, content: string): string =>
+	// ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D50, D52 (`REG-D-146`; design §12.2, §12.4) — THE PROMPT IN TWO PARTS: the HEAD, every
+	// slice the material holds, which `assembleHead` writes with a fence and a content; and TODAY'S REVIEW SECTION (`section`,
+	// below), from D8's first line to the end. ⭑ Their join is today's prompt, byte for byte: what the room is measured on
+	// (`measure`), so every cut lands where it lands today; the prompt sent is the head and the measured section built from
+	// today's (`reviewPrompt`). ⛔ The head ends where the assembler says, never where a search for D8's line finds it.
+	const assembleHead = (fence: string, content: string): string =>
 		[
 			'You are an independent assurance reviewer performing a REASONING REVIEW of an AI-produced professional artifact.',
 			'You ask whether the artifact genuinely discharges its delegated professional obligation, or merely produces a',
@@ -1567,47 +1621,55 @@ function promptPlan(input: ReasoningReviewInput) {
 			// ⭐⭐ `JAN-EXEC` Phase 7, package X — D30 (`REG-D-140`; design §10.2) — and, where the framing has one (a command's review
 			// alone), its line saying what each criterion is judged of, on its own line immediately before D8's first: D8's lines
 			// are not edited. ⛔ Unset, the list drops it, so every other framing reads as before, byte for byte.
-			framed.criteriaLine,
-			'Evaluate EACH derivational-integrity failure class below. For each, decide whether the FAILURE is PRESENT',
-			'(failed=true): present means the artifact does NOT MEET that criterion. What an unmet criterion costs is the',
-			"policy's, shown in brackets beside it, whatever severity you give; a concern that leaves the criterion met",
-			'is not a failure, so put it in residualUncertainty, not in a failed finding. For each failure give a',
-			'one-sentence statement citing specifics, and a severity (INFORMATIONAL|ADVISORY|MATERIAL|BLOCKING|CRITICAL):',
-			declared(rubric),
-			// ⭐ D8 — EACH GLOSS IS TRUE OF `dispositionFromFindings` for the stakes it names (a declared BLOCKING or CRITICAL
-			// criterion unmet rejects; a MATERIAL one gives CONDITIONALLY_SATISFIED; an ADVISORY or INFORMATIONAL one changes
-			// nothing), and `reasoning-review-validator.test.ts` holds each to that ladder. ⛔ They glossed SATISFIED as "no
-			// material failures" and CONDITIONALLY_SATISFIED as "only minor/advisory failures", which the policy contradicted.
-			// The empty line before the sentence is design D8's own, so it is written into the line (this list drops a '').
-			'\nThen give an overall disposition RECOMMENDATION: SATISFIED (no criterion is unmet, except ones the policy',
-			'marks ADVISORY or INFORMATIONAL), CONDITIONALLY_SATISFIED (an unmet criterion the policy marks MATERIAL, and',
-			'none it marks BLOCKING or CRITICAL), REJECTED (an unmet criterion the policy marks BLOCKING or CRITICAL),',
-			'INCONCLUSIVE, or ESCALATED.',
-			// ⚠ A RECORDED STATEMENT IS ABOUT THE FOUR LINES ABOVE (`REG-D-090`; `JAN-ESCREC` D2). Every VALID
-			// review whose recommendation is the LAST value they name gets an observation saying *"The review
-			// prompt does not define"* it: true while these four lines stand exactly as written, that value bare at
-			// their end, and the prompt names it nowhere else — both pinned in every framing where the prompt is
-			// built, the sentence whole and the value's every mention counted (`reasoning-review-validator.test.ts`).
-			// What neither pin sees is a definition ELSEWHERE in the prompt that never names the value. ⛔ Any edit
-			// that defines it makes every LATER record false, revises the statement too, and moves the reviewer
-			// fingerprint (a paid re-measurement). ⭑ No name of that value here: `REG-D-090`'s search still finds two.
-			// ⭑ `PQ-1`: the fence sentence in the preamble names and defines no disposition value either (`FENCE_MEANING`).
-			// ⭑ D8 glossed the other three again and left this one bare, last and named once, so the statement stays true.
-			// ⭐ P7-6 I6 — one row per criterion, met or not, AFTER D8's lines and on a line of its own, an empty line before
-			// it (this list drops a '', so it is written into the line, as D8's own is). It names and defines no disposition
-			// value either (`ONE_ROW_PER_CRITERION`).
-			`\n${ONE_ROW_PER_CRITERION}`,
-			'',
-			'Return ONLY a single-line minified JSON object (no markdown, no prose) shaped EXACTLY as:',
-			// The example id comes from the POLICY too. It was hardcoded to 'RR-01-no-problem-substitution' — a
-			// constant leaking back into the prompt through the output example, which would have told the reviewer to
-			// name a criterion the policy does not declare, and `coerceJudgement` would then have dropped that finding
-			// as unrecognised. Caught by policy-governs-review.test.ts on its first run.
-			`{"findings":[{"criterionId":"${input.criteria[0]?.id ?? 'CRITERION-ID'}","failed":false,"statement":"...","severity":"MATERIAL"}],`,
-			'"recommendation":"SATISFIED","residualUncertainty":["..."]}'
+			// ⭐⭐ Package Z1 — D42, kept by D50 (design §11.3, §12.2) — it is the head's LAST line: in the prompt sent it stands
+			// immediately before `THE REVIEW`, the measured section's first line, rather than before D8's first (C5's line, REG-F-594).
+			framed.criteriaLine
 		]
 			.filter(Boolean)
 			.join('\n');
+	// ⭐⭐ Package Z1 — D52 — TODAY'S REVIEW SECTION, one string for the input: D8's lines, the rubric, and the lines after it.
+	// ⭑ The measured section is built from this text (`measuredSection`), so each of these lines reaches the prompt sent, and
+	// the room is measured with this one in place of the measured section.
+	const rubricBlock = declared(rubric);
+	const section = [
+		...D8_INSTRUCTION,
+		rubricBlock,
+		// ⭐ D8 — EACH GLOSS IS TRUE OF `dispositionFromFindings` for the stakes it names (a declared BLOCKING or CRITICAL
+		// criterion unmet rejects; a MATERIAL one gives CONDITIONALLY_SATISFIED; an ADVISORY or INFORMATIONAL one changes
+		// nothing), and `reasoning-review-validator.test.ts` holds each to that ladder. ⛔ They glossed SATISFIED as "no
+		// material failures" and CONDITIONALLY_SATISFIED as "only minor/advisory failures", which the policy contradicted.
+		// The empty line before the sentence is design D8's own, so it is written into the line (this list drops a '').
+		'\nThen give an overall disposition RECOMMENDATION: SATISFIED (no criterion is unmet, except ones the policy',
+		'marks ADVISORY or INFORMATIONAL), CONDITIONALLY_SATISFIED (an unmet criterion the policy marks MATERIAL, and',
+		'none it marks BLOCKING or CRITICAL), REJECTED (an unmet criterion the policy marks BLOCKING or CRITICAL),',
+		'INCONCLUSIVE, or ESCALATED.',
+		// ⚠ A RECORDED STATEMENT IS ABOUT THE FOUR LINES ABOVE (`REG-D-090`; `JAN-ESCREC` D2). Every VALID
+		// review whose recommendation is the LAST value they name gets an observation saying *"The review
+		// prompt does not define"* it: true while these four lines stand exactly as written, that value bare at
+		// their end, and the prompt names it nowhere else — both pinned in every framing where the prompt is
+		// built, the sentence whole and the value's every mention counted (`reasoning-review-validator.test.ts`).
+		// What neither pin sees is a definition ELSEWHERE in the prompt that never names the value. ⛔ Any edit
+		// that defines it makes every LATER record false, revises the statement too, and moves the reviewer
+		// fingerprint (a paid re-measurement). ⭑ No name of that value here: `REG-D-090`'s search still finds two.
+		// ⭑ `PQ-1`: the fence sentence in the preamble names and defines no disposition value either (`FENCE_MEANING`).
+		// ⭑ D8 glossed the other three again and left this one bare, last and named once, so the statement stays true.
+		// ⭐ P7-6 I6 — one row per criterion, met or not, AFTER D8's lines and on a line of its own, an empty line before
+		// it (this list drops a '', so it is written into the line, as D8's own is). It names and defines no disposition
+		// value either (`ONE_ROW_PER_CRITERION`).
+		`\n${ONE_ROW_PER_CRITERION}`,
+		'',
+		'Return ONLY a single-line minified JSON object (no markdown, no prose) shaped EXACTLY as:',
+		// The example id comes from the POLICY too. It was hardcoded to 'RR-01-no-problem-substitution' — a
+		// constant leaking back into the prompt through the output example, which would have told the reviewer to
+		// name a criterion the policy does not declare, and `coerceJudgement` would then have dropped that finding
+		// as unrecognised. Caught by policy-governs-review.test.ts on its first run.
+		`{"findings":[{"criterionId":"${input.criteria[0]?.id ?? 'CRITERION-ID'}","failed":false,"statement":"...","severity":"MATERIAL"}],`,
+		'"recommendation":"SATISFIED","residualUncertainty":["..."]}'
+	]
+		.filter(Boolean)
+		.join('\n');
+	/** Today's prompt with `fence` and `content`: the head, then today's review section. */
+	const assemble = (fence: string, content: string): string => `${assembleHead(fence, content)}\n${section}`;
 	// Measure the fixed scaffolding + all other (bounded) slices via a sentinel, then give the graph content the
 	// remaining budget. This keeps the whole prompt ≤ PROMPT_BUDGET regardless of how large the authored graph is.
 	// WRITTEN AS AN ESCAPE, NOT AS THE BYTE ITSELF. This was a literal NUL character in the source, which made git
@@ -1647,6 +1709,9 @@ function promptPlan(input: ReasoningReviewInput) {
 		prefenced,
 		deliverable,
 		assemble,
+		// ⭐⭐ Package Z1 — the head and today's review section apart (`todayPrompt`), and the rubric as that section carries it.
+		assembleHead,
+		today: { text: section, instruction: D8_INSTRUCTION, rubric: rubricBlock } satisfies TodaySection,
 		contentBudget,
 		untrustedBytes: [
 			...untrusted.flatMap((e) => (e ? [e.bytes] : [])),
@@ -1664,7 +1729,12 @@ function promptPlan(input: ReasoningReviewInput) {
 			// before the part: ~~each names a child by its name and id, JSON-encoded, and a child cut short of its name holds it
 			// nowhere else in the prompt~~ ⭐ A2 (3) — each names a child by its ordinal and its type id, JSON-encoded. The
 			// builder's subject lists every child's id, but this chooser does not rest on any builder's shape: it reads them.
-			...(input.framing === 'PWA_TYPE' && input.declaredPartCut !== undefined ? [input.declaredPartCut] : [])
+			...(input.framing === 'PWA_TYPE' && input.declaredPartCut !== undefined ? [input.declaredPartCut] : []),
+			// ⭐⭐ Package Z1 — D50 — and each statement the indications block quotes, as it quotes it (`reviewPrompt`): a statement is
+			// cut from the answer and the account, and an answer's JSON value is decoded or written again, so a token its bytes did not
+			// hold can stand in it, a line of its own among them. ⛔ Quoted between fence lines of that token, its line would close the
+			// block's region and stand what follows on a host line.
+			...quotedAlso
 		]
 	};
 }
@@ -1742,8 +1812,11 @@ function deliverablePrompt(input: ReasoningReviewInput, plan: ReturnType<typeof 
 	return plan.assemble(fence, renderDeliverable(fence, layout));
 }
 
-function judgePrompt(input: ReasoningReviewInput): string {
-	const plan = promptPlan(input);
+/**
+ * TODAY'S PROMPT for `input`: the head, every slice cut to its room and fenced, then today's review section. ⭐⭐ Package Z1 —
+ * D52: never sent since Z1; what the room is computed with, and what the measured prompt keeps of it — its head, byte for byte.
+ */
+function judgePrompt(input: ReasoningReviewInput, plan: ReturnType<typeof promptPlan> = promptPlan(input)): string {
 	if (plan.deliverable) return deliverablePrompt(input, plan, plan.deliverable);
 	// A graph or a work product: its content is UNTRUSTED, cut to the budget with its cut declared, then fenced.
 	// A process result: its content is the builder's REVIEW view, already fenced — read whole by the chooser, never cut.
@@ -1782,10 +1855,215 @@ function judgePrompt(input: ReasoningReviewInput): string {
 	return plan.assemble(fence, plan.prefenced ? input.content : quoted(fence, content));
 }
 
+// ── ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D50, D52 (`REG-D-146`; design §12.2, §12.4) — THE PROMPT SENT ─────────────────────
+//
+// The sponsor's construct, adopted by its screen's bars (`REG-F-605`): before the review, a decision model is asked about each
+// check of the policy's list and each statement of the producer's answer and account, one question at a time, and the review
+// section quotes every one of them with its score as a potential indication. The section is the measured one (D42, D50); the
+// prompt before it is today's, byte for byte, and so are its cuts (D52). ⛔ A review without each indication is a reviewer the
+// screen did not measure: with no source, a source that refuses, a score missing or one not asked for, or a prompt past its
+// room, the review is refused before any reviewer call — `VALIDATOR_EXECUTION_FAILED`, its reason recorded.
+
+/**
+ * ⭐ ONE QUESTION FOR THE DECISION MODEL: a check of the policy's list, by its id and its rubric label (`c00`, `c01`, … in the
+ * rubric's order), or a statement of the producer's (`s00`, `s01`, … in the cut's order). ⚠ As far as package Z1 needs it:
+ * D51's request body (package Z2) is built from these and the prompt's head, and the source sends it.
+ */
+export type IndicationRequest =
+	| { readonly kind: 'check'; readonly key: string; readonly id: string; readonly label: string }
+	| { readonly kind: 'statement'; readonly key: string; readonly statement: string };
+
+/** What a source answers: every request's score, by its key, the probability the model gave its `true` answer — or a refusal. */
+export type IndicationsResult = { readonly scores: Readonly<Record<string, number>> } | { readonly refusal: string };
+
+/**
+ * ⭐ THE INDICATIONS SOURCE — the seam the decision model stands behind, beside `print`: asked ONCE a review, with every
+ * request, before the first reviewer call; a repair or a retry reuses the first prompt and never asks again. ⚠ Package Z1
+ * builds the seam and its test doubles only: no source is wired in production, so a production review is refused here until
+ * package Z2's client and committed records land with it (the build brief's integration note).
+ */
+export type IndicationsSource = (requests: readonly IndicationRequest[]) => Promise<IndicationsResult>;
+
+/** The statement a review fails with when its validator was given no indications source. Host-authored and fixed. */
+export const NO_INDICATIONS_SOURCE_STATEMENT =
+	'This review was not sent: no decision model is configured to give it its potential indications, and a review without each of them is a reviewer the screen of the adopted construct did not measure (REG-D-146). No model was called.';
+
+/** A reason handed to the record plane: no control character, bounded (`RecordPlaneProseSchema`). */
+const recordable = (reason: string): string => {
+	const plain = reason.replace(/\p{Cc}/gu, ' ');
+	return plain.length > 1_000 ? `${plain.slice(0, 1_000)} …` : plain;
+};
+
+/** The statement a review fails with when its indications could not be had: `reason`, the source's or the validator's. */
+export function indicationsRefusedStatement(reason: string): string {
+	return (
+		`This review was not sent: its potential indications could not be had from the decision model — ${recordable(reason)}. ` +
+		'A review without each of them is a reviewer the screen of the adopted construct did not measure (REG-D-146; D51). No reviewer was called.'
+	);
+}
+
+/** The statement a review fails with when its prompt would pass a bound of the measured section's room (D52). */
+export function sectionOverBoundStatement(what: string, length: number, bound: number): string {
+	return (
+		`This review was not sent: ${what} would be ${length} characters, past its bound of ${bound} (REG-D-146; D52). ` +
+		'No indication is dropped to fit it, so the review is refused. No model was called.'
+	);
+}
+
+/** The statement a review fails with when the producer's answer nests deeper than the cut reads it (`PY_JSON_MAX_DEPTH`). */
+const ANSWER_TOO_DEEP_STATEMENT =
+	'This review was not sent: the producer’s answer nests deeper than its statements can be cut as the adopted construct cuts them, so no prompt the screen measured can be built for it (REG-D-146). No model was called.';
+
+/** Today's prompt for an input, in the two parts its assembler wrote, with the prompt's own fence. */
+interface TodayPrompt {
+	/** The prompt before today's review section — its last line feed included, as `wide_common.py`'s `split_head` keeps it. */
+	readonly head: string;
+	readonly today: TodaySection;
+	readonly fence: string;
+}
+
+/** `wide_common.py` `fence_of`: the first line of the form `<<<UNTRUSTED-nn>>>` — Python's `\d` — the prompt's own fence. */
+const FENCE_LINE = /^<<<UNTRUSTED-\p{Nd}+>>>$/u;
+
+/**
+ * ⭐ TODAY'S PROMPT, IN ITS TWO PARTS: the head and today's review section, split where the assembler joined them — today's
+ * prompt always ends with its section (`assemble`) — never by a search for D8's line, which an untrusted slice can carry.
+ * `quotedAlso` is what the fence must also avoid: the statements the block will quote. ⭑ The fence is the head's first fence
+ * line, as `fence_of` reads it: every line before it is the host's preamble and intent, so it is the fence the chooser took.
+ */
+function todayPrompt(input: ReasoningReviewInput, quotedAlso: readonly string[]): TodayPrompt {
+	const plan = promptPlan(input, quotedAlso);
+	const prompt = judgePrompt(input, plan);
+	if (!prompt.endsWith(`\n${plan.today.text}`)) throw new Error(SECTION_LAYOUT_REFUSAL);
+	const head = prompt.slice(0, prompt.length - plan.today.text.length);
+	const fence = head.split('\n').find((line) => FENCE_LINE.test(line));
+	if (fence === undefined) throw new Error(SECTION_LAYOUT_REFUSAL);
+	return { head, today: plan.today, fence };
+}
+
+/** The checks and statements the block lists for today's prompt: its rubric's lines, and its head's regions (`wide_common.py`). */
+function cutOf(t: TodayPrompt): { readonly checks: CutCheck[]; readonly statements: CutStatement[] } {
+	try {
+		return { checks: checksOf(t.today.text), statements: statementsOf(t.head, t.fence) };
+	} catch (e) {
+		if (e instanceof PyJsonTooDeep) throw new Error(ANSWER_TOO_DEEP_STATEMENT);
+		throw e;
+	}
+}
+
+const keyOf = (prefix: 'c' | 's', i: number): string => `${prefix}${String(i).padStart(2, '0')}`;
+
+/** The score `scores` holds for each request, in order — or why it does not hold a probability for each, and nothing else. */
+function scoresFor(requests: readonly IndicationRequest[], result: IndicationsResult): number[] | string {
+	if ('refusal' in result) return result.refusal;
+	const asked = new Set(requests.map((r) => r.key));
+	const extra = Object.keys(result.scores).filter((k) => !asked.has(k));
+	if (extra.length > 0) return `it returned a score for ${extra.length} question(s) it was not asked (${extra.slice(0, 8).join(', ')})`;
+	const out: number[] = [];
+	for (const r of requests) {
+		const score = Object.hasOwn(result.scores, r.key) ? result.scores[r.key] : undefined;
+		if (score === undefined) return `it returned no score for ${r.key}`;
+		if (typeof score !== 'number' || !Number.isFinite(score) || score < 0 || score > 1)
+			return `its score for ${r.key} is not a probability from 0 to 1`;
+		out.push(score);
+	}
+	return out;
+}
+
+/** The prompt sent with the block built from `checks` and `statements`, scored as given, and its length against today's. */
+function measuredPrompt(
+	t: TodayPrompt,
+	checks: readonly CutCheck[],
+	statements: readonly CutStatement[],
+	scores: readonly number[],
+	text: ReviewSectionText
+): string {
+	const block = indicationsBlock(
+		checks.map((c, i) => ({ id: c.id, score: scores[i]! })),
+		statements.map((s, i) => ({ text: s.text, score: scores[checks.length + i]! })),
+		t.fence,
+		QUOTED_STATEMENT_MAX,
+		text
+	);
+	const prompt = t.head + measuredSection(t.today, block, text);
+	const todayLength = t.head.length + t.today.text.length;
+	if (prompt.length - todayLength > SECTION_GROWTH_MAX)
+		throw new Error(sectionOverBoundStatement('its growth beyond today’s prompt', prompt.length - todayLength, SECTION_GROWTH_MAX));
+	if (prompt.length > WHOLE_PROMPT_MAX) throw new Error(sectionOverBoundStatement('its whole prompt', prompt.length, WHOLE_PROMPT_MAX));
+	return prompt;
+}
+
+/**
+ * ⭐⭐ THE PROMPT A REVIEW SENDS (D50, D52): today's head, byte for byte, then the measured section quoting every check and every
+ * statement with its score.
+ *   · The cut is the screen's (`review-cuts.ts`): the checks off today's rubric, the statements off the head's regions.
+ *   · ⛔ The fence avoids the quoted statements too (`promptPlan`'s `quotedAlso`), so none of them can close the block's region;
+ *     the head is built again with it, and must cut to the same checks and statements.
+ *   · The room: the whole prompt and its growth beyond today's are checked first with every score at `0.00` — every score from
+ *     0 to 1 is written in four characters — so a prompt past a bound refuses before the decision model is asked, and again as
+ *     sent.
+ *   · The source is asked ONCE, with every request; its scores are taken only if it scored exactly what was asked, each a
+ *     probability from 0 to 1.
+ * `text` is the section's fixed text: the product's, but where a test shows the acceptance moves with one character of it.
+ */
+export async function reviewPrompt(
+	input: ReasoningReviewInput,
+	indications: IndicationsSource | undefined,
+	text: ReviewSectionText = REVIEW_SECTION_TEXT
+): Promise<string> {
+	const first = cutOf(todayPrompt(input, []));
+	const t = todayPrompt(input, first.statements.map((s) => s.text));
+	const { checks, statements } = cutOf(t);
+	if (JSON.stringify([checks, statements]) !== JSON.stringify([first.checks, first.statements]))
+		throw new Error(SECTION_LAYOUT_REFUSAL);
+	const requests: IndicationRequest[] = [
+		...checks.map((c, i): IndicationRequest => ({ kind: 'check', key: keyOf('c', i), id: c.id, label: c.label })),
+		...statements.map((s, i): IndicationRequest => ({ kind: 'statement', key: keyOf('s', i), statement: s.text }))
+	];
+	measuredPrompt(t, checks, statements, requests.map(() => 0), text);
+	if (indications === undefined) throw new Error(NO_INDICATIONS_SOURCE_STATEMENT);
+	let result: IndicationsResult;
+	try {
+		result = await indications(requests);
+	} catch (e) {
+		throw new Error(indicationsRefusedStatement(e instanceof Error ? e.message : String(e)));
+	}
+	const scores = scoresFor(requests, result);
+	if (typeof scores === 'string') throw new Error(indicationsRefusedStatement(scores));
+	return measuredPrompt(t, checks, statements, scores, text);
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D45 (`REG-D-145`; design §11.6, revision 8) — ONE CLAIM OF A REPLY'S CLAIMS LIST, as the
+ * measured section asks for it (`CLAIMS_LINE`, `CLAIMS_SHAPE`): the claim, its evidence and its status.
+ */
+export interface ReviewClaim {
+	readonly claim: string;
+	readonly evidence: string;
+	readonly status: string;
+}
+
+/**
+ * ⭐ D45 — THE JUDGEMENT AS THIS VALIDATOR COERCES IT: the package's, with the reply's claims list kept beside it. ⛔ KEPT AND
+ * NEVER SCORED: the disposition, the findings and every repair read the package's fields alone — nothing that decides reads
+ * `claims` (`reasoningReviewResultFromJudgement` maps the findings; the repairs ask of the findings) — and a reply without
+ * claims is no malformed reply.
+ */
+export type CoercedJudgement = ReasoningReviewJudgement & { readonly claims: readonly ReviewClaim[] };
+
+/** ⭐ D45 — an item of a claims list the reader keeps: an object whose `claim`, `evidence` and `status` are strings. */
+const isClaim = (c: unknown): c is ReviewClaim =>
+	typeof c === 'object' &&
+	c !== null &&
+	typeof (c as Record<string, unknown>).claim === 'string' &&
+	typeof (c as Record<string, unknown>).evidence === 'string' &&
+	typeof (c as Record<string, unknown>).status === 'string';
+
 /** `input` is threaded in for its POLICY CRITERIA: the admissible criterion ids are the policy's, not a
  *  constant's. A finding naming an id outside the policy is dropped — which is only correct if the id set
- *  comes from the same place the rubric did. */
-function coerceJudgement(parsed: unknown, input: PolicyCriteria): ReasoningReviewJudgement {
+ *  comes from the same place the rubric did.
+ *  ⭐ Package Z1 — D45 — exported so its reading of `claims` is held where it is made (`review-section.test.ts`). */
+export function coerceJudgement(parsed: unknown, input: PolicyCriteria): CoercedJudgement {
 	const o = (parsed ?? {}) as Record<string, unknown>;
 	const findings: ReasoningReviewFinding[] = Array.isArray(o.findings)
 		? (o.findings as Record<string, unknown>[])
@@ -1806,7 +2084,12 @@ function coerceJudgement(parsed: unknown, input: PolicyCriteria): ReasoningRevie
 	const residualUncertainty = Array.isArray(o.residualUncertainty)
 		? (o.residualUncertainty as unknown[]).filter((x): x is string => typeof x === 'string')
 		: [];
-	return { findings, recommendation, residualUncertainty };
+	// ⭐ D45 — the claims list, read and kept: each item an object with string `claim`, `evidence` and `status`, its other keys
+	// dropped; any other item dropped; no list, none. ⛔ Read last and returned beside the rest: nothing above reads it.
+	const claims: ReviewClaim[] = Array.isArray(o.claims)
+		? (o.claims as unknown[]).filter(isClaim).map((c) => ({ claim: c.claim, evidence: c.evidence, status: c.status }))
+		: [];
+	return { findings, recommendation, residualUncertainty, claims };
 }
 
 /** The impure backend seam. Injectable so the §14.3 conformance scenario can exercise the REAL Validator path —
@@ -2058,6 +2341,13 @@ function callBoundOf(opts: AgyValidatorOptions): number | undefined {
 export interface AgyValidatorOptions {
 	print?: AgyPrint;
 	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D50 (`REG-D-146`; design §12.2) — THE DECISION MODEL THE REVIEW'S POTENTIAL INDICATIONS
+	 * COME FROM (`IndicationsSource`), asked once a review before its first reviewer call. ⛔ ABSENT, EVERY REVIEW IS REFUSED
+	 * (`NO_INDICATIONS_SOURCE_STATEMENT`): no default stands in for the model, since a review without each indication is a
+	 * reviewer the screen did not measure. ⚠ Package Z1 wires none in production; package Z2's client and committed records do.
+	 */
+	indications?: IndicationsSource;
+	/**
 	 * The configured model, or a resolver called when the review RUNS (`JAN-SELREV` D4: the devin branch passes
 	 * `assuranceModel`, so its model is read in `evaluate`, as agy's `judgeModel()` is, and a refusal is recorded).
 	 */
@@ -2186,7 +2476,9 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 			// repair reads it to tell "the repair got no reply" — after which the first judgement stands — from a refusal of
 			// who answered or a retention fault, which propagate as everywhere in this validator.
 			const noReply = new WeakSet<Error>();
-			const prompt = judgePrompt(input);
+			// ⭐⭐ Package Z1 — D50 — the measured prompt, its indications asked of the decision model ONCE, here, before any reviewer
+			// call: every repair and retry below reuses it. ⛔ A refusal here leaves no reviewer call made.
+			const prompt = await reviewPrompt(input, opts.indications);
 			// ICP-02 d2b — PER-9-a: "each retry, reformat, and repair request included" is its OWN record.
 			// `firstRaw` is a CONST on purpose: the previous `raw = await print(...)` destroyed the first try's
 			// answer on the repair path, which is finding #25. CSAA-007 states the rule this now enforces

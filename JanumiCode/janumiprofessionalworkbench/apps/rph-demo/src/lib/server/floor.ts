@@ -49,7 +49,7 @@ import type { ArtifactStore } from '@janumipwb/rph-ports';
 import { createFloorRegistry } from './assurance/index.js';
 import { pwaTypeReviewInput } from './assurance/review-input.js';
 import { stipulationFor } from './stipulations.js';
-import { REVIEWER_CALLS_PER_REVIEW, type AgyPrint } from './assurance/reasoning-review-validator.js';
+import { REVIEWER_CALLS_PER_REVIEW, type AgyPrint, type IndicationsSource } from './assurance/reasoning-review-validator.js';
 import {
 	ALLOWANCE_STOPPED_NO_REVIEWER_FAILED,
 	allowanceStoppedStatement,
@@ -971,6 +971,11 @@ export async function runPwaFloor(
 		 *  by spawning a real agy. See createFloorRegistry's own note. */
 		print?: AgyPrint;
 		/**
+		 * ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D50 (`REG-D-146`) — the decision model the review's potential indications come from,
+		 * beside `print` (`IndicationsSource`). ⛔ Production omits it until package Z2: the floor's reviews are then refused.
+		 */
+		indications?: IndicationsSource;
+		/**
 		 * The CANONICAL handle the exchange records are written through.
 		 *
 		 * ⛔ NEVER PASS THE CANDIDATE FORK HERE. The default is the workbench's canonical engine, and it is
@@ -1047,6 +1052,7 @@ export async function runPwaFloor(
 		artifacts,
 		exchanges,
 		...(opts.print ? { print: opts.print } : {}),
+		...(opts.indications ? { indications: opts.indications } : {}),
 		// ⭐ B6 — EACH PART IS ASKED ABOUT WITH THE PWA IT BELONGS TO, which this floor knows: the part's own registration,
 		// else its PWA's (`stipulationFor`). Nothing is read from any engine to do it, so a turn's fork sees no extra by-id
 		// read (`REG-D-072` D6).

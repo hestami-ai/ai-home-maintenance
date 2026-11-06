@@ -222,10 +222,15 @@ export async function runNegativeControl(i: {
 	readonly maxCalls?: number;
 	readonly now?: () => number;
 }): Promise<NegativeControlResult> {
-	const [{ evaluateCase }, { SEEDED_REASONING_REVIEW_CRITERIA }] = await Promise.all([
+	const [{ evaluateCase }, { SEEDED_REASONING_REVIEW_CRITERIA }, { PLACEHOLDER_INDICATIONS }] = await Promise.all([
 		import('../reviewer-qual/runner.js'),
-		import('@janumipwb/rph-assurance')
+		import('@janumipwb/rph-assurance'),
+		import('../reviewer-qual/indications.js')
 	]);
+	// ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D50 (`REG-D-146`) — the decision model its validator asks: the scripts' placeholder in a
+	// dry run, which calls no model (`indications.ts`); ⛔ none in a live run until package Z2's client and records land, so a
+	// live run is refused before its first reviewer call, never sent with placeholder scores.
+	const indications = i.mode === 'DRY_RUN' ? PLACEHOLDER_INDICATIONS : undefined;
 	const requested = i.repetitions ?? REPETITIONS;
 	const maxCalls = i.maxCalls ?? MAX_REVIEWER_CALLS;
 	const c = negativeControlCase();
@@ -252,7 +257,8 @@ export async function runNegativeControl(i: {
 					candidate,
 					call: capped,
 					scoringDigest: SCORING_LABEL,
-					...(i.now ? { now: i.now } : {})
+					...(i.now ? { now: i.now } : {}),
+					...(indications ? { indications } : {})
 				});
 				repetitions.push(repetitionOf(repetition, e.scored, e.calls));
 			} catch (error) {

@@ -171,6 +171,7 @@ import {
 } from '../scripts/fence-skeleton/core.js';
 import { committedExtracts } from '../scripts/fence-skeleton/generate.js';
 import { BUN, hermeticEnv, NO_PROGRAMS } from './reviewer-qualification-hermetic.js';
+import { PLACEHOLDER_INDICATIONS } from '../scripts/reviewer-qual/indications.js';
 
 const REPO = fileURLToPath(new URL('../', import.meta.url))
 	.replace(/\\/g, '/')
@@ -383,6 +384,7 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint MOVES on each component
 			...PRODUCT_SEAMS,
 			evaluate: (a) =>
 				evaluateCase({
+					indications: PLACEHOLDER_INDICATIONS,
 					...a,
 					call: (p) => a.call(p.replace(REPAIR_INSTRUCTION, `${REPAIR_INSTRUCTION} Nothing else.`))
 				})
@@ -397,6 +399,7 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint MOVES on each component
 			...PRODUCT_SEAMS,
 			evaluate: (a) =>
 				evaluateCase({
+					indications: PLACEHOLDER_INDICATIONS,
 					...a,
 					call: (p) => a.call(p.replace(CRITERION_REPAIR_LINE, `${CRITERION_REPAIR_LINE} Nothing else.`))
 				})
@@ -1417,6 +1420,8 @@ describe('JAN-CRITREAD J2-3 — the probe set reaches every branch of prompt ass
 	it('⭐ the budget object is frozen, and it is the one the fingerprint hashes by default', () => {
 		expect(Object.isFrozen(REASONING_REVIEW_BUDGET)).toBe(true);
 		expect(PRODUCT_SEAMS.budget).toBe(REASONING_REVIEW_BUDGET);
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D52, `REG-D-146`; design §12.4) — ~~the eight~~: and the measured
+		// section's three bounds, written in the same object, so the fingerprint's budget component hashes them too.
 		expect(Object.keys(REASONING_REVIEW_BUDGET).sort()).toEqual(
 			[
 				'PROMPT_BUDGET',
@@ -1426,9 +1431,13 @@ describe('JAN-CRITREAD J2-3 — the probe set reaches every branch of prompt ass
 				'RATIONALE_MAX',
 				'NARRATION_MAX',
 				'CONTENT_MAX',
-				'CONTENT_MIN'
+				'CONTENT_MIN',
+				'SECTION_GROWTH_MAX',
+				'QUOTED_STATEMENT_MAX',
+				'WHOLE_PROMPT_MAX'
 			].sort()
 		);
+		expect([REASONING_REVIEW_BUDGET.SECTION_GROWTH_MAX, REASONING_REVIEW_BUDGET.QUOTED_STATEMENT_MAX, REASONING_REVIEW_BUDGET.WHOLE_PROMPT_MAX], 'D52’s three bounds').toEqual([9_500, 700, 33_000]);
 	});
 
 	it('⛔ the budget object is the ONLY place a limit is written — the validator binds each once, by destructuring the object, and reads every one', () => {
@@ -4825,6 +4834,7 @@ describe('JAN-CRITREAD J2-3 — the scoring corpus', () => {
 		for (const entry of corpus) {
 			let n = 0;
 			const e = await evaluateCase({
+				indications: PLACEHOLDER_INDICATIONS,
 				case: CORPUS_CASE,
 				criteria: SEEDED_REASONING_REVIEW_CRITERIA,
 				candidate: FIXTURE,
@@ -4872,6 +4882,7 @@ describe('JAN-CRITREAD J2-3 — the scoring corpus', () => {
 				'ESCALATED'
 			);
 			const e = await evaluateCase({
+				indications: PLACEHOLDER_INDICATIONS,
 				case: CORPUS_CASE,
 				criteria: SEEDED_REASONING_REVIEW_CRITERIA,
 				candidate: FIXTURE,
@@ -4916,6 +4927,7 @@ describe('JAN-CRITREAD J2-3 — the scoring corpus', () => {
 				`${id}: every criterion answered, none failed`
 			).toEqual(ids.map((k) => [k, false]));
 			const e = await evaluateCase({
+				indications: PLACEHOLDER_INDICATIONS,
 				case: CORPUS_CASE,
 				criteria: SEEDED_REASONING_REVIEW_CRITERIA,
 				candidate: FIXTURE,
@@ -4936,6 +4948,7 @@ describe('⭐⭐ P7-6 I5 — the scoring corpus holds the measured run’s reply
 		const sent: string[] = [];
 		let n = 0;
 		const e = await evaluateCase({
+			indications: PLACEHOLDER_INDICATIONS,
 			case: CORPUS_CASE,
 			criteria: SEEDED_REASONING_REVIEW_CRITERIA,
 			candidate: FIXTURE,
@@ -4961,6 +4974,7 @@ describe('⭐⭐ package L — D13 — the scoring corpus’s entries that draw 
 		const sent: string[] = [];
 		let n = 0;
 		const e = await evaluateCase({
+			indications: PLACEHOLDER_INDICATIONS,
 			case: 'case' in entry! ? (entry as { case: QualificationCase }).case : CORPUS_CASE,
 			criteria: SEEDED_REASONING_REVIEW_CRITERIA,
 			candidate: FIXTURE,
@@ -5046,6 +5060,7 @@ describe('⭐⭐ R3-A F3 — the DECLARED corpus, each entry PINNED BY ID to the
 			const entry = corpus.find((e) => e.id === id)!;
 			let n = 0;
 			const e = await evaluateCase({
+				indications: PLACEHOLDER_INDICATIONS,
 				case: entry.case,
 				criteria: SEEDED_REASONING_REVIEW_CRITERIA,
 				candidate: FIXTURE,
@@ -5078,12 +5093,15 @@ describe('JAN-SELREV SR-2 (D6) — the fingerprint measures the validator WITHOU
 			const reply = entry.replies[0] as ToolInvocationResult;
 			expect(reply.producer.modelId, `${entry.id}: another model`).not.toBe(FIXTURE.modelLabel);
 			// The SCORING seam — the runner's validator, which every corpus outcome is scored through.
+			// ⭐ Package Z1 — D50 (`REG-D-146`): with the scripts' placeholder decision model, as the fingerprint scores the corpus
+			// (`fingerprint.ts` `scoringDigestOf`); without one the validator refuses before its transport.
 			const e = await PRODUCT_SEAMS.evaluate({
 				case: CORPUS_CASE,
 				criteria: SEEDED_REASONING_REVIEW_CRITERIA,
 				candidate: FIXTURE,
 				scoringDigest: '0'.repeat(64),
-				call: async () => ({ returned: reply, served: null })
+				call: async () => ({ returned: reply, served: null }),
+				indications: PLACEHOLDER_INDICATIONS
 			});
 			expect(e.calls, `${entry.id}: one call, and no repair`).toHaveLength(1);
 			expect(
@@ -5122,6 +5140,7 @@ describe('JAN-CRITREAD J2-3 — the fingerprint and the runner agree', () => {
 		const two: QualificationCase[] = CASES.filter((c) => c.id === 'G-RR-04' || c.id === 'W-CLEAN');
 		let n = 0;
 		const lines = await runQualification({
+			indications: PLACEHOLDER_INDICATIONS,
 			runId: 'qr-agree-1',
 			date: '2026-09-24T12:00:00.000Z',
 			commit: 'e5f9358b'.repeat(5),
@@ -5166,6 +5185,7 @@ describe('JAN-CRITREAD J2-3 — the fingerprint and the runner agree', () => {
 		]);
 		let n = 0;
 		const lines = await runQualification({
+			indications: PLACEHOLDER_INDICATIONS,
 			runId: 'qr-agree-2',
 			date: '2026-10-09T12:00:00.000Z',
 			commit: 'e5f9358b'.repeat(5),
@@ -5212,6 +5232,7 @@ describe('JAN-CRITREAD J2-3 — the fingerprint and the runner agree', () => {
 		const one: QualificationCase[] = CURRENT_CASES.filter((c) => c.id === 'W12-CLEAN');
 		let n = 0;
 		const lines = await runQualification({
+			indications: PLACEHOLDER_INDICATIONS,
 			runId: 'qr-agree-3',
 			date: '2026-10-10T12:00:00.000Z',
 			commit: 'e5f9358b'.repeat(5),
@@ -5262,6 +5283,7 @@ describe('JAN-CRITREAD J2-3 — the fingerprint and the runner agree', () => {
 		});
 		let n = 0;
 		const lines = await runQualification({
+			indications: PLACEHOLDER_INDICATIONS,
 			runId: 'qr-agree-4',
 			date: '2026-10-25T12:00:00.000Z',
 			commit: 'e5f9358b'.repeat(5),

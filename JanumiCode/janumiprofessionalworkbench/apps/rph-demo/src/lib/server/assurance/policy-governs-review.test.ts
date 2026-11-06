@@ -20,6 +20,7 @@ import {
 import type { AssessmentCriterion } from '@janumipwb/rph-contracts';
 import { describe, expect, it } from 'vitest';
 import { createAgyReasoningReviewValidator, type AgyPrint } from './reasoning-review-validator.js';
+import { TEST_INDICATIONS } from './indications.testing.js';
 
 const SUBJECT: AssuranceSubject = {
 	subjectId: 'pwa_governs',
@@ -70,7 +71,7 @@ const CLEAN = JSON.stringify({ findings: [], recommendation: 'SATISFIED' });
 describe('the POLICY governs the Reasoning Review — the seeded object is load-bearing, not a projection', () => {
 	it('a criterion that exists ONLY in the policy reaches the RUBRIC the reviewer is asked to judge', async () => {
 		const { prompts, print } = capturing(CLEAN);
-		await createAgyReasoningReviewValidator({ print, modelId: 'judge' }).evaluate(
+		await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: 'judge' }).evaluate(
 			SUBJECT,
 			ctx([REVISED])
 		);
@@ -81,7 +82,7 @@ describe('the POLICY governs the Reasoning Review — the seeded object is load-
 
 	it('a criterion REMOVED from the policy disappears from the rubric — the constant does not smuggle it back', async () => {
 		const { prompts, print } = capturing(CLEAN);
-		await createAgyReasoningReviewValidator({ print, modelId: 'judge' }).evaluate(
+		await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: 'judge' }).evaluate(
 			SUBJECT,
 			ctx([REVISED])
 		);
@@ -96,7 +97,7 @@ describe('the POLICY governs the Reasoning Review — the seeded object is load-
 
 	it('the policy also governs the SCORED criterion set — not just the prompt', async () => {
 		const { print } = capturing(CLEAN);
-		const result = await createAgyReasoningReviewValidator({ print, modelId: 'judge' }).evaluate(
+		const result = await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: 'judge' }).evaluate(
 			SUBJECT,
 			ctx([REVISED])
 		);
@@ -119,7 +120,7 @@ describe('the POLICY governs the Reasoning Review — the seeded object is load-
 			recommendation: 'REJECTED'
 		});
 		const { print } = capturing(judged);
-		const result = await createAgyReasoningReviewValidator({ print, modelId: 'judge' }).evaluate(
+		const result = await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: 'judge' }).evaluate(
 			SUBJECT,
 			ctx([REVISED])
 		);
@@ -135,7 +136,7 @@ describe('the POLICY governs the Reasoning Review — the seeded object is load-
 		// criterion must NOT block — and nothing tested that, because none existed.
 		const advisory: AssessmentCriterion = { ...REVISED, severityIfNotMet: 'ADVISORY' };
 		const { print } = capturing(CLEAN);
-		const result = await createAgyReasoningReviewValidator({ print, modelId: 'judge' }).evaluate(
+		const result = await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: 'judge' }).evaluate(
 			SUBJECT,
 			ctx([advisory])
 		);
@@ -143,6 +144,7 @@ describe('the POLICY governs the Reasoning Review — the seeded object is load-
 
 		const blocking = capturing(CLEAN);
 		const r2 = await createAgyReasoningReviewValidator({
+			indications: TEST_INDICATIONS,
 			print: blocking.print,
 			modelId: 'judge'
 		}).evaluate(SUBJECT, ctx([REVISED]));
@@ -151,7 +153,7 @@ describe('the POLICY governs the Reasoning Review — the seeded object is load-
 
 	it('the seeded criteria still drive the review unchanged — the seed IS the policy until revised', async () => {
 		const { prompts, print } = capturing(CLEAN);
-		const result = await createAgyReasoningReviewValidator({ print, modelId: 'judge' }).evaluate(
+		const result = await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: 'judge' }).evaluate(
 			SUBJECT,
 			ctx(SEEDED_REASONING_REVIEW_CRITERIA)
 		);

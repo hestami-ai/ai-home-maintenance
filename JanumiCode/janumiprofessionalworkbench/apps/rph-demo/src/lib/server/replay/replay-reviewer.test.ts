@@ -65,6 +65,7 @@ import {
 	type ReplayRun
 } from './replay-run.js';
 import { fixtureManifest } from './replay-fixture.testing.js';
+import { TEST_INDICATIONS } from '../assurance/indications.testing.js';
 
 const SUBJECT: AssuranceSubject = {
 	subjectId: 'art_replayed_review',
@@ -111,7 +112,7 @@ async function promptOf(ctx: ValidatorContext = CTX, subject: AssuranceSubject =
 		seen.push(p);
 		return CLEAN;
 	};
-	await createAgyReasoningReviewValidator({ print: capture, modelId: REVIEWER.modelId }).evaluate(
+	await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print: capture, modelId: REVIEWER.modelId }).evaluate(
 		subject,
 		ctx
 	);
@@ -203,6 +204,7 @@ const recordingOf = (
 function replayed(run: ReplayRun) {
 	const exchanges = createExchangeSink();
 	const validator = createAgyReasoningReviewValidator({
+		indications: TEST_INDICATIONS,
 		print: run.reviewerPrint,
 		clock: run.clock,
 		exchanges,
@@ -434,7 +436,7 @@ describe('⭐ the floor registry’s REPLAY arm (D2)', () => {
 		const plan = await runFloorAndPlanRecording(
 			SUBJECT,
 			CTX,
-			createFloorRegistry({ testMode: true, exchanges, ...(print ? { print } : {}) })
+			createFloorRegistry({ testMode: true, exchanges, indications: TEST_INDICATIONS, ...(print ? { print } : {}) })
 		);
 		return {
 			review: plan.assessments.find((a) => a.policyId === FLOOR_POLICY_IDS.REASONING_REVIEW),
@@ -550,7 +552,7 @@ describe('⭐ the floor registry’s REPLAY arm (D2)', () => {
 		process.env.PATH = noProgramsDirectory();
 		process.env.JPWB_REPLAY = dir;
 		expect(
-			createFloorRegistry({ testMode: true }).get(FLOOR_POLICY_IDS.REASONING_REVIEW)?.validatorId
+			createFloorRegistry({ testMode: true, indications: TEST_INDICATIONS }).get(FLOOR_POLICY_IDS.REASONING_REVIEW)?.validatorId
 		).toBe('replay.reasoning-review');
 		// ⭑ And the assessment the floor records names it too: the validator writes its own id into its result, which the
 		// replay arm rewrites — the registry's id alone would leave the record saying agy reviewed.
@@ -596,7 +598,7 @@ describe('⭐ the floor registry’s REPLAY arm (D2)', () => {
 		process.env.JPWB_REPLAY = dir;
 	};
 	const declaredReview = () =>
-		createDeclaredPolicyReviewer({ testMode: true }).review(DECLARED_SUBJECT, declaredInput());
+		createDeclaredPolicyReviewer({ testMode: true, indications: TEST_INDICATIONS }).review(DECLARED_SUBJECT, declaredInput());
 
 	it('(x) ⭐ the merge (J3) — a DECLARED review under the REPLAY selection is the replay’s too: served from the recording by its full prompt, its reviewer the recording’s', async () => {
 		const prompt = await promptOf({ reasoningReview: declaredInput() }, DECLARED_SUBJECT);
@@ -688,7 +690,7 @@ describe('⭐ the floor registry’s REPLAY arm (D2)', () => {
 			],
 			'jpwb-replay-declared-id-'
 		);
-		const reviewer = createDeclaredPolicyReviewer({ testMode: true });
+		const reviewer = createDeclaredPolicyReviewer({ testMode: true, indications: TEST_INDICATIONS });
 		expect(reviewer.validatorId, 'the declared reviewer under the replay').toBe('replay.declared-policy');
 		const served = await reviewer.review(DECLARED_SUBJECT, declaredInput());
 		const thrown = await reviewer.review(DECLARED_SUBJECT, declaredInput());

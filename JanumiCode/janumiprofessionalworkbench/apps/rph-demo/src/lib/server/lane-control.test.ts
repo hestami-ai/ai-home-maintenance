@@ -18,6 +18,14 @@ import { laneFindings, type LaneSource } from './lane-control.js';
 import type { StipulationRegistration } from './stipulations.js';
 import { clearingJudgement, withLiveReviewerSeam } from './assurance/clearing-reviewer.testing.js';
 
+// ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D50 (`REG-D-146`): the product's configured decision model, whose potential
+// indications every review asks for before its first reviewer call, stood in for by a double that calls no model —
+// as the reviewer's program is. ⛔ Production configures none until package Z2, and refuses the review.
+vi.mock('./assurance/decision-model.js', async () => {
+	const { TEST_INDICATIONS } = await import('./assurance/indications.testing.js');
+	return { configuredIndications: () => TEST_INDICATIONS };
+});
+
 const RR = 'floor.reasoning-review';
 const STANDIN = 'standin.reasoning-review';
 

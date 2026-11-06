@@ -135,6 +135,7 @@ import {
 	type ValidatorContext
 } from '@janumipwb/rph-assurance';
 import { createAgyReasoningReviewValidator } from './reasoning-review-validator.js';
+import { TEST_INDICATIONS } from './indications.testing.js';
 
 const SENTINEL = 'SENTINEL-PROMPT-CONTENT-4417';
 
@@ -180,7 +181,7 @@ describe('the whole chain: a failed agy run leaks no prompt content into the ass
 		registry.register(schemaInvariantValidatorInstance);
 		registry.register(identityProvenanceValidatorInstance);
 		registry.register(
-			createAgyReasoningReviewValidator({ print: (prompt) => agyPrint(prompt, exec), modelId: JUDGE_ID })
+			createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print: (prompt) => agyPrint(prompt, exec), modelId: JUDGE_ID })
 		);
 
 		const outcome = await runDeMinimisFloor(FLOOR_SUBJECT, FLOOR_CTX, registry);

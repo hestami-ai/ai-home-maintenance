@@ -94,6 +94,15 @@ import {
 	type AgyPrint,
 	type AgyValidatorOptions
 } from './reasoning-review-validator.js';
+import { TEST_INDICATIONS } from './indications.testing.js';
+
+// ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D50 (`REG-D-146`): the product's configured decision model, whose potential
+// indications every review asks for before its first reviewer call, stood in for by a double that calls no model —
+// as the reviewer's program is. ⛔ Production configures none until package Z2, and refuses the review.
+vi.mock('./decision-model.js', async () => {
+	const { TEST_INDICATIONS } = await import('./indications.testing.js');
+	return { configuredIndications: () => TEST_INDICATIONS };
+});
 
 const SUBJECT: AssuranceSubject = {
 	subjectId: 'art_thrown_call',
@@ -197,6 +206,7 @@ function tool(...script: readonly (string | Error)[]) {
 function reviewer(print: AgyPrint, clock: () => string, over: Partial<AgyValidatorOptions> = {}) {
 	const exchanges = createExchangeSink();
 	const validator = createAgyReasoningReviewValidator({
+		indications: TEST_INDICATIONS,
 		print,
 		modelId: JUDGE,
 		clock,
@@ -854,6 +864,7 @@ describe('⭐ P7-2b (viii) — the failed call’s record cannot be kept: the re
 		const { prompts, print } = tool(new Error(TRANSPORT), CLEAN);
 		const exchanges = createExchangeSink();
 		const validator = createAgyReasoningReviewValidator({
+			indications: TEST_INDICATIONS,
 			print,
 			modelId: JUDGE,
 			clock: clockAt(0, 5_000, 5_100, 9_000),
@@ -1071,6 +1082,7 @@ describe('⭐ P7-2b — where the rule applies: the product’s own reviewers, a
 		vi.stubEnv('JPWB_JUDGE_MODEL', 'fixture-judge');
 		const exchanges = createExchangeSink();
 		const validator = createAgyReasoningReviewValidator({
+			indications: TEST_INDICATIONS,
 			modelId: 'fixture-judge',
 			exchanges,
 			clock: clockAt(0, 5, 10, 15)
@@ -1107,6 +1119,7 @@ describe('⭐ P7-2b — where the rule applies: the product’s own reviewers, a
 		vi.stubEnv('JPWB_JUDGE_MODEL', 'fixture-judge');
 		const exchanges = createExchangeSink();
 		const validator = createAgyReasoningReviewValidator({
+			indications: TEST_INDICATIONS,
 			modelId: 'fixture-judge',
 			exchanges,
 			clock: clockAt(0, 180_000, 180_100, 180_200)
@@ -1138,6 +1151,7 @@ describe('⭐ P7-2b — where the rule applies: the product’s own reviewers, a
 		const { prompts, print } = tool(new Error(TRANSPORT), CLEAN);
 		const exchanges = createExchangeSink();
 		const validator = createAgyReasoningReviewValidator({
+			indications: TEST_INDICATIONS,
 			agentId: 'devin',
 			modelId: 'fixture-label',
 			providerId: 'devin',

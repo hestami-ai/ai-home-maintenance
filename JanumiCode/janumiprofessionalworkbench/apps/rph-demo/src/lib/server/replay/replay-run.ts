@@ -39,7 +39,7 @@
 import { mkdirSync, mkdtempSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { REVIEWER_CALL_BOUND_MS } from '../assurance/reasoning-review-validator.js';
+import { REVIEWER_CALL_BOUND_MS, type IndicationsSource } from '../assurance/reasoning-review-validator.js';
 import { answerFromText, type ToolInvocationResult } from '../tools/backing-tool.js';
 import { OutputLimitReached } from '../tools/output-limit.js';
 import {
@@ -128,6 +128,13 @@ export interface ReplayRun extends ReplayCommandSource {
 	checkToolResult(tried: ExecutorTry, index: number, rendered: string): void;
 	/** ⭐ The reviewer's `print`: the next recorded reply, if the prompt hashes to it. ⛔ Rejects `ReplayRefusal` otherwise. */
 	readonly reviewerPrint: (prompt: string) => Promise<ToolInvocationResult>;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D50 (`REG-D-146`) — the decision model the replayed review's indications come from.
+	 * ⛔ A recording read from disk holds no decision-model scores — what a replay serves for them is not designed (design §12
+	 * names none) — so it carries none, and a replayed review is refused before its first call; a double of the paid run may
+	 * carry one (`replay-regression.test.ts`). ⚠ Never the live configured model: a replay runs nothing.
+	 */
+	readonly indications?: IndicationsSource;
 	/** ⭐ The validator's clock: virtual time, advanced by each replayed call's recorded elapsed time. */
 	readonly clock: () => string;
 	/** Mark the replay stale from an arm's own check (a tool's outcome that differs from the recording's). */

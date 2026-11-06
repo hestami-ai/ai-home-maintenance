@@ -380,8 +380,15 @@ export function serializeLine(line: RecordLine): string {
  * ⚠ RESTATED, SO IT CAN DRIFT: a key `coerceJudgement` starts reading must be added here, or a replay would not see what
  * the run saw — which the runner's replay of every retention form is there to catch.
  */
-export const JUDGEMENT_READ_KEYS = ['findings', 'recommendation', 'residualUncertainty'] as const;
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D45 (`REG-D-145`; design §11.6) — AND `claims`, the list the measured section asks every
+ * reply for, which `coerceJudgement` reads, keeps and never scores: last, so an answer without one keeps its retained form
+ * byte for byte. ⛔ Unread here, every reply the construct asks for would carry an `UNREAD_KEY` the reviewer never made.
+ */
+export const JUDGEMENT_READ_KEYS = ['findings', 'recommendation', 'residualUncertainty', 'claims'] as const;
 export const FINDING_READ_KEYS = ['criterionId', 'failed', 'statement', 'severity'] as const;
+/** ⭐ D45 — the three keys the product reads of a claim (`ReviewClaim`), each as a string, or the item is dropped. */
+export const CLAIM_READ_KEYS = ['claim', 'evidence', 'status'] as const;
 
 /** JSON cannot write ±Infinity (`1e400` parses to it); ±Number.MAX_VALUE keeps its type and truthiness — all the product
  *  reads of a number. */
@@ -409,10 +416,13 @@ const listOf =
 	(item: (v: unknown) => unknown) =>
 	(v: unknown): unknown =>
 		Array.isArray(v) ? v.map(item) : emptied(v);
+/** ⭐ D45 — a claim as the product reads it: its three keys, each read as a scalar; anything else read only as a type. */
+const claim = (v: unknown): unknown => (isObject(v) ? pick(v, CLAIM_READ_KEYS, scalar) : emptied(v));
 const READ: Readonly<Record<(typeof JUDGEMENT_READ_KEYS)[number], (v: unknown) => unknown>> = {
 	findings: listOf(finding),
 	recommendation: scalar,
-	residualUncertainty: listOf(scalar)
+	residualUncertainty: listOf(scalar),
+	claims: listOf(claim)
 };
 
 /**

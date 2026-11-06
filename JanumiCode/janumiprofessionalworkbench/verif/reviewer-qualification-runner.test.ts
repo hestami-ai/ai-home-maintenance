@@ -62,6 +62,7 @@ import {
 	type Transport,
 	type TransportReply
 } from '../scripts/reviewer-qual/transports.js';
+import { PLACEHOLDER_INDICATIONS } from '../scripts/reviewer-qual/indications.js';
 
 const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url));
 const read = (file: string): string => readFileSync(`${REPO_ROOT}${file}`, 'utf8');
@@ -136,6 +137,9 @@ const inputs = (over: Partial<RunInputs> & Pick<RunInputs, 'transport' | 'cases'
 	repetitions: 1,
 	env: {},
 	now: ticking(),
+	// ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D50 (`REG-D-146`) — the scripts' placeholder decision model (`indications.ts`), so each
+	// case's validator sends its prompt: these rows are about the runner, and a run that calls a reviewer hands none until Z2.
+	indications: PLACEHOLDER_INDICATIONS,
 	...over
 });
 
@@ -160,6 +164,7 @@ async function initialPrompts(): Promise<Map<string, string>> {
 	for (const c of CASES) {
 		let sent = '';
 		const v = createAgyReasoningReviewValidator({
+			indications: PLACEHOLDER_INDICATIONS,
 			agentId: 'x',
 			modelId: 'x',
 			providerId: 'x',
@@ -262,6 +267,7 @@ describe('JAN-CRITREAD J2-2 — the runner, over a stub transport', () => {
 				expect(call.scored?.disposition).toBe('SATISFIED');
 				// ⭐ THE SPAN IS ENOUGH: replayed through the same path, it scores to what was recorded at run time.
 				const replayed = await evaluateCase({
+					indications: PLACEHOLDER_INDICATIONS,
 					case: caseById(call.caseId),
 					criteria: CRITERIA,
 					candidate: STUB,
@@ -374,6 +380,7 @@ describe('JAN-CRITREAD J2-2 — the runner, over a stub transport', () => {
 			expect(calls.at(-1)!.scored?.disposition, row.name).toBe(row.disposition);
 			// ⭐ EVERY RETENTION FORM RE-SCORES: replayed through the same path, the record scores what the run scored.
 			const replayed = await evaluateCase({
+				indications: PLACEHOLDER_INDICATIONS,
 				case: caseById('G-CLEAN'),
 				criteria: CRITERIA,
 				candidate: STUB,
@@ -454,6 +461,7 @@ describe('JAN-CRITREAD J2-2 — the runner, over a stub transport', () => {
 		const c = caseById('G-CLEAN');
 		const read = (text: string) =>
 			createAgyReasoningReviewValidator({
+				indications: PLACEHOLDER_INDICATIONS,
 				agentId: 'x',
 				modelId: 'x',
 				providerId: 'x',
@@ -506,6 +514,7 @@ describe('JAN-CRITREAD J2-2 — the runner, over a stub transport', () => {
 				independenceOk: false
 			});
 			const replayed = await evaluateCase({
+				indications: PLACEHOLDER_INDICATIONS,
 				case: caseById('G-CLEAN'),
 				criteria: CRITERIA,
 				candidate: STUB,
@@ -564,6 +573,7 @@ describe('JAN-CRITREAD J2-2 — the runner, over a stub transport', () => {
 		);
 		expect(recordProblems(scalar.map(serializeLine).join(''), { tracked: false })).toEqual([]);
 		const replayed = await evaluateCase({
+			indications: PLACEHOLDER_INDICATIONS,
 			case: caseById('G-CLEAN'),
 			criteria: CRITERIA,
 			candidate: STUB,
@@ -602,6 +612,7 @@ describe('JAN-CRITREAD J2-2 — the runner, over a stub transport', () => {
 			const registry = createValidatorRegistry();
 			registry.register(
 				createAgyReasoningReviewValidator({
+					indications: PLACEHOLDER_INDICATIONS,
 					agentId: 'stub',
 					modelId: 'stub-reviewer',
 					providerId: 'jpwb-stub',
@@ -699,6 +710,18 @@ describe('JAN-CRITREAD J2-2 — the runner, over a stub transport', () => {
 			);
 			expect(stub.prompts).toEqual([]);
 		}
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D50 (`REG-D-146`; design §12.2): a paid run hands its validator no decision model until
+	// package Z2's client and records land (`run.ts`), so it must stop at its first case, before a single reviewer call is paid for.
+	it('⛔ Z1 — a run handed no decision model stops at its first case on the harness’s refusal: no reviewer call, and no line at all', async () => {
+		const stub = stubTransport(() => answer(judgement([])));
+		const written: unknown[] = [];
+		await expect(
+			runQualification(inputs({ transport: stub, cases: [caseById('G-CLEAN')], indications: undefined, onLine: (l) => written.push(l) }))
+		).rejects.toThrow(/the validator failed before it called its transport — Error: This review was not sent: no decision model is configured/);
+		expect(stub.prompts, 'no reviewer call').toEqual([]);
+		expect(written, 'no line at all').toEqual([]);
 	});
 });
 

@@ -25,6 +25,8 @@ import { describe, expect, it } from 'vitest';
 import type { ObservedProcessRun } from '../tools/process-run-observer.js';
 import { createAgyReasoningReviewValidator, REASONING_REVIEW_BUDGET } from './reasoning-review-validator.js';
 import { declaredPolicyReviewInput, processResultReviewInput, workProductReviewInput } from './review-input.js';
+import { TEST_INDICATIONS } from './indications.testing.js';
+import { todayPromptOf } from './review-section.testing.js';
 
 const SUBJECT: AssuranceSubject = {
 	subjectId: 'evd_01K5QFBR8Z0000000000000N01',
@@ -109,6 +111,7 @@ const DESIGN_ACCOUNT: ProfessionalRationaleSummary = {
 async function promptOf(input: ReasoningReviewInput): Promise<string> {
 	let seen = '';
 	await createAgyReasoningReviewValidator({
+		indications: TEST_INDICATIONS,
 		print: async (p) => {
 			seen = p;
 			return JSON.stringify({
@@ -289,7 +292,14 @@ describe('⭐⭐ package N — D12: a command’s review asks what the account s
 		expect(lines.filter((l) => l === CRITERIA_LINE), 'D30’s line, once, on a line of its own').toHaveLength(1);
 		const at = lines.indexOf(D8_FIRST_LINE);
 		expect(at, 'arrangement: D8’s first line, on a line of its own').toBeGreaterThan(0);
-		expect(lines[at - 1], 'D30’s line, immediately before D8’s first line').toBe(CRITERIA_LINE);
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D42, kept by D50; `REG-D-146`; design §11.3, §12.2) — ~~`expect(lines[at - 1],
+		// 'D30’s line, immediately before D8’s first line').toBe(CRITERIA_LINE)`~~: D8's lines move into the measured section, after its
+		// method, and C5's line stays where it was, the head's last line — so in the prompt sent it stands immediately before `THE REVIEW`.
+		// Restated: on its own line, once, immediately before `THE REVIEW`; and D8's first line follows it in the section, after the method.
+		const review = lines.indexOf('THE REVIEW');
+		expect(review, 'arrangement: THE REVIEW on a line of its own').toBeGreaterThan(0);
+		expect(lines[review - 1], 'C5’s line, immediately before THE REVIEW').toBe(CRITERIA_LINE);
+		expect(at, 'D8’s first line, in the measured section after THE REVIEW').toBeGreaterThan(review);
 	});
 
 	it('⭑ D30 CONTROL — a finished work’s review (its files listed, the empty view, or none shown), a declared sign-off’s, a part’s and a graph’s carry no word of D30’s line, D8’s first line in each; ⭑ the reader finds the line in a command’s', async () => {
@@ -418,7 +428,9 @@ describe('⭐⭐ package N — D10: the review of the finished work is shown the
 				deliverable: { afterTry: 1, files, sequence: { acts: [], droppedRuns: 0, recordedLimit: 32 } }
 			} as Parameters<typeof workProductReviewInput>[0])
 		);
-		expect(p.length, 'the prompt passed its budget').toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.PROMPT_BUDGET);
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D52, `REG-D-146`; design §12.4) — ~~`expect(p.length, 'the prompt passed its budget').toBeLessThanOrEqual(PROMPT_BUDGET)`~~: the room is today's (D52): TODAY's prompt for this input, the head and today's review section, is within PROMPT_BUDGET; the prompt sent, within its whole bound.
+		expect(todayPromptOf(p, SEEDED_REASONING_REVIEW_CRITERIA).length, 'today’s prompt passed its budget').toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.PROMPT_BUDGET);
+		expect(p.length, 'the prompt sent passed its whole bound').toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.WHOLE_PROMPT_MAX);
 		const lines = p.split('\n');
 		for (const f of files) {
 			const at = lines.indexOf(`Added ${JSON.stringify(f.path)}:`);
@@ -446,7 +458,9 @@ describe('⭐⭐ package N — D10: the review of the finished work is shown the
 				deliverable: { afterTry: 1, files, sequence: { acts: [], droppedRuns: 0, recordedLimit: 32 } }
 			} as Parameters<typeof workProductReviewInput>[0])
 		);
-		expect(p.length).toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.PROMPT_BUDGET);
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D52, `REG-D-146`; design §12.4) — ~~`expect(p.length).toBeLessThanOrEqual(PROMPT_BUDGET)`~~: the room is today's (D52): TODAY's prompt for this input, the head and today's review section, is within PROMPT_BUDGET; the prompt sent, within its whole bound.
+		expect(todayPromptOf(p, SEEDED_REASONING_REVIEW_CRITERIA).length).toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.PROMPT_BUDGET);
+		expect(p.length).toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.WHOLE_PROMPT_MAX);
 		const cut = /\[CUT FOR THIS REVIEW: the changed files — the first (\d+) of the 400 are shown; the last (\d+) are removed\.\]/.exec(p);
 		expect(cut, 'the list’s cut is not declared').not.toBeNull();
 		const shown = Number(cut![1]);
@@ -472,7 +486,9 @@ describe('⭐⭐ package N — D10: the review of the finished work is shown the
 			hostSequence: { acts, droppedRuns: 0, recordedLimit: 32, subjectOrdinal: 17 }
 		} as Parameters<typeof processResultReviewInput>[0]);
 		const p = await promptOf(input);
-		expect(p.length).toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.PROMPT_BUDGET);
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D52, `REG-D-146`; design §12.4) — ~~`expect(p.length).toBeLessThanOrEqual(PROMPT_BUDGET)`~~: the room is today's (D52): TODAY's prompt for this input, the head and today's review section, is within PROMPT_BUDGET; the prompt sent, within its whole bound.
+		expect(todayPromptOf(p, SEEDED_REASONING_REVIEW_CRITERIA).length).toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.PROMPT_BUDGET);
+		expect(p.length).toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.WHOLE_PROMPT_MAX);
 		expect(p, 'the act under review is not marked').toMatch(/\n {2}17\. ran \["node","-e",.*← this command\n/);
 		expect(p, 'no act’s cut is declared').toMatch(/\n {2}\[CUT FOR THIS REVIEW: the command of act \d+ — the first \d+ of its \d+ code points are shown; the last \d+ are removed\.\]\n {2}\d+\. ran /);
 	});

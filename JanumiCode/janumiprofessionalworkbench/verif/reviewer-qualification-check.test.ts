@@ -108,6 +108,7 @@ import { runQualification, type RunFingerprint } from '../scripts/reviewer-qual/
 import { scoringCorpus } from '../scripts/reviewer-qual/scoring-corpus.js';
 import type { TransportReply } from '../scripts/reviewer-qual/transports.js';
 import { BUN, GIT, hermeticEnv, NO_PROGRAMS } from './reviewer-qualification-hermetic.js';
+import { PLACEHOLDER_INDICATIONS } from '../scripts/reviewer-qual/indications.js';
 
 const REPO = fileURLToPath(new URL('../', import.meta.url))
 	.replace(/\\/g, '/')
@@ -412,6 +413,7 @@ async function recorded(o: {
 	let n = 0;
 	const { TransportFailure } = await import('../scripts/reviewer-qual/transports.js');
 	return runQualification({
+		indications: PLACEHOLDER_INDICATIONS,
 		runId: o.runId,
 		date: o.date ?? '2026-09-24T12:00:00.000Z',
 		commit: 'e5f9358b'.repeat(5),

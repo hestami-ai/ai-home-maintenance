@@ -29,6 +29,8 @@ import {
 	RUN11_SHAPED_NODES,
 	RUN11_SHAPED_REQUEST
 } from './run11-shaped-pwa.testing.js';
+import { TEST_INDICATIONS } from './indications.testing.js';
+import { todayPromptOf } from './review-section.testing.js';
 
 const CRITERIA = SEEDED_REASONING_REVIEW_CRITERIA;
 const { PROMPT_BUDGET } = REASONING_REVIEW_BUDGET;
@@ -51,6 +53,7 @@ const CLEAN = JSON.stringify({
 async function sentFor(input: ReasoningReviewInput): Promise<{ readonly prompts: string[]; readonly refusal?: string }> {
 	const prompts: string[] = [];
 	const validator = createAgyReasoningReviewValidator({
+		indications: TEST_INDICATIONS,
 		agentId: 'agy',
 		modelId: 'test-judge-model',
 		providerId: 'google',
@@ -409,7 +412,9 @@ describe('⭐⭐ the review in parts, B1 — measured on a run-11-shaped PWA: th
 				expect(part, `${what}: its own part`).toBeDefined();
 				const input = pwaTypeReviewInput({ criteria: CRITERIA, part: part!, ...v });
 				const p = await promptFor(input);
-				expect(p.length, `${what}: within PROMPT_BUDGET`).toBeLessThanOrEqual(PROMPT_BUDGET);
+				// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D52, `REG-D-146`; design §12.4) — ~~`expect(p.length, `${what}: within PROMPT_BUDGET`).toBeLessThanOrEqual(PROMPT_BUDGET)`~~: the room is today's (D52): TODAY's prompt for this input, the head and today's review section, is within PROMPT_BUDGET; the prompt sent, within its whole bound.
+				expect(todayPromptOf(p, CRITERIA).length, `${what}: today’s prompt within PROMPT_BUDGET`).toBeLessThanOrEqual(PROMPT_BUDGET);
+				expect(p.length, `${what}: the prompt sent within its whole bound`).toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.WHOLE_PROMPT_MAX);
 				expect('declaredPartCut' in input, `${what}: no cut`).toBe(false);
 				expect(p, `${what}: no cut declared`).not.toContain('[CUT FOR THIS REVIEW: the skeleton of');
 				// ⚠ As the part's JSON line writes them: a contract's quotes are escaped there.

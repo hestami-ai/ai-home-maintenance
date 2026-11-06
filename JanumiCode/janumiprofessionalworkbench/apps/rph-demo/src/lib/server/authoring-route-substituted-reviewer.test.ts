@@ -60,6 +60,14 @@ import { clearAuthoringTurns, getPendingAuthoringTurn } from './authoring-turn.j
 import { loadPwaFloor, type FloorBlockedHint, type FloorView } from './floor.js';
 import { dispatch, mintUiId, resetEngine } from './workbench.js';
 
+// ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D50 (`REG-D-146`): the product's configured decision model, whose potential
+// indications every review asks for before its first reviewer call, stood in for by a double that calls no model —
+// as the reviewer's program is. ⛔ Production configures none until package Z2, and refuses the review.
+vi.mock('./assurance/decision-model.js', async () => {
+	const { TEST_INDICATIONS } = await import('./assurance/indications.testing.js');
+	return { configuredIndications: () => TEST_INDICATIONS };
+});
+
 type RouteEvent = Parameters<typeof POST>[0];
 type LoadEvent = Parameters<typeof load>[0];
 interface StreamedEvent {

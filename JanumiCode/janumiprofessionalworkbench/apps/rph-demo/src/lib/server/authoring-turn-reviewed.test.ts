@@ -37,6 +37,14 @@ import {
 import { reasoningReviewCriteria, runPwaFloor, type FloorProducer } from './floor.js';
 import { clearingJudgement, withLiveReviewerSeam } from './assurance/clearing-reviewer.testing.js';
 
+// ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D50 (`REG-D-146`): the product's configured decision model, whose potential
+// indications every review asks for before its first reviewer call, stood in for by a double that calls no model —
+// as the reviewer's program is. ⛔ Production configures none until package Z2, and refuses the review.
+vi.mock('./assurance/decision-model.js', async () => {
+	const { TEST_INDICATIONS } = await import('./assurance/indications.testing.js');
+	return { configuredIndications: () => TEST_INDICATIONS };
+});
+
 const TS = '2026-09-22T09:00:00Z';
 const PWA = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5P00';
 const OTHER_PWA = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5P01';

@@ -26,6 +26,14 @@ import { createFloorRegistry } from './index.js';
 import { noProgramsDirectory } from './no-programs.testing.js';
 import { STANDIN_VALIDATOR_ID } from './standin-reasoning-review-validator.js';
 
+// ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D50 (`REG-D-146`): the product's configured decision model, whose potential
+// indications every review asks for before its first reviewer call, stood in for by a double that calls no model —
+// as the reviewer's program is. ⛔ Production configures none until package Z2, and refuses the review.
+vi.mock('./decision-model.js', async () => {
+	const { TEST_INDICATIONS } = await import('./indications.testing.js');
+	return { configuredIndications: () => TEST_INDICATIONS };
+});
+
 const SUBJECT: AssuranceSubject = {
 	subjectId: 'pwa_selection',
 	objectType: 'PROFESSIONAL_WORK_ARCHITECTURE',

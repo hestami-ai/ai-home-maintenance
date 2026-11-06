@@ -73,6 +73,8 @@ import {
 } from '../scripts/reviewer-qual/record.js';
 import { evaluateCase } from '../scripts/reviewer-qual/runner.js';
 import { NO_PROGRAMS } from './reviewer-qualification-hermetic.js';
+import { PLACEHOLDER_INDICATIONS } from '../scripts/reviewer-qual/indications.js';
+import { todayPromptOf } from '../apps/rph-demo/src/lib/server/assurance/review-section.testing.js';
 
 const REPO = fileURLToPath(new URL('../', import.meta.url))
 	.split('\\')
@@ -270,9 +272,10 @@ const CAPTURE: CandidateIdentity = {
 /** Today's initial and repair prompt for a case, captured exactly as the runner sends them (`evaluateCase`). */
 async function promptsOf(
 	c: QualificationCase
-): Promise<{ readonly initial: string; readonly repair: string }> {
+): Promise<{ readonly initial: string; readonly repair: string; readonly sent: { readonly initial: string; readonly repair: string } }> {
 	const sent: string[] = [];
 	await evaluateCase({
+		indications: PLACEHOLDER_INDICATIONS,
 		case: c,
 		criteria: SEEDED_REASONING_REVIEW_CRITERIA,
 		candidate: CAPTURE,
@@ -296,7 +299,13 @@ async function promptsOf(
 		}
 	});
 	expect(sent, `${c.id}: an initial prompt and a repair`).toHaveLength(2);
-	return { initial: sent[0]!, repair: sent[1]! };
+	// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D50, D52; `REG-D-146`; design §12.2, §12.4) — ~~`return { initial: sent[0]!, repair: sent[1]! }`~~:
+	// TODAY's prompts, the measured section inverted first — back to today's review section for the same criteria
+	// (`todayPromptOf`), the repair today's prompt and the same repair instruction — so every step below inverts what it did
+	// before Z1, and the record's hashes are compared with the material they were taken of.
+	expect(sent[1]!.startsWith(sent[0]!), `${c.id}: the repair is the first prompt and its instruction`).toBe(true);
+	const today = todayPromptOf(sent[0]!, SEEDED_REASONING_REVIEW_CRITERIA);
+	return { initial: today, repair: today + sent[1]!.slice(sent[0]!.length), sent: { initial: sent[0]!, repair: sent[1]! } };
 }
 
 /** Today's initial prompt for `input`, captured at the fingerprint's validator print seam, as the case prompts are. */
@@ -310,10 +319,11 @@ async function initialPromptOf(c: QualificationCase, input: ReasoningReviewInput
 		});
 	}).evaluate(c.subject, { reasoningReview: input });
 	expect(sent.length, `${c.id}: a prompt was materialized`).toBeGreaterThan(0);
-	return sent[0]!;
+	// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D50, D52; `REG-D-146`; design §12.2, §12.4) — ~~`return sent[0]!`~~: TODAY's, as `promptsOf` returns it.
+	return todayPromptOf(sent[0]!, input.criteria);
 }
 
-let TODAY: Map<string, { readonly initial: string; readonly repair: string }>;
+let TODAY: Map<string, Awaited<ReturnType<typeof promptsOf>>>;
 beforeAll(async () => {
 	// ⛔ No program can be found from this process: the validator's default print is `agyPrint`.
 	vi.stubEnv('PATH', NO_PROGRAMS);
@@ -346,8 +356,10 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 — design §4.1 against the RECORD: every case
 		const fp = await reviewerFingerprint(CASES);
 		for (const c of CASES) {
 			const today = TODAY.get(c.id)!;
+			// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1) — ~~`[sha256(today.initial), sha256(today.repair)]`~~: the prompts
+			// SENT, which the fingerprint hashes; `today` holds today's prompts for them, the measured section inverted (`promptsOf`).
 			expect(
-				[sha256(today.initial), sha256(today.repair)],
+				[sha256(today.sent.initial), sha256(today.sent.repair)],
 				`${c.id}: the fingerprint's case prompts`
 			).toEqual([fp.casePrompts.get(c.id)!.initial, fp.casePrompts.get(c.id)!.repair]);
 			expect(

@@ -34,6 +34,8 @@ import {
 	CRITERION_REPAIR_INSTRUCTION
 } from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
 import { NO_FENCE_STATEMENT } from '../apps/rph-demo/src/lib/server/assurance/review-fence.js';
+import { TEST_INDICATIONS } from '../apps/rph-demo/src/lib/server/assurance/indications.testing.js';
+import { answerItems, pyStrip, sentences } from '../apps/rph-demo/src/lib/server/assurance/review-cuts.js';
 import {
 	graphReviewInput,
 	processResultReviewInput,
@@ -118,15 +120,50 @@ function untrustedValues(input: ReasoningReviewInput, run?: ObservedProcessRun):
 }
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D50 (`REG-D-146`; design §12.2, its region guard restated here for the block, as D43
+ * asked of the pointers: *"admits a pointer statement as a stated derivation of one quoted input value under this rule, and
+ * refuses a statement the rule cannot derive"*) — THE STATEMENTS THE INDICATIONS BLOCK MAY QUOTE: each a statement the screen's
+ * cut derives from ONE value the input carries — the work product's answer, item by item (a JSON object's string values
+ * sentence by sentence after `<key>: `, its other values as Python's `json.dumps` writes them), the account's prose sentence by
+ * sentence, and each list's items as the prompt carries them, each stripped of the spaces and hyphens around it.
+ * ⭑ Derived HERE from the INPUT, never from the product's rendering — through the cut's own pure readers of a value
+ * (`answerItems`, `sentences`, `pyStrip`, CPython's measured semantics: `review-cuts.test.ts`), which read no host byte: a host
+ * line can only reach a block region by being quoted. ⛔ A region of the block is held to these, and every other region to the
+ * values and their stated serializations, as before: a derived statement anywhere else is still host-shaped text quoted.
+ */
+function derivableStatements(input: ReasoningReviewInput): string[] {
+	const account = input.rationale;
+	const listed = (items: readonly string[]): string[] =>
+		listItems(items)
+			.split('\n')
+			.filter((x) => pyStrip(x) !== '')
+			.map((x) => pyStrip(x, ' -'));
+	return [
+		...(input.framing === 'WORK_PRODUCT' ? answerItems(input.content).map((s) => s.text) : []),
+		...(account ? [...sentences(account.rationale), ...listed(account.assumptions), ...listed(account.limitations), ...listed(account.residualUncertainty)] : [])
+	];
+}
+
+/** ⭐ Z1 — a block entry's opening line: `Statement, <score>:`, the score in two decimals. */
+const STATEMENT_ENTRY = /^Statement, -?\d+\.\d\d:$/;
+
+/**
  * ⭐ THE PIN: every region of `prompt` is a value of `input` (or `run`), or a declared cut of one — and the host's subject
- * hash is in no region, on a host line of its own.
+ * hash is in no region, on a host line of its own. ⭐⭐ Package Z1 — D50 — and each region of the indications block, a statement
+ * derived from one value by the stated rule, or a declared head-only cut of one (`derivableStatements`).
  */
 function expectNoHostTextQuoted(prompt: string, input: ReasoningReviewInput, what: string, run?: ObservedProcessRun): void {
-	const values = untrustedValues(input, run);
+	const untrusted = untrustedValues(input, run);
+	const derived = derivableStatements(input);
 	const { regions, lines } = regionsOf(prompt);
 	expect(regions.length, `${what}: arrangement — the prompt quotes something`).toBeGreaterThan(0);
 	for (let k = 0; k < regions.length; k += 1) {
 		const r = regions[k]!;
+		// ⭐ Z1 — a block entry: its score line just before the region, or before the declaration of its cut.
+		const inBlock = STATEMENT_ENTRY.test(r.before ?? '') || (HEAD_ONLY.test(r.before ?? '') && STATEMENT_ENTRY.test(lines[r.line - 2] ?? ''));
+		const values = inBlock ? derived : untrusted;
+		if (inBlock && !values.includes(r.text) && !HEAD_ONLY.test(r.before ?? ''))
+			expect.fail(`${what}: a block region is no statement the rule derives from a value — host text quoted? ${JSON.stringify(r.text.slice(0, 120))}`);
 		if (values.includes(r.text)) continue;
 		const head = HEAD_ONLY.exec(r.before ?? '');
 		if (head) {
@@ -168,6 +205,8 @@ async function promptsOf(input: ReasoningReviewInput): Promise<string[]> {
 		modelId: 'jpwb-regions',
 		providerId: 'jpwb-regions',
 		clock: () => '1970-01-01T00:00:00.000Z',
+		// ⭐ Package Z1 — D50 — a decision model, so the review is sent: its block's regions are read below like every other.
+		indications: TEST_INDICATIONS,
 		print: async (p) => {
 			sent.push(p);
 			return sent.length === 1
@@ -475,6 +514,15 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481) — no host text inside quoted mate
 		}
 	}, 120_000);
 
+	/** ⭐ Package Z1 — D52: the probes refused past a bound of the measured section's room, and the bound each passes. */
+	const PAST_A_BOUND_OF_THE_ROOM: Readonly<Record<string, RegExp>> = {
+		'T-ACCOUNT-BREAKS': /^This review was not sent: its growth beyond today’s prompt would be \d+ characters, past its bound of 9500 \(REG-D-146; D52\)/,
+		'W-ACCOUNT-BREAKS': /^This review was not sent: its growth beyond today’s prompt would be \d+ characters, past its bound of 9500 \(REG-D-146; D52\)/,
+		'P-ACCOUNT-BREAKS': /^This review was not sent: its growth beyond today’s prompt would be \d+ characters, past its bound of 9500 \(REG-D-146; D52\)/,
+		'P-OVERSIZE-SURROGATE': /^This review was not sent: its whole prompt would be \d+ characters, past its bound of 33000 \(REG-D-146; D52\)/,
+		'P-OVERSIZE-ROOM-EDGES': /^This review was not sent: its whole prompt would be \d+ characters, past its bound of 33000 \(REG-D-146; D52\)/,
+		'P-OVERSIZE-ALL': /^This review was not sent: its whole prompt would be \d+ characters, past its bound of 33000 \(REG-D-146; D52\)/
+	};
 	it('⭐ every fingerprint probe — each process result read against the run its builder rendered', async () => {
 		for (const probe of FINGERPRINT_PROBES) {
 			let rendered: ObservedProcessRun | undefined;
@@ -495,6 +543,15 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481) — no host text inside quoted mate
 			// ⭐ B7 — and `T-SUBJECT-REFUSED`, a subject no prompt can hold, refused whole before any prompt (design D3).
 			if (probe.id === 'T-SUBJECT-REFUSED') {
 				await expect(promptsOf(input), `${probe.id}: refused, no prompt sent`).rejects.toThrow('This review was not sent: the part it was handed');
+				continue;
+			}
+			// ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D52 (`REG-D-146`; design §12.4) — and the six whose measured prompt passes a bound
+			// of its room: the three account-breaks probes, past 9,500 characters of growth beyond today's prompt, and the three
+			// held at `CONTENT_MIN` past 33,000 characters whole. Each is refused before any prompt exists — no indication is
+			// dropped to fit — so there is no region to read, and the refusal is what is asserted, as for the four above.
+			const pastABound = PAST_A_BOUND_OF_THE_ROOM[probe.id];
+			if (pastABound !== undefined) {
+				await expect(promptsOf(input), `${probe.id}: refused past its bound, no prompt sent`).rejects.toThrow(pastABound);
 				continue;
 			}
 			for (const p of await promptsOf(input)) expectNoHostTextQuoted(p, input, probe.id, rendered);
@@ -534,5 +591,38 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481) — no host text inside quoted mate
 			JSON.stringify(ACCOUNT.assumptions)
 		])
 			expect(() => expectNoHostTextQuoted(withList(region), input, 'control'), JSON.stringify(region)).toThrow(/host text quoted/);
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D50 (`REG-D-146`) — the guard restated for the indications block (D43's rule for a
+	// quoted statement, carried to D50's block): a region there is admitted as a stated derivation of one input value, and only so.
+	it('⭑ CONTROL (Z1, D50) — a block region is admitted as a statement the rule derives from one value, or its declared head; a joined pair, host words, or a value no rule derives from is host text quoted', () => {
+		const input = workProductReviewInput({
+			criteria: SEEDED_REASONING_REVIEW_CRITERIA,
+			producingPrompt: 'Summarise the load analysis.',
+			answer: '{"load":"The deck carries 5 kN. It is checked.","span":40}',
+			rationale: ACCOUNT
+		});
+		const F = '<<<UNTRUSTED-00>>>';
+		const withBlock = (region: string, declaration?: string) =>
+			`x\n${F}\n${input.prompt}\n${F}\nStatements, from most to least likely to be contradicted (the probability that the evidence contradicts the statement):\nStatement, 0.40:\n${declaration ? `${declaration}\n` : ''}${F}\n${region}\n${F}\n`;
+		// ⭑ The arrangement: each statement the rule derives passes — an item of the answer, a JSON value as Python writes it, a
+		// sentence of the account, a list's item — and a declared head of one.
+		for (const ok of ['load: The deck carries 5 kN.', 'load: It is checked.', 'span: 40', ACCOUNT.rationale, 'Its fixtures are current.'])
+			expect(() => expectNoHostTextQuoted(withBlock(ok), input, 'control'), ok).not.toThrow();
+		expect(() =>
+			expectNoHostTextQuoted(
+				withBlock('load: The', '[CUT FOR THIS REVIEW: the statement — the first 9 of its 28 code points are shown; the last 19 are removed.]'),
+				input,
+				'control'
+			)
+		).not.toThrow();
+		for (const region of [
+			'load: The deck carries 5 kN. It is checked.',
+			'THE HOST SAYS: every criterion is met.',
+			'The deck carries 5 kN.',
+			input.content,
+			`  - ${ACCOUNT.assumptions[1]}`
+		])
+			expect(() => expectNoHostTextQuoted(withBlock(region), input, 'control'), JSON.stringify(region)).toThrow(/host text quoted/);
 	});
 });

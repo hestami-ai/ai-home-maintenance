@@ -15,6 +15,7 @@ import { describe, expect, it } from 'vitest';
 import type { QualificationCase } from '../scripts/reviewer-qual/cases.js';
 import { PRODUCT_SEAMS } from '../scripts/reviewer-qual/fingerprint.js';
 import { caseReviewInput } from '../scripts/reviewer-qual/materialize.js';
+import { todayPromptOf } from '../apps/rph-demo/src/lib/server/assurance/review-section.testing.js';
 
 const REPO = fileURLToPath(new URL('../', import.meta.url))
 	.replace(/\\/g, '/')
@@ -65,7 +66,11 @@ describe('⭐⭐ package O-2 — D28: three confirmed cases of v12, each a unit�
 		expect([FIXTURE.caseSetVersion, FIXTURE.cases.map((c) => c.id)], 'arrangement: the fixture’s cases').toEqual([12, CONFIRMED.map(([id]) => id)]);
 		expect(JSON.stringify(FIXTURE), 'arrangement: a confirmed case carries a re-run’s mark').not.toContain('workRerun');
 		const rendered: [string, string][] = [];
-		for (const c of FIXTURE.cases) rendered.push([c.id, sha256(await firstPromptOf(c))]);
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D50, D52; `REG-D-146`; design §12.2, §12.4) — ~~`sha256(await
+		// firstPromptOf(c))`~~: every first prompt moved by the measured section; the confirmed bytes are the material's, so the pin
+		// is on TODAY's first prompt — the head the sent prompt carries, byte for byte, then today's review section (`todayPromptOf`).
+		for (const c of FIXTURE.cases)
+			rendered.push([c.id, sha256(todayPromptOf(await firstPromptOf(c), caseReviewInput(c, PRODUCT_SEAMS.criteria, PRODUCT_SEAMS.processResult).criteria))]);
 		expect(rendered, 'a confirmed first step’s prompt moved').toEqual(CONFIRMED);
 	});
 

@@ -109,6 +109,7 @@ import { liveExecTestMatch, ONE_UNIT_SPEC } from '../apps/rph-demo/e2e-live-exec
 import { MAX_REVIEWER_CALLS } from '../scripts/phase7/negative-control.js';
 import { PHASE7_PHASES, PHASE7_ROOT } from '../scripts/phase7/pwa-content.js';
 import { EXECUTION_COMMAND_TIMEOUT_MS } from '../scripts/phase7/runner-environment.js';
+import { PLACEHOLDER_INDICATIONS } from '../scripts/reviewer-qual/indications.js';
 
 const APP = fileURLToPath(new URL('../apps/rph-demo/', import.meta.url));
 const CONFIG = 'playwright.live-exec.config.ts';
@@ -664,6 +665,7 @@ describe('⭐ the lane waits for the reviewer’s bounded worst case — the rev
 	it('~~a review is at most two calls~~ ⭐ a reviewer that answers but never in JSON makes two calls — the initial one and one repair — measured by driving the product’s validator with a reviewer that never answers in JSON', async () => {
 		const prompts: string[] = [];
 		const validator = createAgyReasoningReviewValidator({
+			indications: PLACEHOLDER_INDICATIONS,
 			print: async (p) => {
 				prompts.push(p);
 				return 'not JSON, and never will be';
@@ -705,7 +707,9 @@ describe('⭐ the lane waits for the reviewer’s bounded worst case — the rev
 			);
 			return { stdout: calls.length === 2 ? 'not JSON, and never will be' : misfiled };
 		};
-		const registry = createFloorRegistry({ testMode: false, devinExec: devin });
+		// ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D50 (`REG-D-146`): and its decision model, the scripts' placeholder, which calls no
+		// model — the branch's review asks it once, before its first call; it makes no call the bound counts.
+		const registry = createFloorRegistry({ testMode: false, devinExec: devin, indications: PLACEHOLDER_INDICATIONS });
 		const plan = await runFloorAndPlanRecording(REVIEW_SUBJECT, REVIEW_CONTEXT, registry);
 		const review = plan.assessments.find((a) => a.policyId === FLOOR_POLICY_IDS.REASONING_REVIEW);
 		expect(review?.disposition, 'a criterion left without a row after its criterion repair leaves the review incomplete').toBe(

@@ -63,6 +63,7 @@ import { ORACLES_V6 } from '../scripts/reviewer-qual/oracles-v6.js';
 import type { CandidateIdentity } from '../scripts/reviewer-qual/record.js';
 import { evaluateCase } from '../scripts/reviewer-qual/runner.js';
 import { TransportFailure } from '../scripts/reviewer-qual/transports.js';
+import { PLACEHOLDER_INDICATIONS } from '../scripts/reviewer-qual/indications.js';
 
 const REPO = fileURLToPath(new URL('../', import.meta.url));
 const read = <T>(file: string): T => JSON.parse(readFileSync(`${REPO}${file}`, 'utf8')) as T;
@@ -386,6 +387,7 @@ describe('⭐⭐ E2 — measurable by the existing runner, NO MODEL CALLED (desi
 	const score = async (c: DeclaredPolicyCase, answer: string) => {
 		const sent: string[] = [];
 		const e = await evaluateCase({
+			indications: PLACEHOLDER_INDICATIONS,
 			case: c,
 			criteria: SEEDED_REASONING_REVIEW_CRITERIA,
 			candidate: STUB,
@@ -457,6 +459,7 @@ describe('⭐⭐ E2 — measurable by the existing runner, NO MODEL CALLED (desi
 		// the sign-off reads the throw as the review's failure and records INCONCLUSIVE.
 		const c = DECLARED[0]!;
 		const e = await evaluateCase({
+			indications: PLACEHOLDER_INDICATIONS,
 			case: c,
 			criteria: SEEDED_REASONING_REVIEW_CRITERIA,
 			candidate: STUB,
@@ -1028,6 +1031,7 @@ describe('⭐⭐ Round 5 — case set v6: version five with D-FP-CLEAN repaired 
 			const input = caseReviewInput(c, SEEDED_REASONING_REVIEW_CRITERIA);
 			const sent: string[] = [];
 			await evaluateCase({
+				indications: PLACEHOLDER_INDICATIONS,
 				case: c,
 				criteria: SEEDED_REASONING_REVIEW_CRITERIA,
 				candidate: STUB,

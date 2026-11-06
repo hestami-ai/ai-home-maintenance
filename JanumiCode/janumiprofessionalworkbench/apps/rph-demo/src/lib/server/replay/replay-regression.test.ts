@@ -70,12 +70,17 @@ vi.mock('node:child_process', async (importOriginal) => {
 });
 
 // ⭑ The paid run's double, when a pass asks for it; else the product's own replay, untouched.
+// ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D50 (`REG-D-146`) — ~~else the product's own replay, untouched~~: and handed the decision
+// model the paid pass was handed. ⛔ A recording holds no decision-model scores yet — what a replay serves for them is not
+// designed (design §12 names none) — so the product's own replay carries none (`ReplayRun.indications`) and would refuse every
+// review; both passes are handed the same double, so the reviewer prompts the replay checks are the ones the paid pass recorded.
 vi.mock('./replay-run.js', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('./replay-run.js')>();
+	const { TEST_INDICATIONS } = await import('../assurance/indications.testing.js');
 	return {
 		...actual,
 		replayRunFor: (dir: string) =>
-			(seam.paid as ReturnType<typeof actual.replayRunFor> | undefined) ?? actual.replayRunFor(dir)
+			(seam.paid as ReturnType<typeof actual.replayRunFor> | undefined) ?? { ...actual.replayRunFor(dir), indications: TEST_INDICATIONS }
 	};
 });
 
@@ -136,6 +141,7 @@ import {
 } from './recording.js';
 import { forgetReplayRuns, REPLAY_ROOT_NAME, replayRunFor, type ReplayRun } from './replay-run.js';
 import { inMemoryStoreRows } from './replay-store-rows.testing.js';
+import { TEST_INDICATIONS } from '../assurance/indications.testing.js';
 
 const RISK = {
 	'risk.consequence': 'HIGH',
@@ -316,6 +322,8 @@ function paidRun(root: string): ReplayRun & {
 			served = { ...served, commands: served.commands + 1 };
 			return { recorded: RUN };
 		},
+		// ⭐ Package Z1 — the decision model the paid run's reviews ask, as the replay pass is handed it (the `vi.mock` above).
+		indications: TEST_INDICATIONS,
 		async reviewerPrint(prompt: string): Promise<ToolInvocationResult> {
 			const text = cleanJudgementOf(prompt);
 			ms += 1_000;

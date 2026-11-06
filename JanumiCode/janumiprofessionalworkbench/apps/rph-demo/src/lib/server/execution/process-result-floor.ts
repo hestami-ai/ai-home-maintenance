@@ -63,6 +63,7 @@ import type { AuthedEngineHandle } from '@janumipwb/rph-engine';
 import type { ObservedProcessRun } from '../tools/process-run-observer.js';
 import { commandLine } from '../assurance/process-result-render.js';
 import { processResultReviewInput } from '../assurance/review-input.js';
+import type { IndicationsSource } from '../assurance/reasoning-review-validator.js';
 import { runFloorOverSubject, type FloorRunOutcome } from './floor-over-subject.js';
 
 /** The two BLOCKING codes `R17` names. Exported so a test names the same string the floor emits. */
@@ -214,6 +215,8 @@ export async function runProcessResultFloor(
 		readonly newId: (prefix: string) => string;
 		readonly criteria: readonly AssessmentCriterion[];
 		readonly print?: (prompt: string) => Promise<string>;
+		/** ⭐ Package Z1 — D50 — the decision model, beside `print` (`runFloorOverSubject`). */
+		readonly indications?: IndicationsSource;
 	}
 ): Promise<FloorRunOutcome> {
 	const facts = await processResultFloorFacts(subject, opts.artifacts);

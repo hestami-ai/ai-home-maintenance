@@ -26,13 +26,22 @@ import {
 	type ValidatorContext
 } from '@janumipwb/rph-assurance';
 import { createInMemoryArtifactStore, type ArtifactStore } from '@janumipwb/rph-ports';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { ExchangeRecord } from '../agent/exchange-record.js';
 import { OUTPUT_LIMIT, OutputLimitReached, outputLimitOf } from '../tools/output-limit.js';
 import { clearingJudgement } from './clearing-reviewer.testing.js';
 import { createExchangeSink } from './exchange-capture.js';
 import { mintIdsFor, toRecordModelExchange } from './exchange-recorder.js';
 import { createAgyReasoningReviewValidator, type AgyPrint } from './reasoning-review-validator.js';
+import { TEST_INDICATIONS } from './indications.testing.js';
+
+// ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D50 (`REG-D-146`): the product's configured decision model, whose potential
+// indications every review asks for before its first reviewer call, stood in for by a double that calls no model —
+// as the reviewer's program is. ⛔ Production configures none until package Z2, and refuses the review.
+vi.mock('./decision-model.js', async () => {
+	const { TEST_INDICATIONS } = await import('./indications.testing.js');
+	return { configuredIndications: () => TEST_INDICATIONS };
+});
 
 const SUBJECT: AssuranceSubject = {
 	subjectId: 'art_output_limit',
@@ -109,6 +118,7 @@ function tool(...script: readonly (string | Error)[]) {
 function reviewer(print: AgyPrint, clock: () => string, store?: ArtifactStore) {
 	const exchanges = createExchangeSink();
 	const validator = createAgyReasoningReviewValidator({
+		indications: TEST_INDICATIONS,
 		print,
 		modelId: JUDGE,
 		clock,

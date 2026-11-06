@@ -130,6 +130,7 @@ import {
 	type StoredObject,
 	type StoreRows
 } from '../scripts/phase7/run-report-core.js';
+import { PLACEHOLDER_INDICATIONS } from '../scripts/reviewer-qual/indications.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const RUN_REPORT = join(ROOT, 'scripts', 'phase7', 'run-report.ts');
@@ -984,7 +985,7 @@ describe('JAN-EXEC P7-2 D9 — the pairing of a review with the call that conclu
 			return r;
 		};
 		const exchanges = createExchangeSink();
-		await createAgyReasoningReviewValidator({ print, modelId: 'fixture-judge', exchanges }).evaluate(
+		await createAgyReasoningReviewValidator({ indications: PLACEHOLDER_INDICATIONS,  print, modelId: 'fixture-judge', exchanges }).evaluate(
 			{
 				subjectId: 'art_1',
 				objectType: 'ARTIFACT',
@@ -3051,6 +3052,7 @@ describe('⭐⭐ package X — D34 — a review that ended on a call thrown at o
 		const identity = replies.some((r) => typeof r !== 'string' && !(r instanceof Error));
 		const exchanges = createExchangeSink();
 		await createAgyReasoningReviewValidator({
+			indications: PLACEHOLDER_INDICATIONS,
 			print,
 			modelId: 'fixture-judge',
 			...(identity ? { agentId: 'devin', providerId: 'devin', requireReportedModel: true } : {}),
@@ -4704,7 +4706,7 @@ describe('⭐⭐ P5 package B’s check (finding 2) — what the root’s review
 			sent.push(p);
 			return MET;
 		};
-		await createAgyReasoningReviewValidator({ print, modelId: 'fixture-judge' }).evaluate(ROOT, { reasoningReview: input });
+		await createAgyReasoningReviewValidator({ indications: PLACEHOLDER_INDICATIONS,  print, modelId: 'fixture-judge' }).evaluate(ROOT, { reasoningReview: input });
 		expect(sent.length, 'arrangement: the validator sent its prompt').toBeGreaterThan(0);
 		return sent[0]!;
 	};

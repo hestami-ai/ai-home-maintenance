@@ -77,6 +77,14 @@ import { noProgramsDirectory } from '../assurance/no-programs.testing.js';
 import { resetEngine } from '../workbench.js';
 import { beginExecute, modelWorkUnit } from './begin-execute.testing.js';
 
+// ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D50 (`REG-D-146`): the product's configured decision model, whose potential
+// indications every review asks for before its first reviewer call, stood in for by a double that calls no model —
+// as the reviewer's program is. ⛔ Production configures none until package Z2, and refuses the review.
+vi.mock('../assurance/decision-model.js', async () => {
+	const { TEST_INDICATIONS } = await import('../assurance/indications.testing.js');
+	return { configuredIndications: () => TEST_INDICATIONS };
+});
+
 /** `REG-D-090`'s sentence for the execution plane, verbatim (`JAN-ESCREC` design D3) — printed beside an ESCALATED review
  *  only. Restated, not imported: it is the operator's word, so a change to it must redden here rather than be followed. */
 const HUMAN_SENTENCE =

@@ -18,6 +18,8 @@ import type { AssessmentCriterion } from '@janumipwb/rph-contracts';
 import { describe, expect, it } from 'vitest';
 import { createAgyReasoningReviewValidator, REASONING_REVIEW_BUDGET } from './reasoning-review-validator.js';
 import { declaredPolicyReviewInput, workProductReviewInput } from './review-input.js';
+import { TEST_INDICATIONS } from './indications.testing.js';
+import { todayPromptOf } from './review-section.testing.js';
 
 const SUBJECT: AssuranceSubject = {
 	subjectId: 'pwu_01K5QFBR8Z0000000000000O21',
@@ -31,6 +33,7 @@ const SUBJECT: AssuranceSubject = {
 async function promptOf(input: ReasoningReviewInput): Promise<string> {
 	let seen = '';
 	await createAgyReasoningReviewValidator({
+		indications: TEST_INDICATIONS,
 		print: async (p) => {
 			seen = p;
 			return JSON.stringify({
@@ -238,7 +241,9 @@ describe('⭐⭐ package O-2 — D28: a declared review marks a work re-run’s 
 			['Design', true]
 		]);
 		expect(p, 'the cut work’s subject does not say what the mark means').toContain(`with the exit the host recorded${RERUN_CLAUSE}:`);
-		expect(p.length, 'the prompt passed its budget').toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.PROMPT_BUDGET);
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D52, `REG-D-146`; design §12.4) — ~~`expect(p.length, 'the prompt passed its budget').toBeLessThanOrEqual(PROMPT_BUDGET)`~~: the room is today's (D52): TODAY's prompt for this input, the head and today's review section, is within PROMPT_BUDGET; the prompt sent, within its whole bound.
+		expect(todayPromptOf(p, input.criteria).length, 'today’s prompt passed its budget').toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.PROMPT_BUDGET);
+		expect(p.length, 'the prompt sent passed its whole bound').toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.WHOLE_PROMPT_MAX);
 	});
 });
 
@@ -399,7 +404,9 @@ describe('⭐⭐ package X — D31: a work re-run’s view whose files carry mar
 			inThisStep: i % 2 === 0 ? ('UNCHANGED' as const) : ('ADDED' as const)
 		}));
 		const p = await promptOf(workProduct({ ...MARKED, files }));
-		expect(p.length, 'the marked prompt passed its budget').toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.PROMPT_BUDGET);
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D52, `REG-D-146`; design §12.4) — ~~`expect(p.length, 'the marked prompt passed its budget').toBeLessThanOrEqual(PROMPT_BUDGET)`~~: the room is today's (D52): TODAY's prompt for this input, the head and today's review section, is within PROMPT_BUDGET; the prompt sent, within its whole bound.
+		expect(todayPromptOf(p, SEEDED_REASONING_REVIEW_CRITERIA).length, 'today’s marked prompt passed its budget').toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.PROMPT_BUDGET);
+		expect(p.length, 'the marked prompt sent passed its whole bound').toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.WHOLE_PROMPT_MAX);
 		const lines = p.split('\n');
 		const at = lines.indexOf(markedHeading(1));
 		expect(at, 'the marked heading').toBeGreaterThan(-1);

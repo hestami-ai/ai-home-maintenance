@@ -184,6 +184,14 @@ import { getArtifactStore, getEngine, resetEngine, uiSession } from '../../../li
 import { stepSuccessShape } from '../../../../../../scripts/phase7/run-report-core.js';
 import { actions, load } from './+page.server.js';
 
+// ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D50 (`REG-D-146`): the product's configured decision model, whose potential
+// indications every review asks for before its first reviewer call, stood in for by a double that calls no model —
+// as the reviewer's program is. ⛔ Production configures none until package Z2, and refuses the review.
+vi.mock('../../../lib/server/assurance/decision-model.js', async () => {
+	const { TEST_INDICATIONS } = await import('../../../lib/server/assurance/indications.testing.js');
+	return { configuredIndications: () => TEST_INDICATIONS };
+});
+
 const LIVE_BACKEND_VARIABLES = [
 	'JPWB_ASSURANCE_TOOL',
 	'JPWB_ASSURANCE_MODEL',

@@ -35,6 +35,7 @@ import type { ProfessionalWorkObjectType } from '@janumipwb/rph-contracts';
 import type { ArtifactStore } from '@janumipwb/rph-ports';
 import { createFloorRegistry } from '../assurance/index.js';
 import type { StipulationLookup } from '../assurance/standin-reasoning-review-validator.js';
+import type { IndicationsSource } from '../assurance/reasoning-review-validator.js';
 import { anyStipulationRegistered, stipulationFor, workProductPwaOf } from '../stipulations.js';
 import {
 	classifyFloorRemediation,
@@ -179,6 +180,8 @@ export async function runFloorOverSubject(
 		readonly now: () => string;
 		readonly newId: (prefix: string) => string;
 		readonly print?: (prompt: string) => Promise<string>;
+		/** ⭐ Package Z1 — D50 — the decision model, beside `print`: none in production until package Z2, every review refused. */
+		readonly indications?: IndicationsSource;
 	}
 ): Promise<FloorRunOutcome> {
 	const assuranceSubject: AssuranceSubject = {
@@ -218,6 +221,7 @@ export async function runFloorOverSubject(
 			artifacts: opts.artifacts,
 			exchanges,
 			...(opts.print ? { print: opts.print } : {}),
+			...(opts.indications ? { indications: opts.indications } : {}),
 			stipulations
 		}),
 		// ⭐ `REG-D-071` Q5: the engine this floor records into decides whether a stipulated answer counts — the same

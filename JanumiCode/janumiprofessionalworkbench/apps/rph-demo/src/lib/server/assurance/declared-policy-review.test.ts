@@ -33,6 +33,16 @@ import {
 	REASONING_REVIEW_BUDGET
 } from './reasoning-review-validator.js';
 import { declaredPolicyReviewInput } from './review-input.js';
+import { TEST_INDICATIONS } from './indications.testing.js';
+import { todayPromptOf } from './review-section.testing.js';
+
+// ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D50 (`REG-D-146`): the product's configured decision model, whose potential
+// indications every review asks for before its first reviewer call, stood in for by a double that calls no model —
+// as the reviewer's program is. ⛔ Production configures none until package Z2, and refuses the review.
+vi.mock('./decision-model.js', async () => {
+	const { TEST_INDICATIONS } = await import('./indications.testing.js');
+	return { configuredIndications: () => TEST_INDICATIONS };
+});
 
 const SUBJECT: AssuranceSubject = {
 	subjectId: 'pwu_01ARZ3NDEKTSV4RRFFQ69GSD01',
@@ -72,6 +82,7 @@ const INPUT = declaredPolicyReviewInput({
 function capturing(reply: string) {
 	const prompts: string[] = [];
 	const validator = createAgyReasoningReviewValidator({
+		indications: TEST_INDICATIONS,
 		modelId: 'qualified-reviewer-model',
 		agentId: 'devin',
 		providerId: 'devin',
@@ -142,6 +153,7 @@ describe('⭐⭐ E2 — the model reviewer: the validator, in the DECLARED_POLIC
 
 	it('⛔ a call that THREW is ANSWERED, not thrown: no row, and the validator’s own statement as the failure', async () => {
 		const validator = createAgyReasoningReviewValidator({
+			indications: TEST_INDICATIONS,
 			modelId: 'qualified-reviewer-model',
 			print: () => Promise.reject(new Error('transport down'))
 		});
@@ -368,7 +380,9 @@ describe('⭐⭐ P5 package B (F2) — the work of many units, longer than its b
 			);
 		}
 		expect(prompt, 'the head-only cut still declared itself').not.toContain('[CUT FOR THIS REVIEW: the work — ');
-		expect(prompt.length, 'the prompt passed its budget').toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.PROMPT_BUDGET);
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D52, `REG-D-146`; design §12.4) — ~~`expect(prompt.length, 'the prompt passed its budget').toBeLessThanOrEqual(PROMPT_BUDGET)`~~: the room is today's (D52): TODAY's prompt for this input, the head and today's review section, is within PROMPT_BUDGET; the prompt sent, within its whole bound.
+		expect(todayPromptOf(prompt, input.criteria).length, 'today’s prompt passed its budget').toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.PROMPT_BUDGET);
+		expect(prompt.length, 'the prompt sent passed its whole bound').toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.WHOLE_PROMPT_MAX);
 	});
 
 	it('⛔ a unit whose commands alone pass its share keeps its first commands, the rest declared removed', async () => {

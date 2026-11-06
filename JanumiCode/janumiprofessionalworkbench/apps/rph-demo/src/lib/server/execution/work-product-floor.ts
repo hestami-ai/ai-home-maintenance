@@ -26,6 +26,7 @@ import type { ArtifactStore } from '@janumipwb/rph-ports';
 import type { AuthedEngineHandle } from '@janumipwb/rph-engine';
 import { splitAnswerSpan } from '../assurance/agy-cli.js';
 import { workProductReviewInput } from '../assurance/review-input.js';
+import type { IndicationsSource } from '../assurance/reasoning-review-validator.js';
 import { runFloorOverSubject, type FloorRunOutcome } from './floor-over-subject.js';
 
 /** What this module needs about the artifact and the call that produced it. Structural, so a test can drive it. */
@@ -155,6 +156,8 @@ export async function runWorkProductFloor(
 		readonly newId: (prefix: string) => string;
 		readonly criteria: readonly AssessmentCriterion[];
 		readonly print?: (prompt: string) => Promise<string>;
+		/** ⭐ Package Z1 — D50 — the decision model, beside `print` (`runFloorOverSubject`). */
+		readonly indications?: IndicationsSource;
 	}
 	// ⭑ THE SHARED OUTCOME, NOT A RESTATEMENT OF IT. This was an inline object type carrying its own docblock
 	// for `remediation`; a second caller restating it is how two descriptions of one shape come to disagree

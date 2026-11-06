@@ -108,6 +108,7 @@ import { DEVIN_REVIEWER_PREAMBLE } from '../../apps/rph-demo/src/lib/server/tool
 import { fenceSkeletonDigest } from '../fence-skeleton/digest.js';
 import { CURRENT_CASE_SET_FILE, type CaseSet, type QualificationCase } from './cases.js';
 import { canonicalJson, reviewerFingerprintOf, sha256, type FingerprintComponents } from './digest.js';
+import { PLACEHOLDER_INDICATIONS } from './indications.js';
 import { caseReviewInput } from './materialize.js';
 import {
 	CATALOG_DECLARED_POLICIES,
@@ -238,8 +239,10 @@ const SEEDED_INDEPENDENCE: IndependenceRequirement = (() => {
 
 export const PRODUCT_SEAMS: FingerprintSeams = {
 	// ⛔ Built WITHOUT `requireReportedModel`, as the runner's is (`JAN-SELREV` D6): only the product's devin branch sets it.
+	// ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D50 (`REG-D-146`) — and with the scripts' placeholder decision model, every question
+	// scored 0 (`indications.ts`): no record of scores exists until package Z2's, which replace it (D54).
 	validator: (print) =>
-		createAgyReasoningReviewValidator({ ...FINGERPRINT_EVALUATOR, clock: FIXED_CLOCK, print }),
+		createAgyReasoningReviewValidator({ ...FINGERPRINT_EVALUATOR, clock: FIXED_CLOCK, indications: PLACEHOLDER_INDICATIONS, print }),
 	evaluate: evaluateCase,
 	budget: REASONING_REVIEW_BUDGET,
 	criteria: SEEDED_REASONING_REVIEW_CRITERIA,
@@ -452,6 +455,8 @@ async function scoringDigestOf(seams: FingerprintSeams): Promise<string> {
 			candidate: FINGERPRINT_CANDIDATE,
 			scoringDigest: NO_DIGEST,
 			requiredEvidenceOf,
+			// ⭐ Package Z1 — the placeholder decision model, as the seams' validator is given (`PRODUCT_SEAMS`).
+			indications: PLACEHOLDER_INDICATIONS,
 			call: async (p) => {
 				sent.push(p);
 				return { returned: entry.replies[Math.min(n++, entry.replies.length - 1)]!, served: null };

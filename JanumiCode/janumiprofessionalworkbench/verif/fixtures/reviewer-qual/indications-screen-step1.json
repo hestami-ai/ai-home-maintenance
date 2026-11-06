@@ -1,0 +1,1114 @@
+{
+	"about": "Package Z1's acceptance (REG-D-146; design §12.2 D50 and §12.4 D52; roadmap §9b.5b, Z1 predicted reds 3 and 4). `cases`: for the 11 case-set-v13 cases the screen of the sponsor's construct measured, step 1's recorded score of each question it asked alone (repetition 1, cold), keyed as it was asked (c00... for the checks in the rubric's order, s00... for the statements in the cut's order), with the sha256 of what it asked about (a check's `id: label`, or the statement), and `armN`, the sha256 of the screen's new-arm prompt built from those scores. `headsBeforeZ1`: for all 97 v13 cases, the sha256 of the product's first prompt before its review section (everything before `Evaluate EACH derivational-integrity failure class below.`), as the code before package Z1 rendered it at d8c7a014.",
+	"scoredBy": {
+		"model": "pplx-decider:27b-q4_K_M",
+		"digest": "733585a9ebb6",
+		"serverVersion": "0.40.11"
+	},
+	"cases": {
+		"W12-CSV-RR-08": {
+			"armN": "92f2cc856fe5bf9be343c5aee41beb03b267b4051bc90cd0cdb7165eafc3e9eb",
+			"checks": {
+				"c00": {
+					"score": 0.04067103588634973,
+					"asked": "fa22876d0ba1eb8f8447e2631f4d55a2ebb25bd5945752764088a6e2c09e4806"
+				},
+				"c01": {
+					"score": 0.04927611087052555,
+					"asked": "0b400e7857ac1ee2d9d628ad3d79577cd52b248428ee1e50ecb02a1f5f206865"
+				},
+				"c02": {
+					"score": 0.06362179144589142,
+					"asked": "62869ae486784ee926543cfbdbb20ebc109a6d29a20da5589aa9dce73d7e91fc"
+				},
+				"c03": {
+					"score": 0.04483397341668352,
+					"asked": "1ebc51b9da8d313769a5e9d78f3a4e6c9be62f3daef9fa4fa803b9f01cd5670c"
+				},
+				"c04": {
+					"score": 0.04365673239112008,
+					"asked": "9aef6e48d4d6bf3bb44aa986baeb5c395ae4edfc36b58f8678a6de06b2df605b"
+				},
+				"c05": {
+					"score": 0.14483240122284913,
+					"asked": "5877ea6e9e8ebc4bfcab5c558363a5b40665cd98f465b94374cc46f5effc7b97"
+				},
+				"c06": {
+					"score": 0.16817583571567352,
+					"asked": "fd15dd547f68fb1876dd4f16d42d383743ea5d06c23c428aa38c085745dddd6f"
+				},
+				"c07": {
+					"score": 0.10972171447424561,
+					"asked": "e73b2ba080d274d9025fd3bcf8d2497913023545c1dd00bded783b4e3a05fcab"
+				},
+				"c08": {
+					"score": 0.038948759608066874,
+					"asked": "45725a755f521f7ac222bfb537c8d7ba9a5f07257c278a416764fea027521d54"
+				}
+			},
+			"statements": {
+				"s00": {
+					"score": 0.23759313198534798,
+					"asked": "7f4d67caa58636d950c4a84180001e6941a9bf85c41b7a223bf5753b5d004e7c"
+				},
+				"s01": {
+					"score": 0.0017301115920740446,
+					"asked": "949ff6ff34ba0b26c09030ed8acca50ec0e8fc3458992a21f14822ee8c650635"
+				},
+				"s02": {
+					"score": 0.06060284849817817,
+					"asked": "4209dfd5ac676aca58f7e3e5c6e898f5c2feca53fcef03e878b464bdb8b2afbd"
+				},
+				"s03": {
+					"score": 0.007947019735365508,
+					"asked": "dffc7ba8f1be8181b5ae3d4af1b9902ede5923b6a25f7f5a88157bf2574d2d47"
+				},
+				"s04": {
+					"score": 0.01931252751217159,
+					"asked": "97ff80c67b4953830f2e97e73af7a8581b7c212d0f2e16aad4603a7f3ecb3812"
+				},
+				"s05": {
+					"score": 0.1475467876254712,
+					"asked": "a61cc67c8c9e396166fc8f3d18a11cc57db5622c33784f79c4539f4c2d445482"
+				},
+				"s06": {
+					"score": 0.24218752761121032,
+					"asked": "35011635efc25f06ea61bf4cd30ceb8ad664cbe641d9e81e98c6aebb322ba529"
+				},
+				"s07": {
+					"score": 0.02656735542686105,
+					"asked": "04d388391260e4d9c9e45b7bd8b2894363961cf7d4299f8dd3b9b7f9f6fa98e1"
+				},
+				"s08": {
+					"score": 0.03535132278314497,
+					"asked": "f816e460bc76acb80e3e6337dff8e8692d395f2bfa973a24e7788d39aeaab4a8"
+				},
+				"s09": {
+					"score": 0.035038101958575464,
+					"asked": "b3e6057f61a38d6a847741326a3ba5bfcfd576206b0fe4daece05615e575fda3"
+				},
+				"s10": {
+					"score": 0.030308269929301305,
+					"asked": "a911231888361e2534219346c63bc9f882e9cc476dd302632edb2928efc8d979"
+				},
+				"s11": {
+					"score": 0.08262609730086745,
+					"asked": "96a77cbbedfca842b486e47fc27296315649be1a5a8e6d40db0ebff4e02c0cf4"
+				},
+				"s12": {
+					"score": 0.013492291522729913,
+					"asked": "f9f253e839d7c4723fd18001b395b7f72efed90dfa4856ee9529fcdf726555b6"
+				},
+				"s13": {
+					"score": 0.021112382607711005,
+					"asked": "b93bc86b8f27299bbe23e525cb0ed7247766d6553ed900d2653d3e064adfbc05"
+				},
+				"s14": {
+					"score": 0.07331016777373507,
+					"asked": "745decd7a4925e7c44f7c5d31c9ecbf710725f3b3820c63ff0080259741653cf"
+				}
+			}
+		},
+		"W12-CSV-RR-03": {
+			"armN": "779f686de250f4539b4eeec760a87ed3fbc1e3a70f7ae5827cbcf3f499c06b1c",
+			"checks": {
+				"c00": {
+					"score": 0.0954507077203378,
+					"asked": "fa22876d0ba1eb8f8447e2631f4d55a2ebb25bd5945752764088a6e2c09e4806"
+				},
+				"c01": {
+					"score": 0.32355669193133213,
+					"asked": "0b400e7857ac1ee2d9d628ad3d79577cd52b248428ee1e50ecb02a1f5f206865"
+				},
+				"c02": {
+					"score": 0.27733705583995055,
+					"asked": "62869ae486784ee926543cfbdbb20ebc109a6d29a20da5589aa9dce73d7e91fc"
+				},
+				"c03": {
+					"score": 0.13653135251825285,
+					"asked": "1ebc51b9da8d313769a5e9d78f3a4e6c9be62f3daef9fa4fa803b9f01cd5670c"
+				},
+				"c04": {
+					"score": 0.3023653014803769,
+					"asked": "9aef6e48d4d6bf3bb44aa986baeb5c395ae4edfc36b58f8678a6de06b2df605b"
+				},
+				"c05": {
+					"score": 0.12112631609489101,
+					"asked": "5877ea6e9e8ebc4bfcab5c558363a5b40665cd98f465b94374cc46f5effc7b97"
+				},
+				"c06": {
+					"score": 0.1484065523382739,
+					"asked": "fd15dd547f68fb1876dd4f16d42d383743ea5d06c23c428aa38c085745dddd6f"
+				},
+				"c07": {
+					"score": 0.07862488003679498,
+					"asked": "e73b2ba080d274d9025fd3bcf8d2497913023545c1dd00bded783b4e3a05fcab"
+				},
+				"c08": {
+					"score": 0.05656200881865034,
+					"asked": "45725a755f521f7ac222bfb537c8d7ba9a5f07257c278a416764fea027521d54"
+				}
+			},
+			"statements": {
+				"s00": {
+					"score": 0.002180643089641458,
+					"asked": "7f4d67caa58636d950c4a84180001e6941a9bf85c41b7a223bf5753b5d004e7c"
+				},
+				"s01": {
+					"score": 0.01678244805861899,
+					"asked": "5f533975a8e05fc1e4cafdd608b54bdf495b3adc25458fd942611564fcee13e4"
+				},
+				"s02": {
+					"score": 0.03929794291277392,
+					"asked": "c47c2e2ebfb053ef2ae6c8a844b06133b7e4da6ae0725a67604555e11583e964"
+				},
+				"s03": {
+					"score": 0.008211537931866313,
+					"asked": "dffc7ba8f1be8181b5ae3d4af1b9902ede5923b6a25f7f5a88157bf2574d2d47"
+				},
+				"s04": {
+					"score": 0.009866063394285585,
+					"asked": "59a2bde810167a40a918e29f6eecc7aae61dd54fba10177fe904ee46fb151bb5"
+				},
+				"s05": {
+					"score": 0.39203989079072704,
+					"asked": "a61cc67c8c9e396166fc8f3d18a11cc57db5622c33784f79c4539f4c2d445482"
+				},
+				"s06": {
+					"score": 0.003975461533041862,
+					"asked": "35011635efc25f06ea61bf4cd30ceb8ad664cbe641d9e81e98c6aebb322ba529"
+				},
+				"s07": {
+					"score": 0.023170207318027,
+					"asked": "04d388391260e4d9c9e45b7bd8b2894363961cf7d4299f8dd3b9b7f9f6fa98e1"
+				},
+				"s08": {
+					"score": 0.026536346324683498,
+					"asked": "24477073baef082988f4369cec2f660ffb4a7d1f17da26d176982b7677c8e751"
+				},
+				"s09": {
+					"score": 0.03912477237312741,
+					"asked": "927db642eab19f0d1628ecd6b7db01744eae4767336155b1ea56bd237013efa7"
+				},
+				"s10": {
+					"score": 0.025797875311237846,
+					"asked": "b3e6057f61a38d6a847741326a3ba5bfcfd576206b0fe4daece05615e575fda3"
+				},
+				"s11": {
+					"score": 0.02785514664961638,
+					"asked": "a911231888361e2534219346c63bc9f882e9cc476dd302632edb2928efc8d979"
+				},
+				"s12": {
+					"score": 0.06513782024650136,
+					"asked": "96a77cbbedfca842b486e47fc27296315649be1a5a8e6d40db0ebff4e02c0cf4"
+				},
+				"s13": {
+					"score": 0.006294542735417158,
+					"asked": "5f15efd2538703966eca81a99b47e24af9268cddf5f119b1978c6f7b0fe783d1"
+				},
+				"s14": {
+					"score": 0.02709133543823017,
+					"asked": "f9f253e839d7c4723fd18001b395b7f72efed90dfa4856ee9529fcdf726555b6"
+				},
+				"s15": {
+					"score": 0.015488830179076762,
+					"asked": "b93bc86b8f27299bbe23e525cb0ed7247766d6553ed900d2653d3e064adfbc05"
+				},
+				"s16": {
+					"score": 0.03992633225255123,
+					"asked": "745decd7a4925e7c44f7c5d31c9ecbf710725f3b3820c63ff0080259741653cf"
+				}
+			}
+		},
+		"W12-RR-03": {
+			"armN": "5fefe195ee1e944e99920fbc4afce64bbd58a818ebfddbd299f4f1c7e5d70e56",
+			"checks": {
+				"c00": {
+					"score": 0.03677628937998947,
+					"asked": "fa22876d0ba1eb8f8447e2631f4d55a2ebb25bd5945752764088a6e2c09e4806"
+				},
+				"c01": {
+					"score": 0.03062665874750801,
+					"asked": "0b400e7857ac1ee2d9d628ad3d79577cd52b248428ee1e50ecb02a1f5f206865"
+				},
+				"c02": {
+					"score": 0.10865612582558248,
+					"asked": "62869ae486784ee926543cfbdbb20ebc109a6d29a20da5589aa9dce73d7e91fc"
+				},
+				"c03": {
+					"score": 0.02690794317042357,
+					"asked": "1ebc51b9da8d313769a5e9d78f3a4e6c9be62f3daef9fa4fa803b9f01cd5670c"
+				},
+				"c04": {
+					"score": 0.0328856004346713,
+					"asked": "9aef6e48d4d6bf3bb44aa986baeb5c395ae4edfc36b58f8678a6de06b2df605b"
+				},
+				"c05": {
+					"score": 0.22192819968921523,
+					"asked": "5877ea6e9e8ebc4bfcab5c558363a5b40665cd98f465b94374cc46f5effc7b97"
+				},
+				"c06": {
+					"score": 0.14137008859434821,
+					"asked": "fd15dd547f68fb1876dd4f16d42d383743ea5d06c23c428aa38c085745dddd6f"
+				},
+				"c07": {
+					"score": 0.049953614222287904,
+					"asked": "e73b2ba080d274d9025fd3bcf8d2497913023545c1dd00bded783b4e3a05fcab"
+				},
+				"c08": {
+					"score": 0.022516189170787754,
+					"asked": "45725a755f521f7ac222bfb537c8d7ba9a5f07257c278a416764fea027521d54"
+				}
+			},
+			"statements": {
+				"s00": {
+					"score": 0.39051679318981897,
+					"asked": "5b0aa55f26e2c1651da4b4199be2132e63d484206d043e19eef6c3216372b13c"
+				},
+				"s01": {
+					"score": 0.0009296479620602925,
+					"asked": "da2ea1a69a776a541bdeaf5bc51090d755960437b18b9d08c7115c9a31031913"
+				},
+				"s02": {
+					"score": 0.0015937005155459195,
+					"asked": "8d5a74fd99b2a01698ec13b8315f06f92a2587d2b386cf02000ac716754975ba"
+				},
+				"s03": {
+					"score": 0.004338036824373747,
+					"asked": "c5d2409d868da882cf7968b752ad9de66c92f0edebfbc7d74c33d10acf7fea57"
+				},
+				"s04": {
+					"score": 0.0015108709774466261,
+					"asked": "7f2055bc505ea8d24db656f3cf2a9d332ad213d4e14ab5712397d3cdd56e42cb"
+				},
+				"s05": {
+					"score": 0.00852203306222451,
+					"asked": "106da7df5c008aa00bee86c3cc3684d1d45ffef8d5512d989cea4025aad7b57a"
+				},
+				"s06": {
+					"score": 0.04154918967185135,
+					"asked": "bae1599301f20991eaa7d9674fbea3ee9c96174d5d205417f3e516932aa2461b"
+				},
+				"s07": {
+					"score": 0.20327704594038945,
+					"asked": "71bec3ca23cfa49ed9a3ba0a2e460f550fd45e1ecea65d6f78f675d3ccf434fe"
+				},
+				"s08": {
+					"score": 0.0023987100567664193,
+					"asked": "306f462d9002dbe29d5c4d4fb815c1707353291e7127295c00d5117c94df21b7"
+				},
+				"s09": {
+					"score": 0.005182501990661493,
+					"asked": "9bfe85156e77e6c3849c0a5e62446bf3996a4d229108ad1f91df2493c87316ac"
+				},
+				"s10": {
+					"score": 0.03036998626289374,
+					"asked": "2214c501834e797cfdd87a593eb2e0d73d897182578342902b62b25f24f58df4"
+				},
+				"s11": {
+					"score": 0.009550021924299755,
+					"asked": "3b7a4255e0f46facb7b25232e5644f1be9070330714ad7447078bfce086ede0a"
+				},
+				"s12": {
+					"score": 0.01676729157834666,
+					"asked": "cce933ee40e422f1b74f243fd887a7984990f9776a7cdbb72b0dc553e447b450"
+				}
+			}
+		},
+		"D12-AC-01": {
+			"armN": "59ddc9ba57722aa5c67b3fff48d3b69a7e4acc91f5f03ebdb60867e2083f65d0",
+			"checks": {
+				"c00": {
+					"score": 0.5496464297522722,
+					"asked": "b63835a909f3a8f483b67e751050d7895a127e230c1756f90333aee7ae5b4b8f"
+				},
+				"c01": {
+					"score": 0.014105875959400393,
+					"asked": "570c38152ac7e5bbceb420914b76eee153ebb657e8a9379b2cd90ba911ede496"
+				},
+				"c02": {
+					"score": 0.06411100144516714,
+					"asked": "671de667eb4277ef93d6e06fb2b756eedaac7b9a29411c484154e09623cfad14"
+				},
+				"c03": {
+					"score": 0.405317722193204,
+					"asked": "5ff0b90187a6bb01db6610ed199dcb85e5f3f885011b63dddbb8cd4a20884daf"
+				},
+				"c04": {
+					"score": 0.1261106396502189,
+					"asked": "8982e8c80fc60435cda4365770d0c0e94b88e3761b8cc5b806eebe2a1d649cd3"
+				},
+				"c05": {
+					"score": 0.08465234158253931,
+					"asked": "72182ebfbf309b74281879563d8b4ba336d7a50690f41622bbbe040eadb647fa"
+				},
+				"c06": {
+					"score": 0.12863239193970466,
+					"asked": "7cdb654e8c6ff594b5e368045365c2a20b7ddd96951f5b932957f7a1a199508c"
+				},
+				"c07": {
+					"score": 0.17239408792255473,
+					"asked": "6519170d028a344427392de78213edbd9820289e90e3103bf3f1d94e42433d44"
+				},
+				"c08": {
+					"score": 0.04385816404034236,
+					"asked": "d2238aa07d1355391974fdd9882d79b203ef273cce35a88118c15de3b547dd9a"
+				},
+				"c09": {
+					"score": 0.03861343257333709,
+					"asked": "6cd5ddf1588dd1413ad93d70cc030f33a39f50e8d2654e1db96e85f8dcce7ab8"
+				}
+			},
+			"statements": {
+				"s00": {
+					"score": 0.517224688811916,
+					"asked": "58dbd96d520180438950c701f6b3074e62fe4abe9b4d69f55fdcec302ed03d4a"
+				},
+				"s01": {
+					"score": 0.061508650549232845,
+					"asked": "960f30e675320aabccffd2ab1a03df6cacc94dd5b7d29d1c10155a8aca7ccb62"
+				},
+				"s02": {
+					"score": 0.012052501095528897,
+					"asked": "cefd189a468ddb23ef85c226bf36d0584547cebd2adfde8df972d24e491fcb65"
+				},
+				"s03": {
+					"score": 0.0341046890412421,
+					"asked": "e7a0de076672b922f4c7afae6df1403f3000b8610df906cc64440595ccfe1f46"
+				},
+				"s04": {
+					"score": 0.022620128495211566,
+					"asked": "e270128c64527b7a9135967f8953f12466fc1aa33651b6b2624cce1acdc01489"
+				}
+			}
+		},
+		"W13-CSV-RERUN-RR-07": {
+			"armN": "858a0d6f3b4e817f52dffc4f0fcce8b278fdb661a866196e37134effe4d28526",
+			"checks": {
+				"c00": {
+					"score": 0.021925910865099176,
+					"asked": "fa22876d0ba1eb8f8447e2631f4d55a2ebb25bd5945752764088a6e2c09e4806"
+				},
+				"c01": {
+					"score": 0.03821285570845682,
+					"asked": "0b400e7857ac1ee2d9d628ad3d79577cd52b248428ee1e50ecb02a1f5f206865"
+				},
+				"c02": {
+					"score": 0.04736738882074947,
+					"asked": "62869ae486784ee926543cfbdbb20ebc109a6d29a20da5589aa9dce73d7e91fc"
+				},
+				"c03": {
+					"score": 0.07103929039967774,
+					"asked": "1ebc51b9da8d313769a5e9d78f3a4e6c9be62f3daef9fa4fa803b9f01cd5670c"
+				},
+				"c04": {
+					"score": 0.06178592340072348,
+					"asked": "9aef6e48d4d6bf3bb44aa986baeb5c395ae4edfc36b58f8678a6de06b2df605b"
+				},
+				"c05": {
+					"score": 0.35191601278381784,
+					"asked": "5877ea6e9e8ebc4bfcab5c558363a5b40665cd98f465b94374cc46f5effc7b97"
+				},
+				"c06": {
+					"score": 0.5644972907908898,
+					"asked": "fd15dd547f68fb1876dd4f16d42d383743ea5d06c23c428aa38c085745dddd6f"
+				},
+				"c07": {
+					"score": 0.1520788225782057,
+					"asked": "e73b2ba080d274d9025fd3bcf8d2497913023545c1dd00bded783b4e3a05fcab"
+				},
+				"c08": {
+					"score": 0.0447305238606433,
+					"asked": "45725a755f521f7ac222bfb537c8d7ba9a5f07257c278a416764fea027521d54"
+				}
+			},
+			"statements": {
+				"s00": {
+					"score": 0.5111927245638234,
+					"asked": "5d4f9e6bb5cb6de1352df8a716fb92267e043041b57a3e8cec48f60f1d04fdf5"
+				},
+				"s01": {
+					"score": 0.044125833017699,
+					"asked": "69603bd8e7b55b5a364e29ca7c9ee3617ed302f3675bf666de95c9a10969bf1b"
+				},
+				"s02": {
+					"score": 0.0009629654164162388,
+					"asked": "949ff6ff34ba0b26c09030ed8acca50ec0e8fc3458992a21f14822ee8c650635"
+				},
+				"s03": {
+					"score": 0.011902338505786527,
+					"asked": "3c677b92ab542597ae6b61d735eb2f79ad2045b34ccf18939fafe1d27bc21ec0"
+				},
+				"s04": {
+					"score": 0.011058464800105187,
+					"asked": "281dff01c76905282ba04809123481c26704987571a08827e3eeebb58ae5b5a2"
+				},
+				"s05": {
+					"score": 0.012558967674776114,
+					"asked": "97ff80c67b4953830f2e97e73af7a8581b7c212d0f2e16aad4603a7f3ecb3812"
+				},
+				"s06": {
+					"score": 0.12321103261888343,
+					"asked": "a61cc67c8c9e396166fc8f3d18a11cc57db5622c33784f79c4539f4c2d445482"
+				},
+				"s07": {
+					"score": 0.08884531912636436,
+					"asked": "a31c8e66a745c5894dfec17249a074d7c7b18ce42b0258a4fb2d11b986b63b29"
+				},
+				"s08": {
+					"score": 0.03654900132960304,
+					"asked": "a1432f46c3bdf5161df350955a9f8b92803b004c3429d639020e0c706e4b8700"
+				},
+				"s09": {
+					"score": 0.5425109835223396,
+					"asked": "f6799a5cfdf18bad705242910c5e5280fb618778585b82fc3d3ce9b5bad46fa2"
+				},
+				"s10": {
+					"score": 0.01837048303126775,
+					"asked": "b24a6f1129053299fadab15e3d264c898be0ca79a22e76da12ce3857f4fdfb16"
+				},
+				"s11": {
+					"score": 0.012619408626920589,
+					"asked": "e428a18b0961968f025a19b9a0e3d6a653b265315209ec797dcdefdcf5119f05"
+				},
+				"s12": {
+					"score": 0.014178265684828141,
+					"asked": "020d395bef2c0feb4727f0b2dd235a083d8f4718ba4942364394d2001ed712a6"
+				},
+				"s13": {
+					"score": 0.0249501186270019,
+					"asked": "b3e6057f61a38d6a847741326a3ba5bfcfd576206b0fe4daece05615e575fda3"
+				},
+				"s14": {
+					"score": 0.03035083813056264,
+					"asked": "a911231888361e2534219346c63bc9f882e9cc476dd302632edb2928efc8d979"
+				},
+				"s15": {
+					"score": 0.05156129697560479,
+					"asked": "96a77cbbedfca842b486e47fc27296315649be1a5a8e6d40db0ebff4e02c0cf4"
+				},
+				"s16": {
+					"score": 0.01507534612303136,
+					"asked": "f9f253e839d7c4723fd18001b395b7f72efed90dfa4856ee9529fcdf726555b6"
+				},
+				"s17": {
+					"score": 0.009419080498315587,
+					"asked": "b93bc86b8f27299bbe23e525cb0ed7247766d6553ed900d2653d3e064adfbc05"
+				},
+				"s18": {
+					"score": 0.04026808889872356,
+					"asked": "745decd7a4925e7c44f7c5d31c9ecbf710725f3b3820c63ff0080259741653cf"
+				}
+			}
+		},
+		"P12-RR-02": {
+			"armN": "0217ee5c1366e4003e5756f05e9f5ff9e6e87f89633c40af9bdcb7464bc273d6",
+			"checks": {
+				"c00": {
+					"score": 0.04314529861228193,
+					"asked": "fa22876d0ba1eb8f8447e2631f4d55a2ebb25bd5945752764088a6e2c09e4806"
+				},
+				"c01": {
+					"score": 0.05813715879111306,
+					"asked": "0b400e7857ac1ee2d9d628ad3d79577cd52b248428ee1e50ecb02a1f5f206865"
+				},
+				"c02": {
+					"score": 0.10974803708059169,
+					"asked": "62869ae486784ee926543cfbdbb20ebc109a6d29a20da5589aa9dce73d7e91fc"
+				},
+				"c03": {
+					"score": 0.03201000070342961,
+					"asked": "1ebc51b9da8d313769a5e9d78f3a4e6c9be62f3daef9fa4fa803b9f01cd5670c"
+				},
+				"c04": {
+					"score": 0.02787156156772329,
+					"asked": "9aef6e48d4d6bf3bb44aa986baeb5c395ae4edfc36b58f8678a6de06b2df605b"
+				},
+				"c05": {
+					"score": 0.09016903754088837,
+					"asked": "5877ea6e9e8ebc4bfcab5c558363a5b40665cd98f465b94374cc46f5effc7b97"
+				},
+				"c06": {
+					"score": 0.05418282740361065,
+					"asked": "fd15dd547f68fb1876dd4f16d42d383743ea5d06c23c428aa38c085745dddd6f"
+				},
+				"c07": {
+					"score": 0.06440597926706475,
+					"asked": "e73b2ba080d274d9025fd3bcf8d2497913023545c1dd00bded783b4e3a05fcab"
+				},
+				"c08": {
+					"score": 0.03757408737166512,
+					"asked": "45725a755f521f7ac222bfb537c8d7ba9a5f07257c278a416764fea027521d54"
+				}
+			},
+			"statements": {
+				"s00": {
+					"score": 0.037194200338226804,
+					"asked": "0c8fb130738ed98c5e2f1580b916508009bb8c37666782f1036fd88cbca2be27"
+				},
+				"s01": {
+					"score": 0.06032952514115113,
+					"asked": "13c19ad8142d11301a023b1b6343da604fc1c6feae83b5947cec7501a1c1228a"
+				},
+				"s02": {
+					"score": 0.07285711948240861,
+					"asked": "c0a65a579e40ba92661db6fb93e7f862ccc21ae53a9d68beb9e4b5a32024a8a2"
+				},
+				"s03": {
+					"score": 0.03275933937058642,
+					"asked": "e7983e3d618733d36d50164e0cda496a1cc41f5443af824d58f61dbd3bb8a6e3"
+				},
+				"s04": {
+					"score": 0.06909966152201774,
+					"asked": "6234b022d7e92da8a55d61b20ed444ffc0bbce81bd551c3e4bd48a57ff2e42f1"
+				}
+			}
+		},
+		"W12-CSV-CLEAN": {
+			"armN": "514eb53ea4aa34845bbdb27b347d471af31f68062164dcb6a9e03e91c4cf1417",
+			"checks": {
+				"c00": {
+					"score": 0.015576915396532736,
+					"asked": "fa22876d0ba1eb8f8447e2631f4d55a2ebb25bd5945752764088a6e2c09e4806"
+				},
+				"c01": {
+					"score": 0.02173384679905005,
+					"asked": "0b400e7857ac1ee2d9d628ad3d79577cd52b248428ee1e50ecb02a1f5f206865"
+				},
+				"c02": {
+					"score": 0.03397186403819413,
+					"asked": "62869ae486784ee926543cfbdbb20ebc109a6d29a20da5589aa9dce73d7e91fc"
+				},
+				"c03": {
+					"score": 0.020262205364949836,
+					"asked": "1ebc51b9da8d313769a5e9d78f3a4e6c9be62f3daef9fa4fa803b9f01cd5670c"
+				},
+				"c04": {
+					"score": 0.03569427198656698,
+					"asked": "9aef6e48d4d6bf3bb44aa986baeb5c395ae4edfc36b58f8678a6de06b2df605b"
+				},
+				"c05": {
+					"score": 0.07292273238031674,
+					"asked": "5877ea6e9e8ebc4bfcab5c558363a5b40665cd98f465b94374cc46f5effc7b97"
+				},
+				"c06": {
+					"score": 0.05143619523255883,
+					"asked": "fd15dd547f68fb1876dd4f16d42d383743ea5d06c23c428aa38c085745dddd6f"
+				},
+				"c07": {
+					"score": 0.060950825705118485,
+					"asked": "e73b2ba080d274d9025fd3bcf8d2497913023545c1dd00bded783b4e3a05fcab"
+				},
+				"c08": {
+					"score": 0.02761291526215786,
+					"asked": "45725a755f521f7ac222bfb537c8d7ba9a5f07257c278a416764fea027521d54"
+				}
+			},
+			"statements": {
+				"s00": {
+					"score": 0.002254049202577019,
+					"asked": "7f4d67caa58636d950c4a84180001e6941a9bf85c41b7a223bf5753b5d004e7c"
+				},
+				"s01": {
+					"score": 0.001383834511570937,
+					"asked": "949ff6ff34ba0b26c09030ed8acca50ec0e8fc3458992a21f14822ee8c650635"
+				},
+				"s02": {
+					"score": 0.048717225115214285,
+					"asked": "4209dfd5ac676aca58f7e3e5c6e898f5c2feca53fcef03e878b464bdb8b2afbd"
+				},
+				"s03": {
+					"score": 0.007875230908740026,
+					"asked": "dffc7ba8f1be8181b5ae3d4af1b9902ede5923b6a25f7f5a88157bf2574d2d47"
+				},
+				"s04": {
+					"score": 0.010113018254557763,
+					"asked": "97ff80c67b4953830f2e97e73af7a8581b7c212d0f2e16aad4603a7f3ecb3812"
+				},
+				"s05": {
+					"score": 0.11631646273335765,
+					"asked": "a61cc67c8c9e396166fc8f3d18a11cc57db5622c33784f79c4539f4c2d445482"
+				},
+				"s06": {
+					"score": 0.0028036743340655356,
+					"asked": "35011635efc25f06ea61bf4cd30ceb8ad664cbe641d9e81e98c6aebb322ba529"
+				},
+				"s07": {
+					"score": 0.023724752869696435,
+					"asked": "04d388391260e4d9c9e45b7bd8b2894363961cf7d4299f8dd3b9b7f9f6fa98e1"
+				},
+				"s08": {
+					"score": 0.02408271365855214,
+					"asked": "f816e460bc76acb80e3e6337dff8e8692d395f2bfa973a24e7788d39aeaab4a8"
+				},
+				"s09": {
+					"score": 0.0201313579443838,
+					"asked": "b3e6057f61a38d6a847741326a3ba5bfcfd576206b0fe4daece05615e575fda3"
+				},
+				"s10": {
+					"score": 0.028599225531674953,
+					"asked": "a911231888361e2534219346c63bc9f882e9cc476dd302632edb2928efc8d979"
+				},
+				"s11": {
+					"score": 0.04012397949397461,
+					"asked": "96a77cbbedfca842b486e47fc27296315649be1a5a8e6d40db0ebff4e02c0cf4"
+				},
+				"s12": {
+					"score": 0.016833270383981035,
+					"asked": "f9f253e839d7c4723fd18001b395b7f72efed90dfa4856ee9529fcdf726555b6"
+				},
+				"s13": {
+					"score": 0.010230955783077759,
+					"asked": "b93bc86b8f27299bbe23e525cb0ed7247766d6553ed900d2653d3e064adfbc05"
+				},
+				"s14": {
+					"score": 0.03358180753422014,
+					"asked": "745decd7a4925e7c44f7c5d31c9ecbf710725f3b3820c63ff0080259741653cf"
+				}
+			}
+		},
+		"W12-CLEAN": {
+			"armN": "0d3be2fcfe606c113fa8a156dcf9dff9b1b83ace3fee1ad6f0e0902b77c31040",
+			"checks": {
+				"c00": {
+					"score": 0.006726788631609378,
+					"asked": "fa22876d0ba1eb8f8447e2631f4d55a2ebb25bd5945752764088a6e2c09e4806"
+				},
+				"c01": {
+					"score": 0.013125099626553657,
+					"asked": "0b400e7857ac1ee2d9d628ad3d79577cd52b248428ee1e50ecb02a1f5f206865"
+				},
+				"c02": {
+					"score": 0.02519693565711601,
+					"asked": "62869ae486784ee926543cfbdbb20ebc109a6d29a20da5589aa9dce73d7e91fc"
+				},
+				"c03": {
+					"score": 0.005935902713784167,
+					"asked": "1ebc51b9da8d313769a5e9d78f3a4e6c9be62f3daef9fa4fa803b9f01cd5670c"
+				},
+				"c04": {
+					"score": 0.01713317924726905,
+					"asked": "9aef6e48d4d6bf3bb44aa986baeb5c395ae4edfc36b58f8678a6de06b2df605b"
+				},
+				"c05": {
+					"score": 0.017046185310860558,
+					"asked": "5877ea6e9e8ebc4bfcab5c558363a5b40665cd98f465b94374cc46f5effc7b97"
+				},
+				"c06": {
+					"score": 0.009415790829613463,
+					"asked": "fd15dd547f68fb1876dd4f16d42d383743ea5d06c23c428aa38c085745dddd6f"
+				},
+				"c07": {
+					"score": 0.01950346130831089,
+					"asked": "e73b2ba080d274d9025fd3bcf8d2497913023545c1dd00bded783b4e3a05fcab"
+				},
+				"c08": {
+					"score": 0.01263500301004145,
+					"asked": "45725a755f521f7ac222bfb537c8d7ba9a5f07257c278a416764fea027521d54"
+				}
+			},
+			"statements": {
+				"s00": {
+					"score": 0.011621385275976644,
+					"asked": "00425e8100695d9125e8405324ead43ea976205100b4f318f44b6831ce80fece"
+				},
+				"s01": {
+					"score": 0.0007583035919119849,
+					"asked": "da2ea1a69a776a541bdeaf5bc51090d755960437b18b9d08c7115c9a31031913"
+				},
+				"s02": {
+					"score": 0.0009674168499512759,
+					"asked": "8d5a74fd99b2a01698ec13b8315f06f92a2587d2b386cf02000ac716754975ba"
+				},
+				"s03": {
+					"score": 0.003205036450955769,
+					"asked": "c5d2409d868da882cf7968b752ad9de66c92f0edebfbc7d74c33d10acf7fea57"
+				},
+				"s04": {
+					"score": 0.0008941019239393992,
+					"asked": "7f2055bc505ea8d24db656f3cf2a9d332ad213d4e14ab5712397d3cdd56e42cb"
+				},
+				"s05": {
+					"score": 0.006787587386294662,
+					"asked": "106da7df5c008aa00bee86c3cc3684d1d45ffef8d5512d989cea4025aad7b57a"
+				},
+				"s06": {
+					"score": 0.008827769967053246,
+					"asked": "bae1599301f20991eaa7d9674fbea3ee9c96174d5d205417f3e516932aa2461b"
+				},
+				"s07": {
+					"score": 0.001883511779412207,
+					"asked": "306f462d9002dbe29d5c4d4fb815c1707353291e7127295c00d5117c94df21b7"
+				},
+				"s08": {
+					"score": 0.0029752107043416816,
+					"asked": "9bfe85156e77e6c3849c0a5e62446bf3996a4d229108ad1f91df2493c87316ac"
+				},
+				"s09": {
+					"score": 0.029047951348161436,
+					"asked": "2214c501834e797cfdd87a593eb2e0d73d897182578342902b62b25f24f58df4"
+				},
+				"s10": {
+					"score": 0.009182013334305704,
+					"asked": "3b7a4255e0f46facb7b25232e5644f1be9070330714ad7447078bfce086ede0a"
+				},
+				"s11": {
+					"score": 0.011241932911666945,
+					"asked": "cce933ee40e422f1b74f243fd887a7984990f9776a7cdbb72b0dc553e447b450"
+				}
+			}
+		},
+		"D12-AC-CLEAN": {
+			"armN": "6f7d421aa2357861c3ab1e46d20827a6acb7adf6cc3700fa6cc228deed3a0ca2",
+			"checks": {
+				"c00": {
+					"score": 0.026421390756444674,
+					"asked": "b63835a909f3a8f483b67e751050d7895a127e230c1756f90333aee7ae5b4b8f"
+				},
+				"c01": {
+					"score": 0.010973655345569308,
+					"asked": "570c38152ac7e5bbceb420914b76eee153ebb657e8a9379b2cd90ba911ede496"
+				},
+				"c02": {
+					"score": 0.023250284222358836,
+					"asked": "671de667eb4277ef93d6e06fb2b756eedaac7b9a29411c484154e09623cfad14"
+				},
+				"c03": {
+					"score": 0.35605895239111146,
+					"asked": "5ff0b90187a6bb01db6610ed199dcb85e5f3f885011b63dddbb8cd4a20884daf"
+				},
+				"c04": {
+					"score": 0.03988120211517617,
+					"asked": "8982e8c80fc60435cda4365770d0c0e94b88e3761b8cc5b806eebe2a1d649cd3"
+				},
+				"c05": {
+					"score": 0.06619663383404378,
+					"asked": "72182ebfbf309b74281879563d8b4ba336d7a50690f41622bbbe040eadb647fa"
+				},
+				"c06": {
+					"score": 0.08880713674916485,
+					"asked": "7cdb654e8c6ff594b5e368045365c2a20b7ddd96951f5b932957f7a1a199508c"
+				},
+				"c07": {
+					"score": 0.05833491684364354,
+					"asked": "6519170d028a344427392de78213edbd9820289e90e3103bf3f1d94e42433d44"
+				},
+				"c08": {
+					"score": 0.01995099543659918,
+					"asked": "d2238aa07d1355391974fdd9882d79b203ef273cce35a88118c15de3b547dd9a"
+				},
+				"c09": {
+					"score": 0.013326421279887993,
+					"asked": "6cd5ddf1588dd1413ad93d70cc030f33a39f50e8d2654e1db96e85f8dcce7ab8"
+				}
+			},
+			"statements": {
+				"s00": {
+					"score": 0.06897461247583005,
+					"asked": "3df19018291f8c8d3209fc5924502b44378ede8808ee41fc0ab88fe4fa7ff416"
+				},
+				"s01": {
+					"score": 0.05180925232243187,
+					"asked": "960f30e675320aabccffd2ab1a03df6cacc94dd5b7d29d1c10155a8aca7ccb62"
+				},
+				"s02": {
+					"score": 0.011247461857401199,
+					"asked": "cefd189a468ddb23ef85c226bf36d0584547cebd2adfde8df972d24e491fcb65"
+				},
+				"s03": {
+					"score": 0.02296266303772462,
+					"asked": "e7a0de076672b922f4c7afae6df1403f3000b8610df906cc64440595ccfe1f46"
+				},
+				"s04": {
+					"score": 0.016019110952644983,
+					"asked": "e270128c64527b7a9135967f8953f12466fc1aa33651b6b2624cce1acdc01489"
+				}
+			}
+		},
+		"W13-CSV-RERUN": {
+			"armN": "0cd05a841c025b4e4bc427c54bef4dafc134c0e81947635faa1ec362c9e1357d",
+			"checks": {
+				"c00": {
+					"score": 0.02007039096700564,
+					"asked": "fa22876d0ba1eb8f8447e2631f4d55a2ebb25bd5945752764088a6e2c09e4806"
+				},
+				"c01": {
+					"score": 0.02880874501934389,
+					"asked": "0b400e7857ac1ee2d9d628ad3d79577cd52b248428ee1e50ecb02a1f5f206865"
+				},
+				"c02": {
+					"score": 0.03757429250117016,
+					"asked": "62869ae486784ee926543cfbdbb20ebc109a6d29a20da5589aa9dce73d7e91fc"
+				},
+				"c03": {
+					"score": 0.02144627195241322,
+					"asked": "1ebc51b9da8d313769a5e9d78f3a4e6c9be62f3daef9fa4fa803b9f01cd5670c"
+				},
+				"c04": {
+					"score": 0.038048602488242746,
+					"asked": "9aef6e48d4d6bf3bb44aa986baeb5c395ae4edfc36b58f8678a6de06b2df605b"
+				},
+				"c05": {
+					"score": 0.0664925445874001,
+					"asked": "5877ea6e9e8ebc4bfcab5c558363a5b40665cd98f465b94374cc46f5effc7b97"
+				},
+				"c06": {
+					"score": 0.06280971479109927,
+					"asked": "fd15dd547f68fb1876dd4f16d42d383743ea5d06c23c428aa38c085745dddd6f"
+				},
+				"c07": {
+					"score": 0.09574013900528745,
+					"asked": "e73b2ba080d274d9025fd3bcf8d2497913023545c1dd00bded783b4e3a05fcab"
+				},
+				"c08": {
+					"score": 0.033706385746420264,
+					"asked": "45725a755f521f7ac222bfb537c8d7ba9a5f07257c278a416764fea027521d54"
+				}
+			},
+			"statements": {
+				"s00": {
+					"score": 0.0053192217664170885,
+					"asked": "03d28912eb8f4ecd67683870e7750f325d90785727c99893c1f16d652647f9e7"
+				},
+				"s01": {
+					"score": 0.015861145908657222,
+					"asked": "03acf2c73a0e02104371508176bea293213f99a5d687e281162ad601a646fe1b"
+				},
+				"s02": {
+					"score": 0.0009310240534423745,
+					"asked": "949ff6ff34ba0b26c09030ed8acca50ec0e8fc3458992a21f14822ee8c650635"
+				},
+				"s03": {
+					"score": 0.009603592416346505,
+					"asked": "3c677b92ab542597ae6b61d735eb2f79ad2045b34ccf18939fafe1d27bc21ec0"
+				},
+				"s04": {
+					"score": 0.0067059500796864836,
+					"asked": "281dff01c76905282ba04809123481c26704987571a08827e3eeebb58ae5b5a2"
+				},
+				"s05": {
+					"score": 0.012838474880033953,
+					"asked": "97ff80c67b4953830f2e97e73af7a8581b7c212d0f2e16aad4603a7f3ecb3812"
+				},
+				"s06": {
+					"score": 0.0954489119515798,
+					"asked": "a61cc67c8c9e396166fc8f3d18a11cc57db5622c33784f79c4539f4c2d445482"
+				},
+				"s07": {
+					"score": 0.07115642338486806,
+					"asked": "a31c8e66a745c5894dfec17249a074d7c7b18ce42b0258a4fb2d11b986b63b29"
+				},
+				"s08": {
+					"score": 0.019090168631122024,
+					"asked": "a1432f46c3bdf5161df350955a9f8b92803b004c3429d639020e0c706e4b8700"
+				},
+				"s09": {
+					"score": 0.1087008165842845,
+					"asked": "7c19f0c3d9820079f600d4dde9f0151118d17e9dd0266d635b9da263f2c2a5e7"
+				},
+				"s10": {
+					"score": 0.01254265798206666,
+					"asked": "b24a6f1129053299fadab15e3d264c898be0ca79a22e76da12ce3857f4fdfb16"
+				},
+				"s11": {
+					"score": 0.008061041863000377,
+					"asked": "e428a18b0961968f025a19b9a0e3d6a653b265315209ec797dcdefdcf5119f05"
+				},
+				"s12": {
+					"score": 0.011076096620981277,
+					"asked": "020d395bef2c0feb4727f0b2dd235a083d8f4718ba4942364394d2001ed712a6"
+				},
+				"s13": {
+					"score": 0.01861714994445163,
+					"asked": "b3e6057f61a38d6a847741326a3ba5bfcfd576206b0fe4daece05615e575fda3"
+				},
+				"s14": {
+					"score": 0.025298611593872124,
+					"asked": "a911231888361e2534219346c63bc9f882e9cc476dd302632edb2928efc8d979"
+				},
+				"s15": {
+					"score": 0.04475149462473131,
+					"asked": "96a77cbbedfca842b486e47fc27296315649be1a5a8e6d40db0ebff4e02c0cf4"
+				},
+				"s16": {
+					"score": 0.01391841868751502,
+					"asked": "f9f253e839d7c4723fd18001b395b7f72efed90dfa4856ee9529fcdf726555b6"
+				},
+				"s17": {
+					"score": 0.01070650224423875,
+					"asked": "b93bc86b8f27299bbe23e525cb0ed7247766d6553ed900d2653d3e064adfbc05"
+				},
+				"s18": {
+					"score": 0.05342680267547435,
+					"asked": "745decd7a4925e7c44f7c5d31c9ecbf710725f3b3820c63ff0080259741653cf"
+				}
+			}
+		},
+		"P12-RR-03": {
+			"armN": "d3efef1aa20a38bdb95ee7cbf81598b355c99db55250b3774f5dce25c85bd66a",
+			"checks": {
+				"c00": {
+					"score": 0.058460566130910475,
+					"asked": "fa22876d0ba1eb8f8447e2631f4d55a2ebb25bd5945752764088a6e2c09e4806"
+				},
+				"c01": {
+					"score": 0.054785232296075334,
+					"asked": "0b400e7857ac1ee2d9d628ad3d79577cd52b248428ee1e50ecb02a1f5f206865"
+				},
+				"c02": {
+					"score": 0.21956816207316043,
+					"asked": "62869ae486784ee926543cfbdbb20ebc109a6d29a20da5589aa9dce73d7e91fc"
+				},
+				"c03": {
+					"score": 0.021564961480431147,
+					"asked": "1ebc51b9da8d313769a5e9d78f3a4e6c9be62f3daef9fa4fa803b9f01cd5670c"
+				},
+				"c04": {
+					"score": 0.027301815673144016,
+					"asked": "9aef6e48d4d6bf3bb44aa986baeb5c395ae4edfc36b58f8678a6de06b2df605b"
+				},
+				"c05": {
+					"score": 0.05364625175526091,
+					"asked": "5877ea6e9e8ebc4bfcab5c558363a5b40665cd98f465b94374cc46f5effc7b97"
+				},
+				"c06": {
+					"score": 0.01903421764551015,
+					"asked": "fd15dd547f68fb1876dd4f16d42d383743ea5d06c23c428aa38c085745dddd6f"
+				},
+				"c07": {
+					"score": 0.022363407419102036,
+					"asked": "e73b2ba080d274d9025fd3bcf8d2497913023545c1dd00bded783b4e3a05fcab"
+				},
+				"c08": {
+					"score": 0.02054462069272315,
+					"asked": "45725a755f521f7ac222bfb537c8d7ba9a5f07257c278a416764fea027521d54"
+				}
+			},
+			"statements": {
+				"s00": {
+					"score": 0.007047453446507173,
+					"asked": "aecead1442cbd9c0071ee3066d7b5884549196982f9d28c1dfdd11414228563b"
+				},
+				"s01": {
+					"score": 0.05860070593774068,
+					"asked": "13c19ad8142d11301a023b1b6343da604fc1c6feae83b5947cec7501a1c1228a"
+				},
+				"s02": {
+					"score": 0.08053977311201763,
+					"asked": "c0a65a579e40ba92661db6fb93e7f862ccc21ae53a9d68beb9e4b5a32024a8a2"
+				},
+				"s03": {
+					"score": 0.007558845336544754,
+					"asked": "4dc908b37f2e7b5cb947bff234869f4b88b2c5e349eb553207eb9e6ed3746452"
+				},
+				"s04": {
+					"score": 0.02731655717262336,
+					"asked": "e7983e3d618733d36d50164e0cda496a1cc41f5443af824d58f61dbd3bb8a6e3"
+				},
+				"s05": {
+					"score": 0.07669940968800192,
+					"asked": "87d0f5e26b3dd8123894f7cd5df7258e10b3503cb747dc780d5bfef63fa7ef25"
+				}
+			}
+		}
+	},
+	"headsBeforeZ1": {
+		"D12-AC-01": "abaa89a8cf0f68ca57320a3ca91998e4dcf46732e5ef85e80c592d17586f4c7b",
+		"D12-AC-CLEAN": "c31dc9f52787e7524db6d0bea067d3b30a4e0c3b5ecc33e77d466d737f99c54d",
+		"D12-AD-01": "e5ea233d43372d106934404d87315b9fb4777f62df1db06774d80cc16acfac2d",
+		"D12-AD-CLEAN": "17e1296e3dadca093878a65b725720b89508419b5c3833c6128ae683599f5fc0",
+		"D12-CSV-TA-RERUN": "9e480ef5bc7b74f3ef1503a485b7bf55db285f7d8df8bca77c71f282f9af75ad",
+		"D12-DC-01": "5d9c925a3de4afcb5dd5204417430a49f1d8a1582676e55303613a656a3e1d31",
+		"D12-DC-CLEAN": "b725b0a6d0e9cdd93363eebdbc95367538b40ecb421dc91dcfdb0c28be2c1f0b",
+		"D12-FP-03": "f8d17582e5fa988e0fdf0db2235092f2cabf6bf288de8c441957e5f196a433e8",
+		"D12-FP-CLEAN": "e47ea2d232971e1235ac7d61b2dac6068c96c79748a09b4161f2fd3948197e3c",
+		"D12-IP-02": "b96a284e7a4c181b7ee99fef4a2054c9dd3d204fe7771b37d42d0bacf1495b2b",
+		"D12-IP-CLEAN": "41fc01f96bc2b9ae8a06e41f233f2b49474df2833dfb76ab8bf6998126474361",
+		"D12-RC-04": "9e923a6b06eb5a7a65f85e299ff0c80fe522aa39651cea99c5d4cf20d971502f",
+		"D12-RC-CLEAN": "e1549abc1a1a175bcce548a28343feeefd92ff5d44fc7626b8afe9208c7b5840",
+		"D12-TA-08": "8f6ca9a952f3fe1315d1ab9c6285fbcc5e9854a066367d0b88dedaeda36a3862",
+		"D12-TA-CLEAN-B": "066b9ba22ed641c882f52f92cd1c8396bdc9122532bed085167a0bd994a3a838",
+		"G10-CLEAN.T02": "67bbc442aafc7f618364b776e1012924fa4465cc04e978c96075cfe85bae038d",
+		"G10-CLEAN.T04": "6b5066c1b640b08ca084e25d5e7c7a6bcac1b0b88deeb025b22d903b36486153",
+		"G10-CLEAN.T05": "86723919bfa8c6bee4d7154b42f5b2dff4a70e37fb9bd125c231e2aa492e2289",
+		"G10-CLEAN.T06": "6956473f41179282c4913129f0cd9f974071f34a88cece05e727d08d47725758",
+		"G10-CLEAN.T07": "4284d438a748f7fb4715835a4b7b4ca00b58afa1e0deb60cd05c5216d99876f8",
+		"G10-RR-01.T01": "bb066f86b3b00f55c08aebb5a1c31f8e5e279355d1ac14f6639b20bfb230cf92",
+		"G10-RR-03.T04": "cef69993c0cd35a38184b73be92464a462d5e83c07f69f68d90a3be8c1af8ab2",
+		"G10-RR-04.T05": "3095c72dfe685813a9f0171fb0a54bb044c2d7fedb525914ca300af2a5f493f9",
+		"G10-RR-05.T01": "7cdebce2af533c8bb72a68f14e6b33ecd4ab689bd95e2da494d0950335afdc8f",
+		"G10-RR-06.T05": "936668bf927defece17b730bfa07ee8a5eb9a9829213ebaf73bf363cb30a8a68",
+		"G10-RR-07.T06": "dcb41f70986109126bb0cbeb0582f4afb8960db2fb75e1e873b2b0e016cb579a",
+		"G10-RR-08.T05": "211d9361f920a57b23c50d7df4f00ec38452abf8e77f296d67f63ffb51e2eb48",
+		"G11-CLEAN-R1.T01": "d0e1877baf1e1468f60ed697b1d912cf11faf465b6a419407b6dab7ca2a9c848",
+		"G11-CLEAN-R2.T01": "d6c5c6a3ce349a02c07fbf8ff44a918751a9ee509e0f12cb5d3b1f2a344c065b",
+		"G11-CLEAN-R3.T01": "fe37be0ebea99104e6292618653dec9f9d30982184b108ba2b1c48eb8875b5ec",
+		"G11-CLEAN.T01": "9b4afb944ea1b00f369b6275598d003e60ba7d2090fb09722a7d0de7a0bf8276",
+		"G11-CLEAN.T03": "5faf8effc0c21fcc79dbd8edad86b2c45dfad2003302546592734db66a65e7d6",
+		"G11-RR-02.T01": "28871e0ee77cc705e30da186a0921776d1927102d0f9c14d888405958b1496e4",
+		"G11-RR-09.T01": "654db5f9de62f3c2f13b63e1d1312e5436a2b87d7ed187e4bdba8b39b8a4457c",
+		"G7-CLEAN.T01": "3ba04fda3d0453fde7bd2a6e4b57365f333e4e26617d02fd8a3a10500929d2e5",
+		"G7-CLEAN.T02": "cc8045b15e291890304eca57abca45413043fab79b0b092d88c7dc61b5901e9f",
+		"G7-CLEAN.T03": "03db83eee7c9c11ecdcb0a7742912e9c320a14edb938743edc4a45e39226a4d5",
+		"G7-RR-02.T02": "bb3c5a22aee2351d57fd1c80fc65951c4199c86f29acb43f93c537d955774130",
+		"G7-RR-03-CHILD.T01": "e648b07b74b4ac035631d8720d34b90af70bc2deec87e1638038e9083714f2f0",
+		"G7-RR-03-PROMPT.T02": "505e1ebee57c08f5baf202c1cbcf064aa3ba0139f75010d6e87e6cf710336864",
+		"G7-RR-04.T03": "775c564432fa30a2751c1c6d4f524203166910964cbc6b5f690508382c96e850",
+		"G7-RR-08.T02": "04d50580ff8270f3e6b240c02671b1ca2fe0a14fb35b14257c10e0b416f0d82c",
+		"G8-CLEAN.T01": "9fb834495d855471e96c337996bc37153a1f57509a13e703dedae53dc8e9f823",
+		"G8-CLEAN.T02": "f2811d5c708a0ed67e4a9da601b1cd1c14db2c5b30400d2902c800f13b8e6cc4",
+		"G8-CLEAN.T03": "d91d87ae196594c21b8b7991b0ac206bebdb6a159e694029d53bd9524389079b",
+		"G8-CLEAN.T04": "b4f642645b16a39fb5457006c1b9cf0fed0a0b5ace943b744d4187f89e4d31c4",
+		"G8-CLEAN.T05": "cdd76ddfd6d2e5a9c3debd5a161e6b138774b06444022c2c96e6875ec7c9d6b7",
+		"G8-CLEAN.T06": "d58917387487bf0c158a9127af884b576879cdc41efff09904bc6db5612526ad",
+		"G8-CLEAN.T07": "c32d0b3b7f7a8ec89e6eea54dd6159a662ec9f34950cd30d62a2ba8598a562fa",
+		"G8-RR-02.T05": "8b0262811ef3c41d7257d5d5f816b584c8383362ac240743f329c81d855bfeb2",
+		"P12-CLEAN-R1": "46925ec278142defa3b838a225d2d63fec7c3b0a8c7ab828110fdcb6a57f866c",
+		"P12-CLEAN-R2": "6fc51235a21e924bb97033702d0d3c5cf9d266b3d6852e46b65302dbac6331f7",
+		"P12-CLEAN-R3": "972ef0c4d28d59f465df36d72b617425fa615e5559986d3763ac21a86de44048",
+		"P12-CLEAN": "d5363017588cca19748ee9d656c67bd2c226aeb5849841d486c0c821a09236e8",
+		"P12-CSV-COUNT-RR-07": "366c36a8895c84a33968d3a82e3d3fb78581af1600f109527bd3a6d7a130a530",
+		"P12-CSV-COUNT": "6848a1efa01821494661a52b60f153c9737924c52a75a956711aca8e18351c17",
+		"P12-CSV-LS": "57365f7306cdc24a805df212bf68923b6f99af288ff660a6a00140cef5315c2b",
+		"P12-CSV-READ": "73e71f4409900b71dce9e60a430781c3dfe8818d525e7e51151e8c3bca3d6b46",
+		"P12-RR-01": "8127bcbf8e2803663a627689c727631805babce6c9b9152a6fa4f286c0bd951b",
+		"P12-RR-02": "f9191b5fd07b42cf7b14858e850f32d2deed08e75ddc215edaea2c2d6de0c5a3",
+		"P12-RR-03": "d114406fb49c8c7cecf07217358b38d642e02472fb67d71eb782c77a814bb227",
+		"P12-RR-04": "1a82df0d148a0b10be75975ee34e2d7af603a4e35a69fe1822619f38136a845f",
+		"P12-RR-05": "a0796405fc7bc21f35f99bea6f945652765dbf6898974786870c09dfcd91dd8d",
+		"P12-RR-06": "6c91160b03352a3d1f8b6b66b14d1856014262f63ecee912e8e3a011c355816e",
+		"P12-RR-07-CUT": "204273ec9b0896ed12197482f057f8b93b736a860e423cb5a6de51b979225770",
+		"P12-RR-07": "756aa422801aa282476151444875c6c2fb8729a254211f73e2d550303f107144",
+		"P12-RR-08": "313bee1cfa70ac919250eeb4e8d0e0ce4e6a7cbb47d957309aedb39674760a05",
+		"P12-RR-09": "d7e70d300d635af4315359b153f425c0ca3826ca11d66ab4381cac9d8b80de8f",
+		"P13-CSV-NARROWED-WHOLE": "49cf6fc5477a4c518fd0df1a4af37e4051b2e9651a40baf9062b9901f99bcf7d",
+		"P13-CSV-NARROWED": "f2110ae1a30b30754fd8443b1c140fc9f078643e1651919c2f9ce95b4c77b348",
+		"W12-CLEAN-R1": "8ca16c906d5115f3896b98c027f0cbf813783162d3d9df69fe8b8c0a1f4fb532",
+		"W12-CLEAN-R2": "e2ad40f8b217b483ba10bed50bffbbe68a0554387319a0f16c9ba44fa2180672",
+		"W12-CLEAN-R3": "3dd5fe1f6bfa6ed7b208a727964d04edfe2c7cb86403b3f73db8407b2d6fb705",
+		"W12-CLEAN": "2ac731833c5bc0108676f8208621a0d6664a0fee53217d8277dd9cf3ba66b7bf",
+		"W12-CSV-CLEAN-R1": "e3e5562a0d118a5f3e710fdba99b134714043c8f96315a7767feb08635850a6f",
+		"W12-CSV-CLEAN-R2": "3bdd5fa748aa4df3a913b9023536e7cfedb902282d92dd6347b0d3553fb5269f",
+		"W12-CSV-CLEAN-R3": "81e40a368315ed8d1bcc12921e10a37b7128dfad7630da8e30ff06c7b9a00c3a",
+		"W12-CSV-CLEAN-T2": "dc6749df0e98c8dfdc049837220c0fee8331f450473a4ecb003a54f852501cc3",
+		"W12-CSV-CLEAN": "0f8f2ea2ff837c757226b8c3a1a85e50af9062ab8031b798416d3aa2c543c05f",
+		"W12-CSV-RR-02": "0f354506478b2183d57bc354ec4f9cb8392378196e16d4c47af159114d2ca3a3",
+		"W12-CSV-RR-03": "15ef48888a8e0fd2f69baba93b8102a2b6e650cc4fac142abc39a630c70c4ace",
+		"W12-CSV-RR-07": "8e9b01df29b4cb39f768093cb58bfa93c006877975a465fa3da40b010c67d5b2",
+		"W12-CSV-RR-08": "84b9c7a51e0831d2a59763693ff1a8522acb623a7864ff3697ca61f285bc5629",
+		"W12-CSV-RR-09": "3ceb87885adb4841281338acb7900ef32853d8f4510f4b9c31f05affe12e9228",
+		"W12-CSV-STALE-READ": "3e044e3e4bc54afcfaf2cb760af69f4df176dba5ff8d9700b95fb64d5b5fe85c",
+		"W12-RR-01": "42f2875aeebd4fccdd9676f22fdcdcceb359905773c4f051d55347a5875c7933",
+		"W12-RR-02": "9b3810636f44e8a36634b9891996557c9bc6c9550811359875304de65fffb413",
+		"W12-RR-03": "ec954872c9e480e9ebfa6bcbd4dc7e941461e750162e2df1991a98320e58ae49",
+		"W12-RR-04": "b96ff37c353a95f3f2d55f21ce8fc9441c6a2dbd4ebbb68cb8431ae4572524cd",
+		"W12-RR-05": "6d43d459658bf1c7c64f541b70ef0c4895b26c7477a9f7da1a1c2e466783827f",
+		"W12-RR-06": "38524587fd2272644e5d15c4ed3de06944ab1b705887a0dda206b964c3600d14",
+		"W12-RR-07": "0b8da6c68e13812da0ed3d47390b909b91b37da31b7ff55af0bc214de5e07d79",
+		"W12-RR-08": "e5b80ca6e2c37dd9dd3ed364ec4062d3e5d0b42b98bdd12d960d31374f462fd8",
+		"W12-RR-09": "57545e58262e9b2bd6a8faa993d70749048d9daa4da2ede001695ecb96400045",
+		"W13-CSV-INHERITED": "9f8ca8996223d233b29eb16f5e2ccd373cc47c0ccda972571c9ccc502f265976",
+		"W13-CSV-RERUN-RR-07": "e4143488356ab245bd6ee55ba902bea363fa5dfa90f549530bcade51728befeb",
+		"W13-CSV-RERUN": "d16db419fcf2a13e6ce78399409832e6df3f96a72dbfca4ed05c05aa8612271c"
+	}
+}

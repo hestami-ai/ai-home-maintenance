@@ -22,6 +22,7 @@ import {
 	type RunLine,
 	type ScoredOutcome
 } from './record.js';
+import { PLACEHOLDER_INDICATIONS } from './indications.js';
 import { evaluateCase, replayReplies } from './runner.js';
 
 /** Why a recorded evaluation cannot be re-scored today — the check reports it as a non-reproduction. */
@@ -54,7 +55,10 @@ export async function rescoreEvaluation(
 			criteria,
 			candidate: run.candidate,
 			call: replayReplies(calls),
-			scoringDigest
+			scoringDigest,
+			// ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D50 — the scripts' placeholder decision model (`indications.ts`): a re-scoring
+			// replays recorded replies in order, so the scores the prompt quotes decide nothing it reads.
+			indications: PLACEHOLDER_INDICATIONS
 		});
 	} catch (e) {
 		throw new NotRescorable(

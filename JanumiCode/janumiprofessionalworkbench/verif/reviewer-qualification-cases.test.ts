@@ -50,6 +50,7 @@ import { MAX_AGY_PROMPT_CHARS } from '../apps/rph-demo/src/lib/server/assurance/
 import {
 	createAgyReasoningReviewValidator,
 	DECLARED_WORK_RERUN_CLAUSE,
+	REASONING_REVIEW_BUDGET,
 	deliverableHeading,
 	WORK_PRODUCT_DELIVERABLE_SUBJECT,
 	WORK_PRODUCT_RERUN_DELIVERABLE_SUBJECT
@@ -62,6 +63,7 @@ import {
 	type DeclaredReviewWorkProduct,
 	type ProcessResultReviewSource
 } from '../apps/rph-demo/src/lib/server/assurance/review-input.js';
+import { todayPromptOf } from '../apps/rph-demo/src/lib/server/assurance/review-section.testing.js';
 import { splitExecutionEnvelope } from '../apps/rph-demo/src/lib/server/execution/execution-contract.js';
 import { AGENT_CREDENTIAL, SESSION_CREDENTIAL, standaloneAuthenticator } from '../apps/rph-demo/src/lib/server/identity.js';
 import { buildPwaExport } from '../apps/rph-demo/src/lib/server/workbench.js';
@@ -158,6 +160,7 @@ import { caseSetDigest, PRODUCT_SEAMS, reviewerFingerprint } from '../scripts/re
 import { caseReviewInput } from '../scripts/reviewer-qual/materialize.js';
 import type { CandidateIdentity } from '../scripts/reviewer-qual/record.js';
 import { evaluateCase } from '../scripts/reviewer-qual/runner.js';
+import { PLACEHOLDER_INDICATIONS } from '../scripts/reviewer-qual/indications.js';
 
 const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url));
 const read = (file: string): string => readFileSync(`${REPO_ROOT}${file}`, 'utf8');
@@ -182,10 +185,13 @@ const EVALUATOR = { agentId: 'agy', modelId: 'test-judge-model', providerId: 'go
 const CUT_DECLARED = '[CUT FOR THIS REVIEW: ';
 
 /** Every prompt the REAL validator sends for a case: the first, then — when the first reply is unusable — the repair. */
-async function promptsFor(c: QualificationCase): Promise<{ initial: string; repair: string; input: ReasoningReviewInput }> {
+async function promptsFor(
+	c: QualificationCase
+): Promise<{ initial: string; repair: string; input: ReasoningReviewInput; today: string; todayRepair: string }> {
 	const input = caseReviewInput(c, SEEDED_REASONING_REVIEW_CRITERIA);
 	const prompts: string[] = [];
 	const validator = createAgyReasoningReviewValidator({
+		indications: PLACEHOLDER_INDICATIONS,
 		...EVALUATOR,
 		print: async (prompt) => {
 			prompts.push(prompt);
@@ -200,7 +206,12 @@ async function promptsFor(c: QualificationCase): Promise<{ initial: string; repa
 	});
 	await validator.evaluate(c.subject, { reasoningReview: input });
 	expect(prompts, `${c.id}: an initial prompt and a repair`).toHaveLength(2);
-	return { initial: prompts[0]!, repair: prompts[1]!, input };
+	// ⭐⭐ Package Z1 — D50, D52 (`REG-D-146`; design §12.2, §12.4): and TODAY's prompts for it — the head the sent prompt carries,
+	// byte for byte, then today's review section, which D52 computes the material's room against (`todayPromptOf`); today's repair
+	// is today's prompt and the same repair instruction, as the sent repair is the sent prompt and it.
+	expect(prompts[1]!.startsWith(prompts[0]!), `${c.id}: the repair is the first prompt and its instruction`).toBe(true);
+	const today = todayPromptOf(prompts[0]!, input.criteria);
+	return { initial: prompts[0]!, repair: prompts[1]!, input, today, todayRepair: today + prompts[1]!.slice(prompts[0]!.length) };
 }
 
 /**
@@ -525,6 +536,7 @@ describe('JAN-CRITREAD J2-1 — reviewer-qualification case set v1', () => {
 			const oracle = oracles.get(c.id)!;
 			const input = caseReviewInput(c, SEEDED_REASONING_REVIEW_CRITERIA);
 			const validator = createAgyReasoningReviewValidator({
+				indications: PLACEHOLDER_INDICATIONS,
 				...EVALUATOR,
 				print: async () =>
 					JSON.stringify({
@@ -909,6 +921,7 @@ describe('JAN-CRITREAD J2-5 — reviewer-qualification case set v2: version one 
 			const oracle = oracles.get(c.id)!;
 			const input = caseReviewInput(c, SEEDED_REASONING_REVIEW_CRITERIA);
 			const validator = createAgyReasoningReviewValidator({
+				indications: PLACEHOLDER_INDICATIONS,
 				...EVALUATOR,
 				print: async () =>
 					JSON.stringify({
@@ -1033,15 +1046,21 @@ const nodeOf = (c: GraphCase, kind: string) => c.input.nodes.find((n) => n.pwuKi
 async function promptProblemsIn(cases: readonly QualificationCase[]): Promise<string[]> {
 	const problems: string[] = [];
 	for (const c of cases) {
-		const { initial, repair, input } = await promptsFor(c);
+		const { initial, input, today, todayRepair } = await promptsFor(c);
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D50, D52; `REG-D-146`; design §12.2, §12.4) — ~~`initial` and `repair`, the prompts sent~~: the
+		// material's checks are TODAY's prompts' — its room is computed against today's review section, so its every cut, its
+		// wholeness and agy's 28,000 characters are measured there, as before Z1. ⭐ And the prompt sent is held to D52's whole
+		// bound; the sent prompts past agy's ceiling are pinned by name (`Y12`; design §12.4: devin is the selected transport).
 		for (const [role, prompt] of [
-			['initial', initial],
-			['repair', repair]
+			['initial', today],
+			['repair', todayRepair]
 		] as const)
 			if (prompt.length > MAX_AGY_PROMPT_CHARS) problems.push(`${c.id} ${role}: ${prompt.length} chars`);
-		if (initial.includes(CUT_DECLARED)) problems.push(`${c.id}: a slice is truncated`);
-		if (!initial.includes(input.content)) problems.push(`${c.id}: the content is not whole`);
-		if (!initial.includes(input.prompt)) problems.push(`${c.id}: the instruction is not whole`);
+		if (today.includes(CUT_DECLARED)) problems.push(`${c.id}: a slice is truncated`);
+		if (!today.includes(input.content)) problems.push(`${c.id}: the content is not whole`);
+		if (!today.includes(input.prompt)) problems.push(`${c.id}: the instruction is not whole`);
+		if (initial.length > REASONING_REVIEW_BUDGET.WHOLE_PROMPT_MAX)
+			problems.push(`${c.id} initial sent: ${initial.length} chars, past D52's whole bound`);
 	}
 	return problems;
 }
@@ -1288,6 +1307,7 @@ describe('JAN-CRITREAD J2-7 — reviewer-qualification case set v3: version two 
 			const oracle = oracles.get(c.id)!;
 			const input = caseReviewInput(c, SEEDED_REASONING_REVIEW_CRITERIA);
 			const validator = createAgyReasoningReviewValidator({
+				indications: PLACEHOLDER_INDICATIONS,
 				...EVALUATOR,
 				print: async () =>
 					JSON.stringify({
@@ -2307,6 +2327,7 @@ describe('JAN-PRQUAL PQ-2 — reviewer-qualification case set v4: version three,
 			const oracle = oracles.get(c.id)!;
 			const input = caseReviewInput(c, SEEDED_REASONING_REVIEW_CRITERIA);
 			const validator = createAgyReasoningReviewValidator({
+				indications: PLACEHOLDER_INDICATIONS,
 				...EVALUATOR,
 				print: async () =>
 					JSON.stringify({
@@ -2644,6 +2665,7 @@ describe('⭐⭐ package P F3 — reviewer-qualification case set v7: version si
 			const oracle = oracles.get(c.id)!;
 			const input = caseReviewInput(c, SEEDED_REASONING_REVIEW_CRITERIA);
 			const validator = createAgyReasoningReviewValidator({
+				indications: PLACEHOLDER_INDICATIONS,
 				...EVALUATOR,
 				print: async () =>
 					JSON.stringify({
@@ -3066,6 +3088,7 @@ describe('⭐⭐ the review in parts, B7 — reviewer-qualification case set v8:
 		const scored = async (c: PwaTypeCase, reply: string) =>
 			(
 				await evaluateCase({
+					indications: PLACEHOLDER_INDICATIONS,
 					case: c,
 					criteria: SEEDED_REASONING_REVIEW_CRITERIA,
 					candidate: EVALUATING_CANDIDATE,
@@ -3570,6 +3593,7 @@ describe('⭐⭐ the review in parts, B8a — reviewer-qualification case set v9
 				recommendation: oracle.disposition
 			});
 			const { scored } = await evaluateCase({
+				indications: PLACEHOLDER_INDICATIONS,
 				case: c,
 				criteria: SEEDED_REASONING_REVIEW_CRITERIA,
 				candidate: EVALUATING_CANDIDATE,
@@ -4138,7 +4162,11 @@ const REVIEWER_FINGERPRINT_V9 = '5ab3d68643bffbbf700c622526b626f47d4c487690e1eb5
 // MOVED 2026-10-31 — D30's wording settled on the reviewer as C5 (REG-F-594; design §10.2, revision 7).
 // ~~'106cf8e93abb840aaef72c6edb2675a57104d74ac8fcb12decb3b9e53048f4b7'~~ — the cases test prints the value restated below.
 // The 27 process-result probes that send a prompt move with C5; the budget, criteria, scoring and case-set digest stay pinned.
-const REVIEWER_FINGERPRINT_TODAY = '479121cf7e6af2c91331855d50e140ac1f7ceb323c5b0abd01f22e2ac8992945';
+// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D50, D52; `REG-D-146`; design §12.2, §12.4) — ~~'479121cf7e6af2c91331855d50e140ac1f7ceb323c5b0abd01f22e2ac8992945'~~:
+// every prompt moves — the measured section, scored by the scripts' placeholder decision model until package Z2's records
+// (D54) — so the probes component moves, and the budget component with D52's three members. Criteria, scoring and every
+// case-set digest stay. Unmeasured: RED on COVERAGE until D53.
+const REVIEWER_FINGERPRINT_TODAY = '3a5ac37c5e1591c2f39137572beefaff84da6d8ccf271581365e708f513b9b93';
 /**
  * ⭐ THE PROTOTYPE'S PROMPTS (`REG-D-131` Q36: *"its prompts must match the checked prototype hash for hash"*) — the sha256 of
  * each of the 19 bridge part cases' first prompt as the lead's in-memory prototype of D3b rendered it through the product's
@@ -4418,8 +4446,10 @@ describe('⭐⭐ the review in parts, B8b — reviewer-qualification case set v1
 			bridge.filter((id) => v10.casePrompts.get(id)!.initial === v9.casePrompts.get(v9PartOf(id))!.initial),
 			'a bridge part case whose prompt did not move: it owes no RUN, and D3b did not reach it'
 		).toEqual([]);
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D50, D52; `REG-D-146`; design §12.2, §12.4) — ~~`v10.casePrompts.get(id)!.initial`~~: the
+		// prototype's bytes are the material's, so the pin is on TODAY's first prompt (`todayFirstPromptSha256`).
 		expect(
-			bridge.map((id) => [v9PartOf(id), v10.casePrompts.get(id)!.initial]),
+			await Promise.all(bridge.map(async (id) => [v9PartOf(id), await todayFirstPromptSha256(caseIn(CASE_SET_V10, id))] as const)),
 			'each bridge part case’s first prompt, the prototype’s, byte for byte'
 		).toEqual(PROTOTYPE_PROMPTS_V10);
 		// ⭐ Package L — D13: ~~[REVIEWER_FINGERPRINT_V9, REVIEWER_FINGERPRINT_V9]~~ today's, which the scoring digest moved.
@@ -4655,6 +4685,7 @@ describe('⭐⭐ the review in parts, B8b — reviewer-qualification case set v1
 				recommendation: oracle.disposition
 			});
 			const { scored } = await evaluateCase({
+				indications: PLACEHOLDER_INDICATIONS,
 				case: c,
 				criteria: SEEDED_REASONING_REVIEW_CRITERIA,
 				candidate: EVALUATING_CANDIDATE,
@@ -4934,8 +4965,9 @@ describe('⭐⭐ the review in parts, B8b, package K — reviewer-qualification 
 			MOVED_IDS_V11.filter(([old, id]) => v11.casePrompts.get(id)?.initial === v10.casePrompts.get(old)?.initial).map(([, id]) => id),
 			'one of the 7 whose first prompt did not move: it owes no RUN, and D3d did not reach it'
 		).toEqual([]);
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D50, D52; `REG-D-146`; design §12.2, §12.4) — ~~`v11.casePrompts.get(id)?.initial`~~: on TODAY's first prompt (`todayFirstPromptSha256`).
 		expect(
-			bridgePartIdsV11().map((id) => [id, v11.casePrompts.get(id)?.initial]),
+			await Promise.all(bridgePartIdsV11().map(async (id) => [id, await todayFirstPromptSha256(caseIn(CASE_SET_V11, id))] as const)),
 			'each bridge part case’s first prompt, the prototype’s, byte for byte'
 		).toEqual(PROTOTYPE_PROMPTS_V11);
 		// ⭐ Package L — D13: ~~[REVIEWER_FINGERPRINT_V9, REVIEWER_FINGERPRINT_V9]~~ today's, which the scoring digest moved.
@@ -5141,6 +5173,7 @@ describe('⭐⭐ the review in parts, B8b, package K — reviewer-qualification 
 				recommendation: oracle.disposition
 			});
 			const { scored } = await evaluateCase({
+				indications: PLACEHOLDER_INDICATIONS,
 				case: c,
 				criteria: SEEDED_REASONING_REVIEW_CRITERIA,
 				candidate: EVALUATING_CANDIDATE,
@@ -5775,8 +5808,9 @@ describe('⭐⭐ package V — reviewer-qualification case set v12: version elev
 		expect(PROTOTYPE_PROMPTS_V12.map(([id]) => id), 'arrangement: the prototype’s 56, in the set’s order').toEqual(ORDER_56);
 		// ⭐ Package X, 2026-10-31 (design §10.6): ~~'each of the 56’s first prompt, the prototype’s, hash for hash'~~ — 42 rows restated
 		// as the build renders them, the prototype's struck beside each; the 14 declared rows the prototype's (the constant's notes).
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D50, D52; `REG-D-146`; design §12.2, §12.4) — ~~`twelve.casePrompts.get(id)?.initial`~~: on TODAY's first prompt (`todayFirstPromptSha256`).
 		expect(
-			ORDER_56.map((id) => [id, twelve.casePrompts.get(id)?.initial]),
+			await Promise.all(ORDER_56.map(async (id) => [id, await todayFirstPromptSha256(caseIn(CASE_SET_V12, id))] as const)),
 			'each of the 56’s first prompt — the prototype’s, or, where package X’s D30 or D32 moves it, the build’s — hash for hash'
 		).toEqual(PROTOTYPE_PROMPTS_V12);
 		const parts = CASE_SET_V12.cases.filter((c) => c.arm === 'PWA_TYPE').map((c) => c.id);
@@ -6171,6 +6205,7 @@ describe('⭐⭐ package V — reviewer-qualification case set v12: version elev
 				recommendation: oracle.disposition
 			});
 			const { scored } = await evaluateCase({
+				indications: PLACEHOLDER_INDICATIONS,
 				case: c,
 				criteria: SEEDED_REASONING_REVIEW_CRITERIA,
 				candidate: EVALUATING_CANDIDATE,
@@ -6312,6 +6347,24 @@ const viewOfV12 = (c: QualificationCase): Deliverable => {
 	return view!;
 };
 /** The first prompt the product's validator sends for a case — its transport a stub — as the fingerprint captures it. */
+/** ⭐⭐ Package Z1 — D50, D52: `c` in `set`, by id. */
+const caseIn = (set: CaseSet, id: string): QualificationCase => {
+	const c = set.cases.find((x) => x.id === id);
+	if (c === undefined) throw new Error(`${id}: not in case set v${set.caseSetVersion}`);
+	return c;
+};
+
+/**
+ * ⭐⭐ Package Z1 — D50, D52 (`REG-D-146`; design §12.2, §12.4) — TODAY's first prompt for `c`, as the fingerprint's seams
+ * materialize it: the head its sent prompt carries, byte for byte, then today's review section (`todayPromptOf`) — the bytes
+ * every first-prompt pin written before Z1 is about. Its sha256 beside it.
+ */
+async function todayFirstPromptV12(c: QualificationCase): Promise<string> {
+	const input = caseReviewInput(c, PRODUCT_SEAMS.criteria, PRODUCT_SEAMS.processResult);
+	return todayPromptOf(await firstPromptV12(c), input.criteria);
+}
+const todayFirstPromptSha256 = async (c: QualificationCase): Promise<string> => sha256(await todayFirstPromptV12(c));
+
 async function firstPromptV12(c: QualificationCase): Promise<string> {
 	const sent: string[] = [];
 	const validator = PRODUCT_SEAMS.validator(async (p: string) => {
@@ -6374,8 +6427,9 @@ describe('⭐⭐ package V-2 — reviewer-qualification case set v12’s three r
 		const twelve = await fpV12();
 		// ⭐ Package X, 2026-10-31 (design §10.6): ~~'each of the three’s first prompt, the prototype’s, hash for hash'~~ — two rows
 		// restated as the build renders them, the prototype's struck beside each; the sign-off's row the prototype's (the constant's notes).
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D50, D52; `REG-D-146`; design §12.2, §12.4) — ~~`twelve.casePrompts.get(id)?.initial`~~: on TODAY's first prompt (`todayFirstPromptSha256`).
 		expect(
-			RERUN_IDS_V12.map((id) => [id, twelve.casePrompts.get(id)?.initial]),
+			await Promise.all(RERUN_IDS_V12.map(async (id) => [id, await todayFirstPromptSha256(caseIn(CASE_SET_V12, id))] as const)),
 			'each of the three’s first prompt — the prototype’s, or, where package X’s D32 moves it, the build’s — hash for hash'
 		).toEqual(PROTOTYPE_PROMPTS_RERUN_V12);
 		expect(twelve.reviewer, 'the reviewer fingerprint, unmoved').toBe(REVIEWER_FINGERPRINT_TODAY);
@@ -6528,7 +6582,10 @@ describe('⭐⭐ package V-2 — reviewer-qualification case set v12’s three r
 			exitCode: 0,
 			timedOut: false
 		});
-		const [p, q] = (await Promise.all([firstPromptV12(clean), firstPromptV12(twin)])).map((x) => x.split('\n'));
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D50, D52; `REG-D-146`; design §12.2, §12.4) — ~~the sent first prompts, split~~: TODAY's,
+		// the material the twin's construction is about; its measured section is pinned with W13-CSV-RERUN-RR-07's, whose
+		// prompt the screen's acceptance holds byte for byte (`verif/review-indications-screen.test.ts`).
+		const [p, q] = (await Promise.all([todayFirstPromptV12(clean), todayFirstPromptV12(twin)])).map((x) => x.split('\n'));
 		expect(q!.length, 'the twin’s prompt, as many lines as its clean source’s').toBe(p!.length);
 		expect(
 			p!.flatMap((line, i) => (line === q![i] ? [] : [[line, q![i]]])),
@@ -6752,6 +6809,7 @@ describe('⭐⭐ package V-2 — reviewer-qualification case set v12’s three r
 				recommendation: oracle!.disposition
 			});
 			const { scored } = await evaluateCase({
+				indications: PLACEHOLDER_INDICATIONS,
 				case: c,
 				criteria: SEEDED_REASONING_REVIEW_CRITERIA,
 				candidate: EVALUATING_CANDIDATE,
@@ -7343,12 +7401,17 @@ describe('package Y — case set v13 and oracles v13 (D37)', () => {
 		const unmoved = CASE_SET_V12.cases.filter(c => !/^[WP]12-/.test(c.id));
 		expect([moved.size, unmoved.length]).toEqual([42, 50]);
 		for (const set of ySets()) {
-			const rendered = await Promise.all(set.cases.map(async c => [c.id, sha256((await promptsFor(c)).initial)] as const));
+			// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D50, D52; `REG-D-146`; design §12.2, §12.4) — ~~`sha256((await promptsFor(c)).initial)`~~:
+			// on TODAY's first prompt, the material these 97 pins are about; the measured section is pinned by the screen's
+			// acceptance over the 11 it screened (`verif/review-indications-screen.test.ts`), and over all 97 by package Z2's.
+			const rendered = await Promise.all(set.cases.map(async c => [c.id, sha256((await promptsFor(c)).today)] as const));
 			expect(rendered).toEqual(Y_FIRST_PROMPTS);
 			const hashes = new Map(rendered);
 			const fingerprint = await reviewerFingerprint(set.cases);
 			expect(fingerprint.caseSet).toBe('f4fc815d13d14a58cbd5f4f4a9c69a9d0ed376e6a9840a6f5afe768aeba92cfc');
-			expect(fingerprint.reviewer).toBe('479121cf7e6af2c91331855d50e140ac1f7ceb323c5b0abd01f22e2ac8992945');
+			// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D50, D52; `REG-D-146`) — ~~'479121cf7e6af2c91331855d50e140ac1f7ceb323c5b0abd01f22e2ac8992945'~~:
+			// today's reviewer, as `REVIEWER_FINGERPRINT_TODAY` restates it; the case-set digest above stays.
+			expect(fingerprint.reviewer).toBe(REVIEWER_FINGERPRINT_TODAY);
 			for (const [id, pin] of moved) expect(hashes.get(id), id).toBe(pin);
 			for (const c of unmoved) expect(hashes.get(c.id), c.id).toBe(recorded.filter(l => l.kind === 'CALL' && l.role === 'initial' && l.caseId === c.id).at(-1)!.promptSha256);
 		}
@@ -7447,14 +7510,26 @@ describe('package Y — case set v13 and oracles v13 (D37)', () => {
 			expect(await check(`${set.conferral} ${ORACLES_PROPOSED}`)).toEqual([{limb:'CONFERRAL',message:ORACLES_NOT_CONFERRED}]);
 		}
 	});
-	it('Y12 every prompt under 28000 characters; only P12-RR-07-CUT declares a review cut', async () => {
+	// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D50, D52; `REG-D-146`; design §12.2, §12.4) — ~~'Y12 every prompt under 28000 characters'~~:
+	// every TODAY prompt under 28,000; every prompt sent within D52's two bounds; and the three sent past agy's 28,000 are
+	// the three the design counts (design §12.4: 3 of 97; devin, the selected transport, has no such ceiling).
+	it('Y12 every ⛔ today’s prompt under 28000 characters; only P12-RR-07-CUT declares a review cut; ⭐ every prompt sent within 33,000 characters and 9,500 beyond today’s, no statement cut, and exactly three past agy’s 28,000', async () => {
 		for (const set of ySets()) {
 			expect(set.cases).toHaveLength(97);
+			const pastAgy: string[] = [];
 			for (const c of set.cases) {
 				const p = await promptsFor(c);
-				for (const text of [p.initial,p.repair]) expect(text.length,c.id).toBeLessThan(28000);
-				expect(p.initial.includes('[CUT FOR THIS REVIEW:'),c.id).toBe(c.id === 'P12-RR-07-CUT');
+				// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D50, D52; `REG-D-146`; design §12.2, §12.4) — ~~`[p.initial, p.repair]`… `toBeLessThan(28000)`;
+				// `p.initial.includes('[CUT FOR THIS REVIEW:')`~~: TODAY's prompts, whose room the material's cuts are made in.
+				for (const text of [p.today,p.todayRepair]) expect(text.length,c.id).toBeLessThan(28000);
+				expect(p.today.includes('[CUT FOR THIS REVIEW:'),c.id).toBe(c.id === 'P12-RR-07-CUT');
+				// ⭐ Z1 — D52: the prompt sent, within its two bounds, and quoting no statement cut (the longest within 700).
+				expect(p.initial.length,c.id).toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.WHOLE_PROMPT_MAX);
+				expect(p.initial.length - p.today.length,c.id).toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.SECTION_GROWTH_MAX);
+				expect(p.initial.includes('[CUT FOR THIS REVIEW: the statement'),c.id).toBe(false);
+				if (p.initial.length >= MAX_AGY_PROMPT_CHARS) pastAgy.push(c.id);
 			}
+			expect(pastAgy, 'the prompts sent past agy’s 28,000 characters').toEqual(['P12-RR-07-CUT', 'W13-CSV-RERUN', 'W13-CSV-RERUN-RR-07']);
 		}
 	});
 	it('Y13 the oracles compose through the runner’s scoring, valid and independent', async () => {
@@ -7464,7 +7539,7 @@ describe('package Y — case set v13 and oracles v13 (D37)', () => {
 				const oracle = ORACLES_V13.oracles.find(o => o.caseId === c.id)!;
 				const rubric = c.arm === 'DECLARED_POLICY' ? c.input.policy.criteria : SEEDED_REASONING_REVIEW_CRITERIA;
 				const reply = JSON.stringify({findings:rubric.map(k => ({criterionId:k.id,failed:oracle.faulted.includes(k.id),statement:'as the oracle expects',severity:oracle.faulted.includes(k.id)?'BLOCKING':'INFORMATIONAL'})),recommendation:oracle.disposition});
-				const {scored} = await evaluateCase({case:c,criteria:SEEDED_REASONING_REVIEW_CRITERIA,candidate:EVALUATING_CANDIDATE,scoringDigest:'0'.repeat(64),call:async () => ({returned:reply,served:null})});
+				const {scored} = await evaluateCase({ indications: PLACEHOLDER_INDICATIONS, case:c,criteria:SEEDED_REASONING_REVIEW_CRITERIA,candidate:EVALUATING_CANDIDATE,scoringDigest:'0'.repeat(64),call:async () => ({returned:reply,served:null})});
 				expect([scored.disposition,scored.resultClass,scored.independenceOk],c.id).toEqual([oracle.disposition,'VALID',true]);
 			}
 		}

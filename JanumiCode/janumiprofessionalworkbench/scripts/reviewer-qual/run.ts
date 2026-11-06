@@ -32,6 +32,7 @@ import {
 	sourceResolutionProblem,
 	SOURCE_PROBE
 } from './preflight.js';
+import type { IndicationsSource } from '../../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
 import type { CallReply } from './record.js';
 import type { RunFingerprint } from './runner.js';
 import type { CandidateSpec, TransportDeps } from './transports.js';
@@ -47,6 +48,13 @@ export interface CliDeps {
 	readonly commit: () => string;
 	readonly now: () => Date;
 	readonly transportDeps?: TransportDeps;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D50 (`REG-D-146`; design §12.2) — the decision model each case's review asks for its
+	 * potential indications, once, before its first reviewer call. ⛔ The CLI run from the command line hands none in Z1: no client
+	 * exists until package Z2's, so a paid run is refused at its first case before any call to the model it measures — its RUN
+	 * line written, no CALL line. A test hands a double here, as it hands `transportDeps`.
+	 */
+	readonly indications?: IndicationsSource;
 }
 
 /**
@@ -278,6 +286,7 @@ export async function main(argv: readonly string[], deps: CliDeps): Promise<numb
 			transport,
 			repetitions: Number(args.repetitions ?? 2),
 			env: deps.env,
+			...(deps.indications ? { indications: deps.indications } : {}),
 			onLine: (line) => {
 				appendFileSync(args.out!, record.serializeLine(line));
 				appended += 1;

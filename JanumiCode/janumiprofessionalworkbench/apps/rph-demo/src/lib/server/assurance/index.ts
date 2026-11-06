@@ -15,7 +15,11 @@ import {
 } from '@janumipwb/rph-assurance';
 import type { ArtifactStore } from '@janumipwb/rph-ports';
 import type { ExchangeSink } from './exchange-capture.js';
-import { createAgyReasoningReviewValidator, type AgyPrint } from './reasoning-review-validator.js';
+import {
+	createAgyReasoningReviewValidator,
+	type AgyPrint,
+	type IndicationsSource
+} from './reasoning-review-validator.js';
 import {
 	createStandinReasoningReviewValidator,
 	STANDIN_VALIDATOR_ID,
@@ -31,6 +35,7 @@ import {
 	type DeclaredStipulationLookup
 } from './declared-policy-review.js';
 import { judgeModel } from './agy-cli.js';
+import { configuredIndications } from './decision-model.js';
 import { assuranceModel, devinPrint, type DevinExec } from '../tools/devin-reviewer.js';
 import { refusalMessage, selectReviewer, type ReviewerSelection } from './reviewer-selection.js';
 import { productCallBoundFor, replayRunFor } from '../replay/replay-run.js';
@@ -54,6 +59,14 @@ export function createFloorRegistry(opts: {
 	 * justified `AgyExec` in `REG-F-333`.
 	 */
 	print?: AgyPrint;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D50 (`REG-D-146`; design §12.2) — THE DECISION MODEL THE REVIEW'S POTENTIAL INDICATIONS
+	 * COME FROM, handed to the reasoning-review validator beside `print` (`IndicationsSource`). ⛔ PRODUCTION HANDS NONE IN Z1: no
+	 * client is built until package Z2, so every real and replayed review is refused before any reviewer call, the reason on the
+	 * record (`NO_INDICATIONS_SOURCE_STATEMENT`) — the fail-closed state Z1 leaves until it merges with Z2. ⭑ A test hands a double
+	 * here as it hands `print`, so the wiring stays reachable; a stand-in never answers for the model.
+	 */
+	indications?: IndicationsSource;
 	/**
 	 * ⭐ `JAN-SELREV` SR-1 — the devin PROGRAM, injectable at its exec seam, so the devin branch is reached with nothing
 	 * injected but the program. Every real-path test injects `print`, which wins, so until this seam existed no test had
@@ -102,6 +115,9 @@ export function createFloorRegistry(opts: {
 				...(opts.artifacts ? { artifacts: opts.artifacts } : {}),
 				...(opts.exchanges ? { exchanges: opts.exchanges } : {}),
 				...(opts.clock ? { clock: opts.clock } : {}),
+				// ⭐ Package Z1 — the decision model: one handed in wins, as an injected `print` does; else the one configured
+				// (`decision-model.ts`), which is none until package Z2 — and every review is then refused before a call.
+				...decisionModelOf(opts.indications ?? configuredIndications()),
 				// ⚠ AN EXPLICITLY INJECTED `print` STILL WINS over the configured tool. It is the seam the gate uses to
 				// exercise this wiring without spawning anything, and a tool selection that overrode it would make the
 				// retention assertions untestable — the reason `AgyPrint` was made injectable at all.
@@ -151,6 +167,8 @@ export function createDeclaredPolicyReviewer(opts: {
 	artifacts?: ArtifactStore;
 	exchanges?: ExchangeSink;
 	print?: AgyPrint;
+	/** ⭐ Package Z1 — the decision model, as `createFloorRegistry` takes it: none in production until package Z2. */
+	indications?: IndicationsSource;
 	devinExec?: DevinExec;
 	clock?: () => string;
 	stipulations?: DeclaredStipulationLookup;
@@ -227,7 +245,7 @@ export function createDeclaredPolicyReviewer(opts: {
  */
 function replayReviewer(
 	selection: Extract<ReviewerSelection, { kind: 'REPLAY' }>,
-	opts: { artifacts?: ArtifactStore; exchanges?: ExchangeSink }
+	opts: { artifacts?: ArtifactStore; exchanges?: ExchangeSink; indications?: IndicationsSource }
 ): Validator {
 	let run: ReturnType<typeof replayRunFor>;
 	try {
@@ -242,6 +260,10 @@ function replayReviewer(
 		...(opts.exchanges ? { exchanges: opts.exchanges } : {}),
 		print: run.reviewerPrint,
 		clock: run.clock,
+		// ⭐⭐ Package Z1 — D50 — ⚠ A RECORDING HOLDS NO DECISION-MODEL SCORES YET: what a replay serves for them is not designed
+		// (design §12 names none). The decision model handed in, else the replay's own (`ReplayRun.indications`, none in a
+		// recording read from disk); none, and the replayed review is refused. ⛔ Never the live configured one: a replay runs nothing.
+		...decisionModelOf(opts.indications ?? run.indications),
 		agentId: reviewer.agentId,
 		modelId: reviewer.modelId,
 		providerId: reviewer.providerId,
@@ -256,6 +278,10 @@ function replayReviewer(
 		})
 	};
 }
+
+/** ⭐ Package Z1 — a validator's `indications` option, where there is a source; none, and the option is absent (refused). */
+const decisionModelOf = (indications: IndicationsSource | undefined): { indications?: IndicationsSource } =>
+	indications === undefined ? {} : { indications };
 
 /** ⭐ Finding 10 — the id a REPLAYED review is recorded under: never `agy.reasoning-review`, since no reviewer ran. */
 export const REPLAY_REVIEWER_ID = 'replay.reasoning-review';

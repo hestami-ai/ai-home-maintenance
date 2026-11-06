@@ -52,6 +52,7 @@ import { ToolCallKilled, type KilledCallFacts } from '../apps/rph-demo/src/lib/s
 import { recordProblems, type CallLine, type RunLine } from '../scripts/reviewer-qual/record.js';
 import { reviewerFingerprint } from '../scripts/reviewer-qual/fingerprint.js';
 import { main, runSummary } from '../scripts/reviewer-qual/run.js';
+import { NO_INDICATIONS_SOURCE_STATEMENT } from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
 import { runQualification, type RunFingerprint } from '../scripts/reviewer-qual/runner.js';
 import {
 	AGY_PRINT_TIMEOUT_MS,
@@ -69,6 +70,7 @@ import {
 	NO_PROGRAMS,
 	reviewerProgramsIn
 } from './reviewer-qualification-hermetic.js';
+import { PLACEHOLDER_INDICATIONS } from '../scripts/reviewer-qual/indications.js';
 
 const REPO = fileURLToPath(new URL('../', import.meta.url))
 	.replace(/\\/g, '/')
@@ -187,6 +189,7 @@ describe('JAN-CRITREAD J2-2 — the product transports (REG-D-072 D12)', () => {
 		// ⭐ D3b (8) — arrangement: a case renamed in the current set must not shrink the fixture in silence.
 		expect(TWO.map((c) => c.id), 'arrangement: the two cases, both in the current set').toEqual(['W12-CLEAN', 'G11-CLEAN.T01']);
 		const lines = await runQualification({
+			indications: PLACEHOLDER_INDICATIONS,
 			runId: 'qr-agy-1',
 			date: '2026-09-24T12:00:00.000Z',
 			commit: 'e5f9358b'.repeat(5),
@@ -520,6 +523,7 @@ describe('JAN-CRITREAD J2-2 — the product transports (REG-D-072 D12)', () => {
 		const written: unknown[] = [];
 		await expect(
 			runQualification({
+				indications: PLACEHOLDER_INDICATIONS,
 				runId: 'qr-agy-unresolved',
 				date: '2026-09-24T12:00:00.000Z',
 				commit: 'e5f9358b'.repeat(5),
@@ -833,6 +837,7 @@ describe('JAN-CRITREAD J2-2 — an Ollama refusal made before the server is touc
 				call: (prompt) => t.call(prompt.padEnd(agyCli.MAX_AGY_PROMPT_CHARS + 1, '.'))
 			};
 			const lines = await runQualification({
+				indications: PLACEHOLDER_INDICATIONS,
 				runId: 'qr-ollama-over-long',
 				date: '2026-09-24T12:00:00.000Z',
 				commit: 'e5f9358b'.repeat(5),
@@ -907,7 +912,8 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 		return { status: r.status, err: `${r.stdout ?? ''}${r.stderr ?? ''}`, wrote: existsSync(out) };
 	};
 
-	/** The CLI in process: a fingerprint handed in, agy's exec seam captured — so no model is ever called. */
+	/** The CLI in process: a fingerprint handed in, agy's exec seam captured — so no model is ever called. ⭐ Package Z1 (D50,
+	 *  `REG-D-146`) — and its decision model, the scripts' placeholder, which calls none. */
 	const inProcess = (spawned: Spawned[], written: string[], commit = 'e5f9358b'.repeat(5)) => ({
 		env: process.env,
 		resolve: () => 'file:///E:/repo/packages/rph-assurance/src/index.ts',
@@ -915,7 +921,8 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 		fingerprint: async () => FINGERPRINT,
 		commit: () => commit,
 		now: () => new Date('2026-09-24T12:00:00.000Z'),
-		transportDeps: { agyExec: capturing(spawned) }
+		transportDeps: { agyExec: capturing(spawned) },
+		indications: PLACEHOLDER_INDICATIONS
 	});
 
 	it('⛔ the CLI refuses JPWB_AGY_BIN ITSELF, before it computes a fingerprint — which loads the validator, and with it agy-cli (D12)', async () => {
@@ -1191,38 +1198,65 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 		expect(r.wrote).toBe(false);
 	});
 
-	it('⭐ with a clean environment it proceeds past the fingerprint to the transport — a local stand-in, never a real server — and records a RUN stamped with today’s fingerprint', async () => {
+	// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D50, `REG-D-146`; design §12.2) — the CLI run from the command line
+	// hands its runner no decision model until package Z2's client lands (`run.ts` `CliDeps.indications`), so its first case is
+	// refused before any call, and the runner writes its RUN line only with a first evaluation (`runner.ts`): ~~exit 0, a RUN
+	// line stamped with today's fingerprint, a CALL line whose prompt is the fingerprint's, one call to the stand-in~~ ⭐ exit 2,
+	// the refusal stated, nothing written, the stand-in asked who it is and sent no prompt. ⭑ What the child process can no
+	// longer show is carried by THE SAME COMMAND IN PROCESS, its fingerprint computed as the CLI computes it (`run.ts`
+	// `TODAYS_FINGERPRINT`: `reviewerFingerprint` over the committed set) and the scripts' placeholder decision model: the RUN
+	// line stamped with today's fingerprint, its CALL line's prompt the fingerprint's own, one call to the stand-in.
+	it('⭐ with a clean environment it proceeds past the fingerprint to the transport — a local stand-in, never a real server — ⛔ and in package Z1 is refused at its first case, before any call and before any line (no decision model is configured); ⭐ in process, with the placeholder decision model, it records a RUN stamped with today’s fingerprint', async () => {
 		const s = await ollamaStandIn('answer');
 		try {
 			const out = join(tmp(), 'run.ndjson');
+			const command = [
+				'--transport',
+				'ollama',
+				'--model',
+				'gpt-oss:20b',
+				'--ollama-url',
+				s.url,
+				'--cases',
+				'W12-CLEAN',
+				'--repetitions',
+				'1',
+				'--out',
+				out
+			];
 			// ⚠ ASYNCHRONOUS, because the stand-in answers from THIS process: a synchronous spawn would block it.
 			const r = await new Promise<{ status: number | null; err: string }>((resolve) => {
-				const child = spawn(
-					BUN,
-					[
-						'--conditions=source',
-						'scripts/reviewer-qual/run.ts',
-						'--transport',
-						'ollama',
-						'--model',
-						'gpt-oss:20b',
-						'--ollama-url',
-						s.url,
-						'--cases',
-						'W12-CLEAN',
-						'--repetitions',
-						'1',
-						'--out',
-						out
-					],
-					{ cwd: REPO, env: hermeticEnv(), windowsHide: true }
-				);
+				const child = spawn(BUN, ['--conditions=source', 'scripts/reviewer-qual/run.ts', ...command], {
+					cwd: REPO,
+					env: hermeticEnv(),
+					windowsHide: true
+				});
 				let err = '';
 				child.stdout.on('data', (c: Buffer) => (err += c.toString('utf8')));
 				child.stderr.on('data', (c: Buffer) => (err += c.toString('utf8')));
 				child.on('close', (status) => resolve({ status, err }));
 			});
-			expect(r.status, r.err).toBe(0);
+			// ~~expect(r.status, r.err).toBe(0);~~ ⛔ Z1: refused before anything was appended.
+			expect(r.status, r.err).toBe(2);
+			expect(r.err, 'the refusal, stated').toContain(NO_INDICATIONS_SOURCE_STATEMENT);
+			expect(existsSync(out), 'nothing written').toBe(false);
+			expect(s.seen.length, 'past the fingerprint to the transport: the stand-in was asked who it is').toBeGreaterThan(0);
+			expect(
+				s.seen.filter((q) => q.body?.prompt !== undefined),
+				'no prompt, to the stand-in'
+			).toHaveLength(0);
+			// ⭑ THE SAME COMMAND IN PROCESS, with the placeholder decision model.
+			cleanEnv();
+			const written: string[] = [];
+			// `inProcess`'s dependencies — its placeholder decision model among them — with today's fingerprint for its fixture's.
+			const code = await main(command, {
+				...inProcess([], written),
+				fingerprint: async () => {
+					const f = await reviewerFingerprint(CASES);
+					return { reviewer: f.reviewer, scoring: f.scoring, caseSet: f.caseSet };
+				}
+			});
+			expect(code, written.join('')).toBe(0);
 			const text = readFileSync(out, 'utf8');
 			expect(recordProblems(text, { tracked: true })).toEqual([]);
 			const [runRow = '', callRow = ''] = text.trimEnd().split('\n');
@@ -1262,7 +1296,9 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 			fingerprint: async () => FINGERPRINT,
 			commit: () => 'e5f9358b'.repeat(5),
 			now: () => new Date('2026-09-24T12:00:00.000Z'),
-			transportDeps: { agyExec: capturing(spawned) }
+			transportDeps: { agyExec: capturing(spawned) },
+			// ⭐ Package Z1 (D50, `REG-D-146`) — and its decision model, the scripts' placeholder, which calls none.
+			indications: PLACEHOLDER_INDICATIONS
 		};
 		const args = [
 			'--transport',

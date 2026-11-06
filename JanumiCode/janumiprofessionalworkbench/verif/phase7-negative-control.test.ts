@@ -26,6 +26,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vites
 import { processResultReviewInput } from '../apps/rph-demo/src/lib/server/assurance/review-input.js';
 import {
 	createAgyReasoningReviewValidator,
+	NO_INDICATIONS_SOURCE_STATEMENT,
 	REASONING_REVIEW_BUDGET
 } from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
 import {
@@ -42,6 +43,7 @@ import {
 } from '../scripts/phase7/negative-control.js';
 import { PHASE7_E2E, PRODUCT_BRIEF, renderedPrompt } from '../scripts/phase7/pwa-content.js';
 import { NO_PROGRAMS } from './reviewer-qualification-hermetic.js';
+import { PLACEHOLDER_INDICATIONS } from '../scripts/reviewer-qual/indications.js';
 
 const CRITERIA = SEEDED_REASONING_REVIEW_CRITERIA;
 const RR = {
@@ -129,6 +131,7 @@ describe('JAN-EXEC P7-4e — the negative control’s case', () => {
 		await runNegativeControl({ transport: recording, mode: 'DRY_RUN', repetitions: 1 });
 		let independent = '';
 		await createAgyReasoningReviewValidator({
+			indications: PLACEHOLDER_INDICATIONS,
 			agentId: 'x',
 			modelId: 'x',
 			providerId: 'x',
@@ -284,18 +287,28 @@ describe('JAN-EXEC P7-4e — the command line', () => {
 		expect(d.said.join('')).toMatch(/REG-D-072 D12/);
 	});
 
-	it('⭐ --live: the selected reviewer is asked for by name, twice, within the cap — here a stub stands in for it', async () => {
+	// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D50, `REG-D-146`; design §12.2, §12.3) — ~~`--live: the selected
+	// reviewer is asked for by name, twice, within the cap`: `expect(await main([…'--live'…], d)).toBe(0)`, `expect(written.
+	// reviewerCalls).toBeLessThanOrEqual(MAX_REVIEWER_CALLS)`, `expect(written.held).toBe(true)`~~: every review now asks a
+	// decision model for its potential indications before its first reviewer call, and a live run has none until package Z2's
+	// client and records land — never the dry run's placeholder scores. So `--live` loads the selected reviewer by name as
+	// before, and its review is refused before any call to it: the result is written, LIVE, no reviewer call made, not held,
+	// stopped with the validator's statement — exit 4, a stopped run.
+	it('⭐ --live: the selected reviewer is asked for by name, ⛔ and in package Z1 no call is made to it — no decision model is configured for a live run, so its review is refused before its first call — here a stub stands in for it', async () => {
 		const out = outFile();
-		const loadLiveTransport = vi.fn<NegativeControlCliDeps['loadLiveTransport']>(async () =>
-			stubTransport(judgement([RR['03'], RR['06']]))
-		);
+		const transport = stubTransport(judgement([RR['03'], RR['06']]));
+		const calls = vi.spyOn(transport, 'call');
+		const loadLiveTransport = vi.fn<NegativeControlCliDeps['loadLiveTransport']>(async () => transport);
 		const d = deps({ loadLiveTransport });
-		expect(await main(['--out', out, '--live', '--model', 'glm-5-3-flash-max'], d)).toBe(0);
+		expect(await main(['--out', out, '--live', '--model', 'glm-5-3-flash-max'], d)).toBe(4);
 		expect(loadLiveTransport).toHaveBeenCalledTimes(1);
 		expect(loadLiveTransport.mock.calls[0]?.[0]).toEqual({ transport: 'devin', modelLabel: 'glm-5-3-flash-max' });
+		expect(calls, 'no reviewer call').not.toHaveBeenCalled();
 		const written = JSON.parse(readFileSync(out, 'utf8')) as NegativeControlResult;
 		expect(written.mode).toBe('LIVE');
+		expect(written.reviewerCalls).toBe(0);
 		expect(written.reviewerCalls).toBeLessThanOrEqual(MAX_REVIEWER_CALLS);
-		expect(written.held).toBe(true);
+		expect(written.held).toBe(false);
+		expect(written.stopped).toContain(NO_INDICATIONS_SOURCE_STATEMENT);
 	});
 });

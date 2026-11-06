@@ -47,6 +47,14 @@ import {
 	markAuthoringTurnValid
 } from './authoring-turn.js';
 
+// ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D50 (`REG-D-146`): the product's configured decision model, whose potential
+// indications every review asks for before its first reviewer call, stood in for by a double that calls no model —
+// as the reviewer's program is. ⛔ Production configures none until package Z2, and refuses the review.
+vi.mock('./assurance/decision-model.js', async () => {
+	const { TEST_INDICATIONS } = await import('./assurance/indications.testing.js');
+	return { configuredIndications: () => TEST_INDICATIONS };
+});
+
 const PWA = 'pwa_01ARZ3NDEKTSV4RRFFQ69G5Q00';
 /** Three types, defined in this order — the export's, and so the parts'. */
 const ROOT = 'pwut_01ARZ3NDEKTSV4RRFFQ69G5Q10';

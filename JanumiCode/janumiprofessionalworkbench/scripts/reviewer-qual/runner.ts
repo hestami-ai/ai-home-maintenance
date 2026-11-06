@@ -47,7 +47,8 @@ import {
 	CRITERION_REPAIR_INSTRUCTION,
 	MISSING_CRITERION_REPAIR_CLOSING,
 	MISSING_CRITERION_REPAIR_OPENING,
-	missingCriterionRepairInstruction
+	missingCriterionRepairInstruction,
+	type IndicationsSource
 } from '../../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
 import {
 	isToolInvocationResult,
@@ -188,6 +189,13 @@ export async function evaluateCase(args: {
 	 * (`fingerprint.ts`), so its declared corpus is scored at the ceilings it hashes.
 	 */
 	readonly requiredEvidenceOf?: (policyId: string) => RequiredEvidence | undefined;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D50 (`REG-D-146`) — the decision model the validator asks for its potential indications
+	 * before its first call (`IndicationsSource`). ⛔ Absent, the validator refuses the case before any call, so the run stops on
+	 * its harness refusal: no paid evaluation is made without each indication. The fingerprint, the re-scoring and the negative
+	 * control's dry run hand the scripts' placeholder (`indications.ts`); a run that calls a reviewer hands none until package Z2.
+	 */
+	readonly indications?: IndicationsSource;
 }): Promise<Evaluation> {
 	const now = args.now ?? (() => performance.now());
 	// ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (design B5) — A DECLARED CASE IS ANSWERED AGAINST ITS OWN POLICY'S CRITERIA, never the
@@ -214,6 +222,7 @@ export async function evaluateCase(args: {
 		agentId: args.candidate.agentId,
 		modelId: args.candidate.modelLabel,
 		providerId: args.candidate.provider,
+		...(args.indications ? { indications: args.indications } : {}),
 		clock: EXCHANGE_CLOCK,
 		print: async (prompt) => {
 			const role = callRole(calls.length, prompt);
@@ -493,6 +502,11 @@ export interface RunInputs {
 	readonly now?: () => number;
 	/** Each line as it is made, so a run killed part-way keeps every call it measured. */
 	readonly onLine?: (line: RunLine | CallLine) => void;
+	/**
+	 * ⭐⭐ Package Z1 — D50 — the decision model each evaluation's validator asks (`evaluateCase`). ⛔ `run.ts` hands none until
+	 * package Z2's client and records land, so a paid run refuses at its first case, before its RUN line and before any call.
+	 */
+	readonly indications?: IndicationsSource;
 }
 
 /**
@@ -541,7 +555,8 @@ export async function runQualification(i: RunInputs): Promise<(RunLine | CallLin
 					candidate,
 					call: (prompt) => withinOneDay(() => i.transport.call(prompt)),
 					scoringDigest: i.fingerprint.scoring,
-					...(i.now ? { now: i.now } : {})
+					...(i.now ? { now: i.now } : {}),
+					...(i.indications ? { indications: i.indications } : {})
 				});
 				if (pending) emit(pending);
 				pending = undefined;

@@ -114,6 +114,16 @@ import {
 import { fenceCandidate, FENCE_MEANING, NO_FENCE_STATEMENT } from './review-fence.js';
 import { graphReviewInput, processResultReviewInput, pwaTypeReviewInput, workProductReviewInput } from './review-input.js';
 import { renderRationale } from '../agent/rationale.js';
+import { TEST_INDICATIONS } from './indications.testing.js';
+import { todayPromptOf } from './review-section.testing.js';
+
+// ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D50 (`REG-D-146`): the product's configured decision model, whose potential
+// indications every review asks for before its first reviewer call, stood in for by a double that calls no model —
+// as the reviewer's program is. ⛔ Production configures none until package Z2, and refuses the review.
+vi.mock('./decision-model.js', async () => {
+	const { TEST_INDICATIONS } = await import('./indications.testing.js');
+	return { configuredIndications: () => TEST_INDICATIONS };
+});
 
 const PRODUCER: FloorProducer = {
 	agentId: 'jpwb-authoring-agent',
@@ -132,6 +142,7 @@ const RATIONALE: ProfessionalRationaleSummary = {
 async function materialize(input: ReasoningReviewInput): Promise<string> {
 	const prompts: string[] = [];
 	const validator = createAgyReasoningReviewValidator({
+		indications: TEST_INDICATIONS,
 		agentId: 'agy',
 		modelId: 'test-judge-model',
 		providerId: 'google',
@@ -1353,7 +1364,9 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 — a 64 KiB process result, read whole by noth
 		for (const run of [BIG_RUN, aRun({ ...BIG_RUN, stderr: 'x'.repeat(65_536) }), aRun({ argv: Array.from({ length: 3_000 }, (_, i) => `a${i}`) })]) {
 			const input = build(run);
 			const prompt = await materialize(input);
-			expect(prompt.length, 'over PROMPT_BUDGET').toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.PROMPT_BUDGET);
+			// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D52, `REG-D-146`; design §12.4) — ~~`expect(prompt.length, 'over PROMPT_BUDGET').toBeLessThanOrEqual(PROMPT_BUDGET)`~~: the room is today's (D52): TODAY's prompt for this input, the head and today's review section, is within PROMPT_BUDGET; the prompt sent, within its whole bound.
+			expect(todayPromptOf(prompt, input.criteria).length, 'today’s prompt over PROMPT_BUDGET').toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.PROMPT_BUDGET);
+			expect(prompt.length, 'the prompt sent over its whole bound').toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.WHOLE_PROMPT_MAX);
 			// ⭑ The builder's view reaches the prompt WHOLE: not one byte of it was cut or re-declared by the validator.
 			expect(prompt).toContain(`\n${input.content}\n`);
 			expect(prompt, 'the validator cut the command result').not.toContain('[CUT FOR THIS REVIEW: the command result');
@@ -1369,7 +1382,9 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 — a 64 KiB process result, read whole by noth
 		const prompt = await materialize(input);
 		expect(budget).toBeGreaterThan(REASONING_REVIEW_BUDGET.CONTENT_MIN);
 		expect(budget).toBeLessThan(REASONING_REVIEW_BUDGET.CONTENT_MAX);
-		expect(prompt.length - content.length + budget).toBe(REASONING_REVIEW_BUDGET.PROMPT_BUDGET);
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D52, `REG-D-146`; design §12.4) — ~~`expect(prompt.length - content.length + budget).toBe(PROMPT_BUDGET)`~~: the seam is measured on TODAY's prompt,
+		// which the room is computed against — the head and today's review section — to the character.
+		expect(todayPromptOf(prompt, input.criteria).length - content.length + budget).toBe(REASONING_REVIEW_BUDGET.PROMPT_BUDGET);
 		expect(content.length).toBeLessThanOrEqual(budget);
 		// ⭐⭐ `JAN-EXEC` Phase 7, package N's check, finding 5 (design D12) — AND WITH THE STEP'S SEQUENCE ON ITS HOST LINES: the
 		// seam is the room the assembler leaves the view beside the sequence, to the character. ⛔ The sequence's element is
@@ -1387,12 +1402,21 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 — a 64 KiB process result, read whole by noth
 		const room = processResultContentBudget({ ...around, framing: 'PROCESS_RESULT' });
 		const withSequence = await materialize(sequenced);
 		expect(withSequence, 'arrangement: no sequence on the host lines').toContain('  2. ran ["pytest","-rs","checks/"] — exit 0');
-		expect(withSequence.length - view.length + room, 'the seam beside a sequence').toBe(REASONING_REVIEW_BUDGET.PROMPT_BUDGET);
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D52, `REG-D-146`; design §12.4) — ~~`expect(withSequence.length - view.length + room, …).toBe(PROMPT_BUDGET)`~~: on TODAY's prompt, to the character.
+		expect(todayPromptOf(withSequence, sequenced.criteria).length - view.length + room, 'the seam beside a sequence').toBe(REASONING_REVIEW_BUDGET.PROMPT_BUDGET);
 		// ⭑ A view exactly at its room — the builder's own view, padded after its last fence to the character — is sent whole,
 		// and the prompt is the budget, never past it.
 		const full = await materialize({ ...sequenced, content: view.padEnd(room, ' ') });
-		expect(full.length, 'a view at its room passed PROMPT_BUDGET beside a sequence').toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.PROMPT_BUDGET);
-		// ⛔ AND NO MEMBER WAS ADDED TO THE BUDGET OBJECT: the reviewer fingerprint hashes it as its `budget` component.
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D52, `REG-D-146`; design §12.4) — ~~`expect(full.length, 'a view at its room
+		// passed PROMPT_BUDGET beside a sequence').toBeLessThanOrEqual(PROMPT_BUDGET)`~~: the room is today's, so TODAY's prompt with the
+		// view at its room is within PROMPT_BUDGET; the prompt sent, within its whole bound.
+		expect(todayPromptOf(full, sequenced.criteria).length, 'a view at its room passed PROMPT_BUDGET beside a sequence').toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.PROMPT_BUDGET);
+		expect(full.length, 'the prompt sent passed its whole bound').toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.WHOLE_PROMPT_MAX);
+		// ⛔ AND NO MEMBER WAS ADDED TO THE BUDGET OBJECT FOR THE SEQUENCE: the reviewer fingerprint hashes it as its `budget` component.
+		// ⛔ MOVED 2026-11-06 (package Z1 — D52) — ~~`expect(Object.keys(REASONING_REVIEW_BUDGET)).toEqual(['PROMPT_BUDGET', 'USER_INTENT_MAX',
+		// 'RUBRIC_MAX', 'PRIOR_MAX', 'RATIONALE_MAX', 'NARRATION_MAX', 'CONTENT_MAX', 'CONTENT_MIN'])`~~: D52 writes the measured section's
+		// own room in the object, the one place a limit is written — three members, none of them the sequence's. Restated: the eight,
+		// then D52's three, and no other.
 		expect(Object.keys(REASONING_REVIEW_BUDGET)).toEqual([
 			'PROMPT_BUDGET',
 			'USER_INTENT_MAX',
@@ -1401,7 +1425,10 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 — a 64 KiB process result, read whole by noth
 			'RATIONALE_MAX',
 			'NARRATION_MAX',
 			'CONTENT_MAX',
-			'CONTENT_MIN'
+			'CONTENT_MIN',
+			'SECTION_GROWTH_MAX',
+			'QUOTED_STATEMENT_MAX',
+			'WHOLE_PROMPT_MAX'
 		]);
 	});
 });
@@ -1575,7 +1602,10 @@ describe('⭐ JAN-PRQUAL PQ-1 — design §4.1: the graph and work-product promp
 			const prompt = await materialize(
 				graphReviewInput({ criteria: SEEDED_REASONING_REVIEW_CRITERIA, graph: LITERAL_EXPORT, ...opts })
 			);
-			expect(sha256(headPromptOf(prompt)), label).toBe(HEAD_PROMPT_SHA256[label]);
+			// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D42, D50, D52; `REG-D-146`) — ~~`sha256(headPromptOf(prompt))`~~: one step
+			// more to invert — the measured section, which replaces today's review section after the head; inverted first, by
+			// today's section for the same criteria (`todayPromptOf`). Every other step is inverted as before.
+			expect(sha256(headPromptOf(todayPromptOf(prompt, SEEDED_REASONING_REVIEW_CRITERIA))), label).toBe(HEAD_PROMPT_SHA256[label]);
 			expect(sha256(prompt), `${label}: the fence moved nothing`).not.toBe(HEAD_PROMPT_SHA256[label]);
 		}
 	});
@@ -1583,7 +1613,8 @@ describe('⭐ JAN-PRQUAL PQ-1 — design §4.1: the graph and work-product promp
 	it('⭐ every literal work-product input: the same', async () => {
 		for (const { label, source } of WP_OPTIONS) {
 			const prompt = await materialize(workProductReviewInput({ criteria: SEEDED_REASONING_REVIEW_CRITERIA, ...source }));
-			expect(sha256(headPromptOf(prompt)), label).toBe(HEAD_PROMPT_SHA256[label]);
+			// ⛔ MOVED 2026-11-06 (package Z1 — D42, D50, D52) — ~~`sha256(headPromptOf(prompt))`~~: the measured section inverted first.
+			expect(sha256(headPromptOf(todayPromptOf(prompt, SEEDED_REASONING_REVIEW_CRITERIA))), label).toBe(HEAD_PROMPT_SHA256[label]);
 			expect(sha256(prompt), `${label}: the fence moved nothing`).not.toBe(HEAD_PROMPT_SHA256[label]);
 		}
 	});

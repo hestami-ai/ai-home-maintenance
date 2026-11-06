@@ -56,6 +56,8 @@ import { renderRationale } from '../agent/rationale.js';
 import { declaredPolicyReviewInput, processResultReviewInput } from './review-input.js';
 import { createInMemoryArtifactStore, type ArtifactStore } from '@janumipwb/rph-ports';
 import type { ToolInvocationResult } from '../tools/backing-tool.js';
+import { TEST_INDICATIONS } from './indications.testing.js';
+import { DECIDING, headOf, TESTS, todayPromptOf } from './review-section.testing.js';
 
 /**
  * ⭐ R11 — the adapter observation every `ToolInvocationResult` now owes.
@@ -213,6 +215,7 @@ describe('Reasoning Review Validator — a CONTENT STORE failure is not a malfor
 		// means "the model returned something unusable", which is the one thing that disposition is for.
 		await expect(
 			createAgyReasoningReviewValidator({
+				indications: TEST_INDICATIONS,
 				print,
 				modelId: JUDGE,
 				artifacts: store,
@@ -240,6 +243,7 @@ describe('Reasoning Review Validator — a CONTENT STORE failure is not a malfor
 		const exchanges = createExchangeSink();
 
 		const result = await createAgyReasoningReviewValidator({
+			indications: TEST_INDICATIONS,
 			print,
 			modelId: JUDGE,
 			exchanges
@@ -289,7 +293,7 @@ describe('⭐⭐ P7-6 I2 — every reviewer reply is KEPT as content, parsed or 
 		const { print } = replying(PROSE, CLEAN);
 		const store = createInMemoryArtifactStore();
 		const exchanges = createExchangeSink();
-		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE, artifacts: store, exchanges }).evaluate(
+		const result = await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE, artifacts: store, exchanges }).evaluate(
 			SUBJECT,
 			ctx()
 		);
@@ -316,7 +320,7 @@ describe('⭐⭐ P7-6 I2 — every reviewer reply is KEPT as content, parsed or 
 		const store = createInMemoryArtifactStore();
 		const exchanges = createExchangeSink();
 		await expect(
-			createAgyReasoningReviewValidator({ print, modelId: JUDGE, artifacts: store, exchanges }).evaluate(SUBJECT, ctx())
+			createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE, artifacts: store, exchanges }).evaluate(SUBJECT, ctx())
 		).rejects.toThrow();
 		const kept = await Promise.all(
 			exchanges.drain().map(async (e) => [e.disposition, await store.get(e.rawOutputBeforeCoercionRef.storageKey ?? '')])
@@ -331,7 +335,7 @@ describe('⭐⭐ P7-6 I2 — every reviewer reply is KEPT as content, parsed or 
 		const { print } = replying('', CLEAN);
 		const store = createInMemoryArtifactStore();
 		const exchanges = createExchangeSink();
-		await createAgyReasoningReviewValidator({ print, modelId: JUDGE, artifacts: store, exchanges }).evaluate(SUBJECT, ctx());
+		await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE, artifacts: store, exchanges }).evaluate(SUBJECT, ctx());
 		const [first] = exchanges.drain();
 		expect(first!.parseOutcome.outcome).toBe('EMPTY_RESPONSE');
 		expect(first!.rawOutputBeforeCoercionRef.status).toBe('STORED');
@@ -350,7 +354,7 @@ describe('⭐⭐ P7-6 I2 — every reviewer reply is KEPT as content, parsed or 
 		};
 		const store = createInMemoryArtifactStore();
 		const exchanges = createExchangeSink();
-		await createAgyReasoningReviewValidator({ print, modelId: JUDGE, artifacts: store, exchanges, callBoundMs: 240_000 }).evaluate(
+		await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE, artifacts: store, exchanges, callBoundMs: 240_000 }).evaluate(
 			SUBJECT,
 			ctx()
 		);
@@ -364,7 +368,7 @@ describe('⭐⭐ P7-6 I2 — every reviewer reply is KEPT as content, parsed or 
 		const { print } = replying(`Let me think first.\n${CLEAN}\nThat is all.`);
 		const store = createInMemoryArtifactStore();
 		const exchanges = createExchangeSink();
-		await createAgyReasoningReviewValidator({ print, modelId: JUDGE, artifacts: store, exchanges }).evaluate(SUBJECT, ctx());
+		await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE, artifacts: store, exchanges }).evaluate(SUBJECT, ctx());
 		const [only] = exchanges.drain();
 		expect(only!.answerSpanRef.status).toBe('STORED');
 		expect(only!.volunteeredReasoningRef.status).toBe('STORED');
@@ -379,7 +383,7 @@ describe('⭐⭐ P7-6 I2 — every reviewer reply is KEPT as content, parsed or 
 		const { print } = replying(devinReport(CLEAN, EXPORT));
 		const store = createInMemoryArtifactStore();
 		const exchanges = createExchangeSink();
-		await createAgyReasoningReviewValidator({ print, modelId: JUDGE, artifacts: store, exchanges }).evaluate(SUBJECT, ctx());
+		await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE, artifacts: store, exchanges }).evaluate(SUBJECT, ctx());
 		const [only] = exchanges.drain();
 		const report = only!.observedToolCalls;
 		expect(report.observation).toBe('NOT_OBSERVABLE');
@@ -396,7 +400,7 @@ describe('⭐⭐ P7-6 I2 — every reviewer reply is KEPT as content, parsed or 
 		const { print } = replying(devinReport(PROSE, EXPORT), CLEAN);
 		const store = createInMemoryArtifactStore();
 		const exchanges = createExchangeSink();
-		await createAgyReasoningReviewValidator({ print, modelId: JUDGE, artifacts: store, exchanges }).evaluate(SUBJECT, ctx());
+		await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE, artifacts: store, exchanges }).evaluate(SUBJECT, ctx());
 		const [first, repair] = exchanges.drain();
 		expect(first!.observedToolCalls.reason, 'arrangement: the first call’s export is pointed at').toMatch(/storage key /);
 		expect(repair!.observedToolCalls.reason ?? '', 'the repair’s record names no export').not.toMatch(/storage key /);
@@ -406,7 +410,7 @@ describe('⭐⭐ P7-6 I2 — every reviewer reply is KEPT as content, parsed or 
 describe('Reasoning Review Validator — §14.3 conformance: no private chain-of-thought', () => {
 	it('reaches a VALID Assessment with all volunteered reasoning material withheld (the ablation)', async () => {
 		const { print } = capturing();
-		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(
+		const result = await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE }).evaluate(
 			SUBJECT,
 			ctx({ rationale: RATIONALE })
 		);
@@ -426,10 +430,12 @@ describe('Reasoning Review Validator — §14.3 conformance: no private chain-of
 		const withheld = capturing();
 
 		const a = await createAgyReasoningReviewValidator({
+			indications: TEST_INDICATIONS,
 			print: withAccount.print,
 			modelId: JUDGE
 		}).evaluate(SUBJECT, ctx({ rationale: RATIONALE, narration: 'I added a Realization root.' }));
 		const b = await createAgyReasoningReviewValidator({
+			indications: TEST_INDICATIONS,
 			print: withheld.print,
 			modelId: JUDGE
 		}).evaluate(SUBJECT, ctx());
@@ -446,7 +452,7 @@ describe('Reasoning Review Validator — §14.3 conformance: no private chain-of
 
 	it('renders the CONTRACTED account and its declared bindings — not scraped narration (§9.7 / §3)', async () => {
 		const { prompts, print } = capturing();
-		await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(
+		await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE }).evaluate(
 			SUBJECT,
 			ctx({ rationale: RATIONALE, narration: 'I added a Realization root.' })
 		);
@@ -463,7 +469,7 @@ describe('Reasoning Review Validator — §14.3 conformance: no private chain-of
 
 	it('records a LIMITATION when the producer returned no rationale summary — never infers from silence', async () => {
 		const { prompts, print } = capturing();
-		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(
+		const result = await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE }).evaluate(
 			SUBJECT,
 			ctx()
 		);
@@ -479,6 +485,7 @@ describe('Reasoning Review Validator — §14.3 conformance: no private chain-of
 
 		const declared = capturing();
 		const ok = await createAgyReasoningReviewValidator({
+			indications: TEST_INDICATIONS,
 			print: declared.print,
 			modelId: JUDGE
 		}).evaluate(SUBJECT, ctx({ rationale: RATIONALE }));
@@ -487,7 +494,7 @@ describe('Reasoning Review Validator — §14.3 conformance: no private chain-of
 
 	it("budgets the WHOLE prompt under agy's command-line ceiling on a huge graph (the ENAMETOOLONG fix)", async () => {
 		const { prompts, print } = capturing();
-		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(
+		const result = await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE }).evaluate(
 			SUBJECT,
 			ctx({
 				rationale: RATIONALE,
@@ -496,7 +503,12 @@ describe('Reasoning Review Validator — §14.3 conformance: no private chain-of
 			})
 		);
 		// The assembled prompt stays under the argv ceiling, so agyPrint can never reach `spawn ENAMETOOLONG`...
-		expect(prompts[0].length).toBeLessThanOrEqual(MAX_AGY_PROMPT_CHARS);
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D52, `REG-D-146`; design §12.4) — ~~`expect(prompts[0].length).toBeLessThanOrEqual(MAX_AGY_PROMPT_CHARS)`~~:
+		// the measured section has its own room. The material's room is today's, so TODAY's prompt for this input stays under the
+		// argv ceiling, as before; the prompt sent stays within its own whole bound. ⚠ agy keeps its ceiling, and fails at its call on
+		// a prompt past it (D52: the selected transport is devin, which reads the prompt from a file).
+		expect(todayPromptOf(prompts[0]!, SEEDED_REASONING_REVIEW_CRITERIA).length, 'today’s prompt under agy’s ceiling').toBeLessThanOrEqual(MAX_AGY_PROMPT_CHARS);
+		expect(prompts[0]!.length, 'the prompt sent within its whole bound').toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.WHOLE_PROMPT_MAX);
 		// ...the oversized graph content is truncated (declared, §9.7)... ⭐ `JAN-PRQUAL` `PQ-1`: declared BEFORE its bytes,
 		// naming the slice — this read `toContain('…(truncated)')`, the marker that followed the bytes and named nothing.
 		expect(prompts[0]).toContain('[CUT FOR THIS REVIEW: the artifact — the first ');
@@ -506,7 +518,7 @@ describe('Reasoning Review Validator — §14.3 conformance: no private chain-of
 
 	it('DECLARES truncation rather than silently cutting the subject or the account (§9.7)', async () => {
 		const { prompts, print } = capturing();
-		await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(
+		await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE }).evaluate(
 			SUBJECT,
 			ctx({ narration: 'y'.repeat(5000), content: `{"pad":"${'x'.repeat(30000)}"}` })
 		);
@@ -518,7 +530,7 @@ describe('Reasoning Review Validator — §14.3 conformance: no private chain-of
 
 	it('records the ACTUAL evaluator identity so independence is checkable against the producer (§8.4)', async () => {
 		const { print } = capturing();
-		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(
+		const result = await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE }).evaluate(
 			SUBJECT,
 			ctx()
 		);
@@ -559,7 +571,7 @@ describe('Reasoning Review Validator — §14.3 conformance: no private chain-of
 				}) +
 				'\n```'
 		);
-		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(
+		const result = await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE }).evaluate(
 			SUBJECT,
 			ctx()
 		);
@@ -588,13 +600,13 @@ describe('JAN-TOOLSUITE TS-06 — the SEAM sanitises, not just the adapters', ()
 			throw new Error(`Command failed: agy --print ${p} --model X`);
 		};
 		await expect(
-			createAgyReasoningReviewValidator({ print: leaky, modelId: JUDGE }).evaluate(SUBJECT, ctx())
+			createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print: leaky, modelId: JUDGE }).evaluate(SUBJECT, ctx())
 		).rejects.toThrow(/WITHHELD from the record plane/);
 
 		// ⭑ AND THE ASSERTION THAT ACTUALLY MATTERS: the prompt's own bytes are absent from what propagates.
 		// Asserting only the word "WITHHELD" would pass on a message that ALSO carried the prompt.
 		expect(sent.length).toBeGreaterThan(200);
-		const caught = await createAgyReasoningReviewValidator({ print: leaky, modelId: JUDGE })
+		const caught = await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print: leaky, modelId: JUDGE })
 			.evaluate(SUBJECT, ctx())
 			.then(
 				() => '',
@@ -611,7 +623,7 @@ describe('JAN-TOOLSUITE TS-06 — the SEAM sanitises, not just the adapters', ()
 		const clean: AgyPrint = async () => {
 			throw new Error('devin exited with code 2: model not available for this account');
 		};
-		const caught = await createAgyReasoningReviewValidator({ print: clean, modelId: JUDGE })
+		const caught = await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print: clean, modelId: JUDGE })
 			.evaluate(SUBJECT, ctx())
 			.then(
 				() => '',
@@ -662,7 +674,7 @@ describe('JAN-LIVEEXEC LE-02 — the reviewer is told what it is actually lookin
 			seen = p;
 			return CLEAN;
 		};
-		await createAgyReasoningReviewValidator({ print: capture, modelId: JUDGE }).evaluate(
+		await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print: capture, modelId: JUDGE }).evaluate(
 			subject,
 			ctx({ framing, ...(observedToolCalls ? { observedToolCalls } : {}) })
 		);
@@ -824,7 +836,7 @@ describe('⭐⭐ package P F1 (REG-F-503 remedy 1) — the PWA_GRAPH framing say
 	];
 	const promptOf = async (framing: ReviewFraming): Promise<string> => {
 		const { prompts, print } = capturing();
-		await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(SUBJECT, ctx({ framing }));
+		await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE }).evaluate(SUBJECT, ctx({ framing }));
 		expect(prompts, `${framing}: one prompt`).toHaveLength(1);
 		return prompts[0]!;
 	};
@@ -884,7 +896,7 @@ describe('⭐⭐ the review in parts, B2 (REG-D-125) — the PWA_TYPE framing: t
 		"The producing agent's PROFESSIONAL RATIONALE SUMMARY — its own contracted account of how the artifact discharges the obligation (Section 9.7). Judge whether it is candid and whether the artifact bears it out; an account that claims more than the artifact supports is itself a finding:";
 	const promptOf = async (framing: ReviewFraming): Promise<string> => {
 		const { prompts, print } = capturing();
-		await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(SUBJECT, ctx({ framing, rationale: RATIONALE }));
+		await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE }).evaluate(SUBJECT, ctx({ framing, rationale: RATIONALE }));
 		expect(prompts, `${framing}: one prompt`).toHaveLength(1);
 		return prompts[0]!;
 	};
@@ -941,7 +953,7 @@ describe('⭐⭐ the review in parts, B2 (REG-D-125) — the PWA_TYPE framing: t
 			commands: [],
 			rationale: RATIONALE
 		});
-		await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(SUBJECT, { reasoningReview: declared });
+		await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE }).evaluate(SUBJECT, { reasoningReview: declared });
 		const others: [string, string][] = [
 			...(await Promise.all((['PWA_GRAPH', 'WORK_PRODUCT'] as const).map(async (f) => [f, await promptOf(f)] as [string, string]))),
 			['DECLARED_POLICY', prompts[0]!]
@@ -1002,6 +1014,7 @@ describe('JAN-ASRIDENT — the reviewing tool reports which model answered', () 
 		// differ, and Devin's own export shows two different strings ("GLM-5.2 High" vs "glm-5-2").
 		const exchanges = createExchangeSink();
 		await createAgyReasoningReviewValidator({
+			indications: TEST_INDICATIONS,
 			print: reporting(),
 			modelId: JUDGE,
 			exchanges
@@ -1026,7 +1039,7 @@ describe('JAN-ASRIDENT — the reviewing tool reports which model answered', () 
 		// never once stated.
 		const exchanges = createExchangeSink();
 		const { print } = capturing();
-		await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(
+		await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE, exchanges }).evaluate(
 			SUBJECT,
 			ctx()
 		);
@@ -1052,7 +1065,7 @@ describe('JAN-ASRIDENT — the reviewing tool reports which model answered', () 
 			identityEvidence: 'PROVIDER_REPORTED' as const,
 			observedToolCalls: UNOBSERVED
 		});
-		await createAgyReasoningReviewValidator({ print: blank, modelId: JUDGE, exchanges }).evaluate(
+		await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print: blank, modelId: JUDGE, exchanges }).evaluate(
 			SUBJECT,
 			ctx()
 		);
@@ -1070,6 +1083,7 @@ describe('JAN-ASRIDENT — the reviewing tool reports which model answered', () 
 		// REPORTED model against the reviewer's CONFIGURED one — two different kinds of fact on the two sides of
 		// one equality test. THE MUTANT: pass the pre-call `evaluator` to the result builder.
 		const result = await createAgyReasoningReviewValidator({
+			indications: TEST_INDICATIONS,
 			print: reporting('glm-5-2'),
 			modelId: JUDGE
 		}).evaluate(SUBJECT, ctx());
@@ -1081,6 +1095,7 @@ describe('JAN-ASRIDENT — the reviewing tool reports which model answered', () 
 		// string is truthy, so every existing injected `print` would be read as a result object and lose its
 		// answer entirely.
 		const result = await createAgyReasoningReviewValidator({
+			indications: TEST_INDICATIONS,
 			print: async () => CLEAN,
 			modelId: JUDGE
 		}).evaluate(SUBJECT, ctx());
@@ -1164,6 +1179,7 @@ describe('JAN-SELREV SR-2 (D6) — a reported model other than the one configure
 		let thrown: unknown;
 		try {
 			await createAgyReasoningReviewValidator({
+				indications: TEST_INDICATIONS,
 				print,
 				modelId: JUDGE,
 				requireReportedModel: true,
@@ -1212,6 +1228,7 @@ describe('JAN-SELREV SR-2 (D6) — a reported model other than the one configure
 		let thrown: unknown;
 		try {
 			await createAgyReasoningReviewValidator({
+				indications: TEST_INDICATIONS,
 				print,
 				modelId: JUDGE,
 				requireReportedModel: true,
@@ -1239,6 +1256,7 @@ describe('JAN-SELREV SR-2 (D6) — a reported model other than the one configure
 		const exchanges = createExchangeSink();
 		await expect(
 			createAgyReasoningReviewValidator({
+				indications: TEST_INDICATIONS,
 				print,
 				modelId: JUDGE,
 				requireReportedModel: true,
@@ -1270,6 +1288,7 @@ describe('JAN-SELREV SR-2 (D6) — a reported model other than the one configure
 		const { store, byKey } = tickingStore();
 		await expect(
 			createAgyReasoningReviewValidator({
+				indications: TEST_INDICATIONS,
 				print,
 				modelId: JUDGE,
 				requireReportedModel: true,
@@ -1299,6 +1318,7 @@ describe('JAN-SELREV SR-2 (D6) — a reported model other than the one configure
 		const { print } = reports(JUDGE);
 		const exchanges = createExchangeSink();
 		const result = await createAgyReasoningReviewValidator({
+			indications: TEST_INDICATIONS,
 			print,
 			modelId: JUDGE,
 			requireReportedModel: true,
@@ -1314,6 +1334,7 @@ describe('JAN-SELREV SR-2 (D6) — a reported model other than the one configure
 		const { print } = capturing();
 		const exchanges = createExchangeSink();
 		const result = await createAgyReasoningReviewValidator({
+			indications: TEST_INDICATIONS,
 			print,
 			modelId: JUDGE,
 			requireReportedModel: true,
@@ -1331,6 +1352,7 @@ describe('JAN-SELREV SR-2 (D6) — a reported model other than the one configure
 		const { print } = reports(SUBSTITUTE);
 		const exchanges = createExchangeSink();
 		const result = await createAgyReasoningReviewValidator({
+			indications: TEST_INDICATIONS,
 			print,
 			modelId: JUDGE,
 			exchanges
@@ -1345,7 +1367,7 @@ describe('JAN-SELREV SR-2 (D6) — a reported model other than the one configure
 describe('JAN-OUTCONTRACT — the instruction carries the contract, and truncation is DECLARED', () => {
 	it('⭑ a contract inside the instruction reaches the reviewer verbatim', async () => {
 		const { prompts, print } = capturing();
-		await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(
+		await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE }).evaluate(
 			SUBJECT,
 			ctx({
 				prompt:
@@ -1366,7 +1388,7 @@ describe('JAN-OUTCONTRACT — the instruction carries the contract, and truncati
 		// silently — the reviewer would then judge against an instruction it believed complete.
 		const { prompts, print } = capturing();
 		const huge = `${'x'.repeat(4_500)}\n\nThe output this work requires:\nSENTINEL_CONTRACT`;
-		await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(
+		await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE }).evaluate(
 			SUBJECT,
 			ctx({ prompt: huge })
 		);
@@ -1393,7 +1415,7 @@ describe('⛔ REG-D-071 Q4 — a MODEL cannot mark its own answers stipulated', 
 			residualUncertainty: []
 		});
 		const { print } = capturing(reply);
-		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(SUBJECT, ctx());
+		const result = await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE }).evaluate(SUBJECT, ctx());
 
 		expect(result.criteria.map((c) => c.outcome)).toEqual(SEEDED_REASONING_REVIEW_CRITERIA.map(() => 'MET'));
 		expect(
@@ -1481,7 +1503,7 @@ describe('⚠ JAN-ESCREC — the prompt NAMES ESCALATED once and gives it no def
 	/** The MATERIALIZED prompt for one framing: what the reviewer reads, and what the statement is about. */
 	const promptFor = async (framing: ReviewFraming): Promise<string> => {
 		const { prompts, print } = capturing();
-		await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(
+		await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE }).evaluate(
 			SUBJECT,
 			ctx({ framing })
 		);
@@ -1548,15 +1570,26 @@ describe('⭐⭐ design §9.3 D8 — the prompt agrees with the policy: D8’s l
 			// dropped the stakes from any one line, is another block.
 			const criteria = policyWith(STAKES);
 			const { prompts, print } = capturing();
-			await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(SUBJECT, {
+			await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE }).evaluate(SUBJECT, {
 				reasoningReview: { ...ctx({ framing }).reasoningReview!, criteria }
 			});
 			const lines = prompts[0]!.split('\n');
 			const at = lines.indexOf(D8_INSTRUCTION_LINES[0]);
 			expect(at, 'arrangement: the instruction opens on a line of its own').toBeGreaterThan(0);
-			expect(lines.slice(at, at + D8_INSTRUCTION_LINES.length + criteria.length + 1 + D8_RECOMMENDATION_LINES.length)).toEqual([
+			// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D42, kept by D50; `REG-D-146`; design §11.3, §12.2) — ~~the instruction, every rubric line, D8's
+			// empty line and the sentence, one block: `[...D8_INSTRUCTION_LINES, ...rubric lines, '', ...D8_RECOMMENDATION_LINES]`~~ —
+			// D8 with the rubric moves into the measured section, where each RR- criterion's test follows its rubric line and
+			// `DECIDING` stands between the rubric and D8's empty line. Restated, as exact: D8's lines, every rubric line with ITS
+			// criterion's stakes and its test, `DECIDING`, D8's empty line and the sentence, one block.
+			const rubric = criteria.flatMap((c) => {
+				const test = TESTS[c.id.slice(0, 5)];
+				const line = `- ${c.id}: ${c.description} [if unmet: ${c.severityIfNotMet}]`;
+				return test === undefined ? [line] : [line, `  Test: ${test}`];
+			});
+			expect(lines.slice(at, at + D8_INSTRUCTION_LINES.length + rubric.length + DECIDING.length + 1 + D8_RECOMMENDATION_LINES.length)).toEqual([
 				...D8_INSTRUCTION_LINES,
-				...criteria.map((c) => `- ${c.id}: ${c.description} [if unmet: ${c.severityIfNotMet}]`),
+				...rubric,
+				...DECIDING,
 				'',
 				...D8_RECOMMENDATION_LINES
 			]);
@@ -1590,7 +1623,7 @@ describe('⭐⭐ design §9.3 D8 — the prompt agrees with the policy: D8’s l
 				residualUncertainty: []
 			});
 			const { prompts, print } = capturing(reply);
-			const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(SUBJECT, {
+			const result = await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE }).evaluate(SUBJECT, {
 				reasoningReview: { ...ctx({ framing: 'WORK_PRODUCT' }).reasoningReview!, criteria }
 			});
 			expect(prompts[0], 'arrangement: the rubric shows the criterion’s stakes').toContain(
@@ -1614,7 +1647,7 @@ describe('⭐⭐ design §9.3 D8 — the prompt agrees with the policy: D8’s l
 			residualUncertainty: []
 		});
 		const { print } = capturing(reply);
-		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(SUBJECT, {
+		const result = await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE }).evaluate(SUBJECT, {
 			reasoningReview: { ...ctx({ framing: 'PWA_GRAPH' }).reasoningReview!, criteria }
 		});
 		expect(result.criteria.slice(0, 2).map((c) => c.outcome), 'arrangement: both recorded unmet').toEqual(['NOT_MET', 'NOT_MET']);
@@ -1625,7 +1658,7 @@ describe('⭐⭐ design §9.3 D8 — the prompt agrees with the policy: D8’s l
 
 	it('⭑ CONTROL — every criterion met is SATISFIED, as the first gloss says, and the policy’s floor rubric is shown whole, uncut', async () => {
 		const { prompts, print } = capturing();
-		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(SUBJECT, ctx());
+		const result = await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE }).evaluate(SUBJECT, ctx());
 		expect(
 			dispositionFromFindings({ findings: result.observations.map((o) => ({ severity: o.severity, open: o.open })), criteria: result.criteria })
 		).toBe('SATISFIED');
@@ -1633,7 +1666,14 @@ describe('⭐⭐ design §9.3 D8 — the prompt agrees with the policy: D8’s l
 		// budget component).
 		expect(prompts[0], 'the floor rubric is cut').not.toContain('[CUT FOR THIS REVIEW: the rubric');
 		const rubric = SEEDED_REASONING_REVIEW_CRITERIA.map((c) => `- ${c.id}: ${c.description} [if unmet: ${c.severityIfNotMet}]`).join('\n');
-		expect(prompts[0]).toContain(`\n${rubric}\n\n${D8_RECOMMENDATION_LINES[0]}\n`);
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D42, kept by D50) — ~~`expect(prompts[0]).toContain(`\n${rubric}\n\n${D8_RECOMMENDATION_LINES[0]}\n`)`~~:
+		// the rubric moves into the measured section, each criterion's test after its line and `DECIDING` after the rubric. Restated:
+		// the whole floor rubric, every line with its test, then `DECIDING`, D8's empty line and the sentence.
+		const withTests = SEEDED_REASONING_REVIEW_CRITERIA.flatMap((c) => [
+			`- ${c.id}: ${c.description} [if unmet: ${c.severityIfNotMet}]`,
+			`  Test: ${TESTS[c.id.slice(0, 5)]!}`
+		]).join('\n');
+		expect(prompts[0]).toContain(`\n${withTests}\n${DECIDING.join('\n')}\n\n${D8_RECOMMENDATION_LINES[0]}\n`);
 		expect(rubric.length, 'the floor rubric within RUBRIC_MAX').toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.RUBRIC_MAX);
 	});
 });
@@ -1662,7 +1702,7 @@ describe('⭐⭐ P7-6 I6 — the prompt asks for ONE ROW PER CRITERION, met or n
 		'⭐ %s — the sentence is one line of the prompt, once, after D8’s recommendation sentence and before the output format',
 		async (framing) => {
 			const { prompts, print } = capturing();
-			await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(SUBJECT, ctx({ framing }));
+			await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE }).evaluate(SUBJECT, ctx({ framing }));
 			const lines = prompts[0]!.split('\n');
 			// ⛔ THE MUTANT: the sentence dropped, in every framing or in one — the reviewer is again free to read D8's
 			// "For each failure" as "list only the failures" (`REG-F-552`, `REG-F-489`).
@@ -1732,7 +1772,7 @@ describe('⭐⭐ P7-6 I5 — a reply that answers NO criterion is repaired ONCE,
 	it('⭐ the measured run’s exact reply draws a SECOND call, the prompt plus the line naming the cause', async () => {
 		const { prompts, print } = replying(NO_ROWS, CLEAN);
 		const exchanges = createExchangeSink();
-		await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+		await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
 		// ⛔ AT HEAD: ONE call — no repair follows a reply that parses.
 		expect(prompts, 'a repair is sent').toHaveLength(2);
 		expect(prompts[1], 'the prompt, then the line naming what was wrong').toBe(`${prompts[0]}\n\n${CRITERION_REPAIR_LINE}`);
@@ -1749,7 +1789,7 @@ describe('⭐⭐ P7-6 I5 — a reply that answers NO criterion is repaired ONCE,
 	it('⭐ the repair ANSWERS: its judgement is used — the review concludes', async () => {
 		const { print } = replying(NO_ROWS, CLEAN);
 		const exchanges = createExchangeSink();
-		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+		const result = await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
 		expect(result.criteria.map((c) => c.outcome), 'every criterion answered, by the repair').toEqual(
 			SEEDED_REASONING_REVIEW_CRITERIA.map(() => 'MET')
 		);
@@ -1759,7 +1799,7 @@ describe('⭐⭐ P7-6 I5 — a reply that answers NO criterion is repaired ONCE,
 	it('⛔ the repair answers NONE again: the FIRST judgement stands, as today — the recommendation kept, every criterion unassessed', async () => {
 		const { prompts, print } = replying(NO_ROWS, '{"findings":[],"recommendation":"REJECTED","residualUncertainty":[]}');
 		const exchanges = createExchangeSink();
-		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+		const result = await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
 		expect(prompts, 'once, never twice').toHaveLength(2);
 		expect(result.executionFailed).toBe(false);
 		// ⛔ THE FIRST reply's recommendation, not the repair's: a repair that answered nothing changes nothing.
@@ -1773,7 +1813,7 @@ describe('⭐⭐ P7-6 I5 — a reply that answers NO criterion is repaired ONCE,
 	it('⛔ the repair does NOT PARSE: the FIRST judgement stands — never a throw, which would be worse than today', async () => {
 		const { print } = replying(NO_ROWS, "I'll check the files first.");
 		const exchanges = createExchangeSink();
-		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+		const result = await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
 		expect(result.executionFailed, 'today the review completes, so it still does').toBe(false);
 		expect(result.dispositionRecommendation).toBe(asToday.recommendation);
 		const [, repair] = exchanges.drain();
@@ -1789,7 +1829,7 @@ describe('⭐⭐ P7-6 I5 — a reply that answers NO criterion is repaired ONCE,
 			return NO_ROWS;
 		};
 		const exchanges = createExchangeSink();
-		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+		const result = await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
 		expect(result.executionFailed, 'a repair that got no reply makes nothing worse than today').toBe(false);
 		expect(result.dispositionRecommendation).toBe(asToday.recommendation);
 		expect(exchanges.drain().map((e) => e.disposition)).toEqual(['repair-requested', 'no-response']);
@@ -1807,14 +1847,14 @@ describe('⭐⭐ P7-6 I5 — a reply that answers NO criterion is repaired ONCE,
 	it('⭐ the I5 marker opens the first reply’s record and a repair’s that answered none — and not a repair that did not parse', async () => {
 		const none = replying(NO_ROWS, '{"findings":[],"recommendation":"REJECTED","residualUncertainty":[]}');
 		const noneSink = createExchangeSink();
-		await createAgyReasoningReviewValidator({ print: none.print, modelId: JUDGE, exchanges: noneSink }).evaluate(SUBJECT, ctx());
+		await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print: none.print, modelId: JUDGE, exchanges: noneSink }).evaluate(SUBJECT, ctx());
 		const [first, repairedNone] = noneSink.drain();
 		expect(NO_CRITERION_ANSWERED, 'the marker is a sentence, not an empty string every detail holds').toMatch(/REG-F-552/);
 		expect(first!.parseOutcome.detail.startsWith(NO_CRITERION_ANSWERED), 'the first reply’s record').toBe(true);
 		expect(repairedNone!.parseOutcome.detail.startsWith(NO_CRITERION_ANSWERED), 'a repair that answered none').toBe(true);
 		const prose = replying(NO_ROWS, "I'll check the files first.");
 		const proseSink = createExchangeSink();
-		await createAgyReasoningReviewValidator({ print: prose.print, modelId: JUDGE, exchanges: proseSink }).evaluate(SUBJECT, ctx());
+		await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print: prose.print, modelId: JUDGE, exchanges: proseSink }).evaluate(SUBJECT, ctx());
 		expect(proseSink.drain()[1]!.parseOutcome.detail, 'a repair that did not parse').not.toContain(NO_CRITERION_ANSWERED);
 	});
 
@@ -1825,7 +1865,7 @@ describe('⭐⭐ P7-6 I5 — a reply that answers NO criterion is repaired ONCE,
 		});
 		const { prompts, print } = replying(unknown, CLEAN);
 		const exchanges = createExchangeSink();
-		await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+		await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
 		expect(prompts).toHaveLength(2);
 		expect(exchanges.drain()[0]!.parseOutcome.detail).toMatch(/does not declare/);
 	});
@@ -1837,17 +1877,17 @@ describe('⭐⭐ P7-6 I5 — a reply that answers NO criterion is repaired ONCE,
 		});
 		const { prompts, print } = replying(some, CLEAN);
 		const exchanges = createExchangeSink();
-		await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+		await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
 		expect(prompts, 'a partial reply is taken as it stands').toHaveLength(1);
 		expect(exchanges.drain().map((e) => e.disposition)).toEqual(['accepted']);
 	});
 
 	it('⭑ CONTROL — a fully answered reply is not repaired, and a reply that does not parse still draws the JSON repair, not this one', async () => {
 		const answered = replying(CLEAN);
-		await createAgyReasoningReviewValidator({ print: answered.print, modelId: JUDGE }).evaluate(SUBJECT, ctx());
+		await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print: answered.print, modelId: JUDGE }).evaluate(SUBJECT, ctx());
 		expect(answered.prompts).toHaveLength(1);
 		const prose = replying(PROSE, CLEAN);
-		await createAgyReasoningReviewValidator({ print: prose.print, modelId: JUDGE }).evaluate(SUBJECT, ctx());
+		await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print: prose.print, modelId: JUDGE }).evaluate(SUBJECT, ctx());
 		expect(prose.prompts[1]).toBe(`${prose.prompts[0]}\n\nIMPORTANT: reply with ONLY the minified JSON object.`);
 	});
 
@@ -1860,7 +1900,7 @@ describe('⭐⭐ P7-6 I5 — a reply that answers NO criterion is repaired ONCE,
 	it('⛔ D13 (REG-D-135 (3)) — the decided bound: at most one JSON repair and one criterion repair — a JSON repair that answers no criterion draws I5’s repair, three calls, never a fourth', async () => {
 		const { prompts, print } = replying(PROSE, NO_ROWS, CLEAN);
 		const exchanges = createExchangeSink();
-		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+		const result = await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
 		expect(prompts, 'three calls: the first, the JSON repair, the criterion repair').toHaveLength(3);
 		expect(prompts[1]).toBe(`${prompts[0]}\n\nIMPORTANT: reply with ONLY the minified JSON object.`);
 		expect(prompts[2], 'the review’s prompt and I5’s line, never the JSON repair’s prompt').toBe(`${prompts[0]}\n\n${CRITERION_REPAIR_LINE}`);
@@ -1879,7 +1919,7 @@ describe('⭐⭐ P7-6 I5 — a reply that answers NO criterion is repaired ONCE,
 		expect(records[1]!.parseOutcome.detail.startsWith(NO_CRITERION_ANSWERED), 'the JSON repair’s reply carries I5’s marker').toBe(true);
 		// ⛔ THE LIMB THAT KEEPS THE BOUND: a criterion repair that answers none again is never repaired again — no fourth call.
 		const again = replying(PROSE, NO_ROWS, NO_ROWS, CLEAN);
-		await createAgyReasoningReviewValidator({ print: again.print, modelId: JUDGE }).evaluate(SUBJECT, ctx());
+		await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print: again.print, modelId: JUDGE }).evaluate(SUBJECT, ctx());
 		expect(again.prompts, 'never a fourth call').toHaveLength(3);
 	});
 });
@@ -1968,7 +2008,7 @@ describe('⭐⭐ package L — D13: one criterion repair after any parsed reply 
 	it('⭐ run-12’s shape draws exactly ONE criterion repair, its line naming only the declared id with no row — never the reviewer’s', async () => {
 		const { prompts, print } = replying(SLIPPED, CLEAN);
 		const exchanges = createExchangeSink();
-		await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+		await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
 		// ⛔ AT HEAD: ONE call — the criterion repair stops being eligible once any declared row is kept.
 		expect(prompts, 'one criterion repair is sent').toHaveLength(2);
 		expect(prompts[1], 'the review’s prompt, then the line').toBe(`${prompts[0]}\n\n${MISSING_CRITERION_LINE([DECLARED_RR03])}`);
@@ -1991,7 +2031,7 @@ describe('⭐⭐ package L — D13: one criterion repair after any parsed reply 
 	it('⭐ a JSON repair whose parsed answer has that shape draws the criterion repair: three calls, the chain as made', async () => {
 		const { prompts, print } = replying(PROSE, SLIPPED, CLEAN);
 		const exchanges = createExchangeSink();
-		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+		const result = await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
 		// ⛔ AT HEAD: TWO calls — the JSON repair's parsed answer was taken as it stood (case 43's shape, `REG-F-566`).
 		expect(prompts, 'the first, the JSON repair, the criterion repair').toHaveLength(3);
 		expect(prompts[2], 'the review’s prompt and the line — never the JSON repair’s prompt').toBe(
@@ -2012,7 +2052,7 @@ describe('⭐⭐ package L — D13: one criterion repair after any parsed reply 
 	it('⭐ a repair that gives a row for every declared criterion is USED: the review concludes SATISFIED', async () => {
 		const { print } = replying(SLIPPED, CLEAN);
 		const exchanges = createExchangeSink();
-		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+		const result = await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
 		// ⛔ AT HEAD: INCONCLUSIVE — RR-03 UNABLE_TO_DETERMINE, the declared criterion with no row.
 		expect(result.criteria.map((c) => c.outcome)).toEqual(SEEDED_REASONING_REVIEW_CRITERIA.map(() => 'MET'));
 		expect(composed(result)).toBe('SATISFIED');
@@ -2022,7 +2062,7 @@ describe('⭐⭐ package L — D13: one criterion repair after any parsed reply 
 	it('⛔ a repair that slips again leaves the FIRST judgement standing — INCONCLUSIVE — the repair recorded rejected, with its cause', async () => {
 		const { prompts, print } = replying(SLIPPED, SLIPPED);
 		const exchanges = createExchangeSink();
-		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+		const result = await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
 		expect(prompts, 'once, never twice').toHaveLength(2);
 		expect(result.executionFailed).toBe(false);
 		expect(outcomeOf(result, DECLARED_RR03)).toBe('UNABLE_TO_DETERMINE');
@@ -2047,7 +2087,7 @@ describe('⭐⭐ package L — D13: one criterion repair after any parsed reply 
 		});
 		const { prompts, print } = replying(SLIPPED, partial);
 		const exchanges = createExchangeSink();
-		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+		const result = await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
 		expect(prompts, 'one criterion repair is sent').toHaveLength(2);
 		// ⭐ DISCRIMINATING: the first reply left RR-03 without a row and answered RR-05; the partial repair the reverse. Used, it
 		// would read RR-03 MET and RR-05 UNABLE_TO_DETERMINE.
@@ -2075,7 +2115,7 @@ describe('⭐⭐ package L — D13: one criterion repair after any parsed reply 
 		] as const) {
 			const { prompts, print } = replying(NO_ROWS, repairReply, CLEAN);
 			const exchanges = createExchangeSink();
-			const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+			const result = await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
 			expect(prompts, `${shape}: the review’s one criterion repair, and no third call`).toHaveLength(2);
 			expect(prompts[1], `${shape}: I5’s line, unchanged`).toBe(`${prompts[0]}\n\n${CRITERION_REPAIR_LINE}`);
 			expect(exchanges.drain().map((e) => e.disposition), `${shape}: the repair is recorded used`).toEqual(['repair-requested', 'accepted']);
@@ -2091,7 +2131,7 @@ describe('⭐⭐ package L — D13: one criterion repair after any parsed reply 
 	it('⛔ a repair that does not parse, or gets no reply, leaves the first judgement standing — never a throw', async () => {
 		const prose = replying(SLIPPED, PROSE);
 		const proseSink = createExchangeSink();
-		const unparsed = await createAgyReasoningReviewValidator({ print: prose.print, modelId: JUDGE, exchanges: proseSink }).evaluate(SUBJECT, ctx());
+		const unparsed = await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print: prose.print, modelId: JUDGE, exchanges: proseSink }).evaluate(SUBJECT, ctx());
 		expect(prose.prompts, 'one criterion repair is sent').toHaveLength(2);
 		expect(unparsed.executionFailed).toBe(false);
 		expect(outcomeOf(unparsed, DECLARED_RR03)).toBe('UNABLE_TO_DETERMINE');
@@ -2105,7 +2145,7 @@ describe('⭐⭐ package L — D13: one criterion repair after any parsed reply 
 			return SLIPPED;
 		};
 		const sink = createExchangeSink();
-		const noReply = await createAgyReasoningReviewValidator({ print: throwing, modelId: JUDGE, exchanges: sink }).evaluate(SUBJECT, ctx());
+		const noReply = await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print: throwing, modelId: JUDGE, exchanges: sink }).evaluate(SUBJECT, ctx());
 		expect(noReply.executionFailed).toBe(false);
 		expect(outcomeOf(noReply, DECLARED_RR03)).toBe('UNABLE_TO_DETERMINE');
 		expect(sink.drain().map((e) => e.disposition)).toEqual(['repair-requested', 'no-response']);
@@ -2114,7 +2154,7 @@ describe('⭐⭐ package L — D13: one criterion repair after any parsed reply 
 	it('⛔ after a JSON repair, a criterion repair that slips again leaves the JSON repair’s judgement standing, and its record says so', async () => {
 		const { prompts, print } = replying(PROSE, SLIPPED, SLIPPED, CLEAN);
 		const exchanges = createExchangeSink();
-		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+		const result = await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
 		expect(prompts, 'three calls, never a fourth').toHaveLength(3);
 		expect(composed(result)).toBe('INCONCLUSIVE');
 		const records = exchanges.drain();
@@ -2137,7 +2177,7 @@ describe('⭐⭐ package L — D13: one criterion repair after any parsed reply 
 		});
 		const { prompts, print } = replying(case02, CLEAN);
 		const exchanges = createExchangeSink();
-		const result = await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+		const result = await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
 		expect(prompts, 'a reply with a failed row is taken as it stands').toHaveLength(1);
 		expect(exchanges.drain().map((e) => e.disposition)).toEqual(['accepted']);
 		expect([outcomeOf(result, a!), outcomeOf(result, b!)]).toEqual(['NOT_MET', 'NOT_MET']);
@@ -2203,7 +2243,7 @@ describe('⭐⭐ P76F-A A2 — the cause an I5 record states is TRUE for each ki
 		async (_kind, reply, cause) => {
 			const { print } = replying(reply, CLEAN);
 			const exchanges = createExchangeSink();
-			await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+			await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
 			const [first] = exchanges.drain();
 			expect(first!.disposition, 'arrangement: the reply drew no criterion repair').toBe('repair-requested');
 			const detail = first!.parseOutcome.detail;
@@ -2219,7 +2259,7 @@ describe('⭐⭐ P76F-A A2 — the cause an I5 record states is TRUE for each ki
 	it('⭐ the measured run’s own shape, recorded in full: the marker, the count, the cause, and what follows the one repair', async () => {
 		const { print } = replying(NO_ROWS, CLEAN);
 		const exchanges = createExchangeSink();
-		await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+		await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
 		expect(exchanges.drain()[0]!.parseOutcome.detail).toBe(
 			`${NO_CRITERION_ANSWERED} It parsed, but none of the policy's ${SEEDED_REASONING_REVIEW_CRITERIA.length} criteria has a row: its findings list is empty. ` +
 				'One repair was requested; if it answers none either, does not parse or gets no reply, this reply’s judgement is the one the review keeps, its recommendation recorded (REG-D-090).'
@@ -2229,7 +2269,7 @@ describe('⭐⭐ P76F-A A2 — the cause an I5 record states is TRUE for each ki
 	it('⛔ a repair that answers none again: its record opens with the marker, names ITS OWN cause, and says the FIRST reply’s judgement stands — never that its own is kept', async () => {
 		const { print } = replying(NO_ROWS, rowsReply({ failed: false, statement: 'met' }));
 		const exchanges = createExchangeSink();
-		await createAgyReasoningReviewValidator({ print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+		await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
 		const [, repair] = exchanges.drain();
 		expect(repair!.disposition, 'arrangement: the repair was not refused').toBe('rejected');
 		const detail = repair!.parseOutcome.detail;
@@ -2245,7 +2285,7 @@ describe('⭐⭐ P76F-A A2 — the cause an I5 record states is TRUE for each ki
 	it('⭑ CONTROL — the marker is the I5 records’ alone: a reply that did not parse, its repair request and an accepted reply carry none', async () => {
 		const prose = replying(PROSE, CLEAN);
 		const exchanges = createExchangeSink();
-		await createAgyReasoningReviewValidator({ print: prose.print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
+		await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print: prose.print, modelId: JUDGE, exchanges }).evaluate(SUBJECT, ctx());
 		const details = exchanges.drain().map((e) => [e.disposition, e.parseOutcome.detail.startsWith(NO_CRITERION_ANSWERED)]);
 		expect(details).toEqual([
 			['repair-requested', false],
@@ -2267,7 +2307,7 @@ describe('⭐⭐ P76F-A A2 — the cause an I5 record states is TRUE for each ki
 /** One materialized prompt for `input`, through the real validator at its print seam. */
 async function promptOf(input: ValidatorContext['reasoningReview']): Promise<string> {
 	const { prompts, print } = capturing();
-	await createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(SUBJECT, {
+	await createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE }).evaluate(SUBJECT, {
 		reasoningReview: input
 	});
 	expect(prompts, 'the validator sends exactly one prompt for a clean reply').toHaveLength(1);
@@ -2464,10 +2504,16 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 — every cut, in every framing, is declared BE
 					bytes = lines.slice(at + 2, close).join('\n');
 				} else {
 					expect(lines[at + 1], 'the rubric is host-authored: its bytes follow, unfenced').toMatch(/^- /);
-					const then = lines.findIndex((l) => l.startsWith('Then give an overall disposition RECOMMENDATION:'));
-					// ⭐ D8 (design §9.3): an empty line stands between the rubric and the sentence, and is no byte of the rubric.
-					expect(lines[then - 1], 'D8’s empty line before the recommendation sentence').toBe('');
-					bytes = lines.slice(at + 1, then - 1).join('\n');
+					// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D42, kept by D50) — ~~the rubric's bytes ran to D8's empty line before the
+					// recommendation sentence (`lines.slice(at + 1, then - 1)`)~~: in the measured section `DECIDING` follows the rubric,
+					// and each RR- criterion's test its line — host lines the design adds, no byte of the rubric. Restated: the bytes
+					// shown run to `DECIDING`'s empty line, each test line read away.
+					const deciding = lines.indexOf('DECIDING', at);
+					expect(lines[deciding - 1], 'DECIDING’s empty line after the rubric').toBe('');
+					bytes = lines
+						.slice(at + 1, deciding - 1)
+						.filter((l) => !l.startsWith('  Test: '))
+						.join('\n');
 				}
 				expect([...bytes].length, `${slice.name}: the declaration's kept count is not the bytes shown`).toBe(kept);
 				// ⭐ THE DECLARATION COUNTS IN THE LIMIT (`REG-F-483`): declaration, newline and bytes fit the slice's own limit.
@@ -2531,7 +2577,10 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 — every cut, in every framing, is declared BE
 			['WORK_PRODUCT', 'the work product']
 		] as const) {
 			const p = await promptOf({ ...ctx({ framing, content: 'z'.repeat(60_000) }).reasoningReview! });
-			expect(p.length, `${framing}: over PROMPT_BUDGET`).toBeLessThanOrEqual(B.PROMPT_BUDGET);
+			// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D52) — ~~`expect(p.length, `${framing}: over PROMPT_BUDGET`).toBeLessThanOrEqual(B.PROMPT_BUDGET)`~~:
+			// the room is today's, so TODAY's prompt is within PROMPT_BUDGET; the prompt sent, within its whole bound.
+			expect(todayPromptOf(p, SEEDED_REASONING_REVIEW_CRITERIA).length, `${framing}: over PROMPT_BUDGET`).toBeLessThanOrEqual(B.PROMPT_BUDGET);
+			expect(p.length, `${framing}: over its whole bound`).toBeLessThanOrEqual(B.WHOLE_PROMPT_MAX);
 			expect(p, `${framing}: the content cut is not declared, naming it`).toContain(`[CUT FOR THIS REVIEW: ${name} — the first `);
 			const lines = p.split('\n');
 			const at = lines.findIndex((l) => l.startsWith(`[CUT FOR THIS REVIEW: ${name} — `));
@@ -2545,7 +2594,7 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 — every cut, in every framing, is declared BE
 		const input = { ...ctx({ framing: 'PWA_TYPE', content: 'z'.repeat(60_000) }).reasoningReview! };
 		const { content: _part, ...rest } = input;
 		const room = pwaTypeContentBudget({ ...rest, framing: 'PWA_TYPE' });
-		await expect(createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(SUBJECT, { reasoningReview: input })).rejects.toThrow(
+		await expect(createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE }).evaluate(SUBJECT, { reasoningReview: input })).rejects.toThrow(
 			pwaTypeOverBudgetStatement(60_000, room)
 		);
 		expect(prompts, 'no prompt is sent').toEqual([]);
@@ -2828,7 +2877,7 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 — the fence is deterministic, escalates past 
 		const { prompts, print } = capturing();
 		const everyCandidate = Array.from({ length: 100 }, (_, i) => fenceCandidate(i)).join(' ');
 		await expect(
-			createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(SUBJECT, { reasoningReview: wp(everyCandidate) })
+			createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE }).evaluate(SUBJECT, { reasoningReview: wp(everyCandidate) })
 		).rejects.toThrow(NO_FENCE_STATEMENT);
 		expect(prompts, 'a prompt with no fence was sent').toHaveLength(0);
 		// ⭑ CONTROL — one candidate short of all, and the last one is the fence.
@@ -2845,10 +2894,13 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 — the fence is deterministic, escalates past 
 		const view = 'q'.repeat(budget);
 		const p = await promptOf({ ...input, content: view });
 		expect(p, 'the view at its budget is sent whole').toContain(`\n${view}\n`);
-		expect(p.length, 'and the prompt is within PROMPT_BUDGET').toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.PROMPT_BUDGET);
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D52) — ~~`expect(p.length, 'and the prompt is within PROMPT_BUDGET').toBeLessThanOrEqual(PROMPT_BUDGET)`~~:
+		// TODAY's prompt, the room's measure, is within PROMPT_BUDGET; the prompt sent, within its whole bound.
+		expect(todayPromptOf(p, input.criteria).length, 'and today’s prompt is within PROMPT_BUDGET').toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.PROMPT_BUDGET);
+		expect(p.length, 'and the prompt sent within its whole bound').toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.WHOLE_PROMPT_MAX);
 		const { prompts, print } = capturing();
 		await expect(
-			createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(SUBJECT, { reasoningReview: { ...input, content: `${view}q` } })
+			createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE }).evaluate(SUBJECT, { reasoningReview: { ...input, content: `${view}q` } })
 		).rejects.toThrow(`review view is ${budget + 1} characters, and this prompt leaves it ${budget} (REG-F-480)`);
 		expect(prompts, 'a view one unit over its budget was sent').toHaveLength(0);
 	});
@@ -2856,7 +2908,7 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 — the fence is deterministic, escalates past 
 	it('⛔ a PROCESS_RESULT content longer than its budget is REFUSED, never cut: it is the builder’s fenced view', async () => {
 		const { prompts, print } = capturing();
 		await expect(
-			createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(SUBJECT, {
+			createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE }).evaluate(SUBJECT, {
 				reasoningReview: { ...ctx({ framing: 'PROCESS_RESULT', content: 'q'.repeat(30_000) }).reasoningReview! }
 			})
 		).rejects.toThrow(/review view is 30000 characters, and this prompt leaves it \d+ \(REG-F-480\)/);
@@ -3388,7 +3440,11 @@ describe('⭐ JAN-PRQUAL PQ-1 (REG-F-481) — JSON on a host line or in a fence 
 			expect(texts, `${framing}: the limitations`).toContain('  - No intrusive\u2029investigation.');
 			expect(texts, `${framing}: the residual uncertainty`).toContain('  - Whether the wind\u0085data is current.');
 			const raw = [...p.matchAll(new RegExp(RAW_BREAK.source, 'g'))].map((m) => m.index!);
-			expect(raw, `${framing}: arrangement — the three breaks reach the prompt raw`).toHaveLength(3);
+			// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D50) — ~~`toHaveLength(3)`~~: the block quotes each list item as the decision model was asked
+			// about it, stripped of its prefix and raw (`wide_common.py`), so each break reaches the prompt twice: three times in the
+			// head, once in each list's region, and three in the block — every one inside a region, as below.
+			expect([...headOf(p).matchAll(new RegExp(RAW_BREAK.source, 'g'))], `${framing}: arrangement — the three breaks reach the head raw`).toHaveLength(3);
+			expect(raw, `${framing}: arrangement — and again in the block’s quotations`).toHaveLength(6);
 			for (const i of raw)
 				expect(regions.some((r) => i >= r.start && i < r.end), `${framing}: a raw break at ${i} stands outside every region`).toBe(true);
 		}
@@ -3744,7 +3800,9 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481; design §9.3 D7) — the fence choo
 			narration: 'Ran the suite.',
 			priorGaps: ['RR-07: the check is missing.']
 		});
-		const regions = readFences(await promptOf(input)).regions;
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D50) — ~~`readFences(await promptOf(input)).regions`~~: the block's statements stand between the
+		// prompt's own fence lines after the head. The slices the chooser reads are the head's, read here.
+		const regions = readFences(headOf(await promptOf(input))).regions;
 		expect(regions[0]?.text, 'arrangement: the first region is the instruction').toBe('Run the checks.');
 		const carried = regions.filter((r) => r.fence === regions[0]!.fence).map((r) => r.text);
 		const bullets = (xs: readonly string[]): string => xs.map((x) => `  - ${x}`).join('\n');
@@ -3786,7 +3844,11 @@ describe('⭐ JAN-PRQUAL PQ-1 (REG-F-480, REG-F-483) — the edges of a head-onl
 				B.USER_INTENT_MAX,
 				B.RATIONALE_MAX
 			]);
-			expect(p, `${framing}: a slice at its limit was declared cut`).not.toContain('[CUT FOR THIS REVIEW: ');
+			// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D52) — ~~`expect(p, …).not.toContain('[CUT FOR THIS REVIEW: ')`~~: the block quotes the account's
+			// rationale, one statement of 3,900 characters, head-only past 700 under a declaration of its own. Restated: the head
+			// holds no cut, and the one cut after it is that quotation's.
+			expect(headOf(p), `${framing}: a slice at its limit was declared cut`).not.toContain('[CUT FOR THIS REVIEW: ');
+			expect(p.slice(headOf(p).length).split('[CUT FOR THIS REVIEW: ').slice(1).every((c) => c.startsWith('the statement — ')), `${framing}: a cut after the head that is no statement's quotation`).toBe(true);
 			expect(p, `${framing}: the instruction, whole`).toContain(`\n${fenceCandidate(0)}\n${instruction}\n${fenceCandidate(0)}\n`);
 			// ⭐ D7: the rationale directly under the section heading, unlabelled (~~under "Its rationale:"~~).
 			expect(p, `${framing}: the account's rationale, whole`).toContain(
@@ -3816,7 +3878,11 @@ describe('⭐ JAN-PRQUAL PQ-1 (REG-F-480, REG-F-483) — the edges of a head-onl
 			expect(accountLinesOf(p).filter((l) => l.endsWith(': (none declared)')), 'arrangement: each empty list is its host line').toEqual(
 				empty.map((key) => `${LIST_HOST_LABEL[key]}: (none declared)`)
 			);
-			expect(p, 'the account at its limit was declared cut').not.toContain('[CUT FOR THIS REVIEW: ');
+			// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D52) — ~~`expect(p, 'the account at its limit was declared cut').not.toContain('[CUT FOR THIS REVIEW: ')`~~:
+			// the block quotes the account's rationale, one statement past 700 characters, head-only under a declaration of its own.
+			// Restated: the head holds no cut, and every cut after it is a statement's quotation.
+			expect(headOf(p), 'the account at its limit was declared cut').not.toContain('[CUT FOR THIS REVIEW: ');
+			expect(p.slice(headOf(p).length).split('[CUT FOR THIS REVIEW: ').slice(1).every((c) => c.startsWith('the statement — ')), 'a cut after the head that is no statement’s quotation').toBe(true);
 			expect(p, "the account's rationale, whole").toContain(`${accountHeadingEnd(framing)}\n${fenceCandidate(0)}\n${account.rationale}\n${fenceCandidate(0)}\n`);
 			// ⭑ CONTROL — one unit over: cut and declared, and every line of the account still within RATIONALE_MAX.
 			const over = await promptOf({ ...ctx({ framing, rationale: { ...account, rationale: `${account.rationale}y` } }).reasoningReview! });
@@ -3834,7 +3900,9 @@ describe('⭐ JAN-PRQUAL PQ-1 (REG-F-480, REG-F-483) — the edges of a head-onl
 			const declaration = p.split('\n').find((l) => l.startsWith(`[CUT FOR THIS REVIEW: ${name} — `));
 			expect(declaration, `${framing}: arrangement: the content is cut`).toBeDefined();
 			const widest = headCutDeclaration(name, 60_000, 60_000, 60_000);
-			expect(p.length + widest.length - declaration!.length, `${framing}: the content's limit is not the budget the assembler leaves`).toBe(
+			// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D52) — ~~`p.length + widest.length - declaration!.length` … `.toBe(B.PROMPT_BUDGET)`~~: the room
+			// is today's, so TODAY's prompt, the head and today's section, is PROMPT_BUDGET but for the digits the declaration did not need.
+			expect(todayPromptOf(p, SEEDED_REASONING_REVIEW_CRITERIA).length + widest.length - declaration!.length, `${framing}: the content's limit is not the budget the assembler leaves`).toBe(
 				B.PROMPT_BUDGET
 			);
 		}
@@ -3844,11 +3912,13 @@ describe('⭐ JAN-PRQUAL PQ-1 (REG-F-480, REG-F-483) — the edges of a head-onl
 		const { content: _part, ...rest } = { ...ctx({ framing: 'PWA_TYPE' }).reasoningReview! };
 		const room = pwaTypeContentBudget({ ...rest, framing: 'PWA_TYPE' });
 		const exact = await promptOf({ ...rest, content: 'z'.repeat(room) });
-		expect(exact.length, 'the part at its room: the prompt is the budget').toBe(B.PROMPT_BUDGET);
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D52) — ~~`expect(exact.length, 'the part at its room: the prompt is the budget').toBe(B.PROMPT_BUDGET)`~~:
+		// the room is today's: TODAY's prompt for the part at its room is the budget, exactly.
+		expect(todayPromptOf(exact, SEEDED_REASONING_REVIEW_CRITERIA).length, 'the part at its room: today’s prompt is the budget').toBe(B.PROMPT_BUDGET);
 		expect(exact, 'and nothing is cut').not.toContain('[CUT FOR THIS REVIEW: ');
 		const { prompts, print } = capturing();
 		await expect(
-			createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(SUBJECT, { reasoningReview: { ...rest, content: 'z'.repeat(room + 1) } })
+			createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE }).evaluate(SUBJECT, { reasoningReview: { ...rest, content: 'z'.repeat(room + 1) } })
 		).rejects.toThrow(pwaTypeOverBudgetStatement(room + 1, room));
 		expect(prompts, 'one unit over: no prompt').toEqual([]);
 	});
@@ -3859,12 +3929,14 @@ describe('⭐ JAN-PRQUAL PQ-1 (REG-F-480, REG-F-483) — the edges of a head-onl
 		const declaredPartCut = headCutDeclaration('the skeleton of child 1 of 2 (type id "pwut_CODE")', 40, 90, 50);
 		const fits = 'z'.repeat(room - declaredPartCut.length - 1);
 		const exact = await promptOf({ ...rest, declaredPartCut, content: fits });
-		expect(exact.length, 'the part at its room, its declarations in it: the prompt is the budget').toBe(B.PROMPT_BUDGET);
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D52) — ~~`expect(exact.length, 'the part at its room, its declarations in it: the prompt is the budget').toBe(B.PROMPT_BUDGET)`~~:
+		// the room is today's: TODAY's prompt is the budget, exactly.
+		expect(todayPromptOf(exact, SEEDED_REASONING_REVIEW_CRITERIA).length, 'the part at its room, its declarations in it: today’s prompt is the budget').toBe(B.PROMPT_BUDGET);
 		expect(exact, 'the declarations on the line before the part’s fence, the part whole').toContain(`\n${declaredPartCut}\n${fenceCandidate(0)}\n${fits}\n`);
 		expect(exact.split('[CUT FOR THIS REVIEW: ').length - 1, 'and nothing is cut again').toBe(1);
 		const { prompts, print } = capturing();
 		await expect(
-			createAgyReasoningReviewValidator({ print, modelId: JUDGE }).evaluate(SUBJECT, {
+			createAgyReasoningReviewValidator({ indications: TEST_INDICATIONS,  print, modelId: JUDGE }).evaluate(SUBJECT, {
 				reasoningReview: { ...rest, declaredPartCut, content: `${fits}z` }
 			})
 		).rejects.toThrow(pwaTypeOverBudgetStatement(room + 1, room));
