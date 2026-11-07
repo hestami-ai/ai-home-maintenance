@@ -103,6 +103,7 @@ import {
 	pwaTypeContentBudget,
 	pwaTypeOverBudgetStatement,
 	REASONING_REVIEW_BUDGET,
+	reviewPrompt,
 	sequenceBlock,
 	sequenceRoom
 } from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
@@ -144,18 +145,22 @@ import {
 	type FingerprintSeams,
 	type ReviewerFingerprint
 } from '../scripts/reviewer-qual/fingerprint.js';
-import { sha256 } from '../scripts/reviewer-qual/digest.js';
+import { canonicalJson, sha256 } from '../scripts/reviewer-qual/digest.js';
 import { detectMalformations } from '../scripts/reviewer-qual/malformations.js';
 import type { ToolInvocationResult } from '../apps/rph-demo/src/lib/server/tools/backing-tool.js';
 import { DEVIN_REVIEWER_PREAMBLE } from '../apps/rph-demo/src/lib/server/tools/devin-reviewer.js';
 import {
 	CATALOG_DECLARED_POLICIES,
+	D52_REFUSAL_PROBES,
 	FINGERPRINT_PROBES,
 	PROBE_SUBJECT,
 	READER_CORPUS,
 	SEEDED_PROBE_LIBRARY,
 	type DeclaredProbePolicy
 } from '../scripts/reviewer-qual/probes.js';
+import * as PROBES_MODULE from '../scripts/reviewer-qual/probes.js';
+import { REVIEW_SECTION_TEXT } from '../apps/rph-demo/src/lib/server/assurance/review-section.js';
+import { headOf, todayPromptOf } from '../apps/rph-demo/src/lib/server/assurance/review-section.testing.js';
 import type { CallLine, CandidateIdentity } from '../scripts/reviewer-qual/record.js';
 import { evaluateCase, runQualification } from '../scripts/reviewer-qual/runner.js';
 import { caseReviewInput } from '../scripts/reviewer-qual/materialize.js';
@@ -312,7 +317,9 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint MOVES on each component
 		// named OVERSIZE — the validator's cuts and the process-result builder's alike — so a probe that carries a cut
 		// cannot hide among the probes an oversize change is said not to reach, nor an OVERSIZE probe carry none.
 		const moved = FINGERPRINT_PROBES.map((p) => p.id).filter((id) => fp.probePrompts.get(id) !== BASE.probePrompts.get(id));
-		expect(moved).toEqual(FINGERPRINT_PROBES.map((p) => p.id).filter((id) => id.includes('OVERSIZE')));
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~`.filter((id) => id.includes('OVERSIZE'))`~~: the ones
+		// named OVERSIZE that the product sends — a D52 refusal probe sends no prompt to carry one.
+		expect(moved).toEqual(FINGERPRINT_PROBES.map((p) => p.id).filter((id) => id.includes('OVERSIZE') && !(id in D52_REFUSAL_PROBES)));
 	});
 
 	it('⭐⭐ P7-6 I4 — the DEVIN PREAMBLE, one character of it: `probes` moves, no probe prompt does, and — the limit, measured — no case prompt either', async () => {
@@ -521,8 +528,10 @@ describe('JAN-CRITREAD J2-3 — the reviewer fingerprint MOVES on each component
 		const fp = await reviewerFingerprint(CASES, seams);
 		onlyMoved(fp, ['probes']);
 		// ⭑ As the row for the view of a process result, read whole, names them: `P-NO-FENCE` is refused before any prompt exists.
-		expect(movedProbes(fp), 'the probes that move').toEqual(P_PROBES().filter((id) => id !== 'P-NO-FENCE'));
-		expect(movedProbes(fp), 'arrangement: 27 of the 28 process-result probes').toHaveLength(27);
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~P-NO-FENCE alone refused; 27 of the 28~~: and the four
+		// D52 refusal probes of this framing send none either; 30 of the 35.
+		expect(movedProbes(fp), 'the probes that move').toEqual(P_PROBES().filter((id) => id !== 'P-NO-FENCE' && !(id in D52_REFUSAL_PROBES)));
+		expect(movedProbes(fp), 'arrangement: 30 of the 35 process-result probes').toHaveLength(30);
 		expect(fp.casePrompts, 'no case of v1 is a process result').toEqual(BASE.casePrompts);
 		// ~~expect(CURRENT_PROCESS_RESULTS, 'the arrangement: the current set holds the eighteen').toHaveLength(18);~~ — 2026-10-31, package Y: v13 adds two commands and one work case; its records name version thirteen; reviewer definition unchanged.
 		expect(CURRENT_PROCESS_RESULTS, 'the arrangement: the current set holds the twenty').toHaveLength(20);
@@ -1057,7 +1066,9 @@ describe('JAN-CRITREAD J2-3 — the probe set reaches every branch of prompt ass
 	 */
 	it('⭑ CONTROL (D28) — package N’s five finished-work probes, each a first step’s, read as they did before D28 ⭐ (package X: the three work-product ones as D32 moves them), hash for hash', () => {
 		expect(
-			['W-DELIVERABLE', 'W-OVERSIZE-DELIVERABLE', 'W-OVERSIZE-FILE-LIST', 'D-DELIVERABLE', 'D-OVERSIZE-DELIVERABLE'].map((id) => [id, sha256(prompt(id))]),
+			// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~`sha256(prompt(id))`~~: on TODAY's prompt, the head the
+			// prompt sent carries and today's review section (`todayPromptOf`) — the bytes these hashes were taken of (Z1, D50).
+			['W-DELIVERABLE', 'W-OVERSIZE-DELIVERABLE', 'W-OVERSIZE-FILE-LIST', 'D-DELIVERABLE', 'D-OVERSIZE-DELIVERABLE'].map((id) => [id, sha256(todayPromptOf(prompt(id), probeInputOf(id).criteria))]),
 			'a first step’s finished-work probe moved'
 		).toEqual([
 			['W-DELIVERABLE', 'bf2a80d789465f82deb6a87398f0ff2b9a550588a31860bdaa54cb3dcfba94af'], // ~~'3ea214bb2f39c659d8a0ffeeccf983511e48f1636c11937d788e8b9d61375d65'~~
@@ -1306,7 +1317,9 @@ describe('JAN-CRITREAD J2-3 — the probe set reaches every branch of prompt ass
 			'the prior findings',
 			'the rubric'
 		]);
-		expect(cutSlices(prompt('P-OVERSIZE-ALL')), 'process result: all six').toEqual([
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~`prompt('P-OVERSIZE-ALL')`~~: its sent successor's;
+		// the block's head-only cut of its one-statement rationale read apart.
+		expect(cutSlices(prompt('P-OVERSIZE-ALL-SENT')).filter((x) => x !== 'the statement'), 'process result: all six').toEqual([
 			'the instruction',
 			'stdout',
 			"the account's rationale",
@@ -1338,7 +1351,8 @@ describe('JAN-CRITREAD J2-3 — the probe set reaches every branch of prompt ass
 		// FILLING that budget but for the digits its stdout declaration did not need (the builder reserved the widest).
 		for (const [id, min] of [
 			['P-OVERSIZE-CONTENT', false],
-			['P-OVERSIZE-ALL', true]
+			// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~'P-OVERSIZE-ALL'~~: its sent successor, held at CONTENT_MIN too.
+			['P-OVERSIZE-ALL-SENT', true]
 		] as const) {
 			const input = inputOf(id);
 			const b = viewBudget(input);
@@ -1367,10 +1381,15 @@ describe('JAN-CRITREAD J2-3 — the probe set reaches every branch of prompt ass
 		const B = REASONING_REVIEW_BUDGET;
 		const callsOf = (input: ReasoningReviewInput): number => input.observedToolCalls?.calls?.length ?? 0;
 		const atMin = P_PROBES().filter((id) => viewBudget(inputOf(id)) === B.CONTENT_MIN);
-		expect(atMin, 'the three probes held at CONTENT_MIN').toEqual(['P-OVERSIZE-SURROGATE', 'P-OVERSIZE-ROOM-EDGES', 'P-OVERSIZE-ALL']);
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~the three~~: the three D52 refusal probes held there,
+		// and their three sent successors — `P-OVERSIZE-ALL-SENT` held there by its slices alone, at production's one call,
+		// an impossible input by the narration and prior it carries; each refusal probe's prompt read off its refusal.
+		expect(atMin, 'the probes held at CONTENT_MIN').toEqual(['P-OVERSIZE-SURROGATE', 'P-OVERSIZE-SURROGATE-SENT', 'P-OVERSIZE-ROOM-EDGES', 'P-OVERSIZE-ROOM-EDGES-SENT', 'P-OVERSIZE-ALL', 'P-OVERSIZE-ALL-SENT']);
 		for (const id of atMin) {
-			expect(callsOf(inputOf(id)), `${id}: more calls than production records`).toBeGreaterThan(OBSERVED_TOOL_CALL_LIMIT);
-			expect(prompt(id).length, `${id}: a prompt over PROMPT_BUDGET`).toBeGreaterThan(B.PROMPT_BUDGET);
+			const i = inputOf(id);
+			expect(callsOf(i) > OBSERVED_TOOL_CALL_LIMIT || (i.narration !== undefined && 'prior' in i), `${id}: more calls than production records, or a narration and a prior`).toBe(true);
+			const refused = /its whole prompt would be (\d+) characters/.exec(prompt(id));
+			expect(refused ? Number(refused[1]) : prompt(id).length, `${id}: a prompt over PROMPT_BUDGET`).toBeGreaterThan(B.PROMPT_BUDGET);
 			expect(FINGERPRINT_PROBES.find((p) => p.id === id)!.covers, `${id}: its covers text says so`).toContain(
 				'an impossible input'
 			);
@@ -1491,7 +1510,7 @@ describe('JAN-CRITREAD J2-3 — the probe set reaches every branch of prompt ass
 		}
 	});
 
-	it('⭐ every limit a probe can reach cuts exactly where the budget object says — intent, rubric, prior gaps, rationale, narration, the whole prompt', () => {
+	it('⭐ every limit a probe can reach cuts exactly where the budget object says — intent, rubric, prior gaps, rationale, narration, the whole prompt', async () => {
 		const B = REASONING_REVIEW_BUDGET;
 		// ~~`cut(limit) = limit + TRUNCATED.length`, the intent `between(p, '"""', '"""')`, the prior `between(p, 'A PREVIOUS
 		// review flagged: ', '. Judge whether')`, the rationale `between(p, 'is itself a finding:\n"""', '"""')`~~ — `PQ-1`:
@@ -1501,13 +1520,17 @@ describe('JAN-CRITREAD J2-3 — the probe set reaches every branch of prompt ass
 		const intentOf: Readonly<Record<string, string>> = {
 			'T-OVERSIZE-ALL': 'the request',
 			'W-OVERSIZE-ALL': 'the instruction',
-			'P-OVERSIZE-ALL': 'the instruction'
+			'P-OVERSIZE-ALL-SENT': 'the instruction'
 		};
-		for (const id of ['T-OVERSIZE-ALL', 'W-OVERSIZE-ALL', 'P-OVERSIZE-ALL']) {
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~'P-OVERSIZE-ALL'~~: its sent successor.
+		for (const id of ['T-OVERSIZE-ALL', 'W-OVERSIZE-ALL', 'P-OVERSIZE-ALL-SENT']) {
 			const p = prompt(id);
 			expect(headCut(p, intentOf[id]!).limit, `${id}: the intent, at USER_INTENT_MAX`).toBe(B.USER_INTENT_MAX);
 			// ⭐ Design §9.3 D8: an empty line stands between the rubric and the recommendation sentence, no byte of the rubric.
-			expect(headCut(p, 'the rubric', '\n\nThen give an overall').limit, `${id}: the rubric, at RUBRIC_MAX`).toBe(B.RUBRIC_MAX);
+			// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~`headCut(p, …)`~~: the rubric read without the
+			// measured section's `  Test: ` lines (D42, kept by D50), each written after an RR- criterion's line of the rubric cut,
+			// and up to DECIDING, which the measured section writes between the rubric and the recommendation sentence.
+			expect(headCut(p.split('\n').filter((l) => !l.startsWith('  Test: ')).join('\n'), 'the rubric', '\n\nDECIDING').limit, `${id}: the rubric, at RUBRIC_MAX`).toBe(B.RUBRIC_MAX);
 			expect(headCut(p, 'the prior findings').limit, `${id}: the prior gaps, at PRIOR_MAX`).toBe(B.PRIOR_MAX);
 			// ~~`headCut(p, 'the rationale summary').limit` at RATIONALE_MAX~~ — `PQ-1` (`REG-F-481`): the account is fenced
 			// field by field under the host's labels, and RATIONALE_MAX bounds the account's every line: its lines, from the
@@ -1522,7 +1545,8 @@ describe('JAN-CRITREAD J2-3 — the probe set reaches every branch of prompt ass
 				`${id}: the account, at RATIONALE_MAX`
 			).toBe(B.RATIONALE_MAX);
 		}
-		for (const id of ['T-OVERSIZE-ALL', 'P-OVERSIZE-ALL'])
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D52; `REG-D-146`) — ~~'P-OVERSIZE-ALL'~~: its sent successor.
+		for (const id of ['T-OVERSIZE-ALL', 'P-OVERSIZE-ALL-SENT'])
 			expect(headCut(prompt(id), 'the narration').limit, `${id}: the narration, at NARRATION_MAX`).toBe(B.NARRATION_MAX);
 		// The content takes what the scaffolding leaves of PROMPT_BUDGET, ~~so the whole prompt is the budget and its cut~~ so
 		// the scaffolding and the content's limit are PROMPT_BUDGET exactly, and the prompt is never longer: it is short of it
@@ -1531,11 +1555,14 @@ describe('JAN-CRITREAD J2-3 — the probe set reaches every branch of prompt ass
 		for (const [id, slice] of [['W-OVERSIZE-ALL', 'the work product']] as const) {
 			const p = prompt(id);
 			const c = headCut(p, slice);
+			// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D52; `REG-D-146`) — ~~`p.length`~~: TODAY's prompt's length, the
+			// prompt sent less its growth as the validator measures it (`growthOf`) — the room is computed against today's section.
+			const today = p.length - (await growthOf(probeInputOf(id)));
 			expect(
-				p.length - c.declaration.length - 1 - c.bytes.length + c.limit,
+				today - c.declaration.length - 1 - c.bytes.length + c.limit,
 				`${id}: the scaffolding and the content’s limit, at PROMPT_BUDGET`
 			).toBe(B.PROMPT_BUDGET);
-			expect(p.length, `${id}: the whole prompt, within PROMPT_BUDGET`).toBeLessThanOrEqual(B.PROMPT_BUDGET);
+			expect(today, `${id}: today’s prompt, within PROMPT_BUDGET`).toBeLessThanOrEqual(B.PROMPT_BUDGET);
 		}
 	});
 
@@ -1732,14 +1759,16 @@ const BRANCH_CHANGES: Readonly<Record<string, BranchChange>> = {
 		change: rewrite(`${CUT_DECLARED}stdout — `, `${CUT_DECLARED}STDOUT — `)
 	},
 	'a review-layer cut of stderr': {
-		moves: ['P-OVERSIZE-ROOM-EDGES', 'P-OVERSIZE-STREAMS', 'P-OVERSIZE-AT-ITS-BUDGET'],
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~`moves: ['P-OVERSIZE-ROOM-EDGES', 'P-OVERSIZE-STREAMS', 'P-OVERSIZE-AT-ITS-BUDGET']`~~: and the sent successor of each refusal probe it moves, whose view is that probe's, byte for byte
+		moves: ['P-OVERSIZE-ROOM-EDGES', 'P-OVERSIZE-ROOM-EDGES-SENT', 'P-OVERSIZE-STREAMS', 'P-OVERSIZE-AT-ITS-BUDGET'],
 		takes: (_r, view) => view.includes(`${CUT_DECLARED}stderr — `),
 		change: rewrite(`${CUT_DECLARED}stderr — `, `${CUT_DECLARED}STDERR — `)
 	},
 	// ⭐ TWO LARGE STREAMS SHARE THE ROOM — max-min, so each over its share is given an equal one (`allocate`). The change
 	// is a split one unit uneven: stdout's TAIL keeps one more unit, stderr's one fewer, each declaration recounted.
 	'two large streams share the room': {
-		moves: ['P-OVERSIZE-ROOM-EDGES', 'P-OVERSIZE-STREAMS', 'P-OVERSIZE-AT-ITS-BUDGET'],
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~`moves: ['P-OVERSIZE-ROOM-EDGES', 'P-OVERSIZE-STREAMS', 'P-OVERSIZE-AT-ITS-BUDGET']`~~: and the sent successor of each refusal probe it moves, whose view is that probe's, byte for byte
+		moves: ['P-OVERSIZE-ROOM-EDGES', 'P-OVERSIZE-ROOM-EDGES-SENT', 'P-OVERSIZE-STREAMS', 'P-OVERSIZE-AT-ITS-BUDGET'],
 		takes: (_r, view) => view.includes(`${CUT_DECLARED}stdout — `) && view.includes(`${CUT_DECLARED}stderr — `),
 		change: (source, view) => {
 			const out = headAndTailCut(view, 'stdout')!;
@@ -1759,7 +1788,8 @@ const BRANCH_CHANGES: Readonly<Record<string, BranchChange>> = {
 	// the same room and the same widest declaration, so the same k, with nothing to give back — and the HEAD is then the
 	// first ⌈k/2⌉ units and the TAIL the rest, half pairs and all, under a declaration recounted as the product counts.
 	'a surrogate pair astride a cut': {
-		moves: ['P-OVERSIZE-SURROGATE', 'P-OVERSIZE-ROOM-EDGES'],
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~`moves: ['P-OVERSIZE-SURROGATE', 'P-OVERSIZE-ROOM-EDGES']`~~: and the sent successor of each refusal probe it moves, whose view is that probe's, byte for byte
+		moves: ['P-OVERSIZE-SURROGATE', 'P-OVERSIZE-SURROGATE-SENT', 'P-OVERSIZE-ROOM-EDGES', 'P-OVERSIZE-ROOM-EDGES-SENT'],
 		takes: (r, view) => /[\uD800-\uDFFF]/.test(r.stdout) && view.includes(`${CUT_DECLARED}stdout — `),
 		change: (source, view) => {
 			const s = source.run.stdout;
@@ -1773,7 +1803,8 @@ const BRANCH_CHANGES: Readonly<Record<string, BranchChange>> = {
 	// asks the TAIL for half of what is kept instead — which differs only where the HEAD gave a unit back and the TAIL
 	// did not step past one: `P-OVERSIZE-SURROGATE`'s TAIL steps past a unit either way, so it is the same view there.
 	'the unit the HEAD gives back goes to the TAIL': {
-		moves: ['P-OVERSIZE-ROOM-EDGES'],
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~`moves: ['P-OVERSIZE-ROOM-EDGES']`~~: and the sent successor of each refusal probe it moves, whose view is that probe's, byte for byte
+		moves: ['P-OVERSIZE-ROOM-EDGES', 'P-OVERSIZE-ROOM-EDGES-SENT'],
 		takes: (r, view) => codePoints(r.stdout) !== r.stdout.length && view.includes(`${CUT_DECLARED}stdout — `),
 		change: (source, view) => {
 			const s = source.run.stdout;
@@ -1786,7 +1817,8 @@ const BRANCH_CHANGES: Readonly<Record<string, BranchChange>> = {
 	// shown whole — its fence lines then overrun the room, and the view stays within the budget only by the digits other
 	// declarations did not need.
 	'a stream within its two fence lines of fitting': {
-		moves: ['P-OVERSIZE-ROOM-EDGES'],
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~`moves: ['P-OVERSIZE-ROOM-EDGES']`~~: and the sent successor of each refusal probe it moves, whose view is that probe's, byte for byte
+		moves: ['P-OVERSIZE-ROOM-EDGES', 'P-OVERSIZE-ROOM-EDGES-SENT'],
 		takes: (r, view) =>
 			view.includes(`${CUT_DECLARED}stderr — `) &&
 			!r.omittedRegions.some((o) => o.stream === 'STDERR') &&
@@ -1967,7 +1999,8 @@ const CHOOSER_RULES: Readonly<Record<string, ChooserRule>> = {
 	// ⭐ AS THE RENDERER ITSELF IS CALLED: `renderProcessResultReview` handed no other untrusted slice at all.
 	// ⭐ Package N — D12 — and `P-SEQUENCE`, whose act's command holds `00`, which the view's chooser reads among them.
 	'the prompt’s other untrusted slices — the instruction, the account, the narration, the prior findings, every unminted name': {
-		moves: ['P-OVERSIZE-FENCES', 'P-OVERSIZE-ALL', 'P-FENCES-OTHER-SLICES', 'P-ACCOUNT-BREAKS', 'P-SEQUENCE'],
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~`moves: ['P-OVERSIZE-FENCES', 'P-OVERSIZE-ALL', 'P-FENCES-OTHER-SLICES', 'P-ACCOUNT-BREAKS', 'P-SEQUENCE']`~~: the refusal probes still move (a view's change reaches the content they hash) and their successors that plant in that slice move with them
+		moves: ['P-OVERSIZE-FENCES', 'P-OVERSIZE-ALL', 'P-OVERSIZE-ALL-SENT', 'P-FENCES-OTHER-SLICES', 'P-ACCOUNT-BREAKS', 'P-ACCOUNT-BREAKS-A', 'P-ACCOUNT-BREAKS-B', 'P-OVERSIZE-STATEMENTS-1', 'P-OVERSIZE-STATEMENTS-2', 'P-SEQUENCE'],
 		builder: (source) => {
 			const input = PRODUCT_SEAMS.processResult(source);
 			return { ...input, content: renderProcessResultReview(source.run, viewBudget(input), []) };
@@ -1976,7 +2009,8 @@ const CHOOSER_RULES: Readonly<Record<string, ChooserRule>> = {
 	// ⭐ Design §9.3 D7: `P-ACCOUNT-BREAKS` plants in every field of the account (`probes.ts` `BREAKS_ACCOUNT`), so each
 	// row that stops reading one moves it too.
 	'each field of the account': {
-		moves: ['P-OVERSIZE-FENCES', 'P-FENCES-OTHER-SLICES', 'P-ACCOUNT-BREAKS'],
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~`moves: ['P-OVERSIZE-FENCES', 'P-FENCES-OTHER-SLICES', 'P-ACCOUNT-BREAKS']`~~: the refusal probes still move (a view's change reaches the content they hash) and their successors that plant in that slice move with them
+		moves: ['P-OVERSIZE-FENCES', 'P-FENCES-OTHER-SLICES', 'P-ACCOUNT-BREAKS', 'P-ACCOUNT-BREAKS-A', 'P-ACCOUNT-BREAKS-B', 'P-OVERSIZE-STATEMENTS-1', 'P-OVERSIZE-STATEMENTS-2'],
 		builder: choosing(
 			() => true,
 			(input) => otherUntrustedOf({ ...input, rationale: undefined })
@@ -1987,23 +2021,28 @@ const CHOOSER_RULES: Readonly<Record<string, ChooserRule>> = {
 	// that skipped any one of the three moved no probe (driven on a disposable copy).
 	// `P-FENCES-OTHER-SLICES` plants in each.
 	'the instruction': {
-		moves: ['P-OVERSIZE-FENCES', 'P-OVERSIZE-ALL', 'P-FENCES-OTHER-SLICES'],
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~`moves: ['P-OVERSIZE-FENCES', 'P-OVERSIZE-ALL', 'P-FENCES-OTHER-SLICES']`~~: the refusal probes still move (a view's change reaches the content they hash) and their successors that plant in that slice move with them
+		moves: ['P-OVERSIZE-FENCES', 'P-OVERSIZE-ALL', 'P-OVERSIZE-ALL-SENT', 'P-FENCES-OTHER-SLICES'],
 		builder: choosing(() => true, otherUntrustedBut('the instruction'))
 	},
 	"the account's rationale": {
-		moves: ['P-OVERSIZE-FENCES', 'P-ACCOUNT-BREAKS'],
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~`moves: ['P-OVERSIZE-FENCES', 'P-ACCOUNT-BREAKS']`~~: the refusal probes still move (a view's change reaches the content they hash) and their successors that plant in that slice move with them
+		moves: ['P-OVERSIZE-FENCES', 'P-ACCOUNT-BREAKS', 'P-ACCOUNT-BREAKS-A', 'P-OVERSIZE-STATEMENTS-1'],
 		builder: choosing(() => true, otherUntrustedBut("the account's rationale"))
 	},
 	"the account's assumptions": {
-		moves: ['P-OVERSIZE-FENCES', 'P-ACCOUNT-BREAKS'],
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~`moves: ['P-OVERSIZE-FENCES', 'P-ACCOUNT-BREAKS']`~~: the refusal probes still move (a view's change reaches the content they hash) and their successors that plant in that slice move with them
+		moves: ['P-OVERSIZE-FENCES', 'P-ACCOUNT-BREAKS', 'P-ACCOUNT-BREAKS-A', 'P-OVERSIZE-STATEMENTS-1'],
 		builder: choosing(() => true, otherUntrustedBut("the account's assumptions"))
 	},
 	"the account's limitations": {
-		moves: ['P-FENCES-OTHER-SLICES', 'P-ACCOUNT-BREAKS'],
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~`moves: ['P-FENCES-OTHER-SLICES', 'P-ACCOUNT-BREAKS']`~~: the refusal probes still move (a view's change reaches the content they hash) and their successors that plant in that slice move with them
+		moves: ['P-FENCES-OTHER-SLICES', 'P-ACCOUNT-BREAKS', 'P-ACCOUNT-BREAKS-B', 'P-OVERSIZE-STATEMENTS-2'],
 		builder: choosing(() => true, otherUntrustedBut("the account's limitations"))
 	},
 	"the account's residual uncertainty": {
-		moves: ['P-OVERSIZE-FENCES', 'P-ACCOUNT-BREAKS'],
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~`moves: ['P-OVERSIZE-FENCES', 'P-ACCOUNT-BREAKS']`~~: the refusal probes still move (a view's change reaches the content they hash) and their successors that plant in that slice move with them
+		moves: ['P-OVERSIZE-FENCES', 'P-ACCOUNT-BREAKS', 'P-ACCOUNT-BREAKS-B', 'P-OVERSIZE-STATEMENTS-2'],
 		builder: choosing(() => true, otherUntrustedBut("the account's residual uncertainty"))
 	},
 	'the narration': { moves: ['P-FENCES-OTHER-SLICES'], builder: choosing(() => true, otherUntrustedBut('the narration')) },
@@ -2272,7 +2311,8 @@ const ACCOUNT_SLICES: readonly string[] = [
 ];
 const VALIDATOR_CHOOSER_RULES: Readonly<Record<string, ValidatorChooserRule>> = {
 	'the instruction': {
-		moves: ['T-OVERSIZE-ALL', 'T-OVERSIZE-FENCES', 'W-OVERSIZE-ALL', 'W-FENCES', 'P-OVERSIZE-FENCES', 'P-OVERSIZE-ALL', 'P-FENCES-OTHER-SLICES'],
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~`moves: ['T-OVERSIZE-ALL', 'T-OVERSIZE-FENCES', 'W-OVERSIZE-ALL', 'W-FENCES', 'P-OVERSIZE-FENCES', 'P-OVERSIZE-ALL', 'P-FENCES-OTHER-SLICES']`~~: a refusal probe sends no prompt, and the block quotes each account field's lines as statements the chooser reads too, so only the successors whose plants stand past the quoted head move for an account field — `OVERSIZE-STATEMENTS-1`/`-2` — and each successor of a slice no statement quotes
+		moves: ['T-OVERSIZE-ALL', 'T-OVERSIZE-FENCES', 'W-OVERSIZE-ALL', 'W-FENCES', 'P-OVERSIZE-FENCES', 'P-OVERSIZE-ALL-SENT', 'P-FENCES-OTHER-SLICES'],
 		kept: (s) => s !== 'the instruction',
 		framings: ['T', 'W', 'P']
 	},
@@ -2347,71 +2387,49 @@ const VALIDATOR_CHOOSER_RULES: Readonly<Record<string, ValidatorChooserRule>> = 
 	// ⭐ Design §9.3 D7: the account-breaks probes plant in every field of the account, in every framing (`probes.ts`
 	// `BREAKS_ACCOUNT`), so each row that stops reading a field of it moves them too.
 	"the account's rationale": {
-		moves: [
-			'T-OVERSIZE-FENCES',
-			'T-ACCOUNT-BREAKS',
-			'W-FENCES',
-			'W-ACCOUNT-BREAKS',
-			'P-OVERSIZE-FENCES',
-			'P-ACCOUNT-BREAKS'
-		],
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~`moves: ['T-OVERSIZE-FENCES', 'T-ACCOUNT-BREAKS', 'W-FENCES', 'W-ACCOUNT-BREAKS', 'P-OVERSIZE-FENCES', 'P-ACCOUNT-BREAKS']`~~: a refusal probe sends no prompt, and the block quotes each account field's lines as statements the chooser reads too, so only the successors whose plants stand past the quoted head move for an account field — `OVERSIZE-STATEMENTS-1`/`-2` — and each successor of a slice no statement quotes
+		moves: ['T-OVERSIZE-STATEMENTS-1', 'W-OVERSIZE-STATEMENTS-1', 'P-OVERSIZE-STATEMENTS-1'],
 		kept: (s) => s !== "the account's rationale",
 		framings: ['T', 'W', 'P']
 	},
 	"the account's assumptions": {
-		moves: [
-			'T-OVERSIZE-FENCES',
-			'T-ACCOUNT-BREAKS',
-			'W-FENCES',
-			'W-ACCOUNT-BREAKS',
-			'P-OVERSIZE-FENCES',
-			'P-ACCOUNT-BREAKS'
-		],
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~`moves: ['T-OVERSIZE-FENCES', 'T-ACCOUNT-BREAKS', 'W-FENCES', 'W-ACCOUNT-BREAKS', 'P-OVERSIZE-FENCES', 'P-ACCOUNT-BREAKS']`~~: a refusal probe sends no prompt, and the block quotes each account field's lines as statements the chooser reads too, so only the successors whose plants stand past the quoted head move for an account field — `OVERSIZE-STATEMENTS-1`/`-2` — and each successor of a slice no statement quotes
+		moves: ['T-OVERSIZE-STATEMENTS-1', 'W-OVERSIZE-STATEMENTS-1', 'P-OVERSIZE-FENCES', 'P-OVERSIZE-STATEMENTS-1'],
 		kept: (s) => s !== "the account's assumptions",
 		framings: ['T', 'W', 'P']
 	},
 	// ~~"the account's limitations — cut", moving T-OVERSIZE-FENCES alone~~ — its limitations alone are cut; a work
 	// product's and a process result's are whole.
 	"the account's limitations": {
-		moves: [
-			'T-OVERSIZE-FENCES',
-			'T-ACCOUNT-BREAKS',
-			'W-FENCES',
-			'W-ACCOUNT-BREAKS',
-			'P-OVERSIZE-ALL',
-			'P-FENCES-OTHER-SLICES',
-			'P-ACCOUNT-BREAKS'
-		],
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~`moves: ['T-OVERSIZE-FENCES', 'T-ACCOUNT-BREAKS', 'W-FENCES', 'W-ACCOUNT-BREAKS', 'P-OVERSIZE-ALL', 'P-FENCES-OTHER-SLICES', 'P-ACCOUNT-BREAKS']`~~: a refusal probe sends no prompt, and the block quotes each account field's lines as statements the chooser reads too, so only the successors whose plants stand past the quoted head move for an account field — `OVERSIZE-STATEMENTS-1`/`-2` — and each successor of a slice no statement quotes
+		moves: ['T-OVERSIZE-FENCES', 'T-OVERSIZE-STATEMENTS-2', 'W-OVERSIZE-STATEMENTS-2', 'P-OVERSIZE-STATEMENTS-2'],
 		kept: (s) => s !== "the account's limitations",
 		framings: ['T', 'W', 'P']
 	},
 	"the account's residual uncertainty": {
-		moves: [
-			'T-OVERSIZE-FENCES',
-			'T-ACCOUNT-BREAKS',
-			'W-FENCES',
-			'W-ACCOUNT-BREAKS',
-			'P-OVERSIZE-FENCES',
-			'P-ACCOUNT-BREAKS'
-		],
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~`moves: ['T-OVERSIZE-FENCES', 'T-ACCOUNT-BREAKS', 'W-FENCES', 'W-ACCOUNT-BREAKS', 'P-OVERSIZE-FENCES', 'P-ACCOUNT-BREAKS']`~~: a refusal probe sends no prompt, and the block quotes each account field's lines as statements the chooser reads too, so only the successors whose plants stand past the quoted head move for an account field — `OVERSIZE-STATEMENTS-1`/`-2` — and each successor of a slice no statement quotes
+		moves: ['T-OVERSIZE-STATEMENTS-2', 'W-OVERSIZE-STATEMENTS-2', 'P-OVERSIZE-FENCES', 'P-OVERSIZE-STATEMENTS-2'],
 		kept: (s) => s !== "the account's residual uncertainty",
 		framings: ['T', 'W', 'P']
 	},
 	// ⚠ A work product's prompt carries no narration: `workProductReviewInput` sends none.
 	'the narration': {
-		moves: ['T-OVERSIZE-FENCES', 'P-OVERSIZE-ALL', 'P-FENCES-OTHER-SLICES'],
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~`moves: ['T-OVERSIZE-FENCES', 'P-OVERSIZE-ALL', 'P-FENCES-OTHER-SLICES']`~~: a refusal probe sends no prompt, and the block quotes each account field's lines as statements the chooser reads too, so only the successors whose plants stand past the quoted head move for an account field — `OVERSIZE-STATEMENTS-1`/`-2` — and each successor of a slice no statement quotes
+		moves: ['T-OVERSIZE-FENCES', 'P-OVERSIZE-ALL-SENT', 'P-FENCES-OTHER-SLICES'],
 		kept: (s) => s !== 'the narration',
 		framings: ['T', 'P']
 	},
 	'the prior findings': {
-		moves: ['T-OVERSIZE-FENCES', 'W-FENCES', 'P-OVERSIZE-ALL', 'P-FENCES-OTHER-SLICES'],
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~`moves: ['T-OVERSIZE-FENCES', 'W-FENCES', 'P-OVERSIZE-ALL', 'P-FENCES-OTHER-SLICES']`~~: a refusal probe sends no prompt, and the block quotes each account field's lines as statements the chooser reads too, so only the successors whose plants stand past the quoted head move for an account field — `OVERSIZE-STATEMENTS-1`/`-2` — and each successor of a slice no statement quotes
+		moves: ['T-OVERSIZE-FENCES', 'W-FENCES', 'P-OVERSIZE-ALL-SENT', 'P-FENCES-OTHER-SLICES'],
 		kept: (s) => s !== 'the prior findings',
 		framings: ['T', 'W', 'P']
 	},
 	// ⭐ …AND EACH IN ONE FRAMING ALONE, as the review drove them: the account and the prior findings of a work product, and
 	// the limitations of a process result.
 	'the account, in a work product’s review alone': {
-		moves: ['W-FENCES', 'W-ACCOUNT-BREAKS'],
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~`moves: ['W-FENCES', 'W-ACCOUNT-BREAKS']`~~: a refusal probe sends no prompt, and the block quotes each account field's lines as statements the chooser reads too, so only the successors whose plants stand past the quoted head move for an account field — `OVERSIZE-STATEMENTS-1`/`-2` — and each successor of a slice no statement quotes
+		moves: ['W-OVERSIZE-STATEMENTS-1', 'W-OVERSIZE-STATEMENTS-2'],
 		kept: (s, f) => !(ACCOUNT_SLICES.includes(s) && f === 'WORK_PRODUCT'),
 		framings: ['W']
 	},
@@ -2421,7 +2439,8 @@ const VALIDATOR_CHOOSER_RULES: Readonly<Record<string, ValidatorChooserRule>> = 
 		framings: ['W']
 	},
 	"the account's limitations, in a process result’s review alone": {
-		moves: ['P-OVERSIZE-ALL', 'P-FENCES-OTHER-SLICES', 'P-ACCOUNT-BREAKS'],
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~`moves: ['P-OVERSIZE-ALL', 'P-FENCES-OTHER-SLICES', 'P-ACCOUNT-BREAKS']`~~: a refusal probe sends no prompt, and the block quotes each account field's lines as statements the chooser reads too, so only the successors whose plants stand past the quoted head move for an account field — `OVERSIZE-STATEMENTS-1`/`-2` — and each successor of a slice no statement quotes
+		moves: ['P-OVERSIZE-STATEMENTS-2'],
 		kept: (s, f) => !(s === "the account's limitations" && f === 'PROCESS_RESULT'),
 		framings: ['P']
 	},
@@ -2429,7 +2448,8 @@ const VALIDATOR_CHOOSER_RULES: Readonly<Record<string, ValidatorChooserRule>> = 
 	// avoids it): every process-result probe the validator sends a prompt for. ⚠ `P-NO-FENCE` is refused before any
 	// prompt exists, so there is no prompt of it to re-fence.
 	'the view of a process result, read whole': {
-		moves: P_PROBES().filter((id) => id !== 'P-NO-FENCE'),
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~`moves: P_PROBES().filter((id) => id !== 'P-NO-FENCE')`~~: a refusal probe sends no prompt, and the block quotes each account field's lines as statements the chooser reads too, so only the successors whose plants stand past the quoted head move for an account field — `OVERSIZE-STATEMENTS-1`/`-2` — and each successor of a slice no statement quotes
+		moves: P_PROBES().filter((id) => id !== 'P-NO-FENCE' && !(id in D52_REFUSAL_PROBES)),
 		kept: (s) => s !== 'the view',
 		framings: ['P'],
 		// ⭐ `PQ-2` — each process-result case's view is fenced by `<<<UNTRUSTED-00>>>`, and those fence lines are the view's:
@@ -2597,6 +2617,33 @@ const FIELD_READING_ROWS: readonly (readonly [field: string, reading: string])[]
 /** The probes that plant in each field of the account both ways (`probes.ts` `BREAKS_ACCOUNT`), in the probe set's
  *  order. */
 const ACCOUNT_BREAKS_PROBES: readonly string[] = ['T-ACCOUNT-BREAKS', 'W-ACCOUNT-BREAKS', 'P-ACCOUNT-BREAKS'];
+/**
+ * ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — THE ACCOUNT-BREAKS PROBES ARE D52'S REFUSAL PROBES, and each field's plants stand in their successors
+ * (`probes.ts` `SENT_SUCCESSORS`): `-A` (the prose, the assumptions) and `-B` (the limitations, the residual uncertainty)
+ * keep `BREAKS_ACCOUNT`'s plants one to a line, so the block quotes each as a statement; `OVERSIZE-STATEMENTS-1` and `-2`
+ * the plants a reader may read FEWER of, past the head the block quotes. ⭑ So a validator chooser that reads MORE than the
+ * prompt carries (`over`) moves `-A`/`-B` — the token it now reads stands in the field alone — and one that reads FEWER
+ * (`under`, `unlaid`) moves the OVERSIZE-STATEMENTS one, the candidates it misses being quoted nowhere else; a view's
+ * chooser reads the fields alone, so every reading moves `-A`/`-B` and a reading of fewer the OVERSIZE-STATEMENTS one too.
+ */
+const BREAKS_SUCCESSORS_IN: Readonly<Record<string, { readonly quoted: string; readonly unquoted: string }>> = {
+	"the account's rationale": { quoted: 'ACCOUNT-BREAKS-A', unquoted: 'OVERSIZE-STATEMENTS-1' },
+	"the account's assumptions": { quoted: 'ACCOUNT-BREAKS-A', unquoted: 'OVERSIZE-STATEMENTS-1' },
+	"the account's limitations": { quoted: 'ACCOUNT-BREAKS-B', unquoted: 'OVERSIZE-STATEMENTS-2' },
+	"the account's residual uncertainty": { quoted: 'ACCOUNT-BREAKS-B', unquoted: 'OVERSIZE-STATEMENTS-2' }
+};
+/** The probes a validator chooser that reads `field` by `reading` moves: in every framing, as above. */
+const breaksMovedByValidator = (field: string, reading: string): string[] => {
+	const r = FIELD_READINGS[reading]!;
+	const s = BREAKS_SUCCESSORS_IN[field]!;
+	return ['T', 'W', 'P'].flatMap((f) => [...(r.over ? [`${f}-${s.quoted}`] : []), ...(r.under || r.unlaid ? [`${f}-${s.unquoted}`] : [])]);
+};
+/** The probes a view's chooser that reads `field` by `reading` moves: the refusal probe, whose view it builds, and its successors. */
+const breaksMovedByView = (field: string, reading: string): string[] => {
+	const r = FIELD_READINGS[reading]!;
+	const s = BREAKS_SUCCESSORS_IN[field]!;
+	return ['P-ACCOUNT-BREAKS', `P-${s.quoted}`, ...(r.under || r.unlaid ? [`P-${s.unquoted}`] : [])];
+};
 /**
  * `prompt` re-fenced with the token a validator chooser would choose that read `field` by `read` — every other region,
  * and a process result's view whole and each unminted call name, ⭐ and a declared review's host-line slices
@@ -2899,11 +2946,13 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 		for (const [id, token, why] of [
 			['T-OVERSIZE-ALL', '<<<UNTRUSTED-01>>>', 'past the 00 its cut instruction keeps'],
 			['W-OVERSIZE-ALL', '<<<UNTRUSTED-01>>>', 'past the 00 its cut instruction keeps'],
-			['P-OVERSIZE-ALL', '<<<UNTRUSTED-05>>>', 'past the 00 its cut instruction keeps, its view’s own 01, and the 02 to 04 of its limitations, narration and prior findings']
+			// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~'P-OVERSIZE-ALL'~~: its sent successor.
+			['P-OVERSIZE-ALL-SENT', '<<<UNTRUSTED-05>>>', 'past the 00 its cut instruction keeps, its view’s own 01, and the 02 to 04 of its limitations, narration and prior findings']
 		] as const)
 			expect(promptToken(id), `${id}: ${why}`).toBe(token);
 		// ⭐ THE ARRANGEMENT: P-OVERSIZE-ALL holds its three where P-OVERSIZE-FENCES holds none, in the order the chain needs.
-		const all = promptRegions(BASE.probePrompts.get('P-OVERSIZE-ALL')!);
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~'P-OVERSIZE-ALL'~~: its sent successor's head.
+		const all = promptRegions(headOf(BASE.probePrompts.get('P-OVERSIZE-ALL-SENT')!));
 		expect(
 			all.regions.flatMap((r) => {
 				const n = /<<<UNTRUSTED-(\d\d)>>>/.exec(regionText(all.lines, r))?.[1];
@@ -2925,7 +2974,9 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 			'<<<UNTRUSTED-04>>>'
 		]);
 		expect(promptToken('P-FENCES-OTHER-SLICES'), 'P-FENCES-OTHER-SLICES’s prompt: past its view’s own 04').toBe('<<<UNTRUSTED-05>>>');
-		const other = promptRegions(BASE.probePrompts.get('P-FENCES-OTHER-SLICES')!);
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~the prompt sent~~: its head, the material; the block quotes
+		// the account's lines again, as statements, after it.
+		const other = promptRegions(headOf(BASE.probePrompts.get('P-FENCES-OTHER-SLICES')!));
 		expect(
 			other.regions.flatMap((r) => {
 				const n = /<<<UNTRUSTED-(\d\d)>>>/.exec(regionText(other.lines, r))?.[1];
@@ -3117,7 +3168,8 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 		);
 		expect(samePrompt(collapsed), 'CONTROL: a probe collapsed into another is found').toEqual([['P-CLEAN', 'P-PRODUCTION']]);
 		// ⭐ The two that do, on purpose: the validator's chooser and the view's over the two slices production never fills.
-		for (const id of P_PROBES().filter((x) => x !== 'P-OVERSIZE-ALL' && x !== 'P-FENCES-OTHER-SLICES')) {
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — and `P-OVERSIZE-ALL-SENT`, `P-OVERSIZE-ALL` sent.
+		for (const id of P_PROBES().filter((x) => x !== 'P-OVERSIZE-ALL' && x !== 'P-OVERSIZE-ALL-SENT' && x !== 'P-FENCES-OTHER-SLICES')) {
 			const i = FINGERPRINT_PROBES.find((x) => x.id === id)!.input(PRODUCT_SEAMS.criteria, PRODUCT_SEAMS.processResult);
 			expect([i.narration, 'prior' in i], `${id}: no narration, no prior — production sends neither`).toEqual([undefined, false]);
 		}
@@ -3177,7 +3229,9 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 				validator: (print) => PRODUCT_SEAMS.validator((p) => print(c.change(p)))
 			});
 			onlyMoved(fp, ['probes']);
-			const carrying = FINGERPRINT_PROBES.filter((x) => c.carries(x.input(PRODUCT_SEAMS.criteria, PRODUCT_SEAMS.processResult))).map(
+			// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~every probe whose input carries it~~: every one the
+			// product sends — a D52 refusal probe sends no prompt to quote it in.
+			const carrying = FINGERPRINT_PROBES.filter((x) => !(x.id in D52_REFUSAL_PROBES) && c.carries(x.input(PRODUCT_SEAMS.criteria, PRODUCT_SEAMS.processResult))).map(
 				(x) => x.id
 			);
 			expect(movedProbes(fp), 'the probes whose input carries it').toEqual(carrying);
@@ -3223,7 +3277,9 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 			'<<<UNTRUSTED-98>>>'
 		);
 		// ⭐ THE ARRANGEMENT: each slice of the graph holds its candidate, in the order the chain needs.
-		const { lines, regions } = promptRegions(BASE.probePrompts.get('T-OVERSIZE-FENCES')!);
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~the prompt sent~~: its head, the material — the block
+		// quotes the account's lines again, as statements, after it.
+		const { lines, regions } = promptRegions(headOf(BASE.probePrompts.get('T-OVERSIZE-FENCES')!));
 		expect(
 			regions.map((r) => [r.slice, /<<<UNTRUSTED-(\d\d)>>>/.exec(regionText(lines, r))?.[1]]),
 			'T-OVERSIZE-FENCES: one candidate in each slice, 00 to 07'
@@ -3238,7 +3294,8 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 			['the prior findings', '07']
 		]);
 		// ⭐ …and each slice of the work product, its narration none (`workProductReviewInput` sends none).
-		const wp = promptRegions(BASE.probePrompts.get('W-FENCES')!);
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~the prompt sent~~: its head, the material.
+		const wp = promptRegions(headOf(BASE.probePrompts.get('W-FENCES')!));
 		expect(
 			wp.regions.map((r) => [r.slice, /<<<UNTRUSTED-(\d\d)>>>/.exec(regionText(wp.lines, r))?.[1]]),
 			'W-FENCES: one candidate in each slice, 00 to 06'
@@ -3262,7 +3319,8 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 		// prose always has. ~~each escaped in its region, none raw in the prompt~~: what holds now is that every raw break
 		// stands inside that region, none on a host line, and the chooser reads the region as carried.
 		const input = FINGERPRINT_PROBES.find((x) => x.id === 'T-OVERSIZE-FENCES')!.input(PRODUCT_SEAMS.criteria, PRODUCT_SEAMS.processResult);
-		const p = BASE.probePrompts.get('T-OVERSIZE-FENCES')!;
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~the prompt sent~~: its head, the material.
+		const p = headOf(BASE.probePrompts.get('T-OVERSIZE-FENCES')!);
 		const raw = (text: string) => JSON_LINE_BREAKS.filter((c) => text.includes(String.fromCharCode(c)));
 		expect(
 			[
@@ -3503,15 +3561,25 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 		// OF A FIELD A CONTROL LAID OUT HELD NO CANDIDATE, so a chooser that read a field with its bidi controls read away,
 		// in one framing alone, moved no probe (driven): each field holds three candidates more, each on a line one family
 		// of controls lays out and read only so (`probes.ts` `LAID_OUT_LINES`).
-		for (const id of ACCOUNT_BREAKS_PROBES) {
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~`ACCOUNT_BREAKS_PROBES`, each prompt's token 36 (37)~~:
+		// the refusal probes send no prompt, so the arrangement is held on the successors that keep `BREAKS_ACCOUNT`'s plants,
+		// two fields each, their tokens past the eighteen candidates they hold — 18 (19); each read on its head, the material.
+		/** Each successor that keeps `BREAKS_ACCOUNT`'s plants, and the two fields it plants, nine candidates each from `00`. */
+		const ARRANGED_SUCCESSORS: readonly (readonly [id: string, planted: readonly string[]])[] = ['T', 'W', 'P'].flatMap((f) => [
+			[`${f}-ACCOUNT-BREAKS-A`, [ACCOUNT_FIELDS[0]!, ACCOUNT_FIELDS[1]!]] as const,
+			[`${f}-ACCOUNT-BREAKS-B`, [ACCOUNT_FIELDS[2]!, ACCOUNT_FIELDS[3]!]] as const
+		]);
+		/** Their tokens, past the eighteen candidates two fields hold (`probes.ts` `SPLIT_BREAKS_TOKENS`). */
+		const SPLIT_TOKENS = [18, 19] as const;
+		for (const [id, planted] of ARRANGED_SUCCESSORS) {
 			const input = inputOf(id);
 			const account = input.rationale!;
-			const { lines, token, regions } = promptRegions(BASE.probePrompts.get(id)!);
+			const { lines, token, regions } = promptRegions(headOf(BASE.probePrompts.get(id)!));
 			const processResult = input.framing === 'PROCESS_RESULT';
 			// THE TOKENS — past the ~~twenty-four~~ thirty-six candidates the fields hold, each where it is only while all
 			// of them are read.
-			expect(token, `${id}: the prompt’s token`).toBe(fenceCandidateOf(processResult ? 37 : 36));
-			if (processResult) expect(viewParts(input.content).token, `${id}: the view’s token`).toBe(fenceCandidateOf(36));
+			expect(token, `${id}: the prompt’s token`).toBe(fenceCandidateOf(processResult ? 19 : 18));
+			if (processResult) expect(viewParts(input.content).token, `${id}: the view’s token`).toBe(fenceCandidateOf(18));
 			// EACH FIELD SHOWN WHOLE, AS D7 WRITES IT — the prose as written, each list its items after `  - `, one to a line,
 			// an item holding a line feed as written (its later lines under no prefix) — and, for a process result, those
 			// very bytes handed to the view's chooser.
@@ -3523,8 +3591,8 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 			expect(texts, `${id}: each field as D7 writes it`).toEqual([account.rationale, ...ACCOUNT_LISTS.map((k) => bulleted(account[k]))]);
 			expect(
 				ACCOUNT_LISTS.map((k) => account[k].some((item) => item.includes('\n'))),
-				`${id}: each list holds an item with a line feed`
-			).toEqual([true, true, true]);
+				`${id}: each list it plants holds an item with a line feed`
+			).toEqual(ACCOUNT_LISTS.map((_, i) => planted.includes(ACCOUNT_FIELDS[i + 1]!)));
 			if (processResult) {
 				const names = otherUntrustedNames(input);
 				expect(
@@ -3537,19 +3605,19 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 			// out unread (`unlaid`), or reads both tokens (`over`), as stated; and a reader that breaks a line at ONE
 			// terminator leaves exactly the one candidate it splits unread, ⭐ and one that reads ONE family of bidi
 			// controls away, exactly the one candidate that family lays out.
-			ACCOUNT_FIELDS.forEach((f, k) => {
-				const text = texts[k]!;
+			planted.forEach((f, k) => {
+				const text = texts[ACCOUNT_FIELDS.indexOf(f)]!;
 				const six = Array.from({ length: 6 }, (_, i) => PER_FIELD * k + i);
 				const laid = LAYOUT_FAMILIES.map((_, i) => PER_FIELD * k + six.length + i);
 				expect(
-					[six.every((n) => holds(text, n)), laid.every((n) => holds(text, n)), BREAKS_TOKENS.some((n) => holds(text, n))],
+					[six.every((n) => holds(text, n)), laid.every((n) => holds(text, n)), SPLIT_TOKENS.some((n) => holds(text, n))],
 					`${id}: ${f}, as carried — its six candidates read, its three laid out read, neither token`
 				).toEqual([true, true, false]);
 				// EACH TOKEN'S PLANTS, KIND BY KIND: split by a line feed; written backwards on a line of its own with no
 				// bidi control, below one a control lays out; and, in a list, astride two items.
 				const fieldLines = text.split('\n');
 				const controlAt = fieldLines.findIndex((l) => l.includes(RIGHT_TO_LEFT_OVERRIDE));
-				for (const n of BREAKS_TOKENS) {
+				for (const n of SPLIT_TOKENS) {
 					const t = fenceCandidateOf(n);
 					const backwards = [...t]
 						.reverse()
@@ -3586,7 +3654,7 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 					if (r.lists && !LIST_SLICES.includes(f)) continue;
 					const read = r.read(text);
 					expect(
-						[six.every((n) => !holds(read, n)), BREAKS_TOKENS.every((n) => holds(read, n))],
+						[six.every((n) => !holds(read, n)), SPLIT_TOKENS.every((n) => holds(read, n))],
 						`${id}: ${f}, read ${name} — [its six unread, both tokens read]`
 					).toEqual([r.under, r.over]);
 					expect(
@@ -3621,7 +3689,9 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 			const seams: FingerprintSeams = { ...PRODUCT_SEAMS, validator: validatorPrinting((p, input) => reread(p, input, field, read)) };
 			const fp = await reviewerFingerprint(CASES, seams);
 			onlyMoved(fp, ['probes']);
-			expect(movedProbes(fp), 'the probes that plant in that field both ways').toEqual(ACCOUNT_BREAKS_PROBES);
+			// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~`toEqual(ACCOUNT_BREAKS_PROBES)`~~: their successors
+			// that plant in that field by that reading, one in every framing (`breaksMovedByValidator`).
+			expect(movedProbes(fp), 'the probes that plant in that field both ways').toEqual(breaksMovedByValidator(field, reading));
 			expect(fp.casePrompts, 'no case prompt moves').toEqual(BASE.casePrompts);
 			// ⭐ `PQ-2` (design D4) — nor any of the current set, measured: no case's account holds a plant read only otherwise.
 			expect(await movedNow(seams), 'no case prompt of the current set moves').toEqual([]);
@@ -3638,7 +3708,9 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 			};
 			const fp = await reviewerFingerprint(CASES, seams);
 			onlyMoved(fp, ['probes']);
-			expect(movedProbes(fp), 'the process-result probe that plants in that field both ways').toEqual(['P-ACCOUNT-BREAKS']);
+			// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~`toEqual(['P-ACCOUNT-BREAKS'])`~~: and its successors
+			// that plant in that field by that reading (`breaksMovedByView`).
+			expect(movedProbes(fp), 'the process-result probe that plants in that field both ways').toEqual(breaksMovedByView(field, reading));
 			expect(fp.casePrompts, 'no case prompt moves').toEqual(BASE.casePrompts);
 			// ⭐ `PQ-2` (design D4) — nor any of the current set, measured.
 			expect(await movedNow(seams), 'no case prompt of the current set moves').toEqual([]);
@@ -3680,7 +3752,9 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 				? [x.id]
 				: [];
 		});
-		expect(showing, 'the arrangement: the probes that show such an item whole').toEqual(ACCOUNT_BREAKS_PROBES);
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~`toEqual(ACCOUNT_BREAKS_PROBES)`~~: their successors
+		// that keep `BREAKS_ACCOUNT`'s items, `-A` and `-B` in every framing; the refusal probes show none.
+		expect(showing, 'the arrangement: the probes that show such an item whole').toEqual(['T-ACCOUNT-BREAKS-A', 'T-ACCOUNT-BREAKS-B', 'W-ACCOUNT-BREAKS-A', 'W-ACCOUNT-BREAKS-B', 'P-ACCOUNT-BREAKS-A', 'P-ACCOUNT-BREAKS-B']);
 		const seams: FingerprintSeams = { ...PRODUCT_SEAMS, validator: validatorPrinting((p) => listsReserialized(p, indented)) };
 		const fp = await reviewerFingerprint(CASES, seams);
 		onlyMoved(fp, ['probes']);
@@ -3700,7 +3774,15 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 		'⭐ %s encoded by `JSON.stringify`, not `jsonLine`, moves `probes` through the probe that plants a break there, and no case prompt — of v1, nor of the current set (PQ-2)',
 		async (site) => {
 			const e = ENCODER_CALL_SITES[site]!;
-			const seams: FingerprintSeams = { ...PRODUCT_SEAMS, validator: validatorPrinting((p, input) => encodedRaw(p, input, e.which)) };
+			// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~`encodedRaw(p, …)`~~: on the head, the material each
+			// call site is in; the measured section after it is the validator's own text and the producer's statements.
+			const seams: FingerprintSeams = {
+				...PRODUCT_SEAMS,
+				validator: validatorPrinting((p, input) => {
+					const head = headOf(p);
+					return encodedRaw(head, input, e.which) + p.slice(head.length);
+				})
+			};
 			const fp = await reviewerFingerprint(CASES, seams);
 			onlyMoved(fp, ['probes']);
 			expect(movedProbes(fp), 'the probe whose break that call site encodes').toEqual(e.moves);
@@ -3889,8 +3971,9 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 		// THE VALIDATOR'S CHOOSER OVER A PROCESS RESULT'S CUT SLICES (`P-OVERSIZE-ALL`): its own token, `05`, at the end of
 		// the instruction, the rationale, the narration and the prior findings, each read uncut beside the prompt's other
 		// regions and the view whole, as the product's chooser reads them.
-		const pa = promptRegions(BASE.probePrompts.get('P-OVERSIZE-ALL')!);
-		const paInput = inputOf('P-OVERSIZE-ALL');
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~'P-OVERSIZE-ALL'~~: its sent successor, on its head.
+		const pa = promptRegions(headOf(BASE.probePrompts.get('P-OVERSIZE-ALL-SENT')!));
+		const paInput = inputOf('P-OVERSIZE-ALL-SENT');
 		expect(pa.token, 'the arrangement: P-OVERSIZE-ALL’s prompt token').toBe('<<<UNTRUSTED-05>>>');
 		for (const slice of ['the instruction', "the account's rationale", 'the narration', 'the prior findings']) {
 			expect(pa.regions.find((x) => x.slice === slice)?.cut, `P-OVERSIZE-ALL: the arrangement — ${slice} is cut`).toBe(true);
@@ -4011,8 +4094,11 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 		const builderCuts: string[] = [];
 		let cuts = 0;
 		for (const probe of FINGERPRINT_PROBES) {
-			const sent = BASE.probePrompts.get(probe.id)!;
-			if (sent.startsWith(REFUSED)) continue;
+			// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~the prompt sent~~: its head, the material the cuts
+			// are made in — the block's head-only quotation of a long statement is the measured section's, not the material's.
+			const sentWhole = BASE.probePrompts.get(probe.id)!;
+			if (sentWhole.startsWith(REFUSED)) continue;
+			const sent = headOf(sentWhole);
 			let source: ProcessResultReviewSource | undefined;
 			const input = probe.input(PRODUCT_SEAMS.criteria, (s) => {
 				source = s;
@@ -4055,14 +4141,15 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 		expect(plantless, 'the cuts that remove no plant').toEqual([
 			'W-OVERSIZE-EDGES: the content (the validator’s)',
 			'P-OVERSIZE-CONTENT: stdout (the view’s)',
-			'P-OVERSIZE-SURROGATE: stdout (the view’s)',
-			'P-OVERSIZE-ROOM-EDGES: stdout (the view’s)',
-			'P-OVERSIZE-ROOM-EDGES: stderr (the view’s)',
+			// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~the three refusal probes'~~: their sent successors'.
+			'P-OVERSIZE-SURROGATE-SENT: stdout (the view’s)',
+			'P-OVERSIZE-ROOM-EDGES-SENT: stdout (the view’s)',
+			'P-OVERSIZE-ROOM-EDGES-SENT: stderr (the view’s)',
 			'P-OVERSIZE-STREAMS: stdout (the view’s)',
 			'P-OVERSIZE-AT-ITS-BUDGET: the command line (the view’s)',
 			'P-OVERSIZE-AT-ITS-BUDGET: stdout (the view’s)',
 			'P-OVERSIZE-AT-ITS-BUDGET: stderr (the view’s)',
-			'P-OVERSIZE-ALL: stdout (the view’s)'
+			'P-OVERSIZE-ALL-SENT: stdout (the view’s)'
 		]);
 		// ⭐ Package N — D11 — MOVED DELIBERATELY: and `D-OVERSIZE-DELIVERABLE`, one unit's finished work its builder cut.
 		expect(builderCuts, 'the declared reviews whose work their builder cut, ⭐ and the part whose children its builder cut').toEqual([
@@ -4093,7 +4180,9 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 			FINGERPRINT_PROBES.map((x) => x.id).filter((id) => BASE.probePrompts.get(id)!.startsWith(`${REFUSED}\n`)),
 			'the probes the validator refuses'
 			// ⭐ B7 — and a part whose subject is too long to show, refused whole (`T-SUBJECT-REFUSED`).
-		).toEqual(['T-SUBJECT-REFUSED', 'T-NO-FENCE', 'W-NO-FENCE', 'P-NO-FENCE']);
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~the four~~: and the six D52 refusal probes, each refused
+		// past a bound of the measured section's room (pinned below, 'THE SIX PAST A BOUND').
+		).toEqual(FINGERPRINT_PROBES.map((x) => x.id).filter((id) => ['T-SUBJECT-REFUSED', 'T-NO-FENCE', 'W-NO-FENCE', 'P-NO-FENCE'].includes(id) || id in D52_REFUSAL_PROBES));
 		const { content: part, ...huge } = inputOf('T-SUBJECT-REFUSED');
 		expect(BASE.probePrompts.get('T-SUBJECT-REFUSED'), 'the full-subject refusal, hashed as a prompt is').toBe(
 			[REFUSED, pwaTypeOverBudgetStatement(part.length, pwaTypeContentBudget({ ...huge, framing: 'PWA_TYPE' })), part].join('\n')
@@ -4107,8 +4196,11 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (D3) — the fingerprint reaches the process-re
 		const fp = await freshOverFence(neverClosed);
 		onlyMoved(fp, ['probes']);
 		expect(movedProbes(fp), 'the probes the validator refuses').toEqual(['T-NO-FENCE', 'W-NO-FENCE', 'P-NO-FENCE']);
+		// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~`${id}: sent, where it was refused`~~: each moves, and
+		// what it hashes now is no fence refusal — the measured section's own cut refuses a prompt whose fence a region holds
+		// (`review-cuts.ts` `regions`), a second line behind the chooser's, so such a chooser's prompt is refused there.
 		for (const id of ['T-NO-FENCE', 'W-NO-FENCE', 'P-NO-FENCE'])
-			expect(fp.probePrompts.get(id)!.startsWith(`${REFUSED}\n`), `${id}: sent, where it was refused`).toBe(false);
+			expect(fp.probePrompts.get(id)!.includes(NO_FENCE_STATEMENT), `${id}: no longer its fence refusal`).toBe(false);
 		expect(fp.casePrompts, 'no case prompt moves').toEqual(BASE.casePrompts);
 		// ⭐ `PQ-2` (design D4) — nor any of the current set's: no case prints every candidate.
 		expect(movedCasePrompts(await freshOverFence(neverClosed, CURRENT_CASES), BASE_NOW), 'no case prompt of the current set moves').toEqual([]);
@@ -4795,9 +4887,20 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481) — the fingerprint reaches the ske
 		'a control anywhere in a line',
 		'a line is laid out with its runs reversed'
 	];
-	const movedByRule = (name: string): string[] =>
+	// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) — ~~the account-breaks rules: `['T-ACCOUNT-BREAKS', 'W-ACCOUNT-BREAKS', 'P-OVERSIZE-FENCES', 'P-ACCOUNT-BREAKS']`~~:
+	// a refusal probe sends no prompt — but P-ACCOUNT-BREAKS, whose view the reader builds, so its content moves — and each
+	// sent successor that plants by that rule moves in its place, rule by rule (measured, each a successor's plant).
+	const MOVED_BY_ACCOUNT_BREAKS_RULE: ReadonlyMap<string, readonly string[]> = new Map([
+		["a line terminator a reader may not break at, read as nothing too — each read as a break alone (the view’s own 08, split by a raw U+2028 in stderr)", ['T-ACCOUNT-BREAKS-A', 'T-ACCOUNT-BREAKS-B', 'T-OVERSIZE-STATEMENTS-1', 'T-OVERSIZE-STATEMENTS-2', 'W-ACCOUNT-BREAKS-A', 'W-ACCOUNT-BREAKS-B', 'W-OVERSIZE-STATEMENTS-1', 'W-OVERSIZE-STATEMENTS-2', 'P-OVERSIZE-FENCES', 'P-ACCOUNT-BREAKS', 'P-ACCOUNT-BREAKS-A', 'P-ACCOUNT-BREAKS-B', 'P-OVERSIZE-STATEMENTS-1', 'P-OVERSIZE-STATEMENTS-2']],
+		["a line holding a bidi control, read laid out reversed — no line reversed (11, written backwards after a RIGHT-TO-LEFT OVERRIDE, in stderr)", ['T-ACCOUNT-BREAKS-A', 'T-ACCOUNT-BREAKS-B', 'T-OVERSIZE-STATEMENTS-1', 'T-OVERSIZE-STATEMENTS-2', 'W-ACCOUNT-BREAKS-A', 'W-ACCOUNT-BREAKS-B', 'W-OVERSIZE-STATEMENTS-1', 'W-OVERSIZE-STATEMENTS-2', 'P-OVERSIZE-FENCES', 'P-ACCOUNT-BREAKS', 'P-ACCOUNT-BREAKS-A', 'P-ACCOUNT-BREAKS-B', 'P-OVERSIZE-STATEMENTS-1', 'P-OVERSIZE-STATEMENTS-2']],
+		["an isolate or an embedding lays a line out, as the override does — the override alone (12, written backwards between a RIGHT-TO-LEFT ISOLATE and its pop, in the instruction)", ['T-ACCOUNT-BREAKS-A', 'T-ACCOUNT-BREAKS-B', 'T-OVERSIZE-STATEMENTS-1', 'T-OVERSIZE-STATEMENTS-2', 'W-ACCOUNT-BREAKS-A', 'W-ACCOUNT-BREAKS-B', 'W-OVERSIZE-STATEMENTS-1', 'W-OVERSIZE-STATEMENTS-2', 'P-OVERSIZE-FENCES', 'P-ACCOUNT-BREAKS', 'P-ACCOUNT-BREAKS-A', 'P-ACCOUNT-BREAKS-B', 'P-OVERSIZE-STATEMENTS-1', 'P-OVERSIZE-STATEMENTS-2']],
+		["a line is laid out with its runs reversed too — code point by code point alone (18, its digits before its name inside a RIGHT-TO-LEFT EMBEDDING, in stderr)", ['T-ACCOUNT-BREAKS-A', 'T-ACCOUNT-BREAKS-B', 'T-OVERSIZE-STATEMENTS-1', 'T-OVERSIZE-STATEMENTS-2', 'W-ACCOUNT-BREAKS-A', 'W-ACCOUNT-BREAKS-B', 'W-OVERSIZE-STATEMENTS-1', 'W-OVERSIZE-STATEMENTS-2', 'P-OVERSIZE-FENCES', 'P-ACCOUNT-BREAKS', 'P-ACCOUNT-BREAKS-A', 'P-ACCOUNT-BREAKS-B', 'P-OVERSIZE-STATEMENTS-1', 'P-OVERSIZE-STATEMENTS-2']],
+		["every line of a slice that holds a control is laid out — the first alone (13, after an override on the second line of stderr that holds one)", ['T-ACCOUNT-BREAKS-A', 'T-OVERSIZE-STATEMENTS-1', 'W-ACCOUNT-BREAKS-A', 'W-OVERSIZE-STATEMENTS-1', 'P-OVERSIZE-FENCES', 'P-ACCOUNT-BREAKS', 'P-ACCOUNT-BREAKS-A', 'P-ACCOUNT-BREAKS-B', 'P-OVERSIZE-STATEMENTS-1']],
+		["a control anywhere in a line lays it out — only a control that begins it (14, after an override mid-line, in stderr)", ['T-OVERSIZE-STATEMENTS-1', 'T-OVERSIZE-STATEMENTS-2', 'W-OVERSIZE-STATEMENTS-1', 'W-OVERSIZE-STATEMENTS-2', 'P-OVERSIZE-FENCES', 'P-ACCOUNT-BREAKS', 'P-ACCOUNT-BREAKS-A', 'P-ACCOUNT-BREAKS-B', 'P-OVERSIZE-STATEMENTS-1', 'P-OVERSIZE-STATEMENTS-2']]
+	]);
+	const movedByRule = (name: string): readonly string[] =>
 		ACCOUNT_BREAKS_RULES.some((rule) => name.startsWith(rule))
-			? ['T-ACCOUNT-BREAKS', 'W-ACCOUNT-BREAKS', 'P-OVERSIZE-FENCES', 'P-ACCOUNT-BREAKS']
+			? [...MOVED_BY_ACCOUNT_BREAKS_RULE].find(([prefix]) => name.startsWith(prefix))![1]
 			: ['P-OVERSIZE-FENCES'];
 	it.each(READER_RULES)(
 		'⭐ the reader’s rule: %s — dropped, it moves `probes` through P-OVERSIZE-FENCES and the probes that plant by that rule alone (the account-breaks probes, by a terminator and by each layout rule their laid-out lines stand on), its view’s token falling to the plant it no longer reads',
@@ -5409,5 +5512,136 @@ describe('⭐⭐ D3a (REG-D-127) — the part probes carry the policy material: 
 				type.requiredAssurancePolicyIds
 			);
 		}
+	});
+});
+
+// ── ⭐⭐ `JAN-EXEC` Phase 7, package Z1b — D52 (`REG-D-146`; the lead's ruling of 2026-11-06 on Z1's §8, option 1) ───────────────
+// Six probes pass a bound of the measured section's room, so the product refuses them before any prompt, and a refused probe
+// hashes its refusal alone: no change only they reached moved the fingerprint. They are kept byte for byte as D52's REFUSAL
+// PROBES, and every branch they reached is reached by a probe the product SENDS, within both bounds — their successors
+// (`probes.ts` `D52_REFUSAL_PROBES`, `SENT_SUCCESSORS`). Read through the module, so these reds name what is missing.
+const Z1B = PROBES_MODULE as unknown as {
+	readonly D52_REFUSAL_PROBES?: Readonly<Record<string, 'growth' | 'whole'>>;
+	readonly SENT_SUCCESSORS?: Readonly<Record<string, readonly string[]>>;
+};
+/** D52's statement for a prompt past each bound, whole, as the validator writes it (`sectionOverBoundStatement`). */
+const PAST_A_BOUND: Readonly<Record<'growth' | 'whole', RegExp>> = {
+	growth:
+		/^This review was not sent: its growth beyond today’s prompt would be \d+ characters, past its bound of 9500 \(REG-D-146; D52\)\. No indication is dropped to fit it, so the review is refused\. No model was called\.$/,
+	whole: /^This review was not sent: its whole prompt would be \d+ characters, past its bound of 33000 \(REG-D-146; D52\)\. No indication is dropped to fit it, so the review is refused\. No model was called\.$/
+};
+/** Each refusal probe's input as it was at `8bbe8f1b` — the canonical JSON's sha256: kept byte for byte. */
+const REFUSAL_PROBE_INPUT_SHA256: Readonly<Record<string, string>> = {
+	'T-ACCOUNT-BREAKS': '5c86d17b61f2be46ef20635d32336503a5ca4205608553d0ed636e28ef8745a8',
+	'W-ACCOUNT-BREAKS': '7426a4603db3fd58f380006f3cf6895f35d09e2084e2da6b24a39b483694745b',
+	'P-ACCOUNT-BREAKS': '74e3c2013d881ab1c265c0277051b0f5f8920bbb3bec7db4aad76b4cf81a1c86',
+	'P-OVERSIZE-SURROGATE': '7e25d7a3dc0a5fe25f1d9217c48d9a3bc05c3d7b96aef15f7490654c0bb98229',
+	'P-OVERSIZE-ROOM-EDGES': 'a6500444793a107db6f5460d535691befb6683ed786c89faa5643f9e9bbb0073',
+	'P-OVERSIZE-ALL': '1a88dbf68b5c1367a870cdaebdfc453d8e18ff51bedea577103069222aac1d99'
+};
+/**
+ * The growth of `input`'s measured prompt beyond today's, AS THE VALIDATOR MEASURES IT: the statement of its own growth
+ * bound, read with the method padded past that bound by a known length (`reviewPrompt`'s `text`). ⚠ Not `todayPromptOf`,
+ * which rebuilds today's section from the criteria and so writes a rubric the validator cut whole.
+ */
+async function growthOf(input: ReasoningReviewInput): Promise<number> {
+	const pad = 'x'.repeat(REASONING_REVIEW_BUDGET.SECTION_GROWTH_MAX);
+	const padded = { ...REVIEW_SECTION_TEXT, METHOD: [...REVIEW_SECTION_TEXT.METHOD, pad] };
+	const refused = await reviewPrompt(input, PLACEHOLDER_INDICATIONS, padded).then(
+		() => '',
+		(e: unknown) => (e instanceof Error ? e.message : String(e))
+	);
+	const m = /^This review was not sent: its growth beyond today’s prompt would be (\d+) characters/.exec(refused);
+	expect(m, 'the padded section is refused for its growth').not.toBeNull();
+	return Number(m![1]) - pad.length - 1;
+}
+const probeInputOf = (id: string): ReasoningReviewInput =>
+	FINGERPRINT_PROBES.find((p) => p.id === id)!.input(PRODUCT_SEAMS.criteria, PRODUCT_SEAMS.processResult, PRODUCT_SEAMS.declaredPolicies);
+
+describe('⭐⭐ JAN-EXEC Phase 7, package Z1b — D52’s refusal probes, and the probes the product sends that reach every branch they reached', () => {
+	it('⭐ THE SIX PAST A BOUND ARE D52’S REFUSAL PROBES — declared so, kept byte for byte, each refused before any prompt with D52’s statement for the bound it passes, and hashed as that refusal and its content', () => {
+		expect(Z1B.D52_REFUSAL_PROBES, 'the probe set declares its D52 refusal probes, each with the bound it passes').toEqual({
+			'T-ACCOUNT-BREAKS': 'growth',
+			'W-ACCOUNT-BREAKS': 'growth',
+			'P-ACCOUNT-BREAKS': 'growth',
+			'P-OVERSIZE-SURROGATE': 'whole',
+			'P-OVERSIZE-ROOM-EDGES': 'whole',
+			'P-OVERSIZE-ALL': 'whole'
+		});
+		for (const [id, bound] of Object.entries(Z1B.D52_REFUSAL_PROBES ?? {})) {
+			const input = probeInputOf(id);
+			expect(sha256(canonicalJson(input)), `${id}: its input, byte for byte as at 8bbe8f1b`).toBe(REFUSAL_PROBE_INPUT_SHA256[id]);
+			const [head, statement, ...content] = BASE.probePrompts.get(id)!.split('\n');
+			expect(head, `${id}: refused before any prompt`).toBe(REFUSED);
+			expect(statement, `${id}: refused past its ${bound} bound, with D52’s statement`).toMatch(PAST_A_BOUND[bound]);
+			expect(content.join('\n'), `${id}: then the content it was handed, and nothing of its material`).toBe(input.content);
+		}
+		// ⭑ The three account-breaks probes among them, refused for their growth, `BREAKS_ACCOUNT` still in each — its tokens
+		// (`BREAKS_TOKENS`) split by a line feed in it, as at d8c7a014.
+		expect(ACCOUNT_BREAKS_PROBES.map((id) => Z1B.D52_REFUSAL_PROBES?.[id]), 'the account-breaks probes, refused for their growth').toEqual(['growth', 'growth', 'growth']);
+		for (const id of ACCOUNT_BREAKS_PROBES) {
+			const account = probeInputOf(id).rationale!;
+			const all = [account.rationale, ...account.assumptions, ...account.limitations, ...account.residualUncertainty].join(String.fromCharCode(10));
+			for (const n of BREAKS_TOKENS) {
+				const c = fenceCandidateOf(n);
+				expect(all.includes(`${c.slice(0, 14)}${String.fromCharCode(10)}${c.slice(14)}`), `${id}: its token ${n}, split by a line feed`).toBe(true);
+			}
+		}
+		// ⭑ CONTROL — and no other probe is refused past a bound: every other refusal is one the validator made before Z1.
+		expect(
+			FINGERPRINT_PROBES.map((p) => p.id).filter((id) => /past its bound of \d+ \(REG-D-146; D52\)/.test(BASE.probePrompts.get(id)!.split('\n')[1] ?? '')),
+			'the probes refused past a D52 bound'
+		).toEqual(FINGERPRINT_PROBES.map((p) => p.id).filter((id) => id in (Z1B.D52_REFUSAL_PROBES ?? {})));
+	});
+
+	it('⭐ EVERY BRANCH A REFUSAL PROBE REACHED IS REACHED BY A PROBE THE PRODUCT SENDS — its successors, each sent, within 9,500 characters of growth beyond today’s prompt and 33,000 whole', async () => {
+		expect(Object.keys(Z1B.SENT_SUCCESSORS ?? {}), 'successors for each refusal probe').toEqual(Object.keys(REFUSAL_PROBE_INPUT_SHA256));
+		for (const [id, successors] of Object.entries(Z1B.SENT_SUCCESSORS ?? {})) {
+			expect(successors.length, `${id}: a successor`).toBeGreaterThan(0);
+			for (const s of successors) {
+				const sent = BASE.probePrompts.get(s);
+				expect(sent, `${s}: a probe of the set`).toBeDefined();
+				expect(sent!.startsWith(`${REFUSED}${'\n'}`), `${s}: sent`).toBe(false);
+				const growth = await growthOf(probeInputOf(s));
+				expect(growth, `${s}: its growth, within 9,500`).toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.SECTION_GROWTH_MAX);
+				expect(growth, `${s}: its growth, a measurement`).toBeGreaterThan(0);
+				expect(sent!.length, `${s}: its whole prompt, within 33,000`).toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.WHOLE_PROMPT_MAX);
+			}
+		}
+	});
+
+	it('⭐ A SENT PROBE HOLDS ITS CONTENT AT CONTENT_MIN — the three refusal probes’ successors that were held there, each over PROMPT_BUDGET through an impossible input', async () => {
+		const pProbes = FINGERPRINT_PROBES.map((p) => p.id).filter((id) => id.startsWith('P-'));
+		const sentAtMin = pProbes.filter(
+			(id) => !BASE.probePrompts.get(id)!.startsWith(REFUSED) && viewBudget(inputOf(id)) === REASONING_REVIEW_BUDGET.CONTENT_MIN
+		);
+		expect(sentAtMin, 'a sent probe holds its content at CONTENT_MIN').toEqual(['P-OVERSIZE-SURROGATE-SENT', 'P-OVERSIZE-ROOM-EDGES-SENT', 'P-OVERSIZE-ALL-SENT']);
+		for (const id of sentAtMin) {
+			const input = inputOf(id);
+			const calls = input.observedToolCalls?.calls?.length ?? 0;
+			// ⭑ An impossible input on purpose: more calls than production records (the surrogate's and the room edges'), or a
+			// narration and a prior, which production never sends (the all-slices one, held there by its slices alone).
+			expect(calls > 32 || (input.narration !== undefined && input.prior !== undefined), `${id}: an input production cannot build`).toBe(true);
+			const sent = BASE.probePrompts.get(id)!;
+			expect(sent.length - (await growthOf(input)), `${id}: today’s prompt over PROMPT_BUDGET`).toBeGreaterThan(REASONING_REVIEW_BUDGET.PROMPT_BUDGET);
+		}
+		// ⭑ CONTROL — the call list holds it there by a few calls: ten fewer, and the content leaves CONTENT_MIN.
+		const fewer = (id: string): ReasoningReviewInput =>
+			FINGERPRINT_PROBES.find((p) => p.id === id)!.input(PRODUCT_SEAMS.criteria, (source) =>
+				PRODUCT_SEAMS.processResult({
+					...source,
+					observedToolCalls:
+						source.observedToolCalls?.observation === 'OBSERVED' && source.observedToolCalls.calls !== undefined
+							? {
+									...source.observedToolCalls,
+									calls: source.observedToolCalls.calls.slice(0, -10),
+									observedCount: source.observedToolCalls.calls.length - 10,
+									recordedLimit: source.observedToolCalls.calls.length - 10
+								}
+							: source.observedToolCalls
+				})
+			);
+		for (const id of ['P-OVERSIZE-SURROGATE-SENT', 'P-OVERSIZE-ROOM-EDGES-SENT'])
+			expect(viewBudget(fewer(id)), `${id}: ten calls fewer, above CONTENT_MIN`).toBeGreaterThan(REASONING_REVIEW_BUDGET.CONTENT_MIN);
 	});
 });

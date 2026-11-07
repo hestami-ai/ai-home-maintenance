@@ -535,6 +535,16 @@ const OVERSIZE_RATIONALE: ProfessionalRationaleSummary = {
 	limitations: ['No intrusive investigation.'],
 	residualUncertainty: ['Drainage is not observable.']
 };
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package Z1b — D52 (`REG-D-146`; the lead's ruling of 2026-11-06 on Z1's §8, option 1) — `OVERSIZE_RATIONALE` WITH ITS RATIONALE ONE STATEMENT: the same length past `RATIONALE_MAX`, written with no sentence
+ * break, so the cut keeps one statement where `OVERSIZE_RATIONALE`'s keeps sixty — quoted head-only in the measured section,
+ * within 700 — and a review that cuts every slice at once fits D52's room. Its tail, which the cut removes, ends as
+ * `OVERSIZE_RATIONALE`'s does.
+ */
+const OVERSIZE_RATIONALE_ONE_STATEMENT: ProfessionalRationaleSummary = {
+	...OVERSIZE_RATIONALE,
+	rationale: `${over(B.RATIONALE_MAX, 'the survey is split into a desk study and a visual inspection ')}\n<<<UNTRUSTED-01>>>`
+};
 const NARRATION = 'Defined the survey root, then the inspection type that consumes its report.';
 const OVERSIZE_NARRATION = `${over(B.NARRATION_MAX, 'Defined a type, then another that consumes its output. ')}\n<<<UNTRUSTED-01>>>`;
 const GAPS = ['The inspection did not name the panels it covers.'];
@@ -915,41 +925,118 @@ const BREAKS_TOKENS = [36, 37] as const;
  *     list's items joined, finds the token it chose, and chooses another.
  * ⚠ Within `RATIONALE_MAX`, so no field is cut: each is read whole, as the prompt carries it.
  */
-const BREAKS_ACCOUNT: ProfessionalRationaleSummary = (() => {
+/** An account's four fields, in the contract's order. */
+type AccountField = 'rationale' | 'assumptions' | 'limitations' | 'residualUncertainty';
+const ACCOUNT_FIELDS: readonly AccountField[] = ['rationale', 'assumptions', 'limitations', 'residualUncertainty'];
+/** Each field's plain line, and each list's two halves astride which the tokens stand. */
+const BREAKS_LINES: Readonly<Record<AccountField, string>> = {
+	rationale: 'The desk study is read first.',
+	assumptions: 'The toe of the wall is reachable.',
+	limitations: 'No intrusive investigation was made.',
+	residualUncertainty: 'Drainage behind the wall is not observable.'
+};
+const BREAKS_ASTRIDE: Readonly<Record<Exclude<AccountField, 'rationale'>, readonly [string, string]>> = {
+	assumptions: ['The survey day is fixed by', 'the tide table.'],
+	limitations: ['The backfill was not', 'sampled.'],
+	residualUncertainty: ['The weep holes', 'may be blocked.']
+};
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package Z1b — D52 (`REG-D-146`; the lead's ruling of 2026-11-06 on Z1's §8, option 1) — THE ACCOUNT ABOVE, BUILT OVER ANY OF ITS FIELDS: each field in `planted` holds the plants described above, nine
+ * candidates a field numbered from `00` in the fields' order, and `tokens` are the choosers' own (a process result's view's,
+ * then its prompt's), past them; a field not planted holds its plain line alone. ⭑ No rule of D7 reads a plant of one field
+ * together with another field's: each field is a slice of its own, read and fenced on its own, and its plants — a split, a
+ * laid-out line, a token astride two items — stand within it. The fields are read together only in the token the chooser
+ * takes, past every candidate of every planted field. `BREAKS_ACCOUNT` is it over all four, byte for byte as before.
+ */
+const breaksAccount = (planted: readonly AccountField[], tokens: readonly [number, number]): ProfessionalRationaleSummary => {
 	const field = (first: number, line: string): string[] => [
 		...UNBROKEN.map((split, i) => splitBy(first + i, split)),
-		...BREAKS_TOKENS.map((n) => splitBy(n, '\n')),
+		...tokens.map((n) => splitBy(n, '\n')),
 		`\u202e${line}`,
-		...BREAKS_TOKENS.map(writtenBackwards)
+		...tokens.map(writtenBackwards)
 	];
 	const astride = (before: string, after: string): string[] =>
-		BREAKS_TOKENS.flatMap((n) => [`${before} ${candidate(n).slice(0, 14)}`, `${candidate(n).slice(14)} ${after}`]);
+		tokens.flatMap((n) => [`${before} ${candidate(n).slice(0, 14)}`, `${candidate(n).slice(14)} ${after}`]);
 	/** The field's laid-out lines, its last: the candidates after its six, one on a line of each layout. */
 	const laidOut = (first: number): string[] => LAID_OUT_LINES.map((line, i) => line(first + UNBROKEN.length + i));
+	const firstOf = (f: AccountField): number => 9 * planted.indexOf(f);
+	const list = (f: Exclude<AccountField, 'rationale'>): string[] =>
+		planted.includes(f)
+			? [...field(firstOf(f), BREAKS_LINES[f]), ...astride(...BREAKS_ASTRIDE[f]), ...laidOut(firstOf(f))]
+			: [BREAKS_LINES[f]];
 	const prose = [
 		'The survey is split into a desk study and a visual inspection.',
-		...field(0, 'The desk study is read first.'),
-		...laidOut(0)
+		...(planted.includes('rationale')
+			? [...field(firstOf('rationale'), BREAKS_LINES.rationale), ...laidOut(firstOf('rationale'))]
+			: [])
 	];
 	return {
 		rationale: prose.join('\n'),
-		assumptions: [
-			...field(9, 'The toe of the wall is reachable.'),
-			...astride('The survey day is fixed by', 'the tide table.'),
-			...laidOut(9)
-		],
-		limitations: [
-			...field(18, 'No intrusive investigation was made.'),
-			...astride('The backfill was not', 'sampled.'),
-			...laidOut(18)
-		],
-		residualUncertainty: [
-			...field(27, 'Drainage behind the wall is not observable.'),
-			...astride('The weep holes', 'may be blocked.'),
-			...laidOut(27)
-		]
+		assumptions: list('assumptions'),
+		limitations: list('limitations'),
+		residualUncertainty: list('residualUncertainty')
 	};
-})();
+};
+const BREAKS_ACCOUNT: ProfessionalRationaleSummary = breaksAccount(ACCOUNT_FIELDS, BREAKS_TOKENS);
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package Z1b — D52 (`REG-D-146`; the lead's ruling of 2026-11-06 on Z1's §8, option 1) — THE FOUR FIELDS IN TWO ACCOUNTS, two fields each: `BREAKS_ACCOUNT`'s growth beyond today's prompt passes 9,500 in
+ * every framing (9,638, 9,781, 9,638), so its three probes are D52's refusal probes; each of these holds half its plants,
+ * every plant of a field in one account, eighteen candidates `00` to `17`, and the choosers' tokens past them, `18` (a part's,
+ * a work product's and a view's) and `19` (a process result's prompt).
+ */
+const SPLIT_BREAKS_TOKENS = [18, 19] as const;
+const BREAKS_ACCOUNT_A: ProfessionalRationaleSummary = breaksAccount(['rationale', 'assumptions'], SPLIT_BREAKS_TOKENS);
+const BREAKS_ACCOUNT_B: ProfessionalRationaleSummary = breaksAccount(['limitations', 'residualUncertainty'], SPLIT_BREAKS_TOKENS);
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package Z1b — D50, D52 (`REG-D-146`; the lead's ruling of 2026-11-06 on Z1's §8, option 1) — EACH FIELD'S PLANTS A READER MAY READ FEWER OF, PAST THE HEAD THE MEASURED SECTION QUOTES. The cut reads every line
+ * of a list, and every sentence of the prose, as a statement (`review-cuts.ts` `statementsOf`), the block quotes each whole up
+ * to 700 characters under the prompt's own fence, and the validator's chooser reads those statements too (`reviewPrompt`'s
+ * `quotedAlso`): so a chooser that reads a field with FEWER candidates than the prompt carries — a terminator read as a line
+ * feed, its bidi controls read away, the field as one line of JSON, or the field not at all — still finds each candidate a
+ * statement quotes, and chooses as it does today. ⛔ `BREAKS_ACCOUNT_A` and `_B` keep `BREAKS_ACCOUNT`'s plants one to a line,
+ * so the block quotes every one of them, and such a chooser moved none of them (measured, Z1b). Here each plant stands past the
+ * head the block quotes of a statement longer than 700 (587 code points, its declaration of 112 within; measured): in the
+ * prose, one statement (no sentence break), a first line past that head and then the field's nine plants on lines of their
+ * own; in a list, two lines each longer than 700 — the six split candidates at the end of the first, a line laid out inside an
+ * isolate (the reader's last layout) at the end of the second, before a tail. ⚠ Two fields so planted fit `RATIONALE_MAX` whole:
+ * the prose and the assumptions in one probe, the limitations and the residual uncertainty in another.
+ */
+const UNQUOTED_FILLER = 'The survey records each panel of the retaining wall in turn and in full ';
+/** A line's head: longer than the 587 code points the block quotes of a statement past 700. */
+const UNQUOTED_HEAD = B.QUOTED_STATEMENT_MAX - 100;
+const longHead = (opening: string): string =>
+	`${opening} ${UNQUOTED_FILLER.repeat(Math.ceil(UNQUOTED_HEAD / UNQUOTED_FILLER.length))}`.slice(0, UNQUOTED_HEAD).trimEnd();
+/** The prose: one statement — a first line past the quoted head, then the field's nine candidates on lines of their own. */
+const unquotedProse = (first: number): string =>
+	[
+		longHead('the desk study is read first and'),
+		...UNBROKEN.map((split, i) => splitBy(first + i, split)),
+		...LAID_OUT_LINES.map((line, i) => line(first + UNBROKEN.length + i))
+	].join('\n');
+/** A list: two lines each longer than 700, each plant past the head the block quotes of it — the six split candidates at the
+ *  end of the first; a line laid out inside an isolate at the end of the second, before a tail. */
+const unquotedList = (first: number, opening: string): string[] => [
+	`${longHead(opening)} ${UNBROKEN.map((split, i) => splitBy(first + i, split)).join(' ')}`,
+	`${longHead(opening)} ${LAID_OUT_LINES[LAID_OUT_LINES.length - 1]!(first + UNBROKEN.length)} ${UNQUOTED_FILLER.repeat(2).trimEnd()}`
+];
+const PLAIN_ACCOUNT: ProfessionalRationaleSummary = {
+	rationale: 'The survey is split into a desk study and a visual inspection.',
+	assumptions: [BREAKS_LINES.assumptions],
+	limitations: [BREAKS_LINES.limitations],
+	residualUncertainty: [BREAKS_LINES.residualUncertainty]
+};
+/** The prose (`00`-`08`) and the assumptions (`09`-`15`), past their quoted heads: the choosers' tokens `16` and `17`. */
+const UNQUOTED_ACCOUNT_1: ProfessionalRationaleSummary = {
+	...PLAIN_ACCOUNT,
+	rationale: unquotedProse(0),
+	assumptions: unquotedList(9, 'the toe of the wall is reachable and')
+};
+/** The limitations (`00`-`06`) and the residual uncertainty (`07`-`13`), past their quoted heads: tokens `14` and `15`. */
+const UNQUOTED_ACCOUNT_2: ProfessionalRationaleSummary = {
+	...PLAIN_ACCOUNT,
+	limitations: unquotedList(0, 'no intrusive investigation was made and'),
+	residualUncertainty: unquotedList(7, 'drainage behind the wall is not observable and')
+};
 
 /**
  * ⭐ A RUN THE HOST WATCHED, with the port's stream names (`REG-F-487`) — every process-result probe's run starts here,
@@ -1040,6 +1127,26 @@ const CALLS_AT_CONTENT_MIN: ObservedToolCallReport = {
 	})),
 	observedCount: Math.ceil(B.PROMPT_BUDGET / 25),
 	recordedLimit: Math.ceil(B.PROMPT_BUDGET / 25)
+};
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package Z1b — D52 (`REG-D-146`; the lead's ruling of 2026-11-06 on Z1's §8, option 1) — A CALL LIST THAT HOLDS THE CONTENT AT `CONTENT_MIN` WITHIN D52'S ROOM. `CALLS_AT_CONTENT_MIN` passes `PROMPT_BUDGET`
+ * with its scaffolding alone, so a prompt it holds there passes D52's whole bound of 33,000 once the measured section is added
+ * (47,246 and 47,242): its two probes are D52's refusal probes. This list is the smallest that still leaves the content
+ * `CONTENT_MIN` — its scaffolding just past `PROMPT_BUDGET - CONTENT_MIN` — and a few calls more (measured; the fingerprint
+ * test pins it: 'a sent probe holds its content at CONTENT_MIN'): still an impossible input on purpose, more calls than
+ * production's 32 and a prompt over `PROMPT_BUDGET`, and sent. ⚠ At `CONTENT_MIN` a slice's room is a constant of the budget
+ * object, so the views it holds there are the refusal probes' views, byte for byte.
+ */
+const CALLS_HOLDING_CONTENT_MIN: ObservedToolCallReport = {
+	observation: 'OBSERVED',
+	calls: Array.from({ length: 530 }, (_, i) => ({
+		ordinal: i + 1,
+		nameProvenance: 'MINTED_BY_HOST' as const,
+		toolName: 'run_command',
+		outcome: 'COMPLETED' as const
+	})),
+	observedCount: 530,
+	recordedLimit: 530
 };
 // ~~`processResult` — a literal `ReasoningReviewInput` with `content: COMMAND_RESULT` and a narration production never
 // sends~~ (`PQ-1`, D3: five of the seven old probes sent a narration and two sent prior gaps; production sends neither).
@@ -1199,14 +1306,18 @@ const RERUN_MARKED_DELIVERABLE: Deliverable = {
  * `PQ-1` (design D3) it is: ~~G-BARE, G-DECLARED, G-PRIOR, G-OVERSIZE-CONTENT, G-OVERSIZE-ALL, G-OVERSIZE-FENCES,
  * G-OVERSIZE-LISTS, G-NO-FENCE, G-STAKES, G-ACCOUNT-BREAKS;~~ ⭐ B7: T-LEAF, T-COMPOSITE, T-ROOT, T-OVERSIZE-CHILDREN,
  * T-ABSENT-FIELDS, ⭐ (D3a) T-DECLARED-POLICIES, T-APPLICABLE-POLICIES, T-SEEDED-LIBRARY, T-SUBJECT-REFUSED, T-OVERSIZE-ALL,
- * T-OVERSIZE-FENCES, T-OVERSIZE-LISTS, T-NO-FENCE, T-STAKES, T-ACCOUNT-BREAKS; W-BARE, W-DECLARED-PRIOR, W-OVERSIZE-CONTENT,
- * W-OVERSIZE-ALL, W-OVERSIZE-EDGES, W-FENCES, W-OVERSIZE-LISTS, W-NO-FENCE, W-STAKES, W-ACCOUNT-BREAKS, ⭐ (package N)
+ * T-OVERSIZE-FENCES, T-OVERSIZE-LISTS, T-NO-FENCE, T-STAKES, T-ACCOUNT-BREAKS, ⭐ (package Z1b) T-ACCOUNT-BREAKS-A,
+ * T-ACCOUNT-BREAKS-B, T-OVERSIZE-STATEMENTS-1, T-OVERSIZE-STATEMENTS-2; W-BARE, W-DECLARED-PRIOR, W-OVERSIZE-CONTENT,
+ * W-OVERSIZE-ALL, W-OVERSIZE-EDGES, W-FENCES, W-OVERSIZE-LISTS, W-NO-FENCE, W-STAKES, W-ACCOUNT-BREAKS, ⭐ (package Z1b) W-ACCOUNT-BREAKS-A, W-ACCOUNT-BREAKS-B, W-OVERSIZE-STATEMENTS-1,
+ * W-OVERSIZE-STATEMENTS-2, ⭐ (package N)
  * W-DELIVERABLE, W-OVERSIZE-DELIVERABLE, W-OVERSIZE-FILE-LIST, ⭐ (package O-2) W-RERUN-DELIVERABLE, W-RERUN-NO-FILE, ⭐ (package X) W-RERUN-MARKED; P-CLEAN,
  * P-SIGNAL, P-TIMED-OUT, P-INCOMPLETE-CAPTURE, P-STDOUT-CAPTURE-CUT, P-STDERR-CAPTURE-CUT, P-OVERSIZE-CONTENT,
- * P-OVERSIZE-COMMAND, P-OVERSIZE-SURROGATE, P-OVERSIZE-ROOM-EDGES, P-OVERSIZE-STREAMS, P-OVERSIZE-AT-ITS-BUDGET,
+ * P-OVERSIZE-COMMAND, P-OVERSIZE-SURROGATE, ⭐ (package Z1b) P-OVERSIZE-SURROGATE-SENT, P-OVERSIZE-ROOM-EDGES, ⭐ (package Z1b)
+ * P-OVERSIZE-ROOM-EDGES-SENT, P-OVERSIZE-STREAMS, P-OVERSIZE-AT-ITS-BUDGET,
  * P-OVERSIZE-FENCES, P-OVERSIZE-LISTS, P-FENCE-AT-THE-LAST, P-NO-FENCE, P-PRODUCTION, P-ABSENT-REPORT,
- * P-NOT-OBSERVABLE, P-NOT-OBSERVABLE-BARE, P-NONE-OBSERVED, P-OBSERVED, P-OVERSIZE-ALL, P-FENCES-OTHER-SLICES,
- * P-STAKES, P-ACCOUNT-BREAKS, ⭐ (package N) P-SEQUENCE, P-OVERSIZE-SEQUENCE; ⭐ (`JAN-EXEC` Phase 7 completion E2, P5 package D)
+ * P-NOT-OBSERVABLE, P-NOT-OBSERVABLE-BARE, P-NONE-OBSERVED, P-OBSERVED, P-OVERSIZE-ALL, ⭐ (package Z1b) P-OVERSIZE-ALL-SENT,
+ * P-FENCES-OTHER-SLICES, P-STAKES, P-ACCOUNT-BREAKS, ⭐ (package Z1b) P-ACCOUNT-BREAKS-A, P-ACCOUNT-BREAKS-B, P-OVERSIZE-STATEMENTS-1,
+ * P-OVERSIZE-STATEMENTS-2, ⭐ (package N) P-SEQUENCE, P-OVERSIZE-SEQUENCE; ⭐ (`JAN-EXEC` Phase 7 completion E2, P5 package D)
  * D-pol_intent_fidelity,
  * D-pol_intent_completeness, D-pol_assumption_disclosure, D-pol_requirement_coverage, D-pol_decomposition_coverage,
  * D-pol_constraint_propagation, D-pol_architecture_coverage, D-pol_historical_consistency, D-pol_intent_preservation,
@@ -1216,7 +1327,8 @@ const RERUN_MARKED_DELIVERABLE: Deliverable = {
  * ~~forty-seven~~ ~~sixty-six (B7's check: twelve T-, ten W-, twenty-six P-, seventeen D- and NO-CRITERIA)~~ ~~sixty-nine
  * (D3a: fifteen T-, ten W-, twenty-six P-, seventeen D- and NO-CRITERIA)~~ ~~seventy-six (package N: fifteen T-, thirteen W-,
  * twenty-eight P-, nineteen D- and NO-CRITERIA)~~ ~~seventy-nine (package O-2, D28: fifteen T-, fifteen W-, twenty-eight P-,
- * twenty D- and NO-CRITERIA)~~ eighty (package X, D31: fifteen T-, sixteen W-, twenty-eight P-, twenty D- and NO-CRITERIA), every
+ * twenty D- and NO-CRITERIA)~~ ~~eighty (package X, D31: fifteen T-, sixteen W-, twenty-eight P-, twenty D- and NO-CRITERIA)~~
+ * ninety-five (package Z1b, D50 and D52: nineteen T-, twenty W-, thirty-five P-, twenty D- and NO-CRITERIA), every
  * process-result one `P-`-prefixed.
  * ~~⭐ Package P F1 (`REG-F-503` remedy 1) — and, after G-ACCOUNT-BREAKS, G-TYPE-DECLARATIONS, G-TYPE-DECLARATIONS-ABSENT and
  * G-OVERSIZE-TYPE-DECLARATIONS.~~ ⭐ B7 — the graph framing's probes left the fingerprint with case set v8; NO-CRITERIA is a
@@ -1386,6 +1498,29 @@ export const FINGERPRINT_PROBES: readonly FingerprintProbe[] = [
 			'part framing; the VALIDATOR’S FENCE CHOOSER over each field of the account as the prompt carries it — in each, a candidate split by each line terminator a reader may not break at, a candidate on a line of each layout the reader states (an override, an embedding, an isolate), the field’s last lines, and the prompt’s own token split by a line feed (in a list, an item holding one), written backwards below a line a bidi control lays out, and astride two items',
 		input: (criteria) => pwaTypeReviewInput({ criteria, prompt: INTENT, part: partOf(NODES, ROOT_ID), rationale: BREAKS_ACCOUNT })
 	},
+	{
+		// ⭐⭐ `JAN-EXEC` Phase 7, package Z1b — D52 (`REG-D-146`; the lead's ruling of 2026-11-06 on Z1's §8, option 1) — `T-ACCOUNT-BREAKS`'s plants in two probes the product sends, two fields each (`BREAKS_ACCOUNT_A`, `_B`):
+		// each fenced by `<<<UNTRUSTED-18>>>`, past the eighteen candidates its two fields hold.
+		id: 'T-ACCOUNT-BREAKS-A',
+		covers: 'part framing; the VALIDATOR’S FENCE CHOOSER over the rationale and the assumptions of the account as the prompt carries it — the plants `T-ACCOUNT-BREAKS` holds there, sent within D52’s room: in each, a candidate split by each line terminator a reader may not break at, a candidate on a line of each layout the reader states, the field’s last lines, and the prompt’s own token split by a line feed, written backwards below a line a bidi control lays out, and astride two items',
+		input: (criteria) => pwaTypeReviewInput({ criteria, prompt: INTENT, part: partOf(NODES, ROOT_ID), rationale: BREAKS_ACCOUNT_A })
+	},
+	{
+		id: 'T-ACCOUNT-BREAKS-B',
+		covers: 'part framing; the VALIDATOR’S FENCE CHOOSER over the limitations and the residual uncertainty of the account as the prompt carries it — the plants `T-ACCOUNT-BREAKS` holds there, sent within D52’s room: in each, a candidate split by each line terminator a reader may not break at, a candidate on a line of each layout the reader states, the field’s last lines, and the prompt’s own token split by a line feed, written backwards below a line a bidi control lays out, and astride two items',
+		input: (criteria) => pwaTypeReviewInput({ criteria, prompt: INTENT, part: partOf(NODES, ROOT_ID), rationale: BREAKS_ACCOUNT_B })
+	},
+	{
+		// ⭐⭐ `JAN-EXEC` Phase 7, package Z1b — D50, D52 (`REG-D-146`; the lead's ruling of 2026-11-06 on Z1's §8, option 1) — the plants a reader may read fewer of, past the head the block quotes (`UNQUOTED_ACCOUNT_1`, `_2`): named OVERSIZE, as every probe that carries a cut is — here the block's, of each statement past 700.
+		id: 'T-OVERSIZE-STATEMENTS-1',
+		covers: 'part framing; the VALIDATOR’S FENCE CHOOSER over the prose and the assumptions of the account, each plant a reader may read fewer of — a candidate split by each terminator a reader may not break at, a candidate on a line the reader lays out — past the head the measured section quotes of its statement, so a chooser that reads the field with fewer candidates than the prompt carries chooses another',
+		input: (criteria) => pwaTypeReviewInput({ criteria, prompt: INTENT, part: partOf(NODES, ROOT_ID), rationale: UNQUOTED_ACCOUNT_1 })
+	},
+	{
+		id: 'T-OVERSIZE-STATEMENTS-2',
+		covers: 'part framing; the VALIDATOR’S FENCE CHOOSER over the limitations and the residual uncertainty of the account, each plant a reader may read fewer of — a candidate split by each terminator a reader may not break at, a candidate on a line the reader lays out — past the head the measured section quotes of its statement, so a chooser that reads the field with fewer candidates than the prompt carries chooses another',
+		input: (criteria) => pwaTypeReviewInput({ criteria, prompt: INTENT, part: partOf(NODES, ROOT_ID), rationale: UNQUOTED_ACCOUNT_2 })
+	},
 	// ── the work-product arm, through the builder the work-product floor uses ──
 	{
 		id: 'W-BARE',
@@ -1498,6 +1633,30 @@ export const FINGERPRINT_PROBES: readonly FingerprintProbe[] = [
 			'work-product framing; the VALIDATOR’S FENCE CHOOSER over each field of the account as the prompt carries it — in each, a candidate split by each line terminator a reader may not break at, a candidate on a line of each layout the reader states (an override, an embedding, an isolate), the field’s last lines, and the prompt’s own token split by a line feed (in a list, an item holding one), written backwards below a line a bidi control lays out, and astride two items',
 		input: (criteria) =>
 			workProductReviewInput({ criteria, producingPrompt: PRODUCING_PROMPT, answer: ANSWER, rationale: BREAKS_ACCOUNT })
+	},
+	{
+		// ⭐⭐ `JAN-EXEC` Phase 7, package Z1b — D52 (`REG-D-146`; the lead's ruling of 2026-11-06 on Z1's §8, option 1) — `W-ACCOUNT-BREAKS`'s plants in two probes the product sends, as `T-ACCOUNT-BREAKS-A` and `-B`, in this framing.
+		id: 'W-ACCOUNT-BREAKS-A',
+		covers: 'work-product framing; the VALIDATOR’S FENCE CHOOSER over the rationale and the assumptions of the account as the prompt carries it — the plants `W-ACCOUNT-BREAKS` holds there, sent within D52’s room: in each, a candidate split by each line terminator a reader may not break at, a candidate on a line of each layout the reader states, the field’s last lines, and the prompt’s own token split by a line feed, written backwards below a line a bidi control lays out, and astride two items',
+		input: (criteria) =>
+			workProductReviewInput({ criteria, producingPrompt: PRODUCING_PROMPT, answer: ANSWER, rationale: BREAKS_ACCOUNT_A })
+	},
+	{
+		id: 'W-ACCOUNT-BREAKS-B',
+		covers: 'work-product framing; the VALIDATOR’S FENCE CHOOSER over the limitations and the residual uncertainty of the account as the prompt carries it — the plants `W-ACCOUNT-BREAKS` holds there, sent within D52’s room: in each, a candidate split by each line terminator a reader may not break at, a candidate on a line of each layout the reader states, the field’s last lines, and the prompt’s own token split by a line feed, written backwards below a line a bidi control lays out, and astride two items',
+		input: (criteria) =>
+			workProductReviewInput({ criteria, producingPrompt: PRODUCING_PROMPT, answer: ANSWER, rationale: BREAKS_ACCOUNT_B })
+	},
+	{
+		// ⭐⭐ `JAN-EXEC` Phase 7, package Z1b — D50, D52 (`REG-D-146`; the lead's ruling of 2026-11-06 on Z1's §8, option 1) — the plants a reader may read fewer of, past the head the block quotes (`UNQUOTED_ACCOUNT_1`, `_2`): named OVERSIZE, as every probe that carries a cut is — here the block's, of each statement past 700.
+		id: 'W-OVERSIZE-STATEMENTS-1',
+		covers: 'work-product framing; the VALIDATOR’S FENCE CHOOSER over the prose and the assumptions of the account, each plant a reader may read fewer of — a candidate split by each terminator a reader may not break at, a candidate on a line the reader lays out — past the head the measured section quotes of its statement, so a chooser that reads the field with fewer candidates than the prompt carries chooses another',
+		input: (criteria) => workProductReviewInput({ criteria, producingPrompt: PRODUCING_PROMPT, answer: ANSWER, rationale: UNQUOTED_ACCOUNT_1 })
+	},
+	{
+		id: 'W-OVERSIZE-STATEMENTS-2',
+		covers: 'work-product framing; the VALIDATOR’S FENCE CHOOSER over the limitations and the residual uncertainty of the account, each plant a reader may read fewer of — a candidate split by each terminator a reader may not break at, a candidate on a line the reader lays out — past the head the measured section quotes of its statement, so a chooser that reads the field with fewer candidates than the prompt carries chooses another',
+		input: (criteria) => workProductReviewInput({ criteria, producingPrompt: PRODUCING_PROMPT, answer: ANSWER, rationale: UNQUOTED_ACCOUNT_2 })
 	},
 	// ── ⭐⭐ `JAN-EXEC` Phase 7, package N — D10 (`REG-D-135` (1); `REG-F-522` remedy candidate 2; `REG-F-553`'s class) — THE
 	// FINISHED WORK, beside the answer ─────────────────────────────────────────────────────────────────────────────────────
@@ -1670,6 +1829,15 @@ export const FINGERPRINT_PROBES: readonly FingerprintProbe[] = [
 			)
 	},
 	{
+		// ⭐⭐ `JAN-EXEC` Phase 7, package Z1b — D52 (`REG-D-146`; the lead's ruling of 2026-11-06 on Z1's §8, option 1) — `P-OVERSIZE-SURROGATE`, sent: the same run and account, held at `CONTENT_MIN` by the call list that holds it
+		// there within D52's room (`CALLS_HOLDING_CONTENT_MIN`), so its view is the refusal probe's, byte for byte.
+		id: 'P-OVERSIZE-SURROGATE-SENT',
+		covers:
+			'process-result framing; a SURROGATE PAIR ASTRIDE A CUT, at the HEAD and at the TAIL, of a stream whose code points and UTF-16 units differ in digit count; the content at CONTENT_MIN, within D52’s room, through an impossible input — more calls than production’s 32, a prompt over PROMPT_BUDGET',
+		input: (criteria, build) =>
+			refusalProbe('P-OVERSIZE-SURROGATE').input(criteria, (source) => build({ ...source, observedToolCalls: CALLS_HOLDING_CONTENT_MIN }))
+	},
+	{
 		// ⭐ THE TWO EDGES OF A SLICE'S ROOM, where a cut rule decides by one unit — so a change to either rule moves a view
 		// only on its edge, and no other probe stands on one. Held at `CONTENT_MIN` by the same call list as
 		// `P-OVERSIZE-SURROGATE` (an impossible input, on purpose), so each room is the run's and the renderer's alone:
@@ -1693,6 +1861,15 @@ export const FINGERPRINT_PROBES: readonly FingerprintProbe[] = [
 				}),
 				{ rationale: RATIONALE, observedToolCalls: CALLS_AT_CONTENT_MIN }
 			)
+	},
+	{
+		// ⭐⭐ `JAN-EXEC` Phase 7, package Z1b — D52 (`REG-D-146`; the lead's ruling of 2026-11-06 on Z1's §8, option 1) — `P-OVERSIZE-ROOM-EDGES`, sent: the same run and account, held at `CONTENT_MIN` within D52's room
+		// (`CALLS_HOLDING_CONTENT_MIN`), so each room, and each edge it stands on, is the refusal probe's.
+		id: 'P-OVERSIZE-ROOM-EDGES-SENT',
+		covers:
+			'process-result framing; the EDGES OF A ROOM — stdout with a pair astride its HEAD only, the unit given back going to an ASCII TAIL; stderr two units past fitting whole between its fence lines; the content at CONTENT_MIN, within D52’s room, through an impossible input — more calls than production’s 32, a prompt over PROMPT_BUDGET',
+		input: (criteria, build) =>
+			refusalProbe('P-OVERSIZE-ROOM-EDGES').input(criteria, (source) => build({ ...source, observedToolCalls: CALLS_HOLDING_CONTENT_MIN }))
 	},
 	{
 		// ⭐ THIS HOST'S OWN TIMEOUT, AS PRODUCTION RECORDS IT, OVER STREAMS THAT FILLED THE CAPTURE. The runner's own
@@ -1902,6 +2079,23 @@ export const FINGERPRINT_PROBES: readonly FingerprintProbe[] = [
 			})
 	},
 	{
+		// ⭐⭐ `JAN-EXEC` Phase 7, package Z1b — D52 (`REG-D-146`; the lead's ruling of 2026-11-06 on Z1's §8, option 1) — `P-OVERSIZE-ALL`, sent: every slice oversize at once and each of its plants where it stands, within D52's
+		// room — production's one call, its slices each at its cap holding the content at `CONTENT_MIN` alone, and the rationale
+		// one statement (`OVERSIZE_RATIONALE_ONE_STATEMENT`). Fenced as it is: its view by
+		// `<<<UNTRUSTED-01>>>`, its prompt by `<<<UNTRUSTED-05>>>`.
+		id: 'P-OVERSIZE-ALL-SENT',
+		covers:
+			'process-result framing; the VALIDATOR’S FENCE CHOOSER over the limitations, the narration and the prior findings, a candidate in each, and its own token at the end of each slice its prompt cuts; every slice oversize at once, within D52’s room — production’s one call, the content CONTENT_MIN held there by the slices alone, the rationale one statement; an impossible input on purpose — a narration and a prior production never sends, a prompt over PROMPT_BUDGET',
+		input: (criteria, build) =>
+			refusalProbe('P-OVERSIZE-ALL').input(criteria, (source) =>
+				build({
+					...source,
+					rationale: { ...source.rationale!, rationale: `${OVERSIZE_RATIONALE_ONE_STATEMENT.rationale}\n${candidate(5)}` },
+					observedToolCalls: ONE_CALL
+				})
+			)
+	},
+	{
 		// ⭐ `PQ-1` (`REG-F-481`; design D2 under the sponsor's answer (a)) — THE VIEW'S CHOOSER OVER THE THREE SLICES
 		// `P-OVERSIZE-FENCES` LEAVES EMPTY: a candidate in the limitations (`01`), the narration (`02`) and the prior
 		// findings (`03`), past the instruction's `00` — so the view is fenced by `<<<UNTRUSTED-04>>>` and the prompt by
@@ -1943,6 +2137,31 @@ export const FINGERPRINT_PROBES: readonly FingerprintProbe[] = [
 			'process-result framing, production’s shape; BOTH FENCE CHOOSERS over each field of the account as the prompt carries it — in each, a candidate split by each line terminator a reader may not break at, a candidate on a line of each layout the reader states (an override, an embedding, an isolate), the field’s last lines, and the view’s token and the prompt’s each split by a line feed (in a list, an item holding one), written backwards below a line a bidi control lays out, and astride two items',
 		input: (criteria, build) =>
 			asProduction(criteria, build, run(), { rationale: BREAKS_ACCOUNT, observedToolCalls: ONE_CALL })
+	},
+	{
+		// ⭐⭐ `JAN-EXEC` Phase 7, package Z1b — D52 (`REG-D-146`; the lead's ruling of 2026-11-06 on Z1's §8, option 1) — `P-ACCOUNT-BREAKS`'s plants in two probes the product sends, two fields each: each view fenced by
+		// `<<<UNTRUSTED-18>>>` and each prompt by `<<<UNTRUSTED-19>>>`, past the eighteen candidates its two fields hold.
+		id: 'P-ACCOUNT-BREAKS-A',
+		covers: 'process-result framing, production’s shape; BOTH FENCE CHOOSERS over the rationale and the assumptions of the account as the prompt carries it — the plants `P-ACCOUNT-BREAKS` holds there, sent within D52’s room: in each, a candidate split by each line terminator a reader may not break at, a candidate on a line of each layout the reader states, the field’s last lines, and the view’s token and the prompt’s each split by a line feed, written backwards below a line a bidi control lays out, and astride two items',
+		input: (criteria, build) =>
+			asProduction(criteria, build, run(), { rationale: BREAKS_ACCOUNT_A, observedToolCalls: ONE_CALL })
+	},
+	{
+		id: 'P-ACCOUNT-BREAKS-B',
+		covers: 'process-result framing, production’s shape; BOTH FENCE CHOOSERS over the limitations and the residual uncertainty of the account as the prompt carries it — the plants `P-ACCOUNT-BREAKS` holds there, sent within D52’s room: in each, a candidate split by each line terminator a reader may not break at, a candidate on a line of each layout the reader states, the field’s last lines, and the view’s token and the prompt’s each split by a line feed, written backwards below a line a bidi control lays out, and astride two items',
+		input: (criteria, build) =>
+			asProduction(criteria, build, run(), { rationale: BREAKS_ACCOUNT_B, observedToolCalls: ONE_CALL })
+	},
+	{
+		// ⭐⭐ `JAN-EXEC` Phase 7, package Z1b — D50, D52 (`REG-D-146`; the lead's ruling of 2026-11-06 on Z1's §8, option 1) — the plants a reader may read fewer of, past the head the block quotes (`UNQUOTED_ACCOUNT_1`, `_2`): named OVERSIZE, as every probe that carries a cut is — here the block's, of each statement past 700.
+		id: 'P-OVERSIZE-STATEMENTS-1',
+		covers: 'process-result framing, production’s shape; the VALIDATOR’S FENCE CHOOSER, AND THE VIEW’S, over the prose and the assumptions of the account, each plant a reader may read fewer of — a candidate split by each terminator a reader may not break at, a candidate on a line the reader lays out — past the head the measured section quotes of its statement, so a chooser that reads the field with fewer candidates than the prompt carries chooses another',
+		input: (criteria, build) => asProduction(criteria, build, run(), { rationale: UNQUOTED_ACCOUNT_1, observedToolCalls: ONE_CALL })
+	},
+	{
+		id: 'P-OVERSIZE-STATEMENTS-2',
+		covers: 'process-result framing, production’s shape; the VALIDATOR’S FENCE CHOOSER, AND THE VIEW’S, over the limitations and the residual uncertainty of the account, each plant a reader may read fewer of — a candidate split by each terminator a reader may not break at, a candidate on a line the reader lays out — past the head the measured section quotes of its statement, so a chooser that reads the field with fewer candidates than the prompt carries chooses another',
+		input: (criteria, build) => asProduction(criteria, build, run(), { rationale: UNQUOTED_ACCOUNT_2, observedToolCalls: ONE_CALL })
 	},
 	// ── ⭐⭐ `JAN-EXEC` Phase 7, package N — D12 (`REG-D-135` (1); `REG-F-579`; `REG-F-553`'s class) — A COMMAND'S PLACE IN THE
 	// STEP'S SEQUENCE ───────────────────────────────────────────────────────────────────────────────────────────────────
@@ -2200,6 +2419,36 @@ export const FINGERPRINT_PROBES: readonly FingerprintProbe[] = [
 		input: () => pwaTypeReviewInput({ criteria: [], prompt: INTENT, part: partOf(NODES, ROOT_ID) })
 	}
 ];
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package Z1b — D52 (`REG-D-146`; the lead's ruling of 2026-11-06 on Z1's §8, option 1) — D52'S REFUSAL PROBES: the six whose measured prompt passes a bound of its room, each with the bound it passes —
+ * kept byte for byte, so the fingerprint hashes D52's refusal in every framing that reaches a bound (an edit that sends
+ * what D52 refuses, or moves a bound, moves `probes`). A refused probe hashes its refusal alone, so each branch they reach
+ * is reached by a probe the product sends: `SENT_SUCCESSORS`.
+ */
+export const D52_REFUSAL_PROBES: Readonly<Record<string, 'growth' | 'whole'>> = {
+	'T-ACCOUNT-BREAKS': 'growth',
+	'W-ACCOUNT-BREAKS': 'growth',
+	'P-ACCOUNT-BREAKS': 'growth',
+	'P-OVERSIZE-SURROGATE': 'whole',
+	'P-OVERSIZE-ROOM-EDGES': 'whole',
+	'P-OVERSIZE-ALL': 'whole'
+};
+/** ⭐⭐ `JAN-EXEC` Phase 7, package Z1b — D52 (`REG-D-146`; the lead's ruling of 2026-11-06 on Z1's §8, option 1) — each refusal probe's successors: the probes the product sends that reach every branch it reached. */
+/** A refusal probe, read when a successor's input is built from it (after the probe set exists). */
+function refusalProbe(id: string): FingerprintProbe {
+	const probe = FINGERPRINT_PROBES.find((x) => x.id === id);
+	if (probe === undefined || !(id in D52_REFUSAL_PROBES)) throw new Error(`${id}: no D52 refusal probe`);
+	return probe;
+}
+export const SENT_SUCCESSORS: Readonly<Record<string, readonly string[]>> = {
+	'T-ACCOUNT-BREAKS': ['T-ACCOUNT-BREAKS-A', 'T-ACCOUNT-BREAKS-B', 'T-OVERSIZE-STATEMENTS-1', 'T-OVERSIZE-STATEMENTS-2'],
+	'W-ACCOUNT-BREAKS': ['W-ACCOUNT-BREAKS-A', 'W-ACCOUNT-BREAKS-B', 'W-OVERSIZE-STATEMENTS-1', 'W-OVERSIZE-STATEMENTS-2'],
+	'P-ACCOUNT-BREAKS': ['P-ACCOUNT-BREAKS-A', 'P-ACCOUNT-BREAKS-B', 'P-OVERSIZE-STATEMENTS-1', 'P-OVERSIZE-STATEMENTS-2'],
+	'P-OVERSIZE-SURROGATE': ['P-OVERSIZE-SURROGATE-SENT'],
+	'P-OVERSIZE-ROOM-EDGES': ['P-OVERSIZE-ROOM-EDGES-SENT'],
+	'P-OVERSIZE-ALL': ['P-OVERSIZE-ALL-SENT']
+};
 
 // ── ⭐⭐ THE READER CORPUS (`JAN-PRQUAL` `PQ-1`; `REG-F-481`; design D2 under the sponsor's answer (a)) ─────────────────
 /**

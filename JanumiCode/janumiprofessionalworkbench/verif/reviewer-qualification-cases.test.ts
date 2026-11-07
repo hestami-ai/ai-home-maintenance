@@ -4166,7 +4166,11 @@ const REVIEWER_FINGERPRINT_V9 = '5ab3d68643bffbbf700c622526b626f47d4c487690e1eb5
 // every prompt moves — the measured section, scored by the scripts' placeholder decision model until package Z2's records
 // (D54) — so the probes component moves, and the budget component with D52's three members. Criteria, scoring and every
 // case-set digest stay. Unmeasured: RED on COVERAGE until D53.
-const REVIEWER_FINGERPRINT_TODAY = '3a5ac37c5e1591c2f39137572beefaff84da6d8ccf271581365e708f513b9b93';
+// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1b — D50, D52; `REG-D-146`; the lead's ruling on Z1's §8, option 1) —
+// ~~'3a5ac37c5e1591c2f39137572beefaff84da6d8ccf271581365e708f513b9b93'~~: the probes move, and only they — fifteen probes
+// the product sends reach every branch D52's six refusal probes reached (`probes.ts` `SENT_SUCCESSORS`). No case prompt,
+// nor the budget, criteria, scoring or case-set digest, moved. Unmeasured: RED on COVERAGE until D53.
+const REVIEWER_FINGERPRINT_TODAY = '9ddc1250135725080d195f6d3c2234ef6524f31db70a8da0959d031477bc2933';
 /**
  * ⭐ THE PROTOTYPE'S PROMPTS (`REG-D-131` Q36: *"its prompts must match the checked prototype hash for hash"*) — the sha256 of
  * each of the 19 bridge part cases' first prompt as the lead's in-memory prototype of D3b rendered it through the product's
