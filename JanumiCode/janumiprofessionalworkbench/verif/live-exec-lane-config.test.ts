@@ -1349,11 +1349,20 @@ describe('⛔ the config and the spec take every one of these from the helper', 
 
 	// ⭐ `JAN-EXEC` Phase 7 `P7-2` (D8). P7-3a is this spec's paid run, and the Phase 7 run counts its calls only as the
 	// operator gives them — its store sits under the temporary folder (`REG-F-526`), so the spec must say the count itself.
-	it('⭐ P7-2 D8 — the spec prints and annotates the reviewer calls it spent: EVERY ASSURANCE exchange, a call that threw included', () => {
+	// ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z2a — D51, `REG-D-146`; design §12.3: *"The report keeps these local
+	// requests beside the reviewer calls; it never counts them as reviewer calls."*): a review's decision-model requests are
+	// ASSURANCE exchanges of their own, so ~~EVERY ASSURANCE exchange~~ every ASSURANCE exchange that is no decision-model request
+	// is a reviewer call — known by its identity through the product's own predicate, never a copy of it.
+	it('⭐ P7-2 D8 — the spec prints and annotates the reviewer calls it spent: ~~EVERY ASSURANCE exchange~~ every ASSURANCE exchange but the decision model’s (Z2a, D51), a call that threw included', () => {
 		const sf = parsed(SPEC);
 		expect(initializersOf(sf, 'assurance')).toEqual([
-			"exchanges.filter((e) => e.plane === 'ASSURANCE')"
+			// ~~"exchanges.filter((e) => e.plane === 'ASSURANCE')"~~ ⛔ MOVED 2026-11-07 (Z2a, D51):
+			"exchanges.filter((e) => e.plane === 'ASSURANCE' && !isDecisionModelExchange(e))"
 		]);
+		expect(
+			importsFrom(sf, '../src/lib/server/assurance/decision-model-request'),
+			'the decision model’s requests known by the product’s own predicate'
+		).toEqual(['isDecisionModelExchange']);
 		expect(annotationsOf(sf)['reviewer-calls'], 'the annotation the JSON report keeps').toBe(
 			'String(assurance.length)'
 		);

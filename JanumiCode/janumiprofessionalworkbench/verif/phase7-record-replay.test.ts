@@ -980,4 +980,31 @@ describe('⭐ The merge of E12 and E4 (J3) — a DECLARED review’s reviewer ca
 			built.recording?.reviewer.map((c) => [c.unit, c.framing, c.promptSha256])
 		]).toEqual([0, [['requirements', 'declared-policy', sha(DECLARED_PROMPT)]]]);
 	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package Z2a — D51 (`REG-D-146`; design §12.3): a review's decision-model requests are ASSURANCE exchanges
+	// of their own, made before its first reviewer call — never a reviewer call to replay, nor the authoring floor's call left out.
+	// ⚠ What a replay serves for them is package Z2b's (Z1's departure 10); until then a replayed review is refused for its indications.
+	it('⛔ Z2a (D51) — a decision model’s request is no reviewer call of the recording, and no authoring call left out', () => {
+		const request = row(
+			'mex_dm',
+			'MODEL_EXCHANGE',
+			{
+				...input.store.objects[3]!.state,
+				resolvedModel: { value: 'pplx-decider:27b-q4_K_M' },
+				resolvedProvider: { availability: 'REPORTED', evidence: 'PROVIDER_REPORTED', value: 'ollama' },
+				requestedAt: '2026-10-11T09:59:00.000Z',
+				respondedAt: '2026-10-11T09:59:16.000Z'
+			},
+			4
+		);
+		const built = buildRecording({
+			...input,
+			store: { ...input.store, objects: [...input.store.objects.slice(0, 3), request, { ...input.store.objects[3]!, firstSequence: 5 }] }
+		});
+		expect(built.problems).toEqual([]);
+		expect([
+			built.authoringCallsLeftOut,
+			built.recording?.reviewer.map((c) => [c.unit, c.framing, c.promptSha256])
+		]).toEqual([0, [['requirements', 'declared-policy', sha(DECLARED_PROMPT)]]]);
+	});
 });

@@ -625,4 +625,34 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481) — no host text inside quoted mate
 		])
 			expect(() => expectNoHostTextQuoted(withBlock(region), input, 'control'), JSON.stringify(region)).toThrow(/host text quoted/);
 	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package Z2a — D51 (`REG-D-146`; roadmap §9b.5b, Z2 predicted red 3: *"The region guard must admit a
+	// quotation derived by this rule and refuse one the rule cannot derive"*). ⭑ Package Z1 restated the guard for the block (its
+	// departure 7: the control above, and every case prompt's block read by the sweep). What this adds is the guard held to the
+	// REFERENCE: over the 97 v13 cases, every statement the screen's own cut derives (`decision-model-cuts-v13.json`, Python's) is
+	// one the guard admits — derived here from the INPUT — and, of the same real case, a quotation the rule cannot derive is refused.
+	it('⭑ Z2a (D51) — the guard admits every statement the screen’s own cut derives, 97 of 97 cases; and of a real case refuses one it cannot derive', async () => {
+		const reference = (
+			JSON.parse(readFileSync(new URL('./fixtures/reviewer-qual/decision-model-cuts-v13.json', import.meta.url), 'utf8')) as {
+				readonly cases: Readonly<Record<string, { readonly statements: readonly (readonly [string, string])[] }>>;
+			}
+		).cases;
+		const cases = committedCaseSet(new URL('../', import.meta.url)).cases;
+		expect(Object.keys(reference).sort(), 'arrangement: a reference cut for each current case').toEqual(cases.map((c) => c.id).sort());
+		const unadmitted: string[] = [];
+		for (const c of cases) {
+			const derived = derivableStatements(caseReviewInput(c, SEEDED_REASONING_REVIEW_CRITERIA));
+			for (const [, s] of reference[c.id]!.statements) if (!derived.includes(s)) unadmitted.push(`${c.id}: ${s.slice(0, 60)}`);
+		}
+		expect(unadmitted, 'statements the screen cut that the guard would refuse as host text').toEqual([]);
+		const c = cases.find((x) => x.id === 'W12-CSV-CLEAN')!;
+		const input = caseReviewInput(c, SEEDED_REASONING_REVIEW_CRITERIA);
+		const [first, second] = reference[c.id]!.statements.map(([, s]) => s);
+		const F = '<<<UNTRUSTED-00>>>';
+		const withBlock = (region: string) =>
+			`x\n${F}\n${input.prompt}\n${F}\nStatements, from most to least likely to be contradicted (the probability that the evidence contradicts the statement):\nStatement, 0.40:\n${F}\n${region}\n${F}\n`;
+		expect(() => expectNoHostTextQuoted(withBlock(first!), input, 'W12-CSV-CLEAN'), 'arrangement: its first statement is admitted').not.toThrow();
+		for (const region of [`${first!} ${second!}`, input.prompt, `${first!}.`])
+			expect(() => expectNoHostTextQuoted(withBlock(region), input, 'W12-CSV-CLEAN'), JSON.stringify(region.slice(0, 80))).toThrow(/host text quoted/);
+	});
 });

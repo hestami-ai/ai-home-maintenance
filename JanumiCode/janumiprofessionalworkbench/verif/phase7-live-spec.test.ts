@@ -1213,6 +1213,28 @@ describe('⭐ the store, as the run reads it after every act (REG-F-540)', () =>
 			3
 		);
 	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package Z2a — D51 (`REG-D-146`): the decision model's requests are ASSURANCE exchanges too, and never a
+	// reviewer call — so the lane's limit, read before every paid act, counts none of them (`isDecisionModelExchange`).
+	it('⛔ Z2a (D51) — the lane’s limit counts no decision-model request: known by its identity', () => {
+		const snap = {
+			modelExchanges: [
+				{ id: 'mx_r', state: { plane: 'ASSURANCE', exchangeRole: 'INITIAL', disposition: 'ACCEPTED' } },
+				...['c00', 's00'].map((k) => ({
+					id: `mx_${k}`,
+					state: {
+						plane: 'ASSURANCE',
+						exchangeRole: 'INITIAL',
+						disposition: 'ACCEPTED',
+						resolvedProvider: { availability: 'REPORTED', evidence: 'PROVIDER_REPORTED', value: 'ollama' }
+					}
+				}))
+			],
+			evidence: [],
+			artifacts: []
+		} as unknown as EngineSnapshot;
+		expect(recordedReviewerCalls(snap), 'a decision-model request counted against the paid limit').toBe(1);
+	});
 });
 
 /**

@@ -82,6 +82,8 @@ import {
 // ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D50, D52 (`REG-D-146`; design §12.2, §12.4) — the measured review section, and the
 // checks and statements its indications block lists, cut as the screen of the sponsor's construct cut them.
 import { checksOf, PyJsonTooDeep, statementsOf, type CutCheck, type CutStatement } from './review-cuts.js';
+// ⭐⭐ Package Z2a — D51 — the decision model's material, and who answers for it on the record. ⚠ A pure module.
+import { DECISION_MODEL_PROVIDER, materialOf } from './decision-model-request.js';
 import {
 	indicationsBlock,
 	measuredSection,
@@ -1873,16 +1875,76 @@ export type IndicationRequest =
 	| { readonly kind: 'check'; readonly key: string; readonly id: string; readonly label: string }
 	| { readonly kind: 'statement'; readonly key: string; readonly statement: string };
 
-/** What a source answers: every request's score, by its key, the probability the model gave its `true` answer — or a refusal. */
-export type IndicationsResult = { readonly scores: Readonly<Record<string, number>> } | { readonly refusal: string };
+/**
+ * What a source answers: every request's score, by its key, the probability the model gave its `true` answer — or a refusal.
+ * ⭐⭐ Package Z2a — D51 — and, from a source that asked a model, every request it made (`exchanges`), answered or not: each is
+ * recorded as a try of its own before any reviewer call (`createAgyReasoningReviewValidator`). A double that asks nothing
+ * returns none.
+ */
+export type IndicationsResult =
+	| { readonly scores: Readonly<Record<string, number>>; readonly exchanges?: readonly IndicationExchange[] }
+	| { readonly refusal: string; readonly exchanges?: readonly IndicationExchange[] };
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package Z2a — D51 (`REG-D-146`; design §12.3) — ONE REQUEST THE DECISION MODEL'S CLIENT MADE, as the
+ * record keeps it (PER-9, PER-11; D43's durable record per request): its exact bytes, the response before any reading, the identity
+ * it was held to, the other models the server held, its times, and what became of it. ⚠ The client's report of its own request:
+ * the validator records it, and judges nothing from it but the score the result carries.
+ */
+export interface IndicationExchange {
+	/** The question's key (`c00`, `s03`), or `unload` for step 1's unload request (`unloadBody`). */
+	readonly key: string;
+	/** The exact bytes sent, as `json.dumps` wrote them — ASCII, so the string is its own UTF-8. */
+	readonly body: string;
+	/** The response body as it arrived, before any reading; '' when no answer arrived. */
+	readonly response: string;
+	readonly requestedAt: string;
+	readonly respondedAt: string;
+	/** The identity the review's requests were held to: the model, its served digest, the server's version. */
+	readonly served: { readonly model: string; readonly digest: string; readonly serverVersion: string };
+	/** The other models the server held when the request was sent (`/api/ps`), as step 1 recorded them. */
+	readonly otherModels: readonly string[];
+	/** Its score; step 1's unload request, whose answer is not read; or why there is no score, and how far its reading went. */
+	readonly outcome:
+		| { readonly kind: 'SCORED'; readonly score: number }
+		| { readonly kind: 'UNLOAD' }
+		| { readonly kind: 'FAILED'; readonly reason: string; readonly parse: ExchangeParseOutcome['outcome'] };
+}
 
 /**
  * ⭐ THE INDICATIONS SOURCE — the seam the decision model stands behind, beside `print`: asked ONCE a review, with every
  * request, before the first reviewer call; a repair or a retry reuses the first prompt and never asks again. ⚠ Package Z1
  * builds the seam and its test doubles only: no source is wired in production, so a production review is refused here until
  * package Z2's client and committed records land with it (the build brief's integration note).
+ * ⭐⭐ Package Z2a — D51 — `material` is what every request of the review carries in its state: the prompt before the review
+ * section, less its first four lines (`materialOf`), the bytes a source writes into each body (`decisionModelBody`).
  */
-export type IndicationsSource = (requests: readonly IndicationRequest[]) => Promise<IndicationsResult>;
+export type IndicationsSource = (requests: readonly IndicationRequest[], material: string) => Promise<IndicationsResult>;
+
+/** ⭐ Z2a — D51 — what a decision-model request owes, said on its record: no work product, and why nothing is missing. */
+const INDICATION_DERIVATION =
+	'This try is one question a decision model was asked before a Reasoning Review (D51): its answer is a probability the ' +
+	'review’s prompt quotes as a potential indication, not a deliverable. Nothing was derived from it as a work product and ' +
+	'nothing is missing.';
+
+/** ⭐ Z2a — D51 — what the client saw of a request beyond its answer: no tool surface, and the other models the server held. */
+function indicationObservation(others: readonly string[]): string {
+	const held =
+		others.length === 0
+			? 'the server held no other model'
+			: `the server held ${others.length} other model(s): ${others.slice(0, 8).join(', ')}`;
+	return (
+		'The decision model’s endpoint (POST /v1/systemone) offers no tools, and its client sees only the answer it returns: this ' +
+		`record says nothing of any tool call. When this request was sent, ${held} (/api/ps), as step 1 recorded it (D51).`
+	);
+}
+
+/** ⭐ Z2a — D51 — E-5 of a decision-model request: its score read, step 1's unload request unread, or how far its reading went. */
+function indicationParseOutcome(e: IndicationExchange): ExchangeParseOutcome {
+	if (e.outcome.kind === 'SCORED') return { outcome: 'PARSED', detail: `answers.${e.key}.noul read: ${e.outcome.score}` };
+	if (e.outcome.kind === 'UNLOAD') return { outcome: 'NOT_ATTEMPTED', detail: 'Step 1’s unload request: its answer is not read (D51).' };
+	return { outcome: e.outcome.parse, detail: recordable(e.outcome.reason) };
+}
 
 /** The statement a review fails with when its validator was given no indications source. Host-authored and fixed. */
 export const NO_INDICATIONS_SOURCE_STATEMENT =
@@ -2022,9 +2084,11 @@ export async function reviewPrompt(
 	];
 	measuredPrompt(t, checks, statements, requests.map(() => 0), text);
 	if (indications === undefined) throw new Error(NO_INDICATIONS_SOURCE_STATEMENT);
+	// ⭐⭐ Package Z2a — D51 — what each request carries in its state: the head, less its first four lines.
+	const material = materialOf(t.head);
 	let result: IndicationsResult;
 	try {
-		result = await indications(requests);
+		result = await indications(requests, material);
 	} catch (e) {
 		throw new Error(indicationsRefusedStatement(e instanceof Error ? e.message : String(e)));
 	}
@@ -2476,9 +2540,73 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 			// repair reads it to tell "the repair got no reply" — after which the first judgement stands — from a refusal of
 			// who answered or a retention fault, which propagate as everywhere in this validator.
 			const noReply = new WeakSet<Error>();
+			/**
+			 * ⭐⭐ `JAN-EXEC` Phase 7, package Z2a — D51 (`REG-D-146`; design §12.3) — ONE DECISION-MODEL REQUEST, RECORDED AS A TRY OF ITS
+			 * OWN (PER-9, PER-11): `initial`, succeeding no try — a request is no retry of another, so `predecessor` is not read into
+			 * it — its identity the one the review's requests were held to (provider, model, and the digest and server version as
+			 * its version), its exact body the materialized input, the response as it arrived, the parse outcome, its times, and the
+			 * other models the server held. ⭑ Numbered in this run's attempts, before the reviewer's first try, which points at them.
+			 */
+			const captureIndication = (e: IndicationExchange) => {
+				tryCounter += 1;
+				return captureTry({
+					...(opts.artifacts ? { store: opts.artifacts } : {}),
+					...(opts.exchanges ? { sink: opts.exchanges } : {}),
+					tenantPrefix: opts.tenantPrefix ?? 'tnt-local',
+					exchangeId: `exch-${tryCounter}`,
+					role: 'initial',
+					model: {
+						modelId: e.served.model,
+						providerId: DECISION_MODEL_PROVIDER,
+						evidence: 'PROVIDER_REPORTED',
+						version: `${e.served.digest} on Ollama ${e.served.serverVersion}`
+					},
+					prompt: e.body,
+					rawOutput: e.response,
+					disposition: e.outcome.kind !== 'FAILED' ? 'accepted' : e.response === '' ? 'no-response' : 'rejected',
+					attemptOrdinal: tryCounter,
+					requestedAt: e.requestedAt,
+					respondedAt: e.respondedAt,
+					parseOutcome: indicationParseOutcome(e),
+					workProductDerivation: { relation: 'NO_WORK_PRODUCT_EXPECTED', reason: INDICATION_DERIVATION },
+					observedToolCalls: { observation: 'NOT_OBSERVABLE', reason: indicationObservation(e.otherModels) },
+					// ⭑ Every response that arrived is kept, as a reviewer's reply is; a request that got none has none to keep.
+					...(e.response === '' ? {} : ({ unseparatedRawOutput: 'RETAINED_FOR_DIAGNOSIS' } as const))
+				});
+			};
 			// ⭐⭐ Package Z1 — D50 — the measured prompt, its indications asked of the decision model ONCE, here, before any reviewer
 			// call: every repair and retry below reuses it. ⛔ A refusal here leaves no reviewer call made.
-			const prompt = await reviewPrompt(input, opts.indications);
+			// ⭐⭐ Package Z2a — D51 (`REG-D-146`; D43's durable record) — AND EVERY REQUEST THE DECISION MODEL'S CLIENT MADE FOR IT IS A
+			// TRY OF ITS OWN, recorded here before any reviewer call — answered or not, the review sent or refused — in the same store
+			// and sink as the reviewer's tries, so the floor's drain records it as theirs are recorded (`REG-F-336`: store, sink and
+			// consumer together). ⛔ Never a reviewer call: its provider says whose it is (`isDecisionModelExchange`).
+			let requested: readonly IndicationExchange[] = [];
+			const source = opts.indications;
+			const asked: IndicationsSource | undefined =
+				source === undefined
+					? undefined
+					: async (requests, material) => {
+							const result = await source(requests, material);
+							requested = result.exchanges ?? [];
+							return result;
+						};
+			let prompt: string;
+			try {
+				prompt = await reviewPrompt(input, asked);
+			} finally {
+				for (const e of requested) await captureIndication(e);
+			}
+			// ⭐ Z2a — the review's first reviewer exchange points at the set: the attempts of this run that the requests were.
+			let pointer =
+				requested.length === 0
+					? ''
+					: ` ⭑ Its prompt quotes the decision model’s potential indications: ${requested.length} request(s) made before it in ` +
+						`this run, each recorded as an exchange of its own, attempts ${tryCounter - requested.length + 1} to ${tryCounter} (D51).`;
+			const pointsAtTheSet = (): string => {
+				const once = pointer;
+				pointer = '';
+				return once;
+			};
 			// ICP-02 d2b — PER-9-a: "each retry, reformat, and repair request included" is its OWN record.
 			// `firstRaw` is a CONST on purpose: the previous `raw = await print(...)` destroyed the first try's
 			// answer on the repair path, which is finding #25. CSAA-007 states the rule this now enforces
@@ -2547,7 +2675,9 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 							'This try is a Reasoning Review — an ASSURANCE act whose answer is a judgement about ' +
 							'somebody else’s work, not a deliverable. Nothing was derived from the answer span and ' +
 							'nothing is missing; the assessment this call produced is recorded as an ' +
-							'ASSURANCE_ASSESSMENT, not as an ARTIFACT.'
+							'ASSURANCE_ASSESSMENT, not as an ARTIFACT.' +
+							// ⭐ Z2a — D51: on the review's first reviewer try alone, where its decision-model requests are.
+							pointsAtTheSet()
 					},
 					observedToolCalls: governedToolCallReport(reported.observation),
 					// ⭐⭐ P7-6 I2 (`DESIGN-the-reviewer-isolated.md` §2; `REG-F-351`; `REG-D-103` (2)) — EVERY REPLY THIS REVIEWER

@@ -8,6 +8,7 @@ import {
 	wiredReviewer
 } from './lane-config';
 import { outputLimitOf } from '../src/lib/server/tools/output-limit';
+import { isDecisionModelExchange } from '../src/lib/server/assurance/decision-model-request';
 
 // JAN-LIVEEXEC — a work unit runs on a REAL model and is reviewed by a REAL, DIFFERENT one.
 //
@@ -188,7 +189,9 @@ test.describe('LIVE — a work unit is executed by a real model and reviewed by 
 
 		const exchanges = snap.modelExchanges.map((r) => r.state as Record<string, unknown>);
 		const execution = exchanges.filter((e) => e.plane === 'EXECUTION');
-		const assurance = exchanges.filter((e) => e.plane === 'ASSURANCE');
+		// ⭐⭐ `JAN-EXEC` Phase 7, package Z2a — D51 (`REG-D-146`) — the reviewer's calls alone: a review's decision-model requests are
+		// ASSURANCE exchanges of their own, never reviewer calls, known by their identity (`isDecisionModelExchange`).
+		const assurance = exchanges.filter((e) => e.plane === 'ASSURANCE' && !isDecisionModelExchange(e));
 		expect(execution.length, 'no model was invoked for the step').toBeGreaterThanOrEqual(1);
 		expect(assurance.length, 'no model reviewed the work product').toBeGreaterThanOrEqual(1);
 

@@ -41,9 +41,9 @@ export function recordingIndications(inner: IndicationsSource = TEST_INDICATIONS
 	const calls: (readonly IndicationRequest[])[] = [];
 	return {
 		calls,
-		source: async (requests) => {
+		source: async (requests, material) => {
 			calls.push(requests);
-			return inner(requests);
+			return inner(requests, material);
 		}
 	};
 }

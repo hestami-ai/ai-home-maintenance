@@ -60,6 +60,8 @@ import {
 } from '../../apps/rph-demo/src/lib/server/replay/recording.js';
 // ⭐ P5 package A (F1) — the one reading of a reply the tool cut at the model's output-token limit. Pure.
 import { outputLimitOf } from '../../apps/rph-demo/src/lib/server/tools/output-limit.js';
+// ⭐⭐ Package Z2a — D51 — the decision model's requests, known by their identity. ⚠ A pure module.
+import { isDecisionModelExchange } from '../../apps/rph-demo/src/lib/server/assurance/decision-model-request.js';
 import { workspaceTreeSha256 } from './node-tests.js';
 import type { StoredObject, StoreRows } from './run-report-core.js';
 
@@ -590,6 +592,9 @@ function reviewerBound(rows: readonly StoredObject[], agent: string): number | n
 export function recordsAsReviewerCall(row: StoredObject): boolean {
 	// ⭐ The review in parts, B3 (`REG-D-125`): the authoring floor now reviews each type of the PWA as a part, under the type.
 	if (row.state.subjectObjectType === AUTHORING_FLOOR_PART_SUBJECT) return false;
+	// ⭐⭐ `JAN-EXEC` Phase 7, package Z2a — D51 (`REG-D-146`) — nor is a review's decision-model request a reviewer call: an ASSURANCE
+	// exchange of its own, known by its identity. ⚠ What a replay serves for it is package Z2b's (Z1's departure 10).
+	if (isDecisionModelExchange(row.state)) return false;
 	return row.state.plane === 'ASSURANCE' && row.state.subjectObjectType !== AUTHORING_FLOOR_SUBJECT;
 }
 
@@ -630,7 +635,7 @@ export function buildRecording(i: RecorderInput): RecorderOutput {
 	const assuranceRows = exchanges.filter(recordsAsReviewerCall);
 	// ⭐ `REG-D-112` (c) — counted, so the recorder can say what it left out and why.
 	const authoringCallsLeftOut = exchanges.filter(
-		(e) => e.state.plane === 'ASSURANCE' && !recordsAsReviewerCall(e)
+		(e) => e.state.plane === 'ASSURANCE' && !recordsAsReviewerCall(e) && !isDecisionModelExchange(e.state)
 	).length;
 
 	const tried = executionRows.map((row, n) => executorTryOf(row, n, x));

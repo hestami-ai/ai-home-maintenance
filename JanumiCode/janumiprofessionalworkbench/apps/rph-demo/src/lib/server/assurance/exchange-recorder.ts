@@ -150,19 +150,23 @@ function identityFacts(id: ResolvedModelIdentity) {
 				evidence: id.evidence ?? ('HOST_CONFIGURED' as const),
 				value: id.modelId
 			},
-			resolvedModelVersion: {
-				availability: 'UNREPORTED' as const,
-				evidence: 'NONE' as const,
-				// ⚠ THE RATIONALE IS NOW TOOL-NEUTRAL, AND THAT IS A CORRECTION RATHER THAN A TIDY-UP. It read
-				// "agy --print reports no model version", which is FALSE about Pi and Devin — a record that
-				// explains an absence by naming a tool that was not used states something untrue.
-				// ⭑ The absence itself still holds for all three: they report a model LABEL (`gpt-5.4-mini`,
-				// `glm-5-2`), and a label is not a version. Writing one into the version field is the
-				// substitution `PER-9` forbids, so the arm stays UNREPORTED.
-				rationale:
-					'No backing tool this host drives reports a resolved model VERSION: each returns a model label, ' +
-					'and a label is not a version.'
-			}
+			// ⭐⭐ `JAN-EXEC` Phase 7, package Z2a — D51 — EXCEPT WHERE A VERSION WAS OBTAINED: the decision model's served digest and
+			// its server's version, read from the server itself before the review's first request (`ResolvedModelIdentity.version`).
+			resolvedModelVersion: id.version
+				? { availability: 'REPORTED' as const, evidence: id.evidence ?? ('HOST_CONFIGURED' as const), value: id.version }
+				: {
+						availability: 'UNREPORTED' as const,
+						evidence: 'NONE' as const,
+						// ⚠ THE RATIONALE IS NOW TOOL-NEUTRAL, AND THAT IS A CORRECTION RATHER THAN A TIDY-UP. It read
+						// "agy --print reports no model version", which is FALSE about Pi and Devin — a record that
+						// explains an absence by naming a tool that was not used states something untrue.
+						// ⭑ The absence itself still holds for all three: they report a model LABEL (`gpt-5.4-mini`,
+						// `glm-5-2`), and a label is not a version. Writing one into the version field is the
+						// substitution `PER-9` forbids, so the arm stays UNREPORTED.
+						rationale:
+							'No backing tool this host drives reports a resolved model VERSION: each returns a model label, ' +
+							'and a label is not a version.'
+					}
 		};
 	const arm = {
 		availability: id.kind === 'unreported' ? ('UNREPORTED' as const) : ('UNRESOLVABLE' as const),

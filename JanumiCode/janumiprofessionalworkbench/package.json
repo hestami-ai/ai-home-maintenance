@@ -27,6 +27,8 @@
 		"gate:fast": "bun run slices:ledger:check && bun run guards:export:check && bun run gen:check && bun run tracker:build && bun run check-types && bun run lint && bun run boundary && bun run build && bun run test && bun run test:coverage && bun run coverage:floor:check && cd apps/rph-demo && bun run check && cd ../.. && bun run gate:tail",
 		"gate:tail": "bun run scripts/gate-tail.ts",
 		"reviewer:qual:check": "bun --conditions=source scripts/reviewer-qual/check.ts",
+		"reviewer:qual:decision-model-records": "bun --conditions=source scripts/reviewer-qual/decision-model-records.ts",
+		"reviewer:qual:decision-model-live-check": "bun --conditions=source scripts/reviewer-qual/decision-model-live-check.ts",
 		"spec:obligations": "bun run scripts/spec-obligations.ts",
 		"tracker:build": "bun run scripts/tracker/build.ts",
 		"tracker:check": "bun run scripts/tracker/check.ts",

@@ -73,6 +73,12 @@ export type ResolvedModelIdentity =
 			 *  is the fabricated-measurement defect. Optional, defaulting to the weaker grade, because every
 			 *  existing caller IS host-configured and silently promoting them would be that same defect. */
 			readonly evidence?: 'PROVIDER_REPORTED' | 'HOST_CONFIGURED';
+			/**
+			 * ⭐⭐ `JAN-EXEC` Phase 7, package Z2a — D51 — THE VERSION ACTUALLY INVOKED, where one was obtained: the decision model's
+			 * served digest and its server's version (`<digest> on Ollama <version>`), read from the server before the review's first
+			 * request. Absent for every backing tool, none of which reports one (`identityFacts`).
+			 */
+			readonly version?: string;
 	  }
 	| { readonly kind: 'unreported'; readonly rationale: string }
 	| { readonly kind: 'unresolvable'; readonly rationale: string };
@@ -224,6 +230,8 @@ export type ModelInput =
 			readonly modelId: string;
 			readonly providerId: string;
 			readonly evidence?: 'PROVIDER_REPORTED' | 'HOST_CONFIGURED';
+			/** ⭐ Z2a — D51 — the version actually invoked, where one was obtained (`ResolvedModelIdentity`). */
+			readonly version?: string;
 	  }
 	| { readonly unavailable: 'unreported' | 'unresolvable'; readonly rationale: string };
 
@@ -278,7 +286,8 @@ function toIdentity(model: ModelInput): ResolvedModelIdentity {
 				kind: 'resolved',
 				modelId: model.modelId,
 				providerId: model.providerId,
-				...(model.evidence ? { evidence: model.evidence } : {})
+				...(model.evidence ? { evidence: model.evidence } : {}),
+				...(model.version ? { version: model.version } : {})
 			};
 }
 

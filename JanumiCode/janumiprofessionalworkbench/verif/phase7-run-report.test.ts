@@ -165,6 +165,11 @@ interface Call {
 	 * the tool cut at the model's output-token limit (`outputLimitOf`). Absent, the record carries none, as before.
 	 */
 	readonly outputTruncation?: string;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package Z2a — D51 — the provider the exchange was answered by, as its record names it: `ollama` for a
+	 * decision model's request (`isDecisionModelExchange`). Absent, the record names none, as before.
+	 */
+	readonly provider?: string;
 }
 interface PhaseKnobs {
 	/** Begin & Execute was pressed. Default true. */
@@ -319,6 +324,7 @@ function aRun(
 				disposition: c.disposition,
 				parseOutcome: { outcome: c.parse ?? 'PARSED', detail: c.detail ?? '' },
 				...(c.outputTruncation === undefined ? {} : { outputTruncation: c.outputTruncation }),
+				...(c.provider === undefined ? {} : { resolvedProvider: { availability: 'REPORTED', evidence: 'PROVIDER_REPORTED', value: c.provider } }),
 				...refs(`mex_${subject}_${i}`, c.disposition)
 			})
 		);
@@ -1797,6 +1803,27 @@ describe('JAN-EXEC P7-2 D9 — the reviewer calls, a lower bound, and the paid l
 		).report.reviewerCalls;
 		expect([calls.recorded, calls.noResponse, calls.retries, calls.repairs, calls.lowerBound]).toEqual([5, 1, 1, 0, true]);
 		expect(calls.byUnit.design).toEqual({ recorded: 2, noResponse: 1, retries: 1, repairs: 0 });
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package Z2a — D51 (`REG-D-146`; design §12.3): *"The report keeps these local requests beside the
+	// reviewer calls; it never counts them as reviewer calls."* Nor are they the review's calls its assessment is paired with.
+	it('⛔ Z2a (D51) — a decision model’s requests are counted beside the reviewer calls, never among them, and paired with no review', () => {
+		const ollama = (ordinal: number): Call => ({ role: 'INITIAL', disposition: 'ACCEPTED', ordinal, provider: 'ollama' });
+		const run = aRun({ design: { review: [ollama(1), ollama(2), { role: 'INITIAL', disposition: 'ACCEPTED', ordinal: 3 }] } });
+		const { report } = reportOf(run);
+		expect([report.reviewerCalls.recorded, report.reviewerCalls.byUnit.design!.recorded], 'the paid count').toEqual([4, 1]);
+		expect(report.reviewerCalls.decisionModelRequests, 'beside it').toBe(2);
+		expect(report.reviewerCalls.limit.recorded).toBe(4);
+		expect(
+			report.pairing.rows.filter((p) => p.unit === 'design').map((p) => p.calls.length),
+			'the review is paired with its reviewer call alone'
+		).toEqual([1]);
+		const control = reportOf(aRun({})).report.reviewerCalls;
+		expect([control.recorded, control.decisionModelRequests], 'CONTROL: a run with none').toEqual([4, 0]);
+		expect(renderMarkdown(report), 'report.md says so beside the count').toContain(
+			'- **Decision-model requests (D51):** 2 — the decision model’s, beside the reviewer calls and never among them.'
+		);
+		expect(renderMarkdown(reportOf(aRun({})).report), 'CONTROL: no line for a run with none').not.toContain('Decision-model requests');
 	});
 
 	// ⭐ P7-6R — the limit is 200 since `REG-D-105` (1), which amends `REG-D-102` (4)'s 150.

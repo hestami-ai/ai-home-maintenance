@@ -59,6 +59,8 @@ import { homedir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { backup, DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
+// ⭐⭐ Package Z2a — D51 — the decision model's requests, known by their identity. ⚠ A pure module.
+import { isDecisionModelExchange } from '../../apps/rph-demo/src/lib/server/assurance/decision-model-request.js';
 import { K5_JOIN_CAUSE, K5_OWN_FOLDER_CAUSE, K5_STOP_CAUSE, k5CapCause } from './k5-causes.js';
 import { workspaceTreeSha256 } from './node-tests.js';
 import {
@@ -463,6 +465,12 @@ export interface ReviewerCalls {
 	/** Those reviewing this unit's work product or its commands; null for the final archive. */
 	readonly unit: CallCount | null;
 	readonly lowerBound: string;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package Z2a — D51 (`REG-D-146`; design §12.3) — THE DECISION MODEL'S REQUESTS THE STORE RECORDS, beside
+	 * the reviewer calls and never among them: each an ASSURANCE exchange of its own, known by its identity
+	 * (`isDecisionModelExchange`). Free and local — no reviewer call, so nothing the paid limit counts.
+	 */
+	readonly decisionModelRequests: number;
 }
 
 const countOf = (rows: readonly SnapshotRow[]): CallCount => ({
@@ -484,15 +492,19 @@ function unitOfReviewSubject(snap: ArchiveSnapshot, exchange: SnapshotRow): stri
 /** ⭐ D8 — the reviewer calls the store records, every one and this unit's. */
 export function reviewerCalls(snap: ArchiveSnapshot, unitId: string | null): ReviewerCalls {
 	const assurance = snap.modelExchanges.filter((x) => str(x.state.plane) === 'ASSURANCE');
+	// ⭐⭐ Package Z2a — D51 — the decision model's requests are ASSURANCE exchanges too, and never a reviewer call: known by their
+	// identity, counted beside.
+	const calls = assurance.filter((x) => !isDecisionModelExchange(x.state));
 	return {
-		recorded: countOf(assurance),
+		recorded: countOf(calls),
 		unit:
 			unitId === null
 				? null
-				: countOf(assurance.filter((x) => unitOfReviewSubject(snap, x) === unitId)),
+				: countOf(calls.filter((x) => unitOfReviewSubject(snap, x) === unitId)),
 		lowerBound:
 			'A lower bound: a call whose capture faulted, a record the engine refused, or a floor run cut off ' +
-			'before its records were drained leaves no exchange, and the negative control’s calls are in no store.'
+			'before its records were drained leaves no exchange, and the negative control’s calls are in no store.',
+		decisionModelRequests: assurance.length - calls.length
 	};
 }
 

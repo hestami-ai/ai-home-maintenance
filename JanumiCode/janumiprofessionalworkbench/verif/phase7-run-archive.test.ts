@@ -500,6 +500,25 @@ describe('⭐ D7, D8 — the reviewer calls the store records: every one, a LOWE
 		expect(reviewerCalls(snap, 'pwu_1').unit).toEqual({ calls: 3, noResponse: 1, retry: 1 });
 		expect(reviewerCalls(snap, 'pwu_2').unit).toEqual({ calls: 1, noResponse: 0, retry: 0 });
 	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package Z2a — D51 (`REG-D-146`; design §12.3): *"The report keeps these local requests beside the
+	// reviewer calls; it never counts them as reviewer calls."* Each decision-model request is an ASSURANCE exchange of its own,
+	// known by its identity — the provider it was answered by (`isDecisionModelExchange`) — and never a paid call.
+	it('⛔ Z2a (D51) — a decision model’s request is no reviewer call: known by its identity, counted beside the paid count', () => {
+		const ollama = { availability: 'REPORTED', evidence: 'PROVIDER_REPORTED', value: 'ollama' };
+		const withRequests = snapshotOf({
+			...snap,
+			modelExchanges: [
+				row('d1', { plane: 'ASSURANCE', subjectObjectId: 'art_1', exchangeRole: 'INITIAL', disposition: 'ACCEPTED', resolvedProvider: ollama }),
+				row('d2', { plane: 'ASSURANCE', subjectObjectId: 'art_1', exchangeRole: 'INITIAL', disposition: 'NO_RESPONSE', resolvedProvider: ollama }),
+				...snap.modelExchanges
+			]
+		});
+		expect(reviewerCalls(withRequests, null).recorded, 'the paid count is the reviewer’s alone').toEqual({ calls: 4, noResponse: 1, retry: 1 });
+		expect(reviewerCalls(withRequests, 'pwu_1').unit).toEqual({ calls: 3, noResponse: 1, retry: 1 });
+		expect(reviewerCalls(withRequests, null).decisionModelRequests, 'beside it').toBe(2);
+		expect(reviewerCalls(snap, null).decisionModelRequests, 'CONTROL: a run with none counts none').toBe(0);
+	});
 });
 
 describe('⭐ D7 — the hashes: per file and per folder for src/, test/, docs/, and the tree as the manifest takes it', () => {

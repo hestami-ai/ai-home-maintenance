@@ -51,6 +51,8 @@ import {
 // ⭐ P5 package A (F1) — the one reading of a reply the tool ended at the model's output-token limit, from a stored
 // record. Pure: it loads no reviewer.
 import { outputLimitOf } from '../../apps/rph-demo/src/lib/server/tools/output-limit.js';
+// ⭐⭐ Package Z2a — D51 — the decision model's requests, known by their identity. ⚠ A pure module.
+import { isDecisionModelExchange } from '../../apps/rph-demo/src/lib/server/assurance/decision-model-request.js';
 import { scanText } from './archive-scan.js';
 // ⭐ P5 package B (F5) — the causes the archive's K5 check names, in the words it writes them (`run-archive.ts`).
 import { K5_JOIN_CAUSE, K5_STOP_CAUSE } from './k5-causes.js';
@@ -783,6 +785,11 @@ export interface ReviewerCallCount {
 
 export interface ReviewerCalls extends ReviewerCallCount {
 	readonly lowerBound: true;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package Z2a — D51 (`REG-D-146`; design §12.3) — the decision model's requests the record holds, beside
+	 * the reviewer calls and never among them (`isDecisionModelExchange`): free and local, nothing the paid limit counts.
+	 */
+	readonly decisionModelRequests: number;
 	readonly byUnit: Readonly<Record<string, ReviewerCallCount>>;
 	/**
 	 * Design D8's check, restated over the record: prior + recorded + reserve~~, under the limit~~ ⭐ against the limit (R3-B's
@@ -2127,7 +2134,8 @@ function buildPairing(ix: Index, units: readonly Unit[]): PairingReport {
 	const reviews = assessments.filter((a) => str(a.state.assurancePolicyId) === REASONING_REVIEW);
 	const exchangesOf = new Map<string, StoredObject[]>();
 	for (const x of ix.ofType('MODEL_EXCHANGE'))
-		if (str(x.state.plane) === 'ASSURANCE' && str(x.state.assurancePolicyId) === REASONING_REVIEW)
+		// ⭐⭐ Package Z2a — D51 — a review's decision-model requests are none of its calls: known by their identity.
+		if (str(x.state.plane) === 'ASSURANCE' && str(x.state.assurancePolicyId) === REASONING_REVIEW && !isDecisionModelExchange(x.state))
 			append(exchangesOf, str(x.state.subjectObjectId), x);
 	const reviewsOf = new Map<string, StoredObject[]>();
 	for (const r of reviews) append(reviewsOf, strs(r.state.subjectObjectIds)[0] ?? '', r);
@@ -2204,7 +2212,10 @@ function runLimitOf(checks: readonly LaneLimitCheck[], problems: string[]): numb
 }
 
 function buildReviewerCalls(ix: Index, units: readonly Unit[], lane: LaneRows, problems: string[]): ReviewerCalls {
-	const calls = ix.ofType('MODEL_EXCHANGE').filter((x) => str(x.state.plane) === 'ASSURANCE');
+	const assurance = ix.ofType('MODEL_EXCHANGE').filter((x) => str(x.state.plane) === 'ASSURANCE');
+	// ⭐⭐ Package Z2a — D51 (`REG-D-146`; design §12.3): *"The report keeps these local requests beside the reviewer calls; it never
+	// counts them as reviewer calls."* Each is an ASSURANCE exchange of its own, known by its identity.
+	const calls = assurance.filter((x) => !isDecisionModelExchange(x.state));
 	const byUnit: Record<string, ReviewerCallCount> = {};
 	for (const slug of [...units.map((u) => u.slug), 'unattributed'])
 		byUnit[slug] = countCalls(
@@ -2228,6 +2239,8 @@ function buildReviewerCalls(ix: Index, units: readonly Unit[], lane: LaneRows, p
 			// ⭐ Package O's check, finding 4 — and no standing against a limit the record does not state.
 			under: total === null || limit === null ? null : total < limit
 		},
+		// ⭐⭐ Package Z2a — D51 — beside the reviewer calls, never among them.
+		decisionModelRequests: assurance.length - calls.length,
 		laneLimitChecks,
 		// ⭐⭐ Package L2's check, finding 1 — ~~`LIMIT_CAVEAT`~~ the caveat of this run, by its Send check ⭐ and, package O (D27), by its
 		// own checks and the limit they used: a run recorded before package L reads its own lane's caveat.
@@ -4761,6 +4774,13 @@ function unitLines(r: RunReport): string[] {
 		'',
 		`- **Recorded:** ${r.reviewerCalls.recorded} (${r.reviewerCalls.noResponse} with no response, ` +
 			`${r.reviewerCalls.retries} retries, ${r.reviewerCalls.repairs} repairs).`,
+		// ⭐⭐ Package Z2a — D51 — and beside them, the decision model's requests, where the record holds any.
+		...(r.reviewerCalls.decisionModelRequests > 0
+			? [
+					`- **Decision-model requests (D51):** ${r.reviewerCalls.decisionModelRequests} — the decision model’s, beside the ` +
+						'reviewer calls and never among them.'
+				]
+			: []),
 		`- **The limit (design D8):** ${limit.prior ?? 'prior spend not given'} + ${limit.recorded} + ${limit.reserve} = ` +
 			`${limit.total ?? '?'}${against}.`,
 		// ⭐ E12's polish (fix2's F8; the lead's delegated decision of 2026-10-15, to be registered) — and the lane's own reads.
