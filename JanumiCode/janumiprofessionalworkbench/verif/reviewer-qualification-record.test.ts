@@ -275,6 +275,21 @@ describe('JAN-CRITREAD J2-2 — the reviewer-qualification record', () => {
 		expect(lineProblems(noFinding).join('\n')).toContain('ESCALATION: missing key "finding"');
 	});
 
+	// ⭐⭐ `JAN-EXEC` Phase 7, package Z2b — D54 and D49 (`REG-D-146`; design §12.6: *"Record the scoring identity beside the candidate
+	// without breaking recorded lines"*) — a RUN line names the decision model whose recorded scores its prompts were built from:
+	// `decisionModel`, beside `candidate`, closed like every key; a line written before Z2b, with none, stays valid.
+	it('⭐ Z2b (D54) — the RUN line’s scoring identity: `decisionModel` beside the candidate, closed; a line without it stays valid', () => {
+		const identity = { model: 'pplx-decider:27b-q4_K_M', digest: `733585a9ebb6${'0'.repeat(52)}`, serverVersion: '0.40.15' };
+		expect(lineProblems({ ...RUN, decisionModel: identity }), 'the new form').toEqual([]);
+		expect(lineProblems(RUN), 'a line recorded before Z2b').toEqual([]);
+		expect(lineProblems({ ...RUN, decisionModel: { ...identity, scores: [0.5] } }).join('\n')).toContain(
+			'RUN.decisionModel: unexpected key "scores"'
+		);
+		expect(lineProblems({ ...RUN, decisionModel: { ...identity, digest: 'abc' } }).join('\n')).toContain('RUN.decisionModel.digest:');
+		const { serverVersion: _v, ...noVersion } = identity;
+		expect(lineProblems({ ...RUN, decisionModel: noVersion }).join('\n')).toContain('RUN.decisionModel: missing key "serverVersion"');
+	});
+
 	it('⛔ THE KEYS ARE CLOSED BY OWN PROPERTY — a name every object inherits (constructor, toString, __proto__ …) is refused like any other, at the top and nested', () => {
 		// ⚠ Each arrangement goes through JSON.parse, as a record line arrives: in JSON text `__proto__` is an OWN key,
 		// never the prototype, so it is exactly as able to carry text into a line as `constructor` is.

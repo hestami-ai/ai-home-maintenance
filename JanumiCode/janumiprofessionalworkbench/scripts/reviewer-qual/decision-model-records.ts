@@ -10,11 +10,17 @@
 //   · first, `IDENTITY`: the model, its served digest and the server's version, once a file;
 //   · then one `CASE` or `PROBE` line an entry: its id, then per question its key, kind, the sha256 of its exact body and its
 //     full score as returned (JSON round-trip exact) — the lookup the static source of package Z2b makes, by body;
+//     ⭐⭐ (Z2b phase 1b — D54 restated, `REG-D-146`; ~~to be filed in d48 as~~ filed in d48 as `REG-F-611`) and, for a review whose request the server
+//     refused with HTTP 413 (a body past its 64 KiB limit), the refused request as returned (`refusedRequest`): its key, kind,
+//     body sha256, the status and the server's answer as it arrived, after the questions answered before it — at most one, since
+//     the client stops a review at its first refusal. The run goes on. ⛔ Every other refusal still stops it;
 //   · and, for step 1's two controls (`W12-CSV-RR-08`, `W12-CSV-CLEAN`), a `CONTROL` line: every question asked again, which
 //     must equal the first exactly.
 // ⛔ ITS STOPS — THE MEASURED CONDITION (`REG-F-608`): another model loaded, before the first request or by any request's record;
 // the served digest or the server's version other than the file's, read before each entry and after the last; a review the
-// client refuses; a control repeat that differs. A stopped entry writes nothing: the file holds only whole entries.
+// client refuses ⭐ (Z2b phase 1b) for any reason but a request the server refused with HTTP 413; a control repeat that differs;
+// ⭐ a line of its own file whose refused request is malformed (`refusedRequestOf`). A stopped entry writes nothing: the file holds
+// only whole entries.
 // ⭑ IT RESUMES: an entry the file holds is not asked again. And before the first request it prints how many it will make, and
 // the time they take at 16.3 s a request (the later check's median on Ollama 0.40.15).
 //
@@ -27,6 +33,7 @@ import { fileURLToPath } from 'node:url';
 import type { ReasoningReviewInput } from '@janumipwb/rph-assurance';
 import {
 	createDecisionModelClient,
+	refusedRequestReason,
 	type DecisionModelBounds
 } from '../../apps/rph-demo/src/lib/server/assurance/decision-model-client.js';
 import {
@@ -35,6 +42,7 @@ import {
 	type IndicationRequest,
 	type IndicationsResult
 } from '../../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
+import { MALFORMED_REFUSED_REQUEST, refusedRequestOf, type RecordedRefusal } from './recorded-indications.js';
 
 /** One review whose questions are asked: a case of the set, or a probe of the fingerprint. */
 export interface RecordsEntry {
@@ -128,7 +136,10 @@ async function ask(
 	run: RecordsRun,
 	identity: RecordsIdentity,
 	entry: RecordsEntry
-): Promise<{ readonly questions: readonly RecordedQuestion[] } | { readonly refused: string }> {
+): Promise<
+	| { readonly questions: readonly RecordedQuestion[]; readonly refusedRequest?: RecordedRefusal }
+	| { readonly refused: string }
+> {
 	const client = createDecisionModelClient({
 		server: run.server,
 		model: run.model,
@@ -146,17 +157,37 @@ async function ask(
 	} catch (e) {
 		// ⭑ Refused before any request — the room, the material, the fence: the review the product would refuse, recorded so.
 		if (result === undefined) return { refused: e instanceof Error ? e.message : String(e) };
-		if ('refusal' in result) throw new Stopped(`STOPPED: ${entry.id}: the client refused its review: ${result.refusal}`);
-		throw e;
+		// ⭐ Z2b phase 1b — a request the server refused with HTTP 413 is recorded as returned (`refusedAt413`); every other refusal stops.
+		if ('refusal' in result && refusedAt413(result) === undefined)
+			throw new Stopped(`STOPPED: ${entry.id}: the client refused its review: ${result.refusal}`);
+		if (!('refusal' in result)) throw e;
 	}
 	const made = (result?.exchanges ?? []) as readonly IndicationExchange[];
 	const crowded = made.find((x) => x.otherModels.length > 0);
 	if (crowded) throw new Stopped(`STOPPED: ${entry.id}: another model was loaded when ${crowded.key} was sent (${crowded.otherModels.join(', ')})`);
+	const questions = made.flatMap((x): RecordedQuestion[] =>
+		x.outcome.kind === 'SCORED' ? [{ key: x.key, kind: kinds.get(x.key)!, bodySha256: sha256(x.body), score: x.outcome.score }] : []
+	);
+	const refused = result === undefined || !('refusal' in result) ? undefined : refusedAt413(result);
+	if (refused === undefined) return { questions };
 	return {
-		questions: made.flatMap((x): RecordedQuestion[] =>
-			x.outcome.kind === 'SCORED' ? [{ key: x.key, kind: kinds.get(x.key)!, bodySha256: sha256(x.body), score: x.outcome.score }] : []
-		)
+		questions,
+		refusedRequest: { key: refused.key, kind: kinds.get(refused.key)!, bodySha256: sha256(refused.body), status: 413, response: refused.response }
 	};
+}
+
+/**
+ * ⭐⭐ Z2b phase 1b — D54 restated — THE REQUEST A REVIEW WAS REFUSED AT, WHERE THE SERVER REFUSED IT WITH HTTP 413: the client's last
+ * exchange, its refusal exactly the client's own words for a 413 of that request and the answer it holds
+ * (`refusedRequestReason`) — or `undefined` for any other refusal: another status, a request cut or unreached, an unload refused, a
+ * score missing, an identity moved. ⭑ The words are compared whole, made by the client's formatter, so no other refusal reads as one.
+ * ⭑ A 413 whose answer is empty is a 413 too, recorded with its answer empty: its words are the client's for that answer.
+ */
+function refusedAt413(result: { readonly refusal: string; readonly exchanges?: readonly IndicationExchange[] }): IndicationExchange | undefined {
+	const last = result.exchanges?.at(-1);
+	if (last === undefined || last.key === 'unload' || last.outcome.kind !== 'FAILED') return undefined;
+	const words = refusedRequestReason(last.key, 413, last.response);
+	return last.outcome.reason === words && result.refusal === words ? last : undefined;
 }
 
 /** Whether two askings of one review are exactly equal: the same questions, the same bodies, the same scores. */
@@ -187,8 +218,10 @@ export async function makeRecords(run: RecordsRun): Promise<{ readonly made: num
 					`STOPPED: ${run.file} was made on ${head.model} ${String(head.digest).slice(0, 12)} on Ollama ${head.serverVersion}; the server serves ` +
 						`${identity.model} ${identity.digest.slice(0, 12)} on Ollama ${identity.serverVersion} (REG-F-608)`
 				);
-			for (const line of lines.slice(1)) {
-				const r = JSON.parse(line) as { kind: string; id: string; questions?: readonly RecordedQuestion[] };
+			for (const [n, line] of lines.slice(1).entries()) {
+				const r = JSON.parse(line) as { kind: string; id: string; questions?: readonly RecordedQuestion[]; refusedRequest?: unknown };
+				// ⭐ Z2b phase 1b — a refused request is admitted only in its form, as the static source admits it.
+				if (refusedRequestOf(r) === null) throw new Stopped(`STOPPED: ${run.file} line ${n + 2} ${MALFORMED_REFUSED_REQUEST}`);
 				if (r.kind === 'CONTROL') controlled.add(r.id);
 				else held.set(r.id, r.questions ?? []);
 			}
@@ -229,12 +262,20 @@ export async function makeRecords(run: RecordsRun): Promise<{ readonly made: num
 			let first = held.get(e.id);
 			if (wanted) {
 				const asked = await ask(run, identity, e);
-				const line = 'refused' in asked ? { kind: e.kind, id: e.id, questions: [], refused: asked.refused } : { kind: e.kind, id: e.id, questions: asked.questions };
+				// ⭐ Z2b phase 1b — the refused request, where the server refused one with HTTP 413, after the questions answered before it.
+				const line =
+					'refused' in asked
+						? { kind: e.kind, id: e.id, questions: [], refused: asked.refused }
+						: { kind: e.kind, id: e.id, questions: asked.questions, ...(asked.refusedRequest ? { refusedRequest: asked.refusedRequest } : {}) };
 				appendFileSync(run.file, `${JSON.stringify(line)}\n`, 'utf8');
 				first = line.questions;
 				made += 1;
-				requests += line.questions.length;
-				run.log(`${e.kind} ${e.id}: ${line.questions.length} question(s)${'refused' in line ? ' — refused before any request' : ''}`);
+				const refusedRequest = 'refusedRequest' in line ? line.refusedRequest : undefined;
+				requests += line.questions.length + (refusedRequest ? 1 : 0);
+				run.log(
+					`${e.kind} ${e.id}: ${line.questions.length} question(s)${'refused' in line ? ' — refused before any request' : ''}` +
+						(refusedRequest ? `, then request ${refusedRequest.key} refused by the server: HTTP ${refusedRequest.status}` : '')
+				);
 			}
 			if (repeat) {
 				const again = await ask(run, identity, e);

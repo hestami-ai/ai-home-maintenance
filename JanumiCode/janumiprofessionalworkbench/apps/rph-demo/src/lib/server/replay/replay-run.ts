@@ -39,11 +39,13 @@
 import { mkdirSync, mkdtempSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { decisionModelBody } from '../assurance/decision-model-request.js';
 import { REVIEWER_CALL_BOUND_MS, type IndicationsSource } from '../assurance/reasoning-review-validator.js';
 import { answerFromText, type ToolInvocationResult } from '../tools/backing-tool.js';
 import { OutputLimitReached } from '../tools/output-limit.js';
 import {
 	expandText,
+	indicationBodySha256,
 	instructionsSha256,
 	pwaContentDigest,
 	readRecording,
@@ -130,11 +132,14 @@ export interface ReplayRun extends ReplayCommandSource {
 	readonly reviewerPrint: (prompt: string) => Promise<ToolInvocationResult>;
 	/**
 	 * ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D50 (`REG-D-146`) — the decision model the replayed review's indications come from.
-	 * ⛔ A recording read from disk holds no decision-model scores — what a replay serves for them is not designed (design §12
+	 * ~~⛔ A recording read from disk holds no decision-model scores — what a replay serves for them is not designed (design §12
 	 * names none) — so it carries none, and a replayed review is refused before its first call; a double of the paid run may
-	 * carry one (`replay-regression.test.ts`). ⚠ Never the live configured model: a replay runs nothing.
+	 * carry one (`replay-regression.test.ts`).~~ ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z2b; Z1's departure 10): THE
+	 * RECORDING'S OWN — each request answered by the run's recorded request whose body it is, in the order the run made them
+	 * (`recording.indications`); a request with none refuses the replayed review before any reviewer call. A double of the paid
+	 * run may still stand in for it (`replay-regression.test.ts`). ⚠ Never the live configured model: a replay runs nothing.
 	 */
-	readonly indications?: IndicationsSource;
+	readonly indications: IndicationsSource;
 	/** ⭐ The validator's clock: virtual time, advanced by each replayed call's recorded elapsed time. */
 	readonly clock: () => string;
 	/** Mark the replay stale from an arm's own check (a tool's outcome that differs from the recording's). */
@@ -206,6 +211,8 @@ export function createReplayRun(
 	let root: string | undefined;
 	let virtualMs = REPLAY_EPOCH_MS;
 	const next = { executor: 0, commands: 0, reviewer: 0 };
+	/** ⭐ Z2b — the decision-model requests served: a cursor of its own, as `consumed()` counts the three arms' calls. */
+	let indicationsServed = 0;
 	let poisoned: ReplayRefusal | undefined;
 	/** ⭐ Whether the published PWA has been held to the recording's digest (`checkPublishedPwa`). */
 	let pwaChecked = false;
@@ -372,6 +379,40 @@ export function createReplayRun(
 							: '')
 				)
 			);
+		},
+
+		// ⭐⭐ `JAN-EXEC` Phase 7, package Z2b — D51's record (`REG-D-146`; package Z1's departure 10) — THE REPLAY'S DECISION MODEL:
+		// each request of a replayed review answered by the next recorded request, in the order the run made them, IF ITS BODY IS
+		// THE ONE RECORDED THERE — the body the product builds for it (`decisionModelBody`, the recorded model, the review's
+		// material), its strings scrubbed (`indicationBodySha256`). ⛔ Past the last recorded request, or another body in its place,
+		// the replayed review is refused before any reviewer call, and the replay is poisoned, as any arm's mismatch poisons it; a
+		// recorded request that got no score refuses it too, with the reason the run got none. Never by order alone (`REG-D-067`).
+		async indications(requests, material) {
+			const answered: Record<string, number> = {};
+			for (const request of requests) {
+				const what = `decision-model request ${indicationsServed + 1} (${request.key})`;
+				const already = afterPoison(what);
+				if (already) return { refusal: already.message };
+				const recorded = recording.indications[indicationsServed];
+				if (recorded === undefined) return { refusal: exhausted(what, recording.indications.length).message };
+				const actual = indicationBodySha256(decisionModelBody(recorded.model, material, request), scrub);
+				// ⭑ The body names its question's key (`questions`), so a body matched is a key matched: the body alone is compared.
+				if (actual !== recorded.bodySha256)
+					return {
+						refusal: poison(
+							new ReplayRefusal(
+								'REPLAY_STALE',
+								`${what}: its body hashes to ${actual}, and the recording holds ${recorded.bodySha256} in its place ` +
+									`(${recorded.key}). The decision model would be asked something other than what the recorded score answered.`
+							)
+						).message
+					};
+				indicationsServed += 1;
+				if (recorded.outcome.kind === 'FAILED')
+					return { refusal: `${what} got no score in the recorded run: ${recorded.outcome.reason}` };
+				answered[request.key] = recorded.outcome.score;
+			}
+			return { scores: answered };
 		},
 
 		nextCommand(argv) {

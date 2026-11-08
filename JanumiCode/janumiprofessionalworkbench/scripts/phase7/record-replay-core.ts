@@ -33,6 +33,7 @@ import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'n
 import { dirname, join } from 'node:path';
 import {
 	expandText,
+	indicationBodySha256,
 	instructionsOfSentPrompt,
 	instructionsSha256,
 	osFamilyOf,
@@ -50,6 +51,7 @@ import {
 	type RecordedCell,
 	type RecordedCommand,
 	type RecordedIdentity,
+	type RecordedIndication,
 	type RecordedReply,
 	type RecordedRole,
 	type RecordedToolOutcome,
@@ -61,7 +63,7 @@ import {
 // ⭐ P5 package A (F1) — the one reading of a reply the tool cut at the model's output-token limit. Pure.
 import { outputLimitOf } from '../../apps/rph-demo/src/lib/server/tools/output-limit.js';
 // ⭐⭐ Package Z2a — D51 — the decision model's requests, known by their identity. ⚠ A pure module.
-import { isDecisionModelExchange } from '../../apps/rph-demo/src/lib/server/assurance/decision-model-request.js';
+import { isDecisionModelExchange, unloadBody } from '../../apps/rph-demo/src/lib/server/assurance/decision-model-request.js';
 import { workspaceTreeSha256 } from './node-tests.js';
 import type { StoredObject, StoreRows } from './run-report-core.js';
 
@@ -580,6 +582,43 @@ function reviewerBound(rows: readonly StoredObject[], agent: string): number | n
 	return RECORDED_CALL_BOUND_MS[agent] ?? null;
 }
 
+/** ⭐ Z2b — the score a decision-model request's parse outcome records the validator reading (`indicationParseOutcome`). */
+const SCORE_READ = /^answers\.([^.\s]+)\.noul read: (\S+)$/;
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package Z2b — D51's record (`REG-D-146`; package Z1's departure 10) — ONE DECISION-MODEL REQUEST OF THE
+ * RUN, AS THE RECORDING KEEPS IT for the replay to serve its review from (`replay-run.ts`, `indications`): its question's key and
+ * model, read off its exact body; the body's hash with every string in it scrubbed (`indicationBodySha256`); and the score its
+ * parse outcome records the validator reading — the number JavaScript wrote, which reads back exactly — or, for a request that got
+ * none, that outcome's reason. ⭑ Step 1's unload request asks no question: undefined, left out. ⛔ A row whose body is no request,
+ * or whose score cannot be read, is a problem of the recording, named.
+ */
+function indicationOf(row: StoredObject, n: number, x: Extraction): RecordedIndication | undefined {
+	const where = `decision-model request ${n + 1} (${row.id})`;
+	const body = contentOf(row.state.materializedInputRef, x.input.content);
+	if (body === undefined) return void x.problems.push(`${where}: its body is not retained, so it cannot be keyed`);
+	let parsed: { readonly model?: unknown; readonly questions?: unknown };
+	try {
+		parsed = JSON.parse(body) as typeof parsed;
+	} catch {
+		return void x.problems.push(`${where}: its body is no decision-model request (D51), so it cannot be keyed`);
+	}
+	const model = parsed.model;
+	const keys = typeof parsed.questions === 'object' && parsed.questions !== null ? Object.keys(parsed.questions) : [];
+	if (typeof model !== 'string' || keys.length !== 1)
+		return void x.problems.push(`${where}: its body is no decision-model request (D51), so it cannot be keyed`);
+	if (body === unloadBody(model)) return undefined;
+	const key = keys[0]!;
+	const parse = rec(row.state.parseOutcome);
+	const bodySha256 = indicationBodySha256(body, x.scrub);
+	if (parse.outcome !== 'PARSED') return { key, model, bodySha256, outcome: { kind: 'FAILED', reason: str(parse.detail) } };
+	const read = SCORE_READ.exec(str(parse.detail));
+	const score = read === null ? Number.NaN : Number(read[2]);
+	if (read?.[1] !== key || !Number.isFinite(score) || score < 0 || score > 1)
+		return void x.problems.push(`${where}: its record names no score read for ${key}, so its review cannot be replayed`);
+	return { key, model, bodySha256, outcome: { kind: 'SCORED', score } };
+}
+
 /**
  * ⭐⭐ `REG-D-112` (c) — WHETHER AN EXCHANGE ROW IS ONE OF THE RECORDING'S REVIEWER CALLS: an ASSURANCE-plane call, ⛔ NOT THE
  * AUTHORING FLOOR's. The replay covers the execution half from the PUBLISHED PWA: it re-creates that PWA and never runs an
@@ -661,6 +700,12 @@ export function buildRecording(i: RecorderInput): RecorderOutput {
 	const reviewer = assuranceRows
 		.map((row, n) => reviewerCallOf(row, n, x, agent, tries))
 		.filter((c): c is ReviewerCall => c !== undefined);
+	// ⭐⭐ `JAN-EXEC` Phase 7, package Z2b — D51's record — and every decision-model request of the run's reviews, in the order the
+	// run made them: what a replay serves its reviews' indications from (`replay-run.ts`). Step 1's unload request is left out.
+	const indications = exchanges
+		.filter((e) => isDecisionModelExchange(e.state))
+		.map((row, n) => indicationOf(row, n, x))
+		.filter((i): i is RecordedIndication => i !== undefined);
 
 	const digest = pwaContentDigest(i.store.objects);
 	if (typeof digest !== 'string') x.problems.push(...digest);
@@ -694,7 +739,8 @@ export function buildRecording(i: RecorderInput): RecorderOutput {
 			},
 			executor,
 			commands,
-			reviewer
+			reviewer,
+			indications
 		},
 		problems: [],
 		pairs,

@@ -70,7 +70,8 @@
 //     view's token and the prompt's) and the end of each slice `P-OVERSIZE-ALL`'s prompt cuts (the instruction, the
 //     rationale, the narration and the prior findings, each holding the view's token and then the prompt's own); ⚠ BUT
 //     NOT IN EVERY CUT A PROBE TAKES — the cuts that stand on a cut's own arithmetic remove no plant:
-//     `W-OVERSIZE-EDGES`'s answer (the validator's chooser), and the stdout of `P-OVERSIZE-CONTENT`,
+//     `W-OVERSIZE-EDGES`'s answer (the validator's chooser) — ⭐ (Z2b phase 1b) and its successor `W-OVERSIZE-EDGES-SENT`'s,
+//     which the fingerprint test names in its place, past the server's limit — and the stdout of `P-OVERSIZE-CONTENT`,
 //     `P-OVERSIZE-SURROGATE`, `P-OVERSIZE-STREAMS` and `P-OVERSIZE-ALL`, both streams of `P-OVERSIZE-ROOM-EDGES` and
 //     all three slices of `P-OVERSIZE-AT-ITS-BUDGET` (the view's), each a residual named below. And astride two slices
 //     (`W-FENCES`'s instruction and answer, `T-OVERSIZE-FENCES`'s request and rationale, `P-OVERSIZE-FENCES`'s
@@ -596,6 +597,15 @@ const BRICK = '\u{1F9F1}';
 const CAPTURE_CAP = 65_536;
 /** `line` repeated, then cut to exactly `units` characters — ASCII here, so as many UTF-8 bytes. */
 const filled = (line: string, units: number): string => line.repeat(Math.ceil(units / line.length)).slice(0, units);
+/** `W-OVERSIZE-EDGES`'s instruction: EXACTLY `USER_INTENT_MAX` units, shown whole and undeclared — its successor's too. */
+const EDGES_INSTRUCTION = filled('Write the condition survey summary for the retaining wall, panel by panel. ', B.USER_INTENT_MAX);
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package Z2b phase 1b — D54 restated (`REG-D-146`; ~~to be filed in d48 as~~ filed in d48 as `REG-F-611`) — `W-OVERSIZE-EDGES`'s
+ * ANSWER UNDER THE SERVER'S LIMIT: `CONTENT_MAX` code points again, past the room, mostly ASCII — three astral characters
+ * opening it, so its kept HEAD's code points and UTF-16 units still differ, by three. ⭑ `W-OVERSIZE-EDGES`'s, every code point
+ * astral, keeps 8,777 of them, sent as 17,554 `\u` escapes: 113,057 bytes as sent, and the server refused it (HTTP 413).
+ */
+const EDGES_ANSWER_SENT = `${BRICK.repeat(3)}${filled('Panel surveyed; bulging within tolerance; weep holes clear. ', B.CONTENT_MAX - 3)}`;
 /** A verbose pytest stdout that filled the capture — what is kept of a 480 KB run. */
 const CAPTURED_STDOUT = filled('survey/checks/test_panels.py::test_bulge[panel-9] PASSED\n', CAPTURE_CAP);
 /**
@@ -750,6 +760,27 @@ const FENCE_UNREAD = {
  * a chooser that read the HEAD and the TAIL joined, and no token in either alone.
  */
 const UNSEEN = '\u200b'.repeat(B.CONTENT_MAX);
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package Z2b phase 1b — D54 restated (`REG-D-146`; ~~to be filed in d48 as~~ filed in d48 as `REG-F-611`) — `UNSEEN` AT A
+ * LENGTH THE SERVER ACCEPTS, for `P-OVERSIZE-FENCES-SENT`. `P-OVERSIZE-FENCES`'s two runs are each as long as the most content a
+ * review keeps, so its stdout's cut falls inside them whatever the room; and the zero-width spaces its review keeps, 15,496, go
+ * as `\u200b` escapes, six bytes each, which put its requests at 103,034 bytes as sent, past the server's 64 KiB. Its successor's
+ * runs are 1,024 each, with ASCII lines before the first (`FENCES_HEAD_FILLER`) and after the second (`FENCES_TAIL_FILLER`)
+ * placing each cut 512 into its run — the HEAD ending inside the first, the TAIL beginning inside the second — so the halves of
+ * the view's token stand astride the cut as they do in `P-OVERSIZE-FENCES`, and every other plant where it stands there.
+ * ⚠ CONSTANTS TUNED TO THE VIEW'S ROOM FOR STDOUT — 7,783 code points of HEAD and as many of TAIL today — as `TIED_ITEM` is
+ * to the account's labels: `verif/decision-model-refusals.test.ts` holds each cut inside its run with 256 to spare on each side,
+ * so a room moved further reddens it. Re-tune the two fillers by the room the stdout's cut declaration states.
+ */
+const UNSEEN_SENT = '\u200b'.repeat(1_024);
+/** ASCII lines of a passing suite, `units` long, the last ending with a line feed: a filler no chooser reads a candidate in. */
+const passingLines = (units: number): string => `${filled('survey/checks/test_panels.py::test_bulge PASSED\n', units - 1)}\n`;
+const FENCES_HEAD_FILLER = passingLines(7_238);
+const FENCES_TAIL_FILLER = passingLines(7_233);
+/** ⭐ Z2b phase 1b — `P-OVERSIZE-FENCES`'s stdout, every plant where it stands, its runs at `UNSEEN_SENT`'s length. */
+const FENCES_STDOUT_SENT =
+	`${FENCE_PLANTS.stdoutHead}\n${FENCES_HEAD_FILLER}${FENCE_UNREAD.firstHalf}${UNSEEN_SENT}${FENCE_UNREAD.removedMiddle}\n` +
+	`${UNSEEN_SENT}${FENCE_UNREAD.secondHalf}\n${FENCES_TAIL_FILLER}${FENCE_PLANTS.stdoutTail}\n${FENCE_UNREAD.firstHalf}`;
 /** The fence's form, `<<<UNTRUSTED-nn>>>` — how a candidate a probe prints is spelled, exactly. */
 const candidate = (n: number): string => `<<<UNTRUSTED-${String(n).padStart(2, '0')}>>>`;
 /** The first `count` candidates, a line each — what a stdout that prints them holds. */
@@ -1308,13 +1339,13 @@ const RERUN_MARKED_DELIVERABLE: Deliverable = {
  * T-ABSENT-FIELDS, ⭐ (D3a) T-DECLARED-POLICIES, T-APPLICABLE-POLICIES, T-SEEDED-LIBRARY, T-SUBJECT-REFUSED, T-OVERSIZE-ALL,
  * T-OVERSIZE-FENCES, T-OVERSIZE-LISTS, T-NO-FENCE, T-STAKES, T-ACCOUNT-BREAKS, ⭐ (package Z1b) T-ACCOUNT-BREAKS-A,
  * T-ACCOUNT-BREAKS-B, T-OVERSIZE-STATEMENTS-1, T-OVERSIZE-STATEMENTS-2; W-BARE, W-DECLARED-PRIOR, W-OVERSIZE-CONTENT,
- * W-OVERSIZE-ALL, W-OVERSIZE-EDGES, W-FENCES, W-OVERSIZE-LISTS, W-NO-FENCE, W-STAKES, W-ACCOUNT-BREAKS, ⭐ (package Z1b) W-ACCOUNT-BREAKS-A, W-ACCOUNT-BREAKS-B, W-OVERSIZE-STATEMENTS-1,
+ * W-OVERSIZE-ALL, W-OVERSIZE-EDGES, ⭐ (package Z2b phase 1b) W-OVERSIZE-EDGES-SENT, W-FENCES, W-OVERSIZE-LISTS, W-NO-FENCE, W-STAKES, W-ACCOUNT-BREAKS, ⭐ (package Z1b) W-ACCOUNT-BREAKS-A, W-ACCOUNT-BREAKS-B, W-OVERSIZE-STATEMENTS-1,
  * W-OVERSIZE-STATEMENTS-2, ⭐ (package N)
  * W-DELIVERABLE, W-OVERSIZE-DELIVERABLE, W-OVERSIZE-FILE-LIST, ⭐ (package O-2) W-RERUN-DELIVERABLE, W-RERUN-NO-FILE, ⭐ (package X) W-RERUN-MARKED; P-CLEAN,
  * P-SIGNAL, P-TIMED-OUT, P-INCOMPLETE-CAPTURE, P-STDOUT-CAPTURE-CUT, P-STDERR-CAPTURE-CUT, P-OVERSIZE-CONTENT,
  * P-OVERSIZE-COMMAND, P-OVERSIZE-SURROGATE, ⭐ (package Z1b) P-OVERSIZE-SURROGATE-SENT, P-OVERSIZE-ROOM-EDGES, ⭐ (package Z1b)
  * P-OVERSIZE-ROOM-EDGES-SENT, P-OVERSIZE-STREAMS, P-OVERSIZE-AT-ITS-BUDGET,
- * P-OVERSIZE-FENCES, P-OVERSIZE-LISTS, P-FENCE-AT-THE-LAST, P-NO-FENCE, P-PRODUCTION, P-ABSENT-REPORT,
+ * P-OVERSIZE-FENCES, ⭐ (package Z2b phase 1b) P-OVERSIZE-FENCES-SENT, P-OVERSIZE-LISTS, P-FENCE-AT-THE-LAST, P-NO-FENCE, P-PRODUCTION, P-ABSENT-REPORT,
  * P-NOT-OBSERVABLE, P-NOT-OBSERVABLE-BARE, P-NONE-OBSERVED, P-OBSERVED, P-OVERSIZE-ALL, ⭐ (package Z1b) P-OVERSIZE-ALL-SENT,
  * P-FENCES-OTHER-SLICES, P-STAKES, P-ACCOUNT-BREAKS, ⭐ (package Z1b) P-ACCOUNT-BREAKS-A, P-ACCOUNT-BREAKS-B, P-OVERSIZE-STATEMENTS-1,
  * P-OVERSIZE-STATEMENTS-2, ⭐ (package N) P-SEQUENCE, P-OVERSIZE-SEQUENCE; ⭐ (`JAN-EXEC` Phase 7 completion E2, P5 package D)
@@ -1328,7 +1359,8 @@ const RERUN_MARKED_DELIVERABLE: Deliverable = {
  * (D3a: fifteen T-, ten W-, twenty-six P-, seventeen D- and NO-CRITERIA)~~ ~~seventy-six (package N: fifteen T-, thirteen W-,
  * twenty-eight P-, nineteen D- and NO-CRITERIA)~~ ~~seventy-nine (package O-2, D28: fifteen T-, fifteen W-, twenty-eight P-,
  * twenty D- and NO-CRITERIA)~~ ~~eighty (package X, D31: fifteen T-, sixteen W-, twenty-eight P-, twenty D- and NO-CRITERIA)~~
- * ninety-five (package Z1b, D50 and D52: nineteen T-, twenty W-, thirty-five P-, twenty D- and NO-CRITERIA), every
+ * ~~ninety-five (package Z1b, D50 and D52: nineteen T-, twenty W-, thirty-five P-, twenty D- and NO-CRITERIA)~~ ninety-seven
+ * (package Z2b phase 1b, D54 restated: nineteen T-, twenty-one W-, thirty-six P-, twenty D- and NO-CRITERIA), every
  * process-result one `P-`-prefixed.
  * ~~⭐ Package P F1 (`REG-F-503` remedy 1) — and, after G-ACCOUNT-BREAKS, G-TYPE-DECLARATIONS, G-TYPE-DECLARATIONS-ABSENT and
  * G-OVERSIZE-TYPE-DECLARATIONS.~~ ⭐ B7 — the graph framing's probes left the fingerprint with case set v8; NO-CRITERIA is a
@@ -1572,9 +1604,23 @@ export const FINGERPRINT_PROBES: readonly FingerprintProbe[] = [
 		input: (criteria) =>
 			workProductReviewInput({
 				criteria,
-				producingPrompt: filled('Write the condition survey summary for the retaining wall, panel by panel. ', B.USER_INTENT_MAX),
+				// ~~`filled('Write the condition survey summary for the retaining wall, panel by panel. ', B.USER_INTENT_MAX)`~~ ⛔ MOVED
+				// 2026-11-07 (Z2b phase 1b), the same text named, its successor's too: `EDGES_INSTRUCTION`.
+				producingPrompt: EDGES_INSTRUCTION,
 				answer: BRICK.repeat(B.CONTENT_MAX)
 			})
+	},
+	{
+		// ⭐⭐ `JAN-EXEC` Phase 7, package Z2b phase 1b — D54 restated (`REG-D-146`; ~~to be filed in d48 as~~ filed in d48 as `REG-F-611`) —
+		// `W-OVERSIZE-EDGES`, SENT: the server refused `W-OVERSIZE-EDGES` (HTTP 413, its requests 113,057 bytes as sent), so it is a
+		// refusal probe now, kept byte for byte (`SERVER_REFUSAL_PROBES`), and this one stands on its two edges under the limit: the
+		// same instruction, EXACTLY `USER_INTENT_MAX` units, shown whole and undeclared; an answer past the room, cut head-only, its
+		// kept HEAD declared in code points, three astral characters in it (`EDGES_ANSWER_SENT`). So a cut that took a slice AT its
+		// limit, or counted units, moves this probe.
+		id: 'W-OVERSIZE-EDGES-SENT',
+		covers:
+			'work-product framing; W-OVERSIZE-EDGES under the server’s 64 KiB limit — the instruction EXACTLY at USER_INTENT_MAX, shown whole; a mostly-ASCII answer over CONTENT_MAX, three astral characters in its kept HEAD, counted in code points',
+		input: (criteria) => workProductReviewInput({ criteria, producingPrompt: EDGES_INSTRUCTION, answer: EDGES_ANSWER_SENT })
 	},
 	{
 		// ⭐ `PQ-1` (`REG-F-481`) — THE VALIDATOR'S CHOOSER OVER A WORK PRODUCT, every slice it quotes: a candidate in each —
@@ -1963,6 +2009,21 @@ export const FINGERPRINT_PROBES: readonly FingerprintProbe[] = [
 				rationale: FENCES_ACCOUNT,
 				observedToolCalls: ONE_CALL
 			})
+	},
+	{
+		// ⭐⭐ `JAN-EXEC` Phase 7, package Z2b phase 1b — D54 restated (`REG-D-146`; ~~to be filed in d48 as~~ filed in d48 as `REG-F-611`) —
+		// `P-OVERSIZE-FENCES`, SENT: `P-OVERSIZE-FENCES`'s requests are 103,034 bytes as sent, past the server's 64 KiB, so it is a
+		// refusal probe now, kept byte for byte (`SERVER_REFUSAL_PROBES`) — its refusal predicted by the bytes as sent, to be shown by
+		// its record — and this one carries every plant it carries under the limit, built from it: its instruction, account, calls
+		// and view but stdout as they are, and its stdout every plant where it stands, the runs a reader does not see shortened
+		// (`FENCES_STDOUT_SENT`). So the fence choosers, the six families of the skeleton's table and the eleven rules of the reader
+		// it stands on, and the account's lookalikes (`REG-F-497` (a): U+200B, U+2076 and U+0415, the only ones any probe's account
+		// spells), are reached by a probe the product sends, whatever `P-OVERSIZE-FENCES`'s record shows.
+		id: 'P-OVERSIZE-FENCES-SENT',
+		covers:
+			'process-result framing, production’s shape; P-OVERSIZE-FENCES under the server’s 64 KiB limit — every plant of the FENCE CHOOSERS, the skeleton’s families, the reader’s rules and the account’s lookalikes where it stands, the runs a reader does not see shortened, each cut inside one',
+		input: (criteria, build) =>
+			limitProbe('P-OVERSIZE-FENCES').input(criteria, (source) => build({ ...source, run: { ...source.run, stdout: FENCES_STDOUT_SENT } }))
 	},
 	{
 		// ⭐ `PQ-1` (`REG-F-481`) — BOTH CHOOSERS OVER A PROCESS RESULT'S CUT LISTS, in production's shape: each list of the
@@ -2449,6 +2510,37 @@ export const SENT_SUCCESSORS: Readonly<Record<string, readonly string[]>> = {
 	'P-OVERSIZE-ROOM-EDGES': ['P-OVERSIZE-ROOM-EDGES-SENT'],
 	'P-OVERSIZE-ALL': ['P-OVERSIZE-ALL-SENT']
 };
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package Z2b phase 1b — D54 restated (`REG-D-146`; the lead's decision, ~~to be filed in d48 as~~ filed in d48 as `REG-F-611`;
+ * `z2b-p1-rulings.md`, "The records run's stop") — THE SERVER'S REFUSAL PROBES: the probes whose requests the decision model's
+ * server refuses as too large — HTTP 413, "text and schema must not exceed 64 KiB" — each with the request it refuses first, kept
+ * byte for byte, so the fingerprint hashes that refusal in the client's own words (`refusedRequestReason`) as it hashes D52's.
+ * `W-OVERSIZE-EDGES`: the server refused it, at the records run's 24th probe (`records-facts.md` §4). `P-OVERSIZE-FENCES`: its
+ * refusal is the lead's inference from the bytes as sent (103,034), not yet shown by its record — ⚠ if that record shows answers,
+ * it stays a sent probe, and the withdrawal is its line here struck and its line in this map's pin struck
+ * (`decision-model-refusals.test.ts`), nothing else: every other refusal pin reads this map. A refused probe hashes its
+ * refusal alone, so each branch it reached is reached by a probe the product sends under the limit: `UNDER_THE_LIMIT_SUCCESSORS`.
+ */
+export const SERVER_REFUSAL_PROBES: Readonly<Record<string, string>> = {
+	'W-OVERSIZE-EDGES': 'c00',
+	'P-OVERSIZE-FENCES': 'c00'
+};
+/**
+ * ⭐⭐ Z2b phase 1b — each probe past the server's limit, and the probes the product sends under it, by a margin, that reach every
+ * branch it reached — built whatever its record shows, so a withdrawn refusal leaves them standing (`P-OVERSIZE-FENCES-SENT` carries
+ * the account's lookalikes, `REG-F-497` (a)).
+ */
+export const UNDER_THE_LIMIT_SUCCESSORS: Readonly<Record<string, readonly string[]>> = {
+	'W-OVERSIZE-EDGES': ['W-OVERSIZE-EDGES-SENT'],
+	'P-OVERSIZE-FENCES': ['P-OVERSIZE-FENCES-SENT']
+};
+/** A probe past the server's limit, read when a successor's input is built from it (after the probe set exists). */
+function limitProbe(id: string): FingerprintProbe {
+	const probe = FINGERPRINT_PROBES.find((x) => x.id === id);
+	if (probe === undefined || !(id in UNDER_THE_LIMIT_SUCCESSORS)) throw new Error(`${id}: no probe past the server's limit`);
+	return probe;
+}
 
 // ── ⭐⭐ THE READER CORPUS (`JAN-PRQUAL` `PQ-1`; `REG-F-481`; design D2 under the sponsor's answer (a)) ─────────────────
 /**

@@ -109,6 +109,9 @@ import { fenceSkeletonDigest } from '../fence-skeleton/digest.js';
 import { CURRENT_CASE_SET_FILE, type CaseSet, type QualificationCase } from './cases.js';
 import { canonicalJson, reviewerFingerprintOf, sha256, type FingerprintComponents } from './digest.js';
 import { PLACEHOLDER_INDICATIONS } from './indications.js';
+// ⭐⭐ Package Z2b — D54 — the committed records' scores, and the pointer component the fingerprint hashes beside the probes.
+import { decisionModelPointer, PRODUCT_POINTER_PARTS, type PointerParts } from './decision-model-pointer.js';
+import { COMMITTED_INDICATIONS } from './recorded-indications.js';
 import { caseReviewInput } from './materialize.js';
 import {
 	CATALOG_DECLARED_POLICIES,
@@ -202,6 +205,12 @@ export interface FingerprintSeams {
 	 * criteria component and, where a declared entry's ceiling moves, the scoring digest.
 	 */
 	readonly declaredPolicies: readonly DeclaredProbePolicy[];
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package Z2b — D54 (`REG-D-146`; design §12.6) — THE POINTER COMPONENT'S PARTS: the decision model's
+	 * request text, the block's text and the identity the records must have (`decision-model-pointer.ts`), hashed beside the probes
+	 * (`DECISION_MODEL_POINTER`, below). A test swaps one to show it moves `probes`.
+	 */
+	readonly pointer: PointerParts;
 }
 
 /** Who the fingerprint's validator says it is: an identity no producer carries, so independence never decides a probe. */
@@ -241,8 +250,11 @@ export const PRODUCT_SEAMS: FingerprintSeams = {
 	// ⛔ Built WITHOUT `requireReportedModel`, as the runner's is (`JAN-SELREV` D6): only the product's devin branch sets it.
 	// ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D50 (`REG-D-146`) — and with the scripts' placeholder decision model, every question
 	// scored 0 (`indications.ts`): no record of scores exists until package Z2's, which replace it (D54).
+	// ~~⭐⭐ … and with the scripts' placeholder decision model, every question scored 0 (`indications.ts`): no record of scores
+	// exists until package Z2's, which replace it (D54).~~ ⛔ MOVED (`JAN-EXEC` Phase 7, package Z2b — D54; Z1's departure 8): THE
+	// COMMITTED RECORDS' SCORES, through the static source (`recorded-indications.ts`): a question no record holds refuses its review.
 	validator: (print) =>
-		createAgyReasoningReviewValidator({ ...FINGERPRINT_EVALUATOR, clock: FIXED_CLOCK, indications: PLACEHOLDER_INDICATIONS, print }),
+		createAgyReasoningReviewValidator({ ...FINGERPRINT_EVALUATOR, clock: FIXED_CLOCK, indications: COMMITTED_INDICATIONS, print }),
 	evaluate: evaluateCase,
 	budget: REASONING_REVIEW_BUDGET,
 	criteria: SEEDED_REASONING_REVIEW_CRITERIA,
@@ -251,6 +263,8 @@ export const PRODUCT_SEAMS: FingerprintSeams = {
 	devinPreamble: DEVIN_REVIEWER_PREAMBLE,
 	// ⭐ E2 — THE CATALOG'S DECLARED POLICIES AS THE PRODUCT SEEDS THEM (`probes.ts`), never a copy of their text.
 	declaredPolicies: CATALOG_DECLARED_POLICIES,
+	// ⭐⭐ Z2b — D54 — THE PRODUCT'S OWN PARTS: its request text, its section text and the identity it is held to.
+	pointer: PRODUCT_POINTER_PARTS,
 	// ⛔ THE PRODUCT'S BUILDER ITSELF — the same function `runProcessResultFloor` builds through, never a copy or a wrapper
 	// of it (`verif/reviewer-qualification-fingerprint.test.ts` holds the identity). That is why the production fingerprint
 	// cannot hash a process result other than as the product sends it: the floor's input IS this function's output for
@@ -360,6 +374,14 @@ const readerTokens = (): string => JSON.stringify(READER_CORPUS.map((w) => [w.sl
 const TRANSPORT_PREAMBLE = 'DEVIN-PREAMBLE';
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package Z2b — D54 (`REG-D-146`; design §12.6; roadmap §9b.5b, Z2 predicted red 8) — THE POINTER
+ * COMPONENT, HASHED AS THE PROBES ARE: the decision model's request, both cuts, the block, the cold path and the identity the records
+ * must have (`decision-model-pointer.ts`). ⚠ In `probes`, as the skeleton, the reader and the preamble are, so `FingerprintComponents`
+ * and the RUN line keep their shape.
+ */
+const DECISION_MODEL_POINTER = 'DECISION-MODEL';
+
+/**
  * Each case's initial and repair prompt hashes, exactly as the runner records them (`CallLine.promptSha256`) — the
  * fingerprint test holds the two equal over a run ('the case prompts are the hashes a run records').
  *
@@ -455,7 +477,10 @@ async function scoringDigestOf(seams: FingerprintSeams): Promise<string> {
 			candidate: FINGERPRINT_CANDIDATE,
 			scoringDigest: NO_DIGEST,
 			requiredEvidenceOf,
-			// ⭐ Package Z1 — the placeholder decision model, as the seams' validator is given (`PRODUCT_SEAMS`).
+			// ~~⭐ Package Z1 — the placeholder decision model, as the seams' validator is given (`PRODUCT_SEAMS`).~~ ⛔ MOVED (Z2b — D54): the
+			// seams' validator reads the committed records now; THE SCORING CORPUS KEEPS THE PLACEHOLDER, and says why: its cases are
+			// the corpus's own (`CORPUS_CASE`, the declared corpus), in no record, and no score reaches what this digest hashes — each
+			// entry's outcome is scored from its replies, and a repair's instruction is hashed as what it appends to its first prompt.
 			indications: PLACEHOLDER_INDICATIONS,
 			call: async (p) => {
 				sent.push(p);
@@ -504,11 +529,14 @@ export async function reviewerFingerprint(
 	if (prompts.has(FENCE_READER)) throw new Error(`a probe is named ${FENCE_READER}, which is the reader corpus's entry`);
 	if (prompts.has(TRANSPORT_PREAMBLE))
 		throw new Error(`a probe is named ${TRANSPORT_PREAMBLE}, which is the devin preamble's entry`);
+	if (prompts.has(DECISION_MODEL_POINTER))
+		throw new Error(`a probe is named ${DECISION_MODEL_POINTER}, which is the pointer component's entry`);
 	/** What `probes` hashes, in order: each probe's prompt (or refusal), and then — as ~~two~~ three more entries — the
 	 *  skeleton's digest, the reader corpus's tokens and (⭐ P7-6 I4) the preamble devin's transport writes. */
 	const probePrompts = new Map([...prompts, [FENCE_SKELETON, (skeletonDigest ??= fenceSkeletonDigest())]]);
 	probePrompts.set(FENCE_READER, readerTokens());
 	probePrompts.set(TRANSPORT_PREAMBLE, seams.devinPreamble);
+	probePrompts.set(DECISION_MODEL_POINTER, await decisionModelPointer(seams.pointer));
 	const floorComponents: FingerprintComponents = {
 		probes: sha256(JSON.stringify([...probePrompts].map(([id, p]) => [id, sha256(p)]))),
 		budget: sha256(canonicalJson(seams.budget)),

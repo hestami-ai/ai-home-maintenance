@@ -22,7 +22,8 @@ import {
 	type RunLine,
 	type ScoredOutcome
 } from './record.js';
-import { PLACEHOLDER_INDICATIONS } from './indications.js';
+// ⭐⭐ Package Z2b — D54 (Z1's departure 8): the committed records' scores, not the placeholder's.
+import { COMMITTED_INDICATIONS } from './recorded-indications.js';
 import { evaluateCase, replayReplies } from './runner.js';
 
 /** Why a recorded evaluation cannot be re-scored today — the check reports it as a non-reproduction. */
@@ -56,9 +57,10 @@ export async function rescoreEvaluation(
 			candidate: run.candidate,
 			call: replayReplies(calls),
 			scoringDigest,
-			// ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D50 — the scripts' placeholder decision model (`indications.ts`): a re-scoring
-			// replays recorded replies in order, so the scores the prompt quotes decide nothing it reads.
-			indications: PLACEHOLDER_INDICATIONS
+			// ~~⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D50 — the scripts' placeholder decision model (`indications.ts`): a re-scoring
+			// replays recorded replies in order, so the scores the prompt quotes decide nothing it reads.~~ ⛔ MOVED (Z2b — D54): the
+			// committed records' scores, so a re-scoring builds today's prompt as a run would; a case no record holds is not re-scorable.
+			indications: COMMITTED_INDICATIONS
 		});
 	} catch (e) {
 		throw new NotRescorable(

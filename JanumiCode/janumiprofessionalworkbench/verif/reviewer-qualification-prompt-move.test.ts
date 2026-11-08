@@ -76,6 +76,17 @@ import { NO_PROGRAMS } from './reviewer-qualification-hermetic.js';
 import { PLACEHOLDER_INDICATIONS } from '../scripts/reviewer-qual/indications.js';
 import { todayPromptOf } from '../apps/rph-demo/src/lib/server/assurance/review-section.testing.js';
 
+// ⭐⭐ `JAN-EXEC` Phase 7, package Z2b — D54 (`REG-D-146`) — THE HISTORY'S DECISION MODEL (`reviewer-qualification-history.ts`):
+// this file renders reviews D54's records do not hold — case set v3, the set the selected candidate was measured on — so the
+// committed records' source answers a question no record holds with the placeholder's 0, as this file's assertions were written
+// against since package Z1, and every question the records hold with its recorded score. ⛔ The product's own source refuses such a
+// question (`recorded-indications.test.ts`).
+vi.mock('../scripts/reviewer-qual/recorded-indications.js', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('../scripts/reviewer-qual/recorded-indications.js')>();
+	const { historyIndications } = await import('./reviewer-qualification-history.js');
+	return { ...actual, COMMITTED_INDICATIONS: historyIndications(() => actual.committedRecords(new URL('../', import.meta.url))) };
+});
+
 const REPO = fileURLToPath(new URL('../', import.meta.url))
 	.split('\\')
 	.join('/');

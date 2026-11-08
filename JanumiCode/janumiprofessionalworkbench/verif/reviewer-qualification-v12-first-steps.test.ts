@@ -11,11 +11,22 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { QualificationCase } from '../scripts/reviewer-qual/cases.js';
 import { PRODUCT_SEAMS } from '../scripts/reviewer-qual/fingerprint.js';
 import { caseReviewInput } from '../scripts/reviewer-qual/materialize.js';
 import { todayPromptOf } from '../apps/rph-demo/src/lib/server/assurance/review-section.testing.js';
+
+// ⭐⭐ `JAN-EXEC` Phase 7, package Z2b — D54 (`REG-D-146`) — THE HISTORY'S DECISION MODEL (`reviewer-qualification-history.ts`):
+// this file renders reviews D54's records do not hold — its control: each case marked a work re-run, a material no record holds —
+// so the committed records' source answers a question no record holds with the placeholder's 0, as this file's assertions were
+// written against since package Z1, and every question the records hold with its recorded score. ⛔ The product's own source
+// refuses such a question (`recorded-indications.test.ts`).
+vi.mock('../scripts/reviewer-qual/recorded-indications.js', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('../scripts/reviewer-qual/recorded-indications.js')>();
+	const { historyIndications } = await import('./reviewer-qualification-history.js');
+	return { ...actual, COMMITTED_INDICATIONS: historyIndications(() => actual.committedRecords(new URL('../', import.meta.url))) };
+});
 
 const REPO = fileURLToPath(new URL('../', import.meta.url))
 	.replace(/\\/g, '/')

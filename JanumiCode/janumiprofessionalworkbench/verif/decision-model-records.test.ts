@@ -7,7 +7,7 @@
 //   · step 1's controls asked twice, exactly equal — and a repeat that differs stops the run;
 //   · another model loaded refuses the start; a server version changed between entries stops it; a stopped entry writes nothing.
 import { createHash } from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync, existsSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, existsSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SEEDED_REASONING_REVIEW_CRITERIA, type ReasoningReviewInput } from '@janumipwb/rph-assurance';
@@ -168,5 +168,73 @@ describe('⭐ Z2a (D54) — the records script: every question through the produ
 		const out = await r.go();
 		expect(out.stopped).toBe('STOPPED: A: the client refused its review: request c00 was refused: HTTP 500: model runner crashed');
 		expect(linesOf(r.file).map((l) => l.kind)).toEqual(['IDENTITY']);
+	});
+});
+
+// ⭐⭐ `JAN-EXEC` Phase 7, package Z2b phase 1b — D54 RESTATED (`REG-D-146`; the lead's decision, ~~to be filed in d48 as~~ filed in d48 as `REG-F-611`;
+// `z2b-p1-rulings.md`, "The records run's stop") — A REQUEST THE SERVER REFUSES WITH HTTP 413 IS RECORDED AS RETURNED: the entry's
+// line holds the questions answered before it, and the refused request's key, kind, body sha256, status and the server's answer
+// as it arrived — at most one, since the client stops a review at its first refusal — and the run goes on. ⛔ Every other refusal
+// still stops the run and writes nothing for that entry (the row above). ⭑ The records run stopped so at its 24th probe:
+// "STOPPED: W-OVERSIZE-EDGES: the client refused its review: request c00 was refused: HTTP 413: text and schema must not exceed
+// 64 KiB" (`records-facts.md` §4).
+// ⭑ PREDICTED RED, WRITTEN FIRST: the script has no form for a request the server refuses, so it stops at the first 413.
+describe('⛔ PREDICTED RED (Z2b phase 1b; D54 restated) — a request the server refuses with HTTP 413 is recorded as returned', () => {
+	/** Ollama's answer to a request past its limit (`d46-facts-verbatim.md` V19). */
+	const TOO_LARGE = { status: 413, json: { error: 'text and schema must not exceed 64 KiB' } } as const;
+
+	it('⭐ the questions answered before it, then the refused request — key, kind, body sha256, 413 and the server’s answer — and the run goes on', async () => {
+		// ⭑ A's third request refused, as the server refuses a body past its limit; every other request answered.
+		const s = await stub({ answer: ({ body, parsed, n }) => (n === 3 ? TOO_LARGE : scoredAnswer(body, parsed)) });
+		const r = runOf(s.url, { controls: [] });
+		const out = await r.go();
+		expect(out.stopped, 'the run goes on past a 413').toBeUndefined();
+		const [, a, b] = linesOf(r.file);
+		const sent = posts(s);
+		expect(a, 'A: the two questions answered before it, scored as returned').toMatchObject({ kind: 'CASE', id: 'A' });
+		expect((a!.questions as { key: string; bodySha256: string }[]).map((q) => [q.key, q.bodySha256])).toEqual([
+			['c00', sha256(sent[0]!.body)],
+			['c01', sha256(sent[1]!.body)]
+		]);
+		expect(a!.refusedRequest, 'A: the refused request, as the server returned it').toEqual({
+			key: 'c02',
+			kind: 'check',
+			bodySha256: sha256(sent[2]!.body),
+			status: 413,
+			response: JSON.stringify(TOO_LARGE.json)
+		});
+		expect('refused' in a!, 'no refusal before any request').toBe(false);
+		expect(b, 'B: asked after it, whole').toMatchObject({ kind: 'CASE', id: 'B' });
+		expect('refusedRequest' in b!).toBe(false);
+		expect(r.log, 'the log names the refusal').toContain('CASE A: 2 question(s), then request c02 refused by the server: HTTP 413');
+		expect(out.requests, 'the requests made, the refused one among them').toBe(sent.length);
+		// ⭑ And it resumes: a held entry, refused or not, is not asked again.
+		const before = posts(s).length;
+		const again = await runOf(s.url, { file: r.file, controls: [] }).go();
+		expect([again.made, posts(s).length - before, again.stopped]).toEqual([0, 0, undefined]);
+	});
+
+	it('⭐ a 413 whose answer is empty is a 413 too: recorded as returned, its answer empty, and the run goes on', async () => {
+		const s = await stub({ answer: ({ body, parsed, n }) => (n === 1 ? { status: 413, raw: '' } : scoredAnswer(body, parsed)) });
+		const r = runOf(s.url, { controls: [] });
+		const out = await r.go();
+		expect(out.stopped, 'the run goes on past a 413 with no answer').toBeUndefined();
+		const [, a, b] = linesOf(r.file);
+		expect([a!.questions, a!.refusedRequest]).toEqual([[], { key: 'c00', kind: 'check', bodySha256: sha256(posts(s)[0]!.body), status: 413, response: '' }]);
+		expect(b, 'B: asked after it, whole').toMatchObject({ kind: 'CASE', id: 'B' });
+	});
+
+	it('⛔ a file whose line holds a refused request that is no 413 with its body hash stops the run, naming the line', async () => {
+		const s = await stub();
+		const r = runOf(s.url, { controls: [] });
+		await r.go();
+		const [head, a, b] = readFileSync(r.file, 'utf8').trimEnd().split('\n');
+		const line = JSON.parse(a!) as Record<string, unknown>;
+		const forged = { ...line, refusedRequest: { key: 'c09', kind: 'check', bodySha256: sha256('x'), status: 500, response: '{}' } };
+		writeFileSync(r.file, `${[head, JSON.stringify(forged), b].join('\n')}\n`, 'utf8');
+		const out = await runOf(s.url, { file: r.file, controls: [] }).go();
+		expect(out.stopped).toBe(
+			`STOPPED: ${r.file} line 2 holds a refused request that is no 413 with its key, kind, body hash and the server’s answer (D54)`
+		);
 	});
 });

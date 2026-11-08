@@ -21,7 +21,9 @@ import { clearingJudgement, withLiveReviewerSeam } from './assurance/clearing-re
 
 // ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D50 (`REG-D-146`): the product's configured decision model, whose potential
 // indications every review asks for before its first reviewer call, stood in for by a double that calls no model —
-// as the reviewer's program is. ⛔ Production configures none until package Z2, and refuses the review.
+// as the reviewer's program is. ~~⛔ Production configures none until package Z2, and refuses the review.~~ ⛔ MOVED 2026-11-07
+// (`JAN-EXEC` Phase 7, package Z2b): production configures the client from its settings since package Z2a — the server and the
+// model (`decision-model.ts`), held to D54's records' identity — and, unconfigured, refuses the review.
 vi.mock('./assurance/decision-model.js', async () => {
 	const { TEST_INDICATIONS } = await import('./assurance/indications.testing.js');
 	return { configuredIndications: () => TEST_INDICATIONS };

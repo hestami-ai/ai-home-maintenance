@@ -37,6 +37,19 @@ import type { CallReply } from './record.js';
 import type { RunFingerprint } from './runner.js';
 import type { CandidateSpec, TransportDeps } from './transports.js';
 
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package Z2b — D54 — THE CLI'S DECISION MODEL: a test's double, as handed; else the committed records'
+ * static source with their identity, read once, which the RUN line writes beside the candidate.
+ */
+async function decisionModelOf(
+	handed: IndicationsSource | undefined
+): Promise<{ indications: IndicationsSource; decisionModel?: { model: string; digest: string; serverVersion: string } }> {
+	if (handed) return { indications: handed };
+	const { COMMITTED_INDICATIONS, committedRecordsIdentity } = await import('./recorded-indications.js');
+	const identity = committedRecordsIdentity();
+	return 'refusal' in identity ? { indications: COMMITTED_INDICATIONS } : { indications: COMMITTED_INDICATIONS, decisionModel: identity };
+}
+
 export interface CliDeps {
 	/** The environment the product reads — `process.env`, which the runner WRITES the model variable into. */
 	readonly env: Record<string, string | undefined>;
@@ -53,6 +66,9 @@ export interface CliDeps {
 	 * potential indications, once, before its first reviewer call. ⛔ The CLI run from the command line hands none in Z1: no client
 	 * exists until package Z2's, so a paid run is refused at its first case before any call to the model it measures — its RUN
 	 * line written, no CALL line. A test hands a double here, as it hands `transportDeps`.
+	 * ⛔ MOVED (`JAN-EXEC` Phase 7, package Z2b — D54): ~~The CLI run from the command line hands none~~ — absent, the CLI reads the
+	 * COMMITTED RECORDS (`recorded-indications.ts`, `COMMITTED_INDICATIONS`), so a run renders every prompt from D54's scores and
+	 * writes their identity on its RUN line; a case whose questions no record holds is refused before any call.
 	 */
 	readonly indications?: IndicationsSource;
 }
@@ -286,7 +302,8 @@ export async function main(argv: readonly string[], deps: CliDeps): Promise<numb
 			transport,
 			repetitions: Number(args.repetitions ?? 2),
 			env: deps.env,
-			...(deps.indications ? { indications: deps.indications } : {}),
+			// ⭐⭐ Z2b — D54: the records' scores, and their identity on the RUN line; a double where a test hands one.
+			...(await decisionModelOf(deps.indications)),
 			onLine: (line) => {
 				appendFileSync(args.out!, record.serializeLine(line));
 				appended += 1;

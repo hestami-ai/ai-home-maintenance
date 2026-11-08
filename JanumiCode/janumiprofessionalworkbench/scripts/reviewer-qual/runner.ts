@@ -507,6 +507,11 @@ export interface RunInputs {
 	 * package Z2's client and records land, so a paid run refuses at its first case, before its RUN line and before any call.
 	 */
 	readonly indications?: IndicationsSource;
+	/**
+	 * ⭐⭐ Package Z2b — D54 — the identity of the records `indications` reads, written on the RUN line beside the candidate
+	 * (`RunLine.decisionModel`).
+	 */
+	readonly decisionModel?: { readonly model: string; readonly digest: string; readonly serverVersion: string };
 }
 
 /**
@@ -545,6 +550,8 @@ export async function runQualification(i: RunInputs): Promise<(RunLine | CallLin
 			caseIds: i.cases.map((c) => c.id),
 			repetitions: i.repetitions,
 			candidate,
+			// ⭐⭐ Package Z2b — D54 — the scoring identity, beside the candidate: the records' the prompts were rendered from.
+			...(i.decisionModel ? { decisionModel: { model: i.decisionModel.model, digest: i.decisionModel.digest, serverVersion: i.decisionModel.serverVersion } } : {}),
 			deployable: DEPLOYABLE_TRANSPORTS.has(candidate.transport)
 		});
 		for (let repetition = 1; repetition <= i.repetitions; repetition++)

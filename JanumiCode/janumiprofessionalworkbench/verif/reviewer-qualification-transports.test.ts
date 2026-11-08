@@ -52,6 +52,7 @@ import { ToolCallKilled, type KilledCallFacts } from '../apps/rph-demo/src/lib/s
 import { recordProblems, type CallLine, type RunLine } from '../scripts/reviewer-qual/record.js';
 import { reviewerFingerprint } from '../scripts/reviewer-qual/fingerprint.js';
 import { main, runSummary } from '../scripts/reviewer-qual/run.js';
+import { DECISION_MODEL_RECORDS_IDENTITY } from '../apps/rph-demo/src/lib/server/assurance/decision-model-identity.js';
 import { NO_INDICATIONS_SOURCE_STATEMENT } from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
 import { runQualification, type RunFingerprint } from '../scripts/reviewer-qual/runner.js';
 import {
@@ -1206,7 +1207,12 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 	// longer show is carried by THE SAME COMMAND IN PROCESS, its fingerprint computed as the CLI computes it (`run.ts`
 	// `TODAYS_FINGERPRINT`: `reviewerFingerprint` over the committed set) and the scripts' placeholder decision model: the RUN
 	// line stamped with today's fingerprint, its CALL line's prompt the fingerprint's own, one call to the stand-in.
-	it('⭐ with a clean environment it proceeds past the fingerprint to the transport — a local stand-in, never a real server — ⛔ and in package Z1 is refused at its first case, before any call and before any line (no decision model is configured); ⭐ in process, with the placeholder decision model, it records a RUN stamped with today’s fingerprint', async () => {
+	// ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z2b — D54; Z1's departure 19; the Z2b brief's item 8) — the CLI renders its
+	// prompts from D54's committed records (`run.ts` `decisionModelOf`, the static source), so THE CHILD PROCESS SHOWS THE STAMP AGAIN:
+	// ~~exit 2, the refusal stated, nothing written~~ ⭐ exit 0, a RUN line stamped with today's fingerprint and the records' scoring
+	// identity beside its candidate, a CALL line whose prompt is the fingerprint's, one call to the stand-in. ⭑ The same command in
+	// process stays, ~~with the scripts' placeholder decision model~~ handed no decision model, so it too reads the committed records.
+	it('⭐ with a clean environment it proceeds past the fingerprint to the transport — a local stand-in, never a real server — ~~⛔ and in package Z1 is refused at its first case, before any call and before any line (no decision model is configured)~~ ⭐ (Z2b) and records a RUN stamped with today’s fingerprint and the records’ scoring identity, its prompt rendered from the committed records; ⭐ in process, ~~with the placeholder decision model~~ handed none, the same', async () => {
 		const s = await ollamaStandIn('answer');
 		try {
 			const out = join(tmp(), 'run.ndjson');
@@ -1237,20 +1243,43 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 				child.on('close', (status) => resolve({ status, err }));
 			});
 			// ~~expect(r.status, r.err).toBe(0);~~ ⛔ Z1: refused before anything was appended.
-			expect(r.status, r.err).toBe(2);
-			expect(r.err, 'the refusal, stated').toContain(NO_INDICATIONS_SOURCE_STATEMENT);
-			expect(existsSync(out), 'nothing written').toBe(false);
+			// ~~expect(r.status, r.err).toBe(2);~~
+			// ~~expect(r.err, 'the refusal, stated').toContain(NO_INDICATIONS_SOURCE_STATEMENT);~~
+			// ~~expect(existsSync(out), 'nothing written').toBe(false);~~
+			// ⛔ MOVED (Z2b, item 8): the child renders from the committed records — its RUN stamp, shown again.
+			expect(r.status, r.err).toBe(0);
+			expect(r.err, 'no refusal for want of a decision model').not.toContain(NO_INDICATIONS_SOURCE_STATEMENT);
 			expect(s.seen.length, 'past the fingerprint to the transport: the stand-in was asked who it is').toBeGreaterThan(0);
+			const today = await reviewerFingerprint(CASES);
+			const spawned = readFileSync(out, 'utf8');
+			expect(recordProblems(spawned, { tracked: true }), 'the child’s record validates').toEqual([]);
+			const [childRun = '', childCall = ''] = spawned.trimEnd().split('\n');
+			expect(JSON.parse(childRun) as RunLine, 'the child’s RUN line, stamped with today’s fingerprint').toMatchObject({
+				kind: 'RUN',
+				reviewerFingerprint: today.reviewer,
+				scoringDigest: today.scoring,
+				caseSetDigest: today.caseSet,
+				caseIds: ['W12-CLEAN'],
+				deployable: false,
+				// ⭐ Z2b (D54) — the scoring identity, beside the candidate: the committed records' own.
+				decisionModel: { ...DECISION_MODEL_RECORDS_IDENTITY }
+			});
+			expect((JSON.parse(childCall) as CallLine).promptSha256, 'the child sent the prompt the fingerprint derives').toBe(
+				today.casePrompts.get('W12-CLEAN')!.initial
+			);
 			expect(
 				s.seen.filter((q) => q.body?.prompt !== undefined),
-				'no prompt, to the stand-in'
-			).toHaveLength(0);
-			// ⭑ THE SAME COMMAND IN PROCESS, with the placeholder decision model.
+				'~~no prompt, to the stand-in~~ ⭐ one prompt, to the stand-in, from the child'
+			).toHaveLength(1);
+			// ⭑ THE SAME COMMAND IN PROCESS, ~~with the placeholder decision model~~ ⛔ MOVED (Z2b): handed none, so it reads the records.
 			cleanEnv();
+			rmSync(out);
 			const written: string[] = [];
-			// `inProcess`'s dependencies — its placeholder decision model among them — with today's fingerprint for its fixture's.
+			// `inProcess`'s dependencies — ~~its placeholder decision model among them~~ its placeholder left out (Z2b) — with today's
+			// fingerprint for its fixture's.
+			const { indications: _placeholder, ...committed } = inProcess([], written);
 			const code = await main(command, {
-				...inProcess([], written),
+				...committed,
 				fingerprint: async () => {
 					const f = await reviewerFingerprint(CASES);
 					return { reviewer: f.reviewer, scoring: f.scoring, caseSet: f.caseSet };
@@ -1262,14 +1291,15 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 			const [runRow = '', callRow = ''] = text.trimEnd().split('\n');
 			const run = JSON.parse(runRow) as RunLine;
 			const call = JSON.parse(callRow) as CallLine;
-			const today = await reviewerFingerprint(CASES);
 			expect(run, 'stamped with today’s fingerprint, computed from source').toMatchObject({
 				kind: 'RUN',
 				reviewerFingerprint: today.reviewer,
 				scoringDigest: today.scoring,
 				caseSetDigest: today.caseSet,
 				caseIds: ['W12-CLEAN'],
-				deployable: false
+				deployable: false,
+				// ⭐ Z2b (D54) — the records' scoring identity, beside the candidate.
+				decisionModel: { ...DECISION_MODEL_RECORDS_IDENTITY }
 			});
 			expect(run.candidate.serverUtcOffset).toBe('-04:00');
 			expect(call.promptSha256, 'the prompt the fingerprint derives is the one sent').toBe(
@@ -1277,8 +1307,8 @@ describe('JAN-CRITREAD J2-2 — the CLI runs from source (REG-D-072 D11) and ref
 			);
 			expect(
 				s.seen.filter((q) => q.body?.prompt !== undefined),
-				'one call, to the stand-in'
-			).toHaveLength(1);
+				'~~one call, to the stand-in~~ ⭐ (Z2b) one call more, to the stand-in, in process'
+			).toHaveLength(2);
 		} finally {
 			await s.close();
 		}

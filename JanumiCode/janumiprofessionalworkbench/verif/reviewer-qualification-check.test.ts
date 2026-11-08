@@ -108,7 +108,18 @@ import { runQualification, type RunFingerprint } from '../scripts/reviewer-qual/
 import { scoringCorpus } from '../scripts/reviewer-qual/scoring-corpus.js';
 import type { TransportReply } from '../scripts/reviewer-qual/transports.js';
 import { BUN, GIT, hermeticEnv, NO_PROGRAMS } from './reviewer-qualification-hermetic.js';
-import { PLACEHOLDER_INDICATIONS } from '../scripts/reviewer-qual/indications.js';
+import { COMMITTED_INDICATIONS } from '../scripts/reviewer-qual/recorded-indications.js';
+
+// ⭐⭐ `JAN-EXEC` Phase 7, package Z2b — D54 (`REG-D-146`) — THE HISTORY'S DECISION MODEL (`reviewer-qualification-history.ts`):
+// this file renders reviews D54's records do not hold — the fingerprint over versions one to twelve, for its fixtures, and
+// re-scores their evaluations — so the committed records' source answers a question no record holds with the placeholder's 0, as
+// this file's assertions were written against since package Z1, and every question the records hold with its recorded score. ⛔ The
+// product's own source refuses such a question (`recorded-indications.test.ts`).
+vi.mock('../scripts/reviewer-qual/recorded-indications.js', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('../scripts/reviewer-qual/recorded-indications.js')>();
+	const { historyIndications } = await import('./reviewer-qualification-history.js');
+	return { ...actual, COMMITTED_INDICATIONS: historyIndications(() => actual.committedRecords(new URL('../', import.meta.url))) };
+});
 
 const REPO = fileURLToPath(new URL('../', import.meta.url))
 	.replace(/\\/g, '/')
@@ -330,6 +341,9 @@ let FP_V2: ReviewerFingerprint;
 let FP_V3: ReviewerFingerprint;
 /** Which case a prompt belongs to — by its hash, initial or repair — in versions one to three or the current set. */
 let CASE_OF: Map<string, string>;
+// ⭑ Z2b phase 2 — ~~60 s~~ its budget, 240 s: it renders thirteen fingerprints, and each review's prompt now builds and
+// hashes every decision-model request's body against D54's records (about 19 s without coverage, 9 s before the records);
+// the gate's coverage run timed it out at 60 s.
 beforeAll(async () => {
 	// ⛔ No program can be found from this process: the validator's default print is `agyPrint`.
 	vi.stubEnv('PATH', NO_PROGRAMS);
@@ -352,7 +366,7 @@ beforeAll(async () => {
 			([id, p]) => [[p.initial, id] as const, [p.repair, id] as const]
 		)
 	);
-}, 60_000);
+}, 240_000);
 afterAll(() => {
 	vi.unstubAllEnvs();
 });
@@ -413,7 +427,10 @@ async function recorded(o: {
 	let n = 0;
 	const { TransportFailure } = await import('../scripts/reviewer-qual/transports.js');
 	return runQualification({
-		indications: PLACEHOLDER_INDICATIONS,
+		// ~~indications: PLACEHOLDER_INDICATIONS,~~ ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z2b phase 1b) — the source the
+		// case map's prompts were rendered with (the history source, mocked above), so a run's prompts are the ones `CASE_OF` knows
+		// once the records are in: over stub-made records the placeholder's prompts were no case's (phase 1b's simulation).
+		indications: COMMITTED_INDICATIONS,
 		runId: o.runId,
 		date: o.date ?? '2026-09-24T12:00:00.000Z',
 		commit: 'e5f9358b'.repeat(5),
@@ -2503,6 +2520,8 @@ describe('⭐⭐ the review in parts, B8b — under case set v10 and an UNMOVED 
 		expect((await onVersionTen([file(without)])).problems.map((p) => p.limb), 'CONTROL: without the run, the 19’s coverage alone').toEqual(['COVERAGE', 'COVERAGE']);
 	});
 
+	// ⭑ Z2b phase 2 — its own time budget, 120 s: rendering a review now builds and hashes each decision-model request's body
+	// against D54's records, about twice the work it was, and the gate's coverage run gives a row 30 s by default.
 	it('⭐ ~~A SUPERSEDED LINE STRIKES THE WHOLE RUN — citing a register finding, it discharges the reproduction problem, and the 16 software part cases v9’s part run alone covered are owed again, by any candidate and by the selected one; a run over them too is GREEN.~~ ⭐ A SUPERSEDED LINE IS NOT OWED, AND REFUSED (REG-D-132) — v9’s part run reproduces under version ten, so a line striking it, citing a register finding, is refused, and the coverage it gives the 16 software part cases stands. CONTROL: under version nine the same line is refused, the run reproducing there', async () => {
 		const v8 = await v8Run();
 		const before = [
@@ -2525,7 +2544,7 @@ describe('⭐⭐ the review in parts, B8b — under case set v10 and an UNMOVED 
 		expect(limb(await onVersionNine([file(underNine)]), 'REPRODUCTION'), 'CONTROL: under version nine it reproduces').toBe(
 			STRIKE_REFUSED(underNine.length - 1)
 		);
-	});
+	}, 120_000);
 });
 
 // ── ⭐⭐ `JAN-EXEC` Phase 7, the review in parts, B8b, package K (`REG-D-133`; DESIGN-authoring-review-in-parts.md D3d and §5) ──
@@ -2632,6 +2651,8 @@ describe('⭐⭐ the review in parts, B8b, package K — under case set v11 and 
 		return [...v8, ...(await restamped(v8)), ...(await v9Parts()), ...(await v10Bridge()), escalated];
 	};
 
+	// ⭑ Z2b phase 2 — its own time budget, 120 s: rendering a review now builds and hashes each decision-model request's body
+	// against D54's records, about twice the work it was, and the gate's coverage run gives a row 30 s by default.
 	it('⛔ RED, AND EXACTLY SO — coverage of exactly the 7 under their new ids, by any candidate and by the selected one, and nothing else: no REPRODUCTION problem, no ESCALATION problem, no CONFERRAL problem, the 69 others covered as they stand. CONTROL: under version ten the same record is GREEN; and without its ESCALATION line the options study’s reading owes one under version ten, and under version eleven — limb 3 judging it against today’s oracles, which hold no G10-CLEAN.T03 — nothing more, the present behaviour pinned', async () => {
 		// ⭐ Package V — ~~'the current set is version eleven'~~: version eleven's committed set, a fixed fixture since version twelve;
 		// ~~`CURRENT_*`, `FP_NOW`~~ below, each `V11_*` and `FP_V11`.
@@ -2672,8 +2693,10 @@ describe('⭐⭐ the review in parts, B8b, package K — under case set v11 and 
 			{ limb: 'COVERAGE', message: owed('any', SEVEN, unescalated) },
 			{ limb: 'COVERAGE', message: owed('selected', SEVEN, unescalated) }
 		]);
-	});
+	}, 120_000);
 
+	// ⭑ Z2b phase 2 — its own time budget, 120 s: rendering a review now builds and hashes each decision-model request's body
+	// against D54's records, about twice the work it was, and the gate's coverage run gives a row 30 s by default.
 	it('⭐ A RUN OVER THE 7 TURNS IT GREEN — the selected candidate’s run of the 7 under their new ids, under today’s fingerprint, each as its oracle expects, discharges their coverage: nothing owed. CONTROL: a run over the 7 by another candidate leaves the selected candidate’s coverage owed', async () => {
 		const lines = [...(await asRecorded()), ...(await v11Run('qr-v11-bridge', SEVEN, '2026-10-26T10:00:00.000Z')), select(GLM)];
 		expect((await onVersionEleven([file(lines)])).problems, 'the 7 run under their new ids: nothing owed').toEqual([]);
@@ -2689,7 +2712,7 @@ describe('⭐⭐ the review in parts, B8b, package K — under case set v11 and 
 		expect((await onVersionEleven([file(byAnother)])).problems, 'CONTROL: run by another candidate, the selected one’s coverage owed').toEqual([
 			{ limb: 'COVERAGE', message: owed('selected', SEVEN, byAnother) }
 		]);
-	});
+	}, 120_000);
 });
 
 // ── ⭐⭐ `JAN-EXEC` Phase 7, before P6 again, package V (`REG-D-136`; DESIGN-data-flow-order-and-deliverable-review.md D14) ────
@@ -2820,6 +2843,8 @@ describe('⭐⭐ package V — under case set v12 and the fingerprint L and N mo
 		]);
 	});
 
+	// ⭑ Z2b phase 2 — its own time budget, 120 s: rendering a review now builds and hashes each decision-model request's body
+	// against D54's records, about twice the work it was, and the gate's coverage run gives a row 30 s by default.
 	it('⭐ RESCORED lines of that run for the 35, the ACKNOWLEDGED line naming the 56 ⭐ and the three re-run cases added, and a run of the selected candidate over the 56 ⭐ and one over the three under today’s fingerprint, each answered as its oracle expects: GREEN; without the line, it alone is owed; without the ⭐ runs, the 56 ⭐ and the three alone, by any candidate and by the selected one; ⭐ without the three’s run, the three alone; without the RESCORED lines, the 35 alone', async () => {
 		const v11 = await v11Run();
 		const rescored = await restampToday(v11);
@@ -2852,7 +2877,7 @@ describe('⭐⭐ package V — under case set v12 and the fingerprint L and N mo
 			{ limb: 'COVERAGE', message: [owed('any', PARTS(), withoutRescores), hint(PARTS())].join('\n    ') },
 			{ limb: 'COVERAGE', message: [owed('selected', PARTS(), withoutRescores), hint(PARTS())].join('\n    ') }
 		]);
-	});
+	}, 120_000);
 
 	it('⚠ PRESENT BEHAVIOUR, PINNED FOR THE LEAD — a run under an earlier fingerprint none of whose cases version twelve holds owes the ACKNOWLEDGED line by itself: no case prompt recorded under it is a current case’s, so none shows the move, as on the committed record, whose first run is version one’s. CONTROL: under version eleven, which holds its work-product cases, one of them recorded with another prompt shows the move, and the line is not owed', async () => {
 		const v1 = tamper(await recorded({ runId: 'qr-v1-before', cases: CASES, fingerprint: moved('probes') }), 'W-CLEAN', (c) => ({
@@ -3617,6 +3642,8 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		expect(r.out).toContain('is not in a git work tree');
 	});
 
+	// ⭑ Z2b phase 2 — its own time budget, 120 s: rendering a review now builds and hashes each decision-model request's body
+	// against D54's records, about twice the work it was, and the gate's coverage run gives a row 30 s by default.
 	it('⛔ RED on an empty record — all ~~76~~ ~~⭐ 91~~ ~~⭐ 94~~ ⭐ 97 cases of the committed set are owed (package Y, 2026-10-31: v13 adds three cases)', () => {
 		const r = cli(['--conditions=source'], ['--records', gitRepo()]);
 		expect(r.status, r.out).toBe(1);
@@ -3645,7 +3672,7 @@ describe('JAN-CRITREAD J2-3 — the CLI reads SOURCE (REG-D-072 D11), reads only
 		expect(r.out).not.toContain('[CONFERRAL]');
 		// ~~expect(CURRENT_SET.caseSetVersion).toBe(12); // ⭐ package K — ~~10~~; ⭐ package V — ~~11~~~~ — 2026-10-31, package Y: v13 is current with 97 cases; CLI coverage and records must name the whole set.
 		expect(CURRENT_SET.caseSetVersion).toBe(13); // ⭐ package K — ~~10~~; ⭐ package V — ~~11~~
-	});
+	}, 120_000);
 
 	it('⭐ on a TRACKED record that covers the committed set, reproduces, and holds no material failure: ~~nothing owed but the conferral of version seven’s six new oracles (package P F3)~~ ~~⭐ GREEN, its oracles conferred (REG-D-126, B7)~~ ~~⭐ B8a: nothing owed but the sponsor’s confirmation of the restated bridge cases (REG-D-127)~~ ⭐ GREEN, the restatement confirmed (REG-D-129) ⭐ B8b: and version ten’s, confirmed as proposed (REG-D-131 Q36) ⭐ package K: and version eleven’s, its restatement recorded (REG-D-133 Q39)', async () => {
 		const dir = gitRepo();

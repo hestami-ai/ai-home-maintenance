@@ -1,5 +1,5 @@
 // ⭐⭐ `JAN-EXEC` Phase 8 (`DESIGN-phase-7-completion.md` §5 D1; `REG-D-111` (5); `REG-F-530`) — THE REPLAY'S RECORDING:
-// what a paid run leaves for CI to replay at no cost, as one folder of four files.
+// what a paid run leaves for CI to replay at no cost, as one folder of ~~four~~ five files (⭐ Z2b: `decision-model.jsonl`).
 //
 //   recording.json   the commit, the reviewer fingerprint, the PWA-content digest, ⭐ the OS FAMILY it was made on, ⭐ the
 //                    PUBLISHED PWA's declared content (`REG-D-112` (c), below), the models, the scrub's token kinds, and
@@ -15,7 +15,11 @@
 //   reviewer.jsonl   one line per REVIEWER CALL ⭐ OF THE EXECUTION HALF, in dispatch order: the unit, the framing, the
 //                    role, `promptSha256` (over the scrubbed prompt), the prompt's own bytes, the reply (ANSWERED /
 //                    NOT_RETAINED / NO_ANSWER_SPAN / THROWN with its sanitised message / ⭐ OUTPUT_LIMIT, a reply the
-//                    tool cut, P5 package A), the evaluator, and the call's ELAPSED time.
+//                    tool cut, P5 package A), the evaluator, and the call's ELAPSED time;
+//   decision-model.jsonl   ⭐⭐ `JAN-EXEC` Phase 7, package Z2b (D51; `REG-D-146`) — one line per DECISION-MODEL REQUEST a review
+//                    made before its first reviewer call, in the order the run made them: the key, the model, `bodySha256`
+//                    (over the body with every string in it scrubbed, `indicationBodySha256`), and the score — or why the
+//                    request got none. Step 1's unload request asks no question, and is not among them.
 //
 // ⛔ ALL THREE MUST REPLAY (`REG-F-530`): a replay of the executor alone either pays the reviewer and runs real commands,
 // or reviews with the stand-in and stops at the first unit. So the recording holds the reviewer's answers and the
@@ -105,8 +109,11 @@ import { FINISH_REASON_SHAPE } from '../tools/output-limit.js';
  * so it is refused as another shape rather than read with its key half missing. None was ever committed.
  * ⭐ ~~`/2`~~ `/3` (the lead's delegated decision of 2026-10-15, to be registered): each tool call's `resultSha256`. A `/2`
  * recording keys no result, and is refused the same way. None was committed either.
+ * ⭐ ~~`/3`~~ `/4` (`JAN-EXEC` Phase 7, package Z2b — D51's record, `REG-D-146`; package Z1's departure 10): each decision-model
+ * request the run's reviews made (`indications`), which a replay serves its reviews from. A `/3` recording holds none, so every
+ * review it replayed would be refused at its first request; it is refused as another shape instead. None was committed either.
  */
-export const RECORDING_FORMAT = 'jpwb-replay-recording/3';
+export const RECORDING_FORMAT = 'jpwb-replay-recording/4';
 
 /** The OS family a recording was made on (finding 6, the header's "⚠⚠"). */
 export type OsFamily = 'windows' | 'posix';
@@ -115,12 +122,13 @@ export type OsFamily = 'windows' | 'posix';
 export const osFamilyOf = (platform: string = process.platform): OsFamily =>
 	platform === 'win32' ? 'windows' : 'posix';
 
-/** The four files, by role. */
+/** The ~~four~~ five files, by role. ⭐ Z2b — and the decision model's requests (`indications`). */
 export const RECORDING_FILES = {
 	manifest: 'recording.json',
 	executor: 'executor.jsonl',
 	commands: 'commands.jsonl',
-	reviewer: 'reviewer.jsonl'
+	reviewer: 'reviewer.jsonl',
+	indications: 'decision-model.jsonl'
 } as const;
 
 /**
@@ -645,11 +653,44 @@ export interface ReviewerCall {
 	readonly elapsedMs: number;
 }
 
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package Z2b — ONE DECISION-MODEL REQUEST OF THE RUN (D51's durable record, `REG-D-146`; package Z1's
+ * departure 10): one question a review asked before its first reviewer call, as the replay serves it again. ⭑ Its body is kept as a
+ * hash only — the material it carries is the reviewer prompt's own head, which the reviewer call keeps.
+ */
+export interface RecordedIndication {
+	/** The question's key (`c00`, `s03`). */
+	readonly key: string;
+	/** The model the request named — its body's first field, rebuilt so by the replay. */
+	readonly model: string;
+	/** The body's hash with every string in it scrubbed (`indicationBodySha256`) — what the replay checks each request against. */
+	readonly bodySha256: string;
+	/** The score the decision model gave — or, for a request that got none, why: the replayed review is refused with it. */
+	readonly outcome: { readonly kind: 'SCORED'; readonly score: number } | { readonly kind: 'FAILED'; readonly reason: string };
+}
+
+/**
+ * ⭐ Z2b — A DECISION-MODEL REQUEST'S BODY, HASHED AS THE RECORDING KEEPS IT: every string in it scrubbed (`scrub`), then written
+ * again as JSON. ⛔ Never the body's text scrubbed whole: a body is JSON, whose strings escape what they hold (a Windows path's
+ * backslashes, every non-ASCII character), so a directory would not be found in it as the run spelled it.
+ */
+export function indicationBodySha256(body: string, scrub: (text: string) => string): string {
+	const scrubbed = (v: unknown): unknown => {
+		if (typeof v === 'string') return scrub(v);
+		if (Array.isArray(v)) return v.map(scrubbed);
+		if (typeof v === 'object' && v !== null) return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, scrubbed(x)]));
+		return v;
+	};
+	return sha256Hex(JSON.stringify(scrubbed(JSON.parse(body))));
+}
+
 export interface Recording {
 	readonly manifest: RecordingManifest;
 	readonly executor: readonly ExecutorTry[];
 	readonly commands: readonly RecordedCommand[];
 	readonly reviewer: readonly ReviewerCall[];
+	/** ⭐ Z2b — every decision-model request the run's reviews made, in the order the run made them (`/4`). */
+	readonly indications: readonly RecordedIndication[];
 }
 
 /**
@@ -929,6 +970,23 @@ function reviewerCallOf(v: unknown, where: string): ReviewerCall {
 	};
 }
 
+/** ⭐ Z2b — one decision-model request's line: its key, model, body hash, and a score from 0 to 1 or the reason it got none. */
+function indicationOf(v: unknown, where: string): RecordedIndication {
+	if (!isRecord(v)) return refuse(where, 'is not a JSON object');
+	const key = field(v, 'key', where, isString, 'string');
+	const model = field(v, 'model', where, isString, 'string');
+	const bodySha256 = field(v, 'bodySha256', where, isHex64, 'SHA-256');
+	const o = isRecord(v.outcome) ? v.outcome : refuse(where, 'has no `outcome` object');
+	if (o.kind === 'SCORED') {
+		const score = o.score;
+		if (typeof score !== 'number' || !Number.isFinite(score) || score < 0 || score > 1)
+			refuse(where, 'has a score that is no probability from 0 to 1');
+		return { key, model, bodySha256, outcome: { kind: 'SCORED', score: score as number } };
+	}
+	if (o.kind === 'FAILED') return { key, model, bodySha256, outcome: { kind: 'FAILED', reason: field(o, 'reason', where, isString, 'string') } };
+	return refuse(where, 'has an `outcome.kind` this replay does not know');
+}
+
 /** One `.jsonl` file's lines, each parsed by `of`, each refusal naming its file and line. */
 function linesOf<T>(dir: string, file: string, of: (v: unknown, where: string) => T): T[] {
 	const path = join(dir, file);
@@ -985,12 +1043,13 @@ export function readRecording(dir: string, host: OsFamily = osFamilyOf()): Recor
 		manifest: read,
 		executor: linesOf(dir, RECORDING_FILES.executor, executorTryOf),
 		commands: linesOf(dir, RECORDING_FILES.commands, commandOf),
-		reviewer: linesOf(dir, RECORDING_FILES.reviewer, reviewerCallOf)
+		reviewer: linesOf(dir, RECORDING_FILES.reviewer, reviewerCallOf),
+		indications: linesOf(dir, RECORDING_FILES.indications, indicationOf)
 	};
 }
 
 /**
- * ⭐ A RECORDING AS ITS FOUR FILES' TEXT — the one serialisation, so the recorder and a test that constructs a recording
+ * ⭐ A RECORDING AS ITS ~~FOUR~~ FIVE FILES' TEXT — the one serialisation, so the recorder and a test that constructs a recording
  * write the same bytes. The manifest is tab-indented JSON; each `.jsonl` line is one JSON value, in order, newline-ended.
  */
 export function recordingFiles(recording: Recording): Readonly<Record<string, string>> {
@@ -1000,6 +1059,7 @@ export function recordingFiles(recording: Recording): Readonly<Record<string, st
 		[RECORDING_FILES.manifest]: `${JSON.stringify(recording.manifest, null, '\t')}\n`,
 		[RECORDING_FILES.executor]: jsonl(recording.executor),
 		[RECORDING_FILES.commands]: jsonl(recording.commands),
-		[RECORDING_FILES.reviewer]: jsonl(recording.reviewer)
+		[RECORDING_FILES.reviewer]: jsonl(recording.reviewer),
+		[RECORDING_FILES.indications]: jsonl(recording.indications)
 	};
 }

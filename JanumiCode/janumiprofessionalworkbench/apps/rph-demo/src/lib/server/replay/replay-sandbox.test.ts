@@ -30,7 +30,9 @@ const EMPTY: Recording = {
 	},
 	executor: [],
 	commands: [],
-	reviewer: []
+	reviewer: [],
+	// ⭐ `JAN-EXEC` Phase 7, package Z2b (`/4`) — the run's decision-model requests: none this fixture's run asked.
+	indications: []
 };
 
 const saved = {

@@ -180,6 +180,21 @@ async function initialPrompts(): Promise<Map<string, string>> {
 }
 
 describe('JAN-CRITREAD J2-2 — the runner, over a stub transport', () => {
+	// ⭐⭐ `JAN-EXEC` Phase 7, package Z2b — D54 (D49's RUN-line rule): the scoring identity of the records the prompts were rendered
+	// from, written on the RUN line BESIDE THE CANDIDATE; and a run handed none writes none, as every line recorded before Z2b.
+	it('⭐ Z2b (D54) — the RUN line carries the records’ scoring identity beside its candidate, and none when it is handed none', async () => {
+		const identity = { model: 'pplx-decider:27b-q4_K_M', digest: `733585a9ebb6${'0'.repeat(52)}`, serverVersion: '0.40.15' };
+		const stub = stubTransport(() => answer(judgement([])));
+		const [run] = (await runQualification(inputs({ transport: stub, cases: CASES.slice(0, 1), decisionModel: identity }))) as [RunLine];
+		expect(Object.keys(run).slice(Object.keys(run).indexOf('candidate'), Object.keys(run).indexOf('candidate') + 2), 'beside the candidate').toEqual([
+			'candidate',
+			'decisionModel'
+		]);
+		expect(run.decisionModel).toEqual(identity);
+		const [before] = (await runQualification(inputs({ transport: stub, cases: CASES.slice(0, 1) }))) as [RunLine];
+		expect('decisionModel' in before, 'handed none, it writes none').toBe(false);
+	});
+
 	it('⭐ a run over a stub transport produces RUN + CALL lines that validate, each scored to its oracle through the product’s path', async () => {
 		const byPrompt = await initialPrompts();
 		expect(byPrompt.size, 'every case sends a distinct prompt').toBe(26);

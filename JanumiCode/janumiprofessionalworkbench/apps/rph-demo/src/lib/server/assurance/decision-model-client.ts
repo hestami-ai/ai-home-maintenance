@@ -9,7 +9,7 @@
 //   2. THE MODEL FOUND LOADED IS UNLOADED by step 1's own unload request (`unloadBody`; `step1_single.py` 104-105).
 //   3. BEFORE EVERY REQUEST, `/api/ps` read until the model is absent — step 1's `wait_gone` — refusing past 120 s, and the
 //      other models the server holds read once more, as step 1 recorded them; another model loaded refuses nothing (the sponsor
-//      ruled on 2026-11-06 that the decision model is not to be measured against the graphics card, a ruling still to be registered).
+//      ruled on 2026-11-06 that the decision model is not to be measured against the graphics card, a ruling ~~still to be registered~~ registered as `REG-D-147`).
 //   4. THE REQUEST: its exact bytes (`decisionModelBody`), `content-type: application/json`, `keep_alive` 0 — so the model is
 //      unloaded after it, and the next request is answered by a fresh load — its score read as `answers[key].noul`.
 // ⛔ Every refusal is a reason, never a throw: no server, no model, another digest, another server version, an HTTP error (a 413
@@ -59,6 +59,12 @@ export interface DecisionModelClientOptions {
 	readonly clock?: () => string;
 	/** For tests: the request's fixed text. Absent, the screen's (`DECISION_MODEL_TEXT`). */
 	readonly text?: DecisionModelText;
+	/**
+	 * ⭐⭐ Package Z2b — D54 — the HTTP client the requests go through: absent, the platform's `fetch`. ⚠ Handed in only where no
+	 * server is meant to be reached: the reviewer fingerprint's pointer component drives the cold path against a server held in
+	 * memory, so a change to the path moves the fingerprint (`scripts/reviewer-qual/decision-model-pointer.ts`).
+	 */
+	readonly fetch?: typeof fetch;
 }
 
 /** A reason a review is refused with: thrown inside the client, returned from it. */
@@ -94,11 +100,23 @@ function errorOf(text: string): string {
 	}
 }
 
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package Z2b phase 1b — D54 restated (`REG-D-146`; ~~to be filed in d48 as~~ filed in d48 as `REG-F-611`) — THE CLIENT'S OWN WORDS
+ * FOR A REQUEST THE SERVER REFUSED: its key, the status and the error the server's answer names (`errorOf`). ⭑ Exported so the
+ * static source answers a body recorded refused in these words, made from the recorded status and answer, never a copy of them
+ * (`scripts/reviewer-qual/recorded-indications.ts`): a change to the words moves the replay with the client.
+ */
+export function refusedRequestReason(key: string, status: number, response: string): string {
+	return `request ${key} was refused: HTTP ${status}${errorOf(response)}`;
+}
+
 /** ⭐ A response read as step 1 read it — `answers[key].noul` — or why it holds no score for exactly what was asked. */
 function scoreOf(key: string, posted: Extract<Posted, { kind: 'ANSWERED' }>): IndicationExchange['outcome'] {
 	const fail = (parse: 'NOT_ATTEMPTED' | 'EMPTY_RESPONSE' | 'JSON_PARSE_FAILED' | 'SCHEMA_COERCION_FAILED', reason: string) =>
 		({ kind: 'FAILED', parse, reason }) as const;
-	if (posted.status < 200 || posted.status > 299) return fail('NOT_ATTEMPTED', `request ${key} was refused: HTTP ${posted.status}${errorOf(posted.text)}`);
+	// ~~`request ${key} was refused: HTTP ${posted.status}${errorOf(posted.text)}`~~ ⛔ MOVED 2026-11-07 (Z2b phase 1b): the same words,
+	// from the formatter the static source shares (`refusedRequestReason`).
+	if (posted.status < 200 || posted.status > 299) return fail('NOT_ATTEMPTED', refusedRequestReason(key, posted.status, posted.text));
 	if (posted.text.trim() === '') return fail('EMPTY_RESPONSE', `request ${key}’s answer was empty`);
 	let parsed: unknown;
 	try {
@@ -128,6 +146,7 @@ export function createDecisionModelClient(o: DecisionModelClientOptions): Indica
 	const bounds: DecisionModelBounds = { ...DECISION_MODEL_BOUNDS, ...o.bounds };
 	const clock = o.clock ?? (() => new Date().toISOString());
 	const text = o.text ?? DECISION_MODEL_TEXT;
+	const fetch = o.fetch ?? globalThis.fetch;
 
 	/** Step 1's `get`: one read of the server, its JSON. */
 	const get = async (path: string): Promise<Record<string, unknown>> => {

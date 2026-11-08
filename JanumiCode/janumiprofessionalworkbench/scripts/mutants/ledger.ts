@@ -11356,8 +11356,12 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "SR2-M15-the-fingerprints-probe-validator-requires-the-reported-model",
 		file: "scripts/reviewer-qual/fingerprint.ts",
-		find: "createAgyReasoningReviewValidator({ ...FINGERPRINT_EVALUATOR, clock: FIXED_CLOCK, indications: PLACEHOLDER_INDICATIONS, print }),",
-		replace: "createAgyReasoningReviewValidator({ ...FINGERPRINT_EVALUATOR, clock: FIXED_CLOCK, indications: PLACEHOLDER_INDICATIONS, print, requireReportedModel: true }), // MUTANT: the probe validator requires the reported model",
+		// RE-ANCHORED 2026-11-07 (`JAN-EXEC` Phase 7, package Z2b — D54): the probe validator reads the committed records' static
+		// source in place of the placeholder (`COMMITTED_INDICATIONS`), so ~~`indications: PLACEHOLDER_INDICATIONS`~~ is gone from
+		// its line. The mutation is the same: the validator built WITH `requireReportedModel`. ⚠ Re-measured in phase 2, with the
+		// records: its victim's pins wait for them.
+		find: "createAgyReasoningReviewValidator({ ...FINGERPRINT_EVALUATOR, clock: FIXED_CLOCK, indications: COMMITTED_INDICATIONS, print }),",
+		replace: "createAgyReasoningReviewValidator({ ...FINGERPRINT_EVALUATOR, clock: FIXED_CLOCK, indications: COMMITTED_INDICATIONS, print, requireReportedModel: true }), // MUTANT: the probe validator requires the reported model",
 		expectRed: ["verif/reviewer-qualification-fingerprint.test.ts"],
 		why: "PROMISE (JAN-SELREV D6): the fingerprint's probe validator is built without requireReportedModel, as the runner's is. WHO RELIES: the reviewer fingerprint, which must measure the prompt and scoring the product's validator has without the devin-only gate. WHAT THE MUTATION DOES: the probe seam refuses a reply reporting another model; the fingerprint measures a validator no qualification runs. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-fingerprint.test.ts: '⛔ a corpus reply reporting ANOTHER model is scored, never refused — by both of the fingerprint’s validators' (Error: The reviewing tool 'devin' reported that the model 'jpwb-qualification-case-author' answered, but this review is configured for 'jpwb-fingerprint-reviewer' — a substituted model, so the review fails closed (JAN-SELREV D6). Reconfigur) ⭑ RE-ANCHORED 2026-11-06 (JAN-EXEC Phase 7, package Z1 - D50; REG-D-146; ledger rule #5, in the commit that moved the code): the probe validator is built with the scripts' placeholder decision model too (indications.ts), so the line names it; the mutation, the promise and the victim are unchanged. ⭑ RE-MEASURED 2026-11-06 (JAN-EXEC Phase 7, package Z1 - D50, D52; REG-D-146: the review section's code beside this entry's anchor moved, or its victim's pins were restated): RE-OBSERVED (bun run mutants -- P6X-Z1- and the 26 entries re-measured with it (P6X-X-M2, P6X-X-M3, SR2-M15, SR2-M14, J23-M30, ER1-M100, ER1-V103, ER1-V200, ER1-M307, PQ1-M1310 to PQ1-M1320, PQ1-V1307, P76-M19, PQ1-M1422, PQ1-M1423, PQ1-V1402 and PQ1-V1403), by their full ids, 2026-11-06, in the package Z1 worktree, branch p7c-z, the changes staged, each mutant applied and restored by the runner; 'KILLED      41', 'RETIRED     0', 'SURVIVED    1', 'UNANCHORED  0', 'NO_COMPILE  0', 'KILLED_UNNAMED 0', 'ABORTED_DIRTY 0', 'INCONCLUSIVE 7', 'DUPLICATE   0', 'ABOLISHED   0', '49 entries -> 49 distinct mutations measured (0 duplicate, 0 retired, 0 abolished).'): INCONCLUSIVE - the runner's verdict, verbatim: 'INCONCLUSIVE   SR2-M15-the-fingerprints-probe-validator-requires-the-reported-model the named victim verif/reviewer-qualification-fingerprint.test.ts was ALREADY RED before this mutation was applied, so its failure afterwards attributes nothing — fix the suite'. ⚠ NOT MEASURED: its victim is red at package Z1 for the reason z1-facts.md section 8 gives (six fingerprint probes past a D52 bound), held for the lead's ruling; this entry is owed a measurement once the victim is green. ⭑ RE-MEASURED 2026-11-06 (JAN-EXEC Phase 7, package Z1b - D52; REG-D-146: its victim green again, the six probes past a D52 bound kept as refusal probes and their sent successors added): RE-OBSERVED (bun run mutants -- the eighteen entries of package Z1b by their ids: P6X-Z1-M24 to M29, the five it re-anchored (PQ1-M1557, PQ1-M1558, PQ1-M1766, PQ1-M1767, ARP-B7-M31) and the seven package Z1 left INCONCLUSIVE (SR2-M15, J23-M30, SR2-M14, PQ1-M1422, PQ1-M1423, PQ1-V1402, PQ1-V1403), 2026-11-06, in the package Z1b worktree, branch p7c-z, the changes staged, each mutant applied and restored by the runner; 'KILLED      18', 'SURVIVED    0', 'UNANCHORED  0', 'NO_COMPILE  0', 'KILLED_UNNAMED 0', 'ABORTED_DIRTY 0', 'INCONCLUSIVE 0', '18 entries -> 18 distinct mutations measured (0 duplicate, 0 retired, 0 abolished).'): KILLED - the runner's verdict, verbatim: 'KILLED         SR2-M15-the-fingerprints-probe-validator-requires-the-reported-model ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'.",
 		source: "JAN-SELREV SR-2 - the model and the program that ran are the ones configured: requireReportedModel in the validator's timed(), set only by the product's devin branch (D6); the adapters export their captured program overrides and the selector refuses the SELECTED tool's outside test mode, even as '' (D7; REG-F-441 remedy (a)) (ROADMAP-the-selected-reviewer.md SR-2; DESIGN-the-selected-reviewer.md revision 2, D6, D7)"
@@ -16217,8 +16221,9 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "PQ1-M612-the-edges-instruction-is-under-its-limit",
 		file: "scripts/reviewer-qual/probes.ts",
-		find: "producingPrompt: filled('Write the condition survey summary for the retaining wall, panel by panel. ', B.USER_INTENT_MAX),",
-		replace: "producingPrompt: filled('Write the condition survey summary for the retaining wall, panel by panel. ', B.USER_INTENT_MAX - 1), // MUTANT: the instruction is one under its limit",
+		// RE-ANCHORED 2026-11-07 (`JAN-EXEC` Phase 7, package Z2b phase 1b — D54 restated: the instruction named, `EDGES_INSTRUCTION`, W-OVERSIZE-EDGES's and its successor's alike). ⚠ Re-measured with phase 1b's mutants.
+		find: "const EDGES_INSTRUCTION = filled('Write the condition survey summary for the retaining wall, panel by panel. ', B.USER_INTENT_MAX);",
+		replace: "const EDGES_INSTRUCTION = filled('Write the condition survey summary for the retaining wall, panel by panel. ', B.USER_INTENT_MAX - 1); // MUTANT: the instruction is one under its limit",
 		expectRed: ["verif/reviewer-qualification-fingerprint.test.ts"],
 		why: "PROMISE (REG-F-480, REG-F-483, REG-F-476): a slice exactly at its limit is shown whole and undeclared, and the fingerprint moves if it is cut, because W-OVERSIZE-EDGES's instruction is EXACTLY USER_INTENT_MAX. WHO RELIES: reviewer:qual:check. WHAT THE MUTATION DOES: the instruction is one unit short, so a cut taking a slice AT its limit moves nothing; the arrangement reddens. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-fingerprint.test.ts: '⭐ W-OVERSIZE-EDGES stands on a head-only cut’s two edges — an instruction EXACTLY at USER_INTENT_MAX, shown whole and undeclared; an astral answer, its kept HEAD declared in CODE POINTS' (AssertionError: the arrangement: an instruction of EXACTLY USER_INTENT_MAX units: expected 3999 to be 4000 // Object.is equality)",
 		source: "JAN-PRQUAL PQ-1 (fix round 2, instrument) - the fingerprint reaches the fence choosers, every family of the skeleton's table, the command line's encoder, the capture line's count, a head-only cut's two edges and the account's host lines and tie; the shared rows pinned whole; the painted limb reads the glyphs' own paint by difference; step 2b of the inverse transform (DESIGN-process-result-qualification.md D2, D3, D6; ROADMAP-process-result-qualification.md PQ-1; REG-F-476, REG-F-480, REG-F-481, REG-D-094)"
@@ -19102,8 +19107,9 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "PQ1-M1430-the-view-chooser-stdout-row-skips-nothing",
 		file: "verif/reviewer-qualification-fingerprint.test.ts",
-		find: "stdout: { moves: ['P-OVERSIZE-FENCES', 'P-FENCE-AT-THE-LAST'], builder: choosing((p) => p.slice !== 'stdout') },",
-		replace: "stdout: { moves: ['P-OVERSIZE-FENCES', 'P-FENCE-AT-THE-LAST'], builder: choosing(() => true) }, // MUTANT: stdout read",
+		// RE-ANCHORED 2026-11-07 (`JAN-EXEC` Phase 7, package Z2b phase 1b — D54 restated: the row names P-OVERSIZE-FENCES's successor under the server's limit, `P-OVERSIZE-FENCES-SENT`). ⚠ Re-measured with phase 1b's mutants.
+		find: "stdout: { moves: ['P-OVERSIZE-FENCES-SENT', 'P-FENCE-AT-THE-LAST'], builder: choosing((p) => p.slice !== 'stdout') },",
+		replace: "stdout: { moves: ['P-OVERSIZE-FENCES-SENT', 'P-FENCE-AT-THE-LAST'], builder: choosing(() => true) }, // MUTANT: stdout read",
 		expectRed: ["verif/reviewer-qualification-fingerprint.test.ts"],
 		why: "PROMISE: a view-chooser row stands for each slice the view's chooser reads, stdout whole and cut among them (REG-F-481; design D2 under the sponsor's answer (a) of 2026-10-03). WHO RELIES: the reviewer fingerprint (design section 5.5, 5.6), which says which reviewer definition a record measured, and reviewer:qual:check, which reads it before the paid re-run (design section 9.4) is trusted. WHAT THE MUTATION DOES: the stdout row skips nothing, and asks nothing. OBSERVED: KILLED — 1 test(s) red in reviewer-qualification-fingerprint.test.ts: '⭐ a view chooser that stops reading stdout moves `probes` through exactly the probes that plant a candidate there, and no case prompt' (AssertionError: the reviewer fingerprint moves: expected 'ed39d6cc8c7b4d566c8bdd88f0ac9f67ed028…' not to be 'ed39d6cc8c7b4d566c8bdd88f0ac9f67ed028…' // Object.is equality)",
 		source: "JAN-PRQUAL PQ-1 (fix round 6, instrument) - the instrument under design §9.3 D7 and D8 (the sponsor's answers of 2026-10-05): every slice either fence chooser reads, what no chooser may read, the reader corpus whole and by label, and the rubric's stakes and the glosses hashed (DESIGN-process-result-qualification.md §9.3; ROADMAP-process-result-qualification.md PQ-1; REG-F-481, REG-F-476, REG-D-094)"
@@ -35346,8 +35352,9 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "ARP-B7-M31-the-probe-set-comment-keeps-its-old-count",
 		file: "scripts/reviewer-qual/probes.ts",
-		find: "NO-CRITERIA)~~\n * ninety-five",
-		replace: "NO-CRITERIA)~~\n * forty-seven",
+		// RE-ANCHORED 2026-11-07 (`JAN-EXEC` Phase 7, package Z2b phase 1b — D54 restated: the comment's count struck and restated, ninety-seven, with the two successors). ⚠ Re-measured with phase 1b's mutants.
+		find: "NO-CRITERIA)~~ ninety-seven",
+		replace: "NO-CRITERIA)~~ forty-seven",
 		expectRed: ["verif/reviewer-qualification-fingerprint.test.ts"],
 		why: "PROMISE (B7's check, its fourth MINOR finding): the probe set's doc comment states the number of probes it names, the set's own. WHO RELIES: the reader of probes.ts, told what the fingerprint hashes. WHAT THE MUTATION DOES: the comment's count is 'forty-seven' again. OBSERVED (bun run mutants -- ARP-B7-M31 ARP-B7-M32, 2026-10-24, in the package D worktree, the changes staged, each mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         ARP-B7-M31-the-probe-set-comment-keeps-its-old-count ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'. ⭐ RE-ANCHORED 2026-10-24 (the review in parts, package F, B8a; ledger rule #5, in the commit that moved the code): the probe set's doc comment strikes its count of sixty-six and states sixty-nine, the D3a probes added, so the find is the struck span's end and the count after it, and the mutation still makes the count read 'forty-seven'. The promise and the mutation are unchanged. RE-OBSERVED (bun run mutants -- ARP-F-M and the fifteen entries this package re-anchored, by their full ids, 2026-10-24, in the package F worktree, the changes staged, each mutant applied and restored by the runner): KILLED - the runner's verdict, verbatim: 'KILLED         ARP-B7-M31-the-probe-set-comment-keeps-its-old-count ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'. ⭐ RE-ANCHORED 2026-10-26 (JAN-EXEC Phase 7, package N; ledger rule #5, in the commit that moved the code): the probe set's doc comment strikes its count of sixty-nine and states seventy-six, package N's seven probes added. The promise and the mutation are unchanged. RE-OBSERVED (bun run mutants -- P6X-N- and the 14 entries package N re-anchored, by their full ids, 2026-10-26, in the package N worktree, branch p7c-p6-n, the changes staged, each mutant applied and restored by the runner; 35 entries, 35 distinct mutations measured, 'KILLED      33', 'SURVIVED    0', 'UNANCHORED  0', 'NO_COMPILE  2' (P6X-N-M9 and P6X-N-M17, each re-formulated to mutate the consequence and re-measured alone: 'KILLED      2', 'NO_COMPILE  0')): KILLED - the runner's verdict, verbatim: 'KILLED         ARP-B7-M31-the-probe-set-comment-keeps-its-old-count ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'. ⭐ RE-ANCHORED 2026-10-26 (JAN-EXEC Phase 7, package O-2, design D28; ledger rule #5, in the commit that moved the code): the probe set's doc comment strikes its count of seventy-six and states seventy-nine, package O-2's three probes added. The promise and the mutation are unchanged. RE-OBSERVED (bun run mutants -- P6X-O2- and the five entries package O-2 re-anchored or re-formulated, by their full ids, 2026-10-26, in the package O worktree, branch p7c-p6-o, package O-2, the changes staged, each mutant applied and restored by the runner; '20 entries -> 20 distinct mutations measured (0 duplicate, 0 retired, 0 abolished).' 'KILLED      20', 'SURVIVED    0', 'UNANCHORED  0', 'NO_COMPILE  0', 'RETIRED     0', 'ABORTED_DIRTY 0', 'INCONCLUSIVE 0'): KILLED - the runner's verdict, verbatim: 'KILLED         ARP-B7-M31-the-probe-set-comment-keeps-its-old-count ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'. ⭐ RE-ANCHORED 2026-10-31 (JAN-EXEC Phase 7, package X, stage X2 - D31; ledger rule #5, in the commit that moved the code): the probe set's doc comment strikes its count of seventy-nine and states eighty, W-RERUN-MARKED added, so the find is the struck span's end and the count after it, and the mutation still makes the count read 'forty-seven'. The promise and the mutation are unchanged. RE-OBSERVED (bun run mutants -- ARP-B7-M31-the-probe-set-comment-keeps-its-old-count alone, 2026-10-31, in the package X worktree, branch p7c-p6-x, stage X2 (D31's product side and its probe), the changes staged, the mutant applied and restored by the runner; '1 entries -> 1 distinct mutations measured (0 duplicate, 0 retired, 0 abolished).', 'KILLED      1', 'SURVIVED    0', 'UNANCHORED  0', 'NO_COMPILE  0', 'ABORTED_DIRTY 0', 'INCONCLUSIVE 0'): KILLED - the runner's verdict, verbatim: 'KILLED         ARP-B7-M31-the-probe-set-comment-keeps-its-old-count ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'. ⭑ RE-ANCHORED 2026-11-06 (JAN-EXEC Phase 7, package Z1b — D52; REG-D-146; ledger rule #5, in the commit that moved the code): `BREAKS_ACCOUNT` is now `breaksAccount` over all four fields (byte for byte as before), and the probe set's count moved to ninety-five; the mutation is written on the code that now builds it. The count is the comment's last, unstruck, ninety-five (package Z1b). ⭑ RE-MEASURED 2026-11-06 (JAN-EXEC Phase 7, package Z1b - D52; REG-D-146: its victim green again, the six probes past a D52 bound kept as refusal probes and their sent successors added): RE-OBSERVED (bun run mutants -- the eighteen entries of package Z1b by their ids: P6X-Z1-M24 to M29, the five it re-anchored (PQ1-M1557, PQ1-M1558, PQ1-M1766, PQ1-M1767, ARP-B7-M31) and the seven package Z1 left INCONCLUSIVE (SR2-M15, J23-M30, SR2-M14, PQ1-M1422, PQ1-M1423, PQ1-V1402, PQ1-V1403), 2026-11-06, in the package Z1b worktree, branch p7c-z, the changes staged, each mutant applied and restored by the runner; 'KILLED      18', 'SURVIVED    0', 'UNANCHORED  0', 'NO_COMPILE  0', 'KILLED_UNNAMED 0', 'ABORTED_DIRTY 0', 'INCONCLUSIVE 0', '18 entries -> 18 distinct mutations measured (0 duplicate, 0 retired, 0 abolished).'): KILLED - the runner's verdict, verbatim: 'KILLED         ARP-B7-M31-the-probe-set-comment-keeps-its-old-count ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'.",
 		source: "JAN-EXEC Phase 7, the review in parts, package D, B7's check, the fourth MINOR finding - FINGERPRINT_PROBES' doc comment, which says the probe set in its fixed order, names all 66 probes in that order (the declared framing's seventeen D- among them) and states their number, sixty-six, where B7 left 'forty-seven' over a list of 49"
@@ -39771,7 +39778,8 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "P6X-Z2-M9-an-http-error-is-read-as-an-answer",
 		file: "apps/rph-demo/src/lib/server/assurance/decision-model-client.ts",
-		find: "if (posted.status < 200 || posted.status > 299) return fail('NOT_ATTEMPTED', `request ${key} was refused: HTTP ${posted.status}${errorOf(posted.text)}`);",
+		// RE-ANCHORED 2026-11-07 (`JAN-EXEC` Phase 7, package Z2b phase 1b — D54 restated: the words now from the formatter the static source shares, `refusedRequestReason`). ⚠ Re-measured with phase 1b's mutants.
+		find: "if (posted.status < 200 || posted.status > 299) return fail('NOT_ATTEMPTED', refusedRequestReason(key, posted.status, posted.text));",
 		replace: "// MUTANT: an HTTP error's body read as an answer",
 		expectRed: ["apps/rph-demo/src/lib/server/assurance/decision-model-client.test.ts"],
 		why: "PROMISE (an HTTP error, a 413 among them, refuses the review with its status and the server's error). WHO RELIES: the selected reviewer, which reads the indications the screen measured (REG-F-605), D53's re-measurement and D54's records, made through this code. WHAT THE MUTATION DOES: a refused request's error body is read for a score. PREDICTED RED: the HTTP error and 413 refusals, which name the status. OBSERVED (bun run mutants -- P6X-Z2-M7- to P6X-Z2-M23- by their ids (the 17 whose victim is the client's test, re-measured after that test's waits were bounded and two replacements were made to compile), 2026-11-07, in the package Z2a worktree, branch p7c-z, the changes staged, each mutant applied and restored by the runner; 'KILLED      17', 'SURVIVED    0', 'UNANCHORED  0', 'NO_COMPILE  0', 'KILLED_UNNAMED 0', 'ABORTED_DIRTY 0', 'INCONCLUSIVE 0', '17 entries -> 17 distinct mutations measured (0 duplicate, 0 retired, 0 abolished).'): KILLED - the runner's verdict, verbatim: 'KILLED         P6X-Z2-M9-an-http-error-is-read-as-an-answer ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯'.",
@@ -39960,8 +39968,12 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 	{
 		id: "P6X-Z2-M30-the-configured-version-is-ignored",
 		file: "apps/rph-demo/src/lib/server/assurance/decision-model.ts",
-		find: "return createDecisionModelClient({ server, model, identity: { digest, serverVersion } });",
-		replace: "return createDecisionModelClient({ server, model, identity: { digest, serverVersion: '0.40.15' } }); // MUTANT: the configured version ignored",
+		// RE-ANCHORED 2026-11-07 (`JAN-EXEC` Phase 7, package Z2b — D51, D54; the Z2b brief's item 3): the server version is no longer
+		// configured — the client is held to D54's records' identity (`DECISION_MODEL_RECORDS_IDENTITY`) — so ~~`identity: { digest,
+		// serverVersion }`~~ is gone. The promise is restated: the client is held to THE RECORDS' version; the mutant holds it to
+		// another, written here (⛔ not '0.40.15', the records' own, which would be an equivalent mutant).
+		find: "return createDecisionModelClient({ server, model, identity: { digest: recorded.digest, serverVersion: recorded.serverVersion } });",
+		replace: "return createDecisionModelClient({ server, model, identity: { digest: recorded.digest, serverVersion: '0.40.16' } }); // MUTANT: the records' version ignored",
 		expectRed: ["apps/rph-demo/src/lib/server/assurance/decision-model.test.ts"],
 		why: "PROMISE (the client is held to the configured server version). WHO RELIES: the selected reviewer, which reads the indications the screen measured (REG-F-605), D53's re-measurement and D54's records, made through this code. WHAT THE MUTATION DOES: the client is held to a version written here. PREDICTED RED: the configured row's refusal of 0.40.15 against 0.40.16. OBSERVED (bun run mutants -- P6X-Z2- (all 35 entries of package Z2a), 2026-11-07, in the package Z2a worktree, branch p7c-z, the changes staged, each mutant applied and restored by the runner; 'KILLED      31', 'SURVIVED    0', 'UNANCHORED  0', 'NO_COMPILE  2', 'KILLED_UNNAMED 0', 'ABORTED_DIRTY 0', 'INCONCLUSIVE 2', '35 entries -> 35 distinct mutations measured (0 duplicate, 0 retired, 0 abolished).'): KILLED - the runner's verdict, verbatim: 'KILLED         P6X-Z2-M30-the-configured-version-is-ignored ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'.",
 		source: "JAN-EXEC Phase 7, package Z2a (REG-D-146; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.3 and §12.6, D51 and D54; roadmap §9b.5b, Z2): the decision model's request byte for byte as the screen sent it; its client — step 1's cold path, the identity held to the configured one, each refusal before any reviewer call; each request a try of its own on the record, the review's first exchange pointing at the set; the paid count, the lane's limit, the report and the replay recorder counting none of them; and D54's records-generation and live-check scripts"
@@ -40010,5 +40022,530 @@ export const DECLARED_MUTANTS: readonly DeclaredMutant[] = [
 		expectRed: ["verif/decision-model-live-check.test.ts"],
 		why: "PROMISE (the live check's scores exactly equal, 394 of 394 (D54)). WHO RELIES: the selected reviewer, which reads the indications the screen measured (REG-F-605), D53's re-measurement and D54's records, made through this code. WHAT THE MUTATION DOES: scores one unit in the last place apart read as equal. PREDICTED RED: the live check's ulp row. OBSERVED (bun run mutants -- P6X-Z2- (all 35 entries of package Z2a), 2026-11-07, in the package Z2a worktree, branch p7c-z, the changes staged, each mutant applied and restored by the runner; 'KILLED      31', 'SURVIVED    0', 'UNANCHORED  0', 'NO_COMPILE  2', 'KILLED_UNNAMED 0', 'ABORTED_DIRTY 0', 'INCONCLUSIVE 2', '35 entries -> 35 distinct mutations measured (0 duplicate, 0 retired, 0 abolished).'): KILLED - the runner's verdict, verbatim: 'KILLED         P6X-Z2-M35-the-live-check-compares-loosely ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯'.",
 		source: "JAN-EXEC Phase 7, package Z2a (REG-D-146; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.3 and §12.6, D51 and D54; roadmap §9b.5b, Z2): the decision model's request byte for byte as the screen sent it; its client — step 1's cold path, the identity held to the configured one, each refusal before any reviewer call; each request a try of its own on the record, the review's first exchange pointing at the set; the paid count, the lane's limit, the report and the replay recorder counting none of them; and D54's records-generation and live-check scripts"
+	},
+	{
+		id: "P6X-Z2B-M1-an-inner-name-of-the-state-moves",
+		file: "apps/rph-demo/src/lib/server/assurance/decision-model-request.ts",
+		find: "['decision_policy', dict(['objective', str(text.OBJECTIVE)]",
+		replace: "['decision_policies', dict(['objective', str(text.OBJECTIVE)] /* MUTANT: an inner name of the state renamed */",
+		expectRed: ["verif/decision-model-pointer.test.ts"],
+		why: "PROMISE (the pointer covers this evaluation's own inner names (D51, D54)). WHO RELIES: the gate and the qualification, which render every prompt from D54's records and run no model (D54), and D53's re-measurement, held to the fingerprint those prompts make. WHAT THE MUTATION DOES: the state names its policy `decision_policies`. PREDICTED RED: the pointer's whole-text pin (POINTER_TODAY). OBSERVED: owed — measured by the runner in phase 2 (the Z2b brief), its verdict quoted here then.",
+		source: "JAN-EXEC Phase 7, package Z2b (REG-D-146; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.2 and §12.6, D50 and D54; roadmap §9b.5b, Z2): the committed records' static source, refusing a question no record holds, a body scored twice and records of another identity; the fingerprint's pointer component; the RUN line's scoring identity beside the candidate; production held to the records' identity; and a replay serving its recorded indications, matched by body"
+	},
+	{
+		id: "P6X-Z2B-M2-a-questions-answer-moves",
+		file: "apps/rph-demo/src/lib/server/assurance/decision-model-request.ts",
+		find: "CHECK_TRUE: 'The criterion is not met.',",
+		replace: "CHECK_TRUE: 'The criterion is unmet.', // MUTANT: a question's answer reworded",
+		expectRed: ["verif/decision-model-pointer.test.ts"],
+		why: "PROMISE (the pointer covers both questions and their answers (D54)). WHO RELIES: the gate and the qualification, which render every prompt from D54's records and run no model (D54), and D53's re-measurement, held to the fingerprint those prompts make. WHAT THE MUTATION DOES: a check's `true` answer reads otherwise. PREDICTED RED: the pointer's whole-text pin (POINTER_TODAY). OBSERVED: owed — measured by the runner in phase 2 (the Z2b brief), its verdict quoted here then.",
+		source: "JAN-EXEC Phase 7, package Z2b (REG-D-146; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.2 and §12.6, D50 and D54; roadmap §9b.5b, Z2): the committed records' static source, refusing a question no record holds, a body scored twice and records of another identity; the fingerprint's pointer component; the RUN line's scoring identity beside the candidate; production held to the records' identity; and a replay serving its recorded indications, matched by body"
+	},
+	{
+		id: "P6X-Z2B-M3-the-statement-cut-drops-a-region",
+		file: "apps/rph-demo/src/lib/server/assurance/review-cuts.ts",
+		find: "\t\telse if (label.startsWith('Residual uncertainty')) out.push(...listItems('residual', body));\n",
+		replace: "\t\t// MUTANT: the residual-uncertainty region is not cut into statements\n",
+		expectRed: ["verif/decision-model-pointer.test.ts"],
+		why: "PROMISE (the pointer covers both cuts (D54): the statements, every region D43's host-label cut reads). WHO RELIES: the gate and the qualification, which render every prompt from D54's records and run no model (D54), and D53's re-measurement, held to the fingerprint those prompts make. WHAT THE MUTATION DOES: the residual-uncertainty region yields no statement. PREDICTED RED: the pointer's whole-text pin (POINTER_TODAY). OBSERVED: owed — measured by the runner in phase 2 (the Z2b brief), its verdict quoted here then.",
+		source: "JAN-EXEC Phase 7, package Z2b (REG-D-146; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.2 and §12.6, D50 and D54; roadmap §9b.5b, Z2): the committed records' static source, refusing a question no record holds, a body scored twice and records of another identity; the fingerprint's pointer component; the RUN line's scoring identity beside the candidate; production held to the records' identity; and a replay serving its recorded indications, matched by body"
+	},
+	{
+		id: "P6X-Z2B-M4-the-check-cut-keeps-the-bracket",
+		file: "apps/rph-demo/src/lib/server/assurance/review-cuts.ts",
+		find: "const CHECK_LINE = /^- ([A-Z]{2}-\\p{Nd}\\p{Nd}[A-Za-z0-9-]*): ([^\\n]*?)(?: \\[if unmet: [A-Z]+\\])?$/u;",
+		replace: "const CHECK_LINE = /^- ([A-Z]{2}-\\p{Nd}\\p{Nd}[A-Za-z0-9-]*): ([^\\n]*)$/u; // MUTANT: the policy's bracket is kept in the label",
+		expectRed: ["verif/decision-model-pointer.test.ts"],
+		why: "PROMISE (the pointer covers both cuts (D54): the checks, the policy's bracket removed). WHO RELIES: the gate and the qualification, which render every prompt from D54's records and run no model (D54), and D53's re-measurement, held to the fingerprint those prompts make. WHAT THE MUTATION DOES: a check's label keeps `[if unmet: …]`. PREDICTED RED: the pointer's whole-text pin (POINTER_TODAY). OBSERVED: owed — measured by the runner in phase 2 (the Z2b brief), its verdict quoted here then.",
+		source: "JAN-EXEC Phase 7, package Z2b (REG-D-146; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.2 and §12.6, D50 and D54; roadmap §9b.5b, Z2): the committed records' static source, refusing a question no record holds, a body scored twice and records of another identity; the fingerprint's pointer component; the RUN line's scoring identity beside the candidate; production held to the records' identity; and a replay serving its recorded indications, matched by body"
+	},
+	{
+		id: "P6X-Z2B-M5-a-statement-entry-is-formatted-otherwise",
+		file: "apps/rph-demo/src/lib/server/assurance/review-section.ts",
+		find: "`Statement, ${pyFormat2(statements[i]!.score)}:`,",
+		replace: "`Statement ${pyFormat2(statements[i]!.score)}:`, // MUTANT: a statement's entry formatted otherwise",
+		expectRed: ["verif/decision-model-pointer.test.ts"],
+		why: "PROMISE (the pointer covers the block's wording and format (D50, D54)). WHO RELIES: the gate and the qualification, which render every prompt from D54's records and run no model (D54), and D53's re-measurement, held to the fingerprint those prompts make. WHAT THE MUTATION DOES: a statement's entry loses its comma. PREDICTED RED: the pointer's whole-text pin (POINTER_TODAY). OBSERVED: owed — measured by the runner in phase 2 (the Z2b brief), its verdict quoted here then.",
+		source: "JAN-EXEC Phase 7, package Z2b (REG-D-146; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.2 and §12.6, D50 and D54; roadmap §9b.5b, Z2): the committed records' static source, refusing a question no record holds, a body scored twice and records of another identity; the fingerprint's pointer component; the RUN line's scoring identity beside the candidate; production held to the records' identity; and a replay serving its recorded indications, matched by body"
+	},
+	{
+		id: "P6X-Z2B-M6-the-wait-reads-ps-once",
+		file: "apps/rph-demo/src/lib/server/assurance/decision-model-client.ts",
+		find: "\t\twhile ((await loaded()).includes(o.model)) {\n",
+		replace: "\t\tfor (let polls = 0; polls < 1 && (await loaded()).includes(o.model); polls += 1) { // MUTANT: /api/ps read once, never until absent\n",
+		expectRed: ["verif/decision-model-pointer.test.ts"],
+		why: "PROMISE (the pointer covers the cold path (D51, D54): `/api/ps` read until the model is absent before every request). WHO RELIES: the gate and the qualification, which render every prompt from D54's records and run no model (D54), and D53's re-measurement, held to the fingerprint those prompts make. WHAT THE MUTATION DOES: the wait reads `/api/ps` once and goes on, the model still listed. PREDICTED RED: the pointer's whole-text pin (POINTER_TODAY): its requests. OBSERVED: owed — measured by the runner in phase 2 (the Z2b brief), its verdict quoted here then.",
+		source: "JAN-EXEC Phase 7, package Z2b (REG-D-146; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.2 and §12.6, D50 and D54; roadmap §9b.5b, Z2): the committed records' static source, refusing a question no record holds, a body scored twice and records of another identity; the fingerprint's pointer component; the RUN line's scoring identity beside the candidate; production held to the records' identity; and a replay serving its recorded indications, matched by body"
+	},
+	{
+		id: "P6X-Z2B-M7-the-records-model-moves",
+		file: "apps/rph-demo/src/lib/server/assurance/decision-model-identity.ts",
+		find: "\tmodel: 'pplx-decider:27b-q4_K_M',\n",
+		replace: "\tmodel: 'pplx-decider:27b-q8_0', // MUTANT: another model\n",
+		expectRed: ["verif/decision-model-pointer.test.ts"],
+		why: "PROMISE (the pointer covers the model (D54)). WHO RELIES: the gate and the qualification, which render every prompt from D54's records and run no model (D54), and D53's re-measurement, held to the fingerprint those prompts make. WHAT THE MUTATION DOES: the identity names another model. PREDICTED RED: the pointer's whole-text pin (POINTER_TODAY). OBSERVED: owed — measured by the runner in phase 2 (the Z2b brief), its verdict quoted here then.",
+		source: "JAN-EXEC Phase 7, package Z2b (REG-D-146; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.2 and §12.6, D50 and D54; roadmap §9b.5b, Z2): the committed records' static source, refusing a question no record holds, a body scored twice and records of another identity; the fingerprint's pointer component; the RUN line's scoring identity beside the candidate; production held to the records' identity; and a replay serving its recorded indications, matched by body"
+	},
+	{
+		id: "P6X-Z2B-M8-the-records-digest-moves",
+		file: "apps/rph-demo/src/lib/server/assurance/decision-model-identity.ts",
+		find: "\tdigest: '733585a9ebb6205d2d5b64a13748f0b1c9f1285885dd267780cfdb1c4c8ef141',\n",
+		replace: "\tdigest: '733585a9ebb6205d2d5b64a13748f0b1c9f1285885dd267780cfdb1c4c8ef140', // MUTANT: another digest\n",
+		expectRed: ["verif/decision-model-pointer.test.ts"],
+		why: "PROMISE (the pointer covers the model's digest (D54)). WHO RELIES: the gate and the qualification, which render every prompt from D54's records and run no model (D54), and D53's re-measurement, held to the fingerprint those prompts make. WHAT THE MUTATION DOES: the identity names another digest, one character off. PREDICTED RED: the pointer's whole-text pin (POINTER_TODAY). OBSERVED: owed — measured by the runner in phase 2 (the Z2b brief), its verdict quoted here then.",
+		source: "JAN-EXEC Phase 7, package Z2b (REG-D-146; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.2 and §12.6, D50 and D54; roadmap §9b.5b, Z2): the committed records' static source, refusing a question no record holds, a body scored twice and records of another identity; the fingerprint's pointer component; the RUN line's scoring identity beside the candidate; production held to the records' identity; and a replay serving its recorded indications, matched by body"
+	},
+	{
+		id: "P6X-Z2B-M9-the-records-server-version-moves",
+		file: "apps/rph-demo/src/lib/server/assurance/decision-model-identity.ts",
+		find: "\tserverVersion: '0.40.15'\n",
+		replace: "\tserverVersion: '0.40.16' // MUTANT: another server version\n",
+		expectRed: ["verif/decision-model-pointer.test.ts"],
+		why: "PROMISE (the pointer covers the server version (D54; REG-F-608: an update moves the fingerprint)). WHO RELIES: the gate and the qualification, which render every prompt from D54's records and run no model (D54), and D53's re-measurement, held to the fingerprint those prompts make. WHAT THE MUTATION DOES: the identity names 0.40.16. PREDICTED RED: the pointer's whole-text pin (POINTER_TODAY). OBSERVED: owed — measured by the runner in phase 2 (the Z2b brief), its verdict quoted here then.",
+		source: "JAN-EXEC Phase 7, package Z2b (REG-D-146; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.2 and §12.6, D50 and D54; roadmap §9b.5b, Z2): the committed records' static source, refusing a question no record holds, a body scored twice and records of another identity; the fingerprint's pointer component; the RUN line's scoring identity beside the candidate; production held to the records' identity; and a replay serving its recorded indications, matched by body"
+	},
+	{
+		id: "P6X-Z2B-M10-the-fingerprint-leaves-the-pointer-out",
+		file: "scripts/reviewer-qual/fingerprint.ts",
+		find: "\tprobePrompts.set(DECISION_MODEL_POINTER, await decisionModelPointer(seams.pointer));\n",
+		replace: "\t// MUTANT: the pointer component is not hashed beside the probes\n",
+		expectRed: ["verif/decision-model-pointer.test.ts"],
+		why: "PROMISE (a change to any part of the pointer moves the reviewer fingerprint (D54)). WHO RELIES: the gate and the qualification, which render every prompt from D54's records and run no model (D54), and D53's re-measurement, held to the fingerprint those prompts make. WHAT THE MUTATION DOES: `probes` hashes no pointer entry. PREDICTED RED: the pointer row 'the reviewer fingerprint hashes it beside the probes'. OBSERVED: owed — measured by the runner in phase 2 (the Z2b brief), its verdict quoted here then.",
+		source: "JAN-EXEC Phase 7, package Z2b (REG-D-146; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.2 and §12.6, D50 and D54; roadmap §9b.5b, Z2): the committed records' static source, refusing a question no record holds, a body scored twice and records of another identity; the fingerprint's pointer component; the RUN line's scoring identity beside the candidate; production held to the records' identity; and a replay serving its recorded indications, matched by body"
+	},
+	{
+		id: "P6X-Z2B-M11-a-question-no-record-holds-scores-0",
+		file: "scripts/reviewer-qual/recorded-indications.ts",
+		find: "\t\t\tif (score === undefined) return { refusal: `the records hold no score for request ${r.key} (its body ${sha.slice(0, 12)}…)` };\n",
+		replace: "\t\t\tif (score === undefined) {\n\t\t\t\tscores[r.key] = 0; // MUTANT: a question no record holds scores 0\n\t\t\t\tcontinue;\n\t\t\t}\n",
+		expectRed: ["verif/recorded-indications.test.ts"],
+		why: "PROMISE (a request with no record refuses the review: never a fallback score, never 0.00 (D54)). WHO RELIES: the gate and the qualification, which render every prompt from D54's records and run no model (D54), and D53's re-measurement, held to the fingerprint those prompts make. WHAT THE MUTATION DOES: an unrecorded question is scored 0. PREDICTED RED: the static source's 'no record' row. OBSERVED: owed — measured by the runner in phase 2 (the Z2b brief), its verdict quoted here then.",
+		source: "JAN-EXEC Phase 7, package Z2b (REG-D-146; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.2 and §12.6, D50 and D54; roadmap §9b.5b, Z2): the committed records' static source, refusing a question no record holds, a body scored twice and records of another identity; the fingerprint's pointer component; the RUN line's scoring identity beside the candidate; production held to the records' identity; and a replay serving its recorded indications, matched by body"
+	},
+	{
+		id: "P6X-Z2B-M12-a-body-scored-twice-is-read",
+		file: "scripts/reviewer-qual/recorded-indications.ts",
+		find: "\t\t\tif (records.contradicted.has(sha))\n",
+		replace: "\t\t\tif (records.contradicted.has(sha) && requests.length < 0) // MUTANT: a body the records score twice is read\n",
+		expectRed: ["verif/recorded-indications.test.ts"],
+		why: "PROMISE (two records for one body with different scores refuse it (the Z2b brief, item 1)). WHO RELIES: the gate and the qualification, which render every prompt from D54's records and run no model (D54), and D53's re-measurement, held to the fingerprint those prompts make. WHAT THE MUTATION DOES: the contradiction is ignored. PREDICTED RED: the static source's 'contradict themselves' row. OBSERVED: owed — measured by the runner in phase 2 (the Z2b brief), its verdict quoted here then.",
+		source: "JAN-EXEC Phase 7, package Z2b (REG-D-146; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.2 and §12.6, D50 and D54; roadmap §9b.5b, Z2): the committed records' static source, refusing a question no record holds, a body scored twice and records of another identity; the fingerprint's pointer component; the RUN line's scoring identity beside the candidate; production held to the records' identity; and a replay serving its recorded indications, matched by body"
+	},
+	{
+		id: "P6X-Z2B-M13-records-of-another-identity-are-read",
+		file: "scripts/reviewer-qual/recorded-indications.ts",
+		find: "\tif (!sameIdentity(first, expected))\n",
+		replace: "\tif (!sameIdentity(first, expected) && files.length < 0) // MUTANT: records of another identity are read\n",
+		expectRed: ["verif/recorded-indications.test.ts"],
+		why: "PROMISE (records whose identity differs from the product's are refused, never read (D51, D54; REG-F-608)). WHO RELIES: the gate and the qualification, which render every prompt from D54's records and run no model (D54), and D53's re-measurement, held to the fingerprint those prompts make. WHAT THE MUTATION DOES: records made on 0.40.16 are read. PREDICTED RED: the static source's identity rows. OBSERVED: owed — measured by the runner in phase 2 (the Z2b brief), its verdict quoted here then.",
+		source: "JAN-EXEC Phase 7, package Z2b (REG-D-146; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.2 and §12.6, D50 and D54; roadmap §9b.5b, Z2): the committed records' static source, refusing a question no record holds, a body scored twice and records of another identity; the fingerprint's pointer component; the RUN line's scoring identity beside the candidate; production held to the records' identity; and a replay serving its recorded indications, matched by body"
+	},
+	{
+		id: "P6X-Z2B-M14-files-that-disagree-are-read",
+		file: "scripts/reviewer-qual/recorded-indications.ts",
+		find: "\tif (!ok.every((r) => sameIdentity(r.file.identity, first)))\n",
+		replace: "\tif (!ok.every((r) => sameIdentity(r.file.identity, first)) && files.length < 0) // MUTANT: files of two identities are read\n",
+		expectRed: ["verif/recorded-indications.test.ts"],
+		why: "PROMISE (the two files must agree on model, digest and server version (the Z2b brief, item 1)). WHO RELIES: the gate and the qualification, which render every prompt from D54's records and run no model (D54), and D53's re-measurement, held to the fingerprint those prompts make. WHAT THE MUTATION DOES: the files' identities go uncompared. PREDICTED RED: the static source's 'disagree on their identity' row. OBSERVED: owed — measured by the runner in phase 2 (the Z2b brief), its verdict quoted here then.",
+		source: "JAN-EXEC Phase 7, package Z2b (REG-D-146; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.2 and §12.6, D50 and D54; roadmap §9b.5b, Z2): the committed records' static source, refusing a question no record holds, a body scored twice and records of another identity; the fingerprint's pointer component; the RUN line's scoring identity beside the candidate; production held to the records' identity; and a replay serving its recorded indications, matched by body"
+	},
+	{
+		id: "P6X-Z2B-M15-a-first-line-of-another-kind-is-read-as-the-identity",
+		file: "scripts/reviewer-qual/recorded-indications.ts",
+		find: "\tif (head.kind !== 'IDENTITY' || typeof head.model !== 'string'",
+		replace: "\tif (typeof head.model !== 'string' /* MUTANT: the first line's kind is not read */",
+		expectRed: ["verif/recorded-indications.test.ts"],
+		why: "PROMISE (each file's IDENTITY line is read first (D54)). WHO RELIES: the gate and the qualification, which render every prompt from D54's records and run no model (D54), and D53's re-measurement, held to the fingerprint those prompts make. WHAT THE MUTATION DOES: a first line of another kind is taken for the identity when it carries its fields. PREDICTED RED: the static source's 'no identity line first' row. OBSERVED: owed — measured by the runner in phase 2 (the Z2b brief), its verdict quoted here then.",
+		source: "JAN-EXEC Phase 7, package Z2b (REG-D-146; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.2 and §12.6, D50 and D54; roadmap §9b.5b, Z2): the committed records' static source, refusing a question no record holds, a body scored twice and records of another identity; the fingerprint's pointer component; the RUN line's scoring identity beside the candidate; production held to the records' identity; and a replay serving its recorded indications, matched by body"
+	},
+	{
+		id: "P6X-Z2B-M16-the-re-scoring-reads-the-placeholder",
+		file: "scripts/reviewer-qual/rescore.ts",
+		find: "\t\t\tindications: COMMITTED_INDICATIONS\n",
+		replace: "\t\t\tindications: async (requests) => ({ scores: Object.fromEntries(requests.map((r) => [r.key, 0])) }) // MUTANT: the placeholder's 0\n",
+		expectRed: ["verif/recorded-indications.test.ts"],
+		why: "PROMISE (the re-scoring reads the committed records, not the placeholder (the Z2b brief, item 2)). WHO RELIES: the gate and the qualification, which render every prompt from D54's records and run no model (D54), and D53's re-measurement, held to the fingerprint those prompts make. WHAT THE MUTATION DOES: the re-scoring scores every question 0. PREDICTED RED: the re-scoring row 'a case no committed record holds is not re-scorable'. OBSERVED: owed — measured by the runner in phase 2 (the Z2b brief), its verdict quoted here then.",
+		source: "JAN-EXEC Phase 7, package Z2b (REG-D-146; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.2 and §12.6, D50 and D54; roadmap §9b.5b, Z2): the committed records' static source, refusing a question no record holds, a body scored twice and records of another identity; the fingerprint's pointer component; the RUN line's scoring identity beside the candidate; production held to the records' identity; and a replay serving its recorded indications, matched by body"
+	},
+	{
+		id: "P6X-Z2B-M17-another-configured-model-is-admitted",
+		file: "apps/rph-demo/src/lib/server/assurance/decision-model.ts",
+		find: "\tif (model !== recorded.model) {\n",
+		replace: "\tif (model !== recorded.model && model === '') { // MUTANT: a model other than the records' is admitted\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/decision-model.test.ts"],
+		why: "PROMISE (the configured model must be the records' (D51; REG-D-052)). WHO RELIES: the gate and the qualification, which render every prompt from D54's records and run no model (D54), and D53's re-measurement, held to the fingerprint those prompts make. WHAT THE MUTATION DOES: a model other than the records' is asked. PREDICTED RED: the production row 'a model other than the records’ is refused'. OBSERVED: owed — measured by the runner in phase 2 (the Z2b brief), its verdict quoted here then.",
+		source: "JAN-EXEC Phase 7, package Z2b (REG-D-146; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.2 and §12.6, D50 and D54; roadmap §9b.5b, Z2): the committed records' static source, refusing a question no record holds, a body scored twice and records of another identity; the fingerprint's pointer component; the RUN line's scoring identity beside the candidate; production held to the records' identity; and a replay serving its recorded indications, matched by body"
+	},
+	{
+		id: "P6X-Z2B-M18-the-client-is-held-to-another-digest",
+		file: "apps/rph-demo/src/lib/server/assurance/decision-model.ts",
+		find: "{ digest: recorded.digest, serverVersion",
+		replace: "{ digest: `${'0'.repeat(64)}` /* MUTANT: another digest */, serverVersion",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/decision-model.test.ts"],
+		why: "PROMISE (the client's digest must equal D54's records' (D51)). WHO RELIES: the gate and the qualification, which render every prompt from D54's records and run no model (D54), and D53's re-measurement, held to the fingerprint those prompts make. WHAT THE MUTATION DOES: the client is held to a digest no server serves. PREDICTED RED: the production row 'configured: the client … held to the records’ identity'. OBSERVED: owed — measured by the runner in phase 2 (the Z2b brief), its verdict quoted here then.",
+		source: "JAN-EXEC Phase 7, package Z2b (REG-D-146; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.2 and §12.6, D50 and D54; roadmap §9b.5b, Z2): the committed records' static source, refusing a question no record holds, a body scored twice and records of another identity; the fingerprint's pointer component; the RUN line's scoring identity beside the candidate; production held to the records' identity; and a replay serving its recorded indications, matched by body"
+	},
+	{
+		id: "P6X-Z2B-M19-the-runner-writes-no-scoring-identity",
+		file: "scripts/reviewer-qual/runner.ts",
+		find: "\t\t\t...(i.decisionModel ? { decisionModel: {",
+		replace: "\t\t\t...(i.decisionModel && i.repetitions < 0 ? { decisionModel: { /* MUTANT: the scoring identity is not written */",
+		expectRed: ["verif/reviewer-qualification-runner.test.ts"],
+		why: "PROMISE (the RUN line records the scoring identity beside the candidate (D54; D49)). WHO RELIES: the gate and the qualification, which render every prompt from D54's records and run no model (D54), and D53's re-measurement, held to the fingerprint those prompts make. WHAT THE MUTATION DOES: the RUN line carries no `decisionModel`. PREDICTED RED: the runner row 'the RUN line carries the records’ scoring identity'. OBSERVED: owed — measured by the runner in phase 2 (the Z2b brief), its verdict quoted here then.",
+		source: "JAN-EXEC Phase 7, package Z2b (REG-D-146; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.2 and §12.6, D50 and D54; roadmap §9b.5b, Z2): the committed records' static source, refusing a question no record holds, a body scored twice and records of another identity; the fingerprint's pointer component; the RUN line's scoring identity beside the candidate; production held to the records' identity; and a replay serving its recorded indications, matched by body"
+	},
+	{
+		id: "P6X-Z2B-M20-a-run-line-without-the-identity-is-refused",
+		file: "scripts/reviewer-qual/record.ts",
+		find: "\t\t}, ['decisionModel']),\n",
+		replace: "\t\t}, []), // MUTANT: the scoring identity is required of every RUN line\n",
+		expectRed: ["verif/reviewer-qualification-record.test.ts"],
+		why: "PROMISE (lines already recorded stay valid (D54; the Z2b brief, item 5)). WHO RELIES: the gate and the qualification, which render every prompt from D54's records and run no model (D54), and D53's re-measurement, held to the fingerprint those prompts make. WHAT THE MUTATION DOES: every RUN line written before Z2b is refused. PREDICTED RED: the record row 'a line without it stays valid'. OBSERVED: owed — measured by the runner in phase 2 (the Z2b brief), its verdict quoted here then.",
+		source: "JAN-EXEC Phase 7, package Z2b (REG-D-146; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.2 and §12.6, D50 and D54; roadmap §9b.5b, Z2): the committed records' static source, refusing a question no record holds, a body scored twice and records of another identity; the fingerprint's pointer component; the RUN line's scoring identity beside the candidate; production held to the records' identity; and a replay serving its recorded indications, matched by body"
+	},
+	{
+		id: "P6X-Z2B-M21-the-replay-serves-by-order-alone",
+		file: "apps/rph-demo/src/lib/server/replay/replay-run.ts",
+		find: "\t\t\t\tif (actual !== recorded.bodySha256)\n",
+		replace: "\t\t\t\tif (actual !== recorded.bodySha256 && recorded.key !== request.key) // MUTANT: served by its place and key alone\n",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replay-indications.test.ts"],
+		why: "PROMISE (a replay answers each request from the recorded exchange whose body it is (the Z2b brief, item 7; REG-D-067)). WHO RELIES: the gate and the qualification, which render every prompt from D54's records and run no model (D54), and D53's re-measurement, held to the fingerprint those prompts make. WHAT THE MUTATION DOES: a request is answered by whatever is recorded in its place under its key. PREDICTED RED: the replay row 'another body … under the request’s own key'. OBSERVED: owed — measured by the runner in phase 2 (the Z2b brief), its verdict quoted here then.",
+		source: "JAN-EXEC Phase 7, package Z2b (REG-D-146; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.2 and §12.6, D50 and D54; roadmap §9b.5b, Z2): the committed records' static source, refusing a question no record holds, a body scored twice and records of another identity; the fingerprint's pointer component; the RUN line's scoring identity beside the candidate; production held to the records' identity; and a replay serving its recorded indications, matched by body"
+	},
+	{
+		id: "P6X-Z2B-M22-the-replay-scores-a-request-past-the-last-0",
+		file: "apps/rph-demo/src/lib/server/replay/replay-run.ts",
+		find: "\t\t\t\tif (recorded === undefined) return { refusal: exhausted(what, recording.indications.length).message };\n",
+		replace: "\t\t\t\tif (recorded === undefined) {\n\t\t\t\t\tanswered[request.key] = 0; // MUTANT: a request past the last is scored 0\n\t\t\t\t\tcontinue;\n\t\t\t\t}\n",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replay-indications.test.ts"],
+		why: "PROMISE (a request with no recorded exchange refuses the replayed review (the Z2b brief, item 7)). WHO RELIES: the gate and the qualification, which render every prompt from D54's records and run no model (D54), and D53's re-measurement, held to the fingerprint those prompts make. WHAT THE MUTATION DOES: it is scored 0. PREDICTED RED: the replay row 'past the last'. OBSERVED: owed — measured by the runner in phase 2 (the Z2b brief), its verdict quoted here then.",
+		source: "JAN-EXEC Phase 7, package Z2b (REG-D-146; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.2 and §12.6, D50 and D54; roadmap §9b.5b, Z2): the committed records' static source, refusing a question no record holds, a body scored twice and records of another identity; the fingerprint's pointer component; the RUN line's scoring identity beside the candidate; production held to the records' identity; and a replay serving its recorded indications, matched by body"
+	},
+	{
+		id: "P6X-Z2B-M23-the-replay-scores-a-failed-request-0",
+		file: "apps/rph-demo/src/lib/server/replay/replay-run.ts",
+		// ⛔ RE-FORMULATED 2026-11-07 (measured NO_COMPILE: `replay-run.ts(413,46): error TS2339: Property 'score' does not exist on
+		// type …` — a condition made false loses the narrowing the score's read relies on, the ledger's V-2c lesson): the CONSEQUENCE
+		// is mutated, the refusal replaced by an admission, so the branch still narrows.
+		find: "\t\t\t\tif (recorded.outcome.kind === 'FAILED')\n\t\t\t\t\treturn { refusal: `${what} got no score in the recorded run: ${recorded.outcome.reason}` };\n",
+		replace: "\t\t\t\tif (recorded.outcome.kind === 'FAILED') {\n\t\t\t\t\tanswered[request.key] = 0; // MUTANT: a request that got no score is served 0\n\t\t\t\t\tcontinue;\n\t\t\t\t}\n",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/replay-indications.test.ts"],
+		why: "PROMISE (a recorded request that got no score refuses the replayed review). WHO RELIES: the gate and the qualification, which render every prompt from D54's records and run no model (D54), and D53's re-measurement, held to the fingerprint those prompts make. WHAT THE MUTATION DOES: its recorded failure is not read. PREDICTED RED: the replay row 'a recorded request that got no score'. OBSERVED: owed — measured by the runner in phase 2 (the Z2b brief), its verdict quoted here then.",
+		source: "JAN-EXEC Phase 7, package Z2b (REG-D-146; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.2 and §12.6, D50 and D54; roadmap §9b.5b, Z2): the committed records' static source, refusing a question no record holds, a body scored twice and records of another identity; the fingerprint's pointer component; the RUN line's scoring identity beside the candidate; production held to the records' identity; and a replay serving its recorded indications, matched by body"
+	},
+	{
+		id: "P6X-Z2B-M24-the-recorder-records-no-request",
+		file: "scripts/phase7/record-replay-core.ts",
+		find: "\t\t.filter((e) => isDecisionModelExchange(e.state))\n",
+		replace: "\t\t.filter((e) => isDecisionModelExchange(e.state) && e.firstSequence < 0) // MUTANT: no request is recorded\n",
+		expectRed: ["verif/phase7-record-replay.test.ts"],
+		why: "PROMISE (the recording holds each decision-model request of the run (the Z2b brief, item 7)). WHO RELIES: the gate and the qualification, which render every prompt from D54's records and run no model (D54), and D53's re-measurement, held to the fingerprint those prompts make. WHAT THE MUTATION DOES: the recording holds none. PREDICTED RED: the recorder row 'each decision-model request is written into the recording'. OBSERVED: owed — measured by the runner in phase 2 (the Z2b brief), its verdict quoted here then.",
+		source: "JAN-EXEC Phase 7, package Z2b (REG-D-146; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.2 and §12.6, D50 and D54; roadmap §9b.5b, Z2): the committed records' static source, refusing a question no record holds, a body scored twice and records of another identity; the fingerprint's pointer component; the RUN line's scoring identity beside the candidate; production held to the records' identity; and a replay serving its recorded indications, matched by body"
+	},
+	{
+		id: "P6X-Z2B-M25-the-recorder-hashes-the-body-unscrubbed",
+		file: "scripts/phase7/record-replay-core.ts",
+		find: "\tconst bodySha256 = indicationBodySha256(body, x.scrub);\n",
+		replace: "\tconst bodySha256 = indicationBodySha256(body, (t) => t); // MUTANT: the run's directories are kept in the hash\n",
+		expectRed: ["verif/phase7-record-replay.test.ts"],
+		why: "PROMISE (a body is hashed as scrubbed, so a replay in its own sandbox matches it). WHO RELIES: the gate and the qualification, which render every prompt from D54's records and run no model (D54), and D53's re-measurement, held to the fingerprint those prompts make. WHAT THE MUTATION DOES: the run's workspace stays in the hash. PREDICTED RED: the recorder row's body hash. OBSERVED: owed — measured by the runner in phase 2 (the Z2b brief), its verdict quoted here then.",
+		source: "JAN-EXEC Phase 7, package Z2b (REG-D-146; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.2 and §12.6, D50 and D54; roadmap §9b.5b, Z2): the committed records' static source, refusing a question no record holds, a body scored twice and records of another identity; the fingerprint's pointer component; the RUN line's scoring identity beside the candidate; production held to the records' identity; and a replay serving its recorded indications, matched by body"
+	},
+	{
+		id: "P6X-Z2B-M26-the-recorder-keeps-the-unload-request",
+		file: "scripts/phase7/record-replay-core.ts",
+		find: "\tif (body === unloadBody(model)) return undefined;\n",
+		replace: "\t// MUTANT: step 1's unload request is recorded as a question\n",
+		expectRed: ["verif/phase7-record-replay.test.ts"],
+		why: "PROMISE (step 1's unload request asks no question, and is not among the recorded requests). WHO RELIES: the gate and the qualification, which render every prompt from D54's records and run no model (D54), and D53's re-measurement, held to the fingerprint those prompts make. WHAT THE MUTATION DOES: it is recorded as one. PREDICTED RED: the recorder row's list of requests. OBSERVED: owed — measured by the runner in phase 2 (the Z2b brief), its verdict quoted here then.",
+		source: "JAN-EXEC Phase 7, package Z2b (REG-D-146; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.2 and §12.6, D50 and D54; roadmap §9b.5b, Z2): the committed records' static source, refusing a question no record holds, a body scored twice and records of another identity; the fingerprint's pointer component; the RUN line's scoring identity beside the candidate; production held to the records' identity; and a replay serving its recorded indications, matched by body"
+	},
+	{
+		id: "P6X-Z2B-M27-the-body-hash-scrubs-no-string",
+		file: "apps/rph-demo/src/lib/server/replay/recording.ts",
+		find: "\t\tif (typeof v === 'string') return scrub(v);\n",
+		replace: "\t\tif (typeof v === 'string') return v; // MUTANT: no string in the body is scrubbed\n",
+		expectRed: ["verif/phase7-record-replay.test.ts"],
+		why: "PROMISE (every string inside a body is scrubbed before it is hashed (`indicationBodySha256`)). WHO RELIES: the gate and the qualification, which render every prompt from D54's records and run no model (D54), and D53's re-measurement, held to the fingerprint those prompts make. WHAT THE MUTATION DOES: the body is hashed as the run wrote it. PREDICTED RED: the recorder row's body hash. OBSERVED: owed — measured by the runner in phase 2 (the Z2b brief), its verdict quoted here then.",
+		source: "JAN-EXEC Phase 7, package Z2b (REG-D-146; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.2 and §12.6, D50 and D54; roadmap §9b.5b, Z2): the committed records' static source, refusing a question no record holds, a body scored twice and records of another identity; the fingerprint's pointer component; the RUN line's scoring identity beside the candidate; production held to the records' identity; and a replay serving its recorded indications, matched by body"
+	},
+	{
+		id: "P6X-Z2B-M28-the-reader-admits-a-score-past-1",
+		file: "apps/rph-demo/src/lib/server/replay/recording.ts",
+		find: "score < 0 || score > 1)\n\t\t\trefuse(where, 'has a score that is no probability from 0 to 1');",
+		replace: "score < 0 || score > 2) // MUTANT: a score past 1 is admitted\n\t\t\trefuse(where, 'has a score that is no probability from 0 to 1');",
+		expectRed: ["apps/rph-demo/src/lib/server/replay/recording.test.ts"],
+		why: "PROMISE (a recorded score is a probability from 0 to 1). WHO RELIES: the gate and the qualification, which render every prompt from D54's records and run no model (D54), and D53's re-measurement, held to the fingerprint those prompts make. WHAT THE MUTATION DOES: a score of 1.5 is read. PREDICTED RED: the recording row 'a score that is no probability'. OBSERVED: owed — measured by the runner in phase 2 (the Z2b brief), its verdict quoted here then.",
+		source: "JAN-EXEC Phase 7, package Z2b (REG-D-146; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.2 and §12.6, D50 and D54; roadmap §9b.5b, Z2): the committed records' static source, refusing a question no record holds, a body scored twice and records of another identity; the fingerprint's pointer component; the RUN line's scoring identity beside the candidate; production held to the records' identity; and a replay serving its recorded indications, matched by body"
+	},
+	{
+		id: "P6X-Z2B-M29-a-413-recorded-as-a-score",
+		file: "scripts/reviewer-qual/decision-model-records.ts",
+		find: "\tif (refused === undefined) return { questions };\n",
+		replace: "\tif (refused === undefined || refused.key !== '') return { questions: refused === undefined ? questions : [...questions, { key: refused.key, kind: kinds.get(refused.key)!, bodySha256: sha256(refused.body), score: 0 }] }; // MUTANT: a 413 recorded as a score\n",
+		expectRed: ["verif/decision-model-records.test.ts"],
+		why: "PROMISE (a request the server refuses with HTTP 413 is recorded as returned: its key, kind, body sha256, status and answer, beside the questions answered before it). WHO RELIES: D54's records, which the lead makes with this script against the live server — the two held probes and their successors — and every reader of them: the static source the gate and the qualification read, and the fingerprint. WHAT THE MUTATION DOES: the refused request is written as a question scored 0, no refusal kept. PREDICTED RED: the records test's '⭐ the questions answered before it, then the refused request' row. OBSERVED: owed — measured by the runner in phase 1b, its verdict quoted in z2b-facts.md.",
+		source: "JAN-EXEC Phase 7, package Z2b phase 1b (REG-D-146; the lead's decision restating D54, ~~to be filed in d48 as~~ filed in d48 as REG-F-611; z2b-p1-rulings.md, \"The records run's stop: two probes past the server's 64 KiB limit\", and its clarification of item 5; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.3 D51 and §12.6 D54): a request the decision model's server refuses with HTTP 413 is recorded as returned, the static and history sources answer it in the client's own words, the stub refuses past 64 KiB by the bytes as sent, and the two probes past the limit are refusal probes, kept byte for byte, their branches reached by successors under it"
+	},
+	{
+		id: "P6X-Z2B-M30-the-run-goes-on-past-another-refusal",
+		file: "scripts/reviewer-qual/decision-model-records.ts",
+		find: "\tconst words = refusedRequestReason(last.key, 413, last.response);\n",
+		replace: "\tconst words = last.outcome.reason; // MUTANT: any refusal of a request read as the server's 413\n",
+		expectRed: ["verif/decision-model-records.test.ts"],
+		why: "PROMISE (every refusal but a 413 still stops the run and writes nothing for that entry). WHO RELIES: D54's records, which the lead makes with this script against the live server — the two held probes and their successors — and every reader of them: the static source the gate and the qualification read, and the fingerprint. WHAT THE MUTATION DOES: a request refused with any status is recorded as a 413 and the run goes on. PREDICTED RED: the records test's '⛔ a server that refuses a review stops the run' row (HTTP 500). OBSERVED: owed — measured by the runner in phase 1b, its verdict quoted in z2b-facts.md.",
+		source: "JAN-EXEC Phase 7, package Z2b phase 1b (REG-D-146; the lead's decision restating D54, ~~to be filed in d48 as~~ filed in d48 as REG-F-611; z2b-p1-rulings.md, \"The records run's stop: two probes past the server's 64 KiB limit\", and its clarification of item 5; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.3 D51 and §12.6 D54): a request the decision model's server refuses with HTTP 413 is recorded as returned, the static and history sources answer it in the client's own words, the stub refuses past 64 KiB by the bytes as sent, and the two probes past the limit are refusal probes, kept byte for byte, their branches reached by successors under it"
+	},
+	{
+		id: "P6X-Z2B-M31-a-malformed-refusal-read-on-resume",
+		file: "scripts/reviewer-qual/decision-model-records.ts",
+		find: "\t\t\t\tif (refusedRequestOf(r) === null) throw new Stopped(",
+		replace: "\t\t\t\tif (refusedRequestOf(r) === null && r.id === '') throw new Stopped(",
+		expectRed: ["verif/decision-model-records.test.ts"],
+		why: "PROMISE (the records script, reading its own file to resume, refuses a malformed refused request, as the static source does). WHO RELIES: D54's records, which the lead makes with this script against the live server — the two held probes and their successors — and every reader of them: the static source the gate and the qualification read, and the fingerprint. WHAT THE MUTATION DOES: a line whose refused request is no 413 with its body hash is resumed past. PREDICTED RED: the records test's '⛔ a file whose line holds a refused request that is no 413' row. OBSERVED: owed — measured by the runner in phase 1b, its verdict quoted in z2b-facts.md.",
+		source: "JAN-EXEC Phase 7, package Z2b phase 1b (REG-D-146; the lead's decision restating D54, ~~to be filed in d48 as~~ filed in d48 as REG-F-611; z2b-p1-rulings.md, \"The records run's stop: two probes past the server's 64 KiB limit\", and its clarification of item 5; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.3 D51 and §12.6 D54): a request the decision model's server refuses with HTTP 413 is recorded as returned, the static and history sources answer it in the client's own words, the stub refuses past 64 KiB by the bytes as sent, and the two probes past the limit are refusal probes, kept byte for byte, their branches reached by successors under it"
+	},
+	{
+		id: "P6X-Z2B-M32-the-refused-request-is-not-counted",
+		file: "scripts/reviewer-qual/decision-model-records.ts",
+		find: "requests += line.questions.length + (refusedRequest ? 1 : 0);",
+		replace: "requests += line.questions.length; // MUTANT: the refused request not counted among the requests made",
+		expectRed: ["verif/decision-model-records.test.ts"],
+		why: "PROMISE (the run counts every request it made, the refused one among them). WHO RELIES: D54's records, which the lead makes with this script against the live server — the two held probes and their successors — and every reader of them: the static source the gate and the qualification read, and the fingerprint. WHAT THE MUTATION DOES: the refused request is left out of the count the run reports. PREDICTED RED: the records test's 413 row, its 'the requests made, the refused one among them'. OBSERVED: owed — measured by the runner in phase 1b, its verdict quoted in z2b-facts.md.",
+		source: "JAN-EXEC Phase 7, package Z2b phase 1b (REG-D-146; the lead's decision restating D54, ~~to be filed in d48 as~~ filed in d48 as REG-F-611; z2b-p1-rulings.md, \"The records run's stop: two probes past the server's 64 KiB limit\", and its clarification of item 5; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.3 D51 and §12.6 D54): a request the decision model's server refuses with HTTP 413 is recorded as returned, the static and history sources answer it in the client's own words, the stub refuses past 64 KiB by the bytes as sent, and the two probes past the limit are refusal probes, kept byte for byte, their branches reached by successors under it"
+	},
+	{
+		id: "P6X-Z2B-M33-the-static-source-scores-a-refused-body",
+		file: "scripts/reviewer-qual/recorded-indications.ts",
+		find: "\t\tif (refusal !== undefined) refused.push(refusal);\n",
+		replace: "\t\tif (refusal !== undefined) questions.push({ sha: refusal.bodySha256, score: 0 }); // MUTANT: a refused body scored 0\n",
+		expectRed: ["verif/decision-model-refusals.test.ts"],
+		why: "PROMISE (a body recorded refused answers the review with the client's refusal, never a score). WHO RELIES: the gate, the qualification and the reviewer fingerprint, which read D54's records through the static source; a review whose request the server refused must be refused as the client refused it, before any reviewer call (D51). WHAT THE MUTATION DOES: the refused body is read as a score of 0, so the review is sent. PREDICTED RED: decision-model-refusals.test.ts's '⭐ the static source refuses the review with the client’s words' row. OBSERVED: owed — measured by the runner in phase 1b, its verdict quoted in z2b-facts.md.",
+		source: "JAN-EXEC Phase 7, package Z2b phase 1b (REG-D-146; the lead's decision restating D54, ~~to be filed in d48 as~~ filed in d48 as REG-F-611; z2b-p1-rulings.md, \"The records run's stop: two probes past the server's 64 KiB limit\", and its clarification of item 5; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.3 D51 and §12.6 D54): a request the decision model's server refuses with HTTP 413 is recorded as returned, the static and history sources answer it in the client's own words, the stub refuses past 64 KiB by the bytes as sent, and the two probes past the limit are refusal probes, kept byte for byte, their branches reached by successors under it"
+	},
+	{
+		id: "P6X-Z2B-M34-the-static-source-s-own-refusal-words",
+		file: "scripts/reviewer-qual/recorded-indications.ts",
+		find: "\t\t\tif (refusal !== undefined) return { refusal: refusedRequestReason(r.key, refusal.status, refusal.response) };\n",
+		replace: "\t\t\tif (refusal !== undefined) return { refusal: `request ${r.key} was refused: HTTP ${refusal.status}` }; // MUTANT: the source's own words, the server's error dropped\n",
+		expectRed: ["verif/decision-model-refusals.test.ts"],
+		why: "PROMISE (the static source answers a refused body in the client's own words, made by the client's formatter from the recorded status and answer). WHO RELIES: the gate, the qualification and the reviewer fingerprint, which read D54's records through the static source; a review whose request the server refused must be refused as the client refused it, before any reviewer call (D51). WHAT THE MUTATION DOES: the source writes its own words, without the error the server's answer names. PREDICTED RED: decision-model-refusals.test.ts's static source rows. OBSERVED: owed — measured by the runner in phase 1b, its verdict quoted in z2b-facts.md.",
+		source: "JAN-EXEC Phase 7, package Z2b phase 1b (REG-D-146; the lead's decision restating D54, ~~to be filed in d48 as~~ filed in d48 as REG-F-611; z2b-p1-rulings.md, \"The records run's stop: two probes past the server's 64 KiB limit\", and its clarification of item 5; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.3 D51 and §12.6 D54): a request the decision model's server refuses with HTTP 413 is recorded as returned, the static and history sources answer it in the client's own words, the stub refuses past 64 KiB by the bytes as sent, and the two probes past the limit are refusal probes, kept byte for byte, their branches reached by successors under it"
+	},
+	{
+		id: "P6X-Z2B-M35-a-copy-of-the-refusal-words",
+		file: "scripts/reviewer-qual/recorded-indications.ts",
+		find: "\t\t\tif (refusal !== undefined) return { refusal: refusedRequestReason(r.key, refusal.status, refusal.response) };\n",
+		replace: "\t\t\tif (refusal !== undefined) return { refusal: 'request c00 was refused: HTTP 413: text and schema must not exceed 64 KiB' }; // MUTANT: a copy of the words\n",
+		expectRed: ["verif/decision-model-refusals.test.ts"],
+		why: "PROMISE (the static source's words are made from the record, never a copy of them). WHO RELIES: the gate, the qualification and the reviewer fingerprint, which read D54's records through the static source; a review whose request the server refused must be refused as the client refused it, before any reviewer call (D51). WHAT THE MUTATION DOES: every refused body answers with W-OVERSIZE-EDGES's words, copied. PREDICTED RED: decision-model-refusals.test.ts's 'exactly W-OVERSIZE-EDGES’s' row (key c01) and '⭐ the words follow the record' row. OBSERVED: owed — measured by the runner in phase 1b, its verdict quoted in z2b-facts.md.",
+		source: "JAN-EXEC Phase 7, package Z2b phase 1b (REG-D-146; the lead's decision restating D54, ~~to be filed in d48 as~~ filed in d48 as REG-F-611; z2b-p1-rulings.md, \"The records run's stop: two probes past the server's 64 KiB limit\", and its clarification of item 5; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.3 D51 and §12.6 D54): a request the decision model's server refuses with HTTP 413 is recorded as returned, the static and history sources answer it in the client's own words, the stub refuses past 64 KiB by the bytes as sent, and the two probes past the limit are refusal probes, kept byte for byte, their branches reached by successors under it"
+	},
+	{
+		id: "P6X-Z2B-M36-a-malformed-refusal-admitted",
+		file: "scripts/reviewer-qual/recorded-indications.ts",
+		find: "\t\tif (refusal === null) return `${name} line ${n + 2} ${MALFORMED_REFUSED_REQUEST}`;\n",
+		replace: "\t\tif (refusal === null) continue; // MUTANT: a malformed refused request read past, its line read as holding none\n",
+		expectRed: ["verif/decision-model-refusals.test.ts"],
+		why: "PROMISE (the static source refuses a malformed refused request by name). WHO RELIES: the gate, the qualification and the reviewer fingerprint, which read D54's records through the static source; a review whose request the server refused must be refused as the client refused it, before any reviewer call (D51). WHAT THE MUTATION DOES: a malformed refused request is read past. PREDICTED RED: decision-model-refusals.test.ts's '⛔ a refused request is admitted only with status 413 and its body hash' row. OBSERVED: owed — measured by the runner in phase 1b, its verdict quoted in z2b-facts.md.",
+		source: "JAN-EXEC Phase 7, package Z2b phase 1b (REG-D-146; the lead's decision restating D54, ~~to be filed in d48 as~~ filed in d48 as REG-F-611; z2b-p1-rulings.md, \"The records run's stop: two probes past the server's 64 KiB limit\", and its clarification of item 5; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.3 D51 and §12.6 D54): a request the decision model's server refuses with HTTP 413 is recorded as returned, the static and history sources answer it in the client's own words, the stub refuses past 64 KiB by the bytes as sent, and the two probes past the limit are refusal probes, kept byte for byte, their branches reached by successors under it"
+	},
+	{
+		id: "P6X-Z2B-M37-a-refusal-of-any-status-admitted",
+		file: "scripts/reviewer-qual/recorded-indications.ts",
+		find: "if (typeof r.bodySha256 !== 'string' || !SHA.test(r.bodySha256) || r.status !== 413 || typeof r.response !== 'string') return null;",
+		replace: "if (typeof r.bodySha256 !== 'string' || !SHA.test(r.bodySha256) || typeof r.response !== 'string') return null; // MUTANT: a refusal of any status admitted",
+		expectRed: ["verif/decision-model-refusals.test.ts"],
+		why: "PROMISE (a refused request is admitted only with status 413). WHO RELIES: the gate, the qualification and the reviewer fingerprint, which read D54's records through the static source; a review whose request the server refused must be refused as the client refused it, before any reviewer call (D51). WHAT THE MUTATION DOES: a refused request of any status is read, as a 413. PREDICTED RED: decision-model-refusals.test.ts's malformed row, its 'another status' and 'no status'. OBSERVED: owed — measured by the runner in phase 1b, its verdict quoted in z2b-facts.md.",
+		source: "JAN-EXEC Phase 7, package Z2b phase 1b (REG-D-146; the lead's decision restating D54, ~~to be filed in d48 as~~ filed in d48 as REG-F-611; z2b-p1-rulings.md, \"The records run's stop: two probes past the server's 64 KiB limit\", and its clarification of item 5; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.3 D51 and §12.6 D54): a request the decision model's server refuses with HTTP 413 is recorded as returned, the static and history sources answer it in the client's own words, the stub refuses past 64 KiB by the bytes as sent, and the two probes past the limit are refusal probes, kept byte for byte, their branches reached by successors under it"
+	},
+	{
+		id: "P6X-Z2B-M38-a-refusal-never-contradicts-a-score",
+		file: "scripts/reviewer-qual/recorded-indications.ts",
+		find: "\t\t\tif (scores.has(q.bodySha256) || (had !== undefined && (had.status !== q.status || had.response !== q.response)))\n",
+		replace: "\t\t\tif (q.key === '' && scores.has(q.bodySha256)) // MUTANT: a body scored and refused, or refused twice otherwise, read as refused\n",
+		expectRed: ["verif/decision-model-refusals.test.ts"],
+		why: "PROMISE (a body recorded both scored and refused, or refused twice with two answers, is a contradiction, refused as one). WHO RELIES: the gate, the qualification and the reviewer fingerprint, which read D54's records through the static source; a review whose request the server refused must be refused as the client refused it, before any reviewer call (D51). WHAT THE MUTATION DOES: the refusal stands over the score, and a second answer is never compared. PREDICTED RED: decision-model-refusals.test.ts's '⛔ a body recorded both scored and refused is a contradiction' row. OBSERVED: owed — measured by the runner in phase 1b, its verdict quoted in z2b-facts.md.",
+		source: "JAN-EXEC Phase 7, package Z2b phase 1b (REG-D-146; the lead's decision restating D54, ~~to be filed in d48 as~~ filed in d48 as REG-F-611; z2b-p1-rulings.md, \"The records run's stop: two probes past the server's 64 KiB limit\", and its clarification of item 5; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.3 D51 and §12.6 D54): a request the decision model's server refuses with HTTP 413 is recorded as returned, the static and history sources answer it in the client's own words, the stub refuses past 64 KiB by the bytes as sent, and the two probes past the limit are refusal probes, kept byte for byte, their branches reached by successors under it"
+	},
+	{
+		id: "P6X-Z2B-M39-the-history-source-answers-a-refused-body-0",
+		file: "verif/reviewer-qualification-history.ts",
+		find: "\tif (refused !== undefined) return { refusal: refusedRequestReason(key, refused.status, refused.response) };\n",
+		replace: "\tif (refused !== undefined && key === '') return { refusal: refusedRequestReason(key, refused.status, refused.response) }; // MUTANT: a refused body answered as unrecorded\n",
+		expectRed: ["verif/decision-model-refusals.test.ts"],
+		why: "PROMISE (the history source replays a recorded refusal as the static source does). WHO RELIES: the tests that render reviews through the history source, the fingerprint's among them, which must refuse what the product refuses. WHAT THE MUTATION DOES: a refused body is answered 0, as a body no record holds. PREDICTED RED: decision-model-refusals.test.ts's '⭐ the history source (tests only) replays a recorded refusal' row. OBSERVED: owed — measured by the runner in phase 1b, its verdict quoted in z2b-facts.md.",
+		source: "JAN-EXEC Phase 7, package Z2b phase 1b (REG-D-146; the lead's decision restating D54, ~~to be filed in d48 as~~ filed in d48 as REG-F-611; z2b-p1-rulings.md, \"The records run's stop: two probes past the server's 64 KiB limit\", and its clarification of item 5; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.3 D51 and §12.6 D54): a request the decision model's server refuses with HTTP 413 is recorded as returned, the static and history sources answer it in the client's own words, the stub refuses past 64 KiB by the bytes as sent, and the two probes past the limit are refusal probes, kept byte for byte, their branches reached by successors under it"
+	},
+	{
+		id: "P6X-Z2B-M40-the-stub-s-limit-a-byte-higher",
+		file: "apps/rph-demo/src/lib/server/assurance/decision-model-stub.testing.ts",
+		find: "if (Buffer.concat(chunks).length > STUB_REQUEST_LIMIT_BYTES) return send(res, 413, TOO_LARGE);",
+		replace: "if (Buffer.concat(chunks).length > STUB_REQUEST_LIMIT_BYTES + 1) return send(res, 413, TOO_LARGE); // MUTANT: the limit a byte higher",
+		expectRed: ["verif/decision-model-refusals.test.ts"],
+		why: "PROMISE (the stub refuses a request past 64 KiB by the bytes as sent, and answers one at it). WHO RELIES: every test that makes records against the stub — the records script's, the static source's, the probes' — which stand for the live server only as far as the stub refuses what it refuses. WHAT THE MUTATION DOES: a request one byte past the limit is answered. PREDICTED RED: decision-model-refusals.test.ts's '⭐ a request of exactly 64 KiB as sent is answered; one byte more is refused' row. OBSERVED: owed — measured by the runner in phase 1b, its verdict quoted in z2b-facts.md.",
+		source: "JAN-EXEC Phase 7, package Z2b phase 1b (REG-D-146; the lead's decision restating D54, ~~to be filed in d48 as~~ filed in d48 as REG-F-611; z2b-p1-rulings.md, \"The records run's stop: two probes past the server's 64 KiB limit\", and its clarification of item 5; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.3 D51 and §12.6 D54): a request the decision model's server refuses with HTTP 413 is recorded as returned, the static and history sources answer it in the client's own words, the stub refuses past 64 KiB by the bytes as sent, and the two probes past the limit are refusal probes, kept byte for byte, their branches reached by successors under it"
+	},
+	{
+		id: "P6X-Z2B-M41-the-stub-s-limit-a-byte-lower",
+		file: "apps/rph-demo/src/lib/server/assurance/decision-model-stub.testing.ts",
+		find: "if (Buffer.concat(chunks).length > STUB_REQUEST_LIMIT_BYTES) return send(res, 413, TOO_LARGE);",
+		replace: "if (Buffer.concat(chunks).length >= STUB_REQUEST_LIMIT_BYTES) return send(res, 413, TOO_LARGE); // MUTANT: the limit a byte lower",
+		expectRed: ["verif/decision-model-refusals.test.ts"],
+		why: "PROMISE (the stub answers a request of exactly 64 KiB as sent). WHO RELIES: every test that makes records against the stub — the records script's, the static source's, the probes' — which stand for the live server only as far as the stub refuses what it refuses. WHAT THE MUTATION DOES: a request of exactly the limit is refused. PREDICTED RED: the same row, its 'at the limit: answered'. OBSERVED: owed — measured by the runner in phase 1b, its verdict quoted in z2b-facts.md.",
+		source: "JAN-EXEC Phase 7, package Z2b phase 1b (REG-D-146; the lead's decision restating D54, ~~to be filed in d48 as~~ filed in d48 as REG-F-611; z2b-p1-rulings.md, \"The records run's stop: two probes past the server's 64 KiB limit\", and its clarification of item 5; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.3 D51 and §12.6 D54): a request the decision model's server refuses with HTTP 413 is recorded as returned, the static and history sources answer it in the client's own words, the stub refuses past 64 KiB by the bytes as sent, and the two probes past the limit are refusal probes, kept byte for byte, their branches reached by successors under it"
+	},
+	{
+		id: "P6X-Z2B-M42-the-stub-measures-the-text-decoded",
+		file: "apps/rph-demo/src/lib/server/assurance/decision-model-stub.testing.ts",
+		find: "if (Buffer.concat(chunks).length > STUB_REQUEST_LIMIT_BYTES) return send(res, 413, TOO_LARGE);",
+		replace: "if ((() => { try { return Buffer.byteLength(JSON.stringify(JSON.parse(body))); } catch { return Buffer.concat(chunks).length; } })() > STUB_REQUEST_LIMIT_BYTES) return send(res, 413, TOO_LARGE); // MUTANT: the text decoded measured, not the bytes as sent",
+		expectRed: ["verif/decision-model-refusals.test.ts"],
+		why: "PROMISE (the stub measures the bytes as sent, its non-ASCII as `\\u` escapes, as the server's one refusal and 117 answers show). WHO RELIES: every test that makes records against the stub — the records script's, the static source's, the probes' — which stand for the live server only as far as the stub refuses what it refuses. WHAT THE MUTATION DOES: the body's decoded text is measured, so an escaped body past the limit as sent is answered. PREDICTED RED: decision-model-refusals.test.ts's '⭐ by the bytes as sent, not the text decoded' row. OBSERVED: owed — measured by the runner in phase 1b, its verdict quoted in z2b-facts.md.",
+		source: "JAN-EXEC Phase 7, package Z2b phase 1b (REG-D-146; the lead's decision restating D54, ~~to be filed in d48 as~~ filed in d48 as REG-F-611; z2b-p1-rulings.md, \"The records run's stop: two probes past the server's 64 KiB limit\", and its clarification of item 5; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.3 D51 and §12.6 D54): a request the decision model's server refuses with HTTP 413 is recorded as returned, the static and history sources answer it in the client's own words, the stub refuses past 64 KiB by the bytes as sent, and the two probes past the limit are refusal probes, kept byte for byte, their branches reached by successors under it"
+	},
+	{
+		id: "P6X-Z2B-M43-the-client-s-words-drop-the-server-s-error",
+		file: "apps/rph-demo/src/lib/server/assurance/decision-model-client.ts",
+		find: "\treturn `request ${key} was refused: HTTP ${status}${errorOf(response)}`;\n",
+		replace: "\treturn `request ${key} was refused: HTTP ${status}`; // MUTANT: the server's error dropped from the client's words\n",
+		expectRed: ["apps/rph-demo/src/lib/server/assurance/decision-model-client.test.ts"],
+		why: "PROMISE (the client's words for a refused request name its key, the status and the server's error, one formatter for the client and the static source). WHO RELIES: the gate, the qualification and the reviewer fingerprint, which read D54's records through the static source; a review whose request the server refused must be refused as the client refused it, before any reviewer call (D51). WHAT THE MUTATION DOES: the words name no error. PREDICTED RED: the client test's HTTP error and 413 rows. OBSERVED: owed — measured by the runner in phase 1b, its verdict quoted in z2b-facts.md.",
+		source: "JAN-EXEC Phase 7, package Z2b phase 1b (REG-D-146; the lead's decision restating D54, ~~to be filed in d48 as~~ filed in d48 as REG-F-611; z2b-p1-rulings.md, \"The records run's stop: two probes past the server's 64 KiB limit\", and its clarification of item 5; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.3 D51 and §12.6 D54): a request the decision model's server refuses with HTTP 413 is recorded as returned, the static and history sources answer it in the client's own words, the stub refuses past 64 KiB by the bytes as sent, and the two probes past the limit are refusal probes, kept byte for byte, their branches reached by successors under it"
+	},
+	{
+		id: "P6X-Z2B-M44-w-oversize-edges-sent-s-input-moves",
+		file: "scripts/reviewer-qual/probes.ts",
+		find: "const EDGES_ANSWER_SENT = `${BRICK.repeat(3)}${filled('Panel surveyed; bulging within tolerance; weep holes clear. ', B.CONTENT_MAX - 3)}`;",
+		replace: "const EDGES_ANSWER_SENT = `${BRICK.repeat(3)}${filled('Panel surveyed, bulging within tolerance; weep holes clear. ', B.CONTENT_MAX - 3)}`; // MUTANT: one character of the successor's answer",
+		expectRed: ["verif/decision-model-refusals.test.ts"],
+		why: "PROMISE (each successor's input is pinned, so the request the lead records is the one this commit sends). WHO RELIES: the reviewer fingerprint, whose probes reach every branch the two past the limit reached only through these successors, and the lead's records of them, made from this commit. WHAT THE MUTATION DOES: one character of W-OVERSIZE-EDGES-SENT's answer changes, every structural property kept. PREDICTED RED: decision-model-refusals.test.ts's '⭐ EVERY BRANCH A REFUSAL PROBE REACHED IS REACHED BY A SUCCESSOR' row, its input pin. OBSERVED: owed — measured by the runner in phase 1b, its verdict quoted in z2b-facts.md.",
+		source: "JAN-EXEC Phase 7, package Z2b phase 1b (REG-D-146; the lead's decision restating D54, ~~to be filed in d48 as~~ filed in d48 as REG-F-611; z2b-p1-rulings.md, \"The records run's stop: two probes past the server's 64 KiB limit\", and its clarification of item 5; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.3 D51 and §12.6 D54): a request the decision model's server refuses with HTTP 413 is recorded as returned, the static and history sources answer it in the client's own words, the stub refuses past 64 KiB by the bytes as sent, and the two probes past the limit are refusal probes, kept byte for byte, their branches reached by successors under it"
+	},
+	{
+		id: "P6X-Z2B-M45-p-oversize-fences-sent-s-input-moves",
+		file: "scripts/reviewer-qual/probes.ts",
+		find: "const passingLines = (units: number): string => `${filled('survey/checks/test_panels.py::test_bulge PASSED\\n', units - 1)}\\n`;",
+		replace: "const passingLines = (units: number): string => `${filled('survey/checks/test_panels.py::test_bulge passed\\n', units - 1)}\\n`; // MUTANT: one word of the successor's fillers",
+		expectRed: ["verif/decision-model-refusals.test.ts"],
+		why: "PROMISE (each successor's input is pinned). WHO RELIES: the reviewer fingerprint, whose probes reach every branch the two past the limit reached only through these successors, and the lead's records of them, made from this commit. WHAT THE MUTATION DOES: one word of P-OVERSIZE-FENCES-SENT's fillers changes, every plant and cut kept. PREDICTED RED: the same row, its input pin. OBSERVED: owed — measured by the runner in phase 1b, its verdict quoted in z2b-facts.md.",
+		source: "JAN-EXEC Phase 7, package Z2b phase 1b (REG-D-146; the lead's decision restating D54, ~~to be filed in d48 as~~ filed in d48 as REG-F-611; z2b-p1-rulings.md, \"The records run's stop: two probes past the server's 64 KiB limit\", and its clarification of item 5; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.3 D51 and §12.6 D54): a request the decision model's server refuses with HTTP 413 is recorded as returned, the static and history sources answer it in the client's own words, the stub refuses past 64 KiB by the bytes as sent, and the two probes past the limit are refusal probes, kept byte for byte, their branches reached by successors under it"
+	},
+	{
+		id: "P6X-Z2B-M46-a-server-refusal-probe-undeclared",
+		file: "scripts/reviewer-qual/probes.ts",
+		find: "\t'W-OVERSIZE-EDGES': 'c00',\n",
+		replace: "\t// MUTANT: W-OVERSIZE-EDGES, refused by the server, undeclared\n",
+		expectRed: ["verif/decision-model-refusals.test.ts"],
+		why: "PROMISE (the probe set declares the probes the server refuses, each with the request it refuses first). WHO RELIES: the reviewer fingerprint, whose probes reach every branch the two past the limit reached only through these successors, and the lead's records of them, made from this commit. WHAT THE MUTATION DOES: W-OVERSIZE-EDGES is left out of the refusal probes (its line alone, so a withdrawal of P-OVERSIZE-FENCES's line leaves this entry anchored). PREDICTED RED: decision-model-refusals.test.ts's '⭐ THE TWO PAST 64 KiB AS SENT ARE THE SERVER’S REFUSAL PROBES' row. OBSERVED: owed — measured by the runner in phase 1b, its verdict quoted in z2b-facts.md.",
+		source: "JAN-EXEC Phase 7, package Z2b phase 1b (REG-D-146; the lead's decision restating D54, ~~to be filed in d48 as~~ filed in d48 as REG-F-611; z2b-p1-rulings.md, \"The records run's stop: two probes past the server's 64 KiB limit\", and its clarification of item 5; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.3 D51 and §12.6 D54): a request the decision model's server refuses with HTTP 413 is recorded as returned, the static and history sources answer it in the client's own words, the stub refuses past 64 KiB by the bytes as sent, and the two probes past the limit are refusal probes, kept byte for byte, their branches reached by successors under it"
+	},
+	{
+		id: "P6X-Z2B-M47-w-oversize-edges-is-not-kept-byte-for-byte",
+		file: "scripts/reviewer-qual/probes.ts",
+		find: "answer: BRICK.repeat(B.CONTENT_MAX)",
+		replace: "answer: BRICK.repeat(B.CONTENT_MAX - 1) // MUTANT: the refusal probe's answer a code point shorter",
+		expectRed: ["verif/decision-model-refusals.test.ts"],
+		why: "PROMISE (the server's refusal probes are kept byte for byte, as REG-F-609's are). WHO RELIES: the reviewer fingerprint, whose probes reach every branch the two past the limit reached only through these successors, and the lead's records of them, made from this commit. WHAT THE MUTATION DOES: W-OVERSIZE-EDGES's answer is a code point shorter: still past the limit, still refused. PREDICTED RED: decision-model-refusals.test.ts's refusal probes row, its input pin. OBSERVED: owed — measured by the runner in phase 1b, its verdict quoted in z2b-facts.md.",
+		source: "JAN-EXEC Phase 7, package Z2b phase 1b (REG-D-146; the lead's decision restating D54, ~~to be filed in d48 as~~ filed in d48 as REG-F-611; z2b-p1-rulings.md, \"The records run's stop: two probes past the server's 64 KiB limit\", and its clarification of item 5; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.3 D51 and §12.6 D54): a request the decision model's server refuses with HTTP 413 is recorded as returned, the static and history sources answer it in the client's own words, the stub refuses past 64 KiB by the bytes as sent, and the two probes past the limit are refusal probes, kept byte for byte, their branches reached by successors under it"
+	},
+	{
+		id: "P6X-Z2B-M48-p-oversize-fences-is-not-kept-byte-for-byte",
+		file: "scripts/reviewer-qual/probes.ts",
+		find: "const UNSEEN = '\\u200b'.repeat(B.CONTENT_MAX);",
+		replace: "const UNSEEN = '\\u200b'.repeat(B.CONTENT_MAX - 1); // MUTANT: the refusal probe's runs a code point shorter",
+		expectRed: ["verif/decision-model-refusals.test.ts"],
+		why: "PROMISE (the server's refusal probes are kept byte for byte). WHO RELIES: the reviewer fingerprint, whose probes reach every branch the two past the limit reached only through these successors, and the lead's records of them, made from this commit. WHAT THE MUTATION DOES: P-OVERSIZE-FENCES's runs are a code point shorter: still past the limit. PREDICTED RED: the same row, its input pin. OBSERVED: owed — measured by the runner in phase 1b, its verdict quoted in z2b-facts.md.",
+		source: "JAN-EXEC Phase 7, package Z2b phase 1b (REG-D-146; the lead's decision restating D54, ~~to be filed in d48 as~~ filed in d48 as REG-F-611; z2b-p1-rulings.md, \"The records run's stop: two probes past the server's 64 KiB limit\", and its clarification of item 5; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.3 D51 and §12.6 D54): a request the decision model's server refuses with HTTP 413 is recorded as returned, the static and history sources answer it in the client's own words, the stub refuses past 64 KiB by the bytes as sent, and the two probes past the limit are refusal probes, kept byte for byte, their branches reached by successors under it"
+	},
+	{
+		id: "P6X-Z2B-M49-w-oversize-edges-sent-s-answer-is-ascii",
+		file: "scripts/reviewer-qual/probes.ts",
+		find: "const EDGES_ANSWER_SENT = `${BRICK.repeat(3)}${filled('Panel surveyed; bulging within tolerance; weep holes clear. ', B.CONTENT_MAX - 3)}`;",
+		replace: "const EDGES_ANSWER_SENT = `${'xyz'}${filled('Panel surveyed; bulging within tolerance; weep holes clear. ', B.CONTENT_MAX - 3)}`; // MUTANT: the successor's answer all ASCII, its kept HEAD's code points and units the same",
+		expectRed: ["verif/decision-model-refusals.test.ts"],
+		why: "PROMISE (W-OVERSIZE-EDGES-SENT's kept HEAD holds astral characters, so its code points and its UTF-16 units differ, as PQ1-M613 held of W-OVERSIZE-EDGES's). WHO RELIES: the reviewer fingerprint, whose probes reach the head-only cut's code points and the cut astride a run a reader does not see only through these successors, past the server's limit, and the lead's records of them. WHAT THE MUTATION DOES: the three astral characters become three ASCII ones. PREDICTED RED: decision-model-refusals.test.ts's '⭐ W-OVERSIZE-EDGES-SENT stands on both of W-OVERSIZE-EDGES’s edges' row, and the successors' input pin. OBSERVED: owed — measured by the runner in phase 1b, its verdict quoted in z2b-facts.md.",
+		source: "JAN-EXEC Phase 7, package Z2b phase 1b (REG-D-146; the lead's decision restating D54, ~~to be filed in d48 as~~ filed in d48 as REG-F-611; z2b-p1-rulings.md, \"The records run's stop: two probes past the server's 64 KiB limit\", and its clarification of item 5; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.3 D51 and §12.6 D54): the two probes past the limit are refusal probes, kept byte for byte, their branches reached by successors under it — here, the successors' own forms of what the two's own mutants held (PQ1-M613 on W-OVERSIZE-EDGES's astral answer, PQ1-M1211 on P-OVERSIZE-FENCES's unseen runs), found by phase 1b's discovery to be the only two such entries the successors do not share"
+	},
+	{
+		id: "P6X-Z2B-M50-p-oversize-fences-sent-s-run-is-seen",
+		file: "scripts/reviewer-qual/probes.ts",
+		find: "const UNSEEN_SENT = '\\u200b'.repeat(1_024);",
+		replace: "const UNSEEN_SENT = '.'.repeat(1_024); // MUTANT: the successor's runs seen by a reader",
+		expectRed: ["verif/decision-model-refusals.test.ts"],
+		why: "PROMISE (P-OVERSIZE-FENCES-SENT's stdout is cut inside runs a reader does not see, so the view's token stands astride the cut, as PQ1-M1211 held of P-OVERSIZE-FENCES's). WHO RELIES: the reviewer fingerprint, whose probes reach the head-only cut's code points and the cut astride a run a reader does not see only through these successors, past the server's limit, and the lead's records of them. WHAT THE MUTATION DOES: the runs are full stops, which a reader sees. PREDICTED RED: decision-model-refusals.test.ts's '⭐ P-OVERSIZE-FENCES-SENT holds every plant of P-OVERSIZE-FENCES' row, and the successors' input pin. OBSERVED: owed — measured by the runner in phase 1b, its verdict quoted in z2b-facts.md.",
+		source: "JAN-EXEC Phase 7, package Z2b phase 1b (REG-D-146; the lead's decision restating D54, ~~to be filed in d48 as~~ filed in d48 as REG-F-611; z2b-p1-rulings.md, \"The records run's stop: two probes past the server's 64 KiB limit\", and its clarification of item 5; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.3 D51 and §12.6 D54): the two probes past the limit are refusal probes, kept byte for byte, their branches reached by successors under it — here, the successors' own forms of what the two's own mutants held (PQ1-M613 on W-OVERSIZE-EDGES's astral answer, PQ1-M1211 on P-OVERSIZE-FENCES's unseen runs), found by phase 1b's discovery to be the only two such entries the successors do not share"
+	},
+	{
+		id: "P6X-Z2B-M51-p-oversize-fences-sent-s-head-cut-falls-outside-its-run",
+		file: "scripts/reviewer-qual/probes.ts",
+		find: "const FENCES_HEAD_FILLER = passingLines(7_238);",
+		replace: "const FENCES_HEAD_FILLER = passingLines(7_238 - 600); // MUTANT: the HEAD's filler 600 shorter, its cut no longer inside the run",
+		expectRed: ["verif/decision-model-refusals.test.ts"],
+		why: "PROMISE (P-OVERSIZE-FENCES-SENT's HEAD ends inside its first run with room on both sides of the cut, the constant tuned to the view's room). WHO RELIES: the reviewer fingerprint, whose probes reach the head-only cut's code points and the cut astride a run a reader does not see only through these successors, past the server's limit, and the lead's records of them. WHAT THE MUTATION DOES: the filler before the first run is 600 code points shorter, so the HEAD ends past the run. PREDICTED RED: the same row, its 'the HEAD ends inside the first run'. OBSERVED: owed — measured by the runner in phase 1b, its verdict quoted in z2b-facts.md.",
+		source: "JAN-EXEC Phase 7, package Z2b phase 1b (REG-D-146; the lead's decision restating D54, ~~to be filed in d48 as~~ filed in d48 as REG-F-611; z2b-p1-rulings.md, \"The records run's stop: two probes past the server's 64 KiB limit\", and its clarification of item 5; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.3 D51 and §12.6 D54): the two probes past the limit are refusal probes, kept byte for byte, their branches reached by successors under it — here, the successors' own forms of what the two's own mutants held (PQ1-M613 on W-OVERSIZE-EDGES's astral answer, PQ1-M1211 on P-OVERSIZE-FENCES's unseen runs), found by phase 1b's discovery to be the only two such entries the successors do not share"
+	},
+	{
+		id: "P6X-Z2B-M52-a-413-with-an-empty-answer-stops-the-run",
+		file: "scripts/reviewer-qual/decision-model-records.ts",
+		find: "\tif (last === undefined || last.key === 'unload' || last.outcome.kind !== 'FAILED') return undefined;\n",
+		replace: "\tif (last === undefined || last.key === 'unload' || last.outcome.kind !== 'FAILED' || last.response === '') return undefined; // MUTANT: a 413 with an empty answer read as another refusal\n",
+		expectRed: ["verif/decision-model-records.test.ts"],
+		why: "PROMISE (a request the server refuses with HTTP 413 is recorded as returned, whatever its answer holds, an empty one too). WHO RELIES: D54's records, which the lead makes with this script against the live server — the two held probes and their successors — and every reader of them: the static source the gate and the qualification read, and the fingerprint. WHAT THE MUTATION DOES: a 413 whose answer is empty stops the run, as any other refusal does. PREDICTED RED: the records test's '⭐ a 413 whose answer is empty is a 413 too' row. OBSERVED: owed — measured by the runner in phase 1b, its verdict quoted in z2b-facts.md.",
+		source: "JAN-EXEC Phase 7, package Z2b phase 1b (REG-D-146; the lead's decision restating D54, ~~to be filed in d48 as~~ filed in d48 as REG-F-611; z2b-p1-rulings.md, \"The records run's stop: two probes past the server's 64 KiB limit\", and its clarification of item 5; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.3 D51 and §12.6 D54): a request the decision model's server refuses with HTTP 413 is recorded as returned, the static and history sources answer it in the client's own words, the stub refuses past 64 KiB by the bytes as sent, and the two probes past the limit are refusal probes, kept byte for byte, their branches reached by successors under it"
+	},
+	{
+		id: "P6X-Z2B-M53-a-refused-key-its-line-also-scores-admitted",
+		file: "scripts/reviewer-qual/recorded-indications.ts",
+		find: "\tif (answered.includes(r.key)) return null;\n",
+		replace: "\tif (answered.includes(r.key) && r.key === '') return null; // MUTANT: a refused request whose key its line also scores admitted\n",
+		expectRed: ["verif/decision-model-refusals.test.ts"],
+		why: "PROMISE (a refused request is admitted only in its form: no request both answered and refused on one line). WHO RELIES: the gate, the qualification and the reviewer fingerprint, which read D54's records through the static source; a review whose request the server refused must be refused as the client refused it, before any reviewer call (D51). WHAT THE MUTATION DOES: a line whose refused request names a key the line also scores is read. PREDICTED RED: decision-model-refusals.test.ts's '⛔ a refused request is admitted only with status 413 and its body hash' row, its last check. OBSERVED: owed — measured by the runner in phase 1b, its verdict quoted in z2b-facts.md.",
+		source: "JAN-EXEC Phase 7, package Z2b phase 1b (REG-D-146; the lead's decision restating D54, ~~to be filed in d48 as~~ filed in d48 as REG-F-611; z2b-p1-rulings.md, \"The records run's stop: two probes past the server's 64 KiB limit\", and its clarification of item 5; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.3 D51 and §12.6 D54): a request the decision model's server refuses with HTTP 413 is recorded as returned, the static and history sources answer it in the client's own words, the stub refuses past 64 KiB by the bytes as sent, and the two probes past the limit are refusal probes, kept byte for byte, their branches reached by successors under it"
+	},
+	{
+		id: "P6X-Z2B-M54-a-body-no-record-holds-scores-0-the-copy-s-fingerprint-is-not-refused",
+		file: "scripts/reviewer-qual/recorded-indications.ts",
+		find: "\t\t\tif (score === undefined) return { refusal: `the records hold no score for request ${r.key} (its body ${sha.slice(0, 12)}…)` };\n",
+		replace: "\t\t\tif (score === undefined) {\n\t\t\t\tscores[r.key] = 0; // MUTANT: a question no record holds scores 0\n\t\t\t\tcontinue;\n\t\t\t}\n",
+		expectRed: ["verif/reviewer-qualification-fingerprint.test.ts"],
+		why: "PROMISE (an edit that reaches the decision model's material leaves the program's fingerprint REFUSED over the committed records, never computed from a score no record holds; the lead's ruling on E2, option (a)). WHO RELIES: the gate's check and the qualification, which compute today's fingerprint in a child over the committed records. WHAT THE MUTATION DOES: M11's own edit, asked of the fingerprint test: the static source scores a body no record holds 0, so the edited copy's fingerprint is computed. PREDICTED RED: the fingerprint test's E2 copy-tree row (⭐⭐ JAN-EXEC Phase 7 completion E2 — the edited copy's fingerprint is refused, exit 1). OBSERVED: owed — measured by the runner in phase 2, its verdict quoted in z2b-facts.md.",
+		source: "JAN-EXEC Phase 7, package Z2b phase 2 (REG-D-146; D54 restated, REG-F-611; z2b-p2-brief.md and z2b-p1-rulings.md, \"Phase 1b accepted\" and the rulings on phase 1's questions; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.2 and §12.6, D50 and D54): D54's records committed, what they complete, E2's copy-tree row refused over them, the history source's guard and its tests-only boundary, and the placeholder kept out of the paid CLI and the fingerprint's seams"
+	},
+	{
+		id: "P6X-Z2B-M55-the-history-source-hashes-another-model-s-body",
+		file: "verif/reviewer-qualification-history.ts",
+		find: "\t\t\tconst sha = sha256(decisionModelBody(model, material, q));\n",
+		replace: "\t\t\tconst sha = sha256(decisionModelBody(`${model}-another`, material, q)); // MUTANT: the history source hashes another model's body, so it misses every body the records hold\n",
+		expectRed: ["verif/reviewer-qualification-fingerprint.test.ts"],
+		why: "PROMISE (the history source answers every body the committed records hold from them, so what the tests pin as today's is the product's own; phase 1's ruling 3 (a)). WHO RELIES: the six test files that render reviews through the history source, the fingerprint's among them, and every pin they hold as today's. WHAT THE MUTATION DOES: each body is hashed as another model's, so no record matches and every question scores 0, as before the records. PREDICTED RED: the fingerprint test's history guard (⭐ Z2b (D54) — over the current set and the probes, every question the fingerprint asks is one the committed records hold). OBSERVED: owed — measured by the runner in phase 2, its verdict quoted in z2b-facts.md.",
+		source: "JAN-EXEC Phase 7, package Z2b phase 2 (REG-D-146; D54 restated, REG-F-611; z2b-p2-brief.md and z2b-p1-rulings.md, \"Phase 1b accepted\" and the rulings on phase 1's questions; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.2 and §12.6, D50 and D54): D54's records committed, what they complete, E2's copy-tree row refused over them, the history source's guard and its tests-only boundary, and the placeholder kept out of the paid CLI and the fingerprint's seams"
+	},
+	{
+		id: "P6X-Z2B-M56-the-history-source-imported-outside-verif",
+		file: "scripts/reviewer-qual/indications.ts",
+		find: "import type { IndicationsSource } from '../../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';\n",
+		replace: "import type { IndicationsSource } from '../../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';\nimport '../../verif/reviewer-qualification-history.js'; // MUTANT: the history source imported outside verif/\n",
+		expectRed: ["verif/recorded-indications.test.ts"],
+		why: "PROMISE (the history source, which answers a body no record holds with 0, stays tests-only: no file outside verif/ imports it; phase 1's ruling 3 (b)). WHO RELIES: the product, the gate's check, the re-scoring and the qualification CLI, which must refuse a body no record holds (D54). WHAT THE MUTATION DOES: a script imports it. PREDICTED RED: recorded-indications.test.ts's '⛔ no file of apps/, packages/ or scripts/ imports the history source' row. OBSERVED: owed — measured by the runner in phase 2, its verdict quoted in z2b-facts.md.",
+		source: "JAN-EXEC Phase 7, package Z2b phase 2 (REG-D-146; D54 restated, REG-F-611; z2b-p2-brief.md and z2b-p1-rulings.md, \"Phase 1b accepted\" and the rulings on phase 1's questions; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.2 and §12.6, D50 and D54): D54's records committed, what they complete, E2's copy-tree row refused over them, the history source's guard and its tests-only boundary, and the placeholder kept out of the paid CLI and the fingerprint's seams"
+	},
+	{
+		id: "P6X-Z2B-M57-the-paid-cli-reads-the-placeholder",
+		file: "scripts/reviewer-qual/run.ts",
+		find: "\treturn 'refusal' in identity ? { indications: COMMITTED_INDICATIONS } : { indications: COMMITTED_INDICATIONS, decisionModel: identity };\n",
+		replace: "\treturn 'refusal' in identity ? { indications: COMMITTED_INDICATIONS } : { indications: (await import('./indications.js')).PLACEHOLDER_INDICATIONS, decisionModel: identity }; // MUTANT: the paid CLI reads the placeholder\n",
+		expectRed: ["verif/reviewer-qualification-transports.test.ts"],
+		why: "PROMISE (the paid qualification CLI renders every prompt from the committed records, as the fingerprint does, never from the placeholder; phase 1's rulings, Added to phase 2). WHO RELIES: D53's re-measurement and every paid run, whose prompts must be the ones today's fingerprint derives. WHAT THE MUTATION DOES: decisionModelOf hands the runner the placeholder, every score 0, while the RUN line still names the records' identity. PREDICTED RED: the transports test's spawned CLI row (⭐ with a clean environment it proceeds past the fingerprint to the transport), whose CALL line's prompt must be the one the fingerprint derives. OBSERVED: owed — measured by the runner in phase 2, its verdict quoted in z2b-facts.md.",
+		source: "JAN-EXEC Phase 7, package Z2b phase 2 (REG-D-146; D54 restated, REG-F-611; z2b-p2-brief.md and z2b-p1-rulings.md, \"Phase 1b accepted\" and the rulings on phase 1's questions; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.2 and §12.6, D50 and D54): D54's records committed, what they complete, E2's copy-tree row refused over them, the history source's guard and its tests-only boundary, and the placeholder kept out of the paid CLI and the fingerprint's seams"
+	},
+	{
+		id: "P6X-Z2B-M58-the-fingerprint-s-seams-read-the-placeholder",
+		file: "scripts/reviewer-qual/fingerprint.ts",
+		find: "\t\tcreateAgyReasoningReviewValidator({ ...FINGERPRINT_EVALUATOR, clock: FIXED_CLOCK, indications: COMMITTED_INDICATIONS, print }),\n",
+		replace: "\t\tcreateAgyReasoningReviewValidator({ ...FINGERPRINT_EVALUATOR, clock: FIXED_CLOCK, indications: PLACEHOLDER_INDICATIONS, print }), // MUTANT: the fingerprint's seams read the placeholder\n",
+		expectRed: ["verif/reviewer-qualification-cases.test.ts"],
+		why: "PROMISE (the fingerprint's seams render every probe and case prompt from the committed records, never from the placeholder; phase 1's rulings, Added to phase 2). WHO RELIES: the gate's check, the qualification and D53, held to the fingerprint those prompts make. WHAT THE MUTATION DOES: PRODUCT_SEAMS.validator reads the placeholder, every score 0. PREDICTED RED: the cases test's REVIEWER_FINGERPRINT_TODAY rows, re-pinned in phase 2 to the fingerprint over the records. OBSERVED: owed — measured by the runner in phase 2, its verdict quoted in z2b-facts.md.",
+		source: "JAN-EXEC Phase 7, package Z2b phase 2 (REG-D-146; D54 restated, REG-F-611; z2b-p2-brief.md and z2b-p1-rulings.md, \"Phase 1b accepted\" and the rulings on phase 1's questions; docs/_working/DESIGN-data-flow-order-and-deliverable-review.md §12.2 and §12.6, D50 and D54): D54's records committed, what they complete, E2's copy-tree row refused over them, the history source's guard and its tests-only boundary, and the placeholder kept out of the paid CLI and the fingerprint's seams"
 	}
 ];

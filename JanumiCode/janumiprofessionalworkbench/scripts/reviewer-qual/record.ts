@@ -200,6 +200,13 @@ export interface RunLine {
 	readonly candidate: CandidateIdentity;
 	/** The transport's, never the writer's: `DEPLOYABLE_TRANSPORTS.has(candidate.transport)`. */
 	readonly deployable: boolean;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package Z2b — D54 and D49 (`REG-D-146`; design §12.6: *"Record the scoring identity beside the candidate
+	 * without breaking recorded lines"*) — THE DECISION MODEL THE RUN'S PROMPTS QUOTE: the model, digest and server version of the
+	 * records its indications were read from (`recorded-indications.ts`). ⚠ Optional, so every line written before Z2b stays
+	 * valid; the runner writes it on every new one.
+	 */
+	readonly decisionModel?: { readonly model: string; readonly digest: string; readonly serverVersion: string };
 }
 /** What came back from one model call, as far as a tracked record may keep it (§5.3). */
 export type CallReply =
@@ -831,8 +838,10 @@ const LINE_SHAPES: Readonly<Record<RecordLineKind, Check>> = {
 			caseIds: arrayOf(str(ID, 'an id'), 1),
 			repetitions: int(1),
 			candidate,
-			deployable: bool
-		}),
+			deployable: bool,
+			// ⭐ Z2b — D54: the scoring identity, closed; absent from every line written before it.
+			decisionModel: shape({ model: str(), digest: str(SHA256, 'a sha256'), serverVersion: str() })
+		}, ['decisionModel']),
 		(v, at) => {
 			if (!isObject(v) || !isObject(v.candidate) || typeof v.deployable !== 'boolean') return [];
 			const transport = v.candidate.transport as TransportName;

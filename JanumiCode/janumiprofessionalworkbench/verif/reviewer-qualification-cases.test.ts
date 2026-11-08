@@ -45,7 +45,7 @@ import { assurancePolicyViews, PwaAuthoringBroker } from '@janumipwb/rph-authori
 import { ontology } from '@janumipwb/rph-product-realization-pwa';
 import { DEFAULT_CONTEXT_ASSEMBLY_POLICY, markersIn, prepareModelInvocation } from '@janumipwb/rph-application';
 import { OBSERVED_TOOL_CALL_LIMIT, type DomainCommand, type PromptTemplate } from '@janumipwb/rph-contracts';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { MAX_AGY_PROMPT_CHARS } from '../apps/rph-demo/src/lib/server/assurance/agy-cli.js';
 import {
 	createAgyReasoningReviewValidator,
@@ -161,6 +161,17 @@ import { caseReviewInput } from '../scripts/reviewer-qual/materialize.js';
 import type { CandidateIdentity } from '../scripts/reviewer-qual/record.js';
 import { evaluateCase } from '../scripts/reviewer-qual/runner.js';
 import { PLACEHOLDER_INDICATIONS } from '../scripts/reviewer-qual/indications.js';
+
+// ⭐⭐ `JAN-EXEC` Phase 7, package Z2b — D54 (`REG-D-146`) — THE HISTORY'S DECISION MODEL (`reviewer-qualification-history.ts`):
+// this file renders reviews D54's records do not hold — versions eight to twelve, to show what moved from one version to the next
+// and what did not — so the committed records' source answers a question no record holds with the placeholder's 0, as this file's
+// assertions were written against since package Z1, and every question the records hold with its recorded score. ⛔ The product's
+// own source refuses such a question (`recorded-indications.test.ts`).
+vi.mock('../scripts/reviewer-qual/recorded-indications.js', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('../scripts/reviewer-qual/recorded-indications.js')>();
+	const { historyIndications } = await import('./reviewer-qualification-history.js');
+	return { ...actual, COMMITTED_INDICATIONS: historyIndications(() => actual.committedRecords(new URL('../', import.meta.url))) };
+});
 
 const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url));
 const read = (file: string): string => readFileSync(`${REPO_ROOT}${file}`, 'utf8');
@@ -3384,6 +3395,8 @@ describe('⭐⭐ the review in parts, B8a — reviewer-qualification case set v9
 		}
 	});
 
+	// ⭑ Z2b phase 2 — its own time budget, 120 s: rendering a review now builds and hashes each decision-model request's body
+	// against D54's records, about twice the work it was, and the gate's coverage run gives a row 30 s by default.
 	it('⛔ THE 41’S PROMPTS DID NOT MOVE — each carried case’s initial, repair and criterion-repair prompts are the same under version nine as under version eight; ⭑ CONTROL: every part case’s initial prompt moved', async () => {
 		const [v8, v9] = await Promise.all([reviewerFingerprint(CASE_SET_V8.cases), reviewerFingerprint(CASE_SET_V9.cases)]);
 		const carried = CASE_SET_V9.cases.filter((c) => c.arm !== 'PWA_TYPE').map((c) => c.id);
@@ -3391,7 +3404,7 @@ describe('⭐⭐ the review in parts, B8a — reviewer-qualification case set v9
 		for (const id of carried) expect(v9.casePrompts.get(id), id).toEqual(v8.casePrompts.get(id));
 		const moved = partsV9().filter((c) => v9.casePrompts.get(c.id)!.initial !== v8.casePrompts.get(c.id)!.initial);
 		expect(moved.map((c) => c.id), 'the 35 part prompts moved').toEqual(partsV9().map((c) => c.id));
-	});
+	}, 120_000);
 
 	it('⭐ THE SEEDED LIBRARY — every part case carries the library the workbench seeds, as the authoring surface’s view reads it over a seeded engine, value for value; the probes cut every part with the same', () => {
 		const view = seededLibraryView();
@@ -4170,7 +4183,14 @@ const REVIEWER_FINGERPRINT_V9 = '5ab3d68643bffbbf700c622526b626f47d4c487690e1eb5
 // ~~'3a5ac37c5e1591c2f39137572beefaff84da6d8ccf271581365e708f513b9b93'~~: the probes move, and only they — fifteen probes
 // the product sends reach every branch D52's six refusal probes reached (`probes.ts` `SENT_SUCCESSORS`). No case prompt,
 // nor the budget, criteria, scoring or case-set digest, moved. Unmeasured: RED on COVERAGE until D53.
-const REVIEWER_FINGERPRINT_TODAY = '9ddc1250135725080d195f6d3c2234ef6524f31db70a8da0959d031477bc2933';
+// ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z2b — D50, D54; `REG-D-146`; `REG-F-611`; design §12.2 and §12.6) —
+// ~~'9ddc1250135725080d195f6d3c2234ef6524f31db70a8da0959d031477bc2933'~~: the probes move, and only they. Three causes, each
+// package Z2b's: the decision model's pointer, hashed beside the probes as `DECISION-MODEL` (phase 1); the two probes the server
+// refused, now hashed as their refusals, and their two successors sent under its limit (phase 1b, `REG-F-611`); and every prompt
+// quoting D54's committed scores in place of the placeholder's 0 (phase 2). The program computes the same over the records
+// (`fingerprint.ts` run as a program: probes `978a02ba…`). The budget, criteria, scoring (`f0de7f48…`) and case-set (`f4fc815d…`)
+// components stay. Unmeasured: RED on COVERAGE until D53.
+const REVIEWER_FINGERPRINT_TODAY = '80bf8356befa33dd9e08d469e72d8b940e384710891eb4797f7923827a2fa6b7';
 /**
  * ⭐ THE PROTOTYPE'S PROMPTS (`REG-D-131` Q36: *"its prompts must match the checked prototype hash for hash"*) — the sha256 of
  * each of the 19 bridge part cases' first prompt as the lead's in-memory prototype of D3b rendered it through the product's
@@ -7399,6 +7419,8 @@ describe('package Y — case set v13 and oracles v13 (D37)', () => {
 			for (const c of kept) expect(JSON.stringify(yCase(c.id, set)), c.id).toBe(JSON.stringify(c));
 		}
 	});
+	// ⭑ Z2b phase 2 — its own time budget, 120 s: rendering a review now builds and hashes each decision-model request's body
+	// against D54's records, about twice the work it was, and the gate's coverage run gives a row 30 s by default.
 	it('Y04 every first prompt pinned: 50 recorded v12, 42 current X rows, and the five C5 build pins', async () => {
 		const recorded = read('docs/tracking/reviewer-qualification/runs.ndjson').split('\n').filter(Boolean).map(l => JSON.parse(l) as {kind: string; role?: string; caseId?: string; promptSha256?: string});
 		const moved = new Map(PROTOTYPE_PROMPTS_V12.filter(([id]) => /^[WP]12-/.test(id)));
@@ -7419,7 +7441,7 @@ describe('package Y — case set v13 and oracles v13 (D37)', () => {
 			for (const [id, pin] of moved) expect(hashes.get(id), id).toBe(pin);
 			for (const c of unmoved) expect(hashes.get(c.id), c.id).toBe(recorded.filter(l => l.kind === 'CALL' && l.role === 'initial' && l.caseId === c.id).at(-1)!.promptSha256);
 		}
-	});
+	}, 120_000);
 	it('Y05 the recast pair differs only at its id, production marks, and the marked heading clause', async () => {
 		for (const set of ySets()) for (const [oldId, id] of Object.entries(Y_RECAST)) {
 			const c = yWork(id, set);
@@ -7499,6 +7521,8 @@ describe('package Y — case set v13 and oracles v13 (D37)', () => {
 			for (const id of Object.values(Y_RECAST)) expect(set.oracles.find(o => o.caseId === id)!.note).toContain('mark');
 		}
 	});
+	// ⭑ Z2b phase 2 — its own time budget, 120 s: rendering a review now builds and hashes each decision-model request's body
+	// against D54's records, about twice the work it was, and the gate's coverage run gives a row 30 s by default.
 	it('Y11 conferral recorded: exact checked draft under C5; carried confirmations and Q51 verbatim; no awaiting marker', async () => {
 		const register = read(REGISTER_FILE);
 		for (const set of yOracles()) {
@@ -7513,7 +7537,7 @@ describe('package Y — case set v13 and oracles v13 (D37)', () => {
 			expect(await check(set.conferral)).toEqual([]);
 			expect(await check(`${set.conferral} ${ORACLES_PROPOSED}`)).toEqual([{limb:'CONFERRAL',message:ORACLES_NOT_CONFERRED}]);
 		}
-	});
+	}, 120_000);
 	// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D50, D52; `REG-D-146`; design §12.2, §12.4) — ~~'Y12 every prompt under 28000 characters'~~:
 	// every TODAY prompt under 28,000; every prompt sent within D52's two bounds; and the three sent past agy's 28,000 are
 	// the three the design counts (design §12.4: 3 of 97; devin, the selected transport, has no such ceiling).

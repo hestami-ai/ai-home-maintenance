@@ -91,6 +91,11 @@ const RECORDING: Recording = {
 			evaluator: { agentId: 'devin', modelId: 'r', providerId: 'devin' },
 			elapsedMs: 0
 		}
+	],
+	// ⭐ `JAN-EXEC` Phase 7, package Z2b (`/4`) — a decision-model request of each outcome, read back as written.
+	indications: [
+		{ key: 'c00', model: 'pplx-decider:27b-q4_K_M', bodySha256: sha256Hex('body c00'), outcome: { kind: 'SCORED', score: 0.12345678901234568 } },
+		{ key: 's00', model: 'pplx-decider:27b-q4_K_M', bodySha256: sha256Hex('body s00'), outcome: { kind: 'FAILED', reason: 'the request took more than 120 s (D51)' } }
 	]
 };
 
@@ -120,7 +125,9 @@ describe('⭐ the recording’s format (D1)', () => {
 			)
 		};
 		expect(() => readRecording(written(otherFormat))).toThrow(
-			'REPLAY_RECORDING_REFUSED: the recording is refused: recording.json names the format "jpwb-replay-recording/0", not jpwb-replay-recording/3'
+			// ~~'REPLAY_RECORDING_REFUSED: the recording is refused: recording.json names the format "jpwb-replay-recording/0", not jpwb-replay-recording/3'~~
+			// ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z2b): the format is `/4`, its decision-model requests beside the calls.
+			'REPLAY_RECORDING_REFUSED: the recording is refused: recording.json names the format "jpwb-replay-recording/0", not jpwb-replay-recording/4'
 		);
 		// ⭐ (the lead's delegated decision of 2026-10-15, to be registered) A `/2` recording keys no tool result, and is
 		// refused as another shape rather than read with its key half missing.
@@ -132,7 +139,28 @@ describe('⭐ the recording’s format (D1)', () => {
 			)
 		};
 		expect(() => readRecording(written(formatTwo))).toThrow(
-			'recording.json names the format "jpwb-replay-recording/2", not jpwb-replay-recording/3'
+			// ~~'recording.json names the format "jpwb-replay-recording/2", not jpwb-replay-recording/3'~~ ⛔ MOVED (Z2b): `/4`.
+			'recording.json names the format "jpwb-replay-recording/2", not jpwb-replay-recording/4'
+		);
+		// ⭐ `JAN-EXEC` Phase 7, package Z2b — and a `/3` recording holds no decision-model request, so every review it replayed would
+		// be refused at its first: it is refused as another shape too, and a `/4` recording without its fifth file is refused by name.
+		const formatThree = {
+			...files,
+			[RECORDING_FILES.manifest]: files[RECORDING_FILES.manifest]!.replace(RECORDING_FORMAT, 'jpwb-replay-recording/3')
+		};
+		expect(() => readRecording(written(formatThree))).toThrow(
+			'recording.json names the format "jpwb-replay-recording/3", not jpwb-replay-recording/4'
+		);
+		const noIndications = Object.fromEntries(Object.entries(files).filter(([f]) => f !== RECORDING_FILES.indications));
+		expect(() => readRecording(written(noIndications))).toThrow(
+			'REPLAY_RECORDING_REFUSED: the recording is refused: decision-model.jsonl is absent'
+		);
+		const notAProbability = {
+			...files,
+			[RECORDING_FILES.indications]: files[RECORDING_FILES.indications]!.replace('"score":0.12345678901234568', '"score":1.5')
+		};
+		expect(() => readRecording(written(notAProbability))).toThrow(
+			'REPLAY_RECORDING_REFUSED: the recording is refused: decision-model.jsonl:1 has a score that is no probability from 0 to 1'
 		);
 		expect(() => readRecording('relative/recording')).toThrow(
 			/'relative\/recording' is not absolute/

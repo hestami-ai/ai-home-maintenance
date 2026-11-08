@@ -30,18 +30,22 @@ import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import Database from 'better-sqlite3';
 import { createSqliteDriver, SCHEMA_SQL } from '@janumipwb/rph-persistence';
 import { afterAll, describe, expect, it } from 'vitest';
 import { REVIEWER_CALL_BOUND_MS } from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
 import { splitExecutionEnvelope } from '../apps/rph-demo/src/lib/server/execution/execution-contract.js';
+import { decisionModelBody, unloadBody } from '../apps/rph-demo/src/lib/server/assurance/decision-model-request.js';
 import {
+	indicationBodySha256,
 	instructionsSha256,
 	osFamilyOf,
 	readRecording,
 	SCRUB_TOKENS,
+	scrubPairs,
+	scrubText,
 	sha256Hex,
 	toolDefinitionsSha256
 } from '../apps/rph-demo/src/lib/server/replay/recording.js';
@@ -984,27 +988,89 @@ describe('⭐ The merge of E12 and E4 (J3) — a DECLARED review’s reviewer ca
 	// ⭐⭐ `JAN-EXEC` Phase 7, package Z2a — D51 (`REG-D-146`; design §12.3): a review's decision-model requests are ASSURANCE exchanges
 	// of their own, made before its first reviewer call — never a reviewer call to replay, nor the authoring floor's call left out.
 	// ⚠ What a replay serves for them is package Z2b's (Z1's departure 10); until then a replayed review is refused for its indications.
-	it('⛔ Z2a (D51) — a decision model’s request is no reviewer call of the recording, and no authoring call left out', () => {
-		const request = row(
-			'mex_dm',
+	// ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z2b): ~~its row the declared review's own state, its prompt and reply~~ — the row
+	// a decision-model request leaves, its body a request's (`decisionModelBody`) and its parse outcome the score read, since the
+	// recorder now writes each request into the recording (the test below) and refuses a row it cannot read as one.
+	const DM_MODEL = 'pplx-decider:27b-q4_K_M';
+	const DM_MATERIAL = `Work unit: Requirements.\nThe files: ${input.workspace}${sep}docs${sep}requirements.md\n`;
+	const C00 = { kind: 'check', key: 'c00', id: 'RC-01', label: 'Requirement RC-01 is covered.' } as const;
+	const S00 = { kind: 'statement', key: 's00', statement: `requirements: R1 is written in ${input.workspace}${sep}docs.` } as const;
+	const dm = (id: string, key: string, state: Record<string, unknown>, at: string, n: number) =>
+		row(
+			id,
 			'MODEL_EXCHANGE',
 			{
-				...input.store.objects[3]!.state,
-				resolvedModel: { value: 'pplx-decider:27b-q4_K_M' },
+				plane: 'ASSURANCE',
+				invokerId: 'reasoning-review',
+				subjectObjectId: 'pwu_req',
+				subjectObjectType: 'PROFESSIONAL_WORK_UNIT',
+				exchangeRole: 'INITIAL',
+				resolvedModel: { value: DM_MODEL },
 				resolvedProvider: { availability: 'REPORTED', evidence: 'PROVIDER_REPORTED', value: 'ollama' },
-				requestedAt: '2026-10-11T09:59:00.000Z',
-				respondedAt: '2026-10-11T09:59:16.000Z'
+				requestedAt: at,
+				respondedAt: at,
+				materializedInputRef: { status: 'STORED', storageKey: key },
+				...state
 			},
-			4
+			n
 		);
-		const built = buildRecording({
-			...input,
-			store: { ...input.store, objects: [...input.store.objects.slice(0, 3), request, { ...input.store.objects[3]!, firstSequence: 5 }] }
-		});
+	const DM_CONTENT: [string, string][] = [
+		['dm-unload', unloadBody(DM_MODEL)],
+		['dm-c00', decisionModelBody(DM_MODEL, DM_MATERIAL, C00)],
+		['dm-s00', decisionModelBody(DM_MODEL, DM_MATERIAL, S00)]
+	];
+	const DM_ROWS = [
+		dm('mex_dm_unload', 'dm-unload', { disposition: 'ACCEPTED', parseOutcome: { outcome: 'NOT_ATTEMPTED', detail: 'Step 1’s unload request: its answer is not read (D51).' } }, '2026-10-11T09:58:00.000Z', 4),
+		dm('mex_dm_c00', 'dm-c00', { disposition: 'ACCEPTED', parseOutcome: { outcome: 'PARSED', detail: 'answers.c00.noul read: 0.12345678901234568' } }, '2026-10-11T09:59:00.000Z', 5),
+		dm('mex_dm_s00', 'dm-s00', { disposition: 'NO_RESPONSE', parseOutcome: { outcome: 'TIMEOUT', detail: 'the request took more than 120 s (D51)' } }, '2026-10-11T09:59:30.000Z', 6)
+	];
+	const withRequests = (rows: readonly ReturnType<typeof row>[]): RecorderInput => ({
+		...input,
+		store: { ...input.store, objects: [...input.store.objects.slice(0, 3), ...rows, { ...input.store.objects[3]!, firstSequence: 9 }] },
+		content: new Map([...input.content, ...DM_CONTENT])
+	});
+	it('⛔ Z2a (D51) — a decision model’s request is no reviewer call of the recording, and no authoring call left out', () => {
+		// ~~const request = row('mex_dm', 'MODEL_EXCHANGE', { ...input.store.objects[3]!.state, resolvedModel: …, resolvedProvider: …, requestedAt: …, respondedAt: … }, 4);~~
+		const built = buildRecording(withRequests([DM_ROWS[1]!]));
 		expect(built.problems).toEqual([]);
 		expect([
 			built.authoringCallsLeftOut,
 			built.recording?.reviewer.map((c) => [c.unit, c.framing, c.promptSha256])
 		]).toEqual([0, [['requirements', 'declared-policy', sha(DECLARED_PROMPT)]]]);
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package Z2b — D51's record (Z1's departure 10; the brief's item 7): THE RECORDER WRITES EACH REQUEST INTO
+	// THE RECORDING, in the order the run made them, for the replay to serve its review's indications from: its key, its model, its
+	// body's hash with every string in it scrubbed (the workspace named inside the material and a statement found as the run spelled
+	// it, never inside JSON's escapes), and its score or the reason it got none. Step 1's unload request asks no question: left out.
+	it('⭐ Z2b (D51) — each decision-model request is written into the recording: key, model, scrubbed body hash, score or why none; the unload request left out', () => {
+		const built = buildRecording(withRequests(DM_ROWS));
+		expect(built.problems).toEqual([]);
+		const pairs = scrubPairs({ WORKSPACE: input.workspace, PROCESS_OUTPUT: `${input.workspace}.process-output`, HOME: input.home });
+		const scrubbed = (t: string) => scrubText(t, pairs);
+		expect(scrubbed(DM_MATERIAL), 'arrangement: the material names the run’s workspace').not.toBe(DM_MATERIAL);
+		expect(built.recording?.indications).toEqual([
+			{
+				key: 'c00',
+				model: DM_MODEL,
+				bodySha256: indicationBodySha256(decisionModelBody(DM_MODEL, scrubbed(DM_MATERIAL), C00), (t) => t),
+				outcome: { kind: 'SCORED', score: 0.12345678901234568 }
+			},
+			{
+				key: 's00',
+				model: DM_MODEL,
+				bodySha256: indicationBodySha256(decisionModelBody(DM_MODEL, scrubbed(DM_MATERIAL), { ...S00, statement: scrubbed(S00.statement) }), (t) => t),
+				outcome: { kind: 'FAILED', reason: 'the request took more than 120 s (D51)' }
+			}
+		]);
+	});
+
+	it('⛔ Z2b — a decision-model row whose body is no request refuses the recording, writing nothing, named', () => {
+		const built = buildRecording({
+			...withRequests([DM_ROWS[1]!]),
+			content: new Map([...input.content, ['dm-c00', 'not a request']])
+		});
+		expect(built.recording).toBeNull();
+		expect(built.problems).toEqual(['decision-model request 1 (mex_dm_c00): its body is no decision-model request (D51), so it cannot be keyed']);
 	});
 });

@@ -6,6 +6,13 @@
 //   · `POST /v1/systemone` — every question it was asked scored, by default as a function of the body's bytes (`stubScore`), so a
 //     score names the exact request it answers; `keep_alive` 0 unloads the model after the request, as Ollama does, and the
 //     unload is seen by `/api/ps` only after `lingerPolls` more reads of it, the window step 1's poll waits through.
+//     ⭐⭐ (Z2b phase 1b — D54 restated, `REG-D-146`; ~~to be filed in d48 as~~ filed in d48 as `REG-F-611`) A REQUEST PAST 64 KiB BY THE BYTES AS SENT
+//     IS REFUSED, AS THE SERVER REFUSES IT: HTTP 413, `{"error":"text and schema must not exceed 64 KiB"}` (`STUB_REQUEST_LIMIT_BYTES`).
+//     ⚠ THE LEAD'S INFERENCE, NOT A MEASURED RULE (`records-facts.md` §5): the API reference says the text and schema must fit within
+//     64 KiB, and of the 118 entries the server was asked, it refused one, `W-OVERSIZE-EDGES`, whose body is 113,057 bytes as sent
+//     (its non-ASCII sent as `\u` escapes) and 42,724 decoded — and answered all 117 others, each body at most 26,155 bytes. Only the
+//     bytes as sent separate the one from the 117. `P-OVERSIZE-FENCES`'s record tests it: 103,034 bytes as sent, 56,348 decoded, so
+//     this rule refuses it and a decoded one would not. ⛔ If that record shows answers, this rule is wrong.
 // Every request is kept, its bytes as they arrived (`requests`), so a test can say what was sent, in what order, how often.
 // ⭑ FOR Z2b TOO: the static source, the materializer and the fingerprint read D54's records by the sha256 of each body; a record
 // made through the product's client against this stub is a record of exactly the bytes the product sends.
@@ -18,6 +25,10 @@ import type { AddressInfo } from 'node:net';
 export const STUB_MODEL = 'pplx-decider:27b-q4_K_M';
 export const STUB_DIGEST = `733585a9ebb6${'0123456789abcdef'.repeat(3)}0123`;
 export const STUB_VERSION = '0.40.15';
+/** ⭐ Z2b phase 1b — the most a request may be, in bytes as sent, before the stub refuses it as the server does (the lead's inference). */
+export const STUB_REQUEST_LIMIT_BYTES = 64 * 1024;
+/** ⭐ Z2b phase 1b — the server's answer to a request past its limit (`d46-facts-verbatim.md` V19). */
+const TOO_LARGE = JSON.stringify({ error: 'text and schema must not exceed 64 KiB' });
 
 /** One request the stub received, as it arrived. */
 export interface StubRequest {
@@ -118,6 +129,8 @@ export async function startDecisionModelStub(o: StubOptions = {}): Promise<Decis
 			}
 			if (req.method === 'POST' && path === '/v1/systemone') {
 				requests.push(seen);
+				// ⭐ Z2b phase 1b — past the limit by the bytes as sent: refused before it is read, as the server refuses it.
+				if (Buffer.concat(chunks).length > STUB_REQUEST_LIMIT_BYTES) return send(res, 413, TOO_LARGE);
 				let parsed: Record<string, unknown>;
 				try {
 					parsed = JSON.parse(body) as Record<string, unknown>;

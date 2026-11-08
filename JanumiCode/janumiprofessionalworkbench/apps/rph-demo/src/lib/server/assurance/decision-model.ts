@@ -13,6 +13,12 @@
 // identity becomes D54's records' own. Unconfigured — none of the four set — this answers `undefined`, and every real review is
 // refused before its first reviewer call (`NO_INDICATIONS_SOURCE_STATEMENT`), as Z1 left it. Configured in part, it answers a
 // source that refuses every review, naming what is missing: no default stands in for a setting.
+// ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z2b — D51, D54; the Z2b brief's item 3): ~~four settings~~ TWO — the server's
+// address and the model. The identity the client is held to is D54's records' own (`DECISION_MODEL_RECORDS_IDENTITY`,
+// `decision-model-identity.ts`), so `JPWB_DECISION_MODEL_DIGEST` and `JPWB_DECISION_MODEL_SERVER_VERSION` are no longer read: an
+// operator's digest or version could only stand in for the records' — and another identity owes new records (`REG-F-608`). The model
+// is still the operator's to configure, never defaulted (`REG-D-052`); one other than the records' is refused, since the records
+// hold no score of its.
 // ⭑ A test that drives the product's own wiring stands a double in here (`vi.mock`), as it stands one in for `devinPrint`;
 // nothing in production stands in for the model.
 // ⭑ THE LANE PASSES THE OPERATOR'S OWN: the live lane's server inherits the shell's environment (`playwright.live-exec.config.ts`,
@@ -21,14 +27,13 @@
 // TYPES ONLY: building the client opens nothing, so the floor registry still reaches it at no cost — the client reaches the server
 // only when a review asks it.
 import { createDecisionModelClient } from './decision-model-client.js';
+import { DECISION_MODEL_RECORDS_IDENTITY } from './decision-model-identity.js';
 import type { IndicationsSource } from './reasoning-review-validator.js';
 
-/** ⭐ The four settings, by what each configures. */
+/** ⭐ ~~The four settings~~ The two settings (Z2b), by what each configures. */
 export const DECISION_MODEL_VARIABLES = Object.freeze({
 	server: 'JPWB_DECISION_MODEL_SERVER',
-	model: 'JPWB_DECISION_MODEL',
-	digest: 'JPWB_DECISION_MODEL_DIGEST',
-	serverVersion: 'JPWB_DECISION_MODEL_SERVER_VERSION'
+	model: 'JPWB_DECISION_MODEL'
 });
 
 /** `a`, `a and b`, `a, b and c`. */
@@ -40,15 +45,19 @@ export function configuredIndications(): IndicationsSource | undefined {
 	const read = (name: string): string | undefined => process.env[name]?.trim() || undefined;
 	const server = read(DECISION_MODEL_VARIABLES.server);
 	const model = read(DECISION_MODEL_VARIABLES.model);
-	const digest = read(DECISION_MODEL_VARIABLES.digest);
-	const serverVersion = read(DECISION_MODEL_VARIABLES.serverVersion);
 	const missing = Object.values(DECISION_MODEL_VARIABLES).filter((name) => read(name) === undefined);
 	if (missing.length === Object.values(DECISION_MODEL_VARIABLES).length) return undefined;
-	if (server === undefined || model === undefined || digest === undefined || serverVersion === undefined) {
+	if (server === undefined || model === undefined) {
 		const refusal =
 			`the decision model is configured in part: ${listed(missing)} ${missing.length === 1 ? 'is' : 'are'} not set ` +
 			`(REG-D-052: no default stands in for ${missing.length === 1 ? 'it' : 'them'})`;
 		return async () => ({ refusal });
 	}
-	return createDecisionModelClient({ server, model, identity: { digest, serverVersion } });
+	// ⭐ Z2b — the records' model, and the records' identity: the only scores the screen measured are theirs.
+	const recorded = DECISION_MODEL_RECORDS_IDENTITY;
+	if (model !== recorded.model) {
+		const refusal = `the configured decision model is ${model}, not ${recorded.model}, the model D54’s records were made with (D51; REG-D-052)`;
+		return async () => ({ refusal });
+	}
+	return createDecisionModelClient({ server, model, identity: { digest: recorded.digest, serverVersion: recorded.serverVersion } });
 }

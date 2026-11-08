@@ -14,6 +14,17 @@
 // control's `--live` run hand their validator no source, so they refuse before any call until package Z2 lands the client
 // and the records — which is why Z1 merges only with Z2 (the build brief's integration note). Z2 replaces this with the
 // records' static source.
+// ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z2b — D54; Z1's departure 8): ~~the fingerprint's probes, case prompts and
+// scoring digest, the re-scoring of recorded replies~~ — THE FINGERPRINT'S PROBES AND CASE PROMPTS, THE RE-SCORING AND THE
+// QUALIFICATION CLI READ D54's COMMITTED RECORDS (`recorded-indications.ts`, the static source, which refuses a question no record
+// holds). This placeholder stays for what no record covers, and says so where it is used:
+//   · the fingerprint's SCORING DIGEST — its corpus's cases are its own (`CORPUS_CASE`, the declared corpus), in no record, and no
+//     score reaches what the digest hashes (`fingerprint.ts`, `scoringDigestOf`);
+//   · the negative control's DRY RUN — its crafted case is in no record either (`../phase7/negative-control.ts`);
+//   · tests, which stand it in where a review needs scores and asserts nothing of them; and, through the history's decision model
+//     (`verif/reviewer-qualification-history.ts`), the score a question of the case sets' history gets where no record holds it.
+// ⛔ Still never a source a review sent to a reviewer is built with: the paid CLI reads the records, and the negative control's
+// `--live` run is handed none.
 import type { IndicationsSource } from '../../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
 
 export const PLACEHOLDER_INDICATIONS: IndicationsSource = async (requests) => ({

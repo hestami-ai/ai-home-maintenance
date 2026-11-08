@@ -230,6 +230,9 @@ export async function runNegativeControl(i: {
 	// ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D50 (`REG-D-146`) — the decision model its validator asks: the scripts' placeholder in a
 	// dry run, which calls no model (`indications.ts`); ⛔ none in a live run until package Z2's client and records land, so a
 	// live run is refused before its first reviewer call, never sent with placeholder scores.
+	// ⚠ STILL SO AFTER Z2b (D54; the Z2b brief's item 2, a departure the report states): this control's crafted case is in neither
+	// set D54 records — v13's cases and the fingerprint's probes — so the records' static source would refuse its every request;
+	// the dry run keeps the placeholder, and a live run stays refused until the lead rules on records for this case.
 	const indications = i.mode === 'DRY_RUN' ? PLACEHOLDER_INDICATIONS : undefined;
 	const requested = i.repetitions ?? REPETITIONS;
 	const maxCalls = i.maxCalls ?? MAX_REVIEWER_CALLS;

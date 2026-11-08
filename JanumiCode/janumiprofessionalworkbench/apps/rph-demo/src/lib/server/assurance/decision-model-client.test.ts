@@ -150,7 +150,7 @@ describe('⛔ PREDICTED RED 4 (Z2; D51) — cold only, as step 1 measured it', (
 		expect(questionPosts(s)).toEqual([]);
 	});
 
-	it('⭐ the other models the server held are recorded with each request, and refuse nothing (the sponsor’s ruling of 2026-11-06, to be registered)', async () => {
+	it('⭐ the other models the server held are recorded with each request, and refuse nothing (the sponsor’s ruling of 2026-11-06, ~~to be registered~~ registered as `REG-D-147`)', async () => {
 		const s = await stub({ others: ['llama3.2:3b'] });
 		const result = await clientOf(s.url)(REQUESTS, MATERIAL);
 		expect('scores' in result).toBe(true);

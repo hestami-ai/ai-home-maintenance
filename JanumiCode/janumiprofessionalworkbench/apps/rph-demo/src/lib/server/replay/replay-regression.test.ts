@@ -74,6 +74,9 @@ vi.mock('node:child_process', async (importOriginal) => {
 // model the paid pass was handed. ⛔ A recording holds no decision-model scores yet — what a replay serves for them is not
 // designed (design §12 names none) — so the product's own replay carries none (`ReplayRun.indications`) and would refuse every
 // review; both passes are handed the same double, so the reviewer prompts the replay checks are the ones the paid pass recorded.
+// ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z2b): ~~A recording holds no decision-model scores yet … carries none~~ — a
+// recording holds each request of the run (`/4`), and the product's own replay serves them (`replay-indications.test.ts`); but the
+// paid pass's double asks no model and so records none, and the replay pass is handed the same double still.
 vi.mock('./replay-run.js', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('./replay-run.js')>();
 	const { TEST_INDICATIONS } = await import('../assurance/indications.testing.js');
@@ -279,7 +282,9 @@ function paidRun(root: string): ReplayRun & {
 			},
 			executor: [],
 			commands: [],
-			reviewer: []
+			reviewer: [],
+			// ⭐ Z2b (`/4`) — and no decision-model request: the double serves its own script.
+			indications: []
 		} satisfies Recording,
 		root: () => root,
 		useSandbox: (p: { workspace: string; processOutput: string }) => {
@@ -633,7 +638,10 @@ async function recordingOfPass(
 			}
 		],
 		commands: [RUN],
-		reviewer
+		reviewer,
+		// ⭐ `JAN-EXEC` Phase 7, package Z2b (`/4`) — the paid pass's decision-model requests: none, its decision model the double
+		// (`TEST_INDICATIONS`), which asks no model and so leaves no request to record; the replay pass is handed the same double.
+		indications: []
 	};
 }
 
