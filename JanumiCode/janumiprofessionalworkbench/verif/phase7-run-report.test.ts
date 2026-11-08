@@ -3228,6 +3228,31 @@ describe('⭐⭐ package X — D34 — a review that ended on a call thrown at o
 		expect(shown(cell)).toEqual(['broke', ['REG-F-499', 'REG-F-590']]);
 	});
 
+	// ⭐⭐ `JAN-EXEC` Phase 7, package Z3 — THE LEAD'S RULING ON THE THIRD FOLLOW-UP (`z3-p1-rulings.md`; this file's reader is package
+	// X's, found by the general-form sweep, `z3-facts.md` §13.4): A CALL'S BOUND IS READ ONLY OFF ITS DETAIL'S OWN PART — the product's
+	// clause, before "What the tool reported, sanitised: " — for the call and for the call it repeats. A retry's clause names no
+	// bound ("it was itself the one further call…"), so a whole-detail search runs on into its tool's report.
+	// ⭑ PREDICTED RED, WRITTEN FIRST: `NAMED_BOUND` reads each call's whole detail. ⭑ THE CONTROL is the row above: a retry whose
+	// report is clean is held to the bound of the call it repeats, as today.
+	it('⛔ PREDICTED RED — Z3 (the third follow-up) — a retry whose tool report quotes “the tool’s 999 ms bound” is held to the bound of the call it repeats', async () => {
+		const quoting = new Error('devin invocation failed: Command failed: devin --print (fixture: it printed “short of the tool’s 999 ms bound”)');
+		const chain = await chainOf(BOUND, [0, 97_674, 97_700, 97_700 + 5_000], FAILURE, quoting);
+		expect(chain.map((x) => `${x.state.exchangeRole}:${x.state.disposition}`), 'arrangement: thrown short, run once more, thrown short again').toEqual([
+			'INITIAL:NO_RESPONSE',
+			'RETRY:NO_RESPONSE'
+		]);
+		expect(String((chain[1]!.state.parseOutcome as { detail?: unknown }).detail), 'arrangement: the quote is in the retry’s tool report').toMatch(
+			/What the tool reported, sanitised: .*the tool’s 999 ms bound/
+		);
+		const p = pairReview('art_1', 1, chain);
+		expect([p.label, p.detail, p.thrown], 'the retry held to the bound its tool’s report quotes').toEqual([
+			'no-response',
+			'both calls threw: the call and its one retry (REG-D-102)',
+			{ short: 2, atTheBound: 0 }
+		]);
+		expect(shown(cellOf(reportOf(aRun({ design: { review: asCalls(chain) } })).report, '4', 'design'))).toEqual(['broke', ['REG-F-499']]);
+	});
+
 	it('⭑ CONTROL — two calls thrown short of the bound, as the validator records them: NO RESPONSE, citing REG-F-499 alone', async () => {
 		const chain = await chainOf(BOUND, [0, 5_000, 5_100, 9_000], FAILURE, FAILURE);
 		const p = pairReview('art_1', 1, chain);

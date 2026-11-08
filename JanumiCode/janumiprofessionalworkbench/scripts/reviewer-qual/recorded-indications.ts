@@ -39,6 +39,14 @@ export interface DecisionModelRecords {
 	readonly refused: ReadonlyMap<string, RecordedRefusal>;
 	/** ⭐ Z2b phase 1b — the bodies a refusal contradicts: recorded scored too, or refused again with another answer. */
 	readonly refusalContradicted: ReadonlySet<string>;
+	/** ⭐ Z3 — D53 — the entries the records hold, by their kind and id (`CASE W12-CLEAN`, `PROBE T-NO-FENCE`). */
+	readonly entries: ReadonlySet<string>;
+	/**
+	 * ⭐⭐ Z3 phase 2 — D53 (the lead's reading, for d49) — THE ENTRIES WHOSE LINE RECORDS THEIR REVIEW REFUSED, each with its
+	 * words: the server's refusal of a request (`refusedRequest`, in the client's own words, `refusedRequestReason`), or a refusal
+	 * before any request (`refused`). Such an entry is held, but holds no review: the validator refuses it before any reviewer call.
+	 */
+	readonly refusedEntries: ReadonlyMap<string, string>;
 }
 export type RecordsRead = DecisionModelRecords | { readonly refusal: string };
 
@@ -82,7 +90,7 @@ export function refusedRequestOf(entry: { readonly refusedRequest?: unknown; rea
 function parsed(
 	name: string,
 	text: string
-): { identity: DecisionModelRecordsIdentity; questions: { sha: string; score: number }[]; refused: RecordedRefusal[] } | string {
+): { identity: DecisionModelRecordsIdentity; questions: { sha: string; score: number }[]; refused: RecordedRefusal[]; entries: string[]; refusedEntries: [string, string][] } | string {
 	const lines = text.split('\n').filter((l) => l.trim() !== '');
 	let head: Record<string, unknown>;
 	try {
@@ -94,14 +102,17 @@ function parsed(
 		return `${name} does not begin with its IDENTITY line (D54)`;
 	const questions: { sha: string; score: number }[] = [];
 	const refused: RecordedRefusal[] = [];
+	const entries: string[] = [];
+	const refusedEntries: [string, string][] = [];
 	for (const [n, line] of lines.slice(1).entries()) {
-		let entry: { kind?: unknown; questions?: unknown; refusedRequest?: unknown; refused?: unknown };
+		let entry: { kind?: unknown; id?: unknown; questions?: unknown; refusedRequest?: unknown; refused?: unknown };
 		try {
 			entry = JSON.parse(line) as typeof entry;
 		} catch {
 			return `${name} line ${n + 2} is no JSON`;
 		}
 		if (!Array.isArray(entry.questions)) return `${name} line ${n + 2} holds no questions`;
+		if ((entry.kind === 'CASE' || entry.kind === 'PROBE') && typeof entry.id === 'string') entries.push(`${entry.kind} ${entry.id}`);
 		for (const q of entry.questions as { bodySha256?: unknown; score?: unknown }[]) {
 			if (typeof q.bodySha256 !== 'string' || !SHA.test(q.bodySha256) || typeof q.score !== 'number' || !Number.isFinite(q.score) || q.score < 0 || q.score > 1)
 				return `${name} line ${n + 2} holds a question that is no body hash and probability`;
@@ -111,8 +122,11 @@ function parsed(
 		const refusal = refusedRequestOf(entry);
 		if (refusal === null) return `${name} line ${n + 2} ${MALFORMED_REFUSED_REQUEST}`;
 		if (refusal !== undefined) refused.push(refusal);
+		// ⭐ Z3 phase 2 — and the entry's review refused, where its line records it so, in the refusal's own words.
+		const why = refusal !== undefined ? refusedRequestReason(refusal.key, refusal.status, refusal.response) : typeof entry.refused === 'string' ? entry.refused : undefined;
+		if (why !== undefined && (entry.kind === 'CASE' || entry.kind === 'PROBE') && typeof entry.id === 'string') refusedEntries.push([`${entry.kind} ${entry.id}`, why]);
 	}
-	return { identity: { model: head.model, digest: head.digest, serverVersion: head.serverVersion }, questions, refused };
+	return { identity: { model: head.model, digest: head.digest, serverVersion: head.serverVersion }, questions, refused, entries, refusedEntries };
 }
 
 const sameIdentity = (a: DecisionModelRecordsIdentity, b: DecisionModelRecordsIdentity): boolean =>
@@ -140,6 +154,8 @@ export function readDecisionModelRecords(
 		};
 	const scores = new Map<string, number>();
 	const contradicted = new Set<string>();
+	const entries = new Set(ok.flatMap((r) => r.file.entries));
+	const refusedEntries = new Map(ok.flatMap((r) => r.file.refusedEntries));
 	for (const r of ok)
 		for (const q of r.file.questions) {
 			const had = scores.get(q.sha);
@@ -156,7 +172,7 @@ export function readDecisionModelRecords(
 				refusalContradicted.add(q.bodySha256);
 			else refused.set(q.bodySha256, q);
 		}
-	return { identity: first, scores, contradicted, refused, refusalContradicted };
+	return { identity: first, scores, contradicted, refused, refusalContradicted, entries, refusedEntries };
 }
 
 /**
@@ -182,6 +198,24 @@ export function recordedIndications(records: RecordsRead): IndicationsSource {
 		}
 		return { scores };
 	};
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package Z3 — D53 — THE RECORDS AND THE FILES THEY WERE READ FROM: what a D53 run reads, and the sha256 of
+ * each file, which the live re-derivation's evidence names (a record changed since, and the case is re-derived again).
+ */
+export interface RecordsOnFile {
+	readonly read: RecordsRead;
+	readonly files: readonly { readonly name: string; readonly sha256: string }[];
+}
+
+/** ⭐ Z3 — D53 — the committed records under `root`, with their files' sha256 (`RecordsOnFile`). */
+export function committedRecordsOnFile(root: URL): RecordsOnFile {
+	const files = RECORDS_FILES.flatMap((f) => {
+		const path = fileURLToPath(new URL(`${RECORDS_FOLDER}${f}`, root));
+		return existsSync(path) ? [{ name: f, sha256: createHash('sha256').update(readFileSync(path)).digest('hex') }] : [];
+	});
+	return { read: committedRecords(root), files };
 }
 
 /** ⭐ The committed records under `root` (a `file:` URL ending in `/`): both files, read and held to the product's identity. */

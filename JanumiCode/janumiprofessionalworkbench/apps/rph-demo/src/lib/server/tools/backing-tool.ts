@@ -8,6 +8,8 @@
 // itself. Of the 100 closed enums in the ratified contracts NOT ONE names a tool, agent, provider, CLI or
 // vendor, and `PER-2` would make a deployment fact permanent. A vendor name may not enter the wire vocabulary.
 import type { ExchangeIdentityFact } from '@janumipwb/rph-contracts';
+// ⭐ Z3 — the free-tier refusals an answer carries, in the carrier's own type (`ToolInvocationResult.freeTierRefusals`).
+import type { FreeTierRefusals } from './free-tier-refusals.js';
 
 export type BackingToolRole = 'EXECUTION' | 'ASSURANCE';
 
@@ -307,6 +309,16 @@ export interface ToolInvocationResult {
 	 * ⭑ `undefined` means the tool wrote none, or none could be read — an absence of the record, never "no tool ran".
 	 */
 	readonly sessionExport?: string;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package Z3 — D46 (`REG-D-145`; design §11.7) — THE FREE-TIER REFUSALS THE ADAPTER WAITED OUT BEFORE THIS
+	 * ANSWER: how many, and the time it waited. ⚠ None reached the model, and none is a reviewer call; the time is no part of this
+	 * call's own (`freeTierRefusalsOf`, `devin-reviewer.ts`). `undefined` when the call was refused none.
+	 * ~~`{ readonly count: number; readonly waitedMs: number }`~~ ⛔ MOVED 2026-11-07 (Z3 — found in the second follow-up's sweep): the
+	 * declaration had kept the first build's shape after the correction to ruling 3 added `beforeLastAttemptMs`, so it named less
+	 * than the adapter carries. ⭐ The carrier's own type. ⭑ No reader read the field through the old type: each uses
+	 * `freeTierRefusalsOf`.
+	 */
+	readonly freeTierRefusals?: FreeTierRefusals;
 }
 
 /**

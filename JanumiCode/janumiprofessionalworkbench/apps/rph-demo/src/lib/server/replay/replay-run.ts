@@ -43,6 +43,8 @@ import { decisionModelBody } from '../assurance/decision-model-request.js';
 import { REVIEWER_CALL_BOUND_MS, type IndicationsSource } from '../assurance/reasoning-review-validator.js';
 import { answerFromText, type ToolInvocationResult } from '../tools/backing-tool.js';
 import { OutputLimitReached } from '../tools/output-limit.js';
+// ⭐ Z3 (the lead's ruling on question 5) — a recorded call's carried refusals, attached as devin's adapter attaches them.
+import { freeTierRefusalsFigures, withFreeTierRefusals } from '../tools/free-tier-refusals.js';
 import {
 	expandText,
 	indicationBodySha256,
@@ -457,19 +459,25 @@ export function createReplayRun(
 			next.reviewer += 1;
 			// ⭐ THE RECORDED ELAPSED TIME, through the validator's clock: its `respondedAt` is read after this returns.
 			virtualMs += call.elapsedMs;
+			// ⭐⭐ `JAN-EXEC` Phase 7, package Z3 — the lead's ruling on question 5 (`z3-p1-rulings.md`) — THE CALL'S CARRIED FREE-TIER
+			// REFUSALS, attached as devin's adapter attached them: on the failure thrown (`withFreeTierRefusals`) and on the answer. The
+			// validator then takes all that came before the last attempt off the recorded span, as it did in the run, and writes the
+			// run's detail, clause and observation.
+			const refusals = call.freeTierRefusals;
 			// ⭐ A RECORDED THROW IS THROWN AGAIN, with the tool's own message: the validator's seam sanitises it as it did.
-			if (call.reply.status === 'THROWN') throw new Error(expand(call.reply.message));
+			// ~~`throw new Error(expand(call.reply.message))`~~ ⛔ MOVED 2026-11-07 (Z3 — Q5): and with the refusals it carried.
+			if (call.reply.status === 'THROWN') throw withFreeTierRefusals(new Error(expand(call.reply.message)), refusals);
 			// ⭐ P5 package A (F1) — A RECORDED CUT IS CUT AGAIN: the product's class, the tool's message, the partial reply and
 			// what the tool reported of the cut — and, as for every replayed reply, no identity a provider reported.
 			if (call.reply.status === 'OUTPUT_LIMIT')
-				throw new OutputLimitReached(expand(call.reply.message), {
+				throw withFreeTierRefusals(new OutputLimitReached(expand(call.reply.message), {
 					facts: {
 						...(call.reply.finishReason === null ? {} : { finishReason: call.reply.finishReason }),
 						...(call.reply.outputTokens === null ? {} : { outputTokens: call.reply.outputTokens })
 					},
 					partialReply: expand(call.reply.partialReply),
 					observedToolCalls: REPLAYED_REVIEW_OBSERVATION
-				});
+				}), refusals);
 			const text = replyText(call, expand);
 			return {
 				answer: answerFromText(text),
@@ -479,7 +487,18 @@ export function createReplayRun(
 				// state a fact about a call that did not happen (`REG-F-530`, "Identity"). The host asserts the recorded
 				// identity, and the record grades it so.
 				identityEvidence: 'HOST_CONFIGURED',
-				observedToolCalls: REPLAYED_REVIEW_OBSERVATION
+				// ⭐ Z3 (Q5) — the refusals the recorded answer met, stated as the run's observation stated them, in the phrase a
+				// recording reads them back by (`freeTierRefusalsFigures`), and carried on the answer as the adapter carried them.
+				observedToolCalls:
+					refusals === undefined
+						? REPLAYED_REVIEW_OBSERVATION
+						: {
+								canObserve: false,
+								reason:
+									`${REPLAYED_REVIEW_OBSERVATION.reason} In the run, the recorded call answered after ` +
+									`${freeTierRefusalsFigures(refusals)}, each refusal waited out and the same call made again (D46).`
+							},
+				...(refusals === undefined ? {} : { freeTierRefusals: refusals })
 			};
 		}
 	};

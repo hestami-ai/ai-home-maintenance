@@ -73,6 +73,19 @@ export function createFloorRegistry(opts: {
 	 * ever reached the branch the selected reviewer (~~`REG-D-084`~~ ⭐ `REG-D-119`) runs on.
 	 */
 	devinExec?: DevinExec;
+	/**
+	 * ⭐ `JAN-EXEC` Phase 7, package Z3 — D46 — the wait `devinPrint` makes before it makes a refused call again, injectable beside
+	 * the program for the same reason: absent, a real 45 s.
+	 */
+	devinWait?: (ms: number) => Promise<void>;
+	/**
+	 * ⭐ `JAN-EXEC` Phase 7, package Z3 — the lead's correction to ruling 3 — the clock `devinPrint` measures all that came before a
+	 * call's last attempt on, in milliseconds: a test that scripts the validator's `clock` and devin's refusals hands the same one
+	 * here, so the span the validator measures and the figure it takes off it are read off one clock. Absent, devinPrint's own
+	 * monotonic wall clock, which the validator's wall clock follows in production. ⛔ Never derived from `clock`: a test that
+	 * scripts `clock` as a fixed sequence of readings would have them read by devinPrint too.
+	 */
+	devinNow?: () => number;
 	clock?: () => string;
 	/**
 	 * ⭐ `JAN-CRITREAD` J1-2 — the host's answer to "did the test register a stipulation for this subject, on this
@@ -93,6 +106,9 @@ export function createFloorRegistry(opts: {
 	// inside test mode; outside it the real Validator is the only option, because `JPWB_ASSESSOR=mock` once
 	// swapped in the content-blind mock in ANY environment while the floor still recorded SATISFIED.
 	const selection = selectReviewer({ testMode: opts.testMode });
+	// ⭐ Z3 — the lead's correction to ruling 3 — the clock devinPrint measures what came before a call's last attempt on: the one
+	// handed in, else devinPrint's own monotonic wall clock (`devinNow`'s doc says why it is never derived from `clock`).
+	const devinNow = opts.devinNow;
 	const registry = createValidatorRegistry();
 	registry.register(schemaInvariantValidatorInstance);
 	registry.register(identityProvenanceValidatorInstance);
@@ -125,7 +141,8 @@ export function createFloorRegistry(opts: {
 					? { print: opts.print }
 					: selection.kind === 'DEVIN'
 						? {
-								print: (prompt: string) => devinPrint(prompt, opts.devinExec),
+								// ⭐ Z3 — the correction — and the clock the validator times the call by (`devinNow`).
+								print: (prompt: string) => devinPrint(prompt, opts.devinExec, opts.devinWait, devinNow),
 								agentId: 'devin',
 								// ⭑ D4 — RESOLVED WHEN THE REVIEW RUNS, NEVER HERE. The validator calls it inside
 								// `evaluate`, when `devinPrint` reads the same variable for devin's argv — so the model
@@ -170,6 +187,10 @@ export function createDeclaredPolicyReviewer(opts: {
 	/** ⭐ Package Z1 — the decision model, as `createFloorRegistry` takes it: none in production until package Z2. */
 	indications?: IndicationsSource;
 	devinExec?: DevinExec;
+	/** ⭐ Z3 — D46 — as `createFloorRegistry` takes it. */
+	devinWait?: (ms: number) => Promise<void>;
+	/** ⭐ Z3 — the correction — as `createFloorRegistry` takes it. */
+	devinNow?: () => number;
 	clock?: () => string;
 	stipulations?: DeclaredStipulationLookup;
 }): DeclaredPolicyReviewer {

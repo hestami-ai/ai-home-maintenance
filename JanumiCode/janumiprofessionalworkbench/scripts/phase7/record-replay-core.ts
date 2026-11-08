@@ -62,6 +62,10 @@ import {
 } from '../../apps/rph-demo/src/lib/server/replay/recording.js';
 // ⭐ P5 package A (F1) — the one reading of a reply the tool cut at the model's output-token limit. Pure.
 import { outputLimitOf } from '../../apps/rph-demo/src/lib/server/tools/output-limit.js';
+// ⭐ Z3 (the lead's ruling on question 5) — a reviewer call's carried free-tier refusals, read back off its record's own words —
+// ⭐ (the ruling on the second follow-up) off the product's own sentence only, at its opening.
+import { freeTierRefusalsIn } from '../../apps/rph-demo/src/lib/server/replay/recording.js';
+import { FREE_TIER_REFUSALS_OPENING, type FreeTierRefusals } from '../../apps/rph-demo/src/lib/server/tools/free-tier-refusals.js';
 // ⭐⭐ Package Z2a — D51 — the decision model's requests, known by their identity. ⚠ A pure module.
 import { isDecisionModelExchange, unloadBody } from '../../apps/rph-demo/src/lib/server/assurance/decision-model-request.js';
 import { workspaceTreeSha256 } from './node-tests.js';
@@ -467,6 +471,35 @@ function toolsOwnWords(row: StoredObject, x: Extraction): string {
 }
 
 /**
+ * ⭐ Z3 (the lead's ruling on the second follow-up) — a failed call's detail, THE PRODUCT'S OWN PART: all before the tool's report
+ * (`THROWN_MARKER`), which is the tool's words. ⭑ The complement of `toolsOwnWords`: a detail with no marker is the tool's words
+ * whole there, so nothing of it is the product's here.
+ */
+function productsPart(detail: string): string {
+	const at = detail.indexOf(THROWN_MARKER);
+	return at < 0 ? '' : detail.slice(0, at);
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package Z3 — THE LEAD'S RULING ON THE SECOND FOLLOW-UP (`z3-p1-rulings.md`) — THE REFUSALS A REVIEWER CALL'S
+ * RECORD STATES, READ OFF THE PRODUCT'S OWN SENTENCE ONLY, by the call's class: a failure's (thrown, or cut at the output limit) in the
+ * validator's sentence, in its detail's own part (`productsPart`) — never the tool's report after it; an answer's in devin's adapter's
+ * sentence, in its observation's reason — never its parse outcome's detail, whose parser message can quote the reply. Each at its
+ * sentence's opening (`FREE_TIER_REFUSALS_OPENING`), its figures right after it (`freeTierRefusalsIn`). ⭑ No opening: none stated.
+ * ⛔ An opening whose figures do not read there is the recorder's problem for that call (the string returned) — never "no refusals".
+ */
+function refusalsTheRecordStates(row: StoredObject, reply: RecordedReply): FreeTierRefusals | string | undefined {
+	const answered = reply.status === 'ANSWERED';
+	const opening = answered ? FREE_TIER_REFUSALS_OPENING.answer : FREE_TIER_REFUSALS_OPENING.failure;
+	const stated = answered
+		? freeTierRefusalsIn(str(rec(row.state.observedToolCalls).reason), opening)
+		: freeTierRefusalsIn(productsPart(str(rec(row.state.parseOutcome).detail)), opening);
+	return stated !== null
+		? stated
+		: `its record states free-tier refusals (“${opening.trimEnd()} …”) in figures that do not read, so the refusals it met cannot be replayed`;
+}
+
+/**
  * A reviewer call's reply: a call that threw, its cause as the tool printed it; ⭐ (P5 package A, F1) a reply the tool cut
  * at the model's output-token limit (`outputLimitOf`), its own form — never ANSWERED, which the replay would hand the
  * validator to parse and repair, a call the run never made; else its retained raw reply.
@@ -549,6 +582,18 @@ function reviewerCallOf(
 		return undefined;
 	}
 	const subjectType = str(row.state.subjectObjectType);
+	// ⭐⭐ `JAN-EXEC` Phase 7, package Z3 — the lead's ruling on question 5 (`z3-p1-rulings.md`) — THE REFUSALS THE CALL CARRIED, read
+	// back off what its record states of them, in the one phrase the product writes them in (`freeTierRefusalsFigures`): a failure's
+	// in its detail (the validator's sentence), an answer's in its observation (devin's adapter's). ⭑ None stated: none kept.
+	// ~~`freeTierRefusalsIn(str(rec(row.state.parseOutcome).detail)) ?? freeTierRefusalsIn(str(rec(row.state.observedToolCalls).reason))`~~
+	// ⛔ MOVED 2026-11-07 (Z3 — the lead's ruling on the second follow-up): the whole detail held text that is not the product's — a
+	// failure's tool report, an unparsed answer's parser message — so they are read by the call's class, off the product's own
+	// sentence only (`refusalsTheRecordStates`); and a statement whose figures do not read is refused, never kept as none.
+	const refusals = refusalsTheRecordStates(row, reply);
+	if (typeof refusals === 'string') {
+		x.problems.push(`${where}: ${refusals}`);
+		return undefined;
+	}
 	return {
 		// ⭐ The merge of E12 and E4 (J3) — A CALL WHOSE SUBJECT IS A UNIT names that unit: E12's declared review, which a
 		// sign-off makes after every phase ran. ⛔ Named by the last try before it, it was the last phase's, whichever it judged.
@@ -566,7 +611,8 @@ function reviewerCallOf(
 			modelId: str(rec(row.state.resolvedModel).value),
 			providerId: str(rec(row.state.resolvedProvider).value)
 		},
-		elapsedMs
+		elapsedMs,
+		...(refusals === undefined ? {} : { freeTierRefusals: refusals })
 	};
 }
 
@@ -576,10 +622,24 @@ function reviewerCallOf(
  */
 function reviewerBound(rows: readonly StoredObject[], agent: string): number | null {
 	for (const row of rows) {
-		const bound = /tool’s (\d+) ms bound/.exec(str(rec(row.state.parseOutcome).detail));
+		// ~~`/tool’s (\d+) ms bound/.exec(str(rec(row.state.parseOutcome).detail))`~~ ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package
+		// Z3 — the lead's ruling on the third follow-up; package X's reader, found by the general-form sweep): every reviewer row's
+		// whole detail was searched, an answer's parse detail and a tool's report with it, so a quote there could set the bound.
+		const bound = /tool’s (\d+) ms bound/.exec(boundStatedBy(row));
 		if (bound) return Number(bound[1]);
 	}
 	return RECORDED_CALL_BOUND_MS[agent] ?? null;
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package Z3 — THE LEAD'S RULING ON THE THIRD FOLLOW-UP (`z3-p1-rulings.md`) — WHERE A REVIEWER ROW STATES THE
+ * BOUND ITS CALL WAS HELD TO: a failed call's (thrown, or cut at the output limit, as `replyOf` classes them) own clause, in its
+ * detail's own part (`productsPart`), never the tool's report after it. ⭑ An answer states none: its parse detail is the parser's
+ * message, which can quote the reply.
+ */
+function boundStatedBy(row: StoredObject): string {
+	const failed = row.state.disposition === 'NO_RESPONSE' || outputLimitOf(row.state) !== undefined;
+	return failed ? productsPart(str(rec(row.state.parseOutcome).detail)) : '';
 }
 
 /** ⭐ Z2b — the score a decision-model request's parse outcome records the validator reading (`indicationParseOutcome`). */

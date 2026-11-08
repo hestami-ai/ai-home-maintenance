@@ -622,3 +622,6 @@ describe('⭐⭐ package X — D34 — a call killed during its run is thrown wi
 		expect(diagnosticCarriesPrompt((thrown as Error).message, LONG)).toBe(false);
 	});
 });
+
+// ⭐ `JAN-EXEC` Phase 7, package Z3 — D46: devin's free-tier refusal, waited out and the same call made again, is measured in
+// `devin-free-tier.test.ts`, where every row hands `devinPrint` its wait (that file's header says why it is not here).

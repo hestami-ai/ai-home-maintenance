@@ -233,6 +233,29 @@ describe('⭐ the recording’s format (D1)', () => {
 		);
 	});
 
+	// ⭐⭐ `JAN-EXEC` Phase 7, package Z3 — THE LEAD'S RULING ON QUESTION 5 (`z3-p1-rulings.md`): A REVIEWER CALL'S CARRIED FREE-TIER
+	// REFUSALS ARE KEPT — optional, so the format stays `/4` (no `/4` recording exists outside the uncommitted Z2b and Z3 trees) — in
+	// the carrier's form: how many, their waits, and all that came before the last attempt.
+	// ⭑ PREDICTED RED, WRITTEN FIRST: the reader drops the field, so a replay of the call would be handed no refusals.
+	it('⭐ Z3 (Q5) — a reviewer call’s free-tier refusals read back; a set no refusal could have made is refused, named', () => {
+		const refused: Recording = {
+			...RECORDING,
+			reviewer: [{ ...RECORDING.reviewer[0]!, elapsedMs: 640_000, freeTierRefusals: { count: 3, waitedMs: 135_000, beforeLastAttemptMs: 165_000 } }]
+		};
+		const files = recordingFiles(refused);
+		expect(readRecording(written(files))).toEqual(refused);
+		const at = (from: string, to: string) => ({
+			...files,
+			[RECORDING_FILES.reviewer]: files[RECORDING_FILES.reviewer]!.replace(from, to)
+		});
+		expect(() => readRecording(written(at('"count":3', '"count":0')))).toThrow(
+			'reviewer.jsonl:1 has `freeTierRefusals` that are no refusals waited out: a count from 1, and waits within all that came before the last attempt'
+		);
+		expect(() => readRecording(written(at('"beforeLastAttemptMs":165000', '"beforeLastAttemptMs":100000')))).toThrow(
+			'reviewer.jsonl:1 has `freeTierRefusals` that are no refusals waited out'
+		);
+	});
+
 	it('⛔ refuses a recording made on the other OS family, with a reason of its own — never REPLAY_STALE at its first path', () => {
 		const here = process.platform === 'win32' ? 'windows' : 'posix';
 		const there = here === 'windows' ? 'posix' : 'windows';

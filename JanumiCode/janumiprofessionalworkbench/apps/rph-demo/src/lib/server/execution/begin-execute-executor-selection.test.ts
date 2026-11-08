@@ -228,7 +228,8 @@ describe('⭐ D4 — the REVIEWER is asked first: with both refused, the operato
 			result.data?.error ?? '',
 			'the step was not refused with the REVIEWER’s reason'
 		).toContain("'devin' has no model: JPWB_ASSURANCE_MODEL is not set");
-		expect(result.data?.error).toContain('REG-D-119');
+		// ~~toContain('REG-D-119')~~ ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z3 — D41): the selection's rulings now.
+		expect(result.data?.error).toContain('REG-D-145, REG-D-146');
 		expect(result.data?.error, 'the executor was asked first').not.toContain(
 			'JPWB_EXECUTOR is not set'
 		);

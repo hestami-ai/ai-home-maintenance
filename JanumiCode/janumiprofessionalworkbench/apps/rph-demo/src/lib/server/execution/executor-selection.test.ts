@@ -344,12 +344,15 @@ describe('⭐ D1 — the guidance names the WIRED tools, both variables, no defa
 		);
 	});
 
-	it('names the GLM-5.3 Flash rule the reviewer’s guidance states, with the selection it follows from', () => {
+	// ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z3 — D41; design §11.2; `REG-D-145`, `REG-D-146`): the rule follows the selection.
+	it('names the ~~GLM-5.3 Flash~~ ⭐ swe-2-max rule the reviewer’s guidance states, with the selection it follows from', () => {
+		// ~~'The selected reviewer (REG-D-119) is devin with glm-5-3-flash-high'~~
 		expect(EXECUTOR_GUIDANCE).toContain(
-			'The selected reviewer (REG-D-119) is devin with glm-5-3-flash-high'
+			'The selected reviewer (REG-D-145, REG-D-146) is devin with swe-2-max'
 		);
+		// ~~'may not run a GLM-5.3 Flash model under any provider or spelling'~~
 		expect(EXECUTOR_GUIDANCE).toContain(
-			'may not run a GLM-5.3 Flash model under any provider or spelling'
+			'may not run swe-2-max under any provider or spelling'
 		);
 	});
 });

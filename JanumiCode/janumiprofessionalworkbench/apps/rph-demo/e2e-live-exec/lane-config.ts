@@ -286,7 +286,9 @@ export function laneKeysRefusal(
 		'    agy   — JPWB_JUDGE_MODEL (a label the installed agy recognises: agy rejects an unknown one, and its error ' +
 			'output lists the labels it knows — REG-F-331)',
 		'  and, for the reviewing tool, no program override (JPWB_DEVIN_BIN, JPWB_AGY_BIN).',
-		'The selected reviewer (REG-D-119) is JPWB_ASSURANCE_TOOL=devin with JPWB_ASSURANCE_MODEL=glm-5-3-flash-high: ' +
+		// ~~'The selected reviewer (REG-D-119) is JPWB_ASSURANCE_TOOL=devin with JPWB_ASSURANCE_MODEL=glm-5-3-flash-high: ' +~~
+		// ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z3 — D41; design §11.2): devin's `swe-2-max` makes the reasoning reviews.
+		'The selected reviewer (REG-D-145, REG-D-146) is JPWB_ASSURANCE_TOOL=devin with JPWB_ASSURANCE_MODEL=swe-2-max: ' +
 			'configuration you set, not a default (REG-D-052).',
 		'⚠ The producing and reviewing models must DIFFER, or the reasoning review is refused for non-independence ' +
 			'(ASR-13) — which is the check working, not a fault.'
@@ -342,16 +344,23 @@ export const LANE_BUDGET = Object.freeze({
 	// after a throw: 3 × 2 = 6.
 	reviewerCallsPerTry: 6,
 	executorCallMs: 240_000,
-	setupMs: 120_000
+	setupMs: 120_000,
+	// ⭐⭐ `JAN-EXEC` Phase 7, package Z3 — D51's Time bullet (`REG-D-146`; design §12.3: *"Replace D43's 120 s review allowance with
+	// 1,200 s in the lane's wait formulas"*) — EACH REVIEW'S DECISION-MODEL REQUESTS, TOGETHER: the client's bound on a review's
+	// requests (`DECISION_MODEL_BOUNDS.reviewMs`), restated because this module imports nothing, and held to it by
+	// `verif/live-exec-lane-config.test.ts`. Every wait below that counts a review counts it once more.
+	reviewIndicationsMs: 1_200_000
 });
 
 /**
  * How long the spec waits for "Begin & Execute" to answer: ~~3 × (240 s + 2 × 240 s) = 2,160 s (36 minutes)~~ ~~⭐ `P7-2b`:
  * 3 × (240 s + 4 × 240 s) = 3,600 s (60 minutes)~~ ~~⭐ package L, D13: 3 × (240 s + 6 × 240 s) = 5,040 s (84 minutes)~~ ⭐ package X, D35 (devin’s bound 480 s): 3 × (240 s + 6 × 480 s) = 9,360 s (156 minutes).
  */
+// ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z3 — D51's Time bullet; design §12.3): ~~3 × (240 s + 6 × 480 s) = 9,360 s~~ — and each try's
+// review its decision model's requests: 3 × (240 s + 6 × 480 s + 1,200 s) = 12,960 s (216 minutes), the design's figure.
 export const EXECUTE_TIMEOUT_MS =
 	LANE_BUDGET.tries *
-	(LANE_BUDGET.executorCallMs + LANE_BUDGET.reviewerCallsPerTry * LANE_BUDGET.reviewerCallMs);
+	(LANE_BUDGET.executorCallMs + LANE_BUDGET.reviewerCallsPerTry * LANE_BUDGET.reviewerCallMs + LANE_BUDGET.reviewIndicationsMs);
 
 /** The lane's per-test timeout: the POST's wait plus the setup before it — ~~2,280 s (38 minutes)~~ ~~⭐ 3,720 s (62 minutes)~~
  *  ~~⭐ package L, D13: 5,160 s (86 minutes)~~ ⭐ package X, D35 (devin’s bound 480 s): 9,480 s (158 minutes). */
@@ -388,9 +397,12 @@ export const PHASE7_COMMAND_MS = 120_000;
  * 54,960 s (15.3 hours)~~ ⭐ package X, D35 (devin’s bound 480 s): 9,360 s + 92,160 s + 3,840 s = 105,360 s (29.3 hours). D4 rules that a phase which outlasts it ends the run there, so the next is never started beside it
  * (`REG-F-535`, `REG-F-527`).
  */
+// ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z3 — D51's Time bullet; design §12.3): ~~9,360 s + 92,160 s + 3,840 s = 105,360 s~~ — and each
+// command review its decision model's requests: 12,960 s + 32 × (6 × 480 s + 1,200 s) + 32 × 120 s = 12,960 s + 130,560 s +
+// 3,840 s = 147,360 s (40.9 hours), the design's figure.
 export const PHASE7_UNIT_ALLOWANCE_MS =
 	EXECUTE_TIMEOUT_MS +
-	PHASE7_REVIEWED_COMMANDS * (LANE_BUDGET.reviewerCallsPerTry * LANE_BUDGET.reviewerCallMs) +
+	PHASE7_REVIEWED_COMMANDS * (LANE_BUDGET.reviewerCallsPerTry * LANE_BUDGET.reviewerCallMs + LANE_BUDGET.reviewIndicationsMs) +
 	PHASE7_REVIEWED_COMMANDS * PHASE7_COMMAND_MS;
 
 /** The phases a model runs: §3.2's four (`scripts/phase7/pwa-content.ts`, `PHASE7_PHASES`). The root runs none. */
@@ -448,8 +460,11 @@ export const PHASE7_DECLARED_POLICIES_PER_UNIT = 4;
  * another, each the reasoning-review validator's own call, retry and repair — up to `reviewerCallsPerTry` calls of
  * `reviewerCallMs` (`LANE_BUDGET`, by reference) — ~~4 × 4 × 240 s = 3,840 s~~ ~~⭐ package L, D13: 4 × 6 × 240 s = 5,760 s~~ ⭐ package X, D35 (devin’s bound 480 s): 4 × 6 × 480 s = 11,520 s.
  */
+// ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z3 — D51's Time bullet; design §12.3): ~~4 × 6 × 480 s = 11,520 s~~ — and each declared review its
+// decision model's requests: 4 × (6 × 480 s + 1,200 s) = 16,320 s, the design's figure.
 export const PHASE7_DECLARED_REVIEWS_MS =
-	PHASE7_DECLARED_POLICIES_PER_UNIT * LANE_BUDGET.reviewerCallsPerTry * LANE_BUDGET.reviewerCallMs;
+	PHASE7_DECLARED_POLICIES_PER_UNIT *
+	(LANE_BUDGET.reviewerCallsPerTry * LANE_BUDGET.reviewerCallMs + LANE_BUDGET.reviewIndicationsMs);
 
 /**
  * ⭐⭐ E2 (design B8: *"The sign-off's time bound grows to cover the reviews"*) — RECORD ASSURANCE'S OWN BOUND: the act's
@@ -550,7 +565,8 @@ export const PHASE7_SIGN_OFF_UNIT_MS =
 
 /** A unit's declared reviews at their bound, for `policies` declared policies: `PHASE7_DECLARED_REVIEWS_MS`'s arithmetic. */
 export function phase7DeclaredReviewsMs(policies: number): number {
-	return policies * LANE_BUDGET.reviewerCallsPerTry * LANE_BUDGET.reviewerCallMs;
+	// ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z3 — D51's Time bullet; design §12.3): and each review its decision model's requests.
+	return policies * (LANE_BUDGET.reviewerCallsPerTry * LANE_BUDGET.reviewerCallMs + LANE_BUDGET.reviewIndicationsMs);
 }
 
 /** Record Assurance's bound for a unit declaring `policies`: its act's and its reviews', as `PHASE7_RECORD_ASSURANCE_MS`. */
@@ -806,7 +822,10 @@ export const PHASE7_AUTHORING_FLOOR_RUNS = 2;
 export function phase7AuthoringAllowanceMs(parts: number): number {
 	return (
 		PHASE7_AUTHORING_FLOOR_RUNS *
-		(LANE_BUDGET.executorCallMs + Math.max(1, parts) * LANE_BUDGET.reviewerCallsPerTry * LANE_BUDGET.reviewerCallMs)
+		// ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z3 — D51's Time bullet; design §12.3): and each part's review its decision model's
+		// requests — 2 × parts × 1,200 s more: 8,640 s at one part, 131,040 s at sixteen.
+		(LANE_BUDGET.executorCallMs +
+			Math.max(1, parts) * (LANE_BUDGET.reviewerCallsPerTry * LANE_BUDGET.reviewerCallMs + LANE_BUDGET.reviewIndicationsMs))
 	);
 }
 
@@ -1026,6 +1045,10 @@ export const NODE_TIMER_CEILING_MS = 2_147_483_647;
  * phase sooner at sixteen parts than at one (16 phases, not 17; eight policies each, 15 at either). ⭐ Package X, D35 (devin’s
  * bound 480 s): one part's share 9,425 s, sixteen's 95,825 s, so for four phases 1,197,065 s; the ceiling still comes a phase
  * sooner at sixteen parts (8 phases, not 9; eight policies each, 8 at either; one each, 10 at one part and 9 at sixteen).
+ * ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z3 — D51's Time bullet; design §12.3): each review its decision model's
+ * 1,200 s too, so ~~1,101,240 s + 9,425 s = 1,110,665 s~~ for four phases is 1,527,240 s + 11,825 s = 1,539,065 s (1,527,240 s +
+ * 134,225 s = 1,661,465 s at sixteen parts), and the ceiling ~~9 phases (8 at sixteen parts)~~ comes at 6 phases at one part and
+ * at sixteen alike; eight policies each, 6 at one part and 5 at sixteen; one each, 7 at one part and 6 at sixteen.
  */
 export function phase7HalfBTestTimeoutMs(declared: readonly number[], parts: number): number {
 	const phases = declared.length - 1;

@@ -1800,11 +1800,33 @@ interface AgainstTheBound {
  */
 function againstTheBound(sorted: readonly StoredObject[], x: StoredObject): AgainstTheBound {
 	const detailOf = (y: StoredObject | undefined): string => str(rec(y?.state.parseOutcome).detail);
+	// ⭐⭐ `JAN-EXEC` Phase 7, package Z3 — the lead's ruling on the third follow-up (`z3-p1-rulings.md`; this reader is package X's,
+	// found by the general-form sweep) — THE BOUND ONLY OFF EACH DETAIL'S OWN PART (`ownPartOf`), for the call and for the call it
+	// repeats. ~~`NAMED_BOUND.exec(detailOf(x))`, and `detailOf` for the call it repeats~~ ⛔ MOVED 2026-11-07: a retry's clause names
+	// no bound, so the whole-detail search ran on into its tool's report, and a quote there was taken as the call's own bound.
+	// ⭑ `FAILED_AFTER` is anchored at the detail's start, the product's opening, so it reads the whole detail as before.
+	const statedOf = (y: StoredObject | undefined): string => ownPartOf(detailOf(y));
 	const after = FAILED_AFTER.exec(detailOf(x));
-	const own = NAMED_BOUND.exec(detailOf(x));
-	const repeated = str(x.state.exchangeRole) === 'RETRY' ? NAMED_BOUND.exec(detailOf(sorted[sorted.indexOf(x) - 1])) : null;
+	const own = NAMED_BOUND.exec(statedOf(x));
+	const repeated = str(x.state.exchangeRole) === 'RETRY' ? NAMED_BOUND.exec(statedOf(sorted[sorted.indexOf(x) - 1])) : null;
 	const bound = own ?? repeated;
 	return { afterMs: after === null ? null : Number(after[1]), boundMs: bound === null ? null : Number(bound[1]) };
+}
+
+/**
+ * ⭐ Z3 (the lead's ruling on the third follow-up) — the words that open the tool's report in a failed call's E-5 detail
+ * (`reasoning-review-validator.ts`, `thrownCallDetail`; `tools/output-limit.ts`, `outputLimitDetail`): what follows them is the
+ * tool's, what comes before them the product's.
+ */
+const TOOL_REPORT = 'What the tool reported, sanitised: ';
+
+/**
+ * ⭐ Z3 — a failed call's E-5 detail, THE PRODUCT'S OWN PART: all before the tool's report. ⭑ A detail with no marker has none, as
+ * the recorder reads one (`record-replay-core.ts`, `productsPart`, this one's twin).
+ */
+function ownPartOf(detail: string): string {
+	const at = detail.indexOf(TOOL_REPORT);
+	return at < 0 ? '' : detail.slice(0, at);
 }
 
 /** Whether a call that threw with no reply did so at or past its tool's bound (`REG-F-590`), short of it (`REG-F-499`), or neither. */

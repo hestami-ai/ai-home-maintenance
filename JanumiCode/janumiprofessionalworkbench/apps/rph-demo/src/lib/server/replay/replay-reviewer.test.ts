@@ -395,6 +395,69 @@ describe('⭐ the replay reviewer — the product’s validator on recorded repl
 		);
 	});
 
+	// ⭐⭐ `JAN-EXEC` Phase 7, package Z3 — THE LEAD'S RULING ON QUESTION 5 (`z3-p1-rulings.md`, "The follow-up hand-back"): THE
+	// RECORDING KEEPS EACH CALL'S CARRIED FREE-TIER REFUSALS, and the replay attaches them as devin's adapter does — on the failure
+	// it throws (`withFreeTierRefusals`) and on the answer — so a replay writes the live run's detail, clause and observation.
+	// ⭑ PREDICTED RED, WRITTEN FIRST: the replay throws a recorded failure bare, so the validator decides on the recorded span — a
+	// call refused 3 times, then failing 475 s into its last attempt, replays as "a timeout" where the run read "short of the bound".
+	it('⛔ PREDICTED RED — Z3 (Q5) — a recorded call refused three times, then failing short of the bound, replays as the run read it: short of the bound, its refusals stated', async () => {
+		const prompt = await promptOf();
+		const run = createReplayRun(
+			recordingOf([
+				call(prompt, { status: 'THROWN', message: TRANSPORT }, 640_000, {
+					freeTierRefusals: { count: 3, waitedMs: 135_000, beforeLastAttemptMs: 165_000 }
+				}),
+				call(prompt, { status: 'ANSWERED', text: CLEAN }, 1, { role: 'retry' })
+			]),
+			() => '/unused'
+		);
+		const { validator, exchanges } = replayed(run);
+		await settle(validator.evaluate(SUBJECT, CTX));
+		const records = exchanges.drain();
+		expect(records[0]!.parseOutcome.detail).toContain(
+			'The reviewing tool’s call failed after 475000 ms with no reply, short of the tool’s 480000 ms bound, so it is run once ' +
+				'more (REG-D-102). Before this, the call met 3 free-tier refusals: 30000 ms of refused attempts and 135000 ms of waits, ' +
+				'each refusal waited out and the same call made again: all left out of the time shown here (D46).'
+		);
+		expect(Date.parse(records[0]!.respondedAt) - Date.parse(records[0]!.requestedAt), 'the recorded span, as the run kept it').toBe(640_000);
+	});
+
+	it('⛔ PREDICTED RED — Z3 (Q5) — a recorded answer after refusals replays with them: carried on the answer, and stated in its observation', async () => {
+		const prompt = await promptOf();
+		const run = createReplayRun(
+			recordingOf([
+				call(prompt, { status: 'ANSWERED', text: CLEAN }, 338_000, {
+					freeTierRefusals: { count: 3, waitedMs: 135_000, beforeLastAttemptMs: 138_000 }
+				})
+			]),
+			() => '/unused'
+		);
+		const { validator, exchanges } = replayed(run);
+		await validator.evaluate(SUBJECT, CTX);
+		const [record] = exchanges.drain();
+		expect((record!.observedToolCalls as { reason: string }).reason).toContain(
+			'the recorded call answered after 3 free-tier refusals: 3000 ms of refused attempts and 135000 ms of waits'
+		);
+	});
+
+	it('⭑ CONTROL — Z3 (Q5) — a recorded call with no refusals replays as today: no refusal stated in its detail or its observation', async () => {
+		const prompt = await promptOf();
+		const run = createReplayRun(
+			recordingOf([
+				call(prompt, { status: 'THROWN', message: TRANSPORT }, 97_674),
+				call(prompt, { status: 'ANSWERED', text: CLEAN }, 1, { role: 'retry' })
+			]),
+			() => '/unused'
+		);
+		const { validator, exchanges } = replayed(run);
+		await settle(validator.evaluate(SUBJECT, CTX));
+		const records = exchanges.drain();
+		expect(records[0]!.parseOutcome.detail).toContain(
+			'The reviewing tool’s call failed after 97674 ms with no reply, short of the tool’s 480000 ms bound, so it is run once more (REG-D-102). What the tool reported'
+		);
+		expect((records[1]!.observedToolCalls as { reason: string }).reason).not.toContain('free-tier');
+	});
+
 	it('(v) ⛔ no replayed exchange is graded PROVIDER_REPORTED: the host asserts the recorded identity', async () => {
 		const prompt = await promptOf();
 		const run = createReplayRun(

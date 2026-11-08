@@ -24,6 +24,8 @@
 //     span, nothing but whether the product's parse accepted the reply. `REG-F-428`'s classes are detected here, over
 //     the raw reply, and only their names are kept.
 import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
 	composeAssuranceOutcome,
 	createValidatorRegistry,
@@ -77,6 +79,10 @@ import {
 	type ServedFacts
 } from './record.js';
 import { TransportFailure, type Transport, type TransportReply } from './transports.js';
+// ⭐ Z3 — D46 — read from its own module, which reads no setting when it loads (never devin's adapter, which does).
+import { freeTierRefusalsOf } from '../../apps/rph-demo/src/lib/server/tools/free-tier-refusals.js';
+// ⭐ Z3 (the lead's strengthening) — the bytes one question is sent as, so the re-derivation's evidence names each body it asked.
+import { decisionModelBody } from '../../apps/rph-demo/src/lib/server/assurance/decision-model-request.js';
 
 /** What a run is stamped with — J2-3's reviewer fingerprint, scoring digest and case-set digest (§5.5), handed in. */
 export interface RunFingerprint {
@@ -196,6 +202,11 @@ export async function evaluateCase(args: {
 	 * control's dry run hand the scripts' placeholder (`indications.ts`); a run that calls a reviewer hands none until package Z2.
 	 */
 	readonly indications?: IndicationsSource;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package Z3 — D47 — each call as it ends: its ordinal in the evaluation, its role, and the tool's own
+	 * session export when it wrote one (devin's), for the run to keep outside the repository (`runQualification`).
+	 */
+	readonly onCall?: (n: number, role: CallRole, sessionExport: string | undefined) => void;
 }): Promise<Evaluation> {
 	const now = args.now ?? (() => performance.now());
 	// ⭐⭐ `JAN-EXEC` Phase 7 completion E2 (design B5) — A DECLARED CASE IS ANSWERED AGAINST ITS OWN POLICY'S CRITERIA, never the
@@ -227,7 +238,12 @@ export async function evaluateCase(args: {
 		print: async (prompt) => {
 			const role = callRole(calls.length, prompt);
 			const started = now();
-			const elapsed = () => Math.round(now() - started);
+			// ⭐⭐ `JAN-EXEC` Phase 7, package Z3 — D46 — a call's time is the call's own: the free-tier refusals devin's adapter waited
+			// out before it (`freeTierRefusalsOf`) reached no model, and their waits are taken off — so an answer counted past 240 s
+			// is one that took that long, never one that waited.
+			// ~~`?.waitedMs ?? 0`~~ ⛔ MOVED 2026-11-07 (Z3 — the lead's correction to ruling 3): a CALL line's time is its last
+			// attempt's, so all that came before it is taken off — the refused attempts and their waits (`beforeLastAttemptMs`).
+			const elapsed = (of?: unknown) => Math.round(now() - started) - (freeTierRefusalsOf(of)?.beforeLastAttemptMs ?? 0);
 			try {
 				const reply = await args.call(prompt);
 				const raw = replyText(reply.returned);
@@ -235,11 +251,13 @@ export async function evaluateCase(args: {
 				calls.push({
 					role,
 					promptSha256: sha256(prompt),
-					elapsedMs: elapsed(),
+					elapsedMs: elapsed(reply.returned),
 					reply: retained(raw),
 					malformations: detectMalformations(raw, criterionIds),
 					served: reply.served
 				});
+				// ⭐ Z3 — D47 — the call's session export, kept by the run.
+				args.onCall?.(calls.length, role, isToolInvocationResult(reply.returned) ? reply.returned.sessionExport : undefined);
 				return reply.returned;
 			} catch (e) {
 				if (e instanceof TransportFailure)
@@ -276,6 +294,9 @@ export async function evaluateCase(args: {
 					});
 				// ⚠ The validator sanitises whatever its seam throws, so the harness's own fault leaves by this variable.
 				else harness = e;
+				// ⭐ Z3 — D47 — a call that failed: a cut reply's export when devin wrote one; a transport failure left none to keep.
+				if (e instanceof OutputLimitReached) args.onCall?.(calls.length, role, e.sessionExport);
+				else if (e instanceof TransportFailure) args.onCall?.(calls.length, role, undefined);
 				throw e;
 			}
 		}
@@ -512,6 +533,105 @@ export interface RunInputs {
 	 * (`RunLine.decisionModel`).
 	 */
 	readonly decisionModel?: { readonly model: string; readonly digest: string; readonly serverVersion: string };
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package Z3 — D47 (`REG-D-145`; design §11.7) — WHERE EACH CALL'S SESSION EXPORT IS KEPT: a folder outside
+	 * the repository, one file a call, named by run id, case, repetition, call and role, its sha256 in the log. The record's shape
+	 * is unchanged: the export is never in it.
+	 */
+	readonly exports?: ExportCustody;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package Z3 — D53 (`REG-D-146`; design §12.5) — THE LIVE RE-DERIVATION before each case's first paid call
+	 * (`rederiving`).
+	 */
+	readonly rederive?: Rederivation;
+}
+
+/** ⭐ Z3 — D47 — the folder each call's export is written to, and the log its sha256 goes to. */
+export interface ExportCustody {
+	readonly folder: string;
+	readonly log: (line: string) => void;
+}
+
+/**
+ * ⭐ Z3 — D53 — what the live re-derivation needs: the decision model asked live (the product's client, as configured), the folder
+ * its evidence is kept in (outside the repository, beside the exports), the records' files it is bound to, and the log.
+ */
+export interface Rederivation {
+	readonly live: IndicationsSource;
+	readonly folder: string;
+	readonly records: readonly { readonly name: string; readonly sha256: string }[];
+	/**
+	 * ⭐ Z3 (the lead's strengthening, `z3-p1-rulings.md`) — the model the records were made with, so each question's evidence names
+	 * the body it re-derived, `decisionModelBody(model, material, request)`, by the sha256 the records key it by.
+	 */
+	readonly model: string;
+	readonly log: (line: string) => void;
+}
+
+/** ⭐ Z3 — D47 — one call's export, kept: written under the run's own folder, its sha256 logged; or its absence, said. */
+function keepExport(c: ExportCustody, runId: string, caseId: string, repetition: number, n: number, role: CallRole, text: string | undefined): void {
+	const name = `${runId}/${caseId}.${repetition}.${n}.${role}.json`;
+	if (text === undefined) return c.log(`export ${name}: none — the tool wrote no session export for this call`);
+	mkdirSync(join(c.folder, runId), { recursive: true });
+	writeFileSync(join(c.folder, name), text, 'utf8');
+	c.log(`export ${name} sha256 ${sha256(text)}`);
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package Z3 — D53 (design §12.5: *"Before a case's first call, re-derive its scores live by D51's cold path
+ * and stop on any difference."*) — THE RECORDS' SOURCE FOR ONE CASE, RE-DERIVED LIVE BEFORE ITS FIRST PAID CALL: the validator asks
+ * its indications before its first reviewer call, so this asks the same requests of the live decision model first, through the
+ * product's client, and every score must equal the records' exactly. ⛔ A difference, or the client's refusal, refuses the review
+ * — the run stops before that call. ⭑ ONCE IN D53, NOT BEFORE EVERY REPETITION: the evidence is kept outside the repository
+ * (`<folder>/<case>.json`, its sha256 in the log), and a later repetition or run of D53 on the same records reads it instead.
+ * ⭐ Z3 (the lead's ruling) — EXPORTED FOR THE RE-DERIVATION PASS (`run.ts` `--mode rederive`), which asks every case's requests
+ * through this same wrapper before any paid call, so the evidence it writes is the evidence a paid run reads.
+ */
+export function rederiving(r: Rederivation, caseId: string, committed: IndicationsSource | undefined): IndicationsSource | undefined {
+	if (committed === undefined) return undefined;
+	return async (requests, material) => {
+		const recorded = await committed(requests, material);
+		if ('refusal' in recorded) return recorded;
+		const file = join(r.folder, `${caseId}.json`);
+		const label = `rederived/${caseId}.json`;
+		// ⭐⭐ Z3 — THE LEAD'S STRENGTHENING — EACH QUESTION NAMED BY THE BODY IT RE-DERIVES, by the sha256 the records key it by: each
+		// evidence file can be checked against the records with nothing run again, and the cases shown to the sponsor name exactly
+		// what was re-derived. ⛔ Evidence is reused only where the keys, the bodies and the scores are all equal.
+		const questions = requests.map((q) => ({
+			key: q.key,
+			bodySha256: sha256(decisionModelBody(r.model, material, q)),
+			score: recorded.scores[q.key]
+		}));
+		if (existsSync(file)) {
+			const text = readFileSync(file, 'utf8');
+			const before = JSON.parse(text) as { records?: unknown; questions?: { key: string; bodySha256?: string; score: number }[] };
+			// ~~`JSON.stringify(requests.map((q) => ({ key: q.key, score: recorded.scores[q.key] })))`~~ ⛔ MOVED 2026-11-07 (Z3 — the
+			// strengthening): the questions with their bodies.
+			const same =
+				JSON.stringify(before.records) === JSON.stringify(r.records) && JSON.stringify(before.questions) === JSON.stringify(questions);
+			if (same) {
+				r.log(`re-derived ${caseId} before: ${label} sha256 ${sha256(text)}`);
+				return recorded;
+			}
+		}
+		const live = await r.live(requests, material);
+		if ('refusal' in live)
+			return { refusal: `REFUSED (D53): ${caseId}: the live re-derivation was refused — ${live.refusal}; the run stops before this case’s first call` };
+		const differ = requests.filter((q) => live.scores[q.key] !== recorded.scores[q.key]);
+		if (differ.length > 0)
+			return {
+				refusal:
+					`REFUSED (D53): ${caseId}: re-derived live, ${differ.length} of ${requests.length} score(s) differ from the records — ` +
+					`${differ.map((q) => `${q.key}: recorded ${recorded.scores[q.key]}, live ${live.scores[q.key]}`).join('; ')}; the run stops before this case’s first call`
+			};
+		// ~~`questions: requests.map((q) => ({ key: q.key, score: recorded.scores[q.key] }))`~~ ⛔ MOVED 2026-11-07 (Z3 — the
+		// strengthening): each question with its body.
+		const text = `${JSON.stringify({ kind: 'REDERIVED', caseId, records: r.records, questions }, null, '\t')}\n`;
+		mkdirSync(r.folder, { recursive: true });
+		writeFileSync(file, text, 'utf8');
+		r.log(`re-derived ${caseId}: ${requests.length} of ${requests.length} score(s) equal to the records’ — ${label} sha256 ${sha256(text)}`);
+		return recorded;
+	};
 }
 
 /**
@@ -563,7 +683,10 @@ export async function runQualification(i: RunInputs): Promise<(RunLine | CallLin
 					call: (prompt) => withinOneDay(() => i.transport.call(prompt)),
 					scoringDigest: i.fingerprint.scoring,
 					...(i.now ? { now: i.now } : {}),
-					...(i.indications ? { indications: i.indications } : {})
+					// ⭐ Z3 — D53 — the records' source, re-derived live before the case's first paid call where the run re-derives.
+					...(i.indications ? { indications: i.rederive ? rederiving(i.rederive, c.id, i.indications)! : i.indications } : {}),
+					// ⭐ Z3 — D47 — each call's session export, kept outside the repository.
+					...(i.exports ? { onCall: (n: number, role: CallRole, text: string | undefined) => keepExport(i.exports!, i.runId, c.id, repetition, n, role, text) } : {})
 				});
 				if (pending) emit(pending);
 				pending = undefined;

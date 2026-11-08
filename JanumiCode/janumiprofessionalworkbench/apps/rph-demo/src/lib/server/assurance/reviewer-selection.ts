@@ -82,13 +82,16 @@ export type ReviewerSelection =
  * model is configured and never pinned, and `REG-F-331`'s argument — a pinned label rots when the installed tool stops
  * recognising it — applies to a selected label as much as to any other.
  */
+// ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z3 — D41; design §11.2; `REG-D-145`, `REG-D-146`): ~~`REG-D-119`'s devin with
+// glm-5-3-flash-high, and its independence rule, no GLM-5.3 Flash model for the executor or the authoring agent~~ — devin's
+// `swe-2-max` makes the reasoning reviews, so the rule names it.
 export const SELECTED_REVIEWER_GUIDANCE =
-	'The selected reviewer (REG-D-119) is devin with glm-5-3-flash-high: set JPWB_ASSURANCE_TOOL=devin and ' +
-	'JPWB_ASSURANCE_MODEL=glm-5-3-flash-high. That selection is configuration, not a default this host falls back to ' +
+	'The selected reviewer (REG-D-145, REG-D-146) is devin with swe-2-max: set JPWB_ASSURANCE_TOOL=devin and ' +
+	'JPWB_ASSURANCE_MODEL=swe-2-max. That selection is configuration, not a default this host falls back to ' +
 	'(REG-D-052); agy (JPWB_ASSURANCE_TOOL=agy with JPWB_JUDGE_MODEL), and devin with another model, stay ' +
 	'configurable. ⚠ Independence (ASR-13): neither the executor (JPWB_EXECUTOR_MODEL, for agy and Pi alike) ' +
 	'nor the authoring agent (JPWB_AGENT_MODEL, else Pi’s own settings, else the first ' +
-	'model Pi has credentials for) may run a GLM-5.3 Flash model under any provider or spelling — the ' +
+	'model Pi has credentials for) may run swe-2-max under any provider or spelling — the ' +
 	'independence check compares the model ids the tools report by exact string, so another spelling of the same ' +
 	'model would pass it falsely.';
 

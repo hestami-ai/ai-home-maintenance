@@ -17,6 +17,15 @@ import type { AdapterToolObservation, ToolInvocationResult } from './backing-too
 import { FINISH_REASON_SHAPE, OutputLimitReached, type OutputLimitFacts } from './output-limit.js';
 // ⭐⭐ Package X — D34 (`REG-F-590`) — the class a call killed during its run is thrown as, with what the kill left.
 import { SIGNAL_SHAPE, ToolCallKilled, type KilledCallFacts } from './killed-call.js';
+// ⭐ Z3 — D46 — the refusals a call was waited out through, carried on its answer or on the failure it throws.
+import {
+	FREE_TIER_REFUSALS_OPENING,
+	freeTierRefusalsFigures,
+	freeTierRefusalsOf,
+	withFreeTierRefusals,
+	type FreeTierRefusals
+} from './free-tier-refusals.js';
+export { freeTierRefusalsOf, type FreeTierRefusals };
 
 const run = promisify(execFile);
 
@@ -106,7 +115,7 @@ const DENY_ALL_TOOLS_CONFIG = `${JSON.stringify(
  * (`OutputLimitReached`). ⚠ ONLY THERE: an exit 0 whose export names no model is returned as the bare stdout, and every
  * other failure is thrown without it.
  */
-const DEVIN_TOOL_OBSERVATION: AdapterToolObservation = {
+const DEVIN_TOOL_OBSERVATION: Extract<AdapterToolObservation, { readonly canObserve: false }> = {
 	canObserve: false,
 	reason:
 		'The devin adapter runs `devin --print` to completion and reads its stdout and ATIF export. It ' +
@@ -121,6 +130,46 @@ const DEVIN_TOOL_OBSERVATION: AdapterToolObservation = {
  * token limit)"*, then *"Error: Response truncated: model hit max output token limit. The output above is incomplete."*
  */
 export const DEVIN_OUTPUT_LIMIT = 'Response truncated: model hit max output token limit';
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package Z3 — D46 (`REG-D-145`; design §11.7: *"`devinPrint` recognises "free model rate limit", waits 45 s
+ * and makes the same call again, at most three times. Such a refusal did not reach the model. It is no reviewer call and no
+ * exchange. State the refusal count in the eventual exchange's tool observation. A fourth refusal fails the call as today."*) —
+ * DEVIN'S FREE-TIER REFUSAL: the phrase it fails with (met 6 times by three concurrent lanes, 2026-11-01), the wait, and how many
+ * times the same call is made again.
+ */
+export const DEVIN_FREE_TIER_REFUSAL = 'free model rate limit';
+export const DEVIN_FREE_TIER_WAIT_MS = 45_000;
+export const DEVIN_FREE_TIER_RETRIES = 3;
+
+/**
+ * ⭐ D46 — whether a failed devin call is the free tier's refusal: the phrase, in the failure's MESSAGE — where `execFile` puts what
+ * devin wrote to stderr (`Command failed: devin --print …\n<stderr>`). All six refusals the 2026-11-01 screens met read so:
+ * `Error: Agent error: Reached free model rate limit. …` after the command line.
+ * ~~in its message or in what it printed~~ ⛔ MOVED 2026-11-07 (Z3): never `stderr` itself, since binding it opens the retention
+ * surface `REG-Q-066` gates (`verif/agy-stderr-unbound.test.ts`, which found it). And never stdout: a reply cut short can quote the
+ * phrase (a review of this very adapter would), and that call reached the model, so waiting it out would pay for it again.
+ */
+function isFreeTierRefusal(e: unknown): boolean {
+	const message = (e as { message?: unknown } | null)?.message;
+	return typeof message === 'string' && message.includes(DEVIN_FREE_TIER_REFUSAL);
+}
+
+/**
+ * ⭐ D46 — the observation's added sentence: the refusals stated where the exchange states what the adapter saw.
+ * ~~`devin refused this call ${count} time(s) for its free tier (“…”) before it answered, …`~~ ⛔ MOVED 2026-11-07 (Z3 — the lead's
+ * rulings on question 5 and the correction to ruling 3): the sentence names the refusals' figures in the one phrase a recording
+ * reads them back by (`freeTierRefusalsFigures`), so a replay of the call can carry them as this adapter did.
+ * ⭐ Z3 (the lead's ruling on the second follow-up) — ~~`devin answered after ${…}`~~, its opening words now the shared ones
+ * (`FREE_TIER_REFUSALS_OPENING.answer`, the same text): the recorder reads the figures only right after them. ⭑ The "45 s" stays
+ * the rule's wait, as the rule asks it; the figures are the waits as long as they took (`waitedMs`).
+ */
+const refusalsStated = (refusals: FreeTierRefusals): string =>
+	`${FREE_TIER_REFUSALS_OPENING.answer}${freeTierRefusalsFigures(refusals)} (“${DEVIN_FREE_TIER_REFUSAL}”), each refusal waited out for ` +
+	`${DEVIN_FREE_TIER_WAIT_MS / 1000} s and the same call made again: no refusal reached the model, and none is a reviewer call ` +
+	'(D46).';
+
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * ⭐ P5 package A (F1) — what devin's export says of its LAST agent step: the output tokens it counted
@@ -255,7 +304,15 @@ export type DevinExec = (
  */
 export async function devinPrint(
 	prompt: string,
-	exec: DevinExec = run as unknown as DevinExec
+	exec: DevinExec = run as unknown as DevinExec,
+	/** ⭐ Z3 — D46 — the wait before the same call is made again, for tests; absent, a real 45 s. */
+	wait: (ms: number) => Promise<void> = sleep,
+	/**
+	 * ⭐ Z3 — the lead's correction to ruling 3 — THE CLOCK THIS CALL'S CALLERS TIME IT BY, in milliseconds: what came before the
+	 * last attempt is measured on it (`FreeTierRefusals.beforeLastAttemptMs`), so each caller takes off a figure of its own clock.
+	 * Absent, the monotonic wall clock, which every caller's own clock follows in production; a test hands its one virtual clock.
+	 */
+	now: () => number = () => performance.now()
 ): Promise<string | ToolInvocationResult> {
 	// ⚠ RESOLVED BEFORE THE DIRECTORY EXISTS. `assuranceModel()` REFUSES when unconfigured (`REG-F-331`), and
 	// my first version of this line put it after `mkdtemp` and outside the `try` — so an unconfigured host
@@ -265,6 +322,28 @@ export async function devinPrint(
 	const dir = await mkdtemp(join(tmpdir(), 'jpwb-devin-'));
 	const promptPath = join(dir, 'prompt.txt');
 	const exportPath = join(dir, 'export.json');
+	// ⭐ Z3 — D46 — the free-tier refusals waited out so far: none reached the model.
+	let refused = 0;
+	// ⭐ Z3 — the lead's correction to ruling 3 — when the first attempt began, and the last: all between is no part of the call.
+	let firstAttemptAt: number | undefined;
+	let lastAttemptAt = 0;
+	// ⭐ Z3 — the lead's ruling on the second follow-up — the waits as long as they took, each measured around it on the same clock.
+	let waitedMs = 0;
+	// ~~`refused === 0 ? undefined : { count: refused, waitedMs: refused * DEVIN_FREE_TIER_WAIT_MS }`~~ ⛔ MOVED 2026-11-07 (Z3 — the
+	// correction): and all that came before the last attempt, the refused attempts' run time and their waits, on the callers' clock.
+	// ~~`waitedMs: refused * DEVIN_FREE_TIER_WAIT_MS,`~~ ⛔ MOVED 2026-11-07 (Z3 — the second follow-up, "measure the waits"): the rule's
+	// figure made the refused attempts' time (the measured total less it) absorb any lateness of the real waits.
+	// ⭐ Z3 — IN WHOLE MILLISECONDS, each figure rounded once, here: this clock reads fractions of one (`performance.now()`), and every
+	// reader takes whole ones — the figures' pattern, a CALL line's integer `elapsedMs`, the run report's "failed after N ms".
+	// Rounding keeps order, so the waits never exceed what came before the last attempt.
+	const waited = (): FreeTierRefusals | undefined =>
+		refused === 0
+			? undefined
+			: {
+					count: refused,
+					waitedMs: Math.round(waitedMs),
+					beforeLastAttemptMs: Math.round(lastAttemptAt - (firstAttemptAt ?? lastAttemptAt))
+				};
 	try {
 		// ⭐ P7-6 I4 — the no-tools preamble FIRST, then the prompt, in the one file devin reads (`DEVIN_REVIEWER_PREAMBLE`).
 		// ⚠ The diagnostic check below still measures against `prompt`, the caller's: the preamble is this file's own
@@ -273,7 +352,9 @@ export async function devinPrint(
 		// ⭐ P7-6 I1 — the deny-all project config, in the folder devin runs in; nothing else is put there.
 		await mkdir(join(dir, '.devin'));
 		await writeFile(join(dir, '.devin', 'config.json'), DENY_ALL_TOOLS_CONFIG, 'utf8');
-		const { stdout } = await exec(
+		// ⭐⭐ Z3 — D46 — THE SAME CALL, MADE AGAIN after each free-tier refusal, at most three times; a fourth refusal fails it as
+		// any failure does, below. ⛔ Every other failure is never waited out.
+		const once = (): ReturnType<DevinExec> => exec(
 			DEVIN_BIN,
 			[
 				'--print',
@@ -295,6 +376,27 @@ export async function devinPrint(
 			// (`verif/reviewer-qualification-transports.test.ts`); the recorder's `RECORDED_CALL_BOUND_MS` to the validator's.
 			{ cwd: dir, timeout: 480_000, maxBuffer: 16 * 1024 * 1024, windowsHide: true }
 		);
+		let answered: { stdout: string } | undefined;
+		while (answered === undefined)
+			try {
+				// ⭐⭐ Z3 — the lead's follow-up — THE SESSION EXPORT IS THE LAST ATTEMPT'S: every attempt is given this one path, read
+				// after the loop (the reported model, the session export) and in the catch (the cut, the kill), so a refused
+				// attempt's export is removed before the same call is made again. ⛔ No record shows whether devin writes one on a
+				// refusal; removing it costs nothing either way.
+				await rm(exportPath, { force: true });
+				// ⭐ Z3 — the correction — each attempt's start, on the callers' clock: the last one's is where the call begins.
+				lastAttemptAt = now();
+				firstAttemptAt ??= lastAttemptAt;
+				answered = await once();
+			} catch (e) {
+				if (refused >= DEVIN_FREE_TIER_RETRIES || !isFreeTierRefusal(e)) throw e;
+				refused += 1;
+				// ⭐ Z3 — the second follow-up — the rule's wait asked for, and measured as long as it took, on the callers' clock.
+				const waitFrom = now();
+				await wait(DEVIN_FREE_TIER_WAIT_MS);
+				waitedMs += now() - waitFrom;
+			}
+		const { stdout } = answered;
 		// ⭑⭑ THE READ HAPPENS HERE, AND THE PLACEMENT IS THE WHOLE FIX. `readReportedModel` was written with
 		// `devinPrint` and could never be called by anyone: the `finally` below deletes `dir` before this
 		// function returns, so the export it reads is gone by the time any caller holds the answer. It was not
@@ -310,7 +412,26 @@ export async function devinPrint(
 		// ⚠ DISCLOSED (P7-6 I2): an export that names no model is not carried either — the bare string has no field for
 		// it — and nor is the export of a call that FAILED (the throw below), whose cause is all the caller is handed:
 		// ⭐ save (P5 package A) one whose reply devin ended at the output-token limit, which carries it (`OutputLimitReached`).
-		if (!reported) return stdout;
+		// ⭐ Z3 — D46 — the observation, with the refusals waited out stated in it.
+		const refusals = waited();
+		const observedToolCalls: AdapterToolObservation =
+			refusals === undefined
+				? DEVIN_TOOL_OBSERVATION
+				: { canObserve: false, reason: `${DEVIN_TOOL_OBSERVATION.reason} ${refusalsStated(refusals)}` };
+		// ⭐ Z3 — D46 — ~~`if (!reported) return stdout;`~~ an export that names no model still returns the bare stdout, but for a
+		// call refused first: the refusals are stated in its observation, which a bare string has no place for — so it is a report
+		// with no model in it, and the record keeps the host's configuration (the validator reads a model only where one is named).
+		if (!reported && refusals === undefined) return stdout;
+		if (!reported)
+			return {
+				answer: answerFromText(stdout),
+				rawOutput: stdout,
+				producer: { agentId: 'devin', modelId: '', providerId: '' },
+				identityEvidence: 'HOST_CONFIGURED',
+				observedToolCalls,
+				...(sessionExport === undefined ? {} : { sessionExport }),
+				freeTierRefusals: refusals
+			};
 		return {
 			// ⭐ `JAN-NOANS` — `execFile` RESOLVES ON EXIT 0, AND EXIT 0 WITH EMPTY STDOUT IS NOT AN ANSWER.
 			// This adapter has no richer signal than the bytes: the CLI either printed something or it did not,
@@ -334,9 +455,10 @@ export async function devinPrint(
 			// completion and reads its stdout plus an ATIF export; it mints no tool surface of its own and
 			// watches no session, so anything devin did internally is devin's business and invisible here.
 			// ⛔ Saying NONE_OBSERVED would claim this adapter looked. It did not look.
-			observedToolCalls: DEVIN_TOOL_OBSERVATION,
+			observedToolCalls,
 			// ⭐ P7-6 I2 — devin's own record of the session, for the caller to retain (`ToolInvocationResult.sessionExport`).
-			...(sessionExport === undefined ? {} : { sessionExport })
+			...(sessionExport === undefined ? {} : { sessionExport }),
+			...(refusals === undefined ? {} : { freeTierRefusals: refusals })
 		};
 	} catch (e) {
 		const raw = e instanceof Error ? e.message : String(e);
@@ -356,8 +478,10 @@ export async function devinPrint(
 		// kill was thrown with its diagnostic alone: the record could not tell a call that was answering from one that printed
 		// nothing.
 		const killed = cut === undefined ? await devinKilled(e, exportPath) : undefined;
-		if (killed !== undefined) throw new ToolCallKilled(diagnostic, killed);
-		throw cut === undefined ? new Error(diagnostic) : new OutputLimitReached(diagnostic, cut);
+		// ⭐ Z3 — D46 — whatever is thrown carries the refusals waited out before it, off its message (`freeTierRefusalsOf`).
+		const carry = <E extends Error>(thrown: E): E => withFreeTierRefusals(thrown, waited());
+		if (killed !== undefined) throw carry(new ToolCallKilled(diagnostic, killed));
+		throw carry(cut === undefined ? new Error(diagnostic) : new OutputLimitReached(diagnostic, cut));
 	} finally {
 		await rm(dir, { recursive: true, force: true }).catch(() => undefined);
 	}

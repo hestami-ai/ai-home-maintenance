@@ -106,7 +106,8 @@ describe('⭐ D5 — the authoring route refuses a turn its floor registry would
 		expect(events[0]!.message).toContain(
 			"The reviewing tool 'devin' has no model: JPWB_ASSURANCE_MODEL is not set"
 		);
-		expect(events[0]!.message).toContain('REG-D-119');
+		// ~~toContain('REG-D-119')~~ ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z3 — D41): the selection's rulings now.
+		expect(events[0]!.message).toContain('REG-D-145, REG-D-146');
 		expect(
 			vi.mocked(createAuthoringAgent),
 			'an authoring agent was created for a refused turn'
@@ -128,7 +129,8 @@ describe('⭐ D5 — the authoring route refuses a turn its floor registry would
 			`the route did not refuse before the turn: ${JSON.stringify(events).slice(0, 600)}`
 		).toEqual(['error', 'done']);
 		expect(events[0]!.message).toContain('JPWB_ASSURANCE_TOOL is not set');
-		expect(events[0]!.message).toContain('REG-D-119');
+		// ~~toContain('REG-D-119')~~ ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z3 — D41): the selection's rulings now.
+		expect(events[0]!.message).toContain('REG-D-145, REG-D-146');
 		expect(vi.mocked(createAuthoringAgent)).not.toHaveBeenCalled();
 		expect(getPendingAuthoringTurn(pwaId)).toBeUndefined();
 	});

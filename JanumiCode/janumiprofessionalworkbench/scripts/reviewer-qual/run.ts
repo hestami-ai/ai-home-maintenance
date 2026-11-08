@@ -5,6 +5,9 @@
  *       [--repetitions 2] [--cases <id>,<id>…] [--run-id <id>]
  *       [--ollama-url http://host:11434 (required for ollama)] [--think <level>] [--temperature 0] [--seed 42]
  *       [--num-ctx 131072]
+ *       [--exports <folder outside the repository> (required for devin: D47)]
+ *       [--mode rederive (devin: D53's re-derivation pass — every case re-derived live, no reviewer called; no
+ *        --repetitions, no --run-id)]
  *
  * ⛔ AN OLLAMA RUN NAMES ITS SERVER (`JAN-CRITREAD` J2-3). `--ollama-url` is required — no default, and no `OLLAMA_HOST`
  * fallback: the machine the harness runs on may BE the shared server (`REG-F-427`), so a run that forgot the flag, or a
@@ -33,8 +36,11 @@ import {
 	SOURCE_PROBE
 } from './preflight.js';
 import type { IndicationsSource } from '../../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
+import type { AssessmentCriterion } from '@janumipwb/rph-contracts';
+import type { QualificationCase } from './cases.js';
 import type { CallReply } from './record.js';
-import type { RunFingerprint } from './runner.js';
+import type { RunFingerprint, RunInputs } from './runner.js';
+import type { RecordsOnFile } from './recorded-indications.js';
 import type { CandidateSpec, TransportDeps } from './transports.js';
 
 /**
@@ -71,6 +77,11 @@ export interface CliDeps {
 	 * writes their identity on its RUN line; a case whose questions no record holds is refused before any call.
 	 */
 	readonly indications?: IndicationsSource;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package Z3 — D53 — D54's records, with the sha256 of the files they were read from, that a devin run reads
+	 * (`recorded-indications.ts`, `committedRecordsOnFile`); a test hands its own. Absent, the committed records.
+	 */
+	readonly records?: () => RecordsOnFile;
 }
 
 /**
@@ -104,8 +115,14 @@ const FLAGS: ReadonlySet<string> = new Set([
 	'think',
 	'temperature',
 	'seed',
-	'num-ctx'
+	'num-ctx',
+	// ⭐ Z3 — D47 — the folder outside the repository each devin call's session export is kept in.
+	'exports',
+	// ⭐ Z3 — the lead's ruling (`z3-p1-rulings.md`) — `rederive`: D53's re-derivation pass, which calls no reviewer.
+	'mode'
 ]);
+/** ⭐ Z3 — the flags only a run reads: the re-derivation pass calls no reviewer and appends nothing, so each would be ignored. */
+const RUN_ONLY = ['repetitions', 'run-id'] as const;
 /** The flags only the ollama transport reads — given to another transport, each would be ignored in silence. */
 const OLLAMA_ONLY = ['ollama-url', 'think', 'temperature', 'seed', 'num-ctx'] as const;
 /**
@@ -156,6 +173,12 @@ function argsProblem(args: Args): string | undefined {
 		args.transport === 'ollama' ? undefined : OLLAMA_ONLY.find((f) => args[f] !== undefined);
 	if (ignored)
 		return `--${ignored} is an ollama option: the ${args.transport} transport would ignore it`;
+	// ⭐ Z3 — the re-derivation pass is D53's, before its devin runs; nothing it would ignore is taken in silence.
+	if (args.mode !== undefined && args.mode !== 'run' && args.mode !== 'rederive') return '--mode is run or rederive';
+	if (args.mode === 'rederive' && args.transport !== 'devin')
+		return '--mode rederive is D53’s pass before its devin runs: --transport devin';
+	const runOnly = args.mode === 'rederive' ? RUN_ONLY.find((f) => args[f] !== undefined) : undefined;
+	if (runOnly) return `--${runOnly} is a run’s: --mode rederive calls no reviewer and appends nothing`;
 	return Object.keys(NUMBERS)
 		.map((flag) => (args[flag] === undefined ? undefined : numberProblem(flag, args[flag])))
 		.find((problem) => problem !== undefined);
@@ -209,6 +232,121 @@ export function runSummary(out: string, replies: readonly CallReply[]): string {
  * The run. Returns the exit code: 0 run recorded, 2 refused before anything was written, 3 no fingerprint could be computed,
  * 4 the harness stopped the run part-way — the lines appended before it stay, and name no fault of the candidate's.
  */
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package Z3 — D47 AND D53'S REFUSALS BEFORE A PAID CALL (`REG-D-145`, `REG-D-146`; design §11.7 D47, §12.5
+ * D53's Prechecks; roadmap "D53 — the re-measurement", Step 1), for a devin run — D53's, the selected candidate's — each before the
+ * transport is loaded and so before any call. ⭑ D48's refusals that stand are built where they were: one run id a record
+ * (`main`), D11 and D12 (`preflight.ts`); the rest live in the run's driver, as `p12high/run.sh`'s did.
+ *   · D47 — `--exports`, a folder outside the repository, where each call's session export is kept;
+ *   · D53 — the SELECTION in force in the record this run appends to (`--out`, as D53's runs append to `runs.ndjson`) names this
+ *     run's candidate, devin with its `--model`;
+ *   · D53 — D54's records are read and hold every current case, 97 of 97 (the static source holds them to the product's identity,
+ *     and the live client holds the server to theirs);
+ *   · D53 — the decision model is configured, for the live re-derivation before each case's first paid call (`runner.ts`
+ *     `rederiving`), its evidence kept beside the exports.
+ * Returns what the run reads, or why it is refused.
+ */
+async function d53Prechecks(
+	args: Args,
+	cases: readonly { readonly id: string }[],
+	root: URL,
+	deps: CliDeps,
+	say: (s: string) => void
+): Promise<string | Pick<import('./runner.js').RunInputs, 'indications' | 'decisionModel' | 'exports' | 'rederive'>> {
+	const { existsSync, readFileSync } = await import('node:fs');
+	const { isAbsolute, join, relative, resolve } = await import('node:path');
+	const { fileURLToPath } = await import('node:url');
+	// D47 — the folder, outside the repository.
+	const folder = args.exports === undefined ? undefined : resolve(args.exports);
+	if (folder === undefined)
+		return 'REFUSED (D47): a devin run keeps each call’s session export in a folder outside the repository: --exports is required. Nothing was run.';
+	const inside = relative(fileURLToPath(root), folder);
+	if (!inside.startsWith('..') && !isAbsolute(inside))
+		return `REFUSED (D47): --exports names a folder inside the repository (${inside || '.'}): the exports are kept outside it. Nothing was run.`;
+	// D53 — the SELECTION in force names this run's candidate.
+	const lines = existsSync(args.out!) ? readFileSync(args.out!, 'utf8').split('\n').filter((l) => l.trim() !== '') : [];
+	const selected = lines
+		.map((l) => JSON.parse(l) as { kind?: string; candidate?: { transport?: string; modelLabel?: string } })
+		.filter((l) => l.kind === 'SELECTION')
+		.at(-1)?.candidate;
+	if (selected?.transport !== 'devin' || selected.modelLabel !== args.model)
+		return selected === undefined
+			? `REFUSED (D53): ${args.out} holds no SELECTION, and a devin run measures the candidate selected. Nothing was run.`
+			: `REFUSED (D53): the SELECTION in force names ${selected.transport} / ${selected.modelLabel}, not this run’s devin / ${args.model}. Nothing was run.`;
+	// D53 — D54's records, read, and holding every current case.
+	const ri = await import('./recorded-indications.js');
+	const onFile = deps.records?.() ?? ri.committedRecordsOnFile(root);
+	if ('refusal' in onFile.read) return `REFUSED (D53): D54’s records cannot be read — ${onFile.read.refusal}. Nothing was run.`;
+	const read = onFile.read;
+	const missing = cases.filter((c) => !read.entries.has(`CASE ${c.id}`)).map((c) => c.id);
+	if (missing.length > 0)
+		return `REFUSED (D53): D54’s records hold ${cases.length - missing.length} of the ${cases.length} current cases; none for ${missing.join(', ')}. Nothing was run.`;
+	// ⭐⭐ Z3 phase 2 — D53 (the lead's reading, for d49) — A CASE WHOSE RECORD HOLDS A REFUSAL IS NOT PRESENT: the validator
+	// refuses its review before any reviewer call (`recorded-indications.ts` `refusedEntries`), so D53 cannot measure it. Refused,
+	// naming each such case and its refusal, the refusal's last full stop left to the sentence's own.
+	const refusedCases = cases.flatMap((c) => {
+		const why = read.refusedEntries.get(`CASE ${c.id}`);
+		return why === undefined ? [] : [`${c.id} — ${why.replace(/\.$/, '')}`];
+	});
+	if (refusedCases.length > 0)
+		return `REFUSED (D53): D54’s records hold a refusal, not a review, for ${refusedCases.length} of the ${cases.length} current cases: ${refusedCases.join('; ')}. Nothing was run.`;
+	// ⭐ Z3 phase 2 — and what the records hold, said: every current case, none refused, and the files read by their sha256.
+	say(`D53 — D54’s records hold ${cases.length} of the ${cases.length} current cases, none refused (${onFile.files.map((f) => `${f.name} sha256 ${f.sha256}`).join(', ')})`);
+	// D53 — the decision model, for the live re-derivation.
+	const { configuredIndications } = await import('../../apps/rph-demo/src/lib/server/assurance/decision-model.js');
+	const live = configuredIndications();
+	if (live === undefined)
+		return 'REFUSED (D53): the live re-derivation asks the decision model, and it is not configured (JPWB_DECISION_MODEL_SERVER and JPWB_DECISION_MODEL). Nothing was run.';
+	return {
+		indications: ri.recordedIndications(read),
+		decisionModel: read.identity,
+		exports: { folder, log: say },
+		rederive: { live, folder: join(folder, 'rederived'), records: onFile.files, model: read.identity.model, log: say }
+	};
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package Z3 — THE RE-DERIVATION PASS (the lead's ruling, `z3-p1-rulings.md`: *"the re-derivation as its own
+ * pass, before any paid call"*), `--mode rederive`, past D53's prechecks.
+ *   · Each case of the run — every current case, unless `--cases` names some — has its requests asked live through the paid run's
+ *     own wrapper (`runner.ts` `rederiving`). That wrapper writes the evidence a paid run then reads, `<exports>/rederived/<case>.json`,
+ *     with its sha256 in the log.
+ *   · The requests are the ones the paid run's validator asks: the product's `reviewPrompt` renders the case's prompt from the same
+ *     input (`caseReviewInput`) and criteria, and asks them of the source it is handed, as the validator does.
+ *   · ⛔ NO REVIEWER IS CALLED: no transport is loaded, and nothing is appended to `--out`.
+ *   · ⛔ A difference, or the client's refusal, stops the pass with exit 2, that case's evidence unwritten.
+ * Why a pass (the ruling): a stale record is found before any spend, the sponsor can see every case re-derived beside the
+ * materialized prompts, and the paid runs then read the evidence and do not hold the graphics card.
+ */
+async function rederivationPass(
+	cases: readonly QualificationCase[],
+	paid: Pick<RunInputs, 'indications' | 'rederive'>,
+	criteria: readonly AssessmentCriterion[],
+	say: (s: string) => void
+): Promise<number> {
+	const [{ reviewPrompt }, { caseReviewInput }, { rederiving }] = await Promise.all([
+		import('../../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js'),
+		import('./materialize.js'),
+		import('./runner.js')
+	]);
+	for (const [n, c] of cases.entries()) {
+		try {
+			await reviewPrompt(caseReviewInput(c, criteria), rederiving(paid.rederive!, c.id, paid.indications));
+		} catch (e) {
+			say(
+				`${(e as Error).message} — the re-derivation pass stopped at ${c.id}, case ${n + 1} of ${cases.length}: no reviewer ` +
+					'was called, and no evidence was written for it'
+			);
+			return 2;
+		}
+	}
+	say(
+		`re-derivation pass: ${cases.length} of ${cases.length} case(s) re-derived, every score equal to the records’; no reviewer ` +
+			'was called, and nothing was appended to the record'
+	);
+	return 0;
+}
+
 export async function main(argv: readonly string[], deps: CliDeps): Promise<number> {
 	const say = (s: string) => deps.write(`reviewer-qual — ${s}\n`);
 	const d11 = sourceResolutionProblem(deps.resolve(SOURCE_PROBE));
@@ -281,6 +419,16 @@ export async function main(argv: readonly string[], deps: CliDeps): Promise<numb
 		say(selected);
 		return 2;
 	}
+	// ⭐⭐ `JAN-EXEC` Phase 7, package Z3 — D47 and D53's refusals before a paid call (design §11.7, §12.5): a devin run is D53's.
+	const paid = args.transport === 'devin' ? await d53Prechecks(args, caseSet.cases, root, deps, say) : undefined;
+	if (typeof paid === 'string') {
+		say(paid);
+		return 2;
+	}
+	// ⭐⭐ Z3 — THE RE-DERIVATION PASS (the lead's ruling): past D53's prechecks, every case of the run re-derived, and here it ends —
+	// before any transport is loaded. ⭑ `paid` is always present: `--mode rederive` is refused for any transport but devin.
+	if (args.mode === 'rederive')
+		return paid === undefined ? 2 : rederivationPass(selected, paid, assurance.SEEDED_REASONING_REVIEW_CRITERIA, say);
 	const replies: CallReply[] = [];
 	let appended = 0;
 	try {
@@ -303,7 +451,9 @@ export async function main(argv: readonly string[], deps: CliDeps): Promise<numb
 			repetitions: Number(args.repetitions ?? 2),
 			env: deps.env,
 			// ⭐⭐ Z2b — D54: the records' scores, and their identity on the RUN line; a double where a test hands one.
-			...(await decisionModelOf(deps.indications)),
+			// ⭐⭐ Z3 — D53 — and a devin run's: the records it was held to, each case re-derived live before its first call, and
+			// each call's export kept (D47).
+			...(paid ?? (await decisionModelOf(deps.indications))),
 			onLine: (line) => {
 				appendFileSync(args.out!, record.serializeLine(line));
 				appended += 1;

@@ -60,6 +60,13 @@ import { governedToolCallReport } from '../tools/observed-tool-calls.js';
 import { OutputLimitReached, outputLimitDetail } from '../tools/output-limit.js';
 // ⭐⭐ Package X — D34 (`REG-F-590`) — what a call killed during its run left, as its adapter read it. ⚠ A pure module.
 import { killedCallFacts, killedCallOf, type KilledCallFacts } from '../tools/killed-call.js';
+// ⭐ `JAN-EXEC` Phase 7, package Z3 — D46 — the free-tier refusals a tool's adapter waited out inside one call, read off what it threw.
+import {
+	FREE_TIER_REFUSALS_OPENING,
+	freeTierRefusalsFigures,
+	freeTierRefusalsOf,
+	type FreeTierRefusals
+} from '../tools/free-tier-refusals.js';
 import type { ExchangeParseOutcome } from '../agent/exchange-record.js';
 import type { ObservedToolCallReport } from '@janumipwb/rph-contracts';
 import { allocate } from './process-result-render.js';
@@ -2371,6 +2378,35 @@ function thrownCallDisposal(
 }
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package Z3 — D46 (the lead's ruling on Z3's question 3, `z3-p1-rulings.md`) — THE FREE-TIER REFUSALS A
+ * FAILED CALL HELD, STATED BESIDE ITS TIME. The tool's adapter waited each out and made the same call again (`devinPrint`), so they
+ * reached no model, and the time the detail gives (the one the clause was decided on) leaves their waits out. ⭑ That is also the
+ * time the run report places against the bound (`scripts/phase7/run-report-core.ts`, `FAILED_AFTER`). ⛔ The exchange's
+ * requested and responded times stay the span they are. ⭑ A failure that held none is worded as before.
+ */
+function withRefusals(clause: string, refusals: FreeTierRefusals | undefined, placed: boolean): string {
+	if (refusals === undefined) return clause;
+	return `${clause}. ${refusalsBeforeTheFailure(refusals, placed)}`;
+}
+
+/**
+ * ⭐ Z3 — D46 — the sentence `withRefusals` adds: how many refusals, the refused attempts' run time and their waits, and what the
+ * time shown does with them.
+ * ~~`Before this, the tool’s free tier refused the call ${count} time(s), each refusal waited out and the same call made again:
+ * ${waitedMs} ms of waits, left out of the time shown here (D46)`~~ ⛔ MOVED 2026-11-07 (Z3 — the lead's correction to ruling 3
+ * and ruling on question 5): the refused attempts' run time is stated beside the waits, both left out of the time, in the one
+ * phrase a recording reads them back by (`freeTierRefusalsFigures`).
+ * ⭐ Z3 (the lead's ruling on the second follow-up) — ~~`Before this, the call met ${…}`~~, its opening words now the shared ones
+ * (`FREE_TIER_REFUSALS_OPENING.failure`, the same text): the recorder reads the figures only right after them.
+ */
+function refusalsBeforeTheFailure(refusals: FreeTierRefusals, placed: boolean): string {
+	return (
+		`${FREE_TIER_REFUSALS_OPENING.failure}${freeTierRefusalsFigures(refusals)}, each refusal waited out and the same call made again: ` +
+		(placed ? 'all left out of the time shown here (D46)' : 'more than the clock gave the whole call (D46)')
+	);
+}
+
+/**
  * ⭐ `P7-2b` — E-5's detail for a call that threw (`REG-F-499`'s first remedy): when it failed, what became of it, and
  * the cause the tool printed — the SANITISED form only (`sanitiseToolFailure`), never the raw rejection, which may carry
  * the prompt (finding #60).
@@ -2784,8 +2820,26 @@ export function createAgyReasoningReviewValidator(opts: AgyValidatorOptions = {}
 					const failure = sanitiseToolFailure(e, p, 'reasoning-review backing tool');
 					noReply.add(failure);
 					const times = { requestedAt, respondedAt: clock() };
-					const elapsedMs = Date.parse(times.respondedAt) - Date.parse(times.requestedAt);
-					const disposal = thrownCallDisposal(role, elapsedMs, callBound);
+					// ~~const elapsedMs = Date.parse(times.respondedAt) - Date.parse(times.requestedAt);~~ ⛔ MOVED 2026-11-07 (`JAN-EXEC`
+					// Phase 7, package Z3 — D46; the lead's ruling on Z3's question 3): THE CALL'S OWN TIME decides the clause. The free-tier
+					// refusals the tool's adapter waited out inside this one call (`freeTierRefusalsOf`) reached no model, so the time
+					// placed against the bound is ~~the span less their waits~~ ⭐ (the correction) the last attempt's, as the qualification's
+					// transport classes a failure. A
+					// failure after refusals whose own time is short of the bound is no timeout. ⛔ `times`, the exchange's
+					// requested and responded times, stay the span. ⭑ A span shorter than the waits it holds is a time the clock cannot
+					// place (`thrownCallDisposal`'s third rule).
+					const spanMs = Date.parse(times.respondedAt) - Date.parse(times.requestedAt);
+					const refusals = freeTierRefusalsOf(e);
+					// ~~`spanMs - refusals.waitedMs`~~ ⛔ MOVED 2026-11-07 (Z3 — the lead's correction to ruling 3): the time is the last
+					// attempt's, so all that came before it is taken off — the refused attempts' run time and their waits together, as
+					// devinPrint measured them on the clock this call is timed by (`beforeLastAttemptMs`).
+					const elapsedMs = refusals === undefined ? spanMs : spanMs - refusals.beforeLastAttemptMs;
+					const decided = thrownCallDisposal(role, elapsedMs, callBound);
+					// ⭐ Z3 — and the detail states the refusals and their waits beside that time (`withRefusals`); none held, as before.
+					const disposal = {
+						...decided,
+						clause: withRefusals(decided.clause, refusals, Number.isFinite(elapsedMs) && elapsedMs >= 0)
+					};
 					// ⭐⭐ P5 package A (F1) — A REPLY THE TOOL ENDED AT THE MODEL'S OUTPUT-TOKEN LIMIT IS ITS OWN CLASS, never a call
 					// with no reply: `rejected` — a reply arrived, and nothing is judged from it — its partial reply kept whole for
 					// diagnosis and its output declared cut (`cutAtOutputLimit`), E-5 opening with the class's marker

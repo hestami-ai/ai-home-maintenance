@@ -51,6 +51,7 @@ import {
 } from '../apps/rph-demo/src/lib/server/replay/recording.js';
 import { fixtureKeyOf } from '../apps/rph-demo/src/lib/server/replay/replay-fixture.testing.js';
 import { outputLimitDetail } from '../apps/rph-demo/src/lib/server/tools/output-limit.js';
+import { freeTierRefusalsFigures, type FreeTierRefusals } from '../apps/rph-demo/src/lib/server/tools/free-tier-refusals.js';
 import { scanText } from '../scripts/phase7/archive-scan.js';
 import {
 	buildRecording,
@@ -148,6 +149,32 @@ function arrange(
 		readonly cutFirstReview?: string;
 		/** ⭐ P5 package C (F5 (b)) — and that partial reply NOT retained: its ref pending, as a store that kept none records it. */
 		readonly cutNotRetained?: boolean;
+		/**
+		 * ⭐ Z3 (the lead's ruling on question 5) — the first review call met these free-tier refusals before it failed, and its retry
+		 * met `retryRefusals` before it answered: each stated as the product states them, in the failure's detail and in the
+		 * answer's observation (`freeTierRefusalsFigures`).
+		 */
+		readonly refusedFirstReview?: FreeTierRefusals;
+		readonly retryRefusals?: FreeTierRefusals;
+		/**
+		 * ⭐ Z3 (the lead's ruling on the second follow-up) — what is not the product's sentence, and what looks like it: text the
+		 * first review call's tool report ends with (`firstReportTail`), after its own words; the sentence the first call's detail
+		 * states in place of the product's (`firstStatement`), and the one the retry's observation states (`retryStatement`); and a
+		 * retry whose reply did not parse (`retryUnparsed`), its parse outcome's detail the message, a repair answering after it.
+		 */
+		readonly firstReportTail?: string;
+		readonly firstStatement?: string;
+		readonly retryStatement?: string;
+		readonly retryUnparsed?: { readonly reply: string; readonly detail: string };
+		/**
+		 * ⭐ Z3 (the lead's ruling on the third follow-up: the bound read only off a failed call's own part) — a review of the
+		 * command's evidence answered before the work product's review, its reply unparsed and its parse detail the message, a repair
+		 * after it (`earlierCommandReview`); the clause the first call's detail states in place of "short of the tool’s 240000 ms
+		 * bound, …" (`firstClause`); and no retry after it (`noRetry`), as a clause that says the call is not run again has it.
+		 */
+		readonly earlierCommandReview?: { readonly reply: string; readonly detail: string };
+		readonly firstClause?: string;
+		readonly noRetry?: boolean;
 	} = {}
 ): Arranged {
 	const run = tempDir('run');
@@ -215,6 +242,19 @@ function arrange(
 		state,
 		firstSequence: 0
 	});
+	// ⭐ Z3 — what each review call's record states of its refusals: the first call's in the validator's sentence
+	// (`refusalsBeforeTheFailure`), the retry's in devin's adapter's (`refusalsStated`) — or the sentence a row puts in their place.
+	const firstStatement =
+		o.firstStatement ??
+		(o.refusedFirstReview === undefined
+			? undefined
+			: `Before this, the call met ${freeTierRefusalsFigures(o.refusedFirstReview)}, each refusal waited out and the same call made again: all left out of the time shown here (D46).`);
+	const retryStatement =
+		o.retryStatement ??
+		(o.retryRefusals === undefined
+			? undefined
+			: `devin answered after ${freeTierRefusalsFigures(o.retryRefusals)} (“free model rate limit”), each refusal waited out for 45 s and the same call made again: no refusal reached the model, and none is a reviewer call (D46).`);
+	const retryReply = o.retryUnparsed?.reply ?? CLEAN;
 	const objects = [
 		{ id: UND, objectType: 'UNDERTAKING', state: { name: 'wordfreq realization' } },
 		{
@@ -315,6 +355,48 @@ function arrange(
 				}
 			}
 		},
+		// ⭐ Z3 (the lead's ruling on the third follow-up) — a review answered BEFORE any call threw: the command's evidence reviewed,
+		// its reply unparsed, its parse outcome `classifyParse`'s (the class and the parser's message), and the repair that answered it.
+		// ⭑ Requested just before the work product's review — in this one-try fixture inside the try's span; a run of several units
+		// holds an answered review ahead of a thrown one in the same order.
+		...(o.earlierCommandReview === undefined
+			? []
+			: [
+					exchange('mex_command_review_1', {
+						plane: 'ASSURANCE',
+						subjectObjectId: 'evd_1',
+						subjectObjectType: 'EVIDENCE',
+						exchangeRole: 'INITIAL',
+						disposition: 'REPAIR_REQUESTED',
+						requestedAt: '2026-10-11T08:00:58.000Z',
+						respondedAt: '2026-10-11T08:00:59.000Z',
+						resolvedModel: { value: 'fixture-reviewer-model' },
+						resolvedProvider: { value: 'devin' },
+						materializedInputRef: ref(o.reviewPrompt ?? REVIEW_PROMPT),
+						rawOutputBeforeCoercionRef: pending,
+						answerSpanRef: ref(o.earlierCommandReview.reply),
+						volunteeredReasoningRef: ref('\n'),
+						omittedRegions: [{ role: 'MODEL_ANSWER', byteSize: Buffer.byteLength(o.earlierCommandReview.reply), byteOffset: 0 }],
+						parseOutcome: { outcome: 'JSON_PARSE_FAILED', detail: o.earlierCommandReview.detail }
+					}),
+					exchange('mex_command_review_2', {
+						plane: 'ASSURANCE',
+						subjectObjectId: 'evd_1',
+						subjectObjectType: 'EVIDENCE',
+						exchangeRole: 'REPAIR',
+						disposition: 'ACCEPTED',
+						requestedAt: '2026-10-11T08:00:59.000Z',
+						respondedAt: '2026-10-11T08:00:59.900Z',
+						resolvedModel: { value: 'fixture-reviewer-model' },
+						resolvedProvider: { value: 'devin' },
+						materializedInputRef: ref(`${o.reviewPrompt ?? REVIEW_PROMPT}\n\nIMPORTANT: reply with ONLY the minified JSON object.`),
+						rawOutputBeforeCoercionRef: pending,
+						answerSpanRef: ref(CLEAN),
+						volunteeredReasoningRef: ref('\n'),
+						omittedRegions: [{ role: 'MODEL_ANSWER', byteSize: Buffer.byteLength(CLEAN), byteOffset: 0 }],
+						parseOutcome: { outcome: 'PARSED' }
+					})
+				]),
 		// ⭑ The first review call threw short of its bound — its cause printing devin's temp folder under the home folder.
 		// ⭐ P5 package A (F1) — or, with `cutFirstReview`, its reply the tool cut at the model's output-token limit, recorded
 		// as the validator records one: REJECTED, its output DECLARED cut, the reply kept whole, E-5 the class's detail.
@@ -334,7 +416,7 @@ function arrange(
 						rawOutputBeforeCoercionRef: pending,
 						parseOutcome: {
 							outcome: 'NOT_ATTEMPTED',
-							detail: `The reviewing tool’s call failed after 97674 ms with no reply, short of the tool’s 240000 ms bound, so it is run once more (REG-D-102). What the tool reported, sanitised: reasoning-review backing tool invocation failed: ${TRANSPORT} --prompt-file ${join(home, 'AppData', 'Local', 'Temp', 'jpwb-devin-x', 'prompt.txt')}`
+							detail: `The reviewing tool’s call failed after 97674 ms with no reply, ${o.firstClause ?? 'short of the tool’s 240000 ms bound, so it is run once more (REG-D-102)'}.${firstStatement === undefined ? '' : ` ${firstStatement}`} What the tool reported, sanitised: reasoning-review backing tool invocation failed: ${TRANSPORT} --prompt-file ${join(home, 'AppData', 'Local', 'Temp', 'jpwb-devin-x', 'prompt.txt')}${o.firstReportTail ?? ''}`
 						}
 					}
 				: {
@@ -348,30 +430,70 @@ function arrange(
 								facts: { outputTokens: 25_000 },
 								partialChars: o.cutFirstReview.length,
 								elapsedMs: 97_674,
-								clause: 'short of the tool’s 240000 ms bound, so it is run once more (REG-D-102)',
+								// ⭐ Z3 — and the refusals the cut call met, stated as the validator states them: in its clause (`withRefusals`).
+								clause: `short of the tool’s 240000 ms bound, so it is run once more (REG-D-102)${firstStatement === undefined ? '' : `. ${firstStatement.replace(/\.$/, '')}`}`,
 								reported: `reasoning-review backing tool invocation failed: ${CUT} --prompt-file ${join(home, 'AppData', 'Local', 'Temp', 'jpwb-devin-x', 'prompt.txt')}`
 							})
 						}
 					})
 		}),
 		// ⭑ Its retry answered — the reply kept in two halves, as the reviewer's replies are (`REG-D-057`).
+		// ⭐ Z3 (the third follow-up) — none, with `noRetry`.
+		...(o.noRetry === true
+			? []
+			: [
 		exchange('mex_review_2', {
 			plane: 'ASSURANCE',
 			subjectObjectId: 'art_1',
 			subjectObjectType: 'ARTIFACT',
 			exchangeRole: 'RETRY',
-			disposition: 'ACCEPTED',
+			// ⭐ Z3 — or its reply did not parse, so a repair was asked (the validator's `repair-requested`).
+			disposition: o.retryUnparsed === undefined ? 'ACCEPTED' : 'REPAIR_REQUESTED',
 			requestedAt: '2026-10-11T08:02:37.674Z',
-			respondedAt: '2026-10-11T08:03:04.274Z',
+			// ⭐ Z3 (Q5) — a retry that met a refusal before it answered spans the refusal and its wait too.
+			respondedAt: retryStatement === undefined ? '2026-10-11T08:03:04.274Z' : '2026-10-11T08:03:50.274Z',
 			resolvedModel: { value: 'fixture-reviewer-model' },
 			resolvedProvider: { value: 'devin' },
 			materializedInputRef: ref(o.reviewPrompt ?? REVIEW_PROMPT),
 			rawOutputBeforeCoercionRef: pending,
-			answerSpanRef: ref(CLEAN),
+			answerSpanRef: ref(retryReply),
 			volunteeredReasoningRef: ref('\n'),
-			omittedRegions: [{ role: 'MODEL_ANSWER', byteSize: Buffer.byteLength(CLEAN), byteOffset: 0 }],
-			parseOutcome: { outcome: 'PARSED' }
-		}),
+			omittedRegions: [{ role: 'MODEL_ANSWER', byteSize: Buffer.byteLength(retryReply), byteOffset: 0 }],
+			// ⭐ Z3 — an unparsed reply's outcome is `classifyParse`'s: the class and the parser's message, which can quote the reply.
+			parseOutcome: o.retryUnparsed === undefined ? { outcome: 'PARSED' } : { outcome: 'JSON_PARSE_FAILED', detail: o.retryUnparsed.detail },
+			// ⭐ Z3 (Q5) — what devin's adapter said of the call, its refusals stated where it states them.
+			...(retryStatement === undefined
+				? {}
+				: {
+						observedToolCalls: {
+							observation: 'NOT_OBSERVABLE',
+							reason: `devin cannot be watched here. ${retryStatement}`
+						}
+					})
+		})
+				]),
+		// ⭐ Z3 — and the repair that answered it, as the validator asks one (`repairPrompt`): no refusal met.
+		...(o.retryUnparsed === undefined
+			? []
+			: [
+					exchange('mex_review_3', {
+						plane: 'ASSURANCE',
+						subjectObjectId: 'art_1',
+						subjectObjectType: 'ARTIFACT',
+						exchangeRole: 'REPAIR',
+						disposition: 'ACCEPTED',
+						requestedAt: '2026-10-11T08:03:50.274Z',
+						respondedAt: '2026-10-11T08:04:11.000Z',
+						resolvedModel: { value: 'fixture-reviewer-model' },
+						resolvedProvider: { value: 'devin' },
+						materializedInputRef: ref(`${o.reviewPrompt ?? REVIEW_PROMPT}\n\nIMPORTANT: reply with ONLY the minified JSON object.`),
+						rawOutputBeforeCoercionRef: pending,
+						answerSpanRef: ref(CLEAN),
+						volunteeredReasoningRef: ref('\n'),
+						omittedRegions: [{ role: 'MODEL_ANSWER', byteSize: Buffer.byteLength(CLEAN), byteOffset: 0 }],
+						parseOutcome: { outcome: 'PARSED' }
+					})
+				]),
 		{
 			id: 'asa_1',
 			objectType: 'ASSURANCE_ASSESSMENT',
@@ -604,6 +726,192 @@ describe('⭐ the recorder (D1) — a final archive into a replay recording, scr
 
 	// ⭐ P5 package C (F5 (b); package A's check, finding 4) — A CUT WHOSE PARTIAL REPLY THE STORE DID NOT RETAIN CANNOT BE
 	// REPLAYED AS THE RUN MADE IT: the recorder refuses it, by name, and writes nothing — never a cut with an invented reply.
+	// ⭐⭐ `JAN-EXEC` Phase 7, package Z3 — THE LEAD'S RULING ON QUESTION 5 (`z3-p1-rulings.md`): THE RECORDING KEEPS EACH REVIEWER
+	// CALL'S CARRIED FREE-TIER REFUSALS, read back off what the run's record states of them — the failure's detail, the answer's
+	// observation (`freeTierRefusalsIn`) — in the carrier's form, so the replay can attach them as devin's adapter did.
+	// ⭑ PREDICTED RED, WRITTEN FIRST: the recorder keeps the span alone, and the replay of the call decides on it.
+	it('⛔ PREDICTED RED — Z3 (Q5) — a review call’s refusals are recorded with it: the failure’s from its detail, the answer’s from its observation', () => {
+		const out = join(tempDir('out'), 'recording');
+		const failed = { count: 1, waitedMs: 45_000, beforeLastAttemptMs: 46_000 };
+		const answered = { count: 1, waitedMs: 45_000, beforeLastAttemptMs: 46_000 };
+		const r = record(arrange({ refusedFirstReview: failed, retryRefusals: answered }), out);
+		expect(r.code, r.out).toBe(0);
+		const recording = readRecording(out);
+		expect(recording.reviewer.map((c) => c.freeTierRefusals)).toEqual([failed, answered]);
+		expect(recording.reviewer.map((c) => c.elapsedMs), 'the spans, as the run kept them').toEqual([97_674, 72_600]);
+	});
+
+	it('⭑ CONTROL — Z3 (Q5) — a review call with no refusals is recorded as today: no refusals field at all', () => {
+		const out = join(tempDir('out'), 'recording');
+		const r = record(arrange(), out);
+		expect(r.code, r.out).toBe(0);
+		expect(readRecording(out).reviewer.map((c) => 'freeTierRefusals' in c)).toEqual([false, false]);
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package Z3 — THE LEAD'S RULING ON THE SECOND FOLLOW-UP (`z3-p1-rulings.md`): THE READER READS ONLY THE
+	// PRODUCT'S OWN SENTENCE. A record's detail holds text that is not the product's — a failure's tool report, after "What the tool
+	// reported, sanitised: ", and the parser's message for an answer that did not parse, which can quote the reply — so the refusals
+	// are read by the call's class, from the product's part only, at the sentence's opening: a failure's (thrown or cut) in its detail
+	// before the tool's report, at "Before this, the call met "; an answer's in its observation, at "devin answered after ".
+	// ⛔ An opening whose figures do not read is the recorder's problem for that call, never "no refusals".
+	// ⭑ PREDICTED RED, WRITTEN FIRST: the reader looks for the figures anywhere in the detail, then in the observation.
+	describe('⛔ PREDICTED RED (Z3; the second follow-up) — a call’s refusals are read off the product’s own sentence only', () => {
+		const quoted = { count: 2, waitedMs: 90_000, beforeLastAttemptMs: 91_500 };
+		// ⭑ Both of the product's sentences, as a text that is not the product's can quote them: a review of devin's adapter, or of
+		// a run's record, that the tool echoed or the reply carried.
+		const quoting =
+			`Before this, the call met ${freeTierRefusalsFigures(quoted)}, each refusal waited out and the same call made again: ` +
+			`all left out of the time shown here (D46). devin answered after ${freeTierRefusalsFigures(quoted)} (“free model rate limit”)`;
+
+		it('⛔ (i) a failure with no refusals whose tool report quotes the figures records none — the quote kept as the tool’s words', () => {
+			const out = join(tempDir('out'), 'recording');
+			const r = record(arrange({ firstReportTail: ` while sending “${quoting}”` }), out);
+			expect(r.code, r.out).toBe(0);
+			const recording = readRecording(out);
+			expect(recording.reviewer.map((c) => c.freeTierRefusals), 'refusals read off the tool’s report').toEqual([undefined, undefined]);
+			const first = recording.reviewer[0]!.reply;
+			expect(first.status === 'THROWN' ? first.message : '', 'the tool’s words, kept whole').toContain(quoting);
+		});
+
+		// ⭑ CONTROL — the class rule's other failure: a call cut at the output limit states its refusals in its detail's own part too
+		// (`outputLimitDetail`, its clause the validator's `withRefusals`), and they are read there, as a thrown call's are. Not a red:
+		// the old reader read them too. Its own mutant (`P6X-Z3-M55`, a cut read as an answer) shows the row tells the classes apart.
+		it('⭑ CONTROL — a call cut at the output limit, its refusals stated in its detail’s own part, records them there', () => {
+			const out = join(tempDir('out'), 'recording');
+			const cut = { count: 1, waitedMs: 45_000, beforeLastAttemptMs: 47_000 };
+			const r = record(arrange({ cutFirstReview: '{"findings":[', refusedFirstReview: cut }), out);
+			expect(r.code, r.out).toBe(0);
+			expect(readRecording(out).reviewer.map((c) => [c.reply.status, c.freeTierRefusals]), 'the cut’s refusals').toEqual([
+				['OUTPUT_LIMIT', cut],
+				['ANSWERED', undefined]
+			]);
+		});
+
+		it('⛔ (ii) an answered call whose parse detail quotes the figures records none from it, while its observation’s refusals are read', () => {
+			const out = join(tempDir('out'), 'recording');
+			const observed = { count: 1, waitedMs: 45_000, beforeLastAttemptMs: 46_000 };
+			// ⭑ A reply that does not parse (its trailing comma), and a parser's message that quotes it whole: `classifyParse` records the
+			// parser's message as it is.
+			const reply = `{"findings":[{"statement":"${quoting}"}],}`;
+			const r = record(
+				arrange({ retryRefusals: observed, retryUnparsed: { reply, detail: `Unexpected token '}', "${reply}" is not valid JSON` } }),
+				out
+			);
+			expect(r.code, r.out).toBe(0);
+			expect(readRecording(out).reviewer.map((c) => [c.role, c.freeTierRefusals]), 'refusals read off the parser’s message').toEqual([
+				['initial', undefined],
+				['retry', observed],
+				['repair', undefined]
+			]);
+		});
+
+		it('⛔ (iii) a failure’s statement of refusals whose figures do not read is the recorder’s problem for that call: refused, nothing written', () => {
+			const out = join(tempDir('out'), 'recording');
+			const r = record(
+				arrange({
+					firstStatement:
+						'Before this, the call met 2 free-tier refusals: 1.5 s of refused attempts and 90 s of waits, each refusal waited out and ' +
+						'the same call made again: all left out of the time shown here (D46).'
+				}),
+				out
+			);
+			expect(r.out, 'a statement that does not read was taken for none').toContain(
+				'reviewer call 1 (mex_review_1): its record states free-tier refusals (“Before this, the call met …”) in figures that do ' +
+					'not read, so the refusals it met cannot be replayed'
+			);
+			expect(r.code, r.out).toBe(1);
+			expect(existsSync(out), 'a recording was written').toBe(false);
+		});
+
+		// ⭑ The figures are read right after the opening, where the sentence writes them: figures further on are no figures of it.
+		it('⛔ (iii) and a statement whose figures are not at its opening, though some follow later, is the same problem', () => {
+			const out = join(tempDir('out'), 'recording');
+			const r = record(
+				arrange({
+					firstStatement:
+						'Before this, the call met the free tier’s refusal twice — 2 free-tier refusals: 1500 ms of refused attempts and 90000 ' +
+						'ms of waits — each refusal waited out and the same call made again: all left out of the time shown here (D46).'
+				}),
+				out
+			);
+			expect(r.out, 'figures read from further on than the opening').toContain(
+				'reviewer call 1 (mex_review_1): its record states free-tier refusals (“Before this, the call met …”) in figures that do ' +
+					'not read, so the refusals it met cannot be replayed'
+			);
+			expect(r.code, r.out).toBe(1);
+		});
+
+		it('⛔ (iii) and an answer’s, the same', () => {
+			const out = join(tempDir('out'), 'recording');
+			const r = record(
+				arrange({
+					retryStatement:
+						'devin answered after 2 free-tier refusals: 1.5 s of refused attempts and 90 s of waits (“free model rate limit”), each ' +
+						'refusal waited out for 45 s and the same call made again: no refusal reached the model, and none is a reviewer call (D46).'
+				}),
+				out
+			);
+			expect(r.out, 'a statement that does not read was taken for none').toContain(
+				'reviewer call 2 (mex_review_2): its record states free-tier refusals (“devin answered after …”) in figures that do not ' +
+					'read, so the refusals it met cannot be replayed'
+			);
+			expect(r.code, r.out).toBe(1);
+			expect(existsSync(out), 'a recording was written').toBe(false);
+		});
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package Z3 — THE LEAD'S RULING ON THE THIRD FOLLOW-UP (`z3-p1-rulings.md`; package X's reader, found by
+	// the general-form sweep, `z3-facts.md` §13.4): THE BOUND A RECORDING CARRIES IS READ ONLY OFF A FAILED CALL'S OWN CLAUSE — a
+	// thrown or cut row's, in its detail's own part (`productsPart`) — never off an answer's parse detail or a tool's report.
+	// ⭑ PREDICTED RED, WRITTEN FIRST: the reader takes the first "tool’s N ms bound" in any reviewer row's whole detail.
+	// ⭑ THE CONTROL is the first row of this file: a thrown call's own clause, "short of the tool’s 240000 ms bound", is the
+	// recording's bound (240 000), not the tool's known one (480 000).
+	describe('⛔ PREDICTED RED (Z3; the third follow-up) — the recorded bound is read only off a failed call’s own clause', () => {
+		// ⭑ The validator's whole sentence for a call that threw, quoted, as a review of a run's record can quote it: its bound, and
+		// the opening of its tool's report.
+		const quotedDetail =
+			'The reviewing tool’s call failed after 1200 ms with no reply, short of the tool’s 999 ms bound, so it is run once more ' +
+			'(REG-D-102). What the tool reported, sanitised: devin exited with code 1';
+
+		it('⛔ an answered call ahead of any thrown one, whose parse detail quotes “the tool’s 999 ms bound”: the bound is the thrown call’s own', () => {
+			const out = join(tempDir('out'), 'recording');
+			const reply = `{"findings":[{"statement":"${quotedDetail}"}],}`;
+			const r = record(
+				arrange({ earlierCommandReview: { reply, detail: `Unexpected token '}', "${reply}" is not valid JSON` } }),
+				out
+			);
+			expect(r.code, r.out).toBe(0);
+			const recording = readRecording(out);
+			expect(recording.reviewer.map((c) => [c.framing, c.role, c.reply.status]), 'arrangement: the answered review first').toEqual([
+				['command', 'initial', 'ANSWERED'],
+				['command', 'repair', 'ANSWERED'],
+				['work-product', 'initial', 'THROWN'],
+				['work-product', 'retry', 'ANSWERED']
+			]);
+			expect(recording.manifest.models.reviewer.callBoundMs, 'the bound read off an answer’s parse detail').toBe(240_000);
+		});
+
+		// ⭑ A clause that names no bound is the validator's when its reviewer declares none (`thrownCallDisposal`): the search
+		// then runs on into the tool's report, and only the product's own part keeps it out.
+		it('⛔ a thrown call whose clause names no bound, and whose tool report quotes one: the tool’s known bound, never the quote', () => {
+			const out = join(tempDir('out'), 'recording');
+			const r = record(
+				arrange({
+					firstClause: 'this reviewer declares no bound, so a call that throws is not run again',
+					firstReportTail: ` while sending “${quotedDetail}”`,
+					noRetry: true
+				}),
+				out
+			);
+			expect(r.code, r.out).toBe(0);
+			const recording = readRecording(out);
+			expect(recording.reviewer.map((c) => [c.role, c.reply.status]), 'arrangement: one call, thrown, not run again').toEqual([
+				['initial', 'THROWN']
+			]);
+			expect(recording.manifest.models.reviewer.callBoundMs, 'the bound read off the tool’s report').toBe(RECORDED_CALL_BOUND_MS.devin);
+		});
+	});
+
 	it('⛔ P5 C — refuses, writing nothing, a review call cut at the output-token limit whose partial reply is not retained', () => {
 		const out = join(tempDir('out'), 'recording');
 		const r = record(arrange({ cutFirstReview: '{"findings":[', cutNotRetained: true }), out);

@@ -82,6 +82,12 @@ export interface CandidateSpec {
 export interface TransportDeps {
 	/** agy's exec seam, for tests. Absent → the real `execFile`. The argv assertion wraps whichever is used. */
 	readonly agyExec?: AgyExec;
+	/**
+	 * ⭐ `JAN-EXEC` Phase 7, package Z3 — devin's exec seam and its free-tier wait (D46), for tests: the product's own `devinPrint`
+	 * runs with them, so a devin run is driven end to end with no program. Absent → the real program and a real 45 s.
+	 */
+	readonly devinExec?: (file: string, args: readonly string[], options: { cwd: string; timeout: number; maxBuffer: number; windowsHide: boolean }) => Promise<{ stdout: string }>;
+	readonly devinWait?: (ms: number) => Promise<void>;
 	/** A monotonic clock in ms, for tests. */
 	readonly now?: () => number;
 }
@@ -135,7 +141,14 @@ export async function loadTransport(
 	// the product does not read, or a variable something else overrode, would otherwise record one model and run another.
 	const problem = devinModelProblem(devin.resolveAssuranceModel(), spec.modelLabel);
 	if (problem) throw new HarnessRefusal(problem);
-	return createDevinTransport(devin, spec.modelLabel, deps);
+	// ⭐ Z3 — the product's devinPrint, with a test's exec seam and wait where one is handed.
+	// ⭐ (the lead's correction to ruling 3) — and the clock this transport times the call by (`deps.now`), on which devinPrint
+	// measures all that came before the last attempt, so the figure the transport takes off is a figure of its own clock.
+	const seamed =
+		deps.devinExec === undefined && deps.devinWait === undefined && deps.now === undefined
+			? devin
+			: { ...devin, devinPrint: (prompt: string) => devin.devinPrint(prompt, deps.devinExec, deps.devinWait, deps.now) };
+	return createDevinTransport(seamed, spec.modelLabel, deps);
 }
 
 /** Why devin would not be given the recorded label, or undefined. */
@@ -296,6 +309,9 @@ export function createAgyTransport(
 }
 
 export type DevinPrint = (prompt: string) => Promise<string | ToolInvocationResult>;
+// ⭐ Z3 — D46 — read from its own module, which reads no setting when it loads: devin's adapter is loaded only after the
+// override refusal (`loadTransport`), and this module must not load it before.
+import { freeTierRefusalsOf } from '../../apps/rph-demo/src/lib/server/tools/free-tier-refusals.js';
 /** What the devin transport needs of `devin-reviewer.ts` — injected, as agy's module is. */
 export interface DevinModule {
 	readonly devinPrint: DevinPrint;
@@ -346,7 +362,11 @@ export function createDevinTransport(
 				// ⭐ P5 package A (F2) — a reply devin ended at the model's output-token limit is the product's own class, passed
 				// on for the runner to record as one: never a TIMEOUT or a REFUSAL read off the clock.
 				if (e instanceof OutputLimitReached) throw e;
-				const elapsed = Math.round(now() - started);
+				// ⭐⭐ `JAN-EXEC` Phase 7, package Z3 — D46 — the failed call's own time: the free-tier refusals waited out before it reached
+				// no model, and their 45 s waits are no part of it (`freeTierRefusalsOf`), so a failure is classed by the call it ended.
+				// ~~`?.waitedMs ?? 0`~~ ⛔ MOVED 2026-11-07 (Z3 — the lead's correction to ruling 3): the failure is classed by its last
+				// attempt's time, so all that came before it is taken off — the refused attempts and their waits (`beforeLastAttemptMs`).
+				const elapsed = Math.round(now() - started) - (freeTierRefusalsOf(e)?.beforeLastAttemptMs ?? 0);
 				// ⭐⭐ Package X — D34 (`REG-F-590`; design §10.5, revision 5) — a TIMEOUT whose call the product's adapter saw killed
 				// states what the kill left (`killedCallFacts`): counts and facts, the harness's words beside the time and the bound,
 				// never the diagnostic. ⛔ Before X the reason was the time and the bound alone.

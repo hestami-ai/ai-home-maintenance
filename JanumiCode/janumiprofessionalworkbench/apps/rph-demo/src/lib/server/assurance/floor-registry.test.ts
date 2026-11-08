@@ -200,9 +200,10 @@ describe('⛔ outside test mode a misconfigured reviewer is RECORDED, never thro
 			expect(failed).toHaveLength(1);
 			const statement = failed[0]!.statement;
 			expect(statement).toContain(c.names);
-			expect(statement).toContain('REG-D-119');
+			// ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z3 — D41; design §11.2; `REG-D-145`, `REG-D-146`): ~~'REG-D-119'~~, ~~'… JPWB_ASSURANCE_MODEL=glm-5-3-flash-high'~~.
+			expect(statement).toContain('REG-D-145, REG-D-146');
 			expect(statement).toContain(
-				'JPWB_ASSURANCE_TOOL=devin and JPWB_ASSURANCE_MODEL=glm-5-3-flash-high'
+				'JPWB_ASSURANCE_TOOL=devin and JPWB_ASSURANCE_MODEL=swe-2-max'
 			);
 			expect(statement).toContain('ASR-13');
 			expect(
@@ -454,7 +455,8 @@ describe('⛔ SR-2 (D7) — a program override: refused outside test mode for th
 			const failed = review.observations.filter((o) => o.code === 'VALIDATOR_EXECUTION_FAILED');
 			expect(failed).toHaveLength(1);
 			expect(failed[0]!.statement).toContain(`JPWB_DEVIN_BIN=${JSON.stringify(program)}`);
-			expect(failed[0]!.statement).toContain('REG-D-119');
+			// ~~'REG-D-119'~~ ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z3 — D41): the selection's rulings now.
+			expect(failed[0]!.statement).toContain('REG-D-145, REG-D-146');
 		});
 
 	it('agy, JPWB_AGY_BIN set: refused and recorded, the injected print never called', async () => {

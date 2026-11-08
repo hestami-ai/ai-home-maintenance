@@ -26,7 +26,7 @@ import {
 	runFloorAndPlanRecording,
 	SEEDED_REASONING_REVIEW_CRITERIA
 } from '@janumipwb/rph-assurance';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { splitAnswerSpan } from '../apps/rph-demo/src/lib/server/assurance/agy-cli.js';
 import { createAgyReasoningReviewValidator } from '../apps/rph-demo/src/lib/server/assurance/reasoning-review-validator.js';
 import type { ToolInvocationResult } from '../apps/rph-demo/src/lib/server/tools/backing-tool.js';
@@ -58,10 +58,13 @@ import {
 	type RunInputs
 } from '../scripts/reviewer-qual/runner.js';
 import {
+	createDevinTransport,
 	TransportFailure,
 	type Transport,
 	type TransportReply
 } from '../scripts/reviewer-qual/transports.js';
+import { writeFileSync } from 'node:fs';
+import { DEVIN_FREE_TIER_REFUSAL, devinPrint, type DevinExec } from '../apps/rph-demo/src/lib/server/tools/devin-reviewer.js';
 import { PLACEHOLDER_INDICATIONS } from '../scripts/reviewer-qual/indications.js';
 
 const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url));
@@ -179,7 +182,178 @@ async function initialPrompts(): Promise<Map<string, string>> {
 	return byPrompt;
 }
 
+/**
+ * ⭐ Z3 — D46 — devin at its exec seam on a shared clock: `refusals` free-tier refusals, the last attempt taking `lastMs`.
+ * ⭐ (the lead's correction to ruling 3) — and each refused attempt `refusalMs` of its own; devinPrint is handed the same clock.
+ */
+function devinOnTheClock(refusals: number, lastMs: number, answers: boolean, answer: string, refusalMs = 0) {
+	const clock = { ms: 0 };
+	let attempts = 0;
+	const exec: DevinExec = async (_file, args) => {
+		attempts += 1;
+		const last = attempts > refusals;
+		if (last || (!answers && attempts === refusals)) clock.ms += lastMs;
+		else clock.ms += refusalMs;
+		if (!last)
+			throw Object.assign(new Error(`Command failed: devin --print\nError: ${DEVIN_FREE_TIER_REFUSAL} reached`), {
+				code: 1,
+				stdout: '',
+				stderr: `Error: ${DEVIN_FREE_TIER_REFUSAL} reached`
+			});
+		writeFileSync(args[args.indexOf('--export') + 1]!, JSON.stringify({ steps: [{ extra: { generation_model: 'swe-2-max' } }] }));
+		return { stdout: answer };
+	};
+	const module = {
+		devinPrint: (prompt: string) =>
+			devinPrint(
+				prompt,
+				exec,
+				async (ms) => {
+					clock.ms += ms;
+				},
+				() => clock.ms
+			),
+		resolveAssuranceModel: () => 'swe-2-max'
+	};
+	return { clock, module, attempts: () => attempts };
+}
+
 describe('JAN-CRITREAD J2-2 — the runner, over a stub transport', () => {
+	// ⭐⭐ `JAN-EXEC` Phase 7, package Z3 — D46 — A FOURTH REFUSAL FAILS THE CALL AS TODAY, CLASSED BY THE CALL'S OWN TIME: the 45 s waits
+	// before it are no part of it, so a refusal that came 400 s into its own call is a REFUSAL, never a TIMEOUT read off 535 s.
+	it('⛔ PREDICTED RED — Z3 (D46) — four refusals: the transport classes the failure by the last call’s own time, the waits taken off', async () => {
+		vi.stubEnv('JPWB_ASSURANCE_MODEL', 'swe-2-max');
+		let clock = 0;
+		let attempts = 0;
+		const exec: DevinExec = async () => {
+			attempts += 1;
+			if (attempts === 4) clock += 400_000;
+			throw Object.assign(new Error(`Command failed: devin --print\nError: ${DEVIN_FREE_TIER_REFUSAL} reached`), {
+				code: 1,
+				stdout: '',
+				stderr: `Error: ${DEVIN_FREE_TIER_REFUSAL} reached`
+			});
+		};
+		const transport = createDevinTransport(
+			{
+				devinPrint: (p) =>
+					devinPrint(
+						p,
+						exec,
+						async (ms) => {
+							clock += ms;
+						},
+						// ⭐ Z3 (the lead's correction to ruling 3) — the clock the transport times the call by.
+						() => clock
+					),
+				resolveAssuranceModel: () => 'swe-2-max'
+			},
+			'swe-2-max',
+			{ now: () => clock }
+		);
+		const failure = (await transport.call('p').catch((e: unknown) => e)) as TransportFailure;
+		expect([attempts, clock], 'arrangement: four attempts, three waits and a 400 s last call').toEqual([4, 535_000]);
+		expect([failure.failureClass, failure.reason]).toEqual(['REFUSAL', 'devin failed after 400000 ms']);
+		vi.unstubAllEnvs();
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package Z3 — THE LEAD'S CORRECTION TO RULING 3 (`z3-p1-rulings.md`, "The follow-up hand-back"): the
+	// transport classes a failure by its last attempt's time. It takes off all that came before that attempt — the refused attempts'
+	// run time and their waits, as devinPrint measured them on the transport's own clock.
+	// ⭑ PREDICTED RED, WRITTEN FIRST: the waits alone are taken off, so 3 refused attempts of 10 s, then a failure 475 s into the last,
+	// read 505 s — a TIMEOUT against devin's 480 s kill, which is false.
+	it('⛔ PREDICTED RED — Z3 (the lead’s correction) — three refused attempts of 10 s, then a failure 475 s into the last: a REFUSAL, by the last attempt’s 475 s', async () => {
+		vi.stubEnv('JPWB_ASSURANCE_MODEL', 'swe-2-max');
+		let clock = 0;
+		let attempts = 0;
+		const exec: DevinExec = async () => {
+			attempts += 1;
+			if (attempts <= 3) {
+				clock += 10_000;
+				throw Object.assign(new Error(`Command failed: devin --print\nError: ${DEVIN_FREE_TIER_REFUSAL} reached`), { code: 1, stdout: '' });
+			}
+			clock += 475_000;
+			throw Object.assign(new Error('Command failed: devin --print\nError: the session ended'), { code: 1, stdout: '' });
+		};
+		const transport = createDevinTransport(
+			{
+				devinPrint: (p) =>
+					devinPrint(
+						p,
+						exec,
+						async (ms) => {
+							clock += ms;
+						},
+						() => clock
+					),
+				resolveAssuranceModel: () => 'swe-2-max'
+			},
+			'swe-2-max',
+			{ now: () => clock }
+		);
+		const failure = (await transport.call('p').catch((e: unknown) => e)) as TransportFailure;
+		expect([attempts, clock], 'arrangement: three refused attempts of 10 s, three waits, a 475 s last attempt').toEqual([4, 640_000]);
+		expect([failure.failureClass, failure.reason]).toEqual(['REFUSAL', 'devin failed after 475000 ms']);
+		vi.unstubAllEnvs();
+	});
+
+	// ⭑ CONTROL — Z3 (the lead's correction) — WITH NO REFUSAL, EVERYTHING READS AS TODAY: nothing is taken off a call that met none,
+	// at the transport or at the runner.
+	it('⭑ CONTROL — Z3 (the lead’s correction) — no refusal: the transport classes a failure by its whole time, and a CALL line’s time is its span, as today', async () => {
+		vi.stubEnv('JPWB_ASSURANCE_MODEL', 'swe-2-max');
+		let clock = 0;
+		const exec: DevinExec = async () => {
+			clock += 300_000;
+			throw Object.assign(new Error('Command failed: devin --print\nError: the session ended'), { code: 1, stdout: '' });
+		};
+		const failing = createDevinTransport(
+			{
+				devinPrint: (p) => devinPrint(p, exec, async () => undefined, () => clock),
+				resolveAssuranceModel: () => 'swe-2-max'
+			},
+			'swe-2-max',
+			{ now: () => clock }
+		);
+		const failure = (await failing.call('p').catch((e: unknown) => e)) as TransportFailure;
+		expect([failure.failureClass, failure.reason]).toEqual(['REFUSAL', 'devin failed after 300000 ms']);
+		const devin = devinOnTheClock(0, 200_000, true, judgement([]));
+		const transport = createDevinTransport(devin.module, 'swe-2-max', { now: () => devin.clock.ms });
+		const lines = await runQualification(inputs({ transport, cases: CASES.slice(0, 1), now: () => devin.clock.ms }));
+		expect(lines.filter((l): l is CallLine => l.kind === 'CALL').map((c) => c.elapsedMs)).toEqual([200_000]);
+		vi.unstubAllEnvs();
+	});
+
+	// ⭐⭐ Z3 — THE LEAD'S CORRECTION, AT THE RUNNER: a CALL line's time is the last attempt's.
+	// ⭑ PREDICTED RED, WRITTEN FIRST: three refused attempts of 1 s each before an answer after 200 s read 203 s.
+	it('⛔ PREDICTED RED — Z3 (the lead’s correction) — three refused attempts of 1 s, then an answer after 200 s: the CALL line’s time is 200000', async () => {
+		vi.stubEnv('JPWB_ASSURANCE_MODEL', 'swe-2-max');
+		const devin = devinOnTheClock(3, 200_000, true, judgement([]), 1_000);
+		const transport = createDevinTransport(devin.module, 'swe-2-max', { now: () => devin.clock.ms });
+		const lines = await runQualification(inputs({ transport, cases: CASES.slice(0, 1), now: () => devin.clock.ms }));
+		const calls = lines.filter((l): l is CallLine => l.kind === 'CALL');
+		expect([devin.attempts(), devin.clock.ms], 'arrangement: 3 s of refused attempts, 135 s of waits, a 200 s answer').toEqual([4, 338_000]);
+		expect(calls.map((c) => c.elapsedMs), 'the answering attempt’s own 200 s').toEqual([200_000]);
+		vi.unstubAllEnvs();
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package Z3 — D46 (design §11.7: *"Its devin transport follows the same rule. CALL lines stay one per call
+	// that reached the model."*) — THE PRODUCT'S `devinPrint` BEHIND THE QUALIFICATION'S DEVIN TRANSPORT, three refusals waited out
+	// before an answer: one CALL line, and its time the call's own — the 45 s waits taken off, so an answer past 240 s is one that
+	// took that long, never one that waited.
+	it('⛔ PREDICTED RED — Z3 (D46) — three refusals, then an answer: one CALL line, its time the answering call’s own, the waits taken off', async () => {
+		// The model the product's devinPrint reads, as the run's transport sets it (`transports.ts` `loadTransport`).
+		vi.stubEnv('JPWB_ASSURANCE_MODEL', 'swe-2-max');
+		const devin = devinOnTheClock(3, 200_000, true, judgement([]));
+		const transport = createDevinTransport(devin.module, 'swe-2-max', { now: () => devin.clock.ms });
+		const lines = await runQualification(inputs({ transport, cases: CASES.slice(0, 1), now: () => devin.clock.ms }));
+		const calls = lines.filter((l): l is CallLine => l.kind === 'CALL');
+		expect(devin.attempts(), 'the same call made four times').toBe(4);
+		expect(calls, 'one CALL line: the call that reached the model').toHaveLength(1);
+		expect(calls[0]!.reply.status).toBe('ANSWERED');
+		expect(calls[0]!.elapsedMs, 'the answering call’s own 200 s, never the 135 s of waits').toBe(200_000);
+		vi.unstubAllEnvs();
+	});
+
 	// ⭐⭐ `JAN-EXEC` Phase 7, package Z2b — D54 (D49's RUN-line rule): the scoring identity of the records the prompts were rendered
 	// from, written on the RUN line BESIDE THE CANDIDATE; and a run handed none writes none, as every line recorded before Z2b.
 	it('⭐ Z2b (D54) — the RUN line carries the records’ scoring identity beside its candidate, and none when it is handed none', async () => {

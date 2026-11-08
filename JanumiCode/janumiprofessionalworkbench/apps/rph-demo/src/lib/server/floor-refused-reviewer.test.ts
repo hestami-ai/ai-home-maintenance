@@ -60,7 +60,8 @@ function expectTheRefusalRecorded(host: EngineHandle): void {
 	);
 	expect(log, 'the refusal was recorded as agy’s work').not.toContain('agy.reasoning-review');
 	expect(log).toContain(REFUSAL);
-	expect(log).toContain('REG-D-119');
+	// ~~toContain('REG-D-119')~~ ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z3 — D41): the selection's rulings now.
+	expect(log).toContain('REG-D-145, REG-D-146');
 }
 
 /** The refusal's statement, as the floor's own observations carry it. */
@@ -74,7 +75,8 @@ function expectTheRefusalObserved(
 	).toBeGreaterThan(0);
 	const statements = failed.map((o) => o.statement).join('\n');
 	expect(statements).toContain(REFUSAL);
-	expect(statements).toContain('REG-D-119');
+	// ~~toContain('REG-D-119')~~ ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z3 — D41): the selection's rulings now.
+	expect(statements).toContain('REG-D-145, REG-D-146');
 }
 
 let opened: EngineHandle | undefined;

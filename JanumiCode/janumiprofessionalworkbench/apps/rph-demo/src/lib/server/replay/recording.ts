@@ -101,6 +101,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, isAbsolute, join } from 'node:path';
 import type { ProcessOutputOmission } from '@janumipwb/rph-ports';
 import { FINISH_REASON_SHAPE } from '../tools/output-limit.js';
+import { FREE_TIER_REFUSALS_FIGURES, type FreeTierRefusals } from '../tools/free-tier-refusals.js';
 
 /**
  * The format's own name and version. ⛔ A reader refuses any other: a recording of another shape replays another run.
@@ -651,6 +652,14 @@ export interface ReviewerCall {
 	readonly evaluator: RecordedIdentity;
 	/** ⭐ The call's ELAPSED time in ms: replayed through the validator's clock, so a retry happens where it happened. */
 	readonly elapsedMs: number;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package Z3 — the lead's ruling on question 5 (`z3-p1-rulings.md`) — THE FREE-TIER REFUSALS THE CALL
+	 * CARRIED, in the carrier's form (`FreeTierRefusals`): how many, their waits, and all that came before the last attempt, read off
+	 * what the run's record states of them. The replay attaches them as devin's adapter did, so the validator takes them off the
+	 * elapsed time above as it did in the run. ⭑ OPTIONAL, and absent for a call that met none, so the format stays `/4`: no `/4`
+	 * recording exists outside the uncommitted Z2b and Z3 trees (`git log --all -S`, 2026-11-07).
+	 */
+	readonly freeTierRefusals?: FreeTierRefusals;
 }
 
 /**
@@ -966,8 +975,43 @@ function reviewerCallOf(v: unknown, where: string): ReviewerCall {
 		prompt: field(v, 'prompt', where, isString, 'string'),
 		reply: replyOf(v.reply, where),
 		evaluator: identity(v.evaluator, `${where} evaluator`),
-		elapsedMs: field(v, 'elapsedMs', where, isCount, 'count')
+		elapsedMs: field(v, 'elapsedMs', where, isCount, 'count'),
+		// ⭐ Z3 (Q5) — the call's carried refusals, where it met some.
+		...(v.freeTierRefusals === undefined ? {} : { freeTierRefusals: refusalsOf(v.freeTierRefusals, where) })
 	};
+}
+
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package Z3 — the lead's ruling on question 5 — THE FREE-TIER REFUSALS A RUN'S RECORD STATES, read back in the
+ * carrier's form: the figures `freeTierRefusalsFigures` writes into a failure's detail and an answer's observation, by their pattern
+ * (`FREE_TIER_REFUSALS_FIGURES`). None stated: `undefined`. ⭑ For the recorder (`scripts/phase7/record-replay-core.ts`), which keeps
+ * them with each reviewer call it records.
+ * ~~`freeTierRefusalsIn(text)`, the figures anywhere in `text`~~ ⛔ MOVED 2026-11-07 (Z3 — the lead's ruling on the second follow-up:
+ * the reader reads only the product's own sentence): ⭐ THE FIGURES RIGHT AFTER `opening`, the words the product's sentence opens
+ * with (`FREE_TIER_REFUSALS_OPENING`), where it writes them. No opening in `text`: `undefined`, none stated. ⛔ An opening whose
+ * figures do not read there: `null` — never none — which the recorder refuses by name (fail closed).
+ */
+export function freeTierRefusalsIn(text: string, opening: string): FreeTierRefusals | null | undefined {
+	const at = text.indexOf(opening);
+	if (at < 0) return undefined;
+	const m = FREE_TIER_REFUSALS_FIGURES.exec(text.slice(at + opening.length));
+	if (m === null || m.index !== 0) return null;
+	const waitedMs = Number(m[3]);
+	return { count: Number(m[1]), waitedMs, beforeLastAttemptMs: Number(m[2]) + waitedMs };
+}
+
+/**
+ * ⭐ Z3 (Q5) — a reviewer call's free-tier refusals, held to what refusals waited out can be: a count from 1, and waits within all
+ * that came before the last attempt. ⛔ Anything else is refused, never replayed as a time the run never had.
+ */
+function refusalsOf(v: unknown, where: string): FreeTierRefusals {
+	const r = isRecord(v) ? v : {};
+	if (!isCount(r.count) || r.count < 1 || !isCount(r.waitedMs) || !isCount(r.beforeLastAttemptMs) || r.waitedMs > r.beforeLastAttemptMs)
+		refuse(
+			where,
+			'has `freeTierRefusals` that are no refusals waited out: a count from 1, and waits within all that came before the last attempt'
+		);
+	return { count: r.count as number, waitedMs: r.waitedMs as number, beforeLastAttemptMs: r.beforeLastAttemptMs as number };
 }
 
 /** ⭐ Z2b — one decision-model request's line: its key, model, body hash, and a score from 0 to 1 or the reason it got none. */

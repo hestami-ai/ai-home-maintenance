@@ -119,20 +119,25 @@ describe('⭐ the selector answers the design’s table — every mode, tool, mo
 });
 
 describe('what a refusal SAYS — it names the fault, and every one carries the selection and the independence rule', () => {
-	it('⭑ the guidance names ~~REG-D-084’s~~ ⭐ REG-D-119’s selection as configuration, and ASR-13’s independence rule', () => {
+	it('⭑ the guidance names ~~REG-D-084’s~~ ~~⭐ REG-D-119’s~~ ⭐ REG-D-145’s and REG-D-146’s selection as configuration, and ASR-13’s independence rule', () => {
 		// ⭐ `REG-D-119` — the sponsor selected devin with glm-5-3-flash-high on 2026-10-19, replacing `REG-D-084`'s
 		// glm-5-3-flash-max.
+		// ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z3 — D41; design §11.2; `REG-D-145`, `REG-D-146`): devin's `swe-2-max`.
+		// ~~'The selected reviewer (REG-D-119) is devin with glm-5-3-flash-high: set JPWB_ASSURANCE_TOOL=devin and ' +~~
+		// ~~'JPWB_ASSURANCE_MODEL=glm-5-3-flash-high.'~~
 		expect(SELECTED_REVIEWER_GUIDANCE).toContain(
-			'The selected reviewer (REG-D-119) is devin with glm-5-3-flash-high: set JPWB_ASSURANCE_TOOL=devin and ' +
-				'JPWB_ASSURANCE_MODEL=glm-5-3-flash-high.'
+			'The selected reviewer (REG-D-145, REG-D-146) is devin with swe-2-max: set JPWB_ASSURANCE_TOOL=devin and ' +
+				'JPWB_ASSURANCE_MODEL=swe-2-max.'
 		);
+		expect(SELECTED_REVIEWER_GUIDANCE, 'the independence rule names the selected model').toContain('may run swe-2-max');
 		expect(SELECTED_REVIEWER_GUIDANCE).toContain(
 			'not a default this host falls back to (REG-D-052)'
 		);
 		expect(SELECTED_REVIEWER_GUIDANCE).toContain('stay configurable');
 		expect(SELECTED_REVIEWER_GUIDANCE).toContain('Independence (ASR-13)');
+		// ~~'may run a GLM-5.3 Flash model under any provider or spelling'~~ ⛔ MOVED (Z3 — D41): the selected model, named.
 		expect(SELECTED_REVIEWER_GUIDANCE).toContain(
-			'may run a GLM-5.3 Flash model under any provider or spelling'
+			'may run swe-2-max under any provider or spelling'
 		);
 		// ~~⭑ `JAN-SELREV` SR-3: the executor's model is NOT always `JPWB_EXECUTOR_MODEL` — the agy executor runs the judge
 		// model (`REG-F-458`), and guidance naming only the executor variable would send an agy host to the wrong one.~~

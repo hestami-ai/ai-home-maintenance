@@ -201,7 +201,8 @@ describe('⭐ D5 — beginExecute asks the reviewer selector before it dispatche
 				result.data?.error ?? '',
 				'the step was not refused with the reviewer guidance'
 			).toContain(c.names);
-			expect(result.data?.error).toContain('REG-D-119');
+			// ~~toContain('REG-D-119')~~ ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z3 — D41): the selection's rulings now.
+			expect(result.data?.error).toContain('REG-D-145, REG-D-146');
 			expect(result.status).toBe(400);
 			expect(eventCount(), 'a refused step dispatched something').toBe(before);
 			expect(
@@ -233,7 +234,8 @@ describe('⭐ D5 — beginExecute asks the reviewer selector before it dispatche
 			result.data?.error ?? '',
 			'the server-mode step was not refused for its unset tool'
 		).toContain('JPWB_ASSURANCE_TOOL is not set');
-		expect(result.data?.error).toContain('REG-D-119');
+		// ~~toContain('REG-D-119')~~ ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z3 — D41): the selection's rulings now.
+		expect(result.data?.error).toContain('REG-D-145, REG-D-146');
 		expect(result.status).toBe(400);
 		expect(eventCount(), 'a refused step dispatched something').toBe(before);
 		expect(

@@ -1281,7 +1281,9 @@ describe('⭐ C1, C3 — the lane’s half, and half B’s author, at boot', () 
 
 describe('⭐ C3 — the authoring allowance, folded into the timeout', () => {
 	/** One review at its bound: `reviewerCallsPerTry` calls, each at the reviewer's. */
-	const REVIEW_MS = LANE_BUDGET.reviewerCallsPerTry * LANE_BUDGET.reviewerCallMs;
+	// ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z3 — D51's Time bullet; design §12.3): ~~`LANE_BUDGET.reviewerCallsPerTry * LANE_BUDGET.reviewerCallMs`~~ —
+	// and each part's review its decision model's 1,200 s: the authoring gains 2 × parts × 1,200 s.
+	const REVIEW_MS = LANE_BUDGET.reviewerCallsPerTry * LANE_BUDGET.reviewerCallMs + LANE_BUDGET.reviewIndicationsMs;
 
 	// ⭐ The review in parts, B6 (`REG-D-125`; design D9) — ~~2,400 s for every turn~~: each floor run reviews each type of the
 	// candidate as a part, so the allowance is the inventory's — 2,400 s at one part, as before, and 31,200 s at sixteen.
@@ -1298,12 +1300,17 @@ describe('⭐ C3 — the authoring allowance, folded into the timeout', () => {
 		);
 		// ⛔ MOVED 2026-10-31 (package X; design D35, revision 5; devin’s bound 480 s) — ~~`3_360_000, 46_560_000, 1_680_000`~~: 2 × (240 s + 6 × 480 s) = 6,240 s, 2 × (240 s +
 		// 16 × 6 × 480 s) = 92,640 s, and one try's share of the Begin & Execute wait 3,120 s.
+		// ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z3 — D51's Time bullet; design §12.3) — ~~`6_240_000, 92_640_000, 3_120_000`~~: 2 × (240 s
+		// + 6 × 480 s + 1,200 s) = 8,640 s, 2 × (240 s + 16 × (6 × 480 s + 1,200 s)) = 131,040 s — each 2 × parts × 1,200 s more —
+		// and one try's share of the Begin & Execute wait 4,320 s.
 		expect([phase7AuthoringAllowanceMs(1), phase7AuthoringAllowanceMs(16), EXECUTE_TIMEOUT_MS / LANE_BUDGET.tries]).toEqual([
-			6_240_000, 92_640_000, 3_120_000
+			8_640_000, 131_040_000, 4_320_000
 		]);
+		expect(phase7AuthoringAllowanceMs(16) - 92_640_000, 'the gain over package X’s figure: 2 × parts × 1,200 s').toBe(2 * 16 * 1_200_000);
 		// ⭑ AT LEAST ONE PART: a turn that has staged no type yet is given one part's, ~~the 2,400 s every turn had~~ ~~3,360 s~~
 		// 6,240 s (package X, D35).
-		expect(phase7AuthoringAllowanceMs(0)).toBe(6_240_000);
+		// ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z3 — D51's Time bullet; design §12.3) — ~~`toBe(6_240_000)`~~: 8,640 s.
+		expect(phase7AuthoringAllowanceMs(0)).toBe(8_640_000);
 	});
 
 	it('⭐ the authoring’s share: the allowance, one overrunning poll, and four designer acts each at its bound — ~~5,585 s~~ ~~6,545 s~~ 9,425 s at one part, ~~34,385 s~~ ~~49,745 s (package L, D13)~~ 95,825 s at sixteen (package X, D35)', () => {
@@ -1316,7 +1323,9 @@ describe('⭐ C3 — the authoring allowance, folded into the timeout', () => {
 					4 * (PHASE7_UI_MS + PHASE7_SIGN_OFF_MS + PHASE7_INTROSPECT_MS)
 			);
 		// ⛔ MOVED 2026-10-31 (package X; design D35, revision 5; devin’s bound 480 s) — ~~`[6_545_000, 49_745_000]`~~: 6,240 s + 3,185 s and 92,640 s + 3,185 s.
-		expect([phase7AuthoringMs(1), phase7AuthoringMs(16)]).toEqual([9_425_000, 95_825_000]);
+		// ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z3 — D51's Time bullet; design §12.3) — ~~`[9_425_000, 95_825_000]`~~: 8,640 s + 3,185 s and
+		// 131,040 s + 3,185 s.
+		expect([phase7AuthoringMs(1), phase7AuthoringMs(16)]).toEqual([11_825_000, 134_225_000]);
 	});
 
 	it('⭐ half B’s timeout: half A’s re-counted for the agent’s phases, plus the authoring for its parts; capped at Node’s timer ceiling', () => {
@@ -1326,7 +1335,9 @@ describe('⭐ C3 — the authoring allowance, folded into the timeout', () => {
 		// (`PHASE7_SIGN_OFF_UNIT_MS`, 11,280 s, not 1,800 s), so the share is ~~82,320 s~~ ~~91,800 s~~ ⭐ (package L, D13: each
 		// review six calls) 55,740 + 300 + 58,080 + 15,120 = 129,240 s.
 		// ⛔ MOVED 2026-10-31 (package X; design D35, revision 5; devin’s bound 480 s) — ~~`toBe(129_240_000)`~~: 106,140 + 300 + 108,480 + 26,640 = 241,560 s.
-		expect(PHASE7_PER_PHASE_MS).toBe(241_560_000);
+		// ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z3 — D51's Time bullet; design §12.3) — ~~`toBe(241_560_000)`~~: 148,140 + 300 + 150,480 +
+		// 36,240 = 335,160 s.
+		expect(PHASE7_PER_PHASE_MS).toBe(335_160_000);
 		expect(
 			PHASE7_TEST_TIMEOUT_MS -
 				PHASE7_SETUP_MS -
@@ -1341,22 +1352,28 @@ describe('⭐ C3 — the authoring allowance, folded into the timeout', () => {
 		expect(phase7HalfBTestTimeoutMs(units(4), 1)).toBe(PHASE7_TEST_TIMEOUT_MS + phase7AuthoringMs(1));
 		// ⭐ Package L — D13: ~~425,225 s~~ 590,040 s + 6,545 s.
 		// ⛔ MOVED 2026-10-31 (package X; design D35, revision 5; devin’s bound 480 s) — ~~`toBe(596_585_000)`~~: 1,101,240 s + 9,425 s.
-		expect(phase7HalfBTestTimeoutMs(units(4), 1)).toBe(1_110_665_000);
+		// ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z3 — D51's Time bullet; design §12.3) — ~~`toBe(1_110_665_000)`~~: 1,527,240 s + 11,825 s.
+		expect(phase7HalfBTestTimeoutMs(units(4), 1)).toBe(1_539_065_000);
 		// ⭐ The review in parts, B6 — the authoring's share is the inventory's: sixteen parts, ~~454,025 s~~ ⭐ 639,785 s for four
 		// phases. ⛔ MOVED 2026-10-31 (package X; design D35, revision 5; devin’s bound 480 s) — ~~`toBe(639_785_000)`~~: 1,101,240 s + 95,825 s.
-		expect(phase7HalfBTestTimeoutMs(units(4), 16)).toBe(1_197_065_000);
+		// ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z3 — D51's Time bullet; design §12.3) — ~~`toBe(1_197_065_000)`~~: 1,527,240 s + 134,225 s.
+		expect(phase7HalfBTestTimeoutMs(units(4), 16)).toBe(1_661_465_000);
 		// ⭐ And the ceiling's first phase count, as lane-config.ts states it: ~~23, at one part and at sixteen alike~~ ⭐ package
 		// L, D13: 17 at one part, 16 at sixteen — the larger allowance now reaches the ceiling a phase sooner.
 		// ⛔ MOVED 2026-10-31 (package X; design D35, revision 5; devin’s bound 480 s) — ~~`[1, 17]`, `[16, 16]`~~: 9 at one part, 8 at sixteen, as lane-config.ts now states them.
+		// ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z3 — D51's Time bullet; design §12.3) — ~~`[1, 9]`, `[16, 8]`~~: 6 at one part and 6 at sixteen,
+		// as lane-config.ts now states them (each phase's share 335,160 s).
 		for (const [parts, first] of [
-			[1, 9],
-			[16, 8]
+			[1, 6],
+			[16, 6]
 		] as const)
 			expect([
 				phase7HalfBTestTimeoutMs(units(first - 1), parts) < NODE_TIMER_CEILING_MS,
 				phase7HalfBTestTimeoutMs(units(first), parts)
 			]).toEqual([true, NODE_TIMER_CEILING_MS]);
-		expect(phase7HalfBTestTimeoutMs(units(7), 1) - phase7HalfBTestTimeoutMs(units(6), 1)).toBe(PHASE7_PER_PHASE_MS);
+		// ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z3 — D51's Time bullet; design §12.3): ~~`units(7)` less `units(6)`~~ — both now at the
+		// ceiling; one phase more, below it.
+		expect(phase7HalfBTestTimeoutMs(units(5), 1) - phase7HalfBTestTimeoutMs(units(4), 1)).toBe(PHASE7_PER_PHASE_MS);
 		expect(phase7HalfBTestTimeoutMs(units(1), 1)).toBe(
 			PHASE7_TEST_TIMEOUT_MS - 3 * PHASE7_PER_PHASE_MS + phase7AuthoringMs(1)
 		);
@@ -2584,7 +2601,9 @@ describe('⭐⭐ The merge of E12 and E3 (J1, J2) — half B’s sign-offs count
 	 * One declared review at its bound: its call, retry and repair, each `reviewerCallMs` — ~~960 s~~ 2,880 s (six calls of 480 s;
 	 * package X, D35 — the figure had not been restated for package L's six calls of 240 s, 1,440 s).
 	 */
-	const REVIEW_MS = PER_POLICY * LANE_BUDGET.reviewerCallMs;
+	// ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z3 — D51's Time bullet; design §12.3): ~~`PER_POLICY * LANE_BUDGET.reviewerCallMs`~~ — and its
+	// decision model's requests, 1,200 s: 4,080 s.
+	const REVIEW_MS = PER_POLICY * LANE_BUDGET.reviewerCallMs + LANE_BUDGET.reviewIndicationsMs;
 
 	it('⛔ R3-B F2 — an agent’s unit declaring FIVE policies has its Record Assurance, and the rule’s re-run of its declared reviews, given a bound that covers FIVE reviews; one declaring one, one review', async () => {
 		// ⛔ PREDICTED RED, read from the code: the lane handed its sign-off presses no bound, and each press waited
