@@ -7422,7 +7422,13 @@ describe('package Y — case set v13 and oracles v13 (D37)', () => {
 	// ⭑ Z2b phase 2 — its own time budget, 120 s: rendering a review now builds and hashes each decision-model request's body
 	// against D54's records, about twice the work it was, and the gate's coverage run gives a row 30 s by default.
 	it('Y04 every first prompt pinned: 50 recorded v12, 42 current X rows, and the five C5 build pins', async () => {
-		const recorded = read('docs/tracking/reviewer-qualification/runs.ndjson').split('\n').filter(Boolean).map(l => JSON.parse(l) as {kind: string; role?: string; caseId?: string; promptSha256?: string});
+		const recorded = read('docs/tracking/reviewer-qualification/runs.ndjson').split('\n').filter(Boolean).map(l => JSON.parse(l) as {kind: string; role?: string; caseId?: string; promptSha256?: string; runId?: string; caseSetVersion?: number});
+		// ⛔ MOVED 2026-11-09 (`JAN-EXEC` Phase 7, D53; `REG-F-617`) — ~~each case's last initial CALL in the whole record~~:
+		// its last initial CALL in a run of case set 12 or earlier, the record these 50 pins are named for. D53's runs (case set
+		// v13, under the adopted construct) record another first prompt for each of these cases — `D12-RC-CLEAN`'s
+		// `e7ae9637…` (`runs.ndjson:1591`) against v12's `d41e38c1…` (`:1367`) — which `reviewer:qual:check`'s REPRODUCTION
+		// limb holds to today's; read as the latest call, they moved these pins off the material this test renders.
+		const beforeV13 = new Set(recorded.filter(l => l.kind === 'RUN' && (l.caseSetVersion ?? 0) <= 12).map(l => l.runId));
 		const moved = new Map(PROTOTYPE_PROMPTS_V12.filter(([id]) => /^[WP]12-/.test(id)));
 		const unmoved = CASE_SET_V12.cases.filter(c => !/^[WP]12-/.test(c.id));
 		expect([moved.size, unmoved.length]).toEqual([42, 50]);
@@ -7439,7 +7445,7 @@ describe('package Y — case set v13 and oracles v13 (D37)', () => {
 			// today's reviewer, as `REVIEWER_FINGERPRINT_TODAY` restates it; the case-set digest above stays.
 			expect(fingerprint.reviewer).toBe(REVIEWER_FINGERPRINT_TODAY);
 			for (const [id, pin] of moved) expect(hashes.get(id), id).toBe(pin);
-			for (const c of unmoved) expect(hashes.get(c.id), c.id).toBe(recorded.filter(l => l.kind === 'CALL' && l.role === 'initial' && l.caseId === c.id).at(-1)!.promptSha256);
+			for (const c of unmoved) expect(hashes.get(c.id), c.id).toBe(recorded.filter(l => l.kind === 'CALL' && l.role === 'initial' && l.caseId === c.id && beforeV13.has(l.runId)).at(-1)!.promptSha256);
 		}
 	}, 120_000);
 	it('Y05 the recast pair differs only at its id, production marks, and the marked heading clause', async () => {
