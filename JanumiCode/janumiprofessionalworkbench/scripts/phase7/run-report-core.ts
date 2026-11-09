@@ -211,6 +211,8 @@ export const NEGATIVE_CONTROL_RESERVE = PHASE7_NEGATIVE_CONTROL_RESERVE;
  * its rounds having run inside the Send press" — the contradiction `P6X-L-M31` was added to remove. ⭐ SO THE CAVEAT IS THE
  * RECORD'S (`limitCaveatOf`): this one where the run's Send check counted the allowance, or the run recorded no Send check; else
  * the Send clause the lane made before D20 was true of, stated with that run's own count. The parts below are the caveat's three:
+ * ⭐⭐ Package L3 — D55 (`REG-D-148`): ~~raising REG-D-131’s~~ the sponsor's limit is now `REG-D-148`'s, "about 4,600",
+ * raising `REG-D-135` (4)'s; the whole-press rule the caveat cites stays `REG-D-135` (4)'s.
  * the count before each press (`LIMIT_CAVEAT_COUNT`), Send's (`LIMIT_CAVEAT_SEND`), and the lower bound
  * (`LIMIT_CAVEAT_LOWER_BOUND`).
  */
@@ -219,7 +221,7 @@ export const LIMIT_CAVEAT_COUNT =
 	`(${LANE_BUDGET.tries} tries + ${PHASE7_REVIEWED_COMMANDS} command runs) × ${LANE_BUDGET.reviewerCallsPerTry}, its other presses each ` +
 	`theirs — with the negative control’s ${NEGATIVE_CONTROL_RESERVE} held back, and presses nothing that would pass the limit by that ` +
 	`count (REG-D-135 (4); the sponsor’s limit is ` +
-	`"about ${PAID_LIMIT.toLocaleString('en-US')}", raising REG-D-131’s). `;
+	`"about ${PAID_LIMIT.toLocaleString('en-US')}", REG-D-148, raising REG-D-135 (4)’s). `;
 /** ⭐ D20 — Send's press, bounded by the allowance the lane hands the authoring review: a run's whose Send check counted it. */
 export const LIMIT_CAVEAT_SEND =
 	`Send’s press is bounded by the allowance the lane hands ` +

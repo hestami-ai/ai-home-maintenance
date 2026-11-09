@@ -159,10 +159,11 @@ test.describe('Phase 7 half B — the turn, accepted, published and run, through
 		// allowance the lane hands the authoring review counted — the limit less none spent before and the negative control's 4,
 		// so the check reaches the limit. ⚠ This gate's server is handed no allowance (`playwright.config.ts`): the lane's count is
 		// rehearsed here, the server's bound in `floor-allowance.test.ts` and `authoring-route-allowance.test.ts`.
+		// ⭐⭐ Package L3 — D55 (`REG-D-148`): ~~2400~~ the limit is now 4,600, which the check reaches exactly.
 		expect(a.limitCheck, 'the limit before Send').toMatchObject({
 			prior: 0,
 			ahead: phase7AuthoringReviewAllowance(0),
-			total: 2400,
+			total: 4600,
 			allowed: true
 		});
 		expect(a.floor.map((f) => f.state), 'the authoring floor, as the turn’s fork held it').toEqual([

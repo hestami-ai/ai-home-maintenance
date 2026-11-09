@@ -718,8 +718,13 @@ export const PHASE7_TEST_TIMEOUT_MS =
  * reviewer call (`src/lib/server/assurance/review-allowance.ts`), so its press cannot spend past what was counted. So the rule
  * bounds the recorded reviewer exchanges, a lower bound when a capture faults (`scripts/phase7/run-report-core.ts`,
  * `LIMIT_CAVEAT`).
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L3 — D55 (2026-11-09) — ~~2400~~ 4600: the sponsor chose *"About 4,600
+ * (Recommended)"*, whose text read *"Covers P6 again's high estimate (3,324 + about 1,030 + 214). The limit would stop P6
+ * again only if it ran past its high estimate."* (`REG-D-148`), and its meaning reads *"The limit becomes about 4,600,
+ * raising `REG-D-135` (4)'s about 2,400."* — held as the number the ruling's meaning states, without its thousands comma.
+ * What each check counts (D16) and the allowance's rule (D20) are unchanged.
  */
-export const PHASE7_PAID_LIMIT = 2400;
+export const PHASE7_PAID_LIMIT = 4600;
 
 /** ⭐ D8 — the reviewer calls held back for the negative control (P7-4e): its own cap (`negative-control.ts`). */
 export const PHASE7_NEGATIVE_CONTROL_RESERVE = 4;
@@ -875,7 +880,8 @@ export const AUTHORING_REVIEW_ALLOWANCE_VARIABLE = 'JPWB_AUTHORING_REVIEW_ALLOWA
 
 /**
  * ⭐ D20 — THE ALLOWANCE A PAID HALF-B RUN HANDS ITS AUTHORING REVIEW: what the limit leaves after the calls spent before the run
- * and the negative control's reserve — 2,400 − 1,117 − 4 = 1,279 at P6 again's planned spend — and never below none. Nothing is
+ * and the negative control's reserve — ~~2,400 − 1,117 − 4 = 1,279 at P6 again's planned spend~~ 4,600 − 3,324 − 4 =
+ * 1,272 at P6 again's measured prior spend (D55) — and never below none. Nothing is
  * recorded in the run before Send, which half B presses first, so the calls recorded are counted by Send's check itself.
  */
 export function phase7AuthoringReviewAllowance(prior: number): number {

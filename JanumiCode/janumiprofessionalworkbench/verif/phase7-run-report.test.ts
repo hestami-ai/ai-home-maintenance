@@ -2616,7 +2616,7 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 		const caveat =
 			'The lane counts each press’s whole worst case before it — a model unit’s press 210 reviewer calls, (3 tries + 32 ' +
 			'command runs) × 6, its other presses each theirs — with the negative control’s 4 held back, and presses nothing that ' +
-			'would pass the limit by that count (REG-D-135 (4); the sponsor’s limit is "about 2,400", raising REG-D-131’s). Send’s ' +
+			'would pass the limit by that count (REG-D-135 (4); the sponsor’s limit is "about 4,600", REG-D-148, raising REG-D-135 (4)’s). Send’s ' +
 			'press is bounded by the allowance the lane hands the authoring review — the limit less the calls spent before the run ' +
 			'and the negative control’s 4, which Send’s check counts — for every round of the authoring floor reserves its worst ' +
 			'case, its types × 6, against that allowance before its first reviewer call, and a round that would pass what is left ' +
@@ -2700,6 +2700,8 @@ describe('JAN-EXEC P7-2 D9 — the stage matrix (§1)', () => {
 		);
 		expect(r.reviewerCalls.limitCaveat, 'the caveat is not the one true of the run’s lane').toBe(ONE_TRY_CAVEAT + LIMIT_CAVEAT_LOWER_BOUND);
 		expect(r.reviewerCalls.limitCaveat).not.toContain('about 2,400');
+		// ⭐⭐ Package L3 — D55 (`REG-D-148`): nor today's limit, about 4,600.
+		expect(r.reviewerCalls.limitCaveat).not.toContain('about 4,600');
 	});
 
 	it('⭑ CONTROL — a record of today’s lane, its checks against 2400 counting each press’s whole worst case, reports its own limit and today’s caveat', () => {

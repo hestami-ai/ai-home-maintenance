@@ -1220,12 +1220,13 @@ describe('⭐ C1, C3 — the lane’s half, and half B’s author, at boot', () 
 		});
 		// ⛔ MOVED 2026-10-26 (`JAN-EXEC` Phase 7, package O; design D26) — ~~`serverEnv: { JPWB_DEMO_DB: store }` for half B~~: the config
 		// hands a paid half-B run's server the authoring review's allowance (`phase7AuthoringReviewAllowanceEnv`), and the boot now
-		// refuses one handed otherwise — so the half-B boots here are handed what the config hands, 2,400 − 0 − 4 = 2,396.
+		// refuses one handed otherwise — so the half-B boots here are handed what the config hands, ~~2,400 − 0 − 4 = 2,396~~ 4,600 − 0 − 4 = 4,596
+		// (`REG-D-148`; D55).
 		const boot = (env: Record<string, string>) =>
 			bootOf({
 				paid: true,
 				env: { ...ADMITTED, JPWB_PHASE7_PRIOR_REVIEWER_CALLS: '0', ...env },
-				serverEnv: { JPWB_DEMO_DB: store, ...(env.JPWB_PHASE7_HALF === 'B' ? { [AUTHORING_REVIEW_ALLOWANCE_VARIABLE]: '2396' } : {}) },
+				serverEnv: { JPWB_DEMO_DB: store, ...(env.JPWB_PHASE7_HALF === 'B' ? { [AUTHORING_REVIEW_ALLOWANCE_VARIABLE]: '4596' } : {}) },
 				store,
 				run: ready
 			});
@@ -1259,19 +1260,19 @@ describe('⭐ C1, C3 — the lane’s half, and half B’s author, at boot', () 
 				store,
 				run: ready
 			});
-		// ⭑ CONTROL — the computed allowance, 2,400 − 1,117 − 4 = 1,279: recorded, and nothing refused.
-		const clean = await handed('1279');
-		expect([clean.refusals, clean.record.overlay[AUTHORING_REVIEW_ALLOWANCE_VARIABLE]]).toEqual([[], '1279']);
+		// ⭑ CONTROL — the computed allowance, ~~2,400 − 1,117 − 4 = 1,279~~ 4,600 − 1,117 − 4 = 3,479 (D55): recorded, and nothing refused.
+		const clean = await handed('3479');
+		expect([clean.refusals, clean.record.overlay[AUTHORING_REVIEW_ALLOWANCE_VARIABLE]]).toEqual([[], '3479']);
 		const other = await handed('2396');
 		expect(other.record.overlay[AUTHORING_REVIEW_ALLOWANCE_VARIABLE], 'the boot record does not say what the server was handed').toBe('2396');
 		expect(other.refusals, 'a paid half-B server handed another allowance than the computed one was booted').toEqual([
-			`the server was handed ${AUTHORING_REVIEW_ALLOWANCE_VARIABLE}="2396", not the 1279 this paid half-B run computes — the ` +
+			`the server was handed ${AUTHORING_REVIEW_ALLOWANCE_VARIABLE}="2396", not the 3479 this paid half-B run computes — the ` +
 				`limit of ${PHASE7_PAID_LIMIT} less the 1117 calls spent before the run and the negative control’s 4 (REG-F-580; ` +
 				'design D20, D26): Send’s check counts the computed allowance, so a server handed another would bound the authoring ' +
 				'review by a figure that check never counted'
 		]);
 		expect((await handed(undefined)).refusals, 'a paid half-B server handed no allowance was booted').toEqual([
-			`the server was handed no ${AUTHORING_REVIEW_ALLOWANCE_VARIABLE}, not the 1279 this paid half-B run computes — the ` +
+			`the server was handed no ${AUTHORING_REVIEW_ALLOWANCE_VARIABLE}, not the 3479 this paid half-B run computes — the ` +
 				`limit of ${PHASE7_PAID_LIMIT} less the 1117 calls spent before the run and the negative control’s 4 (REG-F-580; ` +
 				'design D20, D26): Send’s check counts the computed allowance, so a server handed another would bound the authoring ' +
 				'review by a figure that check never counted'
@@ -2237,7 +2238,7 @@ describe('⛔ REG-D-112 (E3’s review, 2) — the LIMIT is checked before Send 
 	const FLOOR_WORST = phase7AuthoringReviewerCalls(SIXTEEN);
 	/** ⭐ Package L2 — D20 — what Send's check says it counted, restated: the allowance the lane hands the authoring review. */
 	const COUNTED_ALLOWANCE = 'the allowance the lane hands the authoring review, which no round of its floor may pass';
-	/** ⭐ D20 — the calls spent before P6 again, as planned (design D20): 2,400 − 1,117 − 4 = 1,279 handed over. */
+	/** ⭐ D20 — the calls spent before P6 again, as planned (design D20): ~~2,400 − 1,117 − 4 = 1,279~~ 4,600 − 1,117 − 4 = 3,479 handed over (`REG-D-148`; D55; P6 again's measured prior is 3,324). */
 	const PLANNED_PRIOR = 1117;
 	/**
 	 * ~~A model unit's worst case, as its allowance counts it: each try's review, and each reviewed command's — 140.~~ ~~⭐
@@ -2261,7 +2262,7 @@ describe('⛔ REG-D-112 (E3’s review, 2) — the LIMIT is checked before Send 
 	// ⛔ PREDICTED RED, read from the code at 59135143: the check counted 192, so 1,117 + 1 + 4 + 192 = 1,314 let Send through.
 	it('⭐ the allowance it hands over, with the calls already recorded, past the limit: half B refuses BEFORE SEND — nothing sent, the run ends paid-limit, the check kept', async () => {
 		const allowance = phase7AuthoringReviewAllowance(PLANNED_PRIOR);
-		expect(allowance, 'arrangement: the allowance handed over at P6 again’s planned spend').toBe(1279);
+		expect(allowance, 'arrangement: the allowance handed over at P6 again’s planned spend').toBe(3479);
 		const l = halfBLane({ paid: true, prior: PLANNED_PRIOR, recordedBeforeSend: 1 });
 		const record = await l.run();
 		expect(l.only('author.send', 'beginExecute'), 'Send was pressed past the limit').toEqual([]);

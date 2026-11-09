@@ -1066,7 +1066,12 @@ describe('⭐ P7-2 D4 — the Phase 7 lane waits an ALLOWANCE derived from the b
 	// label must name the same; ~~REG-D-131 Q37's chosen label, "Raise to about 1,000 (Recommended)"~~ — superseded: 1,001 of its
 	// about 1,000 were spent at run-12 (Q44's question). ⭑ And the same item states what each press now counts: a model unit's
 	// press 210, `(3 tries + 32 kept command runs) reviews × 6 calls` — the lane's `PHASE7_UNIT_REVIEWER_CALLS`, held to it here.
-	it('⭐ D8 — the paid limit is the sponsor’s, read from the ruling in force, ~~REG-D-131 Q37~~ REG-D-135 (4), which raises REG-D-131’s; and the whole press it counts, 210, is the ruling’s', () => {
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L3 — D55 (2026-11-09) — THE RULING IN FORCE IS NOW `REG-D-148`, which raises
+	// `REG-D-135` (4)'s limit: the sponsor chose *"About 4,600 (Recommended)"*, and its MEANING item (1) says *"The
+	// limit becomes about 4,600, raising `REG-D-135` (4)'s about 2,400."* The number, the chosen label and the whole
+	// press are read from that item; ~~`REG-D-135` (4)~~ — superseded: D53 left 3,324 spent of its about 2,400
+	// (`REG-D-148`'s question).
+	it('⭐ D8 — the paid limit is the sponsor’s, read from the ruling in force, ~~REG-D-131 Q37~~ ~~REG-D-135 (4), which raises REG-D-131’s~~ REG-D-148 (1), which raises REG-D-135 (4)’s; and the whole press it counts, 210, is the ruling’s', () => {
 		const register = readFileSync(REGISTER, 'utf8');
 		const entry = (id: string) => {
 			const at = register.indexOf(`### ${id} `);
@@ -1075,22 +1080,22 @@ describe('⭐ P7-2 D4 — the Phase 7 lane waits an ALLOWANCE derived from the b
 			return register.slice(at, next === -1 ? undefined : next);
 		};
 		expect(entry('REG-D-110'), 'REG-D-110 does not amend REG-D-102 (4)').toContain('(`REG-D-102` (4) amended)');
-		const ruling = entry('REG-D-135');
+		const ruling = entry('REG-D-148');
 		const meaning = ruling.split('\n- ').find((item) => item.startsWith('**MEANING.**'));
-		expect(meaning, 'REG-D-135 records no MEANING').toBeDefined();
-		const four = meaning!.split('\n  ').find((line) => line.startsWith('4. '));
-		expect(four, 'REG-D-135’s MEANING has no item (4)').toBeDefined();
-		// ⭑ The item writes its number with a thousands comma, "2,400": read as written, then parsed without the comma.
-		const stated = /^4\. The limit becomes about (\d{1,3}(?:,\d{3})*), raising `REG-D-131`'s about 1,000\./.exec(four!)?.[1];
-		expect(stated, 'REG-D-135 (4) states no limit raising REG-D-131’s').toBeDefined();
-		expect(PHASE7_PAID_LIMIT, 'the lane’s limit is not the one REG-D-135 (4) states').toBe(Number(stated!.replaceAll(',', '')));
-		// ⭐ And the label the sponsor chose (Q44) names the same number.
-		expect(ruling, 'the label the sponsor chose in REG-D-135 Q44 does not name that limit').toContain(
+		expect(meaning, 'REG-D-148 records no MEANING').toBeDefined();
+		const one = meaning!.split('\n  ').find((line) => line.startsWith('1. '));
+		expect(one, 'REG-D-148’s MEANING has no item (1)').toBeDefined();
+		// ⭑ The item writes its number with a thousands comma, ~~"2,400"~~ "4,600": read as written, then parsed without the comma.
+		const stated = /^1\. The limit becomes about (\d{1,3}(?:,\d{3})*), raising `REG-D-135` \(4\)'s about 2,400\./.exec(one!)?.[1];
+		expect(stated, 'REG-D-148 (1) states no limit raising REG-D-135 (4)’s').toBeDefined();
+		expect(PHASE7_PAID_LIMIT, 'the lane’s limit is not the one REG-D-148 (1) states').toBe(Number(stated!.replaceAll(',', '')));
+		// ⭐ And the label the sponsor chose (~~Q44~~ `REG-D-148`) names the same number.
+		expect(ruling, 'the label the sponsor chose in REG-D-148 does not name that limit').toContain(
 			`The sponsor chose *"About ${stated} (Recommended)"*`
 		);
 		// ⭐ D16 — the whole press the item says a model unit's press counts is the lane's.
-		const press = /A model unit's press counts (\d+): \((\d+) tries \+ (\d+) kept command runs\) reviews × (\d+) calls\./.exec(four!);
-		expect(press, 'REG-D-135 (4) states no whole press').not.toBeNull();
+		const press = /A model unit's press counts (\d+): \((\d+) tries \+ (\d+) kept command runs\) reviews × (\d+) calls\./.exec(one!);
+		expect(press, 'REG-D-148 (1) states no whole press').not.toBeNull();
 		expect([PHASE7_UNIT_REVIEWER_CALLS, LANE_BUDGET.tries, PHASE7_REVIEWED_COMMANDS, LANE_BUDGET.reviewerCallsPerTry]).toEqual(
 			press!.slice(1).map(Number)
 		);

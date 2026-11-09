@@ -93,8 +93,9 @@ import { STORE_FILE } from './run-folder';
 //      delegated decision of 2026-10-16, registered as REG-D-114 (14)) the sponsor's limit — ~~150~~ ~~200 (`REG-D-105`
 //      (1))~~ ~~⭐ 450 (`REG-D-110` (1))~~ ~~⭐ 600 (`REG-D-117` Q10, raising `REG-D-110` (1)'s)~~ ~~⭐ 650 (`REG-D-120` Q15,
 //      raising `REG-D-110` (1)'s)~~ ~~⭐ 800 (`REG-D-123` Q26, raising `REG-D-110` (1)'s)~~ ~~⭐ 900 (`REG-D-126` Q32, raising
-//      `REG-D-110` (1)'s)~~ ~~⭐ 1000 (`REG-D-131` Q37, raising `REG-D-110` (1)'s)~~ ⭐ 2400 (`REG-D-135` (4), raising
-//      `REG-D-131`'s; package L, D17), `lane-config.ts`'s
+//      `REG-D-110` (1)'s)~~ ~~⭐ 1000 (`REG-D-131` Q37, raising `REG-D-110` (1)'s)~~ ~~⭐ 2400 (`REG-D-135` (4), raising
+//      `REG-D-131`'s; package L, D17)~~ ⭐ 4600 (`REG-D-148`, raising `REG-D-135` (4)'s; package L3, D55),
+//      `lane-config.ts`'s
 //      `PHASE7_PAID_LIMIT` — or the run ends `paid-limit`. Each press waits on its own
 //      response for up to one phase's allowance (D4); one with NO ANSWER — it outlasted that allowance, or its request
 //      failed in transit — ends the run there, `allowance-exceeded` or `request-failed`, the root's included, and

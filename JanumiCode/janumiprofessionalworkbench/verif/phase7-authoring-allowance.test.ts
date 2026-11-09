@@ -64,12 +64,13 @@ describe('⭐ L2 — the lane restates the product, and is held to it', () => {
 describe('⭐⭐ L2 — D20: a paid half-B run’s server is booted with the allowance; the dry run and half A are handed none', () => {
 	// ⛔ PREDICTED RED, read from the code at 59135143: the config lays no allowance over the server — so the authoring floor
 	// inside Send has no bound, and Send's check counts an estimate (`REG-F-580`).
-	it('⛔ RED — the allowance is the limit less the calls spent before the run and the negative control’s 4: 2,400 − 1,117 − 4 = 1,279 at P6 again’s planned spend', () => {
-		expect([PHASE7_PAID_LIMIT, PHASE7_NEGATIVE_CONTROL_RESERVE]).toEqual([2400, 4]);
-		expect(phase7AuthoringReviewAllowanceEnv(paidHalfB('1117'))).toEqual({ [AUTHORING_REVIEW_ALLOWANCE_VARIABLE]: '1279' });
-		expect(phase7AuthoringReviewAllowanceEnv(paidHalfB('0'))).toEqual({ [AUTHORING_REVIEW_ALLOWANCE_VARIABLE]: '2396' });
-		expect(phase7AuthoringReviewAllowanceEnv(paidHalfB(' 12 '))).toEqual({ [AUTHORING_REVIEW_ALLOWANCE_VARIABLE]: '2384' });
-		expect([1117, 0, 2396, 2397, 5000].map(phase7AuthoringReviewAllowance), 'never below none').toEqual([1279, 2396, 0, 0, 0]);
+	// ⭐⭐ Package L3 — D55 (`REG-D-148`): the limit is now 4,600, and the prior is P6 again's measured 3,324.
+	it('⛔ RED — the allowance is the limit less the calls spent before the run and the negative control’s 4: ~~2,400 − 1,117 − 4 = 1,279 at P6 again’s planned spend~~ 4,600 − 3,324 − 4 = 1,272 at P6 again’s measured prior spend (D55)', () => {
+		expect([PHASE7_PAID_LIMIT, PHASE7_NEGATIVE_CONTROL_RESERVE]).toEqual([4600, 4]);
+		expect(phase7AuthoringReviewAllowanceEnv(paidHalfB('3324'))).toEqual({ [AUTHORING_REVIEW_ALLOWANCE_VARIABLE]: '1272' });
+		expect(phase7AuthoringReviewAllowanceEnv(paidHalfB('0'))).toEqual({ [AUTHORING_REVIEW_ALLOWANCE_VARIABLE]: '4596' });
+		expect(phase7AuthoringReviewAllowanceEnv(paidHalfB(' 12 '))).toEqual({ [AUTHORING_REVIEW_ALLOWANCE_VARIABLE]: '4584' });
+		expect([3324, 0, 4596, 4597, 5000].map(phase7AuthoringReviewAllowance), 'never below none').toEqual([1272, 4596, 0, 0, 0]);
 	});
 
 	it('⛔ RED — a prior the spec cannot read hands an allowance of none, fail-closed — and the spec’s boot refuses that run before any press', () => {
