@@ -34,6 +34,7 @@ import {
 	LANE_BUDGET,
 	laneKeysRefusal,
 	NODE_TIMER_CEILING_MS,
+	PHASE7_TIMEOUT_CEILING_MS,
 	phase7Half,
 	phase7AuthoringAllowanceMs,
 	phase7AuthoringMs,
@@ -1373,17 +1374,26 @@ describe('⭐ C3 — the authoring allowance, folded into the timeout', () => {
 			[16, 6]
 		] as const)
 			expect([
-				phase7HalfBTestTimeoutMs(units(first - 1), parts) < NODE_TIMER_CEILING_MS,
+				// ⛔ MOVED 2026-11-10 (`JAN-EXEC` Phase 7, package L6 — design D60; `REG-F-622`): ~~`NODE_TIMER_CEILING_MS`~~ the cap
+				// one second under it, `PHASE7_TIMEOUT_CEILING_MS`, so that the timer Playwright arms at the cap fits Node's ceiling.
+				phase7HalfBTestTimeoutMs(units(first - 1), parts) < PHASE7_TIMEOUT_CEILING_MS,
 				phase7HalfBTestTimeoutMs(units(first), parts)
-			]).toEqual([true, NODE_TIMER_CEILING_MS]);
+			]).toEqual([true, PHASE7_TIMEOUT_CEILING_MS]);
 		// ⛔ MOVED 2026-11-07 (`JAN-EXEC` Phase 7, package Z3 — D51's Time bullet; design §12.3): ~~`units(7)` less `units(6)`~~ — both now at the
 		// ceiling; one phase more, below it.
 		expect(phase7HalfBTestTimeoutMs(units(5), 1) - phase7HalfBTestTimeoutMs(units(4), 1)).toBe(PHASE7_PER_PHASE_MS);
 		expect(phase7HalfBTestTimeoutMs(units(1), 1)).toBe(
 			PHASE7_TEST_TIMEOUT_MS - 3 * PHASE7_PER_PHASE_MS + phase7AuthoringMs(1)
 		);
-		expect(phase7HalfBTestTimeoutMs(units(40), 1)).toBe(NODE_TIMER_CEILING_MS);
+		// ⛔ MOVED 2026-11-10 (package L6 — D60): ~~`toBe(NODE_TIMER_CEILING_MS)`~~ the cap one second under it.
+		expect(phase7HalfBTestTimeoutMs(units(40), 1)).toBe(PHASE7_TIMEOUT_CEILING_MS);
 		expect(NODE_TIMER_CEILING_MS).toBe(2_147_483_647);
+		// ⭐⭐ `JAN-EXEC` Phase 7, package L6 — design D60 (`REG-F-622`): the timer Playwright arms for a fresh slot, its remaining time
+		// + 1 ms (`workerProcessEntry.js`), fits Node's ceiling at every timeout the lane sets. ⛔ PREDICTED RED: at HEAD the cap was the
+		// ceiling itself, so a fresh after-hooks slot armed 2,147,483,648 and fired at once (P6 again's second run).
+		for (const set of [phase7HalfBTestTimeoutMs(units(40), 1), phase7HalfBAuthoringTimeoutMs(2_000), PHASE7_TEST_TIMEOUT_MS])
+			expect(set + 1, 'a fresh slot’s timer at this timeout passes Node’s ceiling').toBeLessThanOrEqual(NODE_TIMER_CEILING_MS);
+		expect(PHASE7_TIMEOUT_CEILING_MS).toBe(NODE_TIMER_CEILING_MS - 1_000);
 		// ⭐ Each unit's sign-off re-counted for its own policies: one more policy, two more reviews — Record Assurance's, and the
 		// rule's one re-run of them — at ~~four~~ six calls of ~~240 s~~ 480 s each (package L, D13; package X, D35).
 		expect(phase7HalfBTestTimeoutMs([4, 5, 4, 4, 4], 1) - phase7HalfBTestTimeoutMs(units(4), 1)).toBe(2 * REVIEW_MS);
@@ -1392,7 +1402,8 @@ describe('⭐ C3 — the authoring allowance, folded into the timeout', () => {
 			PHASE7_TEST_TIMEOUT_MS + phase7AuthoringMs(1),
 			PHASE7_TEST_TIMEOUT_MS + phase7AuthoringMs(16)
 		]);
-		expect(phase7HalfBAuthoringTimeoutMs(2_000)).toBe(NODE_TIMER_CEILING_MS);
+		// ⛔ MOVED 2026-11-10 (package L6 — D60): ~~`toBe(NODE_TIMER_CEILING_MS)`~~ the cap one second under it.
+		expect(phase7HalfBAuthoringTimeoutMs(2_000)).toBe(PHASE7_TIMEOUT_CEILING_MS);
 	});
 
 	it('⭐ the lane extends the test’s timeout when its turn stages more than one part’s allowance holds, and when the units are read, by ~~the agent’s phase count~~ ⭐ each of the agent’s units’ declared policies, the root’s first, and the parts its turn staged', async () => {

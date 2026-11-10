@@ -1028,6 +1028,14 @@ export const PHASE7_PER_PHASE_MS =
 export const NODE_TIMER_CEILING_MS = 2_147_483_647;
 
 /**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L6 — design D60 (`REG-F-622`) — THE CAP HALF B'S TIMEOUT TAKES: one second under Node's timer ceiling.
+ * Playwright 1.61.1 arms a slot's timer at its remaining time + 1 ms, and its after-hooks stage a fresh slot at the test's whole
+ * timeout (`node_modules/playwright/lib/worker/workerProcessEntry.js`), so a cap AT the ceiling armed 2,147,483,647.996: past it, and
+ * Node fired it at once, reporting a run whose lane had ended as timed out. ⛔ It capped at `NODE_TIMER_CEILING_MS`.
+ */
+export const PHASE7_TIMEOUT_CEILING_MS = NODE_TIMER_CEILING_MS - 1_000;
+
+/**
  * ⭐⭐ C3 — HALF B'S TIMEOUT, ONCE ITS UNITS ARE READ (C2: the PWA is the agent's, so its phases are as many as it made):
  * half A's, re-counted for `phases` phases in place of §3.2's four, plus the authoring's share — for four phases,
  * ~~372,240 s + 5,585 s = 377,825 s~~ ~~⭐ 419,640 s + 5,585 s = 425,225 s~~ ~~⭐ package L, D13: 590,040 s + 6,545 s = 596,585 s~~ ⭐ package X, D35 (devin’s bound 480 s): 1,101,240 s + 9,425 s = 1,110,665 s,
@@ -1060,7 +1068,7 @@ export function phase7HalfBTestTimeoutMs(declared: readonly number[], parts: num
 	const phases = declared.length - 1;
 	const signOffs = declared.reduce((ms, policies) => ms + phase7SignOffUnitMs(policies) - PHASE7_SIGN_OFF_UNIT_MS, 0);
 	return Math.min(
-		NODE_TIMER_CEILING_MS,
+		PHASE7_TIMEOUT_CEILING_MS,
 		PHASE7_TEST_TIMEOUT_MS + (phases - PHASE7_MODEL_UNITS) * PHASE7_PER_PHASE_MS + signOffs + phase7AuthoringMs(parts)
 	);
 }
@@ -1074,5 +1082,5 @@ export function phase7HalfBTestTimeoutMs(declared: readonly number[], parts: num
  * A's timeout.
  */
 export function phase7HalfBAuthoringTimeoutMs(parts: number): number {
-	return Math.min(NODE_TIMER_CEILING_MS, PHASE7_TEST_TIMEOUT_MS + phase7AuthoringMs(parts));
+	return Math.min(PHASE7_TIMEOUT_CEILING_MS, PHASE7_TEST_TIMEOUT_MS + phase7AuthoringMs(parts));
 }

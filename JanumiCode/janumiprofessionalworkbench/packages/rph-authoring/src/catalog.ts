@@ -94,10 +94,16 @@ export const PWU_TYPE_HELP = {
 		'Whether this template is ARMED. A DRAFT template is authored text and renders nothing — the step that ' +
 		'would use it is refused. ACTIVE is the instruction the model is actually given. A type must declare ' +
 		'MODEL to arm one: the engine refuses an ACTIVE template on work discharged any other way.',
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L6 — design D58 (`REG-D-150` (1); `REG-F-621`): ~~"so changing it changes the work — but
+	// nothing compares the answer back against it. Contract conformance is not machine-checked today."~~ True of the text, and
+	// silent that the work-product check reads every answer as JSON and refuses one it cannot read (`work-product-floor.ts`):
+	// so the author is told to ask for one JSON object. Conformance to the text stays unchecked, and the admission says so (EG-06).
 	promptOutputContract:
 		'What a usable answer looks like. This text is APPENDED VERBATIM to the instruction the model receives, ' +
-		'so changing it changes the work — but nothing compares the answer back against it. Contract conformance ' +
-		'is not machine-checked today.',
+		'so changing it changes the work. Ask for exactly one JSON object: the work-product check reads the answer ' +
+		'as JSON and refuses one it cannot read, so carry a document inside it as text. Beyond that form, nothing ' +
+		'compares the answer back against this text: whether the answer conforms is the reviewer\'s judgement, not ' +
+		'machine-checked.',
 	boundaryApplicabilityNote:
 		'For a DELEGATED_EXTERNAL type: free-text scope/condition of the delegation (e.g. "STAT panels only; routine handled internally"). Optional.'
 } as const;

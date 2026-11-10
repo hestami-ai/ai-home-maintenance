@@ -28,6 +28,7 @@ import { splitAnswerSpan } from '../assurance/agy-cli.js';
 import { workProductReviewInput } from '../assurance/review-input.js';
 import type { IndicationsSource } from '../assurance/reasoning-review-validator.js';
 import { runFloorOverSubject, type FloorRunOutcome } from './floor-over-subject.js';
+import { WORK_PRODUCT_NOT_PARSEABLE } from '../floor.js';
 
 /** What this module needs about the artifact and the call that produced it. Structural, so a test can drive it. */
 export interface WorkProductSubject {
@@ -113,7 +114,8 @@ export function workProductFloorFacts(
 	return verifyExchangeContent(subject.exchange, store).then((report) => ({
 		schemaInvariant: {
 			schemaValid: parseable,
-			invariantViolations: parseable ? [] : ['WORK_PRODUCT_NOT_PARSEABLE']
+			// ⭐⭐ Package L6 — D59 — the code the classifier keys on, spelled once (`floor.ts`).
+			invariantViolations: parseable ? [] : [WORK_PRODUCT_NOT_PARSEABLE]
 		},
 		identityProvenance: {
 			hasStableId: Boolean(subject.artifactId),

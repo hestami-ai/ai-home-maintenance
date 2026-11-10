@@ -102,6 +102,17 @@ describe('buildSystemPrompt authoring-backbone boundaries', () => {
 		expect(howToWork).toContain('decide it, with edit_pwu_type, for every type you copy');
 	});
 
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L6 — design D58 (`REG-D-150` (1); `REG-F-621`): a MODEL type's work product is read as JSON, so
+	// the author is told to ask for exactly one JSON object, a document carried inside it as text. ⛔ PREDICTED RED: at HEAD nothing
+	// in the prompt says so, and P6 again's second run's author asked for Markdown on 3 of its 9 types.
+	it('⭐⭐ L6 (D58) — HOW TO WORK tells the author a MODEL type’s output contract asks for exactly one JSON object, a document carried inside it as text', () => {
+		const prompt = buildSystemPrompt({ id: 'PWA-TEST', name: 'Test PWA', domain: 'testing', publicationStatus: 'DRAFT' });
+		const howToWork = prompt.slice(prompt.indexOf('HOW TO WORK'), prompt.indexOf('GOVERNANCE'));
+		expect(howToWork).toContain('Its output contract (promptOutputContract) must ask for exactly ONE JSON object');
+		expect(howToWork).toContain('the work-product check reads the work product as JSON and refuses one it cannot read');
+		expect(howToWork).toContain('so carry a document inside that object as text');
+	});
+
 	// ⭐ `REG-F-507` remedy 2 (`DESIGN-phase-7-completion.md` §4a E2): the instructions name the markers a work unit
 	// supplies, read from the one render map, as the shared help names them.
 	it('⭐ HOW TO WORK names the markers a work unit supplies — {subject}, {title}, {description} and {purpose} — and no other', () => {

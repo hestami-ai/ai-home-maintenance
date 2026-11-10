@@ -213,6 +213,18 @@ describe('EG-06 — the PWU Type form admits what it does not enforce', () => {
 			);
 	});
 
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L6 — design D58 (`REG-D-150` (1); `REG-F-621`): the output contract's help says the one thing the
+	// workbench DOES check of an answer, its form, beside the admission above, which stays true of conformance. ⛔ PREDICTED RED: at
+	// HEAD it said "nothing compares the answer back against it" and nothing of the work-product check, which reads every answer
+	// as JSON — so a live author asked for Markdown, and the check refused it (P6 again's second run).
+	it('⭐⭐ L6 (D58) — the output contract’s help asks for exactly one JSON object, which the work-product check reads, and still admits conformance is unchecked', () => {
+		const help = HELP.promptOutputContract ?? '';
+		expect(help).toMatch(/Ask for exactly one JSON object/);
+		expect(help).toMatch(/the work-product check reads the answer as JSON and refuses one it cannot read/);
+		expect(help).toMatch(/carry a document inside it as text/);
+		expect(help, 'the admission kept: conformance to the text is not machine-checked').toMatch(/not machine-checked/);
+	});
+
 	it('⛔ the PWU Type form single-sources ALL its help — no form carries two vocabularies for one thing', () => {
 		// ⚠ MEASURED, NOT FEARED: three of these fifteen were INLINE LITERALS in the markup while their twelve
 		// siblings came from the catalog — and those three were exactly the ones the agent's tool schema cannot

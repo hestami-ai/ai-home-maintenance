@@ -41,6 +41,8 @@ const seam = vi.hoisted(() => ({
 	script: (() => ({ acts: [], account: 'An account.' })) as (turn: number) => {
 		readonly acts: readonly TurnAct[];
 		readonly account: string;
+		/** ⭐⭐ Package L6 — D59 — the turn's work product, when a case scripts one; else `{ done: 'turn N' }`, as before. */
+		readonly workProduct?: unknown;
 	},
 	/** One in-memory workspace per Undertaking, held across requests. */
 	workspaces: new Map<string, unknown>(),
@@ -156,7 +158,7 @@ vi.mock('./model.js', async (importOriginal) => {
 			return {
 				turn: async (text: string) => {
 					seam.turns.push(text);
-					const { acts, account } = seam.script(seam.turns.length);
+					const { acts, account, workProduct } = seam.script(seam.turns.length);
 					for (const act of acts) {
 						if ('write' in act) {
 							const out = await context.workspace.writeFile(act.write.path, act.write.contents);
@@ -183,7 +185,7 @@ vi.mock('./model.js', async (importOriginal) => {
 							} as never);
 					}
 					return JSON.stringify({
-						workProduct: { done: `turn ${seam.turns.length}` },
+						workProduct: workProduct ?? { done: `turn ${seam.turns.length}` },
 						rationale: { rationale: account, assumptions: [], limitations: [], residualUncertainty: [] }
 					});
 				},
@@ -1361,5 +1363,52 @@ describe('⭐⭐ package O-2’s check, finding 2 — the re-review of a WORK RE
 		expect(reReview, 'a first step’s re-review moved from today’s subject').toContain(FIRST_STEP_SUBJECT_FILES);
 		expect(reReview!.split('\n'), 'a first step’s re-review moved from today’s heading').toContain(firstStepHeading(1));
 		for (const words of RERUN_WORDS) expect(reReview, `a first step’s re-review reads the re-run’s words: ${words}`).not.toContain(words);
+	});
+});
+
+// ⭐⭐ `JAN-EXEC` Phase 7, package L6 — design D59 (`REG-D-150` (3); `REG-D-059`; `REG-F-515`; `REG-F-621`) — THROUGH THE PAGE'S OWN
+// ACTIONS: a work product the check cannot read as JSON goes back to the model with the check's findings, within the loop and on a
+// person's re-run, as P6 again's second run needed.
+describe('⭐⭐ package L6 — D59: a work product the check cannot read as JSON goes back to the model', () => {
+	/** A Markdown document like P6 again's: headings, and a code block opened `text`, with no JSON in it. */
+	const MARKDOWN = '# Requirements\n\n## Invocation\n\n```text\nwordfreq [options] [file]\n```\n';
+	const FINDING = 'WORK_PRODUCT_NOT_PARSEABLE: The work product could not be read as JSON, so the work-product check refused it.';
+
+	it('⛔ THE PREDICTED RED — try 1’s Markdown goes back with the check’s findings, and try 2’s one JSON object completes the step', async () => {
+		// THE RED (design D59): at HEAD the classifier answered a passing review beside the refused check with no finding and
+		// autoRefine false, so the loop stopped after one try and the step was refused (REG-F-515).
+		seam.script = (turn) => ({
+			acts: [],
+			account: `The requirements were written on try ${turn}.`,
+			workProduct: turn === 1 ? MARKDOWN : { document: MARKDOWN }
+		});
+		const pwuId = await modelWorkUnit();
+
+		const result = await beginExecute(pwuId);
+
+		expect(seam.turns, 'the check’s finding sent the model no second try').toHaveLength(2);
+		expect(seam.turns[1], 'the check’s finding never reached the model’s second turn').toContain(FINDING);
+		expect(seam.turns[1], 'the schema policy’s own finding beside it').toContain(
+			'SCHEMA_INVALID: Subject failed strict output-contract/schema validation.'
+		);
+		expect(result.data?.error, 'the second try’s JSON work product did not complete the step').toBeUndefined();
+	});
+
+	it('⛔ a person’s re-run after such a stop carries the check’s findings on its first turn', async () => {
+		// THE RED (design D59; P7-6R RD8): at HEAD the stop's classification listed no finding, so the re-run carried none.
+		let fixed = false;
+		seam.script = (turn) => ({ acts: [], account: `Attempt ${turn}.`, workProduct: fixed ? { document: MARKDOWN } : MARKDOWN });
+		const pwuId = await modelWorkUnit();
+		expect((await beginExecute(pwuId)).data?.error, 'arrangement: the unit stopped on the check').toMatch(/WORK_PRODUCT_NOT_PARSEABLE/);
+		const before = seam.turns.length;
+		fixed = true;
+
+		const rerun = (await actions.rerunWork(
+			actionEvent('rerunWork', { pwuId, rationale: 'The work product could not be read as JSON; run the work again.' }) as never
+		)) as { advanced?: string; data?: { error?: string } };
+
+		expect(seam.turns.length, 'arrangement: the re-run sent the model no turn').toBeGreaterThan(before);
+		expect(seam.turns[before], 'the re-run’s first turn carried no finding of the check').toContain(FINDING);
+		expect([rerun.advanced, rerun.data?.error], 'arrangement: the re-run’s JSON work product completed it').toEqual(['work-rerun', undefined]);
 	});
 });

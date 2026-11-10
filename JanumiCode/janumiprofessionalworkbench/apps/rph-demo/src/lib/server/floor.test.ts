@@ -37,7 +37,9 @@ import {
 	isOperationalRemediation,
 	loadPwaFloor,
 	loadSubjectFloor,
-	runPwaFloor
+	runPwaFloor,
+	WORK_PRODUCT_NOT_PARSEABLE,
+	WORK_PRODUCT_NOT_PARSEABLE_FINDING
 } from './floor.js';
 import type {
 	EscalationRecommendationNote,
@@ -277,6 +279,64 @@ describe('classifyFloorRemediation — operational assurance failures never beco
 
 		expect(result.action).toBe('RESOLVE_OTHER_FLOOR_FINDINGS');
 		expect(result.autoRefine).toBe(false);
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L6 — design D59 (`REG-D-150` (3); `REG-D-059`; `REG-F-515`): the work-product check's findings go
+	// back to the executor. ⛔ PREDICTED RED: at HEAD a passing review beside the refused check answered RESOLVE_OTHER_FLOOR_FINDINGS
+	// with autoRefine false and no finding, so the loop stopped after one try and a re-run carried nothing (P6 again's second run).
+	describe('⭐⭐ L6 (D59) — a work product the check cannot read as JSON goes back to the executor', () => {
+		type Obs = FloorView['policies'][number]['observations'][number];
+		const SCHEMA_INVALID: Obs = { code: 'SCHEMA_INVALID', severity: 'CRITICAL', statement: 'Subject failed strict output-contract/schema validation.' };
+		const NOT_PARSEABLE: Obs = { code: 'WORK_PRODUCT_NOT_PARSEABLE', severity: 'BLOCKING', statement: 'Deterministic invariant violated: WORK_PRODUCT_NOT_PARSEABLE' };
+		const schemaRefused = (observations: Obs[] = [SCHEMA_INVALID, NOT_PARSEABLE]): FloorView['policies'][number] => ({
+			policyId: 'floor.schema-invariant',
+			disposition: 'REJECTED',
+			independenceOk: true,
+			observations
+		});
+		const SENT_BACK: Obs[] = [
+			SCHEMA_INVALID,
+			{
+				...NOT_PARSEABLE,
+				statement:
+					'The work product could not be read as JSON, so the work-product check refused it. Return the work product as exactly one JSON object, carrying any document inside it as text.'
+			}
+		];
+
+		it('⛔ a passing review beside the refused check: the same action, autoRefine true, the check’s findings sent back', () => {
+			const result = classifyFloorRemediation(floorView({ policies: [schemaRefused(), reviewPolicy({ disposition: 'SATISFIED' })] }));
+			expect([result.action, result.autoRefine]).toEqual(['RESOLVE_OTHER_FLOOR_FINDINGS', true]);
+			expect(result.findings).toEqual(SENT_BACK);
+		});
+
+		it('⛔ a review asking for revision beside it: its findings, then the check’s', () => {
+			const finding: Obs = { code: 'RR-02-no-obligation-elision', severity: 'BLOCKING', statement: 'An obligation was elided.' };
+			const result = classifyFloorRemediation(
+				floorView({ policies: [schemaRefused(), reviewPolicy({ disposition: 'REJECTED', observations: [finding] })] })
+			);
+			expect([result.action, result.autoRefine]).toEqual(['REFINE_SUBJECT', true]);
+			expect(result.findings).toEqual([finding, ...SENT_BACK]);
+		});
+
+		it('⭑ CONTROL — a schema finding without the work-product code, a graph’s, is not sent back, as before', () => {
+			const result = classifyFloorRemediation(
+				floorView({ policies: [schemaRefused([SCHEMA_INVALID]), reviewPolicy({ disposition: 'SATISFIED' })] })
+			);
+			expect([result.action, result.autoRefine, result.findings]).toEqual(['RESOLVE_OTHER_FLOOR_FINDINGS', false, []]);
+		});
+
+		it('⭑ CONTROL — a review that did not execute beside the refused check is answered as that review, as before', () => {
+			const failed: Obs = { code: 'VALIDATOR_EXECUTION_FAILED', severity: 'MATERIAL', statement: 'devin exited with code 1.' };
+			const result = classifyFloorRemediation(
+				floorView({ policies: [schemaRefused(), reviewPolicy({ disposition: 'INCONCLUSIVE', observations: [failed] })] })
+			);
+			expect([result.action, result.autoRefine, result.findings]).toEqual(['RETRY_OR_CONFIGURE_REVIEWER', false, []]);
+		});
+
+		it('⭑ the code is the one the work-product floor records, spelled once, and its statement the one the executor reads', () => {
+			expect(WORK_PRODUCT_NOT_PARSEABLE).toBe('WORK_PRODUCT_NOT_PARSEABLE');
+			expect(WORK_PRODUCT_NOT_PARSEABLE_FINDING).toBe(SENT_BACK[1]!.statement);
+		});
 	});
 
 	it('requires no remediation after a satisfied floor', () => {

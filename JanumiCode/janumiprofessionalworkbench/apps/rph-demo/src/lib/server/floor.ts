@@ -408,6 +408,32 @@ const OPERATIONAL_REVIEW_CODES: ReadonlySet<string> = new Set([
 const isReviewerRecommendation = (o: { readonly code: string }): boolean =>
 	o.code === REVIEWER_RECOMMENDED_ESCALATION;
 
+/**
+ * ⭐⭐ `JAN-EXEC` Phase 7, package L6 — design D59 (`REG-D-150` (3); `REG-D-059`; `REG-F-515`) — THE CODE ONLY THE WORK-PRODUCT FLOOR
+ * RECORDS: a work product whose located answer span does not parse as JSON. ⭑ SPELLED ONCE, HERE: `execution/work-product-floor.ts`
+ * records this constant, so the classifier's key and the floor's record cannot drift apart.
+ */
+export const WORK_PRODUCT_NOT_PARSEABLE = 'WORK_PRODUCT_NOT_PARSEABLE';
+
+/** ⭐⭐ Package L6 — D59 — what the executor reads in place of that code's recorded statement, which only names the code again. */
+export const WORK_PRODUCT_NOT_PARSEABLE_FINDING =
+	'The work product could not be read as JSON, so the work-product check refused it. Return the work product as exactly one JSON object, carrying any document inside it as text.';
+
+/**
+ * ⭐⭐ Package L6 — D59 — THE WORK-PRODUCT CHECK'S FINDINGS, WHICH THE EXECUTOR CAN ADDRESS: the observations of a REJECTED
+ * `floor.schema-invariant` that carries `WORK_PRODUCT_NOT_PARSEABLE`, each by its code, that code's statement the one above. ⛔ KEYED
+ * ON THE CODE, which only the work-product floor records, so the authoring floor's answers do not move; empty for any other floor.
+ * ⛔ Never identity, provenance or trace findings: those facts are the host's (`REG-F-515`).
+ */
+function workProductCheckFindings(floor: FloorView): FloorObservationView[] {
+	const schema = floor.policies.find((p) => p.policyId === FLOOR_POLICY_IDS.SCHEMA_INVARIANT);
+	if (schema?.disposition !== 'REJECTED' || !schema.observations.some((o) => o.code === WORK_PRODUCT_NOT_PARSEABLE))
+		return [];
+	return schema.observations.map((o) =>
+		o.code === WORK_PRODUCT_NOT_PARSEABLE ? { ...o, statement: WORK_PRODUCT_NOT_PARSEABLE_FINDING } : o
+	);
+}
+
 /** The dispositions that JUDGED the subject and found something in it — the only ones whose findings may
  *  be sent back to the producer. Of `AggregateAssuranceDisposition`'s six members these are the two that
  *  assert something ABOUT THE WORK; the other four assert something about the REVIEW. */
@@ -565,7 +591,8 @@ export function classifyFloorRemediation(floor: FloorView): FloorRemediation {
 		return {
 			action: 'REFINE_SUBJECT',
 			autoRefine: true,
-			findings: subjectFindings,
+			// ⭐⭐ Package L6 — D59 — and beside the review's, the work-product check's findings, when it refused the work product.
+			findings: [...subjectFindings, ...workProductCheckFindings(floor)],
 			guidance:
 				'PublishPwa remains blocked while valid Reasoning Review findings are open. Revise the reviewed PWA graph and/or its recorded professional rationale as the coded findings require, then rerun assurance.'
 		};
@@ -583,6 +610,21 @@ export function classifyFloorRemediation(floor: FloorView): FloorRemediation {
 				'PublishPwa remains blocked because the mandatory Reasoning Review is incomplete but produced no valid subject finding. Inspect the recorded policy result, configure or change the reviewer as needed, and rerun assurance. Do not revise the PWA or record a waiver merely to clear an incomplete review.'
 		};
 	}
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L6 — design D59 (`REG-D-150` (3); `REG-D-059`; `REG-F-515`) — THE REVIEW PASSED AND THE
+	// WORK-PRODUCT CHECK REFUSED: the check's findings go back to the producer, as a review's do — the same action, so a person's
+	// recovery offers and cites what it did (`stopped-unit-recovery.ts`), and a re-run carries them. ⛔ It read autoRefine false and no
+	// finding, so the loop stopped after one try and the re-run of P6 again's second run carried nothing (`REG-F-621`).
+	const checkFindings = workProductCheckFindings(floor);
+	if (checkFindings.length > 0)
+		return {
+			action: 'RESOLVE_OTHER_FLOOR_FINDINGS',
+			autoRefine: true,
+			findings: checkFindings,
+			guidance:
+				'The work-product check refused the work product: it could not be read as JSON. Its findings go back to the producer, ' +
+				'to return the work product as one JSON object (REG-D-150; REG-D-059).'
+		};
 
 	return {
 		action: 'RESOLVE_OTHER_FLOOR_FINDINGS',
