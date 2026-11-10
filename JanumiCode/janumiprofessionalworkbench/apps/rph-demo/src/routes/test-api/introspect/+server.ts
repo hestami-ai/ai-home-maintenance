@@ -90,7 +90,10 @@ export const GET: RequestHandler = () => {
 							// ⭐ `JAN-CRITREAD` J1-3 (§4.8): what a staged review RESTS ON — its criterion rows and its
 							// completion — which the object state alone does not say. The candidate's own events only.
 							criterionEvents: candidateOwn(turn.engine, canonicalIds, 'AssuranceCriterionEvaluated'),
-							completionEvents: candidateOwn(turn.engine, canonicalIds, 'AssuranceAssessmentCompleted')
+							completionEvents: candidateOwn(turn.engine, canonicalIds, 'AssuranceAssessmentCompleted'),
+							// ⭐⭐ `JAN-EXEC` Phase 7, package L4 — D56 (`REG-F-620`) — and its own observations: a review refused before
+							// any call records its reason as one (`VALIDATOR_EXECUTION_FAILED`), which the lane keeps with its part.
+							observationEvents: candidateOwn(turn.engine, canonicalIds, 'AssuranceObservationRecorded')
 						}
 					]
 				: [];

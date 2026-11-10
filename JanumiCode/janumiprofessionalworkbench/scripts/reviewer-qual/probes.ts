@@ -1161,7 +1161,7 @@ const CALLS_AT_CONTENT_MIN: ObservedToolCallReport = {
 };
 /**
  * ⭐⭐ `JAN-EXEC` Phase 7, package Z1b — D52 (`REG-D-146`; the lead's ruling of 2026-11-06 on Z1's §8, option 1) — A CALL LIST THAT HOLDS THE CONTENT AT `CONTENT_MIN` WITHIN D52'S ROOM. `CALLS_AT_CONTENT_MIN` passes `PROMPT_BUDGET`
- * with its scaffolding alone, so a prompt it holds there passes D52's whole bound of 33,000 once the measured section is added
+ * with its scaffolding alone, so a prompt it holds there passes D52's whole bound of ~~33,000~~ 35,500 (`REG-D-149`) once the measured section is added
  * (47,246 and 47,242): its two probes are D52's refusal probes. This list is the smallest that still leaves the content
  * `CONTENT_MIN` — its scaffolding just past `PROMPT_BUDGET - CONTENT_MIN` — and a few calls more (measured; the fingerprint
  * test pins it: 'a sent probe holds its content at CONTENT_MIN'): still an impossible input on purpose, more calls than

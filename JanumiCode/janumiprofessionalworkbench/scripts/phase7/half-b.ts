@@ -346,6 +346,12 @@ export interface FloorPartDisposition {
 	readonly typeName: string;
 	readonly state: string;
 	readonly evaluator: string | null;
+	/**
+	 * ⭐⭐ `JAN-EXEC` Phase 7, package L4 — D56 (`REG-F-620`) — the statement of each `VALIDATOR_EXECUTION_FAILED` observation the
+	 * part's review carries, in the record's order: a part refused before any call is recorded with the validator's words.
+	 * Present only when there is one.
+	 */
+	readonly refusals?: readonly string[];
 }
 
 /** One floor policy's assessment of the PWA in the round: its state, who judged it, and whose work it judged. */
@@ -380,8 +386,22 @@ export function floorDispositions(
 	assessments: readonly Row[],
 	pwaId: string,
 	types: readonly Row[],
-	tokenOf: (assessmentId: string) => string | undefined
+	tokenOf: (assessmentId: string) => string | undefined,
+	/**
+	 * ⭐⭐ Package L4 — D56 (`REG-F-620`) — the candidate's own `AssuranceObservationRecorded` events (the introspection's
+	 * `observationEvents`), from which each part's refusals are read; none, as the run report reads its store, unless given.
+	 */
+	observations: readonly Readonly<Record<string, unknown>>[] = []
 ): FloorDisposition[] {
+	const refusalsOf = (assessmentId: string | undefined): string[] =>
+		assessmentId === undefined
+			? []
+			: observations
+					.filter((e) => str(e.eventType) === 'AssuranceObservationRecorded')
+					.map((e) => (typeof e.payload === 'object' && e.payload !== null ? (e.payload as Record<string, unknown>) : {}))
+					.filter((p) => str(p.assessmentId) === assessmentId && str(p.findingCode) === 'VALIDATOR_EXECUTION_FAILED')
+					.map((p) => str(p.statement))
+					.filter((s) => s !== '');
 	const typeIds = new Set(types.map((t) => t.id));
 	const subjectOf = (a: Row): string | undefined => strs(a.state.subjectObjectIds)[0];
 	const floorOf = assessments.filter((a) =>
@@ -408,11 +428,13 @@ export function floorDispositions(
 		const reviews = types.map((t) => latestOf(t.id, policyId));
 		const parts = types.map((t, i): FloorPartDisposition => {
 			const review = reviews[i];
+			const refusals = refusalsOf(review?.id);
 			return {
 				typeId: t.id,
 				typeName: str(t.state.name) || t.id,
 				state: review === undefined ? 'MISSING' : str(review.state.assessmentState),
-				evaluator: identityOf(review?.state.evaluator)
+				evaluator: identityOf(review?.state.evaluator),
+				...(refusals.length > 0 ? { refusals } : {})
 			};
 		});
 		return {

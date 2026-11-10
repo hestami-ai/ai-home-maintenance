@@ -87,6 +87,9 @@ export interface EngineSnapshot {
 		readonly criterionEvents: ReadonlyArray<Record<string, unknown>>;
 		/** ⭐ J1-3 — the candidate's OWN `AssuranceAssessmentCompleted` events. */
 		readonly completionEvents: ReadonlyArray<Record<string, unknown>>;
+		/** ⭐⭐ `JAN-EXEC` Phase 7, package L4 — D56 (`REG-F-620`) — its OWN `AssuranceObservationRecorded` events; absent on a
+		 *  snapshot taken before package L4. */
+		readonly observationEvents?: ReadonlyArray<Record<string, unknown>>;
 	}>;
 	/** ⭐ J1-3 — the stipulation registry as the server holds it; a reset discards it. */
 	readonly stipulations: ReadonlyArray<{

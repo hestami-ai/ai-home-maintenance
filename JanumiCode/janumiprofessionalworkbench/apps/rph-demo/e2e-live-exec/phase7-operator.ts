@@ -1971,7 +1971,10 @@ async function recordTheFloor(
 		staged?.assessments ?? [],
 		pwaId,
 		staged?.pwuTypes ?? [],
-		correlationsOf(staged?.completionEvents ?? [])
+		correlationsOf(staged?.completionEvents ?? []),
+		// ⭐⭐ `JAN-EXEC` Phase 7, package L4 — D56 (`REG-F-620`) — and the candidate's own observations, so a part refused before
+		// any call is recorded with the validator's words.
+		staged?.observationEvents ?? []
 	);
 	authoring.authorModel.resolved =
 		(await author.producerLine()) ?? authoring.floor.find((f) => f.producer !== null)?.producer ?? null;

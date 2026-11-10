@@ -1525,7 +1525,7 @@ describe('JAN-CRITREAD J2-3 — the probe set reaches every branch of prompt ass
 				'WHOLE_PROMPT_MAX'
 			].sort()
 		);
-		expect([REASONING_REVIEW_BUDGET.SECTION_GROWTH_MAX, REASONING_REVIEW_BUDGET.QUOTED_STATEMENT_MAX, REASONING_REVIEW_BUDGET.WHOLE_PROMPT_MAX], 'D52’s three bounds').toEqual([9_500, 700, 33_000]);
+		expect([REASONING_REVIEW_BUDGET.SECTION_GROWTH_MAX, REASONING_REVIEW_BUDGET.QUOTED_STATEMENT_MAX, REASONING_REVIEW_BUDGET.WHOLE_PROMPT_MAX], 'D52’s three bounds, ⭐ the whole one the sponsor’s 35,500 (REG-D-149)').toEqual([9_500, 700, 35_500]);
 	});
 
 	it('⛔ the budget object is the ONLY place a limit is written — the validator binds each once, by destructuring the object, and reads every one', () => {
@@ -5672,7 +5672,7 @@ const Z1B = PROBES_MODULE as unknown as {
 const PAST_A_BOUND: Readonly<Record<'growth' | 'whole', RegExp>> = {
 	growth:
 		/^This review was not sent: its growth beyond today’s prompt would be \d+ characters, past its bound of 9500 \(REG-D-146; D52\)\. No indication is dropped to fit it, so the review is refused\. No model was called\.$/,
-	whole: /^This review was not sent: its whole prompt would be \d+ characters, past its bound of 33000 \(REG-D-146; D52\)\. No indication is dropped to fit it, so the review is refused\. No model was called\.$/
+	whole: /^This review was not sent: its whole prompt would be \d+ characters, past its bound of 35500 \(REG-D-146; D52\)\. No indication is dropped to fit it, so the review is refused\. No model was called\.$/
 };
 /** Each refusal probe's input as it was at `8bbe8f1b` — the canonical JSON's sha256: kept byte for byte. */
 const REFUSAL_PROBE_INPUT_SHA256: Readonly<Record<string, string>> = {
@@ -5738,7 +5738,7 @@ describe('⭐⭐ JAN-EXEC Phase 7, package Z1b — D52’s refusal probes, and t
 		).toEqual(FINGERPRINT_PROBES.map((p) => p.id).filter((id) => id in (Z1B.D52_REFUSAL_PROBES ?? {})));
 	});
 
-	it('⭐ EVERY BRANCH A REFUSAL PROBE REACHED IS REACHED BY A PROBE THE PRODUCT SENDS — its successors, each sent, within 9,500 characters of growth beyond today’s prompt and 33,000 whole', async () => {
+	it('⭐ EVERY BRANCH A REFUSAL PROBE REACHED IS REACHED BY A PROBE THE PRODUCT SENDS — its successors, each sent, within 9,500 characters of growth beyond today’s prompt and ~~33,000~~ 35,500 whole', async () => {
 		expect(Object.keys(Z1B.SENT_SUCCESSORS ?? {}), 'successors for each refusal probe').toEqual(Object.keys(REFUSAL_PROBE_INPUT_SHA256));
 		for (const [id, successors] of Object.entries(Z1B.SENT_SUCCESSORS ?? {})) {
 			expect(successors.length, `${id}: a successor`).toBeGreaterThan(0);
@@ -5749,7 +5749,7 @@ describe('⭐⭐ JAN-EXEC Phase 7, package Z1b — D52’s refusal probes, and t
 				const growth = await growthOf(probeInputOf(s));
 				expect(growth, `${s}: its growth, within 9,500`).toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.SECTION_GROWTH_MAX);
 				expect(growth, `${s}: its growth, a measurement`).toBeGreaterThan(0);
-				expect(sent!.length, `${s}: its whole prompt, within 33,000`).toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.WHOLE_PROMPT_MAX);
+				expect(sent!.length, `${s}: its whole prompt, within ~~33,000~~ 35,500`).toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.WHOLE_PROMPT_MAX);
 			}
 		}
 	});

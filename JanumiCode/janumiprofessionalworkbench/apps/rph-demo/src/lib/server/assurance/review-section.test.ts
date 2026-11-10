@@ -433,8 +433,10 @@ describe('⛔ PREDICTED RED 2 (Z1; D50) — every check and every statement with
 
 // ── ⛔ PREDICTED RED 4 — THE ROOM ──────────────────────────────────────────────────────────────────────────────────────
 describe('⛔ PREDICTED RED 4 (Z1; D52) — the material’s room as today’s; the section’s own room; refused past it, no indication dropped', () => {
-	it('⭐ the budget object holds the section’s three bounds: 9,500 of growth, 700 a quoted statement, 33,000 the whole prompt', () => {
-		expect(REASONING_REVIEW_BUDGET).toMatchObject({ SECTION_GROWTH_MAX: 9_500, QUOTED_STATEMENT_MAX: 700, WHOLE_PROMPT_MAX: 33_000 });
+	// ⛔ MOVED 2026-11-09 (`JAN-EXEC` Phase 7, package L4 — D56; `REG-D-149`) — ~~33,000 the whole prompt~~ 35,500: the sponsor's
+	// ruling, after the two phase types of P6 again's first live-authored PWA built 33,138 and 33,494 (`REG-F-618`).
+	it('⭐ the budget object holds the section’s three bounds: 9,500 of growth, 700 a quoted statement, 35,500 the whole prompt (REG-D-149)', () => {
+		expect(REASONING_REVIEW_BUDGET).toMatchObject({ SECTION_GROWTH_MAX: 9_500, QUOTED_STATEMENT_MAX: 700, WHOLE_PROMPT_MAX: 35_500 });
 	});
 
 	it('⭐ a part exactly at today’s room is sent with the measured section; one unit more is refused with today’s statement, the decision model not asked', async () => {
@@ -478,7 +480,13 @@ describe('⛔ PREDICTED RED 4 (Z1; D52) — the material’s room as today’s; 
 		expect(under.prompts[0]!.split('\n').filter((l) => l === 'Statement, 0.50:'), 'none dropped').toHaveLength(40);
 	});
 
-	it('⭐ a whole prompt past 33,000 is refused, its growth within 9,500, before the decision model is asked', async () => {
+	// ⛔ MOVED 2026-11-09 (`JAN-EXEC` Phase 7, package L4 — D56; `REG-D-149`) — ~~a whole prompt past 33,000 is refused, its growth
+	// within 9,500, before the decision model is asked~~: the same input, past 33,000 and within 35,500 whole, is SENT.
+	// ⛔ PREDICTED RED with the bound still 33,000: refused. A graph's or a part's whole prompt cannot pass 35,500 —
+	// today's is held to `PROMPT_BUDGET`, 26,000, and the growth to 9,500 — save at `CONTENT_MIN`, so the refusal past
+	// 35,500 is asserted where the three probes held there are read (`verif/review-prompt-regions.test.ts`, the
+	// fingerprint test).
+	it('⭐ a whole prompt past 33,000 and within 35,500, its growth within 9,500, is sent with the measured section (REG-D-149)', async () => {
 		const input: ReasoningReviewInput = {
 			criteria: FLOOR,
 			framing: 'PWA_GRAPH',
@@ -489,8 +497,12 @@ describe('⛔ PREDICTED RED 4 (Z1; D52) — the material’s room as today’s; 
 		};
 		const { source, calls } = recordingIndications();
 		const out = await review(input, source);
-		expect((out.error as Error).message).toMatch(/^This review was not sent: its whole prompt would be (\d+) characters, past its bound of 33000 /);
-		expect([out.prompts.length, calls.length]).toEqual([0, 0]);
+		expect(out.error, 'sent, not refused').toBeUndefined();
+		const sent = out.prompts[0] ?? '';
+		expect(sent.length, 'past the old bound').toBeGreaterThan(33_000);
+		expect(sent.length, 'within the sponsor’s').toBeLessThanOrEqual(REASONING_REVIEW_BUDGET.WHOLE_PROMPT_MAX);
+		expect(sent, 'with the measured section').toContain('\nTHE REVIEW\n');
+		expect(calls.length, 'the decision model asked, once').toBe(1);
 	});
 
 	it('⭐ a statement past 700 characters is asked whole and quoted head-only under its declaration, within 700', async () => {

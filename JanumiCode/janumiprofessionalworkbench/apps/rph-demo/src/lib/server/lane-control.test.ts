@@ -645,6 +645,32 @@ describe('⭐ the server keeps the lane — each case a per-test fixture alone c
 		expect((await h.final()).violations).toEqual([]);
 	});
 
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L4 — D56 (`REG-F-620`) — ⛔ PREDICTED RED, read from the code: introspect gave a staged
+	// candidate's criterion rows and completions only, so a review refused before any call left its words nowhere the lane reads.
+	it('⭐ introspect shows a staged candidate’s own observations: a review that failed operationally, with its VALIDATOR_EXECUTION_FAILED statement', async () => {
+		const h = await host('empty');
+		await h.announce('refused › a reviewer that fails');
+		await h.reset('empty');
+		h.createPwa(PWA);
+		const { view } = await withLiveReviewerSeam(() =>
+			h.reviewOnTurn(PWA, async () => {
+				throw new Error('the reviewer is down');
+			})
+		);
+		expect(view.satisfied, 'arrangement: the review did not pass').toBe(false);
+		const snap = (await h.introspect()) as {
+			authoringCandidates: {
+				observationEvents?: { eventType: string; payload: { findingCode: string; statement: string } }[];
+			}[];
+		};
+		const failed = (snap.authoringCandidates[0]?.observationEvents ?? []).filter(
+			(e) => e.payload.findingCode === 'VALIDATOR_EXECUTION_FAILED'
+		);
+		expect(failed.length, 'the refused review’s own observation').toBeGreaterThan(0);
+		expect(failed.every((e) => e.eventType === 'AssuranceObservationRecorded' && e.payload.statement !== '')).toBe(true);
+		await h.reset('empty');
+	});
+
 	it('⛔ the route is test mode only — 404 on a server that exposes the harness, 422 on a body it does not know', async () => {
 		const live = await host('empty', 'server', '1');
 		await expect(live.postLane({ final: true })).rejects.toMatchObject({ status: 404 });

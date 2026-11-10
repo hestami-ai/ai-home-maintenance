@@ -514,14 +514,15 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481) — no host text inside quoted mate
 		}
 	}, 120_000);
 
-	/** ⭐ Package Z1 — D52: the probes refused past a bound of the measured section's room, and the bound each passes. */
+	/** ⭐ Package Z1 — D52: the probes refused past a bound of the measured section's room, and the bound each passes. ⛔ MOVED 2026-11-09 (`JAN-EXEC` Phase 7, package L4 — D56; `REG-D-149`): the whole
+	 *  bound ~~33000~~ 35500. */
 	const PAST_A_BOUND_OF_THE_ROOM: Readonly<Record<string, RegExp>> = {
 		'T-ACCOUNT-BREAKS': /^This review was not sent: its growth beyond today’s prompt would be \d+ characters, past its bound of 9500 \(REG-D-146; D52\)/,
 		'W-ACCOUNT-BREAKS': /^This review was not sent: its growth beyond today’s prompt would be \d+ characters, past its bound of 9500 \(REG-D-146; D52\)/,
 		'P-ACCOUNT-BREAKS': /^This review was not sent: its growth beyond today’s prompt would be \d+ characters, past its bound of 9500 \(REG-D-146; D52\)/,
-		'P-OVERSIZE-SURROGATE': /^This review was not sent: its whole prompt would be \d+ characters, past its bound of 33000 \(REG-D-146; D52\)/,
-		'P-OVERSIZE-ROOM-EDGES': /^This review was not sent: its whole prompt would be \d+ characters, past its bound of 33000 \(REG-D-146; D52\)/,
-		'P-OVERSIZE-ALL': /^This review was not sent: its whole prompt would be \d+ characters, past its bound of 33000 \(REG-D-146; D52\)/
+		'P-OVERSIZE-SURROGATE': /^This review was not sent: its whole prompt would be \d+ characters, past its bound of 35500 \(REG-D-146; D52\)/,
+		'P-OVERSIZE-ROOM-EDGES': /^This review was not sent: its whole prompt would be \d+ characters, past its bound of 35500 \(REG-D-146; D52\)/,
+		'P-OVERSIZE-ALL': /^This review was not sent: its whole prompt would be \d+ characters, past its bound of 35500 \(REG-D-146; D52\)/
 	};
 	it('⭐ every fingerprint probe — each process result read against the run its builder rendered', async () => {
 		for (const probe of FINGERPRINT_PROBES) {
@@ -547,7 +548,7 @@ describe('⭐⭐ JAN-PRQUAL PQ-1 (REG-F-481) — no host text inside quoted mate
 			}
 			// ⭐⭐ `JAN-EXEC` Phase 7, package Z1 — D52 (`REG-D-146`; design §12.4) — and the six whose measured prompt passes a bound
 			// of its room: the three account-breaks probes, past 9,500 characters of growth beyond today's prompt, and the three
-			// held at `CONTENT_MIN` past 33,000 characters whole. Each is refused before any prompt exists — no indication is
+			// held at `CONTENT_MIN` past ~~33,000~~ 35,500 characters whole. Each is refused before any prompt exists — no indication is
 			// dropped to fit — so there is no region to read, and the refusal is what is asserted, as for the four above.
 			const pastABound = PAST_A_BOUND_OF_THE_ROOM[probe.id];
 			if (pastABound !== undefined) {

@@ -158,7 +158,9 @@ const criterionIds = (input: PolicyCriteria): ReadonlySet<string> =>
  *   · `QUOTED_STATEMENT_MAX` — a statement the block quotes, its cut's declaration counted (the measured longest is 552): a
  *     longer one is asked of the decision model whole and quoted head-only under a declaration — a case the screen did not
  *     measure, disclosed so;
- *   · `WHOLE_PROMPT_MAX` — the whole prompt sent (the measured maximum is 31,755 on v13, `P12-RR-07-CUT`).
+ *   · `WHOLE_PROMPT_MAX` — the whole prompt sent (the measured maximum is 31,755 on v13, `P12-RR-07-CUT`). ⭐ 35,500 since
+ *     `REG-D-149` (package L4 — D56): the sponsor raised it after P6 again's first live-authored PWA built two parts of
+ *     33,138 and 33,494 (`REG-F-618`); a prompt of 31,868 to 35,500 is untested, and disclosed.
  * A prompt past a bound is refused (`VALIDATOR_EXECUTION_FAILED`, its reason), and no indication is dropped to fit. ⚠ In UTF-16
  * units, as every limit here: the design's figures were measured in code points, which UTF-16 counts no fewer of. ⚠ agy keeps
  * its own ceiling (`MAX_AGY_PROMPT_CHARS`, 28,000; 3 of 97 v13 prompts pass it): an agy review of a prompt past it fails at its
@@ -175,7 +177,8 @@ export const REASONING_REVIEW_BUDGET = Object.freeze({
 	CONTENT_MIN: 4_000, // always give the reviewer at least this much graph
 	SECTION_GROWTH_MAX: 9_500,
 	QUOTED_STATEMENT_MAX: 700,
-	WHOLE_PROMPT_MAX: 33_000
+	// ⛔ MOVED 2026-11-09 (`JAN-EXEC` Phase 7, package L4 — D56; `REG-D-149`): ~~33_000~~.
+	WHOLE_PROMPT_MAX: 35_500
 });
 const {
 	PROMPT_BUDGET,

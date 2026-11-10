@@ -429,6 +429,8 @@ interface HalfBScript {
 	readonly candidateFloor?: {
 		readonly assessments: readonly ObjectRow[];
 		readonly completionEvents: readonly Record<string, unknown>[];
+		/** ⭐⭐ `JAN-EXEC` Phase 7, package L4 — D56 (`REG-F-620`) — the candidate's own observations; none unless said. */
+		readonly observationEvents?: readonly Record<string, unknown>[];
 	};
 	/**
 	 * ⭐ R3-B's fix round (F1) — the ASSURANCE exchanges a unit's Begin & Execute records, by the unit's id; none unless said.
@@ -585,7 +587,9 @@ function halfBLane(script: HalfBScript) {
 								assessments: script.candidateFloor?.assessments ?? floorOfTheCandidate(stagedAt(readsAfterSend)),
 								conversations: [],
 								criterionEvents: [],
-								completionEvents: script.candidateFloor?.completionEvents ?? []
+								completionEvents: script.candidateFloor?.completionEvents ?? [],
+								// ⭐⭐ Package L4 — D56 (`REG-F-620`): the candidate's own observations, as the introspection gives them.
+								observationEvents: script.candidateFloor?.observationEvents ?? []
 							}
 						]
 		} as unknown as EngineSnapshot;
@@ -1931,6 +1935,33 @@ describe('⭐ C1 — the floor’s dispositions, as the record holds them', () =
 			{ aggregateId: 'asm_2', correlationId: 'authoring-floor:run-2' }
 		]);
 		expect(['asm_1', 'asm_2', 'asm_3'].map(tokenOf)).toEqual(['authoring-floor:run-1', 'authoring-floor:run-2', undefined]);
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L4 — D56 (`REG-F-620`; `REG-D-149`) — A PART REFUSED BEFORE ANY CALL, RECORDED WITH THE
+	// VALIDATOR'S WORDS. ⛔ PREDICTED RED, read from the code: the read kept each part's state and evaluator only, so P6 again's
+	// first run recorded two parts INCONCLUSIVE and their cause in none of its records.
+	it('⭐ a part whose review failed operationally carries each VALIDATOR_EXECUTION_FAILED statement; another code, and a part with none, carry no refusals', () => {
+		const types = [type('t1', 'Plan'), type('t2', 'Build')];
+		const rows = [rr('A1', 'INCONCLUSIVE', 't1'), rr('A2', 'SATISFIED', 't2', { modelId: 'swe-2-max', providerId: 'devin' })];
+		const NOT_SENT = 'This review was not sent: its whole prompt would be 33138 characters, past its bound of 33000 (REG-D-146; D52). No indication is dropped to fit it, so the review is refused. No model was called.';
+		const observation = (assessmentId: string, findingCode: string, statement: string) => ({
+			eventType: 'AssuranceObservationRecorded',
+			aggregateId: `obs_${assessmentId}_${findingCode}`,
+			payload: { assessmentId, findingCode, severity: 'MATERIAL', statement }
+		});
+		const events = [
+			observation('A1', 'VALIDATOR_EXECUTION_FAILED', NOT_SENT),
+			observation('A1', 'SCHEMA_FINDING', 'a finding, not a refusal'),
+			observation('A2', 'INFORMATIONAL_NOTE', 'met')
+		];
+		const partsOf = (observations?: readonly Record<string, unknown>[]) =>
+			floorDispositions(rows, PWA_ID, types, roundOf, observations).find((f) => f.policyId === 'floor.reasoning-review')?.parts;
+		expect(partsOf(events)).toEqual([
+			{ typeId: 't1', typeName: 'Plan', state: 'INCONCLUSIVE', evaluator: null, refusals: [NOT_SENT] },
+			{ typeId: 't2', typeName: 'Build', state: 'SATISFIED', evaluator: 'devin/swe-2-max' }
+		]);
+		// ⭑ CONTROL — read with no observations, as the run report reads its store: no part carries refusals.
+		expect(partsOf()?.some((p) => 'refusals' in p)).toBe(false);
 	});
 });
 
@@ -4197,6 +4228,39 @@ describe('⭐⭐ The review in parts, B6 — the authoring’s spend reserve cou
 	// restated in the report (`COUNTED_WHOLE_PRESS`), held equal here to the words the lane's check records (`COUNTED_AHEAD.wholePress`).
 	it('⭑ package O’s check, finding 4 — the words today’s lane records before a model press are the ones the report tells today’s lane by', () => {
 		expect(COUNTED_WHOLE_PRESS).toBe(COUNTED_AHEAD.wholePress);
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L4 — D56 (`REG-F-620`) — ⛔ PREDICTED RED, read from the code: the lane kept each part's
+	// state and evaluator only (`recordTheFloor`), so a part refused before any call was recorded INCONCLUSIVE and its cause
+	// was in none of the run's records.
+	it('⛔ the lane records a part refused before any call with the validator’s words, from the candidate’s own observations', async () => {
+		const token = 'authoring-floor:sha256:candidate-1:floorrun_1';
+		const subjectOf = (a: ObjectRow) => (a.state.subjectObjectIds as string[])[0];
+		const round = floorOfTheCandidate(AGENT_TYPES).map((a) => ({
+			id: `r1_${a.id}`,
+			state: subjectOf(a) === 'pwutype_build' ? { ...a.state, assessmentState: 'INCONCLUSIVE' } : a.state
+		}));
+		const refused = round.find((a) => subjectOf(a) === 'pwutype_build')!;
+		const NOT_SENT = 'This review was not sent: its whole prompt would be 33138 characters, past its bound of 33000 (REG-D-146; D52). No indication is dropped to fit it, so the review is refused. No model was called.';
+		const l = halfBLane({
+			paid: true,
+			candidateFloor: {
+				assessments: round,
+				completionEvents: round.map((a) => ({ eventType: 'AssuranceAssessmentCompleted', aggregateId: a.id, correlationId: token })),
+				observationEvents: [
+					{
+						eventType: 'AssuranceObservationRecorded',
+						aggregateId: 'obs_1',
+						payload: { assessmentId: refused.id, findingCode: 'VALIDATOR_EXECUTION_FAILED', severity: 'MATERIAL', statement: NOT_SENT }
+					}
+				]
+			}
+		});
+		const record = await l.run();
+		const parts = record.authoring?.floor.find((f) => f.policyId === 'floor.reasoning-review')?.parts ?? [];
+		expect(parts.filter((p) => p.refusals !== undefined).map((p) => [p.typeName, p.state, p.refusals])).toEqual([
+			['Build wordfreq', 'INCONCLUSIVE', [NOT_SENT]]
+		]);
 	});
 
 	// ⛔ PREDICTED RED, read from the code: given the types, the lane took each type's latest review in the whole fork, so a

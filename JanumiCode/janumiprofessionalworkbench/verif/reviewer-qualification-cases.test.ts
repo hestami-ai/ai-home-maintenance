@@ -4190,7 +4190,12 @@ const REVIEWER_FINGERPRINT_V9 = '5ab3d68643bffbbf700c622526b626f47d4c487690e1eb5
 // quoting D54's committed scores in place of the placeholder's 0 (phase 2). The program computes the same over the records
 // (`fingerprint.ts` run as a program: probes `978a02ba…`). The budget, criteria, scoring (`f0de7f48…`) and case-set (`f4fc815d…`)
 // components stay. Unmeasured: RED on COVERAGE until D53.
-const REVIEWER_FINGERPRINT_TODAY = '80bf8356befa33dd9e08d469e72d8b940e384710891eb4797f7923827a2fa6b7';
+// ⛔ MOVED 2026-11-09 (`JAN-EXEC` Phase 7, package L4 — D56; `REG-D-149`) —
+// ~~'80bf8356befa33dd9e08d469e72d8b940e384710891eb4797f7923827a2fa6b7'~~: D52's whole bound 33,000 -> 35,500. The budget
+// component moves, and the probes component with the three whole-bound refusal probes' statements, which name the bound
+// (each still refused); no case prompt moves (v13's are at most 31,755). The record's RESCORED lines re-stamp D53's
+// evaluations under it and its ACKNOWLEDGED line names it, its reason quoting the ruling: 31,868 to 35,500 untested.
+const REVIEWER_FINGERPRINT_TODAY = '3edfd8d0319e19b4ffbd05a772c85ed62a250318eb3a65825aab08679e8c565a';
 /**
  * ⭐ THE PROTOTYPE'S PROMPTS (`REG-D-131` Q36: *"its prompts must match the checked prototype hash for hash"*) — the sha256 of
  * each of the 19 bridge part cases' first prompt as the lead's in-memory prototype of D3b rendered it through the product's
@@ -7547,7 +7552,7 @@ describe('package Y — case set v13 and oracles v13 (D37)', () => {
 	// ⛔ MOVED 2026-11-06 (`JAN-EXEC` Phase 7, package Z1 — D50, D52; `REG-D-146`; design §12.2, §12.4) — ~~'Y12 every prompt under 28000 characters'~~:
 	// every TODAY prompt under 28,000; every prompt sent within D52's two bounds; and the three sent past agy's 28,000 are
 	// the three the design counts (design §12.4: 3 of 97; devin, the selected transport, has no such ceiling).
-	it('Y12 every ⛔ today’s prompt under 28000 characters; only P12-RR-07-CUT declares a review cut; ⭐ every prompt sent within 33,000 characters and 9,500 beyond today’s, no statement cut, and exactly three past agy’s 28,000', async () => {
+	it('Y12 every ⛔ today’s prompt under 28000 characters; only P12-RR-07-CUT declares a review cut; ⭐ every prompt sent within ~~33,000~~ 35,500 characters (REG-D-149) and 9,500 beyond today’s, no statement cut, and exactly three past agy’s 28,000', async () => {
 		for (const set of ySets()) {
 			expect(set.cases).toHaveLength(97);
 			const pastAgy: string[] = [];
