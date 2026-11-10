@@ -90,6 +90,12 @@ export const FLOOR_POLICIES = [
 	'floor.identity-provenance',
 	'floor.reasoning-review'
 ] as const;
+
+/**
+ * ⭐⭐ Package L5 — design D57 — the finding code of a validator that did not execute (`validators.ts`). D52's bounds refuse a
+ * review with it before any call, its statement saying why (`reasoning-review-validator.ts`, `sectionOverBoundStatement`).
+ */
+export const VALIDATOR_EXECUTION_FAILED = 'VALIDATOR_EXECUTION_FAILED';
 export const REASONING_REVIEW = 'floor.reasoning-review';
 /** The demo sign-off's policy (`assurance/demo-policy.ts` `DEMO_POLICY_ID`), created by the first Record Assurance. */
 export const DEMO_POLICY_ID = 'pol_01ARZ3NDEKTSV4RRFFQ69GDEM0';
@@ -570,6 +576,12 @@ export interface StoredContent {
 	readonly actualHash: string | null;
 	readonly actualSize: number | null;
 	/**
+	 * ⭐⭐ Package L5 — design D57 (`REG-D-149` (2)) — the bytes' length in CHARACTERS as the reader measured it, a JavaScript string's
+	 * length: the unit of D52's bounds (`prompt.length`, `reasoning-review-validator.ts`), never the bytes, which a non-ASCII text
+	 * exceeds. Null when the row holds no bytes; absent, the reader measured none. Either way a length unknown, never a short one.
+	 */
+	readonly actualChars?: number | null;
+	/**
 	 * ⭐ P5 package B's check (finding 2) — where the bytes are a declared review's prompt, what it SHOWED of its work, as the
 	 * reader read it from them (`declaredWorkShown`); null where they are not one. Absent, the reader handed no reading.
 	 */
@@ -688,6 +700,8 @@ export type PairingLabel =
 	| 'timed-out'
 	| 'output-limit'
 	| 'refused'
+	// ⭐⭐ Package L5 — D57: the review's validator refused it before any call, and said why (`VALIDATOR_EXECUTION_FAILED`).
+	| 'not-sent'
 	| 'no-answer-recorded'
 	| 'not-pairable';
 export const PAIRING_LABELS: readonly PairingLabel[] = [
@@ -698,6 +712,7 @@ export const PAIRING_LABELS: readonly PairingLabel[] = [
 	'timed-out',
 	'output-limit',
 	'refused',
+	'not-sent',
 	'no-answer-recorded',
 	'not-pairable'
 ];
@@ -792,6 +807,20 @@ export interface ReviewerCalls extends ReviewerCallCount {
 	 * the reviewer calls and never among them (`isDecisionModelExchange`): free and local, nothing the paid limit counts.
 	 */
 	readonly decisionModelRequests: number;
+	/**
+	 * ⭐⭐ Package L5 — design D57 (`REG-D-149` (2)) — THE PROMPTS PAST WHAT THE REVIEWER WAS MEASURED ON: of the INITIAL reviewer
+	 * calls, those whose prompt — their materialized input, as the content store holds it, its hash verified — is longer than
+	 * `measured` characters, the most the selected reviewer was measured on (D52), and the longest. ⛔ In characters, the bound's
+	 * unit, never bytes. ⛔ A call whose prompt the record does not hold is counted in `initial` and not in `read`: its length is
+	 * unknown, never short.
+	 */
+	readonly untestedSizes: {
+		readonly measured: number;
+		readonly initial: number;
+		readonly read: number;
+		readonly over: number;
+		readonly longest: number | null;
+	};
 	readonly byUnit: Readonly<Record<string, ReviewerCallCount>>;
 	/**
 	 * Design D8's check, restated over the record: prior + recorded + reserve~~, under the limit~~ ⭐ against the limit (R3-B's
@@ -1016,6 +1045,25 @@ export interface AuthoringSummary {
 		readonly parts?: readonly { readonly typeId: string; readonly typeName: string; readonly state: string }[];
 	}[];
 	/**
+	 * ⭐⭐ Package L5 — design D57 (`REG-F-620`) — THE AUTHORING FLOOR AS THE LANE RECORDED IT (`lane/run.json`, `authoring.floor`,
+	 * `floorDispositions` in `scripts/phase7/half-b.ts`): each policy and each part with its state, its evaluator and any refusal
+	 * statement, shown beside the store's, each labelled by its source. ⛔ The candidate lives in the server's preview engine, so a
+	 * run that stopped before acceptance leaves the store no floor, and the store's reads MISSING (P6 again's first run). Empty when
+	 * the lane recorded none.
+	 */
+	readonly laneFloor: readonly {
+		readonly policyId: string;
+		readonly state: string;
+		readonly evaluator: string | null;
+		readonly parts?: readonly {
+			readonly typeId: string;
+			readonly typeName: string;
+			readonly state: string;
+			readonly evaluator: string | null;
+			readonly refusals: readonly string[];
+		}[];
+	}[];
+	/**
 	 * ⭐ C3 — the author's model, as configured, and ~~as the floor recorded the producer it judged~~ ⭐ `REG-D-112` (finding 8)
 	 * as THE TURN'S OWN STREAM named it, its `producer` event (`phase7-operator.ts`, `producerOfStream`): the floor's
 	 * assessments name no producer, so the store records no author for a turn.
@@ -1208,6 +1256,8 @@ interface Index {
 	readonly correlationOf: ReadonlyMap<string, string>;
 	readonly criteriaOf: ReadonlyMap<string, readonly { criterionId: string; result: string }[]>;
 	readonly observationsOf: ReadonlyMap<string, readonly { code: string; severity: string }[]>;
+	/** ⭐⭐ Package L5 — D57 — each assessment's `VALIDATOR_EXECUTION_FAILED` statements, from its recorded observations. */
+	readonly executionFailuresOf: ReadonlyMap<string, readonly string[]>;
 	readonly content: ReadonlyMap<string, StoredContent> | null;
 }
 
@@ -1228,6 +1278,7 @@ function indexOf(store: StoreRows): Index {
 	const correlationOf = new Map<string, string>();
 	const criteriaOf = new Map<string, { criterionId: string; result: string }[]>();
 	const observationsOf = new Map<string, { code: string; severity: string }[]>();
+	const executionFailuresOf = new Map<string, string[]>();
 	for (const e of events) {
 		append(byEventType, e.eventType, e);
 		if (str(e.correlationId) !== '' && !correlationOf.has(e.aggregateId)) correlationOf.set(e.aggregateId, str(e.correlationId));
@@ -1235,8 +1286,12 @@ function indexOf(store: StoreRows): Index {
 		if (e.eventType === 'AssuranceAssessmentCompleted') completionOf.set(assessmentId || e.aggregateId, e);
 		else if (e.eventType === 'AssuranceCriterionEvaluated')
 			append(criteriaOf, assessmentId, { criterionId: str(e.payload.criterionId), result: str(e.payload.result) });
-		else if (e.eventType === 'AssuranceObservationRecorded')
+		else if (e.eventType === 'AssuranceObservationRecorded') {
 			append(observationsOf, assessmentId, { code: str(e.payload.findingCode), severity: str(e.payload.severity) });
+			// ⭐⭐ Package L5 — D57 — and a validator's refusal by its statement: what a review that was not sent says of itself.
+			if (str(e.payload.findingCode) === VALIDATOR_EXECUTION_FAILED)
+				append(executionFailuresOf, assessmentId, str(e.payload.statement));
+		}
 	}
 	return {
 		byId: new Map(store.objects.map((o) => [o.id, o])),
@@ -1247,6 +1302,7 @@ function indexOf(store: StoreRows): Index {
 		correlationOf,
 		criteriaOf,
 		observationsOf,
+		executionFailuresOf,
 		content: store.content === null ? null : new Map(store.content.map((c) => [c.storageKey, c]))
 	};
 }
@@ -2092,7 +2148,7 @@ export function pairRun(token: string, exchanges: readonly StoredObject[]): Pair
  *   · ⛔ otherwise the SUBJECT RULE, over the reviews whose token names no call and the calls no review's token names — a
  *     record from before the key keeps exactly the refusal it had (`pairReview`): honest, never paired on a guess.
  */
-function pairingOf(ix: Index, review: StoredObject, reviewsOfSubject: readonly StoredObject[], calls: readonly StoredObject[]): Pairing {
+function pairingOfCalls(ix: Index, review: StoredObject, reviewsOfSubject: readonly StoredObject[], calls: readonly StoredObject[]): Pairing {
 	const subjectId = strs(review.state.subjectObjectIds)[0] ?? '';
 	const tokenOf = (a: StoredObject): string => ix.correlationOf.get(a.id) ?? '';
 	const token = tokenOf(review);
@@ -2110,6 +2166,20 @@ function pairingOf(ix: Index, review: StoredObject, reviewsOfSubject: readonly S
 			calls: []
 		};
 	return pairReview(subjectId, reviewsOfSubject.filter((r) => !named.has(tokenOf(r))).length, loose);
+}
+
+/**
+ * ⭐⭐ Package L5 — design D57 (`REG-D-149` (3); `REG-F-620`) — ONE REVIEW'S PAIRING (`pairingOfCalls`), A REVIEW NOT SENT TOLD
+ * APART: *"A review whose assessment carries `VALIDATOR_EXECUTION_FAILED` and no call reads `not-sent` in the pairing, its detail
+ * the validator's statement, in place of `no-answer-recorded`."* ⛔ NO CALL AT ALL: a review that sent one and recorded no
+ * conclusion reads `no-answer-recorded`, whatever its assessment carries; and one whose own assessment carries no refusal is still
+ * an orphan's (`REG-F-525`).
+ */
+function pairingOf(ix: Index, review: StoredObject, reviewsOfSubject: readonly StoredObject[], calls: readonly StoredObject[]): Pairing {
+	const paired = pairingOfCalls(ix, review, reviewsOfSubject, calls);
+	if (paired.label !== 'no-answer-recorded' || paired.calls.length > 0) return paired;
+	const refusals = ix.executionFailuresOf.get(review.id) ?? [];
+	return refusals.length === 0 ? paired : { ...paired, label: 'not-sent', detail: refusals.join(' | ') };
 }
 
 /** Why an assessment other than a Reasoning Review asked no model: what made it. */
@@ -2235,6 +2305,31 @@ function runLimitOf(checks: readonly LaneLimitCheck[], problems: string[]): numb
 	return checks.at(-1)?.limit ?? null;
 }
 
+/**
+ * ⭐⭐ Package L5 — design D57 (`REG-D-149` (2)) — the most characters of a whole prompt the selected reviewer was measured on: 31,755
+ * on case set v13, and 31,867 with Run A's three scratch `P14-` cases (D52). ⚠ The design's number, not the bound: the bound is
+ * `WHOLE_PROMPT_MAX`, 35,500, and a prompt of 31,868 to 35,500 characters is untested.
+ */
+export const MEASURED_WHOLE_PROMPT_MAX = 31_867;
+
+/** ⭐⭐ Package L5 — D57 — of the reviewer calls, the INITIAL ones, and their prompts' lengths as the content store holds them. */
+function untestedSizesOf(ix: Index, calls: readonly StoredObject[]): ReviewerCalls['untestedSizes'] {
+	const initial = calls.filter((x) => str(x.state.exchangeRole) === 'INITIAL');
+	const lengths = initial.flatMap((x) => {
+		const ref = rec(x.state.materializedInputRef);
+		if (contentVerdict(ref, ix.content) !== 'VERIFIED') return [];
+		const chars = ix.content?.get(str(ref.storageKey))?.actualChars;
+		return typeof chars === 'number' ? [chars] : [];
+	});
+	return {
+		measured: MEASURED_WHOLE_PROMPT_MAX,
+		initial: initial.length,
+		read: lengths.length,
+		over: lengths.filter((n) => n > MEASURED_WHOLE_PROMPT_MAX).length,
+		longest: lengths.length === 0 ? null : Math.max(...lengths)
+	};
+}
+
 function buildReviewerCalls(ix: Index, units: readonly Unit[], lane: LaneRows, problems: string[]): ReviewerCalls {
 	const assurance = ix.ofType('MODEL_EXCHANGE').filter((x) => str(x.state.plane) === 'ASSURANCE');
 	// ⭐⭐ Package Z2a — D51 (`REG-D-146`; design §12.3): *"The report keeps these local requests beside the reviewer calls; it never
@@ -2265,6 +2360,8 @@ function buildReviewerCalls(ix: Index, units: readonly Unit[], lane: LaneRows, p
 		},
 		// ⭐⭐ Package Z2a — D51 — beside the reviewer calls, never among them.
 		decisionModelRequests: assurance.length - calls.length,
+		// ⭐⭐ Package L5 — design D57 (`REG-D-149` (2)) — the initial calls whose prompt passed what the reviewer was measured on.
+		untestedSizes: untestedSizesOf(ix, calls),
 		laneLimitChecks,
 		// ⭐⭐ Package L2's check, finding 1 — ~~`LIMIT_CAVEAT`~~ the caveat of this run, by its Send check ⭐ and, package O (D27), by its
 		// own checks and the limit they used: a run recorded before package L reads its own lane's caveat.
@@ -3446,6 +3543,9 @@ function idsOfUnconcluded(r: PairingRow): string[] {
 	if (r.label === 'output-limit') ids.push('REG-F-563');
 	if (r.refusal === 'failed-repair') ids.push('REG-F-489', 'REG-F-428', 'REG-F-479');
 	if (r.label === 'no-answer-recorded') ids.push('REG-F-525');
+	// ⭐⭐ Package L5 — D57 — a review not sent bears on the entries its validator's own statement names: a D52 bound's refusal
+	// names `REG-D-146`. One that names none cites none: a break no register entry names yet.
+	if (r.label === 'not-sent') ids.push(...new Set(r.detail.match(/REG-[A-Z]-\d+/g) ?? []));
 	if (r.label === 'not-pairable') ids.push('REG-F-433');
 	if (r.subjectKind === 'command') ids.push('REG-F-520');
 	return ids;
@@ -4515,6 +4615,30 @@ function findingsOf(lane: LaneRows): { typeId: string; typeName: string; check: 
 	});
 }
 
+/** ⭐⭐ Package L5 — D57 — the authoring floor as `lane/run.json` holds it, read as recorded: no state, evaluator or refusal inferred. */
+function laneFloorOf(a: Record<string, unknown>): AuthoringSummary['laneFloor'] {
+	const policies = Array.isArray(a.floor) ? (a.floor as unknown[]).map(rec) : [];
+	return policies.map((p) => {
+		const parts = Array.isArray(p.parts) ? (p.parts as unknown[]).map(rec) : undefined;
+		return {
+			policyId: str(p.policyId),
+			state: str(p.state),
+			evaluator: str(p.evaluator) || null,
+			...(parts === undefined
+				? {}
+				: {
+						parts: parts.map((q) => ({
+							typeId: str(q.typeId),
+							typeName: str(q.typeName),
+							state: str(q.state),
+							evaluator: str(q.evaluator) || null,
+							refusals: strs(q.refusals)
+						}))
+					})
+		};
+	});
+}
+
 /** ⭐ E3 (C4, C5) — half B's authoring, as the report states it; null in half A. */
 function authoringSummary(ix: Index, lane: LaneRows, half: RunHalf): AuthoringSummary | null {
 	if (half !== 'B') return null;
@@ -4534,6 +4658,8 @@ function authoringSummary(ix: Index, lane: LaneRows, half: RunHalf): AuthoringSu
 			state: f.state,
 			...(f.parts === undefined ? {} : { parts: f.parts.map((p) => ({ typeId: p.typeId, typeName: p.typeName, state: p.state })) })
 		})),
+		// ⭐⭐ Package L5 — design D57 — and the floor as the lane recorded it, beside the store's.
+		laneFloor: laneFloorOf(a),
 		author: {
 			configured: str(rec(a.authorModel).configured) || null,
 			// ⭐ C3 — as the page's turn named it: the store records no author for a turn.
@@ -4770,6 +4896,31 @@ function matrixLines(r: RunReport): string[] {
 	];
 }
 
+/**
+ * ⭐⭐ Package L5 — design D57 — `REG-D-149` (2), verbatim: what each run report discloses of the prompts it counts. ⚠ A copy of the
+ * register's words; `verif/phase7-run-report.test.ts` reads them from the register and holds this to them.
+ */
+export const REG_D_149_2 =
+	'No new measurement. The selected reviewer was measured on prompts of at most 31,867 characters (D52), so a prompt of 31,868 to 35,500 is untested. It is disclosed: in the qualification record\'s ACKNOWLEDGED line for the fingerprint the bound moves, and in each run report, which counts the reviews whose prompt passed 31,867.';
+
+/** ⭐⭐ Package L5 — D57 — the reviewer-calls section's count of the prompts past what the reviewer was measured on. */
+function untestedSizeLines(u: ReviewerCalls['untestedSizes']): string[] {
+	const unread = u.initial - u.read;
+	const n = (v: number): string => String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+	return [
+		`- **Prompts longer than the ${n(u.measured)} characters the reviewer was measured on (design D57):** ${u.over} of the ` +
+			`${plural(u.read, 'initial reviewer call', 'initial reviewer calls')} whose prompt the record holds` +
+			`${u.longest === null ? '' : `; the longest, ${n(u.longest)} characters`}.`,
+		...(unread > 0
+			? [
+					`  - ${plural(unread, 'initial reviewer call has', 'initial reviewer calls have')} no prompt the record holds, so ` +
+						`${unread === 1 ? 'its length is' : 'their lengths are'} unknown.`
+				]
+			: []),
+		`  - REG-D-149 (2), verbatim: *"${REG_D_149_2}"*`
+	];
+}
+
 function unitLines(r: RunReport): string[] {
 	const limit = r.reviewerCalls.limit;
 	// ⭐ By the one rule (`runStanding`): ~~limit.under ? ', under it' : ', NOT under it'~~.
@@ -4798,6 +4949,8 @@ function unitLines(r: RunReport): string[] {
 		'',
 		`- **Recorded:** ${r.reviewerCalls.recorded} (${r.reviewerCalls.noResponse} with no response, ` +
 			`${r.reviewerCalls.retries} retries, ${r.reviewerCalls.repairs} repairs).`,
+		// ⭐⭐ Package L5 — design D57 (`REG-D-149` (2)) — and the prompts past what the reviewer was measured on.
+		...untestedSizeLines(r.reviewerCalls.untestedSizes),
 		// ⭐⭐ Package Z2a — D51 — and beside them, the decision model's requests, where the record holds any.
 		...(r.reviewerCalls.decisionModelRequests > 0
 			? [
@@ -4845,7 +4998,9 @@ function authoringLines(r: RunReport): string[] {
 			`${inParens(a.candidate.detail)}, ${a.candidate.hash ?? 'no hash'}.`,
 		`- **The authoring floor, as the store holds it:** ${a.floor.map((f) => `${f.policyId} ${f.state}`).join(', ') || 'none'}.`,
 		// ⭐ The review in parts, B6 — and its Reasoning Review by type: the complete part set of the round.
-		`- **Its reasoning review, by type:** ${a.floor.find((f) => f.policyId === REASONING_REVIEW)?.parts?.map((p) => `${p.typeName} ${p.state}`).join(', ') || 'no type'}.`,
+		`- **Its reasoning review, by type, as the store holds it:** ${a.floor.find((f) => f.policyId === REASONING_REVIEW)?.parts?.map((p) => `${p.typeName} ${p.state}`).join(', ') || 'no type'}.`,
+		// ⭐⭐ Package L5 — design D57 (`REG-F-620`) — labelled by its source, as the floor the lane recorded is beside it.
+		...laneFloorLines(a.laneFloor),
 		`- **The reviewer:** ${a.reviewer ?? 'none recorded'}. **The author:** ${a.author.resolved ?? 'none recorded'} ` +
 			`(configured: ${a.author.configured ?? 'unset'}).`,
 		// ⭐ R3-B F5 — ~~${a.acceptedHash ?? 'none'}~~: with no answer, none RECORDED, and the server may still have accepted one.
@@ -4857,6 +5012,20 @@ function authoringLines(r: RunReport): string[] {
 		),
 		'- **Measured as they are, and disclosed:**',
 		...a.caveats.map((c) => `  - ${c}`)
+	];
+}
+
+/** ⭐⭐ Package L5 — design D57 — the authoring floor as `lane/run.json` holds it: each policy, then the review's parts and refusals. */
+function laneFloorLines(floor: AuthoringSummary['laneFloor']): string[] {
+	const review = floor.find((f) => f.policyId === REASONING_REVIEW);
+	return [
+		`- **The authoring floor, as the lane recorded it (lane/run.json):** ${floor.map((f) => `${f.policyId} ${f.state}`).join(', ') || 'none recorded'}.`,
+		...(review?.parts === undefined
+			? []
+			: [
+					`- **Its reasoning review, by type, as the lane recorded it:** ${review.parts.map((p) => `${p.typeName} ${p.state}`).join(', ') || 'no type'}.`,
+					...review.parts.flatMap((p) => p.refusals.map((s) => `  - "${p.typeName}" refused: ${s}`))
+				])
 	];
 }
 

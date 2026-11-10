@@ -799,6 +799,10 @@ describe('JAN-EXEC P7-2 D9 — the run report over stores the product wrote, rea
 			// ⭐ P5 package A (F1) — a review that ended on a reply the tool cut at the model's output-token limit: none here.
 			'output-limit': 0,
 			refused: 0,
+			// ⛔ MOVED 2026-11-10 (`JAN-EXEC` Phase 7, package L5; design D57) — a label more: a review its validator refused
+			// before any call (`VALIDATOR_EXECUTION_FAILED`, no call), read in place of no-answer-recorded. None here: every
+			// review of this run sent its calls.
+			'not-sent': 0,
 			'no-answer-recorded': 0,
 			'not-pairable': 0
 		});

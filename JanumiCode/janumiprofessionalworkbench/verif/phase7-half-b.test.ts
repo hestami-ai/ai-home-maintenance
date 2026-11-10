@@ -4398,9 +4398,71 @@ describe('⭐⭐ The review in parts, B6 — the authoring’s spend reserve cou
 				}))
 			}
 		]);
+		// ⛔ MOVED 2026-11-10 (package L5, design D57): ~~'- **Its reasoning review, by type:** '~~ — labelled by its source, the
+		// store, beside the lane's own record of the floor.
 		expect(renderMarkdown(r)).toContain(
-			'- **Its reasoning review, by type:** Verify wordfreq end to end INCONCLUSIVE, Specify wordfreq SATISFIED, ' +
+			'- **Its reasoning review, by type, as the store holds it:** Verify wordfreq end to end INCONCLUSIVE, Specify wordfreq SATISFIED, ' +
 				'Build wordfreq SATISFIED, wordfreq Realization SATISFIED.'
 		);
+	});
+
+	// ⭐⭐ `JAN-EXEC` Phase 7, package L5 — design D57 (`REG-F-620`): *"Half B's section shows `lane/run.json`'s floor, each policy and
+	// each part with its state and any refusal statement, beside the store's, each labelled by its source."* ⛔ PREDICTED RED: at
+	// HEAD the report holds the store's floor alone — in P6 again's first run MISSING three times over, beside a lane record of 19
+	// parts SATISFIED and two refused.
+	it('⭐⭐ L5 (D57) — half B’s section shows the floor as the lane recorded it, each part’s state and refusal, beside the store’s, each labelled by its source', () => {
+		const REFUSED =
+			'This review was not sent: its whole prompt would be 33138 characters, past its bound of 33000 (REG-D-146; D52). ' +
+			'No indication is dropped to fit it, so the review is refused. No model was called.';
+		const recorded = [
+			{ policyId: 'floor.schema-invariant', state: 'SATISFIED', evaluator: 'floor.deterministic', producer: null },
+			{ policyId: 'floor.identity-provenance', state: 'SATISFIED', evaluator: 'floor.deterministic', producer: null },
+			{
+				policyId: 'floor.reasoning-review',
+				state: 'INCONCLUSIVE',
+				evaluator: 'devin/swe-2-max',
+				producer: null,
+				parts: [
+					{ typeId: 'pwutype_verify', typeName: 'Verify wordfreq end to end', state: 'INCONCLUSIVE', evaluator: 'evaluator', refusals: [REFUSED] },
+					{ typeId: 'pwutype_spec', typeName: 'Specify wordfreq', state: 'SATISFIED', evaluator: 'devin/swe-2-max' }
+				]
+			}
+		];
+		const lane = halfBLaneRows();
+		const run = lane.run as Record<string, unknown>;
+		const withFloor: LaneRows = { ...lane, run: { ...run, authoring: { ...(run.authoring as Record<string, unknown>), floor: recorded } } };
+		const r = buildRunReport(halfBStore(), withFloor, { accountNames: NAMES }).report;
+		expect(r.authoring?.laneFloor).toEqual([
+			{ policyId: 'floor.schema-invariant', state: 'SATISFIED', evaluator: 'floor.deterministic' },
+			{ policyId: 'floor.identity-provenance', state: 'SATISFIED', evaluator: 'floor.deterministic' },
+			{
+				policyId: 'floor.reasoning-review',
+				state: 'INCONCLUSIVE',
+				evaluator: 'devin/swe-2-max',
+				parts: [
+					{ typeId: 'pwutype_verify', typeName: 'Verify wordfreq end to end', state: 'INCONCLUSIVE', evaluator: 'evaluator', refusals: [REFUSED] },
+					{ typeId: 'pwutype_spec', typeName: 'Specify wordfreq', state: 'SATISFIED', evaluator: 'devin/swe-2-max', refusals: [] }
+				]
+			}
+		]);
+		const md = renderMarkdown(r);
+		expect(md).toContain(
+			'- **The authoring floor, as the lane recorded it (lane/run.json):** floor.schema-invariant SATISFIED, ' +
+				'floor.identity-provenance SATISFIED, floor.reasoning-review INCONCLUSIVE.'
+		);
+		expect(md).toContain(
+			'- **Its reasoning review, by type, as the lane recorded it:** Verify wordfreq end to end INCONCLUSIVE, Specify wordfreq SATISFIED.'
+		);
+		expect(md).toContain(`  - "Verify wordfreq end to end" refused: ${REFUSED}`);
+		expect(md, 'beside the store’s, each labelled by its source').toContain('- **The authoring floor, as the store holds it:** ');
+		expect(md).toContain('- **Its reasoning review, by type, as the store holds it:** ');
+	});
+
+	it('⛔ L5 (D57) CONTROL — a lane record holding no floor says none was recorded: the store’s floor is never shown as the lane’s', () => {
+		const r = buildRunReport(halfBStore(), halfBLaneRows(), { accountNames: NAMES }).report;
+		expect(r.authoring?.laneFloor).toEqual([]);
+		const md = renderMarkdown(r);
+		expect(md).toContain('- **The authoring floor, as the lane recorded it (lane/run.json):** none recorded.');
+		expect(md).not.toContain('Its reasoning review, by type, as the lane recorded it');
 	});
 });

@@ -170,6 +170,8 @@ export function readStores(archive: string): StoreRows {
 				purged: r.purged === 1,
 				actualHash: r.bytes === null ? null : `sha256:${createHash('sha256').update(r.bytes, 'utf8').digest('hex')}`,
 				actualSize: r.bytes === null ? null : Buffer.byteLength(r.bytes, 'utf8'),
+				// ⭐⭐ Package L5 — design D57 — and its length in characters, a JavaScript string's: the unit of D52's bounds.
+				actualChars: r.bytes === null ? null : r.bytes.length,
 				declaredWork: r.bytes === null ? null : declaredWorkShown(r.bytes)
 			}));
 		} finally {

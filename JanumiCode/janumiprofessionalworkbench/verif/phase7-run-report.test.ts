@@ -290,7 +290,9 @@ function aRun(
 			byteSize: text.length,
 			purged: false,
 			actualHash: fault === 'mismatch' ? `sha256:${sha('other bytes')}` : contentHash,
-			actualSize: text.length
+			actualSize: text.length,
+			// ⭐⭐ Package L5 — design D57 — and its length in characters, as the reader measures it: these texts are ASCII.
+			actualChars: text.length
 		});
 		return { status: 'STORED', storageKey: key, contentHash, byteSize: text.length };
 	};
@@ -4992,6 +4994,199 @@ describe('⭐⭐ P5 package B’s check (finding 2) — what the root’s review
 				`root: as intended — ${GIVEN_P5}; and what their prompts showed of it — pol_intent_preservation (1 call): the work ` +
 					`products of "Requirements", "Design" and no command, cut as the host declared: ${cut}`
 			);
+		},
+		120_000
+	);
+});
+
+// ⭐⭐ `JAN-EXEC` Phase 7, package L5 — design D57 (`DESIGN-data-flow-order-and-deliverable-review.md` §12.11; `REG-D-149` (2) and
+// (3); `REG-F-620`): the run report names each review refused before any call by its statement, and counts the initial reviewer
+// calls whose prompt passed what the reviewer was measured on. The authoring floor as the lane recorded it is
+// `phase7-half-b.test.ts`'s.
+describe('⭐⭐ package L5 — D57 — the run report says what was not sent, and what was untested', () => {
+	/** D52's whole-prompt refusal, worded as `reasoning-review-validator.ts` words it (`sectionOverBoundStatement`). */
+	const BOUND =
+		'This review was not sent: its whole prompt would be 35612 characters, past its bound of 35500 (REG-D-146; D52). ' +
+		'No indication is dropped to fit it, so the review is refused. No model was called.';
+	interface Observed {
+		readonly code: string;
+		readonly statement: string;
+		/** The assessment the observation is recorded on: the design work product's review unless said. */
+		readonly assessmentId?: string;
+	}
+	/** The design phase's work-product review recording `review`, its floor INCONCLUSIVE, the observations recorded as `observed`. */
+	const designRun = (observed: readonly Observed[], review: readonly Call[] = []) =>
+		aRun(
+			{ design: { review, workProductFloor: ['SATISFIED', 'SATISFIED', 'INCONCLUSIVE'] } },
+			{
+				extraEvents: observed.map((o, i) => ({
+					eventType: 'AssuranceObservationRecorded',
+					aggregateType: 'ASSURANCE_OBSERVATION',
+					aggregateId: `obs_design_${i}`,
+					commandId: null,
+					payload: {
+						assessmentId: o.assessmentId ?? 'asmt_art_design_2',
+						findingCode: o.code,
+						severity: 'MATERIAL',
+						statement: o.statement
+					}
+				}))
+			}
+		);
+	const designReview = (r: RunReport) => r.pairing.rows.find((p) => p.assessmentId === 'asmt_art_design_2');
+
+	// ⛔ PREDICTED RED: at HEAD the review reads `no-answer-recorded`, citing `REG-F-525` — "no ASSURANCE-plane exchange names the
+	// subject" — though the record misses nothing: its validator refused before any call, and said why.
+	it('⛔ a review its validator refused before any call reads NOT-SENT, its detail the refusal’s statement, citing what the statement names', () => {
+		const { report } = reportOf(designRun([{ code: 'VALIDATOR_EXECUTION_FAILED', statement: BOUND }]));
+		const row = designReview(report);
+		expect([row?.label, row?.detail, row?.calls.length]).toEqual(['not-sent', BOUND, 0]);
+		expect([report.pairing.counts['not-sent'], report.pairing.counts['no-answer-recorded']]).toEqual([1, 0]);
+		const four = cellOf(report, '4', 'design');
+		expect(four.value).toBe('broke');
+		expect(four.registerIds, 'the entry its refusal’s own statement names').toContain('REG-D-146');
+		expect(four.registerIds, 'an orphan’s finding, for a record that misses nothing').not.toContain('REG-F-525');
+		expect(four.basis).toContain('the review of work product art_design is not-sent');
+		// ⭐ A refusal that names no entry is not sent either, and cites none: a break no register entry names yet.
+		const other = reportOf(designRun([{ code: 'VALIDATOR_EXECUTION_FAILED', statement: 'The reviewer could not be started.' }])).report;
+		expect([designReview(other)?.label, designReview(other)?.detail]).toEqual(['not-sent', 'The reviewer could not be started.']);
+		expect(cellOf(other, '4', 'design').registerIds).not.toContain('REG-D-146');
+		expect(cellOf(other, '4', 'design').registerIds).not.toContain('REG-F-525');
+	});
+
+	it('⛔ CONTROL: with no refusal on its own assessment, a review with no call reads no-answer-recorded, citing REG-F-525, as before', () => {
+		const cases: readonly (readonly Observed[])[] = [
+			[],
+			[{ code: 'SCHEMA_INVALID', statement: 'Subject failed strict output-contract/schema validation.' }],
+			[{ code: 'VALIDATOR_EXECUTION_FAILED', statement: BOUND, assessmentId: 'asmt_art_design_0' }]
+		];
+		for (const observed of cases) {
+			const { report } = reportOf(designRun(observed));
+			expect(designReview(report)?.label, JSON.stringify(observed)).toBe('no-answer-recorded');
+			expect(cellOf(report, '4', 'design').registerIds, JSON.stringify(observed)).toContain('REG-F-525');
+		}
+	});
+
+	it('⛔ CONTROL: a review that recorded a call is never not-sent, whatever its assessment carries', () => {
+		const sent: Call[] = [{ role: 'INITIAL', disposition: 'REPAIR_REQUESTED', ordinal: 1, parse: 'JSON_PARSE_FAILED' }];
+		const { report } = reportOf(designRun([{ code: 'VALIDATOR_EXECUTION_FAILED', statement: BOUND }], sent));
+		expect([designReview(report)?.label, designReview(report)?.calls.length]).toEqual(['no-answer-recorded', 1]);
+	});
+
+	/** The register's own words: item `n` of entry `id`'s numbered list, verbatim. */
+	const registerItem = (id: string, n: number): string => {
+		const text = readFileSync(join(ROOT, 'docs', 'canon', 'JPWB-REG-005 Decision and Divergence Register.md'), 'utf8');
+		const from = text.indexOf(`\n### ${id} `);
+		expect(from, `arrangement: ${id} in the register`).toBeGreaterThan(0);
+		const end = text.indexOf('\n### ', from + 1);
+		const entry = text.slice(from, end === -1 ? undefined : end);
+		const line = entry.split(/\r?\n/).find((l) => l.startsWith(`  ${n}. `));
+		expect(line, `arrangement: ${id} (${n}) in the register`).toBeDefined();
+		return line!.slice(`  ${n}. `.length);
+	};
+	type Sized = Call & { readonly chars?: number | 'unretained' | 'mismatched' };
+	/**
+	 * A run whose phases' reviews made `calls`, each prompt `chars` characters long as the reader measured it — or not retained
+	 * (`PENDING_CONTENT_PLANE`), or its bytes not holding what its record claims.
+	 */
+	const sizedRun = (calls: Partial<Record<Slug, readonly Sized[]>>) => {
+		const run = aRun(
+			Object.fromEntries(Object.entries(calls).map(([slug, review]) => [slug, { review }])) as Partial<Record<Slug, PhaseKnobs>>
+		);
+		const sizeOf = (key: string): Sized['chars'] => {
+			const m = /^k_in_mex_art_(.+)_(\d+)$/.exec(key);
+			return m ? calls[m[1] as Slug]?.[Number(m[2])]?.chars : undefined;
+		};
+		const content = (run.store.content ?? []).map((c) => {
+			const chars = sizeOf(c.storageKey);
+			if (chars === 'mismatched') return { ...c, actualHash: `sha256:${sha('other bytes')}` };
+			return typeof chars === 'number' ? { ...c, actualChars: chars } : c;
+		});
+		const objects = run.store.objects.map((o) => {
+			const key = String((o.state.materializedInputRef as { readonly storageKey?: unknown } | undefined)?.storageKey ?? '');
+			return sizeOf(key) === 'unretained'
+				? { ...o, state: { ...o.state, materializedInputRef: { status: 'PENDING_CONTENT_PLANE', reason: 'not retained' } } }
+				: o;
+		});
+		return { ...run, store: { ...run.store, content, objects } };
+	};
+
+	// ⛔ PREDICTED RED: at HEAD the report holds no such count (`untestedSizes` is undefined), and report.md says nothing of it.
+	it('⭐ the initial reviewer calls whose prompt passed 31,867 characters are counted, the longest given, quoting REG-D-149 (2) verbatim', () => {
+		const { report } = reportOf(
+			sizedRun({
+				// at the measured maximum: not past it
+				requirements: [{ role: 'INITIAL', disposition: 'ACCEPTED', ordinal: 1, chars: 31_867 }],
+				// one past it; its retry, longer still, is no initial call
+				design: [
+					{ role: 'INITIAL', disposition: 'NO_RESPONSE', ordinal: 1, chars: 31_868 },
+					{ role: 'RETRY', disposition: 'ACCEPTED', ordinal: 2, chars: 40_000 }
+				],
+				// the decision model's request, longer still, is no reviewer call
+				implementation: [
+					{ role: 'INITIAL', disposition: 'ACCEPTED', ordinal: 1, provider: 'ollama', chars: 50_000 },
+					{ role: 'INITIAL', disposition: 'ACCEPTED', ordinal: 2, chars: 20_000 }
+				],
+				// a prompt the record does not hold: its length unknown, never short
+				'end-to-end': [{ role: 'INITIAL', disposition: 'ACCEPTED', ordinal: 1, chars: 'unretained' }]
+			})
+		);
+		expect(report.reviewerCalls.untestedSizes).toEqual({ measured: 31_867, initial: 4, read: 3, over: 1, longest: 31_868 });
+		const md = renderMarkdown(report);
+		expect(md).toContain(
+			'- **Prompts longer than the 31,867 characters the reviewer was measured on (design D57):** 1 of the 3 initial reviewer ' +
+				'calls whose prompt the record holds; the longest, 31,868 characters.'
+		);
+		expect(md).toContain('  - 1 initial reviewer call has no prompt the record holds, so its length is unknown.');
+		expect(md).toContain(`  - REG-D-149 (2), verbatim: *"${registerItem('REG-D-149', 2)}"*`);
+	});
+
+	it('⛔ CONTROL: a prompt whose bytes do not hold what its record claims is not read; with no content store, none is', () => {
+		const some = reportOf(
+			sizedRun({
+				requirements: [{ role: 'INITIAL', disposition: 'ACCEPTED', ordinal: 1, chars: 'mismatched' }],
+				design: [{ role: 'INITIAL', disposition: 'ACCEPTED', ordinal: 1, chars: 25_000 }]
+			})
+		).report;
+		expect(some.reviewerCalls.untestedSizes).toEqual({ measured: 31_867, initial: 4, read: 3, over: 0, longest: 25_000 });
+		const none = reportOf(aRun({}, { contentStore: false })).report;
+		expect(none.reviewerCalls.untestedSizes).toEqual({ measured: 31_867, initial: 4, read: 0, over: 0, longest: null });
+		const md = renderMarkdown(none);
+		expect(md).toContain(
+			'- **Prompts longer than the 31,867 characters the reviewer was measured on (design D57):** 0 of the 0 initial reviewer ' +
+				'calls whose prompt the record holds.'
+		);
+		expect(md).toContain('  - 4 initial reviewer calls have no prompt the record holds, so their lengths are unknown.');
+	});
+
+	// ⛔ PREDICTED RED: at HEAD the reader measures no characters, so the count reads no prompt. ⛔ And a reader counting BYTES would
+	// count the wide prompt past 31,867: 33,000 bytes in 11,000 characters.
+	it(
+		'⛔ the command line measures each prompt in characters, the bound’s unit, never its bytes',
+		() => {
+			const wide = '—'.repeat(11_000);
+			const long = 'p'.repeat(31_868);
+			const asStored = (key: string, text: string) => ({
+				status: 'STORED',
+				storageKey: key,
+				contentHash: `sha256:${sha(text)}`,
+				byteSize: Buffer.byteLength(text, 'utf8')
+			});
+			const run0 = aRun({});
+			const objects = run0.store.objects.map((o) => {
+				if (o.id === 'mex_art_design_0') return { ...o, state: { ...o.state, materializedInputRef: asStored('k_wide', wide) } };
+				if (o.id === 'mex_art_requirements_0') return { ...o, state: { ...o.state, materializedInputRef: asStored('k_long', long) } };
+				return o;
+			});
+			const run = runFolder({ ...run0.store, objects, content: null });
+			writeContentStore(join(run, 'lane', 'archive', '06-final', 'demo.sqlite.content.sqlite'), [
+				{ storageKey: 'k_wide', bytes: wide },
+				{ storageKey: 'k_long', bytes: long }
+			]);
+			const r = cli([run]);
+			expect(r.code, r.out).toBe(0);
+			const report = JSON.parse(readFileSync(join(run, 'lane', 'report', 'report.json'), 'utf8')) as RunReport;
+			expect(report.reviewerCalls.untestedSizes).toEqual({ measured: 31_867, initial: 4, read: 2, over: 1, longest: 31_868 });
 		},
 		120_000
 	);
